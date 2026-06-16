@@ -114,7 +114,8 @@ describe('handleBotSlash', () => {
     const root = mkdtempSync(join(tmpdir(), 'botcmd-hub-'));
     try {
       mkdirSync(join(root, '.deckent', 'autonomous'), { recursive: true });
-      writeFileSync(join(root, '.deckent', 'nervous-pending.json'),
+      mkdirSync(join(root, '.deckent', 'nervous'), { recursive: true });
+      writeFileSync(join(root, '.deckent', 'nervous', 'nervous-pending.json'),
         JSON.stringify([{ id: 'n7', title: 'Directives changed' }]));
       writeFileSync(join(root, '.deckent', 'autonomous', 'pending.json'),
         JSON.stringify([{ triggerId: 't-42', action: 'autonomous.execute', requestedBy: 'system', enqueuedAt: 'x' }]));

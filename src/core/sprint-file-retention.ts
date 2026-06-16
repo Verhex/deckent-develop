@@ -1,8 +1,9 @@
 /**
  * Sprint File Retention — Hybrid keep_last_n + size_cap_mb policy.
  *
- * Sprint-prefixed files in .deckent/ (events, seq, checkpoint, gate, pre-archive)
- * accumulate indefinitely without this module. Retention enforces:
+ * Sprint-prefixed files in .deckent/recently-works/ (events, seq, checkpoint,
+ * gate, pre-archive) accumulate indefinitely without this module. Retention
+ * enforces:
  *  1. keep_last_n: keep the N most-recent sprints, archive older ones
  *  2. size_cap_mb: if total sprint file size exceeds cap, archive oldest first
  *  3. Counter cleanup: -seq and -checkpoint-seq files are deleted on sprint DONE
@@ -17,7 +18,18 @@ import {
   readFileSync, writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import { RECENT_WORKS_DIR } from './constants.js';
 import type { SprintFileRetentionConfig } from './config-types.js';
+
+/**
+ * Directory scanned for sprint-prefixed machine artifacts. Sprint-NNN-*.jsonl /
+ * -seq / -gate.json / -pre-archive.* now live under `.deckent/recently-works/`
+ * (purpose-folder de-scatter). The archive TARGET (`archive_path`) and forensic
+ * TARGET (`docs/audits/`) are unchanged.
+ */
+function sprintArtifactsDir(root: string): string {
+  return join(root, RECENT_WORKS_DIR);
+}
 
 // ─── Constants ────────────────────────────────────────────────────────
 
@@ -60,7 +72,7 @@ const FORENSIC_PATTERNS = [
 export interface RetentionResult {
   /** Files moved to archive */
   archived: string[];
-  /** Sprint IDs kept in .deckent/ root */
+  /** Sprint IDs kept in .deckent/recently-works/ */
   kept: string[];
   /** Counter files deleted */
   countersDeleted: string[];
@@ -103,9 +115,9 @@ function isCounterFile(filename: string): boolean {
   return COUNTER_PATTERNS.some(re => re.test(filename));
 }
 
-/** List all sprint-prefixed files in .deckent/ root (not subdirectories). */
+/** List all sprint-prefixed files in .deckent/recently-works/ (not subdirectories). */
 export function listSprintFiles(root: string): string[] {
-  const deckentDir = join(root, '.deckent');
+  const deckentDir = sprintArtifactsDir(root);
   if (!existsSync(deckentDir)) return [];
   return readdirSync(deckentDir).filter(f => {
     const fullPath = join(deckentDir, f);
@@ -115,9 +127,9 @@ export function listSprintFiles(root: string): string[] {
   });
 }
 
-/** List all forensic sprint files in .deckent/ root. */
+/** List all forensic sprint files in .deckent/recently-works/. */
 export function listForensicFiles(root: string): string[] {
-  const deckentDir = join(root, '.deckent');
+  const deckentDir = sprintArtifactsDir(root);
   if (!existsSync(deckentDir)) return [];
   return readdirSync(deckentDir).filter(f => {
     if (!f.startsWith('sprint-')) return false;
@@ -141,7 +153,7 @@ export function groupBySprintId(files: string[]): Record<string, string[]> {
 
 /** Calculate total size in bytes of sprint files. */
 function calculateTotalSize(root: string, files: string[]): number {
-  const deckentDir = join(root, '.deckent');
+  const deckentDir = sprintArtifactsDir(root);
   let total = 0;
   for (const f of files) {
     try { total += statSync(join(deckentDir, f)).size; } catch { /* skip */ }
@@ -156,7 +168,7 @@ function calculateTotalSize(root: string, files: string[]): number {
  * These are ephemeral counters whose state is already captured in checkpoint.json.
  */
 export function cleanupCounters(root: string, sprintId: string): string[] {
-  const deckentDir = join(root, '.deckent');
+  const deckentDir = sprintArtifactsDir(root);
   const deleted: string[] = [];
   if (!existsSync(deckentDir)) return deleted;
 
@@ -190,7 +202,7 @@ export function migrateForensicFiles(root: string): string[] {
     const targetDir = join(root, 'docs', 'audits', sprintId);
     mkdirSync(targetDir, { recursive: true });
 
-    const srcPath = join(root, '.deckent', f);
+    const srcPath = join(sprintArtifactsDir(root), f);
     // Strip sprint prefix for cleaner filenames in audit dir
     const cleanName = f.replace(`${sprintId}-`, '');
     const dstPath = join(targetDir, cleanName);
@@ -216,7 +228,7 @@ export function migrateForensicFiles(root: string): string[] {
  * Enforce sprint file retention policy.
  *
  * Strategy:
- * 1. List all sprint-prefixed machine files in .deckent/
+ * 1. List all sprint-prefixed machine files in .deckent/recently-works/
  * 2. Group by sprint ID, sort chronologically
  * 3. Apply keep_last_n — sprints beyond window are archived
  * 4. Apply size_cap_mb — if remaining files exceed cap, archive more
@@ -278,7 +290,7 @@ export function enforceRetention(
   }
 
   // Step 5: Execute archival
-  const deckentDir = join(root, '.deckent');
+  const deckentDir = sprintArtifactsDir(root);
 
   for (const sprintId of archiveSet) {
     const archiveDir = join(root, resolved.archive_path, sprintId);

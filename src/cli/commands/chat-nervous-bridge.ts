@@ -13,9 +13,10 @@
 
 import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { getLanguage, getMessage } from '../helpers/messages.js';
 import type { NervousNotification } from '../../core/nervous-types.js';
+import { NERVOUS_PENDING_FILE, NERVOUS_HISTORY_FILE, NERVOUS_IPC_DIR } from '../../core/constants.js';
 
 // ─── ANSI (Node built-in, ADR-010) ──────────────────────────────────────────
 
@@ -40,15 +41,15 @@ function severityPrefix(severity: string): string {
 // ─── File I/O Helpers ─────────────────────────────────────────────────────────
 
 function pendingPath(root: string): string {
-  return join(root, '.deckent', 'nervous-pending.json');
+  return join(root, NERVOUS_PENDING_FILE);
 }
 
 function historyPath(root: string): string {
-  return join(root, '.deckent', 'nervous-history.jsonl');
+  return join(root, NERVOUS_HISTORY_FILE);
 }
 
 function writePendingNervous(root: string, notifications: NervousNotification[]): void {
-  const dir = join(root, '.deckent');
+  const dir = dirname(pendingPath(root));
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(pendingPath(root), JSON.stringify(notifications, null, 2) + '\n', 'utf-8');
 }
@@ -58,7 +59,7 @@ function appendNervousHistory(
   notification: NervousNotification,
   decision: 'accepted' | 'rejected',
 ): void {
-  const dir = join(root, '.deckent');
+  const dir = dirname(historyPath(root));
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   const record = {
     id: `bridge-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -87,8 +88,8 @@ function writeIpcApprovalSync(
   modifiedPayload: Record<string, unknown>,
 ): void {
   try {
-    const pendingDir = join(root, '.deckent', 'nervous-ipc', 'pending');
-    const resolvedDir = join(root, '.deckent', 'nervous-ipc', 'resolved');
+    const pendingDir = join(root, NERVOUS_IPC_DIR, 'pending');
+    const resolvedDir = join(root, NERVOUS_IPC_DIR, 'resolved');
     mkdirSync(pendingDir, { recursive: true });
     mkdirSync(resolvedDir, { recursive: true });
     const safeId = notificationId.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 64) || 'unknown';

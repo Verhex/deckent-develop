@@ -15,7 +15,7 @@ import { z } from 'zod';
 import { readJsonSafe } from '../core/utils.js';
 import { parseOidcClaims } from '../core/auth-oidc.js';
 import { writeAuditEvent } from '../core/audit-writer.js';
-import { PROJECT_CONFIG_PATH } from '../core/constants.js';
+import { PROJECT_CONFIG_PATH, RECENT_WORKS_DIR } from '../core/constants.js';
 import { PERMISSION_MATRIX, isValidRole, type Role } from '../core/rbac.js';
 import { isValidTenantId } from '../core/tenant-context.js';
 import { readAuditEvents, queryAudit } from '../core/audit-query.js';
@@ -151,9 +151,9 @@ function listRbacRoles(): RbacRole[] {
 
 // ─── Audit ───────────────────────────────────────────────────────────
 
-/** Latest sprint id with an event stream file (.deckent/<sprintId>-events.jsonl). */
+/** Latest sprint id with an event stream file (.deckent/recently-works/<sprintId>-events.jsonl). */
 function latestEventSprintId(projectRoot: string): string | null {
-  const deckentDir = join(projectRoot, '.deckent');
+  const deckentDir = join(projectRoot, RECENT_WORKS_DIR);
   if (!existsSync(deckentDir)) return null;
   try {
     const ids = readdirSync(deckentDir)

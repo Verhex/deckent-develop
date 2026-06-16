@@ -10,7 +10,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DetectorContext, DetectorResult } from '../../core/nervous-types.js';
-import { DECKENT_DIR } from '../../core/constants.js';
+import { RECENT_WORKS_DIR } from '../../core/constants.js';
 
 const DEFAULT_THRESHOLD_MS = 600_000; // 10 dakika
 
@@ -125,7 +125,7 @@ function readLastEventTimestamp(
   projectRoot: string,
   sprintId: string,
 ): number | null {
-  const filePath = join(projectRoot, DECKENT_DIR, `${sprintId}-events.jsonl`);
+  const filePath = join(projectRoot, RECENT_WORKS_DIR, `${sprintId}-events.jsonl`);
   if (!existsSync(filePath)) {
     return null;
   }

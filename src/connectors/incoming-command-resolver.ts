@@ -18,6 +18,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { NERVOUS_PENDING_FILE } from '../core/constants.js';
 import { makeApprovalGate } from '../orchestra/autonomous/approval-adapter.js';
 import { NervousIpcQueue } from '../nervous/ipc-queue.js';
 import { getMessage } from '../cli/helpers/messages.js';
@@ -41,7 +42,7 @@ export interface CommandResolverDeps {
 }
 
 function readNervousPendingFile(root: string): NervousPendingLike[] {
-  const path = join(root, '.deckent', 'nervous-pending.json');
+  const path = join(root, NERVOUS_PENDING_FILE);
   if (!existsSync(path)) return [];
   try {
     const data: unknown = JSON.parse(readFileSync(path, 'utf-8'));

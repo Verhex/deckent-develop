@@ -80,7 +80,7 @@ describe('invalidateDocCache', () => {
 describe('cleanIpcDirs', () => {
   it('removes IPC files older than the cutoff, keeps fresh ones', () => {
     const r = makeRoot();
-    const resolved = join(r, '.deckent', 'panic-ipc', 'resolved');
+    const resolved = join(r, '.deckent', 'nervous', 'panic-ipc', 'resolved');
     mkdirSync(resolved, { recursive: true });
     const oldFile = join(resolved, 'old.json');
     const freshFile = join(resolved, 'fresh.json');
@@ -105,8 +105,8 @@ describe('cleanIpcDirs', () => {
 describe('pruneDeadEventStream', () => {
   it('drops corrupt lines and rewrites, keeping valid JSON events', () => {
     const r = makeRoot();
-    mkdirSync(join(r, '.deckent'), { recursive: true });
-    const path = join(r, '.deckent', 'sprint-001-events.jsonl');
+    mkdirSync(join(r, '.deckent', 'recently-works'), { recursive: true });
+    const path = join(r, '.deckent', 'recently-works', 'sprint-001-events.jsonl');
     writeFileSync(path, '{"seq":1}\nNOT-JSON\n{"seq":2}\n{bad\n', 'utf-8');
     const dropped = pruneDeadEventStream(r, 'sprint-001');
     expect(dropped).toBe(2);

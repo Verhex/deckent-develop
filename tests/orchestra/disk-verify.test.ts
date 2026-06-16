@@ -370,7 +370,7 @@ describe('restoreSprintFromCheckpoint — disk-verify recovery gate', () => {
     restoreSprintFromCheckpoint(projectRoot, sprintId);
 
     // Verify the audit event appears in the sprint event stream.
-    const eventsPath = join(projectRoot, '.deckent', `${sprintId}-events.jsonl`);
+    const eventsPath = join(projectRoot, '.deckent', 'recently-works', `${sprintId}-events.jsonl`);
     expect(existsSync(eventsPath)).toBe(true);
     const raw = readFileSync(eventsPath, 'utf-8');
     const lines = raw.split('\n').filter(l => l.trim().length > 0);
@@ -591,7 +591,7 @@ describe('Sprint 197 197-001 — untracked file gate invariants', () => {
       expect(taskJson.status).toBe(TaskStatus.MANUAL_REVIEW_REQUIRED);
 
       // Audit event must be emitted with the untracked path in the payload.
-      const eventsPath = join(projectRoot, '.deckent', `${sprintId}-events.jsonl`);
+      const eventsPath = join(projectRoot, '.deckent', 'recently-works', `${sprintId}-events.jsonl`);
       expect(existsSync(eventsPath)).toBe(true);
       const raw = readFileSync(eventsPath, 'utf-8');
       const events = raw.split('\n').filter(l => l.trim().length > 0).map(l =>

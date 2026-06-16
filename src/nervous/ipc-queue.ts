@@ -19,6 +19,7 @@ import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
+import { NERVOUS_IPC_DIR } from '../core/constants.js';
 
 // ─── Nervous Poller Liveness (APPROVE-007, §4G) ───────────────────────────────
 //
@@ -29,7 +30,7 @@ import { basename, dirname, join } from 'node:path';
 
 /** Heartbeat file path under the nervous IPC dir. */
 export function heartbeatPath(projectRoot: string): string {
-  return join(projectRoot, '.deckent', 'nervous-ipc', 'heartbeat');
+  return join(projectRoot, NERVOUS_IPC_DIR, 'heartbeat');
 }
 
 /** Stamp the heartbeat with the current time (best-effort, never throws). */
@@ -128,7 +129,7 @@ export class NervousIpcQueue {
   private readonly resolvedDir: string;
 
   constructor(projectRoot: string) {
-    this.baseDir = join(projectRoot, '.deckent', 'nervous-ipc');
+    this.baseDir = join(projectRoot, NERVOUS_IPC_DIR);
     this.pendingDir = join(this.baseDir, 'pending');
     this.resolvedDir = join(this.baseDir, 'resolved');
   }

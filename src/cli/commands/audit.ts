@@ -10,7 +10,7 @@ import { createSyslogSiemTransport, type SyslogSendImpl } from '../../core/siem-
 import { planRetention, type RetentionPolicy } from '../../core/audit-retention.js';
 import { AUDIT_EVENT_CHANNEL, type AuditEventPayload } from '../../core/audit-writer.js';
 import { readEvents } from '../../orchestra/event-stream.js';
-import { DECKENT_DIR } from '../../core/constants.js';
+import { RECENT_WORKS_DIR } from '../../core/constants.js';
 import { loadConfig } from '../../core/config.js';
 import { print, printError } from '../helpers/output.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
@@ -226,7 +226,7 @@ export function runAuditRetention(
   // after the prune partition — both are contiguous head slices of the audit
   // index list, mirroring planRetention's [ prune | archive | keep ] layout.
   if (plan.archive.length > 0) {
-    const archivePath = join(root, DECKENT_DIR, `${sprintId}-events-archive.jsonl`);
+    const archivePath = join(root, RECENT_WORKS_DIR, `${sprintId}-events-archive.jsonl`);
     const archivedLines = auditIndices
       .slice(plan.prune.length, dropCount)
       .map((i) => JSON.stringify(all[i]!));
@@ -238,7 +238,7 @@ export function runAuditRetention(
   // all non-audit events and the keep partition in original stream order.
   const dropSet = new Set(auditIndices.slice(0, dropCount));
   const kept = all.filter((_, i) => !dropSet.has(i));
-  const streamPath = join(root, DECKENT_DIR, `${sprintId}-events.jsonl`);
+  const streamPath = join(root, RECENT_WORKS_DIR, `${sprintId}-events.jsonl`);
   const tmpPath = `${streamPath}.tmp`;
   writeFileSync(tmpPath, kept.length > 0 ? kept.map((e) => JSON.stringify(e)).join('\n') + '\n' : '', 'utf-8');
   renameSync(tmpPath, streamPath);
@@ -433,10 +433,10 @@ export function registerAudit(program: Command): void {
       try {
         const result = await runSelfAuditGate(sprintId, root);
 
-        // Write gate result to .deckent/<sprint-id>-gate.json
-        const deckentDir = join(root, '.deckent');
-        if (!existsSync(deckentDir)) mkdirSync(deckentDir, { recursive: true });
-        const gatePath = join(deckentDir, `${sprintId}-gate.json`);
+        // Write gate result to .deckent/recently-works/<sprint-id>-gate.json
+        const recentWorksDir = join(root, RECENT_WORKS_DIR);
+        if (!existsSync(recentWorksDir)) mkdirSync(recentWorksDir, { recursive: true });
+        const gatePath = join(recentWorksDir, `${sprintId}-gate.json`);
         writeFileSync(gatePath, JSON.stringify(result, null, 2) + '\n', 'utf-8');
 
         if (opts.json) {

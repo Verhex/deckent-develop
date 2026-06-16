@@ -1,12 +1,12 @@
 // ═══ deckent features — Feature Manifest CLI ══════════════════════════════
 // Sprint 150 Task 029 — Feature Manifest Canlılaştırma
-// Lists features by category from .deckent/features-manifest.json
+// Lists features by category from .deckent/settings/features-manifest.json
 // ADR-022-V2: CLI/MCP parity with deckent_feature_query MCP tool
 
 import { Command } from 'commander';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { DECKENT_DIR } from '../../core/constants.js';
+import { FEATURES_MANIFEST_FILE } from '../../core/constants.js';
 
 interface FeatureEntry {
   id: string;
@@ -35,7 +35,7 @@ type FeatureCategory = 'active' | 'lightly_used' | 'dormant' | 'dead' | 'all';
 const VALID_CATEGORIES: FeatureCategory[] = ['active', 'lightly_used', 'dormant', 'dead', 'all'];
 
 function loadManifest(root: string): FeaturesManifest | null {
-  const manifestPath = join(root, DECKENT_DIR, 'features-manifest.json');
+  const manifestPath = join(root, FEATURES_MANIFEST_FILE);
   if (!existsSync(manifestPath)) return null;
   try {
     return JSON.parse(readFileSync(manifestPath, 'utf-8')) as FeaturesManifest;
@@ -85,7 +85,7 @@ function formatTable(entries: Array<FeatureEntry & { category: string }>): strin
 export function registerFeatures(program: Command): void {
   program
     .command('features')
-    .description('List features from .deckent/features-manifest.json by category')
+    .description('List features from .deckent/settings/features-manifest.json by category')
     .option('-c, --category <category>', 'Filter by category: active, lightly_used, dormant, dead, all', 'all')
     .option('--json', 'Output as JSON')
     .option('--id <featureId>', 'Show details for a specific feature')

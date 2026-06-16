@@ -6,6 +6,7 @@
 
 import { appendFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { RECENT_WORKS_DIR } from './constants.js';
 import { ErrorRegistry } from './errors.js';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -115,7 +116,7 @@ export function getPerSprintMetricsPath(projectRoot?: string, sprintId?: string)
   const root = projectRoot ?? _projectRoot;
   const sid = sprintId ?? _sprintId;
   if (!root || !sid) return null;
-  return join(root, METRICS_DIR, `${sid}-metrics.jsonl`);
+  return join(root, RECENT_WORKS_DIR, `${sid}-metrics.jsonl`);
 }
 
 /**
@@ -470,6 +471,10 @@ function appendEntry(entry: ObservabilityEntry): void {
     if (_perSprintFile && _sprintId) {
       const perSprintPath = getPerSprintMetricsPath(_projectRoot, _sprintId);
       if (perSprintPath) {
+        const perSprintDir = dirname(perSprintPath);
+        if (!existsSync(perSprintDir)) {
+          mkdirSync(perSprintDir, { recursive: true });
+        }
         appendFileSync(perSprintPath, JSON.stringify(taggedEntry) + '\n', 'utf-8');
       }
     }

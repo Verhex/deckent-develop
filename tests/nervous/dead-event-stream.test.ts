@@ -66,7 +66,7 @@ function writeEventToStream(
   sprintId: string,
   timestampMs: number,
 ): void {
-  const deckentDir = join(projectRoot, '.deckent');
+  const deckentDir = join(projectRoot, '.deckent', 'recently-works');
   mkdirSync(deckentDir, { recursive: true });
   const filePath = join(deckentDir, `${sprintId}-events.jsonl`);
   const event = {

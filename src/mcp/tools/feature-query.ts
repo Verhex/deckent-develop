@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { DECKENT_DIR } from '../../core/constants.js';
+import { FEATURES_MANIFEST_FILE } from '../../core/constants.js';
 
 interface FeatureEntry {
   id: string;
@@ -30,7 +30,7 @@ interface FeaturesManifest {
 }
 
 function readManifest(root: string): FeaturesManifest | null {
-  const manifestPath = join(root, DECKENT_DIR, 'features-manifest.json');
+  const manifestPath = join(root, FEATURES_MANIFEST_FILE);
   if (!existsSync(manifestPath)) return null;
   try {
     return JSON.parse(readFileSync(manifestPath, 'utf-8')) as FeaturesManifest;
@@ -47,7 +47,7 @@ export function registerFeatureQueryTool(server: McpServer): void {
       description:
         'Query the Deckent feature manifest — list features by category (active, lightly_used, dormant, dead, all) ' +
         'or look up a specific feature by ID. Returns feature metadata including files, description, and category. ' +
-        'Reads from .deckent/features-manifest.json. Run `node scripts/sync-manifest.mjs` to regenerate.',
+        'Reads from .deckent/settings/features-manifest.json. Run `node scripts/sync-manifest.mjs` to regenerate.',
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

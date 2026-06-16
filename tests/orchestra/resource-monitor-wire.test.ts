@@ -99,7 +99,7 @@ describe('createAndStartResourceMonitor', () => {
     );
 
     expect(captured?.intervalMs).toBe(2000);
-    expect(captured?.logPath).toBe(join(tmpRoot, '.deckent', 'resource-log.jsonl'));
+    expect(captured?.logPath).toBe(join(tmpRoot, '.deckent', 'settings', 'resource-log.jsonl'));
   });
 
   it('honors a custom log_path (resolved under project root)', () => {

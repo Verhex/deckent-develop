@@ -16,7 +16,7 @@
 
 import { appendFileSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { DECKENT_DIR } from './constants.js';
+import { DECKENT_DIR, RECENT_WORKS_DIR } from './constants.js';
 import { debugLog } from './utils.js';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -176,11 +176,11 @@ export type ChannelCode = typeof CHANNELS[keyof typeof CHANNELS];
 // ─── Path Helpers ────────────────────────────────────────────────
 
 function eventsFilePath(projectRoot: string, sprintId: string): string {
-  return join(projectRoot, DECKENT_DIR, `${sprintId}-events.jsonl`);
+  return join(projectRoot, RECENT_WORKS_DIR, `${sprintId}-events.jsonl`);
 }
 
 function sequenceFilePath(projectRoot: string, sprintId: string): string {
-  return join(projectRoot, DECKENT_DIR, `${sprintId}-seq`);
+  return join(projectRoot, RECENT_WORKS_DIR, `${sprintId}-seq`);
 }
 
 // ─── Sequence Counter ────────────────────────────────────────────
@@ -271,9 +271,9 @@ export function writeEvent(
       }
     }
 
-    const deckentDir = join(projectRoot, DECKENT_DIR);
-    if (!existsSync(deckentDir)) {
-      mkdirSync(deckentDir, { recursive: true });
+    const recentWorksDir = join(projectRoot, RECENT_WORKS_DIR);
+    if (!existsSync(recentWorksDir)) {
+      mkdirSync(recentWorksDir, { recursive: true });
     }
 
     const sequence = nextSequence(projectRoot, sprintId);

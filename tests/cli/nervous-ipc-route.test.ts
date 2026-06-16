@@ -40,17 +40,17 @@ function notif(id: string): NervousNotification {
 }
 
 function plantPending(root: string, id: string): void {
-  mkdirSync(join(root, '.deckent'), { recursive: true });
-  writeFileSync(join(root, '.deckent', 'nervous-pending.json'), JSON.stringify([notif(id)]), 'utf-8');
+  mkdirSync(join(root, '.deckent', 'nervous'), { recursive: true });
+  writeFileSync(join(root, '.deckent', 'nervous', 'nervous-pending.json'), JSON.stringify([notif(id)]), 'utf-8');
 }
 
 function readPending(root: string): unknown[] {
-  const p = join(root, '.deckent', 'nervous-pending.json');
+  const p = join(root, '.deckent', 'nervous', 'nervous-pending.json');
   return existsSync(p) ? JSON.parse(readFileSync(p, 'utf-8')) : [];
 }
 
 function ipcPendingCount(root: string): number {
-  const dir = join(root, '.deckent', 'nervous-ipc', 'pending');
+  const dir = join(root, '.deckent', 'nervous', 'nervous-ipc', 'pending');
   return existsSync(dir) ? readdirSync(dir).filter(f => f.endsWith('.json')).length : 0;
 }
 
@@ -95,7 +95,7 @@ describe('APPROVE-007 — CLI nervous IPC routing + liveness', () => {
     expect(ipcPendingCount(mockRoot)).toBe(0);            // no IPC routing
     expect(readPending(mockRoot)).toHaveLength(0);        // dismissed from pending
     expect(out.toLowerCase()).toContain('no live');
-    const hist = join(mockRoot, '.deckent', 'nervous-history.jsonl');
+    const hist = join(mockRoot, '.deckent', 'nervous', 'nervous-history.jsonl');
     const histContent = existsSync(hist) ? readFileSync(hist, 'utf-8') : '';
     expect(histContent).not.toContain('"decision":"accepted"'); // no audit lie
   });

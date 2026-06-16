@@ -100,8 +100,8 @@ describe('autonomous CLI i18n (228-001)', () => {
   });
 
   it('recent-audit header uses i18n with {count}', async () => {
-    const eventsFile = join(root, '.deckent', 'autonomous-events.jsonl');
-    mkdirSync(join(root, '.deckent'), { recursive: true });
+    const eventsFile = join(root, '.deckent', 'recently-works', 'autonomous-events.jsonl');
+    mkdirSync(join(root, '.deckent', 'recently-works'), { recursive: true });
     writeFileSync(eventsFile, JSON.stringify({
       timestamp: '2026-06-04T00:00:00.000Z',
       payload: {

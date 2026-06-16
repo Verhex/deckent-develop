@@ -18,14 +18,32 @@ export const CLAUDE_RULES_DIR = join('.claude', 'rules');
 export const WORKSPACE_DIR = join(DECKENT_DIR, 'workspace');
 export const PLUGINS_DIR = join(DECKENT_DIR, 'plugins');
 export const I18N_DIR = join(DECKENT_DIR, 'i18n');
-export const JOBS_DIR = join(DECKENT_DIR, 'jobs');
-export const DECISIONS_LOG_DIR = join(DECKENT_DIR, 'decisions');
+// ─── Purpose-folder roots (de-scatter: settings = config-like JSON,
+//     runtime = ephemeral per-run state, nervous = nervous-system files) ──
+export const SETTINGS_DIR = join(DECKENT_DIR, 'settings');
+export const RUNTIME_DIR = join(DECKENT_DIR, 'runtime');
+export const JOBS_DIR = join(RUNTIME_DIR, 'jobs');
+export const DECISIONS_LOG_DIR = join(RUNTIME_DIR, 'decisions');
 // Sprint 157 T-001: per-attempt forensic record of every Brain evaluation
 // decision. Layout: <EVALUATIONS_DIR>/<sprintId>/<taskId>-attempt-<N>.json
 // (see src/orchestra/evaluation-audit-trail.ts). Auditor-readable, append-
 // only (overwrites at the same attemptNum slot).
-export const EVALUATIONS_DIR = join(DECKENT_DIR, 'evaluations');
-export const DOCS_CONFIG_FILE = join(DECKENT_DIR, 'docs.json');
+export const EVALUATIONS_DIR = join(RUNTIME_DIR, 'evaluations');
+export const DOCS_CONFIG_FILE = join(SETTINGS_DIR, 'docs.json');
+export const FEATURES_MANIFEST_FILE = join(SETTINGS_DIR, 'features-manifest.json');
+export const RESOURCE_LOG_FILE = join(SETTINGS_DIR, 'resource-log.jsonl');
+// ─── Nervous System runtime files (ADR-040) ──────────────────────────
+// All nervous-system runtime artifacts live under one purpose-folder.
+// NOTE: observer.ts `isObserverNoiseFile` matches these via substring
+// (`nervous-`, `nervous-ipc`, `panic-ipc`) — the new paths still satisfy it.
+export const NERVOUS_DIR = join(DECKENT_DIR, 'nervous');
+export const NERVOUS_LOG_FILE = join(NERVOUS_DIR, 'nervous-log.jsonl');
+export const NERVOUS_HISTORY_FILE = join(NERVOUS_DIR, 'nervous-history.jsonl');
+export const NERVOUS_PENDING_FILE = join(NERVOUS_DIR, 'nervous-pending.json');
+export const NERVOUS_IPC_DIR = join(NERVOUS_DIR, 'nervous-ipc');
+export const PANIC_IPC_DIR = join(NERVOUS_DIR, 'panic-ipc');
+// ─── Per-sprint ephemeral artifacts (events, metrics, gate, archives) ──
+export const RECENT_WORKS_DIR = join(DECKENT_DIR, 'recently-works');
 export const MEMORY_DB_FILE = 'memory.db' as const;
 export const MEMORY_EXPORTS_DIR = 'exports' as const;
 export const DASHBOARD_FILE = '.dashboard' as const;

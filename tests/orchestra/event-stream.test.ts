@@ -22,7 +22,7 @@ describe('event-stream', () => {
 
   beforeEach(() => {
     testRoot = join(tmpdir(), `deckent-event-stream-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    mkdirSync(join(testRoot, '.deckent'), { recursive: true });
+    mkdirSync(join(testRoot, '.deckent', 'recently-works'), { recursive: true });
   });
 
   afterEach(() => {
@@ -135,10 +135,10 @@ describe('event-stream', () => {
   });
 
   it('should skip malformed lines in event stream', () => {
-    const filePath = join(testRoot, '.deckent', `${sprintId}-events.jsonl`);
+    const filePath = join(testRoot, '.deckent', 'recently-works', `${sprintId}-events.jsonl`);
     writeFileSync(filePath, '{"valid": true}\nnot-json\n{"also": "valid"}\n', 'utf-8');
     // Also write sequence file so readSequence works
-    writeFileSync(join(testRoot, '.deckent', `${sprintId}-seq`), '0', 'utf-8');
+    writeFileSync(join(testRoot, '.deckent', 'recently-works', `${sprintId}-seq`), '0', 'utf-8');
 
     const events = readEvents(testRoot, sprintId);
     // Malformed lines are skipped — only valid JSON lines are returned

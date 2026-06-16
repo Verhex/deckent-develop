@@ -30,7 +30,7 @@ function makeRoot(): string {
     tmpdir(),
     `deckent-e2e-event-stream-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   );
-  mkdirSync(join(root, '.deckent'), { recursive: true });
+  mkdirSync(join(root, '.deckent', 'recently-works'), { recursive: true });
   return root;
 }
 
@@ -385,7 +385,7 @@ describe('event-stream runtime e2e', () => {
     writeEvent(testRoot, sprintId, 'worker', 'brain', CHANNELS.HEARTBEAT, { taskId: 'T1', sequence: 1 });
 
     // Manually corrupt the JSONL file (simulates Docker SIGKILL partial write)
-    const eventsPath = join(testRoot, '.deckent', `${sprintId}-events.jsonl`);
+    const eventsPath = join(testRoot, '.deckent', 'recently-works', `${sprintId}-events.jsonl`);
     const existing = readFileSync(eventsPath, 'utf-8');
     writeFileSync(eventsPath, existing + '{PARTIAL_CORRUPTION\n', 'utf-8');
 

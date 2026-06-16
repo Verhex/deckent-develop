@@ -60,7 +60,7 @@ export interface ResourceMonitorConfig {
   enabled: boolean;
   /** Sampling interval in ms (default: 5000, min: 1000). */
   interval_ms?: number;
-  /** JSONL log path relative to project root (default: '.deckent/resource-log.jsonl'). */
+  /** JSONL log path relative to project root (default: '.deckent/settings/resource-log.jsonl'). */
   log_path?: string;
 }
 

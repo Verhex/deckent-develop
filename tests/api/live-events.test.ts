@@ -92,14 +92,14 @@ describe('live-events bridge', () => {
 
   // ── 3. jsonl tail → deckent_event ────────────────────────────
   it('tails the active sprint event-stream JSONL into deckent_event', async () => {
-    mkdirSync(join(root, '.deckent'), { recursive: true });
+    mkdirSync(join(root, '.deckent', 'recently-works'), { recursive: true });
     writeFileSync(
       join(root, '.deckent', 'sprint-state.json'),
       JSON.stringify({ sprintId: 'sprint-test' }),
       'utf-8',
     );
     // Pre-existing file with one line — primed offset means it is NOT replayed.
-    const jsonl = join(root, '.deckent', 'sprint-test-events.jsonl');
+    const jsonl = join(root, '.deckent', 'recently-works', 'sprint-test-events.jsonl');
     writeFileSync(jsonl, JSON.stringify({ sequence: 1, channel: 'OLD' }) + '\n', 'utf-8');
 
     start();

@@ -18,9 +18,9 @@ function makeTmpRoot(): string {
 }
 
 function writePending(root: string, items: NervousNotification[]): void {
-  mkdirSync(join(root, '.deckent'), { recursive: true });
+  mkdirSync(join(root, '.deckent', 'nervous'), { recursive: true });
   writeFileSync(
-    join(root, '.deckent', 'nervous-pending.json'),
+    join(root, '.deckent', 'nervous', 'nervous-pending.json'),
     JSON.stringify(items, null, 2) + '\n',
     'utf-8',
   );
@@ -42,13 +42,13 @@ function makeNotification(overrides: Partial<NervousNotification> = {}): Nervous
 }
 
 function ipcPendingFiles(root: string): string[] {
-  const dir = join(root, '.deckent', 'nervous-ipc', 'pending');
+  const dir = join(root, '.deckent', 'nervous', 'nervous-ipc', 'pending');
   if (!existsSync(dir)) return [];
   return readdirSync(dir).filter(f => f.endsWith('.json'));
 }
 
 function readFirstIpcFile(root: string): Record<string, unknown> {
-  const dir = join(root, '.deckent', 'nervous-ipc', 'pending');
+  const dir = join(root, '.deckent', 'nervous', 'nervous-ipc', 'pending');
   const files = readdirSync(dir).filter(f => f.endsWith('.json'));
   if (files.length === 0) throw new Error('No IPC files found');
   return JSON.parse(readFileSync(join(dir, files[0]!), 'utf-8')) as Record<string, unknown>;

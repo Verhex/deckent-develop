@@ -29,7 +29,7 @@ function makeTempDir(): string {
     `deckent-test-checkpoint-loop-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
   mkdirSync(dir, { recursive: true });
-  mkdirSync(join(dir, '.deckent'), { recursive: true });
+  mkdirSync(join(dir, '.deckent', 'recently-works'), { recursive: true });
   return dir;
 }
 
@@ -69,7 +69,7 @@ function writeEventsJsonl(
   sprintId: string,
   sequences: number[],
 ): void {
-  const path = join(root, '.deckent', `${sprintId}-events.jsonl`);
+  const path = join(root, '.deckent', 'recently-works', `${sprintId}-events.jsonl`);
   const lines = sequences
     .map((s) =>
       JSON.stringify({
@@ -201,7 +201,7 @@ describe('Sprint 161 T-002 — Checkpoint Loop Runtime Wire', () => {
   it('7. computeEventStreamOffset returns 0 when events.jsonl is empty', () => {
     const root = makeTempDir();
     try {
-      const path = join(root, '.deckent', 'sprint-161-events.jsonl');
+      const path = join(root, '.deckent', 'recently-works', 'sprint-161-events.jsonl');
       writeFileSync(path, '', 'utf-8');
       expect(computeEventStreamOffset(root, 'sprint-161')).toBe(0);
 

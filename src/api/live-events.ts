@@ -19,7 +19,7 @@
 
 import { watch, existsSync, readFileSync, type FSWatcher } from 'node:fs';
 import { join } from 'node:path';
-import { DECKENT_DIR, TASKS_DIR } from '../core/constants.js';
+import { TASKS_DIR, RECENT_WORKS_DIR } from '../core/constants.js';
 import { getCurrentSprintId, type DeckentEvent } from '../core/event-stream.js';
 import { debugLog } from '../core/utils.js';
 
@@ -165,7 +165,7 @@ export function startLiveEventBridge(opts: LiveEventBridgeOptions): LiveEventBri
     if (closed) return;
     const sprintId = getCurrentSprintId(projectRoot);
     if (!sprintId) return;
-    const file = join(projectRoot, DECKENT_DIR, `${sprintId}-events.jsonl`);
+    const file = join(projectRoot, RECENT_WORKS_DIR, `${sprintId}-events.jsonl`);
     if (!existsSync(file)) return;
     let content: string;
     try {
@@ -216,7 +216,7 @@ export function startLiveEventBridge(opts: LiveEventBridgeOptions): LiveEventBri
     try {
       const sprintId = getCurrentSprintId(projectRoot);
       if (!sprintId) return;
-      const file = join(projectRoot, DECKENT_DIR, `${sprintId}-events.jsonl`);
+      const file = join(projectRoot, RECENT_WORKS_DIR, `${sprintId}-events.jsonl`);
       if (existsSync(file)) {
         offsets.set(file, readFileSync(file, 'utf-8').length);
       }
@@ -269,7 +269,9 @@ export function startLiveEventBridge(opts: LiveEventBridgeOptions): LiveEventBri
   try {
     primeEventsOffset();
     setupDirWatch(join(projectRoot, TASKS_DIR), scheduleTaskFile);
-    setupDirWatch(join(projectRoot, DECKENT_DIR), scheduleDeckentFile);
+    // Event-stream JSONL now lives under .deckent/recently-works/ — watch that
+    // dir (non-recursive) so the `-events.jsonl` tail still fires.
+    setupDirWatch(join(projectRoot, RECENT_WORKS_DIR), scheduleDeckentFile);
   } catch (err) {
     debugLog('live-events:start', err);
   }

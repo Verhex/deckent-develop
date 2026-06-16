@@ -119,7 +119,7 @@ describe('panic-gate non-blocking — awaitPanicGateApproval (async)', () => {
 
   it('resolved marker present → APPROVED before deadline', async () => {
     vi.useFakeTimers();
-    const resolvedDir = join(testRoot, '.deckent', 'panic-ipc', 'resolved');
+    const resolvedDir = join(testRoot, '.deckent', 'nervous', 'panic-ipc', 'resolved');
     mkdirSync(resolvedDir, { recursive: true });
     writeFileSync(
       join(resolvedDir, 'task-003.json'),

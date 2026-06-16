@@ -6,6 +6,7 @@ import { existsSync, readFileSync, readdirSync, mkdirSync, writeFileSync } from 
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { RECENT_WORKS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -33,7 +34,7 @@ export interface RestoreResult {
 
 /**
  * Create a pre-archive snapshot of all task files for a sprint.
- * Produces `.deckent/<sprintId>-pre-archive.tar.gz` + SHA-256 hash file.
+ * Produces `.deckent/recently-works/<sprintId>-pre-archive.tar.gz` + SHA-256 hash file.
  *
  * @param projectRoot - Project root directory
  * @param sprintId - Sprint ID (e.g. 'sprint-143')
@@ -65,11 +66,11 @@ export function createPreArchiveSnapshot(
     return null;
   }
 
-  const deckentDir = join(projectRoot, '.deckent');
-  mkdirSync(deckentDir, { recursive: true });
+  const recentWorksDir = join(projectRoot, RECENT_WORKS_DIR);
+  mkdirSync(recentWorksDir, { recursive: true });
 
-  const snapshotPath = join(deckentDir, `${sprintId}-pre-archive.tar.gz`);
-  const hashPath = join(deckentDir, `${sprintId}-pre-archive.sha256`);
+  const snapshotPath = join(recentWorksDir, `${sprintId}-pre-archive.tar.gz`);
+  const hashPath = join(recentWorksDir, `${sprintId}-pre-archive.sha256`);
 
   // Create tar.gz using tar command (available on linux/macOS)
   const tarResult = spawnSync('tar', [
@@ -217,9 +218,9 @@ export function restoreFromSnapshot(
   projectRoot: string,
   sprintId: string,
 ): RestoreResult {
-  const deckentDir = join(projectRoot, '.deckent');
-  const snapshotPath = join(deckentDir, `${sprintId}-pre-archive.tar.gz`);
-  const hashPath = join(deckentDir, `${sprintId}-pre-archive.sha256`);
+  const recentWorksDir = join(projectRoot, RECENT_WORKS_DIR);
+  const snapshotPath = join(recentWorksDir, `${sprintId}-pre-archive.tar.gz`);
+  const hashPath = join(recentWorksDir, `${sprintId}-pre-archive.sha256`);
 
   if (!existsSync(snapshotPath)) {
     return { restoredFiles: [], success: false, error: `Snapshot not found: ${snapshotPath}` };

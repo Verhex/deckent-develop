@@ -36,11 +36,11 @@ function readDecisions(): Record<string, { outcome: string }> {
   return existsSync(p) ? JSON.parse(readFileSync(p, 'utf-8')) : {};
 }
 function seedNervousPending(id: string): void {
-  mkdirSync(join(root, '.deckent'), { recursive: true });
-  writeFileSync(join(root, '.deckent', 'nervous-pending.json'), JSON.stringify([{ id, title: 't', summary: 's' }]) + '\n');
+  mkdirSync(join(root, '.deckent', 'nervous'), { recursive: true });
+  writeFileSync(join(root, '.deckent', 'nervous', 'nervous-pending.json'), JSON.stringify([{ id, title: 't', summary: 's' }]) + '\n');
 }
 function ipcPendingFiles(): string[] {
-  const dir = join(root, '.deckent', 'nervous-ipc', 'pending');
+  const dir = join(root, '.deckent', 'nervous', 'nervous-ipc', 'pending');
   return existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.json')) : [];
 }
 

@@ -58,7 +58,7 @@ coverage/
 .deckent/sprint-state.json
 .deckent/plugins/*
 !.deckent/plugins/.gitkeep
-.deckent/jobs/
+.deckent/runtime/jobs/
 .deckent/usage/
 .deckent/cache/
 .deckent/traces/
@@ -66,7 +66,13 @@ coverage/
 .deckent/metrics.jsonl
 
 # Managed docs runtime config (private — template in src/cli/commands/init-templates/)
-.deckent/docs.json
+.deckent/settings/docs.json
+
+# Nervous System runtime (ADR-040 — logs, history, pending, IPC dirs, all regenerated)
+.deckent/nervous/
+
+# Per-sprint ephemeral artifacts (events, metrics, gate, pre-archive — regenerated each run)
+.deckent/recently-works/
 
 # Sprint ephemeral artifacts (IPC, events, checkpoints — regenerated each run)
 .deckent/sprint-*-ipc/
@@ -82,7 +88,7 @@ coverage/
 .deckent/sprint-*-merge-runbook.sh
 .deckent/sprint-*-worktree-setup.sh
 .deckent/sprint-*-dispatch-locks.json
-.deckent/evaluations/
+.deckent/runtime/evaluations/
 .deckent/pids/
 .claude/scheduled_tasks.lock
 .claude/settings.local.json

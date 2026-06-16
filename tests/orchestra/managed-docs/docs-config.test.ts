@@ -14,7 +14,7 @@ function cleanup() {
 
 beforeEach(() => {
   cleanup();
-  fs.mkdirSync(DECKENT_DIR, { recursive: true });
+  fs.mkdirSync(path.join(DECKENT_DIR, 'settings'), { recursive: true });
 });
 
 afterEach(cleanup);
@@ -44,7 +44,7 @@ describe('loadDocsConfig', () => {
 
   it('loads valid config', () => {
     const config = { version: 1 as const, docs: [{ id: 'test', path: 'test.md' }] };
-    fs.writeFileSync(path.join(DECKENT_DIR, 'docs.json'), JSON.stringify(config), 'utf-8');
+    fs.writeFileSync(path.join(DECKENT_DIR, 'settings', 'docs.json'), JSON.stringify(config), 'utf-8');
     const loaded = loadDocsConfig(TEST_ROOT);
     expect(loaded).not.toBeNull();
     expect(loaded!.docs).toHaveLength(1);
@@ -52,12 +52,12 @@ describe('loadDocsConfig', () => {
   });
 
   it('returns null for invalid JSON', () => {
-    fs.writeFileSync(path.join(DECKENT_DIR, 'docs.json'), 'NOT JSON', 'utf-8');
+    fs.writeFileSync(path.join(DECKENT_DIR, 'settings', 'docs.json'), 'NOT JSON', 'utf-8');
     expect(loadDocsConfig(TEST_ROOT)).toBeNull();
   });
 
   it('returns null for missing docs array', () => {
-    fs.writeFileSync(path.join(DECKENT_DIR, 'docs.json'), '{"version":1}', 'utf-8');
+    fs.writeFileSync(path.join(DECKENT_DIR, 'settings', 'docs.json'), '{"version":1}', 'utf-8');
     expect(loadDocsConfig(TEST_ROOT)).toBeNull();
   });
 });
@@ -67,13 +67,13 @@ describe('loadDocsConfig', () => {
 describe('saveDocsConfig', () => {
   it('creates config file', () => {
     saveDocsConfig(TEST_ROOT, { version: 1, docs: [] });
-    const configPath = path.join(DECKENT_DIR, 'docs.json');
+    const configPath = path.join(DECKENT_DIR, 'settings', 'docs.json');
     expect(fs.existsSync(configPath)).toBe(true);
   });
 
   it('writes valid JSON', () => {
     saveDocsConfig(TEST_ROOT, { version: 1, docs: [{ id: 'a', path: 'a.md' }] });
-    const raw = fs.readFileSync(path.join(DECKENT_DIR, 'docs.json'), 'utf-8');
+    const raw = fs.readFileSync(path.join(DECKENT_DIR, 'settings', 'docs.json'), 'utf-8');
     const parsed = JSON.parse(raw);
     expect(parsed.version).toBe(1);
     expect(parsed.docs).toHaveLength(1);

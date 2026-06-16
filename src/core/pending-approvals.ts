@@ -8,6 +8,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { NERVOUS_PENDING_FILE } from './constants.js';
 
 export interface PendingApproval {
   /** Which gate parked this approval. */
@@ -22,10 +23,10 @@ export interface PendingApproval {
   rejectCommand: string;
 }
 
-/** Read parked nervous approvals from `.deckent/nervous-pending.json`
+/** Read parked nervous approvals from `.deckent/nervous/nervous-pending.json`
  *  (NervousNotification[] shape — we read only id/title, no nervous import). */
 function readNervous(projectRoot: string): PendingApproval[] {
-  const path = join(projectRoot, '.deckent', 'nervous-pending.json');
+  const path = join(projectRoot, NERVOUS_PENDING_FILE);
   if (!existsSync(path)) return [];
   try {
     const data: unknown = JSON.parse(readFileSync(path, 'utf-8'));

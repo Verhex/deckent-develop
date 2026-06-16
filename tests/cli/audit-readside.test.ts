@@ -190,8 +190,8 @@ describe('audit read-side — retention plan/apply (retention subcommand)', () =
   });
   afterEach(() => { rmSync(root, { recursive: true, force: true }); });
 
-  const streamPath = (): string => join(root, '.deckent', `${SPRINT}-events.jsonl`);
-  const archivePath = (): string => join(root, '.deckent', `${SPRINT}-events-archive.jsonl`);
+  const streamPath = (): string => join(root, '.deckent', 'recently-works', `${SPRINT}-events.jsonl`);
+  const archivePath = (): string => join(root, '.deckent', 'recently-works', `${SPRINT}-events-archive.jsonl`);
 
   function seedThree(): void {
     writeAuditEvent(root, SPRINT, { tenantId: 'local', actor: 'system', action: 'a1' });
@@ -275,7 +275,7 @@ describe('audit read-side — retention plan/apply (retention subcommand)', () =
     const result = runAuditRetention(root, 'sprint-empty', { maxCount: 1 }, true);
 
     expect(result).toEqual({ sprintId: 'sprint-empty', scanned: 0, keep: 0, archive: 0, prune: 0, applied: true });
-    expect(existsSync(join(root, '.deckent', 'sprint-empty-events.jsonl'))).toBe(false);
-    expect(existsSync(join(root, '.deckent', 'sprint-empty-events-archive.jsonl'))).toBe(false);
+    expect(existsSync(join(root, '.deckent', 'recently-works', 'sprint-empty-events.jsonl'))).toBe(false);
+    expect(existsSync(join(root, '.deckent', 'recently-works', 'sprint-empty-events-archive.jsonl'))).toBe(false);
   });
 });

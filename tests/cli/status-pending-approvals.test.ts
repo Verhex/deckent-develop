@@ -11,7 +11,7 @@ const dirs: string[] = [];
 function sandbox(): string {
   const d = mkdtempSync(join(tmpdir(), 'status-pending-'));
   dirs.push(d);
-  mkdirSync(join(d, '.deckent'), { recursive: true });
+  mkdirSync(join(d, '.deckent', 'nervous'), { recursive: true });
   return d;
 }
 afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }); });
@@ -23,7 +23,7 @@ describe('buildPendingApprovalsSection (W4 status surfacing)', () => {
 
   it('renders the count header + the exact accept command per parked approval', () => {
     const d = sandbox();
-    writeFileSync(join(d, '.deckent', 'nervous-pending.json'), JSON.stringify([
+    writeFileSync(join(d, '.deckent', 'nervous', 'nervous-pending.json'), JSON.stringify([
       { id: 'k9', title: 'Directives changed mid-sprint' },
     ]));
     const s = buildPendingApprovalsSection(d, 'en');
@@ -35,7 +35,7 @@ describe('buildPendingApprovalsSection (W4 status surfacing)', () => {
 
   it('localizes the header (TR)', () => {
     const d = sandbox();
-    writeFileSync(join(d, '.deckent', 'nervous-pending.json'), JSON.stringify([{ id: 'x1', title: 't' }]));
+    writeFileSync(join(d, '.deckent', 'nervous', 'nervous-pending.json'), JSON.stringify([{ id: 'x1', title: 't' }]));
     expect(buildPendingApprovalsSection(d, 'tr')!).toContain('Bekleyen onaylar: 1');
   });
 });

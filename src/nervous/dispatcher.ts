@@ -14,6 +14,7 @@ import { appendFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { assertBrainScope } from './runtime-scope-check.js';
+import { NERVOUS_LOG_FILE } from '../core/constants.js';
 
 // ─── Notify Bridge (DECKENT→USER:NOTIFY — Hot Fix H6) ───────────
 import { notify } from '../core/notify.js';
@@ -224,8 +225,8 @@ export class NervousDispatcher {
       return this.fileAdapter.push(notification);
     }
 
-    // Default file adapter: append JSONL to .deckent/nervous-log.jsonl
-    const logPath = join(this.projectRoot, '.deckent', 'nervous-log.jsonl');
+    // Default file adapter: append JSONL to .deckent/nervous/nervous-log.jsonl
+    const logPath = join(this.projectRoot, NERVOUS_LOG_FILE);
     const dir = dirname(logPath);
     if (!existsSync(dir)) {
       await mkdir(dir, { recursive: true });

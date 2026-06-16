@@ -40,9 +40,9 @@ function captureStdout(fn: () => void | Promise<void>): Promise<string> {
 }
 
 function plantPending(root: string, id: string): void {
-  mkdirSync(join(root, '.deckent'), { recursive: true });
+  mkdirSync(join(root, '.deckent', 'nervous'), { recursive: true });
   writeFileSync(
-    join(root, '.deckent', 'nervous-pending.json'),
+    join(root, '.deckent', 'nervous', 'nervous-pending.json'),
     JSON.stringify([
       {
         id,

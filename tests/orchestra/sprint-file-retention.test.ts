@@ -41,7 +41,8 @@ function createTestRoot(): string {
 
 /** Create a fake sprint file set for a given sprint ID. */
 function createSprintFiles(root: string, sprintId: string, opts?: { includeCheckpoint?: boolean; includeGate?: boolean; includePreArchive?: boolean }): void {
-  const deckentDir = join(root, '.deckent');
+  const deckentDir = join(root, '.deckent', 'recently-works');
+  mkdirSync(deckentDir, { recursive: true });
   // Always create events + seq
   writeFileSync(join(deckentDir, `${sprintId}-events.jsonl`), `{"type":"test","sprintId":"${sprintId}"}\n`);
   writeFileSync(join(deckentDir, `${sprintId}-seq`), '42');
@@ -63,7 +64,8 @@ function createSprintFiles(root: string, sprintId: string, opts?: { includeCheck
 
 /** Create forensic files for a sprint. */
 function createForensicFiles(root: string, sprintId: string): void {
-  const deckentDir = join(root, '.deckent');
+  const deckentDir = join(root, '.deckent', 'recently-works');
+  mkdirSync(deckentDir, { recursive: true });
   writeFileSync(join(deckentDir, `${sprintId}-layer3-scorecard.md`), '# Scorecard\n');
   writeFileSync(join(deckentDir, `${sprintId}-verifier-log.md`), '# Verifier\n');
 }
@@ -110,7 +112,7 @@ describe('listSprintFiles', () => {
   });
 
   it('should exclude directories like sprint-god-analysis/', () => {
-    mkdirSync(join(testRoot, '.deckent', 'sprint-god-analysis'), { recursive: true });
+    mkdirSync(join(testRoot, '.deckent', 'recently-works', 'sprint-god-analysis'), { recursive: true });
     createSprintFiles(testRoot, 'sprint-140');
     const files = listSprintFiles(testRoot);
     expect(files.some(f => f === 'sprint-god-analysis')).toBe(false);
@@ -142,22 +144,22 @@ describe('cleanupCounters', () => {
     const deleted = cleanupCounters(testRoot, 'sprint-150');
     expect(deleted).toContain('sprint-150-seq');
     expect(deleted).toContain('sprint-150-checkpoint-seq');
-    expect(existsSync(join(testRoot, '.deckent', 'sprint-150-seq'))).toBe(false);
-    expect(existsSync(join(testRoot, '.deckent', 'sprint-150-checkpoint-seq'))).toBe(false);
+    expect(existsSync(join(testRoot, '.deckent', 'recently-works', 'sprint-150-seq'))).toBe(false);
+    expect(existsSync(join(testRoot, '.deckent', 'recently-works', 'sprint-150-checkpoint-seq'))).toBe(false);
   });
 
   it('should not delete non-counter files', () => {
     createSprintFiles(testRoot, 'sprint-150');
     cleanupCounters(testRoot, 'sprint-150');
-    expect(existsSync(join(testRoot, '.deckent', 'sprint-150-events.jsonl'))).toBe(true);
-    expect(existsSync(join(testRoot, '.deckent', 'sprint-150-gate.json'))).toBe(true);
+    expect(existsSync(join(testRoot, '.deckent', 'recently-works', 'sprint-150-events.jsonl'))).toBe(true);
+    expect(existsSync(join(testRoot, '.deckent', 'recently-works', 'sprint-150-gate.json'))).toBe(true);
   });
 
   it('should not affect other sprints', () => {
     createSprintFiles(testRoot, 'sprint-149');
     createSprintFiles(testRoot, 'sprint-150');
     cleanupCounters(testRoot, 'sprint-150');
-    expect(existsSync(join(testRoot, '.deckent', 'sprint-149-seq'))).toBe(true);
+    expect(existsSync(join(testRoot, '.deckent', 'recently-works', 'sprint-149-seq'))).toBe(true);
   });
 });
 
@@ -171,7 +173,7 @@ describe('migrateForensicFiles', () => {
     expect(existsSync(join(testRoot, 'docs', 'audits', 'sprint-138', 'layer3-scorecard.md'))).toBe(true);
     expect(existsSync(join(testRoot, 'docs', 'audits', 'sprint-138', 'verifier-log.md'))).toBe(true);
     // Source removed
-    expect(existsSync(join(testRoot, '.deckent', 'sprint-138-layer3-scorecard.md'))).toBe(false);
+    expect(existsSync(join(testRoot, '.deckent', 'recently-works', 'sprint-138-layer3-scorecard.md'))).toBe(false);
   });
 
   it('should not move non-forensic sprint files', () => {
@@ -179,7 +181,7 @@ describe('migrateForensicFiles', () => {
     createForensicFiles(testRoot, 'sprint-140');
     migrateForensicFiles(testRoot);
     // Machine files still in .deckent/
-    expect(existsSync(join(testRoot, '.deckent', 'sprint-140-events.jsonl'))).toBe(true);
+    expect(existsSync(join(testRoot, '.deckent', 'recently-works', 'sprint-140-events.jsonl'))).toBe(true);
   });
 });
 
@@ -207,7 +209,7 @@ describe('enforceRetention', () => {
     expect(archivedFiles.some(f => f === 'gate.json')).toBe(true);
 
     // Source files removed
-    expect(existsSync(join(testRoot, '.deckent', 'sprint-130-events.jsonl'))).toBe(false);
+    expect(existsSync(join(testRoot, '.deckent', 'recently-works', 'sprint-130-events.jsonl'))).toBe(false);
   });
 
   it('should not archive when under keep_last_n', () => {
@@ -237,7 +239,7 @@ describe('enforceRetention', () => {
       createSprintFiles(testRoot, `sprint-${i}`, { includePreArchive: true });
       // Make the events file large (~200KB)
       const bigContent = 'x'.repeat(200 * 1024);
-      writeFileSync(join(testRoot, '.deckent', `sprint-${i}-events.jsonl`), bigContent);
+      writeFileSync(join(testRoot, '.deckent', 'recently-works', `sprint-${i}-events.jsonl`), bigContent);
     }
 
     // 3 sprints × ~200KB = ~600KB. With size_cap_mb < 0.5 (512KB), oldest should be archived

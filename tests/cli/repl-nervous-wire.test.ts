@@ -34,7 +34,7 @@ function makeTmpRoot(): string {
 }
 
 function writePending(root: string, items: NervousNotification[]): void {
-  const dir = join(root, '.deckent');
+  const dir = join(root, '.deckent', 'nervous');
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(
     join(dir, 'nervous-pending.json'),
@@ -44,7 +44,7 @@ function writePending(root: string, items: NervousNotification[]): void {
 }
 
 function readPending(root: string): NervousNotification[] {
-  const path = join(root, '.deckent', 'nervous-pending.json');
+  const path = join(root, '.deckent', 'nervous', 'nervous-pending.json');
   if (!existsSync(path)) return [];
   return JSON.parse(readFileSync(path, 'utf-8')) as NervousNotification[];
 }

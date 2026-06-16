@@ -8,7 +8,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { DECKENT_DIR, TASKS_DIR, BRAIN_DIR } from '../core/constants.js';
+import { DECKENT_DIR, TASKS_DIR, BRAIN_DIR, RECENT_WORKS_DIR } from '../core/constants.js';
 import { debugLog, readJsonSafe } from '../core/utils.js';
 import type { Sprint } from '../core/types.js';
 import { SprintPhase, SprintStatus } from '../core/types.js';
@@ -123,7 +123,7 @@ export function computeEventStreamOffset(
   projectRoot: string,
   sprintId: string,
 ): number {
-  const filePath = join(projectRoot, DECKENT_DIR, `${sprintId}-events.jsonl`);
+  const filePath = join(projectRoot, RECENT_WORKS_DIR, `${sprintId}-events.jsonl`);
   if (!existsSync(filePath)) return 0;
   try {
     const raw = readFileSync(filePath, 'utf-8');

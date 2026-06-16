@@ -15,7 +15,7 @@ const dirs: string[] = [];
 function sandbox(): string {
   const d = mkdtempSync(join(tmpdir(), 'renderer-pending-'));
   dirs.push(d);
-  mkdirSync(join(d, '.deckent'), { recursive: true });
+  mkdirSync(join(d, '.deckent', 'nervous'), { recursive: true });
   return d;
 }
 afterEach(() => {
@@ -26,7 +26,7 @@ describe('StatusRenderer.snapshot() — W3 pending approvals (live status --foll
   it('renders the parked approval title + exact accept command', () => {
     const d = sandbox();
     writeFileSync(
-      join(d, '.deckent', 'nervous-pending.json'),
+      join(d, '.deckent', 'nervous', 'nervous-pending.json'),
       JSON.stringify([{ id: 'k9', title: 'Directives changed' }]),
     );
     const out = new StatusRenderer({ projectRoot: d, noColor: true, terminalWidth: 80 }).snapshot();

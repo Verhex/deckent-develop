@@ -84,10 +84,10 @@ let projectRoot: string;
 
 function makeRoot(): string {
   const root = mkdtempSync(join(tmpdir(), 'deckent-actor-test-'));
-  mkdirSync(join(root, '.deckent'), { recursive: true });
+  mkdirSync(join(root, '.deckent', 'recently-works'), { recursive: true });
   // Minimal events.jsonl so latestEventSprintId returns 'sprint-277'
   writeFileSync(
-    join(root, '.deckent', 'sprint-277-events.jsonl'),
+    join(root, '.deckent', 'recently-works', 'sprint-277-events.jsonl'),
     JSON.stringify({
       timestamp: new Date().toISOString(),
       sequence: 1,

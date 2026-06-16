@@ -14,7 +14,7 @@ import { readFile } from 'node:fs/promises';
 import { watch, existsSync, type FSWatcher, statSync, openSync, readSync, closeSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DeckentEvent, ChannelCode } from './event-stream.js';
-import { DECKENT_DIR } from '../core/constants.js';
+import { RECENT_WORKS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 import {
   setNotificationDispatcher,
@@ -40,7 +40,7 @@ interface Subscription {
 // ─── Path Helper ────────────────────────────────────────────────
 
 function eventsFilePath(projectRoot: string, sprintId: string): string {
-  return join(projectRoot, DECKENT_DIR, `${sprintId}-events.jsonl`);
+  return join(projectRoot, RECENT_WORKS_DIR, `${sprintId}-events.jsonl`);
 }
 
 // ─── EventBus Class ─────────────────────────────────────────────

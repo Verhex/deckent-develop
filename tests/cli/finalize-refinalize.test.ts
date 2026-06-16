@@ -387,7 +387,7 @@ describe('finalizeSprint — double-finalize stats idempotency (FINALIZE-RECOUNT
     const tasks = [makeTask('900-001')];
     const evaluations = new Map<string, TaskEvaluation>([['900-001', TaskEvaluation.DONE]]);
     const results = [makeResult('900-001')];
-    const jobPath = join(root, '.deckent', 'jobs', `${SPRINT_ID}.json`);
+    const jobPath = join(root, '.deckent', 'runtime', 'jobs', `${SPRINT_ID}.json`);
 
     // startedAt known → real duration string, never 'unknown'
     await finalizeSprint(root, makeSprint(tasks), evaluations, results, finalizeOpts);
@@ -483,7 +483,7 @@ describe('finalize CLI — end-to-end re-finalize pipeline (tmpdir)', () => {
 
     // Archive-aware totals: 2/2, not 1/1
     const job = readJson<{ metrics: { totalTasks: number; done: number; duration: string; durationMs: number } }>(
-      join(root, '.deckent', 'jobs', `${SPRINT_ID}.json`),
+      join(root, '.deckent', 'runtime', 'jobs', `${SPRINT_ID}.json`),
     );
     expect(job.metrics.totalTasks).toBe(2);
     expect(job.metrics.done).toBe(2);
@@ -522,7 +522,7 @@ describe('finalize CLI — end-to-end re-finalize pipeline (tmpdir)', () => {
     await runFinalizeCli(['--force']);
 
     const job = readJson<{ metrics: { duration: string } }>(
-      join(root, '.deckent', 'jobs', `${SPRINT_ID}.json`),
+      join(root, '.deckent', 'runtime', 'jobs', `${SPRINT_ID}.json`),
     );
     expect(job.metrics.duration).toBe('unknown');
 

@@ -1,7 +1,7 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
-import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
+import { BRAIN_DIR, MEMORY_DB_FILE, DECISIONS_LOG_DIR } from '../../core/constants.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import { print } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -214,10 +214,10 @@ export function extractGoalFromSprintLog(content: string): string | null {
 
 /**
  * Build human-readable output for a task's routing decision log.
- * Reads from `.deckent/decisions/decision-<taskId>.json`.
+ * Reads from `<DECISIONS_LOG_DIR>/decision-<taskId>.json`.
  */
 export function buildTaskDecisionOutput(taskId: string, root: string, lang = 'en'): string | null {
-  const decisionPath = join(root, '.deckent', 'decisions', `decision-${taskId}.json`);
+  const decisionPath = join(root, DECISIONS_LOG_DIR, `decision-${taskId}.json`);
   if (!existsSync(decisionPath)) return null;
 
   try {

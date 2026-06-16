@@ -20,7 +20,7 @@ import { randomUUID } from 'node:crypto';
 
 function createTmpRoot(): string {
   const root = join(tmpdir(), `panic-accept-test-${randomUUID().slice(0, 8)}`);
-  mkdirSync(join(root, '.deckent'), { recursive: true });
+  mkdirSync(join(root, '.deckent', 'nervous'), { recursive: true });
   return root;
 }
 
@@ -124,7 +124,7 @@ describe('Panic guard approval UI (Sprint 180 W4-2)', () => {
     });
 
     // Assert — IPC marker written
-    const ipcDir = join(testRoot, '.deckent', 'panic-ipc', 'pending');
+    const ipcDir = join(testRoot, '.deckent', 'nervous', 'panic-ipc', 'pending');
     expect(existsSync(ipcDir)).toBe(true);
 
     const files = readdirSync(ipcDir);
@@ -147,7 +147,7 @@ describe('Panic guard approval UI (Sprint 180 W4-2)', () => {
     writePanicEvent(testRoot, 'sprint-180', '180-009', 'w-180-009');
 
     // Pre-write resolved marker for 180-009 to assert filtering
-    const resolvedDir = join(testRoot, '.deckent', 'panic-ipc', 'resolved');
+    const resolvedDir = join(testRoot, '.deckent', 'nervous', 'panic-ipc', 'resolved');
     mkdirSync(resolvedDir, { recursive: true });
     writeFileSync(
       join(resolvedDir, '180-009.json'),
@@ -201,7 +201,7 @@ describe('Panic guard approval UI (Sprint 180 W4-2)', () => {
     expect(data.accepted).toBe(true);
     expect(data.notificationId).toBe('panic:180-011');
 
-    const ipcDir = join(testRoot, '.deckent', 'panic-ipc', 'pending');
+    const ipcDir = join(testRoot, '.deckent', 'nervous', 'panic-ipc', 'pending');
     expect(existsSync(ipcDir)).toBe(true);
 
     const files = readdirSync(ipcDir);
