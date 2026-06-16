@@ -1,4 +1,0 @@
-{"type":"metric","name":"collision.detected","value":3,"tags":{"pairs":"14","sprintId":"sprint-158"},"timestamp":"2026-05-12T14:21:01.232Z"}
-{"type":"metric","name":"wave.start","value":0,"tags":{"wave":"dep-pipeline","count":"6","sprintId":"sprint-158"},"timestamp":"2026-05-12T14:21:01.232Z"}
-{"type":"metric","name":"collision.detected","value":3,"tags":{"pairs":"14","sprintId":"sprint-158"},"timestamp":"2026-05-12T14:21:01.248Z"}
-{"type":"metric","name":"wave.start","value":0,"tags":{"wave":"dep-pipeline","count":"6","sprintId":"sprint-158"},"timestamp":"2026-05-12T14:21:01.248Z"}
