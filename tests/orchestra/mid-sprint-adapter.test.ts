@@ -270,6 +270,63 @@ describe('MidSprintAdapter', () => {
       expect(task.routingMeta?.taskDNA).toBeDefined();
       expect(task.routingMeta?.confidence).toBe('high');
     });
+
+    // ─── MODEL-GUARD on the FIX/reroute path (Sprint-283 floor) ───────────
+    it('upgrades an economy model on a code task during reroute (Sprint-283)', () => {
+      // The exact Sprint-283 bug: a tsx code task on haiku rerouted to doc-writer
+      // must NOT keep haiku — the economy floor for code-development re-asserts.
+      const adapter = new MidSprintAdapter(agentPool, skillPool, outcomeTracker);
+      const task = makeTask({
+        model: 'haiku',
+        type: 'code-development',
+        scope: { directories: ['src/dashboard/'], filesRead: [], filesWrite: ['src/dashboard/App.tsx'] },
+      });
+      const decision = makeDecision({ agentId: 'doc-writer', skillIds: ['documentation-writer'] });
+
+      adapter.applyReroute(task, decision);
+
+      expect(task.model).toBe('sonnet');
+      expect(task.assignedAgent).toBe('doc-writer');
+    });
+
+    it('keeps economy model on a doc task during reroute (economy allowed)', () => {
+      const adapter = new MidSprintAdapter(agentPool, skillPool, outcomeTracker);
+      const task = makeTask({
+        model: 'haiku',
+        type: 'document-write',
+        scope: { directories: ['docs/'], filesRead: [], filesWrite: ['docs/guide.md'] },
+      });
+      const decision = makeDecision({ agentId: 'doc-writer', skillIds: ['documentation-writer'] });
+
+      adapter.applyReroute(task, decision);
+
+      expect(task.model).toBe('haiku');
+    });
+
+    it('honors forceModel=haiku on a code task during reroute (explicit override)', () => {
+      const adapter = new MidSprintAdapter(agentPool, skillPool, outcomeTracker);
+      const task = makeTask({
+        model: 'haiku',
+        forceModel: 'haiku',
+        type: 'code-development',
+        scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/foo.ts'] },
+      });
+      const decision = makeDecision({ agentId: 'bug-fixer', skillIds: ['testing-expert'] });
+
+      adapter.applyReroute(task, decision);
+
+      expect(task.model).toBe('haiku');
+    });
+
+    it('leaves a standard model untouched on a code task during reroute', () => {
+      const adapter = new MidSprintAdapter(agentPool, skillPool, outcomeTracker);
+      const task = makeTask({ model: 'sonnet', type: 'code-development' });
+      const decision = makeDecision({ agentId: 'bug-fixer', skillIds: ['testing-expert'] });
+
+      adapter.applyReroute(task, decision);
+
+      expect(task.model).toBe('sonnet');
+    });
   });
 
   describe('confidence threshold', () => {

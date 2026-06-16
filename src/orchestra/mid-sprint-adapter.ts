@@ -8,6 +8,9 @@ import type { AgentPool } from '../core/agent-types.js';
 import type { SkillDefinition } from '../core/skill-types.js';
 import type { RoutingDecision, UserOverride, TaskDNA } from '../core/routing-types.js';
 import { routeTaskV2, type RoutingOptions } from '../core/routing-engine.js';
+import { enforceModelTierGuard } from '../core/model-tier-guard.js';
+import { getModelProvider } from '../core/model-equivalence.js';
+import { modelRegistry } from '../core/model-registry.js';
 import type { OutcomeTracker } from './outcome-tracker.js';
 import type { ResolvedConfig } from '../core/config-types.js';
 import { debugLog } from '../core/utils.js';
@@ -167,9 +170,29 @@ export class MidSprintAdapter {
       routingVersion: 'v2',
     };
 
+    // MODEL-GUARD: re-routing must NOT leave a code-development task on an
+    // economy model (Sprint-283: FIX rerouted a tsx task to haiku + doc-writer).
+    // The reroute keeps the plan-time model; re-assert the economy floor here so
+    // the floor holds across the FIX path too. An explicit user pin (forceModel)
+    // is honored.
+    if (task.model) {
+      const provider = modelRegistry.has(task.model) ? getModelProvider(task.model) : undefined;
+      const guarded = enforceModelTierGuard({
+        taskKind: task.type,
+        scope: task.scope,
+        model: task.model,
+        targetProvider: provider,
+        explicitOverride: Boolean(task.forceModel),
+      });
+      if (guarded.upgraded) {
+        task.model = guarded.model;
+        debugLog('mid-sprint-adapter:tier-guard', `Task ${task.id}: ${guarded.reason}`);
+      }
+    }
+
     debugLog(
       'mid-sprint-adapter:apply',
-      `Task ${task.id} rerouted → agent=${task.assignedAgent}, skills=[${task.assignedSkills.join(', ')}]`,
+      `Task ${task.id} rerouted → agent=${task.assignedAgent}, skills=[${task.assignedSkills.join(', ')}], model=${task.model}`,
     );
   }
 }

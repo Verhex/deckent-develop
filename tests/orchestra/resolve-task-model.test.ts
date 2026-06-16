@@ -78,7 +78,7 @@ describe('resolveTaskModel', () => {
     expect(result).toBe('sonnet');
   });
 
-  it('returns haiku when haiku_allowed=true and score is low', () => {
+  it('floors a low-score CODE task to sonnet even when haiku_allowed=true (MODEL-GUARD)', () => {
     const config = makeConfig({
       mode: 'max_plan',
       activeModeConfig: {
@@ -88,12 +88,27 @@ describe('resolveTaskModel', () => {
         haiku_allowed: true,
       },
     });
-    // Single dir → -1, but note docs → -2; score = -3 → haiku
-    // BUT layer 3 (docs scope) caps at sonnet, so still sonnet
-    // Use a non-docs single dir scope with very simple task (score = -1)
+    // score: single dir = -1 → economy → would be haiku; but src/cli is a
+    // code-development scope, so MODEL-GUARD upgrades economy → sonnet.
     const scope = makeScope(['src/cli/'], ['src/cli/simple.ts']);
     const result = resolveTaskModel('Minimal fix', 'A very simple change', scope, config);
-    // score: single dir = -1 → haiku; haiku_allowed=true → returns haiku
+    expect(result).toBe('sonnet');
+  });
+
+  it('returns haiku for a low-score DOC task when haiku_allowed=true (economy allowed)', () => {
+    const config = makeConfig({
+      mode: 'max_plan',
+      activeModeConfig: {
+        max_workers: 4,
+        brain_model: 'opus',
+        default_model: 'sonnet',
+        haiku_allowed: true,
+      },
+    });
+    // A documentation task may use an economy model. forceModel pins haiku; the
+    // guard exempts doc kinds, so haiku survives.
+    const scope = makeScope(['docs/'], ['docs/note.md']);
+    const result = resolveTaskModel('Tiny doc', 'A doc note', scope, config, [], 'haiku');
     expect(result).toBe('haiku');
   });
 

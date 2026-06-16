@@ -4,6 +4,8 @@ import type { TaskScope, ModelType, ResolvedConfig, PatternEntry, ProviderName }
 import { getModelTier } from '../core/types.js';
 import { getEquivalentModel, isModelAvailable } from '../core/model-equivalence.js';
 import type { ModelTier } from '../core/model-equivalence.js';
+import { enforceModelTierGuard } from '../core/model-tier-guard.js';
+import { debugLog } from '../core/utils.js';
 import { getDefaultProviderName, isAdapterProvider } from './sprint-utils.js';
 
 // ─── Tier Helpers ───────────────────────────────────────────────────
@@ -286,12 +288,19 @@ export function resolveTaskModel(
   }
 
   // Resolve tier to concrete model for target provider
-  const model: ModelType = resolveTierToModel(currentTier, { ...config, worker_provider: targetProvider === 'claude' ? config.worker_provider : targetProvider } as ResolvedConfig);
+  let model: ModelType = resolveTierToModel(currentTier, { ...config, worker_provider: targetProvider === 'claude' ? config.worker_provider : targetProvider } as ResolvedConfig);
 
   // Layer 5: provider mapping — ensure final model belongs to target provider
   if (targetProvider !== 'claude' && !isModelAvailable(model, targetProvider)) {
-    return getEquivalentModel(model, targetProvider);
+    model = getEquivalentModel(model, targetProvider);
   }
 
-  return model;
+  // MODEL-GUARD: an auto-selected economy model may NOT run a code-development
+  // task (Sprint-283 floor). No forceModel here (Layer 0 returned early), so
+  // this is never an explicit override — upgrade economy→standard for code.
+  const guarded = enforceModelTierGuard({ scope, model, targetProvider });
+  if (guarded.upgraded) {
+    debugLog('model-selector:tier-guard', guarded.reason);
+  }
+  return guarded.model;
 }
