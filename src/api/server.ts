@@ -49,7 +49,7 @@ import { registerNervousRoutes } from './nervous-endpoint.js';
 import { registerAutonomousRoutes } from './autonomous-endpoint.js';
 import { registerProcessRoutes } from './process-endpoint.js';
 import { registerReactiveRoutes } from './reactive-endpoint.js';
-import { registerEnterpriseRoutes, handleEnterpriseTenantWrite } from './enterprise-endpoint.js';
+import { registerEnterpriseRoutes, handleEnterpriseTenantWrite, handleEnterpriseRbacWrite, handleEnterpriseRateWrite } from './enterprise-endpoint.js';
 import { resolveChatProvider } from '../core/config.js';
 import { resolveChatAdapter } from '../cli/commands/chat-provider-parity.js';
 import { registerCoverageRoutes } from './coverage-endpoint.js';
@@ -457,13 +457,17 @@ async function handleRequest(
     return;
   }
 
-  // ─── Enterprise tenant mutations (282-010, DASH-UX-6) ──────
-  // POST/PUT/DELETE /api/enterprise/tenants[/:id] — admin-RBAC, audit-logged.
+  // ─── Enterprise mutations (282-010, DASH-UX-6) ──────────────
+  // POST/PUT/DELETE /api/enterprise/{tenants,rbac,rate}[/:id] — admin-RBAC, audit-logged.
   // Dispatched here (ahead of the GET/POST blocks) so all three verbs reach the
   // single handler in enterprise-endpoint.ts. Already auth-gated above.
   if (
     (method === 'POST' || method === 'PUT' || method === 'DELETE') &&
-    url.split('?')[0]!.startsWith('/api/enterprise/tenants')
+    (
+      url.split('?')[0]!.startsWith('/api/enterprise/tenants') ||
+      url.split('?')[0]!.startsWith('/api/enterprise/rbac') ||
+      url.split('?')[0]!.startsWith('/api/enterprise/rate')
+    )
   ) {
     let entBody: unknown = {};
     if (method !== 'DELETE') {
@@ -476,6 +480,8 @@ async function handleRequest(
       }
     }
     if (await handleEnterpriseTenantWrite(url, method, res, projectRoot, entBody, req)) return;
+    if (await handleEnterpriseRbacWrite(url, method, res, projectRoot, entBody, req)) return;
+    if (await handleEnterpriseRateWrite(url, method, res, projectRoot, entBody, req)) return;
   }
 
   // ─── GET routes ────────────────────────────────────────────

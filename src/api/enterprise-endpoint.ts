@@ -588,3 +588,266 @@ export async function handleEnterpriseTenantWrite(
   sendJson(res, { ok: true, id }, 200);
   return true;
 }
+
+// ─── RBAC role mutations — POST / PUT / DELETE (DASH-UX-6) ──────────────────
+//
+// Admin-only writes for RBAC custom roles. Persisted in config.json under the
+// `rbac_roles` key as Array<{ role, permissions }>. The GET /api/enterprise/rbac
+// read endpoint is NOT changed (it still reads from PERMISSION_MATRIX).
+
+const RbacRoleCreateSchema = z
+  .object({
+    role: z.string().min(1).max(64),
+    permissions: z.array(z.string()),
+  })
+  .strict();
+
+const RbacRoleUpdateSchema = z
+  .object({
+    permissions: z.array(z.string()).optional(),
+  })
+  .strict();
+
+function rbacRoleArray(cfg: Record<string, unknown>): Array<{ role: string; permissions: string[] }> {
+  const raw = cfg['rbac_roles'];
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (e): e is { role: string; permissions: string[] } =>
+      e !== null &&
+      typeof e === 'object' &&
+      typeof (e as Record<string, unknown>)['role'] === 'string' &&
+      Array.isArray((e as Record<string, unknown>)['permissions']),
+  );
+}
+
+function rbacRoleIdFromPath(path: string): string | null {
+  const prefix = '/api/enterprise/rbac/';
+  if (!path.startsWith(prefix)) return null;
+  const rest = path.slice(prefix.length);
+  if (!rest || rest.includes('/')) return null;
+  try { return decodeURIComponent(rest); } catch { return rest; }
+}
+
+export async function handleEnterpriseRbacWrite(
+  url: string,
+  method: string,
+  res: ServerResponse,
+  projectRoot: string,
+  body: unknown,
+  req?: IncomingMessage,
+): Promise<boolean> {
+  const parsed = new URL(url, 'http://localhost');
+  const path = parsed.pathname;
+  if (path !== '/api/enterprise/rbac' && !path.startsWith('/api/enterprise/rbac/')) return false;
+  if (method !== 'POST' && method !== 'PUT' && method !== 'DELETE') return false;
+
+  const sprintId = latestEventSprintId(projectRoot);
+  const decision = authorizeTenantAdmin(req, projectRoot, sprintId, `rbac:${method.toLowerCase()}`);
+  if (!decision.authorized) {
+    sendApiError(res, 403, 'FORBIDDEN', 'admin role required for RBAC role management');
+    return true;
+  }
+  const actor = decision.actor;
+
+  if (method === 'POST') {
+    if (path !== '/api/enterprise/rbac') {
+      sendApiError(res, 404, 'NOT_FOUND', 'unknown rbac route');
+      return true;
+    }
+    const result = RbacRoleCreateSchema.safeParse(body);
+    if (!result.success) {
+      sendJson(res, { error: { code: 'VALIDATION_ERROR', message: 'Invalid RBAC role payload', details: result.error.issues.map((i) => ({ field: i.path.join('.') || '(root)', message: i.message })) } }, 400);
+      return true;
+    }
+    const input = result.data;
+    const cfg = readRawConfig(projectRoot);
+    const roles = rbacRoleArray(cfg);
+    if (roles.some((r) => r.role === input.role)) {
+      sendApiError(res, 409, 'CONFLICT', `role '${input.role}' already exists`);
+      return true;
+    }
+    const record = { role: input.role, permissions: input.permissions };
+    cfg['rbac_roles'] = [...roles, record];
+    writeRawConfig(projectRoot, cfg);
+    if (sprintId) writeAuditEvent(projectRoot, sprintId, { tenantId: 'local', actor, action: 'enterprise:rbac:create', target: input.role });
+    sendJson(res, record, 201);
+    return true;
+  }
+
+  const role = rbacRoleIdFromPath(path);
+  if (!role) {
+    sendApiError(res, 400, 'BAD_REQUEST', 'role name required in path');
+    return true;
+  }
+
+  const cfg = readRawConfig(projectRoot);
+  const roles = rbacRoleArray(cfg);
+  const idx = roles.findIndex((r) => r.role === role);
+
+  if (method === 'PUT') {
+    const result = RbacRoleUpdateSchema.safeParse(body);
+    if (!result.success) {
+      sendJson(res, { error: { code: 'VALIDATION_ERROR', message: 'Invalid RBAC role payload', details: result.error.issues.map((i) => ({ field: i.path.join('.') || '(root)', message: i.message })) } }, 400);
+      return true;
+    }
+    if (idx < 0) {
+      sendApiError(res, 404, 'NOT_FOUND', `role '${role}' not found`);
+      return true;
+    }
+    const current = roles[idx]!;
+    const patch = result.data;
+    const updated = { role, permissions: patch.permissions ?? current.permissions };
+    roles[idx] = updated;
+    cfg['rbac_roles'] = roles;
+    writeRawConfig(projectRoot, cfg);
+    if (sprintId) writeAuditEvent(projectRoot, sprintId, { tenantId: 'local', actor, action: 'enterprise:rbac:update', target: role });
+    sendJson(res, updated, 200);
+    return true;
+  }
+
+  if (idx < 0) {
+    sendApiError(res, 404, 'NOT_FOUND', `role '${role}' not found`);
+    return true;
+  }
+  roles.splice(idx, 1);
+  cfg['rbac_roles'] = roles;
+  writeRawConfig(projectRoot, cfg);
+  if (sprintId) writeAuditEvent(projectRoot, sprintId, { tenantId: 'local', actor, action: 'enterprise:rbac:delete', target: role });
+  sendJson(res, { ok: true, role }, 200);
+  return true;
+}
+
+// ─── Rate-limit rule mutations — POST / PUT / DELETE (DASH-UX-6) ────────────
+//
+// Admin-only writes for rate-limit rules. Persisted in config.json under the
+// `rate_rules` key as Array<{ id, endpoint, limit }>. The GET /api/enterprise/rate
+// read endpoint is NOT changed (it still reads from the live RateLimiter snapshot).
+
+const RateLimitCreateSchema = z
+  .object({
+    id: z.string().min(1).max(128),
+    endpoint: z.string().min(1),
+    limit: z.number().int().positive(),
+  })
+  .strict();
+
+const RateLimitUpdateSchema = z
+  .object({
+    endpoint: z.string().min(1).optional(),
+    limit: z.number().int().positive().optional(),
+  })
+  .strict();
+
+function rateLimitRuleArray(cfg: Record<string, unknown>): Array<{ id: string; endpoint: string; limit: number }> {
+  const raw = cfg['rate_rules'];
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (e): e is { id: string; endpoint: string; limit: number } =>
+      e !== null &&
+      typeof e === 'object' &&
+      typeof (e as Record<string, unknown>)['id'] === 'string' &&
+      typeof (e as Record<string, unknown>)['endpoint'] === 'string' &&
+      typeof (e as Record<string, unknown>)['limit'] === 'number',
+  );
+}
+
+function rateLimitIdFromPath(path: string): string | null {
+  const prefix = '/api/enterprise/rate/';
+  if (!path.startsWith(prefix)) return null;
+  const rest = path.slice(prefix.length);
+  if (!rest || rest.includes('/')) return null;
+  try { return decodeURIComponent(rest); } catch { return rest; }
+}
+
+export async function handleEnterpriseRateWrite(
+  url: string,
+  method: string,
+  res: ServerResponse,
+  projectRoot: string,
+  body: unknown,
+  req?: IncomingMessage,
+): Promise<boolean> {
+  const parsed = new URL(url, 'http://localhost');
+  const path = parsed.pathname;
+  if (path !== '/api/enterprise/rate' && !path.startsWith('/api/enterprise/rate/')) return false;
+  if (method !== 'POST' && method !== 'PUT' && method !== 'DELETE') return false;
+
+  const sprintId = latestEventSprintId(projectRoot);
+  const decision = authorizeTenantAdmin(req, projectRoot, sprintId, `rate:${method.toLowerCase()}`);
+  if (!decision.authorized) {
+    sendApiError(res, 403, 'FORBIDDEN', 'admin role required for rate-limit rule management');
+    return true;
+  }
+  const actor = decision.actor;
+
+  if (method === 'POST') {
+    if (path !== '/api/enterprise/rate') {
+      sendApiError(res, 404, 'NOT_FOUND', 'unknown rate route');
+      return true;
+    }
+    const result = RateLimitCreateSchema.safeParse(body);
+    if (!result.success) {
+      sendJson(res, { error: { code: 'VALIDATION_ERROR', message: 'Invalid rate-limit rule payload', details: result.error.issues.map((i) => ({ field: i.path.join('.') || '(root)', message: i.message })) } }, 400);
+      return true;
+    }
+    const input = result.data;
+    const cfg = readRawConfig(projectRoot);
+    const rules = rateLimitRuleArray(cfg);
+    if (rules.some((r) => r.id === input.id)) {
+      sendApiError(res, 409, 'CONFLICT', `rate-limit rule '${input.id}' already exists`);
+      return true;
+    }
+    const record = { id: input.id, endpoint: input.endpoint, limit: input.limit };
+    cfg['rate_rules'] = [...rules, record];
+    writeRawConfig(projectRoot, cfg);
+    if (sprintId) writeAuditEvent(projectRoot, sprintId, { tenantId: 'local', actor, action: 'enterprise:rate:create', target: input.id });
+    sendJson(res, record, 201);
+    return true;
+  }
+
+  const id = rateLimitIdFromPath(path);
+  if (!id) {
+    sendApiError(res, 400, 'BAD_REQUEST', 'rule id required in path');
+    return true;
+  }
+
+  const cfg = readRawConfig(projectRoot);
+  const rules = rateLimitRuleArray(cfg);
+  const idx = rules.findIndex((r) => r.id === id);
+
+  if (method === 'PUT') {
+    const result = RateLimitUpdateSchema.safeParse(body);
+    if (!result.success) {
+      sendJson(res, { error: { code: 'VALIDATION_ERROR', message: 'Invalid rate-limit rule payload', details: result.error.issues.map((i) => ({ field: i.path.join('.') || '(root)', message: i.message })) } }, 400);
+      return true;
+    }
+    if (idx < 0) {
+      sendApiError(res, 404, 'NOT_FOUND', `rate-limit rule '${id}' not found`);
+      return true;
+    }
+    const current = rules[idx]!;
+    const patch = result.data;
+    const updated = {
+      id,
+      endpoint: patch.endpoint ?? current.endpoint,
+      limit: patch.limit ?? current.limit,
+    };
+    rules[idx] = updated;
+    cfg['rate_rules'] = rules;
+    writeRawConfig(projectRoot, cfg);
+    if (sprintId) writeAuditEvent(projectRoot, sprintId, { tenantId: 'local', actor, action: 'enterprise:rate:update', target: id });
+    sendJson(res, updated, 200);
+    return true;
+  }
+
+  if (idx < 0) {
+    sendApiError(res, 404, 'NOT_FOUND', `rate-limit rule '${id}' not found`);
+    return true;
+  }
+  rules.splice(idx, 1);
+  cfg['rate_rules'] = rules;
+  writeRawConfig(projectRoot, cfg);
+  if (sprintId) writeAuditEvent(projectRoot, sprintId, { tenantId: 'local', actor, action: 'enterprise:rate:delete', target: id });
+  sendJson(res, { ok: true, id }, 200);
+  return true;
+}
