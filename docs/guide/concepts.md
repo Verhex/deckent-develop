@@ -122,6 +122,8 @@ A **skill** is a specialized capability injected into a worker agent's prompt, p
 
 Skills are assigned per task in `DIRECTIVES.md` via the `- Skills:` field, and Deckent's routing engine automatically selects the best match based on task scope and project stack. Workers without an explicit skill assignment receive the most relevant built-in skills for their task type.
 
+Skill selection is tunable through the `skill_routing` block in `.deckent/config.json` — it controls scoring weights, the minimum activation threshold, and the per-task skill budget the router uses when matching skills to a task.
+
 ---
 
 ## Scope

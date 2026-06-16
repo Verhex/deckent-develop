@@ -85,9 +85,10 @@ Agents are added by placing an `agent.json` in `.deckent/agents/<name>/`. There 
 
 ```bash
 deckent skill publish .deckent/skills/my-skill
+deckent skill publish .deckent/skills/my-skill --dry-run   # validate + sign without uploading
 ```
 
-The publish command validates the manifest, performs an AST sandbox scan, signs the package with Ed25519, and uploads it to the registry.
+The publish command validates the manifest, performs an AST sandbox scan, signs the package with Ed25519, and uploads it to the registry. Pass `--dry-run` to run the full validate-and-sign pipeline without uploading — useful for verifying a package is publish-ready before committing to the registry.
 
 ### Publishing an Agent
 

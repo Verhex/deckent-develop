@@ -324,9 +324,12 @@ deckent autonomous reject  <triggerId>   # reject → recorded, not run
 # action: 'reject',  triggerId: '<id>'  — reject
 ```
 
-### 3. Governed task/sprint execution
+### 3. No auto-sprint-start — governed task/sprint execution
 
-When a trigger passes both the RBAC gate and the approval gate, the engine's **execute-dispatcher** runs the entry:
+**No auto-sprint-start:** the loop never starts a sprint (or any task) on its own. A
+trigger only executes after it has cleared both the default-deny RBAC gate **and** the
+human-approval / policy gate. When a trigger passes both gates, the engine's
+**execute-dispatcher** runs the entry:
 - `kind: task` → spawns a single worker task via the configured provider
 - `kind: sprint` → runs a full sprint lifecycle (`runSprintLifecycle`)
 - `kind: capability` → invokes the F8 capability-broker verb (`CapabilityRegistry.invoke`)

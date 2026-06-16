@@ -35,10 +35,13 @@ describe('docs/reference/marketplace.md', () => {
 
   it('describes CLI search commands', () => {
     const content = readFileSync(guidePath, 'utf-8');
-    expect(content).toContain('deckent marketplace search');
+    // Real marketplace search command is `deckent skill search <query>`
+    // with `--category` / `--limit` / `--json` options (src/cli/commands/
+    // skill-marketplace.ts). There is no `deckent marketplace search`, nor
+    // `--type` / `--sort` flags.
+    expect(content).toContain('deckent skill search');
     expect(content).toContain('--category');
-    expect(content).toContain('--type');
-    expect(content).toContain('--sort');
+    expect(content).toContain('--limit');
   });
 
   it('describes installation process', () => {
@@ -46,12 +49,15 @@ describe('docs/reference/marketplace.md', () => {
     expect(content).toContain('deckent skill install');
     expect(content).toContain('deckent agent install');
     expect(content).toContain('--force');
-    expect(content).toContain('--dry-run');
   });
 
   it('describes publishing requirements', () => {
     const content = readFileSync(guidePath, 'utf-8');
-    expect(content).toContain('deckent marketplace publish');
+    // Real publish command is `deckent skill publish <skillPath>` with a
+    // `--dry-run` option (src/cli/commands/skill-marketplace.ts) — there is no
+    // `deckent marketplace publish` command.
+    expect(content).toContain('deckent skill publish');
+    expect(content).toContain('--dry-run');
     expect(content).toContain('manifest.json');
     expect(content).toContain('semver');
   });

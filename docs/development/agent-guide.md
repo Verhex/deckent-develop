@@ -146,6 +146,16 @@ This creates `.deckent/agents/my-agent/` with:
 - Reference project conventions
 - Keep under 500 lines for optimal context usage
 
+### Adaptive Agent
+
+The **Adaptive Agent** (`src/agents/adaptive-agent.ts`) performs runtime agent
+adaptation: it tailors the resolved agent's prompt and behavior to the live task
+context at spawn time. Rather than shipping a single static persona, the adaptive
+layer enriches the selected agent with task-specific signals (scope, stack, prior
+outcomes), so the same built-in agent behaves differently for a Python data task
+versus a TypeScript API task. This keeps the agent roster small while adapting each
+worker to the work at hand.
+
 ## 5. Agent Pool Management
 
 Agents are stored in two pools:
@@ -169,6 +179,19 @@ deckent agent disable <name>         # Disable an agent (excluded from routing)
 deckent agent delete <name>          # Remove from pool
 deckent agent edit <name>            # Edit agent configuration
 ```
+
+### Retirement
+
+Agents leave the pool through three retirement paths:
+
+- **LRU eviction** — Temporary agents are capped at 50 entries; the least-recently-used
+  temp agents (older than 5 sprints) are evicted automatically to keep the pool lean
+  (`src/core/agent-pool.ts`). Persistent agents are never evicted.
+- **Disable** — `deckent agent disable <name>` removes an agent from routing without
+  deleting it; `deckent agent enable <name>` reverses this. Disabled agents are skipped
+  by the routing engine but their configuration and history are preserved.
+- **Demotion** — Underperforming agents are demoted by the Evolution Pipeline (their
+  activation rules are weakened or the agent is disabled) based on outcome data.
 
 ## 6. Evolution Pipeline
 
@@ -201,9 +224,14 @@ Agent performance is tracked at multiple levels:
 
 ### Viewing Performance
 ```bash
-deckent agent stats <name>     # Sprint-by-sprint breakdown for one agent
-deckent agent list             # Summary table for all agents
+deckent agent stats <name>            # Sprint-by-sprint breakdown for one agent
+deckent agent stats <name> --json     # Machine-readable JSON output for tooling
+deckent agent list                    # Summary table for all agents
+deckent agent list --json             # Machine-readable JSON output
 ```
+
+The `--json` flag on `deckent agent stats` and `deckent agent list` emits structured
+output (counts, success rate, per-sprint history) for scripting and dashboard ingestion.
 
 Brain uses these metrics during planning to make informed agent-task assignments, creating a feedback loop that improves sprint outcomes over time.
 

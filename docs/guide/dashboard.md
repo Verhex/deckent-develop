@@ -144,6 +144,24 @@ Authorization: Bearer <token>
 The assistant response appears in the chat thread. Conversation history is maintained
 within the session. Nervous system alerts are streamed alongside chat responses.
 
+## Terminal
+
+The dashboard includes an embedded **Terminal** (ADR-062) docked at the bottom of every
+page. Click the terminal bar to expand it, or use the maximize control to take over the
+viewport. It opens an interactive PTY session in the project directory so you can run
+`deckent` commands and shell tooling without leaving the browser.
+
+- **WS gateway** — the terminal streams over a WebSocket gateway (`src/api/terminal/ws-gateway.ts`)
+  authenticated with the same Bearer token as the rest of the dashboard.
+- **Command guard** — input passes through a command guard (`src/api/terminal/command-guard.ts`)
+  that blocks destructive patterns before they reach the PTY.
+- **Audit trail** — every session is recorded to a tamper-evident audit chain
+  (`src/api/terminal/audit-integrity.ts`) so terminal activity is attributable and reviewable.
+- **Tabs** — multiple terminal tabs can run concurrently; each tab is an independent PTY session.
+
+The Terminal dock is available on all pages, making it convenient to start a sprint,
+check `deckent status`, or tail worker logs while watching the live UI update.
+
 ## Authentication
 
 All API calls from the dashboard use a Bearer token injected at serve startup. If you

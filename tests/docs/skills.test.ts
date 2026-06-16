@@ -34,8 +34,11 @@ describe('docs/reference/skills.md', () => {
     }
   });
 
-  it('documents all 10 built-in skills', () => {
+  it('documents the built-in skills', () => {
     const content = readFileSync(skillsPath, 'utf-8');
+    // Built-in skill ids per src/core/builtins/skills/*/manifest.json.
+    // The accessibility skill id is `accessibility-expert` (not the
+    // nonexistent `accessibility-specialist`).
     const builtInSkills = [
       'typescript-expert',
       'react-specialist',
@@ -46,7 +49,7 @@ describe('docs/reference/skills.md', () => {
       'database-migration',
       'devops-engineer',
       'documentation-writer',
-      'accessibility-specialist',
+      'accessibility-expert',
     ];
     for (const skill of builtInSkills) {
       expect(content).toContain(skill);

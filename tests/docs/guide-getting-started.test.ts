@@ -169,8 +169,11 @@ describe('docs/guide/concepts.md', () => {
 
   it('explains Memory system with decay', () => {
     expect(content).toContain('## Memory');
-    expect(content).toContain('MEMORY.md');
-    expect(content).toContain('DEBT.md');
+    // Memory V2 (ADR-088) is DB-first: the root `.brain/MEMORY.md` and
+    // `.brain/DEBT.md` files were removed and replaced by generated exports
+    // under `.brain/exports/` (lowercase `memory.md` / `debt.md`).
+    expect(content).toContain('memory.md');
+    expect(content).toContain('debt.md');
     expect(content).toContain('decay');
   });
 

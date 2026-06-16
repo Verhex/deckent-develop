@@ -33,17 +33,27 @@ describe('docs/development/agent-guide.md', () => {
     }
   });
 
-  it('documents all 8 built-in agents', () => {
+  it('documents all 15 built-in agents', () => {
     const content = readFileSync(guidePath, 'utf-8');
+    // The 15 built-in agents per src/core/agent-pool.ts (ADR-041, Sprint 166
+    // reconfirmed — testing agents removed; test-writer/api-designer/devops-agent
+    // never existed in the current roster).
     const builtInAgents = [
       'security-auditor',
-      'test-writer',
       'doc-writer',
+      'bug-fixer',
       'code-reviewer',
-      'performance-optimizer',
+      'refactorer',
+      'api-builder',
+      'performance-analyzer',
+      'ci-guardian',
+      'architect',
+      'architecture-planner',
+      'accessibility-auditor',
+      'data-engineer',
+      'devops-engineer',
+      'frontend-designer',
       'migration-specialist',
-      'api-designer',
-      'devops-agent',
     ];
     for (const agent of builtInAgents) {
       expect(content).toContain(agent);
