@@ -38,7 +38,7 @@ describe('Decision Log Rehabilitation', () => {
   beforeEach(() => {
     tmpDir = createTempDir();
     // Create .deckent/decisions/ directory
-    fs.mkdirSync(path.join(tmpDir, '.deckent', 'decisions'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.deckent', 'runtime', 'decisions'), { recursive: true });
   });
 
   afterEach(() => {
@@ -61,7 +61,7 @@ describe('Decision Log Rehabilitation', () => {
 
     logger.log('sprint-146', '146-001', meaningful);
 
-    const logPath = path.join(tmpDir, '.deckent', 'decisions', 'decision-146-001.json');
+    const logPath = path.join(tmpDir, '.deckent', 'runtime', 'decisions', 'decision-146-001.json');
     expect(fs.existsSync(logPath)).toBe(true);
 
     const persisted = JSON.parse(fs.readFileSync(logPath, 'utf-8'));
@@ -147,7 +147,7 @@ describe('Decision Log Rehabilitation', () => {
   // ─── Test 6: deckent explain --task reads decision log ────────────────
   it('buildTaskDecisionOutput reads and formats decision log for a task', () => {
     // Write a decision log file
-    const decisionDir = path.join(tmpDir, '.deckent', 'decisions');
+    const decisionDir = path.join(tmpDir, '.deckent', 'runtime', 'decisions');
     const logData = {
       taskId: '146-001',
       sprintId: 'sprint-146',

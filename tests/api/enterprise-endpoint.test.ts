@@ -26,7 +26,7 @@ function makeProjectRoot(): string {
   const root = mkdtempSync(join(tmpdir(), 'deckent-ent-proj-'));
   mkdirSync(join(root, '.brain', 'sprints'), { recursive: true });
   mkdirSync(join(root, '.tasks'), { recursive: true });
-  mkdirSync(join(root, '.deckent'), { recursive: true });
+  mkdirSync(join(root, '.deckent', 'recently-works'), { recursive: true });
   return root;
 }
 
@@ -47,7 +47,7 @@ function writeEventsFixture(
     }),
   );
   writeFileSync(
-    join(root, '.deckent', `${sprintId}-events.jsonl`),
+    join(root, '.deckent', 'recently-works', `${sprintId}-events.jsonl`),
     lines.join('\n') + '\n',
     'utf-8',
   );

@@ -18,7 +18,7 @@ let tmpRoot: string;
 const SPRINT_ID = 'sprint-test';
 
 function writeEvents(root: string, events: DeckentEvent[]): void {
-  const deckentDir = join(root, '.deckent');
+  const deckentDir = join(root, '.deckent', 'recently-works');
   mkdirSync(deckentDir, { recursive: true });
   const lines = events.map(e => JSON.stringify(e)).join('\n') + '\n';
   writeFileSync(join(deckentDir, `${SPRINT_ID}-events.jsonl`), lines, 'utf-8');

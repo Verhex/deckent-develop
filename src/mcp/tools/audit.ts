@@ -1,5 +1,6 @@
 import { existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { RECENT_WORKS_DIR } from '../../core/constants.js';
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { runSelfAuditGate } from '../../orchestra/sprint-finalizer.js';
@@ -107,9 +108,9 @@ export function registerAuditTool(server: McpServer): void {
         const result = await runSelfAuditGate(sprintId, root);
 
         // Write gate result
-        const deckentDir = join(root, '.deckent');
-        if (!existsSync(deckentDir)) mkdirSync(deckentDir, { recursive: true });
-        const gatePath = join(deckentDir, `${sprintId}-gate.json`);
+        const recentWorksDir = join(root, RECENT_WORKS_DIR);
+        if (!existsSync(recentWorksDir)) mkdirSync(recentWorksDir, { recursive: true });
+        const gatePath = join(recentWorksDir, `${sprintId}-gate.json`);
         writeFileSync(gatePath, JSON.stringify(result, null, 2) + '\n', 'utf-8');
 
         const enriched = enrichResponse('audit', {

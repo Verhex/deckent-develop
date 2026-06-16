@@ -116,7 +116,7 @@ describe('NOTIFY channel via writeEvent', () => {
   it('should produce JSONL lines containing NOTIFY channel', () => {
     emitNotify(testRoot, sprintId, 'info', 'Sprint complete', 'All done');
 
-    const eventsFile = join(testRoot, '.deckent', `${sprintId}-events.jsonl`);
+    const eventsFile = join(testRoot, '.deckent', 'recently-works', `${sprintId}-events.jsonl`);
     const raw = readFileSync(eventsFile, 'utf-8');
     expect(raw).toContain('"DECKENT→USER:NOTIFY"');
   });

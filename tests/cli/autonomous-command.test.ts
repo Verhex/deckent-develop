@@ -148,8 +148,8 @@ describe('deckent autonomous CLI (226-007)', () => {
       'utf-8',
     );
     // Plant audit JSONL with one event
-    const eventsFile = join(root, '.deckent', 'autonomous-events.jsonl');
-    mkdirSync(join(root, '.deckent'), { recursive: true });
+    const eventsFile = join(root, '.deckent', 'recently-works', 'autonomous-events.jsonl');
+    mkdirSync(join(root, '.deckent', 'recently-works'), { recursive: true });
     writeFileSync(eventsFile, JSON.stringify({
       timestamp: '2026-06-04T00:02:00.000Z',
       sequence: 1,
@@ -187,7 +187,7 @@ describe('deckent autonomous CLI (226-007)', () => {
     expect(out).toContain('Autonomous runtime started');
     expect(out).toContain('Autonomous loop finished');
     // 1 iteration, idle → no audit events written
-    const eventsFile = join(root, '.deckent', 'autonomous-events.jsonl');
+    const eventsFile = join(root, '.deckent', 'recently-works', 'autonomous-events.jsonl');
     expect(existsSync(eventsFile)).toBe(false);
   });
 
@@ -241,7 +241,7 @@ describe('deckent autonomous CLI (226-007)', () => {
     );
 
     // Audit event: cycle outcome is 'pending' (parked, not denied).
-    const eventsFile = join(root, '.deckent', 'autonomous-events.jsonl');
+    const eventsFile = join(root, '.deckent', 'recently-works', 'autonomous-events.jsonl');
     expect(existsSync(eventsFile)).toBe(true);
     const lines = readFileSync(eventsFile, 'utf-8').split('\n').filter((l) => l.length > 0);
     expect(lines.length).toBeGreaterThanOrEqual(1);

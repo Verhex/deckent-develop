@@ -1273,7 +1273,7 @@ export async function finalizeSprint(
       `Retention complete: archived=${retentionResult.archived.length}, countersDeleted=${retentionResult.countersDeleted.length}, forensicMoved=${retentionResult.forensicMoved.length}, bytesFreed=${retentionResult.bytesFreed}`);
   } catch (e) { debugLog('finalizeSprint:sprintFileRetention', e); }
 
-  // 13. Write job completion summary to .deckent/jobs/ for MCP polling and CLI notification
+  // 13. Write job completion summary to .deckent/runtime/jobs/ for MCP polling and CLI notification
   debugLog('finalizeSprint:breadcrumb', 'Step 13 (jobSummary) — entering');
   try {
     const jobsDir = join(projectRoot, JOBS_DIR);

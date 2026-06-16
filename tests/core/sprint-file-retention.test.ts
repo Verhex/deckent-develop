@@ -31,7 +31,7 @@ import {
 
 function createTmpProject(suffix: string): string {
   const dir = join(tmpdir(), `deckent-retention-${suffix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
-  mkdirSync(join(dir, '.deckent'), { recursive: true });
+  mkdirSync(join(dir, '.deckent', 'recently-works'), { recursive: true });
   return dir;
 }
 
@@ -40,7 +40,7 @@ function cleanupTmpProject(dir: string): void {
 }
 
 function seedSprintFile(root: string, filename: string, content = '{}'): void {
-  writeFileSync(join(root, '.deckent', filename), content);
+  writeFileSync(join(root, '.deckent', 'recently-works', filename), content);
 }
 
 // ─── Extractors ─────────────────────────────────────────────────────
@@ -111,8 +111,8 @@ describe('enforceRetention — keep_last_n', () => {
     expect(result.archived.every(p => p.includes('sprint-100'))).toBe(true);
 
     // Source files removed
-    expect(existsSync(join(tmpDir, '.deckent', 'sprint-100-events.jsonl'))).toBe(false);
-    expect(existsSync(join(tmpDir, '.deckent', 'sprint-101-events.jsonl'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.deckent', 'recently-works', 'sprint-100-events.jsonl'))).toBe(false);
+    expect(existsSync(join(tmpDir, '.deckent', 'recently-works', 'sprint-101-events.jsonl'))).toBe(true);
 
     // Archive location correct
     expect(existsSync(join(tmpDir, '.deckent', 'archive', 'sprints', 'sprint-100'))).toBe(true);
@@ -180,9 +180,9 @@ describe('cleanupCounters', () => {
     const deleted = cleanupCounters(tmpDir, 'sprint-150');
 
     expect(deleted.sort()).toEqual(['sprint-150-checkpoint-seq', 'sprint-150-seq']);
-    expect(existsSync(join(tmpDir, '.deckent', 'sprint-150-seq'))).toBe(false);
-    expect(existsSync(join(tmpDir, '.deckent', 'sprint-150-checkpoint-seq'))).toBe(false);
-    expect(existsSync(join(tmpDir, '.deckent', 'sprint-150-events.jsonl'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.deckent', 'recently-works', 'sprint-150-seq'))).toBe(false);
+    expect(existsSync(join(tmpDir, '.deckent', 'recently-works', 'sprint-150-checkpoint-seq'))).toBe(false);
+    expect(existsSync(join(tmpDir, '.deckent', 'recently-works', 'sprint-150-events.jsonl'))).toBe(true);
   });
 
   it('ignores other sprints', () => {
@@ -191,8 +191,8 @@ describe('cleanupCounters', () => {
 
     cleanupCounters(tmpDir, 'sprint-150');
 
-    expect(existsSync(join(tmpDir, '.deckent', 'sprint-149-seq'))).toBe(true);
-    expect(existsSync(join(tmpDir, '.deckent', 'sprint-150-seq'))).toBe(false);
+    expect(existsSync(join(tmpDir, '.deckent', 'recently-works', 'sprint-149-seq'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.deckent', 'recently-works', 'sprint-150-seq'))).toBe(false);
   });
 });
 
@@ -216,10 +216,10 @@ describe('migrateForensicFiles', () => {
     expect(existsSync(join(tmpDir, 'docs', 'audits', 'sprint-140', 'verifier-log.md'))).toBe(true);
 
     // Source removed
-    expect(existsSync(join(tmpDir, '.deckent', 'sprint-140-layer3-scorecard.md'))).toBe(false);
+    expect(existsSync(join(tmpDir, '.deckent', 'recently-works', 'sprint-140-layer3-scorecard.md'))).toBe(false);
 
     // Non-forensic preserved in .deckent/
-    expect(existsSync(join(tmpDir, '.deckent', 'sprint-140-events.jsonl'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.deckent', 'recently-works', 'sprint-140-events.jsonl'))).toBe(true);
   });
 
   it('no-op when no forensic files', () => {
@@ -270,6 +270,6 @@ describe('runRetention — combined pipeline', () => {
     const result = runRetention(tmpDir, null, DEFAULT_RETENTION_CONFIG);
 
     expect(result.countersDeleted).toEqual([]);
-    expect(existsSync(join(tmpDir, '.deckent', 'sprint-150-seq'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.deckent', 'recently-works', 'sprint-150-seq'))).toBe(true);
   });
 });

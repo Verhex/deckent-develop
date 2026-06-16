@@ -46,7 +46,7 @@ import { runTaskMode } from '../../orchestra/task-mode-runner.js';
 import { runSprint as runSprintLifecycle } from '../../orchestra/sprint-controller.js';
 import { waitForRunResult } from './run.js';
 import { loadConfig } from '../../core/config.js';
-import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
+import { PROJECT_CONFIG_PATH, RECENT_WORKS_DIR } from '../../core/constants.js';
 import { bootstrapProviders } from '../../core/provider.js';
 import type { ModelType } from '../../core/types.js';
 import { loadReactiveMap } from '../../orchestra/autonomous/reactive/reactive-map.js';
@@ -75,7 +75,7 @@ function stopMarkerPath(root: string): string {
 }
 
 function eventsPath(root: string, sprintId = 'autonomous'): string {
-  return join(root, '.deckent', `${sprintId}-events.jsonl`);
+  return join(root, RECENT_WORKS_DIR, `${sprintId}-events.jsonl`);
 }
 
 function ensureAutonomousDir(root: string): void {

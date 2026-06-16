@@ -68,10 +68,10 @@ let projectRoot: string | undefined;
 
 function makeRoot(): string {
   const root = mkdtempSync(join(tmpdir(), 'deckent-ent-crud-'));
-  mkdirSync(join(root, '.deckent'), { recursive: true });
+  mkdirSync(join(root, '.deckent', 'recently-works'), { recursive: true });
   // A minimal events stream so latestEventSprintId resolves → audit writes land.
   writeFileSync(
-    join(root, '.deckent', `${SPRINT_ID}-events.jsonl`),
+    join(root, '.deckent', 'recently-works', `${SPRINT_ID}-events.jsonl`),
     JSON.stringify({
       timestamp: '2026-06-11T00:00:00.000Z',
       sequence: 1,
@@ -96,7 +96,7 @@ function readConfig(root: string): { tenants?: Array<Record<string, unknown>> } 
 }
 
 function readEvents(root: string): string {
-  const p = join(root, '.deckent', `${SPRINT_ID}-events.jsonl`);
+  const p = join(root, '.deckent', 'recently-works', `${SPRINT_ID}-events.jsonl`);
   return existsSync(p) ? readFileSync(p, 'utf-8') : '';
 }
 

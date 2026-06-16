@@ -132,7 +132,7 @@ function writeSyntheticExitNoResult(tmpDir: string, taskId: string, exitCode = 0
 }
 
 function readEventStream(tmpDir: string, sprintId: string): Array<{ channel: string; payload: Record<string, unknown> }> {
-  const eventsPath = join(tmpDir, '.deckent', `${sprintId}-events.jsonl`);
+  const eventsPath = join(tmpDir, '.deckent', 'recently-works', `${sprintId}-events.jsonl`);
   if (!existsSync(eventsPath)) return [];
   const raw = readFileSync(eventsPath, 'utf-8');
   return raw

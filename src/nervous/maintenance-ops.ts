@@ -16,7 +16,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { clearDocCache } from '../orchestra/managed-docs/doc-cache.js';
-import { NERVOUS_IPC_DIR, PANIC_IPC_DIR } from '../core/constants.js';
+import { NERVOUS_IPC_DIR, PANIC_IPC_DIR, RECENT_WORKS_DIR } from '../core/constants.js';
 
 const DECKENT_DIR = '.deckent';
 
@@ -102,11 +102,11 @@ export function cleanIpcDirs(projectRoot: string, maxAgeMs = 60 * 60 * 1000): nu
 
 /**
  * Prune corrupt (unparseable) lines from a sprint event stream
- * (`.deckent/<sprintId>-events.jsonl`), rewriting only the valid JSON events.
+ * (`.deckent/recently-works/<sprintId>-events.jsonl`), rewriting only the valid JSON events.
  * Returns the count of dropped lines; 0 when the file is absent or already clean.
  */
 export function pruneDeadEventStream(projectRoot: string, sprintId: string): number {
-  const path = join(projectRoot, DECKENT_DIR, `${sprintId}-events.jsonl`);
+  const path = join(projectRoot, RECENT_WORKS_DIR, `${sprintId}-events.jsonl`);
   if (!existsSync(path)) return 0;
   const lines = readFileSync(path, 'utf-8').split('\n').filter((l) => l.trim().length > 0);
   const valid: string[] = [];

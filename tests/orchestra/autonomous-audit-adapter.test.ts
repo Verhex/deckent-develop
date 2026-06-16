@@ -20,7 +20,7 @@ function makeRecord(overrides: Partial<AuditRecord> = {}): AuditRecord {
 }
 
 function readEvents(root: string, sprintId: string = 'autonomous'): unknown[] {
-  const filePath = join(root, '.deckent', `${sprintId}-events.jsonl`);
+  const filePath = join(root, '.deckent', 'recently-works', `${sprintId}-events.jsonl`);
   if (!existsSync(filePath)) return [];
   return readFileSync(filePath, 'utf-8')
     .split('\n')

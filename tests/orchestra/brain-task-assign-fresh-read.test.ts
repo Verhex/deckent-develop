@@ -108,7 +108,7 @@ describe('consultCollisionDecision (Sprint 168 C0c RC2 wire)', () => {
     expect(decision.taskIds).toEqual(['168-001', '168-002']);
 
     // Verify event written to .deckent/sprint-168-events.jsonl
-    const eventsPath = join(testRoot, '.deckent', 'sprint-168-events.jsonl');
+    const eventsPath = join(testRoot, '.deckent', 'recently-works', 'sprint-168-events.jsonl');
     expect(existsSync(eventsPath)).toBe(true);
 
     const raw = readFileSync(eventsPath, 'utf-8');
@@ -126,7 +126,7 @@ describe('consultCollisionDecision (Sprint 168 C0c RC2 wire)', () => {
       files: ['shared.json'],
       detectedAt: 'spawn-time',
     });
-    const eventsPath = join(testRoot, '.deckent', 'sprint-168-events.jsonl');
+    const eventsPath = join(testRoot, '.deckent', 'recently-works', 'sprint-168-events.jsonl');
     const raw = readFileSync(eventsPath, 'utf-8');
     const event = JSON.parse(raw.trim().split('\n')[0]!);
     expect(event.payload.reason).toContain('shared.json');

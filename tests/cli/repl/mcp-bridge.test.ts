@@ -82,7 +82,7 @@ function makeBroker(opts: {
 }
 
 function readEventsFile(root: string, sprintId: string): unknown[] {
-  const p = join(root, '.deckent', `${sprintId}-events.jsonl`);
+  const p = join(root, '.deckent', 'recently-works', `${sprintId}-events.jsonl`);
   if (!existsSync(p)) return [];
   return readFileSync(p, 'utf-8')
     .split('\n')

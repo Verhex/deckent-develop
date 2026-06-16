@@ -12,7 +12,7 @@ function cleanup() {
 
 beforeEach(() => {
   cleanup();
-  fs.mkdirSync(DECKENT_DIR, { recursive: true });
+  fs.mkdirSync(path.join(DECKENT_DIR, 'settings'), { recursive: true });
 });
 
 afterEach(cleanup);
@@ -43,7 +43,7 @@ describe('seedDocsConfig', () => {
       docs: [{ id: 'custom', path: 'CUSTOM.md', autoSections: ['My Section'] }],
     };
     fs.writeFileSync(
-      path.join(DECKENT_DIR, 'docs.json'),
+      path.join(DECKENT_DIR, 'settings', 'docs.json'),
       JSON.stringify(customConfig, null, 2),
       'utf-8',
     );

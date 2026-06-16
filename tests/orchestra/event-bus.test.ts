@@ -32,7 +32,7 @@ describe('EventBus', () => {
   beforeEach(() => {
     bus = new EventBus();
     testRoot = join(tmpdir(), `deckent-event-bus-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    mkdirSync(join(testRoot, '.deckent'), { recursive: true });
+    mkdirSync(join(testRoot, '.deckent', 'recently-works'), { recursive: true });
   });
 
   afterEach(() => {
@@ -139,7 +139,7 @@ describe('EventBus', () => {
 
   it('should return last N events from JSONL file via tail()', async () => {
     // Write 8 events to JSONL
-    const filePath = join(testRoot, '.deckent', `${sprintId}-events.jsonl`);
+    const filePath = join(testRoot, '.deckent', 'recently-works', `${sprintId}-events.jsonl`);
     for (let i = 1; i <= 8; i++) {
       const event = makeEvent({ sequence: i, payload: { index: i } });
       appendFileSync(filePath, JSON.stringify(event) + '\n', 'utf-8');
@@ -160,7 +160,7 @@ describe('EventBus', () => {
   });
 
   it('should return empty array for empty file via tail()', async () => {
-    const filePath = join(testRoot, '.deckent', `${sprintId}-events.jsonl`);
+    const filePath = join(testRoot, '.deckent', 'recently-works', `${sprintId}-events.jsonl`);
     appendFileSync(filePath, '', 'utf-8');
 
     const result = await bus.tail(testRoot, sprintId, 10);
@@ -197,7 +197,7 @@ describe('EventBus', () => {
 
   it('should clean up all file watchers on unwatchAll()', () => {
     // Create the JSONL file first so watch doesn't fail
-    const filePath = join(testRoot, '.deckent', `${sprintId}-events.jsonl`);
+    const filePath = join(testRoot, '.deckent', 'recently-works', `${sprintId}-events.jsonl`);
     appendFileSync(filePath, '', 'utf-8');
 
     const watcher = bus.watchFile(testRoot, sprintId);
@@ -283,7 +283,7 @@ describe('EventBus', () => {
   // ─── Test 15: tail() skips malformed lines ────────────────────
 
   it('should skip malformed JSON lines in tail()', async () => {
-    const filePath = join(testRoot, '.deckent', `${sprintId}-events.jsonl`);
+    const filePath = join(testRoot, '.deckent', 'recently-works', `${sprintId}-events.jsonl`);
     appendFileSync(filePath, JSON.stringify(makeEvent({ sequence: 1 })) + '\n', 'utf-8');
     appendFileSync(filePath, 'not valid json\n', 'utf-8');
     appendFileSync(filePath, JSON.stringify(makeEvent({ sequence: 3 })) + '\n', 'utf-8');
@@ -308,7 +308,7 @@ describe('EventBus', () => {
   // ─── Test 17: watchFile detects new events (integration) ──────
 
   it('should detect new JSONL lines via watchFile', async () => {
-    const filePath = join(testRoot, '.deckent', `${sprintId}-events.jsonl`);
+    const filePath = join(testRoot, '.deckent', 'recently-works', `${sprintId}-events.jsonl`);
     // Create file with initial content
     appendFileSync(filePath, JSON.stringify(makeEvent({ sequence: 1 })) + '\n', 'utf-8');
 

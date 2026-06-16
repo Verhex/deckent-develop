@@ -2,7 +2,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { DASHBOARD_FILE, TASKS_DIR, DECKENT_DIR } from '../../core/constants.js';
+import { DASHBOARD_FILE, TASKS_DIR, DECKENT_DIR, RECENT_WORKS_DIR } from '../../core/constants.js';
 import { readLatestJobState } from './job-runner.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatStatusResponse, wrapResponse, type StatusData } from '../helpers/format.js';
@@ -20,7 +20,7 @@ function readEventStreamTail(
   sprintId: string,
   maxLines = 20,
 ): unknown[] {
-  const filePath = join(projectRoot, DECKENT_DIR, `${sprintId}-events.jsonl`);
+  const filePath = join(projectRoot, RECENT_WORKS_DIR, `${sprintId}-events.jsonl`);
   if (!existsSync(filePath)) return [];
   try {
     const raw = readFileSync(filePath, 'utf-8');
@@ -79,7 +79,7 @@ function readMetricSnapshot(
   sprintId: string,
 ): Record<string, unknown> {
   // Try per-sprint file first (written when perSprintFile is enabled)
-  const perSprintPath = join(projectRoot, DECKENT_DIR, `${sprintId}-metrics.jsonl`);
+  const perSprintPath = join(projectRoot, RECENT_WORKS_DIR, `${sprintId}-metrics.jsonl`);
   if (existsSync(perSprintPath)) {
     try {
       const raw = readFileSync(perSprintPath, 'utf-8');

@@ -10,7 +10,7 @@ import type { DeckentEvent } from './event-stream.js';
 import { can, Permission } from './rbac.js';
 import { AUDIT_EVENT_CHANNEL } from './audit-writer.js';
 import type { AuditEvent, AuditEventPayload } from './audit-writer.js';
-import { DECKENT_DIR } from './constants.js';
+import { RECENT_WORKS_DIR } from './constants.js';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -121,7 +121,7 @@ export function readAuditEvents(projectRoot: string, sprintId: string): AuditEve
  * Missing archive → `[]`; malformed lines are skipped (never throws).
  */
 export function readArchivedAuditEvents(projectRoot: string, sprintId: string): AuditEventPayload[] {
-  const archivePath = join(projectRoot, DECKENT_DIR, `${sprintId}-events-archive.jsonl`);
+  const archivePath = join(projectRoot, RECENT_WORKS_DIR, `${sprintId}-events-archive.jsonl`);
   if (!existsSync(archivePath)) return [];
   let raw: string;
   try {

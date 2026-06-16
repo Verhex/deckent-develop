@@ -37,21 +37,21 @@ describe('DecisionLogger.log', () => {
   it('creates decision log file', () => {
     const logger = new DecisionLogger(TEST_ROOT);
     logger.log('sprint-031', '031-001', makeEntries(3));
-    const filePath = path.join(TEST_ROOT, '.deckent', 'decisions', 'decision-031-001.json');
+    const filePath = path.join(TEST_ROOT, '.deckent', 'runtime', 'decisions', 'decision-031-001.json');
     expect(fs.existsSync(filePath)).toBe(true);
   });
 
   it('creates decisions directory if missing', () => {
     const logger = new DecisionLogger(TEST_ROOT);
     logger.log('sprint-031', '031-001', makeEntries(1));
-    const dir = path.join(TEST_ROOT, '.deckent', 'decisions');
+    const dir = path.join(TEST_ROOT, '.deckent', 'runtime', 'decisions');
     expect(fs.existsSync(dir)).toBe(true);
   });
 
   it('writes valid JSON', () => {
     const logger = new DecisionLogger(TEST_ROOT);
     logger.log('sprint-031', '031-001', makeEntries(2));
-    const filePath = path.join(TEST_ROOT, '.deckent', 'decisions', 'decision-031-001.json');
+    const filePath = path.join(TEST_ROOT, '.deckent', 'runtime', 'decisions', 'decision-031-001.json');
     const raw = fs.readFileSync(filePath, 'utf-8');
     expect(() => JSON.parse(raw)).not.toThrow();
   });
@@ -59,7 +59,7 @@ describe('DecisionLogger.log', () => {
   it('stores correct taskId', () => {
     const logger = new DecisionLogger(TEST_ROOT);
     logger.log('sprint-031', '031-005', makeEntries(1));
-    const filePath = path.join(TEST_ROOT, '.deckent', 'decisions', 'decision-031-005.json');
+    const filePath = path.join(TEST_ROOT, '.deckent', 'runtime', 'decisions', 'decision-031-005.json');
     const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
     expect(data.taskId).toBe('031-005');
   });
@@ -67,7 +67,7 @@ describe('DecisionLogger.log', () => {
   it('stores correct sprintId', () => {
     const logger = new DecisionLogger(TEST_ROOT);
     logger.log('sprint-031', '031-001', makeEntries(1));
-    const filePath = path.join(TEST_ROOT, '.deckent', 'decisions', 'decision-031-001.json');
+    const filePath = path.join(TEST_ROOT, '.deckent', 'runtime', 'decisions', 'decision-031-001.json');
     const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
     expect(data.sprintId).toBe('sprint-031');
   });
@@ -76,7 +76,7 @@ describe('DecisionLogger.log', () => {
     const logger = new DecisionLogger(TEST_ROOT);
     const entries = makeEntries(6);
     logger.log('sprint-031', '031-001', entries);
-    const filePath = path.join(TEST_ROOT, '.deckent', 'decisions', 'decision-031-001.json');
+    const filePath = path.join(TEST_ROOT, '.deckent', 'runtime', 'decisions', 'decision-031-001.json');
     const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
     expect(data.steps).toHaveLength(6);
   });
@@ -84,7 +84,7 @@ describe('DecisionLogger.log', () => {
   it('stores decidedAt as ISO string', () => {
     const logger = new DecisionLogger(TEST_ROOT);
     logger.log('sprint-031', '031-001', makeEntries(1));
-    const filePath = path.join(TEST_ROOT, '.deckent', 'decisions', 'decision-031-001.json');
+    const filePath = path.join(TEST_ROOT, '.deckent', 'runtime', 'decisions', 'decision-031-001.json');
     const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
     expect(data.decidedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
@@ -93,7 +93,7 @@ describe('DecisionLogger.log', () => {
     const logger = new DecisionLogger(TEST_ROOT);
     logger.log('sprint-031', '031-001', makeEntries(2));
     logger.log('sprint-031', '031-001', makeEntries(4));
-    const filePath = path.join(TEST_ROOT, '.deckent', 'decisions', 'decision-031-001.json');
+    const filePath = path.join(TEST_ROOT, '.deckent', 'runtime', 'decisions', 'decision-031-001.json');
     const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
     expect(data.steps).toHaveLength(4);
   });
@@ -134,7 +134,7 @@ describe('DecisionLogger.readDecisionLog', () => {
 
   it('returns null for corrupted JSON', () => {
     const logger = new DecisionLogger(TEST_ROOT);
-    const dir = path.join(TEST_ROOT, '.deckent', 'decisions');
+    const dir = path.join(TEST_ROOT, '.deckent', 'runtime', 'decisions');
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, 'decision-031-001.json'), 'NOT JSON', 'utf-8');
     const result = logger.readDecisionLog('031-001');
@@ -172,7 +172,7 @@ describe('DecisionLogger.listDecisions', () => {
   it('skips corrupted files in listing', () => {
     const logger = new DecisionLogger(TEST_ROOT);
     logger.log('sprint-031', '031-001', makeEntries(1));
-    const dir = path.join(TEST_ROOT, '.deckent', 'decisions');
+    const dir = path.join(TEST_ROOT, '.deckent', 'runtime', 'decisions');
     fs.writeFileSync(path.join(dir, 'decision-031-bad.json'), 'BROKEN', 'utf-8');
     const result = logger.listDecisions('sprint-031');
     expect(result).toContain('031-001');
@@ -181,7 +181,7 @@ describe('DecisionLogger.listDecisions', () => {
   it('ignores non-decision files', () => {
     const logger = new DecisionLogger(TEST_ROOT);
     logger.log('sprint-031', '031-001', makeEntries(1));
-    const dir = path.join(TEST_ROOT, '.deckent', 'decisions');
+    const dir = path.join(TEST_ROOT, '.deckent', 'runtime', 'decisions');
     fs.writeFileSync(path.join(dir, 'other-file.txt'), 'hello', 'utf-8');
     const result = logger.listDecisions('sprint-031');
     expect(result).toEqual(['031-001']);

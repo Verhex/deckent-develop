@@ -7,7 +7,7 @@ const PROJECT_ROOT = join(import.meta.dirname ?? __dirname, '..', '..');
 
 describe('docs.json schema validation (Bug R fix)', () => {
   it('contains AGENTS.md entry with correct autoSections and protectedSections', () => {
-    const docsJsonPath = join(PROJECT_ROOT, '.deckent', 'docs.json');
+    const docsJsonPath = join(PROJECT_ROOT, '.deckent', 'settings', 'docs.json');
     const raw = readFileSync(docsJsonPath, 'utf-8');
     const parsed = JSON.parse(raw) as { docs: Array<{ id: string; path: string; autoSections: string[]; protectedSections: string[] }> };
 

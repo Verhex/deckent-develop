@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 // Sprint 139 Task 038 — Schema validation (original)
 // Sprint 150 Task 029 — Content-vs-code integrity, CLI/MCP wire, staleness detection
 
-const MANIFEST_PATH = join(process.cwd(), '.deckent', 'features-manifest.json');
+const MANIFEST_PATH = join(process.cwd(), '.deckent', 'settings', 'features-manifest.json');
 
 type FeatureEntry = {
   id: string;

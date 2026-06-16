@@ -71,6 +71,9 @@ coverage/
 # Nervous System runtime (ADR-040 — logs, history, pending, IPC dirs, all regenerated)
 .deckent/nervous/
 
+# Per-sprint ephemeral artifacts (events, metrics, gate, pre-archive — regenerated each run)
+.deckent/recently-works/
+
 # Sprint ephemeral artifacts (IPC, events, checkpoints — regenerated each run)
 .deckent/sprint-*-ipc/
 .deckent/sprint-*-events.jsonl
