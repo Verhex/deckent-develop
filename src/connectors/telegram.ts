@@ -13,11 +13,12 @@
 import { BaseConnector } from './base-connector.js';
 import type { ConnectorConfig, OutgoingMessage, IncomingCallback } from './types.js';
 
-/** Telegram inline-keyboard `extra` for sendMessage (rich-approval buttons). */
+/** Telegram sendMessage `extra` (rich-approval buttons + rich-text mode). */
 interface SendExtra {
   reply_markup?: {
     inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
   };
+  parse_mode?: 'HTML' | 'MarkdownV2';
 }
 
 /** Minimal Telegraf type surface we rely on (avoids hard import-time dependency) */
@@ -159,13 +160,20 @@ export class TelegramConnector extends BaseConnector {
     if (!this.bot) {
       throw new Error('Telegram connector not started');
     }
-    // Rich-approval bot: render inline buttons (approve/reject) when present.
-    // No buttons → plain 2-arg call, byte-identical to the pre-button behaviour.
+    // Rich-approval bot: attach inline buttons (approve/reject) and/or a rich-text
+    // parse_mode when present. No extras → plain 2-arg call, byte-identical to the
+    // pre-button behaviour (keeps the legacy send path untouched).
+    const extra: SendExtra = {};
     if (msg.buttons && msg.buttons.length > 0) {
-      const inline_keyboard = msg.buttons.map((row) =>
-        row.map((b) => ({ text: b.text, callback_data: b.callbackData })),
-      );
-      await this.bot.telegram.sendMessage(msg.channelId, msg.text, { reply_markup: { inline_keyboard } });
+      extra.reply_markup = {
+        inline_keyboard: msg.buttons.map((row) =>
+          row.map((b) => ({ text: b.text, callback_data: b.callbackData })),
+        ),
+      };
+    }
+    if (msg.parseMode) extra.parse_mode = msg.parseMode;
+    if (extra.reply_markup || extra.parse_mode) {
+      await this.bot.telegram.sendMessage(msg.channelId, msg.text, extra);
       return;
     }
     await this.bot.telegram.sendMessage(msg.channelId, msg.text);

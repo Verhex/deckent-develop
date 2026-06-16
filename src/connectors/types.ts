@@ -43,6 +43,13 @@ export interface OutgoingMessage {
    * Rows of buttons: `[[{text:'✓ Approve', callbackData:'approve:<id>'}, …]]`.
    */
   readonly buttons?: ReadonlyArray<ReadonlyArray<InlineButton>>;
+  /**
+   * Optional rich-text mode (rich-approval bot). When set, button-capable
+   * connectors render `text` with formatting (Telegram → `parse_mode`); the
+   * caller is responsible for escaping dynamic content for that mode. Omit for
+   * plain text. Ignored by connectors that don't support it.
+   */
+  readonly parseMode?: 'HTML' | 'MarkdownV2';
 }
 
 /** A single inline action button (rich-approval bot). */

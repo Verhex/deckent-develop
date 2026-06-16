@@ -165,6 +165,25 @@ describe('TelegramConnector', () => {
     });
   });
 
+  it('sendMessage with parseMode — passes parse_mode (rich text), combinable with buttons', async () => {
+    const { MockTelegraf, instance } = createMockTelegraf();
+    const connector = new TelegramConnector(MockTelegraf as any);
+    await connector.start(makeConfig());
+
+    await connector.sendMessage({
+      connector: 'telegram',
+      channelId: '300400',
+      text: '<b>Approval</b>',
+      parseMode: 'HTML',
+      buttons: [[{ text: '✓', callbackData: 'approve:x' }]],
+    });
+
+    expect(instance.telegram.sendMessage).toHaveBeenCalledWith('300400', '<b>Approval</b>', {
+      reply_markup: { inline_keyboard: [[{ text: '✓', callback_data: 'approve:x' }]] },
+      parse_mode: 'HTML',
+    });
+  });
+
   it('callback_query press — forwards callback_data to onCallback and acks the press', async () => {
     const { MockTelegraf, instance } = createMockTelegraf();
     const connector = new TelegramConnector(MockTelegraf as any);

@@ -50,6 +50,28 @@ function formatNotification(n: Notification): string {
   return `${head}\n${cmds}`;
 }
 
+/** Escape the three characters Telegram's HTML parse_mode treats specially. */
+function htmlEscape(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
+ * Telegram HTML-formatted notification (rich-approval bot): bold title, the
+ * fallback approve/reject commands as <code> (the inline buttons carry the real
+ * action). Dynamic content is HTML-escaped so a triggerId/command containing
+ * `<`/`>`/`&` never breaks the parse. Plain `formatNotification` still serves
+ * connectors without rich text.
+ */
+function formatNotificationHtml(n: Notification): string {
+  const emoji = PRIORITY_EMOJI[n.priority] ?? 'ℹ️';
+  const head = `${emoji} <b>${htmlEscape(n.title)}</b>\n${htmlEscape(n.summary)}`;
+  if (!n.actions || n.actions.length === 0) return head;
+  const cmds = n.actions
+    .map((a) => `${htmlEscape(a.label)}: <code>${htmlEscape(a.cliCommand)}</code>`)
+    .join('\n');
+  return `${head}\n${cmds}`;
+}
+
 /**
  * Build a single row of inline buttons from a notification's actions (rich-approval
  * bot). Only actions carrying a `callbackData` become buttons — text-only actions
@@ -93,9 +115,6 @@ export function makeConnectorNotificationAdapter(
     },
 
     async send(notification: Notification): Promise<void> {
-      // BOT-1 + BOT-LEN: humanize (when enabled) then split into Telegram-safe
-      // parts — never reject/cut. Passthrough humanizer = lossless chunk only.
-      const parts = await humanizer.toParts(formatNotification(notification));
       // Rich-approval bot: actions that carry a callbackData become inline buttons,
       // attached to the LAST part so they render once, under the final message.
       // Button-incapable connectors ignore `buttons` and keep the cliCommand text.
@@ -104,12 +123,22 @@ export function makeConnectorNotificationAdapter(
         targets.map((t) =>
           withTimeout(
             (async (): Promise<void> => {
+              // Per-connector rendering: Telegram gets HTML rich text (bold title,
+              // <code> commands) + parse_mode; other connectors keep plain text so
+              // they never display raw tags. BOT-1 + BOT-LEN: humanize then split
+              // into platform-safe parts — never reject/cut.
+              const isTelegram = t.connector.id === 'telegram';
+              const rendered = isTelegram
+                ? formatNotificationHtml(notification)
+                : formatNotification(notification);
+              const parts = await humanizer.toParts(rendered);
               for (let i = 0; i < parts.length; i++) {
                 const isLast = i === parts.length - 1;
                 await t.connector.sendMessage({
                   connector: t.connector.id,
                   channelId: t.chatId,
                   text: parts[i]!,
+                  ...(isTelegram ? { parseMode: 'HTML' as const } : {}),
                   ...(isLast && buttons ? { buttons } : {}),
                 });
               }

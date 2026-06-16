@@ -115,12 +115,29 @@ describe('ConnectorNotificationAdapter (BOT-001)', () => {
     expect(tg.sent[0]?.text).toContain('reject a3f9c');
   });
 
-  it('no actions → no command footer (plain notification, back-compat)', async () => {
+  it('no actions → no command footer; Telegram gets HTML rich text + parse_mode', async () => {
     const tg = fakeConnector('telegram');
     const adapter = makeConnectorNotificationAdapter([{ connector: tg, chatId: 'TG-1' }]);
     await adapter.send(notif());
     expect(tg.sent[0]?.text).not.toContain('approve');
-    expect(tg.sent[0]?.text).toBe('ℹ️ [deckent] Sprint done: 5 tasks complete');
+    // Telegram → HTML: bold title, no command footer (no actions), parse_mode set.
+    expect(tg.sent[0]?.text).toBe('ℹ️ <b>Sprint done</b>\n5 tasks complete');
+    expect(tg.sent[0]?.parseMode).toBe('HTML');
+  });
+
+  it('non-Telegram connectors keep plain text (no HTML tags, no parse_mode)', async () => {
+    const dc = fakeConnector('discord');
+    const adapter = makeConnectorNotificationAdapter([{ connector: dc, chatId: 'DC-1' }]);
+    await adapter.send(notif());
+    expect(dc.sent[0]?.text).toBe('ℹ️ [deckent] Sprint done: 5 tasks complete');
+    expect(dc.sent[0]?.parseMode).toBeUndefined();
+  });
+
+  it('HTML-escapes dynamic content in the Telegram rich format', async () => {
+    const tg = fakeConnector('telegram');
+    const adapter = makeConnectorNotificationAdapter([{ connector: tg, chatId: 'TG-1' }]);
+    await adapter.send({ ...notif(), summary: 'a < b & c > d' });
+    expect(tg.sent[0]?.text).toContain('a &lt; b &amp; c &gt; d');
   });
 
   it('isAvailable reflects whether any target is configured', () => {
