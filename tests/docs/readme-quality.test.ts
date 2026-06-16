@@ -55,15 +55,18 @@ describe('README quality gate (Sprint 201)', () => {
   });
 
   it('quickstart copy-paste: install/init/start commands are present in the documented order', () => {
-    const quickStartIdx = README_EN.indexOf('## Quick Start');
-    expect(quickStartIdx).toBeGreaterThan(-1);
+    // The quickstart lives in the "90-second tour" opening section (README was
+    // restructured away from a literal "## Quick Start" heading). The contract
+    // is unchanged: a copy-pasteable install → init → start sequence near the top.
+    const quickStartIdx = README_EN.indexOf('## The 90-second tour');
+    expect(quickStartIdx, 'quickstart tour section missing').toBeGreaterThan(-1);
     const block = README_EN.slice(quickStartIdx, quickStartIdx + 1200);
     const installIdx = block.indexOf('npm install -g deckent');
     const initIdx = block.indexOf('deckent init');
     const startIdx = block.indexOf('deckent start');
-    expect(installIdx, 'install command missing from Quick Start').toBeGreaterThan(-1);
-    expect(initIdx, 'init command missing from Quick Start').toBeGreaterThan(-1);
-    expect(startIdx, 'start command missing from Quick Start').toBeGreaterThan(-1);
+    expect(installIdx, 'install command missing from quickstart').toBeGreaterThan(-1);
+    expect(initIdx, 'init command missing from quickstart').toBeGreaterThan(-1);
+    expect(startIdx, 'start command missing from quickstart').toBeGreaterThan(-1);
     expect(installIdx).toBeLessThan(initIdx);
     expect(initIdx).toBeLessThan(startIdx);
   });

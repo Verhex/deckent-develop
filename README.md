@@ -231,7 +231,7 @@ deckent is built to be watched, not to be a black box.
 
 ### Safety & quality
 - **Scope enforcement** — the Auditor diffs the working tree (`git diff --stat`) and flags any write outside a worker's assigned scope; local/agentic workers reject out-of-scope writes outright
-- **RBAC authority matrix (ADR-037)** — Brain / Auditor / Worker have distinct roles with a tamper-evident, HMAC-chained audit trail
+- **RBAC authority matrix (ADR-037)** — Brain / Auditor / Worker have distinct roles with a tamper-evident, HMAC-chained audit trail. In V1.0 these are **advisory role boundaries**: violations are detected, logged to the audit trail, and surfaced as warnings (compile-time lint + Auditor `git diff` monitoring) but do not hard-block at runtime. Hard runtime enforcement lands as a V2 post-GA flip.
 - **Spawn safety** — workers spawn with array args against a binary whitelist; no shell-string injection
 - **`.deck` secrets** — reference tokens as `$DECK:MY_TOKEN`, resolved at runtime, kept out of git
 - **Proof-of-function (ADR-079)** — user-facing changes must pass a real-binary run, not just a unit test

@@ -12,7 +12,9 @@ describe('README.md', () => {
   });
 
   it('starts with the project name heading', () => {
-    expect(content).toContain('# deckent');
+    // README uses a centered HTML <h1> for the logo-aligned masthead rather
+    // than a markdown `# deckent` heading.
+    expect(content).toContain('<h1 align="center">deckent</h1>');
   });
 
   // Sprint 150 T-150-021: README overhauled with new tagline "The AI orchestrator for…".
@@ -34,8 +36,10 @@ describe('README.md', () => {
     expect(content).toContain('[![license]');
   });
 
-  it('contains GIF demo placeholder', () => {
-    expect(content).toContain('<!-- ![demo](docs/assets/demo.gif) -->');
+  it('contains a top-of-README visual asset', () => {
+    // The historical GIF-demo placeholder was replaced by a real logo masthead
+    // plus inline terminal-output examples in the "90-second tour".
+    expect(content).toContain('docs/assets/logo.png');
   });
 
   // Sprint 150 T-150-021: README overhaul removed historical quick-start block.
@@ -46,11 +50,13 @@ describe('README.md', () => {
     expect(content).toContain('npx deckent start');
   });
 
-  it('contains How It Works section', () => {
-    expect(content).toContain('## How It Works');
-    expect(content).toContain('Describe');
-    expect(content).toContain('Plan');
-    expect(content).toContain('Execute');
+  it('contains a "how it works" explainer section', () => {
+    // Restructured from "## How It Works" to "## What deckent actually is",
+    // which walks the Brain (plan) → Workers (build) → Auditor (watch) flow.
+    expect(content).toContain('## What deckent actually is');
+    expect(content).toContain('plan');
+    expect(content).toContain('build');
+    expect(content).toContain('Auditor');
   });
 
   it('contains Architecture section with ASCII diagram', () => {
@@ -60,12 +66,12 @@ describe('README.md', () => {
     expect(content).toContain('Auditor');
   });
 
-  it('contains Key Features section', () => {
-    expect(content).toContain('## Key Features');
+  it('contains a Features section covering the core capabilities', () => {
+    // Heading is "## Features"; the legacy bullet labels were reworded.
+    expect(content).toContain('## Features');
     expect(content).toContain('Sprint Lifecycle');
-    expect(content).toContain('Multi-Worker Parallel');
-    expect(content).toContain('GO / NO-GO Evaluation');
-    expect(content).toContain('Multi-Provider Support');
+    expect(content).toContain('Parallel workers');
+    expect(content).toContain('Memory');
   });
 
   // Sprint 150 T-150-021: README comparison dropped OpenHands (per memory
@@ -79,18 +85,21 @@ describe('README.md', () => {
     expect(content).toContain('OpenClaw');
   });
 
-  it('contains Requirements section', () => {
-    expect(content).toContain('## Requirements');
+  it('documents requirements', () => {
+    // Requirements now live inline in the "## Install" section under a
+    // "**Requirements:**" callout rather than a dedicated "## Requirements" heading.
+    expect(content).toContain('**Requirements:**');
     expect(content).toContain('Node.js');
-    expect(content).toContain('>= 24');
+    expect(content).toContain('≥ 24');
     expect(content).toContain('git');
-    // Provider-neutral (2026-06-02): README no longer requires Claude specifically —
+    // Provider-neutral: README no longer requires Claude specifically —
     // any provider CLI (claude/codex/gemini) or Ollama. Assert the neutral framing.
-    expect(content).toContain('At least one provider');
+    expect(content).toContain('at least one provider');
   });
 
-  it('contains CLI Usage section with examples', () => {
-    expect(content).toContain('## CLI Usage');
+  it('documents CLI usage with command examples', () => {
+    // CLI commands are shown across the tour/install/sprint sections rather than
+    // under a single "## CLI Usage" heading.
     expect(content).toContain('deckent init');
     expect(content).toContain('deckent start');
     expect(content).toContain('deckent status');
@@ -125,7 +134,8 @@ describe('README.md', () => {
 
   it('contains links to GitHub and website', () => {
     expect(content).toContain('github.com/VerhexIO/deckent');
-    expect(content).toContain('deckent.agency');
+    // Canonical website is deckent.ai (the old deckent.agency domain is retired).
+    expect(content).toContain('deckent.ai');
   });
 
   it('is written in English (no Turkish headings)', () => {

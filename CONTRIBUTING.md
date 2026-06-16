@@ -8,21 +8,22 @@ deckent is, unusually, **built with deckent** — the maintainers run sprints on
 
 ## Table of Contents
 
-1. [Quick Start](#quick-start)
+1. [Getting Started](#getting-started)
 2. [Development Setup](#development-setup)
 3. [Project Structure](#project-structure)
 4. [Code Standards](#code-standards)
-5. [Testing](#testing)
-6. [Adding a CLI Command](#adding-a-cli-command)
-7. [Adding an MCP Tool or Resource](#adding-an-mcp-tool-or-resource)
-8. [Building a Plugin](#building-a-plugin)
+5. [Testing Guide](#testing-guide)
+6. [How to Add a CLI Command](#how-to-add-a-cli-command)
+7. [MCP Tool and Resource Development](#mcp-tool-and-resource-development)
+8. [Plugin System Development](#plugin-system-development)
 9. [Adding a Language (i18n)](#adding-a-language-i18n)
 10. [Branches, Commits, and PRs](#branches-commits-and-prs)
-11. [How deckent Builds deckent](#how-deckent-builds-deckent)
+11. [Pull Request Process](#pull-request-process)
+12. [How deckent Builds deckent](#how-deckent-builds-deckent)
 
 ---
 
-## Quick Start
+## Getting Started
 
 ```bash
 git clone https://github.com/VerhexIO/deckent.git
@@ -90,27 +91,26 @@ npm run validate:publish  # aggregate pre-publish validation
 
 ```
 deckent/
-├── src/
-│   ├── core/         — types, constants, layered config, memory store (SQLite),
-│   │                   model registry, routing engine, plugin loader
-│   ├── orchestra/    — the sprint engine: sprint-controller (PLAN→…→CLEANUP),
-│   │                   planner, task-builder, result-evaluator, task-router,
-│   │                   debt-manager, dependency waves, nervous/autonomous wiring
-│   ├── agents/       — worker lifecycle: claim, file lock, heartbeat, result write
-│   ├── monitor/      — Auditor scan loop, dashboard state, sprint tracking
-│   ├── nervous/      — proactive meta-orchestrator (ADR-040): observe → detect →
-│   │                   decide → propose → dispatch
-│   ├── providers/    — provider adapters (Claude, Codex, Gemini) + fallback chain
-│   ├── connectors/   — Discord / Telegram / WhatsApp + incoming router
-│   ├── api/          — HTTP API server, SSE stream, dashboard watcher, auth
-│   ├── mcp/          — MCP server (stdio): tools/, resources/, helpers/enrich.ts
-│   ├── mcp-client/   — outgoing MCP client (broker, registry) for external servers
-│   ├── cli/          — Commander.js CLI: entry.ts, commands/, repl/, helpers/ (i18n)
-│   ├── agent/        — native-terminal-agent core (experimental): loop, session,
-│   │                   permission engine, provider adapters, tool registry
-│   ├── training/     — training-data tooling (trace extraction → JSONL)
-│   ├── dashboard/    — web dashboard (React + Vite + Tailwind)
-│   └── extensions/   — VS Code extension host integration
+├── src/core/         — types, constants, layered config, memory store (SQLite),
+│                       model registry, routing engine, plugin loader
+├── src/orchestra/    — the sprint engine: sprint-controller (PLAN→…→CLEANUP),
+│                       planner, task-builder, result-evaluator, task-router,
+│                       debt-manager, dependency waves, nervous/autonomous wiring
+├── src/agents/       — worker lifecycle: claim, file lock, heartbeat, result write
+├── src/monitor/      — Auditor scan loop, dashboard state, sprint tracking
+├── src/nervous/      — proactive meta-orchestrator (ADR-040): observe → detect →
+│                       decide → propose → dispatch
+├── src/providers/    — provider adapters (Claude, Codex, Gemini) + fallback chain
+├── src/connectors/   — Discord / Telegram / WhatsApp + incoming router
+├── src/api/          — HTTP API server, SSE stream, dashboard watcher, auth
+├── src/mcp/          — MCP server (stdio): tools/, resources/, helpers/enrich.ts
+├── src/mcp-client/   — outgoing MCP client (broker, registry) for external servers
+├── src/cli/          — Commander.js CLI: entry.ts, commands/, repl/, helpers/ (i18n)
+├── src/agent/        — native-terminal-agent core (experimental): loop, session,
+│                       permission engine, provider adapters, tool registry
+├── src/training/     — training-data tooling (trace extraction → JSONL)
+├── src/dashboard/    — web dashboard (React + Vite + Tailwind)
+├── src/extensions/   — VS Code extension host integration
 ├── tests/            — mirrors src/, plus e2e/, integration/, dashboard/, security/,
 │                       docker/, agent/, training/, …
 ├── docs/             — reference (auto-generated), architecture, ADRs, guides
@@ -160,7 +160,7 @@ import { join } from 'node:path';
 
 ---
 
-## Testing
+## Testing Guide
 
 Tests use **[vitest](https://vitest.dev/)**. Test files live in `tests/`, mirroring `src/`.
 
@@ -213,7 +213,7 @@ describe('loadConfig', () => {
 
 ---
 
-## Adding a CLI Command
+## How to Add a CLI Command
 
 deckent uses Commander.js. Each command is its own file under `src/cli/commands/` and exports a `register<Name>(program)` function.
 
@@ -241,9 +241,15 @@ npm run docs:stats          # refreshes README counts
 
 ---
 
-## Adding an MCP Tool or Resource
+## MCP Tool and Resource Development
 
 deckent's MCP server uses the official `@modelcontextprotocol/sdk`. Each tool/resource is a file under `src/mcp/tools/` or `src/mcp/resources/` exporting `register<Name>Tool(server)` / `register<Name>Resource(server)`.
+
+### Adding a new MCP tool
+
+A tool is an invokable, parameterized action. Create a file under `src/mcp/tools/`,
+export a `register<Name>Tool(server)` function, and mark its `annotations`
+(`readOnlyHint` / `destructiveHint` / `idempotentHint`) accurately:
 
 ```typescript
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -272,11 +278,18 @@ export function registerMyTool(server: McpServer): void {
 
 Wire it into `src/mcp/tools/index.ts` (or `resources/index.ts`), add tests under `tests/mcp/`, then run `npm run docs:ref` to regenerate the tool/resource reference. Mark destructive/long-running tools with correct `annotations`.
 
+### Adding a new MCP resource
+
+A resource is read-only context exposed via a `deckent://` URI (e.g. `deckent://dashboard`).
+Create a file under `src/mcp/resources/`, export `register<Name>Resource(server)`, wire it
+into `src/mcp/resources/index.ts`, and add tests under `tests/mcp/`. Resources never mutate
+state — they only return a serialized snapshot of project data.
+
 ---
 
-## Building a Plugin
+## Plugin System Development
 
-Plugins add reusable, skill-style capabilities. Each is a directory under `.deckent/plugins/` described by a `manifest.json` (validated by `src/core/plugin.ts`).
+Plugins add reusable, skill-style capabilities. Each is a directory under `.deckent/plugins/` described by a `manifest.json` (validated against the `PluginManifest` interface in `src/core/plugin.ts`).
 
 ```bash
 deckent plugin create my-plugin   # scaffolds manifest.json + SKILL.md + README.md
@@ -359,7 +372,7 @@ Format: `type(scope): description`
 
 Use a module name (`core`, `orchestra`, `cli`, `mcp`, …) or an area scope (`repo-cleanup`, `sprint-NNN`) as the scope. Imperative mood ("add", "fix"), ~72 chars.
 
-### Pull Requests
+## Pull Request Process
 
 1. Branch from `main`; keep the PR focused on one concern.
 2. Write tests for new code; keep them hermetic.
