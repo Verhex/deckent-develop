@@ -39,4 +39,10 @@ describe('planGoal', () => {
     await planGoal({ goal: 'g', seeds: ['seed-one', 'seed-two'], complete });
     expect(seenPrompt).toContain('seed-one');
   });
+  it('includes the default policy in the prompt when provided', async () => {
+    let seen = '';
+    const complete = async (p: string) => { seen = p; return JSON.stringify({ items: [] }); };
+    await planGoal({ goal: 'g', defaultPolicy: 'approval-required', complete });
+    expect(seen).toContain('approval-required');
+  });
 });

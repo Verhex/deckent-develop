@@ -9,6 +9,8 @@ export interface PlanGoalInput {
   context?: string;
   /** Cap on returned items (default 30). */
   maxItems?: number;
+  /** Default per-item policy when the model does not upgrade it (e.g. 'approval-required'). */
+  defaultPolicy?: string;
   complete: LlmComplete;
 }
 
@@ -20,6 +22,9 @@ export function buildGoalPlanPrompt(input: Omit<PlanGoalInput, 'complete'>): str
     ? `\n\nSeed items (open checklist lines from the referenced artifact — group/refine, assign kind):\n${input.seeds.map((s) => `- ${s}`).join('\n')}`
     : '';
   const ctx = input.context ? `\n\nProject context:\n${input.context}` : '';
+  const policyLine = input.defaultPolicy
+    ? `\nDefault policy for items is "${input.defaultPolicy}" unless a rule above upgrades it (e.g. destructive → approval-required).`
+    : '';
   return `You are the Deckent autonomous planner. Decompose the GOAL into a LIGHTWEIGHT backlog — titles + kind + scope only, NO implementation detail (detail is generated later, just in time).
 
 Output STRICT JSON: { "items": PlannedItem[] }. Each PlannedItem:
@@ -33,7 +38,7 @@ Output STRICT JSON: { "items": PlannedItem[] }. Each PlannedItem:
 Rules: single-file/tight change → task; multi-file/multi-module feature → sprint;
 non-code connector op (db.query/erp.read/mail.send/http.get) → capability;
 multi-step workflow/DAG → process; "continuously …" → recurring cron;
-"N agents over X" → fanOut.concurrency=N; destructive/irreversible → approval-required.
+"N agents over X" → fanOut.concurrency=N; destructive/irreversible → approval-required.${policyLine}
 At most ${input.maxItems ?? DEFAULT_MAX} items. Output ONLY the JSON, no prose.
 
 GOAL: ${input.goal}${seeds}${ctx}`;

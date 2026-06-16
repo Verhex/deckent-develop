@@ -13,7 +13,7 @@
 
 import { Command } from 'commander';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
@@ -234,13 +234,18 @@ export async function handlePlan(opts: AutonomousPlanOptions): Promise<void> {
   const lang = getLanguage(opts.lang);
   const root = opts.root ?? resolveProjectRoot();
   const out = opts.print ?? print;
-  const seeds = opts.from
-    ? extractArtifactSeeds(opts.from.includes('/') || opts.from.includes('#') ? opts.from : join(root, opts.from))
-    : undefined;
+  let seeds: string[] | undefined;
+  if (opts.from) {
+    const hashIdx = opts.from.indexOf('#');
+    const filePart = hashIdx >= 0 ? opts.from.slice(0, hashIdx) : opts.from;
+    const anchorPart = hashIdx >= 0 ? opts.from.slice(hashIdx) : '';
+    const resolved = (isAbsolute(filePart) ? filePart : join(root, filePart)) + anchorPart;
+    seeds = extractArtifactSeeds(resolved);
+  }
   const summaryPath = join(root, '.brain', 'exports', 'summary.md');
   const context = existsSync(summaryPath) ? readFileSync(summaryPath, 'utf-8') : undefined;
 
-  const items = await planGoal({ goal: opts.goal, seeds, context, maxItems: opts.maxItems, complete: opts.complete });
+  const items = await planGoal({ goal: opts.goal, seeds, context, maxItems: opts.maxItems, defaultPolicy: opts.policy, complete: opts.complete });
   if (items.length === 0) {
     out(getMessage('autonomous.plan_empty', lang));
     return;
@@ -823,6 +828,8 @@ export function registerAutonomous(program: Command): void {
     .action(async (goal: string, o: { from?: string; policy?: string; maxItems?: string; model?: string; dryRun?: boolean; root?: string; lang?: string }) => {
       try {
         const root = o.root ?? resolveProjectRoot();
+        const config = await loadConfig(root);
+        await bootstrapProviders(config);
         const model = o.model ?? 'sonnet';
         await handlePlan({
           goal, root, from: o.from, policy: o.policy,
