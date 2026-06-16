@@ -290,6 +290,14 @@ export interface Task {
   modelEffort?: string;
   /** Sprint 196 WP-2: Intent mode for FIX worker — how to approach the re-execution. */
   fixMode?: 'verify-only' | 'amend' | 're-implement';
+  /**
+   * Tier-1 Proof-of-Function smoke directive (216-004, officially landed PLAN-W1).
+   * Parsed from a DIRECTIVES `Smoke: <cmd> → <expect>` line and threaded through
+   * the structured/AI planner into the written `.tasks/task-*.json`. Consumed by
+   * `proof-of-function.readSmokeSpec` for the post-sprint real-binary run-verify
+   * gate (ADR-079). Absent for Tier-0 tasks.
+   */
+  smoke?: { command: string; expect: string };
   /** Assigned agent ID (from agent pool) or 'generic' */
   assignedAgent?: string;
   /** Assigned skill IDs (from skill pool) */

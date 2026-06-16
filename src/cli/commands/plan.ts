@@ -84,11 +84,13 @@ export function registerPlan(program: Command): void {
     .command('plan')
     .description('Plan a sprint without executing it')
     .option('--no-confirm', 'Skip confirmation, auto-approve plan')
+    .option('-y, --yes', 'Non-interactive: auto-approve the plan (DRAFT → PENDING) without prompting')
     .option('--structured', 'Force structured parsing (skip AI)')
     .option('--dry-run', 'Show plan without writing task files to disk')
     .option('--interrogate', 'Challenge directives with structural questions before planning')
     .action(async (opts: {
       confirm?: boolean;
+      yes?: boolean;
       structured?: boolean;
       dryRun?: boolean;
       interrogate?: boolean;
@@ -99,11 +101,17 @@ export function registerPlan(program: Command): void {
         const config = await loadConfig(root);
         const lang = config.language ?? 'en';
 
+        // PLAN-W1 Bug 2: --yes is the non-interactive auto-approve switch. It must
+        // never block on a prompt — treat it like --no-confirm for the interactive
+        // gates (interrogation + final approval), but still plan as DRAFT so the
+        // normal DRAFT → PENDING lifecycle runs (just without a human at the keyboard).
+        const autoApprove = opts.yes === true;
+
         // ─── Interrogation (PLAN-INT-1) ──────────────────────────────────
         // Run BEFORE readContext so planSprint sees the revised DIRECTIVES.md.
-        // Skip silently if --no-confirm (non-interactive) or no DIRECTIVES content.
+        // Skip silently if --no-confirm / --yes (non-interactive) or no DIRECTIVES content.
         const shouldInterrogate = opts.interrogate === true || config.plan?.interrogate === true;
-        if (shouldInterrogate && opts.confirm !== false) {
+        if (shouldInterrogate && opts.confirm !== false && !autoApprove) {
           const directivesPath = join(root, 'DIRECTIVES.md');
           if (existsSync(directivesPath)) {
             const content = readFileSync(directivesPath, 'utf-8');
@@ -205,7 +213,10 @@ export function registerPlan(program: Command): void {
 
         // Approval flow for DRAFT tasks
         if (asDraft) {
-          const confirmed = await promptConfirm('Approve this plan?');
+          // PLAN-W1 Bug 2: --yes skips the interactive prompt and approves directly
+          // (DRAFT → PENDING), so non-interactive callers (CI / pipe / MCP) don't get
+          // EOF → false → tasks stranded in DRAFT.
+          const confirmed = autoApprove ? true : await promptConfirm('Approve this plan?');
           if (confirmed) {
             await confirmDraftTasks(root, sprint);
             print(getMessage('plan.approved', lang));

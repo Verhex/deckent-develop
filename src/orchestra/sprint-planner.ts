@@ -379,7 +379,7 @@ export async function planSprint(
   // Structured fallback (mode === 'structured' || AI fail + auto)
   if (!plannerResult && (planMode === 'structured' || planMode === 'auto')) {
     const structuredTasks = parsedDirectives;
-    const directiveSources: Array<{ title: string; description: string; scope: TaskScope; provider?: import('../core/types.js').ProviderName; forceModel?: import('../core/types.js').ModelType; forceEffort?: import('../core/types.js').TaskEffort; testTarget?: string; forceAgent?: string; forceSkills?: string[]; excludeAgent?: string[]; excludeSkills?: string[]; priority?: import('../core/types.js').TaskPriority; dependencies?: string[]; authMode?: 'subscription' | 'api'; backend?: 'docker' | 'tmux' | 'subprocess'; modelEffort?: string }> =
+    const directiveSources: Array<{ title: string; description: string; scope: TaskScope; provider?: import('../core/types.js').ProviderName; forceModel?: import('../core/types.js').ModelType; forceEffort?: import('../core/types.js').TaskEffort; testTarget?: string; forceAgent?: string; forceSkills?: string[]; excludeAgent?: string[]; excludeSkills?: string[]; priority?: import('../core/types.js').TaskPriority; dependencies?: string[]; authMode?: 'subscription' | 'api'; backend?: 'docker' | 'tmux' | 'subprocess'; modelEffort?: string; smoke?: { command: string; expect: string } }> =
       structuredTasks.length > 0
         ? structuredTasks
         : context.directives
@@ -441,6 +441,10 @@ export async function planSprint(
         authMode: src.authMode,
         backend: src.backend,
         modelEffort: src.modelEffort,
+        // PLAN-W1 Bug 1: thread the parsed Tier-1 Smoke: directive into the task
+        // so it lands in the written `.tasks/task-*.json` (previously dropped here,
+        // leaving the post-sprint proof-of-function gate with no command to run).
+        smoke: src.smoke,
       }, seq++));
     }
   }
