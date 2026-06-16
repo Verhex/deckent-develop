@@ -237,6 +237,36 @@ Fix the config module.
       const result = extractGoNogoCriteria('desc', 'tests/unit/foo.test.ts');
       expect(result.goCriteria).toContain('tests/unit/foo.test.ts');
     });
+
+    // WP-13 (🔴): the proof-label prefix must be cleanly stripped. The previous
+    // strip regex only matched `**Label**:` (colon OUTSIDE the bold) and the
+    // `[-*]` fallback then mangled the common `**Kanıt:**` (colon INSIDE the
+    // bold) form into `*Kanıt:**`, splicing broken markdown into the DoD block.
+    it('WP-13: strips **Kanıt:** (colon inside bold) without mangling to *Kanıt:**', () => {
+      const description = '**Kanıt:** `grep -c "crossTenant" tests/api/x.test.ts` >= 2 yeni test';
+      const result = extractGoNogoCriteria(description);
+      // The command content survives…
+      expect(result.goCriteria).toContain('grep -c "crossTenant"');
+      // …but the broken/partial label prefix must be gone entirely.
+      expect(result.goCriteria).not.toContain('*Kanıt:**');
+      expect(result.goCriteria).not.toContain('Kanıt:');
+      expect(result.goCriteria).not.toMatch(/\*\*?Kanıt/);
+    });
+
+    it('WP-13: strips **Test:** prefix cleanly', () => {
+      const description = '**Test:** 2 yeni test (anti-IDOR-404 + positive-OIDC-stamp)';
+      const result = extractGoNogoCriteria(description);
+      expect(result.goCriteria).toContain('2 yeni test');
+      expect(result.goCriteria).not.toMatch(/\*\*?Test:/);
+    });
+
+    it('WP-13: strips bulleted **Proof:** prefix cleanly', () => {
+      const description = '- **Proof:** `npx vitest run tests/api/x.test.ts` green';
+      const result = extractGoNogoCriteria(description);
+      expect(result.goCriteria).toContain('npx vitest run');
+      expect(result.goCriteria).not.toMatch(/\*\*?Proof:/);
+      expect(result.goCriteria).not.toMatch(/^[\s;]*[-*]\s*\*/);
+    });
   });
 
   describe('writeSprintState / readSprintState / clearSprintState', () => {

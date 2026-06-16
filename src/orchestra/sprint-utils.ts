@@ -388,6 +388,38 @@ export function buildSpawnRetryHint(error: unknown, sprint: Sprint): string {
 // ═══ Directive Parsing Utilities ═════════════════════════════════════
 
 /**
+ * Proof/verification label prefix matcher (WP-13).
+ *
+ * Matches the leading label of a DIRECTIVES proof line — `Kanıt:`, `Proof:`,
+ * `Test:`, `Doğrulama:`, `Verify(ication):` — in EVERY markdown form a directive
+ * author uses, so the same regex powers both detection and stripping:
+ *   - `Kanıt:`              (plain)
+ *   - `**Kanıt:**`          (colon INSIDE the bold — the dominant DIRECTIVES form)
+ *   - `**Kanıt**:`          (colon OUTSIDE the bold)
+ *   - `- **Proof:**`        (bulleted)
+ *
+ * The previous strip regex only handled the colon-OUTSIDE form (`**Label**:`),
+ * so the colon-inside `**Kanıt:**` slipped through and the `[-*]` bullet
+ * fallback then chewed a single `*` off, splicing a broken `*Kanıt:**` token
+ * into the worker's Definition-of-Done block. A trailing `:` (adjacent to the
+ * label or to its closing `**`) is required, so prose like "Verify the output"
+ * is NOT mistaken for a directive.
+ */
+const PROOF_LABEL_PREFIX_RE =
+  /^\s*[-*]?\s*\*{0,2}\s*(?:Kan[ıi]t|Proof|Doğrulama|Verification|Verify|Test)\*{0,2}:\*{0,2}\s*/i;
+
+/**
+ * Strip the proof-label prefix from a directive line (WP-13). When no label
+ * prefix is present (e.g. an inline `- \`grep …\`` command line caught by the
+ * fallback branch), only a leading bullet is removed so the command survives.
+ */
+function stripProofLabel(line: string): string {
+  const withoutLabel = line.replace(PROOF_LABEL_PREFIX_RE, '');
+  if (withoutLabel !== line) return withoutLabel.trim();
+  return line.replace(/^\s*[-*]\s*/, '').trim();
+}
+
+/**
  * Extract task-specific GO/NOGO criteria from DIRECTIVES description.
  * Parses "Kanıt:", "Proof:", "Doğrulama:", "Verify:" lines for goCriteria.
  * Falls back to generic criteria if no specific proof lines found.
@@ -406,19 +438,20 @@ export function extractGoNogoCriteria(
 
   for (const line of lines) {
     const trimmed = line.trim();
-    // Match proof/verification patterns
-    if (/^(?:\*\*)?(?:Kanıt|Kan[ıi]t|Proof|Doğrulama|Verify|Verification|Test:)(?:\*\*)?:/i.test(trimmed)) {
+    // Match proof/verification directive lines (Kanıt/Proof/Test/Verify…) in any
+    // markdown form — see PROOF_LABEL_PREFIX_RE (WP-13).
+    if (PROOF_LABEL_PREFIX_RE.test(trimmed)) {
       proofLines.push(trimmed);
     }
-    // Match inline grep/command verification patterns
-    if (/^\s*[-*]\s*`(?:grep|find|wc|ls|cat|npx)\s/.test(trimmed)) {
+    // Match inline grep/command verification patterns (bulleted commands w/o a label)
+    else if (/^\s*[-*]\s*`(?:grep|find|wc|ls|cat|npx)\s/.test(trimmed)) {
       proofLines.push(trimmed);
     }
   }
 
   const specificCriteria = proofLines
     .slice(0, 3)
-    .map(l => l.replace(/^\*\*.*?\*\*:\s*/, '').replace(/^[-*]\s*/, ''))
+    .map(stripProofLabel)
     .join('; ');
 
   // ── WM-7 path: kind × stack aware base ──────────────────────────────────
