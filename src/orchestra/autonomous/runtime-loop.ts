@@ -148,6 +148,12 @@ export interface BuildEngineRuntimeOptions {
   waitForResult: ExecuteDispatcherDeps['waitForResult'];
   /** Gap F: max ms to wait for a task result. Defaults to 600_000 in dispatcher. */
   resultTimeoutMs?: number;
+  /**
+   * Goal-planner Phase 2: when provided, a planned task/sprint entry with no
+   * detail is detailed JIT (and persisted) before it runs (forwarded to the
+   * execute-dispatcher). Absent → planned entries run title-only (backward-safe).
+   */
+  jitComplete?: ExecuteDispatcherDeps['jitComplete'];
   /** Optional extra trigger source (e.g. a reactive/webhook source) added last. */
   reactiveSource?: TriggerSource;
   /**
@@ -224,6 +230,7 @@ export function buildEngineRuntime(
       backlogPath: opts.backlogPath,
       waitForResult: opts.waitForResult,
       resultTimeoutMs: opts.resultTimeoutMs,
+      jitComplete: opts.jitComplete,
       capabilityRegistry,
     }),
   );

@@ -926,6 +926,28 @@ const MESSAGES: MessageMap = {
     tr: '  - {ts} {action} -> {outcome}: {reason}',
   },
 
+  // ─── autonomous plan subcommand (Task 8 — goal planner) ──────────────
+  'autonomous.plan_header': {
+    en: 'Planned {count} item(s) from goal:',
+    tr: 'Hedeften {count} madde planlandı:',
+  },
+  'autonomous.plan_row': {
+    en: '  [{kind}/{policy}] {id}: {summary}',
+    tr: '  [{kind}/{policy}] {id}: {summary}',
+  },
+  'autonomous.plan_written': {
+    en: 'Wrote {count} item(s) to the backlog (pending). Review: deckent autonomous backlog list',
+    tr: '{count} madde backlog’a yazıldı (pending). Gözden geçir: deckent autonomous backlog list',
+  },
+  'autonomous.plan_dryrun': {
+    en: 'Dry-run — nothing written.',
+    tr: 'Dry-run — hiçbir şey yazılmadı.',
+  },
+  'autonomous.plan_empty': {
+    en: 'The planner returned no valid items.',
+    tr: 'Planner geçerli madde döndürmedi.',
+  },
+
   // ─── autonomous backlog subcommand (Task 7) ──────────────────────────
   'autonomous.backlog.added': {
     en: 'Backlog entry added: {id}',
