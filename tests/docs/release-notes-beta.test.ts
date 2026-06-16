@@ -11,90 +11,84 @@ function readReleaseNotes(): string {
 
 const fileExists = existsSync(RELEASE_NOTES_PATH);
 
-describe.skipIf(!fileExists)('RELEASE-NOTES-BETA.md content', () => {
+// The release notes were rewritten for the v1.0.0-beta.1 public beta
+// (docs/release/release-notes.md). The original assertions validated a long-retired
+// Sprint-042/047-era format (".deck Secret System", "NO_GO Trend" table, "9,300+
+// tests", "Generated from Sprint 042"); those are gone by design. These assertions
+// validate the CURRENT release notes against code-reality (version, providers,
+// agent/skill counts, key features, honest known-limitations).
+describe.skipIf(!fileExists)('release-notes.md content', () => {
   it('file exists', () => {
     expect(existsSync(RELEASE_NOTES_PATH)).toBe(true);
   });
 
-  it('reflects current sprint count', () => {
+  it('is the v1.0.0-beta.1 public beta release notes', () => {
     const content = readReleaseNotes();
-    // Sprint count should be 47+ (updated as project progresses)
-    expect(content).toMatch(/\d+ development sprints/);
+    expect(content).toContain('1.0.0-beta.1');
+    expect(content).toMatch(/Public Beta/i);
   });
 
-  it('reflects current test count', () => {
+  it('states the Node.js >= 24 requirement', () => {
     const content = readReleaseNotes();
-    // Test count should be mentioned in the metrics table (e.g., "Test Count | 11,862")
-    expect(content).toMatch(/Test Count\s*\|\s*[\d,]+/);
+    expect(content).toMatch(/Node\.js[^\n]*(>=\s*24|≥\s*24)/);
   });
 
-  it('does NOT still say 9,300+ tests', () => {
+  it('reflects the current development-sprint scale', () => {
     const content = readReleaseNotes();
+    // No longer a literal count in the intro prose; a Key Metrics row carries it.
+    expect(content).toMatch(/Sprints[^\n]*\|\s*\d{3}/);
+  });
+
+  it('documents the four-provider fleet', () => {
+    const content = readReleaseNotes();
+    expect(content).toContain('Claude');
+    expect(content).toContain('Codex');
+    expect(content).toContain('Gemini');
+    expect(content).toContain('Ollama');
+  });
+
+  it('documents the 15 built-in agents and 21 built-in skills', () => {
+    const content = readReleaseNotes();
+    expect(content).toMatch(/15 Built-in Agents/i);
+    expect(content).toMatch(/21 Built-in Skills/i);
+  });
+
+  it('describes the 8-phase sprint lifecycle', () => {
+    const content = readReleaseNotes();
+    expect(content).toContain('PLAN');
+    expect(content).toContain('CLEANUP');
+    expect(content).toMatch(/GO\/NO-GO|GO\/NO-GO Evaluation/);
+  });
+
+  it('describes Memory V2 DB-first architecture', () => {
+    const content = readReleaseNotes();
+    expect(content).toMatch(/Memory V2/);
+    expect(content).toMatch(/SQLite|FTS5/);
+  });
+
+  it('describes the Nervous System and Autonomous engine', () => {
+    const content = readReleaseNotes();
+    expect(content).toContain('Nervous System');
+    expect(content).toMatch(/Autonomous [Ee]ngine/);
+  });
+
+  it('lists Ollama sprint-worker support as a partial limitation', () => {
+    const content = readReleaseNotes();
+    expect(content).toMatch(/Known Limitations/i);
+    expect(content).toMatch(/Ollama[^\n]*partial/i);
+  });
+
+  it('discloses ADR-037 RBAC runtime enforcement as advisory/soft', () => {
+    const content = readReleaseNotes();
+    expect(content).toContain('ADR-037');
+    expect(content).toMatch(/advisory/i);
+  });
+
+  it('does NOT carry the retired Sprint-042/047 release-notes format', () => {
+    const content = readReleaseNotes();
+    // Sanity guard: ensure the obsolete structure is genuinely gone.
     expect(content).not.toContain('9,300+');
-  });
-
-  it('does NOT still say 42 sprints in intro', () => {
-    const content = readReleaseNotes();
-    expect(content).not.toContain('42 development sprints');
-  });
-
-  it('mentions .deck secret system', () => {
-    const content = readReleaseNotes();
-    expect(content).toContain('.deck Secret System');
-  });
-
-  it('mentions multi-environment init', () => {
-    const content = readReleaseNotes();
-    // environment-aware init wizard
-    expect(content).toMatch(/[Mm]ulti-[Ee]nvironment [Ii]nit|Multi-environment Init/);
-  });
-
-  it('mentions language-agnostic verify loop', () => {
-    const content = readReleaseNotes();
-    expect(content).toContain('Language-Agnostic Verify Loop');
-  });
-
-  it('mentions rich sprint output', () => {
-    const content = readReleaseNotes();
-    expect(content).toContain('Rich Sprint Output');
-  });
-
-  it('lists MCP backend as deferred limitation', () => {
-    const content = readReleaseNotes();
-    expect(content).toMatch(/MCP.*backend.*deferred|MCP server mode.*deferred/i);
-  });
-
-  it('lists API mode as partial limitation', () => {
-    const content = readReleaseNotes();
-    expect(content).toMatch(/[Aa]PI mode.*partial|partial.*[Aa]PI mode/);
-  });
-
-  it('includes NO_GO trend table', () => {
-    const content = readReleaseNotes();
-    expect(content).toContain('NO_GO Trend');
-    expect(content).toContain('Sprint 047');
-    expect(content).toContain('100%');
-    expect(content).toContain('manual fix');
-  });
-
-  it('updated footer references Sprint 047', () => {
-    const content = readReleaseNotes();
-    expect(content).toContain('Sprint 047');
-  });
-
-  it('does NOT reference Sprint 042 in footer', () => {
-    const content = readReleaseNotes();
-    // The old footer said "Generated from Sprint 042"
+    expect(content).not.toContain('NO_GO Trend');
     expect(content).not.toContain('Generated from Sprint 042');
-  });
-
-  it('updated release date to 2026-03-24', () => {
-    const content = readReleaseNotes();
-    expect(content).toContain('2026-03-24');
-  });
-
-  it('mentions Connector health tracking', () => {
-    const content = readReleaseNotes();
-    expect(content).toMatch(/[Cc]onnector.*[Hh]ealth|[Hh]ealth.*[Tt]racking/);
   });
 });

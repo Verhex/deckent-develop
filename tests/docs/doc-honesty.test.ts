@@ -6,7 +6,10 @@ const root = join(import.meta.dirname ?? __dirname, '../../');
 
 describe('doc-honesty', () => {
   it('Gate #8 is marked PARTIAL in beta-tracker.md', () => {
-    const content = readFileSync(join(root, 'docs/release/beta-tracker.md'), 'utf8');
+    // beta-tracker.md was moved docs/release/ → docs/archive/ (superseded
+    // internal-strategy doc, commit ebc55b03); its Gate #8 PARTIAL/Docker-runtime
+    // honesty disclosure is preserved at the archive path.
+    const content = readFileSync(join(root, 'docs/archive/beta-tracker.md'), 'utf8');
     expect(content).toMatch(/PARTIAL/);
     expect(content).toMatch(/Docker runtime/);
   });
