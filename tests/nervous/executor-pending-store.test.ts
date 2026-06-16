@@ -2,7 +2,7 @@
 //
 // Root cause: the Executor parks approve / suggest-timeout decisions in an
 // in-memory pendingApprovals Map but never persists them, so `deckent nervous`
-// and the REPL `/nervous` (which read .deckent/nervous-pending.json) always show
+// and the REPL `/nervous` (which read .deckent/nervous/nervous-pending.json) always show
 // an empty queue. An injected PendingApprovalStore lets bootstrap persist the
 // parked notification on park and drop it on resolve — string-free + testable.
 

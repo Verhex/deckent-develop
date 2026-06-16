@@ -13,6 +13,7 @@ import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { listPendingPanicEvents, acceptPanicGuard } from '../cli/commands/nervous.js';
 import { readRecommendations, dismissRecommendation } from '../nervous/recommendation-log.js';
+import { NERVOUS_PENDING_FILE, NERVOUS_IPC_DIR, PANIC_IPC_DIR } from '../core/constants.js';
 
 function sendJson(res: ServerResponse, data: unknown, status = 200): void {
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -54,7 +55,7 @@ function severityToRisk(severity?: string): 'low' | 'medium' | 'high' {
  * Fail-safe ([] on missing/corrupt).
  */
 function readNervousPendingApprovals(root: string): DashboardPendingApproval[] {
-  const path = join(root, '.deckent', 'nervous-pending.json');
+  const path = join(root, NERVOUS_PENDING_FILE);
   if (!existsSync(path)) return [];
   try {
     const data: unknown = JSON.parse(readFileSync(path, 'utf-8'));
@@ -87,7 +88,7 @@ function readNervousPendingApprovals(root: string): DashboardPendingApproval[] {
  */
 function writeNervousIpcApproval(root: string, notificationId: string, decision: 'accepted' | 'rejected'): void {
   try {
-    const pendingDir = join(root, '.deckent', 'nervous-ipc', 'pending');
+    const pendingDir = join(root, NERVOUS_IPC_DIR, 'pending');
     mkdirSync(pendingDir, { recursive: true });
     const safeId = notificationId.replace(/[^a-zA-Z0-9_-]/g, '_');
     const suffix = `${Date.now().toString(36)}-${randomBytes(4).toString('hex')}`;
@@ -167,7 +168,7 @@ export function registerNervousRoutes(
   // listPendingPanicEvents drops it) + nervous-ipc reject for the executor.
   if (method === 'POST' && path.startsWith('/api/nervous/reject/')) {
     const taskId = decodeURIComponent(path.slice('/api/nervous/reject/'.length));
-    const resolvedDir = join(projectRoot, '.deckent', 'panic-ipc', 'resolved');
+    const resolvedDir = join(projectRoot, PANIC_IPC_DIR, 'resolved');
     mkdirSync(resolvedDir, { recursive: true });
     const safeTaskId = taskId.replace(/[^a-zA-Z0-9_-]/g, '_');
     writeFileSync(join(resolvedDir, `${safeTaskId}.json`), JSON.stringify({ taskId, rejectedVia: 'dashboard', at: new Date().toISOString() }));

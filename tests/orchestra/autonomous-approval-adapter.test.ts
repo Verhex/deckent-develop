@@ -24,7 +24,7 @@ let pendingPath: string;
 
 beforeEach(() => {
   workDir = mkdtempSync(join(tmpdir(), 'approval-adapter-'));
-  pendingPath = join(workDir, '.deckent', 'nervous-pending.json');
+  pendingPath = join(workDir, '.deckent', 'nervous', 'nervous-pending.json');
 });
 
 afterEach(() => {

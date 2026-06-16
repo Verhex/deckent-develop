@@ -17,13 +17,13 @@ import type { NervousNotification, ExecutionRecord } from '../../src/core/nervou
 
 function createTmpRoot(): string {
   const root = join(tmpdir(), `nervous-tui-${randomUUID().slice(0, 8)}`);
-  mkdirSync(join(root, '.deckent'), { recursive: true });
+  mkdirSync(join(root, '.deckent', 'nervous'), { recursive: true });
   return root;
 }
 
 function writePending(root: string, notifications: NervousNotification[]): void {
   writeFileSync(
-    join(root, '.deckent', 'nervous-pending.json'),
+    join(root, '.deckent', 'nervous', 'nervous-pending.json'),
     JSON.stringify(notifications),
     'utf-8',
   );
@@ -31,7 +31,7 @@ function writePending(root: string, notifications: NervousNotification[]): void 
 
 function writeHistory(root: string, records: ExecutionRecord[]): void {
   const content = records.map(r => JSON.stringify(r)).join('\n') + '\n';
-  writeFileSync(join(root, '.deckent', 'nervous-history.jsonl'), content, 'utf-8');
+  writeFileSync(join(root, '.deckent', 'nervous', 'nervous-history.jsonl'), content, 'utf-8');
 }
 
 function writeConfig(root: string, config: Record<string, unknown>): void {

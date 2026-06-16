@@ -80,7 +80,7 @@ describe('invalidateDocCache', () => {
 describe('cleanIpcDirs', () => {
   it('removes IPC files older than the cutoff, keeps fresh ones', () => {
     const r = makeRoot();
-    const resolved = join(r, '.deckent', 'panic-ipc', 'resolved');
+    const resolved = join(r, '.deckent', 'nervous', 'panic-ipc', 'resolved');
     mkdirSync(resolved, { recursive: true });
     const oldFile = join(resolved, 'old.json');
     const freshFile = join(resolved, 'fresh.json');

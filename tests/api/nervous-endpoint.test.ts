@@ -4,8 +4,8 @@
  * root via startTestServer, no gitignored state.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { writeFileSync, existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { writeFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import { startTestServer, call, type TestServerHandle } from './test-server-helper.js';
 
 describe('/api/nervous/* routes', () => {
@@ -67,7 +67,9 @@ describe('/api/nervous/* — unified hub integration (W8)', () => {
   });
 
   function seedNervousPending(root: string): void {
-    writeFileSync(join(root, '.deckent', 'nervous-pending.json'), JSON.stringify([
+    const p = join(root, '.deckent', 'nervous', 'nervous-pending.json');
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, JSON.stringify([
       { id: 'nrv-1', type: 'directives-protection', title: 'Directives changed mid-sprint', message: 'baseline drift', severity: 'critical', detectorId: 'directives-protection', createdAt: '2026-06-15T00:00:00.000Z' },
     ]));
   }
@@ -96,7 +98,7 @@ describe('/api/nervous/* — unified hub integration (W8)', () => {
     seedNervousPending(handle.projectRoot);
     const res = await call(handle, '/api/nervous/accept/nrv-1', { method: 'POST' });
     expect(res.status).toBe(200);
-    const ipcPending = join(handle.projectRoot, '.deckent', 'nervous-ipc', 'pending');
+    const ipcPending = join(handle.projectRoot, '.deckent', 'nervous', 'nervous-ipc', 'pending');
     expect(existsSync(ipcPending)).toBe(true);
     expect(readdirSync(ipcPending).length).toBeGreaterThanOrEqual(1);
   });
@@ -114,7 +116,9 @@ describe('/api/nervous/recommendations routes', () => {
       { id: 'rec-aaaaaaaaaa11', actionId: 'DEBT_REPRIORITIZE', createdAt: '2026-06-15T10:00:00.000Z', payload: { debtId: 'D-12' }, status: 'open' },
       { id: 'rec-bbbbbbbbbb22', actionId: 'COMMIT_PUSH', createdAt: '2026-06-15T11:00:00.000Z', payload: {}, status: 'dismissed' },
     ];
-    writeFileSync(join(root, '.deckent', 'nervous-recommendations.jsonl'), lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+    const p = join(root, '.deckent', 'nervous', 'nervous-recommendations.jsonl');
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
   }
 
   it('GET /api/nervous/recommendations returns [] on a fresh project', async () => {

@@ -14,17 +14,17 @@ import type { NervousNotification, ExecutionRecord } from '../../src/core/nervou
 
 function createTmpRoot(): string {
   const root = join(tmpdir(), `nervous-test-${randomUUID().slice(0, 8)}`);
-  mkdirSync(join(root, '.deckent'), { recursive: true });
+  mkdirSync(join(root, '.deckent', 'nervous'), { recursive: true });
   return root;
 }
 
 function writePending(root: string, notifications: NervousNotification[]): void {
-  writeFileSync(join(root, '.deckent', 'nervous-pending.json'), JSON.stringify(notifications), 'utf-8');
+  writeFileSync(join(root, '.deckent', 'nervous', 'nervous-pending.json'), JSON.stringify(notifications), 'utf-8');
 }
 
 function writeHistory(root: string, records: ExecutionRecord[]): void {
   const content = records.map(r => JSON.stringify(r)).join('\n') + '\n';
-  writeFileSync(join(root, '.deckent', 'nervous-history.jsonl'), content, 'utf-8');
+  writeFileSync(join(root, '.deckent', 'nervous', 'nervous-history.jsonl'), content, 'utf-8');
 }
 
 function writeConfig(root: string, config: Record<string, unknown>): void {
@@ -179,13 +179,13 @@ describe('deckent nervous CLI', () => {
     expect(output.toLowerCase()).toContain('no live');
 
     // Removed from the pending queue.
-    const pending = JSON.parse(readFileSync(join(testRoot, '.deckent', 'nervous-pending.json'), 'utf-8'));
+    const pending = JSON.parse(readFileSync(join(testRoot, '.deckent', 'nervous', 'nervous-pending.json'), 'utf-8'));
     expect(pending).toHaveLength(0);
 
     // No 'accepted' history record — nothing executed (audit honesty). The live
     // IPC → executor → execute path is covered by tests/cli/nervous-ipc-route.test.ts.
     let hist = '';
-    try { hist = readFileSync(join(testRoot, '.deckent', 'nervous-history.jsonl'), 'utf-8'); } catch { /* none */ }
+    try { hist = readFileSync(join(testRoot, '.deckent', 'nervous', 'nervous-history.jsonl'), 'utf-8'); } catch { /* none */ }
     expect(hist).not.toContain('"decision":"accepted"');
   });
 
@@ -205,7 +205,7 @@ describe('deckent nervous CLI', () => {
     expect(output).toContain('later');
 
     // Verify history
-    const historyContent = readFileSync(join(testRoot, '.deckent', 'nervous-history.jsonl'), 'utf-8');
+    const historyContent = readFileSync(join(testRoot, '.deckent', 'nervous', 'nervous-history.jsonl'), 'utf-8');
     const record = JSON.parse(historyContent.trim()) as ExecutionRecord;
     expect(record.decision).toBe('rejected');
     expect(record.payload).toEqual({ reason: 'later' });
@@ -324,7 +324,7 @@ describe('deckent nervous CLI', () => {
 
 function writeRecommendations(root: string, lines: object[]): void {
   const content = lines.map(l => JSON.stringify(l)).join('\n') + '\n';
-  writeFileSync(join(root, '.deckent', 'nervous-recommendations.jsonl'), content, 'utf-8');
+  writeFileSync(join(root, '.deckent', 'nervous', 'nervous-recommendations.jsonl'), content, 'utf-8');
 }
 
 describe('deckent nervous recommendations (Brain inbox)', () => {
@@ -380,7 +380,7 @@ describe('deckent nervous recommendations (Brain inbox)', () => {
     });
     expect(output).toMatch(/dismissed|kapat/i);
 
-    const onDisk = readFileSync(join(testRoot, '.deckent', 'nervous-recommendations.jsonl'), 'utf-8');
+    const onDisk = readFileSync(join(testRoot, '.deckent', 'nervous', 'nervous-recommendations.jsonl'), 'utf-8');
     expect(JSON.parse(onDisk.trim()).status).toBe('dismissed');
   });
 

@@ -22,7 +22,7 @@ function makeTmpRoot(): string {
 }
 
 function ensureDeckentDir(root: string): string {
-  const dir = join(root, '.deckent');
+  const dir = join(root, '.deckent', 'nervous');
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
@@ -32,7 +32,7 @@ function ensureDeckentDir(root: string): string {
 function writePending(root: string, items: NervousNotification[]): void {
   ensureDeckentDir(root);
   writeFileSync(
-    join(root, '.deckent', 'nervous-pending.json'),
+    join(root, '.deckent', 'nervous', 'nervous-pending.json'),
     JSON.stringify(items, null, 2) + '\n',
     'utf-8',
   );
@@ -65,7 +65,7 @@ describe('getPendingNervous', () => {
     expect(result).toEqual([]);
   });
 
-  it('reads notifications from .deckent/nervous-pending.json', () => {
+  it('reads notifications from .deckent/nervous/nervous-pending.json', () => {
     const n = makeNotification();
     writePending(root, [n]);
     const result = getPendingNervous(root);
@@ -76,7 +76,7 @@ describe('getPendingNervous', () => {
 
   it('returns empty array on corrupted JSON', () => {
     ensureDeckentDir(root);
-    writeFileSync(join(root, '.deckent', 'nervous-pending.json'), '{ broken json', 'utf-8');
+    writeFileSync(join(root, '.deckent', 'nervous', 'nervous-pending.json'), '{ broken json', 'utf-8');
     const result = getPendingNervous(root);
     expect(result).toEqual([]);
   });
@@ -84,7 +84,7 @@ describe('getPendingNervous', () => {
   it('returns empty array when file contains non-array JSON', () => {
     ensureDeckentDir(root);
     writeFileSync(
-      join(root, '.deckent', 'nervous-pending.json'),
+      join(root, '.deckent', 'nervous', 'nervous-pending.json'),
       JSON.stringify({ not: 'an-array' }),
       'utf-8',
     );
@@ -176,7 +176,7 @@ describe('handleNervousSlash', () => {
     const n = makeNotification();
     writePending(root, [n]);
     handleNervousSlash(['accept', n.id], root, false);
-    const histPath = join(root, '.deckent', 'nervous-history.jsonl');
+    const histPath = join(root, '.deckent', 'nervous', 'nervous-history.jsonl');
     expect(existsSync(histPath)).toBe(true);
     const lines = readFileSync(histPath, 'utf-8').trim().split('\n').filter(Boolean);
     expect(lines.length).toBeGreaterThan(0);
@@ -189,7 +189,7 @@ describe('handleNervousSlash', () => {
     const n = makeNotification();
     writePending(root, [n]);
     handleNervousSlash(['reject', n.id], root, false);
-    const histPath = join(root, '.deckent', 'nervous-history.jsonl');
+    const histPath = join(root, '.deckent', 'nervous', 'nervous-history.jsonl');
     const lines = readFileSync(histPath, 'utf-8').trim().split('\n').filter(Boolean);
     const record = JSON.parse(lines[0]!);
     expect(record.decision).toBe('rejected');

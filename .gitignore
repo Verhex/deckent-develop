@@ -68,6 +68,9 @@ coverage/
 # Managed docs runtime config (private — template in src/cli/commands/init-templates/)
 .deckent/settings/docs.json
 
+# Nervous System runtime (ADR-040 — logs, history, pending, IPC dirs, all regenerated)
+.deckent/nervous/
+
 # Sprint ephemeral artifacts (IPC, events, checkpoints — regenerated each run)
 .deckent/sprint-*-ipc/
 .deckent/sprint-*-events.jsonl

@@ -36,6 +36,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { PANIC_IPC_DIR } from '../core/constants.js';
 import { SAFETY_FLOOR } from './authority-matrix.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -98,7 +99,7 @@ function emitWarning(sink: ((msg: string) => void) | undefined, msg: string): vo
 }
 
 function resolvedMarkerPath(projectRoot: string, taskId: string): string {
-  return join(projectRoot, '.deckent', 'panic-ipc', 'resolved', `${taskId}.json`);
+  return join(projectRoot, PANIC_IPC_DIR, 'resolved', `${taskId}.json`);
 }
 
 function readDecisionFromMarker(path: string): 'APPROVED' | 'REJECTED' | null {

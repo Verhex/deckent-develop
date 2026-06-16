@@ -17,7 +17,7 @@ import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 /** Path (relative to project root) of the durable recommendation feed. */
-export const RECOMMENDATIONS_FILE = '.deckent/nervous-recommendations.jsonl';
+export const RECOMMENDATIONS_FILE = '.deckent/nervous/nervous-recommendations.jsonl';
 
 /**
  * A nervous proposal awaiting Brain / operator disposition. The data layer is

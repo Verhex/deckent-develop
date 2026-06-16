@@ -11,8 +11,8 @@
 //     → DecisionEngine.decide()
 //     → Proposer.propose()
 //     → Promise.allSettled([
-//          NervousDispatcher.dispatch()  → .deckent/nervous-log.jsonl,
-//          Executor.handle()             → .deckent/nervous-history.jsonl,
+//          NervousDispatcher.dispatch()  → .deckent/nervous/nervous-log.jsonl,
+//          Executor.handle()             → .deckent/nervous/nervous-history.jsonl,
 //       ])
 //
 // NERVOUS-TODO §11.5 test stratejisi: real pipeline, real I/O, no per-layer
@@ -27,7 +27,7 @@
 // without touching the assertions.
 //
 // File path note: the dispatcher file channel writes to
-// `.deckent/nervous-log.jsonl` (see src/nervous/dispatcher.ts pushToFile),
+// `.deckent/nervous/nervous-log.jsonl` (see src/nervous/dispatcher.ts pushToFile),
 // not the legacy `.deckent/nervous-events/*.json` directory hinted at in
 // DIRECTIVES. The assertion uses the real path.
 
@@ -214,8 +214,8 @@ describe('Nervous Integration Runtime — W3-3 full pipeline', () => {
     // settle on disk.
     vi.useRealTimers();
 
-    const logPath = join(projectRoot, '.deckent', 'nervous-log.jsonl');
-    const historyPath = join(projectRoot, '.deckent', 'nervous-history.jsonl');
+    const logPath = join(projectRoot, '.deckent', 'nervous', 'nervous-log.jsonl');
+    const historyPath = join(projectRoot, '.deckent', 'nervous', 'nervous-history.jsonl');
 
     expect(await waitForJsonlFile(logPath, 2000)).toBe(true);
     expect(await waitForJsonlFile(historyPath, 2000)).toBe(true);

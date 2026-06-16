@@ -8,6 +8,7 @@ import type { MemoryStore } from '../core/memory-store.js';
 import { appendFile, readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { NERVOUS_HISTORY_FILE } from '../core/constants.js';
 
 /**
  * JSONL-based audit trail for Nervous System execution records.
@@ -21,7 +22,7 @@ export class NervousHistory {
   private readonly filePath: string;
 
   constructor(projectRoot: string) {
-    this.filePath = join(projectRoot, '.deckent', 'nervous-history.jsonl');
+    this.filePath = join(projectRoot, NERVOUS_HISTORY_FILE);
   }
 
   /** Atomic append — each record is one JSONL line */

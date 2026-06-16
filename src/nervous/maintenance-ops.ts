@@ -16,6 +16,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { clearDocCache } from '../orchestra/managed-docs/doc-cache.js';
+import { NERVOUS_IPC_DIR, PANIC_IPC_DIR } from '../core/constants.js';
 
 const DECKENT_DIR = '.deckent';
 
@@ -74,9 +75,9 @@ export function invalidateDocCache(projectRoot: string, cacheType: string): void
  */
 export function cleanIpcDirs(projectRoot: string, maxAgeMs = 60 * 60 * 1000): number {
   const dirs = [
-    join(projectRoot, DECKENT_DIR, 'nervous-ipc', 'pending'),
-    join(projectRoot, DECKENT_DIR, 'panic-ipc', 'pending'),
-    join(projectRoot, DECKENT_DIR, 'panic-ipc', 'resolved'),
+    join(projectRoot, NERVOUS_IPC_DIR, 'pending'),
+    join(projectRoot, PANIC_IPC_DIR, 'pending'),
+    join(projectRoot, PANIC_IPC_DIR, 'resolved'),
   ];
   const cutoff = Date.now() - maxAgeMs;
   let removed = 0;

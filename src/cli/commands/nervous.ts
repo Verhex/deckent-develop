@@ -6,7 +6,7 @@
 // ADR-010: no external deps beyond commander.js — ANSI escape codes for colors.
 
 import { Command } from 'commander';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync, watchFile, unwatchFile, readdirSync } from 'node:fs';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
@@ -24,6 +24,7 @@ import {
   readRecommendations,
   dismissRecommendation,
 } from '../../nervous/recommendation-log.js';
+import { NERVOUS_HISTORY_FILE, NERVOUS_PENDING_FILE, PANIC_IPC_DIR } from '../../core/constants.js';
 
 // ─── ANSI Color Helpers ─────────────────────────────────────────────────────
 
@@ -58,11 +59,11 @@ function outcomeIcon(decision: string, outcome: string): string {
 // ─── File Paths ─────────────────────────────────────────────────────────────
 
 function getHistoryPath(root: string): string {
-  return join(root, '.deckent', 'nervous-history.jsonl');
+  return join(root, NERVOUS_HISTORY_FILE);
 }
 
 function getPendingPath(root: string): string {
-  return join(root, '.deckent', 'nervous-pending.json');
+  return join(root, NERVOUS_PENDING_FILE);
 }
 
 function getConfigPath(root: string): string {
@@ -129,14 +130,14 @@ function readNervousConfig(root: string): NervousSystemConfig {
 
 function writePendingNotifications(root: string, notifications: NervousNotification[]): void {
   const path = getPendingPath(root);
-  const dir = join(root, '.deckent');
+  const dir = dirname(path);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(path, JSON.stringify(notifications, null, 2), 'utf-8');
 }
 
 function appendHistoryRecord(root: string, record: ExecutionRecord): void {
   const path = getHistoryPath(root);
-  const dir = join(root, '.deckent');
+  const dir = dirname(path);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   appendFileSync(path, JSON.stringify(record) + '\n', 'utf-8');
 }
@@ -545,7 +546,7 @@ export interface PanicGuardPendingEvent {
 }
 
 function getPanicIpcDir(root: string): string {
-  return join(root, '.deckent', 'panic-ipc');
+  return join(root, PANIC_IPC_DIR);
 }
 
 /**

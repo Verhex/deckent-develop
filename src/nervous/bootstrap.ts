@@ -14,6 +14,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { NERVOUS_PENDING_FILE } from '../core/constants.js';
 import { getCurrentSprintId, writeEvent, CHANNELS } from '../core/event-stream.js';
 import { NervousObserver } from './observer.js';
 import { DecisionEngine } from './decision-engine.js';
@@ -56,16 +57,14 @@ export interface NervousBootstrapDeps {
   observerActiveInAnyPhase?: boolean;
 }
 
-const PENDING_FILE = 'nervous-pending.json';
-
 /**
  * File-backed PendingApprovalStore (APPROVE-004, §4G). Persists parked approvals
  * as the same `NervousNotification[]` shape that `deckent nervous` and the REPL
- * `/nervous` bridge read from `.deckent/nervous-pending.json`, so executor-parked
+ * `/nervous` bridge read from `.deckent/nervous/nervous-pending.json`, so executor-parked
  * approvals become visible to the operator instead of an always-empty queue.
  */
 export function makeFilePendingStore(projectRoot: string): PendingApprovalStore {
-  const path = join(projectRoot, '.deckent', PENDING_FILE);
+  const path = join(projectRoot, NERVOUS_PENDING_FILE);
   const read = (): NervousNotification[] => {
     if (!existsSync(path)) return [];
     try {

@@ -12,11 +12,11 @@ const dirs: string[] = [];
 function sandbox(): string {
   const d = mkdtempSync(join(tmpdir(), 'pending-approvals-'));
   dirs.push(d);
-  mkdirSync(join(d, '.deckent'), { recursive: true });
+  mkdirSync(join(d, '.deckent', 'nervous'), { recursive: true });
   return d;
 }
 afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }); });
-const nervousPath = (d: string) => join(d, '.deckent', 'nervous-pending.json');
+const nervousPath = (d: string) => join(d, '.deckent', 'nervous', 'nervous-pending.json');
 
 describe('readPendingApprovals', () => {
   it('returns [] when no pending file exists (fail-safe)', () => {
