@@ -58,7 +58,7 @@ coverage/
 .deckent/sprint-state.json
 .deckent/plugins/*
 !.deckent/plugins/.gitkeep
-.deckent/jobs/
+.deckent/runtime/jobs/
 .deckent/usage/
 .deckent/cache/
 .deckent/traces/
@@ -82,7 +82,7 @@ coverage/
 .deckent/sprint-*-merge-runbook.sh
 .deckent/sprint-*-worktree-setup.sh
 .deckent/sprint-*-dispatch-locks.json
-.deckent/evaluations/
+.deckent/runtime/evaluations/
 .deckent/pids/
 .claude/scheduled_tasks.lock
 .claude/settings.local.json
