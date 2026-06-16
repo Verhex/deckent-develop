@@ -9,7 +9,7 @@
 //   Gap F: completion tracking — waitForResult() after launch (CLI's waitForRunResult
 //          primitive); result != null && selfAssessment DONE/GO_WITH_TECH_DEBT = success
 //          (mirrors run.ts:320). null = timeout = failure.
-import { writeFileSync } from 'node:fs';
+import { atomicWriteFileSync } from '../../agents/worker-lifecycle.js';
 import type { ResolvedConfig } from '../../core/config-types.js';
 import type { ActionHandler } from '../../nervous/executor.js';
 import type { CapabilityRegistry } from '../../core/capability-broker.js';
@@ -23,8 +23,10 @@ import type { LlmComplete } from './goal-planner-types.js';
 /** Action id the backlog-trigger sets on every entry-driven trigger. */
 export const AUTONOMOUS_EXECUTE_ACTION = 'autonomous.execute';
 
+/** Persist the backlog with the project's durability contract (write-tmp → fsync
+ *  → rename), matching every other backlog write in backlog.ts. */
 function saveBacklogFile(path: string, bl: BacklogFile): void {
-  writeFileSync(path, JSON.stringify(bl, null, 2), 'utf-8');
+  atomicWriteFileSync(path, JSON.stringify(bl, null, 2));
 }
 
 export interface ExecuteDispatcherDeps {
