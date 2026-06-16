@@ -48,8 +48,6 @@ docs/sprint-log/**
 docs/smoke-**
 docs/KNOWN_ISSUES.md
 docs/ROADMAP-GOD-LEVEL.md
-docs/directives/**
-docs/security/**
 
 # ─── Top-level legacy/transient (pre-reorg) ───────────────────────────────
 next-session-prompt.md

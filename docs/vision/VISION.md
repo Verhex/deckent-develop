@@ -118,28 +118,28 @@ This is where Deckent becomes a fully autonomous multi-agent development platfor
 ---
 
 ## Deckent by the Numbers
-| Metrik | Değer |
+| Metric | Value |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-288 |
-| MCP Tools | 34 |
+| Sprint | sprint-289 |
+| MCP Tools | 35 |
 | MCP Resources | 8 |
 | CLI Commands | 57+ |
-| Dashboard Pages | 16 |
+| Dashboard Pages | 17 |
 | Agents | 15 built-in + 2 custom |
 | Skills | 21 built-in |
 | Providers | 4 (Claude, Codex, Gemini, Ollama) |
 
 ## Sprint Metrics
-| Metrik | Değer |
+| Metric | Value |
 |--------|-------|
-| Sprint | sprint-288 |
-| Toplam Task | 5 |
-| Tamamlanan | 5 |
+| Sprint | sprint-289 |
+| Total Tasks | 5 |
+| Completed | 5 |
 | Tech Debt | 0 |
 | No-Go | 0 |
-| Süre | 7dk 26sn |
+| Duration | 8dk 3sn |
 | Coverage | 0.0% |
 
 ## Sprint History
-_Sprint geçmişi yok._
+_No sprint history._

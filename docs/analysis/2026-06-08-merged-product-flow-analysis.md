@@ -1,7 +1,7 @@
 # 2026-06-08 — Birleşik Ürün-Akışı Analizi (Alperen RCA + Bağımsız Kod-Doğrulamalı Pas)
 
 Bu doküman iki analizi **birleştirir**:
-1. **Alperen CLI/MCP RCA** — `docs/alperen-analysis/2026-06-08-cli-mcp-product-flow-root-cause.md` (ürün-akışı kök-neden, open-beta 72/100).
+1. **Alperen CLI/MCP RCA** — `docs/analysis/2026-06-08-cli-mcp-product-flow-root-cause.md` (ürün-akışı kök-neden, open-beta 72/100).
 2. **Bağımsız kod-doğrulamalı pas (2026-06-08)** — 5 paralel investigator (CLI/MCP parity · task/work model · onboarding/provider/auth · autonomous/flow/enterprise · coverage-critic), her iddia `file:line` doğrulamalı; alperen RCA'yı VERIFY + EXTEND + CORRECT + yeni-bulgu.
 
 Amaç: SSOT'a (MASTER-PLAN/blueprint) yazılacak **pozisyon + iş planı revizyonu** için kanıtlanmış, çift-doğrulanmış birleşik karar katmanı. (Deep positioning revizyonu Alperen ile birlikte — bu doküman onun girdisi.)
@@ -130,7 +130,7 @@ Amaç: SSOT'a (MASTER-PLAN/blueprint) yazılacak **pozisyon + iş planı revizyo
 ---
 
 ## 7. Kaynaklar
-- Alperen RCA: `docs/alperen-analysis/2026-06-08-cli-mcp-product-flow-root-cause.md`.
+- Alperen RCA: `docs/analysis/2026-06-08-cli-mcp-product-flow-root-cause.md`.
 - Local-model autonomous RCA: `docs/analysis/2026-06-08-local-model-autonomous-rca.md`.
 - Bağımsız pas: 5 investigator (CLI/MCP-parity · task-model · onboarding/provider · autonomous/flow/enterprise · coverage-critic), 2026-06-08, hepsi file:line kod-doğrulamalı.
 - SSOT: `docs/MASTER-PLAN.md` (§4I AS-8, §10A continuation), `docs/vision/blueprint.md` (§23 Phase-8).

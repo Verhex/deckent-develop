@@ -6,9 +6,9 @@
 
 ## A. Mevcut Durum (snapshot)
 - **Autonomous-ollama:** KAPALI, main'de (`a58d86bf`), Phase-1+1c. Local-model autonomous canlı kanıtlandı (qwen3.6 zero-cost).
-- **Birleşik ürün-akışı analizi BİTTİ:** `docs/alperen-analysis/2026-06-08-merged-product-flow-analysis.md` (LOCAL). Kaynaklar: alperen CLI/MCP RCA + local-model RCA (`docs/analysis/2026-06-08-local-model-autonomous-rca.md`, tracked) + bağımsız 5-investigator kod-doğrulamalı pas + 5 P0 doğrudan spot-check.
+- **Birleşik ürün-akışı analizi BİTTİ:** `docs/analysis/2026-06-08-merged-product-flow-analysis.md` (LOCAL). Kaynaklar: alperen CLI/MCP RCA + local-model RCA (`docs/analysis/2026-06-08-local-model-autonomous-rca.md`, tracked) + bağımsız 5-investigator kod-doğrulamalı pas + 5 P0 doğrudan spot-check.
 - **Çift-beta verdict:** developer/dogfood ~71/100 · enterprise-facing ~52/100. İki yeni eksen: hollow-surface vs missing-contract, wired vs proven.
-- **Git:** main temiz+push'lu. Strateji dokümanları (`docs/alperen-analysis/`, MASTER-PLAN, blueprint) bilinçli LOCAL/gitignored.
+- **Git:** main temiz+push'lu. Strateji dokümanları (`docs/analysis/`, MASTER-PLAN, blueprint) bilinçli LOCAL/gitignored.
 - **Hafıza:** `project_merged_product_flow_analysis`, `project_autonomous_engine_direction`, `project_autonomous_ollama_execution_gap` (CLOSED) güncel.
 
 ---
@@ -17,7 +17,7 @@
 
 **Bağlam:** Alperen codex ile global rekabet analizi yaptırdı (aşağıdaki prompt). Görev: **(a) codex çıktısını değerlendir** (doğruluk, eksik, bias, deckent iddialarının kod-gerçekliğiyle uyumu), **(b) Claude olarak bağımsız kontrol et** (özellikle codex'in deckent'e dair iddialarını gerçek repo koduyla doğrula — proof-of-function kültürü; pazar/rakip iddialarını WebSearch ile teyit et), **(c) iki değerlendirmeyi sentezle** → birleşik competitive-analysis kararı.
 
-**ÖNCE YAP:** Codex çıktı dosyasını bul (Alperen'e sor ya da repo'da ara — muhtemel `docs/alperen-analysis/` veya kök'te). Çıktı yoksa Alperen'den iste.
+**ÖNCE YAP:** Codex çıktı dosyasını bul (Alperen'e sor ya da repo'da ara — muhtemel `docs/analysis/` veya kök'te). Çıktı yoksa Alperen'den iste.
 
 **Doğrulama disiplini (bu projede zorunlu):**
 - Codex'in **deckent hakkındaki her iddiasını** gerçek koddan `file:line` ile doğrula — README/marketing değil. (Merged-doc'taki kod-doğrulamalı bulgular referans: 5-enum TaskType, autonomous=always-generic, EffectClass wire-gap, enterprise-dashboard hollow, multi-tenant schema-only, RBAC advisory, npm-unpublished vb.)
@@ -25,7 +25,7 @@
 - Şişirme/bias yakala: deckent'i olduğundan güçlü/zayıf gösteren iddiaları işaretle. Skorları merged-doc'un çift-beta verdict'iyle (71/52) tutarlılık açısından çapraz-kontrol et.
 - Önceki oturumda **bir investigator hatası yakalanmıştı** ("getEffectClass yok" → aslında `rubric-registry.ts:375`'te VAR ama wire değil). Aynı titizlik: güven ama doğrula.
 
-**Çıktı:** `docs/alperen-analysis/2026-06-08-competitive-analysis-review.md` (LOCAL) — codex-değerlendirme + Claude-bağımsız-bulgular + düzeltmeler + birleşik konumlandırma görüşü. Pozisyon revizyonuna (İş 3) girdi olur.
+**Çıktı:** `docs/analysis/2026-06-08-competitive-analysis-review.md` (LOCAL) — codex-değerlendirme + Claude-bağımsız-bulgular + düzeltmeler + birleşik konumlandırma görüşü. Pozisyon revizyonuna (İş 3) girdi olur.
 
 ### Codex'e verilen prompt (verbatim — değerlendirme/yeniden-koşum için):
 <details><summary>Tam prompt (18 part: global market research → competitive scoring → SWOT → strategic threats → VC verdict)</summary>

@@ -31,7 +31,6 @@ DIRECTIVES.md
 
 # Development files
 kararlanacakplan.md
-docs/directives/
 .contracts/
 tsconfig.json
 vitest.config.ts

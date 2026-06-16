@@ -34,7 +34,7 @@ describe('partitionFiles + isExcluded', () => {
       'docs/development/repo-sync.md',
       'docs/archive/old.md',
       'docs/audits/sprint-139/dead-code-report.md',
-      'docs/alperen-analysis/notes.md',
+      'docs/analysis/notes.md',
       'docs/core-memory/identity.md',
       // should DROP — personal root markdowns
       'DIRECTIVES.md',
@@ -94,7 +94,7 @@ describe('partitionFiles + isExcluded', () => {
       'docs/development/',
       'docs/archive/',
       'docs/audits/',
-      'docs/alperen-analysis/',
+      'docs/analysis/',
       'docs/core-memory/',
       'DIRECTIVES.md',
       'RESUME-MONDAY.md',

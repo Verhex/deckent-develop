@@ -2,6 +2,19 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint289] - 2026-06-15
+
+### Added
+
+- Process anti-IDOR + positive-OIDC tenant-stamp testleri
+- Actor.id audit-lineage — gerçek OIDC sub audit-chain'e düşsün
+- deriveRequestPrincipal defense-in-depth (verified-claims sinyali)
+- Test-kapsama kapanışı (N3 drain integration + N2 401/sub-flag + D8 guard)
+- Stale-comment süpürmesi (doc-drift temizliği)
+
+
+_Tasks: 5 total, 5 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint288] - 2026-06-15
 
 ### Added

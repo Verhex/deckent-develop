@@ -17,7 +17,7 @@ const BROKEN_PATHS = [
   'docs/launch',
   'docs/directives',
   'docs/audits',
-  'docs/alperen-analysis',
+  'docs/analysis',
 ];
 
 function countOccurrences(haystack: string, needle: string): number {

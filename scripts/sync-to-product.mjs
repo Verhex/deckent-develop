@@ -34,7 +34,7 @@ export const EXCLUDE = [
   'docs/development/',
   'docs/archive/',
   'docs/audits/',
-  'docs/alperen-analysis/',
+  'docs/analysis/',
   'docs/core-memory/',
   // personal root markdowns
   'DIRECTIVES.md',

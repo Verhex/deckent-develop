@@ -90,7 +90,7 @@ coverage/
 # Deckent runtime artifacts (per-sprint, ephemeral)
 # Cache-prefix stability: these files change frequently and alter git-status snapshot,
 # breaking system-prompt cache coherence. Gitignored to preserve prompt-cache prefix
-# identity across sprint runs (analysis: docs/alperen-analysis/2026-06-10-weekly-limit-reverse-engineering.md §8)
+# identity across sprint runs (analysis: docs/analysis/2026-06-10-weekly-limit-reverse-engineering.md §8)
 .deckent/heartbeat.pid
 .deckent/sprint.lock
 .deckent/mcp-server.pid

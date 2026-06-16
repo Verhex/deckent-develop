@@ -9,10 +9,10 @@
 
 **Kapsam Girdileri:**
 - `docs/audits/sprint-188/*.md` (12 audit raporu, 250 KB, ~80+ bulgu)
-- `docs/alperen-analysis/2026-05-22-wrongstack-comparison-learnings.md` (WS-Z/D/K/X serisi)
+- `docs/analysis/2026-05-22-wrongstack-comparison-learnings.md` (WS-Z/D/K/X serisi)
 - `docs/ROADMAP-GOD-LEVEL.md` (Trinity + Sub-projects + Conversational Shell)
 - `docs/vision/roadmap.md` (Trinity matrix, Path B/A/C)
-- `docs/alperen-analysis/2026-05-22-memory-v2-migration.md` (Memory V2 migration)
+- `docs/analysis/2026-05-22-memory-v2-migration.md` (Memory V2 migration)
 - 2026-05-23 yeni stratejik direktifler (Alperen)
 - 3 çatal kararı (Alperen onaylı, 2026-05-23)
 
@@ -822,10 +822,10 @@ Her sprint sonunda **3 görünür değişim** raporlanmalı:
 
 ## V.C — Dosya Lokasyonları
 
-- Bu plan: `docs/alperen-analysis/2026-05-23-comprehensive-work-plan.md`
+- Bu plan: `docs/analysis/2026-05-23-comprehensive-work-plan.md`
 - Sprint 188 raporları: `docs/audits/sprint-188/*.md` (12 dosya)
-- WrongStack analizi: `docs/alperen-analysis/2026-05-22-wrongstack-comparison-learnings.md`
-- Memory V2 migration: `docs/alperen-analysis/2026-05-22-memory-v2-migration.md`
+- WrongStack analizi: `docs/analysis/2026-05-22-wrongstack-comparison-learnings.md`
+- Memory V2 migration: `docs/analysis/2026-05-22-memory-v2-migration.md`
 - Roadmap (planlama log): `docs/ROADMAP-GOD-LEVEL.md`
 - Vision (kanonik): `docs/vision/roadmap.md`
 - Trinity matrix: `docs/vision/roadmap.md:24-44`
@@ -1027,7 +1027,7 @@ result-write gap; underlying source already landed during Sprint 190 cross-fixes
 | 4 | `TIER_PROVIDER_MAP` ollama row for cross-provider tier remapping | `src/core/model-equivalence.ts` | ✗ Not in filesWrite |
 
 **Why items 2-4 are deferred:** 191-017-fix scope is limited to `providers/`,
-`cli/commands/`, `docs/alperen-analysis/`, and corresponding tests. Items 2-4 require
+`cli/commands/`, `docs/analysis/`, and corresponding tests. Items 2-4 require
 writes into `src/core/` which the auditor would flag as boundary violations under
 ADR-037. They are documented here verbatim so the next sprint can pick them up with
 zero discovery cost — exact files, exact change needed.

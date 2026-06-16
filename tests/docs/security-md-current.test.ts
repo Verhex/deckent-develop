@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = join(import.meta.dirname, '..', '..');
@@ -22,34 +22,9 @@ describe('SECURITY.md — current version', () => {
   });
 });
 
-describe('docs/security/threat-model.md', () => {
-  const threatModelPath = join(ROOT, 'docs', 'security', 'threat-model.md');
-
-  it('(b) threat-model.md file exists', () => {
-    expect(existsSync(threatModelPath)).toBe(true);
-  });
-
-  it('(b) threat-model.md has at least 6 top-level headings', () => {
-    const content = readFileSync(threatModelPath, 'utf-8');
-    const headings = content.match(/^#{1,2} .+/gm) ?? [];
-    expect(headings.length).toBeGreaterThanOrEqual(6);
-  });
-
-  it('(b) threat-model.md covers required attack surfaces', () => {
-    const content = readFileSync(threatModelPath, 'utf-8');
-    expect(content).toContain('Worker Code Execution');
-    expect(content).toContain('API Key');
-    expect(content).toContain('Multi-Project');
-    expect(content).toContain('MCP');
-  });
-
-  it('(b) threat-model.md honestly discloses ADR-037 V1.0 advisory nature', () => {
-    const content = readFileSync(threatModelPath, 'utf-8');
-    expect(content).toContain('ADR-037');
-    expect(content).toMatch(/advisory|soft/i);
-    expect(content).toMatch(/V2|post-GA/i);
-  });
-});
+// NOTE: docs/security/threat-model.md was removed 2026-06-16 (docs/security to be
+// re-documented from scratch). Its block is intentionally gone; re-add coverage
+// when the new security docs land.
 
 describe('README.md — advisory role boundaries disclosure', () => {
   const readmePath = join(ROOT, 'README.md');

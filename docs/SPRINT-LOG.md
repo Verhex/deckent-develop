@@ -7951,3 +7951,29 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 288-005: Tema E — Arayüzler & Operasyon (DONE)
 
 ---
+## Sprint 289 — sprint-289
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-15
+**Duration:** 484s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 483991ms |
+
+### Tasks
+
+- 289-001: Process anti-IDOR + positive-OIDC tenant-stamp testleri (DONE)
+- 289-002: Actor.id audit-lineage — gerçek OIDC sub audit-chain'e düşsün (DONE)
+- 289-003: deriveRequestPrincipal defense-in-depth (verified-claims sinyali) (DONE)
+- 289-004: Test-kapsama kapanışı (N3 drain integration + N2 401/sub-flag + D8 guard) (DONE)
+- 289-005: Stale-comment süpürmesi (doc-drift temizliği) (DONE)
+
+---

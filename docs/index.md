@@ -88,7 +88,4 @@ features:
 
 ### Features
 
-- [Feature Overview](features/00-genel-bakis.md)
-- [Memory V2](features/05-memory-v2.md)
-- [Dependency Waves](features/09-dependency-waves.md)
-- [Nervous System](features/18-nervous-system.md)
+_Feature documentation is being rewritten (2026-06-16) — links return once the new docs land._
