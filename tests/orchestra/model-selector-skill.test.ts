@@ -77,8 +77,9 @@ describe('resolveTaskModel — skillModels parameter (Layer 4d)', () => {
     const result = resolveTaskModel(
       'Simple fix', 'A tiny change', scope, config,
     );
-    // Should be haiku (score = -1, haiku_allowed=true)
-    expect(result).toBe('haiku');
+    // Baseline for a code scope (score = -1 → economy) is floored to sonnet by
+    // MODEL-GUARD; undefined skillModels leaves that guarded baseline unchanged.
+    expect(result).toBe('sonnet');
   });
 
   it('empty skillModels array has no effect', () => {
@@ -87,7 +88,8 @@ describe('resolveTaskModel — skillModels parameter (Layer 4d)', () => {
       'Simple fix', 'A tiny change', scope, config,
       undefined, undefined, [],
     );
-    expect(result).toBe('haiku');
+    // Same guarded baseline (sonnet); an empty skillModels array is a no-op.
+    expect(result).toBe('sonnet');
   });
 
   it('skill model upgrade still capped by Layer 3 (docs scope)', () => {

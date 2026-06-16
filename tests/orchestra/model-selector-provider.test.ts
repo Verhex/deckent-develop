@@ -32,9 +32,17 @@ describe('resolveTaskModel — provider parameter backward compat', () => {
   const config = makeConfig();
   const patterns: never[] = [];
 
-  it('no provider parameter returns Claude model (haiku)', () => {
+  it('floors an auto-selected economy code task to sonnet (MODEL-GUARD)', () => {
+    // src/cli/ is a code-development scope; a low score would auto-resolve to
+    // haiku (economy), but MODEL-GUARD forbids economy for code → sonnet.
     const scope = makeScope(['src/cli/']);
     const result = resolveTaskModel('Simple fix', 'A tiny change', scope, config);
+    expect(result).toBe('sonnet');
+  });
+
+  it('honors forceModel=haiku on a code scope (explicit override)', () => {
+    const scope = makeScope(['src/cli/']);
+    const result = resolveTaskModel('Simple fix', 'A tiny change', scope, config, [], 'haiku');
     expect(result).toBe('haiku');
   });
 
@@ -69,10 +77,23 @@ describe('resolveTaskModel — codex provider', () => {
   const config = makeConfig();
   const patterns: never[] = [];
 
-  it('simple task resolves to gpt-5-mini (economy tier)', () => {
+  it('floors an auto-selected economy code task to gpt-4.1 on codex (MODEL-GUARD)', () => {
+    // Would auto-resolve to gpt-5-mini (economy) for a code scope; MODEL-GUARD
+    // forbids economy for code-development → standard gpt-4.1.
     const scope = makeScope(['src/cli/']);
     const result = resolveTaskModel(
       'Simple fix', 'A tiny change', scope, config, patterns,
+      undefined, undefined, 'codex',
+    );
+    expect(result).toBe('gpt-4.1');
+  });
+
+  it('keeps gpt-5-mini for an auto-selected economy DOC task on codex (economy allowed)', () => {
+    // docs/ is exempt from the economy floor. A doc scope auto-resolves through
+    // the economy tier on codex (gpt-5-mini) and is NOT upgraded by MODEL-GUARD.
+    const scope = makeScope(['docs/'], ['docs/guide.md']);
+    const result = resolveTaskModel(
+      'Tiny doc', 'A tiny doc note', scope, config, patterns,
       undefined, undefined, 'codex',
     );
     expect(result).toBe('gpt-5-mini');
@@ -104,14 +125,15 @@ describe('resolveTaskModel — gemini provider', () => {
   const config = makeConfig();
   const patterns: never[] = [];
 
-  it('simple task resolves to gemini-2.0-flash (economy tier)', () => {
+  it('floors an auto-selected economy code task to gemini-2.5-flash (MODEL-GUARD)', () => {
+    // Would auto-resolve to gemini-2.0-flash (economy) for a code scope;
+    // MODEL-GUARD forbids economy for code-development → standard gemini-2.5-flash.
     const scope = makeScope(['src/cli/']);
     const result = resolveTaskModel(
       'Simple fix', 'A tiny change', scope, config, patterns,
       undefined, undefined, 'gemini',
     );
-    // haiku -> economy tier -> gemini-2.0-flash (economy on gemini)
-    expect(result).toBe('gemini-2.0-flash');
+    expect(result).toBe('gemini-2.5-flash');
   });
 
   it('medium task resolves to gemini-2.5-flash (standard tier)', () => {
