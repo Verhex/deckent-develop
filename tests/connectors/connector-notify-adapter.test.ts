@@ -49,6 +49,37 @@ function notif(priority: Notification['priority'] = 'info'): Notification {
 }
 
 describe('ConnectorNotificationAdapter (BOT-001)', () => {
+  // Rich-approval bot: actions carrying callbackData become inline buttons on the
+  // sent message; actions without callbackData stay text-only (no buttons).
+  it('renders callbackData actions as inline buttons on the message', async () => {
+    const tg = fakeConnector('telegram');
+    const adapter = makeConnectorNotificationAdapter([{ connector: tg, chatId: '111' }]);
+    await adapter.send({
+      ...notif('critical'),
+      title: 'Approval required',
+      summary: 'autonomous.execute (backlog-x)',
+      actions: [
+        { label: '✓ Approve', cliCommand: 'deckent autonomous approve backlog-x', callbackData: 'approve:backlog-x' },
+        { label: '✗ Reject', cliCommand: 'deckent autonomous reject backlog-x', callbackData: 'reject:backlog-x' },
+      ],
+    });
+    const last = tg.sent.at(-1)!;
+    expect(last.buttons).toEqual([[
+      { text: '✓ Approve', callbackData: 'approve:backlog-x' },
+      { text: '✗ Reject', callbackData: 'reject:backlog-x' },
+    ]]);
+  });
+
+  it('omits buttons when actions carry no callbackData (text-only fallback)', async () => {
+    const tg = fakeConnector('telegram');
+    const adapter = makeConnectorNotificationAdapter([{ connector: tg, chatId: '111' }]);
+    await adapter.send({
+      ...notif('info'),
+      actions: [{ label: 'Approve', cliCommand: 'deckent nervous accept x' }],
+    });
+    expect(tg.sent.at(-1)!.buttons).toBeUndefined();
+  });
+
   it('sends to each connector at its own chat id, with the notification text', async () => {
     const tg = fakeConnector('telegram');
     const dc = fakeConnector('discord');

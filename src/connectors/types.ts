@@ -36,6 +36,33 @@ export interface OutgoingMessage {
   readonly text: string;
   /** Original message ID for threading / reply */
   readonly replyTo?: string;
+  /**
+   * Optional inline action buttons (rich-approval bot). Rendered by connectors
+   * that support them (Telegram → inline_keyboard with callback_data); ignored
+   * by connectors that don't (the `text` already carries the fallback command).
+   * Rows of buttons: `[[{text:'✓ Approve', callbackData:'approve:<id>'}, …]]`.
+   */
+  readonly buttons?: ReadonlyArray<ReadonlyArray<InlineButton>>;
+}
+
+/** A single inline action button (rich-approval bot). */
+export interface InlineButton {
+  /** Button label shown to the user (already localized). */
+  readonly text: string;
+  /** Opaque machine payload delivered on press (e.g. `approve:<triggerId>`). */
+  readonly callbackData: string;
+}
+
+/** A button press delivered back from a connector (Telegram callback_query). */
+export interface IncomingCallback {
+  /** Source connector. */
+  readonly connector: ConnectorId;
+  /** Chat/channel the press came from. */
+  readonly channelId: string;
+  /** User who pressed the button. */
+  readonly fromUser: string;
+  /** The button's `callbackData` (e.g. `approve:<triggerId>`). */
+  readonly data: string;
 }
 
 /** Handler function for incoming messages */

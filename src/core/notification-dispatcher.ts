@@ -28,6 +28,13 @@ export interface NotificationAction {
   label: string;
   /** The exact CLI command to run (e.g. "deckent nervous accept <id>"). */
   cliCommand: string;
+  /**
+   * Optional machine-actionable payload for rich surfaces (rich-approval bot).
+   * When set, button-capable connectors (Telegram) render this action as an
+   * inline button whose press carries this string back (e.g. `approve:<id>`);
+   * text-only surfaces keep showing {@link cliCommand}. See connectors/callback-router.
+   */
+  callbackData?: string;
 }
 
 export interface Notification {

@@ -12,12 +12,12 @@ type TextHandler = (ctx: {
 
 function createMockTelegraf() {
   let textHandler: TextHandler | undefined;
+  let callbackHandler: ((ctx: any) => void) | undefined;
 
   const instance = {
-    on: vi.fn((event: string, handler: TextHandler) => {
-      if (event === 'text') {
-        textHandler = handler;
-      }
+    on: vi.fn((event: string, handler: any) => {
+      if (event === 'text') textHandler = handler;
+      if (event === 'callback_query') callbackHandler = handler;
     }),
     launch: vi.fn(async () => {}),
     stop: vi.fn(),
@@ -32,6 +32,13 @@ function createMockTelegraf() {
         from: { id: userId },
         chat: { id: chatId },
       });
+    },
+    /** Simulate an inline-button press (callback_query). Returns the ack spy. */
+    _simulateCallback(userId: number, chatId: number, data: string) {
+      if (!callbackHandler) throw new Error('No callback_query handler registered');
+      const answerCbQuery = vi.fn(async () => ({}));
+      callbackHandler({ callbackQuery: { id: 'cb1', data }, from: { id: userId }, chat: { id: chatId }, answerCbQuery });
+      return answerCbQuery;
     },
   };
 
@@ -129,6 +136,52 @@ describe('TelegramConnector', () => {
     await connector.sendMessage(outgoing);
 
     expect(instance.telegram.sendMessage).toHaveBeenCalledWith('300400', 'Sprint 149 tamamlandı!');
+  });
+
+  // ─── Rich-approval bot: inline buttons + callback presses ─────────────
+
+  it('sendMessage with buttons — renders reply_markup.inline_keyboard with callback_data', async () => {
+    const { MockTelegraf, instance } = createMockTelegraf();
+    const connector = new TelegramConnector(MockTelegraf as any);
+    await connector.start(makeConfig());
+
+    await connector.sendMessage({
+      connector: 'telegram',
+      channelId: '300400',
+      text: 'Approval required',
+      buttons: [[
+        { text: '✓ Approve', callbackData: 'approve:backlog-x' },
+        { text: '✗ Reject', callbackData: 'reject:backlog-x' },
+      ]],
+    });
+
+    expect(instance.telegram.sendMessage).toHaveBeenCalledWith('300400', 'Approval required', {
+      reply_markup: {
+        inline_keyboard: [[
+          { text: '✓ Approve', callback_data: 'approve:backlog-x' },
+          { text: '✗ Reject', callback_data: 'reject:backlog-x' },
+        ]],
+      },
+    });
+  });
+
+  it('callback_query press — forwards callback_data to onCallback and acks the press', async () => {
+    const { MockTelegraf, instance } = createMockTelegraf();
+    const connector = new TelegramConnector(MockTelegraf as any);
+    const onCb = vi.fn();
+    connector.onCallback(onCb);
+    await connector.start(makeConfig());
+
+    const ack = instance._simulateCallback(100200, 300400, 'approve:backlog-x');
+
+    expect(onCb).toHaveBeenCalledTimes(1);
+    expect(onCb.mock.calls[0][0]).toEqual({
+      connector: 'telegram',
+      channelId: '300400',
+      fromUser: '100200',
+      data: 'approve:backlog-x',
+    });
+    expect(ack).toHaveBeenCalledTimes(1); // spinner cleared
   });
 
   it('stop — bot stopped, connector becomes unhealthy', async () => {

@@ -592,6 +592,24 @@ export function makeTickReporter(
           action: t.action,
           triggerId: id,
         }),
+        undefined,
+        {
+          // Rich-approval bot: button-capable surfaces (Telegram) render these as
+          // inline [✓ Approve] [✗ Reject] buttons whose press routes to the gate;
+          // text surfaces keep the cliCommand. callbackData = `approve:<triggerId>`.
+          actions: [
+            {
+              label: getMessage('autonomous.action_approve', lang),
+              cliCommand: `deckent autonomous approve ${id}`,
+              callbackData: `approve:${id}`,
+            },
+            {
+              label: getMessage('autonomous.action_reject', lang),
+              cliCommand: `deckent autonomous reject ${id}`,
+              callbackData: `reject:${id}`,
+            },
+          ],
+        },
       );
     }
     if (t && result.outcome !== 'pending') notified.delete(id);

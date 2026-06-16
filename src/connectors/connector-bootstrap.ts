@@ -19,6 +19,8 @@ import {
 } from './connector-notify-adapter.js';
 import { makeIncomingCommandRouter, type CommandResolver, type ResolveOutcome } from './incoming-command-router.js';
 import { makeCommandResolver } from './incoming-command-resolver.js';
+import { parseApprovalCallback } from './callback-router.js';
+import type { IncomingCallback } from './types.js';
 import { type ChatResponder } from './chat-bridge.js';
 import { chunkMessage } from './message-format.js';
 import type { BotHumanizer } from './bot-humanizer.js';
@@ -255,8 +257,7 @@ export async function bootstrapConnectorCommands(
           }
         };
         const chat = deps.chat;
-        connector.onMessage(
-          makeIncomingCommandRouter({
+        const commandRouter = makeIncomingCommandRouter({
             authorizedChatIds: [chatId],
             resolve,
             reply: send,
@@ -291,8 +292,29 @@ export async function bootstrapConnectorCommands(
                   },
                 }
               : {}),
-          }),
-        );
+          });
+        connector.onMessage(commandRouter);
+        // Rich-approval bot: a button press (Telegram callback_query) becomes a
+        // synthetic `approve <id>` / `reject <id>` command fed to the SAME router —
+        // reusing the chat-id auth chokepoint, the gate resolve, and the ack reply.
+        // Only the Telegram connector exposes onCallback; others are unaffected
+        // (feature-detected). A press is a machine decision → never the LLM/onChat.
+        const cbCapable = connector as unknown as { onCallback?: (h: (cb: IncomingCallback) => void) => void };
+        if (typeof cbCapable.onCallback === 'function') {
+          cbCapable.onCallback((cb: IncomingCallback) => {
+            const parsed = parseApprovalCallback(cb.data);
+            if (!parsed) return;
+            commandRouter({
+              id: `cb-${cb.data}`,
+              connector: connector.id,
+              fromUser: cb.fromUser,
+              channelId: cb.channelId,
+              text: `${parsed.action} ${parsed.triggerId}`,
+              timestamp: new Date().toISOString(),
+              raw: { callback: cb.data },
+            });
+          });
+        }
         // INBOUND: full start() — launches the poll (non-blocking) AND enables send.
         await connector.start({ enabled: true, token: cfg.token });
         started.push(connector);

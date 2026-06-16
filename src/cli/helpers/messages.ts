@@ -910,8 +910,16 @@ const MESSAGES: MessageMap = {
     tr: 'Otonom onay gerekiyor',
   },
   'autonomous.notify_pending_summary': {
-    en: '{action} ({triggerId}) is awaiting human approval — run: deckent autonomous approve {triggerId}',
-    tr: '{action} ({triggerId}) insan onayı bekliyor — çalıştır: deckent autonomous approve {triggerId}',
+    en: '{action} ({triggerId}) is awaiting human approval — tap a button below or run: deckent autonomous approve {triggerId}',
+    tr: '{action} ({triggerId}) insan onayı bekliyor — aşağıdaki butona dokun ya da çalıştır: deckent autonomous approve {triggerId}',
+  },
+  'autonomous.action_approve': {
+    en: '✓ Approve',
+    tr: '✓ Onayla',
+  },
+  'autonomous.action_reject': {
+    en: '✗ Reject',
+    tr: '✗ Reddet',
   },
   'autonomous.audit_row': {
     en: '  - {ts} {action} -> {outcome}: {reason}',

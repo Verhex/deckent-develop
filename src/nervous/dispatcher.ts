@@ -340,8 +340,10 @@ function bridgeToUserNotify(notification: NervousNotification): void {
     const code = notification.shortCode ?? notification.id;
     const actions = hasActions
       ? [
-          { label: 'Approve', cliCommand: `approve ${code}` },
-          { label: 'Reject', cliCommand: `reject ${code}` },
+          // callbackData (rich-approval bot): a Telegram button press carries
+          // `approve:<code>` back → routed to the approval gate, not the LLM.
+          { label: 'Approve', cliCommand: `approve ${code}`, callbackData: `approve:${code}` },
+          { label: 'Reject', cliCommand: `reject ${code}`, callbackData: `reject:${code}` },
         ]
       : undefined;
     void notify(

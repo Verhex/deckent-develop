@@ -12,7 +12,7 @@
 // differs per platform) — NOT ConnectorPool.broadcast (one channel for all).
 
 import type { Notification, NotificationAdapter } from '../core/notification-dispatcher.js';
-import type { IMessageConnector } from './types.js';
+import type { IMessageConnector, InlineButton } from './types.js';
 import { makeBotHumanizer, type BotHumanizer } from './bot-humanizer.js';
 
 /** A started (outbound) connector plus the chat id notifications are sent to. */
@@ -50,6 +50,20 @@ function formatNotification(n: Notification): string {
   return `${head}\n${cmds}`;
 }
 
+/**
+ * Build a single row of inline buttons from a notification's actions (rich-approval
+ * bot). Only actions carrying a `callbackData` become buttons — text-only actions
+ * keep their cliCommand in the rendered text. Returns undefined when no action is
+ * button-actionable so the message stays a plain text send (back-compat).
+ */
+function buildActionButtons(actions: Notification['actions']): InlineButton[][] | undefined {
+  if (!actions || actions.length === 0) return undefined;
+  const row: InlineButton[] = actions
+    .filter((a) => typeof a.callbackData === 'string' && a.callbackData.length > 0)
+    .map((a) => ({ text: a.label, callbackData: a.callbackData! }));
+  return row.length > 0 ? [row] : undefined;
+}
+
 /** Resolve `undefined` after `ms` so a hanging send never blocks the caller. */
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | undefined> {
   return Promise.race([
@@ -82,15 +96,21 @@ export function makeConnectorNotificationAdapter(
       // BOT-1 + BOT-LEN: humanize (when enabled) then split into Telegram-safe
       // parts — never reject/cut. Passthrough humanizer = lossless chunk only.
       const parts = await humanizer.toParts(formatNotification(notification));
+      // Rich-approval bot: actions that carry a callbackData become inline buttons,
+      // attached to the LAST part so they render once, under the final message.
+      // Button-incapable connectors ignore `buttons` and keep the cliCommand text.
+      const buttons = buildActionButtons(notification.actions);
       await Promise.all(
         targets.map((t) =>
           withTimeout(
             (async (): Promise<void> => {
-              for (const text of parts) {
+              for (let i = 0; i < parts.length; i++) {
+                const isLast = i === parts.length - 1;
                 await t.connector.sendMessage({
                   connector: t.connector.id,
                   channelId: t.chatId,
-                  text,
+                  text: parts[i]!,
+                  ...(isLast && buttons ? { buttons } : {}),
                 });
               }
             })(),
