@@ -4,7 +4,7 @@
 
 import type { CapabilityTarget, ActorContext } from '../../core/work-model.js';
 
-export type BacklogKind = 'task' | 'sprint' | 'capability';
+export type BacklogKind = 'task' | 'sprint' | 'capability' | 'process';
 export type BacklogPolicy = 'auto' | 'approval-required' | 'risk-tagged';
 export type BacklogStatus = 'pending' | 'running' | 'parked' | 'done' | 'failed';
 
@@ -37,6 +37,13 @@ export interface BacklogEntry {
    *  hash-chain records the actual principal instead of a constant 'system'.
    *  Optional + additive: actor-less entries keep the prior 'system' fallback. */
   actor?: ActorContext;
+  /** Goal-planner (Phase 1): a lightweight, not-yet-detailed item. The full
+   *  spec.description is generated just-in-time at dispatch (Phase 2). */
+  planned?: boolean;
+  /** Goal-planner: one-line WHAT for the plan table + JIT detail seed. */
+  summary?: string;
+  /** Goal-planner: parallel fan-out hint — run `concurrency` jobs over `over`. */
+  fanOut?: { over: string; concurrency: number };
   lastRun: string | null;
   lastResult: { ok: boolean; reason: string } | null;
 }

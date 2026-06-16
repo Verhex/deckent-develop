@@ -8,7 +8,7 @@ import { TASKS_DIR } from '../../core/constants.js';
 import type { BacklogEntry, BacklogFile, BacklogStatus } from './backlog-types.js';
 import { nextRun } from './scheduled-flow.js';
 
-const KINDS = new Set(['task', 'sprint', 'capability']);
+const KINDS = new Set(['task', 'sprint', 'capability', 'process']);
 const POLICIES = new Set(['auto', 'approval-required', 'risk-tagged']);
 const STATUSES = new Set(['pending', 'running', 'parked', 'done', 'failed']);
 const TRIGGER_TYPES = new Set(['recurring', 'one-off', 'reactive']);
@@ -19,7 +19,7 @@ export function validateBacklogEntry(e: unknown): string | null {
   const r = e as Record<string, unknown>;
   if (typeof r.id !== 'string' || !r.id) return 'entry.id must be a non-empty string';
   if (typeof r.title !== 'string' || !r.title.trim()) return `entry.${r.id}.title must be a non-empty string`;
-  if (!KINDS.has(r.kind as string)) return `entry.${r.id}.kind must be task|sprint`;
+  if (!KINDS.has(r.kind as string)) return `entry.${r.id}.kind must be task|sprint|capability|process`;
   if (!POLICIES.has(r.policy as string)) return `entry.${r.id}.policy must be auto|approval-required|risk-tagged`;
   if (!STATUSES.has(r.status as string)) return `entry.${r.id}.status invalid`;
   const t = r.trigger as Record<string, unknown> | undefined;
@@ -34,6 +34,14 @@ export function validateBacklogEntry(e: unknown): string | null {
       return `entry.${r.id}.spec.capabilityTarget.capability must be a non-empty string`;
     }
   }
+  if (r.fanOut !== undefined) {
+    const f = r.fanOut as Record<string, unknown>;
+    if (!f || typeof f !== 'object' || typeof f.over !== 'string' || typeof f.concurrency !== 'number' || f.concurrency < 1) {
+      return `entry.${r.id}.fanOut must be { over: string, concurrency: number>=1 }`;
+    }
+  }
+  if (r.planned !== undefined && typeof r.planned !== 'boolean') return `entry.${r.id}.planned must be boolean`;
+  if (r.summary !== undefined && typeof r.summary !== 'string') return `entry.${r.id}.summary must be a string`;
   return null;
 }
 
