@@ -1,4 +1,5 @@
 import { PlannedItemSchema, type PlannedItem, type LlmComplete } from './goal-planner-types.js';
+import type { BacklogEntry, BacklogTrigger } from './backlog-types.js';
 
 export interface PlanGoalInput {
   goal: string;
@@ -71,4 +72,32 @@ export async function planGoal(input: PlanGoalInput): Promise<PlannedItem[]> {
   const max = input.maxItems ?? DEFAULT_MAX;
   const raw = await input.complete(buildGoalPlanPrompt(input));
   return parsePlannedItems(raw).slice(0, max);
+}
+
+function toTrigger(t: PlannedItem['trigger']): BacklogTrigger {
+  if (t === 'one-off') return { type: 'one-off' };
+  if ('recurring' in t) return { type: 'recurring', cron: t.recurring };
+  return { type: 'reactive', detector: t.reactive };
+}
+
+/** Map a PlannedItem to a pending, `planned: true` BacklogEntry (no description —
+ *  that is generated JIT at dispatch). */
+export function plannedItemToBacklogEntry(item: PlannedItem): BacklogEntry {
+  return {
+    id: item.id,
+    title: item.title,
+    kind: item.kind,
+    spec: {
+      scopeDir: item.scopeDir,
+      ...(item.capabilityTarget ? { capabilityTarget: item.capabilityTarget } : {}),
+    },
+    policy: item.policy,
+    trigger: toTrigger(item.trigger),
+    status: 'pending',
+    planned: true,
+    summary: item.summary,
+    ...(item.fanOut ? { fanOut: item.fanOut } : {}),
+    lastRun: null,
+    lastResult: null,
+  };
 }
