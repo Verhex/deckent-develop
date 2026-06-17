@@ -925,6 +925,17 @@ const MESSAGES: MessageMap = {
     en: '  - {ts} {action} -> {outcome}: {reason}',
     tr: '  - {ts} {action} -> {outcome}: {reason}',
   },
+  // ─── autonomous flow-reporter (CORE-UNIFORMITY slice 1) ──────────────
+  'autonomous.flow_line': { en: '{icon} {label} [{entryId}] {detail}', tr: '{icon} {label} [{entryId}] {detail}' },
+  'autonomous.flow_picked': { en: 'picked', tr: 'seçildi' },
+  'autonomous.flow_jit_detail': { en: 'JIT detail', tr: 'JIT detay' },
+  'autonomous.flow_spawned': { en: 'spawned', tr: 'başlatıldı' },
+  'autonomous.flow_brain_verdict': { en: 'Brain', tr: 'Brain' },
+  'autonomous.flow_audit_verdict': { en: 'Auditor', tr: 'Denetçi' },
+  'autonomous.flow_cross_verify': { en: 'Cross-verify', tr: 'Çapraz-doğrulama' },
+  'autonomous.flow_done': { en: 'done', tr: 'tamam' },
+  'autonomous.flow_failed': { en: 'failed', tr: 'başarısız' },
+  'autonomous.flow_parked': { en: 'parked', tr: 'beklemede' },
 
   // ─── autonomous plan subcommand (Task 8 — goal planner) ──────────────
   'autonomous.plan_header': {
