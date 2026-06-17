@@ -45,7 +45,31 @@ export interface BacklogEntry {
   /** Goal-planner: parallel fan-out hint — run `concurrency` jobs over `over`. */
   fanOut?: { over: string; concurrency: number };
   lastRun: string | null;
-  lastResult: { ok: boolean; reason: string } | null;
+  /**
+   * Outcome of the last run. CORE-UNIFORMITY (slice 1): additively widened to
+   * carry the rich Brain-Eval + Auditor + Cross-Verify verdict so a finished
+   * autonomous task surfaces the SAME core evaluation sprint mode produces.
+   * All fields beyond `ok`/`reason` are optional — pre-existing `{ ok, reason }`
+   * writers and on-disk back-compat are preserved.
+   */
+  lastResult: {
+    ok: boolean;
+    reason: string;
+    /** Brain decision (rubric + reconciliation). */
+    decision?: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
+    /** True when the worker self-reported NO_GO but disk-verify overrode it. */
+    reconciled?: boolean;
+    /** Rubric quality score (totalScore). */
+    quality?: number;
+    /** Auditor verdict (advisory — never flips status). */
+    audit?: {
+      boundary: 'clean' | string[];
+      adr: 'ok' | string[];
+      functional: 'pass' | 'fail' | 'skipped';
+    };
+    /** XVER-1 cross-provider verification (advisory; honest-skip → ran:false). */
+    crossVerify?: { ran: boolean; verdict?: 'confirmed' | 'refuted' | 'unclear' };
+  } | null;
 }
 
 /** On-disk backlog file shape (.deckent/autonomous/backlog.json). */
