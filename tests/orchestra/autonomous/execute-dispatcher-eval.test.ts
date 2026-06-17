@@ -106,4 +106,28 @@ describe('execute-dispatcher — Brain+Auditor+CrossVerify wire', () => {
     expect(saved.status).toBe('done');
     expect(saved.lastResult.audit.boundary).toEqual(['File outside scope: x.ts']);
   });
+
+  it('writes the Brain assessment back into the worker .result file', async () => {
+    const backlogPath = setup();
+    // mimic the worker having written its .result
+    const resultPath = join(dir!, '.tasks', 'task-run-1.result');
+    mkdirSync(join(dir!, '.tasks'), { recursive: true });
+    writeFileSync(resultPath, JSON.stringify({ taskId: 'run-1', selfAssessment: 'DONE', filesChanged: ['src/api/x.ts'] }), 'utf-8');
+
+    const handler = makeExecuteDispatcher({
+      projectRoot: dir!, config: {} as any, backlogPath,
+      runTask: async () => ({ taskId: 'run-1' }),
+      runSprint: async () => ({}),
+      waitForResult: async () => ({ taskId: 'run-1', selfAssessment: 'DONE', filesChanged: ['src/api/x.ts'] } as any),
+      evaluate: () => ({ decision: 'DONE', quality: 95, reconciled: false, reason: 'ok' }),
+      audit: async () => ({ boundary: 'clean', adr: 'ok', functional: 'pass' }),
+      crossVerify: async () => ({ ran: false }),
+    });
+    await handler(AUTONOMOUS_EXECUTE_ACTION, { entry });
+
+    const saved = JSON.parse(readFileSync(resultPath, 'utf-8'));
+    expect(saved.brainAssessment.decision).toBe('DONE');
+    expect(saved.brainAssessment.audit.functional).toBe('pass');
+    expect(saved.selfAssessment).toBe('DONE'); // worker field preserved
+  });
 });

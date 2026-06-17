@@ -15,6 +15,10 @@ import {
   type ADRViolation, type VerificationResult,
 } from '../../monitor/auditor.js';
 import { runCrossVerify, type RunCrossVerifyOptions } from '../cross-verify-runner.js';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { atomicWriteFileSync } from '../../agents/worker-lifecycle.js';
+import { TASKS_DIR } from '../../core/constants.js';
 
 export interface BacklogEvaluation {
   decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
@@ -192,4 +196,26 @@ export async function crossVerifyBacklogResult(
   const decisionEnum = evaluation.decision as unknown as TaskEvaluation;
   const run = await runCrossVerify(projectRoot, task, result, decisionEnum, config, opts);
   return { ran: run.ran, ...(run.advisory ? { verdict: run.advisory.verdict } : {}) };
+}
+
+/** Merge the Brain+Auditor+CrossVerify verdict into the worker's `.result` as a
+ *  `brainAssessment` field, alongside the worker's own `selfAssessment` — so the result
+ *  record carries BOTH the worker's self-report AND the orchestrator's assessment
+ *  (traceability + AI-operator data). Mirrors cross-verify's writeAdvisoryToResult.
+ *  Fail-safe: a missing `.result` or any I/O error is swallowed — a writeback must never
+ *  break the dispatch. */
+export function writeBrainAssessmentToResult(
+  projectRoot: string,
+  taskId: string,
+  assessment: NonNullable<BacklogEntry['lastResult']>,
+): void {
+  try {
+    const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
+    if (!existsSync(resultPath)) return;
+    const parsed = JSON.parse(readFileSync(resultPath, 'utf-8')) as Record<string, unknown>;
+    parsed.brainAssessment = assessment;
+    atomicWriteFileSync(resultPath, JSON.stringify(parsed, null, 2) + '\n');
+  } catch {
+    /* fail-safe — never let a result-writeback error break the dispatch */
+  }
 }

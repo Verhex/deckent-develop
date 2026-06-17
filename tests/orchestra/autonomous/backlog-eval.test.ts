@@ -185,3 +185,34 @@ describe('reconcileWithAudit (Brain⇄Auditor — false-NO_GO fix)', () => {
     expect(reconcileWithAudit(ok, cleanAudit, result({}))).toEqual(ok);
   });
 });
+
+import { writeBrainAssessmentToResult } from '../../../src/orchestra/autonomous/backlog-eval.js';
+import { mkdtempSync, writeFileSync as wfs, readFileSync as rfs, rmSync as rms, mkdirSync as mds } from 'node:fs';
+import { tmpdir as tmp } from 'node:os';
+import { join as pjoin } from 'node:path';
+
+describe('writeBrainAssessmentToResult', () => {
+  it('merges brainAssessment into the worker .result, preserving existing fields', () => {
+    const dir = mkdtempSync(pjoin(tmp(), 'brain-wb-'));
+    try {
+      mds(pjoin(dir, '.tasks'), { recursive: true });
+      const rp = pjoin(dir, '.tasks', 'task-run-1.result');
+      wfs(rp, JSON.stringify({ taskId: 'run-1', selfAssessment: 'DONE', filesChanged: ['a.ts'] }), 'utf-8');
+      writeBrainAssessmentToResult(dir, 'run-1', {
+        ok: true, reason: 'r', decision: 'GO_WITH_TECH_DEBT', reconciled: true, quality: 78,
+        audit: { boundary: 'clean', adr: 'ok', functional: 'pass' }, crossVerify: { ran: false },
+      });
+      const saved = JSON.parse(rfs(rp, 'utf-8'));
+      expect(saved.selfAssessment).toBe('DONE');               // preserved
+      expect(saved.brainAssessment.decision).toBe('GO_WITH_TECH_DEBT');
+      expect(saved.brainAssessment.reconciled).toBe(true);
+      expect(saved.brainAssessment.audit.functional).toBe('pass');
+    } finally { rms(dir, { recursive: true, force: true }); }
+  });
+  it('is fail-safe when the .result file is absent (never throws)', () => {
+    const dir = mkdtempSync(pjoin(tmp(), 'brain-wb-'));
+    try {
+      expect(() => writeBrainAssessmentToResult(dir, 'missing', { ok: true, reason: 'r' })).not.toThrow();
+    } finally { rms(dir, { recursive: true, force: true }); }
+  });
+});

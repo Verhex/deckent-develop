@@ -21,6 +21,7 @@ import { needsJitDetail, generateItemDetail } from './jit-detail.js';
 import type { LlmComplete } from './goal-planner-types.js';
 import {
   evaluateBacklogResult, auditBacklogResult, crossVerifyBacklogResult, reconcileWithAudit,
+  writeBrainAssessmentToResult,
   type BacklogEvaluation, type AuditVerdict, type CrossVerifyVerdict,
 } from './backlog-eval.js';
 import type { FlowReporter } from './flow-reporter.js';
@@ -234,6 +235,9 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
                 },
                 crossVerify: { ran: xv.ran, ...(xv.verdict ? { verdict: xv.verdict } : {}) },
               };
+              // Brain-assessment writeback: attach the orchestrator's verdict to the worker
+              // .result alongside the worker's selfAssessment (traceability + AI-operator data).
+              writeBrainAssessmentToResult(deps.projectRoot, result.taskId, richResult);
             } else {
               ok = false;
               reason = 'timeout — no result within limit (incl. grace re-poll)';
