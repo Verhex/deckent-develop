@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildTaskForEval, mapEvaluation, evaluateBacklogResult, auditBacklogResult,
+  crossVerifyBacklogResult,
 } from '../../../src/orchestra/autonomous/backlog-eval.js';
 import type { BacklogEntry } from '../../../src/orchestra/autonomous/backlog-types.js';
-import type { TaskResult, EvaluationResult } from '../../../src/core/types.js';
+import type { TaskResult, EvaluationResult, ResolvedConfig } from '../../../src/core/types.js';
 import type { VerificationResult } from '../../../src/monitor/auditor.js';
 
 const passFn = async (): Promise<VerificationResult> => ({ verdict: 'PASS', reason: 'ok' });
@@ -112,5 +113,27 @@ describe('auditBacklogResult (Component ② — advisory)', () => {
       { verifyFunctional: passFn },
     );
     expect(v.boundary).toBe('clean');
+  });
+});
+
+const passingEval = { decision: 'DONE' as const, quality: 95, reconciled: false, reason: 'ok' };
+
+describe('crossVerifyBacklogResult (Component ③ — XVER-1 cross-provider, advisory)', () => {
+  it('honest-skips (ran:false) when cross_verify is disabled (no config)', async () => {
+    const xv = await crossVerifyBacklogResult(entry, result({}), '/nonexistent-root', undefined, passingEval);
+    expect(xv.ran).toBe(false);
+    expect(xv.verdict).toBeUndefined();
+  });
+  it('surfaces a refuted advisory but does NOT throw / does not block (advisory)', async () => {
+    const config = { cross_verify: { enabled: true, high_stakes_only: false } } as unknown as ResolvedConfig;
+    const xv = await crossVerifyBacklogResult(
+      entry, result({}), '/nonexistent-root', config, passingEval,
+      {
+        availableProviders: ['claude', 'codex'],
+        spawnVerifier: async () => 'VERDICT: refuted\nThe change does not cover the error path.',
+      },
+    );
+    expect(xv.ran).toBe(true);
+    expect(xv.verdict).toBe('refuted');
   });
 });

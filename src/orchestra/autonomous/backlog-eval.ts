@@ -5,14 +5,16 @@
 // SAME functions sprint mode calls, so a finished autonomous task passes through the
 // same core evaluation. No new evaluation logic lives here — uniformity by construction.
 import type { BacklogEntry } from './backlog-types.js';
-import type { Task, TaskResult, TaskScope, RubricScore, EvaluationResult, ProviderName } from '../../core/types.js';
+import type { Task, TaskResult, TaskScope, RubricScore, EvaluationResult, ProviderName, TaskEvaluation } from '../../core/types.js';
 import { TaskStatus } from '../../core/types.js';
+import type { ResolvedConfig } from '../../core/types.js';
 import { evaluateWithRubric } from '../result-evaluator.js';
 import type { BoundaryViolation } from '../../core/monitoring-types.js';
 import {
   isFileInScope, checkADRCompliance, verifyWorkerResult,
   type ADRViolation, type VerificationResult,
 } from '../../monitor/auditor.js';
+import { runCrossVerify, type RunCrossVerifyOptions } from '../cross-verify-runner.js';
 
 export interface BacklogEvaluation {
   decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
@@ -129,4 +131,29 @@ export async function auditBacklogResult(
   }
 
   return { boundary, adr, functional };
+}
+
+export interface CrossVerifyVerdict {
+  /** True when a 2nd-provider verifier actually ran. False = honest-skip (disabled /
+   *  no 2nd provider / not-passing) — never a silent pass. */
+  ran: boolean;
+  verdict?: 'confirmed' | 'refuted' | 'unclear';
+}
+
+/** Component ③ (BINDING): cross-provider verification — Anthropic's work checked by
+ *  OpenAI and vice-versa. Advisory: a `refuted` verdict is surfaced + persisted but never
+ *  flips the Brain decision (Brain/human decides). Honest-skip when no 2nd provider. */
+export async function crossVerifyBacklogResult(
+  entry: BacklogEntry,
+  result: TaskResult,
+  projectRoot: string,
+  config: ResolvedConfig | undefined,
+  evaluation: BacklogEvaluation,
+  opts: RunCrossVerifyOptions = {},
+): Promise<CrossVerifyVerdict> {
+  const task = buildTaskForEval(entry, result);
+  // EvaluationResult.decision strings equal the TaskEvaluation enum values.
+  const decisionEnum = evaluation.decision as unknown as TaskEvaluation;
+  const run = await runCrossVerify(projectRoot, task, result, decisionEnum, config, opts);
+  return { ran: run.ran, ...(run.advisory ? { verdict: run.advisory.verdict } : {}) };
 }
