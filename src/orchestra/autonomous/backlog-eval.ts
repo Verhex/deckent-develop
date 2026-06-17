@@ -140,6 +140,35 @@ export interface CrossVerifyVerdict {
   verdict?: 'confirmed' | 'refuted' | 'unclear';
 }
 
+/** Brain⇄Auditor reconciliation (false-NO_GO fix). When the Brain returns NO_GO but the
+ *  Auditor INDEPENDENTLY confirms the work is real (functional pass), in-scope (boundary
+ *  clean) and present (filesChanged), and the worker did NOT honestly self-report NO_GO,
+ *  the Brain decision is upgraded to GO_WITH_TECH_DEBT. This catches the schema/coverage
+ *  technicality where evaluateWithRubric hard-rejects a verified comment/doc change before
+ *  its own reconciliation can run. Conservative: an honest worker NO_GO, a functional fail,
+ *  a boundary violation, or no disk work all leave the NO_GO intact. */
+export function reconcileWithAudit(
+  evaluation: BacklogEvaluation,
+  verdict: AuditVerdict,
+  result: TaskResult,
+): BacklogEvaluation {
+  if (
+    evaluation.decision === 'NO_GO' &&
+    result.selfAssessment !== 'NO_GO' &&
+    verdict.functional === 'pass' &&
+    verdict.boundary === 'clean' &&
+    result.filesChanged.length > 0
+  ) {
+    return {
+      decision: 'GO_WITH_TECH_DEBT',
+      quality: evaluation.quality,
+      reconciled: true,
+      reason: `Brain NO_GO reconciled by Auditor: functional pass + clean boundary on real work (${evaluation.reason})`,
+    };
+  }
+  return evaluation;
+}
+
 /** Component ③ (BINDING): cross-provider verification — Anthropic's work checked by
  *  OpenAI and vice-versa. Advisory: a `refuted` verdict is surfaced + persisted but never
  *  flips the Brain decision (Brain/human decides). Honest-skip when no 2nd provider. */

@@ -70,6 +70,25 @@ describe('execute-dispatcher — Brain+Auditor+CrossVerify wire', () => {
     expect(JSON.parse(readFileSync(backlogPath, 'utf-8')).entries[0].status).toBe('failed');
   });
 
+  it('reconciles a Brain NO_GO into done when the Auditor independently confirms real work (live false-NO_GO fix)', async () => {
+    const backlogPath = setup();
+    const handler = makeExecuteDispatcher({
+      projectRoot: dir!, config: {} as any, backlogPath,
+      runTask: async () => ({ taskId: 'run-1' }),
+      runSprint: async () => ({}),
+      waitForResult: async () => ({ taskId: 'run-1', selfAssessment: 'DONE', filesChanged: ['src/cli/helpers/output.ts'] } as any),
+      evaluate: () => ({ decision: 'NO_GO', quality: 0, reconciled: false, reason: 'Schema violation: missing required fields [coverage]' }),
+      audit: async () => ({ boundary: 'clean', adr: 'ok', functional: 'pass' }),
+      crossVerify: async () => ({ ran: false }),
+    });
+    const res = await handler(AUTONOMOUS_EXECUTE_ACTION, { entry });
+    expect(res.outcome).toBe('success');
+    const saved = JSON.parse(readFileSync(backlogPath, 'utf-8')).entries[0];
+    expect(saved.status).toBe('done');
+    expect(saved.lastResult.decision).toBe('GO_WITH_TECH_DEBT');
+    expect(saved.lastResult.reconciled).toBe(true);
+  });
+
   it('an out-of-scope boundary violation stays advisory (still done on a GO decision)', async () => {
     const backlogPath = setup();
     const handler = makeExecuteDispatcher({

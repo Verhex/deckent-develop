@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildTaskForEval, mapEvaluation, evaluateBacklogResult, auditBacklogResult,
-  crossVerifyBacklogResult,
+  crossVerifyBacklogResult, reconcileWithAudit, type AuditVerdict,
 } from '../../../src/orchestra/autonomous/backlog-eval.js';
 import type { BacklogEntry } from '../../../src/orchestra/autonomous/backlog-types.js';
 import type { TaskResult, EvaluationResult, ResolvedConfig } from '../../../src/core/types.js';
@@ -135,5 +135,38 @@ describe('crossVerifyBacklogResult (Component ③ — XVER-1 cross-provider, adv
     );
     expect(xv.ran).toBe(true);
     expect(xv.verdict).toBe('refuted');
+  });
+});
+
+const noGoEval = { decision: 'NO_GO' as const, quality: 0, reconciled: false, reason: 'Schema violation: missing required fields [coverage]' };
+const cleanAudit: AuditVerdict = { boundary: 'clean', adr: 'ok', functional: 'pass' };
+
+describe('reconcileWithAudit (Brain⇄Auditor — false-NO_GO fix)', () => {
+  it('reconciles a Brain NO_GO when Auditor confirms real, in-scope, functionally-passing work', () => {
+    const r = reconcileWithAudit(noGoEval, cleanAudit, result({ selfAssessment: 'DONE', filesChanged: ['src/api/x.ts'] }));
+    expect(r.decision).toBe('GO_WITH_TECH_DEBT');
+    expect(r.reconciled).toBe(true);
+    expect(r.reason).toMatch(/Auditor/i);
+  });
+  it('does NOT reconcile when the worker honestly self-reported NO_GO', () => {
+    const r = reconcileWithAudit(noGoEval, cleanAudit, result({ selfAssessment: 'NO_GO', filesChanged: ['src/api/x.ts'] }));
+    expect(r.decision).toBe('NO_GO');
+    expect(r.reconciled).toBe(false);
+  });
+  it('does NOT reconcile when the Auditor functional verdict is not pass', () => {
+    const r = reconcileWithAudit(noGoEval, { boundary: 'clean', adr: 'ok', functional: 'fail' }, result({ selfAssessment: 'DONE', filesChanged: ['src/api/x.ts'] }));
+    expect(r.decision).toBe('NO_GO');
+  });
+  it('does NOT reconcile when there is a boundary violation', () => {
+    const r = reconcileWithAudit(noGoEval, { boundary: [{ type: 'file_outside_scope', agentId: 'w', detail: 'x', timestamp: 'T' }], adr: 'ok', functional: 'pass' }, result({ selfAssessment: 'DONE', filesChanged: ['src/api/x.ts'] }));
+    expect(r.decision).toBe('NO_GO');
+  });
+  it('does NOT reconcile when there is no real work (empty filesChanged)', () => {
+    const r = reconcileWithAudit(noGoEval, cleanAudit, result({ selfAssessment: 'DONE', filesChanged: [] }));
+    expect(r.decision).toBe('NO_GO');
+  });
+  it('passes a non-NO_GO evaluation through unchanged', () => {
+    const ok = { decision: 'DONE' as const, quality: 95, reconciled: false, reason: 'ok' };
+    expect(reconcileWithAudit(ok, cleanAudit, result({}))).toEqual(ok);
   });
 });

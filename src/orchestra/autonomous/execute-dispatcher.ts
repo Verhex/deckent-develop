@@ -20,7 +20,7 @@ import type { ExecutionPool } from './execution-pool.js';
 import { needsJitDetail, generateItemDetail } from './jit-detail.js';
 import type { LlmComplete } from './goal-planner-types.js';
 import {
-  evaluateBacklogResult, auditBacklogResult, crossVerifyBacklogResult,
+  evaluateBacklogResult, auditBacklogResult, crossVerifyBacklogResult, reconcileWithAudit,
   type BacklogEvaluation, type AuditVerdict, type CrossVerifyVerdict,
 } from './backlog-eval.js';
 import type { FlowReporter } from './flow-reporter.js';
@@ -214,14 +214,19 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
               const xv = await crossVerify(live, result, deps.projectRoot, deps.config, evaluation);
               deps.flow?.step('cross_verify', entry.id, xv.ran ? `verdict=${xv.verdict}` : 'skipped (no 2nd provider / disabled)');
 
-              ok = evaluation.decision !== 'NO_GO';
-              reason = evaluation.reason || `decision=${evaluation.decision}`;
+              // Brain⇄Auditor reconciliation: the Auditor's independent functional-pass on
+              // real, in-scope work overrides a Brain NO_GO that is a schema/coverage
+              // technicality (live false-NO_GO fix — "Brain understands the work via the Auditor").
+              const finalEval = reconcileWithAudit(evaluation, verdict, result);
+
+              ok = finalEval.decision !== 'NO_GO';
+              reason = finalEval.reason || `decision=${finalEval.decision}`;
               richResult = {
                 ok,
                 reason,
-                decision: evaluation.decision,
-                reconciled: evaluation.reconciled,
-                quality: evaluation.quality,
+                decision: finalEval.decision,
+                reconciled: finalEval.reconciled,
+                quality: finalEval.quality,
                 audit: {
                   boundary: verdict.boundary === 'clean' ? 'clean' : verdict.boundary.map((v) => v.detail),
                   adr: verdict.adr === 'ok' ? 'ok' : verdict.adr.map((v) => `${v.adrId}: ${v.violation}`),
