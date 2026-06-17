@@ -53,6 +53,7 @@ import {
   handleStatus,
   handleStop,
   handleCleanup,
+  handlePlan,
 } from '../../src/cli/commands/autonomous.js';
 import { useSandboxHome } from '../helpers/sandbox-home.js';
 
@@ -193,6 +194,47 @@ describe('deckent autonomous CLI (226-007)', () => {
     // 1 iteration, idle → no audit events written
     const eventsFile = join(root, '.deckent', 'recently-works', 'autonomous-events.jsonl');
     expect(existsSync(eventsFile)).toBe(false);
+  });
+
+  it('plan re-queues a terminal (failed) entry with the same id (replace, not silent drop)', async () => {
+    const blDir = join(root, '.deckent', 'autonomous');
+    mkdirSync(blDir, { recursive: true });
+    const blPath = join(blDir, 'backlog.json');
+    writeFileSync(blPath, JSON.stringify({ _version: '1.0', entries: [
+      { id: 'fix-x', title: 'old', kind: 'task', spec: { scopeDir: 'src/cli/' }, policy: 'auto',
+        trigger: { type: 'one-off' }, status: 'failed', lastRun: null, lastResult: { ok: false, reason: 'prior' } },
+    ] }), 'utf-8');
+    const complete = async (): Promise<string> => JSON.stringify({ items: [
+      { id: 'fix-x', title: 'Fix X', kind: 'task', scopeDir: 'src/cli/', summary: 'fix x', policy: 'auto', trigger: 'one-off' },
+    ] });
+
+    const out = await captureStdout(() => handlePlan({ root, lang: 'en', goal: 'fix x', complete }));
+
+    const saved = JSON.parse(readFileSync(blPath, 'utf-8'));
+    const matches = saved.entries.filter((x: { id: string }) => x.id === 'fix-x');
+    expect(matches).toHaveLength(1);                 // replaced, not duplicated
+    expect(matches[0].status).toBe('pending');       // re-queued from failed
+    expect(out).toContain('Wrote 1');                // honest added count
+  });
+
+  it('plan does NOT disturb an active (pending) entry with the same id', async () => {
+    const blDir = join(root, '.deckent', 'autonomous');
+    mkdirSync(blDir, { recursive: true });
+    const blPath = join(blDir, 'backlog.json');
+    writeFileSync(blPath, JSON.stringify({ _version: '1.0', entries: [
+      { id: 'fix-x', title: 'inflight', kind: 'task', spec: { scopeDir: 'src/cli/' }, policy: 'auto',
+        trigger: { type: 'one-off' }, status: 'pending', lastRun: null, lastResult: null },
+    ] }), 'utf-8');
+    const complete = async (): Promise<string> => JSON.stringify({ items: [
+      { id: 'fix-x', title: 'Fix X', kind: 'task', scopeDir: 'src/cli/', summary: 'fix x', policy: 'auto', trigger: 'one-off' },
+    ] });
+
+    const out = await captureStdout(() => handlePlan({ root, lang: 'en', goal: 'fix x', complete }));
+
+    const saved = JSON.parse(readFileSync(blPath, 'utf-8'));
+    expect(saved.entries.filter((x: { id: string }) => x.id === 'fix-x')).toHaveLength(1);
+    expect(saved.entries.find((x: { id: string }) => x.id === 'fix-x').title).toBe('inflight'); // untouched
+    expect(out).toContain('No new items');
   });
 
   it('start refuses when autonomous.enabled is false (flag-gate)', async () => {

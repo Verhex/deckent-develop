@@ -962,6 +962,10 @@ const MESSAGES: MessageMap = {
     en: 'The planner returned no valid items.',
     tr: 'Planner geçerli madde döndürmedi.',
   },
+  'autonomous.plan_none_added': {
+    en: 'No new items queued — {skipped} already active in the backlog (pending/running/parked). Wait for them to finish, or remove them first: deckent autonomous backlog remove <id>',
+    tr: 'Yeni madde eklenmedi — {skipped} madde backlog\'da zaten aktif (pending/running/parked). Bitmelerini bekle veya önce kaldır: deckent autonomous backlog remove <id>',
+  },
 
   // ─── autonomous backlog subcommand (Task 7) ──────────────────────────
   'autonomous.backlog.added': {

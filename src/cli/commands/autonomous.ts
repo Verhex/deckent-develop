@@ -265,13 +265,31 @@ export async function handlePlan(opts: AutonomousPlanOptions): Promise<void> {
 
   const path = defaultBacklogPath(root);
   const bl = loadBacklog(path);
+  // Dedup by id, but only an ACTIVE (pending/running/parked) entry blocks a re-plan —
+  // don't disturb in-flight work. A TERMINAL (done/failed) entry with the same id is
+  // REPLACED so a goal can be re-queued (the planner emits deterministic ids, so a plain
+  // id-skip would silently drop every re-plan after the first run — the live dogfood bug).
+  const ACTIVE_STATUSES = new Set(['pending', 'running', 'parked']);
+  let added = 0;
+  let skipped = 0;
   for (const it of items) {
-    if (bl.entries.some((e) => e.id === it.id)) continue;
-    bl.entries.push(plannedItemToBacklogEntry(it));
+    const idx = bl.entries.findIndex((e) => e.id === it.id);
+    if (idx >= 0 && ACTIVE_STATUSES.has(bl.entries[idx]!.status)) {
+      skipped++;
+      continue;
+    }
+    const fresh = plannedItemToBacklogEntry(it);
+    if (idx >= 0) bl.entries[idx] = fresh; // terminal dup → re-queue (replace)
+    else bl.entries.push(fresh);
+    added++;
   }
   mkdirSync(dirname(path), { recursive: true });
   atomicWriteFileSync(path, JSON.stringify(bl, null, 2));
-  out(getMessage('autonomous.plan_written', lang, { count: String(items.length) }));
+  if (added === 0) {
+    out(getMessage('autonomous.plan_none_added', lang, { skipped: String(skipped) }));
+  } else {
+    out(getMessage('autonomous.plan_written', lang, { count: String(added) }));
+  }
 }
 
 /**
