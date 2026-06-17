@@ -5,9 +5,14 @@
 // SAME functions sprint mode calls, so a finished autonomous task passes through the
 // same core evaluation. No new evaluation logic lives here — uniformity by construction.
 import type { BacklogEntry } from './backlog-types.js';
-import type { Task, TaskResult, RubricScore, EvaluationResult, ProviderName } from '../../core/types.js';
+import type { Task, TaskResult, TaskScope, RubricScore, EvaluationResult, ProviderName } from '../../core/types.js';
 import { TaskStatus } from '../../core/types.js';
 import { evaluateWithRubric } from '../result-evaluator.js';
+import type { BoundaryViolation } from '../../core/monitoring-types.js';
+import {
+  isFileInScope, checkADRCompliance, verifyWorkerResult,
+  type ADRViolation, type VerificationResult,
+} from '../../monitor/auditor.js';
 
 export interface BacklogEvaluation {
   decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
@@ -66,4 +71,62 @@ export function evaluateBacklogResult(
 ): BacklogEvaluation {
   const task = buildTaskForEval(entry, result);
   return mapEvaluation(result, evaluateWithRubric(result, task, undefined, projectRoot));
+}
+
+export interface AuditVerdict {
+  boundary: 'clean' | BoundaryViolation[];
+  adr: 'ok' | ADRViolation[];
+  functional: 'pass' | 'fail' | 'skipped';
+}
+
+export interface AuditDeps {
+  /** Injected for hermetic tests (default = real verifyWorkerResult, which may spawn git/tsc). */
+  verifyFunctional?: (taskId: string, projectRoot: string, result: TaskResult) => Promise<VerificationResult>;
+  /** Injected for hermetic tests (default = real checkADRCompliance). */
+  checkAdr?: (projectRoot: string, changedFiles: string[]) => ADRViolation[];
+}
+
+/** Component ②: post-execution Auditor verdict (advisory only — never flips the Brain
+ *  decision, per ADR-037 V1.0). Reuses the auditor's scope primitive + ADR + functional
+ *  checks against the worker's declared filesChanged (the post-hoc ground truth). */
+export async function auditBacklogResult(
+  entry: BacklogEntry,
+  result: TaskResult,
+  projectRoot: string,
+  deps: AuditDeps = {},
+): Promise<AuditVerdict> {
+  // boundary — scopeDir "." / undefined means "no declared scope" → no boundary claim.
+  const scopeDir = entry.spec.scopeDir;
+  let boundary: 'clean' | BoundaryViolation[] = 'clean';
+  if (scopeDir && scopeDir !== '.') {
+    const scope: TaskScope = { directories: [scopeDir], filesRead: [], filesWrite: [] };
+    const violations: BoundaryViolation[] = [];
+    for (const f of result.filesChanged) {
+      if (!isFileInScope(f, scope)) {
+        violations.push({
+          type: 'file_outside_scope',
+          agentId: result.workerId || entry.id,
+          detail: `File outside scope: ${f}`,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+    if (violations.length > 0) boundary = violations;
+  }
+
+  // adr — hermetic by default: absent .brain/memory.db → [] → 'ok'.
+  const adrViolations = (deps.checkAdr ?? checkADRCompliance)(projectRoot, result.filesChanged);
+  const adr: 'ok' | ADRViolation[] = adrViolations.length === 0 ? 'ok' : adrViolations;
+
+  // functional — nothing changed → nothing to functionally verify.
+  let functional: 'pass' | 'fail' | 'skipped';
+  if (result.filesChanged.length === 0) {
+    functional = 'skipped';
+  } else {
+    const verify = deps.verifyFunctional ?? ((id, pr, r) => verifyWorkerResult(id, pr, r));
+    const vr = await verify(result.taskId, projectRoot, result);
+    functional = vr.verdict === 'PASS' ? 'pass' : 'fail';
+  }
+
+  return { boundary, adr, functional };
 }

@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
-  buildTaskForEval, mapEvaluation, evaluateBacklogResult,
+  buildTaskForEval, mapEvaluation, evaluateBacklogResult, auditBacklogResult,
 } from '../../../src/orchestra/autonomous/backlog-eval.js';
 import type { BacklogEntry } from '../../../src/orchestra/autonomous/backlog-types.js';
 import type { TaskResult, EvaluationResult } from '../../../src/core/types.js';
+import type { VerificationResult } from '../../../src/monitor/auditor.js';
+
+const passFn = async (): Promise<VerificationResult> => ({ verdict: 'PASS', reason: 'ok' });
+const failFn = async (): Promise<VerificationResult> => ({ verdict: 'FAIL', reason: 'broke' });
 
 const entry: BacklogEntry = {
   id: 'roles', title: 'Roles CRUD', kind: 'task',
@@ -67,5 +71,46 @@ describe('evaluateBacklogResult (end-to-end via real evaluateWithRubric)', () =>
     );
     expect(e.decision).toBe('NO_GO');
     expect(e.reconciled).toBe(false);
+  });
+});
+
+describe('auditBacklogResult (Component ② — advisory)', () => {
+  it('in-scope clean result → boundary clean, adr ok, functional pass', async () => {
+    const v = await auditBacklogResult(
+      entry, result({ filesChanged: ['src/api/roles.ts'] }), '/nonexistent-root',
+      { verifyFunctional: passFn },
+    );
+    expect(v.boundary).toBe('clean');
+    expect(v.adr).toBe('ok');                            // no .brain/memory.db → no ADR rules
+    expect(v.functional).toBe('pass');
+  });
+  it('out-of-scope filesChanged → boundary violation list', async () => {
+    const v = await auditBacklogResult(
+      entry, result({ filesChanged: ['src/orchestra/elsewhere.ts'] }), '/nonexistent-root',
+      { verifyFunctional: passFn },
+    );
+    expect(Array.isArray(v.boundary)).toBe(true);
+    expect((v.boundary as unknown[]).length).toBe(1);
+  });
+  it('maps a FAIL/DOWNGRADE verifyWorkerResult verdict to functional fail', async () => {
+    const v = await auditBacklogResult(
+      entry, result({ filesChanged: ['src/api/roles.ts'] }), '/nonexistent-root',
+      { verifyFunctional: failFn },
+    );
+    expect(v.functional).toBe('fail');
+  });
+  it('skips functional when no files changed', async () => {
+    const v = await auditBacklogResult(
+      entry, result({ filesChanged: [] }), '/nonexistent-root', { verifyFunctional: passFn },
+    );
+    expect(v.functional).toBe('skipped');
+  });
+  it('treats scopeDir "." as unrestricted (no boundary claim)', async () => {
+    const broad: typeof entry = { ...entry, spec: { ...entry.spec, scopeDir: '.' } };
+    const v = await auditBacklogResult(
+      broad, result({ filesChanged: ['anywhere/file.ts'] }), '/nonexistent-root',
+      { verifyFunctional: passFn },
+    );
+    expect(v.boundary).toBe('clean');
   });
 });
