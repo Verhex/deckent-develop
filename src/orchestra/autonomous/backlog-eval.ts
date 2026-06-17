@@ -24,6 +24,10 @@ export interface BacklogEvaluation {
   reconciled: boolean;
   /** Most-informative rubric line (worst failing criterion, else "all criteria passed"). */
   reason: string;
+  /** True when the Brain NO_GO is purely a result-schema rejection (e.g. missing
+   *  coverage on a comment/doc change) rather than a quality judgment — the only
+   *  NO_GO the Auditor-reconcile is allowed to upgrade. */
+  schemaRejected?: boolean;
 }
 
 /** Build the minimal Task the sprint-mode kernels expect from a backlog entry + its run
@@ -61,6 +65,7 @@ export function mapEvaluation(result: TaskResult, evaluation: EvaluationResult):
     quality: evaluation.totalScore,
     reconciled: result.selfAssessment === 'NO_GO' && evaluation.decision !== 'NO_GO',
     reason: pickReason(evaluation.rubricScores),
+    schemaRejected: evaluation.rubricScores.some((s) => s.criterion === 'schema_validation' && !s.passed),
   };
 }
 
@@ -140,13 +145,14 @@ export interface CrossVerifyVerdict {
   verdict?: 'confirmed' | 'refuted' | 'unclear';
 }
 
-/** Brain⇄Auditor reconciliation (false-NO_GO fix). When the Brain returns NO_GO but the
- *  Auditor INDEPENDENTLY confirms the work is real (functional pass), in-scope (boundary
- *  clean) and present (filesChanged), and the worker did NOT honestly self-report NO_GO,
- *  the Brain decision is upgraded to GO_WITH_TECH_DEBT. This catches the schema/coverage
- *  technicality where evaluateWithRubric hard-rejects a verified comment/doc change before
- *  its own reconciliation can run. Conservative: an honest worker NO_GO, a functional fail,
- *  a boundary violation, or no disk work all leave the NO_GO intact. */
+/** Brain⇄Auditor reconciliation (false-NO_GO fix). Narrowly upgrades a Brain NO_GO to
+ *  GO_WITH_TECH_DEBT ONLY when that NO_GO is a result-SCHEMA rejection (e.g. a verified
+ *  comment/doc change whose result omitted `coverage`), AND the Auditor's functional check
+ *  passed, AND the change is in-scope (boundary clean) on real files, AND the worker did not
+ *  honestly self-report NO_GO. A genuine low-quality rubric NO_GO is NOT a schema rejection
+ *  and is left intact. (Note: `functional: 'pass'` can be a trivial pass-by-default for a
+ *  source change lacking a co-located test — so this fires only for the schema-technicality
+ *  case, never to launder a quality failure; the ceiling is GO_WITH_TECH_DEBT, never DONE.) */
 export function reconcileWithAudit(
   evaluation: BacklogEvaluation,
   verdict: AuditVerdict,
@@ -154,6 +160,7 @@ export function reconcileWithAudit(
 ): BacklogEvaluation {
   if (
     evaluation.decision === 'NO_GO' &&
+    evaluation.schemaRejected === true &&
     result.selfAssessment !== 'NO_GO' &&
     verdict.functional === 'pass' &&
     verdict.boundary === 'clean' &&
@@ -163,7 +170,7 @@ export function reconcileWithAudit(
       decision: 'GO_WITH_TECH_DEBT',
       quality: evaluation.quality,
       reconciled: true,
-      reason: `Brain NO_GO reconciled by Auditor: functional pass + clean boundary on real work (${evaluation.reason})`,
+      reason: `Brain schema-NO_GO reconciled by Auditor: functional pass + clean boundary on real work (${evaluation.reason})`,
     };
   }
   return evaluation;

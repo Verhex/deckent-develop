@@ -77,7 +77,7 @@ describe('execute-dispatcher — Brain+Auditor+CrossVerify wire', () => {
       runTask: async () => ({ taskId: 'run-1' }),
       runSprint: async () => ({}),
       waitForResult: async () => ({ taskId: 'run-1', selfAssessment: 'DONE', filesChanged: ['src/cli/helpers/output.ts'] } as any),
-      evaluate: () => ({ decision: 'NO_GO', quality: 0, reconciled: false, reason: 'Schema violation: missing required fields [coverage]' }),
+      evaluate: () => ({ decision: 'NO_GO', quality: 0, reconciled: false, reason: 'Schema violation: missing required fields [coverage]', schemaRejected: true }),
       audit: async () => ({ boundary: 'clean', adr: 'ok', functional: 'pass' }),
       crossVerify: async () => ({ ran: false }),
     });

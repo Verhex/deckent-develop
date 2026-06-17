@@ -43,7 +43,16 @@ describe('mapEvaluation (EvaluationResult -> BacklogEvaluation)', () => {
   });
   it('clean DONE → reconciled false, quality = totalScore', () => {
     const m = mapEvaluation(result({ selfAssessment: 'DONE' }), rubric({}));
-    expect(m).toEqual({ decision: 'DONE', quality: 95, reconciled: false, reason: 'all criteria passed' });
+    expect(m).toEqual({ decision: 'DONE', quality: 95, reconciled: false, reason: 'all criteria passed', schemaRejected: false });
+  });
+  it('sets schemaRejected when the rubric is a schema_validation failure', () => {
+    const m = mapEvaluation(
+      result({ selfAssessment: 'DONE' }),
+      { decision: 'NO_GO', totalScore: 0, retryCount: 0,
+        rubricScores: [{ criterion: 'schema_validation', score: 0, passed: false, reason: 'Schema violation: missing required fields [coverage]' }] },
+    );
+    expect(m.schemaRejected).toBe(true);
+    expect(m.decision).toBe('NO_GO');
   });
   it('selfAssessment NO_GO but kernel decided GO_WITH_TECH_DEBT → reconciled true', () => {
     const m = mapEvaluation(
@@ -138,7 +147,7 @@ describe('crossVerifyBacklogResult (Component ③ — XVER-1 cross-provider, adv
   });
 });
 
-const noGoEval = { decision: 'NO_GO' as const, quality: 0, reconciled: false, reason: 'Schema violation: missing required fields [coverage]' };
+const noGoEval = { decision: 'NO_GO' as const, quality: 0, reconciled: false, reason: 'Schema violation: missing required fields [coverage]', schemaRejected: true as const };
 const cleanAudit: AuditVerdict = { boundary: 'clean', adr: 'ok', functional: 'pass' };
 
 describe('reconcileWithAudit (Brain⇄Auditor — false-NO_GO fix)', () => {
@@ -164,6 +173,12 @@ describe('reconcileWithAudit (Brain⇄Auditor — false-NO_GO fix)', () => {
   it('does NOT reconcile when there is no real work (empty filesChanged)', () => {
     const r = reconcileWithAudit(noGoEval, cleanAudit, result({ selfAssessment: 'DONE', filesChanged: [] }));
     expect(r.decision).toBe('NO_GO');
+  });
+  it('does NOT reconcile a genuine quality NO_GO (not a schema rejection) even when functional passes', () => {
+    const qualityNoGo = { decision: 'NO_GO' as const, quality: 55, reconciled: false, reason: 'correctness below threshold', schemaRejected: false as const };
+    const r = reconcileWithAudit(qualityNoGo, cleanAudit, result({ selfAssessment: 'DONE', filesChanged: ['src/api/x.ts'] }));
+    expect(r.decision).toBe('NO_GO');
+    expect(r.reconciled).toBe(false);
   });
   it('passes a non-NO_GO evaluation through unchanged', () => {
     const ok = { decision: 'DONE' as const, quality: 95, reconciled: false, reason: 'ok' };
