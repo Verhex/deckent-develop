@@ -633,7 +633,7 @@ export function checkBoundaryViolations(
   return violations;
 }
 
-function isFileInScope(filePath: string, scope: TaskScope): boolean {
+export function isFileInScope(filePath: string, scope: TaskScope): boolean {
   const normalizedFile = normalize(filePath).replace(/\\/g, '/');
 
   for (const dir of scope.directories) {
