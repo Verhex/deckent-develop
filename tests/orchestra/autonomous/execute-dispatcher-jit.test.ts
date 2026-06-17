@@ -33,6 +33,9 @@ describe('execute-dispatcher — JIT detail', () => {
       runSprint: async () => ({}),
       waitForResult: async () => ({ taskId: 'tid', selfAssessment: 'DONE' } as any),
       jitComplete: async () => 'DETAILED: add roles crud endpoints',
+      evaluate: () => ({ decision: 'DONE', quality: 100, reconciled: false, reason: 'ok' }),
+      audit: async () => ({ boundary: 'clean', adr: 'ok', functional: 'pass' }),
+      crossVerify: async () => ({ ran: false }),
     });
     const res = await handler(AUTONOMOUS_EXECUTE_ACTION, { entry: baseEntry });
     expect(res.outcome).toBe('success');
@@ -52,6 +55,9 @@ describe('execute-dispatcher — JIT detail', () => {
       // First poll times out (null); the worker writes its DONE .result moments
       // later, so the grace re-poll finds it (disk-verify outranks the timeout).
       waitForResult: async () => { calls++; return calls === 1 ? null : ({ taskId: 'tid', selfAssessment: 'DONE' } as any); },
+      evaluate: () => ({ decision: 'DONE', quality: 100, reconciled: false, reason: 'ok' }),
+      audit: async () => ({ boundary: 'clean', adr: 'ok', functional: 'pass' }),
+      crossVerify: async () => ({ ran: false }),
     });
     const res = await handler(AUTONOMOUS_EXECUTE_ACTION, { entry });
     expect(res.outcome).toBe('success');

@@ -45,6 +45,13 @@ const noGoResult: TaskResult = {
   filesChanged: [], notes: '', linesAdded: 0, linesRemoved: 0,
 };
 
+// CORE-UNIFORMITY (slice 1): the task branch now runs the real Brain-Eval kernel,
+// which schema-rejects the minimal fixtures above. These deterministic stubs keep the
+// task-branch wiring tests hermetic (they assert dispatch/status flow, not the kernel).
+const okEval = () => ({ decision: 'DONE' as const, quality: 100, reconciled: false, reason: 'ok' });
+const okAudit = async () => ({ boundary: 'clean' as const, adr: 'ok' as const, functional: 'pass' as const });
+const skipXVerify = async () => ({ ran: false });
+
 // ─── Tmpdir management ───────────────────────────────────────────────
 
 let tmpDir: string;
@@ -172,6 +179,7 @@ describe('execute-dispatcher', () => {
       projectRoot: tmpDir, config: {} as never,
       runTask, runSprint,
       backlogPath, waitForResult,
+      evaluate: okEval, audit: okAudit, crossVerify: skipXVerify,
     });
 
     const res = await handler('autonomous.execute', { entry: taskEntry });
@@ -242,6 +250,8 @@ describe('execute-dispatcher', () => {
       projectRoot: tmpDir, config: {} as never,
       runTask, runSprint: vi.fn(),
       backlogPath, waitForResult,
+      evaluate: () => ({ decision: 'GO_WITH_TECH_DEBT', quality: 80, reconciled: false, reason: 'tech debt' }),
+      audit: okAudit, crossVerify: skipXVerify,
     });
 
     const res = await handler('autonomous.execute', { entry: taskEntry });
@@ -364,6 +374,7 @@ describe('execute-dispatcher', () => {
       projectRoot: tmpDir, config: {} as never,
       runTask, runSprint: vi.fn(),
       backlogPath, waitForResult,
+      evaluate: okEval, audit: okAudit, crossVerify: skipXVerify,
     });
     await handler('autonomous.execute', { entry: entryNoDesc });
     expect(runTask.mock.calls[0]![0].description).toBe('t');
@@ -383,6 +394,7 @@ describe('execute-dispatcher', () => {
       projectRoot: tmpDir, config: {} as never,
       runTask, runSprint: vi.fn(),
       backlogPath, waitForResult,
+      evaluate: okEval, audit: okAudit, crossVerify: skipXVerify,
       resultTimeoutMs: 42_000,
     });
     await handler('autonomous.execute', { entry: taskEntry });
@@ -402,6 +414,7 @@ describe('execute-dispatcher', () => {
       projectRoot: tmpDir, config: {} as never,
       runTask, runSprint: vi.fn(),
       backlogPath, waitForResult,
+      evaluate: okEval, audit: okAudit, crossVerify: skipXVerify,
       pool: mockPool,
     });
 
@@ -421,6 +434,7 @@ describe('execute-dispatcher', () => {
       projectRoot: tmpDir, config: {} as never,
       runTask, runSprint: vi.fn(),
       backlogPath, waitForResult,
+      evaluate: okEval, audit: okAudit, crossVerify: skipXVerify,
     });
 
     const res = await handler('autonomous.execute', { entry: taskEntry });

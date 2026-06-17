@@ -19,6 +19,11 @@ import type { TaskResult } from '../../core/types.js';
 import type { ExecutionPool } from './execution-pool.js';
 import { needsJitDetail, generateItemDetail } from './jit-detail.js';
 import type { LlmComplete } from './goal-planner-types.js';
+import {
+  evaluateBacklogResult, auditBacklogResult, crossVerifyBacklogResult,
+  type BacklogEvaluation, type AuditVerdict, type CrossVerifyVerdict,
+} from './backlog-eval.js';
+import type { FlowReporter } from './flow-reporter.js';
 
 /** Action id the backlog-trigger sets on every entry-driven trigger. */
 export const AUTONOMOUS_EXECUTE_ACTION = 'autonomous.execute';
@@ -72,13 +77,19 @@ export interface ExecuteDispatcherDeps {
    *  detailed JIT (and persisted) before it runs. Absent → planned entries run
    *  with description = title (back-compat). */
   jitComplete?: LlmComplete;
-}
-
-/** Determine whether a TaskResult represents success (mirrors run.ts:320). */
-function isSuccess(result: TaskResult | null): boolean {
-  if (!result) return false;
-  const a = result.selfAssessment ?? 'NO_GO';
-  return a === 'DONE' || a === 'GO_WITH_TECH_DEBT';
+  /**
+   * CORE-UNIFORMITY (slice 1): Brain-Eval / Auditor / Cross-Verify hooks. Default to the
+   * real mode-independent kernels (backlog-eval.ts); injected as deterministic stubs in
+   * hermetic dispatcher tests. A finished task is evaluated by the SAME core sprint mode uses.
+   */
+  evaluate?: (entry: BacklogEntry, result: TaskResult, projectRoot: string) => BacklogEvaluation;
+  audit?: (entry: BacklogEntry, result: TaskResult, projectRoot: string) => Promise<AuditVerdict>;
+  crossVerify?: (
+    entry: BacklogEntry, result: TaskResult, projectRoot: string,
+    config: ResolvedConfig, evaluation: BacklogEvaluation,
+  ) => Promise<CrossVerifyVerdict>;
+  /** Rich dual-channel flow emitter (human terminal + AI JSONL). Absent → no flow. */
+  flow?: FlowReporter;
 }
 
 export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandler {
@@ -106,13 +117,20 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
           live = await generateItemDetail(entry, deps.jitComplete);
           const blJit = loadBacklog(deps.backlogPath);
           const idx = blJit.entries.findIndex((e) => e.id === entry.id);
-          if (idx >= 0) { blJit.entries[idx] = { ...blJit.entries[idx]!, spec: live.spec }; saveBacklogFile(deps.backlogPath, blJit); }
+          if (idx >= 0) {
+            blJit.entries[idx] = { ...blJit.entries[idx]!, spec: live.spec };
+            saveBacklogFile(deps.backlogPath, blJit);
+            deps.flow?.step('jit_detail', entry.id, `detail generated (${(live.spec.description ?? '').length} chars)`);
+          }
         } catch { /* JIT failure → fall back to the title-only description below */ }
       }
 
       try {
         let ok = false;
         let reason = '';
+        // Rich Brain+Auditor+CrossVerify verdict (task branch only). null → fall back to
+        // the plain { ok, reason } for sprint/capability/process branches.
+        let richResult: BacklogEntry['lastResult'] = null;
 
         if (entry.kind === 'sprint') {
           // Sprint: runSprint awaits the full lifecycle — success unless it throws.
@@ -165,20 +183,56 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
 
           const taskId = r?.taskId;
           if (taskId) {
+            deps.flow?.step('spawned', entry.id, `taskId=${taskId}`);
             // Gap F: wait for real done/failed (not just launched)
             let result = await deps.waitForResult(deps.projectRoot, taskId, timeoutMs);
             if (!result) {
-              // false-FAILURE fix: a real worker (docker + JIT detail + verify) can
-              // write its .result seconds after the window closes — observed 9s past
-              // a 600s timeout (2026-06-17 dogfood). Disk-verify outranks the timeout,
-              // so grace re-poll once for a late result before declaring failure
-              // (the Spurious-NO_GO reconciliation pattern, applied to the autonomous task path).
+              // false-FAILURE fix: a real worker can write its .result seconds after the
+              // window closes — observed 9s past a 600s timeout (2026-06-17 dogfood).
+              // Grace re-poll once before failing (disk-verify outranks the timeout).
               result = await deps.waitForResult(deps.projectRoot, taskId, GRACE_RESULT_MS);
             }
-            ok = isSuccess(result);
-            reason = result
-              ? `selfAssessment=${result.selfAssessment ?? 'NO_GO'}`
-              : 'timeout — no result within limit (incl. grace re-poll)';
+
+            if (result) {
+              // CORE-UNIFORMITY: a finished autonomous task passes through the SAME
+              // Brain-Eval + Auditor + Cross-Verify sprint mode applies (mode-independent
+              // kernels). The Auditor + cross-verify verdicts are ADVISORY (never flip the
+              // Brain decision, per ADR-037 V1.0); the rich verdict is persisted + flow-reported.
+              const evaluate = deps.evaluate ?? evaluateBacklogResult;
+              const audit = deps.audit ?? auditBacklogResult;
+              const crossVerify = deps.crossVerify ?? crossVerifyBacklogResult;
+
+              const evaluation = evaluate(live, result, deps.projectRoot);
+              deps.flow?.step('brain_verdict', entry.id,
+                `${evaluation.decision} q=${evaluation.quality}${evaluation.reconciled ? ' (reconciled)' : ''}`);
+
+              const verdict = await audit(live, result, deps.projectRoot);
+              const boundaryNote = verdict.boundary === 'clean' ? 'clean' : `${verdict.boundary.length} violation(s)`;
+              const adrNote = verdict.adr === 'ok' ? 'ok' : `${verdict.adr.length} issue(s)`;
+              deps.flow?.step('audit_verdict', entry.id, `boundary ${boundaryNote} · ADR ${adrNote} · fn ${verdict.functional}`);
+
+              const xv = await crossVerify(live, result, deps.projectRoot, deps.config, evaluation);
+              deps.flow?.step('cross_verify', entry.id, xv.ran ? `verdict=${xv.verdict}` : 'skipped (no 2nd provider / disabled)');
+
+              ok = evaluation.decision !== 'NO_GO';
+              reason = evaluation.reason || `decision=${evaluation.decision}`;
+              richResult = {
+                ok,
+                reason,
+                decision: evaluation.decision,
+                reconciled: evaluation.reconciled,
+                quality: evaluation.quality,
+                audit: {
+                  boundary: verdict.boundary === 'clean' ? 'clean' : verdict.boundary.map((v) => v.detail),
+                  adr: verdict.adr === 'ok' ? 'ok' : verdict.adr.map((v) => `${v.adrId}: ${v.violation}`),
+                  functional: verdict.functional,
+                },
+                crossVerify: { ran: xv.ran, ...(xv.verdict ? { verdict: xv.verdict } : {}) },
+              };
+            } else {
+              ok = false;
+              reason = 'timeout — no result within limit (incl. grace re-poll)';
+            }
           } else {
             // runTask returned no taskId — cannot track completion; treat as failure
             // to avoid false-done (the "wiring-% vs user-working" trap).
@@ -187,9 +241,12 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
           }
         }
 
-        // Gap B — final writeback (re-load to avoid clobbering concurrent changes)
+        // Gap B — final writeback (re-load to avoid clobbering concurrent changes).
+        // Task branch carries the rich Brain+Auditor+CrossVerify verdict; other kinds
+        // keep the plain { ok, reason } (sprint already evaluates + cross-verifies).
         const blFinal: BacklogFile = loadBacklog(deps.backlogPath);
-        updateStatus(deps.backlogPath, blFinal, entry.id, ok ? 'done' : 'failed', { ok, reason });
+        updateStatus(deps.backlogPath, blFinal, entry.id, ok ? 'done' : 'failed', richResult ?? { ok, reason });
+        deps.flow?.step(ok ? 'done' : 'failed', entry.id, reason);
 
         return ok ? { outcome: 'success' } : { outcome: 'failure', error: reason };
       } catch (err: unknown) {

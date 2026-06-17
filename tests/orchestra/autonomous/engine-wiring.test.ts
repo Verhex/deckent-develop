@@ -215,7 +215,11 @@ describe('engine wiring — recurring re-enqueue + work-generator', () => {
     writeFileSync(backlogPath, JSON.stringify({ _version: '1.0', entries: [] }));
     const opts = flowOpts(false);
     opts.runTask = vi.fn().mockResolvedValue({ taskId: 't-flow' });
-    opts.waitForResult = vi.fn().mockResolvedValue({ taskId: 't-flow', selfAssessment: 'DONE', testsPassed: true, filesChanged: [], notes: '', linesAdded: 0, linesRemoved: 0 });
+    // CORE-UNIFORMITY (slice 1): the dispatcher's task branch now runs the real
+    // Brain-Eval kernel on this result via the live composition root (no test-level
+    // injection seam here). A schema-complete result (coverage present) drives the
+    // kernel to DONE so the end-to-end flow records 'done' as before.
+    opts.waitForResult = vi.fn().mockResolvedValue({ taskId: 't-flow', selfAssessment: 'DONE', testsPassed: true, coverage: 100, filesChanged: [], notes: '', linesAdded: 0, linesRemoved: 0 });
     const bundle = buildEngineRuntime(opts);
 
     const result = await runAutonomousCycle({}, bundle.deps);
