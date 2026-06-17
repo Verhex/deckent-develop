@@ -51,6 +51,7 @@ import {
   AUTONOMOUS_EXECUTE_ACTION,
   type ExecuteDispatcherDeps,
 } from './execute-dispatcher.js';
+import type { FlowReporter } from './flow-reporter.js';
 import { evaluatePolicy } from '../../core/policy-engine.js';
 import { Permission } from '../../core/rbac.js';
 import { decidePolicy, computeEntryEffectClass } from './policy-gate.js';
@@ -154,6 +155,12 @@ export interface BuildEngineRuntimeOptions {
    * execute-dispatcher). Absent → planned entries run title-only (backward-safe).
    */
   jitComplete?: ExecuteDispatcherDeps['jitComplete'];
+  /**
+   * CORE-UNIFORMITY (slice 1): rich dual-channel flow emitter forwarded to the
+   * execute-dispatcher so the autonomous terminal shows the live Brain+Auditor+
+   * CrossVerify flow (and an AI operator collects it as JSONL). Absent → no flow.
+   */
+  flow?: FlowReporter;
   /** Optional extra trigger source (e.g. a reactive/webhook source) added last. */
   reactiveSource?: TriggerSource;
   /**
@@ -231,6 +238,7 @@ export function buildEngineRuntime(
       waitForResult: opts.waitForResult,
       resultTimeoutMs: opts.resultTimeoutMs,
       jitComplete: opts.jitComplete,
+      flow: opts.flow,
       capabilityRegistry,
     }),
   );
