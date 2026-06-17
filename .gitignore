@@ -90,6 +90,19 @@ coverage/
 .deckent/sprint-*-dispatch-locks.json
 .deckent/runtime/evaluations/
 .deckent/pids/
+
+# Autonomous + general runtime state (GITIGN-RT, 2026-06-17 — local-only, never tracked)
+.deckent/*.pid
+.deckent/notify-log.jsonl
+.deckent/autonomous-events.jsonl
+.deckent/autonomous-seq
+.deckent/panic-ipc/
+.deckent/sprint-*-start.log
+.deckent/evaluations/
+.deckent/autonomous/backlog.json
+.deckent/autonomous/pending.json
+.deckent/autonomous/*-task.md
+
 .claude/scheduled_tasks.lock
 .claude/settings.local.json
 
