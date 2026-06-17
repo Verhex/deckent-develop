@@ -22,6 +22,13 @@ describe('parsePlannedItems', () => {
     ] }) + '\n```';
     expect(parsePlannedItems(raw).map((i) => i.title)).toEqual(['T']);
   });
+  it('unwraps a Claude CLI envelope ({type,result:fenced-json}) into items (dogfood 2026-06-17)', () => {
+    const inner = '```json\n' + JSON.stringify({ items: [
+      { id: 'x', title: 'X', kind: 'task', scopeDir: 'src/', summary: 's', policy: 'auto', trigger: 'one-off' },
+    ] }) + '\n```';
+    const envelope = JSON.stringify({ type: 'result', subtype: 'success', result: inner, usage: {} });
+    expect(parsePlannedItems(envelope).map((i) => i.id)).toEqual(['x']);
+  });
 });
 
 describe('planGoal', () => {

@@ -58,6 +58,15 @@ function stripToJson(raw: string): string {
 export function parsePlannedItems(raw: string): PlannedItem[] {
   let parsed: unknown;
   try { parsed = JSON.parse(stripToJson(raw)); } catch { return []; }
+  // Provider-envelope tolerance: a Claude CLI `--output-format json` envelope wraps
+  // the model text in a `result` string. When the top level has no `items` array but
+  // a string `result`, parse that inner text instead (it holds the fenced {items:[…]}).
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    const obj = parsed as { items?: unknown; result?: unknown };
+    if (!Array.isArray(obj.items) && typeof obj.result === 'string') {
+      try { parsed = JSON.parse(stripToJson(obj.result)); } catch { return []; }
+    }
+  }
   const arr = (parsed as { items?: unknown })?.items;
   if (!Array.isArray(arr)) return [];
   const seen = new Set<string>();

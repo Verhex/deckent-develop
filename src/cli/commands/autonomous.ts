@@ -283,7 +283,19 @@ function realPlannerComplete(model: string): LlmComplete {
     const adapter = resolveAdapter();
     const spawnArgs = buildPlannerSpawnArgs(adapter, prompt, model as ModelType);
     const r = spawnSync(spawnArgs.command, spawnArgs.args, { encoding: 'utf-8', timeout: 120_000, maxBuffer: 10 * 1024 * 1024 });
-    return (r.stdout ?? '') + (r.stderr ?? '');
+    // Diagnostics (do not silently return empty → "no valid items" hides real failures):
+    // surface spawn errors, timeouts, and non-zero exits so the operator sees the cause.
+    if (r.error) throw new Error(`planner spawn failed (${adapter.name}): ${r.error.message}`);
+    if (r.signal === 'SIGTERM') throw new Error(`planner timed out (${adapter.name}) — raise the timeout or narrow the goal`);
+    const stdout = r.stdout ?? '';
+    if (r.status !== 0 && !stdout) {
+      throw new Error(`planner exited status=${r.status ?? 'null'} (${adapter.name}): ${(r.stderr ?? '').slice(0, 300)}`);
+    }
+    // Unwrap the provider-specific envelope (Claude `--output-format json` wraps the
+    // model text in `.result`; Gemini/Codex differ) to the inner text — parsePlannedItems
+    // then reads the {items:[…]} JSON. Without this the envelope's top level has no
+    // `items` and every plan returned "no valid items" (live dogfood 2026-06-17).
+    return adapter.parseAgentResponse ? adapter.parseAgentResponse(stdout) : stdout;
   };
 }
 
