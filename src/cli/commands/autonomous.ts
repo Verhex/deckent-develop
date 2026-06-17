@@ -494,7 +494,22 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
   });
   const onTick = makeTickReporter(lang);
 
-  print(getMessage('autonomous.start_banner', lang, { flows: String(flows.length) }));
+  // Surface the immediate work queue, not just scheduled flows: an empty/all-done backlog
+  // would otherwise idle silently behind a "0 flow(s)"-only banner. pending = ready-now;
+  // recurring/reactive entries are scheduled (they re-arm later) so they suppress the warning.
+  const backlogEntries = (() => {
+    try { return loadBacklog(backlogPath).entries; } catch { return []; }
+  })();
+  const pendingCount = backlogEntries.filter((e) => e.status === 'pending').length;
+  const scheduledCount = backlogEntries.filter(
+    (e) => e.trigger.type === 'recurring' || e.trigger.type === 'reactive',
+  ).length;
+  print(getMessage('autonomous.start_banner', lang, {
+    flows: String(flows.length), pending: String(pendingCount),
+  }));
+  if (pendingCount === 0 && flows.length === 0 && scheduledCount === 0) {
+    print(getMessage('autonomous.start_no_work', lang));
+  }
 
   // Wrap sleep so the stop marker triggers abort.
   const sleep = (ms: number): Promise<void> =>

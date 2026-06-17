@@ -186,6 +186,10 @@ describe('deckent autonomous CLI (226-007)', () => {
     );
     expect(out).toContain('Autonomous runtime started');
     expect(out).toContain('Autonomous loop finished');
+    // UX: an empty backlog must report "0 pending" + an explicit "no pending work"
+    // line instead of silently idling behind the misleading "0 flow(s)"-only banner.
+    expect(out).toContain('0 pending');
+    expect(out).toContain('No pending work');
     // 1 iteration, idle → no audit events written
     const eventsFile = join(root, '.deckent', 'recently-works', 'autonomous-events.jsonl');
     expect(existsSync(eventsFile)).toBe(false);

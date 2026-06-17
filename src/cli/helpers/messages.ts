@@ -841,8 +841,12 @@ const MESSAGES: MessageMap = {
     tr: 'Otonom mod zaten açık ({path}). Başlatmak için: deckent autonomous start',
   },
   'autonomous.start_banner': {
-    en: 'Autonomous runtime started — {flows} flow(s), default-deny + approval-gate active',
-    tr: 'Otonom runtime başladı — {flows} flow, default-deny + onay-kapısı aktif',
+    en: 'Autonomous runtime started — {flows} flow(s), {pending} pending backlog item(s), default-deny + approval-gate active',
+    tr: 'Otonom runtime başladı — {flows} flow, {pending} pending backlog maddesi, default-deny + onay-kapısı aktif',
+  },
+  'autonomous.start_no_work': {
+    en: 'No pending work — backlog has no pending or scheduled items (all done/failed). Queue one with: deckent autonomous plan "<goal>" — the loop will idle until work is added.',
+    tr: 'Bekleyen iş yok — backlog\'da pending veya zamanlanmış madde yok (hepsi done/failed). Kuyruğa iş ekle: deckent autonomous plan "<hedef>" — iş eklenene kadar döngü boşta bekler.',
   },
   'autonomous.start_done': {
     en: 'Autonomous loop finished ({iterations} cycles, reason: {reason})',
