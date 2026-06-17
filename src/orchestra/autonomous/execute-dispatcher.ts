@@ -23,6 +23,10 @@ import type { LlmComplete } from './goal-planner-types.js';
 /** Action id the backlog-trigger sets on every entry-driven trigger. */
 export const AUTONOMOUS_EXECUTE_ACTION = 'autonomous.execute';
 
+/** Grace window for a late `.result` after the primary timeout (false-FAILURE fix):
+ *  a real worker can finish seconds past the deadline; we re-poll once before failing. */
+const GRACE_RESULT_MS = 30_000;
+
 /** Persist the backlog with the project's durability contract (write-tmp → fsync
  *  → rename), matching every other backlog write in backlog.ts. */
 function saveBacklogFile(path: string, bl: BacklogFile): void {
@@ -162,11 +166,19 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
           const taskId = r?.taskId;
           if (taskId) {
             // Gap F: wait for real done/failed (not just launched)
-            const result = await deps.waitForResult(deps.projectRoot, taskId, timeoutMs);
+            let result = await deps.waitForResult(deps.projectRoot, taskId, timeoutMs);
+            if (!result) {
+              // false-FAILURE fix: a real worker (docker + JIT detail + verify) can
+              // write its .result seconds after the window closes — observed 9s past
+              // a 600s timeout (2026-06-17 dogfood). Disk-verify outranks the timeout,
+              // so grace re-poll once for a late result before declaring failure
+              // (the Spurious-NO_GO reconciliation pattern, applied to the autonomous task path).
+              result = await deps.waitForResult(deps.projectRoot, taskId, GRACE_RESULT_MS);
+            }
             ok = isSuccess(result);
             reason = result
               ? `selfAssessment=${result.selfAssessment ?? 'NO_GO'}`
-              : 'timeout — no result within limit';
+              : 'timeout — no result within limit (incl. grace re-poll)';
           } else {
             // runTask returned no taskId — cannot track completion; treat as failure
             // to avoid false-done (the "wiring-% vs user-working" trap).

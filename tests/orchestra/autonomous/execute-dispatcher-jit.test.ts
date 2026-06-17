@@ -41,6 +41,24 @@ describe('execute-dispatcher — JIT detail', () => {
     expect(saved.entries[0].spec.description).toContain('DETAILED');
   });
 
+  it('reconciles a late result after the initial waitForResult timeout (false-FAILURE fix)', async () => {
+    const entry = { ...baseEntry, planned: false };
+    const backlogPath = setup(entry);
+    let calls = 0;
+    const handler = makeExecuteDispatcher({
+      projectRoot: dir!, config: {} as any, backlogPath,
+      runTask: async () => ({ taskId: 'tid' }),
+      runSprint: async () => ({}),
+      // First poll times out (null); the worker writes its DONE .result moments
+      // later, so the grace re-poll finds it (disk-verify outranks the timeout).
+      waitForResult: async () => { calls++; return calls === 1 ? null : ({ taskId: 'tid', selfAssessment: 'DONE' } as any); },
+    });
+    const res = await handler(AUTONOMOUS_EXECUTE_ACTION, { entry });
+    expect(res.outcome).toBe('success');
+    expect(calls).toBe(2); // grace re-poll fired after the first timeout
+    expect(JSON.parse(readFileSync(backlogPath, 'utf-8')).entries[0].status).toBe('done');
+  });
+
   it('fails a process entry with an honest reason (F3-008 pending)', async () => {
     const backlogPath = setup({ ...baseEntry, kind: 'process' });
     const handler = makeExecuteDispatcher({
