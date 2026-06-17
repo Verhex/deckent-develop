@@ -6,7 +6,7 @@ import { formatHumanSprintComplete } from '../../orchestra/sprint-reporter.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 
-/** DB-first memory entry count — replaces legacy countBrainLines. */
+/** Returns total memory entry count from the project's SQLite DB. Returns 0 if the DB is absent or unreadable. */
 function getMemoryEntryCount(projectRoot: string): number {
   const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
   if (!existsSync(dbPath)) return 0;

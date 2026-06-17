@@ -35,7 +35,7 @@ function handleDeckentError(error: DeckentError, opts?: ErrorHandlerOpts): void 
       process.stderr.write(colorizeHumanError(formatted) + '\n');
     }
   } else {
-    // Legacy format for errors without human context
+    // Compact format: DeckentError without rich context fields set
     if (opts?.noColor) {
       process.stderr.write(`[${error.code}] ${error.message}\n`);
     } else {

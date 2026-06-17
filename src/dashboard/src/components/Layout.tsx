@@ -13,14 +13,14 @@ import type { SSEStatus } from "../hooks/useSSE";
 import { useTranslation } from "../i18n/LanguageProvider";
 import type { DashboardState } from "../types";
 // Nav single-source (nav-items.ts) — ALL routes defined there, mirrored below for grep targets:
-// groupLabel: "talk"   groupLabelKey: "nav.group.talk"  (was groupLabel: "Konuş")
+// groupLabel: "talk"   groupLabelKey: "nav.group.talk"
 //   → { to: "/chat", labelKey: "nav.chat", icon: MessageCircle }
-// groupLabel: "watch"  groupLabelKey: "nav.group.watch"  (was groupLabel: "İzle")
+// groupLabel: "watch"  groupLabelKey: "nav.group.watch"
 //   → { to: "/", labelKey: "nav.dashboard", icon: LayoutDashboard },
 //   { to: "/status", labelKey: "dashboard.status", icon: Activity },
 //   { to: "/history", labelKey: "nav.history", icon: History },
 //   { to: "/workers" }, { to: "/debt" }, { to: "/evolution" }, { to: "/nervous" }, { to: "/autonomous" }
-// groupLabel: "manage" groupLabelKey: "nav.group.manage"  (was groupLabel: "Yönet")
+// groupLabel: "manage" groupLabelKey: "nav.group.manage"
 //   → { to: "/memory", labelKey: "nav.memory", icon: Brain },
 //   { to: "/memory-explorer" }, { to: "/config", labelKey: "nav.config", icon: SlidersHorizontal },
 //   { to: "/settings" }, { to: "/directives" }, { to: "/enterprise" }

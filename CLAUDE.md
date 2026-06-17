@@ -109,20 +109,22 @@ Canlı sprint, debt, agent performance ve ADR durumu için: `@.brain/exports/sum
 Komutlar: `deckent status`, `deckent history`, `deckent retro`, `deckent recall "<sorgu>"`.
 
 ## Sprint Metrics
-| Metrik | Değer |
+| Metric | Value |
 |--------|-------|
-| Sprint | sprint-288 |
-| Toplam Task | 5 |
-| Tamamlanan | 5 |
+| Sprint | sprint-289 |
+| Total Tasks | 5 |
+| Completed | 5 |
 | Tech Debt | 0 |
 | No-Go | 0 |
-| Süre | 7dk 26sn |
+| Duration | 8dk 3sn |
 | Coverage | 0.0% |
 
 ## Active Debt
-_Teknik borç kaydı yok._
+_No tech debt record._
 
 ## Agent Performance
-| Agent | Tasks | Done | Başarı |
+| Agent | Tasks | Done | Success |
 |-------|-------|------|--------|
-| doc-writer | 5 | 5 | 100% |
+| security-auditor | 3 | 3 | 100% |
+| ci-guardian | 1 | 1 | 100% |
+| code-reviewer | 1 | 1 | 100% |
