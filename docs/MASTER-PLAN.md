@@ -1256,4 +1256,25 @@ Items surfaced during the Sprint 211 doc-consolidation audit that were intention
 
 ---
 
+## 18. CORE-UNIFORMITY — Autonomous Core Kernel (2026-06-17, session-emergent, arc: ARC-H + ARC-E)
+
+> Bu iş 2026-06-17 autonomous-dogfood session'ından doğdu. §15 lossless-invariant haritası: CORE-UNIFORMITY → **ARC-H** (Autonomous & Process Mode); routing-bulgusu → **ROUTE-1** (ARC-E); process-executor → **F3-008** (ARC-H). Detay: memory `project_autonomous_first_dogfood_grand_vision`.
+
+**✅ DONE + pushed (main `01d6d3fc`):** CORE-UNIFORMITY **slice 1** — Brain-Eval + Auditor + Cross-Verify + Flow-Reporter `execute-dispatcher` task-path'e wire (sprint ile AYNI core, mod-bağımsız kernel'ler; `src/orchestra/autonomous/backlog-eval.ts` ①②③ + `flow-reporter.ts` ④; reuse, reimplement DEĞİL). + **A** false-NO_GO reconcile (Brain schema-NO_GO + Auditor functional-pass → GO_WITH_TECH_DEBT; review-hardened: yalnız `schemaRejected`, gerçek-kalite-NO_GO değil) + **B** brainAssessment→worker`.result` (selfAssessment yanında) + **2 usability fix** (start banner pending-count/"No pending work" + handlePlan terminal-entry re-queue & honest count). Subagent-driven 8-task + A/B + 6 opus-review + holistik SHIP; 305 test; canlı smoke disk-verified (doc-task DONE + brainAssessment diskte).
+
+**🔴 SIRADAKİ (bu session'da belirlendi — sırayla):**
+- [ ] **ROUTE-1 / "C" — routing-v2 precision** (ARC-E): canlı smoke `assignedAgent:api-builder` (yorum-temizliğine YANLIŞ; code-reviewer/refactorer/code-simplifier olmalı) + `assignedSkills:[]` boş gösterdi. intent-classifier comment/doc→doğru agent + routing-engine-v2 titiz multi-signal scoring. Investigate→spec→plan. (MODEL-GUARD ✅ tier-guard'ı tamamladı; bu, agent/skill **seçim-hassasiyeti**.)
+- [ ] **CORE-UNIFORMITY slice 2 — Lifecycle kernel** (ARC-H 🆕): mod-bağımsız retro/decay/cleanup + autonomous-item'lar arası per-item `.tasks/` hijyen (Alperen-emri: "iş bitip diğerine geçerken .tasks boşalt + retro/decay/cleanup sistematiğe"). Bu slice'ın kurduğu temiz core-sınırının üstüne biner.
+- [ ] **F3-008 — process-mode executor** (ARC-H): `kind=process` şu an honest-fail → mod-geçişi 2/3 (task✅ sprint✅ process🔴). MASTER-PLAN F3-008 Workflow-Composer ile birlikte autonomous-akışına.
+- [ ] **Modularization (core/base/ext/cust→deckent-hub)** — sonraki faz; bu kernel onun ön-koşulu mod-bağımsız çekirdeği kurdu (§8 MOD-SPLIT / ARC-F ön-hazırlık ile uyumlu).
+
+**Minor (tuning, bu session-bulgusu):**
+- [ ] **TOK-AUT** tokenUsage autonomous task-mode `0/0/0` (orchestrator-enrichment autonomous-path'te dolmuyor; WP-4 ailesi).
+- [ ] **ADR-NOISE** `checkADRCompliance` global dependency-count'u (ADR-010) HER autonomous task'ta advisory basıyor (task-spesifik değil → gürültü).
+- [ ] **IDLE-SPIN** autonomous idle busy-spin (gözlenen 57456-cycle, memory GAP) — idle-loop verimliliği doğrulanmalı.
+- [ ] **DOC-35** DECKENT.md "34 tools" vs gerçek **35** (mcp-overview.md koddan 35 türetti, kaynak ground-truth).
+- [ ] **GITIGN-RT** `.deckent/` runtime-state tracked (bot.pid/backlog/pending/loglar) → `git rm --cached` + `.gitignore` (public-repo'da runtime-churn kirliliği).
+
+---
+
 *Single source of truth. Update this document — not the superseded roadmaps — when status changes. New work-items MUST also be assigned to a §15 arc, §16 sub-project, OR §17 SDK arc (lossless-map invariant).*
