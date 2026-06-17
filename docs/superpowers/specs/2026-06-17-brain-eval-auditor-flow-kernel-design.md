@@ -61,12 +61,28 @@ execute-dispatcher (autonomous, kind=task)        sprint-controller (EVALUATE) �
    │     via auditBacklogResult(entry, result, projectRoot)
    │     → AuditVerdict { boundary: clean|violation[], adr: ok|issues, functional: pass|fail }  (advisory)
    ▼
-   ③ Flow-Reporter       = structured step emitter
+   ③ Cross-Verify hook   = runCrossVerify (XVER-1)   [EXISTS — cross-verify-runner.ts; sprint-only today]
+   │     cross-provider: Anthropic worker → OpenAI verifier (mutual); ADVISORY (never a downgrade);
+   │     honest-skip when no 2nd provider; config.cross_verify gated
+   │     → CrossVerifyAdvisory { verdict: confirmed|refuted|unclear }
+   ▼
+   ④ Flow-Reporter       = structured step emitter (reports brain + audit + cross-verify)
          ├─ channel 1: terminal (human-readable debug flow)
          └─ channel 2: JSONL audit-event / event-stream (AI-consumable data)
    ▼
-   persist rich verdict → backlog.lastResult { ok, reason, decision, reconciled, quality, audit }
+   persist rich verdict → backlog.lastResult { ok, reason, decision, reconciled, quality, audit, crossVerify }
 ```
+
+**Binding cross-check rule (memory `feedback_cross_check_anthropic_openai`):** Anthropic's work is
+verified by OpenAI and vice-versa — "brain-eval alone is not enough." XVER-1 exists but is wired ONLY
+into sprint mode; this slice extends it to the autonomous/task path (the rule's explicit "task-moduna
+gerçek-wire et"). Component ③ is therefore not optional polish — it is a binding requirement.
+
+**Dual-perspective (memory `feedback_dual_perspective_dogfood_product`):** every component serves BOTH
+(a) deckent dogfood — deckent's own autonomous runs gain core uniformity — AND (b) deckent product —
+a USER/ENTERPRISE running `deckent autonomous` gets the same Brain + Auditor + cross-provider trust +
+rich flow. The kernels are project-agnostic; the Flow-Reporter's dual channel (human terminal + AI
+JSONL) is the agentic-OS enterprise surface. No MVP — god-level on both faces.
 
 Both kernels already exist and are mode-independent; this slice **wires** them into the autonomous
 task path (the gap) and adds the flow-reporter. Sprint already runs them, so uniformity holds by
@@ -94,7 +110,15 @@ construction — the kernels are the single source for both paths.
   Returns `AuditVerdict { boundary: 'clean' | BoundaryViolation[], adr: 'ok' | string[], functional: 'pass' | 'fail' | 'skipped' }`.
 - **Advisory only** (ADR-037 V1.0): the audit verdict is recorded + surfaced in the flow, but does NOT flip the Brain decision or block dispatch. A boundary violation on an otherwise-GO task stays GO with the violation noted (the human/AI sees it).
 
-## 6. Component ③ — Flow-Reporter (rich debug flow, dual-channel)
+## 5b. Component ③ — Cross-Verify hook (XVER-1, cross-provider — BINDING)
+
+- **Reuse (unchanged):** `runCrossVerify` in `src/orchestra/cross-verify-runner.ts` (XVER-1, ADR-074). It dispatches a SECOND-provider verifier with an adversarial "try to refute" prompt, reads the verifier's verdict, and merges an advisory `crossVerify` field into the task's `.result` — `CrossVerifyAdvisory { verdict: 'confirmed' | 'refuted' | 'unclear' }`. NEVER a downgrade (Brain/human decides). Today it is called only from `sprint-phases.ts`.
+- **New adapter:** `crossVerifyBacklogResult(entry, result, projectRoot, config)` (in `backlog-eval.ts`). Builds the Task-for-eval (same as the Brain adapter) and calls `runCrossVerify`, returning the `CrossVerifyRunResult { ran, advisory?, refuted }`.
+- **Cross-provider, mutual:** the worker provider is Anthropic (claude) → the verifier is OpenAI (codex); an OpenAI worker → an Anthropic verifier. Gated by `config.cross_verify.enabled` (default-off today — this slice activates it for the autonomous path) and `high_stakes_only`. **Honest-skip** when no second provider is configured/available (`ran: false` surfaced in the flow — never a silent pass).
+- **Advisory only:** the `crossVerify` verdict is recorded + flow-reported; a `refuted` verdict does NOT flip the Brain decision or block — it flags the result for Brain/human review (per the memory: "advisory; Brain/insan decides"). `refuted` is surfaced prominently in the flow + persisted.
+- **Why binding:** memory `feedback_cross_check_anthropic_openai` — "brain-eval tek başına yetmez"; same-family models cannot audit their own blind spots. Cross-provider verification is required for a while, and this is the wire that brings it to the autonomous/task path (not just sprint).
+
+## 6. Component ④ — Flow-Reporter (rich debug flow, dual-channel)
 
 A structured step emitter `makeFlowReporter({ print, audit, projectRoot })` producing one event per
 orchestration step, on two channels:
@@ -125,23 +149,28 @@ lastResult: {
   reconciled?: boolean;                               // was self-report overridden by disk-verify
   quality?: number;                                   // rubric/quality score
   audit?: { boundary: 'clean' | string[]; adr: 'ok' | string[]; functional: 'pass' | 'fail' | 'skipped' };
+  crossVerify?: { ran: boolean; verdict?: 'confirmed' | 'refuted' | 'unclear' };  // XVER-1 cross-provider (advisory)
 } | null
 ```
 
-Mapping to backlog status: `GO` / `GO_WITH_TECH_DEBT` → `done`; `NO_GO` → `failed`. `backlog list` /
-status surface the decision + reconciled + quality + audit so "Brain analyzed the work and the
-worker" is visible.
+Mapping to backlog status: `GO` / `GO_WITH_TECH_DEBT` → `done`; `NO_GO` → `failed`. The Auditor and
+cross-verify verdicts are ADVISORY — they are surfaced + persisted but never flip the status (a
+`refuted` cross-verify or a boundary violation on an otherwise-GO task stays `done`, flagged for
+review). `backlog list` / status surface decision + reconciled + quality + audit + crossVerify so
+"Brain analyzed the work and the worker, and a second provider cross-checked it" is visible.
 
 ## 8. The wire (execute-dispatcher, task branch)
 
-After `waitForResult` (+ the existing grace re-poll), when a `result` is present:
+After `waitForResult` (+ the existing grace re-poll), when a `result` is present, in order:
 1. `flow.step('brain_verdict', …)` → `const evaluation = evaluateBacklogResult(live, result, projectRoot)`.
 2. `flow.step('audit_verdict', …)` → `const audit = await auditBacklogResult(live, result, projectRoot)`.
-3. `ok = evaluation.decision !== 'NO_GO'`; `reason = evaluation.reason`.
-4. `updateStatus(..., ok ? 'done' : 'failed', { ok, reason, decision, reconciled, quality, audit })`.
-5. `flow.step(ok ? 'done' : 'failed', …)`.
-Capability/process/sprint branches keep their current behavior (sprint already evaluates; capability
-uses the broker audit). The flow-reporter still emits `picked`/`spawned`/`done` for all kinds.
+3. `flow.step('cross_verify', …)` → `const xv = await crossVerifyBacklogResult(live, result, projectRoot, config)` (honest-skip → `ran:false`).
+4. `ok = evaluation.decision !== 'NO_GO'`; `reason = evaluation.reason`.
+5. `updateStatus(..., ok ? 'done' : 'failed', { ok, reason, decision, reconciled, quality, audit, crossVerify })`.
+6. `flow.step(ok ? 'done' : 'failed', …)` (a `refuted` cross-verify or a boundary violation is included in the line so the human/AI sees it even on a `done`).
+Capability/process/sprint branches keep their current behavior (sprint already evaluates +
+cross-verifies; capability uses the broker audit). The flow-reporter still emits `picked`/`spawned`/
+`done` for all kinds.
 
 ## 9. Testing (TDD, hermetic)
 
@@ -150,8 +179,12 @@ uses the broker audit). The flow-reporter still emits `picked`/`spawned`/`done` 
   clean DONE → GO; genuine NO_GO (no work) → failure. Inject/stub the disk-verify where needed.
 - **Auditor adapter:** `auditBacklogResult` flags an out-of-scope `filesChanged` as a boundary
   violation; an in-scope clean result → `boundary: 'clean'`.
-- **Flow-Reporter:** emits the expected ordered step records on both channels (capture via an
-  injected `print` + `audit` sink).
+- **Cross-Verify adapter:** `crossVerifyBacklogResult` returns `ran:false` (honest-skip) when no
+  second provider is configured; with a stubbed `runCrossVerify`, a `refuted` advisory is surfaced +
+  persisted but does NOT flip the status (stays `done`). Reuse the existing cross-verify-runner test
+  patterns; the cross-provider spawn is mocked (no live second-provider call in unit tests).
+- **Flow-Reporter:** emits the expected ordered step records (`picked`→`spawned`→`brain_verdict`→
+  `audit_verdict`→`cross_verify`→`done`) on both channels (capture via an injected `print` + `audit` sink).
 - **execute-dispatcher integration:** a finished task drives the Brain+Auditor verdict into `ok` +
   the rich `lastResult`, and the flow steps fire. Reuse the existing hermetic dispatcher test setup
   (`execute-dispatcher-jit.test.ts`).
