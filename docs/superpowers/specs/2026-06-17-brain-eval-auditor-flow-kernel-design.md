@@ -90,24 +90,27 @@ construction — the kernels are the single source for both paths.
 
 ## 4. Component ① — Brain-Eval kernel + adapter
 
-- **Kernel (reuse, unchanged):** `evaluateResult(result, task, vitestJsonOutput?, coverageThreshold=90, projectRoot?): TaskEvaluation` in `result-evaluator.ts`. It already does spurious-NO_GO reconciliation (`reconcileSpuriousNoGo`, disk-verify), TIMEOUT_WITH_WORK handling, rubric quality scoring, and the GO/NO_GO/GO_WITH_TECH_DEBT decision.
-- **New adapter:** `evaluateBacklogResult(entry: BacklogEntry, result: TaskResult, projectRoot: string): TaskEvaluation` (new module `src/orchestra/autonomous/backlog-eval.ts`). Builds a minimal `Task` from the entry:
+- **Kernel (reuse, unchanged):** `evaluateWithRubric(result, task, rubric?, projectRoot?): EvaluationResult` in `result-evaluator.ts`. This is the **non-deprecated** evaluation path sprint mode uses; it already does rubric quality scoring (`totalScore` + `rubricScores`), spurious-NO_GO reconciliation (`reconcileRubricNoGo` + `reconcileSpuriousNoGo`, disk-verify), OOM-kill recovery, and the GO/NO_GO/GO_WITH_TECH_DEBT decision. (The older `evaluateResult` returns a bare `TaskEvaluation` enum and is `@deprecated` — do NOT use it; it would discard the quality + reconciliation surfacing this slice needs.) `EvaluationResult = { decision: 'DONE'|'GO_WITH_TECH_DEBT'|'NO_GO'; totalScore: number; rubricScores: RubricScore[]; retryCount: number }`.
+- **New adapter:** `evaluateBacklogResult(entry: BacklogEntry, result: TaskResult, projectRoot: string): BacklogEvaluation` (new module `src/orchestra/autonomous/backlog-eval.ts`). Builds a minimal `Task` from the entry (shared `buildTaskForEval(entry, result)` helper, reused by all three adapters):
   - `id` = `result.taskId` (the run-id) || `entry.id`
   - `description` = `entry.spec.description` (JIT detail) ?? `entry.summary` ?? `entry.title`
   - `scope` = `{ directories: [entry.spec.scopeDir ?? '.'], filesRead: [], filesWrite: [] }`
   - `goNogo` = `{ goCriteria: entry.summary ?? entry.title, noGoCriteria: '', techDebtAcceptable: '' }` (the planner emits no explicit goNogo; the decision is driven by selfAssessment + reconciliation + disk-verify, not goNogo text)
-  - `provider`/`model` from `entry`/`result`
-  Then calls `evaluateResult(result, task, undefined, /*coverage*/ 90, projectRoot)` and returns the `TaskEvaluation`.
+  - `provider`/`model` from `entry`/`result`; remaining required `Task` fields filled with neutral defaults (`effort:'normal'`, `priority:'NORMAL'`, `status:'DONE'`, `dependencies:[]`, `reason:''`, `title:entry.title`).
+  Then calls `evaluateWithRubric(result, task, undefined, projectRoot)` and maps the `EvaluationResult` to `BacklogEvaluation = { decision, quality: totalScore, reconciled, reason }` where:
+  - `quality` = `evaluation.totalScore`
+  - `reconciled` = `result.selfAssessment === 'NO_GO' && evaluation.decision !== 'NO_GO'` (derived — the kernel overrides `decision` internally on reconciliation but does not expose a flag; this honest derivation surfaces it)
+  - `reason` = the lowest-scoring rubric criterion's `reason` (most-informative line), or `'all criteria passed'` when none failed.
 - **Why reconciliation matters:** a worker that self-reported NO_GO/TIMEOUT but whose git diff shows real work is reconciled to GO_WITH_TECH_DEBT — "Brain understands the worker correctly." This subsumes the grace re-poll's intent properly (the grace re-poll catches the late *write*; reconciliation catches the wrong *self-report*; both are kept and complementary).
 
 ## 5. Component ② — Auditor kernel (post-execution, advisory)
 
 - **Reuse (unchanged):** `checkBoundaryViolations` (detects `file_outside_scope`), `checkADRCompliance`, `verifyWorkerResult` in `monitor/auditor.ts`.
-- **New adapter:** `auditBacklogResult(entry: BacklogEntry, result: TaskResult, projectRoot: string): AuditVerdict` — lives in the SAME new module `src/orchestra/autonomous/backlog-eval.ts` alongside `evaluateBacklogResult` (both are thin entry→kernel adapters; one focused module). Runs:
-  - **boundary** — are `result.filesChanged` within `entry.spec.scopeDir`? Reuse `checkBoundaryViolations` against the entry's scope. Out-of-scope writes → `violation[]`.
-  - **adr** — `checkADRCompliance` on the result/task.
-  - **functional** — `verifyWorkerResult` (when applicable; async).
-  Returns `AuditVerdict { boundary: 'clean' | BoundaryViolation[], adr: 'ok' | string[], functional: 'pass' | 'fail' | 'skipped' }`.
+- **New adapter:** `auditBacklogResult(entry, result, projectRoot, deps?): Promise<AuditVerdict>` — lives in the SAME new module `src/orchestra/autonomous/backlog-eval.ts` alongside `evaluateBacklogResult` (both are thin entry→kernel adapters; one focused module). Runs:
+  - **boundary** — are `result.filesChanged` within `entry.spec.scopeDir`? Reuse the auditor's canonical scope primitive `isFileInScope` (newly `export`ed from `monitor/auditor.ts`) over `result.filesChanged` — the worker's declared changes are the post-hoc ground truth. (The `checkBoundaryViolations` wrapper is git-`diff --stat`-based and sprint-scan-specific; reusing its inner `isFileInScope` is the faithful, hermetic adaptation for the post-execution autonomous path.) Out-of-scope files → `BoundaryViolation[]`.
+  - **adr** — `checkADRCompliance(projectRoot, result.filesChanged)` → `ADRViolation[]` (hermetic by default: absent `.brain/memory.db` → `[]` → `adr:'ok'`).
+  - **functional** — `verifyWorkerResult(taskId, projectRoot, result)` (async). Injected via `deps.verifyFunctional` (default = real `verifyWorkerResult`) so unit tests stay hermetic. Map `VerificationVerdict`: `'PASS'→'pass'`, `'FAIL'→'fail'`, `'DOWNGRADE'→'fail'`.
+  Returns `AuditVerdict { boundary: 'clean' | BoundaryViolation[], adr: 'ok' | ADRViolation[], functional: 'pass' | 'fail' | 'skipped' }`.
 - **Advisory only** (ADR-037 V1.0): the audit verdict is recorded + surfaced in the flow, but does NOT flip the Brain decision or block dispatch. A boundary violation on an otherwise-GO task stays GO with the violation noted (the human/AI sees it).
 
 ## 5b. Component ③ — Cross-Verify hook (XVER-1, cross-provider — BINDING)
