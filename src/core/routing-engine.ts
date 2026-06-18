@@ -31,6 +31,7 @@ import { analyzeSkillInMemory } from '../orchestra/ecosystem-intelligence.js';
 import { resolveComposition } from './skill-selector.js';
 import { modelRegistry } from './model-registry.js';
 import { normalizeTechStack } from './work-model.js';
+import type { TaskKind } from './work-model.js';
 import { getAgentDomain, type AgentDomain } from './agent-pool.js';
 import { debugLog } from './utils.js';
 
@@ -138,6 +139,27 @@ export const TASK_DOMAIN_TO_AGENT_ID: Readonly<Record<string, string>> = {
   helm: 'devops-engineer',
 };
 
+/** ROUTE-1 B2 — intents that mark a task as a TOUCH-UP rather than a surface build.
+ *  For these the path-extracted domain proxy + user-surface bonus are suppressed so a
+ *  comment-sweep / doc edit touching src/api/ is not hijacked by api-builder. The
+ *  intent-driven domain bonus (INTENT_TO_AGENT_DOMAIN, path 1) is NOT affected. */
+const SURFACE_SUPPRESS_INTENTS: ReadonlySet<IntentType> = new Set<IntentType>(['refactor', 'documentation']);
+
+/** ROUTE-1 B2 — canonical TaskKinds (medium axis) that also suppress the path proxy. */
+const SURFACE_SUPPRESS_KINDS: ReadonlySet<TaskKind> = new Set<TaskKind>(['audit', 'documentation']);
+
+/**
+ * True when the task is genuinely building/extending its surface — path-proxy and
+ * user-surface bonuses apply. False for touch-up / non-build work (bonuses suppressed).
+ * OR semantics: suppression fires on either the operation arm (intent) or the medium
+ * arm (taskKind), so a code-development-medium refactor-operation is still suppressed.
+ */
+export function isSurfaceBuildTask(intent: IntentType, taskKind?: TaskKind): boolean {
+  if (SURFACE_SUPPRESS_INTENTS.has(intent)) return false;
+  if (taskKind !== undefined && SURFACE_SUPPRESS_KINDS.has(taskKind)) return false;
+  return true;
+}
+
 /**
  * Return the domain-match bonus for an agent against a task's DNA.
  *
@@ -148,27 +170,33 @@ export const TASK_DOMAIN_TO_AGENT_ID: Readonly<Record<string, string>> = {
  *      TASK_DOMAIN_TO_AGENT_ID for one of the task's extracted domain
  *      names.
  *
- * @param agentId      The agent id being scored.
- * @param agentDomain  The agent's domain (from getAgentDomain).
- * @param taskDNA      The classified task.
+ * @param agentId        The agent id being scored.
+ * @param agentDomain    The agent's domain (from getAgentDomain).
+ * @param taskDNA        The classified task.
+ * @param allowPathProxy When false, path 2 (domain-name proxy) is suppressed;
+ *                       path 1 (intent-driven) always runs. Defaults to true so
+ *                       existing 3-arg callers are byte-for-byte unchanged.
  * @returns DOMAIN_MATCH_BONUS on match, 0 otherwise.
  */
 export function getDomainMatchBonus(
   agentId: string,
   agentDomain: AgentDomain | 'generic',
   taskDNA: TaskDNA,
+  allowPathProxy: boolean = true,
 ): number {
-  // Path 1: intent → agent domain
+  // Path 1: intent → agent domain (intent-driven, always honoured).
   const targetDomain = INTENT_TO_AGENT_DOMAIN[taskDNA.intent.primary];
   if (targetDomain && agentDomain === targetDomain) {
     return DOMAIN_MATCH_BONUS;
   }
 
-  // Path 2: extracted task domain name → specific agent id
-  for (const domain of taskDNA.domains) {
-    const expectedAgent = TASK_DOMAIN_TO_AGENT_ID[domain.name.toLowerCase()];
-    if (expectedAgent && expectedAgent === agentId) {
-      return DOMAIN_MATCH_BONUS;
+  // Path 2: extracted task domain name → specific agent id (path proxy, gated).
+  if (allowPathProxy) {
+    for (const domain of taskDNA.domains) {
+      const expectedAgent = TASK_DOMAIN_TO_AGENT_ID[domain.name.toLowerCase()];
+      if (expectedAgent && expectedAgent === agentId) {
+        return DOMAIN_MATCH_BONUS;
+      }
     }
   }
 
