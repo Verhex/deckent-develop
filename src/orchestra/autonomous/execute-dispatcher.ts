@@ -284,7 +284,14 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
             if (result) {
               // TOK-AUT: mirror the sprint path (result-collector.ts:632) — fill tokenUsage
               // from measured CLI log tokens when available; honest-zero when not (WP-4).
-              enrichResultTokenUsage(result, undefined, deps.projectRoot);
+              // Best-effort: token enrichment must NEVER fail the task — a throw here was
+              // caught by the dispatch try/catch and flipped a completed task to 'failed'
+              // (Sprint 290 regression, found via process-controller.test.ts reversible-scope).
+              try {
+                enrichResultTokenUsage(result, undefined, deps.projectRoot);
+              } catch (e) {
+                console.warn(`[execute-dispatcher] token enrichment failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);
+              }
               // CORE-UNIFORMITY: a finished autonomous task passes through the SAME
               // Brain-Eval + Auditor + Cross-Verify sprint mode applies (mode-independent
               // kernels). The Auditor + cross-verify verdicts are ADVISORY (never flip the

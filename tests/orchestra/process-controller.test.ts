@@ -37,6 +37,12 @@ function deps(overrides: Partial<ProcessControllerDeps> = {}): ProcessController
         error: 'write denied by mock',
       }),
     } as unknown as ProcessControllerDeps['capabilityRegistry'],
+    // CORE-UNIFORMITY: the autonomous task path now runs the Brain-Eval/Auditor/Cross-Verify
+    // kernels (execute-dispatcher.ts). This is a process-controller POLICY test — mock the
+    // downstream verdicts (a real eval NO_GOs the evidence-less mock result → false 'failed').
+    evaluate: (() => ({ decision: 'DONE', quality: 100 })) as unknown as ProcessControllerDeps['evaluate'],
+    audit: (async () => ({ boundary: 'clean', adr: 'ok', functional: 'pass' })) as unknown as ProcessControllerDeps['audit'],
+    crossVerify: (async () => ({ ran: false })) as unknown as ProcessControllerDeps['crossVerify'],
     idGen: () => `proc-${++n}`,
     ...overrides,
   };

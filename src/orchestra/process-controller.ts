@@ -76,7 +76,7 @@ export interface ProcessRecord {
 }
 
 export interface ProcessControllerDeps
-  extends Pick<ExecuteDispatcherDeps, 'projectRoot' | 'config' | 'runTask' | 'runSprint' | 'waitForResult' | 'resultTimeoutMs' | 'capabilityRegistry'> {
+  extends Pick<ExecuteDispatcherDeps, 'projectRoot' | 'config' | 'runTask' | 'runSprint' | 'waitForResult' | 'resultTimeoutMs' | 'capabilityRegistry' | 'evaluate' | 'audit' | 'crossVerify'> {
   /** Durable backlog the submitted entry is appended to (and queried from). */
   backlogPath: string;
   /** Unique execution-id generator (injected for deterministic tests). */
@@ -167,6 +167,12 @@ export function makeProcessController(deps: ProcessControllerDeps): ProcessContr
         waitForResult: deps.waitForResult,
         ...(deps.resultTimeoutMs !== undefined ? { resultTimeoutMs: deps.resultTimeoutMs } : {}),
         ...(deps.capabilityRegistry ? { capabilityRegistry: deps.capabilityRegistry } : {}),
+        // CORE-UNIFORMITY: forward the injectable Brain-Eval/Auditor/Cross-Verify kernels so
+        // callers + tests can override them. Production omits them → the dispatcher uses its
+        // real defaults (evaluateBacklogResult/auditBacklogResult/crossVerifyBacklogResult).
+        ...(deps.evaluate ? { evaluate: deps.evaluate } : {}),
+        ...(deps.audit ? { audit: deps.audit } : {}),
+        ...(deps.crossVerify ? { crossVerify: deps.crossVerify } : {}),
       });
       const outcome = (await dispatcher(AUTONOMOUS_EXECUTE_ACTION, { entry })) as {
         outcome: 'success' | 'failure';
