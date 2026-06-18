@@ -1456,6 +1456,24 @@ const MESSAGES: MessageMap = {
     en: 'Is there a 10x simpler alternative that gets 80% of the value at 10% of the effort?',
     tr: 'Çabanın %10\'uyla değerin %80\'ini sağlayan 10 kat daha basit bir alternatif var mı?',
   },
+
+  // ─── docs track command (ADR-090) ───────────────────────────────────────
+  'docs.track.scanned': {
+    en: 'Scanned {count} docs ({stale} need attention).',
+    tr: '{count} doküman tarandı ({stale} dikkat gerektiriyor).',
+  },
+  'docs.track.none': {
+    en: 'No tracked docs found.',
+    tr: 'İzlenen doküman bulunamadı.',
+  },
+  'docs.track.header': {
+    en: 'rank  state           score  path',
+    tr: 'kod   durum           skor   yol',
+  },
+  'docs.track.synced': {
+    en: 'Synced {count} docs to memory.db (no front-matter written).',
+    tr: '{count} doküman memory.db ile senkronlandı (front-matter yazılmadı).',
+  },
 };
 
 /**

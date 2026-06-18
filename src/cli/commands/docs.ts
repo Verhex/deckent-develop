@@ -9,6 +9,41 @@ import { runManagedDocUpdates, buildStandaloneDocContext } from '../../orchestra
 import { clearDocCache } from '../../orchestra/managed-docs/doc-cache.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { loadDocTrackingConfig } from '../../core/doc-tracking/config.js';
+import { scanDocs } from '../../core/doc-tracking/scanner.js';
+import { DocTrackingStore } from '../../core/doc-tracking/store.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
+
+// ─── doc-tracking handlers (ADR-090; exported for testability) ─────────────
+export async function runDocsTrackScan(
+  root: string,
+  opts: { write: boolean; prune: boolean },
+): Promise<{ count: number; stale: number }> {
+  const config = loadDocTrackingConfig(root);
+  const store = new DocTrackingStore(join(root, '.brain/memory.db'));
+  try {
+    const { records } = await scanDocs(root, config, store, { write: opts.write, prune: opts.prune });
+    const stale = records.filter(r => r.state === 'STALE' || r.state === 'CRITICAL_STALE').length;
+    return { count: records.length, stale };
+  } finally {
+    store.close();
+  }
+}
+
+export function runDocsTrackStatus(
+  root: string,
+  filter: { stale: boolean; rank?: number },
+): Array<{ doc_rank: number; state: string; priority_score: number; path: string }> {
+  const store = new DocTrackingStore(join(root, '.brain/memory.db'));
+  try {
+    return store.getAll()
+      .filter(r => (filter.stale ? r.state === 'STALE' || r.state === 'CRITICAL_STALE' || r.state === 'DRIFT' : true))
+      .filter(r => (filter.rank === undefined ? true : r.doc_rank <= filter.rank))
+      .map(r => ({ doc_rank: r.doc_rank, state: r.state, priority_score: r.priority_score, path: r.path }));
+  } finally {
+    store.close();
+  }
+}
 
 export function registerDocs(program: Command): void {
   const docs = program
@@ -153,5 +188,48 @@ export function registerDocs(program: Command): void {
         }
       }
       print(`\nDone. ${results.filter(r => r.updated).length}/${results.length} docs updated.`);
+    });
+
+  // ─── docs track (ADR-090) ─────────────────────────────────────────────
+  const track = docs.command('track').description('Track doc freshness (hash + DCR + stale)');
+
+  track
+    .command('scan')
+    .description('Hash + timestamp + rank all docs; write front-matter; sync memory.db')
+    .option('--no-write', 'Do not modify front-matter (DB-only)')
+    .option('--prune', 'Remove records for deleted docs')
+    .action(async (opts: { write: boolean; prune?: boolean }) => {
+      const root = resolveProjectRoot();
+      const lang = getLanguage();
+      const { count, stale } = await runDocsTrackScan(root, { write: opts.write, prune: !!opts.prune });
+      print(getMessage('docs.track.scanned', lang, { count: String(count), stale: String(stale) }));
+    });
+
+  track
+    .command('status')
+    .description('Report tracked docs by rank + stale state')
+    .option('--stale', 'Only DRIFT/STALE/CRITICAL_STALE')
+    .option('--rank <n>', 'Only docs with doc_rank <= n', parseInt)
+    .option('--json', 'Raw JSON output')
+    .action((opts: { stale?: boolean; rank?: number; json?: boolean }) => {
+      const root = resolveProjectRoot();
+      const lang = getLanguage();
+      const rows = runDocsTrackStatus(root, { stale: !!opts.stale, rank: opts.rank });
+      if (opts.json) { print(JSON.stringify(rows, null, 2)); return; }
+      if (rows.length === 0) { print(getMessage('docs.track.none', lang)); return; }
+      print(getMessage('docs.track.header', lang));
+      for (const r of rows) {
+        print(`${String(r.doc_rank).padEnd(5)} ${r.state.padEnd(15)} ${String(Math.round(r.priority_score)).padEnd(6)} ${r.path}`);
+      }
+    });
+
+  track
+    .command('sync')
+    .description('Update memory.db only (no front-matter writes)')
+    .action(async () => {
+      const root = resolveProjectRoot();
+      const lang = getLanguage();
+      const { count } = await runDocsTrackScan(root, { write: false, prune: false });
+      print(getMessage('docs.track.synced', lang, { count: String(count) }));
     });
 }
