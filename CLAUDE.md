@@ -21,6 +21,19 @@ MVP ve temel seviye iş ve işçilik planlamıyorum. Her zaman milyonlarca kişi
 - **Riskli/görsel kod kör-default-on edilmez** — flag-gated + doğrula, sonra default.
 - Şüphe varsa: "Bu god-level/enterprise mi, i18n-temiz mi, borç bırakıyor mu?" diye sor — sonra yaz.
 
+## ⚖️ Bağlayıcı Operasyon Kuralları (memory-promoted — her oturum geçerli)
+Auto-memory lazy yüklenir (topic dosyaları yalnız okunca gelir); bu yüzden gerçekten-bağlayıcı kurallar buraya terfi edildi (her oturum garanti). Detay: `~/.claude/projects/.../memory/`.
+- **Türkçe konuş** (Alperen) — anlatım TR, kod/komut/teknik terim EN.
+- **Çift-bakış zorunlu** — her işte deckent-dogfood + deckent-product (user/enterprise).
+- **Sprint'i Alperen onayı olmadan kill/cleanup ETME**; `rm .tasks/*` YASAK.
+- **`.brain/memory.db` ASLA silinmez** — tüm Brain knowledge orada.
+- **Sprint çalışırken `npm run build` ve `/login` YASAK** (ESM cache + worker auth-loss); build sonrası `/mcp restart` Alperen yapar.
+- **Commit/push öncesi `git branch -vv`** — shared-worktree HEAD-drift; başka oturumun commit'ini bozma; commit yalnız Alperen isteyince.
+- **Sprint'ler CLI'dan** (`env -u ANTHROPIC_API_KEY deckent …`), MCP'den start/run/plan değil.
+- **Disk-verify ground truth** — Brain sentetik NO_GO'ya güvenme; `git diff --stat`/`git ls-files` ile doğrula.
+- **haiku yalnız doc** — kod/tsx'e route etme.
+- **İş-takip SSOT** = `docs/MASTER-PLAN.md` §10 + memory `work_tracking_ledger`; aktif öncelikler MEMORY.md tepesinde pinned.
+
 ## Rules
 @DIRECTIVES.md
 @.brain/exports/summary.md
@@ -111,13 +124,13 @@ Komutlar: `deckent status`, `deckent history`, `deckent retro`, `deckent recall 
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-289 |
-| Total Tasks | 5 |
-| Completed | 5 |
-| Tech Debt | 0 |
+| Sprint | sprint-290 |
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 1 |
 | No-Go | 0 |
-| Duration | 8dk 3sn |
-| Coverage | 0.0% |
+| Duration | 27dk 31sn |
+| Coverage | N/A |
 
 ## Active Debt
 _No tech debt record._
@@ -125,6 +138,6 @@ _No tech debt record._
 ## Agent Performance
 | Agent | Tasks | Done | Success |
 |-------|-------|------|--------|
-| security-auditor | 3 | 3 | 100% |
-| ci-guardian | 1 | 1 | 100% |
-| code-reviewer | 1 | 1 | 100% |
+| refactorer | 2 | 2 | 100% |
+| bug-fixer | 3 | 3 | 100% |
+| doc-writer | 1 | 1 | 100% |
