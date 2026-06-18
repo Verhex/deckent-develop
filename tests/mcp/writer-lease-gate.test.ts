@@ -50,6 +50,12 @@ describe('isWriteCall', () => {
     expect(isWriteCall('deckent_docs', { action: 'list' })).toBe(false);
     expect(isWriteCall('deckent_docs', { action: 'track-scan' })).toBe(true);
   });
+  it('autonomous approve/reject are writes; status/backlog_list are reads', () => {
+    expect(isWriteCall('deckent_autonomous', { action: 'approve' })).toBe(true);
+    expect(isWriteCall('deckent_autonomous', { action: 'reject' })).toBe(true);
+    expect(isWriteCall('deckent_autonomous', { action: 'status' })).toBe(false);
+    expect(isWriteCall('deckent_autonomous', { action: 'backlog_list' })).toBe(false);
+  });
 });
 
 describe('buildLeaseDenialResponse', () => {
