@@ -2,14 +2,18 @@
  * MCP writer-lease (MCP-W1). Project-scoped single-writer lease so that, while
  * every IDE window boots its own MCP server (reads everywhere), mutating tools
  * are serialized to one window. The lease auto-transfers when the owner exits
- * (dead pid) or goes stale (no heartbeat past ttl). Mirrors the O_EXCL +
- * pid-liveness pattern of file-lock.ts / the retired server-singleton-lock.ts.
+ * (dead pid) or goes stale (no heartbeat past ttl). Reuses the pid-liveness
+ * pattern of file-lock.ts / the retired server-singleton-lock.ts; acquire,
+ * refresh, and steal all use a plain overwrite (corrupt-as-free handles the
+ * rare write race), and the lease is advisory — the deep sprint-lock backstops
+ * the only dangerous op.
  */
 import {
   mkdirSync, readFileSync, unlinkSync, writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { DECKENT_DIR } from '../core/constants.js';
+import { debugLog } from '../core/utils.js';
 
 export const DEFAULT_WRITER_LEASE_TTL_MS = 120_000;
 const LEASE_FILE = 'mcp-writer.lease';
@@ -105,8 +109,11 @@ export function releaseWriterLease(projectRoot: string): void {
   try {
     unlinkSync(leasePathFor(projectRoot));
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
-      // best-effort: never throw from release
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== 'ENOENT') {
+      // Best-effort: never throw from release, but surface a non-ENOENT
+      // failure (e.g. EPERM/EBUSY) so a stuck lease is debuggable.
+      debugLog('writer-lease:release', `failed to remove lease: ${String(err)}`);
     }
   }
 }
