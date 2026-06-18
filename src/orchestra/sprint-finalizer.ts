@@ -68,6 +68,7 @@ import { buildResultsMap } from './result-collector.js';
 
 // ─── Debt Manager ─────────────────────────────────────────────────
 import { runDecay, auditBrainBudget } from './debt-manager.js';
+import { runDocTrackingSync } from '../core/doc-tracking/sync.js';
 
 // ─── Observability ────────────────────────────────────────────────
 import { generateLoadReport, initObservability } from '../core/observability.js';
@@ -566,6 +567,25 @@ export function runBudgetedDecay(
   } catch (e) { debugLog('runBudgetedDecay', e); }
 }
 
+/**
+ * ADR-090 doc-tracking sync hook. Gated on config.doc_tracking.sync_on_finalize
+ * (default OFF — no surprise overhead). DB-only (no front-matter writes).
+ * Fail-safe: any error is swallowed (debugLog) so it can never break finalize.
+ */
+export async function maybeRunDocTrackingSync(
+  projectRoot: string,
+  config: { doc_tracking?: { sync_on_finalize?: boolean } } | undefined,
+): Promise<{ ran: boolean; count?: number }> {
+  if (config?.doc_tracking?.sync_on_finalize !== true) return { ran: false };
+  try {
+    const { count } = await runDocTrackingSync(projectRoot);
+    return { ran: true, count };
+  } catch (e) {
+    debugLog('finalizeSprint:docTrackingSync', e);
+    return { ran: true };
+  }
+}
+
 
 // ═══ Finalize Sprint ══════════════════════════════════════════════
 
@@ -855,6 +875,13 @@ export async function finalizeSprint(
       decaySprints: opts?.config?.decay_after_sprints,
     });
   }
+
+  // 7b. ADR-090 doc-tracking sync (gated, fail-safe — never breaks finalize)
+  debugLog('finalizeSprint:breadcrumb', 'doc-tracking sync hook — entering');
+  try {
+    const dtRes = await maybeRunDocTrackingSync(projectRoot, opts?.config);
+    if (dtRes.ran) debugLog('finalizeSprint:docTrackingSync', `synced ${dtRes.count ?? '?'} docs`);
+  } catch (e) { debugLog('finalizeSprint:docTrackingSync', e); }
 
   // 8. Run afterSprint plugin hooks
   if (!opts?.skipHooks) {

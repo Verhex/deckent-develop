@@ -514,6 +514,13 @@ export interface DeckentConfig {
   /** Worker-to-worker communication configuration (Sprint 278 COMM-1). Default-disabled (opt-in). */
   worker_comms?: WorkerCommsConfig;
 
+  // ─── Doc-Tracking (ADR-090) ──────────────────────────────────────────
+  /** Doc-tracking options. */
+  doc_tracking?: {
+    /** Run a DB-only doc-tracking sync at sprint finalize (default: false). */
+    sync_on_finalize?: boolean;
+  };
+
   // ─── Cost Guard ──────────────────────────────────────────────────────
   /** Mid-sprint token-usage abort guard (Sprint 279 WK-cost). Default-disabled (opt-in). */
   cost_guard?: CostGuardConfig;
@@ -851,6 +858,11 @@ export interface ResolvedConfig {
   cross_verify?: CrossVerifyConfig;
   /** Worker-to-worker communication configuration (passed through from DeckentConfig). Default-disabled. */
   worker_comms?: WorkerCommsConfig;
+  /** Doc-tracking options (passed through from DeckentConfig, ADR-090). */
+  doc_tracking?: {
+    /** Run a DB-only doc-tracking sync at sprint finalize (default: false). */
+    sync_on_finalize?: boolean;
+  };
   /** Mid-sprint cost guard configuration (passed through from DeckentConfig). Default-disabled. */
   cost_guard?: CostGuardConfig;
   /** Observability configuration (passed through from DeckentConfig) */
