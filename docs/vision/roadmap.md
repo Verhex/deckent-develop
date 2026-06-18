@@ -49,6 +49,30 @@ The maturity gap is expected. Building the Developer face first forced the engin
 
 ---
 
+## Three Faces, One Engine — The Trinity
+
+> **"Deckent will be an AI Assistant, an AI System Worker, and an AI Developer. Companies, developers, and everyday people will all be able to use it. This has always been the goal."** — Alperen, 2026-05-20
+
+Deckent is **three things in one**, served by the **same engine** (Brain + MCP tools + Memory + Agent pool + Nervous System + Hybrid Mode).
+
+| Face | Audience | What it does | Mode |
+|------|----------|---------------|------|
+| **AI Assistant** | Everyday people — students, freelancers, household users, anyone with a goal and a question | Conversational planning, reminders, personal memory, day-to-day workflow help | Chat Mode |
+| **AI System Worker** | Companies — operations, IT, finance, customer experience, any vertical department | Business automation, system integration, scheduled flows, audited execution, long-running background tasks | Process Mode |
+| **AI Developer** | Builders — solo developers, teams, agencies | Sprint orchestration, multi-agent execution, quality gates, retrospective learning, refactor and review | Sprint Mode |
+
+These are **not three products**. They are **three modes of the same product**. The same MCP tools that orchestrate a developer's sprint also automate a company's reporting job and answer an everyday user's question. The Hybrid Mode architecture (ADR-042) anticipated this from the start: Sprint Mode and Task Mode are shipping today; Chat Mode and Process Mode complete the trinity.
+
+**Today's maturity is uneven, and that is honest:**
+
+- **AI Developer** is ~95% — 170+ sprints of dogfooding, beta-ready for 1 June 2026.
+- **AI System Worker** is ~50% — MCP server and multi-tenant isolation in flight (Sub-project #3), enterprise integrations and scheduled-flow dashboards on the horizon.
+- **AI Assistant** is ~25% — memory and nervous system are ready, the conversational shell decision is pending (see *Conversational Shell — Direction Under Consideration* below).
+
+The maturity gap is expected. Building the Developer face first forced the engine to become real — the same engine that will run the other two faces. **The goal has always been all three.**
+
+---
+
 ## The Four Immovable Principles
 
 These principles define what Deckent is. They are not slogans — they are architectural constraints that shape every feature decision. See ADR-033 for the formal record.
@@ -146,6 +170,41 @@ Whatever surface you use, the conversational shell does not change Deckent's ide
 - **Still free, forever.** Conversational mode is not a "pro" tier — it ships in the same MIT package as everything else.
 - **Still terminal-first.** `deckent` in any terminal must produce the same result as the dashboard surface.
 - **Still verifiable.** Every tool call the model makes is the same MCP tool a human would call from the CLI — auditable, reproducible, no hidden orchestration.
+
+---
+
+## Conversational Shell — Direction Under Consideration
+
+> **Status:** Pending architecture decision (recorded 2026-05-20). Three viable paths are documented in `docs/ROADMAP-GOD-LEVEL.md` ⚡ 2026-05-20 (Discussion) with verified code-level inventory. This section captures the product-vision framing; the decision itself is open.
+
+Today Deckent works through imperative CLI commands and an MCP server (27+ tools). A developer types `deckent init && deckent plan && deckent start`, and orchestration runs. For users who already speak fluent CLI, this is fast. For users who want to *chat* — to describe what they want and let Deckent figure out which commands to invoke — there is a missing layer.
+
+**The question is not whether Deckent should support conversational interaction.** The MCP server already makes every command callable from Claude Code, Cursor, and VS Code. **The question is whether Deckent should ship its own native conversational shell** — `deckent chat` — so that a user with nothing but Deckent installed can have the same experience without depending on a host LLM CLI.
+
+### Three architectural paths, captured for later decision
+
+**Path A — Build on the embedded terminal (Sprint 175).** Add a `DeckentChatBackend` that reuses the PTY/WS gateway/auth/audit infrastructure shipped in Sprint 175. A "Deckent" tab in the dashboard becomes a native chat surface; the CLI variant of `deckent chat` calls the same backend without the embedded shell. ~600 LoC, no new dependencies, multi-tenant compatible by inheritance from the terminal stack.
+
+**Path B — Host the user's existing AI CLI.** `deckent chat` spawns the user's installed `claude`, `codex`, or `gemini` CLI as a subprocess, auto-attaching the Deckent MCP server. The host CLI runs the tool-use loop; Deckent provides MCP and pty forwarding. ~150 LoC, ships fastest, but requires at least one external AI CLI on the user's machine.
+
+**Path C — Native SDK with its own REPL.** Deckent uses the Anthropic, OpenAI, and Google SDKs directly to run a tool-use loop in a custom REPL. The provider abstraction migrates from CLI shell-out to native SDK. ~1500 LoC plus migration, and an amendment to ADR-010 (single-runtime-dependency), but the only path that lets `npx deckent` chat from a fresh machine with zero external CLI prerequisites.
+
+### Why this is a real strategic choice, not a technical detail
+
+Each path makes a different bet about who the user is. **Path B trusts** that any user serious enough to install Deckent already has `claude` or `codex` locally — a reasonable assumption today, increasingly safe over time. **Path A bets** on the dashboard becoming the primary surface where conversational interaction lives — a continuation of the Sprint 175 web-terminal investment. **Path C** is the only path that survives the install-and-run principle (ADR-033) with no caveats: a fresh machine, one `npx deckent`, and conversation starts immediately, regardless of what AI CLIs are installed.
+
+The three paths do not conflict. A natural sequence is **B → A → C**: ship the lightest path so the public beta has a working `deckent chat`, layer the dashboard-native experience as Sprint 175 sub-projects close out, and migrate to native SDK chat in Q3 2026 when the provider abstraction is mature enough to absorb the SDK transition.
+
+### What stays decided
+
+Whichever path is chosen, the conversational shell does not change Deckent's identity:
+
+- **Still a product, not a service.** The chat runs locally; no Deckent-controlled endpoint is involved (ADR-033).
+- **Still free, forever.** Conversational mode is not a "pro" tier — it ships in the same MIT package as everything else.
+- **Still terminal-first.** A `deckent chat` in any terminal must produce the same result as the dashboard tab.
+- **Still verifiable.** Every tool call the LLM makes is the same MCP tool a human would call from the CLI — auditable, reproducible, no hidden orchestration.
+
+The decision is documented but not made. See `docs/ROADMAP-GOD-LEVEL.md` ⚡ 2026-05-20 (Discussion) for the full architectural comparison and verified inventory of existing building blocks.
 
 ---
 

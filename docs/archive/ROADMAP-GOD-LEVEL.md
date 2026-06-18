@@ -289,6 +289,57 @@ Referans memory'ler: `project_deckent_trinity_anchor` (canonical), `feedback_dec
 
 ---
 
+## ⚡ 2026-05-20 (Trinity Vision Anchor — "Hedefimiz Her Zaman Bu")
+
+Alperen kanonik beyan (2026-05-20): **"Deckent hem AI asistan hem AI system worker hem AI developer olacak. Hem şirketler, hem geliştiriciler, hem de sade kişiler Deckent'i kullanabilecek. Hedefimiz her zaman bu."**
+
+Bu, "Deckent sadece dev tool" / "Deckent sadece enterprise SaaS" / "Deckent sadece kişisel asistan" çerçevelemelerinin **hepsini reddeden** üst-anchor. Mevcut motor (Brain + MCP 27 tool + Memory V2 + 15 agent + 21 skill + Nervous System + Hybrid Mode ADR-042) **zaten 3 yüzü taşıyacak şekilde kurulu**.
+
+### Trinity Matris (tek motor, 3 yüz, 3 kitle)
+
+| Yüz | Kitle | İşlev özü | Mode (ADR-042 üzerinden) | Olgunluk |
+|-----|-------|-----------|---------------------------|----------|
+| **AI Asistan** | Sade kişiler (öğrenci/freelancer/ev/günlük) | Conversational + planlama + hatırlatma + kişisel hafıza | **Chat Mode** (yeni, conversational shell Yol A/B/C karar bekliyor) | ~%25 (memory + nervous hazır, REPL eksik) |
+| **AI System Worker** | Şirketler (operasyon/IT/finans/CX/vertical) | İş otomasyonu + sistem entegrasyonu + scheduled flow + audit chain | **Process Mode** (Sub-project #3 multi-tenant + scheduled flows dashboard ile) | ~%50 (MCP + multi-tenant inşaada, enterprise entegrasyonu eksik) |
+| **AI Developer** | Geliştiriciler (solo/ekip/agency) | Sprint orchestration + multi-agent + quality gates + retro | **Sprint Mode** (ADR-042'de yerleşik, 170+ sprint dogfood) | ~%95 (1 Haz beta hazır) |
+
+### Üç Yüz Aynı Motoru Paylaşır
+
+```
+        ┌─────────────────────────────────────────────┐
+        │              TEK DECKENT MOTORU              │
+        │  Brain + MCP (27 tool) + Memory + Agent pool │
+        │  Nervous System + Auditor + Hybrid Mode     │
+        └─────────────────────────────────────────────┘
+                ▲              ▲              ▲
+                │              │              │
+        ┌───────┴──────┐ ┌─────┴─────┐ ┌─────┴─────┐
+        │ Chat Mode    │ │Process Mode│ │Sprint Mode│
+        │ (assistant)  │ │(sys worker)│ │(developer)│
+        │ → sade kişi  │ │ → şirket   │ │ → dev     │
+        └──────────────┘ └────────────┘ └───────────┘
+```
+
+Aynı 27 MCP tool, aynı SQLite memory, aynı agent pool, aynı nervous system — sadece **arayüz katmanı (mode)** değişir.
+
+### Anchor Sonuçları
+
+- **Hiçbir feature kararı "yalnızca dev için" veya "yalnızca enterprise için" çerçeveleyemez** — 3 yüze birden hizmet etmeli (veya en az 1 yüzü güçlendirip diğer 2'ye zarar vermemeli).
+- **"Persona-slice rakibi" tezi:** OpenHuman = sade kişi slice'ı, Devin/Cursor = developer slice'ı, Agentforce/Salesforce = enterprise slice'ı. Deckent **üçünü birden** yapma iddiasında — kanıtlanmamış ama hedef.
+- **Beta sıralaması (1 Haz 2026):** Sprint Mode OSS yüzü açılır (AI Developer); Chat + Process Mode'lar post-beta ark'ta tamamlanır.
+- **Olgunluk dengesizliği kasıtlı:** Developer'ı önce inşa etmek motoru zorladı → motor reel oldu → diğer 2 yüze hazır altyapı oldu. Meta-dogfood'un yan kazancı.
+
+### Değişmeyen DNA ile Bağlam
+
+Bu trinity beyanı §11 anchor kurallarını (ADR-033 product-not-service / ADR-034 multi-project isolation / ADR-042 hybrid mode) **rafine eder, çelişmez**. Üç yüz de:
+- Local-first çalışır (no Deckent cloud)
+- MIT lisansı altında ücretsiz (no pro tier / no enterprise edition)
+- Aynı binary'den gelir (no separate distributions)
+
+Referans memory'ler: `project_deckent_trinity_anchor` (canonical), `feedback_deckent_multi_role_scope`, `project_deckent_agentic_os_vision`, `project_deckent_god_level_vision`.
+
+---
+
 ## ⚡ 2026-05-20 (Sprint 175 → Embedded Web Terminal #1/4 Teslim)
 
 VSCode-benzeri **gömülü web terminal** dashboard içinde **canlı çalışıyor** (Alperen smoke 2026-05-20). 4-parçalı agentic-OS yolunun #1 alt-projesi.
