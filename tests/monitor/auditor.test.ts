@@ -1695,6 +1695,55 @@ describe('checkADRCompliance', () => {
     const violations = checkADRCompliance('/tmp/test', ['src/good-file.ts']);
     expect(violations).toHaveLength(0);
   });
+
+  it('count_check: suppresses ADR-010 global dep advisory when changedFiles does NOT include package.json', () => {
+    // ADR-NOISE fix: a doc-only task should not trigger the global dep-count advisory.
+    mockedExistsSync.mockReturnValue(true);
+    mockAuditorMemStore.getByType.mockImplementation((type: string) => {
+      if (type === 'adr') return [
+        { id: 'adr-010', type: 'adr', title: 'Minimal Runtime Deps', status: 'accepted', content: 'Keep dep count low.', metadata: '{}', created_at: '', updated_at: '', deleted_at: null },
+      ];
+      return [];
+    });
+    mockedReadFileSync.mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.endsWith('package.json')) {
+        // Many deps — would trigger advisory IF count_check ran.
+        return JSON.stringify({ dependencies: { a: '1', b: '2', c: '3', d: '4' } });
+      }
+      return '';
+    });
+
+    // changedFiles does NOT include package.json
+    const violations = checkADRCompliance('/tmp/test', ['docs/README.md', 'src/core/types.ts']);
+    expect(violations).toHaveLength(0);
+  });
+
+  it('count_check: emits ADR-010 dep advisory when changedFiles INCLUDES package.json and count exceeds max', () => {
+    // Behaviour-preserving: tasks that actually touch package.json still get the advisory.
+    mockedExistsSync.mockReturnValue(true);
+    mockAuditorMemStore.getByType.mockImplementation((type: string) => {
+      if (type === 'adr') return [
+        { id: 'adr-010', type: 'adr', title: 'Minimal Runtime Deps', status: 'accepted', content: 'Keep dep count low.', metadata: '{}', created_at: '', updated_at: '', deleted_at: null },
+      ];
+      return [];
+    });
+    mockedReadFileSync.mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.endsWith('package.json')) {
+        // maxCount in rule is 3; 4 deps exceeds it.
+        return JSON.stringify({ dependencies: { a: '1', b: '2', c: '3', d: '4' } });
+      }
+      return '';
+    });
+
+    // changedFiles DOES include package.json
+    const violations = checkADRCompliance('/tmp/test', ['package.json', 'src/core/types.ts']);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]!.adrId).toBe('ADR-010');
+    expect(violations[0]!.severity).toBe('warning');
+    expect(violations[0]!.violation).toContain('exceeds max');
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════

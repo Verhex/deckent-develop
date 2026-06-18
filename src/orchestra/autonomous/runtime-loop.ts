@@ -401,7 +401,19 @@ export async function runAutonomousLoop(
     iterations += 1;
     options.onTick?.(result);
 
-    const waitMs = result.outcome === 'no_trigger' ? options.intervalMs : 0;
+    // Only outcomes that advance the backlog state (execute-dispatcher updated the
+    // entry to running→done/failed) justify immediate re-tick (sleep 0). All idle-
+    // equivalent outcomes (no_trigger, pending, denied, rejected) sleep intervalMs
+    // to prevent busy-spin when entries are stuck without a status writeback — e.g.
+    // an approval-required entry stays `pending` in the backlog until a human acts,
+    // so the trigger source re-emits it every cycle and the loop must back off.
+    const isActiveWork = result.outcome === 'executed' || result.outcome === 'failed';
+    const waitMs = isActiveWork ? 0 : options.intervalMs;
+    if (process.env.DECKENT_DEBUG_AUTONOMOUS) {
+      process.stderr.write(
+        `[autonomous-loop] iter=${iterations} outcome=${result.outcome} waitMs=${waitMs}\n`,
+      );
+    }
     await sleep(waitMs);
   }
 }

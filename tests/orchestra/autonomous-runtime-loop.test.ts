@@ -309,3 +309,54 @@ describe('buildAutonomousRuntime + runAutonomousLoop — 5-adapter real wire', (
     expect(sleep.calls).toEqual([333, 333]);
   });
 });
+
+// ─── Idle-spin regression tests (busy-spin fix) ───────────────────────
+// Verifies that non-active outcomes (pending, denied, rejected, no_trigger)
+// all sleep intervalMs rather than sleep(0), preventing the ~57456-cycle
+// busy-spin observed when entries are stuck awaiting approval or authority.
+
+describe('runAutonomousLoop — idle-spin fix (non-active outcomes sleep intervalMs)', () => {
+  it('(a) pending outcome sleeps intervalMs — busy-spin prevented for approval-gate entries', async () => {
+    // Simulate a backlog entry stuck in the approval gate:
+    // authority says needs_approval, gate returns pending indefinitely.
+    // Without the fix: sleep(0) → re-tick → same outcome → 57456-cycle spin.
+    // With the fix: sleep(intervalMs) → rate-limited.
+    const deps: AutonomousRuntimeDeps = {
+      triggerSource: { next: () => makeTrigger({ id: 'approval-entry-1' }) },
+      authority: { check: () => ({ outcome: 'needs_approval', reason: 'approval required' }) },
+      approvalGate: { request: async () => ({ outcome: 'pending', reason: 'awaiting human approval' }) },
+      executor: { execute: vi.fn().mockResolvedValue({ ok: true }) },
+      audit: { record: vi.fn() },
+      now: () => '2026-06-18T00:00:00.000Z',
+    };
+    const sleep = trackedSleep();
+
+    await runAutonomousLoop(config, deps, {
+      intervalMs: 400,
+      maxIterations: 3,
+      sleep: sleep.fn,
+    });
+
+    // All 3 cycles returned 'pending' → each sleep must be intervalMs, never 0.
+    expect(sleep.calls).toHaveLength(3);
+    expect(sleep.calls.every((ms) => ms === 400)).toBe(true);
+  });
+
+  it('(b) executed outcome sleeps 0 — fast re-tick preserved for real dispatched work', async () => {
+    // A real backlog entry is dispatched and completes (authority=allowed, executor ok).
+    // The loop must re-tick immediately (sleep 0) so subsequent entries are processed
+    // without waiting the idle interval.
+    const { deps } = stubDeps(); // authority=allowed, executor returns {ok:true} → 'executed'
+    const sleep = trackedSleep();
+
+    await runAutonomousLoop(config, deps, {
+      intervalMs: 999,
+      maxIterations: 3,
+      sleep: sleep.fn,
+    });
+
+    // All 3 cycles returned 'executed' → each sleep must be 0, never intervalMs.
+    expect(sleep.calls).toHaveLength(3);
+    expect(sleep.calls.every((ms) => ms === 0)).toBe(true);
+  });
+});

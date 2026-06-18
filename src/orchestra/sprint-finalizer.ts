@@ -527,6 +527,46 @@ export async function applyAdaptiveThresholds(projectRoot: string, config: Resol
 }
 
 
+// ═══ Budgeted Decay (mode-independent) ════════════════════════════
+
+/**
+ * CORE-UNIFORMITY (slice 2): mode-independent budgeted brain-memory decay.
+ *
+ * Extracted from finalizeSprint so BOTH the sprint lifecycle AND the autonomous
+ * per-item lifecycle (execute-dispatcher's `postItemLifecycle`) share a single
+ * decay path — sprint-coupling resolved. Audits the brain budget; when OVER it
+ * forces a decay, otherwise runs the normal (budget-gated) decay.
+ *
+ * Self-contained + fail-safe: never throws (errors are debug-logged and swallowed),
+ * so callers can invoke it inline without guarding. Behavior is identical to the
+ * former inline finalizeSprint block; only the debug label differs.
+ *
+ * @param projectRoot - Project root directory
+ * @param sprintId - Current sprint id (used for retention-window math in runDecay)
+ * @param opts.memoryBudget - Brain memory budget in entries/lines (default 900)
+ * @param opts.decaySprints - Retention window; MUST be the caller's
+ *   `config.decay_after_sprints` (default 20). Dropping it regresses the Sprint 232
+ *   memory-loss bug (runDecay silently falls back to a hardcoded 8).
+ */
+export function runBudgetedDecay(
+  projectRoot: string,
+  sprintId: string,
+  opts?: { memoryBudget?: number; decaySprints?: number },
+): void {
+  try {
+    const memBudget = opts?.memoryBudget ?? 900;
+    const decayAfterSprints = opts?.decaySprints;
+    const budgetAudit = auditBrainBudget(projectRoot, memBudget);
+    if (budgetAudit.status === 'OVER') {
+      debugLog('runBudgetedDecay', `Brain budget OVER: ${budgetAudit.decayableLines} decayable lines > ${memBudget} budget (${budgetAudit.permanentLines} permanent exempt, decay_after_sprints=${decayAfterSprints ?? 'default'})`);
+      runDecay(projectRoot, sprintId, { force: true, memoryBudget: memBudget, decaySprints: decayAfterSprints });
+    } else {
+      runDecay(projectRoot, sprintId, { memoryBudget: memBudget, decaySprints: decayAfterSprints });
+    }
+  } catch (e) { debugLog('runBudgetedDecay', e); }
+}
+
+
 // ═══ Finalize Sprint ══════════════════════════════════════════════
 
 /**
@@ -807,17 +847,13 @@ export async function finalizeSprint(
   // option was dropped and runDecay fell back to a hardcoded 8 — too aggressive,
   // causing memory-loss across sprint-226/231 dogfood.
   if (!opts?.skipDecay) {
-    try {
-      const memBudget = opts?.config?.memory_budget ?? 900;
-      const decayAfterSprints = opts?.config?.decay_after_sprints;
-      const budgetAudit = auditBrainBudget(projectRoot, memBudget);
-      if (budgetAudit.status === 'OVER') {
-        debugLog('finalizeSprint:runDecay', `Brain budget OVER: ${budgetAudit.decayableLines} decayable lines > ${memBudget} budget (${budgetAudit.permanentLines} permanent exempt, decay_after_sprints=${decayAfterSprints ?? 'default'})`);
-        runDecay(projectRoot, sprint.id, { force: true, memoryBudget: memBudget, decaySprints: decayAfterSprints });
-      } else {
-        runDecay(projectRoot, sprint.id, { memoryBudget: memBudget, decaySprints: decayAfterSprints });
-      }
-    } catch (e) { debugLog('finalizeSprint:runDecay', e); }
+    // CORE-UNIFORMITY (slice 2): decay now flows through the mode-independent
+    // runBudgetedDecay helper (shared with the autonomous per-item lifecycle).
+    // Behavior unchanged — same audit → force/normal branching as before.
+    runBudgetedDecay(projectRoot, sprint.id, {
+      memoryBudget: opts?.config?.memory_budget ?? 900,
+      decaySprints: opts?.config?.decay_after_sprints,
+    });
   }
 
   // 8. Run afterSprint plugin hooks

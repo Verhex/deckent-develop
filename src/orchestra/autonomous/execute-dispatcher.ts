@@ -14,7 +14,7 @@ import type { ResolvedConfig } from '../../core/config-types.js';
 import type { ActionHandler } from '../../nervous/executor.js';
 import type { CapabilityRegistry } from '../../core/capability-broker.js';
 import type { BacklogEntry, BacklogFile } from './backlog-types.js';
-import { loadBacklog, updateStatus } from './backlog.js';
+import { loadBacklog, updateStatus, cleanupAutonomousArtifacts, purgeCompletedBacklog } from './backlog.js';
 import type { TaskResult } from '../../core/types.js';
 import type { ExecutionPool } from './execution-pool.js';
 import { needsJitDetail, generateItemDetail } from './jit-detail.js';
@@ -25,6 +25,9 @@ import {
   type BacklogEvaluation, type AuditVerdict, type CrossVerifyVerdict,
 } from './backlog-eval.js';
 import type { FlowReporter } from './flow-reporter.js';
+import { getCurrentSprintId } from '../../core/event-stream.js';
+import { runProcess } from '../process-runtime.js';
+import { enrichResultTokenUsage } from '../result-collector.js';
 
 /** Action id the backlog-trigger sets on every entry-driven trigger. */
 export const AUTONOMOUS_EXECUTE_ACTION = 'autonomous.execute';
@@ -91,6 +94,68 @@ export interface ExecuteDispatcherDeps {
   ) => Promise<CrossVerifyVerdict>;
   /** Rich dual-channel flow emitter (human terminal + AI JSONL). Absent → no flow. */
   flow?: FlowReporter;
+  /**
+   * CORE-UNIFORMITY (slice 2): mode-independent budgeted-decay used by the post-item
+   * lifecycle hook. Absent → the hook lazily loads sprint-finalizer's `runBudgetedDecay`
+   * (keeps the dispatcher's STATIC import graph free of the heavy finalizer/cli tree).
+   * Injected as a stub in hermetic tests so they need no memory.db.
+   */
+  runBudgetedDecay?: (projectRoot: string, sprintId: string, opts: { memoryBudget?: number; decaySprints?: number }) => void | Promise<void>;
+}
+
+/**
+ * CORE-UNIFORMITY (slice 2): mode-independent post-item lifecycle hook.
+ *
+ * Runs after an autonomous backlog item reaches its terminal status — the per-item
+ * analogue of what sprint-finalizer runs at sprint end. Three steps, each independently
+ * fail-safe (a thrown step is warned + skipped, never corrupting the item outcome):
+ *   1. cleanupAutonomousArtifacts() — delete leaked `task-run-*` / `_*.pid` files
+ *   2. purgeCompletedBacklog()      — trim completed entries (keep the most recent runs)
+ *   3. runBudgetedDecay()           — decay brain memory when over budget
+ *
+ * Idempotent: re-running against an already-clean state is a no-op. The decay step
+ * defaults to a lazily-imported `runBudgetedDecay` so the dispatcher's static graph
+ * stays light; tests inject a stub to stay hermetic.
+ */
+export async function postItemLifecycle(deps: {
+  projectRoot: string;
+  backlogPath: string;
+  config: ResolvedConfig;
+  /** The just-completed item's run id — its task-run-* files (incl. the .result
+   *  Brain-assessment writeback) are preserved; only stale prior-run artifacts are swept. */
+  keepTaskId?: string;
+  runBudgetedDecay?: (projectRoot: string, sprintId: string, opts: { memoryBudget?: number; decaySprints?: number }) => void | Promise<void>;
+}): Promise<void> {
+  // 1. Artifact cleanup — remove per-run task files and PID bookkeeping that would
+  //    otherwise accumulate between autonomous items (keeping this run's own files).
+  try {
+    cleanupAutonomousArtifacts(deps.projectRoot, undefined, deps.keepTaskId);
+  } catch (e) {
+    console.warn(`[postItemLifecycle] artifact cleanup failed: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  // 2. Backlog purge — trim completed (done/failed) entries, keeping the recent ones.
+  try {
+    purgeCompletedBacklog(deps.backlogPath, loadBacklog(deps.backlogPath));
+  } catch (e) {
+    console.warn(`[postItemLifecycle] backlog purge failed: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  // 3. Budgeted brain-memory decay — same mode-independent helper the sprint lifecycle
+  //    uses. Lazy-import keeps the heavy finalizer/cli tree out of the static graph.
+  try {
+    const decay = deps.runBudgetedDecay
+      ?? (await import('../sprint-finalizer.js')).runBudgetedDecay;
+    // Current sprint id drives runDecay's retention-window math. In pure-autonomous
+    // mode (no prior sprint) this is null → 'sprint-0' (conservative: no age-based decay).
+    const sprintId = getCurrentSprintId(deps.projectRoot) ?? 'sprint-0';
+    await decay(deps.projectRoot, sprintId, {
+      memoryBudget: deps.config?.memory_budget,
+      decaySprints: deps.config?.decay_after_sprints,
+    });
+  } catch (e) {
+    console.warn(`[postItemLifecycle] decay failed: ${e instanceof Error ? e.message : String(e)}`);
+  }
 }
 
 export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandler {
@@ -125,6 +190,11 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
           }
         } catch { /* JIT failure → fall back to the title-only description below */ }
       }
+
+      // CORE-UNIFORMITY (slice 2): the just-completed item's own run id. The post-item
+      // cleanup keeps this run's task-run-* files (its .result carries the Brain-assessment
+      // writeback / traceability) and sweeps only stale artifacts from prior runs.
+      let runTaskId: string | undefined;
 
       try {
         let ok = false;
@@ -162,8 +232,24 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
               : `${result.code}: ${result.error}`;
           }
         } else if (entry.kind === 'process') {
-          ok = false;
-          reason = 'process/workflow execution is not available yet (F3-008 Workflow Composer pending)';
+          // F3-008 (mode-transition 3/3): a process is an ordered list of steps run
+          // STRICTLY SEQUENTIALLY through the SAME runTask/capability primitives. The
+          // runtime reports in the standard TaskResult envelope; an absent/invalid
+          // definition is an honest NO_GO (never a silent success). The plain
+          // { ok, reason } lastResult mirrors the capability/sprint branches — a
+          // process composes already-evaluated sub-steps, so it is not re-run through
+          // the per-worker Brain-Eval.
+          const procResult = await runProcess(live, {
+            projectRoot: deps.projectRoot,
+            config: deps.config,
+            runTask: deps.runTask,
+            waitForResult: deps.waitForResult,
+            resultTimeoutMs: timeoutMs,
+            ...(deps.capabilityRegistry ? { capabilityRegistry: deps.capabilityRegistry } : {}),
+            ...(deps.flow ? { flow: deps.flow } : {}),
+          });
+          ok = procResult.selfAssessment !== 'NO_GO';
+          reason = procResult.notes || `process ${procResult.selfAssessment}`;
         } else {
           // Task: launch worker, then wait for real completion (Gap F).
           //
@@ -184,6 +270,7 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
 
           const taskId = r?.taskId;
           if (taskId) {
+            runTaskId = taskId; // keep this run's artifacts during post-item cleanup
             deps.flow?.step('spawned', entry.id, `taskId=${taskId}`);
             // Gap F: wait for real done/failed (not just launched)
             let result = await deps.waitForResult(deps.projectRoot, taskId, timeoutMs);
@@ -195,6 +282,9 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
             }
 
             if (result) {
+              // TOK-AUT: mirror the sprint path (result-collector.ts:632) — fill tokenUsage
+              // from measured CLI log tokens when available; honest-zero when not (WP-4).
+              enrichResultTokenUsage(result, undefined, deps.projectRoot);
               // CORE-UNIFORMITY: a finished autonomous task passes through the SAME
               // Brain-Eval + Auditor + Cross-Verify sprint mode applies (mode-independent
               // kernels). The Auditor + cross-verify verdicts are ADVISORY (never flip the
@@ -257,6 +347,14 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
         updateStatus(deps.backlogPath, blFinal, entry.id, ok ? 'done' : 'failed', richResult ?? { ok, reason });
         deps.flow?.step(ok ? 'done' : 'failed', entry.id, reason);
 
+        // CORE-UNIFORMITY (slice 2): mode-independent post-item lifecycle hygiene
+        // (artifact cleanup + backlog purge + budgeted decay). Fully fail-safe —
+        // never alters the item outcome returned below.
+        await postItemLifecycle({
+          projectRoot: deps.projectRoot, backlogPath: deps.backlogPath,
+          config: deps.config, runBudgetedDecay: deps.runBudgetedDecay, keepTaskId: runTaskId,
+        });
+
         return ok ? { outcome: 'success' } : { outcome: 'failure', error: reason };
       } catch (err: unknown) {
         const reason = err instanceof Error ? err.message : String(err);
@@ -267,6 +365,12 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
         } catch {
           // Never let the writeback failure mask the original error
         }
+        // Post-item lifecycle still runs on the error path — a crashed item can leak
+        // task-run-* / _*.pid artifacts too. Idempotent + fail-safe.
+        await postItemLifecycle({
+          projectRoot: deps.projectRoot, backlogPath: deps.backlogPath,
+          config: deps.config, runBudgetedDecay: deps.runBudgetedDecay, keepTaskId: runTaskId,
+        });
         return { outcome: 'failure', error: reason };
       }
     };

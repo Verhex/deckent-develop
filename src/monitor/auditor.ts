@@ -2190,6 +2190,12 @@ export function checkADRCompliance(
       }
       case 'count_check': {
         if (rule.maxCount === undefined) break;
+        // Only fire when changedFiles actually includes package.json — firing on every
+        // task regardless of changed files produces global advisory noise (ADR-NOISE fix).
+        const touchesPackageJson = changedFiles.some(
+          f => f === 'package.json' || f.endsWith('/package.json'),
+        );
+        if (!touchesPackageJson) break;
         try {
           const pkgPath = join(projectRoot, 'package.json');
           const pkgContent = readFileSync(pkgPath, 'utf-8');

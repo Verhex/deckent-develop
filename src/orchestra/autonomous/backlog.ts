@@ -124,10 +124,16 @@ export function purgeCompletedBacklog(
  * Fail-safe: per-file errors are silently swallowed; a missing directory is a no-op.
  * Resolves AUT-6 (PID-1 finding): autonomous artifacts never cleaned up otherwise.
  * Returns the number of artifact files removed (so callers can report a count).
+ *
+ * `keepTaskId` (CORE-UNIFORMITY slice 2): when the per-item lifecycle hook sweeps after
+ * a single item, the just-completed run's own files (`task-{keepTaskId}.*`, e.g. its
+ * `.result` carrying the Brain-assessment writeback) are preserved — only PRIOR-run
+ * artifacts are removed. Omitted by teardown/global callers, which sweep everything.
  */
 export function cleanupAutonomousArtifacts(
   projectRoot: string,
   tasksDir: string = TASKS_DIR,
+  keepTaskId?: string,
 ): number {
   const dir = join(projectRoot, tasksDir);
   if (!existsSync(dir)) return 0;
@@ -137,9 +143,13 @@ export function cleanupAutonomousArtifacts(
   } catch {
     return 0;
   }
+  // Preserve the current run's `task-{keepTaskId}.<ext>` files (exact run match, not a
+  // numeric-prefix collision like task-run-1 vs task-run-10).
+  const keepPrefix = keepTaskId ? `task-${keepTaskId}.` : null;
   let removed = 0;
   for (const file of files) {
     if (!file.startsWith('task-run-') && !/^_.*\.pid$/.test(file)) continue;
+    if (keepPrefix && file.startsWith(keepPrefix)) continue;
     try {
       unlinkSync(join(dir, file));
       removed += 1;

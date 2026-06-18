@@ -32,16 +32,21 @@ import {
   AUTONOMOUS_EXECUTE_ACTION,
   type ExecuteDispatcherDeps,
 } from './autonomous/execute-dispatcher.js';
+import type { ProcessStep } from './process-runtime.js';
 import { atomicWriteFileSync } from '../agents/worker-lifecycle.js';
 
 /** A single execution submission (the ExecutionRequest envelope, process flavor). */
 export interface ProcessSubmitCtx {
   /** What to do (free text — the task description or capability intent). */
   description: string;
-  /** task (default) | sprint | capability. Inferred 'capability' when a target is set. */
-  kind?: 'task' | 'sprint' | 'capability';
+  /** task (default) | sprint | capability | process. Inferred 'capability' when a target is set. */
+  kind?: 'task' | 'sprint' | 'capability' | 'process';
   /** Non-code work target (erp.read / db.query / mail.send …). */
   capabilityTarget?: CapabilityTarget;
+  /** kind=process: ordered steps run sequentially by the process runtime (inline form). */
+  steps?: ProcessStep[];
+  /** kind=process: path to a JSON process definition ({ steps:[...] }) — file-ref form. */
+  processRef?: string;
   /** Scope directory for a code task (drives EffectClass risk). */
   scopeDir?: string;
   provider?: string;
@@ -101,15 +106,22 @@ export function makeProcessController(deps: ProcessControllerDeps): ProcessContr
       const kind: BacklogEntry['kind'] = ctx.kind ?? (ctx.capabilityTarget ? 'capability' : 'task');
       const tenant = ctx.tenant ?? ctx.actor?.tenantId;
 
+      // steps/processRef are process-runtime fields, read structurally off the spec
+      // (not in the closed BacklogEntry.spec type — validateBacklogEntry tolerates
+      // extra spec fields). Cast keeps the entry well-typed for every other consumer.
+      const spec = {
+        description: ctx.description,
+        ...(ctx.scopeDir ? { scopeDir: ctx.scopeDir } : {}),
+        ...(ctx.capabilityTarget ? { capabilityTarget: ctx.capabilityTarget } : {}),
+        ...(ctx.steps ? { steps: ctx.steps } : {}),
+        ...(ctx.processRef ? { processRef: ctx.processRef } : {}),
+      } as BacklogEntry['spec'];
+
       const entry: BacklogEntry = {
         id,
         title: ctx.description.slice(0, 80),
         kind,
-        spec: {
-          description: ctx.description,
-          ...(ctx.scopeDir ? { scopeDir: ctx.scopeDir } : {}),
-          ...(ctx.capabilityTarget ? { capabilityTarget: ctx.capabilityTarget } : {}),
-        },
+        spec,
         // Safe-by-default: the EffectClass (not the submitter) decides auto vs park.
         policy: 'risk-tagged',
         ...(ctx.provider ? { provider: ctx.provider } : {}),

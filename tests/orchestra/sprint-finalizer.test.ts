@@ -219,9 +219,11 @@ import {
   runSelfAuditGate,
   applyGateStatus,
   finalizeSprint,
+  runBudgetedDecay,
 } from '../../src/orchestra/sprint-finalizer.js';
 import type { FinalizeSprintOptions, SelfAuditResult } from '../../src/orchestra/sprint-finalizer.js';
 import { GO_WITH_GATE_FAILURE } from '../../src/orchestra/result-evaluator.js';
+import { runDecay as mockRunDecay, auditBrainBudget as mockAuditBrainBudget } from '../../src/orchestra/debt-manager.js';
 import { tryCodeVerifiedDone, writeCodeVerifiedResult } from '../../src/monitor/auditor.js';
 import { buildResultsMap } from '../../src/orchestra/result-collector.js';
 
@@ -1353,5 +1355,49 @@ describe('sprint-finalizer — post-finalize hooks (Sprint 143 Task 10)', () => 
     };
     expect(callArgs.metrics.totalTasks).toBe(1);
     expect(callArgs.metrics.completedTasks).toBe(1);
+  });
+});
+
+// ─── CORE-UNIFORMITY (slice 2): runBudgetedDecay — mode-independent helper ───
+describe('runBudgetedDecay (mode-independent decay helper)', () => {
+  beforeEach(() => {
+    // mockClear (not reset) keeps the module-level default implementation intact so
+    // other describe blocks are unaffected; per-test behavior uses *Once variants.
+    vi.mocked(mockRunDecay).mockClear();
+    vi.mocked(mockAuditBrainBudget).mockClear();
+  });
+
+  it('is callable with primitives only — no sprint object needed (mode-independent)', () => {
+    vi.mocked(mockAuditBrainBudget).mockReturnValueOnce({ status: 'OK', decayableLines: 0, permanentLines: 0, totalLines: 0 });
+
+    // Invoked exactly the way the autonomous per-item hook calls it.
+    expect(() => runBudgetedDecay('/tmp/project', 'sprint-42', { memoryBudget: 900, decaySprints: 20 })).not.toThrow();
+
+    expect(vi.mocked(mockAuditBrainBudget)).toHaveBeenCalledWith('/tmp/project', 900);
+    expect(vi.mocked(mockRunDecay)).toHaveBeenCalledWith(
+      '/tmp/project', 'sprint-42', { memoryBudget: 900, decaySprints: 20 },
+    );
+  });
+
+  it('forces decay when the budget is OVER, normal decay when OK', () => {
+    // OVER → force:true
+    vi.mocked(mockAuditBrainBudget).mockReturnValueOnce({ status: 'OVER', decayableLines: 1200, permanentLines: 0, totalLines: 1200 });
+    runBudgetedDecay('/tmp/project', 'sprint-7', { memoryBudget: 900, decaySprints: 20 });
+    expect(vi.mocked(mockRunDecay)).toHaveBeenLastCalledWith(
+      '/tmp/project', 'sprint-7', { force: true, memoryBudget: 900, decaySprints: 20 },
+    );
+
+    // OK → no force
+    vi.mocked(mockAuditBrainBudget).mockReturnValueOnce({ status: 'OK', decayableLines: 10, permanentLines: 0, totalLines: 10 });
+    runBudgetedDecay('/tmp/project', 'sprint-8', { memoryBudget: 900, decaySprints: 20 });
+    expect(vi.mocked(mockRunDecay)).toHaveBeenLastCalledWith(
+      '/tmp/project', 'sprint-8', { memoryBudget: 900, decaySprints: 20 },
+    );
+  });
+
+  it('never throws — an auditBrainBudget failure is swallowed (fail-safe)', () => {
+    vi.mocked(mockAuditBrainBudget).mockImplementationOnce(() => { throw new Error('audit boom'); });
+    expect(() => runBudgetedDecay('/tmp/project', 'sprint-9')).not.toThrow();
+    expect(vi.mocked(mockRunDecay)).not.toHaveBeenCalled();
   });
 });
