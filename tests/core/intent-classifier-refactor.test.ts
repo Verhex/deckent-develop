@@ -224,4 +224,43 @@ describe('intent-classifier-refactor — Sprint 148', () => {
       expect(tags.filter(t => t === 'test-coverage')).toHaveLength(1);
     });
   });
+
+  // ─── ROUTE-1 B1: comment / code-structure sweep → refactor ─────────────────
+  describe('ROUTE-1 B1 — comment-sweep is refactor, not implementation/documentation', () => {
+    it('clean stale comments under src/api/ → refactor (not implementation)', () => {
+      const dna = classifyIntent({
+        title: 'clean stale comments',
+        description: 'remove stale and dead comments from the api module',
+        scope: { directories: ['src/api/'], filesRead: [], filesWrite: ['src/api/x.ts'] },
+      });
+      expect(dna.intent.primary).toBe('refactor');
+    });
+
+    it('remove unused imports under src/ → refactor', () => {
+      const dna = classifyIntent({
+        title: 'remove unused imports',
+        description: 'delete unused imports across the module',
+        scope: { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/x.ts'] },
+      });
+      expect(dna.intent.primary).toBe('refactor');
+    });
+
+    it('authoring README prose stays documentation (no false refactor)', () => {
+      const dna = classifyIntent({
+        title: 'update the getting-started guide',
+        description: 'write documentation and examples in the readme',
+        scope: { directories: ['docs/'], filesRead: [], filesWrite: ['README.md', 'docs/guide.md'] },
+      });
+      expect(dna.intent.primary).toBe('documentation');
+    });
+
+    it('feature build stays implementation (no false refactor)', () => {
+      const dna = classifyIntent({
+        title: 'add POST /api/users endpoint',
+        description: 'implement the create-user endpoint and validation',
+        scope: { directories: ['src/api/'], filesRead: [], filesWrite: ['src/api/users.ts'] },
+      });
+      expect(dna.intent.primary).toBe('implementation');
+    });
+  });
 });

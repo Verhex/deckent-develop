@@ -132,6 +132,19 @@ export function detectPrimaryIntent(
     }
   }
 
+  // ROUTE-1 B1: a comment / code-structure SWEEP is a refactor operation — not a
+  // documentation edit (authoring prose) and not a feature build. A touch-up verb
+  // co-occurring with a code-structure noun scores refactor ≥ 4 so it (a) trips the
+  // hasStrongNonImplSignal gate below — suppressing the generic src/-write
+  // implementation boost — and (b) outranks the bare `comment` documentation hit.
+  const CLEANUP_VERB = /\b(clean(?:up)?|stale|dead|remove|delete|rename|simplif\w+|tidy|sweep|prune|dedupe|deduplicate)\b/;
+  const CODE_STRUCT_NOUN = /\b(comments?|jsdoc|imports?|whitespace|formatting|lint|unused)\b/;
+  if (CLEANUP_VERB.test(text) && CODE_STRUCT_NOUN.test(text)) {
+    const r = scores.find((s) => s.intent === 'refactor');
+    if (r) r.score += 4;
+    else scores.push({ intent: 'refactor', score: 4 });
+  }
+
   // CRITICAL FIX: Write ratio analysis prevents the detectTaskType ordering bug.
   // If most writes go to src/, it's implementation even if "test" keyword appears.
   // Sprint 209: gate the default-implementation boost so a strong scope signal
