@@ -239,7 +239,7 @@ deckent is built to be watched, not to be a black box.
 ### Surfaces
 - **Interactive REPL** — `deckent` with markdown streaming, slash commands, and mid-session model/provider switching
 - **Web dashboard** — 16 pages (React + Vite + Tailwind): live status, workers, directives, memory explorer, debt, history, config, chat, nervous system, evolution, enterprise — plus an embedded web terminal (PTY over WebSocket, token-auth + audited)
-- **MCP server** — 34 tools + 8 resources over stdio, so any MCP client (Claude Code, Claude Desktop, …) can drive deckent
+- **MCP server** — 35 tools + 8 resources over stdio, so any MCP client (Claude Code, Claude Desktop, …) can drive deckent
 - **Autonomous engine** — a durable backlog with recurring (cron), one-off, and reactive triggers; deckent works a queue on its own
 - **Connectors** — Discord, Telegram, and WhatsApp for notifications and remote triggering
 - **Enterprise foundation** — multi-tenant isolation, audit query, OIDC/SSO dashboard login (RS256-pinned JWT, PKCE), role-based access, scheduled flows, and webhooks — all in the same MIT codebase, no gated edition
@@ -324,7 +324,7 @@ deckent ships an MCP server, so any MCP-compatible tool can drive it:
 claude mcp add deckent -- npx deckent-mcp     # any MCP client works the same way
 ```
 
-**34 tools + 8 resources** over stdio. → [docs/reference/mcp-guide.md](docs/reference/mcp-guide.md)
+**35 tools + 8 resources** over stdio. → [docs/reference/mcp-guide.md](docs/reference/mcp-guide.md)
 
 ---
 

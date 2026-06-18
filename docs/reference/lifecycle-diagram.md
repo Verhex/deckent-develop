@@ -43,7 +43,7 @@ flowchart TD
 graph TD
     subgraph entry["User Entry Points"]
         CLI["**cli/**\n55+ commands · helpers · entry point"]
-        MCP_S["**mcp/**\n34 tools · 8 resources · stdio transport"]
+        MCP_S["**mcp/**\n35 tools · 8 resources · stdio transport"]
         API_S["**api/**\nHTTP API · SSE · rate limiting"]
     end
 
