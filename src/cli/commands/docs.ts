@@ -45,6 +45,23 @@ export function runDocsTrackStatus(
   }
 }
 
+// CI-gate: CRITICAL_STALE docs (optionally rank-bounded) → caller exits non-zero.
+export function runDocsTrackCheck(
+  root: string,
+  opts: { maxRank?: number },
+): { ok: boolean; violations: Array<{ path: string; doc_rank: number; state: string; priority_score: number }> } {
+  const store = new DocTrackingStore(join(root, '.brain/memory.db'));
+  try {
+    const violations = store.getAll()
+      .filter(r => r.state === 'CRITICAL_STALE')
+      .filter(r => (opts.maxRank === undefined ? true : r.doc_rank <= opts.maxRank))
+      .map(r => ({ path: r.path, doc_rank: r.doc_rank, state: r.state, priority_score: r.priority_score }));
+    return { ok: violations.length === 0, violations };
+  } finally {
+    store.close();
+  }
+}
+
 export function registerDocs(program: Command): void {
   const docs = program
     .command('docs')
@@ -198,11 +215,23 @@ export function registerDocs(program: Command): void {
     .description('Hash + timestamp + rank all docs; write front-matter; sync memory.db')
     .option('--no-write', 'Do not modify front-matter (DB-only)')
     .option('--prune', 'Remove records for deleted docs')
-    .action(async (opts: { write: boolean; prune?: boolean }) => {
+    .option('--check', 'After scan, exit non-zero if any CRITICAL_STALE doc exists (CI gate)')
+    .option('--max-rank <n>', 'With --check, only gate on docs with doc_rank <= n', parseInt)
+    .action(async (opts: { write: boolean; prune?: boolean; check?: boolean; maxRank?: number }) => {
       const root = resolveProjectRoot();
       const lang = getLanguage();
       const { count, stale } = await runDocsTrackScan(root, { write: opts.write, prune: !!opts.prune });
       print(getMessage('docs.track.scanned', lang, { count: String(count), stale: String(stale) }));
+      if (opts.check) {
+        const { ok, violations } = runDocsTrackCheck(root, { maxRank: opts.maxRank });
+        if (!ok) {
+          print(getMessage('docs.track.check_violations', lang, { count: String(violations.length) }));
+          for (const v of violations) print(`  ${String(v.doc_rank).padEnd(5)} ${v.state} ${v.path}`);
+          process.exitCode = 1;
+        } else {
+          print(getMessage('docs.track.check_clean', lang));
+        }
+      }
     });
 
   track

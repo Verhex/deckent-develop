@@ -1474,6 +1474,14 @@ const MESSAGES: MessageMap = {
     en: 'Synced {count} docs to memory.db (no front-matter written).',
     tr: '{count} doküman memory.db ile senkronlandı (front-matter yazılmadı).',
   },
+  'docs.track.check_clean': {
+    en: 'Doc-tracking check passed — no critical-stale docs.',
+    tr: 'Doküman kontrolü geçti — kritik-bayat doküman yok.',
+  },
+  'docs.track.check_violations': {
+    en: '{count} critical-stale doc(s) found:',
+    tr: '{count} kritik-bayat doküman bulundu:',
+  },
 };
 
 /**
