@@ -58,8 +58,10 @@ Plus a **second override locus**: `task-router.ts:257`
 - **Operation axis** — from the description verbs (refactor / cleanup / audit / document).
 - **Medium axis** — from `task.type` (code vs doc vs test).
 
-`detectTaskType`/`rubricTypeToKind` already give `audit | document-write | code-development`
-(the `RubricTaskType` triple = exactly DEVAM's "audit/doc/code-dev"). The operation axis is the
+`detectTaskType` gives the `RubricTaskType` triple `audit | document-write | code-development`
+(= exactly DEVAM's "audit/doc/code-dev"); `rubricTypeToKind` maps these to the `TaskKind` values
+`audit | documentation | code-development` — and `task.type` always carries the **`TaskKind`** form,
+so the suppress-kind set below uses `documentation` (not the rubric name `document-write`). The operation axis is the
 piece the classifier must sharpen.
 
 ## 2. Signal model (reliability-weighted)
@@ -102,7 +104,7 @@ isSurfaceBuildTask(intent, taskKind):
   // path-domain / surface bonus is a "you are BUILDING this surface" signal.
   SUPPRESS when the task is a touch-up / non-build:
     intent.primary ∈ { 'refactor', 'documentation' }   // operation axis
-    OR taskKind   ∈ { 'audit', 'document-write' }       // medium axis
+    OR taskKind   ∈ { 'audit', 'documentation' }        // medium axis (TaskKind)
   → return false (suppress bonus)
   otherwise → return true (bonus applies, as today)
 ```
@@ -118,7 +120,7 @@ Genuine "build the `/api/users` endpoint" (intent `implementation`/`feature`, ki
 preserved).
 
 > **Predicate is intentionally conservative:** only `refactor` + `documentation` intents and
-> `audit` + `document-write` kinds suppress. `implementation` / `feature` / `bugfix` keep the
+> `audit` + `documentation` kinds suppress. `implementation` / `feature` / `bugfix` keep the
 > bonus, minimising lossless risk. The set is a named constant, easy to tune.
 
 ### B3 — SSOT-consume · `routing-engine.ts` (+ `work-model.ts` if adapter gap)
@@ -132,7 +134,7 @@ preserved).
   low-confidence / true tie); a confident B1 classification is never overridden by `task.type`.
   This matters for the symptom: `task.type='code-development'` → `taskKindToIntent` =
   `implementation`, but B1 confidently yields `refactor`, so `refactor` stands. The B2 gate is an
-  **OR** (`intent ∈ {refactor,documentation}` OR `kind ∈ {audit,document-write}`) precisely so the
+  **OR** (`intent ∈ {refactor,documentation}` OR `kind ∈ {audit,documentation}`) precisely so the
   **intent arm** suppresses the path bonus here even though the `code-development` medium would not.
 - **Caller churn ≈ zero.** All six call sites already pass the full `Task` object (which carries
   `.type`): `mid-sprint-adapter.ts:154`, `task-mode-runner.ts:140`, `sprint-planner.ts:597`,
@@ -150,7 +152,7 @@ preserved).
 - **Empty-skill floor (two-tier)** in `selectBestSkills`: if no candidate clears
   `skillMinScore`, (1) relax to the best-scoring candidate with `score > 0`; (2) if still none,
   use a kind/intent default — `refactor → code-simplifier`, `code-development → typescript-expert`
-  (or the stack-detected language expert), `document-write → documentation-writer`. Guarantees
+  (or the stack-detected language expert), `documentation → documentation-writer`. Guarantees
   `assignedSkills.length >= 1` for any classified task. The floor is *additive* — it never
   removes a skill that already qualified.
 
@@ -181,7 +183,7 @@ Callers unchanged (B3 structural type-widening).
    `{ title:'clean stale comments', description:'remove stale/dead comments', scope:{ filesWrite:['src/api/x.ts'] }, type:'code-development' }`
    → assert `agentId ∈ {code-reviewer, refactorer, code-simplifier}` **and** `skillIds.length > 0`.
 2. **Unit per mechanism:** B1 (comment-sweep→`refactor`, doc-authoring stays `documentation`);
-   B2 (`isSurfaceBuildTask` false for refactor/audit/document-write, true for implementation);
+   B2 (`isSurfaceBuildTask` false for refactor/audit/documentation, true for implementation);
    B3 (`task.type` tie-breaks a tied `classifyIntent`); B4 (maps non-empty, floor guarantees ≥1).
 3. **Lossless guard:** "build the `/api/users` endpoint" (`implementation` + `code-development`)
    → still `api-builder` with non-empty skills (surface routing intact).
@@ -199,12 +201,21 @@ Callers unchanged (B3 structural type-widening).
   deterministic precision fix; the learned layer consumes it later.
 - **Model/effort tier** — closed by MODEL-GUARD.
 - **Provider routing** — separate layer (`task-router.ts` provider block), unchanged.
+- **Base-activation residue (consciously delegated, NOT a B2 gap).** B2 gates only the path-proxy
+  + surface **bonuses**, never an agent's **base activation rule**. So a pure `documentation`-intent
+  task touching `src/api/` can still win `api-builder` via its base `domains.$contains('api')` rule
+  (score 8) **iff no documentation-activating agent out-scores it**. In the real pool this is
+  mitigated by `doc-writer` (activates on `documentation` intent at score 10 > 8), so the routing is
+  correct there. ROUTE-1 deliberately does not touch base activation; the documentation-intent
+  routing safety-net is `doc-writer`'s activation rule, not the B2 gate. A regression pinning
+  `doc-writer@10 > api-builder@8` for a documentation sweep guards this invariant (see plan
+  follow-up).
 
 ## 8. Open judgement calls (flagged for review)
 
 - **B2 suppress-set membership.** Current: `{refactor, documentation}` intents +
-  `{audit, document-write}` kinds. Excludes `bugfix` (kept as build-ish so an api bug-fix may
+  `{audit, documentation}` kinds. Excludes `bugfix` (kept as build-ish so an api bug-fix may
   still draw api-builder, though bug-fixer usually wins on its own rule). Tunable.
 - **B4 floor defaults.** `refactor→code-simplifier`, `code-development→typescript-expert`
-  (stack-aware), `document-write→documentation-writer`. The relax-threshold tier (best `score>0`
+  (stack-aware), `documentation→documentation-writer`. The relax-threshold tier (best `score>0`
   candidate) runs first, so hardcoded defaults are a last resort only.
