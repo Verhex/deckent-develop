@@ -256,3 +256,84 @@ describe('ROUTE-1 — capstone: dual-perspective end-to-end', () => {
     expect(d.agentId).not.toBe('api-builder');
   });
 });
+
+describe('ROUTE-1 skill-floor precision — principled-default-first + stack-aware', () => {
+  // Hermetic skill pool mirroring the REAL narrow activation rules that cause
+  // the floor to fire for code tasks (no rule matches an implementation task
+  // in a non-special domain), plus the coincidental skills that used to win.
+  function makeFloorSkillPool(): Map<string, SkillDefinition> {
+    const p = new Map<string, SkillDefinition>();
+    const defs: Array<Partial<SkillDefinition> & { id: string; name: string }> = [
+      { id: 'documentation-writer', name: 'Doc Writer', category: 'workflow', triggers: ['doc'], priority: 5,
+        activation: { rules: [{ when: { 'intent.primary': 'documentation' }, score: 10 }], exclude: [], minScore: 5 } },
+      { id: 'testing-expert', name: 'Testing Expert', category: 'workflow', triggers: ['test'], priority: 10,
+        activation: { rules: [{ when: { 'tags': { $contains: 'test-coverage' } }, score: 2 }], exclude: [], minScore: 5 } },
+      { id: 'typescript-expert', name: 'TS Expert', category: 'language', triggers: ['typescript'], priority: 10,
+        activation: { rules: [{ when: { 'domains': { $contains: 'typescript' } }, score: 10 }], exclude: [], minScore: 5 } },
+      { id: 'python-expert', name: 'Python Expert', category: 'language', triggers: ['python'], priority: 10,
+        activation: { rules: [{ when: { 'domains': { $contains: 'python' } }, score: 10 }], exclude: [], minScore: 5 } },
+      { id: 'code-simplifier', name: 'Code Simplifier', category: 'workflow', triggers: ['refactor'], priority: 8,
+        activation: { rules: [{ when: { 'intent.primary': 'refactor' }, score: 8 }], exclude: [], minScore: 5 } },
+    ];
+    for (const d of defs) { const s = createSkillDefinition(d); p.set(s.id, s); }
+    return p;
+  }
+  const floorAgents = makeAgentPool(
+    makeAgent('bug-fixer', { source: 'builtin', activation: { rules: [
+      { when: { 'intent.primary': 'implementation' }, score: 7 },
+      { when: { 'intent.primary': 'bugfix' }, score: 9 },
+    ], exclude: [], minScore: 5 } }),
+  );
+  const tsStack = { language: 'typescript', framework: 'node', dependencies: [] as string[] };
+  const pyStack = { language: 'python', framework: 'fastapi', dependencies: [] as string[] };
+
+  it('REGRESSION: implementation code task in TS project → typescript-expert (NOT documentation-writer/testing-expert)', () => {
+    const d = routeTaskV2(
+      { title: 'add post-item lifecycle hook', description: 'implement a post-item cleanup hook in the dispatcher module',
+        scope: { directories: ['src/orchestra/'], filesRead: [], filesWrite: ['src/orchestra/x.ts'] },
+        type: 'code-development' },
+      floorAgents, makeFloorSkillPool(), { projectStack: tsStack },
+    );
+    expect(d.skillIds).toContain('typescript-expert');
+    expect(d.skillIds).not.toContain('documentation-writer');
+    expect(d.skillIds).not.toContain('testing-expert');
+  });
+
+  it('STACK-AWARE (product): implementation task in a PYTHON project → python-expert (not typescript-expert)', () => {
+    const d = routeTaskV2(
+      { title: 'add endpoint handler', description: 'implement the create handler in the api module',
+        scope: { directories: ['src/api/'], filesRead: [], filesWrite: ['src/api/x.py'] },
+        type: 'code-development' },
+      floorAgents, makeFloorSkillPool(), { projectStack: pyStack },
+    );
+    expect(d.skillIds).toContain('python-expert');
+    expect(d.skillIds).not.toContain('typescript-expert');
+  });
+
+  it('LOSSLESS: refactor task → code-simplifier (via activation, not the floor)', () => {
+    const d = routeTaskV2(
+      { title: 'refactor the dispatcher', description: 'refactor and restructure the dispatcher for clarity',
+        scope: { directories: ['src/orchestra/'], filesRead: [], filesWrite: ['src/orchestra/x.ts'] },
+        type: 'refactor' },
+      floorAgents, makeFloorSkillPool(), { projectStack: tsStack },
+    );
+    expect(d.taskDNA.intent.primary).toBe('refactor');
+    expect(d.skillIds).toContain('code-simplifier');
+  });
+
+  it('HONEST-EMPTY: unknown-intent task with no sub-threshold and no principled default → []', () => {
+    const d = routeTaskV2(
+      { title: 'zzz', description: 'zzz',
+        scope: { directories: [], filesRead: [], filesWrite: [] } },
+      floorAgents,
+      // pool whose only skill cannot match and is not a code/doc default
+      (() => { const p = new Map<string, SkillDefinition>();
+        const s = createSkillDefinition({ id: 'graphql-expert', name: 'GraphQL', category: 'workflow', triggers: ['graphql'],
+          activation: { rules: [{ when: { 'domains': { $contains: 'graphql' } }, score: 10 }], exclude: [], minScore: 5 } });
+        p.set(s.id, s); return p; })(),
+      { projectStack: tsStack },
+    );
+    expect(d.taskDNA.intent.primary).toBe('unknown');
+    expect(d.skillIds).toEqual([]);
+  });
+});
