@@ -689,8 +689,8 @@ describe('Evolution Pipeline Integration', () => {
 
   // ── Scenario 10: synergy conflict path ──────────────────────────────────
 
-  describe('Scenario 10: synergy conflict → exclusion rules', () => {
-    it('generates exclusion rules for skill-skill conflict', () => {
+  describe('Scenario 10: synergy conflict → reasoning only', () => {
+    it('detects skill-skill conflict in reasoning without emitting an unconditional rule', () => {
       for (let i = 0; i < 6; i++) {
         tracker.recordOutcome(makeOutcome({
           taskId: `conflict-${i}`,
@@ -708,10 +708,11 @@ describe('Evolution Pipeline Integration', () => {
       const evolver = new RuleEvolver(tracker);
       const result = evolver.evolveRules();
 
-      const exclusions = result.newRules.filter(
-        r => r.type === 'exclusion' && r.evidence.includes('skill-y'),
+      // Lean-A: synergy no longer emits unconditional rules — only reasoning.
+      const conflictRules = result.newRules.filter(
+        r => r.rule.name?.includes('conflict-skill-x-with-skill-y'),
       );
-      expect(exclusions.length).toBeGreaterThan(0);
+      expect(conflictRules).toEqual([]);
       expect(result.reasoning.some(r => r.includes('Conflict detected'))).toBe(true);
     });
 

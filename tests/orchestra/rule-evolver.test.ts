@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { RuleEvolver } from '../../src/orchestra/rule-evolver.js';
+import { RuleEvolver, isUnconditionalRule } from '../../src/orchestra/rule-evolver.js';
 import { OutcomeTracker } from '../../src/orchestra/outcome-tracker.js';
 import { createDefaultTaskDNA } from '../../src/core/routing-types.js';
 
@@ -120,7 +120,7 @@ describe('RuleEvolver', () => {
   });
 
   describe('evolveSynergyRules (skill-skill pairs)', () => {
-    it('creates activation EvolvedRule for synergistic skill pairs', () => {
+    it('does NOT create an unconditional activation rule for synergistic skill pairs (reasoning only)', () => {
       const dna = createDefaultTaskDNA();
       // 5 tasks where skill-a and skill-b always succeed together
       for (let i = 0; i < 5; i++) {
@@ -132,15 +132,16 @@ describe('RuleEvolver', () => {
       }
 
       const result = evolver.evolveRules();
+      // Lean-A: synergy no longer emits unconditional rules — only reasoning.
       const synergyRule = result.newRules.find(r =>
         r.type === 'activation' && r.entityType === 'skill' &&
         r.rule.name?.includes('synergy-skill-a-with-skill-b'),
       );
-      expect(synergyRule).toBeDefined();
-      expect(synergyRule!.sampleSize).toBe(5);
+      expect(synergyRule).toBeUndefined();
+      expect(result.reasoning.some(r => /Synergy detected/.test(r))).toBe(true);
     });
 
-    it('creates exclusion EvolvedRule for conflicting skill pairs', () => {
+    it('does NOT create an unconditional exclusion rule for conflicting skill pairs (reasoning only)', () => {
       const dna = createDefaultTaskDNA();
       // 5 tasks where skill-x and skill-y always fail together
       for (let i = 0; i < 5; i++) {
@@ -152,11 +153,13 @@ describe('RuleEvolver', () => {
       }
 
       const result = evolver.evolveRules();
+      // Lean-A: synergy no longer emits unconditional rules — only reasoning.
       const conflictRule = result.newRules.find(r =>
         r.type === 'exclusion' && r.entityType === 'skill' &&
         r.rule.name?.includes('conflict-skill-x-with-skill-y'),
       );
-      expect(conflictRule).toBeDefined();
+      expect(conflictRule).toBeUndefined();
+      expect(result.reasoning.some(r => /Conflict detected/.test(r))).toBe(true);
     });
 
     it('does not create skill-skill rules for agent+skill synergy pairs', () => {
@@ -179,9 +182,9 @@ describe('RuleEvolver', () => {
       expect(agentSkillRules).toHaveLength(0);
     });
 
-    it('sets correct confidence and status based on sample size', () => {
+    it('emits no synergy rule regardless of sample size (high samples still reasoning-only)', () => {
       const dna = createDefaultTaskDNA();
-      // 10 tasks → higher confidence
+      // 10 tasks → previously higher confidence; now still no rule emitted
       for (let i = 0; i < 10; i++) {
         tracker.recordOutcome({
           taskId: `task-${i}`, sprintId: 'sprint-001', taskDNA: dna,
@@ -191,10 +194,10 @@ describe('RuleEvolver', () => {
       }
 
       const result = evolver.evolveRules();
+      // Lean-A: synergy no longer emits unconditional rules — only reasoning.
       const rule = result.newRules.find(r => r.rule.name?.includes('synergy-skill-p-with-skill-q'));
-      expect(rule).toBeDefined();
-      expect(rule!.confidence).toBeGreaterThan(0.65);
-      expect(['auto-applied', 'suggested']).toContain(rule!.status);
+      expect(rule).toBeUndefined();
+      expect(result.reasoning.some(r => /Synergy detected: skill-p\+skill-q/.test(r))).toBe(true);
     });
 
     it('detects conflict in reasoning for failing pairs', () => {
@@ -272,5 +275,63 @@ describe('RuleEvolver', () => {
       );
       expect(exclusionRule).toBeDefined();
     });
+  });
+});
+
+describe('Lean-A — synergy/conflict no longer emit unconditional rules', () => {
+  // Mirrors the file's existing fixture style: seeds the synergy matrix via
+  // recordOutcome (skill+skill pairs) rather than poking the matrix directly,
+  // so the verdict is derived by the real OutcomeTracker logic.
+  function makeEvolverWithSynergyMatrix(
+    pairs: Array<{ pair: string; tasks: number; successRate: number; verdict: 'synergy' | 'conflict' }>,
+  ): { evolveRules: () => ReturnType<RuleEvolver['evolveRules']> } {
+    const tracker = new OutcomeTracker('/tmp/test');
+    const dna = createDefaultTaskDNA();
+    for (const p of pairs) {
+      const [skillA, skillB] = p.pair.split('+');
+      // verdict='synergy' needs successRate >= 0.85; 'conflict' needs < 0.5.
+      // Drive it with all-DONE (synergy) or all-NO_GO (conflict) co-uses.
+      const evaluation = p.verdict === 'synergy' ? 'DONE' : 'NO_GO';
+      const coverage = p.verdict === 'synergy' ? 95 : 0;
+      for (let i = 0; i < p.tasks; i++) {
+        tracker.recordOutcome({
+          taskId: `${p.pair}-${i}`, sprintId: 'sprint-001', taskDNA: dna,
+          agentId: null, skillIds: [skillA, skillB], evaluation,
+          coverage, routingVersion: 'v2',
+        });
+      }
+    }
+    const evolver = new RuleEvolver(tracker);
+    return { evolveRules: () => evolver.evolveRules() };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('isUnconditionalRule: true for empty when, false for a real condition or missing when', () => {
+    expect(isUnconditionalRule({ when: {} })).toBe(true);
+    expect(isUnconditionalRule({ when: { 'intent.primary': 'refactor' } })).toBe(false);
+    expect(isUnconditionalRule({})).toBe(false);
+    expect(isUnconditionalRule(undefined)).toBe(false);
+  });
+
+  it('evolveSynergyRules emits NO activation/exclusion rules (reasoning only) for skill-pair synergy/conflict', () => {
+    // High-sample synergy pair + conflict pair, both above MIN_SAMPLES, seeded
+    // through the real OutcomeTracker so the verdict is derived authentically.
+    const result = makeEvolverWithSynergyMatrix([
+      { pair: 'documentation-writer+typescript-expert', tasks: 12, successRate: 0.9, verdict: 'synergy' },
+      { pair: 'git-expert+performance-optimizer', tasks: 12, successRate: 0.1, verdict: 'conflict' },
+    ]).evolveRules();
+
+    // No synergy-*/conflict-* (unconditional when:{}) rules produced.
+    const synergyConflictRules = result.newRules.filter(r =>
+      /^(synergy|conflict)-/.test((r.rule as { name?: string }).name ?? ''),
+    );
+    expect(synergyConflictRules).toEqual([]);
+
+    // Reasoning is still emitted for both verdicts.
+    expect(result.reasoning.some(r => /Synergy detected/.test(r))).toBe(true);
+    expect(result.reasoning.some(r => /Conflict detected/.test(r))).toBe(true);
   });
 });

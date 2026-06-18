@@ -36,6 +36,7 @@ import { MemoryStore } from '../core/memory-store.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { getNextSprintId, readJsonSafe, debugLog } from '../core/utils.js';
+import { isUnconditionalRule } from './rule-evolver.js';
 
 // ─── Sprint Utilities ─────────────────────────────────────────────
 import { readFileSafe, extractGoNogoCriteria, isAdapterProvider } from './sprint-utils.js';
@@ -528,6 +529,15 @@ export async function planSprint(
         let injectedCount = 0;
 
         for (const evolved of autoApplied) {
+          // Lean-A: never inject a legacy/stale unconditional (`when: {}`) rule — it
+          // matches every task and reintroduces the synergy/conflict runaway.
+          if (isUnconditionalRule(evolved.rule as { when?: Record<string, unknown> })) {
+            debugLog(
+              'planSprint:evolved-rules',
+              `Skipped unconditional (empty-when) rule '${(evolved.rule as { name?: string }).name ?? evolved.entityId}'`,
+            );
+            continue;
+          }
           if (evolved.entityType === 'agent') {
             const agent = pool.get(evolved.entityId);
             if (!agent) continue;

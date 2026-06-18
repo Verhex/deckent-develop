@@ -39,6 +39,18 @@ const SIGNIFICANT_DELTA = 0.15;
 
 const EVOLVED_RULES_FILE = '.deckent/routing/evolved-rules.json';
 
+/**
+ * True when an evolved rule's condition is a present-but-empty object (`when: {}`).
+ * Such a rule matches EVERY task — a legacy synergy/conflict artifact that must not
+ * be injected into activation configs (it causes per-task score domination).
+ */
+export function isUnconditionalRule(
+  rule: { when?: Record<string, unknown> } | undefined | null,
+): boolean {
+  const w = rule?.when;
+  return !!w && typeof w === 'object' && !Array.isArray(w) && Object.keys(w).length === 0;
+}
+
 export class RuleEvolver {
   private readonly tracker: OutcomeTracker;
   private readonly projectRoot: string;
@@ -158,72 +170,22 @@ export class RuleEvolver {
 
     for (const entry of this.tracker.getSynergyMatrix()) {
       if (entry.tasks < MIN_SAMPLES) continue;
-      const parts = entry.pair.split('+') as [string, string];
-      const [partA, partB] = parts;
 
       if (entry.verdict === 'synergy') {
         reasoning.push(`Synergy detected: ${entry.pair} (${Math.round(entry.successRate * 100)}% over ${entry.tasks} tasks)`);
-
-        // Only create rules for skill-skill synergies (not agent+skill)
-        if (!this.isAgentId(partA) && !this.isAgentId(partB)) {
-          const confidence = Math.min(0.5 + entry.tasks * 0.04, 0.95);
-          const status = confidence >= AUTO_APPLY_CONFIDENCE ? 'auto-applied' :
-                         confidence >= SUGGEST_CONFIDENCE ? 'suggested' : 'pending';
-
-          rules.push({
-            type: 'activation',
-            entityId: partA,
-            entityType: 'skill',
-            rule: {
-              name: `synergy-${partA}-with-${partB}`,
-              when: {},
-              score: Math.round(entry.successRate * 5),
-            } as ActivationRule,
-            evidence: `${entry.tasks} co-uses with '${partB}', ${Math.round(entry.successRate * 100)}% success`,
-            confidence,
-            status,
-            sampleSize: entry.tasks,
-          });
-        }
+        // Lean-A: skill+skill synergy informs routing weight at COMPOSITION time
+        // (fast-follow), not as an unconditional `when: {}` activation rule that
+        // would fire on every task. No rule emitted here.
       }
 
       if (entry.verdict === 'conflict') {
         reasoning.push(`Conflict detected: ${entry.pair} (${Math.round(entry.successRate * 100)}% over ${entry.tasks} tasks)`);
-
-        // Only create exclusion rules for skill-skill conflicts
-        if (!this.isAgentId(partA) && !this.isAgentId(partB)) {
-          const confidence = Math.min(0.5 + entry.tasks * 0.04, 0.95);
-          const status = confidence >= AUTO_APPLY_CONFIDENCE ? 'auto-applied' :
-                         confidence >= SUGGEST_CONFIDENCE ? 'suggested' : 'pending';
-
-          rules.push({
-            type: 'exclusion',
-            entityId: partA,
-            entityType: 'skill',
-            rule: {
-              name: `conflict-${partA}-with-${partB}`,
-              when: {},
-              reason: `Conflict with '${partB}' — low success rate (${Math.round(entry.successRate * 100)}%) when co-used`,
-            } as ExclusionRule,
-            evidence: `${entry.tasks} co-uses with '${partB}', ${Math.round(entry.successRate * 100)}% success`,
-            confidence,
-            status,
-            sampleSize: entry.tasks,
-          });
-        }
+        // Lean-A: same — no unconditional exclusion rule. Conflict is a pairwise,
+        // composition-time signal, not a per-task exclusion.
       }
     }
 
     return { rules, reasoning };
-  }
-
-  /**
-   * Detect if an entity ID belongs to an agent (vs a skill).
-   * Uses the learnings agent performance keys as the source of truth.
-   */
-  private isAgentId(entityId: string): boolean {
-    const learnings = this.tracker.getLearnings();
-    return entityId in learnings.agentPerformance;
   }
 
   /**
