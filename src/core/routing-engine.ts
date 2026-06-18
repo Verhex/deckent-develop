@@ -30,7 +30,7 @@ import { evaluateActivation, migrateV1AgentToActivation, migrateV1SkillToActivat
 import { analyzeSkillInMemory } from '../orchestra/ecosystem-intelligence.js';
 import { resolveComposition } from './skill-selector.js';
 import { modelRegistry } from './model-registry.js';
-import { normalizeTechStack } from './work-model.js';
+import { normalizeTechStack, taskKindToIntent } from './work-model.js';
 import type { TaskKind } from './work-model.js';
 import { getAgentDomain, type AgentDomain } from './agent-pool.js';
 import { debugLog } from './utils.js';
@@ -293,7 +293,7 @@ interface ScoredCandidate {
  * Route a task to the best agent + skills using the v2 intent-based engine.
  */
 export function routeTaskV2(
-  task: { title: string; description: string; scope: TaskScope },
+  task: { title: string; description: string; scope: TaskScope; type?: TaskKind },
   agentPool: AgentPool,
   skillPool: Map<string, SkillDefinition>,
   options?: RoutingOptions,
@@ -307,6 +307,17 @@ export function routeTaskV2(
   // Step 1: Classify task intent
   const taskDNA = classifyIntent(task);
   reasoning.push(`Intent: ${taskDNA.intent.primary} (confidence: ${taskDNA.intent.confidence})`);
+
+  // ROUTE-1 B3 — when the keyword classifier cannot resolve an intent, fall back to the
+  // canonical TaskKind SSOT (scope-shape) instead of 'unknown'. Confident classifications
+  // are never overridden — the operation axis outranks the medium axis.
+  if (taskDNA.intent.primary === 'unknown' && task.type !== undefined) {
+    const kindIntent = taskKindToIntent(task.type);
+    if (kindIntent !== 'unknown') {
+      taskDNA.intent.primary = kindIntent;
+      reasoning.push(`Intent from TaskKind SSOT: ${kindIntent} (task.type=${task.type})`);
+    }
+  }
 
   // Step 2: Resolve user overrides
   const resolved = resolveOverrides(overrides);
@@ -349,7 +360,7 @@ export function routeTaskV2(
     if (dynamicExclusions.length > 0) {
       reasoning.push(`Dynamic exclusions: [${dynamicExclusions.join(', ')}]`);
     }
-    const agentResult = selectBestAgent(taskDNA, agentPool, cfg, learningData, allExcludeAgents);
+    const agentResult = selectBestAgent(taskDNA, agentPool, cfg, learningData, allExcludeAgents, task.type);
     agentId = agentResult.agentId;
     agentScore = agentResult.score;
     agentConfidence = agentResult.confidence;
@@ -474,9 +485,13 @@ function selectBestAgent(
   cfg: RoutingEngineConfig,
   learningData: LearningBonus[],
   excludeAgents: string[],
+  taskKind?: TaskKind,
 ): { agentId: string | null; score: number; confidence: ConfidenceLevel; reasoning: string[] } {
   const candidates: ScoredCandidate[] = [];
   const reasoning: string[] = [];
+
+  // ROUTE-1 B2 — suppress path-proxy + user-surface bonus for touch-up / non-build tasks.
+  const buildTask = isSurfaceBuildTask(taskDNA.intent.primary, taskKind);
 
   for (const [id, agent] of pool) {
     if (!agent.enabled) continue;
@@ -485,7 +500,8 @@ function selectBestAgent(
     // surface (cli/api→api-builder, dashboard→frontend-designer, e2e→ci-guardian)
     // gets +USER_SURFACE_BONUS and BYPASSES excludes (override + activation), so
     // a user-facing task cannot collapse to refactorer's generic impl@7.
-    const surfaceBonus = getUserSurfaceBonus(id, taskDNA);
+    // ROUTE-1 B2: suppressed for non-build tasks (touch-ups, refactor, doc, audit).
+    const surfaceBonus = buildTask ? getUserSurfaceBonus(id, taskDNA) : 0;
 
     if (excludeAgents.includes(id)) {
       if (surfaceBonus > 0) {
@@ -516,7 +532,7 @@ function selectBestAgent(
     // agent (api-builder / security-auditor / devops-engineer / …) beats
     // the generic refactorer impl@7 candidate. Refactorer/architect still
     // get impl@7; this is purely an additive tiebreaker.
-    const domainBonus = getDomainMatchBonus(id, getAgentDomain(agent), taskDNA);
+    const domainBonus = getDomainMatchBonus(id, getAgentDomain(agent), taskDNA, buildTask);
     if (domainBonus > 0) {
       reasoning.push(`Agent '${id}' domain-match bonus: +${domainBonus} (intent=${taskDNA.intent.primary}, domains=[${taskDNA.domains.map(d => d.name).join(', ')}])`);
     }
