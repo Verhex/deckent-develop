@@ -629,7 +629,7 @@ export const WRITE_ACTION_PREDICATES: Record<string, (args: any) => boolean> = {
   deckent_config: (a) => a?.action === 'set',
   deckent_docs: (a) => ['add', 'remove', 'update', 'run', 'track-scan'].includes(a?.action),
   deckent_autonomous: (a) =>
-    ['start', 'stop', 'backlog_add', 'backlog_remove', 'backlog_approve', 'backlog_reject'].includes(a?.action),
+    ['start', 'stop', 'backlog_add', 'backlog_remove', 'approve', 'reject'].includes(a?.action),
   deckent_nervous_config: (a) => ['set_preset', 'set_override', 'reset'].includes(a?.action),
 };
 
