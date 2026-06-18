@@ -1482,6 +1482,10 @@ const MESSAGES: MessageMap = {
     en: '{count} critical-stale doc(s) found:',
     tr: '{count} kritik-bayat doküman bulundu:',
   },
+  'mcp.writer_lease.denied': {
+    en: "Write tool '{tool}' is held by another deckent window (pid {pid}). Read tools work here; mutations run in that window — the lease transfers automatically when it exits.",
+    tr: "'{tool}' yazma aracı başka bir deckent penceresinde (pid {pid}) kilitli. Okuma araçları burada çalışır; değişiklikler o pencerede yürür — pencere kapanınca yetki otomatik devrolur.",
+  },
 };
 
 /**
