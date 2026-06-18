@@ -9,6 +9,7 @@ import { classifyIntent } from '../../src/core/intent-classifier.js';
 import type { AgentDefinition, AgentPool } from '../../src/core/agent-types.js';
 import { createAgentDefinition } from '../../src/core/agent-types.js';
 import type { SkillDefinition } from '../../src/core/skill-types.js';
+import { createSkillDefinition } from '../../src/core/skill-types.js';
 
 // ROUTE-1 — routing-v2 precision: path-proxy + surface bonus gated by operation/medium.
 
@@ -115,5 +116,52 @@ describe('ROUTE-1 B2/B3 — agent selection', () => {
       pool, emptySkillPool,
     );
     expect(decision.taskDNA.intent.primary).toBe('refactor');
+  });
+});
+
+function makeSkillPool(...defs: Array<Partial<SkillDefinition> & { id: string; name: string }>): Map<string, SkillDefinition> {
+  const p = new Map<string, SkillDefinition>();
+  for (const d of defs) { const s = createSkillDefinition(d); p.set(s.id, s); }
+  return p;
+}
+
+const skillPool = makeSkillPool(
+  { id: 'code-simplifier', name: 'Code Simplifier', category: 'workflow', triggers: ['refactor', 'cleanup', 'simplify'], priority: 8 },
+  { id: 'typescript-expert', name: 'TypeScript Expert', category: 'language', triggers: ['typescript', 'ts', 'types'], priority: 10 },
+  { id: 'api-builder', name: 'API Builder', category: 'workflow', triggers: ['api', 'endpoint', 'rest'], priority: 7 },
+);
+
+describe('ROUTE-1 B4 — skill selection', () => {
+  it('refactor comment-sweep → non-empty skills incl. code-simplifier', () => {
+    const decision = routeTaskV2(
+      { title: 'clean stale comments', description: 'remove stale comments from the api module',
+        scope: { directories: ['src/api/'], filesRead: [], filesWrite: ['src/api/x.ts'] },
+        type: 'code-development' },
+      pool, skillPool,
+    );
+    expect(decision.skillIds.length).toBeGreaterThan(0);
+    expect(decision.skillIds).toContain('code-simplifier');
+  });
+
+  it('refactor task does NOT pull the api path-proxy skill', () => {
+    const decision = routeTaskV2(
+      { title: 'remove dead comments', description: 'delete dead comments in api',
+        scope: { directories: ['src/api/'], filesRead: [], filesWrite: ['src/api/x.ts'] },
+        type: 'code-development' },
+      pool, skillPool,
+    );
+    expect(decision.skillIds).not.toContain('api-builder');
+  });
+
+  it('floor: a classified task never returns empty skills when a default exists', () => {
+    const decision = routeTaskV2(
+      { title: 'tidy comments', description: 'sweep stale comments',
+        scope: { directories: ['src/x/'], filesRead: [], filesWrite: ['src/x/y.ts'] },
+        type: 'refactor' },
+      pool, makeSkillPool(
+        { id: 'code-simplifier', name: 'Code Simplifier', category: 'workflow', triggers: ['xyzzy'], priority: 1 },
+      ),
+    );
+    expect(decision.skillIds).toContain('code-simplifier');
   });
 });

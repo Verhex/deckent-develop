@@ -405,7 +405,7 @@ export function routeTaskV2(
     const skillResult = selectBestSkills(
       taskDNA, skillPool, cfg, learningData,
       resolved.excludeSkills ?? [], skillBudget,
-      options?.projectStack ?? null,
+      options?.projectStack ?? null, task.type,
     );
     skillIds = skillResult.skillIds;
     for (const [id, score] of skillResult.scores) skillScores.set(id, score);
@@ -576,6 +576,44 @@ function selectBestAgent(
 
 // ─── Skill Selection ────────────────────────────────────────────────────────
 
+/** ROUTE-1 B4 — guaranteed skill when none cleared skillMinScore. */
+const KIND_DEFAULT_SKILL: Partial<Record<TaskKind, string>> = {
+  'code-development': 'typescript-expert',
+  refactor:          'code-simplifier',
+  documentation:     'documentation-writer',
+  audit:             'code-simplifier',
+  test:              'testing-expert',
+};
+const INTENT_DEFAULT_SKILL: Partial<Record<IntentType, string>> = {
+  refactor:       'code-simplifier',
+  implementation: 'typescript-expert',
+  documentation:  'documentation-writer',
+};
+
+/**
+ * Pick a floor skill when no candidate cleared the threshold:
+ *  (1) the best sub-threshold candidate (score > 0), else
+ *  (2) a kind/intent default that exists in the pool.
+ * Returns null for genuinely unclassifiable tasks (intent 'unknown', no sub-threshold)
+ * so an empty pool / no-signal task honestly yields no skill.
+ */
+function pickSkillFloor(
+  subThreshold: Array<{ id: string; finalScore: number }>,
+  intent: IntentType,
+  taskKind: TaskKind | undefined,
+  pool: Map<string, SkillDefinition>,
+): string | null {
+  if (subThreshold.length > 0) {
+    return [...subThreshold].sort((a, b) => b.finalScore - a.finalScore)[0]!.id;
+  }
+  if (intent === 'unknown') return null;
+  const byKind = taskKind ? KIND_DEFAULT_SKILL[taskKind] : undefined;
+  if (byKind && pool.has(byKind)) return byKind;
+  const byIntent = INTENT_DEFAULT_SKILL[intent];
+  if (byIntent && pool.has(byIntent)) return byIntent;
+  return null;
+}
+
 function selectBestSkills(
   taskDNA: TaskDNA,
   pool: Map<string, SkillDefinition>,
@@ -584,9 +622,12 @@ function selectBestSkills(
   excludeSkills: string[],
   budget: SkillBudget,
   projectStack: { language: string; framework: string; dependencies: string[] } | null,
+  taskKind?: TaskKind,
 ): { skillIds: string[]; scores: Map<string, number>; confidence: ConfidenceLevel; reasoning: string[] } {
   const candidates: ScoredCandidate[] = [];
+  const subThreshold: Array<{ id: string; finalScore: number }> = [];
   const reasoning: string[] = [];
+  const buildTask = isSurfaceBuildTask(taskDNA.intent.primary, taskKind);
 
   for (const [id, skill] of pool) {
     if (!skill.enabled) continue;
@@ -641,7 +682,7 @@ function selectBestSkills(
     }
 
     // Intent-based priority bonus: boost skills aligned with task's primary intent
-    const intentBonus = getIntentPriorityBonus(id, taskDNA, projectStack);
+    const intentBonus = getIntentPriorityBonus(id, taskDNA, projectStack, buildTask);
     if (intentBonus > 0) {
       reasoning.push(`Skill '${id}' intent-priority bonus: +${intentBonus} (intent=${taskDNA.intent.primary})`);
     }
@@ -661,10 +702,18 @@ function selectBestSkills(
         finalScore,
         matchedRules: result.matchedRules,
       });
+    } else if (finalScore > 0) {
+      subThreshold.push({ id, finalScore });
     }
   }
 
   if (candidates.length === 0) {
+    // ROUTE-1 B4 — empty-skill floor: never return [] for a classified task.
+    const floorId = pickSkillFloor(subThreshold, taskDNA.intent.primary, taskKind, pool);
+    if (floorId) {
+      reasoning.push(`Skill floor: '${floorId}' (no candidate ≥ ${cfg.skillMinScore})`);
+      return { skillIds: [floorId], scores: new Map([[floorId, 0]]), confidence: 'low', reasoning };
+    }
     reasoning.push('No skill met minimum score threshold');
     return { skillIds: [], scores: new Map(), confidence: 'uncertain', reasoning };
   }
@@ -690,6 +739,18 @@ function selectBestSkills(
   const finalCandidates = candidates
     .filter(c => resolvedIds.has(c.id))
     .slice(0, budget.maxSkills);
+
+  // ROUTE-1 B4 — budget-cap floor: trivial tasks (maxSkills=0) would drop all
+  // candidates; preserve the best-scored candidate as a floor instead.
+  if (finalCandidates.length === 0) {
+    const budgetFloorId = candidates[0]?.id
+      ?? pickSkillFloor(subThreshold, taskDNA.intent.primary, taskKind, pool);
+    if (budgetFloorId) {
+      const topScore = candidates[0]?.finalScore ?? 0;
+      reasoning.push(`Skill floor (budget cap): '${budgetFloorId}' (maxSkills=${budget.maxSkills})`);
+      return { skillIds: [budgetFloorId], scores: new Map([[budgetFloorId, topScore]]), confidence: 'low', reasoning };
+    }
+  }
 
   const scores = new Map<string, number>();
   const skillIds: string[] = [];
@@ -887,6 +948,8 @@ export const INTENT_TO_SKILL_ID: Partial<Record<IntentType, string>> = {
   migration:     'database-migration',
   performance:   'performance-optimizer',
   architecture:  'system-architect',
+  refactor:      'code-simplifier',   // ROUTE-1 B4
+  config:        'devops-engineer',   // ROUTE-1 B4
 };
 
 /** Map path-extracted task domain name (TaskDNA.domains[].name) → skill id.
@@ -924,29 +987,30 @@ function getIntentPriorityBonus(
   skillId: string,
   taskDNA: TaskDNA,
   projectStack: { language: string; framework: string; dependencies: string[] } | null,
+  allowPathProxy: boolean = true,
 ): number {
   const primary = taskDNA.intent.primary;
 
-  // Sprint 148: test-coverage tag replaces former 'testing' primary intent
   if (taskDNA.tags?.includes('test-coverage') && skillId === 'testing-expert') return 2;
   if (primary === 'documentation' && skillId === 'documentation-writer') return 2;
 
   if (primary === 'implementation' && skillId === 'typescript-expert') {
-    // Boost typescript-expert when TypeScript is the project language or detected in domains
     const isTypeScript =
       projectStack?.language?.toLowerCase() === 'typescript' ||
       taskDNA.domains.some(d => d.name.toLowerCase().includes('typescript'));
     if (isTypeScript) return 2;
   }
 
-  // Sprint 209-004: intent→skill bonus (domain skill diversification via intent signal)
+  // intent→skill (intent-driven, always honoured)
   const intentSkillId = INTENT_TO_SKILL_ID[primary];
   if (intentSkillId === skillId) return SKILL_DOMAIN_BONUS;
 
-  // Sprint 209-004: domain→skill bonus (domain skill diversification via scope path signal)
-  for (const domain of taskDNA.domains) {
-    const domainSkillId = TASK_DOMAIN_TO_SKILL_ID[domain.name.toLowerCase()];
-    if (domainSkillId === skillId) return SKILL_DOMAIN_BONUS;
+  // domain→skill (path proxy, gated — ROUTE-1 B4)
+  if (allowPathProxy) {
+    for (const domain of taskDNA.domains) {
+      const domainSkillId = TASK_DOMAIN_TO_SKILL_ID[domain.name.toLowerCase()];
+      if (domainSkillId === skillId) return SKILL_DOMAIN_BONUS;
+    }
   }
 
   return 0;
