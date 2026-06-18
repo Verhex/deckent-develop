@@ -99,6 +99,13 @@ import type { Sprint, Task, TaskResult, ResolvedConfig } from '../../src/core/ty
 import { buildSprintFromTasks, registerFinalize } from '../../src/cli/commands/finalize.js';
 import { finalizeSprint, persistFinalSprintState } from '../../src/orchestra/sprint-finalizer.js';
 
+// The end-to-end finalize tests run the full finalizeSprint pipeline (real
+// better-sqlite3 memory.db I/O, archive, decay) — sometimes twice (double-finalize).
+// spawnSync is mocked (no real subprocess), but the DB-heavy pipeline legitimately
+// exceeds vitest's 10s default under CI parallel load. Bump the file-wide timeout so
+// these heavy-but-correct tests don't flake on slow/loaded machines.
+vi.setConfig({ testTimeout: 45_000 });
+
 // ─── Fixture Helpers ─────────────────────────────────────────────────
 
 const SPRINT_ID = 'sprint-900';
