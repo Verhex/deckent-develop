@@ -584,6 +584,7 @@ const KIND_DEFAULT_SKILL: Partial<Record<TaskKind, string>> = {
   audit:             'code-simplifier',
   test:              'testing-expert',
 };
+// Fallback when taskKind is unavailable (pickSkillFloor tries KIND_DEFAULT_SKILL first).
 const INTENT_DEFAULT_SKILL: Partial<Record<IntentType, string>> = {
   refactor:       'code-simplifier',
   implementation: 'typescript-expert',
@@ -742,7 +743,8 @@ function selectBestSkills(
 
   // ROUTE-1 B4 — budget-cap floor: trivial tasks (maxSkills=0) would drop all
   // candidates; preserve the best-scored candidate as a floor instead.
-  if (finalCandidates.length === 0) {
+  // Unknown-intent guard: mirrors pickSkillFloor contract — unclassifiable tasks return [].
+  if (finalCandidates.length === 0 && taskDNA.intent.primary !== 'unknown') {
     const budgetFloorId = candidates[0]?.id
       ?? pickSkillFloor(subThreshold, taskDNA.intent.primary, taskKind, pool);
     if (budgetFloorId) {

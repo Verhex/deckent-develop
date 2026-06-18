@@ -119,19 +119,19 @@ describe('ROUTE-1 B2/B3 — agent selection', () => {
   });
 });
 
-function makeSkillPool(...defs: Array<Partial<SkillDefinition> & { id: string; name: string }>): Map<string, SkillDefinition> {
-  const p = new Map<string, SkillDefinition>();
-  for (const d of defs) { const s = createSkillDefinition(d); p.set(s.id, s); }
-  return p;
-}
-
-const skillPool = makeSkillPool(
-  { id: 'code-simplifier', name: 'Code Simplifier', category: 'workflow', triggers: ['refactor', 'cleanup', 'simplify'], priority: 8 },
-  { id: 'typescript-expert', name: 'TypeScript Expert', category: 'language', triggers: ['typescript', 'ts', 'types'], priority: 10 },
-  { id: 'api-builder', name: 'API Builder', category: 'workflow', triggers: ['api', 'endpoint', 'rest'], priority: 7 },
-);
-
 describe('ROUTE-1 B4 — skill selection', () => {
+  function makeSkillPool(...defs: Array<Partial<SkillDefinition> & { id: string; name: string }>): Map<string, SkillDefinition> {
+    const p = new Map<string, SkillDefinition>();
+    for (const d of defs) { const s = createSkillDefinition(d); p.set(s.id, s); }
+    return p;
+  }
+
+  const skillPool = makeSkillPool(
+    { id: 'code-simplifier', name: 'Code Simplifier', category: 'workflow', triggers: ['refactor', 'cleanup', 'simplify'], priority: 8 },
+    { id: 'typescript-expert', name: 'TypeScript Expert', category: 'language', triggers: ['typescript', 'ts', 'types'], priority: 10 },
+    { id: 'api-builder', name: 'API Builder', category: 'workflow', triggers: ['api', 'endpoint', 'rest'], priority: 7 },
+  );
+
   it('refactor comment-sweep → non-empty skills incl. code-simplifier', () => {
     const decision = routeTaskV2(
       { title: 'clean stale comments', description: 'remove stale comments from the api module',
@@ -151,6 +151,16 @@ describe('ROUTE-1 B4 — skill selection', () => {
       pool, skillPool,
     );
     expect(decision.skillIds).not.toContain('api-builder');
+  });
+
+  it('build api task DOES include api-builder (positive-control: path-proxy allowed for builds)', () => {
+    const decision = routeTaskV2(
+      { title: 'implement new endpoint', description: 'implement a new rest api endpoint for users',
+        scope: { directories: ['src/api/'], filesRead: [], filesWrite: ['src/api/users.ts'] },
+        type: 'code-development' },
+      pool, skillPool,
+    );
+    expect(decision.skillIds).toContain('api-builder');
   });
 
   it('floor: a classified task never returns empty skills when a default exists', () => {
