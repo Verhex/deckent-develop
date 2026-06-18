@@ -8,16 +8,17 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { addDoc, removeDoc, loadDocsConfig, saveDocsConfig } from '../../orchestra/managed-docs/docs-config.js';
 import { runManagedDocUpdates, buildStandaloneDocContext } from '../../orchestra/managed-docs/managed-doc-runner.js';
 import { validatePath } from '../../core/validators.js';
+import { runDocsTrackScan, runDocsTrackStatus } from '../../cli/commands/docs.js';
 
 export function registerDocsTool(server: McpServer): void {
   server.registerTool(
     'deckent_docs',
     {
       title: 'Managed Docs',
-      description: 'Manage user-defined documents in sprint lifecycle. Actions: "add" registers a file; "remove" unregisters; "list" shows all; "update" modifies section rules; "run" triggers doc updates without a sprint. Auto sections are updated with generated content (metrics, debt, history, etc.). Protected sections are never touched.',
+      description: 'Manage user-defined documents in sprint lifecycle. Actions: "add" registers a file; "remove" unregisters; "list" shows all; "update" modifies section rules; "run" triggers doc updates without a sprint; "track-scan" runs a DB-only doc-tracking scan (hash + DCR + stale); "track-status" lists tracked doc health. Auto sections are updated with generated content (metrics, debt, history, etc.). Protected sections are never touched.',
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        action: z.enum(['add', 'remove', 'list', 'update', 'run']).describe('Action to perform'),
+        action: z.enum(['add', 'remove', 'list', 'update', 'run', 'track-scan', 'track-status']).describe('Action to perform'),
         file: z.string().optional().describe('File path or doc ID (required for add/remove/update)'),
         autoSections: z.array(z.string()).optional().describe('Section headings for auto-update (e.g., ["Sprint Metrics", "Active Debt"])'),
         protectedSections: z.array(z.string()).optional().describe('Section headings to protect (e.g., ["Vision", "Architecture"])'),
@@ -33,6 +34,15 @@ export function registerDocsTool(server: McpServer): void {
       const root = rootArg ?? process.cwd();
 
       try {
+        if (action === 'track-scan') {
+          const { count, stale } = await runDocsTrackScan(root, { write: false, prune: false });
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ success: true, count, stale }) }] };
+        }
+        if (action === 'track-status') {
+          const rows = runDocsTrackStatus(root, { stale: false });
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ docs: rows }) }] };
+        }
+
         if (action === 'list') {
           const config = loadDocsConfig(root);
           if (!config || config.docs.length === 0) {
