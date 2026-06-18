@@ -53,6 +53,7 @@ import { registerEnterpriseRoutes, handleEnterpriseTenantWrite, handleEnterprise
 import { resolveChatProvider } from '../core/config.js';
 import { resolveChatAdapter } from '../cli/commands/chat-provider-parity.js';
 import { registerCoverageRoutes } from './coverage-endpoint.js';
+import { registerDocsHealthRoute } from './docs-health-endpoint.js';
 import { registerAuthMeRoute } from './auth-me-endpoint.js';
 import { registerOidcCallbackRoute } from './oidc-callback-endpoint.js';
 import { handleOutputStream, isOutputStreamRequest } from './output-stream.js';
@@ -821,6 +822,8 @@ async function handleRequest(
     if (registerEnterpriseRoutes(url, method, res, projectRoot, rateLimiter ? { rateLimiter } : {})) return;
     // Coverage history + brain budget: /api/coverage
     if (registerCoverageRoutes(url, res, projectRoot)) return;
+    // Docs health (doc-tracking ADR-090): /api/docs/health
+    if (registerDocsHealthRoute(url, res, projectRoot)) return;
     // Auth identity: /api/auth/me (277-001)
     if (registerAuthMeRoute(url, method, res, req)) return;
 
