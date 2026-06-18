@@ -98,6 +98,17 @@ describe('installWriterLeaseGate', () => {
     await expect(handlers.get('deckent_start')!({}, {})).resolves.toBe('ran');
   });
 
+  it('fails open (runs the write) when the lease cannot be written', async () => {
+    // projectRoot is a FILE, so the lease dir under it cannot be created → acquire throws
+    const root = sandbox();
+    const filePath = join(root, 'not-a-dir');
+    writeFileSync(filePath, 'x', 'utf-8');
+    const { server, handlers } = makeStub();
+    installWriterLeaseGate(server, { projectRoot: filePath, lang: 'en', isAlive: () => true });
+    server.registerTool('deckent_start', { annotations: { readOnlyHint: false } }, async () => 'ran');
+    await expect(handlers.get('deckent_start')!({}, {})).resolves.toBe('ran');
+  });
+
   it('mixed tool read action runs even when lease is held', async () => {
     const root = sandbox();
     seedOtherOwner(root, 999_013);

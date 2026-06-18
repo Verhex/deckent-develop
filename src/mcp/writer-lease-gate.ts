@@ -59,7 +59,18 @@ export function installWriterLeaseGate(server: McpServer, ctx: WriterLeaseGateCo
 
     const gated = async (args: unknown, extra: unknown): Promise<unknown> => {
       if (!isWriteCall(name, args)) return cb(args, extra);
-      const lease = acquireOrCheckWriterLease(ctx.projectRoot, leaseOpts);
+      let lease: ReturnType<typeof acquireOrCheckWriterLease>;
+      try {
+        lease = acquireOrCheckWriterLease(ctx.projectRoot, leaseOpts);
+      } catch (err) {
+        // Fail-open (spec §Error-Handling): a lease fs-error must NOT brick the
+        // write surface. The only dangerous op (deckent_start) is backstopped by
+        // the deep sprint-lock (isSprintLocked), so allowing the write is safe.
+        process.stderr.write(
+          `deckent-mcp: writer-lease check failed for ${name}, allowing write (fail-open): ${err instanceof Error ? err.message : String(err)}\n`,
+        );
+        return cb(args, extra);
+      }
       if (!lease.ok) return buildLeaseDenialResponse(name, lease.ownerPid, ctx.lang);
       return cb(args, extra);
     };
