@@ -189,7 +189,7 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 | `deckent_agent_list` | Kayitli agent'lari listele (built-in ve temp) | Evet | Hayir |
 | `deckent_skill_list` | Kayitli skill'leri listele (manifest ve AST sandbox info) | Evet | Hayir |
 | `deckent_checkpoint` | Checkpoint approve/reject | Hayir | Hayir |
-| `deckent_docs` | Sprint lifecycle dokuman yonetimi (add/remove/list) | Hayir | Hayir |
+| `deckent_docs` | Sprint lifecycle dokuman yonetimi (add/remove/list + track-scan/track-status — doc-health, ADR-090) | Hayir | Hayir |
 | `deckent_explain` | Sprint gecmisini ve sonuclarini acikla | Evet | Hayir |
 | `deckent_memory_query` | Proje hafizasinda cross-source arama (ADR, sprint, debt, pattern) | Evet | Hayir |
 | `deckent_watch` | Sprint event'lerini gercek zamanli akisla izle | Evet | Hayir |

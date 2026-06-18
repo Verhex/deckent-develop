@@ -350,7 +350,15 @@ Separate `better-sqlite3` connection to `.brain/memory.db` (does NOT touch `entr
 
 `.deckent/settings/docs.json` additive `tracking` block (all optional, merged over defaults): `rankMap`, `defaultRank`, `trackIgnore`, `noFrontmatter`, `scoring{weights{content,code,ageMax},criticalAt,staleAt,maxRank}`, `sizeCapBytes`.
 
-CLI: `deckent docs track scan [--no-write] [--prune]` · `docs track status [--stale] [--rank <n>] [--json]` · `docs track sync`.
+CLI: `deckent docs track scan [--no-write] [--prune] [--check] [--max-rank <n>]` · `docs track status [--stale] [--rank <n>] [--json]` · `docs track sync`.
+
+### Doc-Tracking Faz 2 surfaces (ADR-090)
+
+- **`GET /api/docs/health`** (auth-gated, read-only) → `{ rows: DocStatusRow[], heatmap: {bucket,state,count}[], generatedAt }`. Buckets: `0` / `1-10` / `11-50` / `51-94` / `95+`. Consumed by the dashboard "Docs Health" page (`/docs-health`).
+- **MCP `deckent_docs`** actions: `track-scan` (DB-only scan → `{count,stale}`), `track-status` (→ `{docs:[...]}`).
+- **CLI `--check`**: `deckent docs track scan --check [--max-rank <n>]` exits non-zero if any `CRITICAL_STALE` doc (optionally `doc_rank <= n`).
+- **code-drift**: docs with a `tracks:` front-matter glob get `signals.code_drift` (true when any tracked source file's git author-date is newer than the doc; null when no `tracks`).
+- **Config:** `config.doc_tracking.sync_on_finalize` (boolean, default `false`) — DB-only doc-tracking sync at sprint finalize (fail-safe).
 
 ## Lock File Format
 
