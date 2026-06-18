@@ -175,3 +175,55 @@ describe('ROUTE-1 B4 — skill selection', () => {
     expect(decision.skillIds).toContain('code-simplifier');
   });
 });
+
+describe('ROUTE-1 — capstone: dual-perspective end-to-end', () => {
+  // Local skill pool — mirrors B4 makeSkillPool but visible at capstone scope.
+  function makeCapstoneSkillPool(...defs: Array<Partial<SkillDefinition> & { id: string; name: string }>): Map<string, SkillDefinition> {
+    const p = new Map<string, SkillDefinition>();
+    for (const d of defs) { const s = createSkillDefinition(d); p.set(s.id, s); }
+    return p;
+  }
+  const skillPool = makeCapstoneSkillPool(
+    { id: 'code-simplifier', name: 'Code Simplifier', category: 'workflow', triggers: ['refactor', 'cleanup', 'simplify'], priority: 8 },
+    { id: 'typescript-expert', name: 'TypeScript Expert', category: 'language', triggers: ['typescript', 'ts', 'types'], priority: 10 },
+    { id: 'api-builder', name: 'API Builder', category: 'workflow', triggers: ['api', 'endpoint', 'rest'], priority: 7 },
+  );
+
+  it('DOGFOOD: deckent comment-sweep → refactorer + code-simplifier, never api-builder/[]', () => {
+    const d = routeTaskV2(
+      { title: 'stale-comment sweep', description: 'clean stale and dead comments across modules',
+        scope: { directories: ['src/api/'], filesRead: [], filesWrite: ['src/api/x.ts'] },
+        type: 'code-development' },
+      pool, skillPool,
+    );
+    expect(d.agentId).not.toBe('api-builder');
+    expect(['refactorer', 'code-reviewer']).toContain(d.agentId);
+    expect(d.skillIds.length).toBeGreaterThan(0);
+    expect(d.skillIds).toContain('code-simplifier');
+  });
+
+  it('PRODUCT: a user project refactor/cleanup sweep under src/api/ is not hijacked to api-builder', () => {
+    // "cleanup" / "remove dead code" → refactor intent → buildTask=false → surface+path-proxy
+    // bonuses suppressed → refactorer(10) > api-builder(8) → not api-builder.
+    // (Justification: "remove obsolete jsdoc" classifies as documentation intent, where
+    // no pool agent activates on documentation, so api-builder wins via domain rule — that
+    // is NOT the B2 misroute class; the B2 gate only suppresses the BONUS, not base scores.)
+    const d = routeTaskV2(
+      { title: 'cleanup and remove dead code in api handlers', description: 'refactor and remove dead code from api module',
+        scope: { directories: ['src/api/'], filesRead: [], filesWrite: ['src/api/handlers.ts'] },
+        type: 'code-development' },
+      pool, skillPool,
+    );
+    expect(d.agentId).not.toBe('api-builder');
+  });
+
+  it('LOSSLESS PRODUCT: a user building their API still gets api-builder', () => {
+    const d = routeTaskV2(
+      { title: 'build the orders endpoint', description: 'implement POST /api/orders with validation',
+        scope: { directories: ['src/api/'], filesRead: [], filesWrite: ['src/api/orders.ts'] },
+        type: 'code-development' },
+      pool, skillPool,
+    );
+    expect(d.agentId).toBe('api-builder');
+  });
+});

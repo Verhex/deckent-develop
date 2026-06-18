@@ -171,3 +171,27 @@ describe('applyUserSurfaceBonus — direct unit tests', () => {
     expect(applyUserSurfaceBonus(task)).toBeNull();
   });
 });
+
+describe('ROUTE-1 B2 — applyUserSurfaceBonus gate', () => {
+  it('comment-sweep touching src/api/ → no surface override (null)', () => {
+    // A stale-comment sweep has refactor intent → isSurfaceBuildTask returns false → null.
+    const task = makeTask({
+      title: 'clean stale comments',
+      description: 'remove stale comments from api',
+      scope: { directories: ['src/api/'], filesRead: [], filesWrite: ['src/api/x.ts'] },
+      type: 'code-development',
+    });
+    expect(applyUserSurfaceBonus(task)).toBeNull();
+  });
+
+  it('LOSSLESS: genuine api build → api-builder surface override', () => {
+    // Genuine endpoint implementation has build/implementation intent → allowed.
+    const task = makeTask({
+      title: 'add POST /api/users endpoint',
+      description: 'implement create-user endpoint',
+      scope: { directories: ['src/api/'], filesRead: [], filesWrite: ['src/api/users.ts'] },
+      type: 'code-development',
+    });
+    expect(applyUserSurfaceBonus(task)).toBe('api-builder');
+  });
+});

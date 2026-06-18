@@ -10,7 +10,7 @@ import { getDefaultProviderName } from './sprint-utils.js';
 import { brainEstimateTimeout } from './timeout-estimator.js';
 import type { SprintHistory } from './timeout-estimator.js';
 import { writeEvent, CHANNELS } from './event-stream.js';
-import { getUserSurfaceBonus, USER_SURFACE_AGENTS } from '../core/routing-engine.js';
+import { getUserSurfaceBonus, USER_SURFACE_AGENTS, isSurfaceBuildTask } from '../core/routing-engine.js';
 import { classifyIntent } from '../core/intent-classifier.js';
 import { taskKindToIntent } from '../core/work-model.js';
 import type { IntentType } from '../core/routing-types.js';
@@ -216,6 +216,8 @@ export function applyUserSurfaceBonus(task: Task): string | null {
       description: task.description,
       scope: task.scope,
     });
+    // ROUTE-1 B2 — touch-up / non-build tasks must not be diverted to a surface owner.
+    if (!isSurfaceBuildTask(taskDNA.intent.primary, task.type)) return null;
     for (const candidate of USER_SURFACE_AGENTS) {
       if (getUserSurfaceBonus(candidate, taskDNA) > 0) {
         return candidate;
