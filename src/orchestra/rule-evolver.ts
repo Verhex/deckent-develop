@@ -82,7 +82,8 @@ export class RuleEvolver {
       reasoning.push(...skillRules.reasoning);
     }
 
-    // Evolve synergy-based rules (creates EvolvedRule objects for skill-skill pairs)
+    // Record skill-pair synergy/conflict (reasoning only — Lean-A removed the
+    // unconditional `when:{}` rule emission; composition-time synergy is a fast-follow).
     const synergyRules = this.evolveSynergyRules();
     newRules.push(...synergyRules.rules);
     reasoning.push(...synergyRules.reasoning);
@@ -159,10 +160,12 @@ export class RuleEvolver {
   }
 
   /**
-   * Evolve synergy-based rules for skill pairs.
-   * Skill+skill synergy → activation rules.
-   * Skill+skill conflict → exclusion rules.
-   * Agent+skill pairs are logged but do not produce new rules (they inform routing weight instead).
+   * Record skill-pair synergy/conflict as reasoning only (Lean-A).
+   * Skill+skill synergy/conflict are pairwise, COMPOSITION-time signals — they no
+   * longer produce per-skill activation/exclusion rules (an unconditional `when:{}`
+   * rule fired on every task and dominated routing). Returns `rules: []`; the synergy
+   * matrix is consumed at selection time by the composition-synergy fast-follow.
+   * Agent+skill pairs are likewise logged but produce no rules.
    */
   private evolveSynergyRules(): { rules: EvolvedRule[]; reasoning: string[] } {
     const rules: EvolvedRule[] = [];
