@@ -566,4 +566,17 @@ export const tr: Record<TranslationKey, string> = {
   'memory_explorer.filter_deprecated': 'Kullanımdan Kaldırılan',
   'memory_explorer.filter_rejected': 'Reddedilen',
   'memory_explorer.debt_note': 'Tam borç tablosu için yukarıdaki Borç sekmesini kullanın. Bellek araması FTS5 (tam metin arama) kullanır.',
+
+  // Docs Health (ADR-090)
+  'nav.docs_health': 'Doküman Sağlığı',
+  'docs_health.title': 'Doküman Sağlığı',
+  'docs_health.docs_count': '{count} doküman',
+  'docs_health.loading': 'Yükleniyor…',
+  'docs_health.error': 'Doküman sağlığı yüklenemedi',
+  'docs_health.clear_filter': 'Filtreyi temizle',
+  'docs_health.heatmap_corner': 'kod \\ durum',
+  'docs_health.col_rank': 'kod',
+  'docs_health.col_state': 'durum',
+  'docs_health.col_score': 'skor',
+  'docs_health.col_path': 'yol',
 };

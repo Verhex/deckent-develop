@@ -18,6 +18,7 @@ import EnterprisePage from "./pages/EnterprisePage";
 import MemoryExplorerPage from "./pages/MemoryExplorerPage";
 import WorkersPage from "./pages/WorkersPage";
 import DirectivesPage from "./pages/DirectivesPage";
+import DocsHealthPage from "./pages/DocsHealthPage";
 import LoginPage from "./pages/LoginPage";
 import CallbackPage from "./pages/CallbackPage";
 
@@ -44,6 +45,7 @@ function App() {
                 <Route path="/memory-explorer" element={<MemoryExplorerPage />} />
                 <Route path="/workers" element={<WorkersPage />} />
                 <Route path="/directives" element={<DirectivesPage />} />
+                <Route path="/docs-health" element={<DocsHealthPage />} />
               </Route>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/auth/callback" element={<CallbackPage />} />

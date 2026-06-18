@@ -64,6 +64,7 @@ export const navGroups: ReadonlyArray<NavGroup> = [
       { to: "/config", labelKey: "nav.config", icon: SlidersHorizontal },
       { to: "/settings", labelKey: "nav.settings", icon: Settings },
       { to: "/directives", labelKey: "nav.directives", icon: FileText },
+      { to: "/docs-health", labelKey: "nav.docs_health", icon: FileText },
       { to: "/enterprise", labelKey: "nav.enterprise", icon: Building2 },
     ],
   },

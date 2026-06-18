@@ -564,6 +564,19 @@ export const en = {
   'memory_explorer.filter_deprecated': 'Deprecated',
   'memory_explorer.filter_rejected': 'Rejected',
   'memory_explorer.debt_note': 'Use the Debt tab above for the full debt table. Memory search uses FTS5 (full-text search) from memory.db.',
+
+  // Docs Health (ADR-090)
+  'nav.docs_health': 'Docs Health',
+  'docs_health.title': 'Docs Health',
+  'docs_health.docs_count': '{count} docs',
+  'docs_health.loading': 'Loading…',
+  'docs_health.error': 'Failed to load doc health',
+  'docs_health.clear_filter': 'Clear filter',
+  'docs_health.heatmap_corner': 'rank \\ state',
+  'docs_health.col_rank': 'rank',
+  'docs_health.col_state': 'state',
+  'docs_health.col_score': 'score',
+  'docs_health.col_path': 'path',
 } as const;
 
 export type TranslationKey = keyof typeof en;
