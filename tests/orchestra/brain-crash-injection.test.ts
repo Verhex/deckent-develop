@@ -1,15 +1,17 @@
 // ═══ Brain Crash Injection Integration Tests ═════════════════════════
-// Sprint 162 Task 3 (T-007). Six crash scenarios that prove the Sprint
+// Sprint 162 Task 3 (T-007). Five crash scenarios that prove the Sprint
 // 160-162 stability work survives the failure modes it was designed for:
 //
 //   S1: SIGTERM mid-EXECUTE → checkpoint + .result enables resume-evaluate
 //   S2: unhandledRejection carries an API key → redactSensitive scrubs it
-//   S3: Double-MCP race → second acquireSingletonLock throws SingletonLockError
 //   S4: sprint-state.json desync + checkpoint @EVALUATE → recovery re-syncs
 //   S5: Missing checkpoint → readCheckpoint returns null (fresh-start, no
 //       false positive)
 //   S6: writeEvaluationAudit throws → runEvaluatePhase still completes
 //       (fail-soft wire, T-003 verified)
+//
+// NOTE: S3 (Double-MCP singleton race) retired by MCP-W1 — coexistence is
+// now covered by the writer-lease tests (tests/mcp/writer-lease*.test.ts).
 //
 // Heavy collaborators around runEvaluatePhase are mocked so the suite
 // stays a unit-of-integration test: the public APIs and on-disk artifacts
@@ -17,8 +19,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync,
-  writeFileSync, writeSync, closeSync,
+  existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
+  writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -120,9 +122,6 @@ vi.mock('../../src/orchestra/evaluation-audit-trail.ts', async () => {
 // ─── Imports of modules under test (post-mock) ────────────────────────
 
 import { redactSensitive } from '../../src/orchestra/sensitive-redactor.js';
-import {
-  acquireSingletonLock, releaseSingletonLock, SingletonLockError,
-} from '../../src/mcp/server-singleton-lock.js';
 import {
   writeCheckpoint, readCheckpoint, writePhaseCheckpoint,
   restoreSprintFromCheckpoint,
@@ -286,27 +285,6 @@ describe('Sprint 162 T-007 — Brain crash injection integration', () => {
     // `redactLongContent` pass — match either the per-pattern Bearer
     // replacement or the length-based collapse marker.
     expect(redacted.stack!).toMatch(/Bearer \[REDACTED\]|\[REDACTED:\d+ chars\]/);
-  });
-
-  // ─── S3: Double-MCP singleton race ───────────────────────────────────
-  it('S3: Double-MCP — second acquireSingletonLock throws SingletonLockError (T-006)', () => {
-    const lockPath = join(root, DECKENT_DIR, 'mcp-server.pid');
-
-    // First MCP "process" — we forge a pid file as if a live MCP wrote it
-    // (PID 1 / init is always alive on POSIX and never matches our pid).
-    const livePid = process.platform === 'win32' ? 4 : 1; // 4 = System on Windows
-    const fd = openSync(lockPath, 'wx');
-    try { writeSync(fd, String(livePid)); } finally { closeSync(fd); }
-
-    // Second MCP process boots and must lose the race.
-    expect(() => acquireSingletonLock(lockPath)).toThrowError(SingletonLockError);
-    try {
-      acquireSingletonLock(lockPath);
-    } catch (err) {
-      expect(err).toBeInstanceOf(SingletonLockError);
-      expect((err as SingletonLockError).ownerPid).toBe(livePid);
-      expect((err as Error).message).toContain('singleton lock held');
-    }
   });
 
   // ─── S4: sprint-state desync + checkpoint @EVALUATE ──────────────────

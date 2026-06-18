@@ -2,22 +2,18 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DECKENT_VERSION, DECKENT_DIR } from '../core/constants.js';
+import { DECKENT_VERSION } from '../core/constants.js';
 import { registerTools } from './tools/index.js';
 import { registerResources } from './resources/index.js';
 import { McpNotificationAdapter } from '../core/notify-adapters/mcp-adapter.js';
 import { NotifyDispatcher } from '../core/notification-dispatcher.js';
 import { bootstrapNotifyDispatcher } from '../core/notify-bootstrap.js';
-import {
-  acquireSingletonLock,
-  releaseSingletonLock,
-  SingletonLockError,
-  type LockHandle,
-} from './server-singleton-lock.js';
-
-const MCP_SERVER_PID_FILE = 'mcp-server.pid' as const;
+import { installWriterLeaseGate, type WriterLeaseGateContext } from './writer-lease-gate.js';
+import { installWriterLeaseReleaseHooks } from './writer-lease.js';
+import { getLanguage } from '../cli/helpers/messages.js';
+import { loadConfig } from '../core/config.js';
 
 export const DECKENT_MCP_INSTRUCTIONS = `
 Deckent is an AI agent orchestration CLI that runs multi-agent sprints inside your project.
@@ -128,19 +124,23 @@ export function initializeNotifyDispatcher(
   });
 }
 
-export function createServer(): McpServer {
+export function createServer(ctx?: Partial<WriterLeaseGateContext>): McpServer {
   const server = new McpServer(
     { name: 'deckent', version: DECKENT_VERSION },
     { instructions: DECKENT_MCP_INSTRUCTIONS },
   );
 
+  const gateCtx: WriterLeaseGateContext = {
+    projectRoot: ctx?.projectRoot ?? process.cwd(),
+    lang: ctx?.lang ?? getLanguage(),
+    ttlMs: ctx?.ttlMs,
+  };
+  installWriterLeaseGate(server, gateCtx);
+
   registerTools(server);
   registerResources(server);
 
-  // Bind MCP notification adapter to this server instance
   mcpNotifyAdapter = new McpNotificationAdapter(server);
-
-  // Initialize global dispatcher (CLI + MCP + file) for lifecycle notifications
   try {
     initializeNotifyDispatcher(server, process.cwd());
   } catch (err) {
@@ -148,60 +148,20 @@ export function createServer(): McpServer {
       `deckent-mcp: notify dispatcher init failed: ${err instanceof Error ? err.message : String(err)}\n`,
     );
   }
-
   return server;
 }
 
-export function bootSingletonGuard(projectRoot: string): LockHandle {
-  const lockPath = join(projectRoot, DECKENT_DIR, MCP_SERVER_PID_FILE);
-  try {
-    const handle = acquireSingletonLock(lockPath);
-    installSingletonReleaseHooks(handle);
-    return handle;
-  } catch (err) {
-    if (err instanceof SingletonLockError) {
-      process.stderr.write(
-        `deckent-mcp: refused to start — singleton lock held by pid=${err.ownerPid ?? 'unknown'} (${lockPath})\n`,
-      );
-    } else {
-      process.stderr.write(
-        `deckent-mcp: singleton guard failed: ${err instanceof Error ? err.message : String(err)}\n`,
-      );
-    }
-    process.exit(2);
-  }
-}
-
-let singletonReleaseHooksInstalled = false;
-
-function installSingletonReleaseHooks(handle: LockHandle): void {
-  if (singletonReleaseHooksInstalled) return;
-  singletonReleaseHooksInstalled = true;
-
-  const release = (): void => {
-    try {
-      releaseSingletonLock(handle);
-    } catch {
-      // best-effort: never throw from exit/signal hooks
-    }
-  };
-
-  process.on('exit', release);
-
-  process.on('SIGTERM', () => {
-    release();
-    process.exit(0);
-  });
-
-  process.on('SIGINT', () => {
-    release();
-    process.exit(0);
-  });
-}
-
 async function main(): Promise<void> {
-  bootSingletonGuard(process.cwd());
-  const server = createServer();
+  const root = process.cwd();
+  let lang = 'en';
+  try {
+    const config = await loadConfig(root);
+    lang = getLanguage(config.language);
+  } catch {
+    // default 'en' — config load is best-effort for the denial locale
+  }
+  installWriterLeaseReleaseHooks(root);
+  const server = createServer({ projectRoot: root, lang });
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
