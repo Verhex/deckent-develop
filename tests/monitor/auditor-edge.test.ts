@@ -104,6 +104,8 @@ describe('scanHeartbeats — edge cases', () => {
     mockedReaddirSync.mockReturnValue(['task-001.hb', 'task-002.hb'] as never);
 
     const stale = new Date(Date.now() - 200_000).toISOString();
+    // bug-1: freshness from .hb mtime — old host mtime is the genuine-staleness signal.
+    mockedStatSync.mockReturnValue({ mtimeMs: Date.now() - 200_000 } as never);
     mockedReadFileSync
       .mockReturnValueOnce(JSON.stringify(makeHb('w1', 'task-001', stale)) as never)
       // task JSON read for task-001 — simulate missing file (throws ENOENT)
@@ -178,6 +180,8 @@ describe('scanHeartbeats — edge cases', () => {
     mockedReaddirSync.mockReturnValue(['task-001.hb'] as never);
 
     const stale = new Date(Date.now() - 300_000).toISOString(); // 300s
+    // bug-1: detail "stale for Ns" now derives elapsed from the .hb mtime — set it 300s old.
+    mockedStatSync.mockReturnValue({ mtimeMs: Date.now() - 300_000 } as never);
     mockedReadFileSync
       .mockReturnValueOnce(JSON.stringify(makeHb('w-agent', 'task-001', stale)) as never)
       // T-003 fix: auditor reads task-<id>.json to check completion — simulate missing

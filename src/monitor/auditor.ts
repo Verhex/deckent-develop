@@ -359,10 +359,26 @@ export function isWorkerStale(
   hbPath?: string,
 ): boolean {
   const currentTime = Date.now();
-  const parsedTime = new Date(hb.timestamp).getTime();
-  if (isNaN(parsedTime)) return true; // malformed timestamp → stale
 
-  // Primary signal: HB timestamp freshness — if fresh, worker is alive
+  // Bug-1: freshness from the host filesystem mtime (set on every write through
+  // the docker bind-mount) — clock-skew-proof. The worker's self-reported in-file
+  // `hb.timestamp` is written on the container clock, which can be hours-skewed
+  // (observed: midnight) and falsely reads as stale even for healthy workers. Use
+  // the .hb mtime when its path is known (the scan loop always passes it); fall
+  // back to the in-file timestamp only when hbPath is absent (standalone callers).
+  let parsedTime: number;
+  if (hbPath) {
+    try {
+      parsedTime = statSync(hbPath).mtimeMs;
+    } catch {
+      return true; // stat error → treat as stale (fail-safe)
+    }
+  } else {
+    parsedTime = new Date(hb.timestamp).getTime();
+    if (isNaN(parsedTime)) return true; // malformed timestamp → stale
+  }
+
+  // Primary signal: HB freshness — if fresh, worker is alive
   const elapsed = currentTime - parsedTime;
   if (elapsed <= heartbeatTimeoutMs) {
     return false; // Fresh heartbeat — definitively not stale
@@ -482,8 +498,16 @@ export function scanHeartbeats(projectRoot: string, heartbeatTimeoutMs = 120_000
       continue; // Worker is alive by multi-signal consensus — skip stale reporting
     }
 
-    // Worker is stale by multi-signal check — apply existing reconciliation layers
-    const parsedTime = new Date(hb.timestamp).getTime();
+    // Worker is stale by multi-signal check — apply existing reconciliation layers.
+    // Bug-1: derive the displayed staleness age from the .hb mtime (the same
+    // clock-skew-proof signal isWorkerStale now uses), not the container-clock
+    // in-file timestamp — otherwise the "stale for Ns" text would be misleading.
+    let parsedTime: number;
+    try {
+      parsedTime = statSync(hbPath).mtimeMs;
+    } catch {
+      parsedTime = new Date(hb.timestamp).getTime();
+    }
     if (isNaN(parsedTime)) continue; // malformed timestamp — skip
     const elapsed = currentTime - parsedTime;
 

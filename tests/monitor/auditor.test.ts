@@ -168,6 +168,9 @@ describe('scanHeartbeats', () => {
     mockedReaddirSync.mockReturnValue(['task-001.hb'] as never);
 
     const staleTimestamp = new Date(Date.now() - 200_000).toISOString();
+    // bug-1: freshness from .hb mtime — a genuinely-hung worker is one whose host
+    // file mtime is old (the in-file timestamp alone no longer drives staleness).
+    mockedStatSync.mockReturnValue({ mtimeMs: Date.now() - 200_000 } as never);
     const hb: Heartbeat = {
       workerId: 'w1', taskId: 'task-001', status: 'CODING' as never,
       currentAction: 'writing', timestamp: staleTimestamp, filesChangedCount: 0, sequence: 0,
@@ -267,6 +270,8 @@ describe('scanHeartbeats', () => {
     mockedReaddirSync.mockReturnValue(['task-001.hb'] as never);
 
     const staleTimestamp = new Date(Date.now() - 121_000).toISOString();
+    // bug-1: freshness from .hb mtime — old host mtime is the genuine-staleness signal.
+    mockedStatSync.mockReturnValue({ mtimeMs: Date.now() - 121_000 } as never);
     const hb: Heartbeat = {
       workerId: 'w1', taskId: 'task-001', status: 'CODING' as never,
       currentAction: 'writing', timestamp: staleTimestamp, filesChangedCount: 0, sequence: 0,

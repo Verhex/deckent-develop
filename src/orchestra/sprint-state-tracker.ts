@@ -9,7 +9,7 @@
 //   - .tasks/task-<id>.result       → completedTasks
 //   - .brain/memory.db              → openDebtCount (DB-first, Task #4d)
 
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { readSprintState } from './sprint-utils.js';
 import { getDebtItems } from '../core/debt-store.js';
@@ -80,18 +80,24 @@ function readActiveWorkers(tasksDir: string): ActiveWorker[] {
     // spurious WORKER_RESPAWN for a DONE worker (the false-positive root).
     if (existsSync(join(tasksDir, file.replace(/\.hb$/, '.result')))) continue;
     try {
-      const raw = readFileSync(join(tasksDir, file), 'utf-8');
-      const hb = JSON.parse(raw) as { workerId?: unknown; taskId?: unknown; timestamp?: unknown };
+      const hbPath = join(tasksDir, file);
+      const raw = readFileSync(hbPath, 'utf-8');
+      const hb = JSON.parse(raw) as { workerId?: unknown; taskId?: unknown };
       const workerId = typeof hb.workerId === 'string' ? hb.workerId : null;
       const taskId = typeof hb.taskId === 'string' ? hb.taskId : null;
       if (workerId === null || taskId === null) continue;
       out.push({
         id: workerId,
         taskId,
-        lastHeartbeat: typeof hb.timestamp === 'string' ? hb.timestamp : new Date(0).toISOString(),
+        // Bug-1: freshness from the host filesystem mtime (set on every write
+        // through the docker bind-mount) — clock-skew-proof. The worker's
+        // self-reported in-file `timestamp` is written on the container clock,
+        // which can be hours-skewed (observed: midnight) and falsely reads as
+        // stale, spamming StaleWorkerDetector → WORKER_RESPAWN for healthy workers.
+        lastHeartbeat: new Date(statSync(hbPath).mtimeMs).toISOString(),
       });
     } catch {
-      // malformed .hb — skip silently
+      // malformed .hb / stat error — skip silently
     }
   }
   return out;
