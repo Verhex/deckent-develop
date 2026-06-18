@@ -330,6 +330,28 @@ searchMemory(store, {
 - `PROJECT-IDENTITY.md`: **Removed** — deprecated since Sprint 166 (ADR-046), superseded by `.deckent/workspace/IDENTITY.md` (managed-docs `identity-md` in `docs.json`). Identity remains in `memory.db` (decay_exempt).
 - `sprints/sprint-NNN.md`: Sprint logs (in DB + file)
 
+## doc_tracking Table (ADR-090)
+
+Separate `better-sqlite3` connection to `.brain/memory.db` (does NOT touch `entries` / MemoryStore). Created idempotently (`CREATE TABLE IF NOT EXISTS`) by `DocTrackingStore`.
+
+| Column | Type | Meaning |
+|--------|------|---------|
+| path | TEXT PK | repo-relative POSIX path |
+| content_hash | TEXT | `sha256:…` of body (front-matter excluded); null when EXEMPT/temp |
+| last_updated | TEXT | ISO8601 git author-date (mtime fallback) |
+| doc_rank | INTEGER | DCR — 0=most critical, unbounded |
+| status | TEXT | active\|draft\|temp\|frozen\|superseded |
+| stale_score | REAL | 0..100 rank-independent severity |
+| priority_score | REAL | 0..100 rank-weighted urgency |
+| state | TEXT | FRESH\|DRIFT\|STALE\|CRITICAL_STALE\|EXEMPT |
+| signals | TEXT | JSON {content_drift, code_drift, age_days} |
+| tracked_code | TEXT | JSON string[] (`tracks` globs) or null |
+| first_seen / last_scanned | TEXT | ISO8601 |
+
+`.deckent/settings/docs.json` additive `tracking` block (all optional, merged over defaults): `rankMap`, `defaultRank`, `trackIgnore`, `noFrontmatter`, `scoring{weights{content,code,ageMax},criticalAt,staleAt,maxRank}`, `sizeCapBytes`.
+
+CLI: `deckent docs track scan [--no-write] [--prune]` · `docs track status [--stale] [--rank <n>] [--json]` · `docs track sync`.
+
 ## Lock File Format
 
 Lock files in `.locks/`: `{filepath-with-__-separators}.lock`
