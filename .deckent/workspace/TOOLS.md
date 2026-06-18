@@ -30,6 +30,7 @@ Dashboard: deckent web
 | models | `deckent_models` |
 | nervous | `deckent_nervous` |
 | plan | `deckent_plan` |
+| process | `deckent_process` |
 | recover | `deckent_recover` |
 | retro | `deckent_retro` |
 | review | `deckent_review` |
@@ -41,7 +42,7 @@ Dashboard: deckent web
 | usage | `deckent_usage` |
 | watch | `deckent_watch` |
 
-_Total: 30 MCP tools_
+_Total: 31 MCP tools_
 
 **Key operational tools:** `deckent_audit`, `deckent_nervous`, `deckent_watch`, `deckent_recover`, `deckent_status`, `deckent_memory_query`
 

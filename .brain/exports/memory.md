@@ -1,5 +1,29 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-290 Learnings
+- Sprint sprint-290 Learnings: ## Sprint sprint-290 Learnings
+- F3-008 — process-mode executor (mod-geçişi 3/3): GO_WITH_TECH_DEBT — F3-008 process-mode executor — mode-transition 3/3 complete (task✅ sprint✅ process✅).
+
+WHAT CHANGED:
+1. NEW src/orchestr
+
+## Gains
+- 290-001 — CORE-UNIFORMITY slice 2 — mod-bağımsız Lifecycle kernel — CORE-UNIFORMITY slice 2 — mode-independent post-item lifecycle kernel.
+- 290-003 — TOK-AUT — autonomous tokenUsage 0/0/0 fix — Added `enrichResultTokenUsage(result, undefined, deps.projectRoot)` call at execute-dispatcher.ts...
+- 290-004 — ADR-NOISE — checkADRCompliance count_check'i task-spesifik yap — Added a guard in the count_check case of checkADRCompliance (auditor.ts:2195-2198) that checks wh...
+- 290-005 — IDLE-SPIN — autonomous idle busy-spin teşhis + fix — Root cause: runAutonomousLoop used `outcome === 'no_trigger' ? intervalMs : 0` — only no_trigger ...
+- 290-006 — DOC-35 — DECKENT.md tool-count 34→35 + process — Changed '34 tools:' → '35 tools:' and appended **process** to the tool list on line 30 of DECKENT...
+
+## Sprint sprint-289 Learnings
+- Sprint sprint-289 Learnings: ## Sprint sprint-289 Learnings
+
+## Gains
+- 289-001 — Process anti-IDOR + positive-OIDC tenant-stamp testleri — Added 2 real-HTTP, mock-free security tests to tests/api/process-endpoint.test.ts, closing the au...
+- 289-002 — Actor.id audit-lineage — gerçek OIDC sub audit-chain'e düşsün — Actor.id audit-lineage fix — the real OIDC sub now survives into the capability invocation's audi...
+- 289-003 — deriveRequestPrincipal defense-in-depth (verified-claims sinyali) — Defense-in-depth claimsVerified signal added to deriveRequestPrincipal (additive, fail-closed).
+- 289-004 — Test-kapsama kapanışı (N3 drain integration + N2 401/sub-flag + D8 guard) — All 4 test-coverage gaps closed:
+- 289-005 — Stale-comment süpürmesi (doc-drift temizliği) — All 5 stale-comment items addressed (comment-only, zero behavior change):
+
 ## Sprint sprint-288 Learnings
 - Sprint sprint-288 Learnings: ## Sprint sprint-288 Learnings
 

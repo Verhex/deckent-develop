@@ -7977,3 +7977,30 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 289-005: Stale-comment süpürmesi (doc-drift temizliği) (DONE)
 
 ---
+## Sprint 290 — sprint-290
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-18
+**Duration:** 1652s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1651792ms |
+
+### Tasks
+
+- 290-001: CORE-UNIFORMITY slice 2 — mod-bağımsız Lifecycle kernel (DONE)
+- 290-002: F3-008 — process-mode executor (mod-geçişi 3/3) (GO_WITH_TECH_DEBT)
+- 290-003: TOK-AUT — autonomous tokenUsage 0/0/0 fix (DONE)
+- 290-004: ADR-NOISE — checkADRCompliance count_check'i task-spesifik yap (DONE)
+- 290-005: IDLE-SPIN — autonomous idle busy-spin teşhis + fix (DONE)
+- 290-006: DOC-35 — DECKENT.md tool-count 34→35 + process (DONE)
+
+---

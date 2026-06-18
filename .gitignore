@@ -189,3 +189,6 @@ docs/audits/sprint-139/dead-code-report.md
 .tmp-test/
 .test-e2e-*/
 .brain/archive/
+
+# Stray non-project doc (Claude system-prompt artifact, not deckent source) — keep on disk, out of repo
+claude-fable-x.md

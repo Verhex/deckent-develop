@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-290-002 | Tech debt from 290-002: F3-008 process-mode executor — mode-transition 3/3 compl | normal | sprint-290 | resolved |
 | debt-285-001 | Tech debt from 285-001: Kök-teşhis raporu + 9 repro testi (5 normal + 4 it.fails | normal | sprint-285 | resolved |
 | debt-285-002 | Tech debt from 285-002: H1-fix: replaced the single confirmResolve slot (app.tsx | normal | sprint-285 | resolved |
 | debt-283-002 | Tech debt from 283-002: All goCriteria met: (1) /debt route added to App.tsx wit | normal | sprint-283 | resolved |

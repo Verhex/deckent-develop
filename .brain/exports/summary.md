@@ -83,6 +83,12 @@
 | adr-089 | Backend-Agnostic Worker Observation + Per-Worker Independent Backends | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-290 Learnings** (sprint-290): ## Sprint sprint-290 Learnings
+- F3-008 — process-mode executor (mod-geçişi 3/3): GO_WITH_TECH_DEBT — F3-008 process-...
+- **Sprint sprint-289 Learnings** (sprint-289): ## Sprint sprint-289 Learnings
+
+## Gains
+- 289-001 — Process anti-IDOR + positive-OIDC tenant-stamp testleri — Added ...
 - **Sprint sprint-288 Learnings** (sprint-288): ## Sprint sprint-288 Learnings
 
 ## Gains
@@ -107,10 +113,6 @@
 - 281-001 — Mimari & Eşzamanlılık Doğruluğu Denetimi — Mimari & eşzamanlılık...
 - **Sprint sprint-280 Learnings** (sprint-280): ## Sprint sprint-280 Learnings
 - REPL /mcp broker wire — G1 (mcp-bridge → chat-native) (OPUS, Tier-1): GO_WITH_TECH_D...
-- **Sprint sprint-279 Learnings** (sprint-279): ## Sprint sprint-279 Learnings
-- WK-nervous — panic-gate timeout wire (0-caller → spawn yolu): GO_WITH_TECH_DEBT — Fi...
-- **Sprint sprint-278 Learnings** (sprint-278): ## Sprint sprint-278 Learnings
-- shared→worker okuma — spawn-time SharedMemory prompt enjeksiyonu (OPUS): GO_WITH_TEC...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -149,5 +151,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 595 | Generated: 2026-06-15_
+_Total entries: 615 | Generated: 2026-06-18_

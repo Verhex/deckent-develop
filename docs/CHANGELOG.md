@@ -2,6 +2,26 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint290] - 2026-06-18
+
+### Added
+
+- CORE-UNIFORMITY slice 2 — mod-bağımsız Lifecycle kernel
+- ADR-NOISE — checkADRCompliance count_check'i task-spesifik yap
+- DOC-35 — DECKENT.md tool-count 34→35 + process
+
+### Changed
+
+- F3-008 — process-mode executor (mod-geçişi 3/3) (completed with tech debt)
+
+### Fixed
+
+- TOK-AUT — autonomous tokenUsage 0/0/0 fix
+- IDLE-SPIN — autonomous idle busy-spin teşhis + fix
+
+
+_Tasks: 6 total, 6 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint289] - 2026-06-15
 
 ### Added
