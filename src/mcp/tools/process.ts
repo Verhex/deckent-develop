@@ -34,6 +34,7 @@ export function registerProcessTool(server: McpServer): void {
         'automation). action=submit injects an ExecutionRequest (policy-gated: read-only ' +
         'capabilities auto-run, side-effecting ones park for approval); action=status|result ' +
         'polls a prior submission by executionId.',
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         action: z.enum(['submit', 'status', 'result']).describe('submit | status | result'),
         root: z.string().optional().describe('Project root (default: cwd)'),

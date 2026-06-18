@@ -206,7 +206,7 @@ export function registerNervousSubscribeTool(server: McpServer): void {
         'Subscribe to Nervous System notifications for the current sprint. ' +
         'Registers this MCP client for push notifications. Also surfaces ' +
         'currently pending PanicGuard kill approvals as PANIC_GUARD_KILL_PENDING events (Sprint 180 W4-2).',
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         sprintId: z.string().optional().describe('Sprint ID to subscribe to (default: active sprint)'),
         root: z.string().optional().describe('Project root path (for panic event scan)'),

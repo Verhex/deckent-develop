@@ -384,11 +384,11 @@ describe('Specific Tool Annotation Values', () => {
     expect(ann?.destructiveHint).toBe(true);
   });
 
-  it('deckent_plan: read-only, idempotent (dry-run preview)', () => {
+  it('deckent_plan: write tool (writes .tasks/task-*.json), not destructive', () => {
     const ann = server.tools.get('deckent_plan')?.config.annotations;
-    expect(ann?.readOnlyHint).toBe(true);
+    // MCP-W1: plan writes .tasks/ files → readOnlyHint must be false (corrected from original true)
+    expect(ann?.readOnlyHint).toBe(false);
     expect(ann?.destructiveHint).toBe(false);
-    expect(ann?.idempotentHint).toBe(true);
   });
 
   it('deckent_retro: read-only', () => {
