@@ -5,6 +5,7 @@ import { parseFrontmatter, hashBody, writeManagedFrontmatter } from './frontmatt
 import { resolveRank } from './rank-resolver.js';
 import { scoreDoc } from './stale-scorer.js';
 import { getFileGitDateAsync } from './git-date.js';
+import { computeCodeDrift } from './code-drift.js';
 import type { DocTrackingStore } from './store.js';
 import type { DocRecord, DocStatus, DocTrackingConfig } from './types.js';
 
@@ -72,7 +73,9 @@ export async function scanDocs(
 
     const prev = store.getByPath(rel);
     const content_drift = !!(prev?.content_hash && content_hash && prev.content_hash !== content_hash);
-    const signals = { content_drift, code_drift: null as boolean | null, age_days };
+    const docMs = gitMs > 0 ? gitMs : now;
+    const code_drift = await computeCodeDrift(root, tracked_code, docMs);
+    const signals = { content_drift, code_drift, age_days };
 
     const { stale_score, priority_score, state } = scoreDoc({ doc_rank, status, signals }, config);
 

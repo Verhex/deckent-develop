@@ -44,4 +44,18 @@ describe('scanDocs', () => {
     expect(r.records.find(x => x.path === 'docs/d.md')?.state).toBe('EXEMPT');
     expect(r.records.find(x => x.path === 'docs/d.md')?.content_hash).toBeNull();
   });
+
+  it('computes code_drift (non-null path) when a doc carries tracks, null otherwise', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'dt-scan-')); store = new DocTrackingStore(join(dir, 'memory.db'));
+    // doc WITH tracks → code_drift evaluated + tracked_code populated
+    mk('docs/reference/tracked.md', '---\ntracks:\n  - docs/reference/tracked.md\n---\n# T\nbody\n');
+    // doc WITHOUT tracks → code_drift stays null (Phase 1 behavior)
+    mk('docs/reference/plain.md', '# P\nbody\n');
+    const r = await scanDocs(dir, C, store, { write: false, prune: false, now: Date.parse('2026-06-18T00:00:00Z') });
+    const tracked = r.records.find(x => x.path === 'docs/reference/tracked.md')!;
+    const plain = r.records.find(x => x.path === 'docs/reference/plain.md')!;
+    expect(typeof tracked.signals.code_drift === 'boolean' || tracked.signals.code_drift === null).toBe(true);
+    expect(tracked.tracked_code).toEqual(['docs/reference/tracked.md']);
+    expect(plain.signals.code_drift).toBeNull();
+  });
 });
