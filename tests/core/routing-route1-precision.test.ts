@@ -35,6 +35,7 @@ describe('ROUTE-1 B2 — getDomainMatchBonus path-proxy gating', () => {
 
   it('path-proxy bonus applies when allowed (default)', () => {
     // api-builder is the path-proxy owner for the extracted `api` domain.
+    expect(apiTaskDNA.domains.some((d) => d.name.toLowerCase() === 'api')).toBe(true);
     expect(getDomainMatchBonus('api-builder', 'api', apiTaskDNA)).toBe(DOMAIN_MATCH_BONUS);
   });
 
@@ -49,6 +50,7 @@ describe('ROUTE-1 B2 — getDomainMatchBonus path-proxy gating', () => {
       scope: { directories: ['src/auth/'], filesRead: [], filesWrite: ['src/auth/jwt.ts'] },
     });
     // security intent → security agent domain (INTENT_TO_AGENT_DOMAIN), path 1.
+    expect(secDNA.intent.primary).toBe('security');
     expect(getDomainMatchBonus('security-auditor', 'security', secDNA, false)).toBe(DOMAIN_MATCH_BONUS);
   });
 });
