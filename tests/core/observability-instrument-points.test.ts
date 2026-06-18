@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { initObservability, resetObservability, metric, generateLoadReport } from '../../src/core/observability.js';
@@ -145,7 +145,13 @@ describe('auditor.ts hb.stale metric', () => {
       sequence: 1,
       timestamp: staleTime,
     };
-    writeFileSync(join(root, '.tasks', 'task-stale-task-001.hb'), JSON.stringify(hb), 'utf-8');
+    const hbPath = join(root, '.tasks', 'task-stale-task-001.hb');
+    writeFileSync(hbPath, JSON.stringify(hb), 'utf-8');
+    // scanHeartbeats derives staleness from the file MTIME (Sprint 139 clock-skew-proof
+    // signal), not the embedded `timestamp`. Backdate the mtime so the HB is genuinely
+    // stale by the signal the production code actually uses.
+    const staleEpoch = new Date(Date.now() - 5 * 60 * 1000);
+    utimesSync(hbPath, staleEpoch, staleEpoch);
 
     // No task.json → task not completed → CRITICAL alert should trigger
     // No .result file → shouldReportStale returns true

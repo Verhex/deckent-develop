@@ -11,9 +11,9 @@
 
 ### Küme 1 — heartbeat-staleness (test-hermetiklik)
 - **Testler:** `tests/core/observability-instrument-points.test.ts` (`scanHeartbeats` hb.stale metric), `tests/integration/lifecycle.test.ts` (Auditor scan — stale heartbeat).
-- **Belirti:** Stale HB (`timestamp = now-5dk`, `sequence:1`, no `.result`) + `scanHeartbeats(root, 30_000)` → 0 alert beklenirken 0; deterministik değil (kümede/parallel'de pollute).
-- **Kök:** `src/monitor/auditor.ts` modül-seviye mutable cache'ler: `heartbeatCache` (line 50, `lastSequence` taşır → Signal C) + `livenessCache` (line 166 → Signal B). `clearLivenessCache()` var ama **`heartbeatCache` için reset export YOK**. Suite genelinde paylaşılan state → test-sıra/parallel bağımlı; `isWorkerStale`'in secondary-signal'leri (B liveness / C sequence) yanlış "alive" verince stale-alert bastırılıyor.
-- **Fix:** test-only `__resetAuditorCaches()` export (heartbeatCache + livenessCache + varsa diğer modül-state'i temizler) + heartbeat-staleness testlerinde `beforeEach(__resetAuditorCaches)`. Gerekirse `isWorkerStale` çağrı-yolunda test-injectable liveness (deterministik). **Üretim davranışı değişmez** (reset yalnız test-çağrılı; prod scan-loop kendi cache-yönetimini sürdürür). Empirik: izolasyonda reprodüksiyon → tam-bastıran sinyali instrument → reset/inject ile deterministik yeşil (N-run).
+- **Belirti:** Stale HB (`timestamp = now-5dk/200s`, `sequence`, no `.result`) + `scanHeartbeats` → alert beklenirken 0. İzolasyonda **da** fail → flaky değil, **deterministik pre-existing failure** (baseline'da da).
+- **Kök (systematic-debug ile DOĞRULANDI):** `scanHeartbeats` (auditor.ts:505-510) staleness-yaşını **dosya MTIME**'ından hesaplar (Sprint 139 "Bug-1" clock-skew-proof fix), embedded `hb.timestamp`'ten DEĞİL; `isWorkerStale` de aynı mtime sinyalini kullanır (kod-yorumu 502-504). Testler `.hb`'yi **şimdi** yazıp embedded-timestamp'i eski set ediyor → dosya-mtime taze → "fresh" → stale-alert yok. Test, mtime-tabanlı tasarıma uymuyor (**bayat test**, cache/hermetiklik DEĞİL — ilk hipotez yanlıştı).
+- **Fix:** Testlerde `.hb` yazımından sonra dosya **mtime'ını backdate et** (`utimesSync(hbPath, staleEpoch, staleEpoch)`) → prod'un kullandığı sinyalle gerçekten stale. **Üretim kodu doğru, dokunulmaz** (mtime-tabanlı clock-skew-proof tasarım kasıtlı). Empirik: observability + lifecycle testleri fix sonrası deterministik yeşil.
 
 ### Küme 2 — finalize-slowness (timeout)
 - **Testler:** `tests/cli/finalize-refinalize.test.ts` (V2 recordOutcome, jobs-summary, --force counts, double-finalize ×4-6).

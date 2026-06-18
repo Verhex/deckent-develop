@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import {
-  mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync,
+  mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, utimesSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -436,6 +436,11 @@ describe('Auditor scan integration', () => {
       filesChangedCount: 0, sequence: 0,
     };
     writeHeartbeat(root, { ...staleHb, taskId: '099' });
+    // scanHeartbeats derives staleness from the file MTIME (Sprint 139 clock-skew-proof
+    // signal), not the embedded `timestamp`. Backdate the mtime past the default 120s
+    // threshold so the HB is genuinely stale by the signal the production code uses.
+    const staleEpoch = new Date(Date.now() - 200_000);
+    utimesSync(join(root, TASKS_DIR, 'task-099.hb'), staleEpoch, staleEpoch);
 
     const result = scanHeartbeats(root);
     expect(result.staleAgents.length).toBe(1);
