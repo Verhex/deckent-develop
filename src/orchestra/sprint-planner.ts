@@ -656,6 +656,16 @@ export async function planSprint(
             `Task ${task.id} → agent=${task.assignedAgent}, skills=[${task.assignedSkills.join(', ')}], ` +
             `confidence=${decision.agentConfidence}, intent=${decision.taskDNA.intent.primary}`,
           );
+          // Observability: surface routeTaskV2's skill scoring rationale (why these
+          // skills won / whether the floor fired) so the live plan path is debuggable
+          // without re-deriving it in isolation. Dev-only (DECKENT_DEBUG).
+          debugLog(
+            'planSprint:routing-v2-skills',
+            `Task ${task.id} skill reasoning: ` +
+            decision.reasoning
+              .filter(r => /skill|floor|budget|bonus|threshold|mismatch|excluded/i.test(r))
+              .join(' | '),
+          );
         } catch (taskErr) {
           debugLog('planSprint:routing-v2', `V2 routing failed for task ${task.id}: ${taskErr}`);
         }
