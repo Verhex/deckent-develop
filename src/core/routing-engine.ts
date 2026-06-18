@@ -315,6 +315,7 @@ export function routeTaskV2(
     const kindIntent = taskKindToIntent(task.type);
     if (kindIntent !== 'unknown') {
       taskDNA.intent.primary = kindIntent;
+      taskDNA.intent.confidence = 0.5; // SSOT-derived intent — modest confidence, not classifier-certain
       reasoning.push(`Intent from TaskKind SSOT: ${kindIntent} (task.type=${task.type})`);
     }
   }

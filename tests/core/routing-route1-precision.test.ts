@@ -226,4 +226,33 @@ describe('ROUTE-1 — capstone: dual-perspective end-to-end', () => {
     );
     expect(d.agentId).toBe('api-builder');
   });
+
+  it('SAFETY-NET: pure documentation sweep under src/api/ → doc-writer, not api-builder (base-activation, not B2)', () => {
+    // B2 suppresses path-proxy / surface BONUSES for documentation intent, but NOT
+    // an agent's base activation rule. The real safety-net is doc-writer activating
+    // on documentation intent at score 10 (> api-builder's domain rule at score 8).
+    // This test pins that invariant so a future activation change can't silently
+    // reopen the hole.
+    const docPool = makeAgentPool(
+      makeAgent('doc-writer', {
+        source: 'builtin',
+        activation: { rules: [{ when: { 'intent.primary': 'documentation' }, score: 10 }], exclude: [], minScore: 5 },
+      }),
+      makeAgent('api-builder', {
+        source: 'builtin',
+        activation: { rules: [{ when: { domains: { $contains: 'api' } }, score: 8 }], exclude: [], minScore: 5 },
+      }),
+    );
+    const d = routeTaskV2(
+      { title: 'update API documentation',
+        description: 'write and update the api endpoint documentation guide',
+        scope: { directories: ['src/api/'], filesRead: [], filesWrite: ['src/api/x.ts'] },
+        type: 'documentation' },
+      docPool, emptySkillPool,
+    );
+    // Guard: task must classify as documentation for the test to exercise the intended path.
+    expect(d.taskDNA.intent.primary).toBe('documentation');
+    expect(d.agentId).toBe('doc-writer');
+    expect(d.agentId).not.toBe('api-builder');
+  });
 });
