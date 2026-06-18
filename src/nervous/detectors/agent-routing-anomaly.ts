@@ -85,10 +85,13 @@ export class AgentRoutingAnomalyDetector {
 
     if (anomalies.length === 0) return null;
 
+    const topAnomaly = anomalies.reduce((a, b) => (b.rate > a.rate ? b : a));
     return {
       risk: 'high',
       shouldNotify: true,
       severity: 'warning',
+      title: `Agent routing anomaly: ${topAnomaly.agent} (${(topAnomaly.rate * 100).toFixed(0)}%)`,
+      message: `ADR-041 violation in ${newPhase} — ${topAnomaly.agent} assigned ${topAnomaly.count}/${total} tasks (${(topAnomaly.rate * 100).toFixed(0)}%); skill/agent split not working`,
       groupKey: `agent-routing-anomaly:${ctx.sprintState.sprintId}`,
       suggestedActions: anomalies.map(a => ({
         id: 'SKILL_ROUTING_ADJUST',

@@ -173,6 +173,8 @@ export class ScopeCollisionMonitor {
       risk: 'medium',
       shouldNotify: true,
       severity: 'warning',
+      title: `Scope collision on ${collisions.length} file(s)`,
+      message: `${collisions.length} file(s) are claimed by multiple active tasks (first: ${collisions[0]!.file} → ${collisions[0]!.taskIds.join(', ')}) — concurrent writes risk corruption; reorder`,
       groupKey,
       suggestedActions: [
         {

@@ -53,6 +53,9 @@ describe('Proposer → Executor Integration', () => {
       risk: 'low',
       shouldNotify: true,
       severity: 'info',
+      // bug-2: title/message are now required on DetectorResult.
+      title: 'Orphan tasks found',
+      message: '3 orphan tasks will be archived',
       groupKey: 'orphan-tasks',
       suggestedActions: [{
         id: 'ORPHAN_TASK_ARCHIVE',
@@ -99,6 +102,9 @@ describe('Proposer → Executor Integration', () => {
       risk: 'medium',
       shouldNotify: true,
       severity: 'warning',
+      // bug-2: title/message are now required on DetectorResult.
+      title: 'Worker stale',
+      message: 'Worker w-001 not responding',
       suggestedActions: [{
         id: 'WORKER_RESPAWN',
         label: 'Respawn w-001',
@@ -143,6 +149,9 @@ describe('Proposer → Executor Integration', () => {
       risk: 'medium',
       shouldNotify: true,
       severity: 'warning',
+      // bug-2: title/message are now required on DetectorResult.
+      title: 'Worker stale',
+      message: 'Worker w-001 not responding',
       suggestedActions: [{
         id: 'WORKER_RESPAWN',
         label: 'Respawn w-001',
@@ -184,6 +193,9 @@ describe('Proposer → Executor Integration', () => {
       risk: 'medium',
       shouldNotify: true,
       severity: 'warning',
+      // bug-2: title/message are now required on DetectorResult.
+      title: 'Debt trend rising',
+      message: 'Debt rate > 15%',
       suggestedActions: [{
         id: 'DEBT_REPRIORITIZE',
         label: 'Reprioritize debt',
@@ -224,6 +236,9 @@ describe('Proposer → Executor Integration', () => {
       risk: 'low',
       shouldNotify: true,
       severity: 'info',
+      // bug-2: title/message are now required on DetectorResult.
+      title: 'Cache stale',
+      message: 'Invalidate cache',
       suggestedActions: [{
         id: 'CACHE_INVALIDATE',
         label: 'Invalidate cache',
@@ -255,6 +270,9 @@ describe('Proposer → Executor Integration', () => {
       risk: 'medium',
       shouldNotify: true,
       severity: 'warning',
+      // bug-2: title/message are now required on DetectorResult.
+      title: 'Worker stale',
+      message: 'w-001 stale',
       groupKey: 'stale-worker:w-001',
       suggestedActions: [{
         id: 'WORKER_RESPAWN',
@@ -303,6 +321,9 @@ describe('Proposer → Executor Integration', () => {
     const detectorResult: DetectorResult = {
       risk: 'low',
       shouldNotify: false,
+      // bug-2: title/message are now required on DetectorResult.
+      title: 'Test',
+      message: 'Test',
       suggestedActions: [],
       metadata: {},
     };
@@ -328,6 +349,9 @@ describe('Proposer → Executor Integration', () => {
       risk: 'low',
       shouldNotify: true,
       severity: 'info',
+      // bug-2: title/message are now required on DetectorResult.
+      title: 'Stale lock',
+      message: 'Lock held too long',
       suggestedActions: [{
         id: 'STALE_LOCK_RELEASE',
         label: 'Release stale lock',
@@ -361,6 +385,9 @@ describe('Proposer → Executor Integration', () => {
       risk: 'medium',
       shouldNotify: true,
       severity: 'warning',
+      // bug-2: title/message are now required on DetectorResult.
+      title: 'Worker stale',
+      message: 'Stale',
       suggestedActions: [{
         id: 'WORKER_RESPAWN',
         label: 'Respawn',
@@ -400,6 +427,9 @@ describe('Proposer → Executor Integration', () => {
       risk: 'high',
       shouldNotify: true,
       severity: 'critical',
+      // bug-2: title/message are now required on DetectorResult.
+      title: 'Sprint ready',
+      message: 'Sprint can be started',
       suggestedActions: [{
         id: 'SPRINT_START',
         label: 'Start sprint',

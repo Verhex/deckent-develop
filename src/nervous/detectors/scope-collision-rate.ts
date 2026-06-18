@@ -77,6 +77,8 @@ export class ScopeCollisionRateDetector {
       risk: 'medium',
       shouldNotify: true,
       severity,
+      title: `High scope-collision rate (${collisionCount})`,
+      message: `${collisionCount} scope collisions this sprint (threshold ${this.collisionThreshold}) — planner is over-overlapping task scopes; consider a refactor`,
       groupKey: `scope-collision-rate:${ctx.sprintState.sprintId}`,
       suggestedActions: [
         {

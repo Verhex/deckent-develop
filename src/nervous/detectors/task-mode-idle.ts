@@ -57,6 +57,8 @@ export class TaskModeIdleDetector {
       risk: 'low',
       shouldNotify: true,
       severity: 'info',
+      title: `User idle ${idleMinutes}min`,
+      message: `No user activity for ${idleMinutes}min in task mode — suggest a check-in`,
       groupKey: `task-mode-idle:${idleMinutes}m`,
       suggestedActions: [
         {

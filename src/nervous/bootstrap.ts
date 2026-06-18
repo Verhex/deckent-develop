@@ -260,7 +260,7 @@ export function createNervousSystemIfEnabled(
   return { observer, dispose };
 }
 
-async function runPipeline(
+export async function runPipeline(
   result: DetectorResult,
   event: ObserverEvent,
   decisionEngine: DecisionEngine,
@@ -272,18 +272,18 @@ async function runPipeline(
     const decisions = decisionEngine.decide(result);
     if (decisions.length === 0) return;
 
-    const metadata = (result as { metadata?: Record<string, unknown> }).metadata ?? {};
-    const detectorId = String(metadata.detectorId ?? 'unknown');
-    const title = String(metadata.title ?? detectorId);
-    const message = String(metadata.message ?? `Detected: ${detectorId}`);
-
+    // bug 2 (Sprint 290): title/message/detectorId are first-class on
+    // DetectorResult now — read them directly. The registry stamps detectorId;
+    // the `?? 'detector'` only fires if that stamp is bypassed, never 'unknown'.
+    const detectorId = result.detectorId
+      ?? String((result.metadata as { type?: unknown } | undefined)?.type ?? 'detector');
     const notification = proposer.propose(result, decisions, {
       detectorId,
       sprintId: event.sprintId,
       taskId: event.taskId,
-      title,
-      message,
-    } as never);
+      title: result.title,
+      message: result.message,
+    });
     if (!notification) return;
 
     await Promise.allSettled([

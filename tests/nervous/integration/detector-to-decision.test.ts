@@ -22,6 +22,9 @@ function makeDetectorResult(overrides: Partial<DetectorResult> = {}): DetectorRe
     risk: 'medium',
     shouldNotify: true,
     severity: 'warning',
+    // bug-2: title/message are now required on DetectorResult.
+    title: 'Stale worker w-001',
+    message: 'Test detector result for detector→decision integration',
     groupKey: 'test-group',
     suggestedActions: [{
       id: 'WORKER_RESPAWN',

@@ -99,6 +99,8 @@ export class NotificationDeliveryHealthDetector {
       risk: severity === 'critical' ? 'high' : 'medium',
       shouldNotify: true,
       severity,
+      title: `Nervous bridge degraded (${pct}% failures)`,
+      message: `${failed}/${sent} notification deliveries failed (${pct}%) — operators may not be receiving alerts; repair the bridge`,
       groupKey: `notification-delivery-health:${ctx.sprintState.sprintId}`,
       suggestedActions: [
         {

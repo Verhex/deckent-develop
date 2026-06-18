@@ -90,15 +90,18 @@ function assembleNervousPipeline(
       try {
         const decisions = decisionEngine.decide(result);
         if (decisions.length === 0) return;
-        const detectorId = String(result.metadata?.detectorId ?? 'unknown');
-        const title = String(result.metadata?.title ?? detectorId);
-        const message = String(result.metadata?.message ?? `Detected: ${detectorId}`);
+        // bug-2: title/message/detectorId now first-class on DetectorResult —
+        // read them directly (the registry stamps detectorId), mirroring the
+        // fixed bootstrap.runPipeline. The old metadata-bag + 'unknown'/'Detected:'
+        // fallbacks encoded the bug this test now guards against.
+        const detectorId = result.detectorId
+          ?? String((result.metadata as { type?: unknown } | undefined)?.type ?? 'detector');
         const notification = proposer.propose(result, decisions, {
           detectorId,
           sprintId: event.sprintId,
           taskId: event.taskId,
-          title,
-          message,
+          title: result.title,
+          message: result.message,
         });
         if (!notification) return;
         await Promise.allSettled([

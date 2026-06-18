@@ -83,10 +83,13 @@ export class BuildFailureRecurrenceDetector {
 
     if (recurrentFiles.length === 0) return null;
 
+    const worst = recurrentFiles.reduce((a, b) => (b.count > a.count ? b : a));
     return {
       risk: 'medium',
       shouldNotify: true,
       severity: 'warning',
+      title: `Recurring build failure: ${recurrentFiles.length} file(s)`,
+      message: `${recurrentFiles.length} file(s) failed across ${this.recurrenceThreshold}+ consecutive sprints — worst: ${worst.file} (${worst.count} sprints); needs root-cause`,
       groupKey: `build-failure-recurrence:${ctx.sprintState.sprintId}`,
       suggestedActions: recurrentFiles.map(rf => ({
         id: 'BUILD_FAILURE_INVESTIGATE',

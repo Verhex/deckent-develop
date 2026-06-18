@@ -32,6 +32,9 @@ function makeDetectorResult(
   return {
     risk: 'low',
     shouldNotify: true,
+    // bug-2: title/message are now required on DetectorResult.
+    title: 'Test detection',
+    message: 'Test detector result for decision-engine',
     ...overrides,
   };
 }

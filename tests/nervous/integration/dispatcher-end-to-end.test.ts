@@ -66,6 +66,9 @@ describe('Dispatcher End-to-End Integration', () => {
       risk: 'high',
       shouldNotify: true,
       severity: 'emergency',
+      // bug-2: title/message are now required on DetectorResult.
+      title: 'EMERGENCY: DIRECTIVES.md corrupted',
+      message: 'Template reversion detected',
       groupKey: 'directives-protection:sprint-147',
       suggestedActions: [{
         id: 'DIRECTIVES_WRITE',
@@ -117,6 +120,9 @@ describe('Dispatcher End-to-End Integration', () => {
       risk: 'low',
       shouldNotify: true,
       severity: 'info',
+      // bug-2: title/message are now required on DetectorResult.
+      title: 'Log rotation needed',
+      message: 'Rotate sprint logs',
       suggestedActions: [{
         id: 'LOG_ROTATION',
         label: 'Rotate logs',

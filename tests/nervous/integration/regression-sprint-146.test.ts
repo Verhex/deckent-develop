@@ -149,6 +149,9 @@ describe('Sprint 146 Regression Tests', () => {
       risk: 'high',
       shouldNotify: true,
       severity: 'emergency',
+      // bug-2: title/message are now required on DetectorResult.
+      title: 'DIRECTIVES.md integrity breach',
+      message: 'DIRECTIVES.md reverted to template mid-sprint',
       groupKey: 'directives-protection:sprint-145',
       suggestedActions: [{
         id: 'DIRECTIVES_WRITE',

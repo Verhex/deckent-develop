@@ -64,6 +64,8 @@ export class DebtTrendAnalyzer {
       risk: 'medium',
       shouldNotify: true,
       severity: 'warning',
+      title: `Debt trend rising (${(avgDebtRate * 100).toFixed(1)}%)`,
+      message: `Avg tech-debt rate over last ${this.windowSize} sprints is ${(avgDebtRate * 100).toFixed(1)}%, above the ${(this.thresholdRate * 100).toFixed(0)}% threshold — re-prioritize next sprint`,
       groupKey: `debt-trend:${ctx.sprintState.sprintId}`,
       suggestedActions: [
         {

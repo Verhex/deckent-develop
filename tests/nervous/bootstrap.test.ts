@@ -70,8 +70,21 @@ vi.mock('node:fs', async (importOriginal) => {
 import {
   createNervousSystemIfEnabled,
   makeFilePendingStore,
+  runPipeline,
 } from '../../src/nervous/bootstrap.js';
 import { getPendingNervous } from '../../src/cli/commands/chat-nervous-bridge.js';
+import { DetectorRegistry } from '../../src/nervous/detector-registry.js';
+import { DecisionEngine } from '../../src/nervous/decision-engine.js';
+import { Proposer } from '../../src/nervous/proposer.js';
+import type {
+  DetectorResult,
+  DetectorContext,
+  ObserverEvent,
+  NervousNotification,
+} from '../../src/core/nervous-types.js';
+import type { IDetector } from '../../src/nervous/detector-registry.js';
+import type { NervousDispatcher } from '../../src/nervous/dispatcher.js';
+import type { Executor } from '../../src/nervous/executor.js';
 
 // ─── Test Helpers ──────────────────────────────────────────────────────────
 function makeNervousConfig(overrides: Partial<NervousSystemConfig> = {}): NervousSystemConfig {
@@ -243,5 +256,101 @@ describe('makeFilePendingStore — CLI-readable nervous-pending.json (APPROVE-00
     expect(getPendingNervous(root).map((n) => n.id).sort()).toEqual(['n1', 'n2']);
     store.remove('n1');
     expect(getPendingNervous(root).map((n) => n.id)).toEqual(['n2']);
+  });
+});
+
+// ─── bug 2 (Sprint 290) — proposals carry real title/message/detectorId ──────
+//
+// Regression: bootstrap.runPipeline read metadata.{detectorId,title,message},
+// which detectors never set (they set metadata.type) → every proposal showed
+// 'unknown' / 'Detected: unknown'. The fix makes title/message first-class on
+// DetectorResult, has the registry stamp detectorId, and bootstrap read the
+// fields directly. This drives the REAL pipeline path (registry stamp →
+// decisionEngine → proposer) through the exported runPipeline with a stub
+// dispatcher that captures the emitted notification.
+
+describe('runPipeline — proposal carries detector title/message/detectorId (bug 2)', () => {
+  const STUB_EVENT: ObserverEvent = {
+    id: 'evt-bug2',
+    source: 'cron',
+    type: 'CRON_TICK',
+    timestamp: '2026-06-17T10:00:00.000Z',
+    payload: {},
+    sprintId: 'sprint-290',
+  };
+
+  // A stub detector that returns a real title/message — the registry stamps its
+  // detectorId, exactly as the 12 real detectors flow.
+  class StubBug2Detector implements IDetector {
+    readonly detectorId = 'stub-bug2';
+    detect(): DetectorResult {
+      return {
+        risk: 'medium',
+        shouldNotify: true,
+        severity: 'warning',
+        title: 'Stale worker w-290-001',
+        message: 'Heartbeat stale >10min — respawn proposed for w-290-001',
+        groupKey: 'stub-bug2:w-290-001',
+        suggestedActions: [
+          {
+            id: 'WORKER_RESPAWN',
+            label: 'Re-spawn w-290-001',
+            risk: 'medium',
+            payload: { workerId: 'w-290-001' },
+          },
+        ],
+        metadata: { type: 'stub-bug2' },
+      };
+    }
+  }
+
+  function makeDetectorContext(): DetectorContext {
+    const snapshot = { ...IDLE_SNAPSHOT, sprintId: 'sprint-290', currentPhase: 'EXECUTE' };
+    return {
+      event: STUB_EVENT,
+      sprintState: snapshot as typeof IDLE_SNAPSHOT,
+      projectRoot: '/tmp/bug2-project',
+      now: new Date('2026-06-17T10:00:00.000Z'),
+    };
+  }
+
+  it('dispatched notification carries the detector title/message/detectorId, never "unknown"', async () => {
+    // Build a registry and inject the stub onto its active list (private field —
+    // test seam) so runAll() stamps detectorId, mirroring the real flow.
+    const registry = new DetectorRegistry({});
+    (registry as unknown as { active: IDetector[] }).active.push(new StubBug2Detector());
+
+    const results = await registry.runAll(makeDetectorContext());
+    expect(results).toHaveLength(1);
+    const result = results[0]!;
+    // Registry stamped the authoritative detectorId.
+    expect(result.detectorId).toBe('stub-bug2');
+
+    const decisionEngine = new DecisionEngine(makeNervousConfig());
+    const proposer = new Proposer(makeNervousConfig());
+
+    // Stub dispatcher + executor capture the notification runPipeline builds.
+    let captured: NervousNotification | null = null;
+    const dispatcher = {
+      dispatch: async (n: NervousNotification) => {
+        captured = n;
+        return { delivered: true, channels: [] };
+      },
+    } as unknown as NervousDispatcher;
+    const executor = {
+      handle: async () => [],
+    } as unknown as Executor;
+
+    await runPipeline(result, STUB_EVENT, decisionEngine, proposer, dispatcher, executor);
+
+    expect(captured).not.toBeNull();
+    const n = captured as unknown as NervousNotification;
+    expect(n.detectorId).toBe('stub-bug2');
+    expect(n.title).toBe('Stale worker w-290-001');
+    expect(n.message).toBe('Heartbeat stale >10min — respawn proposed for w-290-001');
+    // The bug: these used to be 'unknown' / 'Detected: unknown'.
+    expect(n.detectorId).not.toBe('unknown');
+    expect(n.title).not.toBe('unknown');
+    expect(n.message).not.toBe('Detected: unknown');
   });
 });

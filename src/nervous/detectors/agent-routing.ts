@@ -120,11 +120,18 @@ export class AgentRoutingHealth {
 
     // Corrupt agent varsa critical, sadece anomaly ise warning
     const hasCritical = issues.some(i => i.type === 'corrupt-agent');
+    const corruptCount = issues.filter(i => i.type === 'corrupt-agent').length;
 
     return {
       risk: 'medium',
       shouldNotify: true,
       severity: hasCritical ? 'critical' : 'warning',
+      title: hasCritical
+        ? `Corrupt agent ID detected (${corruptCount})`
+        : `Agent routing anomaly (${issues.length})`,
+      message: hasCritical
+        ? `${corruptCount} task(s) carry an invalid agent ID (e.g. "string;") — routing/pool corruption; first: ${issues.find(i => i.type === 'corrupt-agent')!.detail}`
+        : `${issues.length} routing issue(s) at EVALUATE — ${issues[0]!.detail}`,
       groupKey: `agent-routing:${ctx.sprintState.sprintId}`,
       suggestedActions: issues.map(i => ({
         id: i.type === 'corrupt-agent' ? 'AGENT_PERFORMANCE_FLAG' : 'SKILL_ROUTING_ADJUST',

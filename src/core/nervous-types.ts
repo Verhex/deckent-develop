@@ -195,6 +195,12 @@ export interface DetectorResult {
   readonly suggestedActions: ReadonlyArray<Pick<NotificationAction, 'id' | 'label' | 'risk' | 'payload'>>;
   /** Notification üretilmeli mi */
   readonly shouldNotify: boolean;
+  /** Human-readable headline (REQUIRED — e.g. "Stale worker w-290-001"). */
+  readonly title: string;
+  /** Human-readable description (REQUIRED — what was detected + why it matters). */
+  readonly message: string;
+  /** Authoritative detector id — stamped by the registry, not the detector body. */
+  readonly detectorId?: string;
   /** Notification severity — shouldNotify true ise kullanılır */
   readonly severity?: Severity;
   /** Gruplama anahtarı — throttle için */

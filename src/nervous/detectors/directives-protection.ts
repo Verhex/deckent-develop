@@ -73,6 +73,8 @@ export class DirectivesMidSprintProtection {
       risk: 'high',
       shouldNotify: true,
       severity: 'emergency',
+      title: 'DIRECTIVES.md integrity breach mid-sprint',
+      message: `${reason} during ${ctx.sprintState.currentPhase} phase — emergency restore from task JSON files proposed`,
       groupKey: `directives-protection:${ctx.sprintState.sprintId}`,
       suggestedActions: [{
         id: 'DIRECTIVES_WRITE',

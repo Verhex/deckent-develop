@@ -180,7 +180,7 @@ export class DetectorRegistry {
       try {
         const result = detector.detect(ctx);
         if (result !== null) {
-          results.push(result);
+          results.push({ ...result, detectorId: detector.detectorId });
         }
       } catch (err) {
         // Detector başarısız oldu — nervous loop kırılmamalı

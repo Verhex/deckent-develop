@@ -73,6 +73,8 @@ export class DeadEventStreamDetector {
       risk: 'high',
       shouldNotify: true,
       severity: 'critical',
+      title: `Dead event stream — silent ${silenceMinutes}min`,
+      message: `Sprint ${sprintState.sprintId} emitted no events for ${silenceMinutes}min with ${sprintState.activeWorkers.length} active worker(s) — possible stall`,
       groupKey: `dead-event-stream:${sprintState.sprintId}`,
       suggestedActions: [
         {

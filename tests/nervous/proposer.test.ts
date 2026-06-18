@@ -54,6 +54,9 @@ function makeDetectorResult(overrides: Partial<DetectorResult> = {}): DetectorRe
     risk: 'medium',
     shouldNotify: true,
     severity: 'warning',
+    // bug-2: title/message are now required on DetectorResult.
+    title: 'Stale worker w-001',
+    message: 'Heartbeat stale — respawn proposed for w-001',
     groupKey: undefined,
     suggestedActions: [
       { id: 'WORKER_RESPAWN', label: 'Re-spawn worker', risk: 'medium', payload: { workerId: 'w-001' } },

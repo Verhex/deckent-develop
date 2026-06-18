@@ -53,6 +53,8 @@ export class StaleWorkerDetector {
       risk: 'medium',
       shouldNotify: true,
       severity: 'warning',
+      title: `Stale worker${staleWorkers.length > 1 ? `s (${staleWorkers.length})` : ` ${staleWorkers[0]!.id}`}`,
+      message: `Heartbeat stale >${Math.round(this.staleThresholdMs / 60000)}min — respawn proposed for ${staleWorkers.map(w => w.id).join(', ')}`,
       groupKey: `stale-worker:${staleWorkers.map(w => w.id).join(',')}`,
       suggestedActions: staleWorkers.map(w => ({
         id: 'WORKER_RESPAWN',

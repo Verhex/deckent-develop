@@ -112,6 +112,8 @@ export class TokenSpikeDetector {
       risk: severity === 'critical' ? 'high' : 'medium',
       shouldNotify: true,
       severity,
+      title: `Token cost spike $${estimatedCostUsd.toFixed(2)}`,
+      message: `Estimated sprint cost $${estimatedCostUsd.toFixed(2)} ${isAboveThreshold ? `exceeds the $${this.costThreshold} threshold` : `is >2x the $${avgCost} average`} — review token usage`,
       groupKey: `token-spike:${ctx.sprintState.sprintId}`,
       suggestedActions: [
         {

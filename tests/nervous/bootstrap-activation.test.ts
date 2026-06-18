@@ -148,7 +148,13 @@ function makeDetectorResult(): DetectorResult {
     suggestedActions: [{ id: 'ORPHAN_TASK_ARCHIVE', label: 'archive', risk: 'low' }],
     shouldNotify: true,
     severity: 'warning',
-    metadata: { detectorId: 'orphan-task', title: 'orphan', message: 'orphan detected' },
+    // bug-2: title/message/detectorId are first-class now (were stuffed in
+    // metadata, the exact bug shape). detectorId is normally stamped by the
+    // registry; set it here since this test emits a synthetic detection event.
+    detectorId: 'orphan-task',
+    title: 'orphan',
+    message: 'orphan detected',
+    metadata: { type: 'orphan-task' },
   };
 }
 
