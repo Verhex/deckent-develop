@@ -3,6 +3,8 @@ import type { Command } from 'commander';
 import { createHttpServer } from '../../api/server.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print } from '../helpers/output.js';
+import { getMessage } from '../helpers/messages.js';
+import { detectLang } from '../helpers/i18n.js';
 import { getDashboardStaticDir, dashboardIsBuilt } from '../helpers/dashboard-dir.js';
 
 interface WebOpts {
@@ -25,25 +27,28 @@ export function getMimeType(filePath: string): string {
 export function registerWeb(program: Command): void {
   program
     .command('web')
-    .description('Start web dashboard with API server')
+    .description('Start web dashboard with API server (deprecated — use `deckent serve`)')
     .option('--port <number>', 'Port to listen on', '3100')
     .option('--dev', 'Development mode — use Vite dev server for frontend')
     .action((opts: WebOpts) => {
       const root = resolveProjectRoot();
+      const lang = detectLang(root);
       const port = parseInt(opts.port ?? '3100', 10);
 
+      print(getMessage('web.deprecated_use_serve', lang));
+
       if (opts.dev) {
-        print("Run 'cd src/dashboard && npm run dev' for Vite dev server on port 5173");
+        print(getMessage('web.dev_server_hint', lang));
       }
 
       const staticDir = opts.dev ? undefined : getDashboardStaticDir();
       if (staticDir && !dashboardIsBuilt(staticDir)) {
-        print(`Warning: bundled dashboard not found at ${staticDir}`);
-        print("Run 'npm run build:dashboard' (repo) or reinstall deckent. API still works.");
+        print(getMessage('web.dashboard_not_found', lang, { name: staticDir }));
+        print(getMessage('web.build_dashboard_hint', lang));
       }
       const api = createHttpServer(root, port, staticDir);
 
-      print(`Deckent Web Dashboard on http://localhost:${port}`);
+      print(getMessage('web.listening', lang, { name: String(port) }));
 
       const cleanup = (): void => {
         api.close().then(() => {

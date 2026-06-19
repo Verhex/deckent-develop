@@ -6,6 +6,8 @@ import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
 import { loadConfig, validatePartialConfig, ConfigValidationError, deepMerge, CONFIG_METADATA, listConfigByCategory } from '../../core/config.js';
 import { migrateConfig, setNestedValue, getNestedValue } from '../../core/config-migration.js';
 import { print, printError } from '../helpers/output.js';
+import { getMessage } from '../helpers/messages.js';
+import { detectLang } from '../helpers/i18n.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { ErrorRegistry } from '../../core/errors.js';
 
@@ -110,6 +112,7 @@ export function registerConfig(program: Command): void {
     .description('Set a configuration value')
     .action(async (key: string, value: string) => {
       const root = resolveProjectRoot();
+      const lang = detectLang(root);
       const configPath = join(root, PROJECT_CONFIG_PATH);
 
       try {
@@ -134,10 +137,10 @@ export function registerConfig(program: Command): void {
 
         validatePartialConfig(existing);
         writeFileSync(configPath, JSON.stringify(existing, null, 2) + '\n');
-        print(`Set ${key} = ${JSON.stringify(parsed)}`);
+        print(getMessage('config.set', lang, { key, value: JSON.stringify(parsed) }));
       } catch (error) {
         if (error instanceof ConfigValidationError) {
-          printError(new Error(`Invalid config: ${error.errors.join(', ')}`));
+          printError(new Error(getMessage('config.invalid', lang, { errors: error.errors.join(', ') })));
         } else {
           printError(error);
         }
@@ -150,11 +153,12 @@ export function registerConfig(program: Command): void {
     .description('Get a configuration value by key (supports dot notation)')
     .action(async (key: string) => {
       const root = resolveProjectRoot();
+      const lang = detectLang(root);
       try {
         const config = await loadConfig(root);
         const value = getNestedValue(config as unknown as Record<string, unknown>, key);
         if (value === undefined) {
-          printError(new Error(`Key not found: ${key}`));
+          printError(new Error(getMessage('config.key_not_found', lang, { key })));
           process.exitCode = 1;
           return;
         }
@@ -170,11 +174,12 @@ export function registerConfig(program: Command): void {
     .description('Export config to stdout or a file')
     .action((file?: string) => {
       const root = resolveProjectRoot();
+      const lang = detectLang(root);
       const configPath = join(root, PROJECT_CONFIG_PATH);
       try {
         exportConfig(configPath, file);
         if (file) {
-          print(`Config exported to ${file}`);
+          print(getMessage('config.exported', lang, { path: file }));
         }
       } catch (error) {
         printError(error);
@@ -187,13 +192,14 @@ export function registerConfig(program: Command): void {
     .description('Import config from a JSON file')
     .action((file: string) => {
       const root = resolveProjectRoot();
+      const lang = detectLang(root);
       const configPath = join(root, PROJECT_CONFIG_PATH);
       try {
         importConfig(file, configPath);
-        print(`Config imported from ${file}`);
+        print(getMessage('config.imported', lang, { path: file }));
       } catch (error) {
         if (error instanceof ConfigValidationError) {
-          printError(new Error(`Invalid config: ${error.errors.join(', ')}`));
+          printError(new Error(getMessage('config.invalid', lang, { errors: error.errors.join(', ') })));
         } else {
           printError(error);
         }
@@ -235,6 +241,7 @@ export function registerConfig(program: Command): void {
     .option('--dry-run', 'Show what would be changed without modifying files')
     .action((opts: { dryRun?: boolean }) => {
       const root = resolveProjectRoot();
+      const lang = detectLang(root);
       const configPath = join(root, PROJECT_CONFIG_PATH);
       try {
         const result = migrateConfig(configPath, { dryRun: opts.dryRun });
@@ -244,21 +251,21 @@ export function registerConfig(program: Command): void {
           return;
         }
         if (!result.migrated) {
-          print('Config is already up to date — no migration needed.');
+          print(getMessage('config.migrate_up_to_date', lang));
           return;
         }
         if (opts.dryRun) {
-          print(`[dry-run] Would add ${result.addedFields.length} missing field(s):`);
+          print(getMessage('config.migrate_dry_run', lang, { count: String(result.addedFields.length) }));
           for (const field of result.addedFields) {
             print(`  + ${field}`);
           }
         } else {
-          print(`Migration complete. Added ${result.addedFields.length} field(s):`);
+          print(getMessage('config.migrate_complete', lang, { count: String(result.addedFields.length) }));
           for (const field of result.addedFields) {
             print(`  + ${field}`);
           }
           if (result.backupPath) {
-            print(`Backup saved to: ${result.backupPath}`);
+            print(getMessage('config.migrate_backup', lang, { path: result.backupPath }));
           }
         }
       } catch (error) {

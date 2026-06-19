@@ -6,7 +6,7 @@ import { parseCronExpr } from '../../core/scheduled-flow.js';
 import { FlowRuntime } from '../../core/flow-runtime.js';
 
 export function registerFlow(program: Command): void {
-  const flowCmd = program.command('flow').description('Manage scheduled flows (F3 process mode)');
+  const flowCmd = program.command('flow').description('Manage scheduled flows (process mode)');
 
   // ─── flow list ────────────────────────────────────────────────────
   flowCmd

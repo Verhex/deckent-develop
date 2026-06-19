@@ -5,6 +5,8 @@ import { MemoryStore } from '../../core/memory-store.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
+import { getMessage } from '../helpers/messages.js';
+import { detectLang } from '../helpers/i18n.js';
 
 export function registerRemember(program: Command): void {
   program
@@ -15,10 +17,11 @@ export function registerRemember(program: Command): void {
     .option('--title <title>', 'Entry title (default: first 60 chars of note)')
     .action((note: string, opts) => {
       const root = resolveProjectRoot();
+      const lang = detectLang(root);
       const dbPath = join(root, BRAIN_DIR, MEMORY_DB_FILE);
 
       if (!existsSync(dbPath)) {
-        printError('Memory V2 DB not found. Run `deckent memory migrate` first.');
+        printError(getMessage('remember.db_not_found', lang));
         return;
       }
 
@@ -37,8 +40,8 @@ export function registerRemember(program: Command): void {
           tags,
         });
 
-        print(`  Stored: [${opts.type}] ${title}`);
-        if (tags.length > 0) print(`  Tags: ${tags.join(', ')}`);
+        print(getMessage('remember.stored', lang, { type: String(opts.type), title }));
+        if (tags.length > 0) print(getMessage('remember.tags', lang, { tags: tags.join(', ') }));
       } finally {
         store.close();
       }

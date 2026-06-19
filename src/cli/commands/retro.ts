@@ -5,6 +5,7 @@ import { BRAIN_DIR, SPRINTS_DIR, MEMORY_DB_FILE } from '../../core/constants.js'
 import { MemoryStore } from '../../core/memory-store.js';
 import { print } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getMessage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 
 export interface RichSprintSummary {
@@ -358,7 +359,7 @@ export function registerRetro(program: Command): void {
 
       const content = loadLatestRetro(root);
       if (!content || !content.trim()) {
-        print('No retrospective found. Run `deckent start` to complete a sprint first.');
+        print(getMessage('retro.none_found', lang));
         return;
       }
 
@@ -399,7 +400,7 @@ export function registerRetro(program: Command): void {
       if (opts.compare) {
         const prevContent = loadPreviousRetro(root);
         if (!prevContent) {
-          print('No previous sprint found for comparison.');
+          print(getMessage('retro.no_previous_sprint', lang));
           return;
         }
         const prevSummary = parseRetroToRichSummary(prevContent);

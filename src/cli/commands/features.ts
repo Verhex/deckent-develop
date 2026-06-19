@@ -7,6 +7,10 @@ import { Command } from 'commander';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { FEATURES_MANIFEST_FILE } from '../../core/constants.js';
+import { resolveProjectRoot } from '../helpers/process.js';
+import { print, printError } from '../helpers/output.js';
+import { getMessage } from '../helpers/messages.js';
+import { detectLang } from '../helpers/i18n.js';
 
 interface FeatureEntry {
   id: string;
@@ -57,8 +61,8 @@ function getAllEntries(manifest: FeaturesManifest, category: FeatureCategory): A
   return entries.map(e => ({ ...e, category }));
 }
 
-function formatTable(entries: Array<FeatureEntry & { category: string }>): string {
-  if (entries.length === 0) return '  (no features in this category)';
+function formatTable(entries: Array<FeatureEntry & { category: string }>, lang: string): string {
+  if (entries.length === 0) return `  ${getMessage('features.empty_category', lang)}`;
 
   const lines: string[] = [];
   const idWidth = Math.max(4, ...entries.map(e => e.id.length));
@@ -85,17 +89,20 @@ function formatTable(entries: Array<FeatureEntry & { category: string }>): strin
 export function registerFeatures(program: Command): void {
   program
     .command('features')
+    .alias('feature-query')
     .description('List features from .deckent/settings/features-manifest.json by category')
     .option('-c, --category <category>', 'Filter by category: active, lightly_used, dormant, dead, all', 'all')
     .option('--json', 'Output as JSON')
     .option('--id <featureId>', 'Show details for a specific feature')
     .action((opts: { category: string; json: boolean; id?: string }) => {
-      const root = process.cwd();
+      const root = resolveProjectRoot();
+      const lang = detectLang(root);
       const manifest = loadManifest(root);
 
       if (!manifest) {
-        console.error('Error: features-manifest.json not found. Run `node scripts/sync-manifest.mjs` to generate.');
-        process.exit(1);
+        printError(getMessage('features.manifest_not_found', lang));
+        process.exitCode = 1;
+        return;
       }
 
       // Single feature detail
@@ -103,17 +110,18 @@ export function registerFeatures(program: Command): void {
         const all = getAllEntries(manifest, 'all');
         const feature = all.find(e => e.id === opts.id);
         if (!feature) {
-          console.error(`Error: feature "${opts.id}" not found.`);
-          process.exit(1);
+          printError(getMessage('features.feature_not_found', lang, { name: opts.id }));
+          process.exitCode = 1;
+          return;
         }
         if (opts.json) {
-          console.log(JSON.stringify(feature, null, 2));
+          print(JSON.stringify(feature, null, 2));
         } else {
-          console.log(`Feature: ${feature.id}`);
-          console.log(`Category: ${feature.category}`);
-          console.log(`Label: ${feature.label}`);
-          console.log(`Files: ${feature.files.join(', ')}`);
-          console.log(`Description: ${feature.description}`);
+          print(`${getMessage('features.detail_feature', lang)}: ${feature.id}`);
+          print(`${getMessage('features.detail_category', lang)}: ${feature.category}`);
+          print(`${getMessage('features.detail_label', lang)}: ${feature.label}`);
+          print(`${getMessage('features.detail_files', lang)}: ${feature.files.join(', ')}`);
+          print(`${getMessage('features.detail_description', lang)}: ${feature.description}`);
         }
         return;
       }
@@ -121,14 +129,18 @@ export function registerFeatures(program: Command): void {
       // Category validation
       const category = opts.category as FeatureCategory;
       if (!VALID_CATEGORIES.includes(category)) {
-        console.error(`Error: invalid category "${category}". Valid: ${VALID_CATEGORIES.join(', ')}`);
-        process.exit(1);
+        printError(getMessage('features.invalid_category', lang, {
+          name: category,
+          valid: VALID_CATEGORIES.join(', '),
+        }));
+        process.exitCode = 1;
+        return;
       }
 
       const entries = getAllEntries(manifest, category);
 
       if (opts.json) {
-        console.log(JSON.stringify({
+        print(JSON.stringify({
           manifest_version: manifest._meta.version,
           sprint: manifest._meta.sprintId,
           category,
@@ -139,10 +151,16 @@ export function registerFeatures(program: Command): void {
       }
 
       // Table output
-      console.log(`\nDeckent Features — ${category === 'all' ? 'All Categories' : category}`);
-      console.log(`Sprint: ${manifest._meta.sprintId} | Generated: ${manifest._meta.generatedAt}`);
-      console.log('');
-      console.log(formatTable(entries));
-      console.log(`\n  Total: ${entries.length} features`);
+      const heading = category === 'all'
+        ? getMessage('features.header_all', lang)
+        : category;
+      print(`\n${getMessage('features.header_title', lang, { category: heading })}`);
+      print(getMessage('features.header_meta', lang, {
+        sprint: manifest._meta.sprintId,
+        generated: manifest._meta.generatedAt,
+      }));
+      print('');
+      print(formatTable(entries, lang));
+      print(`\n  ${getMessage('features.total', lang, { count: String(entries.length) })}`);
     });
 }

@@ -25,6 +25,7 @@ export function formatAnalysisResult(analysis: ProjectAnalysis): string {
 export function registerAnalyze(program: Command): void {
   program
     .command('analyze')
+    .alias('analyze-project')
     .description('Analyze project stack, size, and recommended methodology')
     .option('--json', 'Output raw JSON')
     .action((opts: { json?: boolean }) => {

@@ -867,7 +867,7 @@ export function handlePending(opts: AutonomousPendingOptions): void {
 export function registerAutonomous(program: Command): void {
   const cmd = program
     .command('autonomous')
-    .description('Autonomous runtime — authority-bounded continuous loop (F3-009)');
+    .description('Autonomous runtime — authority-bounded continuous loop');
 
   cmd
     .command('enable')

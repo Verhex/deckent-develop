@@ -6,6 +6,8 @@ import { searchMemory } from '../../core/memory-query.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
+import { getMessage } from '../helpers/messages.js';
+import { detectLang } from '../helpers/i18n.js';
 
 export function registerRecall(program: Command): void {
   program
@@ -15,12 +17,14 @@ export function registerRecall(program: Command): void {
     .option('-n, --limit <n>', 'Max results', '5')
     .option('--sprint-min <n>', 'Minimum sprint number')
     .option('-m, --mode <mode>', 'FTS5 token join mode: or (default, broader) | and (all tokens must match)', 'or')
+    .option('--json', 'Output results as JSON')
     .action((query: string, opts) => {
       const root = resolveProjectRoot();
+      const lang = detectLang(root);
       const dbPath = join(root, BRAIN_DIR, MEMORY_DB_FILE);
 
       if (!existsSync(dbPath)) {
-        printError('Memory V2 DB not found. Run `deckent memory migrate` first.');
+        printError(getMessage('recall.db_not_found', lang));
         return;
       }
 
@@ -36,12 +40,23 @@ export function registerRecall(program: Command): void {
           mode,
         });
 
-        if (results.length === 0) {
-          print(`No results for "${query}".`);
+        if (opts.json) {
+          print(JSON.stringify(results.map((r) => ({
+            type: r.entry.type,
+            title: r.entry.title,
+            sprintId: r.entry.sprint_id,
+            summary: r.entry.summary,
+            snippet: r.snippet,
+          }))));
           return;
         }
 
-        print(`\n  ${results.length} result(s) for "${query}":\n`);
+        if (results.length === 0) {
+          print(getMessage('recall.no_results', lang, { query }));
+          return;
+        }
+
+        print(getMessage('recall.results_header', lang, { count: String(results.length), query }));
         for (let i = 0; i < results.length; i++) {
           const r = results[i]!;
           const sprint = r.entry.sprint_id ? ` (${r.entry.sprint_id})` : '';

@@ -4,6 +4,8 @@ import type { Command } from 'commander';
 import type { DashboardState } from '../../core/types.js';
 import { DASHBOARD_FILE } from '../../core/constants.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getMessage } from '../helpers/messages.js';
+import { detectLang } from '../helpers/i18n.js';
 
 interface DashboardOpts {
   interval?: string;
@@ -36,7 +38,7 @@ export function isNoColor(flagValue?: boolean): boolean {
   return flagValue === true || process.env['NO_COLOR'] !== undefined;
 }
 
-export function renderDashboard(state: DashboardState, noColor?: boolean): string {
+export function renderDashboard(state: DashboardState, noColor?: boolean, lang: string = 'en'): string {
   const W = getTerminalWidth();
   const inner = W - 2;
 
@@ -47,8 +49,8 @@ export function renderDashboard(state: DashboardState, noColor?: boolean): strin
     `\u2551 ${padRight(content, inner - 1)}\u2551`;
 
   // Sprint info
-  const sprintHeader = `Sprint: ${state.sprint.id} (#${state.sprint.number})`;
-  const sprintPhase = `Phase: ${state.sprint.phase}  Status: ${state.sprint.status}`;
+  const sprintHeader = getMessage('dashboard.sprint_line', lang, { id: state.sprint.id, number: String(state.sprint.number) });
+  const sprintPhase = getMessage('dashboard.phase_status', lang, { phase: state.sprint.phase, status: state.sprint.status });
 
   // Workers table — D) show agent/skill columns
   const agentColW = Math.max(10, Math.floor((inner - 1) * 0.15));
@@ -58,12 +60,12 @@ export function renderDashboard(state: DashboardState, noColor?: boolean): strin
   const elapsedColW = 8;
   const agentNameColW = inner - 1 - idColW - taskColW - statusColW - elapsedColW - agentColW;
   const workerHeader =
-    padRight('ID', idColW) +
-    padRight('Task', taskColW) +
-    padRight('Status', statusColW) +
-    padRight('Elapsed', elapsedColW) +
-    padRight('Agent', agentColW) +
-    padRight('Skill', Math.max(0, agentNameColW));
+    padRight(getMessage('dashboard.col_id', lang), idColW) +
+    padRight(getMessage('dashboard.col_task', lang), taskColW) +
+    padRight(getMessage('dashboard.col_status', lang), statusColW) +
+    padRight(getMessage('dashboard.col_elapsed', lang), elapsedColW) +
+    padRight(getMessage('dashboard.col_agent', lang), agentColW) +
+    padRight(getMessage('dashboard.col_skill', lang), Math.max(0, agentNameColW));
   const workerSep = '-'.repeat(inner - 1);
   const workerRows = state.agents.map((a) => {
     const id = padRight(a.id, idColW);
@@ -83,7 +85,7 @@ export function renderDashboard(state: DashboardState, noColor?: boolean): strin
   const activeWidth = Math.round((p.active / total) * barWidth);
   const pendingWidth = barWidth - filledWidth - activeWidth;
   const bar = '#'.repeat(filledWidth) + '+'.repeat(activeWidth) + '.'.repeat(Math.max(0, pendingWidth));
-  const progressLine = `[${bar}] ${p.done}/${p.total} done ${p.active} active ${p.blocked} pending`;
+  const progressLine = `[${bar}] ${getMessage('dashboard.progress', lang, { done: String(p.done), total: String(p.total), active: String(p.active), blocked: String(p.blocked) })}`;
 
   // Alerts
   const alertLines = state.alerts.length > 0
@@ -91,7 +93,7 @@ export function renderDashboard(state: DashboardState, noColor?: boolean): strin
         const ts = new Date(a.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
         return row(`[${a.level}] ${a.message} (${ts})`);
       })
-    : [row('No alerts.')];
+    : [row(getMessage('dashboard.no_alerts', lang))];
 
   const time = state.updatedAt
     ? new Date(state.updatedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -110,7 +112,7 @@ export function renderDashboard(state: DashboardState, noColor?: boolean): strin
     mid,
     row(progressLine),
     mid,
-    row('Alerts:'),
+    row(getMessage('dashboard.alerts_label', lang)),
     ...alertLines,
     bot,
   ].join('\n');
@@ -152,6 +154,7 @@ export function registerDashboard(program: Command): void {
       const root = resolveProjectRoot();
       const dashPath = join(root, DASHBOARD_FILE);
       const noColor = isNoColor(opts.noColor);
+      const lang = detectLang(root);
 
       // A) --json: output raw dashboard JSON (same as status --raw) and exit
       if (opts.json) {
@@ -169,10 +172,10 @@ export function registerDashboard(program: Command): void {
         const state = readDashboardFile(dashPath);
         process.stdout.write('\x1Bc');
         if (!state) {
-          process.stdout.write('No active sprint. Run deckent start first.\n');
+          process.stdout.write(getMessage('dashboard.no_active_sprint', lang) + '\n');
           return;
         }
-        process.stdout.write(renderDashboard(state, noColor) + '\n');
+        process.stdout.write(renderDashboard(state, noColor, lang) + '\n');
       };
 
       render();

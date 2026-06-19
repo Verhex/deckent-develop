@@ -137,7 +137,7 @@ function waitForSignal(): Promise<void> {
 export function registerBot(program: Command): void {
   const cmd = program
     .command('bot')
-    .description(getMessage('bot.listen_desc', getLanguage(undefined)));
+    .description(getMessage('bot.group_desc', getLanguage(undefined)));
 
   cmd
     .command('listen')

@@ -8,6 +8,8 @@ import { runSelfAuditGate } from '../../orchestra/sprint-finalizer.js';
 import { TASKS_DIR, LOCKS_DIR } from '../../core/constants.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getMessage } from '../helpers/messages.js';
+import { detectLang } from '../helpers/i18n.js';
 
 /** 5 minutes — same as orphan-cleaner STALE_LOCK_AGE_MS */
 const STALE_LOCK_AGE_MS = 5 * 60 * 1000;
@@ -25,6 +27,7 @@ async function runRecovery(
   root: string,
   sprintId: string,
   opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean },
+  lang: string,
 ): Promise<RecoveryReport> {
   const report: RecoveryReport = {
     audit: { overallGate: 'SKIPPED' },
@@ -86,19 +89,19 @@ async function runRecovery(
   try {
     report.orphanIpcDirs = cleanOrphanIpcDirs(root, { checkLivePid: true });
   } catch (e) {
-    print(`  Warning: IPC cleanup failed: ${e}`);
+    print(getMessage('recover.warn_ipc_cleanup_failed', lang, { error: String(e) }));
   }
 
   // Step 3: Clear stale locks (.lock and .spawnlock)
   try {
     report.staleLocksCleaned = clearStaleLocks(root, STALE_LOCK_AGE_MS);
   } catch (e) {
-    print(`  Warning: Lock cleanup failed: ${e}`);
+    print(getMessage('recover.warn_lock_cleanup_failed', lang, { error: String(e) }));
   }
   try {
     report.staleSpawnLocksCleaned = clearStaleSpawnLocks(root, STALE_LOCK_AGE_MS);
   } catch (e) {
-    print(`  Warning: Spawn lock cleanup failed: ${e}`);
+    print(getMessage('recover.warn_spawn_lock_cleanup_failed', lang, { error: String(e) }));
   }
 
   // Step 4: Archive terminal task files
@@ -107,7 +110,7 @@ async function runRecovery(
     report.taskFilesArchived = cleanupResult.archivedFiles.length;
     report.taskFilesPreserved = cleanupResult.preservedFiles.length;
   } catch (e) {
-    print(`  Warning: Task archive failed: ${e}`);
+    print(getMessage('recover.warn_task_archive_failed', lang, { error: String(e) }));
   }
 
   return report;
@@ -120,61 +123,81 @@ export function registerRecover(program: Command): void {
     .option('--dry-run', 'Preview what would be cleaned without making changes')
     .option('--force', 'Skip interactive confirmation')
     .option('--skip-audit', 'Skip the audit step')
-    .action(async (sprintId: string, opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean }) => {
+    .option('--json', 'Output recovery result as JSON')
+    .action(async (sprintId: string, opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean; json?: boolean }) => {
       const root = resolveProjectRoot();
+      const lang = detectLang(root);
 
       try {
+        if (opts.json) {
+          const report = await runRecovery(root, sprintId, { ...opts, dryRun: opts.dryRun }, lang);
+          print(JSON.stringify({
+            sprintId,
+            dryRun: Boolean(opts.dryRun),
+            auditGate: report.audit.overallGate,
+            orphanIpcDirs: report.orphanIpcDirs.length,
+            staleLocksCleaned: report.staleLocksCleaned,
+            staleSpawnLocksCleaned: report.staleSpawnLocksCleaned,
+            taskFilesArchived: report.taskFilesArchived,
+            taskFilesPreserved: report.taskFilesPreserved,
+          }));
+          return;
+        }
+
         if (opts.dryRun) {
-          print(`\n  Recovery preview for ${sprintId} (dry-run):`);
+          print(getMessage('recover.preview_header', lang, { sprintId }));
           print(`  ─────────────────────────────────────────`);
 
-          const report = await runRecovery(root, sprintId, { ...opts, dryRun: true });
+          const report = await runRecovery(root, sprintId, { ...opts, dryRun: true }, lang);
 
           if (report.audit.overallGate !== 'SKIPPED') {
-            print(`  Audit gate:      ${report.audit.overallGate}`);
+            print(getMessage('recover.audit_gate', lang, { gate: report.audit.overallGate }));
           }
-          print(`  Orphan IPC dirs: ${report.orphanIpcDirs.length} would be removed`);
-          print(`  Stale locks:     ${report.staleLocksCleaned} would be cleared`);
-          print(`  Stale spawnlocks:${report.staleSpawnLocksCleaned} would be cleared`);
-          print(`  Task files:      ${report.taskFilesArchived} would be archived`);
+          print(getMessage('recover.preview_orphan_ipc', lang, { count: String(report.orphanIpcDirs.length) }));
+          print(getMessage('recover.preview_stale_locks', lang, { count: String(report.staleLocksCleaned) }));
+          print(getMessage('recover.preview_stale_spawnlocks', lang, { count: String(report.staleSpawnLocksCleaned) }));
+          print(getMessage('recover.preview_task_files', lang, { count: String(report.taskFilesArchived) }));
           print(`  ─────────────────────────────────────────`);
-          print(`\n  Run without --dry-run to execute.\n`);
+          print(getMessage('recover.preview_run_to_execute', lang));
           return;
         }
 
         // Interactive confirmation (unless --force)
         if (!opts.force) {
-          print(`\n  ⚠ Recovery will clean up sprint ${sprintId}:`);
-          print(`    - Remove orphan IPC directories (dead PIDs only)`);
-          print(`    - Clear stale lock files (>5min)`);
-          print(`    - Archive terminal task files (DONE/NO_GO)`);
-          print(`    - Preserve active tasks (PENDING/EXECUTING)\n`);
-          print(`  Use --force to skip this confirmation, or --dry-run to preview.\n`);
+          print(getMessage('recover.confirm_header', lang, { sprintId }));
+          print(getMessage('recover.confirm_remove_ipc', lang));
+          print(getMessage('recover.confirm_clear_locks', lang));
+          print(getMessage('recover.confirm_archive_tasks', lang));
+          print(getMessage('recover.confirm_preserve_active', lang));
+          print(getMessage('recover.confirm_hint', lang));
 
           const readline = await import('node:readline/promises');
           const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-          const answer = await rl.question('  Proceed? (y/N) ');
+          const answer = await rl.question(getMessage('recover.confirm_prompt', lang));
           rl.close();
 
           if (answer.toLowerCase() !== 'y') {
-            print('  Aborted.');
+            print(getMessage('recover.aborted', lang));
             return;
           }
         }
 
-        print(`\n  Recovering sprint ${sprintId}...`);
-        const report = await runRecovery(root, sprintId, opts);
+        print(getMessage('recover.recovering', lang, { sprintId }));
+        const report = await runRecovery(root, sprintId, opts, lang);
 
         print(`  ─────────────────────────────────────────`);
         if (report.audit.overallGate !== 'SKIPPED') {
-          print(`  Audit gate:      ${report.audit.overallGate}`);
+          print(getMessage('recover.audit_gate', lang, { gate: report.audit.overallGate }));
         }
-        print(`  Orphan IPC dirs: ${report.orphanIpcDirs.length} removed`);
-        print(`  Stale locks:     ${report.staleLocksCleaned} cleared`);
-        print(`  Stale spawnlocks:${report.staleSpawnLocksCleaned} cleared`);
-        print(`  Task files:      ${report.taskFilesArchived} archived, ${report.taskFilesPreserved} preserved`);
+        print(getMessage('recover.result_orphan_ipc', lang, { count: String(report.orphanIpcDirs.length) }));
+        print(getMessage('recover.result_stale_locks', lang, { count: String(report.staleLocksCleaned) }));
+        print(getMessage('recover.result_stale_spawnlocks', lang, { count: String(report.staleSpawnLocksCleaned) }));
+        print(getMessage('recover.result_task_files', lang, {
+          archived: String(report.taskFilesArchived),
+          preserved: String(report.taskFilesPreserved),
+        }));
         print(`  ─────────────────────────────────────────`);
-        print(`\n  ✓ Recovery complete. Sprint ${sprintId} is ready for restart.\n`);
+        print(getMessage('recover.complete', lang, { sprintId }));
       } catch (error) {
         printError(error);
         process.exitCode = 1;

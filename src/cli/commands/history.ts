@@ -4,6 +4,8 @@ import type { Command } from 'commander';
 import { BRAIN_DIR, SPRINTS_DIR, DECKENT_DIR } from '../../core/constants.js';
 import { print, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getMessage } from '../helpers/messages.js';
+import { detectLang } from '../helpers/i18n.js';
 import { collectSprintFiles } from '../../orchestra/sprint-reporter.js';
 
 interface SprintRecord {
@@ -228,17 +230,18 @@ export function registerHistory(program: Command): void {
     .option('--trend', 'Show success rate/coverage trend analysis for last 5 sprints')
     .action((opts: HistoryOpts) => {
       const root = resolveProjectRoot();
+      const lang = detectLang(root);
       const sprintsDir = join(root, BRAIN_DIR, SPRINTS_DIR);
 
       if (!existsSync(sprintsDir)) {
-        print('No sprint history found.');
+        print(getMessage('history.no_history', lang));
         return;
       }
 
       let entries = collectSprintFiles(root);
 
       if (entries.length === 0) {
-        print('No sprint history found.');
+        print(getMessage('history.no_history', lang));
         return;
       }
 
@@ -281,7 +284,7 @@ export function registerHistory(program: Command): void {
       }
 
       if (records.length === 0) {
-        print('No matching sprint history found.');
+        print(getMessage('history.no_match', lang));
         return;
       }
 

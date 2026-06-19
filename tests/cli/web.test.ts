@@ -57,7 +57,7 @@ describe('registerWeb', () => {
   it('registers web command', () => {
     const cmd = program.commands.find((c) => c.name() === 'web');
     expect(cmd).toBeDefined();
-    expect(cmd!.description()).toBe('Start web dashboard with API server');
+    expect(cmd!.description()).toBe('Start web dashboard with API server (deprecated — use `deckent serve`)');
   });
 
   it('starts server with default port', async () => {
