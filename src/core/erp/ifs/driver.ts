@@ -169,7 +169,7 @@ export function createIfsErpDriver(opts: IfsErpDriverOptions): ErpDriver {
   const fetchImpl = opts.fetchImpl ?? (globalThis.fetch as IfsFetchLike | undefined);
   if (typeof fetchImpl !== 'function') {
     throw new DeckentError('DECKENT_E004',
-      'ifs ERP driver: no fetch available — pass fetchImpl or run on Node 18+ where globalThis.fetch is built in',
+      'ifs ERP driver: no fetch available — pass fetchImpl or run on Node 24+ where globalThis.fetch is built in',
     );
   }
 

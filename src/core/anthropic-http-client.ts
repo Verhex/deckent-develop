@@ -1,5 +1,5 @@
 /**
- * Anthropic Native HTTP Client — Zero dependency, Node 18+ fetch.
+ * Anthropic Native HTTP Client — Zero dependency, Node 24+ fetch.
  *
  * Wraps Anthropic Claude API calls we need for the User Safety Shield:
  * - POST /v1/messages/count_tokens (pre-sprint token estimation, free)
@@ -7,7 +7,7 @@
  * - GET  /v1/organizations/cost_report (Admin API, Team/Enterprise only)
  * - Rate limit header extraction (13 headers from any response)
  *
- * ADR-010 compliant: uses Node 18+ built-in fetch, zero runtime dependency.
+ * ADR-010 compliant: uses Node 24+ built-in fetch, zero runtime dependency.
  *
  * Sprint 141 Task 141-SAFE-05
  */

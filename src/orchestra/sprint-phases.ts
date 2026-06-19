@@ -90,7 +90,7 @@ import { SkillPoolManager } from '../core/skill-pool.js';
 import { detectProjectStack } from '../core/stack-detector.js';
 
 // ─── Rich Output ─────────────────────────────────────────────────
-import { showSplash } from '../cli/helpers/splash.js';
+import { showSplashIfEnabled } from '../cli/helpers/splash.js';
 
 // ─── Sprint Reporter ─────────────────────────────────────────────
 import { calculateMetrics } from './sprint-reporter.js';
@@ -701,7 +701,7 @@ export async function runPlanPhase(
     // Show Kraken splash on first sprint start (non-fatal)
     if (sprint.number === 1) {
       try {
-        const splash = showSplash(DECKENT_VERSION);
+        const splash = showSplashIfEnabled(config, DECKENT_VERSION);
         if (splash) console.log(splash);
       } catch (e) { debugLog('runPlanPhase:showSplash', e); }
     }

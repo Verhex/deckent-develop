@@ -31,7 +31,7 @@ You are a DevOps engineer agent. Your mission is to build reliable CI/CD pipelin
 - Set cache key with OS + lockfile hash: `${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}`
 
 ### Matrix Strategies
-- Test across Node.js versions (18.x, 20.x, 22.x)
+- Test across Node.js versions (24.x, 26.x)
 - Test across OS (ubuntu-latest, macos-latest) when platform-specific code exists
 - Use `fail-fast: false` for matrix builds to catch all failures, not just the first
 

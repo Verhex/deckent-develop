@@ -201,7 +201,7 @@ function subscriptionReplEnv(): NodeJS.ProcessEnv {
  * http://localhost:11434). Zero-API: no external network dependency, no
  * subscription. Honours DECKENT_OLLAMA_HOST / DECKENT_OLLAMA_MODEL env vars.
  *
- * Uses the global `fetch` (Node 18+; project requires Node >= 24) so no new
+ * Uses the global `fetch` (Node >= 24 built-in fetch) so no new
  * runtime dependency is introduced (ADR-010 compliance).
  *
  * Sprint 221 Task 221-005: connection-refused / DNS failures are wrapped

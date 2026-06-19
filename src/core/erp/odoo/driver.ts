@@ -139,7 +139,7 @@ export function createOdooErpDriver(opts: OdooErpDriverOptions): ErpDriver {
   const fetchImpl = opts.fetchImpl ?? (globalThis.fetch as OdooFetchLike | undefined);
   if (typeof fetchImpl !== 'function') {
     throw new DeckentError('DECKENT_E004', 
-      'odoo ERP driver: no fetch available — pass fetchImpl or run on Node 18+ where globalThis.fetch is built in',
+      'odoo ERP driver: no fetch available — pass fetchImpl or run on Node 24+ where globalThis.fetch is built in',
     );
   }
 

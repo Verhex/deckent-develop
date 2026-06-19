@@ -5,7 +5,7 @@
 // Design: dumb pipe, fail-loud. Non-2xx responses and network errors THROW —
 // the forwarder (siem-forwarder.ts) owns retry/drop semantics, so the transport
 // performs NO internal retries (no double-retry). fetch is injectable for
-// hermetic tests; the default is globalThis.fetch (Node 18+ built-in).
+// hermetic tests; the default is globalThis.fetch (Node 24+ built-in).
 //
 // ADR-010: no new runtime deps — built-in fetch only.
 // ADR-008: imports only from core/.
@@ -62,7 +62,7 @@ export function createHttpSiemTransport(
   const fetchImpl = opts.fetchImpl ?? (globalThis.fetch as SiemFetchLike | undefined);
   if (typeof fetchImpl !== 'function') {
     throw new DeckentError('DECKENT_E004', 
-      'siem-transport-http: no fetch available — pass fetchImpl or run on Node 18+ where globalThis.fetch is built in',
+      'siem-transport-http: no fetch available — pass fetchImpl or run on Node 24+ where globalThis.fetch is built in',
     );
   }
 

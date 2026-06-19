@@ -793,6 +793,9 @@ export interface ResolvedConfig {
   projectName: string;
   projectRoot: string;
   version: string;
+  /** Show the Kraken ASCII splash on first sprint start (default: true).
+   *  @see DeckentConfig.output_splash — gated via showSplashIfEnabled (ADR-021). */
+  output_splash?: boolean;
   /** Resolved tier-based model strategy (from mode preset + config overrides) */
   model_strategy?: ModelStrategy;
   auto_docs?: AutoDocsConfig;

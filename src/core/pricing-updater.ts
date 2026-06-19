@@ -7,7 +7,7 @@
  * Secondary validator: OpenRouter API (cross-check, warn on >5% delta).
  * Fallback: bundled baseline (ADR-033 offline-first).
  *
- * Zero runtime dependency — uses Node 18+ native fetch().
+ * Zero runtime dependency — uses Node 24+ native fetch().
  *
  * Sprint 141 Task 141-SAFE-02
  */

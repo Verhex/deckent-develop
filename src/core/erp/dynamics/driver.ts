@@ -170,7 +170,7 @@ export function createDynamicsErpDriver(opts: DynamicsErpDriverOptions): ErpDriv
   const fetchImpl = opts.fetchImpl ?? (globalThis.fetch as DynamicsFetchLike | undefined);
   if (typeof fetchImpl !== 'function') {
     throw new DeckentError('DECKENT_E004', 
-      'dynamics ERP driver: no fetch available — pass fetchImpl or run on Node 18+ where globalThis.fetch is built in',
+      'dynamics ERP driver: no fetch available — pass fetchImpl or run on Node 24+ where globalThis.fetch is built in',
     );
   }
 
