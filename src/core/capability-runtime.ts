@@ -21,8 +21,11 @@ import {
   installDataHandlers,
   type DataHandlerOptions,
 } from './capability-handlers-data.js';
-import { installErpHandler } from './erp/handler.js';
 import type { ErpConnector } from './erp/connector.js';
+import {
+  installErpHandlerWithApprovalGate,
+  type ErpApprovalGateFn,
+} from './erp-connector.js';
 import {
   withAuditedInvocation,
   type CapabilityAuditRecord,
@@ -32,8 +35,11 @@ import {
 export interface CapabilityRuntimeOptions extends ExtendedHandlerOptions {
   data?: DataHandlerOptions;
   /** Opt-in ERP read access (Sprint 265) — absent ⇒ no 'erp.read' handler
-   *  is registered and the registry behaves exactly as before (backward-safe). */
-  erp?: { connector: ErpConnector };
+   *  is registered and the registry behaves exactly as before (backward-safe).
+   *  `approvalGate` is optional: when provided every invocation is pre-checked
+   *  (medium-risk, risk-tagged erp.read, ADR-069 direction). Gate absent → plain
+   *  installErpHandler behaviour (default-off, backward-safe). */
+  erp?: { connector: ErpConnector; approvalGate?: ErpApprovalGateFn };
 }
 
 /**
@@ -56,7 +62,13 @@ export function createAuditedCapabilityRegistry(
   installDataHandlers(registry, { db: options.data?.db, mail: options.data?.mail });
   // Opt-in ERP wake (E12) — installed before the audit wrap below so erp.read
   // invocations emit audit records through the same loop as every other handler.
-  if (options.erp) installErpHandler(registry, { connector: options.erp.connector });
+  if (options.erp) {
+    installErpHandlerWithApprovalGate(
+      registry,
+      { connector: options.erp.connector },
+      options.erp.approvalGate,
+    );
+  }
 
   if (emit) {
     const safeEmit = (record: CapabilityAuditRecord): void => {

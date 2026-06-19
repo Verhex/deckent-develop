@@ -28,6 +28,10 @@ export interface AuditEvent {
   action: string;
   target?: string;
   metadata?: Record<string, unknown>;
+  /** Groups all events belonging to the same logical request flow (ENT-3 causal lineage). */
+  correlationId?: string;
+  /** Identifies the upstream request that caused this event to be emitted (ENT-3 causal lineage). */
+  causationId?: string;
   /**
    * Tamper-evident chain field. Added by writeAuditEvent() — absent on legacy records.
    * Contains the hmac of the previous event in the chain (or the genesis constant).
@@ -84,6 +88,8 @@ export function writeAuditEvent(
     action: event.action,
     ...(event.target !== undefined ? { target: event.target } : {}),
     ...(event.metadata !== undefined ? { metadata: event.metadata } : {}),
+    ...(event.correlationId !== undefined ? { correlationId: event.correlationId } : {}),
+    ...(event.causationId !== undefined ? { causationId: event.causationId } : {}),
     timestamp,
   };
 

@@ -6,7 +6,7 @@
  * unit tests.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHmac } from 'node:crypto';
 import { startTestServer, call, type TestServerHandle } from './test-server-helper.js';
@@ -135,6 +135,50 @@ describe('/api/process/* routes', () => {
     const admin = await call(handle, `/api/process/status/${id}`, { headers: bearer({ sub: 'root', tenant: 'tenant-A', role: 'admin' }) });
     expect(admin.status).toBe(200);
     expect(admin.json<{ id: string }>().id).toBe(id);
+  });
+
+  it('SECURITY (fail-closed): claim-siz (no-tenant) principal cannot access another-tenant entry → 404', async () => {
+    // Seed the backlog with an entry stamped tenant: 'other-tenant' directly.
+    // Then access with no bearer (claim-siz → callerTenant='local') → fail-closed → 404.
+    handle = await startTestServer({ disableAuth: true });
+    const blDir = join(handle.projectRoot, '.deckent', 'autonomous');
+    mkdirSync(blDir, { recursive: true });
+    const seededEntry = {
+      id: 'proc-seed-001',
+      title: 'Seeded other-tenant entry',
+      kind: 'task',
+      policy: 'auto',
+      status: 'pending',
+      tenant: 'other-tenant',
+      trigger: { type: 'one-off' },
+      spec: { description: 'seeded for fail-closed test' },
+    };
+    writeFileSync(join(blDir, 'backlog.json'), JSON.stringify({ _version: '1.0', entries: [seededEntry] }));
+
+    // No bearer → principal.tenantId = undefined → callerTenant = 'local'
+    // Entry tenant = 'other-tenant' ≠ 'local' → allowed = false → 404
+    const status = await call(handle, '/api/process/status/proc-seed-001');
+    expect(status.status).toBe(404);
+    const result = await call(handle, '/api/process/result/proc-seed-001');
+    expect(result.status).toBe(404);
+  });
+
+  it('SECURITY (fail-closed): claim-siz principal sees local (untagged) entry → 200 (v1-default)', async () => {
+    // A no-tenant principal should still see untagged ('local') entries.
+    // entry.tenant = undefined → entry.tenant??'local' = 'local' = callerTenant → allowed.
+    handle = await startTestServer({ disableAuth: true });
+    const submit = await call(handle, '/api/process/submit', {
+      method: 'POST',
+      body: JSON.stringify({ description: 'local task', kind: 'capability', capabilityTarget: { capability: 'erp.write' } }),
+    });
+    expect(submit.status).toBe(200);
+    const id = submit.json<{ executionId: string }>().executionId;
+
+    // Same no-bearer request → principal.tenantId = undefined → callerTenant = 'local'
+    // Entry was submitted with no bearer → entry.tenant = undefined → 'local' match → 200
+    const statusRes = await call(handle, `/api/process/status/${id}`);
+    expect(statusRes.status).toBe(200);
+    expect(statusRes.json<{ id: string }>().id).toBe(id);
   });
 
   it('SECURITY (tenant-stamp): submit stamps the durable entry tenant from the OIDC claim, not the client body', async () => {

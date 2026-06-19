@@ -26,6 +26,30 @@ import type {
 } from './work-model.js';
 import { DeckentError } from './errors.js';
 
+// ─── Role → Capability grant map (F8-003 least-privilege) ────────────────────
+
+/** Canonical mapping from actor role → granted capability set.
+ *  Roles are additive: operator ⊃ developer ⊃ viewer. */
+export const ROLE_CAPABILITY_MAP: Record<string, Capability[]> = {
+  viewer: ['fs-read', 'mcp-tool'],
+  developer: ['fs-read', 'fs-write', 'network', 'mcp-tool', 'shell'],
+  operator: [
+    'fs-read', 'fs-write', 'network',
+    'db-query', 'erp-read', 'mcp-tool', 'shell',
+  ],
+  admin: [
+    'fs-read', 'fs-write', 'network',
+    'db-query', 'db-write', 'erp-read', 'erp-write',
+    'shell', 'approval', 'provider-pin', 'gpu', 'tenant-scope', 'mcp-tool',
+  ],
+};
+
+/** Derive the granted capability set for a role. Returns `[]` for unknown roles
+ *  (no capabilities granted — safe-deny for unrecognised roles). */
+export function deriveGrantedCapabilities(role: string): Capability[] {
+  return ROLE_CAPABILITY_MAP[role] ?? [];
+}
+
 // ─── Result + context types ──────────────────────────────────────────────────
 
 /** Why an invocation did not produce a value. */
@@ -51,6 +75,10 @@ export interface InvocationContext {
   /** Audit lineage (ENT-3) — propagated, not interpreted, by the broker. */
   correlationId?: string;
   causationId?: string;
+  /** F8-003 least-privilege per-call flag. When true AND `grantedCapabilities` is
+   *  absent, derives grants from `actor.role` via {@link ROLE_CAPABILITY_MAP} and
+   *  enforces the gate (no-grant=deny). Default-off → permissive (v1-compat). */
+  enforceLeastPrivilege?: boolean;
 }
 
 /** A registered backend. Declares the capability it needs (least-privilege). */
@@ -91,6 +119,12 @@ interface BackendEntry {
  */
 export class CapabilityRegistry {
   private readonly backends = new Map<string, BackendEntry[]>();
+
+  /** F8-003 registry-level least-privilege enforcement. When `true`, every
+   *  `invoke` call that has no explicit `grantedCapabilities` auto-derives grants
+   *  from `ctx.actor.role` via {@link ROLE_CAPABILITY_MAP} and enforces the gate.
+   *  Default `false` — permissive (v1-default preserved). */
+  leastPrivilegeEnabled = false;
 
   /**
    * Register `handler` as a backend under `name` (a verb like 'mail.send' or a
@@ -212,9 +246,17 @@ export class CapabilityRegistry {
 
     const { name, handler } = resolved;
 
+    // F8-003 least-privilege gate: resolve the effective grant set.
+    // Priority: explicit ctx.grantedCapabilities > role-derived > none (permissive).
+    let effectiveGrants: Capability[] | undefined = ctx.grantedCapabilities;
+    if (effectiveGrants === undefined && (this.leastPrivilegeEnabled || ctx.enforceLeastPrivilege)) {
+      // Auto-derive from role — unknown role yields [] which denies all.
+      effectiveGrants = deriveGrantedCapabilities(ctx.actor?.role ?? '');
+    }
+
     if (
-      ctx.grantedCapabilities !== undefined &&
-      !ctx.grantedCapabilities.includes(handler.requiredCapability)
+      effectiveGrants !== undefined &&
+      !effectiveGrants.includes(handler.requiredCapability)
     ) {
       return {
         ok: false,

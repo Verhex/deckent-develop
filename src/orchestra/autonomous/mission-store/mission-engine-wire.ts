@@ -14,6 +14,7 @@ import { makeMissionDeliver, type MissionNotifyPayload } from './mission-deliver
 import { migrateBacklogJson } from './mission-migrate.js';
 import { runMissionScheduler, type DispatchFn, type MissionSchedulerSummary } from './mission-scheduler.js';
 import { advanceGoalMission, type GoalAdvanceDeps } from './goal-mission.js';
+import { auditMissionLifecycle } from './mission-audit-bridge.js';
 import type { Mission, MissionStore, ResultLike } from './mission-types.js';
 
 /**
@@ -75,6 +76,19 @@ function resolvePoolSize(config: ResolvedConfig): number {
 }
 
 /**
+ * Resolve the optional per-tenant concurrency cap from config. Read via the same
+ * off-type cast `isV2Engine` uses for `autonomous.engine` — `per_tenant_pool_size`
+ * is not (yet) on the ResolvedConfig type; adding it is a separate type-only
+ * follow-up. A value < 1 or non-number → undefined → NO cap → v1-default
+ * (global-only scheduling, single-tenant localhost unaffected).
+ */
+function resolvePerTenantPoolSize(config: ResolvedConfig): number | undefined {
+  const raw = (config.autonomous as Record<string, unknown> | undefined)?.['per_tenant_pool_size'];
+  if (typeof raw === 'number' && raw >= 1) return Math.floor(raw);
+  return undefined;
+}
+
+/**
  * Boot + run the autonomous-v2 engine to completion (or abort).
  *
  * 1. Open + migrate the durable mission store (SqliteMissionStore @ projectRoot).
@@ -103,13 +117,27 @@ export async function runV2Engine(
       ...(deps.runCapability ? { runCapability: deps.runCapability } : {}),
     });
 
-    const onMissionSettled = makeMissionDeliver({
+    const deliver = makeMissionDeliver({
       notify: deps.notify ?? ((): void => { /* no delivery channel — settle silently */ }),
       ...(deps.lang ? { lang: deps.lang } : {}),
     });
+    // Single settle wrap-point: audit the mission lifecycle (tamper-evident,
+    // fail-safe) BEFORE delivery. Both the scheduler-only path and the
+    // goal-driven path consume this handler, so wrapping here covers both.
+    const onMissionSettled = (mission: Mission): void => {
+      auditMissionLifecycle(projectRoot, {
+        tenantId: mission.tenant,
+        actor: 'scheduler',
+        action: 'missions:settle',
+        missionId: mission.id,
+        metadata: { status: mission.status, ok: mission.lastResult?.ok ?? null },
+      });
+      deliver(mission);
+    };
 
     const intervalMs = deps.intervalMs ?? config.autonomous?.interval_ms ?? 5000;
     const poolSize = resolvePoolSize(config);
+    const perTenantPoolSize = resolvePerTenantPoolSize(config);
 
     // Goal-driven path (Type-2): interleave the goal-driver with the scheduler.
     // Only taken when goal bindings are injected — otherwise the existing
@@ -122,6 +150,7 @@ export async function runV2Engine(
         intervalMs,
         onMissionSettled,
         goalDeps: deps.goalDeps,
+        ...(perTenantPoolSize !== undefined ? { perTenantPoolSize } : {}),
         ...(deps.signal ? { signal: deps.signal } : {}),
         ...(deps.maxIterations !== undefined ? { maxIterations: deps.maxIterations } : {}),
       });
@@ -131,6 +160,7 @@ export async function runV2Engine(
       poolSize,
       intervalMs,
       onMissionSettled,
+      ...(perTenantPoolSize !== undefined ? { perTenantPoolSize } : {}),
       ...(deps.signal ? { signal: deps.signal } : {}),
       ...(deps.maxIterations !== undefined ? { maxIterations: deps.maxIterations } : {}),
     });
@@ -149,6 +179,8 @@ interface GoalDrivenEngineOpts {
   goalDeps: GoalAdvanceDeps;
   signal?: AbortSignal;
   maxIterations?: number;
+  /** Per-tenant fair-share cap, threaded into each scheduler drain pass. */
+  perTenantPoolSize?: number;
 }
 
 /**
@@ -219,6 +251,7 @@ async function runGoalDrivenEngine(opts: GoalDrivenEngineOpts): Promise<MissionS
       intervalMs,
       onMissionSettled: schedOnSettled,
       maxIterations: GOAL_DRAIN_BOUND,
+      ...(opts.perTenantPoolSize !== undefined ? { perTenantPoolSize: opts.perTenantPoolSize } : {}),
       ...(signal ? { signal } : {}),
     });
     dispatched += summary.dispatched;

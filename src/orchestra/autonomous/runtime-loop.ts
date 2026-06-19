@@ -40,6 +40,7 @@ import { createAuditedCapabilityRegistry } from '../../core/capability-runtime.j
 import { buildErpConnectorFromConfig } from '../../core/erp/index.js';
 import { writeAuditEvent } from '../../core/audit-writer.js';
 import type { PolicyGate } from '../autonomous-runtime.js';
+import type { ActorContext } from '../../core/work-model.js';
 import { withNervousObserver } from '../autonomous-runtime.js';
 import {
   makeBacklogTriggerSource,
@@ -190,6 +191,14 @@ export interface BuildEngineRuntimeOptions {
    * called fail-safe inside runAutonomousCycle (errors never break the loop).
    */
   nervousTick?: () => void | Promise<void>;
+  /**
+   * ENT-2: session-level actor (the authenticated API principal) whose tenantId is
+   * used as a fallback in audit write-sites when an individual backlog entry's actor
+   * carries no tenantId. Absent → falls back to entry-level actor → 'local'.
+   * Additive + backward-safe: existing callers (CLI) pass nothing; the per-entry
+   * actor.tenantId is still the primary source and is never overridden by this field.
+   */
+  actor?: ActorContext;
 }
 
 /**
@@ -213,11 +222,16 @@ export function buildEngineRuntime(
   // handler so autonomous capability entries round-trip to a real ERP; absent ⇒
   // no erp.read handler (backward-safe).
   const erpConnector = buildErpConnectorFromConfig(opts.config.erp, process.env);
+  // ENT-2: session actor tenantId is the secondary source; entry-level actor
+  // (record.actor?.tenantId) remains the primary. Callers from the API can inject
+  // the authenticated principal so audit events carry the real tenant even for
+  // entries that pre-date per-entry actor threading.
+  const sessionTenantId = opts.actor?.tenantId;
   const capabilityRegistry = opts.capabilityRegistry ?? createAuditedCapabilityRegistry(
     (record) => {
       writeAuditEvent(opts.projectRoot, 'autonomous', {
-        tenantId: record.actor?.tenantId ?? 'local',
-        actor: record.actor?.id ?? 'system',
+        tenantId: record.actor?.tenantId ?? sessionTenantId ?? 'local',
+        actor: record.actor?.id ?? opts.actor?.id ?? 'system',
         action: `capability.${record.outcome}`,
         target: record.capability,
         metadata: { timestamp: record.timestamp, error: record.error },
@@ -401,14 +415,11 @@ export async function runAutonomousLoop(
     iterations += 1;
     options.onTick?.(result);
 
-    // Only outcomes that advance the backlog state (execute-dispatcher updated the
-    // entry to running→done/failed) justify immediate re-tick (sleep 0). All idle-
-    // equivalent outcomes (no_trigger, pending, denied, rejected) sleep intervalMs
-    // to prevent busy-spin when entries are stuck without a status writeback — e.g.
-    // an approval-required entry stays `pending` in the backlog until a human acts,
-    // so the trigger source re-emits it every cycle and the loop must back off.
-    const isActiveWork = result.outcome === 'executed' || result.outcome === 'failed';
-    const waitMs = isActiveWork ? 0 : options.intervalMs;
+    // Active outcome (executed) → re-tick immediately (sleep 0).
+    // All other outcomes (no_trigger/pending/denied/rejected/failed) → sleep
+    // intervalMs to prevent busy-spin when the backlog is empty or entries are
+    // stuck awaiting approval or authority.
+    const waitMs = result.outcome === 'executed' ? 0 : options.intervalMs;
     if (process.env.DECKENT_DEBUG_AUTONOMOUS) {
       process.stderr.write(
         `[autonomous-loop] iter=${iterations} outcome=${result.outcome} waitMs=${waitMs}\n`,

@@ -18,6 +18,7 @@ import { detectLang } from '../helpers/i18n.js';
 import { SqliteMissionStore } from '../../orchestra/autonomous/mission-store/sqlite-mission-store.js';
 import { createListMission } from '../../orchestra/autonomous/mission-store/mission-ingest.js';
 import { createGoalMission } from '../../orchestra/autonomous/mission-store/goal-mission.js';
+import { auditMissionLifecycle } from '../../orchestra/autonomous/mission-store/mission-audit-bridge.js';
 import { projectMission } from '../../orchestra/autonomous/mission-store/mission-view.js';
 import type { WorkItemKind } from '../../orchestra/autonomous/mission-store/mission-types.js';
 import { DECKENT_DIR } from '../../core/constants.js';
@@ -95,6 +96,13 @@ export function handleCreateList(opts: CreateListOpts): void {
       deliverTo: opts.deliverTo,
       items: opts.items,
     });
+    auditMissionLifecycle(opts.root, {
+      tenantId: opts.tenant ?? 'local',
+      actor: 'cli',
+      action: 'missions:create',
+      missionId: mission.id,
+      metadata: { kind: mission.kind, title: mission.title },
+    });
     print(
       getMessage('autonomous_mission.create_list.created', opts.lang, {
         id: mission.id,
@@ -129,6 +137,13 @@ export function handleCreateGoal(opts: CreateGoalOpts): void {
       acceptance: opts.acceptance,
       tenant: opts.tenant,
       deliverTo: opts.deliverTo,
+    });
+    auditMissionLifecycle(opts.root, {
+      tenantId: opts.tenant ?? 'local',
+      actor: 'cli',
+      action: 'missions:create',
+      missionId: mission.id,
+      metadata: { kind: mission.kind, title: mission.title },
     });
     print(
       getMessage('autonomous_mission.create_goal.created', opts.lang, {

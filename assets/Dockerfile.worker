@@ -1,0 +1,55 @@
+# ─── Deckent Worker Container ──────────────────────────────────────────────
+# Lightweight container for isolated worker execution.
+# Each worker runs in its own container with:
+#   - Claude CLI (or Codex/Gemini CLI)
+#   - Git for diff operations
+#   - Node.js for tsc/vitest verification
+#   - Project mounted read-only, .tasks/ mounted read-write
+
+FROM node:24-trixie-slim
+
+# Install essential tools
+# ca-certificates (Sprint 252 PSL-1 verify): REQUIRED for non-claude provider CLIs
+# in-container. The codex CLI is a Rust binary whose TLS/websocket client uses the
+# SYSTEM root CA store; without ca-certificates it fails with "no native root CA
+# certificates found" connecting to chatgpt.com (Sprint 252 codex-in-docker verify).
+# (Node-based CLIs like gemini bundle their own CAs, so this was previously latent.)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Claude Code CLI globally (always present — default lean image)
+RUN npm i -g @anthropic-ai/claude-code
+
+# Optional provider CLIs — default lean (Claude-only). Opt-in via build args:
+#   docker build --build-arg INSTALL_CODEX=true ...
+#   docker build --build-arg INSTALL_GEMINI=true ...
+#   docker build --build-arg INSTALL_OLLAMA=true ...
+# Manual uncomment alternative (without build args):
+# RUN npm i -g @openai/codex
+# RUN npm i -g @google/gemini-cli
+# RUN curl -fsSL https://ollama.ai/install.sh | sh
+ARG INSTALL_CODEX=false
+ARG INSTALL_GEMINI=false
+ARG INSTALL_OLLAMA=false
+RUN if [ "$INSTALL_CODEX" = "true" ]; then npm i -g @openai/codex; fi
+RUN if [ "$INSTALL_GEMINI" = "true" ]; then npm i -g @google/gemini-cli; fi
+RUN if [ "$INSTALL_OLLAMA" = "true" ]; then curl -fsSL https://ollama.ai/install.sh | sh; fi
+
+# Create writable home directory for non-root execution
+# spawn-backend-docker.ts uses --tmpfs /tmp/deckent-home, but this ensures
+# the base path exists even without tmpfs (e.g., docker exec debugging)
+RUN mkdir -p /tmp/deckent-home && chmod 777 /tmp/deckent-home
+ENV HOME=/tmp/deckent-home
+
+# Set workspace directory
+WORKDIR /workspace
+
+# Health check: verify claude CLI is available
+HEALTHCHECK --interval=30s --timeout=5s --retries=1 \
+  CMD claude --version || exit 1
+
+# No entrypoint — command passed by DockerSpawnBackend
+CMD ["echo", "deckent-worker ready"]

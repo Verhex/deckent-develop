@@ -157,6 +157,8 @@ export interface ExecutionRequest {
   skillIds?: string[];
   autoApprove?: boolean;
   timeoutMs?: number;
+  /** Opt-in native skills passthrough (AS4-P2). Maps to config native_skills_passthrough. Default-off. */
+  useNativeSkills?: boolean;
   // ── INTERACTION ──
   mode?: InteractionMode;
   // ── IDENTITY / GOVERNANCE envelope ──

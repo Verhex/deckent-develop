@@ -28,7 +28,7 @@ import {
   type NamespacedTool,
 } from '../../mcp-client/registry.js';
 import { loadMcpServers } from '../../mcp-client/config.js';
-import { classifyTool, type ToolPermission } from '../repl/tool-permissions.js';
+import { classifyTool, classifyExternalTool, type ToolPermission } from '../repl/tool-permissions.js';
 import { writeEvent } from '../../orchestra/event-stream.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -149,6 +149,22 @@ function formatTool(t: NamespacedTool): string {
   return `${t.namespacedName}${desc}`;
 }
 
+// ─── Namespaced registration helper ─────────────────────────────────────────
+
+/**
+ * Register tools from a single server into the registry under namespaced keys
+ * (`<server>__<tool>`) and return the resulting entries. Called on every
+ * connect and reconnect so the registry always reflects current server state.
+ */
+function registerNamespaced(
+  reg: McpToolRegistry,
+  server: string,
+  tools: McpToolDescriptor[],
+): NamespacedTool[] {
+  reg.register(server, tools);
+  return reg.listForServer(server);
+}
+
 // ─── Bridge factory ──────────────────────────────────────────────────────────
 
 const MCP_NS_SEP = '__';
@@ -201,8 +217,7 @@ export function buildMcpBridge(opts: McpBridgeOptions): {
         await broker.connect(name, def);
       }
       const tools = await broker.listTools(name);
-      registry.register(name, tools);
-      return registry.listForServer(name);
+      return registerNamespaced(registry, name, tools);
     },
 
     async loadAndConnectAll(): Promise<string[]> {
@@ -214,7 +229,7 @@ export function buildMcpBridge(opts: McpBridgeOptions): {
             await broker.connect(name, def);
           }
           const tools = await broker.listTools(name);
-          registry.register(name, tools);
+          registerNamespaced(registry, name, tools);
           connected.push(name);
         } catch {
           // Skip a misbehaving server — the REPL stays usable.
@@ -246,16 +261,57 @@ export function buildMcpBridge(opts: McpBridgeOptions): {
         };
       }
 
-      // Permission tier — classifyTool returns 'read' for unknown names; for
-      // external MCP calls we ALWAYS promote at least to 'confirm' since
-      // their side-effects are not part of the deckent_* allow-list. The
-      // classifyTool result is still consulted so a namespaced name that
-      // accidentally collides with an 'always'-tier deckent name (e.g.
-      // `deckent_kill__nope`) is not silently downgraded.
-      const baseTier = classifyTool(namespacedName, args);
+      // Permission tier — classifyTool is consulted to catch any accidental
+      // collision between a namespaced external name and an 'always'-tier
+      // deckent tool; external tools are NEVER 'always' (no permanent
+      // auto-approve). Read-only external tools (name-prefix heuristic via
+      // classifyExternalTool) auto-approve without a confirm prompt; all
+      // other external tools require confirmation.
+      const deckentTier = classifyTool(namespacedName, args);
       const tier: ToolPermission =
-        baseTier === 'read' ? 'confirm' : baseTier;
+        deckentTier === 'always' ? 'confirm' : classifyExternalTool(resolved.tool);
 
+      // Read-only external tools — skip confirm prompt, dispatch directly.
+      if (tier === 'read') {
+        const startedAt = new Date().toISOString();
+        const t0 = Date.now();
+        try {
+          const result = await broker.callTool(resolved.server, resolved.tool, args);
+          audit({
+            server: resolved.server,
+            tool: resolved.tool,
+            args,
+            startedAt,
+            durationMs: Date.now() - t0,
+            outcome: 'ok',
+            namespacedName,
+          });
+          return {
+            ok: true,
+            output: typeof result === 'string' ? result : JSON.stringify(result),
+            tier,
+          };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          audit({
+            server: resolved.server,
+            tool: resolved.tool,
+            args,
+            startedAt,
+            durationMs: Date.now() - t0,
+            outcome: 'error',
+            error: msg,
+            namespacedName,
+          });
+          return {
+            ok: false,
+            output: `[mcp-error] ${namespacedName}: ${msg}`,
+            tier,
+          };
+        }
+      }
+
+      // Non-read-only (confirm tier) — ask user before dispatching.
       const action: McpConfirmAction = {
         name: namespacedName,
         server: resolved.server,

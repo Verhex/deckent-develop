@@ -143,6 +143,28 @@ export function readArchivedAuditEvents(projectRoot: string, sprintId: string): 
   return payloads;
 }
 
+/**
+ * Read all audit events for a sprint whose correlationId OR causationId matches `id`.
+ *
+ * Provides ENT-3 causal lineage traceability: a single call retrieves every
+ * event that belongs to a logical request flow (by correlationId) OR was
+ * triggered by a specific upstream event (by causationId). Missing stream → []
+ * (never throws). Events without lineage fields are excluded.
+ *
+ * @param projectRoot - Project root directory
+ * @param sprintId    - Sprint identifier, e.g. "sprint-208"
+ * @param id          - correlationId or causationId value to match
+ */
+export function readAuditEventsByCorrelationId(
+  projectRoot: string,
+  sprintId: string,
+  id: string,
+): AuditEventPayload[] {
+  return readAuditEvents(projectRoot, sprintId).filter(
+    e => e.correlationId === id || e.causationId === id,
+  );
+}
+
 // ─── Filter Helpers ───────────────────────────────────────────────
 
 function filterByTenant(events: DeckentEvent[], tenantId: string): DeckentEvent[] {
@@ -193,16 +215,10 @@ function toAuditEntry(e: DeckentEvent): AuditEntry {
 // No I/O — callers supply the event list; these functions only filter/group.
 
 /**
- * AuditEvent with optional lineage fields (correlationId + causationId).
- * Extends the base write-side AuditEvent with the two lineage fields that
- * DeckentEvent carries at the top level (ADR-035, ENT-3).
+ * AuditEvent with lineage fields — correlationId/causationId now live on the
+ * base AuditEvent (ENT-3). This alias is kept for existing callers.
  */
-export interface AuditEventWithLineage extends AuditEvent {
-  /** Groups all events belonging to the same logical request flow. */
-  correlationId?: string;
-  /** Identifies the upstream request that caused this event to be emitted. */
-  causationId?: string;
-}
+export type AuditEventWithLineage = AuditEvent;
 
 /**
  * Filter events by correlationId (exact match).

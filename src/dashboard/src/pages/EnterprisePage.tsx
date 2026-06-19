@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs"
 import { Badge } from "../components/ui/badge";
 import { SkeletonTable } from "../components/Skeleton";
 import EmptyState from "../components/EmptyState";
-import { Building2, Shield, FileText, Gauge, AlertTriangle, Plus, Pencil, Trash2, X, Save, Loader2 } from "lucide-react";
+import { Building2, Shield, FileText, Gauge, AlertTriangle, Plus, Pencil, Trash2, X, Save, Loader2, ScrollText } from "lucide-react";
 import type { Alert } from "../types";
 
 type TenantStatus = "active" | "suspended" | "inactive";
@@ -89,6 +89,7 @@ export default function EnterprisePage() {
   const { data: rbac, loading: rbacLoading, error: rbacError, refetch: refetchRbac } = useApi<RbacRole[]>("/api/enterprise/rbac");
   const { data: audit, loading: auditLoading, error: auditError } = useApi<AuditEntry[]>("/api/enterprise/audit");
   const { data: rate, loading: rateLoading, error: rateError, refetch: refetchRate } = useApi<RateLimitInfo[]>("/api/enterprise/rate");
+  const { data: missionsAudit, loading: missionsAuditLoading, error: missionsAuditError } = useApi<AuditEntry[]>("/api/enterprise/missions-audit");
   const { data: statusData } = useApi<{ alerts: Alert[] }>("/api/status");
   const { identity } = useAuth();
 
@@ -397,6 +398,7 @@ export default function EnterprisePage() {
           <TabsTrigger value="rbac" data-testid="tab-rbac">RBAC</TabsTrigger>
           <TabsTrigger value="audit" data-testid="tab-audit">Audit Log</TabsTrigger>
           <TabsTrigger value="rate" data-testid="tab-rate">Rate Limits</TabsTrigger>
+          <TabsTrigger value="missions-audit" data-testid="tab-missions-audit">{t("enterprise.missions_audit_tab")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="tenants">
@@ -957,6 +959,50 @@ export default function EnterprisePage() {
               )}
               {!rateLoading && !rateError && (!rate || rate.length === 0) && (
                 <EmptyState icon={Gauge} title="No rate limit data" description="No rate limit information available." />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="missions-audit">
+          <Card className="bg-zinc-900 border-zinc-800">
+            <CardHeader>
+              <CardTitle className="text-zinc-100">{t("enterprise.missions_audit_title")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {missionsAuditLoading && <div aria-label="loading"><SkeletonTable rows={5} cols={5} /></div>}
+              {missionsAuditError && <p className="text-red-400">{t("enterprise.missions_audit_error")}</p>}
+              {missionsAudit && missionsAudit.length > 0 && (
+                <div className="overflow-x-auto" data-testid="missions-audit-table">
+                  <table className="w-full text-sm text-zinc-300">
+                    <thead>
+                      <tr className="border-b border-zinc-700">
+                        <th className="text-left py-2 pr-4 text-zinc-400">{t("enterprise.missions_audit_col_mission")}</th>
+                        <th className="text-left py-2 pr-4 text-zinc-400">{t("enterprise.missions_audit_col_action")}</th>
+                        <th className="text-left py-2 pr-4 text-zinc-400">{t("enterprise.missions_audit_col_actor")}</th>
+                        <th className="text-left py-2 pr-4 text-zinc-400">{t("enterprise.missions_audit_col_result")}</th>
+                        <th className="text-left py-2 text-zinc-400">{t("enterprise.missions_audit_col_time")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {missionsAudit.map((entry) => (
+                        <tr key={entry.id} className="border-b border-zinc-800 hover:bg-zinc-800/40">
+                          <td className="py-2 pr-4 font-mono text-xs">{entry.resource}</td>
+                          <td className="py-2 pr-4 font-mono text-xs">{entry.action}</td>
+                          <td className="py-2 pr-4">{entry.actor}</td>
+                          <td className="py-2 pr-4">
+                            <Badge className={entry.result === "success" ? "bg-green-900 text-green-300" : "bg-red-900 text-red-300"}>
+                              {entry.result}
+                            </Badge>
+                          </td>
+                          <td className="py-2 text-zinc-500 text-xs">{entry.timestamp}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {!missionsAuditLoading && !missionsAuditError && (!missionsAudit || missionsAudit.length === 0) && (
+                <EmptyState icon={ScrollText} title={t("enterprise.missions_audit_empty")} />
               )}
             </CardContent>
           </Card>

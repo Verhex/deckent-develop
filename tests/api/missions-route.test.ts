@@ -1,5 +1,5 @@
 /**
- * Tests for /api/missions/* endpoints (295-005).
+ * Tests for /api/missions/* endpoints (295-005, 298-001).
  * Hermetic: tmpdir project root + real SqliteMissionStore + mini http server.
  * Tier-1: all assertions use real served JSON over real HTTP — no mock-only.
  */
@@ -17,11 +17,27 @@ let projectRoot: string;
 let server: Server;
 let baseUrl: string;
 
+/**
+ * Build a minimal fake JWT whose payload carries the given claims.
+ * parseOidcClaims only base64-decodes the payload — no signature check.
+ * deriveRequestPrincipal uses the extracted tenant/role from this token.
+ */
+function fakeJwt(claims: Record<string, unknown>): string {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify(claims)).toString('base64url');
+  return `${header}.${payload}.fakesig`;
+}
+
+/** Returns fetch options with an Authorization: Bearer header for the given claims. */
+function bearerHeaders(claims: Record<string, unknown>): Record<string, string> {
+  return { Authorization: `Bearer ${fakeJwt(claims)}` };
+}
+
 async function startServer(root: string): Promise<{ server: Server; baseUrl: string }> {
   const s = createServer((req, res) => {
     const url = req.url ?? '/';
     const method = req.method ?? 'GET';
-    if (!registerMissionsRoute(url, method, res, root)) {
+    if (!registerMissionsRoute(url, method, res, root, req)) {
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'not found' }));
     }
@@ -164,6 +180,110 @@ describe('GET /api/missions/:id', () => {
 
     const res = await fetch(`${baseUrl}/api/missions/any-id`);
     expect(res.status).toBe(404);
+  });
+});
+
+describe('tenant isolation (anti-IDOR, 298-001)', () => {
+  it('(a) acme-principal sees only acme missions, not globex', async () => {
+    projectRoot = mkdtempSync(join(tmpdir(), 'missions-idor-'));
+    const store = new SqliteMissionStore(projectRoot);
+    store.migrate();
+    store.createMission({ id: 'acme-1', kind: 'list', title: 'Acme task', renderAs: 'checklist', tenant: 'acme' });
+    store.createMission({ id: 'globex-1', kind: 'list', title: 'Globex task', renderAs: 'checklist', tenant: 'globex' });
+    store.close();
+
+    const started = await startServer(projectRoot);
+    server = started.server;
+    baseUrl = started.baseUrl;
+
+    const res = await fetch(`${baseUrl}/api/missions`, { headers: bearerHeaders({ sub: 'alice', tenant: 'acme' }) });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { missions: MissionView[] };
+    const ids = body.missions.map((m) => m.id);
+    expect(ids).toContain('acme-1');
+    expect(ids).not.toContain('globex-1');
+  });
+
+  it('(b) acme-principal GET /api/missions/:id for a globex mission → 404 (no existence leak)', async () => {
+    projectRoot = mkdtempSync(join(tmpdir(), 'missions-idor-'));
+    const store = new SqliteMissionStore(projectRoot);
+    store.migrate();
+    store.createMission({ id: 'globex-2', kind: 'list', title: 'Globex secret', renderAs: 'checklist', tenant: 'globex' });
+    store.close();
+
+    const started = await startServer(projectRoot);
+    server = started.server;
+    baseUrl = started.baseUrl;
+
+    const res = await fetch(`${baseUrl}/api/missions/globex-2`, { headers: bearerHeaders({ sub: 'alice', tenant: 'acme' }) });
+    expect(res.status).toBe(404);
+  });
+
+  it('(c-a) claim-siz (no-tenant) principal + acme/globex missions → list empty (fail-closed regression guard)', async () => {
+    // Previously fail-open: no-tenant principal saw ALL missions.
+    // After fix: callerTenant='local', acme/globex missions invisible → fail-closed.
+    projectRoot = mkdtempSync(join(tmpdir(), 'missions-idor-'));
+    const store = new SqliteMissionStore(projectRoot);
+    store.migrate();
+    store.createMission({ id: 'acme-3', kind: 'list', title: 'Acme item', renderAs: 'checklist', tenant: 'acme' });
+    store.createMission({ id: 'globex-3', kind: 'list', title: 'Globex item', renderAs: 'checklist', tenant: 'globex' });
+    store.close();
+
+    const started = await startServer(projectRoot);
+    server = started.server;
+    baseUrl = started.baseUrl;
+
+    // No Authorization header → deriveRequestPrincipal returns { id: 'api-static' } with no tenantId
+    // callerTenant defaults to 'local'; acme/globex missions are NOT 'local' → not visible
+    const res = await fetch(`${baseUrl}/api/missions`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { missions: MissionView[] };
+    const ids = body.missions.map((m) => m.id);
+    expect(ids).not.toContain('acme-3');
+    expect(ids).not.toContain('globex-3');
+    expect(ids.length).toBe(0);
+  });
+
+  it('(c-b) claim-siz + local (untagged) mission → visible (v1-default)', async () => {
+    // No-tenant principal → callerTenant='local'; untagged mission → tenant??'local'='local' → visible.
+    projectRoot = mkdtempSync(join(tmpdir(), 'missions-idor-'));
+    const store = new SqliteMissionStore(projectRoot);
+    store.migrate();
+    store.createMission({ id: 'local-1', kind: 'list', title: 'Local task', renderAs: 'checklist' });
+    store.createMission({ id: 'acme-5', kind: 'list', title: 'Acme task', renderAs: 'checklist', tenant: 'acme' });
+    store.close();
+
+    const started = await startServer(projectRoot);
+    server = started.server;
+    baseUrl = started.baseUrl;
+
+    const res = await fetch(`${baseUrl}/api/missions`);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { missions: MissionView[] };
+    const ids = body.missions.map((m) => m.id);
+    expect(ids).toContain('local-1');
+    expect(ids).not.toContain('acme-5');
+  });
+
+  it('(d) admin-role principal sees all missions regardless of tenant', async () => {
+    projectRoot = mkdtempSync(join(tmpdir(), 'missions-idor-'));
+    const store = new SqliteMissionStore(projectRoot);
+    store.migrate();
+    store.createMission({ id: 'acme-4', kind: 'list', title: 'Acme admin', renderAs: 'checklist', tenant: 'acme' });
+    store.createMission({ id: 'globex-4', kind: 'list', title: 'Globex admin', renderAs: 'checklist', tenant: 'globex' });
+    store.close();
+
+    const started = await startServer(projectRoot);
+    server = started.server;
+    baseUrl = started.baseUrl;
+
+    // Admin from tenant 'acme' should still see globex missions
+    const res = await fetch(`${baseUrl}/api/missions`, { headers: bearerHeaders({ sub: 'root', tenant: 'acme', role: 'admin' }) });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { missions: MissionView[] };
+    const ids = body.missions.map((m) => m.id);
+    expect(ids).toContain('acme-4');
+    expect(ids).toContain('globex-4');
   });
 });
 

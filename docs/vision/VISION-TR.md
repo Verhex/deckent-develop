@@ -67,7 +67,7 @@ Farklı bağlamlar için üç backend: **tmux** (en hızlı, canlı terminal, Li
 
 ### MCP (Model Context Protocol) Entegrasyonu
 
-MCP, Deckent'i herhangi bir MCP-uyumlu IDE veya araçla entegre eder. 34 tool ve 8 resource ile sprint yaşam döngüsünün tamamı programatik olarak erişilebilir. Bu, Deckent'i sadece bir CLI değil, bir platform haline getirir.
+MCP, Deckent'i herhangi bir MCP-uyumlu IDE veya araçla entegre eder. 35 tool ve 8 resource ile sprint yaşam döngüsünün tamamı programatik olarak erişilebilir. Bu, Deckent'i sadece bir CLI değil, bir platform haline getirir.
 
 ### Docker Container İzolasyonu
 
@@ -121,11 +121,11 @@ Deckent'in tam otonom çok-ajanlı geliştirme platformu haline geldiği nokta �
 | Metric | Value |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-290 |
+| Sprint | sprint-302 |
 | MCP Tools | 35 |
 | MCP Resources | 8 |
-| CLI Commands | 57+ |
-| Dashboard Pages | 17 |
+| CLI Commands | 60+ |
+| Dashboard Pages | 20 |
 | Agents | 15 built-in + 2 custom |
 | Skills | 21 built-in |
 | Providers | 4 (Claude, Codex, Gemini, Ollama) |
@@ -147,10 +147,10 @@ _No sprint history._
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-290 |
-| Total Tasks | 6 |
-| Completed | 6 |
-| Tech Debt | 1 |
+| Sprint | sprint-302 |
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
 | No-Go | 0 |
-| Duration | 27dk 31sn |
+| Duration | 29dk 38sn |
 | Coverage | N/A |

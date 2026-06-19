@@ -51,12 +51,12 @@ export async function registerProcessRoutes(
   if (method === 'GET' && (path.startsWith('/api/process/status/') || path.startsWith('/api/process/result/'))) {
     const id = decodeURIComponent(path.slice(path.lastIndexOf('/') + 1));
     const entry = loadBacklog(await backlogPathFor(projectRoot)).entries.find((e) => e.id === id);
-    // Tenant-scope (anti-IDOR): a tenant-tagged entry is only visible to that
-    // tenant; a caller bound to a different tenant gets 404 (no existence leak).
-    // Untagged ('local') entries + tenant-less / admin principals see everything.
-    const crossTenant = !!entry?.tenant && !!principal.tenantId
-      && entry.tenant !== principal.tenantId && principal.role !== 'admin';
-    if (!entry || crossTenant) {
+    // Effective-tenant fail-closed: callerTenant defaults to 'local' when no
+    // tenantId claim. A claim-siz principal only sees 'local' entries (fail-closed).
+    const callerTenant = principal.tenantId ?? 'local';
+    const isAdmin = principal.role === 'admin';
+    const allowed = isAdmin || (!!entry && (entry.tenant ?? 'local') === callerTenant);
+    if (!entry || !allowed) {
       sendJson(res, { error: 'execution not found', id }, 404);
       return true;
     }

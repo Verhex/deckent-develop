@@ -361,10 +361,34 @@ describe('AuthorityMatrix', () => {
     it('normalizeWorkerRole maps known roles (case-insensitive) and rejects others', () => {
       expect(normalizeWorkerRole('admin')).toBe('admin');
       expect(normalizeWorkerRole('Engineer')).toBe('engineer');
+      expect(normalizeWorkerRole('operator')).toBe('operator');
       expect(normalizeWorkerRole('  viewer ')).toBe('viewer');
       expect(normalizeWorkerRole('wizard')).toBeNull();
       expect(normalizeWorkerRole(undefined)).toBeNull();
       expect(normalizeWorkerRole('')).toBeNull();
+    });
+
+    it('operator-permit: operator with execute-class capabilities → permit', () => {
+      const result = checkWorkerAuthority(reqSlice('operator', ['fs-read', 'fs-write', 'shell', 'mcp-tool', 'network']));
+      expect(result.allowed).toBe(true);
+      expect(result.level).toBe('permit');
+      expect(result.role).toBe('operator');
+      expect(result.deniedCapabilities).toEqual([]);
+    });
+
+    it('viewer-deny: viewer requesting execute-class capabilities → soft warn (blocked under enforceRbac)', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      // SOFT: allowed but warned by default
+      const soft = checkWorkerAuthority(reqSlice('viewer', ['shell', 'mcp-tool']));
+      expect(soft.allowed).toBe(true);
+      expect(soft.level).toBe('warn');
+      expect(soft.deniedCapabilities).toContain('shell');
+      expect(soft.deniedCapabilities).toContain('mcp-tool');
+      // HARD: enforceRbac=true → blocked
+      const hard = checkWorkerAuthority(reqSlice('viewer', ['shell', 'mcp-tool']), { enforceRbac: true });
+      expect(hard.allowed).toBe(false);
+      expect(hard.level).toBe('deny');
+      warnSpy.mockRestore();
     });
 
     it('ROLE_CAPABILITY_MAP is a nested hierarchy (admin ⊇ engineer ⊇ viewer)', () => {

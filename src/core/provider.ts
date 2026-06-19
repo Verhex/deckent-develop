@@ -186,6 +186,25 @@ export class ProviderUnavailableError extends ProviderError {
   }
 }
 
+// ─── Provider Name Validation ────────────────────────────────────────
+
+/**
+ * Runtime-validate a provider name string.
+ *
+ * Accepts any non-empty string composed of ASCII letters, digits, hyphens, and
+ * underscores — including arbitrary names like 'test-ai', 'groq', 'mistral' that
+ * are NOT in the built-in ProviderName union. This intentionally does NOT reject
+ * unknown names: config-driven providers (F1-012) extend the known set at runtime.
+ *
+ * Returns false only for empty/whitespace or names containing characters outside
+ * the safe set (prevents injection via config.providers.registry).
+ */
+export function validateProviderName(name: string): boolean {
+  if (typeof name !== 'string') return false;
+  const trimmed = name.trim();
+  return trimmed.length > 0 && /^[A-Za-z0-9_-]+$/.test(trimmed);
+}
+
 // ─── ProviderRegistry ────────────────────────────────────────────────
 /**
  * ProviderRegistry — singleton registry for ProviderAdapter instances.
@@ -880,6 +899,24 @@ export async function bootstrapProviders(
     }
   }
 
+  // ─── Bootstrap Bedrock (F1-015) — AWS-creds-gated ──────────────────────
+  // Register BedrockAdapter when AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY +
+  // AWS_REGION are all present. No AWS SDK — hand-rolled SigV4 (ADR-010).
+  const hasBedrockCreds =
+    Boolean(process.env['AWS_ACCESS_KEY_ID']) &&
+    Boolean(process.env['AWS_SECRET_ACCESS_KEY']) &&
+    Boolean(process.env['AWS_REGION'] ?? process.env['AWS_DEFAULT_REGION']);
+  if (hasBedrockCreds && !registry.hasProvider('bedrock')) {
+    try {
+      const { createBedrockAdapter } = await import('../providers/bedrock.js');
+      const bedrockAdapter = createBedrockAdapter(root);
+      registry.registerProvider(bedrockAdapter);
+      registered.push('bedrock' as ProviderName);
+    } catch {
+      skipped.push({ name: 'bedrock' as ProviderName, reason: 'Failed to create BedrockAdapter' });
+    }
+  }
+
   // ─── Config-driven provider registry (F1-012, zero-hardcode) ───────────
   // When `config.providers.registry` is present, register each declared
   // provider generically — adding a provider needs NO code change. Absent
@@ -891,7 +928,7 @@ export async function bootstrapProviders(
     for (const def of providerRegistryDefs) {
       const name = typeof def?.name === 'string' ? def.name.trim() : '';
       const kind = def?.type ?? def?.adapter;
-      if (!name) {
+      if (!validateProviderName(name)) {
         skipped.push({ name: 'unknown' as ProviderName, reason: 'provider registry entry is missing a non-empty name' });
         continue;
       }

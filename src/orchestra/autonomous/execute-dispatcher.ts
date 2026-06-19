@@ -28,6 +28,9 @@ import type { FlowReporter } from './flow-reporter.js';
 import { getCurrentSprintId } from '../../core/event-stream.js';
 import { runProcess } from '../process-runtime.js';
 import { enrichResultTokenUsage } from '../result-collector.js';
+import type { Task } from '../../core/task-types.js';
+import { evaluatePolicy } from '../../core/policy-engine.js';
+import type { PolicyActivationInput, PolicyConditionInput, PolicyInput } from '../../core/policy-engine.js';
 
 /** Action id the backlog-trigger sets on every entry-driven trigger. */
 export const AUTONOMOUS_EXECUTE_ACTION = 'autonomous.execute';
@@ -101,6 +104,23 @@ export interface ExecuteDispatcherDeps {
    * Injected as a stub in hermetic tests so they need no memory.db.
    */
   runBudgetedDecay?: (projectRoot: string, sprintId: string, opts: { memoryBudget?: number; decaySprints?: number }) => void | Promise<void>;
+  /**
+   * F10-001: policy-engine activation+condition gate (flag-gated default-off).
+   * When enabled, each entry is evaluated through evaluatePolicy's activation and
+   * condition layers before execution:
+   *   - 'park' / 'deny' → entry status set to 'parked', execution aborted.
+   *   - 'suggest'       → advisory warning only, execution proceeds.
+   *   - 'permit'        → proceed silently.
+   * The RBAC layer is NOT checked here (runtime-loop's policyGate already handles it).
+   * Absent or enabled=false → no gate (backward-safe, v1-default).
+   */
+  policyEngine?: {
+    enabled: boolean;
+    /** Derive the activation layer input from this entry. Return undefined to skip. */
+    buildActivationInput?: (entry: BacklogEntry) => PolicyActivationInput | undefined;
+    /** Derive the condition-gate input from this entry. Return undefined to skip. */
+    buildConditionInput?: (entry: BacklogEntry) => PolicyConditionInput | undefined;
+  };
 }
 
 /**
@@ -189,6 +209,31 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
             deps.flow?.step('jit_detail', entry.id, `detail generated (${(live.spec.description ?? '').length} chars)`);
           }
         } catch { /* JIT failure → fall back to the title-only description below */ }
+      }
+
+      // F10-001: policy-engine activation+condition gate (flag-gated default-off).
+      // Runs after JIT detail (so the final description is available to builders) and
+      // before kind-dispatch so a parked/denied entry never starts execution.
+      if (deps.policyEngine?.enabled) {
+        const policyInput: PolicyInput = {};
+        const activInput = deps.policyEngine.buildActivationInput?.(live);
+        if (activInput) policyInput.activation = activInput;
+        const condInput = deps.policyEngine.buildConditionInput?.(live);
+        if (condInput) policyInput.condition = condInput;
+        if (policyInput.activation || policyInput.condition) {
+          const verdict = evaluatePolicy(policyInput);
+          if (verdict.decision === 'park' || verdict.decision === 'deny') {
+            const parkReason = `policy-engine: ${verdict.decision} — ${verdict.reasons.join('; ')}`;
+            const blPark = loadBacklog(deps.backlogPath);
+            updateStatus(deps.backlogPath, blPark, entry.id, 'parked', { ok: false, reason: parkReason });
+            deps.flow?.step('parked', entry.id, parkReason);
+            return { outcome: 'failure', error: parkReason };
+          }
+          if (verdict.decision === 'suggest') {
+            // Advisory: proceed with low-activation warning (non-blocking by design).
+            console.warn(`[execute-dispatcher] policy-engine suggest for entry '${entry.id}': ${verdict.reasons.join('; ')}`);
+          }
+        }
       }
 
       // CORE-UNIFORMITY (slice 2): the just-completed item's own run id. The post-item
@@ -288,7 +333,10 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
               // caught by the dispatch try/catch and flipped a completed task to 'failed'
               // (Sprint 290 regression, found via process-controller.test.ts reversible-scope).
               try {
-                enrichResultTokenUsage(result, undefined, deps.projectRoot);
+                const taskStub: Task | undefined = (entry.model || entry.provider)
+                  ? { id: result.taskId ?? entry.id, provider: entry.provider, model: entry.model as Task['model'] } as unknown as Task
+                  : undefined;
+                enrichResultTokenUsage(result, taskStub, deps.projectRoot);
               } catch (e) {
                 console.warn(`[execute-dispatcher] token enrichment failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);
               }

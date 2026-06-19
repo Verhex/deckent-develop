@@ -2,12 +2,27 @@
 import type { ModelType, TaskEffort, TaskScope, PatternEntry, ResolvedConfig } from './types.js';
 import type { AgentDefinition, AgentPool } from './agent-types.js';
 import type { SkillDefinition, ProjectStack } from './skill-types.js';
+import type { TaskKind } from './work-model.js';
 
-// ─── Task Type ─────────────────────────────────────────────────────────────
+// ─── Task Type (WM-2 canonical-reconciled) ──────────────────────────────────
+// Single source of truth for the decision taxonomy values. Previously the union
+// literal and a parallel runtime validation array duplicated the same seven
+// members; `TaskType` is now DERIVED from one const tuple (no drift, no
+// duplicate array). The decision taxonomy is a faithful projection of the
+// canonical `TaskKind` SSOT (src/core/work-model.ts) via the `decisionTypeToKind`
+// adapter — see {@link DecisionCanonicalKind} + tests/core/wm2-canonical.test.ts.
 
-export type TaskType = 'code' | 'test' | 'doc' | 'security' | 'refactor' | 'devops' | 'config';
+const DECISION_TASK_TYPES = ['code', 'test', 'doc', 'security', 'refactor', 'devops', 'config'] as const;
 
-const VALID_TASK_TYPES: readonly TaskType[] = ['code', 'test', 'doc', 'security', 'refactor', 'devops', 'config'];
+export type TaskType = (typeof DECISION_TASK_TYPES)[number];
+
+/**
+ * The canonical {@link TaskKind} a decision {@link TaskType} reconciles to (via
+ * work-model `decisionTypeToKind`). Canonical-import anchor — links decision
+ * callsites to the one work-model SSOT instead of re-deriving a taxonomy.
+ * Compile-time only; erased at runtime.
+ */
+export type DecisionCanonicalKind = TaskKind;
 
 // ─── Task Analysis ─────────────────────────────────────────────────────────
 
@@ -71,7 +86,7 @@ export function createDefaultAnalysis(): TaskAnalysis {
  * Type guard: checks if a string is a valid TaskType.
  */
 export function isValidTaskType(type: string): type is TaskType {
-  return VALID_TASK_TYPES.includes(type as TaskType);
+  return (DECISION_TASK_TYPES as readonly string[]).includes(type);
 }
 
 /**

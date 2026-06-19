@@ -737,7 +737,10 @@ export class DockerSpawnBackend implements SpawnBackend {
     // (claude --version) before doing any task work, so a /login auth-loss
     // during a sprint produces a real AUTH_FAILED .result instead of a silent
     // exit 0. Skipped when worker.ts sees DECKENT_AUTH_SKIP=1 (test env).
-    dockerArgs.push('-e', 'CLAUDE_AUTH_REQUIRED=1');
+    // WM-5: gate to claude-only — codex/gemini/ollama must not receive this flag.
+    if (providerBinary === 'claude') {
+      dockerArgs.push('-e', 'CLAUDE_AUTH_REQUIRED=1');
+    }
     // Sprint 194 T-004 (W-M M-2): bind V8 heap to the container memory cap.
     // Explicit -e overrides any leaked process.env.NODE_OPTIONS — workers must
     // get the deterministic Deckent value, not whatever the host shell carries.

@@ -1,26 +1,32 @@
 // ─── Routing Engine v2 Types ─────────────────────────────────────────────────
 // Task DNA, Activation Rules, Routing Decisions — the foundation of intent-based routing.
 
-// ─── Intent Classification ──────────────────────────────────────────────────
+import type { TaskKind } from './work-model.js';
 
-export type IntentType =
-  | 'implementation'
-  | 'bugfix'
-  | 'refactor'
-  | 'documentation'
-  | 'security'
-  | 'devops'
-  | 'config'
-  | 'performance'
-  | 'design'
-  | 'migration'
-  | 'architecture'
-  | 'unknown';
+// ─── Intent Classification (WM-2 canonical-reconciled) ──────────────────────
+// `IntentType` is the routing-engine SSOT — consumed as `Record<IntentType, …>`
+// exhaustive maps across routing-engine / intent-classifier / task-router /
+// outcome-tracker / ecosystem-intelligence. It is a distinct taxonomy from
+// canonical `TaskKind` (bugfix/performance/migration/architecture vs audit/data),
+// NOT a deletable duplicate of it. It is single-sourced from ONE const tuple —
+// the union is DERIVED from `ALL_INTENT_TYPES` (previously the union literal and
+// the runtime array duplicated the same members). It reconciles to the canonical
+// `TaskKind` SSOT (src/core/work-model.ts) via the `intentToKind` / `taskKindToIntent`
+// adapters — see {@link IntentCanonicalKind} + tests/core/wm2-canonical.test.ts.
 
-export const ALL_INTENT_TYPES: readonly IntentType[] = [
+export const ALL_INTENT_TYPES = [
   'implementation', 'bugfix', 'refactor', 'documentation',
   'security', 'devops', 'config', 'performance', 'design', 'migration', 'architecture', 'unknown',
 ] as const;
+
+export type IntentType = (typeof ALL_INTENT_TYPES)[number];
+
+/**
+ * The canonical {@link TaskKind} an {@link IntentType} reconciles to (via
+ * work-model `intentToKind`). Canonical-import anchor — links the routing intent
+ * taxonomy to the one work-model SSOT. Compile-time only; erased at runtime.
+ */
+export type IntentCanonicalKind = TaskKind;
 
 /**
  * Sub-intent types for fine-grained routing within 'core-dev' (implementation) tasks.

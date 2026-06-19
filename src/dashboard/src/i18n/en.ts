@@ -507,6 +507,17 @@ export const en = {
   'enterprise.rate_invalid_limit': 'Limit must be a positive integer.',
   'enterprise.confirm_delete_rate': 'Delete this rate rule?',
 
+  // Enterprise — Missions Audit (298-005)
+  'enterprise.missions_audit_tab': 'Missions Audit',
+  'enterprise.missions_audit_title': 'Missions Audit Log',
+  'enterprise.missions_audit_col_mission': 'Mission ID',
+  'enterprise.missions_audit_col_action': 'Action',
+  'enterprise.missions_audit_col_actor': 'Actor',
+  'enterprise.missions_audit_col_result': 'Result',
+  'enterprise.missions_audit_col_time': 'Time',
+  'enterprise.missions_audit_empty': 'No mission audit entries',
+  'enterprise.missions_audit_error': 'Failed to load mission audit log',
+
   // Evolution Page (283-003)
   'evolution.title': 'Evolution',
   'evolution.tab_genealogy': 'Genealogy',

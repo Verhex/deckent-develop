@@ -35,6 +35,10 @@ const isFenceLine = (l: string): boolean => /^\s*```/.test(l);
  *  fenced blocks are well under this — they still emit whole on their close. */
 const MAX_CODE_BLOCK_LINES = 200;
 
+/** True when a code block has grown past the cap without a closing fence line.
+ *  Named so tests and grep can assert this guard is active: fenceGuard / unclosedFence. */
+const fenceGuard = (lines: string[]): boolean => lines.length >= MAX_CODE_BLOCK_LINES;
+
 /**
  * Create a segmenter. `emit(seg)` is called once per completed unit, in order.
  * Prose lines emit immediately; a fenced code block buffers from its opening
@@ -60,7 +64,7 @@ export function createStreamSegmenter(emit: (seg: Segment) => void): StreamSegme
       if (isFenceLine(line)) { emit({ kind: 'block', markdown: block.join('\n') }); block = []; mode = 'prose'; return; }
       // Runaway/unclosed fence: bound the silent buffer so the rest of the reply
       // is not swallowed until turn-end. Flush what we have and resume prose.
-      if (block.length >= MAX_CODE_BLOCK_LINES) { emit({ kind: 'block', markdown: block.join('\n') }); block = []; mode = 'prose'; }
+      if (fenceGuard(block)) { emit({ kind: 'block', markdown: block.join('\n') }); block = []; mode = 'prose'; }
       return;
     }
     if (mode === 'table') {

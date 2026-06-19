@@ -509,6 +509,17 @@ export const tr: Record<TranslationKey, string> = {
   'enterprise.rate_invalid_limit': 'Sınır pozitif bir tam sayı olmalıdır.',
   'enterprise.confirm_delete_rate': 'Bu hız kuralı silinsin mi?',
 
+  // Enterprise — Görev Denetim İzi (298-005)
+  'enterprise.missions_audit_tab': 'Görev Denetimi',
+  'enterprise.missions_audit_title': 'Görev Denetim Kaydı',
+  'enterprise.missions_audit_col_mission': 'Görev Kimliği',
+  'enterprise.missions_audit_col_action': 'Eylem',
+  'enterprise.missions_audit_col_actor': 'Aktör',
+  'enterprise.missions_audit_col_result': 'Sonuç',
+  'enterprise.missions_audit_col_time': 'Zaman',
+  'enterprise.missions_audit_empty': 'Görev denetim kaydı yok',
+  'enterprise.missions_audit_error': 'Görev denetim kaydı yüklenemedi',
+
   // Evolution Page (283-003)
   'evolution.title': 'Evrim',
   'evolution.tab_genealogy': 'Soyağacı',

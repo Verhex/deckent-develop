@@ -11,6 +11,8 @@ import { routeTaskV2, type RoutingOptions } from '../core/routing-engine.js';
 import { enforceModelTierGuard } from '../core/model-tier-guard.js';
 import { getModelProvider } from '../core/model-equivalence.js';
 import { modelRegistry } from '../core/model-registry.js';
+import { resolveWithOverflow, type OverflowOptions, type OverflowResolution } from '../core/provider-overflow.js';
+import type { RateLimitState } from '../core/token-quota.js';
 import type { OutcomeTracker } from './outcome-tracker.js';
 import type { ResolvedConfig } from '../core/config-types.js';
 import { debugLog } from '../core/utils.js';
@@ -23,6 +25,88 @@ export interface RerouteResult {
   reason: string;
   newDecision?: RoutingDecision;
 }
+
+// ─── Rate-Limit Failover ─────────────────────────────────────────────────────
+// Synthetic RateLimitState that signals quota exhaustion (retryAfter=60).
+// Used when no real rate-limit snapshot is available but the worker notes
+// contain a 429 / rate-limit string.
+const RATE_LIMIT_EXHAUSTED_STATE: RateLimitState = {
+  retryAfter: 60,
+  requestsLimit: null,
+  requestsRemaining: null,
+  requestsReset: null,
+  inputTokensLimit: null,
+  inputTokensRemaining: null,
+  inputTokensReset: null,
+  outputTokensLimit: null,
+  outputTokensRemaining: null,
+  outputTokensReset: null,
+  tokensLimit: null,
+  tokensRemaining: null,
+  tokensReset: null,
+};
+
+/**
+ * Detect whether a task result signals a 429 / rate-limit error.
+ * Inspects the free-text notes field written by workers.
+ */
+export function is429Error(result: TaskResult): boolean {
+  const msg = result.notes.toLowerCase();
+  return (
+    msg.includes('429') ||
+    msg.includes('rate limit') ||
+    msg.includes('rate_limit') ||
+    msg.includes('too many requests') ||
+    msg.includes('ratelimit')
+  );
+}
+
+/**
+ * Apply rate-limit failover for a failed task in the FIX phase.
+ *
+ * When a worker result signals a 429 / quota exhaustion (via notes text or an
+ * explicit `rateLimitState`), calls `resolveWithOverflow` to find an
+ * equivalent-tier API-provider fallback (e.g. opus@claude-sub → gpt-5@codex-api).
+ *
+ * Returns the OverflowResolution when an overflow happened, or null when:
+ *  - no 429 signal is present in notes AND no rateLimitState is provided, OR
+ *  - resolveWithOverflow found no equivalent fallback (no_equivalent / already_api).
+ *
+ * @param task           The original failed task.
+ * @param result         The worker result (notes inspected for 429 pattern).
+ * @param rateLimitState Optional real rate-limit snapshot; if absent and notes
+ *                       contain a 429 pattern a synthetic EXHAUSTED state is used.
+ * @param options        Forwarded to resolveWithOverflow (apiProvider, estimatedTokens).
+ */
+export function applyRateLimitFailover(
+  task: Task,
+  result: TaskResult,
+  rateLimitState?: RateLimitState | null,
+  options?: OverflowOptions,
+): OverflowResolution | null {
+  const has429 = is429Error(result);
+  // No signal at all — skip
+  if (!has429 && (rateLimitState == null)) {
+    return null;
+  }
+  // Prefer the real snapshot when provided; fall back to synthetic exhausted state
+  const state: RateLimitState = rateLimitState ?? (has429 ? RATE_LIMIT_EXHAUSTED_STATE : null!);
+
+  const resolution = resolveWithOverflow(task, modelRegistry, state, options);
+  if (!resolution.overflowed) {
+    return null;
+  }
+
+  debugLog(
+    'mid-sprint-adapter:429-failover',
+    `Task ${task.id}: 429 failover ${task.model}@${String(task.provider)} → ${resolution.fallbackModel}@${String(resolution.fallbackProvider)}`,
+  );
+
+  return resolution;
+}
+
+// Re-export type so callers can reference the resolution shape
+export type { OverflowResolution as RateLimitFailoverResolution };
 
 // ─── MidSprintAdapter ───────────────────────────────────────────────────────
 
@@ -156,6 +240,24 @@ export class MidSprintAdapter {
       debugLog('mid-sprint-adapter:reroute', err);
       return null;
     }
+  }
+
+  /**
+   * Handle 429 / rate-limit failover for a failed task in the FIX phase.
+   *
+   * Detects rate-limit errors in the task result and delegates to
+   * `applyRateLimitFailover` to switch the task to an equivalent-tier API
+   * provider (e.g. opus@claude-sub → gpt-5@codex-api).
+   *
+   * @returns The new overflowed task if failover was applied, null otherwise.
+   */
+  handleRateLimitFailover(
+    task: Task,
+    result: TaskResult,
+    rateLimitState?: RateLimitState | null,
+  ): Task | null {
+    const resolution = applyRateLimitFailover(task, result, rateLimitState);
+    return resolution ? resolution.task : null;
   }
 
   /**

@@ -119,7 +119,7 @@ Deckent is feature-rich and production-validated for the Developer face. Shipped
 
 - **CLI** — 55+ commands covering the full sprint lifecycle (`init`, `plan`, `start`, `status`, `review`, `retro`, `cleanup`, `recall`, `remember`, and more).
 - **Native REPL** — `deckent` with no arguments opens an agentic tool-use shell with streaming and in-turn tool queueing + approval (ADR-081/082/083).
-- **MCP server** — 34 tools and 8 resources over stdio transport. Register with any MCP-compatible host (`claude mcp add deckent -- npx deckent-mcp`) to drive Deckent from Claude Code, VS Code, JetBrains, or other editors.
+- **MCP server** — 35 tools and 8 resources over stdio transport. Register with any MCP-compatible host (`claude mcp add deckent -- npx deckent-mcp`) to drive Deckent from Claude Code, VS Code, JetBrains, or other editors.
 - **Sprint engine** — PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP, with dependency-pipeline waves and continuous dispatch (ADR-045/064).
 - **Memory V2** — DB-first SQLite with FTS5 dual-layer i18n search; `.md` exports are generated snapshots (ADR-088).
 - **Web dashboard** — React + Vite + Tailwind, served locally with token auth and an embedded web terminal.
@@ -160,7 +160,7 @@ Whatever ships, it ships under the four immovable principles: a product you own,
 
 ## From Commands to Conversation
 
-Deckent works through imperative CLI commands and an MCP server (34 tools). A developer types `deckent init && deckent plan && deckent start`, and orchestration runs. For users who already speak fluent CLI, this is fast. For users who want to *chat* — to describe what they want and let Deckent figure out which commands to invoke — Deckent ships a native conversational shell.
+Deckent works through imperative CLI commands and an MCP server (35 tools). A developer types `deckent init && deckent plan && deckent start`, and orchestration runs. For users who already speak fluent CLI, this is fast. For users who want to *chat* — to describe what they want and let Deckent figure out which commands to invoke — Deckent ships a native conversational shell.
 
 The MCP server already makes every command callable from any MCP-compatible host. On top of that, Deckent provides its own native REPL so that a user with nothing but Deckent installed can have the same experience without depending on an external LLM CLI. The first conversational path shipped early — `deckent chat` (`chat.ts`) landed in Sprint 190 — and the native REPL has since become the default surface. The provider abstraction reaches Claude, Codex, Gemini, and local Ollama models through the same tool-use loop.
 

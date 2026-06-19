@@ -324,6 +324,14 @@ export interface ChatNativeOptions {
    * stricter prompt. Tests inject a stub to drive the cancel path.
    */
   mcpConfirm?: McpConfirmFn;
+  /**
+   * AS2-P2 — REPL `/provider` switcher parity. Called when the user types
+   * `/provider <name>` in the loop; the caller (e.g. createSwitchableProvider)
+   * rebuilds the underlying adapter. When omitted the switch is acknowledged
+   * (confirmation message emitted) but no adapter rebuild occurs. Default-off
+   * for backward compatibility with callers that don't wire a switcher.
+   */
+  switchProvider?: (providerName: string) => void;
 }
 
 const DEFAULT_MAX_TURNS = 50;
@@ -561,6 +569,23 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       transcript.push({ role: 'assistant', content: interrText });
       memStore?.appendChatTurn(sessionId, 'user', line);
       memStore?.appendChatTurn(sessionId, 'assistant', interrText);
+      continue;
+    }
+    // AS2-P2 — `/provider` switcher parity: handle here (before the slash
+    // registry which returns 'none' for /provider) so Path-C (HTTP/terminal)
+    // has the same UX as the Ink REPL (app.tsx line ~431). The switchProvider
+    // callback rebuilds the underlying adapter; when omitted the confirmation
+    // is still emitted so the user knows the command was received.
+    if (line === '/provider' || line.startsWith('/provider ')) {
+      const arg = line.slice('/provider'.length).trim();
+      let replyText: string;
+      if (arg.length === 0) {
+        replyText = getMessage('tui.switch_usage', lang);
+      } else {
+        opts.switchProvider?.(arg);
+        replyText = `${getMessage('tui.switched', lang)}: ${arg}`;
+      }
+      output(replyText);
       continue;
     }
     // Sprint 280 T-280-004 — `/mcp` external-MCP-client wire (G1). The bridge

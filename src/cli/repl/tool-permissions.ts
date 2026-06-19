@@ -63,3 +63,39 @@ export function classifyTool(tool: string, args: Record<string, unknown>): ToolP
   if (tool === 'deckent_resources') return 'read';
   return 'read';
 }
+
+// ─── External MCP tool classification ────────────────────────────────────────
+
+/**
+ * Name prefixes that indicate a read-only MCP tool operation.
+ * Tools whose name starts with any of these are auto-approved (no prompt).
+ */
+const READ_ONLY_PREFIXES: readonly string[] = [
+  'list_',
+  'get_',
+  'read_',
+  'fetch_',
+  'describe_',
+  'show_',
+  'search_',
+  'query_',
+  'inspect_',
+  'check_',
+  'find_',
+  'browse_',
+];
+
+/**
+ * Classify an external MCP tool by its tool name using name-prefix heuristics.
+ *
+ * - Read-only prefixes (list_, get_, read_, etc.) → `'read'` (auto-approve, no prompt).
+ * - All other tools → `'confirm'` (prompt once; `'a'` remembered for session).
+ * - **Never returns `'always'`** — external tools cannot be permanently auto-approved.
+ */
+export function classifyExternalTool(toolName: string): Exclude<ToolPermission, 'always'> {
+  const lower = toolName.toLowerCase();
+  for (const prefix of READ_ONLY_PREFIXES) {
+    if (lower.startsWith(prefix)) return 'read';
+  }
+  return 'confirm';
+}

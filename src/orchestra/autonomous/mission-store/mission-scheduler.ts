@@ -13,6 +13,14 @@ export interface MissionSchedulerOptions {
   now?: () => string;
   maxIterations?: number;
   onMissionSettled?: (mission: Mission) => void;
+  /**
+   * Optional per-tenant concurrency cap (enterprise fair-share). When set, no
+   * single tenant may hold more than this many items in flight at once, so a
+   * flooding tenant cannot consume the whole global `poolSize` and starve the
+   * rest. UNDEFINED → no cap → behaviour identical to the global-only scheduler
+   * (v1-default). A mission's tenant is resolved via `store.getMission`.
+   */
+  perTenantPoolSize?: number;
 }
 
 export interface MissionSchedulerSummary {
@@ -46,6 +54,10 @@ export async function runMissionScheduler(
 ): Promise<MissionSchedulerSummary> {
   const sleep = opts.sleep ?? defaultSleep;
   const inFlight = new Set<Promise<void>>();
+  // Per-tenant in-flight counters (run-scoped). Only consulted when
+  // perTenantPoolSize is set; the global-only path never touches this map.
+  const perTenantFlight = new Map<string, number>();
+  const cap = opts.perTenantPoolSize;
   let iterations = 0;
   let dispatched = 0;
 
@@ -59,17 +71,38 @@ export async function runMissionScheduler(
     // serial claim up to free slots — atomic, race-free
     let claimedThisTick = 0;
     while (inFlight.size < opts.poolSize) {
-      const due = store.queryDue({ limit: 1 });
+      // No cap → original single-item FIFO (limit:1; zero extra store calls,
+      // behaviour + perf unchanged). Cap set → scan the full pending FIFO and
+      // claim the first item whose tenant is still below its concurrency cap, so
+      // a tenant flooding more than `poolSize` items cannot hide every other
+      // tenant behind it (limit:poolSize would). FIFO within a tenant is kept.
+      const due = cap !== undefined ? store.queryDue() : store.queryDue({ limit: 1 });
       if (due.length === 0) break;
-      const item = due[0]!;
-      if (!store.claimItem(item.id, 'scheduler')) continue; // someone else won → re-query
-      dispatched++; claimedThisTick++;
-      const p: Promise<void> = Promise.resolve()
-        .then(() => dispatch(item))
-        .then((r) => store.updateItemStatus(item.id, r.ok ? 'done' : 'failed', r))
-        .catch((e) => store.updateItemStatus(item.id, 'failed', { ok: false, reason: String((e as Error)?.message ?? e) }))
-        .finally(() => { inFlight.delete(p); try { checkMissionComplete(store, item.missionId, opts); } catch { /* fail-safe */ } });
-      inFlight.add(p);
+
+      let claimedOne = false;
+      for (const item of due) {
+        let tenant = 'local';
+        if (cap !== undefined) {
+          tenant = store.getMission(item.missionId)?.tenant ?? 'local';
+          if ((perTenantFlight.get(tenant) ?? 0) >= cap) continue; // tenant full → skip to next due item
+        }
+        if (!store.claimItem(item.id, 'scheduler')) continue; // someone else won → try next due item
+        claimedOne = true;
+        dispatched++; claimedThisTick++;
+        if (cap !== undefined) perTenantFlight.set(tenant, (perTenantFlight.get(tenant) ?? 0) + 1);
+        const p: Promise<void> = Promise.resolve()
+          .then(() => dispatch(item))
+          .then((r) => store.updateItemStatus(item.id, r.ok ? 'done' : 'failed', r))
+          .catch((e) => store.updateItemStatus(item.id, 'failed', { ok: false, reason: String((e as Error)?.message ?? e) }))
+          .finally(() => {
+            inFlight.delete(p);
+            if (cap !== undefined) perTenantFlight.set(tenant, (perTenantFlight.get(tenant) ?? 1) - 1);
+            try { checkMissionComplete(store, item.missionId, opts); } catch { /* fail-safe */ }
+          });
+        inFlight.add(p);
+        break; // claimed one → re-evaluate free slots from the top
+      }
+      if (!claimedOne) break; // nothing eligible this pass (all due tenants at cap / lost the claim race)
     }
 
     if (inFlight.size > 0) {

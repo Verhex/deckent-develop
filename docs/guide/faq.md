@@ -156,7 +156,7 @@ Deckent provides an **MCP (Model Context Protocol) server** that integrates dire
 ```
 Claude Code (IDE) ─── MCP stdio transport ───> deckent-mcp server
                                                       ↓
-                                          src/mcp/tools/ (34 tools)
+                                          src/mcp/tools/ (35 tools)
                                           src/mcp/resources/ (8 resources)
                                                       ↓
                                           Deckent Core Engine

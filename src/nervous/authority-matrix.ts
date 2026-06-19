@@ -196,7 +196,7 @@ export function isSafetyFloorAction(actionId: string): boolean {
 export const ENFORCE_RBAC_CONFIG_KEY = 'enforce_rbac' as const;
 
 /** Minimal RBAC role taxonomy for worker authority (ENT-1). */
-export type WorkerRole = 'admin' | 'engineer' | 'viewer';
+export type WorkerRole = 'admin' | 'engineer' | 'operator' | 'viewer';
 
 /**
  * Minimal role → allowed-{@link Capability} map. The required capabilities of a
@@ -205,6 +205,8 @@ export type WorkerRole = 'admin' | 'engineer' | 'viewer';
  *  - `admin`    — every capability (full trust).
  *  - `engineer` — dev capabilities; excludes enterprise-admin caps (`erp-write`,
  *                 `tenant-scope`).
+ *  - `operator` — execute/dispatch + read; excludes dev-admin caps (`db-write`,
+ *                 `erp-write`, `approval`, `provider-pin`, `gpu`, `tenant-scope`).
  *  - `viewer`   — read-only (`fs-read`, `db-query`, `erp-read`).
  */
 export const ROLE_CAPABILITY_MAP: Readonly<Record<WorkerRole, ReadonlySet<Capability>>> =
@@ -216,6 +218,9 @@ export const ROLE_CAPABILITY_MAP: Readonly<Record<WorkerRole, ReadonlySet<Capabi
     engineer: new Set<Capability>([
       'fs-read', 'fs-write', 'network', 'db-query', 'db-write', 'erp-read',
       'shell', 'approval', 'provider-pin', 'gpu', 'mcp-tool',
+    ]),
+    operator: new Set<Capability>([
+      'fs-read', 'fs-write', 'network', 'db-query', 'erp-read', 'shell', 'mcp-tool',
     ]),
     viewer: new Set<Capability>(['fs-read', 'db-query', 'erp-read']),
   });
@@ -265,6 +270,8 @@ export function normalizeWorkerRole(role: string | undefined | null): WorkerRole
       return 'admin';
     case 'engineer':
       return 'engineer';
+    case 'operator':
+      return 'operator';
     case 'viewer':
       return 'viewer';
     default:

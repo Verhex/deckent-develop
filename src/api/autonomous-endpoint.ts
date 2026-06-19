@@ -9,13 +9,28 @@
 // the durable autonomous artifacts (approval-adapter gate + backlog) — no engine
 // boot. Fail-safe: a missing/corrupt backlog or pending file degrades to empty,
 // never a 500.
+//
+// ENT-2: when `req` + `opts.strictTenantIsolation` are provided, the backlog
+// endpoint filters entries by the caller's tenantId (derived server-side from the
+// bearer via deriveRequestPrincipal — never from client-supplied fields).
 
-import type { ServerResponse } from 'node:http';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { makeApprovalGate } from '../orchestra/autonomous/approval-adapter.js';
 import { loadBacklog } from '../orchestra/autonomous/backlog.js';
 import type { BacklogEntry } from '../orchestra/autonomous/backlog-types.js';
+import { deriveRequestPrincipal } from './auth-me-endpoint.js';
+
+/** Options for ENT-2 tenant isolation on the autonomous backlog endpoint. */
+export interface AutonomousRouteOptions {
+  /**
+   * When true, GET /api/autonomous/backlog filters entries by the caller's
+   * tenantId (derived from the bearer on `req`). Mirrors `strict_tenant_isolation`
+   * in ResolvedConfig. Default false → all entries (backward-compat).
+   */
+  strictTenantIsolation?: boolean;
+}
 
 function sendJson(res: ServerResponse, data: unknown, status = 200): void {
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -79,12 +94,17 @@ function recentAudit(root: string, n = 5): Array<{ timestamp: string; action: st
 /**
  * Handle autonomous-engine HTTP routes. Returns true when the route matched (and a
  * response was sent), false otherwise so the caller can fall through.
+ *
+ * ENT-2: pass `req` + `opts.strictTenantIsolation` to enable per-tenant backlog
+ * filtering. When absent the endpoint returns all entries (backward-compat).
  */
 export function registerAutonomousRoutes(
   url: string,
   method: string,
   res: ServerResponse,
   projectRoot: string,
+  req?: IncomingMessage,
+  opts?: AutonomousRouteOptions,
 ): boolean {
   const path = new URL(url, 'http://localhost').pathname;
   if (!path.startsWith('/api/autonomous/')) return false;
@@ -104,7 +124,17 @@ export function registerAutonomousRoutes(
 
   // GET /api/autonomous/backlog
   if (method === 'GET' && path === '/api/autonomous/backlog') {
-    sendJson(res, safeBacklog(projectRoot).map((e) => ({
+    let entries = safeBacklog(projectRoot);
+    // ENT-2 tenant isolation: filter when req is available and strict mode is on.
+    if (req && opts?.strictTenantIsolation) {
+      const principal = deriveRequestPrincipal(req);
+      const callerTenant = principal.tenantId ?? 'local';
+      const isAdmin = principal.role === 'admin';
+      if (!isAdmin) {
+        entries = entries.filter((e) => (e.tenant ?? 'local') === callerTenant);
+      }
+    }
+    sendJson(res, entries.map((e) => ({
       id: e.id,
       title: e.title,
       kind: e.kind,

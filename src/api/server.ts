@@ -818,7 +818,7 @@ async function handleRequest(
     if (registerMemorySearch(url, res, projectRoot)) return;
     if (registerNervousRoutes(url, method, res, projectRoot)) return;
     if (registerAutonomousRoutes(url, method, res, projectRoot)) return;
-    if (registerMissionsRoute(url, method, res, projectRoot)) return;
+    if (registerMissionsRoute(url, method, res, projectRoot, req)) return;
     if (await registerProcessRoutes(url, method, res, undefined, projectRoot, req)) return;
     // Enterprise dashboard data: /api/enterprise/{tenants,rbac,audit,rate} (269-001)
     if (registerEnterpriseRoutes(url, method, res, projectRoot, rateLimiter ? { rateLimiter } : {})) return;

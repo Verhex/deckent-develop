@@ -67,7 +67,7 @@ Three backends for different contexts: **tmux** (fastest, live terminal, Linux/m
 
 ### MCP (Model Context Protocol) Integration
 
-MCP integrates Deckent with any MCP-compatible IDE or tool. With 34 tools and 8 resources, the entire sprint lifecycle is programmatically accessible. This makes Deckent not just a CLI, but a platform.
+MCP integrates Deckent with any MCP-compatible IDE or tool. With 35 tools and 8 resources, the entire sprint lifecycle is programmatically accessible. This makes Deckent not just a CLI, but a platform.
 
 ### Docker Container Isolation
 
@@ -121,11 +121,11 @@ This is where Deckent becomes a fully autonomous multi-agent development platfor
 | Metric | Value |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-290 |
+| Sprint | sprint-302 |
 | MCP Tools | 35 |
 | MCP Resources | 8 |
-| CLI Commands | 57+ |
-| Dashboard Pages | 17 |
+| CLI Commands | 60+ |
+| Dashboard Pages | 20 |
 | Agents | 15 built-in + 2 custom |
 | Skills | 21 built-in |
 | Providers | 4 (Claude, Codex, Gemini, Ollama) |
@@ -133,12 +133,12 @@ This is where Deckent becomes a fully autonomous multi-agent development platfor
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-290 |
-| Total Tasks | 6 |
-| Completed | 6 |
-| Tech Debt | 1 |
+| Sprint | sprint-302 |
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
 | No-Go | 0 |
-| Duration | 27dk 31sn |
+| Duration | 29dk 38sn |
 | Coverage | N/A |
 
 ## Sprint History

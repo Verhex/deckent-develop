@@ -20,6 +20,8 @@ import { PERMISSION_MATRIX, isValidRole, type Role } from '../core/rbac.js';
 import { isValidTenantId } from '../core/tenant-context.js';
 import { readAuditEvents, queryAudit } from '../core/audit-query.js';
 import type { AuditEventPayload } from '../core/audit-writer.js';
+import { readMissionAudit } from '../orchestra/autonomous/mission-store/mission-audit-bridge.js';
+import { deriveRequestPrincipal, type RequestPrincipal } from './auth-me-endpoint.js';
 
 // ─── Dashboard contract shapes (EnterprisePage.tsx) ─────────────────
 
@@ -261,6 +263,22 @@ export function registerEnterpriseRoutes(
     const rateData = listRateLimits(deps);
     if (sprintId) writeAuditEvent(projectRoot, sprintId, { tenantId: 'local', actor, action: 'enterprise:rate:read' });
     sendJson(res, rateData);
+    return true;
+  }
+
+  if (path === '/api/enterprise/missions-audit') {
+    const bearer = extractBearer(req);
+    const claims = bearer ? parseOidcClaims(bearer) : null;
+    const principal: RequestPrincipal = req ? deriveRequestPrincipal(req) : { id: 'local' };
+    // Static/opaque owner-token or no-bearer (auth-disabled/test) or OIDC-admin → full view.
+    // OIDC non-admin → only own tenant's records (closes cross-tenant leak, finding #2).
+    const seeAll = claims === null || principal.role === 'admin';
+    const callerTenant = principal.tenantId ?? 'local';
+    const payloads = readMissionAudit(projectRoot);
+    const scoped = seeAll ? payloads : payloads.filter((p) => ((p.tenantId as string | undefined) ?? 'local') === callerTenant);
+    const entries = scoped.map((p, i) => toAuditEntry(p, i));
+    if (sprintId) writeAuditEvent(projectRoot, sprintId, { tenantId: 'local', actor, action: 'enterprise:missions-audit:read' });
+    sendJson(res, entries);
     return true;
   }
 

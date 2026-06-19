@@ -2157,6 +2157,11 @@ export function checkADRCompliance(
 ): ADRViolation[] {
   const violations: ADRViolation[] = [];
 
+  // No changed files → no violations possible; skip DB scan entirely.
+  if (changedFiles.length === 0) {
+    return violations;
+  }
+
   // DB-first: load ADRs from MemoryStore
   let adrs: ParsedADR[] = [];
   const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
