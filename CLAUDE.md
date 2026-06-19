@@ -1,5 +1,5 @@
 <!-- Dil: TR | Teknik terimler EN -->
-@DECKENT.md
+> Tam iş-akışı + agent/skill kataloğu + MCP referansı: **DECKENT.md** — auto-load dışı bırakıldı (oturum context'ini hafif tutmak için, F1-TOK); gerektiğinde oku.
 
 # Project: deckent
 
@@ -105,7 +105,7 @@ When acting as Auditor: @.claude/rules/auditor.md
 When acting as Worker: @.claude/rules/worker-default.md
 
 ## Contracts
-@docs/reference/api-surface.md
+> Ajan-arası kontratlar (HTTP API, task/result/lock formatları): **docs/reference/api-surface.md** — auto-load dışı; yalnız API/contract işinde oku.
 
 ## Identity
 @.deckent/workspace/IDENTITY.md
@@ -124,12 +124,12 @@ Komutlar: `deckent status`, `deckent history`, `deckent retro`, `deckent recall 
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-290 |
-| Total Tasks | 6 |
-| Completed | 6 |
-| Tech Debt | 1 |
+| Sprint | sprint-295 |
+| Total Tasks | 8 |
+| Completed | 8 |
+| Tech Debt | 0 |
 | No-Go | 0 |
-| Duration | 27dk 31sn |
+| Duration | 14dk 10sn |
 | Coverage | N/A |
 
 ## Active Debt
@@ -138,6 +138,6 @@ _No tech debt record._
 ## Agent Performance
 | Agent | Tasks | Done | Success |
 |-------|-------|------|--------|
-| refactorer | 2 | 2 | 100% |
-| bug-fixer | 3 | 3 | 100% |
-| doc-writer | 1 | 1 | 100% |
+| architect | 6 | 6 | 100% |
+| api-builder | 1 | 1 | 100% |
+| frontend-designer | 1 | 1 | 100% |
