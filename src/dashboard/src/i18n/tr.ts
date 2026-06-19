@@ -494,6 +494,15 @@ export const tr: Record<TranslationKey, string> = {
   'enterprise.rbac_required_role': 'Rol adı zorunludur.',
   'enterprise.confirm_delete_role': 'Bu rol silinsin mi?',
 
+  // Enterprise — Hız sınırı kuralı yönetimi (DASH-D3)
+  'enterprise.new_rate_rule': 'Yeni hız kuralı',
+  'enterprise.rate_id': 'Kural kimliği',
+  'enterprise.rate_endpoint': 'Uç nokta',
+  'enterprise.rate_limit': 'Sınır',
+  'enterprise.rate_required_fields': 'Kural kimliği ve uç nokta zorunludur.',
+  'enterprise.rate_invalid_limit': 'Sınır pozitif bir tam sayı olmalıdır.',
+  'enterprise.confirm_delete_rate': 'Bu hız kuralı silinsin mi?',
+
   // Evolution Page (283-003)
   'evolution.title': 'Evrim',
   'evolution.tab_genealogy': 'Soyağacı',

@@ -492,6 +492,15 @@ export const en = {
   'enterprise.rbac_required_role': 'Role name is required.',
   'enterprise.confirm_delete_role': 'Delete this role?',
 
+  // Enterprise — Rate-limit rule management (DASH-D3)
+  'enterprise.new_rate_rule': 'New rate rule',
+  'enterprise.rate_id': 'Rule ID',
+  'enterprise.rate_endpoint': 'Endpoint',
+  'enterprise.rate_limit': 'Limit',
+  'enterprise.rate_required_fields': 'Rule ID and endpoint are required.',
+  'enterprise.rate_invalid_limit': 'Limit must be a positive integer.',
+  'enterprise.confirm_delete_rate': 'Delete this rate rule?',
+
   // Evolution Page (283-003)
   'evolution.title': 'Evolution',
   'evolution.tab_genealogy': 'Genealogy',

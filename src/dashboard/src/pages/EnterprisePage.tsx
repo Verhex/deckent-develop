@@ -28,6 +28,13 @@ interface RbacFormState {
   permissions: string;
 }
 
+interface RateFormState {
+  mode: "create" | "edit";
+  id: string;
+  endpoint: string;
+  limit: string;
+}
+
 interface TenantInfo {
   id: string;
   name: string;
@@ -81,7 +88,7 @@ export default function EnterprisePage() {
   const { data: tenants, loading: tenantsLoading, error: tenantsError, refetch: refetchTenants } = useApi<TenantInfo[]>("/api/enterprise/tenants");
   const { data: rbac, loading: rbacLoading, error: rbacError, refetch: refetchRbac } = useApi<RbacRole[]>("/api/enterprise/rbac");
   const { data: audit, loading: auditLoading, error: auditError } = useApi<AuditEntry[]>("/api/enterprise/audit");
-  const { data: rate, loading: rateLoading, error: rateError } = useApi<RateLimitInfo[]>("/api/enterprise/rate");
+  const { data: rate, loading: rateLoading, error: rateError, refetch: refetchRate } = useApi<RateLimitInfo[]>("/api/enterprise/rate");
   const { data: statusData } = useApi<{ alerts: Alert[] }>("/api/status");
   const { identity } = useAuth();
 
@@ -108,6 +115,12 @@ export default function EnterprisePage() {
   const [rbacMutating, setRbacMutating] = useState(false);
   const [rbacMutationError, setRbacMutationError] = useState<string | null>(null);
   const [rbacConfirmDeleteId, setRbacConfirmDeleteId] = useState<string | null>(null);
+
+  // ─── Rate-limit rule CRUD (DASH-D3) ────────────────────────────────
+  const [rateForm, setRateForm] = useState<RateFormState | null>(null);
+  const [rateMutating, setRateMutating] = useState(false);
+  const [rateMutationError, setRateMutationError] = useState<string | null>(null);
+  const [rateConfirmDeleteId, setRateConfirmDeleteId] = useState<string | null>(null);
 
   // Admin-only management: OIDC admins or the local static-token owner (full
   // access). Non-admin OIDC roles see the read-only view (buttons hidden); the
@@ -262,6 +275,73 @@ export default function EnterprisePage() {
       setRbacMutationError(err instanceof Error ? err.message : String(err));
     } finally {
       setRbacMutating(false);
+    }
+  }
+
+  // ─── Rate-limit rule CRUD handlers (DASH-D3) ───────────────────────
+  function openRateCreate(): void {
+    setRateMutationError(null);
+    setRateConfirmDeleteId(null);
+    setRateForm({ mode: "create", id: "", endpoint: "", limit: "" });
+  }
+
+  function openRateEdit(item: RateLimitInfo): void {
+    setRateMutationError(null);
+    setRateConfirmDeleteId(null);
+    setRateForm({ mode: "edit", id: item.endpoint, endpoint: item.endpoint, limit: String(item.limit) });
+  }
+
+  function closeRateForm(): void {
+    setRateForm(null);
+    setRateMutationError(null);
+  }
+
+  async function submitRateForm(): Promise<void> {
+    if (!rateForm) return;
+    const limitNum = Number(rateForm.limit);
+    if (!rateForm.id.trim() || !rateForm.endpoint.trim()) {
+      setRateMutationError(t("enterprise.rate_required_fields"));
+      return;
+    }
+    if (!Number.isInteger(limitNum) || limitNum <= 0) {
+      setRateMutationError(t("enterprise.rate_invalid_limit"));
+      return;
+    }
+    setRateMutating(true);
+    setRateMutationError(null);
+    try {
+      if (rateForm.mode === "create") {
+        await mutate("POST", "/api/enterprise/rate", {
+          id: rateForm.id.trim(),
+          endpoint: rateForm.endpoint.trim(),
+          limit: limitNum,
+        });
+      } else {
+        await mutate("PUT", `/api/enterprise/rate/${encodeURIComponent(rateForm.id)}`, {
+          endpoint: rateForm.endpoint.trim(),
+          limit: limitNum,
+        });
+      }
+      setRateForm(null);
+      refetchRate();
+    } catch (err: unknown) {
+      setRateMutationError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRateMutating(false);
+    }
+  }
+
+  async function deleteRateRule(id: string): Promise<void> {
+    setRateMutating(true);
+    setRateMutationError(null);
+    try {
+      await mutate("DELETE", `/api/enterprise/rate/${encodeURIComponent(id)}`);
+      setRateConfirmDeleteId(null);
+      refetchRate();
+    } catch (err: unknown) {
+      setRateMutationError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRateMutating(false);
     }
   }
 
@@ -714,10 +794,94 @@ export default function EnterprisePage() {
 
         <TabsContent value="rate">
           <Card className="bg-zinc-900 border-zinc-800">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-zinc-100">Rate Limit Status</CardTitle>
+              {canManage && !rateForm && (
+                <button
+                  type="button"
+                  onClick={openRateCreate}
+                  data-testid="rate-create-btn"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-brand-700 hover:bg-brand-600 px-3 py-1.5 text-sm text-white"
+                >
+                  <Plus className="h-4 w-4" />
+                  {t("enterprise.new_rate_rule")}
+                </button>
+              )}
             </CardHeader>
             <CardContent>
+              {rateMutationError && (
+                <div
+                  data-testid="rate-mutation-error"
+                  className="mb-3 flex items-center gap-2 rounded-md border border-red-800 bg-red-950/50 px-3 py-2 text-sm text-red-300"
+                >
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>{t("enterprise.mutation_error", { msg: rateMutationError })}</span>
+                </div>
+              )}
+
+              {rateForm && (
+                <div data-testid="rate-form" className="mb-4 rounded-md border border-zinc-700 bg-zinc-950/60 p-4 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <label className="flex flex-col gap-1 text-xs text-zinc-400">
+                      {t("enterprise.rate_id")}
+                      <input
+                        data-testid="rate-form-id"
+                        value={rateForm.id}
+                        disabled={rateForm.mode === "edit" || rateMutating}
+                        onChange={(e) => setRateForm({ ...rateForm, id: e.target.value })}
+                        placeholder="api-sprints"
+                        className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 disabled:opacity-50"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs text-zinc-400">
+                      {t("enterprise.rate_endpoint")}
+                      <input
+                        data-testid="rate-form-endpoint"
+                        value={rateForm.endpoint}
+                        disabled={rateMutating}
+                        onChange={(e) => setRateForm({ ...rateForm, endpoint: e.target.value })}
+                        placeholder="/api/sprints"
+                        className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 disabled:opacity-50"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs text-zinc-400">
+                      {t("enterprise.rate_limit")}
+                      <input
+                        data-testid="rate-form-limit"
+                        type="number"
+                        min={1}
+                        value={rateForm.limit}
+                        disabled={rateMutating}
+                        onChange={(e) => setRateForm({ ...rateForm, limit: e.target.value })}
+                        placeholder="100"
+                        className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 disabled:opacity-50"
+                      />
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void submitRateForm()}
+                      disabled={rateMutating}
+                      data-testid="rate-form-submit"
+                      className="inline-flex items-center gap-1.5 rounded-md bg-brand-700 hover:bg-brand-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+                    >
+                      {rateMutating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      {rateMutating ? t("enterprise.saving") : rateForm.mode === "create" ? t("enterprise.create") : t("enterprise.save")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeRateForm}
+                      disabled={rateMutating}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+                    >
+                      <X className="h-4 w-4" />
+                      {t("enterprise.cancel")}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {rateLoading && <div aria-label="loading"><SkeletonTable rows={3} cols={4} /></div>}
               {rateError && <p className="text-red-400">Error: {rateError}</p>}
               {rate && rate.length > 0 && (
@@ -728,7 +892,56 @@ export default function EnterprisePage() {
                       <div key={item.endpoint} className="rounded-md border border-zinc-800 p-3">
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-mono text-xs text-zinc-300">{item.endpoint}</span>
-                          <span className="text-xs text-zinc-500">{item.remaining}/{item.limit}</span>
+                          <span className="inline-flex items-center gap-2">
+                            <span className="text-xs text-zinc-500">{item.remaining}/{item.limit}</span>
+                            {canManage && (
+                              rateConfirmDeleteId === item.endpoint ? (
+                                <span className="inline-flex items-center gap-2" data-testid="rate-confirm-delete">
+                                  <span className="text-xs text-zinc-400">{t("enterprise.confirm_delete_rate")}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => void deleteRateRule(item.endpoint)}
+                                    disabled={rateMutating}
+                                    data-testid={`rate-delete-confirm-${item.endpoint}`}
+                                    className="rounded-md bg-red-800 hover:bg-red-700 px-2 py-1 text-xs text-white disabled:opacity-50"
+                                  >
+                                    {t("enterprise.delete")}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setRateConfirmDeleteId(null)}
+                                    disabled={rateMutating}
+                                    className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+                                  >
+                                    {t("enterprise.cancel")}
+                                  </button>
+                                </span>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => openRateEdit(item)}
+                                    aria-label={t("enterprise.edit")}
+                                    title={t("enterprise.edit")}
+                                    data-testid={`rate-edit-${item.endpoint}`}
+                                    className="rounded-md border border-zinc-700 p-1.5 text-zinc-300 hover:bg-zinc-800"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setRateConfirmDeleteId(item.endpoint); setRateMutationError(null); }}
+                                    aria-label={t("enterprise.delete")}
+                                    title={t("enterprise.delete")}
+                                    data-testid={`rate-delete-${item.endpoint}`}
+                                    className="rounded-md border border-zinc-700 p-1.5 text-red-300 hover:bg-red-950/60"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </>
+                              )
+                            )}
+                          </span>
                         </div>
                         <div className="w-full bg-zinc-800 rounded-full h-1.5">
                           <div
