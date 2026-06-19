@@ -120,12 +120,12 @@ describe("WorkerCommsPanel — renders with agent data", () => {
     expect(screen.getByTestId("handoff-w-2")).toBeTruthy();
   });
 
-  it("shows shared-count for DONE workers", () => {
+  it("shows completed-worker count for DONE workers", () => {
     h.mockSseState = AGENTS_STATE;
     renderWithI18n(<WorkersPage />);
     const sharedEl = screen.getByTestId("worker-comms-shared-count");
     expect(sharedEl.textContent).toContain("1");
-    expect(sharedEl.textContent).toMatch(/shared/i);
+    expect(sharedEl.textContent).toMatch(/completed/i);
   });
 
   it("renders the handoff list container when DONE agents exist", () => {

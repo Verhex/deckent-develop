@@ -62,6 +62,11 @@ export const tr: Record<TranslationKey, string> = {
 
   // Workers Page
   'workers.subtitle': 'Canlı worker tablosu — durum, heartbeat yaşı, durdurma kontrolü',
+  'workers.comms_no_handoffs_title': 'Worker aktarımı yok',
+  'workers.comms_no_handoffs_desc': "Tamamlanan worker'lar ve paylaşılan bağlam burada görünecek.",
+  'workers.comms_completed_count_one': '{{n}} tamamlanan worker',
+  'workers.comms_completed_count_other': '{{n}} tamamlanan worker',
+  'workers.comms_no_completed': 'Bu sprintte tamamlanan aktarım yok.',
 
   // Directives Page
   'directives.subtitle': 'DIRECTIVES.md görüntüle ve düzenle — sprint hedefleri ve görevler',

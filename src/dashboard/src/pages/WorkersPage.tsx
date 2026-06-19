@@ -24,6 +24,7 @@ interface WorkerCommsPanelProps {
  * written to SharedMemory) and recent handoff entries per DONE worker.
  */
 function WorkerCommsPanel({ agents }: WorkerCommsPanelProps) {
+  const { t } = useTranslation();
   const doneAgents = agents.filter((a) => a.status === "DONE");
   const sharedCount = doneAgents.length;
 
@@ -40,8 +41,8 @@ function WorkerCommsPanel({ agents }: WorkerCommsPanelProps) {
         <div data-testid="worker-comms-empty">
           <EmptyState
             icon={ArrowRightLeft}
-            title="No worker handoffs"
-            description="Completed workers and shared context will appear here."
+            title={t('workers.comms_no_handoffs_title')}
+            description={t('workers.comms_no_handoffs_desc')}
           />
         </div>
       </div>
@@ -60,12 +61,12 @@ function WorkerCommsPanel({ agents }: WorkerCommsPanelProps) {
           className="ml-auto text-xs text-zinc-500"
           data-testid="worker-comms-shared-count"
         >
-          {sharedCount} shared {sharedCount === 1 ? "key" : "keys"}
+          {t(sharedCount === 1 ? 'workers.comms_completed_count_one' : 'workers.comms_completed_count_other', { n: sharedCount })}
         </span>
       </div>
 
       {doneAgents.length === 0 ? (
-        <p className="text-xs text-zinc-500 py-1">No completed handoffs in this sprint.</p>
+        <p className="text-xs text-zinc-500 py-1">{t('workers.comms_no_completed')}</p>
       ) : (
         <ul className="space-y-1" data-testid="worker-comms-handoffs">
           {doneAgents.map((a) => (

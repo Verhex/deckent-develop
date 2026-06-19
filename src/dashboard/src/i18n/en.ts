@@ -60,6 +60,11 @@ export const en = {
 
   // Workers Page
   'workers.subtitle': 'Live worker grid — status, heartbeat age, kill control',
+  'workers.comms_no_handoffs_title': 'No worker handoffs',
+  'workers.comms_no_handoffs_desc': 'Completed workers and shared context will appear here.',
+  'workers.comms_completed_count_one': '{{n}} completed worker',
+  'workers.comms_completed_count_other': '{{n}} completed workers',
+  'workers.comms_no_completed': 'No completed handoffs in this sprint.',
 
   // Directives Page
   'directives.subtitle': 'View and edit DIRECTIVES.md — sprint goals and tasks',
