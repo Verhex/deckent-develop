@@ -6,6 +6,7 @@ import {
   loadTemplate,
   renderTemplate,
   formatAdrSection,
+  resolveWorkerPaths,
   extractCustomSection,
   mergeWithCustom,
   type RuleGeneratorOptions,
@@ -123,6 +124,29 @@ describe('rule-generator', () => {
       const section = formatAdrSection([makeAdr()]);
       expect(section).toContain('deckent recall');
       expect(section).toContain('.brain/memory.db');
+    });
+  });
+
+  // ── Worker Paths (stack-aware) ─────────────────────────────────
+
+  describe('resolveWorkerPaths', () => {
+    it('defaults to src/** + tests/** for typescript/unknown/null', () => {
+      expect(resolveWorkerPaths('typescript')).toEqual(['src/**', 'tests/**']);
+      expect(resolveWorkerPaths(undefined)).toEqual(['src/**', 'tests/**']);
+      expect(resolveWorkerPaths(null)).toEqual(['src/**', 'tests/**']);
+      expect(resolveWorkerPaths('totally-unknown-stack')).toEqual(['src/**', 'tests/**']);
+    });
+
+    it('uses layout-free extension globs for go/python/csharp', () => {
+      expect(resolveWorkerPaths('go')).toEqual(['**/*.go']);
+      expect(resolveWorkerPaths('python')).toEqual(['**/*.py']);
+      expect(resolveWorkerPaths('csharp')).toEqual(['**/*.cs']);
+    });
+
+    it('uses convention dirs for ruby/dart/swift', () => {
+      expect(resolveWorkerPaths('ruby')).toEqual(['lib/**', 'spec/**']);
+      expect(resolveWorkerPaths('dart')).toEqual(['lib/**', 'test/**']);
+      expect(resolveWorkerPaths('swift')).toEqual(['Sources/**', 'Tests/**']);
     });
   });
 
@@ -348,31 +372,46 @@ describe('rule-generator', () => {
   // ── Claude Provider Specific ───────────────────────────────────
 
   describe('claude provider frontmatter', () => {
-    it('brain gets task/brain paths', () => {
+    it('brain gets directives + task/brain paths (product-safe, no dogfood leak)', () => {
+      // 2026-06-19 — added `DIRECTIVES.md` (universal: every deckent project has
+      // it, and the Brain reads it first). PRODUCT-SAFE: must NOT include
+      // deckent-dev's own `src/orchestra/**` — the generator runs in every user
+      // project, where that path does not exist.
       generateRules({ projectRoot: TEST_ROOT, adrs: [], providers: ['claude'], roles: ['brain'] });
       const content = readFileSync(join(TEST_ROOT, '.claude', 'rules', 'brain.md'), 'utf-8');
+      expect(content).toContain('DIRECTIVES.md');
       expect(content).toContain('.tasks/*');
       expect(content).toContain('.brain/*');
+      expect(content).not.toContain('src/orchestra'); // no dogfood leak
     });
 
-    it('auditor gets monitor-subsystem + dashboard paths', () => {
-      // Sprint 198-003 / 198-004 — auditor frontmatter paths no longer include
+    it('auditor gets dashboard + locks paths (product-safe, no dogfood leak)', () => {
+      // Sprint 198-003 / 198-004 — auditor frontmatter no longer includes
       // `.brain/PATTERNS.md` (patterns live in memory.db, not a flat .md).
-      // 2026-06-19 — added `src/monitor/**` so the rule actually activates when
-      // working on the monitoring subsystem; `.dashboard`-only never triggered.
-      // See src/core/rule-generator.ts claudeAdapter() pathsMap.
+      // 2026-06-19 — universal deckent artifacts only: `.dashboard` (output) +
+      // `.locks/*` (stale-lock scan). PRODUCT-SAFE: must NOT include deckent-dev's
+      // own `src/monitor/**` — a user's project has no such dir (dogfood leak).
       generateRules({ projectRoot: TEST_ROOT, adrs: [], providers: ['claude'], roles: ['auditor'] });
       const content = readFileSync(join(TEST_ROOT, '.claude', 'rules', 'auditor.md'), 'utf-8');
-      expect(content).toContain('src/monitor/**');
       expect(content).toContain('.dashboard');
+      expect(content).toContain('.locks/*');
       expect(content).not.toContain('PATTERNS.md');
+      expect(content).not.toContain('src/monitor'); // no dogfood leak
     });
 
-    it('worker gets src/tests paths', () => {
+    it('worker gets src/tests paths (default, no stack override)', () => {
       generateRules({ projectRoot: TEST_ROOT, adrs: [], providers: ['claude'], roles: ['worker-default'] });
       const content = readFileSync(join(TEST_ROOT, '.claude', 'rules', 'worker-default.md'), 'utf-8');
       expect(content).toContain('src/**');
       expect(content).toContain('tests/**');
+    });
+
+    it('worker uses stack-aware override paths when provided (no TS assumption)', () => {
+      // PRODUCT-SAFE: a Go project gets `**/*.go`, not the TS-shaped `src/**`.
+      generateRules({ projectRoot: TEST_ROOT, adrs: [], providers: ['claude'], roles: ['worker-default'], workerPaths: ['**/*.go'] });
+      const content = readFileSync(join(TEST_ROOT, '.claude', 'rules', 'worker-default.md'), 'utf-8');
+      expect(content).toContain('**/*.go');
+      expect(content).not.toContain('src/**');
     });
   });
 

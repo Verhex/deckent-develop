@@ -47,6 +47,8 @@ export interface RuleGeneratorOptions {
   providers?: RuleProvider[];
   /** Specific roles to generate (default: all 3) */
   roles?: RuleRole[];
+  /** Worker-role frontmatter source/test globs (stack-aware). Default ['src/**','tests/**']. */
+  workerPaths?: string[];
 }
 
 export interface RuleGeneratorResult {
@@ -56,6 +58,46 @@ export interface RuleGeneratorResult {
 }
 
 // ─── Provider Adapters ───────────────────────────────────────────
+
+// ─── Worker Paths (stack-aware, product-safe) ────────────────────
+
+/**
+ * Worker-role frontmatter source/test globs per detected stack. The worker
+ * rule activates when the spawned worker edits matching files, so the globs
+ * must fit the PROJECT's real layout — a Go/Python/C# project has no
+ * `src/**,tests/**`. PRODUCT-SAFE: the generator runs in every user project,
+ * so resolve from the detected stack (stack-detector) with a safe
+ * `src/**,tests/**` default for TS/JS/unknown.
+ */
+const WORKER_PATHS_BY_STACK: Record<string, string[]> = {
+  typescript: ['src/**', 'tests/**'],
+  javascript: ['src/**', 'tests/**'],
+  rust: ['src/**', 'tests/**'],
+  php: ['src/**', 'tests/**'],
+  java_maven: ['src/**'],
+  java_gradle: ['src/**'],
+  kotlin_maven: ['src/**'],
+  kotlin_gradle: ['src/**'],
+  go: ['**/*.go'],
+  python: ['**/*.py'],
+  csharp: ['**/*.cs'],
+  swift: ['Sources/**', 'Tests/**'],
+  ruby: ['lib/**', 'spec/**'],
+  dart: ['lib/**', 'test/**'],
+  flutter: ['lib/**', 'test/**'],
+  c_cmake: ['**/*.c', '**/*.h', '**/*.cpp', '**/*.hpp', '**/*.cc'],
+  c_make: ['**/*.c', '**/*.h', '**/*.cpp', '**/*.hpp', '**/*.cc'],
+};
+
+/**
+ * Resolve worker-role frontmatter globs from a detected stack `language`.
+ * Falls back to `['src/**', 'tests/**']` for TS/JS/unknown.
+ */
+export function resolveWorkerPaths(language?: string | null): string[] {
+  return WORKER_PATHS_BY_STACK[language ?? ''] ?? ['src/**', 'tests/**'];
+}
+
+// ─── Provider Adapters ───────────────────────────────────────
 
 interface ProviderAdapter {
   /** Wraps the rule content with provider-specific format (placed inside the AUTO block) */
@@ -68,15 +110,20 @@ interface ProviderAdapter {
   preamble(role: RuleRole): string;
 }
 
-function claudeAdapter(): ProviderAdapter {
+function claudeAdapter(workerPaths?: string[]): ProviderAdapter {
   const pathsMap: Record<RuleRole, string[]> = {
-    'brain': ['.tasks/*', '.brain/*'],
-    // Auditor guidance should activate when working on the monitoring subsystem
-    // (the in-process auditor lives in src/monitor/**), plus its runtime output
-    // file `.dashboard`. Previously `.dashboard`-only → the rule never activated
-    // in practice (`.dashboard` is a generated artifact, not hand-edited).
-    'auditor': ['src/monitor/**', '.dashboard'],
-    'worker-default': ['src/**', 'tests/**'],
+    // Activate on the sprint spec the Brain reads first (`DIRECTIVES.md`) plus
+    // the task/memory state. PRODUCT-SAFE: only deckent-universal paths — the
+    // generator runs in EVERY `deckent init`ed project, so it must not bake in
+    // deckent-dev's own layout (`src/orchestra/**` would be a dogfood leak; a
+    // user's project has no such dir).
+    'brain': ['DIRECTIVES.md', '.tasks/*', '.brain/*'],
+    // PRODUCT-SAFE: the Auditor is a pure monitoring role with no user-source
+    // domain — its only universal artifacts are `.dashboard` (its output) and
+    // `.locks/*` (stale-lock scan). `src/monitor/**` would help deckent-dev but
+    // is a dogfood leak in a user's project (they have no such dir).
+    'auditor': ['.dashboard', '.locks/*'],
+    'worker-default': workerPaths ?? ['src/**', 'tests/**'],
   };
 
   return {
@@ -133,15 +180,15 @@ function geminiAdapter(): ProviderAdapter {
   };
 }
 
-function cursorAdapter(): ProviderAdapter {
+function cursorAdapter(workerPaths?: string[]): ProviderAdapter {
   // Cursor Project Rules load only `.cursor/rules/*.mdc` (MDC format). The MDC
   // frontmatter (description / globs / alwaysApply) MUST be line 1 → emitted via
   // preamble(), before the AUTO block. Plain `.md` files are silently ignored
   // by Cursor — hence fileExt() === 'mdc'.
   const globsMap: Record<RuleRole, string> = {
-    'brain': '.tasks/**,.brain/**',
-    'auditor': 'src/monitor/**,.dashboard',
-    'worker-default': 'src/**,tests/**',
+    'brain': 'DIRECTIVES.md,.tasks/**,.brain/**',
+    'auditor': '.dashboard,.locks/*',
+    'worker-default': (workerPaths ?? ['src/**', 'tests/**']).join(','),
   };
   const descMap: Record<RuleRole, string> = {
     'brain': 'Deckent Brain (orchestrator) role rules',
@@ -167,7 +214,7 @@ function cursorAdapter(): ProviderAdapter {
   };
 }
 
-const ADAPTERS: Record<RuleProvider, () => ProviderAdapter> = {
+const ADAPTERS: Record<RuleProvider, (workerPaths?: string[]) => ProviderAdapter> = {
   claude: claudeAdapter,
   codex: codexAdapter,
   gemini: geminiAdapter,
@@ -387,7 +434,7 @@ export function generateRules(opts: RuleGeneratorOptions): RuleGeneratorResult {
       result.errors.push(`Unknown provider: ${provider}`);
       continue;
     }
-    const adapter = adapterFactory();
+    const adapter = adapterFactory(opts.workerPaths);
     const rulesDir = join(projectRoot, adapter.rulesDir());
 
     // Ensure directory exists
@@ -471,5 +518,17 @@ export async function regenerateRules(projectRoot: string): Promise<RuleGenerato
     store.close();
   }
 
-  return generateRules({ projectRoot, adrs });
+  // Stack-aware worker frontmatter (product-safe): a Go/Python/Rust/… project
+  // must not get a TS-shaped `src/**,tests/**` glob. Fail-safe → default on any
+  // detection error (resolveWorkerPaths(undefined) → ['src/**','tests/**']).
+  let workerPaths: string[] | undefined;
+  try {
+    const { detectProjectStack } = await import('./stack-detector.js');
+    const stack = detectProjectStack(projectRoot);
+    workerPaths = resolveWorkerPaths(stack?.language);
+  } catch {
+    workerPaths = undefined;
+  }
+
+  return generateRules({ projectRoot, adrs, workerPaths });
 }

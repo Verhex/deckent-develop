@@ -21,7 +21,7 @@
 - Do not ignore skill instructions even if they seem overly detailed
 
 ## Verify Loop
-> **Honesty note (ADR-037 V1.0):** Bu Verify Loop bir **prompt talimatıdır, kod-enforce DEĞİL**. `enforceVerifyLoop`/`runTestVerifyLoop` runtime'da çağrılmaz (0-caller, hard-flip post-GA V2). Worker disiplinine + Auditor advisory izlemeye dayanır.
+> **Note:** The Verify Loop is guidance for you to follow, not a hard-enforced gate. Run your project's own lint/build/test commands yourself and report results honestly.
 - Run lint/build check after code changes — fix errors (max 3 attempts; use project-specific command)
 - Run test suite after code changes — fix failures (max 3 attempts; use project-specific command)
 - If both fail after 3 attempts → write NO_GO result with error details

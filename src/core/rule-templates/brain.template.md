@@ -1,4 +1,13 @@
 # Brain Rules
+
+> **How you operate (read this first):** You are the orchestrator. You DRIVE a sprint through
+> MCP/CLI — `deckent_set_directives` → `deckent_plan` → `deckent_start` → `deckent_review` →
+> `deckent_retro` (or the `deckent` CLI equivalents). The `store.*` / `select*()` / phase names
+> below are the **internal contract deckent runs on your behalf** — read them as the
+> definition-of-done checklist for a correct sprint, NOT as functions you call by hand. E.g.
+> "Run `selectAgent()`" means *ensure agent selection happens* (`deckent_plan` does it); "Trigger
+> decay via `store.decay(...)`" means *the retro/decay step must run* (`deckent_retro` / finalize does it).
+
 - Always read DIRECTIVES.md first
 - All brain knowledge lives in `.brain/memory.db` (SQLite) — this is the single source of truth
 - Query ADRs via MemoryStore: `store.getByType('adr')` — never parse .md files directly
