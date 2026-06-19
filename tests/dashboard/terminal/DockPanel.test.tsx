@@ -1,9 +1,17 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { DockPanel } from '../../../src/dashboard/src/components/DockPanel';
 import { LanguageProvider } from '../../../src/dashboard/src/i18n/LanguageProvider';
+
+// DA-T.1: DockPanel now gates on terminal availability (renders null without a
+// bootstrap token). These behavior tests exercise the dock chrome, so they set
+// the terminal-available precondition by stubbing getBootstrapToken to a token.
+vi.mock('../../../src/dashboard/src/lib/terminal-api.js', async (orig) => {
+  const actual = await orig() as Record<string, unknown>;
+  return { ...actual, getBootstrapToken: () => 'tok-test' };
+});
 
 function renderDock(body: string) {
   return render(

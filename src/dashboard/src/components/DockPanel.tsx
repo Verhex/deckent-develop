@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { ChevronUp, ChevronDown, Maximize2, Minimize2, SquareTerminal } from 'lucide-react';
 import { useTranslation } from '../i18n/LanguageProvider';
+import { getBootstrapToken } from '../lib/terminal-api.js';
 
 const COLLAPSED_HEIGHT = 32;
 const DEFAULT_HEIGHT = 280;
@@ -12,6 +13,13 @@ export function DockPanel({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [maximized, setMaximized] = useState(false);
   const [height, setHeight] = useState(DEFAULT_HEIGHT);
+
+  // DA-T.1: the dock (terminal bar) renders ONLY when the server injected a
+  // terminal bootstrap token — same availability rule as TerminalPanel. When
+  // the terminal is disabled (non-localhost / no --terminal), render NOTHING
+  // instead of a dead bar with an empty body. Placed after hooks (Rules of Hooks).
+  const terminalAvailable = typeof window !== 'undefined' && !!getBootstrapToken();
+  if (!terminalAvailable) return null;
 
   const startResize = (event: React.MouseEvent) => {
     const startY = event.clientY;
