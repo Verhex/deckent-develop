@@ -5,6 +5,8 @@
 ---
 
 ## TL;DR (good morning 👋)
+**Tonight's tally:** 8 commits pushed to main (`a9985024`→`d331af67`), all green (tsc clean, dashboard 1068/1068, sprint-291 disk-verified 3/3). Auto-mode (sprint) dogfooded + a real regression caught & fixed. Recovered from a WSL crash. DASH-D3 RBAC/Rate CRUD + terminal-bar + dashboard-suite-green landed. Beta = **NEAR-READY**; the one hard blocker (npm publish) is yours. I stopped here rather than run the continuous autonomous loop / another docker flow unattended after the crash — that's the #3 morning recommendation, with the exact command.
+
 - **Auto-mode lifecycle dogfood: SUCCESS.** Ran a real `deckent start` sprint (291, docker, 3 sonnet workers, $0 subscription) end-to-end through PLAN→…→RETRO. **3/3 DONE, disk-verified** (not trusting Brain verdict). No false-NO_GO, no ADR-noise, no haiku — the Sprint-290 eval fixes hold live.
 - **The dogfood caught + I fixed a real registration regression** (process command wired in the wrong file → harness fail) — exactly what dogfooding is for.
 - **WSL crashed ~06:1x** (same risk as Sprint 270). Sprint had already finalized; I recovered, disk-verified, fixed the regression, and committed.
