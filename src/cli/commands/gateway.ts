@@ -78,8 +78,9 @@ export function registerGateway(program: Command): void {
     .option('--lang <code>', 'Language override (en|tr)')
     .action((opts: { lang?: string }) => {
       const l = getLanguage(opts.lang);
-      if (readPid() !== null) {
-        console.log(getMessage('gateway.daemon_already', l, { pid: String(readPid()) }));
+      const existing = readPid();
+      if (existing !== null) {
+        console.log(getMessage('gateway.daemon_already', l, { pid: String(existing) }));
         return;
       }
       const child = spawn(process.execPath, [entryPath(), 'gateway', 'listen'], {

@@ -47,10 +47,13 @@ describe('RuntimeSupervisor', () => {
     let seen: NodeJS.ProcessEnv | undefined;
     const spawnFn: SpawnRuntimeFn = (_p, env) => { seen = env; return makeFakeChild().child; };
     const sup = makeRuntimeSupervisor({ spawnFn });
-    sup.getOrSpawn('/foo');
-    expect(seen && 'ANTHROPIC_API_KEY' in seen).toBe(false);
-    delete process.env['ANTHROPIC_API_KEY'];
-    await sup.dispose();
+    try {
+      sup.getOrSpawn('/foo');
+      expect(seen && 'ANTHROPIC_API_KEY' in seen).toBe(false);
+    } finally {
+      delete process.env['ANTHROPIC_API_KEY'];
+      await sup.dispose();
+    }
   });
 
   it('respawns after the child exits', async () => {

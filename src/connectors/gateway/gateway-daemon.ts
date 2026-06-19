@@ -1,6 +1,5 @@
 // src/connectors/gateway/gateway-daemon.ts
-import type { IMessageConnector, IncomingCallback } from '../types.js';
-import { ConnectorPool } from '../connector-pool.js';
+import type { IMessageConnector } from '../types.js';
 import { makeRuntimeSupervisor, type RuntimeSupervisor } from './runtime-supervisor.js';
 import { makeGatewayRouter } from './gateway-router.js';
 import { loadSessionRegistry } from './session-registry.js';
@@ -66,11 +65,6 @@ export async function startGatewayListen(opts: GatewayListenOptions): Promise<Ga
     return { active: [], dispose: async () => { await supervisor.dispose(); } };
   }
 
-  // ConnectorPool is registered but not used for startAll here — gateway owns the
-  // lifecycle directly (single connector, gateway-specific token).
-  const pool = new ConnectorPool();
-  pool.register(connector);
-
   const send = async (chatKey: string, parts: string[]): Promise<void> => {
     const channelId = chatKey.split(':').slice(1).join(':');
     for (const part of parts) {
@@ -87,20 +81,10 @@ export async function startGatewayListen(opts: GatewayListenOptions): Promise<Ga
   });
   connector.onMessage(router);
 
-  // Approval callbacks (inline buttons) → synthetic command fed to the router.
-  // Cast to optional-chained extended type so this compiles against the base interface.
-  const cbCapable = connector as unknown as { onCallback?: (h: (cb: IncomingCallback) => void) => void };
-  cbCapable.onCallback?.((cb: IncomingCallback) => {
-    router({
-      id: `cb-${cb.data}`,
-      connector: connector.id,
-      fromUser: cb.fromUser,
-      channelId: cb.channelId,
-      text: cb.data,
-      timestamp: new Date().toISOString(),
-      raw: { callback: cb.data },
-    });
-  });
+  // NOTE (G1 scope): approval-callback handling (inline-button approve/reject →
+  // resolve the bound project's parked action) is deferred to the G1 follow-up
+  // together with /pending + pairing. We intentionally do NOT wire onCallback
+  // here, so a button press is never silently misrouted into the chat runtime.
 
   await connector.start({ enabled: true, token: opts.gatewayToken });
   print(getMessage('gateway.listen_active', lang, { connectors: connector.id }));
