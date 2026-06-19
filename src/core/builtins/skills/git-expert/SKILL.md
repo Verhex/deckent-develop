@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-06-10
+content_hash: sha256:f2b9f8bb8949e0c124a90244d2066729ed76c053e90a23b52afeef7acdec538c
+---
+
 # Git Expert
 
 ## Branch Strategy

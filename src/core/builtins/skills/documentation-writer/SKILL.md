@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-06-04
+content_hash: sha256:3ff91b95d35d6ade9b2bf107b204425d91deb45e07377b93671936c1c7d4ed55
+---
+
 # Documentation Writer
 
 ## README Structure

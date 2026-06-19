@@ -7,17 +7,13 @@
 // Sprint 147 Task 9
 
 import type { DetectorContext, DetectorResult } from '../../core/nervous-types.js';
-
-// 10 dakika. Bitmiş worker'lar (.result yazmış) snapshot'ın activeWorkers'ından
-// zaten elenir (sprint-state-tracker), dolayısıyla bu eşik YALNIZ gerçekten
-// asılı kalmış AKTİF bir worker içindir — uzun-soluklu bir tool-call'u erkenden
-// "stale" damgalamamak için 3dk→10dk yükseltildi (uyarı gürültüsü azaltma).
-// Override: config.nervous_system.detectors.stale_worker.threshold_ms.
-const DEFAULT_STALE_MS = 600000;
+import { DEFAULT_HEARTBEAT_TIMEOUT_MS } from '../../core/config.js';
 
 /**
  * Aktif worker'ların heartbeat'lerini izler.
- * 10dk+ güncelleme yok → WORKER_RESPAWN önerisi (medium risk).
+ * config.heartbeat_timeout ms+ güncelleme yok → WORKER_RESPAWN önerisi (medium risk).
+ * SSOT: config.heartbeat_timeout (default 120s) → DEFAULT_HEARTBEAT_TIMEOUT_MS.
+ * Override: config.nervous_system.detectors.stale_worker.threshold_ms.
  *
  * Tetikleyiciler: cron tick veya filesystem değişikliği.
  * event-bus kaynağı bu detector tarafından işlenmez.
@@ -25,7 +21,7 @@ const DEFAULT_STALE_MS = 600000;
 export class StaleWorkerDetector {
   readonly detectorId = 'stale-worker';
 
-  constructor(private readonly staleThresholdMs = DEFAULT_STALE_MS) {}
+  constructor(private readonly staleThresholdMs = DEFAULT_HEARTBEAT_TIMEOUT_MS) {}
 
   detect(ctx: DetectorContext): DetectorResult | null {
     // Sadece cron veya filesystem kaynaklı event'leri işle

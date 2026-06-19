@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-06-04
+content_hash: sha256:d5b5d34d2d0cdf835664fe1b53fb83830bce3fad767270e4d7f9b87f2386dd7c
+---
+
 # Database Migration
 
 ## Migration Safety

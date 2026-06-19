@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-06-04
+content_hash: sha256:dbe71ba4d4705d2d14e0c72ae752e873797bb42d492e7f8681292bb726842b1f
+---
+
 # CI Testing Expert
 
 ## Role

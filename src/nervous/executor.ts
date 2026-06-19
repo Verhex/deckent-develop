@@ -9,6 +9,10 @@ import type {
   NotificationAction,
   ExecutionRecord,
 } from '../core/nervous-types.js';
+import {
+  DEFAULT_APPROVE_TIMEOUT_ATTENDED_MS,
+  DEFAULT_APPROVE_TIMEOUT_UNATTENDED_MS,
+} from '../core/config.js';
 import { ACTION_BY_ID } from './action-registry.js';
 import { awaitPanicGateApproval, isLockedPanicAction } from './panic-gate.js';
 import { randomUUID } from 'node:crypto';
@@ -34,6 +38,16 @@ export interface ActionHandler {
 }
 
 /**
+ * Optional auto-apply predicate — detectors may implement this to gate
+ * timeout-auto-proceed. Executor calls it before auto-applying a conditional-
+ * approve action and logs the result for auditability.
+ *
+ * ok=true  → proceed with auto-apply (timeout-auto-applied decision)
+ * ok=false → veto auto-apply; action stays pending for explicit human approval
+ */
+export type CanAutoApplyFn = (payload: Record<string, unknown>) => {ok: boolean; reason: string};
+
+/**
  * Sink for parked approvals (APPROVE-004, §4G). The Executor calls add() when a
  * notification parks awaiting a human decision and remove() when it resolves, so
  * the parked queue is visible to `deckent nervous` / REPL `/nervous` (which read
@@ -51,8 +65,34 @@ const TIMEOUT_MAP: Readonly<Record<string, number>> = {
   'suggest-30m': 30 * 60 * 1000, // 1800000 ms
 };
 
-/** Default hard timeout for approve-policy actions (non-SAFETY_FLOOR). Matches panic-gate default. */
-export const APPROVE_TIMEOUT_MS = 10_000;
+/** Attended session timeout. Config key: nervous_system.approve_timeout_attended_ms. */
+export const APPROVE_TIMEOUT_ATTENDED_MS = DEFAULT_APPROVE_TIMEOUT_ATTENDED_MS;
+/** Unattended session timeout. Config key: nervous_system.approve_timeout_unattended_ms. */
+export const APPROVE_TIMEOUT_UNATTENDED_MS = DEFAULT_APPROVE_TIMEOUT_UNATTENDED_MS;
+
+/**
+ * Returns true when the current process is running in an interactive (attended)
+ * session: a TTY stdout, an SSH connection, or a terminal emulator environment.
+ * Used to select the appropriate approval-window length at module-init time.
+ * Safety-floor actions ignore this value — they always require explicit approval.
+ */
+export function detectAttendedSession(): boolean {
+  // isTTY is true when stdout is connected to a real terminal
+  if (process.stdout.isTTY) return true;
+  // SSH_CONNECTION is set for remote interactive sessions
+  if (process.env['SSH_CONNECTION']) return true;
+  // TERM is set by most terminal emulators (exclude 'dumb' which is CI/non-interactive)
+  const term = process.env['TERM'];
+  if (term && term !== 'dumb') return true;
+  return false;
+}
+
+/** Default hard timeout for approve-policy actions (non-SAFETY_FLOOR).
+ *  Presence-aware: attended sessions get 30s, unattended get 5s.
+ *  Override via config.nervous_system.approve_timeout_ms. */
+export const APPROVE_TIMEOUT_MS = detectAttendedSession()
+  ? APPROVE_TIMEOUT_ATTENDED_MS
+  : APPROVE_TIMEOUT_UNATTENDED_MS;
 
 /**
  * Arm the auto-proceed timer only for a non-safety-floor action with a POSITIVE
@@ -85,6 +125,10 @@ export class Executor {
     /** Hard timeout (ms) before a non-safety-floor approve action auto-proceeds.
      *  <= 0 disables auto-proceed entirely (action stays pending). */
     private readonly approveTimeoutMs: number = APPROVE_TIMEOUT_MS,
+    /** Optional map of action-id → canAutoApply predicate. When present for an
+     *  action, the predicate is called before timeout-auto-proceed and its result
+     *  is logged (auditable). ok=false vetoes auto-apply; action stays pending. */
+    private readonly canAutoApplyMap?: ReadonlyMap<string, CanAutoApplyFn>,
   ) {}
 
   /**
@@ -369,6 +413,15 @@ export class Executor {
           timeoutMs: this.approveTimeoutMs,
         }).then((gateDecision) => {
           if (gateDecision === 'TIMEOUT_AUTO_PROCEED') {
+            const predicate = this.canAutoApplyMap?.get(action.id);
+            if (predicate) {
+              const result = predicate(action.payload ?? {});
+              console.log(`[nervous][canAutoApply] action=${action.id} ok=${result.ok} reason="${result.reason}"`);
+              if (!result.ok) {
+                // Predicate vetoed auto-apply — action stays pending for human approval
+                return;
+              }
+            }
             void finish('timeout-auto-applied', 'timeout');
           }
           // APPROVED/REJECTED from file marker: handled by resolveApproval in-memory path.

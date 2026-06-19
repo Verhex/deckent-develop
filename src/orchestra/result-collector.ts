@@ -704,6 +704,13 @@ export async function waitForResults(
                 `disk-verify found evidence (linesAdded=${diskVerify.linesAdded}, ` +
                 `untrackedFiles=${diskVerify.untrackedFiles.length}). ` +
                 `Status reclassified as MANUAL_REVIEW_REQUIRED — see sprint events.`,
+              tokenUsage: {
+                inputTokens: 0,
+                outputTokens: 0,
+                cacheReadTokens: 0,
+                provider: taskForScope?.provider as TokenUsage['provider'],
+                model: (taskForScope?.forceModel ?? taskForScope?.model) as TokenUsage['model'],
+              },
             }
           : {
               taskId,
@@ -715,6 +722,13 @@ export async function waitForResults(
               coverage: 0,
               selfAssessment: 'NO_GO',
               notes: 'Worker timeout — process exceeded time limit and was killed',
+              tokenUsage: {
+                inputTokens: 0,
+                outputTokens: 0,
+                cacheReadTokens: 0,
+                provider: taskForScope?.provider as TokenUsage['provider'],
+                model: (taskForScope?.forceModel ?? taskForScope?.model) as TokenUsage['model'],
+              },
             };
         // Write synthetic result to disk so evaluate phase can also read it
         try {

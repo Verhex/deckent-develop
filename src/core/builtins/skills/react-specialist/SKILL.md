@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-06-04
+content_hash: sha256:1706f9ed13acd7f436ae3bc18644bafb7852f91f19eb696c25cf808fe1f24fbd
+---
+
 # React Specialist
 
 ## Component Design

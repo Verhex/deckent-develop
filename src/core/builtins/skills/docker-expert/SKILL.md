@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-06-04
+content_hash: sha256:59af70ae8da890ae69ac0caf6fc66875fcfc232391e5ad6780d4286c0c5e4eed
+---
+
 # Docker Expert
 
 ## Multi-Stage Builds

@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-06-04
+content_hash: sha256:ffc6d8f09eac53866ceb3d876eb27fdb6802316e5354e76ca5cbcd6c321c0c5e
+---
+
 # Python Expert
 
 ## Type Hints (PEP 484+)

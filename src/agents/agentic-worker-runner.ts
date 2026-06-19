@@ -32,6 +32,11 @@ import {
 import type { McpToolDispatcher } from '../cli/commands/chat-native.js';
 import { OLLAMA_TOOLS } from './agentic-worker-tools.js';
 import { isPathInScope, type ScopeLike } from './scope-guard.js';
+import {
+  writeEvent,
+  getCurrentSprintId,
+  SCOPE_INSUFFICIENT_CHANNEL,
+} from '../orchestra/event-stream.js';
 
 // ─── Public types ───────────────────────────────────────────────────────────
 
@@ -437,6 +442,16 @@ export async function runAgenticWorker(
         const targetPath = String(args['path'] ?? '');
         if (!isPathInScope(targetPath, scope, projectRoot)) {
           const errMsg = `[scope-violation] ${name}: path "${targetPath}" is outside the assigned task scope. Allowed files: ${scope.filesWrite.join(', ') || '(none)'} ; Allowed directories: ${scope.directories.join(', ') || '(none)'}. Choose a path inside the scope or call task_done with NO_GO if no in-scope path is suitable.`;
+          const scopeSprintId = getCurrentSprintId(projectRoot);
+          if (scopeSprintId) {
+            writeEvent(projectRoot, scopeSprintId, 'worker', 'brain', SCOPE_INSUFFICIENT_CHANNEL, {
+              taskId,
+              attemptedPath: targetPath,
+              reason: errMsg,
+              goCriteria: goNogo.goCriteria,
+              currentScope: { filesWrite: scope.filesWrite, directories: scope.directories },
+            });
+          }
           messages.push({
             role: 'tool',
             content: errMsg,

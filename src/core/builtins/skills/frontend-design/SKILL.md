@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-06-04
+content_hash: sha256:5f49f50480cd97ea74ba3b438da4fcd33d892a74330ca5e03e0242837ea88c62
+---
+
 # Frontend Design
 
 ## Tailwind Utility-First Patterns

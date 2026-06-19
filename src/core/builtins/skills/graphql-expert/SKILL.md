@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-06-04
+content_hash: sha256:77aedf6d03e7f013f8bccfe3fbeb7e769c9314b7c17edfc33a168c0cbcf7a0a9
+---
+
 # GraphQL Expert
 
 ## Schema Design

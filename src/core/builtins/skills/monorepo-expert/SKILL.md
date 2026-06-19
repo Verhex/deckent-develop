@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-06-04
+content_hash: sha256:85e35a2cd1200590fbccbe5d908ac2281f4fe20c04815c5e9f70af05655f65ef
+---
+
 # Monorepo Expert
 
 ## Workspace Structure

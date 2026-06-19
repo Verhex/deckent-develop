@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-06-04
+content_hash: sha256:90e1d2bcfee327954023bcfdf7a7bb0e11c3e29b9c1696a0b6d8fd0c5c658393
+---
+
 # Accessibility Expert
 
 ## WCAG 2.1 AA Requirements

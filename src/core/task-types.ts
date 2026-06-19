@@ -374,12 +374,35 @@ export interface RubricScore {
   reason: string;
 }
 
+/**
+ * Root-cause category for a NO_GO evaluation result.
+ * Set by `enrichEvaluationWithCategory` in result-evaluator.ts.
+ * Only present on NO_GO decisions — DONE/GO_WITH_TECH_DEBT leave this undefined.
+ */
+export type NoGoCategory =
+  | 'BOUNDARY_VIOLATION'
+  | 'POLICY_CONFLICT'
+  | 'RUNTIME_ERROR'
+  | 'TECHNICAL'
+  | 'FATAL_ERROR'
+  | 'DEPENDENCY_CONFLICT'
+  | 'ADR_VIOLATION'
+  | 'UNKNOWN';
+
 /** Full evaluation result from rubric-based grading */
 export interface EvaluationResult {
   decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
   totalScore: number;
   rubricScores: RubricScore[];
   retryCount: number;
+  /** Root-cause category (STATE-W1). Only set on NO_GO decisions. */
+  noGoCategory?: NoGoCategory;
+  /** Files from result.filesChanged that are within task.scope (in-scope). Only set on NO_GO. */
+  filesInScope?: string[];
+  /** Files from result.filesChanged outside task.scope and not auxiliary. Only set on NO_GO. */
+  filesOutOfScope?: string[];
+  /** True when filesInScope is non-empty — partial promotion is possible. Only set on NO_GO. */
+  isPartialPromotable?: boolean;
 }
 
 // ─── Token Usage ────────────────────────────────────────────────────

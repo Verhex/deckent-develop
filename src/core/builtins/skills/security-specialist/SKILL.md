@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-06-04
+content_hash: sha256:5f55f0a05f93ca6bc91361eeaaab9181ca2025f5702283437b778f272ee13404
+---
+
 # Security Specialist
 
 ## OWASP Top 10 Awareness

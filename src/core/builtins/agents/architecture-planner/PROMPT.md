@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-04-21
+content_hash: sha256:b84c52a8536ca9f944fddfb626bf646741ed65b3aad1d6269ba8866aacd6036d
+---
+
 # Architecture Planner Agent
 
 ## Role

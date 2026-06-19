@@ -231,7 +231,9 @@ export function buildTaskPrompt(task: Task, ctx: SprintContext): PromptArtifact 
   );
 
   // ── 4. Scope Rules (sanitized) ──────────────────────────────────────
-  const scopeBlock = buildScopeBlock(task.scope, scopeWarnings);
+  // PROMPT-W1 (d): decide once which optional boilerplate this task needs.
+  const boilerplate = conditionalBoilerplate(task);
+  const scopeBlock = buildScopeBlock(task.scope, scopeWarnings, boilerplate.hostConfig);
 
   // ── 5. Dependencies Block ───────────────────────────────────────────
   const depsBlock = buildDependenciesBlock(task.dependencies, ctx.dependencies, ctx.tasksDir);
@@ -269,6 +271,7 @@ export function buildTaskPrompt(task: Task, ctx: SprintContext): PromptArtifact 
     task,
     effort,
     idempotencyKey,
+    emitIdempotency: boilerplate.idempotency,
     preExistingFailures: ctx.preExistingFailures,
   });
 
@@ -382,7 +385,12 @@ function buildAdrBlock(
 
   for (const r of filtered) outIds.push(r.adrId);
 
-  const content = buildAdrPromptSection(filtered, 'full', allAdrs);
+  // PROMPT-W1 (a): scope-gate ADR bodies for code-development tasks so that
+  // ADRs not intersecting the task scope render as a condensed head+summary+
+  // pointer instead of their full amendment-log body. Other task kinds (and
+  // tasks with no `type`) keep the full render → backward-safe.
+  const scopeGated = task.type === 'code-development';
+  const content = buildAdrPromptSection(filtered, 'full', allAdrs, 'full', scopeGated);
   if (!content) return '';
 
   return `=== Mandatory Architecture Rules (ADR) ===\nAll accepted ADRs below are mandatory constraints. Violating an accepted ADR requires a NO_GO result + ADR amendment proposal.\n\n${content}\n`;
@@ -410,9 +418,60 @@ A \`Smoke:\` proof command is attached to this task: \`${smoke.command}\`${expec
 This host-smoke is run by Brain ON THE HOST after your task completes (with a real auth token) — it is Brain's gate, NOT yours. You do NOT need to run it inside your container. If the command fails inside your sandbox (missing host binary, unbindable port, or absent token), that is EXPECTED — do NOT mark NO_GO for a sandbox smoke failure. Make your code changes land and your targeted tests pass; Brain runs the real smoke host-side.`;
 }
 
+// ─── Conditional Boilerplate Gating (PROMPT-W1 d) ──────────────────────
+
+/**
+ * Path hints that mark a task as touching HOST-FACING config — the only place
+ * the no-hardcode-`/workspace` portability note is relevant. A pure `src/**`
+ * refactor never writes these, so it should not carry the note.
+ */
+const HOST_CONFIG_PATH_HINTS = [
+  '.claude/', '.github/', '.gitlab', '.husky', '.deckent/', 'scripts/',
+  'package.json', 'tsconfig', 'dockerfile', 'docker-compose',
+  '.yml', '.yaml', '.toml',
+];
+
+/** True when any scope path looks like host-facing config (case-insensitive). */
+function touchesHostConfig(scope: TaskScope | undefined): boolean {
+  const paths = [...(scope?.filesWrite ?? []), ...(scope?.directories ?? [])];
+  return paths.some(p => {
+    const n = p.toLowerCase();
+    return HOST_CONFIG_PATH_HINTS.some(h => n.includes(h));
+  });
+}
+
+/** Which optional boilerplate blocks a task actually needs (PROMPT-W1 d). */
+interface ConditionalBoilerplate {
+  /** Idempotency Key section — only meaningful when the task may call external APIs. */
+  idempotency: boolean;
+  /** Host-config portability note — only meaningful when scope touches host-facing config. */
+  hostConfig: boolean;
+}
+
+/**
+ * Decide which optional boilerplate blocks to emit for a task (PROMPT-W1 d).
+ *
+ * Two blocks are pure noise for a pure-refactor / no-API task and are gated off:
+ *  - the **Idempotency Key** section (retry safety for EXTERNAL API calls); and
+ *  - the **host-config** portability note (no-hardcode-`/workspace`).
+ *
+ * Gating is conservative so the common case is unchanged: a task with no `type`
+ * keeps the Idempotency block (the F1 idempotency tests pin its presence for
+ * no-type tasks); only a positively-identified `refactor` kind drops it. The
+ * host-config note is emitted only when the scope actually touches host-facing
+ * config — independent of the API noise — so a CI/workflow task still gets it.
+ */
+export function conditionalBoilerplate(task: Task): ConditionalBoilerplate {
+  const isPureRefactor = task.type === 'refactor';
+  return {
+    idempotency: !isPureRefactor,
+    hostConfig: !isPureRefactor && touchesHostConfig(task.scope),
+  };
+}
+
 // ─── Scope Block Builder ───────────────────────────────────────────────
 
-function buildScopeBlock(scope: TaskScope, outWarnings: string[]): string {
+function buildScopeBlock(scope: TaskScope, outWarnings: string[], emitHostConfigNote: boolean): string {
   // Sanitize filesWrite
   const sanitized = sanitizeScope(scope.filesWrite);
   for (const w of sanitized.warnings) outWarnings.push(w);
@@ -436,6 +495,12 @@ function buildScopeBlock(scope: TaskScope, outWarnings: string[]): string {
     scopeFiles = '  - (determined by your task scope)';
   }
 
+  // PROMPT-W1 (d): the host-config portability note is only relevant when the
+  // task actually writes host-facing config; a pure src/** refactor skips it.
+  const hostConfigNote = emitHostConfigNote
+    ? `\n\nWhen writing host-facing config (hooks in \`.claude/settings.json\`, scripts in \`package.json\`, CI workflows), NEVER hard-code your container working directory (e.g. \`/workspace/...\`). That path does not exist on the user's host machine and will break at runtime. Use a portable form instead: \`$CLAUDE_PROJECT_DIR/...\`, a path relative to the project root, or a bare command resolved via PATH.`
+    : '';
+
   return `## Scope Rules
 You may ONLY modify files in these directories:
 ${scopeDirs}
@@ -443,9 +508,7 @@ ${scopeDirs}
 You may ONLY write to these files:
 ${scopeFiles}
 
-DO NOT touch files outside your scope — the auditor will flag violations.
-
-When writing host-facing config (hooks in \`.claude/settings.json\`, scripts in \`package.json\`, CI workflows), NEVER hard-code your container working directory (e.g. \`/workspace/...\`). That path does not exist on the user's host machine and will break at runtime. Use a portable form instead: \`$CLAUDE_PROJECT_DIR/...\`, a path relative to the project root, or a bare command resolved via PATH.`;
+DO NOT touch files outside your scope — the auditor will flag violations.${hostConfigNote}`;
 }
 
 // ─── Dependencies Block Builder ────────────────────────────────────────
@@ -785,6 +848,40 @@ Both fields are optional. Only populate them when you have meaningful cross-work
 // ─── Definition-of-Done Checklist (WP-19) ──────────────────────────────
 
 /**
+ * Split a goCriteria string into top-level clauses, paren-aware (PROMPT-W1 c).
+ *
+ * The previous naive `/[;\n]+/` split broke a single criterion apart whenever it
+ * contained a `;` or newline INSIDE brackets — e.g. `Run tests (unit; e2e)` was
+ * counted as two items, inflating the checklist denominator ("wrong 6/6"). This
+ * walks the string tracking bracket depth (`()`, `[]`, `{}`) and splits ONLY on a
+ * top-level `;` or newline (depth 0). Separators nested inside brackets — and any
+ * internal newline within a bracketed clause — are preserved verbatim.
+ */
+function parenAwareSplit(goCriteria: string): string[] {
+  const items: string[] = [];
+  let parenDepth = 0;
+  let buf = '';
+  for (const ch of goCriteria) {
+    if (ch === '(' || ch === '[' || ch === '{') {
+      parenDepth++;
+      buf += ch;
+    } else if (ch === ')' || ch === ']' || ch === '}') {
+      if (parenDepth > 0) parenDepth--;
+      buf += ch;
+    } else if ((ch === ';' || ch === '\n') && parenDepth === 0) {
+      // Top-level separator → end the current clause (empty clauses are dropped
+      // by the caller's length filter, matching the old `+` collapse semantics).
+      items.push(buf);
+      buf = '';
+    } else {
+      buf += ch;
+    }
+  }
+  if (buf.length > 0) items.push(buf);
+  return items;
+}
+
+/**
  * Build the goCriteria-derived self-assessment checklist (WP-19).
  *
  * Splits the task's `goCriteria` into discrete clauses (on `;` / newlines) and
@@ -795,8 +892,7 @@ Both fields are optional. Only populate them when you have meaningful cross-work
  * empty so the section is never stranded.
  */
 export function buildDodChecklist(goCriteria?: string): string {
-  const items = (goCriteria ?? '')
-    .split(/[;\n]+/)
+  const items = parenAwareSplit(goCriteria ?? '')
     .map(s => s.trim().replace(/^[-*]\s*/, ''))
     .filter(s => s.length > 0);
 
@@ -834,8 +930,29 @@ interface RenderInput {
    * was reaching workers verbatim because no shell expansion happened.
    */
   idempotencyKey: string;
+  /**
+   * PROMPT-W1 (d): whether to emit the Idempotency Key section. False for
+   * pure-refactor / no-API tasks where external-API retry safety is irrelevant.
+   */
+  emitIdempotency: boolean;
   /** Live pre-existing test-failure count at the sprint baseline (WP-14); undefined when uncaptured. */
   preExistingFailures?: number;
+}
+
+/**
+ * Persona/task verify-precedence override note (PROMPT-W1 b).
+ *
+ * Agent personas (e.g. bug-fixer) carry a "run the FULL suite / all existing
+ * tests must pass / always write a regression test" mandate. For a targeted
+ * deckent task that conflicts with the task's own CRITICAL VERIFY STEPS
+ * (targeted-only; pre-existing unrelated failures ≠ NO_GO). This note makes the
+ * task's verify-steps the single authority so a worker does not false-NO_GO on a
+ * persona full-suite mandate. `verificationMode === 'doc'` → '' (the doc verify
+ * path already states its own, non-conflicting guidance).
+ */
+export function buildVerifyPrecedenceNote(verificationMode: 'targeted' | 'doc'): string {
+  if (verificationMode !== 'targeted') return '';
+  return `> Verify-precedence (this task overrides your persona): the CRITICAL VERIFY STEPS above are the single authority on how to verify THIS task. Where your agent persona or a skill says "run the full test suite", "all existing tests must pass (zero regressions)", or "always write a regression test", defer to the targeted-only guidance above — run only the test file(s) covering the module(s) you changed, and treat pre-existing unrelated failures as NOT a NO_GO.`;
 }
 
 /**
@@ -860,7 +977,7 @@ export function buildPreExistingFailuresNote(preExistingFailures?: number): stri
 }
 
 function renderTemplate(input: RenderInput): string {
-  const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, task, effort, idempotencyKey, preExistingFailures } = input;
+  const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, task, effort, idempotencyKey, emitIdempotency, preExistingFailures } = input;
 
   // Conditionally emit non-empty sections only (skip filler empty headers).
   // Sprint 273 (F1-TOK fix #5): Skills FIRST, then Agent — skill blocks are
@@ -880,6 +997,14 @@ function renderTemplate(input: RenderInput): string {
   // when description started with the title and collapsed markdown structure
   // (lists, bold) into a single line. Now: id + title on one line, description
   // as its own paragraph so markdown survives rendering.
+  // PROMPT-W1 (d): the Idempotency Key section is only emitted when the task may
+  // make external API calls (gated off for pure-refactor / no-API tasks).
+  const dodBlock = task.goNogo?.goCriteria
+    ? `\n## Definition of Done (goCriteria — your work is judged against this)\n${task.goNogo.goCriteria}${task.goNogo.noGoCriteria ? `\nNO-GO if: ${task.goNogo.noGoCriteria}` : ''}\n`
+    : '';
+  const idempotencyBlock = emitIdempotency
+    ? `\n## Idempotency Key\n${idempotencyKey}\nUse this key for external API calls (Idempotency-Key header) to make retries safe.`
+    : '';
   sections.push(`You are a Deckent worker agent.
 See .deckent/workspace/WORKER-GUIDE.md for heartbeat format, result format, and error handling rules.
 
@@ -890,10 +1015,7 @@ ${task.description}
 
 - Model: ${task.model}
 - Effort: ${effort}
-${task.goNogo?.goCriteria ? `\n## Definition of Done (goCriteria — your work is judged against this)\n${task.goNogo.goCriteria}${task.goNogo.noGoCriteria ? `\nNO-GO if: ${task.goNogo.noGoCriteria}` : ''}\n` : ''}
-## Idempotency Key
-${idempotencyKey}
-Use this key for external API calls (Idempotency-Key header) to make retries safe.`);
+${dodBlock}${idempotencyBlock}`);
 
   // What to do
   sections.push(`## What To Do
@@ -916,6 +1038,10 @@ Use this key for external API calls (Idempotency-Key header) to make retries saf
     task.scope?.directories ?? [],
   );
   const isDocOnlyTask = taskDomains.length > 0 && taskDomains.every(d => d === 'doc');
+  // PROMPT-W1 (b): a doc-only task verifies by reading its file back; every other
+  // task verifies via targeted tests, which is also the mode whose guidance must
+  // take precedence over a persona's conflicting full-suite test-mandate.
+  const verificationMode: 'targeted' | 'doc' = isDocOnlyTask ? 'doc' : 'targeted';
   if (isDocOnlyTask) {
     sections.push(`## VERIFY STEPS (doc-only task — DO NOT run the test suite)
 This is a Tier-0 documentation task: there is no source code to type-check or test. DO NOT run \`npm test\` / \`vitest\` / the project test suite — it is large, unrelated to your file, slow, and produces spurious failures that do NOT reflect your work.
@@ -936,7 +1062,8 @@ Check the project's TOOLS.md or package.json scripts to find the right commands.
 If BOTH pass → selfAssessment = "DONE"
 If minor issues remain → selfAssessment = "GO_WITH_TECH_DEBT" with details in notes
 If Bash tool is unavailable → report in notes, selfAssessment = "GO_WITH_TECH_DEBT"
-If targeted tests fail after 3 attempts → selfAssessment = "NO_GO" with error details`);
+If targeted tests fail after 3 attempts → selfAssessment = "NO_GO" with error details
+${buildVerifyPrecedenceNote(verificationMode)}`);
   }
 
   // Smoke note (WP-16) — Tier-1 Proof-of-Function context. Emitted next to the

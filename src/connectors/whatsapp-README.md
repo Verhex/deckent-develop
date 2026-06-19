@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-04-21
+content_hash: sha256:5f1abb249c349e352483da6c6028c3a4388fc9a411322dd138e910f5de4cd7ad
+---
+
 # WhatsApp Connector — Activation Guide
 
 ## Status: Scaffold Only (Sprint 150)

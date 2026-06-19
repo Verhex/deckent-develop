@@ -4,6 +4,7 @@ import type { ProviderSpawnOptions } from '../core/provider.js';
 import { ensureSession, spawnWorker as tmuxSpawnWorker, killWorker as tmuxKillWorker, listWorkers as tmuxListWorkers } from './tmux.js';
 import { SubprocessSpawnBackend } from '../providers/subprocess.js';
 import { DockerSpawnBackend } from './spawn-backend-docker.js';
+import { assertNotLethalWithoutApproval } from '../nervous/panic-gate.js';
 
 // ─── SpawnBackend Interface ───────────────────────────────────────────────────
 
@@ -68,6 +69,13 @@ export interface SpawnBackendOptions extends ProviderSpawnOptions {
    * parameter to tmux/subprocess backends.
    */
   taskTimeoutSeconds?: number;
+  /**
+   * Optional action id for the toggle-independent SAFETY_FLOOR guard (GATE-W2).
+   * When set, `checkLethalGuard` checks the action against the 5 locked
+   * SAFETY_FLOOR actions before any process is spawned — regardless of whether
+   * `nervous.enabled` is true. Lethal actions throw SpawnBackendError.
+   */
+  actionId?: string;
 }
 
 // ─── SpawnBackendError ────────────────────────────────────────────────────────
@@ -79,6 +87,27 @@ export class SpawnBackendError extends Error {
   ) {
     super(message);
     this.name = 'SpawnBackendError';
+  }
+}
+
+// ─── Toggle-Independent Lethal Guard Helper ───────────────────────────────────
+
+/**
+ * Run the toggle-independent SAFETY_FLOOR guard before spawning a worker.
+ *
+ * Delegates to `assertNotLethalWithoutApproval` (panic-gate.ts) which fires
+ * regardless of whether `config.nervous_system.enabled` is true. Non-lethal or
+ * absent `actionId` is a no-op. Lethal actions (KILL_LIVE_SPRINT,
+ * DESTRUCTIVE_GIT, MANUAL_FILE_DELETE, COST_OVER_THRESHOLD,
+ * ADR_DEPRECATE_ACCEPTED) throw immediately — no process is ever spawned.
+ *
+ * @toggleIndependent — active even when nervous system is disabled.
+ */
+function checkLethalGuard(actionId: string | undefined, backendName: string): void {
+  if (!actionId) return;
+  const result = assertNotLethalWithoutApproval(actionId);
+  if (result.blocked) {
+    throw new SpawnBackendError(result.reason, backendName);
   }
 }
 
@@ -100,6 +129,7 @@ export class TmuxBackend implements SpawnBackend {
   }
 
   spawn(taskId: string, model: ModelType, prompt: string, opts?: SpawnBackendOptions): void {
+    checkLethalGuard(opts?.actionId, this.name);
     // Sprint 168 C0e Cross-Backend Contract: tmpfiles persist until sprint cleanup,
     // archived together by archivePromptFiles() during sprint cleanup phase.
     // (Same as Docker backend spawn-backend-docker.ts:941-942 — Sprint 156 Task 4.)
@@ -170,6 +200,7 @@ export class SubprocessBackend implements SpawnBackend {
   }
 
   spawn(taskId: string, model: ModelType, prompt: string, opts?: SpawnBackendOptions): void {
+    checkLethalGuard(opts?.actionId, this.name);
     // Sprint 168 C0e Cross-Backend Contract: tmpfiles persist until sprint cleanup,
     // archived together by archivePromptFiles() during sprint cleanup phase.
     // (Same as Docker backend spawn-backend-docker.ts:941-942 — Sprint 156 Task 4.)

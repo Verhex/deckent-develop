@@ -77,17 +77,17 @@ afterEach(() => {
 });
 
 describe('panic-gate wire — Executor.handleApprove timeout', () => {
-  it('auto-proceeds (timeout-auto-applied) for non-SAFETY_FLOOR after 10s', async () => {
+  it('auto-proceeds (timeout-auto-applied) for non-SAFETY_FLOOR after 50ms', async () => {
     vi.useFakeTimers();
     const history = createMockHistory();
     const handler = createMockHandler();
-    const executor = new Executor(history, handler, undefined, testRoot);
+    const executor = new Executor(history, handler, undefined, testRoot, 50);
     const notification = createNotification('notif-001');
 
     const handlePromise = executor.handle(notification);
 
-    // Advance past the 10s APPROVE_TIMEOUT_MS
-    await vi.advanceTimersByTimeAsync(10_001);
+    // Advance past the 50ms explicit approveTimeoutMs
+    await vi.advanceTimersByTimeAsync(51);
 
     const records = await handlePromise;
     expect(records).toHaveLength(1);
@@ -100,11 +100,11 @@ describe('panic-gate wire — Executor.handleApprove timeout', () => {
     vi.useFakeTimers();
     const history = createMockHistory();
     const handler = createMockHandler('success');
-    const executor = new Executor(history, handler, undefined, testRoot);
+    const executor = new Executor(history, handler, undefined, testRoot, 50);
     const notification = createNotification('notif-002');
 
     const handlePromise = executor.handle(notification);
-    await vi.advanceTimersByTimeAsync(10_001);
+    await vi.advanceTimersByTimeAsync(51);
     await handlePromise;
 
     expect(handler).toHaveBeenCalledOnce();
@@ -115,7 +115,7 @@ describe('panic-gate wire — Executor.handleApprove timeout', () => {
     vi.useFakeTimers();
     const history = createMockHistory();
     const handler = createMockHandler();
-    const executor = new Executor(history, handler, undefined, testRoot);
+    const executor = new Executor(history, handler, undefined, testRoot, 50);
     // KILL_LIVE_SPRINT is a SAFETY_FLOOR action
     const notification = createNotification('notif-003', {
       id: 'KILL_LIVE_SPRINT',
@@ -140,7 +140,7 @@ describe('panic-gate wire — Executor.handleApprove timeout', () => {
     vi.useFakeTimers();
     const history = createMockHistory();
     const handler = createMockHandler();
-    const executor = new Executor(history, handler, undefined, testRoot);
+    const executor = new Executor(history, handler, undefined, testRoot, 10_000);
     const notification = createNotification('notif-004');
 
     const handlePromise = executor.handle(notification);
@@ -162,7 +162,7 @@ describe('panic-gate wire — Executor.handleApprove timeout', () => {
     vi.useFakeTimers();
     const history = createMockHistory();
     const handler = createMockHandler();
-    const executor = new Executor(history, handler, undefined, testRoot);
+    const executor = new Executor(history, handler, undefined, testRoot, 10_000);
     const notification = createNotification('notif-005');
 
     const handlePromise = executor.handle(notification);
@@ -182,11 +182,11 @@ describe('panic-gate wire — Executor.handleApprove timeout', () => {
     vi.useFakeTimers();
     const history = createMockHistory();
     const handler = createMockHandler();
-    const executor = new Executor(history, handler, undefined, testRoot);
+    const executor = new Executor(history, handler, undefined, testRoot, 50);
     const notification = createNotification('notif-006');
 
     const handlePromise = executor.handle(notification);
-    await vi.advanceTimersByTimeAsync(10_001);
+    await vi.advanceTimersByTimeAsync(51);
     await handlePromise;
 
     expect(history.records).toHaveLength(1);
@@ -197,7 +197,7 @@ describe('panic-gate wire — Executor.handleApprove timeout', () => {
     vi.useFakeTimers();
     const history = createMockHistory();
     const handler = createMockHandler();
-    const executor = new Executor(history, handler, undefined, testRoot);
+    const executor = new Executor(history, handler, undefined, testRoot, 10_000);
     const notification = createNotification('notif-007');
 
     const handlePromise = executor.handle(notification);

@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-06-04
+content_hash: sha256:5cf2a67a74a7ce6dd495a31a0a8d9dc54c525a5f7fd438ea327c566aec588631
+---
+
 # Performance Optimizer
 
 ## Profiling Methodology

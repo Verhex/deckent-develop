@@ -1,3 +1,10 @@
+---
+doc_rank: 0
+status: active
+last_updated: 2026-06-19
+content_hash: sha256:bb17dd81902055762286c26b9aa117342a37968ee4f1b483467d2ee37107467f
+---
+
 # Deckent — Master Plan
 
 > **Status:** CANONICAL — this is the single source of truth for vision, current state, remaining work, business plan, and sequencing.

@@ -233,3 +233,47 @@ export function awaitPanicGateApproval(opts: AwaitPanicGateOptions): Promise<Pan
     poll();
   });
 }
+
+// ─── Toggle-Independent Lethal Guard ─────────────────────────────────────────
+
+/**
+ * Result returned by {@link assertNotLethalWithoutApproval}.
+ */
+export interface LethalGuardResult {
+  /** True when the action is a SAFETY_FLOOR action that requires explicit approval. */
+  readonly blocked: boolean;
+  /** Human-readable block reason (empty string when not blocked). */
+  readonly reason: string;
+}
+
+/**
+ * Toggle-independent proactive lethal guard (GATE-W2).
+ *
+ * Checks whether `actionId` is one of the 5 SAFETY_FLOOR actions that must
+ * always require explicit user approval:
+ *   KILL_LIVE_SPRINT | MANUAL_FILE_DELETE | COST_OVER_THRESHOLD |
+ *   DESTRUCTIVE_GIT  | ADR_DEPRECATE_ACCEPTED
+ *
+ * This guard fires regardless of `config.nervous_system.enabled`. When nervous
+ * is disabled the reactive detector is offline, but this proactive TCB layer
+ * remains active at every call site.
+ *
+ * Behavior:
+ *   - nervous ON  → both this guard AND the reactive nervous detector fire.
+ *   - nervous OFF → only this guard fires (detective layer is offline).
+ *   - Non-lethal  → always returns `{ blocked: false }` with no warning.
+ *
+ * @toggleIndependent — active regardless of nervous.enabled toggle.
+ */
+export function assertNotLethalWithoutApproval(
+  actionId: string,
+  opts?: { warn?: (msg: string) => void },
+): LethalGuardResult {
+  if (!isLockedPanicAction(actionId)) {
+    return { blocked: false, reason: '' };
+  }
+  const reason =
+    `[SAFETY_FLOOR] toggleIndependent guard: '${actionId}' requires explicit user approval — blocked`;
+  emitWarning(opts?.warn, reason);
+  return { blocked: true, reason };
+}

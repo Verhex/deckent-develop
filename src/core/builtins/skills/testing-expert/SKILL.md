@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-06-04
+content_hash: sha256:a9b7e2df919667ab98787c46097561a05139344e5ed48c144175ef29b9d97fdc
+---
+
 # Testing Expert
 
 ## Test Pyramid

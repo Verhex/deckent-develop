@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-06-04
+content_hash: sha256:2543fb814806b656ad61113771c49ca43022804c3724b2ad48662a4a78c1fa6a
+---
+
 # API Builder
 
 ## RESTful Design

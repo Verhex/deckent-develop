@@ -151,6 +151,14 @@ export function classifyTaskIntent(task: Pick<Task, 'scope' | 'title' | 'descrip
 // ─── Scoring Functions ──────────────────────────────────────────────
 
 /**
+ * matchReason emitted by {@link scoreScopeMatch} when an ADR's text references
+ * the task's scope. PROMPT-W1 (a) reuses this as the per-ADR scope-intersection
+ * signal for scope-gated rendering, so the literal lives in one place to keep
+ * the producer (scoreScopeMatch) and the consumer (buildAdrPromptSection) in lockstep.
+ */
+const SCOPE_MATCH_REASON = 'scope-path-match';
+
+/**
  * Score based on scope path match.
  * If ADR content mentions directories or keywords related to task scope, +0.4.
  */
@@ -182,7 +190,7 @@ function scoreScopeMatch(adr: MemoryEntryV2, taskDirs: string[]): { score: numbe
   }
 
   return matched
-    ? { score: 0.4, reason: 'scope-path-match' }
+    ? { score: 0.4, reason: SCOPE_MATCH_REASON }
     : { score: 0, reason: null };
 }
 
@@ -432,6 +440,11 @@ function extractOperativeSection(content: string): string | null {
  * @param adrRender - 'full' (default): full content; 'operative': emit only the
  *   `<!-- worker-operative-start --> / <!-- worker-operative-end -->` section when
  *   present, with a footnote. ADRs without markers fall back to full content.
+ * @param scopeGated - PROMPT-W1 (a). When true (code-development tasks), an ADR
+ *   that does NOT intersect the task scope (no `scope-path-match` reason) is
+ *   rendered condensed — `Active constraint` head + summary + `[full: …]` pointer
+ *   — instead of its full amendment-log body. Scope-intersecting ADRs still print
+ *   the full body. Defaults to false → byte-for-byte legacy rendering.
  * @returns Formatted markdown string for prompt injection
  */
 export function buildAdrPromptSection(
@@ -439,6 +452,7 @@ export function buildAdrPromptSection(
   mode: 'full' | 'summary',
   allAdrs?: MemoryEntryV2[],
   adrRender: 'full' | 'operative' = 'full',
+  scopeGated: boolean = false,
 ): string {
   if (adrs.length === 0) return '';
 
@@ -454,6 +468,28 @@ export function buildAdrPromptSection(
 
     if (mode === 'full') {
       const rawContent = entry?.content ?? `(content not available for ${adr.adrId})`;
+
+      // PROMPT-W1 (a): scope-gating. For code-development tasks, an ADR whose
+      // text does NOT reference the task scope (no scope-path-match) is a
+      // background constraint — the worker needs its operative rule, not the
+      // full amendment-log history. Emit a condensed head + summary + pointer
+      // and skip the body. Scope-intersecting ADRs fall through to full render.
+      const scopeIntersect = adr.matchReasons.includes(SCOPE_MATCH_REASON);
+      if (scopeGated && !scopeIntersect) {
+        const distilled = distillActiveConstraint(rawContent, entry?.summary);
+        const constraintHead = distilled ? `**Active constraint:** ${distilled}\n\n` : '';
+        const summaryText = entry?.summary?.trim()
+          ? entry.summary.trim()
+          : entry?.content
+            ? extractSummary(entry.content)
+            : '';
+        const summaryBlock = summaryText ? `${summaryText}\n\n` : '';
+        sections.push(
+          `## ${adr.adrId}: ${adr.title}\n\n${constraintHead}${summaryBlock}[full: .brain/memory.db ${adr.adrId}]`,
+        );
+        continue;
+      }
+
       let content = rawContent;
       if (adrRender === 'operative') {
         const operative = extractOperativeSection(rawContent);

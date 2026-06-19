@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-06-04
+content_hash: sha256:a5c79e0ab3201da42243c798d82dead54e724b2608b809eef976c33a149a8075
+---
+
 # TypeScript Expert
 
 ## Strict Mode

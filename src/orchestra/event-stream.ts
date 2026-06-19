@@ -15,3 +15,5 @@
 // New code should import from `../core/event-stream.js` directly.
 
 export * from '../core/event-stream.js';
+
+export const SCOPE_INSUFFICIENT_CHANNEL = 'WORKER→BRAIN:SCOPE_INSUFFICIENT';

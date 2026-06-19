@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-03-22
+content_hash: sha256:297cf180f713e298a65eb847c272ea00ac1e17c6b07f49dff9d2397418f6d14e
+---
+
 # Platform-Specific Test Guide
 
 This document describes which test files are platform-specific and how to run

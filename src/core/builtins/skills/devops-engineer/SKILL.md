@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-06-04
+content_hash: sha256:c2f7f10cc025c35d9224c85cd6b208ae6a6b088801fc062b756e09d78333da55
+---
+
 # DevOps Engineer
 
 ## Dockerfile Best Practices

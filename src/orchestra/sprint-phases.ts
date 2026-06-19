@@ -438,6 +438,38 @@ function toAuditDecision(evaluation: TaskEvaluation): AuditDecision {
 }
 
 /**
+ * TEL-W1 (Sprint 303): Build the Brain-owned evaluation reason string.
+ * When NO_GO was driven by a concrete veto (honest-gate violation or
+ * concrete test failure), the cause is appended so observers can distinguish
+ * "raise the rubric score" from "fix the actual boundary/test violation".
+ * Falls back to the rubric-score-only format when no concrete veto reason exists.
+ *
+ * @internal Exported for unit testing only.
+ */
+export function buildBrainEvaluationReason(
+  rubricScore: number,
+  evaluation: TaskEvaluation,
+  verdictLabel: string,
+  gated: { honest: boolean; violation?: string },
+  result: Pick<TaskResult, 'testsPassed' | 'selfAssessment'>,
+): string {
+  if (evaluation === TaskEvaluation.NO_GO) {
+    let vetoReason: string | undefined;
+    if (!gated.honest && gated.violation) {
+      vetoReason = gated.violation;
+    } else if (result.testsPassed === false) {
+      vetoReason = 'concrete_test_failed';
+    } else if (result.selfAssessment === 'NO_GO') {
+      vetoReason = 'worker_self_no_go';
+    }
+    if (vetoReason) {
+      return `rubric total ${rubricScore} → NO_GO (cause: ${vetoReason})`;
+    }
+  }
+  return `rubric total ${rubricScore} → ${verdictLabel}`;
+}
+
+/**
  * Adapter: map a task's rubric-registry TaskType to the audit-trail's
  * screaming-snake {@link AuditRuleSet} union.
  */
@@ -1307,7 +1339,9 @@ export async function runEvaluatePhase(
             if (persisted) {
               const verdictLabel = toAuditDecision(evaluation);
               persisted.brainEvaluation = verdictLabel;
-              persisted.brainEvaluationReason = `rubric total ${rubricResult.totalScore} → ${verdictLabel}`;
+              persisted.brainEvaluationReason = buildBrainEvaluationReason(
+                rubricResult.totalScore, evaluation, verdictLabel, gated, result,
+              );
               writeFileSync(resultPath, JSON.stringify(persisted, null, 2) + '\n', 'utf-8');
             }
           }

@@ -29,6 +29,7 @@ import { checkAuthority, emitAuthorityViolation } from '../orchestra/authority-e
 import { MemoryStore } from '../core/memory-store.js';
 import { MEMORY_DB_FILE } from '../core/constants.js';
 import { ACTIVE_EXECUTION_STATUSES, COMPLETED_STATUSES } from '../core/heartbeat-types.js';
+import { DEFAULT_HEARTBEAT_TIMEOUT_MS } from '../core/config.js';
 import { emitAlert } from './alert-emitter.js';
 
 // ─── Constants ─────────────────────────────────────────────────────
@@ -464,7 +465,7 @@ export function createAlert(
   };
 }
 
-export function scanHeartbeats(projectRoot: string, heartbeatTimeoutMs = 120_000): {
+export function scanHeartbeats(projectRoot: string, heartbeatTimeoutMs = DEFAULT_HEARTBEAT_TIMEOUT_MS): {
   heartbeats: Heartbeat[];
   staleAgents: BoundaryViolation[];
   alerts: Alert[];
@@ -596,8 +597,8 @@ export function runAuthorityChecks(
     if (!result.allowed) {
       alerts.push(
         createAlert(
-          AlertLevel.WARNING,
-          `[ADR-037 soft] Authority violation: worker ${workerId} attempted to write ${filePath} — ${result.reason}`,
+          AlertLevel.CRITICAL,
+          `[boundary-violation] Worker ${workerId} wrote outside scope: ${filePath} — ${result.reason}. Veto-authority: result-evaluator.`,
           workerId,
         ),
       );

@@ -7,7 +7,7 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Task, TaskResult, EvaluationRubric, RubricScore, EvaluationResult } from '../core/types.js';
+import type { Task, TaskResult, EvaluationRubric, RubricScore, EvaluationResult, NoGoCategory } from '../core/types.js';
 import { TaskEvaluation } from '../core/types.js';
 import { BRAIN_DIR, SPRINTS_DIR, TASKS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
@@ -1307,7 +1307,78 @@ export function evaluateWithRubric(
     }
   }
 
+  // STATE-W1: enrich NO_GO result with root-cause category and scope file lists
+  if (evaluation.decision === 'NO_GO') {
+    return enrichEvaluationWithCategory(evaluation, result, task);
+  }
+
   return evaluation;
+}
+
+// ─── STATE-W1: NO_GO Root-Cause Taxonomy ─────────────────────────────
+
+/**
+ * Enrich a NO_GO EvaluationResult with root-cause category and scope file lists.
+ *
+ * Only modifies NO_GO decisions — DONE and GO_WITH_TECH_DEBT pass through unchanged.
+ * This is additive: decision/totalScore/rubricScores fields are preserved.
+ *
+ * Category priority:
+ * 1. notes OOM|SIGKILL  → RUNTIME_ERROR  (infra kill signal, most specific)
+ * 2. notes AUTH|401/403 → FATAL_ERROR
+ * 3. scope_compliance < 80 or filesOutOfScope.length > 0 → BOUNDARY_VIOLATION
+ * 4. correctness score = 0 or testsPassed=false → TECHNICAL
+ * 5. else               → UNKNOWN
+ */
+export function enrichEvaluationWithCategory(
+  evaluation: EvaluationResult,
+  result: TaskResult,
+  task: Task,
+): EvaluationResult {
+  if (evaluation.decision !== 'NO_GO') return evaluation;
+
+  const dirs = task.scope?.directories ?? [];
+  const writeFiles = task.scope?.filesWrite ?? [];
+  const changed = result.filesChanged ?? [];
+
+  const filesInScope: string[] = [];
+  const filesOutOfScope: string[] = [];
+
+  for (const file of changed) {
+    const inDir = dirs.some(d => file.startsWith(d));
+    const inWrite = writeFiles.some(w => file === w);
+    if (inDir || inWrite || isAuxiliaryFile(file)) {
+      filesInScope.push(file);
+    } else {
+      filesOutOfScope.push(file);
+    }
+  }
+
+  const isPartialPromotable = filesInScope.length > 0;
+
+  const notesText = (result.notes ?? '').toLowerCase();
+  const scopeScore = evaluation.rubricScores.find(s => s.criterion === 'scope_compliance')?.score ?? 100;
+  const correctnessScore = evaluation.rubricScores.find(s => s.criterion === 'correctness')?.score ?? 100;
+
+  let noGoCategory: NoGoCategory = 'UNKNOWN';
+
+  if (/oom|sigkill|oom.?kill/.test(notesText)) {
+    noGoCategory = 'RUNTIME_ERROR';
+  } else if (/\bauth\b|authentication|unauthorized|401|403/.test(notesText)) {
+    noGoCategory = 'FATAL_ERROR';
+  } else if (scopeScore < 80 || filesOutOfScope.length > 0) {
+    noGoCategory = 'BOUNDARY_VIOLATION';
+  } else if (correctnessScore === 0 || result.testsPassed === false) {
+    noGoCategory = 'TECHNICAL';
+  }
+
+  return {
+    ...evaluation,
+    noGoCategory,
+    filesInScope,
+    filesOutOfScope,
+    isPartialPromotable,
+  };
 }
 
 // ─── TECH_DEBT Downgrade Layer (Honest Assessment Calibration v2) ────

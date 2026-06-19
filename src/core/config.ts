@@ -230,6 +230,15 @@ export const DEFAULT_PROMPT_CONFIG: Required<PromptConfig> = {
  */
 export const DEFAULT_OUTBOUND_DAILY_QUOTA_BYTES = 1_073_741_824; // 1 GiB
 
+// ─── Heartbeat & Approval Window SSOT Constants ──────────────────────────────
+/** ms equivalent of config.heartbeat_timeout default (120s × 1000).
+ *  Single SSOT: auditor.scanHeartbeats and StaleWorkerDetector both default to this. */
+export const DEFAULT_HEARTBEAT_TIMEOUT_MS = 120_000;
+/** Default for config key nervous_system.approve_timeout_attended_ms (30s, interactive sessions). */
+export const DEFAULT_APPROVE_TIMEOUT_ATTENDED_MS = 30_000;
+/** Default for config key nervous_system.approve_timeout_unattended_ms (5s, CI/background). */
+export const DEFAULT_APPROVE_TIMEOUT_UNATTENDED_MS = 5_000;
+
 // ─── Nervous System Zod Schemas (Sprint 180 W0 — Step F) ─────────────
 // Runtime validation that mirrors the NervousSystemConfig TypeScript
 // interface from config-types.ts. Used by tests and integration
@@ -1207,7 +1216,7 @@ export function createDefaultConfig(): DeckentConfig {
         cross_channel_dedup: true,
       },
       detectors: {
-        stale_worker: { enabled: true, threshold_ms: 180000 },
+        stale_worker: { enabled: true, threshold_ms: 120000 },
         scope_collision: { enabled: true },
         debt_trend: { enabled: true, threshold_rate: 0.15 },
         agent_routing: { enabled: true, anomaly_threshold: 0.40 },

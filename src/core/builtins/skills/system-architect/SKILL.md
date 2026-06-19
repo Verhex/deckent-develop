@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-06-04
+content_hash: sha256:c7dea2b48fc27c15569c62d43e525edad14a4a3bb1bf4b2f2d9851857d0c6f55
+---
+
 # System Architect Skill
 
 ## Registry Pattern

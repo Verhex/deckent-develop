@@ -1,3 +1,10 @@
+---
+doc_rank: 50
+status: active
+last_updated: 2026-06-04
+content_hash: sha256:f11656cfb46691987a2d28c9bd7d20fdea7c4ff9cfb3e12d2d64435a3160fd40
+---
+
 # Code Simplifier
 
 ## Cyclomatic Complexity Reduction

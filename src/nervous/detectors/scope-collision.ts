@@ -164,6 +164,42 @@ export class ScopeCollisionMonitor {
   }
 
   /**
+   * Predicate: çakışan task'ların sıralanabilir (serialize-edilebilir) olup olmadığını kontrol eder.
+   * Executor, timeout-auto-proceed'den önce bu predicate'i çağırır ve sonucu loglar.
+   *
+   * Mantık: herhangi bir task birden fazla çakışma grubunda yer alıyorsa (karmaşık bağımlılık
+   * grafiği), otomatik yeniden sıralama güvenli değildir → ok=false, human müdahale gerekir.
+   * Aksi takdirde her çakışma çifti sırayla çözülebilir → ok=true (auto-serialize-OK).
+   */
+  canAutoApply(payload: Record<string, unknown>): {ok: boolean; reason: string} {
+    const rawCollisions = payload['collisions'];
+    const collisions = Array.isArray(rawCollisions)
+      ? (rawCollisions as Array<{file: string; taskIds: string[]}>)
+      : [];
+
+    if (collisions.length === 0) {
+      return {ok: true, reason: 'no collisions to serialize'};
+    }
+
+    // Her task'ın kaç farklı çakışma grubunda göründüğünü say
+    const taskGroupCount = new Map<string, number>();
+    for (const collision of collisions) {
+      const taskIds = Array.isArray(collision.taskIds) ? collision.taskIds : [];
+      for (const tid of taskIds) {
+        taskGroupCount.set(tid, (taskGroupCount.get(tid) ?? 0) + 1);
+      }
+    }
+
+    // Bir task 2+ grupta ise döngüsel bağımlılık → otomatik sıralama güvenli değil
+    const hasCircular = [...taskGroupCount.values()].some(count => count > 1);
+    if (hasCircular) {
+      return {ok: false, reason: 'collisions form circular dependencies — manual serialization required'};
+    }
+
+    return {ok: true, reason: `auto-serialize-OK: ${collisions.length} collision(s) can be sequenced`};
+  }
+
+  /**
    * Tespit edilen çakışmalardan DetectorResult üretir.
    */
   private buildResult(collisions: CollisionEntry[]): DetectorResult {

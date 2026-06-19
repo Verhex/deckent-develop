@@ -9,7 +9,11 @@ import type { TaskDNA, IntentType, SubIntentType, OperationType, TaskSize } from
 
 const INTENT_KEYWORDS: Record<IntentType, string[]> = {
   security: ['security', 'auth', 'authentication', 'jwt', 'csrf', 'xss', 'injection', 'vulnerability', 'encryption', 'owasp', 'permission', 'acl', 'rbac'],
-  bugfix: ['fix', 'bug', 'error', 'crash', 'regression', 'broken', 'issue', 'defect', 'patch', 'hotfix', 'wire', 'runtime'],
+  // ROUTE-W1 (Sprint 303): 'wire'/'runtime' dropped — they signal integration/implementation
+  // ("wire X into the runtime loop"), not a defect, and were pulling refactor/impl tasks to
+  // bug-fixer. 'broken' stays (a genuine bug signal) but is context-gated by the
+  // refactor-to-spec block in detectPrimaryIntent (a spelled-out structural edit suppresses bugfix).
+  bugfix: ['fix', 'bug', 'error', 'crash', 'regression', 'broken', 'issue', 'defect', 'patch', 'hotfix'],
   // 'testing' removed as primary intent — Sprint 148 taxonomy reform
   // Test work is now tracked via 'test-coverage' tag in TaskDNA.tags
   refactor: ['refactor', 'cleanup', 'restructure', 'simplify', 'extract', 'split', 'merge', 'consolidate', 'rename', 'reorganize'],
@@ -143,6 +147,29 @@ export function detectPrimaryIntent(
     const r = scores.find((s) => s.intent === 'refactor');
     if (r) r.score += 4;
     else scores.push({ intent: 'refactor', score: 4 });
+  }
+
+  // ROUTE-W1: a refactor-to-spec task spells out BOTH the operation AND the target
+  // structure (e.g. "remove the threshold branch → use a waitMs ternary; add the string to
+  // a Set"). Root-cause + fix are already given, so this is a mechanical structural edit —
+  // NOT a bug investigation (5-Whys / bisect would be dead-weight). When an operation verb
+  // co-occurs with a code-structure noun on a SMALL scope (1–2 writes), boost refactor (≥4
+  // trips the hasStrongNonImplSignal gate below AND outranks an incidental bugfix hit) and
+  // suppress any incidental bugfix score so a stray 'broken'/'fix' token cannot pull a
+  // spelled-out structural edit to bug-fixer.
+  const REFACTOR_OP_VERB = /\b(remove|delete|clean(?:up)?|simplif\w+|replace|inline|extract|collapse|consolidate)\b/;
+  const STRUCT_NOUN = /\b(ternary|loop|set|map|object|array|switch|enum)\b/;
+  const isRefactorToSpec =
+    REFACTOR_OP_VERB.test(text) &&
+    STRUCT_NOUN.test(text) &&
+    scope.filesWrite.length >= 1 &&
+    scope.filesWrite.length <= 2;
+  if (isRefactorToSpec) {
+    const r = scores.find((s) => s.intent === 'refactor');
+    if (r) r.score += 4;
+    else scores.push({ intent: 'refactor', score: 4 });
+    const b = scores.find((s) => s.intent === 'bugfix');
+    if (b) b.score = Math.max(0, b.score - 4);
   }
 
   // CRITICAL FIX: Write ratio analysis prevents the detectTaskType ordering bug.
