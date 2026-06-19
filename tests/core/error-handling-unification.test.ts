@@ -587,7 +587,10 @@ describe('Error handling completeness', () => {
     // mcp.ts throws for CLI input/config validation (invalid kv-pair/scope/transport, missing HTTP
     // url, server-not-found) — all i18n'd operational faults surfaced to the caller, same category,
     // not domain errors warranting a registered DeckentError code.
-    const ALLOWED_FILES = new Set(['agent.ts', 'skill.ts', 'chat-session.ts', 'chat-provider-parity.ts', 'mcp.ts']);
+    // autonomous.ts throws for planner spawn faults (spawn failed / timed out / non-zero exit) —
+    // spawn/operational category like chat-session.ts. process.ts throws for i18n'd CLI input
+    // validation (missing description / executionId) — same input-validation category as mcp.ts.
+    const ALLOWED_FILES = new Set(['agent.ts', 'skill.ts', 'chat-session.ts', 'chat-provider-parity.ts', 'mcp.ts', 'autonomous.ts', 'process.ts']);
     const files = readdirSync(dir).filter(f => f.endsWith('.ts') && !ALLOWED_FILES.has(f));
     for (const file of files) {
       const content = readFileSync(join(dir, file), 'utf-8');

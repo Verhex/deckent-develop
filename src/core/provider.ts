@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import type { ModelType, ProviderName } from './types.js';
-import type { ResolvedConfig } from './config-types.js';
+import type { ResolvedConfig, ProviderDefinition } from './config-types.js';
 import { PROVIDER_MODEL_MAP } from './task-types.js';
 import { getEquivalentModel } from './model-equivalence.js';
 import { Connector } from './session-interface.js';
@@ -767,7 +767,7 @@ export interface BootstrapResult {
  * @param registry    Provider registry (defaults to global singleton)
  */
 export async function bootstrapProviders(
-  config: Pick<ResolvedConfig, 'brain_provider' | 'worker_provider' | 'fallback_provider' | 'projectRoot'> & { auth_mode?: 'subscription' | 'api' | 'hybrid' },
+  config: Pick<ResolvedConfig, 'brain_provider' | 'worker_provider' | 'fallback_provider' | 'projectRoot' | 'providers'> & { auth_mode?: 'subscription' | 'api' | 'hybrid' },
   projectRoot?: string,
   registry: ProviderRegistry = providerRegistry,
 ): Promise<BootstrapResult> {
@@ -876,6 +876,65 @@ export async function bootstrapProviders(
         registered.push(candidate.name as unknown as ProviderName);
       } catch {
         skipped.push({ name: candidate.name as unknown as ProviderName, reason: `Failed to create OpenAICompatibleAdapter for ${candidate.name}` });
+      }
+    }
+  }
+
+  // ─── Config-driven provider registry (F1-012, zero-hardcode) ───────────
+  // When `config.providers.registry` is present, register each declared
+  // provider generically — adding a provider needs NO code change. Absent
+  // (or empty) → built-in claude/codex/gemini/ollama behavior is unchanged
+  // (backward-safe default). Invalid entries are skipped with a friendly
+  // reason and NEVER throw mid-bootstrap.
+  const providerRegistryDefs: ProviderDefinition[] | undefined = config.providers?.registry;
+  if (Array.isArray(providerRegistryDefs)) {
+    for (const def of providerRegistryDefs) {
+      const name = typeof def?.name === 'string' ? def.name.trim() : '';
+      const kind = def?.type ?? def?.adapter;
+      if (!name) {
+        skipped.push({ name: 'unknown' as ProviderName, reason: 'provider registry entry is missing a non-empty name' });
+        continue;
+      }
+      if (!kind) {
+        skipped.push({ name: name as ProviderName, reason: `provider "${name}" registry entry is missing type/adapter` });
+        continue;
+      }
+      // Idempotent — a name already registered (built-in or earlier entry) wins.
+      if (registry.hasProvider(name)) {
+        registered.push(name as ProviderName);
+        continue;
+      }
+      try {
+        let adapter: ProviderAdapter | null = null;
+        if (kind === 'openai-compatible') {
+          if (!def.baseUrl || !def.apiKeyEnv || !Array.isArray(def.models) || def.models.length === 0) {
+            skipped.push({ name: name as ProviderName, reason: `openai-compatible provider "${name}" needs baseUrl, apiKeyEnv and a non-empty models list` });
+            continue;
+          }
+          const { OpenAICompatibleAdapter } = await import('../providers/openai-compatible.js');
+          adapter = new OpenAICompatibleAdapter({
+            name,
+            baseURL: def.baseUrl,
+            apiKeyEnv: def.apiKeyEnv,
+            models: def.models,
+          });
+        } else {
+          // CLI kind (claude/codex/gemini/ollama) — alias a built-in adapter
+          // under the custom registry name via the same factory map used above.
+          const factory = adapterFactories[kind as ProviderName];
+          if (!factory) {
+            skipped.push({ name: name as ProviderName, reason: `unknown adapter type "${kind}" for provider "${name}"` });
+            continue;
+          }
+          const built = await factory();
+          adapter = built.name === name
+            ? built
+            : Object.create(built, { name: { value: name, writable: false } }) as ProviderAdapter;
+        }
+        registry.registerProvider(adapter);
+        registered.push(name as ProviderName);
+      } catch {
+        skipped.push({ name: name as ProviderName, reason: `Failed to create adapter for provider "${name}"` });
       }
     }
   }

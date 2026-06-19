@@ -162,6 +162,36 @@ export interface BotAgentConfig {
   timeout_ms?: number;
 }
 
+/**
+ * Adapter kind that backs a config-driven provider (F1-012).
+ * - `openai-compatible` — generic HTTP adapter; points at ANY OpenAI
+ *   `/chat/completions`-compatible base URL, enabling fully config-driven
+ *   registration with zero code change.
+ * - `claude | codex | gemini | ollama` — alias a built-in adapter under a
+ *   custom registry name.
+ */
+export type ProviderAdapterKind = 'claude' | 'codex' | 'gemini' | 'ollama' | 'openai-compatible';
+
+/**
+ * A single config-driven provider definition (F1-012, zero-hardcode).
+ * Declared under `config.providers.registry`; bootstrap registers each entry
+ * generically so adding a provider needs NO source change.
+ */
+export interface ProviderDefinition {
+  /** Unique registry name (any string), e.g. 'groq' | 'mistral' | 'claude-fast'. */
+  name: string;
+  /** Adapter kind backing this provider. */
+  type?: ProviderAdapterKind;
+  /** Alias for `type` (either key is accepted). */
+  adapter?: ProviderAdapterKind;
+  /** OpenAI-compatible base URL, e.g. https://api.groq.com/openai/v1 (type='openai-compatible'). */
+  baseUrl?: string;
+  /** Env var holding the API key (type='openai-compatible'). */
+  apiKeyEnv?: string;
+  /** Model ids this provider serves (type='openai-compatible'). */
+  models?: string[];
+}
+
 export interface DeckentConfig {
   mode: PlanMode;
   modes: Record<string, PlanModeConfig>;
@@ -225,6 +255,11 @@ export interface DeckentConfig {
     worker?: ProviderName;
     fallback?: ProviderName;
     overrides?: Record<string, ProviderName>;
+    /** Config-driven provider registry (F1-012, zero-hardcode). When present,
+     *  bootstrap registers each definition — adding a provider needs NO code
+     *  change. Absent → built-in claude/codex/gemini/ollama behavior is
+     *  unchanged (backward-safe default). */
+    registry?: ProviderDefinition[];
   };
   /** Auto-select cheapest capable provider (default: false) */
   cost_optimization?: boolean;
@@ -773,6 +808,10 @@ export interface ResolvedConfig {
   worker_provider?: ProviderName;
   /** Fallback when primary provider unavailable */
   fallback_provider?: ProviderName;
+  /** Grouped provider config pass-through (F1-012). Routing fields are already
+   *  flattened into brain_provider/worker_provider/fallback_provider above; this
+   *  carries `registry` (config-driven provider definitions) to bootstrap. */
+  providers?: DeckentConfig['providers'];
   // Memory
   memory_budget?: number;
   decay_after_sprints?: number;

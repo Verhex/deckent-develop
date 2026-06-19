@@ -4,54 +4,29 @@
 
 import { DeckentError } from './errors.js';
 import { OLLAMA_BUILTIN_MODELS } from './ollama-models.js';
+import type {
+  RegistryProviderName,
+  RegistryProviderNameExt,
+  ModelTier,
+  ModelDefinition,
+  ParametricResolveOptions,
+} from './model-registry-types.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
+// The type declarations now live in `model-registry-types.ts` (the project
+// `*-types.ts` convention). They are re-exported here so every existing importer
+// of these types from `./model-registry.js` keeps working unchanged.
 
-/** Provider name — defined here to avoid circular import with task-types.ts.
- *
- *  NOTE (Sprint 190 W-F F-11): The local Ollama provider is registered with
- *  a literal `'ollama'` runtime value but kept out of this static type union
- *  because widening it cascades a compile error into task-types.ts
- *  (`getProviderForModel` returns `ProviderName` which is currently 'claude' |
- *  'codex' | 'gemini'). Until task-types.ts gets the matching widen (out of
- *  scope for task 190-009), Ollama model definitions use a `provider` cast
- *  and callers that want Ollama-aware queries pass `'ollama' as RegistryProviderName`.
- *  The runtime catalog still serves Ollama models correctly via
- *  `getByProvider('ollama' as RegistryProviderName)`.
- */
-export type RegistryProviderName = 'claude' | 'codex' | 'gemini';
-
-/** Extended provider name including local providers — runtime helper. */
-export type RegistryProviderNameExt = RegistryProviderName | 'ollama';
-
-export type ModelTier = 'economy' | 'standard' | 'premium' | 'premium_plus';
-
-export type ModelStatus = 'ga' | 'preview' | 'deprecated';
-
-export interface ModelCapabilities {
-  streaming: boolean;
-  toolUse: boolean;
-  vision: boolean;
-  codeExecution: boolean;
-  reasoning: boolean;
-}
-
-export interface ModelCost {
-  input: number;
-  output: number;
-}
-
-export interface ModelDefinition {
-  id: string;
-  apiId: string;
-  provider: RegistryProviderName;
-  tier: ModelTier;
-  contextWindow: number;
-  costPerMillion: ModelCost;
-  capabilities: ModelCapabilities;
-  status: ModelStatus;
-  maxOutputTokens?: number;
-}
+export type {
+  RegistryProviderName,
+  RegistryProviderNameExt,
+  ModelTier,
+  ModelStatus,
+  ModelCapabilities,
+  ModelCost,
+  ModelDefinition,
+  ParametricResolveOptions,
+} from './model-registry-types.js';
 
 // ─── Built-in Model Catalog ────────────────────────────────────────────────
 // Bundled snapshot = offline last-resort fallback. models.dev catalog is the
@@ -230,6 +205,97 @@ const TIER_ORDER: Record<ModelTier, number> = {
   premium_plus: 3,
 };
 
+// ─── Parametric / Extensible Resolution (F1-PD) ────────────────────────────
+// The bundled BUILTIN_MODELS catalog is the offline fallback, but the registry
+// is no longer a closed set: an unknown / brand-new model id is RESOLVED into a
+// runtime-validated ModelDefinition rather than rejected. The string-union
+// hardcode (OpenAIModel / GeminiModel in task-types.ts) no longer gates runtime
+// resolution — provider + tier are derived parametrically from the id, with
+// every field overridable via ParametricResolveOptions.
+
+/** Infer the provider from a model id using common naming conventions.
+ *  Falls back to 'claude' (the project default provider) when no pattern matches. */
+export function inferProviderFromId(id: string): RegistryProviderNameExt {
+  const lid = id.toLowerCase().trim();
+  if (
+    lid.startsWith('claude') ||
+    lid.startsWith('opus') ||
+    lid.startsWith('sonnet') ||
+    lid.startsWith('haiku') ||
+    lid.startsWith('fable')
+  ) {
+    return 'claude';
+  }
+  if (lid.startsWith('gemini') || lid.startsWith('google')) {
+    return 'gemini';
+  }
+  // OpenAI / Codex: gpt-* plus the "o-series" reasoning models (o1/o3/o4/o5...).
+  if (lid.startsWith('gpt') || lid.startsWith('codex') || /^o\d/.test(lid)) {
+    return 'codex';
+  }
+  if (lid.startsWith('ollama') || lid.startsWith('llama') || lid.includes(':')) {
+    // `name:tag` shape (e.g. `qwen3:8b`) is the Ollama local-tag convention.
+    return 'ollama';
+  }
+  return 'claude';
+}
+
+/** Infer the capability tier from a model id using common naming conventions.
+ *  Token boundaries (`\b`) are used so a small-model token like `mini` is only
+ *  matched as a word — e.g. `gemini` (which contains the substring "mini") is
+ *  NOT mis-classified as economy. Defaults to 'standard' when no pattern matches. */
+export function inferTierFromId(id: string): ModelTier {
+  const lid = id.toLowerCase().trim();
+  // economy: explicit small-model tokens.
+  if (/\b(mini|nano)\b/.test(lid) || lid.includes('haiku')) {
+    return 'economy';
+  }
+  // premium_plus: top-tier reasoning / flagship tokens.
+  if (/\b(ultra|max|o3)\b/.test(lid)) {
+    return 'premium_plus';
+  }
+  // premium: flagship chat tokens.
+  if (lid.includes('opus') || /\bpro\b/.test(lid) || /\bgpt-?5\b/.test(lid)) {
+    return 'premium';
+  }
+  // standard: mid-tier tokens.
+  if (lid.includes('flash') || lid.includes('sonnet') || /\bgpt-?4/.test(lid)) {
+    return 'standard';
+  }
+  return 'standard';
+}
+
+/** Build a runtime-validated ModelDefinition for an arbitrary (possibly unknown)
+ *  model id. Provider and tier are inferred from the id unless overridden; the
+ *  remaining fields fall back to safe, neutral defaults. This is the parametric
+ *  core that lets the catalog accept new model ids without a code change. */
+export function buildParametricModel(
+  id: string,
+  opts: ParametricResolveOptions = {},
+): ModelDefinition {
+  const provider = opts.provider ?? (inferProviderFromId(id) as RegistryProviderName);
+  const def: ModelDefinition = {
+    id,
+    apiId: opts.apiId ?? id,
+    provider,
+    tier: opts.tier ?? inferTierFromId(id),
+    contextWindow: opts.contextWindow ?? 200_000,
+    costPerMillion: opts.costPerMillion ?? { input: 0, output: 0 },
+    capabilities: {
+      streaming: opts.capabilities?.streaming ?? true,
+      toolUse: opts.capabilities?.toolUse ?? true,
+      vision: opts.capabilities?.vision ?? false,
+      codeExecution: opts.capabilities?.codeExecution ?? false,
+      reasoning: opts.capabilities?.reasoning ?? false,
+    },
+    status: opts.status ?? 'ga',
+  };
+  if (opts.maxOutputTokens !== undefined) {
+    def.maxOutputTokens = opts.maxOutputTokens;
+  }
+  return def;
+}
+
 // ─── ModelRegistry Class ───────────────────────────────────────────────────
 
 export class ModelRegistry {
@@ -251,6 +317,29 @@ export class ModelRegistry {
       throw new DeckentError('E_UNKNOWN_MODEL', `Unknown model: ${id}`);
     }
     return model;
+  }
+
+  /**
+   * Parametric resolution (F1-PD) — the non-throwing counterpart of getOrThrow().
+   *
+   * Returns the catalog entry for `id` when present; otherwise synthesizes a
+   * runtime-validated ModelDefinition (provider + tier inferred from the id,
+   * every field overridable via `opts`) instead of rejecting an unknown / new
+   * model id. By default the synthesized entry is also registered so subsequent
+   * lookups (get / getOrThrow / resolveApiId / cost) treat it as first-class;
+   * pass `{ register: false }` to resolve without mutating the registry.
+   *
+   * This keeps the bundled catalog as the fallback while making it extensible:
+   * a brand-new model id is accepted without a code change.
+   */
+  resolve(id: string, opts: ParametricResolveOptions = {}): ModelDefinition {
+    const existing = this.models.get(id);
+    if (existing) return existing;
+    const def = buildParametricModel(id, opts);
+    if (opts.register ?? true) {
+      this.models.set(def.id, def);
+    }
+    return def;
   }
 
   has(id: string): boolean {

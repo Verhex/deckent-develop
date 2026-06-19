@@ -1419,6 +1419,10 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     brain_provider: config.brain_provider,
     worker_provider: config.worker_provider,
     fallback_provider: config.fallback_provider,
+    // F1-012 — carry grouped `providers` (incl. config-driven `registry`) so
+    // bootstrapProviders can register config-declared providers. Routing fields
+    // are already flattened above; this preserves `registry` for the registry loop.
+    providers: config.providers,
     // Sprint 220 Task 220-001 — optional native REPL provider override.
     chat_provider: (config as DeckentConfigWithChatProvider).chat_provider,
     // Native transport + BOT-1 bot-agent — pass through so loadConfig does not
@@ -2141,6 +2145,8 @@ export function mergeConfigs(
     version: config.version ?? DECKENT_VERSION,
     auto_docs: config.auto_docs ?? { ...DEFAULT_AUTO_DOCS },
     skills: config.skills,
+    // F1-012 — pass grouped `providers` (incl. config-driven `registry`) through.
+    providers: config.providers,
     // Sprint 220 Task 220-001 — optional native REPL provider override.
     chat_provider: (config as DeckentConfigWithChatProvider).chat_provider,
     // Sprint 179 W2-4: see resolveCoverageGates docstring for split semantics.
