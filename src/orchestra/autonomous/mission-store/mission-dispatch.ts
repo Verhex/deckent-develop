@@ -35,11 +35,37 @@ export interface MissionDispatchDeps {
   /** kind='capability' — non-code work (mail/db/http/erp) via a broker. Optional:
    *  when absent, capability items fail with a clear 'no capability broker' reason. */
   runCapability?: (target: unknown) => Promise<ResultLike>;
+  /** kind='process' — run a process (ordered multi-step composite) via an injected
+   *  runner. Optional: when absent, an inline `spec.steps[]` process is executed
+   *  step-by-step via runTask (sequential, fail-stop); with neither, the item fails
+   *  with a clear reason (no silent task-fallback). */
+  runProcess?: (spec: Record<string, unknown>) => Promise<ResultLike>;
 }
 
 /** Narrow an unknown spec value to a non-empty string, else undefined. */
 function str(v: unknown): string | undefined {
   return typeof v === 'string' && v.length > 0 ? v : undefined;
+}
+
+/** Build a MissionTaskContext from a spec-like object (the work item's spec, or a
+ *  single process step). Mirrors the task-branch rules: `description` falls back to
+ *  `fallbackId`; optional model/provider/scopeDir are omitted when absent. */
+function buildTaskContext(
+  projectRoot: string,
+  spec: Record<string, unknown>,
+  fallbackId: string,
+): MissionTaskContext {
+  const ctx: MissionTaskContext = {
+    projectRoot,
+    description: str(spec.description) ?? fallbackId,
+  };
+  const model = str(spec.model);
+  const provider = str(spec.provider);
+  const scopeDir = str(spec.scopeDir);
+  if (model) ctx.model = model;
+  if (provider) ctx.provider = provider;
+  if (scopeDir) ctx.scopeDir = scopeDir;
+  return ctx;
 }
 
 /**
@@ -49,27 +75,18 @@ function str(v: unknown): string | undefined {
  *   - 'task'       → runTask({ description, model?, provider?, scopeDir? } from spec)
  *   - 'sprint'     → runSprint(projectRoot, config); resolves → { ok: true }, throws → { ok: false }
  *   - 'capability' → runCapability(spec.capabilityTarget); no broker → { ok: false, 'no capability broker' }
- *   - 'process'    → { ok: false, 'process kind not yet wired' } (explicitly NOT a silent task-fallback)
+ *   - 'process'    → runProcess(spec) if injected; else inline spec.steps[] run sequentially
+ *                    via runTask (fail-stop); else { ok: false, <reason> } (NOT a silent task-fallback)
  *   - default      → { ok: false, 'unknown work item kind: <k>' } (runtime-malformed guard)
  */
 export function buildMissionDispatch(deps: MissionDispatchDeps): DispatchFn {
-  const { projectRoot, config, runTask, runSprint, runCapability } = deps;
+  const { projectRoot, config, runTask, runSprint, runCapability, runProcess } = deps;
 
   return async (item: WorkItem): Promise<ResultLike> => {
     const spec = item.spec ?? {};
     try {
       if (item.kind === 'task') {
-        const ctx: MissionTaskContext = {
-          projectRoot,
-          description: str(spec.description) ?? item.id,
-        };
-        const model = str(spec.model);
-        const provider = str(spec.provider);
-        const scopeDir = str(spec.scopeDir);
-        if (model) ctx.model = model;
-        if (provider) ctx.provider = provider;
-        if (scopeDir) ctx.scopeDir = scopeDir;
-        return await runTask(ctx);
+        return await runTask(buildTaskContext(projectRoot, spec, item.id));
       }
 
       if (item.kind === 'sprint') {
@@ -91,9 +108,29 @@ export function buildMissionDispatch(deps: MissionDispatchDeps): DispatchFn {
       }
 
       if (item.kind === 'process') {
-        // Phase-1: a process is an ordered, multi-step composite — running it as a
-        // single task would be a false success. Flag it explicitly until wired.
-        return { ok: false, reason: 'process kind not yet wired' };
+        // A process is an ordered, multi-step composite. Precedence (no silent fallback):
+        //   1. injected runProcess broker → delegate the whole spec to it.
+        //   2. inline spec.steps[] → run each step as a task-dispatch, sequential, fail-stop.
+        //   3. neither → explicit failure (a process with no runner and no steps is malformed).
+        if (runProcess) {
+          return await runProcess(spec);
+        }
+        const steps = Array.isArray(spec.steps) ? spec.steps : null;
+        if (!steps || steps.length === 0) {
+          return { ok: false, reason: 'process kind requires a runProcess broker or a non-empty spec.steps[]' };
+        }
+        for (let i = 0; i < steps.length; i++) {
+          const raw = steps[i];
+          if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+            return { ok: false, reason: `process step ${i + 1} is not an object` };
+          }
+          const ctx = buildTaskContext(projectRoot, raw as Record<string, unknown>, `${item.id}#step${i + 1}`);
+          const res = await runTask(ctx);
+          if (!res.ok) {
+            return { ok: false, reason: `process step ${i + 1} failed: ${res.reason ?? 'no reason'}` };
+          }
+        }
+        return { ok: true, reason: `process completed (${steps.length} steps)` };
       }
 
       // Runtime-malformed guard: WorkItemKind is a closed union at the type level,

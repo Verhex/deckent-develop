@@ -1055,6 +1055,38 @@ const MESSAGES: MessageMap = {
     tr: '  - [{status}] {id}: {title} (tür:{kind} politika:{policy})',
   },
 
+  // ─── autonomous-mission command (Sprint 296 — Task 296-001 i18n) ─────────
+  'autonomous_mission.create_list.created': {
+    en: 'Mission created: {id} — {title} ({count} item(s))',
+    tr: 'Misyon oluşturuldu: {id} — {title} ({count} madde)',
+  },
+  'autonomous_mission.create_goal.created': {
+    en: 'Goal mission created: {id} — {goal}',
+    tr: 'Hedef misyonu oluşturuldu: {id} — {goal}',
+  },
+  'autonomous_mission.list.empty': {
+    en: 'No autonomous missions found.',
+    tr: 'Otonom misyon bulunamadı.',
+  },
+  'autonomous_mission.list.header': {
+    en: 'Autonomous missions ({count}):',
+    tr: 'Otonom misyonlar ({count}):',
+  },
+  'autonomous_mission.items_file_error': {
+    en: 'Failed to load items file: {error}',
+    tr: 'Madde dosyası yüklenemedi: {error}',
+  },
+
+  // ─── mission deliver (mission-deliver.ts) ─────────────────────────────────
+  'mission.settled.title': {
+    en: 'Mission settled: {title}',
+    tr: 'Misyon tamamlandı: {title}',
+  },
+  'mission.settled.summary': {
+    en: 'Mission {id} finished with status: {status}',
+    tr: '{id} misyonu {status} durumuyla tamamlandı',
+  },
+
   // ─── memory backup subcommand ──────────────────────────────────
   'memory.backup.desc': {
     en: 'Create a WAL-safe backup of memory.db',

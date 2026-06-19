@@ -38,6 +38,39 @@ export interface GoalAdvanceDeps {
 }
 
 /**
+ * Real-world bindings for the goal-loop, named for what they actually are in
+ * production: a `planner` (e.g. realPlannerComplete-style — turns a goal +
+ * prior work into the next batch of work-items) and an `accepter` (an
+ * LLM/Brain-eval that decides whether the goal is reached). {@link buildGoalDeps}
+ * adapts these onto the loop's generic {@link GoalAdvanceDeps} surface
+ * (`author`/`accept`) consumed by {@link advanceGoalMission}.
+ */
+export interface GoalDeps {
+  /** Real planner — produce the next work-items for the goal given prior items. */
+  planner(goal: string, priorItems: WorkItem[]): Promise<NewWorkItem[]>;
+  /** Real acceptance evaluator (LLM / Brain-eval) — is the goal reached? */
+  accepter(goal: string, items: WorkItem[]): Promise<boolean>;
+  /** Infinite-loop guard, forwarded verbatim to {@link advanceGoalMission}. */
+  maxRounds?: number;
+}
+
+/**
+ * Inject-based adapter: bind a real `planner`/`accepter` (the production
+ * functions, wired at the composition root) onto the loop's `author`/`accept`
+ * interface. Intentionally thin — it exists so the live engine and the tests
+ * share ONE seam: production passes the real planner + Brain-eval; tests pass
+ * fakes. Keeping the names distinct (planner/accepter vs author/accept) lets the
+ * loop stay domain-agnostic while the call-site reads in real-world terms.
+ */
+export function buildGoalDeps(deps: GoalDeps): GoalAdvanceDeps {
+  return {
+    author: (goal, priorItems) => deps.planner(goal, priorItems),
+    accept: (goal, items) => deps.accepter(goal, items),
+    ...(deps.maxRounds !== undefined ? { maxRounds: deps.maxRounds } : {}),
+  };
+}
+
+/**
  * Type-2: create a `kind='goal'` mission (renderAs `goal`). The goal + acceptance
  * are persisted in the mission spec; the loop is driven by {@link advanceGoalMission}.
  */

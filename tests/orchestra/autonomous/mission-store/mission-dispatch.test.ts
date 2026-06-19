@@ -110,14 +110,55 @@ describe('buildMissionDispatch — capability', () => {
 });
 
 describe('buildMissionDispatch — process & unknown', () => {
-  it('flags process kind explicitly as not-yet-wired (no silent task-fallback)', async () => {
+  it('delegates kind=process to the injected runProcess broker with the full spec (runTask untouched)', async () => {
+    const seen: unknown[] = [];
+    let taskCalled = false;
+    const spec = { steps: [{ description: 'a' }], label: 'deploy' };
+    const dispatch = buildMissionDispatch(baseDeps({
+      runTask: async () => { taskCalled = true; return { ok: true }; },
+      runProcess: async (s) => { seen.push(s); return { ok: true, reason: 'process broker done' }; },
+    }));
+    const res = await dispatch(mkItem('process', spec));
+    expect(res).toEqual({ ok: true, reason: 'process broker done' });
+    expect(seen).toEqual([spec]);
+    expect(taskCalled).toBe(false); // broker owns the whole process — no per-step task dispatch
+  });
+
+  it('runs inline spec.steps[] sequentially as task-dispatches and reports ok when all pass', async () => {
+    const order: string[] = [];
+    const dispatch = buildMissionDispatch(baseDeps({
+      runTask: async (ctx) => { order.push(ctx.description); return { ok: true }; },
+    }));
+    const res = await dispatch(mkItem('process', {
+      steps: [{ description: 'step-one' }, { description: 'step-two' }, { description: 'step-three' }],
+    }));
+    expect(res).toEqual({ ok: true, reason: 'process completed (3 steps)' });
+    expect(order).toEqual(['step-one', 'step-two', 'step-three']); // sequential, in spec order
+  });
+
+  it('stops at the first failing step (fail-stop) and never runs later steps', async () => {
+    const order: string[] = [];
+    const dispatch = buildMissionDispatch(baseDeps({
+      runTask: async (ctx) => {
+        order.push(ctx.description);
+        return ctx.description === 'step-two' ? { ok: false, reason: 'boom' } : { ok: true };
+      },
+    }));
+    const res = await dispatch(mkItem('process', {
+      steps: [{ description: 'step-one' }, { description: 'step-two' }, { description: 'step-three' }],
+    }));
+    expect(res).toEqual({ ok: false, reason: 'process step 2 failed: boom' });
+    expect(order).toEqual(['step-one', 'step-two']); // step-three never reached
+  });
+
+  it('fails with an explicit reason when there is no runProcess broker and no steps (no silent task-fallback)', async () => {
     let taskCalled = false;
     const dispatch = buildMissionDispatch(baseDeps({
       runTask: async () => { taskCalled = true; return { ok: true }; },
     }));
-    const res = await dispatch(mkItem('process', { description: 'multi-step' }));
-    expect(res).toEqual({ ok: false, reason: 'process kind not yet wired' });
-    expect(taskCalled).toBe(false);
+    const res = await dispatch(mkItem('process', { description: 'multi-step' })); // no runProcess, no steps
+    expect(res).toEqual({ ok: false, reason: 'process kind requires a runProcess broker or a non-empty spec.steps[]' });
+    expect(taskCalled).toBe(false); // never silently degraded to a single task
   });
 
   it('reports an explicit reason for an unknown (runtime-malformed) kind', async () => {

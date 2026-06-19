@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -10,6 +10,11 @@ import {
 } from '../../../../src/orchestra/autonomous/mission-store/mission-engine-wire.js';
 import type { MissionTaskContext } from '../../../../src/orchestra/autonomous/mission-store/mission-dispatch.js';
 import type { MissionNotifyPayload } from '../../../../src/orchestra/autonomous/mission-store/mission-deliver.js';
+import {
+  createGoalMission,
+  buildGoalDeps,
+} from '../../../../src/orchestra/autonomous/mission-store/goal-mission.js';
+import type { NewWorkItem, WorkItem } from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
 import type { ResolvedConfig } from '../../../../src/core/config-types.js';
 
 // ── tmpdir lifecycle ──────────────────────────────────────────────────
@@ -180,5 +185,106 @@ describe('runV2Engine', () => {
     // Re-open to verify the engine persisted + completed the mission, then closed cleanly.
     const verify = openStore(r);
     expect(verify.getMission('mOwn')!.status).toBe('completed');
+  });
+});
+
+describe('runV2Engine — goal-driven (Type-2)', () => {
+  it('drives a goal mission end-to-end: author→item→scheduler→accept→completed', async () => {
+    const r = root();
+    const store = openStore(r);
+    createGoalMission(store, { id: 'gW', title: 'Goal Wire', goal: 'reach it', deliverTo: 'carol' });
+
+    // Fake planner: round-0 (no prior) authors one task item; later rounds dry.
+    // Fake accepter: once the work is done → goal reached.
+    const planner = vi.fn(async (_goal: string, prior: WorkItem[]): Promise<NewWorkItem[]> =>
+      prior.length === 0
+        ? [{ id: 'gW-step-1', missionId: 'gW', kind: 'task', spec: { description: 'goal step 1' } }]
+        : []);
+    const accepter = vi.fn(async () => true);
+
+    const ran: string[] = [];
+    const payloads: MissionNotifyPayload[] = [];
+    const deps: RunV2EngineDeps = {
+      runTask: async (ctx: MissionTaskContext) => { ran.push(ctx.description); return { ok: true }; },
+      runSprint: async () => undefined,
+      notify: (p) => { payloads.push(p); },
+      goalDeps: buildGoalDeps({ planner, accepter }),
+      store,
+      maxIterations: BOUNDED,
+    };
+
+    const summary = await runV2Engine(r, cfg({ engine: 'v2' }), deps);
+
+    // The authored work-item ran through the scheduler exactly once.
+    expect(ran).toEqual(['goal step 1']);
+    expect(store.listItems('gW').map((i) => i.status)).toEqual(['done']);
+
+    // The goal-loop (not the scheduler) settled the mission: accept → completed.
+    const mission = store.getMission('gW')!;
+    expect(mission.status).toBe('completed');
+    expect(mission.lastResult).toEqual({ ok: true });
+
+    // Planner consulted for the author round AND the dry round; accepter once.
+    expect(planner.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(accepter).toHaveBeenCalledTimes(1);
+
+    // Exactly ONE settle delivery for the goal mission (no spurious mid-round notify).
+    const goalPayloads = payloads.filter((p) => p.to === 'carol');
+    expect(goalPayloads).toHaveLength(1);
+    expect(goalPayloads[0]!.status).toBe('completed');
+
+    expect(summary.reason).toBe('drained');
+  });
+
+  it('fails a goal mission when the loop exhausts (author a round, then dry + reject → failed)', async () => {
+    const r = root();
+    const store = openStore(r);
+    createGoalMission(store, { id: 'gX', title: 'Goal Exhaust', goal: 'unreachable' });
+
+    const planner = vi.fn(async (_goal: string, prior: WorkItem[]): Promise<NewWorkItem[]> =>
+      prior.length === 0
+        ? [{ id: 'gX-step-1', missionId: 'gX', kind: 'task', spec: { description: 'try once' } }]
+        : []);
+    const accepter = vi.fn(async () => false);
+
+    const deps: RunV2EngineDeps = {
+      runTask: async () => ({ ok: true }),
+      runSprint: async () => undefined,
+      goalDeps: buildGoalDeps({ planner, accepter }),
+      store,
+      maxIterations: BOUNDED,
+    };
+    await runV2Engine(r, cfg({ engine: 'v2' }), deps);
+
+    // First round ran, then planner went dry and accepter rejected → exhausted/failed.
+    expect(store.listItems('gX').map((i) => i.status)).toEqual(['done']);
+    const mission = store.getMission('gX')!;
+    expect(mission.status).toBe('failed');
+    expect(mission.lastResult).toEqual({ ok: false, reason: 'goal not reached, no further work' });
+    expect(accepter).toHaveBeenCalledTimes(1);
+  });
+
+  it('still drives plain list missions when goalDeps is present (no regression)', async () => {
+    const r = root();
+    const store = openStore(r);
+    store.createMission({ id: 'mL', kind: 'list', title: 'List', renderAs: 'checklist' });
+    store.enqueueItem({ id: 'mL-0', missionId: 'mL', kind: 'task', spec: { description: 'list work' } });
+
+    const planner = vi.fn(async (): Promise<NewWorkItem[]> => []);
+    const accepter = vi.fn(async () => false);
+
+    const ran: string[] = [];
+    const deps: RunV2EngineDeps = {
+      runTask: async (ctx: MissionTaskContext) => { ran.push(ctx.description); return { ok: true }; },
+      runSprint: async () => undefined,
+      goalDeps: buildGoalDeps({ planner, accepter }),
+      store,
+      maxIterations: BOUNDED,
+    };
+    const summary = await runV2Engine(r, cfg({ engine: 'v2' }), deps);
+
+    expect(ran).toEqual(['list work']);
+    expect(store.getMission('mL')!.status).toBe('completed');
+    expect(summary.dispatched).toBe(1);
   });
 });

@@ -1,15 +1,45 @@
-# DIRECTIVES — Sprint: Autonomous v2 FULL (cutover + Type-1/Type-2 + deliver + API + CLI + dashboard)
+# DIRECTIVES — Sprint: Autonomous v2 follow-ups (i18n + MissionsPage route + process-kind + goal-loop real-planner)
 
-## Goal: Autonomous-v2'yi tek sprint'te tam kapsamlı tamamla. MissionStore (sprint-293) + MissionScheduler (sprint-294) zaten kurulu (`src/orchestra/autonomous/mission-store/`). Bu sprint geri kalan HER ŞEYİ ekler: real-dispatch, Type-1 list-ingest, Type-2 goal-loop, deliver-channel, mission API, mission CLI, dashboard mission-view, ve **flag-gated cutover** (canlı autonomous'a v2-engine'i bağla, default v1 → güvenli). 8 task, 2 wave (Wave-1 5 additive modül paralel; Wave-2 3 entegrasyon deps'li). max_workers=8 → bol paralel. Her task **god-level, no-MVP, no-tech-debt, TDD, gerçek-davranış testi, i18n-first**.
+## Goal: Autonomous-v2'nin canlı-e2e'de + audit'te bulunan 4 açık-ucunu kapat. (1) **i18n-fix**: `autonomous-mission` CLI ham-key basıyor (messages.ts'te `autonomous_mission.*` = 0 tanımlı) → en/tr string ekle. (2) **MissionsPage route/nav**: component var ama dashboard route'una/nav'ına bağlı değil. (3) **dispatch process-kind**: şu an dürüst `{ok:false,'not yet wired'}` → gerçek process-execution. (4) **goal-loop real-planner**: Type-2 author/accept'i gerçek planner'a bağla + runV2Engine'de goal-mission'ları sür. 4 task **paralel** (distinct files, dep yok). Her task god-level, TDD, i18n-first, no-tech-debt. max_workers=8.
 
 ## Ortak kurallar (BAĞLAYICI)
-- **Mevcut modülleri tüket** — `src/orchestra/autonomous/mission-store/`: `mission-types.js` (MissionStore, WorkItem, Mission, ResultLike, MissionView), `sqlite-mission-store.js` (SqliteMissionStore), `mission-scheduler.js` (runMissionScheduler, DispatchFn, MissionSchedulerOptions), `mission-events.js`, `mission-view.js` (projectMission), `mission-migrate.js` (migrateBacklogJson). Spec: `docs/superpowers/specs/2026-06-19-autonomous-v2-store-design.md` + `...-scheduler-design.md`.
-- **Cerrahi scope** — yalnız Files/Scope. **ESM** `.js` import-suffix. **i18n-first** — user-facing string → `getMessage(key, lang)` (`src/cli/helpers/messages.ts`, en/tr), hardcode YASAK. **Dashboard EMOJI YASAK** → lucide-react ikon. **better-sqlite3 zaten dep** (yeni dep yok). **Hermetik test** (tmpdir-db, afterEach, no spawnSync, ≤5ms timer). **Execution-agnostic** — runTask/runSprint/planner/notify **inject** edilir, testler fake verir. `tsc --noEmit` temiz, mevcut suite yeşil. **No haiku.**
-- **Cutover GÜVENLİ:** canlı `autonomous.ts`/`runtime-loop.ts` davranışı **flag default'ta DEĞİŞMEZ** (`config.autonomous.engine` yoksa/`'v1'` → eski loop). v2 yalnız `engine==='v2'`'de aktif. Minimal canlı-dosya diff'i — ağır iş yeni modülde.
+- **Mevcut v2 modüllerini tüket** (`src/orchestra/autonomous/mission-store/`). **Cerrahi scope** — yalnız Files/Scope. **ESM** `.js`. **i18n-first** — user-facing string → getMessage(key,lang) gerçekten TANIMLI olmalı (ham-key YASAK — bu sprint'in ana dersi). **Dashboard EMOJI YASAK** → lucide-react. **Hermetik test** (tmpdir, afterEach, no spawnSync). **Proof-of-function** — user-surface (CLI/dashboard) testleri **rendered-string'i** assert etsin, yalnız key'i değil. `tsc --noEmit` temiz, mevcut suite yeşil. **No haiku.**
 
 ---
 
-## Task 1: Real DispatchFn — item.kind → execute (Wave 1)
+## Task 1: i18n — autonomous-mission CLI rendered strings
+- Model: sonnet
+- Effort: normal
+- Agent: architect
+- Skills: typescript-expert
+- Files: src/cli/helpers/messages.ts, tests/cli/autonomous-mission.test.ts
+- Scope: src/cli/helpers/, tests/cli/
+
+### Description
+`autonomous-mission` CLI'ın kullandığı TÜM `getMessage` key'lerini bul (`grep -oE "getMessage\('([^']+)'" src/cli/commands/autonomous-mission.ts`) ve `messages.ts`'e **en + tr** string'lerini ekle — create_list.created, create_goal.created, list.header, ve diğerleri (boş-liste, hata, başlık vb.). String'ler anlamlı + i18n-temiz (en default, tr çevirisi). Mevcut messages.ts deseni (key→{en,tr}) referans. Ayrıca diğer v2-surface'lerin (api/deliver) getMessage key'lerini de tara — eksik varsa ekle. Testte **rendered string'i** assert et (ham-key DEĞİL) — örn. `expect(out).not.toContain('autonomous_mission.')` + beklenen-metin içeriyor.
+
+**Kanıt:** `grep -c "autonomous_mission" src/cli/helpers/messages.ts` → >0 (tüm key'ler tanımlı); `node dist/cli/entry.js autonomous-mission list` ham-key basmaz (CC build-sonrası doğrular).
+**Test:** mevcut autonomous-mission testine 2+ assertion ekle — çıktı ham-key içermez (`not.toContain('autonomous_mission.')`), beklenen okunabilir-metin içerir. Gerçek getMessage çözümünü assert et.
+
+---
+
+## Task 2: Dashboard MissionsPage route + nav wire
+- Model: sonnet
+- Effort: normal
+- Agent: frontend-designer
+- Skills: react-specialist, frontend-design
+- Files: src/dashboard/src/App.tsx, src/dashboard/src/App.test.tsx
+- Scope: src/dashboard/src/
+
+### Description
+`MissionsPage` (zaten var, `src/dashboard/src/pages/MissionsPage.tsx`) dashboard **route + nav**'ına bağlı değil → erişilemiyor. `App.tsx`'e `/missions` route'u + nav-item ("Missions", **i18n stable-id**, lucide ikon, EMOJI YASAK) ekle. Mevcut route/nav desenini (diğer pages nasıl ekli) referans al — aynı pattern. Nav-label i18n (dashboard i18n sistemi). Lazy-import gerekiyorsa mevcut desen.
+
+**Kanıt:** `grep -n "MissionsPage\|/missions" src/dashboard/src/App.tsx` → route+nav eklendi; `npm run test:dashboard` ilgili test yeşil.
+**Test:** App.test.tsx'e 1+ test — nav'da "Missions" item render olur / `/missions` route MissionsPage'i mount eder. React Testing Library, gerçek render.
+
+---
+
+## Task 3: dispatch process-kind — real process execution
 - Model: opus
 - Effort: high
 - Agent: architect
@@ -18,127 +48,27 @@
 - Scope: src/orchestra/autonomous/mission-store/, tests/orchestra/autonomous/mission-store/
 
 ### Description
-`buildMissionDispatch(deps): DispatchFn` — bir WorkItem'ı kind'ine göre çalıştıran gerçek dispatch'i kurar (scheduler bunu inject olarak alır). deps inject: `runTask(ctx): Promise<{ok,reason?}>`, `runSprint(projectRoot,config): Promise<unknown>`, `runCapability(target): Promise<{ok,reason?}>` (opsiyonel; yoksa capability → `{ok:false,reason:'no capability broker'}`). Map: `kind='task'` → runTask(item.spec.description...) ; `kind='sprint'` → runSprint (throw → `{ok:false}`, yoksa `{ok:true}`) ; `kind='capability'` → runCapability(item.spec.capabilityTarget) ; `kind='process'` → şimdilik runTask-fallback veya `{ok:false,reason:'process kind not yet wired'}` (açıkça işaretle). Dönen `ResultLike`. Execute-dispatcher'ın (`execute-dispatcher.ts`) kind-branch mantığını referans al ama **canlı dosyaya dokunma** — bu yeni, inject-tabanlı, test-edilebilir bir builder.
+`buildMissionDispatch`'te `kind='process'` şu an `{ok:false,'process kind not yet wired'}`. **Gerçek process-execution'a bağla:** bir process = sıralı multi-step composite. `deps.runProcess(spec): Promise<{ok,reason?}>` inject seçeneği ekle (varsa kullan); YOKSA process'i item.spec'teki step'leri sırayla işleyen bir composite olarak ele al (her step bir task-dispatch → ilk-fail'de dur, hepsi-ok→ok) — VEYA mevcut `src/cli/commands/process.ts` / process-mode executor desenini referans alıp inject-tabanlı bir runner. Backward-compat: `deps.runProcess` yoksa + step yoksa → açık `{ok:false,reason}` (silent-fallback YOK). Mevcut 4 dispatch testini bozma.
 
-**Kanıt:** `grep -n "buildMissionDispatch\|kind === 'sprint'\|kind === 'capability'" src/orchestra/autonomous/mission-store/mission-dispatch.ts` → eklendi; test yeşil.
-**Test:** 4+ gerçek-davranış testi (task→runTask çağrılır+ok; sprint→runSprint throw→{ok:false}, ok→{ok:true}; capability→broker; bilinmeyen/process→açık reason). Fake deps inject et, çağrıları assert et.
-
----
-
-## Task 2: Type-1 list ingestion (Wave 1)
-- Model: sonnet
-- Effort: normal
-- Agent: architect
-- Skills: typescript-expert
-- Files: src/orchestra/autonomous/mission-store/mission-ingest.ts, tests/orchestra/autonomous/mission-store/mission-ingest.test.ts
-- Scope: src/orchestra/autonomous/mission-store/, tests/orchestra/autonomous/mission-store/
-
-### Description
-`createListMission(store, spec): Mission` — Tip-1: N-maddelik bir listeyi bir `kind='list'` Mission + N `work_item`'a çevirir. spec: `{ id, title, tenant?, deliverTo?, items: Array<{ id?, kind, spec?, policy? }> }`. Mission'ı `store.createMission` ile (renderAs 'checklist'), her item'ı `store.enqueueItem` ile (missionId = mission.id, item.id verilmezse `${missionId}-${index}` türet) ekler. Dönen Mission. Boş `items` → mission yine oluşur (0 item, hemen-complete edilebilir — scheduler settle eder). Idempotent değil gerekmez ama dup id → store ON CONFLICT DO NOTHING zaten korur.
-
-**Kanıt:** `grep -n "createListMission" src/orchestra/autonomous/mission-store/mission-ingest.ts` → eklendi; test yeşil.
-**Test:** 3+ test (20-maddelik liste → 1 list-mission + 20 pending work-item; item.id türetme; tenant/deliverTo taşınır). Gerçek SqliteMissionStore (tmpdir) ile assert.
+**Kanıt:** `grep -n "runProcess\|kind === 'process'" src/orchestra/autonomous/mission-store/mission-dispatch.ts` → gerçek-wire eklendi; test yeşil.
+**Test:** 2+ yeni test (process + runProcess inject → çağrılır+ok; process step-listesi → sıralı, fail-stop; runProcess yok+step yok → açık reason). Mevcut dispatch testleri yeşil kalır.
 
 ---
 
-## Task 3: Type-2 goal-loop — author + acceptance (Wave 1)
+## Task 4: goal-loop real-planner wire + engine drive
 - Model: opus
 - Effort: high
 - Agent: architect
 - Skills: typescript-expert
-- Files: src/orchestra/autonomous/mission-store/goal-mission.ts, tests/orchestra/autonomous/mission-store/goal-mission.test.ts
-- Scope: src/orchestra/autonomous/mission-store/, tests/orchestra/autonomous/mission-store/
-- Dependencies: 295-002
-
-### Description
-Tip-2: "tamamlanana kadar çalış". İki fonksiyon: (a) `createGoalMission(store, spec): Mission` — `kind='goal'` mission oluşturur (renderAs 'goal', spec.goal + spec.acceptance). (b) `advanceGoalMission(store, missionId, deps): Promise<'authored'|'accepted'|'exhausted'>` — goal-loop'un BİR adımı: mission'ın açık (pending/running) item'ı yoksa → `deps.author(goal, priorItems): Promise<NewWorkItem[]>` (inject edilen planner) ile sonraki work-item'ları üretir + enqueue eder ('authored'); üretmezse `deps.accept(goal, items): Promise<boolean>` (inject acceptance) ile goal tamam mı bak → tamam ise `updateMissionStatus(completed)` ('accepted'), değil + yeni-item-yok ise 'exhausted' (updateMissionStatus failed, reason 'goal not reached, no further work'). `deps.maxRounds` guard (sonsuz döngü koruması). **author/accept inject** → test fake verir (gerçek planner cutover'da bağlanır). Bu modül goal-loop'un mantığı; scheduler item'ları koşturur, bu fonksiyon round'ları sürer.
-
-**Kanıt:** `grep -n "createGoalMission\|advanceGoalMission\|author\|accept" src/orchestra/autonomous/mission-store/goal-mission.ts` → eklendi; test yeşil.
-**Test:** 4+ test (createGoalMission goal-mission; advance açık-item-yok+author→yeni item 'authored'; author boş + accept true → 'accepted' completed; accept false + author boş → 'exhausted' failed; açık-item varken advance no-op). Fake author/accept inject, gerçek store ile assert.
-
----
-
-## Task 4: Deliver-channel — onMissionSettled → notify (Wave 1)
-- Model: sonnet
-- Effort: normal
-- Agent: architect
-- Skills: typescript-expert
-- Files: src/orchestra/autonomous/mission-store/mission-deliver.ts, tests/orchestra/autonomous/mission-store/mission-deliver.test.ts
+- Files: src/orchestra/autonomous/mission-store/goal-mission.ts, src/orchestra/autonomous/mission-store/mission-engine-wire.ts, tests/orchestra/autonomous/mission-store/goal-mission.test.ts, tests/orchestra/autonomous/mission-store/mission-engine-wire.test.ts
 - Scope: src/orchestra/autonomous/mission-store/, tests/orchestra/autonomous/mission-store/
 
 ### Description
-`makeMissionDeliver(deps)` → bir `onMissionSettled(mission)` handler döner (scheduler'a `MissionSchedulerOptions.onMissionSettled` olarak verilir). Settle olan mission'ı `deps.notify({ to: mission.deliverTo, title, status, summary }): void|Promise<void>` (inject — gerçekte notification-dispatcher) ile user/authority'ye iletir. `deliverTo` yoksa default kanal (notify to:null). Hata fail-safe (notify throw → yut, log). i18n: bildirim metni `getMessage` üzerinden (en default). Mevcut `src/core/notification-dispatcher.ts` desenini referans al ama inject-tabanlı kal (canlı dosyaya dokunma).
+Type-2 goal-mission'ları CANLI sürülebilir yap. (a) `goal-mission.ts`'e `buildGoalDeps(deps)` helper ekle — `author`'ı gerçek planner'a (`deps.planner(goal, priorItems): Promise<NewWorkItem[]>`, örn. realPlannerComplete-tarzı) ve `accept`'i bir değerlendiriciye (`deps.accepter(goal, items): Promise<boolean>`, LLM/Brain-eval) bağlayan inject-tabanlı bir adapter; maxRounds guard. (b) `mission-engine-wire.ts` `runV2Engine`'e **goal-driver** ekle: scheduler tick'leri arasında, açık-item'ı olmayan her `kind='goal'` active-mission için `advanceGoalMission(store, missionId, goalDeps)` çağır (author→enqueue yeni item'lar → scheduler koşturur; accept→complete; exhausted→failed). Planner/accepter **inject** (gerçek bağlama composition-root'ta; testler fake). Mevcut goal-mission + engine-wire testlerini bozma.
 
-**Kanıt:** `grep -n "makeMissionDeliver\|onMissionSettled\|deliverTo" src/orchestra/autonomous/mission-store/mission-deliver.ts` → eklendi; test yeşil.
-**Test:** 3+ test (completed mission → notify çağrılır doğru payload; deliverTo null → default; notify throw → handler yutar, fırlatmaz). Fake notify inject, çağrı assert.
-
----
-
-## Task 5: Mission API endpoints (Wave 1)
-- Model: sonnet
-- Effort: normal
-- Agent: api-builder
-- Skills: api-builder, typescript-expert
-- Files: src/api/missions-route.ts, tests/api/missions-route.test.ts
-- Scope: src/api/, tests/api/
-
-### Description
-Auth-gated read-only mission endpoint'leri: `GET /api/missions` → `{ missions: MissionView[] }` (store.listMissions → her biri projectMission ile MissionView); `GET /api/missions/:id` → MissionView | 404. MissionStore'u inject/lazy-aç (proje-root'tan autonomous.db; yoksa boş liste — fail-safe). Mevcut api desenini (`src/api/`) + auth-gate'i referans al. user-facing hata mesajı yok (JSON). **Tier-1 user-surface** — gerçek-served-JSON assert eden test (mock-only YASAK).
-
-**Kanıt:** `grep -n "/api/missions\|projectMission\|listMissions" src/api/missions-route.ts` → eklendi; test yeşil.
-**Test:** 3+ test (boş store → {missions:[]}; 2 mission → MissionView listesi doğru shape+render_as; /:id 404). Gerçek store (tmpdir) + gerçek route handler assert.
+**Kanıt:** `grep -n "buildGoalDeps\|advanceGoalMission\|goal-driver\|planner" src/orchestra/autonomous/mission-store/goal-mission.ts src/orchestra/autonomous/mission-store/mission-engine-wire.ts` → eklendi; test yeşil.
+**Test:** 3+ yeni test (buildGoalDeps author→planner çağrılır+enqueue; runV2Engine goal-mission idle → advance çağrılır, author→item→scheduler→accept→completed uçtan-uca fake-planner ile; exhausted→failed). Gerçek store (tmpdir) + fake planner/accepter inject, uçtan-uca assert.
 
 ---
 
-## Task 6: Dashboard Missions page (Wave 2)
-- Model: sonnet
-- Effort: normal
-- Agent: frontend-designer
-- Skills: react-specialist, frontend-design
-- Files: src/dashboard/src/pages/MissionsPage.tsx, src/dashboard/src/pages/MissionsPage.test.tsx
-- Scope: src/dashboard/src/pages/, src/dashboard/src/
-- Dependencies: 295-005
-
-### Description
-`/api/missions`'ı tüketen Missions sayfası — mission listesi, her biri `render_as`'e göre görsel rozet (sprint/workflow/task/goal/checklist) + progress (done/total) + status. **EMOJI YASAK → lucide-react ikon.** i18n (t/getMessage). Mevcut dashboard sayfa-desenini (diğer pages/) + nav-register'ı referans al (gerekirse nav'a "Missions" ekle — i18n stable-id). Veri-fetch + render mantığını **unit-test** et (mock fetch data ile MissionView listesi → doğru rozet/progress render). Tam-görsel polish CC build-sonrası doğrular.
-
-**Kanıt:** `grep -n "MissionsPage\|render_as\|lucide" src/dashboard/src/pages/MissionsPage.tsx` → eklendi; `npm run test:dashboard` ilgili test yeşil.
-**Test:** 2+ test (MissionView[] mock → her mission doğru render_as-rozet + progress; boş → empty-state). React Testing Library, gerçek component render.
-
----
-
-## Task 7: Cutover — flag-gated v2 engine wire (Wave 2)
-- Model: opus
-- Effort: high
-- Agent: architect
-- Skills: typescript-expert
-- Files: src/orchestra/autonomous/mission-store/mission-engine-wire.ts, src/cli/commands/autonomous.ts, tests/orchestra/autonomous/mission-store/mission-engine-wire.test.ts
-- Scope: src/orchestra/autonomous/mission-store/, src/cli/commands/, tests/orchestra/autonomous/
-- Dependencies: 295-001, 295-003, 295-004
-
-### Description
-v2-engine'i canlıya bağla — **flag-gated, default-off (güvenli).** (a) Yeni `mission-engine-wire.ts`: `runV2Engine(projectRoot, config, deps): Promise<MissionSchedulerSummary>` — `SqliteMissionStore` aç+migrate, boot'ta `migrateBacklogJson(projectRoot, store)` (backlog→store), `buildMissionDispatch` (Task 1, gerçek runTask/runSprint inject) + `makeMissionDeliver` (Task 4) → `runMissionScheduler(store, dispatch, { poolSize: config.autonomous.pool_size ?? max_workers, intervalMs, signal, onMissionSettled })`. (b) `autonomous.ts`'te **minimal flag-branch**: `if (config.autonomous?.engine === 'v2') { ...runV2Engine...; return }` — eski yol (engine yoksa/'v1') AYNEN kalır (mevcut testler yeşil). Ağır iş wire-modülde; autonomous.ts diff'i minimal. config-types'a `engine?: 'v1'|'v2'` ekle (gerekirse Task ayrı tutar — burada inline minimal).
-
-**Kanıt:** `grep -n "runV2Engine\|engine === 'v2'\|migrateBacklogJson" src/orchestra/autonomous/mission-store/mission-engine-wire.ts src/cli/commands/autonomous.ts` → eklendi; v1 default davranış değişmez (mevcut autonomous testleri yeşil).
-**Test:** 3+ test (runV2Engine: store-aç+migrate+scheduler-koş, fake dispatch ile mission-complete; flag yok → v1 path seçilir [autonomous.ts branch testi mümkünse, yoksa runV2Engine unit]; backlog→store migration boot'ta çağrılır). Gerçek store (tmpdir) + fake runTask/runSprint inject.
-
----
-
-## Task 8: CLI — deckent autonomous mission (Wave 2)
-- Model: sonnet
-- Effort: normal
-- Agent: architect
-- Skills: typescript-expert
-- Files: src/cli/commands/autonomous-mission.ts, src/cli/index.ts, tests/cli/autonomous-mission.test.ts
-- Scope: src/cli/commands/, src/cli/, tests/cli/
-- Dependencies: 295-002, 295-003
-
-### Description
-Yeni CLI komut grubu `deckent autonomous-mission` (autonomous.ts'e DOKUNMA — ayrı dosya, `index.ts` buildProgram'a `registerAutonomousMission` ekle): `create-list <title>` (+ `--item kind:spec` tekrarlı veya `--items-file json`) → `createListMission` (Task 2); `create-goal <goal>` (+ `--accept`, `--deliver-to`) → `createGoalMission` (Task 3); `list` → store.listMissions tablo (MissionView özet). i18n-first (getMessage). Mevcut command-register desenini (`register<Name>(program)`, ADR-012) + `autonomous.ts`'in store-aç desenini referans al. Komut çıktısı i18n + canlı-veri (store'dan).
-
-**Kanıt:** `grep -n "registerAutonomousMission\|create-list\|create-goal\|createListMission\|createGoalMission" src/cli/commands/autonomous-mission.ts src/cli/index.ts` → eklendi; test yeşil. `node dist/cli/entry.js autonomous-mission --help` → komutlar listelenir (CC build-sonrası doğrular).
-**Test:** 3+ test (create-list → store'da list-mission+items; create-goal → goal-mission; list → mevcut mission'ları basar). Gerçek store (tmpdir) + komut-handler çağır, i18n key kullanımını assert.
-
----
-
-**Beklenen:** Wave-1 (295-001..005, 5 paralel additive modül — distinct files, collision yok) → Wave-2 (295-006 dashboard[dep 005], 295-007 cutover[dep 001/003/004], 295-008 CLI[dep 002/003]). max_workers=8 → Wave-1 5-paralel. Sprint-sonu: `tsc --noEmit` temiz; `npx vitest run tests/orchestra/autonomous/ tests/api/ tests/cli/` + `npm run test:dashboard` → yeni testler + mevcut suite yeşil; v1-default autonomous davranışı korunur. CC disk-verify + (user-surface) build-sonrası smoke.
+**Beklenen:** 4 task paralel (distinct files: messages.ts / App.tsx / mission-dispatch.ts / goal-mission+engine-wire — collision yok). Sprint-sonu: `tsc --noEmit` temiz; `npx vitest run tests/orchestra/autonomous/ tests/cli/` + `npm run test:dashboard` → yeni+mevcut testler yeşil; ham-key kalmaz. CC disk-verify + canlı-binary smoke (autonomous-mission list temiz-string; engine:'v2' goal-mission uçtan-uca).

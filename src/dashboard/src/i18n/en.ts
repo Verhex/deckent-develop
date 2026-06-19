@@ -10,6 +10,7 @@ export const en = {
   'nav.evolution': 'Evolution',
   'nav.nervous': 'Nervous',
   'nav.autonomous': 'Autonomous',
+  'nav.missions': 'Missions',
   'nav.memory_explorer': 'Memory Explorer',
   'nav.enterprise': 'Enterprise',
   'nav.group.talk': 'Talk',

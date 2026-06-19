@@ -68,9 +68,9 @@ describe('handleCreateList', () => {
       handleCreateList({ root, lang: 'en', title: 'My List', items, id: 'list-cli-001' }),
     );
 
-    // getMessage falls back to the key string when key is not in MESSAGES yet —
-    // verify the i18n scaffold is in use (key prefix in output)
-    expect(out).toContain('autonomous_mission');
+    // getMessage resolves the key — no ham-key in output, readable string present
+    expect(out).not.toContain('autonomous_mission.');
+    expect(out).toContain('Mission created: list-cli-001');
 
     // verify in store
     const store = newStore(root);
@@ -125,8 +125,9 @@ describe('handleCreateList', () => {
         id: 'list-tr-001',
       }),
     );
-    // getMessage uses the key as fallback — verify i18n scaffold is in use
-    expect(out).toContain('autonomous_mission');
+    // getMessage resolves the key — no ham-key in output, readable Turkish string present
+    expect(out).not.toContain('autonomous_mission.');
+    expect(out).toContain('Misyon oluşturuldu: list-tr-001');
   });
 });
 
@@ -143,8 +144,9 @@ describe('handleCreateGoal', () => {
       }),
     );
 
-    // getMessage uses the key as fallback — verify i18n scaffold is in use
-    expect(out).toContain('autonomous_mission');
+    // getMessage resolves the key — no ham-key, readable English string present
+    expect(out).not.toContain('autonomous_mission.');
+    expect(out).toContain('Goal mission created: goal-cli-001');
 
     const store = newStore(root);
     try {
@@ -196,8 +198,10 @@ describe('handleListMissions', () => {
   it('prints empty message when no db exists', () => {
     const root = mkRoot();
     const out = captureOutput(() => handleListMissions({ root, lang: 'en' }));
-    // should not throw; should print empty message key or fallback
+    // should not throw; should print resolved i18n string (not ham-key)
     expect(out.length).toBeGreaterThan(0);
+    expect(out).not.toContain('autonomous_mission.');
+    expect(out).toContain('No autonomous missions found.');
   });
 
   it('lists existing missions as a table', () => {

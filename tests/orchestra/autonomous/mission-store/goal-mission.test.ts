@@ -6,6 +6,7 @@ import { SqliteMissionStore } from '../../../../src/orchestra/autonomous/mission
 import {
   createGoalMission,
   advanceGoalMission,
+  buildGoalDeps,
 } from '../../../../src/orchestra/autonomous/mission-store/goal-mission.js';
 import type { NewWorkItem, WorkItem } from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
 
@@ -183,6 +184,76 @@ describe('advanceGoalMission', () => {
     const accept = vi.fn(async () => false);
 
     await expect(advanceGoalMission(store, 'missing', { author, accept })).rejects.toThrow(/goal mission not found/);
+
+    store.close();
+  });
+});
+
+describe('buildGoalDeps', () => {
+  it('adapts planner→author: planner is invoked and its items are enqueued', async () => {
+    const store = newStore();
+    createGoalMission(store, { id: 'g-bd', title: 'BuildDeps', goal: 'reach it' });
+
+    const planner = vi.fn(async (_goal: string, _prior: WorkItem[]): Promise<NewWorkItem[]> => [
+      { id: 'g-bd-1', missionId: 'g-bd', kind: 'task', spec: { description: 'planned step' } },
+    ]);
+    const accepter = vi.fn(async () => false);
+
+    const goalDeps = buildGoalDeps({ planner, accepter });
+    const outcome = await advanceGoalMission(store, 'g-bd', goalDeps);
+
+    expect(outcome).toBe('authored');
+    expect(planner).toHaveBeenCalledTimes(1);
+    expect(planner).toHaveBeenCalledWith('reach it', []);
+    expect(accepter).not.toHaveBeenCalled();
+
+    const items = store.listItems('g-bd');
+    expect(items).toHaveLength(1);
+    expect(items[0].id).toBe('g-bd-1');
+    expect(items[0].status).toBe('pending');
+    expect(items[0].missionId).toBe('g-bd');
+
+    store.close();
+  });
+
+  it('adapts accepter→accept: when the planner is dry, the accepter decides completion', async () => {
+    const store = newStore();
+    createGoalMission(store, { id: 'g-bd-acc', title: 'Accept', goal: 'reach' });
+
+    const planner = vi.fn(async (): Promise<NewWorkItem[]> => []);
+    const accepter = vi.fn(async () => true);
+
+    const outcome = await advanceGoalMission(store, 'g-bd-acc', buildGoalDeps({ planner, accepter }));
+
+    expect(outcome).toBe('accepted');
+    expect(planner).toHaveBeenCalledTimes(1);
+    expect(accepter).toHaveBeenCalledTimes(1);
+    expect(accepter).toHaveBeenCalledWith('reach', []);
+    expect(store.getMission('g-bd-acc')!.status).toBe('completed');
+
+    store.close();
+  });
+
+  it('forwards maxRounds to the loop guard (planner not consulted past the cap)', async () => {
+    const store = newStore();
+    createGoalMission(store, { id: 'g-bd-max', title: 'Max', goal: 'g' });
+    store.enqueueItem({ id: 'g-bd-max-1', missionId: 'g-bd-max', kind: 'task' });
+    store.updateItemStatus('g-bd-max-1', 'done', { ok: true });
+
+    const planner = vi.fn(async (): Promise<NewWorkItem[]> => [
+      { id: 'never', missionId: 'g-bd-max', kind: 'task' },
+    ]);
+    const accepter = vi.fn(async () => false);
+
+    const outcome = await advanceGoalMission(
+      store,
+      'g-bd-max',
+      buildGoalDeps({ planner, accepter, maxRounds: 1 }),
+    );
+
+    expect(outcome).toBe('exhausted');
+    expect(planner).not.toHaveBeenCalled();
+    expect(store.getMission('g-bd-max')!.status).toBe('failed');
 
     store.close();
   });

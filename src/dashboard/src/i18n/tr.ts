@@ -12,6 +12,7 @@ export const tr: Record<TranslationKey, string> = {
   'nav.evolution': 'Evrim',
   'nav.nervous': 'Sinir Sistemi',
   'nav.autonomous': 'Otonom',
+  'nav.missions': 'Görevler',
   'nav.memory_explorer': 'Hafıza Gezgini',
   'nav.enterprise': 'Kurumsal',
   'nav.group.talk': 'Konuş',
