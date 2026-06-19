@@ -52,6 +52,7 @@ import type { BacklogEntry } from '../../orchestra/autonomous/backlog-types.js';
 import { runTaskMode } from '../../orchestra/task-mode-runner.js';
 import { runSprint as runSprintLifecycle } from '../../orchestra/sprint-controller.js';
 import { waitForRunResult } from './run.js';
+import { isV2Engine, runV2Engine } from '../../orchestra/autonomous/mission-store/mission-engine-wire.js';
 import { loadConfig } from '../../core/config.js';
 import { PROJECT_CONFIG_PATH, RECENT_WORKS_DIR } from '../../core/constants.js';
 import { bootstrapProviders } from '../../core/provider.js';
@@ -379,6 +380,56 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
   const resolvedConfig = await loadConfig(root);
   if (!resolvedConfig.autonomous?.enabled) {
     print(getMessage('autonomous.disabled', lang));
+    return;
+  }
+
+  // ── Autonomous-v2 cutover (flag-gated, DEFAULT-OFF) ──────────────────
+  // Only `config.autonomous.engine === 'v2'` routes to the MissionStore +
+  // MissionScheduler runtime; the entire v1 path below stays byte-for-byte
+  // unchanged when the flag is absent/'v1' (existing autonomous tests stay green).
+  if (isV2Engine(resolvedConfig)) {
+    await bootstrapProviders(resolvedConfig);
+    const stopFileV2 = stopMarkerPath(root);
+    if (existsSync(stopFileV2)) rmSync(stopFileV2);
+    const controllerV2 = new AbortController();
+    const sigintV2 = (): void => controllerV2.abort();
+    process.on('SIGINT', sigintV2);
+    const taskConfigV2 = { ...resolvedConfig, deckent_style: 'task' as const };
+    const sprintConfigV2 = { ...resolvedConfig, deckent_style: 'sprint' as const };
+    const resultTimeoutMs =
+      ((resolvedConfig.autonomous as Record<string, unknown> | undefined)?.result_timeout_ms as number | undefined) ?? 600_000;
+    const maxIterationsV2 = opts.maxIterations !== undefined
+      ? Math.max(0, parseInt(opts.maxIterations, 10) || 0)
+      : undefined;
+    try {
+      const summary = await runV2Engine(root, resolvedConfig, {
+        // Real task execution: spawn via runTaskMode → wait for the result file →
+        // map selfAssessment to the scheduler's ResultLike contract.
+        runTask: async (ctx) => {
+          const { taskId } = await runTaskMode({
+            description: ctx.description,
+            model: ctx.model as ModelType | undefined,
+            provider: ctx.provider,
+            ...(ctx.scopeDir ? { scope: { directories: [ctx.scopeDir] } } : {}),
+            projectRoot: ctx.projectRoot ?? root,
+            autoApprove: true,
+          }, taskConfigV2);
+          const res = await waitForRunResult(root, taskId, resultTimeoutMs);
+          if (!res) return { ok: false, reason: 'task timed out (no result file)' };
+          return { ok: res.selfAssessment !== 'NO_GO', reason: res.notes };
+        },
+        runSprint: (projectRoot) => runSprintLifecycle(projectRoot, sprintConfigV2),
+        signal: controllerV2.signal,
+        ...(maxIterationsV2 !== undefined ? { maxIterations: maxIterationsV2 } : {}),
+        lang,
+      });
+      print(getMessage('autonomous.start_done', lang, {
+        iterations: String(summary.iterations),
+        reason: summary.reason,
+      }));
+    } finally {
+      process.off('SIGINT', sigintV2);
+    }
     return;
   }
 

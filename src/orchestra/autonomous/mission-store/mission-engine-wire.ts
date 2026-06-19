@@ -1,0 +1,112 @@
+// Autonomous v2 — flag-gated cutover: wire MissionStore + MissionScheduler into
+// the live runtime. This module is the composition root for the v2 engine; the
+// live CLI (`deckent autonomous start`) calls `runV2Engine` ONLY when
+// `config.autonomous.engine === 'v2'` (see `isV2Engine`). The default (engine
+// absent or 'v1') leaves the existing v1 loop untouched — a safe cutover.
+//
+// All execution primitives (runTask / runSprint / runCapability / notify) are
+// INJECTED so this module is hermetically testable: the live CLI passes the real
+// spawn+wait wiring; tests pass fakes and a real SqliteMissionStore at a tmpdir.
+import type { ResolvedConfig } from '../../../core/config-types.js';
+import { SqliteMissionStore } from './sqlite-mission-store.js';
+import { buildMissionDispatch, type MissionTaskContext } from './mission-dispatch.js';
+import { makeMissionDeliver, type MissionNotifyPayload } from './mission-deliver.js';
+import { migrateBacklogJson } from './mission-migrate.js';
+import { runMissionScheduler, type MissionSchedulerSummary } from './mission-scheduler.js';
+import type { MissionStore, ResultLike } from './mission-types.js';
+
+/**
+ * Pure flag predicate — true only when the project config opts into the v2
+ * engine. `autonomous.engine` is not (yet) on the ResolvedConfig type, so it is
+ * read via the same cast the live code uses for other off-type autonomous fields
+ * (e.g. `result_timeout_ms`). Adding `engine?: 'v1' | 'v2'` to config-types is a
+ * separate, type-only follow-up; behaviour here is correct either way.
+ */
+export function isV2Engine(config: ResolvedConfig): boolean {
+  const engine = (config.autonomous as Record<string, unknown> | undefined)?.['engine'];
+  return engine === 'v2';
+}
+
+/** Injected execution + delivery primitives for `runV2Engine`. */
+export interface RunV2EngineDeps {
+  /** kind='task' — run a single worker for the item's description (→ ResultLike). */
+  runTask: (ctx: MissionTaskContext) => Promise<ResultLike>;
+  /** kind='sprint' — run the full sprint lifecycle (success unless it throws). */
+  runSprint: (projectRoot: string, config: ResolvedConfig) => Promise<unknown>;
+  /** kind='capability' — optional broker; absent → capability items fail clearly. */
+  runCapability?: (target: unknown) => Promise<ResultLike>;
+  /** Settle-delivery channel. Absent → no-op (mission still settles silently). */
+  notify?: (payload: MissionNotifyPayload) => void | Promise<void>;
+  /** Idle-tick interval ms. Default: config.autonomous.interval_ms ?? 5000. */
+  intervalMs?: number;
+  /** Bounded run — stop after N scheduler iterations (tests pass this). */
+  maxIterations?: number;
+  /** Cooperative cancellation (SIGINT / stop-marker). */
+  signal?: AbortSignal;
+  /** UI language for delivery messages. Default 'en'. */
+  lang?: string;
+  /**
+   * Test seam — inject a real MissionStore (e.g. SqliteMissionStore at a tmpdir)
+   * so setup, run and assertions share one instance. When provided the engine
+   * does NOT close it (caller owns its lifecycle); when absent the engine opens
+   * its own SqliteMissionStore(projectRoot) and closes it on completion.
+   */
+  store?: MissionStore;
+}
+
+/** Resolve a concrete scheduler pool size from config (never < 1). */
+function resolvePoolSize(config: ResolvedConfig): number {
+  const fromAutonomous = config.autonomous?.pool_size;
+  if (typeof fromAutonomous === 'number' && fromAutonomous >= 1) return Math.floor(fromAutonomous);
+  const maxWorkers = config.activeModeConfig?.max_workers;
+  if (typeof maxWorkers === 'number' && maxWorkers >= 1) return Math.floor(maxWorkers);
+  return 1; // 'auto' / unset → serial-safe default (matches autonomous.pool_size default)
+}
+
+/**
+ * Boot + run the autonomous-v2 engine to completion (or abort).
+ *
+ * 1. Open + migrate the durable mission store (SqliteMissionStore @ projectRoot).
+ * 2. One-time backlog.json → store import (no-op if missions already exist).
+ * 3. Build the real DispatchFn (kind → injected runTask/runSprint/runCapability).
+ * 4. Build the settle → notify delivery handler.
+ * 5. Run the concurrent, race-free scheduler with a config-resolved pool size.
+ */
+export async function runV2Engine(
+  projectRoot: string,
+  config: ResolvedConfig,
+  deps: RunV2EngineDeps,
+): Promise<MissionSchedulerSummary> {
+  const ownsStore = deps.store === undefined;
+  const store: MissionStore = deps.store ?? new SqliteMissionStore(projectRoot);
+  try {
+    store.migrate();
+    // Boot: import the legacy backlog into a `legacy` mission (no-op if missions exist).
+    migrateBacklogJson(projectRoot, store);
+
+    const dispatch = buildMissionDispatch({
+      projectRoot,
+      config,
+      runTask: deps.runTask,
+      runSprint: deps.runSprint,
+      ...(deps.runCapability ? { runCapability: deps.runCapability } : {}),
+    });
+
+    const onMissionSettled = makeMissionDeliver({
+      notify: deps.notify ?? ((): void => { /* no delivery channel — settle silently */ }),
+      ...(deps.lang ? { lang: deps.lang } : {}),
+    });
+
+    const intervalMs = deps.intervalMs ?? config.autonomous?.interval_ms ?? 5000;
+
+    return await runMissionScheduler(store, dispatch, {
+      poolSize: resolvePoolSize(config),
+      intervalMs,
+      onMissionSettled,
+      ...(deps.signal ? { signal: deps.signal } : {}),
+      ...(deps.maxIterations !== undefined ? { maxIterations: deps.maxIterations } : {}),
+    });
+  } finally {
+    if (ownsStore) store.close();
+  }
+}

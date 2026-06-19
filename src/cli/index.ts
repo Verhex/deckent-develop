@@ -55,6 +55,7 @@ import { registerFlow } from './commands/flow.js';
 import { registerRbac } from './commands/rbac.js';
 import { registerEvolve } from './commands/evolve.js';
 import { registerAutonomous } from './commands/autonomous.js';
+import { registerAutonomousMission } from './commands/autonomous-mission.js';
 import { registerBot } from './commands/bot.js';
 import { registerMcp } from './commands/mcp.js';
 import { registerResources } from './commands/resources.js';
@@ -142,6 +143,7 @@ export function buildProgram(): Command {
   registerRbac(program);
   registerEvolve(program);
   registerAutonomous(program);
+  registerAutonomousMission(program);
   registerBot(program);
   registerMcp(program);
   registerResources(program);
