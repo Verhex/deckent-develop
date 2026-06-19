@@ -116,7 +116,7 @@ export function initializeNotifyDispatcher(
   server: McpServer,
   projectRoot: string,
 ): NotifyDispatcher {
-  // MCP notifications/message adapter (reuses the singleton bound in createServer)
+  // MCP notifications/message adapter (reuses the adapter wired in createServer)
   const mcpAdapter = mcpNotifyAdapter ?? new McpNotificationAdapter(server);
   return bootstrapNotifyDispatcher({
     projectRoot,

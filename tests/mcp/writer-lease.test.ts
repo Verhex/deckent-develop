@@ -7,6 +7,7 @@ import {
   releaseWriterLease,
   readWriterLease,
   isProcessAlive,
+  installWriterLeaseReleaseHooks,
   DEFAULT_WRITER_LEASE_TTL_MS,
 } from '../../src/mcp/writer-lease.js';
 
@@ -94,5 +95,24 @@ describe('writer-lease', () => {
   it('isProcessAlive returns true for the current process and false for an impossible pid', () => {
     expect(isProcessAlive(process.pid)).toBe(true);
     expect(isProcessAlive(2_147_483_646)).toBe(false);
+  });
+});
+
+describe('installWriterLeaseReleaseHooks idempotency', () => {
+  it('adds exactly one exit-listener on double-call and second call is no-op', () => {
+    const root = sandbox();
+    const beforeCount = process.listenerCount('exit');
+    const beforeListeners = process.rawListeners('exit').slice();
+
+    installWriterLeaseReleaseHooks(root);
+    expect(process.listenerCount('exit')).toBe(beforeCount + 1);
+
+    installWriterLeaseReleaseHooks(root);
+    expect(process.listenerCount('exit')).toBe(beforeCount + 1);
+
+    // Cleanup: remove the newly added exit listener to prevent suite leak
+    const added = process.rawListeners('exit').filter(l => !beforeListeners.includes(l)) as ((...args: unknown[]) => void)[];
+    for (const l of added) process.removeListener('exit', l);
+    expect(process.listenerCount('exit')).toBe(beforeCount);
   });
 });

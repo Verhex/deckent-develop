@@ -15,5 +15,6 @@ describe('mcp.writer_lease.denied message', () => {
     expect(msg).toContain('deckent_start');
     expect(msg).toContain('4242');
     expect(msg).not.toContain('{tool}');
+    expect(msg).not.toContain('{pid}');
   });
 });

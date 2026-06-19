@@ -1486,6 +1486,32 @@ const MESSAGES: MessageMap = {
     en: "Write tool '{tool}' is held by another deckent window (pid {pid}). Read tools work here; mutations run in that window — the lease transfers automatically when it exits.",
     tr: "'{tool}' yazma aracı başka bir deckent penceresinde (pid {pid}) kilitli. Okuma araçları burada çalışır; değişiklikler o pencerede yürür — pencere kapanınca yetki otomatik devrolur.",
   },
+
+  // ─── process command (ADR-022 CLI/MCP parity) ───────────────────────────
+  'process.submit_success': {
+    en: 'Submitted. executionId: {executionId} | status: {status}',
+    tr: 'Gönderildi. executionId: {executionId} | durum: {status}',
+  },
+  'process.status_found': {
+    en: 'executionId: {executionId} | status: {status} | title: {title} | kind: {kind}',
+    tr: 'executionId: {executionId} | durum: {status} | başlık: {title} | tür: {kind}',
+  },
+  'process.result_found': {
+    en: 'executionId: {executionId} | status: {status} | title: {title} | result: {result}',
+    tr: 'executionId: {executionId} | durum: {status} | başlık: {title} | sonuç: {result}',
+  },
+  'process.not_found': {
+    en: 'No entry found for executionId: {executionId}',
+    tr: 'executionId için kayıt bulunamadı: {executionId}',
+  },
+  'process.description_required': {
+    en: 'Description is required for submit',
+    tr: 'Submit için açıklama gereklidir',
+  },
+  'process.executionId_required': {
+    en: 'executionId is required',
+    tr: 'executionId gereklidir',
+  },
 };
 
 /**
