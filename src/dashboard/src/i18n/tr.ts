@@ -586,7 +586,7 @@ export const tr: Record<TranslationKey, string> = {
   // Docs Health (ADR-090)
   'nav.docs_health': 'Doküman Sağlığı',
   'docs_health.title': 'Doküman Sağlığı',
-  'docs_health.docs_count': '{count} doküman',
+  'docs_health.docs_count': '{{count}} doküman',
   'docs_health.loading': 'Yükleniyor…',
   'docs_health.error': 'Doküman sağlığı yüklenemedi',
   'docs_health.clear_filter': 'Filtreyi temizle',

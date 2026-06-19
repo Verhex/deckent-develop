@@ -8,6 +8,9 @@ import { join } from "node:path";
 
 const DASHBOARD_SRC = join(process.cwd(), "src", "dashboard", "src");
 const layout = () => readFileSync(join(DASHBOARD_SRC, "components/Layout.tsx"), "utf-8");
+// Sprint 282: navGroups (the group definitions + order) moved to nav-items.ts —
+// the single source of truth. Group-structure assertions read it directly.
+const navItemsSrc = () => readFileSync(join(DASHBOARD_SRC, "nav-items.ts"), "utf-8");
 
 describe("Layout — chat-first nav ordering", () => {
   it("chat nav item appears before dashboard in navGroups definition", () => {
@@ -20,23 +23,23 @@ describe("Layout — chat-first nav ordering", () => {
     expect(chatIdx).toBeLessThan(dashIdx);
   });
 
-  it("chat is the first item in the first nav group (Konuş)", () => {
-    const content = layout();
+  it("chat is the first item in the first nav group (talk)", () => {
+    const content = navItemsSrc();
     // navGroups[0].items[0] must be /chat
-    expect(content).toContain('groupLabel: "Konuş"');
-    const konusIdx = content.indexOf('groupLabel: "Konuş"');
-    const chatInKonusIdx = content.indexOf('"/chat"', konusIdx);
-    const dashInContent = content.indexOf('"/"', konusIdx);
-    // /chat appears before the dashboard "/" entry after the Konuş group label
-    expect(chatInKonusIdx).toBeGreaterThan(konusIdx);
-    expect(chatInKonusIdx).toBeLessThan(dashInContent);
+    expect(content).toContain('groupLabel: "talk"');
+    const talkIdx = content.indexOf('groupLabel: "talk"');
+    const chatInTalkIdx = content.indexOf('"/chat"', talkIdx);
+    const dashInContent = content.indexOf('"/"', talkIdx);
+    // /chat appears before the dashboard "/" entry after the talk group label
+    expect(chatInTalkIdx).toBeGreaterThan(talkIdx);
+    expect(chatInTalkIdx).toBeLessThan(dashInContent);
   });
 
-  it("all 3 nav groups are defined: Konuş, İzle, Yönet", () => {
-    const content = layout();
-    expect(content).toContain('groupLabel: "Konuş"');
-    expect(content).toContain('groupLabel: "İzle"');
-    expect(content).toContain('groupLabel: "Yönet"');
+  it("all 3 nav groups are defined: talk, watch, manage", () => {
+    const content = navItemsSrc();
+    expect(content).toContain('groupLabel: "talk"');
+    expect(content).toContain('groupLabel: "watch"');
+    expect(content).toContain('groupLabel: "manage"');
   });
 
   it("active-link styling is preserved (border-l-2 border-gold on active)", () => {

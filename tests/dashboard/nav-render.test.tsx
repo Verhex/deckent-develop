@@ -44,11 +44,12 @@ function NavRenderHarness() {
 }
 
 describe("Dashboard nav — render-based assertion of 10 pages", () => {
-  it("renders all 15 nav links into the DOM (real React render, not source grep)", () => {
+  it("renders all 16 nav links into the DOM (real React render, not source grep)", () => {
     // 10 (Sprint 219) + /workers + /directives (Sprint 269 Task 269-002)
+    // + /docs-health (ADR-090 doc-tracking dashboard page, commit 033b6bc9)
     render(React.createElement(NavRenderHarness));
     const links = screen.getAllByRole("link");
-    expect(links.length).toBe(15);
+    expect(links.length).toBe(16);
   });
 
   it("renders Evolution / Nervous / Enterprise / Memory Explorer entries (Sprint 215 god-level pages)", () => {
@@ -75,11 +76,11 @@ describe("Dashboard nav — render-based assertion of 10 pages", () => {
     expect(hrefs).toContain("/status");
   });
 
-  it("Sidebar.tsx is the SINGLE canonical source: navItems is exported, has exactly 15 unique routes", () => {
+  it("Sidebar.tsx is the SINGLE canonical source: navItems is exported, has exactly 16 unique routes", () => {
     // Single-source claim: exported as a named ReadonlyArray<NavItem>.
-    // 10 (Sprint 219) + /workers + /directives (Sprint 269 Task 269-002).
+    // 10 (Sprint 219) + /workers + /directives (Sprint 269) + /docs-health (ADR-090).
     expect(Array.isArray(navItems)).toBe(true);
-    expect(navItems).toHaveLength(15);
+    expect(navItems).toHaveLength(16);
 
     // No duplicate `to` keys — proves there is no accidental fork inside
     // Sidebar.tsx itself.

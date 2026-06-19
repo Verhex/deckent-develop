@@ -584,7 +584,7 @@ export const en = {
   // Docs Health (ADR-090)
   'nav.docs_health': 'Docs Health',
   'docs_health.title': 'Docs Health',
-  'docs_health.docs_count': '{count} docs',
+  'docs_health.docs_count': '{{count}} docs',
   'docs_health.loading': 'Loading…',
   'docs_health.error': 'Failed to load doc health',
   'docs_health.clear_filter': 'Clear filter',
