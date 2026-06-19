@@ -1,7 +1,11 @@
 /**
- * help.ts — `deckent help` command with TR/EN i18n support.
+ * help.ts — `deckent help-info` (alias `deckent info`) localized quick-reference.
  *
- * Provides localized quick-reference help.
+ * Provides a curated TR/EN quick-reference of common commands. Registered as
+ * `help-info` (alias `info`) because commander reserves the built-in `help`
+ * command: `deckent help` / `deckent --help` auto-lists ALL registered commands,
+ * while `deckent info` shows this curated localized reference. The program's
+ * top-level help text points users here (see buildProgram `addHelpText`).
  * ADR-012: registerHelp(program) pattern.
  * ADR-010: no external deps.
  */
@@ -29,6 +33,17 @@ const HELP_CONTENT = {
           ['deckent doctor', 'Check system health'],
           ['deckent retro', 'Read sprint retrospective'],
           ['deckent cleanup', 'Archive completed sprint'],
+        ],
+      },
+      {
+        heading: 'Operations & Monitoring',
+        items: [
+          ['deckent watch --follow <taskId>', 'Follow a worker live (docker logs / tmux pane)'],
+          ['deckent status --watch', 'Live sprint progress'],
+          ['deckent resources', 'Live docker worker resource usage'],
+          ['deckent serve', 'Start the HTTP API + dashboard server'],
+          ['deckent dashboard', 'Open the web dashboard'],
+          ['deckent audit <sprintId>', 'Run the self-audit gate'],
         ],
       },
       {
@@ -64,6 +79,17 @@ const HELP_CONTENT = {
           ['deckent doctor', 'Sistem sağlığını kontrol et'],
           ['deckent retro', 'Sprint retrospektifini oku'],
           ['deckent cleanup', 'Tamamlanan sprinti arşivle'],
+        ],
+      },
+      {
+        heading: 'İşlem & İzleme',
+        items: [
+          ['deckent watch --follow <taskId>', 'Bir worker\'ı canlı izle (docker logs / tmux pane)'],
+          ['deckent status --watch', 'Canlı sprint ilerlemesi'],
+          ['deckent resources', 'Canlı docker worker kaynak kullanımı'],
+          ['deckent serve', 'HTTP API + dashboard sunucusunu başlat'],
+          ['deckent dashboard', 'Web dashboard\'ı aç'],
+          ['deckent audit <sprintId>', 'Öz-denetim gate\'ini çalıştır'],
         ],
       },
       {

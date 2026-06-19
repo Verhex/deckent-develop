@@ -218,7 +218,16 @@ describe('formatHelp()', () => {
     expect(formatHelp('en')).not.toBe(formatHelp('tr'));
   });
 
-  it('contains all 3 sections in English output', () => {
+  it('surfaces the operations/monitoring commands (watch --follow, resources) in EN and TR', () => {
+    for (const lang of ['en', 'tr'] as const) {
+      const output = formatHelp(lang);
+      // docker-worker live monitor must be discoverable from the quick-reference
+      expect(output).toContain('deckent watch --follow');
+      expect(output).toContain('deckent resources');
+    }
+  });
+
+  it('contains all sections in English output', () => {
     const output = formatHelp('en');
     for (const section of HELP_CONTENT.en.sections) {
       expect(output).toContain(section.heading);

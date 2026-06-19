@@ -139,8 +139,8 @@ function computeSplitRatio(): number {
 export function registerWatch(program: Command): void {
   program
     .command('watch')
-    .description('Live tmux split view: dashboard + worker panes')
-    .option('--follow <taskId>', 'Attach to a specific worker pane')
+    .description('Follow a live worker (docker logs / tmux pane / subprocess log) with --follow <taskId>, or open the tmux dashboard split')
+    .option('--follow <taskId>', 'Follow a specific worker live — docker logs -f (docker backend), tmux pane, or subprocess log')
     .action((opts: { follow?: string }) => {
       const root = resolveProjectRoot();
 

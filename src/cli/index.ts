@@ -75,6 +75,7 @@ export function buildProgram(): Command {
   const program = new Command()
     .name('deckent')
     .description('AI agent orchestration system — your AI development team, orchestrated.')
+    .addHelpText('after', '\nRun `deckent info` for a localized (TR/EN) quick-reference of common commands.\n')
     .showSuggestionAfterError(true)
     .option('-V, --version', 'output the version number with splash')
     .option('--version-json', 'output version info as JSON')
