@@ -109,19 +109,20 @@ describe('rule-generator', () => {
       expect(section).toContain('ADR-002');
     });
 
-    it('uses content first line when summary is null', () => {
-      const adrs = [makeAdr({ summary: null })];
+    it('is id-only — does not embed ADR titles or summaries (2026-06-19 index contract)', () => {
+      // ADR section collapsed to a bold id index + memory.db pointer. Titles
+      // and summaries are no longer embedded (they live in memory.db SSOT).
+      const adrs = [makeAdr({ title: 'TypeScript + ESM', summary: 'A'.repeat(200) })];
       const section = formatAdrSection(adrs);
-      expect(section).toContain('Use TypeScript with ESM modules');
+      expect(section).toContain('**ADR-001**');         // id index preserved
+      expect(section).not.toContain('TypeScript + ESM'); // title dropped
+      expect(section).not.toContain('A'.repeat(120));    // summary dropped
     });
 
-    it('truncates long summaries', () => {
-      const longSummary = 'A'.repeat(200);
-      const adrs = [makeAdr({ summary: longSummary })];
-      const section = formatAdrSection(adrs);
-      // Should be truncated to 120 chars
-      expect(section).toContain('A'.repeat(120));
-      expect(section).not.toContain('A'.repeat(121));
+    it('emits a deckent recall pointer to the memory.db SSOT', () => {
+      const section = formatAdrSection([makeAdr()]);
+      expect(section).toContain('deckent recall');
+      expect(section).toContain('.brain/memory.db');
     });
   });
 
@@ -354,13 +355,15 @@ describe('rule-generator', () => {
       expect(content).toContain('.brain/*');
     });
 
-    it('auditor gets dashboard path', () => {
+    it('auditor gets monitor-subsystem + dashboard paths', () => {
       // Sprint 198-003 / 198-004 — auditor frontmatter paths no longer include
-      // `.brain/PATTERNS.md`. Patterns are written to memory.db (SQLite), not
-      // to a flat .md file. The auditor only needs `.dashboard` to operate.
+      // `.brain/PATTERNS.md` (patterns live in memory.db, not a flat .md).
+      // 2026-06-19 — added `src/monitor/**` so the rule actually activates when
+      // working on the monitoring subsystem; `.dashboard`-only never triggered.
       // See src/core/rule-generator.ts claudeAdapter() pathsMap.
       generateRules({ projectRoot: TEST_ROOT, adrs: [], providers: ['claude'], roles: ['auditor'] });
       const content = readFileSync(join(TEST_ROOT, '.claude', 'rules', 'auditor.md'), 'utf-8');
+      expect(content).toContain('src/monitor/**');
       expect(content).toContain('.dashboard');
       expect(content).not.toContain('PATTERNS.md');
     });

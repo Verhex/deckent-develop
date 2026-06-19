@@ -71,7 +71,11 @@ interface ProviderAdapter {
 function claudeAdapter(): ProviderAdapter {
   const pathsMap: Record<RuleRole, string[]> = {
     'brain': ['.tasks/*', '.brain/*'],
-    'auditor': ['.dashboard'],
+    // Auditor guidance should activate when working on the monitoring subsystem
+    // (the in-process auditor lives in src/monitor/**), plus its runtime output
+    // file `.dashboard`. Previously `.dashboard`-only → the rule never activated
+    // in practice (`.dashboard` is a generated artifact, not hand-edited).
+    'auditor': ['src/monitor/**', '.dashboard'],
     'worker-default': ['src/**', 'tests/**'],
   };
 
@@ -136,7 +140,7 @@ function cursorAdapter(): ProviderAdapter {
   // by Cursor — hence fileExt() === 'mdc'.
   const globsMap: Record<RuleRole, string> = {
     'brain': '.tasks/**,.brain/**',
-    'auditor': '.dashboard',
+    'auditor': 'src/monitor/**,.dashboard',
     'worker-default': 'src/**,tests/**',
   };
   const descMap: Record<RuleRole, string> = {
@@ -196,6 +200,18 @@ export function loadTemplate(role: RuleRole, templateDir?: string): string {
 
 /**
  * Format ADR entries into a markdown section for embedding in rules.
+ *
+ * Index-only contract (2026-06-19): the full ADR text + rationale live in
+ * `.brain/memory.db` (the SSOT). Embedding each ADR's title + summary inline
+ * duplicated ~80 lines of *stale copy* into every rule file (3 roles × 4
+ * providers = 12 files) and contradicted these files' own rule ("query
+ * `store.getByType('adr')`, not a static .md copy"). We therefore emit a
+ * compact bold **ADR-NNN** id index + a `deckent recall` pointer to the SSOT.
+ *
+ * Anti-regression preserved: every accepted ADR still appears as `**ADR-NNN**`
+ * (the Sprint-167 "44/50 ADRs, 11 missing" data-loss guard, pinned by
+ * `rule-regen-db-query.test.ts` + the ADR-046 step-ordering invariant). Only
+ * the verbose title/summary is dropped — look any id up via `deckent recall`.
  */
 export function formatAdrSection(adrs: MemoryEntryV2[]): string {
   if (adrs.length === 0) return '';
@@ -203,23 +219,19 @@ export function formatAdrSection(adrs: MemoryEntryV2[]): string {
   const accepted = adrs.filter(a => a.status === 'accepted');
   if (accepted.length === 0) return '';
 
-  const lines: string[] = [
+  const ids = accepted.map(a => `**${a.id.toUpperCase()}**`).join(', ');
+
+  return [
     '',
     '## Active ADR Constraints',
     '',
-  ];
-
-  for (const adr of accepted) {
-    const id = adr.id.toUpperCase();
-    const title = adr.title || '(untitled)';
-    // Extract first meaningful line of content as summary
-    const summary = adr.summary
-      ?? adr.content.split('\n').find(l => l.trim().length > 0 && !l.startsWith('#'))
-      ?? '';
-    lines.push(`- **${id}**: ${title}${summary ? ' — ' + summary.slice(0, 120) : ''}`);
-  }
-
-  return lines.join('\n');
+    'Full ADR text + rationale live in `.brain/memory.db` (SSOT). Query with '
+      + '`deckent recall "<topic>"` or `store.getByType(\'adr\')` — do NOT rely on '
+      + 'a static copy. The list below is an id-only index; look any id up for '
+      + 'its current constraint.',
+    '',
+    `Accepted: ${ids}`,
+  ].join('\n');
 }
 
 /**
