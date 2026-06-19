@@ -23,6 +23,7 @@
 | `16ff9a1d` | **Sprint 291 dogfood** — `deckent process` CLI (submit/status/result, runtime-proven) + MCP-W1 review-minors (TR `{pid}` test, server.ts comment) + writer-lease release-hooks test + recovery-fix. |
 | `d4ad9a46`,`9ddebcbc` | **DASH-D3 (beta-blocker #2 partial)** — Enterprise **RBAC role CRUD + Rate-limit rule CRUD UI** wired to the existing backend endpoints (admin-gated `canManage`, mirrors Tenants pattern, shared `mutate()` helper, lucide icons / i18n en+tr, 8 hermetic component tests). RBAC & Rate tabs are no longer read-only. |
 | `26387940` | **Dashboard suite GREEN** (was 5 pre-existing failures → **1066/1066**). Fixed: nav-count 15→16 (docs-health route), nav group-label drift (i18n stable-ids), and a **real user-facing i18n bug** — `docs_health.docs_count` used single-brace `{count}` which `t()` rendered LITERALLY ("{count} docs"); now `{{count}}`. |
+| `9b7d9ad7` | **DASH-D3 DA-T.1** — the terminal DockPanel bar no longer renders an empty dead bar on every page when the terminal is default-off (gates on bootstrap-token, same rule as TerminalPanel). Dashboard suite **1068/1068** green. |
 
 ## Auto-mode dogfood findings (the headline)
 **Sprint lifecycle (`deckent start`) — VALIDATED.** Planned structured (no-haiku via explicit models), spawned 3 docker workers, executed, evaluated, finalized, archived, wrote retro/learnings. Cost $0 (subscription). All 3 tasks DONE and **disk-verified** (process.ts real not stub; tsc clean; 21 affected tests green). The known false-NO_GO / ADR-noise families did NOT fire — Sprint-290's eval fixes (auditor count_check pkg-only guard; backlog-eval coverage-exemption) are live-confirmed.
@@ -58,7 +59,7 @@ Orchestrator: **solid happy-path**, documented edge-case (crash-recovery) debt. 
 
 ## Recommended next (when you're back)
 1. **Decide the npm-publish blocker** (#1) — biggest beta lever, needs you.
-2. **DASH-D3** — RBAC/Rate CRUD UI + terminal DockPanel + settings persistence (backend done; execution not discovery).
+2. **DASH-D3 remaining** — ✅ done tonight: RBAC + Rate CRUD UI, terminal DockPanel dead-bar, full dashboard suite green. ⬜ remaining (smaller polish, see inventory): settings language/theme persistence (DA-2.1), workers-comms honest counts (DA-14.1/2), chat notification panel always-empty (DA-7.2), panic-guard toggle (DA-10.1), orphaned `RoutingDistribution`/`SprintControlPanel` components (surface or remove).
 3. **Validate the autonomous loop live** (`deckent autonomous` end-to-end) — I validated `deckent start`; the continuous loop deserves the same on a fresh small goal (I held off running it unattended right after a WSL crash).
 4. **F3 routing diversity** (structured-mode all→refactorer) — quality polish for ROUTE-1.
 5. **#4 ledger follow-ups** (provider tech-debt F1-PD/AD, MF-4..9, planner precedence) per MASTER-PLAN.
@@ -73,6 +74,8 @@ Orchestrator: **solid happy-path**, documented edge-case (crash-recovery) debt. 
 - **~06:1x** Recovered post-crash. Disk-verified deliverables, found+fixed registration regression, runtime-proved `deckent process`, committed `16ff9a1d`, pushed. Wrote this report.
 - **~06:25** GOV-1 closed: ADR-090 confirmed well-formed in `memory.db` (type=adr, accepted, decay_exempt, proper content).
 - **~06:40** DASH-D3 RBAC + Rate CRUD UI (opus subagent) — verified (enterprise-crud 8/8 + no-emoji pass, tsc clean, file-scope isolated, i18n purely additive), committed `d4ad9a46`/`9ddebcbc`, pushed.
+- **~06:46** Dashboard suite GREEN — fixed the 5 pre-existing failures (rigorously confirmed pre-existing first), incl. a real i18n render bug. `26387940`, pushed.
+- **~06:55** DASH-D3 DA-T.1 — terminal DockPanel dead-bar gated; dashboard 1068/1068. `9b7d9ad7`, pushed.
 
 ## Pre-existing dashboard test debt — ✅ RESOLVED tonight (commit `26387940`, suite now 1066/1066)
 `npm run test:dashboard` has **5 pre-existing failures** (confirmed present at `394035a7`, before any of tonight's dashboard work; the DASH-D3 i18n additions carry no single-brace placeholder, en.ts already had 1 at parent):
