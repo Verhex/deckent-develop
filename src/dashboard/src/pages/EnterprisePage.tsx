@@ -21,6 +21,13 @@ interface TenantFormState {
   status: TenantStatus;
 }
 
+interface RbacFormState {
+  mode: "create" | "edit";
+  role: string;
+  // Comma/whitespace-separated permission tokens (parsed on submit).
+  permissions: string;
+}
+
 interface TenantInfo {
   id: string;
   name: string;
@@ -72,7 +79,7 @@ function dedupDocSyncAlerts(alerts: Alert[]): Alert[] {
 
 export default function EnterprisePage() {
   const { data: tenants, loading: tenantsLoading, error: tenantsError, refetch: refetchTenants } = useApi<TenantInfo[]>("/api/enterprise/tenants");
-  const { data: rbac, loading: rbacLoading, error: rbacError } = useApi<RbacRole[]>("/api/enterprise/rbac");
+  const { data: rbac, loading: rbacLoading, error: rbacError, refetch: refetchRbac } = useApi<RbacRole[]>("/api/enterprise/rbac");
   const { data: audit, loading: auditLoading, error: auditError } = useApi<AuditEntry[]>("/api/enterprise/audit");
   const { data: rate, loading: rateLoading, error: rateError } = useApi<RateLimitInfo[]>("/api/enterprise/rate");
   const { data: statusData } = useApi<{ alerts: Alert[] }>("/api/status");
@@ -96,12 +103,20 @@ export default function EnterprisePage() {
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
+  // ─── RBAC role CRUD (DASH-D3) ──────────────────────────────────────
+  const [rbacForm, setRbacForm] = useState<RbacFormState | null>(null);
+  const [rbacMutating, setRbacMutating] = useState(false);
+  const [rbacMutationError, setRbacMutationError] = useState<string | null>(null);
+  const [rbacConfirmDeleteId, setRbacConfirmDeleteId] = useState<string | null>(null);
+
   // Admin-only management: OIDC admins or the local static-token owner (full
   // access). Non-admin OIDC roles see the read-only view (buttons hidden); the
   // server enforces the same rule with a 403 regardless of the UI.
   const canManage = identity?.role === "admin" || identity?.mode === "static";
 
-  async function mutateTenant(method: string, path: string, payload?: unknown): Promise<void> {
+  // Shared mutation helper (fetch + bearer auth + JSON error surface). Used by
+  // the Tenant, RBAC, and Rate CRUD flows so the auth/error block lives once.
+  async function mutate(method: string, path: string, payload?: unknown): Promise<void> {
     const headers: Record<string, string> = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
     if (payload !== undefined) headers["Content-Type"] = "application/json";
@@ -150,13 +165,13 @@ export default function EnterprisePage() {
     setMutationError(null);
     try {
       if (form.mode === "create") {
-        await mutateTenant("POST", "/api/enterprise/tenants", {
+        await mutate("POST", "/api/enterprise/tenants", {
           id: form.id.trim(),
           name: form.name.trim(),
           status: form.status,
         });
       } else {
-        await mutateTenant("PUT", `/api/enterprise/tenants/${encodeURIComponent(form.id)}`, {
+        await mutate("PUT", `/api/enterprise/tenants/${encodeURIComponent(form.id)}`, {
           name: form.name.trim(),
           status: form.status,
         });
@@ -174,13 +189,79 @@ export default function EnterprisePage() {
     setMutating(true);
     setMutationError(null);
     try {
-      await mutateTenant("DELETE", `/api/enterprise/tenants/${encodeURIComponent(id)}`);
+      await mutate("DELETE", `/api/enterprise/tenants/${encodeURIComponent(id)}`);
       setConfirmDeleteId(null);
       refetchTenants();
     } catch (err: unknown) {
       setMutationError(err instanceof Error ? err.message : String(err));
     } finally {
       setMutating(false);
+    }
+  }
+
+  // ─── RBAC role CRUD handlers (DASH-D3) ─────────────────────────────
+  function openRbacCreate(): void {
+    setRbacMutationError(null);
+    setRbacConfirmDeleteId(null);
+    setRbacForm({ mode: "create", role: "", permissions: "" });
+  }
+
+  function openRbacEdit(entry: RbacRole): void {
+    setRbacMutationError(null);
+    setRbacConfirmDeleteId(null);
+    setRbacForm({ mode: "edit", role: entry.role, permissions: entry.permissions.join(", ") });
+  }
+
+  function closeRbacForm(): void {
+    setRbacForm(null);
+    setRbacMutationError(null);
+  }
+
+  /** Parse a comma/whitespace-separated permission list into a deduped token array. */
+  function parsePermissions(raw: string): string[] {
+    return [...new Set(raw.split(/[\s,]+/).map((p) => p.trim()).filter(Boolean))];
+  }
+
+  async function submitRbacForm(): Promise<void> {
+    if (!rbacForm) return;
+    if (!rbacForm.role.trim()) {
+      setRbacMutationError(t("enterprise.rbac_required_role"));
+      return;
+    }
+    setRbacMutating(true);
+    setRbacMutationError(null);
+    try {
+      const permissions = parsePermissions(rbacForm.permissions);
+      if (rbacForm.mode === "create") {
+        await mutate("POST", "/api/enterprise/rbac", {
+          role: rbacForm.role.trim(),
+          permissions,
+        });
+      } else {
+        await mutate("PUT", `/api/enterprise/rbac/${encodeURIComponent(rbacForm.role)}`, {
+          permissions,
+        });
+      }
+      setRbacForm(null);
+      refetchRbac();
+    } catch (err: unknown) {
+      setRbacMutationError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRbacMutating(false);
+    }
+  }
+
+  async function deleteRbacRole(role: string): Promise<void> {
+    setRbacMutating(true);
+    setRbacMutationError(null);
+    try {
+      await mutate("DELETE", `/api/enterprise/rbac/${encodeURIComponent(role)}`);
+      setRbacConfirmDeleteId(null);
+      refetchRbac();
+    } catch (err: unknown) {
+      setRbacMutationError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRbacMutating(false);
     }
   }
 
@@ -417,10 +498,81 @@ export default function EnterprisePage() {
 
         <TabsContent value="rbac">
           <Card className="bg-zinc-900 border-zinc-800">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-zinc-100">RBAC Role Matrix</CardTitle>
+              {canManage && !rbacForm && (
+                <button
+                  type="button"
+                  onClick={openRbacCreate}
+                  data-testid="rbac-create-btn"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-brand-700 hover:bg-brand-600 px-3 py-1.5 text-sm text-white"
+                >
+                  <Plus className="h-4 w-4" />
+                  {t("enterprise.new_role")}
+                </button>
+              )}
             </CardHeader>
             <CardContent>
+              {rbacMutationError && (
+                <div
+                  data-testid="rbac-mutation-error"
+                  className="mb-3 flex items-center gap-2 rounded-md border border-red-800 bg-red-950/50 px-3 py-2 text-sm text-red-300"
+                >
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>{t("enterprise.mutation_error", { msg: rbacMutationError })}</span>
+                </div>
+              )}
+
+              {rbacForm && (
+                <div data-testid="rbac-form" className="mb-4 rounded-md border border-zinc-700 bg-zinc-950/60 p-4 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="flex flex-col gap-1 text-xs text-zinc-400">
+                      {t("enterprise.role_name")}
+                      <input
+                        data-testid="rbac-form-role"
+                        value={rbacForm.role}
+                        disabled={rbacForm.mode === "edit" || rbacMutating}
+                        onChange={(e) => setRbacForm({ ...rbacForm, role: e.target.value })}
+                        placeholder="auditor"
+                        className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 disabled:opacity-50"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs text-zinc-400">
+                      {t("enterprise.role_permissions")}
+                      <input
+                        data-testid="rbac-form-permissions"
+                        value={rbacForm.permissions}
+                        disabled={rbacMutating}
+                        onChange={(e) => setRbacForm({ ...rbacForm, permissions: e.target.value })}
+                        placeholder="read, write"
+                        className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 disabled:opacity-50"
+                      />
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void submitRbacForm()}
+                      disabled={rbacMutating}
+                      data-testid="rbac-form-submit"
+                      className="inline-flex items-center gap-1.5 rounded-md bg-brand-700 hover:bg-brand-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+                    >
+                      {rbacMutating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      {rbacMutating ? t("enterprise.saving") : rbacForm.mode === "create" ? t("enterprise.create") : t("enterprise.save")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeRbacForm}
+                      disabled={rbacMutating}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+                    >
+                      <X className="h-4 w-4" />
+                      {t("enterprise.cancel")}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {rbacLoading && <div aria-label="loading"><SkeletonTable rows={3} cols={2} /></div>}
               {rbacError && <p className="text-red-400">Error: {rbacError}</p>}
               {sortedRbac && sortedRbac.length > 0 && (
@@ -447,6 +599,55 @@ export default function EnterprisePage() {
                           <Badge className="bg-brand-900 text-brand-300 text-xs" data-testid="my-role-indicator">
                             You
                           </Badge>
+                        )}
+                        {canManage && (
+                          <span className="ml-auto inline-flex items-center gap-1.5">
+                            {rbacConfirmDeleteId === entry.role ? (
+                              <span className="inline-flex items-center gap-2" data-testid="rbac-confirm-delete">
+                                <span className="text-xs text-zinc-400">{t("enterprise.confirm_delete_role")}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => void deleteRbacRole(entry.role)}
+                                  disabled={rbacMutating}
+                                  data-testid={`rbac-delete-confirm-${entry.role}`}
+                                  className="rounded-md bg-red-800 hover:bg-red-700 px-2 py-1 text-xs text-white disabled:opacity-50"
+                                >
+                                  {t("enterprise.delete")}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setRbacConfirmDeleteId(null)}
+                                  disabled={rbacMutating}
+                                  className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+                                >
+                                  {t("enterprise.cancel")}
+                                </button>
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => openRbacEdit(entry)}
+                                  aria-label={t("enterprise.edit")}
+                                  title={t("enterprise.edit")}
+                                  data-testid={`rbac-edit-${entry.role}`}
+                                  className="rounded-md border border-zinc-700 p-1.5 text-zinc-300 hover:bg-zinc-800"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { setRbacConfirmDeleteId(entry.role); setRbacMutationError(null); }}
+                                  aria-label={t("enterprise.delete")}
+                                  title={t("enterprise.delete")}
+                                  data-testid={`rbac-delete-${entry.role}`}
+                                  className="rounded-md border border-zinc-700 p-1.5 text-red-300 hover:bg-red-950/60"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </>
+                            )}
+                          </span>
                         )}
                       </div>
                       <div className="flex flex-wrap gap-2">

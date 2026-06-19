@@ -485,6 +485,13 @@ export const en = {
   'enterprise.required_fields': 'Tenant ID and name are required.',
   'enterprise.mutation_error': 'Operation failed: {{msg}}',
 
+  // Enterprise — RBAC role management (DASH-D3)
+  'enterprise.new_role': 'New role',
+  'enterprise.role_name': 'Role name',
+  'enterprise.role_permissions': 'Permissions (comma-separated)',
+  'enterprise.rbac_required_role': 'Role name is required.',
+  'enterprise.confirm_delete_role': 'Delete this role?',
+
   // Evolution Page (283-003)
   'evolution.title': 'Evolution',
   'evolution.tab_genealogy': 'Genealogy',

@@ -487,6 +487,13 @@ export const tr: Record<TranslationKey, string> = {
   'enterprise.required_fields': 'Kiracı kimliği ve ad zorunludur.',
   'enterprise.mutation_error': 'İşlem başarısız: {{msg}}',
 
+  // Enterprise — RBAC rol yönetimi (DASH-D3)
+  'enterprise.new_role': 'Yeni rol',
+  'enterprise.role_name': 'Rol adı',
+  'enterprise.role_permissions': 'İzinler (virgülle ayrılmış)',
+  'enterprise.rbac_required_role': 'Rol adı zorunludur.',
+  'enterprise.confirm_delete_role': 'Bu rol silinsin mi?',
+
   // Evolution Page (283-003)
   'evolution.title': 'Evrim',
   'evolution.tab_genealogy': 'Soyağacı',
