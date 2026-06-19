@@ -12,6 +12,7 @@ vi.mock('node:fs', () => ({
 
 vi.mock('node:os', () => ({
   platform: vi.fn().mockReturnValue('linux'),
+  homedir: () => '/home/test',
 }));
 
 vi.mock('node:child_process', () => ({

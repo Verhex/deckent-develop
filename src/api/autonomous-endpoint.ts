@@ -120,7 +120,22 @@ export function registerAutonomousRoutes(
     }
     const events = readAuditEventsByCorrelationId(projectRoot, 'autonomous', correlationId);
     const chain = buildCausalChain(events, correlationId);
-    sendJson(res, { correlationId, events: chain, totalEvents: chain.length });
+
+    // ENT-3-SEC: tenant-scope filtering (anti-IDOR, fail-CLOSED).
+    // Mirrors the audit-list branch below: a non-admin sees ONLY their own tenant's
+    // events (no/unparseable claim → effective tenant 'local'); only a verified-admin
+    // (role checked upstream by the bearer auth-gate) sees the full chain. No fail-open
+    // "seeAll" path — an unknown/unauthenticated principal is scoped to 'local', never
+    // granted cross-tenant visibility. Empty result (200) leaks no existence.
+    if (req) {
+      const principal = deriveRequestPrincipal(req);
+      const callerTenant = principal.tenantId ?? 'local';
+      const isAdmin = principal.role === 'admin';
+      const scoped = isAdmin ? chain : chain.filter((e) => (e.tenantId ?? 'local') === callerTenant);
+      sendJson(res, { correlationId, events: scoped, totalEvents: scoped.length });
+    } else {
+      sendJson(res, { correlationId, events: chain, totalEvents: chain.length });
+    }
     return true;
   }
 
