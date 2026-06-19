@@ -98,7 +98,7 @@
     "access": "public"
   },
   "optionalDependencies": {
-    "discord.js": "^14.26.3"
+    "discord.js": "^14.26.4"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
