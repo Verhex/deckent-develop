@@ -1,58 +1,77 @@
-# DIRECTIVES — Sprint: Zero-Hardcode Provider/Model + Ink-REPL Stabilization (autonomous kind=sprint dogfood)
+# DIRECTIVES — Sprint: Autonomous v2 MissionStore Foundation (dogfood + CC-verify)
 
-## Goal: MASTER-PLAN §14 üç kapsamlı işi paralel kapat: F1-012 (config-driven provider registry, zero-hardcode), F1-PD (model-catalog de-hardcode), F11-016 (Ink REPL stream-segmenter stabilizasyon + ADR). Bu sprint **autonomous→kind=sprint→runSprint paralel** yolunun dogfood'udur (max_workers=8). Üç task distinct-scope → paralel. Her task TDD + cerrahi + lossless + backward-compatible. Mock-only YASAK. tsc temiz, mevcut testler yeşil kalır.
+## Goal: `docs/superpowers/plans/2026-06-19-autonomous-v2-store.md` planını uygula — durable `MissionStore` modülü (SQLite-WAL `autonomous.db` + per-mission jsonl hot-path), Mission/WorkItem modeli, **atomic race-free claim**, MissionView projection, backlog.json→db migration. **Additive** — `src/orchestra/autonomous/mission-store/` yeni modülü; canlı `backlog.ts`/loop'a DOKUNMA → mevcut 213 autonomous testi trivial-yeşil kalır. Wave 1 = Task 1 (store core), Wave 2 paralel = Task 2/3/4 (ayrı dosyalar). Her task TDD (failing-test → impl → green), tam kod planda.
 
 ## Ortak kurallar (BAĞLAYICI)
-- **Gerçek-davranış testi**, mock değil. **Cerrahi scope** — yalnız Files/Scope. **Backward-compat** — mevcut claude/codex/gemini/ollama davranışı bozulmaz; mevcut testler geçer. **ESM** `.js`. **i18n-first** (user-facing string → getMessage). **No haiku** (per-task model aşağıda).
+- **Plan-dosyasını OKU** (`docs/superpowers/plans/2026-06-19-autonomous-v2-store.md`) — tam kod + test orada; ilgili Task bölümünü uygula. **Cerrahi** — yalnız Files/Scope. **ESM** `.js` import-suffix. **better-sqlite3 zaten dep** (yeni dep yok, ADR-010), pattern = `src/core/doc-tracking/store.ts` (WAL, `CREATE TABLE IF NOT EXISTS`). **Hermetik test** (tmpdir db, afterEach cleanup, no spawnSync). **Atomic claim** = tek `UPDATE…WHERE status='pending'`, `changes===1` — asla read-then-write. `tsc --noEmit` temiz. **Canlı consumer'a (backlog.ts/loop) dokunma.** **No haiku.**
 
 ---
 
-## Task 1: F1-012 — Config-driven provider registry (zero-hardcode)
+## Task 1: MissionStore core — types + SQLite store (plan Task 1-3)
 - Model: opus
 - Effort: high
 - Agent: architect
 - Skills: typescript-expert
-- Files: src/core/provider.ts, src/core/config.ts, src/core/config-types.ts
-- Scope: src/core/
+- Files: src/orchestra/autonomous/mission-store/mission-types.ts, src/orchestra/autonomous/mission-store/sqlite-mission-store.ts, tests/orchestra/autonomous/mission-store/sqlite-mission-store-schema.test.ts, tests/orchestra/autonomous/mission-store/missions-crud.test.ts, tests/orchestra/autonomous/mission-store/work-items-claim.test.ts
+- Scope: src/orchestra/autonomous/mission-store/, tests/orchestra/autonomous/mission-store/
 
 ### Description
-Provider kaydı şu an hardcoded bootstrap-site'larında (`provider.ts` `registerProvider`/bootstrap). F1-012: **config-driven `providers[]`** ekle (any-key, zero-hardcode) — `config.providers` (opsiyonel dizi: `{ name, type/adapter, ... }`) varsa bootstrap onları kayıt eder; yoksa mevcut built-in claude/codex/gemini/ollama davranışı **değişmeden** sürer (backward-safe default). Hardcoded registration mantığını config-okumalı hale getir; tip eklemelerini `config-types.ts`'e yap. Yeni bir provider eklemek **kod değişmeden** config'le mümkün olsun.
+Planın **Task 1 + Task 2 + Task 3** bölümlerini uygula (hepsi `sqlite-mission-store.ts` + `mission-types.ts`'i kurduğu için TEK task = tek dosya, collision-free). `mission-types.ts`: tüm v2 tipleri + `MissionStore` interface. `sqlite-mission-store.ts`: `SqliteMissionStore implements MissionStore` — `.deckent/autonomous/autonomous.db` (WAL), `migrate()` (CREATE TABLE IF NOT EXISTS), `recover()` (running→pending), missions CRUD, work-items, **atomic `claimItem`** (N-eşzamanlı-claim → tam 1 başarı), `queryDue`, `updateItemStatus`, `listItems`. Plandaki tam kodu + 3 test dosyasını birebir uygula (race-testi dahil).
 
-**Kanıt:** `grep -n "config.providers\|providers\?:" src/core/config-types.ts src/core/provider.ts` → eklendi; built-in'siz config'te de bootstrap çalışır (backward-compat).
-**Test:** 3+ test (config.providers'tan kayıt; boş/eksik config → built-in default korunur; geçersiz provider entry → dostça atla/hata). Gerçek registry'yi assert et.
+**Kanıt:** `grep -rn "claimItem\|implements MissionStore\|journal_mode" src/orchestra/autonomous/mission-store/` → atomic claim + WAL var; `npx vitest run tests/orchestra/autonomous/mission-store/` → yeşil.
+**Test:** plandaki 8 test (schema/migrate/recover, missions CRUD, work-items + **atomic-claim race: 5 eşzamanlı claim → tam 1 true**). Gerçek SqliteMissionStore'u tmpdir-db ile assert et.
 
 ---
 
-## Task 2: F1-PD — De-hardcode model catalog (parametric)
-- Model: opus
-- Effort: high
-- Agent: architect
-- Skills: typescript-expert
-- Files: src/core/model-registry.ts, src/core/model-registry-types.ts
-- Scope: src/core/
-
-### Description
-`model-registry.ts` BUILTIN_MODELS (13-model), `OpenAIModel`/`GeminiModel` union'ları, `PROVIDER_MODEL_MAP` hardcoded ve çürüyor (yeni model id → reddediliyor). F1-PD: model katalogunu **parametrik** yap — bundled 13-model **fallback olarak kalır**, ama katalog **config/runtime ile genişletilebilir** olsun ve **bilinmeyen-yeni model id reddedilmesin** (string-union sertliği kalksın, runtime-validated parametric resolution'a geç). DB-persist/multi-source reconciliation (F1-AD) BU TASK'TA DEĞİL — yalnız hardcode'u parametrik-genişletilebilir hale getir. `config.ts`'e DOKUNMA (Task 1 onu sahipleniyor).
-
-**Kanıt:** `grep -n "BUILTIN_MODELS\|extensib\|parametr" src/core/model-registry.ts` → parametric path eklendi; yeni-model-id testi reddedilmiyor.
-**Test:** 3+ test (bundled 13 fallback korunur; yeni/bilinmeyen model id kabul + resolve; provider-tier eşleme parametrik). Gerçek ModelRegistry'yi assert et.
-
----
-
-## Task 3: F11-016 — Ink REPL stream-segmenter stabilization + ADR
+## Task 2: Per-mission jsonl hot-path events (plan Task 4)
 - Model: sonnet
 - Effort: normal
 - Agent: architect
 - Skills: typescript-expert
-- Files: src/cli/repl/native-transport.ts, src/cli/repl/app.tsx, tests/cli/repl/, docs/superpowers/specs/2026-06-19-ink-react-dep-adr.md
-- Scope: src/cli/repl/, tests/cli/, docs/
+- Dependencies: Task 1
+- Files: src/orchestra/autonomous/mission-store/mission-events.ts, tests/orchestra/autonomous/mission-store/mission-events.test.ts
+- Scope: src/orchestra/autonomous/mission-store/, tests/orchestra/autonomous/mission-store/
 
 ### Description
-F11-016: Ink (React-for-CLI) REPL'in **stream-segmenter race**'ini stabilize et — bilinen "unclosed-fence + queue/flush" yarışı (streaming markdown bloklarının kapanmamış code-fence'te yanlış-segmentlenmesi/flush-race'i). **Birim-test-edilebilir segmenter mantığını** hedefle (cursor/interaktif-TUI DEĞİL — o autonomous'ta doğrulanamaz). Ayrıca **ink+react runtime-dependency kararının ADR'ını** yaz (ADR-010 tek-dependency ilkesine karşı ink+react'in neden kabul edildiği; `docs/superpowers/specs/2026-06-19-ink-react-dep-adr.md`). Interaktif cursor/keypress'e dokunma.
+Planın **Task 4** bölümünü uygula. `mission-events.ts`: `MissionEventLog` sınıfı — per-mission `.deckent/autonomous/events/<missionId>.jsonl`, `append` / `readTail(max)` / `reset` (= dosya unlink, rewrite-bottleneck yok). `MissionEvent` tipini Task 1'in `mission-types.ts`'inden import et (`./mission-types.js`). Eksik dosya → boş dön, throw etme (loss-tolerant). Plandaki tam kodu + testi uygula.
 
-**Kanıt:** `grep -rn "fence\|segment\|flush" src/cli/repl/native-transport.ts` → race-fix; ADR dosyası var.
-**Test:** 2+ birim-test (unclosed-fence segmenti doğru biriktirilir/flush edilir; multi-chunk stream doğru segmentlenir). Gerçek segmenter fonksiyonunu çağır.
+**Kanıt:** `grep -n "appendFileSync\|unlink\|readTail" src/orchestra/autonomous/mission-store/mission-events.ts` → eklendi; `npx vitest run tests/orchestra/autonomous/mission-store/mission-events.test.ts` → yeşil.
+**Test:** plandaki test (append+readTail round-trip; reset → dosya unlink + boş okuma throw etmez). Gerçek MissionEventLog'u tmpdir ile assert et.
 
 ---
 
-**Beklenen:** 3 task paralel (max_workers=8, 3 worker), distinct-scope → collision yok. autonomous→kind=sprint→runSprint dogfood: paralel spawn gözlemi, disk-verify deliverable, eval kalitesi. Sprint-sonu tsc temiz, yeni testler + mevcut suite yeşil.
+## Task 3: MissionView projection contract (plan Task 5)
+- Model: sonnet
+- Effort: normal
+- Agent: architect
+- Skills: typescript-expert
+- Dependencies: Task 1
+- Files: src/orchestra/autonomous/mission-store/mission-view.ts, tests/orchestra/autonomous/mission-store/mission-view.test.ts
+- Scope: src/orchestra/autonomous/mission-store/, tests/orchestra/autonomous/mission-store/
+
+### Description
+Planın **Task 5** bölümünü uygula. `mission-view.ts`: `MissionView` tipi + `projectMission(store, id): MissionView | null` — mission + work-items → client-render contract (`renderAs` + türetilmiş progress `{done,total}`). `MissionStore`/`Mission`/`WorkItem`/`Progress` tiplerini Task 1'in `mission-types.ts`'inden import et. Plandaki tam kodu + testi uygula (`subscribe` YOK — YAGNI, scheduler sub-project'i ekleyecek).
+
+**Kanıt:** `grep -n "projectMission\|MissionView" src/orchestra/autonomous/mission-store/mission-view.ts` → eklendi; `npx vitest run tests/orchestra/autonomous/mission-store/mission-view.test.ts` → yeşil.
+**Test:** plandaki test (mission + items → MissionView, renderAs mapping, progress 1/2 done; missing → null). Gerçek SqliteMissionStore + projectMission ile assert et.
+
+---
+
+## Task 4: backlog.json → autonomous.db migration (plan Task 6)
+- Model: sonnet
+- Effort: normal
+- Agent: architect
+- Skills: typescript-expert
+- Dependencies: Task 1
+- Files: src/orchestra/autonomous/mission-store/mission-migrate.ts, tests/orchestra/autonomous/mission-store/mission-migrate.test.ts
+- Scope: src/orchestra/autonomous/mission-store/, tests/orchestra/autonomous/mission-store/
+
+### Description
+Planın **Task 6** bölümünü uygula. `mission-migrate.ts`: `migrateBacklogJson(projectRoot, store): number` — legacy `backlog.json` entry'lerini `legacy` mission'ının work-item'ları olarak import eder; import sayısı döner; **idempotent** (missions varsa no-op). `BacklogEntry`/`BacklogStatus`'u `../backlog-types.js`'ten import et. Plandaki tam kodu + testi uygula.
+
+**Kanıt:** `grep -n "migrateBacklogJson\|legacy" src/orchestra/autonomous/mission-store/mission-migrate.ts` → eklendi; `npx vitest run tests/orchestra/autonomous/mission-store/mission-migrate.test.ts` → yeşil.
+**Test:** plandaki test (2 entry → legacy mission'ın 2 work-item'ı; e2 kind=sprint; idempotent re-run → 0). Gerçek migration'ı tmpdir-fixture ile assert et.
+
+---
+
+**Beklenen:** Wave 1 (Task 1) → Wave 2 paralel (Task 2/3/4, ayrı dosyalar, collision yok). Sprint-sonu: `tsc --noEmit` temiz; `npx vitest run tests/orchestra/autonomous/` → yeni mission-store testleri + mevcut 213 autonomous testi yeşil (additive, canlı consumer dokunulmadı). CC disk-verify eder.
