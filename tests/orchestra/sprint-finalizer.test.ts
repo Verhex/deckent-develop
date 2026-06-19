@@ -435,18 +435,22 @@ describe('sprint-finalizer — finalizeSprint gate.json integration', () => {
     fsMod.promises.mkdir.mockReset().mockResolvedValue(undefined);
   });
 
-  it('finalizeSprint writes gate.json to .deckent/ after runSelfAuditGate', async () => {
+  it('finalizeSprint writes gate.json to .deckent/recently-works/ after runSelfAuditGate', async () => {
     const fsMod = nodeFsMod as unknown as { promises: { writeFile: ReturnType<typeof vi.fn> } };
     const sprint = makeSprint('sprint-137');
     const evaluations = new Map<string, TaskEvaluation>();
 
     await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
 
-    // gate.json must be written to .deckent/sprint-137-gate.json
+    // gate.json must be written to .deckent/recently-works/sprint-137-gate.json
+    // (Sprint 150 de-scatter: gate/seq/events/pre-archive all live under recently-works,
+    //  managed by sprint-file-retention — NOT the legacy .deckent/ root).
     const gateWriteCall = fsMod.promises.writeFile.mock.calls.find(
       (call: unknown[]) => typeof call[0] === 'string' && (call[0] as string).includes('sprint-137-gate.json'),
     );
     expect(gateWriteCall).toBeDefined();
+    // Canonical location: under recently-works, never the .deckent/ root.
+    expect(gateWriteCall![0] as string).toContain('recently-works');
     // Content must be valid JSON with overallGate field
     const writtenContent = gateWriteCall![1] as string;
     const parsed = JSON.parse(writtenContent) as { overallGate: string };
@@ -780,11 +784,12 @@ describe('sprint-finalizer — Layer 4 runtime wire fix (Sprint 138)', () => {
 
     await finalizeSprint('/tmp/project', sprint, evaluations, [], { skipDecay: true, skipHooks: true });
 
-    // gate.json must be written to .deckent/sprint-138-gate.json
+    // gate.json must be written to .deckent/recently-works/sprint-138-gate.json
     const gateWriteCall = fsMod.promises.writeFile.mock.calls.find(
       (call: unknown[]) => typeof call[0] === 'string' && (call[0] as string).includes('sprint-138-gate.json'),
     );
     expect(gateWriteCall).toBeDefined();
+    expect(gateWriteCall![0] as string).toContain('recently-works');
     const parsed = JSON.parse(gateWriteCall![1] as string) as { overallGate: string };
     expect(['PASS', 'GATE_FAILURE']).toContain(parsed.overallGate);
   });

@@ -168,8 +168,8 @@ const AUTHORITY_MATRIX: Record<AgentRole, RoleAuthority> = {
       { pattern: '.deckent/sprint-state.json', allowed: false, actions: ['write'] },
       // ALLOW — Auditor observation + reporting files
       { pattern: '.dashboard', allowed: true, actions: ['write'] },
-      { pattern: '.deckent/sprint-*-gate.json', allowed: true },
-      { pattern: '.deckent/sprint-*-events.jsonl', allowed: true, actions: ['append'] },
+      { pattern: '.deckent/recently-works/sprint-*-gate.json', allowed: true },
+      { pattern: '.deckent/recently-works/sprint-*-events.jsonl', allowed: true, actions: ['append'] },
       { pattern: 'docs/audits/**', allowed: true },
       { pattern: '.brain/PATTERNS.md', allowed: true, actions: ['append'] },
       { pattern: '.locks/**', allowed: true },

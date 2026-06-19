@@ -25,7 +25,7 @@ import type {
 import type { TaskDNA } from '../core/routing-types.js';
 
 import {
-  BRAIN_DIR, JOBS_DIR, DASHBOARD_FILE,
+  BRAIN_DIR, JOBS_DIR, DASHBOARD_FILE, RECENT_WORKS_DIR,
 } from '../core/constants.js';
 
 import { runRetention } from '../core/sprint-file-retention.js';
@@ -1163,9 +1163,15 @@ export async function finalizeSprint(
       overallGate: 'GATE_FAILURE',
     };
   }
-  // Write gate.json to .deckent/ — ALWAYS (even on gate failure or fallback)
+  // Write gate.json to .deckent/recently-works/ — ALWAYS (even on gate failure or fallback).
+  // Canonical location since the Sprint 150 de-scatter (gate/seq/events/pre-archive all live
+  // under recently-works, managed by sprint-file-retention). Matches the `deckent audit`
+  // CLI + MCP writers; the legacy `.deckent/` root path was outside retention (files piled up
+  // un-pruned and invisible to listSprintFiles).
   try {
-    const gatePath = join(projectRoot, '.deckent', `${sprint.id}-gate.json`);
+    const recentWorksDir = join(projectRoot, RECENT_WORKS_DIR);
+    await fsPromises.mkdir(recentWorksDir, { recursive: true });
+    const gatePath = join(recentWorksDir, `${sprint.id}-gate.json`);
     await fsPromises.writeFile(gatePath, JSON.stringify(gateResult, null, 2));
     debugLog('finalizeSprint:selfAuditGate', `Gate result written to ${gatePath} overallGate=${gateResult.overallGate}`);
 
