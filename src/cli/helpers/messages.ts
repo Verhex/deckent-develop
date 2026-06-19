@@ -1680,6 +1680,52 @@ const MESSAGES: MessageMap = {
     tr: 'Bilinmeyen proje: {name}. `/projects` ile listele.',
     en: 'Unknown project: {name}. List with `/projects`.',
   },
+
+  // ─── gateway daemon lifecycle ───────────────────────────────────────
+  'gateway.listen_active': {
+    tr: 'Gateway dinleyici aktif: {connectors}',
+    en: 'Gateway listener active: {connectors}',
+  },
+  'gateway.listen_none': {
+    tr: 'Bağlantı kurulamadı — aktif connector yok.',
+    en: 'No connectors active — gateway listener not started.',
+  },
+  'gateway.listen_stopped': {
+    tr: 'Gateway dinleyici durduruldu.',
+    en: 'Gateway listener stopped.',
+  },
+  'gateway.daemon_started': {
+    tr: 'Gateway daemon başlatıldı (PID: {pid}). Oturum kapanınca devam eder.',
+    en: 'Gateway daemon started (PID: {pid}). Continues after terminal close.',
+  },
+  'gateway.daemon_already': {
+    tr: 'Gateway daemon zaten çalışıyor (PID: {pid}).',
+    en: 'Gateway daemon already running (PID: {pid}).',
+  },
+  'gateway.daemon_stopped': {
+    tr: 'Gateway daemon durduruldu (PID: {pid}).',
+    en: 'Gateway daemon stopped (PID: {pid}).',
+  },
+  'gateway.daemon_not_running': {
+    tr: 'Gateway daemon çalışmıyor.',
+    en: 'Gateway daemon is not running.',
+  },
+  'gateway.daemon_status_running': {
+    tr: 'Gateway daemon çalışıyor (PID: {pid}).',
+    en: 'Gateway daemon running (PID: {pid}).',
+  },
+  'gateway.daemon_reboot_note': {
+    tr: 'Not: Daemon, yeniden başlatmada otomatik başlamaz — OS supervisor (systemd/pm2) kurun.',
+    en: 'Note: Daemon does not survive reboot automatically — set up an OS supervisor (systemd/pm2).',
+  },
+  'gateway.group_desc': {
+    tr: 'Proje-kapsamlı mesajlaşma gateway (G1)',
+    en: 'Project-scoped messaging gateway (G1)',
+  },
+  'gateway.pair_approved': {
+    tr: 'Onaylandı: {code} → {project}',
+    en: 'Approved: {code} → {project}',
+  },
 };
 
 /**

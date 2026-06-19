@@ -57,6 +57,7 @@ import { registerEvolve } from './commands/evolve.js';
 import { registerAutonomous } from './commands/autonomous.js';
 import { registerAutonomousMission } from './commands/autonomous-mission.js';
 import { registerBot } from './commands/bot.js';
+import { registerGateway } from './commands/gateway.js';
 import { registerMcp } from './commands/mcp.js';
 import { registerResources } from './commands/resources.js';
 import { registerUsage } from './commands/usage.js';
@@ -146,6 +147,7 @@ export function buildProgram(): Command {
   registerAutonomous(program);
   registerAutonomousMission(program);
   registerBot(program);
+  registerGateway(program);
   registerMcp(program);
   registerResources(program);
   registerUsage(program);
