@@ -22,6 +22,7 @@
 | `a9985024` | Doc reality-sync (README+lifecycle-diagram 34→35) + dashboard dead-area inventory. |
 | `16ff9a1d` | **Sprint 291 dogfood** — `deckent process` CLI (submit/status/result, runtime-proven) + MCP-W1 review-minors (TR `{pid}` test, server.ts comment) + writer-lease release-hooks test + recovery-fix. |
 | `d4ad9a46`,`9ddebcbc` | **DASH-D3 (beta-blocker #2 partial)** — Enterprise **RBAC role CRUD + Rate-limit rule CRUD UI** wired to the existing backend endpoints (admin-gated `canManage`, mirrors Tenants pattern, shared `mutate()` helper, lucide icons / i18n en+tr, 8 hermetic component tests). RBAC & Rate tabs are no longer read-only. |
+| `26387940` | **Dashboard suite GREEN** (was 5 pre-existing failures → **1066/1066**). Fixed: nav-count 15→16 (docs-health route), nav group-label drift (i18n stable-ids), and a **real user-facing i18n bug** — `docs_health.docs_count` used single-brace `{count}` which `t()` rendered LITERALLY ("{count} docs"); now `{{count}}`. |
 
 ## Auto-mode dogfood findings (the headline)
 **Sprint lifecycle (`deckent start`) — VALIDATED.** Planned structured (no-haiku via explicit models), spawned 3 docker workers, executed, evaluated, finalized, archived, wrote retro/learnings. Cost $0 (subscription). All 3 tasks DONE and **disk-verified** (process.ts real not stub; tsc clean; 21 affected tests green). The known false-NO_GO / ADR-noise families did NOT fire — Sprint-290's eval fixes (auditor count_check pkg-only guard; backlog-eval coverage-exemption) are live-confirmed.
@@ -73,7 +74,7 @@ Orchestrator: **solid happy-path**, documented edge-case (crash-recovery) debt. 
 - **~06:25** GOV-1 closed: ADR-090 confirmed well-formed in `memory.db` (type=adr, accepted, decay_exempt, proper content).
 - **~06:40** DASH-D3 RBAC + Rate CRUD UI (opus subagent) — verified (enterprise-crud 8/8 + no-emoji pass, tsc clean, file-scope isolated, i18n purely additive), committed `d4ad9a46`/`9ddebcbc`, pushed.
 
-## Pre-existing dashboard test debt (finding — NOT introduced tonight, verified)
+## Pre-existing dashboard test debt — ✅ RESOLVED tonight (commit `26387940`, suite now 1066/1066)
 `npm run test:dashboard` has **5 pre-existing failures** (confirmed present at `394035a7`, before any of tonight's dashboard work; the DASH-D3 i18n additions carry no single-brace placeholder, en.ts already had 1 at parent):
 - `nav-render.test.tsx` ×2 — expects "exactly 15 unique routes / 15 nav links", but the app now has 16 routes (the doc-tracking `/docs-health` route was added without updating the nav test count). Likely a stale test expectation OR a missing nav-group entry.
 - `layout-chat-first.test.tsx` ×2 — nav-group assertions ("Konuş/İzle/Yönet" 3 groups, chat first) — same nav-structure drift.
