@@ -8,6 +8,14 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+async function waitFor(cond: () => boolean, tries = 200): Promise<void> {
+  for (let i = 0; i < tries; i++) {
+    if (cond()) return;
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  throw new Error('waitFor: condition not met in time');
+}
+
 function msg(text: string): IncomingMessage {
   return { id: '1', connector: 'telegram', fromUser: 'u1', channelId: '42', text, timestamp: '2026-06-20T00:00:00Z' };
 }
@@ -34,14 +42,14 @@ describe('gateway-router', () => {
   it('guides an unbound chat instead of routing', async () => {
     const { d, sent } = await deps();
     makeGatewayRouter(d)(msg('hello'));
-    await new Promise((r) => setTimeout(r, 0));
+    await waitFor(() => sent.length > 0);
     expect(sent[0]!.parts.join(' ')).toContain('/use');
   });
 
   it('/use binds the chat to a project', async () => {
     const { d, sent } = await deps();
     makeGatewayRouter(d)(msg('/use foo'));
-    await new Promise((r) => setTimeout(r, 0));
+    await waitFor(() => sent.length > 0);
     expect(d.sessions.resolve(chatKeyOf('telegram', '42'))?.projectPath).toBe('/home/me/foo');
     expect(sent[0]!.parts.join(' ')).toContain('foo');
   });
@@ -50,7 +58,7 @@ describe('gateway-router', () => {
     const { d, sent } = await deps();
     await d.sessions.bind(chatKeyOf('telegram', '42'), '/home/me/foo', 'u1');
     makeGatewayRouter(d)(msg('what is my sprint status?'));
-    await new Promise((r) => setTimeout(r, 0));
+    await waitFor(() => sent.length > 0);
     expect(sent[0]!.parts.join('')).toBe('runtime-reply');
   });
 
@@ -58,7 +66,7 @@ describe('gateway-router', () => {
     const { d, sent } = await deps({ isAuthorized: () => false });
     await d.sessions.bind(chatKeyOf('telegram', '42'), '/home/me/foo', 'u1');
     makeGatewayRouter(d)(msg('hi'));
-    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 25));
     expect(sent).toHaveLength(0);
   });
 });

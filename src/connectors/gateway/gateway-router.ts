@@ -58,8 +58,7 @@ export function makeGatewayRouter(deps: GatewayRouterDeps): (msg: IncomingMessag
         if (!arg) { await send(chatKey, [getMessage('gateway.use_usage', lang)]); return; }
         const proj = projects.resolve(arg);
         if (!proj) { await send(chatKey, [getMessage('gateway.use_unknown', lang, { name: arg })]); return; }
-        // Bind updates the in-memory map synchronously; disk persist is background.
-        void sessions.bind(chatKey, proj.path, chatKey);
+        await sessions.bind(chatKey, proj.path, chatKey);
         await send(chatKey, [getMessage('gateway.bound_ok', lang, { project: proj.name })]);
         return;
       }
@@ -75,7 +74,7 @@ export function makeGatewayRouter(deps: GatewayRouterDeps): (msg: IncomingMessag
       }
       case '/projects': {
         const rows = projects.list().map((p) => getMessage('gateway.projects_row', lang, { name: p.name, path: p.path }));
-        await send(chatKey, [getMessage('gateway.projects_header', lang), ...rows].join('\n').split('\n'));
+        await send(chatKey, [getMessage('gateway.projects_header', lang), ...rows]);
         return;
       }
       default: {
