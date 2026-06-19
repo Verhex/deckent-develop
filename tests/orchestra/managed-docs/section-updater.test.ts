@@ -194,3 +194,37 @@ describe('trimToMaxLines', () => {
     expect(result).toContain('truncated');
   });
 });
+
+describe('self-heal: unbounded-growth guard (worker-guide Anti-Patterns bug)', () => {
+  it('collapses accumulated duplicate sub-sections to a single fresh copy', () => {
+    const generated = '### Sub A\n\nbody a\n\n### Sub B\n\nbody b';
+    const dup = '\n\n## Sub A\n\nold a\n\n## Sub B\n\nold b';
+    const bloated = `# Doc\n\n## Anti-Patterns${dup}${dup}${dup}\n\n## Protected\n\nkeep me`;
+
+    const out = replaceSectionContent(bloated, 'Anti-Patterns', generated);
+
+    expect((out.match(/Sub A/g) || []).length).toBe(1); // one copy, not 3
+    expect((out.match(/Sub B/g) || []).length).toBe(1);
+    expect(out).toContain('## Protected');               // unrelated section kept
+    expect(out).toContain('keep me');
+    expect(out).toContain('body a');                     // fresh content in
+    expect(out).not.toContain('old a');                  // stale copies out
+  });
+
+  it('is idempotent — a second pass yields identical output', () => {
+    const generated = '### Sub A\n\nbody a';
+    const bloated = '# Doc\n\n## Anti-Patterns\n\n## Sub A\n\nold\n\n## Sub A\n\nold2\n\n## Protected\n\nkeep';
+    const once = replaceSectionContent(bloated, 'Anti-Patterns', generated);
+    const twice = replaceSectionContent(once, 'Anti-Patterns', generated);
+    expect(twice).toBe(once);
+  });
+
+  it('no-op when generated content has no sub-headings (never strips following sections)', () => {
+    const generated = '| col |\n|-----|\n| val |';
+    const doc = '# Doc\n\n## Metrics\n\nold table\n\n## Next\n\nkeep';
+    const out = replaceSectionContent(doc, 'Metrics', generated);
+    expect(out).toContain('## Next');
+    expect(out).toContain('keep');
+    expect(out).toContain('| val |');
+  });
+});

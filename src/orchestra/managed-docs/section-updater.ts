@@ -118,6 +118,22 @@ function extractAutogenBlocks(body: string): string[] {
   return body.match(re) ?? [];
 }
 
+// ─── headingTitles ────────────────────────────────────────────────────────
+
+/**
+ * Collect the lowercased heading titles (H1–H6) present in a markdown string.
+ * Used by replaceSectionContent to detect stale duplicate copies of generated
+ * sub-sections (the unbounded-growth self-heal).
+ */
+function headingTitles(md: string): Set<string> {
+  const set = new Set<string>();
+  for (const line of md.split('\n')) {
+    const m = line.match(/^#{1,6}\s+(.+)$/);
+    if (m) set.add(m[1]!.toLowerCase().trim());
+  }
+  return set;
+}
+
 // ─── replaceSectionContent ────────────────────────────────────────────────
 
 /**
@@ -137,7 +153,26 @@ export function replaceSectionContent(
 
   const lines = content.split('\n');
   const before = lines.slice(0, section.startLine + 1); // include heading
-  const after = lines.slice(section.endLine);
+
+  // Self-heal (unbounded-growth guard): when the generated content carries
+  // same-level sub-headings (e.g. the worker-guide "Anti-Patterns" autoSection),
+  // parseSections stops the section boundary right after the heading, so earlier
+  // regens re-appended a fresh copy every sprint → the doc grew without bound.
+  // Strip any sections immediately following this one whose heading TITLE
+  // duplicates a heading in newContent — those are stale accumulated copies.
+  // Unrelated (protected/other) sections are never touched (their titles don't
+  // match); when newContent has no sub-headings this is a no-op (== old behavior).
+  const newTitles = headingTitles(newContent);
+  let afterLine = section.endLine;
+  if (newTitles.size > 0) {
+    const tail = parseSections(lines.slice(section.endLine).join('\n'));
+    for (const s of tail) {
+      const t = s.heading.replace(/^#+\s*/, '').toLowerCase().trim();
+      if (!newTitles.has(t)) break;
+      afterLine = section.endLine + s.endLine;
+    }
+  }
+  const after = lines.slice(afterLine);
 
   // Preserve AUTOGEN blocks from the old body — they are managed by a separate
   // tool and must not be destroyed when generated content is swapped in.
