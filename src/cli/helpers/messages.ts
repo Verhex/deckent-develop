@@ -1642,6 +1642,44 @@ const MESSAGES: MessageMap = {
   'dashboard.no_alerts': { en: 'No alerts.', tr: 'Uyarı yok.' },
   'dashboard.alerts_label': { en: 'Alerts:', tr: 'Uyarılar:' },
   'dashboard.no_active_sprint': { en: 'No active sprint. Run deckent start first.', tr: 'Aktif sprint yok. Önce `deckent start` çalıştırın.' },
+
+  // ─── gateway connector ──────────────────────────────────────────────
+  'gateway.unbound': {
+    tr: 'Bu sohbet bir projeye bağlı değil. `/projects` ile listeyi gör, `/use <isim>` ile bağla.',
+    en: 'This chat is not bound to a project. Use `/projects` to list, `/use <name>` to bind.',
+  },
+  'gateway.bound_ok': {
+    tr: 'Bağlandı: {project}. Artık mesajların bu projeye gider.',
+    en: 'Bound to {project}. Your messages now go to this project.',
+  },
+  'gateway.unbind_ok': {
+    tr: 'Bağlantı kaldırıldı. `/use <isim>` ile yeniden bağla.',
+    en: 'Unbound. Use `/use <name>` to bind again.',
+  },
+  'gateway.not_bound': {
+    tr: 'Zaten bağlı değilsin.',
+    en: 'Not bound to anything.',
+  },
+  'gateway.whoami': {
+    tr: 'Bağlı proje: {project}',
+    en: 'Bound project: {project}',
+  },
+  'gateway.projects_header': {
+    tr: 'Kayıtlı projeler:',
+    en: 'Registered projects:',
+  },
+  'gateway.projects_row': {
+    tr: '• {name} — {path}',
+    en: '• {name} — {path}',
+  },
+  'gateway.use_usage': {
+    tr: 'Kullanım: /use <proje-ismi veya path>',
+    en: 'Usage: /use <project-name or path>',
+  },
+  'gateway.use_unknown': {
+    tr: 'Bilinmeyen proje: {name}. `/projects` ile listele.',
+    en: 'Unknown project: {name}. List with `/projects`.',
+  },
 };
 
 /**
