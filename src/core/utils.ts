@@ -257,7 +257,12 @@ export function ensureDeckentImport(filePath: string): void {
   const ref = `@${DECKENT_FILE}`;
   if (existsSync(filePath)) {
     const content = readFileSync(filePath, 'utf-8');
-    if (!content.includes(ref)) {
+    // Reference-aware: ANY mention of DECKENT.md satisfies the requirement — the
+    // `@`-auto-load import OR a plain "see DECKENT.md" on-demand reference. Only
+    // prepend the auto-load import when there is NO reference at all, so a
+    // deliberate on-demand choice (context-trim) is respected, not overwritten
+    // back to auto-load. Backward-compatible: files with `@DECKENT.md` unchanged.
+    if (!content.includes(DECKENT_FILE)) {
       writeFileSync(filePath, `${ref}\n\n${content}`);
     }
   } else {

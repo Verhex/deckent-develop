@@ -20,8 +20,7 @@
 - Planning mode: brain_planning = 'ai' | 'structured' | 'auto'
 
 ## Agents & Skills
-- 15 built-in agents: security-auditor, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist
-- 21 built-in skills: typescript-expert, testing-expert, documentation-writer, security-specialist, performance-optimizer, api-builder, devops-engineer, database-migration, react-specialist, python-expert, ci-testing, accessibility-expert, anthropic-sdk, code-simplifier, docker-expert, frontend-design, git-expert, graphql-expert, migration-expert, monorepo-expert, system-architect
+- 15 built-in agents + 21 built-in skills — tam listeler (aktivasyon anahtar kelimeleriyle) aşağıdaki **Built-in Agents (15)** / **Built-in Skills (21)** bölümlerinde (tek-kaynak; burada tekrarlanmaz).
 - Agent pool: .deckent/agents/*/agent.json — LRU eviction (max 50 temp, 5 sprint age)
 - Skill registry: .deckent/skills/*/skill.json — AST sandbox validation
 - Task routing: task-router.ts assigns agent + skills + provider per task
@@ -168,41 +167,9 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 
 ## MCP Tool Reference — MCP Arac Referansi
 
-| Tool | Aciklama | ReadOnly | Destructive |
-|------|----------|----------|-------------|
-| `deckent_init` | Projeyi baslat, dizinleri olustur, ortam adapter'larini kur | Hayir | Hayir |
-| `deckent_set_directives` | DIRECTIVES.md'yi guncelle, sprint hedeflerini tanimla | Hayir | Hayir |
-| `deckent_plan` | DIRECTIVES'i oku, task JSON'larini olustur | Hayir | Hayir |
-| `deckent_start` | Sprint'i baslat, worker'lari spawn et | Hayir | Hayir |
-| `deckent_status` | Aktif sprint durumunu goster (worker'lar, alertler, ilerleme) | Evet | Hayir |
-| `deckent_doctor` | Codebase sagligini kontrol et, sorunlari tespit et | Evet | Hayir |
-| `deckent_retro` | Son sprint retrospektifini goster | Evet | Hayir |
-| `deckent_history` | Sprint gecmisini listele | Evet | Hayir |
-| `deckent_analyze_project` | Proje stack'ini, bagimlilikları, sagligi analiz et | Evet | Hayir |
-| `deckent_sync` | Konfigurasyon ve manifest'leri senkronize et | Hayir | Hayir |
-| `deckent_config` | Konfigurasyon oku veya guncelle | Hayir | Hayir |
-| `deckent_review` | Sprint sonucunu degerlendir: GO / NO_GO / GO_WITH_TECH_DEBT | Evet | Hayir |
-| `deckent_run` | Tek bir task'i arka planda calistir | Hayir | Hayir |
-| `deckent_kill` | Aktif sprint'i veya belirli worker'lari durdur | Hayir | **Evet** |
-| `deckent_cleanup` | Task dosyalarini arsivle, sprint'i temizle | Hayir | **Evet** |
-| `deckent_help` | Runtime yetenekleri, proje durumu ve kullanim rehberi goster | Evet | Hayir |
-| `deckent_agent_list` | Kayitli agent'lari listele (built-in ve temp) | Evet | Hayir |
-| `deckent_skill_list` | Kayitli skill'leri listele (manifest ve AST sandbox info) | Evet | Hayir |
-| `deckent_checkpoint` | Checkpoint approve/reject | Hayir | Hayir |
-| `deckent_docs` | Sprint lifecycle dokuman yonetimi (add/remove/list + track-scan/track-status — doc-health, ADR-090) | Hayir | Hayir |
-| `deckent_explain` | Sprint gecmisini ve sonuclarini acikla | Evet | Hayir |
-| `deckent_memory_query` | Proje hafizasinda cross-source arama (ADR, sprint, debt, pattern) | Evet | Hayir |
-| `deckent_watch` | Sprint event'lerini gercek zamanli akisla izle | Evet | Hayir |
-| `deckent_feature_query` | Ozellik manifestini sorgula (active/dormant/dead/all) | Evet | Hayir |
-| `deckent_audit` | Herhangi bir sprint icin Brain Self-Audit Gate calistir | Evet | Hayir |
-| `deckent_recover` | Cokmus veya takilmis sprint'i kurtar | Hayir | **Evet** |
-| `deckent_nervous_subscribe` | Nervous System bildirimlerine abone ol | Hayir | Hayir |
-| `deckent_nervous_accept` | Bekleyen nervous bildirimini kabul et | Hayir | Hayir |
-| `deckent_nervous_reject` | Bekleyen nervous bildirimini reddet | Hayir | Hayir |
-| `deckent_nervous_status` | Nervous System mevcut durumunu goster | Evet | Hayir |
-| `deckent_nervous_config` | Nervous System detector'larini yapilandir | Hayir | Hayir |
-| `deckent_autonomous` | Otonom motor: status/stop/backlog yonetimi (add destekler: cron, capability) | Hayir | Hayir |
-| `deckent_models` | Model registry'yi listele (provider/tier/apiId, canli veri) | Evet | Hayir |
+> **Tam araç listesi (35 araç) koddan otomatik türetilir — bkz. `docs/reference/mcp-tools.md`** (`npm run docs:ref`).
+> Eskiden burada duran el-yazımı tablo **drift etmişti** (33 vs 35); canonical generated referans tek-kaynaktır.
+> Araç adları yukarıdaki `## MCP Integration` bölümünde listelenir; somut parametre örnekleri aşağıdadır.
 
 ### Parametre Ornekleri
 

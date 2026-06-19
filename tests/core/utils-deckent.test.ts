@@ -97,6 +97,17 @@ describe('ensureDeckentImport', () => {
     expect(writeFileSync).not.toHaveBeenCalled();
   });
 
+  it('respects an on-demand "see DECKENT.md" reference — does NOT force @-auto-load back', () => {
+    // Reference-aware (2026-06-19): a deliberate non-@ reference satisfies the
+    // requirement; sync must not re-prepend the @-import (context-trim respected).
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue('See DECKENT.md for the full workflow (on-demand)\n\n# Project\n');
+
+    ensureDeckentImport('/tmp/project/CLAUDE.md');
+
+    expect(writeFileSync).not.toHaveBeenCalled();
+  });
+
   it('works with AGENTS.md path', () => {
     vi.mocked(existsSync).mockReturnValue(false);
 
