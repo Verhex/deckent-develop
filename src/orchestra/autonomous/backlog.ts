@@ -211,6 +211,9 @@ export function applyRecurringReenqueue(path: string, bl: BacklogFile, now: Date
   return changed ? next : bl;
 }
 
+/** BacklogEntry extended with optional ENT-3 lineage fields (runtime-only, not declared in backlog-types.ts). */
+type BacklogEntryWithCorrId = BacklogEntry & { correlationId?: string };
+
 /**
  * Enqueue work-generator candidates into the backlog. Dedupe is by id against
  * entries of ANY status (a done/failed `wg-*` entry must not re-enqueue while
@@ -218,14 +221,19 @@ export function applyRecurringReenqueue(path: string, bl: BacklogFile, now: Date
  * candidates are skipped with a warning — this path is fed by generators and
  * must never throw. Mutates `bl.entries`, persists atomically only when at
  * least one candidate was accepted, and returns the newly enqueued entries.
+ *
+ * ENT-3 causal lineage: when `correlationId` is provided, each newly enqueued
+ * entry is stamped with it so its downstream audit events share a common
+ * correlation scope (generation-trigger → work-item causal link).
  */
 export function enqueueCandidates(
   path: string,
   bl: BacklogFile,
   candidates: BacklogEntry[],
+  correlationId?: string,
 ): BacklogEntry[] {
   const seen = new Set(bl.entries.map((e) => e.id));
-  const fresh: BacklogEntry[] = [];
+  const fresh: BacklogEntryWithCorrId[] = [];
   for (const c of candidates) {
     if (seen.has(c.id)) continue;
     const err = validateBacklogEntry(c);
@@ -234,10 +242,15 @@ export function enqueueCandidates(
       continue;
     }
     seen.add(c.id);
-    fresh.push(c);
+    // ENT-3: stamp the entry with the generation-batch correlationId when provided.
+    // Extra fields are preserved on round-trip (loadBacklog ignores unknown fields).
+    const entry: BacklogEntryWithCorrId = correlationId !== undefined
+      ? Object.assign({}, c, { correlationId })
+      : c;
+    fresh.push(entry);
   }
   if (fresh.length === 0) return [];
-  bl.entries.push(...fresh);
+  bl.entries.push(...(fresh as BacklogEntry[]));
   atomicWriteFileSync(path, JSON.stringify(bl, null, 2));
-  return fresh;
+  return fresh as BacklogEntry[];
 }

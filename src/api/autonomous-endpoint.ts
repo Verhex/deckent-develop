@@ -21,6 +21,7 @@ import { makeApprovalGate } from '../orchestra/autonomous/approval-adapter.js';
 import { loadBacklog } from '../orchestra/autonomous/backlog.js';
 import type { BacklogEntry } from '../orchestra/autonomous/backlog-types.js';
 import { deriveRequestPrincipal } from './auth-me-endpoint.js';
+import { readAuditEventsByCorrelationId, buildCausalChain } from '../core/audit-query.js';
 
 /** Options for ENT-2 tenant isolation on the autonomous backlog endpoint. */
 export interface AutonomousRouteOptions {
@@ -108,6 +109,20 @@ export function registerAutonomousRoutes(
 ): boolean {
   const path = new URL(url, 'http://localhost').pathname;
   if (!path.startsWith('/api/autonomous/')) return false;
+
+  // GET /api/autonomous/lineage/:correlationId (ENT-3 causal-lineage endpoint)
+  // Must be checked before the approval/reject prefix matchers to avoid false conflicts.
+  if (method === 'GET' && path.startsWith('/api/autonomous/lineage/')) {
+    const correlationId = decodeURIComponent(path.slice('/api/autonomous/lineage/'.length));
+    if (!correlationId) {
+      sendJson(res, { error: 'correlationId is required' }, 400);
+      return true;
+    }
+    const events = readAuditEventsByCorrelationId(projectRoot, 'autonomous', correlationId);
+    const chain = buildCausalChain(events, correlationId);
+    sendJson(res, { correlationId, events: chain, totalEvents: chain.length });
+    return true;
+  }
 
   const gate = makeApprovalGate({ pendingPath: pendingPath(projectRoot) });
 

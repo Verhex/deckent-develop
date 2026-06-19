@@ -9,18 +9,21 @@
 // description text. Worker prompt/title language never influences routing.
 
 import type { Task, EvaluationRubric } from '../core/types.js';
-import { taskKindToRubric } from '../core/work-model.js';
+import { taskKindToRubric, type RubricTaskType } from '../core/work-model.js';
 import { inferStackFromFiles, isCoverageMeasurable } from '../core/coverage-adapters.js';
 
 /**
- * Task taxonomy for rubric selection.
+ * Task taxonomy for rubric selection — backward-compat alias of the canonical
+ * {@link RubricTaskType} (single-sourced in `core/work-model.ts`, WM-2). Kept as
+ * a named re-export so existing importers (`import { TaskType } from
+ * './rubric-registry.js'`) keep resolving; new code references `RubricTaskType`.
  *
  * - `audit`: producing a single audit report file under `docs/audits/`
  * - `document-write`: producing one or more markdown docs anywhere under `docs/`
  *   (excluding `docs/audits/` which is the audit territory)
  * - `code-development`: anything else (default) — implementation, tests, refactors
  */
-export type TaskType = 'audit' | 'document-write' | 'code-development';
+export type TaskType = RubricTaskType;
 
 /**
  * Code rubric — mirrors DEFAULT_RUBRIC in result-evaluator.ts.
@@ -91,7 +94,7 @@ export const DOC_WRITE_RUBRIC: EvaluationRubric = {
  * @security Frozen object — runtime mutation rejected by the engine.
  * Do not export; consumers use {@link getRubric} which performs the lookup.
  */
-const RUBRIC_REGISTRY: Readonly<Record<TaskType, EvaluationRubric>> = Object.freeze({
+const RUBRIC_REGISTRY: Readonly<Record<RubricTaskType, EvaluationRubric>> = Object.freeze({
   audit: AUDIT_RUBRIC,
   'document-write': DOC_WRITE_RUBRIC,
   'code-development': CODE_RUBRIC,
@@ -165,7 +168,7 @@ export function isDocumentWriteTask(task: Task): boolean {
  * Audit takes precedence over document-write because audit reports also
  * live under `docs/`, but with stricter shape (single file, `docs/audits/`).
  */
-export function detectTaskType(task: Task): TaskType {
+export function detectTaskType(task: Task): RubricTaskType {
   if (isAuditTask(task)) return 'audit';
   if (isDocumentWriteTask(task)) return 'document-write';
   return 'code-development';
@@ -362,7 +365,7 @@ export type EffectClass =
  *
  * @see ADR-055 (proposed, Sprint 156).
  */
-const EFFECT_CLASS_REGISTRY: Readonly<Record<TaskType, EffectClass>> = Object.freeze({
+const EFFECT_CLASS_REGISTRY: Readonly<Record<RubricTaskType, EffectClass>> = Object.freeze({
   audit: 'pure',
   'document-write': 'reversible',
   'code-development': 'reversible',

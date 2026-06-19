@@ -334,9 +334,12 @@ export class BedrockAdapter implements ProviderAdapter {
     const hasKey = hasAwsCredentials();
     const region = process.env['AWS_REGION'] ?? process.env['AWS_DEFAULT_REGION'];
     const hints: string[] = [];
-    if (!process.env['AWS_ACCESS_KEY_ID']) hints.push('Set AWS_ACCESS_KEY_ID');
-    if (!process.env['AWS_SECRET_ACCESS_KEY']) hints.push('Set AWS_SECRET_ACCESS_KEY');
-    if (!region) hints.push('Set AWS_REGION');
+    if (!process.env['AWS_ACCESS_KEY_ID']) hints.push('Set AWS_ACCESS_KEY_ID env var');
+    if (!process.env['AWS_SECRET_ACCESS_KEY']) hints.push('Set AWS_SECRET_ACCESS_KEY env var');
+    if (!region) hints.push('Set AWS_REGION (or AWS_DEFAULT_REGION) env var');
+    if (!hasKey) {
+      hints.push('Bedrock bootstrap was skipped at startup (no AWS credentials detected)');
+    }
     return {
       name: 'bedrock',
       binaryFound: true, // HTTP — no binary
@@ -345,7 +348,7 @@ export class BedrockAdapter implements ProviderAdapter {
       authMethod: 'api_key',
       authStatus: hasKey ? 'ok' : 'missing',
       available: hasKey,
-      partial: false,
+      partial: hints.length > 0 && hasKey,
       models: [...this.supportedModels] as ModelType[],
       reason: hasKey
         ? `Bedrock adapter ready (region: ${region ?? 'unknown'})`

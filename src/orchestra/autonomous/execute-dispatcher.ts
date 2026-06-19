@@ -17,6 +17,8 @@ import type { BacklogEntry, BacklogFile } from './backlog-types.js';
 import { loadBacklog, updateStatus, cleanupAutonomousArtifacts, purgeCompletedBacklog } from './backlog.js';
 import type { TaskResult } from '../../core/types.js';
 import type { ExecutionPool } from './execution-pool.js';
+import { writeAuditEvent } from '../../core/audit-writer.js';
+import { readAuditEvents } from '../../core/audit-query.js';
 import { needsJitDetail, generateItemDetail } from './jit-detail.js';
 import type { LlmComplete } from './goal-planner-types.js';
 import {
@@ -30,10 +32,29 @@ import { runProcess } from '../process-runtime.js';
 import { enrichResultTokenUsage } from '../result-collector.js';
 import type { Task } from '../../core/task-types.js';
 import { evaluatePolicy } from '../../core/policy-engine.js';
-import type { PolicyActivationInput, PolicyConditionInput, PolicyInput } from '../../core/policy-engine.js';
+import type { PolicyActivationInput, PolicyConditionInput, PolicyRbacInput, PolicyInput } from '../../core/policy-engine.js';
+import { resolveRiskClass } from '../../core/work-model.js';
+import type { Capability } from '../../core/work-model.js';
 
 /** Action id the backlog-trigger sets on every entry-driven trigger. */
 export const AUTONOMOUS_EXECUTE_ACTION = 'autonomous.execute';
+
+/** ENT-3: BacklogEntry extended with optional causal-lineage fields (runtime-only). */
+type EntryMeta = BacklogEntry & { correlationId?: string };
+
+/**
+ * ENT-3: Read the hmac of the last written audit event for a sprint.
+ * Used to establish causationId = parent-event-hmac in the result audit event.
+ * Best-effort: returns undefined on I/O error or empty stream.
+ */
+function readLastAuditHmac(projectRoot: string, sprintId: string): string | undefined {
+  try {
+    const events = readAuditEvents(projectRoot, sprintId);
+    return events.length > 0 ? events[events.length - 1]?.hmac : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /** Grace window for a late `.result` after the primary timeout (false-FAILURE fix):
  *  a real worker can finish seconds past the deadline; we re-poll once before failing. */
@@ -120,6 +141,10 @@ export interface ExecuteDispatcherDeps {
     buildActivationInput?: (entry: BacklogEntry) => PolicyActivationInput | undefined;
     /** Derive the condition-gate input from this entry. Return undefined to skip. */
     buildConditionInput?: (entry: BacklogEntry) => PolicyConditionInput | undefined;
+    /** Derive the RBAC layer input from this entry. Return undefined to skip.
+     *  When provided, the role authorization check is composed into the policy
+     *  verdict (runtime-loop:332 pattern — activation+condition+rbac birlikte). */
+    buildRbacInput?: (entry: BacklogEntry) => PolicyRbacInput | undefined;
   };
 }
 
@@ -178,6 +203,24 @@ export async function postItemLifecycle(deps: {
   }
 }
 
+/**
+ * Derive the capability set of a BacklogEntry for risk classification.
+ * Mirrors runtime-loop.ts `deriveEntryCapabilities`; duplicated here to avoid
+ * a circular import (runtime-loop → execute-dispatcher → runtime-loop).
+ * Pure; no I/O.
+ */
+function deriveCapabilitiesForRisk(entry: BacklogEntry): Capability[] {
+  if (entry.kind !== 'capability') return ['fs-write'];
+  const verb = (entry.spec.capabilityTarget?.capability ?? '').toLowerCase();
+  const isWrite = /\.(write|create|update|delete|drop|exec|send|capture)\b/.test(verb);
+  if (verb.startsWith('db.')) return isWrite ? ['db-write'] : ['db-query'];
+  if (verb.startsWith('erp.')) return isWrite ? ['erp-write'] : ['erp-read'];
+  if (verb.startsWith('fs.')) return isWrite ? ['fs-write'] : ['fs-read'];
+  if (verb.startsWith('shell')) return ['shell'];
+  if (verb.startsWith('mail.') || verb.startsWith('http.') || verb.startsWith('network')) return ['network'];
+  return ['fs-read'];
+}
+
 export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandler {
   const timeoutMs = deps.resultTimeoutMs ?? 600_000;
 
@@ -211,7 +254,7 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
         } catch { /* JIT failure → fall back to the title-only description below */ }
       }
 
-      // F10-001: policy-engine activation+condition gate (flag-gated default-off).
+      // F10-001/002: policy-engine activation+condition+rbac gate + risk-gate (flag-gated default-off).
       // Runs after JIT detail (so the final description is available to builders) and
       // before kind-dispatch so a parked/denied entry never starts execution.
       if (deps.policyEngine?.enabled) {
@@ -220,18 +263,36 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
         if (activInput) policyInput.activation = activInput;
         const condInput = deps.policyEngine.buildConditionInput?.(live);
         if (condInput) policyInput.condition = condInput;
-        if (policyInput.activation || policyInput.condition) {
-          const verdict = evaluatePolicy(policyInput);
-          if (verdict.decision === 'park' || verdict.decision === 'deny') {
-            const parkReason = `policy-engine: ${verdict.decision} — ${verdict.reasons.join('; ')}`;
+        // rbac layer for policyInput (runtime-loop:332 pattern — activation+condition+rbac birlikte)
+        const rbacInput = deps.policyEngine.buildRbacInput?.(live);
+        if (rbacInput) policyInput.rbac = rbacInput;
+        // Always evaluate — empty input yields 'permit' (pure, no side effects).
+        const verdict = evaluatePolicy(policyInput);
+        if (verdict.decision === 'park' || verdict.decision === 'deny') {
+          const parkReason = `policy-engine: ${verdict.decision} — ${verdict.reasons.join('; ')}`;
+          const blPark = loadBacklog(deps.backlogPath);
+          updateStatus(deps.backlogPath, blPark, entry.id, 'parked', { ok: false, reason: parkReason });
+          deps.flow?.step('parked', entry.id, parkReason);
+          return { outcome: 'failure', error: parkReason };
+        }
+        if (verdict.decision === 'suggest') {
+          // Advisory: proceed with low-activation warning (non-blocking by design).
+          console.warn(`[execute-dispatcher] policy-engine suggest for entry '${entry.id}': ${verdict.reasons.join('; ')}`);
+        }
+        // F10-002: risk-gate — permit + HIGH-risk verb + risk_gate_enabled → park (execute etme).
+        // Fires only when all other layers pass ('permit'); catches high-risk capability verbs
+        // (shell / db-write / erp-write) before they reach the worker spawn path.
+        if (verdict.decision === 'permit' && deps.config.risk_gate_enabled) {
+          const riskClass = resolveRiskClass({
+            requirements: { capabilities: deriveCapabilitiesForRisk(live), resources: [] },
+            capabilityTarget: live.spec.capabilityTarget,
+          });
+          if (riskClass === 'high') {
+            const parkReason = `risk-gate: HIGH-risk entry parked (risk_gate_enabled=true, class=${riskClass}) — ${verdict.reasons.join('; ')}`;
             const blPark = loadBacklog(deps.backlogPath);
             updateStatus(deps.backlogPath, blPark, entry.id, 'parked', { ok: false, reason: parkReason });
             deps.flow?.step('parked', entry.id, parkReason);
             return { outcome: 'failure', error: parkReason };
-          }
-          if (verdict.decision === 'suggest') {
-            // Advisory: proceed with low-activation warning (non-blocking by design).
-            console.warn(`[execute-dispatcher] policy-engine suggest for entry '${entry.id}': ${verdict.reasons.join('; ')}`);
           }
         }
       }
@@ -270,6 +331,9 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
               // audit hash-chain records WHO submitted; fall back to a tenant-scoped
               // 'system' actor (then bare 'system') for actor-less entries.
               actor: entry.actor ?? (entry.tenant ? { id: 'system', tenantId: entry.tenant } : { id: 'system' }),
+              // ENT-3: propagate causal-lineage correlationId through the capability invocation
+              // context so the audit bridge and handlers can carry it into downstream events.
+              correlationId: (entry as EntryMeta).correlationId,
             });
             ok = result.ok;
             reason = result.ok
@@ -317,6 +381,22 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
           if (taskId) {
             runTaskId = taskId; // keep this run's artifacts during post-item cleanup
             deps.flow?.step('spawned', entry.id, `taskId=${taskId}`);
+
+            // ENT-3: write a spawn audit event so downstream result events can reference
+            // this event's hmac as their causationId (causal-lineage chain A→B).
+            const entryCorrelationId = (entry as EntryMeta).correlationId;
+            const auditSprintId = getCurrentSprintId(deps.projectRoot) ?? 'autonomous';
+            writeAuditEvent(deps.projectRoot, auditSprintId, {
+              tenantId: entry.tenant ?? entry.actor?.tenantId ?? 'local',
+              actor: entry.actor?.id ?? 'system',
+              action: 'task.spawned',
+              target: taskId,
+              correlationId: entryCorrelationId,
+              metadata: { entryId: entry.id, kind: entry.kind },
+            });
+            // Read back the just-written spawn event's hmac — used as causationId for the
+            // result event so buildCausalChain can reconstruct the spawn→result chain.
+            const spawnEventHmac = readLastAuditHmac(deps.projectRoot, auditSprintId);
             // Gap F: wait for real done/failed (not just launched)
             let result = await deps.waitForResult(deps.projectRoot, taskId, timeoutMs);
             if (!result) {
@@ -383,6 +463,18 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
               // Brain-assessment writeback: attach the orchestrator's verdict to the worker
               // .result alongside the worker's selfAssessment (traceability + AI-operator data).
               writeBrainAssessmentToResult(deps.projectRoot, result.taskId, richResult);
+
+              // ENT-3: write a result audit event with causationId = spawn event's hmac so
+              // buildCausalChain can reconstruct the spawn→result causal link (A→B pattern).
+              writeAuditEvent(deps.projectRoot, auditSprintId, {
+                tenantId: entry.tenant ?? entry.actor?.tenantId ?? 'local',
+                actor: entry.actor?.id ?? 'system',
+                action: ok ? 'task.succeeded' : 'task.failed',
+                target: taskId,
+                correlationId: entryCorrelationId,
+                causationId: spawnEventHmac,
+                metadata: { entryId: entry.id, decision: finalEval.decision, quality: finalEval.quality },
+              });
             } else {
               ok = false;
               reason = 'timeout — no result within limit (incl. grace re-poll)';

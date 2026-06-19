@@ -264,4 +264,99 @@ describe('createConfirmQueue — FIFO burst + concurrent safety (F11-016)', () =
     q.answer('y');
     expect(q.head()).toBeNull();
   });
+
+  it('mid-burst arrival: new enqueues while head is being answered grow total, 0 dropped', async () => {
+    // Simulates the realistic case: tool confirms A+B are enqueued, user answers A,
+    // then C+D+E arrive while B is the head. None should be dropped; total grows.
+    const q = createConfirmQueue(() => {});
+    const noop = () => {};
+
+    // Initial burst: A, B
+    q.enqueue({ summary: 'A', resolve: noop });
+    q.enqueue({ summary: 'B', resolve: noop });
+
+    expect(q.head()).toMatchObject({ summary: 'A', index: 1, total: 2 });
+
+    // Answer A (answered=1, pending=[B])
+    q.answer('y');
+    expect(q.head()).toMatchObject({ summary: 'B', index: 2, total: 2 });
+
+    // Mid-burst: C, D, E arrive while B is the head (answered=1, pending=[B,C,D,E])
+    q.enqueue({ summary: 'C', resolve: noop });
+    q.enqueue({ summary: 'D', resolve: noop });
+    q.enqueue({ summary: 'E', resolve: noop });
+
+    // Total must grow: answered(1) + pending(4) = 5
+    expect(q.head()).toMatchObject({ summary: 'B', index: 2, total: 5 });
+    expect(q.size()).toBe(4);
+
+    // Answer B
+    q.answer('y');
+    expect(q.head()).toMatchObject({ summary: 'C', index: 3, total: 5 });
+
+    q.answer('y');
+    expect(q.head()).toMatchObject({ summary: 'D', index: 4, total: 5 });
+
+    q.answer('y');
+    expect(q.head()).toMatchObject({ summary: 'E', index: 5, total: 5 });
+
+    q.answer('y');
+    // Burst fully drained → answered resets
+    expect(q.head()).toBeNull();
+    expect(q.size()).toBe(0);
+  });
+
+  it('5+ burst with concurrent enqueue race — 0 drop, all FIFO', async () => {
+    // Stress: 7 items enqueued before any answer (simulates rapid-fire tool calls).
+    // Verifies no item is dropped and FIFO ordering is preserved.
+    const q = createConfirmQueue(() => {});
+
+    const promises = Array.from({ length: 7 }, (_, i) =>
+      new Promise<ConfirmAnswer>((resolve) =>
+        q.enqueue({ summary: `item-${i}`, resolve }),
+      ),
+    );
+
+    expect(q.size()).toBe(7);
+
+    for (let i = 0; i < 7; i++) {
+      expect(q.head()!.summary).toBe(`item-${i}`);
+      q.answer(i % 2 === 0 ? 'y' : 'n'); // alternate y/n — deny must not cascade
+    }
+
+    const results = await Promise.all(promises);
+    // Expected alternating y/n pattern with 0 drops
+    expect(results).toEqual(['y', 'n', 'y', 'n', 'y', 'n', 'y']);
+    expect(q.size()).toBe(0);
+    expect(q.head()).toBeNull();
+  });
+
+  it('always (a) cascade with 5-item same-tool burst — all resolved, 0 dropped', async () => {
+    // 5 items, all same tool-name, first answered with 'a' → all 5 cascade-resolved
+    const q = createConfirmQueue(() => {});
+    const answers: ConfirmAnswer[] = [];
+
+    const promises = Array.from({ length: 5 }, (_, i) =>
+      new Promise<ConfirmAnswer>((resolve) =>
+        q.enqueue({
+          summary: `write-file-${i}`,
+          toolName: 'bash',
+          resolve: (a) => { answers[i] = a; resolve(a); },
+        }),
+      ),
+    );
+
+    expect(q.size()).toBe(5);
+
+    // Answer head with 'a' → cascade resolves all 4 same-tool pending items
+    q.answer('a');
+
+    const results = await Promise.all(promises);
+    // All 5 must resolve as 'a' (0 dropped)
+    expect(results).toEqual(['a', 'a', 'a', 'a', 'a']);
+    expect(q.size()).toBe(0);
+    expect(q.head()).toBeNull();
+    // Internal answers array must also be complete (no undefined slots)
+    expect(answers).toEqual(['a', 'a', 'a', 'a', 'a']);
+  });
 });

@@ -58,6 +58,18 @@ export type CapabilityErrorCode =
   | 'CAPABILITY_DENIED'
   | 'CAPABILITY_FAILED';
 
+/** Denial audit info emitted via {@link CapabilityRegistry.emitDenied} when a
+ *  CAPABILITY_DENIED result is produced. Consumed by the audit bridge in
+ *  capability-runtime.ts to write a structured `capability.denied` audit event. */
+export interface CapabilityDenialInfo {
+  capability: string;
+  handler: string;
+  role?: string;
+  grantedCapabilities?: readonly Capability[];
+  actorId?: string;
+  tenantId?: string;
+}
+
 /** Outcome of {@link CapabilityRegistry.invoke} — never thrown, always returned. */
 export type CapabilityResult =
   | { ok: true; capability: string; handler: string; value: unknown }
@@ -125,6 +137,12 @@ export class CapabilityRegistry {
    *  from `ctx.actor.role` via {@link ROLE_CAPABILITY_MAP} and enforces the gate.
    *  Default `false` — permissive (v1-default preserved). */
   leastPrivilegeEnabled = false;
+
+  /** F8-003 denial audit hook. When set, called on every CAPABILITY_DENIED result
+   *  BEFORE the result is returned to the caller. Injected by capability-runtime.ts
+   *  to wire `writeAuditEvent(action:'capability.denied', ...)`. Default `undefined`
+   *  — no-op, backward-safe. */
+  emitDenied?: (info: CapabilityDenialInfo) => void;
 
   /**
    * Register `handler` as a backend under `name` (a verb like 'mail.send' or a
@@ -258,6 +276,14 @@ export class CapabilityRegistry {
       effectiveGrants !== undefined &&
       !effectiveGrants.includes(handler.requiredCapability)
     ) {
+      this.emitDenied?.({
+        capability: verb,
+        handler: name,
+        role: ctx.actor?.role,
+        grantedCapabilities: effectiveGrants,
+        actorId: ctx.actor?.id,
+        tenantId: ctx.actor?.tenantId,
+      });
       return {
         ok: false,
         capability: verb,

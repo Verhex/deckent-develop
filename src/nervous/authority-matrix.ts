@@ -14,6 +14,7 @@ import type {
 } from '../core/nervous-types.js';
 import type { ActorContext, Capability, ExecutionRequest } from '../core/work-model.js';
 import { ACTION_BY_ID } from './action-registry.js';
+import { writeAuditEvent } from '../core/audit-writer.js';
 
 // ─── Safety Floor ────────────────────────────────────────────────────────────
 
@@ -225,6 +226,20 @@ export const ROLE_CAPABILITY_MAP: Readonly<Record<WorkerRole, ReadonlySet<Capabi
     viewer: new Set<Capability>(['fs-read', 'db-query', 'erp-read']),
   });
 
+/**
+ * ENT-1 audit bridge context. When supplied to {@link checkWorkerAuthority}, a role
+ * violation writes an `authority.denied` event to the sprint audit hash-chain
+ * (ADR-037 audit-trail). Fires on both soft-warn and hard-deny.
+ */
+export interface AuthorityAuditContext {
+  /** Project root — passed to writeAuditEvent for the event-stream path. */
+  projectRoot: string;
+  /** Sprint id label for the audit event. Defaults to 'autonomous'. */
+  sprintId?: string;
+  /** Tenant id for the audit record. Falls back to the actor tenant → 'local'. */
+  tenantId?: string;
+}
+
 /** Options for {@link checkWorkerAuthority}. */
 export interface AuthorityEnforcementOptions {
   /**
@@ -235,6 +250,12 @@ export interface AuthorityEnforcementOptions {
   enforceRbac?: boolean;
   /** Optional structured emit hook (e.g. event-stream wire) — fired on a violation. */
   emit?: (payload: WorkerAuthorityViolation) => void;
+  /**
+   * ENT-1 audit bridge. When set, a role violation also writes an `authority.denied`
+   * event to the sprint audit hash-chain (ADR-037 audit-trail). Absent → no audit write
+   * (backward-safe).
+   */
+  audit?: AuthorityAuditContext;
 }
 
 /** Structured payload describing a role-based authority violation (for emit). */
@@ -333,6 +354,20 @@ export function checkWorkerAuthority(
 
   if (opts.emit) {
     opts.emit({ actorId: actor?.id, role, deniedCapabilities, enforced, reason });
+  }
+
+  // ENT-1 audit bridge — record the authority violation on the sprint audit
+  // hash-chain (ADR-037 audit-trail). Fires on both soft-warn and hard-deny;
+  // `metadata.enforced` distinguishes the two. writeAuditEvent is itself
+  // fail-safe (validation/IO never throws) so this never breaks the gate.
+  if (opts.audit) {
+    writeAuditEvent(opts.audit.projectRoot, opts.audit.sprintId ?? 'autonomous', {
+      tenantId: opts.audit.tenantId ?? actor?.tenantId ?? 'local',
+      actor: actor?.id ?? 'system',
+      action: 'authority.denied',
+      target: role,
+      metadata: { deniedCapabilities, enforced, reason },
+    });
   }
 
   if (enforced) {

@@ -40,8 +40,14 @@ import { createAuditedCapabilityRegistry } from '../../core/capability-runtime.j
 import { buildErpConnectorFromConfig } from '../../core/erp/index.js';
 import { writeAuditEvent } from '../../core/audit-writer.js';
 import type { PolicyGate } from '../autonomous-runtime.js';
-import type { ActorContext } from '../../core/work-model.js';
+import type { ActorContext, Capability } from '../../core/work-model.js';
 import { withNervousObserver } from '../autonomous-runtime.js';
+// ENT-1: 0-caller RBAC gates wired into the autonomous policy gate (flag-gated by
+// config.enforce_rbac, default off → ADR-037 V1.0 warn-only). backlog-trigger.js here
+// is src/orchestra/backlog-trigger.ts (the sprint-path gate), distinct from the
+// autonomous ./backlog-trigger.js trigger-source imports above.
+import { checkBacklogEntryRbac } from '../backlog-trigger.js';
+import { checkSprintSpawnRbac } from '../sprint-runtime.js';
 import {
   makeBacklogTriggerSource,
   makeFlowBacklogBridge,
@@ -59,6 +65,7 @@ import { decidePolicy, computeEntryEffectClass } from './policy-gate.js';
 import { applyRecurringReenqueue, enqueueCandidates, loadBacklog } from './backlog.js';
 import { makeWorkGeneratorSource } from './work-generator-source.js';
 import type { BacklogEntry } from './backlog-types.js';
+import { randomUUID } from 'node:crypto';
 
 // Re-export TriggerSource so callers can type reactiveSource without importing autonomous-runtime.
 export type { TriggerSource } from '../autonomous-runtime.js';
@@ -180,6 +187,13 @@ export interface BuildEngineRuntimeOptions {
    * or to install custom connector handlers.
    */
   capabilityRegistry?: CapabilityRegistry;
+  /**
+   * ENT-3 causal lineage: session-level correlation identifier propagated into
+   * capability-audit events written by `createAuditedCapabilityRegistry`. When
+   * absent (the common case) the audit events carry no session correlationId;
+   * per-entry correlationId is handled in execute-dispatcher for task entries.
+   */
+  correlationId?: string;
   clock?: () => Date;
   now?: () => string;
   /** Optional persistence path for the approval-adapter pending queue (forwarded to inner buildAutonomousRuntime). */
@@ -199,6 +213,76 @@ export interface BuildEngineRuntimeOptions {
    * actor.tenantId is still the primary source and is never overridden by this field.
    */
   actor?: ActorContext;
+}
+
+// ─── ENT-1: entry RBAC enforcement (flag-gated wire) ─────────────────
+//
+// Wires the two 0-caller RBAC gates (checkBacklogEntryRbac / checkSprintSpawnRbac)
+// into the autonomous dispatch path. Default-off (config.enforce_rbac) keeps the
+// ADR-037 V1.0 warn-only contract; a role-less entry is always permitted (the
+// permissive default in checkWorkerAuthority), so pre-ENT-1 backlogs are unaffected.
+
+/**
+ * Derive the worker {@link Capability} set a backlog entry will exercise — the RBAC
+ * input for {@link checkBacklogEntryRbac}. Pure; no I/O.
+ *  - `capability` kind → derived from the dotted verb (db/erp/fs/shell/network).
+ *  - `task` | `sprint` | `process` → working-tree code work → `['fs-write']`.
+ */
+export function deriveEntryCapabilities(entry: BacklogEntry): Capability[] {
+  if (entry.kind === 'capability') {
+    const verb = (entry.spec.capabilityTarget?.capability ?? '').toLowerCase();
+    const isWriteVerb = /\.(write|create|update|delete|drop|exec|send|capture)\b/.test(verb);
+    if (verb.startsWith('db.')) return isWriteVerb ? ['db-write'] : ['db-query'];
+    if (verb.startsWith('erp.')) return isWriteVerb ? ['erp-write'] : ['erp-read'];
+    if (verb.startsWith('fs.')) return isWriteVerb ? ['fs-write'] : ['fs-read'];
+    if (verb.startsWith('shell')) return ['shell'];
+    if (verb.startsWith('mail.') || verb.startsWith('http.') || verb.startsWith('network')) {
+      return ['network'];
+    }
+    return ['fs-read']; // unknown verb → least-privilege read-only assumption
+  }
+  // task / sprint / process all drive working-tree code changes.
+  return ['fs-write'];
+}
+
+/** Verdict of {@link enforceEntryRbac}. */
+export interface EntryRbacVerdict {
+  allowed: boolean;
+  reason: string;
+}
+
+/**
+ * ENT-1 — gate a backlog entry through the role-based authority matrix.
+ *
+ * Runs {@link checkBacklogEntryRbac} for every entry, plus
+ * {@link checkSprintSpawnRbac} for `kind=sprint` entries (sprint worker-spawn path).
+ * Both are flag-aware: when `config.enforce_rbac` is off they soft-warn + audit but
+ * return `allowed:true` (backward-safe); when on, a role-denied capability HARD-denies.
+ * Entries without an `actor.role` always permit (permissive default).
+ *
+ * @param entry  The backlog entry being dispatched.
+ * @param config Resolved config carrying the `enforce_rbac` flag.
+ * @param audit  Optional audit bridge — a violation writes `authority.denied`.
+ */
+export function enforceEntryRbac(
+  entry: BacklogEntry,
+  config: ResolvedConfig,
+  audit?: { projectRoot: string; sprintId?: string; tenantId?: string },
+): EntryRbacVerdict {
+  const req = {
+    actor: entry.actor,
+    requirements: { capabilities: deriveEntryCapabilities(entry), resources: [] },
+  };
+
+  const backlog = checkBacklogEntryRbac(req, config, audit);
+  if (!backlog.allowed) return { allowed: false, reason: backlog.reason };
+
+  if (entry.kind === 'sprint') {
+    const spawn = checkSprintSpawnRbac(req, config, audit);
+    if (!spawn.allowed) return { allowed: false, reason: spawn.reason };
+  }
+
+  return { allowed: true, reason: backlog.reason };
 }
 
 /**
@@ -235,6 +319,9 @@ export function buildEngineRuntime(
         action: `capability.${record.outcome}`,
         target: record.capability,
         metadata: { timestamp: record.timestamp, error: record.error },
+        // ENT-3: thread the session-level correlationId into capability-audit events so all
+        // invocations in a session share a traceable correlation scope (opts.correlationId ?? entry-level).
+        correlationId: opts.correlationId,
       });
     },
     erpConnector ? { erp: { connector: erpConnector } } : {},
@@ -309,7 +396,14 @@ export function buildEngineRuntime(
   if (opts.generateWork) {
     const generateWork = opts.generateWork;
     sources.push(makeWorkGeneratorSource({
-      generate: () => enqueueCandidates(opts.backlogPath, loadBacklog(opts.backlogPath), generateWork()),
+      generate: () => {
+        const candidates = generateWork();
+        if (candidates.length === 0) return [];
+        // ENT-3: stamp each work-generator batch with a fresh correlationId so all entries
+        // from the SAME generation trigger share a traceable correlation scope.
+        const batchCorrelationId = randomUUID();
+        return enqueueCandidates(opts.backlogPath, loadBacklog(opts.backlogPath), candidates, batchCorrelationId);
+      },
     }));
   }
   base.deps.triggerSource = makeHybridTriggerSource(sources);
@@ -328,6 +422,18 @@ export function buildEngineRuntime(
       const entry = (trigger.payload as { entry?: BacklogEntry } | undefined)?.entry;
       if (!entry) {
         return { decision: 'auto', reason: 'no entry (non-backlog trigger) → authority-only' };
+      }
+      // ENT-1 — role-based authority gate (flag-gated by config.enforce_rbac). A
+      // role-denied capability HARD-denies when the flag is on, writes an
+      // `authority.denied` audit event either way, and is a no-op for role-less
+      // entries (permissive default → backward-safe with pre-ENT-1 backlogs).
+      const rbacVerdict = enforceEntryRbac(entry, opts.config, {
+        projectRoot: opts.projectRoot,
+        sprintId: 'autonomous',
+        tenantId: entry.tenant,
+      });
+      if (!rbacVerdict.allowed) {
+        return { decision: 'deny', reason: rbacVerdict.reason };
       }
       if (rbacPolicy?.enabled) {
         const verdict = evaluatePolicy({

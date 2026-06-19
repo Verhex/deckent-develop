@@ -8,6 +8,39 @@
 
 import type { DetectorContext, DetectorResult } from '../../core/nervous-types.js';
 import { DEFAULT_HEARTBEAT_TIMEOUT_MS } from '../../core/config.js';
+import { readFileSync, existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+
+/**
+ * Per-scope adaptive threshold hesaplama.
+ * Büyük-scope worker'a false-stale-kill azaltmak için daha uzun tolerans verir.
+ * Formula: min(base × (1 + 0.02×files + 0.03×dirs), base×2)
+ */
+export function computeAdaptiveThreshold(
+  base: number,
+  filesWriteCount: number,
+  dirCount: number,
+): number {
+  return Math.min(base * (1 + 0.02 * filesWriteCount + 0.03 * dirCount), base * 2);
+}
+
+function readTaskScope(projectRoot: string, taskId: string): { filesWrite: string[] } {
+  if (!projectRoot) return { filesWrite: [] };
+  const taskFile = join(projectRoot, '.tasks', `task-${taskId}.json`);
+  if (!existsSync(taskFile)) return { filesWrite: [] };
+  try {
+    const raw = readFileSync(taskFile, 'utf-8');
+    const parsed = JSON.parse(raw) as { scope?: { filesWrite?: string[] } };
+    return { filesWrite: parsed.scope?.filesWrite ?? [] };
+  } catch {
+    return { filesWrite: [] };
+  }
+}
+
+function countUniqueDirs(filesWrite: string[]): number {
+  if (filesWrite.length === 0) return 0;
+  return new Set(filesWrite.map(f => dirname(f))).size;
+}
 
 /**
  * Aktif worker'ların heartbeat'lerini izler.
@@ -35,10 +68,13 @@ export class StaleWorkerDetector {
       return null;
     }
 
-    // Heartbeat'i stale olan worker'ları filtrele
+    // Heartbeat'i stale olan worker'ları filtrele (per-scope adaptive threshold)
     const staleWorkers = ctx.sprintState.activeWorkers.filter(w => {
       const lastHbMs = new Date(w.lastHeartbeat).getTime();
-      return ctx.now.getTime() - lastHbMs > this.staleThresholdMs;
+      const scope = readTaskScope(ctx.projectRoot, w.taskId);
+      const dirCount = countUniqueDirs(scope.filesWrite);
+      const threshold = computeAdaptiveThreshold(this.staleThresholdMs, scope.filesWrite.length, dirCount);
+      return ctx.now.getTime() - lastHbMs > threshold;
     });
 
     if (staleWorkers.length === 0) {
@@ -56,9 +92,21 @@ export class StaleWorkerDetector {
         id: 'WORKER_RESPAWN',
         label: `Re-spawn ${w.id} (task ${w.taskId})`,
         risk: 'medium' as const,
-        payload: { workerId: w.id, taskId: w.taskId, lastHeartbeat: w.lastHeartbeat },
+        payload: { workerId: w.id, taskId: w.taskId, lastHeartbeat: w.lastHeartbeat, staleCount: staleWorkers.length },
       })),
       metadata: { type: 'stale-worker', count: staleWorkers.length },
     };
+  }
+
+  /**
+   * Predicate: WORKER_RESPAWN'ın timeout-auto-proceed'de güvenli olup olmadığını kontrol eder.
+   * tek-stale (count=1) → ok; ≥3-stale (cascade) → veto (human onayı gerekli).
+   */
+  canAutoApply(payload: Record<string, unknown>): { ok: boolean; reason: string } {
+    const staleCount = typeof payload['staleCount'] === 'number' ? payload['staleCount'] : 1;
+    if (staleCount >= 3) {
+      return { ok: false, reason: `cascade respawn (${staleCount} stale workers) — human approval required` };
+    }
+    return { ok: true, reason: 'single stale worker — safe to auto-respawn' };
   }
 }

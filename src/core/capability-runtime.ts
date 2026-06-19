@@ -30,6 +30,7 @@ import {
   withAuditedInvocation,
   type CapabilityAuditRecord,
 } from './capability-audit-bridge.js';
+import { writeAuditEvent } from './audit-writer.js';
 
 /** Handler options forwarded to the underlying install* functions. */
 export interface CapabilityRuntimeOptions extends ExtendedHandlerOptions {
@@ -40,6 +41,16 @@ export interface CapabilityRuntimeOptions extends ExtendedHandlerOptions {
    *  (medium-risk, risk-tagged erp.read, ADR-069 direction). Gate absent → plain
    *  installErpHandler behaviour (default-off, backward-safe). */
   erp?: { connector: ErpConnector; approvalGate?: ErpApprovalGateFn };
+  /** F8-003 denial audit context. When set, CAPABILITY_DENIED results emit a
+   *  `capability.denied` audit event via `writeAuditEvent`. Default-off when absent. */
+  denialAudit?: {
+    /** Project root path for audit event storage. */
+    projectRoot: string;
+    /** Sprint identifier for audit log (default: 'capability'). */
+    sprintId?: string;
+    /** Tenant identifier for audit event (default: 'local'). */
+    tenantId?: string;
+  };
 }
 
 /**
@@ -49,6 +60,10 @@ export interface CapabilityRuntimeOptions extends ExtendedHandlerOptions {
  * - `emit` absent → plain registry (audit default-off, backward-safe).
  * - `emit` throwing is contained here (fail-safe): an audit-sink failure must
  *   never fail the capability invocation itself.
+ * - `config.enforce_least_privilege` → sets `registry.leastPrivilegeEnabled = true`
+ *   (F8-003 hard-flip; default-off when config absent or flag false).
+ * - `options.denialAudit` → wires `registry.emitDenied` to emit a structured
+ *   `capability.denied` audit event via `writeAuditEvent` on every CAPABILITY_DENIED.
  *
  * Note: handlers like env.read / shell.exec are allowlist-gated and DENY by
  * default (empty allowlist) unless options open them up — safe-by-default.
@@ -56,6 +71,7 @@ export interface CapabilityRuntimeOptions extends ExtendedHandlerOptions {
 export function createAuditedCapabilityRegistry(
   emit?: (record: CapabilityAuditRecord) => void,
   options: CapabilityRuntimeOptions = {},
+  config?: { enforce_least_privilege?: boolean },
 ): CapabilityRegistry {
   const registry = createDefaultRegistry();
   installExtendedHandlers(registry, options);
@@ -84,6 +100,33 @@ export function createAuditedCapabilityRegistry(
       registry.unregister(name);
       registry.register(name, withAuditedInvocation(handler, safeEmit));
     }
+  }
+
+  // F8-003: wire enforce_least_privilege config flag → registry.leastPrivilegeEnabled
+  if (config?.enforce_least_privilege) {
+    registry.leastPrivilegeEnabled = true;
+  }
+
+  // F8-003: wire denial audit — CAPABILITY_DENIED → capability.denied audit event
+  if (options.denialAudit) {
+    const { projectRoot, sprintId = 'capability', tenantId = 'local' } = options.denialAudit;
+    registry.emitDenied = (info) => {
+      try {
+        writeAuditEvent(projectRoot, sprintId, {
+          tenantId,
+          actor: info.actorId ?? 'unknown',
+          action: 'capability.denied',
+          target: info.capability,
+          metadata: {
+            handler: info.handler,
+            role: info.role,
+            grantedCapabilities: info.grantedCapabilities,
+          },
+        });
+      } catch {
+        // fail-safe: a broken audit sink never breaks the invocation
+      }
+    };
   }
 
   return registry;

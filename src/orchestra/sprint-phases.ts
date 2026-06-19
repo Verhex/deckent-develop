@@ -13,6 +13,7 @@ import {
   readFileSync, writeFileSync, existsSync, readdirSync, statSync, unlinkSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 // ─── Core (value imports — enums used at runtime) ──────────────────
 import {
@@ -57,6 +58,10 @@ import {
   recordRollbackInDebt, saveSafetyPoint, deleteSafetyPoint,
   isGitRepo, cleanOrphanSafetyPoint,
 } from './rollback.js';
+
+// ─── Partial Promotion (PROMOTE-W1b) ─────────────────────────────
+import { attemptPartialPromotion } from './result-promoter.js';
+import { revertFilesToHead } from '../agents/worker-rollback.js';
 
 // ─── Plugin Hooks ─────────────────────────────────────────────────
 import {
@@ -140,7 +145,7 @@ import {
 // sprint-spawner but had no runtime caller. Wired here so NO_GO →
 // dependents PAUSED and DONE → dependents PENDING actually fire.
 import { applyCascadeToSprint, applyUnblockToSprint } from './sprint-spawner.js';
-import { writeEvent, getCurrentSprintId } from './event-stream.js';
+import { writeEvent, getCurrentSprintId, readEvents, SCOPE_INSUFFICIENT_CHANNEL } from './event-stream.js';
 import { checkWorkerLiveness } from './worker-liveness.js';
 import type { FailureContext } from './result-evaluator.js';
 
@@ -1280,6 +1285,69 @@ export async function runEvaluatePhase(
         // workers can be reconciled via reconcileSpuriousNoGo (git diff fallback).
         const rubricResult = evaluateWithRubric(result, task, undefined, projectRoot);
         let evaluation = toTaskEvaluation(rubricResult);
+
+        // PROMOTE-W1b: flag-gated partial promotion (default-off).
+        // Runs BEFORE the honest-gate lock so genuine rubric-NO_GO+isPartialPromotable
+        // results can be salvaged; the lock below overrides for dishonest stubs.
+        {
+          type ConfigWithPP = ResolvedConfig & { partial_promotion_enabled?: boolean };
+          const ppEnabled = (config as ConfigWithPP | undefined)?.partial_promotion_enabled === true;
+          if (
+            ppEnabled &&
+            evaluation === TaskEvaluation.NO_GO &&
+            rubricResult.isPartialPromotable === true &&
+            gated.honest
+          ) {
+            try {
+              const ppResult = attemptPartialPromotion(projectRoot, task, result, rubricResult);
+              if (ppResult.promoted) {
+                // in-scope commit
+                try {
+                  execFileSync('git', ['add', '--', ...ppResult.inScopeFiles], {
+                    cwd: projectRoot, stdio: ['ignore', 'ignore', 'pipe'],
+                  });
+                  execFileSync('git', ['commit', '-m',
+                    `partial-promotion: task-${task.id} in-scope work salvaged [PROMOTE-W1b]`], {
+                    cwd: projectRoot, stdio: ['ignore', 'ignore', 'pipe'],
+                  });
+                } catch (e) {
+                  debugLog('runEvaluatePhase:partialPromotion:commit', e);
+                }
+                // out-of-scope revert
+                if (ppResult.droppedFiles.length > 0) {
+                  try {
+                    revertFilesToHead(projectRoot, ppResult.droppedFiles);
+                  } catch (e) {
+                    debugLog('runEvaluatePhase:partialPromotion:revert', e);
+                  }
+                }
+                // upgrade verdict
+                evaluation = TaskEvaluation.GO_WITH_TECH_DEBT;
+                // emit BRAIN→AUDITOR event
+                try {
+                  const sidForPP = getCurrentSprintId(projectRoot) ?? sprint.id;
+                  writeEvent(
+                    projectRoot, sidForPP, 'brain', 'auditor',
+                    'BRAIN→AUDITOR:PARTIAL_PROMOTION_APPLIED',
+                    {
+                      taskId: task.id,
+                      inScopeFiles: ppResult.inScopeFiles,
+                      droppedFiles: ppResult.droppedFiles,
+                      originalVerdict: 'NO_GO',
+                      upgradedVerdict: 'GO_WITH_TECH_DEBT',
+                      timestamp: new Date().toISOString(),
+                    },
+                  );
+                } catch (e) {
+                  debugLog('runEvaluatePhase:partialPromotion:event', e);
+                }
+              }
+            } catch (e) {
+              debugLog('runEvaluatePhase:partialPromotion', e);
+            }
+          }
+        }
+
         // Sprint 165 Task 1: ensure honest-gate violations cannot be re-promoted
         // by the rubric reconciler (reconcileRubricNoGo can override NO_GO
         // when concrete rubric scores look good — for stub results this would
@@ -1318,6 +1386,70 @@ export async function runEvaluatePhase(
             }
           } catch (e) {
             debugLog('runEvaluatePhase:ciRegressionCheck', e);
+          }
+        }
+
+        // SCOPE-W1b: brain-side SCOPE_INSUFFICIENT consumer + scope-expand (flag-gated default-off).
+        // Reads WORKER→BRAIN:SCOPE_INSUFFICIENT events for the current sprint, finds events
+        // matching this task, and when the flag is on: expands task.scope.filesWrite so the
+        // FIX task inherits the larger scope. diff-salvage: annotates result.notes with the
+        // previous run's filesChanged so the FIX prompt carries context.
+        {
+          type ConfigWithSAE = ResolvedConfig & { scope_auto_expand_enabled?: boolean };
+          const saeEnabled = (config as ConfigWithSAE | undefined)?.scope_auto_expand_enabled === true;
+          if (saeEnabled) {
+            try {
+              const sidForSAE = getCurrentSprintId(projectRoot) ?? sprint.id;
+              const scopeInsEvents = readEvents(projectRoot, sidForSAE, { channel: SCOPE_INSUFFICIENT_CHANNEL });
+              const taskScopeEvents = scopeInsEvents.filter(e => {
+                const p = e.payload as { taskId?: string } | undefined;
+                return p?.taskId === task.id;
+              });
+              if (taskScopeEvents.length > 0) {
+                const addedPaths: string[] = [];
+                for (const ev of taskScopeEvents) {
+                  const p = ev.payload as { attemptedPath?: string } | undefined;
+                  if (p?.attemptedPath && !task.scope.filesWrite.includes(p.attemptedPath)) {
+                    task.scope.filesWrite.push(p.attemptedPath);
+                    addedPaths.push(p.attemptedPath);
+                  }
+                }
+                if (addedPaths.length > 0) {
+                  // Persist expanded scope to disk so the FIX task inherits it.
+                  try {
+                    const taskPath = join(projectRoot, TASKS_DIR, `task-${task.id}.json`);
+                    if (existsSync(taskPath)) {
+                      const taskJson = readJsonSafe<Task>(taskPath);
+                      if (taskJson) {
+                        taskJson.scope.filesWrite = task.scope.filesWrite;
+                        writeFileSync(taskPath, JSON.stringify(taskJson, null, 2) + '\n', 'utf-8');
+                      }
+                    }
+                  } catch (e) { debugLog('runEvaluatePhase:scopeAutoExpand:persist', e); }
+                  // diff-salvage: annotate result.notes so the FIX prompt carries prev-changed context.
+                  if (result.filesChanged?.length) {
+                    const salvage = `[scope-expand] prev-changed: ${result.filesChanged.join(', ')}`;
+                    result.notes = result.notes ? `${result.notes}\n${salvage}` : salvage;
+                  }
+                  // Emit BRAIN→AUDITOR:SCOPE_AUTO_EXPANDED event.
+                  try {
+                    writeEvent(
+                      projectRoot, sidForSAE, 'brain', 'auditor',
+                      'BRAIN→AUDITOR:SCOPE_AUTO_EXPANDED',
+                      {
+                        taskId: task.id,
+                        addedPaths,
+                        prevFilesChanged: result.filesChanged ?? [],
+                        timestamp: new Date().toISOString(),
+                      },
+                    );
+                  } catch (e) { debugLog('runEvaluatePhase:scopeAutoExpand:event', e); }
+                  debugLog('runEvaluatePhase:scopeAutoExpand', `task=${task.id} addedPaths=${addedPaths.join(',')}`);
+                }
+              }
+            } catch (e) {
+              debugLog('runEvaluatePhase:scopeAutoExpand', e);
+            }
           }
         }
 

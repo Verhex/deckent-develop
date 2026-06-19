@@ -215,6 +215,31 @@ export function rollbackWorkerScope(
   }
 }
 
+/**
+ * Revert specific out-of-scope files to HEAD — partial-promotion pipeline (PROMOTE-W1b).
+ * For each path: first attempts `git checkout HEAD -- <path>` (tracked files),
+ * then `git clean -fd -- <path>` for untracked. Mirrors the per-file loop in
+ * rollbackWorkerScope without the stash-drop step.
+ */
+export function revertFilesToHead(repoRoot: string, filePaths: string[]): void {
+  for (const p of filePaths) {
+    try {
+      execFileSync('git', ['checkout', 'HEAD', '--', p], {
+        cwd: repoRoot,
+        stdio: ['ignore', 'ignore', 'pipe'],
+      });
+    } catch {
+      // not in HEAD — may be untracked, try clean
+      try {
+        execFileSync('git', ['clean', '-fd', '--', p], {
+          cwd: repoRoot,
+          stdio: ['ignore', 'ignore', 'pipe'],
+        });
+      } catch { /* nothing to clean */ }
+    }
+  }
+}
+
 export function dropWorkerSnapshot(
   repoRoot: string,
   stashRef: string,

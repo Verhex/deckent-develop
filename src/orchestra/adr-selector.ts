@@ -9,7 +9,7 @@
 
 import type { Task } from '../core/task-types.js';
 import type { MemoryEntryV2 } from '../core/memory-types.js';
-import { taskKindToAdrDomain } from '../core/work-model.js';
+import { taskKindToAdrDomain, type AdrTaskType } from '../core/work-model.js';
 
 // ─── Public Types ────────────────────────────────────────────────────
 
@@ -40,20 +40,13 @@ const SCOPE_PATH_KEYWORDS: Record<string, string[]> = {
 // ─── Task Type ADR Preset Matrix ─────────────────────────────────────
 
 /**
- * Task type string union — matches task intent classification keys.
- * Used in TASK_TYPE_ADR_PRESETS for guaranteed ADR inclusion per type.
+ * Task type string union — matches task intent classification keys. Used in
+ * TASK_TYPE_ADR_PRESETS for guaranteed ADR inclusion per type. Backward-compat
+ * alias of the canonical {@link AdrTaskType} (single-sourced in
+ * `core/work-model.ts`, WM-2); kept as a named re-export so existing importers
+ * keep resolving. New code references `AdrTaskType`.
  */
-export type TaskType =
-  | 'core-dev'
-  | 'docs'
-  | 'test'
-  | 'cli'
-  | 'mcp'
-  | 'security'
-  | 'observability'
-  | 'orchestra'
-  | 'provider'
-  | 'dashboard';
+export type TaskType = AdrTaskType;
 
 /**
  * Preset ADR IDs guaranteed to appear in the top-N for each task type.
@@ -62,7 +55,7 @@ export type TaskType =
  *
  * Sprint 146 — Task 146-006
  */
-export const TASK_TYPE_ADR_PRESETS: Record<TaskType, string[]> = {
+export const TASK_TYPE_ADR_PRESETS: Record<AdrTaskType, string[]> = {
   'core-dev':      ['adr-001', 'adr-002', 'adr-008', 'adr-015'],
   'docs':          ['adr-029', 'adr-030', 'adr-032'],
   // WP-15: adr-087 (Async I/O & Test Hermeticity Standard) is THE test-hermeticity
@@ -243,7 +236,7 @@ function scoreIntentPreference(adr: MemoryEntryV2, intent: string): { score: num
  * Ensures architecturally critical ADRs always appear in prompt injection.
  */
 function scorePresetBonus(adr: MemoryEntryV2, taskType: string): { score: number; reason: string | null } {
-  const presets = TASK_TYPE_ADR_PRESETS[taskType as TaskType];
+  const presets = TASK_TYPE_ADR_PRESETS[taskType as AdrTaskType];
   if (!presets) return { score: 0, reason: null };
 
   const adrId = adr.id.toLowerCase();

@@ -11,7 +11,7 @@ import type {
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS missions (
   id TEXT PRIMARY KEY, kind TEXT NOT NULL, status TEXT NOT NULL,
-  tenant TEXT NOT NULL DEFAULT 'local', title TEXT NOT NULL, spec TEXT,
+  tenant TEXT NOT NULL, title TEXT NOT NULL, spec TEXT,
   created_by TEXT, deliver_to TEXT, render_as TEXT NOT NULL, progress TEXT,
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, completed_at TEXT, last_result TEXT );
 CREATE TABLE IF NOT EXISTS work_items (

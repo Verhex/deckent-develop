@@ -12,7 +12,7 @@ import type { SprintHistory } from './timeout-estimator.js';
 import { writeEvent, CHANNELS } from './event-stream.js';
 import { getUserSurfaceBonus, USER_SURFACE_AGENTS, isSurfaceBuildTask } from '../core/routing-engine.js';
 import { classifyIntent } from '../core/intent-classifier.js';
-import { taskKindToIntent } from '../core/work-model.js';
+import { taskKindToIntent, type RouterTaskType } from '../core/work-model.js';
 import type { IntentType } from '../core/routing-types.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -53,13 +53,18 @@ export interface TaskRouting {
   authMode: 'subscription' | 'api';
 }
 
-/** Task type categories detected from scope and file patterns */
-export type TaskType = 'code' | 'test' | 'doc' | 'design' | 'unknown';
+/**
+ * Task type categories detected from scope and file patterns — backward-compat
+ * alias of the canonical {@link RouterTaskType} (single-sourced in
+ * `core/work-model.ts`, WM-2). Kept as a named re-export so existing importers
+ * keep resolving; new code references `RouterTaskType`.
+ */
+export type TaskType = RouterTaskType;
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
 /** Map from task type to skill_routing config key */
-const TASK_TYPE_TO_ROUTING_KEY: Record<TaskType, keyof SkillRoutingConfig | null> = {
+const TASK_TYPE_TO_ROUTING_KEY: Record<RouterTaskType, keyof SkillRoutingConfig | null> = {
   design: 'design',
   test: 'testing',
   doc: 'docs',
@@ -115,7 +120,7 @@ function inferProviderFromModel(model: ModelType | string): ProviderName | undef
  * @param task - The task to classify
  * @returns The detected task type category
  */
-export function detectTaskType(task: Task): TaskType {
+export function detectTaskType(task: Task): RouterTaskType {
   const dirs = task.scope.directories;
   const allFiles = [...task.scope.filesWrite, ...task.scope.filesRead];
   const writeFiles = task.scope.filesWrite;

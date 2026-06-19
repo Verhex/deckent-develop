@@ -57,21 +57,37 @@ export interface AuditQueryResult {
  * for the tenant scope. Calls `can(role, Permission.READ, tenantId)` — returns
  * an empty result if the check fails (fail-closed, ADR-037).
  *
+ * When `opts.strictTenantIsolation` is true, `query.tenantId` is used as-is with
+ * no 'local' fallback. A missing tenantId in strict mode is fail-closed (empty result).
+ *
  * @param projectRoot - Project root directory
  * @param sprintId    - Sprint identifier, e.g. "sprint-205"
  * @param query       - Filter parameters (all optional, AND semantics)
  * @param role        - Optional caller role for RBAC enforcement
+ * @param opts        - Optional enforcement overrides
  */
 export function queryAudit(
   projectRoot: string,
   sprintId: string,
   query: AuditQuery = {},
   role?: string,
+  opts?: { strictTenantIsolation?: boolean },
 ): AuditQueryResult {
   if (role !== undefined) {
-    const tenantId = query.tenantId ?? 'local';
-    if (!can(role, Permission.READ, tenantId)) {
-      return { sprintId, totalScanned: 0, matched: [] };
+    const strict = opts?.strictTenantIsolation ?? false;
+    if (strict) {
+      // Strict mode: never default to 'local'. Missing tenantId = fail-closed.
+      if (query.tenantId === undefined) {
+        return { sprintId, totalScanned: 0, matched: [] };
+      }
+      if (!can(role, Permission.READ, query.tenantId)) {
+        return { sprintId, totalScanned: 0, matched: [] };
+      }
+    } else {
+      const tenantId = query.tenantId ?? 'local';
+      if (!can(role, Permission.READ, tenantId)) {
+        return { sprintId, totalScanned: 0, matched: [] };
+      }
     }
   }
 

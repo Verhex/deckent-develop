@@ -68,6 +68,21 @@ export class DirectivesMidSprintProtection {
     );
   }
 
+  /**
+   * Predicate: DIRECTIVES_WRITE'ın timeout-auto-proceed'de güvenli olup olmadığını kontrol eder.
+   * EXECUTE fazında veto (koruyucu); FIX fazında ok (emergency restore güvenli).
+   */
+  canAutoApply(payload: Record<string, unknown>): { ok: boolean; reason: string } {
+    const phase = typeof payload['phase'] === 'string' ? payload['phase'] : '';
+    if (phase === 'EXECUTE') {
+      return { ok: false, reason: 'DIRECTIVES_WRITE during EXECUTE phase — veto auto-apply, human approval required' };
+    }
+    if (phase === 'FIX') {
+      return { ok: true, reason: 'DIRECTIVES_WRITE during FIX phase — safe to auto-restore' };
+    }
+    return { ok: true, reason: 'DIRECTIVES_WRITE auto-apply OK' };
+  }
+
   private buildCriticalAlert(ctx: DetectorContext, reason: string): DetectorResult {
     return {
       risk: 'high',

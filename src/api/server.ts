@@ -55,7 +55,7 @@ import { resolveChatProvider } from '../core/config.js';
 import { resolveChatAdapter } from '../cli/commands/chat-provider-parity.js';
 import { registerCoverageRoutes } from './coverage-endpoint.js';
 import { registerDocsHealthRoute } from './docs-health-endpoint.js';
-import { registerAuthMeRoute } from './auth-me-endpoint.js';
+import { registerAuthMeRoute, deriveRequestPrincipal } from './auth-me-endpoint.js';
 import { registerOidcCallbackRoute } from './oidc-callback-endpoint.js';
 import { handleOutputStream, isOutputStreamRequest } from './output-stream.js';
 import { createOutputCollector, type OutputCollector } from '../core/output-collector.js';
@@ -1512,6 +1512,9 @@ export function createHttpServer(
       if (terminalMgr && terminalAuth && terminalAudit && rawUrl.startsWith('/api/terminal/')) {
         const authHeader = req.headers['authorization'] ?? '';
         const tok = authHeader.replace(/^Bearer\s+/i, '');
+        // Derive principal from request bearer (claims read from JWT; unverified before auth gate).
+        const terminalPrincipal = deriveRequestPrincipal(req);
+        const terminalTenantId: string = terminalPrincipal.tenantId ?? 'local';
         // Async seam (Sprint 268): prefer verifyAsync when the provider defines
         // it (JWKS key resolution) — the handler is already async. Sync-only
         // providers (LocalToken) keep the exact previous code path.
@@ -1521,7 +1524,7 @@ export function createHttpServer(
         if (!terminalAuthorized) {
           terminalAudit.record({
             action: 'auth.deny',
-            tenantId: 'local',
+            tenantId: terminalTenantId,
             detail: `http ${method} ${urlPath}`,
             at: new Date().toISOString(),
           });
@@ -1540,11 +1543,11 @@ export function createHttpServer(
               kind: kind as SessionKind,
               tool: input.tool as CreateSessionInput['tool'],
               args: input.args,
-              tenantId: 'local' as TenantId,
+              tenantId: terminalTenantId as TenantId,
             });
             terminalAudit.record({
               action: 'session.create',
-              tenantId: 'local',
+              tenantId: terminalTenantId,
               sessionId: sess.id,
               detail: `kind=${sess.kind}`,
               at: new Date().toISOString(),
@@ -1571,7 +1574,7 @@ export function createHttpServer(
           terminalMgr.kill(id);
           terminalAudit.record({
             action: 'session.kill',
-            tenantId: 'local',
+            tenantId: terminalTenantId,
             sessionId: id,
             detail: 'http delete',
             at: new Date().toISOString(),

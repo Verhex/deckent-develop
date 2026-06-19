@@ -21,7 +21,10 @@ import { DecisionEngine } from './decision-engine.js';
 import { Proposer } from './proposer.js';
 import { NervousDispatcher } from './dispatcher.js';
 import { Executor, APPROVE_TIMEOUT_MS } from './executor.js';
+import type { CanAutoApplyFn } from './executor.js';
 import { NervousHistory } from './history.js';
+import { StaleWorkerDetector } from './detectors/stale-worker.js';
+import { DirectivesMidSprintProtection } from './detectors/directives-protection.js';
 import {
   NervousIpcQueue,
   writeNervousHeartbeat,
@@ -201,7 +204,14 @@ export function createNervousSystemIfEnabled(
   // make-usable #3: thread the configurable approve auto-proceed timeout (0 or
   // negative → never auto-proceed; the cautious-user trust setting).
   const approveTimeoutMs = nervousConfig.approve_timeout_ms ?? APPROVE_TIMEOUT_MS;
-  const executor = new Executor(history, actionHandler, pendingStore, projectRoot, approveTimeoutMs);
+  // NERV-W1b: predicate map — canAutoApply per action-id (executor line ~416 consumes this)
+  const staleDetector = new StaleWorkerDetector();
+  const directivesDetector = new DirectivesMidSprintProtection();
+  const canAutoApplyMap = new Map<string, CanAutoApplyFn>([
+    ['WORKER_RESPAWN', (p) => staleDetector.canAutoApply(p)],
+    ['DIRECTIVES_WRITE', (p) => directivesDetector.canAutoApply(p)],
+  ]);
+  const executor = new Executor(history, actionHandler, pendingStore, projectRoot, approveTimeoutMs, canAutoApplyMap);
 
   // APPROVE-005 (§4G): poll the MCP IPC queue so `deckent_nervous_accept/reject`
   // (which write approval files) resolve the running executor's pending map —

@@ -1,7 +1,16 @@
 import { spawnSync } from 'node:child_process';
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Command } from 'commander';
 import { print, printError } from '../helpers/output.js';
-import { DECKENT_VERSION } from '../../core/constants.js';
+import { DECKENT_VERSION, DECKENT_DIR } from '../../core/constants.js';
+import {
+  checkWorkerImage,
+  buildSuggestedImageCmd,
+  DEFAULT_WORKER_IMAGE,
+  type SpawnImpl,
+} from '../../core/worker-image-check.js';
+import { handleImageBuild } from './image.js';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -353,6 +362,66 @@ export function upgradeFromLocal(tgzPath: string): boolean {
   } catch {
     return false;
   }
+}
+
+// ─── Docker Image Re-provision ───────────────────────────────────────────────
+
+export interface ReprovisionOpts {
+  /** Injectable spawn for hermetic tests. */
+  spawnImpl?: SpawnImpl;
+  /** Language for messages. */
+  lang?: string;
+}
+
+/**
+ * After a deckent upgrade, check whether the docker worker image needs
+ * rebuilding (missing or stale) and, if so, rebuild it automatically.
+ *
+ * Call this after a successful `executeUpgrade` when the project uses
+ * spawn_backend === 'docker'. Provider-config changes (e.g. adding codex)
+ * may require image re-provision with different build-args.
+ *
+ * Returns the handleImageBuild exit code (0 = success), or undefined when
+ * no build was needed or the project does not use docker backend.
+ */
+export async function reprovisionWorkerImageAfterUpgrade(
+  root: string,
+  opts: ReprovisionOpts = {},
+): Promise<number | undefined> {
+  const configPath = join(root, DECKENT_DIR, 'config.json');
+  if (!existsSync(configPath)) return undefined;
+
+  let config: Record<string, unknown>;
+  try {
+    config = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+
+  if (config['spawn_backend'] !== 'docker') return undefined;
+
+  const image = typeof config['worker_image'] === 'string' && config['worker_image'].trim()
+    ? config['worker_image'].trim()
+    : DEFAULT_WORKER_IMAGE;
+
+  const requiredProviders = [
+    config['worker_provider'],
+    config['brain_provider'],
+  ].filter((p): p is string => typeof p === 'string' && p.length > 0);
+
+  const report = await checkWorkerImage({ image, requiredProviders, spawnImpl: opts.spawnImpl });
+  if (report.state === 'ready') return undefined;
+
+  print(`  Worker image is ${report.state} after upgrade — re-provisioning...`);
+  print(`  ${buildSuggestedImageCmd(image, requiredProviders)}`);
+
+  const code = await handleImageBuild({
+    image,
+    lang: opts.lang,
+    withCodex: requiredProviders.includes('codex'),
+    withGemini: requiredProviders.includes('gemini'),
+  }, opts.spawnImpl);
+  return code;
 }
 
 export function registerUpgrade(program: Command): void {

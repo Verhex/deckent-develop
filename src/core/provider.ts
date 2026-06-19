@@ -5,6 +5,8 @@ import { PROVIDER_MODEL_MAP } from './task-types.js';
 import { getEquivalentModel } from './model-equivalence.js';
 import { Connector } from './session-interface.js';
 import { loadDeckSecrets } from './deck-file.js';
+import { detectAndRegisterModels, type DetectResult, type DetectAndRegisterOptions } from './model-auto-detect.js';
+import { modelRegistry as globalModelRegistry, type ModelRegistry } from './model-registry.js';
 
 // ─── Provider Spawn Options ──────────────────────────────────────────
 export interface ProviderSpawnOptions {
@@ -771,6 +773,13 @@ export interface BootstrapResult {
    * Intended for passing to SubprocessBackend.spawn() env option.
    */
   providerEnvOverrides: Record<string, Record<string, string>>;
+  /**
+   * Background model auto-detect promise (F1-AD). Resolves once all probed
+   * providers have registered discovered models into the global ModelRegistry.
+   * Fire-and-forget: bootstrap does NOT await this — callers that need the
+   * detected models available synchronously should await this promise.
+   */
+  modelAutoDetectPromise: Promise<DetectResult[]>;
 }
 
 /**
@@ -789,6 +798,7 @@ export async function bootstrapProviders(
   config: Pick<ResolvedConfig, 'brain_provider' | 'worker_provider' | 'fallback_provider' | 'projectRoot' | 'providers'> & { auth_mode?: 'subscription' | 'api' | 'hybrid' },
   projectRoot?: string,
   registry: ProviderRegistry = providerRegistry,
+  _hooks?: { mr?: ModelRegistry; detectOpts?: DetectAndRegisterOptions },
 ): Promise<BootstrapResult> {
   const root = projectRoot ?? config.projectRoot;
 
@@ -1024,5 +1034,15 @@ export async function bootstrapProviders(
     // Health check failure should not block bootstrap
   }
 
-  return { connector, registered, skipped, defaultProvider, providerEnvOverrides };
+  // ─── Model Auto-Detect (F1-AD) — fire-and-forget, best-effort ─────────────
+  // Probe available provider CLIs and register any discovered model-ids in
+  // the global ModelRegistry (parametric — no code change needed for new models).
+  // Does NOT block bootstrap: the promise is returned for callers that need it.
+  const mr = _hooks?.mr ?? globalModelRegistry;
+  const modelAutoDetectPromise = detectAndRegisterModels(
+    mr,
+    { timeoutMs: 5_000, ...(_hooks?.detectOpts ?? {}) },
+  ).catch(() => [] as DetectResult[]);
+
+  return { connector, registered, skipped, defaultProvider, providerEnvOverrides, modelAutoDetectPromise };
 }

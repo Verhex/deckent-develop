@@ -77,6 +77,28 @@ function providerUnavailable(reason: string, lang: 'en' | 'tr'): string {
   return `${PROVIDER_UNAVAILABLE_PREFIX[lang]}: ${reason}`;
 }
 
+// chat-agentic-dispatch: server-side slash-command dispatcher for /status, /recall, /plan.
+// Returns the dispatch reply string, or null when the slash command is not recognised.
+// Only handles slash-prefixed input (e.g. "/status") — keyword commands ("status", "help")
+// remain on the buildChatReply classifier path (backward-compatible).
+export function chatAgenticDispatch(message: string, ctx: ChatContext): string | null {
+  const m = message.trim();
+  if (!m.startsWith('/')) return null;
+
+  const [cmd = ''] = m.slice(1).split(/\s+/);
+  switch (cmd.toLowerCase()) {
+    case 'status':
+    case 'durum':
+      return `Sprint durumu: ${ctx.status?.() ?? 'No status available.'}`;
+    case 'recall':
+      return 'Use `deckent recall "<query>"` in the terminal, or the Memory page in the dashboard.';
+    case 'plan':
+      return 'Use `deckent plan` in the terminal to see the current sprint plan.';
+    default:
+      return `Unknown slash command: ${m}. Available: /status, /recall, /plan.`;
+  }
+}
+
 export interface ResolveChatReplyOptions {
   /** Configured provider adapter; null when none was resolved at server setup. */
   adapter?: ChatProviderAdapter | null;
@@ -87,7 +109,8 @@ export interface ResolveChatReplyOptions {
 /**
  * Resolve a chat reply for POST /api/chat.
  *
- * - Explicit command (status/help/empty) → `buildChatReply` classifier.
+ * - Slash command (/status, /recall, /plan) → `chatAgenticDispatch`.
+ * - Explicit keyword command (status/help/empty) → `buildChatReply` classifier.
  * - Natural-language message → `adapter.send()` (real provider reply).
  * - No adapter / adapter throws / empty reply → honest i18n error
  *   ("Chat provider unavailable: …") — never a silent classifier fallback.
@@ -97,6 +120,12 @@ export async function resolveChatReply(
   ctx: ChatContext,
   opts: ResolveChatReplyOptions = {},
 ): Promise<string> {
+  // Slash commands (/status, /recall, /plan) → chat-agentic-dispatch
+  if (message.trim().startsWith('/')) {
+    const dispatched = chatAgenticDispatch(message.trim(), ctx);
+    if (dispatched !== null) return dispatched;
+  }
+
   if (isExplicitChatCommand(message)) {
     return buildChatReply(message, ctx);
   }

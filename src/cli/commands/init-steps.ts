@@ -40,10 +40,18 @@ import { seedDocsConfig } from '../../orchestra/managed-docs/docs-config.js';
 import { ADR_SEED_DATA, createIdentitySeed } from '../../core/adr-seed.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import { print } from '../helpers/output.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { generateCodexConfig } from '../helpers/codex-config.js';
 import { generateGeminiConfig } from '../helpers/gemini-config.js';
 import { generateCursorConfig } from '../helpers/cursor-config.js';
 import { createDeckTemplate, ensureDeckGitignore } from '../../core/deck-file.js';
+import {
+  checkWorkerImage,
+  buildSuggestedImageCmd,
+  DEFAULT_WORKER_IMAGE,
+  type SpawnImpl,
+} from '../../core/worker-image-check.js';
+import { handleImageBuild } from './image.js';
 import {
   generateDeckentContentTR,
   generateDeckentContentEN,
@@ -646,3 +654,73 @@ function resolveBuiltinsDir(): string | null {
   } catch { /* no builtins available */ }
   return null;
 }
+
+// ─── Docker Worker Image Provisioning ───────────────────────────────
+
+export interface ProvisionDockerImageOpts {
+  /** Auto-confirm build without prompting — equivalent to --yes. */
+  yes?: boolean;
+  /** Language code for i18n messages. */
+  lang?: string;
+  /** Injectable spawn implementation for hermetic tests. */
+  spawnImpl?: SpawnImpl;
+}
+
+/**
+ * Check whether the docker worker image is present/up-to-date and, if not,
+ * build it automatically. Called during `deckent init` (zero-touch first-install)
+ * when spawn_backend === 'docker' is detected in config.
+ *
+ * - No-op if spawn_backend is not 'docker' or config is absent.
+ * - Reads required providers from config (worker_provider, brain_provider).
+ * - Delegates image detection to checkWorkerImage and build to handleImageBuild.
+ * - Pass `spawnImpl` to keep tests hermetic (no real docker invocations).
+ *
+ * Returns the exit code from handleImageBuild (0 = success), or undefined when
+ * no build was needed.
+ */
+export async function maybeProvisionDockerImage(
+  root: string,
+  opts: ProvisionDockerImageOpts = {},
+): Promise<number | undefined> {
+  const configPath = join(root, DECKENT_DIR, 'config.json');
+  if (!existsSync(configPath)) return undefined;
+
+  let config: Record<string, unknown>;
+  try {
+    config = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+
+  if (config['spawn_backend'] !== 'docker') return undefined;
+
+  const lang = getLanguage(opts.lang);
+  const image = typeof config['worker_image'] === 'string' && config['worker_image'].trim()
+    ? config['worker_image'].trim()
+    : DEFAULT_WORKER_IMAGE;
+
+  // Derive required providers from config for CLI probe
+  const requiredProviders = [
+    config['worker_provider'],
+    config['brain_provider'],
+  ].filter((p): p is string => typeof p === 'string' && p.length > 0);
+
+  const report = await checkWorkerImage({ image, requiredProviders, spawnImpl: opts.spawnImpl });
+  if (report.state === 'ready') return undefined;
+
+  print(getMessage('doctor.image_not_ready', lang));
+  print(`  ${getMessage('doctor.image_build_hint', lang)}`);
+
+  // Translate provider names → handleImageBuild flags (codex/gemini are opt-in build-args)
+  const code = await handleImageBuild({
+    image,
+    lang: opts.lang,
+    withCodex: requiredProviders.includes('codex'),
+    withGemini: requiredProviders.includes('gemini'),
+  }, opts.spawnImpl);
+  return code;
+}
+
+// Re-export for consumers that only import from init-steps
+export { buildSuggestedImageCmd, checkWorkerImage };

@@ -211,6 +211,16 @@ export interface DeckentConfig {
    *  tenant sees ONLY its own rows — closes the NULL-tenant leak for strict
    *  multi-tenant deployments. */
   strict_tenant_isolation?: boolean;
+  /** F8-003 — capability least-privilege hard-flip (default: false).
+   *  When true, capability invocations auto-derive grants from `ROLE_CAPABILITY_MAP[actor.role]`
+   *  and hard-deny missing capabilities with a `capability.denied` audit event.
+   *  Default-off: permissive v1 behavior preserved. */
+  enforce_least_privilege?: boolean;
+  /** F10-002 — risk-gate hard-park for HIGH-risk capability verbs (default: false).
+   *  When true, the autonomous policy-engine parks entries whose resolved risk class
+   *  is HIGH (shell / db-write / erp-write verbs) even after a 'permit' verdict.
+   *  Flag-gated, additive; default-off preserves v1 permissive behavior. */
+  risk_gate_enabled?: boolean;
   /** Spawn backend: 'docker' | 'tmux' | 'subprocess' | 'auto' (default: 'auto') */
   spawn_backend?: 'docker' | 'tmux' | 'subprocess' | 'auto';
   /** Docker image for worker containers (default: 'deckent-worker:latest') */
@@ -792,6 +802,25 @@ export interface ResolvedConfig {
    *  When true, tenant-scoped queries omit the `OR tenant_id IS NULL` clause.
    *  @see DeckentConfig.strict_tenant_isolation */
   strict_tenant_isolation?: boolean;
+  /** ENT-1 — HARD RBAC enforcement on the autonomous spawn paths (default: false).
+   *  When false (ADR-037 V1.0): a role-denied capability is warn-only + audit-trailed but
+   *  still proceeds. When true: the backlog-entry / sprint worker-spawn gates HARD-deny a
+   *  request whose `actor.role` lacks a required capability. Additive + backward-safe; the
+   *  permissive default keeps v1 allow-all for role-less requests.
+   *  @see checkWorkerAuthority (src/nervous/authority-matrix.ts) */
+  enforce_rbac?: boolean;
+  /** F8-003 — capability least-privilege hard-flip (default: false).
+   *  When false: capability invocations proceed regardless of actor role (permissive v1-default).
+   *  When true: sets `CapabilityRegistry.leastPrivilegeEnabled = true` — every invocation
+   *  auto-derives grants from `ROLE_CAPABILITY_MAP[actor.role]`; a missing capability is
+   *  HARD-denied + audit-trailed (`action: 'capability.denied'`). Flag-gated, additive. */
+  enforce_least_privilege?: boolean;
+  /** F10-002 — risk-gate hard-park for HIGH-risk capability verbs (default: false).
+   *  When true + autonomous policy-engine verdict is 'permit', entries whose resolved
+   *  risk class is HIGH (shell / db-write / erp-write verbs) are PARKED rather than
+   *  executed. Flag-gated, additive; default-off preserves v1 permissive behavior.
+   *  @see DeckentConfig.risk_gate_enabled */
+  risk_gate_enabled?: boolean;
   /** Spawn backend: 'docker' | 'tmux' | 'subprocess' | 'auto' (default: 'auto') */
   spawn_backend?: 'docker' | 'tmux' | 'subprocess' | 'auto';
   /** Docker image for worker containers (default: 'deckent-worker:latest') */
