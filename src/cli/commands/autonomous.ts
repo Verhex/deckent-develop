@@ -40,9 +40,9 @@ import type {
 import { makeFlowReporter, type FlowReporter, type FlowStepRecord } from '../../orchestra/autonomous/flow-reporter.js';
 import { writeAuditEvent } from '../../core/audit-writer.js';
 import { loadBacklog, validateBacklogEntry, cleanupAutonomousArtifacts } from '../../orchestra/autonomous/backlog.js';
-import { planGoal, plannedItemToBacklogEntry } from '../../orchestra/autonomous/goal-planner.js';
+import { planGoal, plannedItemToBacklogEntry, parsePlannedItems } from '../../orchestra/autonomous/goal-planner.js';
 import { extractArtifactSeeds } from '../../orchestra/autonomous/artifact-ref.js';
-import type { LlmComplete } from '../../orchestra/autonomous/goal-planner-types.js';
+import type { LlmComplete, PlannedItem } from '../../orchestra/autonomous/goal-planner-types.js';
 import { resolveAdapter, buildPlannerSpawnArgs } from '../../orchestra/planner.js';
 import { spawnSync } from 'node:child_process';
 import { makeDebtWorkGenerator } from '../../orchestra/autonomous/work-generator-source.js';
@@ -53,6 +53,8 @@ import { runTaskMode } from '../../orchestra/task-mode-runner.js';
 import { runSprint as runSprintLifecycle } from '../../orchestra/sprint-controller.js';
 import { waitForRunResult } from './run.js';
 import { isV2Engine, runV2Engine } from '../../orchestra/autonomous/mission-store/mission-engine-wire.js';
+import { buildGoalDeps, type GoalAdvanceDeps } from '../../orchestra/autonomous/mission-store/goal-mission.js';
+import type { NewWorkItem, WorkItem } from '../../orchestra/autonomous/mission-store/mission-types.js';
 import { loadConfig } from '../../core/config.js';
 import { PROJECT_CONFIG_PATH, RECENT_WORKS_DIR } from '../../core/constants.js';
 import { bootstrapProviders } from '../../core/provider.js';
@@ -320,6 +322,121 @@ function realPlannerComplete(model: string): LlmComplete {
   };
 }
 
+// ─── Type-2 goal-loop bindings (live planner + accepter) ───────────────
+
+/**
+ * Infinite-loop guard for the live goal-loop: the maximum cumulative work-items a
+ * single goal mission may author before being force-exhausted. A finite bound is a
+ * production safety net — the loop also terminates early when the planner returns an
+ * empty batch (goal reached) — so a misbehaving planner cannot author forever.
+ */
+const GOAL_MAX_ROUNDS = 50;
+
+/** One status line per work-item, shared by the planner + accepter prompts. */
+function formatWorkItemLines(items: WorkItem[]): string {
+  if (items.length === 0) return '(none)';
+  return items
+    .map((i) => {
+      const desc = typeof i.spec?.['description'] === 'string' ? (i.spec['description'] as string) : i.id;
+      const outcome = i.lastResult?.ok === false ? 'FAILED' : i.status;
+      return `- [${outcome}] ${desc}`;
+    })
+    .join('\n');
+}
+
+/**
+ * Planner prompt: given the goal + prior work, ask for the NEXT PlannedItem batch
+ * (or an EMPTY list when the goal is already reached). Reuses the PlannedItem JSON
+ * contract so {@link parsePlannedItems} validates the output, and feeds the prior
+ * work so the model can go dry — the signal the goal-loop needs to evaluate
+ * acceptance instead of authoring forever.
+ */
+function buildGoalNextPrompt(goal: string, priorItems: WorkItem[]): string {
+  return `You are the Deckent autonomous GOAL driver. Decide the NEXT batch of work-items that advances the GOAL, given what has ALREADY been done.
+
+GOAL: ${goal}
+
+Already attempted/completed work-items:
+${formatWorkItemLines(priorItems)}
+
+If the GOAL is already fully achieved by the work above, output an EMPTY list: { "items": [] }.
+Otherwise output the NEXT lightweight work-items (titles + kind + scope only, NO implementation detail — detail is generated just-in-time). Do NOT repeat work already done.
+
+Output STRICT JSON: { "items": PlannedItem[] }. Each PlannedItem:
+{ "id": kebab-slug, "title": short, "kind": "task"|"sprint"|"capability"|"process",
+  "scopeDir": repo-relative dir (e.g. "src/api/"), "summary": one line WHAT,
+  "policy": "auto"|"approval-required"|"risk-tagged",
+  "trigger": "one-off" | {"recurring":"<cron>"} | {"reactive":"<detector>"} }
+
+Output ONLY the JSON, no prose.`;
+}
+
+/** Acceptance prompt: given the goal + settled work, ask for a strict reached verdict. */
+function buildGoalAcceptPrompt(goal: string, items: WorkItem[]): string {
+  return `You are the Deckent autonomous GOAL acceptance evaluator. Decide whether the GOAL has been REACHED, given the settled work-items below.
+
+GOAL: ${goal}
+
+Settled work-items:
+${formatWorkItemLines(items)}
+
+Answer STRICT JSON: { "reached": true } if the goal is fully achieved, else { "reached": false }. Output ONLY the JSON, no prose.`;
+}
+
+/** Map validated PlannedItems onto the goal-loop's NewWorkItem contract. `missionId`
+ *  is a placeholder — advanceGoalMission stamps the real mission id at enqueue. */
+function plannedItemsToWorkItems(items: PlannedItem[]): NewWorkItem[] {
+  return items.map((p) => ({
+    id: p.id,
+    missionId: '',
+    kind: p.kind,
+    spec: { description: p.summary, scopeDir: p.scopeDir },
+    policy: p.policy,
+  }));
+}
+
+/**
+ * Parse the acceptance verdict (`{ "reached": boolean }`) from raw model text.
+ * Fence/preamble + provider-envelope (`.result`) tolerant. Conservative default is
+ * `false` — an ambiguous answer never declares the goal reached.
+ */
+function parseGoalAccepted(raw: string): boolean {
+  const s = raw.trim();
+  const i = s.indexOf('{');
+  const j = s.lastIndexOf('}');
+  if (i >= 0 && j > i) {
+    try {
+      const obj = JSON.parse(s.slice(i, j + 1)) as { reached?: unknown; result?: unknown };
+      if (typeof obj.reached === 'boolean') return obj.reached;
+      // Provider-envelope tolerance: the inner model text lives under `.result`.
+      if (typeof obj.result === 'string') return parseGoalAccepted(obj.result);
+    } catch {
+      // fall through to the conservative token scan
+    }
+  }
+  return /^(true|yes|reached|accepted)\b/i.test(s);
+}
+
+/**
+ * Build the live Type-2 goal-loop bindings from an injected LLM completion. The
+ * production wire passes `realPlannerComplete('sonnet')`; tests pass a fake. The
+ * `planner` decomposes the goal (given prior work) into the next work-items — an
+ * empty batch signals "goal reached" so the loop evaluates the `accepter`, which
+ * asks the same LLM whether the goal is reached. {@link buildGoalDeps} adapts these
+ * onto the loop's author/accept surface and carries the maxRounds guard.
+ */
+export function buildLiveGoalDeps(complete: LlmComplete): GoalAdvanceDeps {
+  const planner = async (goal: string, priorItems: WorkItem[]): Promise<NewWorkItem[]> => {
+    const raw = await complete(buildGoalNextPrompt(goal, priorItems));
+    return plannedItemsToWorkItems(parsePlannedItems(raw));
+  };
+  const accepter = async (goal: string, items: WorkItem[]): Promise<boolean> => {
+    const raw = await complete(buildGoalAcceptPrompt(goal, items));
+    return parseGoalAccepted(raw);
+  };
+  return buildGoalDeps({ planner, accepter, maxRounds: GOAL_MAX_ROUNDS });
+}
+
 // ─── start ────────────────────────────────────────────────────────────
 
 export interface AutonomousStartOptions {
@@ -419,6 +536,11 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
           return { ok: res.selfAssessment !== 'NO_GO', reason: res.notes };
         },
         runSprint: (projectRoot) => runSprintLifecycle(projectRoot, sprintConfigV2),
+        // Type-2 goal-driver: real planner + acceptance evaluator (same provider as
+        // the JIT planner). Without this, idle `kind='goal'` missions never advance —
+        // author/accept stays inert (the live wiring-gap this closes). buildGoalDeps
+        // carries the maxRounds infinite-loop guard.
+        goalDeps: buildLiveGoalDeps(realPlannerComplete('sonnet')),
         signal: controllerV2.signal,
         ...(maxIterationsV2 !== undefined ? { maxIterations: maxIterationsV2 } : {}),
         lang,

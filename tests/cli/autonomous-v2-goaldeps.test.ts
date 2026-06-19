@@ -1,0 +1,173 @@
+// tests/cli/autonomous-v2-goaldeps.test.ts
+//
+// Hermetic tests for the live Type-2 goal-loop wiring (Task 297-002):
+//   1. buildLiveGoalDeps — planner parses the LLM `{items:[…]}` output into
+//      NewWorkItem[] (and goes dry on an empty list); accepter parses the
+//      `{reached:boolean}` verdict. A fake LlmComplete is injected so the REAL
+//      adapter logic (prompt build + parse) is asserted — never a live LLM.
+//   2. handleStart (engine=v2) actually passes `goalDeps` into runV2Engine —
+//      the wiring-gap this task closes. runV2Engine + bootstrapProviders are
+//      mocked so no spawn / no real scheduler runs.
+
+// Mock the v2 engine wire so handleStart's v2 path is captured WITHOUT running the
+// real MissionScheduler. `...actual` keeps isV2Engine real (handleStart gates on it).
+const { runV2Spy } = vi.hoisted(() => ({ runV2Spy: vi.fn() }));
+vi.mock('../../src/orchestra/autonomous/mission-store/mission-engine-wire.js', async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    runV2Engine: (...args: unknown[]) => {
+      runV2Spy(...args);
+      return Promise.resolve({ iterations: 0, dispatched: 0, reason: 'drained' });
+    },
+  };
+});
+
+// Mock bootstrapProviders so the ollama HTTP probe does not run in CI (hermetic + fast).
+vi.mock('../../src/core/provider.js', async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return { ...actual, bootstrapProviders: vi.fn().mockResolvedValue({ registered: [], skipped: [] }) };
+});
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { buildLiveGoalDeps, handleStart } from '../../src/cli/commands/autonomous.js';
+import type { LlmComplete } from '../../src/orchestra/autonomous/goal-planner-types.js';
+import type { WorkItem } from '../../src/orchestra/autonomous/mission-store/mission-types.js';
+import { useSandboxHome } from '../helpers/sandbox-home.js';
+
+// ─── Helpers ──────────────────────────────────────────────────────────
+
+const dirs: string[] = [];
+function mkRoot(): string {
+  const d = mkdtempSync(join(tmpdir(), 'goaldeps-'));
+  dirs.push(d);
+  return d;
+}
+afterEach(() => {
+  for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+});
+
+/** Minimal settled WorkItem fixture (only the fields the adapters read). */
+function wi(partial: Partial<WorkItem>): WorkItem {
+  return {
+    id: 'wi', missionId: 'm', kind: 'task', status: 'done', spec: null,
+    policy: 'auto', renderAs: 'task', progress: null, dependsOn: [], trigger: null,
+    claimedAt: null, claimedBy: null, createdAt: 'T', updatedAt: 'T', lastResult: null,
+    ...partial,
+  };
+}
+
+// ─── buildLiveGoalDeps — planner adapter ───────────────────────────────
+
+describe('buildLiveGoalDeps — planner', () => {
+  it('parses the LLM {items:[…]} output into NewWorkItem[] (id/kind/description)', async () => {
+    const complete: LlmComplete = async () =>
+      JSON.stringify({
+        items: [
+          { id: 'step-1', title: 'Step 1', kind: 'task', scopeDir: 'src/api/', summary: 'do step 1', policy: 'auto', trigger: 'one-off' },
+          { id: 'step-2', title: 'Step 2', kind: 'sprint', scopeDir: 'src/', summary: 'do step 2', policy: 'auto', trigger: 'one-off' },
+        ],
+      });
+    const deps = buildLiveGoalDeps(complete);
+
+    const items = await deps.author('reach the goal', []);
+
+    expect(items.map((i) => i.id)).toEqual(['step-1', 'step-2']);
+    expect(items[0]!.kind).toBe('task');
+    expect(items[0]!.spec?.['description']).toBe('do step 1');
+    expect(items[0]!.spec?.['scopeDir']).toBe('src/api/');
+    expect(items[1]!.kind).toBe('sprint');
+  });
+
+  it('returns [] when the LLM emits an empty item list (goal-reached / dry signal)', async () => {
+    const complete: LlmComplete = async () => JSON.stringify({ items: [] });
+    const deps = buildLiveGoalDeps(complete);
+
+    const items = await deps.author('goal', [wi({ id: 'prev', status: 'done' })]);
+
+    expect(items).toEqual([]);
+  });
+
+  it('tolerates a code-fenced provider envelope and still parses items', async () => {
+    // realPlannerComplete-style: model text fenced + provider `.result` wrapping.
+    const complete: LlmComplete = async () =>
+      JSON.stringify({
+        result: '```json\n{ "items": [ { "id": "a", "title": "A", "kind": "task", "scopeDir": "src/", "summary": "a", "policy": "auto", "trigger": "one-off" } ] }\n```',
+      });
+    const deps = buildLiveGoalDeps(complete);
+
+    const items = await deps.author('goal', []);
+
+    expect(items.map((i) => i.id)).toEqual(['a']);
+  });
+
+  it('feeds the goal + prior-work into the planner prompt (so the model can go dry)', async () => {
+    const prompts: string[] = [];
+    const complete: LlmComplete = async (p) => { prompts.push(p); return JSON.stringify({ items: [] }); };
+    const deps = buildLiveGoalDeps(complete);
+
+    await deps.author('ship feature X', [wi({ id: 'done-1', status: 'done', spec: { description: 'built X core' } })]);
+
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]).toContain('ship feature X');
+    expect(prompts[0]).toContain('built X core');
+  });
+});
+
+// ─── buildLiveGoalDeps — accepter adapter ──────────────────────────────
+
+describe('buildLiveGoalDeps — accepter', () => {
+  it('returns true when the LLM verdict is { reached: true }', async () => {
+    const deps = buildLiveGoalDeps(async () => JSON.stringify({ reached: true }));
+    expect(await deps.accept('goal', [wi({ status: 'done' })])).toBe(true);
+  });
+
+  it('returns false when the LLM verdict is { reached: false }', async () => {
+    const deps = buildLiveGoalDeps(async () => JSON.stringify({ reached: false }));
+    expect(await deps.accept('goal', [wi({ status: 'done' })])).toBe(false);
+  });
+
+  it('defaults to false on an unparseable / ambiguous verdict (conservative)', async () => {
+    const deps = buildLiveGoalDeps(async () => 'I think we are not quite there yet.');
+    expect(await deps.accept('goal', [])).toBe(false);
+  });
+});
+
+// ─── handleStart (engine=v2) wires goalDeps into runV2Engine ───────────
+
+describe('handleStart — engine=v2 passes live goalDeps to runV2Engine', () => {
+  const { beforeEach: sandboxBefore, afterEach: sandboxAfter } = useSandboxHome();
+  beforeEach(sandboxBefore);
+  afterEach(sandboxAfter);
+
+  beforeEach(() => { process.exitCode = undefined; });
+  afterEach(() => { process.exitCode = undefined; });
+
+  it('passes goalDeps (with author + accept fns) into runV2Engine', async () => {
+    const root = mkRoot();
+    const cfgDir = join(root, '.deckent');
+    mkdirSync(cfgDir, { recursive: true });
+    writeFileSync(
+      join(cfgDir, 'config.json'),
+      JSON.stringify({ autonomous: { enabled: true, engine: 'v2' } }, null, 2),
+      'utf-8',
+    );
+    runV2Spy.mockClear();
+
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    try {
+      await handleStart({ root, lang: 'en', maxIterations: '1' });
+    } finally {
+      stdout.mockRestore();
+    }
+
+    expect(runV2Spy).toHaveBeenCalledTimes(1);
+    const deps = runV2Spy.mock.calls[0]![2] as { goalDeps?: { author?: unknown; accept?: unknown } };
+    expect(deps.goalDeps).toBeDefined();
+    expect(typeof deps.goalDeps!.author).toBe('function');
+    expect(typeof deps.goalDeps!.accept).toBe('function');
+  });
+});

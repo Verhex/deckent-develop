@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { createServer, type Server } from 'node:http';
 import { SqliteMissionStore } from '../../src/orchestra/autonomous/mission-store/sqlite-mission-store.js';
 import { registerMissionsRoute } from '../../src/api/missions-route.js';
+import { createHttpServer } from '../../src/api/server.js';
 import type { MissionView } from '../../src/orchestra/autonomous/mission-store/mission-view.js';
 
 let projectRoot: string;
@@ -163,5 +164,24 @@ describe('GET /api/missions/:id', () => {
 
     const res = await fetch(`${baseUrl}/api/missions/any-id`);
     expect(res.status).toBe(404);
+  });
+});
+
+describe('server.ts dispatch — /api/missions is wired (integration)', () => {
+  it('GET /api/missions resolves 200 through createHttpServer dispatch (not 404)', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'missions-server-wire-'));
+    process.env['DECKENT_API_AUTH_DISABLED'] = '1';
+    const api = createHttpServer(root, { port: 0, host: '127.0.0.1' });
+    await new Promise<void>((resolve) => api.server.once('listening', resolve));
+    try {
+      const addr = api.server.address();
+      const port = typeof addr === 'object' && addr ? addr.port : 0;
+      const res = await fetch(`http://127.0.0.1:${port}/api/missions`);
+      expect(res.status).toBe(200);
+    } finally {
+      delete process.env['DECKENT_API_AUTH_DISABLED'];
+      await api.close();
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
