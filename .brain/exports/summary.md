@@ -81,38 +81,47 @@
 | adr-087 | Async I/O & Test Hermeticity Standard | accepted |
 | adr-088 | Memory V2 — DB-First Architecture | accepted |
 | adr-089 | Backend-Agnostic Worker Observation + Per-Worker Independent Backends | accepted |
+| adr-090 | Documentation Tracking & Staleness (DCR + content-hash + multi-signal) | accepted |
 
 ## Recent Learnings
-- **Sprint sprint-290 Learnings** (sprint-290): ## Sprint sprint-290 Learnings
-- F3-008 — process-mode executor (mod-geçişi 3/3): GO_WITH_TECH_DEBT — F3-008 process-...
-- **Sprint sprint-289 Learnings** (sprint-289): ## Sprint sprint-289 Learnings
+- **Sprint sprint-311 Learnings** (sprint-311): ## Sprint sprint-311 Learnings
 
 ## Gains
-- 289-001 — Process anti-IDOR + positive-OIDC tenant-stamp testleri — Added ...
-- **Sprint sprint-288 Learnings** (sprint-288): ## Sprint sprint-288 Learnings
+- 311-001 — ADR-001-W — "Node 18" → "Node 24+" sweep (LIVE src only) — ADR-0...
+- **Sprint sprint-310 Learnings** (sprint-310): ## Sprint sprint-310 Learnings
 
 ## Gains
-- 288-001 — Tema A — Genel Bakış & Vizyon — 4 Türkçe doküman başarıyla oluşt...
-- **Sprint sprint-287 Learnings** (sprint-287): ## Sprint sprint-287 Learnings
+- 310-001 — ENT-3-SEC — /api/autonomous/lineage tenant-scope (anti-IDOR) — E...
+- **Sprint sprint-308 Learnings** (sprint-308): ## Sprint sprint-308 Learnings
+- ADR-064-W — wire planDispatch into live dispatch-path: GO_WITH_TECH_DEBT — ADR-064-W...
+- **Sprint sprint-307 Learnings** (sprint-307): ## Sprint sprint-307 Learnings
 
 ## Gains
-- 287-001 — roadmap.md — user-facing yol-haritasına dönüştür — Transformed d...
-- **Sprint sprint-285 Learnings** (sprint-285): ## Sprint sprint-285 Learnings
-- Tur-içi tool-KUYRUĞU + per-tool sıralı onay (Ink): GO_WITH_TECH_DEBT — H1-fix: repla...
-- **Sprint sprint-284 Learnings** (sprint-284): ## Sprint sprint-284 Learnings
-- Gecikme-ölçüm smoke'u — "anlık" iddiasının kanıt-zinciri: NO_GO — Created scripts/rt...
-- **Sprint sprint-283 Learnings** (sprint-283): ## Sprint sprint-283 Learnings
+- 307-001 — LIVE-W1b fix — adaptive threshold additive (preserve base-case s...
+- **Sprint sprint-306 Learnings** (sprint-306): ## Sprint sprint-306 Learnings
+- ENT-3 — audit causal-lineage propagation + endpoint: NO_GO
 
 ## Gains
-- 283-001 — Terminal-bar overlap — z-index/layout fix (eski 282-007) — Fix: ...
-- **Sprint sprint-282 Learnings** (sprint-282): ## Sprint sprint-282 Learnings
-- POST /api/chat adapter-backed — classifier yalnız açık-komutlara: GO_WITH_TECH_DEBT ...
-- **Sprint sprint-281 Learnings** (sprint-281): ## Sprint sprint-281 Learnings
+- 306-001 — PRO...
+- **Sprint sprint-305 Learnings** (sprint-305): ## Sprint sprint-305 Learnings
 
 ## Gains
-- 281-001 — Mimari & Eşzamanlılık Doğruluğu Denetimi — Mimari & eşzamanlılık...
-- **Sprint sprint-280 Learnings** (sprint-280): ## Sprint sprint-280 Learnings
-- REPL /mcp broker wire — G1 (mcp-bridge → chat-native) (OPUS, Tier-1): GO_WITH_TECH_D...
+- 305-001 — SCOPE-W1 impl — SCOPE_INSUFFICIENT_CHANNEL + escalation emit — S...
+- **Sprint sprint-304 Learnings** (sprint-304): ## Sprint sprint-304 Learnings
+
+## Gains
+- 304-001 — DATA-W1 impl — synthetic timeout result tokenUsage (both branche...
+- **Sprint sprint-303 Learnings** (sprint-303): ## Sprint sprint-303 Learnings
+- GATE-W2 — toggle-independent proactive lethal-guard: GO_WITH_TECH_DEBT — All 7 DoD i...
+- **Sprint sprint-302 Learnings** (sprint-302): ## Sprint sprint-302 Learnings
+
+## Gains
+- 302-001 — IDLE-SPIN fix + error-handling allowlist — ## Bug Fix Report
+- 3...
+- **Sprint sprint-300 Learnings** (sprint-300): ## Sprint sprint-300 Learnings
+
+## Gains
+- 300-001 — Revert enterprise read-gate + tenant-filter missions-audit — All...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -152,5 +161,7 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: file_outside_scope
+- Violation pattern: stale_heartbeat
 
-_Total entries: 615 | Generated: 2026-06-18_
+_Total entries: 691 | Generated: 2026-06-19_

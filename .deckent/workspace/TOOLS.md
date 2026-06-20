@@ -58,6 +58,7 @@ _Total: 31 MCP tools_
 | `audit` | deckent audit |
 | `audit-verify` | deckent audit-verify |
 | `autonomous` | deckent autonomous |
+| `autonomous-mission` | deckent autonomous-mission |
 | `bot` | deckent bot |
 | `chat` | deckent chat |
 | `chat-agentic-dispatch` | deckent chat-agentic-dispatch |
@@ -99,6 +100,7 @@ _Total: 31 MCP tools_
 | `heartbeat` | deckent heartbeat |
 | `help` | deckent help |
 | `history` | deckent history |
+| `image` | deckent image |
 | `init` | deckent init |
 | `init-steps` | deckent init-steps |
 | `init-templates` | deckent init-templates |
@@ -113,6 +115,7 @@ _Total: 31 MCP tools_
 | `output` | deckent output |
 | `plan` | deckent plan |
 | `plugin` | deckent plugin |
+| `process` | deckent process |
 | `quick-start` | deckent quick-start |
 | `rbac` | deckent rbac |
 | `recall` | deckent recall |
@@ -139,4 +142,4 @@ _Total: 31 MCP tools_
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 89 CLI command modules_
+_Total: 92 CLI command modules_

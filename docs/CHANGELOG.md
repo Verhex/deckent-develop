@@ -2,6 +2,18 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint311] - 2026-06-19
+
+### Added
+
+- ADR-001-W — "Node 18" → "Node 24+" sweep (LIVE src only)
+- ADR-021-W — output_splash dormant-knob → gerçek gate
+- ADR-028-W — routing_engine default 'v1'→'v2' (config-tutarlılık)
+- ADR-010-W — cli-highlight + zod ADR-attribution (doc-only)
+
+
+_Tasks: 5 total, 5 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint290] - 2026-06-18
 
 ### Added

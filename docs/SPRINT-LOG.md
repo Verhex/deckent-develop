@@ -8004,3 +8004,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 290-006: DOC-35 — DECKENT.md tool-count 34→35 + process (DONE)
 
 ---
+## Sprint 311 — sprint-311
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-19
+**Duration:** 525s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 524752ms |
+
+### Tasks
+
+- 311-001: ADR-001-W — "Node 18" → "Node 24+" sweep (LIVE src only) (DONE)
+- 311-002: ADR-021-W — output_splash dormant-knob → gerçek gate (DONE)
+- 311-003: ADR-028-W — routing_engine default 'v1'→'v2' (config-tutarlılık) (DONE)
+- 311-004: ADR-010-W — cli-highlight + zod ADR-attribution (doc-only) (DONE)
+
+---

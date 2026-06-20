@@ -313,7 +313,7 @@ The Sprint-172 inventory (9 deps) drifted. Current `package.json` has **13 runti
 | `@modelcontextprotocol/sdk` | `^1.27.1` | MCP server/client transport | ADR-017 |
 | `better-sqlite3` | `^12.10.0` | Memory V2 DB — SQLite + FTS5 | **ADR-088** (Memory V2 — DB-First) |
 | `telegraf` | `^4.16.0` | Telegram connector | ADR-016 |
-| `zod` | `^3.25.0` | Plan/config schema validation | Task planner validation (Sprint 044+) |
+| `zod` | `^3.25.0` | Runtime schema-validation (plan/config); single-purpose, replaces hand-rolled validation | **ADR-010** (this record — sanctioned runtime dep) |
 | `@noble/ed25519` | `^2.3.0` | Ed25519 `.deck` signing | ADR-014 |
 | `@noble/hashes` | `^1.8.0` | SHA-512 `.deck` key derivation | ADR-014 |
 | `@lydell/node-pty` | `^1.2.0-beta.12` | PTY for embedded web terminal (renamed from `node-pty`) | ADR-062 |
@@ -321,12 +321,13 @@ The Sprint-172 inventory (9 deps) drifted. Current `package.json` has **13 runti
 | `ink` | `^7.0.5` | Native REPL (React-for-CLI) | ADR-081 / ADR-083 (Native Agentic REPL) |
 | `react` | `^19.2.7` | Ink REPL + web dashboard | ADR-081 (REPL) / ADR-080 (Dashboard) |
 | `react-dom` | `^19.2.7` | Web dashboard render | ADR-080 (Dashboard) |
-| `cli-highlight` | `^2.1.11` | REPL syntax highlighting | ⚠️ **no ADR yet** → ADR-010-W |
+| `cli-highlight` | `^2.1.11` | REPL syntax highlighting for native agentic REPL output | **ADR-081 / ADR-083** (Native Agentic REPL / REPL-UX) |
 | `discord.js` *(optional)* | `^14.26.3` | Discord connector (lazy/optional) | ADR-016 |
 
-**🟡 ADR-backing gaps (tracked as ADR-010-W):** `cli-highlight` has no governing ADR; `zod` is justified by "planner validation" but no formal ADR. Per this ADR's own principle, each must get an ADR reference (or be removed). `ink`/`react` lean on the Native REPL ADRs (081/083) + Dashboard (080) — adequate but worth an explicit dependency note.
+**✅ All deps ADR-backed (ADR-010-W closed, Sprint 311):** `cli-highlight` → ADR-081/083 (Native REPL / REPL-UX); `zod` → ADR-010 (this record, sanctioned runtime dep). `ink`/`react` → ADR-081/083/080 (REPL + Dashboard). All 13 runtime + 1 optional dependencies in this table now carry a non-empty Governing-ADR.
 
-**Amendment log:** 2026-06-11 — inventory 9→13(+1) güncellendi; `node-pty`→`@lydell/node-pty` rename, `ink`/`react`/`react-dom`/`cli-highlight`/`discord.js` eklendi, `better-sqlite3`→ADR-088 atfı; ADR-backing-eksik dep'ler (cli-highlight, zod) ADR-010-W'ye (Alperen ADR-review). md+db senkron.
+**Amendment log:** 2026-06-11 — inventory 9→13(+1) güncellendi; `node-pty`→`@lydell/node-pty` rename, `ink`/`react`/`react-dom`/`cli-highlight`/`discord.js` eklendi, `better-sqlite3`→ADR-088 atfı; ADR-backing-eksik dep'ler (cli-highlight, zod) ADR-010-W'ye kayıt edildi (Alperen ADR-review). md+db senkron.
+2026-06-19 (Sprint 311, ADR-010-W kapatma) — `cli-highlight` → ADR-081/083 atfı; `zod` → ADR-010 (this record) formal backing; ADR-backing-gaps paragrafı ✅ closed olarak güncellendi. Tüm dep'ler artık ADR-backed.
 
 
 ---
@@ -9459,3 +9460,34 @@ Cross-ref: ADR-009 (superseded), ADR-036 (ADR Governance Integration — ADRs in
 **Roadmap (proposed):** firecracker microVM backend; cloud backend; per-worker backend declaration in the task spec; uniform fleet-wide observation. These are forward-looking (not built); the backend-agnostic-watch + CLI/MCP-parity principle is decided/accepted now.
 
 Cross-ref: ADR-022 (parity), ADR-027 (hybrid spawn), ADR-066 (provider independence), ADR-062 (embedded web terminal — PTY worker-attach), §S DESK-1 (god-level observation surface).
+
+
+---
+
+## adr-090: Documentation Tracking & Staleness (DCR + content-hash + multi-signal)
+
+**Status:** accepted
+
+# ADR-090: Documentation Tracking & Staleness (DCR + content-hash + multi-signal)
+
+**Status:** accepted
+
+**Date:** 2026-06-18
+
+**Related:** ADR-029/030/031 (Managed-Docs), ADR-088 (Memory V2 DB-First), ADR-010 (Tek Runtime Dependency), ADR-087 (Async I/O & Test Hermeticity)
+
+---
+
+**Context:** Projelerde dokümantasyon karmaşıklaşıyor; hangi doc güncel, hangisi koddan geride, hangisi önemli — körlemesine. `DOC-POLICY.md`'nin 4-katmanlı tiering'i el-bakımlı; ADR-031 content-hash yalnız managed-docs auto-section'ları için. Tüm repo dokümanları için makine-okunur bir tazelik + önem sinyali yok.
+
+**Decision:** Her (geçici-olmayan) `.md` dokümana **DCR (Document Criticality Rank — `doc_rank`, 0=en kritik, sonsuz seviye)** + **gövde-content-hash (sha256)** + **last_updated** ata; bunları hem YAML front-matter'da hem `memory.db` `doc_tracking` tablosunda (ayrı `better-sqlite3` bağlantısı, `entries`'e dokunmadan) izle. **Çok-sinyalli stale**: content-drift + age (rank-duyarlı eşik) + (Faz 2) code-drift; `doc_rank` ile ağırlıklı `priority_score`. Geçici doc (`scratch/` veya `status:draft|temp`) hashlenmez (EXEMPT). Kapsam: tüm repo `**/*.md` − `trackIgnore`. `CLAUDE.md`/`DECKENT.md`/`AGENTS.md`/`GEMINI.md` = DB-only (front-matter enjeksiyonu riskli). Hash gövde-only (front-matter hariç, CRLF→LF + tek trailing `\n` normalize) → metadata yazımı drift-churn yaratmaz. CLI: `deckent docs track scan|status|sync`.
+
+**Consequences (+):** Stale/önemli doc'lar makine-tespitli; takip/öneri/analiz netleşir; DOC-POLICY tiering'inin sayısal genelleştirmesi. Mevcut `doc-cache` (SHA-1) ve MemoryStore bozulmaz (additive). 725-doc canlı tarama proof-of-function ile doğrulandı.
+
+**Consequences (−):** Front-matter mutasyonu git-diff gürültüsü ekler (gövde-only hash ile churn sınırlı); ikinci sqlite bağlantısı (WAL ile güvenli). Age sürekli-sinyal olduğundan bugün commit edilmemiş doc en az DRIFT görünür (DRIFT bilgilendirici, "need attention" yalnız STALE/CRITICAL_STALE'i sayar). Code-drift + CI-gate + MCP/dashboard Faz 2'ye ertelendi.
+
+**References:** `docs/superpowers/specs/2026-06-18-doc-tracking-design.md`, `docs/superpowers/plans/2026-06-18-doc-tracking.md`, `docs/reference/api-surface.md` (doc_tracking şeması).
+
+---
+
+**Amendment (Faz 2, 2026-06-18):** code-drift sinyali canlı (`tracks:` glob → `git ls-files` + author-date karşılaştırması, `src/core/doc-tracking/code-drift.ts`; scanner'da wire); `deckent docs track scan --check [--max-rank n]` CI-gate (CRITICAL_STALE → non-zero exit); sprint-finalize hook (`config.doc_tracking.sync_on_finalize`, default OFF, DB-only, fail-safe); MCP `deckent_docs` `track-scan`/`track-status` action'ları; HTTP `GET /api/docs/health` (rank×state heatmap, auth-gated) + dashboard "Docs Health" sayfası (heatmap + drill-down). Tier-1 proof-of-function: serve + `/api/docs/health` 200 (832 doc canlı) + 401 auth-gate + dashboard component test. Spec: `docs/superpowers/specs/2026-06-18-doc-tracking-phase2-design.md`. **Status:** accepted.

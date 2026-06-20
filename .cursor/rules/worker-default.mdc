@@ -27,7 +27,7 @@ alwaysApply: false
 - Do not ignore skill instructions even if they seem overly detailed
 
 ## Verify Loop
-> **Honesty note (ADR-037 V1.0):** Bu Verify Loop bir **prompt talimatıdır, kod-enforce DEĞİL**. `enforceVerifyLoop`/`runTestVerifyLoop` runtime'da çağrılmaz (0-caller, hard-flip post-GA V2). Worker disiplinine + Auditor advisory izlemeye dayanır.
+> **Note:** The Verify Loop is guidance for you to follow, not a hard-enforced gate. Run your project's own lint/build/test commands yourself and report results honestly.
 - Run lint/build check after code changes — fix errors (max 3 attempts; use project-specific command)
 - Run test suite after code changes — fix failures (max 3 attempts; use project-specific command)
 - If both fail after 3 attempts → write NO_GO result with error details
@@ -41,78 +41,9 @@ alwaysApply: false
 
 ## Active ADR Constraints
 
-- **ADR-003**: vitest over Jest — **Status:** accepted
-- **ADR-007**: SpawnOptions Interface — **Status:** accepted
-- **ADR-068**: Enterprise Foundation — Audit Query + Multi-Tenant + Scheduled Flows — **Status:** accepted
-- **ADR-069**: Event-Driven Triggers + RBAC — F3 Webhook & F4 Role-Based Access Control — **Status:** accepted
-- **ADR-008**: Brain Merkezi Import — Tek Yönlü Bağımlılık — **Status:** accepted
-- **ADR-087**: Async I/O & Test Hermeticity Standard — **Status:** accepted
-- **ADR-089**: Backend-Agnostic Worker Observation + Per-Worker Independent Backends — **Status:** accepted
-- **ADR-086**: Native CLI Parity — F11 Feature Set (Sprint 224) — **Status:** accepted
-- **ADR-083**: REPL-UX-Evolution + Provider-Parity + Local-Model-Foundation — **Status:** accepted
-- **ADR-082**: Native-LLM-Wire + Nervous-Activation + Dashboard-v2 Canlı — **Status:** accepted
-- **ADR-081**: Native Agentic Deckent — `deckent` argümansız REPL + Agentic Tool-Use + F2 Streaming + Agentic-OS Direction — **Status:** accepted
-- **ADR-080**: Dashboard God-Level — Sprint-Start Detach + Hollow-Page Wire + Chat Round-Trip + Native UI — **Status:** accepted
-- **ADR-079**: Proof-of-Function DoD — Tier-0/Tier-1 Classification + Sprint-Inner Run-Verify Gate — **Status:** accepted
-- **ADR-078**: CI-Hermeticity Standard + 8-Provider Runtime + Active Identity-Mutation Loop + Dashboard God-Level — **Status:** accepted
-- **ADR-076**: Auth-Precedence Fix + User-Facing Surfaces (serve token-inject, Path A chat, IDE extension) — **Status:** accepted
-- **ADR-077**: Multi-Provider 8-Fleet + OpenAI-Compatible HTTP Adapter — **Status:** accepted
-- **ADR-075**: F5 Evolution Runtime Wiring + Routing Skill→Agent Affinity + Managed-Docs Code-Derived Counts — **Status:** accepted
-- **ADR-074**: Native Chat Real Round-Trip + Enterprise RBAC/Audit/Rate + F5 Evolution Wire — **Status:** accepted
-- **ADR-073**: Routing Live Validation + FIX Prompt Enrichment + Dashboard Control Plane — **Status:** accepted
-- **ADR-072**: Agent Routing Balance (Multi-Signal Scoring) + Dashboard API Auth Hardening — **Status:** accepted
-- **ADR-071**: F3 Autonomous Mode (Self-Dispatch Guard) + F4 Enterprise RBAC/Tenant/Audit — **Status:** accepted
-- **ADR-070**: Brain Evaluation Integrity — Signal-Based Coverage Exemption + Zero-Hard-Code Principle — **Status:** accepted
-- **ADR-066**: Provider Independence — Multi-Provider Backend Parity — **Status:** accepted
-- **ADR-065**: Develop / Product Two-Repo Split — **Status:** accepted
-- **ADR-064**: TOPP — Continuous Dispatch (Wave-Barrier Removal) — **Status:** accepted
-- **ADR-062**: Embedded Web Terminal — PTY Sessions, WS Gateway, Auth & Audit — **Status:** accepted
-- **ADR-063**: Consent-Based Prerequisite Provisioning — > **Numbering note (Sprint 175):** This ADR was originally numbered 062 alongside
-- **ADR-010**: Tek Runtime Dependency — commander.js — **Status:** accepted
-- **ADR-037**: Brain-Auditor-Worker Authority Matrix — RBAC Protocol V1.0 — **Status:** accepted
-- **ADR-047**: Manuel Subagent Dispatch Protocol — **Status:** accepted
-- **ADR-048**: Prompt Lifecycle Contract — **Status:** accepted
-- **ADR-046**: Brain Self-Update Hook Architecture — **Status:** accepted
-- **ADR-045**: Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire — **Status:** accepted
-- **ADR-043**: Brain Crash Recovery Protocol — **Status:** accepted
-- **ADR-044**: Sprint State Observability Contract — **Status:** accepted
-- **ADR-053**: TaskType Taxonomy — Audit / Document-Write / Code-Development + Extensibility Roadmap — **Status:** accepted
-- **ADR-041**: Agent Taxonomy — Horizontal Skills vs Vertical Agents — **Status:** accepted
-- **ADR-042**: Hybrid Mode Architecture — Sprint + Task Dual Modes — **Status:** accepted
-- **ADR-040**: Nervous System Architecture — Proactive Meta-Orchestrator — **Status:** accepted
-- **ADR-038**: Dead Code Disposition — Sprint 139 Audit Results — **Status:** accepted
-- **ADR-039**: Self-Modifying Task Detection — Deckent Dogfood vs User Project Discrimination — **Status:** accepted
-- **ADR-035**: Brain ↔ Worker ↔ Auditor Verification Protocol Standard (Sprint 138) — **Status:** accepted
-- **ADR-033**: Product Vision — Product Not Service — **Status:** accepted
-- **ADR-034**: Multi-Project Isolation — Per-Project Security Boundaries — **Status:** accepted
-- **ADR-029**: Managed-Docs Universalization — Sprint Lifecycle Template-Based Document Generation — **Status:** accepted
-- **ADR-030**: Template Engine + Plugin Loader — Managed-Docs Render Pipeline — **Status:** accepted
-- **ADR-031**: Content Hash Cache — Sprint Dokümanları Hash-Based Invalidation — **Status:** accepted
-- **ADR-032**: i18n Pattern System — TR/EN İçerik Çeşitliliği Desteği — **Status:** accepted
-- **ADR-036**: ADR Governance Integration — Mandatory Architecture Decision Enforcement — **Status:** accepted
-- **ADR-028**: Decision-Engine V1 → V2 Routing Migration — **Status:** accepted
-- **ADR-027**: Hybrid Spawn Backend (Sprint 123, Revisited Sprint 139) — **Status:** accepted
-- **ADR-025**: Graceful Shutdown Stratejisi — SIGINT → interruptActiveSprint (Sprint 076) — **Status:** accepted
-- **ADR-026**: God Object Split Stratejisi — Faz 1-3 Tamamlandı (Sprint 076) — **Status:** accepted
-- **ADR-023**: Plan Tier Generalizasyonu — Provider-Agnostic Tier İsimleri (Sprint 072) — **Status:** accepted
-- **ADR-024**: sprint-controller.ts God Object Split — sprint-phases.ts Extract (Sprint 072) — **Status:** accepted
-- **ADR-022**: CLI/MCP Feature Parity — Parametre Eşitleme + Eksik Komutlar — **Status:** accepted
-- **ADR-018**: Multi-Environment Config Generation (Sprint 046) — **Status:** accepted
-- **ADR-019**: Language-Agnostic Worker Verify (Sprint 046) — **Status:** accepted
-- **ADR-017**: MCP-Native Provider Adapters (Sprint 045) — **Status:** accepted
-- **ADR-014**: .deck Secret File System (Sprint 044) — **Status:** accepted
-- **ADR-015**: TaskRouter Module — 6-level routing (Sprint 044) — **Status:** accepted
-- **ADR-016**: External Messaging Connectors (Discord / Telegram / WhatsApp + Bot) — **Status:** accepted
-- **ADR-020**: Rich Sprint Output — multi-section summary (Sprint 044) — **Status:** accepted
-- **ADR-021**: Kraken ASCII Brand Identity (Sprint 044) — **Status:** accepted
-- **ADR-013**: DECKENT.md Adapter Pattern (Sprint 15) — **Status:** accepted
-- **ADR-001**: TypeScript + ESM — **Status:** accepted
-- **ADR-002**: Node16 Module Resolution — **Status:** accepted
-- **ADR-004**: Layered Config Merge (defaults → global → project → env) — **Status:** accepted
-- **ADR-006**: spawnSync Security Pattern — **Status:** accepted
-- **ADR-011**: node:readline/promises — Built-in Prompt — **Status:** accepted
-- **ADR-012**: register\<Name\>(program) Pattern — **Status:** accepted
-- **ADR-088**: Memory V2 — DB-First Architecture — **Status:** accepted
+Full ADR text + rationale live in `.brain/memory.db` (SSOT). Query with `deckent recall "<topic>"` or `store.getByType('adr')` — do NOT rely on a static copy. The list below is an id-only index; look any id up for its current constraint.
+
+Accepted: **ADR-003**, **ADR-007**, **ADR-068**, **ADR-069**, **ADR-008**, **ADR-087**, **ADR-089**, **ADR-086**, **ADR-083**, **ADR-082**, **ADR-081**, **ADR-080**, **ADR-079**, **ADR-078**, **ADR-076**, **ADR-077**, **ADR-075**, **ADR-074**, **ADR-073**, **ADR-072**, **ADR-071**, **ADR-070**, **ADR-066**, **ADR-065**, **ADR-064**, **ADR-062**, **ADR-063**, **ADR-010**, **ADR-037**, **ADR-047**, **ADR-048**, **ADR-046**, **ADR-045**, **ADR-043**, **ADR-044**, **ADR-053**, **ADR-041**, **ADR-042**, **ADR-040**, **ADR-038**, **ADR-039**, **ADR-035**, **ADR-033**, **ADR-034**, **ADR-029**, **ADR-030**, **ADR-031**, **ADR-032**, **ADR-036**, **ADR-028**, **ADR-027**, **ADR-025**, **ADR-026**, **ADR-023**, **ADR-024**, **ADR-022**, **ADR-018**, **ADR-019**, **ADR-017**, **ADR-014**, **ADR-015**, **ADR-016**, **ADR-020**, **ADR-021**, **ADR-013**, **ADR-001**, **ADR-002**, **ADR-004**, **ADR-006**, **ADR-011**, **ADR-012**, **ADR-088**, **ADR-090**
 <!-- AUTO-END -->
 
 <!-- CUSTOM-START -->

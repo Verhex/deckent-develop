@@ -1,5 +1,186 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-311 Learnings
+- Sprint sprint-311 Learnings: ## Sprint sprint-311 Learnings
+
+## Gains
+- 311-001 — ADR-001-W — "Node 18" → "Node 24+" sweep (LIVE src only) — ADR-001-W — 'Node 18' → 'Node 24+' sweep on LIVE src only.
+- 311-002 — ADR-021-W — output_splash dormant-knob → gerçek gate — Fixed output_splash dormant-knob: replaced gate-less showSplash(DECKENT_VERSION) call on sprint-p...
+- 311-003 — ADR-028-W — routing_engine default 'v1'→'v2' (config-tutarlılık) — Fix: sprint-planner.ts:473 `config.routing_engine ?? 'v1'` → `?? 'v2'`.
+- 311-004 — ADR-010-W — cli-highlight + zod ADR-attribution (doc-only) — Doc-only task.
+
+## Sprint sprint-310 Learnings
+- Sprint sprint-310 Learnings: ## Sprint sprint-310 Learnings
+
+## Gains
+- 310-001 — ENT-3-SEC — /api/autonomous/lineage tenant-scope (anti-IDOR) — ENT-3-SEC anti-IDOR fix implemented on the lineage branch of registerAutonomousRoutes.
+- 310-002 — doctor os-mock — add homedir to vi.mock('node:os') — Added `homedir: () => '/home/test'` to vi.mock('node:os') in both test files.
+
+## Sprint sprint-308 Learnings
+- Sprint sprint-308 Learnings: ## Sprint sprint-308 Learnings
+- ADR-064-W — wire planDispatch into live dispatch-path: GO_WITH_TECH_DEBT — ADR-064-W wire complete.
+
+## Changes
+
+### src/orchestra/result-collector.ts
+- `dispatchTick` closure body replaced: now 
+- CORE-W3 — duplicate dedup (skill-registry + RateLimiter): GO_WITH_TECH_DEBT — CORE-W3 dedup completed:
+
+1. skill-registry.ts DELETED — 0 production callers confirmed (grep verified, only test files 
+
+## Gains
+- 308-001 — ADR-001-W — Node 24+ full-sweep (no "Node 18" anywhere) — ADR-001-W Node 24+ sweep — ALL in-scope work complete and verified, but two goCriteria items are ...
+- 308-002 — ADR-066-W — `?? 'claude'` invariant-drift re-audit (9→≤3) — ## Changes Applied
+- 308-004 — ADR-028-W — V1 routing minor inconsistencies — Two surgical fixes per ADR-028-W:
+- 308-005 — ADR-008-W — resolve core→orchestra import violation — ADR-008-W fix: removed the core→orchestra import violation in routing-engine.ts.
+- 308-006 — CORE-W1 — directive-interrogator core→cli import (move i18n to core) — All 6/6 DoD items verified:
+- 308-007 — ADR-021-W — output_splash dormant-knob → real gate — Fixed ADR-021-W: replaced direct showSplash call with showSplashIfEnabled in sprint-phases.ts.
+- 308-008 — ADR-010-W — dependency ADR-backing justification — ADR-010 Amendment 2 dependency table updated:
+
+## Sprint sprint-307 Learnings
+- Sprint sprint-307 Learnings: ## Sprint sprint-307 Learnings
+
+## Gains
+- 307-001 — LIVE-W1b fix — adaptive threshold additive (preserve base-case staleness) — Root cause: readTaskScope(ctx.projectRoot, taskId) called path.join(undefined, ...) when sprint-s...
+- 307-002 — ENT-3 redo — audit causal-lineage propagation + endpoint — ENT-3 causal-lineage propagation fully implemented:
+
+## Sprint sprint-306 Learnings
+- Sprint sprint-306 Learnings: ## Sprint sprint-306 Learnings
+- ENT-3 — audit causal-lineage propagation + endpoint: NO_GO
+
+## Gains
+- 306-001 — PROMOTE-W1b — wire partial-promotion into EVALUATE + commit/revert — All 6 goCriteria items verified:
+- 306-002 — SCOPE-W1b — brain-side SCOPE_INSUFFICIENT handler + scope-expand — All 6 goCriteria items verified:
+- 306-003 — LIVE-W1b — adaptive stale-HB threshold (per-scope) — All 7/7 DoD items verified:
+- 306-004 — NERV-W1b — canAutoApply predicate into more detectors — All 7/7 DoD items verified:
+- 306-005 — ENT-1 — hard-RBAC enforcement wire + audit-bridge — ENT-1 hard-RBAC enforcement wire + audit-bridge — all 7 DoD items verified.
+- 306-006 — F8-003 — capability least-privilege hard-flip + denial-audit — All 7 DoD items verified:
+- 306-007 — F10-001/002 — policy-engine RBAC+risk-gate live wire — All 8 DoD items verified:
+- 306-009 — ENT-2 — multi-tenancy strict-isolation enforcement (stores+server) — ENT-2 multi-tenancy strict-isolation enforcement complete.
+- …and 6 more delivered
+
+## Sprint sprint-305 Learnings
+- Sprint sprint-305 Learnings: ## Sprint sprint-305 Learnings
+
+## Gains
+- 305-001 — SCOPE-W1 impl — SCOPE_INSUFFICIENT_CHANNEL + escalation emit — SCOPE-W1 impl complete.
+
+## Sprint sprint-304 Learnings
+- Sprint sprint-304 Learnings: ## Sprint sprint-304 Learnings
+
+## Gains
+- 304-001 — DATA-W1 impl — synthetic timeout result tokenUsage (both branches) — Added tokenUsage zero-stub to both branches (disk-evidence + no-disk-evidence) of the synthetic t...
+- 304-002 — LIVE-W1 test fix — panic-gate-wire deterministic timeout — Fixed LIVE-W1 hermeticity regression.
+
+## Sprint sprint-303 Learnings
+- Sprint sprint-303 Learnings: ## Sprint sprint-303 Learnings
+- GATE-W2 — toggle-independent proactive lethal-guard: GO_WITH_TECH_DEBT — All 7 DoD items verified:
+
+1. `npx tsc --noEmit` — CLEAN (0 errors)
+
+2. Targeted tests — 18/18 passed (tests/nervous/gat
+
+## Gains
+- 303-001 — TEL-W1 — telemetry reason = deciding-mechanism — TEL-W1 implemented:
+- 303-002 — DATA-W1 — outputTokens NO_GO/timeout-branch fill + denominator — Added tokenUsage fill to the synthetic NO_GO / timeout result path in result-collector.ts (lines ...
+- 303-003 — SCOPE-W2 — plan-time scope-sufficiency check — Implemented validateGoCriteriaScope(task: PlannerTask): ScopeSufficiencyResult in src/orchestra/p...
+- 303-004 — SCOPE-W1 — worker scope-insufficiency escalation + diff-salvage seed — SCOPE-W1 escalation primitive implemented.
+- 303-005 — ROUTE-W1 — intent-classifier refactor≠bugfix — ROUTE-W1 — intent-classifier refactor≠bugfix.
+- 303-006 — PROMPT-W1 — ADR scope-gating + persona/task verify-precedence + checklist parser + conditional boilerplate — PROMPT-W1 — 4 prompt-composition fixes, all additive/backward-safe.
+- 303-007 — LIVE-W1 — stale-HB SSOT + presence-aware approval-window — LIVE-W1 completed in full.
+- 303-008 — STATE-W1 — richer NO_GO taxonomy (root-cause categorization) — STATE-W1 implemented cleanly.
+- …and 3 more delivered
+
+## Sprint sprint-302 Learnings
+- Sprint sprint-302 Learnings: ## Sprint sprint-302 Learnings
+
+## Gains
+- 302-001 — IDLE-SPIN fix + error-handling allowlist — ## Bug Fix Report
+- 302-002 — ENT-1 RBAC — operator (execute role) permit fix — ## ENT-1 RBAC Fix — Root Cause Analysis + Implementation
+
+## Sprint sprint-300 Learnings
+- Sprint sprint-300 Learnings: ## Sprint sprint-300 Learnings
+
+## Gains
+- 300-001 — Revert enterprise read-gate + tenant-filter missions-audit — All 9/9 DoD items verified:
+
+## Sprint sprint-299 Learnings
+- Sprint sprint-299 Learnings: ## Sprint sprint-299 Learnings
+- Enterprise-read admin-gate (single-point authorizeTenantAdmin): GO_WITH_TECH_DEBT — Gate added at registerEnterpriseRoutes lines 239-240 — single-point authorizeTenantAdmin before all 5 GET read paths (te
+
+## Gains
+- 299-001 — Fail-closed tenant guard — /api/missions + /api/process/* (effective-tenant) — All goCriteria items verified:
+
+## Sprint sprint-298 Learnings
+- Sprint sprint-298 Learnings: ## Sprint sprint-298 Learnings
+
+## Gains
+- 298-001 — Tenant-scoped /api/missions (anti-IDOR read isolation)
+- 298-002 — Mission lifecycle audit-trail bridge (tamper-evident) — Mission lifecycle audit-trail bridge wired to the existing tamper-evident hmac-chained enterprise...
+- 298-003 — Scheduler per-tenant fairness cap (no-starvation) — Per-tenant fairness cap (no-starvation) added to the autonomous-v2 mission scheduler.
+- 298-004 — GET /api/enterprise/missions-audit endpoint — Added GET /api/enterprise/missions-audit endpoint by:
+- 298-005 — EnterprisePage — Missions Audit paneli (i18n-first, no-emoji) — All goCriteria satisfied:
+
+## Sprint sprint-297 Learnings
+- Sprint sprint-297 Learnings: ## Sprint sprint-297 Learnings
+
+## Gains
+- 297-001 — Wire registerMissionsRoute into server.ts (fix /api/missions 404) — 1) src/api/server.ts: added `import { registerMissionsRoute } from './missions-route.js';` (line ...
+- 297-002 — Wire live goalDeps (real planner + accepter) into runV2Engine — Wired live Type-2 goalDeps into the autonomous-v2 cutover.
+
+## Sprint sprint-296 Learnings
+- Sprint sprint-296 Learnings: ## Sprint sprint-296 Learnings
+
+## Gains
+- 296-001 — i18n — autonomous-mission CLI rendered strings — Added 5 autonomous_mission.* keys + 2 mission.settled.* keys (deliver surface) to messages.ts.
+- 296-002 — Dashboard MissionsPage route + nav wire — ## Changes Made
+- 296-003 — dispatch process-kind — real process execution — Wired the kind='process' branch of buildMissionDispatch to real, inject-based process execution (...
+- 296-004 — goal-loop real-planner wire + engine drive — Goal-loop real-planner wire + engine drive — Type-2 goal missions are now LIVE-drivable end-to-en...
+
+## Sprint sprint-295 Learnings
+- Sprint sprint-295 Learnings: ## Sprint sprint-295 Learnings
+
+## Gains
+- 295-001 — Real DispatchFn — item.kind → execute (Wave 1) — buildMissionDispatch(deps): DispatchFn — inject-based, test-able dispatcher that runs a WorkItem ...
+- 295-002 — Type-1 list ingestion (Wave 1) — Implemented createListMission(store, spec): Mission in mission-ingest.ts.
+- 295-003 — Type-2 goal-loop — author + acceptance (Wave 1) — Implemented Type-2 goal-loop in goal-mission.ts.
+- 295-004 — Deliver-channel — onMissionSettled → notify (Wave 1) — Implemented makeMissionDeliver(deps) — returns onMissionSettled handler for MissionSchedulerOptions.
+- 295-005 — Mission API endpoints (Wave 1) — Implemented registerMissionsRoute(url, method, res, projectRoot): boolean following the autonomou...
+- 295-006 — Dashboard Missions page (Wave 2) — MissionsPage.tsx created: renders /api/missions data with render_as badges (checklist→CheckSquare...
+- 295-007 — Cutover — flag-gated v2 engine wire (Wave 2) — Flag-gated autonomous-v2 cutover.
+- 295-008 — CLI — deckent autonomous mission (Wave 2) — Implemented `deckent autonomous-mission` CLI command group (ADR-012 pattern) with create-list, cr...
+
+## Sprint sprint-294 Learnings
+- Sprint sprint-294 Learnings: ## Sprint sprint-294 Learnings
+
+## Gains
+- 294-001 — MissionScheduler — concurrent race-free runtime (plan Task 1-3) — Implemented runMissionScheduler per docs/superpowers/plans/2026-06-19-autonomous-v2-scheduler.md ...
+
+## Sprint sprint-293 Learnings
+- Sprint sprint-293 Learnings: ## Sprint sprint-293 Learnings
+
+## Gains
+- 293-001 — MissionStore core — types + SQLite store (plan Task 1-3) — Implemented plan Task 1+2+3 as a collision-free unit (both source files are new, no live consumer...
+- 293-002 — Per-mission jsonl hot-path events (plan Task 4) — Created MissionEventLog class (mission-events.ts) and hermetic test file.
+- 293-003 — MissionView projection contract (plan Task 5) — MissionView projection contract implemented per plan Task 5.
+- 293-004 — backlog.json → autonomous.db migration (plan Task 6) — Implemented migrateBacklogJson per plan Task 6.
+
+## Sprint sprint-292 Learnings
+- Sprint sprint-292 Learnings: ## Sprint sprint-292 Learnings
+
+## Gains
+- 292-001 — F1-012 — Config-driven provider registry (zero-hardcode) — F1-012 config-driven provider registry (zero-hardcode).
+- 292-002 — F1-PD — De-hardcode model catalog (parametric) — F1-PD — model catalog made parametric & extensible (registry-level de-hardcode).
+- 292-003 — F11-016 — Ink REPL stream-segmenter stabilization + ADR — F11-016 stream-segmenter stabilization + ADR delivered.
+
+## Sprint sprint-291 Learnings
+- Sprint sprint-291 Learnings: ## Sprint sprint-291 Learnings
+
+## Gains
+- 291-001 — `deckent process` CLI komutu — MCP parity — All 5/5 goCriteria items verified:
+- 291-002 — MCP-W1 defer'lı review-minor'ları kapat — Two surgical fixes: (a) Added `expect(msg).not.toContain('{pid}')` to the TR test block in messag...
+- 291-003 — writer-lease release-hooks idempotency testi — Added `installWriterLeaseReleaseHooks` to the import and appended a new `describe('installWriterL...
+
 ## Sprint sprint-290 Learnings
 - Sprint sprint-290 Learnings: ## Sprint sprint-290 Learnings
 - F3-008 — process-mode executor (mod-geçişi 3/3): GO_WITH_TECH_DEBT — F3-008 process-mode executor — mode-transition 3/3 complete (task✅ sprint✅ process✅).

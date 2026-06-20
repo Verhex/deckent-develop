@@ -1,0 +1,79 @@
+{
+  "taskId": "176-018",
+  "sprintId": "sprint-176",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "176-018",
+        "title": "W3.6 — ConfigPage Terminal kategori + i18n",
+        "scope": [
+          "src/dashboard/src/pages/",
+          "src/dashboard/src/i18n/",
+          "src/dashboard/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "frontend-designer",
+        "skills": [
+          "react-specialist",
+          "documentation-writer"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: frontend-designer"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "176-018",
+        "title": "W3.6 — ConfigPage Terminal kategori + i18n",
+        "scope": [
+          "src/dashboard/src/pages/",
+          "src/dashboard/src/i18n/",
+          "src/dashboard/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "frontend-designer",
+        "skills": [
+          "react-specialist",
+          "documentation-writer"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 2 (medium task, 1 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "176-018",
+        "title": "W3.6 — ConfigPage Terminal kategori + i18n",
+        "scope": [
+          "src/dashboard/src/pages/",
+          "src/dashboard/src/i18n/",
+          "src/dashboard/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "frontend-designer",
+        "skills": [
+          "react-specialist",
+          "documentation-writer"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [react-specialist, documentation-writer]"
+    }
+  ],
+  "decidedAt": "2026-05-20T09:06:02.000Z"
+}

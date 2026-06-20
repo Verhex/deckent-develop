@@ -9,6 +9,18 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-308-003 | Tech debt from 308-003: ADR-064-W wire complete.
+
+## Changes
+
+### src/orchestra/ | normal | sprint-308 | resolved |
+| debt-308-009 | Tech debt from 308-009: CORE-W3 dedup completed:
+
+1. skill-registry.ts DELETED — | normal | sprint-308 | resolved |
+| debt-303-009 | Tech debt from 303-009: All 7 DoD items verified:
+
+1. `npx tsc --noEmit` — CLEAN | normal | sprint-303 | resolved |
+| debt-299-002 | Tech debt from 299-002: Gate added at registerEnterpriseRoutes lines 239-240 — s | normal | sprint-299 | resolved |
 | debt-290-002 | Tech debt from 290-002: F3-008 process-mode executor — mode-transition 3/3 compl | normal | sprint-290 | resolved |
 | debt-285-001 | Tech debt from 285-001: Kök-teşhis raporu + 9 repro testi (5 normal + 4 it.fails | normal | sprint-285 | resolved |
 | debt-285-002 | Tech debt from 285-002: H1-fix: replaced the single confirmResolve slot (app.tsx | normal | sprint-285 | resolved |

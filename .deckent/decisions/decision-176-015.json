@@ -1,0 +1,79 @@
+{
+  "taskId": "176-015",
+  "sprintId": "sprint-176",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "176-015",
+        "title": "W3.3 — TerminalView (xterm)",
+        "scope": [
+          "src/dashboard/src/components/terminal/",
+          "tests/dashboard/terminal/",
+          "src/dashboard/",
+          "tests/dashboard/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "frontend-designer",
+        "skills": [
+          "react-specialist"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: frontend-designer"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "176-015",
+        "title": "W3.3 — TerminalView (xterm)",
+        "scope": [
+          "src/dashboard/src/components/terminal/",
+          "tests/dashboard/terminal/",
+          "src/dashboard/",
+          "tests/dashboard/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "frontend-designer",
+        "skills": [
+          "react-specialist"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 1 (small task, 1 module(s), effort=normal)"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "176-015",
+        "title": "W3.3 — TerminalView (xterm)",
+        "scope": [
+          "src/dashboard/src/components/terminal/",
+          "tests/dashboard/terminal/",
+          "src/dashboard/",
+          "tests/dashboard/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "frontend-designer",
+        "skills": [
+          "react-specialist"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [react-specialist]"
+    }
+  ],
+  "decidedAt": "2026-05-20T09:06:01.998Z"
+}
