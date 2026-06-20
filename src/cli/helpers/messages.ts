@@ -1726,6 +1726,10 @@ const MESSAGES: MessageMap = {
     tr: 'Onaylandı: {code} → {project}',
     en: 'Approved: {code} → {project}',
   },
+  'gateway.pair_needed': {
+    tr: 'Bu sohbet {project} için yetkili değil. Eşleştirme kodu: {code}. Sahibi şunu çalıştırsın: deckent gateway pair approve {code} {project}',
+    en: 'This chat is not authorized for {project}. Pairing code: {code}. Ask the owner to run: deckent gateway pair approve {code} {project}',
+  },
 };
 
 /**

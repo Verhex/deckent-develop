@@ -11,6 +11,7 @@ export interface GatewayRouterDeps {
   supervisor: RuntimeSupervisor;
   send: (chatKey: string, parts: string[], buttons?: ReadonlyArray<ReadonlyArray<InlineButton>>) => Promise<void>;
   isAuthorized: (chatKey: string, projectPath: string) => boolean;
+  requestPairing: (chatKey: string) => Promise<string>;
   lang: string;
   newId: () => string;
 }
@@ -22,7 +23,7 @@ export function chatKeyOf(connector: string, channelId: string): string {
 
 /** Build the inbound message handler for the gateway. */
 export function makeGatewayRouter(deps: GatewayRouterDeps): (msg: IncomingMessage) => void {
-  const { sessions, projects, supervisor, send, isAuthorized, lang } = deps;
+  const { sessions, projects, supervisor, send, isAuthorized, requestPairing, lang } = deps;
 
   return (msg: IncomingMessage): void => {
     const chatKey = chatKeyOf(msg.connector, msg.channelId);
@@ -58,6 +59,11 @@ export function makeGatewayRouter(deps: GatewayRouterDeps): (msg: IncomingMessag
         if (!arg) { await send(chatKey, [getMessage('gateway.use_usage', lang)]); return; }
         const proj = projects.resolve(arg);
         if (!proj) { await send(chatKey, [getMessage('gateway.use_unknown', lang, { name: arg })]); return; }
+        if (!isAuthorized(chatKey, proj.path)) {
+          const code = await requestPairing(chatKey);
+          await send(chatKey, [getMessage('gateway.pair_needed', lang, { project: proj.name, code })]);
+          return;
+        }
         await sessions.bind(chatKey, proj.path, chatKey);
         await send(chatKey, [getMessage('gateway.bound_ok', lang, { project: proj.name })]);
         return;

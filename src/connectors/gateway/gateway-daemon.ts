@@ -4,6 +4,7 @@ import { makeRuntimeSupervisor, type RuntimeSupervisor } from './runtime-supervi
 import { makeGatewayRouter } from './gateway-router.js';
 import { loadSessionRegistry } from './session-registry.js';
 import { loadProjectRegistry } from './project-registry.js';
+import { loadGatewayAccess } from './gateway-access.js';
 import { runRuntimeLoop } from './gateway-runtime.js';
 import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
 import { chunkMessage } from '../message-format.js';
@@ -54,6 +55,7 @@ export async function startGatewayListen(opts: GatewayListenOptions): Promise<Ga
 
   const sessions = await loadSessionRegistry();
   const projects = await loadProjectRegistry();
+  const access = await loadGatewayAccess();
   const supervisor = opts.deps?.supervisor ?? makeRuntimeSupervisor();
 
   const connector = opts.deps?.makeConnector
@@ -76,7 +78,8 @@ export async function startGatewayListen(opts: GatewayListenOptions): Promise<Ga
 
   const router = makeGatewayRouter({
     sessions, projects, supervisor, send,
-    isAuthorized: () => true, // G1: allowlist hook (per-project allowlist hardening = G3)
+    isAuthorized: (chatKey, projectPath) => access.isAuthorized(chatKey, projectPath),
+    requestPairing: (chatKey) => access.requestPairing(chatKey),
     lang, newId: nextId,
   });
   connector.onMessage(router);

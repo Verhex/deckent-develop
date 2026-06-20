@@ -31,6 +31,7 @@ async function deps(over: Partial<GatewayRouterDeps> = {}): Promise<{ d: Gateway
     supervisor: { getOrSpawn: () => ({ projectPath: '/home/me/foo', send: async () => ({ id: '1', kind: 'final', parts: ['runtime-reply'] }) }), dispose: async () => {} },
     send: async (chatKey, parts) => { sent.push({ chatKey, parts }); },
     isAuthorized: () => true,
+    requestPairing: async () => 'PAIR1',
     lang: 'en',
     newId: () => 'id1',
     ...over,
@@ -68,5 +69,13 @@ describe('gateway-router', () => {
     makeGatewayRouter(d)(msg('hi'));
     await new Promise((r) => setTimeout(r, 25));
     expect(sent).toHaveLength(0);
+  });
+
+  it('/use by an unauthorized chat returns a pairing code and does NOT bind', async () => {
+    const { d, sent } = await deps({ isAuthorized: () => false, requestPairing: async () => 'PAIR1' });
+    makeGatewayRouter(d)(msg('/use foo'));
+    await waitFor(() => sent.length > 0);
+    expect(d.sessions.resolve(chatKeyOf('telegram', '42'))).toBeUndefined(); // NOT bound
+    expect(sent[0]!.parts.join(' ')).toContain('PAIR1');
   });
 });
