@@ -11,6 +11,7 @@ import { startGatewayListen, runGatewayRuntimeChild } from '../../connectors/gat
 import { loadConfig } from '../../core/config.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { loadGatewayAccess } from '../../connectors/gateway/gateway-access.js';
+import { loadProjectRegistry } from '../../connectors/gateway/project-registry.js';
 
 function writePid(pid = process.pid): void {
   const p = gatewayPidPath();
@@ -69,7 +70,9 @@ export async function handleGatewayPairApprove(opts: { code: string; project: st
   const lang = getLanguage(opts.lang);
   const print = opts.print ?? ((s: string): void => console.log(s));
   const access = await loadGatewayAccess();
-  const res = await access.approvePairing(opts.code, opts.project);
+  const projects = await loadProjectRegistry();
+  const projectPath = projects.resolve(opts.project)?.path ?? opts.project;
+  const res = await access.approvePairing(opts.code, projectPath);
   print(res
     ? getMessage('gateway.pair_approved', lang, { chatKey: res.chatKey, project: opts.project })
     : getMessage('gateway.pair_unknown_code', lang, { code: opts.code }));
