@@ -1723,8 +1723,28 @@ const MESSAGES: MessageMap = {
     en: 'Project-scoped messaging gateway (G1)',
   },
   'gateway.pair_approved': {
-    tr: 'Onaylandı: {code} → {project}',
-    en: 'Approved: {code} → {project}',
+    tr: 'Eşleştirme onaylandı: {chatKey} → {project}',
+    en: 'Pairing approved: {chatKey} → {project}',
+  },
+  'gateway.pair_unknown_code': {
+    tr: 'Bilinmeyen eşleştirme kodu: {code}',
+    en: 'Unknown pairing code: {code}',
+  },
+  'gateway.pair_rejected': {
+    tr: 'Eşleştirme reddedildi: {code}',
+    en: 'Pairing rejected: {code}',
+  },
+  'gateway.pair_list_empty': {
+    tr: 'Bekleyen eşleştirme yok.',
+    en: 'No pending pairings.',
+  },
+  'gateway.pair_list_row': {
+    tr: '• {code} — {chatKey} ({requestedAt})',
+    en: '• {code} — {chatKey} ({requestedAt})',
+  },
+  'gateway.pair_usage': {
+    tr: 'Kullanım: deckent gateway pair approve <code> <project> | reject <code> | list',
+    en: 'Usage: deckent gateway pair approve <code> <project> | reject <code> | list',
   },
   'gateway.pair_needed': {
     tr: 'Bu sohbet {project} için yetkili değil. Eşleştirme kodu: {code}. Sahibi şunu çalıştırsın: deckent gateway pair approve {code} {project}',

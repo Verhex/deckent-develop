@@ -10,6 +10,7 @@ import { gatewayPidPath } from '../../connectors/gateway/gateway-paths.js';
 import { startGatewayListen, runGatewayRuntimeChild } from '../../connectors/gateway/gateway-daemon.js';
 import { loadConfig } from '../../core/config.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { loadGatewayAccess } from '../../connectors/gateway/gateway-access.js';
 
 function writePid(pid = process.pid): void {
   const p = gatewayPidPath();
@@ -53,6 +54,33 @@ async function resolveGatewayToken(): Promise<string> {
   // as a bootstrap; a dedicated gateway .deck is an impl detail (spec §5.1).
   const cfg = await loadConfig(resolveProjectRoot());
   return cfg.notify_connectors?.telegram?.token ?? '';
+}
+
+export async function handleGatewayPairList(opts: { lang?: string; print?: (s: string) => void } = {}): Promise<void> {
+  const lang = getLanguage(opts.lang);
+  const print = opts.print ?? ((s: string): void => console.log(s));
+  const access = await loadGatewayAccess();
+  const pending = access.listPairings();
+  if (pending.length === 0) { print(getMessage('gateway.pair_list_empty', lang)); return; }
+  for (const p of pending) print(getMessage('gateway.pair_list_row', lang, { code: p.code, chatKey: p.chatKey, requestedAt: p.requestedAt }));
+}
+
+export async function handleGatewayPairApprove(opts: { code: string; project: string; lang?: string; print?: (s: string) => void }): Promise<void> {
+  const lang = getLanguage(opts.lang);
+  const print = opts.print ?? ((s: string): void => console.log(s));
+  const access = await loadGatewayAccess();
+  const res = await access.approvePairing(opts.code, opts.project);
+  print(res
+    ? getMessage('gateway.pair_approved', lang, { chatKey: res.chatKey, project: opts.project })
+    : getMessage('gateway.pair_unknown_code', lang, { code: opts.code }));
+}
+
+export async function handleGatewayPairReject(opts: { code: string; lang?: string; print?: (s: string) => void }): Promise<void> {
+  const lang = getLanguage(opts.lang);
+  const print = opts.print ?? ((s: string): void => console.log(s));
+  const access = await loadGatewayAccess();
+  const ok = await access.rejectPairing(opts.code);
+  print(ok ? getMessage('gateway.pair_rejected', lang, { code: opts.code }) : getMessage('gateway.pair_unknown_code', lang, { code: opts.code }));
 }
 
 export function registerGateway(program: Command): void {
@@ -117,6 +145,14 @@ export function registerGateway(program: Command): void {
           : getMessage('gateway.daemon_not_running', l),
       );
     });
+
+  const pair = cmd.command('pair').description(getMessage('gateway.pair_usage', getLanguage(undefined)));
+  pair.command('list').option('--lang <code>', 'Language override (en|tr)')
+    .action(async (opts: { lang?: string }) => { await handleGatewayPairList(opts); });
+  pair.command('approve <code> <project>').option('--lang <code>', 'Language override (en|tr)')
+    .action(async (code: string, project: string, opts: { lang?: string }) => { await handleGatewayPairApprove({ code, project, lang: opts.lang }); });
+  pair.command('reject <code>').option('--lang <code>', 'Language override (en|tr)')
+    .action(async (code: string, opts: { lang?: string }) => { await handleGatewayPairReject({ code, lang: opts.lang }); });
 
   // Hidden child entry — spawned by the supervisor for per-project runtime, not for direct use.
   program.command('gateway-runtime', { hidden: true })
