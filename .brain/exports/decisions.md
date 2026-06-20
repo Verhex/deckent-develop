@@ -9491,3 +9491,31 @@ Cross-ref: ADR-022 (parity), ADR-027 (hybrid spawn), ADR-066 (provider independe
 ---
 
 **Amendment (Faz 2, 2026-06-18):** code-drift sinyali canlı (`tracks:` glob → `git ls-files` + author-date karşılaştırması, `src/core/doc-tracking/code-drift.ts`; scanner'da wire); `deckent docs track scan --check [--max-rank n]` CI-gate (CRITICAL_STALE → non-zero exit); sprint-finalize hook (`config.doc_tracking.sync_on_finalize`, default OFF, DB-only, fail-safe); MCP `deckent_docs` `track-scan`/`track-status` action'ları; HTTP `GET /api/docs/health` (rank×state heatmap, auth-gated) + dashboard "Docs Health" sayfası (heatmap + drill-down). Tier-1 proof-of-function: serve + `/api/docs/health` 200 (832 doc canlı) + 401 auth-gate + dashboard component test. Spec: `docs/superpowers/specs/2026-06-18-doc-tracking-phase2-design.md`. **Status:** accepted.
+
+
+---
+
+## adr-091: Project-Scoped Messaging Gateway — Control-Plane Daemon + Spawned Per-Project Runtimes
+
+**Status:** accepted
+
+# ADR-091: Project-Scoped Messaging Gateway — Control-Plane Daemon + Spawned Per-Project Runtimes
+
+**Status:** accepted
+
+**Date:** 2026-06-20
+
+**Related:** Amends ADR-016 (External Messaging Connectors); aligns with ADR-040 (Nervous), ADR-062 (WS Gateway), ADR-069 (Webhook/RBAC), ADR-025 (Graceful Shutdown), ADR-087 (Async I/O), ADR-089 (Spawn Backend).
+
+## Context
+Telegram/messaging deneyimi baştan-sona re-arch ediliyor (Faz3 transport-önce, tam gateway re-arch). Çok-project bir mesajlaşma gateway tek bot-token başına TEK poller sahiplenmeli (aynı token iki process tarafından poll edilirse Telegram 409 döner), subscription-auth invariant'ını korumalı (ANTHROPIC_API_KEY her worker child'ından silinir) ve per-project crash izolasyonu sağlamalı.
+
+## Decision
+G1: GLOBAL control-plane daemon (`deckent gateway`, home `~/.deckent/gateway/`) token başına TEK connector sahiplenir; project-scoped SessionRegistry (chatKey→project), ProjectRegistry, ve her bound-project için TEK runtime child spawn eden RuntimeSupervisor (`ANTHROPIC_API_KEY` env'den silinmiş). Inbound mesaj → router chat→project binding'ini çözer (explicit `/use`), sonra bound project'in runtime'ına JSON-lines IPC üzerinden route eder (streaming-frame forward-compat). İki-seviyeli secret: bot token gateway-global, project secret runtime-child-local. Topology A (daemon + spawned children).
+
+## Consequences
+- Yeni global home `~/.deckent/gateway/`; per-project `deckent bot` deprecation yolu olarak kalır.
+- Token başına tek poller (409 yok); per-project crash izolasyonu; auth invariant child başına korunur (test-assert'li).
+- G1 follow-up'a ertelendi: pairing allowlist + `/pending` + approval-callback resolution + idle-evict. UYARI: Gateway pairing land etmeden PUBLİKE AÇILMAMALI (şu an isAuthorized hep-true).
+- Alt-projeler: G2 (grammY transport + webhook + Discord parity), G3 (per-session memory/isolation).
+- Spec: docs/superpowers/specs/2026-06-20-messaging-gateway-g1-design.md; plan: docs/superpowers/plans/2026-06-20-messaging-gateway-g1.md; kod main bc45eef5.

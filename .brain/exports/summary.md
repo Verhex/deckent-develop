@@ -82,6 +82,7 @@
 | adr-088 | Memory V2 — DB-First Architecture | accepted |
 | adr-089 | Backend-Agnostic Worker Observation + Per-Worker Independent Backends | accepted |
 | adr-090 | Documentation Tracking & Staleness (DCR + content-hash + multi-signal) | accepted |
+| adr-091 | Project-Scoped Messaging Gateway — Control-Plane Daemon + Spawned Per-Project Runtimes | accepted |
 
 ## Recent Learnings
 - **Sprint sprint-311 Learnings** (sprint-311): ## Sprint sprint-311 Learnings
@@ -164,4 +165,4 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 
-_Total entries: 691 | Generated: 2026-06-19_
+_Total entries: 692 | Generated: 2026-06-20_
