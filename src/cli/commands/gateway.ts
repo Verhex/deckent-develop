@@ -159,6 +159,7 @@ export function registerGateway(program: Command): void {
 
   // Hidden child entry — spawned by the supervisor for per-project runtime, not for direct use.
   program.command('gateway-runtime', { hidden: true })
+    .description(getMessage('gateway.runtime_desc', getLanguage(undefined)))
     .requiredOption('--project <path>', 'Bound project root')
     .option('--lang <code>', 'Language override (en|tr)')
     .action((opts: { project: string; lang?: string }) => {

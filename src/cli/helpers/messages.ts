@@ -1722,6 +1722,10 @@ const MESSAGES: MessageMap = {
     tr: 'Proje-kapsamlı mesajlaşma gateway (G1)',
     en: 'Project-scoped messaging gateway (G1)',
   },
+  'gateway.runtime_desc': {
+    tr: 'Dahili: bir projeye bağlı runtime child (supervisor spawn eder; doğrudan kullanım için değil)',
+    en: 'Internal: per-project runtime child (spawned by the supervisor; not for direct use)',
+  },
   'gateway.pair_approved': {
     tr: 'Eşleştirme onaylandı: {chatKey} → {project}',
     en: 'Pairing approved: {chatKey} → {project}',
