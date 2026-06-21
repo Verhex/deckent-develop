@@ -220,6 +220,43 @@ describe('registerPlanTool', () => {
       expect(content.sprintId).toBe('sprint-001');
       expect(content.jobId).toBeUndefined();
     });
+
+    it('passes dryRun:true to planSprint so it never writes task files (R7)', async () => {
+      const server = makeServer();
+      registerPlanTool(server as any);
+      makeDefaultMocks();
+
+      await server.callTool('deckent_plan', {});
+
+      // The bug: the handler passed no dryRun, so planSprint's write-guard
+      // (`if (!options?.dryRun)`) wrote real .tasks/task-*.json despite the
+      // schema advertising "tasks are never written to disk".
+      expect(mockPlanSprint).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ dryRun: true }),
+      );
+    });
+
+    it('forces dryRun even when the caller asks for dryRun:false (preview-only contract)', async () => {
+      const server = makeServer();
+      registerPlanTool(server as any);
+      makeDefaultMocks();
+
+      await server.callTool('deckent_plan', { dryRun: false });
+
+      // deckent_plan is preview-only; execution is deckent_start's job. A
+      // dryRun:false input must NOT cause planSprint to write task files.
+      expect(mockPlanSprint).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ dryRun: true }),
+      );
+    });
   });
 
   // ── Task list response ─────────────────────────────────────────────────────

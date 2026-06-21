@@ -71,6 +71,12 @@ export function registerPlanTool(server: McpServer): void {
       };
       const sprint = await planSprint(root, config, context, recommendation, {
         mode: input.mode as BrainPlanningMode | undefined,
+        // The plan tool is a PREVIEW only — its schema documents "Always dry-run …
+        // tasks are never written to disk", and execution is deckent_start's job.
+        // Force dryRun so planSprint skips the .tasks/task-*.json write; the tool
+        // previously passed no dryRun at all and wrote real task files despite the
+        // advertised guarantee.
+        dryRun: true,
       });
 
       const tasks = sprint.tasks.map((t) => ({
