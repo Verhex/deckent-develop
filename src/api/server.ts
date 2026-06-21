@@ -1138,6 +1138,8 @@ export interface HttpApi {
   server: Server;
   /** Terminal auth token (test-exposed). Only set when terminal is enabled. */
   terminalToken?: string;
+  /** PTY session manager (test-exposed). Only set when terminal is enabled. */
+  terminalManager?: PtySessionManager;
   close(): Promise<void>;
 }
 
@@ -1452,6 +1454,11 @@ export function createHttpServer(
         scrollbackBytes: 262_144,
         idleTimeoutMs: 1_800_000,
         maxSessions: 10,
+        // Thread the server's bind host so the command guard (deny-list for
+        // remote shell sessions, invariant I3) actually enforces when the server
+        // is exposed beyond loopback. Omitting it defaulted host to 'localhost',
+        // which exempted EVERY session — the guard never fired even on a remote bind.
+        host,
       });
       // Structured audit recorder. Tests pass a no-op sink; production wires
       // MemoryStore. Raw PTY output is NEVER routed here (security invariant).
@@ -1623,6 +1630,7 @@ export function createHttpServer(
   return {
     server,
     terminalToken,
+    terminalManager: terminalMgr,
     close(): Promise<void> {
       watcher?.close();
       liveBridge?.close();
