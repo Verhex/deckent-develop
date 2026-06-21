@@ -149,4 +149,22 @@ describe('DiscordConnector', () => {
       connector.sendMessage({ connector: 'discord', channelId: 'ch-1', text: 'hi' }),
     ).rejects.toThrow('Discord connector not started');
   });
+
+  it('throws instead of silently dropping when the channel cannot be resolved (R6)', async () => {
+    mockChannelsFetch.mockResolvedValue(null); // channel id not found
+    await connector.start(enabledConfig);
+    await expect(
+      connector.sendMessage({ connector: 'discord', channelId: 'ch-missing', text: 'deploy started' }),
+    ).rejects.toThrow(/not a sendable text channel/);
+    expect(mockChannelSend).not.toHaveBeenCalled();
+  });
+
+  it('throws instead of silently dropping when the channel is not text-based (R6)', async () => {
+    mockChannelsFetch.mockResolvedValue({ isTextBased: () => false, send: mockChannelSend });
+    await connector.start(enabledConfig);
+    await expect(
+      connector.sendMessage({ connector: 'discord', channelId: 'ch-voice', text: 'hi' }),
+    ).rejects.toThrow(/not a sendable text channel/);
+    expect(mockChannelSend).not.toHaveBeenCalled();
+  });
 });

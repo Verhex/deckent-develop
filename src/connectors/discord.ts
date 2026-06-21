@@ -63,9 +63,13 @@ export class DiscordConnector extends BaseConnector {
     }
 
     const channel = await this.client.channels.fetch(msg.channelId);
-    if (channel && channel.isTextBased() && 'send' in channel) {
-      await (channel as unknown as { send(text: string): Promise<unknown> }).send(msg.text);
+    // Unresolvable / non-text / non-sendable channel was silently dropped here —
+    // the caller awaited void and assumed delivery. Surface it (parity with the
+    // not-started throw above) so a misconfigured channel id is never invisible.
+    if (!channel || !channel.isTextBased() || !('send' in channel)) {
+      throw new Error(`Discord channel ${msg.channelId} is not a sendable text channel`);
     }
+    await (channel as unknown as { send(text: string): Promise<unknown> }).send(msg.text);
   }
 
   isHealthy(): boolean {
