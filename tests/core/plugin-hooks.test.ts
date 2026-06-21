@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import {
   registerHook,
   runHooks,
@@ -10,6 +11,7 @@ import {
   loadPluginHooks,
   registerPluginHooks,
   loadHookModule,
+  parseCoverageSummary,
   type PluginHook,
   type HookCallback,
   type HookContext,
@@ -86,6 +88,37 @@ function makeConfig(): ResolvedConfig {
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
+
+describe('parseCoverageSummary — real coverage from json-summary (R5)', () => {
+  let tmp: string;
+  beforeEach(() => { tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'deckent-cov-')); });
+  afterEach(() => { try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* ignore */ } });
+
+  function writeSummary(pct: number): void {
+    fs.mkdirSync(path.join(tmp, 'coverage'), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmp, 'coverage', 'coverage-summary.json'),
+      JSON.stringify({ total: { lines: { total: 100, covered: Math.round(pct), skipped: 0, pct } } }),
+      'utf-8',
+    );
+  }
+
+  it('reads total.lines.pct from coverage-summary.json (was hardcoded 0)', () => {
+    writeSummary(88.58);
+    // Pre-fix: coverage was a literal 0 — there was no reader at all.
+    expect(parseCoverageSummary(tmp)).toBeCloseTo(88.58);
+  });
+
+  it('returns 0 when no coverage report exists (honest absence, e.g. fresh checkout)', () => {
+    expect(parseCoverageSummary(tmp)).toBe(0);
+  });
+
+  it('returns 0 on a malformed report instead of throwing', () => {
+    fs.mkdirSync(path.join(tmp, 'coverage'), { recursive: true });
+    fs.writeFileSync(path.join(tmp, 'coverage', 'coverage-summary.json'), '{ not json', 'utf-8');
+    expect(parseCoverageSummary(tmp)).toBe(0);
+  });
+});
 
 describe('plugin-hooks', () => {
   beforeEach(() => {

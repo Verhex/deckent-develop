@@ -591,6 +591,29 @@ export function runFullVitest(projectRoot: string): {
 }
 
 /**
+ * Read the line-coverage percentage from vitest's json-summary report
+ * (coverage/coverage-summary.json — emitted by the json-summary reporter, see
+ * vitest.config.ts). Returns the project's latest measured line coverage, or 0
+ * when no report exists / it is unparseable. This is real coverage data (from
+ * the most recent `test:coverage` run), not a hardcoded 0 — it gives
+ * `track_coverage` an actual behavioral effect without forcing a slow
+ * `--coverage` re-run inside the per-task / pre-sprint gate.
+ */
+export function parseCoverageSummary(projectRoot: string): number {
+  try {
+    const summaryPath = join(projectRoot, 'coverage', 'coverage-summary.json');
+    if (!existsSync(summaryPath)) return 0;
+    const data = JSON.parse(readFileSync(summaryPath, 'utf-8')) as {
+      total?: { lines?: { pct?: number } };
+    };
+    const pct = data.total?.lines?.pct;
+    return typeof pct === 'number' && isFinite(pct) ? pct : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Run pre-sprint CI validation.
  *
  * 1. Reads CI guardian config (or uses overrides)
@@ -664,6 +687,13 @@ export function runPreSprintValidation(
     };
   }
 
+  // track_coverage: read the real line-coverage % from vitest's json-summary
+  // report (the project's latest measured coverage) instead of hardcoding 0, so
+  // both the saved baseline and the returned result carry real data and the
+  // coverage-regression check (readCiBaseline().coverage) is no longer 0-vs-0.
+  // 0 when track_coverage is disabled.
+  const measuredCoverage = config.track_coverage ? parseCoverageSummary(projectRoot) : 0;
+
   // Step 3: Save baseline
   const baseline: CiBaseline = {
     sprintId,
@@ -672,7 +702,7 @@ export function runPreSprintValidation(
       testCount: vitestResult.testCount,
       testPassed: vitestResult.testPassed,
       testFailed: vitestResult.testFailed,
-      coverage: 0,
+      coverage: measuredCoverage,
       timestamp: new Date().toISOString(),
     },
   };
@@ -705,7 +735,7 @@ export function runPreSprintValidation(
     testCount: vitestResult.testCount,
     testPassed: vitestResult.testPassed,
     testFailed: vitestResult.testFailed,
-    coverage: 0,
+    coverage: measuredCoverage,
     baselineSaved,
   };
 }
