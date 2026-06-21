@@ -22,6 +22,7 @@ beforeEach(() => {
 afterEach(() => {
   // restore to plain object so next test starts clean
   (globalThis as unknown as { window: Record<string, unknown> }).window = {};
+  delete (globalThis as unknown as { sessionStorage?: unknown }).sessionStorage;
 });
 
 describe('api-client — Authorization: Bearer token injection', () => {
@@ -110,5 +111,33 @@ describe('api-client — Authorization: Bearer token injection', () => {
   it('getBootstrapApiToken returns undefined when token absent', () => {
     (globalThis as unknown as { window: Record<string, unknown> }).window = {};
     expect(getBootstrapApiToken()).toBeUndefined();
+  });
+
+  it('GET falls back to the session token when no bootstrap token (A7)', async () => {
+    // No bootstrap token; an OIDC/manual-login session token lives in sessionStorage.
+    (globalThis as unknown as { window: Record<string, unknown> }).window = {};
+    (globalThis as unknown as { sessionStorage: { getItem: (k: string) => string | null } }).sessionStorage = {
+      getItem: (k: string) => (k === 'DECKENT_SESSION_TOKEN' ? 'sess-tok-a7' : null),
+    };
+
+    await fetchJson('/api/status');
+
+    const [, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
+    // Pre-fix: authHeaders read only the bootstrap token → no header → silent 401.
+    expect((opts.headers as Record<string, string>)['Authorization']).toBe('Bearer sess-tok-a7');
+  });
+
+  it('bootstrap token takes precedence over the session token', async () => {
+    (globalThis as unknown as { window: { __DECKENT_API_TOKEN__: string } }).window = {
+      __DECKENT_API_TOKEN__: 'bootstrap-wins',
+    };
+    (globalThis as unknown as { sessionStorage: { getItem: (k: string) => string | null } }).sessionStorage = {
+      getItem: () => 'sess-should-not-win',
+    };
+
+    await fetchJson('/api/status');
+
+    const [, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect((opts.headers as Record<string, string>)['Authorization']).toBe('Bearer bootstrap-wins');
   });
 });

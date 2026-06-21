@@ -12,6 +12,8 @@
  * applies the same constant-time compare to both transports.
  */
 
+import { getSessionToken } from "./session.js";
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -36,7 +38,11 @@ export function getBootstrapApiToken(): string | undefined {
 }
 
 function authHeaders(extra?: Record<string, string>): Record<string, string> {
-  const token = getBootstrapApiToken();
+  // Prefer the bootstrap token (localhost auto-inject) then the session token
+  // (OIDC / manual login, persisted in sessionStorage) — same precedence as
+  // useAuth. Without the session fallback every shared API call from a logged-in
+  // (non-localhost) user sent no Authorization header and silently 401'd.
+  const token = getBootstrapApiToken() ?? getSessionToken();
   const base: Record<string, string> = {};
   if (token) base["Authorization"] = `Bearer ${token}`;
   if (extra) Object.assign(base, extra);
@@ -80,7 +86,7 @@ export async function postJson<T>(url: string, body?: unknown): Promise<T> {
  * into the query-token path explicitly.
  */
 export function buildSseUrl(baseUrl: string): string {
-  const token = getBootstrapApiToken();
+  const token = getBootstrapApiToken() ?? getSessionToken();
   if (!token) return baseUrl;
   const separator = baseUrl.includes("?") ? "&" : "?";
   return `${baseUrl}${separator}token=${encodeURIComponent(token)}`;
