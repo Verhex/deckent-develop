@@ -647,6 +647,18 @@ describe('formatHumanStatus — budget check via MemoryStore', () => {
     const result = formatHumanStatus(input);
     expect(result).not.toContain('Budget:');
   });
+
+  it('shows Budget unreadable (not a false OK) when the DB exists but cannot be read (R6)', () => {
+    // A present-but-corrupt/locked DB used to be collapsed into 0 entries and
+    // rendered "0/600 lines (OK)" — a false healthy signal over a broken store.
+    mockOutputMemStore.totalCount.mockImplementation(() => {
+      throw new Error('SQLITE_NOTADB: file is not a database');
+    });
+    const input = makeHumanStatusInput({ projectRoot: '/fake/root' });
+    const result = formatHumanStatus(input);
+    expect(result).toContain('unreadable');
+    expect(result).not.toContain('(OK)');
+  });
 });
 
 // ─── formatHumanStatus — alert detail (D) ────────────────────────────

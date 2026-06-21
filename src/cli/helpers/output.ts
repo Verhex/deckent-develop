@@ -6,15 +6,21 @@ import { formatHumanSprintComplete } from '../../orchestra/sprint-reporter.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 
-/** Returns total memory entry count from the project's SQLite DB. Returns 0 if the DB is absent or unreadable. */
-function getMemoryEntryCount(projectRoot: string): number {
+/**
+ * Returns total memory entry count from the project's SQLite DB.
+ * Absent DB → 0 (no memory yet is a real, healthy zero). A DB that EXISTS but
+ * cannot be read (corrupt / locked / wrong format) → null, NOT 0 — collapsing
+ * "unreadable" into 0 made the budget render a false "0/600 (OK)" while the
+ * store was actually broken.
+ */
+function getMemoryEntryCount(projectRoot: string): number | null {
   const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
   if (!existsSync(dbPath)) return 0;
   try {
     const store = new MemoryStore(dbPath);
     try { return store.totalCount(); }
     finally { store.close(); }
-  } catch { return 0; }
+  } catch { return null; }
 }
 
 // ─── CI Types ────────────────────────────────────────────────────────
@@ -596,7 +602,11 @@ export function formatHumanStatus(input: HumanStatusInput): string {
     try {
       const brainLines = getMemoryEntryCount(input.projectRoot);
       const maxBudget = 600;
-      if (brainLines > maxBudget) {
+      if (brainLines === null) {
+        // DB present but unreadable — surface it rather than faking an OK budget.
+        lines.push('');
+        lines.push(`Budget: ${color('\x1b[33m', 'unknown — memory DB present but unreadable')}`);
+      } else if (brainLines > maxBudget) {
         lines.push('');
         lines.push(`Budget: ${color('\x1b[31m', `OVER (${brainLines}/${maxBudget} lines)`)} \u2014 run \`deckent cleanup --decay\``);
       } else if (brainLines > maxBudget * 0.8) {
