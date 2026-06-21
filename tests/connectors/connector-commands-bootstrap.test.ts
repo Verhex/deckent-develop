@@ -288,6 +288,66 @@ describe('bootstrapConnectorCommands', () => {
     }
   });
 
+  it('chat reply with Markdown → sent as Telegram HTML (parseMode HTML, bold rendered)', async () => {
+    const fake = fakeConnector('telegram');
+    const chat = vi.fn(async () => 'Use **deckent_recover** now');
+    await bootstrapConnectorCommands('/root', cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'resolved'),
+      chat,
+    });
+    fake._emit(incoming('help me', '555'));
+    // Wait for the chat reply to land (thinking + rich reply)
+    await vi.waitFor(() => {
+      const htmlCalls = fake.sendMessage.mock.calls.filter(
+        (c) => (c[0] as { parseMode?: string }).parseMode === 'HTML'
+      );
+      expect(htmlCalls.length).toBeGreaterThan(0);
+    });
+    const htmlCalls = fake.sendMessage.mock.calls.filter(
+      (c) => (c[0] as { parseMode?: string }).parseMode === 'HTML'
+    );
+    const texts = htmlCalls.map((c) => (c[0] as { text: string }).text).join('\n');
+    expect(texts).toContain('<b>deckent_recover</b>');
+    expect(texts).not.toContain('**deckent_recover**');
+  });
+
+  it('chat reply HTML send throws → plain fallback fires (no crash, no lost reply)', async () => {
+    let callCount = 0;
+    let handler: MessageHandler | undefined;
+    const sendMessage = vi.fn(async (msg: { parseMode?: string; text: string }) => {
+      callCount++;
+      if (msg.parseMode === 'HTML') throw new Error('ETELEGRAM: 400 Bad Request: can\'t parse entities');
+    });
+    const fallbackFake = {
+      id: 'telegram' as const,
+      name: 'telegram',
+      start: vi.fn(async () => {}),
+      stop: vi.fn(async () => {}),
+      sendMessage,
+      onMessage: vi.fn((h: MessageHandler) => { handler = h; }),
+      isHealthy: () => true,
+      _emit: (m: IncomingMessage) => handler?.(m),
+    };
+    const chat = vi.fn(async () => 'Use **deckent_recover** now');
+    await bootstrapConnectorCommands('/root', cfg, {
+      makeConnector: () => fallbackFake,
+      resolve: vi.fn(async () => 'resolved'),
+      chat,
+    });
+    (fallbackFake._emit as (m: IncomingMessage) => void)(incoming('help me', '555'));
+    // Wait for plain fallback: a sendMessage call WITHOUT parseMode=HTML containing raw text
+    await vi.waitFor(() => {
+      const plainCalls = sendMessage.mock.calls.filter(
+        (c) => (c[0] as { parseMode?: string }).parseMode !== 'HTML'
+      );
+      // the plain fallback must contain the raw markdown text
+      const plainTexts = plainCalls.map((c) => (c[0] as { text: string }).text).join('\n');
+      expect(plainTexts).toContain('deckent_recover');
+    });
+    // Crucially, no unhandled error — test itself completes without throw
+  });
+
   it('unresolved $DECK token → skipped, nothing started, adapter null', async () => {
     const make = vi.fn();
     const { adapter } = await bootstrapConnectorCommands('/root',

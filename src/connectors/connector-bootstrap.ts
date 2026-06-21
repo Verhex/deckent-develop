@@ -31,6 +31,7 @@ import type { McpToolDispatcher } from '../cli/commands/chat-native.js';
 import { killSprintById } from '../cli/commands/kill.js';
 import { getCurrentSprintId } from '../monitor/sprint-state.js';
 import { getMessage } from '../cli/helpers/messages.js';
+import { markdownToTelegramHtml } from './markdown-to-html.js';
 
 type NotifyConnectorsConfig = NonNullable<DeckentConfig['notify_connectors']>;
 
@@ -265,6 +266,19 @@ export async function bootstrapConnectorCommands(
             await connector.sendMessage({ connector: connector.id, channelId, text: part });
           }
         };
+        // Rich chat-reply send: render Markdown → Telegram HTML, falling back to
+        // PLAIN per-chunk if Telegram rejects the HTML (malformed entities). Chunk
+        // the Markdown SOURCE (line boundaries) BEFORE converting so inline tags
+        // stay balanced per chunk.
+        const sendRich = async (channelId: string, mdText: string): Promise<void> => {
+          for (const part of chunkMessage(mdText)) {
+            try {
+              await connector.sendMessage({ connector: connector.id, channelId, text: markdownToTelegramHtml(part), parseMode: 'HTML' });
+            } catch {
+              await connector.sendMessage({ connector: connector.id, channelId, text: part });
+            }
+          }
+        };
         const chat = deps.chat;
         const commandRouter = makeIncomingCommandRouter({
             authorizedChatIds: [chatId],
@@ -317,20 +331,24 @@ export async function bootstrapConnectorCommands(
                         const reply = await chatStreaming(channelId, text, (partial) => throttle?.push(partial));
                         const body = reply.trim() || getMessage('bot.chat_empty', lang);
                         if (msgId && throttle) {
-                          // Final: edit the placeholder in place with the first part;
-                          // overflow parts (rare, >4000 chars) sent as new messages.
+                          // Final: edit the placeholder in place with the first part
+                          // rendered as HTML; overflow parts sent as rich messages.
                           const parts = chunkMessage(body);
-                          await streamCap.editMessage!(channelId, msgId, parts[0]!).catch(async () => { await send(channelId, parts[0]!); });
-                          for (let i = 1; i < parts.length; i++) await send(channelId, parts[i]!);
+                          const html0 = markdownToTelegramHtml(parts[0]!);
+                          await streamCap.editMessage!(channelId, msgId, html0, 'HTML')
+                            .catch(async () => {
+                              await streamCap.editMessage!(channelId, msgId, parts[0]!).catch(async () => { await send(channelId, parts[0]!); });
+                            });
+                          for (let i = 1; i < parts.length; i++) await sendRich(channelId, parts[i]!);
                         } else {
-                          for (const part of chunkMessage(body)) await send(channelId, part);
+                          await sendRich(channelId, body);
                         }
                       } else {
-                        // Non-streaming fallback — byte-identical to pre-T4 behavior.
+                        // Non-streaming fallback — rich reply.
                         await send(channelId, getMessage('bot.chat_thinking', lang));
                         const reply = await chat(channelId, text);
                         const body = reply.trim() || getMessage('bot.chat_empty', lang);
-                        for (const part of chunkMessage(body)) await send(channelId, part);
+                        await sendRich(channelId, body);
                       }
                     } catch {
                       await send(channelId, getMessage('bot.chat_error', lang)).catch(() => undefined);
