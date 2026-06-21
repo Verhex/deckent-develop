@@ -1,0 +1,281 @@
+# DECKENT TRIAGE PLANI — Bulgu Havuzu → A-fix / B-karar / C-cleanup (+ R1-R8)
+
+> **Amaç:** Cross-check havuzundaki ~431 crit/high (+ medium/low kuyruğu) bulguyu **üç kovaya** ayır, A'ları R1-R8 kök-nedene bağla, B-kararları Alperen'in önüne getir. Bu doküman fix-kampanyasının **SSOT backlog**'u. Kaynak: `deckent-last-standing-crosscheck.md` (Phase-1 CC ⨯ Phase-2 deckent). Her satır file:line taşır; "bazıları zaten sistemsel karardı" → o satırlar **Bucket B**'ye düştü, A'ya değil.
+
+## 0. Kova Özeti
+
+| Kova | Ne demek | Yaklaşık adet | Kim koşar | Sıra |
+|------|----------|--------------|-----------|------|
+| **A — Gerçek defect** | Kod söylediğini yapmıyor; kasıtlı karar DEĞİL | ~75-95 fix-task | deckent + **CC-verify** (auth'u CC el-kodlar) | 1. öncelik |
+| **B — Sistemsel karar** | Soft/off/advisory = (muhtemelen) kasıtlı V1.0 kararı | **14 ruling** (+ B11'de ~18 feature tag'i) | **Alperen karar verir**, ~0 dev | A'dan ÖNCE (A'yı şekillendirir) |
+| **C — Dead cleanup** | Gerçekten ölü scaffolding, sil | ~100 modül → ~4 batch-sprint | deckent (mekanik) + CC zero-caller doğrula | A'dan sonra |
+
+**Kritik prensip:** R1 (fail-open) ve R3 (dormant-knob) bulgularının bir kısmı **kasıtlı V1.0** (ADR-037 advisory, scope soft-enforce, API-mode deferred) → bunlar **B**. Aynı R1 içindeki **auth/tenant/IDOR** bypass'ları kasıtlı DEĞİL → **A**. Triage'ın asıl işi bu ayrım.
+
+---
+
+## 1. BUCKET B — SENİN KARARIN (önce bunlar; A'yı şekillendirir)
+
+> Her ruling: **ne soft**, **kanıt**, **karar seçenekleri**, **CC önerisi**. Bunlar kod-işi değil; senin "koru / hard'a-çevir / dökümante / kes" kararın. A-fix'ler bu kararlara göre yön alır (örn. B1 "hard-flip" dersen R1-RBAC bulguları A'ya terfi eder).
+
+### B1 — RBAC `enforce_rbac` default-false → advisory-only · R1 · ~10 bulgu
+**Ne soft:** `enforce_rbac` standart config'de undefined/false → authority gate warn-only, hard-deny path erişilemez. Yerler: `core/rbac.ts`, `nervous/authority-matrix.ts`, `orchestra/sprint-runtime.ts`, `orchestra/autonomous/runtime-loop.ts`, `orchestra/backlog-trigger.ts` (crosscheck TIER-1 L46-93, TIER-3 L686-697).
+**Kanıt-niteliği:** CLAUDE.md gotcha + ADR-037 V1.0 **açıkça** "runtime advisory/soft, hard-flip post-GA V2" diyor → **bu kasıtlı karar, A değil.**
+**Seçenekler:** (a) V1.0-soft koru, post-GA hard; (b) şimdi hard-flip; (c) **product-default soft kalsın AMA deckent-dev'in KENDİ config'inde hard-mode aç (dogfood kendi enforcement'ını yesin) + hard-path'i wire+test et.**
+**CC önerisi:** (c). Ürün default'u bozmadan, hard-deny path'in gerçekten çalıştığını dogfood'da kanıtlarız. Bugün hard-path **test-only/erişilemez** olduğu için "advisory" aslında "yok" demek — en azından erişilebilir+test-edilir yap.
+
+### B2 — Worker scope-authority hard-block soft (`checkWorkerAuthority`) · R1/R2 · 2 bulgu
+**Ne soft:** `agents/worker.ts:602-620` her iki branch `return true` → scope-violation bloke etmiyor.
+**Kanıt-niteliği:** CLAUDE.md gotcha "scope enforcement runtime advisory/soft (V1.0 Layer-2 kasıtlı eksik), ihlal `git diff --stat` ile izlenir + warn/emit, **bloke ETMEZ**" → soft-block **kasıtlı (B)**. **AMA:** eğer warn/emit path'i de ölüyse (sadece `return true`, hiç emit yok) → o kısım **A** (kasıtlı olan "bloke etme", "sessiz kalma" değil).
+**Seçenekler:** (a) soft koru + emit'i doğrula/tamir et; (b) hard-flip.
+**CC önerisi:** (a). Block kararı V1.0 soft kalsın; ama **emit/audit-trail gerçekten fire ediyor mu** diske-doğrula — etmiyorsa A-fix olarak emit'i canlandır (Auditor'ın izleyebilmesi için şart).
+
+### B3 — PanicGuard BLOCK kararı advisory (kill yine de devam) · R1 · 2 bulgu
+**Ne soft:** `core/panic-guard.ts` / `sprint-controller.ts` — PanicGuard BLOCK dönse de worker-kill yine ilerliyor (TIER-2 L509, TIER-3 L692).
+**Karar:** Panic gerçekten hard-block etmeli mi? (Güvenlik-guard'ı soft olunca amacı kalmıyor.)
+**CC önerisi:** **hard-block** (bu aslında A'ya yakın — ama davranış-değiştiren olduğu için senin onayın). Panic nadir + kasıtlı tetik; soft olması koruma vaadini boşa çıkarıyor.
+
+### B4 — `assertSpawnSafe` / ADR-006 spawn-safety advisory · R1 · 2 bulgu
+**Ne:** `core/spawn-safety.ts` `assertSpawnSafe`/`isSpawnSafe` **zero production caller** (TIER-1 L48, L278) → ADR-006 spawn-safety dokümante ama enforce edilmiyor. **AYRICA** `orchestra/spawn-backend.ts` DockerSpawnBackend (default backend) **SAFETY_FLOOR lethal-guard'ı bypass** ediyor (TIER-3 L688).
+**Ayrım:** SAFETY_FLOOR (rm -rf / force-push / secret) bypass'ı = **A, lethal, kasıtsız**. Genişletilmiş spawn-safety (assertSpawnSafe) advisory kalması = **B**.
+**CC önerisi:** SAFETY_FLOOR **her backend'de hard** (A-fix, B4 değil) + assertSpawnSafe'i ya wire et ya da sil (B/C kararı).
+
+### B5 — Adversarial cross-verify default-OFF · R2 · 1 bulgu
+**Ne:** `orchestra/cross-verify-runner.ts:204` — XVER feature wired ama default-off; REFUTED verdict advisory.
+**Karar:** Dogfood'da açalım mı? (Maliyet/latency artar ama "trust-without-verify"i kapatır.)
+**CC önerisi:** deckent-dev dogfood'da **AÇ**, ürün-default off kalsın (maliyet). REFUTED'ın enforcement-path'i (advisory→block) = ayrı A-fix.
+
+### B6 — Cost-gate `daily_max_usd`/`monthly_max_usd` enforce edilmiyor · R3 · 2 bulgu
+**Ne:** `core/cost-config-loader.ts` — alanlar tanımlı/settable/displayed ama harcama-gate'i olarak hiç enforce edilmiyor (TIER-1 L218).
+**Kanıt-niteliği:** memory "API-mode cost-cap post-beta deferred" → kısmen kasıtlı.
+**CC önerisi:** Şimdi **warn-only** wire (ucuz, görünürlük verir), hard-gate post-beta. Veya tamamen post-beta'ya ertele (senin çağrın).
+
+### B7 — Telemetry + SIEM-forwarder default-off (no-op) · R3 · ~4 bulgu
+**Ne:** `core/telemetry.ts` (`telemetry_enabled`/`telemetry_anonymous` hiç okunmaz, TelemetryCollector zero-caller), `core/siem-forwarder.ts` (default-off, missing transport sessizce tüm audit-event'i atar) (TIER-1 L270, L282-285, TIER-3 L758).
+**Karar:** Privacy-default off **kasıtlı**. Ama kod dormant duruyor.
+**CC önerisi:** Off kalsın + **opt-in dökümante et**; dormant TelemetryCollector'ı ya wire et ya C-sil. SIEM "missing transport = sessiz-discard" yerine **en az bir uyarı** emit etsin (A-mini).
+
+### B8 — API-mode worker-auth post-beta deferred · doğrulama · referans
+**Ne:** memory `project_api_mode_deferred_post_beta`. Havuzda buna bağlı auth-fallback bulguları var.
+**CC önerisi:** Deferred'ı **teyit et** (1 Haziran geçti, hâlâ subscription-default). Değişmeyecekse bu satırları B-kapalı işaretle.
+
+### B9 — autonomous / nervous default-off · doğrulama · referans
+**Ne:** İkisi de kasıtlı default-off (memory `project_automation_usability_state`). Havuzdaki "X never runs in live pipeline" bulgularının bir kısmı bundan.
+**CC önerisi:** Koru + dökümante. "Default-off yüzünden dormant" olanları **B-kapalı** işaretle ki A/C'yi şişirmesin.
+
+### B10 — Writer-lease-gate fs-error'da fail-open · R1 · 1 bulgu
+**Ne:** `mcp/writer-lease-gate.ts:64` — lease fs-error'da TÜM write-tool için fail-open.
+**Kanıt-niteliği:** memory + commit a0ac4f71 "fail open on lease fs-error (**spec compliance**, final review)" → **kasıtlı** (availability > safety).
+**CC önerisi:** Spec gereği fail-open **koru** + risk-yorumu ekle. Değişmeyecekse B-kapalı.
+
+### B11 — Dormant FEATURE'lar: WIRE mi, KES mi? (her biri "bu özelliği istiyor muyuz?")
+Bunlar saf-dead değil; **yarım-kalmış özellik**. Karar: **istiyorsan → A-wire**, istemiyorsan → **C-sil**. Tag'le:
+
+| Feature | Yer | Durum | CC önerisi |
+|---------|-----|-------|-----------|
+| Mission crash-recovery (`recover()`) | `orchestra/autonomous/mission-store/*` | interface'de var, hiç çağrılmıyor → crash'te 'running' kalanlar orphan | **WIRE** (boot'ta recover çağır) |
+| Proof-of-function gate | `orchestra/proof-of-function.ts` | zero-caller → Tier-1 smoke hiç uygulanmıyor | **WIRE** (ADR-079 vaadi) |
+| Post-sprint-smoke | `orchestra/post-sprint-smoke.ts` | runner no-op stub + zero-caller | **WIRE** (real-binary smoke) |
+| Self-modifying enforce | `orchestra/self-modifying-detector.ts` | enforce mode no-op, RBAC hep soft | WIRE  (ADR-038) |
+| F5 evolution loop | `agents/prompt-version.ts` | stats hiç yazılmıyor → evolution sessiz | WIRE  |
+| Marketplace (dependency-resolver, rating) | `core/marketplace/*` | zero-caller | **KES** (post-GA) |
+| Credentials / credential-encryption | `core/credentials.ts`, `credential-encryption.ts` | zero-caller | WIRE (enterprise) |
+| Enterprise-config runtime | `core/enterprise-config.ts` | tamamen dormant | WIRE (enterprise edition) |
+| Notification-providers (slack/discord/webhook) | `core/notification-providers/*` + eski `notifications.ts` | hiç wire değil → bildirim gitmiyor | **WIRE bir tanesi** + eskiyi KES (R4 dup) |
+| ERP-connector `.deck` factory | `core/erp-connector.ts` | zero-caller | KES (IFS round-trip post-beta) |
+| Self-dispatch queue | `core/self-dispatch.ts` | zero-caller |  WIRE (autonomous) |
+| Cascade-detector | `core/cascade-detector.ts` | zero-caller + paused-state re-check yok | WIRE (cost-guard değerli)  | **WIRE** 
+| Timeout-watcher | `orchestra/timeout-watcher.ts` | dead + sprint-phases ile çelişen default | **KES** (sprint-phases canlı) |
+| Sprint-estimator | `orchestra/sprint-estimator.ts` | zero-caller | **WIRE**  |
+| Multi-agent pipeline | `orchestra/multi-agent.ts` | zero-caller | **WIRE**  |
+| CLI dead-class kümesi (Progress*, QueueDisplay, ReviewSummary, SelectiveRetry, WorkerStatusTracker, RecommendationEngine) | `cli/helpers/*` | zero-caller | **KES** (C-batch) |
+| Dashboard dead-component (AppShell, WorkerGrid, RoutingDistribution, analytics×4, theme.ts) | `dashboard/src/*` | zero-caller | **WIRE** (UI'da gösterilecekse) |
+
+→ **B11 aksiyonu:** bu tabloyu sen "WIRE/KES" diye işaretle; WIRE'lar A-backlog'a, KES'ler C-batch'e taşınır.
+
+---
+
+## 1.X — B-RULING SONUÇLARI (RESOLVED 2026-06-21, Alperen) ✅
+
+> Tüm B1-B11 karara bağlandı. **Genel yön: WIRE-ağırlıklı** (god-level/enterprise hedefi → dormant kod = yarım-kalmış altyapı, çoğu wire'lanacak). C-kovası 5 gruba indi.
+
+| Ruling | Karar | Aksiyon |
+|--------|-------|---------|
+| **B1** RBAC default-soft | **(c) kabul** | product-default soft; **deckent-dev config'inde hard-mode AÇ** + hard-deny-path wire+test → **A-task** |
+| **B2** worker scope-block | **(a) kabul** | soft-block koru; **emit/audit-trail diske-doğrula**, ölüyse canlandır → **A-task** |
+| **B3** PanicGuard advisory | **kabul** | PanicGuard BLOCK **hard-block** et → **A-task** |
+| **B4** spawn-safety | **assertSpawnSafe WIRE** | assertSpawnSafe prod-callsite'lara wire + SAFETY_FLOOR her backend hard → **A-task** |
+| **B5** cross-verify off | **kabul** | dogfood config **AÇ**, product off; REFUTED→block enforcement → **A-task** |
+| **B6** cost-gate | **kabul** | **warn-only wire şimdi**; hard-gate API-modunda test edilince (sonra) → **A-task (warn-only)** |
+| **B7** telemetry/siem | **kabul AMA SİLME YOK** | telemetry **WIRE** (altyapı-ref kalsın, gelecekte geliştirilecek) + off-default opt-in doc + SIEM warn-emit → **A-task** |
+| **B8** API-mode | **TÜM API ÖZELLİKLERİ WIRE — tartışmaya kapalı** | API-mode worker-auth 2-hafta-içinde finanse+test; ama **her api/* dormant/unwired feature ŞİMDİ wire** → **A-API grubu** |
+| **B9** autonomous/nervous | **autonomous kanıtlandı kalır; nervous GELİŞTİR+İZLE** | nervous detector'ları wire + canlı-gözlem → **A-nervous grubu** |
+| **B10** writer-lease fail-open | **kabul** | spec gereği fail-open koru + risk-yorum (doc-only) |
+| **B11** dormant feature | **WIRE×13 / KES×5** | aşağı reflow |
+
+**B11 WIRE → A'ya taşındı (13):** mission-crash-recovery, proof-of-function-gate, post-sprint-smoke, self-modifying-enforce (ADR-038), F5-evolution-loop, credentials/credential-encryption (enterprise), enterprise-config-runtime, notification-provider (BİR tanesi), self-dispatch-queue, cascade-detector, sprint-estimator, multi-agent-pipeline, dashboard-components (AppShell/WorkerGrid/RoutingDistribution/analytics×4/theme).
+
+**B11 KES → C'de kaldı (5):** marketplace (dependency-resolver+rating, post-GA), erp-connector `.deck` factory (IFS round-trip post-beta), timeout-watcher (sprint-phases canlı), CLI-dead-class kümesi (Progress*/QueueDisplay/ReviewSummary/SelectiveRetry/WorkerStatusTracker/RecommendationEngine/doctor-format), eski-notification-dup (R4 ile birlikte).
+
+### Reflow sonucu — kova yeniden boyutlandı
+- **Bucket A büyüdü:** orijinal ~80 defect-fix **+ 13 WIRE-feature grubu + A-API (B8) + A-nervous (B9) + telemetry-wire (B7) + 6 B1-B5 enforcement-wire** → **~110-130 A-task**.
+- **Bucket C küçüldü:** ~100 modül değil → **yalnız 5 KES grubu** (~25-30 modül). Geri kalan "dead" sanılan kod aslında **wire-edilecek altyapı**.
+- **Yeni estimate:** A ~7-9 fix-sprint (WIRE-heavy) + C ~2 batch → **~2-3 haftalık denetimli dogfood** (önceki ~1-2 haftadan büyüdü; WIRE > delete).
+
+**B-özet:** 14 ruling RESOLVED. Artık A'ya başlanabilir — kasıtlı mimari korundu (RBAC product-soft, writer-lease fail-open, autonomous default), istenen altyapı wire-backlog'una alındı.
+
+---
+
+## 2. BUCKET A — GERÇEK DEFECT (fix + CC-verify), R1-R8 ile
+
+> Bunlar tartışmasız bug. Kod X vaat edip Y yapıyor; kasıtlı karar değil. R-mekanizmasına göre gruplu — her grup bir fix-sprint çekirdeği. **Auth (R1) CC el-kodlar** (en yüksek risk); mekanik olanları (R5/R6/R8) deckent worker + CC-verify.
+
+### A·R1 — Fail-open AUTH/TENANT/IDOR (kasıtsız güvenlik açığı) — CC el-kodlar 🔴
+| # | Bulgu | file:line | Not |
+|---|-------|-----------|-----|
+| ✅ A1 | **Lineage IDOR**: `registerAutonomousRoutes`'a `req` geçmiyor → tenant-filter kalıcı bypass | `api/server.ts:820,861` | **DONE (06-21)** — req thread edildi; server-level regresyon `tests/api/server-tenant-scope-wire.test.ts` (pre-fix'te fail kanıtlı); tsc+740 api-test yeşil |
+| ✅ A2 | Enterprise missions-audit tenant-isolation dead: `registerEnterpriseRoutes`'a `req` yok | `api/server.ts:824` | **DONE (06-21)** — req thread (6. arg); aynı regresyon-testte kanıtlandı |
+| ✅ A3 | mTLS client-cert detect edilip warn'lanıp **ignore** ediliyor (block yok) | `api/terminal/ws-gateway.ts` | **DONE (06-21, 760a38e8)** — verifier wire-li+cert-presented'ta fail-closed (null/throw→4401); regresyon `ws-gateway-mtls.test.ts` (pre-fix fail kanıtlı); terminal 63/63 yeşil |
+| ⚠️ A4 | `strictTenantIsolation` default-false + MemoryStore'a hiç thread edilmiyor → tenant-leak yapısal | `core/memory-store.ts` | **MİMARİ (cerrahi değil) — KARAR GEREK.** 51 prod `new MemoryStore(` callsite, 0'ı thread; config-types'ta alan yok. Flag'i 51 yere thread = yanlış-şekil (49'u single-tenant iç-store). Doğru fix = query-layer **request-principal scoping** (enterprise multi-tenancy, B9-bitişik). Bugün multi-tenant deployment yok → **latent**, live-exploit değil. → enterprise-arch backlog'a |
+| A5 | `enforce_least_privilege` flag `createAuditedCapabilityRegistry`'e hiç ulaşmıyor | `core/capability-runtime.ts` | |
+| ✅ A6 | AgentDetail.tsx raw fetch `Authorization` header'ı atlıyor → token'lı modda sessiz boş | `dashboard/src/components/AgentDetail.tsx` | **DONE (101c241d)** — fetchJson()'a geçti; regresyon (pre-fix fail); dashboard 72/72 |
+| ✅ A7 | Session token (OIDC/manual) shared API-fetch'e hiç forward edilmiyor → non-bootstrap çağrılar unauth | `dashboard/src/lib/api.ts` | **DONE (2d48efc6)** — authHeaders/buildSseUrl `bootstrap ?? session`; regresyon (pre-fix fail); 10/10 |
+| ✅ A8 | Command-guard deny-list HER prod session'da sessiz bypass | `api/terminal/session-manager.ts:99` | **DONE (09f3a972)** — TIER-2 doğrulandı (server.ts:1451 host geçmiyordu); bind-host thread + manager test-expose; server-level lock (pre-fix remote-test fail); api 746/746. _(peer-host = sub-project #3 ayrı)_ |
+| A9 | `enforceAdrCompliance` internal-error'da **fail-open** → ADR ihlali sessiz maskeleniyor | `orchestra/authority-enforcer.ts` | |
+| ✅ A10 | Auto-edit bash-guard ölü: literal `'bash'` karşılaştırıyor, kayıtlı tool yok | `agent/permission.ts` | **DONE (d8bf1b25)** — gerçek tool `deckent_bash`; `*_bash` match; regresyon gerçek-tool-adıyla (pre-fix fail); 35 yeşil |
+| ✅ A11 | SAFETY_FLOOR lethal-guard DockerSpawnBackend'de bypass (default backend!) | `orchestra/spawn-backend.ts` | **DONE (540a361f)** — checkLethalGuard export + Docker spawn ilk-satır; regresyon Docker-block (pre-fix fail); 841 yeşil |
+| A12 | Credential keyring ilk-erişimde sessiz auto-gen → key-provenance audit imkânsız | `core/credential-encryption.ts` | B11'de KES dersen düşer |
+
+### A·R2 — Verification-spine stub/unwired (trust-without-verify) — CC + deckent 🔴
+> **İLERLEME (06-21):** ✅ **A17 proof-of-function gate WIRED** (`afa7955a`) — `verifyProofOfFunction` artık `runEvaluatePhase`'de Tier-1-DONE task'lara fire ediyor; failing-smoke → GO_WITH_TECH_DEBT + PROOF_OF_FUNCTION_MISMATCH event (zero-caller'dı, Tier-1 gate hiç çalışmıyordu = false-DONE'un kökü). Faithful (pre-wire'da DONE kalıyor). **KALAN R2:** ⬜ A16 post-sprint-smoke (defaultSmokeRunner no-op + runPostSprintSmoke zero-caller — proof-of-function ile R4-çakışma, reconcile gerek) · ⬜ A15 runHonestyCheck→0 stub · ⬜ A13 reconcileRubricNoGo worker-coverage-trust · ⬜ A14 applyTechDebtDowngrade verify-delta-okumuyor · ⬜ A19 execute-dispatcher koşulsuz ok=true · ⬜ A20 handleWorkerQuestion hep 'continue' · ⬜ A21 audit-writer chainHead singleton · ⬜ A22 coverage-validator self-report-trust · ⬜ A18 cross-verify REFUTED advisory · ⬜ A23 Claude auth-yok.
+| # | Bulgu | file:line |
+|---|-------|-----------|
+| A13 | `reconcileRubricNoGo` worker-self-reported coverage'ı ground-truth alıp NO_GO→DONE çeviriyor | `orchestra/mid-sprint-adapter.ts` |
+| A14 | `applyTechDebtDowngrade` worker'dan istediği verify-delta dosyasını **okumadan** DONE kabul ediyor + zero-caller | `orchestra/result-evaluator.ts:358,360` |
+| A15 | `runHonestyCheck` stub hep `0` döner + zero-caller → honesty-gate hiç tetiklenmez | `orchestra/sprint-finalizer.ts:380` |
+| A16 | post-sprint-smoke `defaultSmokeRunner` koşulsuz no-op + `runPostSprintSmoke` zero-caller → faz hiç fire etmez | `orchestra/post-sprint-smoke.ts` |
+| A17 | `applyProofOfFunctionGate`/`verifyProofOfFunction` zero-caller → Tier-1 gate hiç uygulanmaz | `orchestra/proof-of-function.ts:376` |
+| A18 | Cross-verify REFUTED verdict enforcement-path'siz advisory | `orchestra/cross-verify-runner.ts` |
+| A19 | execute-dispatcher sprint-kind koşulsuz `ok=true` (Brain/Auditor eval yok) | `orchestra/autonomous/execute-dispatcher.ts` |
+| A20 | `handleWorkerQuestion` hep `'continue'` auto-yanıt → worker'ın abort/retry/skip'i atılıyor | `orchestra/ipc-registry.ts` |
+| A21 | `audit-writer.chainHead` process-wide singleton → cross-sprint chain hep `brokenAt:0` | `core/audit-writer.ts` |
+| A22 | coverage-validator vitest-JSON yoksa self-reported sayıya güveniyor; validateWorkerCoverage hiç data almıyor | `orchestra/coverage-validator.ts:301` |
+| A23 | Claude availability = binary-var (auth-doğrulama yok); detectClaude `authMethod='session'` koşulsuz | `providers/claude.ts:285`, `core/provider.ts` |
+
+### A·R4 — No-SSOT: divergent reimpl topla (fix ölü-kopyaya inmesin) — CC + deckent 🟠
+3-5× yeniden-yazılmış, fix yanlış kopyaya gidiyor. Tek-doğru-kaynağa indir:
+- 2× `ROLE_CAPABILITY_MAP` divergent → `core/capability-broker.ts` + `nervous/authority-matrix.ts` 🔴
+- 2× `checkWorkerAuthority` divergent → `agents/worker.ts` + `authority-matrix.ts`
+- 2× `evaluateResult` divergent → `orchestra/result-evaluator.ts`
+- 2× `waitForResults` (DI-versiyon hiç çağrılmıyor) → `result-evaluator.ts`
+- 3× `RateLimiter` (core/api/server) → `core/rate-limiter.ts`
+- 3× `parseVitestOutput` → `orchestra/baseline-tracker.ts`
+- 3× `getCurrentSprintId` farklı dosya okuyor → `monitor/sprint-state.ts` 🔴
+- 3× `extractKeywords` → `core/agent-selector.ts`
+- 3× `max_workers` algo → `host-detector`/`system-capacity`/`system-profile`
+- 3× `isNoColor` → `cli/commands/dashboard.ts`
+- 3× `redactSensitive` → `orchestra/sensitive-redactor.ts`
+- 3× MCP-tool-catalog kaynağı drifted → `mcp/tools/index.ts`
+- 3× alert-dedup aynı array'e yazıyor → `monitor/alert-emitter.ts`
+- 2× notification sistemi (+ R6) → `core/notifications.ts`
+- 2× `NervousSystemConfig` divergent → `core/nervous-types.ts` vs `config-types.ts` 🔴
+- 2× `CrossSprintAnalyzer` → agents vs orchestra
+- 2× `useApi` hook → `dashboard/src/lib/useApi.ts`
+- 2× VS Code extension impl → `extensions/vscode/extension.ts`
+- capability dot-vs-hyphen notasyon → `core/capability-handlers-data.ts`
+- audit-writer SHA-256 vs audit-export HMAC (uyumsuz chain) → `core/audit-writer.ts`
+- `RichSprintSummary` 3 yer → retro/retro-parser/sprint-summary
+
+### A·R5 — Hardcoded-0 / fabrike metrik (learning-loop'u öldürüyor) — deckent + CC-verify 🟠
+> **DOGFOOD BATCH R5-A ✅ (sprint-316, 06-21):** 4 contained item — ✅ assignVariant balanced (`f49a13d3`) · ✅ failedTasks gerçek NO_GO (`f49a13d3`) · ✅ agent-stats conflation (`f49a13d3`) · ✅ noGoRate canonical-fraction + retro-writer consumer (`dca20d7d`, worker-fix + CC-completion: worker retro-writer tüketicisini kaçırdı, CC tamamladı). **Brain 4/4 DONE dedi ama CC-verify Task-4'ü kırık buldu (R2 canlı) → CC tamamladı.** **R5 cross-module (CC-hand-code):** ✅ **coverage** ← vitest json-summary (plugin-hooks, `parseCoverageSummary`, `daa2fe2e`) · ✅ **boundaryViolations** ← results×scope (sprint-metrics, canonical `findBoundaryViolations` reuse, `92007ae6`) · ⬜ README test-count fabrikasyonu (readme-metrics, `coveragePercent*10`!) · ⬜ DebtTrendAnalyzer 0% · ⬜ PromptVersion.stats frozen (B11-F5) · ⬜ history_scaling zero-fill.
+Self-improvement makinesini besleyen sayılar sahte → sistem kendi drift'ini göremiyor:
+- `boundaryViolations: 0` literal → `orchestra/sprint-metrics.ts:128,215` + retro "No boundary violations" 🔴
+- coverage hep `0` → `core/plugin-hooks.ts` (track_coverage etkisiz) 🔴
+- `noGoRate` %(0-100) saklanıp fraction(0-1) tüketiliyor (2 path) → `sprint-metrics.ts`, `managed-docs/content-generators.ts` 🔴
+- `failedTasks: 0` hardcode → `mcp/tools/status.ts` (NO_GO sayısı gizleniyor)
+- `assignVariant()` experimentId'yi ignore → A/B atama untracked random 🔴
+- DebtTrendAnalyzer hep `0%` → `nervous/detectors/debt-trend.ts`
+- PromptVersion.stats hep `{uses:0,successRate:0}` → `agents/prompt-version.ts` (B11 F5 ile bağlı)
+- README fabrike test-count → `orchestra/doc-updaters/readme-metrics.ts`
+- agent sprint-stats mentions'ı success sayıyor → %100 şişme → `cli/commands/agent.ts`
+- history_scaling SprintHistory hep zero-fill → factor 1.0 → `orchestra/timeout-estimator.ts`
+
+### A·R6 — Silent fallback / yutulan-hata — deckent + CC-verify 🟠
+Feature görünmez fail ediyor, kullanıcı/Brain sinyal almıyor:
+- Discord sendMessage kanal-yoksa sessiz drop → `connectors/discord.ts`
+- resolveAndAck başarısız approval'da sıfır feedback → `connectors/incoming-command-router.ts`
+- WorkersPage / SprintControlPanel kill/cleanup hatası sessiz yutuluyor → dashboard
+- `getMessage()` eksik-key'de key-string döner → typo görünmez → `cli/helpers/messages.ts`
+- OpenAI adapter `finish_reason='stop'`'ta tool-call'ları sessiz drop → `agent/provider-tooluse/openai.ts`
+- `nextSequence()` non-atomic read-modify-write → eşzamanlı worker'da duplicate seq → `core/event-stream.ts`
+- writeNervousIpcApproval write-fail'i yutar, HTTP 200 → `api/nervous-endpoint.ts`
+- output.ts budget DB-read-error'da "OK" yazar → `cli/helpers/output.ts`
+- skill-sandbox AST-scan tsc-yoksa no-op'a düşer → `core/marketplace/skill-sandbox.ts`
+- runPostFinalizeHooks tüm adımlar catch-and-continue, fail surface yok → `core/identity-generator.ts`
+- `deckent:unauthorized` event dispatch edilir ama listener yok → 401 sessiz → `dashboard/src/lib/api.ts`
+
+### A·R7 — Wired-but-broken / advertised no-op + soft arch-rule — CC + deckent 🟠
+Reklamı yapılan feature aslında no-op:
+- `/provider` switch confirm der ama adapter rebuild etmez (no-op) → `cli/commands/chat-native.ts` 🔴
+- `chat --native` stub-dispatcher tüm tool-call'a placeholder döner → `cli/commands/chat.ts` 🔴
+- `chat --local` "not yet wired" hatası → `cli/commands/chat.ts`
+- selectBestAgent skill-affinity sinyalini atlıyor → "agent imbalance fix" no-op → `core/activation-engine.ts` 🔴
+- `deckent_watch` MCP watchFile() çağırmıyor → sıfır canlı event → `orchestra/event-bus.ts`
+- 'deckent-event' EventEmitter'da listener yok → NervousObserver faz-değişimi almıyor → `orchestra/sprint-controller.ts`
+- `deckent flow run` daemon sadece flow-count basıyor, action koşmuyor → `cli/commands/flow.ts`
+- `deckent_kill` MCP sadece JSON'da PAUSED işaretliyor, gerçek process'i öldürmüyor → `mcp/tools/kill.ts`
+- `deckent_plan` dry-run dökümante ama diske task yazıyor → `mcp/tools/plan.ts` 🔴
+- `nervous edit` IPC-gate bypass → two-writer race → `cli/commands/nervous.ts`
+- `resume` completed-task list geçmeden runSprint → done-task'lar yeniden koşuyor → `cli/commands/resume.ts`
+- rbac CLI grant/revoke ölü in-memory Map'e yazıyor → `cli/commands/rbac.ts`
+- `--auto-approve` ignore/forced-true → `cli/commands/run.ts`, `start.ts`
+- ESM: `runtime-scope-check` bare `require()` ESM'de hep stderr-fallback → `nervous/runtime-scope-check.ts` (R7 ESM-disiplin)
+
+### A·R8 — spawnSync async-context'te (ADR-087 ihlali, event-loop freeze) — deckent mekanik 🟠
+- `monitor-adapter.ts` spawnSync (async)
+- `task-restoration.ts` spawnSync finalizeSprint içinde
+- `planner.ts` AI-planner subprocess spawnSync
+- `output-collector.ts` docker/tmux poll hot-path spawnSync
+- `baseline-tracker.ts` captureVitestBaseline spawnSync
+- `mid-sprint-adapter.ts` reconcileSpuriousNoGo spawnSync 120s
+→ Hepsi async `spawn`'a çevrilecek (ADR-087 + CI-timeout riski).
+
+**A-özet:** ~75-95 distinct fix-task. Auth (A·R1, 12) CC-el-kodu. Geri kalan deckent-worker + zorunlu CC-verify.
+
+---
+
+## 3. BUCKET C — DEAD CODE CLEANUP (batch-delete, zero-caller doğrulanarak)
+
+> Gerçekten ölü scaffolding (broken-feature DEĞİL — onlar B11/A). **Silmeden önce CC her birini repo-grep ile zero-caller doğrular** (test+def hariç). ~100 modül, ~4 batch-sprint:
+
+- **C1 cli/helpers dead-class** (~10): progress-persistence, progress, queue-display, recommendations, review-summary, review-actions, selective-retry, sprint-summary, terminal-utils, worker-status, doctor-format
+- **C2 core dead-module** (~20): global-config, interaction-policy, marketplace/dependency-resolver, marketplace/rating-system, notification-config, notification-providers/*, telemetry (B7'ye bağlı), provider-capabilities, skill-cache, skill-registry, self-dispatch, credentials (B11), decision-config factories, audit-export (zero-caller), session-store (auth-session), token-counter (B7-token)
+- **C3 orchestra dead-module** (~15): monitor-adapter (R8-fix sonrası), result-merger, sprint-estimator, task-retry, timeout-watcher (B11-KES), multi-agent, batch-stats, brain-context, capability-realizer, pattern-recorder/reader, temp-skill-generator orphans
+- **C4 dashboard dead-component** (~10): AppShell, WorkerGrid, RoutingDistribution, analytics×4, theme.ts, terminal-sessions, SprintControlPanel-zero-caller (B11'de WIRE dersen kalır)
+- **C5 dead-test** (~12, R8 test-tiyatrosu): tautological/mock-only/dead-code-pinned testler → ya gerçek-assert'e çevir ya sil (chat-mode, skill-marketplace, doctor-format, sprint-summary×9, mcp-tool-count, repl-status-line-wire, checkpoint, metrics-updater, notification-flow, live-merge, terminal-no-overlap)
+
+**C-uyarı:** C2/C3'teki bazı modüller B11'de "WIRE" işaretlenirse C'den A'ya taşınır. **Önce B11'i karara bağla.**
+
+---
+
+## 4. Sprint Planı & Tahmin
+
+**Sıralama (bağımlılık):**
+1. **B-ruling oturumu (sen)** — B1-B11 karar. ~0 dev. A/C sınırını çizer. **Bunsuz A'ya başlanmaz.**
+2. **A·R1-auth sprint (CC el-kodu)** — A1-A12. En acil (live-IDOR). ~1 oturum + CC-verify.
+3. **A·R5+R6 sprint (deckent + CC-verify)** — hardcoded-metrik + silent-fallback. ~1 batch (≤20).
+4. **A·R4 sprint (SSOT collapse)** — duplicate'ler. ~1-2 batch (dikkatli, canlı-kopya seç).
+5. **A·R2+R7 sprint** — verification-spine wire + advertised-no-op. ~1-2 batch (B11-WIRE'larla birlikte).
+6. **A·R8 sprint** — spawnSync→async. ~1 batch (mekanik).
+7. **C1-C5 cleanup** — ~4 batch-delete (zero-caller doğrulamalı).
+
+**Tahmin (deckent + zorunlu CC-verify, bilinen kısıtlarla):**
+- deckent dispatch 30dk-cap + ≤20-26 task/sprint + rate-limit + R2-gereği-CC-verify (DONE'a güvenmiyoruz) → her batch ~1.5-2h.
+- **A: ~5-6 fix-sprint. C: ~4 sprint.** Senin 5h/günlük + haftalık limitlerine yayılı.
+- **Gerçekçi toplam: ~1-2 haftalık denetimli dogfood oturumu.** Tek-gecede-biter değil; darboğaz CC-verify throughput'u + usage-limit.
+- **Kaç madde:** ~75-95 A-fix + 14 B-ruling (+18 B11-tag) + ~100 C-silme (≈4 batch'e iner).
+
+**Not (meta):** deckent'in 30dk-cap'i (R3 dormant `sprint_timeout_minutes`, `result-collector.ts:530`) kendi audit-sprint'imizi bile yarıda kesti. Bu **A·R3'te erken-fix** edilmeli (sprint_timeout_minutes→timeoutMs thread) yoksa her fix-sprint aynı duvara çarpar. → **Sprint-2'ye ekle.**
+
+---
+_Kaynak: deckent-last-standing-crosscheck.md (Phase-1 CC ⨯ Phase-2 deckent) · 2026-06-21 triage · file:line-grounded, doc-inference yok._
