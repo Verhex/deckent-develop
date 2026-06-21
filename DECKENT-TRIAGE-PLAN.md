@@ -147,7 +147,10 @@ Bunlar saf-dead değil; **yarım-kalmış özellik**. Karar: **istiyorsan → A-
 | A12 | Credential keyring ilk-erişimde sessiz auto-gen → key-provenance audit imkânsız | `core/credential-encryption.ts` | B11'de KES dersen düşer |
 
 ### A·R2 — Verification-spine stub/unwired (trust-without-verify) — CC + deckent 🔴
-> **İLERLEME (06-21):** ✅ **A17 proof-of-function gate WIRED** (`afa7955a`) — `verifyProofOfFunction` artık `runEvaluatePhase`'de Tier-1-DONE task'lara fire ediyor; failing-smoke → GO_WITH_TECH_DEBT + PROOF_OF_FUNCTION_MISMATCH event (zero-caller'dı, Tier-1 gate hiç çalışmıyordu = false-DONE'un kökü). Faithful (pre-wire'da DONE kalıyor). **KALAN R2:** ⬜ A16 post-sprint-smoke (defaultSmokeRunner no-op + runPostSprintSmoke zero-caller — proof-of-function ile R4-çakışma, reconcile gerek) · ⬜ A15 runHonestyCheck→0 stub · ✅ **A13 reconcileRubricNoGo** (`6379680d`) — NO_GO→clean-DONE flip'i (worker-uydurulabilir-coverage'a güveniyordu) **GO_WITH_TECH_DEBT'e indirildi** (reconcileSpuriousNoGo-verified-path paritesi); 2 false-DONE-kodlayan test GWTD'ye güncellendi · ⬜ A14 applyTechDebtDowngrade verify-delta-okumuyor · ⬜ A19 execute-dispatcher koşulsuz ok=true · ⬜ A20 handleWorkerQuestion hep 'continue' · ⬜ A21 audit-writer chainHead singleton · ⬜ A22 coverage-validator self-report-trust · ⬜ A18 cross-verify REFUTED advisory · ⬜ A23 Claude auth-yok.
+> **İLERLEME (06-21):** ✅ **A17 proof-of-function gate WIRED** (`afa7955a`) — `verifyProofOfFunction` artık `runEvaluatePhase`'de Tier-1-DONE task'lara fire ediyor; failing-smoke → GO_WITH_TECH_DEBT + PROOF_OF_FUNCTION_MISMATCH event (zero-caller'dı, Tier-1 gate hiç çalışmıyordu = false-DONE'un kökü). Faithful (pre-wire'da DONE kalıyor). · ✅ **A13 reconcileRubricNoGo** (`6379680d`) — NO_GO→clean-DONE flip'i (worker-uydurulabilir-coverage'a güveniyordu) **GO_WITH_TECH_DEBT'e indirildi** (reconcileSpuriousNoGo-verified-path paritesi); 2 false-DONE-kodlayan test GWTD'ye güncellendi.
+>
+> **İLERLEME (06-22) — A21 ✅ + R2-tail triage:** ✅ **A21 audit-chain per-stream isolation** — `audit-writer.ts` module-level singleton `chainHead`'i (her sprint+partition'ı paylaşıyordu → 2.+ stream GENESIS'le başlamıyor → `verifyAuditChain` cross-sprint hep `brokenAt:0`) **per-(projectRoot,sprintId) Map**'e çevrildi + ilk-yazımda disk-seed (restart-contiguity). Faithful 3-test (pre-fix `brokenAt` RED / post-fix GREEN); 21 dosya/238 test yeşil, tsc EXIT=0. **GERÇEK live-leak (security/audit-integrity).**
+> **DISK-VERIFY BULGUSU:** kalan R2-tail'in çoğu **temiz-live-leak DEĞİL** → ⛔ **A15** `runHonestyCheck` ölü-stub AMA gerçek honesty zaten `runSelfAuditGate` Step-3'te **inline-wired** (R4-dup/hijyen, live-impact düşük) · ⛔ **A16** post-sprint-smoke `defaultSmokeRunner` no-op + invoke-edilmiyor AMA A17 proof-of-function artık canlı Tier-1 smoke → wire = R4-dup (**reconcile: supersede vs wire-distinct kararı**) · ⛔ **A14** verify-delta **iki-uç-ölü** (worker `writeVerifyDeltaBaseline`/`computeVerifyDelta` import-edip-çağırmıyor + Brain `applyTechDebtDowngrade` zero-caller); CI-regression gate'iyle örtüşür + surgical-task'ta false-downgrade riski (**karar: brain-side-compute-wire vs supersede**) · ⛔ **A22** coverage no-JSON-trust branch'i **iki caller'da da `vitestJsonOutput!==undefined` guard'lı → prod'dan erişilemez** (boş-string edge); gerçek sızıntı yapısal (caller `result.coverage` self-report'a güveniyor) = davranış-değiştiren risk. **KALAN gerçek-aday:** ⬜ A19 execute-dispatcher koşulsuz ok=true (eval-infra mevcut, doğrula) · ⬜ A20 handleWorkerQuestion hep 'continue' · ⬜ A18 cross-verify REFUTED advisory · ⬜ A23 Claude auth-yok. **R2 genuine-leak (A17+A13+A21) KAPALI; tail = karar/hijyen/yapısal.**
 | # | Bulgu | file:line |
 |---|-------|-----------|
 | A13 | `reconcileRubricNoGo` worker-self-reported coverage'ı ground-truth alıp NO_GO→DONE çeviriyor | `orchestra/mid-sprint-adapter.ts` |
@@ -158,7 +161,7 @@ Bunlar saf-dead değil; **yarım-kalmış özellik**. Karar: **istiyorsan → A-
 | A18 | Cross-verify REFUTED verdict enforcement-path'siz advisory | `orchestra/cross-verify-runner.ts` |
 | A19 | execute-dispatcher sprint-kind koşulsuz `ok=true` (Brain/Auditor eval yok) | `orchestra/autonomous/execute-dispatcher.ts` |
 | A20 | `handleWorkerQuestion` hep `'continue'` auto-yanıt → worker'ın abort/retry/skip'i atılıyor | `orchestra/ipc-registry.ts` |
-| A21 | `audit-writer.chainHead` process-wide singleton → cross-sprint chain hep `brokenAt:0` | `core/audit-writer.ts` |
+| ✅ A21 | `audit-writer.chainHead` process-wide singleton → cross-sprint chain hep `brokenAt:0` | `core/audit-writer.ts` | **DONE (06-22)** — per-(root,sprintId) Map + disk-seed; faithful 3-test; 238 test yeşil |
 | A22 | coverage-validator vitest-JSON yoksa self-reported sayıya güveniyor; validateWorkerCoverage hiç data almıyor | `orchestra/coverage-validator.ts:301` |
 | A23 | Claude availability = binary-var (auth-doğrulama yok); detectClaude `authMethod='session'` koşulsuz | `providers/claude.ts:285`, `core/provider.ts` |
 
@@ -201,18 +204,19 @@ Self-improvement makinesini besleyen sayılar sahte → sistem kendi drift'ini g
 - history_scaling SprintHistory hep zero-fill → factor 1.0 → `orchestra/timeout-estimator.ts`
 
 ### A·R6 — Silent fallback / yutulan-hata — deckent + CC-verify 🟠
-Feature görünmez fail ediyor, kullanıcı/Brain sinyal almıyor:
-- Discord sendMessage kanal-yoksa sessiz drop → `connectors/discord.ts`
-- resolveAndAck başarısız approval'da sıfır feedback → `connectors/incoming-command-router.ts`
-- WorkersPage / SprintControlPanel kill/cleanup hatası sessiz yutuluyor → dashboard
-- `getMessage()` eksik-key'de key-string döner → typo görünmez → `cli/helpers/messages.ts`
-- OpenAI adapter `finish_reason='stop'`'ta tool-call'ları sessiz drop → `agent/provider-tooluse/openai.ts`
-- `nextSequence()` non-atomic read-modify-write → eşzamanlı worker'da duplicate seq → `core/event-stream.ts`
-- writeNervousIpcApproval write-fail'i yutar, HTTP 200 → `api/nervous-endpoint.ts`
-- output.ts budget DB-read-error'da "OK" yazar → `cli/helpers/output.ts`
-- skill-sandbox AST-scan tsc-yoksa no-op'a düşer → `core/marketplace/skill-sandbox.ts`
-- runPostFinalizeHooks tüm adımlar catch-and-continue, fail surface yok → `core/identity-generator.ts`
-- `deckent:unauthorized` event dispatch edilir ama listener yok → 401 sessiz → `dashboard/src/lib/api.ts`
+> **İLERLEME (06-22):** ✅ **OpenAI tool-call drop FIXED** (`agent/provider-tooluse/openai.ts`) — stream `finish_reason:'tool_calls'` yerine `'stop'`/finish-yok/`[DONE]`-break ile biterse biriken tool-call'lar sessizce düşüyordu (vLLM/Ollama/Azure/proxy bunu yapar). `drainToolCalls` helper (DRY) loop-içi + loop-sonrası flush (`clear()` çift-emit önler). Faithful 2-test (stop-drop + no-finish-drop) pre-fix RED + 1 double-emit guard; **79 affected dosya/1345 test yeşil**, tsc EXIT=0. **Gerçek provider-correctness leak.**
+> **R6-TRIAGE (disk-verify):** ⛔ `nextSequence` non-atomic — within-process ZATEN sync-safe (read+write arası await yok); yalnız cross-process collision, fix = O_EXCL-lock-per-event hot-path overhead/churn → risk>değer, **defer + docstring "atomically" düzelt** · ⛔ `writeNervousIpcApproval` HTTP200 — docstring **"Advisory — a write failure never breaks the HTTP response" = KASITLI** (borderline-B; availability>consistency) · ◑ `getMessage` missing-key — `return key` makul prod-fallback; fix yalnız dev-warn (zayıf-sinyal) ya da call-site-key-guard-test (involved) → marjinal · ✅ **`deckent:unauthorized` listener-yok DOĞRULANDI** — dispatch var (api.ts:56) ama hiçbir `addEventListener` yok → 401 sessiz blank-page; **Tier-1 dashboard fix** (banner-component + i18n + listener + DOM-test + proof-of-function) = ayrı odaklı iş.
+- Discord sendMessage kanal-yoksa sessiz drop → `connectors/discord.ts` ⬜
+- resolveAndAck başarısız approval'da sıfır feedback → `connectors/incoming-command-router.ts` ⬜
+- WorkersPage / SprintControlPanel kill/cleanup hatası sessiz yutuluyor → dashboard ⬜
+- `getMessage()` eksik-key'de key-string döner → typo görünmez → `cli/helpers/messages.ts` ◑ marjinal
+- ✅ OpenAI adapter `finish_reason='stop'`'ta tool-call'ları sessiz drop → `agent/provider-tooluse/openai.ts` **DONE (06-22)**
+- `nextSequence()` non-atomic read-modify-write → eşzamanlı worker'da duplicate seq → `core/event-stream.ts` ⛔ within-process-safe, defer
+- writeNervousIpcApproval write-fail'i yutar, HTTP 200 → `api/nervous-endpoint.ts` ⛔ docstring-kasıtlı (borderline-B)
+- output.ts budget DB-read-error'da "OK" yazar → `cli/helpers/output.ts` ⬜ (skip-eder, false-OK değil — re-verify)
+- skill-sandbox AST-scan tsc-yoksa no-op'a düşer → `core/marketplace/skill-sandbox.ts` ⬜ (marketplace = B11-KES alanı)
+- runPostFinalizeHooks tüm adımlar catch-and-continue, fail surface yok → `core/identity-generator.ts` ⬜
+- `deckent:unauthorized` event dispatch edilir ama listener yok → 401 sessiz → `dashboard/src/lib/api.ts` ✅doğrulandı, ⬜Tier-1-fix
 
 ### A·R7 — Wired-but-broken / advertised no-op + soft arch-rule — CC + deckent 🟠
 Reklamı yapılan feature aslında no-op:
