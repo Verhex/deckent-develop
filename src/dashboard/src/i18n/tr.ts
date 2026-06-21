@@ -59,6 +59,8 @@ export const tr: Record<TranslationKey, string> = {
   'dashboard.kill_all': 'Tümünü Durdur',
   'dashboard.confirm_cleanup': 'Sprint dosyalarını arşivle?',
   'dashboard.confirm_kill': "Tüm worker'ları durdur?",
+  'dashboard.kill_failed': "Worker durdurulamadı — hâlâ çalışıyor olabilir.",
+  'dashboard.cleanup_failed': 'Temizlik başarısız — sprint dosyaları arşivlenmedi.',
   'dashboard.phase_timeline': 'Sprint Fazları',
 
   // Workers Page

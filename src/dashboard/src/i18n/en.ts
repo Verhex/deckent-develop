@@ -57,6 +57,8 @@ export const en = {
   'dashboard.kill_all': 'Kill All',
   'dashboard.confirm_cleanup': 'Archive sprint files?',
   'dashboard.confirm_kill': 'Stop all workers?',
+  'dashboard.kill_failed': 'Failed to stop worker(s) — they may still be running.',
+  'dashboard.cleanup_failed': 'Cleanup failed — sprint files were not archived.',
   'dashboard.phase_timeline': 'Sprint Phases',
 
   // Workers Page

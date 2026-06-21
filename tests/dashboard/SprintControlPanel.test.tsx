@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 import React from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { LanguageProvider } from "../../src/dashboard/src/i18n/LanguageProvider";
 import { SprintControlPanel } from "../../src/dashboard/src/components/SprintControlPanel";
+import { postJson } from "../../src/dashboard/src/lib/api";
 import type { DashboardState, AgentInfo } from "../../src/dashboard/src/types";
 
 vi.mock("../../src/dashboard/src/hooks/useSSE", () => ({
@@ -192,5 +193,24 @@ describe("SprintControlPanel", () => {
 
     expect(screen.getByTestId("sprint-control-panel")).toBeTruthy();
     expect(screen.getByText("sprint-api")).toBeTruthy();
+  });
+
+  it("surfaces an error when kill-all fails instead of swallowing it (R6)", async () => {
+    const state = makeState({
+      sprint: { id: "sprint-err", number: 211, phase: "EXECUTE", status: "running" },
+    });
+    vi.mocked(useSSEWithStatus).mockReturnValue({ data: state, status: "connected" });
+    vi.mocked(useApi).mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
+    vi.mocked(postJson).mockRejectedValueOnce(new Error("HTTP 500"));
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    renderWithProviders(<SprintControlPanel />);
+    // Pre-fix the catch was `// silent` — the failed kill produced no DOM signal.
+    expect(screen.queryByTestId("sprint-control-error")).toBeNull();
+    fireEvent.click(screen.getByTestId("kill-all-btn"));
+
+    await waitFor(() => expect(screen.getByTestId("sprint-control-error")).toBeTruthy());
+    expect(screen.getByTestId("sprint-control-error").textContent).toContain("Failed to stop");
+    confirmSpy.mockRestore();
   });
 });

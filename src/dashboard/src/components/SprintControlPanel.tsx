@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Activity, Skull, Trash2 } from "lucide-react";
+import { Activity, Skull, Trash2, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -9,6 +9,7 @@ import { SprintPhaseTimeline } from "./SprintPhaseTimeline";
 import { useSSEWithStatus } from "../hooks/useSSE";
 import { useApi } from "../hooks/useApi";
 import { postJson } from "../lib/api";
+import { useTranslation } from "../i18n/LanguageProvider";
 import type { DashboardState } from "../types";
 
 const PHASE_COLORS: Record<string, "info" | "warning" | "critical" | "success" | "secondary"> = {
@@ -24,10 +25,12 @@ const PHASE_COLORS: Record<string, "info" | "warning" | "critical" | "success" |
 };
 
 export function SprintControlPanel() {
+  const { t } = useTranslation();
   const { data: sseState, status: sseStatus } = useSSEWithStatus("/api/events");
   const { data: apiState, refetch } = useApi<DashboardState>("/api/status");
   const [isKillAllLoading, setIsKillAllLoading] = useState(false);
   const [isCleanupLoading, setIsCleanupLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const state = sseState ?? apiState;
   const phase = state?.sprint?.phase;
@@ -42,40 +45,45 @@ export function SprintControlPanel() {
   const showKillAll = phase === "EXECUTE" || phase === "FIX";
 
   const handleKillAll = useCallback(async () => {
-    if (!window.confirm("Kill all active workers?")) return;
+    if (!window.confirm(t("dashboard.confirm_kill"))) return;
     setIsKillAllLoading(true);
+    setActionError(null);
     try {
       await postJson("/api/kill/all");
       refetch();
     } catch {
-      // silent
+      // A failed kill used to be swallowed silently — the workers kept running
+      // with zero signal to the operator. Surface it.
+      setActionError(t("dashboard.kill_failed"));
     } finally {
       setIsKillAllLoading(false);
     }
-  }, [refetch]);
+  }, [refetch, t]);
 
   const handleKill = useCallback(async (agentId: string) => {
-    if (!window.confirm(`Kill worker ${agentId}?`)) return;
+    if (!window.confirm(`${t("dashboard.confirm_kill_worker")} ${agentId}?`)) return;
+    setActionError(null);
     try {
       await postJson(`/api/kill/${agentId}`);
       refetch();
     } catch {
-      // silent
+      setActionError(t("dashboard.kill_failed"));
     }
-  }, [refetch]);
+  }, [refetch, t]);
 
   const handleCleanup = useCallback(async () => {
-    if (!window.confirm("Run cleanup?")) return;
+    if (!window.confirm(t("dashboard.confirm_cleanup"))) return;
     setIsCleanupLoading(true);
+    setActionError(null);
     try {
       await postJson("/api/cleanup");
       refetch();
     } catch {
-      // silent
+      setActionError(t("dashboard.cleanup_failed"));
     } finally {
       setIsCleanupLoading(false);
     }
-  }, [refetch]);
+  }, [refetch, t]);
 
   if (!state || state.idle) {
     return (
@@ -152,6 +160,17 @@ export function SprintControlPanel() {
               Cleanup
             </Button>
           </div>
+
+          {actionError && (
+            <div
+              role="alert"
+              data-testid="sprint-control-error"
+              className="mt-3 flex items-center gap-2 rounded-md border border-red-500/40 bg-red-950/60 px-3 py-2 text-sm text-red-200"
+            >
+              <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
+              <span>{actionError}</span>
+            </div>
+          )}
         </CardContent>
       </Card>
 
