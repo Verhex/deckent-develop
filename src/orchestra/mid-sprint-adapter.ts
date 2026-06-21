@@ -599,7 +599,9 @@ export type RubricReconciliationReason =
 export interface RubricReconciliationResult {
   /** Final decision after reconciliation. */
   decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
-  /** True only when the original NO_GO was overridden to DONE. */
+  /** True when the original rubric NO_GO was salvaged away from NO_GO. The
+   *  heuristic (worker-signal) path caps at GO_WITH_TECH_DEBT — never a clean DONE
+   *  — because the gating signals are worker-self-reported (fabricatable). */
   reconciled: boolean;
   /** Machine-readable reason code for the decision. */
   reason: RubricReconciliationReason;
@@ -724,22 +726,27 @@ export function reconcileRubricNoGo(
     };
   }
 
-  // Heuristic override: worker DONE + tests pass + rubric average + coverage
-  // all clear. Sprint 162 162-003 reproduction (rubric 95/95/100/85 → avg 93.75,
-  // coverage ≥ 80) lands here.
+  // Heuristic salvage: worker DONE + tests pass + rubric average + coverage clear.
+  // The signals that gate this (worker selfAssessment, testsPassed, result.coverage)
+  // are all WORKER-self-reported and therefore fabricatable. A heuristic Brain-NO_GO
+  // salvage must NOT mint a clean DONE on unverified data (the false-DONE the audit
+  // flagged): it caps at GO_WITH_TECH_DEBT — identical to reconcileSpuriousNoGo, which
+  // does REAL tsc+vitest verification and likewise never promotes past tech-debt. The
+  // genuinely-good Sprint-162 162-003 regression class is still recovered (not lost as
+  // NO_GO), just acknowledged as tech-debt pending real proof.
   if (
     rubricAverage >= RUBRIC_RECONCILIATION_THRESHOLDS.rubricAverage &&
     coverage >= RUBRIC_RECONCILIATION_THRESHOLDS.coverage
   ) {
     debugLog(
       'reconcile:rubric-nogo',
-      `Spurious NO_GO overridden → DONE (rubric avg=${rubricAverage}, coverage=${coverage})`,
+      `Spurious NO_GO salvaged → GO_WITH_TECH_DEBT (rubric avg=${rubricAverage}, worker-coverage=${coverage})`,
     );
     return {
-      decision: 'DONE',
+      decision: 'GO_WITH_TECH_DEBT',
       reconciled: true,
       reason: 'heuristic_no_go_overridden',
-      notes: `Spurious NO_GO reconciled → DONE: worker selfAssessment=DONE, testsPassed=true, rubric avg ${rubricAverage} ≥ ${RUBRIC_RECONCILIATION_THRESHOLDS.rubricAverage}, coverage ${coverage}% ≥ ${RUBRIC_RECONCILIATION_THRESHOLDS.coverage}%${scopeScore !== undefined ? `, scope_compliance=${scopeScore}` : ''} (heuristic Brain NO_GO overridden — Sprint 162 162-003 regression class)`,
+      notes: `Spurious NO_GO salvaged → GO_WITH_TECH_DEBT: worker selfAssessment=DONE, testsPassed=true, rubric avg ${rubricAverage} ≥ ${RUBRIC_RECONCILIATION_THRESHOLDS.rubricAverage}, coverage ${coverage}% ≥ ${RUBRIC_RECONCILIATION_THRESHOLDS.coverage}%${scopeScore !== undefined ? `, scope_compliance=${scopeScore}` : ''} — worker-reported signals are unverified, so capped at tech-debt (not a clean DONE) per reconcileSpuriousNoGo parity`,
       rubricAverage,
       coverage,
     };

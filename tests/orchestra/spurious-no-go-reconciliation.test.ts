@@ -78,7 +78,7 @@ function makeRubricResult(
 //   Brain heuristic NO_GO must be overridden to DONE.
 
 describe('reconcileRubricNoGo — Sprint 162 162-003 regression class', () => {
-  it('1. heuristic NO_GO reconciled to DONE when worker DONE + rubric avg≥85 + coverage≥80', () => {
+  it('1. heuristic NO_GO salvaged to GO_WITH_TECH_DEBT (NOT clean DONE) when worker DONE + rubric avg≥85 + coverage≥80', () => {
     const result = makeResult({
       selfAssessment: 'DONE',
       testsPassed: true,
@@ -99,16 +99,21 @@ describe('reconcileRubricNoGo — Sprint 162 162-003 regression class', () => {
 
     const reconciled = reconcileRubricNoGo(result, rubricResult);
 
-    expect(reconciled.decision).toBe('DONE');
+    // A13/R2: the gating signals (worker selfAssessment, testsPassed, coverage 95)
+    // are all worker-self-reported and fabricatable, so a heuristic NO_GO salvage
+    // caps at GO_WITH_TECH_DEBT — never a clean DONE. Pre-fix this minted DONE on
+    // the unverified worker coverage (the false-DONE the audit flagged).
+    expect(reconciled.decision).toBe('GO_WITH_TECH_DEBT');
+    expect(reconciled.decision).not.toBe('DONE');
     expect(reconciled.reconciled).toBe(true);
     expect(reconciled.reason).toBe('heuristic_no_go_overridden');
     expect(reconciled.rubricAverage).toBe(93.75);
     expect(reconciled.coverage).toBe(95);
-    expect(reconciled.notes).toContain('Spurious NO_GO reconciled');
-    expect(reconciled.notes).toContain('162-003');
+    expect(reconciled.notes).toContain('Spurious NO_GO salvaged');
+    expect(reconciled.notes).toContain('tech-debt');
   });
 
-  it('1b. evaluateWithRubric end-to-end: 162-003 scenario yields DONE not NO_GO', () => {
+  it('1b. evaluateWithRubric end-to-end: 162-003 scenario yields GO_WITH_TECH_DEBT not NO_GO', () => {
     // Build a result that would normally trip the rubric NO_GO path:
     // - scoreCorrectness: testsPassed=true (60) + selfAssessment DONE (40) = 100
     // - scoreTestCoverage: coverage 95 + no new tests = 95
@@ -132,10 +137,11 @@ describe('reconcileRubricNoGo — Sprint 162 162-003 regression class', () => {
     // so it'd be GO_WITH_TECH_DEBT). Use even higher floor to force NO_GO:
     const forcedNoGo = evaluateWithRubric(result, task, { passingScore: 200 });
     // totalScore ~= 94.25 ; passingScore 200 → 200*0.7=140; 94.25 < 140 → NO_GO
-    // With reconciliation: worker DONE + rubric avg≈91 + coverage 95 → DONE override.
+    // With reconciliation: worker DONE + rubric avg≈91 + coverage 95 → GO_WITH_TECH_DEBT salvage.
 
-    // Without override the rubric would say NO_GO; reconciliation flips it to DONE.
-    expect(forcedNoGo.decision).toBe('DONE');
+    // Without salvage the rubric would say NO_GO; reconciliation lifts it to
+    // GO_WITH_TECH_DEBT (not a clean DONE — worker signals are unverified, A13/R2).
+    expect(forcedNoGo.decision).toBe('GO_WITH_TECH_DEBT');
     // Confirm threshold-only path still passes (sanity)
     expect(evaluation.decision).toBe('GO_WITH_TECH_DEBT');
   });
