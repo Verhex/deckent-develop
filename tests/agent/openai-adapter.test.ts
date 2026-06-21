@@ -53,6 +53,40 @@ describe('createOpenAIAdapter', () => {
     const a = createOpenAIAdapter({ baseUrl: 'http://x/v1', fetchImpl: fakeFetch('', false, 500) });
     await expect(drain(a, req)).rejects.toThrow(/500/);
   });
+  it('flushes accumulated tool-calls when the stream finishes with finish_reason:stop (R6 silent-drop)', async () => {
+    // vLLM/Ollama/Azure/proxies often close a tool-call stream with 'stop' (or
+    // omit finish_reason) instead of the spec 'tool_calls'. Pre-fix the loop only
+    // emitted on 'tool_calls', so the accumulated call was silently dropped.
+    const sse =
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_9","function":{"name":"read_file","arguments":"{\\"pa"}}]}}]}\n\n' +
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"th\\":\\"y\\"}"}}]}}]}\n\n' +
+      'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n' +
+      'data: [DONE]\n\n';
+    const a = createOpenAIAdapter({ baseUrl: 'http://x/v1', fetchImpl: fakeFetch(sse) });
+    const evs = await drain(a, req);
+    expect(evs).toContainEqual({ type: 'tool-call', id: 'call_9', name: 'read_file', args: { path: 'y' } });
+    expect(evs[evs.length - 1]).toEqual({ type: 'done' });
+  });
+  it('flushes accumulated tool-calls when the stream ends with no finish_reason at all', async () => {
+    const sse =
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_x","function":{"name":"read_file","arguments":"{}"}}]}}]}\n\n' +
+      'data: [DONE]\n\n';
+    const a = createOpenAIAdapter({ baseUrl: 'http://x/v1', fetchImpl: fakeFetch(sse) });
+    const evs = await drain(a, req);
+    expect(evs).toContainEqual({ type: 'tool-call', id: 'call_x', name: 'read_file', args: {} });
+  });
+  it('does not double-emit when finish_reason:tool_calls already flushed the accumulator', async () => {
+    // The in-loop emission clears the accumulator, so the stream-end flush must
+    // not re-emit the same call.
+    const sse =
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"read_file","arguments":"{}"}}]}}]}\n\n' +
+      'data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n\n' +
+      'data: [DONE]\n\n';
+    const a = createOpenAIAdapter({ baseUrl: 'http://x/v1', fetchImpl: fakeFetch(sse) });
+    const evs = await drain(a, req);
+    const toolCalls = evs.filter((e) => e.type === 'tool-call');
+    expect(toolCalls).toHaveLength(1);
+  });
   it('synthesizes unique ids for same-named parallel tool calls with omitted ids', async () => {
     const sse =
       'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"read_file","arguments":"{}"}}]}}]}\n\n' +

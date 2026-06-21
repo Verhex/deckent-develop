@@ -28,6 +28,28 @@ function toOpenAIMessage(m: ProviderMessage): Record<string, unknown> {
   return { role: m.role, content: m.content };
 }
 
+/**
+ * Drain accumulated streamed tool-call fragments into normalized tool-call
+ * events, then clear the accumulator. Emitting both on `finish_reason:'tool_calls'`
+ * AND once more at stream end means tool calls survive OpenAI-compatible backends
+ * that close the stream with `finish_reason:'stop'` (or omit it entirely) —
+ * vLLM/Ollama/Azure/proxies do this, and the old code, which only emitted on the
+ * `'tool_calls'` finish reason, silently dropped every accumulated call otherwise.
+ * The in-loop path clears the accumulator, so the stream-end flush never double-emits.
+ */
+function drainToolCalls(acc: Map<number, { id: string; name: string; args: string }>): ProviderEvent[] {
+  const events: ProviderEvent[] = [];
+  for (const [idx, tc] of [...acc.entries()].sort((a, b) => a[0] - b[0])) {
+    let args: Record<string, unknown> = {};
+    try { args = tc.args ? (JSON.parse(tc.args) as Record<string, unknown>) : {}; } catch { args = {}; }
+    // Synthesized id is index-scoped so same-named parallel calls stay distinct
+    // for the Phase B transcript round-trip (toolCallId keying).
+    events.push({ type: 'tool-call', id: tc.id || `call-${tc.name}-${idx}`, name: tc.name, args });
+  }
+  acc.clear();
+  return events;
+}
+
 export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter {
   const fetchImpl = opts.fetchImpl ?? globalThis.fetch;
   return {
@@ -73,17 +95,13 @@ export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter
           }
         }
         if (choice?.finish_reason === 'tool_calls') {
-          for (const [idx, tc] of [...toolAcc.entries()].sort((a, b) => a[0] - b[0])) {
-            let args: Record<string, unknown> = {};
-            try { args = tc.args ? (JSON.parse(tc.args) as Record<string, unknown>) : {}; } catch { args = {}; }
-            // Synthesized id is index-scoped so same-named parallel calls stay
-            // distinct for the Phase B transcript round-trip (toolCallId keying).
-            yield { type: 'tool-call', id: tc.id || `call-${tc.name}-${idx}`, name: tc.name, args };
-          }
-          toolAcc.clear();
+          for (const e of drainToolCalls(toolAcc)) yield e;
         }
         if (chunk.usage) yield { type: 'usage', inputTokens: chunk.usage.prompt_tokens ?? 0, outputTokens: chunk.usage.completion_tokens ?? 0 };
       }
+      // Stream ended (via [DONE] or close) without a `finish_reason:'tool_calls'`
+      // chunk — flush any tool calls still accumulated so they are never dropped.
+      for (const e of drainToolCalls(toolAcc)) yield e;
       yield { type: 'done' };
     },
   };
