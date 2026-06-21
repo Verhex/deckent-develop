@@ -457,6 +457,10 @@ export const tr: Record<TranslationKey, string> = {
   'common.yes': 'Evet',
   'common.no': 'Hayır',
 
+  // Auth
+  'auth.unauthorized.title': 'Oturum süresi doldu',
+  'auth.unauthorized.message': 'Oturumunuz artık yetkili değil — devam etmek için tekrar giriş yapın.',
+
   // Auth Status
   'auth.logged_in_as': 'Giriş yapan: {{name}}',
   'auth.local_session': 'Yerel oturum',

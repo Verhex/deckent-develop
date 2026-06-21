@@ -3,6 +3,7 @@ import { ThemeProvider } from "./components/ThemeProvider";
 import { LanguageProvider } from "./i18n/LanguageProvider";
 import { AuthProvider } from "./hooks/useAuth";
 import { Layout } from "./components/Layout";
+import { UnauthorizedBanner } from "./components/UnauthorizedBanner";
 import DashboardPage from "./pages/DashboardPage";
 import SettingsPage from "./pages/SettingsPage";
 import DebtPage from "./pages/DebtPage";
@@ -28,6 +29,7 @@ function App() {
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>
+          <UnauthorizedBanner />
           <BrowserRouter>
             <Routes>
               <Route element={<Layout />}>

@@ -455,6 +455,10 @@ export const en = {
   'common.yes': 'Yes',
   'common.no': 'No',
 
+  // Auth
+  'auth.unauthorized.title': 'Session expired',
+  'auth.unauthorized.message': 'Your session is no longer authorized — sign in again to continue.',
+
   // Auth Status
   'auth.logged_in_as': 'Logged in as: {{name}}',
   'auth.local_session': 'Local session',
