@@ -42,7 +42,12 @@ export function decide(
   if (ctx.rules.some((r) => matchRule(r, tool, resource))) return 'allow';
   // 5. approval mode (confirm tier only reaches here)
   if (ctx.mode === 'full-auto') return 'allow';
-  if (ctx.mode === 'auto-edit' && tool !== 'bash') return 'allow';
+  // auto-edit auto-approves edits but MUST still gate the shell tool. The
+  // registered shell tool is `deckent_bash` (native registry), so a literal
+  // `!== 'bash'` never matched and the guard was dead. Match the generic `bash`
+  // name and any `*_bash` namespace variant so the prefix cannot defeat it.
+  const isShellTool = tool === 'bash' || tool.endsWith('_bash');
+  if (ctx.mode === 'auto-edit' && !isShellTool) return 'allow';
   return 'ask';
 }
 

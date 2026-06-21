@@ -37,9 +37,13 @@ describe('decide — precedence (deny > floor > allow-rule > tier > mode)', () =
     expect(decide('write_file', 'x', 'confirm', ctx({ mode: 'full-auto' }))).toBe('allow');
     expect(decide('deckent_kill', '', 'always', ctx({ mode: 'full-auto' }))).toBe('ask');
   });
-  it('auto-edit auto-allows non-bash confirm, still asks bash', () => {
+  it('auto-edit auto-allows edits, still asks the shell tool (bash AND deckent_bash)', () => {
     expect(decide('write_file', 'x', 'confirm', ctx({ mode: 'auto-edit' }))).toBe('allow');
+    expect(decide('deckent_edit_file', 'x', 'confirm', ctx({ mode: 'auto-edit' }))).toBe('allow');
     expect(decide('bash', 'ls', 'confirm', ctx({ mode: 'auto-edit' }))).toBe('ask');
+    // A10: the registered shell tool is `deckent_bash`, not `bash`. The guard's
+    // literal `!== 'bash'` never matched it → it was auto-allowed (dead guard).
+    expect(decide('deckent_bash', 'ls', 'confirm', ctx({ mode: 'auto-edit' }))).toBe('ask');
   });
   it('always-floor tool asks even when tier is silent', () => {
     expect(decide('deckent_kill', '', 'silent', ctx())).toBe('ask');
