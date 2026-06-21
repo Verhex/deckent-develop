@@ -817,11 +817,11 @@ async function handleRequest(
     // Memory FTS5 search: /api/memory/search?q= (216-012)
     if (registerMemorySearch(url, res, projectRoot)) return;
     if (registerNervousRoutes(url, method, res, projectRoot)) return;
-    if (registerAutonomousRoutes(url, method, res, projectRoot)) return;
+    if (registerAutonomousRoutes(url, method, res, projectRoot, req)) return;
     if (registerMissionsRoute(url, method, res, projectRoot, req)) return;
     if (await registerProcessRoutes(url, method, res, undefined, projectRoot, req)) return;
     // Enterprise dashboard data: /api/enterprise/{tenants,rbac,audit,rate} (269-001)
-    if (registerEnterpriseRoutes(url, method, res, projectRoot, rateLimiter ? { rateLimiter } : {})) return;
+    if (registerEnterpriseRoutes(url, method, res, projectRoot, rateLimiter ? { rateLimiter } : {}, req)) return;
     // Coverage history + brain budget: /api/coverage
     if (registerCoverageRoutes(url, res, projectRoot)) return;
     // Docs health (doc-tracking ADR-090): /api/docs/health
@@ -858,7 +858,7 @@ async function handleRequest(
     }
 
     if (registerNervousRoutes(url, method, res, projectRoot)) return;
-    if (registerAutonomousRoutes(url, method, res, projectRoot)) return;
+    if (registerAutonomousRoutes(url, method, res, projectRoot, req)) return;
     if (await registerProcessRoutes(url, method, res, body, projectRoot, req)) return;
     if (registerReactiveRoutes(url, method, res, body, projectRoot)) return;
 
