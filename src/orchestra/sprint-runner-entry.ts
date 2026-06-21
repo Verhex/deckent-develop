@@ -225,9 +225,8 @@ async function main(): Promise<void> {
     // instead of being silently dropped (the "safe-but-deaf" gap).
     // BOT-001: fan notifications out to messaging connectors (Telegram/Discord) too.
     const { buildConnectorNotificationAdapter } = await import('../connectors/connector-bootstrap.js');
-    const { buildBotHumanizer } = await import('../connectors/bot-completion.js');
     const connectorAdapter = await buildConnectorNotificationAdapter(
-      config.notify_connectors, {}, buildBotHumanizer(config as unknown as Record<string, unknown>),
+      config.notify_connectors, {},
     );
     bootstrapNotifyDispatcher({
       projectRoot,

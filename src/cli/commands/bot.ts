@@ -20,7 +20,6 @@ import {
   type ConnectorCommandsHandle,
 } from '../../connectors/connector-bootstrap.js';
 import { makeChatResponder } from '../../connectors/chat-bridge.js';
-import { buildBotHumanizer } from '../../connectors/bot-completion.js';
 import {
   writeBotPid, clearBotPid, readBotPid, stopBot, startBotDaemon,
 } from '../../connectors/bot-daemon.js';
@@ -55,7 +54,6 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
       // action ever executes without explicit human approval.
       bootstrapConnectorCommands(r, n, {
         chat: makeChatResponder({ agentic: true, root: r, lang }),
-        humanizer: buildBotHumanizer(config as unknown as Record<string, unknown>),
       }));
   const handle = await bootstrap(root, config.notify_connectors);
 

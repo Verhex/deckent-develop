@@ -13,7 +13,7 @@
 
 import type { Notification, NotificationAdapter } from '../core/notification-dispatcher.js';
 import type { IMessageConnector, InlineButton } from './types.js';
-import { makeBotHumanizer, type BotHumanizer } from './bot-humanizer.js';
+import { chunkMessage } from './message-format.js';
 
 /** A started (outbound) connector plus the chat id notifications are sent to. */
 export interface ConnectorTarget {
@@ -24,12 +24,6 @@ export interface ConnectorTarget {
 export interface ConnectorNotifyOptions {
   /** Per-send timeout in ms (default 5000) — caps a slow/unreachable platform. */
   timeoutMs?: number;
-  /**
-   * BOT-1 bot-agent: rephrases + summarizes-to-fit each notification before send.
-   * Absent → a passthrough humanizer (raw text, lossless chunk) — identical to the
-   * pre-BOT-1 behavior, so this is zero-risk when the bot-agent is off.
-   */
-  humanizer?: BotHumanizer;
 }
 
 const PRIORITY_EMOJI: Record<string, string> = {
@@ -106,7 +100,6 @@ export function makeConnectorNotificationAdapter(
   opts: ConnectorNotifyOptions = {},
 ): NotificationAdapter {
   const timeoutMs = opts.timeoutMs ?? 5000;
-  const humanizer = opts.humanizer ?? makeBotHumanizer();
   return {
     name: 'connector-broadcast',
 
@@ -131,7 +124,7 @@ export function makeConnectorNotificationAdapter(
               const rendered = isTelegram
                 ? formatNotificationHtml(notification)
                 : formatNotification(notification);
-              const parts = await humanizer.toParts(rendered);
+              const parts = chunkMessage(rendered);
               for (let i = 0; i < parts.length; i++) {
                 const isLast = i === parts.length - 1;
                 await t.connector.sendMessage({

@@ -23,7 +23,6 @@ import { parseApprovalCallback } from './callback-router.js';
 import type { IncomingCallback } from './types.js';
 import { type ChatResponder } from './chat-bridge.js';
 import { chunkMessage } from './message-format.js';
-import type { BotHumanizer } from './bot-humanizer.js';
 import { isBotSlash, handleBotSlash } from './bot-commands.js';
 import { takeBotAction, checkExecutable } from './bot-action-store.js';
 import { createCliToolDispatcher } from '../cli/commands/chat-tool-bridge.js';
@@ -107,11 +106,10 @@ export async function buildConnectorTargets(
 export async function buildConnectorNotificationAdapter(
   notifyConnectors: NotifyConnectorsConfig | undefined,
   deps: ConnectorBootstrapDeps = {},
-  humanizer?: BotHumanizer,
 ): Promise<NotificationAdapter | null> {
   const targets = await buildConnectorTargets(notifyConnectors, deps);
   if (targets.length === 0) return null;
-  return makeConnectorNotificationAdapter(targets, humanizer ? { humanizer } : {});
+  return makeConnectorNotificationAdapter(targets);
 }
 
 // ─── BOT-002 — inbound command transport ──────────────────────────────────
@@ -131,12 +129,6 @@ export interface ConnectorCommandsDeps extends ConnectorBootstrapDeps {
   actionDispatcher?: McpToolDispatcher;
   /** Language for inbound acks. */
   lang?: string;
-  /**
-   * BOT-1 bot-agent — humanizes the OUTBOUND notification adapter this returns
-   * (built via buildBotHumanizer). Absent → passthrough (raw, lossless). Inbound
-   * acks / agentic chat replies are left untouched (already conversational).
-   */
-  humanizer?: BotHumanizer;
 }
 
 export interface ConnectorCommandsHandle {
@@ -330,7 +322,7 @@ export async function bootstrapConnectorCommands(
 
   return {
     adapter: targets.length > 0
-      ? makeConnectorNotificationAdapter(targets, deps.humanizer ? { humanizer: deps.humanizer } : {})
+      ? makeConnectorNotificationAdapter(targets)
       : null,
     active: started.map((c) => c.id),
     async dispose(): Promise<void> {

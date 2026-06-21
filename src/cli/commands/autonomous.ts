@@ -29,7 +29,6 @@ import { FlowRegistry } from '../../core/flow-registry.js';
 import { notifyAsync } from '../../core/notify.js';
 import { bootstrapNotifyDispatcher } from '../../core/notify-bootstrap.js';
 import { buildConnectorNotificationAdapter } from '../../connectors/connector-bootstrap.js';
-import { buildBotHumanizer } from '../../connectors/bot-completion.js';
 import { nextRun } from '../../core/scheduled-flow.js';
 import type { ScheduledFlow } from '../../core/scheduled-flow.js';
 import type { SelfDispatchPolicy } from '../../core/self-dispatch.js';
@@ -677,7 +676,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
   // only reached the local TTY; with `deckent bot listen` up, the pushed park is
   // approvable straight from Telegram. Silent no-op otherwise (§4G).
   const connectorAdapter = await buildConnectorNotificationAdapter(
-    resolvedConfig.notify_connectors, {}, buildBotHumanizer(resolvedConfig as unknown as Record<string, unknown>),
+    resolvedConfig.notify_connectors, {},
   );
   bootstrapNotifyDispatcher({
     projectRoot: root,
