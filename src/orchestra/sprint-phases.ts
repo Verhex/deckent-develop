@@ -146,6 +146,7 @@ import {
 // dependents PAUSED and DONE → dependents PENDING actually fire.
 import { applyCascadeToSprint, applyUnblockToSprint } from './sprint-spawner.js';
 import { writeEvent, getCurrentSprintId, readEvents, SCOPE_INSUFFICIENT_CHANNEL } from './event-stream.js';
+import { verifyProofOfFunction } from './proof-of-function.js';
 import { checkWorkerLiveness } from './worker-liveness.js';
 import type { FailureContext } from './result-evaluator.js';
 
@@ -1387,6 +1388,37 @@ export async function runEvaluatePhase(
           } catch (e) {
             debugLog('runEvaluatePhase:ciRegressionCheck', e);
           }
+        }
+
+        // Proof-of-Function gate (ADR-079): a Tier-1 (user-surface) task that has
+        // survived as DONE must prove its `Smoke:` command actually runs host-side.
+        // verifyProofOfFunction is inert for Tier-0 / no-smoke / non-DONE; a failing
+        // smoke downgrades DONE → GO_WITH_TECH_DEBT (it certifies wiring, not UX) and
+        // emits a PROOF_OF_FUNCTION_MISMATCH event for the Auditor. Was unwired —
+        // verifyProofOfFunction had zero production callers, so the Tier-1 gate never fired.
+        if (evaluation === TaskEvaluation.DONE) {
+          try {
+            const proofGate = await verifyProofOfFunction(task, projectRoot, result, rubricResult);
+            if (proofGate.status === 'failed') {
+              evaluation = TaskEvaluation.GO_WITH_TECH_DEBT;
+              try {
+                const sidForPoF = getCurrentSprintId(projectRoot) ?? sprint.id;
+                writeEvent(
+                  projectRoot, sidForPoF, 'brain', 'auditor',
+                  'BRAIN→AUDITOR:PROOF_OF_FUNCTION_MISMATCH',
+                  {
+                    taskId: task.id,
+                    command: proofGate.command,
+                    evidence: proofGate.evidence,
+                    reason: proofGate.reason ?? proofGate.evidence,
+                    originalVerdict: 'DONE',
+                    upgradedVerdict: 'GO_WITH_TECH_DEBT',
+                    timestamp: new Date().toISOString(),
+                  },
+                );
+              } catch (e) { debugLog('runEvaluatePhase:proofOfFunction:event', e); }
+            }
+          } catch (e) { debugLog('runEvaluatePhase:proofOfFunction', e); }
         }
 
         // SCOPE-W1b: brain-side SCOPE_INSUFFICIENT consumer + scope-expand (flag-gated default-off).

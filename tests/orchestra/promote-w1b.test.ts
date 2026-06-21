@@ -269,6 +269,39 @@ describe('PROMOTE-W1b — partial promotion wiring in runEvaluatePhase', () => {
     );
   });
 
+  // ── Proof-of-Function gate wiring (A17) — verifyProofOfFunction was zero-caller ──
+  it('Tier-1 DONE task with a failing Smoke command → downgraded to GO_WITH_TECH_DEBT + PROOF_OF_FUNCTION_MISMATCH event', async () => {
+    // user-surface (Tier-1) task whose Smoke command runs but cannot match the expect.
+    const task = makeTask('pof-001', {
+      scope: { directories: [], filesRead: [], filesWrite: ['src/api/foo.ts'] },
+      smoke: { command: 'node -e ""', expect: 'DECKENT_NONEXISTENT_MARKER' },
+    });
+    const result = makeResult('pof-001');
+    const sprint = makeSprint([task]);
+    const evaluations = new Map<string, TaskEvaluation>();
+    writeFileSync(join(root, '.tasks', `task-${task.id}.result`), JSON.stringify(result), 'utf-8');
+
+    // Rubric returns DONE; the proof-of-function gate must then downgrade because
+    // the Smoke command's output never contains the expected marker.
+    vi.mocked(evaluateWithRubric).mockReturnValue(
+      makeNoGoEvalResult({ decision: 'DONE', noGoCategory: undefined, isPartialPromotable: false }),
+    );
+
+    await runEvaluatePhase(root, sprint, [result], evaluations, 90, makeConfig(false));
+
+    // Pre-wire: stayed DONE (verifyProofOfFunction had zero callers). Post-wire: GO_WITH_TECH_DEBT.
+    expect(evaluations.get(task.id)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    const pofEvent = vi.mocked(writeEvent).mock.calls.find(
+      c => c[4] === 'BRAIN→AUDITOR:PROOF_OF_FUNCTION_MISMATCH',
+    );
+    expect(pofEvent).toBeDefined();
+    expect(pofEvent![5]).toMatchObject({
+      taskId: task.id,
+      originalVerdict: 'DONE',
+      upgradedVerdict: 'GO_WITH_TECH_DEBT',
+    });
+  });
+
   it('flag-on + NO_GO + isPartialPromotable → emits PARTIAL_PROMOTION_APPLIED event', async () => {
     const task = makeTask();
     const result = makeResult();
