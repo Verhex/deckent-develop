@@ -291,3 +291,70 @@ describe('verifyAuditChain — missing-hmac backward-safe', () => {
     expect(result.intact).toBe(true);
   });
 });
+
+// ─── Test 7 — A21: per-stream chain isolation (regression) ─────────
+//
+// Pre-fix: a single module-level chain head was shared across EVERY
+// (projectRoot, sprintId). A second stream written in the same process chained
+// its first event off the first stream's head (≠ GENESIS), so verifyAuditChain
+// — which anchors index 0 at GENESIS — reported brokenAt:0 for it. These tests
+// fail against the singleton and pass once the head is scoped per stream.
+
+describe('verifyAuditChain — A21 per-stream chain isolation', () => {
+  beforeEach(() => {
+    _resetChainHead(); // clear all stream heads — deterministic GENESIS start
+  });
+
+  it('a second sprint stream written after a first still anchors at GENESIS', () => {
+    // Stream A advances its own head within this process.
+    writeAuditEvent(tmpRoot, 'sprint-A', { tenantId: 'acme', actor: 'u1', action: 'login' });
+    writeAuditEvent(tmpRoot, 'sprint-A', { tenantId: 'acme', actor: 'u1', action: 'read' });
+
+    // Stream B: a DIFFERENT sprint in the SAME process, no reset between.
+    // Pre-fix this inherited sprint-A's head and broke at index 0.
+    writeAuditEvent(tmpRoot, 'sprint-B', { tenantId: 'acme', actor: 'u2', action: 'deploy' });
+
+    const { matched } = queryAudit(tmpRoot, 'sprint-B', { channel: AUDIT_EVENT_CHANNEL });
+    const payloads = matched.map(e => e.payload as AuditEventPayload);
+
+    const result = verifyAuditChain(payloads);
+    expect(result.intact).toBe(true);
+    expect(result.brokenAt).toBeUndefined();
+  });
+
+  it('a non-sprint audit partition interleaved with a sprint keeps each chain intact', () => {
+    // Real-world: the autonomous loop writes to the 'autonomous' partition while
+    // a sprint writes to 'sprint-X' — both via writeAuditEvent in one process.
+    writeAuditEvent(tmpRoot, 'autonomous', { tenantId: 'local', actor: 'loop', action: 'tick' });
+    writeAuditEvent(tmpRoot, 'sprint-X', { tenantId: 'local', actor: 'brain', action: 'eval' });
+    writeAuditEvent(tmpRoot, 'autonomous', { tenantId: 'local', actor: 'loop', action: 'tick' });
+
+    for (const stream of ['autonomous', 'sprint-X']) {
+      const { matched } = queryAudit(tmpRoot, stream, { channel: AUDIT_EVENT_CHANNEL });
+      const payloads = matched.map(e => e.payload as AuditEventPayload);
+      const result = verifyAuditChain(payloads);
+      expect(result.intact, `stream ${stream} chain should be intact`).toBe(true);
+    }
+  });
+
+  it('restart that appends to an existing sprint stays contiguous (disk-seed)', () => {
+    // First "process": two events, then simulate a restart by clearing the
+    // in-memory heads. The on-disk chain already anchors at GENESIS.
+    writeAuditEvent(tmpRoot, 'sprint-R', { tenantId: 'acme', actor: 'u1', action: 'a' });
+    writeAuditEvent(tmpRoot, 'sprint-R', { tenantId: 'acme', actor: 'u1', action: 'b' });
+
+    _resetChainHead(); // restart: in-memory heads gone, disk persists
+
+    // Second "process": append — must seed from the last persisted hmac, not
+    // GENESIS (pre-fix this wrote a second GENESIS-anchored event mid-stream).
+    writeAuditEvent(tmpRoot, 'sprint-R', { tenantId: 'acme', actor: 'u1', action: 'c' });
+
+    const { matched } = queryAudit(tmpRoot, 'sprint-R', { channel: AUDIT_EVENT_CHANNEL });
+    const payloads = matched.map(e => e.payload as AuditEventPayload);
+
+    expect(payloads).toHaveLength(3);
+    const result = verifyAuditChain(payloads);
+    expect(result.intact).toBe(true);
+    expect(result.brokenAt).toBeUndefined();
+  });
+});

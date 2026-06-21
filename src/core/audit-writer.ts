@@ -4,7 +4,7 @@
 // Sprint 208 (208-011).
 
 import { createHash } from 'node:crypto';
-import { writeEvent } from './event-stream.js';
+import { writeEvent, readEvents } from './event-stream.js';
 
 // ─── Channel constant ─────────────────────────────────────────────
 
@@ -16,8 +16,51 @@ export const AUDIT_EVENT_CHANNEL = 'DECKENT→AUDIT:EVENT_WRITTEN';
 /** Genesis seed for the tamper-evident hmac chain. */
 const GENESIS_HMAC = 'deckent-audit-genesis-0000000000000000000000000000000000000000';
 
-/** Running chain head — updated after every successful write. */
-let chainHead: string = GENESIS_HMAC;
+/**
+ * Per-(projectRoot, sprintId) running chain heads. A21: a single module-level
+ * head let EVERY sprint and EVERY audit partition ('autonomous', 'process',
+ * mission, enterprise sprint-N) share one running hmac. In a long-lived process
+ * (autonomous loop, server) the second stream written began its first event with
+ * `prevHmac = <previous stream's head>` ≠ GENESIS, so `verifyAuditChain()` over
+ * that stream — which anchors index 0 at GENESIS — returned `{ brokenAt: 0 }`.
+ * Scoping the head per stream makes each on-disk chain independently anchor at
+ * GENESIS at its first event, restoring tamper-evidence cross-sprint.
+ */
+const chainHeads = new Map<string, string>();
+
+/** When set by {@link _resetChainHead}(seed), the next write of every stream
+ *  anchors at `seed` instead of re-seeding from disk/GENESIS (test-only). */
+let chainSeedOverride: string | undefined;
+
+/** Identity key for a chain head. NUL cannot appear in a path or sprintId. */
+function chainKey(projectRoot: string, sprintId: string): string {
+  return `${projectRoot}\u0000${sprintId}`;
+}
+
+/**
+ * Resolve the current chain head for a stream. On the first write of this process
+ * to a given (projectRoot, sprintId) the head is seeded from the last persisted
+ * audit event's hmac so a restart that APPENDS to an existing sprint stays
+ * contiguous (verifyAuditChain anchors index 0 at GENESIS — the pre-restart first
+ * event already carries it). An empty/missing/unreadable stream seeds GENESIS.
+ * Cached per key thereafter.
+ */
+function currentChainHead(projectRoot: string, sprintId: string): string {
+  const key = chainKey(projectRoot, sprintId);
+  const cached = chainHeads.get(key);
+  if (cached !== undefined) return cached;
+
+  let seed = chainSeedOverride ?? GENESIS_HMAC;
+  if (chainSeedOverride === undefined) {
+    try {
+      const auditEvents = readEvents(projectRoot, sprintId, { channel: AUDIT_EVENT_CHANNEL });
+      const lastHmac = (auditEvents[auditEvents.length - 1]?.payload as { hmac?: string } | undefined)?.hmac;
+      if (typeof lastHmac === 'string' && lastHmac.length > 0) seed = lastHmac;
+    } catch { /* missing/unreadable stream → GENESIS */ }
+  }
+  chainHeads.set(key, seed);
+  return seed;
+}
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -52,11 +95,14 @@ export interface AuditEventPayload extends AuditEvent {
 // ─── Public API ───────────────────────────────────────────────────
 
 /**
- * Reset the module-level chain head. Intended for testing only — allows
- * deterministic chain verification in isolated test runs.
+ * Reset all per-stream chain heads. Intended for testing only — allows
+ * deterministic chain verification in isolated test runs. With a `seed` the
+ * next write of every stream anchors at it (legacy single-head semantics);
+ * without one each stream re-seeds from disk/GENESIS on its next write.
  */
 export function _resetChainHead(seed?: string): void {
-  chainHead = seed ?? GENESIS_HMAC;
+  chainHeads.clear();
+  chainSeedOverride = seed;
 }
 
 /**
@@ -93,7 +139,7 @@ export function writeAuditEvent(
     timestamp,
   };
 
-  const prevHmac = chainHead;
+  const prevHmac = currentChainHead(projectRoot, sprintId);
   const hmac = computeEventHmac(prevHmac, basePayload);
 
   const payload: AuditEventPayload = { ...basePayload, prevHmac, hmac };
@@ -108,7 +154,7 @@ export function writeAuditEvent(
   );
 
   if (written !== null) {
-    chainHead = hmac;
+    chainHeads.set(chainKey(projectRoot, sprintId), hmac);
   }
 
   return written !== null;
