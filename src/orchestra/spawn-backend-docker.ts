@@ -23,7 +23,7 @@ import {
 } from '../core/file-lock.js';
 import { markPending, markActive, clearPending } from '../core/active-workers.js';
 import type { SpawnBackend, SpawnBackendOptions } from './spawn-backend.js';
-import { SpawnBackendError } from './spawn-backend.js';
+import { SpawnBackendError, checkLethalGuard } from './spawn-backend.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
@@ -468,6 +468,10 @@ export class DockerSpawnBackend implements SpawnBackend {
    * - timeout wrapper kills container after limit
    */
   spawn(taskId: string, model: ModelType, prompt: string, opts?: SpawnBackendOptions): void {
+    // GATE-W2 toggle-independent SAFETY_FLOOR guard — MUST run before any side
+    // effect (markPending/mkdir/docker). The default backend previously skipped
+    // it while tmux/subprocess enforced it: a lethal actionId could spawn here.
+    checkLethalGuard(opts?.actionId, this.name);
     const dir = opts?.projectDir ?? this.projectDir;
     // Adaptive timeout: prefer per-task override from brainEstimateTimeout(),
     // fall back to constructor value, then DEFAULT_TIMEOUT_SECONDS

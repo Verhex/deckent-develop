@@ -103,7 +103,7 @@ export class SpawnBackendError extends Error {
  *
  * @toggleIndependent — active even when nervous system is disabled.
  */
-function checkLethalGuard(actionId: string | undefined, backendName: string): void {
+export function checkLethalGuard(actionId: string | undefined, backendName: string): void {
   if (!actionId) return;
   const result = assertNotLethalWithoutApproval(actionId);
   if (result.blocked) {

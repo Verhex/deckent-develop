@@ -22,6 +22,7 @@ import {
   TmuxBackend,
   SpawnBackendError,
 } from '../../src/orchestra/spawn-backend.js';
+import { DockerSpawnBackend } from '../../src/orchestra/spawn-backend-docker.js';
 
 // ─── assertNotLethalWithoutApproval unit tests ────────────────────────────────
 
@@ -204,6 +205,40 @@ describe('spawn-backend wire — TmuxBackend lethal guard (GATE-W2)', () => {
       const err = e as Error;
       expect(err.message).not.toContain('SAFETY_FLOOR');
       expect(err.message).not.toContain('toggleIndependent');
+    }
+  });
+});
+
+// ─── spawn-backend wire — DockerSpawnBackend (DEFAULT backend, A11) ───────────
+
+describe('spawn-backend wire — DockerSpawnBackend lethal guard (GATE-W2 / A11)', () => {
+  // Regression for A11: the default backend previously skipped checkLethalGuard
+  // while tmux/subprocess enforced it. The guard runs on spawn()'s first line, so
+  // a lethal actionId throws before any markPending/mkdir/docker side effect.
+  it('DESTRUCTIVE_GIT actionId → throws SpawnBackendError before any spawn', () => {
+    const backend = new DockerSpawnBackend('/tmp/test-proj-docker-gate-w2');
+
+    expect(() =>
+      backend.spawn('task-docker-001', 'claude-sonnet-4-5' as never, 'test prompt', {
+        actionId: 'DESTRUCTIVE_GIT',
+      }),
+    ).toThrow(SpawnBackendError);
+  });
+
+  it('KILL_LIVE_SPRINT → SpawnBackendError with backendName=docker + SAFETY_FLOOR', () => {
+    const backend = new DockerSpawnBackend('/tmp/test-proj-docker-gate-w2');
+
+    try {
+      backend.spawn('task-docker-002', 'claude-sonnet-4-5' as never, 'test', {
+        actionId: 'KILL_LIVE_SPRINT',
+      });
+      expect.fail('Expected SpawnBackendError');
+    } catch (e) {
+      expect(e).toBeInstanceOf(SpawnBackendError);
+      const err = e as SpawnBackendError;
+      expect(err.backendName).toBe('docker');
+      expect(err.message).toContain('SAFETY_FLOOR');
+      expect(err.message).toContain('KILL_LIVE_SPRINT');
     }
   });
 });
