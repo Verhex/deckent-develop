@@ -2,6 +2,32 @@
 
 > **Amaç:** Cross-check havuzundaki ~431 crit/high (+ medium/low kuyruğu) bulguyu **üç kovaya** ayır, A'ları R1-R8 kök-nedene bağla, B-kararları Alperen'in önüne getir. Bu doküman fix-kampanyasının **SSOT backlog**'u. Kaynak: `deckent-last-standing-crosscheck.md` (Phase-1 CC ⨯ Phase-2 deckent). Her satır file:line taşır; "bazıları zaten sistemsel karardı" → o satırlar **Bucket B**'ye düştü, A'ya değil.
 
+---
+## 🌙 OVERNIGHT OTONOM OTURUM LOG (2026-06-22) — Alperen sabah review
+
+> Alperen "sabaha kadar ilerlet + deckent-dogfood verify + build:all izinli" dedi. **8 fix + 3 doc commit, hepsi unpushed (main ahead 9, push YOK — sabah onayın bekleniyor), her biri faithful-regression-locked (pre-fix RED / post-fix GREEN) + affected-suite green.**
+
+**Bu oturum tamamlanan (8 fix):**
+| # | Fix | Commit | Kök | Faithful |
+|---|-----|--------|-----|----------|
+| 1 | audit-chain per-stream isolation | `420d2dce` | A21/R2 (security) | 3-test, 238 yeşil |
+| 2 | OpenAI tool-call stream-end flush | `c35c6540` | R6 | 2-test, 1345 yeşil |
+| 3 | dashboard 401 UnauthorizedBanner | `bc3b42e2` | R6 (Tier-1) | 4 DOM-test + build:all |
+| 4 | Discord sendMessage unsendable→throw | `3a2170e6` | R6 | 2-test, 235 yeşil |
+| 5 | deckent_plan dryRun force | `823b8bb4` | R7 | 2-test, 22 yeşil |
+| 6 | budget false-OK→unreadable | `c7a89f97` | R6 | 1-test, 63 yeşil |
+| 7 | bot resolveAndAck failure-reply | `4e002a70` | R6 | 2-test, 146 yeşil |
+| 8 | SprintControlPanel error+i18n | `80f9c45e` | R6 (Tier-1) | DOM-test + build:all |
+
+**Dogfood-verify:** `npm run build:all` ✅ (2289 modül, temiz) + `deckent doctor` ✅ (4/4 provider ready, memory healthy, auth intact). **Full-suite:** 23.8k test pass; **39 fail TÜMÜ pre-existing** (disk-verify: source'umu origin/main'e revert edip kanıtladım — `mcp/server` config-mock-stale, `notify-lifecycle`/`sprint-160` e2e, `npm-pack` env, `builtin-skills` `.deckent`-mirror-drift, `nav-render` Sidebar-count). **Hiçbiri benim 8 fix'imden değil.**
+
+**Kalan disposition (sabah karar/iş):**
+- ⛔ **R3 sprint_timeout_minutes** dormant (config hiç `timeoutMs`'e thread edilmiyor, 30dk default config-0'ı eziyor) — fix DAVRANIŞ-DEĞİŞTİREN (default→unlimited) → **B-ruling: honor-config vs 30dk-safety-cap?** (otonom yapmadım).
+- ◑ feature-completion (surgical değil): flow-run action-executor eksik · resume completed-list runSprint'e geçmiyor (signature-ripple) · native-chat/`/provider`-switch stub.
+- ⛔ borderline-B/kasıtlı: `--auto-approve` forced (workers-always-full-write) · `deckent_kill` description-dürüst-PAUSED · `writeNervousIpcApproval` advisory-doc · `nextSequence` within-process-safe (docstring "atomically" cross-process yanıltıcı — known-issue) · rbac-CLI enterprise-persistence.
+- ⬜ R8 spawnSync→async (mekanik ama signature-ripple + faithful-test-zor, ayrı odaklı batch) · R4 SSOT (risky, canlı-kopya-seçimi) · marketplace/skill-sandbox (B11-KES).
+
+---
 ## 0. Kova Özeti
 
 | Kova | Ne demek | Yaklaşık adet | Kim koşar | Sıra |
@@ -206,34 +232,34 @@ Self-improvement makinesini besleyen sayılar sahte → sistem kendi drift'ini g
 ### A·R6 — Silent fallback / yutulan-hata — deckent + CC-verify 🟠
 > **İLERLEME (06-22):** ✅ **OpenAI tool-call drop FIXED** (`agent/provider-tooluse/openai.ts`) — stream `finish_reason:'tool_calls'` yerine `'stop'`/finish-yok/`[DONE]`-break ile biterse biriken tool-call'lar sessizce düşüyordu (vLLM/Ollama/Azure/proxy bunu yapar). `drainToolCalls` helper (DRY) loop-içi + loop-sonrası flush (`clear()` çift-emit önler). Faithful 2-test (stop-drop + no-finish-drop) pre-fix RED + 1 double-emit guard; **79 affected dosya/1345 test yeşil**, tsc EXIT=0. **Gerçek provider-correctness leak.**
 > **R6-TRIAGE (disk-verify):** ⛔ `nextSequence` non-atomic — within-process ZATEN sync-safe (read+write arası await yok); yalnız cross-process collision, fix = O_EXCL-lock-per-event hot-path overhead/churn → risk>değer, **defer + docstring "atomically" düzelt** · ⛔ `writeNervousIpcApproval` HTTP200 — docstring **"Advisory — a write failure never breaks the HTTP response" = KASITLI** (borderline-B; availability>consistency) · ◑ `getMessage` missing-key — `return key` makul prod-fallback; fix yalnız dev-warn (zayıf-sinyal) ya da call-site-key-guard-test (involved) → marjinal · ✅ **`deckent:unauthorized` listener-yok DOĞRULANDI** — dispatch var (api.ts:56) ama hiçbir `addEventListener` yok → 401 sessiz blank-page; **Tier-1 dashboard fix** (banner-component + i18n + listener + DOM-test + proof-of-function) = ayrı odaklı iş.
-- Discord sendMessage kanal-yoksa sessiz drop → `connectors/discord.ts` ⬜
-- resolveAndAck başarısız approval'da sıfır feedback → `connectors/incoming-command-router.ts` ⬜
-- WorkersPage / SprintControlPanel kill/cleanup hatası sessiz yutuluyor → dashboard ⬜
+- ✅ Discord sendMessage kanal-yoksa sessiz drop → `connectors/discord.ts` **DONE (06-22, `3a2170e6`)** — null/non-text/non-sendable channel'da throw (not-started throw paritesi); faithful 2-test, 235 connector test yeşil
+- ✅ resolveAndAck başarısız approval'da sıfır feedback → `connectors/incoming-command-router.ts` **DONE (06-22, `4e002a70`)** — resolver-throw'da `bot.resolve_failed` failure-reply (poller-safe korunur); faithful 2-test, 146 test yeşil. _(non-command silent-ignore back-compat'i kasıtlı, korundu)_
+- ✅ SprintControlPanel kill/cleanup hatası sessiz yutuluyor → dashboard **DONE (06-22, `80f9c45e`)** — `actionError` state + lucide-alert (no-emoji) + 3 confirm i18n'lendi (binding-rule) + 2 yeni en/tr key; faithful + build:all proof. _(WorkersPage'in silent-catch'i "next-tick reconcile" yorumlu = kısmen-kasıtlı; diğer SprintControlPanel display-string'leri ayrı i18n-debt)_
 - `getMessage()` eksik-key'de key-string döner → typo görünmez → `cli/helpers/messages.ts` ◑ marjinal
-- ✅ OpenAI adapter `finish_reason='stop'`'ta tool-call'ları sessiz drop → `agent/provider-tooluse/openai.ts` **DONE (06-22)**
+- ✅ OpenAI adapter `finish_reason='stop'`'ta tool-call'ları sessiz drop → `agent/provider-tooluse/openai.ts` **DONE (06-22, `c35c6540`)**
 - `nextSequence()` non-atomic read-modify-write → eşzamanlı worker'da duplicate seq → `core/event-stream.ts` ⛔ within-process-safe, defer
 - writeNervousIpcApproval write-fail'i yutar, HTTP 200 → `api/nervous-endpoint.ts` ⛔ docstring-kasıtlı (borderline-B)
-- output.ts budget DB-read-error'da "OK" yazar → `cli/helpers/output.ts` ⬜ (skip-eder, false-OK değil — re-verify)
+- ✅ output.ts budget DB-unreadable'da false-OK → `cli/helpers/output.ts` **DONE (06-22, `c7a89f97`)** — `getMemoryEntryCount` unreadable'da `null` (absent=0 korunur) → budget "unreadable" uyarısı; faithful (corrupt-DB→unreadable), 63 test yeşil
 - skill-sandbox AST-scan tsc-yoksa no-op'a düşer → `core/marketplace/skill-sandbox.ts` ⬜ (marketplace = B11-KES alanı)
-- runPostFinalizeHooks tüm adımlar catch-and-continue, fail surface yok → `core/identity-generator.ts` ⬜
-- `deckent:unauthorized` event dispatch edilir ama listener yok → 401 sessiz → `dashboard/src/lib/api.ts` ✅doğrulandı, ⬜Tier-1-fix
+- runPostFinalizeHooks catch-and-continue → `core/identity-generator.ts` ⛔ DÜZELTME: her step `result.errors`'a push EDİYOR (swallow değil); caller-surface ayrı kontrol, düşük öncelik
+- ✅ `deckent:unauthorized` event dispatch edilir ama listener yok → 401 sessiz → `dashboard/src/lib/api.ts` **DONE (06-22, `bc3b42e2`)** — `UnauthorizedBanner` (App-root listener + i18n en/tr + DOM-test + build:all proof-of-function)
 
 ### A·R7 — Wired-but-broken / advertised no-op + soft arch-rule — CC + deckent 🟠
-Reklamı yapılan feature aslında no-op:
-- `/provider` switch confirm der ama adapter rebuild etmez (no-op) → `cli/commands/chat-native.ts` 🔴
-- `chat --native` stub-dispatcher tüm tool-call'a placeholder döner → `cli/commands/chat.ts` 🔴
-- `chat --local` "not yet wired" hatası → `cli/commands/chat.ts`
-- selectBestAgent skill-affinity sinyalini atlıyor → "agent imbalance fix" no-op → `core/activation-engine.ts` 🔴
-- `deckent_watch` MCP watchFile() çağırmıyor → sıfır canlı event → `orchestra/event-bus.ts`
-- 'deckent-event' EventEmitter'da listener yok → NervousObserver faz-değişimi almıyor → `orchestra/sprint-controller.ts`
-- `deckent flow run` daemon sadece flow-count basıyor, action koşmuyor → `cli/commands/flow.ts`
-- `deckent_kill` MCP sadece JSON'da PAUSED işaretliyor, gerçek process'i öldürmüyor → `mcp/tools/kill.ts`
-- `deckent_plan` dry-run dökümante ama diske task yazıyor → `mcp/tools/plan.ts` 🔴
-- `nervous edit` IPC-gate bypass → two-writer race → `cli/commands/nervous.ts`
-- `resume` completed-task list geçmeden runSprint → done-task'lar yeniden koşuyor → `cli/commands/resume.ts`
-- rbac CLI grant/revoke ölü in-memory Map'e yazıyor → `cli/commands/rbac.ts`
-- `--auto-approve` ignore/forced-true → `cli/commands/run.ts`, `start.ts`
-- ESM: `runtime-scope-check` bare `require()` ESM'de hep stderr-fallback → `nervous/runtime-scope-check.ts` (R7 ESM-disiplin)
+> **R7-TRIAGE (06-22 disk-verify):** ✅ **plan dry-run FIXED** (`823b8bb4`). ⛔ **`--auto-approve`** = KASITLI (`run.ts:257`/`start.ts:426` `autoApprove=true` hardcode, yorum "Deckent standard: workers MUST have full write permissions") → borderline-B, flag-misleading-ama-bug-değil · ⛔ **`deckent_kill`** = description PAUSED'ı dürüst belgeliyor ("Sets task status to PAUSED, removes hb, releases locks"), process-kill iddiası yok; gerçek-kill fix riskli+faithful-test-zor → defer · ◑ **resume** done-task re-run DOĞRULANDI (`resume.ts:169` runSprint'e completed-list geçmiyor) ama fix runSprint signature-change/ripple → non-surgical, defer · ◑ **flow run** `runtime.tick()`/`start()` çağrılıyor, dispatch-count basıyor; action gerçekten koşuyor mu = FlowRuntime.tick() iç-incelemesi gerek · ⛔ **rbac CLI** in-memory Map (persistence = enterprise-RBAC, B1-bitişik) → defer.
+- `/provider` switch confirm der ama adapter rebuild etmez (no-op) → `cli/commands/chat-native.ts` 🔴 ⬜ (büyük, native-chat subsystem)
+- `chat --native` stub-dispatcher tüm tool-call'a placeholder döner → `cli/commands/chat.ts` 🔴 ⬜ (büyük)
+- `chat --local` "not yet wired" hatası → `cli/commands/chat.ts` ⬜
+- selectBestAgent skill-affinity sinyalini atlıyor → "agent imbalance fix" no-op → `core/activation-engine.ts` 🔴 ⬜ (ADR-075 affinity, memory'de dead-code-known)
+- `deckent_watch` MCP watchFile() çağırmıyor → sıfır canlı event → `orchestra/event-bus.ts` ⬜
+- 'deckent-event' EventEmitter'da listener yok → NervousObserver faz-değişimi almıyor → `orchestra/sprint-controller.ts` ⬜
+- `deckent flow run` daemon sadece flow-count basıyor, action koşmuyor → `cli/commands/flow.ts` ◑ FlowRuntime.tick() incelenecek
+- `deckent_kill` MCP sadece JSON'da PAUSED işaretliyor, gerçek process'i öldürmüyor → `mcp/tools/kill.ts` ⛔ description-dürüst, defer
+- ✅ `deckent_plan` dry-run dökümante ama diske task yazıyor → `mcp/tools/plan.ts` **DONE (06-22, `823b8bb4`)** — tool `dryRun:true` force ediyor (planSprint write-guard'ı tetikler); faithful 2-test
+- `nervous edit` IPC-gate bypass → two-writer race → `cli/commands/nervous.ts` ◑ moderate
+- `resume` completed-task list geçmeden runSprint → done-task'lar yeniden koşuyor → `cli/commands/resume.ts` ◑ doğrulandı, non-surgical (runSprint signature)
+- rbac CLI grant/revoke ölü in-memory Map'e yazıyor → `cli/commands/rbac.ts` ⛔ enterprise-persistence, defer
+- `--auto-approve` ignore/forced-true → `cli/commands/run.ts`, `start.ts` ⛔ KASITLI (workers-always-full-write)
+- ESM: `runtime-scope-check` bare `require()` ESM'de hep stderr-fallback → `nervous/runtime-scope-check.ts` (R7 ESM-disiplin) ⬜
 
 ### A·R8 — spawnSync async-context'te (ADR-087 ihlali, event-loop freeze) — deckent mekanik 🟠
 - `monitor-adapter.ts` spawnSync (async)
