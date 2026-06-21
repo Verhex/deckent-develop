@@ -162,7 +162,7 @@ interface AgentSprintStat {
   sprint: string;
   tasks: number;
   success: number;
-  successRate: number;
+  successRate: number | null;
 }
 
 function loadAgentSprintStats(root: string, agentName: string): AgentSprintStat[] {
@@ -185,20 +185,16 @@ function loadAgentSprintStats(root: string, agentName: string): AgentSprintStat[
     const mentions = (content.match(agentMentionRegex) ?? []).length;
     if (mentions === 0) continue;
 
-    // Try to find task counts associated with this agent
-    const taskLineRegex = /\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*(GO|NO_GO|GO_WITH_TECH_DEBT)\s*\|/g;
+    // Match real sprint table rows: | Task | Agent | Skills | Status |
+    const taskLineRegex = /\|\s*([^|]+)\|\s*([^|]+)\|\s*([^|]+)\|\s*(DONE|GO|GO_WITH_TECH_DEBT|NO_GO)\s*\|/g;
     let tasks = 0;
     let success = 0;
     let match: RegExpExecArray | null;
     while ((match = taskLineRegex.exec(content)) !== null) {
+      const agentCol = (match[2] ?? '').trim();
+      if (!agentCol.toLowerCase().includes(agentName.toLowerCase())) continue;
       tasks++;
-      if (match[3] !== 'NO_GO') success++;
-    }
-
-    if (tasks === 0) {
-      // Fallback: count agent name mentions as a proxy
-      tasks = mentions;
-      success = mentions;
+      if ((match[4] ?? '').trim() !== 'NO_GO') success++;
     }
 
     const sprintName = file.replace('.md', '');
@@ -206,7 +202,7 @@ function loadAgentSprintStats(root: string, agentName: string): AgentSprintStat[
       sprint: sprintName,
       tasks,
       success,
-      successRate: tasks > 0 ? Math.round((success / tasks) * 100) : 0,
+      successRate: tasks > 0 ? Math.round((success / tasks) * 100) : null,
     });
   }
   return stats;
@@ -380,7 +376,7 @@ export function registerAgent(program: Command): void {
         }
 
         const headers = ['Sprint', 'Tasks', 'Success', 'Rate'];
-        const rows = sprintStats.map(s => [s.sprint, String(s.tasks), String(s.success), `${s.successRate}%`]);
+        const rows = sprintStats.map(s => [s.sprint, String(s.tasks), String(s.success), s.successRate !== null ? `${s.successRate}%` : '-']);
         print(formatTable(headers, rows));
       } catch (error) {
         printError(error);

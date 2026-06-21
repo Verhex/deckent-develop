@@ -450,3 +450,94 @@ describe('deckent_status — metricSnapshot (T-150-038)', () => {
     expect(parsed.metricSnapshot?.['result.collected']).toBe(7);
   });
 });
+
+// ─── failedTasks (R5-FAILEDTASKS) ────────────────────────────────────────────
+
+describe('deckent_status — failedTasks real NO_GO count (R5-FAILEDTASKS)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(readLatestJobState).mockReturnValue(null);
+    vi.mocked(getCurrentSprintId).mockReturnValue('sprint-316');
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(readDashboardSafe).mockReturnValue({
+      valid: true,
+      state: sampleDashboard,
+      repaired: false,
+    });
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(sampleDashboard));
+  });
+
+  // 3 task files: 2 NO_GO + 1 DONE — failedTasks must equal 2 (not 0)
+  it('failedTasks reflects real NO_GO count (≥1 NO_GO → failedTasks > 0)', async () => {
+    vi.mocked(readdirSync).mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.includes('.tasks')) {
+        return ['task-001.json', 'task-002.json', 'task-003.json'] as unknown as ReturnType<typeof readdirSync>;
+      }
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(readFileSync).mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.endsWith('task-001.json')) return JSON.stringify({ id: '001', status: 'NO_GO', provider: 'claude' });
+      if (path.endsWith('task-002.json')) return JSON.stringify({ id: '002', status: 'NO_GO', provider: 'claude' });
+      if (path.endsWith('task-003.json')) return JSON.stringify({ id: '003', status: 'DONE', provider: 'claude' });
+      return JSON.stringify(sampleDashboard);
+    });
+
+    const tool = await getStatusTool();
+    // rich-format path: outputMode=explainatory → resolvedMode !== 'standart' → uses noGoCount
+    const result = await tool.handler({ outputMode: 'explainatory' });
+    const parsed = JSON.parse(result.content[0]!.text) as { failedTasks?: number };
+
+    // Pre-fix (failedTasks: 0 hardcoded): this assertion FAILS (failedTasks is 0, expected 2)
+    // Post-fix (failedTasks: noGoCount): this assertion PASSES (failedTasks is 2)
+    expect(parsed.failedTasks).toBe(2);
+  });
+
+  // Verify via json path as well (rawData is returned directly)
+  it('failedTasks in json response reflects NO_GO count from task files', async () => {
+    vi.mocked(readdirSync).mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.includes('.tasks')) {
+        return ['task-A.json', 'task-B.json'] as unknown as ReturnType<typeof readdirSync>;
+      }
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(readFileSync).mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.endsWith('task-A.json')) return JSON.stringify({ id: 'A', status: 'NO_GO', provider: 'claude' });
+      if (path.endsWith('task-B.json')) return JSON.stringify({ id: 'B', status: 'DONE', provider: 'claude' });
+      return JSON.stringify(sampleDashboard);
+    });
+
+    const tool = await getStatusTool();
+    const result = await tool.handler({ json: true });
+    const parsed = JSON.parse(result.content[0]!.text) as { failedTasks?: number };
+
+    // Pre-fix: failedTasks is absent from rawData → undefined; Post-fix: 1
+    expect(parsed.failedTasks).toBe(1);
+  });
+
+  // Hardcode regression: failedTasks must NOT always be 0
+  it('failedTasks is 0 when no NO_GO tasks exist (DONE-only)', async () => {
+    vi.mocked(readdirSync).mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.includes('.tasks')) {
+        return ['task-X.json'] as unknown as ReturnType<typeof readdirSync>;
+      }
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(readFileSync).mockImplementation((p: unknown) => {
+      const path = String(p);
+      if (path.endsWith('task-X.json')) return JSON.stringify({ id: 'X', status: 'DONE', provider: 'claude' });
+      return JSON.stringify(sampleDashboard);
+    });
+
+    const tool = await getStatusTool();
+    const result = await tool.handler({ json: true });
+    const parsed = JSON.parse(result.content[0]!.text) as { failedTasks?: number };
+
+    expect(parsed.failedTasks).toBe(0);
+  });
+});

@@ -139,6 +139,48 @@ describe('PromptAnalytics', () => {
       const variant = analytics.assignVariant(exp.id);
       expect(['A', 'B']).toContain(variant);
     });
+
+    it('deterministically returns B when experiment has 3 A-results and 0 B-results', () => {
+      // PRE-FIX: this test FAILS on pure-random implementation because it ignores experimentId
+      // POST-FIX: balanced assignment reads results and returns under-represented variant
+      const analytics = new PromptAnalytics(tmpDir);
+      const exp = analytics.createExperiment('agent-1', 'PromptA', 'PromptB');
+      analytics.recordResult(exp.id, 'A', 'DONE', 90, 'sprint-001');
+      analytics.recordResult(exp.id, 'A', 'DONE', 85, 'sprint-002');
+      analytics.recordResult(exp.id, 'A', 'NO_GO', 50, 'sprint-003');
+      // 3 A-results, 0 B-results → B is under-represented → must return 'B'
+      const variant = analytics.assignVariant(exp.id);
+      expect(variant).toBe('B');
+    });
+
+    it('falls back to A or B without throwing when experiment is not found', () => {
+      const analytics = new PromptAnalytics(tmpDir);
+      // Non-existent experimentId must not throw — should return 'A' or 'B'
+      expect(() => {
+        const variant = analytics.assignVariant('non-existent-experiment-id');
+        expect(['A', 'B']).toContain(variant);
+      }).not.toThrow();
+    });
+
+    it('returns A when B has more results (A is under-represented)', () => {
+      const analytics = new PromptAnalytics(tmpDir);
+      const exp = analytics.createExperiment('agent-1', 'PromptA', 'PromptB');
+      analytics.recordResult(exp.id, 'B', 'DONE', 80, 'sprint-001');
+      analytics.recordResult(exp.id, 'B', 'DONE', 75, 'sprint-002');
+      // 0 A-results, 2 B-results → A is under-represented → must return 'A'
+      const variant = analytics.assignVariant(exp.id);
+      expect(variant).toBe('A');
+    });
+
+    it('returns A or B (random) when counts are equal', () => {
+      const analytics = new PromptAnalytics(tmpDir);
+      const exp = analytics.createExperiment('agent-1', 'PromptA', 'PromptB');
+      analytics.recordResult(exp.id, 'A', 'DONE', 90, 'sprint-001');
+      analytics.recordResult(exp.id, 'B', 'DONE', 80, 'sprint-001');
+      // Equal counts → random fallback
+      const variant = analytics.assignVariant(exp.id);
+      expect(['A', 'B']).toContain(variant);
+    });
   });
 
   // ─── A/B Testing: recordResult ─────────────────────────────────

@@ -420,3 +420,116 @@ describe('agent disable', () => {
     expect(process.exitCode).toBe(1);
   });
 });
+
+// ─── Task 316-003: agent stats — mentions≠success ────────────────────────────
+
+describe('agent stats — successRate from real task count not mentions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.exitCode = undefined;
+  });
+  afterEach(() => {
+    process.exitCode = undefined;
+  });
+
+  it('returns successRate ~33% when 3 rows: 1 DONE + 2 NO_GO (not 100% via mentions-conflation)', async () => {
+    // Fixture: real 4-column sprint table with 3 rows for "my-agent": 1 DONE, 2 NO_GO
+    // OLD code: mentions=3, taskLineRegex matches 0 rows (old 3-col/GO-only regex) → fallback
+    //   → tasks=mentions=3, success=mentions=3, successRate=100%  — test FAILS on old code
+    // NEW code: 4-col regex matches all 3 rows, filters by agent, tasks=3, success=1, rate=33%
+    const sprintContent = [
+      '## Tasks',
+      '| Task | Agent | Skills | Status |',
+      '|------|-------|--------|--------|',
+      '| 1-001: work item | my-agent | typescript-expert | DONE |',
+      '| 1-002: another item | my-agent | typescript-expert | NO_GO |',
+      '| 1-003: third item | my-agent | typescript-expert | NO_GO |',
+    ].join('\n');
+
+    const agentConfig = makeAgentConfig({ name: 'my-agent' });
+
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockImplementation((path: unknown) => {
+      if (String(path).includes('.brain/sprints')) return ['sprint-1.md'] as any;
+      return [{ name: 'my-agent', isDirectory: () => true }] as any;
+    });
+    vi.mocked(readFileSync).mockImplementation((path: unknown) => {
+      if (String(path).includes('sprint-1.md')) return sprintContent;
+      return JSON.stringify(agentConfig);
+    });
+
+    await runCommand(['agent', 'stats', 'my-agent']);
+
+    expect(formatTable).toHaveBeenCalledWith(
+      ['Sprint', 'Tasks', 'Success', 'Rate'],
+      [['sprint-1', '3', '1', '33%']],
+    );
+  });
+
+  it('shows - for rate when agent is mentioned but has no task rows', async () => {
+    const sprintContent = 'Shoutout to my-agent for the great work this sprint.\n';
+
+    const agentConfig = makeAgentConfig({ name: 'my-agent' });
+
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockImplementation((path: unknown) => {
+      if (String(path).includes('.brain/sprints')) return ['sprint-1.md'] as any;
+      return [{ name: 'my-agent', isDirectory: () => true }] as any;
+    });
+    vi.mocked(readFileSync).mockImplementation((path: unknown) => {
+      if (String(path).includes('sprint-1.md')) return sprintContent;
+      return JSON.stringify(agentConfig);
+    });
+
+    await runCommand(['agent', 'stats', 'my-agent']);
+
+    expect(formatTable).toHaveBeenCalledWith(
+      ['Sprint', 'Tasks', 'Success', 'Rate'],
+      [['sprint-1', '0', '0', '-']],
+    );
+  });
+
+  it('does not count tasks assigned to other agents', async () => {
+    const sprintContent = [
+      '| Task | Agent | Skills | Status |',
+      '|------|-------|--------|--------|',
+      '| task-A | my-agent | skill | DONE |',
+      '| task-B | other-agent | skill | NO_GO |',
+    ].join('\n');
+
+    const agentConfig = makeAgentConfig({ name: 'my-agent' });
+
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockImplementation((path: unknown) => {
+      if (String(path).includes('.brain/sprints')) return ['sprint-1.md'] as any;
+      return [{ name: 'my-agent', isDirectory: () => true }] as any;
+    });
+    vi.mocked(readFileSync).mockImplementation((path: unknown) => {
+      if (String(path).includes('sprint-1.md')) return sprintContent;
+      return JSON.stringify(agentConfig);
+    });
+
+    await runCommand(['agent', 'stats', 'my-agent']);
+
+    // Only the 1 row for my-agent should be counted (100% success from 1 DONE)
+    expect(formatTable).toHaveBeenCalledWith(
+      ['Sprint', 'Tasks', 'Success', 'Rate'],
+      [['sprint-1', '1', '1', '100%']],
+    );
+  });
+
+  it('returns empty stats when sprints directory does not exist', async () => {
+    const agentConfig = makeAgentConfig({ name: 'my-agent' });
+
+    vi.mocked(existsSync).mockImplementation((path: unknown) => {
+      if (String(path).includes('.brain/sprints')) return false;
+      return true;
+    });
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(agentConfig));
+
+    await runCommand(['agent', 'stats', 'my-agent']);
+
+    expect(print).toHaveBeenCalledWith('No sprint history found for this agent.');
+    expect(formatTable).not.toHaveBeenCalled();
+  });
+});

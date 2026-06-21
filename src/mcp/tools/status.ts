@@ -170,6 +170,31 @@ function buildBackendBreakdown(root: string): Record<string, number> {
 }
 
 /**
+ * Count tasks with status NO_GO from .tasks/*.json files.
+ * File-system based to avoid ADR-008 import cycle (status.ts must not import orchestra/).
+ */
+function countNoGoTasks(root: string): number {
+  let count = 0;
+  try {
+    const tasksDir = join(root, TASKS_DIR);
+    if (!existsSync(tasksDir)) return 0;
+    const entries = readdirSync(tasksDir);
+    const files = (Array.isArray(entries) ? entries : []).filter(
+      f => typeof f === 'string' && f.startsWith('task-') && f.endsWith('.json'),
+    );
+    for (const f of files) {
+      try {
+        const data = JSON.parse(readFileSync(join(tasksDir, f), 'utf-8')) as { status?: string };
+        if (data.status === 'NO_GO') count++;
+      } catch { /* skip */ }
+    }
+  } catch {
+    // ignore
+  }
+  return count;
+}
+
+/**
  * Loads the persisted dependency graph for the given sprint from disk.
  * File-system based to avoid ADR-008 import cycle (status.ts must not import orchestra/).
  * Returns null if no graph is persisted yet (sprint has no dep data).
@@ -406,6 +431,7 @@ export function registerStatusTool(server: McpServer): void {
 
       const phaseCountdown = computePhaseCountdown(state);
       const backendBreakdown = buildBackendBreakdown(root);
+      const noGoCount = countNoGoTasks(root);
 
       const verboseFields = verbose ? {
         phase: state['phase'],
@@ -427,6 +453,7 @@ export function registerStatusTool(server: McpServer): void {
         alertSummary,
         agentAssignments,
         skillAssignments,
+        failedTasks: noGoCount,
         // Rich output fields (Sprint 139 T-047)
         eventStreamTail,
         lastOutputs,
@@ -452,7 +479,7 @@ export function registerStatusTool(server: McpServer): void {
           phase: (state['phase'] as string | undefined),
           totalTasks: total,
           completedTasks: done,
-          failedTasks: 0,
+          failedTasks: noGoCount,
           activeWorkers: agents?.length ?? 0,
         };
         const formattedOutput = formatStatus(formatterData, resolvedMode);

@@ -117,10 +117,20 @@ export class PromptABTester {
 
   /**
    * Assign a variant (A or B) for the next run.
-   * Random 50/50 assignment.
+   * Uses balanced assignment: returns the under-represented variant.
+   * Falls back to random 50/50 when experiment is not found or counts are equal.
    */
-  assignVariant(_experimentId: string): 'A' | 'B' {
-    return Math.random() < 0.5 ? 'A' : 'B';
+  assignVariant(experimentId: string): 'A' | 'B' {
+    const experiment = this.getExperiment(experimentId);
+    if (!experiment) {
+      return Math.random() < 0.5 ? 'A' : 'B';
+    }
+    const aCount = experiment.results.filter(r => r.variant === 'A').length;
+    const bCount = experiment.results.filter(r => r.variant === 'B').length;
+    if (aCount === bCount) {
+      return Math.random() < 0.5 ? 'A' : 'B';
+    }
+    return aCount < bCount ? 'A' : 'B';
   }
 
   /**
