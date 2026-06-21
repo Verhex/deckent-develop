@@ -47,14 +47,37 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
   const config = await loadConfig(root);
   const bootstrap =
     opts.bootstrap ??
-    ((r, n): Promise<ConnectorCommandsHandle> =>
+    ((r, n): Promise<ConnectorCommandsHandle> => {
+      // Per-channel map of in-flight partial sinks: keyed by channelId, holds the
+      // onPartial callback supplied by the streaming path in connector-bootstrap so
+      // the responder's output hook reaches the right active Telegram edit closure.
+      const partialSinks = new Map<string, (t: string) => void>();
+
+      // Build ONE warm responder shared by both the streaming path (onChatStreaming)
+      // and the non-streaming fallback (chat), so the agentic persistent child is
+      // never duplicated. The onPartial hook dispatches into the per-channel sink
+      // map; sinks are set/cleared by onChatStreaming around each turn.
       // Full conversational head with model-driven actions (slice 2): the agentic
       // provider can call tools; the gated dispatcher auto-runs read-only ones and
       // PARKS risky ones for phone approval (approve <id>) — no destructive
       // action ever executes without explicit human approval.
-      bootstrapConnectorCommands(r, n, {
-        chat: makeChatResponder({ agentic: true, root: r, lang }),
-      }));
+      const responder = makeChatResponder({
+        agentic: true,
+        root: r,
+        lang,
+        onPartial: (sid, txt) => partialSinks.get(sid)?.(txt),
+      });
+
+      return bootstrapConnectorCommands(r, n, {
+        chat: responder,
+        onChatStreaming: (channelId, text, onPartial) => {
+          partialSinks.set(channelId, onPartial);
+          return responder(channelId, text).finally(() => {
+            partialSinks.delete(channelId);
+          });
+        },
+      });
+    });
   const handle = await bootstrap(root, config.notify_connectors);
 
   if (handle.active.length === 0) {
