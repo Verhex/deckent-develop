@@ -104,6 +104,13 @@ export interface IMessageConnector {
   /** Send a message to a channel. Throws if connector is not started. */
   sendMessage(msg: OutgoingMessage): Promise<void>;
 
+  /** Send a chat action (e.g. 'typing') so the user sees the bot is working. Optional/feature-detected. */
+  sendChatAction?(channelId: string, action: 'typing'): Promise<void>;
+  /** Like sendMessage but returns the platform message id (for later edits). Optional. */
+  sendMessageReturningId?(msg: OutgoingMessage): Promise<string | undefined>;
+  /** Edit a previously-sent message in place (streaming). Optional/feature-detected. */
+  editMessage?(channelId: string, messageId: string, text: string, parseMode?: 'HTML' | 'MarkdownV2'): Promise<void>;
+
   /** Register a handler for incoming messages. Multiple handlers supported. */
   onMessage(handler: MessageHandler): void;
 

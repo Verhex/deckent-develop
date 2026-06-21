@@ -28,7 +28,9 @@ interface TelegrafInstance {
   launch(opts?: { dropPendingUpdates?: boolean }): Promise<void>;
   stop(): void;
   telegram: {
-    sendMessage(chatId: string | number, text: string, extra?: SendExtra): Promise<unknown>;
+    sendMessage(chatId: string | number, text: string, extra?: SendExtra): Promise<{ message_id: number } | unknown>;
+    editMessageText(chatId: string | number, messageId: number, inlineMessageId: undefined, text: string, extra?: SendExtra): Promise<unknown>;
+    sendChatAction(chatId: string | number, action: string): Promise<unknown>;
   };
 }
 
@@ -177,6 +179,29 @@ export class TelegramConnector extends BaseConnector {
       return;
     }
     await this.bot.telegram.sendMessage(msg.channelId, msg.text);
+  }
+
+  async sendChatAction(channelId: string, action: 'typing'): Promise<void> {
+    if (!this.bot) throw new Error('Telegram connector not started');
+    await this.bot.telegram.sendChatAction(channelId, action);
+  }
+
+  async sendMessageReturningId(msg: OutgoingMessage): Promise<string | undefined> {
+    if (!this.bot) throw new Error('Telegram connector not started');
+    const extra: SendExtra = {};
+    if (msg.buttons && msg.buttons.length > 0) {
+      extra.reply_markup = { inline_keyboard: msg.buttons.map((row) => row.map((b) => ({ text: b.text, callback_data: b.callbackData }))) };
+    }
+    if (msg.parseMode) extra.parse_mode = msg.parseMode;
+    const sent = (await this.bot.telegram.sendMessage(msg.channelId, msg.text, extra)) as { message_id?: number };
+    return sent && typeof sent.message_id === 'number' ? String(sent.message_id) : undefined;
+  }
+
+  async editMessage(channelId: string, messageId: string, text: string, parseMode?: 'HTML' | 'MarkdownV2'): Promise<void> {
+    if (!this.bot) throw new Error('Telegram connector not started');
+    const extra: SendExtra = {};
+    if (parseMode) extra.parse_mode = parseMode;
+    await this.bot.telegram.editMessageText(channelId, Number(messageId), undefined, text, extra);
   }
 
   isHealthy(): boolean {
