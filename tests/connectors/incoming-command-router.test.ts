@@ -137,6 +137,35 @@ describe('makeIncomingCommandRouter — authorized dispatch', () => {
     expect(() => handler(msg({ text: 'approve x' }))).not.toThrow();
     await vi.waitFor(() => expect(resolve).toHaveBeenCalled());
   });
+
+  it('a throwing resolver sends a failure reply instead of silently swallowing (R6)', async () => {
+    const resolve = vi.fn(async () => { throw new Error('boom'); });
+    const reply = vi.fn(async () => {});
+    const handler = makeIncomingCommandRouter({
+      authorizedChatIds: ['7374744018'],
+      resolve,
+      reply,
+    });
+    handler(msg({ text: 'approve x9' }));
+    // Pre-fix the catch swallowed the throw and reply was never called — the user
+    // got zero feedback on their approve. It must now receive a failure notice.
+    await vi.waitFor(() => expect(reply).toHaveBeenCalledTimes(1));
+    const [chan, text] = reply.mock.calls[0]!;
+    expect(chan).toBe('7374744018');
+    expect(text).toContain('x9');
+  });
+
+  it('a resolver throw with a reply that also throws still never escapes the handler', async () => {
+    const resolve = vi.fn(async () => { throw new Error('boom'); });
+    const reply = vi.fn(async () => { throw new Error('channel down'); });
+    const handler = makeIncomingCommandRouter({
+      authorizedChatIds: ['7374744018'],
+      resolve,
+      reply,
+    });
+    expect(() => handler(msg({ text: 'approve x' }))).not.toThrow();
+    await vi.waitFor(() => expect(reply).toHaveBeenCalled());
+  });
 });
 
 describe('makeIncomingCommandRouter — backlog-replay guard (acceptFrom)', () => {

@@ -151,5 +151,15 @@ async function resolveAndAck(
     await reply(channelId, getMessage(key, lang, { id: cmd.id }));
   } catch {
     // Fail-safe: a throwing resolver/reply must never crash the inbound poller.
+    // But swallowing it left the user with ZERO feedback on their approve/reject —
+    // best-effort tell them it failed. A reply that itself throws is swallowed by
+    // the inner catch, so the poller still never crashes.
+    if (reply) {
+      try {
+        await reply(channelId, getMessage('bot.resolve_failed', lang, { action: cmd.action, id: cmd.id }));
+      } catch {
+        /* reply path is down too — nothing safe left to do */
+      }
+    }
   }
 }

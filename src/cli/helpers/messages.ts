@@ -1130,6 +1130,10 @@ const MESSAGES: MessageMap = {
     en: '⚠️ No pending approval found (unknown or expired): {id}',
     tr: '⚠️ Bekleyen onay bulunamadı (bilinmiyor veya süresi doldu): {id}',
   },
+  'bot.resolve_failed': {
+    en: '⚠️ Could not process {action} for {id} — please try again.',
+    tr: '⚠️ {id} için {action} işlenemedi — lütfen tekrar deneyin.',
+  },
   'bot.listen_desc': {
     en: 'Listen for inbound approve/reject commands from messaging connectors',
     tr: 'Mesaj connector\'larından gelen approve/reject komutlarını dinle',
