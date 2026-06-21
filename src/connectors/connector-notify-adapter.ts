@@ -38,7 +38,7 @@ function formatNotification(n: Notification): string {
   // Surface the actionable approve/reject commands (each carries its own short
   // code) so the operator can resolve the ask straight from the chat reply —
   // previously actions never reached the connector at all (only the CLI/event
-  // surfaces showed "what to run"). The humanizer preserves commands verbatim.
+  // surfaces showed "what to run"). Rendering is deterministic so commands survive verbatim.
   if (!n.actions || n.actions.length === 0) return head;
   const cmds = n.actions.map((a) => `${a.label}: ${a.cliCommand}`).join('  ·  ');
   return `${head}\n${cmds}`;
