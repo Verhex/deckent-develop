@@ -1,82 +1,66 @@
 /**
- * Telegram bot connector using Telegraf.
+ * Telegram bot connector using grammY (replaces Telegraf — G2a).
  *
- * Implements IMessageConnector via BaseConnector for Telegram Bot API.
- * Token comes from .deck interpolation ($DECK:TELEGRAM_TOKEN).
- *
- * Usage:
- *   const tg = new TelegramConnector();
- *   tg.onMessage((msg) => console.log(msg.text));
- *   await tg.start({ enabled: true, token: 'bot123:ABC...' });
+ * Implements IMessageConnector via BaseConnector for the Telegram Bot API.
+ * Token comes from .deck interpolation ($DECK:TELEGRAM_TOKEN). grammY is loaded
+ * dynamically so tsc/unit-tests don't require it installed (tests inject a fake Bot).
  */
 
 import { BaseConnector } from './base-connector.js';
 import type { ConnectorConfig, OutgoingMessage, IncomingCallback } from './types.js';
 
-/** Telegram sendMessage `extra` (rich-approval buttons + rich-text mode). */
+/** grammY sendMessage/editMessageText `other` (inline buttons + parse mode). */
 interface SendExtra {
-  reply_markup?: {
-    inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
-  };
+  reply_markup?: { inline_keyboard: Array<Array<{ text: string; callback_data: string }>> };
   parse_mode?: 'HTML' | 'MarkdownV2';
 }
 
-/** Minimal Telegraf type surface we rely on (avoids hard import-time dependency) */
-interface TelegrafInstance {
-  on(event: 'text', handler: (ctx: TelegramTextContext) => void): void;
-  on(event: 'callback_query', handler: (ctx: TelegramCallbackContext) => void): void;
-  launch(opts?: { dropPendingUpdates?: boolean }): Promise<void>;
-  stop(): void;
-  telegram: {
-    sendMessage(chatId: string | number, text: string, extra?: SendExtra): Promise<{ message_id: number } | unknown>;
-    editMessageText(chatId: string | number, messageId: number, inlineMessageId: undefined, text: string, extra?: SendExtra): Promise<unknown>;
+/** Minimal grammY Bot surface we rely on (avoids an import-time hard dependency). */
+interface GrammyBotInstance {
+  on(filter: 'message:text', handler: (ctx: GrammyTextContext) => void): void;
+  on(filter: 'callback_query:data', handler: (ctx: GrammyCallbackContext) => void): void;
+  start(opts?: { drop_pending_updates?: boolean }): Promise<void>;
+  stop(): Promise<void>;
+  api: {
+    sendMessage(chatId: string | number, text: string, other?: SendExtra): Promise<{ message_id: number } | unknown>;
+    editMessageText(chatId: string | number, messageId: number, text: string, other?: SendExtra): Promise<unknown>;
     sendChatAction(chatId: string | number, action: string): Promise<unknown>;
   };
 }
 
-interface TelegrafConstructor {
-  new (token: string): TelegrafInstance;
+interface GrammyBotConstructor { new (token: string): GrammyBotInstance }
+
+interface GrammyTextContext {
+  message: { message_id: number; text: string; date: number };
+  from: { id: number };
+  chat: { id: number };
 }
 
-interface TelegramTextContext {
-  message: {
-    message_id: number;
-    text: string;
-    date: number;
-  };
-  from: {
-    id: number;
-  };
-  chat: {
-    id: number;
-  };
-}
-
-/** Telegraf context for an inline-button press (callback_query update). */
-interface TelegramCallbackContext {
+/** grammY context for an inline-button press (callback_query:data update). */
+interface GrammyCallbackContext {
   callbackQuery: { id?: string; data?: string };
   from: { id: number };
   chat?: { id: number };
-  /** Acknowledge the press so Telegram stops the button's loading spinner. */
-  answerCbQuery?: () => Promise<unknown>;
+  /** ACK the press so Telegram clears the button's loading spinner. */
+  answerCallbackQuery?: () => Promise<unknown>;
 }
 
 export class TelegramConnector extends BaseConnector {
   readonly id = 'telegram' as const;
   readonly name = 'Telegram';
 
-  private bot?: TelegrafInstance;
+  private bot?: GrammyBotInstance;
   private callbackHandler?: (cb: IncomingCallback) => void;
 
-  /** Allow injecting a Telegraf constructor for testing */
-  constructor(private readonly TelegrafClass?: TelegrafConstructor) {
+  /** Allow injecting a grammY Bot constructor for testing. */
+  constructor(private readonly BotClass?: GrammyBotConstructor) {
     super();
   }
 
   /**
    * Register a handler for inline-button presses (rich-approval bot). The bot
    * daemon routes these to the approval gate (NOT the LLM) — a press is a
-   * machine decision. Set before start() so the callback_query handler can
+   * machine decision. Set before start() so the callback_query:data handler can
    * forward presses.
    */
   onCallback(handler: (cb: IncomingCallback) => void): void {
@@ -84,15 +68,12 @@ export class TelegramConnector extends BaseConnector {
   }
 
   async start(config: ConnectorConfig): Promise<void> {
-    if (!config.enabled) {
-      await super.start(config);
-      return;
-    }
+    if (!config.enabled) { await super.start(config); return; }
 
-    const TelegrafCtor = this.TelegrafClass ?? await this.loadTelegraf();
-    this.bot = new TelegrafCtor(config.token);
+    const BotCtor = this.BotClass ?? await this.loadGrammy();
+    this.bot = new BotCtor(config.token);
 
-    this.bot.on('text', (ctx: TelegramTextContext) => {
+    this.bot.on('message:text', (ctx: GrammyTextContext) => {
       this.emitMessage({
         id: String(ctx.message.message_id),
         connector: 'telegram',
@@ -104,11 +85,11 @@ export class TelegramConnector extends BaseConnector {
       });
     });
 
-    // Rich-approval bot: an inline-button press arrives as a callback_query.
+    // Rich-approval bot: an inline-button press arrives as a callback_query:data.
     // Forward its callback_data to the registered handler (the bot daemon routes
     // it to the approval gate — never to the LLM) and ACK so the button's spinner
     // clears. Best-effort: a missing handler or ACK failure never crashes the host.
-    this.bot.on('callback_query', (ctx: TelegramCallbackContext) => {
+    this.bot.on('callback_query:data', (ctx: GrammyCallbackContext) => {
       const data = ctx.callbackQuery?.data;
       if (data && this.callbackHandler) {
         this.callbackHandler({
@@ -118,82 +99,72 @@ export class TelegramConnector extends BaseConnector {
           data,
         });
       }
-      void ctx.answerCbQuery?.().catch(() => {});
+      void ctx.answerCallbackQuery?.().catch(() => {});
     });
 
-    // Telegraf v4 launch() in long-polling mode does not resolve until stop() —
-    // awaiting it would hang startup. Fire it and return; polling runs in the
-    // background and the registered 'text' handler receives inbound messages.
-    // dropPendingUpdates discards the backlog buffered while we were offline so a
-    // stale "approve <id>" can't replay on reconnect (defense in depth atop the
-    // router's acceptFrom guard + parked-action TTL).
-    void this.bot.launch({ dropPendingUpdates: true }).catch(() => {
-      // Launch/poll failure must not crash the host (BOT-002 inbound is best-effort).
+    // grammY start() in long-polling mode resolves only on stop() — awaiting it
+    // would hang startup. Fire it and return; drop_pending_updates discards the
+    // offline backlog (defense in depth atop the router's acceptFrom guard).
+    void this.bot.start({ drop_pending_updates: true }).catch(() => {
+      // Poll failure must not crash the host (BOT-002 inbound is best-effort).
     });
     await super.start(config);
   }
 
   /**
-   * Outbound-only init (BOT-001): create the Telegraf instance for sending but
-   * do NOT call launch(). In long-polling mode Telegraf's launch() does not
-   * resolve until stop(), which would hang an awaited startup — and the inbound
-   * poller is BOT-002's concern. sendMessage() works without launch().
+   * Outbound-only init (BOT-001): create the Bot for sending, do NOT start the poll.
+   * In long-polling mode grammY's start() does not resolve until stop(), which would
+   * hang an awaited startup — and the inbound poller is BOT-002's concern.
+   * sendMessage() works without start().
    */
   async startOutbound(config: ConnectorConfig): Promise<void> {
-    if (!config.enabled) {
-      await super.start(config);
-      return;
-    }
-    const TelegrafCtor = this.TelegrafClass ?? await this.loadTelegraf();
-    this.bot = new TelegrafCtor(config.token);
-    // No launch() — outbound only.
+    if (!config.enabled) { await super.start(config); return; }
+    const BotCtor = this.BotClass ?? await this.loadGrammy();
+    this.bot = new BotCtor(config.token);
+    // No start() — outbound only.
     await super.start(config);
   }
 
   async stop(): Promise<void> {
     if (this.bot) {
-      this.bot.stop();
+      await this.bot.stop().catch(() => {}); // grammY stop() is async; best-effort
       this.bot = undefined;
     }
     await super.stop();
   }
 
-  async sendMessage(msg: OutgoingMessage): Promise<void> {
-    if (!this.bot) {
-      throw new Error('Telegram connector not started');
-    }
-    // Rich-approval bot: attach inline buttons (approve/reject) and/or a rich-text
-    // parse_mode when present. No extras → plain 2-arg call, byte-identical to the
-    // pre-button behaviour (keeps the legacy send path untouched).
+  private buildExtra(msg: Pick<OutgoingMessage, 'buttons' | 'parseMode'>): SendExtra {
     const extra: SendExtra = {};
     if (msg.buttons && msg.buttons.length > 0) {
       extra.reply_markup = {
-        inline_keyboard: msg.buttons.map((row) =>
-          row.map((b) => ({ text: b.text, callback_data: b.callbackData })),
-        ),
+        inline_keyboard: msg.buttons.map((row) => row.map((b) => ({ text: b.text, callback_data: b.callbackData }))),
       };
     }
     if (msg.parseMode) extra.parse_mode = msg.parseMode;
+    return extra;
+  }
+
+  async sendMessage(msg: OutgoingMessage): Promise<void> {
+    if (!this.bot) throw new Error('Telegram connector not started');
+    // Rich-approval bot: attach inline buttons (approve/reject) and/or a rich-text
+    // parse_mode when present. No extras → plain 2-arg call, byte-identical to the
+    // pre-button behaviour (keeps the legacy send path untouched).
+    const extra = this.buildExtra(msg);
     if (extra.reply_markup || extra.parse_mode) {
-      await this.bot.telegram.sendMessage(msg.channelId, msg.text, extra);
+      await this.bot.api.sendMessage(msg.channelId, msg.text, extra);
       return;
     }
-    await this.bot.telegram.sendMessage(msg.channelId, msg.text);
+    await this.bot.api.sendMessage(msg.channelId, msg.text);
   }
 
   async sendChatAction(channelId: string, action: 'typing'): Promise<void> {
     if (!this.bot) throw new Error('Telegram connector not started');
-    await this.bot.telegram.sendChatAction(channelId, action);
+    await this.bot.api.sendChatAction(channelId, action);
   }
 
   async sendMessageReturningId(msg: OutgoingMessage): Promise<string | undefined> {
     if (!this.bot) throw new Error('Telegram connector not started');
-    const extra: SendExtra = {};
-    if (msg.buttons && msg.buttons.length > 0) {
-      extra.reply_markup = { inline_keyboard: msg.buttons.map((row) => row.map((b) => ({ text: b.text, callback_data: b.callbackData }))) };
-    }
-    if (msg.parseMode) extra.parse_mode = msg.parseMode;
-    const sent = (await this.bot.telegram.sendMessage(msg.channelId, msg.text, extra)) as { message_id?: number };
+    const sent = (await this.bot.api.sendMessage(msg.channelId, msg.text, this.buildExtra(msg))) as { message_id?: number };
     return sent && typeof sent.message_id === 'number' ? String(sent.message_id) : undefined;
   }
 
@@ -201,24 +172,22 @@ export class TelegramConnector extends BaseConnector {
     if (!this.bot) throw new Error('Telegram connector not started');
     const extra: SendExtra = {};
     if (parseMode) extra.parse_mode = parseMode;
-    await this.bot.telegram.editMessageText(channelId, Number(messageId), undefined, text, extra);
+    // grammY: editMessageText(chat_id, message_id, text, other?) — NO undefined positional.
+    await this.bot.api.editMessageText(channelId, Number(messageId), text, extra);
   }
 
   isHealthy(): boolean {
     return this.bot !== undefined && this.started;
   }
 
-  /** Dynamic import of telegraf — only loaded when actually starting */
-  private async loadTelegraf(): Promise<TelegrafConstructor> {
+  /** Dynamic import of grammy — only loaded when actually starting (not in unit tests). */
+  private async loadGrammy(): Promise<GrammyBotConstructor> {
     try {
-      // Dynamic string-based import avoids tsc error when telegraf is not installed
-      const moduleName = 'telegraf';
-      const mod = await (Function('m', 'return import(m)')(moduleName) as Promise<{ Telegraf: unknown }>);
-      return mod.Telegraf as unknown as TelegrafConstructor;
+      const moduleName = 'grammy';
+      const mod = await (Function('m', 'return import(m)')(moduleName) as Promise<{ Bot: unknown }>);
+      return mod.Bot as unknown as GrammyBotConstructor;
     } catch {
-      throw new Error(
-        'telegraf package not installed. Run: npm install telegraf'
-      );
+      throw new Error('grammy package not installed. Run: npm install grammy');
     }
   }
 }
