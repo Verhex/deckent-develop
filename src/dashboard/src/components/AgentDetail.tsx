@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Badge } from "./ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { useTranslation } from "../i18n/LanguageProvider";
+import { fetchJson } from "../lib/api";
 
 interface AgentDetailProps {
   taskId: string;
@@ -59,12 +60,13 @@ export function AgentDetail({ taskId, onClose, apiBase = "" }: AgentDetailProps)
     let active = true;
     const fetchLog = async () => {
       try {
-        const res = await fetch(`${apiBase}/api/worker/${taskId}/log`);
-        if (res.ok && active) {
-          setData(await res.json() as WorkerLogData);
-        }
+        // Authed fetch (fetchJson attaches the bootstrap Bearer token + signals
+        // 'deckent:unauthorized' on 401). The prior raw fetch sent no Authorization
+        // header, so this panel silently returned nothing whenever a token was set.
+        const result = await fetchJson<WorkerLogData>(`${apiBase}/api/worker/${taskId}/log`);
+        if (active) setData(result);
       } catch {
-        /* ignore fetch errors */
+        /* ignore fetch/non-ok errors (401 already raises the unauthorized banner) */
       }
     };
 

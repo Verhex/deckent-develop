@@ -47,6 +47,7 @@ describe("AgentDetail component", () => {
     cleanup();
     globalThis.fetch = originalFetch;
     vi.useRealTimers();
+    delete (window as unknown as { __DECKENT_API_TOKEN__?: string }).__DECKENT_API_TOKEN__;
   });
 
   it("renders with the task ID in the header", async () => {
@@ -162,7 +163,7 @@ describe("AgentDetail component", () => {
     renderWithProviders(<AgentDetail taskId="002-003" onClose={onClose} />);
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/worker/002-003/log");
+      expect(fetchMock.mock.calls.some((c) => c[0] === "/api/worker/002-003/log")).toBe(true);
     });
   });
 
@@ -180,9 +181,26 @@ describe("AgentDetail component", () => {
     );
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        "http://localhost:3100/api/worker/001-001/log",
-      );
+      expect(fetchMock.mock.calls.some((c) => c[0] === "http://localhost:3100/api/worker/001-001/log")).toBe(true);
+    });
+  });
+
+  it("sends the bootstrap Bearer token (auth header) when a token is configured", async () => {
+    // Regression for A6: the panel previously used a raw fetch with no headers,
+    // so it silently returned nothing whenever the API required a Bearer token.
+    (window as unknown as { __DECKENT_API_TOKEN__?: string }).__DECKENT_API_TOKEN__ = "tok-a6-xyz";
+    const fetchMock = mockFetchResponse(SAMPLE_LOG_DATA);
+    globalThis.fetch = fetchMock;
+
+    renderWithProviders(<AgentDetail taskId="001-001" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      const logCall = fetchMock.mock.calls.find((c) => c[0] === "/api/worker/001-001/log");
+      expect(logCall).toBeTruthy();
+      // Pre-fix: logCall[1] is undefined (raw fetch, no init) → this assertion fails.
+      expect((logCall![1] as RequestInit | undefined)?.headers).toMatchObject({
+        Authorization: "Bearer tok-a6-xyz",
+      });
     });
   });
 
@@ -195,7 +213,7 @@ describe("AgentDetail component", () => {
 
     // Wait for initial worker log fetch (LanguageProvider also fetches /api/config on mount)
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/worker/001-001/log");
+      expect(fetchMock.mock.calls.some((c) => c[0] === "/api/worker/001-001/log")).toBe(true);
     });
 
     const logCallsBefore = fetchMock.mock.calls.filter(
