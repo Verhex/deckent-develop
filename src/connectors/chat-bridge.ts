@@ -76,6 +76,13 @@ export interface ChatResponderDeps {
   root?: string;
   /** Ack/parked-action message language. */
   lang?: string;
+  /**
+   * Faz-1 T3 — streaming partial-reply hook. Invoked on every output line with
+   * the cumulative reply text so far (`collected.join('')`), so a bot connector
+   * can edit a "typing…" placeholder in-place as the reply streams.
+   * Optional and additive: existing callers that omit it are unaffected.
+   */
+  onPartial?: (sessionId: string, partialText: string) => void;
 }
 
 export interface ChatResponder {
@@ -153,7 +160,12 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
       provider,
       dispatcher,
       input: singleMessage(text),
-      output: (line) => { if (line) collected.push(line); },
+      output: (line) => {
+        if (line) {
+          collected.push(line);
+          deps.onPartial?.(sessionId, collected.join(''));
+        }
+      },
       agenticDispatch: true,
       agenticConfirm: confirm,
       gracefulErrors: true, // a provider failure becomes a tagged turn, not a throw
