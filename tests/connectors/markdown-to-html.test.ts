@@ -33,4 +33,15 @@ describe('markdownToTelegramHtml', () => {
     const out = md('Use **deckent_recover** to recover. Run `deckent status` first.');
     expect(out).toBe('Use <b>deckent_recover</b> to recover. Run <code>deckent status</code> first.');
   });
+  it('does not corrupt when model text contains a code-placeholder-like pattern', () => {
+    // Real text containing "C0" / "I0" must round-trip unharmed (no injected code).
+    expect(md('grade C0 and I0 today')).toBe('grade C0 and I0 today');
+    // …and code still works alongside it:
+    expect(md('grade C0 then `x` done')).toBe('grade C0 then <code>x</code> done');
+  });
+  it('does not linkify non-http(s)/tg schemes (javascript: etc.)', () => {
+    expect(md('[click](javascript:alert(1))')).toBe('[click](javascript:alert(1))'); // left as escaped literal text
+    expect(md('[ok](https://x.io)')).toBe('<a href="https://x.io">ok</a>');
+    expect(md('[tgok](tg://resolve?domain=x)')).toBe('<a href="tg://resolve?domain=x">tgok</a>');
+  });
 });
