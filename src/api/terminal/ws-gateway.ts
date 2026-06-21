@@ -48,16 +48,19 @@ export function attachTerminalGateway(server: Server, deps: GatewayDeps): void {
     const url = req.url ?? '';
     if (!url.startsWith(PATH)) return;
 
-    // mTLS seam (sub-project #3): detect client cert on TLS socket.
+    // mTLS seam (sub-project #3): capture the client cert (if any). Verification
+    // is enforced fail-CLOSED inside the auth block below — a presented cert with a
+    // wired verifier MUST verify. Absence of verifyClientCert means mTLS is not
+    // configured, so a presented cert is ignored (never silently treated as auth).
     const tlsSocket = socket as TLSSocket;
+    let peerCertRaw: Buffer | undefined;
     if (typeof tlsSocket.getPeerCertificate === 'function') {
       const peerCert = tlsSocket.getPeerCertificate();
       if (peerCert && peerCert.raw) {
+        peerCertRaw = peerCert.raw;
         if (!deps.auth.verifyClientCert) {
-          console.warn('mTLS configured but not implemented — sub-project #3');
+          console.warn('mTLS client certificate presented but no verifier configured — ignoring (sub-project #3)');
         }
-        // Future (sub-project #3): await deps.auth.verifyClientCert(peerCert.raw)
-        // and use the returned TenantId for session scoping.
       }
     }
 
@@ -93,6 +96,22 @@ export function attachTerminalGateway(server: Server, deps: GatewayDeps): void {
           ws.resume();
         } else {
           authorized = deps.auth.verify(token);
+        }
+        // mTLS fail-CLOSED (sub-project #3 seam): when a client certificate is
+        // presented AND a verifier is wired, the cert MUST verify — a deny (null)
+        // or a throw rejects the upgrade. This closes the prior fail-open where a
+        // presented cert was detected, warned, then ignored. No verifier wired →
+        // cert is not enforced (mTLS not configured; token auth stands alone).
+        if (authorized && peerCertRaw !== undefined && deps.auth.verifyClientCert) {
+          ws.pause();
+          let certTenant: TenantId | null = null;
+          try {
+            certTenant = await deps.auth.verifyClientCert(peerCertRaw);
+          } catch {
+            certTenant = null;
+          }
+          ws.resume();
+          if (certTenant === null) authorized = false;
         }
         if (!authorized) {
           deps.audit.record({
