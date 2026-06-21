@@ -23,6 +23,7 @@ import { parseApprovalCallback } from './callback-router.js';
 import type { IncomingCallback } from './types.js';
 import { type ChatResponder } from './chat-bridge.js';
 import { chunkMessage } from './message-format.js';
+import { makeStreamThrottle } from './stream-throttle.js';
 import { isBotSlash, handleBotSlash } from './bot-commands.js';
 import { takeBotAction, checkExecutable } from './bot-action-store.js';
 import { createCliToolDispatcher } from '../cli/commands/chat-tool-bridge.js';
@@ -114,6 +115,13 @@ export async function buildConnectorNotificationAdapter(
 
 // ─── BOT-002 — inbound command transport ──────────────────────────────────
 
+/** Streaming variant of ChatResponder: receives a per-call `onPartial` callback. */
+export type ChatStreamResponder = (
+  channelId: string,
+  text: string,
+  onPartial: (partial: string) => void,
+) => Promise<string>;
+
 export interface ConnectorCommandsDeps extends ConnectorBootstrapDeps {
   /** Resolve an approval command. Default: disk-backed resolver bound to `root`. */
   resolve?: CommandResolver;
@@ -122,6 +130,15 @@ export interface ConnectorCommandsDeps extends ConnectorBootstrapDeps {
    * a conversation head). Omit → non-command messages stay silently ignored.
    */
   chat?: ChatResponder;
+  /**
+   * Faz-1 T4 — streaming-capable responder. When provided AND the connector exposes
+   * `sendChatAction` + `sendMessageReturningId` + `editMessage`, the bot uses a
+   * typing-indicator + edit-in-place pattern instead of the send-final fallback.
+   * When absent (or the connector lacks the streaming caps), the path falls back to
+   * the byte-identical send-final behavior (send thinking → chat → send reply).
+   * Supplied by bot.ts (Task 5). Existing callers that omit it are unaffected.
+   */
+  onChatStreaming?: ChatStreamResponder;
   /**
    * Dispatcher that EXECUTES a parked bot-action when the user approves it (slice
    * 2b). Default: the CLI tool bridge. Already-approved → raw (ungated) execution.
@@ -274,10 +291,47 @@ export async function bootstrapConnectorCommands(
                         return;
                       }
                       // Natural language → full agentic conversation.
-                      await send(channelId, getMessage('bot.chat_thinking', lang));
-                      const reply = await chat(channelId, text);
-                      const body = reply.trim() || getMessage('bot.chat_empty', lang);
-                      for (const part of chunkMessage(body)) await send(channelId, part);
+                      // Streaming path: typing indicator + edit-in-place as reply
+                      // accumulates. Activates ONLY when (a) the connector exposes
+                      // the 3 optional streaming caps AND (b) onChatStreaming is
+                      // provided. Otherwise: byte-identical send-final fallback.
+                      const streamCap = connector as unknown as {
+                        sendChatAction?: (c: string, a: 'typing') => Promise<void>;
+                        sendMessageReturningId?: (m: { connector: string; channelId: string; text: string }) => Promise<string | undefined>;
+                        editMessage?: (c: string, id: string, t: string, pm?: 'HTML' | 'MarkdownV2') => Promise<void>;
+                      };
+                      const canStream =
+                        deps.onChatStreaming !== undefined &&
+                        typeof streamCap.sendChatAction === 'function' &&
+                        typeof streamCap.sendMessageReturningId === 'function' &&
+                        typeof streamCap.editMessage === 'function';
+
+                      if (canStream) {
+                        const chatStreaming = deps.onChatStreaming!;
+                        await streamCap.sendChatAction!(channelId, 'typing').catch(() => undefined);
+                        const placeholder = getMessage('bot.chat_thinking', lang);
+                        const msgId = await streamCap.sendMessageReturningId!({ connector: connector.id, channelId, text: placeholder });
+                        const throttle = msgId
+                          ? makeStreamThrottle({ edit: (t) => streamCap.editMessage!(channelId, msgId, t.slice(0, 4000)) })
+                          : null;
+                        const reply = await chatStreaming(channelId, text, (partial) => throttle?.push(partial));
+                        const body = reply.trim() || getMessage('bot.chat_empty', lang);
+                        if (msgId && throttle) {
+                          // Final: edit the placeholder in place with the first part;
+                          // overflow parts (rare, >4000 chars) sent as new messages.
+                          const parts = chunkMessage(body);
+                          await streamCap.editMessage!(channelId, msgId, parts[0]!).catch(async () => { await send(channelId, parts[0]!); });
+                          for (let i = 1; i < parts.length; i++) await send(channelId, parts[i]!);
+                        } else {
+                          for (const part of chunkMessage(body)) await send(channelId, part);
+                        }
+                      } else {
+                        // Non-streaming fallback — byte-identical to pre-T4 behavior.
+                        await send(channelId, getMessage('bot.chat_thinking', lang));
+                        const reply = await chat(channelId, text);
+                        const body = reply.trim() || getMessage('bot.chat_empty', lang);
+                        for (const part of chunkMessage(body)) await send(channelId, part);
+                      }
                     } catch {
                       await send(channelId, getMessage('bot.chat_error', lang)).catch(() => undefined);
                     }

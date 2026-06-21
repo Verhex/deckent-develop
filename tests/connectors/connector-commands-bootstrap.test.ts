@@ -296,4 +296,57 @@ describe('bootstrapConnectorCommands', () => {
     expect(make).not.toHaveBeenCalled();
     expect(adapter).toBeNull();
   });
+
+  it('streaming path: connector with 3 caps + onChatStreaming → editMessage called, sendMessage NOT called for reply', async () => {
+    // Build a fake connector that exposes all 3 optional streaming capabilities.
+    let handler: MessageHandler | undefined;
+    const editMessage = vi.fn(async () => {});
+    const sendChatAction = vi.fn(async () => {});
+    const sendMessageReturningId = vi.fn(async () => 'msg-123');
+    const sendMessage = vi.fn(async () => {});
+    const streamCapFake = {
+      id: 'telegram' as const,
+      name: 'telegram',
+      start: vi.fn(async () => {}),
+      stop: vi.fn(async () => {}),
+      sendMessage,
+      onMessage: vi.fn((h: MessageHandler) => { handler = h; }),
+      isHealthy: () => true,
+      // 3 optional streaming caps:
+      sendChatAction,
+      sendMessageReturningId,
+      editMessage,
+      _emit: (m: IncomingMessage) => handler?.(m),
+    };
+
+    const onChatStreaming = vi.fn(async (_channelId: string, _text: string, _onPartial: (t: string) => void) => {
+      _onPartial('partial text');
+      return 'full reply from streaming';
+    });
+
+    await bootstrapConnectorCommands('/root', cfg, {
+      makeConnector: () => streamCapFake,
+      resolve: vi.fn(async () => 'resolved'),
+      chat: vi.fn(async () => 'should not be called'),
+      onChatStreaming,
+    });
+
+    streamCapFake._emit(incoming('hello streaming', '555'));
+
+    // onChatStreaming must be called (not the plain chat responder)
+    await vi.waitFor(() => expect(onChatStreaming).toHaveBeenCalledWith('555', 'hello streaming', expect.any(Function)));
+    // editMessage must be called for the final reply (edit-in-place); may also
+    // be called earlier for throttled partials — check the LAST call for final body.
+    await vi.waitFor(() => expect(editMessage).toHaveBeenCalled());
+    const lastEditArgs = editMessage.mock.calls[editMessage.mock.calls.length - 1] as [string, string, string];
+    expect(lastEditArgs[0]).toBe('555');     // channelId
+    expect(lastEditArgs[1]).toBe('msg-123'); // msgId from sendMessageReturningId
+    expect(lastEditArgs[2]).toContain('full reply');
+    // sendMessage should NOT be called for the reply body (streaming path edits in place)
+    // (it may be called for sendMessage via sendMessageReturningId's placeholder but NOT for reply text)
+    const replyMsgCalls = sendMessage.mock.calls.filter(
+      (c) => (c[0] as { text: string }).text?.includes('full reply')
+    );
+    expect(replyMsgCalls).toHaveLength(0);
+  });
 });
