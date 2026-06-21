@@ -11,6 +11,7 @@ import {
 } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 import { buildResultsMap } from './result-collector.js';
+import { findBoundaryViolations } from './result-evaluator.js';
 
 // ═══ Internal Helpers ══════════════════════════════════════════════
 
@@ -114,6 +115,18 @@ export function calculateMetrics(
   // Inline to avoid the sprint-reporter ↔ sprint-metrics import cycle.
   const durationMs = Math.max(0, endTime - startTime);
 
+  // boundaryViolations: count tasks whose worker wrote files outside their declared
+  // scope. Reuses the canonical per-result detector (findBoundaryViolations) over the
+  // REAL filesChanged vs each task's scope — not a hardcoded 0. (R5: feeds the retro +
+  // learning loop honest counts; was always 0 → retro unconditionally claimed "no
+  // boundary violations" regardless of reality.)
+  const taskById = new Map(sprint.tasks.map(t => [t.id, t]));
+  let boundaryViolations = 0;
+  for (const r of results) {
+    const task = taskById.get(r.taskId);
+    if (task && findBoundaryViolations(r, task).length > 0) boundaryViolations++;
+  }
+
   return {
     totalTasks,
     completedTasks,
@@ -125,7 +138,7 @@ export function calculateMetrics(
     newDebtCount: techDebtTasks,
     resolvedDebtCount: debt ? debt.filter(d => d.resolved && d.resolvedInSprintId === sprint.id).length : 0,
     totalOpenDebt: debt ? debt.filter(d => !d.resolved).length : 0,
-    boundaryViolations: 0,
+    boundaryViolations,
     crossAssignments: 0,
     contextLinesUsed: 0,
   };
@@ -209,6 +222,9 @@ function parseSprintLogMetrics(content: string): SprintMetrics | null {
     durationMs: isNaN(durationMs) ? 0 : durationMs,
     coveragePercent: isNaN(coveragePercent) ? 0 : coveragePercent,
     noGoRate,
+    // Reconstruction defaults: this path parses metrics from a sprint-log .md and has
+    // no results/DB, so debt + boundary counts are unavailable here. The LIVE path
+    // (calculateMetrics) computes the real boundaryViolations from results × task scope.
     newDebtCount: 0,
     resolvedDebtCount: 0,
     totalOpenDebt: 0,

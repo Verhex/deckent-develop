@@ -196,3 +196,47 @@ describe('noGoRate unit contract (R5-NOGORATE)', () => {
     });
   });
 });
+
+// ─── boundaryViolations from real filesChanged × scope (R5) ──────────────────
+describe('calculateMetrics — boundaryViolations counted from results, not hardcoded 0', () => {
+  function sprintWithScopedTask(taskId: string, filesWrite: string[]): Sprint {
+    return {
+      id: 'sprint-bv',
+      number: 1,
+      status: 'completed' as const,
+      phase: 'CLEANUP' as const,
+      workers: [],
+      tasks: [{
+        id: taskId,
+        title: `Task ${taskId}`,
+        description: '',
+        model: 'sonnet',
+        effort: 'low' as const,
+        scope: { directories: [], filesRead: [], filesWrite },
+        goNogo: { goCriteria: '', noGoCriteria: '' },
+      }] as Sprint['tasks'],
+    };
+  }
+  function makeResult(taskId: string, filesChanged: string[]): TaskResult {
+    return {
+      taskId, workerId: 'w1', filesChanged,
+      linesAdded: 10, linesRemoved: 0, testsPassed: true, coverage: 80,
+      selfAssessment: 'DONE' as TaskResult['selfAssessment'], notes: '',
+    };
+  }
+
+  it('counts a task that wrote a file outside its filesWrite scope (was hardcoded 0)', () => {
+    const sprint = sprintWithScopedTask('t1', ['src/allowed.ts']);
+    const evaluations = new Map([['t1', TaskEvaluation.DONE]]);
+    const metrics = calculateMetrics(sprint, evaluations, [makeResult('t1', ['src/OUTSIDE.ts'])]);
+    // Pre-fix: boundaryViolations hardcoded 0 → toBe(1) FAILS
+    expect(metrics.boundaryViolations).toBe(1);
+  });
+
+  it('does not count a task that stayed within its filesWrite scope', () => {
+    const sprint = sprintWithScopedTask('t1', ['src/allowed.ts']);
+    const evaluations = new Map([['t1', TaskEvaluation.DONE]]);
+    const metrics = calculateMetrics(sprint, evaluations, [makeResult('t1', ['src/allowed.ts'])]);
+    expect(metrics.boundaryViolations).toBe(0);
+  });
+});

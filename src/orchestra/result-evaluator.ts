@@ -2041,7 +2041,7 @@ export function isStubResult(result: TaskResult): boolean {
  * This is the Sprint 164 164-006 scenario (worker tried to write DIRECTIVES.md
  * which was outside its scope). Returns the violating paths (empty = clean).
  */
-function findBoundaryViolations(result: TaskResult, task: Task): string[] {
+export function findBoundaryViolations(result: TaskResult, task: Task): string[] {
   const filesWrite = task.scope?.filesWrite ?? [];
   if (filesWrite.length === 0) return [];
 
