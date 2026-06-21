@@ -268,7 +268,7 @@ export function formatHumanRetro(data: HumanRetroData): string {
     lines.push(`| Sprint time | ${durationStr.replace(' total', '')} |`);
   }
   if (metrics.totalTasks > 0) {
-    const noGoPercent = Math.round(metrics.noGoRate);
+    const noGoPercent = Math.round(metrics.noGoRate * 100);
     lines.push(`| NO_GO rate | ${noGoPercent}% (${metrics.noGoTasks}/${metrics.totalTasks}) |`);
   }
   if (metrics.coveragePercent > 0) {
@@ -408,7 +408,7 @@ export function buildRetroHighlights(
   // Compare with previous sprint improvements
   if (previousMetrics && sprint.metrics) {
     if (sprint.metrics.noGoRate < previousMetrics.noGoRate) {
-      items.push(`NO_GO rate improved from ${previousMetrics.noGoRate.toFixed(0)}% to ${sprint.metrics.noGoRate.toFixed(0)}%`);
+      items.push(`NO_GO rate improved from ${(previousMetrics.noGoRate * 100).toFixed(0)}% to ${(sprint.metrics.noGoRate * 100).toFixed(0)}%`);
     }
   }
 

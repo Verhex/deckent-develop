@@ -105,7 +105,7 @@ export function calculateMetrics(
   const coveragePercent = results.length > 0
     ? results.reduce((sum, r) => sum + r.coverage, 0) / results.length
     : 0;
-  const noGoRate = totalTasks > 0 ? (noGoTasks / totalTasks) * 100 : 0;
+  const noGoRate = totalTasks > 0 ? noGoTasks / totalTasks : 0;
 
   const startTime = sprint.startedAt ? new Date(sprint.startedAt).getTime() : Date.now();
   const endTime = sprint.completedAt ? new Date(sprint.completedAt).getTime() : Date.now();
@@ -199,7 +199,7 @@ function parseSprintLogMetrics(content: string): SprintMetrics | null {
 
   if (isNaN(totalTasks) && isNaN(completedTasks)) return null;
 
-  const noGoRate = totalTasks > 0 ? (noGoTasks / totalTasks) * 100 : 0;
+  const noGoRate = totalTasks > 0 ? noGoTasks / totalTasks : 0;
 
   return {
     totalTasks,

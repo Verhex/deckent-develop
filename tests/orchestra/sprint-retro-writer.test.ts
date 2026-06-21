@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { MemoryStore } from '../../src/core/memory-store.js';
-import { writeRetrospective } from '../../src/orchestra/sprint-retro-writer.js';
+import { writeRetrospective, formatHumanRetro } from '../../src/orchestra/sprint-retro-writer.js';
 import type { Sprint, SprintMetrics, TaskEvaluation } from '../../src/core/types.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────
@@ -56,6 +56,28 @@ beforeEach(() => {
 afterEach(() => {
   store.close();
   rmSync(tmpDir, { recursive: true, force: true });
+});
+
+// ─── noGoRate display unit (R5-NOGORATE consumer — retro-writer) ──
+// metrics.noGoRate is canonical FRACTION (0-1); the retro must multiply by 100
+// for display. Regression for the consumer the R5-NOGORATE source fix missed:
+// pre-fix `Math.round(metrics.noGoRate)` rendered 0.5 → "1%" (and 0.6 → "1%").
+describe('formatHumanRetro — NO_GO rate renders fraction as percentage', () => {
+  it('fraction 0.5 → "50%" (not "1%"/"0%")', () => {
+    const sprint = makeMinimalSprint();
+    const metrics = makeMetrics({ totalTasks: 2, noGoTasks: 1, noGoRate: 0.5 });
+    const out = formatHumanRetro({ sprint, evaluations: new Map(), metrics });
+    expect(out).toContain('| NO_GO rate | 50% (1/2) |');
+    expect(out).not.toContain('| NO_GO rate | 1% ');
+    expect(out).not.toContain('| NO_GO rate | 0% ');
+  });
+
+  it('fraction 0.6 → "60%" in the metrics table', () => {
+    const sprint = makeMinimalSprint();
+    const metrics = makeMetrics({ totalTasks: 5, noGoTasks: 3, noGoRate: 0.6 });
+    const out = formatHumanRetro({ sprint, evaluations: new Map(), metrics });
+    expect(out).toContain('| NO_GO rate | 60% (3/5) |');
+  });
 });
 
 // ─── Canonical retro-sprint-NNN ID ───────────────────────────────

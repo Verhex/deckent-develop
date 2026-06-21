@@ -53,6 +53,8 @@ export interface SprintMetrics {
   noGoTasks: number;
   durationMs: number;
   coveragePercent: number;
+  /** Fraction in [0,1] — NOT a percentage. Multiply by 100 for display. Canonical
+   *  unit across all producers (calculateMetrics, parseSprintLogMetrics, parseSprintStats). */
   noGoRate: number;
   newDebtCount: number;
   resolvedDebtCount: number;
