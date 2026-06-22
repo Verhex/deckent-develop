@@ -369,7 +369,7 @@ describe('calculateMetrics', () => {
     expect(metrics.coveragePercent).toBe(0);
   });
 
-  it('calculates noGoRate as percentage', () => {
+  it('calculates noGoRate as a fraction in [0,1]', () => {
     const sprint = makeSprint({ tasks: [makeTask({ id: '1' }), makeTask({ id: '2' }), makeTask({ id: '3' }), makeTask({ id: '4' })] });
     const evals = new Map<string, TaskEvaluation>([
       ['1', TaskEvaluation.NO_GO],
@@ -378,7 +378,8 @@ describe('calculateMetrics', () => {
       ['4', TaskEvaluation.DONE],
     ]);
     const metrics = calculateMetrics(sprint, evals, []);
-    expect(metrics.noGoRate).toBeCloseTo(25, 5); // 1/4 = 25%
+    // Canonical unit is a fraction (SprintMetrics.noGoRate ∈ [0,1]); ×100 at display.
+    expect(metrics.noGoRate).toBeCloseTo(0.25, 5); // 1/4
   });
 
   it('returns 0 noGoRate when no evaluations', () => {
@@ -448,7 +449,7 @@ describe('calculateMetrics', () => {
     const metrics = calculateMetrics(sprint, evals, []);
     expect(metrics.noGoTasks).toBe(2);
     expect(metrics.completedTasks).toBe(0);
-    expect(metrics.noGoRate).toBe(100);
+    expect(metrics.noGoRate).toBe(1); // 2/2 = 1.0 (canonical fraction, not 100%)
   });
 
   it('handles single result coverage', () => {
@@ -792,12 +793,12 @@ describe('readPreviousSprintMetrics', () => {
     const sprintsDir = join(tmpDir, '.brain', 'sprints');
     mkdirSync(sprintsDir, { recursive: true });
     const sprint001 = makeSprint({ id: 'sprint-001' });
-    // 2 no-go out of 4 total → noGoRate should be 50%
+    // 2 no-go out of 4 total → noGoRate 0.5 (canonical fraction, not 50%)
     const metrics001 = makeMetrics({ totalTasks: 4, noGoTasks: 2 });
     writeSprintLog(tmpDir, sprint001, metrics001);
     const result = readPreviousSprintMetrics(tmpDir, 'sprint-002');
     expect(result).not.toBeNull();
-    expect(result!.noGoRate).toBeCloseTo(50, 5);
+    expect(result!.noGoRate).toBeCloseTo(0.5, 5);
   });
 });
 
@@ -852,7 +853,8 @@ describe('formatHumanRetro', () => {
   it('includes readable Metrics table', () => {
     const sprint = makeSprint({ id: 'sprint-040' });
     const evals = new Map([['001', TaskEvaluation.DONE]]);
-    const metrics = makeMetrics({ totalTasks: 12, completedTasks: 11, noGoTasks: 1, noGoRate: 8.3, coveragePercent: 85.5 });
+    // noGoRate is the canonical fraction (0.083 = 8.3%); the table multiplies ×100.
+    const metrics = makeMetrics({ totalTasks: 12, completedTasks: 11, noGoTasks: 1, noGoRate: 0.083, coveragePercent: 85.5 });
     const output = formatHumanRetro({ sprint, evaluations: evals, metrics });
     expect(output).toContain('| What | Value |');
     expect(output).toContain('Tasks completed | 11/12');

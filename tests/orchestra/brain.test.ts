@@ -1318,7 +1318,7 @@ describe('calculateMetrics', () => {
       ['t2', TaskEvaluation.NO_GO],
     ]);
     const m = calculateMetrics(makeSprint(), evaluations, []);
-    expect(m.noGoRate).toBe(50);
+    expect(m.noGoRate).toBe(0.5); // 1 NO_GO of 2 → canonical fraction, not 50%
   });
 
   it('handles empty sprint', () => {
