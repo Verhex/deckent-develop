@@ -92,6 +92,24 @@ describe('readmeMetricsUpdater', () => {
     expect(written).toContain('97.5% coverage');
   });
 
+  it('does not fabricate or corrupt the test count from coverage (R5)', () => {
+    mockedExistsSync.mockReturnValue(true);
+    // "500+ tests" badge-ish prose + a "+5 tests" sprint-log example line.
+    mockedReadFileSync.mockReturnValue(
+      '# Proj\n\n500+ tests | 95% coverage\n\n    286  tsc OK · +5 tests · 0 regressions\n',
+    );
+
+    readmeMetricsUpdater.run(makeCtx()); // metrics.coveragePercent = 97.5
+
+    const written = String(mockedWriteFileSync.mock.calls[0][1]);
+    // Pre-fix wrote `97.5 * 10 = 975+ tests` (a fabrication) and its blind
+    // `/\d+\+?\s+tests?/g` replace also mangled the "+5 tests" example.
+    expect(written).not.toContain('975+ tests');
+    expect(written).toContain('500+ tests'); // real count left intact
+    expect(written).toContain('+5 tests');   // example not corrupted
+    expect(written).toContain('97.5% coverage'); // coverage still updated
+  });
+
   it('returns skipped_not_found when file missing at run time', () => {
     mockedExistsSync.mockReturnValue(false);
     const result = readmeMetricsUpdater.run(makeCtx());

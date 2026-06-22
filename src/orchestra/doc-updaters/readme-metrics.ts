@@ -31,13 +31,14 @@ export const readmeMetricsUpdater: DocUpdater = {
       `${sprint.number} sprints completed`,
     );
 
-    // Update test count: "N+ tests" or "N tests"
-    if (metrics.coveragePercent > 0) {
-      content = content.replace(
-        /\d+\+?\s+tests?/g,
-        `${Math.round(metrics.coveragePercent * 10)}+ tests`,
-      );
-    }
+    // NOTE: the test count is intentionally NOT auto-updated here. The previous
+    // implementation wrote `coveragePercent * 10` as the test count — a pure
+    // fabrication (88% coverage rendered "880+ tests" while the suite has ~23k),
+    // and its blind `/\d+\+?\s+tests?/g` replace also corrupted unrelated prose
+    // like the "+5 tests" sprint-log examples. There is no reliable real test
+    // count in `metrics` at doc-update time, so the test badge is maintained
+    // separately rather than filled with a wrong number (R5: never replace a
+    // real source with another literal).
 
     // Update coverage: "N% coverage" or "N.N% coverage"
     if (metrics.coveragePercent > 0) {
