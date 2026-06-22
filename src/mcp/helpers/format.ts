@@ -29,6 +29,8 @@ export interface StartData {
   activeWorkers?: number;
   queuedTasks?: number;
   estimatedDuration?: string;
+  /** Real estimated sprint duration in minutes (sprint-estimator, B11 WIRE). */
+  estimatedDurationMin?: number;
   error?: string;
 }
 

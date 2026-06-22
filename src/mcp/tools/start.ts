@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { loadConfig, readAuthMode } from '../../core/config.js';
 import { bootstrapProviders } from '../../core/provider.js';
 import { readContext, planSprint, BrainError } from '../../orchestra/brain.js';
+import { estimateSprintFull, type SprintEstimate } from '../../orchestra/sprint-estimator.js';
 import { cleanOrphanIpcDirs } from '../../core/orphan-cleaner.js';
 import { debugLog } from '../../core/utils.js';
 import type { SprintSizeRecommendation } from '../../core/types.js';
@@ -22,6 +23,19 @@ import {
   IPC_CONFIG_FILE,
   type SprintRunnerConfig,
 } from '../../orchestra/sprint-runner-entry.js';
+
+/**
+ * Format an estimated duration (minutes) into a compact human string for the
+ * MCP start response. Single value (e.g. "~25 minutes" / "~1h 5m"), never a
+ * fabricated range — replaces the prior hardcoded "~10-30 minutes" so the
+ * surface reflects the real sprint-estimator output (B11 WIRE).
+ */
+function formatEstimatedDuration(min: number): string {
+  if (min < 60) return `~${min} minute${min === 1 ? '' : 's'}`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m === 0 ? `~${h}h` : `~${h}h ${m}m`;
+}
 
 export function registerStartTool(server: McpServer): void {
   server.registerTool(
@@ -133,6 +147,13 @@ export function registerStartTool(server: McpServer): void {
           };
         }
 
+        // Sprint-estimator wire (B11): real duration estimate computed from the
+        // planned tasks + worker count during the cost-gate pre-plan (no extra
+        // planSprint call). Stays undefined — and the response falls back to the
+        // heuristic range — only when no plan is available (force=true or a
+        // planner failure), so the surface never fabricates a fixed number.
+        let sprintEstimate: SprintEstimate | undefined;
+
         // ─── PRE-SPRINT COST GATE (Sprint 189 T-008) ──────────────
         // Mirrors the CLI cost gate via shared evaluateCostGate() helper.
         // Prevents Sprint 140-style $42 overruns originating from the MCP
@@ -208,6 +229,12 @@ export function registerStartTool(server: McpServer): void {
                 budget: gate.estimate.budgetUsd,
               });
             }
+
+            // Reuse the cost-gate pre-plan to estimate sprint duration. Computed
+            // only after the gate passed (no early-return) so an estimator hiccup
+            // can never bypass the cost gate; estimateSprintFull is pure and does
+            // not throw on valid planned tasks.
+            sprintEstimate = estimateSprintFull(planForCost.tasks, recommendation.maxWorkers, root);
           } catch (e) {
             // Non-fatal: cost-config missing or planner failure should not
             // prevent sprint start (mirrors CLI graceful-degradation).
@@ -292,7 +319,10 @@ export function registerStartTool(server: McpServer): void {
           message: 'Sprint started in background. Use deckent_status to track progress.',
           activeWorkers: 0,
           queuedTasks: 0,
-          estimatedDuration: '~10-30 minutes',
+          estimatedDuration: sprintEstimate
+            ? formatEstimatedDuration(sprintEstimate.estimatedMin)
+            : '~10-30 minutes',
+          estimatedDurationMin: sprintEstimate?.estimatedMin,
         };
 
         const enrichedStart = enrichResponse('start', startData);
