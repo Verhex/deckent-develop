@@ -5,7 +5,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { debugLog } from '../core/utils.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -77,21 +77,50 @@ export function baselinePath(projectRoot: string, sprintId: string): string {
  * @param projectRoot - Project root directory
  * @param timeoutMs - Maximum execution time (default: 180s)
  */
-export function captureVitestBaseline(
+export type VitestRunner = (
+  projectRoot: string,
+  timeoutMs: number,
+) => Promise<{ stdout: string; stderr: string }>;
+
+/**
+ * Default runner: async `spawn` (not `spawnSync`). R8/ADR-087 — the vitest suite
+ * can run for minutes, and spawnSync FROZE the event loop for that entire window
+ * (no heartbeats, no dashboard SSE, no other async work) every time the honesty
+ * gate or pre-sprint baseline fired. Collect stdout/stderr off the streams and
+ * enforce the timeout with a SIGKILL timer; errors resolve to whatever was
+ * captured (parse degrades to null), preserving the old fail-safe contract.
+ */
+const defaultVitestRunner: VitestRunner = (projectRoot, timeoutMs) =>
+  new Promise((resolve) => {
+    let stdout = '';
+    let stderr = '';
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn('npx', ['vitest', 'run', '--reporter=verbose'], {
+        cwd: projectRoot,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: process.platform === 'win32',
+      });
+    } catch (e) {
+      debugLog('captureVitestBaseline:spawn', e);
+      resolve({ stdout, stderr });
+      return;
+    }
+    const timer = setTimeout(() => { child.kill('SIGKILL'); }, timeoutMs);
+    child.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
+    child.stderr?.on('data', (d: Buffer) => { stderr += d.toString(); });
+    child.on('error', (e) => { clearTimeout(timer); debugLog('captureVitestBaseline:spawn', e); resolve({ stdout, stderr }); });
+    child.on('close', () => { clearTimeout(timer); resolve({ stdout, stderr }); });
+  });
+
+export async function captureVitestBaseline(
   projectRoot: string,
   timeoutMs = 180_000,
-): TestBaseline | null {
+  runner: VitestRunner = defaultVitestRunner,
+): Promise<TestBaseline | null> {
   try {
-    const result = spawnSync('npx', ['vitest', 'run', '--reporter=verbose'], {
-      cwd: projectRoot,
-      timeout: timeoutMs,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      encoding: 'utf-8',
-      shell: process.platform === 'win32',
-    });
-
-    const output = (result.stdout ?? '') + (result.stderr ?? '');
-    return parseVitestOutput(output);
+    const { stdout, stderr } = await runner(projectRoot, timeoutMs);
+    return parseVitestOutput((stdout ?? '') + (stderr ?? ''));
   } catch (e) {
     debugLog('captureVitestBaseline:spawn', e);
     return null;
@@ -217,13 +246,13 @@ export function compareBaseline(
  * @param workerNotes - Worker's self-reported notes
  * @param captureCurrentFn - Optional override for capturing current test state (for testing)
  */
-export function checkWorkerHonesty(
+export async function checkWorkerHonesty(
   projectRoot: string,
   sprintId: string,
   taskId: string,
   workerNotes: string,
-  captureCurrentFn?: () => TestBaseline | null,
-): HonestyCheckResult {
+  captureCurrentFn?: () => TestBaseline | null | Promise<TestBaseline | null>,
+): Promise<HonestyCheckResult> {
   // Step 1: Check trigger
   if (!containsHonestyTrigger(workerNotes)) {
     return {
@@ -247,7 +276,7 @@ export function checkWorkerHonesty(
 
   // Step 3: Capture current state
   const captureFn = captureCurrentFn ?? (() => captureVitestBaseline(projectRoot));
-  const current = captureFn();
+  const current = await captureFn();
   if (!current) {
     return {
       taskId,

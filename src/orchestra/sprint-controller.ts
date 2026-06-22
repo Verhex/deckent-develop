@@ -1056,7 +1056,7 @@ export async function runSprint(
     // immediately. The honesty verify-delta degrades gracefully without a baseline.
     if (config.pre_sprint_tests) {
       try {
-        const captured = captureVitestBaseline(projectRoot);
+        const captured = await captureVitestBaseline(projectRoot);
         if (captured) writeBaseline(projectRoot, sprint.id, captured);
       } catch (e) { debugLog('runSprint:baseline', e); }
     }

@@ -8,10 +8,21 @@ import { captureVitestBaseline } from '../../src/orchestra/baseline-tracker.js';
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
+  spawn: vi.fn(),
 }));
 
 function spawnOk(stdout = 'Tests  1 passed (1)'): ReturnType<typeof cp.spawnSync> {
   return { status: 0, stdout, stderr: '', pid: 1, output: [], signal: null } as unknown as ReturnType<typeof cp.spawnSync>;
+}
+
+/** Minimal async-spawn child stub: fires 'close' so the runner Promise resolves. */
+function fakeChild(): ReturnType<typeof cp.spawn> {
+  return {
+    stdout: { on: vi.fn() },
+    stderr: { on: vi.fn() },
+    on: vi.fn((event: string, cb: (code: number) => void) => { if (event === 'close') setImmediate(() => cb(0)); }),
+    kill: vi.fn(),
+  } as unknown as ReturnType<typeof cp.spawn>;
 }
 
 function setPlatform(platform: NodeJS.Platform): void {
@@ -50,15 +61,28 @@ describe('DEP0190 shell:true win32-only conditional', () => {
     expect(opts?.shell).toBe(false);
   });
 
-  it('captureVitestBaseline passes shell=true on win32', () => {
+  it('captureVitestBaseline passes shell=true on win32', async () => {
     setPlatform('win32');
-    vi.mocked(cp.spawnSync).mockReturnValue(spawnOk());
+    // captureVitestBaseline is now async spawn (R8/ADR-087), not spawnSync.
+    vi.mocked(cp.spawn).mockReturnValue(fakeChild());
 
-    captureVitestBaseline('/tmp/proj');
+    await captureVitestBaseline('/tmp/proj');
 
-    const calls = vi.mocked(cp.spawnSync).mock.calls;
+    const calls = vi.mocked(cp.spawn).mock.calls;
     expect(calls.length).toBeGreaterThan(0);
     const opts = calls[0]?.[2] as { shell?: boolean } | undefined;
     expect(opts?.shell).toBe(true);
+  });
+
+  it('captureVitestBaseline passes shell=false on linux/darwin', async () => {
+    setPlatform('linux');
+    vi.mocked(cp.spawn).mockReturnValue(fakeChild());
+
+    await captureVitestBaseline('/tmp/proj');
+
+    const calls = vi.mocked(cp.spawn).mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    const opts = calls[0]?.[2] as { shell?: boolean } | undefined;
+    expect(opts?.shell).toBe(false);
   });
 });

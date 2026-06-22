@@ -7,6 +7,7 @@ import {
   parseVitestOutput,
   containsHonestyTrigger,
   checkWorkerHonesty,
+  captureVitestBaseline,
   baselinePath,
   HONESTY_TRIGGER_PATTERNS,
 } from '../../src/orchestra/baseline-tracker.js';
@@ -167,8 +168,8 @@ describe('baseline-tracker', () => {
   // ─── checkWorkerHonesty (integrated check) ───────────────────────
 
   describe('checkWorkerHonesty', () => {
-    it('returns triggered=false when notes have no trigger phrases', () => {
-      const result = checkWorkerHonesty(
+    it('returns triggered=false when notes have no trigger phrases', async () => {
+      const result = await checkWorkerHonesty(
         TEST_ROOT, 'sprint-134', '134-005',
         'All good, implemented feature successfully',
       );
@@ -176,14 +177,14 @@ describe('baseline-tracker', () => {
       expect(result.violation).toBe(false);
     });
 
-    it('returns violation=true when trigger detected and delta > 0', () => {
+    it('returns violation=true when trigger detected and delta > 0', async () => {
       // Write a baseline first
       writeBaseline(TEST_ROOT, 'sprint-134', makeBaseline({ fail: 2 }));
 
       // Mock current capture: 5 failures (3 new)
       const captureFn = () => makeBaseline({ fail: 5 });
 
-      const result = checkWorkerHonesty(
+      const result = await checkWorkerHonesty(
         TEST_ROOT, 'sprint-134', '134-005',
         'pre-existing failures unrelated to this task',
         captureFn,
@@ -194,12 +195,12 @@ describe('baseline-tracker', () => {
       expect(result.reason).toContain('HONESTY_VIOLATION');
     });
 
-    it('returns violation=false when trigger detected but delta == 0', () => {
+    it('returns violation=false when trigger detected but delta == 0', async () => {
       writeBaseline(TEST_ROOT, 'sprint-134', makeBaseline({ fail: 3 }));
 
       const captureFn = () => makeBaseline({ fail: 3 });
 
-      const result = checkWorkerHonesty(
+      const result = await checkWorkerHonesty(
         TEST_ROOT, 'sprint-134', '134-005',
         'These were already failing before my changes',
         captureFn,
@@ -209,9 +210,9 @@ describe('baseline-tracker', () => {
       expect(result.comparison!.newFailures).toBe(0);
     });
 
-    it('returns violation=false when no baseline exists (graceful degradation)', () => {
+    it('returns violation=false when no baseline exists (graceful degradation)', async () => {
       // Do NOT write a baseline
-      const result = checkWorkerHonesty(
+      const result = await checkWorkerHonesty(
         TEST_ROOT, 'sprint-134', '134-005',
         'pre-existing failure in test suite',
       );
@@ -220,12 +221,12 @@ describe('baseline-tracker', () => {
       expect(result.reason).toContain('no baseline');
     });
 
-    it('returns violation=false when current capture fails', () => {
+    it('returns violation=false when current capture fails', async () => {
       writeBaseline(TEST_ROOT, 'sprint-134', makeBaseline({ fail: 0 }));
 
       const captureFn = () => null; // capture fails
 
-      const result = checkWorkerHonesty(
+      const result = await checkWorkerHonesty(
         TEST_ROOT, 'sprint-134', '134-005',
         'already failing before this sprint',
         captureFn,
@@ -233,6 +234,40 @@ describe('baseline-tracker', () => {
       expect(result.triggered).toBe(true);
       expect(result.violation).toBe(false);
       expect(result.reason).toContain('unable to capture');
+    });
+  });
+
+  // ─── captureVitestBaseline (R8 — async spawn, ADR-087) ───────────────
+
+  describe('captureVitestBaseline (async)', () => {
+    const fakeOutput =
+      ' Test Files  5 passed (5)\n' +
+      ' Tests  100 passed | 2 failed | 1 skipped (103)\n';
+
+    it('returns a Promise (non-blocking — was spawnSync, froze the event loop)', () => {
+      const runner = async () => ({ stdout: '', stderr: '' });
+      expect(captureVitestBaseline('/proj', 1000, runner)).toBeInstanceOf(Promise);
+    });
+
+    it('parses the injected async runner output into a baseline', async () => {
+      const runner = async () => ({ stdout: fakeOutput, stderr: '' });
+      const result = await captureVitestBaseline('/proj', 1000, runner);
+      expect(result).not.toBeNull();
+      expect(result!.pass).toBe(100);
+      expect(result!.fail).toBe(2);
+      expect(result!.skipped).toBe(1);
+      expect(result!.files).toBe(5);
+    });
+
+    it('reads vitest output from stderr too (vitest writes the summary there)', async () => {
+      const runner = async () => ({ stdout: '', stderr: fakeOutput });
+      const result = await captureVitestBaseline('/proj', 1000, runner);
+      expect(result!.pass).toBe(100);
+    });
+
+    it('degrades to null when the runner yields no parseable output', async () => {
+      const runner = async () => ({ stdout: 'nothing useful', stderr: '' });
+      expect(await captureVitestBaseline('/proj', 1000, runner)).toBeNull();
     });
   });
 });

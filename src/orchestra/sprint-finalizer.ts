@@ -348,7 +348,7 @@ export async function runSelfAuditGate(
           if (result.notes && containsHonestyTrigger(result.notes)) {
             const taskBaseline = readBaseline(root, sprintId);
             if (taskBaseline) {
-              const currentCapture = captureVitestBaseline(root, 180_000);
+              const currentCapture = await captureVitestBaseline(root, 180_000);
               if (currentCapture && currentCapture.fail > taskBaseline.fail) {
                 flaggedTasks.push(result.taskId ?? file);
               }
