@@ -315,6 +315,7 @@ import {
   isInterrupted,
   interruptActiveSprint,
   resetInterruptState,
+  resolveSprintTimeoutMs,
 } from '../../src/orchestra/sprint-controller.js';
 
 import type {
@@ -2441,5 +2442,29 @@ describe('finalizeSprint — job output reform', () => {
     expect(taskEval.filesChanged).toEqual([]);
     expect(taskEval.reason).toBe('');
     expect(taskEval.selfAssessment).toBe('NO_GO');
+  });
+});
+
+// ─── resolveSprintTimeoutMs (R3 — sprint_timeout_minutes wire) ────────
+
+describe('resolveSprintTimeoutMs', () => {
+  it('honors sprint_timeout_minutes when no explicit opts timeout (0 = unlimited)', () => {
+    // Pre-fix the knob was never threaded — the call passed opts?.timeoutMs raw, so
+    // an undefined opts always defaulted to the 30-minute cap, ignoring config.
+    expect(resolveSprintTimeoutMs(undefined, { sprint_timeout_minutes: 0 })).toBe(0);
+  });
+
+  it('converts a positive sprint_timeout_minutes to milliseconds', () => {
+    expect(resolveSprintTimeoutMs(undefined, { sprint_timeout_minutes: 90 })).toBe(90 * 60_000);
+  });
+
+  it('an explicit opts.timeoutMs always wins over the config knob', () => {
+    expect(resolveSprintTimeoutMs(1234, { sprint_timeout_minutes: 90 })).toBe(1234);
+    // opts:0 is explicit (caller asked for unlimited) and must NOT fall through to config
+    expect(resolveSprintTimeoutMs(0, { sprint_timeout_minutes: 90 })).toBe(0);
+  });
+
+  it('treats a negative config as unset (undefined → waitForResults 30-minute default)', () => {
+    expect(resolveSprintTimeoutMs(undefined, { sprint_timeout_minutes: -5 })).toBeUndefined();
   });
 });

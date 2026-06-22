@@ -788,6 +788,25 @@ export async function stopResourceMonitor(monitor: ResourceMonitor | null): Prom
 // ═══ Core Functions (kept in this file) ═══════════════════════════
 
 /**
+ * Resolve the EXECUTE-phase wait timeout (ms). An explicit `opts.timeoutMs` always
+ * wins; otherwise honor the `sprint_timeout_minutes` config knob (0 = unlimited, per
+ * its documented contract). R3: this knob was dormant — defined and merged but never
+ * threaded into waitForResults — so every sprint silently fell back to the 30-minute
+ * default regardless of the configured value (it even cut our own audit sprints
+ * short). A negative/non-numeric config is treated as unset (→ undefined, i.e. the
+ * waitForResults default).
+ */
+export function resolveSprintTimeoutMs(
+  optsTimeoutMs: number | undefined,
+  config: Pick<ResolvedConfig, 'sprint_timeout_minutes'>,
+): number | undefined {
+  if (optsTimeoutMs !== undefined) return optsTimeoutMs;
+  const minutes = config.sprint_timeout_minutes;
+  if (typeof minutes !== 'number' || minutes < 0) return undefined;
+  return minutes * 60_000;
+}
+
+/**
  * Wait for task result files to appear on disk using fs.watch with fallback polling.
  * Supports queued task execution: as workers finish, queued tasks are spawned.
  * Delegates to result-collector.ts (extracted Phase 3).
@@ -1112,7 +1131,10 @@ export async function runSprint(
     try {
       sprint.phase = SprintPhase.EXECUTE;
       writeSprintState(projectRoot, sprint);
-      results = await waitForResults(projectRoot, sprint, opts?.timeoutMs, taskQueue, { autoApprove: opts?.autoApprove, spawnBackend }, config);
+      // R3: honor the sprint_timeout_minutes config knob (0 = unlimited) instead of
+      // always falling back to waitForResults' hard-coded 30-minute default.
+      const sprintTimeoutMs = resolveSprintTimeoutMs(opts?.timeoutMs, config);
+      results = await waitForResults(projectRoot, sprint, sprintTimeoutMs, taskQueue, { autoApprove: opts?.autoApprove, spawnBackend }, config);
     } catch (err) {
       safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
     }
