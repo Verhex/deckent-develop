@@ -81,9 +81,12 @@ describe('deckent flow run', () => {
     expect(print).toHaveBeenCalledWith('No flows due.');
   });
 
-  it('prints dispatch count when flows are due (--once)', async () => {
+  it('reports due flows + self-dispatch queueing when flows are due (--once)', async () => {
     mockTick.mockImplementation((cb: (d: unknown[]) => void) => cb([{}, {}]));
     await run('flow', 'run', '--once');
-    expect(print).toHaveBeenCalledWith(expect.stringContaining('2 flow(s) dispatched'));
+    // B11 self-dispatch wire: the daemon now evaluates the due flows against the
+    // scheduled self-dispatch policy and reports the queued-for-approval count,
+    // not just a bare dispatch count.
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('2 flow(s) due'));
   });
 });

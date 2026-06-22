@@ -1,9 +1,79 @@
 import type { Command } from 'commander';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { FlowRegistry } from '../../core/flow-registry.js';
 import { parseCronExpr } from '../../core/scheduled-flow.js';
 import { FlowRuntime } from '../../core/flow-runtime.js';
+import type { DueDispatch } from '../../core/flow-scheduler.js';
+import {
+  createSelfDispatchCallback,
+  type SelfDispatchPolicy,
+  type PendingApprovalItem,
+} from '../../core/self-dispatch.js';
+
+// ─── Self-dispatch wire (Sprint 209 — B11) ──────────────────────────────────
+// The flow daemon evaluates each FlowRuntime tick against a scheduled self-dispatch
+// policy. requiresApproval is TRUE — a due flow is QUEUED for human approval, never
+// auto-started (preserves "Alperen onayı olmadan sprint başlatma yasak"). The queued
+// items persist to .deckent/flows/pending-dispatch.json so they survive the tick and
+// a follow-up approve step can act on them. Before this wire the daemon only printed
+// the due-flow count and took no action (createSelfDispatchCallback was zero-caller).
+const FLOW_DISPATCH_POLICY: SelfDispatchPolicy = {
+  id: 'flow-run',
+  trigger: 'scheduled',
+  action: 'start',
+  guard: { requiresApproval: true },
+};
+
+/** Path of the persisted pending self-dispatch approval queue. */
+export function pendingDispatchPath(projectRoot: string): string {
+  return join(projectRoot, '.deckent', 'flows', 'pending-dispatch.json');
+}
+
+/**
+ * Handle one FlowRuntime tick: evaluate the due dispatches against the flow-run
+ * self-dispatch policy and append any approved-for-dispatch items to the persisted
+ * pending-approval queue. Returns the number newly queued. Pure w.r.t. injected
+ * print/clock so it is unit-testable without spawning the daemon.
+ */
+export function handleFlowDispatchTick(
+  projectRoot: string,
+  dispatches: DueDispatch[],
+  deps: { print?: (msg: string) => void; clock?: () => Date } = {},
+): number {
+  const emit = deps.print ?? ((m: string) => print(m));
+  const path = pendingDispatchPath(projectRoot);
+
+  let queue: PendingApprovalItem[] = [];
+  try {
+    if (existsSync(path)) queue = JSON.parse(readFileSync(path, 'utf-8')) as PendingApprovalItem[];
+  } catch {
+    queue = []; // corrupt/unreadable queue → start fresh (the daemon must not crash)
+  }
+
+  const before = queue.length;
+  const callback = createSelfDispatchCallback(FLOW_DISPATCH_POLICY, queue, deps.clock ? { clock: deps.clock } : {});
+  callback(dispatches);
+  const added = queue.length - before;
+
+  if (added > 0) {
+    try {
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, JSON.stringify(queue, null, 2), 'utf-8');
+    } catch (e) {
+      emit(`Warning: could not persist pending-dispatch queue: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  if (dispatches.length === 0) {
+    emit('No flows due.');
+  } else {
+    emit(`Tick: ${dispatches.length} flow(s) due · ${added} queued for self-dispatch (pending approval → ${path}).`);
+  }
+  return added;
+}
 
 export function registerFlow(program: Command): void {
   const flowCmd = program.command('flow').description('Manage scheduled flows (process mode)');
@@ -84,22 +154,12 @@ export function registerFlow(program: Command): void {
         const runtime = new FlowRuntime(registry);
 
         if (opts.once) {
-          runtime.tick((dispatches) => {
-            if (dispatches.length === 0) {
-              print('No flows due.');
-            } else {
-              print(`Tick: ${dispatches.length} flow(s) dispatched.`);
-            }
-          });
+          runtime.tick((dispatches) => { handleFlowDispatchTick(root, dispatches); });
           return;
         }
 
         print('Flow daemon started. Press Ctrl+C to stop.');
-        runtime.start((dispatches) => {
-          if (dispatches.length > 0) {
-            print(`Tick: ${dispatches.length} flow(s) dispatched.`);
-          }
-        });
+        runtime.start((dispatches) => { handleFlowDispatchTick(root, dispatches); });
         process.on('SIGINT', () => {
           runtime.stop();
           process.exit(0);
