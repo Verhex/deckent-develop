@@ -27,6 +27,8 @@
 - ⛔ borderline-B/kasıtlı: `--auto-approve` forced (workers-always-full-write) · `deckent_kill` description-dürüst-PAUSED · `writeNervousIpcApproval` advisory-doc · `nextSequence` within-process-safe (docstring "atomically" cross-process yanıltıcı — known-issue) · rbac-CLI enterprise-persistence.
 - ⬜ R8 spawnSync→async (mekanik ama signature-ripple + faithful-test-zor, ayrı odaklı batch) · R4 SSOT (risky, canlı-kopya-seçimi) · marketplace/skill-sandbox (B11-KES).
 
+> **POST-PUSH DEVAM (06-22, ikinci blok — 6 unpushed commit, main ahead 6):** 10-overnight-commit push'landıktan sonra Alperen "devam" dedi. ✅ **R5 README de-fabrike** (`7b89dec1`) · ✅ **R5 DebtTrend metadata-wire** (`132afa49`) · ➕ **noGoRate test-hygiene** (`8d2e3766`, prior-session loose-end) · ✅ **R3 sprint_timeout_minutes wire** (`92359eab`, Alperen-ruling: config-onurla, default→unlimited) · ✅ **R8 captureVitestBaseline async** (`45f86208`, en-yüksek freeze). Hepsi faithful-locked + affected-suite-green. **Toplam oturum: 16 commit, 14 gerçek fix.** Kalan R8 (5 site), feature-completion, R4-SSOT, history_scaling/PromptVersion (bigger-wire) açık.
+
 ---
 ## 0. Kova Özeti
 
@@ -262,13 +264,14 @@ Self-improvement makinesini besleyen sayılar sahte → sistem kendi drift'ini g
 - ESM: `runtime-scope-check` bare `require()` ESM'de hep stderr-fallback → `nervous/runtime-scope-check.ts` (R7 ESM-disiplin) ⬜
 
 ### A·R8 — spawnSync async-context'te (ADR-087 ihlali, event-loop freeze) — deckent mekanik 🟠
-- `monitor-adapter.ts` spawnSync (async)
-- `task-restoration.ts` spawnSync finalizeSprint içinde
-- `planner.ts` AI-planner subprocess spawnSync
-- `output-collector.ts` docker/tmux poll hot-path spawnSync
-- `baseline-tracker.ts` captureVitestBaseline spawnSync
-- `mid-sprint-adapter.ts` reconcileSpuriousNoGo spawnSync 120s
-→ Hepsi async `spawn`'a çevrilecek (ADR-087 + CI-timeout riski).
+> **R8-İLERLEME (06-22, Alperen vein-seçimi):** ✅ **baseline-tracker captureVitestBaseline** (`45f86208`) — EN YÜKSEK freeze (180s vitest, runSelfAuditGate + pre-sprint-baseline'da event-loop'u dakikalarca donduruyordu) → async `spawn` + injectable `VitestRunner` (stdout/stderr stream-collect + SIGKILL-timer); `checkWorkerHonesty` cascade-async, 2 prod-caller await; shell-win32 korundu; faithful DI-test ("returns Promise" pre-fix RED). 196 affected yeşil. · **NOT (test-zorluğu):** R8 async-conversion'lar faithful-regression'a (wrong-value-assert) uygun değil — çıktı aynı, yalnız bloklamama değişir → **DI-injectable runner** pattern'i (fake-runner enjekte) test-edilebilirliği sağlar; her site bu pattern'le yapılmalı.
+- ✅ `baseline-tracker.ts` captureVitestBaseline spawnSync **DONE (`45f86208`)** — DI-runner async
+- `monitor-adapter.ts` spawnSync (async) ⬜ — execCommand helper, async-method'larca çağrılıyor (DI-runner uygula)
+- `task-restoration.ts` spawnSync finalizeSprint içinde ⬜ — tar extract (büyük-snapshot'ta yavaş)
+- `planner.ts` AI-planner subprocess spawnSync ⬜ — AI-call (yavaş, yüksek-değer ama planner-complex)
+- `output-collector.ts` docker/tmux poll hot-path spawnSync ⬜ — hot-path poll
+- `mid-sprint-adapter.ts` reconcileSpuriousNoGo spawnSync 120s ⬜ — (asıl 120s `captureVitestBaseline`'di ✅; mid-sprint:356 fast-git, minor)
+→ Kalan 5 site: hepsi async `spawn` + DI-runner'a çevrilecek (ADR-087 + CI-timeout); her biri careful multi-file (signature-cascade).
 
 **A-özet:** ~75-95 distinct fix-task. Auth (A·R1, 12) CC-el-kodu. Geri kalan deckent-worker + zorunlu CC-verify.
 
