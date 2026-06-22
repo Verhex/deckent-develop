@@ -106,6 +106,12 @@ export async function runV2Engine(
   const store: MissionStore = deps.store ?? new SqliteMissionStore(projectRoot);
   try {
     store.migrate();
+    // B11 crash-recovery wire (ADR-043): a previous engine run that crashed or was
+    // killed mid-dispatch leaves work_items stuck in 'running' (claimed but never
+    // settled) — they would orphan forever, never re-dispatched. recover() resets
+    // those rows to 'pending' at boot so this run picks them back up. Idempotent and
+    // narrow: only touches status='running' rows; a clean boot is a no-op.
+    store.recover();
     // Boot: import the legacy backlog into a `legacy` mission (no-op if missions exist).
     migrateBacklogJson(projectRoot, store);
 

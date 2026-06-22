@@ -80,6 +80,33 @@ describe('runV2Engine', () => {
     expect(store.listItems('m1').every((i) => i.status === 'done')).toBe(true);
   });
 
+  it('boot recover() rescues orphaned running work-items left by a prior crash (B11 wire)', async () => {
+    const r = root();
+    const store = openStore(r);
+    store.createMission({ id: 'mR', kind: 'list', title: 'Recover', renderAs: 'checklist' });
+    store.enqueueItem({ id: 'mR-0', missionId: 'mR', kind: 'task', spec: { description: 'orphaned' } });
+    // Simulate a prior crash: the item was claimed ('running') but the engine died
+    // before settling it. queryDue() returns only 'pending' rows, so WITHOUT a boot
+    // recover() this orphan is never re-dispatched — it stays 'running' forever.
+    expect(store.claimItem('mR-0', 'dead-worker')).toBe(true);
+    expect(store.listItems('mR')[0]!.status).toBe('running');
+
+    const seen: string[] = [];
+    const deps: RunV2EngineDeps = {
+      runTask: async (ctx: MissionTaskContext) => { seen.push(ctx.description); return { ok: true }; },
+      runSprint: async () => undefined,
+      store,
+      maxIterations: BOUNDED,
+    };
+
+    await runV2Engine(r, cfg({ engine: 'v2' }), deps);
+
+    // Post-fix: boot recover() flips the orphan back to 'pending' → it is dispatched
+    // and settles. Pre-fix (no recover wire) runTask never sees it and it stays 'running'.
+    expect(seen).toContain('orphaned');
+    expect(store.listItems('mR')[0]!.status).not.toBe('running');
+  });
+
   it('marks a mission failed when an injected runTask reports ok:false', async () => {
     const r = root();
     const store = openStore(r);
