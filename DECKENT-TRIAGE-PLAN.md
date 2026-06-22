@@ -216,18 +216,18 @@ Bunlar saf-dead değil; **yarım-kalmış özellik**. Karar: **istiyorsan → A-
 - `RichSprintSummary` 3 yer → retro/retro-parser/sprint-summary
 
 ### A·R5 — Hardcoded-0 / fabrike metrik (learning-loop'u öldürüyor) — deckent + CC-verify 🟠
-> **DOGFOOD BATCH R5-A ✅ (sprint-316, 06-21):** 4 contained item — ✅ assignVariant balanced (`f49a13d3`) · ✅ failedTasks gerçek NO_GO (`f49a13d3`) · ✅ agent-stats conflation (`f49a13d3`) · ✅ noGoRate canonical-fraction + retro-writer consumer (`dca20d7d`, worker-fix + CC-completion: worker retro-writer tüketicisini kaçırdı, CC tamamladı). **Brain 4/4 DONE dedi ama CC-verify Task-4'ü kırık buldu (R2 canlı) → CC tamamladı.** **R5 cross-module (CC-hand-code):** ✅ **coverage** ← vitest json-summary (plugin-hooks, `parseCoverageSummary`, `daa2fe2e`) · ✅ **boundaryViolations** ← results×scope (sprint-metrics, canonical `findBoundaryViolations` reuse, `92007ae6`) · ⬜ README test-count fabrikasyonu (readme-metrics, `coveragePercent*10`!) · ⬜ DebtTrendAnalyzer 0% · ⬜ PromptVersion.stats frozen (B11-F5) · ⬜ history_scaling zero-fill.
+> **DOGFOOD BATCH R5-A ✅ (sprint-316, 06-21):** 4 contained item — ✅ assignVariant balanced (`f49a13d3`) · ✅ failedTasks gerçek NO_GO (`f49a13d3`) · ✅ agent-stats conflation (`f49a13d3`) · ✅ noGoRate canonical-fraction + retro-writer consumer (`dca20d7d`, worker-fix + CC-completion: worker retro-writer tüketicisini kaçırdı, CC tamamladı). **Brain 4/4 DONE dedi ama CC-verify Task-4'ü kırık buldu (R2 canlı) → CC tamamladı.** **R5 cross-module (CC-hand-code):** ✅ **coverage** ← vitest json-summary (plugin-hooks, `parseCoverageSummary`, `daa2fe2e`) · ✅ **boundaryViolations** ← results×scope (sprint-metrics, canonical `findBoundaryViolations` reuse, `92007ae6`) · ✅ **README test-count fabrikasyonu** (`7b89dec1`, 06-22) — `coveragePercent*10` kör-replace README örneklerini de bozuyordu ("+5 tests"→"880+ tests"); gerçek-kaynak doc-update'te yok + badge dokunulmuyor → fabrike+bozucu replace KALDIRILDI (R5: literal'i literal'le değiştirme) · ✅ **DebtTrendAnalyzer 0%** (`132afa49`, 06-22) — TWO-SIDED wire: writer (`sprint-retro-writer.ts`) memory-entry'ye `metadata:{totalTasks,debtCount}` yazmıyordu → detector `{}` parse edip rate=0 → wire'landı, faithful (real-store) · ⬜ **PromptVersion.stats frozen** (B11-F5, two-sided/F5-loop) · ⬜ **history_scaling zero-fill** — `sprint-spawner.ts:92` `NO_SPRINT_HISTORY={avgTaskDurationMs:0}` hardcoded → factor hep 1.0; fix = geçmiş-sprint avg-duration **aggregation** (mevcut değil) = bigger/feature-completion → defer. · ➕ **noGoRate test-hygiene** (`8d2e3766`, 06-22) — R5-A noGoRate-fraction değişiminden kalan 5 stale-test (sprint-reporter+brain, main'de RED'di) canonical-fraction'a hizalandı (feedback_ccverify dersi: full-importing-suite koş).
 Self-improvement makinesini besleyen sayılar sahte → sistem kendi drift'ini göremiyor:
 - `boundaryViolations: 0` literal → `orchestra/sprint-metrics.ts:128,215` + retro "No boundary violations" 🔴
 - coverage hep `0` → `core/plugin-hooks.ts` (track_coverage etkisiz) 🔴
 - `noGoRate` %(0-100) saklanıp fraction(0-1) tüketiliyor (2 path) → `sprint-metrics.ts`, `managed-docs/content-generators.ts` 🔴
 - `failedTasks: 0` hardcode → `mcp/tools/status.ts` (NO_GO sayısı gizleniyor)
 - `assignVariant()` experimentId'yi ignore → A/B atama untracked random 🔴
-- DebtTrendAnalyzer hep `0%` → `nervous/detectors/debt-trend.ts`
-- PromptVersion.stats hep `{uses:0,successRate:0}` → `agents/prompt-version.ts` (B11 F5 ile bağlı)
-- README fabrike test-count → `orchestra/doc-updaters/readme-metrics.ts`
-- agent sprint-stats mentions'ı success sayıyor → %100 şişme → `cli/commands/agent.ts`
-- history_scaling SprintHistory hep zero-fill → factor 1.0 → `orchestra/timeout-estimator.ts`
+- ✅ DebtTrendAnalyzer hep `0%` → `nervous/detectors/debt-trend.ts` **DONE (06-22, `132afa49`)** — writer metadata-wire
+- PromptVersion.stats hep `{uses:0,successRate:0}` → `agents/prompt-version.ts` (B11 F5 ile bağlı) ⬜ two-sided/F5
+- ✅ README fabrike test-count → `orchestra/doc-updaters/readme-metrics.ts` **DONE (06-22, `7b89dec1`)** — fabrike+bozucu replace kaldırıldı
+- agent sprint-stats mentions'ı success sayıyor → %100 şişme → `cli/commands/agent.ts` ✅ (R5-A `f49a13d3`)
+- history_scaling SprintHistory hep zero-fill → factor 1.0 → `orchestra/timeout-estimator.ts` ⬜ bigger (avg-duration aggregation eksik)
 
 ### A·R6 — Silent fallback / yutulan-hata — deckent + CC-verify 🟠
 > **İLERLEME (06-22):** ✅ **OpenAI tool-call drop FIXED** (`agent/provider-tooluse/openai.ts`) — stream `finish_reason:'tool_calls'` yerine `'stop'`/finish-yok/`[DONE]`-break ile biterse biriken tool-call'lar sessizce düşüyordu (vLLM/Ollama/Azure/proxy bunu yapar). `drainToolCalls` helper (DRY) loop-içi + loop-sonrası flush (`clear()` çift-emit önler). Faithful 2-test (stop-drop + no-finish-drop) pre-fix RED + 1 double-emit guard; **79 affected dosya/1345 test yeşil**, tsc EXIT=0. **Gerçek provider-correctness leak.**
