@@ -45,6 +45,8 @@ vi.mock('../../src/core/utils.js', () => ({
 // Mock result-evaluator — evaluateWithRubric grades fix results
 vi.mock('../../src/orchestra/result-evaluator.js', () => ({
   evaluateWithRubric: vi.fn(),
+  // R8/ADR-087: spurious recovery moved to this async helper — passthrough here.
+  reconcileEvaluationSpuriousNoGo: vi.fn((evaluation) => evaluation),
 }));
 
 // Mock sprint-controller — spawnWorkers, waitForResults, etc.

@@ -123,54 +123,54 @@ describe('isDocTask (result-evaluator)', () => {
 describe('evaluateResult (result-evaluator)', () => {
   // ── Step 1: Hard failures ──────────────────────────────────────
 
-  it('returns NO_GO when selfAssessment is NO_GO (highest priority)', () => {
+  it('returns NO_GO when selfAssessment is NO_GO (highest priority)', async () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({ selfAssessment: 'NO_GO', coverage: 100, testsPassed: true });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
   });
 
-  it('returns NO_GO when selfAssessment is NO_GO even with new tests', () => {
+  it('returns NO_GO when selfAssessment is NO_GO even with new tests', async () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({
       selfAssessment: 'NO_GO', coverage: 100, testsPassed: true,
       filesChanged: ['src/foo.test.ts'],
     });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
   });
 
-  it('returns NO_GO when tests failed (worker says DONE)', () => {
+  it('returns NO_GO when tests failed (worker says DONE)', async () => {
     const task = makeTask(['src/core']);
     const result = makeResult({ testsPassed: false, selfAssessment: 'DONE', coverage: 100 });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
   });
 
-  it('returns NO_GO when tests failed (worker says GO_WITH_TECH_DEBT)', () => {
+  it('returns NO_GO when tests failed (worker says GO_WITH_TECH_DEBT)', async () => {
     const task = makeTask(['src/core']);
     const result = makeResult({ testsPassed: false, selfAssessment: 'GO_WITH_TECH_DEBT', coverage: 100 });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
   });
 
-  it('returns NO_GO for doc task when tests failed', () => {
+  it('returns NO_GO for doc task when tests failed', async () => {
     const task = makeTask(['docs']);
     const result = makeResult({ testsPassed: false, selfAssessment: 'DONE' });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
   });
 
   // ── Step 2: Doc tasks ──────────────────────────────────────────
 
-  it('returns DONE for doc task with passing tests (skips coverage)', () => {
+  it('returns DONE for doc task with passing tests (skips coverage)', async () => {
     const task = makeTask(['docs']);
     const result = makeResult({ testsPassed: true, coverage: 0, selfAssessment: 'DONE' });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
   });
 
-  it('returns DONE for doc task even with zero coverage', () => {
+  it('returns DONE for doc task even with zero coverage', async () => {
     const task = makeTask(['docs/api']);
     const result = makeResult({ coverage: 0, selfAssessment: 'DONE' });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
   });
 
-  it('skips vitest validation for doc tasks', () => {
+  it('skips vitest validation for doc tasks', async () => {
     const task = makeTask(['docs']);
     const result = makeResult({ testsPassed: true, coverage: 0, selfAssessment: 'DONE' });
     const vitestJson = JSON.stringify({
@@ -179,12 +179,12 @@ describe('evaluateResult (result-evaluator)', () => {
       functions: { pct: 50, total: 100, covered: 50 },
       branches: { pct: 50, total: 100, covered: 50 },
     });
-    expect(evaluateResult(result, task, vitestJson)).toBe(TaskEvaluation.DONE);
+    expect(await evaluateResult(result, task, vitestJson)).toBe(TaskEvaluation.DONE);
   });
 
   // ── KEY CHANGE: Brain overrides worker self-assessment ─────────
 
-  it('returns DONE when worker says GO_WITH_TECH_DEBT but has new tests (Brain override)', () => {
+  it('returns DONE when worker says GO_WITH_TECH_DEBT but has new tests (Brain override)', async () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({
       selfAssessment: 'GO_WITH_TECH_DEBT',
@@ -192,10 +192,10 @@ describe('evaluateResult (result-evaluator)', () => {
       coverage: 95,
       filesChanged: ['src/orchestra/foo.ts', 'tests/orchestra/foo.test.ts'],
     });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
   });
 
-  it('returns DONE when worker says GO_WITH_TECH_DEBT but coverage >= 90 and has new tests', () => {
+  it('returns DONE when worker says GO_WITH_TECH_DEBT but coverage >= 90 and has new tests', async () => {
     const task = makeTask(['src/core']);
     const result = makeResult({
       selfAssessment: 'GO_WITH_TECH_DEBT',
@@ -203,10 +203,10 @@ describe('evaluateResult (result-evaluator)', () => {
       coverage: 92,
       filesChanged: ['src/core/utils.ts', 'tests/core/utils.spec.ts'],
     });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
   });
 
-  it('returns DONE when worker says GO_WITH_TECH_DEBT but coverage >= 90 and no new tests', () => {
+  it('returns DONE when worker says GO_WITH_TECH_DEBT but coverage >= 90 and no new tests', async () => {
     const task = makeTask(['src/core']);
     const result = makeResult({
       selfAssessment: 'GO_WITH_TECH_DEBT',
@@ -214,136 +214,136 @@ describe('evaluateResult (result-evaluator)', () => {
       coverage: 95,
       filesChanged: ['src/core/utils.ts'],
     });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
   });
 
   // ── hasNewTests detection ──────────────────────────────────────
 
-  it('detects .test.ts files as new tests', () => {
+  it('detects .test.ts files as new tests', async () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({
       testsPassed: true, coverage: 50, selfAssessment: 'DONE',
       filesChanged: ['src/foo.ts', 'tests/foo.test.ts'],
     });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
   });
 
-  it('detects .spec.ts files as new tests', () => {
+  it('detects .spec.ts files as new tests', async () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({
       testsPassed: true, coverage: 50, selfAssessment: 'DONE',
       filesChanged: ['src/foo.ts', 'tests/foo.spec.ts'],
     });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
   });
 
-  it('detects .test.js files as new tests', () => {
+  it('detects .test.js files as new tests', async () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({
       testsPassed: true, coverage: 50, selfAssessment: 'DONE',
       filesChanged: ['src/foo.ts', 'tests/foo.test.js'],
     });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
   });
 
-  it('detects .spec.js files as new tests', () => {
+  it('detects .spec.js files as new tests', async () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({
       testsPassed: true, coverage: 50, selfAssessment: 'DONE',
       filesChanged: ['src/foo.ts', 'tests/foo.spec.js'],
     });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
   });
 
-  it('no test files detected when filesChanged has no test/spec files', () => {
+  it('no test files detected when filesChanged has no test/spec files', async () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({
       testsPassed: true, coverage: 50, selfAssessment: 'DONE',
       filesChanged: ['src/foo.ts', 'src/bar.ts'],
     });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
-  it('handles undefined filesChanged gracefully (no new tests)', () => {
+  it('handles undefined filesChanged gracefully (no new tests)', async () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({
       testsPassed: true, coverage: 50, selfAssessment: 'DONE',
     });
     // filesChanged defaults to [] in makeResult, but test with explicit undefined
     result.filesChanged = undefined as unknown as string[];
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
-  it('handles empty filesChanged (no new tests)', () => {
+  it('handles empty filesChanged (no new tests)', async () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({
       testsPassed: true, coverage: 50, selfAssessment: 'DONE',
       filesChanged: [],
     });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
   // ── Coverage thresholds ────────────────────────────────────────
 
-  it('returns DONE for coverage >= 90 with no new tests', () => {
+  it('returns DONE for coverage >= 90 with no new tests', async () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({ testsPassed: true, coverage: 90, filesChanged: ['src/foo.ts'] });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
   });
 
-  it('returns DONE for coverage exactly 90', () => {
+  it('returns DONE for coverage exactly 90', async () => {
     const task = makeTask(['src/core']);
     const result = makeResult({ testsPassed: true, coverage: 90, selfAssessment: 'DONE', filesChanged: ['src/a.ts'] });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
   });
 
-  it('returns GO_WITH_TECH_DEBT for coverage 89.9 with no new tests', () => {
+  it('returns GO_WITH_TECH_DEBT for coverage 89.9 with no new tests', async () => {
     const task = makeTask(['src/core']);
     const result = makeResult({ testsPassed: true, coverage: 89.9, selfAssessment: 'DONE', filesChanged: ['src/a.ts'] });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
-  it('returns GO_WITH_TECH_DEBT for coverage 0 with no new tests', () => {
+  it('returns GO_WITH_TECH_DEBT for coverage 0 with no new tests', async () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({ testsPassed: true, coverage: 0, selfAssessment: 'DONE', filesChanged: ['src/a.ts'] });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
-  it('returns DONE for coverage 50 when worker wrote new tests', () => {
+  it('returns DONE for coverage 50 when worker wrote new tests', async () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({
       testsPassed: true, coverage: 50, selfAssessment: 'DONE',
       filesChanged: ['src/a.ts', 'tests/a.test.ts'],
     });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
   });
 
   // ── Mixed scope ────────────────────────────────────────────────
 
-  it('treats mixed scope (docs + src) as normal task — low coverage, no tests', () => {
+  it('treats mixed scope (docs + src) as normal task — low coverage, no tests', async () => {
     const task = makeTask(['docs', 'src/core']);
     const result = makeResult({ testsPassed: true, coverage: 50, selfAssessment: 'DONE', filesChanged: ['src/a.ts'] });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
-  it('mixed scope with high coverage returns DONE', () => {
+  it('mixed scope with high coverage returns DONE', async () => {
     const task = makeTask(['docs', 'src/core']);
     const result = makeResult({ testsPassed: true, coverage: 95, selfAssessment: 'DONE', filesChanged: ['src/a.ts'] });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
   });
 
-  it('mixed scope with new tests returns DONE', () => {
+  it('mixed scope with new tests returns DONE', async () => {
     const task = makeTask(['docs', 'src/core']);
     const result = makeResult({
       testsPassed: true, coverage: 50, selfAssessment: 'DONE',
       filesChanged: ['src/a.ts', 'tests/a.test.ts'],
     });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
   });
 
   // ── vitest JSON coverage validation ────────────────────────────
 
-  it('returns GO_WITH_TECH_DEBT when vitest JSON shows coverage mismatch', () => {
+  it('returns GO_WITH_TECH_DEBT when vitest JSON shows coverage mismatch', async () => {
     const task = makeTask(['src/core']);
     const result = makeResult({
       testsPassed: true, coverage: 95, selfAssessment: 'DONE',
@@ -355,10 +355,10 @@ describe('evaluateResult (result-evaluator)', () => {
       functions: { pct: 50, total: 100, covered: 50 },
       branches: { pct: 50, total: 100, covered: 50 },
     });
-    expect(evaluateResult(result, task, vitestJson)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(await evaluateResult(result, task, vitestJson)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
-  it('returns DONE when vitest JSON confirms coverage and has new tests', () => {
+  it('returns DONE when vitest JSON confirms coverage and has new tests', async () => {
     const task = makeTask(['src/core']);
     const result = makeResult({
       testsPassed: true, coverage: 95, selfAssessment: 'DONE',
@@ -370,22 +370,22 @@ describe('evaluateResult (result-evaluator)', () => {
       functions: { pct: 94, total: 100, covered: 94 },
       branches: { pct: 94, total: 100, covered: 94 },
     });
-    expect(evaluateResult(result, task, vitestJson)).toBe(TaskEvaluation.DONE);
+    expect(await evaluateResult(result, task, vitestJson)).toBe(TaskEvaluation.DONE);
   });
 
   // ── Fallback: worker hint for edge cases ───────────────────────
 
-  it('respects GO_WITH_TECH_DEBT hint as fallback when coverage < 90 and no new tests', () => {
+  it('respects GO_WITH_TECH_DEBT hint as fallback when coverage < 90 and no new tests', async () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({
       selfAssessment: 'GO_WITH_TECH_DEBT',
       testsPassed: true, coverage: 50,
       filesChanged: ['src/a.ts'],
     });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
-  it('returns DONE as default when worker says DONE, coverage < 90 but not caught by other rules', () => {
+  it('returns DONE as default when worker says DONE, coverage < 90 but not caught by other rules', async () => {
     // Edge case: coverage exactly at boundary conditions
     const task = makeTask(['src/orchestra']);
     const result = makeResult({
@@ -394,7 +394,7 @@ describe('evaluateResult (result-evaluator)', () => {
       filesChanged: ['src/a.ts'],
     });
     // No new tests + coverage < 90 → GO_WITH_TECH_DEBT
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 });
 
@@ -810,7 +810,7 @@ describe('isBashUnavailable', () => {
 // ─── evaluateResult() — Bash Unavailable Tolerance ─────────────────
 
 describe('evaluateResult — Bash unavailable tolerance', () => {
-  it('returns GO_WITH_TECH_DEBT when Bash unavailable and testsPassed=false (DONE self)', () => {
+  it('returns GO_WITH_TECH_DEBT when Bash unavailable and testsPassed=false (DONE self)', async () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({
       testsPassed: false,
@@ -819,10 +819,10 @@ describe('evaluateResult — Bash unavailable tolerance', () => {
       notes: 'Bash tool unavailable — session-env ENOENT prevented running tsc --noEmit',
       filesChanged: ['src/orchestra/result-evaluator.ts'],
     });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
-  it('returns GO_WITH_TECH_DEBT when Bash unavailable and testsPassed=false (TECH_DEBT self)', () => {
+  it('returns GO_WITH_TECH_DEBT when Bash unavailable and testsPassed=false (TECH_DEBT self)', async () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({
       testsPassed: false,
@@ -831,10 +831,10 @@ describe('evaluateResult — Bash unavailable tolerance', () => {
       notes: 'Bash tool is unavailable due to session-env ENOENT',
       filesChanged: ['src/orchestra/foo.ts'],
     });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
-  it('returns NO_GO when Bash unavailable but selfAssessment is NO_GO', () => {
+  it('returns NO_GO when Bash unavailable but selfAssessment is NO_GO', async () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({
       testsPassed: false,
@@ -843,10 +843,10 @@ describe('evaluateResult — Bash unavailable tolerance', () => {
       notes: 'Bash tool unavailable — session-env ENOENT',
     });
     // selfAssessment NO_GO is checked BEFORE Bash tolerance
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
   });
 
-  it('returns NO_GO when tests fail without Bash unavailable signal', () => {
+  it('returns NO_GO when tests fail without Bash unavailable signal', async () => {
     const task = makeTask(['src/core']);
     const result = makeResult({
       testsPassed: false,
@@ -854,10 +854,10 @@ describe('evaluateResult — Bash unavailable tolerance', () => {
       selfAssessment: 'DONE',
       notes: 'Tests failed due to type error in config.ts',
     });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
   });
 
-  it('detects "cannot run tsc" pattern as Bash unavailable', () => {
+  it('detects "cannot run tsc" pattern as Bash unavailable', async () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({
       testsPassed: false,
@@ -865,10 +865,10 @@ describe('evaluateResult — Bash unavailable tolerance', () => {
       selfAssessment: 'DONE',
       notes: 'Cannot run tsc due to environment constraint',
     });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
-  it('detects "ENOENT session-env" reversed pattern', () => {
+  it('detects "ENOENT session-env" reversed pattern', async () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({
       testsPassed: false,
@@ -876,7 +876,7 @@ describe('evaluateResult — Bash unavailable tolerance', () => {
       selfAssessment: 'DONE',
       notes: 'ENOENT: no such file or directory, session-env path not found',
     });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 });
 

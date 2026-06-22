@@ -68,13 +68,13 @@ describe('mapEvaluation (EvaluationResult -> BacklogEvaluation)', () => {
 });
 
 describe('evaluateBacklogResult (end-to-end via real evaluateWithRubric)', () => {
-  it('a clean passing result decides non-NO_GO', () => {
-    const e = evaluateBacklogResult(entry, result({}), '/nonexistent-root');
+  it('a clean passing result decides non-NO_GO', async () => {
+    const e = await evaluateBacklogResult(entry, result({}), '/nonexistent-root');
     expect(e.decision).not.toBe('NO_GO');
     expect(e.reconciled).toBe(false);
   });
-  it('an honest NO_GO with no disk work stays NO_GO', () => {
-    const e = evaluateBacklogResult(
+  it('an honest NO_GO with no disk work stays NO_GO', async () => {
+    const e = await evaluateBacklogResult(
       entry,
       result({ selfAssessment: 'NO_GO', testsPassed: false, filesChanged: [], coverage: 0 }),
       '/nonexistent-root',

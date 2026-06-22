@@ -117,12 +117,12 @@ export function isDocTask(task: Task): boolean {
  * for consistent EVALUATE and FIX phase evaluation. This function is retained only
  * for backward compatibility with CLI finalize command.
  */
-export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string, coverageThreshold = 90, projectRoot?: string): TaskEvaluation {
+export async function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string, coverageThreshold = 90, projectRoot?: string): Promise<TaskEvaluation> {
   // Step 1a: Sprint 145 — TIMEOUT_WITH_WORK: worker was killed but has partial work
   // Attempt reconciliation via Spurious NO_GO helper if projectRoot available
   if ((result.selfAssessment as string) === 'TIMEOUT_WITH_WORK') {
     if (projectRoot) {
-      const reconciled = reconcileSpuriousNoGo(result, task, projectRoot);
+      const reconciled = await reconcileSpuriousNoGo(result, task, projectRoot);
       if (reconciled.decision === 'GO_WITH_TECH_DEBT') {
         debugLog('evaluateResult:reconcile', `Task ${task.id}: TIMEOUT_WITH_WORK reconciled → GO_WITH_TECH_DEBT`);
         return TaskEvaluation.GO_WITH_TECH_DEBT;
@@ -136,7 +136,7 @@ export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?
   // Sprint 145: Before giving up, check if git diff shows substantial work
   if (result.selfAssessment === 'NO_GO') {
     if (projectRoot) {
-      const reconciled = reconcileSpuriousNoGo(result, task, projectRoot);
+      const reconciled = await reconcileSpuriousNoGo(result, task, projectRoot);
       if (reconciled.reconciled && reconciled.decision === 'GO_WITH_TECH_DEBT') {
         debugLog('evaluateResult:reconcile', `Task ${task.id}: Spurious NO_GO reconciled → GO_WITH_TECH_DEBT (${reconciled.linesChanged} lines changed)`);
         return TaskEvaluation.GO_WITH_TECH_DEBT;
@@ -1153,7 +1153,13 @@ export function evaluateWithRubric(
   result: TaskResult,
   task: Task,
   rubric?: Partial<EvaluationRubric>,
-  projectRoot?: string,
+  // R8/ADR-087: kept for call-site compatibility but no longer used here. The
+  // spurious-NO_GO recovery (git-diff/tsc/vitest probes) moved OUT of this pure
+  // sync grader into the async reconcileEvaluationSpuriousNoGo() helper, because
+  // those probes used spawnSync and froze the Brain event loop for up to ~190s
+  // during EVALUATE. Production callers that pass a projectRoot wrap this result
+  // through that async helper (see runEvaluatePhase / runFixPhase / backlog-eval).
+  _projectRoot?: string,
 ): EvaluationResult {
   // D-2: Schema validation — reject results with missing required fields
   // Sprint 154 T-004: pass `task` so coverage:null is tolerated on non-code tasks
@@ -1264,47 +1270,9 @@ export function evaluateWithRubric(
         decision: reconciled.decision,
       };
     }
-
-    // Sprint 191 P191-1: Spurious NO_GO recovery for OOM-killed / partial-result
-    // promoted workers (Sprint 151 safety-net). evaluateWithRubric was the only
-    // production EVALUATE path that did NOT call reconcileSpuriousNoGo (Sprint 145
-    // helper was wired only into the deprecated evaluateResult).
-    //
-    // When projectRoot is provided, attempt git-diff/scope/tsc recovery as a
-    // final fallback. For OOM-killed workers (Sprint 151 partial-marker promotion)
-    // we accept reconcile WITHOUT vitest scope check — the worker was killed
-    // before it could run tests, so expecting test pass is illogical. The
-    // result will be GO_WITH_TECH_DEBT (tech debt: tests need follow-up sprint).
-    if (projectRoot) {
-      const isOomKilled =
-        typeof result.notes === 'string' &&
-        (result.notes.includes('OOM-killed') ||
-          result.notes.includes('SIGKILL') ||
-          result.notes.includes('partial-result promoted'));
-
-      const spurious = reconcileSpuriousNoGo(
-        result,
-        task,
-        projectRoot,
-        isOomKilled
-          ? {
-              // OOM-kill path: skip vitest (worker died before tests could run).
-              // Still require: git diff > 0, scope compliant, tsc clean.
-              runVitestScopeCheck: () => ({ passed: true, passRatio: 0 }),
-            }
-          : undefined,
-      );
-      if (spurious.reconciled && spurious.decision === 'GO_WITH_TECH_DEBT') {
-        debugLog(
-          'evaluateWithRubric:spurious-reconcile',
-          `Task ${task.id}: spurious NO_GO reconciled → GO_WITH_TECH_DEBT (${spurious.linesChanged} lines, ${spurious.filesChanged.length} files, oomKilled=${isOomKilled})`,
-        );
-        return {
-          ...evaluation,
-          decision: 'GO_WITH_TECH_DEBT',
-        };
-      }
-    }
+    // Spurious NO_GO recovery (git-diff/tsc/vitest) is applied AFTER this pure
+    // grader by reconcileEvaluationSpuriousNoGo() — async, so it does not freeze
+    // the event loop (R8/ADR-087). Production EVALUATE/FIX paths wrap the result.
   }
 
   // STATE-W1: enrich NO_GO result with root-cause category and scope file lists
@@ -1312,6 +1280,65 @@ export function evaluateWithRubric(
     return enrichEvaluationWithCategory(evaluation, result, task);
   }
 
+  return evaluation;
+}
+
+/**
+ * Spurious NO_GO recovery for the rubric EVALUATE path (Sprint 191 P191-1).
+ *
+ * Extracted from evaluateWithRubric (R8/ADR-087): the git-diff/scope/tsc/vitest
+ * probes inside reconcileSpuriousNoGo() are async `spawn` now — they used to be
+ * `spawnSync` and froze the Brain event loop for up to git10+tsc60+vitest120 ≈
+ * 190s on every EVALUATE that reached a NO_GO with a projectRoot. Keeping
+ * evaluateWithRubric() a pure sync grader, the production call sites that pass a
+ * projectRoot wrap its result through this async step.
+ *
+ * Behavior-preserving (exactly mirrors the old inline block): only NO_GO
+ * decisions with a projectRoot are eligible; OOM-killed/SIGKILL/partial-promoted
+ * workers skip the vitest gate (killed before tests could run). On recovery the
+ * decision flips to GO_WITH_TECH_DEBT, dropping the NO_GO-only STATE-W1 category
+ * fields (matching the pre-refactor `{ ...preEnrichEvaluation, decision }` shape).
+ * Otherwise the input evaluation is returned unchanged.
+ */
+export async function reconcileEvaluationSpuriousNoGo(
+  evaluation: EvaluationResult,
+  result: TaskResult,
+  task: Task,
+  projectRoot?: string,
+): Promise<EvaluationResult> {
+  if (evaluation.decision !== 'NO_GO' || !projectRoot) return evaluation;
+
+  const isOomKilled =
+    typeof result.notes === 'string' &&
+    (result.notes.includes('OOM-killed') ||
+      result.notes.includes('SIGKILL') ||
+      result.notes.includes('partial-result promoted'));
+
+  const spurious = await reconcileSpuriousNoGo(
+    result,
+    task,
+    projectRoot,
+    isOomKilled
+      ? {
+          // OOM-kill path: skip vitest (worker died before tests could run).
+          // Still require: git diff > 0, scope compliant, tsc clean.
+          runVitestScopeCheck: () => ({ passed: true, passRatio: 0 }),
+        }
+      : undefined,
+  );
+
+  if (spurious.reconciled && spurious.decision === 'GO_WITH_TECH_DEBT') {
+    debugLog(
+      'evaluateWithRubric:spurious-reconcile',
+      `Task ${task.id}: spurious NO_GO reconciled → GO_WITH_TECH_DEBT (${spurious.linesChanged} lines, ${spurious.filesChanged.length} files, oomKilled=${isOomKilled})`,
+    );
+    return {
+      decision: 'GO_WITH_TECH_DEBT',
+      totalScore: evaluation.totalScore,
+      rubricScores: evaluation.rubricScores,
+      retryCount: evaluation.retryCount,
+    };
+  }
   return evaluation;
 }
 

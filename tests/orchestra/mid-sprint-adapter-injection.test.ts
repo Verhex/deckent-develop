@@ -21,25 +21,25 @@ afterEach(() => {
 });
 
 describe('C-04 mid-sprint-adapter shell-injection hardening', () => {
-  it('defaultGetGitDiffStats does not execute shell metacharacters in scope.directories', () => {
+  it('defaultGetGitDiffStats does not execute shell metacharacters in scope.directories', async () => {
     const sentinel = join(tmpdir(), `deckent_c04_git_${Date.now()}_${Math.random().toString(36).slice(2)}`);
     sentinels.push(sentinel);
     const cwd = mkdtempSync(join(tmpdir(), 'deckent-c04-'));
     sentinels.push(cwd);
 
     // If dirs are interpolated into a shell string, `; touch <sentinel>`
-    // runs and creates the file. With spawnSync array form, git receives
+    // runs and creates the file. With async spawn array form, git receives
     // it as a literal pathspec and the shell never sees it.
     const malicious = { directories: [`; touch ${sentinel}`] } as { directories: string[] };
 
-    const result = defaultGetGitDiffStats(cwd, malicious as never);
+    const result = await defaultGetGitDiffStats(cwd, malicious as never);
 
     expect(existsSync(sentinel)).toBe(false);
     // Behavior preserved: graceful empty result, never throws
     expect(result).toEqual({ linesChanged: 0, filesChanged: [] });
   });
 
-  it('defaultRunVitestScopeCheck does not execute shell metacharacters in scope dirs', () => {
+  it('defaultRunVitestScopeCheck does not execute shell metacharacters in scope dirs', async () => {
     const sentinel = join(tmpdir(), `deckent_c04_vitest_${Date.now()}_${Math.random().toString(36).slice(2)}`);
     sentinels.push(sentinel);
     const cwd = mkdtempSync(join(tmpdir(), 'deckent-c04v-'));
@@ -49,7 +49,7 @@ describe('C-04 mid-sprint-adapter shell-injection hardening', () => {
     // reaches the command. Shell injection would create the sentinel.
     const malicious = [`src/x; touch ${sentinel}`];
 
-    const out = defaultRunVitestScopeCheck(cwd, malicious);
+    const out = await defaultRunVitestScopeCheck(cwd, malicious);
 
     expect(existsSync(sentinel)).toBe(false);
     expect(typeof out.passRatio).toBe('number');

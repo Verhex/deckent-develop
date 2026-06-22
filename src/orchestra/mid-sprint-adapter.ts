@@ -16,7 +16,7 @@ import type { RateLimitState } from '../core/token-quota.js';
 import type { OutcomeTracker } from './outcome-tracker.js';
 import type { ResolvedConfig } from '../core/config-types.js';
 import { debugLog } from '../core/utils.js';
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -332,32 +332,83 @@ export interface ReconciliationResult {
   scopeCompliant: boolean;
 }
 
-/** Options for dependency injection in tests */
+/**
+ * Options for dependency injection in tests.
+ *
+ * R8/ADR-087: the subprocess overrides are async. The default runners moved off
+ * `spawnSync` (which froze the Brain event loop for up to git10+tsc60+vitest120 ≈
+ * 190s during EVALUATE spurious-NO_GO reconciliation) onto async `spawn`. Test
+ * stubs may still return a plain value — `await` on a non-Promise is a no-op, so
+ * `() => ({ passRatio: 1, passed: true })` and `async () => (...)` both satisfy
+ * these signatures.
+ */
 export interface ReconciliationDeps {
   /** Override for git diff --stat execution */
-  getGitDiffStats?: (projectRoot: string, scope: Task['scope']) => { linesChanged: number; filesChanged: string[] };
+  getGitDiffStats?: (projectRoot: string, scope: Task['scope']) => { linesChanged: number; filesChanged: string[] } | Promise<{ linesChanged: number; filesChanged: string[] }>;
   /** Override for tsc --noEmit check */
-  runTscCheck?: (projectRoot: string) => boolean;
+  runTscCheck?: (projectRoot: string) => boolean | Promise<boolean>;
   /** Override for vitest scope check */
-  runVitestScopeCheck?: (projectRoot: string, scopeDirs: string[]) => { passRatio: number; passed: boolean };
+  runVitestScopeCheck?: (projectRoot: string, scopeDirs: string[]) => { passRatio: number; passed: boolean } | Promise<{ passRatio: number; passed: boolean }>;
 }
+
+/** Captured result of an async subprocess run (mirrors the spawnSync fields these readers consult). */
+interface SubprocessRun {
+  status: number | null;
+  stdout: string;
+  /** True when spawn failed or the timeout SIGKILL fired (maps to spawnSync's `error` field). */
+  error: boolean;
+}
+
+/**
+ * Injectable async command runner — replaces `spawnSync` to keep the event loop
+ * responsive (R8/ADR-087). Defaults to {@link defaultSubprocessRunner}; tests pass
+ * a fake to drive parsing without a real subprocess.
+ */
+export type SubprocessRunner = (
+  cmd: string,
+  args: string[],
+  opts: { cwd: string; timeoutMs: number },
+) => Promise<SubprocessRun>;
+
+/**
+ * Default runner: async `spawn`. Collects stdout off the stream, enforces the
+ * timeout with a SIGKILL timer, and resolves (never rejects) so the callers'
+ * fail-safe `{ ...defaults }` behavior is preserved exactly.
+ */
+const defaultSubprocessRunner: SubprocessRunner = (cmd, args, { cwd, timeoutMs }) =>
+  new Promise((resolve) => {
+    let stdout = '';
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn(cmd, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+    } catch (e) {
+      debugLog('mid-sprint-adapter:spawn', e);
+      resolve({ status: null, stdout: '', error: true });
+      return;
+    }
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL'); }, timeoutMs);
+    child.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
+    child.on('error', (e) => { clearTimeout(timer); debugLog('mid-sprint-adapter:spawn', e); resolve({ status: null, stdout, error: true }); });
+    child.on('close', (code) => { clearTimeout(timer); resolve({ status: code, stdout, error: timedOut }); });
+  });
 
 /**
  * Get git diff stats for files within the task scope.
  * Returns lines changed and files changed.
  */
-export function defaultGetGitDiffStats(projectRoot: string, scope: Task['scope']): { linesChanged: number; filesChanged: string[] } {
+export async function defaultGetGitDiffStats(
+  projectRoot: string,
+  scope: Task['scope'],
+  runner: SubprocessRunner = defaultSubprocessRunner,
+): Promise<{ linesChanged: number; filesChanged: string[] }> {
   try {
     const dirs = scope?.directories ?? [];
-    // ADR-006: array-form spawnSync, no shell — dirs are pathspecs after `--`,
+    // ADR-006: array-form spawn, no shell — dirs are pathspecs after `--`,
     // never interpolated into a command string.
     const args = ['diff', '--stat', 'HEAD'];
     if (dirs.length > 0) args.push('--', ...dirs);
-    const res = spawnSync('git', args, {
-      cwd: projectRoot,
-      encoding: 'utf-8',
-      timeout: 10_000,
-    });
+    const res = await runner('git', args, { cwd: projectRoot, timeoutMs: 10_000 });
     if (res.error || res.status !== 0 || typeof res.stdout !== 'string') {
       return { linesChanged: 0, filesChanged: [] };
     }
@@ -385,15 +436,13 @@ export function defaultGetGitDiffStats(projectRoot: string, scope: Task['scope']
 /**
  * Run tsc --noEmit and return whether it passed.
  */
-export function defaultRunTscCheck(projectRoot: string): boolean {
+export async function defaultRunTscCheck(
+  projectRoot: string,
+  runner: SubprocessRunner = defaultSubprocessRunner,
+): Promise<boolean> {
   try {
-    // ADR-006: array-form spawnSync, no shell. Static args (no task input).
-    const res = spawnSync('npx', ['tsc', '--noEmit'], {
-      cwd: projectRoot,
-      encoding: 'utf-8',
-      timeout: 60_000,
-      stdio: 'pipe',
-    });
+    // ADR-006: array-form spawn, no shell. Static args (no task input).
+    const res = await runner('npx', ['tsc', '--noEmit'], { cwd: projectRoot, timeoutMs: 60_000 });
     return !res.error && res.status === 0;
   } catch {
     return false;
@@ -403,7 +452,11 @@ export function defaultRunTscCheck(projectRoot: string): boolean {
 /**
  * Run vitest for scope-specific files and return pass ratio.
  */
-export function defaultRunVitestScopeCheck(projectRoot: string, scopeDirs: string[]): { passRatio: number; passed: boolean } {
+export async function defaultRunVitestScopeCheck(
+  projectRoot: string,
+  scopeDirs: string[],
+  runner: SubprocessRunner = defaultSubprocessRunner,
+): Promise<{ passRatio: number; passed: boolean }> {
   try {
     // Build test path patterns from scope directories
     const testPatterns = scopeDirs
@@ -414,13 +467,8 @@ export function defaultRunVitestScopeCheck(projectRoot: string, scopeDirs: strin
       return { passRatio: 1, passed: true };
     }
 
-    // ADR-006: array-form spawnSync, no shell — testPatterns are argv items.
-    const res = spawnSync('npx', ['vitest', 'run', '--reporter=json', ...testPatterns], {
-      cwd: projectRoot,
-      encoding: 'utf-8',
-      timeout: 120_000,
-      stdio: 'pipe',
-    });
+    // ADR-006: array-form spawn, no shell — testPatterns are argv items.
+    const res = await runner('npx', ['vitest', 'run', '--reporter=json', ...testPatterns], { cwd: projectRoot, timeoutMs: 120_000 });
     if (res.error || res.status !== 0 || typeof res.stdout !== 'string') {
       // vitest exits non-zero on test failures — preserve prior fail behavior
       return { passRatio: 0, passed: false };
@@ -474,18 +522,18 @@ function checkScopeCompliance(filesChanged: string[], scope: Task['scope']): boo
  * @param projectRoot - Project root path
  * @param deps - Optional dependency injection for testing
  */
-export function reconcileSpuriousNoGo(
+export async function reconcileSpuriousNoGo(
   result: TaskResult,
   task: Task,
   projectRoot: string,
   deps?: ReconciliationDeps,
-): ReconciliationResult {
+): Promise<ReconciliationResult> {
   const getGitDiff = deps?.getGitDiffStats ?? defaultGetGitDiffStats;
   const runTsc = deps?.runTscCheck ?? defaultRunTscCheck;
   const runVitest = deps?.runVitestScopeCheck ?? defaultRunVitestScopeCheck;
 
   // Step 1: Check git diff — is there meaningful work?
-  const diffStats = getGitDiff(projectRoot, task.scope);
+  const diffStats = await getGitDiff(projectRoot, task.scope);
 
   if (diffStats.linesChanged === 0 || diffStats.filesChanged.length === 0) {
     debugLog('reconcile:spurious-nogo', `Task ${task.id}: no git diff — cannot reconcile`);
@@ -518,7 +566,7 @@ export function reconcileSpuriousNoGo(
   }
 
   // Step 3: tsc --noEmit
-  const tscPassed = runTsc(projectRoot);
+  const tscPassed = await runTsc(projectRoot);
   if (!tscPassed) {
     debugLog('reconcile:spurious-nogo', `Task ${task.id}: tsc --noEmit failed — cannot reconcile`);
     return {
@@ -535,7 +583,7 @@ export function reconcileSpuriousNoGo(
 
   // Step 4: vitest scope check
   const scopeDirs = task.scope?.directories ?? [];
-  const vitestResult = runVitest(projectRoot, scopeDirs);
+  const vitestResult = await runVitest(projectRoot, scopeDirs);
   const vitestPassRatio = vitestResult.passRatio;
 
   // Decision: 1+2+3 PASS, 4 partial PASS (>50%) → GO_WITH_TECH_DEBT

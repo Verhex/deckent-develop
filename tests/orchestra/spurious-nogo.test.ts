@@ -65,12 +65,12 @@ function makeDeps(overrides: Partial<ReconciliationDeps> = {}): ReconciliationDe
 // ─── Test Suite 1: TIMEOUT_WITH_WORK scenarios ───────────────────────────
 
 describe('reconcileSpuriousNoGo — TIMEOUT_WITH_WORK', () => {
-  it('1. TIMEOUT_WITH_WORK + git diff dolu + tsc PASS → GO_WITH_TECH_DEBT', () => {
+  it('1. TIMEOUT_WITH_WORK + git diff dolu + tsc PASS → GO_WITH_TECH_DEBT', async () => {
     const result = makeResult({ selfAssessment: 'TIMEOUT_WITH_WORK' as TaskResult['selfAssessment'] });
     const task = makeTask();
     const deps = makeDeps();
 
-    const reconciled = reconcileSpuriousNoGo(result, task, '/workspace', deps);
+    const reconciled = await reconcileSpuriousNoGo(result, task, '/workspace', deps);
 
     expect(reconciled.decision).toBe('GO_WITH_TECH_DEBT');
     expect(reconciled.reconciled).toBe(true);
@@ -79,28 +79,28 @@ describe('reconcileSpuriousNoGo — TIMEOUT_WITH_WORK', () => {
     expect(reconciled.notes).toContain('Spurious NO_GO reconciled');
   });
 
-  it('2. TIMEOUT_WITH_WORK + git diff boş → NO_GO unchanged', () => {
+  it('2. TIMEOUT_WITH_WORK + git diff boş → NO_GO unchanged', async () => {
     const result = makeResult({ selfAssessment: 'TIMEOUT_WITH_WORK' as TaskResult['selfAssessment'] });
     const task = makeTask();
     const deps = makeDeps({
       getGitDiffStats: () => ({ linesChanged: 0, filesChanged: [] }),
     });
 
-    const reconciled = reconcileSpuriousNoGo(result, task, '/workspace', deps);
+    const reconciled = await reconcileSpuriousNoGo(result, task, '/workspace', deps);
 
     expect(reconciled.decision).toBe('NO_GO');
     expect(reconciled.reconciled).toBe(false);
     expect(reconciled.notes).toContain('No file changes');
   });
 
-  it('3. TIMEOUT_WITH_WORK + tsc FAIL → NO_GO', () => {
+  it('3. TIMEOUT_WITH_WORK + tsc FAIL → NO_GO', async () => {
     const result = makeResult({ selfAssessment: 'TIMEOUT_WITH_WORK' as TaskResult['selfAssessment'] });
     const task = makeTask();
     const deps = makeDeps({
       runTscCheck: () => false,
     });
 
-    const reconciled = reconcileSpuriousNoGo(result, task, '/workspace', deps);
+    const reconciled = await reconcileSpuriousNoGo(result, task, '/workspace', deps);
 
     expect(reconciled.decision).toBe('NO_GO');
     expect(reconciled.reconciled).toBe(false);
@@ -112,7 +112,7 @@ describe('reconcileSpuriousNoGo — TIMEOUT_WITH_WORK', () => {
 // ─── Test Suite 2: NO_GO scenarios ───────────────────────────────────────
 
 describe('reconcileSpuriousNoGo — NO_GO', () => {
-  it('4. NO_GO + git diff > 50 lines + tsc PASS → reconciled GO_WITH_TECH_DEBT', () => {
+  it('4. NO_GO + git diff > 50 lines + tsc PASS → reconciled GO_WITH_TECH_DEBT', async () => {
     const result = makeResult({ selfAssessment: 'NO_GO' });
     const task = makeTask();
     const deps = makeDeps({
@@ -122,14 +122,14 @@ describe('reconcileSpuriousNoGo — NO_GO', () => {
       }),
     });
 
-    const reconciled = reconcileSpuriousNoGo(result, task, '/workspace', deps);
+    const reconciled = await reconcileSpuriousNoGo(result, task, '/workspace', deps);
 
     expect(reconciled.decision).toBe('GO_WITH_TECH_DEBT');
     expect(reconciled.reconciled).toBe(true);
     expect(reconciled.linesChanged).toBe(80);
   });
 
-  it('5. NO_GO + git diff < 10 lines → NO_GO unchanged (still reconciled if tsc+vitest pass)', () => {
+  it('5. NO_GO + git diff < 10 lines → NO_GO unchanged (still reconciled if tsc+vitest pass)', async () => {
     const result = makeResult({ selfAssessment: 'NO_GO' });
     const task = makeTask();
     // Even with < 10 lines, if they exist and pass all checks, reconciliation applies
@@ -141,7 +141,7 @@ describe('reconcileSpuriousNoGo — NO_GO', () => {
       }),
     });
 
-    const reconciled = reconcileSpuriousNoGo(result, task, '/workspace', deps);
+    const reconciled = await reconcileSpuriousNoGo(result, task, '/workspace', deps);
 
     // With 5 lines, tsc PASS, vitest 85% → still GO_WITH_TECH_DEBT
     expect(reconciled.decision).toBe('GO_WITH_TECH_DEBT');
@@ -152,7 +152,7 @@ describe('reconcileSpuriousNoGo — NO_GO', () => {
 // ─── Test Suite 3: Scope and vitest edge cases ──────────────────────────
 
 describe('reconcileSpuriousNoGo — edge cases', () => {
-  it('6. Scope violation (filesChanged ⊄ scope) → NO_GO + RBAC alert', () => {
+  it('6. Scope violation (filesChanged ⊄ scope) → NO_GO + RBAC alert', async () => {
     const result = makeResult({ selfAssessment: 'NO_GO' });
     const task = makeTask({
       scope: {
@@ -169,7 +169,7 @@ describe('reconcileSpuriousNoGo — edge cases', () => {
       }),
     });
 
-    const reconciled = reconcileSpuriousNoGo(result, task, '/workspace', deps);
+    const reconciled = await reconcileSpuriousNoGo(result, task, '/workspace', deps);
 
     expect(reconciled.decision).toBe('NO_GO');
     expect(reconciled.reconciled).toBe(false);
@@ -178,7 +178,7 @@ describe('reconcileSpuriousNoGo — edge cases', () => {
     expect(reconciled.notes).toContain('RBAC alert');
   });
 
-  it('7. vitest 75% PASS → GO_WITH_TECH_DEBT (notes explain gap)', () => {
+  it('7. vitest 75% PASS → GO_WITH_TECH_DEBT (notes explain gap)', async () => {
     const result = makeResult({
       selfAssessment: 'TIMEOUT_WITH_WORK' as TaskResult['selfAssessment'],
     });
@@ -187,7 +187,7 @@ describe('reconcileSpuriousNoGo — edge cases', () => {
       runVitestScopeCheck: () => ({ passRatio: 0.75, passed: true }), // >50% = passed
     });
 
-    const reconciled = reconcileSpuriousNoGo(result, task, '/workspace', deps);
+    const reconciled = await reconcileSpuriousNoGo(result, task, '/workspace', deps);
 
     expect(reconciled.decision).toBe('GO_WITH_TECH_DEBT');
     expect(reconciled.reconciled).toBe(true);
@@ -195,7 +195,7 @@ describe('reconcileSpuriousNoGo — edge cases', () => {
     expect(reconciled.notes).toContain('75%');
   });
 
-  it('8. T-144-001 scenario simulate (init split TIMEOUT_WITH_WORK) → reconciled GO_WITH_TECH_DEBT', () => {
+  it('8. T-144-001 scenario simulate (init split TIMEOUT_WITH_WORK) → reconciled GO_WITH_TECH_DEBT', async () => {
     // Simulates Sprint 144 Task 001: worker.ts split 1669→4 files,
     // worker timed out but significant work was done
     const result = makeResult({
@@ -238,7 +238,7 @@ describe('reconcileSpuriousNoGo — edge cases', () => {
       runVitestScopeCheck: () => ({ passRatio: 0.92, passed: true }),
     });
 
-    const reconciled = reconcileSpuriousNoGo(result, task, '/workspace', deps);
+    const reconciled = await reconcileSpuriousNoGo(result, task, '/workspace', deps);
 
     expect(reconciled.decision).toBe('GO_WITH_TECH_DEBT');
     expect(reconciled.reconciled).toBe(true);
@@ -252,26 +252,26 @@ describe('reconcileSpuriousNoGo — edge cases', () => {
 // ─── Test Suite 4: evaluateResult integration ────────────────────────────
 
 describe('evaluateResult — Spurious NO_GO wire integration', () => {
-  it('TIMEOUT_WITH_WORK always returns GO_WITH_TECH_DEBT (no projectRoot)', () => {
+  it('TIMEOUT_WITH_WORK always returns GO_WITH_TECH_DEBT (no projectRoot)', async () => {
     const result = makeResult({
       selfAssessment: 'TIMEOUT_WITH_WORK' as TaskResult['selfAssessment'],
     });
     const task = makeTask();
 
     // Without projectRoot — fallback behavior
-    const evaluation = evaluateResult(result, task);
+    const evaluation = await evaluateResult(result, task);
     expect(evaluation).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
-  it('NO_GO without projectRoot → NO_GO (no reconciliation attempted)', () => {
+  it('NO_GO without projectRoot → NO_GO (no reconciliation attempted)', async () => {
     const result = makeResult({ selfAssessment: 'NO_GO' });
     const task = makeTask();
 
-    const evaluation = evaluateResult(result, task);
+    const evaluation = await evaluateResult(result, task);
     expect(evaluation).toBe(TaskEvaluation.NO_GO);
   });
 
-  it('vitest < 50% pass ratio → NO_GO (reconciliation fails)', () => {
+  it('vitest < 50% pass ratio → NO_GO (reconciliation fails)', async () => {
     const result = makeResult({ selfAssessment: 'NO_GO' });
     const task = makeTask();
     const deps: ReconciliationDeps = {
@@ -283,7 +283,7 @@ describe('evaluateResult — Spurious NO_GO wire integration', () => {
       runVitestScopeCheck: () => ({ passRatio: 0.30, passed: false }),
     };
 
-    const reconciled = reconcileSpuriousNoGo(result, task, '/workspace', deps);
+    const reconciled = await reconcileSpuriousNoGo(result, task, '/workspace', deps);
     expect(reconciled.decision).toBe('NO_GO');
     expect(reconciled.reconciled).toBe(false);
     expect(reconciled.vitestPassRatio).toBe(0.30);

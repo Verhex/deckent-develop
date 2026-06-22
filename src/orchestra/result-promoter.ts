@@ -25,11 +25,14 @@ export interface PartialPromotionResult {
 
 /** Injectable overrides for hermetic testing */
 export interface PartialPromotionOptions {
-  runTscCheck?: (projectRoot: string) => boolean;
+  // R8/ADR-087: the default tsc/vitest runners are async `spawn` now (they used
+  // to be spawnSync, freezing the event loop). Test stubs may still return a plain
+  // value — `await` on a non-Promise is a no-op.
+  runTscCheck?: (projectRoot: string) => boolean | Promise<boolean>;
   runVitestScopeCheck?: (
     projectRoot: string,
     scopeDirs: string[],
-  ) => { passRatio: number; passed: boolean };
+  ) => { passRatio: number; passed: boolean } | Promise<{ passRatio: number; passed: boolean }>;
 }
 
 // ─── Core ────────────────────────────────────────────────────────────────────
@@ -45,13 +48,13 @@ const VITEST_MIN_PASS_RATIO = 0.5;
  * When both gates pass, returns a synthetic TaskResult with filesChanged restricted
  * to in-scope files. Commit/revert wiring is not performed in this slice.
  */
-export function attemptPartialPromotion(
+export async function attemptPartialPromotion(
   root: string,
   task: Task,
   result: TaskResult,
   evaluation: EvaluationResult,
   options?: PartialPromotionOptions,
-): PartialPromotionResult {
+): Promise<PartialPromotionResult> {
   const inScopeFiles = evaluation.filesInScope ?? [];
   const droppedFiles = evaluation.filesOutOfScope ?? [];
 
@@ -84,7 +87,7 @@ export function attemptPartialPromotion(
   const runTsc = options?.runTscCheck ?? defaultRunTscCheck;
   const runVitest = options?.runVitestScopeCheck ?? defaultRunVitestScopeCheck;
 
-  const tscPassed = runTsc(root);
+  const tscPassed = await runTsc(root);
   if (!tscPassed) {
     return {
       promoted: false,
@@ -96,7 +99,7 @@ export function attemptPartialPromotion(
   }
 
   const scopeDirs = task.scope?.directories ?? [];
-  const vitestResult = runVitest(root, scopeDirs);
+  const vitestResult = await runVitest(root, scopeDirs);
   if (vitestResult.passRatio < VITEST_MIN_PASS_RATIO) {
     return {
       promoted: false,

@@ -96,7 +96,7 @@ import { showSplashIfEnabled } from '../cli/helpers/splash.js';
 import { calculateMetrics } from './sprint-reporter.js';
 
 // ─── Rubric-Based Evaluation ─────────────────────────────────────
-import { evaluateWithRubric } from './result-evaluator.js';
+import { evaluateWithRubric, reconcileEvaluationSpuriousNoGo } from './result-evaluator.js';
 
 // ─── Honest Result Gate (Sprint 165 Task 1 — Bug X Fix) ─────────
 // Single canonical honesty boundary. Applied before evaluateWithRubric
@@ -1284,7 +1284,8 @@ export async function runEvaluatePhase(
 
         // Sprint 191 P191-1: pass projectRoot so OOM-killed / partial-result
         // workers can be reconciled via reconcileSpuriousNoGo (git diff fallback).
-        const rubricResult = evaluateWithRubric(result, task, undefined, projectRoot);
+        const rubricResult = await reconcileEvaluationSpuriousNoGo(
+          evaluateWithRubric(result, task, undefined, projectRoot), result, task, projectRoot);
         let evaluation = toTaskEvaluation(rubricResult);
 
         // PROMOTE-W1b: flag-gated partial promotion (default-off).
@@ -1300,7 +1301,7 @@ export async function runEvaluatePhase(
             gated.honest
           ) {
             try {
-              const ppResult = attemptPartialPromotion(projectRoot, task, result, rubricResult);
+              const ppResult = await attemptPartialPromotion(projectRoot, task, result, rubricResult);
               if (ppResult.promoted) {
                 // in-scope commit
                 try {
@@ -1655,7 +1656,8 @@ export async function runEvaluatePhase(
               'runEvaluatePhase:extension-hit',
               `task=${task.id} produced .result during extension window`,
             );
-            const rubricResult = evaluateWithRubric(lateResult, task, undefined, projectRoot);
+            const rubricResult = await reconcileEvaluationSpuriousNoGo(
+              evaluateWithRubric(lateResult, task, undefined, projectRoot), lateResult, task, projectRoot);
             const evaluation = toTaskEvaluation(rubricResult);
             handleEvaluation(projectRoot, task, evaluation, lateResult);
             evaluations.set(task.id, evaluation);
@@ -1715,7 +1717,8 @@ export async function runEvaluatePhase(
               'runEvaluatePhase:alive-grace-hit',
               `task=${task.id} produced .result during grace window`,
             );
-            const graceRubric = evaluateWithRubric(graceResult, task, undefined, projectRoot);
+            const graceRubric = await reconcileEvaluationSpuriousNoGo(
+              evaluateWithRubric(graceResult, task, undefined, projectRoot), graceResult, task, projectRoot);
             const graceEval = toTaskEvaluation(graceRubric);
             handleEvaluation(projectRoot, task, graceEval, graceResult);
             evaluations.set(task.id, graceEval);
@@ -2116,7 +2119,8 @@ export async function runFixPhase(
         const fixResult = fixResults.find(r => r.taskId === fixTask.id);
         if (fixResult) {
           // Sprint 191 P191-1: projectRoot for spurious NO_GO reconcile (fix-task too)
-          const fixRubricResult = evaluateWithRubric(fixResult, fixTask, undefined, projectRoot);
+          const fixRubricResult = await reconcileEvaluationSpuriousNoGo(
+            evaluateWithRubric(fixResult, fixTask, undefined, projectRoot), fixResult, fixTask, projectRoot);
           const fixEval = toTaskEvaluation(fixRubricResult);
           handleEvaluation(projectRoot, fixTask, fixEval, fixResult);
           evaluations.set(fixTask.id, fixEval);

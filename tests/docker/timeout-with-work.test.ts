@@ -117,7 +117,7 @@ describe('Docker EXIT Trap — TIMEOUT_WITH_WORK', () => {
 // ─── Test Suite: evaluateResult with TIMEOUT_WITH_WORK ────────────────────
 
 describe('evaluateResult — TIMEOUT_WITH_WORK handling', () => {
-  it('TIMEOUT_WITH_WORK selfAssessment → GO_WITH_TECH_DEBT', () => {
+  it('TIMEOUT_WITH_WORK selfAssessment → GO_WITH_TECH_DEBT', async () => {
     const task = makeTask('145-test-001');
     const result = makeResult({
       taskId: '145-test-001',
@@ -126,11 +126,11 @@ describe('evaluateResult — TIMEOUT_WITH_WORK handling', () => {
       notes: 'Worker timeout/killed but git diff shows 3 files modified.',
     });
 
-    const evaluation = evaluateResult(result, task);
+    const evaluation = await evaluateResult(result, task);
     expect(evaluation).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
-  it('NO_GO selfAssessment still returns NO_GO (not affected by TIMEOUT_WITH_WORK logic)', () => {
+  it('NO_GO selfAssessment still returns NO_GO (not affected by TIMEOUT_WITH_WORK logic)', async () => {
     const task = makeTask('145-test-002');
     const result = makeResult({
       taskId: '145-test-002',
@@ -138,11 +138,11 @@ describe('evaluateResult — TIMEOUT_WITH_WORK handling', () => {
       notes: 'Worker exited without writing result',
     });
 
-    const evaluation = evaluateResult(result, task);
+    const evaluation = await evaluateResult(result, task);
     expect(evaluation).toBe(TaskEvaluation.NO_GO);
   });
 
-  it('DONE selfAssessment with tests passed still returns DONE', () => {
+  it('DONE selfAssessment with tests passed still returns DONE', async () => {
     const task = makeTask('145-test-003');
     const result = makeResult({
       taskId: '145-test-003',
@@ -152,7 +152,7 @@ describe('evaluateResult — TIMEOUT_WITH_WORK handling', () => {
       filesChanged: ['src/core/config.ts'],
     });
 
-    const evaluation = evaluateResult(result, task);
+    const evaluation = await evaluateResult(result, task);
     expect(evaluation).toBe(TaskEvaluation.DONE);
   });
 });

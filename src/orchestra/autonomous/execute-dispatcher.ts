@@ -110,7 +110,7 @@ export interface ExecuteDispatcherDeps {
    * real mode-independent kernels (backlog-eval.ts); injected as deterministic stubs in
    * hermetic dispatcher tests. A finished task is evaluated by the SAME core sprint mode uses.
    */
-  evaluate?: (entry: BacklogEntry, result: TaskResult, projectRoot: string) => BacklogEvaluation;
+  evaluate?: (entry: BacklogEntry, result: TaskResult, projectRoot: string) => BacklogEvaluation | Promise<BacklogEvaluation>;
   audit?: (entry: BacklogEntry, result: TaskResult, projectRoot: string) => Promise<AuditVerdict>;
   crossVerify?: (
     entry: BacklogEntry, result: TaskResult, projectRoot: string,
@@ -428,7 +428,7 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
               const audit = deps.audit ?? auditBacklogResult;
               const crossVerify = deps.crossVerify ?? crossVerifyBacklogResult;
 
-              const evaluation = evaluate(live, result, deps.projectRoot);
+              const evaluation = await evaluate(live, result, deps.projectRoot);
               deps.flow?.step('brain_verdict', entry.id,
                 `${evaluation.decision} q=${evaluation.quality}${evaluation.reconciled ? ' (reconciled)' : ''}`);
 

@@ -69,7 +69,7 @@ const vitestJustBelow = () => ({ passRatio: 0.49, passed: false });
 
 describe('attemptPartialPromotion — PROMOTE-W1', () => {
   describe('GATE-1: category eligibility', () => {
-    it('returns promoted=false when category is TECHNICAL', () => {
+    it('returns promoted=false when category is TECHNICAL', async () => {
       const task = makeTask();
       const result = makeResult({ filesChanged: ['src/orchestra/result-promoter.ts', 'src/unrelated/foo.ts'] });
       const evaluation = makeNoGoEvaluation({
@@ -79,7 +79,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
         isPartialPromotable: true,
       });
 
-      const out: PartialPromotionResult = attemptPartialPromotion(
+      const out: PartialPromotionResult = await attemptPartialPromotion(
         '/tmp/fake-root',
         task,
         result,
@@ -93,7 +93,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
       expect(out.promotedResult).toBeNull();
     });
 
-    it('returns promoted=false when category is RUNTIME_ERROR', () => {
+    it('returns promoted=false when category is RUNTIME_ERROR', async () => {
       const task = makeTask();
       const result = makeResult({ filesChanged: ['src/orchestra/result-promoter.ts'] });
       const evaluation = makeNoGoEvaluation({
@@ -103,7 +103,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
         isPartialPromotable: true,
       });
 
-      const out = attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
+      const out = await attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
         runTscCheck: tscPass,
         runVitestScopeCheck: vitestPass,
       });
@@ -112,7 +112,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
       expect(out.reason).toContain('gate1_fail');
     });
 
-    it('returns promoted=false when category is FATAL_ERROR', () => {
+    it('returns promoted=false when category is FATAL_ERROR', async () => {
       const task = makeTask();
       const result = makeResult({ filesChanged: ['src/orchestra/result-promoter.ts'] });
       const evaluation = makeNoGoEvaluation({
@@ -122,7 +122,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
         isPartialPromotable: true,
       });
 
-      const out = attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
+      const out = await attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
         runTscCheck: tscPass,
         runVitestScopeCheck: vitestPass,
       });
@@ -131,7 +131,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
       expect(out.reason).toContain('gate1_fail');
     });
 
-    it('returns promoted=false when filesInScope is empty (even with eligible category)', () => {
+    it('returns promoted=false when filesInScope is empty (even with eligible category)', async () => {
       const task = makeTask();
       const result = makeResult({ filesChanged: ['src/unrelated/foo.ts'] });
       const evaluation = makeNoGoEvaluation({
@@ -141,7 +141,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
         isPartialPromotable: false,
       });
 
-      const out = attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
+      const out = await attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
         runTscCheck: tscPass,
         runVitestScopeCheck: vitestPass,
       });
@@ -153,7 +153,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
   });
 
   describe('GATE-2: tsc check', () => {
-    it('returns promoted=false when tsc fails (BOUNDARY_VIOLATION category)', () => {
+    it('returns promoted=false when tsc fails (BOUNDARY_VIOLATION category)', async () => {
       const task = makeTask();
       const result = makeResult({
         filesChanged: ['src/orchestra/result-promoter.ts', 'src/unrelated/foo.ts'],
@@ -165,7 +165,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
         isPartialPromotable: true,
       });
 
-      const out = attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
+      const out = await attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
         runTscCheck: tscFail,
         runVitestScopeCheck: vitestPass,
       });
@@ -176,7 +176,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
       expect(out.promotedResult).toBeNull();
     });
 
-    it('returns promoted=false when tsc fails (UNKNOWN category)', () => {
+    it('returns promoted=false when tsc fails (UNKNOWN category)', async () => {
       const task = makeTask();
       const result = makeResult({
         filesChanged: ['src/orchestra/result-promoter.ts', 'src/unrelated/foo.ts'],
@@ -188,7 +188,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
         isPartialPromotable: true,
       });
 
-      const out = attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
+      const out = await attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
         runTscCheck: tscFail,
         runVitestScopeCheck: vitestPass,
       });
@@ -199,7 +199,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
   });
 
   describe('GATE-2: vitest check', () => {
-    it('returns promoted=false when vitest pass ratio < 0.5', () => {
+    it('returns promoted=false when vitest pass ratio < 0.5', async () => {
       const task = makeTask();
       const result = makeResult({
         filesChanged: ['src/orchestra/result-promoter.ts', 'src/unrelated/foo.ts'],
@@ -211,7 +211,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
         isPartialPromotable: true,
       });
 
-      const out = attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
+      const out = await attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
         runTscCheck: tscPass,
         runVitestScopeCheck: vitestFail,
       });
@@ -221,7 +221,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
       expect(out.reason).toContain('vitest');
     });
 
-    it('returns promoted=false when vitest pass ratio is 0.49 (just below threshold)', () => {
+    it('returns promoted=false when vitest pass ratio is 0.49 (just below threshold)', async () => {
       const task = makeTask();
       const result = makeResult({
         filesChanged: ['src/orchestra/result-promoter.ts', 'src/unrelated/foo.ts'],
@@ -233,7 +233,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
         isPartialPromotable: true,
       });
 
-      const out = attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
+      const out = await attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
         runTscCheck: tscPass,
         runVitestScopeCheck: vitestJustBelow,
       });
@@ -242,7 +242,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
       expect(out.reason).toContain('vitest');
     });
 
-    it('promotes when vitest pass ratio is exactly 0.5 (at threshold)', () => {
+    it('promotes when vitest pass ratio is exactly 0.5 (at threshold)', async () => {
       const task = makeTask();
       const result = makeResult({
         filesChanged: ['src/orchestra/result-promoter.ts', 'src/unrelated/foo.ts'],
@@ -254,7 +254,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
         isPartialPromotable: true,
       });
 
-      const out = attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
+      const out = await attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
         runTscCheck: tscPass,
         runVitestScopeCheck: vitestBorderlinePass,
       });
@@ -264,7 +264,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
   });
 
   describe('Successful partial promotion', () => {
-    it('A+B in-scope tsc-clean + C out-of-scope → promoted=true, inScopeFiles=[A,B], droppedFiles=[C]', () => {
+    it('A+B in-scope tsc-clean + C out-of-scope → promoted=true, inScopeFiles=[A,B], droppedFiles=[C]', async () => {
       const fileA = 'src/orchestra/result-promoter.ts';
       const fileB = 'src/orchestra/result-evaluator.ts';
       const fileC = 'src/unrelated/other.ts';
@@ -290,7 +290,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
         isPartialPromotable: true,
       });
 
-      const out = attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
+      const out = await attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
         runTscCheck: tscPass,
         runVitestScopeCheck: vitestPass,
       });
@@ -303,7 +303,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
       expect(out.promotedResult!.filesChanged).toEqual([fileA, fileB]);
     });
 
-    it('promotedResult preserves all other result fields unchanged', () => {
+    it('promotedResult preserves all other result fields unchanged', async () => {
       const fileA = 'src/orchestra/result-promoter.ts';
       const fileC = 'src/unrelated/other.ts';
 
@@ -324,7 +324,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
         isPartialPromotable: true,
       });
 
-      const out = attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
+      const out = await attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
         runTscCheck: tscPass,
         runVitestScopeCheck: vitestPass,
       });
@@ -340,7 +340,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
       expect(pr.filesChanged).toEqual([fileA]);
     });
 
-    it('promotes when category is UNKNOWN and in-scope files exist', () => {
+    it('promotes when category is UNKNOWN and in-scope files exist', async () => {
       const fileA = 'src/orchestra/result-promoter.ts';
       const fileC = 'src/unrelated/other.ts';
 
@@ -353,7 +353,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
         isPartialPromotable: true,
       });
 
-      const out = attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
+      const out = await attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
         runTscCheck: tscPass,
         runVitestScopeCheck: vitestPass,
       });
@@ -363,7 +363,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
       expect(out.droppedFiles).toEqual([fileC]);
     });
 
-    it('returns empty droppedFiles when all files are in-scope (UNKNOWN category)', () => {
+    it('returns empty droppedFiles when all files are in-scope (UNKNOWN category)', async () => {
       const fileA = 'src/orchestra/result-promoter.ts';
 
       const task = makeTask();
@@ -375,7 +375,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
         isPartialPromotable: true,
       });
 
-      const out = attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
+      const out = await attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
         runTscCheck: tscPass,
         runVitestScopeCheck: vitestPass,
       });
@@ -387,7 +387,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
   });
 
   describe('Edge cases', () => {
-    it('handles missing noGoCategory (undefined) as gate1 fail', () => {
+    it('handles missing noGoCategory (undefined) as gate1 fail', async () => {
       const task = makeTask();
       const result = makeResult({ filesChanged: ['src/orchestra/result-promoter.ts'] });
       const evaluation = makeNoGoEvaluation({
@@ -397,7 +397,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
         isPartialPromotable: true,
       });
 
-      const out = attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
+      const out = await attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
         runTscCheck: tscPass,
         runVitestScopeCheck: vitestPass,
       });
@@ -406,7 +406,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
       expect(out.reason).toContain('gate1_fail');
     });
 
-    it('handles missing filesInScope/filesOutOfScope gracefully', () => {
+    it('handles missing filesInScope/filesOutOfScope gracefully', async () => {
       const task = makeTask();
       const result = makeResult({ filesChanged: ['src/orchestra/result-promoter.ts'] });
       const evaluation = makeNoGoEvaluation({
@@ -414,7 +414,7 @@ describe('attemptPartialPromotion — PROMOTE-W1', () => {
         // filesInScope / filesOutOfScope not set
       });
 
-      const out = attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
+      const out = await attemptPartialPromotion('/tmp/fake-root', task, result, evaluation, {
         runTscCheck: tscPass,
         runVitestScopeCheck: vitestPass,
       });

@@ -80,6 +80,8 @@ vi.mock('../../src/orchestra/result-evaluator.js', () => ({
     ],
     retryCount: 0,
   })),
+  // R8/ADR-087: spurious recovery moved to this async helper — passthrough here.
+  reconcileEvaluationSpuriousNoGo: vi.fn((evaluation) => evaluation),
 }));
 
 vi.mock('../../src/orchestra/sprint-controller.js', async () => {

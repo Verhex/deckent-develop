@@ -53,6 +53,9 @@ vi.mock('../../src/orchestra/result-evaluator.js', async (importOriginal) => {
   return {
     ...actual,
     evaluateWithRubric: vi.fn(),
+    // R8/ADR-087: override the real async spurious helper with a passthrough so
+    // the mocked evaluateWithRubric decision flows through unchanged (no subprocess).
+    reconcileEvaluationSpuriousNoGo: vi.fn((evaluation) => evaluation),
   };
 });
 

@@ -8,7 +8,7 @@ import type { BacklogEntry } from './backlog-types.js';
 import type { Task, TaskResult, TaskScope, RubricScore, EvaluationResult, ProviderName, TaskEvaluation } from '../../core/types.js';
 import { TaskStatus } from '../../core/types.js';
 import type { ResolvedConfig } from '../../core/types.js';
-import { evaluateWithRubric } from '../result-evaluator.js';
+import { evaluateWithRubric, reconcileEvaluationSpuriousNoGo } from '../result-evaluator.js';
 import type { BoundaryViolation } from '../../core/monitoring-types.js';
 import {
   isFileInScope, checkADRCompliance, verifyWorkerResult,
@@ -75,13 +75,15 @@ export function mapEvaluation(result: TaskResult, evaluation: EvaluationResult):
 
 /** Component (1): evaluate a finished autonomous task with the SAME rubric + reconciliation
  *  sprint mode uses (disk-verify outranks a wrong self-report when projectRoot is real). */
-export function evaluateBacklogResult(
+export async function evaluateBacklogResult(
   entry: BacklogEntry,
   result: TaskResult,
   projectRoot: string,
-): BacklogEvaluation {
+): Promise<BacklogEvaluation> {
   const task = buildTaskForEval(entry, result);
-  return mapEvaluation(result, evaluateWithRubric(result, task, undefined, projectRoot));
+  const evaluation = await reconcileEvaluationSpuriousNoGo(
+    evaluateWithRubric(result, task, undefined, projectRoot), result, task, projectRoot);
+  return mapEvaluation(result, evaluation);
 }
 
 export interface AuditVerdict {
