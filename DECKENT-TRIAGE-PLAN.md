@@ -29,6 +29,24 @@
 
 > **POST-PUSH DEVAM (06-22, ikinci blok — 6 unpushed commit, main ahead 6):** 10-overnight-commit push'landıktan sonra Alperen "devam" dedi. ✅ **R5 README de-fabrike** (`7b89dec1`) · ✅ **R5 DebtTrend metadata-wire** (`132afa49`) · ➕ **noGoRate test-hygiene** (`8d2e3766`, prior-session loose-end) · ✅ **R3 sprint_timeout_minutes wire** (`92359eab`, Alperen-ruling: config-onurla, default→unlimited) · ✅ **R8 captureVitestBaseline async** (`45f86208`, en-yüksek freeze). Hepsi faithful-locked + affected-suite-green. **Toplam oturum: 16 commit, 14 gerçek fix.** Kalan R8 (5 site), feature-completion, R4-SSOT, history_scaling/PromptVersion (bigger-wire) açık.
 
+> **R8 SURFACE TAM-SINIFLANDIRMA (06-22, build+restart sonrası — kanıt-temelli, file:line):** Kalan R8 spawnSync site'larını tek-tek prod-consumer + canlılık + ripple açısından inceledim. **Sonuç: temiz-surgical R8 vein TÜKENDİ** (baseline-tracker o vein'di). Sınıflandırma:
+> | Site | Canlı? | Freeze | Ripple | Karar |
+> |------|--------|--------|--------|-------|
+> | `baseline-tracker.ts` | ✅ | dakikalar | await-able | ✅ FIXED (`45f86208`) |
+> | `monitor-adapter.ts` execCommand | ❌ **prod-DEAD** (yalnız testi tüketir; `src/monitor/*` import etmez) | — | **SKIP** (dead-code conversion = busywork) |
+> | `output-collector.ts` poll-path (docker/tmux) | ◑ **DORMANT** — `server.ts:1323` instantiate eder ama `.collect()` prod'da HİÇ çağrılmaz → poll-loop hiç başlamaz, spawnSync ateşlenmez | (potansiyel 10s) | zero | **SKIP-R8** + **YENİ R7 bulgu** (aşağıda) |
+> | `worker-liveness.ts` defaultDockerProbe | ✅ canlı (EVALUATE) | 3s-bounded, yalnız timeout-şüpheli task | sync→async, 5-file ripple | düşük-değer/maliyet (DI-seam zaten var) |
+> | `mid-sprint-adapter.ts` reconcile (git+tsc+vitest) | ✅ canlı (EVALUATE spurious-NO_GO) | **~190s** (git10+tsc60+vitest120 ardışık sync) — **codebase'in EN KÖTÜ freeze'i** | core EVALUATE-path async-refactor: `reconcileSpuriousNoGo`+`evaluateWithRubric`(sprint-phases'te 4 + backlog-eval 1 call-site)+`evaluateResult`+`ReconciliationDeps` imza+**7 test dosyası** | **YÜKSEK değer, surgical DEĞİL** — safety-critical path (yanlışsa her sprint grading bozulur) |
+> | `task-restoration.ts` tar | ◑ resume-only one-shot | saniyeler | resume-path | düşük (hot-loop değil) |
+> | CLI one-shot (doctor/sync/upgrade/onboard/attach/cleanup/start/skill/plugin) | n/a tek-process | alakasız (eşzamanlı async iş yok) | — | **SKIP** (freeze önemsiz) |
+>
+> **YENİ INSIDENTAL BULGULAR (bu araştırmadan):**
+> - 🔴 **R7 — `/api/output-stream` SSE boş yayın:** `OutputCollector.collect()` prod'da hiç çağrılmıyor (`grep '\.collect(' src/` boş) → dashboard worker-output görünümü her zaman BOŞ. Wire etmek spawn-path entegrasyonu ister (worker container-name'leri) → surgical değil.
+> - 🪦 **`followDockerOutput` (output-collector.ts:480, async+injectable, "event loop never blocked" dökümante) — caller'ı YOK** = inşa-edilmiş-ama-wire-edilmemiş ölü-yol.
+> - 🪦 **`monitor-adapter.ts` tüm modül prod-DEAD** (5-class adapter, yalnız test tüketir).
+
+> **R8-RECONCILE ✅ FIXED (06-22, Alperen-onaylı el-refactor — codebase'in EN KÖTÜ freeze'i kapandı):** `reconcileSpuriousNoGo` git-diff(10s)+tsc(60s)+vitest(120s) **~190sn sync Brain-freeze**'i async'e çevrildi. **Option-B' surgical extraction** (full-async'in 20-test-dosyası ripple'ından kaçındı): spurious-block `evaluateWithRubric`'ten ÇIKARILDI → `evaluateWithRubric` saf-sync grader kaldı (64 projectRoot'suz grading-test çağrısı DOKUNULMADI), yeni async `reconcileEvaluationSpuriousNoGo()` helper'ı 5 prod-call-site'ı (runEvaluatePhase ×3 + runFixPhase + evaluateBacklogResult) sarmalıyor. **TAM davranış-koruyucu** (success-path pre-enrich `{decision,totalScore,rubricScores,retryCount}` shape'i birebir; OOM-skip korundu). **Değişen:** 6 src (mid-sprint-adapter async-runner+3-fn+reconcile · result-evaluator extract+deprecated-evaluateResult-async · result-promoter · sprint-phases · backlog-eval · execute-dispatcher) + 11 test (M) + 1 yeni faithful test. **Verify:** tsc EXIT=0 · `tests/orchestra/` 422 dosya/6233 test yeşil + docker-timeout + f10-policy + autonomous-command yeşil · **faithful: `mid-sprint-adapter-async.test.ts` pre-fix 5/5 RED (sync `{0,[]}` döndü, Promise değil) → post-fix 5/5 GREEN** (source-revert ile kanıtlandı). Mock-fix: 4 sprint-phases-entegrasyon testi `reconcileEvaluationSpuriousNoGo` passthrough-mock aldı (partial-mock undefined-export + spread-original gerçek-subprocess riskini kapattı). **COMMIT YOK — Alperen onayı bekleniyor.** Kalan R8: hepsi dead/dormant/CLI-one-shot → R8 vein KAPALI.
+
 ---
 ## 0. Kova Özeti
 
