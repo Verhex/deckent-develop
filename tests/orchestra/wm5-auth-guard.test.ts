@@ -80,6 +80,10 @@ function installSpawnRouter(): void {
       stdout = 'container-id-wm5';
     } else if (cmd === 'docker' && sub === 'inspect') {
       stdout = 'true|0';
+    } else if (cmd === 'claude' && sub === '--version') {
+      // A23: host-side authHealthCheck runs claude --version before a claude spawn.
+      // Model a healthy CLI so the claude-model spawns reach docker run.
+      stdout = 'claude 1.0.0 (host auth ok)';
     }
 
     return {

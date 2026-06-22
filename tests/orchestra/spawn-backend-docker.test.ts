@@ -102,6 +102,11 @@ function installSpawnRouter(): void {
       outcome = successOutcome;
     } else if (cmd === 'docker' && sub === 'inspect') {
       outcome = inspectOutcome;
+    } else if (cmd === 'claude' && sub === '--version') {
+      // A23: spawn-backend-docker now runs authHealthCheck (claude --version) on the
+      // host before spawning a claude container. Model a healthy CLI (non-empty
+      // stdout, exit 0) so the spawn proceeds to docker run.
+      outcome = { stdout: 'claude 1.0.0 (host auth ok)', stderr: '', status: 0 };
     } else {
       outcome = fallback;
     }
@@ -474,5 +479,59 @@ describe('DockerSpawnBackend: PSL-1 provider-aware command + OAuth mount (Sprint
     expect(script).not.toContain('--full-auto');  // deprecated; not used
     expect(script).toMatch(/codex exec .*< "/);   // stdin promptFeed → prompt file piped in
     expect(capturedDockerRunArgs[0]!.some(a => a.includes('/.codex:'))).toBe(true);
+  });
+});
+
+// ─── A23: host-side claude auth health-check before container spawn ──────────
+// authHealthCheck was a zero-caller dead mechanism; the container runs the raw
+// claude CLI (no JS worker), so a worker losing Claude auth produced a silent
+// exit-0 with no .result. The spawn backend now runs the check host-side and
+// writes an honest AUTH_FAILED NO_GO instead of spawning a doomed container.
+describe('A23: host-side claude auth health-check (Sprint 194 W-AUTH wire)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capturedDockerRunArgs.length = 0;
+    // Router: docker healthy, but `claude --version` FAILS (auth lost).
+    mockSpawnSync.mockImplementation((cmd, args) => {
+      const argv = (args as string[] | undefined) ?? [];
+      const sub = argv[0];
+      let stdout = '';
+      let status = 0;
+      let stderr = '';
+      if (cmd === 'docker' && sub === 'images') {
+        stdout = 'imghash';
+      } else if (cmd === 'docker' && sub === 'run') {
+        capturedDockerRunArgs.push([...argv]);
+        stdout = 'container-id-x';
+      } else if (cmd === 'claude' && sub === '--version') {
+        status = 1; // non-zero + empty stdout → authHealthCheck treats as AUTH_FAILED
+        stderr = 'Invalid API key · Please run /login';
+      }
+      return {
+        stdout, stderr, status, signal: null, pid: 1, output: ['', stdout, stderr],
+      } as unknown as ReturnType<typeof spawnSync>;
+    });
+  });
+
+  it('claude auth failure → writes AUTH_FAILED NO_GO .result and SKIPS docker run', async () => {
+    new DockerSpawnBackend('/test/project').spawn('t-a23-authfail', 'sonnet', 'prompt');
+
+    // The doomed container is never spawned — no silent exit-0 phantom worker.
+    // (Pre-fix this was 1: the spawn proceeded straight to docker run.)
+    expect(capturedDockerRunArgs.length).toBe(0);
+
+    // An honest NO_GO .result lands on disk for Brain to collect. writeResult uses
+    // an atomic temp-write+rename, so match on the written CONTENT, not the path.
+    const fs = await import('node:fs');
+    const resultWrite = vi.mocked(fs.writeFileSync).mock.calls.find(c =>
+      String(c[1]).includes('AUTH_FAILED') && String(c[1]).includes('t-a23-authfail'));
+    expect(resultWrite).toBeDefined();
+    expect(String(resultWrite![1])).toContain('NO_GO');
+  });
+
+  it('codex (non-claude) spawn is NOT gated by the claude auth check', () => {
+    new DockerSpawnBackend('/test/project').spawn('t-a23-codex', 'gpt-5', 'prompt');
+    // codex worker proceeds to docker run even though claude --version would fail.
+    expect(capturedDockerRunArgs.length).toBe(1);
   });
 });

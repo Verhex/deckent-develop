@@ -83,6 +83,8 @@ function installSpawnRouter(): void {
       stdout = 'container-id-f1014';
     } else if (cmd === 'docker' && sub === 'inspect') {
       stdout = 'true|0';
+    } else if (cmd === 'claude' && sub === '--version') {
+      stdout = 'claude 1.0.0 (host auth ok)';
     }
 
     return {

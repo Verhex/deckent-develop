@@ -103,6 +103,9 @@ function installSpawnRouter(): void {
       outcome = successOutcome;
     } else if (cmd === 'docker' && sub === 'inspect') {
       outcome = inspectOutcome;
+    } else if (cmd === 'claude' && sub === '--version') {
+      // A23: host-side authHealthCheck runs claude --version before a claude spawn.
+      outcome = { stdout: 'claude 1.0.0 (host auth ok)', stderr: '', status: 0 };
     } else {
       outcome = fallback;
     }

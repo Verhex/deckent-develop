@@ -22,6 +22,7 @@ import {
   SpawnLockError,
 } from '../core/file-lock.js';
 import { markPending, markActive, clearPending } from '../core/active-workers.js';
+import { authHealthCheck } from '../agents/worker.js';
 import type { SpawnBackend, SpawnBackendOptions } from './spawn-backend.js';
 import { SpawnBackendError, checkLethalGuard } from './spawn-backend.js';
 
@@ -585,6 +586,29 @@ export class DockerSpawnBackend implements SpawnBackend {
       return;
     }
     const providerBinary = spec.binary;
+
+    // Sprint 194 W-AUTH A-1 (host-side wire — A23): before spawning a claude
+    // container we run the auth health-check on the HOST. The container executes
+    // the raw `claude` CLI (no Deckent JS worker process), so the documented
+    // CLAUDE_AUTH_REQUIRED check could never fire container-side — authHealthCheck
+    // was a zero-caller dead mechanism, and a worker losing Claude auth produced a
+    // silent exit-0 with no `.result` (the exact bug it was built to prevent). The
+    // container mounts the host ~/.claude credentials, so the host's `claude
+    // --version` is representative. On failure authHealthCheck writes an honest
+    // AUTH_FAILED NO_GO `.result` (+ emits WORKER→BRAIN:AUTH_FAILED); we then skip
+    // the doomed container spawn — Brain collects the real NO_GO instead of timing
+    // out on a phantom worker. DECKENT_AUTH_SKIP=1 bypasses the check (test/local).
+    if (providerBinary === 'claude') {
+      const auth = authHealthCheck(dir, taskId, undefined, { ...process.env, CLAUDE_AUTH_REQUIRED: '1' });
+      if (!auth.ok) {
+        console.warn(
+          `[deckent:spawn-backend-docker] claude auth health-check failed for task ${taskId} `
+          + `— wrote AUTH_FAILED NO_GO, skipping container spawn`,
+        );
+        return;
+      }
+    }
+
     // Sprint 237/252: wire model name (apiId, e.g. claude-opus-4-8, gpt-5.5), not alias.
     const apiId = modelRegistry.get(model)?.apiId ?? model;
     // IMMUTABLE — deckent workers run with full autonomy (autoApprove). The spec
@@ -737,10 +761,12 @@ export class DockerSpawnBackend implements SpawnBackend {
     // Surface effective auth mode to the container (used by worker prompt for
     // model self-awareness; not required by Claude CLI itself).
     dockerArgs.push('-e', `DECKENT_AUTH_MODE=${useApiOnly ? 'api' : 'subscription'}`);
-    // Sprint 194 W-AUTH A-1: tell the container's worker to run authHealthCheck
-    // (claude --version) before doing any task work, so a /login auth-loss
-    // during a sprint produces a real AUTH_FAILED .result instead of a silent
-    // exit 0. Skipped when worker.ts sees DECKENT_AUTH_SKIP=1 (test env).
+    // Sprint 194 W-AUTH A-1: surface the auth-required state to the container
+    // (used by the worker prompt / DECKENT_AUTH_MODE self-awareness). The ACTUAL
+    // auth health-check now runs HOST-side, pre-spawn (see A23 wire above) —
+    // because the container executes the raw claude CLI with no Deckent JS worker
+    // to read this flag, the original container-side check could never fire. This
+    // env var is kept for parity/observability and the WM-5 provider-gate contract.
     // WM-5: gate to claude-only — codex/gemini/ollama must not receive this flag.
     if (providerBinary === 'claude') {
       dockerArgs.push('-e', 'CLAUDE_AUTH_REQUIRED=1');

@@ -38,6 +38,10 @@ vi.mock('node:child_process', () => {
       if (args[0] === 'run') {
         return { status: 0, stdout: 'container-id-abcdef\n', stderr: '' };
       }
+      // A23: host-side authHealthCheck runs claude --version before a claude spawn.
+      if (cmd === 'claude' && args[0] === '--version') {
+        return { status: 0, stdout: 'claude 1.0.0 (host auth ok)', stderr: '' };
+      }
       return { status: 0, stdout: '', stderr: '' };
     }),
     // monitorContainer uses node-spawn(); stub a minimal child shape so it
