@@ -833,18 +833,6 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
-  // ─── Cache Warm validation ──────────────────────────────────────────
-  if (config.cache_warm !== undefined) {
-    const cw = config.cache_warm;
-    if (typeof cw.enabled !== 'boolean') {
-      errors.push('cache_warm.enabled must be a boolean');
-    }
-    if (cw.warm_delay_ms !== undefined) {
-      if (typeof cw.warm_delay_ms !== 'number' || cw.warm_delay_ms < 5000 || cw.warm_delay_ms > 180000) {
-        errors.push('cache_warm.warm_delay_ms must be a number between 5000 and 180000');
-      }
-    }
-  }
 
   // ─── Cross Verify validation (Sprint 276 XVER-1) ─────────────────────
   if (config.cross_verify !== undefined) {
@@ -1509,8 +1497,6 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     autonomous: config.autonomous,
     // Resource Monitor — passed through from project config (opt-in, absent = disabled)
     resource_monitor: config.resource_monitor,
-    // Cache Warm — passed through from project config (opt-in, absent = disabled)
-    cache_warm: config.cache_warm,
     // Worker Comms — passed through (opt-in, absent = disabled)
     worker_comms: config.worker_comms,
     // Cost Guard — passed through (opt-in, absent = disabled)
@@ -2181,8 +2167,6 @@ export function mergeConfigs(
       : structuredClone(DEFAULT_TERMINAL_CONFIG),
     // Resource Monitor — passed through (opt-in, absent = disabled)
     resource_monitor: config.resource_monitor,
-    // Cache Warm — passed through (opt-in, absent = disabled)
-    cache_warm: config.cache_warm,
     // Worker Comms — passed through (opt-in, absent = disabled)
     worker_comms: config.worker_comms,
     // Cost Guard — passed through (opt-in, absent = disabled)

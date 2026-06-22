@@ -64,15 +64,6 @@ export interface ResourceMonitorConfig {
   log_path?: string;
 }
 
-// ─── Cache Warm Config ───────────────────────────────────────────────
-/** Prompt-cache warm spawn configuration (Sprint 274 F1-TOK Faz 2). Opt-in — absent block = disabled. */
-export interface CacheWarmConfig {
-  /** Enable cache-warm spawn strategy (required). */
-  enabled: boolean;
-  /** Delay in ms applied to 2nd+ workers in the first wave (default: 45000, min: 5000, max: 180000). */
-  warm_delay_ms?: number;
-}
-
 // ─── Cross Verify Config ─────────────────────────────────────────────
 /** Cross-provider adversarial verification configuration (Sprint 276 XVER-1). Opt-in — absent block = disabled. */
 export interface CrossVerifyConfig {
@@ -547,9 +538,6 @@ export interface DeckentConfig {
   /** Docker worker resource monitoring configuration (Sprint 271). Default-disabled (opt-in). */
   resource_monitor?: ResourceMonitorConfig;
 
-  // ─── Cache Warm ──────────────────────────────────────────────────────
-  /** Prompt-cache warm spawn configuration (Sprint 274 F1-TOK Faz 2). Default-disabled (opt-in). */
-  cache_warm?: CacheWarmConfig;
 
   // ─── Cross Verify ────────────────────────────────────────────────────
   /** Cross-provider adversarial verification configuration (Sprint 276 XVER-1). Default-disabled (opt-in). */
@@ -923,8 +911,6 @@ export interface ResolvedConfig {
   erp?: ErpRuntimeConfig;
   /** Resource monitor configuration (passed through from DeckentConfig). Default-disabled. */
   resource_monitor?: ResourceMonitorConfig;
-  /** Cache warm spawn configuration (passed through from DeckentConfig). Default-disabled. */
-  cache_warm?: CacheWarmConfig;
   /** Cross-provider adversarial verification configuration (passed through from DeckentConfig). Default-disabled. */
   cross_verify?: CrossVerifyConfig;
   /** Worker-to-worker communication configuration (passed through from DeckentConfig). Default-disabled. */
