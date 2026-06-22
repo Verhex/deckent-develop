@@ -27,6 +27,7 @@ import type {
 } from '../core/types.js';
 
 import { TASKS_DIR } from '../core/constants.js';
+import { CascadeDetector } from '../core/cascade-detector.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { readJsonSafe, debugLog, updateLastSprintId } from '../core/utils.js';
@@ -129,7 +130,7 @@ import { resetDashboard, updateDashboard } from '../monitor/auditor.js';
 import {
   BrainError,
   setActiveSprint, clearActiveSprint, safeDashboardUpdate,
-  waitForHumanApproval,
+  waitForHumanApproval, pauseSprint,
 } from './sprint-lifecycle.js';
 
 // ─── IPC Registry ─────────────────────────────────────────────────
@@ -856,6 +857,43 @@ export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?
 }
 
 /**
+ * Sprint 140 cost-cascade circuit-breaker (B11 wire) — disaster prevention.
+ *
+ * Feeds the EVALUATE-phase outcomes to the {@link CascadeDetector} in task order.
+ * After N consecutive NO_GO (default 5, DEFAULT_CASCADE_CONFIG) the detector returns
+ * PAUSE_SPRINT and we pause the sprint — exactly the Sprint 140 real-world pattern
+ * (197 workers × 100% NO_GO in 14 min = $42 deadweight). The detector + pauseSprint
+ * were both fully built and unit-tested, but the detector had ZERO callers: the
+ * circuit-breaker was never connected. This wires it into the EVALUATE→FIX seam so a
+ * runaway sprint auto-pauses (resume via `deckent resume`) instead of burning cost.
+ *
+ * Returns true when the sprint was paused (caller must skip FIX/RETRO).
+ */
+export function applyCascadeCircuitBreaker(
+  projectRoot: string,
+  sprint: Sprint,
+  evaluations: Map<string, TaskEvaluation>,
+): boolean {
+  const cascade = new CascadeDetector();
+  for (const task of sprint.tasks) {
+    const ev = evaluations.get(task.id);
+    if (ev === undefined) continue;
+    const outcome = ev === TaskEvaluation.DONE
+      ? 'DONE'
+      : ev === TaskEvaluation.GO_WITH_TECH_DEBT
+        ? 'GO_WITH_TECH_DEBT'
+        : 'NO_GO';
+    const action = cascade.onResult(outcome);
+    if (action.action === 'PAUSE_SPRINT') {
+      debugLog('runSprint:cascade-circuit-breaker', action.reason);
+      pauseSprint(projectRoot, sprint, action.reason);
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Execute a full sprint lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP.
  * Supports human checkpoints, configurable timeout, and provider routing.
  */
@@ -1397,6 +1435,13 @@ export async function runSprint(
     projectRoot, sprint, results, evaluations, config.coverage_hard_floor,
     undefined, undefined, deferredTaskIds, { enforceDispatchGate: true },
   );
+
+  // Sprint 140 cost-cascade circuit-breaker (B11 wire): N consecutive NO_GO →
+  // auto-pause before FIX/RETRO so a runaway sprint cannot burn the $42-disaster
+  // cost. Paused state is persisted; resume via `deckent resume`.
+  if (applyCascadeCircuitBreaker(projectRoot, sprint, evaluations)) {
+    return sprint;
+  }
 
   // Mark pending handoffs from NO_GO tasks as failed (downstream integrity)
   try {
