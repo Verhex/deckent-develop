@@ -147,6 +147,20 @@ describe('writeRetrospective — Memory V2 DB-first (B8)', () => {
     expect(mem!.content).toContain('Done task');
   });
 
+  it('records totalTasks/debtCount in the learnings metadata for DebtTrendAnalyzer (R5)', () => {
+    const sprint = makeSprint();
+    // makeMetrics(): totalTasks 3, techDebtTasks 1 → debt rate 1/3.
+    writeRetrospective(root, sprint, new Map([['001', TaskEvaluation.DONE]]), makeMetrics());
+
+    const mem = read('mem-sprint-201');
+    expect(mem).not.toBeNull();
+    // Pre-fix the entry carried no metadata, so DebtTrendAnalyzer parsed {} and
+    // computed a debt rate of 0 for every sprint — the trend never fired.
+    const meta = JSON.parse(mem!.metadata) as Record<string, unknown>;
+    expect(meta.totalTasks).toBe(3);
+    expect(meta.debtCount).toBe(1);
+  });
+
   it('does not duplicate the learnings entry when called twice for the same sprint', () => {
     const sprint = makeSprint();
     writeRetrospective(root, sprint, new Map([['001', TaskEvaluation.DONE]]), makeMetrics());

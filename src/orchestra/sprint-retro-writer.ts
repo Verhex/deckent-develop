@@ -799,6 +799,15 @@ export function writeRetrospective(
             sprint_num: sprintNum,
             tags: ['learning', sprint.id],
             decay_exempt: true,
+            // R5: DebtTrendAnalyzer derives the rolling tech-debt rate from these
+            // two numbers (debtCount / totalTasks) across the last N sprints. The
+            // entry previously carried no metadata, so the detector parsed {} and
+            // every sprint's debt rate was 0 — avgDebtRate never crossed the
+            // threshold and the trend signal was effectively dead.
+            metadata: {
+              totalTasks: metrics.totalTasks,
+              debtCount: metrics.techDebtTasks,
+            },
           });
           writeResult.memoryWritten = true;
         } else {
