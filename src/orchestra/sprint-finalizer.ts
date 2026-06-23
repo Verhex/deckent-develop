@@ -299,27 +299,30 @@ export async function runSelfAuditGate(
     // Read pre-sprint baseline for delta calculation
     const baseline = readBaseline(root, sprintId);
 
-    if (vitestRun.status === 0 || (current && current.fail === 0)) {
-      const delta = baseline && current
-        ? {
-            files: current.files - baseline.files,
-            pass: current.pass - baseline.pass,
-            fail: current.fail - baseline.fail,
-            skipped: current.skipped - baseline.skipped,
-          }
-        : { files: 0, pass: 0, fail: 0, skipped: 0 };
-      vitestResult = { status: 'PASS', delta };
-    } else {
-      const delta = baseline && current
-        ? {
-            files: current.files - baseline.files,
-            pass: current.pass - baseline.pass,
-            fail: current.fail - baseline.fail,
-            skipped: current.skipped - baseline.skipped,
-          }
-        : { files: 0, pass: 0, fail: current?.fail ?? 0, skipped: 0 };
-      vitestResult = { status: 'FAIL', delta };
-    }
+    const delta = baseline != null && current != null
+      ? {
+          files: current.files - baseline.files,
+          pass: current.pass - baseline.pass,
+          fail: current.fail - baseline.fail,
+          skipped: current.skipped - baseline.skipped,
+        }
+      : { files: 0, pass: 0, fail: current?.fail ?? 0, skipped: 0 };
+
+    // B-REGGATE (Sprint 318 forensics): gate on NET-NEW failures (delta vs the
+    // pre-sprint baseline), NOT total failures. Pre-existing failures live in the
+    // baseline → delta excludes them, so GATE_FAILURE fires only when THIS sprint
+    // INTRODUCED regressions (the actionable signal). Total-based gating
+    // (current.fail !== 0) fired on every pre-existing failure → permanent noise →
+    // GO_WITH_GATE_FAILURE was set every sprint and therefore ignored. The
+    // pre-sprint baseline IS the allowlist. No-baseline fallback: conservative —
+    // any current failure counts as a regression so a broken sprint is never
+    // silently passed.
+    const netNewFailures = baseline != null && current != null
+      ? delta.fail
+      : (current?.fail ?? 0);
+    const vitestPassed =
+      vitestRun.status === 0 || (current != null && current.fail === 0) || netNewFailures <= 0;
+    vitestResult = { status: vitestPassed ? 'PASS' : 'FAIL', delta };
   } catch (e) {
     vitestResult = { status: 'FAIL', delta: { files: 0, pass: 0, fail: 0, skipped: 0 } };
     debugLog('runSelfAuditGate:vitest', `execution failed: ${e}`);

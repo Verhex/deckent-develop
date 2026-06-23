@@ -432,4 +432,57 @@ describe('runSelfAuditGate — dedicated tests', () => {
     expect(result.vitest.status).toBe('FAIL');
     expect(result.honesty.violations).toBeGreaterThan(0);
   });
+
+  // ─── B-REGGATE (Sprint 318): gate on NET-NEW failures, not total ──────
+  // Faithful regression for the structural fix: pre-existing failures (present
+  // in the pre-sprint baseline) must NOT trip the gate; only failures the sprint
+  // INTRODUCED should. Pre-fix code gated on `current.fail !== 0` (total) → these
+  // first case returned GATE_FAILURE (RED); post-fix it gates on delta → PASS.
+  function writeBaselineWithFailures(root: string, sprintId: string, fail: number): void {
+    writeFileSync(
+      join(root, '.deckent', `${sprintId}-baseline.json`),
+      JSON.stringify({ files: 6, pass: 120, fail, skipped: 0 }),
+      'utf-8',
+    );
+  }
+
+  it('B-REGGATE: pre-existing failures (zero net-new vs baseline) → vitest PASS, overallGate PASS', async () => {
+    writeMetricsJsonl(tempRoot);
+    // Baseline already had 21 failing tests (e.g. known .deckent mirror drift).
+    writeBaselineWithFailures(tempRoot, SPRINT_ID, 21);
+    const result: SelfAuditResult = await runSelfAuditGate(SPRINT_ID, tempRoot, {
+      runTsc: (_root) => ({ status: 0, stdout: '', stderr: '' }),
+      // Post-sprint: SAME 21 failures, ZERO introduced. vitest exits non-zero.
+      runVitest: (_root) => ({
+        status: 1,
+        stdout: 'Tests  120 passed | 21 failed (141)\nTest Files  5 passed | 1 failed (6)\n',
+        stderr: '',
+      }),
+      honestyResults: [],
+      metricsJsonlPath: join(tempRoot, '.deckent', 'metrics.jsonl'),
+    });
+    // Net-new = 21 - 21 = 0 → must PASS (pre-fix total-based gating returned GATE_FAILURE).
+    expect(result.vitest.delta.fail).toBe(0);
+    expect(result.vitest.status).toBe('PASS');
+    expect(result.overallGate).toBe('PASS');
+  });
+
+  it('B-REGGATE: net-new failures vs baseline → vitest FAIL, overallGate GATE_FAILURE (regression caught)', async () => {
+    writeMetricsJsonl(tempRoot);
+    writeBaselineWithFailures(tempRoot, SPRINT_ID, 21);
+    const result: SelfAuditResult = await runSelfAuditGate(SPRINT_ID, tempRoot, {
+      runTsc: (_root) => ({ status: 0, stdout: '', stderr: '' }),
+      // Post-sprint: 21 pre-existing + 12 introduced = 33 failing.
+      runVitest: (_root) => ({
+        status: 1,
+        stdout: 'Tests  108 passed | 33 failed (141)\nTest Files  4 passed | 5 failed (9)\n',
+        stderr: '',
+      }),
+      honestyResults: [],
+      metricsJsonlPath: join(tempRoot, '.deckent', 'metrics.jsonl'),
+    });
+    expect(result.vitest.delta.fail).toBe(12); // 33 - 21 net-new
+    expect(result.vitest.status).toBe('FAIL');
+    expect(result.overallGate).toBe('GATE_FAILURE');
+  });
 });
