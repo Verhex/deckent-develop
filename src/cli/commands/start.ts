@@ -14,7 +14,7 @@ import { print, printError, formatSprintSummary, formatTable } from '../helpers/
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { promptConfirm } from '../helpers/prompt.js';
-import { bootstrapNotifyDispatcher } from '../../core/notify-bootstrap.js';
+import { bootstrapNotifyDispatcher, resolveWebhookBootstrapOption } from '../../core/notify-bootstrap.js';
 import { buildConnectorNotificationAdapter } from '../../connectors/connector-bootstrap.js';
 import { loadCostConfig, initCostConfig } from '../../core/cost-config-loader.js';
 import { estimateSprintCost, formatEstimate, resolveBillingModeForAuth, type TaskCostInput } from '../../core/cost-calculator.js';
@@ -293,6 +293,7 @@ export function registerStart(program: Command): void {
         bootstrapNotifyDispatcher({
           projectRoot: root,
           extraAdapters: connectorAdapter ? [connectorAdapter] : [],
+          webhook: resolveWebhookBootstrapOption(config),
         });
 
         // Dry-run mode: plan only, no spawn

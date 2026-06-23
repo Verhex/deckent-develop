@@ -22,10 +22,15 @@ import {
 } from './notification-dispatcher.js';
 import { CliNotificationAdapter } from './notify-adapters/cli-adapter.js';
 import { FileNotificationAdapter } from './notify-adapters/file-adapter.js';
+import { buildWebhookNotificationAdapter } from './notify-adapters/webhook-adapter.js';
+import type { HttpClient } from './notification-providers/webhook.js';
 import { setGlobalNotifyDispatcher } from './notify-registry.js';
 
 /** Audit-trail JSONL filename for the file adapter (under <root>/.deckent/). */
 export const NOTIFY_LOG_FILE = 'notify-log.jsonl' as const;
+
+/** Delivery-log filename for the webhook adapter (under <root>/.deckent/). */
+export const WEBHOOK_LOG_FILE = 'notification-log.json' as const;
 
 /** Default throttle window for non-critical notifications (1s — Alperen Q5). */
 export const DEFAULT_NOTIFY_THROTTLE_MS = 1000 as const;
@@ -40,6 +45,13 @@ export interface NotifyBootstrapOptions {
   extraAdapters?: NotificationAdapter[];
   /** Throttle window for non-critical notifications (ms). Default 1000. */
   throttleMs?: number;
+  /**
+   * Generic outbound webhook (R4 WIRE / B11): when set with a non-empty URL, a
+   * webhook adapter is appended so notifications also POST to an external HTTP
+   * endpoint (CI / PagerDuty / Zapier / custom). Callers derive it from
+   * notify_channel='webhook' + notify_url. httpClient is injectable for tests.
+   */
+  webhook?: { url: string; projectName: string; httpClient?: HttpClient };
 }
 
 /**
@@ -57,6 +69,23 @@ export interface NotifyBootstrapOptions {
  * cross-surface clobber occurs; each call builds a fresh dispatcher, so adapters
  * are never double-registered.
  */
+/**
+ * Derive the {@link NotifyBootstrapOptions.webhook} value from resolved config.
+ * Returns the webhook option only when notify_channel is 'webhook' and a URL is
+ * set — the single source for the config→webhook gate shared by every sprint
+ * entry point (CLI start, autonomous, detached runner). undefined otherwise.
+ */
+export function resolveWebhookBootstrapOption(config: {
+  notify_channel?: 'slack' | 'discord' | 'email' | 'webhook' | null;
+  notify_url?: string | null;
+  projectName?: string;
+}): { url: string; projectName: string } | undefined {
+  if (config.notify_channel === 'webhook' && config.notify_url) {
+    return { url: config.notify_url, projectName: config.projectName ?? 'deckent' };
+  }
+  return undefined;
+}
+
 export function bootstrapNotifyDispatcher(
   options: NotifyBootstrapOptions,
 ): NotifyDispatcher {
@@ -74,6 +103,20 @@ export function bootstrapNotifyDispatcher(
   for (const adapter of extras) {
     dispatcher.addAdapter(adapter);
   }
+
+  // Generic outbound webhook (R4 WIRE / B11): bring the formerly dormant
+  // WebhookNotificationProvider into the live chain. Ordered after the connector
+  // extras and before the file audit adapter (external delivery, then local log).
+  let webhookAdapter: NotificationAdapter | undefined;
+  if (options.webhook && options.webhook.url.trim().length > 0) {
+    webhookAdapter = buildWebhookNotificationAdapter({
+      ...options.webhook,
+      // Project-scope the delivery log alongside the file audit adapter.
+      logPath: join(options.projectRoot, DECKENT_DIR, WEBHOOK_LOG_FILE),
+    });
+    dispatcher.addAdapter(webhookAdapter);
+  }
+
   const fileAdapter = new FileNotificationAdapter(
     join(options.projectRoot, DECKENT_DIR, NOTIFY_LOG_FILE),
   );
@@ -87,7 +130,7 @@ export function bootstrapNotifyDispatcher(
   // the "safe-but-deaf" silent-notify gap. Without an extra, the chain is just
   // cli-parent-tty + file-jsonl → notify never reaches the operator's phone.
   if (process.env['DECKENT_DEBUG']) {
-    const names = [cliAdapter.name, ...extras.map((a) => a.name), fileAdapter.name];
+    const names = [cliAdapter.name, ...extras.map((a) => a.name), ...(webhookAdapter ? [webhookAdapter.name] : []), fileAdapter.name];
     process.stderr.write(`[deckent:debug] notify-bootstrap: ${names.length} adapters wired — ${names.join(', ')}\n`);
   }
 

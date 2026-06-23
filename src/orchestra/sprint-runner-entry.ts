@@ -10,7 +10,7 @@
 import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { redactSensitive } from './sensitive-redactor.js';
-import { bootstrapNotifyDispatcher } from '../core/notify-bootstrap.js';
+import { bootstrapNotifyDispatcher, resolveWebhookBootstrapOption } from '../core/notify-bootstrap.js';
 
 // ─── IPC File Names ──────────────────────────────────────────────
 export const IPC_CONFIG_FILE = 'config.json';
@@ -231,6 +231,7 @@ async function main(): Promise<void> {
     bootstrapNotifyDispatcher({
       projectRoot,
       extraAdapters: connectorAdapter ? [connectorAdapter] : [],
+      webhook: resolveWebhookBootstrapOption(config),
     });
 
     writeIpcStatus(ipcDir, {

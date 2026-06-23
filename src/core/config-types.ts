@@ -304,9 +304,12 @@ export interface DeckentConfig {
   // ─── Notifications ─────────────────────────────────────────────────
   /** Notify on sprint completion (default: false) */
   notify_on_complete?: boolean;
-  /** Notification channel (legacy — superseded by notify_connectors; never wired) */
+  /** Notification channel. 'webhook' is wired (R4/B11): notify_channel='webhook' +
+   *  notify_url posts notifications to a generic outbound HTTP endpoint via the
+   *  NotifyDispatcher webhook adapter. slack/discord/email here remain legacy —
+   *  rich connector delivery goes through notify_connectors. */
   notify_channel?: 'slack' | 'discord' | 'email' | 'webhook' | null;
-  /** Notification webhook URL (legacy — superseded by notify_connectors) */
+  /** Outbound webhook URL — delivered when notify_channel='webhook' (R4/B11 WIRE). */
   notify_url?: string | null;
   /**
    * Outbound messaging connectors (BOT-001, §4G). Sprint notifications fan out

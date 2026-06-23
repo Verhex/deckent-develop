@@ -1,11 +1,16 @@
 // ─── Notification Dispatcher ─────────────────────────────────────────
 import { debugLog } from './utils.js';
+import type { NotificationEventName } from './notification-dispatcher.js';
 
 export type NotificationEventType =
   | 'sprint_complete'
   | 'sprint_failed'
   | 'task_nogo'
-  | 'usage_warning';
+  | 'usage_warning'
+  // R4 consolidation (B11 webhook WIRE): the canonical DECKENT→USER:NOTIFY event
+  // vocabulary (notification-dispatcher.ts) is accepted too, so the webhook
+  // adapter forwards the real event name losslessly instead of a coarse bucket.
+  | NotificationEventName;
 
 export interface NotificationEvent {
   type: NotificationEventType;

@@ -27,7 +27,7 @@ import {
 } from '../../orchestra/autonomous/approval-adapter.js';
 import { FlowRegistry } from '../../core/flow-registry.js';
 import { notifyAsync } from '../../core/notify.js';
-import { bootstrapNotifyDispatcher } from '../../core/notify-bootstrap.js';
+import { bootstrapNotifyDispatcher, resolveWebhookBootstrapOption } from '../../core/notify-bootstrap.js';
 import { buildConnectorNotificationAdapter } from '../../connectors/connector-bootstrap.js';
 import { nextRun } from '../../core/scheduled-flow.js';
 import type { ScheduledFlow } from '../../core/scheduled-flow.js';
@@ -681,6 +681,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
   bootstrapNotifyDispatcher({
     projectRoot: root,
     extraAdapters: connectorAdapter ? [connectorAdapter] : [],
+    webhook: resolveWebhookBootstrapOption(resolvedConfig),
   });
   const onTick = makeTickReporter(lang);
 
