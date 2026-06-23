@@ -14,7 +14,7 @@
 //   - Backward compat: .hb/.result files continue in parallel
 //   - Sequence: monotonic per-sprint, stored in .deckent/sprint-NNN-seq
 
-import { appendFileSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { appendFileSync, readFileSync, writeFileSync, existsSync, mkdirSync, statSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { RECENT_WORKS_DIR, SPRINT_STATE_FILE, SPRINT_ACTIVE_FILE } from './constants.js';
 import { debugLog } from './utils.js';
@@ -183,6 +183,31 @@ function sequenceFilePath(projectRoot: string, sprintId: string): string {
   return join(projectRoot, RECENT_WORKS_DIR, `${sprintId}-seq`);
 }
 
+// B-AUTONOMOUS-LOG (Sprint 318): per-sprint event files are small + retention-managed,
+// but the long-lived 'autonomous' stream (sprintId='autonomous') appends to ONE file
+// forever — it grew to 19MB / 56,920 lines over 12 days with no rotation. Cap each
+// event file: when it exceeds MAX_EVENT_FILE_BYTES, rotate to `.1` (overwriting the
+// previous rotation) and start fresh. Standard 2-file log rotation → bounded at
+// ~2×cap, recent history preserved. Per-sprint files (KBs) never trigger.
+const MAX_EVENT_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+/**
+ * Rotate an event file to `<path>.1` when it exceeds `maxBytes`. Returns true if a
+ * rotation happened. Fail-safe: never throws (event I/O must not crash a sprint).
+ * `maxBytes` is injectable for tests.
+ */
+export function rotateEventFileIfLarge(path: string, maxBytes: number = MAX_EVENT_FILE_BYTES): boolean {
+  try {
+    if (!existsSync(path)) return false;
+    if (statSync(path).size <= maxBytes) return false;
+    renameSync(path, `${path}.1`); // atomic; overwrites any prior rotation
+    return true;
+  } catch (err) {
+    debugLog('event-stream:rotateEventFileIfLarge', err);
+    return false;
+  }
+}
+
 // ─── Sequence Counter ────────────────────────────────────────────
 
 /**
@@ -319,7 +344,10 @@ export function writeEvent(
     };
 
     const line = JSON.stringify(event) + '\n';
-    appendFileSync(eventsFilePath(projectRoot, sprintId), line, 'utf-8');
+    const eventsPath = eventsFilePath(projectRoot, sprintId);
+    // B-AUTONOMOUS-LOG: bound the long-lived 'autonomous' stream (rotate at cap).
+    rotateEventFileIfLarge(eventsPath);
+    appendFileSync(eventsPath, line, 'utf-8');
     return event;
   } catch (err) {
     // Fail-safe: NEVER crash the sprint due to event stream I/O.
