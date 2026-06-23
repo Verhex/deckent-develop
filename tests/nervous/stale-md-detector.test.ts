@@ -49,7 +49,7 @@ vi.mock('../../src/core/memory-store.js', () => ({
 
 import { existsSync, statSync } from 'node:fs';
 import { emitAlert } from '../../src/monitor/alert-emitter.js';
-import { runScanCycle } from '../../src/monitor/auditor.js';
+import { runScanCycle, resetStaleMdThrottle } from '../../src/monitor/auditor.js';
 
 const mockExistsSync = vi.mocked(existsSync);
 const mockStatSync = vi.mocked(statSync);
@@ -60,6 +60,7 @@ const mockEmitAlert = vi.mocked(emitAlert);
 describe('stale_md detector in runScanCycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetStaleMdThrottle(); // B-STALEMD: isolate the module-level emit-throttle
     // Default: tasks dir and locks dir don't exist → minimal scan
     mockExistsSync.mockReturnValue(false);
   });
@@ -88,5 +89,36 @@ describe('stale_md detector in runScanCycle', () => {
     runScanCycle('/project', 'sprint-166');
 
     expect(mockEmitAlert).not.toHaveBeenCalled();
+  });
+
+  // B-STALEMD (Sprint 318): throttle — emit once per staleness, not every scan.
+  it('emits stale_md only ONCE across repeated scans of the same stale mtime', () => {
+    const staleMtime = Date.now() - 80 * 60 * 1000; // 80 min ago
+    mockExistsSync.mockImplementation((p: unknown) => String(p).endsWith('CLAUDE.md'));
+    mockStatSync.mockReturnValue({ mtimeMs: staleMtime } as ReturnType<typeof statSync>);
+
+    // Three consecutive scan cycles (e.g. the ~30s auditor loop) with the SAME
+    // unchanged mtime — pre-fix this emitted 3 identical events (the spam).
+    runScanCycle('/project', 'sprint-166');
+    runScanCycle('/project', 'sprint-166');
+    runScanCycle('/project', 'sprint-166');
+
+    expect(mockEmitAlert).toHaveBeenCalledOnce();
+  });
+
+  it('re-emits when staleness clears then returns (mtime change is real news)', () => {
+    mockExistsSync.mockImplementation((p: unknown) => String(p).endsWith('CLAUDE.md'));
+
+    // Stale → emit
+    mockStatSync.mockReturnValue({ mtimeMs: Date.now() - 80 * 60 * 1000 } as ReturnType<typeof statSync>);
+    runScanCycle('/project', 'sprint-166');
+    // Fresh → no emit + reset throttle
+    mockStatSync.mockReturnValue({ mtimeMs: Date.now() - 2 * 60 * 1000 } as ReturnType<typeof statSync>);
+    runScanCycle('/project', 'sprint-166');
+    // Stale again (different mtime) → emit again
+    mockStatSync.mockReturnValue({ mtimeMs: Date.now() - 90 * 60 * 1000 } as ReturnType<typeof statSync>);
+    runScanCycle('/project', 'sprint-166');
+
+    expect(mockEmitAlert).toHaveBeenCalledTimes(2);
   });
 });
