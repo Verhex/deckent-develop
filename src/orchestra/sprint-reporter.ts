@@ -86,25 +86,6 @@ export type {
   CiLearningResult,
 } from './ci-reporter.js';
 
-// ═══ post-sprint-smoke.ts (Sprint 182 W2-3 — verify task pattern) ═══
-// Verify tasks run AFTER the sprint COMPLETE phase via a gated smoke runner.
-// Resolves the Sprint 181 race where verify tasks could fire before primary
-// (W1) deliverables had landed on disk. See ADR-035 / ADR-045 / ADR-047.
-export {
-  classifyVerifyTasks,
-  shouldTriggerPostSprintSmoke,
-  collectUpstreamDeliverables,
-  runPostSprintSmoke,
-} from './post-sprint-smoke.js';
-
-export type {
-  VerifyTaskCandidate,
-  SmokeTaskResult,
-  PostSprintSmokeResult,
-  PostSprintSmokeOptions,
-  SmokeRunnerFn,
-} from './post-sprint-smoke.js';
-
 // ═══ Sprint 168 Cluster C0d — Math Guards (BUG-FF) ═══════════════
 //
 // Sprint 167 finalize produced the cosmetic regression:

@@ -13,7 +13,7 @@
 //      event (channel shape mirrors DISK_VS_CLAIM_MISMATCH_CHANNEL).
 //
 // Design notes:
-//   - Worker does NOT boot servers — Brain does (post-sprint-smoke path).
+//   - Worker does NOT boot servers — Brain does (Brain-side smoke path).
 //   - Smoke runner uses async `spawn` (ADR-006 array-form, no shell,
 //     bounded timeout) — never spawnSync (CI-hermeticity custom rule).
 //   - `task.smoke` is duck-typed (216-004 will add the field on Task);
@@ -23,7 +23,7 @@
 //     rubric-registry (216-001 output) — single source of truth.
 //
 // See: karpathy-discipline.md CUSTOM Proof-of-Function DoD,
-//      ADR-079 (proposed Sprint 216), post-sprint-smoke.ts.
+//      ADR-079 (proposed Sprint 216).
 // @security: same override prohibition as RUBRIC_REGISTRY — gate logic
 //            cannot be relaxed at runtime to upgrade GO_WITH_TECH_DEBT
 //            back to DONE without an ADR amendment.
@@ -369,7 +369,7 @@ function truncate(s: string): string {
  *
  * Why a separate "apply" step (instead of folding the downgrade into
  * verifyProofOfFunction): keeping the verification pure and the gate
- * side-effecting lets the post-sprint-smoke runner consult the verify
+ * side-effecting lets Brain's smoke gate consult the verify
  * result for retro/dashboard output without forcing a state mutation
  * just to read what happened.
  */

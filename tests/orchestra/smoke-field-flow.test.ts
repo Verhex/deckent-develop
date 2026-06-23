@@ -14,7 +14,7 @@ import type { PlannerTask } from '../../src/core/types.js';
  * Verifies that a `Smoke:` directive in DIRECTIVES.md flows uninterrupted from
  * `parseStructuredDirectives` / `parseBulletOrNumberedTasks` → CreateTaskParams →
  * `createTask` → `task.smoke`, in the exact `{ command, expect }` shape that
- * `proof-of-function.readSmokeSpec` (the post-sprint-smoke gate input) accepts.
+ * `proof-of-function.readSmokeSpec` (the proof-of-function gate input) accepts.
  *
  * Adjacent hops are covered by `planner-smoke-wire.test.ts` and
  * `smoke-directive-parse.test.ts`; this file is the dedicated END-TO-END proof
