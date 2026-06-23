@@ -48,6 +48,40 @@
 > **R8-RECONCILE ✅ FIXED (06-22, Alperen-onaylı el-refactor — codebase'in EN KÖTÜ freeze'i kapandı):** `reconcileSpuriousNoGo` git-diff(10s)+tsc(60s)+vitest(120s) **~190sn sync Brain-freeze**'i async'e çevrildi. **Option-B' surgical extraction** (full-async'in 20-test-dosyası ripple'ından kaçındı): spurious-block `evaluateWithRubric`'ten ÇIKARILDI → `evaluateWithRubric` saf-sync grader kaldı (64 projectRoot'suz grading-test çağrısı DOKUNULMADI), yeni async `reconcileEvaluationSpuriousNoGo()` helper'ı 5 prod-call-site'ı (runEvaluatePhase ×3 + runFixPhase + evaluateBacklogResult) sarmalıyor. **TAM davranış-koruyucu** (success-path pre-enrich `{decision,totalScore,rubricScores,retryCount}` shape'i birebir; OOM-skip korundu). **Değişen:** 6 src (mid-sprint-adapter async-runner+3-fn+reconcile · result-evaluator extract+deprecated-evaluateResult-async · result-promoter · sprint-phases · backlog-eval · execute-dispatcher) + 11 test (M) + 1 yeni faithful test. **Verify:** tsc EXIT=0 · `tests/orchestra/` 422 dosya/6233 test yeşil + docker-timeout + f10-policy + autonomous-command yeşil · **faithful: `mid-sprint-adapter-async.test.ts` pre-fix 5/5 RED (sync `{0,[]}` döndü, Promise değil) → post-fix 5/5 GREEN** (source-revert ile kanıtlandı). Mock-fix: 4 sprint-phases-entegrasyon testi `reconcileEvaluationSpuriousNoGo` passthrough-mock aldı (partial-mock undefined-export + spread-original gerçek-subprocess riskini kapattı). **✅ COMMIT+PUSH+BUILD (`7852d23d` fix + `7cd87e3f` docs, origin/main senkron, `npm run build` EXIT=0 — `/mcp restart` Alperen).** Kalan R8: hepsi dead/dormant/CLI-one-shot → R8 vein KAPALI.
 
 ---
+## 🔧 YAPISAL FIX + REGRESYON-GÜVENLİĞİ PLANI (2026-06-23, Alperen TÜMÜYLE ONAYLADI)
+
+> **Bağlam:** Sprint-318 (R4-divergent collapse, ilk deckent-worker fix-sprint'i) **yapısal bozuklukları** açığa çıkardı. Asıl kaygı: "bir yeri düzeltirken başka yeri bozmak". Sprint-318 sonuç: 318-001/004 DONE, 318-002 TECH_DEBT (gerçek — pre-existing `watch-overhaul` testlerini kırdı), 318-003 **SAHTE NO_GO** (kod doğru: tsc=0 + 6 test-dosyası yeşil + rename tam; CC-verify kanıtladı). Kaynak forensiği: `.deckent/recently-works/sprint-318*` + `autonomous-events.jsonl`.
+
+### 💣 Kritik bulgu: regresyon-gate ZATEN var ama ENFORCE EDİLMİYOR
+`sprint-318-gate.json` → **`overallGate: GATE_FAILURE`** + `vitest.delta.fail:21`. deckent'in CI-gate'i (önceki triage'da "A14 ölü" sanılan) **aslında 21 yeni-fail'i yakaladı + GATE_FAILURE verdi** — ama sprint yine "3 DONE..." başarıyla kapandı = gate **kayıt edildi, uygulanmadı.** → "fix başka yeri bozdu"yu deckent ZATEN ölçüyor; eksik = enforcement. Sıfırdan inşa değil, **bağlama** işi.
+
+### Self-correction 3-katman analizi (FIX neden 318-003'ü kurtarmadı)
+| Katman | Faz | Yön | 318-003 |
+|---|---|---|---|
+| reconcileSpuriousNoGo (`7852d23d`'de CC async-refactor) | EVALUATE | NO_GO→DONE upgrade | DONE'dı ✓ |
+| runFixPhase (`sprint-controller.ts:1504`, koşulsuz) | EVALUATE→FIX | NO_GO→DONE upgrade | NO_GO yoktu→boş döndü ✓ |
+| **honest-gate** (`0f4c9365`/Sprint-165, CC dokunmadı) | **RETRO** | DONE→NO_GO **downgrade** | FIX'ten SONRA yanlış-downgrade ✗ |
+Upgrader-katmanlar (200-sprint self-correction) çalıştı; **downgrader (honest-gate, 150-sprint-eski)** RETRO'da sahte NO_GO bastı. Kampanya FIX'i KIRMADI — ilk kez **sıfır-satır refactor task-şekli** (rename/re-export/silme → linesAdded:0) koşturup latent heuristik bug'ı tetikledik.
+
+### Tespit edilen YAPISAL bug'lar (file:line)
+1. **B-REGGATE — gate computed-not-enforced:** `sprint-318-gate.json overallGate:GATE_FAILURE` ama sprint başarı-kapandı. `applyTechDebtDowngrade` zero-caller (A14). → gate→outcome wire + pre-existing allowlist.
+2. **B-STUB — `isStubResult` sıfır-satır false-positive:** `result-evaluator.ts:2055` `selfDone && linesAdded===0 && !testsPassed` → rename/re-export/silme'yi "stub" sanıyor. Saf-rename meşru linesAdded:0.
+3. **B-HGATE-TIMING — honest-gate RETRO'da (FIX-sonrası):** `sprint-phases.ts:2228` stub-tespiti RETRO pre-finalize'de → ürettiği NO_GO FIX-recovery göremiyor (sentinel "FIX recommended" der ama FIX bitti). → EVALUATE-öncesine al.
+4. **B-DOCKER-RACE — honest-gate Docker-sync beklemeden okuyor:** `docker-318-003` worker DONE/exitCode:0 yazdı ama honest-gate `.result` sync'ten önce "yok" sandı → sentinel ([[feedback_docker_oom_false_no_go]]).
+5. **B-SENTINEL-CLOBBER — sentinel gerçek-result'ı eziyor:** `writeHonestSentinelResult` (`result-evaluator.ts:2444`) worker'ın gerçek notu + rubric-eval'i `workerId:brain-honest-gate` stub'la değiştiriyor → "Brain notu düşmedi" sebebi.
+6. **B-STALEMD-SPAM — stale_md her-scan emit:** `auditor.ts:1303` scan-loop'ta (30sn) CLAUDE.md mtime>70dk alert → 18dk sprint=39 event (events'in %59'u). Mis-calibrated (kararlı doc) + event-stream change-only değil.
+7. **B-AUTONOMOUS-LOG — autonomous-events rotation YOK + çift-emit:** `autonomous-events.jsonl` 56.920 satır/19MB (12 günde), rotation yok; `audit-adapter.ts:4` her action `DECKENT→AUDIT:EVENT_WRITTEN`+`AUTONOMOUS:AUDIT` 2× yazıyor; global `autonomous-seq` hiç reset olmuyor.
+8. **B-HANDOFF-STALE — handoff-registry per-sprint temizlenmiyor:** sprint-318 HANDOFF_SUMMARY'de 29 handoff hepsi ESKİ sprint (295-306), 318'in 0 → cross-sprint stale-state birikiyor (idle/ready/pending karışık).
+9. **B-ZOMBIE — daemon hijyeni:** ~6 stale `dist/mcp/server.js` + bot/serve/watch eski-build koşup spurious approval ("auto-flow-external-1970..." — string mevcut kaynakta YOK) üretiyor; sprint-318 gerçek pending-approval üretmedi (`pending-dispatch.json` + `nervous-pending.json` boş).
+
+### 5-FAZLI PLAN (sıra: 0→1→2→3→4)
+- **Faz 0 — sprint-318 temizliği + baseline:** pre-existing-failure allowlist sabitle (origin/main full-suite); 318-002 regresyonu kapat (`watch-overhaul`/`doctor-watch-provider` yeni-semantiğe); `small-commands`/`fix-phase-map` + 21-fail delta kaynağını (`.deckent/skills` mirror finalize'de mi değişti) ayrıştır; 318-001/003/004 + CC dedup'ları (redactSensitive/RichSprintSummary) doğrula+commit.
+- **Faz 1 — deckent self-verification GÜVENİLİR (CC el-kodu, yüksek-stakes):** **#1 B-REGGATE enforce** (gate→outcome + allowlist) · B-STUB/B-HGATE-TIMING/B-DOCKER-RACE/B-SENTINEL-CLOBBER (honest-gate 4-fix) · reconcileSpuriousNoGo(`7852d23d`)+cascade(`06eac04b`) re-verify (CC eval/FIX dokunuşları upgrade'i bozmadı mı).
+- **Faz 2 — kampanya regresyon-disiplini:** blast-radius enumeration (SSOT/rename öncesi tüm importer+test scope'a) + full-affected-suite-vs-baseline gate (worker+CC), [[feedback_ccverify_full_affected_suite]] mekanizma.
+- **Faz 3 — observability hijyeni:** B-STALEMD (scan-loop'tan çıkar→start/end-only+change-only) · B-AUTONOMOUS-LOG (rotation/retention+çift-emit dedup+seq-retention) · B-HANDOFF-STALE (per-sprint cleanup).
+- **Faz 4 — operasyonel:** B-ZOMBIE daemon temizliği (CC→PID+komut, Alperen çalıştırır).
+
+---
 ## 0. Kova Özeti
 
 | Kova | Ne demek | Yaklaşık adet | Kim koşar | Sıra |
