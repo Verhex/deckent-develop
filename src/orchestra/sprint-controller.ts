@@ -703,7 +703,16 @@ export function summarizeHandoffsObservability(
   sprint: Sprint,
 ): void {
   const handoffProtocol = new HandoffProtocol(projectRoot);
-  const handoffs = handoffProtocol.listHandoffs();
+  const allHandoffs = handoffProtocol.listHandoffs();
+  // B-HANDOFF-STALE (Sprint 318): listHandoffs() returns EVERY handoff file ever
+  // written (the registry is never pruned per-sprint), so the summary mixed in 29
+  // stale handoffs from old sprints (295-306) while sprint-318 had 0 of its own.
+  // Scope the per-sprint observability summary to THIS sprint's tasks — a handoff
+  // belongs to the sprint iff either endpoint is one of its task ids.
+  const sprintTaskIds = new Set(sprint.tasks.map(t => t.id));
+  const handoffs = allHandoffs.filter(
+    h => sprintTaskIds.has(h.fromTaskId) || sprintTaskIds.has(h.toTaskId),
+  );
   if (handoffs.length === 0) return;
 
   const summary = {

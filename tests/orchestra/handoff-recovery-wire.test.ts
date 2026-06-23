@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -118,5 +118,31 @@ describe('summarizeHandoffsObservability', () => {
     expect(handoffs).toHaveLength(1);
     expect(handoffs[0].fromTaskId).toBe('task-1');
     expect(handoffs[0].toTaskId).toBe('task-2');
+  });
+
+  // B-HANDOFF-STALE (Sprint 318): the summary must be scoped to THIS sprint's
+  // tasks — listHandoffs() returns every handoff ever written (never pruned), so
+  // pre-fix the summary mixed in stale cross-sprint handoffs (sprint-318's summary
+  // had 29 from sprints 295-306, 0 of its own).
+  it('B-HANDOFF-STALE: summary excludes stale cross-sprint handoffs', () => {
+    const root = tmpRoot();
+    const hp = new HandoffProtocol(root);
+    hp.createHandoff('295-001', '295-007', ['src/old.ts']);   // old sprint
+    hp.createHandoff('301-006', '301-011', ['src/old2.ts']);  // old sprint
+    hp.createHandoff('318-001', '318-002', ['src/new.ts']);   // current sprint
+
+    const sprint: Sprint = {
+      ...minSprint('sprint-318'),
+      tasks: [{ id: '318-001' }, { id: '318-002' }] as Sprint['tasks'],
+    };
+    summarizeHandoffsObservability(root, sprint);
+
+    const eventsFile = join(root, '.deckent', 'recently-works', 'sprint-318-events.jsonl');
+    const events = readFileSync(eventsFile, 'utf-8').trim().split('\n').map(l => JSON.parse(l));
+    const summary = events.find(e => e.channel === 'BRAIN→AUDITOR:HANDOFF_SUMMARY');
+    expect(summary).toBeDefined();
+    // Pre-fix: total=3 (all handoffs). Post-fix: only the current sprint's 1.
+    expect(summary.payload.total).toBe(1);
+    expect(summary.payload.handoffs.map((h: { id: string }) => h.id)).toEqual(['318-001-to-318-002']);
   });
 });
