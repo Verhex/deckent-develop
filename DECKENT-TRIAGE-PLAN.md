@@ -173,6 +173,14 @@ Bunlar saf-dead değil; **yarım-kalmış özellik**. Karar: **istiyorsan → A-
 
 **B-özet:** 14 ruling RESOLVED. Artık A'ya başlanabilir — kasıtlı mimari korundu (RBAC product-soft, writer-lease fail-open, autonomous default), istenen altyapı wire-backlog'una alındı.
 
+> **🔍 ENFORCEMENT-VEIN DISK-VERIFY (06-23) — B1/B2/B3/B6 hiçbiri temiz-committable-surgical-wire DEĞİL (design-first batch):**
+> - **B1 RBAC:** capability-RBAC hard-deny-path (`nervous/authority-matrix.ts checkWorkerAuthority(req,{enforceRbac})`) GERÇEK + ÇALIŞIYOR + test-li (`enforce_rbac` ON → `allowed:false,level:'deny'`+audit-event) AMA yalnız **autonomous-only** wired (`checkSprintSpawnRbac`/`checkBacklogEntryRbac` ← `autonomous/runtime-loop`). MAIN sprint EXECUTE/dispatch'te HİÇBİR authority-check yok. Gap'ler: (a) main-sprint genişletme = **actor/capability-model design** (task'ta capability modeli yok), (b) deckent-dev enforce_rbac=true = **`.deckent/config.json` gitignored → committable kod-wire değil**, (c) file-scope per-write = **subprocess-worker mimari-engelli** (ADR-037 V1.0 kasıtlı). "hard-path erişilemez" iddiası kısmen YANLIŞ (autonomous'ta erişilebilir+çalışıyor).
+> - **B2 worker-scope:** `agents/worker.ts:584 checkWorkerAuthority` (file-scope) = **ZERO-caller dead** (R4-dup: canlı olan `authority-matrix` capability-version); post-hoc scope-violation zaten `boundaryViolations` (sprint-metrics, results×scope) ile sayılıyor → emit-canlandırma gereksiz. Per-write enforce subprocess'te imkânsız (kasıtlı-soft).
+> - **B3 PanicGuard:** `panicGuard.evaluate` TEK call-site (`sprint-controller.ts:1274` graceKill = riskli auto-kill path) ve orada BLOCK **honor ediliyor** (synthetic NO_GO, kill yok). Diğer kill'ler (`sprint-lifecycle` cleanup/pause/dispose) **meşru** (sprint-sonu/pause). → büyük ölçüde **zaten-doğru**, "BLOCK'ta kill ilerliyor" bu path'te yanlış.
+> - **B6 cost-warn:** `daily_max_usd`/`monthly_max_usd` settable+displayed (`cost.ts`) ama enforce-yok; **cumulative-spend aggregation YOK** (getDailySpend/usage-ledger-sum yok) → warn-wire önce spend-data-katmanı ister.
+> - **B1-B2 R4-dup:** 2× `checkWorkerAuthority` (worker.ts:584 dead-file-scope + authority-matrix live-capability) — dead-olanı **C-KES** adayı (test-coupled doğrula).
+> - **KARAR:** enforcement-vein = **design-first batch** (opportunistic-clean-wire DEĞİL). B-ruling'ler zaten product-soft seçti (ADR-037 V1.0 → V2 post-GA). Temiz dormant-feature-wire'ları (B11×7) tükendi. → enforcement hard-flip **post-GA V2'ye defer** VEYA dedicated design-sprint (actor/capability-model + spend-aggregation). Opportunistic surgical-wire ile yapılamaz.
+
 ---
 
 ## 2. BUCKET A — GERÇEK DEFECT (fix + CC-verify), R1-R8 ile
