@@ -19,6 +19,7 @@ import {
   classifyHonestyViolation,
   writeHonestSentinelResult,
   isStubResult,
+  isConfirmedStub,
 } from '../../src/orchestra/result-evaluator.js';
 import type { Task, TaskResult } from '../../src/core/task-types.js';
 import { TaskStatus } from '../../src/core/types.js';
@@ -203,6 +204,38 @@ describe('enforceHonestResultGate — Scenario (d): stub literal forced to NO_GO
 
     const real = makeResult({ linesAdded: 100, testsPassed: true });
     expect(isStubResult(real)).toBe(false);
+  });
+});
+
+// ─── B-STUB (Sprint 318) — RETRO pre-finalize disk-evidence guard ──────────
+// The retro-phase pre-finalize gate switched from raw isStubResult (which
+// false-flagged 318-003's rename → synthetic NO_GO) to isConfirmedStub, which
+// adds the MF-8 disk-evidence override the retro caller previously bypassed.
+describe('isConfirmedStub — B-STUB disk-evidence guard (RETRO pre-finalize)', () => {
+  const scope = { directories: ['src/'], filesRead: [], filesWrite: ['src/a.ts'] };
+  const stubShape = makeResult({
+    filesChanged: ['src/a.ts'], linesAdded: 0, testsPassed: false, selfAssessment: 'DONE',
+  });
+
+  it('stub shape + DISK EVIDENCE (rename/docker untracked) → NOT a confirmed stub', () => {
+    const withEvidence = () => ({ hasDiskEvidence: true, linesAdded: 12, untrackedFiles: [] });
+    expect(isConfirmedStub(stubShape, scope, '/mock', withEvidence)).toBe(false);
+  });
+
+  it('stub shape + NO disk evidence → confirmed stub (legacy synthetic NO_GO preserved)', () => {
+    const noEvidence = () => ({ hasDiskEvidence: false, linesAdded: 0, untrackedFiles: [] });
+    expect(isConfirmedStub(stubShape, scope, '/mock', noEvidence)).toBe(true);
+  });
+
+  it('non-stub result → never a confirmed stub regardless of disk', () => {
+    const real = makeResult({ linesAdded: 100, testsPassed: true });
+    const noEvidence = () => ({ hasDiskEvidence: false, linesAdded: 0, untrackedFiles: [] });
+    expect(isConfirmedStub(real, scope, '/mock', noEvidence)).toBe(false);
+  });
+
+  it('diskVerify throws (no git in sandbox) → fail-open to confirmed stub', () => {
+    const boom = () => { throw new Error('no git'); };
+    expect(isConfirmedStub(stubShape, scope, '/mock', boom)).toBe(true);
   });
 });
 

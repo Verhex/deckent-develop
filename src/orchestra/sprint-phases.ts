@@ -107,7 +107,7 @@ import { evaluateWithRubric, reconcileEvaluationSpuriousNoGo } from './result-ev
 import {
   enforceHonestResultGate,
   writeHonestSentinelResult,
-  isStubResult,
+  isConfirmedStub,
 } from './result-evaluator.js';
 
 // ─── Verify-and-Complete FIX Signal (Sprint 272 — Task 272-004) ──────
@@ -2222,7 +2222,7 @@ export async function runRetroPhase(
       // that stub only the rubric scorer) cannot abort RETRO.
       try {
         const haveSentinel = typeof writeHonestSentinelResult === 'function';
-        const haveStubCheck = typeof isStubResult === 'function';
+        const haveStubCheck = typeof isConfirmedStub === 'function';
         if (haveSentinel || haveStubCheck) {
           const tasksDir = join(projectRoot, TASKS_DIR);
           for (const task of sprint.tasks) {
@@ -2241,8 +2241,16 @@ export async function runRetroPhase(
             try {
               const raw = readFileSync(resultPath, 'utf-8');
               const parsed = JSON.parse(raw) as TaskResult;
-              if (haveStubCheck && isStubResult(parsed)) {
-                debugLog('runRetroPhase:preFinalize', `Rewriting stub .result for task ${task.id}`);
+              // B-STUB / B-DOCKER-RACE / B-SENTINEL-CLOBBER (Sprint 318): isConfirmedStub
+              // adds the MF-8 disk-evidence override the retro-phase caller previously
+              // bypassed — a result is only flipped if it matches the stub shape AND has
+              // no on-disk evidence (git numstat + untracked). Pure refactors (rename/
+              // re-export/delete → linesAdded:0) and docker workers (untracked → numstat 0)
+              // leave real disk changes → honest, NOT flagged. 318-003 (a rename) was
+              // wrongly downgraded + sentinel-clobbered here. Fail-open preserves the
+              // legacy synthetic NO_GO when git is unavailable.
+              if (haveStubCheck && isConfirmedStub(parsed, task.scope, projectRoot)) {
+                debugLog('runRetroPhase:preFinalize', `Rewriting confirmed-stub .result for task ${task.id} (no disk evidence)`);
                 if (haveSentinel) {
                   writeHonestSentinelResult(
                     projectRoot, task.id, parsed.filesChanged ?? [], 'dishonest-done-stub',

@@ -15,6 +15,7 @@ import { validateWorkerCoverage } from './coverage-validator.js';
 import { reconcileSpuriousNoGo, reconcileRubricNoGo } from './mid-sprint-adapter.js';
 import { getRubric, coverageOptional } from './rubric-registry.js';
 import type { DiskVerifyResult } from './disk-verify.js';
+import { verifyDiskAgainstClaim } from './disk-verify.js';
 import {
   detectDishonestResult,
   emitDishonestResultEvent,
@@ -2056,11 +2057,43 @@ export function isStubResult(result: TaskResult): boolean {
   if (codeVerified === 'CODE_VERIFIED_DONE' && linesAdded === 0 && !testsPassed) {
     return true;
   }
-  // Even without the marker, the shape itself is dishonest
+  // Even without the marker, the shape itself is dishonest. NOTE: linesAdded===0
+  // is deliberately SUSPICIOUS at this cheap-heuristic layer — the disk-evidence
+  // override (MF-8, Sprint 252) lives in enforceHonestResultGate(diskVerify) and
+  // the RETRO-path disk check (B-STUB, Sprint 318), NOT here. Keep this strict so
+  // the override layering contract holds.
   if (selfDone && linesAdded === 0 && !testsPassed) {
     return true;
   }
   return false;
+}
+
+/**
+ * B-STUB / B-DOCKER-RACE (Sprint 318): a result is a CONFIRMED stub only when it
+ * matches the cheap {@link isStubResult} shape AND has NO on-disk evidence of real
+ * work. Pure refactors (rename / re-export / delete → linesAdded:0) and docker
+ * workers (new files are untracked → `git numstat HEAD` = 0) trip isStubResult but
+ * leave real disk evidence. The RETRO pre-finalize gate used the cheap heuristic
+ * alone (the retro-phase caller bypassed the MF-8 diskVerify override), so 318-003's
+ * rename was wrongly downgraded to a synthetic NO_GO. This mirrors
+ * enforceHonestResultGate Check-1 (`!hasDiskEvidence && isStubResult`).
+ *
+ * `diskVerifyFn` is injectable for deterministic tests. Fail-open: a git error →
+ * treated as a confirmed stub, preserving the legacy synthetic-NO_GO in sandboxes
+ * without git.
+ */
+export function isConfirmedStub(
+  result: TaskResult,
+  scope: Task['scope'],
+  projectRoot: string,
+  diskVerifyFn: (root: string, sc: Task['scope']) => DiskVerifyResult = verifyDiskAgainstClaim,
+): boolean {
+  if (!isStubResult(result)) return false;
+  try {
+    return diskVerifyFn(projectRoot, scope).hasDiskEvidence !== true;
+  } catch {
+    return true; // fail-open → confirmed stub (legacy synthetic NO_GO preserved)
+  }
 }
 
 /**
