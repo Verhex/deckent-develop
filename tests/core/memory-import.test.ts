@@ -53,17 +53,22 @@ const debtContent = `# Technical Debt
 // ─── extractKeywords ────────────────────────────────────────────
 
 describe('extractKeywords', () => {
-  it('extracts words > 3 chars, lowercased, unique', () => {
-    const kw = extractKeywords('Docker HB Core Fix atomicWriteFileSync');
+  // memory-import's parse path uses { maxResults: 15, minLength: 4 } — these opts
+  // preserve the historical "> 3 chars + max 15" behavior on the canonical SSOT.
+  const MEM_OPTS = { maxResults: 15, minLength: 4 } as const;
+
+  it('extracts words > 3 chars (minLength: 4), lowercased, unique', () => {
+    const kw = extractKeywords('Docker HB Core Fix atomicWriteFileSync', MEM_OPTS);
     expect(kw).toContain('docker');
     expect(kw).toContain('core');
     expect(kw).toContain('atomicwritefilesync');
-    // "HB" is 2 chars — excluded
+    // "HB" is 2 chars, "Fix" is 3 chars — excluded by minLength: 4
     expect(kw).not.toContain('hb');
+    expect(kw).not.toContain('fix');
   });
 
   it('removes common stop words', () => {
-    const kw = extractKeywords('This is the best way with from that');
+    const kw = extractKeywords('This is the best way with from that', MEM_OPTS);
     expect(kw).not.toContain('this');
     expect(kw).not.toContain('the');
     expect(kw).not.toContain('with');
@@ -73,7 +78,7 @@ describe('extractKeywords', () => {
   });
 
   it('removes Turkish stop words', () => {
-    const kw = extractKeywords('için olan ile birlikte yapılır');
+    const kw = extractKeywords('için olan ile birlikte yapılır', MEM_OPTS);
     expect(kw).not.toContain('için');
     expect(kw).not.toContain('olan');
     expect(kw).not.toContain('ile');
@@ -81,9 +86,9 @@ describe('extractKeywords', () => {
     expect(kw).toContain('yapılır');
   });
 
-  it('limits to max 15 keywords', () => {
+  it('limits to max 15 keywords (maxResults: 15)', () => {
     const text = Array.from({ length: 30 }, (_, i) => `keyword${i}`).join(' ');
-    const kw = extractKeywords(text);
+    const kw = extractKeywords(text, MEM_OPTS);
     expect(kw.length).toBeLessThanOrEqual(15);
   });
 
@@ -92,9 +97,42 @@ describe('extractKeywords', () => {
   });
 
   it('deduplicates keywords', () => {
-    const kw = extractKeywords('docker Docker DOCKER docker');
+    const kw = extractKeywords('docker Docker DOCKER docker', MEM_OPTS);
     const dockerCount = kw.filter((w) => w === 'docker').length;
     expect(dockerCount).toBe(1);
+  });
+
+  // ─── Canonical default contract (R4-KEYWORDS SSOT) ──────────────
+  // Default (no opts): minLength 2, uncapped, EN+TR superset stopwords.
+  // This is the surface agent-selector/task-analyzer rely on.
+
+  it('default minLength is 2 — keeps 2/3-char tokens that minLength:4 would drop', () => {
+    const kw = extractKeywords('Docker HB Core Fix atomicWriteFileSync');
+    expect(kw).toContain('hb'); // 2 chars — kept by default minLength 2
+    expect(kw).toContain('fix'); // 3 chars — kept (and "fix" is NOT a base stopword)
+    expect(kw).toContain('docker');
+  });
+
+  it('default is uncapped — returns more than 15 keywords when present', () => {
+    const text = Array.from({ length: 30 }, (_, i) => `keyword${i}`).join(' ');
+    const kw = extractKeywords(text);
+    expect(kw.length).toBe(30);
+  });
+
+  it('default still filters the EN+TR base stopwords', () => {
+    const kw = extractKeywords('the docker için pipeline');
+    expect(kw).not.toContain('the');
+    expect(kw).not.toContain('için');
+    expect(kw).toContain('docker');
+    expect(kw).toContain('pipeline');
+  });
+
+  it('extraStopwords are unioned with the base set (consumer-specific filter)', () => {
+    const base = extractKeywords('deploy the service'); // "deploy" kept by default
+    expect(base).toContain('deploy');
+    const withExtra = extractKeywords('deploy the service', { extraStopwords: ['deploy'] });
+    expect(withExtra).not.toContain('deploy'); // now filtered via extraStopwords
+    expect(withExtra).toContain('service');
   });
 });
 

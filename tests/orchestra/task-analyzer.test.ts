@@ -220,6 +220,34 @@ describe('TaskAnalyzer.analyze — keywords', () => {
     const result = analyzer.analyze(makeTask('', '', makeScope([])));
     expect(result.keywords).toEqual([]);
   });
+
+  // ─── R4-KEYWORDS faithful tests (canonical SSOT delegation) ──────────────────
+  // task-analyzer now delegates to the core canonical extractKeywords, layering its
+  // action-verb stopwords via extraStopwords. Action-verb filtering is PRESERVED;
+  // EN+TR superset adds Turkish filtering (pre-fix RED — the old EN-only copy kept them).
+
+  it('still filters task-analyzer action verbs after SSOT collapse (behavior preserved)', () => {
+    const result = analyzer.analyze(
+      makeTask('Add fix create update new implement parser', 'helper validation registry'),
+    );
+    for (const verb of ['add', 'fix', 'create', 'update', 'new', 'implement']) {
+      expect(result.keywords).not.toContain(verb);
+    }
+    expect(result.keywords).toContain('parser');
+    expect(result.keywords).toContain('helper');
+    expect(result.keywords).toContain('validation');
+    expect(result.keywords).toContain('registry');
+  });
+
+  it('filters Turkish stopwords via the EN+TR canonical base (pre-fix RED)', () => {
+    const result = analyzer.analyze(makeTask('için olan parser', 'ile birlikte registry'));
+    // old EN-only task-analyzer copy kept these Turkish words as keywords
+    expect(result.keywords).not.toContain('için');
+    expect(result.keywords).not.toContain('olan');
+    expect(result.keywords).toContain('parser');
+    expect(result.keywords).toContain('registry');
+    expect(result.keywords).toContain('birlikte');
+  });
 });
 
 // ─── TaskAnalyzer.analyze — scopeWeight ────────────────────────────────────

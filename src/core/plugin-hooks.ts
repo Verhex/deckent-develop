@@ -546,7 +546,7 @@ export interface CiValidationResult {
  *   "Tests  3 failed | 11312 passed (11315)"
  * @internal Exported for testing
  */
-export function parseVitestOutput(output: string): {
+export function parseVitestCounts(output: string): {
   testCount: number;
   testPassed: number;
   testFailed: number;
@@ -581,7 +581,7 @@ export function runFullVitest(projectRoot: string): {
     shell: process.platform === 'win32',
   });
   const output = ((result.stdout ?? '') + (result.stderr ?? '')).trim();
-  const parsed = parseVitestOutput(output);
+  const parsed = parseVitestCounts(output);
 
   return {
     passed: result.status === 0,

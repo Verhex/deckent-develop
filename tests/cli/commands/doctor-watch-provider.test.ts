@@ -43,6 +43,13 @@ vi.mock('../../../src/core/constants.js', () => ({
   TASKS_DIR: '.tasks',
 }));
 
+// R4-SPRINTID (Sprint 318): watch.ts resolves current sprint via canonical
+// core/event-stream.getCurrentSprintId. Mock it (default null = no stale-sprint
+// warning) so --follow attach path is exercised cleanly.
+vi.mock('../../../src/core/event-stream.js', () => ({
+  getCurrentSprintId: vi.fn(() => null),
+}));
+
 import { existsSync, readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { attachToWorkerPane } from '../../../src/orchestra/tmux.js';

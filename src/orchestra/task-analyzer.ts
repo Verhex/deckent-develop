@@ -2,6 +2,7 @@
 // Analyzes task metadata to infer type, complexity, keywords, and duration.
 import type { TaskScope } from '../core/types.js';
 import type { TaskAnalysis, TaskType } from '../core/decision-types.js';
+import { extractKeywords } from '../core/memory-import.js';
 
 // ─── Keyword Pattern Maps ──────────────────────────────────────────────────
 
@@ -16,27 +17,11 @@ const TYPE_PATTERNS: Array<{ type: TaskType; patterns: RegExp }> = [
 
 // ─── Keyword Extraction ────────────────────────────────────────────────────
 
-const STOPWORDS = new Set([
-  'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'shall',
-  'should', 'may', 'might', 'must', 'can', 'could',
-  'and', 'but', 'or', 'nor', 'not', 'so', 'yet',
-  'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as',
-  'into', 'about', 'between', 'through', 'after', 'before', 'during',
-  'all', 'each', 'every', 'both', 'few', 'more', 'most', 'some', 'any',
-  'no', 'if', 'then', 'than', 'when', 'where', 'how', 'what', 'which', 'who',
-  'up', 'out', 'off', 'new', 'add', 'create', 'update', 'fix', 'implement',
-]);
-
-function extractKeywords(text: string): string[] {
-  if (!text) return [];
-  const tokens = text
-    .toLowerCase()
-    .split(/[\s\-_.,;:!?()[\]{}"'`/\\|@#$%^&*+=<>~]+/)
-    .filter((t) => t.length >= 2)
-    .filter((t) => !STOPWORDS.has(t));
-  return [...new Set(tokens)];
-}
+// Task-analyzer-specific stopwords (action verbs). Layered onto the canonical
+// EN+TR base via extraStopwords so they are filtered here WITHOUT leaking into
+// other extractKeywords consumers (e.g. agent-selector, where "fix"/"add" must
+// remain matchable against bug-fixer/api-builder trigger keywords).
+const TASK_ANALYZER_STOPWORDS = ['new', 'add', 'create', 'update', 'fix', 'implement'];
 
 // ─── Complexity Calculation ────────────────────────────────────────────────
 
@@ -112,7 +97,7 @@ export class TaskAnalyzer {
     const text = `${task.title} ${task.description}`;
     const type = this.inferType(text);
     const complexity = calculateComplexity(text, task.scope);
-    const keywords = extractKeywords(text);
+    const keywords = extractKeywords(text, { extraStopwords: TASK_ANALYZER_STOPWORDS });
     const scopeWeight = calculateScopeWeight(task.scope);
     const estimatedDurationMs = estimateDuration(type, complexity);
 

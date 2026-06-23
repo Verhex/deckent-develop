@@ -91,7 +91,7 @@ vi.mock('../../src/monitor/auditor.js', () => ({
   writeCodeVerifiedResult: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../../src/orchestra/baseline-tracker.js', () => ({
-  parseVitestOutput: vi.fn(() => ({ files: 0, pass: 0, fail: 0, skipped: 0 })),
+  parseVitestBaseline: vi.fn(() => ({ files: 0, pass: 0, fail: 0, skipped: 0 })),
   readBaseline: vi.fn(() => null), containsHonestyTrigger: vi.fn(() => false),
   captureVitestBaseline: vi.fn(),
 }));

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
-  parseVitestOutput,
+  parseVitestFailedTests,
   verifyTests,
   runTestVerifyLoop,
   MAX_TEST_RETRIES,
@@ -53,9 +53,9 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// ─── parseVitestOutput ──────────────────────────────────────────────
+// ─── parseVitestFailedTests ──────────────────────────────────────────────
 
-describe('parseVitestOutput', () => {
+describe('parseVitestFailedTests', () => {
   it('should return empty arrays for passing test output', () => {
     const output = `
  ✓ tests/core/utils.test.ts (5)
@@ -64,7 +64,7 @@ describe('parseVitestOutput', () => {
  Tests  17 passed (17)
  Duration  2.34s
 `;
-    const result = parseVitestOutput(output);
+    const result = parseVitestFailedTests(output);
     expect(result.failedTests).toEqual([]);
     expect(result.summary).toContain('passed');
   });
@@ -76,7 +76,7 @@ describe('parseVitestOutput', () => {
 
  Tests  3 failed | 12 passed (15)
 `;
-    const result = parseVitestOutput(output);
+    const result = parseVitestFailedTests(output);
     expect(result.failedTests).toContain('tests/agents/worker.test.ts');
   });
 
@@ -87,7 +87,7 @@ describe('parseVitestOutput', () => {
 
  Tests  2 failed | 5 passed (7)
 `;
-    const result = parseVitestOutput(output);
+    const result = parseVitestFailedTests(output);
     expect(result.failedTests).toContain('tests/foo.test.ts > describe > should work');
     expect(result.failedTests).toContain('tests/bar.test.ts > other test');
   });
@@ -99,7 +99,7 @@ describe('parseVitestOutput', () => {
 
  Tests  2 failed (2)
 `;
-    const result = parseVitestOutput(output);
+    const result = parseVitestFailedTests(output);
     expect(result.failedTests).toContain('should calculate correctly');
     expect(result.failedTests).toContain('should handle edge case');
   });
@@ -110,7 +110,7 @@ describe('parseVitestOutput', () => {
 
  Tests  1 failed (1)
 `;
-    const result = parseVitestOutput(output);
+    const result = parseVitestFailedTests(output);
     expect(result.failedTests).toContain('should validate input');
   });
 
@@ -121,7 +121,7 @@ describe('parseVitestOutput', () => {
 
  Tests  1 failed (1)
 `;
-    const result = parseVitestOutput(output);
+    const result = parseVitestFailedTests(output);
     const count = result.failedTests.filter(t => t.includes('should work')).length;
     expect(count).toBe(1);
   });
@@ -131,18 +131,18 @@ describe('parseVitestOutput', () => {
  Tests  3 failed | 12 passed (15)
  Duration  1.23s
 `;
-    const result = parseVitestOutput(output);
+    const result = parseVitestFailedTests(output);
     expect(result.summary).toBe('Tests  3 failed | 12 passed (15)');
   });
 
   it('should return empty summary when no summary line present', () => {
     const output = 'Error: Cannot find module';
-    const result = parseVitestOutput(output);
+    const result = parseVitestFailedTests(output);
     expect(result.summary).toBe('');
   });
 
   it('should handle empty output', () => {
-    const result = parseVitestOutput('');
+    const result = parseVitestFailedTests('');
     expect(result.failedTests).toEqual([]);
     expect(result.summary).toBe('');
   });
@@ -153,7 +153,7 @@ describe('parseVitestOutput', () => {
 
  Tests  1 failed | 20 passed (21)
 `;
-    const result = parseVitestOutput(output);
+    const result = parseVitestFailedTests(output);
     expect(result.failedTests).toHaveLength(1);
     expect(result.failedTests[0]).toBe('tests/core/config.test.ts');
   });
@@ -166,7 +166,7 @@ describe('parseVitestOutput', () => {
 
  Tests  1 failed | 1 passed (2)
 `;
-    const result = parseVitestOutput(output);
+    const result = parseVitestFailedTests(output);
     expect(result.failedTests.length).toBeGreaterThanOrEqual(1);
     expect(result.failedTests).toContain('should claim task correctly');
   });

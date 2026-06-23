@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import type { Command } from 'commander';
 import { DASHBOARD_FILE, TASKS_DIR } from '../../core/constants.js';
+import { getCurrentSprintId } from '../../core/event-stream.js';
 import { isSessionActive, createWatchLayout, attachToWorkerPane, TmuxError } from '../../orchestra/tmux.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -28,17 +29,11 @@ function getTaskSprintId(root: string, taskId: string): string | null {
   }
 }
 
-/** J) Get the current sprint ID from .deckent/config.json. */
-function getCurrentSprintId(root: string): string | null {
-  const configPath = join(root, '.deckent', 'config.json');
-  if (!existsSync(configPath)) return null;
-  try {
-    const config = JSON.parse(readFileSync(configPath, 'utf-8')) as { last_sprint_id?: string };
-    return config.last_sprint_id ?? null;
-  } catch {
-    return null;
-  }
-}
+// J) The current sprint ID is resolved by the canonical core/event-stream
+//    `getCurrentSprintId` (active→state). R4-SPRINTID (Sprint 318) — conscious
+//    semantic change: `watch` now reflects the ACTIVE sprint (sprint-active.json
+//    → sprint-state.json) instead of the stale `config.last_sprint_id`, so the
+//    stale-worker warning compares against the sprint that is actually running.
 
 /** I) Explain why a worker window was not found. */
 function explainMissingWorker(root: string, taskId: string): string {

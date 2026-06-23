@@ -59,7 +59,7 @@ import {
 
 // ─── Baseline Tracker ─────────────────────────────────────────────
 import {
-  parseVitestOutput, readBaseline, containsHonestyTrigger,
+  parseVitestBaseline, readBaseline, containsHonestyTrigger,
   captureVitestBaseline,
 } from './baseline-tracker.js';
 
@@ -294,7 +294,7 @@ export async function runSelfAuditGate(
         });
 
     const vitestOutput = ((vitestRun.stdout ?? '') + (vitestRun.stderr ?? '')).trim();
-    const current = parseVitestOutput(vitestOutput);
+    const current = parseVitestBaseline(vitestOutput);
 
     // Read pre-sprint baseline for delta calculation
     const baseline = readBaseline(root, sprintId);

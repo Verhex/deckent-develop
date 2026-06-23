@@ -80,7 +80,7 @@ export {
 export {
   getVerifyCommands,
   isDocOnlyScope,
-  parseVitestOutput,
+  parseVitestFailedTests,
   verifyTests,
   runTestVerifyLoop,
   MAX_TEST_RETRIES,

@@ -28,25 +28,78 @@ const STOP_WORDS_TR = new Set([
   'arasında', 'iken', 'zaman', 'yani', 'hala', 'sadece',
 ]);
 
+// Articles / pronouns / modals / conjunctions / prepositions / quantifiers.
+// Folded in from the former core/agent-selector.ts copy so the canonical base
+// is the EN+TR superset of all three divergent implementations (R4-KEYWORDS).
+const STOP_WORDS_EN_COMMON = new Set([
+  'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'shall',
+  'should', 'may', 'might', 'must', 'can', 'could',
+  'i', 'me', 'my', 'we', 'our', 'you', 'your', 'he', 'she', 'it', 'they',
+  'this', 'that', 'these', 'those',
+  'and', 'but', 'or', 'nor', 'not', 'so', 'yet',
+  'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as',
+  'into', 'about', 'between', 'through', 'after', 'before', 'during',
+  'all', 'each', 'every', 'both', 'few', 'more', 'most', 'some', 'any',
+  'no', 'if', 'then', 'than', 'when', 'where', 'how', 'what', 'which', 'who',
+  'up', 'out', 'off',
+]);
+
+// Canonical base stopword set: EN + TR superset (no narrowing). Consumer-specific
+// stopwords (e.g. task-analyzer's action verbs) are layered on via `extraStopwords`
+// so they never leak into other consumers' keyword/routing output.
+const STOPWORDS_BASE = new Set<string>([
+  ...STOP_WORDS_EN,
+  ...STOP_WORDS_TR,
+  ...STOP_WORDS_EN_COMMON,
+]);
+
+// Tokenization delimiter — most-inclusive punctuation class across the three
+// former implementations (whitespace + every punctuation char any copy split on).
+const KEYWORD_DELIMITERS = /[\s\-_.,;:!?()[\]{}"'`/\\|@#$%^&*+=<>~]+/;
+
+// Default minimum kept-token length. Equals the old agent-selector/task-analyzer
+// MIN_KEYWORD_LENGTH; memory-import's own parse path passes minLength: 4 to keep
+// its historical "> 3 chars" behavior.
+const DEFAULT_MIN_KEYWORD_LENGTH = 2;
+
+/** Options preserved when memory-import parses .brain markdown (cap + min-length). */
+const MEMORY_IMPORT_KEYWORD_OPTS = { maxResults: 15, minLength: 4 } as const;
+
 // ─── extractKeywords ─────────────────────────────────────────────
 
 /**
- * Extract unique, lowercased keywords from text.
- * Filters: > 3 chars, not stop words (EN + TR), unique, max 15.
+ * Canonical keyword extractor (R4-KEYWORDS SSOT). Splits on whitespace/punctuation,
+ * lowercases, filters stopwords + short tokens, deduplicates (first-occurrence order).
+ *
+ * Superset of the three former divergent copies, parameterized to preserve each
+ * consumer's behavior:
+ * - `minLength` (default 2) — minimum kept-token length.
+ * - `extraStopwords` — additional stopwords unioned with the EN+TR base set.
+ * - `maxResults` — cap on returned keywords (default: unlimited).
+ *
+ * memory-import callers pass `{ maxResults: 15, minLength: 4 }`; agent-selector and
+ * task-analyzer call with defaults (uncapped, minLength 2).
  */
-export function extractKeywords(text: string): string[] {
-  if (!text) return [];
+export function extractKeywords(
+  text: string,
+  opts?: { maxResults?: number; minLength?: number; extraStopwords?: Iterable<string> },
+): string[] {
+  if (!text || typeof text !== 'string') return [];
 
-  const words = text
-    .replace(/[*#|>`_\-=\[\](){}:;,."'!?/\\~@+^$%&<>]/g, ' ')
-    .split(/\s+/)
-    .map((w) => w.toLowerCase().trim())
-    .filter((w) => w.length > 3)
-    .filter((w) => !STOP_WORDS_EN.has(w))
-    .filter((w) => !STOP_WORDS_TR.has(w));
+  const minLength = opts?.minLength ?? DEFAULT_MIN_KEYWORD_LENGTH;
+  const stopwords = opts?.extraStopwords
+    ? new Set<string>([...STOPWORDS_BASE, ...opts.extraStopwords])
+    : STOPWORDS_BASE;
 
-  const unique = [...new Set(words)];
-  return unique.slice(0, 15);
+  const tokens = text
+    .toLowerCase()
+    .split(KEYWORD_DELIMITERS)
+    .filter((t) => t.length >= minLength)
+    .filter((t) => !stopwords.has(t));
+
+  const unique = [...new Set(tokens)];
+  return opts?.maxResults !== undefined ? unique.slice(0, opts.maxResults) : unique;
 }
 
 // ─── parseDecisionsMd ────────────────────────────────────────────
@@ -93,7 +146,7 @@ export function parseDecisionsMd(content: string): CreateEntryInput[] {
     seenIds.set(baseId, count + 1);
     const id = count === 0 ? baseId : `${baseId}-v${count + 1}`;
 
-    const tags = extractKeywords(`${header.title} ${sectionContent}`);
+    const tags = extractKeywords(`${header.title} ${sectionContent}`, MEMORY_IMPORT_KEYWORD_OPTS);
 
     // If this is a later version, add supersedes relation to the first
     const relations = count > 0
@@ -150,7 +203,7 @@ export function parseMemoryMd(content: string): CreateEntryInput[] {
     const sectionContent = content.slice(sectionStart, sectionEnd).trim();
 
     const sprintId = `sprint-${header.num}`;
-    const tags = extractKeywords(sectionContent);
+    const tags = extractKeywords(sectionContent, MEMORY_IMPORT_KEYWORD_OPTS);
 
     entries.push({
       id: `mem-${header.num}`,
@@ -259,7 +312,7 @@ export function parseDebtMd(content: string): CreateEntryInput[] {
       }
     }
 
-    const tags = extractKeywords(description);
+    const tags = extractKeywords(description, MEMORY_IMPORT_KEYWORD_OPTS);
 
     entries.push({
       id: `debt-${rawId}`,
@@ -511,7 +564,7 @@ export function backfillSprintMemoriesFromSprintsDir(
       continue;
     }
 
-    const tags = extractKeywords(trimmed);
+    const tags = extractKeywords(trimmed, MEMORY_IMPORT_KEYWORD_OPTS);
     store.insert({
       id: memId,
       type: 'memory',

@@ -42,6 +42,13 @@ export const NERVOUS_HISTORY_FILE = join(NERVOUS_DIR, 'nervous-history.jsonl');
 export const NERVOUS_PENDING_FILE = join(NERVOUS_DIR, 'nervous-pending.json');
 export const NERVOUS_IPC_DIR = join(NERVOUS_DIR, 'nervous-ipc');
 export const PANIC_IPC_DIR = join(NERVOUS_DIR, 'panic-ipc');
+// ─── Sprint identity files (single source of truth for getCurrentSprintId) ──
+// Resolution order in core/event-stream.getCurrentSprintId: SPRINT_ACTIVE_FILE
+// (explicit override, if present + parseable) → SPRINT_STATE_FILE (written by
+// writeSprintState during execution). Centralized here so every consumer
+// (core/monitor/cli) derives the same paths from DECKENT_DIR.
+export const SPRINT_STATE_FILE = join(DECKENT_DIR, 'sprint-state.json');
+export const SPRINT_ACTIVE_FILE = join(DECKENT_DIR, 'sprint-active.json');
 // ─── Per-sprint ephemeral artifacts (events, metrics, gate, archives) ──
 export const RECENT_WORKS_DIR = join(DECKENT_DIR, 'recently-works');
 export const MEMORY_DB_FILE = 'memory.db' as const;

@@ -70,6 +70,42 @@ describe('extractKeywords', () => {
     expect(result[1]).toBe('test');
     expect(result[2]).toBe('deploy');
   });
+
+  // ─── R4-KEYWORDS faithful tests (canonical superset, pre-fix RED) ────────────
+  // agent-selector now delegates to the core SSOT (memory-import.extractKeywords):
+  // EN+TR superset stopwords + uncapped default. The old EN-only standalone copy
+  // kept TR words and EN extras like "using"/"only", so the assertions below are
+  // pre-fix RED / post-fix GREEN (verified via `git stash push -- agent-selector.ts`).
+
+  it('filters EN+TR superset stopwords absent from the old EN-only copy (pre-fix RED)', () => {
+    const kw = extractKeywords('using only the için olan deploy pipeline');
+    // EN extras now filtered — the former agent-selector copy did NOT have these
+    expect(kw).not.toContain('using');
+    expect(kw).not.toContain('only');
+    // Turkish stopwords now filtered — the former EN-only copy kept these
+    expect(kw).not.toContain('için');
+    expect(kw).not.toContain('olan');
+    // domain keywords survive
+    expect(kw).toContain('deploy');
+    expect(kw).toContain('pipeline');
+  });
+
+  it('returns all keywords uncapped (no 15-cap leaks from the memory-import path)', () => {
+    const text = Array.from({ length: 20 }, (_, i) => `term${i}`).join(' ');
+    const kw = extractKeywords(text);
+    expect(kw.length).toBe(20);
+  });
+
+  it('keeps short + action keywords matchable for routing (fix/add/ci/123/jwt)', () => {
+    // bug-fixer ("fix"), api-builder, ci-guardian ("ci") rely on these surviving —
+    // they must NOT be folded into the canonical base stopword set.
+    const kw = extractKeywords('fix add ci 123 jwt');
+    expect(kw).toContain('fix');
+    expect(kw).toContain('add');
+    expect(kw).toContain('ci');
+    expect(kw).toContain('123');
+    expect(kw).toContain('jwt');
+  });
 });
 
 // ─── selectAgent ─────────────────────────────────────────────────────────────

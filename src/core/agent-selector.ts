@@ -1,47 +1,15 @@
 // ─── Agent Selector ──────────────────────────────────────────────────────────
 import type { ModelType } from './types.js';
 import type { AgentDefinition, AgentPool, AgentSelectionResult } from './agent-types.js';
+// extractKeywords is the canonical R4-KEYWORDS SSOT in memory-import. Re-exported here
+// for backward-compatible imports; selectAgent/suggestNewAgent call it with defaults
+// (uncapped, minLength 2) so short/action keywords like "fix"/"add"/"ci" stay matchable.
+import { extractKeywords } from './memory-import.js';
 
-// ─── Stopwords (common English words to filter from keyword extraction) ──────
-
-const STOPWORDS = new Set([
-  'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'shall',
-  'should', 'may', 'might', 'must', 'can', 'could',
-  'i', 'me', 'my', 'we', 'our', 'you', 'your', 'he', 'she', 'it', 'they',
-  'this', 'that', 'these', 'those',
-  'and', 'but', 'or', 'nor', 'not', 'so', 'yet',
-  'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as',
-  'into', 'about', 'between', 'through', 'after', 'before', 'during',
-  'all', 'each', 'every', 'both', 'few', 'more', 'most', 'some', 'any',
-  'no', 'if', 'then', 'than', 'when', 'where', 'how', 'what', 'which', 'who',
-  'up', 'out', 'off',
-]);
-
-// Minimum keyword length after filtering
-const MIN_KEYWORD_LENGTH = 2;
+export { extractKeywords };
 
 // Minimum score threshold for an agent to be selected
 const SCORE_THRESHOLD = 3;
-
-// ─── extractKeywords ─────────────────────────────────────────────────────────
-
-/**
- * Extract keywords from text: split on whitespace/punctuation, lowercase,
- * deduplicate, filter stopwords and short tokens.
- */
-export function extractKeywords(text: string): string[] {
-  if (!text || typeof text !== 'string') return [];
-
-  const tokens = text
-    .toLowerCase()
-    .split(/[\s\-_.,;:!?()[\]{}"'`/\\|@#$%^&*+=<>~]+/)
-    .filter((t) => t.length >= MIN_KEYWORD_LENGTH)
-    .filter((t) => !STOPWORDS.has(t));
-
-  // Deduplicate while preserving order
-  return [...new Set(tokens)];
-}
 
 // ─── Glob-like pattern matching ──────────────────────────────────────────────
 

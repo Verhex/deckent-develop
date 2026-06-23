@@ -1,5 +1,10 @@
 // ─── Rich Sprint Summary (ANSI) ─────────────────────────────────────
 
+// Canonical NO_COLOR check (R4-ISNOCOLOR SSOT) lives in ./output.ts.
+// This module previously kept an env-only copy; it now uses the superset
+// so `--no-color` argv is also honored (conscious behavior-expansion).
+import { isNoColor } from './output.js';
+
 // ─── ANSI Codes ─────────────────────────────────────────────────────
 
 const ANSI = {
@@ -10,11 +15,6 @@ const ANSI = {
   bold: '\x1b[1m',
   reset: '\x1b[0m',
 } as const;
-
-/** Check whether ANSI color output is disabled via NO_COLOR env var. */
-function isNoColor(): boolean {
-  return process.env['NO_COLOR'] !== undefined;
-}
 
 /** Wrap text with an ANSI code pair. Returns plain text when NO_COLOR is set. */
 function c(code: string, text: string): string {

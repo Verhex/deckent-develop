@@ -9,6 +9,7 @@ import {
   formatSprintSummary,
   formatAgentLabel,
   formatHumanStatus,
+  isNoColor,
 } from '../../../src/cli/helpers/output.js';
 import type { HumanStatusInput } from '../../../src/cli/helpers/output.js';
 import { AgentStatus, AlertLevel, SprintPhase, SprintStatus } from '../../../src/core/types.js';
@@ -724,5 +725,46 @@ describe('formatHumanStatus — alert detail', () => {
     expect(result).toContain('msg-1');
     expect(result).toContain('msg-2');
     expect(result).not.toContain('more');
+  });
+});
+
+// ─── isNoColor — canonical superset SSOT (R4-ISNOCOLOR) ──────────────
+// output.ts is the single source of truth; sprint-summary-rich.ts and
+// dashboard.ts now import this. The signature is a SUPERSET of the three
+// former divergent copies: it returns true for ANY of the three triggers.
+
+describe('isNoColor — canonical superset', () => {
+  const originalEnv = process.env.NO_COLOR;
+  const originalArgv = [...process.argv];
+
+  afterEach(() => {
+    if (originalEnv === undefined) delete process.env.NO_COLOR;
+    else process.env.NO_COLOR = originalEnv;
+    process.argv = [...originalArgv];
+  });
+
+  it('returns false when no trigger is active', () => {
+    delete process.env.NO_COLOR;
+    process.argv = ['node', 'test'];
+    expect(isNoColor()).toBe(false);
+    expect(isNoColor(false)).toBe(false);
+  });
+
+  it('trigger 1 — returns true when flagValue is explicitly true', () => {
+    delete process.env.NO_COLOR;
+    process.argv = ['node', 'test'];
+    expect(isNoColor(true)).toBe(true);
+  });
+
+  it('trigger 2 — returns true when NO_COLOR env is set', () => {
+    process.env.NO_COLOR = '1';
+    process.argv = ['node', 'test'];
+    expect(isNoColor()).toBe(true);
+  });
+
+  it('trigger 3 — returns true when --no-color is in argv', () => {
+    delete process.env.NO_COLOR;
+    process.argv = ['node', 'test', '--no-color'];
+    expect(isNoColor()).toBe(true);
   });
 });

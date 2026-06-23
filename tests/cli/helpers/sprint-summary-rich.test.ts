@@ -93,6 +93,28 @@ describe('formatRichSprintSummary', () => {
     expect(output).toContain('1 done');
   });
 
+  // ─── R4-ISNOCOLOR faithful regression ─────────────────────────────
+  // After collapsing onto the canonical superset isNoColor (output.ts),
+  // this module now honors `--no-color` in argv too. The former env-only
+  // copy IGNORED argv, so it would still emit ANSI here → pre-fix RED,
+  // post-fix GREEN (verified via `git stash`).
+  it('--no-color in argv produces clean text (superset SSOT — was RED pre-fix)', () => {
+    const savedArgv = [...process.argv];
+    delete process.env['NO_COLOR']; // env unset — only the argv trigger is active
+    process.argv = ['node', 'deckent', '--no-color'];
+    try {
+      const sprint = makeSprint();
+      const evals = makeEvals(['042-001'], [], []);
+      const output = formatRichSprintSummary(sprint, evals);
+
+      expect(output).not.toMatch(/\x1b\[/); // env-only impl FAILED this assertion
+      expect(output).toContain('Sprint #42 Complete');
+      expect(output).toContain('1 done');
+    } finally {
+      process.argv = savedArgv;
+    }
+  });
+
   it('quiet mode shows only results line', () => {
     const sprint = makeSprint();
     const evals = makeEvals(['042-001'], ['042-002'], ['042-003']);

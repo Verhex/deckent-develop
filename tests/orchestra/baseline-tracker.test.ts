@@ -4,7 +4,7 @@ import {
   writeBaseline,
   readBaseline,
   compareBaseline,
-  parseVitestOutput,
+  parseVitestBaseline,
   containsHonestyTrigger,
   checkWorkerHonesty,
   captureVitestBaseline,
@@ -106,8 +106,8 @@ describe('baseline-tracker', () => {
     });
   });
 
-  // parseVitestOutput
-  describe('parseVitestOutput', () => {
+  // parseVitestBaseline
+  describe('parseVitestBaseline', () => {
     it('parses standard vitest summary output', () => {
       const output = `
  ✓ tests/core/types.test.ts (5)
@@ -117,7 +117,7 @@ describe('baseline-tracker', () => {
  Tests  12372 passed | 3 failed | 16 skipped (12391)
  Duration  91.6s
 `;
-      const result = parseVitestOutput(output);
+      const result = parseVitestBaseline(output);
       expect(result).not.toBeNull();
       expect(result!.pass).toBe(12372);
       expect(result!.fail).toBe(3);
@@ -126,7 +126,7 @@ describe('baseline-tracker', () => {
     });
 
     it('returns null for unparseable output', () => {
-      const result = parseVitestOutput('nothing useful here');
+      const result = parseVitestBaseline('nothing useful here');
       expect(result).toBeNull();
     });
   });

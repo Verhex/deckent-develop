@@ -38,6 +38,14 @@ vi.mock('../../../src/core/constants.js', () => ({
   TASKS_DIR: '.tasks',
 }));
 
+// R4-SPRINTID (Sprint 318): watch.ts now resolves the current sprint via the
+// canonical core/event-stream.getCurrentSprintId (active→state) instead of a
+// local config.last_sprint_id reader. Mock it here so these tests drive the
+// "current sprint" directly (its file-reading is covered by event-stream.test.ts).
+vi.mock('../../../src/core/event-stream.js', () => ({
+  getCurrentSprintId: vi.fn(() => null),
+}));
+
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn().mockReturnValue({ status: 0, stdout: '', stderr: '' }),
 }));
@@ -45,6 +53,7 @@ vi.mock('node:child_process', () => ({
 import { existsSync, readFileSync } from 'node:fs';
 import { isSessionActive, createWatchLayout, attachToWorkerPane, TmuxError } from '../../../src/orchestra/tmux.js';
 import { print, printError } from '../../../src/cli/helpers/output.js';
+import { getCurrentSprintId } from '../../../src/core/event-stream.js';
 import { registerWatch, cleanupWatchWindow } from '../../../src/cli/commands/watch.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -144,10 +153,13 @@ describe('watch command — overhaul', () => {
   it('J) warns when task is from a different sprint', async () => {
     vi.mocked(attachToWorkerPane).mockImplementation(() => {});
     vi.mocked(existsSync).mockReturnValue(true);
+    // R4-SPRINTID: current sprint now comes from canonical getCurrentSprintId
+    // (active→state), not config.last_sprint_id. Task is sprint-050, active is
+    // sprint-057 → stale-sprint warning fires.
+    vi.mocked(getCurrentSprintId).mockReturnValue('sprint-057');
     vi.mocked(readFileSync).mockImplementation((p: unknown) => {
       const ps = p as string;
       if (ps.endsWith('task-057-001.json')) return JSON.stringify({ sprintId: 'sprint-050', status: 'DONE', provider: 'claude' });
-      if (ps.endsWith('config.json')) return JSON.stringify({ last_sprint_id: 'sprint-057' });
       return '{}';
     });
     await runCommand(['watch', '--follow', '057-001']);

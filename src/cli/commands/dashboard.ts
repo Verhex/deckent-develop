@@ -6,6 +6,11 @@ import { DASHBOARD_FILE } from '../../core/constants.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { detectLang } from '../helpers/i18n.js';
+// Canonical NO_COLOR check (R4-ISNOCOLOR SSOT) lives in ../helpers/output.ts.
+// Re-exported here so the former `dashboard.js` import path keeps working
+// against the single source of truth — no duplicate body.
+import { isNoColor } from '../helpers/output.js';
+export { isNoColor } from '../helpers/output.js';
 
 interface DashboardOpts {
   interval?: string;
@@ -31,11 +36,6 @@ function formatElapsed(spawnedAt?: string): string {
 function getTerminalWidth(): number {
   const cols = process.stdout.columns ?? 80;
   return Math.max(40, Math.min(cols, 200));
-}
-
-/** Check if colors should be suppressed (NO_COLOR env or --no-color flag). */
-export function isNoColor(flagValue?: boolean): boolean {
-  return flagValue === true || process.env['NO_COLOR'] !== undefined;
 }
 
 export function renderDashboard(state: DashboardState, noColor?: boolean, lang: string = 'en'): string {

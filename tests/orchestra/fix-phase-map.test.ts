@@ -136,6 +136,11 @@ vi.mock('../../src/core/constants.js', () => ({
   DEBT_FILE: 'DEBT.md',
   DECKENT_VERSION: '0.4.0-test',
   DECKENT_DIR: '.deckent',
+  // R4-SPRINTID (Sprint 318): event-stream.getCurrentSprintId (transitive dep of
+  // runFixPhase) now reads these from constants — omitting them returns undefined,
+  // throws in join()/existsSync, and silently aborts the evaluations.set below.
+  SPRINT_STATE_FILE: '.deckent/sprint-state.json',
+  SPRINT_ACTIVE_FILE: '.deckent/sprint-active.json',
 }));
 
 // ─── Imports (after mocks) ──────────────────────────────────────────

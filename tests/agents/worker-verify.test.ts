@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   getVerifyCommands,
   isDocOnlyScope,
-  parseVitestOutput,
+  parseVitestFailedTests,
   parseCompilationErrors,
   MAX_TEST_RETRIES,
   MAX_COMPILATION_RETRIES,
@@ -73,25 +73,25 @@ describe('isDocOnlyScope', () => {
   });
 });
 
-describe('parseVitestOutput', () => {
+describe('parseVitestFailedTests', () => {
   it('parses FAIL lines', () => {
     const output = `
  FAIL tests/foo.test.ts > suite > should work
  FAIL tests/bar.test.ts > another test
     `;
-    const { failedTests } = parseVitestOutput(output);
+    const { failedTests } = parseVitestFailedTests(output);
     expect(failedTests.length).toBeGreaterThanOrEqual(2);
   });
 
   it('extracts summary line', () => {
     const output = `Tests  3 failed | 12 passed (15)`;
-    const { summary } = parseVitestOutput(output);
+    const { summary } = parseVitestFailedTests(output);
     expect(summary).toContain('3 failed');
     expect(summary).toContain('12 passed');
   });
 
   it('returns empty for clean output', () => {
-    const { failedTests, summary } = parseVitestOutput('All tests passed\n');
+    const { failedTests, summary } = parseVitestFailedTests('All tests passed\n');
     expect(failedTests).toEqual([]);
     expect(summary).toBe('');
   });
@@ -101,7 +101,7 @@ describe('parseVitestOutput', () => {
  FAIL tests/foo.test.ts > test a
  FAIL tests/foo.test.ts > test a
     `;
-    const { failedTests } = parseVitestOutput(output);
+    const { failedTests } = parseVitestFailedTests(output);
     const unique = new Set(failedTests);
     expect(failedTests.length).toBe(unique.size);
   });

@@ -73,7 +73,7 @@ export const MAX_TEST_RETRIES = 3;
  * Parse vitest output to extract failing test names and summary.
  * Handles both verbose and default vitest output formats.
  */
-export function parseVitestOutput(output: string): { failedTests: string[]; summary: string } {
+export function parseVitestFailedTests(output: string): { failedTests: string[]; summary: string } {
   const failedTests: string[] = [];
 
   const failLineRegex = /^\s*(?:FAIL|×|✕)\s+(.+)$/gm;
@@ -146,7 +146,7 @@ export function verifyTests(
             ? err.message
             : String(err);
 
-    const { failedTests } = parseVitestOutput(output);
+    const { failedTests } = parseVitestFailedTests(output);
 
     return {
       success: false,

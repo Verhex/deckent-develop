@@ -16,7 +16,7 @@
 
 import { appendFileSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { DECKENT_DIR, RECENT_WORKS_DIR } from './constants.js';
+import { RECENT_WORKS_DIR, SPRINT_STATE_FILE, SPRINT_ACTIVE_FILE } from './constants.js';
 import { debugLog } from './utils.js';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -221,19 +221,48 @@ function nextSequence(projectRoot: string, sprintId: string): number {
 // ─── Core API ────────────────────────────────────────────────────
 
 /**
- * Get current sprint ID from sprint-state.json.
- * Returns null if not found.
+ * Canonical single source of truth for the current active sprint ID.
+ *
+ * Resolution order (R4-SPRINTID — Sprint 318):
+ *   1. `.deckent/sprint-active.json` — explicit override (if present + parseable
+ *      with a non-empty `sprintId`)
+ *   2. `.deckent/sprint-state.json` — persisted by writeSprintState during execution
+ *   3. null — no active sprint detected
+ *
+ * The `active→state` fallback was previously unique to `monitor/sprint-state.ts`;
+ * it is now the canonical behavior so every consumer (core/monitor/cli/orchestra)
+ * agrees. The prior core version read sprint-state.json ONLY and silently ignored
+ * the sprint-active.json override — honoring it here closes that latent divergence.
+ * `.dashboard` is intentionally NOT consulted (display-only).
  */
 export function getCurrentSprintId(projectRoot: string): string | null {
-  const statePath = join(projectRoot, DECKENT_DIR, 'sprint-state.json');
-  if (!existsSync(statePath)) return null;
-  try {
-    const raw = readFileSync(statePath, 'utf-8');
-    const state = JSON.parse(raw) as { sprintId?: string };
-    return state.sprintId ?? null;
-  } catch {
-    return null;
+  // Source 1: sprint-active.json (explicit override / new format)
+  const activePath = join(projectRoot, SPRINT_ACTIVE_FILE);
+  if (existsSync(activePath)) {
+    try {
+      const data = JSON.parse(readFileSync(activePath, 'utf-8')) as { sprintId?: string };
+      if (typeof data.sprintId === 'string' && data.sprintId.length > 0) {
+        return data.sprintId;
+      }
+    } catch {
+      // parse fail → fall through to sprint-state.json
+    }
   }
+
+  // Source 2: sprint-state.json (written by writeSprintState during execution)
+  const statePath = join(projectRoot, SPRINT_STATE_FILE);
+  if (existsSync(statePath)) {
+    try {
+      const data = JSON.parse(readFileSync(statePath, 'utf-8')) as { sprintId?: string };
+      if (typeof data.sprintId === 'string' && data.sprintId.length > 0) {
+        return data.sprintId;
+      }
+    } catch {
+      // parse fail → return null
+    }
+  }
+
+  return null;
 }
 
 /**

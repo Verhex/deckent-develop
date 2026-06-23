@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as cp from 'node:child_process';
 import {
-  parseVitestOutput,
+  parseVitestCounts,
   runFullVitest,
   runPreSprintValidation,
   readCiBaseline,
@@ -54,25 +54,25 @@ describe('Pre-Sprint CI Validation', () => {
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* cleanup */ }
   });
 
-  // ─── parseVitestOutput ─────────────────────────────────────────────
+  // ─── parseVitestCounts ─────────────────────────────────────────────
 
-  describe('parseVitestOutput', () => {
+  describe('parseVitestCounts', () => {
     it('parses all-passed output', () => {
-      const result = parseVitestOutput('Tests  11315 passed (11315)');
+      const result = parseVitestCounts('Tests  11315 passed (11315)');
       expect(result.testCount).toBe(11315);
       expect(result.testPassed).toBe(11315);
       expect(result.testFailed).toBe(0);
     });
 
     it('parses output with failures', () => {
-      const result = parseVitestOutput('Tests  3 failed | 11312 passed (11315)');
+      const result = parseVitestCounts('Tests  3 failed | 11312 passed (11315)');
       expect(result.testCount).toBe(11315);
       expect(result.testPassed).toBe(11312);
       expect(result.testFailed).toBe(3);
     });
 
     it('returns zeros for empty/unparseable output', () => {
-      const result = parseVitestOutput('');
+      const result = parseVitestCounts('');
       expect(result.testCount).toBe(0);
       expect(result.testPassed).toBe(0);
       expect(result.testFailed).toBe(0);
@@ -87,7 +87,7 @@ describe('Pre-Sprint CI Validation', () => {
         '      Tests  38 passed (38)',
         '   Duration  1.23s',
       ].join('\n');
-      const result = parseVitestOutput(output);
+      const result = parseVitestCounts(output);
       expect(result.testCount).toBe(38);
       expect(result.testPassed).toBe(38);
       expect(result.testFailed).toBe(0);

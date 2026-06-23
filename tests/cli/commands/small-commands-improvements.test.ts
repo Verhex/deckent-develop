@@ -31,6 +31,9 @@ vi.mock('../../../src/cli/helpers/output.js', () => ({
   print: vi.fn(),
   printError: vi.fn(),
   formatTable: vi.fn().mockReturnValue('formatted-table'),
+  // R4-ISNOCOLOR (Sprint 318): dashboard.ts now imports the canonical isNoColor
+  // from output.js — partial mock must provide it or the import is undefined.
+  isNoColor: vi.fn(() => false),
 }));
 
 vi.mock('../../../src/cli/helpers/process.js', () => ({

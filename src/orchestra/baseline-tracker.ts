@@ -120,7 +120,7 @@ export async function captureVitestBaseline(
 ): Promise<TestBaseline | null> {
   try {
     const { stdout, stderr } = await runner(projectRoot, timeoutMs);
-    return parseVitestOutput((stdout ?? '') + (stderr ?? ''));
+    return parseVitestBaseline((stdout ?? '') + (stderr ?? ''));
   } catch (e) {
     debugLog('captureVitestBaseline:spawn', e);
     return null;
@@ -133,7 +133,7 @@ export async function captureVitestBaseline(
  *   "Tests  500 passed | 3 failed | 10 skipped (513)"
  *   "Test Files  120 passed | 2 failed (122)"
  */
-export function parseVitestOutput(output: string): TestBaseline | null {
+export function parseVitestBaseline(output: string): TestBaseline | null {
   // Match "Tests  NNN passed" pattern
   const passMatch = output.match(/Tests\s+(\d+)\s+passed/i);
   const failMatch = output.match(/(\d+)\s+failed/i);

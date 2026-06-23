@@ -53,6 +53,8 @@ import {
   DECKENT_VERSION,
   SUPPORTED_LANGUAGES,
   TASK_FILE_EXTENSIONS,
+  SPRINT_STATE_FILE,
+  SPRINT_ACTIVE_FILE,
 } from '../../src/core/constants.js';
 
 describe('Path constants', () => {
@@ -69,6 +71,13 @@ describe('Path constants', () => {
       expect(typeof c).toBe('string');
       expect(c.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('Sprint identity files (R4-SPRINTID mini-SSOT)', () => {
+  it('SPRINT_STATE_FILE / SPRINT_ACTIVE_FILE are derived from DECKENT_DIR', () => {
+    expect(SPRINT_STATE_FILE).toBe(join(DECKENT_DIR, 'sprint-state.json'));
+    expect(SPRINT_ACTIVE_FILE).toBe(join(DECKENT_DIR, 'sprint-active.json'));
   });
 });
 

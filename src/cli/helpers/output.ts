@@ -51,10 +51,14 @@ export interface CIReport {
 
 /**
  * Returns true if color output should be suppressed.
- * Respects NO_COLOR env var (https://no-color.org/) and --no-color flag.
+ * Canonical SSOT (R4-ISNOCOLOR) — superset of all former copies:
+ *  - `flagValue === true` (explicit `--no-color` option already parsed by commander),
+ *  - NO_COLOR env var (https://no-color.org/),
+ *  - `--no-color` present in raw argv.
+ * @param flagValue Optional pre-parsed flag (e.g. commander's `opts.noColor`).
  */
-export function isNoColor(): boolean {
-  return process.env.NO_COLOR !== undefined || process.argv.includes('--no-color');
+export function isNoColor(flagValue?: boolean): boolean {
+  return flagValue === true || process.env.NO_COLOR !== undefined || process.argv.includes('--no-color');
 }
 
 /** Strip ANSI escape codes from text when NO_COLOR is active. */
