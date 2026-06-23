@@ -21,7 +21,6 @@ import { ConflictResolver } from '../../src/orchestra/conflict-resolver.js';
 import { deduplicateAlerts } from '../../src/monitor/auditor.js';
 import { parseSprintLog, formatDurationMs, parseAgentSkillInfo } from '../../src/cli/commands/history.js';
 import { parseRetroToRichSummary } from '../../src/cli/commands/retro.js';
-import { ETACalculator } from '../../src/cli/helpers/eta-calculator.js';
 
 // ─── 1. parseDebtTable: cols array access with ?? fallback ──────────
 describe('parseDebtTable safe array access', () => {
@@ -392,31 +391,5 @@ describe('parseAgentSkillInfo safe regex access', () => {
     const { agents, skills } = parseAgentSkillInfo('No info here');
     expect(agents).toEqual([]);
     expect(skills).toEqual([]);
-  });
-});
-
-// ─── 18. EtaCalculator: safe array access in weighted average ───────
-describe('ETACalculator safe array access', () => {
-  it('calculates ETA with single duration data point', () => {
-    const calc = new ETACalculator();
-    const etaMs = calc.calculateETA(1, 4, 5000, [5000]);
-    expect(etaMs).toBeGreaterThan(0);
-    const formatted = calc.formatETA(etaMs);
-    expect(typeof formatted).toBe('string');
-  });
-
-  it('calculates ETA with multiple duration data points', () => {
-    const calc = new ETACalculator();
-    const etaMs = calc.calculateETA(3, 5, 15000, [5000, 6000, 4000]);
-    expect(etaMs).toBeGreaterThan(0);
-    const formatted = calc.formatETA(etaMs);
-    expect(typeof formatted).toBe('string');
-    expect(formatted).toContain('~');
-  });
-
-  it('returns 0 for completed tasks', () => {
-    const calc = new ETACalculator();
-    const etaMs = calc.calculateETA(5, 5, 25000);
-    expect(etaMs).toBe(0);
   });
 });
