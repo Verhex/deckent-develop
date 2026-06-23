@@ -237,17 +237,18 @@ Bunlar saf-dead değil; **yarım-kalmış özellik**. Karar: **istiyorsan → A-
 
 ### A·R4 — No-SSOT: divergent reimpl topla (fix ölü-kopyaya inmesin) — CC + deckent 🟠
 3-5× yeniden-yazılmış, fix yanlış kopyaya gidiyor. Tek-doğru-kaynağa indir:
+> **🔍 R4 SUB-TRIAGE (06-23 disk-verify, başlangıç örneklemi):** R4 tek-tip DEĞİL → 3 alt-sınıf: **(a) gerçek-ikiz** = birebir-aynı gövde, ADR-008-uyumlu canonical'a re-export = **güvenli opportunistic** (örn. `redactSensitive` ✅); **(b) divergent-design-first** = kopyalar bilinçli farklı davranıyor (imza/dosya/mantık) → collapse davranış-değiştirir + karar gerek (örn. `isNoColor` 3-farklı-imza, `getCurrentSprintId` 3-farklı-dosya+ADR-008-block); **(c) sahte-çakışma** = aynı-isim-farklı-fonksiyon, dedup-gerekmez (örn. orchestra `redactSensitive` error-redactor, orchestra `checkWorkerAuthority` capability-version). → **Her R4 maddesi önce bu 3'e ayrılmalı**; yalnız (a) opportunistic, (b) design-sprint, (c) no-op.
 - 2× `ROLE_CAPABILITY_MAP` divergent → `core/capability-broker.ts` + `nervous/authority-matrix.ts` 🔴
 - 2× `checkWorkerAuthority` divergent → `agents/worker.ts` + `authority-matrix.ts`
 - 2× `evaluateResult` divergent → `orchestra/result-evaluator.ts`
 - 2× `waitForResults` (DI-versiyon hiç çağrılmıyor) → `result-evaluator.ts`
 - 3× `RateLimiter` (core/api/server) → `core/rate-limiter.ts`
 - 3× `parseVitestOutput` → `orchestra/baseline-tracker.ts`
-- 3× `getCurrentSprintId` farklı dosya okuyor → `monitor/sprint-state.ts` 🔴
+- ⛔ 3× `getCurrentSprintId` farklı dosya okuyor → `monitor/sprint-state.ts` 🔴 **DEFER→design-sprint (06-23)** — sınıf-(b): `event-stream.ts`→`sprint-state.json`, `sprint-state.ts`→`sprint-active.json`→fallback, `watch.ts`→`config.json/last_sprint_id` (3 farklı dosya/semantik) + **ADR-008 block** (core `event-stream.ts`, monitor/'tan import edemez) + 53 call-site. Canonical-yeri + "current sprint" semantiği karar gerektirir
 - 3× `extractKeywords` → `core/agent-selector.ts`
 - 3× `max_workers` algo → `host-detector`/`system-capacity`/`system-profile`
-- 3× `isNoColor` → `cli/commands/dashboard.ts`
-- 3× `redactSensitive` → `orchestra/sensitive-redactor.ts`
+- ⛔ 3× `isNoColor` → `cli/commands/dashboard.ts` **DEFER→design (06-23)** — sınıf-(b) divergent: `output.ts`(env+`--no-color` argv) / `sprint-summary-rich.ts`(env-only) / `dashboard.ts`(`flagValue` param+env) = 3 farklı imza+mantık; collapse davranış-değiştirir
+- ✅ 3× `redactSensitive` **DONE** (`84028c4e`, 06-23) — sınıf-(a) gerçek-ikiz: `cli/helpers/output.ts` kopyası `core/redact-sensitive.ts` ile BİREBİR → core'dan re-export (ADR-008-safe); 43 test yeşil. NOT: `orchestra/sensitive-redactor.ts redactSensitive` = sınıf-(c) sahte-çakışma (error-redactor, dokunulmadı)
 - 3× MCP-tool-catalog kaynağı drifted → `mcp/tools/index.ts`
 - 3× alert-dedup aynı array'e yazıyor → `monitor/alert-emitter.ts`
 - ✅ 2× notification sistemi (+ R6) → `core/notifications.ts` **DONE** (`54034d6d` webhook-wire + `573214b2` legacy-class KES; canonical = NotifyDispatcher+notify-adapters, eski dispatcher silindi)
