@@ -68,39 +68,11 @@ export function color(code: string, text: string): string {
   return `${code}${text}\x1b[0m`;
 }
 
-// ─── Credential Redaction ───────────────────────────────────────────
-
-const REDACTED = '[REDACTED]';
-
-/**
- * Redact sensitive credentials from text to prevent leaking secrets in logs.
- * Handles: API keys, Bearer tokens, passwords in URLs, env var assignments.
- */
-export function redactSensitive(text: string): string {
-  if (!text) return text;
-
-  let result = text;
-
-  // API keys: sk-... patterns (OpenAI, Anthropic style) — at least 20 chars after prefix
-  result = result.replace(/\b(sk-[a-zA-Z0-9_-]{20,})\b/g, REDACTED);
-
-  // API keys: key-... patterns — at least 20 chars after prefix
-  result = result.replace(/\b(key-[a-zA-Z0-9_-]{20,})\b/g, REDACTED);
-
-  // Bearer tokens: "Bearer <token>" or "bearer <token>"
-  result = result.replace(/(Bearer\s+)[^\s"',;]+/gi, `$1${REDACTED}`);
-
-  // Passwords in URLs: ://user:password@host
-  result = result.replace(/(:\/\/[^:/?#\s]+:)[^@\s]+(@)/g, `$1${REDACTED}$2`);
-
-  // Environment variable assignments for known sensitive keys
-  result = result.replace(
-    /((?:OPENAI_API_KEY|ANTHROPIC_API_KEY|CLAUDE_API_KEY|API_KEY|SECRET_KEY|ACCESS_TOKEN|AUTH_TOKEN|PRIVATE_KEY)=)[^\s"';]+/gi,
-    `$1${REDACTED}`,
-  );
-
-  return result;
-}
+// ─── Credential Redaction (R4-SSOT) ─────────────────────────────────
+// Canonical impl lives in core/redact-sensitive.ts (ADR-008-safe base
+// layer). Re-exported here so existing `cli/helpers/output.ts` import
+// paths keep working against the single source of truth — no duplicate body.
+export { redactSensitive } from '../../core/redact-sensitive.js';
 
 // ─── Basic Output ───────────────────────────────────────────────────
 
