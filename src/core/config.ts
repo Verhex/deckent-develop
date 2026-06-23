@@ -1412,6 +1412,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     docker_image: config.docker_image,
     docker_timeout: config.docker_timeout,
     worker_memory_limit_by_kind: config.worker_memory_limit_by_kind,
+    worker_memory_limit: config.worker_memory_limit,
     skills: config.skills,
     brain_provider: config.brain_provider,
     worker_provider: config.worker_provider,
@@ -1750,6 +1751,12 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
   worker_memory_limit_by_kind: {
     description: 'Opt-in per-kind Docker memory limits. Keys are canonical TaskKind values. Swap is auto-derived at limit × 1.5.',
     type: 'Record<string, string>',
+    default: undefined,
+    category: 'Sprint',
+  },
+  worker_memory_limit: {
+    description: 'Default per-worker Docker memory limit (docker --memory), e.g. "2g". Falls back to 4g when unset.',
+    type: 'string',
     default: undefined,
     category: 'Sprint',
   },

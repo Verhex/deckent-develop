@@ -516,6 +516,7 @@ export async function spawnWorkers(
             projectDir: projectRoot,
             dockerImage: config.docker_image,
             dockerTimeoutSeconds: config.docker_timeout,
+            dockerMemoryLimit: config.worker_memory_limit,
           })
         : backend;
     // F1-RE (Sprint 252): resolve the model reasoning-effort (opt-in, provider-
@@ -762,6 +763,7 @@ export async function respawnEligibleTasks(
             projectDir: projectRoot,
             dockerImage: config.docker_image,
             dockerTimeoutSeconds: config.docker_timeout,
+            dockerMemoryLimit: config.worker_memory_limit,
           })
         : backend;
     // F1-RE (Sprint 252): resolve the model reasoning-effort (opt-in, provider-

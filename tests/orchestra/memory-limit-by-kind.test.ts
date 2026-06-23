@@ -69,6 +69,7 @@ import {
   parseMemoryString,
   deriveSwapFromLimitBytes,
 } from '../../src/orchestra/spawn-backend-docker.js';
+import { SpawnBackendFactory } from '../../src/orchestra/spawn-backend.js';
 
 const mockSpawnSync = vi.mocked(spawnSync);
 
@@ -251,5 +252,36 @@ describe('DockerSpawnBackend: kind-based memory limits (Sprint 272 T-005)', () =
     expect(flagValue(argv, '--memory')).toBe('1024m');
     // swap = 1024 * 1.5 = 1536 MB
     expect(flagValue(argv, '--memory-swap')).toBe('1536m');
+  });
+});
+
+// ─── B-WORKERMEM (Sprint 318): config-driven --memory via the spawn factory ───
+// The factory used to drop the per-worker memory limit (hardcoded 4g default),
+// so config.worker_memory_limit was display-only. Now SpawnBackendFactory threads
+// dockerMemoryLimit → DockerSpawnBackend → docker --memory.
+describe('SpawnBackendFactory: B-WORKERMEM config-driven --memory wire', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    installSpawnRouter();
+    mockTaskJson = '{}';
+  });
+
+  it('threads dockerMemoryLimit into the docker --memory flag', () => {
+    const backend = SpawnBackendFactory.create({
+      backend: 'docker', projectDir: '/test/project', dockerMemoryLimit: '2g',
+    });
+    backend.spawn('task-mem-1', 'sonnet', 'prompt-body');
+    const argv = capturedDockerRunArgs.at(-1) ?? [];
+    // Pre-wire the factory ignored dockerMemoryLimit → '4g' (RED). Now '2g'.
+    expect(flagValue(argv, '--memory')).toBe('2g');
+  });
+
+  it('falls back to DEFAULT_WORKER_MEMORY_LIMIT when dockerMemoryLimit unset', () => {
+    const backend = SpawnBackendFactory.create({
+      backend: 'docker', projectDir: '/test/project',
+    });
+    backend.spawn('task-mem-2', 'sonnet', 'prompt-body');
+    const argv = capturedDockerRunArgs.at(-1) ?? [];
+    expect(flagValue(argv, '--memory')).toBe(DEFAULT_WORKER_MEMORY_LIMIT);
   });
 });

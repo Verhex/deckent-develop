@@ -929,6 +929,7 @@ export async function runSprint(
           projectDir: projectRoot,
           dockerImage: config.docker_image,
           dockerTimeoutSeconds: config.docker_timeout,
+          dockerMemoryLimit: config.worker_memory_limit,
         })
       : undefined);
 

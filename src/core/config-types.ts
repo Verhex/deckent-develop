@@ -226,6 +226,12 @@ export interface DeckentConfig {
    * Example: { "code-development": "1536m", "documentation": "768m" }
    */
   worker_memory_limit_by_kind?: Record<string, string>;
+  /**
+   * Default per-worker Docker memory limit (docker `--memory`), e.g. "2g".
+   * Falls back to DEFAULT_WORKER_MEMORY_LIMIT ('4g') when unset. Sprint 318
+   * (B-WORKERMEM): wired into the spawn factory — was previously display-only.
+   */
+  worker_memory_limit?: string;
   /** Skill system configuration */
   skills?: SkillConfig;
   /** Decision engine configuration */
@@ -823,6 +829,8 @@ export interface ResolvedConfig {
   docker_timeout?: number;
   /** Opt-in per-kind Docker memory limits. Keys are canonical TaskKind values. Swap derived at × 1.5. */
   worker_memory_limit_by_kind?: Record<string, string>;
+  /** Default per-worker Docker memory limit (docker `--memory`), e.g. "2g". Default '4g'. */
+  worker_memory_limit?: string;
   /** Skill system configuration */
   skills?: SkillConfig;
   /** Provider for Brain planning (default: 'claude') */

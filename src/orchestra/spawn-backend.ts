@@ -303,6 +303,13 @@ export interface SpawnBackendFactoryOptions {
 
   /** Docker graceful shutdown timeout in seconds (default: 15). SIGTERM → grace → SIGKILL. */
   dockerGracefulTimeoutSeconds?: number;
+
+  /**
+   * Per-worker Docker memory limit (docker `--memory`), e.g. "2g". Sprint 318
+   * (B-WORKERMEM): wired from config.worker_memory_limit. Undefined → the backend
+   * default DEFAULT_WORKER_MEMORY_LIMIT ('4g').
+   */
+  dockerMemoryLimit?: string;
 }
 
 /**
@@ -329,6 +336,7 @@ export class SpawnBackendFactory {
         timeoutSeconds: opts.dockerTimeoutSeconds
           ?? (opts.defaultTimeoutMs ? Math.floor(opts.defaultTimeoutMs / 1000) : undefined),
         gracefulTimeoutSeconds: opts.dockerGracefulTimeoutSeconds,
+        memoryLimit: opts.dockerMemoryLimit, // B-WORKERMEM (Sprint 318): config-driven --memory
       });
     }
 
