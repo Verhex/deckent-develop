@@ -181,6 +181,18 @@ Bunlar saf-dead değil; **yarım-kalmış özellik**. Karar: **istiyorsan → A-
 > - **B1-B2 R4-dup:** 2× `checkWorkerAuthority` (worker.ts:584 dead-file-scope + authority-matrix live-capability) — dead-olanı **C-KES** adayı (test-coupled doğrula).
 > - **KARAR:** enforcement-vein = **design-first batch** (opportunistic-clean-wire DEĞİL). B-ruling'ler zaten product-soft seçti (ADR-037 V1.0 → V2 post-GA). Temiz dormant-feature-wire'ları (B11×7) tükendi. → enforcement hard-flip **post-GA V2'ye defer** VEYA dedicated design-sprint (actor/capability-model + spend-aggregation). Opportunistic surgical-wire ile yapılamaz.
 
+> **🏢 ENTERPRISE-LAYER TRACK (Alperen kararı 06-23) — bu kampanya DIŞI, MOD-SPLIT'e devredildi:**
+> Alperen: "enterprise tarafı ayrı ele alalım — deckenti zaten modüler olarak ileride böleceğiz." → enterprise-arch item'ları opportunistic fix-kampanyasından ÇIKARILDI; **MOD-SPLIT enterprise-layer** track'ine (aynı-kod-tabanı + modüler eklenebilir enterprise-layer, **EN SON iş**, [[project_community_pro_split_strategy]]) devredildi. Bu liste, MOD-SPLIT memory'sinin istediği **"enterprise-layer dosya envanteri"** prep'ini de oluşturur (sırası gelince başlangıç noktası):
+> - **A4** `strictTenantIsolation` → query-layer request-principal scoping (`core/memory-store.ts`, 51 callsite) — multi-tenant izolasyon
+> - **A5** `enforce_least_privilege` → `core/capability-runtime.ts` (`createAuditedCapabilityRegistry`'e ulaşmıyor) — least-privilege RBAC
+> - **A12** credential keyring sessiz auto-gen → `core/credential-encryption.ts` — key-provenance/audit
+> - **credentials / credential-encryption** (`core/credentials.ts`, `credential-encryption.ts`) — encrypted-at-rest credential store
+> - **enterprise-config** (`core/enterprise-config.ts` — `TenancyConfig`/`RbacConfig`/`FlowConfig`) + load + consumer'lar
+> - **B1 multi-tenant RBAC** (capability-RBAC'in tenant/enterprise portion'ı; dogfood-RBAC ayrı enforcement-design kalır)
+> - _(ileride: SSO, SIEM-forwarder B7, ERP-connector, audit-query — enterprise yüzeyi)_
+>
+> **Not:** Bunlar "dormant/dead" DEĞİL → **bilinçli geleceğe-dönük enterprise-layer altyapısı** (MOD-SPLIT memory: "modül sınırlarını bilinçli koru, erken soyutlama yapma"). Triage'da C-KES'e DÜŞMEZLER. Sırası: REPL/dashboard + publish-readiness arc'ları bitince.
+
 ---
 
 ## 2. BUCKET A — GERÇEK DEFECT (fix + CC-verify), R1-R8 ile
@@ -194,14 +206,14 @@ Bunlar saf-dead değil; **yarım-kalmış özellik**. Karar: **istiyorsan → A-
 | ✅ A2 | Enterprise missions-audit tenant-isolation dead: `registerEnterpriseRoutes`'a `req` yok | `api/server.ts:824` | **DONE (06-21)** — req thread (6. arg); aynı regresyon-testte kanıtlandı |
 | ✅ A3 | mTLS client-cert detect edilip warn'lanıp **ignore** ediliyor (block yok) | `api/terminal/ws-gateway.ts` | **DONE (06-21, 760a38e8)** — verifier wire-li+cert-presented'ta fail-closed (null/throw→4401); regresyon `ws-gateway-mtls.test.ts` (pre-fix fail kanıtlı); terminal 63/63 yeşil |
 | ⚠️ A4 | `strictTenantIsolation` default-false + MemoryStore'a hiç thread edilmiyor → tenant-leak yapısal | `core/memory-store.ts` | **MİMARİ (cerrahi değil) — KARAR GEREK.** 51 prod `new MemoryStore(` callsite, 0'ı thread; config-types'ta alan yok. Flag'i 51 yere thread = yanlış-şekil (49'u single-tenant iç-store). Doğru fix = query-layer **request-principal scoping** (enterprise multi-tenancy, B9-bitişik). Bugün multi-tenant deployment yok → **latent**, live-exploit değil. → enterprise-arch backlog'a |
-| A5 | `enforce_least_privilege` flag `createAuditedCapabilityRegistry`'e hiç ulaşmıyor | `core/capability-runtime.ts` | |
+| A5 | `enforce_least_privilege` flag `createAuditedCapabilityRegistry`'e hiç ulaşmıyor | `core/capability-runtime.ts` | → **ENTERPRISE-LAYER TRACK** (MOD-SPLIT, 06-23) — least-privilege RBAC enterprise yüzeyi |
 | ✅ A6 | AgentDetail.tsx raw fetch `Authorization` header'ı atlıyor → token'lı modda sessiz boş | `dashboard/src/components/AgentDetail.tsx` | **DONE (101c241d)** — fetchJson()'a geçti; regresyon (pre-fix fail); dashboard 72/72 |
 | ✅ A7 | Session token (OIDC/manual) shared API-fetch'e hiç forward edilmiyor → non-bootstrap çağrılar unauth | `dashboard/src/lib/api.ts` | **DONE (2d48efc6)** — authHeaders/buildSseUrl `bootstrap ?? session`; regresyon (pre-fix fail); 10/10 |
 | ✅ A8 | Command-guard deny-list HER prod session'da sessiz bypass | `api/terminal/session-manager.ts:99` | **DONE (09f3a972)** — TIER-2 doğrulandı (server.ts:1451 host geçmiyordu); bind-host thread + manager test-expose; server-level lock (pre-fix remote-test fail); api 746/746. _(peer-host = sub-project #3 ayrı)_ |
 | A9 | `enforceAdrCompliance` internal-error'da **fail-open** → ADR ihlali sessiz maskeleniyor | `orchestra/authority-enforcer.ts` | |
 | ✅ A10 | Auto-edit bash-guard ölü: literal `'bash'` karşılaştırıyor, kayıtlı tool yok | `agent/permission.ts` | **DONE (d8bf1b25)** — gerçek tool `deckent_bash`; `*_bash` match; regresyon gerçek-tool-adıyla (pre-fix fail); 35 yeşil |
 | ✅ A11 | SAFETY_FLOOR lethal-guard DockerSpawnBackend'de bypass (default backend!) | `orchestra/spawn-backend.ts` | **DONE (540a361f)** — checkLethalGuard export + Docker spawn ilk-satır; regresyon Docker-block (pre-fix fail); 841 yeşil |
-| A12 | Credential keyring ilk-erişimde sessiz auto-gen → key-provenance audit imkânsız | `core/credential-encryption.ts` | B11'de KES dersen düşer |
+| A12 | Credential keyring ilk-erişimde sessiz auto-gen → key-provenance audit imkânsız | `core/credential-encryption.ts` | → **ENTERPRISE-LAYER TRACK** (MOD-SPLIT, 06-23) — credentials ile birlikte; KES değil, geleceğe-dönük altyapı |
 
 ### A·R2 — Verification-spine stub/unwired (trust-without-verify) — CC + deckent 🔴
 > **İLERLEME (06-21):** ✅ **A17 proof-of-function gate WIRED** (`afa7955a`) — `verifyProofOfFunction` artık `runEvaluatePhase`'de Tier-1-DONE task'lara fire ediyor; failing-smoke → GO_WITH_TECH_DEBT + PROOF_OF_FUNCTION_MISMATCH event (zero-caller'dı, Tier-1 gate hiç çalışmıyordu = false-DONE'un kökü). Faithful (pre-wire'da DONE kalıyor). · ✅ **A13 reconcileRubricNoGo** (`6379680d`) — NO_GO→clean-DONE flip'i (worker-uydurulabilir-coverage'a güveniyordu) **GO_WITH_TECH_DEBT'e indirildi** (reconcileSpuriousNoGo-verified-path paritesi); 2 false-DONE-kodlayan test GWTD'ye güncellendi.
