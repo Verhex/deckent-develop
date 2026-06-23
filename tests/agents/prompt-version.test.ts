@@ -236,4 +236,33 @@ describe('PromptVersionManager', () => {
       mgr.updateVersionStats('agent-1', 99, 'DONE');
     });
   });
+
+  describe('recordCurrentVersionUse (F5 wire)', () => {
+    it('records a use against the agent CURRENT version', () => {
+      const mgr = new PromptVersionManager(tmpDir);
+      mgr.createVersion('agent-1', 'v1', 'first');
+      mgr.createVersion('agent-1', 'v2', 'second'); // current = v2
+      mgr.recordCurrentVersionUse('agent-1', 'DONE');
+      expect(mgr.getVersion('agent-1', 2)!.stats.uses).toBe(1);
+      expect(mgr.getVersion('agent-1', 2)!.stats.successRate).toBe(1);
+      // v1 (not current) untouched
+      expect(mgr.getVersion('agent-1', 1)!.stats.uses).toBe(0);
+    });
+
+    it('reflects the evaluation in successRate (NO_GO → 0)', () => {
+      const mgr = new PromptVersionManager(tmpDir);
+      mgr.createVersion('agent-1', 'v1', 'first');
+      mgr.recordCurrentVersionUse('agent-1', 'NO_GO');
+      const v = mgr.getVersion('agent-1', 1)!;
+      expect(v.stats.uses).toBe(1);
+      expect(v.stats.successRate).toBe(0);
+    });
+
+    it('is a no-op when the agent has no versioned prompt', () => {
+      const mgr = new PromptVersionManager(tmpDir);
+      // Should not throw and must not create any version files.
+      mgr.recordCurrentVersionUse('never-versioned', 'DONE');
+      expect(mgr.getCurrentVersion('never-versioned')).toBeNull();
+    });
+  });
 });

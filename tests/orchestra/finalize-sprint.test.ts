@@ -213,6 +213,18 @@ vi.mock('../../src/core/skill-selector.js', () => ({
 vi.mock('../../src/core/agent-pool.js', () => ({
   AgentPoolManager: vi.fn().mockImplementation(() => ({
     loadAgents: vi.fn().mockReturnValue([]),
+    getAgent: vi.fn().mockReturnValue(undefined),
+    updateAgentStats: vi.fn(),
+  })),
+}));
+
+// F5 wire (B11): spy on prompt-version recording so the faithful test can assert
+// finalizeSprint records a use per task agent. Hoisted so the mock factory can
+// reference it. Pre-fix the call did not exist → spy never called → test RED.
+const { recordVersionUseSpy } = vi.hoisted(() => ({ recordVersionUseSpy: vi.fn() }));
+vi.mock('../../src/agents/prompt-version.js', () => ({
+  PromptVersionManager: vi.fn().mockImplementation(() => ({
+    recordCurrentVersionUse: recordVersionUseSpy,
   })),
 }));
 
@@ -637,5 +649,53 @@ describe('FinalizeSprintOptions type', () => {
 
     const metrics = await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, undefined);
     expect(metrics).toBeDefined();
+  });
+});
+
+// ─── F5 prompt-version stats wire (B11) ──────────────────────────────
+// Faithful regression: finalizeSprint must record a use of each task agent's
+// current prompt version (recordCurrentVersionUse) so the F5 analytics see real
+// uses/successRate. Pre-fix the call did not exist → recordVersionUseSpy is never
+// called → these tests fail.
+describe('finalizeSprint — F5 prompt-version stats wire (B11)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(calculateMetrics).mockReturnValue({ ...defaultMetrics });
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(readdirSync).mockReturnValue([]);
+  });
+
+  it('records a prompt-version use per task agent (V1 routing path)', async () => {
+    const task = { ...createTestTask('042-001'), assignedAgent: 'bug-fixer' };
+    const sprint = createTestSprint([task]);
+    const evaluations = new Map([['042-001', TaskEvaluation.DONE]]);
+    const results = [createTestResult('042-001')];
+
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results);
+
+    expect(recordVersionUseSpy).toHaveBeenCalledWith('bug-fixer', TaskEvaluation.DONE);
+  });
+
+  it('records a prompt-version use on the V2 routing path too (dogfood path)', async () => {
+    const task = { ...createTestTask('042-002'), assignedAgent: 'api-builder' };
+    const sprint = createTestSprint([task]);
+    const evaluations = new Map([['042-002', TaskEvaluation.GO_WITH_TECH_DEBT]]);
+    const results = [createTestResult('042-002')];
+    const config = { projectRoot: PROJECT_ROOT, projectName: 'test', routing_engine: 'v2' } as unknown as ResolvedConfig;
+
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { config });
+
+    expect(recordVersionUseSpy).toHaveBeenCalledWith('api-builder', TaskEvaluation.GO_WITH_TECH_DEBT);
+  });
+
+  it('does not record for a DEFERRED task (worker never executed)', async () => {
+    const task = { ...createTestTask('042-003'), assignedAgent: 'bug-fixer' };
+    const sprint = createTestSprint([task]);
+    const evaluations = new Map([['042-003', TaskEvaluation.DEFERRED]]);
+    const results: TaskResult[] = [];
+
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results);
+
+    expect(recordVersionUseSpy).not.toHaveBeenCalled();
   });
 });

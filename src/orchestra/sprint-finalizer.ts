@@ -77,6 +77,7 @@ import type { ObservabilityRotationConfig } from '../core/observability-rotation
 
 // ─── Agent/Skill Pool ─────────────────────────────────────────────
 import { AgentPoolManager } from '../core/agent-pool.js';
+import { PromptVersionManager } from '../agents/prompt-version.js';
 import { SkillPoolManager } from '../core/skill-pool.js';
 
 // ─── Plugin Hooks ─────────────────────────────────────────────────
@@ -898,6 +899,14 @@ export async function finalizeSprint(
   // 8b. Update agent/skill stats
   const routingVersion = (opts?.config as Record<string, unknown> | undefined)?.['routing_engine'] as string | undefined;
 
+  // F5 evolution wire (B11): record per-task use of each agent's CURRENT prompt
+  // version so prompt-analytics / /api/evolution/prompt-metrics see real
+  // uses/successRate (updateVersionStats was zero-caller → stats frozen at 0).
+  // No-op for agents without a versioned prompt. Routing-version agnostic, but
+  // recorded inside each branch's re-finalize guard so `finalize --force` does
+  // not double-count.
+  const promptVersionMgr = new PromptVersionManager(projectRoot);
+
   if (routingVersion !== 'v2') {
     // V1: Write stats directly to agent.json and skill manifest files (legacy behavior)
     try {
@@ -946,6 +955,8 @@ export async function finalizeSprint(
         const agentId = task.assignedAgent;
         if (agentId && !agentsAlreadyRecorded.has(agentId)) {
           poolManager.updateAgentStats(agentId, evaluation, coverage, sprint.id);
+          // F5: record the use against the agent's current prompt version too.
+          promptVersionMgr.recordCurrentVersionUse(agentId, evaluation);
         }
 
         // Update skill stats
@@ -984,6 +995,10 @@ export async function finalizeSprint(
         for (const task of sprint.tasks) {
           const evaluation = evaluations.get(task.id);
           if (!evaluation) continue;
+          // F5: record use against the agent's current prompt version (V2 path).
+          if (task.assignedAgent && evaluation !== TaskEvaluation.DEFERRED) {
+            promptVersionMgr.recordCurrentVersionUse(task.assignedAgent, evaluation);
+          }
           const taskResult = resultsMap.get(task.id);
 
           // Quality assessment — multi-dimensional scoring beyond GO/NO_GO

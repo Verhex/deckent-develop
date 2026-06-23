@@ -146,6 +146,20 @@ export class PromptVersionManager {
     this._saveVersionFile(agentId, v);
   }
 
+  /**
+   * Record one use of an agent's CURRENT prompt version with the task
+   * evaluation (F5 evolution loop wire). No-op when the agent has no versioned
+   * prompt — the common case for built-in agents that were never evolved — so
+   * it is safe to call for every task. Feeds real uses/successRate to the F5
+   * analytics consumers (prompt-analytics, GET /api/evolution/prompt-metrics);
+   * previously updateVersionStats had zero callers so stats stayed {0,0}.
+   */
+  recordCurrentVersionUse(agentId: string, evaluation: string): void {
+    const num = this._getCurrentVersionNumber(agentId);
+    if (num === null) return;
+    this.updateVersionStats(agentId, num, evaluation);
+  }
+
   // ─── Internal ──────────────────────────────────────────────────────
 
   private _agentDir(agentId: string): string {
