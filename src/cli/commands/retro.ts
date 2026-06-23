@@ -8,16 +8,11 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 
-export interface RichSprintSummary {
-  sprintId: string;
-  totalTasks: number;
-  completed: number;
-  noGo: number;
-  techDebt: number;
-  coverage: string;
-  duration: string;
-  raw: string;
-}
+// R4-SSOT: canonical RichSprintSummary lives in retro-parser.ts (consumed by
+// retro-formatter.ts). Imported for internal use + re-exported so retro.ts's
+// own API surface is unchanged — single source of truth, no shape that can drift.
+import type { RichSprintSummary } from './retro-parser.js';
+export type { RichSprintSummary };
 
 // ─── i18n labels ──────────────────────────────────────────────────────────
 
