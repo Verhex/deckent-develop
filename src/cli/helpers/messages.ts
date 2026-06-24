@@ -1819,6 +1819,18 @@ const MESSAGES: MessageMap = {
     en: "Capability '{id}' is denied by policy.",
     tr: "'{id}' yeteneği policy ile reddedildi.",
   },
+  'cap.approval.ack': {
+    en: 'Approval requested for {cap}; awaiting the user\'s decision.',
+    tr: '{cap} için onay istendi; kullanıcının kararı bekleniyor.',
+  },
+  'cap.btn.approve': {
+    en: '✅ Approve',
+    tr: '✅ Onayla',
+  },
+  'cap.btn.reject': {
+    en: '❌ Reject',
+    tr: '❌ Reddet',
+  },
 
   // ─── capability: screenshot ──────────────────────────────────────────
   'cap.screenshot.title': {

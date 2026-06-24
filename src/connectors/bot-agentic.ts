@@ -90,6 +90,14 @@ export interface CapabilityGate {
   resolve(id: string): PolicyResolution;
   /** Execute a capability that resolved to 'auto'. */
   runAuto(id: string, args: Record<string, unknown>): Promise<string>;
+  /**
+   * Optional: send a buttoned approval request message to the user. When
+   * present and returns true the action id was successfully communicated via
+   * a rich (button-carrying) message; the dispatcher then returns a short
+   * acknowledgement instead of the legacy "type approve <id>" text.
+   * Returns false (or rejects) → dispatcher falls back to the legacy message.
+   */
+  sendApproval?(id: string, capId: string, args: Record<string, unknown>): Promise<boolean>;
 }
 
 export interface GatedDispatcherDeps {
@@ -132,7 +140,10 @@ export function makeGatedDispatcher(deps: GatedDispatcherDeps): McpToolDispatche
         if (decision === 'deny') return getMessage('cap.gate.denied', lang, { id: name });
         if (decision === 'confirm') {
           const id = deps.park(name, args);
-          return parkedActionMessage(id, name, args, lang);
+          const sent = deps.capabilities.sendApproval
+            ? await deps.capabilities.sendApproval(id, name, args).catch(() => false)
+            : false;
+          return sent ? approvalRequestedAck(name, lang) : parkedActionMessage(id, name, args, lang);
         }
         // decision === 'auto'
         return deps.capabilities.runAuto(name, args);
@@ -161,6 +172,15 @@ export function makeGatedDispatcher(deps: GatedDispatcherDeps): McpToolDispatche
       }
     },
   };
+}
+
+/**
+ * Short acknowledgement returned when `sendApproval` successfully delivered a
+ * buttoned approval request. The user already received the interactive message;
+ * the model should relay that approval has been requested and await the decision.
+ */
+function approvalRequestedAck(capId: string, lang: string): string {
+  return getMessage('cap.approval.ack', lang, { cap: capId });
 }
 
 /**
