@@ -1820,6 +1820,10 @@ const MESSAGES: MessageMap = {
     en: 'capture {display} display',
     tr: '{display} ekranı yakala',
   },
+  'cap.media.fallback': {
+    en: '[media: {filename} — this connector cannot display it]',
+    tr: '[medya: {filename} — bu connector gösteremiyor]',
+  },
 };
 
 /**

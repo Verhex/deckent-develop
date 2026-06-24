@@ -32,6 +32,10 @@ import { killSprintById } from '../cli/commands/kill.js';
 import { getCurrentSprintId } from '../monitor/sprint-state.js';
 import { getMessage } from '../cli/helpers/messages.js';
 import { markdownToTelegramHtml } from './markdown-to-html.js';
+import { createBuiltinRegistry, buildMediaSink, runCapability } from './capabilities/index.js';
+import { detectPlatform } from './capabilities/platform.js';
+import { defaultSpawn } from './capabilities/spawn.js';
+import { loadNodemailerTransport } from './capabilities/mail-transport.js';
 
 type NotifyConnectorsConfig = NonNullable<DeckentConfig['notify_connectors']>;
 
@@ -147,6 +151,13 @@ export interface ConnectorCommandsDeps extends ConnectorBootstrapDeps {
   actionDispatcher?: McpToolDispatcher;
   /** Language for inbound acks. */
   lang?: string;
+  /**
+   * Slice 1 T10 — bot capabilities config. When provided and enabled, parked
+   * capability tools (screenshot, send_mail …) on the approve-path are routed
+   * through runCapability instead of the generic actionDispatcher.
+   * Default: undefined → { enabled: false } → capabilities surface is OFF.
+   */
+  botCapabilities?: import('./capabilities/types.js').BotCapabilitiesConfig;
 }
 
 export interface ConnectorCommandsHandle {
@@ -179,6 +190,8 @@ export async function bootstrapConnectorCommands(
   const lang = deps.lang ?? 'en';
   const gateResolve = deps.resolve ?? makeCommandResolver(root, {}, lang);
   const actionDispatcher = deps.actionDispatcher ?? createCliToolDispatcher();
+  // Capability registry — shared across the bootstrap lifecycle (flag-gated default-off).
+  const capRegistry = createBuiltinRegistry();
   // Composite resolver: a parked bot-action (slice 2b) is the THIRD gate type —
   // unlike autonomous/nervous (consumed by their own loops), approving here
   // EXECUTES the action in-process and replies the result. Falls through to the
@@ -201,6 +214,34 @@ export async function bootstrapConnectorCommands(
         };
       }
       try {
+        // Capability-aware approve path: capability tools (e.g. screenshot, send_mail)
+        // route through runCapability (single chokepoint) instead of actionDispatcher.
+        // The media sink uses the connector paired with the approved channelId when
+        // available (for sendMedia); falls back to honest text otherwise.
+        if (capRegistry.has(parked.tool)) {
+          // targets may not be populated yet at resolve-definition time but IS
+          // populated by approval time (lazy closure eval).
+          const target = targets.find((t) => t.chatId === parked.channelId);
+          const capConnector = target?.connector ?? { id: 'unknown' };
+          const sendText = async (channelId: string, text: string): Promise<void> => {
+            const t = targets.find((t) => t.chatId === channelId);
+            if (t) { for (const part of chunkMessage(text)) await t.connector.sendMessage({ connector: t.connector.id, channelId, text: part }); }
+          };
+          const capConfig = deps.botCapabilities ?? { enabled: false };
+          const mediaSink = buildMediaSink(capConnector, lang, sendText);
+          const capCtx = {
+            chatKey: parked.channelId,
+            project: root,
+            lang,
+            config: capConfig,
+            now: Date.now(),
+            platform: detectPlatform(),
+            spawn: defaultSpawn,
+            loadMailTransport: loadNodemailerTransport,
+          };
+          const result = await runCapability(capRegistry, parked.tool, parked.args, capCtx, parked.channelId, mediaSink, 'confirm');
+          return { status: 'resolved', reply: getMessage('bot.action_done', lang, { tool: parked.tool }) + '\n' + result };
+        }
         // A bound kill routes to the ownership-validated precise primitive — kills
         // EXACTLY the bound sprint (never --all, never a pid-reused foreign process).
         if (parked.tool === 'deckent_kill' && parked.boundSprintId) {

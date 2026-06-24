@@ -30,6 +30,13 @@ import { classifyActionRisk, type AgenticAction } from '../cli/commands/agentic-
 import { makeGatedDispatcher, hasRealPendingCheckpoint, buildBotSystemPrompt } from './bot-agentic.js';
 import { parkBotAction, isSprintScopedDestructive } from './bot-action-store.js';
 import { getCurrentSprintId } from '../monitor/sprint-state.js';
+import { createBuiltinRegistry, buildMediaSink, runCapability } from './capabilities/index.js';
+import { resolvePolicy } from './capabilities/policy.js';
+import { detectPlatform } from './capabilities/platform.js';
+import { defaultSpawn } from './capabilities/spawn.js';
+import { loadNodemailerTransport } from './capabilities/mail-transport.js';
+import { describeCapabilities } from './capabilities/prompt.js';
+import type { BotCapabilitiesConfig, MediaAttachment } from './capabilities/types.js';
 
 /** Default provider: subscription claude (API key stripped → session auth, no tool_use). */
 function defaultSubscriptionProvider(): ChatProviderAdapter {
@@ -83,6 +90,19 @@ export interface ChatResponderDeps {
    * Optional and additive: existing callers that omit it are unaffected.
    */
   onPartial?: (sessionId: string, partialText: string) => void;
+  /**
+   * Slice 1 T10 — capabilities config. When provided (and enabled), the builtin
+   * capability registry is wired into the gated dispatcher (agentic mode) and the
+   * capability catalog is appended to the bot system prompt.
+   * Default: undefined → capability surface is OFF (existing behavior preserved).
+   */
+  capConfig?: BotCapabilitiesConfig;
+  /**
+   * Connector reference for media delivery — needed to build the media sink so
+   * capability results with media attachments reach the right transport.
+   * When absent, capabilities that produce media fall back to honest text.
+   */
+  capConnector?: { id: string; sendMedia?(channelId: string, media: MediaAttachment): Promise<void> };
 }
 
 export interface ChatResponder {
@@ -102,6 +122,10 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
   const chains = new Map<string, Promise<unknown>>();
   const lang = deps.lang ?? 'en';
 
+  // Capability registry + config — built once per responder (flag-gated default-off).
+  const capRegistry = createBuiltinRegistry();
+  const capConfig = deps.capConfig ?? { enabled: false };
+
   // Agentic mode holds ONE warm persistent child across every turn (the whole
   // point — eliminates per-message cold-start); created lazily on first use.
   let persistent: PersistentProvider | undefined;
@@ -110,7 +134,18 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
     if (!persistent) {
       // Ground the persistent session in the live project context (summary.md) so
       // conversational answers are deckent-specific and accurate, not hollow.
-      persistent = createPersistentClaudeSession({ systemPrompt: buildBotSystemPrompt(deps.root) });
+      // Append capability catalog when enabled — bot learns which tools it may call.
+      const basePrompt = buildBotSystemPrompt(deps.root);
+      const capCatalog = describeCapabilities(
+        capRegistry,
+        (id) => {
+          const c = capRegistry.get(id);
+          return c ? resolvePolicy(c, { chatKey: 'session', config: capConfig, edition: 'solo' }) : 'unavailable';
+        },
+        lang,
+      );
+      const systemPrompt = capCatalog ? basePrompt + capCatalog : basePrompt;
+      persistent = createPersistentClaudeSession({ systemPrompt });
     }
     return persistent;
   }
@@ -130,6 +165,37 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
       const root = deps.root;
       provider = agenticProvider();
       const inner = deps.dispatcher ?? createCliToolDispatcher();
+      // Build a per-session send shim for the media sink (capability results with media).
+      // When a capConnector is provided it sends text via sendMessage; otherwise the
+      // honest-fallback text is silently dropped (capability returned a text result
+      // through runCapability anyway, so the caller still surfaces it).
+      const capConn = deps.capConnector;
+      const sendText = capConn && 'sendMessage' in capConn
+        ? async (channelId: string, text: string): Promise<void> => {
+            await (capConn as { sendMessage(m: { connector: string; channelId: string; text: string }): Promise<void> })
+              .sendMessage({ connector: capConn.id, channelId, text });
+          }
+        : async (_channelId: string, _text: string): Promise<void> => {};
+      const mediaSink = buildMediaSink(deps.capConnector ?? { id: 'unknown' }, lang, sendText);
+      const makeCapCtx = (channelId: string) => ({
+        chatKey: channelId,
+        project: root,
+        lang,
+        config: capConfig,
+        now: Date.now(),
+        platform: detectPlatform(),
+        spawn: defaultSpawn,
+        loadMailTransport: loadNodemailerTransport,
+      });
+      const capGate = {
+        has: (id: string) => capRegistry.has(id),
+        resolve: (id: string) => {
+          const c = capRegistry.get(id);
+          return c ? resolvePolicy(c, { chatKey: sessionId, config: capConfig, edition: 'solo' as const }) : 'unavailable' as const;
+        },
+        runAuto: (id: string, args: Record<string, unknown>) =>
+          runCapability(capRegistry, id, args, makeCapCtx(sessionId), sessionId, mediaSink, 'auto'),
+      };
       dispatcher = makeGatedDispatcher({
         inner,
         park: (tool, args) =>
@@ -148,6 +214,7 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
         // no-op, not an approval gate.
         hasPendingCheckpoint: () => hasRealPendingCheckpoint(root),
         lang,
+        capabilities: capGate,
       });
       confirm = async () => true; // gating lives in the wrapper, not here
     } else {
