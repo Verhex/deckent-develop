@@ -253,7 +253,7 @@ describe('buildSprintFromTasks — evaluationDecision ?? selfAssessment success 
     expect(evaluations.get('900-001')).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
-  it('non-terminal selfAssessment (TIMEOUT_WITH_WORK) falls back to evaluateResult re-grading', () => {
+  it('non-terminal selfAssessment (TIMEOUT_WITH_WORK) falls back to evaluateResultSync re-grading', () => {
     const tasksDir = join(root, '.tasks');
     writeTaskFixture(tasksDir, makeTask('900-001'));
     writeResultFixture(tasksDir, makeResult('900-001', {
@@ -262,7 +262,7 @@ describe('buildSprintFromTasks — evaluationDecision ?? selfAssessment success 
     }));
 
     const { evaluations } = buildSprintFromTasks(root);
-    // evaluateResult: !testsPassed → NO_GO (fallback path exercised)
+    // evaluateResultSync: !testsPassed → NO_GO (fallback path exercised)
     expect(evaluations.get('900-001')).toBe(TaskEvaluation.NO_GO);
   });
 

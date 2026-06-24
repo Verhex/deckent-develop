@@ -5,7 +5,7 @@ import type { Task, TaskResult } from '../../core/types.js';
 import { TaskEvaluation, SprintStatus, SprintPhase } from '../../core/types.js';
 import { TASKS_DIR, BRAIN_DIR, DECKENT_DIR } from '../../core/constants.js';
 import { finalizeSprint } from '../../orchestra/brain.js';
-import { evaluateResult } from '../../orchestra/sprint-controller.js';
+import { evaluateResultSync } from '../../orchestra/sprint-controller.js';
 import { loadConfig } from '../../core/config.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -130,14 +130,14 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string): {
       // worker's `selfAssessment` (sprint-267 live bug: the recorded decision
       // was ignored and every task was re-counted as a failed use). Success
       // detection therefore uses `evaluationDecision ?? selfAssessment`
-      // (DONE / GO_WITH_TECH_DEBT = success). Re-grading via evaluateResult
+      // (DONE / GO_WITH_TECH_DEBT = success). Re-grading via evaluateResultSync
       // stays as the last resort for results carrying neither (or a
       // non-terminal hint such as TIMEOUT_WITH_WORK).
       const recorded = result.evaluationDecision ?? result.selfAssessment;
       if (recorded === 'DONE' || recorded === 'GO_WITH_TECH_DEBT' || recorded === 'NO_GO') {
         evaluations.set(task.id, recorded as TaskEvaluation);
       } else {
-        evaluations.set(task.id, evaluateResult(result, task));
+        evaluations.set(task.id, evaluateResultSync(result, task));
       }
     } else {
       // No result file = NO_GO (timeout or incomplete)

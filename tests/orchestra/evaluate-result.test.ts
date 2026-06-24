@@ -54,7 +54,7 @@ vi.mock('../../src/agents/worker.js', () => ({
   isWorkerStoppable: vi.fn(() => true),
 }));
 
-import { evaluateResult, isDocTask } from '../../src/orchestra/brain.js';
+import { evaluateResultSync, isDocTask } from '../../src/orchestra/brain.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -119,9 +119,9 @@ describe('isDocTask', () => {
   });
 });
 
-// ─── evaluateResult() ────────────────────────────────────────────────
+// ─── evaluateResultSync() ────────────────────────────────────────────────
 
-describe('evaluateResult', () => {
+describe('evaluateResultSync', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   // ── doc task branch ──────────────────────────────────────────────
@@ -129,31 +129,31 @@ describe('evaluateResult', () => {
   it('doc task with testsPassed=true → DONE (skips coverage check)', () => {
     const task = makeTask(['docs']);
     const result = makeResult({ testsPassed: true, coverage: 0, selfAssessment: 'DONE' });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.DONE);
   });
 
   it('doc task with coverage=0 still → DONE', () => {
     const task = makeTask(['docs/guides']);
     const result = makeResult({ coverage: 0, selfAssessment: 'DONE' });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.DONE);
   });
 
   it('doc task with testsPassed=false → NO_GO', () => {
     const task = makeTask(['docs']);
     const result = makeResult({ testsPassed: false, selfAssessment: 'DONE' });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.NO_GO);
   });
 
   it('doc task selfAssessment=NO_GO → NO_GO', () => {
     const task = makeTask(['docs']);
     const result = makeResult({ selfAssessment: 'NO_GO' });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.NO_GO);
   });
 
   it('doc task selfAssessment=GO_WITH_TECH_DEBT → GO_WITH_TECH_DEBT', () => {
     const task = makeTask(['docs']);
     const result = makeResult({ selfAssessment: 'GO_WITH_TECH_DEBT' });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
   // ── normal task branch ──────────────────────────────────────────
@@ -161,25 +161,25 @@ describe('evaluateResult', () => {
   it('normal task with coverage >= 90 → DONE', () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({ testsPassed: true, coverage: 95 });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.DONE);
   });
 
   it('normal task with coverage < 90 → GO_WITH_TECH_DEBT', () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({ testsPassed: true, coverage: 80 });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
   it('normal task with testsPassed=false → NO_GO', () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({ testsPassed: false });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.NO_GO);
   });
 
   it('normal task selfAssessment=NO_GO → NO_GO regardless of coverage', () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({ selfAssessment: 'NO_GO', coverage: 99 });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.NO_GO);
   });
 
   // ── mixed scope (docs/ + src/) uses normal evaluation ───────────
@@ -187,12 +187,12 @@ describe('evaluateResult', () => {
   it('mixed scope with low coverage → GO_WITH_TECH_DEBT (not treated as doc task)', () => {
     const task = makeTask(['docs', 'src/orchestra']);
     const result = makeResult({ testsPassed: true, coverage: 50 });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
   it('mixed scope with high coverage → DONE', () => {
     const task = makeTask(['docs', 'src/orchestra']);
     const result = makeResult({ testsPassed: true, coverage: 95 });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.DONE);
   });
 });

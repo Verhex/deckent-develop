@@ -59,7 +59,7 @@ import { spawnWorker } from '../../src/orchestra/tmux.js';
 // ─── Real Imports ──────────────────────────────────────────────────
 
 import {
-  evaluateResult, handleEvaluation, handleCrossDependencies,
+  evaluateResultSync, handleEvaluation, handleCrossDependencies,
   escalateDebt, writeRetrospective, writeSprintLog,
   calculateMetrics, cleanup, runDecay, resolveDebt,
 } from '../../src/orchestra/brain.js';
@@ -260,7 +260,7 @@ describe('Full sprint lifecycle with mock tmux', () => {
       const result = makeTestResult(taskId);
 
       // Simulate evaluation
-      const evaluation = evaluateResult(result, task);
+      const evaluation = evaluateResultSync(result, task);
 
       expect(evaluation).toBeDefined();
       expect([TaskEvaluation.DONE, TaskEvaluation.GO_WITH_TECH_DEBT, TaskEvaluation.NO_GO])
@@ -282,7 +282,7 @@ describe('Full sprint lifecycle with mock tmux', () => {
 
       writeTaskFile(root, task);
 
-      const evaluation = evaluateResult(result, task);
+      const evaluation = evaluateResultSync(result, task);
       expect(evaluation).toBeDefined();
       expect(result.selfAssessment).toBe('DONE');
     });
@@ -296,7 +296,7 @@ describe('Full sprint lifecycle with mock tmux', () => {
         coverage: 60,
       });
 
-      const evaluation = evaluateResult(result, task);
+      const evaluation = evaluateResultSync(result, task);
       expect(evaluation).toBeDefined();
     });
 
@@ -316,7 +316,7 @@ describe('Full sprint lifecycle with mock tmux', () => {
         testsPassed: false,
       });
 
-      const evaluation = evaluateResult(result, task1);
+      const evaluation = evaluateResultSync(result, task1);
       expect(evaluation).toBe(TaskEvaluation.NO_GO);
 
       // Verify task files exist for dependency checks

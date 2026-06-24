@@ -15,7 +15,7 @@ vi.mock('../../src/orchestra/brain.js', () => ({
 }));
 
 vi.mock('../../src/orchestra/sprint-controller.js', () => ({
-  evaluateResult: vi.fn().mockReturnValue('DONE'),
+  evaluateResultSync: vi.fn().mockReturnValue('DONE'),
 }));
 
 // Partial mock: override regenerateRules but keep real CUSTOM_TEMPLATE +

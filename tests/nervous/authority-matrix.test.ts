@@ -106,7 +106,7 @@ const {
   isSafetyFloorAction,
   checkWorkerAuthority,
   normalizeWorkerRole,
-  ROLE_CAPABILITY_MAP,
+  WORKER_ROLE_CAPABILITY_MAP,
   ENFORCE_RBAC_CONFIG_KEY,
   authorizeExecution,
 } = await import('../../src/nervous/authority-matrix.js');
@@ -391,8 +391,8 @@ describe('AuthorityMatrix', () => {
       warnSpy.mockRestore();
     });
 
-    it('ROLE_CAPABILITY_MAP is a nested hierarchy (admin ⊇ engineer ⊇ viewer)', () => {
-      const { admin, engineer, viewer } = ROLE_CAPABILITY_MAP;
+    it('WORKER_ROLE_CAPABILITY_MAP is a nested hierarchy (admin ⊇ engineer ⊇ viewer)', () => {
+      const { admin, engineer, viewer } = WORKER_ROLE_CAPABILITY_MAP;
       for (const cap of viewer) expect(engineer.has(cap)).toBe(true);
       for (const cap of engineer) expect(admin.has(cap)).toBe(true);
       // admin strictly larger than engineer (erp-write, tenant-scope are admin-only)

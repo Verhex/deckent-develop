@@ -19,7 +19,6 @@ export {
   spawnWorkers,
   waitForResults,
   evaluateResultSync,
-  evaluateResult,
   isDocTask,
   isStaleTaskFile,
   cleanup,

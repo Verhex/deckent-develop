@@ -73,7 +73,7 @@ import { spawnWorker } from '../../src/orchestra/tmux.js';
 // ─── Real Imports ──────────────────────────────────────────────────
 
 import {
-  readContext, evaluateResult, handleEvaluation, handleCrossDependencies,
+  readContext, evaluateResultSync, handleEvaluation, handleCrossDependencies,
   escalateDebt, planSprint, writeRetrospective, writeSprintLog,
   calculateMetrics, decay, cleanup, runDecay, resolveDebt,
 } from '../../src/orchestra/brain.js';
@@ -180,7 +180,7 @@ describe('Full sprint cycle — DONE scenario', () => {
       const resultPath = join(root, TASKS_DIR, `task-${task.id}.result`);
       const result = JSON.parse(readFileSync(resultPath, 'utf-8')) as TaskResult;
       results.push(result);
-      const evaluation = evaluateResult(result, task);
+      const evaluation = evaluateResultSync(result, task);
       handleEvaluation(root, task, evaluation, result);
       evaluations.set(task.id, evaluation);
     }
@@ -247,7 +247,7 @@ describe('Full sprint cycle — NO_GO scenario', () => {
     });
     writeResult(root, result);
 
-    const evaluation = evaluateResult(result, task);
+    const evaluation = evaluateResultSync(result, task);
     expect(evaluation).toBe(TaskEvaluation.NO_GO);
 
     handleEvaluation(root, task, evaluation, result);
@@ -288,7 +288,7 @@ describe('Full sprint cycle — GO_WITH_TECH_DEBT scenario', () => {
     });
     writeResult(root, result);
 
-    const evaluation = evaluateResult(result, task);
+    const evaluation = evaluateResultSync(result, task);
     expect(evaluation).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
 
     handleEvaluation(root, task, evaluation, result);

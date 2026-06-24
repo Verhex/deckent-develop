@@ -1,5 +1,5 @@
 /**
- * Tests: evaluateResult Coverage Entegrasyonu (Gorev 027-007)
+ * Tests: evaluateResultSync Coverage Entegrasyonu (Gorev 027-007)
  *
  * Covers:
  * - Coverage validated task returns DONE
@@ -152,7 +152,7 @@ vi.mock('../../src/agents/worker-ipc.js', () => {
 });
 
 // ─── Import after mocks ───────────────────────────────────────────────
-import { evaluateResult, isDocTask } from '../../src/orchestra/brain.js';
+import { evaluateResultSync, isDocTask } from '../../src/orchestra/brain.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -206,58 +206,58 @@ function makeVitestJson(linePct: number): string {
 
 // ─── Tests ───────────────────────────────────────────────────────────
 
-describe('evaluateResult — basic evaluation (no vitest output)', () => {
+describe('evaluateResultSync — basic evaluation (no vitest output)', () => {
   it('returns NO_GO when self-assessment is NO_GO', () => {
     const task = makeTask();
     const result = makeResult({ selfAssessment: 'NO_GO' });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.NO_GO);
   });
 
   it('returns GO_WITH_TECH_DEBT when self-assessment is GO_WITH_TECH_DEBT', () => {
     const task = makeTask();
     const result = makeResult({ selfAssessment: 'GO_WITH_TECH_DEBT' });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
   it('returns NO_GO when testsPassed is false', () => {
     const task = makeTask();
     const result = makeResult({ testsPassed: false });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.NO_GO);
   });
 
   it('returns DONE for doc task regardless of coverage', () => {
     const task = makeTask({ scope: { directories: ['docs/'], filesRead: [], filesWrite: [] } });
     const result = makeResult({ coverage: 0, testsPassed: true });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.DONE);
   });
 
   it('returns DONE when coverage >= 90 (no vitest output)', () => {
     const task = makeTask();
     const result = makeResult({ coverage: 95 });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.DONE);
   });
 
   it('returns GO_WITH_TECH_DEBT when coverage < 90 (no vitest output)', () => {
     const task = makeTask();
     const result = makeResult({ coverage: 85 });
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 });
 
-describe('evaluateResult — coverage validation with vitest JSON output', () => {
+describe('evaluateResultSync — coverage validation with vitest JSON output', () => {
   it('returns DONE when reported coverage matches actual (within 5%)', () => {
     const task = makeTask();
     // reported: 95, actual: 94 — diff 1% — valid
     const result = makeResult({ coverage: 95 });
     const vitestJson = makeVitestJson(94);
-    expect(evaluateResult(result, task, vitestJson)).toBe(TaskEvaluation.DONE);
+    expect(evaluateResultSync(result, task, vitestJson)).toBe(TaskEvaluation.DONE);
   });
 
   it('returns DONE when reported coverage exactly matches actual', () => {
     const task = makeTask();
     const result = makeResult({ coverage: 92 });
     const vitestJson = makeVitestJson(92);
-    expect(evaluateResult(result, task, vitestJson)).toBe(TaskEvaluation.DONE);
+    expect(evaluateResultSync(result, task, vitestJson)).toBe(TaskEvaluation.DONE);
   });
 
   it('returns GO_WITH_TECH_DEBT when reported coverage differs from actual by > 5%', () => {
@@ -265,7 +265,7 @@ describe('evaluateResult — coverage validation with vitest JSON output', () =>
     // reported: 95, actual: 80 — diff 15% — WARNING
     const result = makeResult({ coverage: 95 });
     const vitestJson = makeVitestJson(80);
-    expect(evaluateResult(result, task, vitestJson)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(evaluateResultSync(result, task, vitestJson)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
   it('returns GO_WITH_TECH_DEBT when worker over-reports coverage significantly', () => {
@@ -273,14 +273,14 @@ describe('evaluateResult — coverage validation with vitest JSON output', () =>
     // reported: 98, actual: 60 — diff 38% — WARNING
     const result = makeResult({ coverage: 98 });
     const vitestJson = makeVitestJson(60);
-    expect(evaluateResult(result, task, vitestJson)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(evaluateResultSync(result, task, vitestJson)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
   it('returns GO_WITH_TECH_DEBT when vitest JSON cannot be parsed', () => {
     const task = makeTask();
     const result = makeResult({ coverage: 95 });
     // Invalid JSON — validateWorkerCoverage returns WARNING
-    expect(evaluateResult(result, task, 'not-valid-json')).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(evaluateResultSync(result, task, 'not-valid-json')).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
   it('returns DONE for doc task even with mismatched vitest JSON (doc tasks skip validation)', () => {
@@ -288,7 +288,7 @@ describe('evaluateResult — coverage validation with vitest JSON output', () =>
     const result = makeResult({ coverage: 95, testsPassed: true });
     const vitestJson = makeVitestJson(10); // big mismatch, but doc task — irrelevant
     // Doc task check runs before coverage validation
-    expect(evaluateResult(result, task, vitestJson)).toBe(TaskEvaluation.DONE);
+    expect(evaluateResultSync(result, task, vitestJson)).toBe(TaskEvaluation.DONE);
   });
 
   it('returns DONE when vitest output is empty string (no validation, falls through to coverage check)', () => {
@@ -296,7 +296,7 @@ describe('evaluateResult — coverage validation with vitest JSON output', () =>
     // empty string → vitestJsonOutput is provided but empty → validateWorkerCoverage uses
     // no vitest output path → returns OK → falls through to coverage < 90 check
     const result = makeResult({ coverage: 95 });
-    expect(evaluateResult(result, task, '')).toBe(TaskEvaluation.DONE);
+    expect(evaluateResultSync(result, task, '')).toBe(TaskEvaluation.DONE);
   });
 
   it('returns GO_WITH_TECH_DEBT when coverage < 90 even when vitest matches (< 90 fallback)', () => {
@@ -304,21 +304,21 @@ describe('evaluateResult — coverage validation with vitest JSON output', () =>
     // reported: 85, actual: 85 — valid match, but 85 < 90 threshold
     const result = makeResult({ coverage: 85 });
     const vitestJson = makeVitestJson(85);
-    expect(evaluateResult(result, task, vitestJson)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(evaluateResultSync(result, task, vitestJson)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
   it('returns NO_GO when self-assessment is NO_GO even with valid vitest JSON', () => {
     const task = makeTask();
     const result = makeResult({ selfAssessment: 'NO_GO', coverage: 95 });
     const vitestJson = makeVitestJson(95);
-    expect(evaluateResult(result, task, vitestJson)).toBe(TaskEvaluation.NO_GO);
+    expect(evaluateResultSync(result, task, vitestJson)).toBe(TaskEvaluation.NO_GO);
   });
 
   it('returns NO_GO when testsPassed false even with valid vitest JSON', () => {
     const task = makeTask();
     const result = makeResult({ testsPassed: false, coverage: 95 });
     const vitestJson = makeVitestJson(95);
-    expect(evaluateResult(result, task, vitestJson)).toBe(TaskEvaluation.NO_GO);
+    expect(evaluateResultSync(result, task, vitestJson)).toBe(TaskEvaluation.NO_GO);
   });
 
   it('validates coverage within 5% boundary — exactly 5% diff is still valid', () => {
@@ -326,7 +326,7 @@ describe('evaluateResult — coverage validation with vitest JSON output', () =>
     // reported: 90, actual: 95 — diff 5% (boundary) — valid
     const result = makeResult({ coverage: 90 });
     const vitestJson = makeVitestJson(95);
-    expect(evaluateResult(result, task, vitestJson)).toBe(TaskEvaluation.DONE);
+    expect(evaluateResultSync(result, task, vitestJson)).toBe(TaskEvaluation.DONE);
   });
 
   it('validates coverage with diff just over 5% — should be GO_WITH_TECH_DEBT', () => {
@@ -334,7 +334,7 @@ describe('evaluateResult — coverage validation with vitest JSON output', () =>
     // reported: 90, actual: 96 — diff 6% > 5% — WARNING
     const result = makeResult({ coverage: 90 });
     const vitestJson = makeVitestJson(96);
-    expect(evaluateResult(result, task, vitestJson)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(evaluateResultSync(result, task, vitestJson)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 });
 

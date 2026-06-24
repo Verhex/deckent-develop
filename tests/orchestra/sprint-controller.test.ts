@@ -4,7 +4,7 @@
  * Tests for the extracted sprint-controller module.
  * Covers: cleanup, isStaleTaskFile, pauseSprint, resumeSprint,
  *         RunSprintOptions interface, PauseState, BrainError, readContext,
- *         evaluateResult, isDocTask, getDefaultProvider.
+ *         evaluateResultSync, isDocTask, getDefaultProvider.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -293,7 +293,6 @@ import {
   resumeSprint,
   BrainError,
   isDocTask,
-  evaluateResult,
   evaluateResultSync,
   getDefaultProvider,
   getChannelRegistry,
@@ -745,7 +744,7 @@ describe('isDocTask', () => {
   });
 });
 
-describe('evaluateResult', () => {
+describe('evaluateResultSync', () => {
   it('returns NO_GO when selfAssessment is NO_GO', () => {
     const task = makeTask();
     const result: TaskResult = {
@@ -754,7 +753,7 @@ describe('evaluateResult', () => {
       coverage: 100, selfAssessment: 'NO_GO', notes: '',
     };
 
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.NO_GO);
   });
 
   it('returns GO_WITH_TECH_DEBT when selfAssessment says so', () => {
@@ -765,7 +764,7 @@ describe('evaluateResult', () => {
       coverage: 100, selfAssessment: 'GO_WITH_TECH_DEBT', notes: '',
     };
 
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
   it('returns NO_GO when tests did not pass', () => {
@@ -776,7 +775,7 @@ describe('evaluateResult', () => {
       coverage: 100, selfAssessment: 'DONE', notes: '',
     };
 
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.NO_GO);
   });
 
   it('returns DONE for doc tasks with passing tests', () => {
@@ -787,7 +786,7 @@ describe('evaluateResult', () => {
       coverage: 0, selfAssessment: 'DONE', notes: '',
     };
 
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.DONE);
   });
 
   it('returns DONE for code tasks with high coverage', () => {
@@ -798,7 +797,7 @@ describe('evaluateResult', () => {
       coverage: 95, selfAssessment: 'DONE', notes: '',
     };
 
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.DONE);
   });
 
   it('returns GO_WITH_TECH_DEBT when coverage below 90%', () => {
@@ -809,24 +808,21 @@ describe('evaluateResult', () => {
       coverage: 80, selfAssessment: 'DONE', notes: '',
     };
 
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 });
 
-// R321-EVALRESULT-DISAMBIG: the sync evaluator is canonically named `evaluateResultSync`
-// to disambiguate it from the async `evaluateResult` in result-evaluator.ts. `evaluateResult`
-// remains as a backward-compat alias (consumed by CLI finalize + legacy tests). These guards
-// pin the rename + alias identity so a future collapse/divergence is caught.
+// R321-EVALRESULT-DISAMBIG + R322-EVALRESULT-CLEANUP: the sync evaluator is canonically named
+// `evaluateResultSync` to disambiguate it from the async `evaluateResult` in result-evaluator.ts.
+// Sprint 322 removed the deprecated `evaluateResult` backward-compat alias — every consumer
+// (CLI finalize + tests) now calls `evaluateResultSync` directly. This guard pins the
+// disambiguated name so a future collapse/divergence is caught.
 describe('evaluateResultSync (disambiguated sync evaluator)', () => {
   it('is exported under the disambiguated name evaluateResultSync', () => {
     expect(typeof evaluateResultSync).toBe('function');
   });
 
-  it('evaluateResult is a backward-compat alias of evaluateResultSync (identical reference)', () => {
-    expect(evaluateResult).toBe(evaluateResultSync);
-  });
-
-  it('produces verdicts identical to the evaluateResult alias', () => {
+  it('produces a DONE verdict for a passing high-coverage result', () => {
     const task = makeTask();
     const result: TaskResult = {
       taskId: '001-001', workerId: 'w-1', filesChanged: [],
@@ -834,7 +830,6 @@ describe('evaluateResultSync (disambiguated sync evaluator)', () => {
       coverage: 95, selfAssessment: 'DONE', notes: '',
     };
 
-    expect(evaluateResultSync(result, task)).toBe(evaluateResult(result, task));
     expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.DONE);
   });
 });

@@ -91,7 +91,7 @@ import {
   updateDashboard,
 } from '../../src/monitor/auditor.js';
 import {
-  readContext, evaluateResult, handleEvaluation, escalateDebt,
+  readContext, evaluateResultSync, handleEvaluation, escalateDebt,
   planSprint, writeRetrospective, writeSprintLog, calculateMetrics,
   decay, cleanup,
 } from '../../src/orchestra/brain.js';
@@ -511,16 +511,16 @@ describe('Brain evaluation integration', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('evaluateResult returns DONE for passing result', () => {
+  it('evaluateResultSync returns DONE for passing result', () => {
     const result = makeTestResult('001');
     const task = makeTestTask('001');
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.DONE);
   });
 
-  it('evaluateResult overrides DONE→NO_GO when testsPassed=false', () => {
+  it('evaluateResultSync overrides DONE→NO_GO when testsPassed=false', () => {
     const result = makeTestResult('001', { testsPassed: false });
     const task = makeTestTask('001');
-    expect(evaluateResult(result, task)).toBe(TaskEvaluation.NO_GO);
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.NO_GO);
   });
 
   it('handleEvaluation DONE updates task and releases locks', () => {

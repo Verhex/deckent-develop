@@ -59,15 +59,31 @@ export function detectSystemCapacity(): SystemCapacity {
 // ─── Suggestions ────────────────────────────────────────────────────
 
 /**
- * Suggest optimal max_workers based on system capacity.
+ * Suggest an **init-time** `max_workers` value from total system capacity.
  *
- * Heuristic (MVP):
+ * This is the conservative, TOTAL-RAM-tier suggestion used by the `deckent init`
+ * wizard to seed a durable `max_workers` value into `config.json`. It is one of
+ * three deliberately-distinct worker-sizing helpers — do not conflate them:
+ *
+ *   - {@link suggestMaxWorkersFromCapacity} (here) — INIT-TIME, total-RAM tiers,
+ *     conservative; the persisted config default shown to the user.
+ *   - `system-profile.ts::calcRecommendedMaxWorkers(freeMemMB, cpuCores)` —
+ *     the **CANONICAL RUNTIME** algorithm: free-memory + cpu based, consumed by
+ *     `config.ts::resolveEffectiveWorkers` to decide how many workers to spawn now.
+ *   - `host-detector.ts::suggestMaxWorkers(totalGB, workerMemGB)` — a different
+ *     concern entirely: per-worker RAM *budget* (floor(totalGB/workerMemGB)-1).
+ *
+ * Renamed from `suggestMaxWorkers` (sprint-322 R-MAXWORKERS-CANONICAL) to remove
+ * the bare-name collision with `host-detector::suggestMaxWorkers` and to make the
+ * canonical-vs-init distinction explicit at every call-site.
+ *
+ * Heuristic (total RAM):
  *   <4GB RAM  → 1 worker
  *   4-8GB     → 2 workers
  *   8-16GB    → 3-4 workers (CPU-dependent)
- *   >16GB     → min(cpuCores - 2, 8)
+ *   >16GB     → min(max(cpuCores - 2, 2), 8)
  */
-export function suggestMaxWorkers(cap: SystemCapacity): number {
+export function suggestMaxWorkersFromCapacity(cap: SystemCapacity): number {
   if (cap.totalRamGB < 4) return 1;
   if (cap.totalRamGB < 8) return 2;
   if (cap.totalRamGB < 16) {
@@ -76,6 +92,15 @@ export function suggestMaxWorkers(cap: SystemCapacity): number {
   // >16GB: scale with cores, cap at 8
   return Math.min(Math.max(cap.cpuCores - 2, 2), 8);
 }
+
+/**
+ * @deprecated Backward-compat alias for {@link suggestMaxWorkersFromCapacity}.
+ * Retained only for the out-of-scope caller `src/cli/commands/init-steps.ts`
+ * (this task's scope is `src/core/` + `tests/`). A follow-up cli-scoped task
+ * should migrate that caller to {@link suggestMaxWorkersFromCapacity} and then
+ * remove this alias, finishing the disambiguation. Identical behavior.
+ */
+export const suggestMaxWorkers = suggestMaxWorkersFromCapacity;
 
 /**
  * Suggest optimal spawn backend based on system capacity.

@@ -176,7 +176,7 @@ const mockedFspWriteFile = vi.mocked(fspWriteFile);
 import {
   readContext, createTask,
   planSprint, spawnWorkers, waitForResults,
-  evaluateResult, isDocTask, handleEvaluation, handleCrossDependencies,
+  evaluateResultSync, isDocTask, handleEvaluation, handleCrossDependencies,
   escalateDebt, writeRetrospective, writeSprintLog,
   calculateMetrics, decay, cleanup, runSprint, runDecay,
   BrainError, buildWorkerPrompt, extractScopeFromDirective, parseStructuredDirectives,
@@ -1017,58 +1017,58 @@ describe('isDocTask', () => {
   });
 });
 
-describe('evaluateResult', () => {
+describe('evaluateResultSync', () => {
   const task = makeTask();
 
   it('returns NO_GO when selfAssessment is NO_GO', () => {
-    expect(evaluateResult(makeResult({ selfAssessment: 'NO_GO' }), task)).toBe(TaskEvaluation.NO_GO);
+    expect(evaluateResultSync(makeResult({ selfAssessment: 'NO_GO' }), task)).toBe(TaskEvaluation.NO_GO);
   });
 
   it('returns GO_WITH_TECH_DEBT when selfAssessment says so', () => {
-    expect(evaluateResult(makeResult({ selfAssessment: 'GO_WITH_TECH_DEBT' }), task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(evaluateResultSync(makeResult({ selfAssessment: 'GO_WITH_TECH_DEBT' }), task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
   it('returns DONE for successful result', () => {
-    expect(evaluateResult(makeResult(), task)).toBe(TaskEvaluation.DONE);
+    expect(evaluateResultSync(makeResult(), task)).toBe(TaskEvaluation.DONE);
   });
 
   it('overrides DONE to NO_GO when testsPassed=false', () => {
-    expect(evaluateResult(makeResult({ testsPassed: false }), task)).toBe(TaskEvaluation.NO_GO);
+    expect(evaluateResultSync(makeResult({ testsPassed: false }), task)).toBe(TaskEvaluation.NO_GO);
   });
 
   it('overrides DONE to GO_WITH_TECH_DEBT when coverage < 90', () => {
-    expect(evaluateResult(makeResult({ coverage: 85 }), task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(evaluateResultSync(makeResult({ coverage: 85 }), task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
   it('is pure — does not call any I/O functions', () => {
-    evaluateResult(makeResult(), task);
+    evaluateResultSync(makeResult(), task);
     expect(mockedReadFileSync).not.toHaveBeenCalled();
     expect(mockedWriteFileSync).not.toHaveBeenCalled();
   });
 
   it('doc task (docs/ scope) skips coverage check — low coverage returns DONE', () => {
     const docTask = makeTask({ scope: { directories: ['docs/'], filesRead: [], filesWrite: [] } });
-    expect(evaluateResult(makeResult({ coverage: 0 }), docTask)).toBe(TaskEvaluation.DONE);
+    expect(evaluateResultSync(makeResult({ coverage: 0 }), docTask)).toBe(TaskEvaluation.DONE);
   });
 
   it('doc task (tmp-test/ scope) skips coverage check — returns DONE', () => {
     const docTask = makeTask({ scope: { directories: ['tmp-test/'], filesRead: [], filesWrite: [] } });
-    expect(evaluateResult(makeResult({ coverage: 10 }), docTask)).toBe(TaskEvaluation.DONE);
+    expect(evaluateResultSync(makeResult({ coverage: 10 }), docTask)).toBe(TaskEvaluation.DONE);
   });
 
   it('doc task (scripts/ scope) skips coverage check — returns DONE', () => {
     const docTask = makeTask({ scope: { directories: ['scripts/'], filesRead: [], filesWrite: [] } });
-    expect(evaluateResult(makeResult({ coverage: 50 }), docTask)).toBe(TaskEvaluation.DONE);
+    expect(evaluateResultSync(makeResult({ coverage: 50 }), docTask)).toBe(TaskEvaluation.DONE);
   });
 
   it('doc task still returns NO_GO when testsPassed=false', () => {
     const docTask = makeTask({ scope: { directories: ['docs/'], filesRead: [], filesWrite: [] } });
-    expect(evaluateResult(makeResult({ testsPassed: false }), docTask)).toBe(TaskEvaluation.NO_GO);
+    expect(evaluateResultSync(makeResult({ testsPassed: false }), docTask)).toBe(TaskEvaluation.NO_GO);
   });
 
   it('mixed scope (docs/ + src/) uses normal coverage evaluation', () => {
     const mixedTask = makeTask({ scope: { directories: ['docs/', 'src/'], filesRead: [], filesWrite: [] } });
-    expect(evaluateResult(makeResult({ coverage: 80 }), mixedTask)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+    expect(evaluateResultSync(makeResult({ coverage: 80 }), mixedTask)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 });
 

@@ -1,6 +1,6 @@
 // ═══ Sprint Controller (Thin Orchestration Layer) ══════════════════
 // Sprint 136: Slimmed from ~1894 LoC to a thin barrel re-export layer.
-// Only runSprint(), waitForResults(), and evaluateResultSync() (alias: evaluateResult) remain here.
+// Only runSprint(), waitForResults(), and evaluateResultSync() remain here.
 // All other functions are delegated to sub-modules:
 //   sprint-planner.ts    — readContext, planSprint, confirmDraftTasks, cleanupDraftTasks
 //   sprint-spawner.ts    — spawnWorkers, respawnEligibleTasks, validateTaskDependencies, routeSprintTasks
@@ -873,16 +873,6 @@ export function evaluateResultSync(result: TaskResult, task: Task, vitestJsonOut
     metric('eval.duration_ms', Date.now() - evalStart, { taskId: task.id });
   }
 }
-
-/**
- * @deprecated Backward-compat alias for {@link evaluateResultSync}. The public name
- * `evaluateResult` is still imported by `src/cli/commands/finalize.ts` (re-grade fallback)
- * and a number of legacy tests — directly and via the `brain.ts` re-export. New call-sites
- * should use `evaluateResultSync`; the alias exists to disambiguate from the async
- * `evaluateResult` in `result-evaluator.ts` without a breaking rename of every consumer.
- * It will be removed in a future finalize-inclusive sweep. Behavior is identical.
- */
-export const evaluateResult = evaluateResultSync;
 
 /**
  * Sprint 140 cost-cascade circuit-breaker (B11 wire) — disaster prevention.

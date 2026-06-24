@@ -210,7 +210,7 @@ export type WorkerRole = 'admin' | 'engineer' | 'operator' | 'viewer';
  *                 `erp-write`, `approval`, `provider-pin`, `gpu`, `tenant-scope`).
  *  - `viewer`   — read-only (`fs-read`, `db-query`, `erp-read`).
  */
-export const ROLE_CAPABILITY_MAP: Readonly<Record<WorkerRole, ReadonlySet<Capability>>> =
+export const WORKER_ROLE_CAPABILITY_MAP: Readonly<Record<WorkerRole, ReadonlySet<Capability>>> =
   Object.freeze({
     admin: new Set<Capability>([
       'fs-read', 'fs-write', 'network', 'db-query', 'db-write', 'erp-read',
@@ -333,7 +333,7 @@ export function checkWorkerAuthority(
     };
   }
 
-  const allowed = ROLE_CAPABILITY_MAP[role];
+  const allowed = WORKER_ROLE_CAPABILITY_MAP[role];
   const required: Capability[] = req.requirements?.capabilities ?? [];
   const deniedCapabilities = required.filter((c) => !allowed.has(c));
 

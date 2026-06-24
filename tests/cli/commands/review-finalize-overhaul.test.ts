@@ -40,7 +40,7 @@ vi.mock('../../../src/orchestra/brain.js', () => ({
 }));
 
 vi.mock('../../../src/orchestra/sprint-controller.js', () => ({
-  evaluateResult: vi.fn().mockReturnValue('DONE'),
+  evaluateResultSync: vi.fn().mockReturnValue('DONE'),
 }));
 
 vi.mock('../../../src/core/config.js', () => ({
@@ -71,7 +71,7 @@ import { promptSelect } from '../../../src/cli/helpers/prompt.js';
 import { readJsonSafe } from '../../../src/core/utils.js';
 import { finalizeSprint } from '../../../src/orchestra/brain.js';
 import { killWorker } from '../../../src/orchestra/tmux.js';
-import { evaluateResult } from '../../../src/orchestra/sprint-controller.js';
+import { evaluateResultSync } from '../../../src/orchestra/sprint-controller.js';
 import { loadConfig } from '../../../src/core/config.js';
 import { getMessage } from '../../../src/cli/helpers/messages.js';
 import { getLangFromConfig } from '../../../src/cli/helpers/config-reader.js';
@@ -266,7 +266,7 @@ describe('finalize overhaul', () => {
     vi.mocked(getLangFromConfig).mockReturnValue('en');
     vi.mocked(resolveProjectRoot).mockReturnValue('/mock/root');
     vi.mocked(loadConfig).mockResolvedValue({} as any);
-    vi.mocked(evaluateResult).mockReturnValue('DONE' as any);
+    vi.mocked(evaluateResultSync).mockReturnValue('DONE' as any);
     process.exitCode = undefined;
   });
 

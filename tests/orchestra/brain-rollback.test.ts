@@ -321,7 +321,7 @@ import {
   readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync,
 } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { runSprint, evaluateResult } from '../../src/orchestra/brain.js';
+import { runSprint } from '../../src/orchestra/brain.js';
 import {
   createSafetyPoint, rollback as rollbackFn, getRollbackPolicy,
   recordRollbackInDebt, isCleanWorkingTree, safetyBranchExists,

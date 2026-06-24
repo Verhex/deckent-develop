@@ -177,7 +177,7 @@ vi.mock('../../src/core/memory-store.js', () => ({
 // from loading. waitForResults is replaced with a local stub below.
 vi.mock('../../src/orchestra/sprint-controller.js', () => ({
   waitForResults: vi.fn(),
-  evaluateResult: vi.fn(),
+  evaluateResultSync: vi.fn(),
   runSprint: vi.fn(),
 }));
 

@@ -85,7 +85,7 @@ vi.mock('../../../src/orchestra/brain.js', () => ({
 }));
 
 vi.mock('../../../src/orchestra/sprint-controller.js', () => ({
-  evaluateResult: vi.fn().mockReturnValue('GO'),
+  evaluateResultSync: vi.fn().mockReturnValue('GO'),
 }));
 
 vi.mock('../../../src/core/config.js', () => ({
