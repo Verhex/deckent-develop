@@ -500,8 +500,13 @@ export async function bootstrapConnectorCommands(
 
         /**
          * Task 11: attempt TTS + sendVoice after a reply is produced.
-         * Returns true when voice was sent (caller skips text reply for reply-in-kind).
+         * Returns true when voice was sent (caller skips text reply).
          * Returns false on any error (caller falls through to text reply).
+         *
+         * Voice decision contract (Finding 1 fix):
+         *   'always'        → synthesize on EVERY turn (text-origin OR voice-origin)
+         *   'reply-in-kind' → synthesize only when inbound was voice-origin
+         *   'off' (default) → never
          */
         const tryReplyWithVoice = async (
           channelId: string,
@@ -509,14 +514,9 @@ export async function bootstrapConnectorCommands(
           isVoiceOrigin: boolean,
         ): Promise<boolean> => {
           if (!voiceAdapter) return false;
-          // Text-origin turns NEVER trigger TTS regardless of mode — task brief §T11.
-          // 'always'       → synthesize only when inbound was a voice turn
-          // 'reply-in-kind'→ synthesize only when inbound was a voice turn
-          // 'off' (default)→ never
-          if (!isVoiceOrigin) return false;
           const tts = ttsModeValue;
-          const shouldTts = tts === 'always' || tts === 'reply-in-kind';
-          if (!shouldTts) return false;
+          const shouldVoice = tts === 'always' || (tts === 'reply-in-kind' && isVoiceOrigin);
+          if (!shouldVoice) return false;
 
           const sendVoiceFn = (connector as unknown as {
             sendVoice?: (channelId: string, audio: { data: Buffer; mime: string }) => Promise<void>;
@@ -578,7 +578,14 @@ export async function bootstrapConnectorCommands(
                         typeof streamCap.sendMessageReturningId === 'function' &&
                         typeof streamCap.editMessage === 'function';
 
-                      if (canStream) {
+                      // Task 11 (Finding 2): compute shouldVoice BEFORE choosing
+                      // streaming vs text path. When true, skip streaming entirely —
+                      // collect the full reply, attempt voice; on success send nothing
+                      // else; on failure fall back to non-streaming text reply.
+                      const tts = ttsModeValue;
+                      const shouldVoiceThisTurn = tts === 'always' || (tts === 'reply-in-kind' && isVoiceOrigin);
+
+                      if (canStream && !shouldVoiceThisTurn) {
                         const chatStreaming = deps.onChatStreaming!;
                         await streamCap.sendChatAction!(channelId, 'typing').catch(() => undefined);
                         const placeholder = getMessage('bot.chat_thinking', lang);
@@ -603,8 +610,19 @@ export async function bootstrapConnectorCommands(
                         } else {
                           await sendRich(channelId, body);
                         }
-                        // Task 11 TTS (streaming path): attempt after full reply is assembled
-                        await tryReplyWithVoice(channelId, body, isVoiceOrigin);
+                      } else if (canStream && shouldVoiceThisTurn) {
+                        // Voice-reply turn + streaming capable: collect full reply WITHOUT
+                        // streaming it as text first, then attempt TTS+sendVoice.
+                        // On TTS success → voice only (text never sent).
+                        // On TTS failure → fall back to non-streaming text reply.
+                        const chatStreaming = deps.onChatStreaming!;
+                        await streamCap.sendChatAction!(channelId, 'typing').catch(() => undefined);
+                        const reply = await chatStreaming(channelId, text, () => {/* collect only — no streaming edits */}, connector as PerTurnMediaConnector);
+                        const body = reply.trim() || getMessage('bot.chat_empty', lang);
+                        const sentVoice = await tryReplyWithVoice(channelId, body, isVoiceOrigin);
+                        if (!sentVoice) {
+                          await sendRich(channelId, body);
+                        }
                       } else {
                         // Non-streaming fallback — rich reply.
                         // Slice 1.1: pass the live connector as the per-turn mediaConnector so
@@ -612,11 +630,10 @@ export async function bootstrapConnectorCommands(
                         await send(channelId, getMessage('bot.chat_thinking', lang));
                         const reply = await chat(channelId, text, connector as PerTurnMediaConnector);
                         const body = reply.trim() || getMessage('bot.chat_empty', lang);
-                        // Task 11 TTS: try voice reply first; for reply-in-kind + voice-origin
-                        // skip the text reply when voice succeeded.
+                        // Task 11 TTS: try voice reply first; skip text when voice succeeded
+                        // (covers both 'always' and 'reply-in-kind' — voice replaces text).
                         const sentVoice = await tryReplyWithVoice(channelId, body, isVoiceOrigin);
-                        const skipTextReply = sentVoice && (ttsModeValue === 'reply-in-kind' && isVoiceOrigin);
-                        if (!skipTextReply) {
+                        if (!sentVoice) {
                           await sendRich(channelId, body);
                         }
                       }

@@ -276,11 +276,13 @@ describe('voice wiring: reply-in-kind TTS', () => {
     expect(fake.sendVoice).toHaveBeenCalledWith('555', synthAudio);
   });
 
-  it('text-origin + tts=always → NO sendVoice (text-origin never triggers TTS)', async () => {
+  it('tts=always + text-origin → sendVoice called AND text reply NOT sent', async () => {
+    // Finding 1 fix: 'always' means EVERY turn including text-origin
     const root = makeTmpRoot();
+    const synthAudio = { data: Buffer.from('synth-text-origin'), mime: 'audio/ogg' };
     const fake = fakeVoiceConnector(Buffer.from([0x4f]), 'audio/ogg');
-    const voice = fakeVoiceAdapter();
-    const chat = vi.fn(async () => 'Text reply.');
+    const voice = fakeVoiceAdapter('', synthAudio);
+    const chat = vi.fn(async () => 'Text-origin reply.');
 
     await bootstrapConnectorCommands(root, cfg, {
       makeConnector: () => fake,
@@ -292,12 +294,44 @@ describe('voice wiring: reply-in-kind TTS', () => {
 
     fake._emit(incomingText('555', 'hello'));
 
-    // Wait for chat reply
-    await vi.waitFor(() => expect(chat).toHaveBeenCalled());
-    await new Promise((r) => setTimeout(r, 50));
+    // Wait for sendVoice (tts=always fires even for text-origin)
+    await vi.waitFor(() => expect(fake.sendVoice).toHaveBeenCalledTimes(1));
+    expect(fake.sendVoice).toHaveBeenCalledWith('555', synthAudio);
 
-    // No sendVoice for text-origin turns
-    expect(fake.sendVoice).not.toHaveBeenCalled();
+    // Text reply (the reply body) must NOT be sent — voice replaces text
+    const replyBodyCalls = fake.sendMessage.mock.calls.filter(
+      (c) => (c[0] as { text: string }).text?.includes('Text-origin reply'),
+    );
+    expect(replyBodyCalls).toHaveLength(0);
+  });
+
+  it('tts=always + voice-origin → sendVoice called AND text reply NOT sent', async () => {
+    // Finding 1 fix: always mode must also skip text reply when voice succeeds
+    const root = makeTmpRoot();
+    const audioBytes = Buffer.from([0x4f, 0x67, 0x67, 0x53]);
+    const synthAudio = { data: Buffer.from('synth-voice-always'), mime: 'audio/ogg' };
+    const fake = fakeVoiceConnector(audioBytes, 'audio/ogg');
+    const voice = fakeVoiceAdapter('hello world', synthAudio);
+    const chat = vi.fn(async () => 'Always-voice reply body.');
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'always' } },
+    });
+
+    fake._emit(incomingVoice('555'));
+
+    await vi.waitFor(() => expect(fake.sendVoice).toHaveBeenCalledTimes(1));
+    expect(fake.sendVoice).toHaveBeenCalledWith('555', synthAudio);
+
+    // Text reply body must NOT be sent
+    const replyBodyCalls = fake.sendMessage.mock.calls.filter(
+      (c) => (c[0] as { text: string }).text?.includes('Always-voice reply body'),
+    );
+    expect(replyBodyCalls).toHaveLength(0);
   });
 
   it('tts=off → never sendVoice even for voice-origin', async () => {
@@ -389,5 +423,111 @@ describe('voice wiring: reply-in-kind TTS', () => {
       expect(allTexts).toContain('Fallback text reply.');
     });
     expect(sendVoiceFn).toHaveBeenCalled(); // was attempted
+  });
+});
+
+describe('voice wiring: streaming path — voice replaces text', () => {
+  /** Fake connector with full streaming caps + sendVoice. */
+  function fakeStreamingVoiceConnector(audioBuffer: Buffer, mime: string) {
+    let handler: MessageHandler | undefined;
+    return {
+      id: 'telegram' as const,
+      name: 'Telegram',
+      start: vi.fn(async () => {}),
+      startOutbound: vi.fn(async () => {}),
+      stop: vi.fn(async () => {}),
+      sendMessage: vi.fn(async () => {}),
+      onMessage: vi.fn((h: MessageHandler) => { handler = h; }),
+      isHealthy: () => true,
+      getFileBuffer: vi.fn(async (_fileId: string) => ({ data: audioBuffer, mime })),
+      sendVoice: vi.fn(async () => {}),
+      // Streaming caps
+      sendChatAction: vi.fn(async () => {}),
+      sendMessageReturningId: vi.fn(async () => 'msg-placeholder-id'),
+      editMessage: vi.fn(async () => {}),
+      _emit: (m: IncomingMessage) => handler?.(m),
+    };
+  }
+
+  it('streaming + reply-in-kind + voice-origin → sendVoice called, NO streamed text, NO sendMessage for reply body', async () => {
+    // Finding 2 fix: voice-reply turns must bypass the streaming text path entirely
+    const root = makeTmpRoot();
+    const audioBytes = Buffer.from([0x4f, 0x67, 0x67, 0x53]);
+    const synthAudio = { data: Buffer.from('stream-voice-synth'), mime: 'audio/ogg' };
+    const fake = fakeStreamingVoiceConnector(audioBytes, 'audio/ogg');
+    const voice = fakeVoiceAdapter('stream hello', synthAudio);
+
+    const chat = vi.fn(async () => 'Stream voice reply body.');
+    // Streaming responder: calls onPartial a few times then returns final
+    const onChatStreaming = vi.fn(async (
+      _channelId: string,
+      _text: string,
+      onPartial: (p: string) => void,
+    ) => {
+      onPartial('Stream ');
+      onPartial('voice ');
+      onPartial('reply body.');
+      return 'Stream voice reply body.';
+    });
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat,
+      onChatStreaming,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'reply-in-kind' } },
+    });
+
+    fake._emit(incomingVoice('555'));
+
+    // Wait for sendVoice — voice must be sent
+    await vi.waitFor(() => expect(fake.sendVoice).toHaveBeenCalledTimes(1));
+    expect(fake.sendVoice).toHaveBeenCalledWith('555', synthAudio);
+
+    // editMessage must NOT have been called (no streaming text was sent)
+    expect(fake.editMessage).not.toHaveBeenCalled();
+
+    // sendMessageReturningId must NOT have been called (no placeholder was created)
+    expect(fake.sendMessageReturningId).not.toHaveBeenCalled();
+
+    // No text sendMessage for the reply body
+    const replyBodyCalls = fake.sendMessage.mock.calls.filter(
+      (c) => (c[0] as { text: string }).text?.includes('Stream voice reply body'),
+    );
+    expect(replyBodyCalls).toHaveLength(0);
+  });
+
+  it('streaming + reply-in-kind + voice-origin + synthesize failure → text reply sent as fallback (no crash)', async () => {
+    // Finding 2: on TTS failure in streaming-voice path, fall back to sendRich (text)
+    const root = makeTmpRoot();
+    const audioBytes = Buffer.from([0x4f, 0x67, 0x67, 0x53]);
+    const fake = fakeStreamingVoiceConnector(audioBytes, 'audio/ogg');
+    const voice: VoiceAdapter = {
+      transcribe: vi.fn(async () => 'hello stream'),
+      synthesize: vi.fn(async () => { throw new Error('TTS down in streaming path'); }),
+    };
+
+    const chat = vi.fn(async () => 'Streaming fallback text.'); // non-streaming fallback (not called when streaming)
+    const onChatStreaming = vi.fn(async () => 'Streaming fallback text.');
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat,
+      onChatStreaming,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'reply-in-kind' } },
+    });
+
+    fake._emit(incomingVoice('555'));
+
+    // Synthesize fails → text reply fallback via sendRich (sendMessage)
+    await vi.waitFor(() => {
+      const allTexts = fake.sendMessage.mock.calls.map((c) => (c[0] as { text: string }).text).join('\n');
+      expect(allTexts).toContain('Streaming fallback text.');
+    });
+    // sendVoice was not called (synthesize failed before it)
+    expect(fake.sendVoice).not.toHaveBeenCalled();
   });
 });
