@@ -166,16 +166,11 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
       provider = agenticProvider();
       const inner = deps.dispatcher ?? createCliToolDispatcher();
       // Build a per-session send shim for the media sink (capability results with media).
-      // When a capConnector is provided it sends text via sendMessage; otherwise the
-      // honest-fallback text is silently dropped (capability returned a text result
-      // through runCapability anyway, so the caller still surfaces it).
-      const capConn = deps.capConnector;
-      const sendText = capConn && 'sendMessage' in capConn
-        ? async (channelId: string, text: string): Promise<void> => {
-            await (capConn as { sendMessage(m: { connector: string; channelId: string; text: string }): Promise<void> })
-              .sendMessage({ connector: capConn.id, channelId, text });
-          }
-        : async (_channelId: string, _text: string): Promise<void> => {};
+      // Chat-turn text delivery via connector is deferred to Slice 2 (requires threading
+      // connector instances through ConnectorCommandsHandle). Until then, the shim is a
+      // no-op; runCapability returns the text result via its return value, so callers
+      // still surface it. capConnector is retained here for the Slice-2 wire.
+      const sendText = async (_channelId: string, _text: string): Promise<void> => {};
       const mediaSink = buildMediaSink(deps.capConnector ?? { id: 'unknown' }, lang, sendText);
       const makeCapCtx = (channelId: string) => ({
         chatKey: channelId,

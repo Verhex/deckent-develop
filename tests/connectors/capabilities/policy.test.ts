@@ -23,9 +23,17 @@ describe('resolvePolicy', () => {
     const config = { enabled: true, policies: { c: 'auto' as const }, perChat: { chat1: { c: 'deny' as const } } };
     expect(resolvePolicy(cap('read', 'auto'), { ...base, config })).toBe('deny');
   });
-  it('destructive can NEVER be auto — clamped to confirm', () => {
+  it('destructive can NEVER be auto — clamped to confirm (global override source)', () => {
     const config = { enabled: true, policies: { c: 'auto' as const } };
     expect(resolvePolicy(cap('destructive', 'deny'), { ...base, config })).toBe('confirm');
+  });
+  it('destructive can NEVER be auto — clamped to confirm (per-chat source)', () => {
+    const config = { enabled: true, policies: { c: 'deny' as const }, perChat: { chat1: { c: 'auto' as const } } };
+    expect(resolvePolicy(cap('destructive', 'deny'), { ...base, config })).toBe('confirm');
+  });
+  it('destructive can NEVER be auto — clamped to confirm (defaultPolicy source)', () => {
+    const config = { enabled: true };
+    expect(resolvePolicy(cap('destructive', 'auto'), { ...base, config })).toBe('confirm');
   });
   it('enterprise capability is unavailable on solo edition', () => {
     expect(resolvePolicy(cap('read', 'auto', 'enterprise'), { ...base, config: { enabled: true } })).toBe('unavailable');

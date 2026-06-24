@@ -29,6 +29,24 @@ describe('sendMailCapability', () => {
     expect(sendMail).not.toHaveBeenCalled();
     expect(res.text).toMatch(/not allowed|izinli değil/i);
   });
+  it('multi-recipient: any recipient outside allowlist → denied before send', async () => {
+    const sendMail = vi.fn();
+    const res = await sendMailCapability.run(
+      { to: ['a@corp.com', 'b@evil.com'], subject: 's', body: 'b' },
+      ctx({ config: { enabled: true, mail: { allowedRecipients: ['@corp.com'] } },
+            loadMailTransport: async () => ({ sendMail } as unknown as MailTransport) }));
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(res.text).toMatch(/not allowed|izinli değil/i);
+  });
+  it('multi-recipient: all allowed → transport called once', async () => {
+    const sendMail = vi.fn(async () => ({ messageId: 'mid-2' }));
+    const res = await sendMailCapability.run(
+      { to: ['a@corp.com', 'b@corp.com'], subject: 's', body: 'b' },
+      ctx({ config: { enabled: true, mail: { from: 'bot@corp.com', allowedRecipients: ['@corp.com'], smtp: { host: 'smtp' } } },
+            loadMailTransport: async () => ({ sendMail } as unknown as MailTransport) }));
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    expect(res.text).toContain('mid-2');
+  });
   it('valid → calls transport with correct envelope', async () => {
     const sendMail = vi.fn(async () => ({ messageId: 'mid-1' }));
     const res = await sendMailCapability.run({ to: 'a@corp.com', subject: 'Hi', body: 'Body' },
