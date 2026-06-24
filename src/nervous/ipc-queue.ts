@@ -17,9 +17,17 @@
 
 import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { NERVOUS_IPC_DIR } from '../core/constants.js';
+
+/**
+ * How long an unconsumed approval file may linger before it is aged out. Once
+ * `markResolved` is gated on consumption (multi-poller safety), an accept that no
+ * live executor ever claims (e.g. its owning process exited) would otherwise loop
+ * in `pending/` forever. After this TTL any poller relocates it as an orphan.
+ */
+const ORPHAN_APPROVAL_TTL_MS = 10 * 60 * 1000; // 10 min
 
 // ─── Nervous Poller Liveness (APPROVE-007, §4G) ───────────────────────────────
 //
@@ -103,7 +111,10 @@ export interface PendingItem {
   readonly request: ApprovalRequest;
 }
 
-export type ApprovalHandler = (request: ApprovalRequest) => void | Promise<void>;
+// The handler returns whether THIS poller's executor actually consumed the
+// approval (matched a pending in its in-memory map). `void` is treated as
+// consumed for backward compatibility with handlers that don't report.
+export type ApprovalHandler = (request: ApprovalRequest) => void | boolean | Promise<void | boolean>;
 
 export interface PollingHandle {
   dispose(): void;
@@ -247,8 +258,20 @@ export class NervousIpcQueue {
         for (const item of items) {
           if (stopped) break;
           try {
-            await handler(item.request);
-            await this.markResolved(item.file);
+            const result = await handler(item.request);
+            // Multi-poller race-safety (executor-always-live yan-fix): when more
+            // than one executor polls the same queue (e.g. the always-on bot AND a
+            // running sprint), an accept belongs to whichever executor holds the
+            // proposal in its in-memory map. A handler that returns `false` did NOT
+            // consume it — leave the file so the OWNING poller can. Resolving
+            // (relocating) it here would "steal" the accept and the real owner
+            // would never resolve its pending. `void`/`true` → consumed (legacy
+            // single-poller behavior preserved). Orphaned accepts (no live owner
+            // within the TTL) are aged out so they cannot loop forever.
+            const consumed = result !== false;
+            if (consumed || this.isOrphanedApproval(item.file)) {
+              await this.markResolved(item.file);
+            }
           } catch {
             // Handler failure: leave the pending file for retry next tick
           }
@@ -275,6 +298,22 @@ export class NervousIpcQueue {
         clearInterval(timer);
       },
     };
+  }
+
+  /**
+   * True when a pending approval file is older than {@link ORPHAN_APPROVAL_TTL_MS}
+   * — i.e. no live executor claimed it within the TTL, so it is safe to age out
+   * (relocate) rather than retry forever. Best-effort: a stat error → not orphaned
+   * (let the next tick retry). Time is read here (not injected) because this is a
+   * runtime age check, not part of any resumable/deterministic flow.
+   */
+  private isOrphanedApproval(filePath: string): boolean {
+    try {
+      const ageMs = Date.now() - statSync(filePath).mtimeMs;
+      return ageMs > ORPHAN_APPROVAL_TTL_MS;
+    } catch {
+      return false;
+    }
   }
 
   // ─── Private ────────────────────────────────────────────────────────────

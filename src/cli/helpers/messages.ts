@@ -1154,6 +1154,10 @@ const MESSAGES: MessageMap = {
     en: 'Stopped listening for inbound commands.',
     tr: 'Inbound komut dinleme durduruldu.',
   },
+  'bot.nervous_active': {
+    en: '🧠 Nervous system active (always-on): approvals from any source are consumed and acknowledged here.',
+    tr: '🧠 Nervous sistemi aktif (daima-açık): herhangi bir kaynaktan gelen onaylar burada tüketilir ve onaylandığı yazılır.',
+  },
   'bot.chat_thinking': {
     en: '💭 thinking…',
     tr: '💭 düşünüyorum…',

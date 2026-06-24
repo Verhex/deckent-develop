@@ -24,6 +24,8 @@ import {
   writeBotPid, clearBotPid, readBotPid, stopBot, startBotDaemon,
 } from '../../connectors/bot-daemon.js';
 import type { DeckentConfig } from '../../core/types.js';
+import { createNervousSystemIfEnabled } from '../../nervous/bootstrap.js';
+import { getSprintStateSnapshot } from '../../orchestra/sprint-state-tracker.js';
 
 export interface BotListenOptions {
   root?: string;
@@ -92,10 +94,29 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
   // it was launched via `bot start` (detached) or `bot listen` directly.
   writeBotPid(root);
 
+  // executor-always-live yan-fix: the bot is the always-on process, so it hosts
+  // the nervous system (observer + executor + IPC poll + heartbeat). This makes
+  // cross-source approvals (bot / CLI / MCP) consumable + acked even when no sprint
+  // or `deckent autonomous` is running — closing the idle gap where an accept only
+  // hit the CLI dismiss-fallback. The single-owner guard inside
+  // createNervousSystemIfEnabled prevents a duplicate observer if a sprint later
+  // hosts its own (first-to-start wins). Returns null when nervous is disabled.
+  const nervousHandle = createNervousSystemIfEnabled(
+    config as unknown as DeckentConfig,
+    root,
+    () => getSprintStateSnapshot(root),
+    undefined, // default actionHandler (the real handlers)
+    { observerActiveInAnyPhase: true }, // bot has no hosted sprint → fire in any phase
+  );
+  if (nervousHandle) {
+    print(getMessage('bot.nervous_active', lang));
+  }
+
   const wait = opts.waitForever ?? waitForSignal;
   try {
     await wait();
   } finally {
+    nervousHandle?.dispose();
     await handle.dispose();
     clearBotPid(root);
     print(getMessage('bot.listen_stopped', lang));

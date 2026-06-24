@@ -29,6 +29,7 @@ import {
   NervousIpcQueue,
   writeNervousHeartbeat,
   clearNervousHeartbeat,
+  isNervousPollerAlive,
 } from './ipc-queue.js';
 import { createActionHandler } from './action-handlers.js';
 import { requestWorkerRespawn } from './respawn-request.js';
@@ -184,6 +185,18 @@ export function createNervousSystemIfEnabled(
     return null;
   }
 
+  // Single-owner guard (executor-always-live yan-fix): if another nervous host is
+  // already live (fresh heartbeat), do NOT start a second one. Two observers would
+  // independently detect the same conditions and double-emit proposals (duplicate
+  // notifications — the exact symptom B-COLLISION-HANG's FIX-5 removed). Whoever
+  // starts first owns detection + approval consumption; later callers (e.g. a
+  // sprint that starts while the always-on bot already hosts nervous) delegate.
+  // A crashed host's heartbeat ages out within ~5 s, so the next caller takes over.
+  // Tests injecting a mock ipcQueue bypass the guard (deterministic, no heartbeat).
+  if (!deps.ipcQueue && isNervousPollerAlive(projectRoot)) {
+    return null;
+  }
+
   const detectorConfig = (nervousConfig as { detectors?: unknown }).detectors;
   const observer = new NervousObserver(
     projectRoot,
@@ -241,6 +254,10 @@ export function createNervousSystemIfEnabled(
         );
       } catch { /* ack is observability only */ }
     }
+    // Multi-poller race-safety: report whether THIS executor consumed the accept
+    // so the queue only relocates files it actually resolved (an accept for a
+    // proposal owned by another live executor is left for that poller).
+    return consumed;
   });
 
   // APPROVE-007 (§4G): heartbeat so a separate `deckent nervous accept` process

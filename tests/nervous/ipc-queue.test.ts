@@ -13,6 +13,7 @@ import {
   readFileSync,
   writeFileSync,
   mkdirSync,
+  utimesSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -205,5 +206,49 @@ describe('NervousIpcQueue', () => {
     await new Promise((r) => setTimeout(r, 100));
     expect(seen.find((s) => s.startsWith('ns-poll-c'))).toBeUndefined();
     expect(readdirSync(queue.getPendingDir())).toHaveLength(1);
+  });
+
+  // Multi-poller race-safety (executor-always-live yan-fix): a handler that
+  // returns false (this poller's executor did NOT own the proposal) must LEAVE the
+  // file in pending/ so the OWNING executor's poller can consume it — not steal +
+  // relocate it here (which would orphan the real owner's pending forever).
+  it('leaves the pending file when the handler returns false (not consumed)', async () => {
+    const queue = new NervousIpcQueue(tempRoot);
+    await queue.writeApproval({ notificationId: 'ns-notmine', decision: 'accepted' });
+
+    let calls = 0;
+    const handle = queue.startPolling(() => { calls++; return false; }, 25);
+    const deadline = Date.now() + 600;
+    while (Date.now() < deadline) {
+      if (calls >= 1) break;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    handle.dispose();
+
+    expect(calls).toBeGreaterThanOrEqual(1);
+    // Pre-fix: always relocated → pending 0. Post-fix: left for the owner → pending 1.
+    expect(readdirSync(queue.getPendingDir())).toHaveLength(1);
+    expect(readdirSync(queue.getResolvedDir())).toHaveLength(0);
+  });
+
+  // Orphan age-out: a never-consumed accept (no live owner exists) must not loop
+  // forever — once it is older than ORPHAN_APPROVAL_TTL_MS any poller relocates it.
+  it('ages out an orphaned (older-than-TTL) unconsumed approval', async () => {
+    const queue = new NervousIpcQueue(tempRoot);
+    const file = await queue.writeApproval({ notificationId: 'ns-orphan', decision: 'accepted' });
+    // Backdate the file ~11 min so it exceeds the 10-min TTL.
+    const oldSec = Date.now() / 1000 - 11 * 60;
+    utimesSync(file, oldSec, oldSec);
+
+    const handle = queue.startPolling(() => false, 25); // never consumes
+    const deadline = Date.now() + 600;
+    while (Date.now() < deadline) {
+      if (readdirSync(queue.getPendingDir()).length === 0) break;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    handle.dispose();
+
+    expect(readdirSync(queue.getPendingDir())).toHaveLength(0); // aged out
+    expect(readdirSync(queue.getResolvedDir())).toHaveLength(1);
   });
 });
