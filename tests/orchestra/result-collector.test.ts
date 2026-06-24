@@ -188,6 +188,36 @@ describe('result-collector timeout detection', () => {
     expect(r2!.selfAssessment).toBe('NO_GO');
     expect(r2!.notes).toContain('timeout');
   });
+
+  // P0-A (lifecycle-robustness, sprint-323 hang): a dependent whose dependency
+  // ended NO_GO can never become ready (dispatch needs every dep in doneIds =
+  // DONE/debt-DONE), so pre-fix waitForResults waited on collected===total until
+  // the FULL timeout — EXECUTE hung. Post-fix it is cascade-skipped immediately so
+  // EXECUTE completes. Faithful: pre-fix the dependent's result is the timeout
+  // synthetic ("Worker timeout") after ~5 s; post-fix it is "Cascade-skipped" fast.
+  it('cascade-skips a dependent whose dependency NO_GO\'d, no EXECUTE hang (P0-A)', async () => {
+    const a: Task = { ...makeTask('dep-a'), status: TaskStatus.PENDING };
+    const b: Task = { ...makeTask('dep-b'), status: TaskStatus.PENDING, dependencies: ['dep-a'] };
+    const sprint = makeSprint([a, b]);
+
+    // Dependency 'dep-a' produced a real NO_GO result.
+    writeFileSync(join(tmpDir, '.tasks', 'task-dep-a.result'), JSON.stringify({
+      taskId: 'dep-a', workerId: 'w-dep-a', filesChanged: [], linesAdded: 0,
+      linesRemoved: 0, testsPassed: false, coverage: 0, selfAssessment: 'NO_GO',
+      notes: 'real failure',
+    }), 'utf-8');
+
+    const start = Date.now();
+    const results = await waitForResults(tmpDir, sprint, 5000);
+    const elapsed = Date.now() - start;
+
+    // Dependent collected (not lost) via cascade-skip — not a 5 s timeout wait.
+    const bRes = results.find(r => r.taskId === 'dep-b');
+    expect(bRes).toBeDefined();
+    expect(bRes!.selfAssessment).toBe('NO_GO');
+    expect(bRes!.notes).toContain('Cascade-skipped'); // pre-fix: 'Worker timeout' (RED)
+    expect(elapsed).toBeLessThan(4000);               // pre-fix: ~5000 ms (RED)
+  });
 });
 
 // ═══ Worker Question Handling ════════════════════════════════════════

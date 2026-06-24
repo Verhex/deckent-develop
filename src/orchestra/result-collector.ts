@@ -987,6 +987,73 @@ export async function waitForResults(
     }
   };
 
+  // P0-A (lifecycle-robustness, sprint-323 hang fix): cascade-skip dead-blocked
+  // tasks. Dispatch requires every dependency in `doneIds` (DONE / debt-DONE only,
+  // see dispatchTick), so a task whose dependency reached a TERMINAL FAILED state
+  // (NO_GO / MANUAL_REVIEW_REQUIRED) can NEVER become ready — it stays PENDING
+  // forever and the `collected === taskIds.size` completion check never satisfies,
+  // hanging EXECUTE so EVALUATE/FIX never run (sprint-323 hung at 28/31 on three
+  // cleanups whose deps NO_GO'd). Write a synthetic cascade-skip NO_GO for each so
+  // it is collected (deferred + re-runnable, NOT silently lost) and EXECUTE can
+  // complete. The while-loop resolves transitivity in one call: a freshly-skipped
+  // task becomes NO_GO, so its own dependents are skipped on the next scan.
+  const cascadeSkipDeadBlocked = async (): Promise<number> => {
+    let totalSkipped = 0;
+    let changed = true;
+    while (changed) {
+      changed = false;
+      const failedIds = new Set<string>();
+      for (const t of sprint.tasks) {
+        if (t.status === TaskStatus.NO_GO || t.status === TaskStatus.MANUAL_REVIEW_REQUIRED) {
+          failedIds.add(t.id);
+        }
+      }
+      if (failedIds.size === 0) break;
+      for (const t of sprint.tasks) {
+        if (collected.has(t.id)) continue;
+        if (t.status !== TaskStatus.PENDING) continue;   // only un-dispatched
+        if (assignedTaskIds.has(t.id)) continue;          // not actively running
+        const failedDep = (t.dependencies ?? []).find(d => failedIds.has(d));
+        if (!failedDep) continue;
+        const skip: TaskResult = {
+          taskId: t.id,
+          workerId: `w-${t.id}`,
+          filesChanged: [],
+          linesAdded: 0,
+          linesRemoved: 0,
+          testsPassed: false,
+          coverage: 0,
+          selfAssessment: 'NO_GO',
+          notes:
+            `Cascade-skipped (lifecycle-robustness P0-A): dependency ${failedDep} ended ` +
+            `NO_GO/MANUAL_REVIEW, so this dependent was never dispatched. Re-run after the ` +
+            `dependency is fixed.`,
+          tokenUsage: {
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheReadTokens: 0,
+            provider: t.provider as TokenUsage['provider'],
+            model: (t.forceModel ?? t.model) as TokenUsage['model'],
+          },
+        };
+        try {
+          await writeFile(
+            join(projectRoot, TASKS_DIR, `task-${t.id}.result`),
+            JSON.stringify(skip, null, 2),
+            'utf-8',
+          );
+        } catch (e) { debugLog('cascadeSkipDeadBlocked:write', e); }
+        results.push(skip);
+        collected.add(t.id);
+        syncTaskStatusFromResult(t.id, skip);
+        totalSkipped++;
+        changed = true;
+        debugLog('cascadeSkipDeadBlocked', `task ${t.id} skipped (dep ${failedDep} failed)`);
+      }
+    }
+    return totalSkipped;
+  };
+
   const initiallyCollected = await collectResults();
   // ADR-064 (TOPP B): unified dispatch tick — replaces the dual
   // `await processQueue(...); await maybeRespawn();` sequence so the
@@ -998,6 +1065,7 @@ export async function waitForResults(
   // before the early all-collected return, so the EVALUATE transition never
   // skips a runnable task.
   await dispatchReadyTasks();
+  await cascadeSkipDeadBlocked();
   if (collected.size === taskIds.size) return results;
 
   // IPC dual-mode: register HEARTBEAT listeners for any channels in registry
@@ -1071,6 +1139,7 @@ export async function waitForResults(
       // the collection-done check below is only reached once every ready task
       // is dispatched-and-awaited (never a synthetic NO_GO for unran work).
       await dispatchReadyTasks();
+      await cascadeSkipDeadBlocked();
       if (collected.size === taskIds.size) break;
       // Check for pending worker questions and auto-answer them
       checkWorkerQuestions(projectRoot, taskIds, collected);
