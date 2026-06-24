@@ -1763,6 +1763,32 @@ const MESSAGES: MessageMap = {
     en: 'This chat is not authorized for {project}. Pairing code: {code}. Ask the owner to run: deckent gateway pair approve {code} {project}',
   },
 
+  // ─── capability: mail ────────────────────────────────────────────────
+  'cap.mail.title': {
+    en: 'Send email',
+    tr: 'Mail gönder',
+  },
+  'cap.mail.recipient_denied': {
+    en: 'Recipient not allowed by policy: {to}',
+    tr: 'Alıcı policy ile izinli değil: {to}',
+  },
+  'cap.mail.smtp_missing': {
+    en: 'SMTP is not configured in .deck.',
+    tr: 'SMTP .deck\'te yapılandırılmamış.',
+  },
+  'cap.mail.sent': {
+    en: 'Mail sent to {to} · {subject} ({id})',
+    tr: 'Mail gönderildi: {to} · {subject} ({id})',
+  },
+  'cap.mail.failed': {
+    en: 'Mail failed: {error}',
+    tr: 'Mail başarısız: {error}',
+  },
+  'cap.mail.preview': {
+    en: '📧 To {to} · Subject {subject} · {body}',
+    tr: '📧 Kime {to} · Konu {subject} · {body}',
+  },
+
   // ─── capability: screenshot ──────────────────────────────────────────
   'cap.screenshot.title': {
     en: 'Screenshot',
