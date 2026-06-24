@@ -62,14 +62,20 @@ export function createVoiceAdapter(
     if (!local?.stt_url || !local?.tts_url) return null;
     // Capture config for the lazy wrapper (ESM — no require())
     const localCfg = local;
+    let localAdapter: VoiceAdapter | null = null;
+    async function getLocal(): Promise<VoiceAdapter> {
+      if (!localAdapter) {
+        const { makeLocalVoiceAdapter } = await import('./local-voice.js');
+        localAdapter = makeLocalVoiceAdapter(localCfg);
+      }
+      return localAdapter;
+    }
     return {
       async transcribe(audio, mime) {
-        const { makeLocalVoiceAdapter } = await import('./local-voice.js');
-        return makeLocalVoiceAdapter(localCfg).transcribe(audio, mime);
+        return (await getLocal()).transcribe(audio, mime);
       },
       async synthesize(text, opts) {
-        const { makeLocalVoiceAdapter } = await import('./local-voice.js');
-        return makeLocalVoiceAdapter(localCfg).synthesize(text, opts);
+        return (await getLocal()).synthesize(text, opts);
       },
     };
   }

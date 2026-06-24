@@ -42,7 +42,6 @@ export function makeOpenAIVoiceAdapter(client: OpenAIClient): VoiceAdapter {
       const ext = mime.split('/')[1] ?? 'wav';
       const fileShim = {
         name: `audio.${ext}`,
-        [Symbol.iterator]: undefined,
         arrayBuffer: async () =>
           audio.buffer.slice(
             audio.byteOffset,

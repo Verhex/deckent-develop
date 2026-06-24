@@ -73,8 +73,7 @@ describe('makeOpenAIVoiceAdapter — synthesize', () => {
     const adapter = makeOpenAIVoiceAdapter(fakeClient as never);
     await adapter.synthesize('test');
     const call = fakeClient.audio.speech.create.mock.calls[0][0] as Record<string, unknown>;
-    expect(typeof call.voice).toBe('string');
-    expect((call.voice as string).length).toBeGreaterThan(0);
+    expect(call.voice).toBe('alloy');
   });
 });
 
