@@ -15,6 +15,11 @@ import type { ProviderAdapter } from '../core/provider.js';
 import { providerRegistry, ProviderError } from '../core/provider.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { debugLog } from '../core/utils.js';
+// Dependency-ref resolution reuse (323-031): resolveDependencyRef handles
+// slot-id (NNN-NNN) exact match AND title-token match (substring-trap safe);
+// isPlanSlotId classifies dropped refs. No import cycle — only sprint-planner
+// imports planner.js, so task-builder never re-enters this module.
+import { resolveDependencyRef, isPlanSlotId } from './task-builder.js';
 
 // ─── Model enum values for Zod schemas ───────────────────────────────────
 const MODEL_ENUM_VALUES = ALL_MODELS as unknown as [string, ...string[]];
@@ -824,6 +829,109 @@ export function buildZeroConfigFallbackPlan(description: string): PlannerResult 
     ],
     reasoning: `Zero-config fallback plan for: ${description}`,
   };
+}
+
+// ─── AI-Plan Dependency Normalization (323-031) ──────────────────────────────
+//
+// The AI planner emits each `task.dependencies` entry as free text — usually the
+// *title* of the depended-on task, because it cannot know the final `NNN-NNN`
+// slot id at plan time. `buildDependencyGraph` (dependency-scheduler.ts) matches
+// strictly by task id, so a title ref is silently dropped and the dependency
+// pipeline is never wired (cleanup-last never runs, just-wired code can be
+// deleted). This pass rewrites every AI task's `dependencies` into concrete
+// same-sprint ids AFTER the tasks have been created (so each carries its real
+// id + title), and reports anything it could not resolve instead of dropping it
+// silently.
+
+/** A dependency ref that failed to resolve to any sibling task (and was dropped). */
+export interface DroppedDependency {
+  /** Id of the task whose dependency could not be resolved. */
+  taskId: string;
+  /** The raw ref string the planner emitted (title or id-shaped). */
+  ref: string;
+  /**
+   * True when `ref` looked like a concrete plan-slot id (`NNN-NNN`) — i.e. it
+   * referenced a task id that does not exist in the sprint, rather than a title
+   * the planner failed to spell exactly.
+   */
+  looksLikePlanSlotId: boolean;
+}
+
+/** Outcome of `normalizePlannerDependencies`. */
+export interface DependencyNormalizationResult {
+  /** Count of dependency refs resolved to a concrete same-sprint id. */
+  resolvedCount: number;
+  /** Refs that could not be resolved — dropped, but never silently (logged + returned). */
+  dropped: DroppedDependency[];
+}
+
+/**
+ * Normalize AI-planner task dependencies into concrete same-sprint task IDs.
+ *
+ * Rewrites each task's `dependencies` array IN PLACE:
+ *   - a ref already a slot id (`323-007`) that names a real sibling → kept
+ *   - a ref that is a sibling task title → resolved to that task's id
+ *   - multiple deps are supported and de-duplicated (first occurrence wins)
+ *   - a self-reference is dropped (a task cannot depend on itself) without being
+ *     reported as unresolvable
+ *   - an unresolvable ref is dropped AND reported (returned in `dropped` +
+ *     `debugLog`) — never silently lost
+ *
+ * Resolution reuses `resolveDependencyRef` (task-builder), which already handles
+ * slot-id exact match and substring-trap-safe title-token matching.
+ *
+ * Behaviour-preserving for plans that already use correct slot ids: every ref
+ * resolves to itself and `dropped` is empty.
+ *
+ * @param tasks AI-created tasks (mutated: `dependencies` rewritten to ids).
+ *   Only `id`, `title`, and `dependencies` are read/written.
+ * @returns resolved count + the list of dropped refs for operator visibility.
+ */
+export function normalizePlannerDependencies(
+  tasks: Array<{ id: string; title: string; dependencies?: string[] }>,
+): DependencyNormalizationResult {
+  const dropped: DroppedDependency[] = [];
+  let resolvedCount = 0;
+
+  for (const task of tasks) {
+    const rawDeps = task.dependencies;
+    if (!rawDeps || rawDeps.length === 0) continue;
+
+    const resolved: string[] = [];
+    const seen = new Set<string>();
+
+    for (const ref of rawDeps) {
+      const id = resolveDependencyRef(ref, tasks);
+
+      if (id && id !== task.id) {
+        if (!seen.has(id)) {
+          seen.add(id);
+          resolved.push(id);
+          resolvedCount++;
+        }
+        continue;
+      }
+
+      if (id === task.id) {
+        // Self-reference — drop without flagging as unresolvable.
+        debugLog('planner:normalizeDeps', `Task ${task.id}: self-dependency "${ref}" dropped`);
+        continue;
+      }
+
+      // Unresolvable — drop, but make it visible (never silent).
+      const looksLikePlanSlotId = isPlanSlotId(ref);
+      dropped.push({ taskId: task.id, ref, looksLikePlanSlotId });
+      debugLog(
+        'planner:normalizeDeps',
+        `Task ${task.id}: unresolvable dependency "${ref}" dropped (` +
+        `${looksLikePlanSlotId ? 'id-shaped — no such task in sprint' : 'title not found among sprint tasks'})`,
+      );
+    }
+
+    task.dependencies = resolved;
+  }
+
+  return { resolvedCount, dropped };
 }
 
 // ─── SCOPE-W2: Plan-time scope-sufficiency check ─────────────────────────────

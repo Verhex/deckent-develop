@@ -3,7 +3,7 @@
 // F4 enterprise foundation — ADR-037 audit-trail + tenant isolation.
 // Sprint 208 (208-011).
 
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import { writeEvent, readEvents } from './event-stream.js';
 
 // ─── Channel constant ─────────────────────────────────────────────
@@ -13,8 +13,41 @@ export const AUDIT_EVENT_CHANNEL = 'DECKENT→AUDIT:EVENT_WRITTEN';
 
 // ─── Hash-chain constants ─────────────────────────────────────────
 
-/** Genesis seed for the tamper-evident hmac chain. */
-const GENESIS_HMAC = 'deckent-audit-genesis-0000000000000000000000000000000000000000';
+/**
+ * Genesis seed for the tamper-evident hmac chain. Algorithm-agnostic — the seed
+ * is the `prevHmac` of every stream's first event regardless of chain version.
+ * Exported so external/compliance verifiers can independently anchor the chain.
+ */
+export const GENESIS_HMAC = 'deckent-audit-genesis-0000000000000000000000000000000000000000';
+
+/**
+ * Shared HMAC secret for the v2 (keyed) chain. MUST match the default `secret`
+ * of `audit-export.ts` (`'deckent-audit'`) so the write side and the
+ * export/verification side use the SAME keyed-HMAC-SHA256 algorithm (323-013).
+ * Exported so an independent verifier can recompute a written record's hmac.
+ *
+ * NOTE (tracked follow-up): a production deployment should thread a single
+ * config/secret-manager-sourced secret through BOTH `audit-writer` and
+ * `audit-export`. Reading an env override on only one side would re-introduce
+ * the very mismatch this task fixes, so the literal default is intentionally
+ * kept identical on both sides here; the shared-config work is out of scope.
+ */
+export const AUDIT_HMAC_SECRET = 'deckent-audit';
+
+/**
+ * Current chain-algorithm version written into every new event's payload.
+ * - **v2** (this constant) — keyed `HMAC-SHA256(AUDIT_HMAC_SECRET, …)`,
+ *   matching `audit-export.ts`'s primitive.
+ * - **v1 / absent** — legacy unkeyed `sha256(…)` (records written before
+ *   323-013). Still verified with the legacy algorithm for backward-compat.
+ *
+ * `chainVersion` is part of the authenticated basePayload, so tampering with it
+ * on a v2 record breaks verification. (A full v2→v1 downgrade forgery remains
+ * theoretically possible only because legacy v1 records were secret-less and are
+ * still accepted for back-compat; upgrading them requires a secret-keyed re-sign
+ * migration — an operational follow-up, see result notes.)
+ */
+const CHAIN_ALGO_VERSION = 2;
 
 /**
  * Per-(projectRoot, sprintId) running chain heads. A21: a single module-level
@@ -82,9 +115,17 @@ export interface AuditEvent {
   prevHmac?: string;
   /**
    * Tamper-evident chain field. Added by writeAuditEvent() — absent on legacy records.
-   * sha256(prevHmac + canonicalJson(payload_without_chain_fields)).
+   * v2: `HMAC-SHA256(AUDIT_HMAC_SECRET, prevHmac + canonicalJson(base))`.
+   * v1/legacy: unkeyed `sha256(prevHmac + canonicalJson(base))`.
+   * `base` = the payload without the chain fields (`prevHmac`, `hmac`).
    */
   hmac?: string;
+  /**
+   * Chain-algorithm version for this record (323-013). `2` = keyed HMAC-SHA256
+   * (export-compatible). Absent/`1` = legacy unkeyed SHA-256. Part of the
+   * authenticated base, so it cannot be silently changed on a v2 record.
+   */
+  chainVersion?: number;
 }
 
 /** The payload stored in the event stream for each audit event. */
@@ -136,11 +177,13 @@ export function writeAuditEvent(
     ...(event.metadata !== undefined ? { metadata: event.metadata } : {}),
     ...(event.correlationId !== undefined ? { correlationId: event.correlationId } : {}),
     ...(event.causationId !== undefined ? { causationId: event.causationId } : {}),
+    // chainVersion is authenticated (part of the hashed base) — see CHAIN_ALGO_VERSION.
+    chainVersion: CHAIN_ALGO_VERSION,
     timestamp,
   };
 
   const prevHmac = currentChainHead(projectRoot, sprintId);
-  const hmac = computeEventHmac(prevHmac, basePayload);
+  const hmac = computeEventHmac(prevHmac, basePayload, CHAIN_ALGO_VERSION);
 
   const payload: AuditEventPayload = { ...basePayload, prevHmac, hmac };
 
@@ -180,13 +223,17 @@ export function verifyAuditChain(events: AuditEvent[]): { intact: boolean; broke
       return { intact: false, brokenAt: i };
     }
 
-    // Reconstruct base payload: strip chain fields before re-hashing
+    // Reconstruct base payload: strip chain links before re-hashing. chainVersion
+    // stays in the base (it is authenticated), and selects the algorithm so that
+    // legacy v1 (unkeyed SHA-256) and v2 (keyed HMAC) records — including a stream
+    // that migrated v1→v2 mid-chain — each verify under their own algorithm.
     const base: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(event)) {
       if (k !== 'hmac' && k !== 'prevHmac') base[k] = v;
     }
 
-    const expected = computeEventHmac(event.prevHmac, base);
+    const version = typeof event.chainVersion === 'number' ? event.chainVersion : 1;
+    const expected = computeEventHmac(event.prevHmac, base, version);
     if (expected !== event.hmac) {
       return { intact: false, brokenAt: i };
     }
@@ -209,14 +256,27 @@ export function validateAuditEvent(event: AuditEvent): boolean {
 
 // ─── Hash-chain helpers ────────────────────────────────────────────
 
-function computeEventHmac(prevHmac: string, basePayload: unknown): string {
-  const h = createHash('sha256');
-  h.update(prevHmac + canonicalJson(basePayload));
-  return h.digest('hex');
+/**
+ * Compute one chain link.
+ * - **v2** — keyed `HMAC-SHA256(AUDIT_HMAC_SECRET, prevHmac + canonicalJson(base))`,
+ *   the same keyed-HMAC primitive `audit-export.ts` uses (323-013 alignment).
+ * - **v1 / legacy** — unkeyed `sha256(prevHmac + canonicalJson(base))`, preserved
+ *   so records written before 323-013 stay verifiable (backward-compat).
+ */
+function computeEventHmac(prevHmac: string, basePayload: unknown, version: number): string {
+  const data = prevHmac + canonicalJson(basePayload);
+  if (version >= 2) {
+    return createHmac('sha256', AUDIT_HMAC_SECRET).update(data).digest('hex');
+  }
+  return createHash('sha256').update(data).digest('hex');
 }
 
-/** Deterministic JSON serialization with sorted keys at every level. */
-function canonicalJson(obj: unknown): string {
+/**
+ * Deterministic JSON serialization with sorted keys at every level. Exported so
+ * an independent/compliance verifier can reconstruct the exact bytes that were
+ * fed to the chain HMAC and re-validate a written record off-process.
+ */
+export function canonicalJson(obj: unknown): string {
   if (obj === null || typeof obj !== 'object') return JSON.stringify(obj);
   if (Array.isArray(obj)) {
     return '[' + (obj as unknown[]).map(canonicalJson).join(',') + ']';

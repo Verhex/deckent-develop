@@ -10,6 +10,15 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Task } from '../../src/core/types.js';
 import { TaskStatus } from '../../src/core/types.js';
+
+// 323-031: spy debugLog so we can assert that buildDependencyGraph reports an
+// unresolvable dependency instead of dropping it silently. `...actual` keeps
+// every other util intact (only debugLog is replaced with a spy).
+vi.mock('../../src/core/utils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/utils.js')>();
+  return { ...actual, debugLog: vi.fn() };
+});
+import { debugLog } from '../../src/core/utils.js';
 import {
   buildDependencyGraph,
   enforceWaveDependency,
@@ -237,6 +246,45 @@ describe('buildDependencyGraph', () => {
     const bDependents = graph.dependents.get('B');
     expect(bDependents).toBeDefined();
     expect(bDependents!.size).toBe(0);
+  });
+
+  // 323-031: an unresolvable dependency (e.g. an un-normalized planner title
+  // string) is still dropped from the graph — but it must be LOGGED, never lost
+  // silently, so an operator can see the dependency-pipeline gap.
+  it('warns (debugLog) instead of silently dropping an unresolvable dependency', () => {
+    vi.mocked(debugLog).mockClear();
+    const tasks = [
+      createTask('001'),
+      createTask('002', ['Build REST API']), // a TITLE string, not a slot id
+    ];
+
+    const graph = buildDependencyGraph(tasks, false);
+
+    // Behaviour preserved: the unresolvable dep is dropped from the edge set.
+    expect(graph.dependencies.get('002')!.size).toBe(0);
+    expect(graph.hasCycle).toBe(false);
+
+    // But it is surfaced, not silent.
+    const calls = vi.mocked(debugLog).mock.calls;
+    const warned = calls.some(
+      ([ctx, msg]) =>
+        ctx === 'dependency-scheduler:buildGraph' &&
+        String(msg).includes('Build REST API') &&
+        String(msg).includes('002'),
+    );
+    expect(warned).toBe(true);
+  });
+
+  it('does not warn when every dependency resolves to a real task id', () => {
+    vi.mocked(debugLog).mockClear();
+    const tasks = [createTask('001'), createTask('002', ['001'])];
+
+    buildDependencyGraph(tasks, false);
+
+    const buildGraphWarnings = vi.mocked(debugLog).mock.calls.filter(
+      ([ctx]) => ctx === 'dependency-scheduler:buildGraph',
+    );
+    expect(buildGraphWarnings).toHaveLength(0);
   });
 });
 

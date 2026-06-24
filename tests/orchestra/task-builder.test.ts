@@ -8,6 +8,8 @@ import {
   parseBulletOrNumberedTasks,
   parsePriorityDirective,
   parseAuthModeDirective,
+  parseDependenciesDirective,
+  isPlanSlotId,
   plannerTaskToParams,
   resolveWorkerEffort,
   buildWorkerPrompt,
@@ -2409,5 +2411,49 @@ describe('createTask — auto-includes matching tests/ dir for code-development 
     const task = createTask(params, 4);
     const testDirs = task.scope.directories.filter(d => d.startsWith('tests/'));
     expect(testDirs).toHaveLength(0);
+  });
+});
+
+// ═══ Dependency directive format guard (323-031) ═══════════════════════
+
+describe('parseDependenciesDirective — structured slot-id format', () => {
+  it('parses "- Dependencies: 323-005, 323-007" to a slot-id array', () => {
+    expect(parseDependenciesDirective('- Dependencies: 323-005, 323-007'))
+      .toEqual(['323-005', '323-007']);
+  });
+
+  it('parses a single bare "Dependencies: 323-005"', () => {
+    expect(parseDependenciesDirective('Dependencies: 323-005')).toEqual(['323-005']);
+  });
+
+  it('parses a JSON-array dependency literal', () => {
+    expect(parseDependenciesDirective('- Dependencies: ["323-005", "323-007"]'))
+      .toEqual(['323-005', '323-007']);
+  });
+
+  it('returns undefined for "none" and for a missing line', () => {
+    expect(parseDependenciesDirective('- Dependencies: none')).toBeUndefined();
+    expect(parseDependenciesDirective(undefined)).toBeUndefined();
+    expect(parseDependenciesDirective('- Dependencies:   ')).toBeUndefined();
+  });
+});
+
+describe('isPlanSlotId — format guard', () => {
+  it('accepts canonical NNN-NNN slot ids', () => {
+    expect(isPlanSlotId('323-005')).toBe(true);
+    expect(isPlanSlotId('1-1')).toBe(true);
+    expect(isPlanSlotId('  323-007  ')).toBe(true); // trims surrounding space
+  });
+
+  it('rejects title-prefix labels and free-text titles', () => {
+    expect(isPlanSlotId('W1-1')).toBe(false);
+    expect(isPlanSlotId('Build REST API')).toBe(false);
+    expect(isPlanSlotId('')).toBe(false);
+  });
+
+  it('rejects malformed / over-length numeric refs', () => {
+    expect(isPlanSlotId('12345-1')).toBe(false); // > 4 digits
+    expect(isPlanSlotId('323')).toBe(false);      // missing dash segment
+    expect(isPlanSlotId('323-')).toBe(false);
   });
 });

@@ -12,7 +12,7 @@
 import { EventEmitter } from 'node:events';
 import { readFile } from 'node:fs/promises';
 import { watch, existsSync, type FSWatcher, statSync, openSync, readSync, closeSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname, basename } from 'node:path';
 import type { DeckentEvent, ChannelCode } from './event-stream.js';
 import { RECENT_WORKS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
@@ -58,6 +58,7 @@ export class EventBus extends EventEmitter {
   private nextSubId = 1;
   private watchers = new Map<string, FSWatcher>();
   private watcherOffsets = new Map<string, number>();
+  private watcherDebounces = new Map<string, ReturnType<typeof setTimeout>>();
 
   constructor() {
     super();
@@ -139,6 +140,23 @@ export class EventBus extends EventEmitter {
    */
   async tail(projectRoot: string, sprintId: string, n: number): Promise<DeckentEvent[]> {
     const filePath = eventsFilePath(projectRoot, sprintId);
+    const watchKey = `${projectRoot}:${sprintId}`;
+
+    // Auto-wire: start cross-process file watcher so subsequent subscribe() calls
+    // receive live events from other processes appending to the JSONL file.
+    // Anchors the watcher offset to the current file size so only new events
+    // (written after this call) are pushed to subscribers; backfill is handled
+    // by the tail() return value itself.
+    if (!this.watchers.has(watchKey)) {
+      const dirPath = dirname(filePath);
+      if (existsSync(dirPath)) {
+        try {
+          this.watchFile(projectRoot, sprintId);
+        } catch (err) {
+          debugLog('event-bus:tail', `Could not auto-start file watcher: ${err}`);
+        }
+      }
+    }
 
     try {
       const content = await readFile(filePath, 'utf-8');
@@ -175,12 +193,20 @@ export class EventBus extends EventEmitter {
    */
   watchFile(projectRoot: string, sprintId: string): FSWatcher {
     const filePath = eventsFilePath(projectRoot, sprintId);
+    const dirPath = dirname(filePath);
+    const targetFileName = basename(filePath);
     const watchKey = `${projectRoot}:${sprintId}`;
 
     // Clean up existing watcher for this sprint
     const existing = this.watchers.get(watchKey);
     if (existing) {
       existing.close();
+    }
+    // Clear any pending debounce so stale reads don't fire after replacement
+    const pendingDebounce = this.watcherDebounces.get(watchKey);
+    if (pendingDebounce !== undefined) {
+      clearTimeout(pendingDebounce);
+      this.watcherDebounces.delete(watchKey);
     }
 
     // Track current file size for incremental reads
@@ -194,14 +220,15 @@ export class EventBus extends EventEmitter {
     }
     this.watcherOffsets.set(watchKey, currentOffset);
 
-    const watcher = watch(filePath, { persistent: false }, (_eventType) => {
+    // Read and publish any new lines appended to the file since last offset
+    const readNewLines = (): void => {
       try {
+        if (!existsSync(filePath)) return;
         const stat = statSync(filePath);
         const prevOffset = this.watcherOffsets.get(watchKey) ?? 0;
 
         if (stat.size <= prevOffset) return; // No new data
 
-        // Read only new bytes
         const fd = openSync(filePath, 'r');
         const buffer = Buffer.alloc(stat.size - prevOffset);
         readSync(fd, buffer, 0, buffer.length, prevOffset);
@@ -223,6 +250,24 @@ export class EventBus extends EventEmitter {
       } catch (err) {
         debugLog('event-bus:watchFile', `Watch read error: ${err}`);
       }
+    };
+
+    // Watch the parent directory rather than the file directly.
+    // This handles both the file-already-exists and file-not-yet-created cases
+    // without throwing ENOENT. A 50ms debounce collapses rapid sequential fs
+    // events into a single readNewLines call, preventing CPU-spin.
+    const watcher = watch(dirPath, { persistent: false }, (_eventType, changedFile) => {
+      // changedFile may be null on some platforms; guard and filter by target
+      if (!changedFile || changedFile !== targetFileName) return;
+
+      const pending = this.watcherDebounces.get(watchKey);
+      if (pending !== undefined) clearTimeout(pending);
+
+      const timer = setTimeout(() => {
+        this.watcherDebounces.delete(watchKey);
+        readNewLines();
+      }, 50);
+      this.watcherDebounces.set(watchKey, timer);
     });
 
     this.watchers.set(watchKey, watcher);
@@ -233,6 +278,12 @@ export class EventBus extends EventEmitter {
    * Close all active file watchers.
    */
   unwatchAll(): void {
+    // Clear pending debounce timers before closing watchers to prevent stale reads
+    for (const [, timer] of this.watcherDebounces) {
+      clearTimeout(timer);
+    }
+    this.watcherDebounces.clear();
+
     for (const [key, watcher] of this.watchers) {
       try {
         watcher.close();

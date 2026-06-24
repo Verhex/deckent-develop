@@ -283,6 +283,19 @@ const DEPENDENCY_REF_RESERVED = new Set(['NONE', 'AUTO']);
 
 const PLAN_SLOT_ID_RE = /^\d{1,4}-\d{1,4}$/;
 
+/**
+ * Format guard (323-031): true when `ref` is a canonical plan-slot task id
+ * (`NNN-NNN`, e.g. "323-005") — the shape structured `- Dependencies: 323-005,
+ * 323-007` lines parse into. Distinguishes concrete slot ids from title-prefix
+ * labels ("W1-1") and free-text titles so callers can validate dependency
+ * format and classify an unresolvable ref as id-shaped (a referenced task that
+ * does not exist) vs title-shaped (planner emitted a title, not an id).
+ * Trims surrounding whitespace; non-string input is never a slot id.
+ */
+export function isPlanSlotId(ref: string): boolean {
+  return typeof ref === 'string' && PLAN_SLOT_ID_RE.test(ref.trim());
+}
+
 function escapeRegExp(literal: string): string {
   return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

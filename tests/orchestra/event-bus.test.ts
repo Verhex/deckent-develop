@@ -323,7 +323,7 @@ describe('EventBus', () => {
     const newEvent = makeEvent({ sequence: 2, payload: { phase: 'EVALUATE' } });
     appendFileSync(filePath, JSON.stringify(newEvent) + '\n', 'utf-8');
 
-    // Wait for fs.watch to trigger
+    // Wait for fs.watch + debounce to trigger
     await new Promise(resolve => setTimeout(resolve, 300));
 
     // Should have received the new event via watchFile → publish
@@ -331,5 +331,34 @@ describe('EventBus', () => {
     const lastReceived = received[received.length - 1]!;
     expect(lastReceived.sequence).toBe(2);
     expect((lastReceived.payload as { phase: string }).phase).toBe('EVALUATE');
-  });
+  }, 2000);
+
+  // ─── Test 18: tail() auto-wire → live events reach subscriber ──
+
+  it('should auto-start watchFile on tail() so live events reach subscribers (deckent_watch wire)', async () => {
+    const filePath = join(testRoot, '.deckent', 'recently-works', `${sprintId}-events.jsonl`);
+
+    // Seed one existing event so tail() has something to backfill
+    appendFileSync(filePath, JSON.stringify(makeEvent({ sequence: 1 })) + '\n', 'utf-8');
+
+    // tail() auto-starts the file watcher (deckent_watch flow)
+    const tailed = await bus.tail(testRoot, sprintId, 10);
+    expect(tailed).toHaveLength(1);
+
+    // Subscribe — watcher is already running from tail(); live events will flow
+    const received: DeckentEvent[] = [];
+    bus.subscribe('*', undefined, (event) => received.push(event));
+
+    // Simulate cross-process write (another worker appends to the JSONL file)
+    const liveEvent = makeEvent({ sequence: 2, payload: { phase: 'EVALUATE' } });
+    appendFileSync(filePath, JSON.stringify(liveEvent) + '\n', 'utf-8');
+
+    // Wait for fs.watch + debounce (50ms) to fire and deliver the event
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    expect(received.length).toBeGreaterThanOrEqual(1);
+    const last = received[received.length - 1]!;
+    expect(last.sequence).toBe(2);
+    expect((last.payload as { phase: string }).phase).toBe('EVALUATE');
+  }, 2000);
 });

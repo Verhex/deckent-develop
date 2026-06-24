@@ -2,12 +2,16 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { createHash, createHmac } from 'node:crypto';
 import {
   writeAuditEvent,
   validateAuditEvent,
   verifyAuditChain,
   _resetChainHead,
   AUDIT_EVENT_CHANNEL,
+  AUDIT_HMAC_SECRET,
+  GENESIS_HMAC,
+  canonicalJson,
   type AuditEventPayload,
 } from '../../src/core/audit-writer.js';
 import { queryAudit } from '../../src/core/audit-query.js';
@@ -356,5 +360,155 @@ describe('verifyAuditChain — A21 per-stream chain isolation', () => {
     const result = verifyAuditChain(payloads);
     expect(result.intact).toBe(true);
     expect(result.brokenAt).toBeUndefined();
+  });
+});
+
+// ─── Test 8 — 323-013: export-compatible keyed-HMAC chain algorithm ──
+//
+// Faithful regression. The writer historically computed its chain `hmac` with
+// UNKEYED sha256 (createHash), while audit-export.ts verifies with a KEYED
+// HMAC-SHA256 (createHmac, default secret 'deckent-audit') — incompatible
+// primitives, so a written record could not be verified under the export's
+// algorithm ("export-verify FAIL"). Pre-fix the toBe(expectedHmac) assertion
+// FAILS (stored value is unkeyed sha256); post-fix it passes.
+
+describe('writeAuditEvent — 323-013 export-compatible HMAC chain algorithm', () => {
+  beforeEach(() => {
+    _resetChainHead();
+  });
+
+  /** Rebuild the authenticated base exactly as the writer hashes it: strip only
+   *  the chain links (prevHmac/hmac); chainVersion stays in (it is authenticated). */
+  function authenticatedBase(p: AuditEventPayload): Record<string, unknown> {
+    const base: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(p)) {
+      if (k !== 'hmac' && k !== 'prevHmac') base[k] = v;
+    }
+    return base;
+  }
+
+  it('written hmac is keyed HMAC-SHA256 with the shared export secret, not unkeyed sha256', () => {
+    writeAuditEvent(tmpRoot, SPRINT_ID, { tenantId: 'acme', actor: 'u1', action: 'login' });
+
+    const { matched } = queryAudit(tmpRoot, SPRINT_ID, { channel: AUDIT_EVENT_CHANNEL });
+    const p = matched[0]!.payload as AuditEventPayload;
+
+    const data = p.prevHmac! + canonicalJson(authenticatedBase(p));
+    const expectedKeyed = createHmac('sha256', AUDIT_HMAC_SECRET).update(data).digest('hex');
+    const legacyUnkeyed = createHash('sha256').update(data).digest('hex');
+
+    // Same keyed-HMAC primitive + secret as audit-export → export-verifiable.
+    expect(p.hmac).toBe(expectedKeyed);
+    // Provably NOT the pre-fix unkeyed sha256 algorithm.
+    expect(p.hmac).not.toBe(legacyUnkeyed);
+    expect(p.chainVersion).toBe(2);
+  });
+
+  it('the writer-shared secret matches audit-export.ts default secret', () => {
+    // The two modules must default to the SAME secret for cross-module
+    // verifiability. This pins the literal that audit-export.ts hard-defaults to.
+    expect(AUDIT_HMAC_SECRET).toBe('deckent-audit');
+  });
+
+  it('an independent verifier recomputes a multi-event chain entirely from the keyed HMAC', () => {
+    writeAuditEvent(tmpRoot, SPRINT_ID, { tenantId: 'acme', actor: 'u1', action: 'login' });
+    writeAuditEvent(tmpRoot, SPRINT_ID, { tenantId: 'acme', actor: 'u1', action: 'read' });
+    writeAuditEvent(tmpRoot, SPRINT_ID, { tenantId: 'acme', actor: 'u1', action: 'logout' });
+
+    const { matched } = queryAudit(tmpRoot, SPRINT_ID, { channel: AUDIT_EVENT_CHANNEL });
+    const payloads = matched.map(e => e.payload as AuditEventPayload);
+
+    let prev = GENESIS_HMAC;
+    for (const p of payloads) {
+      expect(p.prevHmac).toBe(prev);
+      const data = p.prevHmac! + canonicalJson(authenticatedBase(p));
+      const recomputed = createHmac('sha256', AUDIT_HMAC_SECRET).update(data).digest('hex');
+      expect(p.hmac).toBe(recomputed);
+      prev = p.hmac!;
+    }
+  });
+});
+
+// ─── Test 9 — 323-013: versioned-chain backward-compat / migration ──
+//
+// Switching the live algorithm to keyed HMAC must NOT make pre-323-013 records
+// (unkeyed sha256, no chainVersion) unverifiable. verifyAuditChain selects the
+// algorithm per record from its `chainVersion` (absent → v1), so legacy streams
+// and streams that migrated v1→v2 mid-chain both verify, while tamper-evidence
+// is preserved on every version.
+
+describe('verifyAuditChain — 323-013 versioned-chain backward-compat', () => {
+  /** Hand-build a legacy v1 record: unkeyed sha256, NO chainVersion field. */
+  function legacyV1Event(base: Record<string, unknown>, prevHmac: string): AuditEventPayload {
+    const hmac = createHash('sha256').update(prevHmac + canonicalJson(base)).digest('hex');
+    return { ...base, prevHmac, hmac } as AuditEventPayload;
+  }
+
+  /** Hand-build a v2 record: keyed HMAC, chainVersion:2 authenticated. */
+  function v2Event(base: Record<string, unknown>, prevHmac: string): AuditEventPayload {
+    const withVer = { ...base, chainVersion: 2 };
+    const hmac = createHmac('sha256', AUDIT_HMAC_SECRET)
+      .update(prevHmac + canonicalJson(withVer))
+      .digest('hex');
+    return { ...withVer, prevHmac, hmac } as AuditEventPayload;
+  }
+
+  it('a legacy v1 (unkeyed sha256) record still verifies intact', () => {
+    const ev = legacyV1Event(
+      { tenantId: 'org', actor: 'old', action: 'legacy-act', timestamp: '2026-01-01T00:00:00.000Z' },
+      GENESIS_HMAC,
+    );
+    const result = verifyAuditChain([ev]);
+    expect(result.intact).toBe(true);
+    expect(result.brokenAt).toBeUndefined();
+  });
+
+  it('a stream that migrated v1 → v2 mid-chain verifies end-to-end', () => {
+    const e1 = legacyV1Event(
+      { tenantId: 'org', actor: 'old', action: 'a', timestamp: '2026-01-01T00:00:00.000Z' },
+      GENESIS_HMAC,
+    );
+    const e2 = v2Event(
+      { tenantId: 'org', actor: 'new', action: 'b', timestamp: '2026-01-02T00:00:00.000Z' },
+      e1.hmac!, // v2 record links to the legacy head
+    );
+    const e3 = v2Event(
+      { tenantId: 'org', actor: 'new', action: 'c', timestamp: '2026-01-03T00:00:00.000Z' },
+      e2.hmac!,
+    );
+
+    const result = verifyAuditChain([e1, e2, e3]);
+    expect(result.intact).toBe(true);
+    expect(result.brokenAt).toBeUndefined();
+  });
+
+  it('tampering a migrated v2 record still breaks the chain (tamper-evidence preserved)', () => {
+    const e1 = legacyV1Event(
+      { tenantId: 'org', actor: 'old', action: 'a', timestamp: '2026-01-01T00:00:00.000Z' },
+      GENESIS_HMAC,
+    );
+    const e2 = v2Event(
+      { tenantId: 'org', actor: 'new', action: 'b', timestamp: '2026-01-02T00:00:00.000Z' },
+      e1.hmac!,
+    );
+    const tampered = { ...e2, action: 'TAMPERED' } as AuditEventPayload;
+
+    const result = verifyAuditChain([e1, tampered]);
+    expect(result.intact).toBe(false);
+    expect(result.brokenAt).toBe(1);
+  });
+
+  it('relabeling a v2 record as chainVersion:1 fails (algorithm is bound to the authenticated version)', () => {
+    const ev = v2Event(
+      { tenantId: 'org', actor: 'u', action: 'a', timestamp: '2026-01-01T00:00:00.000Z' },
+      GENESIS_HMAC,
+    );
+    // Keep the v2 HMAC but flip the declared version → verify recomputes with the
+    // v1 (unkeyed) algorithm over a base that now says chainVersion:1 → mismatch.
+    const downgraded = { ...ev, chainVersion: 1 } as AuditEventPayload;
+
+    const result = verifyAuditChain([downgraded]);
+    expect(result.intact).toBe(false);
+    expect(result.brokenAt).toBe(0);
   });
 });

@@ -6,6 +6,11 @@
 // Design spec: docs/superpowers/specs/2026-04-20-deckent-nervous-system-design.md
 // ADR-040: proposed (Sprint 147 sonunda accept edilecek)
 
+// The canonical (V2) Nervous System config schema is the SINGLE source of truth and lives in
+// `core/config-types.ts`. `NervousSystemConfigV1` (below) is now a backward-compat runtime VIEW
+// derived from it. Type-only import → erased at compile time, so no runtime ESM cycle (ADR-001).
+import type { NervousSystemConfig } from './config-types.js';
+
 // ─── Authority Modes ─────────────────────────────────────────────────────────
 
 /**
@@ -156,38 +161,41 @@ export interface AuthorityMatrix {
 // ─── Nervous System Config ────────────────────────────────────────────────────
 
 /**
- * Nervous System'in **minimal runtime görünümü** (V1) — Decision Engine / Proposer /
- * Dispatcher gibi çalışma-zamanı bileşenlerinin operate ettiği dar config şekli.
+ * **Backward-compat runtime VIEW** of the canonical {@link NervousSystemConfig} (V2) — the narrow
+ * config shape Decision Engine / Proposer / Dispatcher / bootstrap operate on.
  *
- * @deprecated İsim çakışmasını gidermek için `NervousSystemConfigV1` olarak yeniden
- * adlandırıldı (Sprint 319, B-NERVOUSCONFIG-V1). **Kanonik tam config şeması**
- * `NervousSystemConfig` adıyla `core/config-types.ts`'te yaşar (V2: safety_floor +
- * notifications + detectors). Bu V1, runtime bileşenlerin beklediği dar görünüm olarak
- * korunuyor; tam V1→V2 migrasyonu gelecekte ayrı bir iş (riskli olduğu için bu sprint
- * kapsamı yalnız disambiguation-rename).
+ * ## V1→V2 migration (Sprint 323, task 323-010)
+ * There is now ONE source of truth for the nervous-system config: the full V2
+ * {@link NervousSystemConfig} in `core/config-types.ts` (safety_floor + notifications + detectors).
+ * This type is no longer an independent, divergent definition — it is **derived from V2** via
+ * indexed-access/`Pick`/`Partial`, so its shared fields (`mode`, `enabled`, `actionOverrides`,
+ * `approve_timeout_ms`, `worker_respawn`) can never drift from the canonical schema. At runtime
+ * `config.nervous_system` is always the V2 object; the runtime modules read this narrow view of it.
+ *
+ * Two fields below — `quietHours` and `throttleWindowMs` — are **legacy camelCase aliases** that do
+ * NOT exist on the V2 schema (V2 nests them as `notifications.quiet_hours` / `notifications.throttle_ms`).
+ * They are retained ONLY as optional view fields so the existing readers keep type-checking and
+ * behave byte-for-byte identically: against a real (V2 snake_case) config they resolve to `undefined`
+ * → the modules fall back to their built-in defaults, exactly as today. Re-pointing those reads at the
+ * nested V2 fields would change behavior and is intentionally OUT of this task's scope.
+ *
+ * @see NervousSystemConfig — the canonical V2 schema (single source of truth).
+ * @deprecated Prefer the canonical {@link NervousSystemConfig}. This view is kept for the runtime
+ * modules that consume the narrow shape; new code should read the full V2 config directly.
  */
-export interface NervousSystemConfigV1 {
-  /** Aktif yetki modu (default: 'balanced') */
-  readonly mode: AuthorityMode;
-  /** Eylem bazlı override'lar — mode preset'inin üstüne eklenir */
-  readonly actionOverrides?: Readonly<Record<string, ApprovalPolicy>>;
-  /** Quiet hours: {start: "23:00", end: "07:00"} formatında */
-  readonly quietHours?: Readonly<{ start: string; end: string }>;
-  /** Throttle window (ms) — aynı groupKey notification'lar bu sürede tekrar üretilmez */
-  readonly throttleWindowMs?: number;
-  /** Safety-floor olmayan 'approve' eylemin onaylanmazsa AUTO-PROCEED edeceği
-   *  hard timeout (ms, default 10000). 0 (veya negatif) → auto-proceed KAPALI:
-   *  eylem siz accept/reject edene dek pending kalır (safety-floor zaten asla
-   *  auto-proceed etmez). */
-  readonly approve_timeout_ms?: number;
-  /** N3 (default false): opt-in cooperative worker respawn. When true (sprint
-   *  context), WORKER_RESPAWN writes a durable respawn-REQUEST the sprint-controller
-   *  drains + actions through its own lifecycle (no race). False → WORKER_RESPAWN
-   *  proposes to Brain (the safe default). */
-  readonly worker_respawn?: boolean;
-  /** Nervous system etkin mi (default: false, Sprint 147 sonunda true) */
-  readonly enabled: boolean;
-}
+export type NervousSystemConfigV1 =
+  // Shared fields — derived from the V2 SSOT so they can never diverge from the canonical schema.
+  & Readonly<Pick<NervousSystemConfig, 'mode' | 'enabled'>>
+  & Readonly<Partial<Pick<NervousSystemConfig, 'actionOverrides' | 'approve_timeout_ms' | 'worker_respawn'>>>
+  // Legacy camelCase runtime-view aliases — absent from V2; retained for behavior-preserving reads.
+  & {
+      /** Quiet hours: {start: "23:00", end: "07:00"}. Legacy alias — V2 nests this as
+       *  `notifications.quiet_hours`; absent on a real V2 config (→ undefined → no delay). */
+      readonly quietHours?: Readonly<{ start: string; end: string }>;
+      /** Throttle window (ms) — same-groupKey notifications suppressed within it. Legacy alias —
+       *  V2 nests this as `notifications.throttle_ms`; absent on a real V2 config (→ 5min default). */
+      readonly throttleWindowMs?: number;
+    };
 
 // ─── Detector Result ──────────────────────────────────────────────────────────
 

@@ -132,7 +132,20 @@ export function buildDependencyGraph(
   for (const task of tasks) {
     const deps = new Set<string>();
     for (const dep of task.dependencies ?? []) {
-      if (taskIds.has(dep)) deps.add(dep);
+      if (taskIds.has(dep)) {
+        deps.add(dep);
+      } else {
+        // 323-031: a dependency ref that matches no sprint task id is dropped
+        // here — but NEVER silently. Most often this is an AI-planner title
+        // string that was never normalized to a slot id (see
+        // planner.normalizePlannerDependencies). Surface it so the operator can
+        // see the dependency-pipeline gap instead of a wave silently collapsing.
+        debugLog(
+          'dependency-scheduler:buildGraph',
+          `Task ${task.id}: dependency "${dep}" matches no sprint task id — dropped ` +
+          `(unresolvable; planner may have emitted a title instead of a NNN-NNN id)`,
+        );
+      }
     }
     dependencies.set(task.id, deps);
     if (!dependents.has(task.id)) dependents.set(task.id, new Set());

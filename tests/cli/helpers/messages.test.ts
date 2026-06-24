@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getMessage, getLanguage } from '../../../src/cli/helpers/messages.js';
 
 // All keys defined in messages.ts
@@ -560,5 +560,58 @@ describe('Edge cases', () => {
   it('getLanguage accepts config with trailing chars beyond 2 (e.g. tr_TR)', () => {
     // It slices to 2 chars: 'tr_TR'.slice(0,2) → 'tr'
     expect(getLanguage('tr_TR')).toBe('tr');
+  });
+});
+
+// ─── dev-mode warn for missing keys ──────────────────────────────────────────
+
+describe('getMessage dev-mode warn for missing keys', () => {
+  const origNodeEnv = process.env['NODE_ENV'];
+  let stderrSpy: ReturnType<typeof vi.spyOn<NodeJS.WriteStream, 'write'>>;
+
+  afterEach(() => {
+    stderrSpy?.mockRestore();
+    if (origNodeEnv === undefined) delete process.env['NODE_ENV'];
+    else process.env['NODE_ENV'] = origNodeEnv;
+  });
+
+  it('emits warn to stderr in dev mode (NODE_ENV unset) when key is missing', () => {
+    delete process.env['NODE_ENV'];
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const result = getMessage('totally.unknown.key', 'en');
+    expect(result).toBe('totally.unknown.key');
+    expect(stderrSpy).toHaveBeenCalledOnce();
+    const written = String(stderrSpy.mock.calls[0]![0]);
+    expect(written).toContain('totally.unknown.key');
+    expect(written).toContain('en');
+  });
+
+  it('includes lang in the dev-mode warn message', () => {
+    delete process.env['NODE_ENV'];
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    getMessage('missing.key', 'tr');
+    expect(stderrSpy).toHaveBeenCalledOnce();
+    expect(String(stderrSpy.mock.calls[0]![0])).toContain('tr');
+  });
+
+  it('does NOT emit warn in production mode (NODE_ENV=production)', () => {
+    process.env['NODE_ENV'] = 'production';
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const result = getMessage('totally.unknown.key', 'en');
+    expect(result).toBe('totally.unknown.key');
+    expect(stderrSpy).not.toHaveBeenCalled();
+  });
+
+  it('does NOT emit warn when key exists (even in dev mode)', () => {
+    delete process.env['NODE_ENV'];
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    getMessage('hint.COMPLETE', 'en');
+    expect(stderrSpy).not.toHaveBeenCalled();
+  });
+
+  it('still returns the key string as fallback after emitting warn', () => {
+    delete process.env['NODE_ENV'];
+    stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    expect(getMessage('no.such.key', 'tr')).toBe('no.such.key');
   });
 });

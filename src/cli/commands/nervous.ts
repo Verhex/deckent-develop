@@ -373,7 +373,7 @@ async function handleReject(root: string, id: string, lang: string, reason?: str
 
 // ─── Edit Action ────────────────────────────────────────────────────────────
 
-function handleEdit(root: string, id: string, lang: string): void {
+async function handleEdit(root: string, id: string, lang: string): Promise<void> {
   const pending = readPendingNotifications(root);
   const idx = pending.findIndex(n => n.id === id || n.id.startsWith(id) || n.shortCode === id.toLowerCase());
 
@@ -383,8 +383,25 @@ function handleEdit(root: string, id: string, lang: string): void {
     return;
   }
 
-  // Edit is essentially accept with modified payload
   const notification = pending[idx]!;
+  const action = notification.actions[0]?.id ?? notification.id;
+
+  // APPROVE-007 (§4G): when a nervous executor is live, route the edit through
+  // the IPC queue — the executor owns pending + history (single writer; no
+  // two-writer race). modifiedPayload carries { modified: true } so the executor
+  // can distinguish a plain accept from an edited accept. The CLI must NOT write
+  // pending/history directly in this path.
+  if (isNervousPollerAlive(root)) {
+    await new NervousIpcQueue(root).writeApproval({
+      notificationId: notification.id,
+      decision: 'accepted',
+      modifiedPayload: { modified: true },
+    });
+    print(colorize('  ' + getMessage('nervous.sent_to_executor', lang, { action }), CYAN));
+    return;
+  }
+
+  // Fallback: no live executor — write directly (no race risk, single writer).
   const record: ExecutionRecord = {
     ...generateRecordForDecision(notification, 'accepted'),
     payload: { modified: true },
@@ -395,7 +412,7 @@ function handleEdit(root: string, id: string, lang: string): void {
   writePendingNotifications(root, pending);
 
   print(colorize('  ' + getMessage('nervous.edited', lang, {
-    action: notification.actions[0]?.id ?? notification.id,
+    action,
   }), CYAN));
 }
 
@@ -731,9 +748,9 @@ export function registerNervous(program: Command): void {
     .command('edit <id>')
     .description('Modify and accept a pending suggestion')
     .option('--lang <code>', 'Language override (en|tr)')
-    .action((id: string, _opts: unknown, cmd: Command) => {
+    .action(async (id: string, _opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
-      handleEdit(root, id, langOf(cmd));
+      await handleEdit(root, id, langOf(cmd));
     });
 
   // deckent nervous undo <action-id>

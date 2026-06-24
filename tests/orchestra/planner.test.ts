@@ -18,6 +18,7 @@ import {
   buildPlannerSpawnArgs,
   buildZeroConfigPlanPrompt,
   resolveAdapter,
+  normalizePlannerDependencies,
 } from '../../src/orchestra/planner.js';
 import { providerRegistry } from '../../src/core/provider.js';
 import { BRAIN_PLAN_TIMEOUT_MS } from '../../src/core/constants.js';
@@ -809,5 +810,111 @@ describe('buildZeroConfigPlanPrompt i18n', () => {
     const prompt = buildZeroConfigPlanPrompt('Add dark mode', 'my-app', [], 'en');
     expect(prompt).toContain('Add dark mode');
     expect(prompt).toContain('my-app');
+  });
+});
+
+// ═══ normalizePlannerDependencies (323-031) ══════════════════════════
+
+describe('normalizePlannerDependencies', () => {
+  // Sibling tasks as the AI planner would produce them once createTask has
+  // assigned real NNN-NNN ids. AI emits deps by TITLE; this pass rewrites them.
+  function siblings(): Array<{ id: string; title: string; dependencies?: string[] }> {
+    return [
+      { id: '323-005', title: 'Setup database schema', dependencies: [] },
+      { id: '323-007', title: 'Build REST API', dependencies: [] },
+      { id: '323-010', title: 'Login page UI', dependencies: [] },
+    ];
+  }
+
+  it('resolves a title-string dependency to the sibling task id (faithful — pre-fix RED)', () => {
+    // Pre-fix: the title would survive (or be silently dropped by buildDependencyGraph).
+    // Post-fix: it normalizes to the concrete id.
+    const tasks = siblings();
+    tasks[2]!.dependencies = ['Build REST API']; // Login UI depends on the API (by title)
+
+    const result = normalizePlannerDependencies(tasks);
+
+    expect(tasks[2]!.dependencies).toEqual(['323-007']);
+    expect(result.resolvedCount).toBe(1);
+    expect(result.dropped).toEqual([]);
+  });
+
+  it('resolves multiple deps mixing title and slot-id refs', () => {
+    const tasks = siblings();
+    tasks[2]!.dependencies = ['Setup database schema', '323-007'];
+
+    const result = normalizePlannerDependencies(tasks);
+
+    expect(tasks[2]!.dependencies).toEqual(['323-005', '323-007']);
+    expect(result.resolvedCount).toBe(2);
+    expect(result.dropped).toEqual([]);
+  });
+
+  it('preserves already-correct slot-id dependencies (behaviour-preserving)', () => {
+    const tasks = siblings();
+    tasks[1]!.dependencies = ['323-005'];
+
+    const result = normalizePlannerDependencies(tasks);
+
+    expect(tasks[1]!.dependencies).toEqual(['323-005']);
+    expect(result.dropped).toEqual([]);
+  });
+
+  it('de-duplicates repeated refs that resolve to the same id', () => {
+    const tasks = siblings();
+    tasks[2]!.dependencies = ['Setup database schema', 'Setup database schema', '323-005'];
+
+    normalizePlannerDependencies(tasks);
+
+    expect(tasks[2]!.dependencies).toEqual(['323-005']);
+  });
+
+  it('drops a self-reference without reporting it as unresolvable', () => {
+    const tasks = siblings();
+    tasks[0]!.dependencies = ['Setup database schema']; // names itself by title
+
+    const result = normalizePlannerDependencies(tasks);
+
+    expect(tasks[0]!.dependencies).toEqual([]);
+    expect(result.dropped).toEqual([]);
+  });
+
+  it('drops an unresolvable title dep and reports it (never silent)', () => {
+    const tasks = siblings();
+    tasks[1]!.dependencies = ['Nonexistent task'];
+
+    const result = normalizePlannerDependencies(tasks);
+
+    expect(tasks[1]!.dependencies).toEqual([]);
+    expect(result.resolvedCount).toBe(0);
+    expect(result.dropped).toEqual([
+      { taskId: '323-007', ref: 'Nonexistent task', looksLikePlanSlotId: false },
+    ]);
+  });
+
+  it('flags an id-shaped unresolvable ref distinctly from a title typo', () => {
+    const tasks = siblings();
+    tasks[1]!.dependencies = ['999-999']; // id-shaped but no such task
+
+    const result = normalizePlannerDependencies(tasks);
+
+    expect(tasks[1]!.dependencies).toEqual([]);
+    expect(result.dropped).toEqual([
+      { taskId: '323-007', ref: '999-999', looksLikePlanSlotId: true },
+    ]);
+  });
+
+  it('leaves tasks with empty / undefined dependencies untouched', () => {
+    const tasks: Array<{ id: string; title: string; dependencies?: string[] }> = [
+      { id: '323-005', title: 'A', dependencies: [] },
+      { id: '323-007', title: 'B' }, // undefined dependencies
+    ];
+
+    const result = normalizePlannerDependencies(tasks);
+
+    expect(tasks[0]!.dependencies).toEqual([]);
+    expect(tasks[1]!.dependencies).toBeUndefined();
+    expect(result.resolvedCount).toBe(0);
+    expect(result.dropped).toEqual([]);
   });
 });

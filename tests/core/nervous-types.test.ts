@@ -16,6 +16,7 @@ import type {
   NervousSystemConfigV1,
   DetectorResult,
 } from '../../src/core/nervous-types.js';
+import type { NervousSystemConfig } from '../../src/core/config-types.js';
 
 // ─── Test 1: AuthorityMode union compile eder ────────────────────────────────
 
@@ -166,6 +167,24 @@ describe('NervousNotification', () => {
     expect(config.enabled).toBe(false);
     expect(config.throttleWindowMs).toBe(60000);
     expect(config.actionOverrides).toBeUndefined();
+  });
+
+  it('NervousSystemConfigV1 derives its shared fields from the V2 NervousSystemConfig (single source)', () => {
+    // Sprint 323 (323-010) V1→V2 migration: the V1 view is no longer an independent schema — its
+    // shared fields are Picked from the canonical V2 NervousSystemConfig. These compile-time checks
+    // pin that derivation: V2 field types must be assignable to the V1 view field types.
+    const mode: NervousSystemConfig['mode'] = 'autopilot';
+    const enabled: NervousSystemConfig['enabled'] = true;
+    const overrides: NervousSystemConfig['actionOverrides'] = { COMMIT_PUSH: 'approve' };
+    const view: NervousSystemConfigV1 = {
+      mode,                       // NervousSystemConfig['mode'] → NervousSystemConfigV1['mode']
+      enabled,                    // NervousSystemConfig['enabled'] → NervousSystemConfigV1['enabled']
+      actionOverrides: overrides, // NervousSystemConfig['actionOverrides'] → optional on the view
+    };
+
+    expect(view.mode).toBe('autopilot');
+    expect(view.enabled).toBe(true);
+    expect(view.actionOverrides?.['COMMIT_PUSH']).toBe('approve');
   });
 
   it('DetectorResult shape is valid', () => {

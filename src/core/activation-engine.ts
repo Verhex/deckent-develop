@@ -9,14 +9,48 @@ import { evaluateCondition } from './condition-evaluator.js';
 // ─── Main API ───────────────────────────────────────────────────────────────
 
 /**
+ * Optional skill→agent affinity context for {@link evaluateActivation} (ADR-075,
+ * wired Sprint 323-016).
+ *
+ * `evaluateActivation` runs once per agent inside `selectBestAgent`
+ * (routing-engine.ts), and its returned `score` feeds that function's
+ * `finalScore`. Passing this context is the single integration point through
+ * which the previously-dormant skill→agent affinity signal reaches live agent
+ * scoring — without it, the bonus is never applied (the pre-323-016 state).
+ *
+ * The signal is **flag-gated** (`enabled`) and **default-off**: when this
+ * argument is omitted, or `enabled` is false, `evaluateActivation` behaves
+ * identically to the pre-ADR-075 path (score is byte-for-byte unchanged).
+ * Routing precision is sensitive, so the caller opts in explicitly.
+ */
+export interface SkillAffinityContext {
+  /** The agent being scored (evaluateActivation is invoked per-agent). */
+  readonly agentId: string;
+  /** Skill ids the routing engine plans to assign (or has assigned) to the task. */
+  readonly assignedSkills: readonly string[] | undefined;
+  /** Flag-gate (ADR-075). Default-off: affinity is applied only when this is true. */
+  readonly enabled: boolean;
+}
+
+/**
  * Evaluate an agent/skill's activation config against a task's DNA.
  * Returns score, exclusion status, and matched rule names.
+ *
+ * @param affinity Optional, flag-gated skill→agent affinity context (ADR-075).
+ *   When `affinity.enabled` is true and one of `affinity.assignedSkills` maps to
+ *   `affinity.agentId` via {@link SKILL_AGENT_MAP}, the score is increased by
+ *   {@link SKILL_AGENT_AFFINITY_BONUS}. Omitted / disabled by default →
+ *   behavior is unchanged. Affinity never resurrects an excluded agent: the
+ *   exclusion early-return below returns score 0 before any affinity is added.
  */
 export function evaluateActivation(
   taskDNA: TaskDNA,
   config: ActivationConfig,
+  affinity?: SkillAffinityContext,
 ): ActivationResult {
-  // Check exclusions first — if excluded, skip scoring entirely
+  // Check exclusions first — if excluded, skip scoring entirely.
+  // (Affinity is intentionally NOT applied here: an excluded agent stays at 0;
+  //  the additive affinity bonus must never override an exclusion.)
   for (const exclusion of config.exclude) {
     if (evaluateExclusion(taskDNA, exclusion)) {
       return {
@@ -45,6 +79,20 @@ export function evaluateActivation(
         totalScore += secondaryScore;
         matchedRules.push(`${rule.name ?? `rule`}(via-secondary)`);
       }
+    }
+  }
+
+  // ── Skill→Agent affinity (ADR-075, wired Sprint 323-016) ──────────────────
+  // Flag-gated, default-off. When the caller (selectBestAgent) supplies an
+  // affinity context with enabled=true, the agent receives
+  // SKILL_AGENT_AFFINITY_BONUS if one of the task's assigned skills maps to it
+  // via SKILL_AGENT_MAP. Purely additive — refactorer/generalist agents are
+  // never penalized, preserving the "refactorer-still-eligible" guard.
+  if (affinity?.enabled) {
+    const affinityBonus = getSkillAgentAffinityBonus(affinity.agentId, affinity.assignedSkills);
+    if (affinityBonus > 0) {
+      totalScore += affinityBonus;
+      matchedRules.push(`skill-affinity:${affinity.agentId}(+${affinityBonus})`);
     }
   }
 
@@ -333,6 +381,12 @@ export function getDynamicExclusions(
 //
 // The mapping mirrors the natural skill↔agent specialization pairs in the
 // built-in pool (DECKENT.md "Built-in Agents 15" / "Built-in Skills 21").
+//
+// Wire-up (Sprint 323-016): getSkillAgentAffinityBonus is consumed by
+// evaluateActivation (above) via the flag-gated SkillAffinityContext param —
+// the function selectBestAgent (routing-engine.ts) already calls per-agent.
+// Default-off; selectBestAgent opts in by passing { agentId, assignedSkills,
+// enabled } so the bonus joins result.score → finalScore.
 
 /** Score added to an agent when at least one of the task's assigned skills
  *  maps to that agent in SKILL_AGENT_MAP. Equal to DOMAIN_MATCH_BONUS in

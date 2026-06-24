@@ -246,17 +246,21 @@ function emitSprintEvent(
   payload: Record<string, unknown>,
 ): void {
   try {
-    eventBus.emit('deckent-event', {
+    const data = {
       type,
       ...payload,
       timestamp: new Date().toISOString(),
-    });
+    };
+    eventBus.emit('deckent-event', data);
+    // NervousObserver.subscribeEventBus() listens for 'event' (not 'deckent-event').
+    // Bridge: forward so onEventBusEvent receives sprint phase-change events.
+    eventBus.emit('event', data);
   } catch {
     // Never let event emission break sprint flow
   }
 }
 
-function emitPhaseChange(oldPhase: string, newPhase: string, sprintId: string): void {
+export function emitPhaseChange(oldPhase: string, newPhase: string, sprintId: string): void {
   emitSprintEvent('SPRINT_PHASE_CHANGE', { oldPhase, newPhase, sprintId });
 }
 

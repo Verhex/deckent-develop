@@ -582,8 +582,13 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       if (arg.length === 0) {
         replyText = getMessage('tui.switch_usage', lang);
       } else {
-        opts.switchProvider?.(arg);
-        replyText = `${getMessage('tui.switched', lang)}: ${arg}`;
+        try {
+          opts.switchProvider?.(arg);
+          replyText = `${getMessage('tui.switched', lang)}: ${arg}`;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          replyText = getMessage('chat.provider_error', lang, { message: msg });
+        }
       }
       output(replyText);
       continue;
@@ -1018,4 +1023,89 @@ export function createSubscriptionChatAdapter(
       yield { done: { text: collected, stopReason: 'end_turn' } };
     },
   };
+}
+
+// ─── Switchable Provider (AS2-P2) ───────────────────────────────────
+//
+// Factory that builds a stable proxy ChatProviderAdapter around a mutable
+// internal adapter reference. Pass the returned `provider` and `switchProvider`
+// directly to runChatNativeLoop. When /provider <name> is typed, the loop
+// calls `switchProvider` → the proxy's `current` ref is replaced → the next
+// turn transparently uses the new adapter without restarting the loop.
+//
+// Mirrors the proxy pattern in src/cli/repl/provider-switch.ts (Ink REPL path).
+// This version is tailored for runChatNativeLoop callers that use the
+// subscription (CLI-spawn) adapter model.
+
+/** Options accepted by createSwitchableProvider. */
+export interface SwitchableProviderOptions {
+  /** Initial provider name (omit → registry default). */
+  initialProviderName?: string;
+  /** Registry override — omit for the global providerRegistry singleton. */
+  registry?: ProviderRegistry;
+  /** Binary override (default: 'claude'). */
+  binary?: string;
+  /** Spawn function injection — for tests. */
+  spawnFn?: SubscriptionSpawnFn;
+  /** Extra args override (default: ['--print']). */
+  extraArgs?: readonly string[];
+}
+
+/** Return shape of createSwitchableProvider. */
+export interface SwitchableProviderHandle {
+  /** Stable proxy — pass as ChatNativeOptions.provider. */
+  provider: ChatProviderAdapter;
+  /** Rebuild callback — pass as ChatNativeOptions.switchProvider. */
+  switchProvider: (providerName: string) => void;
+}
+
+/**
+ * Build a switchable subscription provider for use with runChatNativeLoop.
+ *
+ * Returns a stable proxy ChatProviderAdapter and a switchProvider callback.
+ * Wire both into ChatNativeOptions so the loop handles `/provider <name>` by
+ * calling switchProvider → the proxy's current adapter is replaced → subsequent
+ * turns use the new provider without restarting the session.
+ *
+ * Example:
+ *   const { provider, switchProvider } = createSwitchableProvider({ registry });
+ *   await runChatNativeLoop({ provider, switchProvider, ... });
+ */
+export function createSwitchableProvider(
+  opts: SwitchableProviderOptions = {},
+): SwitchableProviderHandle {
+  let current: ChatProviderAdapter = createSubscriptionChatAdapter({
+    providerName: opts.initialProviderName,
+    registry: opts.registry,
+    binary: opts.binary,
+    spawnFn: opts.spawnFn,
+    extraArgs: opts.extraArgs,
+  });
+
+  // Stable proxy — delegates to the mutable `current` via closure.
+  // `stream` is always defined: delegates to current.stream when available
+  // (subscription adapters always have it), else wraps current.send() as a
+  // single-chunk stream so non-streaming providers still work through the proxy.
+  const provider: ChatProviderAdapter = {
+    send: (messages) => current.send(messages),
+    stream: (messages) => {
+      if (current.stream) return current.stream(messages);
+      return (async function* () {
+        const r = await current.send(messages);
+        yield { text: r.text ?? '', done: r };
+      })();
+    },
+  };
+
+  function switchProvider(providerName: string): void {
+    current = createSubscriptionChatAdapter({
+      providerName,
+      registry: opts.registry,
+      binary: opts.binary,
+      spawnFn: opts.spawnFn,
+      extraArgs: opts.extraArgs,
+    });
+  }
+
+  return { provider, switchProvider };
 }

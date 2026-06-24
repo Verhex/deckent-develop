@@ -3,7 +3,7 @@
 // MVP: reads checkpoint, respawns pending tasks, skips completed ones.
 // Sprint 140+ will add mid-worker resume and heartbeat daemon integration.
 
-import { existsSync, readdirSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 
@@ -15,7 +15,7 @@ import {
 } from '../../orchestra/sprint-checkpoint.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
-import { DECKENT_DIR, TASKS_DIR } from '../../core/constants.js';
+import { DECKENT_DIR, SPRINT_STATE_FILE, TASKS_DIR } from '../../core/constants.js';
 
 // ─── Register ───────────────────────────────────────────────────────
 
@@ -164,6 +164,37 @@ export function registerResume(program: Command): void {
       }
 
       print(`\nSpawning ${resumableCount} pending tasks...\n`);
+
+      // ─── Write sprint-state.json so runSprint skips completed tasks ───
+      // runSprint has an internal state-recovery path: if sprint-state.json
+      // exists with a sprintId, it calls restoreSprintFromCheckpoint, rebuilds
+      // the sprint from checkpoint (completed tasks have status=DONE on disk),
+      // and takes action 'resume-evaluate' — jumping to EVALUATE phase and
+      // skipping PLAN/SPAWN/EXECUTE. Without this write, runSprint starts
+      // fresh from DIRECTIVES, re-plans and re-runs all tasks including done ones.
+      const allTaskIds = [
+        ...checkpoint.completedTasks,
+        ...checkpoint.pendingTasks,
+        ...checkpoint.activeWorkers.map(w => w.taskId),
+      ];
+      try {
+        mkdirSync(join(projectRoot, DECKENT_DIR), { recursive: true });
+        writeFileSync(
+          join(projectRoot, SPRINT_STATE_FILE),
+          JSON.stringify({
+            sprintId: checkpoint.sprintId,
+            phase: checkpoint.brainPhase,
+            status: 'ACTIVE',
+            startedAt: checkpoint.timestamp,
+            updatedAt: new Date().toISOString(),
+            taskIds: allTaskIds,
+          }, null, 2),
+          'utf-8',
+        );
+      } catch (e) {
+        // Fail-soft: state recovery is best-effort; runSprint will still run
+        printError(`Warning: Failed to write sprint state for resume: ${e instanceof Error ? e.message : String(e)}`);
+      }
 
       try {
         await runSprint(projectRoot, config, {

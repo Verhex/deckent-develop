@@ -702,7 +702,16 @@ export interface NervousDetectorConfig {
   reserve_for?: string;
 }
 
-/** Full Nervous System configuration schema */
+/**
+ * Full Nervous System configuration schema (V2) — the **single source of truth** for the
+ * `nervous_system` block, referenced by both {@link DeckentConfig} and {@link ResolvedConfig}.
+ *
+ * The narrow camelCase runtime view consumed by the nervous modules
+ * (`NervousSystemConfigV1` in `core/nervous-types.ts`) is **derived from this type** as a documented
+ * backward-compat shim — it does not redefine the schema, so the two can never drift (Sprint 323
+ * V1→V2 migration). Runtime validation mirroring this interface lives in `core/config.ts`
+ * (`NERVOUS_SYSTEM_SCHEMA`).
+ */
 export interface NervousSystemConfig {
   /** Enable nervous system (default: false — Sprint 148 will set true) */
   enabled: boolean;

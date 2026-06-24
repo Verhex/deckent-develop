@@ -13,14 +13,18 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import type { Command } from 'commander';
 
-import { runChatNativeLoop, createSubscriptionChatAdapter, type ChatProviderAdapter, type McpToolDispatcher } from './chat-native.js';
+import { runChatNativeLoop, createSubscriptionChatAdapter, type ChatProviderAdapter } from './chat-native.js';
+import { createCliToolDispatcher } from './chat-tool-bridge.js';
+import { resolveChatAdapter } from './chat-provider-parity.js';
 import { ClaudeAdapter, type ProviderDetectResult } from '../../providers/claude.js';
 import { CodexAdapter } from '../../providers/codex.js';
 import { GeminiAdapter } from '../../providers/gemini.js';
+import { OllamaAdapter } from '../../providers/ollama.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import type { ChatTurn } from '../../core/memory-types.js';
 import { print, printError } from '../helpers/output.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { ensureMcpAttached, type McpHost } from '../helpers/mcp-attach.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 
@@ -266,6 +270,40 @@ export function selectProvider(probes: ProviderProbe[]): ProviderProbe | null {
   return null;
 }
 
+// ─── Local Provider Detection (--local / Ollama) ────────────────────
+
+/** Resolved local-runtime readiness for `deckent chat --local`. */
+export interface LocalProviderStatus {
+  /** True only when the server is reachable AND ≥1 model is installed. */
+  ready: boolean;
+  /** Resolved endpoint (post env-override) — surfaced in honest-fail hints. */
+  host: string;
+  /** Human-readable reason (server unreachable / no models / N models ready). */
+  reason: string;
+  /** Locally installed model tags from `/api/tags`. */
+  models: string[];
+}
+
+/**
+ * Probe the local LLM runtime (Ollama) so `deckent chat --local` can wire onto
+ * it — or honest-fail when nothing is reachable. NEVER throws (delegates to the
+ * adapter's never-throwing {@link OllamaAdapter.detect}); `ready` is true only
+ * for a fully usable server (reachable + at least one model pulled). A reachable
+ * server with zero models reports `ready: false` with an actionable reason so we
+ * never silently launch a session that cannot generate a single token.
+ *
+ * Exposed for tests — production calls it inside the chat action.
+ */
+export async function detectLocalProvider(projectRoot: string): Promise<LocalProviderStatus> {
+  const detect = await new OllamaAdapter(projectRoot).detect();
+  return {
+    ready: detect.ready === true,
+    host: detect.endpoint,
+    reason: detect.reason,
+    models: detect.models,
+  };
+}
+
 // ─── Chat Resume (Sprint 190 T-190-006) ─────────────────────────────
 
 /**
@@ -398,34 +436,53 @@ export function registerChat(program: Command): void {
         print(renderChatResume(opts.resume, turns));
       }
 
-      if (opts.local) {
-        printError(new Error(
-          'Local mode (--local) is not yet wired. Track Sprint 190 T-190-009 (Ollama provider).',
-        ));
-        process.exitCode = 1;
-        return;
-      }
+      const lang = getLanguage();
 
-      const isNativeMode = opts.native === true || opts.message !== undefined;
+      // `--local` runs the native tool-use loop against an on-device LLM
+      // (Ollama) instead of a host AI CLI. It shares the native code path —
+      // only the provider differs — so it inherits the real tool dispatcher,
+      // single-turn (`--once`/`--message`) and REPL modes for free.
+      const isLocalMode = opts.local === true;
+      const isNativeMode = opts.native === true || opts.message !== undefined || isLocalMode;
       if (isNativeMode) {
         const isOnce = opts.once === true || opts.message !== undefined;
 
         let nativeProvider: ChatProviderAdapter;
-        try {
-          nativeProvider = createSubscriptionChatAdapter();
-        } catch {
-          nativeProvider = {
-            async send(_msgs) {
-              return { text: '[native] provider not yet connected to a real LLM', stopReason: 'end_turn' as const };
-            },
-          };
+        if (isLocalMode) {
+          // Honest-fail when no local runtime is reachable — NEVER silently
+          // fall back to a cloud provider (the whole point of --local is to
+          // stay on-device). A reachable-but-model-less server fails here too,
+          // with the adapter's actionable `ollama pull <model>` reason.
+          const local = await detectLocalProvider(projectRoot);
+          if (!local.ready) {
+            printError(new Error(getMessage('chat.local_unavailable', lang, {
+              host: local.host,
+              reason: local.reason,
+            })));
+            process.exitCode = 1;
+            return;
+          }
+          const model = process.env['DECKENT_OLLAMA_MODEL'] ?? local.models[0] ?? 'llama3';
+          nativeProvider = resolveChatAdapter('ollama', { ollamaHost: local.host, ollamaModel: model });
+          print(getMessage('chat.local_launching', lang, { host: local.host, model }));
+        } else {
+          try {
+            nativeProvider = createSubscriptionChatAdapter();
+          } catch {
+            nativeProvider = {
+              async send(_msgs) {
+                return { text: getMessage('chat.native_provider_disconnected', lang), stopReason: 'end_turn' as const };
+              },
+            };
+          }
         }
 
-        const stubDispatcher: McpToolDispatcher = {
-          async dispatch(name, _args) {
-            return `[native] tool "${name}" not yet wired`;
-          },
-        };
+        // Real in-process MCP tool dispatcher — maps deckent_* tool calls to
+        // `dist/cli/entry.js <subcommand>` spawns (the same bridge the Ink REPL
+        // uses). Replaces the prior placeholder stub that returned
+        // "tool … not yet wired" for every call. NEVER throws: unknown/blocked
+        // tools and spawn failures come back as `[mcp-error] …` turn text.
+        const dispatcher = createCliToolDispatcher();
 
         if (isOnce) {
           async function* singleTurnInput(): AsyncGenerator<string> {
@@ -442,17 +499,18 @@ export function registerChat(program: Command): void {
           }
           await runChatNativeLoop({
             provider: nativeProvider,
-            dispatcher: stubDispatcher,
+            dispatcher,
             input: singleTurnInput(),
             output: print,
             maxTurns: 1,
             gracefulErrors: true,
+            lang,
           });
           return;
         }
 
         // Interactive REPL mode
-        print('Deckent native chat. Type :exit to quit.');
+        print(getMessage('chat.native_repl_banner', lang));
         async function* readStdin(): AsyncGenerator<string> {
           const rl = createInterface({ input: process.stdin });
           try {
@@ -463,9 +521,10 @@ export function registerChat(program: Command): void {
         }
         await runChatNativeLoop({
           provider: nativeProvider,
-          dispatcher: stubDispatcher,
+          dispatcher,
           input: readStdin(),
           output: print,
+          lang,
         });
         return;
       }

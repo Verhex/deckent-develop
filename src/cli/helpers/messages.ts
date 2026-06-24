@@ -827,6 +827,27 @@ const MESSAGES: MessageMap = {
     tr: 'DIRECTIVES.md bulunamadı: {root}.',
   },
 
+  // ─── chat --native / --local wiring (Sprint 323 — 323-015) ───────────
+  // NOTE: native_repl_banner + native_provider_disconnected en templates are
+  // byte-identical to the prior hardcoded strings — existing substring
+  // assertions (chat-native-flags "provider not yet connected") stay green.
+  'chat.native_repl_banner': {
+    en: 'Deckent native chat. Type :exit to quit.',
+    tr: 'Deckent yerel sohbet. Çıkmak için :exit yazın.',
+  },
+  'chat.native_provider_disconnected': {
+    en: '[native] provider not yet connected to a real LLM',
+    tr: '[native] sağlayıcı henüz gerçek bir LLM\'e bağlı değil',
+  },
+  'chat.local_unavailable': {
+    en: 'Local LLM runtime not reachable at {host}: {reason}\n  • Install Ollama: https://ollama.com/download\n  • Start it: `ollama serve`\n  • Pull a model: `ollama pull llama3`\n  • Or point at a remote host: DECKENT_OLLAMA_HOST=<url>',
+    tr: 'Yerel LLM çalışma-zamanı erişilemez ({host}): {reason}\n  • Ollama kur: https://ollama.com/download\n  • Başlat: `ollama serve`\n  • Model indir: `ollama pull llama3`\n  • Veya uzak host göster: DECKENT_OLLAMA_HOST=<url>',
+  },
+  'chat.local_launching': {
+    en: 'Deckent local chat → {host} ({model})',
+    tr: 'Deckent yerel sohbet → {host} ({model})',
+  },
+
   // ─── autonomous command (Sprint 228 — 228-001 i18n retrofit) ─────────
   'autonomous.disabled': {
     en: 'Autonomous mode is disabled. Run `deckent autonomous enable` (or set config.autonomous.enabled=true in .deckent/config.json) to run the engine.',
@@ -1837,7 +1858,12 @@ export function getMessage(
   vars?: Record<string, string>,
 ): string {
   const entry = MESSAGES[key];
-  if (!entry) return key;
+  if (!entry) {
+    if (process.env['NODE_ENV'] !== 'production') {
+      process.stderr.write(`[getMessage] missing i18n key: "${key}" (lang: ${lang})\n`);
+    }
+    return key;
+  }
 
   const normalizedLang = lang === 'tr' ? 'tr' : 'en';
   const template = entry[normalizedLang] ?? entry['en'] ?? key;

@@ -316,6 +316,7 @@ import {
   interruptActiveSprint,
   resetInterruptState,
   resolveSprintTimeoutMs,
+  emitPhaseChange,
 } from '../../src/orchestra/sprint-controller.js';
 
 import type {
@@ -357,6 +358,9 @@ const mockedProviderRegistry = vi.mocked(providerRegistry);
 // Task router mock access
 import { routeTask } from '../../src/orchestra/task-router.js';
 const mockedRouteTask = vi.mocked(routeTask);
+
+// EventBus — real singleton (not mocked); used for listener-wire tests
+import { eventBus } from '../../src/orchestra/event-bus.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -2488,5 +2492,70 @@ describe('resolveSprintTimeoutMs', () => {
 
   it('treats a negative config as unset (undefined → waitForResults 30-minute default)', () => {
     expect(resolveSprintTimeoutMs(undefined, { sprint_timeout_minutes: -5 })).toBeUndefined();
+  });
+});
+
+// ─── deckent-event listener wire (Sprint 323 task-018) ─────────────────
+//
+// emitSprintEvent() was emitting 'deckent-event' but NervousObserver
+// subscribes via eventBus.on('event', ...). The fix adds a second
+// eventBus.emit('event', data) call so the observer's handler fires.
+
+describe("Sprint Controller — deckent-event listener wire (Sprint 323 task-018)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("emitPhaseChange emits both 'deckent-event' and 'event' on eventBus", () => {
+    const emitted: Array<[string, unknown]> = [];
+    vi.spyOn(eventBus, 'emit').mockImplementation((name: string, ...args: unknown[]) => {
+      emitted.push([name, args[0]]);
+      return true;
+    });
+
+    emitPhaseChange('PLAN', 'SPAWN', 'sprint-323-test');
+
+    const names = emitted.map(([n]) => n);
+    expect(names).toContain('deckent-event');
+    expect(names).toContain('event');
+  });
+
+  it("event listener (NervousObserver style) receives SPRINT_PHASE_CHANGE payload", () => {
+    const received: unknown[] = [];
+    const listener = (data: unknown): void => { received.push(data); };
+    eventBus.on('event', listener);
+
+    try {
+      emitPhaseChange('SPAWN', 'EXECUTE', 'sprint-323-test');
+
+      expect(received).toHaveLength(1);
+      const payload = received[0] as Record<string, unknown>;
+      expect(payload['type']).toBe('SPRINT_PHASE_CHANGE');
+      expect(payload['oldPhase']).toBe('SPAWN');
+      expect(payload['newPhase']).toBe('EXECUTE');
+      expect(payload['sprintId']).toBe('sprint-323-test');
+      expect(typeof payload['timestamp']).toBe('string');
+    } finally {
+      eventBus.off('event', listener);
+    }
+  });
+
+  it("'deckent-event' emitted with correct SPRINT_PHASE_CHANGE payload", () => {
+    const emitted: Array<[string, unknown]> = [];
+    vi.spyOn(eventBus, 'emit').mockImplementation((name: string, ...args: unknown[]) => {
+      emitted.push([name, args[0]]);
+      return true;
+    });
+
+    emitPhaseChange('EVALUATE', 'FIX', 'sprint-323-wire');
+
+    const deckentEvents = emitted.filter(([n]) => n === 'deckent-event');
+    expect(deckentEvents).toHaveLength(1);
+    const payload = deckentEvents[0]![1] as Record<string, unknown>;
+    expect(payload['type']).toBe('SPRINT_PHASE_CHANGE');
+    expect(payload['oldPhase']).toBe('EVALUATE');
+    expect(payload['newPhase']).toBe('FIX');
+    expect(payload['sprintId']).toBe('sprint-323-wire');
+    expect(typeof payload['timestamp']).toBe('string');
   });
 });
