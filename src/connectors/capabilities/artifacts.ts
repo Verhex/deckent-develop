@@ -3,8 +3,6 @@ import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import type { ArtifactRef, ArtifactStore } from './types.js';
 
-export type { ArtifactStore };
-
 interface MetaRecord {
   readonly id: string;
   readonly filename: string;
@@ -19,8 +17,13 @@ export function createArtifactStore(root: string, opts: { ttlMs?: number; now?: 
   const ttl = opts.ttlMs ?? 3_600_000;
   const now = opts.now ?? (() => Date.now());
 
+  const sanitizeChatKey = (chatKey: string): string => {
+    const safe = chatKey.replace(/[^A-Za-z0-9_\-]/g, '_');
+    return safe.length > 0 ? safe : '_';
+  };
+
   const chatDir = (chatKey: string) =>
-    join(root, '.deckent', 'artifacts', encodeURIComponent(chatKey));
+    join(root, '.deckent', 'artifacts', sanitizeChatKey(chatKey));
 
   /** Prune expired entries in a chatKey directory. */
   const prune = (chatKey: string): void => {
@@ -59,6 +62,7 @@ export function createArtifactStore(root: string, opts: { ttlMs?: number; now?: 
     },
 
     get(chatKey, id): ArtifactRef | null {
+      if (!/^art_[0-9a-f]{8}$/.test(id)) return null;
       prune(chatKey);
       const d = chatDir(chatKey);
       if (!existsSync(d)) return null;
