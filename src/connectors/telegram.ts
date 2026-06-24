@@ -20,6 +20,7 @@ interface GrammyBotInstance {
   on(filter: 'message:text', handler: (ctx: GrammyTextContext) => void): void;
   on(filter: 'message:photo', handler: (ctx: GrammyPhotoContext) => void): void;
   on(filter: 'message:document', handler: (ctx: GrammyDocumentContext) => void): void;
+  on(filter: 'message:voice', handler: (ctx: GrammyVoiceContext) => void): void;
   on(filter: 'callback_query:data', handler: (ctx: GrammyCallbackContext) => void): void;
   start(opts?: { drop_pending_updates?: boolean }): Promise<void>;
   stop(): Promise<void>;
@@ -29,6 +30,7 @@ interface GrammyBotInstance {
     sendChatAction(chatId: string | number, action: string): Promise<unknown>;
     sendPhoto(chatId: string | number, photo: unknown, other?: { caption?: string }): Promise<unknown>;
     sendDocument(chatId: string | number, doc: unknown, other?: { caption?: string }): Promise<unknown>;
+    sendVoice(chatId: string | number, voice: unknown): Promise<unknown>;
     getFile(fileId: string): Promise<{ file_id: string; file_path?: string; file_size?: number }>;
   };
 }
@@ -64,6 +66,17 @@ interface GrammyDocumentContext {
     date: number;
     document: { file_id: string; file_name?: string; mime_type?: string; file_size?: number };
     caption?: string;
+  };
+  from: { id: number };
+  chat: { id: number };
+}
+
+/** grammY context for a voice message (message:voice update). */
+interface GrammyVoiceContext {
+  message: {
+    message_id: number;
+    date: number;
+    voice: { file_id: string; mime_type?: string; duration?: number; file_size?: number };
   };
   from: { id: number };
   chat: { id: number };
@@ -176,6 +189,23 @@ export class TelegramConnector extends BaseConnector {
       });
     });
 
+    // Inbound voice message — carry file_id and mime type (default audio/ogg per Telegram spec).
+    this.bot.on('message:voice', (ctx: GrammyVoiceContext) => {
+      const voice = ctx.message.voice;
+      this.emitMessage({
+        id: String(ctx.message.message_id),
+        connector: 'telegram',
+        fromUser: String(ctx.from.id),
+        channelId: String(ctx.chat.id),
+        text: '',
+        timestamp: new Date(ctx.message.date * 1000).toISOString(),
+        raw: {
+          ...ctx.message,
+          voice: { fileId: voice.file_id, mime: voice.mime_type ?? 'audio/ogg' },
+        },
+      });
+    });
+
     // Rich-approval bot: an inline-button press arrives as a callback_query:data.
     // Forward its callback_data to the registered handler (the bot daemon routes
     // it to the approval gate — never to the LLM) and ACK so the button's spinner
@@ -276,6 +306,13 @@ export class TelegramConnector extends BaseConnector {
     const extra = media.caption ? { caption: media.caption } : undefined;
     if (media.kind === 'photo') await this.bot.api.sendPhoto(channelId, file, extra);
     else await this.bot.api.sendDocument(channelId, file, extra);
+  }
+
+  async sendVoice(channelId: string, audio: { data: Buffer; mime: string }): Promise<void> {
+    if (!this.bot) throw new Error('Telegram connector not started');
+    if (!this.InputFileCtor) await this.loadGrammy();
+    const file = new (this.InputFileCtor as InputFileCtor)(audio.data);
+    await this.bot.api.sendVoice(channelId, file);
   }
 
   /**
