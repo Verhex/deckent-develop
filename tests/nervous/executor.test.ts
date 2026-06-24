@@ -218,6 +218,39 @@ describe('Executor', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  // FIX-2 (B-COLLISION-HANG cross-source approval): resolveApproval must accept
+  // the 5-char shortCode that surfaces (Telegram/CLI/MCP) display, not only the
+  // full notification id. Pre-fix the pendingApprovals map was keyed by full id
+  // only, so an "approve <shortCode>" forwarded verbatim by a surface silently
+  // no-opped (pendingCount stayed 1). Faithful: resolve by shortCode → resolved.
+  it('resolveApproval resolves by shortCode, not only the full id (FIX-2)', async () => {
+    const history = createMockHistory();
+    const handler = createMockHandler('success');
+    const executor = new Executor(history, handler);
+
+    const action = createAction({ policy: 'approve', id: 'KILL_LIVE_SPRINT', isSafetyFloor: true });
+    const notification = createNotification({
+      id: 'notif-uuid-3f9c2a17-long',
+      shortCode: 'a1b2c',
+      actions: [action],
+    });
+
+    const handlePromise = executor.handle(notification);
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000); // SAFETY_FLOOR never auto-resolves
+    expect(executor.pendingCount).toBe(1);
+
+    // Resolve using the SHORT code (what the operator copy-pastes), NOT the full id.
+    executor.resolveApproval('a1b2c', 'accepted');
+    // Asserted BEFORE awaiting so pre-fix fails cleanly here (no hang): the
+    // shortCode missed the full-id-keyed map and pendingCount stayed 1.
+    expect(executor.pendingCount).toBe(0);
+
+    const records = await handlePromise;
+    expect(records).toHaveLength(1);
+    expect(records[0].decision).toBe('accepted');
+    expect(records[0].decidedBy).toBe('user');
+  });
+
   // Test 8: Multiple actions in single notification → multiple records
   it('should handle multiple actions in a single notification sequentially', async () => {
     const history = createMockHistory();

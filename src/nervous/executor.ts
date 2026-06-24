@@ -161,11 +161,28 @@ export class Executor {
     decision: 'accepted' | 'rejected',
     opts?: { modifiedPayload?: Record<string, unknown> },
   ): void {
-    const pending = this.pendingApprovals.get(notificationId);
+    // FIX-2 (B-COLLISION-HANG cross-source approval): accept EITHER the full
+    // notification id OR the 5-char shortCode that surfaces (Telegram/CLI/MCP)
+    // display. The map is keyed by full id; if the direct lookup misses, resolve
+    // a shortCode by scanning entries for a matching notification.shortCode. The
+    // bot resolver pre-maps shortCode→id from the pending file, but CLI/MCP may
+    // forward the shortCode verbatim — without this fallback such an accept
+    // silently no-ops ("approve <shortCode>" lands but never resolves).
+    let resolvedKey = notificationId;
+    let pending = this.pendingApprovals.get(resolvedKey);
+    if (!pending) {
+      for (const [id, p] of this.pendingApprovals) {
+        if (p.notification.shortCode === notificationId) {
+          resolvedKey = id;
+          pending = p;
+          break;
+        }
+      }
+    }
     if (pending) {
       pending.resolve(decision, opts?.modifiedPayload);
-      this.pendingApprovals.delete(notificationId);
-      this.pendingStore?.remove(notificationId);
+      this.pendingApprovals.delete(resolvedKey);
+      this.pendingStore?.remove(resolvedKey);
     }
   }
 
