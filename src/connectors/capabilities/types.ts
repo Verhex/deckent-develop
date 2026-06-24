@@ -45,6 +45,7 @@ export interface CapabilityContext {
   readonly now: number;                // injected for deterministic captions/audit
   readonly spawn: SpawnFn;             // injected host-effect (screenshot)
   readonly loadMailTransport: (cfg: MailConfig | undefined) => Promise<MailTransport>; // injected (mail)
+  readonly platform?: PlatformId;      // injected in tests; defaults to detectPlatform()
 }
 
 export interface Capability<A = unknown> {

@@ -1762,6 +1762,28 @@ const MESSAGES: MessageMap = {
     tr: 'Bu sohbet {project} için yetkili değil. Eşleştirme kodu: {code}. Sahibi şunu çalıştırsın: deckent gateway pair approve {code} {project}',
     en: 'This chat is not authorized for {project}. Pairing code: {code}. Ask the owner to run: deckent gateway pair approve {code} {project}',
   },
+
+  // ─── capability: screenshot ──────────────────────────────────────────
+  'cap.screenshot.title': {
+    en: 'Screenshot',
+    tr: 'Ekran görüntüsü',
+  },
+  'cap.screenshot.unsupported': {
+    en: 'Screenshot is not supported on this platform.',
+    tr: 'Bu platformda ekran görüntüsü desteklenmiyor.',
+  },
+  'cap.screenshot.failed': {
+    en: 'Screenshot failed: {error}',
+    tr: 'Ekran görüntüsü başarısız: {error}',
+  },
+  'cap.screenshot.caption': {
+    en: 'Screen capture',
+    tr: 'Ekran yakalandı',
+  },
+  'cap.screenshot.preview': {
+    en: 'capture {display} display',
+    tr: '{display} ekranı yakala',
+  },
 };
 
 /**
