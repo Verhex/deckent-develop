@@ -1,4 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { screenshotCapability } from '../../../src/connectors/capabilities/builtin/screenshot.js';
 import type { CapabilityContext, SpawnResult } from '../../../src/connectors/capabilities/types.js';
 
@@ -12,6 +15,11 @@ function ctx(overrides: Partial<CapabilityContext> & { spawn: CapabilityContext[
 }
 
 describe('screenshotCapability', () => {
+  afterEach(() => {
+    // Clean up the deterministic tmp PNG path written by the darwin mock (ctx.now = 1_700_000_000_000)
+    rmSync(join(tmpdir(), 'deckent-ss-1700000000000.png'), { force: true });
+  });
+
   it('darwin: builds `screencapture -x -t png <tmp>` and returns PNG media', async () => {
     const calls: Array<{ cmd: string; args: readonly string[] }> = [];
     const spawn = vi.fn(async (cmd: string, args: readonly string[]): Promise<SpawnResult> => {
