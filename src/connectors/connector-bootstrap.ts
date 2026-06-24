@@ -21,7 +21,7 @@ import { makeIncomingCommandRouter, type CommandResolver, type ResolveOutcome } 
 import { makeCommandResolver } from './incoming-command-resolver.js';
 import { parseApprovalCallback } from './callback-router.js';
 import type { IncomingCallback } from './types.js';
-import { type ChatResponder } from './chat-bridge.js';
+import { type ChatResponder, type PerTurnMediaConnector } from './chat-bridge.js';
 import { chunkMessage } from './message-format.js';
 import { makeStreamThrottle } from './stream-throttle.js';
 import { isBotSlash, handleBotSlash } from './bot-commands.js';
@@ -120,11 +120,16 @@ export async function buildConnectorNotificationAdapter(
 
 // ─── BOT-002 — inbound command transport ──────────────────────────────────
 
-/** Streaming variant of ChatResponder: receives a per-call `onPartial` callback. */
+/**
+ * Streaming variant of ChatResponder: receives a per-call `onPartial` callback and
+ * an OPTIONAL `mediaConnector` (Slice 1.1) for per-turn media delivery.
+ * Existing 3-arg callers are unaffected — the 4th arg is additive and optional.
+ */
 export type ChatStreamResponder = (
   channelId: string,
   text: string,
   onPartial: (partial: string) => void,
+  mediaConnector?: PerTurnMediaConnector,
 ) => Promise<string>;
 
 export interface ConnectorCommandsDeps extends ConnectorBootstrapDeps {
@@ -369,7 +374,9 @@ export async function bootstrapConnectorCommands(
                         const throttle = msgId
                           ? makeStreamThrottle({ edit: (t) => streamCap.editMessage!(channelId, msgId, t.slice(0, 4000)) })
                           : null;
-                        const reply = await chatStreaming(channelId, text, (partial) => throttle?.push(partial));
+                        // Slice 1.1: pass the live connector as the per-turn mediaConnector so
+                        // capability media (e.g. screenshot photo) is delivered to the right transport.
+                        const reply = await chatStreaming(channelId, text, (partial) => throttle?.push(partial), connector as PerTurnMediaConnector);
                         const body = reply.trim() || getMessage('bot.chat_empty', lang);
                         if (msgId && throttle) {
                           // Final: edit the placeholder in place with the first part
@@ -386,8 +393,10 @@ export async function bootstrapConnectorCommands(
                         }
                       } else {
                         // Non-streaming fallback — rich reply.
+                        // Slice 1.1: pass the live connector as the per-turn mediaConnector so
+                        // capability media (e.g. screenshot photo) is delivered to the right transport.
                         await send(channelId, getMessage('bot.chat_thinking', lang));
-                        const reply = await chat(channelId, text);
+                        const reply = await chat(channelId, text, connector as PerTurnMediaConnector);
                         const body = reply.trim() || getMessage('bot.chat_empty', lang);
                         await sendRich(channelId, body);
                       }

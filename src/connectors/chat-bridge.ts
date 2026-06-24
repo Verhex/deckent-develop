@@ -98,15 +98,38 @@ export interface ChatResponderDeps {
    */
   capConfig?: BotCapabilitiesConfig;
   /**
-   * Connector reference for media delivery — needed to build the media sink so
-   * capability results with media attachments reach the right transport.
-   * When absent, capabilities that produce media fall back to honest text.
+   * Static connector reference for media delivery — used as a fallback when no
+   * per-turn connector is provided. When absent, capabilities that produce media
+   * fall back to honest text.
    */
   capConnector?: { id: string; sendMedia?(channelId: string, media: MediaAttachment): Promise<void> };
+  /**
+   * Test seam: override the spawn function used by capabilities (e.g. to inject
+   * a fake PNG-returning spawn in unit tests without triggering real OS capture).
+   * When absent, capabilities use their default spawn (defaultSpawn from spawn.ts).
+   */
+  capSpawn?: import('./capabilities/types.js').SpawnFn;
+  /**
+   * Test seam: override the platform id reported to capabilities.
+   * When absent, detectPlatform() is called (runtime detection).
+   */
+  capPlatform?: import('./capabilities/types.js').PlatformId;
 }
 
+/** Per-turn media connector — optional 3rd argument to ChatResponder calls. */
+export type PerTurnMediaConnector = {
+  id: string;
+  sendMedia?(channelId: string, media: MediaAttachment): Promise<void>;
+};
+
 export interface ChatResponder {
-  (sessionId: string, text: string): Promise<string>;
+  /**
+   * Invoke a chat turn. `mediaConnector` is an OPTIONAL 3rd arg (Slice 1.1): when
+   * provided, it is used as the media sink for that turn (overrides the static
+   * `capConnector` dep). Existing 2-arg callers are unaffected — behavior is
+   * identical to today when the arg is absent or the connector has no `sendMedia`.
+   */
+  (sessionId: string, text: string, mediaConnector?: PerTurnMediaConnector): Promise<string>;
   /** Release the warm persistent provider child (agentic mode). Best-effort. */
   dispose?(): Promise<void>;
 }
@@ -150,7 +173,7 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
     return persistent;
   }
 
-  async function runTurn(sessionId: string, text: string): Promise<string> {
+  async function runTurn(sessionId: string, text: string, perTurnMediaConnector?: PerTurnMediaConnector): Promise<string> {
     const collected: string[] = [];
 
     // Provider + dispatcher differ by mode. Agentic: tool_use provider + GATED
@@ -165,21 +188,22 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
       const root = deps.root;
       provider = agenticProvider();
       const inner = deps.dispatcher ?? createCliToolDispatcher();
-      // Build a per-session send shim for the media sink (capability results with media).
-      // Chat-turn text delivery via connector is deferred to Slice 2 (requires threading
-      // connector instances through ConnectorCommandsHandle). Until then, the shim is a
-      // no-op; runCapability returns the text result via its return value, so callers
-      // still surface it. capConnector is retained here for the Slice-2 wire.
+      // Slice 1.1: build the media sink from the PER-TURN connector when provided,
+      // falling back to the static dep, then to the no-media sentinel.
+      // This ensures a chat-turn capability's media (e.g. screenshot → photo) is
+      // delivered to the RIGHT connector for that specific chat turn.
+      // When neither is available, the no-op sendText path produces honest text-fallback.
+      const mediaConn = perTurnMediaConnector ?? deps.capConnector ?? { id: 'unknown' };
       const sendText = async (_channelId: string, _text: string): Promise<void> => {};
-      const mediaSink = buildMediaSink(deps.capConnector ?? { id: 'unknown' }, lang, sendText);
+      const mediaSink = buildMediaSink(mediaConn, lang, sendText);
       const makeCapCtx = (channelId: string) => ({
         chatKey: channelId,
         project: root,
         lang,
         config: capConfig,
         now: Date.now(),
-        platform: detectPlatform(),
-        spawn: defaultSpawn,
+        platform: deps.capPlatform ?? detectPlatform(),
+        spawn: deps.capSpawn ?? defaultSpawn,
         loadMailTransport: loadNodemailerTransport,
       });
       const capGate = {
@@ -243,9 +267,9 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
     return lastAssistantText(transcript);
   }
 
-  const responder = ((sessionId: string, text: string): Promise<string> => {
+  const responder = ((sessionId: string, text: string, mediaConnector?: PerTurnMediaConnector): Promise<string> => {
     const prev = chains.get(sessionId) ?? Promise.resolve();
-    const next = prev.catch(() => undefined).then(() => runTurn(sessionId, text));
+    const next = prev.catch(() => undefined).then(() => runTurn(sessionId, text, mediaConnector));
     chains.set(
       sessionId,
       next.finally(() => {

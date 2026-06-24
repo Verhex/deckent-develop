@@ -97,7 +97,8 @@ describe('bootstrapConnectorCommands', () => {
       chat,
     });
     fake._emit(incoming('durum ne alemde?', '555'));
-    await vi.waitFor(() => expect(chat).toHaveBeenCalledWith('555', 'durum ne alemde?'));
+    // Slice 1.1: chat is now called with an optional 3rd arg (per-turn mediaConnector).
+    await vi.waitFor(() => expect(chat).toHaveBeenCalledWith('555', 'durum ne alemde?', expect.objectContaining({ id: 'telegram' })));
     // a thinking ack + the reply land on the same chat
     await vi.waitFor(() => expect(fake.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(2));
     const texts = fake.sendMessage.mock.calls.map((c) => (c[0] as { text: string }).text);
@@ -393,8 +394,9 @@ describe('bootstrapConnectorCommands', () => {
 
     streamCapFake._emit(incoming('hello streaming', '555'));
 
-    // onChatStreaming must be called (not the plain chat responder)
-    await vi.waitFor(() => expect(onChatStreaming).toHaveBeenCalledWith('555', 'hello streaming', expect.any(Function)));
+    // onChatStreaming must be called (not the plain chat responder).
+    // Slice 1.1: 4th arg is the per-turn mediaConnector (the live connector object).
+    await vi.waitFor(() => expect(onChatStreaming).toHaveBeenCalledWith('555', 'hello streaming', expect.any(Function), expect.objectContaining({ id: 'telegram' })));
     // editMessage must be called for the final reply (edit-in-place); may also
     // be called earlier for throttled partials — check the LAST call for final body.
     await vi.waitFor(() => expect(editMessage).toHaveBeenCalled());

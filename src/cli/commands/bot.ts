@@ -69,20 +69,20 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
         lang,
         onPartial: (sid, txt) => partialSinks.get(sid)?.(txt),
         capConfig: config.bot_capabilities,
-        // capConnector: the connector instance for chat-turn media delivery is
-        // encapsulated inside bootstrapConnectorCommands (lazy-loaded, fail-safe).
-        // Threading it here would require exposing connectors from
-        // ConnectorCommandsHandle, which is a follow-up architectural wire.
-        // Media-producing capability results during chat turns fall back to honest
-        // text until that wire is in place. The APPROVE-PATH already delivers media
-        // correctly via the targets lazy closure in connector-bootstrap.ts.
+        // capConnector is intentionally omitted here — the per-turn connector is
+        // threaded live via the 3rd/4th arg of ChatResponder / ChatStreamResponder
+        // (Slice 1.1). bootstrapConnectorCommands passes connector as mediaConnector
+        // when invoking chat()/onChatStreaming(), so the mediaSink is built from the
+        // correct per-turn connector at call time. No static capConnector needed.
       });
 
       return bootstrapConnectorCommands(r, n, {
         chat: responder,
-        onChatStreaming: (channelId, text, onPartial) => {
+        // Slice 1.1: forward the per-turn mediaConnector (4th arg from bootstrap) into
+        // the responder call so capability media reaches the right connector transport.
+        onChatStreaming: (channelId, text, onPartial, mediaConnector) => {
           partialSinks.set(channelId, onPartial);
-          return responder(channelId, text).finally(() => {
+          return responder(channelId, text, mediaConnector).finally(() => {
             partialSinks.delete(channelId);
           });
         },
