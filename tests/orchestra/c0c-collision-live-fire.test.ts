@@ -253,13 +253,21 @@ describe('spawnWorkers C0c live wire (Sprint 169 W3.1)', () => {
 
     expect(blockedEvents.length).toBeGreaterThanOrEqual(1);
     const blocked = blockedEvents[0]!;
-    const payload = blocked.payload as { taskIds: string[]; files: string[] };
-    expect(payload.taskIds).toEqual(expect.arrayContaining(['W31-H', 'W31-I']));
+    const payload = blocked.payload as { taskIds: string[]; winner?: string; serialized?: boolean; files: string[] };
+    // FIX-3 (B-COLLISION-HANG — Sprint 319): the spawner now SERIALIZES colliding
+    // writers instead of blocking all of them. The lowest-id writer (W31-H) is the
+    // winner and dispatches; only the rest (W31-I) are deferred to a later tick.
+    // This guarantees forward progress — block-all previously deadlocked the
+    // sprint (sprint-319 hung 7h because neither colliding task ever completed).
+    expect(payload.serialized).toBe(true);
+    expect(payload.winner).toBe('W31-H');
+    expect(payload.taskIds).toEqual(['W31-I']);
+    expect(payload.taskIds).not.toContain('W31-H');
     // Canonical form must be in the emitted event
     expect(payload.files).toContain('src/aliased.ts');
 
-    // Neither task should have been spawned by the backend
-    expect(backend.calls.map(c => c.taskId)).not.toContain('W31-H');
+    // The winner (lowest-id) IS spawned; only the deferred writer is held back.
+    expect(backend.calls.map(c => c.taskId)).toContain('W31-H');
     expect(backend.calls.map(c => c.taskId)).not.toContain('W31-I');
   });
 });

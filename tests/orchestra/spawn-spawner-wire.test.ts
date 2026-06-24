@@ -154,13 +154,19 @@ describe('spawnWorkers — C0c wire (Sprint 168 W2.5)', () => {
     expect(blockedEvents.length).toBeGreaterThanOrEqual(1);
     const blocked = blockedEvents[0]!;
     expect(blocked.source).toBe('brain');
-    const payload = blocked.payload as { taskIds: string[]; files: string[]; reason: string };
-    expect(payload.taskIds).toEqual(expect.arrayContaining(['168-W25-A', '168-W25-B']));
+    const payload = blocked.payload as { taskIds: string[]; winner?: string; serialized?: boolean; files: string[]; reason: string };
+    // FIX-3 (B-COLLISION-HANG — Sprint 319): serialize, not block-all. The
+    // lowest-id writer (168-W25-A) is the winner and dispatches; only the rest
+    // (168-W25-B) are deferred — guaranteeing forward progress (block-all
+    // deadlocked the sprint, 319 hung 7h).
+    expect(payload.serialized).toBe(true);
+    expect(payload.winner).toBe('168-W25-A');
+    expect(payload.taskIds).toEqual(['168-W25-B']);
     expect(payload.files).toContain('src/shared.ts');
     expect(payload.reason).toContain('src/shared.ts');
   });
 
-  it('does NOT emit TASK_ASSIGN for blocked colliding tasks', async () => {
+  it('does NOT emit TASK_ASSIGN for the deferred colliding task (winner proceeds)', async () => {
     const t1 = createTask('168-W25-C', ['src/clash.ts']);
     const t2 = createTask('168-W25-D', ['src/clash.ts']);
     persistTasks([t1, t2]);
@@ -179,10 +185,12 @@ describe('spawnWorkers — C0c wire (Sprint 168 W2.5)', () => {
     const assignEvents = events.filter(e => e.channel === CHANNELS.TASK_ASSIGN);
     const assignedTaskIds = assignEvents.map(e => (e.payload as { taskId: string }).taskId);
 
-    expect(assignedTaskIds).not.toContain('168-W25-C');
+    // FIX-3 (B-COLLISION-HANG — Sprint 319): serialize — the winner (lowest-id,
+    // 168-W25-C) dispatches; only the deferred collider (168-W25-D) is held back.
+    expect(assignedTaskIds).toContain('168-W25-C');
     expect(assignedTaskIds).not.toContain('168-W25-D');
-    // And no spawn() invoked for the blocked tasks
-    expect(backend.calls.map(c => c.taskId)).not.toContain('168-W25-C');
+    // The winner IS spawned; the deferred collider is not.
+    expect(backend.calls.map(c => c.taskId)).toContain('168-W25-C');
     expect(backend.calls.map(c => c.taskId)).not.toContain('168-W25-D');
   });
 
@@ -238,13 +246,16 @@ describe('spawnWorkers — C0c wire (Sprint 168 W2.5)', () => {
     const assignEvents = events.filter(e => e.channel === CHANNELS.TASK_ASSIGN);
     const assignedIds = assignEvents.map(e => (e.payload as { taskId: string }).taskId);
 
+    // FIX-3 (B-COLLISION-HANG — Sprint 319): serialize, not block-all. The solo
+    // task and the collision WINNER (lowest-id, 168-W25-F) both proceed; only the
+    // deferred collider (168-W25-G) is held back this tick.
     expect(assignedIds).toContain('168-W25-H');             // solo proceeds
-    expect(assignedIds).not.toContain('168-W25-F');         // collider blocked
-    expect(assignedIds).not.toContain('168-W25-G');         // collider blocked
+    expect(assignedIds).toContain('168-W25-F');             // collision winner proceeds
+    expect(assignedIds).not.toContain('168-W25-G');         // deferred collider held back
 
     const spawnedIds = backend.calls.map(c => c.taskId);
     expect(spawnedIds).toContain('168-W25-H');
-    expect(spawnedIds).not.toContain('168-W25-F');
+    expect(spawnedIds).toContain('168-W25-F');
     expect(spawnedIds).not.toContain('168-W25-G');
   });
 });

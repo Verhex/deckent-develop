@@ -357,13 +357,29 @@ export async function spawnWorkers(
       };
       const decision = handleScopeCollision(payload);
       if (decision.action === 'block') {
-        for (const id of decision.taskIds) blockedTaskIds.add(id);
+        // FIX-3 (B-COLLISION-HANG — Sprint 319 forensics): SERIALIZE instead of
+        // block-all. Among the colliding writers the lowest-id task dispatches
+        // this tick (the "winner"); only the rest are deferred and re-dispatch on
+        // a later tick once the winner completes and the collision clears.
+        // Blocking ALL writers deadlocked the sprint — neither completed, so the
+        // collision never cleared (sprint-319 hung 7h). A deterministic sort
+        // guarantees forward progress: the globally-lowest writer is the winner
+        // of every collision it is in, so it is never blocked. Only the winner
+        // writes the shared file this tick → concurrent-write safety is preserved
+        // (the original goal of the block), without the deadlock or any
+        // approval-gate (the serialize order is deterministic, not a decision).
+        const ordered = [...decision.taskIds].sort();
+        const winner = ordered[0];
+        const deferred = ordered.slice(1);
+        for (const id of deferred) blockedTaskIds.add(id);
         try {
           writeEvent(
             projectRoot, sprintId, 'brain', 'worker',
             CHANNELS.SPAWN_BLOCKED,
             {
-              taskIds: decision.taskIds,
+              taskIds: deferred,
+              winner,
+              serialized: true,
               files: payload.files,
               reason: decision.reason,
               detectedAt: payload.detectedAt,
