@@ -47,6 +47,28 @@ describe('Executor pending store (APPROVE-004)', () => {
     expect(store.remove).toHaveBeenCalledWith('n1');
   });
 
+  // FIX-6 (B-COLLISION-HANG re-notify after approve): an accept that carries the
+  // shortCode (which Telegram/CLI/MCP display) must still purge the pending from
+  // the file-backed store (nervous-pending.json) — keyed by FULL id — so the ask
+  // is NOT re-surfaced. Pre-FIX-2 the shortCode missed the id-keyed map → remove()
+  // never ran → the proposal re-notified forever (the exact user symptom:
+  // "telegramdan onaylasam da aynı bildirim geliyor"). End-to-end guard.
+  it('resolveApproval by shortCode purges the pending by FULL id — no re-notify (FIX-6)', async () => {
+    const store = { add: vi.fn(), remove: vi.fn() };
+    const exec = new Executor(history, handler, store);
+
+    const n = { ...notif('full-id-xyz-9f3', 'approve'), shortCode: 'a1b2c' };
+    const p = exec.handle(n);
+    await Promise.resolve();
+    expect(store.add).toHaveBeenCalledWith(expect.objectContaining({ id: 'full-id-xyz-9f3' }));
+
+    // Operator accepts using the SHORT code they see (not the full UUID).
+    exec.resolveApproval('a1b2c', 'accepted');
+    await p;
+    // Cleared by FULL id → nervous-pending.json is purged → dispatcher stops re-asking.
+    expect(store.remove).toHaveBeenCalledWith('full-id-xyz-9f3');
+  });
+
   it('adds a parked suggest-timeout notification to the store', async () => {
     const store = { add: vi.fn(), remove: vi.fn() };
     const exec = new Executor(history, handler, store);
