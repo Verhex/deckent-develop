@@ -1,5 +1,18 @@
 # NERVOUS-APPROVAL FIX PLAN — B-COLLISION-HANG + cross-source approval overhaul
 
+> ## ✅ STATUS: ALL 6 FIXES DONE (2026-06-24, CC-hand-coded, karpathy-disciplined)
+> | Fix | Commit | Note |
+> |---|---|---|
+> | FIX-3 scope-collision **serialize** (deadlock-preventer) | `61a9c3e1` | block-all → serialize; winner dispatches, rest defer |
+> | FIX-2 **shortCode normalize** (resolveApproval accepts shortCode\|id) | `5009717e` | cross-surface tek-kimlik |
+> | FIX-5 re-notify **debounce** (collision emit once per state) | `770f8ea4` | "aynı bildirim" spam fix |
+> | FIX-1 **Brain-ack** (NERVOUS_APPROVAL_CONSUMED on real consume) | `b3d41bc1` | resolveApproval→boolean + jsonl ack |
+> | FIX-6 re-notify-after-approve **guard** (shortCode purges by full id) | `7d0ada80` | covered by FIX-1/2/5 + bot resolvedWith ack |
+> | FIX-4 **timeout auto-resolve** (non-blocker auto-proceed) | pre-existing | Sprint 279; config `approve_timeout_ms` (attended 30s/unattended 5s), SAFETY_FLOOR exempt |
+>
+> **Verify:** her fix faithful (git-stash/gate-disable RED → GREEN) + tsc=0 + per-fix affected-suite + `npm run build`. **FINAL broad-suite: 19821 pass / 0 test-failure** (yalnız pre-existing mcp/server config-mock-stale file). **KALAN: canlı end-to-end** (gerçek 2-task-same-file sprint + cross-source accept → unblock + APPROVAL_CONSUMED görünür) — build+restart sonrası Alperen ile doğrulanacak.
+
+
 > **CC el-kodu, karpathy-discipline ile.** deckent-worker'a VERİLMEZ (deckent'in kendi
 > nervous/sprint çekirdeği bozuk + scope-collision riski). Her task: D1 (read+plan) →
 > D2 (mevcut-pattern, YAGNI) → D3 (surgical, minimum-diff) → D4 (faithful-test, dürüst-DoD).
