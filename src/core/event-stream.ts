@@ -114,6 +114,13 @@ export const CHANNELS = {
   // `deckent status`. Additive — never the source of truth, only the live signal.
   NERVOUS_NOTIFICATION: 'DECKENT→USER:NERVOUS_NOTIFICATION',
 
+  // FIX-1 (B-COLLISION-HANG cross-source approval): emitted by the nervous IPC
+  // poller when an approval (from ANY surface — bot / CLI / MCP) is actually
+  // consumed by the running executor. This is the Brain-ack: it proves in the
+  // flow (jsonl) that the decision was received + applied, so a resolved ask is
+  // not re-asked. Pairs with the resolved/ IPC dir (the on-disk record).
+  NERVOUS_APPROVAL_CONSUMED: 'DECKENT→USER:NERVOUS_APPROVAL_CONSUMED',
+
   // Orphan HB cleanup (Sprint 139 — Task 016)
   ORPHAN_HB_DETECTED: 'AUDITOR→BRAIN:ORPHAN_HB_DETECTED',
 

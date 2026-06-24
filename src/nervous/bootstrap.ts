@@ -224,7 +224,23 @@ export function createNervousSystemIfEnabled(
     // reaches the executor's payload-merge on accept. Without this the edited
     // payload was carried through the IPC file but dropped here at the poller —
     // the transport (003) + REPL surface (008) were built but not end-to-end live.
-    executor.resolveApproval(req.notificationId, req.decision, { modifiedPayload: req.modifiedPayload });
+    const consumed = executor.resolveApproval(req.notificationId, req.decision, { modifiedPayload: req.modifiedPayload });
+    // FIX-1 (B-COLLISION-HANG cross-source approval): Brain-ack. When an approval
+    // from ANY surface (bot/CLI/MCP) is actually consumed, record it in the event
+    // flow (jsonl) so it is provable the decision was received + applied — and so
+    // the ask is not re-surfaced. Skipped when nothing matched (stale/duplicate
+    // IPC file) so we never emit a false ack. Best-effort: never block consumption.
+    if (consumed) {
+      try {
+        writeEvent(
+          projectRoot,
+          getCurrentSprintId(projectRoot) ?? 'no-sprint',
+          'deckent', 'user',
+          CHANNELS.NERVOUS_APPROVAL_CONSUMED,
+          { notificationId: req.notificationId, decision: req.decision },
+        );
+      } catch { /* ack is observability only */ }
+    }
   });
 
   // APPROVE-007 (§4G): heartbeat so a separate `deckent nervous accept` process

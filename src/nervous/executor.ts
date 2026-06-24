@@ -156,11 +156,16 @@ export class Executor {
    * (the handler is never invoked on reject). SAFETY_FLOOR (locked) actions keep
    * their explicit-approval gating — editing only changes the accepted payload.
    */
+  /**
+   * Resolve a pending approval by full id or shortCode.
+   * @returns true if a matching pending approval was found and resolved; false
+   *   if nothing matched (the caller can then skip the Brain-ack, FIX-1).
+   */
   resolveApproval(
     notificationId: string,
     decision: 'accepted' | 'rejected',
     opts?: { modifiedPayload?: Record<string, unknown> },
-  ): void {
+  ): boolean {
     // FIX-2 (B-COLLISION-HANG cross-source approval): accept EITHER the full
     // notification id OR the 5-char shortCode that surfaces (Telegram/CLI/MCP)
     // display. The map is keyed by full id; if the direct lookup misses, resolve
@@ -183,7 +188,9 @@ export class Executor {
       pending.resolve(decision, opts?.modifiedPayload);
       this.pendingApprovals.delete(resolvedKey);
       this.pendingStore?.remove(resolvedKey);
+      return true;
     }
+    return false;
   }
 
   /**

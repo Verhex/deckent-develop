@@ -251,6 +251,31 @@ describe('Executor', () => {
     expect(records[0].decidedBy).toBe('user');
   });
 
+  // FIX-1 (B-COLLISION-HANG cross-source approval): resolveApproval returns
+  // whether it actually consumed a pending approval, so the IPC poller can emit
+  // the Brain-ack (NERVOUS_APPROVAL_CONSUMED) ONLY on a real consume and skip
+  // stale/duplicate IPC files. Pre-fix it returned void → the boolean assertions
+  // below failed (undefined !== false/true).
+  it('resolveApproval returns true on consume, false when nothing matches (FIX-1)', async () => {
+    const history = createMockHistory();
+    const handler = createMockHandler('success');
+    const executor = new Executor(history, handler);
+
+    const action = createAction({ policy: 'approve', id: 'KILL_LIVE_SPRINT', isSafetyFloor: true });
+    const notification = createNotification({ id: 'notif-ack-1', actions: [action] });
+    const handlePromise = executor.handle(notification);
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+
+    // Unknown id/shortCode → nothing consumed → false (poller must NOT ack).
+    expect(executor.resolveApproval('does-not-exist', 'accepted')).toBe(false);
+    expect(executor.pendingCount).toBe(1);
+    // Real match → consumed → true (poller emits the Brain-ack).
+    expect(executor.resolveApproval('notif-ack-1', 'accepted')).toBe(true);
+    expect(executor.pendingCount).toBe(0);
+
+    await handlePromise;
+  });
+
   // Test 8: Multiple actions in single notification → multiple records
   it('should handle multiple actions in a single notification sequentially', async () => {
     const history = createMockHistory();
