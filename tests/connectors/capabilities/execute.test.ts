@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { z } from 'zod';
-import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { CapabilityRegistry } from '../../../src/connectors/capabilities/registry.js';
@@ -35,8 +35,10 @@ describe('runCapability', () => {
   });
   it('invalid args → honest validation error, run not attempted', async () => {
     const r = new CapabilityRegistry();
-    r.register({ ...mediaCap, paramsSchema: z.object({ n: z.number() }), run: vi.fn() as never });
+    const runMock = vi.fn();
+    r.register({ ...mediaCap, paramsSchema: z.object({ n: z.number() }), run: runMock as never });
     const out = await runCapability(r, 'shot', { n: 'x' }, baseCtx(mkdtempSync(join(tmpdir(), 'cap-'))), 'c', async () => {}, 'auto');
     expect(out).toMatch(/invalid args/i);
+    expect(runMock).not.toHaveBeenCalled();
   });
 });
