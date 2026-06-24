@@ -23,4 +23,20 @@ describe('makeGatedDispatcher — sendApproval', () => {
     const d = makeGatedDispatcher({ inner, park, capabilities: gate({ sendApproval: undefined }) });
     expect(await d.dispatch('send_mail', {})).toMatch(/approve act-2/i);
   });
+  it('confirm fallback: sendApproval returns false → legacy parked text (not short ack)', async () => {
+    const sendApproval = vi.fn(async () => false);
+    const park = vi.fn(() => 'act-3');
+    const d = makeGatedDispatcher({ inner, park, capabilities: gate({ sendApproval }) });
+    const out = await d.dispatch('send_mail', { to: 'b@x.com' });
+    expect(sendApproval).toHaveBeenCalledWith('act-3', 'send_mail', { to: 'b@x.com' });
+    expect(out).toMatch(/approve act-3/i);
+  });
+  it('confirm fallback: sendApproval throws → exception swallowed, legacy parked text returned', async () => {
+    const sendApproval = vi.fn(async () => { throw new Error('network down'); });
+    const park = vi.fn(() => 'act-4');
+    const d = makeGatedDispatcher({ inner, park, capabilities: gate({ sendApproval }) });
+    const out = await d.dispatch('send_mail', { to: 'c@x.com' });
+    expect(sendApproval).toHaveBeenCalledWith('act-4', 'send_mail', { to: 'c@x.com' });
+    expect(out).toMatch(/approve act-4/i);
+  });
 });
