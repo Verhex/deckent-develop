@@ -156,6 +156,40 @@ describe('writeHonestSentinelResult — Scenario (c): missing .result becomes ho
     // notes MUST NOT match Docker auto-pattern (would re-trigger tryCodeVerifiedDone)
     expect(parsed.notes).not.toContain('Docker worker exited without writing result file');
   });
+
+  // P0-B (B-SENTINEL-CLOBBER, sprint-323): a sentinel must NEVER overwrite a real
+  // result. The worker either wrote one (present in .tasks) or the sprint already
+  // evaluated + archived it — neither is a crash.
+  it('does NOT clobber an existing .result with a sentinel (P0-B)', () => {
+    const taskId = 'pb-existing';
+    const realPath = join(tmpRoot, '.tasks', `task-${taskId}.result`);
+    writeFileSync(realPath, JSON.stringify({
+      taskId, workerId: 'w-real', filesChanged: ['src/x.ts'], linesAdded: 42,
+      linesRemoved: 0, testsPassed: true, coverage: 90, selfAssessment: 'DONE', notes: 'real work',
+    }), 'utf-8');
+
+    writeHonestSentinelResult(tmpRoot, taskId, [], 'worker-crashed-no-result');
+
+    const after = JSON.parse(readFileSync(realPath, 'utf-8')) as TaskResult;
+    expect(after.selfAssessment).toBe('DONE');   // pre-fix: NO_GO (clobbered)
+    expect(after.workerId).toBe('w-real');       // pre-fix: brain-honest-gate
+  });
+
+  it('does NOT write a sentinel when a real result is already archived (finalize-race, P0-B)', () => {
+    const taskId = 'pb-archived';
+    const fs = require('node:fs') as typeof import('node:fs');
+    fs.mkdirSync(join(tmpRoot, '.brain', 'archive', 'sprint-1-tasks'), { recursive: true });
+    writeFileSync(
+      join(tmpRoot, '.brain', 'archive', 'sprint-1-tasks', `task-${taskId}.result`),
+      JSON.stringify({ taskId, workerId: 'w-real', selfAssessment: 'DONE', notes: 'archived real' }),
+      'utf-8',
+    );
+
+    writeHonestSentinelResult(tmpRoot, taskId, [], 'worker-crashed-no-result');
+
+    // No sentinel written to .tasks — the archived result is authoritative.
+    expect(existsSync(join(tmpRoot, '.tasks', `task-${taskId}.result`))).toBe(false); // pre-fix: sentinel written
+  });
 });
 
 // ─── Scenario (d) — Stub literal → forced NO_GO ──────────────────────────

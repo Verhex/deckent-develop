@@ -5,11 +5,11 @@
 // No side effects, no file writes — evaluation logic only.
 
 import { readFile, readdir, stat } from 'node:fs/promises';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Task, TaskResult, EvaluationRubric, RubricScore, EvaluationResult, NoGoCategory } from '../core/types.js';
 import { TaskEvaluation } from '../core/types.js';
-import { BRAIN_DIR, SPRINTS_DIR, TASKS_DIR } from '../core/constants.js';
+import { BRAIN_DIR, SPRINTS_DIR, TASKS_DIR, ARCHIVE_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 import { validateWorkerCoverage } from './coverage-validator.js';
 import { reconcileSpuriousNoGo, reconcileRubricNoGo } from './mid-sprint-adapter.js';
@@ -2292,6 +2292,27 @@ export function classifyHonestyViolation(
  *   - notes deliberately DO NOT contain "Docker worker exited without writing result file"
  *     so tryCodeVerifiedDone returns NOT_TRIGGERED (honest NO_GO preserved).
  */
+/**
+ * P0-B (B-SENTINEL-CLOBBER, sprint-323): true when a task already has a real
+ * result archived under `.brain/archive/sprint-*-tasks/`. A missing `.tasks`
+ * result is NOT a crash when the sprint was already finalized — the result was
+ * moved to the archive. Used to suppress a late honest-gate sentinel that would
+ * otherwise clobber the real (archived) verdict.
+ */
+function archivedResultExists(projectRoot: string, taskId: string): boolean {
+  try {
+    const archiveRoot = join(projectRoot, BRAIN_DIR, ARCHIVE_DIR);
+    if (!existsSync(archiveRoot)) return false;
+    for (const dir of readdirSync(archiveRoot)) {
+      if (!dir.endsWith('-tasks')) continue;
+      if (existsSync(join(archiveRoot, dir, `task-${taskId}.result`))) return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export function writeHonestSentinelResult(
   projectRoot: string,
   taskId: string,
@@ -2299,13 +2320,29 @@ export function writeHonestSentinelResult(
   reason: string,
 ): void {
   const tasksDir = join(projectRoot, TASKS_DIR);
+  const resultPath = join(tasksDir, `task-${taskId}.result`);
+
+  // P0-B (B-SENTINEL-CLOBBER): NEVER overwrite a real result with a crash
+  // sentinel. If a `.result` is already present (worker wrote one) OR the task was
+  // already evaluated + archived (sprint finalized → absence is archiving, not a
+  // crash), skip. sprint-323: finalize --force archived 26 real results, then a
+  // late honest-gate pass (orphan RETRO) overwrote them with worker-crashed-no-
+  // result NO_GO sentinels, destroying the true verdicts.
+  if (existsSync(resultPath)) {
+    debugLog('writeHonestSentinelResult:skip-existing', `task ${taskId} already has a .result — not clobbering`);
+    return;
+  }
+  if (archivedResultExists(projectRoot, taskId)) {
+    debugLog('writeHonestSentinelResult:skip-archived', `task ${taskId} already archived (sprint finalized) — not clobbering`);
+    return;
+  }
+
   try {
     mkdirSync(tasksDir, { recursive: true });
   } catch (e) {
     debugLog('writeHonestSentinelResult:mkdir', e);
   }
 
-  const resultPath = join(tasksDir, `task-${taskId}.result`);
   const sentinel: TaskResult = {
     taskId,
     workerId: 'brain-honest-gate',
