@@ -1,0 +1,393 @@
+/**
+ * Task 11 — TDD: inbound voice → STT → agentic turn, reply-in-kind TTS → sendVoice
+ *
+ * Tests that bootstrapConnectorCommands:
+ *   1. When an IncomingMessage carries raw.voice AND voiceAdapter exists AND botCapabilities.voice.stt=true:
+ *      calls getFileBuffer(raw.voice.fileId) → voice.transcribe(data, mime) → routes transcribed text to chat
+ *   2. reply-in-kind + voice-origin → voice.synthesize(stripped reply) → connector.sendVoice(channelId, audio)
+ *      AND skips the text reply (no sendMessage for the reply body)
+ *   3. tts='always' → synthesize + sendVoice regardless of origin
+ *   4. text-origin turn → no sendVoice, never (even with tts=always on text turns this path is text-only)
+ *   5. Transcribe failure → fall back to text path, never crash the turn
+ *   6. Synthesize failure → fall back to text reply, never crash the turn
+ *   7. sendVoice failure → fall back to text reply, never crash the turn
+ *   8. voiceAdapter absent → no voice processing (backward-compat)
+ *   9. voice disabled (stt=false) → no STT, no voice download
+ */
+
+import { describe, it, expect, vi } from 'vitest';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { mkdtempSync } from 'node:fs';
+import { bootstrapConnectorCommands } from '../../src/connectors/connector-bootstrap.js';
+import type { IMessageConnector, IncomingMessage, MessageHandler } from '../../src/connectors/types.js';
+import type { VoiceAdapter } from '../../src/connectors/voice/types.js';
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function makeTmpRoot(): string {
+  return mkdtempSync(join(tmpdir(), 'deckent-voice-wire-test-'));
+}
+
+/** Fake connector with getFileBuffer + sendVoice support. */
+function fakeVoiceConnector(audioBuffer: Buffer, mime: string) {
+  let handler: MessageHandler | undefined;
+  return {
+    id: 'telegram' as const,
+    name: 'Telegram',
+    start: vi.fn(async () => {}),
+    startOutbound: vi.fn(async () => {}),
+    stop: vi.fn(async () => {}),
+    sendMessage: vi.fn(async () => {}),
+    onMessage: vi.fn((h: MessageHandler) => { handler = h; }),
+    isHealthy: () => true,
+    getFileBuffer: vi.fn(async (_fileId: string) => ({ data: audioBuffer, mime })),
+    sendVoice: vi.fn(async () => {}),
+    _emit: (m: IncomingMessage) => handler?.(m),
+  };
+}
+
+/** Incoming message with raw.voice (inbound voice note). */
+function incomingVoice(channelId: string, text: string = ''): IncomingMessage {
+  return {
+    id: 'msg-voice-1',
+    connector: 'telegram',
+    fromUser: 'u1',
+    channelId,
+    text,
+    timestamp: new Date().toISOString(),
+    raw: {
+      voice: {
+        fileId: 'AwABAgAD_voice_id',
+        mime: 'audio/ogg',
+        duration: 5,
+      },
+    },
+  };
+}
+
+/** Incoming plain text message (no raw.voice). */
+function incomingText(channelId: string, text: string): IncomingMessage {
+  return {
+    id: 'msg-text-1',
+    connector: 'telegram',
+    fromUser: 'u1',
+    channelId,
+    text,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+/** Fake VoiceAdapter — transcribe → "take a screenshot", synthesize → Buffer with audio. */
+function fakeVoiceAdapter(
+  transcribeResult = 'take a screenshot',
+  synthesizeResult = { data: Buffer.from('audio-bytes'), mime: 'audio/ogg' },
+): VoiceAdapter {
+  return {
+    transcribe: vi.fn(async () => transcribeResult),
+    synthesize: vi.fn(async () => synthesizeResult),
+  };
+}
+
+const cfg = { telegram: { enabled: true, token: 'bot:tok', chat_id: '555' } };
+
+// ─── Tests ───────────────────────────────────────────────────────────────────
+
+describe('voice wiring: inbound STT → agentic turn', () => {
+  it('voice message: getFileBuffer called, transcribe called, chat receives transcribed text', async () => {
+    const root = makeTmpRoot();
+    const audioBytes = Buffer.from([0x4f, 0x67, 0x67, 0x53]); // OGG magic bytes
+    const fake = fakeVoiceConnector(audioBytes, 'audio/ogg');
+    const voice = fakeVoiceAdapter('take a screenshot');
+
+    const chatCalls: Array<{ channelId: string; text: string }> = [];
+    const chat = vi.fn(async (channelId: string, text: string) => {
+      chatCalls.push({ channelId, text });
+      return 'Screenshot taken.';
+    });
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'off' } },
+    });
+
+    fake._emit(incomingVoice('555'));
+
+    await vi.waitFor(() => expect(chatCalls.length).toBeGreaterThan(0));
+
+    // getFileBuffer called with the voice fileId
+    expect(fake.getFileBuffer).toHaveBeenCalledWith('AwABAgAD_voice_id');
+    // transcribe called with audio bytes
+    expect(voice.transcribe).toHaveBeenCalledWith(audioBytes, 'audio/ogg');
+    // chat received the transcribed text
+    expect(chatCalls[0]!.text).toBe('take a screenshot');
+  });
+
+  it('voice + stt=false → no getFileBuffer, no transcribe, text passed unchanged', async () => {
+    const root = makeTmpRoot();
+    const fake = fakeVoiceConnector(Buffer.from(''), 'audio/ogg');
+    const voice = fakeVoiceAdapter();
+
+    const chatCalls: Array<{ text: string }> = [];
+    const chat = vi.fn(async (_c: string, text: string) => {
+      chatCalls.push({ text });
+      return 'ok';
+    });
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: false, tts: 'off' } },
+    });
+
+    fake._emit(incomingVoice('555', 'original text'));
+
+    await vi.waitFor(() => expect(chatCalls.length).toBeGreaterThan(0));
+
+    // stt disabled: no download, no transcribe
+    expect(fake.getFileBuffer).not.toHaveBeenCalled();
+    expect(voice.transcribe).not.toHaveBeenCalled();
+    // text passed through as-is (empty because voice messages typically have no text)
+    expect(chatCalls[0]!.text).toBe('original text');
+  });
+
+  it('voiceAdapter absent → voice message passes through (no download, backward-compat)', async () => {
+    const root = makeTmpRoot();
+    const fake = fakeVoiceConnector(Buffer.from(''), 'audio/ogg');
+
+    const chatCalls: Array<{ text: string }> = [];
+    const chat = vi.fn(async (_c: string, text: string) => {
+      chatCalls.push({ text });
+      return 'ok';
+    });
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat,
+      // voiceAdapter NOT provided
+    });
+
+    fake._emit(incomingVoice('555', 'voice text'));
+
+    await vi.waitFor(() => expect(chatCalls.length).toBeGreaterThan(0));
+
+    // No voice processing — getFileBuffer NOT called
+    expect(fake.getFileBuffer).not.toHaveBeenCalled();
+  });
+
+  it('transcribe failure → fall back to text path, no crash, no sendVoice', async () => {
+    const root = makeTmpRoot();
+    const fake = fakeVoiceConnector(Buffer.from([0x4f, 0x67, 0x67, 0x53]), 'audio/ogg');
+    const voice: VoiceAdapter = {
+      transcribe: vi.fn(async () => { throw new Error('STT unavailable'); }),
+      synthesize: vi.fn(async () => ({ data: Buffer.from(''), mime: 'audio/ogg' })),
+    };
+
+    const chatCalls: Array<{ text: string }> = [];
+    const chat = vi.fn(async (_c: string, text: string) => {
+      chatCalls.push({ text });
+      return 'fallback reply';
+    });
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'reply-in-kind' } },
+    });
+
+    fake._emit(incomingVoice('555'));
+
+    // Must not crash — wait a bit for the fallback path
+    await new Promise((r) => setTimeout(r, 80));
+
+    // sendVoice must NOT be called (STT failed → no voice-origin → no TTS)
+    expect(fake.sendVoice).not.toHaveBeenCalled();
+    // No crash: test completes normally
+  });
+});
+
+describe('voice wiring: reply-in-kind TTS', () => {
+  it('reply-in-kind + voice-origin → sendVoice called, no text sendMessage for reply body', async () => {
+    const root = makeTmpRoot();
+    const audioBytes = Buffer.from([0x4f, 0x67, 0x67, 0x53]);
+    const fake = fakeVoiceConnector(audioBytes, 'audio/ogg');
+    const synthAudio = { data: Buffer.from('synth-bytes'), mime: 'audio/ogg' };
+    const voice = fakeVoiceAdapter('take a screenshot', synthAudio);
+
+    const chat = vi.fn(async () => '**Screenshot taken.** Done!');
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'reply-in-kind' } },
+    });
+
+    fake._emit(incomingVoice('555'));
+
+    // Wait for the full STT → chat → TTS → sendVoice pipeline
+    await vi.waitFor(() => expect(fake.sendVoice).toHaveBeenCalledTimes(1));
+
+    // sendVoice called with the synthesized audio
+    expect(fake.sendVoice).toHaveBeenCalledWith('555', synthAudio);
+
+    // synthesize was called with stripped text (no markdown)
+    expect(voice.synthesize).toHaveBeenCalled();
+    const synthCall = (voice.synthesize as ReturnType<typeof vi.fn>).mock.calls[0] as [string, unknown];
+    // should NOT contain markdown bold markers
+    expect(synthCall[0]).not.toContain('**');
+    expect(synthCall[0]).toContain('Screenshot taken.');
+
+    // no text reply sendMessage for the reply body (voice-only path)
+    // (thinking ack is ok, but the reply text itself should not be sent)
+    const replyBodyCalls = fake.sendMessage.mock.calls.filter(
+      (c) => (c[0] as { text: string }).text?.includes('Screenshot taken'),
+    );
+    expect(replyBodyCalls).toHaveLength(0);
+  });
+
+  it('tts=always + voice-origin → sendVoice called', async () => {
+    const root = makeTmpRoot();
+    const fake = fakeVoiceConnector(Buffer.from([0x4f]), 'audio/ogg');
+    const synthAudio = { data: Buffer.from('voice-reply'), mime: 'audio/mp3' };
+    const voice = fakeVoiceAdapter('hello world', synthAudio);
+    const chat = vi.fn(async () => 'Hello back.');
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'always' } },
+    });
+
+    fake._emit(incomingVoice('555'));
+
+    await vi.waitFor(() => expect(fake.sendVoice).toHaveBeenCalledTimes(1));
+    expect(fake.sendVoice).toHaveBeenCalledWith('555', synthAudio);
+  });
+
+  it('text-origin + tts=always → NO sendVoice (text-origin never triggers TTS)', async () => {
+    const root = makeTmpRoot();
+    const fake = fakeVoiceConnector(Buffer.from([0x4f]), 'audio/ogg');
+    const voice = fakeVoiceAdapter();
+    const chat = vi.fn(async () => 'Text reply.');
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'always' } },
+    });
+
+    fake._emit(incomingText('555', 'hello'));
+
+    // Wait for chat reply
+    await vi.waitFor(() => expect(chat).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 50));
+
+    // No sendVoice for text-origin turns
+    expect(fake.sendVoice).not.toHaveBeenCalled();
+  });
+
+  it('tts=off → never sendVoice even for voice-origin', async () => {
+    const root = makeTmpRoot();
+    const fake = fakeVoiceConnector(Buffer.from([0x4f, 0x67, 0x67, 0x53]), 'audio/ogg');
+    const voice = fakeVoiceAdapter('hi');
+    const chat = vi.fn(async () => 'Hi back.');
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'off' } },
+    });
+
+    fake._emit(incomingVoice('555'));
+
+    await vi.waitFor(() => expect(chat).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(fake.sendVoice).not.toHaveBeenCalled();
+  });
+
+  it('synthesize failure → fall back to text reply, no crash', async () => {
+    const root = makeTmpRoot();
+    const fake = fakeVoiceConnector(Buffer.from([0x4f, 0x67, 0x67, 0x53]), 'audio/ogg');
+    const voice: VoiceAdapter = {
+      transcribe: vi.fn(async () => 'hi'),
+      synthesize: vi.fn(async () => { throw new Error('TTS unavailable'); }),
+    };
+    const chat = vi.fn(async () => 'Hello reply text.');
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'reply-in-kind' } },
+    });
+
+    fake._emit(incomingVoice('555'));
+
+    // Should fall back to text reply (sendMessage), not crash
+    await vi.waitFor(() => {
+      const allTexts = fake.sendMessage.mock.calls.map((c) => (c[0] as { text: string }).text).join('\n');
+      expect(allTexts).toContain('Hello reply text.');
+    });
+    // sendVoice not called (synthesize failed)
+    expect(fake.sendVoice).not.toHaveBeenCalled();
+  });
+
+  it('sendVoice failure → fall back to text reply, no crash', async () => {
+    const root = makeTmpRoot();
+    const audioBytes = Buffer.from([0x4f, 0x67, 0x67, 0x53]);
+    const synthAudio = { data: Buffer.from('synth'), mime: 'audio/ogg' };
+    const voice = fakeVoiceAdapter('hi', synthAudio);
+    const sendVoiceFn = vi.fn(async () => { throw new Error('sendVoice network error'); });
+    let handler: MessageHandler | undefined;
+    const fake = {
+      id: 'telegram' as const,
+      name: 'Telegram',
+      start: vi.fn(async () => {}),
+      startOutbound: vi.fn(async () => {}),
+      stop: vi.fn(async () => {}),
+      sendMessage: vi.fn(async () => {}),
+      onMessage: vi.fn((h: MessageHandler) => { handler = h; }),
+      isHealthy: () => true,
+      getFileBuffer: vi.fn(async () => ({ data: audioBytes, mime: 'audio/ogg' })),
+      sendVoice: sendVoiceFn,
+      _emit: (m: IncomingMessage) => handler?.(m),
+    };
+
+    const chat = vi.fn(async () => 'Fallback text reply.');
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'reply-in-kind' } },
+    });
+
+    fake._emit(incomingVoice('555'));
+
+    // After sendVoice throws, text reply should be sent as fallback
+    await vi.waitFor(() => {
+      const allTexts = fake.sendMessage.mock.calls.map((c) => (c[0] as { text: string }).text).join('\n');
+      expect(allTexts).toContain('Fallback text reply.');
+    });
+    expect(sendVoiceFn).toHaveBeenCalled(); // was attempted
+  });
+});

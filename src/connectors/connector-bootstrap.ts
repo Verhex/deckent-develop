@@ -38,6 +38,7 @@ import { defaultSpawn } from './capabilities/spawn.js';
 import { loadNodemailerTransport } from './capabilities/mail-transport.js';
 import { createArtifactStore } from './capabilities/artifacts.js';
 import type { ArtifactStore } from './capabilities/types.js';
+import type { VoiceAdapter } from './voice/types.js';
 
 type NotifyConnectorsConfig = NonNullable<DeckentConfig['notify_connectors']>;
 
@@ -46,6 +47,38 @@ interface InboundMediaRaw {
   readonly fileId: string;
   readonly filename: string;
   readonly mime: string;
+}
+
+/** Shape of raw.voice as set by TelegramConnector inbound voice-note handlers. */
+interface InboundVoiceRaw {
+  readonly fileId: string;
+  readonly mime: string;
+  readonly duration?: number;
+}
+
+/**
+ * Strip Markdown and HTML formatting from a string, producing clean text
+ * suitable for TTS synthesis.  Handles the most common patterns from the
+ * Telegram/Markdown render pipeline without pulling in a full DOM parser.
+ */
+function stripFormatting(text: string): string {
+  return text
+    // HTML tags (bold, italic, code, etc.)
+    .replace(/<[^>]+>/g, '')
+    // Markdown bold / italic (** and __)
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/__(.+?)__/g, '$1')
+    // Markdown italic (* and _)
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/_(.+?)_/g, '$1')
+    // Markdown inline code
+    .replace(/`(.+?)`/g, '$1')
+    // Markdown code blocks (``` ... ```)
+    .replace(/```[\s\S]*?```/g, '')
+    // Markdown links [text](url) → text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    // Trim surrounding whitespace
+    .trim();
 }
 
 /**
@@ -84,6 +117,47 @@ async function handleInboundMedia(
   } catch {
     // Download/register failure must never crash the inbound poller
     return msg;
+  }
+}
+
+/**
+ * If msg.raw carries a `voice` field (inbound voice note from Telegram),
+ * download it via connector.getFileBuffer, transcribe via voiceAdapter.transcribe,
+ * and return a new message whose text is the transcribed text with voiceOrigin=true
+ * injected into the raw field.
+ *
+ * When voiceAdapter is absent, stt is disabled, getFileBuffer is absent, or any
+ * step fails, returns the original message unchanged (graceful degrade — never
+ * crashes the inbound loop).  The returned value also carries `voiceOrigin: true`
+ * in raw only when transcription succeeded, so the reply path can decide TTS.
+ */
+async function handleInboundVoice(
+  msg: import('./types.js').IncomingMessage,
+  connector: import('./types.js').IMessageConnector,
+  voiceAdapter: VoiceAdapter | null | undefined,
+  sttEnabled: boolean,
+): Promise<{ msg: import('./types.js').IncomingMessage; voiceOrigin: boolean }> {
+  const raw = msg.raw as Record<string, unknown> | undefined;
+  if (!raw || typeof raw !== 'object') return { msg, voiceOrigin: false };
+  const voiceRaw = raw['voice'] as InboundVoiceRaw | undefined;
+  if (!voiceRaw || typeof voiceRaw.fileId !== 'string') return { msg, voiceOrigin: false };
+  if (!voiceAdapter || !sttEnabled) return { msg, voiceOrigin: false };
+
+  const getFileBuffer = (connector as unknown as {
+    getFileBuffer?: (fileId: string) => Promise<{ data: Buffer; mime: string; filename?: string }>;
+  }).getFileBuffer;
+  if (typeof getFileBuffer !== 'function') return { msg, voiceOrigin: false };
+
+  try {
+    const { data, mime } = await getFileBuffer.call(connector, voiceRaw.fileId);
+    const transcribed = await voiceAdapter.transcribe(data, mime);
+    return {
+      msg: { ...msg, text: transcribed, raw: { ...raw, voiceOrigin: true } },
+      voiceOrigin: true,
+    };
+  } catch {
+    // Download or transcription failure must never crash the inbound poller
+    return { msg, voiceOrigin: false };
   }
 }
 
@@ -211,6 +285,16 @@ export interface ConnectorCommandsDeps extends ConnectorBootstrapDeps {
    * Default: undefined → { enabled: false } → capabilities surface is OFF.
    */
   botCapabilities?: import('./capabilities/types.js').BotCapabilitiesConfig;
+  /**
+   * Task 11 (Phase C) — VoiceAdapter for inbound STT + reply TTS.
+   * When provided and botCapabilities.voice.stt is true, inbound voice messages
+   * are transcribed before being routed to the chat responder.  When
+   * botCapabilities.voice.tts is not 'off', replies to voice-origin turns (or
+   * all turns when tts='always') are synthesized and sent via connector.sendVoice.
+   * Default: undefined → voice processing is OFF (backward-compat).
+   * Task 13 will unify this with the capability context; for now we accept it here.
+   */
+  voiceAdapter?: VoiceAdapter | null;
 }
 
 export interface ConnectorCommandsHandle {
@@ -247,6 +331,12 @@ export async function bootstrapConnectorCommands(
   // the capability context; for now we construct one locally here. The store writes
   // to <root>/.deckent/artifacts/ which is created on first use.
   const artifactStore: ArtifactStore = createArtifactStore(root);
+  // Voice adapter — Task 11 (Phase C): inbound STT + reply-in-kind TTS.
+  // deps.voiceAdapter takes precedence; Task 13 will unify with the capability context.
+  const voiceAdapter: VoiceAdapter | null = deps.voiceAdapter ?? null;
+  const voiceCfg = deps.botCapabilities?.voice;
+  const sttEnabled = Boolean(voiceCfg?.stt);
+  const ttsModeValue = voiceCfg?.tts ?? 'off';
   // Capability registry — shared across the bootstrap lifecycle (flag-gated default-off).
   const capRegistry = createBuiltinRegistry();
   // Composite resolver: a parked bot-action (slice 2b) is the THIRD gate type —
@@ -402,6 +492,48 @@ export async function bootstrapConnectorCommands(
           }
         };
         const chat = deps.chat;
+        // Task 11: track whether the current inbound turn was voice-origin so the
+        // onChat handler can decide whether to TTS-reply.  A simple per-channel map
+        // keyed on channelId is safe: turns for the same channel are serialized by
+        // the command router (one turn at a time per channel), so there is no race.
+        const pendingVoiceOrigin = new Map<string, boolean>();
+
+        /**
+         * Task 11: attempt TTS + sendVoice after a reply is produced.
+         * Returns true when voice was sent (caller skips text reply for reply-in-kind).
+         * Returns false on any error (caller falls through to text reply).
+         */
+        const tryReplyWithVoice = async (
+          channelId: string,
+          replyText: string,
+          isVoiceOrigin: boolean,
+        ): Promise<boolean> => {
+          if (!voiceAdapter) return false;
+          // Text-origin turns NEVER trigger TTS regardless of mode — task brief §T11.
+          // 'always'       → synthesize only when inbound was a voice turn
+          // 'reply-in-kind'→ synthesize only when inbound was a voice turn
+          // 'off' (default)→ never
+          if (!isVoiceOrigin) return false;
+          const tts = ttsModeValue;
+          const shouldTts = tts === 'always' || tts === 'reply-in-kind';
+          if (!shouldTts) return false;
+
+          const sendVoiceFn = (connector as unknown as {
+            sendVoice?: (channelId: string, audio: { data: Buffer; mime: string }) => Promise<void>;
+          }).sendVoice;
+          if (typeof sendVoiceFn !== 'function') return false;
+
+          try {
+            const stripped = stripFormatting(replyText);
+            const audio = await voiceAdapter.synthesize(stripped);
+            await sendVoiceFn.call(connector, channelId, audio);
+            return true; // voice sent — for reply-in-kind, skip text reply
+          } catch {
+            // TTS or sendVoice failure → honest degrade → caller sends text reply
+            return false;
+          }
+        };
+
         const commandRouter = makeIncomingCommandRouter({
             authorizedChatIds: [chatId],
             resolve,
@@ -411,6 +543,10 @@ export async function bootstrapConnectorCommands(
             ...(chat
               ? {
                   onChat: async (channelId: string, text: string): Promise<void> => {
+                    // Consume voice-origin flag for THIS turn (set by onMessage below).
+                    const isVoiceOrigin = pendingVoiceOrigin.get(channelId) ?? false;
+                    pendingVoiceOrigin.delete(channelId);
+
                     // Authorized non-command. The router already enforced the
                     // chat_id chokepoint.
                     try {
@@ -467,6 +603,8 @@ export async function bootstrapConnectorCommands(
                         } else {
                           await sendRich(channelId, body);
                         }
+                        // Task 11 TTS (streaming path): attempt after full reply is assembled
+                        await tryReplyWithVoice(channelId, body, isVoiceOrigin);
                       } else {
                         // Non-streaming fallback — rich reply.
                         // Slice 1.1: pass the live connector as the per-turn mediaConnector so
@@ -474,7 +612,13 @@ export async function bootstrapConnectorCommands(
                         await send(channelId, getMessage('bot.chat_thinking', lang));
                         const reply = await chat(channelId, text, connector as PerTurnMediaConnector);
                         const body = reply.trim() || getMessage('bot.chat_empty', lang);
-                        await sendRich(channelId, body);
+                        // Task 11 TTS: try voice reply first; for reply-in-kind + voice-origin
+                        // skip the text reply when voice succeeded.
+                        const sentVoice = await tryReplyWithVoice(channelId, body, isVoiceOrigin);
+                        const skipTextReply = sentVoice && (ttsModeValue === 'reply-in-kind' && isVoiceOrigin);
+                        if (!skipTextReply) {
+                          await sendRich(channelId, body);
+                        }
                       }
                     } catch {
                       await send(channelId, getMessage('bot.chat_error', lang)).catch(() => undefined);
@@ -483,15 +627,26 @@ export async function bootstrapConnectorCommands(
                 }
               : {}),
           });
-        // Inbound media gate (Task 8): if a message carries raw.media (photo/document),
-        // download the file via getFileBuffer, register as artifact, prepend [attached]
-        // to the text — BEFORE the command router sees the message (the router then passes
-        // the enriched text to onChat). Best-effort: any failure leaves the original message.
+        // Inbound media gate (Task 8) + voice gate (Task 11):
+        //   1. If raw.media → download + register artifact + prepend [attached]
+        //   2. If raw.voice + voiceAdapter + stt → download + transcribe → replace text
+        //      and set pendingVoiceOrigin[channelId]=true so onChat knows the origin.
+        // Both gates are best-effort: any failure leaves the original message.
         connector.onMessage((msg) => {
-          void handleInboundMedia(msg, connector, artifactStore, lang).then((processedMsg) => {
-            commandRouter(processedMsg);
-          }).catch(() => {
-            // Fail-safe: media processing error must never crash the inbound poller
+          void (async () => {
+            // Gate 1: inbound media (Task 8)
+            let processedMsg = await handleInboundMedia(msg, connector, artifactStore, lang).catch(() => msg);
+            // Gate 2: inbound voice (Task 11)
+            const { msg: voiceMsg, voiceOrigin } = await handleInboundVoice(
+              processedMsg, connector, voiceAdapter, sttEnabled,
+            ).catch(() => ({ msg: processedMsg, voiceOrigin: false }));
+            if (voiceOrigin) {
+              // Mark this channel's next onChat turn as voice-origin for TTS reply decision.
+              pendingVoiceOrigin.set(voiceMsg.channelId, true);
+            }
+            commandRouter(voiceMsg);
+          })().catch(() => {
+            // Fail-safe: any gate error must never crash the inbound poller
             commandRouter(msg);
           });
         });

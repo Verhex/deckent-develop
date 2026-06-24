@@ -1883,6 +1883,16 @@ const MESSAGES: MessageMap = {
     en: '[attached: {id}, {filename}]',
     tr: '[ek: {id}, {filename}]',
   },
+
+  // ─── Voice wiring (Task 11 — inbound STT → turn, reply-in-kind TTS) ─────────
+  'voice.transcribe.error': {
+    en: '[voice: transcription unavailable — sending voice note as text]',
+    tr: '[ses: transkripsiyon mevcut değil — ses notu metin olarak gönderildi]',
+  },
+  'voice.tts.error': {
+    en: '[voice: synthesis failed — sending reply as text]',
+    tr: '[ses: sentez başarısız — yanıt metin olarak gönderildi]',
+  },
 };
 
 /**
