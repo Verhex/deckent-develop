@@ -36,8 +36,58 @@ import { createBuiltinRegistry, buildMediaSink, runCapability } from './capabili
 import { detectPlatform } from './capabilities/platform.js';
 import { defaultSpawn } from './capabilities/spawn.js';
 import { loadNodemailerTransport } from './capabilities/mail-transport.js';
+import { createArtifactStore } from './capabilities/artifacts.js';
+import type { ArtifactStore } from './capabilities/types.js';
 
 type NotifyConnectorsConfig = NonNullable<DeckentConfig['notify_connectors']>;
+
+/** Shape of raw.media as set by TelegramConnector inbound photo/document handlers. */
+interface InboundMediaRaw {
+  readonly fileId: string;
+  readonly filename: string;
+  readonly mime: string;
+}
+
+/**
+ * If msg.raw carries a `media` field (inbound photo/document from Telegram),
+ * download it via connector.getFileBuffer, register as an artifact for the channel,
+ * and return a new message whose text has `[attached: <id>, <filename>]` prepended.
+ * When getFileBuffer is absent (connector doesn't support it) or any step fails,
+ * returns the original message unchanged (graceful degrade — never crashes the inbound loop).
+ */
+async function handleInboundMedia(
+  msg: import('./types.js').IncomingMessage,
+  connector: import('./types.js').IMessageConnector,
+  artifactStore: ArtifactStore,
+  lang: string,
+): Promise<import('./types.js').IncomingMessage> {
+  const raw = msg.raw as Record<string, unknown> | undefined;
+  if (!raw || typeof raw !== 'object') return msg;
+  const media = raw['media'] as InboundMediaRaw | undefined;
+  if (!media || typeof media.fileId !== 'string') return msg;
+
+  const getFileBuffer = (connector as unknown as {
+    getFileBuffer?: (fileId: string) => Promise<{ data: Buffer; mime: string; filename?: string }>;
+  }).getFileBuffer;
+  if (typeof getFileBuffer !== 'function') return msg; // graceful degrade
+
+  try {
+    const { data, filename: dlFilename } = await getFileBuffer.call(connector, media.fileId);
+    const ref = artifactStore.register(msg.channelId, {
+      filename: media.filename,
+      mime: media.mime,
+      data,
+    });
+    const notice = getMessage('cap.inbound.attached', lang, { id: ref.id, filename: ref.filename });
+    const text = msg.text ? `${notice}\n${msg.text}` : notice;
+    // Suppress unused variable warning — dlFilename used for future extension
+    void dlFilename;
+    return { ...msg, text };
+  } catch {
+    // Download/register failure must never crash the inbound poller
+    return msg;
+  }
+}
 
 export interface ConnectorBootstrapDeps {
   /** Test/override hook: construct a connector instead of lazy-loading the real module. */
@@ -195,6 +245,10 @@ export async function bootstrapConnectorCommands(
   const lang = deps.lang ?? 'en';
   const gateResolve = deps.resolve ?? makeCommandResolver(root, {}, lang);
   const actionDispatcher = deps.actionDispatcher ?? createCliToolDispatcher();
+  // Artifact store — used for inbound media (Task 8). Task 13 will unify this with
+  // the capability context; for now we construct one locally here. The store writes
+  // to <root>/.deckent/artifacts/ which is created on first use.
+  const artifactStore: ArtifactStore = createArtifactStore(root);
   // Capability registry — shared across the bootstrap lifecycle (flag-gated default-off).
   const capRegistry = createBuiltinRegistry();
   // Composite resolver: a parked bot-action (slice 2b) is the THIRD gate type —
@@ -431,7 +485,18 @@ export async function bootstrapConnectorCommands(
                 }
               : {}),
           });
-        connector.onMessage(commandRouter);
+        // Inbound media gate (Task 8): if a message carries raw.media (photo/document),
+        // download the file via getFileBuffer, register as artifact, prepend [attached]
+        // to the text — BEFORE the command router sees the message (the router then passes
+        // the enriched text to onChat). Best-effort: any failure leaves the original message.
+        connector.onMessage((msg) => {
+          void handleInboundMedia(msg, connector, artifactStore, lang).then((processedMsg) => {
+            commandRouter(processedMsg);
+          }).catch(() => {
+            // Fail-safe: media processing error must never crash the inbound poller
+            commandRouter(msg);
+          });
+        });
         // Rich-approval bot: a button press (Telegram callback_query) becomes a
         // synthetic `approve <id>` / `reject <id>` command fed to the SAME router —
         // reusing the chat-id auth chokepoint, the gate resolve, and the ack reply.

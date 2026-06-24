@@ -1877,6 +1877,12 @@ const MESSAGES: MessageMap = {
     en: '[media: {filename} — this connector cannot display it]',
     tr: '[medya: {filename} — bu connector gösteremiyor]',
   },
+
+  // ─── Inbound media artifact attachment notice (Task 8 — inbound media → artifact) ──
+  'cap.inbound.attached': {
+    en: '[attached: {id}, {filename}]',
+    tr: '[ek: {id}, {filename}]',
+  },
 };
 
 /**

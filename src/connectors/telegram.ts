@@ -18,6 +18,8 @@ interface SendExtra {
 /** Minimal grammY Bot surface we rely on (avoids an import-time hard dependency). */
 interface GrammyBotInstance {
   on(filter: 'message:text', handler: (ctx: GrammyTextContext) => void): void;
+  on(filter: 'message:photo', handler: (ctx: GrammyPhotoContext) => void): void;
+  on(filter: 'message:document', handler: (ctx: GrammyDocumentContext) => void): void;
   on(filter: 'callback_query:data', handler: (ctx: GrammyCallbackContext) => void): void;
   start(opts?: { drop_pending_updates?: boolean }): Promise<void>;
   stop(): Promise<void>;
@@ -27,6 +29,7 @@ interface GrammyBotInstance {
     sendChatAction(chatId: string | number, action: string): Promise<unknown>;
     sendPhoto(chatId: string | number, photo: unknown, other?: { caption?: string }): Promise<unknown>;
     sendDocument(chatId: string | number, doc: unknown, other?: { caption?: string }): Promise<unknown>;
+    getFile(fileId: string): Promise<{ file_id: string; file_path?: string; file_size?: number }>;
   };
 }
 
@@ -41,6 +44,31 @@ interface GrammyTextContext {
   chat: { id: number };
 }
 
+/** grammY context for a photo message (message:photo update). */
+interface GrammyPhotoContext {
+  /** photo is an array of PhotoSize objects; last entry is the largest. */
+  message: {
+    message_id: number;
+    date: number;
+    photo: ReadonlyArray<{ file_id: string; file_size?: number; width: number; height: number }>;
+    caption?: string;
+  };
+  from: { id: number };
+  chat: { id: number };
+}
+
+/** grammY context for a document message (message:document update). */
+interface GrammyDocumentContext {
+  message: {
+    message_id: number;
+    date: number;
+    document: { file_id: string; file_name?: string; mime_type?: string; file_size?: number };
+    caption?: string;
+  };
+  from: { id: number };
+  chat: { id: number };
+}
+
 /** grammY context for an inline-button press (callback_query:data update). */
 interface GrammyCallbackContext {
   callbackQuery: { id?: string; data?: string };
@@ -50,6 +78,19 @@ interface GrammyCallbackContext {
   answerCallbackQuery?: () => Promise<unknown>;
 }
 
+/** Map file extension to MIME type for inbound file downloads. */
+const EXT_TO_MIME: Readonly<Record<string, string>> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  mp4: 'video/mp4',
+  pdf: 'application/pdf',
+  mp3: 'audio/mpeg',
+  ogg: 'audio/ogg',
+};
+
 export class TelegramConnector extends BaseConnector {
   readonly id = 'telegram' as const;
   readonly name = 'Telegram';
@@ -57,6 +98,8 @@ export class TelegramConnector extends BaseConnector {
   private bot?: GrammyBotInstance;
   private callbackHandler?: (cb: IncomingCallback) => void;
   private InputFileCtor?: InputFileCtor;
+  /** Bot token stored at start() time — required to build Telegram file download URLs. */
+  private botToken?: string;
 
   /** Allow injecting a grammY Bot constructor and InputFile constructor for testing. */
   constructor(private readonly BotClass?: GrammyBotConstructor, InputFileCtorArg?: InputFileCtor) {
@@ -77,6 +120,7 @@ export class TelegramConnector extends BaseConnector {
   async start(config: ConnectorConfig): Promise<void> {
     if (!config.enabled) { await super.start(config); return; }
 
+    this.botToken = config.token;
     const BotCtor = this.BotClass ?? await this.loadGrammy();
     this.bot = new BotCtor(config.token);
 
@@ -89,6 +133,46 @@ export class TelegramConnector extends BaseConnector {
         text: ctx.message.text,
         timestamp: new Date(ctx.message.date * 1000).toISOString(),
         raw: ctx.message,
+      });
+    });
+
+    // Inbound photo — use the LARGEST size's file_id (last element per Telegram API).
+    this.bot.on('message:photo', (ctx: GrammyPhotoContext) => {
+      const sizes = ctx.message.photo;
+      const largest = sizes[sizes.length - 1];
+      if (!largest) return;
+      this.emitMessage({
+        id: String(ctx.message.message_id),
+        connector: 'telegram',
+        fromUser: String(ctx.from.id),
+        channelId: String(ctx.chat.id),
+        text: ctx.message.caption ?? '',
+        timestamp: new Date(ctx.message.date * 1000).toISOString(),
+        raw: {
+          ...ctx.message,
+          media: { fileId: largest.file_id, filename: 'photo.jpg', mime: 'image/jpeg' },
+        },
+      });
+    });
+
+    // Inbound document — carry file_id, file_name, mime_type.
+    this.bot.on('message:document', (ctx: GrammyDocumentContext) => {
+      const doc = ctx.message.document;
+      this.emitMessage({
+        id: String(ctx.message.message_id),
+        connector: 'telegram',
+        fromUser: String(ctx.from.id),
+        channelId: String(ctx.chat.id),
+        text: ctx.message.caption ?? '',
+        timestamp: new Date(ctx.message.date * 1000).toISOString(),
+        raw: {
+          ...ctx.message,
+          media: {
+            fileId: doc.file_id,
+            filename: doc.file_name ?? 'document',
+            mime: doc.mime_type ?? 'application/octet-stream',
+          },
+        },
       });
     });
 
@@ -126,6 +210,7 @@ export class TelegramConnector extends BaseConnector {
    */
   async startOutbound(config: ConnectorConfig): Promise<void> {
     if (!config.enabled) { await super.start(config); return; }
+    this.botToken = config.token;
     const BotCtor = this.BotClass ?? await this.loadGrammy();
     this.bot = new BotCtor(config.token);
     // No start() — outbound only.
@@ -191,6 +276,34 @@ export class TelegramConnector extends BaseConnector {
     const extra = media.caption ? { caption: media.caption } : undefined;
     if (media.kind === 'photo') await this.bot.api.sendPhoto(channelId, file, extra);
     else await this.bot.api.sendDocument(channelId, file, extra);
+  }
+
+  /**
+   * Fetch a platform file by fileId and return its raw buffer + mime + filename.
+   *
+   * Calls bot.api.getFile(fileId) to retrieve the file_path, then constructs
+   * the Telegram download URL: `https://api.telegram.org/file/bot<token>/<file_path>`
+   * and fetches it. MIME is derived from the file extension in file_path; falls back
+   * to `application/octet-stream` for unknown extensions.
+   */
+  async getFileBuffer(fileId: string): Promise<{ data: Buffer; mime: string; filename?: string }> {
+    if (!this.bot) throw new Error('Telegram connector not started');
+    if (!this.botToken) throw new Error('Telegram connector not started');
+
+    const fileInfo = await this.bot.api.getFile(fileId);
+    const filePath = fileInfo.file_path ?? '';
+    const url = `https://api.telegram.org/file/bot${this.botToken}/${filePath}`;
+
+    const res = await fetch(url);
+    const arrayBuf = await res.arrayBuffer();
+    const data = Buffer.from(arrayBuf);
+
+    // Derive mime and filename from the file_path (last path component)
+    const basename = filePath.split('/').pop() ?? filePath;
+    const ext = basename.split('.').pop()?.toLowerCase() ?? '';
+    const mime = EXT_TO_MIME[ext] ?? 'application/octet-stream';
+
+    return { data, mime, filename: basename || undefined };
   }
 
   isHealthy(): boolean {
