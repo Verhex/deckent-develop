@@ -31,6 +31,12 @@ export interface BotAction {
    * never hit a different/later sprint than the one it was about.
    */
   readonly boundSprintId?: string;
+  /**
+   * Platform message-id of the out-of-band button approval message sent by the
+   * bot connector. Set by the rich-approval flow so later tasks can edit/delete
+   * that message on resolve (e.g. replace buttons with a result line).
+   */
+  readonly approvalMessageId?: string;
 }
 
 export interface ParkBotActionInput {
@@ -41,6 +47,11 @@ export interface ParkBotActionInput {
   readonly ttlMs?: number;
   /** Active sprint id to bind (ignored unless the tool is sprint-scoped destructive). */
   readonly boundSprintId?: string;
+  /**
+   * Platform message-id of the out-of-band button approval message (rich-approval bot).
+   * Persisted so later pipeline tasks can edit/delete that message on action resolve.
+   */
+  readonly approvalMessageId?: string;
 }
 
 /** Default parked-action TTL: 1 hour. Long enough to act, short enough to bound staleness. */
@@ -109,6 +120,8 @@ export function parkBotAction(root: string, input: ParkBotActionInput): string {
     ...(input.boundSprintId && isSprintScopedDestructive(input.tool)
       ? { boundSprintId: input.boundSprintId }
       : {}),
+    // Persist the approval message-id when provided (rich-approval bot round-trip).
+    ...(input.approvalMessageId ? { approvalMessageId: input.approvalMessageId } : {}),
   };
   writeFileSync(actionPath(root, id), JSON.stringify(action, null, 2) + '\n', 'utf-8');
   return id;

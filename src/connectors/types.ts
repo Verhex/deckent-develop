@@ -115,6 +115,10 @@ export interface IMessageConnector {
   editMessage?(channelId: string, messageId: string, text: string, parseMode?: 'HTML' | 'MarkdownV2'): Promise<void>;
   /** Send a media attachment (photo or document) to a channel. Optional/feature-detected. */
   sendMedia?(channelId: string, media: MediaAttachment): Promise<void>;
+  /** Send a voice/audio message to a channel. Optional/feature-detected. */
+  sendVoice?(channelId: string, audio: { data: Buffer; mime: string }): Promise<void>;
+  /** Fetch a platform file by id and return its raw buffer + mime type. Optional/feature-detected. */
+  getFileBuffer?(fileId: string): Promise<{ data: Buffer; mime: string; filename?: string }>;
 
   /** Register a handler for incoming messages. Multiple handlers supported. */
   onMessage(handler: MessageHandler): void;
@@ -133,4 +137,19 @@ export interface ConnectorConfig {
   readonly webhookUrl?: string;
   /** Connector-specific options */
   readonly options?: Record<string, unknown>;
+}
+
+/**
+ * Per-turn connector subset — the minimal interface chat-turn handlers and
+ * streaming pipelines depend on. Extracted so turn-processing code can depend
+ * on this narrower contract instead of the full `IMessageConnector`, keeping
+ * the boundary explicit and easily mockable in tests.
+ */
+export interface PerTurnConnector {
+  readonly id: string;
+  sendMessage(msg: OutgoingMessage): Promise<void>;
+  sendMessageReturningId?(msg: OutgoingMessage): Promise<string | undefined>;
+  editMessage?(channelId: string, messageId: string, text: string, parseMode?: 'HTML' | 'MarkdownV2'): Promise<void>;
+  sendMedia?(channelId: string, media: MediaAttachment): Promise<void>;
+  sendVoice?(channelId: string, audio: { data: Buffer; mime: string }): Promise<void>;
 }
