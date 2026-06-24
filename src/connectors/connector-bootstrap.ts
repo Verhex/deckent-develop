@@ -204,7 +204,30 @@ export async function bootstrapConnectorCommands(
   const resolve: CommandResolver = async (id, action): Promise<ResolveOutcome> => {
     const parked = takeBotAction(root, id); // consume-once → approve twice ≠ run twice
     if (parked) {
+      /**
+       * Edit-on-resolve: after producing the outcome, edit the original approval
+       * message (remove buttons, show result) if approvalMessageId is set and the
+       * connector exposes editMessage. Best-effort — never crashes the resolve path.
+       */
+      const editApprovalMessage = async (outcome: string): Promise<void> => {
+        if (!parked.approvalMessageId) return;
+        const target = targets.find((t) => t.chatId === parked.channelId);
+        if (!target) return;
+        const editable = target.connector as unknown as {
+          editMessage?(c: string, id: string, t: string, pm?: 'HTML' | 'MarkdownV2'): Promise<void>;
+        };
+        if (typeof editable.editMessage !== 'function') return;
+        await editable.editMessage(
+          parked.channelId,
+          parked.approvalMessageId,
+          markdownToTelegramHtml(outcome),
+          'HTML',
+        ).catch(() => {}); // best-effort: Telegram errors must not crash resolve
+      };
+
       if (action === 'reject') {
+        const rejectOutcome = getMessage('cap.approval.rejected', lang);
+        await editApprovalMessage(rejectOutcome);
         return { status: 'resolved', reply: getMessage('bot.action_rejected', lang, { tool: parked.tool }) };
       }
       // Re-verify at execute time (advisor's two flat rules): TTL + sprint-binding.
@@ -245,6 +268,8 @@ export async function bootstrapConnectorCommands(
             loadMailTransport: loadNodemailerTransport,
           };
           const result = await runCapability(capRegistry, parked.tool, parked.args, capCtx, parked.channelId, mediaSink, 'confirm');
+          const approvedOutcome = getMessage('cap.approval.approved', lang, { result });
+          await editApprovalMessage(approvedOutcome);
           return { status: 'resolved', reply: getMessage('bot.action_done', lang, { tool: parked.tool }) + '\n' + result };
         }
         // A bound kill routes to the ownership-validated precise primitive — kills
@@ -255,18 +280,18 @@ export async function bootstrapConnectorCommands(
             r.status === 'killed' ? 'bot.kill_done'
             : r.status === 'reused' ? 'bot.kill_reused'
             : 'bot.kill_already_stopped';
-          return {
-            status: 'resolved',
-            reply: getMessage(key, lang, {
-              sprint: parked.boundSprintId,
-              pid: r.status === 'killed' ? String(r.pid) : '',
-            }),
-          };
+          const reply = getMessage(key, lang, {
+            sprint: parked.boundSprintId,
+            pid: r.status === 'killed' ? String(r.pid) : '',
+          });
+          await editApprovalMessage(getMessage('cap.approval.approved', lang, { result: reply }));
+          return { status: 'resolved', reply };
         }
         const result = await actionDispatcher.dispatch(parked.tool, parked.args);
         // BOT-LEN: carry the FULL result — the lossless `send` below chunks it
         // into Telegram-safe parts instead of hard-cutting (the old truncate()).
         const body = getMessage('bot.action_done', lang, { tool: parked.tool }) + '\n' + result;
+        await editApprovalMessage(getMessage('cap.approval.approved', lang, { result }));
         return { status: 'resolved', reply: body };
       } catch (err) {
         return {

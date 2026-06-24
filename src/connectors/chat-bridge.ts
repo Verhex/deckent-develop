@@ -28,7 +28,7 @@ import { createCliToolDispatcher } from '../cli/commands/chat-tool-bridge.js';
 import { createPersistentClaudeSession } from '../cli/commands/chat-session.js';
 import { classifyActionRisk, type AgenticAction } from '../cli/commands/agentic-confirm.js';
 import { makeGatedDispatcher, hasRealPendingCheckpoint, buildBotSystemPrompt } from './bot-agentic.js';
-import { parkBotAction, isSprintScopedDestructive } from './bot-action-store.js';
+import { parkBotAction, isSprintScopedDestructive, attachApprovalMessageId } from './bot-action-store.js';
 import { getCurrentSprintId } from '../monitor/sprint-state.js';
 import { createBuiltinRegistry, buildMediaSink, runCapability } from './capabilities/index.js';
 import { resolvePolicy } from './capabilities/policy.js';
@@ -54,11 +54,21 @@ import type { CapabilityRegistry } from './capabilities/registry.js';
  *   Approve/Reject inline buttons using `approvalCallbackData`.
  * - i18n via `getMessage` (en/tr). `cap.approval.header` key localises the header line.
  */
+/**
+ * Returns the platform message-id string when `sendMessageReturningId` is
+ * available and delivers one, `''` (empty string) when the message was sent
+ * via the fallback `sendMessage` (no id), or `false` when the connector has
+ * no send surface at all.
+ *
+ * Callers that only need a boolean (gate: "was approval sent?") can check
+ * `result !== false`. Callers that want the id for later edits receive it
+ * directly and must handle the `''` (sent, no id) case.
+ */
 export function makeSendApproval(
   connector: PerTurnConnector,
   registry: CapabilityRegistry,
   lang: string,
-): (channelId: string, id: string, capId: string, args: Record<string, unknown>) => Promise<boolean> {
+): (channelId: string, id: string, capId: string, args: Record<string, unknown>) => Promise<string | false> {
   return async (channelId, id, capId, args) => {
     if (typeof connector.sendMessage !== 'function') return false;
     const cap = registry.get(capId);
@@ -71,11 +81,11 @@ export function makeSendApproval(
     ]];
     const msg = { connector: connector.id as ConnectorId, channelId, text: html, parseMode: 'HTML' as const, buttons };
     if (connector.sendMessageReturningId) {
-      await connector.sendMessageReturningId(msg);
-    } else {
-      await connector.sendMessage(msg);
+      const mid = await connector.sendMessageReturningId(msg);
+      return mid ?? ''; // real id when available; '' means sent but no id
     }
-    return true;
+    await connector.sendMessage(msg);
+    return ''; // sendMessage-only: sent but no id available
   };
 }
 
@@ -260,8 +270,15 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
         },
         runAuto: (id: string, args: Record<string, unknown>) =>
           runCapability(capRegistry, id, args, makeCapCtx(sessionId), sessionId, mediaSink, 'auto'),
-        sendApproval: (id: string, capId: string, args: Record<string, unknown>) =>
-          sendApprovalFn(sessionId, id, capId, args),
+        sendApproval: async (id: string, capId: string, args: Record<string, unknown>): Promise<boolean> => {
+          const mid = await sendApprovalFn(sessionId, id, capId, args);
+          if (mid !== false && mid !== '') {
+            // Real message id returned — store it on the parked action so the
+            // resolver can edit the message on approve/reject (Task 4).
+            attachApprovalMessageId(root, id, mid);
+          }
+          return mid !== false;
+        },
       };
       dispatcher = makeGatedDispatcher({
         inner,

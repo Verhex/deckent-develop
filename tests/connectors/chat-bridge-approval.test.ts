@@ -24,7 +24,7 @@ function makeRegistry(): CapabilityRegistry {
 }
 
 describe('makeSendApproval', () => {
-  it('sends a buttoned HTML preview via sendMessageReturningId and returns true', async () => {
+  it('sends a buttoned HTML preview via sendMessageReturningId and returns the message id', async () => {
     const sent: OutgoingMessage[] = [];
     const connector = {
       id: 'telegram',
@@ -33,9 +33,10 @@ describe('makeSendApproval', () => {
     };
     const registry = makeRegistry();
     const send = makeSendApproval(connector, registry, 'en');
-    const ok = await send('chan-123', 'act-7', 'send_mail', { to: 'a@x.com' });
+    const mid = await send('chan-123', 'act-7', 'send_mail', { to: 'a@x.com' });
 
-    expect(ok).toBe(true);
+    // Returns the platform message id (for later edit-on-resolve)
+    expect(mid).toBe('mid-9');
     // sendMessageReturningId is preferred over sendMessage
     expect(connector.sendMessageReturningId).toHaveBeenCalledTimes(1);
     expect(connector.sendMessage).not.toHaveBeenCalled();
@@ -55,7 +56,7 @@ describe('makeSendApproval', () => {
     expect(row[1]!.callbackData).toBe('reject:act-7');
   });
 
-  it('falls back to sendMessage when sendMessageReturningId is absent', async () => {
+  it('falls back to sendMessage when sendMessageReturningId is absent — returns empty string (sent, no id)', async () => {
     const sent: OutgoingMessage[] = [];
     const connector = {
       id: 'telegram',
@@ -63,9 +64,11 @@ describe('makeSendApproval', () => {
     };
     const registry = makeRegistry();
     const send = makeSendApproval(connector, registry, 'en');
-    const ok = await send('chan-42', 'act-8', 'send_mail', { to: 'b@x.com' });
+    const mid = await send('chan-42', 'act-8', 'send_mail', { to: 'b@x.com' });
 
-    expect(ok).toBe(true);
+    // Empty string = sent but no id available (sendMessage-only connector)
+    expect(mid).toBe('');
+    expect(mid).not.toBe(false); // not false → sent
     expect(connector.sendMessage).toHaveBeenCalledTimes(1);
     expect(sent[0]!.channelId).toBe('chan-42');
     expect(sent[0]!.buttons![0]![0]!.callbackData).toBe('approve:act-8');
@@ -75,11 +78,11 @@ describe('makeSendApproval', () => {
     const connector = { id: 'noop' };
     const registry = makeRegistry();
     const send = makeSendApproval(connector as any, registry, 'en');
-    const ok = await send('chan-1', 'act-9', 'send_mail', { to: 'c@x.com' });
-    expect(ok).toBe(false);
+    const mid = await send('chan-1', 'act-9', 'send_mail', { to: 'c@x.com' });
+    expect(mid).toBe(false);
   });
 
-  it('uses default preview fallback when capability not in registry', async () => {
+  it('uses default preview fallback when capability not in registry — returns "" (sent, no id)', async () => {
     const sent: OutgoingMessage[] = [];
     const connector = {
       id: 'telegram',
@@ -87,8 +90,10 @@ describe('makeSendApproval', () => {
     };
     const registry = new CapabilityRegistry(); // empty — 'send_mail' not registered
     const send = makeSendApproval(connector, registry, 'en');
-    const ok = await send('chan-5', 'act-10', 'send_mail', { to: 'd@x.com' });
-    expect(ok).toBe(true);
+    const mid = await send('chan-5', 'act-10', 'send_mail', { to: 'd@x.com' });
+    // '' = sent via sendMessage-only connector (no id); !== false = approval was sent
+    expect(mid).toBe('');
+    expect(mid).not.toBe(false);
     // fallback preview includes the capId and args JSON
     expect(sent[0]!.text).toContain('send_mail');
   });

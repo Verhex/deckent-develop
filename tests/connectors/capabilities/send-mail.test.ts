@@ -16,6 +16,33 @@ describe('matchRecipient', () => {
   });
 });
 
+describe('sendMailCapability.preview (Task 4 — rich multi-line)', () => {
+  it('TR: preview is multi-line with bold *Kime* / *Konu* / *Gövde*', () => {
+    const p = sendMailCapability.preview({ to: 'a@x.com', subject: 'Hi', body: 'Hello world' } as any, 'tr');
+    expect(p).toMatch(/\*Kime:\*/);
+    expect(p).toMatch(/\*Konu:\*/);
+    expect(p).toMatch(/Hi/);
+    expect(p).toMatch(/Hello world/);
+    // multi-line: must contain a newline between fields
+    expect(p).toContain('\n');
+  });
+
+  it('EN: preview is multi-line with bold *To* / *Subject* / *Body*', () => {
+    const p = sendMailCapability.preview({ to: 'b@y.com', subject: 'Test', body: 'Body text' } as any, 'en');
+    expect(p).toMatch(/\*To:\*/);
+    expect(p).toMatch(/\*Subject:\*/);
+    expect(p).toMatch(/\*Body:\*/);
+    expect(p).toContain('\n');
+  });
+
+  it('preview includes body up to 200 chars (not truncated at 120)', () => {
+    const longBody = 'x'.repeat(180);
+    const p = sendMailCapability.preview({ to: 'c@z.com', subject: 'S', body: longBody } as any, 'en');
+    // All 180 chars must appear (old code truncated at 120)
+    expect(p).toContain('x'.repeat(180));
+  });
+});
+
 describe('sendMailCapability', () => {
   it('missing SMTP config → honest error, no send', async () => {
     const res = await sendMailCapability.run({ to: 'a@x.com', subject: 's', body: 'b' }, ctx({}));

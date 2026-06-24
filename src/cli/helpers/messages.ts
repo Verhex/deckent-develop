@@ -1806,8 +1806,8 @@ const MESSAGES: MessageMap = {
     tr: 'Mail başarısız: {error}',
   },
   'cap.mail.preview': {
-    en: '📧 To {to} · Subject {subject} · {body}',
-    tr: '📧 Kime {to} · Konu {subject} · {body}',
+    en: '📧 *Send email*\n*To:* {to}\n*Subject:* {subject}\n*Body:* {body}',
+    tr: '📧 *Mail gönderilecek*\n*Kime:* {to}\n*Konu:* {subject}\n*Gövde:* {body}',
   },
 
   // ─── capability: gate (dispatcher-level policy messages) ────────────
@@ -1834,6 +1834,14 @@ const MESSAGES: MessageMap = {
   'cap.btn.reject': {
     en: '❌ Reject',
     tr: '❌ Reddet',
+  },
+  'cap.approval.approved': {
+    en: '✅ Approved — {result}',
+    tr: '✅ Onaylandı — {result}',
+  },
+  'cap.approval.rejected': {
+    en: '❌ Rejected',
+    tr: '❌ Reddedildi',
   },
 
   // ─── capability: screenshot ──────────────────────────────────────────

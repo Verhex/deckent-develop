@@ -30,7 +30,7 @@ export const sendMailCapability: Capability<Params> = {
   edition: 'solo',
   paramsSchema: Params,
   preview: (args, lang) => getMessage('cap.mail.preview', lang, {
-    to: recipientsOf(args.to).join(', '), subject: args.subject, body: args.body.slice(0, 120),
+    to: recipientsOf(args.to).join(', '), subject: args.subject, body: args.body.slice(0, 200),
   }),
   async run(args, ctx): Promise<CapabilityResult> {
     const to = recipientsOf(args.to);

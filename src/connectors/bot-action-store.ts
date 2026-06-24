@@ -145,6 +145,23 @@ export function listBotActions(root: string): BotAction[] {
 }
 
 /**
+ * Attach (or update) the approvalMessageId on an already-parked action. Re-reads
+ * the stored JSON, sets the field, and rewrites atomically. Best-effort: if the
+ * file has already been consumed (taken) the write is a no-op (file absent).
+ */
+export function attachApprovalMessageId(root: string, actionId: string, messageId: string): void {
+  const path = actionPath(root, actionId);
+  if (!existsSync(path)) return; // already consumed — no-op
+  try {
+    const current = JSON.parse(readFileSync(path, 'utf-8')) as BotAction;
+    const updated: BotAction = { ...current, approvalMessageId: messageId };
+    writeFileSync(path, JSON.stringify(updated, null, 2) + '\n', 'utf-8');
+  } catch {
+    // corrupt or race-consumed — best-effort, never crash the turn
+  }
+}
+
+/**
  * Consume a parked action by exact id or unique prefix: read then delete, so a
  * second take (Telegram resend / double-tap) returns null and never re-executes.
  */
