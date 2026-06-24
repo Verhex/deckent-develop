@@ -1545,6 +1545,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // Messaging connectors (BOT-001) — passed through; tokens .deck-interpolated below.
     notify_connectors: (config as DeckentConfig).notify_connectors,
     notify_on_complete: (config as DeckentConfig).notify_on_complete,
+    // Bot capabilities config — passed through (opt-in, default-off).
+    bot_capabilities: (config as DeckentConfig).bot_capabilities,
     // Runtime Style
     deckent_style: config.deckent_style ?? 'sprint',
     // Terminal (Sprint 175) — deepMerge'd `config` already carries defaults from

@@ -30,6 +30,13 @@ import { classifyActionRisk, type AgenticAction } from '../cli/commands/agentic-
 import { makeGatedDispatcher, hasRealPendingCheckpoint, buildBotSystemPrompt } from './bot-agentic.js';
 import { parkBotAction, isSprintScopedDestructive } from './bot-action-store.js';
 import { getCurrentSprintId } from '../monitor/sprint-state.js';
+import { createBuiltinRegistry, buildMediaSink, runCapability } from './capabilities/index.js';
+import { resolvePolicy } from './capabilities/policy.js';
+import { detectPlatform } from './capabilities/platform.js';
+import { defaultSpawn } from './capabilities/spawn.js';
+import { loadNodemailerTransport } from './capabilities/mail-transport.js';
+import { describeCapabilities } from './capabilities/prompt.js';
+import type { BotCapabilitiesConfig, MediaAttachment } from './capabilities/types.js';
 
 /** Default provider: subscription claude (API key stripped → session auth, no tool_use). */
 function defaultSubscriptionProvider(): ChatProviderAdapter {
@@ -83,10 +90,46 @@ export interface ChatResponderDeps {
    * Optional and additive: existing callers that omit it are unaffected.
    */
   onPartial?: (sessionId: string, partialText: string) => void;
+  /**
+   * Slice 1 T10 — capabilities config. When provided (and enabled), the builtin
+   * capability registry is wired into the gated dispatcher (agentic mode) and the
+   * capability catalog is appended to the bot system prompt.
+   * Default: undefined → capability surface is OFF (existing behavior preserved).
+   */
+  capConfig?: BotCapabilitiesConfig;
+  /**
+   * Static connector reference for media delivery — used as a fallback when no
+   * per-turn connector is provided. When absent, capabilities that produce media
+   * fall back to honest text.
+   */
+  capConnector?: { id: string; sendMedia?(channelId: string, media: MediaAttachment): Promise<void> };
+  /**
+   * Test seam: override the spawn function used by capabilities (e.g. to inject
+   * a fake PNG-returning spawn in unit tests without triggering real OS capture).
+   * When absent, capabilities use their default spawn (defaultSpawn from spawn.ts).
+   */
+  capSpawn?: import('./capabilities/types.js').SpawnFn;
+  /**
+   * Test seam: override the platform id reported to capabilities.
+   * When absent, detectPlatform() is called (runtime detection).
+   */
+  capPlatform?: import('./capabilities/types.js').PlatformId;
 }
 
+/** Per-turn media connector — optional 3rd argument to ChatResponder calls. */
+export type PerTurnMediaConnector = {
+  id: string;
+  sendMedia?(channelId: string, media: MediaAttachment): Promise<void>;
+};
+
 export interface ChatResponder {
-  (sessionId: string, text: string): Promise<string>;
+  /**
+   * Invoke a chat turn. `mediaConnector` is an OPTIONAL 3rd arg (Slice 1.1): when
+   * provided, it is used as the media sink for that turn (overrides the static
+   * `capConnector` dep). Existing 2-arg callers are unaffected — behavior is
+   * identical to today when the arg is absent or the connector has no `sendMedia`.
+   */
+  (sessionId: string, text: string, mediaConnector?: PerTurnMediaConnector): Promise<string>;
   /** Release the warm persistent provider child (agentic mode). Best-effort. */
   dispose?(): Promise<void>;
 }
@@ -102,6 +145,10 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
   const chains = new Map<string, Promise<unknown>>();
   const lang = deps.lang ?? 'en';
 
+  // Capability registry + config — built once per responder (flag-gated default-off).
+  const capRegistry = createBuiltinRegistry();
+  const capConfig = deps.capConfig ?? { enabled: false };
+
   // Agentic mode holds ONE warm persistent child across every turn (the whole
   // point — eliminates per-message cold-start); created lazily on first use.
   let persistent: PersistentProvider | undefined;
@@ -110,12 +157,23 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
     if (!persistent) {
       // Ground the persistent session in the live project context (summary.md) so
       // conversational answers are deckent-specific and accurate, not hollow.
-      persistent = createPersistentClaudeSession({ systemPrompt: buildBotSystemPrompt(deps.root) });
+      // Append capability catalog when enabled — bot learns which tools it may call.
+      const basePrompt = buildBotSystemPrompt(deps.root);
+      const capCatalog = describeCapabilities(
+        capRegistry,
+        (id) => {
+          const c = capRegistry.get(id);
+          return c ? resolvePolicy(c, { chatKey: 'session', config: capConfig, edition: 'solo' }) : 'unavailable';
+        },
+        lang,
+      );
+      const systemPrompt = capCatalog ? basePrompt + capCatalog : basePrompt;
+      persistent = createPersistentClaudeSession({ systemPrompt });
     }
     return persistent;
   }
 
-  async function runTurn(sessionId: string, text: string): Promise<string> {
+  async function runTurn(sessionId: string, text: string, perTurnMediaConnector?: PerTurnMediaConnector): Promise<string> {
     const collected: string[] = [];
 
     // Provider + dispatcher differ by mode. Agentic: tool_use provider + GATED
@@ -130,6 +188,33 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
       const root = deps.root;
       provider = agenticProvider();
       const inner = deps.dispatcher ?? createCliToolDispatcher();
+      // Slice 1.1: build the media sink from the PER-TURN connector when provided,
+      // falling back to the static dep, then to the no-media sentinel.
+      // This ensures a chat-turn capability's media (e.g. screenshot → photo) is
+      // delivered to the RIGHT connector for that specific chat turn.
+      // When neither is available, the no-op sendText path produces honest text-fallback.
+      const mediaConn = perTurnMediaConnector ?? deps.capConnector ?? { id: 'unknown' };
+      const sendText = async (_channelId: string, _text: string): Promise<void> => {};
+      const mediaSink = buildMediaSink(mediaConn, lang, sendText);
+      const makeCapCtx = (channelId: string) => ({
+        chatKey: channelId,
+        project: root,
+        lang,
+        config: capConfig,
+        now: Date.now(),
+        platform: deps.capPlatform ?? detectPlatform(),
+        spawn: deps.capSpawn ?? defaultSpawn,
+        loadMailTransport: loadNodemailerTransport,
+      });
+      const capGate = {
+        has: (id: string) => capRegistry.has(id),
+        resolve: (id: string) => {
+          const c = capRegistry.get(id);
+          return c ? resolvePolicy(c, { chatKey: sessionId, config: capConfig, edition: 'solo' as const }) : 'unavailable' as const;
+        },
+        runAuto: (id: string, args: Record<string, unknown>) =>
+          runCapability(capRegistry, id, args, makeCapCtx(sessionId), sessionId, mediaSink, 'auto'),
+      };
       dispatcher = makeGatedDispatcher({
         inner,
         park: (tool, args) =>
@@ -148,6 +233,7 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
         // no-op, not an approval gate.
         hasPendingCheckpoint: () => hasRealPendingCheckpoint(root),
         lang,
+        capabilities: capGate,
       });
       confirm = async () => true; // gating lives in the wrapper, not here
     } else {
@@ -181,9 +267,9 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
     return lastAssistantText(transcript);
   }
 
-  const responder = ((sessionId: string, text: string): Promise<string> => {
+  const responder = ((sessionId: string, text: string, mediaConnector?: PerTurnMediaConnector): Promise<string> => {
     const prev = chains.get(sessionId) ?? Promise.resolve();
-    const next = prev.catch(() => undefined).then(() => runTurn(sessionId, text));
+    const next = prev.catch(() => undefined).then(() => runTurn(sessionId, text, mediaConnector));
     chains.set(
       sessionId,
       next.finally(() => {

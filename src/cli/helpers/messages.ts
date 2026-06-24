@@ -1762,6 +1762,68 @@ const MESSAGES: MessageMap = {
     tr: 'Bu sohbet {project} için yetkili değil. Eşleştirme kodu: {code}. Sahibi şunu çalıştırsın: deckent gateway pair approve {code} {project}',
     en: 'This chat is not authorized for {project}. Pairing code: {code}. Ask the owner to run: deckent gateway pair approve {code} {project}',
   },
+
+  // ─── capability: mail ────────────────────────────────────────────────
+  'cap.mail.title': {
+    en: 'Send email',
+    tr: 'Mail gönder',
+  },
+  'cap.mail.recipient_denied': {
+    en: 'Recipient not allowed by policy: {to}',
+    tr: 'Alıcı policy ile izinli değil: {to}',
+  },
+  'cap.mail.smtp_missing': {
+    en: 'SMTP is not configured in .deck.',
+    tr: 'SMTP .deck\'te yapılandırılmamış.',
+  },
+  'cap.mail.sent': {
+    en: 'Mail sent to {to} · {subject} ({id})',
+    tr: 'Mail gönderildi: {to} · {subject} ({id})',
+  },
+  'cap.mail.failed': {
+    en: 'Mail failed: {error}',
+    tr: 'Mail başarısız: {error}',
+  },
+  'cap.mail.preview': {
+    en: '📧 To {to} · Subject {subject} · {body}',
+    tr: '📧 Kime {to} · Konu {subject} · {body}',
+  },
+
+  // ─── capability: gate (dispatcher-level policy messages) ────────────
+  'cap.gate.unavailable': {
+    en: "Capability '{id}' is not available.",
+    tr: "'{id}' yeteneği kullanılamıyor.",
+  },
+  'cap.gate.denied': {
+    en: "Capability '{id}' is denied by policy.",
+    tr: "'{id}' yeteneği policy ile reddedildi.",
+  },
+
+  // ─── capability: screenshot ──────────────────────────────────────────
+  'cap.screenshot.title': {
+    en: 'Screenshot',
+    tr: 'Ekran görüntüsü',
+  },
+  'cap.screenshot.unsupported': {
+    en: 'Screenshot is not supported on this platform.',
+    tr: 'Bu platformda ekran görüntüsü desteklenmiyor.',
+  },
+  'cap.screenshot.failed': {
+    en: 'Screenshot failed: {error}',
+    tr: 'Ekran görüntüsü başarısız: {error}',
+  },
+  'cap.screenshot.caption': {
+    en: 'Screen capture',
+    tr: 'Ekran yakalandı',
+  },
+  'cap.screenshot.preview': {
+    en: 'capture {display} display',
+    tr: '{display} ekranı yakala',
+  },
+  'cap.media.fallback': {
+    en: '[media: {filename} — this connector cannot display it]',
+    tr: '[medya: {filename} — bu connector gösteremiyor]',
+  },
 };
 
 /**

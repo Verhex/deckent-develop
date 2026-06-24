@@ -25,8 +25,13 @@ interface GrammyBotInstance {
     sendMessage(chatId: string | number, text: string, other?: SendExtra): Promise<{ message_id: number } | unknown>;
     editMessageText(chatId: string | number, messageId: number, text: string, other?: SendExtra): Promise<unknown>;
     sendChatAction(chatId: string | number, action: string): Promise<unknown>;
+    sendPhoto(chatId: string | number, photo: unknown, other?: { caption?: string }): Promise<unknown>;
+    sendDocument(chatId: string | number, doc: unknown, other?: { caption?: string }): Promise<unknown>;
   };
 }
+
+/** InputFile constructor — injected in tests; loaded from grammy in production. */
+interface InputFileCtor { new (data: Buffer, filename?: string): unknown }
 
 interface GrammyBotConstructor { new (token: string): GrammyBotInstance }
 
@@ -51,10 +56,12 @@ export class TelegramConnector extends BaseConnector {
 
   private bot?: GrammyBotInstance;
   private callbackHandler?: (cb: IncomingCallback) => void;
+  private InputFileCtor?: InputFileCtor;
 
-  /** Allow injecting a grammY Bot constructor for testing. */
-  constructor(private readonly BotClass?: GrammyBotConstructor) {
+  /** Allow injecting a grammY Bot constructor and InputFile constructor for testing. */
+  constructor(private readonly BotClass?: GrammyBotConstructor, InputFileCtorArg?: InputFileCtor) {
     super();
+    this.InputFileCtor = InputFileCtorArg;
   }
 
   /**
@@ -176,6 +183,16 @@ export class TelegramConnector extends BaseConnector {
     await this.bot.api.editMessageText(channelId, Number(messageId), text, extra);
   }
 
+  async sendMedia(channelId: string, media: import('./types.js').MediaAttachment): Promise<void> {
+    if (!this.bot) throw new Error('Telegram connector not started');
+    // InputFile may be unset if a Bot was injected without an InputFile ctor and startOutbound() skipped loadGrammy(); load it now. (In production, loadGrammy already set it.)
+    if (!this.InputFileCtor) await this.loadGrammy();
+    const file = new (this.InputFileCtor as InputFileCtor)(Buffer.from(media.data), media.filename);
+    const extra = media.caption ? { caption: media.caption } : undefined;
+    if (media.kind === 'photo') await this.bot.api.sendPhoto(channelId, file, extra);
+    else await this.bot.api.sendDocument(channelId, file, extra);
+  }
+
   isHealthy(): boolean {
     return this.bot !== undefined && this.started;
   }
@@ -184,7 +201,8 @@ export class TelegramConnector extends BaseConnector {
   private async loadGrammy(): Promise<GrammyBotConstructor> {
     try {
       const moduleName = 'grammy';
-      const mod = await (Function('m', 'return import(m)')(moduleName) as Promise<{ Bot: unknown }>);
+      const mod = await (Function('m', 'return import(m)')(moduleName) as Promise<{ Bot: unknown; InputFile: unknown }>);
+      this.InputFileCtor = this.InputFileCtor ?? (mod.InputFile as InputFileCtor);
       return mod.Bot as unknown as GrammyBotConstructor;
     } catch {
       throw new Error('grammy package not installed. Run: npm install grammy');

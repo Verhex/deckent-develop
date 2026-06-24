@@ -20,6 +20,8 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { McpToolDispatcher } from '../cli/commands/chat-native.js';
+import { getMessage } from '../cli/helpers/messages.js';
+import type { PolicyResolution } from './capabilities/policy.js';
 
 /**
  * Risky tools require human approval before executing. Everything not explicitly
@@ -76,6 +78,20 @@ export function hasRealPendingCheckpoint(root: string): boolean {
 /** Park a risky action for later approval; returns the approval id. */
 export type ParkAction = (tool: string, args: Record<string, unknown>) => string;
 
+/**
+ * Capability gate injected into the dispatcher. Provides per-capability policy
+ * resolution so capability tool calls are routed through the SAME single
+ * chokepoint rather than a parallel path (one-chokepoint invariant).
+ */
+export interface CapabilityGate {
+  /** True when `id` names a registered capability tool (e.g. 'screenshot'). */
+  has(id: string): boolean;
+  /** Resolve the policy decision for a capability tool. */
+  resolve(id: string): PolicyResolution;
+  /** Execute a capability that resolved to 'auto'. */
+  runAuto(id: string, args: Record<string, unknown>): Promise<string>;
+}
+
 export interface GatedDispatcherDeps {
   /** Underlying dispatcher that actually runs read-only tools (CLI bridge). */
   readonly inner: McpToolDispatcher;
@@ -90,6 +106,13 @@ export interface GatedDispatcherDeps {
    * alarm (Sprint 238 İŞ3). Omitted → legacy behavior (checkpoint is parked).
    */
   readonly hasPendingCheckpoint?: () => boolean;
+  /**
+   * Optional capability gate. When provided and `capabilities.has(name)` is
+   * true, the capability branch handles the call at the TOP of dispatch (before
+   * the existing checkpoint-guard / risky-park / safe-exec logic) — preserving
+   * the single-chokepoint invariant.
+   */
+  readonly capabilities?: CapabilityGate;
 }
 
 /**
@@ -100,6 +123,20 @@ export function makeGatedDispatcher(deps: GatedDispatcherDeps): McpToolDispatche
   const lang = deps.lang ?? 'en';
   return {
     async dispatch(name: string, args: Record<string, unknown>): Promise<string> {
+      // Capability branch — MUST come first to preserve the one-chokepoint
+      // invariant: capability tool calls route through THIS dispatcher, not a
+      // parallel path. Non-capability names fall through to the existing logic.
+      if (deps.capabilities?.has(name)) {
+        const decision = deps.capabilities.resolve(name);
+        if (decision === 'unavailable') return getMessage('cap.gate.unavailable', lang, { id: name });
+        if (decision === 'deny') return getMessage('cap.gate.denied', lang, { id: name });
+        if (decision === 'confirm') {
+          const id = deps.park(name, args);
+          return parkedActionMessage(id, name, args, lang);
+        }
+        // decision === 'auto'
+        return deps.capabilities.runAuto(name, args);
+      }
       // Sprint 238 İŞ3: a model-initiated `deckent_checkpoint` with NOTHING
       // pending is a no-op — parking it as "approval required" produces a false
       // "checkpoint awaiting approval" alarm (the sprint is not blocked). Answer

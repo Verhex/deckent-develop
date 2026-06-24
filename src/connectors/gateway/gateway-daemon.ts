@@ -116,15 +116,27 @@ export function runGatewayRuntimeChild(opts: { projectPath: string; lang?: strin
   const lang = getLanguage(opts.lang);
   // Lazy import to keep the daemon's module graph light; respond is the gated
   // agentic chat for this project (same engine the single-project bot uses).
-  void import('../chat-bridge.js').then(({ makeChatResponder }) => {
-    const responder = makeChatResponder({ agentic: true, root: opts.projectPath, lang });
-    runRuntimeLoop({
-      input: process.stdin,
-      output: (line) => process.stdout.write(line),
-      // responder IS the callable function — call it directly (not .chat())
-      respond: (text) => responder(`gateway:${opts.projectPath}`, text),
-    });
-  });
+  void Promise.all([
+    import('../chat-bridge.js'),
+    import('../../core/config.js'),
+  ]).then(([{ makeChatResponder }, { loadConfig }]) =>
+    loadConfig(opts.projectPath).then((cfg) => {
+      const responder = makeChatResponder({
+        agentic: true,
+        root: opts.projectPath,
+        lang,
+        capConfig: cfg.bot_capabilities,
+        // capConnector: gateway children use IPC-over-stdout for replies; media
+        // delivery is handled gateway-side. No direct connector ref available here.
+      });
+      runRuntimeLoop({
+        input: process.stdin,
+        output: (line) => process.stdout.write(line),
+        // responder IS the callable function — call it directly (not .chat())
+        respond: (text) => responder(`gateway:${opts.projectPath}`, text),
+      });
+    }),
+  );
 }
 
 function waitForSignal(): Promise<void> {

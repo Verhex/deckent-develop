@@ -21,7 +21,7 @@ import { makeIncomingCommandRouter, type CommandResolver, type ResolveOutcome } 
 import { makeCommandResolver } from './incoming-command-resolver.js';
 import { parseApprovalCallback } from './callback-router.js';
 import type { IncomingCallback } from './types.js';
-import { type ChatResponder } from './chat-bridge.js';
+import { type ChatResponder, type PerTurnMediaConnector } from './chat-bridge.js';
 import { chunkMessage } from './message-format.js';
 import { makeStreamThrottle } from './stream-throttle.js';
 import { isBotSlash, handleBotSlash } from './bot-commands.js';
@@ -32,6 +32,10 @@ import { killSprintById } from '../cli/commands/kill.js';
 import { getCurrentSprintId } from '../monitor/sprint-state.js';
 import { getMessage } from '../cli/helpers/messages.js';
 import { markdownToTelegramHtml } from './markdown-to-html.js';
+import { createBuiltinRegistry, buildMediaSink, runCapability } from './capabilities/index.js';
+import { detectPlatform } from './capabilities/platform.js';
+import { defaultSpawn } from './capabilities/spawn.js';
+import { loadNodemailerTransport } from './capabilities/mail-transport.js';
 
 type NotifyConnectorsConfig = NonNullable<DeckentConfig['notify_connectors']>;
 
@@ -116,11 +120,16 @@ export async function buildConnectorNotificationAdapter(
 
 // ─── BOT-002 — inbound command transport ──────────────────────────────────
 
-/** Streaming variant of ChatResponder: receives a per-call `onPartial` callback. */
+/**
+ * Streaming variant of ChatResponder: receives a per-call `onPartial` callback and
+ * an OPTIONAL `mediaConnector` (Slice 1.1) for per-turn media delivery.
+ * Existing 3-arg callers are unaffected — the 4th arg is additive and optional.
+ */
 export type ChatStreamResponder = (
   channelId: string,
   text: string,
   onPartial: (partial: string) => void,
+  mediaConnector?: PerTurnMediaConnector,
 ) => Promise<string>;
 
 export interface ConnectorCommandsDeps extends ConnectorBootstrapDeps {
@@ -147,6 +156,13 @@ export interface ConnectorCommandsDeps extends ConnectorBootstrapDeps {
   actionDispatcher?: McpToolDispatcher;
   /** Language for inbound acks. */
   lang?: string;
+  /**
+   * Slice 1 T10 — bot capabilities config. When provided and enabled, parked
+   * capability tools (screenshot, send_mail …) on the approve-path are routed
+   * through runCapability instead of the generic actionDispatcher.
+   * Default: undefined → { enabled: false } → capabilities surface is OFF.
+   */
+  botCapabilities?: import('./capabilities/types.js').BotCapabilitiesConfig;
 }
 
 export interface ConnectorCommandsHandle {
@@ -179,6 +195,8 @@ export async function bootstrapConnectorCommands(
   const lang = deps.lang ?? 'en';
   const gateResolve = deps.resolve ?? makeCommandResolver(root, {}, lang);
   const actionDispatcher = deps.actionDispatcher ?? createCliToolDispatcher();
+  // Capability registry — shared across the bootstrap lifecycle (flag-gated default-off).
+  const capRegistry = createBuiltinRegistry();
   // Composite resolver: a parked bot-action (slice 2b) is the THIRD gate type —
   // unlike autonomous/nervous (consumed by their own loops), approving here
   // EXECUTES the action in-process and replies the result. Falls through to the
@@ -201,6 +219,34 @@ export async function bootstrapConnectorCommands(
         };
       }
       try {
+        // Capability-aware approve path: capability tools (e.g. screenshot, send_mail)
+        // route through runCapability (single chokepoint) instead of actionDispatcher.
+        // The media sink uses the connector paired with the approved channelId when
+        // available (for sendMedia); falls back to honest text otherwise.
+        if (capRegistry.has(parked.tool)) {
+          // targets may not be populated yet at resolve-definition time but IS
+          // populated by approval time (lazy closure eval).
+          const target = targets.find((t) => t.chatId === parked.channelId);
+          const capConnector = target?.connector ?? { id: 'unknown' };
+          const sendText = async (channelId: string, text: string): Promise<void> => {
+            const t = targets.find((t) => t.chatId === channelId);
+            if (t) { for (const part of chunkMessage(text)) await t.connector.sendMessage({ connector: t.connector.id, channelId, text: part }); }
+          };
+          const capConfig = deps.botCapabilities ?? { enabled: false };
+          const mediaSink = buildMediaSink(capConnector, lang, sendText);
+          const capCtx = {
+            chatKey: parked.channelId,
+            project: root,
+            lang,
+            config: capConfig,
+            now: Date.now(),
+            platform: detectPlatform(),
+            spawn: defaultSpawn,
+            loadMailTransport: loadNodemailerTransport,
+          };
+          const result = await runCapability(capRegistry, parked.tool, parked.args, capCtx, parked.channelId, mediaSink, 'confirm');
+          return { status: 'resolved', reply: getMessage('bot.action_done', lang, { tool: parked.tool }) + '\n' + result };
+        }
         // A bound kill routes to the ownership-validated precise primitive — kills
         // EXACTLY the bound sprint (never --all, never a pid-reused foreign process).
         if (parked.tool === 'deckent_kill' && parked.boundSprintId) {
@@ -328,7 +374,9 @@ export async function bootstrapConnectorCommands(
                         const throttle = msgId
                           ? makeStreamThrottle({ edit: (t) => streamCap.editMessage!(channelId, msgId, t.slice(0, 4000)) })
                           : null;
-                        const reply = await chatStreaming(channelId, text, (partial) => throttle?.push(partial));
+                        // Slice 1.1: pass the live connector as the per-turn mediaConnector so
+                        // capability media (e.g. screenshot photo) is delivered to the right transport.
+                        const reply = await chatStreaming(channelId, text, (partial) => throttle?.push(partial), connector as PerTurnMediaConnector);
                         const body = reply.trim() || getMessage('bot.chat_empty', lang);
                         if (msgId && throttle) {
                           // Final: edit the placeholder in place with the first part
@@ -345,8 +393,10 @@ export async function bootstrapConnectorCommands(
                         }
                       } else {
                         // Non-streaming fallback — rich reply.
+                        // Slice 1.1: pass the live connector as the per-turn mediaConnector so
+                        // capability media (e.g. screenshot photo) is delivered to the right transport.
                         await send(channelId, getMessage('bot.chat_thinking', lang));
-                        const reply = await chat(channelId, text);
+                        const reply = await chat(channelId, text, connector as PerTurnMediaConnector);
                         const body = reply.trim() || getMessage('bot.chat_empty', lang);
                         await sendRich(channelId, body);
                       }
