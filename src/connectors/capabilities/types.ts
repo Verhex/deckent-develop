@@ -5,6 +5,18 @@ export type PolicyDecision = 'auto' | 'confirm' | 'deny';
 export type Edition = 'solo' | 'enterprise';
 export type PlatformId = 'win-native' | 'win-wsl' | 'darwin' | 'linux' | 'unsupported';
 
+export interface ArtifactRef {
+  readonly id: string;
+  readonly filename: string;
+  readonly mime: string;
+  readonly path: string;
+}
+
+export interface ArtifactStore {
+  register(chatKey: string, a: { filename: string; mime: string; data: Buffer }): ArtifactRef;
+  get(chatKey: string, id: string): ArtifactRef | null;
+}
+
 export interface MediaAttachment {
   readonly kind: 'photo' | 'document';
   readonly filename: string;
@@ -16,6 +28,7 @@ export interface MediaAttachment {
 export interface CapabilityResult {
   readonly text?: string;
   readonly media?: readonly MediaAttachment[];
+  readonly artifacts?: readonly ArtifactRef[];
 }
 
 export interface SpawnResult { readonly code: number; readonly stdout: Buffer; readonly stderr: string }
@@ -46,6 +59,7 @@ export interface CapabilityContext {
   readonly spawn: SpawnFn;             // injected host-effect (screenshot)
   readonly loadMailTransport: (cfg: MailConfig | undefined) => Promise<MailTransport>; // injected (mail)
   readonly platform?: PlatformId;      // injected in tests; defaults to detectPlatform()
+  readonly artifacts?: ArtifactStore;  // injected when artifact flow is available
 }
 
 export interface Capability<A = unknown> {
