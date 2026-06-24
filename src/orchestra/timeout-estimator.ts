@@ -3,10 +3,13 @@
 // scope complexity, sprint history, and backend type.
 // Sprint 145 — Task 145-002
 
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Task } from '../core/task-types.js';
 import type { ResolvedConfig } from '../core/config-types.js';
 import type { TimeoutConfig } from '../core/config-types.js';
 import { DEFAULT_TIMEOUT_CONFIG } from '../core/config.js';
+import { BRAIN_DIR, SPRINTS_DIR } from '../core/constants.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -30,6 +33,91 @@ export interface SprintHistory {
   avgTaskDurationMs: number;
   /** Number of sprints analyzed */
   sprintCount: number;
+}
+
+// ─── Sprint History Aggregation (Sprint 319 B-HISTORYSCALE) ─────────
+
+/** Zero-fill SprintHistory — returned when no usable past-sprint data exists. */
+const EMPTY_SPRINT_HISTORY: SprintHistory = { avgTaskDurationMs: 0, sprintCount: 0 };
+
+/**
+ * Parse `Total Tasks` and `Duration` from a sprint-log markdown body.
+ *
+ * The sprint log (`.brain/sprints/sprint-NNN.md`, written by the doc-updater /
+ * memory-export pipeline) carries a metrics table with rows like:
+ *   `| Total Tasks | 4 |`
+ *   `| Duration | 1122442ms |`
+ *
+ * @returns the parsed pair, or null when either row is missing/unparseable.
+ */
+function parseSprintDurationAndTasks(content: string): { durationMs: number; totalTasks: number } | null {
+  const durationMatch = content.match(/\|\s*Duration\s*\|\s*(\d+)\s*ms\s*\|/i);
+  const tasksMatch = content.match(/\|\s*Total Tasks\s*\|\s*(\d+)\s*\|/i);
+  if (!durationMatch || !tasksMatch) return null;
+  const durationMs = parseInt(durationMatch[1]!, 10);
+  const totalTasks = parseInt(tasksMatch[1]!, 10);
+  if (Number.isNaN(durationMs) || Number.isNaN(totalTasks)) return null;
+  return { durationMs, totalTasks };
+}
+
+/**
+ * Aggregate the average per-task duration from recent sprint logs — the real
+ * data source for the `historyFactor` in {@link brainEstimateTimeout}.
+ *
+ * Reads the last `recentSprintCount` sprint-log markdown files under
+ * `.brain/sprints/` and computes the mean per-task wall-clock duration
+ * (`sprintDurationMs / totalTasks`) across the sprints that carry usable
+ * metrics (both `durationMs > 0` AND `totalTasks > 0`).
+ *
+ * Sprint 319 B-HISTORYSCALE: replaces the hardcoded `{ avgTaskDurationMs: 0 }`
+ * zero-fill that previously pinned `historyFactor` to 1.0 (no learning from
+ * past-sprint durations). When no sprint history exists yet (first sprint) or
+ * no log carries usable metrics, the zero-fill fallback is returned unchanged —
+ * the `historyFactor=1.0` path is preserved and no scaling is fabricated.
+ *
+ * @param projectRoot - Project root (contains `.brain/sprints/`)
+ * @param recentSprintCount - How many of the most-recent sprint logs to average (default 5)
+ * @returns Aggregated {@link SprintHistory}, or the zero-fill fallback when no data exists
+ */
+export function aggregateSprintHistory(
+  projectRoot: string,
+  recentSprintCount = 5,
+): SprintHistory {
+  const sprintsDir = join(projectRoot, BRAIN_DIR, SPRINTS_DIR);
+  if (!existsSync(sprintsDir)) return EMPTY_SPRINT_HISTORY;
+
+  let files: string[];
+  try {
+    files = readdirSync(sprintsDir).filter(f => f.endsWith('.md')).sort();
+  } catch {
+    return EMPTY_SPRINT_HISTORY;
+  }
+
+  // Zero-padded `sprint-NNN.md` sorts lexically into chronological order;
+  // take the most-recent N (mirrors readPreviousSprintMetrics' .sort().at(-1)).
+  const recent = files.slice(-recentSprintCount);
+
+  let totalAvg = 0;
+  let usableSprints = 0;
+  for (const file of recent) {
+    let content: string;
+    try {
+      content = readFileSync(join(sprintsDir, file), 'utf-8');
+    } catch {
+      continue;
+    }
+    const parsed = parseSprintDurationAndTasks(content);
+    if (parsed && parsed.durationMs > 0 && parsed.totalTasks > 0) {
+      totalAvg += parsed.durationMs / parsed.totalTasks;
+      usableSprints += 1;
+    }
+  }
+
+  if (usableSprints === 0) return EMPTY_SPRINT_HISTORY;
+  return {
+    avgTaskDurationMs: Math.round(totalAvg / usableSprints),
+    sprintCount: usableSprints,
+  };
 }
 
 // ─── Backend Factors ────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 // ─── Handoff Protocol ───────────────────────────────────────────────────────
 // Manages artifact handoffs between dependent tasks.
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { ErrorRegistry } from '../core/errors.js';
 import { debugLog } from '../core/utils.js';
@@ -128,6 +128,44 @@ export class HandoffProtocol {
       debugLog('HandoffProtocol:_listHandoffs:readdirSync', e);
       return [];
     }
+  }
+
+  /**
+   * Delete handoff files that do NOT belong to the current sprint.
+   *
+   * `listHandoffs()` returns EVERY handoff file ever written — the registry is
+   * append-only and `.tasks/handoffs/` grows without bound across sprints.
+   * B-HANDOFF-STALE (Sprint 318) scoped the observability *summary* to the
+   * current sprint, but the storage itself kept accumulating; this prunes the
+   * stale cross-sprint files at sprint finalize/cleanup, leaving only in-flight
+   * handoffs.
+   *
+   * A handoff belongs to the current sprint iff either endpoint (`fromTaskId`
+   * or `toTaskId`) is one of `currentSprintTaskIds` — the same membership rule
+   * used by the per-sprint observability summary. In-flight (current) handoffs
+   * are never touched.
+   *
+   * @param currentSprintTaskIds task ids of the current sprint; a handoff whose
+   *   endpoints are BOTH outside this set is deleted.
+   * @returns the number of stale handoff files pruned.
+   */
+  pruneCompletedSprints(currentSprintTaskIds: Set<string>): number {
+    if (!existsSync(this.handoffDir)) return 0;
+
+    let pruned = 0;
+    for (const handoff of this.listHandoffs()) {
+      const belongsToCurrent =
+        currentSprintTaskIds.has(handoff.fromTaskId) ||
+        currentSprintTaskIds.has(handoff.toTaskId);
+      if (belongsToCurrent) continue; // in-flight — leave untouched
+      try {
+        unlinkSync(join(this.handoffDir, `${handoff.id}.json`));
+        pruned++;
+      } catch (e) {
+        debugLog('HandoffProtocol:pruneCompletedSprints:unlink', e);
+      }
+    }
+    return pruned;
   }
 
   // ─── Internal ──────────────────────────────────────────────────────────

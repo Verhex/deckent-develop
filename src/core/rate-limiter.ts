@@ -20,7 +20,7 @@ export interface RateLimitResult {
   limit: number;
 }
 
-// ─── RateLimiter ─────────────────────────────────────────────────────────────
+// ─── TenantRateLimiter ───────────────────────────────────────────────────────
 
 /**
  * Per-tenant token-bucket rate limiter.
@@ -28,7 +28,7 @@ export interface RateLimitResult {
  * Resets automatically after windowMs (default 60 000 ms).
  * `action` is accepted for API surface completeness; per-action limits are a V2 concern.
  */
-export class RateLimiter {
+export class TenantRateLimiter {
   private readonly buckets = new Map<string, BucketState>();
   private readonly maxConcurrent: number;
   private readonly windowMs: number;

@@ -14,7 +14,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
-  NervousSystemConfig,
+  NervousSystemConfigV1,
   SprintStateSnapshot,
   NervousNotification,
 } from '../../src/core/nervous-types.js';
@@ -87,7 +87,7 @@ import type { NervousDispatcher } from '../../src/nervous/dispatcher.js';
 import type { Executor } from '../../src/nervous/executor.js';
 
 // ─── Test Helpers ──────────────────────────────────────────────────────────
-function makeNervousConfig(overrides: Partial<NervousSystemConfig> = {}): NervousSystemConfig {
+function makeNervousConfig(overrides: Partial<NervousSystemConfigV1> = {}): NervousSystemConfigV1 {
   return {
     mode: 'balanced',
     enabled: true,

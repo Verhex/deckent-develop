@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { RateLimiter } from '../../src/api/rate-limiter.js';
+import { ApiRateLimiter } from '../../src/api/rate-limiter.js';
 
-describe('RateLimiter', () => {
-  let limiter: RateLimiter;
+describe('ApiRateLimiter', () => {
+  let limiter: ApiRateLimiter;
 
   beforeEach(() => {
-    limiter = new RateLimiter({ maxRequests: 5, windowMs: 60_000, cleanupIntervalMs: 9_999_999 });
+    limiter = new ApiRateLimiter({ maxRequests: 5, windowMs: 60_000, cleanupIntervalMs: 9_999_999 });
   });
 
   afterEach(() => {
@@ -45,7 +45,7 @@ describe('RateLimiter', () => {
 
   it('resets window after windowMs elapses', () => {
     vi.useFakeTimers();
-    const r1 = new RateLimiter({ maxRequests: 3, windowMs: 1000, cleanupIntervalMs: 9_999_999 });
+    const r1 = new ApiRateLimiter({ maxRequests: 3, windowMs: 1000, cleanupIntervalMs: 9_999_999 });
 
     for (let i = 0; i < 3; i++) r1.check('ip');
     expect(r1.check('ip').allowed).toBe(false);
@@ -73,7 +73,7 @@ describe('RateLimiter', () => {
 
   it('cleanup() removes expired buckets', () => {
     vi.useFakeTimers();
-    const r1 = new RateLimiter({ maxRequests: 5, windowMs: 1000, cleanupIntervalMs: 9_999_999 });
+    const r1 = new ApiRateLimiter({ maxRequests: 5, windowMs: 1000, cleanupIntervalMs: 9_999_999 });
 
     r1.check('a.a.a.a');
     r1.check('b.b.b.b');
@@ -88,7 +88,7 @@ describe('RateLimiter', () => {
   });
 
   it('destroy() stops the cleanup timer (no throws)', () => {
-    const r1 = new RateLimiter({ cleanupIntervalMs: 100 });
+    const r1 = new ApiRateLimiter({ cleanupIntervalMs: 100 });
     expect(() => r1.destroy()).not.toThrow();
     // Calling destroy twice should be safe
     expect(() => r1.destroy()).not.toThrow();
@@ -103,7 +103,7 @@ describe('RateLimiter', () => {
   });
 
   it('uses default maxRequests=60 when not specified', () => {
-    const r1 = new RateLimiter({ cleanupIntervalMs: 9_999_999 });
+    const r1 = new ApiRateLimiter({ cleanupIntervalMs: 9_999_999 });
     for (let i = 0; i < 60; i++) {
       expect(r1.check('z.z.z.z').allowed).toBe(true);
     }
@@ -119,10 +119,10 @@ describe('RateLimiter', () => {
   });
 });
 
-describe('RateLimiter — server integration', () => {
+describe('ApiRateLimiter — server integration', () => {
   it('rate-limited response has correct structure via HTTP', async () => {
     // Lightweight integration: simulate the rate limit path directly
-    const r = new RateLimiter({ maxRequests: 2, windowMs: 60_000, cleanupIntervalMs: 9_999_999 });
+    const r = new ApiRateLimiter({ maxRequests: 2, windowMs: 60_000, cleanupIntervalMs: 9_999_999 });
     r.check('10.0.0.1');
     r.check('10.0.0.1');
     const result = r.check('10.0.0.1');
@@ -135,7 +135,7 @@ describe('RateLimiter — server integration', () => {
   it('static file paths are not counted by the rate limiter (limiter is /api/ only)', () => {
     // The rate limiter itself has no URL awareness — it is only called
     // for /api/ routes in server.ts. Verify it starts fresh per instance.
-    const r = new RateLimiter({ maxRequests: 1, cleanupIntervalMs: 9_999_999 });
+    const r = new ApiRateLimiter({ maxRequests: 1, cleanupIntervalMs: 9_999_999 });
     expect(r.check('client').allowed).toBe(true);
     // Second check from same IP is blocked
     expect(r.check('client').allowed).toBe(false);

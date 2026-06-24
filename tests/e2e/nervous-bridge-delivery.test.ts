@@ -21,7 +21,7 @@ import { randomUUID } from 'node:crypto';
 import { NervousDispatcher, type ChannelAdapter } from '../../src/nervous/dispatcher.js';
 import type {
   NervousNotification,
-  NervousSystemConfig,
+  NervousSystemConfigV1,
   Severity,
   NotificationAction,
 } from '../../src/core/nervous-types.js';
@@ -55,7 +55,7 @@ function cleanupRoot(root: string): void {
   }
 }
 
-function makeConfig(overrides: Partial<NervousSystemConfig> = {}): NervousSystemConfig {
+function makeConfig(overrides: Partial<NervousSystemConfigV1> = {}): NervousSystemConfigV1 {
   return {
     mode: 'balanced',
     enabled: true,

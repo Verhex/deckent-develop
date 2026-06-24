@@ -8,7 +8,7 @@ import { z } from 'zod/v4';
 import { ACTION_REGISTRY } from '../../nervous/action-registry.js';
 import { NervousHistory } from '../../nervous/history.js';
 import { NervousIpcQueue } from '../../nervous/ipc-queue.js';
-import type { AuthorityMode, NervousSystemConfig } from '../../core/nervous-types.js';
+import type { AuthorityMode, NervousSystemConfigV1 } from '../../core/nervous-types.js';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -18,7 +18,7 @@ import {
 
 // ─── Helper: Load nervous config from project ──────────────────────────────
 
-function loadNervousConfig(root: string): NervousSystemConfig {
+function loadNervousConfig(root: string): NervousSystemConfigV1 {
   const configPath = join(root, '.deckent', 'config.json');
   if (!existsSync(configPath)) {
     return { mode: 'balanced', enabled: false };

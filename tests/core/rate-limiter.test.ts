@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { RateLimiter } from '../../src/core/rate-limiter.js';
+import { TenantRateLimiter } from '../../src/core/rate-limiter.js';
 
-describe('RateLimiter', () => {
-  let limiter: RateLimiter;
+describe('TenantRateLimiter', () => {
+  let limiter: TenantRateLimiter;
 
   beforeEach(() => {
-    limiter = new RateLimiter({ maxConcurrent: 3 });
+    limiter = new TenantRateLimiter({ maxConcurrent: 3 });
   });
 
   it('allows requests below the limit', () => {
@@ -67,7 +67,7 @@ describe('RateLimiter', () => {
   });
 
   it('uses default maxConcurrent (10) when no flow config provided', () => {
-    const defaultLimiter = new RateLimiter();
+    const defaultLimiter = new TenantRateLimiter();
     for (let i = 0; i < 10; i++) {
       expect(defaultLimiter.checkLimit('tenant-d', 'action')).toBe(true);
     }
@@ -75,7 +75,7 @@ describe('RateLimiter', () => {
   });
 
   it('resets bucket on window expiry', () => {
-    const shortWindowLimiter = new RateLimiter({ maxConcurrent: 2 }, 50);
+    const shortWindowLimiter = new TenantRateLimiter({ maxConcurrent: 2 }, 50);
     shortWindowLimiter.checkLimit('tenant-e', 'action');
     shortWindowLimiter.checkLimit('tenant-e', 'action');
     expect(shortWindowLimiter.checkLimit('tenant-e', 'action')).toBe(false);

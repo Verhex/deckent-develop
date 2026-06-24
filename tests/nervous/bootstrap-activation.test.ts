@@ -8,7 +8,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type {
-  NervousSystemConfig,
+  NervousSystemConfigV1,
   SprintStateSnapshot,
   DetectorResult,
   ObserverEvent,
@@ -123,7 +123,7 @@ vi.mock('../../src/nervous/history.js', () => ({
 import { createNervousSystemIfEnabled } from '../../src/nervous/bootstrap.js';
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────
-function makeNervousConfig(overrides: Partial<NervousSystemConfig> = {}): NervousSystemConfig {
+function makeNervousConfig(overrides: Partial<NervousSystemConfigV1> = {}): NervousSystemConfigV1 {
   return {
     mode: 'balanced',
     enabled: true,

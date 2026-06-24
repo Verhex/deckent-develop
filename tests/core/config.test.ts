@@ -136,6 +136,19 @@ describe('loadConfig', () => {
     expect(config.modes.performance.brain_model).toBe('opus'); // preserved
   });
 
+  it('carries top-level max_workers through resolution (B-MAXWORKERS-WIRE not-a-dead-knob)', async () => {
+    // End-to-end: a top-level max_workers in config.json must survive the full
+    // load+merge+interpolate path and be honored by resolveEffectiveWorkers.
+    // Performance preset is 8 → without the wire this would resolve to 8.
+    mockedExistsSync.mockImplementation((p) => String(p).includes('.deckent'));
+    mockedReadFile.mockResolvedValue(JSON.stringify({ max_workers: 12 }));
+
+    const config = await loadConfig('/test/project');
+    expect(config.activeModeConfig.max_workers).toBe(8); // preset untouched
+    const profile = makeSystemProfile(16384, 8);
+    expect(resolveEffectiveWorkers(config, profile)).toBe(12); // override honored
+  });
+
   it('throws ConfigValidationError for API mode without env var', async () => {
     mockedExistsSync.mockImplementation((p) => {
       return String(p).includes('.deckent');
@@ -362,6 +375,44 @@ describe('resolveEffectiveWorkers', () => {
     const config = makeResolvedConfig(10);
     const profile = makeSystemProfile(16384, 8);
     expect(resolveEffectiveWorkers(config, profile, 2)).toBe(10);
+  });
+
+  // ─── Sprint 319 B-MAXWORKERS-WIRE — top-level override precedence ────
+  it('top-level config.max_workers (numeric) overrides activeModeConfig.max_workers', () => {
+    // Faithful regression: pre-fix resolveEffectiveWorkers read ONLY
+    // activeModeConfig.max_workers (=8) and the top-level field was dead → 8 (RED).
+    // Post-fix the explicit top-level override (=12) wins → 12 (GREEN).
+    const config = { ...makeResolvedConfig(8), max_workers: 12 };
+    const profile = makeSystemProfile(16384, 8);
+    expect(resolveEffectiveWorkers(config, profile)).toBe(12);
+  });
+
+  it('top-level config.max_workers absent → activeModeConfig is read (behavior preserved)', () => {
+    // makeResolvedConfig sets no top-level max_workers → prior behavior unchanged.
+    const config = makeResolvedConfig(8);
+    const profile = makeSystemProfile(16384, 8);
+    expect(resolveEffectiveWorkers(config, profile)).toBe(8);
+  });
+
+  it('top-level numeric override ignores systemProfile and planLimit', () => {
+    const config = { ...makeResolvedConfig('auto'), max_workers: 12 };
+    const profile = makeSystemProfile(400, 2); // very low resources
+    expect(resolveEffectiveWorkers(config, profile, 2)).toBe(12);
+  });
+
+  it("top-level config.max_workers === 'auto' takes the auto path", () => {
+    // 'auto' preserves auto behavior even when the active mode is numeric.
+    const config = { ...makeResolvedConfig(8), max_workers: 'auto' as const };
+    // recommendedMaxWorkers = max(1, min(floor(16384/400), 8-1, 30)) = 7
+    const profile = makeSystemProfile(16384, 8);
+    expect(resolveEffectiveWorkers(config, profile)).toBe(7);
+  });
+
+  it('top-level non-numeric / out-of-range value falls through to activeModeConfig', () => {
+    // Garbage (0 / negative / NaN) must not become the worker count — fall through.
+    const zero = { ...makeResolvedConfig(8), max_workers: 0 };
+    const profile = makeSystemProfile(16384, 8);
+    expect(resolveEffectiveWorkers(zero, profile)).toBe(8);
   });
 });
 

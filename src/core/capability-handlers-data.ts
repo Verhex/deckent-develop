@@ -12,7 +12,7 @@ import {
 import type { Capability } from './work-model.js';
 import { DeckentError } from './errors.js';
 
-type DataRequiredCapability = 'db.read' | 'mail.read';
+type DataRequiredCapability = 'db-read' | 'mail-read';
 
 export type DbQueryImpl = (
   sql: string,
@@ -64,8 +64,11 @@ export interface DataHandlerOptions {
 const BLOCKED_SQL_TOKEN = /\b(insert|update|delete|drop|alter|create|truncate|merge|replace|grant|revoke|call|execute|exec|into)\b/i;
 
 function requiredCapability(capability: DataRequiredCapability): Capability {
-  // The canonical Capability union has not been widened to the new F8 read-only
-  // names yet; the broker gates by exact string equality.
+  // Grant-tag (Capability) namespace is uniformly HYPHEN — `fs-read`, `db-query`,
+  // `mcp-tool`, ... — so the F8 read-only tags follow it: `db-read` / `mail-read`
+  // (NOT dot `db.read`: the broker gates by exact string equality against the
+  // hyphen grant set, so a dot tag would never match). The canonical Capability
+  // union has not been widened to these new F8 read-only names yet; hence the cast.
   return capability as Capability;
 }
 
@@ -172,7 +175,7 @@ export function createDbQueryHandler(options: DbQueryHandlerOptions = {}): Capab
   const queryImpl = options.queryImpl ?? missingQueryImpl;
 
   return {
-    requiredCapability: requiredCapability('db.read'),
+    requiredCapability: requiredCapability('db-read'),
     description: 'Executes one read-only SELECT query through an injected queryImpl.',
     invoke: (args: Record<string, unknown>, ctx: InvocationContext) => {
       const sql = assertReadOnlySelect(requireString(args, 'sql', 'db.query'));
@@ -186,7 +189,7 @@ export function createMailSearchHandler(options: MailSearchHandlerOptions = {}):
   const searchImpl = options.searchImpl ?? missingSearchImpl;
 
   return {
-    requiredCapability: requiredCapability('mail.read'),
+    requiredCapability: requiredCapability('mail-read'),
     description: 'Searches mail through an injected searchImpl and returns normalized headers.',
     invoke: async (args: Record<string, unknown>, ctx: InvocationContext) => {
       const request: MailSearchRequest = {

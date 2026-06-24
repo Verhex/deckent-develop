@@ -4,14 +4,14 @@
 // Sprint 147 Task 19
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { DetectorResult, NervousSystemConfig, NervousNotification } from '../../../src/core/nervous-types.js';
+import type { DetectorResult, NervousSystemConfigV1, NervousNotification } from '../../../src/core/nervous-types.js';
 import { DecisionEngine } from '../../../src/nervous/decision-engine.js';
 import { Proposer } from '../../../src/nervous/proposer.js';
 import { NervousDispatcher, type ChannelAdapter } from '../../../src/nervous/dispatcher.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function makeConfig(overrides: Partial<NervousSystemConfig> = {}): NervousSystemConfig {
+function makeConfig(overrides: Partial<NervousSystemConfigV1> = {}): NervousSystemConfigV1 {
   return {
     mode: 'balanced',
     enabled: true,
@@ -19,7 +19,7 @@ function makeConfig(overrides: Partial<NervousSystemConfig> = {}): NervousSystem
   };
 }
 
-function makeFullConfig(): NervousSystemConfig {
+function makeFullConfig(): NervousSystemConfigV1 {
   return {
     mode: 'balanced',
     enabled: true,
@@ -28,7 +28,7 @@ function makeFullConfig(): NervousSystemConfig {
       throttle_ms: 300000,
       severity_min: 'info',
     },
-  } as unknown as NervousSystemConfig;
+  } as unknown as NervousSystemConfigV1;
 }
 
 function makeMockAdapter(success = true): ChannelAdapter {

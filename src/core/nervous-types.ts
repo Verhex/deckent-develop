@@ -156,10 +156,17 @@ export interface AuthorityMatrix {
 // ─── Nervous System Config ────────────────────────────────────────────────────
 
 /**
- * .deckent/config.json altında nervous_system alanının şeması.
- * Sprint 147'de config-validator.ts bu interface'i doğrulayacak.
+ * Nervous System'in **minimal runtime görünümü** (V1) — Decision Engine / Proposer /
+ * Dispatcher gibi çalışma-zamanı bileşenlerinin operate ettiği dar config şekli.
+ *
+ * @deprecated İsim çakışmasını gidermek için `NervousSystemConfigV1` olarak yeniden
+ * adlandırıldı (Sprint 319, B-NERVOUSCONFIG-V1). **Kanonik tam config şeması**
+ * `NervousSystemConfig` adıyla `core/config-types.ts`'te yaşar (V2: safety_floor +
+ * notifications + detectors). Bu V1, runtime bileşenlerin beklediği dar görünüm olarak
+ * korunuyor; tam V1→V2 migrasyonu gelecekte ayrı bir iş (riskli olduğu için bu sprint
+ * kapsamı yalnız disambiguation-rename).
  */
-export interface NervousSystemConfig {
+export interface NervousSystemConfigV1 {
   /** Aktif yetki modu (default: 'balanced') */
   readonly mode: AuthorityMode;
   /** Eylem bazlı override'lar — mode preset'inin üstüne eklenir */

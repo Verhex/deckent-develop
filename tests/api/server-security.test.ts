@@ -60,7 +60,7 @@ vi.mock('../../src/api/sprint-job-runner.js', () => ({
 }));
 
 import { writeFileSync } from 'node:fs';
-import { createHttpServer, parseBody, _resetActiveJob, RateLimiter, type HttpApi } from '../../src/api/server.js';
+import { createHttpServer, parseBody, _resetActiveJob, SlidingWindowRateLimiter, type HttpApi } from '../../src/api/server.js';
 import { readJsonSafe } from '../../src/core/utils.js';
 import { deepMerge } from '../../src/core/config.js';
 import { startSprintDetached } from '../../src/api/sprint-job-runner.js';
@@ -156,23 +156,23 @@ describe('Server Security Hardening', () => {
   });
 
   // ─── A) Rate Limiting ───────────────────────────────────────
-  describe('RateLimiter', () => {
+  describe('SlidingWindowRateLimiter', () => {
     it('allows requests within limit', () => {
-      const limiter = new RateLimiter(3, 60_000);
+      const limiter = new SlidingWindowRateLimiter(3, 60_000);
       expect(limiter.check('1.2.3.4')).toBe(true);
       expect(limiter.check('1.2.3.4')).toBe(true);
       expect(limiter.check('1.2.3.4')).toBe(true);
     });
 
     it('blocks requests exceeding limit', () => {
-      const limiter = new RateLimiter(2, 60_000);
+      const limiter = new SlidingWindowRateLimiter(2, 60_000);
       expect(limiter.check('1.2.3.4')).toBe(true);
       expect(limiter.check('1.2.3.4')).toBe(true);
       expect(limiter.check('1.2.3.4')).toBe(false);
     });
 
     it('tracks IPs independently', () => {
-      const limiter = new RateLimiter(1, 60_000);
+      const limiter = new SlidingWindowRateLimiter(1, 60_000);
       expect(limiter.check('1.1.1.1')).toBe(true);
       expect(limiter.check('2.2.2.2')).toBe(true);
       expect(limiter.check('1.1.1.1')).toBe(false);
@@ -180,7 +180,7 @@ describe('Server Security Hardening', () => {
     });
 
     it('resets after window expires', () => {
-      const limiter = new RateLimiter(1, 1); // 1ms window
+      const limiter = new SlidingWindowRateLimiter(1, 1); // 1ms window
       expect(limiter.check('1.1.1.1')).toBe(true);
       // After 1ms the window resets
       return new Promise<void>((resolve) => {

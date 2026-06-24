@@ -4,12 +4,12 @@
 // Sprint 147 Task 19
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { DetectorResult, NervousSystemConfig } from '../../../src/core/nervous-types.js';
+import type { DetectorResult, NervousSystemConfigV1 } from '../../../src/core/nervous-types.js';
 import { DecisionEngine } from '../../../src/nervous/decision-engine.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function makeConfig(overrides: Partial<NervousSystemConfig> = {}): NervousSystemConfig {
+function makeConfig(overrides: Partial<NervousSystemConfigV1> = {}): NervousSystemConfigV1 {
   return {
     mode: 'balanced',
     enabled: true,

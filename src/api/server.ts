@@ -80,7 +80,7 @@ interface RateLimitEntry {
   resetAt: number;
 }
 
-export class RateLimiter {
+export class SlidingWindowRateLimiter {
   private readonly windowMs: number;
   private readonly maxRequests: number;
   private readonly store = new Map<string, RateLimitEntry>();
@@ -404,7 +404,7 @@ async function handleRequest(
   staticDir?: string,
   initWatcher?: () => void,
   _apiToken?: string | null,
-  rateLimiter?: RateLimiter,
+  rateLimiter?: SlidingWindowRateLimiter,
   authMiddleware?: (req: IncomingMessage, res: ServerResponse) => boolean,
   outputCollector?: OutputCollector,
   serveIndexHtml?: (req: IncomingMessage, res: ServerResponse) => boolean,
@@ -416,7 +416,7 @@ async function handleRequest(
   const method = req.method ?? 'GET';
 
   // Rate limiting. Loopback callers are exempt by default (Sprint 269 live
-  // finding — see RateLimiter.exemptLoopback); remote binds keep the limit.
+  // finding — see SlidingWindowRateLimiter.exemptLoopback); remote binds keep the limit.
   if (rateLimiter && url.startsWith('/api/') && !(rateLimiter.exemptLoopback && isLocalhostRequest(req))) {
     const ip = req.socket.remoteAddress ?? '127.0.0.1';
     if (!rateLimiter.check(ip)) {
@@ -1307,7 +1307,7 @@ export function createHttpServer(
   });
 
   const rateLimiter = rateLimitMax > 0
-    ? new RateLimiter(rateLimitMax, undefined, { exemptLoopback: rateLimitExemptLoopback })
+    ? new SlidingWindowRateLimiter(rateLimitMax, undefined, { exemptLoopback: rateLimitExemptLoopback })
     : undefined;
 
   const dashPath = join(projectRoot, DASHBOARD_FILE);

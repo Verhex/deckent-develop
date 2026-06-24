@@ -8,7 +8,7 @@
 // Sprint 147 Task 19
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { DetectorContext, DetectorResult, ObserverEvent, SprintStateSnapshot, NervousSystemConfig } from '../../../src/core/nervous-types.js';
+import type { DetectorContext, DetectorResult, ObserverEvent, SprintStateSnapshot, NervousSystemConfigV1 } from '../../../src/core/nervous-types.js';
 import { AgentRoutingHealth } from '../../../src/nervous/detectors/agent-routing.js';
 import { DirectivesMidSprintProtection } from '../../../src/nervous/detectors/directives-protection.js';
 import { DecisionEngine } from '../../../src/nervous/decision-engine.js';
@@ -140,7 +140,7 @@ describe('Sprint 146 Regression Tests', () => {
 
   it('should produce correct notification and decision for emergency directives scenario', () => {
     // Full pipeline: detector → decision → proposer
-    const config: NervousSystemConfig = { mode: 'balanced', enabled: true };
+    const config: NervousSystemConfigV1 = { mode: 'balanced', enabled: true };
     const engine = new DecisionEngine(config);
     const proposer = new Proposer(config);
 

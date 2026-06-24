@@ -146,3 +146,48 @@ describe('summarizeHandoffsObservability', () => {
     expect(summary.payload.handoffs.map((h: { id: string }) => h.id)).toEqual(['318-001-to-318-002']);
   });
 });
+
+// B-HANDOFF-PRUNE (Sprint 319): B-HANDOFF-STALE scoped the *summary* but the
+// `.tasks/handoffs/` registry itself was never pruned, so it grows without bound
+// across sprints. pruneCompletedSprints() deletes handoff files whose endpoints
+// are both outside the current sprint, keeping in-flight handoffs untouched.
+// Faithful: pre-fix the method does not exist (RED); post-fix prunes stale,
+// keeps current (GREEN).
+describe('pruneCompletedSprints', () => {
+  it('deletes stale cross-sprint handoffs and keeps only the current sprint', () => {
+    const root = tmpRoot();
+    const hp = new HandoffProtocol(root);
+    hp.createHandoff('295-001', '295-007', ['src/old.ts']);   // old sprint
+    hp.createHandoff('301-006', '301-011', ['src/old2.ts']);  // old sprint
+    hp.createHandoff('318-001', '318-002', ['src/new.ts']);   // current sprint
+    expect(hp.listHandoffs()).toHaveLength(3);
+
+    const currentSprintTaskIds = new Set(['318-001', '318-002']);
+    const pruned = hp.pruneCompletedSprints(currentSprintTaskIds);
+
+    expect(pruned).toBe(2); // the two old-sprint files deleted
+    const remaining = hp.listHandoffs();
+    expect(remaining).toHaveLength(1);
+    expect(remaining.map(h => h.id)).toEqual(['318-001-to-318-002']);
+  });
+
+  it('keeps a handoff when EITHER endpoint belongs to the current sprint', () => {
+    const root = tmpRoot();
+    const hp = new HandoffProtocol(root);
+    // cross-boundary handoff: source is current, target is a future/other sprint
+    hp.createHandoff('318-002', '320-001', ['src/cross.ts']);
+    hp.createHandoff('300-001', '300-002', ['src/stale.ts']); // wholly old
+
+    const pruned = hp.pruneCompletedSprints(new Set(['318-001', '318-002']));
+
+    expect(pruned).toBe(1); // only the wholly-old handoff removed
+    expect(hp.listHandoffs().map(h => h.id)).toEqual(['318-002-to-320-001']);
+  });
+
+  it('is a no-op (returns 0) when no handoff registry exists', () => {
+    const root = tmpRoot();
+    const hp = new HandoffProtocol(root);
+    expect(hp.pruneCompletedSprints(new Set(['319-001']))).toBe(0);
+    expect(hp.listHandoffs()).toEqual([]);
+  });
+});

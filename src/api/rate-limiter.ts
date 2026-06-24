@@ -25,7 +25,7 @@ interface Bucket {
   windowStart: number;
 }
 
-export class RateLimiter {
+export class ApiRateLimiter {
   private readonly maxRequests: number;
   private readonly windowMs: number;
   private readonly buckets: Map<string, Bucket> = new Map();

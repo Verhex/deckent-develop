@@ -38,9 +38,9 @@ const LOW_SUCCESS_THRESHOLD = 0.5;
 const LOW_COVERAGE_THRESHOLD = 60;
 const DECLINING_WINDOW = 3;
 
-// ─── CrossSprintAnalyzer ────────────────────────────────────────────
+// ─── AgentPerfAnalyzer ──────────────────────────────────────────────
 
-export class CrossSprintAnalyzer {
+export class AgentPerfAnalyzer {
   constructor(private projectRoot: string) {}
 
   /**

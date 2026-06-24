@@ -81,15 +81,17 @@ import { ParallelPipelineManager } from './parallel-pipeline.js';
 
 // ─── Task Router ────────────────────────────────────────────────
 import { routeTask, emitTimeoutEvents } from './task-router.js';
-import type { SprintHistory } from './timeout-estimator.js';
+import { aggregateSprintHistory } from './timeout-estimator.js';
 
 // Sprint 280 root-cause fix: adaptive per-task timeout is wired into every spawn
 // path (emitTimeoutEvents was a 0-caller dormant function, so docker_timeout
-// silently capped every worker at ~20min). History-scaling is optional in
-// brainEstimateTimeout (only applies when avgTaskDurationMs > 0), so the
-// spawn-time estimate uses the deterministic effort×loc×scope×backend factors —
-// the effort-based estimate is what matters at dispatch.
-const NO_SPRINT_HISTORY: SprintHistory = { avgTaskDurationMs: 0, sprintCount: 0 };
+// silently capped every worker at ~20min).
+// Sprint 319 B-HISTORYSCALE: history-scaling is now sourced from the REAL
+// past-sprint average task duration (aggregateSprintHistory reads `.brain/sprints/`
+// logs), computed once per spawn wave and passed to emitTimeoutEvents. Previously
+// a hardcoded zero-fill pinned historyFactor to 1.0 (no learning). On the first
+// sprint (no logs) the aggregator returns the same zero-fill, so the
+// effort×loc×scope×backend estimate is used unchanged.
 
 // ─── Observability ──────────────────────────────────────────────
 import { metric } from '../core/observability.js';
@@ -414,6 +416,9 @@ export async function spawnWorkers(
   // Sprint 202 Task 202-004 — inter-worker token throttle.
   // Resolved here once so the throttle is consistent across the whole wave.
   const throttleFloorMs = readTokenThrottleMs(config);
+  // Sprint 319 B-HISTORYSCALE — aggregate real past-sprint avg-task-duration once
+  // per wave (file I/O); feeds the historyFactor in emitTimeoutEvents below.
+  const sprintHistory = aggregateSprintHistory(projectRoot);
   let spawnedThisWave = 0;
 
   for (const task of activeTasks) {
@@ -531,7 +536,7 @@ export async function spawnWorkers(
     let taskTimeoutSeconds: number | undefined;
     try {
       taskTimeoutSeconds = emitTimeoutEvents(
-        task, config, NO_SPRINT_HISTORY, projectRoot, getCurrentSprintId(projectRoot) ?? sprint.id,
+        task, config, sprintHistory, projectRoot, getCurrentSprintId(projectRoot) ?? sprint.id,
       );
     } catch (e) { debugLog('spawn:timeoutEstimate', e); }
     let adapterRouted = wantsHostAdapter
@@ -719,6 +724,9 @@ export async function respawnEligibleTasks(
 
   // Sprint 202 Task 202-004 — same inter-worker throttle as spawnWorkers().
   const throttleFloorMs = readTokenThrottleMs(config);
+  // Sprint 319 B-HISTORYSCALE — same real past-sprint history aggregation as
+  // spawnWorkers(), computed once per respawn wave.
+  const sprintHistory = aggregateSprintHistory(projectRoot);
   let spawnedThisWave = 0;
 
   for (const task of toSpawn) {
@@ -778,7 +786,7 @@ export async function respawnEligibleTasks(
     let taskTimeoutSeconds: number | undefined;
     try {
       taskTimeoutSeconds = emitTimeoutEvents(
-        task, config, NO_SPRINT_HISTORY, projectRoot, getCurrentSprintId(projectRoot) ?? sprint.id,
+        task, config, sprintHistory, projectRoot, getCurrentSprintId(projectRoot) ?? sprint.id,
       );
     } catch (e) { debugLog('spawn:timeoutEstimate', e); }
     let adapterRouted = wantsHostAdapter

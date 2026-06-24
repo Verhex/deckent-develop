@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as fs from 'node:fs';
-import { CrossSprintAnalyzer } from '../../src/agents/cross-sprint-analyzer.js';
+import { AgentPerfAnalyzer } from '../../src/agents/cross-sprint-analyzer.js';
 import type { SprintEntry, SprintRange } from '../../src/agents/cross-sprint-analyzer.js';
 
 vi.mock('node:fs');
@@ -21,13 +21,13 @@ function makeLearningFile(entries: Array<SprintEntry & { agentId: string }>) {
   return JSON.stringify(entries);
 }
 
-describe('CrossSprintAnalyzer', () => {
-  let analyzer: CrossSprintAnalyzer;
+describe('AgentPerfAnalyzer', () => {
+  let analyzer: AgentPerfAnalyzer;
   const range: SprintRange = { from: 'sprint-001', to: 'sprint-010' };
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    analyzer = new CrossSprintAnalyzer(ROOT);
+    analyzer = new AgentPerfAnalyzer(ROOT);
   });
 
   // ─── Empty / missing data ───────────────────────────────────────

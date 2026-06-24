@@ -1,13 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Command } from 'commander';
 import { readFileSync } from 'node:fs';
-import { CrossSprintAnalyzer } from '../../src/orchestra/cross-sprint-analyzer.js';
+import { SprintTrendAnalyzer } from '../../src/orchestra/cross-sprint-analyzer.js';
 
 vi.mock('../../src/orchestra/cross-sprint-analyzer.js', () => ({
-  CrossSprintAnalyzer: vi.fn(),
+  SprintTrendAnalyzer: vi.fn(),
 }));
 
-const MockAnalyzer = CrossSprintAnalyzer as unknown as ReturnType<typeof vi.fn>;
+const MockAnalyzer = SprintTrendAnalyzer as unknown as ReturnType<typeof vi.fn>;
 
 function makeProgram(analyzeMock: () => unknown): Command {
   MockAnalyzer.mockImplementation(() => ({ analyze: analyzeMock }));

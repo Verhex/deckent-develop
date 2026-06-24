@@ -2,10 +2,14 @@
 // Sprint 145 — Task 145-002
 // 15+ tests covering all heuristic branches and edge cases
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   brainEstimateTimeout,
   estimateTaskLoC,
+  aggregateSprintHistory,
   type SprintHistory,
   type TimeoutBreakdown,
 } from '../../src/orchestra/timeout-estimator.js';
@@ -362,5 +366,112 @@ describe('TaskRouting timeoutSeconds field', () => {
     // The field is optional, so existing calls still work
     expect(result.provider).toBeDefined();
     expect(result.timeoutSeconds).toBeUndefined(); // routeTask doesn't set it
+  });
+});
+
+// ─── aggregateSprintHistory (Sprint 319 B-HISTORYSCALE) ─────────────
+// Faithful regression for the history_scaling zero-fill fix: the spawner now
+// aggregates the REAL past-sprint average task duration from `.brain/sprints/`
+// logs instead of a hardcoded { avgTaskDurationMs: 0 } that pinned historyFactor
+// to 1.0. Hermetic — all fixtures live under os.tmpdir(), torn down in afterEach.
+
+describe('aggregateSprintHistory', () => {
+  let tmpRoot: string;
+
+  beforeEach(() => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'deckent-history-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  /** Write a sprint-log .md with the canonical metrics table (matches sprint-log doc-updater). */
+  function writeSprintLog(name: string, totalTasks: number, durationMs: number): void {
+    const dir = join(tmpRoot, '.brain', 'sprints');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, `${name}.md`),
+      [
+        `# ${name}`,
+        '',
+        '## Metrics',
+        '| Metric | Value |',
+        '|--------|-------|',
+        `| Total Tasks | ${totalTasks} |`,
+        `| Duration | ${durationMs}ms |`,
+        '',
+      ].join('\n'),
+      'utf-8',
+    );
+  }
+
+  it('returns zero-fill fallback when no .brain/sprints dir exists (first sprint)', () => {
+    expect(aggregateSprintHistory(tmpRoot)).toEqual({ avgTaskDurationMs: 0, sprintCount: 0 });
+  });
+
+  it('returns zero-fill when logs exist but carry no usable metrics (zero tasks)', () => {
+    writeSprintLog('sprint-001', 0, 1000); // totalTasks=0 → not usable
+    expect(aggregateSprintHistory(tmpRoot)).toEqual({ avgTaskDurationMs: 0, sprintCount: 0 });
+  });
+
+  it('aggregates per-task duration from a single sprint log', () => {
+    writeSprintLog('sprint-001', 3, 6_000_000); // avg = 6_000_000 / 3 = 2_000_000ms
+    const history = aggregateSprintHistory(tmpRoot);
+    expect(history.sprintCount).toBe(1);
+    expect(history.avgTaskDurationMs).toBe(2_000_000);
+  });
+
+  it('averages per-task duration across multiple recent sprints', () => {
+    writeSprintLog('sprint-001', 1, 3_600_000); // avg 3_600_000
+    writeSprintLog('sprint-002', 1, 2_400_000); // avg 2_400_000
+    const history = aggregateSprintHistory(tmpRoot);
+    expect(history.sprintCount).toBe(2);
+    expect(history.avgTaskDurationMs).toBe(3_000_000); // mean of per-sprint avgs
+  });
+
+  it('limits aggregation to the most-recent N sprint logs', () => {
+    writeSprintLog('sprint-001', 1, 1_000_000);
+    writeSprintLog('sprint-002', 1, 2_000_000);
+    writeSprintLog('sprint-003', 1, 3_000_000);
+    const history = aggregateSprintHistory(tmpRoot, 2); // sprint-002 + sprint-003 only
+    expect(history.sprintCount).toBe(2);
+    expect(history.avgTaskDurationMs).toBe(2_500_000); // (2M + 3M) / 2
+  });
+
+  it('skips logs that lack Duration/Total Tasks rows', () => {
+    const dir = join(tmpRoot, '.brain', 'sprints');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'sprint-001.md'), '# sprint-001\n\nno metrics table here\n', 'utf-8');
+    writeSprintLog('sprint-002', 2, 4_000_000); // avg 2_000_000
+    const history = aggregateSprintHistory(tmpRoot);
+    expect(history.sprintCount).toBe(1);
+    expect(history.avgTaskDurationMs).toBe(2_000_000);
+  });
+
+  // ─── Faithful: real aggregation drives historyFactor ≠ 1.0 ─────────
+  it('FAITHFUL: aggregated slow-sprint history drives historyFactor > 1.0', () => {
+    writeSprintLog('sprint-001', 1, 3_600_000); // avgTaskDurationMs 3_600_000 (1h/task)
+    const history = aggregateSprintHistory(tmpRoot);
+    const { breakdown } = brainEstimateTimeout(
+      makeTask({ effort: 'normal' }),
+      makeConfig({ spawn_backend: 'docker' }),
+      history,
+    );
+    // historyFactor = max(1.0, (3_600_000/1000) / 1200 * 1.2) = 3.6 — proves the
+    // real avg flows through instead of the old hardcoded 0 → 1.0.
+    expect(breakdown.historyFactor).toBeCloseTo(3.6, 1);
+    expect(breakdown.historyFactor).toBeGreaterThan(1.0);
+  });
+
+  it('FALLBACK: no past-sprint history keeps historyFactor at 1.0', () => {
+    const history = aggregateSprintHistory(tmpRoot); // empty tmp → zero-fill
+    expect(history).toEqual({ avgTaskDurationMs: 0, sprintCount: 0 });
+    const { breakdown } = brainEstimateTimeout(
+      makeTask({ effort: 'normal' }),
+      makeConfig({ spawn_backend: 'docker' }),
+      history,
+    );
+    expect(breakdown.historyFactor).toBe(1.0);
   });
 });

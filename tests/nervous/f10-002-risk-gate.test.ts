@@ -6,16 +6,16 @@
 
 import { describe, it, expect } from 'vitest';
 import { resolveRiskClass } from '../../src/core/work-model.js';
-import type { NervousSystemConfig } from '../../src/core/nervous-types.js';
+import type { NervousSystemConfigV1 } from '../../src/core/nervous-types.js';
 import type { RiskGateRequest } from '../../src/nervous/decision-engine.js';
 import { DecisionEngine } from '../../src/nervous/decision-engine.js';
 import type { DetectorResult } from '../../src/core/nervous-types.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-type RiskGateConfig = NervousSystemConfig & { risk_gate_enabled?: boolean };
+type RiskGateConfig = NervousSystemConfigV1 & { risk_gate_enabled?: boolean };
 
-function makeConfig(riskGateEnabled: boolean, mode: NervousSystemConfig['mode'] = 'balanced'): RiskGateConfig {
+function makeConfig(riskGateEnabled: boolean, mode: NervousSystemConfigV1['mode'] = 'balanced'): RiskGateConfig {
   return { enabled: true, mode, risk_gate_enabled: riskGateEnabled };
 }
 

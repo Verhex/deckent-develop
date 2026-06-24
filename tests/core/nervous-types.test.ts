@@ -13,7 +13,7 @@ import type {
   NervousNotification,
   NotificationAction,
   AuthorityMatrix,
-  NervousSystemConfig,
+  NervousSystemConfigV1,
   DetectorResult,
 } from '../../src/core/nervous-types.js';
 
@@ -154,8 +154,8 @@ describe('NervousNotification', () => {
     expect(balancedMatrix.actionOverrides['COMMIT_PUSH']).toBe('approve');
   });
 
-  it('NervousSystemConfig defaults shape is valid', () => {
-    const config: NervousSystemConfig = {
+  it('NervousSystemConfigV1 defaults shape is valid', () => {
+    const config: NervousSystemConfigV1 = {
       mode: 'balanced',
       enabled: false,
       throttleWindowMs: 60000,

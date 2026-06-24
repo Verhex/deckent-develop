@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as fs from 'node:fs';
 import {
-  CrossSprintAnalyzer,
+  SprintTrendAnalyzer,
   analyzeTrend,
   type SprintTrendPoint,
 } from '../../src/orchestra/cross-sprint-analyzer.js';
@@ -59,12 +59,12 @@ describe('analyzeTrend', () => {
   });
 });
 
-describe('CrossSprintAnalyzer', () => {
-  let analyzer: CrossSprintAnalyzer;
+describe('SprintTrendAnalyzer', () => {
+  let analyzer: SprintTrendAnalyzer;
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    analyzer = new CrossSprintAnalyzer(ROOT);
+    analyzer = new SprintTrendAnalyzer(ROOT);
   });
 
   it('returns empty report when learnings.json does not exist', () => {

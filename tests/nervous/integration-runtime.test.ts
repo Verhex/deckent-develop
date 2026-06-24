@@ -51,7 +51,7 @@ import { NervousHistory } from '../../src/nervous/history.js';
 import type { DetectorConfig } from '../../src/nervous/detector-registry.js';
 import type {
   DetectorResult,
-  NervousSystemConfig,
+  NervousSystemConfigV1,
   ObserverEvent,
 } from '../../src/core/nervous-types.js';
 
@@ -68,7 +68,7 @@ interface PipelineHandle {
  * coupling to the bootstrap module's filesystem availability.
  */
 function assembleNervousPipeline(
-  nervousConfig: NervousSystemConfig & { detectors?: DetectorConfig },
+  nervousConfig: NervousSystemConfigV1 & { detectors?: DetectorConfig },
   projectRoot: string,
   sprintStateProvider: SprintStateProvider,
   actionHandler: ActionHandler,
@@ -189,7 +189,7 @@ describe('Nervous Integration Runtime — W3-3 full pipeline', () => {
     // Authority mode 'autopilot' so medium-risk WORKER_RESPAWN → autonomous.
     // The W3-2 'strict' smoke config is validated separately; here the goal
     // is to flow the pipeline through executor without external approval.
-    const nervousConfig: NervousSystemConfig & { detectors?: DetectorConfig } = {
+    const nervousConfig: NervousSystemConfigV1 & { detectors?: DetectorConfig } = {
       enabled: true,
       mode: 'autopilot',
       throttleWindowMs: 0,

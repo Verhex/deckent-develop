@@ -76,6 +76,21 @@ type DeckentConfigWithChatProvider = DeckentConfig & { chat_provider?: ChatProvi
 type ResolvedConfigWithChatProvider = ResolvedConfig & { chat_provider?: ChatProviderName };
 
 /**
+ * Sprint 319 Task B-MAXWORKERS-WIRE — the **top-level** `max_workers` is a real
+ * raw-config field (read by cli/resources.ts + cli/doctor.ts, written by
+ * cli/init-steps.ts, preserved by config-migration `removeDuplicateKeys`
+ * Decision 2) but was historically DEAD: never surfaced onto `ResolvedConfig`,
+ * so {@link resolveEffectiveWorkers} ignored it and the active-mode preset always
+ * won. These local intersection aliases follow the existing
+ * `…WithThrottle`/`…WithChatProvider` pattern so the shared `config-types.ts`
+ * interface stays untouched. The field is carried through `mergeConfigs`/
+ * `loadConfig` and honored as an explicit override (numeric wins; 'auto' takes the
+ * auto path; absent preserves the prior preset behavior).
+ */
+type DeckentConfigWithMaxWorkers = DeckentConfig & { max_workers?: number | 'auto' };
+type ResolvedConfigWithMaxWorkers = ResolvedConfig & { max_workers?: number | 'auto' };
+
+/**
  * Resolve the REPL chat provider via the documented fallback chain:
  *   1. config.chat_provider (explicit REPL override)
  *   2. config.brain_provider (project's primary provider)
@@ -974,15 +989,32 @@ export function validateConfig(config: DeckentConfig): string[] {
 
 /**
  * Resolves the effective number of workers to spawn.
- * - 'auto': uses systemProfile.recommendedMaxWorkers, capped by an optional plan_limit
+ *
+ * Precedence (Sprint 319 Task B-MAXWORKERS-WIRE):
+ *   1. top-level `config.max_workers` (numeric)  → explicit override, wins outright
+ *   2. top-level `config.max_workers === 'auto'`  → systemProfile auto path
+ *   3. `config.activeModeConfig.max_workers`       → mode preset / per-mode value
+ *
+ * - 'auto' (top-level or per-mode): uses systemProfile.recommendedMaxWorkers,
+ *   capped by an optional plan_limit
  * - number: returns the configured value directly
+ *
+ * The top-level override lets a user pin `max_workers` in config.json without
+ * editing every mode preset. A non-numeric / non-'auto' top-level value (or an
+ * absent one) falls through to the prior mode-config behavior unchanged.
  */
 export function resolveEffectiveWorkers(
   config: ResolvedConfig,
   systemProfile: SystemProfile,
   planLimit?: number,
 ): number {
-  const maxWorkers = config.activeModeConfig.max_workers;
+  // Sprint 319 (B-MAXWORKERS-WIRE): honor the explicit top-level override first.
+  const topLevel = (config as ResolvedConfigWithMaxWorkers).max_workers;
+  if (typeof topLevel === 'number' && Number.isFinite(topLevel) && topLevel >= 1) {
+    return topLevel;
+  }
+
+  const maxWorkers = topLevel === 'auto' ? 'auto' : config.activeModeConfig.max_workers;
   if (maxWorkers === 'auto') {
     const recommended = systemProfile.recommendedMaxWorkers;
     return planLimit !== undefined ? Math.min(recommended, planLimit) : recommended;
@@ -1398,7 +1430,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     }
   }
 
-  const resolved: ResolvedConfigWithThrottle & ResolvedConfigWithChatProvider = {
+  const resolved: ResolvedConfigWithThrottle & ResolvedConfigWithChatProvider & ResolvedConfigWithMaxWorkers = {
     mode: config.mode,
     activeModeConfig,
     modes: config.modes,
@@ -1406,6 +1438,10 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     projectName: config.projectName ?? 'deckent-project',
     projectRoot: root,
     version: config.version ?? DECKENT_VERSION,
+    // Sprint 319 (B-MAXWORKERS-WIRE): carry the top-level explicit worker-count
+    // override into the resolved config so resolveEffectiveWorkers can honor it.
+    // Absent → undefined → prior activeModeConfig/preset behavior is preserved.
+    max_workers: (config as DeckentConfigWithMaxWorkers).max_workers,
     model_strategy: resolvedModelStrategy,
     auto_docs: config.auto_docs ?? { ...DEFAULT_AUTO_DOCS },
     spawn_backend: config.spawn_backend,
@@ -2137,7 +2173,7 @@ export function mergeConfigs(
   };
   const coverageGates = resolveCoverageGates(userCoverageInput);
 
-  const merged: ResolvedConfigWithThrottle & ResolvedConfigWithChatProvider = {
+  const merged: ResolvedConfigWithThrottle & ResolvedConfigWithChatProvider & ResolvedConfigWithMaxWorkers = {
     mode: config.mode,
     activeModeConfig,
     modes: config.modes,
@@ -2145,6 +2181,9 @@ export function mergeConfigs(
     projectName: config.projectName ?? 'deckent-project',
     projectRoot: resolve(process.cwd()),
     version: config.version ?? DECKENT_VERSION,
+    // Sprint 319 (B-MAXWORKERS-WIRE): carry the top-level explicit worker-count
+    // override (see loadConfig + resolveEffectiveWorkers). Absent → undefined.
+    max_workers: (config as DeckentConfigWithMaxWorkers).max_workers,
     auto_docs: config.auto_docs ?? { ...DEFAULT_AUTO_DOCS },
     skills: config.skills,
     // F1-012 — pass grouped `providers` (incl. config-driven `registry`) through.

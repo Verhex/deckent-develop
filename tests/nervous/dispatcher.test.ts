@@ -9,30 +9,30 @@ import { NervousDispatcher } from '../../src/nervous/dispatcher.js';
 import type { ChannelAdapter, Channel } from '../../src/nervous/dispatcher.js';
 import type {
   NervousNotification,
-  NervousSystemConfig,
+  NervousSystemConfigV1,
   Severity,
 } from '../../src/core/nervous-types.js';
 
 // ─── Test Helpers ────────────────────────────────────────────────────────────
 
-function makeConfig(overrides: Record<string, unknown> = {}): NervousSystemConfig {
+function makeConfig(overrides: Record<string, unknown> = {}): NervousSystemConfigV1 {
   return {
     mode: 'balanced',
     enabled: true,
     ...overrides,
-  } as NervousSystemConfig;
+  } as NervousSystemConfigV1;
 }
 
 function makeConfigWithChannels(
   channels: { mcp?: boolean; cli?: boolean; file?: boolean } = {},
-): NervousSystemConfig {
+): NervousSystemConfigV1 {
   return {
     mode: 'balanced',
     enabled: true,
     notifications: {
       channels: { mcp: true, cli: true, file: true, ...channels },
     },
-  } as unknown as NervousSystemConfig;
+  } as unknown as NervousSystemConfigV1;
 }
 
 function makeNotification(overrides: Partial<NervousNotification> = {}): NervousNotification {

@@ -8,7 +8,7 @@
 import type {
   DecisionOutput,
   DetectorResult,
-  NervousSystemConfig,
+  NervousSystemConfigV1,
   Severity,
 } from '../core/nervous-types.js';
 import { MATRIX_BY_MODE, resolvePolicy } from './authority-matrix.js';
@@ -27,7 +27,7 @@ export type RiskGateRequest = Pick<ExecutionRequest, 'requirements' | 'capabilit
 // ─── Decision Engine ────────────────────────────────────────────────────────
 
 export class DecisionEngine {
-  constructor(private readonly config: NervousSystemConfig) {}
+  constructor(private readonly config: NervousSystemConfigV1) {}
 
   /**
    * Ana karar fonksiyonu — her detector sonucu icin cagrilir.
@@ -103,13 +103,13 @@ export class DecisionEngine {
    *
    * Read defensively off the resolved config: `risk_gate_enabled` lives in the
    * `.deckent/config.json` `nervous_system` section, which bootstrap passes
-   * through verbatim to this engine. Declaring it on {@link NervousSystemConfig}
+   * through verbatim to this engine. Declaring it on {@link NervousSystemConfigV1}
    * (core/) is a typed follow-up — out of this task's scope. Absent → false →
    * backward-safe (no gating).
    */
   private isRiskGateEnabled(): boolean {
     return (
-      (this.config as NervousSystemConfig & { risk_gate_enabled?: boolean })
+      (this.config as NervousSystemConfigV1 & { risk_gate_enabled?: boolean })
         .risk_gate_enabled === true
     );
   }

@@ -4,14 +4,14 @@
 // Sprint 147 Task 19
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { DetectorResult, DecisionOutput, NervousSystemConfig, NervousNotification, ExecutionRecord } from '../../../src/core/nervous-types.js';
+import type { DetectorResult, DecisionOutput, NervousSystemConfigV1, NervousNotification, ExecutionRecord } from '../../../src/core/nervous-types.js';
 import { Proposer } from '../../../src/nervous/proposer.js';
 import { DecisionEngine } from '../../../src/nervous/decision-engine.js';
 import { Executor, type ActionHandler, type NervousHistory } from '../../../src/nervous/executor.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function makeConfig(overrides: Partial<NervousSystemConfig> = {}): NervousSystemConfig {
+function makeConfig(overrides: Partial<NervousSystemConfigV1> = {}): NervousSystemConfigV1 {
   return {
     mode: 'balanced',
     enabled: true,

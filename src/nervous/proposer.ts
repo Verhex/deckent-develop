@@ -14,7 +14,7 @@ import type {
   DetectorResult,
   DecisionOutput,
   Severity,
-  NervousSystemConfig,
+  NervousSystemConfigV1,
   ApprovalPolicy,
 } from '../core/nervous-types.js';
 import { randomUUID, createHash } from 'node:crypto';
@@ -59,7 +59,7 @@ export interface ProposerContext {
 export class Proposer {
   private readonly recentGroups: Map<string, number> = new Map(); // groupKey → lastEmittedMs
 
-  constructor(private readonly config: NervousSystemConfig) {}
+  constructor(private readonly config: NervousSystemConfigV1) {}
 
   /**
    * DetectorResult + DecisionOutput[] → NervousNotification | null

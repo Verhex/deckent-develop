@@ -3,7 +3,7 @@
 // ADR-012: register<Name>(program) pattern.
 
 import { Command } from 'commander';
-import { CrossSprintAnalyzer } from '../../orchestra/cross-sprint-analyzer.js';
+import { SprintTrendAnalyzer } from '../../orchestra/cross-sprint-analyzer.js';
 import type { CrossSprintReport, EntityTrend } from '../../orchestra/cross-sprint-analyzer.js';
 
 function trendIcon(direction: EntityTrend['direction']): string {
@@ -57,7 +57,7 @@ export function registerEvolve(program: Command): void {
     .action((opts: { sprints: string; json: boolean }) => {
       const root = process.cwd();
       const n = Math.max(1, parseInt(opts.sprints, 10) || 10);
-      const analyzer = new CrossSprintAnalyzer(root);
+      const analyzer = new SprintTrendAnalyzer(root);
       const report = analyzer.analyze(n);
 
       if (opts.json) {

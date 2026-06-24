@@ -14,7 +14,7 @@ import { getLanguage, getMessage } from '../helpers/messages.js';
 import type {
   NervousNotification,
   ExecutionRecord,
-  NervousSystemConfig,
+  NervousSystemConfigV1,
   Severity,
 } from '../../core/nervous-types.js';
 import { getActiveDirectivesProtection } from '../../nervous/observer.js';
@@ -98,8 +98,8 @@ function readPendingNotifications(root: string): NervousNotification[] {
   }
 }
 
-function readNervousConfig(root: string): NervousSystemConfig {
-  const defaults: NervousSystemConfig = {
+function readNervousConfig(root: string): NervousSystemConfigV1 {
+  const defaults: NervousSystemConfigV1 = {
     mode: 'balanced',
     enabled: false,
     actionOverrides: {},

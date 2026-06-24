@@ -11,7 +11,7 @@ import {
 } from '../../src/core/capability-handlers-data.js';
 import type { Capability } from '../../src/core/work-model.js';
 
-function grant(capability: 'db.read' | 'mail.read'): Capability {
+function grant(capability: 'db-read' | 'mail-read'): Capability {
   return capability as Capability;
 }
 
@@ -26,8 +26,37 @@ async function invoke(handler: CapabilityHandler, args: Record<string, unknown>)
 
 describe('data capability handlers', () => {
   it('declares least-privilege requiredCapability values', () => {
-    expect(dbQueryHandler.requiredCapability).toBe('db.read');
-    expect(mailSearchHandler.requiredCapability).toBe('mail.read');
+    expect(dbQueryHandler.requiredCapability).toBe('db-read');
+    expect(mailSearchHandler.requiredCapability).toBe('mail-read');
+  });
+
+  // Faithful regression (B-CAPNOTATION): requiredCapability is a `Capability`
+  // grant-tag, whose canonical namespace is uniformly HYPHEN (`fs-read`,
+  // `db-query`, `mcp-tool`...). The data handlers previously declared DOT tags
+  // (`db.read` / `mail.read`) — inconsistent notation that never matches a
+  // hyphen grant set. Notation must be hyphen-only (no `.`).
+  it('uses hyphen notation for requiredCapability (no dot, matches Capability namespace)', () => {
+    for (const handler of [dbQueryHandler, mailSearchHandler]) {
+      // Pre-fix RED: 'db.read'/'mail.read' contain a '.'.
+      expect(handler.requiredCapability).not.toContain('.');
+      expect(handler.requiredCapability).toMatch(/^[a-z]+-[a-z]+$/);
+    }
+  });
+
+  it('gates against the canonical hyphen grant tag (dot tag never matched)', async () => {
+    const queryImpl = vi.fn<DbQueryImpl>(async () => ({ rows: [] }));
+    const registry = new CapabilityRegistry();
+    installDataHandlers(registry, { db: { queryImpl } });
+
+    // Granting the canonical hyphen capability `db-read` ALLOWS the handler.
+    // Pre-fix the handler required dot `db.read`, so this hyphen grant produced
+    // CAPABILITY_DENIED (RED); post-fix it matches and the query runs (GREEN).
+    const allowed = await registry.invoke(
+      { capability: 'db.query', args: { sql: 'SELECT id FROM accounts' } },
+      { grantedCapabilities: [grant('db-read')] },
+    );
+    expect(allowed.ok).toBe(true);
+    expect(queryImpl).toHaveBeenCalledTimes(1);
   });
 
   it('installDataHandlers registers handlers without editing the broker', () => {
@@ -43,7 +72,7 @@ describe('data capability handlers', () => {
 
     const denied = await registry.invoke(
       { capability: 'db.query', args: { sql: 'SELECT id FROM accounts' } },
-      { grantedCapabilities: [grant('mail.read')] },
+      { grantedCapabilities: [grant('mail-read')] },
     );
     expect(denied.ok).toBe(false);
     expect(!denied.ok && denied.code).toBe('CAPABILITY_DENIED');
@@ -51,7 +80,7 @@ describe('data capability handlers', () => {
 
     const allowed = await registry.invoke(
       { capability: 'db.query', args: { sql: 'SELECT id FROM accounts' } },
-      { grantedCapabilities: [grant('db.read')] },
+      { grantedCapabilities: [grant('db-read')] },
     );
     expect(expectOk(allowed).value).toEqual({ rows: [{ id: 1 }] });
   });

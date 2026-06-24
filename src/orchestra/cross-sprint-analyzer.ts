@@ -61,9 +61,9 @@ export function analyzeTrend(values: number[]): TrendDirection {
   return 'stable';
 }
 
-// ─── CrossSprintAnalyzer ─────────────────────────────────────────────────────
+// ─── SprintTrendAnalyzer ─────────────────────────────────────────────────────
 
-export class CrossSprintAnalyzer {
+export class SprintTrendAnalyzer {
   private readonly projectRoot: string;
 
   constructor(projectRoot: string) {

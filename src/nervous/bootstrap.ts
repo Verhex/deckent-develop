@@ -36,7 +36,7 @@ import type { ActionHandler, PendingApprovalStore } from './executor.js';
 import type {
   DetectorResult,
   NervousNotification,
-  NervousSystemConfig,
+  NervousSystemConfigV1,
   ObserverEvent,
   SprintStateSnapshot,
 } from '../core/nervous-types.js';
@@ -173,13 +173,13 @@ export function createNervousSystemIfEnabled(
     projectRoot,
     // N3: opt-in cooperative respawn — WORKER_RESPAWN writes a durable request the
     // sprint-controller drains (single-owner, no race). Off → propose (default).
-    ...(((config.nervous_system as NervousSystemConfig | undefined)?.worker_respawn)
+    ...(((config.nervous_system as NervousSystemConfigV1 | undefined)?.worker_respawn)
       ? { requestRespawn: requestWorkerRespawn }
       : {}),
   }),
   deps: NervousBootstrapDeps = {},
 ): NervousSystemHandle | null {
-  const nervousConfig = config.nervous_system as NervousSystemConfig | undefined;
+  const nervousConfig = config.nervous_system as NervousSystemConfigV1 | undefined;
   if (!nervousConfig?.enabled) {
     return null;
   }

@@ -30,7 +30,7 @@ import { NervousDispatcher, type ChannelAdapter } from '../../src/nervous/dispat
 import type {
   DetectorContext,
   DetectorResult,
-  NervousSystemConfig,
+  NervousSystemConfigV1,
   ObserverEvent,
   SprintStateSnapshot,
   NervousNotification,
@@ -94,7 +94,7 @@ function makeContext(root: string, overrides: {
   };
 }
 
-function makeBalancedConfig(overrides: Partial<NervousSystemConfig> = {}): NervousSystemConfig {
+function makeBalancedConfig(overrides: Partial<NervousSystemConfigV1> = {}): NervousSystemConfigV1 {
   return {
     mode: 'balanced',
     enabled: true,
@@ -149,7 +149,7 @@ function writeTask(root: string, task: {
 async function runFullPipeline(opts: {
   detectorResult: DetectorResult;
   detectorId: string;
-  config: NervousSystemConfig;
+  config: NervousSystemConfigV1;
   root: string;
   title: string;
   message: string;

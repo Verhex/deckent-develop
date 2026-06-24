@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type {
   DetectorResult,
-  NervousSystemConfig,
+  NervousSystemConfigV1,
   Severity,
 } from '../../src/core/nervous-types.js';
 import type { Capability } from '../../src/core/work-model.js';
@@ -18,7 +18,7 @@ import {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function makeConfig(overrides: Partial<NervousSystemConfig> = {}): NervousSystemConfig {
+function makeConfig(overrides: Partial<NervousSystemConfigV1> = {}): NervousSystemConfigV1 {
   return {
     mode: 'balanced',
     enabled: true,
@@ -39,12 +39,12 @@ function makeDetectorResult(
   };
 }
 
-/** Config extended with the opt-in risk-gate flag (declared on NervousSystemConfig in a follow-up). */
-type RiskGateConfig = NervousSystemConfig & { risk_gate_enabled?: boolean };
+/** Config extended with the opt-in risk-gate flag (declared on NervousSystemConfigV1 in a follow-up). */
+type RiskGateConfig = NervousSystemConfigV1 & { risk_gate_enabled?: boolean };
 
 function makeRiskGateConfig(
   riskGateEnabled: boolean,
-  overrides: Partial<NervousSystemConfig> = {},
+  overrides: Partial<NervousSystemConfigV1> = {},
 ): RiskGateConfig {
   return { ...makeConfig(overrides), risk_gate_enabled: riskGateEnabled };
 }
@@ -182,7 +182,7 @@ describe('DecisionEngine', () => {
     it('Invalid authorityMode -> throws', () => {
       // Arrange
       const engine = new DecisionEngine(
-        makeConfig({ mode: 'nonexistent-mode' as NervousSystemConfig['mode'] }),
+        makeConfig({ mode: 'nonexistent-mode' as NervousSystemConfigV1['mode'] }),
       );
       const result = makeDetectorResult({
         suggestedActions: [

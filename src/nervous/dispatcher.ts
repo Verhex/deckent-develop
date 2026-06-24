@@ -9,7 +9,7 @@
 // Cross-channel dedup: same notification ID dispatched only once
 // MCP failure → CLI fallback
 
-import type { NervousNotification, NervousSystemConfig, Severity } from '../core/nervous-types.js';
+import type { NervousNotification, NervousSystemConfigV1, Severity } from '../core/nervous-types.js';
 import { appendFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -24,7 +24,7 @@ import type { NotificationEventName } from '../core/notification-dispatcher.js';
 
 export type Channel = 'mcp' | 'cli' | 'file';
 
-// ─── Channel Config (extracted from NervousSystemConfig) ────────────────────
+// ─── Channel Config (extracted from NervousSystemConfigV1) ────────────────────
 
 export interface ChannelConfig {
   readonly mcp: boolean;
@@ -74,7 +74,7 @@ export class NervousDispatcher {
   private isTtyAvailable: () => boolean;
 
   constructor(
-    config: NervousSystemConfig,
+    config: NervousSystemConfigV1,
     projectRoot: string,
     options?: {
       mcpAdapter?: ChannelAdapter;
@@ -278,10 +278,10 @@ const SEVERITY_ICONS: Readonly<Record<string, string>> = {
 };
 
 /**
- * Extract channel config from NervousSystemConfig.
+ * Extract channel config from NervousSystemConfigV1.
  * Supports both the full config format and minimal config.
  */
-function extractChannelConfig(config: NervousSystemConfig): ChannelConfig {
+function extractChannelConfig(config: NervousSystemConfigV1): ChannelConfig {
   // The config may have a notifications.channels sub-object
   const raw = config as unknown as Record<string, unknown>;
   const notifications = raw.notifications as Record<string, unknown> | undefined;

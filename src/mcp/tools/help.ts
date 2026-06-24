@@ -9,12 +9,12 @@ import {
   DECKENT_VERSION,
   JOBS_DIR,
 } from '../../core/constants.js';
+// Canonical tool catalog (B-MCPCATALOG-SSOT). Used at runtime inside the handler
+// only — referencing it at module-eval time would hit the index.ts↔help.ts
+// circular-import TDZ (index.ts imports registerHelpTool, help.ts imports TOOL_CATALOG).
+import { TOOL_CATALOG, type McpToolCatalogEntry } from './index.js';
 
-interface HelpToolInfo {
-  name: string;
-  description: string;
-  readOnly: boolean;
-}
+type HelpToolInfo = McpToolCatalogEntry;
 
 interface HelpResourceInfo {
   name: string;
@@ -44,32 +44,6 @@ interface HelpResponse {
   tools: HelpToolInfo[];
   resources: HelpResourceInfo[];
 }
-
-const TOOLS: HelpToolInfo[] = [
-  { name: 'deckent_init', description: 'Initialize a Deckent project in the current directory', readOnly: false },
-  { name: 'deckent_set_directives', description: 'Write or update DIRECTIVES.md with sprint goals and task definitions', readOnly: false },
-  { name: 'deckent_plan', description: 'Plan the next sprint — creates task JSON files in .tasks/', readOnly: false },
-  { name: 'deckent_start', description: 'Start the sprint — spawns workers and begins execution', readOnly: false },
-  { name: 'deckent_status', description: 'Get the current sprint dashboard: agents, progress, usage, alerts', readOnly: true },
-  { name: 'deckent_doctor', description: 'Run system health checks — config, memory, locks, providers', readOnly: true },
-  { name: 'deckent_retro', description: 'Read the latest sprint retrospective (RETRO.md)', readOnly: true },
-  { name: 'deckent_history', description: 'Browse sprint history and outcomes across all past sprints', readOnly: true },
-  { name: 'deckent_analyze_project', description: 'Analyze project stack: language, framework, test runner, build tool', readOnly: true },
-  { name: 'deckent_sync', description: 'Sync workspace files and agent/skill manifests to disk', readOnly: false },
-  { name: 'deckent_config', description: 'Read, get, or set Deckent configuration values', readOnly: false },
-  { name: 'deckent_review', description: 'Evaluate sprint results — returns GO / NO_GO / GO_WITH_TECH_DEBT', readOnly: true },
-  { name: 'deckent_run', description: 'Run a single task directly without a full sprint', readOnly: false },
-  { name: 'deckent_kill', description: 'Kill a running worker by task ID or kill all workers', readOnly: false },
-  { name: 'deckent_cleanup', description: 'Archive task files and release locks after sprint completes', readOnly: false },
-  { name: 'deckent_help', description: 'Get runtime capabilities, project state, and next-step recommendation', readOnly: true },
-  { name: 'deckent_agent_list', description: 'List registered agents (built-in and project-specific)', readOnly: true },
-  { name: 'deckent_skill_list', description: 'List registered skills with manifest and sandbox info', readOnly: true },
-  { name: 'deckent_checkpoint', description: 'Approve or reject a checkpoint gate during sprint execution', readOnly: false },
-  { name: 'deckent_docs', description: 'Sprint lifecycle document management (add/remove/list)', readOnly: false },
-  { name: 'deckent_explain', description: 'Explain sprint history and results in natural language', readOnly: true },
-  { name: 'deckent_memory_query', description: 'Search project memory across all sources (ADR, sprint, debt, pattern)', readOnly: true },
-  { name: 'deckent_models', description: 'Browse model catalog: list by provider, refresh from models.dev, look up tier', readOnly: true },
-];
 
 const RESOURCES: HelpResourceInfo[] = [
   { name: 'dashboard', uri: 'deckent://dashboard', description: 'Live sprint status: agents, progress, usage, alerts' },
@@ -224,7 +198,7 @@ export function registerHelpTool(server: McpServer): void {
             debug: ['doctor', 'status', 'kill', 'cleanup'],
             config: ['config read', 'config set key value', 'sync'],
           },
-          tools: TOOLS,
+          tools: TOOL_CATALOG,
           resources: RESOURCES,
         };
 

@@ -10,7 +10,7 @@ import { Proposer, computeTimeoutMs } from '../../src/nervous/proposer.js';
 import type {
   DetectorResult,
   DecisionOutput,
-  NervousSystemConfig,
+  NervousSystemConfigV1,
   ActionDefinition,
   Severity,
 } from '../../src/core/nervous-types.js';
@@ -18,7 +18,7 @@ import type { ProposerContext } from '../../src/nervous/proposer.js';
 
 // ─── Test Helpers ────────────────────────────────────────────────────────────
 
-function makeConfig(overrides: Partial<NervousSystemConfig> & Record<string, unknown> = {}): NervousSystemConfig {
+function makeConfig(overrides: Partial<NervousSystemConfigV1> & Record<string, unknown> = {}): NervousSystemConfigV1 {
   return {
     mode: 'balanced',
     enabled: true,
