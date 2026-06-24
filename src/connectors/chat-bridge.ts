@@ -37,6 +37,47 @@ import { defaultSpawn } from './capabilities/spawn.js';
 import { loadNodemailerTransport } from './capabilities/mail-transport.js';
 import { describeCapabilities } from './capabilities/prompt.js';
 import type { BotCapabilitiesConfig, MediaAttachment } from './capabilities/types.js';
+import { approvalCallbackData } from './callback-router.js';
+import { markdownToTelegramHtml } from './markdown-to-html.js';
+import { getMessage } from '../cli/helpers/messages.js';
+import type { PerTurnConnector, ConnectorId } from './types.js';
+import type { CapabilityRegistry } from './capabilities/registry.js';
+
+/**
+ * Build an out-of-band approval sender bound to a specific connector and capability
+ * registry. Returns a curried function `(channelId, id, capId, args) => Promise<boolean>`.
+ *
+ * - Returns `false` immediately when the connector lacks `sendMessage` (no send surface).
+ * - Prefers `sendMessageReturningId` over `sendMessage` (allows message-id capture for
+ *   later edits in Task 4).
+ * - Builds a buttoned HTML preview: `cap.preview` → `markdownToTelegramHtml`, with
+ *   Approve/Reject inline buttons using `approvalCallbackData`.
+ * - i18n via `getMessage` (en/tr). `cap.approval.header` key localises the header line.
+ */
+export function makeSendApproval(
+  connector: PerTurnConnector,
+  registry: CapabilityRegistry,
+  lang: string,
+): (channelId: string, id: string, capId: string, args: Record<string, unknown>) => Promise<boolean> {
+  return async (channelId, id, capId, args) => {
+    if (typeof connector.sendMessage !== 'function') return false;
+    const cap = registry.get(capId);
+    const previewMd = cap ? cap.preview(args as never, lang) : `${capId}(${JSON.stringify(args)})`;
+    const header = getMessage('cap.approval.header', lang);
+    const html = markdownToTelegramHtml(`🔐 ${header}\n${previewMd}`);
+    const buttons: ReadonlyArray<ReadonlyArray<{ text: string; callbackData: string }>> = [[
+      { text: getMessage('cap.btn.approve', lang), callbackData: approvalCallbackData('approve', id) },
+      { text: getMessage('cap.btn.reject', lang), callbackData: approvalCallbackData('reject', id) },
+    ]];
+    const msg = { connector: connector.id as ConnectorId, channelId, text: html, parseMode: 'HTML' as const, buttons };
+    if (connector.sendMessageReturningId) {
+      await connector.sendMessageReturningId(msg);
+    } else {
+      await connector.sendMessage(msg);
+    }
+    return true;
+  };
+}
 
 /** Default provider: subscription claude (API key stripped → session auth, no tool_use). */
 function defaultSubscriptionProvider(): ChatProviderAdapter {
@@ -206,6 +247,11 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
         spawn: deps.capSpawn ?? defaultSpawn,
         loadMailTransport: loadNodemailerTransport,
       });
+      // Bind sendApproval using the per-turn connector (same object used for media in
+      // Slice 1.1). Cast to PerTurnConnector — the real connector has sendMessage; when
+      // absent (no-media sentinel), makeSendApproval returns false and the dispatcher
+      // falls back to the legacy "type approve <id>" text.
+      const sendApprovalFn = makeSendApproval(mediaConn as PerTurnConnector, capRegistry, lang);
       const capGate = {
         has: (id: string) => capRegistry.has(id),
         resolve: (id: string) => {
@@ -214,6 +260,8 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
         },
         runAuto: (id: string, args: Record<string, unknown>) =>
           runCapability(capRegistry, id, args, makeCapCtx(sessionId), sessionId, mediaSink, 'auto'),
+        sendApproval: (id: string, capId: string, args: Record<string, unknown>) =>
+          sendApprovalFn(sessionId, id, capId, args),
       };
       dispatcher = makeGatedDispatcher({
         inner,

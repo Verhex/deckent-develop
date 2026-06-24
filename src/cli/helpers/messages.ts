@@ -1823,6 +1823,10 @@ const MESSAGES: MessageMap = {
     en: 'Approval requested for {cap}; awaiting the user\'s decision.',
     tr: '{cap} için onay istendi; kullanıcının kararı bekleniyor.',
   },
+  'cap.approval.header': {
+    en: 'Approval required — not executed',
+    tr: 'Onay gerekli — çalıştırılmadı',
+  },
   'cap.btn.approve': {
     en: '✅ Approve',
     tr: '✅ Onayla',
