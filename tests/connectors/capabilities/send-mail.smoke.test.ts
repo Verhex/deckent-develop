@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { createServer, type Server } from 'node:net';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { sendMailCapability } from '../../../src/connectors/capabilities/builtin/send-mail.js';
-import type { CapabilityContext, MailConfig, MailTransport } from '../../../src/connectors/capabilities/types.js';
+import type { ArtifactStore, CapabilityContext, MailConfig, MailTransport } from '../../../src/connectors/capabilities/types.js';
 
 // Proof-of-function: a REAL SMTP protocol round-trip against a local in-process sink
 // (not a nodemailer mock). Hermetic: tmp port, async, torn down in the test.
@@ -69,5 +72,48 @@ describe('send_mail real-run (proof-of-function, local SMTP sink)', () => {
       expect(wire).toMatch(/RCPT TO:.*dest@test.local/i);
       expect(wire).toMatch(/Subject: Smoke/i);
     } finally { server.close(); }
+  }, 20_000);
+
+  it('transmits Content-Disposition: attachment when an artifact is attached', async () => {
+    // Same optional-dep guard — skip honestly when nodemailer isn't installed.
+    try {
+      await import('nodemailer');
+    } catch {
+      return; // honest skip — optional transport not installed
+    }
+    // Create a hermetic tmpdir fixture file
+    const dir = mkdtempSync(join(tmpdir(), 'deckent-smoke-attach-'));
+    const fixturePath = join(dir, 'fixture.txt');
+    writeFileSync(fixturePath, 'smoke-attachment-content');
+    try {
+      const { server, port, received } = await smtpSink();
+      try {
+        const cfg = { enabled: true, mail: { from: 'bot@test.local', smtp: { host: '127.0.0.1', port, secure: false } } };
+        // Minimal artifact store seeded with the fixture
+        const store: ArtifactStore = {
+          register: () => { throw new Error('register not expected in this test'); },
+          get: (_chatKey, id) => id === 'art_smoke'
+            ? { id: 'art_smoke', filename: 'fixture.txt', mime: 'text/plain', path: fixturePath }
+            : null,
+        };
+        const ctx = { chatKey: 'smoke', project: process.cwd(), lang: 'en', config: cfg, now: 1,
+          spawn: (async () => ({ code: 0, stdout: Buffer.from(''), stderr: '' })) as CapabilityContext['spawn'],
+          loadMailTransport: makeNativeTransport,
+          artifacts: store } as CapabilityContext;
+        const res = await sendMailCapability.run(
+          { to: 'dest@test.local', subject: 'AttachSmoke', body: 'See attachment', attachIds: ['art_smoke'] } as any,
+          ctx,
+        );
+        expect(res.text).toMatch(/sent|gönderildi/i);
+        const wire = received();
+        // Prove the attachment is on the SMTP wire
+        expect(wire).toMatch(/Content-Disposition:\s*attachment/i);
+        expect(wire).toMatch(/fixture\.txt/i);
+        // Prove a base64 body chunk is present (nodemailer encodes binary attachments in base64)
+        expect(wire).toMatch(/Content-Transfer-Encoding:\s*base64/i);
+      } finally { server.close(); }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   }, 20_000);
 });

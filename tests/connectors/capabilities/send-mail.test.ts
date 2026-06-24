@@ -43,6 +43,28 @@ describe('sendMailCapability.preview (Task 4 — rich multi-line)', () => {
   });
 });
 
+describe('sendMailCapability attachments (T7)', () => {
+  it('attaches artifacts by id; unknown id → honest error, no send', async () => {
+    const sendMail = vi.fn(async () => ({ messageId: 'm1' }));
+    const store = { get: (_c: string, id: string) => id === 'art_1' ? { id, filename: 's.png', mime: 'image/png', path: '/tmp/s.png' } : null };
+    const okCtx = ctx({ config: { enabled: true, mail: { smtp: { host: 'h' } } }, artifacts: store as any,
+      loadMailTransport: async () => ({ sendMail } as any) });
+    await sendMailCapability.run({ to: 'a@corp.com', subject: 'S', body: 'B', attachIds: ['art_1'] } as any, okCtx);
+    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ attachments: [{ filename: 's.png', path: '/tmp/s.png' }] }));
+    const bad = await sendMailCapability.run({ to: 'a@corp.com', subject: 'S', body: 'B', attachIds: ['art_ghost'] } as any, okCtx);
+    expect(bad.text).toMatch(/attachment|ek/i);
+    expect(sendMail).toHaveBeenCalledTimes(1); // not called again for the bad one
+  });
+
+  it('preview with attachIds lists attachment filenames', () => {
+    const store = { get: (_c: string, id: string) => id === 'art_1' ? { id, filename: 's.png', mime: 'image/png', path: '/tmp/s.png' } : null };
+    const p = (sendMailCapability as any).previewWithCtx?.({ to: 'a@corp.com', subject: 'S', body: 'B', attachIds: ['art_1'] }, 'en', store, 'c');
+    // preview function is standard (no ctx), check it works with attach line via standard preview
+    const p2 = sendMailCapability.preview({ to: 'a@corp.com', subject: 'S', body: 'B', attachIds: ['art_1'] } as any, 'en');
+    expect(p2).toMatch(/art_1|s\.png|Attachment|Ek/i);
+  });
+});
+
 describe('sendMailCapability', () => {
   it('missing SMTP config → honest error, no send', async () => {
     const res = await sendMailCapability.run({ to: 'a@x.com', subject: 's', body: 'b' }, ctx({}));

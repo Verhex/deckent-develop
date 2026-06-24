@@ -1809,6 +1809,14 @@ const MESSAGES: MessageMap = {
     en: '📧 *Send email*\n*To:* {to}\n*Subject:* {subject}\n*Body:* {body}',
     tr: '📧 *Mail gönderilecek*\n*Kime:* {to}\n*Konu:* {subject}\n*Gövde:* {body}',
   },
+  'cap.mail.attach_unknown': {
+    en: 'Attachment not found: {id}',
+    tr: 'Ek bulunamadı: {id}',
+  },
+  'cap.mail.preview_attach': {
+    en: '*Attachment:* {files}',
+    tr: '*Ek:* {files}',
+  },
 
   // ─── capability: gate (dispatcher-level policy messages) ────────────
   'cap.gate.unavailable': {

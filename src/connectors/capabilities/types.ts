@@ -34,7 +34,7 @@ export interface CapabilityResult {
 export interface SpawnResult { readonly code: number; readonly stdout: Buffer; readonly stderr: string }
 export type SpawnFn = (cmd: string, args: readonly string[], opts?: { timeoutMs?: number }) => Promise<SpawnResult>;
 
-export interface MailMessage { readonly from: string; readonly to: string | readonly string[]; readonly subject: string; readonly text: string }
+export interface MailMessage { readonly from: string; readonly to: string | readonly string[]; readonly subject: string; readonly text: string; readonly attachments?: readonly { readonly filename: string; readonly path: string }[] }
 export interface MailTransport { sendMail(msg: MailMessage): Promise<{ messageId: string }> }
 
 export interface MailConfig {
