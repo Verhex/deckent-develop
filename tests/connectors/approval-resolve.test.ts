@@ -184,6 +184,50 @@ describe('approval-resolve: editMessage on resolve (Task 4)', () => {
     await handle.dispose();
   });
 
+  it('expired approve: calls editMessage with refusal text and does NOT execute action', async () => {
+    const root = makeTmpRoot();
+    const actionId = 'act-t4-expired';
+    const msgId = 'tg-msg-444';
+    // Park an action that is already TTL-expired (expiresAt in the past)
+    parkRaw(root, {
+      id: actionId,
+      tool: 'deckent_status',
+      args: {},
+      channelId: '555',
+      parkedAt: new Date(Date.now() - 7_200_000).toISOString(),
+      expiresAt: new Date(Date.now() - 3_600_000).toISOString(), // expired 1 hour ago
+      approvalMessageId: msgId,
+    }, actionId);
+
+    const editMessage = vi.fn(async () => {});
+    const dispatch = vi.fn(async () => 'should-not-run');
+    const fake = fakeConnector('telegram', { editMessage });
+
+    const handle = await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      actionDispatcher: { dispatch },
+    });
+
+    fake._emit(incoming(`approve ${actionId}`, '555'));
+
+    await vi.waitFor(() => expect(fake.sendMessage).toHaveBeenCalled(), { timeout: 3000 });
+    // editMessage MUST be called — stale approval shows refusal + removes buttons
+    await vi.waitFor(() => expect(editMessage).toHaveBeenCalledTimes(1), { timeout: 3000 });
+
+    const [chanArg, midArg, textArg, modeArg] = editMessage.mock.calls[0]!;
+    expect(chanArg).toBe('555');
+    expect(midArg).toBe(msgId);
+    // Refusal text must be present (non-empty, contains expiry context)
+    expect(typeof textArg).toBe('string');
+    expect((textArg as string).length).toBeGreaterThan(0);
+    expect(modeArg).toBe('HTML');
+
+    // Action must NOT have been dispatched
+    expect(dispatch).not.toHaveBeenCalled();
+
+    await handle.dispose();
+  });
+
   it('best-effort: editMessage throwing does not crash the resolve path', async () => {
     const root = makeTmpRoot();
     const actionId = 'act-t4-throw';

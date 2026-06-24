@@ -236,10 +236,9 @@ export async function bootstrapConnectorCommands(
       const exec = checkExecutable(parked, { now: Date.now(), currentSprintId: getCurrentSprintId(root) });
       if (!exec.ok) {
         const key = exec.reason === 'expired' ? 'bot.action_expired' : 'bot.action_sprint_changed';
-        return {
-          status: 'resolved',
-          reply: getMessage(key, lang, { tool: parked.tool, sprint: parked.boundSprintId ?? '—' }),
-        };
+        const refusalText = getMessage(key, lang, { tool: parked.tool, sprint: parked.boundSprintId ?? '—' });
+        await editApprovalMessage(refusalText);
+        return { status: 'resolved', reply: refusalText };
       }
       try {
         // Capability-aware approve path: capability tools (e.g. screenshot, send_mail)
