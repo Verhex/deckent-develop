@@ -26,12 +26,17 @@ describe('TelegramConnector.sendMedia', () => {
     expect((file as FakeInputFile).data).toEqual(png.data);
     expect((extra as { caption: string }).caption).toBe('cap');
   });
-  it('document → sendDocument', async () => {
+  it('document → sendDocument(channelId, InputFile(data,filename), {caption})', async () => {
     const { Bot, instance } = mockBot();
     const c = new TelegramConnector(Bot as never, FakeInputFile as never);
     await c.startOutbound(cfg);
-    await c.sendMedia('123', { ...png, kind: 'document', filename: 'f.pdf', mime: 'application/pdf' });
+    const doc = { ...png, kind: 'document' as const, filename: 'f.pdf', mime: 'application/pdf' };
+    await c.sendMedia('123', doc);
     expect(instance.api.sendDocument).toHaveBeenCalledTimes(1);
+    const [chat, file, extra] = instance.api.sendDocument.mock.calls[0]!;
+    expect(chat).toBe('123');
+    expect((file as FakeInputFile).data).toEqual(doc.data);
+    expect((extra as { caption: string }).caption).toBe('cap');
   });
 }
 );

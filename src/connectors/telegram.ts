@@ -185,7 +185,8 @@ export class TelegramConnector extends BaseConnector {
 
   async sendMedia(channelId: string, media: import('./types.js').MediaAttachment): Promise<void> {
     if (!this.bot) throw new Error('Telegram connector not started');
-    if (!this.InputFileCtor) await this.loadGrammy(); // ensure InputFile available (outbound path may skip start)
+    // InputFile may be unset if a Bot was injected without an InputFile ctor and startOutbound() skipped loadGrammy(); load it now. (In production, loadGrammy already set it.)
+    if (!this.InputFileCtor) await this.loadGrammy();
     const file = new (this.InputFileCtor as InputFileCtor)(Buffer.from(media.data), media.filename);
     const extra = media.caption ? { caption: media.caption } : undefined;
     if (media.kind === 'photo') await this.bot.api.sendPhoto(channelId, file, extra);
