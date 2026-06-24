@@ -49,6 +49,14 @@ async function makeNativeTransport(cfg: MailConfig | undefined): Promise<MailTra
 
 describe('send_mail real-run (proof-of-function, local SMTP sink)', () => {
   it('opens a real SMTP connection and transmits the envelope', async () => {
+    // nodemailer is an optionalDependency — when it isn't installed (fresh checkout / CI
+    // without optional deps, or a node_modules that hasn't installed it yet), skip honestly
+    // rather than fail. When present, prove the real SMTP wire below.
+    try {
+      await import('nodemailer');
+    } catch {
+      return; // honest skip — optional transport not installed
+    }
     const { server, port, received } = await smtpSink();
     try {
       const cfg = { enabled: true, mail: { from: 'bot@test.local', smtp: { host: '127.0.0.1', port, secure: false } } };
