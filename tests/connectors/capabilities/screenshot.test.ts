@@ -3,7 +3,7 @@ import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { screenshotCapability } from '../../../src/connectors/capabilities/builtin/screenshot.js';
-import type { CapabilityContext, SpawnResult } from '../../../src/connectors/capabilities/types.js';
+import type { CapabilityContext, SpawnResult, ArtifactStore, ArtifactRef } from '../../../src/connectors/capabilities/types.js';
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]); // PNG magic
 function ctx(overrides: Partial<CapabilityContext> & { spawn: CapabilityContext['spawn']; probePlatform?: string }): CapabilityContext {
@@ -48,5 +48,32 @@ describe('screenshotCapability', () => {
     const res = await screenshotCapability.run({}, ctx({ spawn, platform: 'aix' } as never));
     expect(res.text).toMatch(/not supported|desteklenmiyor/i);
     expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it('registers artifact when ctx.artifacts present, result includes artifacts array with id', async () => {
+    const registeredRef: ArtifactRef = { id: 'art_aabb1122', filename: `screenshot-1700000000000.png`, mime: 'image/png', path: '/tmp/art' };
+    const fakeStore: ArtifactStore = { register: vi.fn(() => registeredRef), get: vi.fn(() => null) };
+    const spawn = vi.fn(async (cmd: string, args: readonly string[]): Promise<SpawnResult> => {
+      const { writeFileSync } = await import('node:fs');
+      writeFileSync(args[args.length - 1] as string, PNG);
+      return { code: 0, stdout: Buffer.from(''), stderr: '' };
+    });
+    const res = await screenshotCapability.run({}, ctx({ spawn, platform: 'darwin', artifacts: fakeStore } as never));
+    expect(fakeStore.register).toHaveBeenCalledWith('c', expect.objectContaining({ mime: 'image/png' }));
+    expect(res.artifacts).toBeDefined();
+    expect(res.artifacts?.[0]?.id).toBe('art_aabb1122');
+    // media must still be present
+    expect(res.media?.[0]?.mime).toBe('image/png');
+  });
+
+  it('no artifact registered when ctx.artifacts absent (backward-compat)', async () => {
+    const spawn = vi.fn(async (cmd: string, args: readonly string[]): Promise<SpawnResult> => {
+      const { writeFileSync } = await import('node:fs');
+      writeFileSync(args[args.length - 1] as string, PNG);
+      return { code: 0, stdout: Buffer.from(''), stderr: '' };
+    });
+    const res = await screenshotCapability.run({}, ctx({ spawn, platform: 'darwin' } as never));
+    expect(res.artifacts).toBeUndefined();
+    expect(res.media?.[0]?.mime).toBe('image/png');
   });
 });

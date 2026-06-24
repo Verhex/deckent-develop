@@ -83,10 +83,16 @@ export const screenshotCapability: Capability<Params> = {
       return { text: getMessage('cap.screenshot.failed', ctx.lang, { error: e instanceof Error ? e.message : String(e) }) };
     }
     try {
+      const filename = `screenshot-${ctx.now}.png`;
       const data = await readFile(path);
       void unlink(path).catch(() => {});
-      return { media: [{ kind: 'photo', filename: `screenshot-${ctx.now}.png`, mime: 'image/png', data,
-        caption: getMessage('cap.screenshot.caption', ctx.lang) + ` · ${hostname()} · ${args.display ?? 'primary'}` }] };
+      const media = [{ kind: 'photo' as const, filename, mime: 'image/png', data,
+        caption: getMessage('cap.screenshot.caption', ctx.lang) + ` · ${hostname()} · ${args.display ?? 'primary'}` }];
+      if (ctx.artifacts) {
+        const ref = ctx.artifacts.register(ctx.chatKey, { filename, mime: 'image/png', data });
+        return { media, artifacts: [ref] };
+      }
+      return { media };
     } catch (e) {
       return { text: getMessage('cap.screenshot.failed', ctx.lang, { error: e instanceof Error ? e.message : String(e) }) };
     }

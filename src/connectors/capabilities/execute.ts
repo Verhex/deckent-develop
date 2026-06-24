@@ -31,7 +31,11 @@ export async function runCapability(
     for (const m of result.media ?? []) {
       try { await sink(channelId, m); } catch { /* sink handles its own honest fallback */ }
     }
-    return result.text ?? `[${capId}] done`;
+    let ack = result.text ?? `[${capId}] done`;
+    if (result.artifacts?.length) {
+      ack += ' ' + result.artifacts.map((a) => `(artifact: ${a.id}, ${a.filename})`).join(' ');
+    }
+    return ack;
   } catch (e) {
     status = 'error';
     return `[capability-error] ${capId}: ${e instanceof Error ? e.message : String(e)}`;

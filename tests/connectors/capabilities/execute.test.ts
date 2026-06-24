@@ -41,4 +41,12 @@ describe('runCapability', () => {
     expect(out).toMatch(/invalid args/i);
     expect(runMock).not.toHaveBeenCalled();
   });
+  it('text-ack includes artifact ids when result.artifacts is non-empty', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cap-art-'));
+    const r = new CapabilityRegistry();
+    r.register({ ...mediaCap, run: async () => ({ text: 'captured', artifacts: [{ id: 'art_1', filename: 's.png', mime: 'image/png', path: '/tmp/x' }] }) });
+    const out = await runCapability(r, 'shot', {}, baseCtx(root), 'c', async () => {}, 'auto');
+    expect(out).toMatch(/art_1/);
+    expect(out).toMatch(/s\.png/);
+  });
 });
