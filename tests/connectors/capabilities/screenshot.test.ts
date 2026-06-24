@@ -53,7 +53,7 @@ describe('screenshotCapability', () => {
   it('registers artifact when ctx.artifacts present, result includes artifacts array with id', async () => {
     const registeredRef: ArtifactRef = { id: 'art_aabb1122', filename: `screenshot-1700000000000.png`, mime: 'image/png', path: '/tmp/art' };
     const fakeStore: ArtifactStore = { register: vi.fn(() => registeredRef), get: vi.fn(() => null) };
-    const spawn = vi.fn(async (cmd: string, args: readonly string[]): Promise<SpawnResult> => {
+    const spawn = vi.fn(async (_cmd: string, args: readonly string[]): Promise<SpawnResult> => {
       const { writeFileSync } = await import('node:fs');
       writeFileSync(args[args.length - 1] as string, PNG);
       return { code: 0, stdout: Buffer.from(''), stderr: '' };

@@ -46,7 +46,6 @@ describe('runCapability', () => {
     const r = new CapabilityRegistry();
     r.register({ ...mediaCap, run: async () => ({ text: 'captured', artifacts: [{ id: 'art_1', filename: 's.png', mime: 'image/png', path: '/tmp/x' }] }) });
     const out = await runCapability(r, 'shot', {}, baseCtx(root), 'c', async () => {}, 'auto');
-    expect(out).toMatch(/art_1/);
-    expect(out).toMatch(/s\.png/);
+    expect(out).toContain('(artifact: art_1, s.png)');
   });
 });
