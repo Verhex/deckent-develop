@@ -7,6 +7,7 @@ import type { ModelType, ProviderName, EvaluationRubric } from './task-types.js'
 import type { ModelStrategy } from './mode-presets.js';
 import type { ModelTier } from './model-equivalence.js';
 import type { ErpRuntimeConfig } from './erp/factory.js';
+import type { BotCapabilitiesConfig } from '../connectors/capabilities/types.js';
 
 // ─── Timeout Configuration ──────────────────────────────────────────
 export interface TimeoutConfig {
@@ -329,6 +330,12 @@ export interface DeckentConfig {
     /** Target chat/channel id the notifications are sent to. */
     chat_id: string;
   }>>;
+
+  // ─── Bot Capabilities (flag-gate + per-capability policies + mail/.deck) ──
+  /** Bot capability framework configuration (flag-gate, opt-in default-off).
+   *  Controls which bot capabilities are active, their approval policies per capability,
+   *  per-chat policy overrides, and SMTP mail config with $DECK: secret resolution. */
+  bot_capabilities?: BotCapabilitiesConfig;
 
   // ─── Native transport + bot-agent (REPL native agent + BOT-1) ──────
   /** Local Ollama endpoint (e.g. "http://127.0.0.1:11434") — native agent + bot-agent. */
