@@ -5,6 +5,9 @@
  * readonly identity fields, async lifecycle, config-driven start.
  */
 
+import type { MediaAttachment } from './capabilities/types.js';
+export type { MediaAttachment } from './capabilities/types.js';
+
 /** Supported messaging platform identifiers */
 export type ConnectorId = 'discord' | 'telegram' | 'whatsapp' | 'slack' | 'email';
 
@@ -110,6 +113,8 @@ export interface IMessageConnector {
   sendMessageReturningId?(msg: OutgoingMessage): Promise<string | undefined>;
   /** Edit a previously-sent message in place (streaming). Optional/feature-detected. */
   editMessage?(channelId: string, messageId: string, text: string, parseMode?: 'HTML' | 'MarkdownV2'): Promise<void>;
+  /** Send a media attachment (photo or document) to a channel. Optional/feature-detected. */
+  sendMedia?(channelId: string, media: MediaAttachment): Promise<void>;
 
   /** Register a handler for incoming messages. Multiple handlers supported. */
   onMessage(handler: MessageHandler): void;
