@@ -1,4 +1,5 @@
 import type { ZodType } from 'zod';
+import type { VoiceConfig } from '../voice/types.js';
 
 export type Tier = 'read' | 'local' | 'external' | 'destructive';
 export type PolicyDecision = 'auto' | 'confirm' | 'deny';
@@ -48,6 +49,8 @@ export interface BotCapabilitiesConfig {
   readonly policies?: Readonly<Record<string, PolicyDecision>>;
   readonly perChat?: Readonly<Record<string, Readonly<Record<string, PolicyDecision>>>>;
   readonly mail?: MailConfig;
+  /** Voice processing configuration (Task 9, Phase C). Default-disabled. */
+  readonly voice?: VoiceConfig;
 }
 
 export interface CapabilityContext {
