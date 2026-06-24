@@ -25,6 +25,7 @@ import {
   isProcessAlive,
   archiveOrphan,
   listPidFiles,
+  terminateOwnedSprintProcess,
 } from '../../src/orchestra/sprint-pid-manager.js';
 import type { SprintStateSnapshot, OrphanInfo } from '../../src/orchestra/sprint-pid-manager.js';
 
@@ -336,6 +337,43 @@ describe('sprint-pid-manager', () => {
   describe('readStateSnapshot', () => {
     it('should return null when no snapshot exists', () => {
       expect(readStateSnapshot(tmpRoot, 'sprint-none')).toBeNull();
+    });
+  });
+
+  // ── P0-C: orphan-on-finalize-force termination ──────────────────
+  describe('terminateOwnedSprintProcess (P0-C)', () => {
+    it('SIGTERMs an owned, alive sprint process', () => {
+      writePid(tmpRoot, 'sprint-x'); // records this process's PID → owned + alive
+      const killed: Array<{ pid: number; sig: NodeJS.Signals }> = [];
+      const res = terminateOwnedSprintProcess(tmpRoot, 'sprint-x', {
+        isAlive: () => true,
+        kill: (pid, sig) => { killed.push({ pid, sig }); },
+      });
+      expect(res.action).toBe('killed');
+      expect(killed).toHaveLength(1);
+      expect(killed[0]!.sig).toBe('SIGTERM');
+      expect(killed[0]!.pid).toBe(res.pid);
+    });
+
+    it('does NOT signal when no PID is recorded', () => {
+      const killed: number[] = [];
+      const res = terminateOwnedSprintProcess(tmpRoot, 'sprint-none', {
+        isAlive: () => true,
+        kill: (pid) => { killed.push(pid); },
+      });
+      expect(res.action).toBe('not-alive');
+      expect(killed).toHaveLength(0);
+    });
+
+    it('does NOT signal a recorded-but-dead process', () => {
+      writePid(tmpRoot, 'sprint-dead');
+      const killed: number[] = [];
+      const res = terminateOwnedSprintProcess(tmpRoot, 'sprint-dead', {
+        isAlive: () => false, // process already exited
+        kill: (pid) => { killed.push(pid); },
+      });
+      expect(res.action).toBe('not-alive');
+      expect(killed).toHaveLength(0);
     });
   });
 });

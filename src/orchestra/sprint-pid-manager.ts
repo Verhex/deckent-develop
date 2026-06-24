@@ -163,6 +163,37 @@ export function clearPid(root: string, sprintId: string): void {
   } catch { /* non-fatal */ }
 }
 
+/** Injectable deps for {@link terminateOwnedSprintProcess} (test seam). */
+export interface TerminateDeps {
+  isAlive?: (pid: number) => boolean;
+  kill?: (pid: number, signal: NodeJS.Signals) => void;
+}
+
+/**
+ * P0-C (orphan-on-finalize-force, sprint-323): terminate a sprint's recorded
+ * start-process when it is provably (or unprovably-but-alive) still running, so a
+ * `finalize --force` does not leave the hung `deckent start` racing the finalize
+ * (re-clobbering results / re-finalizing on its own timeout). NEVER signals a
+ * recycled PID ('reused' — the OS gave the number to an unrelated process).
+ * Returns what it did so the caller can report + decide.
+ */
+export function terminateOwnedSprintProcess(
+  root: string,
+  sprintId: string,
+  deps: TerminateDeps = {},
+): { action: 'killed' | 'skipped-reused' | 'not-alive'; pid: number | null } {
+  const isAlive = deps.isAlive ?? isProcessAlive;
+  const kill = deps.kill ?? ((pid: number, signal: NodeJS.Signals): void => { process.kill(pid, signal); });
+  const ownership = verifySprintOwnership(root, sprintId);
+  const pid = readPid(root, sprintId);
+  if (ownership === 'reused') return { action: 'skipped-reused', pid };
+  if ((ownership === 'owned' || ownership === 'unknown') && pid !== null && isAlive(pid)) {
+    try { kill(pid, 'SIGTERM'); } catch { /* best-effort */ }
+    return { action: 'killed', pid };
+  }
+  return { action: 'not-alive', pid };
+}
+
 // ─── State Snapshot Operations ────────────────────────────────────
 
 /**

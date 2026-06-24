@@ -6,7 +6,9 @@ import { TaskEvaluation, SprintStatus, SprintPhase } from '../../core/types.js';
 import { TASKS_DIR, BRAIN_DIR, DECKENT_DIR } from '../../core/constants.js';
 import { finalizeSprint } from '../../orchestra/brain.js';
 import { evaluateResultSync } from '../../orchestra/sprint-controller.js';
+import { terminateOwnedSprintProcess, clearPid } from '../../orchestra/sprint-pid-manager.js';
 import { loadConfig } from '../../core/config.js';
+import { debugLog } from '../../core/utils.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
@@ -203,6 +205,20 @@ export function registerFinalize(program: Command): void {
           return;
         } else if (incomplete.length > 0) {
           print(`Warning: Forcing finalize with ${incomplete.length} in-progress task(s).`);
+          // P0-C (orphan-on-finalize-force): the original `deckent start` process is
+          // typically still running its EXECUTE wait-loop (that is WHY a --force is
+          // needed). Left alive it races this finalize — re-clobbering results or
+          // re-finalizing on its own timeout (sprint-323). Terminate it (ownership-
+          // guarded — never signals a recycled PID).
+          try {
+            const term = terminateOwnedSprintProcess(root, sprintId);
+            if (term.action === 'killed') {
+              print(`Terminated orphan sprint process (PID ${term.pid}) so it cannot race this finalize.`);
+            } else if (term.action === 'skipped-reused') {
+              print(`Note: the PID recorded for ${sprintId} was recycled by the OS — not signalling; check for a stray process manually.`);
+            }
+            clearPid(root, sprintId);
+          } catch (e) { debugLog('finalize:orphanTerminate', e); }
         }
 
         // (H) Duplicate finalize protection
