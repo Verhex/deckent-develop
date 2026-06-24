@@ -1789,6 +1789,16 @@ const MESSAGES: MessageMap = {
     tr: '📧 Kime {to} · Konu {subject} · {body}',
   },
 
+  // ─── capability: gate (dispatcher-level policy messages) ────────────
+  'cap.gate.unavailable': {
+    en: "Capability '{id}' is not available.",
+    tr: "'{id}' yeteneği kullanılamıyor.",
+  },
+  'cap.gate.denied': {
+    en: "Capability '{id}' is denied by policy.",
+    tr: "'{id}' yeteneği policy ile reddedildi.",
+  },
+
   // ─── capability: screenshot ──────────────────────────────────────────
   'cap.screenshot.title': {
     en: 'Screenshot',
