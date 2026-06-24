@@ -168,6 +168,18 @@ const EXTENSION_ONLY_RE = /^\.[a-z]{1,5}$/i;
  *
  * @returns The normalized path, or null if the path should be excluded
  */
+// FIX-5 (B-COLLISION-HANG re-notify debounce): tracks the last-emitted scope
+// collision signature so a persisting collision (re-detected every dispatch tick)
+// emits its SCOPE_COLLISION_DETECTED / SPAWN_BLOCKED events — and thus triggers a
+// nervous proposal — only ONCE per collision-state, not every ~5-min tick.
+let lastCollisionSignature: string | null = null;
+
+/** Reset the collision-emit debounce. Call at sprint start (and in tests) so a
+ *  new sprint re-emits its collisions even if a prior sprint left the same key. */
+export function resetCollisionDebounce(): void {
+  lastCollisionSignature = null;
+}
+
 export function normalizeScopePath(rawPath: string): string | null {
   const trimmed = rawPath.trim();
   if (!trimmed) return null;
@@ -341,12 +353,27 @@ export async function spawnWorkers(
   const blockedTaskIds = new Set<string>();
   if (collisionResult.collisionCount > 0) {
     const sprintId = getCurrentSprintId(projectRoot) ?? sprint.id;
+    // FIX-5 (B-COLLISION-HANG re-notify debounce — B-STALEMD pattern): the
+    // detector re-runs every dispatch tick, so a persisting collision re-emitted
+    // these events every tick → the nervous proposer re-minted a fresh proposal
+    // each time → notification spam (sprint-319: a new Telegram "scope collision"
+    // every 5 min). Emit only when the collision SET changes; the serialize logic
+    // below still runs each tick (only the observability/nervous-trigger emits
+    // are debounced).
+    const collisionSignature = sprintId + '|' + [...collisionResult.collisions.entries()]
+      .map(([f, w]) => `${f}:${[...w].sort().join(',')}`)
+      .sort()
+      .join(';');
+    const emitCollision = collisionSignature !== lastCollisionSignature;
+    if (emitCollision) lastCollisionSignature = collisionSignature;
     for (const [file, writers] of collisionResult.collisions) {
-      writeEvent(
-        projectRoot, sprintId, 'auditor', 'brain',
-        CHANNELS.SCOPE_COLLISION_DETECTED,
-        { taskIds: writers, files: [file], detectedAt: 'plan-time' },
-      );
+      if (emitCollision) {
+        writeEvent(
+          projectRoot, sprintId, 'auditor', 'brain',
+          CHANNELS.SCOPE_COLLISION_DETECTED,
+          { taskIds: writers, files: [file], detectedAt: 'plan-time' },
+        );
+      }
       debugLog('spawnWorkers:collision', `File "${file}" written by tasks: ${writers.join(', ')}`);
 
       // Sprint 168 W2.5 — consult collision decision (C0c RC2) + emit BLOCKED
@@ -372,27 +399,33 @@ export async function spawnWorkers(
         const winner = ordered[0];
         const deferred = ordered.slice(1);
         for (const id of deferred) blockedTaskIds.add(id);
-        try {
-          writeEvent(
-            projectRoot, sprintId, 'brain', 'worker',
-            CHANNELS.SPAWN_BLOCKED,
-            {
-              taskIds: deferred,
-              winner,
-              serialized: true,
-              files: payload.files,
-              reason: decision.reason,
-              detectedAt: payload.detectedAt,
-            },
-          );
-        } catch (e) {
-          debugLog('spawnWorkers:writeBlockedEvent', e);
+        if (emitCollision) {
+          try {
+            writeEvent(
+              projectRoot, sprintId, 'brain', 'worker',
+              CHANNELS.SPAWN_BLOCKED,
+              {
+                taskIds: deferred,
+                winner,
+                serialized: true,
+                files: payload.files,
+                reason: decision.reason,
+                detectedAt: payload.detectedAt,
+              },
+            );
+          } catch (e) {
+            debugLog('spawnWorkers:writeBlockedEvent', e);
+          }
         }
       }
     }
     metric('collision.detected', collisionResult.collisionCount, {
       pairs: String(collisionResult.collidingPairs.length),
     });
+  } else {
+    // FIX-5: no collisions this tick → clear the debounce so a future collision
+    // (even one with an identical signature) re-emits exactly once.
+    lastCollisionSignature = null;
   }
 
   // Dependency pipeline guard: when enabled, only spawn tasks whose dependencies are all DONE

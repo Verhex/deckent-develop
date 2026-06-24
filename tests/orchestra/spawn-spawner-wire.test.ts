@@ -24,7 +24,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFileSync, mkdirSync, rmSync, existsSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { spawnWorkers } from '../../src/orchestra/sprint-spawner.js';
+import { spawnWorkers, resetCollisionDebounce } from '../../src/orchestra/sprint-spawner.js';
 import { readEvents, CHANNELS } from '../../src/orchestra/event-stream.js';
 import { TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task, ResolvedConfig, ModelType } from '../../src/core/types.js';
@@ -114,6 +114,7 @@ describe('spawnWorkers — C0c wire (Sprint 168 W2.5)', () => {
     mkdirSync(join(testRoot, '.deckent'), { recursive: true });
     // sprint-state.json absent — getCurrentSprintId returns null and code
     // falls back to sprint.id ('sprint-168') passed in the Sprint fixture.
+    resetCollisionDebounce(); // FIX-5: hermetic — clear cross-test debounce state
   });
 
   afterEach(() => {
@@ -257,5 +258,35 @@ describe('spawnWorkers — C0c wire (Sprint 168 W2.5)', () => {
     expect(spawnedIds).toContain('168-W25-H');
     expect(spawnedIds).toContain('168-W25-F');
     expect(spawnedIds).not.toContain('168-W25-G');
+  });
+
+  // FIX-5 (B-COLLISION-HANG re-notify debounce): a persisting collision is
+  // re-detected on every dispatch tick, but SCOPE_COLLISION_DETECTED (which
+  // triggers a nervous proposal) must fire only ONCE per collision-state — not on
+  // every tick. Sprint-319 re-emitted it every ~5 min → a fresh Telegram "scope
+  // collision" proposal each time (notification spam).
+  it('debounces SCOPE_COLLISION_DETECTED across repeated ticks of the same collision (FIX-5)', async () => {
+    const mkPair = (): Task[] => [
+      createTask('168-W25-J', ['src/dup.ts']),
+      createTask('168-W25-K', ['src/dup.ts']),
+    ];
+    persistTasks(mkPair());
+    const backend = makeMockBackend();
+
+    const origCwd = process.cwd();
+    process.chdir(testRoot);
+    try {
+      // Two dispatch ticks with the SAME unresolved collision (fresh PENDING
+      // fixtures each tick so the collision genuinely persists tick-to-tick).
+      await spawnWorkers(testRoot, makeSprint('sprint-168', mkPair()), makeConfig(), { spawnBackend: backend });
+      await spawnWorkers(testRoot, makeSprint('sprint-168', mkPair()), makeConfig(), { spawnBackend: backend });
+    } finally {
+      process.chdir(origCwd);
+    }
+
+    const events = readEvents(testRoot, 'sprint-168');
+    const collisionEvents = events.filter(e => e.channel === CHANNELS.SCOPE_COLLISION_DETECTED);
+    // Pre-fix: 2 (one per tick). Post-fix: 1 (debounced to the collision-state).
+    expect(collisionEvents.length).toBe(1);
   });
 });
