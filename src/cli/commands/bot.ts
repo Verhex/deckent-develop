@@ -68,6 +68,14 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
         root: r,
         lang,
         onPartial: (sid, txt) => partialSinks.get(sid)?.(txt),
+        capConfig: config.bot_capabilities,
+        // capConnector: the connector instance for chat-turn media delivery is
+        // encapsulated inside bootstrapConnectorCommands (lazy-loaded, fail-safe).
+        // Threading it here would require exposing connectors from
+        // ConnectorCommandsHandle, which is a follow-up architectural wire.
+        // Media-producing capability results during chat turns fall back to honest
+        // text until that wire is in place. The APPROVE-PATH already delivers media
+        // correctly via the targets lazy closure in connector-bootstrap.ts.
       });
 
       return bootstrapConnectorCommands(r, n, {
@@ -78,6 +86,7 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
             partialSinks.delete(channelId);
           });
         },
+        botCapabilities: config.bot_capabilities,
       });
     });
   const handle = await bootstrap(root, config.notify_connectors);

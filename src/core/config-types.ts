@@ -857,6 +857,8 @@ export interface ResolvedConfig {
   project_identity_enabled?: boolean;
   /** Outbound messaging connectors (BOT-001, §4G) — passed through from project config, tokens .deck-resolved. */
   notify_connectors?: DeckentConfig['notify_connectors'];
+  /** Bot capability framework config — passed through from project config (opt-in, default-off). */
+  bot_capabilities?: BotCapabilitiesConfig;
   /** Native transport + BOT-1 bot-agent (passed through from project config). */
   ollama_host?: string;
   native_model?: string;
