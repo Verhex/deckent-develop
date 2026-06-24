@@ -5,7 +5,6 @@ import {
   evaluateResult,
   isDocTask,
   isBashUnavailable,
-  waitForResults,
   scoreCorrectness,
   scoreTestCoverage,
   scoreScopeCompliance,
@@ -20,8 +19,6 @@ import {
   decideCascadeAction,
 } from '../../src/orchestra/result-evaluator.js';
 import type {
-  WaitableSprint,
-  ResultWatcher,
   FailureContext,
 } from '../../src/orchestra/result-evaluator.js';
 
@@ -395,186 +392,6 @@ describe('evaluateResult (result-evaluator)', () => {
     });
     // No new tests + coverage < 90 → GO_WITH_TECH_DEBT
     expect(await evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
-  });
-});
-
-// ─── waitForResults() ────────────────────────────────────────────────
-
-describe('waitForResults (result-evaluator)', () => {
-  it('returns immediately when all results exist on disk', async () => {
-    const resultData: TaskResult = makeResult({ taskId: '001' });
-    const sprint: WaitableSprint = { tasks: [{ id: '001' }] };
-
-    const result = await waitForResults('/project', sprint, {
-      fileExists: () => true,
-      readJson: () => resultData,
-      createWatcher: () => ({
-        waitForChange: () => new Promise(() => {}),
-        close: () => {},
-      }),
-    });
-
-    expect(result).toHaveLength(1);
-    expect(result[0].taskId).toBe('001');
-  });
-
-  it('collects multiple task results', async () => {
-    const results: Record<string, TaskResult> = {
-      '001': makeResult({ taskId: '001' }),
-      '002': makeResult({ taskId: '002' }),
-    };
-    const sprint: WaitableSprint = { tasks: [{ id: '001' }, { id: '002' }] };
-
-    const collected = await waitForResults('/project', sprint, {
-      fileExists: (path: string) => {
-        const id = path.includes('001') ? '001' : '002';
-        return id in results;
-      },
-      readJson: (path: string) => {
-        const id = path.includes('001') ? '001' : '002';
-        return results[id] ?? null;
-      },
-      createWatcher: () => ({
-        waitForChange: () => new Promise(() => {}),
-        close: () => {},
-      }),
-    });
-
-    expect(collected).toHaveLength(2);
-  });
-
-  it('waits for watcher when results not yet available', async () => {
-    let callCount = 0;
-    const resultData: TaskResult = makeResult({ taskId: '001' });
-    const sprint: WaitableSprint = { tasks: [{ id: '001' }] };
-
-    const collected = await waitForResults('/project', sprint, {
-      timeoutMs: 1000,
-      fileExists: () => {
-        callCount++;
-        return callCount >= 3; // Result appears on 3rd check
-      },
-      readJson: () => resultData,
-      createWatcher: () => ({
-        waitForChange: () => new Promise(resolve => setTimeout(resolve, 10)),
-        close: () => {},
-      }),
-    });
-
-    expect(collected).toHaveLength(1);
-    expect(callCount).toBeGreaterThanOrEqual(3);
-  });
-
-  it('returns partial results on timeout', async () => {
-    const sprint: WaitableSprint = { tasks: [{ id: '001' }, { id: '002' }] };
-    const resultData: TaskResult = makeResult({ taskId: '001' });
-
-    const collected = await waitForResults('/project', sprint, {
-      timeoutMs: 50,
-      fileExists: (path: string) => path.includes('001'),
-      readJson: (path: string) => path.includes('001') ? resultData : null,
-      createWatcher: () => ({
-        waitForChange: () => new Promise(resolve => setTimeout(resolve, 10)),
-        close: () => {},
-      }),
-    });
-
-    // Only task 001 had its result file
-    expect(collected).toHaveLength(1);
-    expect(collected[0].taskId).toBe('001');
-  });
-
-  it('processes queued tasks when a slot opens', async () => {
-    const spawnedTasks: string[] = [];
-    const killedTasks: string[] = [];
-    const sprint: WaitableSprint = { tasks: [{ id: '001' }] };
-    const queuedTask = makeTask(['src/'], { id: '002' });
-
-    await waitForResults('/project', sprint, {
-      timeoutMs: 100,
-      queue: [queuedTask],
-      fileExists: () => true,
-      readJson: () => makeResult({ taskId: '001' }),
-      killWorker: (taskId: string) => { killedTasks.push(taskId); },
-      spawnTask: (task: Task) => { spawnedTasks.push(task.id); },
-      createWatcher: () => ({
-        waitForChange: () => new Promise(resolve => setTimeout(resolve, 10)),
-        close: () => {},
-      }),
-    });
-
-    expect(killedTasks).toContain('001');
-    expect(spawnedTasks).toContain('002');
-  });
-
-  it('closes watcher on completion', async () => {
-    let watcherClosed = false;
-    const sprint: WaitableSprint = { tasks: [{ id: '001' }] };
-
-    await waitForResults('/project', sprint, {
-      timeoutMs: 50,
-      fileExists: () => false,
-      readJson: () => null,
-      createWatcher: () => ({
-        waitForChange: () => new Promise(resolve => setTimeout(resolve, 10)),
-        close: () => { watcherClosed = true; },
-      }),
-    });
-
-    expect(watcherClosed).toBe(true);
-  });
-
-  it('returns empty array when sprint has no tasks', async () => {
-    const sprint: WaitableSprint = { tasks: [] };
-
-    const collected = await waitForResults('/project', sprint, {
-      fileExists: () => false,
-      readJson: () => null,
-      createWatcher: () => ({
-        waitForChange: () => new Promise(() => {}),
-        close: () => {},
-      }),
-    });
-
-    expect(collected).toHaveLength(0);
-  });
-
-  it('handles readJson returning null gracefully', async () => {
-    const sprint: WaitableSprint = { tasks: [{ id: '001' }] };
-
-    const collected = await waitForResults('/project', sprint, {
-      timeoutMs: 50,
-      fileExists: () => true,
-      readJson: () => null, // file exists but parse fails
-      createWatcher: () => ({
-        waitForChange: () => new Promise(resolve => setTimeout(resolve, 10)),
-        close: () => {},
-      }),
-    });
-
-    expect(collected).toHaveLength(0);
-  });
-
-  it('does not spawn queue when no killWorker provided', async () => {
-    const spawnedTasks: string[] = [];
-    const sprint: WaitableSprint = { tasks: [{ id: '001' }] };
-    const queuedTask = makeTask(['src/'], { id: '002' });
-
-    await waitForResults('/project', sprint, {
-      timeoutMs: 100,
-      queue: [queuedTask],
-      fileExists: () => true,
-      readJson: () => makeResult({ taskId: '001' }),
-      // No killWorker provided — queue should still process but killWorker is a no-op
-      spawnTask: (task: Task) => { spawnedTasks.push(task.id); },
-      createWatcher: () => ({
-        waitForChange: () => new Promise(resolve => setTimeout(resolve, 10)),
-        close: () => {},
-      }),
-    });
-
-    // Queue was processed — spawnTask was called for task 002
-    expect(spawnedTasks).toContain('002');
   });
 });
 

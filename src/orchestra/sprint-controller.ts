@@ -1,6 +1,6 @@
 // ═══ Sprint Controller (Thin Orchestration Layer) ══════════════════
 // Sprint 136: Slimmed from ~1894 LoC to a thin barrel re-export layer.
-// Only runSprint(), waitForResults(), and evaluateResult() remain here.
+// Only runSprint(), waitForResults(), and evaluateResultSync() (alias: evaluateResult) remain here.
 // All other functions are delegated to sub-modules:
 //   sprint-planner.ts    — readContext, planSprint, confirmDraftTasks, cleanupDraftTasks
 //   sprint-spawner.ts    — spawnWorkers, respawnEligibleTasks, validateTaskDependencies, routeSprintTasks
@@ -837,8 +837,17 @@ export async function waitForResults(
 /**
  * Evaluate a worker's task result and return DONE, GO_WITH_TECH_DEBT, or NO_GO.
  * Checks self-assessment, test results, doc-task status, and coverage threshold (90%).
+ *
+ * **Synchronous fast-path evaluator.** This is the *sync* sibling of the canonical
+ * *asynchronous* `evaluateResult` in `result-evaluator.ts`. The two are deliberately
+ * distinct and must NOT be collapsed: the async version performs Spurious-NO_GO /
+ * TIMEOUT_WITH_WORK reconciliation (requires `projectRoot` + git I/O and awaits), whereas
+ * this one is a pure, await-free verdict used by the CLI `finalize` re-grade fallback where
+ * no event-loop suspension is desired. Renamed `evaluateResult` → `evaluateResultSync`
+ * (Sprint 321, R321-EVALRESULT-DISAMBIG) to end the cross-module name collision;
+ * behavior is byte-for-byte unchanged.
  */
-export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string, coverageThreshold = 90): TaskEvaluation {
+export function evaluateResultSync(result: TaskResult, task: Task, vitestJsonOutput?: string, coverageThreshold = 90): TaskEvaluation {
   const evalStart = Date.now();
   try {
   if (result.selfAssessment === 'NO_GO') return TaskEvaluation.NO_GO;
@@ -864,6 +873,16 @@ export function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?
     metric('eval.duration_ms', Date.now() - evalStart, { taskId: task.id });
   }
 }
+
+/**
+ * @deprecated Backward-compat alias for {@link evaluateResultSync}. The public name
+ * `evaluateResult` is still imported by `src/cli/commands/finalize.ts` (re-grade fallback)
+ * and a number of legacy tests — directly and via the `brain.ts` re-export. New call-sites
+ * should use `evaluateResultSync`; the alias exists to disambiguate from the async
+ * `evaluateResult` in `result-evaluator.ts` without a breaking rename of every consumer.
+ * It will be removed in a future finalize-inclusive sweep. Behavior is identical.
+ */
+export const evaluateResult = evaluateResultSync;
 
 /**
  * Sprint 140 cost-cascade circuit-breaker (B11 wire) — disaster prevention.

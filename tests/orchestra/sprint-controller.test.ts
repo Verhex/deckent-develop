@@ -294,6 +294,7 @@ import {
   BrainError,
   isDocTask,
   evaluateResult,
+  evaluateResultSync,
   getDefaultProvider,
   getChannelRegistry,
   spawnWorkers,
@@ -809,6 +810,32 @@ describe('evaluateResult', () => {
     };
 
     expect(evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
+  });
+});
+
+// R321-EVALRESULT-DISAMBIG: the sync evaluator is canonically named `evaluateResultSync`
+// to disambiguate it from the async `evaluateResult` in result-evaluator.ts. `evaluateResult`
+// remains as a backward-compat alias (consumed by CLI finalize + legacy tests). These guards
+// pin the rename + alias identity so a future collapse/divergence is caught.
+describe('evaluateResultSync (disambiguated sync evaluator)', () => {
+  it('is exported under the disambiguated name evaluateResultSync', () => {
+    expect(typeof evaluateResultSync).toBe('function');
+  });
+
+  it('evaluateResult is a backward-compat alias of evaluateResultSync (identical reference)', () => {
+    expect(evaluateResult).toBe(evaluateResultSync);
+  });
+
+  it('produces verdicts identical to the evaluateResult alias', () => {
+    const task = makeTask();
+    const result: TaskResult = {
+      taskId: '001-001', workerId: 'w-1', filesChanged: [],
+      linesAdded: 10, linesRemoved: 0, testsPassed: true,
+      coverage: 95, selfAssessment: 'DONE', notes: '',
+    };
+
+    expect(evaluateResultSync(result, task)).toBe(evaluateResult(result, task));
+    expect(evaluateResultSync(result, task)).toBe(TaskEvaluation.DONE);
   });
 });
 

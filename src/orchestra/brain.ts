@@ -2,7 +2,7 @@
 // Sprint 036: brain.ts is now a thin backward-compatibility layer.
 // All implementations live in dedicated sub-modules:
 //   sprint-controller.ts — runSprint, pause/resume, cleanup, planning, spawning
-//   result-evaluator.ts  — evaluateResult, isDocTask, waitForResults (DI version)
+//   result-evaluator.ts  — evaluateResult, isDocTask
 //   model-selector.ts    — model inference and selection
 //   task-builder.ts      — task creation, scope extraction, directive parsing
 //   debt-manager.ts      — debt lifecycle, escalation, decay
@@ -18,6 +18,7 @@ export {
   cleanupDraftTasks,
   spawnWorkers,
   waitForResults,
+  evaluateResultSync,
   evaluateResult,
   isDocTask,
   isStaleTaskFile,

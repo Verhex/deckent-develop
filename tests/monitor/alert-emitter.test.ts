@@ -27,7 +27,9 @@ vi.mock('../../src/orchestra/event-stream.js', () => ({
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { writeEvent } from '../../src/orchestra/event-stream.js';
-import { emitAlert } from '../../src/monitor/alert-emitter.js';
+import { emitAlert, deduplicateAlert } from '../../src/monitor/alert-emitter.js';
+import { AlertLevel } from '../../src/core/types.js';
+import type { Alert } from '../../src/core/types.js';
 
 const mockExistsSync = vi.mocked(existsSync);
 const mockReadFileSync = vi.mocked(readFileSync);
@@ -126,5 +128,41 @@ describe('emitAlert', () => {
         ).toContain('<!-- AUTO-START -->');
       }
     }
+  });
+});
+
+// ─── Divergence lock (321-003) ───────────────────────────────────────
+// deduplicateAlert keys on `source` ONLY — this is the exact behavior that
+// makes it INTENTIONALLY divergent from auditor.ts's deduplicateAlerts
+// (which keys on `source + "::" + message`). Locking it here ensures a future
+// "collapse the 3 dedup helpers" attempt fails loudly instead of silently
+// flipping dedup semantics. See alert-emitter.ts doc-comment + sprint 319-010 NO_GO.
+
+describe('deduplicateAlert — source-only identity (intentional divergence)', () => {
+  it('merges same source + DIFFERENT message into one entry, refreshing the message', () => {
+    const first: Alert = {
+      level: AlertLevel.WARNING,
+      message: 'CLAUDE.md stale (mtime t1)',
+      source: 'auditor:stale_md_detector',
+      timestamp: '2026-06-11T00:00:00.000Z',
+    };
+    const second: Alert & { lastSeenAt?: string; count?: number } = {
+      level: AlertLevel.WARNING,
+      message: 'CLAUDE.md stale (mtime t2)', // different message, SAME source
+      source: 'auditor:stale_md_detector',
+      timestamp: '2026-06-11T00:05:00.000Z',
+      lastSeenAt: '2026-06-11T00:05:00.000Z',
+      count: 1,
+    };
+
+    const afterFirst = deduplicateAlert([], first);
+    const result = deduplicateAlert(afterFirst as Alert[], second);
+
+    // source-only key ⇒ the differing message does NOT split the entry.
+    expect(result).toHaveLength(1);
+    expect(result[0].count).toBe(2);
+    // message refreshed to the latest occurrence.
+    expect(result[0].message).toBe('CLAUDE.md stale (mtime t2)');
+    expect(result[0].lastSeenAt).toBe('2026-06-11T00:05:00.000Z');
   });
 });

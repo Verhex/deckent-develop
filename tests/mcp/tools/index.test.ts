@@ -9,6 +9,7 @@
  * These tests lock the chain:
  *   TOOL_CATALOG  ===  what registerTools() actually registers   (names + readOnly + count)
  *   deckent_help output  ===  TOOL_CATALOG                        (consumer re-derives)
+ *   server.ts ## Tools (N) list  ===  TOOL_CATALOG                (3rd source, lint-mirrored)
  *
  * The "previously-missing 12" test is the faithful regression: with the OLD
  * 23-entry help.ts it is RED (those tools are absent); with help.ts deriving from
@@ -16,6 +17,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { readFile } from 'node:fs/promises';
 import {
   registerTools,
   TOOL_CATALOG,
@@ -157,6 +159,50 @@ describe('MCP tool catalog SSOT (index.ts)', () => {
       }
       // Old drift was 23; the single source guarantees 35.
       expect(names.size).toBe(35);
+    });
+  });
+
+  describe('server.ts DECKENT_MCP_INSTRUCTIONS mirrors the single source (third-source drift guard)', () => {
+    // The MCP server's human-readable instructions embed a `## Tools (N)` list — the
+    // third historical catalog source (alongside registration and help.ts). It carries
+    // prose descriptions so it cannot re-derive from TOOL_CATALOG at runtime;
+    // scripts/lint-mcp-instructions.mjs guards it as a standalone lint. These tests
+    // mirror that guard INSIDE the vitest suite, so a plain `vitest run` (not just the
+    // separate lint step) catches server.ts drift — proving the single-source count and
+    // name set flow to EVERY consumer, not only help.ts.
+    //
+    // Read via node:fs/promises (NOT the vi.mock('node:fs') above — a distinct module
+    // specifier, left real) and resolve relative to import.meta.url so it is hermetic:
+    // server.ts is a committed source file, never gitignored local state.
+    async function readServerInstructions(): Promise<{ declaredCount: number; tools: string[] }> {
+      const serverUrl = new URL('../../../src/mcp/server.ts', import.meta.url);
+      const source = await readFile(serverUrl, 'utf-8');
+      const header = source.match(/## Tools \((\d+)\)/);
+      if (!header) throw new Error('server.ts: "## Tools (N)" header not found');
+      const declaredCount = Number(header[1]);
+      const tools: string[] = [];
+      const linePattern = /^- (deckent_[a-z_]+):/gm;
+      let m: RegExpExecArray | null;
+      while ((m = linePattern.exec(source)) !== null) tools.push(m[1]!);
+      return { declaredCount, tools };
+    }
+
+    it('## Tools (N) header count equals MCP_TOOL_COUNT (single source of the count)', async () => {
+      const { declaredCount } = await readServerInstructions();
+      expect(declaredCount).toBe(MCP_TOOL_COUNT);
+    });
+
+    it('instruction tool names match TOOL_CATALOG exactly — no missing, no extra (drift regression)', async () => {
+      const { tools } = await readServerInstructions();
+      const catalogNames = new Set(TOOL_CATALOG.map((t) => t.name));
+      const instrSet = new Set(tools);
+
+      const missingFromInstructions = [...catalogNames].filter((n) => !instrSet.has(n));
+      const extraInInstructions = tools.filter((n) => !catalogNames.has(n));
+
+      expect(missingFromInstructions).toEqual([]);
+      expect(extraInInstructions).toEqual([]);
+      expect(tools.length).toBe(MCP_TOOL_COUNT);
     });
   });
 });

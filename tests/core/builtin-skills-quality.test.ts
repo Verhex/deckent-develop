@@ -14,6 +14,7 @@ import { describe, it, expect } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { parseFrontmatter } from '../../src/core/doc-tracking/frontmatter.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '..', '..');
@@ -67,10 +68,19 @@ describe('builtin skill quality invariants', () => {
       }
     });
 
-    it('matches the .deckent dogfood mirror byte-for-byte (when present)', () => {
+    it('matches the .deckent dogfood mirror in authored content (when present)', () => {
       const mirror = path.join(DECKENT_DIR, id, 'SKILL.md');
       if (!fs.existsSync(mirror)) return; // .deckent hidden under ci-sim — skip
-      expect(readSkill(DECKENT_DIR, id)).toBe(content);
+      // .deckent/skills is the bundle source-of-truth (scripts/bundle-builtins.mjs
+      // copies .deckent → src/core/builtins); ADR-090 doc-tracking then stamps managed
+      // frontmatter (doc_rank/status/last_updated/content_hash) onto the bundled
+      // src/core/builtins copy but NOT onto the .deckent dev source. That generated
+      // metadata legitimately differs by location, so we compare the authored body
+      // (frontmatter stripped via the canonical parser) — a real content drift still
+      // fails this assertion; a doc-tracking stamp alone does not.
+      expect(parseFrontmatter(readSkill(DECKENT_DIR, id)).body).toBe(
+        parseFrontmatter(content).body,
+      );
     });
   });
 

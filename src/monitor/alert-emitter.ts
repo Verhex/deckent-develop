@@ -32,10 +32,33 @@ type DedupAlert = Alert & { lastSeenAt?: string };
 const MAX_ALERTS = 50;
 
 /**
- * Deduplicate an alert list by source identity.
- * Incoming alert is upserted: if an entry with the same source exists, its
- * count and lastSeenAt are updated; otherwise a new entry is appended.
- * The resulting list is capped at MAX_ALERTS (most recent entries retained).
+ * Deduplicate an alert list by source identity (single-incoming upsert).
+ *
+ * Incoming alert is upserted: if an entry with the same `source` exists, its
+ * count and lastSeenAt are updated (and message refreshed to the latest);
+ * otherwise a new entry is appended. The resulting list is capped at
+ * MAX_ALERTS, retaining the most recent entries by INSERTION order (no re-sort).
+ *
+ * ─── INTENTIONALLY DIVERGENT — DO NOT COLLAPSE (sprint 319-010 NO_GO / 321-003 recheck) ───
+ * This is ONE of THREE alert-dedup helpers under src/monitor/. They are NOT
+ * redundant copies of one operation — each has a distinct, test-locked contract,
+ * and they CONTRADICT each other on the dedup KEY, so a single "SSOT" helper is
+ * impossible without silently changing observable behavior:
+ *
+ *   1. deduplicateAlert  (THIS — alert-emitter.ts) key = `source`
+ *        sig (list, ONE incoming) → upsert; cap = insertion-order slice(-MAX_ALERTS).
+ *        Same source + DIFFERENT message ⇒ MERGED into one entry (message refreshed).
+ *   2. deduplicateAlerts (auditor.ts)              key = `source + "::" + message`
+ *        sig (existing[], incoming[]) → batch merge; cap = oldest-dropped slice(-ALERT_MAX).
+ *        Same source + DIFFERENT message ⇒ KEPT SEPARATE (two entries).  ← contradicts (1)
+ *   3. dedupAlerts       (dashboard-manager.ts)    key = `source ?? message`
+ *        sig (single list) → Map-fold; cap = lastSeenAt-DESC sort + slice(0, DASHBOARD_MAX_ALERTS).
+ *
+ * (1) and (2) disagree on whether `message` is part of identity, so unifying them
+ * would flip dedup results their respective tests assert (alert-dedup.test.ts vs
+ * auditor.test.ts). They serve different call-sites by design: emitter single-upsert
+ * vs auditor scan-merge vs dashboard full-rewrite. Triage disposition: not-a-bug,
+ * intentional divergence — disambiguated here rather than collapsed.
  */
 export function deduplicateAlert(alerts: Alert[], incoming: DedupAlert): DedupAlert[] {
   const list = alerts as DedupAlert[];
