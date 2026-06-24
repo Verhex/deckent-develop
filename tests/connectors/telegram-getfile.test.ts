@@ -81,22 +81,41 @@ describe('TelegramConnector.getFileBuffer', () => {
   });
 
   it('builds the correct download URL from the stored token', async () => {
-    const { MockBot, instance } = createFakeBot('botTOK:XYZ', 'documents/file_abcd.pdf');
+    const { MockBot, instance } = createFakeBot('123456789:ABCdef', 'documents/file_abcd.pdf');
     const pdfBytes = Buffer.from('%PDF-1.4');
 
     const fakeFetch = makeFakeFetch(pdfBytes);
     globalThis.fetch = fakeFetch as unknown as typeof fetch;
 
     const connector = new TelegramConnector(MockBot as any);
-    await connector.start({ enabled: true, token: 'botTOK:XYZ' });
+    await connector.start({ enabled: true, token: '123456789:ABCdef' });
 
     await connector.getFileBuffer!('some_doc_file_id');
 
     // getFile called with the fileId
     expect(instance.api.getFile).toHaveBeenCalledWith('some_doc_file_id');
-    // fetch called with the correct Telegram download URL
+    // fetch called with the correct Telegram download URL (realistic token format)
     expect(fakeFetch).toHaveBeenCalledWith(
-      'https://api.telegram.org/file/botbotTOK:XYZ/documents/file_abcd.pdf',
+      'https://api.telegram.org/file/bot123456789:ABCdef/documents/file_abcd.pdf',
+    );
+  });
+
+  it('throws when fetch returns a non-ok HTTP status (e.g. 404)', async () => {
+    const { MockBot } = createFakeBot('123456789:ABCdef', 'photos/file_1234.jpg');
+
+    // Stub fetch returning 404 Not Found
+    const failFetch = vi.fn(async (_url: string) => ({
+      ok: false,
+      status: 404,
+      arrayBuffer: async () => new ArrayBuffer(0),
+    }));
+    globalThis.fetch = failFetch as unknown as typeof fetch;
+
+    const connector = new TelegramConnector(MockBot as any);
+    await connector.start({ enabled: true, token: '123456789:ABCdef' });
+
+    await expect(connector.getFileBuffer!('AgAB_test_file_id')).rejects.toThrow(
+      'Telegram file download failed: 404',
     );
   });
 

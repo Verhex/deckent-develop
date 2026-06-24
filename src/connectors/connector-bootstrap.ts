@@ -72,7 +72,7 @@ async function handleInboundMedia(
   if (typeof getFileBuffer !== 'function') return msg; // graceful degrade
 
   try {
-    const { data, filename: dlFilename } = await getFileBuffer.call(connector, media.fileId);
+    const { data } = await getFileBuffer.call(connector, media.fileId);
     const ref = artifactStore.register(msg.channelId, {
       filename: media.filename,
       mime: media.mime,
@@ -80,8 +80,6 @@ async function handleInboundMedia(
     });
     const notice = getMessage('cap.inbound.attached', lang, { id: ref.id, filename: ref.filename });
     const text = msg.text ? `${notice}\n${msg.text}` : notice;
-    // Suppress unused variable warning — dlFilename used for future extension
-    void dlFilename;
     return { ...msg, text };
   } catch {
     // Download/register failure must never crash the inbound poller

@@ -291,10 +291,12 @@ export class TelegramConnector extends BaseConnector {
     if (!this.botToken) throw new Error('Telegram connector not started');
 
     const fileInfo = await this.bot.api.getFile(fileId);
-    const filePath = fileInfo.file_path ?? '';
+    if (!fileInfo.file_path) throw new Error(`Telegram getFile returned no file_path for fileId: ${fileId}`);
+    const filePath = fileInfo.file_path;
     const url = `https://api.telegram.org/file/bot${this.botToken}/${filePath}`;
 
     const res = await fetch(url);
+    if (!res.ok) throw new Error(`Telegram file download failed: ${res.status}`);
     const arrayBuf = await res.arrayBuffer();
     const data = Buffer.from(arrayBuf);
 
