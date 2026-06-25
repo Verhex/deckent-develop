@@ -55,7 +55,7 @@ class TestFakeTts(unittest.TestCase):
 
 
 class TestFakeStt(unittest.TestCase):
-    """FakeStt: transcribe returns a str regardless of wav content."""
+    """FakeStt: transcribe returns a (str, str) 2-tuple regardless of wav content."""
 
     def setUp(self):
         from engines import make_stt_engine  # noqa: PLC0415
@@ -65,20 +65,34 @@ class TestFakeStt(unittest.TestCase):
         self.wav_path = os.path.join(self.tmp_dir, "test.wav")
         pathlib.Path(self.wav_path).write_bytes(b"\x00\x00")
 
-    def test_returns_string(self):
+    def test_returns_two_tuple(self):
+        """transcribe must return a 2-tuple (text: str, detected_language: str)."""
         result = self.engine.transcribe(self.wav_path, "tr")
-        self.assertIsInstance(result, str)
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(len(result), 2)
+
+    def test_returns_string(self):
+        text, detected = self.engine.transcribe(self.wav_path, "tr")
+        self.assertIsInstance(text, str)
+
+    def test_detected_language_is_string(self):
+        """Second element of tuple must be a non-empty str (the detected language tag)."""
+        _text, detected = self.engine.transcribe(self.wav_path, "tr")
+        self.assertIsInstance(detected, str)
+        self.assertGreater(len(detected), 0)
 
     def test_language_param_accepted(self):
-        result = self.engine.transcribe(self.wav_path, "en")
-        self.assertIsInstance(result, str)
+        text, detected = self.engine.transcribe(self.wav_path, "en")
+        self.assertIsInstance(text, str)
+        self.assertIsInstance(detected, str)
 
     def test_raw_bytes_file_accepted(self):
         """Even a non-WAV binary blob path is accepted by the fake (it doesn't parse it)."""
         raw_path = os.path.join(self.tmp_dir, "a.wav")
         pathlib.Path(raw_path).write_bytes(b"\x00\x00")
-        result = self.engine.transcribe(raw_path, "tr")
-        self.assertIsInstance(result, str)
+        text, detected = self.engine.transcribe(raw_path, "tr")
+        self.assertIsInstance(text, str)
+        self.assertIsInstance(detected, str)
 
 
 class TestFactoryErrors(unittest.TestCase):

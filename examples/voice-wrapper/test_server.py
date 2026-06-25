@@ -86,6 +86,17 @@ class TestVoiceContract(unittest.TestCase):
         self.assertIn("text", body)
         self.assertIsInstance(body["text"], str)
 
+    def test_stt_returns_language_string(self) -> None:
+        """FAKE /stt response MUST include a 'language' field (str)."""
+        r = self.client.post(
+            "/stt",
+            content=b"\x00\x00",
+            headers={"content-type": "audio/wav"},
+        )
+        body = r.json()
+        self.assertIn("language", body)
+        self.assertIsInstance(body["language"], str)
+
     def test_stt_fake_transcript_nonempty(self) -> None:
         """FAKE engine returns a non-empty transcript."""
         r = self.client.post(
@@ -95,6 +106,18 @@ class TestVoiceContract(unittest.TestCase):
         )
         body = r.json()
         self.assertGreater(len(body["text"]), 0)
+
+    def test_stt_with_language_param_returns_language_field(self) -> None:
+        """?language=fr query param — response must still include 'language' field (str)."""
+        r = self.client.post(
+            "/stt?language=fr",
+            content=b"\x00\x00",
+            headers={"content-type": "audio/wav"},
+        )
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertIn("language", body)
+        self.assertIsInstance(body["language"], str)
 
     # ------------------------------------------------------------------
     # POST /tts/raw

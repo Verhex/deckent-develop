@@ -3,7 +3,7 @@ server.py — FastAPI server implementing the deckent Voice HTTP contract.
 
 Contract (must match deckent's TypeScript local-voice.ts client exactly):
     GET  /health      → 200 {"status":"ok", "fake":bool, "loaded":{"tts":bool,"stt":bool}}
-    POST /stt         → body=raw audio bytes, Content-Type:<mime>, ?language= → {"text":"..."}
+    POST /stt         → body=raw audio bytes, Content-Type:<mime>, ?language= → {"text":"...","language":"..."}
     POST /tts/raw     → JSON {"text","voice"?,"language"?} → audio/wav bytes (PCM-16)
 
 Environment variables:
@@ -17,7 +17,7 @@ Environment variables:
     TTS_CFG          : VoxCPM2 CFG value (default: 1.3)
 
 Fake mode (TTS_FAKE=1):
-    /stt  → returns {"text": "[fake transcript]"} immediately (no tmp file, no model)
+    /stt  → returns {"text": "[fake transcript]", "language": "tr"} immediately (no tmp file, no model)
     /tts/raw → returns a 1-second 16 kHz silence WAV (stdlib wave; no numpy needed)
 
 Background idle-evict:
@@ -186,6 +186,7 @@ class HealthResponse(BaseModel):
 
 class SttResponse(BaseModel):
     text: str
+    language: str
 
 
 # ---------------------------------------------------------------------------
@@ -225,11 +226,11 @@ async def stt(request: Request) -> JSONResponse:
     In FAKE mode: returns {"text": "[fake transcript]"} immediately without touching
     the ModelManager or writing any file to disk.
     """
-    language: str = request.query_params.get("language") or "en"
+    language: str = request.query_params.get("language") or None  # type: ignore[assignment]
 
     # --- FAKE short-circuit ---
     if FAKE:
-        return JSONResponse(content={"text": "[fake transcript]"})
+        return JSONResponse(content={"text": "[fake transcript]", "language": "tr"})
 
     # --- Real path ---
     if manager is None:
@@ -250,7 +251,7 @@ async def stt(request: Request) -> JSONResponse:
         tmp_f.write(body)
 
     try:
-        text = manager.stt().transcribe(tmp_path, language)
+        text, detected = manager.stt().transcribe(tmp_path, language)
     finally:
         # Best-effort cleanup — failure is non-fatal (tmp will be gc'd by OS).
         try:
@@ -258,7 +259,7 @@ async def stt(request: Request) -> JSONResponse:
         except OSError:
             pass
 
-    return JSONResponse(content={"text": text})
+    return JSONResponse(content={"text": text, "language": detected})
 
 
 # ---------------------------------------------------------------------------

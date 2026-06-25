@@ -49,11 +49,16 @@ class SttEngine(ABC):
     """Abstract STT engine. Implementors MUST be importable without their heavy deps."""
 
     @abstractmethod
-    def transcribe(self, wav_path: str, language: str) -> str:
+    def transcribe(self, wav_path: str, language: str) -> Tuple[str, str]:
         """
-        Transcribe the WAV file at *wav_path* and return the transcript string.
+        Transcribe the WAV file at *wav_path*.
 
-        language : BCP-47 language tag, e.g. "tr", "en".
+        Returns a 2-tuple (text, detected_language) where:
+          text              : the transcript string.
+          detected_language : BCP-47 tag of the detected (or forced) language.
+
+        language : BCP-47 language tag to force, e.g. "tr", "en".
+                   Pass None (or falsy) to auto-detect the language.
         """
 
 
@@ -90,16 +95,19 @@ class FakeTts(TtsEngine):
 _FAKE_STT_TRANSCRIPT = "[fake transcript]"
 
 
+_FAKE_STT_LANGUAGE = "tr"
+
+
 class FakeStt(SttEngine):
     """
-    Returns a fixed transcript string without reading or parsing the audio file.
+    Returns a fixed (transcript, detected_language) 2-tuple without reading the audio file.
 
     Accepts any path value — the file need not exist or be a valid WAV.
     This makes FakeStt safe to use in hermetic tests that pass synthetic paths.
     """
 
-    def transcribe(self, wav_path: str, language: str) -> str:  # noqa: ARG002
-        return _FAKE_STT_TRANSCRIPT
+    def transcribe(self, wav_path: str, language: str) -> Tuple[str, str]:  # noqa: ARG002
+        return _FAKE_STT_TRANSCRIPT, _FAKE_STT_LANGUAGE
 
 
 # ---------------------------------------------------------------------------
@@ -214,9 +222,14 @@ class FasterWhisperStt(SttEngine):
             compute_type=_WHISPER_COMPUTE_TYPE,
         )
 
-    def transcribe(self, wav_path: str, language: str) -> str:
-        segments, _info = self._model.transcribe(wav_path, language=language)
-        return " ".join(seg.text.strip() for seg in segments)
+    def transcribe(self, wav_path: str, language: str) -> Tuple[str, str]:
+        # Pass language=None when falsy to enable whisper auto-detection.
+        forced = language or None
+        segments, info = self._model.transcribe(wav_path, language=forced)
+        text = " ".join(seg.text.strip() for seg in segments)
+        # info.language is the BCP-47 tag whisper detected (or the forced tag when forced).
+        detected: str = language if forced else info.language
+        return text, detected
 
 
 # ---------------------------------------------------------------------------
