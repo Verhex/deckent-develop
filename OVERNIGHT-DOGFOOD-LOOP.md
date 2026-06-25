@@ -29,3 +29,19 @@ Fresh zero-caller + supersession analysis of the 028/C3 candidates (`grep`-prove
 | `orchestra/pattern-recorder.ts` ← `pattern-reader.ts` | ZERO prod (reader feeds decision-engine) | **KEEP (dormant ref-impl)** — decision-engine ADR-028 reference implementation (sprint-139 Defer); integration-tested. | sprint-139 doc + decision-engine.test |
 
 **Decision needed from Alperen (WIRE-vs-KES):** `result-merger` (KES recommended, low value) + `task-retry` (KES recommended, proven superseded). The other three are KEEP (sanctioned Defer / live feature / dormant ref-impl) — not deletion candidates. Until ruled, **nothing deleted** this iteration (fabrike-sil yasak).
+
+---
+
+## Iteration 2 — zero-caller / half-wired discovery sweep (orchestra/ + core/)
+
+Heuristic: a top-level module with **0 production importers** (static `from` + dynamic `import()` + first-symbol use all NONE), filtered to those carrying tests = "tested-but-dead / half-wired". Spot-verified the interesting ones by ALL exports.
+
+**Coherent finding:** deckent ships a layer of **built + tested but never-wired infrastructure** — a half-built performance / multi-tenancy / session layer. ~14 zero-caller modules; cross-referenced against the triage:
+
+- **KNOWN (already in triage/B11/memory):** `skill-cache` (all exports DEAD), `rate-limiter` (core `TenantRateLimiter` DEAD — dead-duplicate of live `api/rate-limiter.ts`; only the `RateLimitResult` type is shared → B-RATELIMITER-DISAMBIG), `skill-registry`, `provider-capabilities`, `auth-session`, `audit-export`, `global-config`, `interaction-policy`, `notification-config`, `credentials` (B11 enterprise), `telemetry` (B7), `spawn-safety` (B4), `monitor-adapter` (triage: prod-DEAD), `timeout-watcher` (B11 KES), `multi-agent` (B11 WIRE), `decision-replay`/`pattern-reader`/`brain-context`/`capability-realizer` (iter-1 + sprint-139).
+- **🆕 NEW (not in triage):**
+  - **`core/agent-cache.ts`** (171 LoC, `AgentSelectionCache`/`TaskSignatureInput`/`CachedResult` — ALL DEAD) — "LRU cache for agent selection results, pure logic". The routing-engine selects an agent **per task with no memoization**; this cache was built + tested to memoize `selectBestAgent` results but is **never wired** into `routeTaskV2`. Half-built perf feature. **WIRE-vs-KES** (WIRE = routing perf on large sprints; KES = dead).
+  - **`core/lazy-loader.ts`** (145 LoC, `lazyLoad`/`LazyHandle`/`LazyMap`/`PreloadConfig` — ALL DEAD) — "generic lazy-load utility, load-on-first-access, pure logic". Zero callers anywhere. Likely abandoned generic util. **KES recommended** (no consumer, no clear future hook) unless a planned lazy-init use exists.
+- **Note (not a finding):** `spawn-backend-mock` is a test helper that intentionally lives in `src/` (MockSpawnBackend) — used by tests, NOT dead. `config-validator` is a 6-LoC re-export shim. Both excluded.
+
+**Action:** recorded for Alperen's WIRE-vs-KES; **nothing deleted** (unattended deferral). The NEW `agent-cache` is the more interesting one — a real, tested routing-perf feature left unwired (sibling to the ADR-075 affinity gap: routing has multiple built-but-unwired enhancements).
