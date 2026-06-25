@@ -45,12 +45,23 @@ the extension (they are metadata/comments).
 
 normalize_numbers_abbr — design notes (Task 2)
 ------------------------------------------------
-Processing order (applied left-to-right in a single pass for numbers, then units):
+Processing order (5 passes, left-to-right):
 
-  1. ``%<number>`` patterns → "yüzde <number-in-words>"
+  1. ``%<number>`` (prefix) → "yüzde <number-in-words>"
      Matched first so "%50" → "yüzde elli" rather than "% elli".
 
-  2. Standalone numeric tokens (integers and decimals with ```.``` or ```,```) →
+  2. ``<number>%`` (suffix) → "yüzde <number-in-words>"
+     Handles the Turkish content pattern "50% indirim" → "yüzde elli indirim".
+     No double-processing risk: the "%" in "%50" is consumed by pass 1, leaving
+     no trailing "%" for pass 2 to match.
+
+  3. ``<number><unit>`` (no-space attached) → "<number-words> <unit-expansion>"
+     Handles attached notation: "3.5GB", "200ms", "50dk".  Only known unit keys
+     from ``_UNIT_MAP`` trigger this pass; unknown letter sequences ("GPT", "js",
+     "px") are not in the alternation and therefore do NOT match — version strings
+     such as "GPT-5", "v2", "v2.0" remain intact.
+
+  4. Standalone numeric tokens (integers and decimals with ```.``` or ```,```) →
      Turkish words via ``num2words(n, lang='tr')``.
      Numeric bounding: negative lookbehind ``(?<![\\w.-])`` and negative lookahead
      ``(?![\\w.-])`` ensure that digits embedded in version strings ("v2", "GPT-5",
@@ -61,7 +72,7 @@ Processing order (applied left-to-right in a single pass for numbers, then units
      "üç virgül beş".  The comma is normalised to a dot before passing to
      num2words so Python's float() parser accepts it.
 
-  3. Unit/abbreviation substitution (\\b-bounded, applied after number conversion):
+  5. Unit/abbreviation substitution (\\b-bounded, applied after number conversion):
      ``GB``→"gigabayt", ``MB``→"megabayt", ``KB``→"kilobayt", ``TB``→"terabayt",
      ``ms``→"milisaniye", ``sn``→"saniye", ``dk``→"dakika", ``vs``→"vesaire",
      ``vb``→"ve benzeri".
@@ -213,11 +224,11 @@ _TR_NUMBER_ATOMS: tuple[str, ...] = (
     # Scale words (longest first to avoid partial grabs)
     "katrilyon", "kentilyon", "trilyon", "milyar", "milyon",
     # Hundred / misc
-    "yüzüncü", "yüz", "eksi", "sıfır",
+    "yüz", "eksi", "sıfır",
     # Tens (longest first within this tier)
     "altmış", "yetmiş", "seksen", "doksan", "yirmi", "otuz", "kırk", "elli", "on",
     # Ones (multi-char before single-char to avoid partial grabs)
-    "sekiz", "dört", "yedi", "dokuz", "alti", "altı",
+    "sekiz", "dört", "yedi", "dokuz", "altı",
     "beş", "üç", "iki", "bir",
     # Thousand (single syllable — after multi-syllable to avoid partial match)
     "bin",
@@ -297,8 +308,30 @@ _UNIT_MAP: dict[str, str] = {
 #
 # Percent-prefix pattern: %<number>  (number may have . or , decimal)
 # Examples: "%50" → "yüzde elli", "%3.5" → "yüzde üç virgül beş"
-_PERCENT_RE: re.Pattern[str] = re.compile(
+_PERCENT_PREFIX_RE: re.Pattern[str] = re.compile(
     r"%(\d+(?:[.,]\d+)?)",
+    re.UNICODE,
+)
+
+# Percent-suffix pattern: <number>%  (number may have . or , decimal)
+# Examples: "50%" → "yüzde elli", "3.5%" → "yüzde üç virgül beş"
+# Applied AFTER prefix-percent so "%50" is handled by the prefix pass and
+# does NOT get re-processed here (the "%" is consumed by the prefix pass,
+# leaving no trailing "%" to trigger this pass).
+_PERCENT_SUFFIX_RE: re.Pattern[str] = re.compile(
+    r"(\d+(?:[.,]\d+)?)%",
+    re.UNICODE,
+)
+
+# No-space unit pattern: <number><unit>  (unit immediately attached, no space)
+# Only matches when the unit string is one of the KNOWN keys in _UNIT_MAP.
+# The alternation is built from the unit map keys so that unknown letter
+# sequences (e.g. "GPT", "js", "px") do NOT match — version guards are safe.
+# Examples: "3.5GB" → "üç virgül beş gigabayt", "200ms" → "iki yüz milisaniye"
+# Lookbehind: digit must NOT be preceded by \w, '.', or '-' (version guard).
+_UNIT_KEYS_PATTERN: str = "|".join(re.escape(k) for k in _UNIT_MAP)
+_NO_SPACE_UNIT_RE: re.Pattern[str] = re.compile(
+    r"(?<![\w.\-])(\d+(?:[.,]\d+)?)(" + _UNIT_KEYS_PATTERN + r")(?![\w])",
     re.UNICODE,
 )
 
@@ -327,10 +360,18 @@ def normalize_numbers_abbr(text: str) -> str:
 
     Processing order (see module docstring for rationale):
 
-      1. ``%<number>`` → "yüzde <number-in-words>"  (e.g. "%50" → "yüzde elli")
-      2. Standalone numeric tokens → Turkish cardinal words
+      1. ``%<number>`` (prefix) → "yüzde <number-in-words>"
+         (e.g. "%50" → "yüzde elli")
+      2. ``<number>%`` (suffix) → "yüzde <number-in-words>"
+         (e.g. "50%" → "yüzde elli"; "%50" is already consumed by pass 1 so no
+         double-processing)
+      3. ``<number><unit>`` (no-space attached) → "<number-words> <unit-expansion>"
+         (e.g. "3.5GB" → "üç virgül beş gigabayt", "200ms" → "iki yüz milisaniye")
+         Only known units from _UNIT_MAP trigger this; unknown letter sequences
+         such as "GPT", "js" do NOT match — version guards remain intact.
+      4. Standalone numeric tokens → Turkish cardinal words
          (e.g. "200" → "iki yüz", "3.5" / "3,5" → "üç virgül beş")
-      3. Unit/abbreviation expansion (\\b-bounded):
+      5. Unit/abbreviation expansion (\\b-bounded, spaced case):
          GB→gigabayt, MB→megabayt, KB→kilobayt, TB→terabayt,
          ms→milisaniye, sn→saniye, dk→dakika, vs→vesaire, vb→ve benzeri
 
@@ -338,7 +379,8 @@ def normalize_numbers_abbr(text: str) -> str:
       Digits immediately preceded or followed by a word character, hyphen, or
       dot are NOT converted.  This protects version strings: "v2", "GPT-5",
       "Node.js", "v2.0" pass through unchanged.  Standalone tokens such as
-      "200", "3.5 GB", "5 dk", and "%50" are fully normalised.
+      "200", "3.5 GB", "5 dk", "%50", "50%", "3.5GB", and "200ms" are fully
+      normalised.
 
     Decimal separators:
       Both ``.`` and ``,`` are accepted as the decimal separator.  The comma is
@@ -346,8 +388,8 @@ def normalize_numbers_abbr(text: str) -> str:
       float).  Turkish TTS engines read "virgül" as the spoken decimal point.
 
     Args:
-        text: Input text that may contain digits, %-prefixed numbers, or unit
-              abbreviations.
+        text: Input text that may contain digits, %-prefixed/suffixed numbers,
+              no-space unit attachments, or spaced unit abbreviations.
 
     Returns:
         Text with numbers spelled out in Turkish and abbreviations expanded.
@@ -372,14 +414,32 @@ def normalize_numbers_abbr(text: str) -> str:
             return m.group(0)  # safety: leave as-is on parse failure
         return _num_to_tr_words(raw)
 
+    def _replace_no_space_unit(m: re.Match) -> str:
+        raw = m.group(1).replace(",", ".")
+        unit_abbr = m.group(2)
+        try:
+            int(raw) if "." not in raw else float(raw)
+        except ValueError:
+            return m.group(0)  # safety: leave as-is on parse failure
+        expansion = _UNIT_MAP[unit_abbr]
+        return _num_to_tr_words(raw) + " " + expansion
+
     # Pass 1: percent-prefix (before standalone numbers so '%50' → 'yüzde elli'
     # not '% elli')
-    result = _PERCENT_RE.sub(_replace_percent, text)
+    result = _PERCENT_PREFIX_RE.sub(_replace_percent, text)
 
-    # Pass 2: standalone numbers
+    # Pass 2: percent-suffix (after prefix so "%50" is already consumed, no
+    # double-processing; handles "50% indirim" form common in Turkish content)
+    result = _PERCENT_SUFFIX_RE.sub(_replace_percent, result)
+
+    # Pass 3: no-space unit attachments (before standalone number pass so
+    # "3.5GB" is handled atomically, not split into "3.5" then "GB")
+    result = _NO_SPACE_UNIT_RE.sub(_replace_no_space_unit, result)
+
+    # Pass 4: standalone numbers
     result = _NUMBER_RE.sub(_replace_number, result)
 
-    # Pass 3: unit abbreviations (\b-bounded, case-sensitive)
+    # Pass 5: unit abbreviations (\b-bounded, case-sensitive, spaced case)
     for pat, expansion in _UNIT_PATTERNS:
         result = pat.sub(expansion, result)
 

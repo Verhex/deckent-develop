@@ -419,6 +419,110 @@ class TestNormalizeNumbersAbbr(unittest.TestCase):
         result = apply_pronunciation("API ile çalışmak", {"API": "Ey Pi Ay"})
         self.assertIn("Ey Pi Ay", result)
 
+    # ------------------------------------------------------------------ #
+    # Fix 1: percent SUFFIX "50%" → "yüzde elli"
+    # ------------------------------------------------------------------ #
+
+    def test_percent_suffix_50(self):
+        """'50%' (suffix form) → 'yüzde elli'."""
+        self.assertEqual("yüzde elli", self.normalize("50%"))
+
+    def test_percent_suffix_in_sentence(self):
+        """'50% indirim' → starts with 'yüzde elli'."""
+        result = self.normalize("50% indirim")
+        self.assertTrue(result.startswith("yüzde elli"), repr(result))
+
+    def test_percent_suffix_decimal(self):
+        """'3.5%' (suffix decimal) → 'yüzde üç virgül beş'."""
+        self.assertEqual("yüzde üç virgül beş", self.normalize("3.5%"))
+
+    def test_percent_prefix_no_double_process(self):
+        """'%50' (prefix form) must NOT be double-processed by the suffix pass."""
+        self.assertEqual("yüzde elli", self.normalize("%50"))
+
+    def test_percent_both_forms_in_sentence(self):
+        """Both prefix and suffix forms in same text must each convert exactly once."""
+        result = self.normalize("%50 indirim ve 30% geri ödeme")
+        # Both should be converted to "yüzde ..." form
+        self.assertIn("yüzde elli", result)
+        self.assertIn("yüzde otuz", result)
+        # No bare "%" should remain
+        self.assertNotIn("%", result)
+
+    # ------------------------------------------------------------------ #
+    # Fix 2: no-space unit attachment "3.5GB" / "200ms" / "50dk"
+    # ------------------------------------------------------------------ #
+
+    def test_no_space_gb(self):
+        """'3.5GB' (no space) → 'üç virgül beş gigabayt'."""
+        self.assertEqual("üç virgül beş gigabayt", self.normalize("3.5GB"))
+
+    def test_no_space_ms(self):
+        """'200ms' (no space) → 'iki yüz milisaniye'."""
+        self.assertEqual("iki yüz milisaniye", self.normalize("200ms"))
+
+    def test_no_space_dk(self):
+        """'50dk' (no space) → 'elli dakika'."""
+        self.assertEqual("elli dakika", self.normalize("50dk"))
+
+    def test_no_space_mb(self):
+        """'512MB' (no space) → contains 'megabayt'."""
+        result = self.normalize("512MB")
+        self.assertIn("megabayt", result)
+        self.assertNotIn("MB", result)
+
+    def test_no_space_unit_in_sentence(self):
+        """'dosya 3.5GB boyutunda' → 'dosya üç virgül beş gigabayt boyutunda'."""
+        result = self.normalize("dosya 3.5GB boyutunda")
+        self.assertIn("üç virgül beş gigabayt", result)
+
+    def test_spaced_unit_still_works_after_fix2(self):
+        """Spaced '3.5 GB' must still work (regression guard)."""
+        self.assertEqual("üç virgül beş gigabayt", self.normalize("3.5 GB"))
+
+    # ------------------------------------------------------------------ #
+    # Fix 2: version guards — unknown-letter-suffix must NOT convert
+    # ------------------------------------------------------------------ #
+
+    def test_gpt5_no_space_not_mangled(self):
+        """'GPT-5' must still pass through unchanged (hyphen lookbehind guard)."""
+        self.assertEqual("GPT-5", self.normalize("GPT-5"))
+
+    def test_v2_no_space_not_mangled(self):
+        """'v2' must still pass through unchanged (letter lookbehind guard)."""
+        self.assertEqual("v2", self.normalize("v2"))
+
+    def test_number_followed_by_unknown_unit_not_expanded(self):
+        """'5px' — 'px' is NOT in _UNIT_MAP — digit must not convert via no-space pass.
+
+        The standalone number pass would normally pick up the '5' but the 'p' in
+        'px' is a word char that follows, so the lookbehind/lookahead also guards
+        this. '5px' must remain as '5px'.
+        """
+        result = self.normalize("5px")
+        self.assertEqual("5px", result)
+
+    def test_number_gpt_label_not_mangled(self):
+        """'GPT5' — 'G' precedes '5' so numeric bounding must block conversion."""
+        result = self.normalize("GPT5")
+        self.assertEqual("GPT5", result)
+
+    # ------------------------------------------------------------------ #
+    # Fix 3: dead atoms removed — regression guard (num2words still works)
+    # ------------------------------------------------------------------ #
+
+    def test_six_alti_still_converts(self):
+        """'6' → must contain 'altı' (correct form); 'alti' (dead atom) never appears."""
+        result = self.normalize("6")
+        self.assertEqual("altı", result)
+
+    def test_dead_atom_alti_plain_i_never_appears(self):
+        """'alti' (plain-i, dead atom) must never appear in any num2words output."""
+        # Test a range of numbers that include 6 in them
+        for n in [6, 16, 26, 60, 106, 600, 1006]:
+            result = self.normalize(str(n))
+            self.assertNotIn("alti", result, f"Dead atom 'alti' found in normalize('{n}'): {result!r}")
+
 
 if __name__ == "__main__":
     unittest.main()
