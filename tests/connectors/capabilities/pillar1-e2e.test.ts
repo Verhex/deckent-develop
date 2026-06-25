@@ -61,7 +61,7 @@ function makeFakeSpawn(root: string): import('../../../src/connectors/capabiliti
 
 /** Parse artifact id from a capability ack like "captured (artifact: art_abc1, screenshot-123.png)". */
 function parseArtifactId(ack: string): string | null {
-  const m = ack.match(/\(artifact: (art_[0-9a-f]{8}),/);
+  const m = ack.match(/\(artifact: (art_[0-9a-f]+),/);
   return m ? (m[1] ?? null) : null;
 }
 
@@ -99,9 +99,14 @@ describe('Pillar-1 E2E: artifact → mail attach through makeChatResponder', () 
 
     // 4. Stateful fake provider:
     //    Turn 1: emit screenshot tool call (auto policy → runs immediately via runAuto).
-    //    Turn 2: parse the artifact id from the tool result, emit send_mail(attachIds:[artId]).
+    //    Turn 2: parse the artifact id from the tool result ack, capture it into
+    //            capturedArtId (closure), then emit send_mail(attachIds:[artId]).
     //    Turn 3: end_turn with final text.
+    //
+    //    capturedArtId is the artId produced by the real screenshot capability run —
+    //    the same id must reach the mail transport as an attachment (continuous chain).
     let callCount = 0;
+    let capturedArtId: string | null = null;
     const fakeProvider: ChatProviderAdapter = {
       async send(messages): Promise<ProviderResponse> {
         callCount++;
@@ -119,6 +124,9 @@ describe('Pillar-1 E2E: artifact → mail attach through makeChatResponder', () 
           const ack = toolResult?.content ?? '';
           const artId = parseArtifactId(ack);
           expect(artId).toBeTruthy(); // artifact must be registered
+
+          // Capture the real artId produced by the screenshot capability run.
+          capturedArtId = artId;
 
           // Request send_mail with the artifact id (confirm policy → parks → sendApproval called).
           return {
@@ -173,24 +181,18 @@ describe('Pillar-1 E2E: artifact → mail attach through makeChatResponder', () 
     expect(approvalCallArgs?.text).toMatch(/send_mail|boss@corp\.com|screenshot/i);
 
     // 9. Assert: the artifact store has the screenshot artifact for this channel.
-    //    (We can't know the exact id, but we can verify the store registered something.)
-    //    The screenshot capability uses ctx.chatKey = sessionId = 'chan-1'.
-    //    Sanitize rule: hyphens are kept (pattern [^A-Za-z0-9_\-]).
-    const artDir = join(root, '.deckent', 'artifacts', 'chan-1');
-    const { existsSync } = await import('node:fs');
-    expect(existsSync(artDir)).toBe(true);
+    //    capturedArtId is the id produced by the real screenshot run — resolve it via
+    //    the same store instance to prove registration + readability (not just dir existence).
+    expect(capturedArtId).not.toBeNull(); // the screenshot turn really produced + acked an id
+    expect(artifactStore.get('chan-1', capturedArtId!)).not.toBeNull();
 
-    // 10. Assert the full round-trip: running send_mail directly with the same artifact
-    //     store (same root/chatKey) and a resolved artId proves the artifact is
-    //     resolvable and the transport receives the correct attachment.
-    //     We extract the artId from the sendApproval preview text (which is serialized
-    //     into the HTML approval message body during park).
-    //     As an alternative, register a known artifact and run send_mail directly.
-    const testRef = artifactStore.register('chan-1', {
-      filename: 'test.png',
-      mime: 'image/png',
-      data: Buffer.from([1, 2, 3]),
-    });
+    // 10. Assert the full continuous round-trip: use capturedArtId (the artifact produced
+    //     by the real screenshot run above) to call sendMailCapability.run directly.
+    //     This proves the ack-parsing / artId threading is NOT disconnected:
+    //     a regression in that path would make capturedArtId null (caught by step 9)
+    //     or the store lookup would fail here.
+    const resolvedRef = artifactStore.get('chan-1', capturedArtId!);
+    expect(resolvedRef).not.toBeNull();
     const capCtx: CapabilityContext = {
       chatKey: 'chan-1',
       project: root,
@@ -202,14 +204,14 @@ describe('Pillar-1 E2E: artifact → mail attach through makeChatResponder', () 
       artifacts: artifactStore,
     };
     const mailResult = await sendMailCapability.run(
-      { to: 'boss@corp.com', subject: 'Test', body: 'Body', attachIds: [testRef.id] },
+      { to: 'boss@corp.com', subject: 'Test', body: 'Body', attachIds: [capturedArtId!] },
       capCtx,
     );
     expect(mailResult.text).not.toMatch(/unknown|error/i);
     expect(sendMailSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         attachments: expect.arrayContaining([
-          expect.objectContaining({ filename: 'test.png' }),
+          expect.objectContaining({ filename: resolvedRef!.filename }),
         ]),
       }),
     );
