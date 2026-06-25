@@ -150,7 +150,7 @@ async function handleInboundVoice(
 
   try {
     const { data, mime } = await getFileBuffer.call(connector, voiceRaw.fileId);
-    const transcribed = await voiceAdapter.transcribe(data, mime);
+    const { text: transcribed } = await voiceAdapter.transcribe(data, mime);
     return {
       msg: { ...msg, text: transcribed, raw: { ...raw, voiceOrigin: true } },
       voiceOrigin: true,

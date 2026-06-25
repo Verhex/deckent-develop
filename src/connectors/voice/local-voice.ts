@@ -13,14 +13,18 @@ export function makeLocalVoiceAdapter(
   local: NonNullable<VoiceConfig['local']>,
 ): VoiceAdapter {
   return {
-    async transcribe(audio: Buffer, mime: string): Promise<string> {
-      const res = await fetch(local.stt_url!, {
+    async transcribe(audio: Buffer, mime: string): Promise<{ text: string; language?: string }> {
+      const sttUrl = local.stt_language
+        ? `${local.stt_url}?language=${encodeURIComponent(local.stt_language)}`
+        : local.stt_url!;
+      const res = await fetch(sttUrl, {
         method: 'POST',
         headers: { 'content-type': mime },
         body: audio,
       });
       if (!res.ok) throw new Error(`stt ${res.status}`);
-      return ((await res.json()) as { text: string }).text;
+      const body = (await res.json()) as { text: string; language?: string };
+      return { text: body.text, language: body.language };
     },
 
     async synthesize(

@@ -28,21 +28,47 @@ function makeFetch(opts: {
 describe('makeLocalVoiceAdapter — transcribe', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it('POSTs audio bytes with correct content-type to stt_url and returns json.text', async () => {
-    const fetchMock = makeFetch({ json: { text: 'hello world' } });
+  it('returns { text, language } from a stubbed {text, language} STT response', async () => {
+    const fetchMock = makeFetch({ json: { text: 'merhaba', language: 'tr' } });
     vi.stubGlobal('fetch', fetchMock);
 
     const adapter = makeLocalVoiceAdapter({ stt_url: 'http://localhost:9000/stt', tts_url: 'http://localhost:9000/tts' });
     const audio = Buffer.from('fake-audio-bytes');
     const result = await adapter.transcribe(audio, 'audio/webm');
 
-    expect(result).toBe('hello world');
+    expect(result).toEqual({ text: 'merhaba', language: 'tr' });
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = (fetchMock as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
     expect(url).toBe('http://localhost:9000/stt');
     expect(init.method).toBe('POST');
     expect((init.headers as Record<string, string>)['content-type']).toBe('audio/webm');
     expect(init.body).toBe(audio);
+  });
+
+  it('appends ?language=<hint> to stt_url when stt_language is set', async () => {
+    const fetchMock = makeFetch({ json: { text: 'merhaba', language: 'tr' } });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const adapter = makeLocalVoiceAdapter({
+      stt_url: 'http://localhost:9000/stt',
+      tts_url: 'http://localhost:9000/tts',
+      stt_language: 'tr',
+    });
+    await adapter.transcribe(Buffer.from('fake'), 'audio/webm');
+
+    const [url] = (fetchMock as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('?language=tr');
+  });
+
+  it('does NOT append ?language= when stt_language is absent (auto-detect)', async () => {
+    const fetchMock = makeFetch({ json: { text: 'hello', language: 'en' } });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const adapter = makeLocalVoiceAdapter({ stt_url: 'http://localhost:9000/stt', tts_url: 'http://localhost:9000/tts' });
+    await adapter.transcribe(Buffer.from('fake'), 'audio/webm');
+
+    const [url] = (fetchMock as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+    expect(url).not.toContain('?language=');
   });
 
   it('throws when stt endpoint returns non-ok status', async () => {

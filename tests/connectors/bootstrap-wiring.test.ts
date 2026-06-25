@@ -205,7 +205,7 @@ describe('Finding 1 — injected artifact store is shared (not fresh internal)',
 
 describe('Finding 2 — voiceAdapter is threaded into the inbound-voice path', () => {
   it('transcribe is called when voiceAdapter + stt enabled + voice message arrives', async () => {
-    const transcribeMock = vi.fn(async (_data: Buffer, _mime: string) => 'hello from voice');
+    const transcribeMock = vi.fn(async (_data: Buffer, _mime: string) => ({ text: 'hello from voice', language: 'en' }));
     const voiceAdapter: VoiceAdapter = {
       transcribe: transcribeMock,
       async synthesize() { return { data: Buffer.alloc(0), mime: 'audio/mpeg' }; },

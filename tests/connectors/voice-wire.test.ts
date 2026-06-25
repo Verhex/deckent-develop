@@ -78,13 +78,13 @@ function incomingText(channelId: string, text: string): IncomingMessage {
   };
 }
 
-/** Fake VoiceAdapter — transcribe → "take a screenshot", synthesize → Buffer with audio. */
+/** Fake VoiceAdapter — transcribe → { text: "take a screenshot" }, synthesize → Buffer with audio. */
 function fakeVoiceAdapter(
   transcribeResult = 'take a screenshot',
   synthesizeResult = { data: Buffer.from('audio-bytes'), mime: 'audio/ogg' },
 ): VoiceAdapter {
   return {
-    transcribe: vi.fn(async () => transcribeResult),
+    transcribe: vi.fn(async () => ({ text: transcribeResult, language: undefined })),
     synthesize: vi.fn(async () => synthesizeResult),
   };
 }
@@ -360,7 +360,7 @@ describe('voice wiring: reply-in-kind TTS', () => {
     const root = makeTmpRoot();
     const fake = fakeVoiceConnector(Buffer.from([0x4f, 0x67, 0x67, 0x53]), 'audio/ogg');
     const voice: VoiceAdapter = {
-      transcribe: vi.fn(async () => 'hi'),
+      transcribe: vi.fn(async () => ({ text: 'hi', language: undefined })),
       synthesize: vi.fn(async () => { throw new Error('TTS unavailable'); }),
     };
     const chat = vi.fn(async () => 'Hello reply text.');
@@ -504,7 +504,7 @@ describe('voice wiring: streaming path — voice replaces text', () => {
     const audioBytes = Buffer.from([0x4f, 0x67, 0x67, 0x53]);
     const fake = fakeStreamingVoiceConnector(audioBytes, 'audio/ogg');
     const voice: VoiceAdapter = {
-      transcribe: vi.fn(async () => 'hello stream'),
+      transcribe: vi.fn(async () => ({ text: 'hello stream', language: undefined })),
       synthesize: vi.fn(async () => { throw new Error('TTS down in streaming path'); }),
     };
 

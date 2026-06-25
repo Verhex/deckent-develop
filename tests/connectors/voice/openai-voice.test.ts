@@ -6,13 +6,17 @@ import { createVoiceAdapter } from '../../../src/connectors/voice/types.js';
 
 function makeFakeOpenAIClient(opts: {
   transcribeResult?: string;
+  transcribeLanguage?: string;
   synthesizeBuffer?: ArrayBuffer;
   synthesizeMime?: string;
 }) {
   return {
     audio: {
       transcriptions: {
-        create: vi.fn(async (_params: unknown) => ({ text: opts.transcribeResult ?? 'transcribed text' })),
+        create: vi.fn(async (_params: unknown) => ({
+          text: opts.transcribeResult ?? 'transcribed text',
+          language: opts.transcribeLanguage,
+        })),
       },
       speech: {
         create: vi.fn(async (_params: unknown) => ({
@@ -26,24 +30,26 @@ function makeFakeOpenAIClient(opts: {
 // ─── makeOpenAIVoiceAdapter — transcribe ─────────────────────────────────────
 
 describe('makeOpenAIVoiceAdapter — transcribe', () => {
-  it('calls openai.audio.transcriptions.create with a file-like object and returns the text', async () => {
-    const fakeClient = makeFakeOpenAIClient({ transcribeResult: 'hello openai' });
+  it('calls openai.audio.transcriptions.create with verbose_json and returns { text, language }', async () => {
+    const fakeClient = makeFakeOpenAIClient({ transcribeResult: 'hello openai', transcribeLanguage: 'en' });
     const adapter = makeOpenAIVoiceAdapter(fakeClient as never);
 
     const audio = Buffer.from('fake-audio');
     const result = await adapter.transcribe(audio, 'audio/webm');
 
-    expect(result).toBe('hello openai');
+    expect(result).toEqual({ text: 'hello openai', language: 'en' });
     expect(fakeClient.audio.transcriptions.create).toHaveBeenCalledOnce();
     const call = fakeClient.audio.transcriptions.create.mock.calls[0][0] as Record<string, unknown>;
     expect(call).toHaveProperty('model');
     expect(call).toHaveProperty('file');
+    expect(call['response_format']).toBe('verbose_json');
   });
 
-  it('returns the transcription text from the response', async () => {
+  it('returns { text, language } — language may be undefined when not in response', async () => {
     const fakeClient = makeFakeOpenAIClient({ transcribeResult: 'another result' });
     const adapter = makeOpenAIVoiceAdapter(fakeClient as never);
-    expect(await adapter.transcribe(Buffer.from('x'), 'audio/mp4')).toBe('another result');
+    const result = await adapter.transcribe(Buffer.from('x'), 'audio/mp4');
+    expect(result).toEqual({ text: 'another result', language: undefined });
   });
 });
 
@@ -120,7 +126,7 @@ describe('makeOpenAIVoiceAdapter — full round-trip', () => {
     const buf = Buffer.from('fake-ogg-audio-bytes');
 
     // Part 1: transcribe
-    const text = await adapter.transcribe(buf, 'audio/ogg');
+    const { text } = await adapter.transcribe(buf, 'audio/ogg');
     expect(text).toBe('hi');
     expect(capturedFile).not.toBeNull();
     // file-shim must have a name (required by openai SDK)

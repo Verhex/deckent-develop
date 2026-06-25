@@ -16,7 +16,8 @@ type OpenAIClient = {
       create(params: {
         model: string;
         file: { name: string; [k: string]: unknown };
-      }): Promise<{ text: string }>;
+        response_format?: string;
+      }): Promise<{ text: string; language?: string }>;
     };
     speech: {
       create(params: {
@@ -36,7 +37,7 @@ type OpenAIClient = {
  */
 export function makeOpenAIVoiceAdapter(client: OpenAIClient): VoiceAdapter {
   return {
-    async transcribe(audio: Buffer, mime: string): Promise<string> {
+    async transcribe(audio: Buffer, mime: string): Promise<{ text: string; language?: string }> {
       // The openai SDK accepts a File-like object with name + arrayBuffer.
       // We construct a minimal shim from the Buffer so no DOM File is needed.
       const ext = mime.split('/')[1] ?? 'wav';
@@ -48,11 +49,13 @@ export function makeOpenAIVoiceAdapter(client: OpenAIClient): VoiceAdapter {
             audio.byteOffset + audio.byteLength,
           ) as ArrayBuffer,
       };
+      // verbose_json includes the detected language in the response
       const result = await client.audio.transcriptions.create({
         model: 'whisper-1',
         file: fileShim as never,
+        response_format: 'verbose_json',
       });
-      return result.text;
+      return { text: result.text, language: result.language };
     },
 
     async synthesize(

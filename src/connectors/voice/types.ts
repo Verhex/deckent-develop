@@ -6,8 +6,10 @@
 // ─── Public interfaces ────────────────────────────────────────────────────────
 
 export interface VoiceAdapter {
-  /** Transcribe audio bytes to text.  mime = input audio MIME (e.g. 'audio/webm'). */
-  transcribe(audio: Buffer, mime: string): Promise<string>;
+  /** Transcribe audio bytes to text.  mime = input audio MIME (e.g. 'audio/webm').
+   *  Returns the transcribed text and the detected language tag (e.g. 'tr', 'en').
+   *  language is optional — providers that cannot detect it may omit it. */
+  transcribe(audio: Buffer, mime: string): Promise<{ text: string; language?: string }>;
   /** Synthesize text to audio bytes. Returns raw bytes + MIME type of the output. */
   synthesize(text: string, opts?: { voice?: string }): Promise<{ data: Buffer; mime: string }>;
 }
@@ -41,6 +43,12 @@ export interface VoiceConfig {
      *          "http://127.0.0.1:8001/health".
      */
     health_url?: string;
+    /**
+     * Optional explicit STT language hint (BCP-47 tag, e.g. 'tr', 'en').
+     * When set, appended as ?language=<tag> to the stt_url so the wrapper forces the
+     * language instead of auto-detecting. Omit to let the wrapper auto-detect.
+     */
+    stt_language?: string;
   };
 }
 
