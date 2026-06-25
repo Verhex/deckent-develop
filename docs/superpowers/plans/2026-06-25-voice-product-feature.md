@@ -14,6 +14,8 @@
 - **`local-voice.ts` lock-step:** STT `POST {stt_url}` bytes→`{text}`; TTS `POST {tts_url}` `{text,voice?}`→bytes. The wrapper MUST satisfy exactly this.
 - **Lifecycle:** lazy-load + idle-evict, `IDLE_EVICT_SEC` env (default 600; `0`=never). STT/TTS evictable independently. HTTP listener always up.
 - **`TTS_FAKE=1` runs with NO models / NO GPU** — every wrapper unit test uses it; CI/any-machine safe.
+- **Wrapper tests use stdlib `unittest`** (NOT pytest — not installable here; system python lacks pip/venv). Run with the existing dogfood venv python (it has fastapi/httpx/numpy/soundfile/starlette):
+  `PYW=/home/alperen/youtube-plan/services/tts/.venv/bin/python; cd examples/voice-wrapper && "$PYW" -m unittest discover -s . -p 'test_*.py' -v`. FAKE-mode WAV writing uses stdlib `wave` (no libsndfile) so tests need no system libs. The pytest-style snippets below are illustrative — write them as `unittest.TestCase` methods.
 - **deckent default-off preserved:** voice disabled ⇒ no adapter, no health-check, no `.deck` read (Pillar-1 `f1aaefdd` guarantee).
 - **i18n-first:** every deckent user-facing string via `getMessage(key, lang)` en+tr. ESM `.js` imports. No new deckent runtime dep (`fetch` builtin).
 - **No secret leakage:** `OPENAI_API_KEY` from `.deck`, never logged; wrapper URLs loopback by default.
