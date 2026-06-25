@@ -122,11 +122,13 @@ describe('event-stream', () => {
 
   // ─── Fail-safe behavior ────────────────────────────────────────
 
-  it('should return null on write failure (invalid projectRoot)', () => {
-    const event = writeEvent('/nonexistent/path/that/cannot/exist', sprintId, 'brain', '*', CHANNELS.SPRINT_PHASE_CHANGE, {});
-    // May succeed if /nonexistent can be created, or null on permission error
-    // The key is it NEVER throws
-    expect(true).toBe(true); // No exception = success
+  it('never throws on write failure (invalid projectRoot)', () => {
+    // Fail-safe contract: an unwritable path must be swallowed (the result is
+    // either null on a permission error or an event if the path got created) and
+    // NEVER throw — a bad projectRoot cannot be allowed to crash the sprint loop.
+    expect(() =>
+      writeEvent('/nonexistent/path/that/cannot/exist', sprintId, 'brain', '*', CHANNELS.SPRINT_PHASE_CHANGE, {}),
+    ).not.toThrow();
   });
 
   it('should return empty array for non-existent events file', () => {

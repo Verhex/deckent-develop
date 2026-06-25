@@ -92,3 +92,35 @@ Investigated the 4 "self-mock" candidates from the iter-4 scan (`plugin`/`config
 - `autonomous.test.ts` → mocks `cli/commands/autonomous.js` (backlog ops), tests `mcp/tools/autonomous.js`.
 - `output.test.ts` → mocks `cli/helpers/output.js` (print), tests `cli/commands/output.js` (`resolveOutputPath`/`readTailLines`/`formatLines`) with concrete assertions (`toBe('.../sprint-139-outputs/...')`, `toHaveLength(10)`, `result[0]==='line 90'`).
 **No tautologies here; all legit.** Heuristic refinement for future C5: a self-mock is only suspect when the mocked path AND the SUT import resolve to the SAME file (dir-sensitive), not just same basename.
+
+---
+
+## Iteration 6 — C5 finalize + cli/api/nervous/connectors discovery
+
+**C5 landscape is now mostly clean** after iter-4. Broad re-scan found NO remaining
+`|| true`/`?? true` escape hatches, and NO all-`toBeDefined` smoke-only files. The single
+remaining literal tautology was **`event-stream.test.ts:129`** (`expect(true).toBe(true) // No
+exception = success`) — converted to the idiomatic real assertion `expect(() => writeEvent(badPath,
+…)).not.toThrow()` (faithful: if `writeEvent` regressed to throw on a bad projectRoot, RED).
+28/28 green. **C5/323-030 effectively cleared** (the codebase has very few tautological tests —
+init-published was the one real offender).
+
+**Discovery sweep (cli/api/nervous/connectors) — 3 NEW genuinely-unwired findings** (static-import
+heuristic refined to also check DYNAMIC `await import()` + bootstrap SUPPORTED lists):
+- 🆕 **`connectors/whatsapp.ts`** (68 LoC, tested) — **genuinely unwired**: not in
+  `connector-bootstrap` `SUPPORTED = ['telegram','discord']` (line 174), no `await import('./whatsapp.js')`
+  anywhere. A built + tested WhatsApp connector that is **never loaded**. WIRE-vs-KES.
+- 🆕 **`connectors/connector-pool.ts`** (`ConnectorPool`, 113 LoC, tested) — **dead**: only a COMMENT
+  reference (`connector-notify-adapter.ts:12` "NOT ConnectorPool.broadcast"); the live notify path is
+  per-channel, not `ConnectorPool`. WIRE-vs-KES.
+- 🆕 **`api/rate-limiter.ts`** (`TenantRateLimiter`, 95 LoC) — **dead duplicate**: the API server uses
+  `SlidingWindowRateLimiter` defined inline in `server.ts:83` (`server.ts:422 rateLimiter.check(ip)`),
+  NOT this module. Together with `core/rate-limiter.ts` (iter-2) this is the **B-RATELIMITER-DISAMBIG
+  cluster: 3 TenantRateLimiter/Result definitions, 1 live (`SlidingWindowRateLimiter`)**.
+- **LIVE (false-positive, excluded):** `connectors/telegram.ts` + `connectors/discord.ts` —
+  dynamically loaded via `connector-bootstrap.ts:180/183` + `gateway-daemon.ts:41/44`.
+
+**⚠️ Not touched:** whatsapp/connector-pool are in Alperen's **active connector/bot work area**
+(Telegram bot + voice) — recorded only, no edits (conflict-avoidance + WIRE-vs-KES is Alperen's).
+Heuristic note: dynamic `await import()` + bootstrap allow-lists must be checked before calling a
+connector/plugin "dead" (static grep alone gives false-positives for registry-loaded modules).
