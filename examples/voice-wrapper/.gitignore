@@ -1,0 +1,17 @@
+# Local runtime / per-deployment — NOT shipped with the example.
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Voice reference clips are user/deployment-provided (personal or dataset audio),
+# not committed to the public example. Point TTS_VOICE_REF at your own clip.
+voice-ref/
+
+# Generated audio + scratch
+/tmp/
+*.wav
+
+# Stray local files
+.gitignore.local
+docs/
