@@ -14,10 +14,9 @@ export function makeLocalVoiceAdapter(
 ): VoiceAdapter {
   return {
     async transcribe(audio: Buffer, mime: string): Promise<{ text: string; language?: string }> {
-      const sttUrl = local.stt_language
-        ? `${local.stt_url}?language=${encodeURIComponent(local.stt_language)}`
-        : local.stt_url!;
-      const res = await fetch(sttUrl, {
+      const url = new URL(local.stt_url!);
+      if (local.stt_language) url.searchParams.set('language', local.stt_language);
+      const res = await fetch(url.toString(), {
         method: 'POST',
         headers: { 'content-type': mime },
         body: audio,
@@ -29,12 +28,16 @@ export function makeLocalVoiceAdapter(
 
     async synthesize(
       text: string,
-      opts?: { voice?: string },
+      opts?: { voice?: string; language?: string },
     ): Promise<{ data: Buffer; mime: string }> {
       const res = await fetch(local.tts_url!, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text, voice: opts?.voice ?? local.tts_voice }),
+        body: JSON.stringify({
+          text,
+          voice: opts?.voice ?? local.tts_voice,
+          ...(opts?.language ? { language: opts.language } : {}),
+        }),
       });
       if (!res.ok) throw new Error(`tts ${res.status}`);
       return {

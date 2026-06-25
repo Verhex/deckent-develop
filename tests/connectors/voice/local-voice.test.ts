@@ -60,6 +60,24 @@ describe('makeLocalVoiceAdapter — transcribe', () => {
     expect(url).toContain('?language=tr');
   });
 
+  it('uses URL API — no double-? when stt_url already has a query string', async () => {
+    const fetchMock = makeFetch({ json: { text: 'hello', language: 'tr' } });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const adapter = makeLocalVoiceAdapter({
+      stt_url: 'http://h/stt?x=1',
+      tts_url: 'http://h/tts',
+      stt_language: 'tr',
+    });
+    await adapter.transcribe(Buffer.from('fake'), 'audio/webm');
+
+    const [url] = (fetchMock as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+    // Must contain both params, single ? only
+    expect(url).toContain('x=1');
+    expect(url).toContain('language=tr');
+    expect(url.indexOf('?')).toBe(url.lastIndexOf('?')); // no double-?
+  });
+
   it('does NOT append ?language= when stt_language is absent (auto-detect)', async () => {
     const fetchMock = makeFetch({ json: { text: 'hello', language: 'en' } });
     vi.stubGlobal('fetch', fetchMock);
@@ -132,6 +150,30 @@ describe('makeLocalVoiceAdapter — synthesize', () => {
     const adapter = makeLocalVoiceAdapter({ stt_url: 'http://localhost:9000/stt', tts_url: 'http://localhost:9000/tts' });
     const result = await adapter.synthesize('test');
     expect(result.mime).toBe('audio/wav');
+  });
+
+  it('includes "language" in POST body when opts.language is provided', async () => {
+    const fetchMock = makeFetch({ arrayBuffer: new ArrayBuffer(2), contentType: 'audio/wav' });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const adapter = makeLocalVoiceAdapter({ stt_url: 'http://localhost:9000/stt', tts_url: 'http://localhost:9000/tts' });
+    await adapter.synthesize('merhaba', { language: 'tr' });
+
+    const [, init] = (fetchMock as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body.language).toBe('tr');
+  });
+
+  it('omits "language" key from POST body when opts.language is absent', async () => {
+    const fetchMock = makeFetch({ arrayBuffer: new ArrayBuffer(2), contentType: 'audio/wav' });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const adapter = makeLocalVoiceAdapter({ stt_url: 'http://localhost:9000/stt', tts_url: 'http://localhost:9000/tts' });
+    await adapter.synthesize('hello', { voice: 'en-US' });
+
+    const [, init] = (fetchMock as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect('language' in body).toBe(false);
   });
 });
 

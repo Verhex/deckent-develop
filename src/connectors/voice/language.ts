@@ -31,8 +31,9 @@ export type ReplyLanguage = { tag: string | null; mode: 'forced' | 'mirror' };
  */
 export function resolveReplyLanguage(cfg: VoiceConfig, turnLang?: string): ReplyLanguage {
   // Priority 1: explicit, concrete language override in config.
-  if (cfg.language && cfg.language !== 'auto') {
-    return { tag: cfg.language, mode: 'forced' };
+  const lang = cfg.language?.trim();
+  if (lang && lang.toLowerCase() !== 'auto') {
+    return { tag: lang, mode: 'forced' };
   }
 
   // Priority 2: voice-detected language from the current turn.

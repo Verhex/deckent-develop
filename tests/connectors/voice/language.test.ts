@@ -17,6 +17,23 @@ describe('resolveReplyLanguage', () => {
     expect(resolveReplyLanguage(cfg)).toEqual({ tag: 'fr', mode: 'forced' });
   });
 
+  // ── cfg.language normalisation — trim + case-insensitive 'auto' ──────────────
+
+  it('treats cfg.language "Auto" (capital) as auto — falls through to turnLang', () => {
+    const cfg: VoiceConfig = { enabled: true, language: 'Auto' };
+    expect(resolveReplyLanguage(cfg, 'en')).toEqual({ tag: 'en', mode: 'forced' });
+  });
+
+  it('treats cfg.language "Auto" (capital) as auto — mirror when no turnLang', () => {
+    const cfg: VoiceConfig = { enabled: true, language: 'Auto' };
+    expect(resolveReplyLanguage(cfg)).toEqual({ tag: null, mode: 'mirror' });
+  });
+
+  it('trims whitespace from cfg.language " tr " and treats as forced tag', () => {
+    const cfg: VoiceConfig = { enabled: true, language: ' tr ' };
+    expect(resolveReplyLanguage(cfg)).toEqual({ tag: 'tr', mode: 'forced' });
+  });
+
   // ── cfg.language = 'auto' → fall through to turnLang ─────────────────────────
 
   it('mirrors turnLang when cfg.language is "auto" and turnLang is present', () => {
