@@ -139,16 +139,32 @@ describe('resolveReplyModality', () => {
       });
     });
 
-    it('"say it" (bare spec keyword) + reply-in-kind + voiceOrigin=false → voice, overridden=true', () => {
-      // Explicit coverage for the bare "say it" spec keyword (distinct from "say it aloud").
-      // Uses (?<!\p{L})say it(?!\p{L}) — must NOT fire on "say italy" (i is \p{L}).
-      expect(resolveReplyModality('please say it', { ttsMode: 'reply-in-kind', voiceOrigin: false })).toEqual({
+    it('"say it aloud" + ttsMode=reply-in-kind + voiceOrigin=false → voice, overridden=true', () => {
+      // "say it aloud" is the explicit form; bare "say it" was removed (UX footgun: fires on
+      // "Can you say it again?" etc.). This test confirms the intended case still works.
+      expect(resolveReplyModality('please say it aloud', { ttsMode: 'reply-in-kind', voiceOrigin: false })).toEqual({
         modality: 'voice',
         overridden: true,
       });
     });
 
-    it('"say italy" must NOT trigger voice override — boundary check for "say it"', () => {
+    it('"please say it" (bare, no aloud) → NOT overridden — falls back to default', () => {
+      // Bare "say it" was removed from VOICE_PATTERNS to avoid UX footgun
+      // (e.g. "Can you say it again?" forcing a voice reply). No override.
+      expect(resolveReplyModality('please say it', { ttsMode: 'reply-in-kind', voiceOrigin: false })).toEqual({
+        modality: 'text',
+        overridden: false,
+      });
+    });
+
+    it('"can you say it again" → NOT overridden (UX-footgun guard)', () => {
+      expect(resolveReplyModality('can you say it again', { ttsMode: 'off', voiceOrigin: false })).toEqual({
+        modality: 'text',
+        overridden: false,
+      });
+    });
+
+    it('"say italy" must NOT trigger voice override — no "say it aloud" match', () => {
       expect(resolveReplyModality('say italy now', { ttsMode: 'off', voiceOrigin: false })).toEqual({
         modality: 'text',
         overridden: false,
@@ -238,6 +254,24 @@ describe('resolveReplyModality', () => {
 
     it('case-insensitive: "YAZARAK" + ttsMode=always → text, overridden=true', () => {
       expect(resolveReplyModality('YAZARAK cevapla', { ttsMode: 'always', voiceOrigin: false })).toEqual({
+        modality: 'text',
+        overridden: true,
+      });
+    });
+
+    it('"bana yaz" (standalone) + ttsMode=always → text, overridden=true (leading boundary)', () => {
+      // Confirms that the leading (?<!\p{L}) boundary does NOT block the legitimate case.
+      expect(resolveReplyModality('ekran görüntüsü al ve bana yaz', { ttsMode: 'always', voiceOrigin: false })).toEqual({
+        modality: 'text',
+        overridden: true,
+      });
+    });
+
+    it('"Xbana yaz" (contrived leading-letter glue) → text still via bare "yaz" pattern', () => {
+      // "Xbana yaz": the "bana yaz" pattern should NOT match (X is \p{L} preceding 'b').
+      // However, bare (?<!\p{L})yaz(?!\p{L}) still matches, so modality is still text.
+      // This validates leading-boundary consistency without breaking the real use-case.
+      expect(resolveReplyModality('Xbana yaz', { ttsMode: 'always', voiceOrigin: false })).toEqual({
         modality: 'text',
         overridden: true,
       });

@@ -66,7 +66,7 @@ export interface ReplyModalityResult {
 // normalisation to handle İ→i, I→ı correctly.
 
 // Note: both tables intentionally include a few phrases beyond the spec's baseline
-// keyword list (e.g. `sesli olarak`, `say it aloud`, `say it`, `yazıyla`, `bana yaz`).
+// keyword list (e.g. `sesli olarak`, `say it aloud`, `yazıyla`, `bana yaz`).
 // These are boundary-safe extensions that improve recall without increasing false-positive
 // risk — each is anchored with (?<!\p{L})...(?!\p{L}) where necessary.
 
@@ -85,14 +85,12 @@ const VOICE_PATTERNS: RegExp[] = [
   /(?<!\p{L})in voice(?!\p{L})/u,
   /read it aloud/u,
   /say it aloud/u,
-  // "say it" as standalone phrase (not followed by a letter, e.g. "say italy")
-  /(?<!\p{L})say it(?!\p{L})/u,
 ];
 
 /** Regex patterns that signal a TEXT reply request. All have `u` flag. */
 const TEXT_PATTERNS: RegExp[] = [
-  // Multi-word phrases — naturally bounded, no extra anchors needed
-  /bana yaz(?!\p{L})/u,
+  // Multi-word phrases — leading + trailing boundary for consistency with project philosophy
+  /(?<!\p{L})bana yaz(?!\p{L})/u,
   /metin olarak/u,
   /reply in text/u,
   /(?<!\p{L})in text(?!\p{L})/u,
