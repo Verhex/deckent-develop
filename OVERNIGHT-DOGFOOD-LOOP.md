@@ -40,7 +40,16 @@
 | `connectors/whatsapp.ts` | not in bootstrap SUPPORTED, never loaded | your call (bot area) |
 | `connectors/connector-pool.ts` | unused (live path = per-channel notify) | your call (bot area) |
 | `api/rate-limiter.ts` + `core/rate-limiter.ts` | dead `TenantRateLimiter` duplicates; live = `server.ts SlidingWindowRateLimiter` | KES the 2 dead (keep the shared `RateLimitResult` type) |
+| `providers/sandbox.ts` (`SandboxSpawnBackend`/`createSandboxBackend`) | zero-caller; no spawn-backend factory/registry selects it | **WIRE** (worker sandbox isolation — security) or KES |
 | KEEP (sanctioned/feature/dormant) | brain-context (Defer+ADR), capability-realizer (AS-4), pattern-recorder/reader (ADR-028) | keep |
+
+### ✅ Loop status: WOUND DOWN — safe backlog exhausted (9 iterations)
+The final discovery sweep (monitor/providers/mcp) returned a single finding (sandbox), confirming
+the unattended-safe backlog is done: C5 cleared, all main dirs swept for half-wired/dead modules,
+two design specs written, this brief consolidated. **The loop has stopped** to avoid manufacturing
+low-value work. Everything left needs YOUR call (the WIRE-vs-KES table) or is attended-defer (the
+design specs / ADR-075 core wire / enforcement). When you say **"build bitti"** we resume into the
+deckent autonomous-sprint dogfood (hybrid part 2).
 
 ### DESIGN-READY specs (implementation attended-defer — your judgment needed)
 - **`DESIGN-ADR-075-AFFINITY-REORDER.md`** — wire the dead ADR-075 skill→agent affinity via a
@@ -189,3 +198,18 @@ two real gaps:**
   gated) OR KES if its contract is stale.
 - **Rollout order** (value/risk): A14 wire → B6 warn-only → B1 worker hard-deny; all default-off,
   dogfood-enabled in deckent-dev's gitignored config. Implementation **attended-defer**.
+
+---
+
+## Iteration 9 — final discovery sweep (monitor/providers/mcp) → loop wound down
+
+Swept the remaining dirs (static + dynamic + registry/string-key checks). **One NEW finding:**
+- 🆕 **`providers/sandbox.ts`** (`SandboxSpawnBackend extends SubprocessSpawnBackend`,
+  `createSandboxBackend`, 161 LoC, tested) — both exports **DEAD** (zero caller, no spawn-backend
+  factory/registry/string-key selects it). A built + tested **worker sandbox-isolation backend**
+  that is never selectable — a half-wired SECURITY feature. WIRE (isolate untrusted workers) or KES.
+
+The sweep was otherwise empty → the **unattended-safe backlog is exhausted**. Per the loop's STOP
+condition I am **ending the loop** (no further wake scheduled) rather than manufacturing low-value
+work. Summary lives in the MORNING BRIEF at the top of this file. **9 iterations, all committed,
+none pushed; zero regressions (tsc=0, affected suites green on every code change).**
