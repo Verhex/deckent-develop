@@ -76,6 +76,9 @@ import { resolveAgentPrompt, resolveSkillPrompts } from './result-collector.js';
 // ─── Task Builder ─────────────────────────────────────────────────
 import { buildWorkerPrompt } from './task-builder.js';
 
+// ─── Planner dependency normalization (323-031 wire) ──────────────
+import { normalizePlannerDependencies } from './planner.js';
+
 // ─── Parallel Pipeline ───────────────────────────────────────────
 import { ParallelPipelineManager } from './parallel-pipeline.js';
 
@@ -334,6 +337,29 @@ export async function spawnWorkers(
 
   const systemProfile = getSystemProfile();
   const maxWorkers = resolveEffectiveWorkers(config, systemProfile);
+
+  // ─── Dependency normalization (Task 323-031 wire — closes the sprint-hang root) ──
+  // The AI planner emits each task.dependencies entry as free text — usually a
+  // sibling TITLE, occasionally a slot id. Left raw, those titles reach
+  // buildDependencyGraph (respawnEligibleTasks / cascade / unblock) as
+  // UNRESOLVABLE refs — the exact dependency-pipeline gap behind the sprint-323
+  // EXECUTE-hang (P0-A cascade-skip treated the symptom; this closes the root).
+  // normalizePlannerDependencies rewrites every ref to a concrete same-sprint id
+  // IN PLACE — idempotent and behaviour-preserving for plans that already use
+  // correct ids (each ref resolves to itself, nothing dropped). Run ONCE here at
+  // the single SPAWN entry so every downstream graph build sees clean ids;
+  // self-healing on resume (re-runs each spawn from the persisted title-deps).
+  // Until this wire the 323-031 normalizer had ZERO production callers.
+  const depNorm = normalizePlannerDependencies(sprint.tasks);
+  if (depNorm.resolvedCount > 0 || depNorm.dropped.length > 0) {
+    debugLog(
+      'spawnWorkers:normalizeDeps',
+      `resolved=${depNorm.resolvedCount} dropped=${depNorm.dropped.length}` +
+      (depNorm.dropped.length
+        ? ` [unresolvable: ${depNorm.dropped.map(d => `${d.taskId}←"${d.ref}"`).join(', ')}]`
+        : ''),
+    );
+  }
 
   // ─── Plan-Time Collision Detection (Sprint 138 ADR-035) ───────
   // Sprint 168 W2.5 — C0c wire: build a blockedTaskIds set from

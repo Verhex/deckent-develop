@@ -89,6 +89,7 @@ vi.mock('../../src/agents/worker.js', () => ({
 }));
 
 vi.mock('../../src/orchestra/planner.js', () => ({
+  normalizePlannerDependencies: () => ({ resolvedCount: 0, dropped: [] }),
   callBrainPlanner: vi.fn().mockReturnValue(null),
 }));
 
