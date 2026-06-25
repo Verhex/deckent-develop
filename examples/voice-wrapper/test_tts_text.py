@@ -523,6 +523,94 @@ class TestNormalizeNumbersAbbr(unittest.TestCase):
             result = self.normalize(str(n))
             self.assertNotIn("alti", result, f"Dead atom 'alti' found in normalize('{n}'): {result!r}")
 
+    # ------------------------------------------------------------------ #
+    # WS3.A Final Review — Fix 1: sentence-final number converts
+    # ------------------------------------------------------------------ #
+
+    def test_sentence_final_number_converts(self):
+        """'Toplam 200.' → 'Toplam iki yüz.' — trailing dot must not block conversion."""
+        result = self.normalize("Toplam 200.")
+        self.assertIn("iki yüz", result)
+        self.assertNotIn("200", result)
+
+    def test_sentence_final_number_plain(self):
+        """'50.' — the bare integer before a sentence period must convert."""
+        result = self.normalize("50.")
+        self.assertIn("elli", result)
+        self.assertNotIn("50", result)
+
+    def test_sentence_final_number_in_sentence(self):
+        """'İşte sonuç: 1234.' — number before terminal dot converts."""
+        result = self.normalize("İşte sonuç: 1234.")
+        self.assertIn("bin", result)
+        self.assertNotIn("1234", result)
+
+    def test_decimal_dot_still_blocked_fix1(self):
+        """'3.5' must still decode as decimal (dot followed by digit blocks integer match)."""
+        result = self.normalize("3.5")
+        self.assertEqual("üç virgül beş", result)
+
+    def test_version_v2_0_still_blocked_fix1(self):
+        """'v2.0' must remain unchanged (lookbehind 'v' + lookahead dot-digit both guard)."""
+        self.assertEqual("v2.0", self.normalize("v2.0"))
+
+    def test_ip_address_unchanged_fix1(self):
+        """'192.168.1.1' must remain unchanged (each segment guarded by (?!\\.\\d))."""
+        self.assertEqual("192.168.1.1", self.normalize("192.168.1.1"))
+
+    def test_ip_subnet_unchanged_fix1(self):
+        """'255.255.255.0' must remain unchanged."""
+        self.assertEqual("255.255.255.0", self.normalize("255.255.255.0"))
+
+    def test_version_3_5_2_unchanged_fix1(self):
+        """'3.5.2' (multi-dot version) must remain unchanged."""
+        self.assertEqual("3.5.2", self.normalize("3.5.2"))
+
+    # ------------------------------------------------------------------ #
+    # WS3.A Final Review — Fix 2: time + slash-date left raw
+    # ------------------------------------------------------------------ #
+
+    def test_time_24h_unchanged(self):
+        """'14:30' must remain unchanged (colon guard — time left raw)."""
+        self.assertEqual("14:30", self.normalize("14:30"))
+
+    def test_time_9_00_unchanged(self):
+        """'saat 9:00' must remain unchanged — '9' before ':' is left raw."""
+        result = self.normalize("saat 9:00")
+        self.assertIn("9:00", result)
+        # 'dokuz' must NOT appear — the time must be left raw
+        self.assertNotIn("dokuz", result)
+
+    def test_slash_date_unchanged(self):
+        """'25/06/2026' must remain unchanged (slash guard — date left raw)."""
+        self.assertEqual("25/06/2026", self.normalize("25/06/2026"))
+
+    def test_normal_number_still_converts_after_fix2(self):
+        """'200 mesaj' must still convert to 'iki yüz mesaj' (regression guard)."""
+        result = self.normalize("200 mesaj")
+        self.assertIn("iki yüz", result)
+        self.assertNotIn("200", result)
+
+    # ------------------------------------------------------------------ #
+    # WS3.A Final Review — Fix 3: thousands-grouped numbers left raw
+    # ------------------------------------------------------------------ #
+
+    def test_en_grouped_million_unchanged(self):
+        """'1,000,000' (EN comma-grouping) must remain unchanged — not mangled."""
+        self.assertEqual("1,000,000", self.normalize("1,000,000"))
+
+    def test_tr_grouped_million_unchanged(self):
+        """'1.000.000' (TR dot-grouping) must remain unchanged — each dot followed by digit guards it."""
+        self.assertEqual("1.000.000", self.normalize("1.000.000"))
+
+    def test_en_grouped_thousand_unchanged(self):
+        """'1,000' (EN comma-grouping thousands) must remain unchanged."""
+        self.assertEqual("1,000", self.normalize("1,000"))
+
+    def test_decimal_comma_3_5_still_converts_fix3(self):
+        """'3,5' (single-comma decimal) must still convert — not blocked by comma guard."""
+        self.assertEqual("üç virgül beş", self.normalize("3,5"))
+
 
 class TestNormalizeForTts(unittest.TestCase):
     """

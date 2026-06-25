@@ -63,14 +63,16 @@ Processing order (5 passes, left-to-right):
 
   4. Standalone numeric tokens (integers and decimals with ```.``` or ```,```) →
      Turkish words via ``num2words(n, lang='tr')``.
-     Numeric bounding: negative lookbehind ``(?<![\\w.-])`` and negative lookahead
-     ``(?![\\w.-])`` ensure that digits embedded in version strings ("v2", "GPT-5",
-     "Node.js", "v2.0") are NOT converted.  The hyphen and dot characters are
-     also excluded from the lookahead, meaning "GPT-5" and "v2.0" pass through
-     unchanged.  Standalone "GPT 5" (space before digit) IS converted.
-     Both decimal separators are accepted: "3.5" and "3,5" both become
-     "üç virgül beş".  The comma is normalised to a dot before passing to
-     num2words so Python's float() parser accepts it.
+     Numeric bounding: lookbehind ``(?<![\\w.:/\\-])`` and two lookaheads
+     ``(?![\\w:/\\-])(?!\\.\\d)`` protect version strings ("v2", "GPT-5",
+     "v2.0", "192.168.1.1"), times ("14:30", "9:00"), and slash-dates
+     ("25/06/2026") from conversion.  Sentence-final numbers ("200.") ARE
+     converted — the trailing ``.`` only blocks conversion when itself followed
+     by a digit (real decimal or version continuation).  EN-style thousands
+     grouping ("1,000,000") is left raw (safe, not mangled).
+     Both decimal separators are accepted for single-separator decimals:
+     "3.5" and "3,5" both become "üç virgül beş".  The comma is normalised
+     to a dot before passing to num2words so Python's float() parser accepts it.
 
   5. Unit/abbreviation substitution (\\b-bounded, applied after number conversion):
      ``GB``→"gigabayt", ``MB``→"megabayt", ``KB``→"kilobayt", ``TB``→"terabayt",
@@ -328,23 +330,56 @@ _PERCENT_SUFFIX_RE: re.Pattern[str] = re.compile(
 # The alternation is built from the unit map keys so that unknown letter
 # sequences (e.g. "GPT", "js", "px") do NOT match — version guards are safe.
 # Examples: "3.5GB" → "üç virgül beş gigabayt", "200ms" → "iki yüz milisaniye"
-# Lookbehind: digit must NOT be preceded by \w, '.', or '-' (version guard).
+# Lookbehind: digit must NOT be preceded by \w, ',', '.', ':', '/', or '-'
+# (version/time/date/grouping guard — consistent with _NUMBER_RE).
 _UNIT_KEYS_PATTERN: str = "|".join(re.escape(k) for k in _UNIT_MAP)
 _NO_SPACE_UNIT_RE: re.Pattern[str] = re.compile(
-    r"(?<![\w.\-])(\d+(?:[.,]\d+)?)(" + _UNIT_KEYS_PATTERN + r")(?![\w])",
+    r"(?<![\w,.:/\-])(\d+(?:[.,]\d+)?)(" + _UNIT_KEYS_PATTERN + r")(?![\w])",
     re.UNICODE,
 )
 
+# Comma-grouping guard (Fix 3):
+# Detects EN-style thousands grouping: a comma followed by exactly 3 digits
+# then another comma or another digit (e.g. "1,000" in "1,000,000").
+# Used in _replace_number to leave grouped numbers raw rather than misreading
+# them as decimals.
+_COMMA_GROUPING_RE: re.Pattern[str] = re.compile(r",\d{3}(?:[,\d]|$)", re.UNICODE)
+
 # Standalone numeric token — integer or decimal (both . and , separators).
-# Negative lookbehind / lookahead on \w, dot, and hyphen so that version
-# strings ("v2", "GPT-5", "v2.0", "Node.js") are NOT matched:
-#   - "v2"     : 'v' is \w  → lookbehind fires  → no match
-#   - "GPT-5"  : '-' in lookbehind  → no match
-#   - "v2.0"   : 'v' before '2' → '2' not matched; '.' before '0' → '0' not matched
-#   - "3.5"    : space/start before '3', space/end after '5' → matched
-#   - "3,5"    : same (comma is decimal sep here, not a list separator)
+#
+# Lookbehind guard  (?<![\w,.:/\-]) :
+#   Blocks conversion when the digit is immediately preceded by a word char,
+#   comma, dot, colon, slash, or hyphen.  This protects:
+#     "v2"          → 'v' is \w  → no match
+#     "GPT-5"       → '-' in set → no match
+#     "v2.0"        → '.' before '0' → '0' not matched
+#     "14:30"       → ':' before '30' → '30' not matched  (time guard — Fix 2)
+#     "25/06/2026"  → '/' before '06' → '06' not matched  (slash-date guard — Fix 2)
+#     "1,000,000"   → after "1,000" is left raw by the callback, the trailing
+#                     ",000" has ',' before '0' → '0' not matched (Fix 3)
+#
+# Lookahead guards  (?![\w:/\-])(?!\.\d) :
+#   Two separate negative lookaheads (AND-logic):
+#   1. (?![\w:/\-])  — blocks if followed by word char, colon, slash, or hyphen.
+#      This prevents "14:30" matching "14" (the ':' blocks), and "25/06" matching
+#      "25" (the '/' blocks).  Also continues to protect "GPT-5", "5px" etc.
+#   2. (?!\.\d)      — blocks if followed by '.' then a digit (real decimal or
+#      version continuation: "3.5", "v2.0", "192.168.1.1", "3.5.2").
+#      A '.' followed by non-digit (sentence-final "200.", whitespace, EOL)
+#      does NOT block — so "200." converts to "iki yüz." (Fix 1).
+#
+# Known limitation (Fix 3):
+#   Grouped numbers such as "1.000.000" (TR dot-grouping) and "1,000,000"
+#   (EN comma-grouping) are left raw (not converted):
+#   - "1.000.000": each segment is blocked by (?!\.\d) since every dot is
+#     followed by a digit → safe, raw.
+#   - "1,000,000": "1,000" matches and is guarded by _COMMA_GROUPING_RE
+#     in the callback; the residual ",000" has its leading ',' in the
+#     lookbehind set, preventing "000" from matching independently.
+#   Future enhancement: expand grouped-number normalisation with full
+#   TR/EN locale-aware parsing.
 _NUMBER_RE: re.Pattern[str] = re.compile(
-    r"(?<![\w.\-])(\d+(?:[.,]\d+)?)(?![\w.\-])",
+    r"(?<![\w,.:/\-])(\d+(?:[.,]\d+)?)(?![\w:/\-])(?!\.\d)",
     re.UNICODE,
 )
 
@@ -376,11 +411,16 @@ def normalize_numbers_abbr(text: str) -> str:
          ms→milisaniye, sn→saniye, dk→dakika, vs→vesaire, vb→ve benzeri
 
     Numeric bounding:
-      Digits immediately preceded or followed by a word character, hyphen, or
-      dot are NOT converted.  This protects version strings: "v2", "GPT-5",
-      "Node.js", "v2.0" pass through unchanged.  Standalone tokens such as
-      "200", "3.5 GB", "5 dk", "%50", "50%", "3.5GB", and "200ms" are fully
-      normalised.
+      Digits immediately preceded or followed by a word character, hyphen, dot,
+      colon, or slash are NOT converted.  This protects version strings ("v2",
+      "GPT-5", "v2.0", "192.168.1.1"), time literals ("14:30", "9:00"), and
+      slash-dates ("25/06/2026").  A trailing ``'.'`` only blocks conversion
+      when the dot is itself followed by a digit — sentence-final numbers such
+      as "Toplam 200." are therefore correctly converted.  Standalone tokens
+      such as "200", "3.5 GB", "5 dk", "%50", "50%", "3.5GB", "200ms", and
+      "200." are fully normalised.  EN/TR thousands-grouped numbers
+      ("1,000,000", "1.000.000") are left raw (known limitation — future
+      enhancement).
 
     Decimal separators:
       Both ``.`` and ``,`` are accepted as the decimal separator.  The comma is
@@ -407,7 +447,14 @@ def normalize_numbers_abbr(text: str) -> str:
         return "yüzde " + _num_to_tr_words(raw)
 
     def _replace_number(m: re.Match) -> str:
-        raw = m.group(1).replace(",", ".")
+        original = m.group(1)
+        # Fix 3: guard against EN/TR thousands-grouping patterns.
+        # A comma followed by exactly 3 digits then another comma or end-of-match
+        # (e.g. "1,000" / "1,000,000") is a grouping separator, NOT a decimal.
+        # Leave these raw — converting "1,000" as decimal "one point zero" is a mangle.
+        if "," in original and _COMMA_GROUPING_RE.search(original):
+            return m.group(0)
+        raw = original.replace(",", ".")
         try:
             int(raw) if "." not in raw else float(raw)
         except ValueError:
