@@ -91,6 +91,64 @@ describe('createOpenAIVoiceAdapter', () => {
   });
 });
 
+// ─── Full mock round-trip (Pillar-1 hardening — Task 6) ──────────────────────
+// Verifies the exact SDK call shapes for both STT and TTS, including:
+//   • file-shim has `name` property (ogg → "audio.ogg")
+//   • file-shim does NOT set [Symbol.iterator]: undefined (Pillar-1 fix held)
+//   • default TTS voice is 'alloy' (pinned)
+//   • synthesize returns Buffer(len>0) with mime
+
+describe('makeOpenAIVoiceAdapter — full round-trip', () => {
+  it('transcribe(buf, audio/ogg) → "hi": file-shim name set, no undefined iterator', async () => {
+    let capturedFile: Record<string, unknown> | null = null;
+    const fakeClient = {
+      audio: {
+        transcriptions: {
+          create: vi.fn(async (params: Record<string, unknown>) => {
+            capturedFile = params['file'] as Record<string, unknown>;
+            return { text: 'hi' };
+          }),
+        },
+        speech: {
+          create: vi.fn(async (_: unknown) => ({
+            arrayBuffer: async () => new Uint8Array([0xde, 0xad, 0xbe, 0xef]).buffer,
+          })),
+        },
+      },
+    };
+    const adapter = makeOpenAIVoiceAdapter(fakeClient as never);
+    const buf = Buffer.from('fake-ogg-audio-bytes');
+
+    // Part 1: transcribe
+    const text = await adapter.transcribe(buf, 'audio/ogg');
+    expect(text).toBe('hi');
+    expect(capturedFile).not.toBeNull();
+    // file-shim must have a name (required by openai SDK)
+    expect(capturedFile!['name']).toBe('audio.ogg');
+    // Pillar-1 fix: the shim must NOT have Symbol.iterator explicitly set to `undefined`.
+    // A plain object has no Symbol.iterator at all; if it were present and === undefined,
+    // the SDK would attempt iteration and fail.  We assert it is NOT an own property
+    // (absent is fine; a real function is fine; deliberately-set-to-undefined is the bug).
+    const ownSymbols = Object.getOwnPropertySymbols(capturedFile!);
+    const hasIteratorAsOwn = ownSymbols.includes(Symbol.iterator);
+    if (hasIteratorAsOwn) {
+      // If the symbol is an own property, it must be a real function (not undefined)
+      const iteratorValue = (capturedFile as Record<symbol, unknown>)[Symbol.iterator];
+      expect(typeof iteratorValue).toBe('function');
+    }
+    // else: no own Symbol.iterator — this is the correct Pillar-1 state
+
+    // Part 2: synthesize — default voice 'alloy' (pinned), Buffer(len>0), mime
+    const result = await adapter.synthesize('hi');
+    expect(Buffer.isBuffer(result.data)).toBe(true);
+    expect(result.data.byteLength).toBeGreaterThan(0);
+    expect(result.mime).toBeTruthy();
+    const synthCall = fakeClient.audio.speech.create.mock.calls[0][0] as Record<string, unknown>;
+    expect(synthCall['voice']).toBe('alloy');
+    expect(synthCall['input']).toBe('hi');
+  });
+});
+
 // ─── createVoiceAdapter — openai provider ────────────────────────────────────
 
 describe('createVoiceAdapter — openai provider', () => {
