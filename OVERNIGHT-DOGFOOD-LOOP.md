@@ -45,3 +45,20 @@ Heuristic: a top-level module with **0 production importers** (static `from` + d
 - **Note (not a finding):** `spawn-backend-mock` is a test helper that intentionally lives in `src/` (MockSpawnBackend) — used by tests, NOT dead. `config-validator` is a 6-LoC re-export shim. Both excluded.
 
 **Action:** recorded for Alperen's WIRE-vs-KES; **nothing deleted** (unattended deferral). The NEW `agent-cache` is the more interesting one — a real, tested routing-perf feature left unwired (sibling to the ADR-075 affinity gap: routing has multiple built-but-unwired enhancements).
+
+---
+
+## Iteration 3 — design-doc: ADR-075 affinity wire (routing-reorder spec)
+
+Turned the confirmed **#2 wiring gap** (ADR-075 affinity tested-but-dead) into an implementable,
+flag-gated design → **`DESIGN-ADR-075-AFFINITY-REORDER.md`**. Summary:
+- **Root cause** (file:line): `routeTaskV2` order is agent-first (`:364`) → skill-second (`:406`),
+  so `selectBestAgent` lacks `assignedSkills` and can't build the affinity context that
+  `activation-engine.ts:91` needs. All 3 `evaluateActivation` calls are 2-arg.
+- **Recommended:** Option A — reorder skill-selection ABOVE agent-selection (safe: skills don't
+  depend on agent), add `routing.skill_agent_affinity` flag (default-off → byte-identical), thread
+  `{agentId, assignedSkills, enabled}` into the 3 calls. Option B (two-pass re-run) rejected.
+- **Faithful test plan** + **routing-balance gate** (measure agent-distribution delta before any
+  default-on — ADR-075's own imbalance concern cuts both ways).
+- **Bundles with** the iter-2 `agent-cache` finding → one "routing-v2 enhancements" attended sprint.
+- **Status:** design-ready; **implementation attended-defer** (behaviour-changing core routing).
