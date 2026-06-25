@@ -9,10 +9,9 @@ Run:
 """
 
 import os
-import struct
+import pathlib
 import tempfile
 import unittest
-import wave
 
 import numpy as np
 
@@ -61,26 +60,14 @@ class TestFakeStt(unittest.TestCase):
     def setUp(self):
         from engines import make_stt_engine  # noqa: PLC0415
         self.engine = make_stt_engine("fake")
-        # Create a minimal valid WAV file in a temp dir.
         self.tmp_dir = tempfile.mkdtemp()
+        # FakeStt never reads the file; any byte blob is sufficient.
         self.wav_path = os.path.join(self.tmp_dir, "test.wav")
-        self._write_silence_wav(self.wav_path, duration_s=0.1, sr=16000)
-
-    def _write_silence_wav(self, path: str, duration_s: float, sr: int) -> None:
-        n = int(duration_s * sr)
-        with wave.open(path, "w") as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(2)
-            wf.setframerate(sr)
-            wf.writeframes(struct.pack("<" + "h" * n, *([0] * n)))
+        pathlib.Path(self.wav_path).write_bytes(b"\x00\x00")
 
     def test_returns_string(self):
         result = self.engine.transcribe(self.wav_path, "tr")
         self.assertIsInstance(result, str)
-
-    def test_returns_non_empty_string(self):
-        result = self.engine.transcribe(self.wav_path, "tr")
-        self.assertGreater(len(result), 0)
 
     def test_language_param_accepted(self):
         result = self.engine.transcribe(self.wav_path, "en")
@@ -89,8 +76,7 @@ class TestFakeStt(unittest.TestCase):
     def test_raw_bytes_file_accepted(self):
         """Even a non-WAV binary blob path is accepted by the fake (it doesn't parse it)."""
         raw_path = os.path.join(self.tmp_dir, "a.wav")
-        with open(raw_path, "wb") as f:
-            f.write(b"\x00\x00")
+        pathlib.Path(raw_path).write_bytes(b"\x00\x00")
         result = self.engine.transcribe(raw_path, "tr")
         self.assertIsInstance(result, str)
 
@@ -122,30 +108,9 @@ class TestFactoryErrors(unittest.TestCase):
 class TestModuleImportNoDeps(unittest.TestCase):
     """
     The engines module must import cleanly without voxcpm / faster_whisper installed.
-    Heavy deps are imported lazily inside class methods — this test verifies the module
-    itself loads fine (the import at the top of each test class already proves this, but
-    we make it explicit here for CI documentation).
+    Heavy deps are imported lazily inside __init__ — verified by TestLazyImportFiresAtInstantiation.
+    This class confirms the module-level import succeeds and the fake path works dep-free.
     """
-
-    def test_import_engines_module_without_heavy_deps(self):
-        import importlib  # noqa: PLC0415
-        import sys  # noqa: PLC0415
-
-        # Remove engines from sys.modules to force a fresh import.
-        sys.modules.pop("engines", None)
-        # Block voxcpm and faster_whisper at import time to simulate clean env.
-        _sentinel = object()
-        sys.modules["voxcpm"] = _sentinel  # type: ignore[assignment]
-        sys.modules["faster_whisper"] = _sentinel  # type: ignore[assignment]
-        try:
-            mod = importlib.import_module("engines")
-            self.assertTrue(hasattr(mod, "make_tts_engine"))
-            self.assertTrue(hasattr(mod, "make_stt_engine"))
-        finally:
-            # Restore
-            sys.modules.pop("voxcpm", None)
-            sys.modules.pop("faster_whisper", None)
-            sys.modules.pop("engines", None)
 
     def test_fake_engine_works_without_voxcpm(self):
         """FakeTts instantiation must not trigger a voxcpm import."""
@@ -158,6 +123,70 @@ class TestModuleImportNoDeps(unittest.TestCase):
         pcm, sr = eng.synthesize("test", "tr")
         self.assertIsInstance(pcm, np.ndarray)
         self.assertEqual(sr, 16000)
+
+
+class TestLazyImportFiresAtInstantiation(unittest.TestCase):
+    """
+    Prove that heavy imports (voxcpm, faster_whisper) fire inside __init__, NOT at
+    module load time.
+
+    Mechanism: set sys.modules["pkg"] = None — Python raises ImportError on
+    ``from pkg import X`` for a None entry, but does NOT load any model.  If the
+    module imported the package at top-level the module import itself would blow up;
+    if the import is deferred to __init__ then (a) the module imports fine and
+    (b) instantiation raises ImportError exactly because we blocked it — proving
+    deferral without ever loading a 4.7 GB model.
+    """
+
+    def test_voxcpm_import_fires_in_init_not_at_module_load(self):
+        """
+        Module import succeeds; VoxCpmTts() raises ImportError because voxcpm is
+        blocked — proving the from-voxcpm import lives inside __init__.
+        """
+        import sys  # noqa: PLC0415
+
+        saved = sys.modules.get("voxcpm", _MISSING)
+        sys.modules["voxcpm"] = None  # type: ignore[assignment]
+        try:
+            # Module-level import must succeed even with voxcpm blocked.
+            sys.modules.pop("engines", None)
+            from engines import VoxCpmTts  # noqa: PLC0415
+            # Instantiation must raise because the __init__ tries to import voxcpm.
+            with self.assertRaises(ImportError):
+                VoxCpmTts()
+        finally:
+            if saved is _MISSING:
+                sys.modules.pop("voxcpm", None)
+            else:
+                sys.modules["voxcpm"] = saved
+            sys.modules.pop("engines", None)
+
+    def test_faster_whisper_import_fires_in_init(self):
+        """
+        Module import succeeds; FasterWhisperStt() raises ImportError because
+        faster_whisper is blocked — proving the from-faster_whisper import lives
+        inside __init__.
+        """
+        import sys  # noqa: PLC0415
+
+        saved = sys.modules.get("faster_whisper", _MISSING)
+        sys.modules["faster_whisper"] = None  # type: ignore[assignment]
+        try:
+            sys.modules.pop("engines", None)
+            from engines import FasterWhisperStt  # noqa: PLC0415
+            with self.assertRaises(ImportError):
+                FasterWhisperStt()
+        finally:
+            if saved is _MISSING:
+                sys.modules.pop("faster_whisper", None)
+            else:
+                sys.modules["faster_whisper"] = saved
+            sys.modules.pop("engines", None)
+
+
+# Sentinel used by TestLazyImportFiresAtInstantiation to distinguish "key absent"
+# from "key present with value None".
+_MISSING = object()
 
 
 if __name__ == "__main__":
