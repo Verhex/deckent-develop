@@ -51,6 +51,14 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
   const print = opts.print ?? ((line: string): void => console.log(line));
 
   const config = await loadConfig(root);
+
+  // Hoist deck secrets read to handleBotListen scope so BOTH the bootstrap closure
+  // (voiceAdapter construction) and the post-bootstrap voice health-check can share
+  // the same single disk read. Gate: read only when caps are on — when caps are off,
+  // neither the voiceAdapter nor the health-check path ever uses deck secrets.
+  const capsOn = !!config.bot_capabilities?.enabled;
+  const deckSecrets: Record<string, string> = capsOn ? loadDeckSecrets(root) : {};
+
   const bootstrap =
     opts.bootstrap ??
     ((r, n): Promise<ConnectorCommandsHandle> => {
@@ -70,14 +78,12 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
 
       // Finding 2 fix — single shared voice adapter per bot.ts lifecycle.
       // createVoiceAdapter returns null when disabled/misconfigured — default-off is
-      // byte-identical. Deck secrets provide OPENAI_API_KEY for the openai provider.
-      // Gate: deck secrets are ONLY read when capabilities are enabled (capsOn).
-      // When capabilities are off, voiceAdapter is null and NO disk read happens.
-      const capsOn = !!config.bot_capabilities?.enabled;
+      // byte-identical. Deck secrets are captured from outer scope (deckSecrets, hoisted
+      // above) so no second loadDeckSecrets disk read occurs here.
       const voiceAdapter = capsOn
         ? createVoiceAdapter(
             config.bot_capabilities?.voice ?? { enabled: false },
-            loadDeckSecrets(r),
+            deckSecrets,
           )
         : null;
 
@@ -130,10 +136,10 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
   // Voice health-check: when voice is explicitly enabled, verify the backend is
   // reachable on start-up. Non-fatal — the bot continues regardless (Pillar-1
   // runtime degrade covers transcribe/synthesize failures). Default-off: deck
-  // secrets are NOT read unless voice is actually enabled.
+  // secrets are NOT read unless voice is actually enabled (gate: capsOn above).
+  // deckSecrets reused from outer scope — no second loadDeckSecrets disk read.
   if (config.bot_capabilities?.voice?.enabled) {
-    const deck = loadDeckSecrets(root);
-    const health = await checkVoiceHealth(config.bot_capabilities.voice, deck);
+    const health = await checkVoiceHealth(config.bot_capabilities.voice, deckSecrets);
     if (!health.ok) {
       print(
         getMessage('voice.wrapper_unreachable', lang, {

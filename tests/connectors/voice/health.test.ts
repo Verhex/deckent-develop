@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { resolveHealthUrl, checkVoiceHealth } from '../../../src/connectors/voice/health.js';
 import type { VoiceConfig } from '../../../src/connectors/voice/types.js';
 
@@ -115,6 +115,53 @@ describe('checkVoiceHealth — local provider', () => {
     expect(result.ok).toBe(true);
     expect(result.provider).toBe('local');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+// ─── checkVoiceHealth — fetch timeout (AbortController) ──────────────────────
+
+describe('checkVoiceHealth — local provider fetch timeout', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+
+  it('resolves ok:false with timeout detail and does NOT hang when fetch never responds', async () => {
+    // Simulate a fetch that hangs until its AbortSignal fires, then rejects with AbortError.
+    const hangingFetch = vi.fn(
+      (_url: string, init?: RequestInit): Promise<Response> =>
+        new Promise<Response>((_resolve, reject) => {
+          const signal = init?.signal as AbortSignal | undefined;
+          if (signal) {
+            // If already aborted before we start (edge case), reject immediately.
+            if (signal.aborted) {
+              reject(new DOMException('The operation was aborted.', 'AbortError'));
+              return;
+            }
+            signal.addEventListener('abort', () => {
+              reject(new DOMException('The operation was aborted.', 'AbortError'));
+            });
+          }
+          // Never resolves on its own — only the abort above unblocks it.
+        }),
+    );
+
+    const cfg: VoiceConfig = {
+      enabled: true,
+      provider: 'local',
+      local: { stt_url: 'http://127.0.0.1:8001/stt' },
+    };
+
+    // Start the health-check — it must NOT resolve before the timer fires.
+    const promise = checkVoiceHealth(cfg, {}, hangingFetch as unknown as typeof globalThis.fetch);
+
+    // Advance fake clock past the 5000ms AbortController ceiling.
+    await vi.advanceTimersByTimeAsync(5001);
+
+    const result = await promise;
+
+    expect(result.ok).toBe(false);
+    expect(result.provider).toBe('local');
+    expect(result.detail).toMatch(/timeout after 5000ms/);
+    expect(hangingFetch).toHaveBeenCalledOnce();
   });
 });
 

@@ -95,8 +95,10 @@ export async function checkVoiceHealth(
     return { ok: true, provider: 'local' };
   }
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
   try {
-    const res = await fetchImpl(healthUrl);
+    const res = await fetchImpl(healthUrl, { signal: controller.signal });
     if (res.ok) {
       return { ok: true, provider: 'local', url: healthUrl };
     }
@@ -107,12 +109,12 @@ export async function checkVoiceHealth(
       detail: `HTTP ${res.status} from ${healthUrl}`,
     };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return {
-      ok: false,
-      provider: 'local',
-      url: healthUrl,
-      detail: `Network error reaching ${healthUrl}: ${msg}`,
-    };
+    const detail =
+      err instanceof Error && err.name === 'AbortError'
+        ? `timeout after 5000ms waiting for ${healthUrl}`
+        : `Network error reaching ${healthUrl}: ${err instanceof Error ? err.message : String(err)}`;
+    return { ok: false, provider: 'local', url: healthUrl, detail };
+  } finally {
+    clearTimeout(timer);
   }
 }
