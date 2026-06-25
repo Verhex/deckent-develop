@@ -286,13 +286,14 @@ export interface ConnectorCommandsDeps extends ConnectorBootstrapDeps {
    */
   botCapabilities?: import('./capabilities/types.js').BotCapabilitiesConfig;
   /**
-   * Task 11 (Phase C) — VoiceAdapter for inbound STT + reply TTS.
+   * VoiceAdapter for inbound STT + reply TTS (Task 11, unified by Task 13).
    * When provided and botCapabilities.voice.stt is true, inbound voice messages
-   * are transcribed before being routed to the chat responder.  When
+   * are transcribed before being routed to the chat responder. When
    * botCapabilities.voice.tts is not 'off', replies to voice-origin turns (or
    * all turns when tts='always') are synthesized and sent via connector.sendVoice.
-   * Default: undefined → voice processing is OFF (backward-compat).
-   * Task 13 will unify this with the capability context; for now we accept it here.
+   * Default: undefined → voice processing is OFF (backward-compat, default-off).
+   * Construct ONE instance at bootstrap level and pass it here; bootstrapConnectorCommands
+   * holds a single voiceAdapter per connector lifetime (Task 13 unification).
    */
   voiceAdapter?: VoiceAdapter | null;
 }
@@ -327,12 +328,16 @@ export async function bootstrapConnectorCommands(
   const lang = deps.lang ?? 'en';
   const gateResolve = deps.resolve ?? makeCommandResolver(root, {}, lang);
   const actionDispatcher = deps.actionDispatcher ?? createCliToolDispatcher();
-  // Artifact store — used for inbound media (Task 8). Task 13 will unify this with
-  // the capability context; for now we construct one locally here. The store writes
-  // to <root>/.deckent/artifacts/ which is created on first use.
+  // Artifact store — single instance per connector (Task 13 unification).
+  // Used by BOTH the inbound media gate (Task 8: register inbound photos/documents)
+  // AND the capability context (Task 13: screenshot registers → send_mail resolves).
+  // The same store is threaded into capCtx.artifacts on the approve-path below so an
+  // inbound-registered photo is resolvable by send_mail's attachIds in the same session.
+  // Writes to <root>/.deckent/artifacts/ which is created on first use.
   const artifactStore: ArtifactStore = createArtifactStore(root);
-  // Voice adapter — Task 11 (Phase C): inbound STT + reply-in-kind TTS.
-  // deps.voiceAdapter takes precedence; Task 13 will unify with the capability context.
+  // Voice adapter — single instance per connector (Task 13).
+  // Shared between inbound STT path (Task 11) and the reply TTS path.
+  // deps.voiceAdapter takes precedence (test seam / pre-constructed instance).
   const voiceAdapter: VoiceAdapter | null = deps.voiceAdapter ?? null;
   const voiceCfg = deps.botCapabilities?.voice;
   const sttEnabled = Boolean(voiceCfg?.stt);
@@ -407,6 +412,7 @@ export async function bootstrapConnectorCommands(
             platform: detectPlatform(),
             spawn: defaultSpawn,
             loadMailTransport: loadNodemailerTransport,
+            artifacts: artifactStore,
           };
           const result = await runCapability(capRegistry, parked.tool, parked.args, capCtx, parked.channelId, mediaSink, 'confirm');
           const approvedOutcome = getMessage('cap.approval.approved', lang, { result });

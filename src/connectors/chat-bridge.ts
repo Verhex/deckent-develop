@@ -36,7 +36,7 @@ import { detectPlatform } from './capabilities/platform.js';
 import { defaultSpawn } from './capabilities/spawn.js';
 import { loadNodemailerTransport } from './capabilities/mail-transport.js';
 import { describeCapabilities } from './capabilities/prompt.js';
-import type { BotCapabilitiesConfig, MediaAttachment } from './capabilities/types.js';
+import type { ArtifactStore, BotCapabilitiesConfig, MediaAttachment } from './capabilities/types.js';
 import { approvalCallbackData } from './callback-router.js';
 import { markdownToTelegramHtml } from './markdown-to-html.js';
 import { getMessage } from '../cli/helpers/messages.js';
@@ -165,6 +165,21 @@ export interface ChatResponderDeps {
    * When absent, detectPlatform() is called (runtime detection).
    */
   capPlatform?: import('./capabilities/types.js').PlatformId;
+  /**
+   * Test seam: override the mail transport loader used by capabilities.
+   * When absent, capabilities use loadNodemailerTransport (real SMTP).
+   * Allows hermetic e2e tests to inject a fake transport spy.
+   */
+  capMailTransport?: import('./capabilities/types.js').CapabilityContext['loadMailTransport'];
+  /**
+   * Task 13 — single artifact store threaded from bootstrap construction.
+   * When provided, capabilities that produce artifacts (screenshot) register them
+   * here, and capabilities that consume artifact ids (send_mail attachIds) resolve
+   * them from the SAME store. Ensures an inbound-registered photo is resolvable
+   * by send_mail in the same bot session (single-instance per connector invariant).
+   * Default: undefined → no artifact context (backward-compat, default-off).
+   */
+  artifacts?: ArtifactStore;
 }
 
 /** Per-turn media connector — optional 3rd argument to ChatResponder calls. */
@@ -255,7 +270,8 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
         now: Date.now(),
         platform: deps.capPlatform ?? detectPlatform(),
         spawn: deps.capSpawn ?? defaultSpawn,
-        loadMailTransport: loadNodemailerTransport,
+        loadMailTransport: deps.capMailTransport ?? loadNodemailerTransport,
+        ...(deps.artifacts !== undefined ? { artifacts: deps.artifacts } : {}),
       });
       // Bind sendApproval using the per-turn connector (same object used for media in
       // Slice 1.1). Cast to PerTurnConnector — the real connector has sendMessage; when
