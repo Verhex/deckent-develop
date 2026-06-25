@@ -407,6 +407,7 @@ Self-improvement makinesini besleyen sayılar sahte → sistem kendi drift'ini g
 5. **A·R2+R7 sprint** — verification-spine wire + advertised-no-op. ~1-2 batch (B11-WIRE'larla birlikte).
 6. **A·R8 sprint** — spawnSync→async. ~1 batch (mekanik).
 7. **C1-C5 cleanup** — ~4 batch-delete (zero-caller doğrulamalı).
+8. **ADR Re-Review (🔚 EN SON — Alperen tek başına, "senle yapmıyoruz")** — §5 BUCKET D. Tüm A-fix + C-cleanup bittikten **sonra** bakılır; 80 ADR tek-tek ship-scope (P-CORE / P-ENT / DOGFOOD / HYBRID-SPLIT) + aksiyon (KEEP / REVISE / REWRITE / DELETE) kararı.
 
 **Tahmin (deckent + zorunlu CC-verify, bilinen kısıtlarla):**
 - deckent dispatch 30dk-cap + ≤20-26 task/sprint + rate-limit + R2-gereği-CC-verify (DONE'a güvenmiyoruz) → her batch ~1.5-2h.
@@ -415,6 +416,38 @@ Self-improvement makinesini besleyen sayılar sahte → sistem kendi drift'ini g
 - **Kaç madde:** ~75-95 A-fix + 14 B-ruling (+18 B11-tag) + ~100 C-silme (≈4 batch'e iner).
 
 **Not (meta):** deckent'in 30dk-cap'i (R3 dormant `sprint_timeout_minutes`, `result-collector.ts:530`) kendi audit-sprint'imizi bile yarıda kesti. Bu **A·R3'te erken-fix** edilmeli (sprint_timeout_minutes→timeoutMs thread) yoksa her fix-sprint aynı duvara çarpar. → **Sprint-2'ye ekle.**
+
+---
+
+## 5. BUCKET D — ADR RE-REVIEW (🔚 EN SON — tüm A-fix + C-cleanup'tan SONRA; Alperen tek başına)
+
+> **Statü:** kayıtlı iş-maddesi, **henüz başlamadı / şimdi yapılmıyor.** Fix-kampanyası (A/B/C) bitince **en son** bu maddeye bakılır (Alperen kararı). **Geri-dönülmez governance işi** (ADR silme/yeniden-yazma) → karar onaylanmadan `.brain/memory.db`'de hiçbir ADR mutasyona uğramaz. SSOT = `.brain/memory.db` (`type='adr'`), **ASLA toptan silinmez** (yalnız onaylı karar ile status/content revize).
+
+**Amaç:** Yenilenmiş stratejilere göre **80 ADR'nin TAMAMI tek-tek** analiz edilir; her birine **(a) ship-scope** + **(b) aksiyon** kararı verilir. Hangi ADR'ler deckent npm paketine **girer**, hangileri **"deckent kurulunca gider"** (dogfood/internal) belirlenir.
+
+**Strateji-merceği:** ADR-065 (Develop/Product Two-Repo Split) + MOD-SPLIT (community/pro) + clean-repo migration (docs-from-scratch).
+
+**Eksen A — Ship-scope (4-sınıf, Alperen-onaylı 2026-06-24):**
+- **P-CORE** — her user-projesinin ihtiyaç duyduğu engine-kontratı → **community npm'de ship.** (örn: adr-066 provider-indep · adr-040 nervous · adr-088 memory-V2 · adr-070 eval-integrity · adr-064 TOPP · adr-079 proof-of-func · adr-022 CLI/MCP-parity · adr-053 task-taxonomy · adr-090 doc-tracking · adr-042 hybrid-mode · adr-035 verify-protocol)
+- **P-ENT** — enterprise-katman → **MOD-SPLIT pro-layer'da ship** (community'ye sızmaz). (örn: adr-037 RBAC-authority · adr-068/069/071 enterprise · adr-034 multi-tenant · adr-067 process+tenant · adr-091 gateway)
+- **DOGFOOD** — deckent'in **kendi** kod/dev-süreç kararı → **kurulunca gider, npm'e konmaz, `deckent-dogfood` mark.** (örn: adr-001 TS+ESM · adr-002 Node16 · adr-003 vitest · adr-007 SpawnOptions · adr-010 tek-dep · adr-011 readline · adr-012 register-pattern · adr-021 kraken-brand · adr-024/026 god-object-split · adr-036 ADR-gov · adr-038 dead-code-S139 · adr-039 dogfood-discrim · adr-047 subagent-dispatch · adr-087 test-hermeticity)
+- **HYBRID-SPLIT** — kalıcı-kontrat + sprint-log karışık → **böl:** kontrat ship, sprint-log sil/dogfood. (örn: sprint-bundle kümesi adr-072..083 "X+Y+Z sprint-N" · adr-076/077/078/080/081/082/083/086 · adr-013 DECKENT.md-adapter · adr-029/030/031/032 managed-docs)
+
+**Eksen B — Aksiyon (yenilenmiş stratejiye göre):** **KEEP** (geçerli, aynen ship) · **REVISE** (metin güncelle, kod-gerçeği/stratejiye hizala) · **REWRITE** (clean tek-konu ADR, sprint-log'suz — clean-repo uyumlu) · **DELETE** (superseded/obsolete) · **SUPERSEDE/MERGE** (başka ADR'ye birleştir).
+
+**Korpus gerçekleri (snapshot 2026-06-24, 80 ADR — memory.db `type='adr'`):**
+- 78 accepted · **2 deprecated** → DELETE/archive-adayı: adr-005 (Sync-I/O), adr-009 (DEBT.md-format) · **4 proposed** → accept/reject/rewrite kararı bekliyor: adr-055 (Hybrid-Scoring), adr-060 (Self-Awareness), adr-061 (AEGIS), adr-067 (Process+Tenant).
+- **Numara boşlukları:** 049-052, 054, 056-059, 084-085 → reconcile (silinmiş mi / hiç yazılmamış mı).
+- **🔴 En büyük REWRITE kümesi:** adr-072..083 sprint-bundle'ları — "tek-ADR-tek-karar" ihlali, sprint-teslimat-logu kılığında ADR. Kalıcı kararları temiz tek-konu ADR'lere çıkar, sprint-cruft'ı sil.
+- **⚠️ SSOT-drift (reconcile şart):** `.claude/rules/{auditor,brain,worker}.md` statik id-listesi ~88 id sayıyor; DB SSOT'ta 80 var. Re-review bu drifti kapatır.
+
+**Yürütme (Alperen-onaylı metod — "önce taslak, sonra derin"):**
+1. **Provisional taslak** — title/cluster-bazlı ilk sınıflandırma (4-sınıf × 5-aksiyon), beraber gözden geçir.
+2. **Full-content deep-pass** — her ADR'nin TAM içeriği `memory.db`'den okunur, tek-tek karar (subagent-driven, 80 ADR).
+3. **Çıktı** — `docs/ADR-REVIEW.md` (per-ADR karar tablosu: id · ship-scope · aksiyon · gerekçe · yeni-metin-taslağı) + bu bucket'ın güncellenmesi.
+4. **Uygulama** — yalnız Alperen-onayından sonra: REVISE/REWRITE/DELETE kararları `store.upsert`/status-change ile memory.db'ye işlenir; ship-scope mark'ları paketleme-filtresine ("deckent kurulunca gider") bağlanır.
+
+**Kapsam:** 80 ADR × (ship-scope + aksiyon) = **80 tek-tek karar. Madde atlanmaz.**
 
 ---
 _Kaynak: deckent-last-standing-crosscheck.md (Phase-1 CC ⨯ Phase-2 deckent) · 2026-06-21 triage · file:line-grounded, doc-inference yok._
