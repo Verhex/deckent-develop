@@ -137,17 +137,16 @@ class TestApplyPronunciation(unittest.TestCase):
     # ------------------------------------------------------------------ #
 
     def test_comment_key_ignored(self):
-        """Keys starting with '_' must not cause replacements."""
+        """Keys starting with '_' must not cause replacements.
+
+        The _comment VALUE ('bu bir yorum') must never be injected as a replacement.
+        Concretely: input text that does NOT contain the _comment value must pass
+        through apply_pronunciation unchanged — i.e. equal to the original input.
+        """
         table_with_comment = dict(self.table)
         table_with_comment["_comment"] = "bu bir yorum"
-        result = self.apply("bu bir yorum içerir", table_with_comment)
-        # The comment VALUE should not appear as a key replacement
-        # More importantly, '_comment' key must be dropped in load_pronunciation
-        # Here we verify apply() doesn't choke and returns sensible output
-        self.assertIsInstance(result, str)
-        # '_comment' literally must not match (underscore not a word char, so \b is odd;
-        # but we guarantee load_pronunciation drops _ keys before apply sees them)
-        self.assertNotIn("bu bir yorum", result.replace("bu bir yorum içerir", ""))
+        # Input does not contain the _comment value — output must be exactly equal to input.
+        self.assertEqual("bu bir yorum icerir", self.apply("bu bir yorum icerir", table_with_comment))
 
     # ------------------------------------------------------------------ #
     # Punctuation preservation
@@ -189,7 +188,7 @@ class TestLoadPronunciation(unittest.TestCase):
             self.assertFalse(key.startswith("_"), f"Key '{key}' must be dropped")
 
     def test_load_explicit_path(self):
-        """load_pronunciation(path=...) reads the given file."""
+        """load_pronunciation(path=...) reads ONLY that file — no seed merge."""
         from tts_text import load_pronunciation
         data = {"TEST": "Teeest", "_comment": "drop me"}
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
@@ -199,6 +198,8 @@ class TestLoadPronunciation(unittest.TestCase):
             table = load_pronunciation(path=tmp_path)
             self.assertIn("TEST", table)
             self.assertNotIn("_comment", table)
+            # path= must load ONLY that file — seed key 'API' must NOT be present.
+            self.assertNotIn("API", table)
         finally:
             os.unlink(tmp_path)
 
