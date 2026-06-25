@@ -444,3 +444,70 @@ def normalize_numbers_abbr(text: str) -> str:
         result = pat.sub(expansion, result)
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Task 3: Combined TTS normalization entry-point (language-gated)
+# ---------------------------------------------------------------------------
+
+
+def normalize_for_tts(
+    text: str,
+    language: Optional[str],
+    table: dict[str, str],
+) -> str:
+    """Language-gated Turkish TTS text normalization.
+
+    When *language* starts with ``"tr"`` (case-insensitive) AND the environment
+    variable ``TTS_TEXT_NORMALIZE`` is not ``"0"``, applies the full Turkish TTS
+    normalization pipeline:
+
+      1. :func:`normalize_numbers_abbr` — convert numbers and abbreviations to
+         Turkish spoken form  (e.g. "200" → "iki yüz", "%50" → "yüzde elli").
+      2. :func:`apply_pronunciation` — respell English tech terms for Turkish TTS
+         (e.g. "API" → "Ey Pi Ay", "deckent" → "Dekent").
+
+    **Order rationale (numbers FIRST, then pronunciation):**
+      The two passes are disjoint by design so the order is safe, but the
+      chosen order is correct for two reasons:
+
+      - Numeric strings like "200" are bare digit sequences, not English tech
+        terms — the pronunciation table will never contain "200" as a key, so
+        running pronunciation FIRST would leave "200" for the number pass anyway.
+        Running numbers FIRST means pronunciation sees the fully-expanded Turkish
+        word form ("iki yüz"), which is also correct (no entry in the table
+        matches "iki yüz").
+
+      - Pronunciation table values (respellings) contain no bare digit sequences
+        — they are phonetic Turkish strings like "Ey Pi Ay".  Running the number
+        pass AFTER pronunciation would therefore not double-process anything.
+
+      The chosen order (numbers → pronunciation) is more semantically intuitive:
+      numeric tokens are resolved to Turkish words first, then the resulting
+      text is scanned for English terms that need phonetic respelling.
+
+    Disable flag:
+      Set ``TTS_TEXT_NORMALIZE=0`` in the environment to disable normalization
+      entirely (even for Turkish), e.g. for debugging or when the TTS engine
+      has its own built-in Turkish g2p.
+
+    Args:
+        text:     Input text as received from the caller (e.g. the reply text).
+        language: BCP-47 language tag (e.g. "tr", "tr-TR", "en", ``None``).
+                  ``None`` is treated as non-Turkish (pass-through).
+        table:    Pronunciation mapping (result of :func:`load_pronunciation`).
+
+    Returns:
+        Normalized text for Turkish, or *text* unchanged for other languages /
+        when the disable flag is set.
+    """
+    # Gating: language must start with "tr" (case-insensitive) AND env flag must
+    # not be "0".  All other cases return text verbatim — pure function, safe to
+    # call unconditionally for every request.
+    if language is None or not language.lower().startswith("tr"):
+        return text
+    if os.environ.get("TTS_TEXT_NORMALIZE") == "0":
+        return text
+
+    # Pipeline: numbers/abbr first, then pronunciation respelling.
+    return apply_pronunciation(normalize_numbers_abbr(text), table)

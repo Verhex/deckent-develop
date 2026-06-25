@@ -524,5 +524,152 @@ class TestNormalizeNumbersAbbr(unittest.TestCase):
             self.assertNotIn("alti", result, f"Dead atom 'alti' found in normalize('{n}'): {result!r}")
 
 
+class TestNormalizeForTts(unittest.TestCase):
+    """
+    Task 3 TDD: normalize_for_tts(text, language, table) — combined entry-point.
+
+    Rules under test:
+      - language starts with "tr" (case-insensitive) AND TTS_TEXT_NORMALIZE != "0"
+        → apply_pronunciation(normalize_numbers_abbr(text), table)
+        (order: numbers/abbr FIRST, then pronunciation)
+      - language="en", language=None, or TTS_TEXT_NORMALIZE=0
+        → return text unchanged
+
+    Order rationale (numbers-then-pronunciation):
+      normalize_numbers_abbr() converts "200" → "iki yüz" (no English terms).
+      apply_pronunciation() then respells any English tokens (e.g. "API" → "Ey Pi Ay").
+      The two passes are disjoint: pronunciation.json entries are Turkish phonetic
+      respellings that contain no bare digits, and number strings ("200") are not
+      English tech terms — so the order is safe and there is no double-processing risk.
+    """
+
+    def setUp(self):
+        from tts_text import normalize_for_tts
+        self.normalize = normalize_for_tts
+        # Minimal table for isolated unit tests (no filesystem needed)
+        self.table = {
+            "API": "Ey Pi Ay",
+            "deckent": "Dekent",
+        }
+
+    # ------------------------------------------------------------------
+    # Turkish — normalization active
+    # ------------------------------------------------------------------
+
+    def test_tr_number_and_pronunciation(self) -> None:
+        """language='tr': numbers AND pronunciation both applied."""
+        result = self.normalize("deckent API yanıtı 200 döndü", "tr", self.table)
+        self.assertIn("iki yüz", result)
+        self.assertIn("Ey Pi Ay", result)
+        self.assertIn("Dekent", result)
+
+    def test_tr_order_numbers_first(self) -> None:
+        """Order: numbers/abbr pass runs before pronunciation pass.
+
+        A pronunciation table entry whose value happens to contain Turkish number
+        words (edge-case regression guard) — but more importantly, the number '200'
+        must be in its words form before apply_pronunciation sees it.  We verify
+        'iki yüz' in the output (not '200'), confirming number pass ran first.
+        """
+        result = self.normalize("API 200", "tr", self.table)
+        self.assertIn("iki yüz", result)
+        self.assertIn("Ey Pi Ay", result)
+        # Bare '200' must be gone (already converted)
+        self.assertNotIn("200", result)
+
+    def test_tr_uppercase_language_code(self) -> None:
+        """language='TR' (uppercase) must also trigger normalization."""
+        result = self.normalize("API 200", "TR", self.table)
+        self.assertIn("Ey Pi Ay", result)
+        self.assertIn("iki yüz", result)
+
+    def test_tr_BCP47_subtag(self) -> None:
+        """language='tr-TR' (subtag) must trigger normalization."""
+        result = self.normalize("API 200", "tr-TR", self.table)
+        self.assertIn("Ey Pi Ay", result)
+        self.assertIn("iki yüz", result)
+
+    # ------------------------------------------------------------------
+    # English — pass-through
+    # ------------------------------------------------------------------
+
+    def test_en_passthrough(self) -> None:
+        """language='en': text returned unchanged."""
+        text = "deckent API yanıtı 200 döndü"
+        result = self.normalize(text, "en", self.table)
+        self.assertEqual(text, result)
+
+    def test_en_uppercase_passthrough(self) -> None:
+        """language='EN': also pass-through (not Turkish)."""
+        text = "API 200"
+        result = self.normalize(text, "EN", self.table)
+        self.assertEqual(text, result)
+
+    # ------------------------------------------------------------------
+    # None language — pass-through
+    # ------------------------------------------------------------------
+
+    def test_none_language_passthrough(self) -> None:
+        """language=None: text returned unchanged."""
+        text = "API 200"
+        result = self.normalize(text, None, self.table)
+        self.assertEqual(text, result)
+
+    # ------------------------------------------------------------------
+    # TTS_TEXT_NORMALIZE=0 — env disable
+    # ------------------------------------------------------------------
+
+    def test_env_disable_tr(self) -> None:
+        """TTS_TEXT_NORMALIZE=0 with language='tr' → pass-through."""
+        old = os.environ.get("TTS_TEXT_NORMALIZE")
+        os.environ["TTS_TEXT_NORMALIZE"] = "0"
+        try:
+            text = "API 200"
+            result = self.normalize(text, "tr", self.table)
+            self.assertEqual(text, result)
+        finally:
+            if old is None:
+                os.environ.pop("TTS_TEXT_NORMALIZE", None)
+            else:
+                os.environ["TTS_TEXT_NORMALIZE"] = old
+
+    def test_env_empty_string_allows_tr(self) -> None:
+        """TTS_TEXT_NORMALIZE='' (empty, not '0') must NOT suppress normalization."""
+        old = os.environ.get("TTS_TEXT_NORMALIZE")
+        os.environ["TTS_TEXT_NORMALIZE"] = ""
+        try:
+            result = self.normalize("API 200", "tr", self.table)
+            self.assertIn("Ey Pi Ay", result)
+        finally:
+            if old is None:
+                os.environ.pop("TTS_TEXT_NORMALIZE", None)
+            else:
+                os.environ["TTS_TEXT_NORMALIZE"] = old
+
+    def test_env_unset_allows_tr(self) -> None:
+        """TTS_TEXT_NORMALIZE unset → normalization active for tr."""
+        old = os.environ.pop("TTS_TEXT_NORMALIZE", None)
+        try:
+            result = self.normalize("API 200", "tr", self.table)
+            self.assertIn("Ey Pi Ay", result)
+        finally:
+            if old is not None:
+                os.environ["TTS_TEXT_NORMALIZE"] = old
+
+    # ------------------------------------------------------------------
+    # Empty / trivial inputs
+    # ------------------------------------------------------------------
+
+    def test_empty_text_unchanged(self) -> None:
+        """Empty text must be returned as-is for any language."""
+        self.assertEqual("", self.normalize("", "tr", self.table))
+        self.assertEqual("", self.normalize("", "en", self.table))
+
+    def test_empty_table_tr_numbers_still_run(self) -> None:
+        """Empty table: pronunciation pass is a no-op; number normalization still runs for tr."""
+        result = self.normalize("200", "tr", {})
+        self.assertIn("iki yüz", result)
+
+
 if __name__ == "__main__":
     unittest.main()

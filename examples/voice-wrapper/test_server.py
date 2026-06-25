@@ -13,6 +13,7 @@ import sys
 import unittest
 import unittest.mock
 import wave
+from urllib.parse import unquote as _url_unquote
 
 # -----------------------------------------------------------------
 # CRITICAL: set TTS_FAKE=1 BEFORE importing server so the module-level
@@ -196,6 +197,134 @@ class TestManagerNoneGuard(unittest.TestCase):
             r = self.client.post("/tts/raw", json={"text": "hello"})
         self.assertEqual(r.status_code, 503)
         self.assertEqual(r.json()["error"], "model manager unavailable")
+
+
+class TestTtsNormalization(unittest.TestCase):
+    """
+    Task 3 TDD: verify Turkish TTS text normalization is wired into /tts/raw.
+
+    Test seam: FAKE mode returns the normalized text in the response header
+    ``X-TTS-Normalized-Text`` (FAKE-only, non-invasive — never set in real path).
+    This lets us assert exactly what text would be synthesized without touching
+    the audio bytes or adding a real-mode side-channel.
+
+    Language-gating rules under test:
+      - language="tr*"  → normalize (numbers + pronunciation)
+      - language="en"   → pass-through (text unchanged)
+      - language=None   → pass-through (default "en")
+      - TTS_TEXT_NORMALIZE=0  → always pass-through, even for "tr"
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.client = TestClient(server.app)
+
+    def _normalized(self, text: str, language: str | None = None) -> str:
+        """POST /tts/raw and return the normalized text from X-TTS-Normalized-Text header.
+
+        The header value is percent-encoded (URL-encoded) to survive HTTP Latin-1 transport;
+        we decode it here before asserting on the Turkish unicode content.
+        Falls back to the original text if the header is absent (pass-through cases).
+        """
+        payload: dict = {"text": text}
+        if language is not None:
+            payload["language"] = language
+        r = self.client.post("/tts/raw", json=payload)
+        self.assertEqual(r.status_code, 200, f"Expected 200, got {r.status_code}")
+        raw = r.headers.get("x-tts-normalized-text")
+        if raw is None:
+            return text
+        return _url_unquote(raw)
+
+    # ------------------------------------------------------------------
+    # Turkish (language="tr") — should normalize
+    # ------------------------------------------------------------------
+
+    def test_tr_number_200_expanded(self) -> None:
+        """language=tr, '200' in text → header contains 'iki yüz'."""
+        normalized = self._normalized("deckent API yanıtı 200 döndü", "tr")
+        self.assertIn("iki yüz", normalized, f"Expected 'iki yüz' in {normalized!r}")
+
+    def test_tr_api_pronunciation(self) -> None:
+        """language=tr, 'API' in text → header contains 'Ey Pi Ay'."""
+        normalized = self._normalized("deckent API yanıtı 200 döndü", "tr")
+        self.assertIn("Ey Pi Ay", normalized, f"Expected 'Ey Pi Ay' in {normalized!r}")
+
+    def test_tr_deckent_pronunciation(self) -> None:
+        """language=tr, 'deckent' in text → header contains 'Dekent'."""
+        normalized = self._normalized("deckent API yanıtı 200 döndü", "tr")
+        self.assertIn("Dekent", normalized, f"Expected 'Dekent' in {normalized!r}")
+
+    def test_tr_full_sentence_all_three(self) -> None:
+        """language=tr: normalized text has iki yüz + Ey Pi Ay + Dekent (all three)."""
+        normalized = self._normalized("deckent API yanıtı 200 döndü", "tr")
+        self.assertIn("iki yüz", normalized)
+        self.assertIn("Ey Pi Ay", normalized)
+        self.assertIn("Dekent", normalized)
+
+    def test_tr_BCP47_subtag(self) -> None:
+        """language=tr-TR (BCP-47 subtag) must also trigger normalization."""
+        normalized = self._normalized("API 200", "tr-TR")
+        self.assertIn("Ey Pi Ay", normalized)
+        self.assertIn("iki yüz", normalized)
+
+    # ------------------------------------------------------------------
+    # English (language="en") — should pass-through unchanged
+    # ------------------------------------------------------------------
+
+    def test_en_api_unchanged(self) -> None:
+        """language=en, 'API' must NOT be respelled (English pass-through)."""
+        normalized = self._normalized("deckent API yanıtı 200 döndü", "en")
+        self.assertIn("API", normalized, "API must remain unchanged for language=en")
+        self.assertNotIn("Ey Pi Ay", normalized)
+
+    def test_en_200_unchanged(self) -> None:
+        """language=en, '200' must NOT be converted to 'iki yüz'."""
+        normalized = self._normalized("deckent API yanıtı 200 döndü", "en")
+        self.assertIn("200", normalized, "200 must remain as digit for language=en")
+        self.assertNotIn("iki yüz", normalized)
+
+    # ------------------------------------------------------------------
+    # No language (None / default) — should pass-through unchanged
+    # ------------------------------------------------------------------
+
+    def test_no_language_api_unchanged(self) -> None:
+        """No language field → defaults to 'en' → API must NOT be respelled."""
+        r = self.client.post("/tts/raw", json={"text": "API 200"})
+        header = r.headers.get("x-tts-normalized-text", "API 200")
+        self.assertIn("API", header)
+        self.assertNotIn("Ey Pi Ay", header)
+
+    # ------------------------------------------------------------------
+    # TTS_TEXT_NORMALIZE=0 — disable flag must suppress normalization
+    # ------------------------------------------------------------------
+
+    def test_normalize_env_disable_tr(self) -> None:
+        """TTS_TEXT_NORMALIZE=0 → even language=tr passes through unchanged."""
+        old = os.environ.get("TTS_TEXT_NORMALIZE")
+        os.environ["TTS_TEXT_NORMALIZE"] = "0"
+        try:
+            normalized = self._normalized("API 200", "tr")
+            self.assertIn("API", normalized, "API must remain unchanged when TTS_TEXT_NORMALIZE=0")
+            self.assertNotIn("Ey Pi Ay", normalized)
+        finally:
+            if old is None:
+                os.environ.pop("TTS_TEXT_NORMALIZE", None)
+            else:
+                os.environ["TTS_TEXT_NORMALIZE"] = old
+
+    def test_normalize_env_enable_explicit_tr(self) -> None:
+        """TTS_TEXT_NORMALIZE=1 (explicit) with language=tr → normalization active."""
+        old = os.environ.get("TTS_TEXT_NORMALIZE")
+        os.environ["TTS_TEXT_NORMALIZE"] = "1"
+        try:
+            normalized = self._normalized("API 200", "tr")
+            self.assertIn("Ey Pi Ay", normalized)
+        finally:
+            if old is None:
+                os.environ.pop("TTS_TEXT_NORMALIZE", None)
+            else:
+                os.environ["TTS_TEXT_NORMALIZE"] = old
 
 
 if __name__ == "__main__":

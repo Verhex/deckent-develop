@@ -37,11 +37,13 @@ import wave
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote as _url_quote
 
 import numpy as np
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from tts_text import load_pronunciation, normalize_for_tts  # type: ignore[import-untyped]
 
 # ---------------------------------------------------------------------------
 # Runtime configuration — resolved once at import time
@@ -75,6 +77,13 @@ try:
     )
 except ModuleNotFoundError:  # pragma: no cover — outside package install
     manager = None  # type: ignore[assignment]
+
+# ---------------------------------------------------------------------------
+# Pronunciation table — loaded ONCE at module load time.
+# Uses the wrapper's bundled pronunciation.json; extended via PRONUNCIATION_FILE env.
+# All /tts/raw calls share this reference — zero per-request I/O overhead.
+# ---------------------------------------------------------------------------
+_PRONUNCIATION: dict[str, str] = load_pronunciation()
 
 
 # ---------------------------------------------------------------------------
@@ -284,15 +293,29 @@ async def tts_raw(body: TtsRequest) -> Response:
     """
     language: str = body.language or "en"
 
+    # Normalize text for Turkish TTS BEFORE synthesis.
+    # Pure function: safe to call in both FAKE and real paths.
+    # Language-gated (only activates for "tr*"); TTS_TEXT_NORMALIZE=0 disables.
+    text: str = normalize_for_tts(body.text, language, _PRONUNCIATION)
+
     # --- FAKE short-circuit ---
     if FAKE:
         wav_bytes = _silence_wav_bytes(duration_sec=1.0, sample_rate=16_000)
-        return Response(content=wav_bytes, media_type="audio/wav")
+        # FAKE-only test seam: expose the normalized text in a response header so
+        # tests can assert what would be synthesized without touching audio bytes.
+        # This header is NEVER set in the real path — it is strictly a test hook.
+        # The value is percent-encoded (RFC 3986) so it is safe for HTTP headers
+        # (which require Latin-1); tests must unquote it with urllib.parse.unquote.
+        return Response(
+            content=wav_bytes,
+            media_type="audio/wav",
+            headers={"X-TTS-Normalized-Text": _url_quote(text, safe=" ,!?'")},
+        )
 
     # --- Real path ---
     if manager is None:
         return JSONResponse(status_code=503, content={"error": "model manager unavailable"})
 
-    pcm, sample_rate = manager.tts().synthesize(body.text, language)
+    pcm, sample_rate = manager.tts().synthesize(text, language)
     wav_bytes = _pcm_float32_to_wav_bytes(pcm, sample_rate)
     return Response(content=wav_bytes, media_type="audio/wav")
