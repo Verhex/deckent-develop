@@ -87,28 +87,40 @@ curl -s localhost:8001/health
 **Request:**
 - Body: raw audio bytes
 - `Content-Type: <audio mime>` — e.g. `audio/ogg`, `audio/mpeg`, `audio/wav`
-- Optional query param: `?language=<bcp47>` — e.g. `?language=tr` (default `en`)
+- Optional query param: `?language=<bcp47>` — e.g. `?language=tr`; **omitted → auto-detect**
+  (whisper detects the spoken language from the audio content)
 
 **Response:** `200 application/json`
 
 ```json
-{ "text": "the transcribed sentence" }
+{ "text": "the transcribed sentence", "language": "tr" }
 ```
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `text` | `string` | The transcribed text |
+| `language` | `string` | BCP-47 tag of the detected (or forced) language, e.g. `"tr"`, `"en"` |
+
+When `?language=<tag>` is supplied the wrapper forces that language and the `language` field in
+the response reflects the forced tag. When the query param is omitted, whisper auto-detects the
+spoken language and returns the detected tag.
 
 Non-2xx → deckent treats the voice message as untranscribable and notifies the user.
 No crash.
 
 **Smoke:**
 ```bash
+# Auto-detect (omit ?language):
 curl --data-binary @clip.ogg \
      -H 'content-type: audio/ogg' \
      'localhost:8001/stt'
-# {"text":"the transcribed sentence"}
+# {"text":"merhaba dünya","language":"tr"}
 
-# With language hint:
+# Force a specific language:
 curl --data-binary @clip.ogg \
      -H 'content-type: audio/ogg' \
      'localhost:8001/stt?language=tr'
+# {"text":"merhaba dünya","language":"tr"}
 ```
 
 ---
@@ -244,7 +256,7 @@ curl -X POST localhost:8001/tts/raw \
   -d '{"text":"test"}' --output fake.wav
 
 curl --data-binary @fake.wav -H 'content-type: audio/wav' localhost:8001/stt
-# {"text":"[fake transcript]"}
+# {"text":"[fake transcript]","language":"tr"}
 ```
 
 ### Run the test suite
@@ -266,7 +278,7 @@ All variables are optional; unset = default.
 |----------|---------|---------|
 | `TTS_ENGINE` | `voxcpm` | TTS engine name (`voxcpm` or `fake`) |
 | `STT_ENGINE` | `faster_whisper` | STT engine name (`faster_whisper` or `fake`) |
-| `TTS_FAKE` | _(unset)_ | Set to `1` to enable fake mode — no models, no GPU; `/stt` returns `{"text":"[fake transcript]"}`, `/tts/raw` returns 1 s of silence WAV |
+| `TTS_FAKE` | _(unset)_ | Set to `1` to enable fake mode — no models, no GPU; `/stt` returns `{"text":"[fake transcript]","language":"tr"}`, `/tts/raw` returns 1 s of silence WAV |
 | `IDLE_EVICT_SEC` | `600` | Seconds of idle time after which a loaded engine is evicted from VRAM. `0` = never evict (keep engines always-resident) |
 | `TTS_VOICE_REF` | `<script-dir>/voice-ref/deckent-canonical.wav` | Path to the canonical voice reference WAV passed to VoxCPM2. Omit or leave empty to use VoxCPM2's built-in default voice |
 | `TTS_TIMESTEPS` | `60` | VoxCPM2 inference timesteps — higher = better quality, slower |
@@ -342,7 +354,7 @@ def health():
 
 @app.post("/stt")
 def stt():
-    return jsonify({"text": "your transcript here"})
+    return jsonify({"text": "your transcript here", "language": "en"})
 
 @app.post("/tts/raw")
 def tts_raw():

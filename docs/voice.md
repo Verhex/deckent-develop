@@ -19,10 +19,14 @@ The underlying abstraction is `VoiceAdapter` (`src/connectors/voice/types.ts`):
 
 ```ts
 interface VoiceAdapter {
-  transcribe(audio: Buffer, mime: string): Promise<string>;
-  synthesize(text: string, opts?: { voice?: string }): Promise<{ data: Buffer; mime: string }>;
+  transcribe(audio: Buffer, mime: string): Promise<{ text: string; language?: string }>;
+  synthesize(text: string, opts?: { voice?: string; language?: string }): Promise<{ data: Buffer; mime: string }>;
 }
 ```
+
+`transcribe` returns the transcribed text **and** the detected language tag (e.g. `"tr"`, `"en"`).
+`synthesize` accepts an optional `language` hint (BCP-47) forwarded to the TTS backend so it
+produces output in the correct language.
 
 `createVoiceAdapter(cfg, deck)` returns `null` when voice is disabled or misconfigured — the bot
 is byte-identical to a voice-free bot when `enabled` is absent or `false`. No adapter is created,
@@ -131,15 +135,18 @@ The full `bot_capabilities.voice` schema (TypeScript source: `src/connectors/voi
 
 ```ts
 interface VoiceConfig {
-  enabled?:  boolean;                          // default: false (must be explicit)
-  stt?:      boolean;                          // default: false — accept inbound voice?
+  enabled?:  boolean;                            // default: false (must be explicit)
+  stt?:      boolean;                            // default: false — accept inbound voice?
   tts?:      'off' | 'always' | 'reply-in-kind'; // default: 'off'
-  provider?: 'local' | 'openai';               // default: 'local'
+  provider?: 'local' | 'openai';                 // default: 'local'
+  language?: 'auto' | string;                    // default: 'auto' — see §5 Language
   local?: {
-    stt_url?:    string;    // required for provider:'local' — POST audio → {text}
-    tts_url?:    string;    // required for provider:'local' — POST {text} → audio bytes
-    tts_voice?:  string;    // optional voice hint forwarded in TTS request body
-    health_url?: string;    // optional; derived from stt_url/tts_url origin + "/health"
+    stt_url?:      string;  // required for provider:'local' — POST audio → {text, language}
+    tts_url?:      string;  // required for provider:'local' — POST {text} → audio bytes
+    tts_voice?:    string;  // optional voice hint forwarded in TTS request body
+    health_url?:   string;  // optional; derived from stt_url/tts_url origin + "/health"
+    stt_language?: string;  // optional explicit STT language hint (BCP-47, e.g. 'tr');
+                            // appended as ?language= to stt_url; omit for auto-detect
   };
 }
 ```
@@ -203,7 +210,90 @@ replies (`tts: "off"`), or synthesize all replies without accepting inbound voic
 
 ---
 
-## 5. Honest degrade — what happens when the backend is unreachable
+## 5. Language — auto-detect, reply consistency, and pinning
+
+### How language flows through a voice turn
+
+1. **STT auto-detect (default):** when `local.stt_language` is absent, the wrapper's STT engine
+   (faster-whisper) detects the spoken language from the audio and returns it as the `language`
+   field in the `/stt` response (e.g. `{"text":"merhaba","language":"tr"}`).
+2. **Language threading:** deckent reads the detected language and uses it in two places:
+   - the LLM prompt receives a language instruction ("reply in `tr`") so the bot never mixes
+     languages within a single reply;
+   - the TTS call forwards `language` so the synthesis backend produces output in the same tongue.
+3. **Result:** the user speaks (or types) in a language → the bot replies in **exactly that
+   language**, consistently. No mixed-language replies.
+
+### The `voice.language` config field
+
+`bot_capabilities.voice.language` controls the **reply language preference**:
+
+| Value | Behavior |
+|-------|----------|
+| absent or `"auto"` | **Auto-detect** — reply in the STT-detected language of each turn; for text turns, the model mirrors the user's input language. |
+| BCP-47 tag (e.g. `"tr"`, `"en-US"`) | **Pinned** — always reply in this language regardless of the detected turn language. Useful for a bot that must always answer in Turkish even when the user writes in English ("TR sabit" use-case). |
+
+### Config examples
+
+**Auto-detect (default — no `language` field needed):**
+```json
+{
+  "voice": {
+    "enabled": true,
+    "provider": "local",
+    "stt": true,
+    "tts": "reply-in-kind",
+    "local": {
+      "stt_url": "http://127.0.0.1:8001/stt",
+      "tts_url": "http://127.0.0.1:8001/tts/raw"
+    }
+  }
+}
+```
+
+**Pinned to Turkish (always reply in `tr`):**
+```json
+{
+  "voice": {
+    "enabled": true,
+    "provider": "local",
+    "stt": true,
+    "tts": "reply-in-kind",
+    "language": "tr",
+    "local": {
+      "stt_url": "http://127.0.0.1:8001/stt",
+      "tts_url": "http://127.0.0.1:8001/tts/raw"
+    }
+  }
+}
+```
+
+**Explicit STT language hint (skip auto-detect, force wrapper to transcribe as `tr`):**
+```json
+{
+  "voice": {
+    "enabled": true,
+    "provider": "local",
+    "stt": true,
+    "tts": "reply-in-kind",
+    "local": {
+      "stt_url": "http://127.0.0.1:8001/stt",
+      "tts_url": "http://127.0.0.1:8001/tts/raw",
+      "stt_language": "tr"
+    }
+  }
+}
+```
+
+`local.stt_language` is appended as `?language=tr` to every STT request, bypassing Whisper's
+auto-detect. Use it when you know all callers speak one language and want to avoid the occasional
+mis-detection. Omit it to keep auto-detect (recommended for multi-lingual bots).
+
+See also: [`examples/voice-wrapper/README.md` §2 `/stt` contract](../examples/voice-wrapper/README.md#post-stt--speech-to-text).
+
+---
+
+## 6. Honest degrade — what happens when the backend is unreachable
 
 deckent is designed to **never crash** due to a missing or unreachable voice backend.
 
@@ -231,7 +321,7 @@ No call ever crashes the bot process. All errors are surfaced honestly.
 
 ---
 
-## 6. Cross-links
+## 7. Cross-links
 
 - **Reference wrapper + full contract doc:** [`examples/voice-wrapper/README.md`](../examples/voice-wrapper/README.md)
 - **Design spec:** [`docs/superpowers/specs/2026-06-25-voice-product-feature-design.md`](superpowers/specs/2026-06-25-voice-product-feature-design.md)
