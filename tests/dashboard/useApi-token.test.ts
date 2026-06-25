@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { useApi } from "../../src/dashboard/src/lib/useApi.js";
+import { useApiClient } from "../../src/dashboard/src/lib/useApiClient.js";
 
 const mockFetch = vi.fn();
 
@@ -19,13 +19,13 @@ afterEach(() => {
     ?.__DECKENT_API_TOKEN__;
 });
 
-describe("useApi — token injection", () => {
+describe("useApiClient — token injection", () => {
   it("GET with token attaches Authorization: Bearer header", async () => {
     (globalThis as { window: { __DECKENT_API_TOKEN__?: string } }).window = {
       __DECKENT_API_TOKEN__: "test-token-123",
     };
 
-    const { result } = renderHook(() => useApi());
+    const { result } = renderHook(() => useApiClient());
     await result.current.get("/api/status");
 
     expect(mockFetch).toHaveBeenCalledWith("/api/status", {
@@ -36,7 +36,7 @@ describe("useApi — token injection", () => {
   it("GET without token sends no Authorization header", async () => {
     (globalThis as { window: { __DECKENT_API_TOKEN__?: string } }).window = {};
 
-    const { result } = renderHook(() => useApi());
+    const { result } = renderHook(() => useApiClient());
     await result.current.get("/api/status");
 
     expect(mockFetch).toHaveBeenCalledWith("/api/status", { headers: {} });
@@ -49,7 +49,7 @@ describe("useApi — token injection", () => {
       __DECKENT_API_TOKEN__: "tok-abc",
     };
 
-    const { result } = renderHook(() => useApi());
+    const { result } = renderHook(() => useApiClient());
     await result.current.post("/api/start", { autoApprove: true });
 
     expect(mockFetch).toHaveBeenCalledWith("/api/start", {
@@ -65,7 +65,7 @@ describe("useApi — token injection", () => {
   it("POST without token omits Authorization header", async () => {
     (globalThis as { window: { __DECKENT_API_TOKEN__?: string } }).window = {};
 
-    const { result } = renderHook(() => useApi());
+    const { result } = renderHook(() => useApiClient());
     await result.current.post("/api/start", { autoApprove: false });
 
     const [, opts] = mockFetch.mock.calls[0] as [string, RequestInit];

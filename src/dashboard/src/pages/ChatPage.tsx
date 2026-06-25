@@ -6,7 +6,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useSSE } from "../hooks/useSSE";
 import { postJson } from "../lib/api";
-import { useApi } from "../lib/useApi";
+import { useApiClient } from "../lib/useApiClient";
 import { streamChatResponse } from "../lib/chat-stream-client";
 import { useTranslation } from "../i18n/LanguageProvider";
 import { Badge } from "../components/ui/badge";
@@ -30,8 +30,8 @@ interface ChatMessage {
 // ── Slash registry (terminal-parity with task 221-003) ──────────
 // Same set surfaced by the native REPL slash registry. Backend agentic intent
 // classifier handles /status, /recall, /plan; /clear and /help are local UX.
-// Authorization: Bearer <token> is attached server-side by useApi.post — see
-// src/dashboard/src/lib/useApi.ts.
+// Authorization: Bearer <token> is attached server-side by useApiClient.post — see
+// src/dashboard/src/lib/useApiClient.ts.
 const SLASH_COMMANDS: ReadonlyArray<{ name: string; desc: string; local: boolean }> = [
   { name: "/help", desc: "Slash komut listesi", local: true },
   { name: "/clear", desc: "Konuşmayı temizle", local: true },
@@ -318,7 +318,7 @@ let msgIdCounter = 0;
 export default function ChatPage() {
   const { t } = useTranslation();
   const sseState = useSSE("/api/events");
-  const { post } = useApi();
+  const { post } = useApiClient();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [notifications, setNotifications] = useState<NotifyEvent[]>([]);
   const [sending, setSending] = useState(false);

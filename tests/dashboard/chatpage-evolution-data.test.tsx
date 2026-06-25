@@ -27,8 +27,8 @@ vi.mock("../../src/dashboard/src/hooks/useSSE", () => ({
 
 const mockPost = vi.fn();
 const mockGet = vi.fn();
-vi.mock("../../src/dashboard/src/lib/useApi", () => ({
-  useApi: vi.fn(() => ({ get: mockGet, post: mockPost })),
+vi.mock("../../src/dashboard/src/lib/useApiClient", () => ({
+  useApiClient: vi.fn(() => ({ get: mockGet, post: mockPost })),
 }));
 
 vi.mock("../../src/dashboard/src/lib/api", () => ({
