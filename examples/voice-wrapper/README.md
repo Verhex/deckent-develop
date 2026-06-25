@@ -24,8 +24,9 @@ or anything else. This wrapper is the reference, not a requirement.
 2. [The deckent Voice HTTP Contract](#2-the-deckent-voice-http-contract)
 3. [Run it](#3-run-it)
 4. [Env knobs](#4-env-knobs)
-5. [Connect to deckent](#5-connect-to-deckent)
-6. [Bring your own backend](#6-bring-your-own-backend)
+5. [Text normalization (Turkish)](#5-text-normalization-turkish)
+6. [Connect to deckent](#6-connect-to-deckent)
+7. [Bring your own backend](#7-bring-your-own-backend)
 
 ---
 
@@ -287,7 +288,165 @@ All variables are optional; unset = default.
 
 ---
 
-## 5. Connect to deckent
+## 5. Text normalization (Turkish)
+
+When `/tts/raw` receives a request with `"language": "tr"` (or any `tr-*` BCP-47 tag such as
+`"tr-TR"`), the wrapper automatically runs a two-pass normalization pipeline on the text before
+handing it to the TTS engine. This ensures VoxCPM2 — which is Turkish-specialized — reads
+English tech terms and numbers naturally rather than falling back to letter-by-letter or
+undefined behavior.
+
+### Code-switching: English terms in Turkish text
+
+Technical and brand terms embedded in Turkish sentences ("API'yi çağırdım", "build başarısız")
+are respelled phonetically so VoxCPM2 reads them as Turkish speakers pronounce them in
+conversation.
+
+The respelling table lives in `pronunciation.json` next to this module (source of truth:
+`tts_text.py`, `load_pronunciation()`). Every key is an English term; every value is the
+Turkish-phonetic form that, when read by a Turkish TTS engine, sounds like the English
+pronunciation. Example entries:
+
+| English term | Phonetic respelling |
+|---|---|
+| `API` | `Ey Pi Ay` |
+| `build` | `Bild` |
+| `GitHub` | `Githab` |
+| `merge` | `Merc` |
+| `ChatGPT` | `Çet Ci Pi Ti` |
+| `Gemini` | `Ceminay` |
+| `deckent` | `Dekent` |
+| `LLM` | `El El Em` |
+| `pull request` | `Pul Rikuest` |
+
+**Phonetic conventions (from `pronunciation.json` `_comment` field):**
+- `c` = English `j` sound (e.g. "Gemini" → "Ceminay", "GPT" → "Ci Pi Ti")
+- `ç` = English `ch` sound (e.g. "ChatGPT" → "Çet Ci Pi Ti", "branch" → "Branç")
+- Values are human-curated and always used verbatim (case is not varied).
+
+**Suffix safety:** Turkish appends grammatical suffixes to English-origin terms, typically with
+an apostrophe: `"API'ler"`, `"build'i"`, `"GitHub'tan"`. The matching uses `\b` word-boundary
+anchors; because `'` (apostrophe) is not a word character in Python `re`, the boundary sits
+naturally between the term and the apostrophe — so `"API'ler"` is matched as `"API"` (respelled
+to `"Ey Pi Ay"`) while `"'ler"` is preserved verbatim → `"Ey Pi Ay'ler"`. Similarly,
+undelimited forms like `"LLMs"` are *not* matched because `s` is a word character and `\b`
+does not fire after `M`.
+
+**Longest-match-first:** the alternation is sorted longest-key-first at runtime so that
+`"ChatGPT"` is tried before `"GPT"`, and `"pull request"` before `"pull"`. This prevents
+partial matches from shadowing longer entries.
+
+**Short-key homonym caveat:** very short or common-word keys (`"bot"`, `"merge"`, `"token"`,
+`"repo"`, `"branch"`) overlap with everyday Turkish vocabulary or other contexts. The seed map
+includes them as a deliberate deckent-domain choice; if your deployment serves domains where
+these words occur in non-technical senses, audit and remove the conflicting keys from your
+extension file.
+
+**Identity entries:** entries in `pronunciation.json` whose value equals the key
+(e.g. `"Figma"` → `"Figma"`, `"Sora"` → `"Sora"`) are included in the seed as curation
+placeholders — they have no effect at runtime until a real phonetic respelling is provided.
+
+### Extending the pronunciation map per deployment
+
+Point the `PRONUNCIATION_FILE` environment variable to a supplemental JSON file. The extension
+is **merged over** the seed: extension keys win on collision, so you can override any built-in
+respelling without replacing the entire map.
+
+```bash
+PRONUNCIATION_FILE=/etc/my-deployment/extra-terms.json ./run.sh
+```
+
+Example extension file:
+
+```json
+{
+  "_comment": "Deployment-specific overrides — merged over the bundled seed.",
+  "Figma": "Figma",
+  "Jira": "Cira",
+  "kubectl": "Küb Kontrol"
+}
+```
+
+Keys starting with `_` are treated as metadata/comments and are dropped from the map.
+
+When `PRONUNCIATION_FILE` is set, the resulting table is `seed ∪ extension` (extension wins
+on collision). When `PRONUNCIATION_FILE` is absent, only the bundled seed is used. To load an
+entirely isolated table without the seed (e.g. in tests), pass `path=` explicitly to
+`load_pronunciation()`.
+
+### Number and abbreviation normalization
+
+Turkish numbers, percentages, and unit abbreviations in the text are expanded to their spoken
+form (via `num2words`, `lang='tr'`) before TTS synthesis. Processing order:
+
+| Pass | Pattern | Example | Result |
+|---|---|---|---|
+| 1 | `%<n>` (prefix percent) | `%50` | `yüzde elli` |
+| 2 | `<n>%` (suffix percent) | `50%` | `yüzde elli` |
+| 3 | `<n><unit>` (no space) | `3.5GB` | `üç virgül beş gigabayt` |
+| 4 | Standalone numbers | `200` | `iki yüz` |
+| 5 | Spaced unit abbreviations | `5 dk` | `5 dakika` (after pass 4 → `beş dakika`) |
+
+Unit map (`_UNIT_MAP` in `tts_text.py`):
+
+| Abbreviation | Spoken form |
+|---|---|
+| `GB` | `gigabayt` |
+| `MB` | `megabayt` |
+| `KB` | `kilobayt` |
+| `TB` | `terabayt` |
+| `ms` | `milisaniye` |
+| `sn` | `saniye` |
+| `dk` | `dakika` |
+| `vs` | `vesaire` |
+| `vb` | `ve benzeri` |
+
+Decimal separators: both `.` and `,` are accepted (`"3,5"` and `"3.5"` both become
+`"üç virgül beş"`). The decimal fraction is read digit-by-digit, not as a fractional integer
+(`"3.5"` → `"üç virgül beş"`, not `"üç virgül elli"`).
+
+Version strings and code identifiers are protected: digits immediately preceded or followed by
+a word character, hyphen, or dot are not converted — `"v2"`, `"GPT-5"`, `"Node.js"`, `"v2.0"`
+pass through unchanged.
+
+### Disable flag
+
+Set `TTS_TEXT_NORMALIZE=0` to bypass the normalization pipeline entirely, even for Turkish
+requests. Use this when your TTS engine has its own built-in Turkish g2p, or for debugging
+the raw synthesis behavior:
+
+```bash
+TTS_TEXT_NORMALIZE=0 ./run.sh
+```
+
+### Language gate
+
+Normalization only activates when the `/tts/raw` request includes a `language` field that
+starts with `tr` (case-insensitive: `"tr"`, `"tr-TR"`, `"TR"` all activate it). All other
+languages (`"en"`, `null`, absent) pass through the text unchanged — the function is a pure
+no-op for non-Turkish requests.
+
+### Example curl
+
+A Turkish sentence mixing English tech terms and a percentage:
+
+```bash
+curl -s -X POST localhost:8001/tts/raw \
+  -H 'content-type: application/json' \
+  -d '{"text":"deckent'\''in build'\''i başarılı, API yanıtı 200 döndü, %95 test geçti, GitHub'\''a merge ettim.","language":"tr"}' \
+  --output normalized.wav
+```
+
+Before synthesis the wrapper normalizes the text to:
+```
+Dekent'in Bild'i başarılı, Ey Pi Ay yanıtı iki yüz döndü, yüzde doksan beş test geçti, Githab'a Merc ettim.
+```
+
+VoxCPM2 then reads each term naturally in Turkish.
+
+---
+
+## 6. Connect to deckent
 
 Add a `voice` block to your deckent project's `bot_capabilities`:
 
@@ -325,7 +484,7 @@ wrapper; you run it yourself (`./run.sh`).
 
 ---
 
-## 6. Bring your own backend
+## 7. Bring your own backend
 
 Implement the three endpoints in §2 in **any language or stack** and point deckent's
 `stt_url` / `tts_url` at it. The contract is the only requirement — not this wrapper,

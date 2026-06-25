@@ -293,7 +293,42 @@ See also: [`examples/voice-wrapper/README.md` §2 `/stt` contract](../examples/v
 
 ---
 
-## 6. Honest degrade — what happens when the backend is unreachable
+## 6. Turkish TTS text normalization (code-switching + numbers)
+
+When the voice language resolves to Turkish (`tr` or any `tr-*` BCP-47 tag), the reference
+wrapper (`examples/voice-wrapper/`) automatically preprocesses the text before passing it to
+VoxCPM2. This ensures two classes of content are spoken naturally:
+
+**Code-switching (English tech terms in Turkish sentences).** English technical and brand terms
+embedded in Turkish text — `"API'yi çağırdım"`, `"build başarısız"`, `"GitHub'a merge ettim"` —
+are respelled phonetically so VoxCPM2 reads them as a Turkish speaker would pronounce them.
+For example, `"API"` becomes `"Ey Pi Ay"`, `"build"` becomes `"Bild"`, `"GitHub"` becomes
+`"Githab"`. The seed map covers common AI, developer-tooling, and deckent-domain terms.
+Turkish grammatical suffixes attached via apostrophe (e.g. `"API'ler"`, `"build'i"`) are
+preserved correctly.
+
+**Numbers and abbreviations.** Bare digits, percentages, and unit abbreviations are expanded to
+their Turkish spoken form: `"200"` → `"iki yüz"`, `"%50"` → `"yüzde elli"`, `"3.5GB"` →
+`"üç virgül beş gigabayt"`. Both `.` and `,` are accepted as decimal separators. Version
+strings (`"v2"`, `"GPT-5"`, `"Node.js"`) pass through unchanged.
+
+**Scope and disabling.** Normalization is active only for Turkish requests; all other languages
+receive the text verbatim. Set `TTS_TEXT_NORMALIZE=0` on the wrapper process to disable it
+entirely (e.g. when your TTS engine has its own Turkish g2p module).
+
+**Per-deployment extension.** Each deployment can extend or override the pronunciation map by
+pointing the `PRONUNCIATION_FILE` environment variable at a supplemental JSON file. Extension
+keys are merged over the built-in seed (extension wins on collision), so you only need to
+supply deltas — not a full replacement map. Keys starting with `_` are treated as comments and
+ignored at runtime.
+
+For the full detail — complete pronunciation table, unit map, pass order, curl example, and
+extension format — see
+[`examples/voice-wrapper/README.md` §5 Text normalization](../examples/voice-wrapper/README.md#5-text-normalization-turkish).
+
+---
+
+## 7. Honest degrade — what happens when the backend is unreachable
 
 deckent is designed to **never crash** due to a missing or unreachable voice backend.
 
