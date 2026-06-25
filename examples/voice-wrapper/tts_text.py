@@ -1,17 +1,23 @@
 """
-tts_text.py — English→Turkish-phonetic pronunciation map loader + apply function.
+tts_text.py — Turkish TTS text normalization: pronunciation map + number/abbreviation
+expansion.
 
-Part of the deckent voice-wrapper (WS3.A Task 1).
+Part of the deckent voice-wrapper (WS3.A, Tasks 1 + 2).
 
-Pure Python stdlib only (re, json, os, pathlib). No heavy dependencies.
+Dependencies
+------------
+- Task 1 (apply_pronunciation, load_pronunciation): stdlib only (re, json, os, pathlib).
+- Task 2 (normalize_numbers_abbr): requires ``num2words`` (pure-Python, listed in
+  requirements.txt).  ``num2words`` is imported at module level; the voice-wrapper
+  virtualenv always has it installed.
 
 Pronunciation map convention (from pronunciation.json):
   - c  = English 'j'  sound  (e.g. "Gemini" → "Ceminay")
   - ç  = English 'ch' sound  (e.g. "ChatGPT" → "Çet Ci Pi Ti")
   - Human-curated; longest term is matched first to avoid partial matches.
 
-Suffix rule
------------
+Suffix rule (apply_pronunciation)
+----------------------------------
 Turkish appends grammatical suffixes to English-origin terms, often with an
 apostrophe: "API'ler", "build'i", "GitHub'tan".  Python's `re` module treats
 an apostrophe (') as a non-word character, so the standard \\b word-boundary
@@ -36,6 +42,36 @@ load_pronunciation()) to a supplemental JSON file.  The extension is MERGED
 OVER the seed: extension keys win on collision, so users can override any
 built-in respelling.  Keys starting with '_' are dropped in both the seed and
 the extension (they are metadata/comments).
+
+normalize_numbers_abbr — design notes (Task 2)
+------------------------------------------------
+Processing order (applied left-to-right in a single pass for numbers, then units):
+
+  1. ``%<number>`` patterns → "yüzde <number-in-words>"
+     Matched first so "%50" → "yüzde elli" rather than "% elli".
+
+  2. Standalone numeric tokens (integers and decimals with ```.``` or ```,```) →
+     Turkish words via ``num2words(n, lang='tr')``.
+     Numeric bounding: negative lookbehind ``(?<![\\w.-])`` and negative lookahead
+     ``(?![\\w.-])`` ensure that digits embedded in version strings ("v2", "GPT-5",
+     "Node.js", "v2.0") are NOT converted.  The hyphen and dot characters are
+     also excluded from the lookahead, meaning "GPT-5" and "v2.0" pass through
+     unchanged.  Standalone "GPT 5" (space before digit) IS converted.
+     Both decimal separators are accepted: "3.5" and "3,5" both become
+     "üç virgül beş".  The comma is normalised to a dot before passing to
+     num2words so Python's float() parser accepts it.
+
+  3. Unit/abbreviation substitution (\\b-bounded, applied after number conversion):
+     ``GB``→"gigabayt", ``MB``→"megabayt", ``KB``→"kilobayt", ``TB``→"terabayt",
+     ``ms``→"milisaniye", ``sn``→"saniye", ``dk``→"dakika", ``vs``→"vesaire",
+     ``vb``→"ve benzeri".
+
+num2words spacing
+-----------------
+``num2words`` for Turkish (``lang='tr'``) produces compact concatenated output
+("ikiyüz", "binikiyüzotuzdört").  A post-processing regex splits on known Turkish
+cardinal-number atoms to produce spaced output ("iki yüz", "bin iki yüz otuz dört"),
+which is required by TTS engines that lack built-in Turkish g2p.
 """
 
 import json
@@ -43,6 +79,8 @@ import os
 import re
 from pathlib import Path
 from typing import Optional
+
+from num2words import num2words as _num2words
 
 # Default path: pronunciation.json living next to this module file.
 _DEFAULT_PRONUNCIATION_PATH = Path(__file__).with_name("pronunciation.json")
@@ -162,3 +200,187 @@ def apply_pronunciation(text: str, table: dict[str, str]) -> str:
         return lower_table[match.group(0).lower()]
 
     return pattern.sub(_replace, text)
+
+
+# ---------------------------------------------------------------------------
+# Task 2: Turkish number + abbreviation normalization
+# ---------------------------------------------------------------------------
+
+# Turkish cardinal-number word atoms produced by num2words(n, lang='tr').
+# Sorted longest-first so the regex alternation greedily consumes the right
+# atom and does not, for example, match "on" inside "otuz".
+_TR_NUMBER_ATOMS: tuple[str, ...] = (
+    # Scale words (longest first to avoid partial grabs)
+    "katrilyon", "kentilyon", "trilyon", "milyar", "milyon",
+    # Hundred / misc
+    "yüzüncü", "yüz", "eksi", "sıfır",
+    # Tens (longest first within this tier)
+    "altmış", "yetmiş", "seksen", "doksan", "yirmi", "otuz", "kırk", "elli", "on",
+    # Ones (multi-char before single-char to avoid partial grabs)
+    "sekiz", "dört", "yedi", "dokuz", "alti", "altı",
+    "beş", "üç", "iki", "bir",
+    # Thousand (single syllable — after multi-syllable to avoid partial match)
+    "bin",
+)
+
+_TR_ATOM_PATTERN: re.Pattern[str] = re.compile(
+    "|".join(re.escape(a) for a in _TR_NUMBER_ATOMS),
+    re.UNICODE,
+)
+
+# Digit-by-digit word map for the decimal fraction part of a float.
+# When reading "3.5" aloud in Turkish tech speech, the decimal part is read
+# digit-by-digit ("beş"), NOT as "fifty hundredths" ("elli").
+# This matches the brief requirement: "3.5" → "üç virgül beş".
+_TR_DIGIT_WORDS: dict[str, str] = {
+    "0": "sıfır", "1": "bir", "2": "iki", "3": "üç", "4": "dört",
+    "5": "beş", "6": "altı", "7": "yedi", "8": "sekiz", "9": "dokuz",
+}
+
+
+def _int_to_tr_spaced(n: int) -> str:
+    """Convert an integer to spaced Turkish cardinal words.
+
+    Calls ``num2words(n, lang='tr')`` which returns compact output
+    ("ikiyüz") then splits on known Turkish number atoms to add spaces
+    ("iki yüz").
+    """
+    compact: str = _num2words(n, lang="tr")
+    parts = _TR_ATOM_PATTERN.findall(compact)
+    return " ".join(parts) if parts else compact
+
+
+def _num_to_tr_words(raw_normalised: str) -> str:
+    """Convert a normalised numeric string to spaced Turkish spoken form.
+
+    The *raw_normalised* string uses ``'.'`` as the decimal separator (commas
+    have already been converted by the caller before this function is called).
+
+    Decimal-part strategy:
+      The decimal fraction is read **digit-by-digit** (not as a fractional
+      integer).  This matches natural Turkish tech-speech convention:
+        "3.5"  → "üç virgül beş"   (not "üç virgül elli")
+        "3.50" → "üç virgül beş sıfır"
+        "10.25"→ "on virgül iki beş"
+
+    Args:
+        raw_normalised: String like ``"200"``, ``"3.5"``, ``"1234"``.
+
+    Returns:
+        Spaced Turkish cardinal string.
+    """
+    if "." in raw_normalised:
+        int_str, dec_str = raw_normalised.split(".", 1)
+        int_words = _int_to_tr_spaced(int(int_str)) if int_str else "sıfır"
+        dec_words = " ".join(_TR_DIGIT_WORDS.get(d, d) for d in dec_str)
+        return f"{int_words} virgül {dec_words}"
+    return _int_to_tr_spaced(int(raw_normalised))
+
+
+# Unit/abbreviation map — curated, extensible.
+# Keys are matched case-sensitively with \b boundaries so "GB" does not
+# accidentally match inside longer tokens.  Order here does not matter;
+# the substitution loop applies them all.
+_UNIT_MAP: dict[str, str] = {
+    "GB": "gigabayt",
+    "MB": "megabayt",
+    "KB": "kilobayt",
+    "TB": "terabayt",
+    "ms": "milisaniye",
+    "sn": "saniye",
+    "dk": "dakika",
+    "vs": "vesaire",
+    "vb": "ve benzeri",
+}
+
+# Pre-compiled patterns for performance.
+#
+# Percent-prefix pattern: %<number>  (number may have . or , decimal)
+# Examples: "%50" → "yüzde elli", "%3.5" → "yüzde üç virgül beş"
+_PERCENT_RE: re.Pattern[str] = re.compile(
+    r"%(\d+(?:[.,]\d+)?)",
+    re.UNICODE,
+)
+
+# Standalone numeric token — integer or decimal (both . and , separators).
+# Negative lookbehind / lookahead on \w, dot, and hyphen so that version
+# strings ("v2", "GPT-5", "v2.0", "Node.js") are NOT matched:
+#   - "v2"     : 'v' is \w  → lookbehind fires  → no match
+#   - "GPT-5"  : '-' in lookbehind  → no match
+#   - "v2.0"   : 'v' before '2' → '2' not matched; '.' before '0' → '0' not matched
+#   - "3.5"    : space/start before '3', space/end after '5' → matched
+#   - "3,5"    : same (comma is decimal sep here, not a list separator)
+_NUMBER_RE: re.Pattern[str] = re.compile(
+    r"(?<![\w.\-])(\d+(?:[.,]\d+)?)(?![\w.\-])",
+    re.UNICODE,
+)
+
+# Unit patterns: one compiled pattern per unit key for \b-bounded matching.
+_UNIT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"\b" + re.escape(abbr) + r"\b", re.UNICODE), expansion)
+    for abbr, expansion in _UNIT_MAP.items()
+]
+
+
+def normalize_numbers_abbr(text: str) -> str:
+    """Normalize numbers and abbreviations in *text* to Turkish spoken form.
+
+    Processing order (see module docstring for rationale):
+
+      1. ``%<number>`` → "yüzde <number-in-words>"  (e.g. "%50" → "yüzde elli")
+      2. Standalone numeric tokens → Turkish cardinal words
+         (e.g. "200" → "iki yüz", "3.5" / "3,5" → "üç virgül beş")
+      3. Unit/abbreviation expansion (\\b-bounded):
+         GB→gigabayt, MB→megabayt, KB→kilobayt, TB→terabayt,
+         ms→milisaniye, sn→saniye, dk→dakika, vs→vesaire, vb→ve benzeri
+
+    Numeric bounding:
+      Digits immediately preceded or followed by a word character, hyphen, or
+      dot are NOT converted.  This protects version strings: "v2", "GPT-5",
+      "Node.js", "v2.0" pass through unchanged.  Standalone tokens such as
+      "200", "3.5 GB", "5 dk", and "%50" are fully normalised.
+
+    Decimal separators:
+      Both ``.`` and ``,`` are accepted as the decimal separator.  The comma is
+      normalised to ``.`` before calling ``num2words`` (which requires a Python
+      float).  Turkish TTS engines read "virgül" as the spoken decimal point.
+
+    Args:
+        text: Input text that may contain digits, %-prefixed numbers, or unit
+              abbreviations.
+
+    Returns:
+        Text with numbers spelled out in Turkish and abbreviations expanded.
+    """
+    if not text:
+        return text
+
+    def _replace_percent(m: re.Match) -> str:
+        raw = m.group(1).replace(",", ".")
+        try:
+            # Validate: attempt int/float parse to catch non-numeric captures.
+            int(raw) if "." not in raw else float(raw)
+        except ValueError:
+            return m.group(0)  # safety: leave as-is on parse failure
+        return "yüzde " + _num_to_tr_words(raw)
+
+    def _replace_number(m: re.Match) -> str:
+        raw = m.group(1).replace(",", ".")
+        try:
+            int(raw) if "." not in raw else float(raw)
+        except ValueError:
+            return m.group(0)  # safety: leave as-is on parse failure
+        return _num_to_tr_words(raw)
+
+    # Pass 1: percent-prefix (before standalone numbers so '%50' → 'yüzde elli'
+    # not '% elli')
+    result = _PERCENT_RE.sub(_replace_percent, text)
+
+    # Pass 2: standalone numbers
+    result = _NUMBER_RE.sub(_replace_number, result)
+
+    # Pass 3: unit abbreviations (\b-bounded, case-sensitive)
+    for pat, expansion in _UNIT_PATTERNS:
+        result = pat.sub(expansion, result)
+
+    return result

@@ -7,6 +7,10 @@ uvicorn[standard]>=0.29.0
 # Numeric processing (PCM float32→int16 WAV conversion)
 numpy>=1.26.0
 
+# Turkish number-to-words (used by tts_text.normalize_numbers_abbr).
+# Pure-Python, no C extension, no heavy dependencies.
+num2words>=0.5.13
+
 # Test-only deps (httpx for fastapi.testclient) are in requirements-dev.txt.
 
 # ---------------------------------------------------------------------------

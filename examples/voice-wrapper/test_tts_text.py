@@ -277,5 +277,148 @@ class TestLoadPronunciation(unittest.TestCase):
         self.assertEqual([], forbidden, f"Non-stdlib modules imported: {forbidden}")
 
 
+class TestNormalizeNumbersAbbr(unittest.TestCase):
+    """Tests for normalize_numbers_abbr() — Turkish number + abbreviation normalization.
+
+    TDD (Task 2, WS3.A): written RED before implementation.
+    Run:
+        PYW=/home/alperen/youtube-plan/services/tts/.venv/bin/python
+        cd examples/voice-wrapper && "$PYW" -m unittest test_tts_text.TestNormalizeNumbersAbbr -v
+    """
+
+    def setUp(self):
+        from tts_text import normalize_numbers_abbr
+        self.normalize = normalize_numbers_abbr
+
+    # ------------------------------------------------------------------ #
+    # Integer → Turkish words
+    # ------------------------------------------------------------------ #
+
+    def test_integer_200(self):
+        """'200' → 'iki yüz'."""
+        self.assertEqual("iki yüz", self.normalize("200"))
+
+    def test_integer_1234_contains_bin(self):
+        """'1234' result must contain 'bin' (Turkish for 1000)."""
+        result = self.normalize("1234")
+        self.assertIn("bin", result)
+
+    def test_integer_50(self):
+        """'50' → 'elli'."""
+        self.assertEqual("elli", self.normalize("50"))
+
+    def test_integer_5(self):
+        """'5' → 'beş'."""
+        self.assertEqual("beş", self.normalize("5"))
+
+    # ------------------------------------------------------------------ #
+    # Decimal separator: both '.' and ','
+    # ------------------------------------------------------------------ #
+
+    def test_decimal_dot_3_5(self):
+        """'3.5' → 'üç virgül beş' (English-style dot decimal)."""
+        result = self.normalize("3.5")
+        self.assertEqual("üç virgül beş", result)
+
+    def test_decimal_comma_3_5(self):
+        """'3,5' → 'üç virgül beş' (Turkish-style comma decimal)."""
+        result = self.normalize("3,5")
+        self.assertEqual("üç virgül beş", result)
+
+    # ------------------------------------------------------------------ #
+    # % prefix: '%50' → 'yüzde elli'
+    # ------------------------------------------------------------------ #
+
+    def test_percent_prefix_50(self):
+        """'%50' → 'yüzde elli'."""
+        self.assertEqual("yüzde elli", self.normalize("%50"))
+
+    def test_percent_prefix_in_sentence(self):
+        """'%75 başarı oranı' → starts with 'yüzde yetmiş beş'."""
+        result = self.normalize("%75 başarı oranı")
+        self.assertTrue(result.startswith("yüzde yetmiş beş"), repr(result))
+
+    # ------------------------------------------------------------------ #
+    # Unit abbreviations
+    # ------------------------------------------------------------------ #
+
+    def test_number_plus_gb(self):
+        """'3.5 GB' → 'üç virgül beş gigabayt'."""
+        self.assertEqual("üç virgül beş gigabayt", self.normalize("3.5 GB"))
+
+    def test_integer_plus_mb(self):
+        """'100 MB' → 'yüz megabayt'."""
+        self.assertEqual("yüz megabayt", self.normalize("100 MB"))
+
+    def test_integer_plus_dk(self):
+        """'5 dk' → 'beş dakika'."""
+        self.assertEqual("beş dakika", self.normalize("5 dk"))
+
+    def test_integer_plus_ms(self):
+        """'200 ms' → 'iki yüz milisaniye'."""
+        self.assertEqual("iki yüz milisaniye", self.normalize("200 ms"))
+
+    def test_unit_kb(self):
+        """'1 KB' → 'bir kilobayt'."""
+        self.assertEqual("bir kilobayt", self.normalize("1 KB"))
+
+    def test_unit_tb(self):
+        """'2 TB' → 'iki terabayt'."""
+        self.assertEqual("iki terabayt", self.normalize("2 TB"))
+
+    def test_unit_sn(self):
+        """'10 sn' → 'on saniye'."""
+        self.assertEqual("on saniye", self.normalize("10 sn"))
+
+    def test_unit_vs(self):
+        """'Python vs diğerleri' → 'Python vesaire diğerleri'."""
+        result = self.normalize("Python vs diğerleri")
+        self.assertIn("vesaire", result)
+
+    def test_unit_vb(self):
+        """'Python, JS vb kullanılır' → contains 've benzeri'."""
+        result = self.normalize("Python, JS vb kullanılır")
+        self.assertIn("ve benzeri", result)
+
+    # ------------------------------------------------------------------ #
+    # Plain text unchanged (no numbers or units)
+    # ------------------------------------------------------------------ #
+
+    def test_plain_text_unchanged(self):
+        """Text with NO numbers, % or units must pass through unchanged."""
+        text = "merhaba dünya nasılsın"
+        self.assertEqual(text, self.normalize(text))
+
+    def test_empty_string(self):
+        """Empty string returns empty string."""
+        self.assertEqual("", self.normalize(""))
+
+    # ------------------------------------------------------------------ #
+    # Numeric bounding — version strings must not be mangled
+    # ------------------------------------------------------------------ #
+
+    def test_v2_not_mangled(self):
+        """'v2' must NOT have its digit converted (letter precedes digit = no match)."""
+        result = self.normalize("v2")
+        # 'v2' must remain as-is — digit preceded by word char → no match
+        self.assertEqual("v2", result)
+
+    def test_gpt_dash_5_not_mangled(self):
+        """'GPT-5' digit after hyphen — document: hyphen-preceded digits are NOT converted."""
+        result = self.normalize("GPT-5")
+        # hyphen precedes digit → excluded by negative lookbehind → unchanged
+        self.assertEqual("GPT-5", result)
+
+    # ------------------------------------------------------------------ #
+    # T1 compatibility: existing apply_pronunciation still works
+    # ------------------------------------------------------------------ #
+
+    def test_t1_apply_pronunciation_still_importable(self):
+        """apply_pronunciation from Task 1 must still import and work after Task 2 changes."""
+        from tts_text import apply_pronunciation
+        result = apply_pronunciation("API ile çalışmak", {"API": "Ey Pi Ay"})
+        self.assertIn("Ey Pi Ay", result)
+
+
 if __name__ == "__main__":
     unittest.main()
