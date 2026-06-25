@@ -16,6 +16,50 @@
 
 ---
 
+# ☀️ MORNING BRIEF (Alperen — read this first)
+
+> Living summary of the overnight CC-fix loop (updated as iterations complete). All work is
+> **committed, NOT pushed** (your call). Source-only — **a build is still pending** before any of
+> the code changes are live in MCP/bot.
+
+### What got COMMITTED overnight (real, faithful-verified)
+- **C5 dead-test cleanup (323-030) — effectively cleared:** `init-published.test.ts` 8 tautologies
+  → 5 real publish-compat guards (`3eb6ddff`); `event-stream.test.ts` write-failure tautology →
+  `not.toThrow()` (`cc23ca5f`). The codebase had very few tautological tests; these were the only
+  real offenders. tsc=0, all green.
+- **batch-stats removed** earlier (sanctioned, `2a9b43eb`).
+- Design specs + disposition reports (below).
+
+### DECISIONS I NEED FROM YOU (WIRE-vs-KES — I did NOT delete/wire unattended)
+| Item | Proof | My recommendation |
+|------|-------|-------------------|
+| `orchestra/result-merger.ts` | zero-caller, no live equivalent | KES (low value) |
+| `orchestra/task-retry.ts` | zero-caller, superseded by live cascade-decision | KES (proven superseded) |
+| `core/agent-cache.ts` (AgentSelectionCache) | zero-caller; routing has no memoization | **WIRE** (routing perf) or KES |
+| `core/lazy-loader.ts` | zero-caller, no consumer | KES |
+| `connectors/whatsapp.ts` | not in bootstrap SUPPORTED, never loaded | your call (bot area) |
+| `connectors/connector-pool.ts` | unused (live path = per-channel notify) | your call (bot area) |
+| `api/rate-limiter.ts` + `core/rate-limiter.ts` | dead `TenantRateLimiter` duplicates; live = `server.ts SlidingWindowRateLimiter` | KES the 2 dead (keep the shared `RateLimitResult` type) |
+| KEEP (sanctioned/feature/dormant) | brain-context (Defer+ADR), capability-realizer (AS-4), pattern-recorder/reader (ADR-028) | keep |
+
+### DESIGN-READY specs (implementation attended-defer — your judgment needed)
+- **`DESIGN-ADR-075-AFFINITY-REORDER.md`** — wire the dead ADR-075 skill→agent affinity via a
+  skill-first routing reorder (flag-gated, default-off, routing-balance gate). Bundles with
+  `agent-cache` wiring. This is the #2 wiring-gap from the sprint-323 audit.
+- **`DESIGN-ENFORCEMENT-VEIN.md`** — B1 RBAC hard-deny (path IS reachable; gap = worker.ts
+  soft-return + dogfood not enabled), B6 cumulative cost-gate (only per-sprint estimate enforced
+  today), A14 `applyTechDebtDowngrade` (zero callers). Rollout A14→B6→B1, all default-off.
+
+### Build → deckent-sprint transition
+When you say **"build bitti"** I'll verify the dist has my changes (planner-deps hang-fix etc.) and
+we transition to the **deckent autonomous-sprint dogfood** (hybrid plan part 2).
+
+### Not touched (boundaries respected)
+connectors/ (your active bot/voice area) · ADR-075 core-routing wire + any behaviour-changing core
+(attended) · src module deletions reserved for your WIRE-vs-KES call · no push, no build, no kill.
+
+---
+
 ## Iteration 1 — 028/C3 dead-code disposition (proof-backed, Alperen WIRE-vs-KES ready)
 
 Fresh zero-caller + supersession analysis of the 028/C3 candidates (`grep`-proven, file:line). `batch-stats` already removed (sanctioned, commit `2a9b43eb`). Remaining:
