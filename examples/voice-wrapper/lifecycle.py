@@ -15,9 +15,14 @@ Design:
     until the process exits (useful when VRAM is not a concern or for tests).
 
 Thread-safety:
-    A single ``threading.Lock`` guards all slot reads and writes.  FastAPI runs
-    sync route handlers in a thread-pool; the lock ensures that concurrent
-    requests do not build the engine twice or race on eviction.
+    Each engine kind has its own ``threading.Lock`` (``_tts_lock`` for TTS,
+    ``_stt_lock`` for STT).  The kind lock is held for the **entire
+    check-and-build sequence**, guaranteeing that the loader is called at most
+    once per engine lifetime even under high concurrency.  Because TTS and STT
+    use separate locks they can still build concurrently.  ``maybe_evict``
+    acquires the relevant kind lock before inspecting or clearing a slot, so it
+    cannot clear a slot that is mid-build; it simply waits.  ``on_evict()`` is
+    called *outside* the lock to avoid deadlock against CUDA-internal mutexes.
 
 Default loader:
     Delegates to ``engines.make_tts_engine(tts_name)`` and
@@ -109,7 +114,11 @@ class ModelManager:
         self._loader: Callable[[str], Any] = loader if loader is not None else self._default_loader
         self._on_evict = on_evict
 
-        self._lock = threading.Lock()
+        # Per-kind locks: each guards all access to its slot (build, touch,
+        # .loaded read, evict).  Separate locks allow TTS and STT to build
+        # concurrently without blocking each other.
+        self._tts_lock = threading.Lock()
+        self._stt_lock = threading.Lock()
         self._tts_slot = _Slot()
         self._stt_slot = _Slot()
 
@@ -149,8 +158,11 @@ class ModelManager:
         current_time = self._now()
         to_evict: list[_Slot] = []
 
-        with self._lock:
-            for slot in (self._tts_slot, self._stt_slot):
+        for slot, lock in (
+            (self._tts_slot, self._tts_lock),
+            (self._stt_slot, self._stt_lock),
+        ):
+            with lock:
                 if slot.loaded:
                     idle = current_time - slot.last_used
                     if idle >= self._idle_evict_sec:
@@ -164,12 +176,16 @@ class ModelManager:
 
     @property
     def loaded(self) -> dict[str, bool]:
-        """Return ``{"tts": bool, "stt": bool}`` snapshot (lock-free read is safe on CPython)."""
-        with self._lock:
-            return {
-                "tts": self._tts_slot.loaded,
-                "stt": self._stt_slot.loaded,
-            }
+        """Return ``{"tts": bool, "stt": bool}`` snapshot.
+
+        Each slot is read under its kind lock for correctness — the lock
+        prevents observing a slot that is mid-build or mid-clear.
+        """
+        with self._tts_lock:
+            tts_loaded = self._tts_slot.loaded
+        with self._stt_lock:
+            stt_loaded = self._stt_slot.loaded
+        return {"tts": tts_loaded, "stt": stt_loaded}
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -177,28 +193,17 @@ class ModelManager:
 
     def _get_or_build(self, kind: str) -> Any:
         slot = self._tts_slot if kind == "tts" else self._stt_slot
+        lock = self._tts_lock if kind == "tts" else self._stt_lock
 
-        # Fast path: already loaded — just re-touch.
-        with self._lock:
-            if slot.loaded:
-                slot.last_used = self._now()
-                return slot.engine
-
-        # Slow path: build outside the lock to avoid blocking other threads
-        # during (potentially expensive) model loading, then re-acquire to
-        # write the result.  A double-checked locking pattern ensures only one
-        # thread actually builds the engine even if multiple threads race.
-        engine = self._loader(kind)
-
-        with self._lock:
+        # The kind lock is held for the ENTIRE check-and-build sequence.
+        # This guarantees that self._loader(kind) is called at most once per
+        # engine lifetime — even when N threads race on the slow path with a
+        # real GPU model that takes seconds to load.  The lock is not released
+        # during the build, so subsequent threads block and then see
+        # slot.loaded == True, skipping the loader entirely.
+        with lock:
             if not slot.loaded:
-                # We won the race — install the engine.
-                slot.engine = engine
-                slot.last_used = self._now()
-            else:
-                # Another thread already built it while we were loading.
-                # Discard our copy; the winner's engine stays.
-                pass
+                slot.engine = self._loader(kind)
             slot.last_used = self._now()
             return slot.engine
 

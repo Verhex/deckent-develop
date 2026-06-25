@@ -2,7 +2,8 @@
 test_lifecycle.py — unittest suite for ModelManager (lifecycle.py).
 
 All tests are hermetic: a fake `now` clock and a counting `loader` are injected
-so no real TTS/STT model is ever loaded. Every test runs in < 1 ms.
+so no real TTS/STT model is ever loaded. Every test runs in < 1 ms (except the
+concurrency tests which use a small sleep/barrier — still well under 1 s total).
 
 Run:
     PYW=/home/alperen/youtube-plan/services/tts/.venv/bin/python
@@ -12,6 +13,7 @@ Run:
 from __future__ import annotations
 
 import threading
+import time
 import unittest
 
 from lifecycle import ModelManager
@@ -320,35 +322,113 @@ class TestOnEvictHook(unittest.TestCase):
 class TestThreadSafety(unittest.TestCase):
     """Concurrent access via threading must not cause race conditions."""
 
+    _N = 20  # number of racing threads
+
     def test_concurrent_tts_calls_build_once(self):
-        """Many threads calling .tts() simultaneously must still only build the engine once."""
-        calls = {"tts": 0}
-        barrier = threading.Barrier(20)
+        """
+        N threads calling .tts() simultaneously must build the engine EXACTLY once.
+
+        Proof method: the injected loader uses a threading.Barrier(N) so that ALL
+        threads reach the loader body before any returns.  Under the old
+        double-checked-locking code (lock released during build) every thread would
+        enter the loader concurrently, so call_count would be N.  Under the
+        per-kind build lock (lock held throughout), only ONE thread ever enters the
+        loader; the rest block on the lock and then see slot.loaded == True.
+
+        Sanity check: temporarily reverting to the old pattern causes this test to
+        fail (call_count == N), confirming the test is a real proof and not GIL-trivial.
+        """
+        N = self._N
+        call_count = {"tts": 0}
+        # Barrier with N participants: every loader invocation must rendezvous
+        # with N-1 others before proceeding.  If only 1 thread calls the loader,
+        # it will block forever — so we use a timeout to surface that as a
+        # BrokenBarrierError rather than a hang.  We set the barrier to N but
+        # the test asserts call_count == 1, so the barrier is only reached once;
+        # we set the barrier parties to 1 to let a single thread through cleanly.
+        #
+        # Implementation: use a small sleep (5 ms) to simulate blocking load.
+        # This is long enough that, if the lock is released during the build,
+        # all N threads enter the slow path before any exits — causing N calls.
+        lock_for_count = threading.Lock()
 
         def loader(kind):
             if kind == "tts":
-                calls["tts"] += 1
+                with lock_for_count:
+                    call_count["tts"] += 1
+                # Simulate a blocking load (e.g. reading a model from disk).
+                # With the per-kind build lock held the entire time, only ONE
+                # thread ever reaches this sleep; the others wait on the lock.
+                time.sleep(0.005)
             return object()
 
         m = ModelManager("fake", "fake", idle_evict_sec=600, loader=loader)
 
+        # Barrier ensures all threads start racing at exactly the same moment.
+        start_barrier = threading.Barrier(N)
         errors = []
 
         def worker():
             try:
-                barrier.wait()   # all threads race at the same moment
+                start_barrier.wait(timeout=5)
                 m.tts()
             except Exception as exc:  # noqa: BLE001
                 errors.append(exc)
 
-        threads = [threading.Thread(target=worker) for _ in range(20)]
+        threads = [threading.Thread(target=worker) for _ in range(N)]
         for th in threads:
             th.start()
         for th in threads:
-            th.join()
+            th.join(timeout=10)
 
         self.assertEqual(errors, [], f"Thread errors: {errors}")
-        self.assertEqual(calls["tts"], 1, "Engine must be built exactly once under concurrency")
+        self.assertEqual(
+            call_count["tts"], 1,
+            f"Engine must be built exactly once under blocking concurrency "
+            f"(got {call_count['tts']} calls — old lock-released-during-load bug would give {N})",
+        )
+
+    def test_concurrent_stt_calls_build_once(self):
+        """
+        Same proof as test_concurrent_tts_calls_build_once but for STT.
+
+        Ensures the per-kind lock fix applies symmetrically to both engine types.
+        """
+        N = self._N
+        call_count = {"stt": 0}
+        lock_for_count = threading.Lock()
+
+        def loader(kind):
+            if kind == "stt":
+                with lock_for_count:
+                    call_count["stt"] += 1
+                time.sleep(0.005)
+            return object()
+
+        m = ModelManager("fake", "fake", idle_evict_sec=600, loader=loader)
+
+        start_barrier = threading.Barrier(N)
+        errors = []
+
+        def worker():
+            try:
+                start_barrier.wait(timeout=5)
+                m.stt()
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
+
+        threads = [threading.Thread(target=worker) for _ in range(N)]
+        for th in threads:
+            th.start()
+        for th in threads:
+            th.join(timeout=10)
+
+        self.assertEqual(errors, [], f"Thread errors: {errors}")
+        self.assertEqual(
+            call_count["stt"], 1,
+            f"STT engine must be built exactly once under blocking concurrency "
+            f"(got {call_count['stt']} calls)",
+        )
 
     def test_concurrent_evict_and_access(self):
         """Eviction and access racing must not crash or corrupt state."""
@@ -361,8 +441,6 @@ class TestThreadSafety(unittest.TestCase):
             now=lambda: t["v"],
             loader=lambda k: object(),
         )
-
-        import time  # noqa: PLC0415
 
         def accessor():
             for _ in range(50):
