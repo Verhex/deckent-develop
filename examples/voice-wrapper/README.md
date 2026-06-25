@@ -118,14 +118,14 @@ curl --data-binary @clip.ogg \
 **Request:** `Content-Type: application/json`
 
 ```json
-{ "text": "hello world", "voice": "optional-id", "language": "en" }
+{ "text": "hello world", "voice": "optional-id" }
 ```
 
 | Field | Required | Default | Meaning |
 |-------|----------|---------|---------|
 | `text` | yes | — | text to synthesize |
 | `voice` | no | `null` | backend-specific voice hint; a fixed-voice backend (e.g. VoxCPM2 with a voice ref) MAY ignore it |
-| `language` | no | `"en"` | BCP-47 language tag forwarded to the engine |
+| `language` | no | `"en"` | BCP-47 language tag; accepted by the server but **NOT sent by deckent's client** (`local-voice.ts` sends only `text` + `voice`). Third-party clients MAY send it; the reference VoxCPM2 engine ignores it (TR-specialized). |
 
 **Response:** `200` with raw audio bytes in the body
 
@@ -145,7 +145,8 @@ curl -s -X POST localhost:8001/tts/raw \
 
 # Verify it's a valid WAV:
 file out.wav
-# out.wav: RIFF (little-endian) data, WAVE audio, Microsoft PCM, 16 bit, mono 48000 Hz
+# out.wav: RIFF (little-endian) data, WAVE audio, Microsoft PCM, 16 bit, mono
+# (16000 Hz in fake mode / 48000 Hz with VoxCPM2)
 ```
 
 ---
@@ -296,7 +297,7 @@ Add a `voice` block to your deckent project's `bot_capabilities`:
 | `tts` | `"reply-in-kind"` — synthesize voice only when the user sent voice; `"always"` — always reply with voice; `"off"` — never synthesize |
 | `stt_url` | STT endpoint on your wrapper |
 | `tts_url` | TTS endpoint on your wrapper |
-| `health_url` | Optional; derived from the `stt_url` host if absent |
+| `health_url` | Optional; deckent's bot-start health-check uses it, and derives it from the `stt_url` host + `/health` if omitted |
 | `tts_voice` | Optional voice hint forwarded in the TTS request body |
 
 **On bot start**, deckent calls `GET <health_url>`. If the wrapper is unreachable it
