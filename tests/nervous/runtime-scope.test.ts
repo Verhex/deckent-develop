@@ -7,6 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { assertBrainScope } from '../../src/nervous/runtime-scope-check.js';
+import { eventBus } from '../../src/orchestra/event-bus.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -52,35 +53,33 @@ describe('assertBrainScope', () => {
     }
   });
 
-  it('should emit violation event on deckent-event channel', async () => {
+  it('should emit violation event on the real eventBus deckent-event channel', () => {
     process.env.DECKENT_WORKER_MODE = '1';
 
-    // Mock the event-bus module that assertBrainScope tries to require
-    const mockEmit = vi.fn();
-    vi.doMock('../../src/orchestra/event-bus.js', () => ({
-      eventBus: { emit: mockEmit },
-    }));
-
-    // Re-import to pick up mock — but assertBrainScope uses require() internally
-    // so we need to verify via the stderr fallback path (ESM environment)
-    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    // 323-024: emitViolationEvent now routes through the statically-imported
+    // eventBus singleton (ESM-correct, synchronous) instead of a bare require()
+    // that is undefined under ESM. Spy on the REAL bus and assert the
+    // NERVOUS_SCOPE_VIOLATION event actually reaches it. This is the faithful
+    // regression: pre-fix (require → undefined → stderr fallback) never called
+    // the real emit, so this assertion is RED before the fix and GREEN after.
+    const emitSpy = vi.spyOn(eventBus, 'emit').mockReturnValue(true);
 
     try {
       assertBrainScope('NervousDispatcher');
     } catch {
-      // Expected throw
+      // Expected throw — the best-effort emit fires BEFORE the throw.
     }
 
-    // In ESM test environment, require() may fail — verify stderr fallback works
-    // Either eventBus.emit was called or stderr.write was called
-    const eventEmitted = mockEmit.mock.calls.length > 0;
-    const stderrWritten = stderrSpy.mock.calls.some(
-      (call) => typeof call[0] === 'string' && call[0].includes('NERVOUS_SCOPE_VIOLATION'),
+    expect(emitSpy).toHaveBeenCalledWith(
+      'deckent-event',
+      expect.objectContaining({
+        type: 'NERVOUS_SCOPE_VIOLATION',
+        component: 'NervousDispatcher',
+        pid: process.pid,
+      }),
     );
-    expect(eventEmitted || stderrWritten).toBe(true);
 
-    stderrSpy.mockRestore();
-    vi.doUnmock('../../src/orchestra/event-bus.js');
+    emitSpy.mockRestore();
   });
 
   it('should enforce scope on NervousObserver constructor', async () => {

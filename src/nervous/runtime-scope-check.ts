@@ -5,6 +5,8 @@
 //
 // Sprint 148 Task 7 — Ana PID Notification Scope Enforcement.
 
+import { eventBus } from '../orchestra/event-bus.js';
+
 /**
  * Assert that the current process is running in Brain scope (not a worker).
  * Throws NervousScopeViolationError if called inside a worker process
@@ -30,16 +32,20 @@ export function assertBrainScope(component: string): void {
 }
 
 /**
- * Best-effort violation event emission.
- * Uses dynamic import to avoid hard coupling — if event-bus is unavailable,
- * falls back to stderr.
+ * Best-effort violation event emission on the `deckent-event` channel.
+ *
+ * Emits through the statically-imported `eventBus` singleton — ESM-correct and
+ * synchronous, so the event reaches the bus BEFORE `assertBrainScope` throws.
+ * The previous implementation used a bare CommonJS `require()`, which is
+ * `undefined` under ESM (Node16 resolution): it threw on every call and always
+ * fell through to the stderr branch, so the real `NERVOUS_SCOPE_VIOLATION` event
+ * never reached the bus (323-024). A genuinely-unexpected emit failure still
+ * degrades to stderr — honest-fail, never silent (the import graph is acyclic:
+ * orchestra/event-bus.ts pulls only core/ leaves + a type-only event-stream
+ * edge, so there is no nervous ↔ orchestra cycle).
  */
 function emitViolationEvent(component: string): void {
   try {
-    // Synchronous import attempt via require-like pattern won't work in ESM.
-    // Use a try/catch around the event-bus module — if already loaded, it's cached.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { eventBus } = require('../orchestra/event-bus.js') as { eventBus: { emit: (event: string, data: unknown) => void } };
     eventBus.emit('deckent-event', {
       type: 'NERVOUS_SCOPE_VIOLATION',
       component,
