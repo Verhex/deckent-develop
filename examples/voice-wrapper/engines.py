@@ -144,28 +144,44 @@ class VoxCpmTts(TtsEngine):
         # Lazy import — only runs when VoxCpmTts() is actually instantiated.
         from voxcpm import VoxCPM  # noqa: PLC0415
 
-        self._model = VoxCPM.from_pretrained(_VOXCPM_MODEL_ID, load_denoiser=False)
+        # Model id + denoiser are env-configurable. Denoiser ON by default (matches the
+        # proven high-quality path); set TTS_DENOISER=0 for environments where the VoxCPM
+        # denoiser conflicts with the CUDA/torchcodec stack. TTS_MODEL allows a Turkish
+        # finetune (e.g. Trendyol/Trendyol-TTS) as a drop-in VoxCPM2 checkpoint.
+        _model_id = os.environ.get("TTS_MODEL") or _VOXCPM_MODEL_ID
+        _denoiser = os.environ.get("TTS_DENOISER", "1") == "1"
+        self._model = VoxCPM.from_pretrained(_model_id, load_denoiser=_denoiser)
         self._sr: int = self._model.tts_model.sample_rate  # typically 48000
         self._cfg: float = float(os.environ.get("TTS_CFG", str(_VOXCPM_DEFAULT_CFG)))
         self._timesteps: int = int(
             os.environ.get("TTS_TIMESTEPS", str(_VOXCPM_DEFAULT_TIMESTEPS))
         )
         self._voice_ref: str | None = os.environ.get("TTS_VOICE_REF") or None
+        # One-pass synthesis preserves natural prosody (the proven quality). Sentence
+        # chunking is only used for long-form text (> threshold chars) to curb VoxCPM
+        # long-form drift; short bot replies generate in a single pass.
+        self._chunk_threshold: int = int(os.environ.get("TTS_CHUNK_THRESHOLD", "400"))
+
+    def _generate(self, text: str) -> NdFloat32:
+        kwargs: dict = {
+            "text": text,
+            "cfg_value": self._cfg,
+            "inference_timesteps": self._timesteps,
+        }
+        if self._voice_ref:
+            kwargs["reference_wav_path"] = self._voice_ref
+        return np.asarray(self._model.generate(**kwargs)).squeeze().astype(np.float32)
 
     def synthesize(self, text: str, language: str) -> Tuple[NdFloat32, int]:  # noqa: ARG002
-        gap = np.zeros(int(_VOXCPM_SENTENCE_GAP_S * self._sr), dtype=np.float32)
         sentences = _split_sentences(text)
+        # One-pass for short/normal text (preserves natural prosody — the proven quality).
+        if len(text) <= self._chunk_threshold or len(sentences) <= 1:
+            return self._generate(text), self._sr
+        # Long-form only: chunk on sentence boundaries with 150ms gaps to curb drift.
+        gap = np.zeros(int(_VOXCPM_SENTENCE_GAP_S * self._sr), dtype=np.float32)
         parts: list[NdFloat32] = []
         for i, sentence in enumerate(sentences):
-            kwargs: dict = {
-                "text": sentence,
-                "cfg_value": self._cfg,
-                "inference_timesteps": self._timesteps,
-            }
-            if self._voice_ref:
-                kwargs["reference_wav_path"] = self._voice_ref
-            chunk = np.asarray(self._model.generate(**kwargs)).squeeze().astype(np.float32)
-            parts.append(chunk)
+            parts.append(self._generate(sentence))
             if i < len(sentences) - 1:
                 parts.append(gap)
         pcm: NdFloat32 = np.concatenate(parts)
