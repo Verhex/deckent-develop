@@ -80,4 +80,15 @@ The 8 never ran the SUT (`handleInit`/`writeIfNotExists`/`ensureDir` are not exp
 5. init.ts source uses `join()`, never `process.cwd()`.
 
 Verify: **5/5 green, tsc=0**, mock-free, hermetic. Net: −8 tautologies, +3 real faithful assertions (coverage UP, not down). Commit `<next>`.
-**Follow-up noted (not done):** `writeIfNotExists`/`ensureDir` runtime behaviour belongs in the helper module's own test — verify that coverage exists (separate sweep). Self-mock candidates to inspect next: `plugin.test.ts`, `autonomous.test.ts`, `config.test.ts`, `output.test.ts` (may be legit partial-mocks, not tautologies).
+**Follow-up noted (not done):** `writeIfNotExists`/`ensureDir` runtime behaviour belongs in the helper module's own test — verify that coverage exists (separate sweep).
+
+---
+
+## Iteration 5 — self-mock candidate triage (negative result)
+
+Investigated the 4 "self-mock" candidates from the iter-4 scan (`plugin`/`config`/`output`/`autonomous` `.test.ts`). **All 4 are FALSE POSITIVES** — the heuristic was fooled by **basename collisions across directories**: each mocks a same-named DEPENDENCY in a different dir and tests a real, different SUT with real assertions:
+- `plugin.test.ts` → mocks `core/plugin.js` (deps), tests `cli/commands/plugin.js` `registerPlugin`.
+- `config.test.ts` → mocks `core/config.js` (loadConfig/validate), tests `cli/commands/config.js`.
+- `autonomous.test.ts` → mocks `cli/commands/autonomous.js` (backlog ops), tests `mcp/tools/autonomous.js`.
+- `output.test.ts` → mocks `cli/helpers/output.js` (print), tests `cli/commands/output.js` (`resolveOutputPath`/`readTailLines`/`formatLines`) with concrete assertions (`toBe('.../sprint-139-outputs/...')`, `toHaveLength(10)`, `result[0]==='line 90'`).
+**No tautologies here; all legit.** Heuristic refinement for future C5: a self-mock is only suspect when the mocked path AND the SUT import resolve to the SAME file (dir-sensitive), not just same basename.
