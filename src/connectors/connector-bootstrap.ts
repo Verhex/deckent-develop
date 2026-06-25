@@ -40,6 +40,7 @@ import { createArtifactStore } from './capabilities/artifacts.js';
 import type { ArtifactStore } from './capabilities/types.js';
 import type { VoiceAdapter } from './voice/types.js';
 import { resolveReplyLanguage } from './voice/language.js';
+import { resolveReplyModality } from './voice/modality.js';
 
 type NotifyConnectorsConfig = NonNullable<DeckentConfig['notify_connectors']>;
 
@@ -540,13 +541,11 @@ export async function bootstrapConnectorCommands(
         const tryReplyWithVoice = async (
           channelId: string,
           replyText: string,
-          isVoiceOrigin: boolean,
+          shouldVoiceThisTurn: boolean,
           replyLangTag?: string | null,
         ): Promise<boolean> => {
           if (!voiceAdapter) return false;
-          const tts = ttsModeValue;
-          const shouldVoice = tts === 'always' || (tts === 'reply-in-kind' && isVoiceOrigin);
-          if (!shouldVoice) return false;
+          if (!shouldVoiceThisTurn) return false;
 
           const sendVoiceFn = (connector as unknown as {
             sendVoice?: (channelId: string, audio: { data: Buffer; mime: string }) => Promise<void>;
@@ -635,12 +634,15 @@ export async function bootstrapConnectorCommands(
                         typeof streamCap.sendMessageReturningId === 'function' &&
                         typeof streamCap.editMessage === 'function';
 
-                      // Task 11 (Finding 2): compute shouldVoice BEFORE choosing
-                      // streaming vs text path. When true, skip streaming entirely —
-                      // collect the full reply, attempt voice; on success send nothing
-                      // else; on failure fall back to non-streaming text reply.
-                      const tts = ttsModeValue;
-                      const shouldVoiceThisTurn = tts === 'always' || (tts === 'reply-in-kind' && isVoiceOrigin);
+                      // Task 11 (Finding 2) + WS2 Task 2: compute shouldVoice BEFORE choosing
+                      // streaming vs text path. WS2: use resolveReplyModality so a per-message
+                      // phrase ("bana yaz", "sesli cevap ver") overrides the ttsMode default in
+                      // both directions.  `text` is the inbound user message (pre-instruction
+                      // prepend, post-transcription) so voice transcripts are checked correctly.
+                      const shouldVoiceThisTurn = resolveReplyModality(text, {
+                        ttsMode: ttsModeValue,
+                        voiceOrigin: isVoiceOrigin,
+                      }).modality === 'voice';
 
                       if (canStream && !shouldVoiceThisTurn) {
                         const chatStreaming = deps.onChatStreaming!;
@@ -680,7 +682,7 @@ export async function bootstrapConnectorCommands(
                         const reply = await chatStreaming(channelId, turnText, () => {/* collect only — no streaming edits */}, connector as PerTurnMediaConnector, detectedLang);
                         const body = reply.trim() || getMessage('bot.chat_empty', lang);
                         // WS1 Task 5 (b): pass resolved language tag to TTS synthesizer.
-                        const sentVoice = await tryReplyWithVoice(channelId, body, isVoiceOrigin, replyLangTag);
+                        const sentVoice = await tryReplyWithVoice(channelId, body, shouldVoiceThisTurn, replyLangTag);
                         if (!sentVoice) {
                           await sendRich(channelId, body);
                         }
@@ -696,7 +698,7 @@ export async function bootstrapConnectorCommands(
                         // Task 11 TTS: try voice reply first; skip text when voice succeeded
                         // (covers both 'always' and 'reply-in-kind' — voice replaces text).
                         // WS1 Task 5 (b): pass resolved language tag to TTS synthesizer.
-                        const sentVoice = await tryReplyWithVoice(channelId, body, isVoiceOrigin, replyLangTag);
+                        const sentVoice = await tryReplyWithVoice(channelId, body, shouldVoiceThisTurn, replyLangTag);
                         if (!sentVoice) {
                           await sendRich(channelId, body);
                         }

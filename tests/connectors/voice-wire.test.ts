@@ -699,6 +699,136 @@ describe('voice wiring: task 5 — reply-language instruction injection + TTS la
   });
 });
 
+// ─── WS2 Task 2: per-turn modality override ───────────────────────────────────
+describe('voice wiring: ws2 task 2 — per-turn modality override', () => {
+  /**
+   * (a) voice-origin + reply-in-kind + transcript contains "bana yaz"
+   *     → override to TEXT → sendVoice NOT called, text reply IS sent
+   */
+  it('voice-origin + reply-in-kind + "bana yaz" in transcript → text reply, sendVoice NOT called', async () => {
+    const root = makeTmpRoot();
+    const audioBytes = Buffer.from([0x4f, 0x67, 0x67, 0x53]);
+    const fake = fakeVoiceConnector(audioBytes, 'audio/ogg');
+    const synthAudio = { data: Buffer.from('should-not-be-sent'), mime: 'audio/ogg' };
+    // Transcript contains "bana yaz" → text override
+    const voice = fakeVoiceAdapter('bana yaz bunu', synthAudio);
+    const chat = vi.fn(async () => 'Text reply because of bana yaz.');
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'reply-in-kind' } },
+    });
+
+    fake._emit(incomingVoice('555'));
+
+    // Wait for chat to be called
+    await vi.waitFor(() => expect(chat).toHaveBeenCalled());
+    // Give the pipeline time to finish
+    await new Promise((r) => setTimeout(r, 80));
+
+    // sendVoice must NOT be called — override to text
+    expect(fake.sendVoice).not.toHaveBeenCalled();
+    // Text reply must be sent
+    const allTexts = fake.sendMessage.mock.calls.map((c) => (c[0] as { text: string }).text).join('\n');
+    expect(allTexts).toContain('Text reply because of bana yaz.');
+  });
+
+  /**
+   * (b) text-origin + reply-in-kind + message contains "sesli cevap ver"
+   *     → override to VOICE → sendVoice IS called
+   */
+  it('text-origin + reply-in-kind + "sesli cevap ver" → sendVoice called', async () => {
+    const root = makeTmpRoot();
+    const synthAudio = { data: Buffer.from('voice-override-reply'), mime: 'audio/ogg' };
+    const fake = fakeVoiceConnector(Buffer.from([0x4f]), 'audio/ogg');
+    const voice = fakeVoiceAdapter('', synthAudio);
+    const chat = vi.fn(async () => 'Voice override reply.');
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'reply-in-kind' } },
+    });
+
+    // text-origin message that explicitly requests voice reply
+    fake._emit(incomingText('555', 'sesli cevap ver bunu'));
+
+    // sendVoice must be called (override to voice even though text-origin + reply-in-kind)
+    await vi.waitFor(() => expect(fake.sendVoice).toHaveBeenCalledTimes(1));
+    expect(fake.sendVoice).toHaveBeenCalledWith('555', synthAudio);
+    // Text reply body must NOT be sent (voice replaced it)
+    const replyBodyCalls = fake.sendMessage.mock.calls.filter(
+      (c) => (c[0] as { text: string }).text?.includes('Voice override reply.'),
+    );
+    expect(replyBodyCalls).toHaveLength(0);
+  });
+
+  /**
+   * (c) regression: voice-origin + reply-in-kind + NO modality phrase → still voice
+   *     (default behavior preserved when no override phrase present)
+   */
+  it('regression: voice-origin + reply-in-kind + no phrase → still voice (default unchanged)', async () => {
+    const root = makeTmpRoot();
+    const audioBytes = Buffer.from([0x4f, 0x67, 0x67, 0x53]);
+    const synthAudio = { data: Buffer.from('default-voice'), mime: 'audio/ogg' };
+    const fake = fakeVoiceConnector(audioBytes, 'audio/ogg');
+    const voice = fakeVoiceAdapter('ekran görüntüsü al', synthAudio);
+    const chat = vi.fn(async () => 'Default voice reply.');
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'reply-in-kind' } },
+    });
+
+    fake._emit(incomingVoice('555'));
+
+    // Default: voice-origin + reply-in-kind → voice (no override phrase → unchanged)
+    await vi.waitFor(() => expect(fake.sendVoice).toHaveBeenCalledTimes(1));
+    expect(fake.sendVoice).toHaveBeenCalledWith('555', synthAudio);
+  });
+
+  /**
+   * (d) honest-degrade still works: override=voice (text-origin + "sesli cevap ver")
+   *     but synthesize throws → falls back to text reply (no crash)
+   */
+  it('modality-override=voice but synthesize throws → honest text fallback, no crash', async () => {
+    const root = makeTmpRoot();
+    const fake = fakeVoiceConnector(Buffer.from([0x4f]), 'audio/ogg');
+    const voice: VoiceAdapter = {
+      transcribe: vi.fn(async () => ({ text: '', language: undefined })),
+      synthesize: vi.fn(async () => { throw new Error('TTS unavailable'); }),
+    };
+    const chat = vi.fn(async () => 'Degrade fallback text reply.');
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'reply-in-kind' } },
+    });
+
+    // text-origin message requesting voice reply, but TTS will fail
+    fake._emit(incomingText('555', 'sesli cevap ver bunu'));
+
+    // Must fall back to text reply (synthesize failed → honest degrade)
+    await vi.waitFor(() => {
+      const allTexts = fake.sendMessage.mock.calls.map((c) => (c[0] as { text: string }).text).join('\n');
+      expect(allTexts).toContain('Degrade fallback text reply.');
+    });
+    // sendVoice was never called (synthesize failed first)
+    expect(fake.sendVoice).not.toHaveBeenCalled();
+  });
+});
+
 describe('voice wiring: streaming path — voice replaces text', () => {
   /** Fake connector with full streaming caps + sendVoice. */
   function fakeStreamingVoiceConnector(audioBuffer: Buffer, mime: string) {
