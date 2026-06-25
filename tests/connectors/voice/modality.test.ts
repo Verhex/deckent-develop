@@ -139,6 +139,22 @@ describe('resolveReplyModality', () => {
       });
     });
 
+    it('"say it" (bare spec keyword) + reply-in-kind + voiceOrigin=false → voice, overridden=true', () => {
+      // Explicit coverage for the bare "say it" spec keyword (distinct from "say it aloud").
+      // Uses (?<!\p{L})say it(?!\p{L}) — must NOT fire on "say italy" (i is \p{L}).
+      expect(resolveReplyModality('please say it', { ttsMode: 'reply-in-kind', voiceOrigin: false })).toEqual({
+        modality: 'voice',
+        overridden: true,
+      });
+    });
+
+    it('"say italy" must NOT trigger voice override — boundary check for "say it"', () => {
+      expect(resolveReplyModality('say italy now', { ttsMode: 'off', voiceOrigin: false })).toEqual({
+        modality: 'text',
+        overridden: false,
+      });
+    });
+
     it('case-insensitive: "SESLİ CEVAP" + ttsMode=off → voice, overridden=true', () => {
       expect(resolveReplyModality('SESLİ CEVAP ver', { ttsMode: 'off', voiceOrigin: false })).toEqual({
         modality: 'voice',

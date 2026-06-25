@@ -19,14 +19,18 @@
 //   - All matches are case-insensitive.
 //   - Multi-word phrases (e.g. "sesli cevap", "reply by voice") match as-is;
 //     they naturally avoid misfire from similar substrings.
-//   - Single-word phrases (yazılı, yazarak, yazıyla, bana oku, sesli olarak, etc.)
-//     use word-boundary anchors (\b on both sides where relevant) so they do NOT
-//     fire inside compound words (e.g. "yazılım" does NOT match "yazılı").
-//   - Bare "yaz" uses \byaz\b (word-boundaries both sides) so "yazıyorum",
-//     "yazılım", "yazılımcı" do NOT trigger, while "bana yaz" and standalone
-//     "yaz" do trigger.
-//   - "bana yaz" is listed as a multi-word phrase AND bare "yaz" with \b on both
-//     sides covers the imperative form embedded elsewhere in the sentence.
+//   - Single-word / boundary-sensitive phrases use Unicode-aware boundaries:
+//       (?<!\p{L})PHRASE(?!\p{L})  with the `u` flag
+//     NOT \b — JavaScript's \b is ASCII-only ([A-Za-z0-9_]) and misclassifies
+//     Turkish characters (e.g. ı U+0131) as non-word chars. This means \byaz\b
+//     would incorrectly fire INSIDE "yazıyorum" because the ı after z is treated
+//     as \W, creating a false word boundary.  Do NOT replace with \b — it breaks
+//     Turkish.  (?<!\p{L}) / (?!\p{L}) covers ALL Unicode letters (Latin, Turkish,
+//     Arabic, CJK …) and correctly blocks compound forms across every script.
+//   - Bare "yaz" uses (?<!\p{L})yaz(?!\p{L}) so "yazıyorum", "yazılım",
+//     "yazılımcı" do NOT trigger, while "bana yaz" and standalone "yaz" do.
+//   - "bana yaz" is also listed as a multi-word phrase for explicit coverage;
+//     bare (?<!\p{L})yaz(?!\p{L}) covers the imperative form elsewhere.
 
 export type ReplyModality = 'voice' | 'text';
 
@@ -60,6 +64,11 @@ export interface ReplyModalityResult {
 //
 // Note: Turkish lowercase (`toLocaleLowerCase('tr')`) is used for input
 // normalisation to handle İ→i, I→ı correctly.
+
+// Note: both tables intentionally include a few phrases beyond the spec's baseline
+// keyword list (e.g. `sesli olarak`, `say it aloud`, `say it`, `yazıyla`, `bana yaz`).
+// These are boundary-safe extensions that improve recall without increasing false-positive
+// risk — each is anchored with (?<!\p{L})...(?!\p{L}) where necessary.
 
 /** Regex patterns that signal a VOICE reply request. All have `u` flag. */
 const VOICE_PATTERNS: RegExp[] = [
