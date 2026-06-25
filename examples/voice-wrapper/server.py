@@ -221,7 +221,8 @@ async def stt(request: Request) -> JSONResponse:
 
     Request body : raw audio bytes (any format the engine supports; typically WAV).
     Content-Type : audio/<subtype> — forwarded as metadata; the engine reads the file path.
-    Query param  : language= (BCP-47, default "en").
+    Query param  : language= (BCP-47); omitted → auto-detect (whisper detects the
+                   spoken language). The response includes the detected "language".
 
     In FAKE mode: returns {"text": "[fake transcript]"} immediately without touching
     the ModelManager or writing any file to disk.
