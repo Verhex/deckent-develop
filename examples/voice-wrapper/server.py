@@ -232,6 +232,9 @@ async def stt(request: Request) -> JSONResponse:
         return JSONResponse(content={"text": "[fake transcript]"})
 
     # --- Real path ---
+    if manager is None:
+        return JSONResponse(status_code=503, content={"error": "model manager unavailable"})
+
     body = await request.body()
 
     # Ensure the temp directory exists.
@@ -285,6 +288,9 @@ async def tts_raw(body: TtsRequest) -> Response:
         return Response(content=wav_bytes, media_type="audio/wav")
 
     # --- Real path ---
+    if manager is None:
+        return JSONResponse(status_code=503, content={"error": "model manager unavailable"})
+
     pcm, sample_rate = manager.tts().synthesize(body.text, language)
     wav_bytes = _pcm_float32_to_wav_bytes(pcm, sample_rate)
     return Response(content=wav_bytes, media_type="audio/wav")

@@ -11,6 +11,7 @@ import io
 import os
 import sys
 import unittest
+import unittest.mock
 import wave
 
 # -----------------------------------------------------------------
@@ -136,6 +137,42 @@ class TestVoiceContract(unittest.TestCase):
         with wave.open(buf, "rb") as wf:
             # May have 0 frames for empty text — just must not crash.
             self.assertGreaterEqual(wf.getnframes(), 0)
+
+
+class TestManagerNoneGuard(unittest.TestCase):
+    """
+    Verify that /stt and /tts/raw return 503 when manager is None and FAKE is off.
+
+    The test temporarily patches server.FAKE = False and server.manager = None so
+    the real-path branch is exercised without touching the module-level FAKE flag
+    that the rest of the suite depends on.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.client = TestClient(server.app)
+
+    def test_stt_503_when_manager_none(self) -> None:
+        with (
+            unittest.mock.patch.object(server, "FAKE", False),
+            unittest.mock.patch.object(server, "manager", None),
+        ):
+            r = self.client.post(
+                "/stt",
+                content=b"\x00\x00",
+                headers={"content-type": "audio/wav"},
+            )
+        self.assertEqual(r.status_code, 503)
+        self.assertEqual(r.json()["error"], "model manager unavailable")
+
+    def test_tts_raw_503_when_manager_none(self) -> None:
+        with (
+            unittest.mock.patch.object(server, "FAKE", False),
+            unittest.mock.patch.object(server, "manager", None),
+        ):
+            r = self.client.post("/tts/raw", json={"text": "hello"})
+        self.assertEqual(r.status_code, 503)
+        self.assertEqual(r.json()["error"], "model manager unavailable")
 
 
 if __name__ == "__main__":

@@ -7,8 +7,7 @@ uvicorn[standard]>=0.29.0
 # Numeric processing (PCM float32→int16 WAV conversion)
 numpy>=1.26.0
 
-# HTTP client used by fastapi.testclient in tests
-httpx>=0.27.0
+# Test-only deps (httpx for fastapi.testclient) are in requirements-dev.txt.
 
 # ---------------------------------------------------------------------------
 # Engine dependencies — installed SEPARATELY per engine, NOT listed here.
