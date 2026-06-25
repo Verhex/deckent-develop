@@ -136,17 +136,17 @@ async function handleInboundVoice(
   connector: import('./types.js').IMessageConnector,
   voiceAdapter: VoiceAdapter | null | undefined,
   sttEnabled: boolean,
-): Promise<{ msg: import('./types.js').IncomingMessage; voiceOrigin: boolean }> {
+): Promise<{ msg: import('./types.js').IncomingMessage; voiceOrigin: boolean; transcribeError: boolean }> {
   const raw = msg.raw as Record<string, unknown> | undefined;
-  if (!raw || typeof raw !== 'object') return { msg, voiceOrigin: false };
+  if (!raw || typeof raw !== 'object') return { msg, voiceOrigin: false, transcribeError: false };
   const voiceRaw = raw['voice'] as InboundVoiceRaw | undefined;
-  if (!voiceRaw || typeof voiceRaw.fileId !== 'string') return { msg, voiceOrigin: false };
-  if (!voiceAdapter || !sttEnabled) return { msg, voiceOrigin: false };
+  if (!voiceRaw || typeof voiceRaw.fileId !== 'string') return { msg, voiceOrigin: false, transcribeError: false };
+  if (!voiceAdapter || !sttEnabled) return { msg, voiceOrigin: false, transcribeError: false };
 
   const getFileBuffer = (connector as unknown as {
     getFileBuffer?: (fileId: string) => Promise<{ data: Buffer; mime: string; filename?: string }>;
   }).getFileBuffer;
-  if (typeof getFileBuffer !== 'function') return { msg, voiceOrigin: false };
+  if (typeof getFileBuffer !== 'function') return { msg, voiceOrigin: false, transcribeError: false };
 
   try {
     const { data, mime } = await getFileBuffer.call(connector, voiceRaw.fileId);
@@ -154,10 +154,12 @@ async function handleInboundVoice(
     return {
       msg: { ...msg, text: transcribed, raw: { ...raw, voiceOrigin: true } },
       voiceOrigin: true,
+      transcribeError: false,
     };
   } catch {
-    // Download or transcription failure must never crash the inbound poller
-    return { msg, voiceOrigin: false };
+    // Download or transcription failure must never crash the inbound poller.
+    // Return transcribeError=true so the callsite can notify the user honestly.
+    return { msg, voiceOrigin: false, transcribeError: true };
   }
 }
 
@@ -296,6 +298,15 @@ export interface ConnectorCommandsDeps extends ConnectorBootstrapDeps {
    * holds a single voiceAdapter per connector lifetime (Task 13 unification).
    */
   voiceAdapter?: VoiceAdapter | null;
+  /**
+   * Shared artifact store threaded from bot.ts (Finding 1 — production wiring fix).
+   * When provided, the inbound media gate + capability approve-path use THIS instance
+   * instead of creating an internal one. Ensures screenshot artifacts registered via
+   * makeChatResponder are resolvable by send_mail in the same bootstrap lifecycle.
+   * Default: undefined → internal createArtifactStore(root) (backward-compat for tests
+   * that construct bootstrap directly without a pre-built store).
+   */
+  artifacts?: ArtifactStore;
 }
 
 export interface ConnectorCommandsHandle {
@@ -333,8 +344,12 @@ export async function bootstrapConnectorCommands(
   // AND the capability context (Task 13: screenshot registers → send_mail resolves).
   // The same store is threaded into capCtx.artifacts on the approve-path below so an
   // inbound-registered photo is resolvable by send_mail's attachIds in the same session.
+  // When deps.artifacts is provided (production bot.ts path), use THAT instance so the
+  // responder (makeChatResponder) and the bootstrap resolver share ONE store — the key
+  // invariant for screenshot→mail-attach (Finding 1 fix). Fall back to a fresh internal
+  // store only for callers that don't inject one (backward-compat, tests).
   // Writes to <root>/.deckent/artifacts/ which is created on first use.
-  const artifactStore: ArtifactStore = createArtifactStore(root);
+  const artifactStore: ArtifactStore = deps.artifacts ?? createArtifactStore(root);
   // Voice adapter — single instance per connector (Task 13).
   // Shared between inbound STT path (Task 11) and the reply TTS path.
   // deps.voiceAdapter takes precedence (test seam / pre-constructed instance).
@@ -654,15 +669,22 @@ export async function bootstrapConnectorCommands(
         //   1. If raw.media → download + register artifact + prepend [attached]
         //   2. If raw.voice + voiceAdapter + stt → download + transcribe → replace text
         //      and set pendingVoiceOrigin[channelId]=true so onChat knows the origin.
+        //   3. If transcription fails → notify user honestly (Finding 3: voice.transcribe.error)
+        //      then route the original message (connector sees it as text, best-effort).
         // Both gates are best-effort: any failure leaves the original message.
         connector.onMessage((msg) => {
           void (async () => {
             // Gate 1: inbound media (Task 8)
             let processedMsg = await handleInboundMedia(msg, connector, artifactStore, lang).catch(() => msg);
             // Gate 2: inbound voice (Task 11)
-            const { msg: voiceMsg, voiceOrigin } = await handleInboundVoice(
+            const { msg: voiceMsg, voiceOrigin, transcribeError } = await handleInboundVoice(
               processedMsg, connector, voiceAdapter, sttEnabled,
-            ).catch(() => ({ msg: processedMsg, voiceOrigin: false }));
+            ).catch(() => ({ msg: processedMsg, voiceOrigin: false, transcribeError: false }));
+            if (transcribeError) {
+              // Honest degrade: tell the user their voice note couldn't be understood.
+              // Best-effort send — never crashes the poller if sendMessage throws.
+              await send(msg.channelId, getMessage('voice.transcribe.error', lang)).catch(() => undefined);
+            }
             if (voiceOrigin) {
               // Mark this channel's next onChat turn as voice-origin for TTS reply decision.
               pendingVoiceOrigin.set(voiceMsg.channelId, true);

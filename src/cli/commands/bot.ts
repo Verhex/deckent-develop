@@ -13,6 +13,7 @@
 
 import type { Command } from 'commander';
 import { loadConfig } from '../../core/config.js';
+import { loadDeckSecrets } from '../../core/deck-file.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
 import {
@@ -20,6 +21,8 @@ import {
   type ConnectorCommandsHandle,
 } from '../../connectors/connector-bootstrap.js';
 import { makeChatResponder } from '../../connectors/chat-bridge.js';
+import { createArtifactStore } from '../../connectors/capabilities/artifacts.js';
+import { createVoiceAdapter } from '../../connectors/voice/types.js';
 import {
   writeBotPid, clearBotPid, readBotPid, stopBot, startBotDaemon,
 } from '../../connectors/bot-daemon.js';
@@ -55,6 +58,24 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
       // the responder's output hook reaches the right active Telegram edit closure.
       const partialSinks = new Map<string, (t: string) => void>();
 
+      // Finding 1 fix — single shared artifact store per bot.ts lifecycle.
+      // Constructed once here and passed to BOTH makeChatResponder (artifacts dep)
+      // AND bootstrapConnectorCommands (artifacts dep) so screenshot artifacts
+      // registered during a chat turn are resolvable by send_mail on the approve-path.
+      // Gated on bot_capabilities being enabled (default-off: undefined store when off).
+      const artifactStore = config.bot_capabilities?.enabled
+        ? createArtifactStore(r)
+        : undefined;
+
+      // Finding 2 fix — single shared voice adapter per bot.ts lifecycle.
+      // createVoiceAdapter returns null when disabled/misconfigured — default-off is
+      // byte-identical. Deck secrets provide OPENAI_API_KEY for the openai provider.
+      const deckSecrets = loadDeckSecrets(r);
+      const voiceAdapter = createVoiceAdapter(
+        config.bot_capabilities?.voice ?? { enabled: false },
+        deckSecrets,
+      );
+
       // Build ONE warm responder shared by both the streaming path (onChatStreaming)
       // and the non-streaming fallback (chat), so the agentic persistent child is
       // never duplicated. The onPartial hook dispatches into the per-channel sink
@@ -69,6 +90,10 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
         lang,
         onPartial: (sid, txt) => partialSinks.get(sid)?.(txt),
         capConfig: config.bot_capabilities,
+        // Finding 1: thread the shared artifact store into the responder so
+        // screenshot artifacts are registered into the SAME instance that
+        // bootstrapConnectorCommands uses for send_mail resolution.
+        ...(artifactStore !== undefined ? { artifacts: artifactStore } : {}),
         // capConnector is intentionally omitted here — the per-turn connector is
         // threaded live via the 3rd/4th arg of ChatResponder / ChatStreamResponder
         // (Slice 1.1). bootstrapConnectorCommands passes connector as mediaConnector
@@ -87,6 +112,12 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
           });
         },
         botCapabilities: config.bot_capabilities,
+        // Finding 1: pass the shared store so bootstrap uses the SAME instance
+        // (not a fresh internal one) — send_mail can resolve screenshot artifacts.
+        ...(artifactStore !== undefined ? { artifacts: artifactStore } : {}),
+        // Finding 2: pass the shared voice adapter — bootstrap's handleInboundVoice
+        // and tryReplyWithVoice now use this instance (previously always null).
+        voiceAdapter,
       });
     });
   const handle = await bootstrap(root, config.notify_connectors);
