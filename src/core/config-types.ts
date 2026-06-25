@@ -74,6 +74,15 @@ export interface CrossVerifyConfig {
   high_stakes_only?: boolean;
   /** Provider priority order for verifier selection (default: ['codex','gemini','claude']). */
   verifier_priority?: string[];
+  /**
+   * Enforce a REFUTED verdict as a real block (default false → advisory-only).
+   * When true, a high-stakes DONE/GO_WITH_TECH_DEBT task that the adversarial
+   * verifier REFUTES is downgraded to NO_GO by the evaluation layer, triggering
+   * the standard FIX path (Task 323-004 / A18). Default-off preserves the
+   * byte-for-byte advisory behavior (ADR-070): the verdict is still persisted +
+   * surfaced as an event, just never enforced.
+   */
+  enforce_refuted?: boolean;
 }
 
 // ─── Worker Comms Config ─────────────────────────────────────────────

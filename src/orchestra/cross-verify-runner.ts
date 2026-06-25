@@ -65,6 +65,14 @@ export interface CrossVerifyRunResult {
   advisory?: CrossVerifyAdvisory;
   /** Convenience flag: `advisory?.verdict === 'refuted'`. Always false when skipped. */
   refuted: boolean;
+  /**
+   * Enforcement signal (Task 323-004 / A18): true only when `refuted` AND
+   * `config.cross_verify.enforce_refuted === true`. The runner NEVER mutates the
+   * task's evaluation (ADR-070) — it only SURFACES this flag so the evaluation
+   * layer can downgrade the task to NO_GO and trigger FIX. Always false when
+   * advisory-only (enforce_refuted off, the default) or skipped.
+   */
+  blocked: boolean;
 }
 
 /** Input passed to a {@link SpawnVerifierFn}. */
@@ -198,6 +206,7 @@ export async function runCrossVerify(
     ran: false,
     skippedReason: reason,
     refuted: false,
+    blocked: false,
   });
 
   // Guard 1 — config-gated default-OFF.
@@ -253,6 +262,11 @@ export async function runCrossVerify(
     }
 
     const verdict = parseRefuteVerdict(output);
+    const refuted = verdict.verdict === 'refuted';
+    // Flag-gated enforcement (default-off): a REFUTED verdict only becomes a
+    // block signal when cross_verify.enforce_refuted is explicitly true. The
+    // downgrade itself is performed by the caller (ADR-070), never here.
+    const blocked = refuted && xv.enforce_refuted === true;
     const advisory: CrossVerifyAdvisory = {
       verifier: verifierProvider,
       verdict: verdict.verdict,
@@ -262,9 +276,9 @@ export async function runCrossVerify(
 
     debugLog(
       'runCrossVerify:done',
-      `task=${task.id} verifier=${verifierProvider} verdict=${verdict.verdict}`,
+      `task=${task.id} verifier=${verifierProvider} verdict=${verdict.verdict} blocked=${blocked}`,
     );
-    return { ran: true, advisory, refuted: verdict.verdict === 'refuted' };
+    return { ran: true, advisory, refuted, blocked };
   } catch (e) {
     // Defensive: any unexpected fault degrades to a skip — never throws.
     debugLog('runCrossVerify:fault', e);

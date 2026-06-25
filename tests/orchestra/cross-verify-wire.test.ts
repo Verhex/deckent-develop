@@ -188,6 +188,8 @@ describe('runCrossVerify — dispatch + advisory write', () => {
     );
     expect(res.ran).toBe(true);
     expect(res.refuted).toBe(true);
+    // Default (enforce_refuted unset) → advisory-only: blocked is false (323-004).
+    expect(res.blocked).toBe(false);
     expect(res.advisory?.verdict).toBe('refuted');
     expect(res.advisory?.reason).toMatch(/signature check is missing/);
     // No downgrade: the runner never touches selfAssessment / evaluation.
@@ -207,6 +209,51 @@ describe('runCrossVerify — dispatch + advisory write', () => {
     expect(res.ran).toBe(true);
     expect(res.refuted).toBe(false);
     expect(res.advisory?.verdict).toBe('unclear');
+  });
+});
+
+describe('runCrossVerify — REFUTED enforcement (323-004 / A18)', () => {
+  it('enforce_refuted=true + REFUTED → blocked=true (enforcement signal fires)', async () => {
+    writeResultFile('276-001', makeResult());
+    const { fn } = makeSpawnSpy('VERDICT: REFUTED signature check is missing on the refresh path');
+    const res = await runCrossVerify(
+      root, makeTask(), makeResult(), TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: true }),
+      { availableProviders: TWO_PROVIDERS, spawnVerifier: fn },
+    );
+    expect(res.ran).toBe(true);
+    expect(res.refuted).toBe(true);
+    expect(res.blocked).toBe(true);
+    // ADR-070: even when enforcing, the runner never mutates the on-disk verdict —
+    // it only SURFACES `blocked`; the evaluation layer owns the NO_GO downgrade.
+    const persisted = readResultFile('276-001');
+    expect(persisted.selfAssessment).toBe('DONE');
+    expect(persisted.crossVerify?.verdict).toBe('refuted');
+  });
+
+  it('enforce_refuted=true + CONFIRMED → blocked=false (only REFUTED blocks)', async () => {
+    writeResultFile('276-001', makeResult());
+    const { fn } = makeSpawnSpy('VERDICT: CONFIRMED jwt checks present');
+    const res = await runCrossVerify(
+      root, makeTask(), makeResult(), TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: true }),
+      { availableProviders: TWO_PROVIDERS, spawnVerifier: fn },
+    );
+    expect(res.ran).toBe(true);
+    expect(res.refuted).toBe(false);
+    expect(res.blocked).toBe(false);
+  });
+
+  it('enforce_refuted=false (explicit) + REFUTED → blocked=false (advisory-only)', async () => {
+    writeResultFile('276-001', makeResult());
+    const { fn } = makeSpawnSpy('VERDICT: REFUTED missing check on the refresh path');
+    const res = await runCrossVerify(
+      root, makeTask(), makeResult(), TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: false }),
+      { availableProviders: TWO_PROVIDERS, spawnVerifier: fn },
+    );
+    expect(res.refuted).toBe(true);
+    expect(res.blocked).toBe(false);
   });
 });
 

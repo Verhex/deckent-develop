@@ -1483,6 +1483,54 @@ export async function runEvaluatePhase(
           }
         }
 
+        // ─── Cross-Verify (Sprint 276 advisory + Task 323-004/A18 enforcement) ──
+        // Runs BEFORE the evaluation is committed (handleEvaluation / evaluations.set)
+        // so flag-gated enforcement can downgrade a REFUTED DONE/GO_WITH_TECH_DEBT to
+        // NO_GO and let the STANDARD NO_GO path (debt + FIX routing + notify) act on
+        // it — instead of trying to reverse a committed DONE after the fact. A
+        // high-stakes pass is re-verified by a DIFFERENT provider whose job is to
+        // REFUTE; the verdict is persisted to .result as a `crossVerify` advisory and
+        // surfaced as an event. Advisory-only by default (enforce_refuted off →
+        // ADR-070: evaluation unchanged, byte-for-byte legacy behavior); the runner
+        // only surfaces `blocked`, this evaluation layer owns the downgrade. All
+        // best-effort: any fault is debugLog'd and never drops the EVALUATE loop.
+        if (
+          resolvedConfig?.cross_verify?.enabled === true &&
+          (evaluation === TaskEvaluation.DONE || evaluation === TaskEvaluation.GO_WITH_TECH_DEBT)
+        ) {
+          try {
+            const xvResult = await runCrossVerify(projectRoot, task, result, evaluation, resolvedConfig);
+            if (xvResult.ran && xvResult.refuted) {
+              try {
+                const sidXv = getCurrentSprintId(projectRoot) ?? sprint.id;
+                writeEvent(
+                  projectRoot, sidXv, 'brain', 'auditor',
+                  xvResult.blocked
+                    ? 'BRAIN→AUDITOR:CROSS_VERIFY_ENFORCED_NO_GO'
+                    : 'BRAIN→AUDITOR:CROSS_VERIFY_REFUTED',
+                  {
+                    taskId: task.id,
+                    verifier: xvResult.advisory?.verifier,
+                    reason: xvResult.advisory?.reason,
+                    evaluation: toAuditDecision(evaluation),
+                    enforced: xvResult.blocked,
+                    timestamp: new Date().toISOString(),
+                  },
+                );
+              } catch (e) { debugLog('runEvaluatePhase:crossVerify-event', e); }
+            }
+            // Task 323-004 / A18 — flag-gated enforcement: a REFUTED high-stakes
+            // result becomes NO_GO so the standard FIX path is triggered. Default-off
+            // (enforce_refuted unset → blocked always false) keeps advisory behavior.
+            if (xvResult.blocked) {
+              debugLog('runEvaluatePhase:crossVerify-enforce', `task=${task.id} REFUTED→NO_GO (enforce_refuted)`);
+              evaluation = TaskEvaluation.NO_GO;
+              const enfNote = `[cross-verify ENFORCED NO_GO] verifier=${xvResult.advisory?.verifier ?? '?'} refuted: ${xvResult.advisory?.reason ?? ''}`.trim();
+              result.notes = result.notes ? `${result.notes}\n${enfNote}` : enfNote;
+            }
+          } catch (e) { debugLog('runEvaluatePhase:crossVerify', e); }
+        }
+
         debugLog('runEvaluatePhase:task', `task=${task.id} selfAssessment=${result.selfAssessment} evaluation=${evaluation} testsPassed=${result.testsPassed}`);
         handleEvaluation(projectRoot, task, evaluation, result);
         evaluations.set(task.id, evaluation);
@@ -1565,38 +1613,6 @@ export async function runEvaluatePhase(
             resolveDebt(projectRoot, `debt-${task.fixForTaskId}`, sprint.id);
           }
           resolveDebt(projectRoot, `debt-${task.id}`, sprint.id);
-        }
-
-        // ─── Cross-Verify Advisory Wire (Sprint 276 — XVER-1 Task 276-007) ──
-        // When config.cross_verify.enabled === true, a high-stakes DONE/
-        // GO_WITH_TECH_DEBT task can be re-verified by a DIFFERENT provider whose
-        // job is to REFUTE the result. The verdict is written to the task's
-        // .result as a `crossVerify` advisory and (when REFUTED) emitted as a
-        // warning event — it NEVER downgrades the evaluation (ADR-070). All
-        // best-effort: any fault is debugLog'd and cannot drop the EVALUATE loop.
-        if (
-          resolvedConfig?.cross_verify?.enabled === true &&
-          (evaluation === TaskEvaluation.DONE || evaluation === TaskEvaluation.GO_WITH_TECH_DEBT)
-        ) {
-          try {
-            const xvResult = await runCrossVerify(projectRoot, task, result, evaluation, resolvedConfig);
-            if (xvResult.ran && xvResult.refuted) {
-              try {
-                const sidXv = getCurrentSprintId(projectRoot) ?? sprint.id;
-                writeEvent(
-                  projectRoot, sidXv, 'brain', 'auditor',
-                  'BRAIN→AUDITOR:CROSS_VERIFY_REFUTED',
-                  {
-                    taskId: task.id,
-                    verifier: xvResult.advisory?.verifier,
-                    reason: xvResult.advisory?.reason,
-                    evaluation: toAuditDecision(evaluation),
-                    timestamp: new Date().toISOString(),
-                  },
-                );
-              } catch (e) { debugLog('runEvaluatePhase:crossVerify-event', e); }
-            }
-          } catch (e) { debugLog('runEvaluatePhase:crossVerify', e); }
         }
       } else {
         // ─── Explicit DEFERRED skip (Sprint 192 — Task 192-009 — W-INTEGRITY I-3) ──

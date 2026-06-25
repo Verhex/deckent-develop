@@ -858,6 +858,9 @@ export function validateConfig(config: DeckentConfig): string[] {
     if (cv.high_stakes_only !== undefined && typeof cv.high_stakes_only !== 'boolean') {
       errors.push('cross_verify.high_stakes_only must be a boolean');
     }
+    if (cv.enforce_refuted !== undefined && typeof cv.enforce_refuted !== 'boolean') {
+      errors.push('cross_verify.enforce_refuted must be a boolean');
+    }
     if (cv.verifier_priority !== undefined) {
       if (!Array.isArray(cv.verifier_priority)) {
         errors.push('cross_verify.verifier_priority must be an array of strings');
