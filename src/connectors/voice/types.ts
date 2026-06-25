@@ -34,6 +34,13 @@ export interface VoiceConfig {
     tts_url?: string;
     /** Default voice name forwarded to the TTS endpoint when none is specified per-call. */
     tts_voice?: string;
+    /**
+     * Explicit health-check URL (GET → 2xx = healthy).
+     * When absent, deckent derives it from the stt_url (or tts_url) origin + "/health".
+     * Example: if stt_url="http://127.0.0.1:8001/stt" the derived URL is
+     *          "http://127.0.0.1:8001/health".
+     */
+    health_url?: string;
   };
 }
 

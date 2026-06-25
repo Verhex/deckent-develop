@@ -23,6 +23,7 @@ import {
 import { makeChatResponder } from '../../connectors/chat-bridge.js';
 import { createArtifactStore } from '../../connectors/capabilities/artifacts.js';
 import { createVoiceAdapter } from '../../connectors/voice/types.js';
+import { checkVoiceHealth } from '../../connectors/voice/health.js';
 import {
   writeBotPid, clearBotPid, readBotPid, stopBot, startBotDaemon,
 } from '../../connectors/bot-daemon.js';
@@ -125,6 +126,24 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
       });
     });
   const handle = await bootstrap(root, config.notify_connectors);
+
+  // Voice health-check: when voice is explicitly enabled, verify the backend is
+  // reachable on start-up. Non-fatal — the bot continues regardless (Pillar-1
+  // runtime degrade covers transcribe/synthesize failures). Default-off: deck
+  // secrets are NOT read unless voice is actually enabled.
+  if (config.bot_capabilities?.voice?.enabled) {
+    const deck = loadDeckSecrets(root);
+    const health = await checkVoiceHealth(config.bot_capabilities.voice, deck);
+    if (!health.ok) {
+      print(
+        getMessage('voice.wrapper_unreachable', lang, {
+          provider: health.provider,
+          url: health.url ?? '',
+          detail: health.detail ?? '',
+        }),
+      );
+    }
+  }
 
   if (handle.active.length === 0) {
     print(getMessage('bot.listen_none', lang));

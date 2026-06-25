@@ -1893,6 +1893,12 @@ const MESSAGES: MessageMap = {
     en: '[voice: synthesis failed — sending reply as text]',
     tr: '[ses: sentez başarısız — yanıt metin olarak gönderildi]',
   },
+
+  // ─── Voice health-check (Task 5 — bot-start honest-warn) ─────────────────
+  'voice.wrapper_unreachable': {
+    en: '⚠️ Voice is configured (provider={provider}) but the backend is unreachable at {url} — voice replies will fall back to text. {detail}',
+    tr: '⚠️ Ses yapılandırıldı (sağlayıcı={provider}) ancak arka uç {url} adresine ulaşılamıyor — ses yanıtları metin olarak gönderilecek. {detail}',
+  },
 };
 
 /**
