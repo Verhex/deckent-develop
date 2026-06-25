@@ -124,3 +124,24 @@ heuristic refined to also check DYNAMIC `await import()` + bootstrap SUPPORTED l
 (Telegram bot + voice) — recorded only, no edits (conflict-avoidance + WIRE-vs-KES is Alperen's).
 Heuristic note: dynamic `await import()` + bootstrap allow-lists must be checked before calling a
 connector/plugin "dead" (static grep alone gives false-positives for registry-loaded modules).
+
+---
+
+## Iteration 7 — enforcement-vein design draft → `DESIGN-ENFORCEMENT-VEIN.md`
+
+Wrote the deferred enforcement-vein design (B1/B6/A9/A14), grounded in current code (file:line),
+flag-gated + default-off + faithful test plans. **Corrected a stale triage assumption + confirmed
+two real gaps:**
+- **B1 (RBAC):** the triage assumed the hard-deny path was *unreachable* — it is NOT. The deny path
+  EXISTS (`authority-matrix.ts:351-353`), the `enforce_rbac` flag is DECLARED (`config-types.ts:836`)
+  and THREADED (`sprint-runtime.ts:30`, `autonomous/runtime-loop.ts`). The real gap is
+  `agents/worker.ts:602-620 checkWorkerAuthority` returning `true` on both branches (Layer-2 soft)
+  + deckent-dev never enabling the flag. Design: honor the flag in worker-side + dogfood-enable.
+- **B6 (cost-gate):** `daily_max_usd`/`monthly_max_usd` are validated + settable but **only
+  `auto_confirm_below_usd` (per-sprint estimate) is enforced** (`cost-gate.ts:119`); no cumulative
+  rolling-spend gate. Design: warn-only `readSpendWindow` vs limits, flag-gated.
+- **A14:** `applyTechDebtDowngrade` (`result-evaluator.ts:1285`) confirmed **ZERO callers**
+  (computed-not-enforced). Sibling B-REGGATE half already fixed (`51105ae0`). Design: wire (flag-
+  gated) OR KES if its contract is stale.
+- **Rollout order** (value/risk): A14 wire → B6 warn-only → B1 worker hard-deny; all default-off,
+  dogfood-enabled in deckent-dev's gitignored config. Implementation **attended-defer**.
