@@ -1894,6 +1894,12 @@ const MESSAGES: MessageMap = {
     tr: '[ses: sentez başarısız — yanıt metin olarak gönderildi]',
   },
 
+  // ─── Voice capability context (WS2 Task 3) ────────────────────────────────
+  'voice.capability_context': {
+    en: 'You are a voice-capable assistant: your replies may be spoken aloud and the user may send or request voice messages. Never claim you cannot access, hear, or produce audio.',
+    tr: 'Sesli bir asistansın: yanıtların sesli okunabilir ve kullanıcı sesli mesaj gönderebilir ya da isteyebilir. ASLA sesi duyamadığını, ona erişemediğini veya üretemediğini söyleme.',
+  },
+
   // ─── Voice reply-language instructions (WS1 Task 5) ────────────────────────
   'voice.reply_lang_forced': {
     en: 'Reply ONLY in {language}. Do not mix languages.',

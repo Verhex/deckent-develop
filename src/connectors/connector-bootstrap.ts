@@ -593,14 +593,15 @@ export async function bootstrapConnectorCommands(
                     if (voiceCfg) {
                       const replyLang = resolveReplyLanguage(voiceCfg, detectedLang);
                       replyLangTag = replyLang.tag;
-                      const instruction =
+                      const capabilityCtx = getMessage('voice.capability_context', lang);
+                      const replyLangInstruction =
                         replyLang.mode === 'forced' && replyLang.tag
                           ? getMessage('voice.reply_lang_forced', lang, { language: replyLang.tag })
                           : getMessage('voice.reply_lang_mirror', lang);
-                      // Prepend as a system-level directive line before the user's message.
-                      // A blank line separates the instruction from the turn text so the LLM
-                      // treats the two as distinct (instruction + user request).
-                      turnText = `${instruction}\n\n${text}`;
+                      // Prepend as a system-level preamble block before the user's message.
+                      // Order: voice-awareness context first, then the language directive, then user text.
+                      // A blank line separates each segment so the LLM treats them as distinct.
+                      turnText = `${capabilityCtx}\n${replyLangInstruction}\n\n${text}`;
                     }
 
                     // Authorized non-command. The router already enforced the

@@ -699,6 +699,115 @@ describe('voice wiring: task 5 — reply-language instruction injection + TTS la
   });
 });
 
+// ─── WS2 Task 3: LLM voice-awareness instruction ─────────────────────────────
+describe('voice wiring: ws2 task 3 — LLM voice-awareness context', () => {
+  /**
+   * When voiceCfg is present, the preamble block prepended to turnText must contain:
+   *  (a) the voice-capability context marker ("voice-capable assistant" / "Sesli bir asistan")
+   *  (b) the reply-language instruction (WS1, already tested separately)
+   *  Both compose into ONE preamble block, no duplication, capability first.
+   *
+   * When voiceCfg is absent (no botCapabilities), turnText === original text (default-off,
+   * byte-identical — neither instruction appears).
+   */
+
+  it('voice-enabled turn → turnText contains voice-capability instruction marker', async () => {
+    const root = makeTmpRoot();
+    const audioBytes = Buffer.from([0x4f, 0x67, 0x67, 0x53]);
+    const fake = fakeVoiceConnector(audioBytes, 'audio/ogg');
+    const voice = fakeVoiceAdapter('take a screenshot');
+
+    const chatTexts: string[] = [];
+    const chat = vi.fn(async (_channelId: string, text: string) => {
+      chatTexts.push(text);
+      return 'Done.';
+    });
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat: chat as unknown as import('../../src/connectors/chat-bridge.js').ChatResponder,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'off' } },
+    });
+
+    fake._emit(incomingVoice('555'));
+
+    await vi.waitFor(() => expect(chatTexts.length).toBeGreaterThan(0));
+
+    // (a) voice-capability context must be in the preamble
+    expect(chatTexts[0]).toMatch(/voice-capable assistant|Sesli bir asistan/i);
+    // (b) user text still present
+    expect(chatTexts[0]).toContain('take a screenshot');
+    // (c) reply-language instruction also present (WS1 composes with WS2)
+    expect(chatTexts[0]).toMatch(/same language|kullandığı dilde|Reply ONLY|SADECE/i);
+  });
+
+  it('voice-enabled text-origin turn → turnText contains both preamble instructions', async () => {
+    // Text-origin with voiceCfg present (e.g. user typed "sesli anlat") should
+    // also get the preamble (voiceCfg gate, not voice-origin gate).
+    const root = makeTmpRoot();
+    const fake = fakeVoiceConnector(Buffer.from([]), 'audio/ogg');
+    const voice = fakeVoiceAdapter();
+
+    const chatTexts: string[] = [];
+    const chat = vi.fn(async (_channelId: string, text: string) => {
+      chatTexts.push(text);
+      return 'ok';
+    });
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat: chat as unknown as import('../../src/connectors/chat-bridge.js').ChatResponder,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: false, tts: 'off' } },
+    });
+
+    fake._emit(incomingText('555', 'tell me something'));
+
+    await vi.waitFor(() => expect(chatTexts.length).toBeGreaterThan(0));
+
+    // Both preamble instructions present
+    expect(chatTexts[0]).toMatch(/voice-capable assistant|Sesli bir asistan/i);
+    expect(chatTexts[0]).toMatch(/same language|kullandığı dilde|Reply ONLY|SADECE/i);
+    // User text still present
+    expect(chatTexts[0]).toContain('tell me something');
+    // Capability context appears BEFORE the reply-language instruction (ordered preamble)
+    const capIdx = chatTexts[0]!.search(/voice-capable assistant|Sesli bir asistan/i);
+    const langIdx = chatTexts[0]!.search(/same language|kullandığı dilde|Reply ONLY|SADECE/i);
+    expect(capIdx).toBeLessThan(langIdx);
+  });
+
+  it('default-off: no voiceCfg → turnText === original text, byte-identical', async () => {
+    const root = makeTmpRoot();
+    const fake = fakeVoiceConnector(Buffer.from([]), 'audio/ogg');
+
+    const chatTexts: string[] = [];
+    const chat = vi.fn(async (_channelId: string, text: string) => {
+      chatTexts.push(text);
+      return 'ok';
+    });
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat: chat as unknown as import('../../src/connectors/chat-bridge.js').ChatResponder,
+      // no voiceAdapter, no botCapabilities → voice OFF
+    });
+
+    fake._emit(incomingText('555', 'hello world'));
+
+    await vi.waitFor(() => expect(chatTexts.length).toBeGreaterThan(0));
+
+    // Default-off: turnText is byte-identical to original text
+    expect(chatTexts[0]).toBe('hello world');
+    // Neither instruction present
+    expect(chatTexts[0]).not.toMatch(/voice-capable assistant|Sesli bir asistan/i);
+    expect(chatTexts[0]).not.toMatch(/same language|kullandığı dilde|Reply ONLY|SADECE/i);
+  });
+});
+
 // ─── WS2 Task 2: per-turn modality override ───────────────────────────────────
 describe('voice wiring: ws2 task 2 — per-turn modality override', () => {
   /**
