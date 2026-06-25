@@ -321,7 +321,121 @@ No call ever crashes the bot process. All errors are surfaced honestly.
 
 ---
 
-## 7. Cross-links
+## 8. Modality control — per-message override
+
+The `tts` config field sets the **default output modality** for every reply (see §4). A user can
+override this default **per message** by including a natural-language phrase in their message.
+No config change is required; the override applies to that single reply only.
+
+### How it works
+
+`resolveReplyModality(text, { ttsMode, voiceOrigin })` in
+`src/connectors/voice/modality.ts` scans the inbound message text (case-insensitive,
+Turkish-locale lowercase) against two phrase tables and returns
+`{ modality: 'voice' | 'text', overridden: boolean }`.
+
+- **Override takes precedence in BOTH directions:** a voice-request phrase forces a voice reply
+  even when `tts` is `"off"`; a text-request phrase forces a text reply even when `tts` is
+  `"always"`.
+- **Tie-break:** when a message contains both a voice phrase and a text phrase, the phrase that
+  appears **last** in the message wins (later = more recent intent).
+- **Matching:** all patterns use the Unicode `u` flag with `(?<!\p{L})…(?!\p{L})` boundaries
+  instead of `\b`, ensuring Turkish characters (ı, ğ, ü, ş, ö, ç, …) are handled correctly.
+  For example, bare `yaz` does **not** fire inside `yazıyorum` or `yazılım`.
+- **No config, no restart:** the override is evaluated live, per turn.
+
+### Voice-request phrases (force voice reply)
+
+Exact patterns from `VOICE_PATTERNS` in `src/connectors/voice/modality.ts`:
+
+| Pattern | Language |
+|---------|----------|
+| `sesli cevap` | TR |
+| `sesli yanıt` | TR |
+| `sesli anlat` | TR |
+| `sesli söyle` | TR |
+| `ses olarak` | TR |
+| `bana oku` | TR |
+| `sesli olarak` | TR |
+| `reply by voice` | EN |
+| `in voice` | EN |
+| `read it aloud` | EN |
+| `say it aloud` | EN |
+| `say it` | EN |
+
+### Text-request phrases (force text reply)
+
+Exact patterns from `TEXT_PATTERNS` in `src/connectors/voice/modality.ts`:
+
+| Pattern | Language |
+|---------|----------|
+| `bana yaz` | TR |
+| `metin olarak` | TR |
+| `yazılı` | TR |
+| `yazarak` | TR |
+| `yazıyla` | TR |
+| `yaz` (standalone) | TR |
+| `reply in text` | EN |
+| `in text` | EN |
+| `as text` | EN |
+| `write it` | EN |
+
+### Examples
+
+**Scenario 1 — `tts: "always"`, user wants text this one time:**
+```
+User (typed):  "Şirketin gelir tablosunu özetle, bana yaz lütfen."
+→ resolveReplyModality fires TEXT_PATTERN "bana yaz" → overridden: true
+→ Bot replies in TEXT (despite tts:"always")
+```
+
+**Scenario 2 — `tts: "off"`, user wants voice this one time:**
+```
+User (typed):  "Bugünkü hava durumunu sesli cevap ver."
+→ resolveReplyModality fires VOICE_PATTERN "sesli cevap" → overridden: true
+→ Bot replies by VOICE (despite tts:"off")
+```
+
+**Scenario 3 — `tts: "reply-in-kind"`, voice message with text override:**
+```
+User (voice):  "...bunu bana yaz." (transcribed from audio)
+→ isVoiceOrigin = true; default would be 'voice'
+→ resolveReplyModality fires TEXT_PATTERN "bana yaz" → overridden: true
+→ Bot replies in TEXT
+```
+
+**Scenario 4 — tie-break (both phrases present, last wins):**
+```
+User (typed):  "Sesli anlat... aslında hayır, yazarak ver."
+→ "sesli anlat" at index ~0; "yazarak" at index ~25 (last) → TEXT wins
+→ Bot replies in TEXT
+```
+
+---
+
+## 9. Voice-awareness — the assistant knows it can speak and hear
+
+When `voice.enabled` is `true`, every agentic turn receives a **voice-capability context block**
+prepended to the user's message (source: `src/connectors/connector-bootstrap.ts` line ~596,
+message key `voice.capability_context`):
+
+> **English:** "You are a voice-capable assistant: your replies may be spoken aloud and the user
+> may send or request voice messages. Never claim you cannot access, hear, or produce audio."
+
+> **Turkish:** "Sesli bir asistansın: yanıtların sesli okunabilir ve kullanıcı sesli mesaj
+> gönderebilir ya da isteyebilir. ASLA sesi duyamadığını, ona erişemediğini veya üretemediğini söyleme."
+
+This context is injected **before** the language directive and the user's actual text, so the LLM
+always has the correct framing for the turn. The bot will never respond with phrases like
+"I can't access audio" or "I'm not able to hear you" — it correctly handles requests such as
+"bana sesli anlat", "say it aloud", and "reply by voice".
+
+**Default-off contract:** when `voice.enabled` is absent or `false`, this injection does not
+occur; the LLM receives no voice context and behavior is byte-identical to a non-voice bot.
+
+---
+
+## 10. Cross-links
 
 - **Reference wrapper + full contract doc:** [`examples/voice-wrapper/README.md`](../examples/voice-wrapper/README.md)
 - **Design spec:** [`docs/superpowers/specs/2026-06-25-voice-product-feature-design.md`](superpowers/specs/2026-06-25-voice-product-feature-design.md)
