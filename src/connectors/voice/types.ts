@@ -19,6 +19,17 @@ export interface VoiceConfig {
   enabled?: boolean;
   /** Enable speech-to-text transcription path (default: false). */
   stt?: boolean;
+  /**
+   * Reply language preference (BCP-47 tag or 'auto').
+   *
+   *  - Concrete tag (e.g. 'tr', 'en-US') — always reply in this language regardless of
+   *    the detected turn language. This is the "TR sabit" ("TR fixed") use-case.
+   *  - 'auto' (or absent)               — fall back to the STT-detected turn language
+   *    when available, otherwise let the model mirror the user's input language.
+   *
+   * Default when absent: 'auto'.
+   */
+  language?: 'auto' | string;
   /** Text-to-speech output policy.
    *  'off'          — never synthesize (default).
    *  'always'       — always synthesize replies.
