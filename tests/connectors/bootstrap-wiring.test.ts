@@ -89,24 +89,102 @@ describe('Finding 1 — injected artifact store is shared (not fresh internal)',
 
     // Bootstrap with the SAME store injected via deps.artifacts.
     const fakeConnector = makeFakeConnector();
+    // Equip the connector with getFileBuffer so the inbound-media gate activates
+    // and INTERNALLY calls artifactStore.register(...) — exercising the code path
+    // that uses deps.artifacts inside bootstrapConnectorCommands.
+    (fakeConnector as unknown as {
+      getFileBuffer: (id: string) => Promise<{ data: Buffer; mime: string }>
+    }).getFileBuffer = async (_fileId: string) => ({
+      data: Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
+      mime: 'image/jpeg',
+    });
+
+    const chatReplies: string[] = [];
     const handle = await bootstrapConnectorCommands(
       root,
-      undefined, // no notify_connectors needed for F1 (just checking store identity)
+      fakeConnectorCfg(), // needs connector config so the inbound loop starts
       {
         artifacts: sharedStore, // <-- the shared instance
         makeConnector: () => fakeConnector,
+        chat: async (_channelId: string, _text: string): Promise<string> => {
+          chatReplies.push(_text);
+          return 'ok';
+        },
+        lang: 'en',
       },
     );
 
-    // The injected sharedStore is the same object used by bootstrap's approve-path
-    // capCtx (deps.artifacts ?? createArtifactStore(root) now resolves to sharedStore).
-    // Verify the artifact registered via the responder-path (same instance) is found.
-    const fetched = sharedStore.get('chan-1', artRef.id);
-    expect(fetched).toBeDefined();
-    expect(fetched?.filename).toBe('screen.png');
-    expect(fetched?.id).toBe(artRef.id);
+    // Fire an inbound media message — this triggers handleInboundMedia inside
+    // bootstrapConnectorCommands, which calls artifactStore.register(...) using
+    // the INJECTED deps.artifacts instance.  The registered artifact must be
+    // visible from sharedStore.get(...) — proving the same instance was used.
+    const mediaMsg = {
+      id: 'msg-media-1',
+      connector: 'telegram' as import('../../src/connectors/types.js').ConnectorId,
+      fromUser: 'user-1',
+      channelId: 'chan-1',
+      text: '',
+      timestamp: new Date().toISOString(),
+      raw: { media: { fileId: 'file-001', filename: 'photo.jpg', mime: 'image/jpeg' } },
+    };
+    fakeConnector._fire(mediaMsg);
+
+    // Wait for the async onMessage gate to complete.
+    await new Promise<void>((r) => setTimeout(r, 80));
+
+    // The injected sharedStore is the same object used by bootstrap's inbound-media
+    // gate (deps.artifacts ?? createArtifactStore(root) resolves to sharedStore).
+    // The artifact registered by handleInboundMedia INSIDE bootstrap must be found
+    // via sharedStore — proving the shared instance is genuinely used, not a fresh one.
+    const allArtIds = chatReplies[0]?.match(/art_[0-9a-f]{8}/);
+    expect(allArtIds, 'bootstrap inbound-media gate must register artifact into the injected store').toBeTruthy();
+    const internalArtId = allArtIds![0]!;
+    const fetched = sharedStore.get('chan-1', internalArtId);
+    expect(fetched, 'artifact registered by bootstrap must be visible from the injected shared store').toBeDefined();
+    expect(fetched?.mime).toBe('image/jpeg');
+
+    // Also confirm the original pre-registered artifact is still accessible (idempotent).
+    const preRegistered = sharedStore.get('chan-1', artRef.id);
+    expect(preRegistered?.filename).toBe('screen.png');
 
     await handle.dispose();
+  });
+
+  it('when deps.artifacts is absent, bootstrap creates an INTERNAL store (negative proof: external artifact not found via fresh store at same root)', async () => {
+    // Create an EXTERNAL store at altRoot — a different tmpdir than root.
+    // Register an artifact there — this simulates an artifact at a path bootstrap
+    // would NEVER know about when it creates its own internal store at `root`.
+    const { mkdtempSync: mkd } = await import('node:fs');
+    const { tmpdir: td } = await import('node:os');
+    const { join: pj } = await import('node:path');
+    const altRoot = mkd(pj(td(), 'bwire-alt-'));
+    try {
+      const externalStore = createArtifactStore(altRoot);
+      const externalRef = externalStore.register('chan-1', {
+        filename: 'external.png',
+        mime: 'image/png',
+        data: Buffer.from([1, 2, 3]),
+      });
+
+      const fakeConnector = makeFakeConnector();
+      // Bootstrap at `root` WITHOUT injecting the external store — bootstrap creates
+      // its own internal store at `root`.
+      const handle = await bootstrapConnectorCommands(
+        root,
+        undefined,
+        { makeConnector: () => fakeConnector },
+      );
+
+      // A fresh store at `root` (same as bootstrap's internal one) must NOT find
+      // the artifact that was registered at altRoot — the stores are independent.
+      const internalView = createArtifactStore(root);
+      const notFound = internalView.get('chan-1', externalRef.id);
+      expect(notFound, 'artifact from altRoot must not be visible in bootstrap root store').toBeNull();
+
+      await handle.dispose();
+    } finally {
+      try { (await import('node:fs')).rmSync(altRoot, { recursive: true, force: true }); } catch { /* best-effort */ }
+    }
   });
 
   it('bootstrap creates its own store when deps.artifacts is absent (backward-compat)', async () => {

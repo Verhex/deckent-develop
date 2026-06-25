@@ -70,11 +70,15 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
       // Finding 2 fix — single shared voice adapter per bot.ts lifecycle.
       // createVoiceAdapter returns null when disabled/misconfigured — default-off is
       // byte-identical. Deck secrets provide OPENAI_API_KEY for the openai provider.
-      const deckSecrets = loadDeckSecrets(r);
-      const voiceAdapter = createVoiceAdapter(
-        config.bot_capabilities?.voice ?? { enabled: false },
-        deckSecrets,
-      );
+      // Gate: deck secrets are ONLY read when capabilities are enabled (capsOn).
+      // When capabilities are off, voiceAdapter is null and NO disk read happens.
+      const capsOn = !!config.bot_capabilities?.enabled;
+      const voiceAdapter = capsOn
+        ? createVoiceAdapter(
+            config.bot_capabilities?.voice ?? { enabled: false },
+            loadDeckSecrets(r),
+          )
+        : null;
 
       // Build ONE warm responder shared by both the streaming path (onChatStreaming)
       // and the non-streaming fallback (chat), so the agentic persistent child is
