@@ -1894,6 +1894,16 @@ const MESSAGES: MessageMap = {
     tr: '[ses: sentez başarısız — yanıt metin olarak gönderildi]',
   },
 
+  // ─── Voice reply-language instructions (WS1 Task 5) ────────────────────────
+  'voice.reply_lang_forced': {
+    en: 'Reply ONLY in {language}. Do not mix languages.',
+    tr: 'SADECE {language} dilinde yanıtla. Dilleri karıştırma.',
+  },
+  'voice.reply_lang_mirror': {
+    en: 'Reply in the same language the user used. Do not mix languages.',
+    tr: 'Kullanıcının kullandığı dilde yanıtla. Dilleri karıştırma.',
+  },
+
   // ─── Voice health-check (Task 5 — bot-start honest-warn) ─────────────────
   'voice.wrapper_unreachable': {
     en: '⚠️ Voice is configured (provider={provider}) but the backend is unreachable at {url} — voice replies will fall back to text. {detail}',

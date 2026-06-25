@@ -39,6 +39,7 @@ import { loadNodemailerTransport } from './capabilities/mail-transport.js';
 import { createArtifactStore } from './capabilities/artifacts.js';
 import type { ArtifactStore } from './capabilities/types.js';
 import type { VoiceAdapter } from './voice/types.js';
+import { resolveReplyLanguage } from './voice/language.js';
 
 type NotifyConnectorsConfig = NonNullable<DeckentConfig['notify_connectors']>;
 
@@ -540,6 +541,7 @@ export async function bootstrapConnectorCommands(
           channelId: string,
           replyText: string,
           isVoiceOrigin: boolean,
+          replyLangTag?: string | null,
         ): Promise<boolean> => {
           if (!voiceAdapter) return false;
           const tts = ttsModeValue;
@@ -553,7 +555,11 @@ export async function bootstrapConnectorCommands(
 
           try {
             const stripped = stripFormatting(replyText);
-            const audio = await voiceAdapter.synthesize(stripped);
+            // WS1 Task 5 (b): pass the resolved language tag to the TTS backend so it
+            // can choose the right voice/model for the output language.  When the mode
+            // is 'mirror' (tag=null) we omit the hint — the backend uses its default.
+            const synthOpts = replyLangTag ? { language: replyLangTag } : undefined;
+            const audio = await voiceAdapter.synthesize(stripped, synthOpts);
             await sendVoiceFn.call(connector, channelId, audio);
             return true; // voice sent — for reply-in-kind, skip text reply
           } catch {
@@ -575,9 +581,28 @@ export async function bootstrapConnectorCommands(
                     const isVoiceOrigin = pendingVoiceOrigin.get(channelId) ?? false;
                     pendingVoiceOrigin.delete(channelId);
                     // Task 3 (WS1): consume the STT-detected language for this turn.
-                    // Task 5 reads detectedLang here to inject a reply-language instruction.
                     const detectedLang = pendingVoiceLang.get(channelId);
                     pendingVoiceLang.delete(channelId);
+
+                    // WS1 Task 5 (a): resolve the reply-language for this turn and build
+                    // the instruction to prepend to the agentic turn text.
+                    // Only fires when voice config is present (voiceCfg is non-null/undefined).
+                    // Default-off contract: when voiceCfg is absent, no instruction is injected
+                    // and behavior is 100% unchanged (backward-compat).
+                    let turnText = text;
+                    let replyLangTag: string | null = null;
+                    if (voiceCfg) {
+                      const replyLang = resolveReplyLanguage(voiceCfg, detectedLang);
+                      replyLangTag = replyLang.tag;
+                      const instruction =
+                        replyLang.mode === 'forced' && replyLang.tag
+                          ? getMessage('voice.reply_lang_forced', lang, { language: replyLang.tag })
+                          : getMessage('voice.reply_lang_mirror', lang);
+                      // Prepend as a system-level directive line before the user's message.
+                      // A blank line separates the instruction from the turn text so the LLM
+                      // treats the two as distinct (instruction + user request).
+                      turnText = `${instruction}\n\n${text}`;
+                    }
 
                     // Authorized non-command. The router already enforced the
                     // chat_id chokepoint.
@@ -627,8 +652,9 @@ export async function bootstrapConnectorCommands(
                           : null;
                         // Slice 1.1: pass the live connector as the per-turn mediaConnector so
                         // capability media (e.g. screenshot photo) is delivered to the right transport.
-                        // Task 3: detectedLang threaded as 5th arg so Task 5 can inject reply-language.
-                        const reply = await chatStreaming(channelId, text, (partial) => throttle?.push(partial), connector as PerTurnMediaConnector, detectedLang);
+                        // WS1 Task 5: turnText carries the reply-language instruction; detectedLang
+                        // still threaded as 5th arg for downstream consumers.
+                        const reply = await chatStreaming(channelId, turnText, (partial) => throttle?.push(partial), connector as PerTurnMediaConnector, detectedLang);
                         const body = reply.trim() || getMessage('bot.chat_empty', lang);
                         if (msgId && throttle) {
                           // Final: edit the placeholder in place with the first part
@@ -650,10 +676,11 @@ export async function bootstrapConnectorCommands(
                         // On TTS failure → fall back to non-streaming text reply.
                         const chatStreaming = deps.onChatStreaming!;
                         await streamCap.sendChatAction!(channelId, 'typing').catch(() => undefined);
-                        // Task 3: detectedLang threaded as 5th arg so Task 5 can inject reply-language.
-                        const reply = await chatStreaming(channelId, text, () => {/* collect only — no streaming edits */}, connector as PerTurnMediaConnector, detectedLang);
+                        // WS1 Task 5: turnText carries the reply-language instruction.
+                        const reply = await chatStreaming(channelId, turnText, () => {/* collect only — no streaming edits */}, connector as PerTurnMediaConnector, detectedLang);
                         const body = reply.trim() || getMessage('bot.chat_empty', lang);
-                        const sentVoice = await tryReplyWithVoice(channelId, body, isVoiceOrigin);
+                        // WS1 Task 5 (b): pass resolved language tag to TTS synthesizer.
+                        const sentVoice = await tryReplyWithVoice(channelId, body, isVoiceOrigin, replyLangTag);
                         if (!sentVoice) {
                           await sendRich(channelId, body);
                         }
@@ -662,12 +689,14 @@ export async function bootstrapConnectorCommands(
                         // Slice 1.1: pass the live connector as the per-turn mediaConnector so
                         // capability media (e.g. screenshot photo) is delivered to the right transport.
                         await send(channelId, getMessage('bot.chat_thinking', lang));
-                        // Task 3: detectedLang threaded as 4th arg so Task 5 can inject reply-language.
-                        const reply = await chat(channelId, text, connector as PerTurnMediaConnector, detectedLang);
+                        // WS1 Task 5: turnText carries the reply-language instruction; detectedLang
+                        // still threaded as 4th arg for downstream consumers.
+                        const reply = await chat(channelId, turnText, connector as PerTurnMediaConnector, detectedLang);
                         const body = reply.trim() || getMessage('bot.chat_empty', lang);
                         // Task 11 TTS: try voice reply first; skip text when voice succeeded
                         // (covers both 'always' and 'reply-in-kind' — voice replaces text).
-                        const sentVoice = await tryReplyWithVoice(channelId, body, isVoiceOrigin);
+                        // WS1 Task 5 (b): pass resolved language tag to TTS synthesizer.
+                        const sentVoice = await tryReplyWithVoice(channelId, body, isVoiceOrigin, replyLangTag);
                         if (!sentVoice) {
                           await sendRich(channelId, body);
                         }

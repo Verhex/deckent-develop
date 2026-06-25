@@ -250,7 +250,8 @@ describe('Finding 2 — voiceAdapter is threaded into the inbound-voice path', (
     // voiceAdapter.transcribe must have been called (F2 — voice adapter is now threaded).
     expect(transcribeMock).toHaveBeenCalledTimes(1);
     // The chat responder received the transcribed text (STT result, not empty string).
-    expect(chatReplies).toContain('hello from voice');
+    // WS1 T5: reply-language instruction is prepended so the exact text is wrapped — check contains.
+    expect(chatReplies.some((t) => t.includes('hello from voice'))).toBe(true);
 
     await handle.dispose();
   });

@@ -122,8 +122,9 @@ describe('voice wiring: inbound STT → agentic turn', () => {
     expect(fake.getFileBuffer).toHaveBeenCalledWith('AwABAgAD_voice_id');
     // transcribe called with audio bytes
     expect(voice.transcribe).toHaveBeenCalledWith(audioBytes, 'audio/ogg');
-    // chat received the transcribed text
-    expect(chatCalls[0]!.text).toBe('take a screenshot');
+    // chat received the transcribed text — WS1 T5: instruction prepended (mirror mode: no lang detected)
+    // assert that the transcribed text is still present in the turn text
+    expect(chatCalls[0]!.text).toContain('take a screenshot');
   });
 
   it('voice + stt=false → no getFileBuffer, no transcribe, text passed unchanged', async () => {
@@ -152,8 +153,8 @@ describe('voice wiring: inbound STT → agentic turn', () => {
     // stt disabled: no download, no transcribe
     expect(fake.getFileBuffer).not.toHaveBeenCalled();
     expect(voice.transcribe).not.toHaveBeenCalled();
-    // text passed through as-is (empty because voice messages typically have no text)
-    expect(chatCalls[0]!.text).toBe('original text');
+    // text contains the original text — WS1 T5: instruction prepended (mirror mode, voice cfg present)
+    expect(chatCalls[0]!.text).toContain('original text');
   });
 
   it('voiceAdapter absent → voice message passes through (no download, backward-compat)', async () => {
@@ -457,8 +458,11 @@ describe('voice wiring: task 3 — detected language threaded to the turn', () =
 
     // The detected language 'tr' must be threaded into the turn
     expect(chatLangs[0]).toBe('tr');
-    // Transcribed text still routed correctly
-    expect((chat.mock.calls[0] as unknown[])[1]).toBe('ekran görüntüsü al');
+    // Transcribed text still routed correctly — WS1 T5: instruction prepended, text is within it
+    const turnText = (chat.mock.calls[0] as unknown[])[1] as string;
+    expect(turnText).toContain('ekran görüntüsü al');
+    // Forced-tr instruction must be in the turn text
+    expect(turnText).toMatch(/Reply ONLY in tr|SADECE tr/i);
   });
 
   it('inbound voice with language=undefined → chat receives detectedLang=undefined (no injection)', async () => {
@@ -521,6 +525,177 @@ describe('voice wiring: task 3 — detected language threaded to the turn', () =
     expect(chatLangs[0]).toBeUndefined();
     // transcribe was NOT called (no voice raw)
     expect(voice.transcribe).not.toHaveBeenCalled();
+  });
+});
+
+describe('voice wiring: task 5 — reply-language instruction injection + TTS language passthrough', () => {
+  /**
+   * Task 5 TDD suite.
+   *
+   * A voice turn with detectedLang='tr' AND voiceCfg.language='auto' (or absent)
+   * must:
+   *  (a) Prepend the forced-tr instruction to the text the chat responder receives.
+   *  (b) Pass language:'tr' to voice.synthesize (TTS language hint).
+   *
+   * A voice turn with voiceCfg.language='tr' (config-forced) must also prepend
+   * the forced instruction even when detectedLang is absent.
+   *
+   * A voice turn with no detectedLang AND voiceCfg.language absent/auto must
+   * prepend the mirror instruction (no specific language) and pass language:undefined
+   * to synthesize.
+   *
+   * A text-origin turn (no voice config) must receive no instruction prepended
+   * (default-off: behavior unchanged when voice config is absent).
+   */
+
+  it('forced-tr: voice detects tr → chat text has forced-tr instruction prepended + synthesize called with language:tr', async () => {
+    const root = makeTmpRoot();
+    const audioBytes = Buffer.from([0x4f, 0x67, 0x67, 0x53]);
+    const fake = fakeVoiceConnector(audioBytes, 'audio/ogg');
+    const synthAudio = { data: Buffer.from('tr-audio'), mime: 'audio/ogg' };
+    const voice: VoiceAdapter = {
+      transcribe: vi.fn(async () => ({ text: 'ekran görüntüsü al', language: 'tr' })),
+      synthesize: vi.fn(async () => synthAudio),
+    };
+
+    const chatTexts: string[] = [];
+    const chat = vi.fn(async (_channelId: string, text: string) => {
+      chatTexts.push(text);
+      return 'Ekran görüntüsü alındı.';
+    });
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat: chat as unknown as import('../../src/connectors/chat-bridge.js').ChatResponder,
+      voiceAdapter: voice,
+      // language absent (auto) → STT-detected 'tr' triggers forced mode
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'reply-in-kind' } },
+    });
+
+    fake._emit(incomingVoice('555'));
+
+    await vi.waitFor(() => expect(chatTexts.length).toBeGreaterThan(0));
+
+    // (a) Instruction must be prepended — contains the language tag and "ONLY"/"SADECE"
+    expect(chatTexts[0]).toMatch(/Reply ONLY in tr|SADECE tr/i);
+    expect(chatTexts[0]).toContain('ekran görüntüsü al');
+
+    // (b) synthesize must have been called with language: 'tr'
+    await vi.waitFor(() => expect(fake.sendVoice).toHaveBeenCalledTimes(1));
+    const synthCalls = (voice.synthesize as ReturnType<typeof vi.fn>).mock.calls;
+    expect(synthCalls.length).toBeGreaterThan(0);
+    const synthOpts = synthCalls[0]![1] as { language?: string } | undefined;
+    expect(synthOpts?.language).toBe('tr');
+  });
+
+  it('forced-tr: config language=tr + no detectedLang → chat text has forced instruction + synthesize language:tr', async () => {
+    const root = makeTmpRoot();
+    const audioBytes = Buffer.from([0x4f, 0x67, 0x67, 0x53]);
+    const fake = fakeVoiceConnector(audioBytes, 'audio/ogg');
+    const synthAudio = { data: Buffer.from('cfg-tr-audio'), mime: 'audio/ogg' };
+    const voice: VoiceAdapter = {
+      // no language returned from STT
+      transcribe: vi.fn(async () => ({ text: 'merhaba', language: undefined })),
+      synthesize: vi.fn(async () => synthAudio),
+    };
+
+    const chatTexts: string[] = [];
+    const chat = vi.fn(async (_channelId: string, text: string) => {
+      chatTexts.push(text);
+      return 'Merhaba!';
+    });
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat: chat as unknown as import('../../src/connectors/chat-bridge.js').ChatResponder,
+      voiceAdapter: voice,
+      // config-level forced language
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'reply-in-kind', language: 'tr' } },
+    });
+
+    fake._emit(incomingVoice('555'));
+
+    await vi.waitFor(() => expect(chatTexts.length).toBeGreaterThan(0));
+
+    // Forced instruction must be in the text
+    expect(chatTexts[0]).toMatch(/Reply ONLY in tr|SADECE tr/i);
+
+    // synthesize called with language: 'tr'
+    await vi.waitFor(() => expect(fake.sendVoice).toHaveBeenCalledTimes(1));
+    const synthCalls = (voice.synthesize as ReturnType<typeof vi.fn>).mock.calls;
+    expect(synthCalls.length).toBeGreaterThan(0);
+    const synthOpts = synthCalls[0]![1] as { language?: string } | undefined;
+    expect(synthOpts?.language).toBe('tr');
+  });
+
+  it('mirror: no detectedLang AND no config language → mirror instruction prepended + synthesize language:undefined', async () => {
+    const root = makeTmpRoot();
+    const audioBytes = Buffer.from([0x4f, 0x67, 0x67, 0x53]);
+    const fake = fakeVoiceConnector(audioBytes, 'audio/ogg');
+    const synthAudio = { data: Buffer.from('mirror-audio'), mime: 'audio/ogg' };
+    const voice: VoiceAdapter = {
+      // no language
+      transcribe: vi.fn(async () => ({ text: 'hello there', language: undefined })),
+      synthesize: vi.fn(async () => synthAudio),
+    };
+
+    const chatTexts: string[] = [];
+    const chat = vi.fn(async (_channelId: string, text: string) => {
+      chatTexts.push(text);
+      return 'Hello!';
+    });
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat: chat as unknown as import('../../src/connectors/chat-bridge.js').ChatResponder,
+      voiceAdapter: voice,
+      // no language config → mirror mode
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'reply-in-kind' } },
+    });
+
+    fake._emit(incomingVoice('555'));
+
+    await vi.waitFor(() => expect(chatTexts.length).toBeGreaterThan(0));
+
+    // Mirror instruction must be in the text
+    expect(chatTexts[0]).toMatch(/same language|kullandığı dilde/i);
+    expect(chatTexts[0]).toContain('hello there');
+
+    // synthesize called WITHOUT language (mirror → tag is null → undefined)
+    await vi.waitFor(() => expect(fake.sendVoice).toHaveBeenCalledTimes(1));
+    const synthCalls = (voice.synthesize as ReturnType<typeof vi.fn>).mock.calls;
+    expect(synthCalls.length).toBeGreaterThan(0);
+    const synthOpts = synthCalls[0]![1] as { language?: string } | undefined;
+    // language should be undefined when mirror mode (no tag)
+    expect(synthOpts?.language).toBeUndefined();
+  });
+
+  it('default-off: no voice config → no instruction prepended (text-origin, backward-compat)', async () => {
+    const root = makeTmpRoot();
+    const fake = fakeVoiceConnector(Buffer.from([]), 'audio/ogg');
+
+    const chatTexts: string[] = [];
+    const chat = vi.fn(async (_channelId: string, text: string) => {
+      chatTexts.push(text);
+      return 'ok';
+    });
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat: chat as unknown as import('../../src/connectors/chat-bridge.js').ChatResponder,
+      // no voiceAdapter, no botCapabilities
+    });
+
+    fake._emit(incomingText('555', 'hello world'));
+
+    await vi.waitFor(() => expect(chatTexts.length).toBeGreaterThan(0));
+
+    // No instruction prepended — text unchanged
+    expect(chatTexts[0]).toBe('hello world');
   });
 });
 

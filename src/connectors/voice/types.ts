@@ -10,8 +10,10 @@ export interface VoiceAdapter {
    *  Returns the transcribed text and the detected language tag (e.g. 'tr', 'en').
    *  language is optional — providers that cannot detect it may omit it. */
   transcribe(audio: Buffer, mime: string): Promise<{ text: string; language?: string }>;
-  /** Synthesize text to audio bytes. Returns raw bytes + MIME type of the output. */
-  synthesize(text: string, opts?: { voice?: string }): Promise<{ data: Buffer; mime: string }>;
+  /** Synthesize text to audio bytes. Returns raw bytes + MIME type of the output.
+   *  opts.language — BCP-47 tag to hint the TTS backend on the output language
+   *  (e.g. 'tr', 'en').  Optional: when absent the backend uses its default. */
+  synthesize(text: string, opts?: { voice?: string; language?: string }): Promise<{ data: Buffer; mime: string }>;
 }
 
 export interface VoiceConfig {
