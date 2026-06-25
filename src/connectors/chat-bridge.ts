@@ -190,12 +190,17 @@ export type PerTurnMediaConnector = {
 
 export interface ChatResponder {
   /**
-   * Invoke a chat turn. `mediaConnector` is an OPTIONAL 3rd arg (Slice 1.1): when
-   * provided, it is used as the media sink for that turn (overrides the static
-   * `capConnector` dep). Existing 2-arg callers are unaffected — behavior is
-   * identical to today when the arg is absent or the connector has no `sendMedia`.
+   * Invoke a chat turn.
+   *  - `mediaConnector` is an OPTIONAL 3rd arg (Slice 1.1): when provided, it is
+   *    used as the media sink for that turn (overrides the static `capConnector`
+   *    dep). Existing 2-arg callers are unaffected.
+   *  - `detectedLang` is an OPTIONAL 4th arg (WS1 Task 3): the BCP-47 language
+   *    tag detected by STT for this turn (e.g. 'tr', 'en'). Only set for
+   *    voice-origin turns whose STT provider returned a language. Absent for
+   *    text-origin turns and voice turns whose provider did not detect a language.
+   *    Task 5 reads this to inject a reply-language instruction into the turn.
    */
-  (sessionId: string, text: string, mediaConnector?: PerTurnMediaConnector): Promise<string>;
+  (sessionId: string, text: string, mediaConnector?: PerTurnMediaConnector, detectedLang?: string): Promise<string>;
   /** Release the warm persistent provider child (agentic mode). Best-effort. */
   dispose?(): Promise<void>;
 }

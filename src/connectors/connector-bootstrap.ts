@@ -136,30 +136,31 @@ async function handleInboundVoice(
   connector: import('./types.js').IMessageConnector,
   voiceAdapter: VoiceAdapter | null | undefined,
   sttEnabled: boolean,
-): Promise<{ msg: import('./types.js').IncomingMessage; voiceOrigin: boolean; transcribeError: boolean }> {
+): Promise<{ msg: import('./types.js').IncomingMessage; voiceOrigin: boolean; detectedLang: string | undefined; transcribeError: boolean }> {
   const raw = msg.raw as Record<string, unknown> | undefined;
-  if (!raw || typeof raw !== 'object') return { msg, voiceOrigin: false, transcribeError: false };
+  if (!raw || typeof raw !== 'object') return { msg, voiceOrigin: false, detectedLang: undefined, transcribeError: false };
   const voiceRaw = raw['voice'] as InboundVoiceRaw | undefined;
-  if (!voiceRaw || typeof voiceRaw.fileId !== 'string') return { msg, voiceOrigin: false, transcribeError: false };
-  if (!voiceAdapter || !sttEnabled) return { msg, voiceOrigin: false, transcribeError: false };
+  if (!voiceRaw || typeof voiceRaw.fileId !== 'string') return { msg, voiceOrigin: false, detectedLang: undefined, transcribeError: false };
+  if (!voiceAdapter || !sttEnabled) return { msg, voiceOrigin: false, detectedLang: undefined, transcribeError: false };
 
   const getFileBuffer = (connector as unknown as {
     getFileBuffer?: (fileId: string) => Promise<{ data: Buffer; mime: string; filename?: string }>;
   }).getFileBuffer;
-  if (typeof getFileBuffer !== 'function') return { msg, voiceOrigin: false, transcribeError: false };
+  if (typeof getFileBuffer !== 'function') return { msg, voiceOrigin: false, detectedLang: undefined, transcribeError: false };
 
   try {
     const { data, mime } = await getFileBuffer.call(connector, voiceRaw.fileId);
-    const { text: transcribed } = await voiceAdapter.transcribe(data, mime);
+    const { text: transcribed, language } = await voiceAdapter.transcribe(data, mime);
     return {
       msg: { ...msg, text: transcribed, raw: { ...raw, voiceOrigin: true } },
       voiceOrigin: true,
+      detectedLang: language,
       transcribeError: false,
     };
   } catch {
     // Download or transcription failure must never crash the inbound poller.
     // Return transcribeError=true so the callsite can notify the user honestly.
-    return { msg, voiceOrigin: false, transcribeError: true };
+    return { msg, voiceOrigin: false, detectedLang: undefined, transcribeError: true };
   }
 }
 
@@ -254,6 +255,7 @@ export type ChatStreamResponder = (
   text: string,
   onPartial: (partial: string) => void,
   mediaConnector?: PerTurnMediaConnector,
+  detectedLang?: string,
 ) => Promise<string>;
 
 export interface ConnectorCommandsDeps extends ConnectorBootstrapDeps {
@@ -518,6 +520,11 @@ export async function bootstrapConnectorCommands(
         // keyed on channelId is safe: turns for the same channel are serialized by
         // the command router (one turn at a time per channel), so there is no race.
         const pendingVoiceOrigin = new Map<string, boolean>();
+        // Task 3 (WS1): parallel map for the STT-detected language (BCP-47 tag).
+        // Set alongside pendingVoiceOrigin when transcription returns a language.
+        // Consumed (read + deleted) in onChat — Task 5 reads it here to inject the
+        // reply-language instruction into the turn before calling chat()/chatStreaming().
+        const pendingVoiceLang = new Map<string, string>();
 
         /**
          * Task 11: attempt TTS + sendVoice after a reply is produced.
@@ -567,6 +574,10 @@ export async function bootstrapConnectorCommands(
                     // Consume voice-origin flag for THIS turn (set by onMessage below).
                     const isVoiceOrigin = pendingVoiceOrigin.get(channelId) ?? false;
                     pendingVoiceOrigin.delete(channelId);
+                    // Task 3 (WS1): consume the STT-detected language for this turn.
+                    // Task 5 reads detectedLang here to inject a reply-language instruction.
+                    const detectedLang = pendingVoiceLang.get(channelId);
+                    pendingVoiceLang.delete(channelId);
 
                     // Authorized non-command. The router already enforced the
                     // chat_id chokepoint.
@@ -616,7 +627,8 @@ export async function bootstrapConnectorCommands(
                           : null;
                         // Slice 1.1: pass the live connector as the per-turn mediaConnector so
                         // capability media (e.g. screenshot photo) is delivered to the right transport.
-                        const reply = await chatStreaming(channelId, text, (partial) => throttle?.push(partial), connector as PerTurnMediaConnector);
+                        // Task 3: detectedLang threaded as 5th arg so Task 5 can inject reply-language.
+                        const reply = await chatStreaming(channelId, text, (partial) => throttle?.push(partial), connector as PerTurnMediaConnector, detectedLang);
                         const body = reply.trim() || getMessage('bot.chat_empty', lang);
                         if (msgId && throttle) {
                           // Final: edit the placeholder in place with the first part
@@ -638,7 +650,8 @@ export async function bootstrapConnectorCommands(
                         // On TTS failure → fall back to non-streaming text reply.
                         const chatStreaming = deps.onChatStreaming!;
                         await streamCap.sendChatAction!(channelId, 'typing').catch(() => undefined);
-                        const reply = await chatStreaming(channelId, text, () => {/* collect only — no streaming edits */}, connector as PerTurnMediaConnector);
+                        // Task 3: detectedLang threaded as 5th arg so Task 5 can inject reply-language.
+                        const reply = await chatStreaming(channelId, text, () => {/* collect only — no streaming edits */}, connector as PerTurnMediaConnector, detectedLang);
                         const body = reply.trim() || getMessage('bot.chat_empty', lang);
                         const sentVoice = await tryReplyWithVoice(channelId, body, isVoiceOrigin);
                         if (!sentVoice) {
@@ -649,7 +662,8 @@ export async function bootstrapConnectorCommands(
                         // Slice 1.1: pass the live connector as the per-turn mediaConnector so
                         // capability media (e.g. screenshot photo) is delivered to the right transport.
                         await send(channelId, getMessage('bot.chat_thinking', lang));
-                        const reply = await chat(channelId, text, connector as PerTurnMediaConnector);
+                        // Task 3: detectedLang threaded as 4th arg so Task 5 can inject reply-language.
+                        const reply = await chat(channelId, text, connector as PerTurnMediaConnector, detectedLang);
                         const body = reply.trim() || getMessage('bot.chat_empty', lang);
                         // Task 11 TTS: try voice reply first; skip text when voice succeeded
                         // (covers both 'always' and 'reply-in-kind' — voice replaces text).
@@ -676,10 +690,10 @@ export async function bootstrapConnectorCommands(
           void (async () => {
             // Gate 1: inbound media (Task 8)
             let processedMsg = await handleInboundMedia(msg, connector, artifactStore, lang).catch(() => msg);
-            // Gate 2: inbound voice (Task 11)
-            const { msg: voiceMsg, voiceOrigin, transcribeError } = await handleInboundVoice(
+            // Gate 2: inbound voice (Task 11 + Task 3 WS1)
+            const { msg: voiceMsg, voiceOrigin, detectedLang: voiceLang, transcribeError } = await handleInboundVoice(
               processedMsg, connector, voiceAdapter, sttEnabled,
-            ).catch(() => ({ msg: processedMsg, voiceOrigin: false, transcribeError: false }));
+            ).catch(() => ({ msg: processedMsg, voiceOrigin: false, detectedLang: undefined as string | undefined, transcribeError: false }));
             if (transcribeError) {
               // Honest degrade: tell the user their voice note couldn't be understood.
               // Best-effort send — never crashes the poller if sendMessage throws.
@@ -688,6 +702,12 @@ export async function bootstrapConnectorCommands(
             if (voiceOrigin) {
               // Mark this channel's next onChat turn as voice-origin for TTS reply decision.
               pendingVoiceOrigin.set(voiceMsg.channelId, true);
+              // Task 3 (WS1): record the STT-detected language for this turn.
+              // Only set when the STT provider returned a language tag; absent = provider
+              // did not detect / did not support language detection — no injection.
+              if (voiceLang !== undefined) {
+                pendingVoiceLang.set(voiceMsg.channelId, voiceLang);
+              }
             }
             commandRouter(voiceMsg);
           })().catch(() => {

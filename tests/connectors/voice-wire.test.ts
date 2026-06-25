@@ -426,6 +426,104 @@ describe('voice wiring: reply-in-kind TTS', () => {
   });
 });
 
+describe('voice wiring: task 3 — detected language threaded to the turn', () => {
+  it('inbound voice with language="tr" → chat receives detectedLang="tr" as 4th arg', async () => {
+    const root = makeTmpRoot();
+    const audioBytes = Buffer.from([0x4f, 0x67, 0x67, 0x53]);
+    const fake = fakeVoiceConnector(audioBytes, 'audio/ogg');
+    // Fake adapter returns both text AND detected language
+    const voice: VoiceAdapter = {
+      transcribe: vi.fn(async () => ({ text: 'ekran görüntüsü al', language: 'tr' })),
+      synthesize: vi.fn(async () => ({ data: Buffer.from(''), mime: 'audio/ogg' })),
+    };
+
+    const chatLangs: Array<string | undefined> = [];
+    const chat = vi.fn(async (_channelId: string, _text: string, _media?: unknown, detectedLang?: string) => {
+      chatLangs.push(detectedLang);
+      return 'Ekran görüntüsü alındı.';
+    });
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat: chat as unknown as import('../../src/connectors/chat-bridge.js').ChatResponder,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'off' } },
+    });
+
+    fake._emit(incomingVoice('555'));
+
+    await vi.waitFor(() => expect(chatLangs.length).toBeGreaterThan(0));
+
+    // The detected language 'tr' must be threaded into the turn
+    expect(chatLangs[0]).toBe('tr');
+    // Transcribed text still routed correctly
+    expect((chat.mock.calls[0] as unknown[])[1]).toBe('ekran görüntüsü al');
+  });
+
+  it('inbound voice with language=undefined → chat receives detectedLang=undefined (no injection)', async () => {
+    const root = makeTmpRoot();
+    const fake = fakeVoiceConnector(Buffer.from([0x4f]), 'audio/ogg');
+    const voice: VoiceAdapter = {
+      transcribe: vi.fn(async () => ({ text: 'hello', language: undefined })),
+      synthesize: vi.fn(async () => ({ data: Buffer.from(''), mime: 'audio/ogg' })),
+    };
+
+    const chatLangs: Array<string | undefined> = [];
+    const chat = vi.fn(async (_channelId: string, _text: string, _media?: unknown, detectedLang?: string) => {
+      chatLangs.push(detectedLang);
+      return 'ok';
+    });
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat: chat as unknown as import('../../src/connectors/chat-bridge.js').ChatResponder,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'off' } },
+    });
+
+    fake._emit(incomingVoice('555'));
+
+    await vi.waitFor(() => expect(chatLangs.length).toBeGreaterThan(0));
+
+    expect(chatLangs[0]).toBeUndefined();
+  });
+
+  it('text-origin turn → detectedLang not set (pendingVoiceLang map stays clean)', async () => {
+    const root = makeTmpRoot();
+    const fake = fakeVoiceConnector(Buffer.from([]), 'audio/ogg');
+    const voice: VoiceAdapter = {
+      transcribe: vi.fn(async () => ({ text: '', language: 'en' })),
+      synthesize: vi.fn(async () => ({ data: Buffer.from(''), mime: 'audio/ogg' })),
+    };
+
+    const chatLangs: Array<string | undefined> = [];
+    const chat = vi.fn(async (_channelId: string, _text: string, _media?: unknown, detectedLang?: string) => {
+      chatLangs.push(detectedLang);
+      return 'ok';
+    });
+
+    await bootstrapConnectorCommands(root, cfg, {
+      makeConnector: () => fake,
+      resolve: vi.fn(async () => 'not-found' as const),
+      chat: chat as unknown as import('../../src/connectors/chat-bridge.js').ChatResponder,
+      voiceAdapter: voice,
+      botCapabilities: { voice: { enabled: true, stt: true, tts: 'off' } },
+    });
+
+    // Text-origin turn (no raw.voice)
+    fake._emit(incomingText('555', 'hello'));
+
+    await vi.waitFor(() => expect(chatLangs.length).toBeGreaterThan(0));
+
+    // Text turns must NOT inject a detectedLang
+    expect(chatLangs[0]).toBeUndefined();
+    // transcribe was NOT called (no voice raw)
+    expect(voice.transcribe).not.toHaveBeenCalled();
+  });
+});
+
 describe('voice wiring: streaming path — voice replaces text', () => {
   /** Fake connector with full streaming caps + sendVoice. */
   function fakeStreamingVoiceConnector(audioBuffer: Buffer, mime: string) {
