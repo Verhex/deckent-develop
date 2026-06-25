@@ -85,6 +85,12 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # Listening on http://127.0.0.1:8001
 ```
 
+> **⚠️ Security — no authentication.** The wrapper has no auth; keep it on `127.0.0.1`
+> (the `run.sh` default). Binding to `0.0.0.0` or a public interface lets anyone reachable
+> drive your GPU and read generated audio. See the
+> [wrapper README](../examples/voice-wrapper/README.md#step-4--start-the-server) for
+> mitigation options (reverse proxy, firewall, private network).
+
 **Config:**
 ```json
 {

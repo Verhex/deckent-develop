@@ -210,6 +210,12 @@ cache (`~/.cache/huggingface/`) automatically. Subsequent starts are instant.
 
 ### Step 4 — Start the server
 
+> **⚠️ Security — no authentication.** This wrapper has no auth. Keep it bound to
+> `127.0.0.1` (the `run.sh` default). Do NOT bind it to `0.0.0.0` or expose it to an
+> untrusted network: anyone who can reach it can use your GPU (`/tts/raw`, `/stt`) and
+> read generated audio. To run it on another host, put it behind an authenticating
+> reverse proxy, a firewall, or a private network.
+
 ```bash
 chmod +x run.sh
 ./run.sh
