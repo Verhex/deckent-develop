@@ -1,162 +1,57 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+/**
+ * init.ts npm-publish compatibility — real publish-compat regression guards.
+ *
+ * (323-030 / C5 dead-test cleanup) This file previously carried 8 tautological
+ * tests — five `expect(true).toBe(true)` placeholders and three assertions on
+ * mocks that were never invoked (the init command was never actually run, so
+ * `expect(writeFileSync).not.toHaveBeenCalled()` was trivially true). They
+ * provided ZERO coverage and were removed along with their now-unused module
+ * mocks. The assertions below test REAL publish-compat properties of the shipped
+ * package and the path-resolution mechanism that makes the binary work from
+ * `dist/` after `npm install`.
+ */
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DECKENT_VERSION } from '../../src/core/constants.js';
 
-vi.mock('node:fs', () => ({
-  writeFileSync: vi.fn(),
-  mkdirSync: vi.fn(),
-  readFileSync: vi.fn(),
-  existsSync: vi.fn(),
-}));
-
-vi.mock('../../src/cli/helpers/prompt.js', () => ({
-  promptText: vi.fn().mockResolvedValue('test-project'),
-  promptSelect: vi.fn().mockResolvedValue('max_plan'),
-}));
-
-vi.mock('../../src/cli/helpers/output.js', () => ({
-  print: vi.fn(),
-  printError: vi.fn(),
-}));
-
-vi.mock('../../src/cli/helpers/process.js', () => ({
-  resolveProjectRoot: vi.fn().mockReturnValue('/tmp/test-project'),
-  handleCliError: vi.fn(),
-}));
-
-vi.mock('../../src/cli/helpers/messages.js', () => ({
-  getMessage: vi.fn().mockReturnValue('message'),
-}));
-
-vi.mock('../../src/core/utils.js', () => ({
-  ensureDeckentImport: vi.fn(),
-}));
-
-vi.mock('../../src/cli/auto-setup.js', () => ({
-  generateSetupRecommendation: vi.fn().mockReturnValue({ mode: 'max_plan', reasons: [] }),
-}));
-
-vi.mock('../../src/core/system-profile.js', () => ({
-  getSystemProfile: vi.fn().mockReturnValue({}),
-}));
-
-vi.mock('../../src/core/subscription.js', () => ({
-  detectSubscription: vi.fn().mockReturnValue({ detected: 'max_plan' }),
-}));
-
-vi.mock('../../src/core/analyzer.js', () => ({
-  analyzeProject: vi.fn().mockReturnValue({}),
-}));
-
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const readPkg = (): Record<string, unknown> =>
+  JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf-8')) as Record<string, unknown>;
 
 describe('init.ts npm publish compatibility', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(existsSync).mockReturnValue(false);
-    vi.mocked(readFileSync).mockReturnValue('{}');
-  });
-
-  it('constants are resolved from package path, not CWD', () => {
-    // Verify that DECKENT_VERSION uses import.meta.url resolution
-    const constantsPath = join(
-      dirname(fileURLToPath(import.meta.url)),
-      '..',
-      '..',
-      'src',
-      'core',
-      'constants.ts',
-    );
-    expect(existsSync(constantsPath) || true).toBe(true);
-  });
-
-  it('init uses join() for all path construction', async () => {
-    // The init command should use join(root, ...) not hardcoded paths
-    const initPath = join(
-      dirname(fileURLToPath(import.meta.url)),
-      '..',
-      '..',
-      'src',
-      'cli',
-      'commands',
-      'init.ts',
-    );
-    // File should exist
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue('join(root,');
-    expect(true).toBe(true); // structural verification
-  });
-
-  it('writeIfNotExists does not overwrite existing files', async () => {
-    // Import the actual module to test writeIfNotExists behavior
-    vi.mocked(existsSync).mockReturnValue(true);
-    // When existsSync returns true, writeFileSync should not be called for that file
-    // This is a design verification test
-    expect(vi.mocked(writeFileSync)).not.toHaveBeenCalled();
-  });
-
-  it('ensureDir creates directories recursively', async () => {
-    vi.mocked(mkdirSync).mockReturnValue(undefined);
-    // mkdirSync should be called with { recursive: true }
-    expect(true).toBe(true); // structural test
-  });
-
-  it('config.json merge preserves existing custom fields', async () => {
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ mode: 'pro_plan', custom: 'value' }));
-    // Object.assign should preserve 'custom' field
-    expect(true).toBe(true);
-  });
-
   it('package.json files field includes dist and LICENSE', () => {
-    const pkgPath = join(
-      dirname(fileURLToPath(import.meta.url)),
-      '..',
-      '..',
-      'package.json',
-    );
-    vi.mocked(existsSync).mockReturnValue(true);
-    // Real check: package.json files field is configured for publish
-    const realPkg = require(pkgPath);
-    expect(realPkg.files).toContain('dist');
-    expect(realPkg.files).toContain('LICENSE');
+    const files = readPkg().files as string[];
+    expect(files).toContain('dist');
+    expect(files).toContain('LICENSE');
   });
 
   it('bin entry points to dist/cli/entry.js', () => {
-    const pkgPath = join(
-      dirname(fileURLToPath(import.meta.url)),
-      '..',
-      '..',
-      'package.json',
-    );
-    const realPkg = require(pkgPath);
-    expect(realPkg.bin.deckent).toBe('./dist/cli/entry.js');
+    const bin = readPkg().bin as { deckent: string };
+    expect(bin.deckent).toBe('./dist/cli/entry.js');
   });
 
-  it('DECKENT_VERSION resolves relative to package install path', () => {
-    // constants.ts uses dirname(fileURLToPath(import.meta.url)) for resolution
-    // This ensures it works from dist/ after npm install
-    const constantsSrc = join(
-      dirname(fileURLToPath(import.meta.url)),
-      '..',
-      '..',
-      'src',
-      'core',
-      'constants.ts',
-    );
-    vi.mocked(existsSync).mockReturnValue(true);
-    expect(true).toBe(true);
+  it('DECKENT_VERSION resolves to the real package version (install-path, not the 0.0.0 fallback)', () => {
+    // Behaviour guard: constants.ts resolves the version via the INSTALL path, so
+    // it must equal package.json's version. If resolution broke (e.g. CWD-relative
+    // with a wrong path), the IIFE's catch returns '0.0.0' — which would not match.
+    expect(DECKENT_VERSION).toBe(readPkg().version);
   });
 
-  it('i18n files are written with writeIfNotExists', () => {
-    vi.mocked(existsSync).mockReturnValue(true);
-    // When files already exist, they should not be overwritten
-    expect(vi.mocked(writeFileSync)).not.toHaveBeenCalled();
+  it('constants.ts resolves DECKENT_VERSION via import.meta.url, never process.cwd()', () => {
+    // Source guard for the mechanism behind the test above: from dist/ after
+    // npm install the version must resolve relative to the installed file.
+    const src = readFileSync(join(repoRoot, 'src', 'core', 'constants.ts'), 'utf-8');
+    const start = src.indexOf('DECKENT_VERSION');
+    const versionBlock = src.slice(start, start + 320);
+    expect(versionBlock).toContain('fileURLToPath(import.meta.url)');
+    expect(versionBlock).not.toContain('process.cwd()');
   });
 
-  it('appendToGitignore handles empty .gitignore', () => {
-    vi.mocked(existsSync).mockReturnValue(false);
-    // Should create .gitignore with entries
-    expect(true).toBe(true);
+  it('init.ts constructs paths with join(), never from process.cwd()', () => {
+    const src = readFileSync(join(repoRoot, 'src', 'cli', 'commands', 'init.ts'), 'utf-8');
+    expect(src).toContain('join(');
+    expect(src).not.toContain('process.cwd()');
   });
 });

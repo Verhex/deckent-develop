@@ -62,3 +62,22 @@ flag-gated design → **`DESIGN-ADR-075-AFFINITY-REORDER.md`**. Summary:
   default-on — ADR-075's own imbalance concern cuts both ways).
 - **Bundles with** the iter-2 `agent-cache` finding → one "routing-v2 enhancements" attended sprint.
 - **Status:** design-ready; **implementation attended-defer** (behaviour-changing core routing).
+
+---
+
+## Iteration 4 — C5 dead-test cleanup (323-030): `tests/cli/init-published.test.ts` ✅ REAL FIX
+
+First C5 conversion. The file had **10 tests: 2 genuine + 8 tautological** (zero coverage):
+- 5× literal `expect(true).toBe(true)` ("structural verification" placeholders).
+- 1× `expect(existsSync(path) || true).toBe(true)` — the `|| true` makes it always pass.
+- 2× `expect(writeFileSync).not.toHaveBeenCalled()` where the init command was **never invoked** → trivially true (nothing could call the mock).
+
+The 8 never ran the SUT (`handleInit`/`writeIfNotExists`/`ensureDir` are not exported from init.ts), so they could not be cheaply converted in place. **Action (convert > delete):** rewrote the file to **5 REAL publish-compat regression guards** — kept the 2 genuine `package.json` checks (files/bin) and replaced the 8 theater tests + all 11 now-unused module mocks with real assertions:
+1. `package.json.files` ⊇ {dist, LICENSE}
+2. `bin.deckent === ./dist/cli/entry.js`
+3. **`DECKENT_VERSION === package.json.version`** — behaviour guard: constants.ts resolves the version via the install path; a broken (CWD-relative) resolution hits the IIFE catch → `'0.0.0'` ≠ real version → RED. **Faithful.**
+4. constants.ts source uses `fileURLToPath(import.meta.url)`, never `process.cwd()` (mechanism guard).
+5. init.ts source uses `join()`, never `process.cwd()`.
+
+Verify: **5/5 green, tsc=0**, mock-free, hermetic. Net: −8 tautologies, +3 real faithful assertions (coverage UP, not down). Commit `<next>`.
+**Follow-up noted (not done):** `writeIfNotExists`/`ensureDir` runtime behaviour belongs in the helper module's own test — verify that coverage exists (separate sweep). Self-mock candidates to inspect next: `plugin.test.ts`, `autonomous.test.ts`, `config.test.ts`, `output.test.ts` (may be legit partial-mocks, not tautologies).
