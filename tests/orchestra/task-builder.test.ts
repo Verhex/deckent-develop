@@ -10,6 +10,8 @@ import {
   parseAuthModeDirective,
   parseDependenciesDirective,
   isPlanSlotId,
+  resolveDependencyRef,
+  resolveTaskDependencies,
   plannerTaskToParams,
   resolveWorkerEffort,
   buildWorkerPrompt,
@@ -625,10 +627,11 @@ describe('parseStructuredDirectives — forceModel/forceEffort', () => {
     expect(tasks[0].forceModel).toBeUndefined();
   });
 
-  it('ignores invalid model values', () => {
+  it('passes through unrecognized model values verbatim (consistent with ModelEffort pattern)', () => {
     const content = '## Task 1: Bad Model\nModel: gpt4\n\n### Description\nTest.';
     const tasks = parseStructuredDirectives(content);
-    expect(tasks[0].forceModel).toBeUndefined();
+    // Model is now parsed verbatim — downstream routing validates per-provider
+    expect(tasks[0].forceModel).toBe('gpt4');
   });
 
   it('parses "Effort: high" into forceEffort', () => {
@@ -2455,5 +2458,104 @@ describe('isPlanSlotId — format guard', () => {
     expect(isPlanSlotId('12345-1')).toBe(false); // > 4 digits
     expect(isPlanSlotId('323')).toBe(false);      // missing dash segment
     expect(isPlanSlotId('323-')).toBe(false);
+  });
+});
+
+// ═══ resolveDependencyRef — integer index resolution (325-001) ════════════════
+
+describe('resolveDependencyRef — pure-integer index refs', () => {
+  const sampleTasks = [
+    { id: '325-001', title: 'First task' },
+    { id: '325-002', title: 'Second task' },
+    { id: '325-003', title: 'Third task' },
+  ];
+
+  it('"0" resolves to the first task id (index 0)', () => {
+    expect(resolveDependencyRef('0', sampleTasks)).toBe('325-001');
+  });
+
+  it('"1" resolves to the second task id (index 1)', () => {
+    expect(resolveDependencyRef('1', sampleTasks)).toBe('325-002');
+  });
+
+  it('"2" resolves to the third task id (index 2)', () => {
+    expect(resolveDependencyRef('2', sampleTasks)).toBe('325-003');
+  });
+
+  it('out-of-bounds integer returns undefined', () => {
+    expect(resolveDependencyRef('99', sampleTasks)).toBeUndefined();
+  });
+
+  it('canonical slot-id still resolves by exact id match (not treated as index)', () => {
+    expect(resolveDependencyRef('325-002', sampleTasks)).toBe('325-002');
+  });
+
+  it('title-prefix label still resolves by title token match', () => {
+    expect(resolveDependencyRef('First', sampleTasks)).toBe('325-001');
+  });
+
+  it('"none" is reserved and returns undefined', () => {
+    expect(resolveDependencyRef('none', sampleTasks)).toBeUndefined();
+  });
+
+  it('empty string returns undefined', () => {
+    expect(resolveDependencyRef('', sampleTasks)).toBeUndefined();
+  });
+});
+
+describe('resolveTaskDependencies — integer index batch resolution', () => {
+  const tasks = [
+    { id: '324-001', title: 'Planner fix' },
+    { id: '324-002', title: 'Router fix' },
+    { id: '324-003', title: 'Evaluator fix' },
+  ];
+
+  it('resolves ["0"] to the first task id', () => {
+    expect(resolveTaskDependencies(['0'], tasks)).toEqual(['324-001']);
+  });
+
+  it('resolves mixed index + slot-id refs correctly', () => {
+    expect(resolveTaskDependencies(['0', '324-003'], tasks)).toEqual(['324-001', '324-003']);
+  });
+
+  it('deduplicates when index and slot-id resolve to same task', () => {
+    // "0" and "324-001" both resolve to the first task
+    expect(resolveTaskDependencies(['0', '324-001'], tasks)).toEqual(['324-001']);
+  });
+
+  it('drops unresolvable refs without throwing', () => {
+    expect(resolveTaskDependencies(['99', '324-002'], tasks)).toEqual(['324-002']);
+  });
+});
+
+describe('parseStructuredDirectives — Dependencies index-ref (325-001 live evidence)', () => {
+  it('"- Dependencies: 0" resolves to the first task id after planning', () => {
+    // Parsing returns the raw "0" string; resolution happens via resolveDependencyRef
+    const content = `## Task 1: Gate task
+- Files: src/core/config.ts
+- Scope: src/core/
+
+### Description
+Gate task.
+
+## Task 2: Dependent task
+- Dependencies: 0
+- Files: src/core/utils.ts
+- Scope: src/core/
+
+### Description
+Depends on task 0 (first task in the list).`;
+    const parsed = parseStructuredDirectives(content);
+    expect(parsed).toHaveLength(2);
+    // The raw "0" is preserved by the parser; caller resolves it via resolveDependencyRef
+    expect(parsed[1]!.dependencies).toEqual(['0']);
+
+    // Simulate sprint-planner resolution: build task stubs and resolve
+    const taskStubs = [
+      { id: '325-001', title: parsed[0]!.title },
+      { id: '325-002', title: parsed[1]!.title },
+    ];
+    const resolved = resolveTaskDependencies(parsed[1]!.dependencies!, taskStubs);
+    expect(resolved).toEqual(['325-001']);
   });
 });

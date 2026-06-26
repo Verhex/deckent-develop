@@ -186,6 +186,94 @@ export function evaluateCostGate(input: CostGateInput): CostGateResult {
   };
 }
 
+// ─── Cumulative Spend Gate (warn-only) ─────────────────────────────────────
+
+export interface SpendGateCheckInput {
+  /** Spend already logged in the current calendar day (from readSpendWindow). */
+  spentDayUsd: number;
+  /** Spend already logged in the current calendar month (from readSpendWindow). */
+  spentMonthUsd: number;
+  /** Sprint cost estimate to be added on top of existing spend. */
+  sprintEstimateUsd: number;
+  /** Loaded cost config (provides daily_max_usd, monthly_max_usd, enforce_spend_gate). */
+  costConfig: CostConfig;
+}
+
+export interface CostLimitWarnEvent {
+  type: 'BRAIN→USER:COST_LIMIT_WARN';
+  /** Which window tripped the threshold. */
+  window: 'day' | 'month';
+  /** Spend already consumed in the window. */
+  spentUsd: number;
+  /** Estimated sprint cost that was added to spentUsd. */
+  sprintEstimateUsd: number;
+  /** Projected total: spentUsd + sprintEstimateUsd. */
+  projectedUsd: number;
+  /** Configured limit that was exceeded. */
+  limitUsd: number;
+  /** Human-readable warning message for display/logging. */
+  message: string;
+}
+
+/**
+ * Check cumulative spend gate — warn-only, never blocks.
+ *
+ * Returns a COST_LIMIT_WARN event when:
+ * - cost_limits.enforce_spend_gate is true (default-off) AND
+ * - projectedSpend (spentThisWindow + sprintEstimateUsd) exceeds daily_max_usd
+ *   or monthly_max_usd.
+ *
+ * Daily window is evaluated before monthly; the first exceeded window is returned.
+ * Returns null when flag is off, both windows are within limits, or monthly_max_usd
+ * is unset.
+ *
+ * Pure function — no I/O. Callers supply pre-read spend values from readSpendWindow().
+ */
+export function checkSpendGate(input: SpendGateCheckInput): CostLimitWarnEvent | null {
+  const { spentDayUsd, spentMonthUsd, sprintEstimateUsd, costConfig } = input;
+  const limits = costConfig.cost_limits;
+
+  if (!limits.enforce_spend_gate) return null;
+
+  // Daily window
+  const projectedDay = spentDayUsd + sprintEstimateUsd;
+  if (projectedDay > limits.daily_max_usd) {
+    return {
+      type: 'BRAIN→USER:COST_LIMIT_WARN',
+      window: 'day',
+      spentUsd: spentDayUsd,
+      sprintEstimateUsd,
+      projectedUsd: projectedDay,
+      limitUsd: limits.daily_max_usd,
+      message:
+        `Projected daily spend $${projectedDay.toFixed(2)} exceeds daily limit ` +
+        `$${limits.daily_max_usd.toFixed(2)} (spent $${spentDayUsd.toFixed(2)} + ` +
+        `sprint estimate $${sprintEstimateUsd.toFixed(2)}).`,
+    };
+  }
+
+  // Monthly window (only when limit is configured)
+  if (limits.monthly_max_usd !== undefined) {
+    const projectedMonth = spentMonthUsd + sprintEstimateUsd;
+    if (projectedMonth > limits.monthly_max_usd) {
+      return {
+        type: 'BRAIN→USER:COST_LIMIT_WARN',
+        window: 'month',
+        spentUsd: spentMonthUsd,
+        sprintEstimateUsd,
+        projectedUsd: projectedMonth,
+        limitUsd: limits.monthly_max_usd,
+        message:
+          `Projected monthly spend $${projectedMonth.toFixed(2)} exceeds monthly limit ` +
+          `$${limits.monthly_max_usd.toFixed(2)} (spent $${spentMonthUsd.toFixed(2)} + ` +
+          `sprint estimate $${sprintEstimateUsd.toFixed(2)}).`,
+      };
+    }
+  }
+
+  return null;
+}
+
 // ─── Convenience: structured error payload for MCP ──────────────────────────
 
 export interface CostGateErrorPayload {

@@ -49,6 +49,7 @@ import { cleanTasksArchive } from './sprint-docs-updater.js';
 import {
   getRecentSprintStats,
   GO_WITH_GATE_FAILURE,
+  applyTechDebtDowngrade,
 } from './result-evaluator.js';
 
 // ─── Auditor (code verification — migrated Sprint 138) ────────────
@@ -1227,6 +1228,34 @@ export async function finalizeSprint(
     ].join('\n') + '\n';
     appendRetroSection(projectRoot, sprint.id, '### Gate Failure', gateSection);
   }
+
+  // 10b2. Tech-debt gate: downgrade sprint outcome when debt ratio exceeds configured threshold.
+  // Flag-gated: gate?.max_tech_debt_ratio absent or 0 → byte-identical (default-off).
+  // applyTechDebtDowngrade determines severity via completion-ratio thresholds (0.8 / 0.5).
+  debugLog('finalizeSprint:breadcrumb', 'Step 10b2 (techDebtGate) — entering');
+  try {
+    const maxDebtRatio = opts?.config?.gate?.max_tech_debt_ratio;
+    if (maxDebtRatio && maxDebtRatio > 0 && metrics.totalTasks > 0) {
+      const debtRatio = metrics.techDebtTasks / metrics.totalTasks;
+      if (debtRatio > maxDebtRatio) {
+        const completionRatio = 1 - debtRatio;
+        const downgradeResult = applyTechDebtDowngrade(
+          'DONE',
+          { selfAssessment: 'DONE' },
+          completionRatio,
+        );
+        // Gate triggered: severity determines whether outcome is GO_WITH_TECH_DEBT or GATE_FAILURE.
+        // applyTechDebtDowngrade: completionRatio < 0.5 → 'NO_GO' (severe) → GATE_FAILURE.
+        const newStatus = downgradeResult.decision === 'NO_GO'
+          ? GO_WITH_GATE_FAILURE
+          : TaskEvaluation.GO_WITH_TECH_DEBT;
+        sprint.status = newStatus as Sprint['status'];
+        debugLog('finalizeSprint:techDebtGate',
+          `Sprint ${sprint.id}: debt-ratio=${(debtRatio * 100).toFixed(1)}% > max=${(maxDebtRatio * 100).toFixed(1)}% → ${newStatus} (${downgradeResult.reason ?? 'gate triggered'})`);
+      }
+    }
+  } catch (e) { debugLog('finalizeSprint:techDebtGate', e); }
+  debugLog('finalizeSprint:breadcrumb', 'Step 10b2 (techDebtGate) — done');
 
   // 10c. Generate load-test-report.md from metrics.jsonl (Sprint 135 N6 — Task 5)
   debugLog('finalizeSprint:breadcrumb', 'Step 10c (loadReport) — entering');

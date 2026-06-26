@@ -74,6 +74,12 @@ export interface CostLimits {
   daily_max_usd: number;
   monthly_max_usd?: number;
   auto_confirm_below_usd?: number;
+  /**
+   * When true, checkSpendGate() emits BRAIN→USER:COST_LIMIT_WARN when projected
+   * cumulative spend (spentThisWindow + sprintEstimate) exceeds daily_max_usd or
+   * monthly_max_usd. Warn-only — sprint is never blocked. Default: false.
+   */
+  enforce_spend_gate?: boolean;
   alert_thresholds?: {
     warning_percent: number;
     critical_percent: number;
@@ -401,4 +407,68 @@ export function buildLedgerPrices(projectRoot: string): Record<string, { in: num
  */
 export function formatCostPerMTok(costPerToken: number): string {
   return `$${(costPerToken * 1_000_000).toFixed(2)}/MTok`;
+}
+
+// ─── Spend-Window Reader ───────────────────────────────────────────────────
+
+const RESOURCE_LOG_PATH = '.deckent/settings/resource-log.jsonl';
+
+/**
+ * Read cumulative USD spend from resource-log entries within a time window.
+ *
+ * Sums `costUsd` fields from `.deckent/settings/resource-log.jsonl` entries
+ * whose `ts` falls within the requested calendar window (current day or month).
+ * Returns 0 when the log is absent, empty, or contains no cost entries yet.
+ *
+ * Hermetic via injectable `readLines` (defaults to sync file read).
+ * Injectable `now` (ISO string) lets tests fix the reference timestamp.
+ */
+export function readSpendWindow(
+  root: string,
+  window: 'day' | 'month',
+  opts?: {
+    readLines?: (filePath: string) => string[];
+    now?: string;
+  },
+): number {
+  const logPath = join(root, RESOURCE_LOG_PATH);
+
+  const readLines =
+    opts?.readLines ??
+    ((p: string): string[] => {
+      try {
+        return readFileSync(p, 'utf-8').split('\n');
+      } catch {
+        return [];
+      }
+    });
+
+  const nowStr = opts?.now ?? new Date().toISOString();
+  // Prefix filter: 'day' → 'YYYY-MM-DD', 'month' → 'YYYY-MM'
+  const prefix = window === 'day' ? nowStr.slice(0, 10) : nowStr.slice(0, 7);
+
+  let total = 0;
+  for (const line of readLines(logPath)) {
+    if (!line.trim()) continue;
+    // Fast pre-filter to avoid JSON.parse on every Docker-stats entry
+    if (!line.includes('"costUsd"')) continue;
+
+    let entry: unknown;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!entry || typeof entry !== 'object') continue;
+    const e = entry as Record<string, unknown>;
+
+    const ts = e['ts'];
+    if (typeof ts !== 'string' || !ts.startsWith(prefix)) continue;
+
+    const costUsd = e['costUsd'];
+    if (typeof costUsd === 'number' && costUsd > 0) {
+      total += costUsd;
+    }
+  }
+  return total;
 }

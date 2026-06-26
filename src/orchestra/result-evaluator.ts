@@ -1953,6 +1953,9 @@ export function findBoundaryViolations(result: TaskResult, task: Task): string[]
     // Allow direct match OR match under any allowed directory in scope
     if (allowed.has(norm)) continue;
     if (protocolFiles.has(norm)) continue;
+    // Doc files (*.md) are never boundary violations — low-risk documentation,
+    // analogous to test-file scope-auto-expand (task-builder.ts BOUNDARY-TEST-PATTERN).
+    if (norm.endsWith('.md')) continue;
     // Scope-directory containment check
     const dirs = task.scope?.directories ?? [];
     const insideDir = dirs.some(d => {
@@ -1995,8 +1998,9 @@ function downgradeToNoGo(
  * Order of checks (first match wins):
  *   1. Stub literal (isStubResult)               → DISHONEST_DONE_STUB / CODE_VERIFIED_STUB
  *   2. filesChanged contains out-of-scope path   → BOUNDARY_VIOLATION
- *   3. filesChanged non-empty + linesAdded === 0 → SCOPE_VIOLATION_OR_EMPTY_WRITE
- *      (only when selfAssessment claims success)
+ *      (*.md doc files are exempt — low-risk documentation, never boundary violations)
+ *   3. filesChanged non-empty + linesAdded === 0 + linesRemoved === 0 → SCOPE_VIOLATION_OR_EMPTY_WRITE
+ *      (only when selfAssessment claims success; linesRemoved>0 = deletion task, not a stub)
  *
  * Real-work failure modes (linesAdded>0 + testsPassed=false) are left
  * untouched — the rubric scorer / mid-sprint reconciler handles those.
@@ -2059,10 +2063,16 @@ export function enforceHonestResultGate(
   // Check 3: filesChanged non-empty but linesAdded === 0 + claimed success
   // (sprint-finalizer's synthetic result shape — caught above by isStubResult,
   // but this is a backstop for any other producer that emits the same shape)
+  //
+  // Deletion tasks naturally produce linesAdded=0 — the worker deleted modules/tests.
+  // linesRemoved>0 is worker-reported evidence of real deletion work (same trust level
+  // as linesAdded). Skip Check 3 when deletions are claimed; genuine stubs have
+  // linesRemoved=0 and are still caught.
   if (
     !hasDiskEvidence &&
     (result.filesChanged?.length ?? 0) > 0 &&
     (result.linesAdded ?? 0) === 0 &&
+    (result.linesRemoved ?? 0) === 0 &&
     result.selfAssessment === 'DONE'
   ) {
     debugLog('enforceHonestResultGate', `Task ${task.id}: SCOPE_VIOLATION_OR_EMPTY_WRITE`);

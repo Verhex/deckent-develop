@@ -98,6 +98,19 @@ export interface WorkerCommsConfig {
   inject_shared?: boolean;
 }
 
+// ─── Gate Config ─────────────────────────────────────────────────────
+/** Sprint outcome gate configuration (Sprint 325, flag-gated default-off).
+ *  Controls post-evaluation outcome downgrade triggers. All fields optional;
+ *  absent block or all-zero values leave behavior byte-identical to pre-gate. */
+export interface GateConfig {
+  /** Maximum allowed tech-debt ratio (0–1). When the sprint's
+   *  (techDebtTasks / totalTasks) exceeds this value, the sprint outcome is
+   *  downgraded via applyTechDebtDowngrade: mild debt → GO_WITH_TECH_DEBT,
+   *  severe debt (completionRatio < 0.5) → GATE_FAILURE.
+   *  Absent or 0 = feature disabled (default-off). */
+  max_tech_debt_ratio?: number;
+}
+
 // ─── Cost Guard Config ───────────────────────────────────────────────
 /** Mid-sprint token-usage abort guard (Sprint 279 WK-cost). Opt-in — absent block = disabled. */
 export interface CostGuardConfig {
@@ -592,6 +605,11 @@ export interface DeckentConfig {
   /** Mid-sprint token-usage abort guard (Sprint 279 WK-cost). Default-disabled (opt-in). */
   cost_guard?: CostGuardConfig;
 
+  // ─── Gate (Sprint 325 — outcome downgrade triggers) ──────────────────
+  /** Sprint outcome gate configuration (flag-gated, default-off).
+   *  Absent block or max_tech_debt_ratio=0 → byte-identical behavior. */
+  gate?: GateConfig;
+
   // ─── ERP (capability-broker erp.read) ───────────────────────────────
   /** ERP connector for the `erp.read` capability (process + autonomous). Opt-in
    *  (`enabled` default-off); secret-free — the credential is read from an env
@@ -973,6 +991,8 @@ export interface ResolvedConfig {
   };
   /** Mid-sprint cost guard configuration (passed through from DeckentConfig). Default-disabled. */
   cost_guard?: CostGuardConfig;
+  /** Sprint outcome gate configuration (passed through from DeckentConfig). Default-disabled. */
+  gate?: GateConfig;
   /** Observability configuration (passed through from DeckentConfig) */
   observability?: DeckentConfig['observability'];
   /** Resolved runtime style — always 'sprint' or 'task' */

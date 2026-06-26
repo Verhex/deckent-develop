@@ -1,90 +1,101 @@
-# DIRECTIVES — Sprint: HALF-WIRED FEATURE DISPOSITION (comprehensive dogfood)
+# DIRECTIVES — Sprint: LIFECYCLE-ROBUSTNESS + ENFORCEMENT-VEIN (CC-fix backlog)
 
 ## Goal
-Deliver every brainstorm decision in ONE sprint — WIRE the valuable built-but-unwired capabilities,
-KES the genuinely-dead ones — as distinct-file parallel tasks. Spec of record:
-`docs/superpowers/specs/2026-06-26-halfwired-feature-disposition-design.md` (no ADR references — the
-ADR set is being overhauled; decisions stand on capability merit). Planner-deps normalization +
-cascade-skip hang-fixes are live, so dependency waves are safe.
+Fix the remaining campaign lifecycle bugs + land the design-ready enforcement-vein, as
+distinct-file parallel tasks. The planner-deps + cascade + FIX-skip (producedWork) hang/skip
+fixes are live, so the dependency pipeline + FIX phase work correctly. Enforcement spec of record:
+`docs/superpowers/specs/2026-06-26-halfwired-feature-disposition-design.md` is the feature spec;
+`DESIGN-ENFORCEMENT-VEIN.md` is the enforcement-vein design (flag-gated, default-off). No ADR
+references — the ADR set is being overhauled; decisions stand on capability merit.
 
 ## Ortak kurallar (BAĞLAYICI — her task)
 - **Cerrahi + distinct-file.** Yalnız scope.filesWrite'a yaz. İki task aynı dosyaya yazmaz.
-- **ESM** `.js` uzantı. **No haiku.** **Hermetik test** (tmpdir, async spawn, no spawnSync, no HOME-leak).
-- **Faithful-regression**: pre-fix RED / post-fix GREEN. **CC-verify gate:** `tsc --noEmit` temiz +
-  değişen-modülü import eden affected test-suite YEŞİL.
-- Davranış-değiştirenler **flag-gated default-OFF** (T0 flag'leri tanımlar). `process.cwd()` YASAK → `join(root, …)`.
-- KES: silmeden önce repo-geneli grep ile **zero prod-caller kanıtla**; `docs/architecture/architecture.md` referans veriyorsa güncelle.
-- Worker: impl GERÇEKTEN landmalı (test-yaz-impl-bırak YASAK).
+  **`src/orchestra/result-evaluator.ts` YALNIZ T2'nin** (T3 onu yalnız import-eder, edit-etmez).
+- **ESM** `.js`. **No haiku.** **Hermetik test** (tmpdir, async spawn, no spawnSync, no HOME-leak).
+- **Faithful-regression:** pre-fix RED / post-fix GREEN (git-stash kanıtlı). **CC-verify:**
+  `tsc --noEmit` temiz + değişen-modülü import eden affected test-suite YEŞİL.
+- Davranış-değiştiren enforcement **flag-gated default-OFF** (T3/T4/T5) → ürün byte-identical.
+  `process.cwd()` YASAK → `join(root, …)`. Worker: impl GERÇEKTEN landmalı.
 
 ---
 
-## Task 0: config-flags — yeni feature flag'leri (tek-sahip config dosyaları)
-- Model: sonnet | Effort: low | Agent: refactorer | Skills: typescript-expert
-- Files: src/core/config-types.ts, src/core/config.ts, tests/core/config-types.test.ts
-- Scope: src/core/
-### Description
-Üç yeni opsiyonel flag'i (hepsi default-off) `config-types.ts`'e ekle + `config.ts`'te boolean-validate et:
-`retry_transient_failures?: boolean` (T5), `routing?: { skill_agent_affinity?: boolean; agent_cache?: boolean }` (T6).
-Davranış-koruyucu: flag yokken hiçbir şey değişmez. **goNogo:** 3 flag tipli + valide; `tsc=0`; config test yeşil; faithful (geçersiz-tip → validation-error).
-
-## Task 1: KES lazy-loader (mekanik)
-- Model: sonnet | Effort: low | Agent: refactorer | Skills: code-simplifier
-- Files: src/core/lazy-loader.ts, tests/core/lazy-loader.test.ts
-- Scope: src/core/, tests/core/
-### Description
-`grep -rn lazyLoad|LazyMap|LazyHandle src --include=*.ts | grep -v test` → zero prod-caller doğrula, sonra `src/core/lazy-loader.ts` + testini sil. **goNogo:** zero-caller kanıtlı; `tsc=0`; suite yeşil; architecture.md referansı varsa güncel.
-
-## Task 2: KES api/rate-limiter (per-IP duplicate)
-- Model: sonnet | Effort: low | Agent: refactorer | Skills: code-simplifier
-- Files: src/api/rate-limiter.ts, tests/api/rate-limiter.test.ts
-- Scope: src/api/, tests/api/
-### Description
-`api/rate-limiter.ts ApiRateLimiter` (per-IP) canlı `server.ts SlidingWindowRateLimiter`'ın gerçek-duplicate'i. Zero-caller doğrula (`server.ts` kendi inline limiter'ını kullanır; `api/rate-limiter` self-contained), sonra modül + testini sil. **goNogo:** zero-caller kanıtlı; `tsc=0`; `tests/api` yeşil.
-
-## Task 3: result-merger split — detectOverlaps WIRE + mergeResults KES
-- Model: opus | Effort: high | Agent: architect | Skills: typescript-expert
-- Files: src/orchestra/result-merger.ts, src/orchestra/sprint-phases.ts, tests/orchestra/result-merger.test.ts, tests/orchestra/sprint-phases-overlap.test.ts
-- Scope: src/orchestra/, tests/orchestra/
-### Description
-`mergeResults`'ı SİL (inline sprint-reporter aggregation supersede ediyor). `detectOverlaps`'ı KORU ve EVALUATE faz'ına (`sprint-phases.ts runEvaluatePhase`) küçük POST-execution check olarak WIRE et: tüm worker'lar bitince, >1 worker'ın FİİLEN değiştirdiği dosyaları tespit et (pre-spawn `detectScopeCollisions`'tan farklı — gerçek-overlap) ve `BRAIN→AUDITOR:WORKER_OVERLAP` audit-event'i emit et (best-effort, EVALUATE-loop'u düşürmez). **Bu task `sprint-phases.ts`'in TEK sahibidir.** **goNogo:** detectOverlaps canlı (faithful: 2-worker-aynı-dosya → overlap-event RED→GREEN); mergeResults silindi + caller yok; `tsc=0`; orchestra-suite yeşil.
-
-## Task 4: sandbox `--sandbox` flag WIRE (no-Docker hafif izolasyon tier)
-- Model: opus | Effort: normal | Agent: devops-engineer | Skills: docker-expert
-- Files: src/cli/commands/start.ts, src/orchestra/spawn-backend.ts, tests/cli/start-sandbox.test.ts
-- Scope: src/cli/, src/orchestra/spawn-backend.ts, tests/cli/
-### Description
-Hazır `SandboxSpawnBackend`/`createSandboxBackend`'i bağla: `deckent start --sandbox` onu spawn-backend olarak seçsin (memory-cap + path-jail + opsiyonel net-block). **`sprint-spawner.ts`'e DOKUNMA** (T5 sahibi) — backend `spawnWorkers`'a opts.spawnBackend ile geçer. Default-off (flag yokken Docker/subprocess aynı). **goNogo:** `--sandbox` → SandboxSpawnBackend seçilir (faithful: flag-on → backend.name='claude-sandbox' RED→GREEN); flag-off byte-identical; `tsc=0`; test yeşil.
-
-## Task 5: task-retry WIRE + exponential backoff
+## Task 1: Planner structured-parse — `- Model:` → forceModel + `- Dependencies: N` index→slot-id
 - Model: opus | Effort: high | Agent: bug-fixer | Skills: typescript-expert
-- Files: src/orchestra/task-retry.ts, src/orchestra/sprint-spawner.ts, tests/orchestra/task-retry.test.ts
-- Scope: src/orchestra/task-retry.ts, src/orchestra/sprint-spawner.ts, tests/orchestra/
-- Dependencies: 0
+- Files: src/orchestra/task-builder.ts, tests/orchestra/task-builder.test.ts
+- Scope: src/orchestra/task-builder.ts, tests/orchestra/
 ### Description
-cascade'in transient-retry kararını (RUNTIME/AMBIGUOUS → shouldRetry, `result-evaluator.ts:1676`) re-queue mekanizmasına bağla: `sprint-spawner.ts`'te transient-fail + retryCount<MAX iken `createRetryTask` ile task'ı yeniden-kuyruğa (`-rN`, PENDING, backoff) koy — NO_GO bırakma. `task-retry.ts`'te flat 2-level backoff'u **exponential**'e çevir (5s→30s→120s). `config.retry_transient_failures` (T0) ile **flag-gated default-off**. FIX-phase (CODE→fix-worker) + runtime-extension'dan distinct. **`sprint-phases.ts`'e DOKUNMA** (T3 sahibi). **goNogo:** flag-on + RUNTIME-fail → re-queue (faithful: createRetryTask çağrılır RED→GREEN); flag-off byte-identical; exponential backoff; `tsc=0`; orchestra-suite yeşil.
+Structured-plan parser (task-builder.ts) İKİ override'ı düşürüyor (sprint-324 canlı-kanıt):
+(1) **`- Model: opus` per-task directive'i `forceModel`'e YANSIMIYOR** → tüm task'lar default sonnet
+(`forceModel?` alanı var ama `- Model:` satırından doldurulmuyor; `- Model:` parse-et → forceModel set-et,
+`- ModelEffort:` deseniyle tutarlı). (2) **`- Dependencies: 0` gibi INDEX-ref'i sprint-slot-id'ye
+(`324-001`) RESOLVE ETMİYOR** → bağımlılık unresolvable kalıyor (`parseDependenciesDirective`'te:
+saf-sayı/index ref'i, task-listesindeki o-index'in slot-id'sine çevir; zaten-slot-id olan dokunulmaz).
+**Kanıt:** `- Model: opus`-li task forceModel='opus' alır; `- Dependencies: 0`-lı task deps=[ilk-task-id].
+**goNogo:** her iki override structured-parse'ta honor edilir (faithful: pre-fix RED — Model-drop +
+index-dep-unresolved); tsc=0; task-builder-suite + structured-plan testleri yeşil.
 
-## Task 6: routing-v2 — agent-cache + skill→agent affinity (skill-first reorder)
+## Task 2: honest-gate deletion false-positive — meşru-deletion ≠ stub/boundary-violation
+- Model: opus | Effort: high | Agent: bug-fixer | Skills: typescript-expert
+- Files: src/orchestra/result-evaluator.ts, tests/orchestra/honest-gate-deletion.test.ts
+- Scope: src/orchestra/result-evaluator.ts, tests/orchestra/
+### Description
+`enforceHonestResultGate` (result-evaluator.ts ~2000-2070) meşru-DELETION task'larını false-NO_GO'luyor
+(sprint-324 324-002/003 canlı-kanıt): (1) **EMPTY_WRITE FP** — `filesChanged` boş-değil + `linesAdded===0`
+→ "stub" sanılıyor; ama DELETION (modül+test silme) doğal `linesAdded:0`. Fix: disk-verify
+(`verifyDiskAgainstClaim` zaten var) ile **gerçek-deletion** (claimed-dosyalar diskte YOK / `linesRemoved>0`)
+doğrulanırsa EMPTY_WRITE flag'leme. (2) **BOUNDARY FP** — task'ın açıkça-İSTEDİĞİ doc-update'i (örn.
+`architecture.md` satır-silme) scope-dışı sayılıyor. Fix: out-of-scope **doc-file (`*.md`) write'larını**
+non-violation say (test-file scope-auto-expand precedent'i task-builder.ts:468 ile aynı mantık — docs
+low-risk, source değil). **goNogo:** disk-doğrulanmış-deletion EMPTY_WRITE-FP'siz; out-of-scope `*.md`
+BOUNDARY-FP'siz; gerçek-stub (no-disk-evidence) + non-doc-source out-of-scope HÂLÂ flag'lenir (regresyon-yok);
+faithful (4-case: deletion→honest / md-out-of-scope→honest / gerçek-stub→flag / source-out-of-scope→flag);
+tsc=0; honest-gate + result-evaluator suite yeşil.
+
+## Task 3: enforcement A14 — applyTechDebtDowngrade wire (flag-gated)
 - Model: opus | Effort: high | Agent: architect | Skills: typescript-expert
-- Files: src/core/routing-engine.ts, src/core/activation-engine.ts, src/core/agent-cache.ts, tests/core/routing-v2.test.ts
-- Scope: src/core/routing-engine.ts, src/core/activation-engine.ts, src/core/agent-cache.ts, tests/core/
-- Dependencies: 0
+- Files: src/orchestra/sprint-finalizer.ts, src/core/config-types.ts, src/core/config.ts, tests/orchestra/gate-techdebt-downgrade.test.ts
+- Scope: src/orchestra/sprint-finalizer.ts, src/core/config-types.ts, src/core/config.ts, tests/orchestra/
 ### Description
-`routeTaskV2`'yi **skill-first reorder** et (skill-seçimi agent-seçiminden ÖNCE — skills agent'a bağlı değil), affinity-context'i (`{agentId, assignedSkills, enabled}`) `evaluateActivation` çağrılarına thread'le (`config.routing.skill_agent_affinity`, T0, default-off). `AgentSelectionCache`'i `selectBestAgent`'ı memoize etmek için bağla (cache-key SEÇİLEN SKILL'leri İÇERSİN → affinity-on iken doğru; pool/config-change'de `clear()`); `config.routing.agent_cache` (T0, default-off). **`config-types.ts`/`config.ts`'e DOKUNMA** (T0 sahibi). İki flag de default-off → byte-identical. Routing-balance validation ayrı follow-up. **`agent-cache.ts`'i sadece bu task düzenler.** **goNogo:** flag-off → routing çıktısı byte-identical (mevcut routing-testleri yeşil, reasoning-order güncellenebilir); flag-on affinity → skill-eşleşen agent bonus alır (faithful RED→GREEN); cache hit/miss doğru; `tsc=0`; core-suite yeşil.
+`applyTechDebtDowngrade` (result-evaluator.ts:1285) ZERO-prod-caller (computed-not-enforced). `sprint-finalizer.ts`
+finalize-akışında, per-task eval SONRASI, sprint'in tech-debt-ratio'su eşiği aşarsa sprint-outcome'u
+downgrade etmek için onu WIRE et (DONE→GO_WITH_TECH_DEBT/GATE_FAILURE). **`result-evaluator.ts`'i DÜZENLEME**
+(T2 sahibi) — `applyTechDebtDowngrade`'i yalnız import-et/çağır; imza değişmesi gerekiyorsa NO_GO+açıklama.
+Yeni flag `gate?: { max_tech_debt_ratio?: number }` (config-types.ts + config.ts boolean/number-validate),
+**default-off** (flag yok/0 → davranış değişmez). **goNogo:** flag-on + debt-ratio>eşik → downgraded-outcome
+(faithful: pre-wire RED — zero-caller); flag-off byte-identical; tsc=0; sprint-finalizer + gate testleri yeşil.
 
-## Task 7: whatsapp connector WIRE
-- Model: sonnet | Effort: normal | Agent: api-builder | Skills: api-builder
-- Files: src/connectors/connector-bootstrap.ts, src/connectors/whatsapp.ts, tests/connectors/whatsapp-bootstrap.test.ts
-- Scope: src/connectors/connector-bootstrap.ts, src/connectors/whatsapp.ts, tests/connectors/
+## Task 4: enforcement B6 — cost-gate cumulative spend warn (flag-gated)
+- Model: opus | Effort: high | Agent: devops-engineer | Skills: typescript-expert
+- Files: src/core/cost-gate.ts, src/core/cost-config-loader.ts, tests/core/cost-gate-spend.test.ts
+- Scope: src/core/cost-gate.ts, src/core/cost-config-loader.ts, tests/core/
 ### Description
-`connector-bootstrap.ts` SUPPORTED listesine `'whatsapp'` ekle + dynamic-load (`await import('./whatsapp.js')`) yolunu telegram/discord deseniyle bağla → whatsapp selectable olsun. **`connector-pool.ts`'e DOKUNMA** (T8 sahibi). **goNogo:** whatsapp SUPPORTED + load-edilebilir (faithful: bootstrap whatsapp döndürür RED→GREEN); `tsc=0`; connectors-suite yeşil.
+`daily_max_usd`/`monthly_max_usd` (cost-config-loader.ts) validate-edilip settable ama **kümülatif
+spend-gate olarak enforce-EDİLMİYOR** (`cost-gate.ts` yalnız per-sprint `auto_confirm_below_usd`-estimate'i
+gate'liyor). Wire (warn-only first): usage/resource-ledger'dan (`.deckent/settings/resource-log.jsonl`)
+`readSpendWindow(root, 'day'|'month')` oku; pre-spawn `projectedSpend = spentThisWindow + sprintEstimate`
+hesapla; `daily_max_usd` (veya monthly) aşılırsa `BRAIN→USER:COST_LIMIT_WARN` event + notify (warn-only,
+ASLA bloke-etmez). Yeni flag `cost_limits.enforce_spend_gate?: boolean` (cost-config-loader.ts),
+**default-off**. **goNogo:** ledger eşik-üstü + flag-on → warn-event emit (sprint devam-eder); flag-off
+veya eşik-altı → event-yok (faithful RED→GREEN); tsc=0; cost-gate + cost-config testleri yeşil.
 
-## Task 8: connector-pool WIRE (broadcast-to-all)
-- Model: sonnet | Effort: normal | Agent: api-builder | Skills: api-builder
-- Files: src/connectors/connector-pool.ts, src/connectors/connector-notify-adapter.ts, tests/connectors/connector-pool.test.ts
-- Scope: src/connectors/connector-pool.ts, src/connectors/connector-notify-adapter.ts, tests/connectors/
+## Task 5: enforcement B1 — worker hard-deny (enforce_rbac honor, flag-gated)
+- Model: opus | Effort: high | Agent: security-auditor | Skills: security-specialist
+- Files: src/agents/worker.ts, tests/agents/worker-authority.test.ts
+- Scope: src/agents/worker.ts, tests/agents/
 ### Description
-`ConnectorPool`'u bağla: tüm aktif connector'lara fan-out eden bir broadcast notify-path. `connector-notify-adapter.ts`'te (canlı per-channel notify'ın yanına) opsiyonel broadcast-to-all yolu ekle. **`connector-bootstrap.ts`'e DOKUNMA** (T7 sahibi). **goNogo:** ConnectorPool.broadcast canlı caller'a sahip (faithful RED→GREEN); per-channel path korunur; `tsc=0`; connectors-suite yeşil.
+`agents/worker.ts:602-620` `checkWorkerAuthority` her iki branch'te `return true` (Layer-2 soft — V1.0
+kasıtlı). `enforce_rbac` flag'i ZATEN config'te (config-types.ts:836) + threaded (sprint-runtime.ts:30) +
+hard-deny path ZATEN var (authority-matrix.ts:351). Eksik: worker-side flag'i honor-etsin. Fix:
+`opts.enforceRbac === true` + scope-violation → `return false` (DENY) yap; flag-off → eski `return true`
+(byte-identical). **`config-types.ts`'e DOKUNMA** (enforce_rbac zaten var; T3 config sahibi). **goNogo:**
+flag-on + scope-dışı-write → checkWorkerAuthority false/deny (faithful: pre-fix RED — hep true); flag-off
+allow (byte-identical); tsc=0; worker-authority testleri yeşil. (Not: deckent-dev `.deckent/config.json`
+gitignored — dogfood'da enforce_rbac=true ayrı/manuel, ürün-default soft kalır.)
 
 ---
 
-**Beklenen:** 9 distinct-file paralel task (T5,T6 → T0 depend). Core/davranış-değiştiren (T3-T6) opus, mekanik (T0-T2, T7-T8) sonnet. Her task faithful + `tsc=0` + affected-suite yeşil. Sprint full-lifecycle'ı (AI-plan→parallel-spawn→execute→evaluate→FIX→retro) gerçek-dogfood olarak koşar. Deferred (DOKUNMA): core `TenantRateLimiter`, sandbox-elevate, routing-affinity default-on.
+**Beklenen:** 5 distinct-file paralel task (dep-yok, hepsi bağımsız). Hepsi **opus** (core/davranış-değiştiren),
+faithful + `tsc=0` + affected-suite yeşil. T3/T4/T5 enforcement flag-gated default-off (ürün byte-identical).
+Sprint full-lifecycle'ı (plan→spawn→execute→evaluate→FIX→retro) koşar; T1 (planner-fix) + T2 (honest-gate-fix)
+gelecek-sprint'lerin planlama+değerlendirme kalitesini düzeltir (dogfood self-correction). DEFER (DOKUNMA):
+routing-affinity-enable (attended balance-validation) · enterprise/MOD-SPLIT (triage-dışı) · büyük-subsystem.

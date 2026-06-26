@@ -348,6 +348,13 @@ export function resolveDependencyRef(
   if (!trimmed) return undefined;
   if (DEPENDENCY_REF_RESERVED.has(trimmed.toUpperCase())) return undefined;
 
+  // Pure integer → 0-based index into the task list (e.g. "0" resolves to the first task's id).
+  // This handles `- Dependencies: 0` refs where the planner emits a list index instead of a slot-id.
+  if (/^\d+$/.test(trimmed)) {
+    const idx = Number.parseInt(trimmed, 10);
+    return tasks[idx]?.id;
+  }
+
   if (PLAN_SLOT_ID_RE.test(trimmed)) {
     const exact = tasks.find(t => t.id === trimmed);
     return exact?.id;
@@ -888,18 +895,13 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
     const parsedProvider = (rawProvider && VALID_PROVIDERS_ALL.includes(rawProvider) ? rawProvider : undefined) as ProviderName | undefined;
 
     // Extract optional Model: override (e.g., "Model: opus", "Model: qwen3.6:27b")
+    // Parsed verbatim — consistent with ModelEffort pattern. Downstream routing/spawn
+    // validates model availability per-provider; no upfront ALL_MODELS gatekeeping here.
     const modelLine = lines.find(l => /^[\s-]*Model:\s*/i.test(l.trim()));
     const forceModel = modelLine
       ? modelLine.trim().replace(/^-\s+/, '').replace(/^Model:\s*/i, '').trim().toLowerCase()
       : undefined;
-    // For adapter-providers (ollama → host-HTTP), accept raw model tag as pass-through;
-    // OllamaAdapter validates dynamically via /api/tags at spawn (Sprint 234).
-    // For typed providers (claude/codex/gemini), keep ALL_MODELS validation.
-    const parsedForceModel = (forceModel
-      ? (parsedProvider && isAdapterProvider(parsedProvider)
-          ? forceModel
-          : ((ALL_MODELS as readonly string[]).includes(forceModel) ? forceModel : undefined))
-      : undefined) as ModelType | undefined;
+    const parsedForceModel = (forceModel || undefined) as ModelType | undefined;
 
     // Extract optional Effort: override (e.g., "Effort: max")
     const effortLine = lines.find(l => /^[\s-]*Effort:\s*/i.test(l.trim()));
@@ -1035,14 +1037,10 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
         // VALID_PROVIDERS_ALL is the canonical extended source (includes 'ollama').
         const parsedProvider = (rawProvider && VALID_PROVIDERS_ALL.includes(rawProvider) ? rawProvider : undefined) as ProviderName | undefined;
 
-        // Extract Model override — adapter-providers accept raw tag pass-through.
+        // Extract Model override — parsed verbatim (consistent with ModelEffort pattern).
         const modelLine = allLines.find(l => /Model:\s*/i.test(l));
         const rawModel = modelLine ? modelLine.replace(/.*Model:\s*/i, '').trim().toLowerCase() : undefined;
-        const parsedForceModel = (rawModel
-          ? (parsedProvider && isAdapterProvider(parsedProvider)
-              ? rawModel
-              : ((ALL_MODELS as readonly string[]).includes(rawModel) ? rawModel : undefined))
-          : undefined) as ModelType | undefined;
+        const parsedForceModel = (rawModel || undefined) as ModelType | undefined;
 
         // Extract Effort override
         const effortLine = allLines.find(l => /Effort:\s*/i.test(l));

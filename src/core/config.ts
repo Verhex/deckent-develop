@@ -909,6 +909,17 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  // ─── Gate config validation (Sprint 325) ───────────────────────────
+  if (config.gate !== undefined) {
+    const g = config.gate;
+    if (g.max_tech_debt_ratio !== undefined) {
+      const v = g.max_tech_debt_ratio;
+      if (typeof v !== 'number' || Number.isNaN(v) || v < 0 || v > 1) {
+        errors.push(`Invalid value '${v}' for field 'gate.max_tech_debt_ratio'. Must be a number in [0, 1].`);
+      }
+    }
+  }
+
   // ─── deckent_style validation ───────────────────────────────────────
   if (config.deckent_style !== undefined && !['sprint', 'task', 'process'].includes(config.deckent_style)) {
     errors.push(`Invalid value '${config.deckent_style}' for field 'deckent_style'. Valid options: sprint, task, process`);
@@ -1561,6 +1572,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     worker_comms: config.worker_comms,
     // Cost Guard — passed through (opt-in, absent = disabled)
     cost_guard: config.cost_guard,
+    // Gate — passed through (opt-in, default-off)
+    gate: config.gate,
     // ERP connector — passed through (opt-in, absent = disabled; secret-free)
     erp: config.erp,
     // Plan config (Sprint 276 PLAN-INT-1) — passed through (opt-in, absent = disabled)
@@ -2242,6 +2255,8 @@ export function mergeConfigs(
     worker_comms: config.worker_comms,
     // Cost Guard — passed through (opt-in, absent = disabled)
     cost_guard: config.cost_guard,
+    // Gate — passed through (opt-in, default-off)
+    gate: config.gate,
     // ERP connector — passed through (opt-in, absent = disabled; secret-free)
     erp: config.erp,
     // Plan config (Sprint 276 PLAN-INT-1) — passed through (opt-in, absent = disabled)

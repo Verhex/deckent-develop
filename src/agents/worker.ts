@@ -588,6 +588,7 @@ export function checkWorkerAuthority(
   taskId: string,
   sprintId?: string,
   isSelfModifyingSprint = false,
+  opts?: { enforceRbac?: boolean },
 ): boolean {
   const result = checkAuthority({
     role: 'worker',
@@ -612,6 +613,11 @@ export function checkWorkerAuthority(
         scopeFilesWrite: scope.filesWrite,
         isSelfModifyingSprint,
       }, result);
+    }
+
+    // ADR-037 V2 hard-deny: honor enforce_rbac flag when on; soft (allow) when off.
+    if (opts?.enforceRbac === true) {
+      return false;
     }
 
     return true;
