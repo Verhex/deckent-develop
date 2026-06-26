@@ -275,6 +275,13 @@ Plan A (engine) merge-ready onaylandı (33/33 test, sıfır Critical, fail-open 
 - **owner perms** — ✅ Plan A'da `['*']` koşulsuz yapıldı (role-map admin'i daraltsa bile owner=full).
 - **`source` taksonomisi** — `ResolvedPrincipal.source` `'local'`/`'guest'`/`'otp'` karışık taşıyor; audit netliği için tek taksonomi.
 - **start-rate-limit (M1)** — `startVerify` re-send'de lockout sıfırlar (`putPendingVerify` ON CONFLICT attempts=0); gateway `(connector,externalId)` başına `startVerify`'ı rate-limit etmeli (§5.3 ile uyumlu, brute-force amplification engeli).
+
+### 11.2 Faz-1b (wiring) final-review follow-up'ları (2026-06-26)
+Plan B merge-ready onaylandı (513 connector test, confused-deputy + I-1 inert-feature **fix'lendi**). Kalan minor hardening (merge-blocker değil; Plan-C/strict-mode'da ele alınacak):
+- **init-failure fail-closed (strict mode)** — `identity.enabled:true` iken `loadGatewayAccess()`/`new IdentityStore()` throw ederse oturum identity'siz **per-channel'a graceful-degrade** ediyor (per-user gate için fail-open). Blast-radius sınırlı (yalnız per-channel allowlist'i geçen gönderen onChat'e ulaşır) + pre-I-1'den kötü değil; ama `enforcement:'strict'`'te init-failure capability'yi **reddetmeli** (degrade değil).
+- **IdentityStore dispose** — bootstrap'ın açtığı `identityStore` `handle.dispose()`'da kapatılmıyor (tek process-ömrü instance, prod'da zararsız; connector-recycle/Windows handle hijyeni için kapatılmalı).
+- **L2 gate defensive guard** — `execute.ts` `principalCan(ctx.principal.permissions ?? [], …)` (runtime-corrupt principal'a karşı; TS kontratı zaten engelliyor, ucuz fail-closed netliği).
+- **`source` taksonomisi** + **e2e null-principal coverage** — küçük test/audit netliği.
 - **prepared-statement pre-compile** — `IdentityStore` hot-path için statement'ları constructor'da derleyebilir (memory-store.ts deseni).
 
 ### 11.1 Faz-1b — binding aktivasyonu (final review I-1, kapatıldı)
