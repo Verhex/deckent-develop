@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
-import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { randomBytes } from 'node:crypto';
 
@@ -548,6 +548,15 @@ describe('waitForResults — token enrichment integration', () => {
     expect(results[0]!.tokenUsage!.outputTokens).toBe(2250); // 150 * 15
     expect(results[0]!.tokenUsage!.model).toBe('opus');
     expect(results[0]!.tokenUsage!.provider).toBe('claude');
+
+    // PERSISTENCE: the enriched tokenUsage must be written BACK to the .result FILE,
+    // not just the in-memory result — the bug was that enrichment was in-memory only,
+    // so the on-disk .result stayed at the worker's 0/0. Re-read the file to confirm.
+    const persisted = JSON.parse(
+      readFileSync(join(tmpDir, '.tasks', 'task-int-001.result'), 'utf-8'),
+    ) as TaskResult;
+    expect(persisted.tokenUsage?.inputTokens).toBe(10000);
+    expect(persisted.tokenUsage?.outputTokens).toBe(2250);
   });
 
   it('does not overwrite worker-reported tokenUsage during collection', async () => {

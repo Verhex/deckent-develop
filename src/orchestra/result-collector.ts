@@ -73,6 +73,7 @@ import {
 import { providerRegistry } from '../core/provider.js';
 import { loadCostConfig } from '../core/cost-config-loader.js';
 import { calculateActualCost } from '../core/cost-calculator.js';
+import { writeFileSync, renameSync } from 'node:fs';
 
 // ─── Sprint Spawner (lazy import — avoid module init cycle) ──────
 // ADR-045: respawnEligibleTasks wire — invoked at runtime only, never at
@@ -525,6 +526,28 @@ export function enrichResultCost(
   }
 }
 
+/**
+ * Persist the orchestrator-enriched result (tokenUsage + cost) back to the
+ * `.result` FILE. {@link enrichResultTokenUsage}/{@link enrichResultCost} mutate
+ * the in-memory result only; without this write the on-disk `.result` keeps the
+ * worker's 0/0 placeholder (the "token counter never shows in the file" bug).
+ *
+ * Side-effect-free + best-effort: a plain atomic write (temp + rename) — NOT
+ * worker.ts `writeResult`, which also re-applies the honest-gate stub-downgrade
+ * and a task-status update (wrong at collection time). A write failure is logged
+ * and ignored so it never breaks collection.
+ */
+function persistEnrichedResult(projectRoot: string, result: TaskResult): void {
+  try {
+    const path = join(projectRoot, TASKS_DIR, `task-${result.taskId}.result`);
+    const tmp = `${path}.enrich-tmp`;
+    writeFileSync(tmp, JSON.stringify(result, null, 2), 'utf-8');
+    renameSync(tmp, path);
+  } catch (err) {
+    debugLog('persistEnrichedResult', err);
+  }
+}
+
 // ═══ Exported Functions ═══════════════════════════════════════════
 
 /**
@@ -693,6 +716,10 @@ export async function waitForResults(
           enrichResultTokenUsage(result, taskMap.get(taskId), projectRoot);
           enrichResultCost(result, taskMap.get(taskId), projectRoot);
           sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, result.filesChanged);
+          // Persist the orchestrator-enriched tokenUsage + cost back to the .result FILE.
+          // enrichResultTokenUsage/enrichResultCost mutate the in-memory result only;
+          // without this write the on-disk .result keeps the worker's 0/0 placeholder.
+          persistEnrichedResult(projectRoot, result);
           results.push(result);
           collected.add(taskId);
           newlyCollected.push(taskId);
@@ -735,6 +762,8 @@ export async function waitForResults(
           enrichResultTokenUsage(lateResult, taskMap.get(taskId), projectRoot);
           enrichResultCost(lateResult, taskMap.get(taskId), projectRoot);
           sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, lateResult.filesChanged);
+          // Persist enriched tokenUsage + cost to the .result FILE (see above).
+          persistEnrichedResult(projectRoot, lateResult);
           results.push(lateResult);
           collected.add(taskId);
           newlyCollected.push(taskId);
@@ -1239,6 +1268,8 @@ export async function waitForResults(
         // genuine worker-sourced filesChanged, same source as branches (a)/(b).
         // The helper is idempotent + guarded, so this is harmless if already swept.
         sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, result.filesChanged);
+        // Persist enriched tokenUsage + cost to the .result FILE (see above).
+        persistEnrichedResult(projectRoot, result);
         results.push(result);
         collected.add(taskId);
         syncTaskStatusFromResult(taskId, result);
