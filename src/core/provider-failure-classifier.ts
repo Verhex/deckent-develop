@@ -39,6 +39,15 @@ export interface ProviderFailureInput {
   resultNotes?: string;
   /** Worker process exit code, if available (137 = SIGKILL/OOM). */
   exitCode?: number;
+  /**
+   * Whether the worker produced substantive work (file changes / lines, or a real
+   * — even if structurally-rejected — result). A worker that produced work clearly
+   * reached AND executed on the provider, so it CANNOT be a usage-limit/auth failure
+   * (those mean the worker never got to run). Guards against false-positives where the
+   * task's SUBJECT text leaks a provider-error keyword into the notes — e.g. a KES task
+   * deleting `rate-limiter.ts` whose notes mention "rate-limit" (sprint-324 FIX-skip bug).
+   */
+  producedWork?: boolean;
 }
 
 /**
@@ -104,6 +113,16 @@ export function classifyProviderFailure(input: ProviderFailureInput): ProviderFa
   // ── Hard rule: exit 137 = SIGKILL (kernel OOM or docker stop) ───────
   if (input.exitCode === SIGKILL_EXIT_CODE) {
     return 'oom';
+  }
+
+  // ── Worker-ran guard: a worker that produced substantive work reached AND
+  // executed on the provider, so it CANNOT be a usage-limit/auth failure (those
+  // mean the worker never ran). This blocks task-SUBJECT text from being read as a
+  // provider error — e.g. a KES task deleting `rate-limiter.ts` whose notes mention
+  // "rate-limit" (sprint-324: that false-positive skipped the whole FIX wave). OOM is
+  // exempt — it is the exitCode hard-rule above (a worker can OOM mid-work).
+  if (input.producedWork === true) {
+    return 'unknown';
   }
 
   const text = `${input.workerLog ?? ''}\n${input.resultNotes ?? ''}`;

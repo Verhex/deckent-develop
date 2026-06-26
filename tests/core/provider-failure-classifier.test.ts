@@ -94,6 +94,43 @@ describe('classifyProviderFailure — signatures', () => {
   });
 });
 
+describe('classifyProviderFailure — producedWork discriminator (sprint-324 false-positive)', () => {
+  // Root cause of the sprint-324 FIX-skip bug: a KES task deleting `src/api/rate-limiter.ts`
+  // wrote "rate-limit"/"rate-limiter" all over its result notes (the module's NAME), matching
+  // the generic /rate.?limit/ usage-limit pattern → the worker was mis-classified as having hit
+  // a provider rate-limit even though it RAN and produced work. A worker that produced file
+  // changes clearly reached + executed on the provider, so it cannot be a usage-limit/auth
+  // failure (those mean the worker never got to run).
+  it('does NOT flag usage-limit when the worker produced work, despite "rate-limit" in notes', () => {
+    expect(classifyProviderFailure({
+      resultNotes: '[honest-gate] SCOPE_VIOLATION_OR_EMPTY_WRITE: deleted src/api/rate-limiter.ts (rate-limit module)',
+      producedWork: true,
+    })).toBe('unknown');
+  });
+
+  it('still flags a genuine usage-limit when the worker produced NO work (exit-without-result)', () => {
+    expect(classifyProviderFailure({
+      resultNotes: 'Claude usage limit reached. Your limit will reset at 3pm.',
+      producedWork: false,
+    })).toBe('usage-limit');
+  });
+
+  it('producedWork=true never masks a real OOM (exitCode 137 hard-rule wins)', () => {
+    expect(classifyProviderFailure({ exitCode: 137, producedWork: true })).toBe('oom');
+  });
+});
+
+describe('summarizeProviderFailures — worker-ran NO_GOs do not skip FIX (sprint-324)', () => {
+  it('two NO_GOs that produced work (one mentions rate-limit) → 0 usage-limit, skipFix false', () => {
+    const s = summarizeProviderFailures([
+      { resultNotes: 'deleted the rate-limiter module; tsc clean', producedWork: true },
+      { resultNotes: '[honest-gate] BOUNDARY_VIOLATION: architecture.md out of scope', producedWork: true },
+    ]);
+    expect(s.usageLimit).toBe(0);
+    expect(s.skipFix).toBe(false);
+  });
+});
+
 describe('summarizeProviderFailures — FIX-skip threshold', () => {
   const limit = { resultNotes: 'usage limit reached' };
   const code = { resultNotes: '3 tests failed' };
