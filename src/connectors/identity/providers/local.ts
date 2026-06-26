@@ -22,7 +22,7 @@ export class LocalIdentityProvider implements IdentityDirectoryProvider {
   resolve(ref: ExternalRef, tenantId: string): ResolvedPrincipal | null {
     const owner = this.opts.owner;
     if (owner && owner.connector === ref.connector && owner.externalId === ref.externalId && owner.tenantId === tenantId) {
-      return { userId: owner.externalId, role: 'admin', permissions: resolvePermissions('admin', this.opts.roleMap), tenantId, verified: true, source: 'local' };
+      return { userId: owner.externalId, role: 'admin', permissions: ['*'], tenantId, verified: true, source: 'local' };
     }
     const rec = this.store.getIdentity(ref.connector, ref.externalId, tenantId);
     if (!rec) return null; // fail-closed

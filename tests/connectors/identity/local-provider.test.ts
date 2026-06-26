@@ -34,4 +34,13 @@ describe('LocalIdentityProvider', () => {
     // @ts-expect-error — exercising the runtime guard
     expect(() => createIdentityProvider({ kind: 'scim', store, local: { edition: 'enterprise' } })).toThrow(/E_UNKNOWN_IDENTITY_PROVIDER/);
   });
+  it('owner shortcut always returns full permissions even when roleMap narrows admin', () => {
+    const p = new LocalIdentityProvider(store, {
+      edition: 'solo',
+      roleMap: { admin: { role: 'admin', permissions: ['order:read'] } },
+      owner: { connector: 'telegram', externalId: '1', tenantId: 'solo' },
+    });
+    const r = p.resolve({ connector: 'telegram', externalId: '1', kind: 'telegram-id' }, 'solo');
+    expect(r?.permissions).toEqual(['*']);
+  });
 });

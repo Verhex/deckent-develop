@@ -40,4 +40,10 @@ describe('verify-bind', () => {
   it('rejects confirm with nothing pending', () => {
     expect(confirmVerify(deps(), ref, '123456', bind)).toEqual({ ok: false, reason: 'none-pending' });
   });
+  it('rejects confirm from a different tenant and clears the pending row (tenant-mismatch)', () => {
+    startVerify(deps(), ref, 'ahmet@firma.com', 'firmax');
+    const crossBind = { principalId: 'ahmet', role: 'operator' as const, tenantId: 'firmay' };
+    expect(confirmVerify(deps(), ref, '123456', crossBind)).toEqual({ ok: false, reason: 'tenant-mismatch' });
+    expect(store.getPendingVerify('telegram', '77')).toBeNull(); // pending cleared on mismatch
+  });
 });

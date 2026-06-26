@@ -17,7 +17,7 @@ export interface VerifyDeps {
 export type StartResult = { ok: true; code: string } | { ok: false; reason: 'invalid-email' };
 export type ConfirmResult =
   | { ok: true; principal: ResolvedPrincipal }
-  | { ok: false; reason: 'none-pending' | 'expired' | 'too-many' | 'wrong-code' };
+  | { ok: false; reason: 'none-pending' | 'expired' | 'too-many' | 'wrong-code' | 'tenant-mismatch' };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -43,6 +43,7 @@ export function confirmVerify(
 ): ConfirmResult {
   const pending = deps.store.getPendingVerify(ref.connector, ref.externalId);
   if (!pending) return { ok: false, reason: 'none-pending' };
+  if (pending.tenantId !== binding.tenantId) { deps.store.deletePendingVerify(ref.connector, ref.externalId); return { ok: false, reason: 'tenant-mismatch' }; }
   if (deps.now() > pending.expiresAt) { deps.store.deletePendingVerify(ref.connector, ref.externalId); return { ok: false, reason: 'expired' }; }
   if (pending.attempts >= deps.maxAttempts) { deps.store.deletePendingVerify(ref.connector, ref.externalId); return { ok: false, reason: 'too-many' }; }
   if (pending.code !== code) {
