@@ -127,3 +127,20 @@ export function enforceRbac(
   if (!rbacConfig?.enabled) return true;
   return can(role, action, tenantId);
 }
+
+// ─── Resource:action permission check (connector-surface RBAC) ────
+// Principals carry a permission set of `resource:action` tokens (e.g. 'order:read'),
+// resolved from a role-map (see connectors/identity/role-map.ts). Supports wildcards:
+//   '*'        → all permissions
+//   '<res>:*'  → any action on a resource
+//   '*:<act>'  → an action on any resource
+// Empty set denies (fail-closed). Used by the connector-surface tool-gate (ADR-092).
+export function principalCan(permissions: readonly string[], required: string): boolean {
+  if (permissions.includes('*')) return true;
+  if (permissions.includes(required)) return true;
+  const idx = required.indexOf(':');
+  if (idx < 0) return false;
+  const res = required.slice(0, idx);
+  const act = required.slice(idx + 1);
+  return permissions.includes(`${res}:*`) || permissions.includes(`*:${act}`);
+}
