@@ -122,6 +122,9 @@ import {
 // ─── Result Map Helper ──────────────────────────────────────────
 import { buildResultsMap } from './result-collector.js';
 
+// ─── Overlap Detection (Sprint 324 — Task 324-004) ───────────────
+import { ResultMerger } from './result-merger.js';
+
 // ─── Evaluation Audit Trail (Sprint 161 — Task 2) ───────────────
 // Per-task forensic record of every Brain evaluation decision. Wire
 // is fail-soft: any I/O error during audit write is debugLog'd but
@@ -1807,6 +1810,32 @@ export async function runEvaluatePhase(
     }
     debugLog('runEvaluatePhase:done', `evaluations.size=${evaluations.size} keys=[${[...evaluations.keys()].join(',')}]`);
 
+    // ─── Post-Execution Overlap Check (Sprint 324 — Task 324-004) ──────
+    // After all workers complete: detect files actually changed by >1 worker.
+    // Different from pre-spawn detectScopeCollisions — this checks real-overlap
+    // from .result filesChanged data. Best-effort: fault never drops EVALUATE.
+    try {
+      const overlapInput = results
+        .filter(r => r.filesChanged && r.filesChanged.length > 0)
+        .map(r => ({ taskId: r.taskId, filesChanged: r.filesChanged }));
+      if (overlapInput.length >= 2) {
+        const overlaps = new ResultMerger().detectOverlaps(overlapInput);
+        if (overlaps.length > 0) {
+          const sidForOverlap = getCurrentSprintId(projectRoot) ?? sprint.id;
+          writeEvent(
+            projectRoot, sidForOverlap, 'brain', 'auditor',
+            'BRAIN→AUDITOR:WORKER_OVERLAP',
+            {
+              sprintId: sprint.id,
+              overlaps,
+              totalOverlappingFiles: overlaps.length,
+              timestamp: new Date().toISOString(),
+            },
+          );
+        }
+      }
+    } catch (e) { debugLog('runEvaluatePhase:workerOverlapCheck', e); }
+
     // ─── Sprint 156 Task 003: Cascade NO_GO → dependents PAUSED ──────
     // For each task that ended up NO_GO with a real result file, classify
     // the failure and (if CODE) cascade-block PENDING dependents → PAUSED.
@@ -2023,7 +2052,13 @@ export async function runFixPhase(
       for (const [taskId, ev] of evaluations) {
         if (ev !== TaskEvaluation.NO_GO) continue;
         const r = guardResultsMap.get(taskId);
-        noGoInputs.push({ resultNotes: r?.notes });
+        // producedWork: a worker that changed files / added lines clearly RAN on the
+        // provider, so it cannot be a provider usage-limit (sprint-324: a KES task whose
+        // notes named the "rate-limiter" module it deleted was mis-flagged as a provider
+        // rate-limit, skipping the whole FIX wave). Without this signal the classifier
+        // pattern-matches the worker's task-SUBJECT text and parks legitimate FIX work.
+        const producedWork = (r?.filesChanged?.length ?? 0) > 0 || (r?.linesAdded ?? 0) > 0;
+        noGoInputs.push({ resultNotes: r?.notes, producedWork });
       }
       // summarizeProviderFailures runs classifyProviderFailure() over each
       // NO_GO input and aggregates the usage-limit ratio + skip verdict.

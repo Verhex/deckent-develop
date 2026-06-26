@@ -99,6 +99,16 @@ export class ConnectorPool {
   }
 
   /**
+   * Broadcast a message to ALL registered connectors in parallel.
+   *
+   * Shorthand for `broadcast(msg, [...all registered ids])`. Per-connector error
+   * isolation is preserved — a failure in one connector does not affect others.
+   */
+  broadcastAll(msg: Omit<OutgoingMessage, 'connector'>): Promise<BroadcastResult[]> {
+    return this.broadcast(msg, Array.from(this.connectors.keys()));
+  }
+
+  /**
    * Register a handler that receives incoming messages from ALL connectors.
    *
    * Internally calls `onMessage` on every currently-registered connector.

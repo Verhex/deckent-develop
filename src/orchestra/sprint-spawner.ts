@@ -49,6 +49,18 @@ function readTokenThrottleMs(config: ResolvedConfig): number {
   return raw;
 }
 
+/**
+ * Read `retry_transient_failures` from a ResolvedConfig via a local cast.
+ * The field is not yet promoted to config-types.ts (Sprint 324 Task 006 scope).
+ * Pattern mirrors `readTokenThrottleMs` above.
+ *
+ * Default: false (feature is opt-in, default-off per T0 spec).
+ */
+function readRetryTransientFailures(config: ResolvedConfig | undefined): boolean {
+  if (!config) return false;
+  return (config as ResolvedConfig & { retry_transient_failures?: boolean }).retry_transient_failures === true;
+}
+
 // ─── Core — system profile ────────────────────────────────────────
 import { getSystemProfile } from '../core/system-profile.js';
 
@@ -140,6 +152,17 @@ import {
   type FailureContext,
   type CascadeDecision,
 } from './result-evaluator.js';
+
+// ─── Transient Retry Re-queue (Sprint 324 Task 006) ──────────────
+// flag-gated (config.retry_transient_failures, default-off):
+// RUNTIME/AMBIGUOUS failures → createRetryTask + exponential backoff + re-queue PENDING.
+import {
+  createRetryTask,
+  getRetryCount,
+  getTransientRetryDelayMs,
+  MAX_RETRY_COUNT,
+  type RetryableTask,
+} from './task-retry.js';
 
 // ─── Fresh-Eyes Rotation (Sprint 156 Task 012) ───────────────────
 import type { FreshEyesRotationStrategy } from './debt-manager.js';
@@ -1051,6 +1074,9 @@ export function selectEligibleForSpawn(
     if (task.status !== TaskStatus.PENDING) continue;
     if (assignedTaskIds.has(task.id)) continue;
     if (collectedIds.has(task.id)) continue;
+    // Transient-retry backoff: skip task until retryAfter timestamp passes
+    const retryAfter = (task as RetryableTask).retryAfter;
+    if (retryAfter !== undefined && retryAfter > Date.now()) continue;
     if (depPipelineEnabled && task.dependencies && task.dependencies.length > 0) {
       const allDone = task.dependencies.every(dep => doneIds.has(dep));
       if (!allDone) continue;
@@ -1263,7 +1289,8 @@ export function evaluateFailureCascade(
  * Integrates evaluateFailureCascade (Task 024 discriminator) with
  * applyFailureCascade (Task 029 scheduler). Respects Alperen's Q1 risk-taking:
  *   - CODE failure → cascade block PENDING dependents → PAUSED
- *   - RUNTIME / AMBIGUOUS → no cascade (retry path, no blocking)
+ *   - RUNTIME / AMBIGUOUS → no cascade; when retry_transient_failures=true,
+ *     re-queue as a retry task with exponential backoff (Sprint 324 Task 006).
  *
  * Each PENDING → PAUSED transition is written to the event stream via
  * SCOPE_COLLISION_DETECTED channel (re-used as blocking signal) so the
@@ -1273,19 +1300,24 @@ export function evaluateFailureCascade(
  * @param sprint - Sprint with tasks to potentially block
  * @param failedTaskId - Task evaluated as NO_GO
  * @param ctx - Failure context for classification
- * @returns CascadeDecision and list of newly blocked task IDs
+ * @param config - Optional resolved config; required for retry_transient_failures flag
+ * @returns CascadeDecision, list of newly blocked task IDs, and optional retry task ID
  */
 export function applyCascadeToSprint(
   projectRoot: string,
   sprint: Sprint,
   failedTaskId: string,
   ctx: FailureContext,
-): { decision: CascadeDecision; blockedTaskIds: string[] } {
+  config?: ResolvedConfig,
+): { decision: CascadeDecision; blockedTaskIds: string[]; retryTaskId?: string } {
   const decision = evaluateFailureCascade(projectRoot, failedTaskId, ctx);
 
   if (!decision.shouldCascade) {
-    // RUNTIME or AMBIGUOUS: no cascade, retry path
-    return { decision, blockedTaskIds: [] };
+    // RUNTIME or AMBIGUOUS: no cascade — attempt transient re-queue if enabled
+    const retryTaskId = readRetryTransientFailures(config)
+      ? _enqueueTransientRetry(projectRoot, sprint, failedTaskId)
+      : undefined;
+    return { decision, blockedTaskIds: [], retryTaskId };
   }
 
   // CODE failure: build graph and cascade-block transitive dependents
@@ -1319,6 +1351,87 @@ export function applyCascadeToSprint(
   );
 
   return { decision, blockedTaskIds: cascadeResult.blockedTaskIds };
+}
+
+/**
+ * Internal helper: create and enqueue a retry task for a transient (RUNTIME/AMBIGUOUS) failure.
+ *
+ * Conditions checked here (all must hold for a retry task to be queued):
+ *   1. The failing task exists in sprint.tasks
+ *   2. Its current retryCount < MAX_RETRY_COUNT
+ *
+ * On success:
+ *   - Creates a new task with id suffix `-r<N>`, status PENDING, retryCount+1
+ *   - Sets `retryAfter` to enforce exponential backoff before spawning
+ *   - Writes the retry task JSON to `.tasks/task-<id>.json`
+ *   - Appends the retry task to sprint.tasks (in-memory mutation)
+ *   - Emits a FIX_REQUEST event to the event stream so the Auditor can observe
+ *
+ * @returns The retry task id, or undefined if the task is ineligible for retry
+ */
+function _enqueueTransientRetry(
+  projectRoot: string,
+  sprint: Sprint,
+  failedTaskId: string,
+): string | undefined {
+  const failedTask = sprint.tasks.find(t => t.id === failedTaskId);
+  if (!failedTask) {
+    debugLog('_enqueueTransientRetry', `task ${failedTaskId} not found in sprint.tasks — skip`);
+    return undefined;
+  }
+
+  const retryCount = getRetryCount(failedTask as RetryableTask);
+  if (retryCount >= MAX_RETRY_COUNT) {
+    debugLog('_enqueueTransientRetry', `task ${failedTaskId} retryCount=${retryCount} >= MAX=${MAX_RETRY_COUNT} — no more retries`);
+    return undefined;
+  }
+
+  const backoffMs = getTransientRetryDelayMs(retryCount);
+  const retryTask = createRetryTask(failedTask as RetryableTask, retryCount) as RetryableTask;
+
+  if (backoffMs > 0) {
+    retryTask.retryAfter = Date.now() + backoffMs;
+  }
+
+  // Persist retry task to disk
+  try {
+    writeFileSync(
+      join(projectRoot, TASKS_DIR, `task-${retryTask.id}.json`),
+      JSON.stringify(retryTask, null, 2),
+      'utf-8',
+    );
+  } catch (e) {
+    debugLog('_enqueueTransientRetry:writeTaskFile', e);
+  }
+
+  // Append to sprint.tasks so downstream spawn picks it up
+  sprint.tasks.push(retryTask as unknown as Task);
+
+  // Emit observability event
+  const sprintId = getCurrentSprintId(projectRoot) ?? sprint.id;
+  try {
+    writeEvent(
+      projectRoot, sprintId, 'brain', 'worker',
+      CHANNELS.FIX_REQUEST,
+      {
+        taskId: retryTask.id,
+        originalTaskId: failedTaskId,
+        retryCount: retryTask.retryCount,
+        backoffMs,
+        retryAfter: retryTask.retryAfter,
+        reason: `Transient retry ${retryTask.retryCount}/${MAX_RETRY_COUNT} for ${failedTaskId} — RUNTIME/AMBIGUOUS failure`,
+      },
+    );
+  } catch (e) {
+    debugLog('_enqueueTransientRetry:writeEvent', e);
+  }
+
+  debugLog(
+    '_enqueueTransientRetry',
+    `Queued retry task ${retryTask.id} (backoff ${backoffMs}ms, retryAfter=${retryTask.retryAfter})`,
+  );
+
+  return retryTask.id;
 }
 
 /**

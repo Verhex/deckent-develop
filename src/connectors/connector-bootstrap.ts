@@ -42,7 +42,8 @@ import type { VoiceAdapter } from './voice/types.js';
 import { resolveReplyLanguage } from './voice/language.js';
 import { resolveReplyModality } from './voice/modality.js';
 
-type NotifyConnectorsConfig = NonNullable<DeckentConfig['notify_connectors']>;
+type NotifyConnectorsConfig = NonNullable<DeckentConfig['notify_connectors']>
+  & Partial<Record<'whatsapp', { enabled: boolean; token: string; chat_id: string }>>;
 
 /** Shape of raw.media as set by TelegramConnector inbound photo/document handlers. */
 interface InboundMediaRaw {
@@ -171,17 +172,21 @@ export interface ConnectorBootstrapDeps {
   makeConnector?: (id: ConnectorId) => IMessageConnector | null;
 }
 
-const SUPPORTED: ReadonlyArray<'telegram' | 'discord'> = ['telegram', 'discord'];
+const SUPPORTED: ReadonlyArray<'telegram' | 'discord' | 'whatsapp'> = ['telegram', 'discord', 'whatsapp'];
 
 /** Lazily import + construct a real connector. Returns null if its dep is absent. */
-async function loadConnector(id: 'telegram' | 'discord'): Promise<IMessageConnector | null> {
+async function loadConnector(id: 'telegram' | 'discord' | 'whatsapp'): Promise<IMessageConnector | null> {
   try {
     if (id === 'telegram') {
       const mod = await import('./telegram.js');
       return new mod.TelegramConnector();
     }
-    const mod = await import('./discord.js');
-    return new mod.DiscordConnector();
+    if (id === 'discord') {
+      const mod = await import('./discord.js');
+      return new mod.DiscordConnector();
+    }
+    const mod = await import('./whatsapp.js');
+    return new mod.WhatsAppConnector();
   } catch (err) {
     console.error(
       `[connector-bootstrap] ${id} module load failed (dependency missing?): ` +

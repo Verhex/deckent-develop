@@ -469,6 +469,8 @@ export interface DeckentConfig {
   human_checkpoints?: ('plan' | 'evaluate' | 'fix')[];
 
   // ─── Sprint ─────────────────────────────────────────────────────────
+  /** Retry tasks that failed due to transient errors (network blip, timeout). Default: false (opt-in). */
+  retry_transient_failures?: boolean;
   /** Enable fix phase after initial execution (default: true) */
   fix_phase_enabled?: boolean;
   /** Max retries during fix phase (default: 2) */
@@ -516,6 +518,13 @@ export interface DeckentConfig {
   // ─── Routing Engine v2 ─────────────────────────────────────────────
   /** Routing engine version: 'v1' (keyword-based), 'v2' (intent-based). Default: 'v2' */
   routing_engine?: 'v1' | 'v2';
+  /** Routing behaviour tuning flags (all default-off, opt-in). */
+  routing?: {
+    /** Prefer agents that have a history of success with the selected skills (default: false). */
+    skill_agent_affinity?: boolean;
+    /** Cache agent selection across tasks in the same sprint to reduce routing overhead (default: false). */
+    agent_cache?: boolean;
+  };
   /** Delay in ms before cleanup deletes .tasks/ files. Default: 180000 (180s). Set 0 for immediate. */
   cleanup_delay_ms?: number;
   /** Routing engine tuning parameters (v2 only) */
@@ -892,6 +901,8 @@ export interface ResolvedConfig {
   // Human Checkpoints
   human_checkpoints?: ('plan' | 'evaluate' | 'fix')[];
   // Sprint
+  /** Retry tasks that failed due to transient errors (default: false). */
+  retry_transient_failures?: boolean;
   fix_phase_enabled?: boolean;
   max_fix_retries?: number;
   /** AI planner subprocess timeout in milliseconds (default: 60000) */
@@ -931,6 +942,8 @@ export interface ResolvedConfig {
     confidenceThreshold?: number;
     maxSkillsDefault?: number;
   };
+  /** Routing behaviour tuning flags (all default-off, opt-in). */
+  routing?: DeckentConfig['routing'];
   /** Delay in ms before cleanup deletes .tasks/ files. Default: 180000 (180s) */
   cleanup_delay_ms?: number;
   /** Enable task dependency pipeline — only spawn tasks whose deps are DONE. Default: false */

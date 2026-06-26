@@ -25,6 +25,7 @@ import { spawnSync } from 'node:child_process';
 import { prepareZeroConfig, cleanupZeroConfig } from './quick-start.js';
 import { isSprintLocked } from '../../core/multi-ide.js';
 import { detectOrphan, archiveOrphan, listPidFiles } from '../../orchestra/sprint-pid-manager.js';
+import { createSandboxBackend } from '../../orchestra/spawn-backend.js';
 
 // ─── Provider Cache ───────────────────────────────────────────────
 
@@ -144,6 +145,7 @@ export function watchSubprocessLogs(projectRoot: string, intervalMs = 2000): () 
 interface StartCommandOpts {
   autoApprove?: boolean;
   sandboxMode?: boolean;
+  sandbox?: boolean;
   dryRun?: boolean;
   force?: boolean;
   watch?: boolean;
@@ -157,6 +159,7 @@ export function registerStart(program: Command): void {
     .description('Start a new sprint (optionally with a one-line description for zero-config mode)')
     .option('--auto-approve', 'Auto-approve worker actions (--dangerously-skip-permissions)')
     .option('--sandbox-mode', 'Run in sandbox mode (git stash + restore)')
+    .option('--sandbox', 'Use sandbox spawn backend (memory-cap + path-jail isolation, no Docker required)')
     .option('--dry-run', 'Plan sprint without spawning workers')
     .option('--force', 'Skip doctor pre-flight checks')
     .option('--watch', 'Automatically open watch mode after sprint spawns workers')
@@ -420,6 +423,7 @@ export function registerStart(program: Command): void {
         }
 
         const timeoutMs = opts.timeout ? parseInt(opts.timeout, 10) : undefined;
+        const sandboxSpawnBackend = opts.sandbox ? createSandboxBackend(root) : undefined;
         let sprintResult;
         try {
           sprintResult = await runSprint(root, config, {
@@ -427,6 +431,7 @@ export function registerStart(program: Command): void {
             autoApprove: true, // Deckent standard: workers MUST have full write permissions
             sandboxMode: opts.sandboxMode,
             timeoutMs,
+            spawnBackend: sandboxSpawnBackend,
           });
         } finally {
           if (stopSubprocessWatch) stopSubprocessWatch();

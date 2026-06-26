@@ -8,12 +8,18 @@ export interface TaskSignatureInput {
   description: string;
   scope: { directories: string[]; filesWrite: string[] };
   taskType?: string;
+  /** Skill IDs assigned to the task — included in the hash so affinity-on cache is correct. */
+  assignedSkills?: string[];
 }
 
 export interface CachedResult {
   agentId: string;
   score: number;
   reason: string;
+  /** ConfidenceLevel string, stored for round-trip. */
+  confidence?: string;
+  /** Full reasoning lines from selectBestAgent for cache-hit passthrough. */
+  reasoningLines?: string[];
 }
 
 interface CacheEntry {
@@ -49,6 +55,7 @@ export class AgentSelectionCache {
       task.scope.directories.slice().sort().join(','),
       task.scope.filesWrite.slice().sort().join(','),
       task.taskType ?? '',
+      (task.assignedSkills ?? []).slice().sort().join(','),
     ];
     return this._simpleHash(parts.join('|'));
   }

@@ -66,12 +66,23 @@ vi.mock('../../src/cli/commands/quick-start.js', () => ({
   cleanupZeroConfig: vi.fn(),
 }));
 
+vi.mock('../../src/orchestra/spawn-backend.js', () => ({
+  createSandboxBackend: vi.fn(() => ({
+    name: 'claude-sandbox',
+    spawn: vi.fn(),
+    kill: vi.fn(),
+    list: vi.fn().mockReturnValue([]),
+    isAvailable: vi.fn().mockResolvedValue(true),
+  })),
+}));
+
 import { loadConfig } from '../../src/core/config.js';
 import { runSprint } from '../../src/orchestra/brain.js';
 import { runDoctorChecks } from '../../src/cli/commands/doctor.js';
 import { print } from '../../src/cli/helpers/output.js';
 import { getMessage } from '../../src/cli/helpers/messages.js';
 import { prepareZeroConfig, cleanupZeroConfig } from '../../src/cli/commands/quick-start.js';
+import { createSandboxBackend } from '../../src/orchestra/spawn-backend.js';
 import { registerStart } from '../../src/cli/commands/start.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -215,5 +226,59 @@ describe('start --sandbox-mode', () => {
   it('without --sandbox-mode and --force, sprint completes', async () => {
     await runCommand('--force');
     expect(runSprint).toHaveBeenCalled();
+  });
+});
+
+// ─── --sandbox (spawn backend selection) ─────────────────────────────
+
+describe('start --sandbox (spawn backend selection)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.exitCode = undefined;
+    vi.mocked(loadConfig).mockResolvedValue(makeConfig() as any);
+    vi.mocked(runSprint).mockResolvedValue(makeSprint() as any);
+    vi.mocked(runDoctorChecks).mockReturnValue(makeDoctorResult(true) as any);
+    vi.mocked(prepareZeroConfig).mockReturnValue({
+      createdTemp: true,
+      alreadyExisted: false,
+      directivesPath: '/mock/root/DIRECTIVES.md',
+    } as any);
+    vi.mocked(cleanupZeroConfig).mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    process.exitCode = undefined;
+  });
+
+  it('--sandbox flag selects SandboxSpawnBackend (name=claude-sandbox)', async () => {
+    await runCommand('--sandbox', '--force');
+    expect(runSprint).toHaveBeenCalledOnce();
+    const opts = vi.mocked(runSprint).mock.calls[0]?.[2];
+    expect(opts?.spawnBackend?.name).toBe('claude-sandbox');
+  });
+
+  it('--sandbox calls createSandboxBackend with project root', async () => {
+    await runCommand('--sandbox', '--force');
+    expect(createSandboxBackend).toHaveBeenCalledWith('/mock/root');
+  });
+
+  it('without --sandbox, spawnBackend is undefined (byte-identical behavior)', async () => {
+    await runCommand('--force');
+    expect(runSprint).toHaveBeenCalledOnce();
+    const opts = vi.mocked(runSprint).mock.calls[0]?.[2];
+    expect(opts?.spawnBackend).toBeUndefined();
+  });
+
+  it('--sandbox + --sandbox-mode: both flags coexist', async () => {
+    await runCommand('--sandbox', '--sandbox-mode', '--force');
+    expect(runSprint).toHaveBeenCalledOnce();
+    const opts = vi.mocked(runSprint).mock.calls[0]?.[2];
+    expect(opts?.spawnBackend?.name).toBe('claude-sandbox');
+    expect(opts?.sandboxMode).toBe(true);
+  });
+
+  it('--sandbox does not call runSprint in dry-run mode', async () => {
+    await runCommand('--sandbox', '--dry-run');
+    expect(runSprint).not.toHaveBeenCalled();
   });
 });

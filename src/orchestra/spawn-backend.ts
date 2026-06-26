@@ -5,6 +5,11 @@ import { ensureSession, spawnWorker as tmuxSpawnWorker, killWorker as tmuxKillWo
 import { SubprocessSpawnBackend } from '../providers/subprocess.js';
 import { DockerSpawnBackend } from './spawn-backend-docker.js';
 import { assertNotLethalWithoutApproval } from '../nervous/panic-gate.js';
+import { SandboxSpawnBackend } from '../providers/sandbox.js';
+import type { SandboxOptions } from '../providers/sandbox.js';
+
+export type { SandboxOptions };
+export { SandboxSpawnBackend };
 
 // ─── SpawnBackend Interface ───────────────────────────────────────────────────
 
@@ -227,6 +232,52 @@ export class SubprocessBackend implements SpawnBackend {
   }
 }
 
+// ─── SandboxBackend ───────────────────────────────────────────────────────────
+
+/**
+ * SandboxBackend — adapts SandboxSpawnBackend to the SpawnBackend interface.
+ *
+ * SandboxSpawnBackend extends SubprocessSpawnBackend (providers/) which exposes
+ * listWorkers() instead of list(). This thin adapter bridges the gap so that
+ * SandboxSpawnBackend can be used wherever SpawnBackend is expected.
+ *
+ * Activated with `deckent start --sandbox`.
+ */
+export class SandboxBackend implements SpawnBackend {
+  readonly name = 'claude-sandbox';
+
+  private readonly inner: SandboxSpawnBackend;
+
+  constructor(projectDir: string, opts?: SandboxOptions) {
+    this.inner = new SandboxSpawnBackend(projectDir, opts);
+  }
+
+  spawn(taskId: string, model: ModelType, prompt: string, opts?: SpawnBackendOptions): void {
+    checkLethalGuard(opts?.actionId, this.name);
+    this.inner.spawn(taskId, model, prompt, opts);
+  }
+
+  kill(taskId: string): void {
+    this.inner.kill(taskId);
+  }
+
+  list(): string[] {
+    return this.inner.listWorkers() as string[];
+  }
+
+  async isAvailable(): Promise<boolean> {
+    return this.inner.isAvailable();
+  }
+}
+
+/**
+ * Factory — create a SandboxBackend for the given project root.
+ * Use this from CLI/API surfaces (e.g. `deckent start --sandbox`).
+ */
+export function createSandboxBackend(projectDir: string, opts?: SandboxOptions): SandboxBackend {
+  return new SandboxBackend(projectDir, opts);
+}
+
 // ─── Tmux Deprecation Warning ─────────────────────────────────────────────────
 
 /**
@@ -277,7 +328,7 @@ export function resolveBackend(backend: string): string {
 
 // ─── SpawnBackendFactory ──────────────────────────────────────────────────────
 
-export type BackendType = 'tmux' | 'subprocess' | 'docker' | 'auto';
+export type BackendType = 'tmux' | 'subprocess' | 'docker' | 'auto' | 'sandbox';
 
 export interface SpawnBackendFactoryOptions {
   /**
@@ -310,6 +361,12 @@ export interface SpawnBackendFactoryOptions {
    * default DEFAULT_WORKER_MEMORY_LIMIT ('4g').
    */
   dockerMemoryLimit?: string;
+
+  /**
+   * Sandbox backend options (memory limit, allowed dirs, network block).
+   * Only consulted when backend is 'sandbox'.
+   */
+  sandboxOptions?: SandboxOptions;
 }
 
 /**
@@ -348,6 +405,10 @@ export class SpawnBackendFactory {
 
     if (resolved === 'tmux') {
       return new TmuxBackend(opts.projectDir);
+    }
+
+    if (resolved === 'sandbox') {
+      return new SandboxBackend(opts.projectDir, opts.sandboxOptions);
     }
 
     // Fallback — should not be reached after resolveBackend() normalisation

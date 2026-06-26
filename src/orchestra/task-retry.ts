@@ -18,11 +18,23 @@ export const RETRY_BACKOFF_MS: Record<number, number> = {
   1: 30_000,
 };
 
+// ─── Transient (RUNTIME/AMBIGUOUS) exponential backoff ─────────────
+// Used by the retry_transient_failures flag-gated re-queue path in sprint-spawner.
+// Formula: min(TRANSIENT_RETRY_BASE_MS * TRANSIENT_RETRY_MULTIPLIER^retryCount, TRANSIENT_RETRY_CAP_MS)
+// → retryCount=0: 5 000ms, retryCount=1: 30 000ms, retryCount≥2: 120 000ms (cap)
+export const TRANSIENT_RETRY_BASE_MS = 5_000;
+export const TRANSIENT_RETRY_MULTIPLIER = 6;
+export const TRANSIENT_RETRY_CAP_MS = 120_000;
+
 // ═══ Types ══════════════════════════════════════════════════════════
 
-/** A Task with an optional retryCount field tracked in task JSON. */
+/** A Task with optional retry fields tracked in task JSON. */
 export interface RetryableTask extends Task {
   retryCount?: number;
+  /** Unix timestamp (ms) before which this retry task must not be spawned.
+   *  Set by the transient-retry re-queue path (sprint-spawner) to enforce
+   *  exponential backoff without blocking the event loop. */
+  retryAfter?: number;
 }
 
 // ═══ Functions ══════════════════════════════════════════════════════
@@ -44,6 +56,22 @@ export function shouldRetry(result: TaskResult, retryCount: number): boolean {
  */
 export function getRetryDelay(retryCount: number): number {
   return RETRY_BACKOFF_MS[retryCount] ?? 0;
+}
+
+/**
+ * Returns the exponential backoff delay in ms for the transient-retry path.
+ * Formula: min(TRANSIENT_RETRY_BASE_MS × TRANSIENT_RETRY_MULTIPLIER^retryCount, TRANSIENT_RETRY_CAP_MS)
+ *   retryCount=0 → 5 000ms  (5s)
+ *   retryCount=1 → 30 000ms (30s)
+ *   retryCount≥2 → 120 000ms (120s, cap)
+ *
+ * Used exclusively by the retry_transient_failures flag-gated re-queue path.
+ */
+export function getTransientRetryDelayMs(retryCount: number): number {
+  return Math.min(
+    TRANSIENT_RETRY_BASE_MS * Math.pow(TRANSIENT_RETRY_MULTIPLIER, retryCount),
+    TRANSIENT_RETRY_CAP_MS,
+  );
 }
 
 /**

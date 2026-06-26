@@ -270,4 +270,47 @@ describe('ConnectorPool', () => {
     expect(pool.get('slack')).toBeUndefined();
     expect(pool.getAll()).toHaveLength(2);
   });
+
+  describe('broadcastAll', () => {
+    it('sends to ALL registered connectors without explicit targets', async () => {
+      const discord = createMockConnector('discord', 'Discord');
+      const telegram = createMockConnector('telegram', 'Telegram');
+      const whatsapp = createMockConnector('whatsapp', 'WhatsApp');
+
+      pool.register(discord);
+      pool.register(telegram);
+      pool.register(whatsapp);
+
+      const results = await pool.broadcastAll({ channelId: 'broadcast-ch', text: 'system alert' });
+
+      expect(results).toHaveLength(3);
+      expect(results.every((r) => r.success)).toBe(true);
+      expect(discord._sentMessages[0]?.text).toBe('system alert');
+      expect(telegram._sentMessages[0]?.text).toBe('system alert');
+      expect(whatsapp._sentMessages[0]?.text).toBe('system alert');
+    });
+
+    it('returns empty array when no connectors are registered', async () => {
+      const results = await pool.broadcastAll({ channelId: 'ch', text: 'hello' });
+      expect(results).toEqual([]);
+    });
+
+    it('per-connector error isolation: a failing connector does not block others', async () => {
+      const discord = createMockConnector('discord', 'Discord');
+      const telegram = createMockConnector('telegram', 'Telegram');
+
+      telegram._sendError = new Error('timeout');
+
+      pool.register(discord);
+      pool.register(telegram);
+
+      const results = await pool.broadcastAll({ channelId: 'ch', text: 'alert' });
+
+      expect(results).toHaveLength(2);
+      expect(results.find((r) => r.connector === 'discord')?.success).toBe(true);
+      expect(results.find((r) => r.connector === 'telegram')?.success).toBe(false);
+      expect(results.find((r) => r.connector === 'telegram')?.error).toBe('timeout');
+      expect(discord._sentMessages).toHaveLength(1);
+    });
+  });
 });

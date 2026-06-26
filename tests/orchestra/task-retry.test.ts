@@ -4,9 +4,13 @@ import {
   createRetryTask,
   getRetryCount,
   getRetryDelay,
+  getTransientRetryDelayMs,
   retryDelay,
   MAX_RETRY_COUNT,
   RETRY_BACKOFF_MS,
+  TRANSIENT_RETRY_BASE_MS,
+  TRANSIENT_RETRY_MULTIPLIER,
+  TRANSIENT_RETRY_CAP_MS,
 } from '../../src/orchestra/task-retry.js';
 import type { RetryableTask } from '../../src/orchestra/task-retry.js';
 import { TaskStatus } from '../../src/core/types.js';
@@ -199,5 +203,61 @@ describe('retryDelay', () => {
 describe('constants', () => {
   it('MAX_RETRY_COUNT is 2', () => {
     expect(MAX_RETRY_COUNT).toBe(2);
+  });
+});
+
+// ═══ getTransientRetryDelayMs (exponential backoff) ════════════════
+
+describe('getTransientRetryDelayMs', () => {
+  it('returns 5 000ms for first transient retry (retryCount=0)', () => {
+    expect(getTransientRetryDelayMs(0)).toBe(5_000);
+  });
+
+  it('returns 30 000ms for second transient retry (retryCount=1)', () => {
+    expect(getTransientRetryDelayMs(1)).toBe(30_000);
+  });
+
+  it('returns cap (120 000ms) for retryCount=2 (formula 180 000ms → capped)', () => {
+    // 5000 * 6^2 = 180 000 > cap 120 000 → 120 000
+    expect(getTransientRetryDelayMs(2)).toBe(120_000);
+  });
+
+  it('returns cap (120 000ms) for out-of-range retryCount', () => {
+    expect(getTransientRetryDelayMs(99)).toBe(120_000);
+  });
+
+  it('grows exponentially: ratio from count=0 to count=1 equals TRANSIENT_RETRY_MULTIPLIER', () => {
+    const d0 = getTransientRetryDelayMs(0);
+    const d1 = getTransientRetryDelayMs(1);
+    expect(d1 / d0).toBe(TRANSIENT_RETRY_MULTIPLIER);
+  });
+
+  it('TRANSIENT_RETRY_BASE_MS is 5 000', () => {
+    expect(TRANSIENT_RETRY_BASE_MS).toBe(5_000);
+  });
+
+  it('TRANSIENT_RETRY_MULTIPLIER is 6', () => {
+    expect(TRANSIENT_RETRY_MULTIPLIER).toBe(6);
+  });
+
+  it('TRANSIENT_RETRY_CAP_MS is 120 000', () => {
+    expect(TRANSIENT_RETRY_CAP_MS).toBe(120_000);
+  });
+});
+
+// ═══ RetryableTask.retryAfter ══════════════════════════════════════
+
+describe('RetryableTask.retryAfter', () => {
+  it('createRetryTask does not set retryAfter — spawner sets it separately', () => {
+    const retry = createRetryTask(makeTask(), 0);
+    expect((retry as RetryableTask).retryAfter).toBeUndefined();
+  });
+
+  it('retryAfter field is assignable to RetryableTask', () => {
+    const task: RetryableTask = {
+      ...makeTask(),
+      retryAfter: Date.now() + 5_000,
+    };
+    expect(typeof task.retryAfter).toBe('number');
   });
 });

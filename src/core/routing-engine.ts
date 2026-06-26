@@ -27,6 +27,8 @@ import {
 } from './routing-types.js';
 import { classifyIntent } from './intent-classifier.js';
 import { evaluateActivation, migrateV1AgentToActivation, migrateV1SkillToActivation, getDynamicExclusions } from './activation-engine.js';
+import type { SkillAffinityContext } from './activation-engine.js';
+import { AgentSelectionCache } from './agent-cache.js';
 import { analyzeSkillInMemory } from '../orchestra/ecosystem-intelligence.js';
 import { resolveComposition } from './skill-selector.js';
 import { modelRegistry } from './model-registry.js';
@@ -277,7 +279,29 @@ export interface RoutingOptions {
   modelId?: string;
   /** Set of active agent IDs for fallback chain resolution */
   activeAgentIds?: Set<string>;
+  /**
+   * Enable skill→agent affinity bonus (ADR-075). Default-off.
+   * When true, agents receive SKILL_AGENT_AFFINITY_BONUS when an assigned skill
+   * maps to them in SKILL_AGENT_MAP. Skills are selected BEFORE agent selection
+   * (skill-first ordering) so the affinity signal is always available.
+   */
+  skillAgentAffinity?: boolean;
+  /**
+   * Enable agent selection cache. Default-off.
+   * When true, selectBestAgent results are memoized via agentSelectionCache.
+   * Cache key includes selected skill IDs so affinity-on cache is correct.
+   * Call agentSelectionCache.clear() when pool or config changes.
+   */
+  agentCache?: boolean;
 }
+
+// ─── Agent Selection Cache (module-level singleton) ─────────────────────────
+//
+// Exported so callers can call .clear() when the agent pool or routing config
+// changes (pool/config-change invalidation — required by agentCache flag semantics).
+// Default-off (agentCache option must be true for it to be used).
+
+export const agentSelectionCache = new AgentSelectionCache();
 
 interface ScoredCandidate {
   id: string;
@@ -291,6 +315,11 @@ interface ScoredCandidate {
 
 /**
  * Route a task to the best agent + skills using the v2 intent-based engine.
+ *
+ * Skill-first ordering (Sprint 324-007): skills are selected BEFORE the agent so
+ * the assigned skill IDs are available as an affinity signal for agent scoring
+ * (`skillAgentAffinity` flag, default-off). When both flags are off the routing
+ * output is byte-identical to the pre-reorder behavior.
  */
 export function routeTaskV2(
   task: { title: string; description: string; scope: TaskScope; type?: TaskKind },
@@ -303,6 +332,8 @@ export function routeTaskV2(
   const learningData = options?.learningData ?? [];
   const reasoning: string[] = [];
   const overrideWarnings: string[] = [];
+  const skillAgentAffinityEnabled = options?.skillAgentAffinity ?? false;
+  const agentCacheEnabled = options?.agentCache ?? false;
 
   // Step 1: Classify task intent
   const taskDNA = classifyIntent(task);
@@ -327,7 +358,39 @@ export function routeTaskV2(
     overrideSource = overrides[0]?.source ?? 'task-directive';
   }
 
-  // Step 3: Select agent
+  // Step 3: Calculate skill budget (effort-aware token allocation)
+  // Moved before agent selection so skill IDs are available as affinity signal.
+  const skillBudget = calculateSkillBudget(taskDNA, cfg, options?.effort);
+  reasoning.push(`Skill budget: max ${skillBudget.maxSkills} (${skillBudget.reason})`);
+
+  // Step 4: Select skills (skill-first — before agent, for affinity signal)
+  let skillIds: string[] = [];
+  const skillScores = new Map<string, number>();
+  let skillConfidence: ConfidenceLevel = 'uncertain';
+
+  if (resolved.forceSkills !== undefined) {
+    // forceSkills=[] means "Skills: none" (explicit no-skills directive), respect it
+    skillIds = resolved.forceSkills;
+    for (const id of skillIds) skillScores.set(id, 100);
+    skillConfidence = skillIds.length > 0 ? 'high' : 'uncertain';
+    reasoning.push(
+      skillIds.length > 0
+        ? `Skills forced by override: [${skillIds.join(', ')}]`
+        : 'Skills cleared by override (none)',
+    );
+  } else {
+    const skillResult = selectBestSkills(
+      taskDNA, skillPool, cfg, learningData,
+      resolved.excludeSkills ?? [], skillBudget,
+      options?.projectStack ?? null, task.type,
+    );
+    skillIds = skillResult.skillIds;
+    for (const [id, score] of skillResult.scores) skillScores.set(id, score);
+    skillConfidence = skillResult.confidence;
+    reasoning.push(...skillResult.reasoning);
+  }
+
+  // Step 5: Select agent (receives selected skill IDs for optional affinity scoring)
   let agentId: string | null = null;
   let agentScore = 0;
   let agentConfidence: ConfidenceLevel = 'uncertain';
@@ -361,57 +424,67 @@ export function routeTaskV2(
     if (dynamicExclusions.length > 0) {
       reasoning.push(`Dynamic exclusions: [${dynamicExclusions.join(', ')}]`);
     }
-    const agentResult = selectBestAgent(taskDNA, agentPool, cfg, learningData, allExcludeAgents, task.type);
-    agentId = agentResult.agentId;
-    agentScore = agentResult.score;
-    agentConfidence = agentResult.confidence;
-    reasoning.push(...agentResult.reasoning);
 
-    // Step 3b: Fallback chain if no agent met threshold
-    if (agentId === null && options?.activeAgentIds) {
-      agentId = selectAgentByFallback(taskDNA.intent.primary, options.activeAgentIds);
-      agentScore = 50; // fallback score
-      agentConfidence = 'low';
-      reasoning.push(`Agent fallback chain: '${agentId}' (intent=${taskDNA.intent.primary})`);
-    } else if (agentId === null) {
-      // No activeAgentIds provided — use static fallback
-      const chain = AGENT_FALLBACK_CHAIN[taskDNA.intent.primary] ?? ['architect'];
-      agentId = chain[0] ?? 'architect';
-      agentScore = 50;
-      agentConfidence = 'low';
-      reasoning.push(`Agent static fallback: '${agentId}' (intent=${taskDNA.intent.primary})`);
+    // Cache key (computed once, reused for lookup + store if agentCacheEnabled)
+    const cacheKey = agentCacheEnabled
+      ? agentSelectionCache.taskSignature({
+          title: task.title,
+          description: task.description,
+          scope: { directories: task.scope.directories, filesWrite: task.scope.filesWrite },
+          taskType: task.type,
+          assignedSkills: skillIds,
+        })
+      : undefined;
+
+    // Cache lookup (flag-gated, default-off)
+    let cacheHit = false;
+    if (cacheKey !== undefined) {
+      const cached = agentSelectionCache.get(cacheKey);
+      if (cached) {
+        agentId = cached.agentId || null;
+        agentScore = cached.score;
+        agentConfidence = (cached.confidence ?? 'uncertain') as ConfidenceLevel;
+        reasoning.push('[agent-cache hit]', ...(cached.reasoningLines ?? []));
+        cacheHit = true;
+      }
     }
-  }
 
-  // Step 4: Calculate skill budget (effort-aware token allocation)
-  const skillBudget = calculateSkillBudget(taskDNA, cfg, options?.effort);
-  reasoning.push(`Skill budget: max ${skillBudget.maxSkills} (${skillBudget.reason})`);
+    if (!cacheHit) {
+      const agentResult = selectBestAgent(
+        taskDNA, agentPool, cfg, learningData, allExcludeAgents, task.type,
+        skillIds, skillAgentAffinityEnabled,
+      );
+      agentId = agentResult.agentId;
+      agentScore = agentResult.score;
+      agentConfidence = agentResult.confidence;
+      reasoning.push(...agentResult.reasoning);
 
-  // Step 5: Select skills
-  let skillIds: string[] = [];
-  const skillScores = new Map<string, number>();
-  let skillConfidence: ConfidenceLevel = 'uncertain';
+      // Store in cache when enabled and an agent was found (skip null — let fallback handle it)
+      if (cacheKey !== undefined && agentId !== null) {
+        agentSelectionCache.cache(cacheKey, {
+          agentId,
+          score: agentScore,
+          reason: 'agent-cache',
+          confidence: agentConfidence,
+          reasoningLines: agentResult.reasoning,
+        });
+      }
 
-  if (resolved.forceSkills !== undefined) {
-    // forceSkills=[] means "Skills: none" (explicit no-skills directive), respect it
-    skillIds = resolved.forceSkills;
-    for (const id of skillIds) skillScores.set(id, 100);
-    skillConfidence = skillIds.length > 0 ? 'high' : 'uncertain';
-    reasoning.push(
-      skillIds.length > 0
-        ? `Skills forced by override: [${skillIds.join(', ')}]`
-        : 'Skills cleared by override (none)',
-    );
-  } else {
-    const skillResult = selectBestSkills(
-      taskDNA, skillPool, cfg, learningData,
-      resolved.excludeSkills ?? [], skillBudget,
-      options?.projectStack ?? null, task.type,
-    );
-    skillIds = skillResult.skillIds;
-    for (const [id, score] of skillResult.scores) skillScores.set(id, score);
-    skillConfidence = skillResult.confidence;
-    reasoning.push(...skillResult.reasoning);
+      // Fallback chain if no agent met threshold
+      if (agentId === null && options?.activeAgentIds) {
+        agentId = selectAgentByFallback(taskDNA.intent.primary, options.activeAgentIds);
+        agentScore = 50; // fallback score
+        agentConfidence = 'low';
+        reasoning.push(`Agent fallback chain: '${agentId}' (intent=${taskDNA.intent.primary})`);
+      } else if (agentId === null) {
+        // No activeAgentIds provided — use static fallback
+        const chain = AGENT_FALLBACK_CHAIN[taskDNA.intent.primary] ?? ['architect'];
+        agentId = chain[0] ?? 'architect';
+        agentScore = 50;
+        agentConfidence = 'low';
+        reasoning.push(`Agent static fallback: '${agentId}' (intent=${taskDNA.intent.primary})`);
+      }
+    }
   }
 
   // Step 6: Context budget fit assessment
@@ -487,6 +560,8 @@ function selectBestAgent(
   learningData: LearningBonus[],
   excludeAgents: string[],
   taskKind?: TaskKind,
+  assignedSkills?: string[],
+  skillAgentAffinity?: boolean,
 ): { agentId: string | null; score: number; confidence: ConfidenceLevel; reasoning: string[] } {
   const candidates: ScoredCandidate[] = [];
   const reasoning: string[] = [];
@@ -515,7 +590,13 @@ function selectBestAgent(
 
     // Get activation config (v2 or migrated from v1)
     const activation = getAgentActivation(agent);
-    const result = evaluateActivation(taskDNA, activation);
+    // Skill→agent affinity context (ADR-075, Sprint 324-007). Flag-gated, default-off.
+    // When enabled, SKILL_AGENT_AFFINITY_BONUS is added inside evaluateActivation when
+    // an assigned skill maps to this agent via SKILL_AGENT_MAP.
+    const affinityCtx: SkillAffinityContext | undefined = skillAgentAffinity
+      ? { agentId: id, assignedSkills, enabled: true }
+      : undefined;
+    const result = evaluateActivation(taskDNA, activation, affinityCtx);
 
     if (result.excluded) {
       if (surfaceBonus > 0) {

@@ -8,11 +8,18 @@
 //
 // Fail-safe (advisor): notify() is awaited in the sprint lifecycle, so a
 // connector that throws OR hangs must never block it. Each send is wrapped in a
-// timeout and per-target error isolation. Use per-connector sendMessage (chat id
-// differs per platform) — NOT ConnectorPool.broadcast (one channel for all).
+// timeout and per-target error isolation.
+//
+// Two paths:
+//   makeConnectorNotificationAdapter — per-channel: each connector has its own chatId,
+//     per-connector rich rendering (Telegram HTML). Use when chatIds differ per platform.
+//   makeConnectorPoolNotificationAdapter — broadcast-to-all: fans out to ALL registered
+//     connectors on the same channelId via ConnectorPool.broadcastAll. Plain text only.
+//     Use for system-wide alerts where every active connector shares a broadcast channel.
 
 import type { Notification, NotificationAdapter } from '../core/notification-dispatcher.js';
 import type { IMessageConnector, InlineButton } from './types.js';
+import type { ConnectorPool } from './connector-pool.js';
 import { chunkMessage } from './message-format.js';
 
 /** A started (outbound) connector plus the chat id notifications are sent to. */
@@ -89,6 +96,38 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | undefined> {
       if (typeof timer.unref === 'function') timer.unref();
     }),
   ]);
+}
+
+/**
+ * Build a NotificationAdapter that broadcasts each notification to ALL connectors
+ * registered in the pool on the same channelId, via ConnectorPool.broadcastAll.
+ *
+ * This is the optional broadcast-to-all path — use when every active connector
+ * should receive the same notification on a shared broadcast channel (e.g. a
+ * system-wide alert that every operator platform picks up). For per-connector
+ * chat ids and rich per-platform rendering use makeConnectorNotificationAdapter.
+ *
+ * Fail-safe: the entire broadcastAll is wrapped in a timeout; a hung pool never
+ * blocks the awaited notify() in the sprint lifecycle.
+ */
+export function makeConnectorPoolNotificationAdapter(
+  pool: ConnectorPool,
+  channelId: string,
+  opts: ConnectorNotifyOptions = {},
+): NotificationAdapter {
+  const timeoutMs = opts.timeoutMs ?? 5000;
+  return {
+    name: 'connector-pool-broadcast',
+
+    isAvailable(): boolean {
+      return pool.getAll().length > 0;
+    },
+
+    async send(notification: Notification): Promise<void> {
+      const text = formatNotification(notification);
+      await withTimeout(pool.broadcastAll({ channelId, text }), timeoutMs).catch(() => undefined);
+    },
+  };
 }
 
 /**

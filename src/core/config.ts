@@ -683,6 +683,10 @@ export function validateConfig(config: DeckentConfig): string[] {
   }
 
   // ─── Sprint config validation ──────────────────────────────────────
+  if (config.retry_transient_failures !== undefined && typeof config.retry_transient_failures !== 'boolean') {
+    errors.push('retry_transient_failures must be a boolean');
+  }
+
   if (config.fix_phase_enabled !== undefined && typeof config.fix_phase_enabled !== 'boolean') {
     errors.push('fix_phase_enabled must be a boolean');
   }
@@ -915,6 +919,20 @@ export function validateConfig(config: DeckentConfig): string[] {
     const validRoutingEngines = ['v1', 'v2'] as const;
     if (!(validRoutingEngines as readonly string[]).includes(config.routing_engine)) {
       errors.push(`Invalid value '${config.routing_engine}' for field 'routing_engine'. Valid: ${validRoutingEngines.join(', ')}`);
+    }
+  }
+
+  // ─── Routing behaviour flags validation (T6) ───────────────────────
+  if (config.routing !== undefined) {
+    if (typeof config.routing !== 'object' || config.routing === null || Array.isArray(config.routing)) {
+      errors.push('routing must be an object');
+    } else {
+      if (config.routing.skill_agent_affinity !== undefined && typeof config.routing.skill_agent_affinity !== 'boolean') {
+        errors.push('routing.skill_agent_affinity must be a boolean');
+      }
+      if (config.routing.agent_cache !== undefined && typeof config.routing.agent_cache !== 'boolean') {
+        errors.push('routing.agent_cache must be a boolean');
+      }
     }
   }
 
@@ -1481,6 +1499,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // Human Checkpoints
     human_checkpoints: config.human_checkpoints,
     // Sprint
+    retry_transient_failures: config.retry_transient_failures,
     fix_phase_enabled: config.fix_phase_enabled,
     max_fix_retries: config.max_fix_retries,
     // Sprint 179 W2-4: coverage gate split.
@@ -1509,6 +1528,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // Routing Engine v2
     routing_engine: config.routing_engine,
     routing_config: config.routing_config,
+    routing: config.routing,
     // Cleanup delay
     cleanup_delay_ms: config.cleanup_delay_ms,
     // Dependency pipeline (Sprint 156: default true; user/project config can override)

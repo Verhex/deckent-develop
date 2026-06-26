@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { DeckentConfig, ResolvedConfig, NervousSystemConfig } from '../../src/core/config-types.js';
 import type { NervousSystemConfigV1 } from '../../src/core/nervous-types.js';
+import { validateConfig, createDefaultConfig, ConfigValidationError } from '../../src/core/config.js';
 
 // ─── DeckentConfig: ai_planner_timeout ───────────────────────────────────────
 
@@ -133,5 +134,149 @@ describe('NervousSystemConfig (V2) — canonical schema', () => {
     // behavior the readers rely on (fall back to defaults). Migration must preserve this.
     expect(view.quietHours).toBeUndefined();
     expect(view.throttleWindowMs).toBeUndefined();
+  });
+});
+
+// ─── T5: retry_transient_failures ────────────────────────────────────────────
+
+describe('DeckentConfig — retry_transient_failures (T5)', () => {
+  it('is optional and undefined when not set', () => {
+    const config: Partial<DeckentConfig> = {};
+    expect(config.retry_transient_failures).toBeUndefined();
+  });
+
+  it('accepts true', () => {
+    const config: Partial<DeckentConfig> = { retry_transient_failures: true };
+    expect(config.retry_transient_failures).toBe(true);
+  });
+
+  it('accepts false', () => {
+    const config: Partial<DeckentConfig> = { retry_transient_failures: false };
+    expect(config.retry_transient_failures).toBe(false);
+  });
+
+  it('ResolvedConfig accepts retry_transient_failures', () => {
+    const resolved: Partial<ResolvedConfig> = { retry_transient_failures: true };
+    expect(resolved.retry_transient_failures).toBe(true);
+  });
+
+  it('validateConfig throws when retry_transient_failures is not a boolean', () => {
+    const config = createDefaultConfig();
+    (config as Record<string, unknown>)['retry_transient_failures'] = 'yes';
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+    try {
+      validateConfig(config);
+    } catch (e) {
+      expect((e as ConfigValidationError).errors).toContainEqual(
+        expect.stringContaining('retry_transient_failures must be a boolean'),
+      );
+    }
+  });
+
+  it('validateConfig accepts true without errors', () => {
+    const config = createDefaultConfig();
+    config.retry_transient_failures = true;
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+
+  it('validateConfig accepts false without errors', () => {
+    const config = createDefaultConfig();
+    config.retry_transient_failures = false;
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+
+  it('validateConfig accepts absent (undefined) without errors (default-off)', () => {
+    const config = createDefaultConfig();
+    expect(config.retry_transient_failures).toBeUndefined();
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+});
+
+// ─── T6: routing.skill_agent_affinity + routing.agent_cache ──────────────────
+
+describe('DeckentConfig — routing (T6)', () => {
+  it('routing is optional and undefined when not set', () => {
+    const config: Partial<DeckentConfig> = {};
+    expect(config.routing).toBeUndefined();
+  });
+
+  it('accepts routing with skill_agent_affinity: true', () => {
+    const config: Partial<DeckentConfig> = { routing: { skill_agent_affinity: true } };
+    expect(config.routing?.skill_agent_affinity).toBe(true);
+  });
+
+  it('accepts routing with agent_cache: false', () => {
+    const config: Partial<DeckentConfig> = { routing: { agent_cache: false } };
+    expect(config.routing?.agent_cache).toBe(false);
+  });
+
+  it('accepts routing with both flags set', () => {
+    const config: Partial<DeckentConfig> = {
+      routing: { skill_agent_affinity: false, agent_cache: true },
+    };
+    expect(config.routing?.skill_agent_affinity).toBe(false);
+    expect(config.routing?.agent_cache).toBe(true);
+  });
+
+  it('accepts routing as empty object (all flags default-off)', () => {
+    const config: Partial<DeckentConfig> = { routing: {} };
+    expect(config.routing?.skill_agent_affinity).toBeUndefined();
+    expect(config.routing?.agent_cache).toBeUndefined();
+  });
+
+  it('ResolvedConfig accepts routing block', () => {
+    const resolved: Partial<ResolvedConfig> = { routing: { skill_agent_affinity: true } };
+    expect(resolved.routing?.skill_agent_affinity).toBe(true);
+  });
+
+  it('validateConfig throws when routing is not an object', () => {
+    const config = createDefaultConfig();
+    (config as Record<string, unknown>)['routing'] = 42;
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+    try {
+      validateConfig(config);
+    } catch (e) {
+      expect((e as ConfigValidationError).errors).toContainEqual(
+        expect.stringContaining('routing must be an object'),
+      );
+    }
+  });
+
+  it('validateConfig throws when routing.skill_agent_affinity is not a boolean', () => {
+    const config = createDefaultConfig();
+    (config as Record<string, unknown>)['routing'] = { skill_agent_affinity: 'yes' };
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+    try {
+      validateConfig(config);
+    } catch (e) {
+      expect((e as ConfigValidationError).errors).toContainEqual(
+        expect.stringContaining('routing.skill_agent_affinity must be a boolean'),
+      );
+    }
+  });
+
+  it('validateConfig throws when routing.agent_cache is not a boolean', () => {
+    const config = createDefaultConfig();
+    (config as Record<string, unknown>)['routing'] = { agent_cache: 1 };
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
+    try {
+      validateConfig(config);
+    } catch (e) {
+      expect((e as ConfigValidationError).errors).toContainEqual(
+        expect.stringContaining('routing.agent_cache must be a boolean'),
+      );
+    }
+  });
+
+  it('validateConfig accepts valid routing block without errors', () => {
+    const config = createDefaultConfig();
+    config.routing = { skill_agent_affinity: true, agent_cache: false };
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+
+  it('validateConfig accepts absent routing without errors (default-off)', () => {
+    const config = createDefaultConfig();
+    expect(config.routing).toBeUndefined();
+    expect(() => validateConfig(config)).not.toThrow();
   });
 });
