@@ -7,6 +7,7 @@ import { Connector } from './session-interface.js';
 import { loadDeckSecrets } from './deck-file.js';
 import { detectAndRegisterModels, type DetectResult, type DetectAndRegisterOptions } from './model-auto-detect.js';
 import { modelRegistry as globalModelRegistry, type ModelRegistry } from './model-registry.js';
+import type { TokenUsage } from './token-usage.js';
 
 // ─── Provider Spawn Options ──────────────────────────────────────────
 export interface ProviderSpawnOptions {
@@ -158,6 +159,25 @@ export interface ProviderAdapter {
    * @returns Unwrapped response string (still text — caller decides whether to JSON.parse)
    */
   parseAgentResponse?(raw: string): string;
+
+  /**
+   * Optional: extract real token usage from the provider's raw stdout/response.
+   *
+   * Each adapter normalizes its native usage report into the provider-agnostic
+   * {@link TokenUsage} shape via `normalizeUsage()` (Anthropic `input_tokens/
+   * output_tokens/cache_*`, OpenAI `prompt_tokens/completion_tokens`, Ollama
+   * `prompt_eval_count/eval_count`, Gemini `usageMetadata.*`, Codex
+   * token-count/usage events). This is a CAPTURE, not a re-count: the numbers
+   * already exist in the response, so there is zero added latency.
+   *
+   * Returns `null` when the provider reported no usage in `rawOutput` — the
+   * orchestrator then falls back to external tokenizer counting (which marks
+   * `source: 'tokenizer-fallback'`).
+   *
+   * @param rawOutput  Full stdout/response captured from the worker run.
+   * @returns Normalized usage with `source: 'provider-adapter'`, or null if absent.
+   */
+  extractUsage?(rawOutput: string): TokenUsage | null;
 }
 
 // ─── ProviderError ───────────────────────────────────────────────────

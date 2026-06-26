@@ -17,6 +17,7 @@ import { isOpenAIModel } from '../core/types.js';
 import { modelRegistry } from '../core/model-registry.js';
 import type { ProviderAdapter, ProviderSpawnOptions, ProviderAvailabilityDetail } from '../core/provider.js';
 import { ProviderError, resolveBinaryPath, parseSemverFromOutput } from '../core/provider.js';
+import { normalizeUsage, type TokenUsage } from '../core/token-usage.js';
 import type { ProviderDetectResult } from './claude.js';
 import { TASKS_DIR } from '../core/constants.js';
 import type { ModelTier } from '../core/model-equivalence.js';
@@ -351,6 +352,52 @@ export class CodexAdapter implements ProviderAdapter {
     return 'none';
   }
 
+  // ─── extractUsage() ────────────────────────────────────────────────
+
+  /**
+   * Extract real token usage from Codex CLI stdout (capture, not re-count).
+   *
+   * `codex exec` emits either a single JSON object or a newline-delimited JSON
+   * event stream (`--json`). Token usage appears in one of two native shapes:
+   *   (a) OpenAI Chat Completions usage (the shape openai-compatible.ts parses):
+   *       `{ "usage": { "prompt_tokens", "completion_tokens", "total_tokens",
+   *                     "prompt_tokens_details": { "cached_tokens" } } }`
+   *   (b) Codex token-count event (Rust CLI):
+   *       `{ "type":"token_count", "info": { "total_token_usage": {
+   *            "input_tokens", "cached_input_tokens", "output_tokens", "total_tokens" } } }`
+   *       (also accepted nested under `msg.info`, top-level `total_token_usage`,
+   *       or with the counts placed directly on `info`).
+   *
+   * Codex reports CUMULATIVE totals, so when several usage payloads appear the
+   * LAST recognizable one wins. Returns null when `rawOutput` carries no usage —
+   * the orchestrator then falls back to external tokenizer counting.
+   */
+  extractUsage(rawOutput: string): TokenUsage | null {
+    if (typeof rawOutput !== 'string') return null;
+    const trimmed = rawOutput.trim();
+    if (trimmed.length === 0) return null;
+
+    // Collect every parseable JSON payload: the whole string (single, possibly
+    // pretty-printed object) plus each JSON line (NDJSON event stream). A
+    // one-line object is simply seen twice — harmless, last-wins is idempotent.
+    const candidates: unknown[] = [];
+    const whole = tryParseJson(trimmed);
+    if (whole !== undefined) candidates.push(whole);
+    for (const line of rawOutput.split(/\r?\n/)) {
+      const t = line.trim();
+      if (t.length < 2 || (t[0] !== '{' && t[0] !== '[')) continue;
+      const parsed = tryParseJson(t);
+      if (parsed !== undefined) candidates.push(parsed);
+    }
+
+    let found: TokenUsage | null = null;
+    for (const candidate of candidates) {
+      const usage = extractUsageFromPayload(candidate);
+      if (usage) found = usage; // cumulative totals — last recognizable usage wins
+    }
+    return found;
+  }
+
   // ─── buildCommand() ─────────────────────────────────────────────────
 
   /**
@@ -480,6 +527,84 @@ function ensureDir(dir: string): void {
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
+}
+
+// ─── Token-usage parsing helpers ──────────────────────────────────────
+
+/** Parse JSON, returning `undefined` (never throwing) on malformed input. */
+function tryParseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Narrow to a plain object (not null, not array). */
+function asObject(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+/** Read a non-negative finite number from an object key, else undefined. */
+function readNum(obj: Record<string, unknown> | undefined, key: string): number | undefined {
+  if (!obj) return undefined;
+  const v = obj[key];
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined;
+}
+
+/**
+ * Pull a {@link TokenUsage} out of one candidate JSON payload, recognizing both
+ * the OpenAI Chat Completions `usage` object and the Codex `token_count` event.
+ * Returns null when the payload carries no recognizable usage numbers.
+ */
+function extractUsageFromPayload(payload: unknown): TokenUsage | null {
+  const obj = asObject(payload);
+  if (!obj) return null;
+
+  // (a) OpenAI Chat Completions usage object.
+  const usage = asObject(obj['usage']);
+  if (usage) {
+    const promptTokens = readNum(usage, 'prompt_tokens') ?? readNum(usage, 'input_tokens');
+    const completionTokens = readNum(usage, 'completion_tokens') ?? readNum(usage, 'output_tokens');
+    if (promptTokens !== undefined || completionTokens !== undefined) {
+      const cached =
+        readNum(asObject(usage['prompt_tokens_details']), 'cached_tokens') ??
+        readNum(usage, 'cached_input_tokens') ??
+        0;
+      return normalizeUsage({
+        inputTokens: promptTokens ?? 0,
+        outputTokens: completionTokens ?? 0,
+        cacheReadTokens: cached,
+        ...(readNum(usage, 'total_tokens') !== undefined
+          ? { totalTokens: readNum(usage, 'total_tokens') }
+          : {}),
+      });
+    }
+  }
+
+  // (b) Codex token_count event — `total_token_usage` nested under info /
+  // msg.info / top-level, or the counts placed directly on `info`.
+  const info = asObject(obj['info']) ?? asObject(asObject(obj['msg'])?.['info']);
+  const totals =
+    asObject(obj['total_token_usage']) ?? asObject(info?.['total_token_usage']) ?? info;
+  if (totals) {
+    const input = readNum(totals, 'input_tokens') ?? readNum(totals, 'prompt_tokens');
+    const output = readNum(totals, 'output_tokens') ?? readNum(totals, 'completion_tokens');
+    if (input !== undefined || output !== undefined) {
+      return normalizeUsage({
+        inputTokens: input ?? 0,
+        outputTokens: output ?? 0,
+        cacheReadTokens: readNum(totals, 'cached_input_tokens') ?? 0,
+        ...(readNum(totals, 'total_tokens') !== undefined
+          ? { totalTokens: readNum(totals, 'total_tokens') }
+          : {}),
+      });
+    }
+  }
+
+  return null;
 }
 
 // ─── Factory ──────────────────────────────────────────────────────────

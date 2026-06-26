@@ -32,6 +32,23 @@ export const ALL_PROVIDER_NAMES: readonly ProviderNameExt[] = [
   'ollama',
 ] as const;
 
+// ─── Worker Output Contract — Result spine (Sprint 326 326-001) ──────────────
+// ADDITIVE single-source re-export of the versioned, Zod-validated result contract
+// (spec §1.2). `TaskResultV1` is the canonical worker-result shape; `validateTaskResult`
+// is the non-throwing validator. This is intentionally NOT aliased to the legacy
+// `TaskResult` interface (task-types.ts) — that interface has a different shape
+// (filesChanged: string[], linesAdded, coverage) and dozens of live consumers, so
+// aliasing would shadow it and break tsc. New consumers (Phase 1.2+) import TaskResultV1.
+export {
+  taskResultSchema,
+  validateTaskResult,
+  TASK_RESULT_SCHEMA_VERSION,
+  type TaskResultV1,
+  type ValidateTaskResult,
+  type ValidateTaskResultOk,
+  type ValidateTaskResultErr,
+} from './task-result-schema.js';
+
 // ─── Worker Comms — TaskResult augmentation (Sprint 278 COMM-1) ──────────────
 // Extends TaskResult (defined in task-types.ts) with optional worker-to-worker
 // communication fields: sharedNotes (for SharedMemory writes) and handoffNotes

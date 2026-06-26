@@ -16,6 +16,7 @@ import { join } from 'node:path';
 import { DECKENT_DIR } from './constants.js';
 import { DeckentError } from './errors.js';
 import { debugLog } from './utils.js';
+import type { LogEvent } from './log-event.js';
 
 /** Output collector specific error type (error-handling unification rule compliance). */
 export class OutputCollectorError extends DeckentError {
@@ -139,6 +140,24 @@ const IDLE_POLL_MS = 5_000;
 const IDLE_THRESHOLD = 3;
 /** Default maximum lines per worker buffer. */
 const DEFAULT_MAX_LINES = 10_000;
+
+// ─── Log-Event Tail (structured JSONL) ──────────────────────────────
+
+/**
+ * Structural guard for a JSONL `LogEvent` row read off disk. Defensive at the
+ * parse boundary: a foreign/legacy/partial line that happens to be valid JSON
+ * but is not a LogEvent is rejected rather than streamed as garbage.
+ */
+function isLogEvent(v: unknown): v is LogEvent {
+  if (typeof v !== 'object' || v === null) return false;
+  const o = v as Record<string, unknown>;
+  return (
+    typeof o.ts === 'string' &&
+    typeof o.seq === 'number' &&
+    typeof o.type === 'string' &&
+    'content' in o
+  );
+}
 
 // ─── Backend Capture Functions ──────────────────────────────────────
 
@@ -315,6 +334,54 @@ export class OutputCollector {
    */
   getActiveWorkers(): string[] {
     return Array.from(this.polling.keys());
+  }
+
+  /**
+   * Tail the structured JSONL log a worker subprocess appends to its per-task
+   * log (`.tasks/task-<id>.log`, written by the spawn-backend via
+   * `writeLogEvent`). This is the live source for the dashboard SSE stream
+   * (spec §2.3): the SSE backfills with `readLogEvents(taskId)` on connect and
+   * tails new appends with `readLogEvents(taskId, lastSeq)`.
+   *
+   * Provider-agnostic: every line is one JSONL `LogEvent`, whichever provider
+   * produced the underlying chunk. A malformed/partial line (e.g. a half-flushed
+   * final append) is skipped rather than throwing — the live stream degrades
+   * gracefully instead of dying. A missing log file yields `[]`.
+   *
+   * @param taskId    Task identifier (log file is `.tasks/task-<id>.log`).
+   * @param afterSeq  Only return events whose `seq` is greater than this. Default
+   *                  `0` returns every event (full backfill); pass the last-seen
+   *                  `seq` for an incremental tail.
+   * @param maxEvents Cap on the number of returned events — backpressure for
+   *                  million-scale logs (mirrors the buffer cap). Most-recent win.
+   */
+  readLogEvents(taskId: string, afterSeq = 0, maxEvents = DEFAULT_MAX_LINES): LogEvent[] {
+    try {
+      const logPath = join(this.projectRoot, '.tasks', `task-${taskId}.log`);
+      if (!existsSync(logPath)) return [];
+
+      const content = readFileSync(logPath, 'utf-8');
+      const events: LogEvent[] = [];
+      for (const line of content.split('\n')) {
+        const trimmed = line.trim();
+        if (trimmed.length === 0) continue;
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(trimmed);
+        } catch {
+          continue; // partial/half-flushed line — skip, never throw
+        }
+        if (isLogEvent(parsed) && parsed.seq > afterSeq) {
+          events.push(parsed);
+        }
+      }
+
+      // Backpressure: keep only the most recent maxEvents (million-scale guard).
+      return events.length > maxEvents ? events.slice(-maxEvents) : events;
+    } catch (err) {
+      debugLog('output-collector:log-events', err);
+      return [];
+    }
   }
 
   /**

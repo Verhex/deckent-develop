@@ -1,0 +1,212 @@
+// ─── Worker Output Contract — Result Schema (the spine) ──────────────────────
+// Spec: docs/superpowers/specs/2026-06-26-worker-output-contract-observability-design.md §1.2
+//
+// The versioned, Zod-validated canonical shape every worker `.result` is assembled
+// into. `TaskResultV1` is INFERRED from the schema (single source of truth), and is
+// re-exported additively from `./types.js` (legacy `TaskResult` in task-types.ts is
+// left untouched — existing consumers keep working).
+//
+// Ownership (§1.1): the orchestrator owns the measurable/provenance fields; the worker
+// contributes only the subjective block (selfAssessment, goCriteria, notes); Brain fills
+// brainEvaluation*; the Auditor fills auditorValidation. Fields filled downstream are
+// optional/nullable/default so a freshly-assembled result still validates.
+
+import { z } from 'zod';
+
+/** Contract version stamped on every `TaskResultV1`. Bump on a breaking shape change. */
+export const TASK_RESULT_SCHEMA_VERSION = '1.0';
+
+// ─── Component schemas ───────────────────────────────────────────────────────
+
+/** The three worker self-assessment verdicts (shared with legacy SelfAssessment). */
+const selfAssessmentSchema = z.enum(['DONE', 'GO_WITH_TECH_DEBT', 'NO_GO']);
+
+/** A single git-derived file change (orchestrator-authoritative, §1.2 work output). */
+const fileChangeSchema = z.object({
+  path: z.string(),
+  status: z.enum(['added', 'modified', 'deleted']),
+  linesAdded: z.number().int().nonnegative(),
+  linesRemoved: z.number().int().nonnegative(),
+});
+
+/** A scope boundary violation detected by the orchestrator (`git diff` vs task.scope). */
+const boundaryViolationSchema = z.object({
+  path: z.string(),
+  reason: z.string(),
+});
+
+/** Provider-agnostic token accounting (§1.3). `source` records provenance honestly. */
+const tokenUsageSchema = z.object({
+  inputTokens: z.number().int().nonnegative(),
+  outputTokens: z.number().int().nonnegative(),
+  cacheReadTokens: z.number().int().nonnegative().default(0),
+  cacheCreationTokens: z.number().int().nonnegative().default(0),
+  totalTokens: z.number().int().nonnegative(),
+  source: z.enum(['provider-adapter', 'tokenizer-fallback']),
+});
+
+/** Cross-provider cost (§1.4). Local/self-hosted → `{ usd: 0, isLocal: true }`. */
+const costSchema = z.object({
+  usd: z.number().nonnegative(),
+  currency: z.literal('USD').default('USD'),
+  pricingSource: z.string(),
+  isLocal: z.boolean().default(false),
+});
+
+/** Verification — test outcome (worker-run, orchestrator-captured). */
+const testsSchema = z.object({
+  passed: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+  coverage: z.number().min(0).max(100).nullable().default(null),
+  command: z.string().nullable().default(null),
+  orchestratorVerified: z.boolean().default(false),
+});
+
+/** Verification — TypeScript compile outcome. */
+const tscSchema = z.object({
+  clean: z.boolean(),
+  errors: z.number().int().nonnegative(),
+});
+
+/** A single go-criterion verdict the worker reports against its definition-of-done. */
+const goCriterionSchema = z.object({
+  id: z.string(),
+  description: z.string(),
+  met: z.boolean(),
+  evidence: z.string().nullable().default(null),
+});
+
+/** Honesty signal raised on a worker claim/authoritative-source conflict (§1.5). */
+const honestGateSchema = z.object({
+  flagged: z.boolean().default(false),
+  violation: z.string().nullable().default(null),
+});
+
+/** A structural note written to SharedMemory (worker-comms, opt-in). */
+const sharedNoteSchema = z.object({
+  key: z.string(),
+  value: z.string(),
+});
+
+/** Auditor second-layer validation record (event-driven, finding-lifecycle). */
+const auditorValidationSchema = z.object({
+  status: z.enum(['OK', 'INCOMPLETE']),
+  checkedAt: z.string(),
+  missingFields: z.array(z.string()).default([]),
+  findingId: z.string().nullable().default(null),
+  resolved: z.boolean().default(true),
+});
+
+// ─── Top-level result schema (spec §1.2) ─────────────────────────────────────
+
+/**
+ * The canonical, versioned worker-result contract. `TaskResultV1` is inferred from
+ * this — do not hand-maintain a parallel interface.
+ *
+ * Required (surfaced in `missingFields` when absent): taskId, workerId, provider, model,
+ * filesChanged, totalLinesAdded, totalLinesRemoved, tokenUsage, cost, tests, tsc,
+ * selfAssessment. Everything filled downstream (Brain/Auditor/comms) is optional or
+ * defaulted so a freshly-assembled result validates before evaluation.
+ */
+export const taskResultSchema = z.object({
+  schemaVersion: z.literal(TASK_RESULT_SCHEMA_VERSION).default(TASK_RESULT_SCHEMA_VERSION),
+
+  // identity / provenance
+  taskId: z.string().min(1),
+  sprintId: z.string().optional(),
+  workerId: z.string(),
+  provider: z.string(),
+  model: z.string(),
+  modelEffort: z.string().optional(),
+  agent: z.string().nullable().default(null),
+  skills: z.array(z.string()).default([]),
+  attempt: z.number().int().positive().default(1),
+  isPriorityFix: z.boolean().default(false),
+  fixForTaskId: z.string().nullable().default(null),
+
+  // timing (orchestrator)
+  spawnedAt: z.string().optional(),
+  startedAt: z.string().optional(),
+  completedAt: z.string().optional(),
+  durationMs: z.number().int().nonnegative().optional(),
+
+  // work output (orchestrator, git-authoritative)
+  filesChanged: z.array(fileChangeSchema),
+  totalLinesAdded: z.number().int().nonnegative(),
+  totalLinesRemoved: z.number().int().nonnegative(),
+  diskVerified: z.boolean().default(false),
+  boundaryViolations: z.array(boundaryViolationSchema).default([]),
+
+  // resource accounting (orchestrator, provider-agnostic)
+  tokenUsage: tokenUsageSchema,
+  cost: costSchema,
+
+  // verification (worker-run, orchestrator-captured)
+  tests: testsSchema,
+  tsc: tscSchema,
+
+  // assessment (worker + brain)
+  selfAssessment: selfAssessmentSchema,
+  goCriteria: z.array(goCriterionSchema).default([]),
+  notes: z.string().default(''),
+  brainEvaluation: selfAssessmentSchema.nullable().default(null),
+  brainEvaluationReason: z.string().nullable().default(null),
+  rubricScores: z.record(z.string(), z.number()).nullable().default(null),
+  totalScore: z.number().nullable().default(null),
+  honestGate: honestGateSchema.default({ flagged: false, violation: null }),
+
+  // comms (optional)
+  handoffNotes: z.string().nullable().default(null),
+  sharedNotes: z.array(sharedNoteSchema).default([]),
+
+  // auditor (second layer)
+  auditorValidation: auditorValidationSchema.nullable().default(null),
+});
+
+/** The canonical worker-result type — inferred from {@link taskResultSchema}. */
+export type TaskResultV1 = z.infer<typeof taskResultSchema>;
+
+// ─── Validator (non-throwing) ────────────────────────────────────────────────
+
+/** Successful validation — `value` is the parsed, defaulted result. */
+export interface ValidateTaskResultOk {
+  ok: true;
+  value: TaskResultV1;
+}
+
+/** Failed validation — `missingFields` lists absent required keys, `errors` all issues. */
+export interface ValidateTaskResultErr {
+  ok: false;
+  missingFields: string[];
+  errors: string[];
+}
+
+export type ValidateTaskResult = ValidateTaskResultOk | ValidateTaskResultErr;
+
+/**
+ * Validate an unknown object against the result contract. **Never throws** — returns a
+ * discriminated result. On failure, `missingFields` holds the dotted paths of absent
+ * required keys (Zod's `received === 'undefined'` signal) and `errors` holds a
+ * human-readable `"<path>: <message>"` line for every issue (missing or invalid).
+ */
+export function validateTaskResult(obj: unknown): ValidateTaskResult {
+  const parsed = taskResultSchema.safeParse(obj);
+  if (parsed.success) {
+    return { ok: true, value: parsed.data };
+  }
+
+  const missingFields: string[] = [];
+  const errors: string[] = [];
+  for (const issue of parsed.error.issues) {
+    const fieldPath = issue.path.length > 0 ? issue.path.join('.') : '(root)';
+    // Zod signals a missing required key with an invalid_type issue whose received
+    // value is the literal 'undefined'. That — not a value-shape error — is "missing".
+    const received = (issue as { received?: unknown }).received;
+    if (issue.code === 'invalid_type' && received === 'undefined') {
+      if (!missingFields.includes(fieldPath)) missingFields.push(fieldPath);
+    }
+    errors.push(`${fieldPath}: ${issue.message}`);
+  }
+  return { ok: false, missingFields, errors };
+}

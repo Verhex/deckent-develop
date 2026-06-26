@@ -191,6 +191,122 @@ export function resolveBillingModeForAuth(
   return undefined;
 }
 
+// ─── Actual Cost (post-run, from real token usage) ─────────────────────────
+
+/**
+ * Cross-provider cost record for a completed run — matches the result contract's
+ * `cost` block (`task-result-schema.ts` §1.4): `{ usd, currency, pricingSource, isLocal }`.
+ * The assembler/reconciler drop this straight into a `TaskResult`.
+ */
+export interface ResultCost {
+  /** Metered USD at per-token API rates. Always `0` for local/self-hosted inference. */
+  usd: number;
+  currency: 'USD';
+  /** Price provenance — `cost-config:<provider>/<modelId>`, `local`, or `unknown-model:<m>`. */
+  pricingSource: string;
+  /** True for on-device / self-hosted inference (no metered third-party billing). */
+  isLocal: boolean;
+}
+
+/**
+ * The token fields {@link calculateActualCost} needs — a structural subset of the
+ * provider-agnostic `TokenUsage` (`token-usage.ts`). Cache fields are optional so a
+ * legacy claude-shaped usage (no cache split) still prices correctly.
+ */
+export interface ActualCostUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens?: number;
+  cacheCreationTokens?: number;
+}
+
+/**
+ * On-device / self-hosted inference provider identifiers — these always bill $0 with
+ * `isLocal:true`. Identity classification (not pricing hard-code): config remains the
+ * primary signal (`default_billing_mode === 'local'`); this set only rescues a local
+ * model that is not catalogued in cost-config.
+ */
+const LOCAL_PROVIDER_NAMES = new Set(['ollama', 'local', 'self-hosted', 'vllm']);
+
+/** Decide whether a run was on-device/self-hosted — config-first, provider-name fallback. */
+function isLocalInference(
+  provider: string | undefined,
+  found: { provider: string } | null,
+  config: CostConfig,
+): boolean {
+  if (provider && LOCAL_PROVIDER_NAMES.has(provider.toLowerCase())) return true;
+  if (found) {
+    const pc = config.providers[found.provider];
+    if (pc?.default_billing_mode === 'local') return true;
+    if (pc && pc.billing_modes_supported.length === 1 && pc.billing_modes_supported[0] === 'local') {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Compute the ACTUAL cost of a completed worker run from its real token usage
+ * (spec §1.4 — the post-run counterpart to {@link estimateSprintCost}). Pure
+ * arithmetic over per-token pricing; the only special case is local/self-hosted
+ * inference, which is always $0 (`isLocal:true`).
+ *
+ * Cross-provider: pricing is resolved by {@link findModel} (model id/alias across
+ * every provider in `config`), so the deckent `provider` name (`'claude'`/`'codex'`/
+ * `'gemini'`/`'ollama'`) need not match the cost-config provider key (`'anthropic'`/…)
+ * — the `provider` argument is used only to detect local inference.
+ *
+ * `config` is injected (not loaded from disk) so the function stays pure and tests
+ * stay hermetic (ADR-087), consistent with {@link estimateSprintCost}.
+ *
+ * Behaviour:
+ *  - local/self-hosted  → `{ usd:0, pricingSource:'local', isLocal:true }` (even with tokens).
+ *  - unknown model      → `{ usd:0, pricingSource:'unknown-model:<m>', isLocal:false }` — never
+ *                          silently priced, so the caller can surface the gap honestly.
+ *  - metered            → per-token sum (input + output + cache_read + cache_creation), with the
+ *                          unit-safety pin ({@link safeCost}) guarding against per-MTok unit errors.
+ *
+ * Subscription billing is intentionally NOT zeroed here: §1.4 defines this field as the raw
+ * arithmetic cost (local→$0 only); subscription/quota accounting lives in the estimate and
+ * reconciler paths.
+ */
+export function calculateActualCost(
+  usage: ActualCostUsage,
+  model: string,
+  provider: string | undefined,
+  config: CostConfig,
+): ResultCost {
+  const found = findModel(config, model);
+
+  // Local/self-hosted inference → no metered billing, regardless of token counts.
+  if (isLocalInference(provider, found, config)) {
+    return { usd: 0, currency: 'USD', pricingSource: 'local', isLocal: true };
+  }
+
+  // Unknown model → cannot price. Report honestly rather than silently charging $0.
+  if (!found) {
+    return { usd: 0, currency: 'USD', pricingSource: `unknown-model:${model}`, isLocal: false };
+  }
+
+  const { provider: pricedProvider, modelId, pricing } = found;
+  const usd =
+    safeCost(usage.inputTokens, pricing.input_cost_per_token, `${modelId}.input`) +
+    safeCost(usage.outputTokens, pricing.output_cost_per_token, `${modelId}.output`) +
+    safeCost(usage.cacheReadTokens ?? 0, pricing.cache_read_input_token_cost, `${modelId}.cache_read`) +
+    safeCost(
+      usage.cacheCreationTokens ?? 0,
+      pricing.cache_creation_input_token_cost,
+      `${modelId}.cache_creation`,
+    );
+
+  return {
+    usd,
+    currency: 'USD',
+    pricingSource: `cost-config:${pricedProvider}/${modelId}`,
+    isLocal: false,
+  };
+}
+
 function calculateTaskCost(
   task: TaskCostInput,
   config: CostConfig,

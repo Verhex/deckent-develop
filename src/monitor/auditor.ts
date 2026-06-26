@@ -31,6 +31,15 @@ import { MEMORY_DB_FILE } from '../core/constants.js';
 import { ACTIVE_EXECUTION_STATUSES, COMPLETED_STATUSES } from '../core/heartbeat-types.js';
 import { DEFAULT_HEARTBEAT_TIMEOUT_MS } from '../core/config.js';
 import { emitAlert } from './alert-emitter.js';
+import { validateTaskResult } from '../core/task-result-schema.js';
+import {
+  closeFinding,
+  getFinding,
+  openFinding,
+  recheckFinding,
+  type Finding,
+  type FindingArtifact,
+} from './finding-ledger.js';
 
 // ─── Constants ─────────────────────────────────────────────────────
 
@@ -3113,5 +3122,119 @@ export async function runVitestAuditGate(
     baseline,
     delta,
     gateStatus,
+  };
+}
+
+// ─── Second-Layer Validation — event-driven, finding-lifecycle (Sprint 326) ───
+//
+// Spec §"Auditor": NOT a continuous re-scan. On each `.result`/`.log` WRITE EVENT the auditor
+// validates the artifact ONCE against the contract and reports to the orchestrator:
+//   { taskId, artifact:'result'|'log', status:'OK'|'INCOMPLETE', missingFields:[...] }
+// Findings have a lifecycle (`finding-ledger.ts`): an INCOMPLETE artifact OPENS a finding and
+// is tracked to resolution; the orchestrator re-derives the artifact and a RECHECK of *that*
+// artifact closes it once it validates OK. An OK artifact is recorded CLOSED and never
+// re-validated. The returned report IS the report to the orchestrator (it invokes this on each
+// write event and consumes the return); wiring it into the sprint controller is a separate
+// phase-6 concern, so this stays a pure, side-effect-local (ledger only) function.
+
+/** The orchestrator-facing report produced for one artifact write event. */
+export interface AuditorValidationReport {
+  taskId: string;
+  artifact: FindingArtifact;
+  /** `OK` = passes the contract (or already validated-clean); `INCOMPLETE` = required fields absent. */
+  status: 'OK' | 'INCOMPLETE';
+  /** Dotted paths of required fields absent (empty when OK). */
+  missingFields: string[];
+  /** `true` when validation actually ran this event; `false` when skipped (already validated OK). */
+  validated: boolean;
+  /** The stable finding id for this artifact (present whenever a ledger entry exists). */
+  findingId: string | null;
+  /** The ledger finding after this event, when one exists. */
+  finding?: Finding;
+}
+
+/** Options for {@link validateArtifactOnWrite} — `validate`/`nowIso` injectable for tests + the log schema. */
+export interface ValidateArtifactOptions {
+  /**
+   * Validator for the artifact. Defaults to {@link validateTaskResult} (the result contract).
+   * The `log` artifact carries a different schema (phase 4) — inject its validator here.
+   */
+  validate?: (obj: unknown) => { ok: true } | { ok: false; missingFields: string[] };
+  /** Deterministic timestamp for ledger writes (defaults to `new Date().toISOString()`). */
+  nowIso?: string;
+}
+
+/**
+ * Validate a single `.result`/`.log` artifact on its WRITE EVENT (one-shot, event-driven) and
+ * drive the finding lifecycle. Returns the orchestrator report.
+ *
+ * Lifecycle:
+ *  - a CLOSED finding already exists → the artifact was validated OK before → SKIP (never
+ *    re-checked); report `OK`, `validated:false`.
+ *  - an OPEN finding exists → this is the orchestrator's re-derivation → RECHECK that artifact:
+ *      · now OK   → close the finding (recheck counted) → report `OK`.
+ *      · still INCOMPLETE → keep it open, refresh missingFields, recheck counted → report `INCOMPLETE`.
+ *  - no finding yet → first validation:
+ *      · OK         → record a closed finding (clean marker) → report `OK`.
+ *      · INCOMPLETE → open a finding → report `INCOMPLETE`.
+ *
+ * Never throws — ledger I/O is fail-safe in `finding-ledger.ts`.
+ */
+export function validateArtifactOnWrite(
+  projectRoot: string,
+  sprintId: string,
+  taskId: string,
+  artifact: FindingArtifact,
+  obj: unknown,
+  opts: ValidateArtifactOptions = {},
+): AuditorValidationReport {
+  const validate = opts.validate ?? validateTaskResult;
+  const nowIso = opts.nowIso;
+
+  const existing = getFinding(projectRoot, sprintId, taskId, artifact);
+
+  // An OK artifact is never re-checked — a closed finding is the "validated-clean" marker.
+  if (existing && existing.status === 'closed') {
+    return {
+      taskId,
+      artifact,
+      status: 'OK',
+      missingFields: [],
+      validated: false,
+      findingId: `finding-${taskId}-${artifact}`,
+      finding: existing,
+    };
+  }
+
+  const result = validate(obj);
+
+  if (result.ok) {
+    // Resolution (open → closed) or a clean first validation (record closed marker).
+    if (existing) recheckFinding(projectRoot, sprintId, taskId, artifact, []);
+    const finding = closeFinding(projectRoot, sprintId, taskId, artifact, nowIso);
+    return {
+      taskId,
+      artifact,
+      status: 'OK',
+      missingFields: [],
+      validated: true,
+      findingId: `finding-${taskId}-${artifact}`,
+      finding,
+    };
+  }
+
+  // INCOMPLETE — open a new finding, or recheck-and-keep-open an existing one.
+  const missingFields = result.missingFields;
+  const finding = existing
+    ? recheckFinding(projectRoot, sprintId, taskId, artifact, missingFields)
+    : openFinding(projectRoot, sprintId, taskId, artifact, missingFields, nowIso);
+  return {
+    taskId,
+    artifact,
+    status: 'INCOMPLETE',
+    missingFields,
+    validated: true,
+    findingId: `finding-${taskId}-${artifact}`,
+    finding,
   };
 }

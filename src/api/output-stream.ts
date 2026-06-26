@@ -22,6 +22,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { OutputCollector } from '../core/output-collector.js';
 import type { OutputSnapshot, OutputEntry } from '../core/output-collector.js';
+import type { LogEvent } from '../core/log-event.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,20 @@ export interface ErrorEvent {
   message: string;
   /** Optional error code. */
   code?: string;
+}
+
+/**
+ * SSE event data payload for the structured JSONL log stream (spec §2.3).
+ * Emitted as `log-backfill` (full history on connect) and `log` (live appends),
+ * mirroring the `snapshot`/`output` pair of the line-based stream.
+ */
+export interface LogStreamEvent {
+  /** Task identifier. */
+  taskId: string;
+  /** A batch of structured log events (backfill history or live appends). */
+  events: readonly LogEvent[];
+  /** Highest `seq` sent so far — the resume cursor for the next push. */
+  lastSeq: number;
 }
 
 /** Options for configuring the SSE handler. */
@@ -245,6 +260,128 @@ export function handleOutputStream(
   }
 
   // Clean up when client disconnects
+  req.on('close', cleanup);
+  req.on('error', cleanup);
+  res.on('error', cleanup);
+
+  return cleanup;
+}
+
+// ─── Structured Log SSE Handler (live JSONL tail) ───────────────────────────────
+
+/** Highest `seq` across a batch of log events (0 when empty). */
+function maxSeq(events: readonly LogEvent[]): number {
+  let max = 0;
+  for (const ev of events) if (ev.seq > max) max = ev.seq;
+  return max;
+}
+
+/**
+ * Handle a Server-Sent Events request for a worker's **structured JSONL log**
+ * (spec §2.3 — the dead-stream fix).
+ *
+ * Unlike {@link handleOutputStream} (which serves line-based pane/log scraping
+ * from the in-memory CircularBuffer that `collect()` would fill), this tails the
+ * per-task JSONL log the spawn-backend writes (`.tasks/task-<id>.log` via
+ * `writeLogEvent`). That file is the live source of truth, so the stream is no
+ * longer dead even when `collect()` has no caller.
+ *
+ * On connect it backfills the full event history (`log-backfill`), then polls
+ * the log and pushes each new appended batch (`log`) — backfill + push. The
+ * worker's `LogEvent.seq` is the resume cursor, so no event is sent twice and
+ * none is missed. `done` fires when an actively-collected worker finishes,
+ * the client disconnects, or `maxConnectionMs` elapses.
+ *
+ * @param req       - Incoming HTTP request
+ * @param res       - Server response (kept open as the SSE stream)
+ * @param collector - OutputCollector exposing `readLogEvents`
+ * @param opts      - Optional configuration overrides
+ * @returns cleanup function that stops polling and closes the connection
+ */
+export function handleLogStream(
+  req: IncomingMessage,
+  res: ServerResponse,
+  collector: OutputCollector,
+  opts: OutputStreamOptions = {},
+): () => void {
+  const pollIntervalMs = opts.pollIntervalMs ?? 500;
+  const maxConnectionMs = opts.maxConnectionMs ?? 0;
+
+  const query = parseStreamQuery(req);
+  if (!query) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Missing required query parameter: taskId' }));
+    return () => undefined;
+  }
+
+  const { taskId } = query;
+
+  writeSseHeaders(res);
+
+  // Backfill: every event already on disk (full history).
+  const backfill = collector.readLogEvents(taskId);
+  let lastSeq = maxSeq(backfill);
+  writeSseEvent(res, 'log-backfill', {
+    taskId,
+    events: backfill,
+    lastSeq,
+  } satisfies LogStreamEvent);
+
+  // A worker that is being actively collected lets us emit `done` on completion;
+  // a pure file-tail (no collect caller) stays open until disconnect/timeout.
+  let everActive = collector.getActiveWorkers().includes(taskId);
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
+  let maxTimer: ReturnType<typeof setTimeout> | null = null;
+  let closed = false;
+
+  function cleanup(): void {
+    if (closed) return;
+    closed = true;
+    if (pollTimer) clearInterval(pollTimer);
+    if (maxTimer) clearTimeout(maxTimer);
+    if (!res.writableEnded) res.end();
+  }
+
+  pollTimer = setInterval(() => {
+    if (res.writableEnded || res.destroyed) {
+      cleanup();
+      return;
+    }
+
+    // Push: only events newer than the last seq we sent.
+    const fresh = collector.readLogEvents(taskId, lastSeq);
+    if (fresh.length > 0) {
+      const nextSeq = maxSeq(fresh);
+      const ok = writeSseEvent(res, 'log', {
+        taskId,
+        events: fresh,
+        lastSeq: nextSeq,
+      } satisfies LogStreamEvent);
+      if (ok) {
+        lastSeq = nextSeq;
+      } else {
+        cleanup();
+        return;
+      }
+    }
+
+    // Done when an actively-collected worker transitions to inactive.
+    const active = collector.getActiveWorkers().includes(taskId);
+    if (active) {
+      everActive = true;
+    } else if (everActive) {
+      writeSseEvent(res, 'done', { taskId });
+      cleanup();
+    }
+  }, pollIntervalMs);
+
+  if (maxConnectionMs > 0) {
+    maxTimer = setTimeout(() => {
+      writeSseEvent(res, 'done', { taskId, reason: 'max-connection-timeout' });
+      cleanup();
+    }, maxConnectionMs);
+  }
+
   req.on('close', cleanup);
   req.on('error', cleanup);
   res.on('error', cleanup);

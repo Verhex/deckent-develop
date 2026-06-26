@@ -1,5 +1,5 @@
-import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync, readdirSync, existsSync, statSync, mkdirSync } from 'node:fs';
+import { join, basename } from 'node:path';
 import { archivePromptFiles } from '../../orchestra/spawn-backend-docker.js';
 import { cleanTasksArchive } from '../../orchestra/sprint-docs-updater.js';
 import { runRetention } from '../../core/sprint-file-retention.js';
@@ -8,7 +8,7 @@ import type { Command } from 'commander';
 import type { Task, Sprint } from '../../core/types.js';
 import { SprintStatus, SprintPhase, TaskStatus } from '../../core/types.js';
 import {
-  TASKS_DIR, LOCKS_DIR, BRAIN_DIR, MEMORY_DB_FILE,
+  TASKS_DIR, LOCKS_DIR, BRAIN_DIR, ARCHIVE_DIR, MEMORY_DB_FILE,
   TMUX_SESSION_NAME, PROJECT_CONFIG_PATH,
 } from '../../core/constants.js';
 import { MemoryStore } from '../../core/memory-store.js';
@@ -39,6 +39,19 @@ function getProjectSessionName(root: string): string {
     }
   } catch { /* use default */ }
   return TMUX_SESSION_NAME;
+}
+
+/** §2.4 — Copy a .log file to archiveDir + byte-verify. Returns true iff archive is byte-exact. */
+export function archiveLogFileWithVerify(liveLogPath: string, archiveDir: string, content: Buffer): boolean {
+  try {
+    mkdirSync(archiveDir, { recursive: true });
+    const archivePath = join(archiveDir, basename(liveLogPath));
+    writeFileSync(archivePath, content);
+    const archiveSize = statSync(archivePath).size;
+    return archiveSize === content.length;
+  } catch {
+    return false;
+  }
 }
 
 /** D) Ensure .brain/archive/ has a git-track exception in .gitignore. */
@@ -185,11 +198,32 @@ export function registerCleanup(program: Command): void {
           workers: [],
         };
 
+        // Compute archiveSprintId before cleanup so §2.4 and §E both use it
+        const archiveSprintId = sprintId ?? `sprint-${sprintNumber || Date.now()}`;
+
+        // §2.4 — Archive .log files with byte-verify before live delete; archive-fail → live-RETAIN
+        const logArchiveDir = join(root, BRAIN_DIR, ARCHIVE_DIR, `${archiveSprintId}-tasks`);
+        const logFilesToRestore: Array<[string, Buffer]> = [];
+        if (existsSync(tasksDir)) {
+          for (const lf of (readdirSync(tasksDir) as string[]).filter(n => n.endsWith('.log'))) {
+            const liveLogPath = join(tasksDir, lf);
+            try {
+              const content = readFileSync(liveLogPath) as Buffer;
+              const ok = archiveLogFileWithVerify(liveLogPath, logArchiveDir, content);
+              if (!ok) logFilesToRestore.push([liveLogPath, content]);
+            } catch { /* unreadable → skip */ }
+          }
+        }
+
         cleanup(root, sprint);
+
+        // Restore .log files whose archiving failed (archive-fail → live-RETAIN per §2.4)
+        for (const [liveLogPath, content] of logFilesToRestore) {
+          try { writeFileSync(liveLogPath, content); } catch { /* best-effort */ }
+        }
 
         // E) Archive .prompt-* files to .tasks/archive/sprint-{id}/ before deleting
         // Prompt files persist during sprint for analysis — archived on cleanup with retention policy
-        const archiveSprintId = sprintId ?? `sprint-${sprintNumber || Date.now()}`;
         const archiveResult = archivePromptFiles(tasksDir, archiveSprintId, promptArchiveRetention);
         if (archiveResult.archived > 0) {
           print(`Archived ${archiveResult.archived} prompt file(s) → .tasks/archive/${archiveSprintId}/`);
