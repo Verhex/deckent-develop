@@ -31,8 +31,8 @@ describe('LocalIdentityProvider', () => {
     expect(p.id).toBe('local');
   });
   it('factory throws on unknown provider kind', () => {
-    // @ts-expect-error — exercising the runtime guard
-    expect(() => createIdentityProvider({ kind: 'scim', store, local: { edition: 'enterprise' } })).toThrow(/E_UNKNOWN_IDENTITY_PROVIDER/);
+    // @ts-expect-error — exercising the runtime guard ('csv' = Faz 2, still an honest-throw seam; 'scim'/'oidc-claims' are now implemented in Faz 3)
+    expect(() => createIdentityProvider({ kind: 'csv', store, local: { edition: 'enterprise' } })).toThrow(/E_UNKNOWN_IDENTITY_PROVIDER/);
   });
   it('owner shortcut always returns full permissions even when roleMap narrows admin', () => {
     const p = new LocalIdentityProvider(store, {

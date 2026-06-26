@@ -1,93 +1,132 @@
-# DIRECTIVES — Sprint: PROVIDER-AGNOSTIC USAGE & COST CAPTURE (full matrix)
+# DIRECTIVES — Sprint: SOCIAL-IDENTITY FAZ 3 — ENTERPRISE IdP ADAPTERS (SCIM + OIDC-claims)
 
 ## Goal
-Implement the **entire** provider-agnostic per-task usage+cost capture design — the actual root-cause
-fix for "the token counter never works". **Spec of record (READ IT FIRST):**
-`docs/superpowers/specs/2026-06-26-provider-agnostic-usage-cost-design.md`. The orchestrator-side
-read+compute (`enrichResultTokenUsage`/`enrichResultCost`, Steps 1-2) is already wired; the missing
-prerequisite is that **each provider's REAL usage must reach `.result.tokenUsage` from its NATIVE
-source** (usage is NOT in stdout — it's in the provider's session-store / HTTP-response / structured
-envelope). Reference patterns in the spec: tokscale (per-provider native-source extraction → one
-schema), LiteLLM/AI-SDK (normalized usage+cost), Hermes→OpenRouter (gateway for the API side).
+Faz 1a (engine, PR #25) + Faz 1b (connector wiring, PR #26) merged. Now implement **Faz 3**: the
+enterprise directory adapters that let `deckent`'s per-user RBAC ingest roles from real IdPs
+(Microsoft Entra ID / Teams, Okta, Google Workspace) via **SCIM 2.0** + **OIDC group/role claims** —
+turning the engine's honest `E_UNKNOWN_IDENTITY_PROVIDER` seams into real adapters.
+**Spec of record (READ FIRST):** `docs/superpowers/specs/2026-06-26-social-identity-rbac-design.md`
+§3 (pluggable provider port), §3.3 (Microsoft/Teams/Okta ingest answer), §11 (carry-overs).
+Engine surface: `src/connectors/identity/` (`provider.ts` port, `index.ts` factory, `identity-store.ts`,
+`role-map.ts` `resolvePermissions(role, roleMap, groupKey)`).
 
-## 🔒 BAĞLAYICI — her task (Law #2 anchor)
-- **PROVIDER-MATRIX-CHECK = her task'ın .plan'ının İLK satırı:** `claude·codex·gemini·ollama·vLLM·
-  openai-compatible·bedrock·OpenRouter·Vertex·Azure — bu değişiklik tek-provider'a mı bağlı?` Tek-provider'a
-  bağlıysa YANLIŞ. **Claude-special-case YASAK.** Çözüm sınıf-genelinde (A/B/C) tutarlı olmalı.
-- **Spec-driven:** design-doc §"Usage-Source Contract" + §"matris" + §"implementation plan"a uy.
+## 🔒 BAĞLAYICI — her task (3 Yasa anchor)
+- **HOT-PATH SAF-LOCAL (belkemiği):** `resolve()` ASLA network yapmaz — yalnız in-memory cache + local
+  SQLite. Tüm IdP I/O **yalnız `sync()`** içinde (out-of-band). Bir task `resolve()`'a network koyarsa YANLIŞ.
+- **ADR-010 tek-runtime-dep:** yeni paket YOK. HTTP = Node global `fetch` (built-in). SCIM/OIDC parse = native.
+- **Fail-closed + honest-seam:** factory hâlâ-implemente-edilmemiş kind'da `DeckentError` throw eder (sessiz stub YOK).
+  Sync hatası → mevcut local store korunur (stale-but-safe), resolve fail-closed.
 - **Cerrahi + distinct-file** (iki task aynı dosyaya yazmaz). ESM `.js`. `process.cwd()` YASAK → `join(root,…)`.
-- **Faithful-regression** (pre-fix RED/post-fix GREEN) + **contract-test** (native-source-sample → normalize)
-  + `tsc --noEmit` temiz + affected-suite yeşil per task. Hermetik (tmpdir, async spawn, no spawnSync, no HOME-leak).
-- **Riskli CLI-invocation değişikliği (T2/T3) PROOF-OF-FUNCTION zorunlu:** gerçek-binary run — agent HÂLÂ
-  `.result` yazıyor mu + log/envelope'da usage var mı. Agent kırılırsa → design-doc'taki **session-store-reader**
-  fallback'ine geç (stdout-format değiştirme). No haiku. Additive + graceful-fallback (envelope yoksa extractUsage null → mevcut davranış).
+- **Hermetik test:** SCIM/OIDC **mock-fetch / fixture** (GERÇEK network YOK), tmpdir IdentityStore, async, no spawnSync,
+  no HOME-leak. `tsc --noEmit` 0-yeni-hata (src/connectors,src/core), affected-suite yeşil per task. ci-sim yeşil.
+- **i18n-first** kullanıcı-görünür string varsa `getMessage` (en/tr). **No haiku** (kod). Additive + graceful.
+- **Edition:** scim/oidc = `edition:'enterprise'`; role-map `groupKey` yolu (dış-grup→deckent rol+izin) wire edilmeli.
 
 ---
 
-## Task 1: rich normalized usage schema (foundation)
+## Task 1: identity config — scim/oidc provider kind + provider-specific config (foundation)
 - Model: sonnet
 - Effort: normal
-- Agent: refactorer
+- Agent: api-builder
 - Skills: typescript-expert
-- Files: src/core/token-usage.ts, tests/core/token-usage-rich.test.ts
-- Scope: src/core/token-usage.ts, tests/core/
+- Files: src/core/config-types.ts, tests/core/identity-config-faz3.test.ts
+- Scope: src/core/config-types.ts, tests/core/
+- Dependencies: 0
 ### Description
-Spec §"normalized schema" (AI-SDK pariteyi). `TokenUsage` + `RawTokenUsage` + `normalizeUsage`'a **`cacheWriteTokens` + `reasoningTokens`** ekle (şu an yok). `totalTokens` reasoning'i de içerebilir (provider-reported öncelik). Additive — mevcut consumer kırılmaz, eksik-alan→0. **Provider-matrix-check:** şema TÜM provider'ların alanlarını taşımalı (anthropic cache_creation/read, ollama eval, openai reasoning, gemini thoughts). **goNogo:** yeni-alanlar default-0 + provider-reported honor; faithful (eski-fixture hâlâ geçer, yeni-alan-fixture set); tsc=0.
+`identity.provider` plain-data şemasını genişlet: `kind: 'local' | 'scim' | 'oidc-claims'`. SCIM için
+`scim?: { baseUrl: string; token: string; userFilter?: string }` ($DECK:-interpolated token). OIDC-claims için
+`oidc?: { issuer: string; audience?: string; groupsClaim?: string; roleClaim?: string }`. Additive — mevcut
+`kind:'local'` kırılmaz; eksik-alan→undefined. Plain-data (core→connectors import YOK).
+### goNogo
+- goCriteria: union 3-kind; scim+oidc config blokları tipli; `kind:'local'` geriye-uyumlu; tsc 0-yeni-hata.
+- nogo: core'a connectors import; mevcut config consumer kırılırsa.
 
-## Task 2: Class-A claude usage-emit (CLI-agent, native source)
+## Task 2: SCIM 2.0 directory provider — sync() pulls Users+Groups → IdentityStore
 - Model: opus
 - Effort: high
 - Agent: api-builder
 - Skills: typescript-expert
-- Files: src/providers/subprocess.ts, src/providers/claude.ts, tests/providers/claude-usage.test.ts
-- Scope: src/providers/subprocess.ts, src/providers/claude.ts, tests/providers/
-- Dependencies: 0
+- Files: src/connectors/identity/providers/scim.ts, tests/connectors/identity/scim-provider.test.ts
+- Scope: src/connectors/identity/providers/, tests/connectors/identity/
+- Dependencies: 1
 ### Description
-Spec §Class-A. claude'un per-run usage'ı stdout'ta YOK (`CLAUDE_SUBPROCESS_CONFIG.buildArgs` subprocess.ts:58 `-p -` usage-emit-siz). **İki yol — design-doc'a göre seç + proof-of-function'la doğrula:** (1) buildArgs'a `--output-format json`/`stream-json` ekle → CLI usage-envelope emit eder → `claude.ts extractUsage` envelope'dan `usage:{input_tokens,output_tokens,cache_read_input_tokens,cache_creation_input_tokens}` çıkarır. **PROOF-OF-FUNCTION ZORUNLU:** gerçek `claude -p --output-format json --allowedTools … --dangerously-skip-permissions` run-et — agent tool-loop'u koşup `.result` yazıyor mu + envelope'da usage var mı? **Eğer json-format agent'ı bozuyorsa** (tool-use disable / .result yazılmıyor) → (2) **session-store-reader** (tokscale deseni): `~/.claude/projects/{path}/*.jsonl` transcript'inden bu-run'ın usage'ını oku (session-id korelasyonu). **gemini.ts:458 `--output-format json` referans.** **Provider-matrix-check zorunlu.** **goNogo:** claude per-run usage `.result.tokenUsage`'a gerçek-değer (proof-of-function: gerçek-run); extractUsage envelope-OR-session-store'dan çıkarır; agent .result-yazımı BOZULMAZ; faithful+contract-test; tsc=0.
+`ScimIdentityProvider implements IdentityDirectoryProvider` (`id='scim'`, `edition:'enterprise'`).
+`sync()`: global `fetch` ile SCIM 2.0 `/Users` (+ `/Groups` membership) çek (Bearer token), her kullanıcı için
+`(connector, externalId=email)` → IdentityRecord; dış-grup → deckent rol/izin (`role-map` `groupKey` yolu);
+`store.upsertIdentity(...)`; SyncReport{upserted, removed} döndür. `resolve(ref, tenantId)` = **yalnız**
+`store.getIdentity(...)` (network YOK). Pagination (SCIM `startIndex`/`itemsPerPage`) + hata → mevcut store korunur.
+`fetch` **inject edilebilir** (test mock-fetch için ctor param, default global fetch).
+### goNogo
+- goCriteria: sync() mock-SCIM fixture'ından N kullanıcı upsert eder + group→role map; resolve() saf-local
+  (mock-fetch sync-DIŞI çağrılmaz — test assert); pagination 2-sayfa; sync-hatası store'u bozmaz; fail-closed resolve.
+- nogo: resolve()'da network; gerçek-network test; yeni runtime-dep.
 
-## Task 3: Class-A codex usage-emit (CLI-agent, native source)
-- Model: opus
+## Task 3: OIDC-claims provider — role+tenant from ID-token claims (verify-bind OIDC yolu)
+- Model: sonnet
 - Effort: high
 - Agent: api-builder
 - Skills: typescript-expert
-- Files: src/providers/codex.ts, tests/providers/codex-usage.test.ts
-- Scope: src/providers/codex.ts, tests/providers/
-- Dependencies: 0
+- Files: src/connectors/identity/providers/oidc-claims.ts, tests/connectors/identity/oidc-claims-provider.test.ts
+- Scope: src/connectors/identity/providers/, tests/connectors/identity/
+- Dependencies: 1
 ### Description
-Spec §Class-A. codex `buildArgs` (`exec --full-auto`) usage-emit-siz. codex'in **structured/usage modunu** ekle (codex'in kendi flag'i / session-store `~/.codex/sessions/*.jsonl` `type:"token_count"`→`last_token_usage` — tokscale deseni) → `extractUsage` çıkarır. **Provider-matrix-check.** Proof-of-function codex-binary mevcutsa; yoksa contract-test (real session-sample → normalize) + açık-not. **goNogo:** codex per-run usage çıkarılır (envelope-or-session-store); faithful+contract-test; tsc=0.
+`OidcClaimsIdentityProvider` — bir doğrulanmış OIDC ID-token claim-set'inden principal türetir:
+`groupsClaim`/`roleClaim` → `role-map` `groupKey` → rol+izin; `tenant` claim → tenantId; `email` → userId.
+Saf-fonksiyon `principalFromClaims(claims, cfg, roleMap, tenantFallback): ResolvedPrincipal | null` (testable,
+network YOK — token doğrulama verify-bind'in işi; bu modül claim→principal eşler). `resolve()` store-lookup;
+asıl giriş `principalFromClaims` (verify-bind OIDC callback'i çağırır).
+### goNogo
+- goCriteria: principalFromClaims sample Entra/Okta claim-set'lerini doğru rol+tenant'a eşler; groupsClaim
+  yoksa/eşleşmeyince fail-closed (null); pure (no I/O); tsc 0-yeni.
+- nogo: token-imza-doğrulama burada (verify-bind'e ait); network.
 
-## Task 4: Class-A gemini verify + extractUsage→result (CLI-agent)
-- Model: opus
+## Task 4: factory wiring — createIdentityProvider supports scim + oidc-claims
+- Model: sonnet
 - Effort: normal
 - Agent: api-builder
 - Skills: typescript-expert
-- Files: src/providers/gemini.ts, tests/providers/gemini-usage.test.ts
-- Scope: src/providers/gemini.ts, tests/providers/
-- Dependencies: 0
+- Files: src/connectors/identity/index.ts, tests/connectors/identity/factory-faz3.test.ts
+- Scope: src/connectors/identity/, tests/connectors/identity/
+- Dependencies: 2, 3
 ### Description
-Spec §Class-A. gemini buildArgs (gemini.ts:458) **zaten `--output-format json`** → usageMetadata emit ediyor. Doğrula: `extractUsage` `usageMetadata:{promptTokenCount,candidatesTokenCount,cachedContentTokenCount,thoughtsTokenCount}`'u normalize-şemaya (reasoning=thoughts) **tam** çıkarıyor mu + result-path'e ulaşıyor mu. Eksikse tamamla. **Provider-matrix-check.** **goNogo:** gemini usageMetadata→normalize (reasoning dahil); contract-test (real gemini-json-sample); faithful; tsc=0.
+`createIdentityProvider` factory'sini `kind:'scim'` ve `kind:'oidc-claims'` için genişlet (honest-throw'u bu
+ikisi için kaldır; provider-specific config'ten inşa et). `kind:'csv'` (Faz 2) hâlâ honest-throw kalır.
+`CreateProviderOptions` union'ını yeni kind+config'lerle güncelle. Mevcut `local` yolu kırılmaz.
+### goNogo
+- goCriteria: factory scim/oidc-claims provider üretir; bilinmeyen-kind (`csv`) hâlâ E_UNKNOWN throw; local geriye-uyumlu; tsc 0-yeni.
+- nogo: sessiz stub; local regresyon.
 
-## Task 5: Class-B API usage-accumulate → result (HTTP-response providers)
+## Task 5: bootstrap sync wiring — background sync() opt-in + role-map groupKey live (Tier-1)
 - Model: opus
 - Effort: high
-- Agent: bug-fixer
-- Skills: typescript-expert
-- Files: src/agents/agentic-worker-entry.ts, tests/agents/api-usage-accumulate.test.ts
-- Scope: src/agents/agentic-worker-entry.ts, tests/agents/
-- Dependencies: 0
-### Description
-Spec §Class-B. API-provider'lar (ollama/openai-compatible/bedrock) usage'ı **HTTP-response'ta zaten alıyor** (ollama eval_count, openai usage) ama agentic-worker `zeroTokenUsage` (0/0) default'luyor (agentic-worker-entry.ts:157/179). **runAgenticWorker'ın loop'undaki her response'tan usage'ı BİRİKTİR** (input/output/cache/reasoning topla) → `.result.tokenUsage`'a normalize-yaz (zeroTokenUsage yerine). _(runAgenticWorker runner-dosyasını grep'le bul — adaptive-agent.ts/agentic-worker.ts; bu task agentic-worker-entry.ts'i sahiplenir, runner'ı SALT-OKUR ve gerekiyorsa import-eder; runner-edit gerekiyorsa NO_GO+not.)_ **Provider-matrix-check:** ollama+openai-compatible+bedrock üçü de. **goNogo:** multi-turn API-loop usage'ı accumulate→result non-zero; faithful (pre-fix 0/0→RED); contract-test (fake multi-response→accumulated); tsc=0.
-
-## Task 6: Class-C OpenRouter first-class (unified gateway, API side)
-- Model: opus
-- Effort: normal
 - Agent: api-builder
 - Skills: typescript-expert
-- Files: src/providers/openai-compatible.ts, tests/providers/openrouter-usage.test.ts
-- Scope: src/providers/openai-compatible.ts, tests/providers/
-- Dependencies: 0
+- Files: src/connectors/connector-bootstrap.ts, tests/connectors/identity-faz3-e2e.test.ts
+- Scope: src/connectors/connector-bootstrap.ts, tests/connectors/
+- Dependencies: 4
 ### Description
-Spec §Class-C + §"gateway-first". Hermes/OpenClaw API-tarafını **OpenRouter (200+ model)** ile çözüyor — OpenRouter OpenAI-uyumlu → openai-compatible adapter zaten kapsar. Doğrula+sağlamlaştır: `extractUsage` OpenRouter response'unun `usage:{prompt_tokens,completion_tokens,prompt_tokens_details:{cached_tokens},completion_tokens_details:{reasoning_tokens}}`'unu normalize-şemaya (cacheRead+reasoning dahil) çıkarıyor mu. **Provider-matrix-check:** openai-compatible-class TÜM gateway'leri (OpenRouter/LiteLLM/vLLM/DeepSeek/Qwen) kapsar. **goNogo:** OpenRouter normalized-usage (cache+reasoning) çıkarılır; contract-test (real OpenRouter-response-sample); faithful; tsc=0.
+`identity.provider.kind` scim/oidc olduğunda bootstrap'ta provider'ı kur + **out-of-band** ilk `sync()`'i
+tetikle (fire-and-forget, hata-log+devam; resolve hot-path'i bloke etmez). Mevcut opt-in/disabled yolu
+**byte-for-byte** korunur (kind yoksa local). Tier-1 e2e: scim-sync (mock-fetch) → IdentityStore dolu →
+inbound mesaj gerçek yoldan principal'a çözülür → L2 gate per-user allow/deny (önceki e2e deseni).
+### goNogo
+- goCriteria: scim kind → sync tetiklenir (mock), store dolar, e2e per-user allow/deny gerçek-yoldan; disabled-path
+  değişmez (mevcut connector suite yeşil); sync-failure connector'ı crash etmez (fail-safe).
+- nogo: resolve hot-path'inde sync-bekleme; disabled-path regresyonu; gerçek-network.
+Smoke: npx vitest run tests/connectors/identity-faz3-e2e.test.ts → scim-sync→inbound→per-user allow/deny GREEN
 
----
-**Beklenen:** 6 distinct-file task (T2/T3/T5 dep-yok bağımsız, T1 foundation). T1 sonnet, T2-T6 opus (core/risky). Her task **provider-matrix-check .plan-ilk-satırı** + faithful+contract-test + (T2/T3 CLI) proof-of-function. **Çözüm sınıf-genelinde provider-agnostik** — claude-special-case YOK. Full lifecycle dogfood. DEFER: Class-D (Cursor web-API, v1.1) · strict-TaskResultV1 (ayrı).
+## Task 6: docs — spec §3.3/§11 güncelle + ADR-092 amend (scim/oidc live)
+- Model: sonnet
+- Effort: low
+- Agent: doc-writer
+- Skills: documentation-writer
+- Files: docs/superpowers/specs/2026-06-26-social-identity-rbac-design.md, docs/adr/092-connector-surface-social-identity-rbac-authorization.md
+- Scope: docs/
+- Dependencies: 5
+### Description
+Spec §3.3 (Microsoft/Teams/Okta ingest) + §11'i "Faz 3 ✅ scim+oidc-claims implemente; resolve saf-local,
+sync out-of-band" olarak güncelle. ADR-092'ye enterprise-IdP adapter notu ekle. Kalan follow-up (SCIM webhook
+push-sync, token-refresh, multi-IdP) açıkça işaretli kalsın. No-silent-debt.
+### goNogo
+- goCriteria: spec+ADR scim/oidc'i live yansıtır; kalan follow-up işaretli; lint:adr yeşil.
+- nogo: over-claim (webhook/refresh yokken "tam" demek).

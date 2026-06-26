@@ -17,7 +17,7 @@ import type { ConnectorId, IMessageConnector, IncomingMessage } from './types.js
 import { IdentityStore } from './identity/identity-store.js';
 import { createIdentityProvider } from './identity/index.js';
 import { resolvePrincipal, type ChannelBinding } from './identity/principal-resolver.js';
-import type { ResolvedPrincipal } from './identity/provider.js';
+import type { IdentityDirectoryProvider, ResolvedPrincipal, SyncReport } from './identity/provider.js';
 import { chatKeyOf } from './gateway/gateway-router.js';
 import { loadGatewayAccess } from './gateway/gateway-access.js';
 import {
@@ -204,6 +204,27 @@ async function loadConnector(id: 'telegram' | 'discord' | 'whatsapp'): Promise<I
 }
 
 /**
+ * Build a per-message principal resolver over an ALREADY-CONSTRUCTED directory
+ * provider (Faz-1 `local`, Faz-3 `scim`/`oidc`). Returns a closure
+ * (msg, binding) → ResolvedPrincipal | null (fail-closed). Provider-agnostic core
+ * shared by buildIdentityResolver (local) and the bootstrap's injected-provider path.
+ */
+export function buildIdentityResolverFromProvider(
+  provider: IdentityDirectoryProvider,
+  identityCfg: NonNullable<DeckentConfig['identity']>,
+  projectRoot: string,
+): (input: { connector: ConnectorId; fromUser: string }, binding: ChannelBinding) => ResolvedPrincipal | null {
+  const roleMap = identityCfg.roleMap as never;
+  return (input, binding) => {
+    try {
+      return resolvePrincipal(input, binding, provider, projectRoot, roleMap);
+    } catch {
+      return null; // fail-closed: any resolution error → treat as unknown sender
+    }
+  };
+}
+
+/**
  * Build a per-message principal resolver from identity config. Pure + O(1) local.
  * Returns a closure (msg, binding) → ResolvedPrincipal | null (fail-closed).
  * Suitable for unit-testing in isolation (no connector required).
@@ -221,14 +242,37 @@ export function buildIdentityResolver(
       owner: identityCfg.owner as never,
     },
   });
-  const roleMap = identityCfg.roleMap as never;
-  return (input, binding) => {
-    try {
-      return resolvePrincipal(input, binding, provider, projectRoot, roleMap);
-    } catch {
-      return null; // fail-closed: any resolution error → treat as unknown sender
-    }
-  };
+  return buildIdentityResolverFromProvider(provider, identityCfg, projectRoot);
+}
+
+/**
+ * Faz-3 out-of-band directory sync. A `scim`/`oidc` provider implements sync() to
+ * pull roles/groups from an IdP; the `local` provider does not. When the provider
+ * exposes sync(), trigger the FIRST pull in the BACKGROUND:
+ *   - fire-and-forget — the returned promise is ignored by production (tests await it);
+ *   - error-log + continue — a failed sync NEVER crashes the connector (fail-safe);
+ *   - NEVER on the resolve hot-path — resolution keeps serving cached identities while
+ *     the sync runs, so it cannot block an inbound message.
+ * No sync() (e.g. `local`) → Promise.resolve() no-op → disabled/local path unchanged.
+ */
+export function triggerBackgroundSync(
+  provider: IdentityDirectoryProvider,
+  label = 'identity',
+): Promise<void> {
+  if (typeof provider.sync !== 'function') return Promise.resolve();
+  return provider.sync().then(
+    (report: SyncReport) => {
+      console.error(
+        `[connector-bootstrap] ${label}: directory sync complete — upserted=${report.upserted} removed=${report.removed}`,
+      );
+    },
+    (err: unknown) => {
+      console.error(
+        `[connector-bootstrap] ${label}: directory sync failed — continuing with cached identities: ` +
+          `${err instanceof Error ? err.message : String(err)}`,
+      );
+    },
+  );
 }
 
 /**
@@ -360,6 +404,24 @@ export interface ConnectorCommandsDeps extends ConnectorBootstrapDeps {
    * the connector inbound path is byte-for-byte unchanged — identity is opt-in.
    */
   identityCfg?: NonNullable<DeckentConfig['identity']>;
+  /**
+   * Faz-3 directory-provider seam. When provided AND identity is enabled, the
+   * bootstrap resolves senders through THIS provider (e.g. a `scim`/`oidc` adapter
+   * that pulls roles from an IdP) instead of the built-in `local` one, and fires the
+   * provider's first sync() OUT-OF-BAND (triggerBackgroundSync — fire-and-forget,
+   * never blocks the resolve hot-path). Absent → the `local` provider is used and no
+   * sync is triggered (byte-for-byte the existing path). The store is opened by the
+   * bootstrap and passed in so the provider's sync()/resolve() share one DB.
+   *
+   * NOTE: constructing a scim/oidc provider directly from `identityCfg.provider.kind`
+   * is gated on the provider-factory + config-kind widening (a future phase, other
+   * files); this seam is the forward-compatible wire that makes the sync trigger live
+   * and injectable today without that widening.
+   */
+  makeIdentityProvider?: (
+    store: IdentityStore,
+    identityCfg: NonNullable<DeckentConfig['identity']>,
+  ) => IdentityDirectoryProvider;
 }
 
 export interface ConnectorCommandsHandle {
@@ -566,7 +628,28 @@ export async function bootstrapConnectorCommands(
     }
     try {
       const identityStore = new IdentityStore(join(root, '.deckent', 'identity.db'));
-      resolveIdentity = buildIdentityResolver(deps.identityCfg, identityStore, root);
+      const providerKind = deps.identityCfg.provider?.kind ?? 'local';
+      if (deps.makeIdentityProvider) {
+        // Faz-3: resolve through the injected directory provider (scim/oidc) and fire
+        // its first sync OUT-OF-BAND. Fire-and-forget — the resolve closure is ready
+        // immediately and serves cached identities while the sync runs; a sync failure
+        // logs + continues (never crashes the connector).
+        const provider = deps.makeIdentityProvider(identityStore, deps.identityCfg);
+        resolveIdentity = buildIdentityResolverFromProvider(provider, deps.identityCfg, root);
+        void triggerBackgroundSync(provider, provider.id);
+      } else if (providerKind === 'local') {
+        // Faz-1 default: built-in local provider (no sync — byte-for-byte the existing path).
+        resolveIdentity = buildIdentityResolver(deps.identityCfg, identityStore, root);
+      } else {
+        // Honest fail (Law 2 — never silent): a `scim`/`oidc-claims` directory kind is
+        // configured but no provider was supplied to build it. The local factory cannot
+        // construct a directory adapter; rather than SILENTLY downgrading to `local`
+        // (which would resolve the WRONG roles), identity is disabled for this session
+        // with a reason. Constructing a directory provider from `provider.kind` is wired
+        // either by passing deps.makeIdentityProvider or by widening the identity factory
+        // (identity/index.ts — out of this task's scope).
+        console.error(`[connector-bootstrap] identity: provider kind "${providerKind}" cannot be constructed here (supply deps.makeIdentityProvider or widen the identity factory) — identity disabled for this session`);
+      }
     } catch (err) {
       console.error(`[connector-bootstrap] identity: failed to initialize IdentityStore — identity disabled: ${err instanceof Error ? err.message : String(err)}`);
     }

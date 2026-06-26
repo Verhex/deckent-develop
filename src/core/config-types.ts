@@ -120,6 +120,50 @@ export interface CostGuardConfig {
   max_limit_cost_usd?: number;
 }
 
+// ─── Identity Provider Config (ADR-092 Faz-1b) ───────────────────────────
+
+/** Built-in local identity provider — roles/bindings managed directly in config. */
+export interface LocalIdentityProviderConfig {
+  kind: 'local';
+}
+
+/** SCIM 2.0 identity provider — syncs users/groups from a SCIM 2.0 endpoint.
+ *  `token` supports `$DECK:` interpolation (resolved at config load). */
+export interface ScimIdentityProviderConfig {
+  kind: 'scim';
+  scim: {
+    /** SCIM 2.0 base URL, e.g. https://scim.example.com/v2 */
+    baseUrl: string;
+    /** Bearer token for SCIM API auth. Use "$DECK:SCIM_TOKEN" for secret resolution. */
+    token: string;
+    /** Optional SCIM filter for user queries, e.g. 'userName sw "a"' */
+    userFilter?: string;
+  };
+}
+
+/** OIDC-claims identity provider — derives roles/groups from JWT claims in the
+ *  bearer token. Requires `api_oidc` or `dashboard_oidc` for token verification. */
+export interface OidcClaimsIdentityProviderConfig {
+  kind: 'oidc-claims';
+  oidc: {
+    /** Expected `iss` claim of the OIDC token. */
+    issuer: string;
+    /** Expected `aud` claim (optional — defaults to any audience). */
+    audience?: string;
+    /** JWT claim name carrying group membership, e.g. 'groups'. */
+    groupsClaim?: string;
+    /** JWT claim name carrying the role, e.g. 'https://example.com/role'. */
+    roleClaim?: string;
+  };
+}
+
+/** Discriminated union of all supported identity provider configurations.
+ *  Discriminant field: `kind`. */
+export type IdentityProviderConfig =
+  | LocalIdentityProviderConfig
+  | ScimIdentityProviderConfig
+  | OidcClaimsIdentityProviderConfig;
+
 // ─── Configuration (Blueprint 13) ───────────────────────────────────
 export interface PlanModeConfig {
   max_workers: number | 'auto';
@@ -365,7 +409,7 @@ export interface DeckentConfig {
    */
   identity?: {
     enabled: boolean;
-    provider?: { kind: 'local' };
+    provider?: IdentityProviderConfig;
     owner?: { connector: string; externalId: string; tenantId: string };
     roleMap?: Record<string, { role: 'admin' | 'operator' | 'viewer'; permissions?: string[] }>;
     channels?: Record<string, { tenantId: string; projectPath: string; mode: 'tenant-locked' | 'per-user'; guestRole?: 'admin' | 'operator' | 'viewer' }>;

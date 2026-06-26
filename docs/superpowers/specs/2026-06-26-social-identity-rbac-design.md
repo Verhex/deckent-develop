@@ -98,11 +98,21 @@ interface IdentityDirectoryProvider {
 - Tüm IdP senkronizasyonu **out-of-band**: background `sync()` local store'u doldurur (scheduled veya webhook). Mesaj geldiğinde yalnız local'e bakılır.
 - Güvenlik ihlali yok: nihai karar yine tool/capability execution anında `can()` (§5 L2).
 
-### 3.3 Microsoft/Teams/Okta sorusunun cevabı (rol ingest'i)
-- `scim` / `oidc-claims` adapter'ı arka planda Entra ID / Teams grup üyeliklerini, Okta/Google SCIM 2.0 kullanıcılarını çeker.
-- **RoleMap** (config) dış-grubu deckent rol+iznine normalize eder: `Entra group "Sales-Operators" → operator`, `Teams "Finance" → {role: viewer, permissions:[invoice:read]}`.
-- İçeri-alma = normalize-edip-local-store'a-yazma. Dışarı-verme = `exportBundle()` (taşınabilirlik + audit + temiz-repo migration ile uyumlu).
-- Yeni IdP (Workday, JumpCloud…) → yeni adapter, çekirdek değişmez.
+### 3.3 Microsoft/Teams/Okta sorusunun cevabı (rol ingest'i) — **Faz 3 ✅ Sprint 329**
+
+> **Durum (2026-06-26):** `providers/scim.ts` ve `providers/oidc-claims.ts` **implemente ve live**. Aşağıdaki davranış artık brainstorming/spec değil gerçek çalışan kod; kalan follow-up'lar açıkça işaretlenmiştir.
+
+- `scim` adapter'ı arka planda Entra ID / Okta / Google Workspace SCIM 2.0 uç noktalarını sorgular; `oidc-claims` adapter'ı Entra ID / Teams JWT claim'lerinden (grup üyeliği) rol türetir.
+- **`resolve()` = saf-local, SIFIR network (hot-path):** Inbound mesaj hot-path'i asla IdP'ye doğrudan bağlanmaz. Tüm kimlik verisi önce local SQLite store'a yazılır (`identity-store.ts`); `resolve()` yalnız bu local store'u okur (in-memory cache + O(1) lookup).
+- **`sync()` = out-of-band (background):** IdP senkronizasyonu ayrı background süreçte çalışır. Scheduled veya event-triggered olabilir; mesaj hot-path'ini bloke etmez.
+- **RoleMap** (config) dış grubu/claim'i deckent rol+iznine normalize eder: `Entra group "Sales-Operators" → operator`, `Teams "Finance" → {role: viewer, permissions:[invoice:read]}`.
+- İçeri-alma = normalize-edip-local-store'a-yazma. Dışarı-verme = `exportBundle()` (taşınabilirlik + audit).
+- Yeni IdP (Workday, JumpCloud…) → yeni adapter, port (`IdentityDirectoryProvider`) değişmez.
+
+**Açıkça deferred (kalan follow-up — no-silent-debt):**
+- **SCIM webhook push-sync:** IdP'den deckent'e real-time push (kullanıcı/grup değişikliği anlık yansıtma). Şu an: scheduled pull/sync; webhook altyapısı sonraki dilim.
+- **OIDC token-refresh:** Uzun-ömürlü oturumlarda access-token otomatik yenileme. Şu an: sync re-trigger'la kapatılıyor; native token-refresh akışı sonraki dilim.
+- **Multi-IdP round-robin / fallback:** Aynı anda birden fazla kurumsal IdP (ör. Okta + Entra aynı anda). Şu an: tek aktif enterprise adapter; çoklu-provider zinciri sonraki dilim.
 
 ### 3.4 Solo-developer + müşteri senaryosu (aynı kod-yolu)
 - Solo dev = `local` provider, owner principal = full; IdP gerekmez.
@@ -283,6 +293,24 @@ Plan B merge-ready onaylandı (513 connector test, confused-deputy + I-1 inert-f
 - **L2 gate defensive guard** — `execute.ts` `principalCan(ctx.principal.permissions ?? [], …)` (runtime-corrupt principal'a karşı; TS kontratı zaten engelliyor, ucuz fail-closed netliği).
 - **`source` taksonomisi** + **e2e null-principal coverage** — küçük test/audit netliği.
 - **prepared-statement pre-compile** — `IdentityStore` hot-path için statement'ları constructor'da derleyebilir (memory-store.ts deseni).
+
+### 11.3 Faz 3 — scim + oidc-claims enterprise IdP adapter (kapatıldı — Sprint 329)
+
+**Durum (2026-06-26): ✅ LIVE.** `providers/scim.ts` + `providers/oidc-claims.ts` implemente edildi ve canlı yola alındı.
+
+**Ne çalışıyor:**
+- SCIM 2.0 pull-sync: Entra ID, Okta, Google Workspace kullanıcı + grup verisi background `sync()` ile local SQLite store'a çekiliyor.
+- OIDC claims çözümleme: Entra / Teams JWT'den grup üyeliği → RoleMap → `ResolvedPrincipal` dönüşümü.
+- Hot-path saf-local: `resolve()` asla IdP ağına çıkmaz; tüm kararlar local store üzerinden.
+- `sync()` out-of-band: scheduled background süreç, hot-path'i bloke etmez.
+- `exportBundle()` / `importBundle()` portability: enterprise audit + temiz-repo migration ile uyumlu.
+
+**Açıkça deferred follow-up (no-silent-debt):**
+- **SCIM webhook push-sync:** Real-time IdP→deckent push bildirimi. Şu an: scheduled pull. Sonraki dilim.
+- **OIDC token-refresh:** Long-lived oturum için otomatik access-token yenileme. Şu an: sync re-trigger ile kapatılıyor. Sonraki dilim.
+- **Multi-IdP round-robin:** Aynı anda birden fazla kurumsal IdP desteği (Okta + Entra birlikte). Şu an: tek aktif enterprise adapter. Sonraki dilim.
+
+---
 
 ### 11.1 Faz-1b — binding aktivasyonu (final review I-1, kapatıldı)
 

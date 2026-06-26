@@ -65,6 +65,19 @@ Faz-1b, per-user gate'i canlı yolda aktive eder: `bot.ts` `config.identity`'i `
 
 **Ertelenen takip (deferred follow-up):** dinamik per-kanal binding yönetimi — admin `/bind` komutu (runtime kanal bağlama) + pairing→binding köprüsü. Faz-1b yalnız config'te tanımlı kanalları aktive eder; runtime mutasyon sonraki dilim.
 
+### Faz 3 — Enterprise-IdP Adapter (Sprint 329)
+
+`providers/scim.ts` (SCIM 2.0) ve `providers/oidc-claims.ts` (Entra / Teams JWT claims) **implemente edildi ve live**. Bu iki adapter `IdentityDirectoryProvider` portunu implemente eder; çekirdek `resolve()` / `sync()` kontratı değişmedi.
+
+**Kritik tasarım noktası (Alperen, 2026-06-26):** `resolve()` = **saf-local, SIFIR network** — hot-path her zaman local SQLite store'u okur, IdP'ye asla doğrudan bağlanmaz. `sync()` = **out-of-band background** — IdP pull-sync ayrı scheduled süreçte çalışır, mesaj hot-path'ini bloke etmez.
+
+**Açıkça deferred follow-up (no-silent-debt):**
+- **SCIM webhook push-sync:** Real-time IdP→deckent push bildirimi. Şu an scheduled pull. Sonraki dilim.
+- **OIDC token-refresh:** Long-lived oturumda access-token otomatik yenileme. Şu an sync re-trigger ile kapatılıyor. Sonraki dilim.
+- **Multi-IdP round-robin / fallback:** Aynı anda birden fazla kurumsal IdP. Şu an tek aktif enterprise adapter. Sonraki dilim.
+
+---
+
 **Consequences (+):**
 
 - Enterprise ortamlarda multi-user, multi-tenant connector deployment güvenli hale gelir
