@@ -298,6 +298,10 @@ export type ChatStreamResponder = (
   onPartial: (partial: string) => void,
   mediaConnector?: PerTurnMediaConnector,
   detectedLang?: string,
+  // ADR-092 (identity-wiring review fix): the per-message RBAC principal resolved
+  // by the bootstrap for THIS sender. Threaded into the chat turn's CapabilityContext
+  // and onto any action it parks. Identity-disabled → undefined → behavior unchanged.
+  principal?: ResolvedPrincipal,
 ) => Promise<string>;
 
 export interface ConnectorCommandsDeps extends ConnectorBootstrapDeps {
@@ -408,10 +412,6 @@ export async function bootstrapConnectorCommands(
   const ttsModeValue = voiceCfg?.tts ?? 'off';
   // Capability registry — shared across the bootstrap lifecycle (flag-gated default-off).
   const capRegistry = createBuiltinRegistry();
-  // Per-channel principal cache — populated by onChat, consumed by the approval capCtx.
-  // Keyed by raw channelId (same key used by parked.channelId on the approve path).
-  // Identity-disabled: never populated → principal stays undefined → L2 gate is a no-op.
-  const lastPrincipals = new Map<string, ResolvedPrincipal | undefined>();
   // Composite resolver: a parked bot-action (slice 2b) is the THIRD gate type —
   // unlike autonomous/nervous (consumed by their own loops), approving here
   // EXECUTES the action in-process and replies the result. Falls through to the
@@ -481,9 +481,11 @@ export async function bootstrapConnectorCommands(
             spawn: defaultSpawn,
             loadMailTransport: loadNodemailerTransport,
             artifacts: artifactStore,
-            // Thread the latest principal for this channel (identity-disabled → undefined → L2 gate no-op).
-            principal: lastPrincipals.get(parked.channelId),
-            tenantId: lastPrincipals.get(parked.channelId)?.tenantId,
+            // Authorize the capability run as the REQUESTER who parked the action
+            // (request-authority / confused-deputy fix) — never "the last chat sender".
+            // Identity-disabled → requesterPrincipal undefined → L2 gate no-op (unchanged).
+            principal: parked.requesterPrincipal,
+            tenantId: parked.requesterPrincipal?.tenantId,
           };
           const result = await runCapability(capRegistry, parked.tool, parked.args, capCtx, parked.channelId, mediaSink, 'confirm');
           const approvedOutcome = getMessage('cap.approval.approved', lang, { result });
@@ -655,8 +657,12 @@ export async function bootstrapConnectorCommands(
                     pendingVoiceLang.delete(channelId);
 
                     // Identity resolution (ADR-092, Task 4). Opt-in — disabled path is byte-for-byte unchanged.
-                    // When resolveIdentity is null (identity disabled), principal stays undefined → L2 gate no-op.
+                    // When resolveIdentity is null (identity disabled), turnPrincipal stays undefined → L2 gate no-op.
                     // Fail-closed: unknown sender on a bound channel with no guestRole → verify prompt + return.
+                    // turnPrincipal is the REQUESTER's principal for THIS message — threaded into the chat
+                    // turn (capCtx) AND carried onto any action the turn parks (request-authority), so the
+                    // approver authorizes as the requester, not the last chat sender (confused-deputy fix).
+                    let turnPrincipal: ResolvedPrincipal | undefined;
                     if (resolveIdentity && identityAccess) {
                       const binding = identityAccess.getBinding(chatKeyOf(msg.connector, channelId));
                       if (binding) {
@@ -666,8 +672,7 @@ export async function bootstrapConnectorCommands(
                           await send(channelId, getMessage('identity.verify_prompt', lang, { method: '/verify' })).catch(() => undefined);
                           return;
                         }
-                        // Cache resolved principal for the approval capCtx (parked-action path).
-                        lastPrincipals.set(channelId, resolved ?? undefined);
+                        turnPrincipal = resolved ?? undefined;
                       }
                     }
 
@@ -745,7 +750,7 @@ export async function bootstrapConnectorCommands(
                         // capability media (e.g. screenshot photo) is delivered to the right transport.
                         // WS1 Task 5: turnText carries the reply-language instruction; detectedLang
                         // still threaded as 5th arg for downstream consumers.
-                        const reply = await chatStreaming(channelId, turnText, (partial) => throttle?.push(partial), connector as PerTurnMediaConnector, detectedLang);
+                        const reply = await chatStreaming(channelId, turnText, (partial) => throttle?.push(partial), connector as PerTurnMediaConnector, detectedLang, turnPrincipal);
                         const body = reply.trim() || getMessage('bot.chat_empty', lang);
                         if (msgId && throttle) {
                           // Final: edit the placeholder in place with the first part
@@ -768,7 +773,7 @@ export async function bootstrapConnectorCommands(
                         const chatStreaming = deps.onChatStreaming!;
                         await streamCap.sendChatAction!(channelId, 'typing').catch(() => undefined);
                         // WS1 Task 5: turnText carries the reply-language instruction.
-                        const reply = await chatStreaming(channelId, turnText, () => {/* collect only — no streaming edits */}, connector as PerTurnMediaConnector, detectedLang);
+                        const reply = await chatStreaming(channelId, turnText, () => {/* collect only — no streaming edits */}, connector as PerTurnMediaConnector, detectedLang, turnPrincipal);
                         const body = reply.trim() || getMessage('bot.chat_empty', lang);
                         // WS1 Task 5 (b): pass resolved language tag to TTS synthesizer.
                         const sentVoice = await tryReplyWithVoice(channelId, body, shouldVoiceThisTurn, replyLangTag);
@@ -782,7 +787,7 @@ export async function bootstrapConnectorCommands(
                         await send(channelId, getMessage('bot.chat_thinking', lang));
                         // WS1 Task 5: turnText carries the reply-language instruction; detectedLang
                         // still threaded as 4th arg for downstream consumers.
-                        const reply = await chat(channelId, turnText, connector as PerTurnMediaConnector, detectedLang);
+                        const reply = await chat(channelId, turnText, connector as PerTurnMediaConnector, detectedLang, turnPrincipal);
                         const body = reply.trim() || getMessage('bot.chat_empty', lang);
                         // Task 11 TTS: try voice reply first; skip text when voice succeeded
                         // (covers both 'always' and 'reply-in-kind' — voice replaces text).

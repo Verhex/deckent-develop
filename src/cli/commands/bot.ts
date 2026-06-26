@@ -116,9 +116,13 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
         chat: responder,
         // Slice 1.1: forward the per-turn mediaConnector (4th arg from bootstrap) into
         // the responder call so capability media reaches the right connector transport.
-        onChatStreaming: (channelId, text, onPartial, mediaConnector) => {
+        onChatStreaming: (channelId, text, onPartial, mediaConnector, detectedLang, principal) => {
           partialSinks.set(channelId, onPartial);
-          return responder(channelId, text, mediaConnector).finally(() => {
+          // Forward the per-message principal (5th responder arg) so a chat-turn
+          // capability runs under / parks with the requester's RBAC (ADR-092).
+          // detectedLang is forwarded for parity (responder ignores it). Identity-
+          // disabled → principal undefined → behavior unchanged.
+          return responder(channelId, text, mediaConnector, detectedLang, principal).finally(() => {
             partialSinks.delete(channelId);
           });
         },

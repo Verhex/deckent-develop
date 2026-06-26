@@ -15,6 +15,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
+import type { ResolvedPrincipal } from './identity/provider.js';
 
 export interface BotAction {
   readonly id: string;
@@ -37,6 +38,14 @@ export interface BotAction {
    * that message on resolve (e.g. replace buttons with a result line).
    */
   readonly approvalMessageId?: string;
+  /**
+   * RBAC principal of the REQUESTER who parked this action (ADR-092). The approval
+   * path authorizes the capability run as THIS principal — never "the last chat
+   * sender" — closing the confused-deputy / privilege-escalation path in multi-user
+   * channels. Set only when identity is enabled at park time; undefined → the L2
+   * tool-gate is a no-op (identity-disabled path byte-for-byte unchanged).
+   */
+  readonly requesterPrincipal?: ResolvedPrincipal;
 }
 
 export interface ParkBotActionInput {
@@ -52,6 +61,12 @@ export interface ParkBotActionInput {
    * Persisted so later pipeline tasks can edit/delete that message on action resolve.
    */
   readonly approvalMessageId?: string;
+  /**
+   * RBAC principal of the requester (ADR-092). Carried onto the parked action so the
+   * approval authorizes as the requester who parked it, not the last chat sender
+   * (confused-deputy fix). Omit when identity is disabled (back-compat).
+   */
+  readonly requesterPrincipal?: ResolvedPrincipal;
 }
 
 /** Default parked-action TTL: 1 hour. Long enough to act, short enough to bound staleness. */
@@ -122,6 +137,9 @@ export function parkBotAction(root: string, input: ParkBotActionInput): string {
       : {}),
     // Persist the approval message-id when provided (rich-approval bot round-trip).
     ...(input.approvalMessageId ? { approvalMessageId: input.approvalMessageId } : {}),
+    // Carry the requester's principal so approval authorizes as the REQUESTER, not
+    // "the last chat sender" (confused-deputy fix). Identity-disabled → omitted.
+    ...(input.requesterPrincipal ? { requesterPrincipal: input.requesterPrincipal } : {}),
   };
   writeFileSync(actionPath(root, id), JSON.stringify(action, null, 2) + '\n', 'utf-8');
   return id;
