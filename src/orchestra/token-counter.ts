@@ -18,6 +18,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { TASKS_DIR } from '../core/constants.js';
 import type { TokenUsage } from '../core/task-types.js';
+import type { ProviderAdapter } from '../core/provider.js';
 
 // ─── Internal helpers ───────────────────────────────────────────────
 
@@ -182,6 +183,50 @@ export function mergeWithWorkerClaim(
  * extractor cannot pull usage tokens out of the contents. Read-only,
  * isolated, safe to call on every result-collect cycle.
  */
+/**
+ * Provider-AGNOSTIC token capture: read the worker's saved output log and ask
+ * the task's provider ADAPTER to extract usage from its own native format.
+ *
+ * Unlike {@link tryLoadCliLogTokens} (Claude-CLI-specific — `extractTokenUsageFromClaudeCli`),
+ * this works for EVERY provider whose adapter implements `extractUsage`
+ * (ollama / codex / gemini / openai-compatible / bedrock), closing the gap where
+ * non-Claude workers always reported 0/0 tokens. The adapter is INJECTED (the
+ * caller resolves it via providerRegistry) so this module needs no runtime
+ * dependency on the provider layer (type-only import → no import cycle).
+ *
+ * Returns the legacy {@link TokenUsage} shape (input/output/cacheRead) or null
+ * when the adapter reports nothing usable.
+ */
+export function tryExtractUsageViaAdapter(
+  projectRoot: string,
+  taskId: string,
+  adapter: ProviderAdapter | undefined,
+): TokenUsage | null {
+  if (!adapter?.extractUsage) return null;
+  const candidates = [
+    join(projectRoot, TASKS_DIR, `task-${taskId}.cli-output.json`),
+    join(projectRoot, TASKS_DIR, `task-${taskId}.log`),
+  ];
+  for (const path of candidates) {
+    if (!existsSync(path)) continue;
+    let content: string;
+    try {
+      content = readFileSync(path, 'utf-8');
+    } catch {
+      continue;
+    }
+    const usage = adapter.extractUsage(content);
+    if (usage && ((usage.inputTokens ?? 0) > 0 || (usage.outputTokens ?? 0) > 0)) {
+      return {
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        cacheReadTokens: usage.cacheReadTokens,
+      };
+    }
+  }
+  return null;
+}
+
 export function tryLoadCliLogTokens(projectRoot: string, taskId: string): TokenUsage | null {
   const candidates = [
     join(projectRoot, TASKS_DIR, `task-${taskId}.cli-output.json`),

@@ -68,7 +68,9 @@ import { drainRespawnRequests } from '../nervous/respawn-request.js';
 import {
   mergeWithWorkerClaim,
   tryLoadCliLogTokens,
+  tryExtractUsageViaAdapter,
 } from './token-counter.js';
+import { providerRegistry } from '../core/provider.js';
 
 // ─── Sprint Spawner (lazy import — avoid module init cycle) ──────
 // ADR-045: respawnEligibleTasks wire — invoked at runtime only, never at
@@ -439,6 +441,26 @@ export function enrichResultTokenUsage(
   task: Task | undefined,
   projectRoot?: string,
 ): void {
+  // Step 0 (Worker Output Contract): provider-AGNOSTIC measured fill — the task's
+  // provider adapter parses its OWN usage format. This is what finally captures
+  // tokens for non-Claude providers (ollama/codex/gemini/openai-compatible),
+  // where the Claude-CLI-specific tryLoadCliLogTokens below always returned null
+  // (the long-standing "token counter never works" gap).
+  if (projectRoot && task?.provider) {
+    let adapter;
+    try {
+      adapter = providerRegistry.getProvider(task.provider);
+    } catch {
+      adapter = undefined;
+    }
+    const viaAdapter = tryExtractUsageViaAdapter(projectRoot, result.taskId, adapter);
+    if (viaAdapter) {
+      const merged = mergeWithWorkerClaim(result.tokenUsage, viaAdapter) ?? viaAdapter;
+      result.tokenUsage = { ...merged, provider: task.provider };
+      return;
+    }
+  }
+
   // Step 1 (Sprint 196 WP-4): orchestrator-side measured fill — always wins.
   if (projectRoot) {
     const measured = tryLoadCliLogTokens(projectRoot, result.taskId);
