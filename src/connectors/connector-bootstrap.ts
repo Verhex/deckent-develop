@@ -10,9 +10,16 @@
 // $DECK token, missing dep, start error) is logged + skipped — startup never
 // crashes on a misconfigured connector (advisor fail-safe).
 
+import { join } from 'node:path';
 import type { NotificationAdapter } from '../core/notification-dispatcher.js';
 import type { DeckentConfig } from '../core/types.js';
-import type { ConnectorId, IMessageConnector } from './types.js';
+import type { ConnectorId, IMessageConnector, IncomingMessage } from './types.js';
+import { IdentityStore } from './identity/identity-store.js';
+import { createIdentityProvider } from './identity/index.js';
+import { resolvePrincipal, type ChannelBinding } from './identity/principal-resolver.js';
+import type { ResolvedPrincipal } from './identity/provider.js';
+import { chatKeyOf } from './gateway/gateway-router.js';
+import { loadGatewayAccess } from './gateway/gateway-access.js';
 import {
   makeConnectorNotificationAdapter,
   type ConnectorTarget,
@@ -197,6 +204,34 @@ async function loadConnector(id: 'telegram' | 'discord' | 'whatsapp'): Promise<I
 }
 
 /**
+ * Build a per-message principal resolver from identity config. Pure + O(1) local.
+ * Returns a closure (msg, binding) → ResolvedPrincipal | null (fail-closed).
+ * Suitable for unit-testing in isolation (no connector required).
+ */
+export function buildIdentityResolver(
+  identityCfg: NonNullable<DeckentConfig['identity']>,
+  store: IdentityStore,
+  projectRoot: string,
+): (input: { connector: ConnectorId; fromUser: string }, binding: ChannelBinding) => ResolvedPrincipal | null {
+  const provider = createIdentityProvider({
+    kind: 'local', store,
+    local: {
+      edition: identityCfg.enforcement === 'strict' ? 'enterprise' : 'team',
+      roleMap: identityCfg.roleMap as never,
+      owner: identityCfg.owner as never,
+    },
+  });
+  const roleMap = identityCfg.roleMap as never;
+  return (input, binding) => {
+    try {
+      return resolvePrincipal(input, binding, provider, projectRoot, roleMap);
+    } catch {
+      return null; // fail-closed: any resolution error → treat as unknown sender
+    }
+  };
+}
+
+/**
  * Bring up each enabled connector (outbound) and return its send target.
  * Tokens must already be resolved (config load runs interpolateConfig); an
  * unresolved "$DECK:…" token is treated as unconfigured and skipped.
@@ -316,6 +351,11 @@ export interface ConnectorCommandsDeps extends ConnectorBootstrapDeps {
    * that construct bootstrap directly without a pre-built store).
    */
   artifacts?: ArtifactStore;
+  /**
+   * Per-message sender identity config (ADR-092). When absent or enabled:false,
+   * the connector inbound path is byte-for-byte unchanged — identity is opt-in.
+   */
+  identityCfg?: NonNullable<DeckentConfig['identity']>;
 }
 
 export interface ConnectorCommandsHandle {
@@ -368,6 +408,10 @@ export async function bootstrapConnectorCommands(
   const ttsModeValue = voiceCfg?.tts ?? 'off';
   // Capability registry — shared across the bootstrap lifecycle (flag-gated default-off).
   const capRegistry = createBuiltinRegistry();
+  // Per-channel principal cache — populated by onChat, consumed by the approval capCtx.
+  // Keyed by raw channelId (same key used by parked.channelId on the approve path).
+  // Identity-disabled: never populated → principal stays undefined → L2 gate is a no-op.
+  const lastPrincipals = new Map<string, ResolvedPrincipal | undefined>();
   // Composite resolver: a parked bot-action (slice 2b) is the THIRD gate type —
   // unlike autonomous/nervous (consumed by their own loops), approving here
   // EXECUTES the action in-process and replies the result. Falls through to the
@@ -437,6 +481,9 @@ export async function bootstrapConnectorCommands(
             spawn: defaultSpawn,
             loadMailTransport: loadNodemailerTransport,
             artifacts: artifactStore,
+            // Thread the latest principal for this channel (identity-disabled → undefined → L2 gate no-op).
+            principal: lastPrincipals.get(parked.channelId),
+            tenantId: lastPrincipals.get(parked.channelId)?.tenantId,
           };
           const result = await runCapability(capRegistry, parked.tool, parked.args, capCtx, parked.channelId, mediaSink, 'confirm');
           const approvedOutcome = getMessage('cap.approval.approved', lang, { result });
@@ -481,6 +528,25 @@ export async function bootstrapConnectorCommands(
   // Backlog-replay guard cutoff: only process messages sent at/after the moment
   // this listener came up (buffered backlog from while it was offline is dropped).
   const acceptFrom = Date.now();
+
+  // Identity: load gateway access + build resolver when enabled. Null when disabled.
+  // When disabled, resolveIdentity=null → onChat closure is byte-identical (no identity path).
+  // Fail-closed: any initialization error → log + disable identity for this session (never crash).
+  const identityAccess = deps.identityCfg?.enabled
+    ? await loadGatewayAccess().catch((err) => {
+        console.error(`[connector-bootstrap] identity: failed to load gateway access — identity disabled: ${err instanceof Error ? err.message : String(err)}`);
+        return null;
+      })
+    : null;
+  let resolveIdentity: ((input: { connector: ConnectorId; fromUser: string }, binding: ChannelBinding) => ResolvedPrincipal | null) | null = null;
+  if (deps.identityCfg?.enabled && identityAccess) {
+    try {
+      const identityStore = new IdentityStore(join(root, '.deckent', 'identity.db'));
+      resolveIdentity = buildIdentityResolver(deps.identityCfg, identityStore, root);
+    } catch (err) {
+      console.error(`[connector-bootstrap] identity: failed to initialize IdentityStore — identity disabled: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 
   if (notifyConnectors) {
     for (const id of SUPPORTED) {
@@ -580,13 +646,30 @@ export async function bootstrapConnectorCommands(
             acceptFrom,
             ...(chat
               ? {
-                  onChat: async (channelId: string, text: string): Promise<void> => {
+                  onChat: async (channelId: string, text: string, msg: IncomingMessage): Promise<void> => {
                     // Consume voice-origin flag for THIS turn (set by onMessage below).
                     const isVoiceOrigin = pendingVoiceOrigin.get(channelId) ?? false;
                     pendingVoiceOrigin.delete(channelId);
                     // Task 3 (WS1): consume the STT-detected language for this turn.
                     const detectedLang = pendingVoiceLang.get(channelId);
                     pendingVoiceLang.delete(channelId);
+
+                    // Identity resolution (ADR-092, Task 4). Opt-in — disabled path is byte-for-byte unchanged.
+                    // When resolveIdentity is null (identity disabled), principal stays undefined → L2 gate no-op.
+                    // Fail-closed: unknown sender on a bound channel with no guestRole → verify prompt + return.
+                    if (resolveIdentity && identityAccess) {
+                      const binding = identityAccess.getBinding(chatKeyOf(msg.connector, channelId));
+                      if (binding) {
+                        const resolved = resolveIdentity({ connector: msg.connector, fromUser: msg.fromUser }, binding);
+                        if (resolved === null && !binding.guestRole) {
+                          // Unknown sender on a tenant-locked channel — send verify prompt, drop turn.
+                          await send(channelId, getMessage('identity.verify_prompt', lang, { method: '/verify' })).catch(() => undefined);
+                          return;
+                        }
+                        // Cache resolved principal for the approval capCtx (parked-action path).
+                        lastPrincipals.set(channelId, resolved ?? undefined);
+                      }
+                    }
 
                     // WS1 Task 5 (a): resolve the reply-language for this turn and build
                     // the instruction to prepend to the agentic turn text.
