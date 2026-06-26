@@ -1915,6 +1915,20 @@ const MESSAGES: MessageMap = {
     en: '⚠️ Voice is configured (provider={provider}) but the backend is unreachable at {url} — voice replies will fall back to text. {detail}',
     tr: '⚠️ Ses yapılandırıldı (sağlayıcı={provider}) ancak arka uç {url} adresine ulaşılamıyor — ses yanıtları metin olarak gönderilecek. {detail}',
   },
+
+  // ─── Connector-surface RBAC / Identity (ADR-092) ─────────────────────────
+  'rbac.unauthorized': {
+    en: 'Not authorized: this action needs the "{permission}" permission.',
+    tr: 'Yetkin yok: bu işlem için "{permission}" izni gerekiyor.',
+  },
+  'identity.verify_prompt': {
+    en: "I can't verify who you are yet. To link your account, message me privately: {method}",
+    tr: 'Kimliğini henüz doğrulayamıyorum. Hesabını bağlamak için bana özelden yaz: {method}',
+  },
+  'identity.binding_unconfigured': {
+    en: 'This channel is not configured for per-user authorization.',
+    tr: 'Bu kanal kullanıcı-bazlı yetkilendirme için yapılandırılmamış.',
+  },
 };
 
 /**
