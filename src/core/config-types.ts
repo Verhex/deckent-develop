@@ -359,6 +359,20 @@ export interface DeckentConfig {
    *  per-chat policy overrides, and SMTP mail config with $DECK: secret resolution. */
   bot_capabilities?: BotCapabilitiesConfig;
 
+  /**
+   * Per-user identity↔RBAC authorization for connector message surface (ADR-092).
+   * Default-off: when absent or enabled:false, connectors keep per-channel behavior.
+   */
+  identity?: {
+    enabled: boolean;
+    provider?: { kind: 'local' };
+    owner?: { connector: string; externalId: string; tenantId: string };
+    roleMap?: Record<string, { role: 'admin' | 'operator' | 'viewer'; permissions?: string[] }>;
+    channels?: Record<string, { tenantId: string; projectPath: string; mode: 'tenant-locked' | 'per-user'; guestRole?: 'admin' | 'operator' | 'viewer' }>;
+    verify?: { ttlSeconds?: number; maxAttempts?: number };
+    enforcement?: 'strict' | 'permissive';
+  };
+
   // ─── Native transport + bot-agent (REPL native agent + BOT-1) ──────
   /** Local Ollama endpoint (e.g. "http://127.0.0.1:11434") — native agent + bot-agent. */
   ollama_host?: string;

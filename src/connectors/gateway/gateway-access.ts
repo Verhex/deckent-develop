@@ -4,6 +4,7 @@ import { dirname } from 'node:path';
 import { randomInt } from 'node:crypto';
 import { gatewayHome } from './gateway-paths.js';
 import { join } from 'node:path';
+import type { ChannelBinding } from '../identity/principal-resolver.js';
 
 export interface PendingPairing { code: string; chatKey: string; requestedAt: string }
 
@@ -15,11 +16,14 @@ export interface GatewayAccess {
   approvePairing(code: string, projectPath: string): Promise<{ chatKey: string } | null>;
   rejectPairing(code: string): Promise<boolean>;
   listPairings(): PendingPairing[];
+  getBinding(chatKey: string): ChannelBinding | null;
+  setBinding(chatKey: string, binding: ChannelBinding): Promise<void>;
 }
 
 export interface LoadGatewayAccessOptions {
   allowlistPath?: string;
   pairingsPath?: string;
+  bindingsPath?: string;
   genCode?: () => string;
   now?: () => string;
 }
@@ -40,8 +44,10 @@ export async function loadGatewayAccess(opts: LoadGatewayAccessOptions = {}): Pr
   const genCode = opts.genCode ?? ((): string => String(randomInt(100000, 1000000)));
   const now = opts.now ?? ((): string => new Date().toISOString());
 
+  const bindingsPath = opts.bindingsPath ?? join(gatewayHome(), 'bindings.json');
   const allow = await readJson<Record<string, string[]>>(allowlistPath, {});
   const pairings = await readJson<Record<string, PendingPairing>>(pairingsPath, {});
+  const bindings = await readJson<Record<string, ChannelBinding>>(bindingsPath, {});
 
   return {
     isAuthorized(chatKey, projectPath) {
@@ -81,5 +87,7 @@ export async function loadGatewayAccess(opts: LoadGatewayAccessOptions = {}): Pr
       return true;
     },
     listPairings() { return Object.values(pairings); },
+    getBinding(chatKey) { return bindings[chatKey] ?? null; },
+    async setBinding(chatKey, binding) { bindings[chatKey] = binding; await writeJson(bindingsPath, bindings); },
   };
 }
