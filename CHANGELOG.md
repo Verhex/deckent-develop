@@ -22,6 +22,8 @@ v1.0.0-beta.1 is the current release. All sprint work since Beta GA (Sprint 150)
 - **OpenAI-Compatible HTTP Adapter** — Ollama + HTTP provider support (ADR-077). 4 providers: claude / codex / gemini / ollama.
 - **Training Data Pipeline** — Live per-turn trace recorder (JSONL), CC-transcript extractor (aligned + general OpenAI-messages corpora, SP-2).
 - **Self-Modifying Task Detection** — ADR-038: deckent dogfood vs user-project discrimination, `self-modifying-detector.ts` (+789 LoC).
+- **Provider-Agnostic Token + Cost Capture** (Sprint 325–328, 2026-06-26) — per-task token usage captured from each provider's NATIVE source (CLI structured-output / session-store, HTTP-response, unified gateway) and normalized to one rich schema (input / output / cache-read / cache-write / reasoning tokens, AI-SDK parity); cost computed per-model (local → $0). Closes the long-standing gap where the worker's final-text was captured instead of the provider's usage envelope (every non-Claude provider — and Claude itself — reported 0/0). Landed across the full matrix (claude / codex / gemini / ollama / openai-compatible / OpenRouter; design-doc `docs/superpowers/specs/2026-06-26-provider-agnostic-usage-cost-design.md`, grounded in tokscale / LiteLLM / Vercel AI SDK / OpenRouter). _Source-landed; per-provider live-proof is build-gated._
+- **Self-Tree Mutation Guard (root fix)** — `worker-rollback.ts` snapshot/rollback now honor the ADR-039 self-project guard (previously only `rollback.ts` did), and the empty-scope `git checkout HEAD -- . && git clean -fd` whole-tree-wipe footgun is removed — deckent dogfood sprints no longer destroy their own uncommitted work mid-sprint.
 
 ---
 
