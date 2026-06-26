@@ -256,3 +256,23 @@ Hız L1'den, güvenlik L2'den. L1 güvenilmez (NL yanlış-sınıflandırabilir)
 
 ## 10. Sıradaki adım
 `writing-plans` ile implementasyon planı (Faz 1 dilimi: mikro-task + `- Dependencies:` grafiği + per-task goCriteria + Smoke direktifleri). Spec Alperen onayından sonra.
+
+---
+
+## 11. Plan-B'ye taşınan ZORUNLU gereksinimler (Plan A final whole-branch review çıktısı — 2026-06-26)
+
+Plan A (engine) merge-ready onaylandı (33/33 test, sıfır Critical, fail-open yok). Aşağıdaki maddeler **headless engine'de merge-blocker değil** ama **Plan B (connector wiring) içinde açıkça karşılanmalı** — aksi halde wiring katmanı bunları sessizce devralır:
+
+**Important (Plan-B'de mutlaka):**
+1. **throw-vs-`null` caller kontratı** — `resolvePrincipal` `| null` döner AMA `withTenant`→`resolveTenant` geçersiz `binding.tenantId`'de (`tenant-context.ts:46`) ve `store.getIdentity` DB-hatasında **throw** eder (ikisi de fail-closed). Plan-B caller bu çağrıyı `try/catch` ile sarmalı ve exception'ı **deny** saymalı; malformed channel-binding / kilitli-DB turn'ü crash etmesin.
+2. **Cache coherence + bounding (multi-process)** — `IdentityStore` cache'i (`identity-store.ts`) yalnız aynı-instance write'larında invalidate olur. Gateway+bot ayrı process (spec §9): (a) revocation/downgrade sonrası **stale-allow** riski; (b) negatif (unknown-sender) cache **sınırsız büyüme** (DoS). Plan-B: paylaşımlı invalidation kanalı veya kısa TTL + LRU/size-cap.
+3. **`confirmVerify` tenant assertion** — ✅ **Plan A'da eklendi** (`pending.tenantId !== binding.tenantId` → `tenant-mismatch`, pending silinir). (Final-review #3 kapatıldı.)
+
+**Minor / hardening (Plan-B'de değerlendir):**
+- **OTP hash** — `pending_verify.code` cleartext saklanıp karşılaştırılıyor (transient+TTL+lockout ile savunulabilir ama enterprise-grade için hash'lenmeli).
+- **crypto genCode** — Plan-B `genCode` injection'ı crypto-secure olmalı (yeterli uzunluk; `Math.random` DEĞİL).
+- **guest least-privilege** — guest default `*:read` (tüm kaynak okuma); spec §3.4 örneği `order:read` istiyordu. Plan-B UX'i scoping `roleMap` ayarlamaya yönlendirmeli veya default'u daraltmalı.
+- **owner perms** — ✅ Plan A'da `['*']` koşulsuz yapıldı (role-map admin'i daraltsa bile owner=full).
+- **`source` taksonomisi** — `ResolvedPrincipal.source` `'local'`/`'guest'`/`'otp'` karışık taşıyor; audit netliği için tek taksonomi.
+- **start-rate-limit (M1)** — `startVerify` re-send'de lockout sıfırlar (`putPendingVerify` ON CONFLICT attempts=0); gateway `(connector,externalId)` başına `startVerify`'ı rate-limit etmeli (§5.3 ile uyumlu, brute-force amplification engeli).
+- **prepared-statement pre-compile** — `IdentityStore` hot-path için statement'ları constructor'da derleyebilir (memory-store.ts deseni).
