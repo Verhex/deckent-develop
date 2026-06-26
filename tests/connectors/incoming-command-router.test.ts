@@ -215,7 +215,7 @@ describe('makeIncomingCommandRouter — chat fallback (onChat)', () => {
       onChat,
     });
     handler(msg({ text: 'sprint durumu nedir?' }));
-    await vi.waitFor(() => expect(onChat).toHaveBeenCalledWith('7374744018', 'sprint durumu nedir?'));
+    await vi.waitFor(() => expect(onChat).toHaveBeenCalledWith('7374744018', 'sprint durumu nedir?', expect.any(Object)));
     expect(resolve).not.toHaveBeenCalled();
   });
 

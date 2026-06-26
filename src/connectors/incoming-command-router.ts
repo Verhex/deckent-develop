@@ -57,7 +57,7 @@ export interface IncomingCommandRouterOptions {
    * the exact same auth chokepoint (a stranger must never reach the engine).
    * Omit to keep non-command messages silently ignored (back-compat).
    */
-  readonly onChat?: (channelId: string, text: string) => void | Promise<void>;
+  readonly onChat?: (channelId: string, text: string, msg: IncomingMessage) => void | Promise<void>;
   /** Message language for acks (default 'en'). */
   readonly lang?: string;
   /**
@@ -120,7 +120,7 @@ export function makeIncomingCommandRouter(
     }
     // Authorized non-command → agentic chat fallback (if wired), else silent.
     if (opts.onChat) {
-      void Promise.resolve(opts.onChat(m.channelId, m.text)).catch(() => {
+      void Promise.resolve(opts.onChat(m.channelId, m.text, m)).catch(() => {
         // Fail-safe: a throwing chat path must never crash the inbound poller.
       });
     }
