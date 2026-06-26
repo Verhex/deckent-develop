@@ -34,7 +34,7 @@ export class IdentityStore {
     `);
   }
 
-  private key(c: string, e: string, t: string): string { return `${c} ${e} ${t}`; }
+  private key(c: string, e: string, t: string): string { return `${c}\0${e}\0${t}`; }
 
   upsertIdentity(rec: IdentityRecord): void {
     this.db.prepare(`

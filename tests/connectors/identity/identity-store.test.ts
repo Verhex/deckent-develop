@@ -47,6 +47,17 @@ describe('IdentityStore', () => {
     expect(store2.getIdentity('telegram', '55', 'firmax')).toEqual(rec);
     store2.close(); rmSync(dir2, { recursive: true, force: true });
   });
+  it('does not collide cache keys across segment boundaries', () => {
+    // ("tg","a b","x") vs ("tg","a","b x") would collide under a space separator
+    store.upsertIdentity({ ...rec, connector: 'telegram', externalId: 'a b', tenantId: 'x', principalId: 'p1' });
+    store.upsertIdentity({ ...rec, connector: 'telegram', externalId: 'a', tenantId: 'b x', principalId: 'p2' });
+    // First read populates cache
+    expect(store.getIdentity('telegram', 'a b', 'x')?.principalId).toBe('p1');
+    expect(store.getIdentity('telegram', 'a', 'b x')?.principalId).toBe('p2');
+    // Second read exercises the cache path
+    expect(store.getIdentity('telegram', 'a b', 'x')?.principalId).toBe('p1');
+    expect(store.getIdentity('telegram', 'a', 'b x')?.principalId).toBe('p2');
+  });
   it('stores and reads a pending-verify with attempts', () => {
     store.putPendingVerify({ connector: 'telegram', externalId: '77', code: '123456', email: 'a@b.c', tenantId: 'firmax', expiresAt: 999 });
     store.bumpVerifyAttempts('telegram', '77');
