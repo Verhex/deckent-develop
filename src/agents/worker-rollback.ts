@@ -24,6 +24,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import { detectDeckentRepo } from '../orchestra/self-modifying-detector.js';
 
 const STASH_REF_PATTERN = /^stash@\{(\d+|NOSTASH)\}$/;
 const NOSTASH_SENTINEL = 'stash@{NOSTASH}';
@@ -96,6 +97,15 @@ export function snapshotWorkerScope(
   taskId: string,
   options?: SnapshotOptions,
 ): string {
+  // ADR-039 self-project guard: NEVER stash the deckent-dev dogfood working
+  // tree. With no scope, `git stash push --include-untracked` (below) is
+  // UNSCOPED — it sweeps every sibling task's untracked deliverable into a stash
+  // that is later dropped, destroying real work (the Sprint-326 self-wipe that
+  // deleted 326-001's output and reverted DIRECTIVES.md). Returning the no-stash
+  // sentinel makes the paired rollback path a no-op too. Mirrors rollback.ts:178.
+  if (detectDeckentRepo(repoRoot)) {
+    return NOSTASH_SENTINEL;
+  }
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
   const message = `deckent-worker-${taskId}-${ts}`;
   const scopedDirs = options?.scopedDirs ?? [];
@@ -173,6 +183,14 @@ export function rollbackWorkerScope(
     throw new WorkerRollbackError(`rollbackWorkerScope: invalid stashRef "${stashRef}"`);
   }
 
+  // ADR-039 self-project guard: never mutate the deckent-dev dogfood working
+  // tree — the empty-scope branch below would `git checkout HEAD -- . &&
+  // git clean -fd`, reverting and deleting every other task's uncommitted work
+  // (the Sprint-326 self-wipe). Mirrors rollback.ts:178.
+  if (detectDeckentRepo(repoRoot)) {
+    return;
+  }
+
   if (scopedPaths.length > 0) {
     // Checkout tracked paths individually so untracked files in the list
     // (which don't exist in HEAD) don't abort the entire checkout batch.
@@ -197,14 +215,12 @@ export function rollbackWorkerScope(
       }
     }
   } else {
-    execFileSync('git', ['checkout', 'HEAD', '--', '.'], {
-      cwd: repoRoot,
-      stdio: ['ignore', 'ignore', 'pipe'],
-    });
-    execFileSync('git', ['clean', '-fd'], {
-      cwd: repoRoot,
-      stdio: ['ignore', 'ignore', 'pipe'],
-    });
+    // SAFETY (Sprint-326 self-wipe fix): an empty scope must NEVER
+    // `git checkout HEAD -- . && git clean -fd` — that reverts every tracked
+    // file and deletes every untracked file in the WHOLE repo, destroying
+    // sibling tasks' uncommitted deliverables. With no explicit scope there is
+    // nothing to roll back via tree-ops; the stash drop below is the only safe
+    // action. (A scoped rollback requires the caller to pass scope.filesWrite.)
   }
 
   if (stashRef !== NOSTASH_SENTINEL) {
