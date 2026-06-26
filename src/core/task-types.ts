@@ -459,6 +459,13 @@ export interface TaskResult {
   /** Token usage data from the worker's LLM interaction */
   tokenUsage?: TokenUsage;
   /**
+   * Computed monetary cost of this task's LLM usage (Worker Output Contract §1.4),
+   * filled orchestrator-side from {@link tokenUsage} + per-model pricing. Local /
+   * self-hosted models (ollama) → `{ usd: 0, isLocal: true }`. Inline type avoids a
+   * task-types ↔ cost-calculator import cycle; structurally equals `ResultCost`.
+   */
+  cost?: { usd: number; currency: string; pricingSource: string; isLocal: boolean };
+  /**
    * Worker self-reported rubric scores.
    * @deprecated Sprint 146: Worker self-report removed — use Quality Assessor dimensions
    * (assessQuality() from quality-assessor.ts) as the canonical quality scoring system.

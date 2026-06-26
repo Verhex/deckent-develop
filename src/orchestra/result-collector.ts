@@ -71,6 +71,8 @@ import {
   tryExtractUsageViaAdapter,
 } from './token-counter.js';
 import { providerRegistry } from '../core/provider.js';
+import { loadCostConfig } from '../core/cost-config-loader.js';
+import { calculateActualCost } from '../core/cost-calculator.js';
 
 // ─── Sprint Spawner (lazy import — avoid module init cycle) ──────
 // ADR-045: respawnEligibleTasks wire — invoked at runtime only, never at
@@ -486,6 +488,43 @@ export function enrichResultTokenUsage(
   };
 }
 
+/**
+ * Orchestrator-side cost fill (Worker Output Contract §1.4): compute the monetary
+ * cost of a task's LLM usage from its captured `tokenUsage` + per-model pricing and
+ * write it to `result.cost`. Self-hosted/local models (ollama) → `{ usd: 0,
+ * isLocal: true }`.
+ *
+ * Best-effort + total: a missing tokenUsage / projectRoot, or a cost-config load
+ * failure, leaves `result.cost` unset rather than throwing. Call AFTER
+ * {@link enrichResultTokenUsage} so the finalized tokenUsage is in place.
+ */
+export function enrichResultCost(
+  result: TaskResult,
+  task: Task | undefined,
+  projectRoot?: string,
+): void {
+  const usage = result.tokenUsage;
+  if (!projectRoot || !usage) return;
+  if ((usage.inputTokens ?? 0) === 0 && (usage.outputTokens ?? 0) === 0) return;
+  try {
+    const costConfig = loadCostConfig(projectRoot);
+    const model = usage.model ?? task?.forceModel ?? 'unknown';
+    const provider = usage.provider ?? task?.provider;
+    result.cost = calculateActualCost(
+      {
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        cacheReadTokens: usage.cacheReadTokens,
+      },
+      model,
+      provider,
+      costConfig,
+    );
+  } catch (err) {
+    debugLog('enrichResultCost', err);
+  }
+}
+
 // ═══ Exported Functions ═══════════════════════════════════════════
 
 /**
@@ -652,6 +691,7 @@ export async function waitForResults(
             }
           }
           enrichResultTokenUsage(result, taskMap.get(taskId), projectRoot);
+          enrichResultCost(result, taskMap.get(taskId), projectRoot);
           sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, result.filesChanged);
           results.push(result);
           collected.add(taskId);
@@ -693,6 +733,7 @@ export async function waitForResults(
         const lateResult = readJsonSafe<TaskResult>(lateResultPath);
         if (lateResult) {
           enrichResultTokenUsage(lateResult, taskMap.get(taskId), projectRoot);
+          enrichResultCost(lateResult, taskMap.get(taskId), projectRoot);
           sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, lateResult.filesChanged);
           results.push(lateResult);
           collected.add(taskId);
@@ -1192,6 +1233,7 @@ export async function waitForResults(
       const result = readJsonSafe<TaskResult>(resultPath);
       if (result) {
         enrichResultTokenUsage(result, taskMap.get(taskId), projectRoot);
+        enrichResultCost(result, taskMap.get(taskId), projectRoot);
         // Sprint 201 review-feedback — close the final-sweep race window: a
         // worker whose real .result lands only after the watcher closed is a
         // genuine worker-sourced filesChanged, same source as branches (a)/(b).

@@ -1,0 +1,82 @@
+import { describe, it, expect, afterEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { enrichResultCost } from '../../src/orchestra/result-collector.js';
+import type { TaskResult } from '../../src/core/task-types.js';
+
+// Worker Output Contract — Step 2 wiring: a monetary `cost` on every result,
+// computed orchestrator-side from the captured tokenUsage + per-model pricing.
+// loadCostConfig falls back to the bundled baseline, so no config file is needed.
+function makeResult(tokenUsage?: TaskResult['tokenUsage']): TaskResult {
+  return {
+    taskId: 'T1',
+    workerId: 'w1',
+    filesChanged: [],
+    linesAdded: 0,
+    linesRemoved: 0,
+    testsPassed: true,
+    coverage: 0,
+    selfAssessment: 'DONE',
+    notes: '',
+    tokenUsage,
+  } as TaskResult;
+}
+
+describe('enrichResultCost — cost in every result', () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs) rmSync(d, { recursive: true, force: true });
+    dirs.length = 0;
+  });
+  function root(): string {
+    const d = mkdtempSync(join(tmpdir(), 'cost-enrich-'));
+    dirs.push(d);
+    return d;
+  }
+
+  it('paid provider/model → cost.usd > 0 (real per-model pricing)', () => {
+    const r = makeResult({
+      inputTokens: 1_000_000,
+      outputTokens: 500_000,
+      provider: 'claude' as never,
+      model: 'claude-opus-4-6' as never,
+    });
+    enrichResultCost(r, undefined, root());
+    expect(r.cost).toBeDefined();
+    expect(typeof r.cost!.usd).toBe('number');
+    expect(r.cost!.usd).toBeGreaterThan(0);
+    expect(r.cost!.isLocal).toBe(false);
+  });
+
+  it('local/ollama usage → cost set with usd 0 and isLocal true', () => {
+    const r = makeResult({
+      inputTokens: 1000,
+      outputTokens: 500,
+      provider: 'ollama' as never,
+      model: 'qwen2.5' as never,
+    });
+    enrichResultCost(r, undefined, root());
+    expect(r.cost).toBeDefined();
+    expect(r.cost!.usd).toBe(0);
+    expect(r.cost!.isLocal).toBe(true);
+  });
+
+  it('no tokenUsage → no cost (no-op)', () => {
+    const r = makeResult(undefined);
+    enrichResultCost(r, undefined, root());
+    expect(r.cost).toBeUndefined();
+  });
+
+  it('zero tokens → no cost (no-op)', () => {
+    const r = makeResult({ inputTokens: 0, outputTokens: 0, provider: 'claude' as never, model: 'claude-opus-4-6' as never });
+    enrichResultCost(r, undefined, root());
+    expect(r.cost).toBeUndefined();
+  });
+
+  it('no projectRoot → no cost, never throws', () => {
+    const r = makeResult({ inputTokens: 100, outputTokens: 50, provider: 'claude' as never, model: 'claude-opus-4-6' as never });
+    expect(() => enrichResultCost(r, undefined, undefined)).not.toThrow();
+    expect(r.cost).toBeUndefined();
+  });
+});
