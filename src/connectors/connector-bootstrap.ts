@@ -542,6 +542,28 @@ export async function bootstrapConnectorCommands(
     : null;
   let resolveIdentity: ((input: { connector: ConnectorId; fromUser: string }, binding: ChannelBinding) => ResolvedPrincipal | null) | null = null;
   if (deps.identityCfg?.enabled && identityAccess) {
+    // ADR-092 Faz-1b (final review I-1): activate config-declared channel bindings.
+    // `config.identity.channels` maps a chatKey (`<connector>:<channelId>`, see
+    // gateway-router.chatKeyOf) → binding shape. Without this seeding nothing ever
+    // calls setBinding, so getBinding() returns null and turnPrincipal stays
+    // undefined → the L2 gate is a no-op. setBinding upserts → idempotent across
+    // restarts. (Dynamic per-channel binding via an admin /bind command is a
+    // deferred follow-up — see ADR-092 + spec §11.)
+    const channels = deps.identityCfg.channels;
+    if (channels) {
+      for (const [chatKey, ch] of Object.entries(channels)) {
+        try {
+          await identityAccess.setBinding(chatKey, {
+            tenantId: ch.tenantId,
+            projectPath: ch.projectPath,
+            mode: ch.mode,
+            ...(ch.guestRole ? { guestRole: ch.guestRole } : {}),
+          });
+        } catch (err) {
+          console.error(`[connector-bootstrap] identity: failed to seed binding for ${chatKey} — skipping: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    }
     try {
       const identityStore = new IdentityStore(join(root, '.deckent', 'identity.db'));
       resolveIdentity = buildIdentityResolver(deps.identityCfg, identityStore, root);

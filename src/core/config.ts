@@ -1583,6 +1583,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     notify_on_complete: (config as DeckentConfig).notify_on_complete,
     // Bot capabilities config — passed through (opt-in, default-off).
     bot_capabilities: (config as DeckentConfig).bot_capabilities,
+    // Per-user identity↔RBAC config (ADR-092) — passed through (opt-in, default-off).
+    identity: (config as DeckentConfig).identity,
     // Runtime Style
     deckent_style: config.deckent_style ?? 'sprint',
     // Terminal (Sprint 175) — deepMerge'd `config` already carries defaults from

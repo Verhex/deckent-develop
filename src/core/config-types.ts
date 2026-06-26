@@ -918,6 +918,10 @@ export interface ResolvedConfig {
   notify_connectors?: DeckentConfig['notify_connectors'];
   /** Bot capability framework config — passed through from project config (opt-in, default-off). */
   bot_capabilities?: BotCapabilitiesConfig;
+  /** Per-user identity↔RBAC config (ADR-092) — passed through from project config
+   *  (opt-in, default-off). Consumed by the connector bootstrap to seed channel
+   *  bindings + activate the L2 gate. */
+  identity?: DeckentConfig['identity'];
   /** Native transport + BOT-1 bot-agent (passed through from project config). */
   ollama_host?: string;
   native_model?: string;

@@ -127,6 +127,11 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
           });
         },
         botCapabilities: config.bot_capabilities,
+        // ADR-092 I-1 (final review): thread the per-user identity config into the
+        // bootstrap so config.identity.channels bindings are seeded and the L2 RBAC
+        // gate activates on the live path (it was previously inert — never wired).
+        // Guarded by presence → identity absent = byte-for-byte the legacy path.
+        ...(config.identity ? { identityCfg: config.identity } : {}),
         // Finding 1: pass the shared store so bootstrap uses the SAME instance
         // (not a fresh internal one) — send_mail can resolve screenshot artifacts.
         ...(artifactStore !== undefined ? { artifacts: artifactStore } : {}),

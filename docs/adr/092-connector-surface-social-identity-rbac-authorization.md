@@ -59,6 +59,12 @@ Gelen mesaj (platform event)
 - Spec: `docs/superpowers/specs/2026-06-26-social-identity-rbac-design.md`
 - i18n keys: `src/cli/helpers/messages.ts` — `rbac.unauthorized`, `identity.verify_prompt`, `identity.binding_unconfigured`
 
+### Faz-1b — Binding Aktivasyonu (final review I-1)
+
+Faz-1b, per-user gate'i canlı yolda aktive eder: `bot.ts` `config.identity`'i `bootstrapConnectorCommands`'a threadler (presence-guard), ve bootstrap `config.identity.channels` map'inden her kanal için `setBinding(chatKey, binding)` ile **config-declared** binding'leri seed eder (idempotent upsert). Bunsuz `getBinding()` daima null döner → `turnPrincipal` undefined → L2 gate no-op'tu (özellik inert). Kapsam: `tests/connectors/connector-bootstrap-gate-e2e.test.ts` (gerçek bootstrap→onMessage→onChat→getBinding→resolveIdentity→`runCapability` yolu).
+
+**Ertelenen takip (deferred follow-up):** dinamik per-kanal binding yönetimi — admin `/bind` komutu (runtime kanal bağlama) + pairing→binding köprüsü. Faz-1b yalnız config'te tanımlı kanalları aktive eder; runtime mutasyon sonraki dilim.
+
 **Consequences (+):**
 
 - Enterprise ortamlarda multi-user, multi-tenant connector deployment güvenli hale gelir

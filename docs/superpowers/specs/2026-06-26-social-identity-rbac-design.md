@@ -276,3 +276,13 @@ Plan A (engine) merge-ready onaylandı (33/33 test, sıfır Critical, fail-open 
 - **`source` taksonomisi** — `ResolvedPrincipal.source` `'local'`/`'guest'`/`'otp'` karışık taşıyor; audit netliği için tek taksonomi.
 - **start-rate-limit (M1)** — `startVerify` re-send'de lockout sıfırlar (`putPendingVerify` ON CONFLICT attempts=0); gateway `(connector,externalId)` başına `startVerify`'ı rate-limit etmeli (§5.3 ile uyumlu, brute-force amplification engeli).
 - **prepared-statement pre-compile** — `IdentityStore` hot-path için statement'ları constructor'da derleyebilir (memory-store.ts deseni).
+
+### 11.1 Faz-1b — binding aktivasyonu (final review I-1, kapatıldı)
+
+Plan B'de tespit edilen son boşluk: per-user özelliği **canlı yolda inert**'ti — (a) `bot.ts` `bootstrapConnectorCommands`'a `identityCfg` geçmiyordu, (b) hiçbir yer `ChannelBinding` oluşturmuyordu → `getBinding()` daima `null` → `turnPrincipal` undefined → L2 gate no-op.
+
+Çözüm (Faz-1b):
+- **bot.ts** → `config.identity` varsa `identityCfg`'i bootstrap deps'ine threadler (presence-guard: identity yoksa byte-for-byte eski yol).
+- **connector-bootstrap.ts** → identity setup sırasında `config.identity.channels` map'ini iterler ve her kanal için `identityAccess.setBinding(chatKey, binding)` çağırır (idempotent upsert). Böylece **config'te tanımlı kanallar aktif** olur; `getBinding` non-null döner, gate gerçekten çalışır. Kapsam: `tests/connectors/connector-bootstrap-gate-e2e.test.ts` (gerçek bootstrap→onMessage→onChat→getBinding→resolveIdentity→runCapability yolu; authorized çalışır / viewer reddedilir / unknown düşürülür).
+
+**Ertelenen takip (deferred follow-up):** dinamik per-kanal binding yönetimi — admin `/bind` komutu (runtime'da yeni kanal bağlama) ve pairing→binding köprüsü (gateway pairing onayı → otomatik binding). Faz-1b yalnız **config-declared** kanalları aktive eder; runtime mutasyon Plan-C/sonraki dilim.
