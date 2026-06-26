@@ -42,6 +42,7 @@ import { markdownToTelegramHtml } from './markdown-to-html.js';
 import { getMessage } from '../cli/helpers/messages.js';
 import type { PerTurnConnector, ConnectorId } from './types.js';
 import type { CapabilityRegistry } from './capabilities/registry.js';
+import type { ResolvedPrincipal } from './identity/provider.js';
 
 /**
  * Build an out-of-band approval sender bound to a specific connector and capability
@@ -199,8 +200,15 @@ export interface ChatResponder {
    *    voice-origin turns whose STT provider returned a language. Absent for
    *    text-origin turns and voice turns whose provider did not detect a language.
    *    Task 5 reads this to inject a reply-language instruction into the turn.
+   *  - `principal` is an OPTIONAL 5th arg (ADR-092, identity-wiring review fix):
+   *    the per-message RBAC principal resolved by the bootstrap for THIS sender.
+   *    When provided, it is set on the turn's CapabilityContext (so an auto-policy
+   *    capability invoked during the turn runs under the requester's RBAC — the
+   *    Task-2 L2 gate is no longer a no-op on the primary path) AND carried onto
+   *    any action the turn PARKS (so the approver authorizes as the requester, not
+   *    the last chat sender). Identity-disabled → undefined → behavior unchanged.
    */
-  (sessionId: string, text: string, mediaConnector?: PerTurnMediaConnector, detectedLang?: string): Promise<string>;
+  (sessionId: string, text: string, mediaConnector?: PerTurnMediaConnector, detectedLang?: string, principal?: ResolvedPrincipal): Promise<string>;
   /** Release the warm persistent provider child (agentic mode). Best-effort. */
   dispose?(): Promise<void>;
 }
@@ -244,7 +252,7 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
     return persistent;
   }
 
-  async function runTurn(sessionId: string, text: string, perTurnMediaConnector?: PerTurnMediaConnector): Promise<string> {
+  async function runTurn(sessionId: string, text: string, perTurnMediaConnector?: PerTurnMediaConnector, principal?: ResolvedPrincipal): Promise<string> {
     const collected: string[] = [];
 
     // Provider + dispatcher differ by mode. Agentic: tool_use provider + GATED
@@ -277,6 +285,10 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
         spawn: deps.capSpawn ?? defaultSpawn,
         loadMailTransport: deps.capMailTransport ?? loadNodemailerTransport,
         ...(deps.artifacts !== undefined ? { artifacts: deps.artifacts } : {}),
+        // Thread the per-message principal so an auto-policy capability invoked
+        // DURING this chat turn runs under the requester's RBAC (Task-2 L2 gate).
+        // Identity-disabled → principal undefined → fields omitted → gate no-op.
+        ...(principal !== undefined ? { principal, tenantId: principal.tenantId } : {}),
       });
       // Bind sendApproval using the per-turn connector (same object used for media in
       // Slice 1.1). Cast to PerTurnConnector — the real connector has sendMessage; when
@@ -313,6 +325,10 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
             ...(isSprintScopedDestructive(tool)
               ? { boundSprintId: getCurrentSprintId(root) ?? undefined }
               : {}),
+            // Carry the requester's principal so a later approval authorizes as the
+            // REQUESTER, not the last chat sender (confused-deputy fix). Identity-
+            // disabled → principal undefined → omitted (parked action unchanged).
+            ...(principal !== undefined ? { requesterPrincipal: principal } : {}),
           }),
         // Sprint 238 İŞ3: suppress the spurious "checkpoint awaiting approval"
         // alarm — a model-initiated deckent_checkpoint with nothing pending is a
@@ -353,9 +369,9 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
     return lastAssistantText(transcript);
   }
 
-  const responder = ((sessionId: string, text: string, mediaConnector?: PerTurnMediaConnector): Promise<string> => {
+  const responder = ((sessionId: string, text: string, mediaConnector?: PerTurnMediaConnector, _detectedLang?: string, principal?: ResolvedPrincipal): Promise<string> => {
     const prev = chains.get(sessionId) ?? Promise.resolve();
-    const next = prev.catch(() => undefined).then(() => runTurn(sessionId, text, mediaConnector));
+    const next = prev.catch(() => undefined).then(() => runTurn(sessionId, text, mediaConnector, principal));
     chains.set(
       sessionId,
       next.finally(() => {

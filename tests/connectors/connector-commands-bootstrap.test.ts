@@ -99,7 +99,8 @@ describe('bootstrapConnectorCommands', () => {
     fake._emit(incoming('durum ne alemde?', '555'));
     // Slice 1.1: chat is now called with an optional 3rd arg (per-turn mediaConnector).
     // Task 3 (WS1): 4th arg is detectedLang — undefined for text-origin turns.
-    await vi.waitFor(() => expect(chat).toHaveBeenCalledWith('555', 'durum ne alemde?', expect.objectContaining({ id: 'telegram' }), undefined));
+    // ADR-092 (identity-wiring): 5th arg is the per-message principal — undefined when identity is disabled.
+    await vi.waitFor(() => expect(chat).toHaveBeenCalledWith('555', 'durum ne alemde?', expect.objectContaining({ id: 'telegram' }), undefined, undefined));
     // a thinking ack + the reply land on the same chat
     await vi.waitFor(() => expect(fake.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(2));
     const texts = fake.sendMessage.mock.calls.map((c) => (c[0] as { text: string }).text);
@@ -398,7 +399,8 @@ describe('bootstrapConnectorCommands', () => {
     // onChatStreaming must be called (not the plain chat responder).
     // Slice 1.1: 4th arg is the per-turn mediaConnector (the live connector object).
     // Task 3 (WS1): 5th arg is detectedLang — undefined for text-origin turns.
-    await vi.waitFor(() => expect(onChatStreaming).toHaveBeenCalledWith('555', 'hello streaming', expect.any(Function), expect.objectContaining({ id: 'telegram' }), undefined));
+    // ADR-092 (identity-wiring): 6th arg is the per-message principal — undefined when identity is disabled.
+    await vi.waitFor(() => expect(onChatStreaming).toHaveBeenCalledWith('555', 'hello streaming', expect.any(Function), expect.objectContaining({ id: 'telegram' }), undefined, undefined));
     // editMessage must be called for the final reply (edit-in-place); may also
     // be called earlier for throttled partials — check the LAST call for final body.
     await vi.waitFor(() => expect(editMessage).toHaveBeenCalled());

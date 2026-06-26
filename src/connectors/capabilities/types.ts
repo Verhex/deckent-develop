@@ -63,6 +63,10 @@ export interface CapabilityContext {
   readonly loadMailTransport: (cfg: MailConfig | undefined) => Promise<MailTransport>; // injected (mail)
   readonly platform?: PlatformId;      // injected in tests; defaults to detectPlatform()
   readonly artifacts?: ArtifactStore;  // injected when artifact flow is available
+  /** Resolved RBAC principal for L2 tool-gate (ADR-092). Populated by Task 4 middleware. */
+  readonly principal?: import('../identity/provider.js').ResolvedPrincipal;
+  /** Tenant scope for the session (mirrors principal.tenantId for convenience). */
+  readonly tenantId?: string;
 }
 
 export interface Capability<A = unknown> {
@@ -72,6 +76,10 @@ export interface Capability<A = unknown> {
   readonly defaultPolicy: PolicyDecision;
   readonly edition: Edition;
   readonly paramsSchema: ZodType<A>;
+  /** RBAC permission token required to run this capability (e.g. 'order:write').
+   * When set, the L2 tool-gate in execute.ts checks principalCan() before execution (ADR-092).
+   * Opt-in: undefined means no gate (back-compat for all existing capabilities). */
+  readonly requiredPermission?: string;
   preview(args: A, lang: string): string;
   run(args: A, ctx: CapabilityContext): Promise<CapabilityResult>;
 }

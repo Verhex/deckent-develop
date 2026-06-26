@@ -2,10 +2,12 @@ import { appendFile, mkdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import type { CapabilityRegistry } from './registry.js';
 import type { CapabilityContext, MediaAttachment, Tier, PolicyDecision } from './types.js';
+import { principalCan } from '../../core/rbac.js';
+import { getMessage } from '../../cli/helpers/messages.js';
 
 export type MediaSink = (channelId: string, media: MediaAttachment) => Promise<void>;
 
-interface AuditEntry { ts: number; chatKey: string; project: string; capId: string; tier: Tier; decision: PolicyDecision; status: 'ok' | 'error' }
+interface AuditEntry { ts: number; chatKey: string; project: string; capId: string; tier: Tier; decision: PolicyDecision; status: 'ok' | 'error' | 'denied' }
 
 async function audit(root: string, entry: AuditEntry): Promise<void> {
   try {
@@ -21,6 +23,15 @@ export async function runCapability(
 ): Promise<string> {
   const cap = registry.get(capId);
   if (!cap) return `[capability-error] unknown capability: ${capId}`;
+
+  // L2 authoritative tool-gate (ADR-092): deny before running when the resolved principal
+  // lacks the capability's required permission. Opt-in — only fires when the cap declares
+  // requiredPermission AND a principal is present. No gate = back-compat for all existing caps.
+  if (cap.requiredPermission && ctx.principal && !principalCan(ctx.principal.permissions, cap.requiredPermission)) {
+    await audit(ctx.project, { ts: ctx.now, chatKey: ctx.chatKey, project: ctx.project, capId, tier: cap.tier, decision, status: 'denied' });
+    return getMessage('rbac.unauthorized', ctx.lang, { permission: cap.requiredPermission });
+  }
+
   const parsed = cap.paramsSchema.safeParse(rawArgs);
   if (!parsed.success) {
     return `[capability-error] ${capId}: invalid args (${parsed.error.issues.map((i) => i.message).join('; ')})`;

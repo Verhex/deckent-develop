@@ -359,6 +359,20 @@ export interface DeckentConfig {
    *  per-chat policy overrides, and SMTP mail config with $DECK: secret resolution. */
   bot_capabilities?: BotCapabilitiesConfig;
 
+  /**
+   * Per-user identity↔RBAC authorization for connector message surface (ADR-092).
+   * Default-off: when absent or enabled:false, connectors keep per-channel behavior.
+   */
+  identity?: {
+    enabled: boolean;
+    provider?: { kind: 'local' };
+    owner?: { connector: string; externalId: string; tenantId: string };
+    roleMap?: Record<string, { role: 'admin' | 'operator' | 'viewer'; permissions?: string[] }>;
+    channels?: Record<string, { tenantId: string; projectPath: string; mode: 'tenant-locked' | 'per-user'; guestRole?: 'admin' | 'operator' | 'viewer' }>;
+    verify?: { ttlSeconds?: number; maxAttempts?: number };
+    enforcement?: 'strict' | 'permissive';
+  };
+
   // ─── Native transport + bot-agent (REPL native agent + BOT-1) ──────
   /** Local Ollama endpoint (e.g. "http://127.0.0.1:11434") — native agent + bot-agent. */
   ollama_host?: string;
@@ -904,6 +918,10 @@ export interface ResolvedConfig {
   notify_connectors?: DeckentConfig['notify_connectors'];
   /** Bot capability framework config — passed through from project config (opt-in, default-off). */
   bot_capabilities?: BotCapabilitiesConfig;
+  /** Per-user identity↔RBAC config (ADR-092) — passed through from project config
+   *  (opt-in, default-off). Consumed by the connector bootstrap to seed channel
+   *  bindings + activate the L2 gate. */
+  identity?: DeckentConfig['identity'];
   /** Native transport + BOT-1 bot-agent (passed through from project config). */
   ollama_host?: string;
   native_model?: string;

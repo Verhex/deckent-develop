@@ -116,13 +116,22 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
         chat: responder,
         // Slice 1.1: forward the per-turn mediaConnector (4th arg from bootstrap) into
         // the responder call so capability media reaches the right connector transport.
-        onChatStreaming: (channelId, text, onPartial, mediaConnector) => {
+        onChatStreaming: (channelId, text, onPartial, mediaConnector, detectedLang, principal) => {
           partialSinks.set(channelId, onPartial);
-          return responder(channelId, text, mediaConnector).finally(() => {
+          // Forward the per-message principal (5th responder arg) so a chat-turn
+          // capability runs under / parks with the requester's RBAC (ADR-092).
+          // detectedLang is forwarded for parity (responder ignores it). Identity-
+          // disabled → principal undefined → behavior unchanged.
+          return responder(channelId, text, mediaConnector, detectedLang, principal).finally(() => {
             partialSinks.delete(channelId);
           });
         },
         botCapabilities: config.bot_capabilities,
+        // ADR-092 I-1 (final review): thread the per-user identity config into the
+        // bootstrap so config.identity.channels bindings are seeded and the L2 RBAC
+        // gate activates on the live path (it was previously inert — never wired).
+        // Guarded by presence → identity absent = byte-for-byte the legacy path.
+        ...(config.identity ? { identityCfg: config.identity } : {}),
         // Finding 1: pass the shared store so bootstrap uses the SAME instance
         // (not a fresh internal one) — send_mail can resolve screenshot artifacts.
         ...(artifactStore !== undefined ? { artifacts: artifactStore } : {}),
