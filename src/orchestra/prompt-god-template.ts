@@ -1,9 +1,9 @@
 // ─── Prompt God Template ────────────────────────────────────────────────────
 // Single entry point for building worker prompts.
 // Pipeline: classifyTaskType → selectAgent → selectSkills → selectRelevantAdrs
-//           → sanitizeScope → renderTemplate → PromptArtifact
+//           → sanitizeScope → renderSegments → (optional leading-T0 reorder) → PromptArtifact
 //
-// Sprint 146 — Task 146-005
+// Sprint 146 — Task 146-005 · tier segmentation Sprint 330 — Task 330-019
 
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
@@ -13,6 +13,14 @@ import { selectRelevantAdrs, buildAdrPromptSection } from './adr-selector.js';
 import { sanitizeScope } from './scope-sanitizer.js';
 import { truncateAtParagraph, inferTaskDomains } from './task-builder.js';
 import { getDefaultProviderName } from './sprint-utils.js';
+import {
+  reorderLeadingT0,
+  DEFAULT_LEADING_T0_REORDER,
+  SEGMENT_SEPARATOR,
+  type PromptTier,
+  type PromptSegment,
+  type PromptSegmentKind,
+} from './prompt-segmentation.js';
 
 // ─── Public Types ──────────────────────────────────────────────────────
 
@@ -26,6 +34,20 @@ export interface PromptArtifact {
     charCount: number;
     estimatedTokens: number;
   };
+}
+
+/**
+ * A compiled worker prompt plus its tier-tagged segmentation (Sprint 330 330-019).
+ *
+ * Superset of {@link PromptArtifact}: `segments` carries the ordered T0/T1/T2
+ * {@link PromptSegment}s the prompt was assembled from, so the provider-agnostic
+ * prompt cache can key on the byte-stable prefix while only the volatile tail
+ * varies. `prompt` is exactly `segments.map(s => s.content).join('\n\n')`.
+ */
+export interface SegmentedPrompt {
+  prompt: string;
+  segments: PromptSegment[];
+  metadata: PromptArtifact['metadata'];
 }
 
 /**
@@ -102,6 +124,18 @@ export interface SprintContext {
    * baseline was captured → the note warns generically without inventing a count.
    */
   preExistingFailures?: number;
+  /**
+   * Leading-T0 cache reorder (Sprint 330 330-019 — provider-agnostic prompt cache).
+   *
+   * EXPERIMENTAL, default-OFF ({@link DEFAULT_LEADING_T0_REORDER}). When true the
+   * compiled prompt is reassembled so the global (T0) then project (T1) tiers lead
+   * contiguously — maximising the byte-stable prefix a provider cache can share
+   * across tasks. When false/undefined the production assembly order (skills first,
+   * per the F1-TOK cache-prefix lesson) is preserved byte-for-byte, so the
+   * prompt-determinism guard stays green. Wire from a config flag at the call site;
+   * never blind-default-on (CLAUDE.md quality bar: risky reorder is flag-gated).
+   */
+  leadingT0Reorder?: boolean;
 }
 
 /**
@@ -201,6 +235,22 @@ export function computeIdempotencyKey(task: Task): string {
  *           selectRelevantAdrs (topN=3) → sanitizeScope → render template.
  */
 export function buildTaskPrompt(task: Task, ctx: SprintContext): PromptArtifact {
+  const { prompt, metadata } = buildTaskPromptSegmented(task, ctx);
+  return { prompt, metadata };
+}
+
+/**
+ * Build the worker prompt AND its tier-tagged segmentation (Sprint 330 330-019).
+ *
+ * Identical pipeline to {@link buildTaskPrompt}, but returns the ordered
+ * {@link PromptSegment}[] alongside the rendered prompt so the provider-agnostic
+ * prompt cache (and the determinism / protected-set guards) can reason about the
+ * T0/T1/T2 tiers. When `ctx.leadingT0Reorder` is set the segments are reassembled
+ * leading-T0 for a longer shared cache prefix; otherwise the production assembly
+ * order (skills first) is preserved byte-for-byte — `buildTaskPrompt` therefore
+ * stays byte-identical to its pre-330-019 output on the default path.
+ */
+export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): SegmentedPrompt {
   const effort = ctx.effort ?? 'medium';
   const agentId = ctx.agentId ?? task.assignedAgent ?? 'generic';
   const skillNames: string[] = [];
@@ -259,7 +309,7 @@ export function buildTaskPrompt(task: Task, ctx: SprintContext): PromptArtifact 
   // so the template can interpolate the resolved value instead of leaking the
   // literal `${IDEMPOTENCY_KEY}` placeholder to the worker.
   const idempotencyKey = computeIdempotencyKey(task);
-  const prompt = renderTemplate({
+  const defaultOrder = renderSegments({
     agentBlock,
     skillBlock,
     adrBlock,
@@ -275,11 +325,19 @@ export function buildTaskPrompt(task: Task, ctx: SprintContext): PromptArtifact 
     preExistingFailures: ctx.preExistingFailures,
   });
 
+  // Leading-T0 reorder (default-OFF): regroup tiers (T0→T1→T2) for the longest
+  // shareable cache prefix. OFF → production order preserved byte-for-byte, so the
+  // prompt-determinism guard (skills-first block order) stays green.
+  const reorder = ctx.leadingT0Reorder ?? DEFAULT_LEADING_T0_REORDER;
+  const segments = reorder ? reorderLeadingT0(defaultOrder) : defaultOrder;
+  const prompt = segments.map(s => s.content).join(SEGMENT_SEPARATOR);
+
   const charCount = prompt.length;
   const estimatedTokens = Math.ceil(charCount / CHARS_PER_TOKEN);
 
   return {
     prompt,
+    segments,
     metadata: {
       agent: agentId,
       skills: skillNames,
@@ -471,7 +529,7 @@ export function conditionalBoilerplate(task: Task): ConditionalBoilerplate {
 
 // ─── Scope Block Builder ───────────────────────────────────────────────
 
-function buildScopeBlock(scope: TaskScope, outWarnings: string[], emitHostConfigNote: boolean): string {
+export function buildScopeBlock(scope: TaskScope, outWarnings: string[], emitHostConfigNote: boolean): string {
   // Sanitize filesWrite
   const sanitized = sanitizeScope(scope.filesWrite);
   for (const w of sanitized.warnings) outWarnings.push(w);
@@ -940,19 +998,46 @@ interface RenderInput {
 }
 
 /**
- * Persona/task verify-precedence override note (PROMPT-W1 b).
+ * Persona/task verify-precedence override note (PROMPT-W1 b) — a PROTECTED T0
+ * worker-safety invariant (Sprint 330 330-019).
  *
  * Agent personas (e.g. bug-fixer) carry a "run the FULL suite / all existing
  * tests must pass / always write a regression test" mandate. For a targeted
  * deckent task that conflicts with the task's own CRITICAL VERIFY STEPS
  * (targeted-only; pre-existing unrelated failures ≠ NO_GO). This note makes the
  * task's verify-steps the single authority so a worker does not false-NO_GO on a
- * persona full-suite mandate. `verificationMode === 'doc'` → '' (the doc verify
- * path already states its own, non-conflicting guidance).
+ * persona full-suite mandate.
+ *
+ * UNCONDITIONAL / PROTECTED: the note is emitted for EVERY verification path that
+ * actually runs tests — the default (no-arg) call and any non-doc mode both emit
+ * it, so it can never be silently gated out of a worker prompt, and the
+ * prompt-protected-set diff test locks its wording against rewording/dropping.
+ *
+ * The single exception is `verificationMode === 'doc'`: a doc-only task runs NO
+ * tests and its VERIFY STEPS block already says "DO NOT run the test suite", so
+ * the "defer to the targeted-only TEST guidance" note would actively contradict it
+ * — that path returns '' (pinned by prompt-w1). Doc-suppression is semantic, not a
+ * general gate: every test-running path always emits.
  */
-export function buildVerifyPrecedenceNote(verificationMode: 'targeted' | 'doc'): string {
-  if (verificationMode !== 'targeted') return '';
+export function buildVerifyPrecedenceNote(verificationMode: 'targeted' | 'doc' = 'targeted'): string {
+  if (verificationMode === 'doc') return '';
   return `> Verify-precedence (this task overrides your persona): the CRITICAL VERIFY STEPS above are the single authority on how to verify THIS task. Where your agent persona or a skill says "run the full test suite", "all existing tests must pass (zero regressions)", or "always write a regression test", defer to the targeted-only guidance above — run only the test file(s) covering the module(s) you changed, and treat pre-existing unrelated failures as NOT a NO_GO.`;
+}
+
+/**
+ * Build the Definition-of-Done (goCriteria) block — a PROTECTED element the
+ * compiler must reproduce byte-for-byte (Sprint 330 330-019).
+ *
+ * Extracted verbatim from the former inline render in {@link renderSegments} so it
+ * can be rendered once and reused by the prompt-protected-set diff test. Leading
+ * and trailing newlines are part of the contract (the block is concatenated
+ * directly onto the task preamble); the output is byte-identical to the prior
+ * inline expression. Empty when the task carries no goCriteria.
+ */
+export function buildDodBlock(goNogo?: { goCriteria?: string; noGoCriteria?: string }): string {
+  if (!goNogo?.goCriteria) return '';
+  const noGo = goNogo.noGoCriteria ? `\nNO-GO if: ${goNogo.noGoCriteria}` : '';
+  return `\n## Definition of Done (goCriteria — your work is judged against this)\n${goNogo.goCriteria}${noGo}\n`;
 }
 
 /**
@@ -976,8 +1061,18 @@ export function buildPreExistingFailuresNote(preExistingFailures?: number): stri
   return `The Full test suite has ${preExistingFailures} pre-existing unrelated failures, measured at this sprint's baseline (stale model-id expectations, env-dependent provider/ollama tests). These pre-existing failures MUST NOT cause a NO_GO — they are not your responsibility. ${tail}`;
 }
 
-function renderTemplate(input: RenderInput): string {
+function renderSegments(input: RenderInput): PromptSegment[] {
   const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, task, effort, idempotencyKey, emitIdempotency, preExistingFailures } = input;
+
+  // Tier-tagged assembly (Sprint 330 330-019). Push order below IS the default
+  // production order — `buildTaskPromptSegmented` joins these contents with
+  // SEGMENT_SEPARATOR, so the default-path output is byte-for-byte identical to the
+  // pre-330-019 `sections.join('\n\n')`. The {@link PromptTier} tags drive the
+  // optional (default-OFF) leading-T0 cache reorder and the protected-set guard.
+  const segments: PromptSegment[] = [];
+  const push = (tier: PromptTier, kind: PromptSegmentKind, content: string): void => {
+    segments.push({ tier, kind, content });
+  };
 
   // Conditionally emit non-empty sections only (skip filler empty headers).
   // Sprint 273 (F1-TOK fix #5): Skills FIRST, then Agent — skill blocks are
@@ -985,11 +1080,10 @@ function renderTemplate(input: RenderInput): string {
   // most-shared content must lead for a shareable provider cache prefix.
   // (273-008 changed the template docs; this is the actual assembly order —
   // locked by tests/orchestra/prompt-determinism.test.ts block-order test.)
-  const sections: string[] = [];
-
-  if (skillBlock) sections.push(skillBlock);
-  if (agentBlock) sections.push(agentBlock);
-  if (adrBlock) sections.push(adrBlock);
+  // Skills / persona / operative ADRs are the T1 (tenant-project) tier.
+  if (skillBlock) push('T1', 'skills', skillBlock);
+  if (agentBlock) push('T1', 'persona', agentBlock);
+  if (adrBlock) push('T1', 'adr', adrBlock);
 
   // Main worker preamble
   // Sprint 182 PQ-4 (F6): title and description live on separate lines/paragraphs.
@@ -999,16 +1093,17 @@ function renderTemplate(input: RenderInput): string {
   // as its own paragraph so markdown survives rendering.
   // PROMPT-W1 (d): the Idempotency Key section is only emitted when the task may
   // make external API calls (gated off for pure-refactor / no-API tasks).
-  const dodBlock = task.goNogo?.goCriteria
-    ? `\n## Definition of Done (goCriteria — your work is judged against this)\n${task.goNogo.goCriteria}${task.goNogo.noGoCriteria ? `\nNO-GO if: ${task.goNogo.noGoCriteria}` : ''}\n`
-    : '';
+  const dodBlock = buildDodBlock(task.goNogo);
   const idempotencyBlock = emitIdempotency
     ? `\n## Idempotency Key\n${idempotencyKey}\nUse this key for external API calls (Idempotency-Key header) to make retries safe.`
     : '';
-  sections.push(`You are a Deckent worker agent.
-See .deckent/workspace/WORKER-GUIDE.md for heartbeat format, result format, and error handling rules.
-
-## Your Task
+  // The global worker-contract preamble (T0) and the per-task body (T2) are split
+  // at the existing blank-line boundary: joined with SEGMENT_SEPARATOR they are
+  // byte-identical to the former single block, but the split lets the T0 contract
+  // lead in the reordered cache layout without dragging the volatile task body.
+  push('T0', 'worker-contract', `You are a Deckent worker agent.
+See .deckent/workspace/WORKER-GUIDE.md for heartbeat format, result format, and error handling rules.`);
+  push('T2', 'task', `## Your Task
 ${task.id}: ${task.title}
 
 ${task.description}
@@ -1017,8 +1112,8 @@ ${task.description}
 - Effort: ${effort}
 ${dodBlock}${idempotencyBlock}`);
 
-  // What to do
-  sections.push(`## What To Do
+  // What to do (embeds task.id in the plan/result paths → volatile T2)
+  push('T2', 'what-to-do', `## What To Do
 1. Read the task scope carefully — understand what files you may touch
 2. Write your execution plan to .tasks/task-${task.id}.plan BEFORE coding — outline your approach, files to modify, and expected changes
 3. Write the code changes described above
@@ -1043,13 +1138,13 @@ ${dodBlock}${idempotencyBlock}`);
   // take precedence over a persona's conflicting full-suite test-mandate.
   const verificationMode: 'targeted' | 'doc' = isDocOnlyTask ? 'doc' : 'targeted';
   if (isDocOnlyTask) {
-    sections.push(`## VERIFY STEPS (doc-only task — DO NOT run the test suite)
+    push('T0', 'verify-steps', `## VERIFY STEPS (doc-only task — DO NOT run the test suite)
 This is a Tier-0 documentation task: there is no source code to type-check or test. DO NOT run \`npm test\` / \`vitest\` / the project test suite — it is large, unrelated to your file, slow, and produces spurious failures that do NOT reflect your work.
 1. Read your file back from disk (the path in your scope) and confirm its content satisfies the goCriteria above.
 2. You MAY run a fast doc/markdown lint if one exists, but a passing test suite is NOT required and NOT expected.
 Mark selfAssessment = "DONE" when the file exists and matches the goCriteria. Use "GO_WITH_TECH_DEBT" only if the content is genuinely partial; use "NO_GO" only if you could not create the file at all. Do NOT mark NO_GO because an unrelated test suite failed.`);
   } else {
-    sections.push(`## CRITICAL VERIFY STEPS (DO NOT SKIP)
+    push('T0', 'verify-steps', `## CRITICAL VERIFY STEPS (DO NOT SKIP)
 You MUST run the project's type check and TARGETED tests before marking your task as done.
 Check the project's TOOLS.md or package.json scripts to find the right commands.
 
@@ -1069,17 +1164,17 @@ ${buildVerifyPrecedenceNote(verificationMode)}`);
   // Smoke note (WP-16) — Tier-1 Proof-of-Function context. Emitted next to the
   // VERIFY STEPS (its natural home) only when the task carries a Smoke: directive.
   const smokeNote = buildSmokeNote(task.smoke);
-  if (smokeNote) sections.push(smokeNote);
+  if (smokeNote) push('T2', 'smoke', smokeNote);
 
-  // Scope block
-  sections.push(scopeBlock);
+  // Scope block — PROTECTED (auditor boundary contract); volatile per task (T2).
+  push('T2', 'scope', scopeBlock);
 
   // Dependencies (only if non-empty)
-  if (depsBlock) sections.push(depsBlock);
+  if (depsBlock) push('T2', 'deps', depsBlock);
 
   // Heartbeat — WP-18 (DASH-RT-1 complement): the worker must keep currentAction
   // fresh so the dashboard shows live progress instead of a stuck "Starting…".
-  sections.push(`## Heartbeat
+  push('T2', 'heartbeat', `## Heartbeat
 Create .tasks/task-${task.id}.hb BEFORE starting work with workerId "w-${task.id}", status "EXECUTING".
 Update periodically: increment sequence, refresh timestamp via new Date().toISOString() (UTC ISO 8601).
 At EVERY significant step, also update the \`currentAction\` field to a short human-readable phrase (e.g. "planning", "editing src/x.ts", "running targeted tests", "writing result") — this drives the live dashboard view, so a stale currentAction reads as a stuck worker.`);
@@ -1091,30 +1186,30 @@ At EVERY significant step, also update the \`currentAction\` field to a short hu
   // so prompts emitted in pure-Ollama configs don't hard-code 'claude' into
   // worker token-usage instructions.
   const provider = task.provider ?? getDefaultProviderName();
-  sections.push(`## Result & Self-Assessment
+  push('T2', 'result-contract', `## Result & Self-Assessment
 Write .tasks/task-${task.id}.result with: taskId, filesChanged, testsPassed, selfAssessment ("DONE"|"GO_WITH_TECH_DEBT"|"NO_GO"), notes, and tokenUsage { "inputTokens": 0, "outputTokens": 0, "cacheReadTokens": 0, "provider": "${provider}", "model": "${task.model}" }. Set provider/model as shown (you know these); leave inputTokens, outputTokens and cacheReadTokens at 0 — do NOT estimate them. An LLM cannot count its own token usage, so any guess only adds noise: the orchestrator fills the real token counts server-side after you finish. tokenUsage is optional — if you omit it the orchestrator still fills it.
 ${buildDodChecklist(task.goNogo?.goCriteria)}
 CRITICAL: never exit without writing the .result file — even on failure, write selfAssessment "NO_GO" with error details. A missing result file stalls the entire sprint.`);
 
-  // Karpathy 4-discipline cognitive anchor (concise, provider-agnostic).
-  sections.push(KARPATHY_ESSENCE);
+  // Karpathy 4-discipline cognitive anchor (concise, provider-agnostic) — global T0.
+  push('T0', 'karpathy', KARPATHY_ESSENCE);
 
   // Shared Context (Sprint 278 COMM-1 / 278-003) — appended LAST, after every
   // shared/structural section, so this per-spawn-variable block sits in the most
   // task-specific region and never splits the Skills→Agent→ADR cache prefix
   // (F1-TOK lesson). Empty when worker_comms is off → byte-for-byte legacy prompt.
-  if (sharedBlock) sections.push(sharedBlock);
+  if (sharedBlock) push('T2', 'shared', sharedBlock);
 
   // Upstream Handoffs (Sprint 278 COMM-1 / 278-004) — appended next to the Shared
   // Context block in the same prompt-END region (same cache-prefix rationale).
   // Empty when worker_comms is off / inject_handoffs disabled → unchanged prompt.
-  if (handoffBlock) sections.push(handoffBlock);
+  if (handoffBlock) push('T2', 'handoff', handoffBlock);
 
   // Worker Comms Instruction (Sprint 278 COMM-1 / 278-006) — appended LAST so
   // workers know how to populate sharedNotes/handoffNotes. Without this block
   // workers never discover these optional fields exist (Tasks 1-5 path stays
   // empty). Empty when worker_comms is off → byte-for-byte legacy prompt.
-  if (commsInstructionBlock) sections.push(commsInstructionBlock);
+  if (commsInstructionBlock) push('T2', 'comms', commsInstructionBlock);
 
-  return sections.join('\n\n');
+  return segments;
 }

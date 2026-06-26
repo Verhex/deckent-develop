@@ -61,6 +61,7 @@ import { registerGateway } from './commands/gateway.js';
 import { registerMcp } from './commands/mcp.js';
 import { registerResources } from './commands/resources.js';
 import { registerUsage } from './commands/usage.js';
+import { registerKpi } from './commands/kpi.js';
 import { registerImage } from './commands/image.js';
 import { showSplash } from './helpers/splash.js';
 import { installFatalHandlers } from './helpers/error-handler.js';
@@ -151,6 +152,7 @@ export function buildProgram(): Command {
   registerMcp(program);
   registerResources(program);
   registerUsage(program);
+  registerKpi(program);
   registerImage(program);
   registerHelp(program);
 

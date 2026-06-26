@@ -20,7 +20,7 @@ import {
   type ModelPricing,
   type BillingMode,
 } from './cost-config-loader.js';
-import { modelRegistry } from './model-registry.js';
+import { modelRegistry, ModelRegistry } from './model-registry.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -121,9 +121,14 @@ export interface EstimateOptions {
 
 // ─── Defaults (CAN be overridden by config in future) ──────────────────────
 
-const DEFAULT_CACHE_HIT_RATIO = 0.70;
 const DEFAULT_RETRY_MULTIPLIER = 1.20;
-const DEFAULT_CACHEABLE_CONTEXT = 8000; // system + ADR + agent boilerplate
+
+// NOTE (Spec Pillar 5 / F1-TOK): the old fabricated cache-hit-ratio and
+// cacheable-context hardcodes were removed. They invented a hit ratio and a
+// cacheable-context size that were never measured, which systematically
+// mis-estimated $-cost. The hit-ratio is now MEASURED from real `cached_tokens`
+// (see calculateRegimeCost); at estimate time, an unmeasured ratio/context
+// defaults to zero (assume no caching) rather than an invented number.
 
 /** Output token estimates by effort (rough heuristic, calibrate over time). */
 const EFFORT_OUTPUT_DEFAULTS: Record<'low' | 'normal' | 'high', number> = {
@@ -189,6 +194,180 @@ export function resolveBillingModeForAuth(
   if (effectiveAuthMode === 'subscription') return 'subscription';
   if (effectiveAuthMode === 'api') return 'api';
   return undefined;
+}
+
+// ─── Regime-Aware Cost (Spec Pillar 5) ─────────────────────────────────────
+//
+// Cost economics differ by *billing regime*, not just by provider:
+//  - subscription/limit → a weekly-limit BURN unit (price-weighted), where
+//    cacheRead is effectively free (zero weight) and cacheWrite dominates at a
+//    1.25×input premium. This is NOT money owed — it is the $-equivalent draw on
+//    the plan's weekly limit (F1-TOK ground truth:
+//    `in·$in + out·$out + cacheWrite·1.25·$in`).
+//  - api ($-per-token) → standard metered USD; cacheRead discounted, cacheWrite a
+//    premium. Per-model in/out price comes from the model-registry; the cache
+//    hit-ratio is MEASURED from real `cached_tokens`, never assumed.
+//  - local → $0.
+//
+// This is ADDITIVE: the legacy estimate/actual paths (estimateSprintCost,
+// calculateActualCost) are untouched. New callers opt into regime economics here.
+
+/** Billing regime that governs how a run's tokens translate to cost. */
+export type CostRegime = 'subscription' | 'api' | 'local';
+
+/** Spec-formula cache weights (these are real archetype weights, not the removed fabricated defaults). */
+const CACHE_WRITE_PREMIUM = 1.25; // cacheWrite priced at 1.25×input (archetype B / limit-burn)
+const CACHE_READ_DISCOUNT = 0.10; // api fallback when config has no cacheRead price (≈0.1×input)
+
+/** Real token usage for a regime-priced run (cache fields optional). */
+export interface RegimeCostUsage {
+  inputTokens: number;
+  outputTokens: number;
+  /** Measured cache-read (hit) tokens — FREE in subscription, discounted in api. */
+  cacheReadTokens?: number;
+  /** Measured cache-creation (write) tokens — the 1.25×input premium driver. */
+  cacheCreationTokens?: number;
+}
+
+export interface RegimeCostResult {
+  regime: CostRegime;
+  /**
+   * subscription → $-equivalent weekly-LIMIT burn unit (cacheRead excluded; a quota
+   * measure, not money owed). api → metered USD. local → 0.
+   */
+  value: number;
+  currency: 'USD';
+  /** True only for subscription: `value` is a limit-burn $-equivalent, not a charge. */
+  isLimitBurn: boolean;
+  /** Price provenance — `registry:<model>`, `cost-config:<provider>/<model>`, `local`, or `unknown-model:<m>`. */
+  pricingSource: string;
+  /**
+   * Cache-read share of all input-side tokens, MEASURED from the real counts
+   * (`cacheRead / (input + cacheRead + cacheWrite)`); never an assumed constant.
+   * `null` when there is no input-side activity to measure.
+   */
+  measuredHitRatio: number | null;
+}
+
+/**
+ * Map a {@link BillingMode} to its {@link CostRegime}. `free_tier` collapses to
+ * `local` for cost purposes (both are $0 with no metered per-token charge).
+ */
+export function billingModeToRegime(mode: BillingMode): CostRegime {
+  switch (mode) {
+    case 'subscription':
+      return 'subscription';
+    case 'local':
+    case 'free_tier':
+      return 'local';
+    case 'api':
+    default:
+      return 'api';
+  }
+}
+
+/**
+ * Resolve per-token input/output price for a model, registry-first (Spec Pillar 5:
+ * "per-model prices come from the registry"), falling back to the cost-config.
+ * Also returns the config pricing (when found) so the api regime can read real
+ * per-model cache prices. Returns `null` when the model is unknown to both.
+ */
+function resolveInOutPricePerToken(
+  model: string,
+  config: CostConfig,
+  registry: ModelRegistry,
+): { input: number; output: number; source: string; configPricing: ModelPricing | null } | null {
+  const def = registry.get(model);
+  const found = findModel(config, model);
+  if (def) {
+    return {
+      input: def.costPerMillion.input / 1_000_000,
+      output: def.costPerMillion.output / 1_000_000,
+      source: `registry:${model}`,
+      configPricing: found?.pricing ?? null,
+    };
+  }
+  if (found) {
+    return {
+      input: found.pricing.input_cost_per_token,
+      output: found.pricing.output_cost_per_token,
+      source: `cost-config:${found.provider}/${found.modelId}`,
+      configPricing: found.pricing,
+    };
+  }
+  return null;
+}
+
+/**
+ * Compute the regime-aware cost of a run from its REAL token usage (Spec Pillar 5).
+ * Pure arithmetic; `config` and `registry` are injected (no disk/global I/O) so the
+ * function stays hermetic and testable.
+ *
+ *  - `local`            → `{ value: 0, pricingSource: 'local' }` regardless of tokens.
+ *  - unknown model      → `{ value: 0, pricingSource: 'unknown-model:<m>' }` (never silently priced).
+ *  - `subscription`     → limit-burn `in·$in + out·$out + cacheWrite·1.25·$in`; cacheRead EXCLUDED
+ *                         (zero weight); `isLimitBurn: true`.
+ *  - `api`              → `in·$in + out·$out + cacheRead·$cacheRead + cacheWrite·$cacheWrite`, with
+ *                         in/out from the registry and cache prices from config (or archetype-B
+ *                         defaults: cacheWrite = 1.25×in, cacheRead = 0.10×in).
+ *
+ * `measuredHitRatio` is always derived from the supplied counts — the hit-ratio is
+ * measured, never assumed.
+ */
+export function calculateRegimeCost(
+  usage: RegimeCostUsage,
+  model: string,
+  regime: CostRegime,
+  config: CostConfig,
+  registry: ModelRegistry = modelRegistry,
+): RegimeCostResult {
+  const input = Math.max(0, usage.inputTokens || 0);
+  const output = Math.max(0, usage.outputTokens || 0);
+  const cacheRead = Math.max(0, usage.cacheReadTokens ?? 0);
+  const cacheWrite = Math.max(0, usage.cacheCreationTokens ?? 0);
+
+  // Measured (never assumed) cache-read share of every input-side token.
+  const inputSide = input + cacheRead + cacheWrite;
+  const measuredHitRatio = inputSide > 0 ? cacheRead / inputSide : null;
+
+  if (regime === 'local') {
+    return { regime, value: 0, currency: 'USD', isLimitBurn: false, pricingSource: 'local', measuredHitRatio };
+  }
+
+  const price = resolveInOutPricePerToken(model, config, registry);
+  if (!price) {
+    return {
+      regime,
+      value: 0,
+      currency: 'USD',
+      isLimitBurn: false,
+      pricingSource: `unknown-model:${model}`,
+      measuredHitRatio,
+    };
+  }
+  const { input: inUsd, output: outUsd, source, configPricing } = price;
+
+  if (regime === 'subscription') {
+    // Weekly-limit burn unit (F1-TOK): cacheRead is FREE (zero weight); cacheWrite is
+    // a 1.25×input premium and dominates the burn.
+    const value =
+      safeCost(input, inUsd, `${model}.input`) +
+      safeCost(output, outUsd, `${model}.output`) +
+      safeCost(cacheWrite, inUsd * CACHE_WRITE_PREMIUM, `${model}.cacheWrite`);
+    return { regime, value, currency: 'USD', isLimitBurn: true, pricingSource: source, measuredHitRatio };
+  }
+
+  // regime === 'api' — standard metered economics. Cache prices come from the
+  // per-model cost-config when present; otherwise fall back to archetype-B weights
+  // relative to the (registry-sourced) input price.
+  const cacheReadUsd = configPricing?.cache_read_input_token_cost ?? inUsd * CACHE_READ_DISCOUNT;
+  const cacheWriteUsd = configPricing?.cache_creation_input_token_cost ?? inUsd * CACHE_WRITE_PREMIUM;
+  const value =
+    safeCost(input, inUsd, `${model}.input`) +
+    safeCost(output, outUsd, `${model}.output`) +
+    safeCost(cacheRead, cacheReadUsd, `${model}.cacheRead`) +
+    safeCost(cacheWrite, cacheWriteUsd, `${model}.cacheWrite`);
+  return { regime, value, currency: 'USD', isLimitBurn: false, pricingSource: source, measuredHitRatio };
 }
 
 // ─── Actual Cost (post-run, from real token usage) ─────────────────────────
@@ -389,15 +568,18 @@ export function estimateSprintCost(
   config: CostConfig,
   options: EstimateOptions = {},
 ): SprintCostEstimate {
+  // Hit-ratio / cacheable-context are MEASURED, not assumed (Spec Pillar 5 / F1-TOK).
+  // When neither the caller nor historical stats supplies one, default to 0 — i.e.
+  // assume no caching rather than fabricate a ratio/size (the removed cache-default fiction).
   const cacheHitRatio =
     options.cacheHitRatio ??
     options.historicalStats?.avgCacheHitRatio ??
-    DEFAULT_CACHE_HIT_RATIO;
+    0;
   const retryMultiplier =
     options.retryMultiplier ??
     options.historicalStats?.avgRetryMultiplier ??
     DEFAULT_RETRY_MULTIPLIER;
-  const cacheableContextTokens = options.cacheableContextTokens ?? DEFAULT_CACHEABLE_CONTEXT;
+  const cacheableContextTokens = options.cacheableContextTokens ?? 0;
 
   const opts = { cacheHitRatio, retryMultiplier, cacheableContextTokens };
 

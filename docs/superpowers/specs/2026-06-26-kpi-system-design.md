@@ -198,9 +198,34 @@ kpi_results(                          -- computed KPI snapshot (fast trend; idem
 
 ## 13. Rollout phases + feedback-driven evolution
 
-- **Phase 1 (dogfood, available-data):** collection API + store + rollup + evaluator + 8/10 available KPIs (universal+dogfood) + CLI/retro + single-tenant. *deckent lives its own KPIs.*
-- **Phase 2 (instrumentation):** `tool_calls` + PR/ADR/bug linkage emitters → remaining 2 KPIs + cost/bug + cost/ADR; dashboard + API + MCP + Telegram.
-- **Phase 3 (enterprise):** full multi-tenant (security-context, RBAC, SLA, billing) + custom-KPI self-serve (config + dashboard editor) + SLO/error-budget.
+- **Phase 1 (dogfood, available-data) — ✅ IMPLEMENTED (Sprint 330):**
+  collection API (typed Measurement, derives 8 base measures from sprint/task data) +
+  KpiStore (better-sqlite3: `kpi_measurements`, `kpi_rollups`, `kpi_results`, tenant-filtered) +
+  rollup-engine (sprint-finalizer hook, incremental+idempotent) +
+  sandboxed formula-evaluator (SSOT — whitelist DSL, div-by-zero→null, multi-tenant safe) +
+  8/10 available KPIs (4 universal: cost/sprint, token/task, cache-hit, cost/KLoC;
+  4 dogfood: avg-retry, no-go-rate, avg-worker-cycle, cost/ADR-proxy) +
+  `deckent kpi` CLI (`--tier --tenant --since/--until --json`) +
+  retro "KPI Scorecard" section (value, Δ-prev, status) +
+  single-tenant baseline (tenant_id column present; multi-tenant RBAC deferred to Phase 3).
+  *deckent dogfoods its own KPIs starting this sprint.*
+
+- **Phase 2 (instrumentation) — 🔜 OPEN follow-up:**
+  `tool_calls` counter emitter → Avg Tool Call KPI unlocked;
+  PR/ADR/bug linkage emitters (`git` + memory.db type=adr + TaskType=bug DONE) → Output/Accepted PR + Cost/Bug Fixed unlocked;
+  dashboard KPI card (value, sparkline, target line, status color) + trend page;
+  `/api/kpi/definitions`, `/api/kpi/values`, `/api/kpi/trend` REST endpoints (RBAC-gated);
+  `deckent_kpi` MCP tool (agent self-reads own KPIs → self-optimization);
+  Telegram sprint-end KPI summary + threshold-breach advisory.
+
+- **Phase 3 (enterprise) — 🔜 OPEN follow-up:**
+  Full multi-tenant (security-context `KpiSecurityContext{tenant_id,role}`, RBAC `kpi:read/write/admin`,
+  per-tenant rollup isolation, cross-tenant leak test at million-tenant scale);
+  custom-KPI self-serve (config + dashboard editor, zod-validated, per-tenant scope);
+  SLA as special KPI class (target + breach-duration tracking, `/api/enterprise/sla`);
+  per-tenant cost rollup → billing basis (`/api/enterprise/billing`);
+  SLO/error-budget (extend threshold to budget-burn; schema field already reserved).
+
 - **Continuous:** retro's existing "config suggestions" mechanism **suggests KPIs** (chronically-breached target, signal-bearing new KPI) → user accept/reject (nervous pattern). This is the engine of "evolves with use + feedback."
 
 ## 14. Open questions / future

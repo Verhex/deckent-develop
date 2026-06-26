@@ -1,6 +1,6 @@
 # Design — Worker Prompt Compiler & Provider-Agnostic Cache Architecture
 
-> **Date:** 2026-06-26 · **Status:** design-ready (brainstorm-approved).
+> **Date:** 2026-06-26 · **Status:** design-landed (sprint 330, brainstorm-approved) · **Implementation:** queued (DIRECTIVES Tasks 12–22, not yet started).
 > **One-line:** Treat the worker prompt as a **deterministic, provider-neutral, tiered byte-stable
 > artifact** (not an LLM "compiler"), and put **all cache behaviour behind a provider-adapter layer
 > of 5 archetypes** fed by a **swappable catalog-source** — so the same prompt logic + cache economics
@@ -233,3 +233,27 @@ hit-field → `cost-calculator` (regime-aware, registry-priced, measured ratio) 
 Each phase is independently shippable; 1→2 (registry feeds cost), 4 underpins 3's cache hits, 5 depends
 on the ADR-operative-state schema. Pairs with the Worker Output Contract spec (token/cost capture is the
 shared consumer of Pillar 3+5).
+
+---
+
+## Status (implemented)
+
+**Design:** ✅ LANDED — sprint 330 · 2026-06-26. Brainstorm-approved, DIRECTIVES Tasks 12–22 queued for implementation.
+
+| Pillar | Description | Implementation state |
+|--------|-------------|----------------------|
+| **Pillar 1** — Prompt builder hardening (T0/T1/T2 tiers, protected-set) | Design complete | ⬜ Not started (Task 19) |
+| **Pillar 2** — Tiered cache-prefix segmentation | Design complete | ⬜ Not started (Task 19) |
+| **Pillar 3** — ProviderCacheAdapter (5 archetypes) | Design complete | ⬜ Not started (Tasks 15, 17, 18) |
+| **Pillar 4** — Catalog-source layer (LocalStatic / ModelsDev / OpenRouter / Custom) | Design complete | ⬜ Not started (Tasks 12–14) |
+| **Pillar 5** — Cost model: two regimes, real economics | Design complete | ⬜ Not started (Task 16) |
+| **Pillar 6** — Protected-set & determinism guarantees | Design complete | ⬜ Not started (Tasks 19–20) |
+| **Agentic-path parity** | Design complete | ⬜ Not started (Task 21) |
+
+**Open follow-ups (no over-claim — none of the below are implemented):**
+
+- ⬜ **Native-API worker path** (Pillar 3-B `B·EXPLICIT-MARKER`) — `cache_read_input_tokens` measurability requires the native Anthropic SDK path, not the CLI spawn path. The CLI spawn (`tmux.ts:119` `claude -p -`) never captures this field; real cross-worker cache sharing with a measurable hit-ratio is only verifiable on the native-API path. Blocked by F2-008 (native SDK round-trip, §14.C).
+- ⬜ **Per-provider adapter expansion** — only Claude / Codex / Gemini / Ollama adapters exist today (`providers/`). Full fleet (DeepSeek · Qwen · Kimi · Gemini-explicit · xAI · Mistral · GLM · Groq · Together · Fireworks · OpenRouter · vLLM · llama.cpp) requires new `ProviderCacheAdapter` per archetype. Each adapter implementation should re-verify provider docs before coding (cache facts drift).
+- ⬜ **UNCONFIRMED provider numbers** — xAI/Together discount rates, certain TTL/min-token values, and Kimi storage pricing in the §Pillar 3 archetype table are marked UNCONFIRMED (sourced 2026-06-26). Do NOT treat these as authoritative until re-verified against each provider's current documentation.
+- ⬜ **ADR operative-state schema** (Pillar 6 prerequisite) — `enforcement_level: 'soft'|'hard'`, `exceptions`, `flag_gating` structured fields are not yet added to the ADR record in `memory-store`. Required before `prompt-protected-set.test.ts` can be written and before the Auditor can stop issuing false NO_GOs on residual/soft ADR violations.
+- ⬜ **Cost-calculator rewrite** — `DEFAULT_CACHE_HIT_RATIO=0.70` and `DEFAULT_CACHEABLE_CONTEXT=8000` hardcodes at `cost-calculator.ts:124/126` are still live. Regime-aware, registry-fed rewrite deferred to Task 16.

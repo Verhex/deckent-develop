@@ -67,6 +67,11 @@ import {
 // ─── Result Collector ─────────────────────────────────────────────
 import { buildResultsMap } from './result-collector.js';
 
+// ─── KPI Collection (Sprint 330 Task 8 — non-blocking finalize hook) ──
+// orchestra → core import: ADR-008 allowed direction (core never imports orchestra).
+import { recordKpiMeasurements } from '../core/kpi/collection.js';
+import type { UsageTotals } from '../core/kpi/collection.js';
+
 // ─── Debt Manager ─────────────────────────────────────────────────
 import { runDecay, auditBrainBudget } from './debt-manager.js';
 import { runDocTrackingSync } from '../core/doc-tracking/sync.js';
@@ -592,6 +597,50 @@ export async function maybeRunDocTrackingSync(
 }
 
 
+// ═══ KPI Usage Totals (Sprint 330 Task 8) ════════════════════════
+
+// Opus-tier public per-token prices (USD). Phase-1 estimate only.
+const OPUS_PRICE_INPUT_USD = 5e-6;
+const OPUS_PRICE_OUTPUT_USD = 25e-6;
+const OPUS_PRICE_CACHE_READ_USD = 0.5e-6;
+
+/**
+ * Aggregate per-task `tokenUsage` across a sprint's results into the
+ * provider-agnostic {@link UsageTotals} consumed by the KPI collection pipeline.
+ *
+ * Cost is a Phase-1 ESTIMATE: token counts × Opus-tier public list price. This is
+ * deliberately a single-tier approximation — results carry no per-task model/provider
+ * split at this layer, and the public Opus rate is the conservative upper bound for a
+ * Claude-default fleet.
+ *
+ * Pure + total: results without `tokenUsage` contribute 0 (so a sprint with no usage
+ * telemetry yields all-zero totals, never a crash), and the function never throws.
+ *
+ * TODO(phase2): replace the public-tier estimate with limit-ledger ground-truth cost
+ * (real provider-reported spend) once the per-task ledger is wired through finalize.
+ */
+export function buildUsageTotals(results: readonly TaskResult[]): UsageTotals {
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let cacheRead = 0;
+
+  for (const result of results) {
+    const usage = result.tokenUsage;
+    if (!usage) continue;
+    inputTokens += usage.inputTokens ?? 0;
+    outputTokens += usage.outputTokens ?? 0;
+    cacheRead += usage.cacheReadTokens ?? 0;
+  }
+
+  const costUsd =
+    inputTokens * OPUS_PRICE_INPUT_USD +
+    outputTokens * OPUS_PRICE_OUTPUT_USD +
+    cacheRead * OPUS_PRICE_CACHE_READ_USD;
+
+  return { costUsd, inputTokens, outputTokens, cacheRead };
+}
+
+
 // ═══ Finalize Sprint ══════════════════════════════════════════════
 
 /**
@@ -691,6 +740,29 @@ export async function finalizeSprint(
   const freshDebt = getDebtItems(projectRoot);
   const metrics = calculateMetrics(sprint, evaluations, results, freshDebt);
   sprint.metrics = metrics;
+
+  // ─── KPI collection hook (Sprint 330 Task 8) — NON-BLOCKING ──────
+  // Record the sprint's 11 base KPI measurements into memory.db. This is a
+  // best-effort telemetry sidecar: any failure (DB locked, missing, compute
+  // error) is swallowed via debugLog so it can NEVER block or fail finalize.
+  // Existing finalize behavior is preserved byte-for-byte. SprintMetrics →
+  // SprintMetricsLike field mapping is explicit (totalTasks→tasksTotal, etc.);
+  // tenant is the Phase-1 'default'.
+  try {
+    recordKpiMeasurements(
+      join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE),
+      sprint.id,
+      'default',
+      {
+        tasksTotal: metrics.totalTasks,
+        tasksDone: metrics.completedTasks,
+        noGo: metrics.noGoTasks,
+        boundaryViolations: metrics.boundaryViolations,
+      },
+      results,
+      buildUsageTotals(results),
+    );
+  } catch (e) { debugLog('finalizeSprint:kpiCollection', e); }
 
   // ─── METRIC_EMITTED: sprint summary metrics ──────────────────────
   // Emitted in parallel with metrics.jsonl so Auditor and Dashboard

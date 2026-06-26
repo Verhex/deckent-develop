@@ -11,6 +11,10 @@ import {
 } from '../core/constants.js';
 import { MemoryStore } from '../core/memory-store.js';
 import { debugLog } from '../core/utils.js';
+// Sprint 330 Task 10 — KPI Scorecard retro section (orchestra → core import;
+// ADR-008 allowed direction: core never imports orchestra).
+import { KpiService } from '../core/kpi/kpi-service.js';
+import { renderScorecardMarkdown } from '../core/kpi/scorecard.js';
 import { assessQuality } from './quality-assessor.js';
 import {
   formatDuration,
@@ -198,6 +202,9 @@ export interface HumanRetroData {
   debt?: DebtItem[];
   /** Sprint 212 Task 7: visible evolution per sprint (skill mutations, genealogy, retirement). */
   behaviorChanges?: BehaviorChange[];
+  /** Sprint 330 Task 10: pre-rendered "KPI Scorecard" markdown (empty string when no KPI data).
+   *  Computed by the caller (writeRetrospective) so this renderer stays pure / string-injected. */
+  scorecardMarkdown?: string;
 }
 
 /**
@@ -292,6 +299,14 @@ export function formatHumanRetro(data: HumanRetroData): string {
   const tokenLines = buildTokenUsageSection(results);
   if (tokenLines.length > 0) {
     lines.push(...tokenLines);
+    lines.push('');
+  }
+
+  // ─── KPI Scorecard (Sprint 330 Task 10) ───────────────────────
+  // Pre-rendered by the caller (writeRetrospective) via KpiService +
+  // renderScorecardMarkdown. Empty string when no KPI data → section omitted.
+  if (data.scorecardMarkdown && data.scorecardMarkdown.trim().length > 0) {
+    lines.push(data.scorecardMarkdown);
     lines.push('');
   }
 
@@ -709,6 +724,25 @@ export function writeRetrospective(
   // file is absent (e.g. first sprint, or test envs without routing wired).
   const behaviorChanges = loadBehaviorChangesFromOutcomes(projectRoot, sprint.id);
 
+  // Sprint 330 Task 10: render this sprint's KPI Scorecard from memory.db.
+  // NON-BLOCKING — any KPI subsystem error is logged and swallowed so the retro
+  // is never failed by it (spec §11 no-silent-debt). Reads the same `.brain/
+  // memory.db` the finalize KPI hook (Task 8) writes to.
+  let scorecardMarkdown = '';
+  if (existsSync(dbPath)) {
+    try {
+      const kpiSvc = new KpiService(dbPath);
+      try {
+        const views = kpiSvc.listSprintViews(sprint.id);
+        scorecardMarkdown = renderScorecardMarkdown(sprint.id, views, 'en');
+      } finally {
+        kpiSvc.close();
+      }
+    } catch (e) {
+      debugLog('writeRetrospective:kpiScorecard', e);
+    }
+  }
+
   // Generate human-friendly RETRO content
   const retroContent = formatHumanRetro({
     sprint,
@@ -721,6 +755,7 @@ export function writeRetrospective(
     patterns,
     debt,
     behaviorChanges,
+    scorecardMarkdown,
   });
 
   // B8 (Memory V2): the legacy `.brain/RETRO.md` + `.brain/MEMORY.md` file

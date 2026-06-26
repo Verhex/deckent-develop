@@ -1492,6 +1492,32 @@ const MESSAGES: MessageMap = {
     tr: '⚠ Şu model(ler) için fiyat bulunamadı: {models} — yakımları $0 sayılıyor. `deckent config update-pricing` çalıştırın veya modeli .deckent/cost-config.json dosyasına ekleyin.',
   },
 
+  // ─── kpi command (Sprint 330 KPI Faz-1, Task 9) ──────────────────────
+  'kpi.title': {
+    en: 'KPI Scorecard — {sprint}',
+    tr: 'KPI Karnesi — {sprint}',
+  },
+  'kpi.header_kpi': {
+    en: 'KPI',
+    tr: 'KPI',
+  },
+  'kpi.header_value': {
+    en: 'Value',
+    tr: 'Değer',
+  },
+  'kpi.header_target': {
+    en: 'Target',
+    tr: 'Hedef',
+  },
+  'kpi.header_status': {
+    en: 'Status',
+    tr: 'Durum',
+  },
+  'kpi.no_data': {
+    en: 'No KPI data available for {sprint}.',
+    tr: '{sprint} için KPI verisi bulunamadı.',
+  },
+
   // ─── interrogation (Sprint 276 PLAN-INT-1) ───────────────────────────
   'interrogate.intro': {
     en: 'Directive Interrogation — challenging your plan before coding:',

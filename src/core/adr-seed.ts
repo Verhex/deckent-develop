@@ -9,6 +9,7 @@
  */
 
 import type { CreateEntryInput } from './memory-types.js';
+import { operativeMetadata } from './adr-operative-state.js';
 
 /** All ADRs from the original DECISIONS.md, ready for DB insert. */
 export const ADR_SEED_DATA: CreateEntryInput[] = [
@@ -99,6 +100,17 @@ export const ADR_SEED_DATA: CreateEntryInput[] = [
     status: 'accepted',
     decay_exempt: true,
     tags: ['architecture', 'adr'],
+    // Operative-state (Task 330-020): the core/→orchestra/ import-direction lint
+    // (authority-enforcer.ts, ADR-008 check) is advisory/soft per ADR-037 V1.0 —
+    // it warns + emits, it does not hard-block. Two sanctioned residuals must NOT
+    // be flagged as NO_GO.
+    metadata: operativeMetadata({
+      enforcementLevel: 'soft',
+      exceptions: [
+        'core/routing-engine.ts → orchestra/ecosystem-intelligence.js (residual, tracked as ADR-008-W)',
+        'provider CLI-spawn adapters wrapping tmux/spawn-backend (ADR-017 + ADR-027 sanctioned)',
+      ],
+    }),
   },
   {
     id: 'adr-009',
@@ -429,6 +441,17 @@ export const ADR_SEED_DATA: CreateEntryInput[] = [
     status: 'accepted',
     decay_exempt: true,
     tags: ['architecture', 'adr'],
+    // Operative-state (Task 330-020): scope.filesWrite RBAC is compile-time lint +
+    // audit-trail; runtime enforcement (Layer-2) is intentionally advisory/soft in
+    // V1.0 — a boundary violation is tracked via `git diff --stat` and warn/emit'd,
+    // it does NOT block. Hard-flip is post-GA V2. The residual carve-out below must
+    // NOT be flagged as NO_GO.
+    metadata: operativeMetadata({
+      enforcementLevel: 'soft',
+      exceptions: [
+        'runtime scope.filesWrite enforcement (Layer-2) advisory in V1.0 — Auditor warns/emits, does not block; hard-flip post-GA V2',
+      ],
+    }),
   },
   {
     id: 'adr-038',
