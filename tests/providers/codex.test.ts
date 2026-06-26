@@ -101,7 +101,9 @@ describe('CodexAdapter', () => {
       adapter.spawn('task-001', 'gpt-4.1', 'test prompt');
       expect(mockSpawn).toHaveBeenCalledWith(
         'codex',
-        ['exec', '--full-auto', 'test prompt', '--model', 'gpt-4.1'],
+        // CODEX_USAGE_EMIT_ARGS (`--json`) is appended so codex prints token_count
+        // events to stdout (provider-agnostic usage capture, Sprint 328 Class-A).
+        ['exec', '--full-auto', 'test prompt', '--model', 'gpt-4.1', '--json'],
         expect.any(Object),
       );
     });

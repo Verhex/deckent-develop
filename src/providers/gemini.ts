@@ -19,6 +19,7 @@ import { TASKS_DIR } from '../core/constants.js';
 import type { ModelTier } from '../core/model-equivalence.js';
 import { getModelForProviderTier } from '../core/model-equivalence.js';
 import { modelRegistry } from '../core/model-registry.js';
+import { normalizeUsage, type TokenUsage } from '../core/token-usage.js';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -740,6 +741,58 @@ export class GeminiAdapter implements ProviderAdapter {
     const parsed = parseGeminiOutput(raw);
     return parsed.response || raw;
   }
+
+  // ─── extractUsage() ────────────────────────────────────────────────
+
+  /**
+   * Extract real token usage from Gemini CLI stdout (capture, not re-count).
+   *
+   * `gemini -p … --output-format json` (see {@link buildArgs}) emits a usage
+   * envelope on every run. Two native shapes are handled:
+   *   - JSON: a single object `{ response, candidates, usageMetadata:{…} }`.
+   *   - stream-json (NDJSON): newline-delimited chunks; the final chunk carries
+   *     the cumulative `usageMetadata`.
+   *
+   * Gemini's `usageMetadata` is normalized to the provider-agnostic
+   * {@link TokenUsage} (Provider matrix, token-usage.ts):
+   *   - `promptTokenCount`        → `inputTokens`
+   *   - `candidatesTokenCount`    → `outputTokens`
+   *   - `cachedContentTokenCount` → `cacheReadTokens`
+   *   - `thoughtsTokenCount`      → `reasoningTokens`  (reasoning = thoughts; sparse)
+   *   - `totalTokenCount`         → `totalTokens`      (Gemini total is additive and
+   *      already includes thoughts, so it is passed through for accurate accounting
+   *      rather than recomputed as input+output)
+   *
+   * Collects every parseable payload (whole string + each NDJSON line); the LAST
+   * recognizable usage wins (the final stream chunk holds the cumulative totals).
+   * Returns null when `rawOutput` carries no usage — the orchestrator then falls
+   * back to external tokenizer counting (`source: 'tokenizer-fallback'`).
+   */
+  extractUsage(rawOutput: string): TokenUsage | null {
+    if (typeof rawOutput !== 'string') return null;
+    const trimmed = rawOutput.trim();
+    if (trimmed.length === 0) return null;
+
+    // Collect every parseable JSON payload: the whole string (single, possibly
+    // pretty-printed object) plus each JSON line (NDJSON stream). A one-line
+    // object is simply seen twice — harmless, last-wins is idempotent.
+    const candidates: unknown[] = [];
+    const whole = tryParseJson(trimmed);
+    if (whole !== undefined) candidates.push(whole);
+    for (const line of rawOutput.split(/\r?\n/)) {
+      const t = line.trim();
+      if (t.length < 2 || (t[0] !== '{' && t[0] !== '[')) continue;
+      const parsed = tryParseJson(t);
+      if (parsed !== undefined) candidates.push(parsed);
+    }
+
+    let found: TokenUsage | null = null;
+    for (const candidate of candidates) {
+      const usage = extractGeminiUsageFromPayload(candidate);
+      if (usage) found = usage; // cumulative totals — last recognizable usage wins
+    }
+    return found;
+  }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -748,6 +801,62 @@ function ensureDir(dir: string): void {
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
+}
+
+// ─── Token-usage parsing helpers ──────────────────────────────────────
+
+/** Parse JSON, returning `undefined` (never throwing) on malformed input. */
+function tryParseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Narrow to a plain object (not null, not array). */
+function asObject(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+/** Read a non-negative finite number from an object key, else undefined. */
+function readNum(obj: Record<string, unknown> | undefined, key: string): number | undefined {
+  if (!obj) return undefined;
+  const v = obj[key];
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined;
+}
+
+/**
+ * Pull a {@link TokenUsage} out of one candidate JSON payload, recognizing the
+ * Gemini `usageMetadata` envelope (also accepted nested under `response.usageMetadata`
+ * for callers that pass the full CLI object). Returns null when the payload carries
+ * no recognizable prompt/candidates token numbers (an empty `usageMetadata: {}` → null).
+ */
+function extractGeminiUsageFromPayload(payload: unknown): TokenUsage | null {
+  const obj = asObject(payload);
+  if (!obj) return null;
+
+  const usage = asObject(obj['usageMetadata']) ?? asObject(asObject(obj['response'])?.['usageMetadata']);
+  if (!usage) return null;
+
+  const promptTokens = readNum(usage, 'promptTokenCount');
+  const candidatesTokens = readNum(usage, 'candidatesTokenCount');
+  // Require at least one real input/output count — an empty usageMetadata is not usage.
+  if (promptTokens === undefined && candidatesTokens === undefined) return null;
+
+  const reasoningTokens = readNum(usage, 'thoughtsTokenCount');
+  const totalTokens = readNum(usage, 'totalTokenCount');
+
+  return normalizeUsage({
+    inputTokens: promptTokens ?? 0,
+    outputTokens: candidatesTokens ?? 0,
+    cacheReadTokens: readNum(usage, 'cachedContentTokenCount') ?? 0,
+    // Sparse fields — only present when Gemini reported them (reasoning = thoughts).
+    ...(reasoningTokens !== undefined ? { reasoningTokens } : {}),
+    ...(totalTokens !== undefined ? { totalTokens } : {}),
+  });
 }
 
 // ─── Factory ─────────────────────────────────────────────────────────

@@ -18,6 +18,7 @@ import type {
   ProviderAvailabilityDetail,
 } from '../core/provider.js';
 import { ProviderError } from '../core/provider.js';
+import { normalizeUsage, type TokenUsage } from '../core/token-usage.js';
 
 // ─── Wire types (OpenAI /chat/completions) ───────────────────────────
 
@@ -202,6 +203,59 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
     return `# ${this.name} HTTP adapter — POST ${this.baseURL}/chat/completions (model=${String(model)})`;
   }
 
+  // ─── extractUsage() ────────────────────────────────────────────────
+
+  /**
+   * Extract real token usage from an OpenAI-compatible `/chat/completions`
+   * response body (capture, not re-count — the numbers already exist in the
+   * response, zero added latency). This single seam covers the entire
+   * Class-C gateway matrix AND OpenAI-shape Class-B APIs — OpenRouter,
+   * LiteLLM-proxy, vLLM, DeepSeek, Qwen all return the same normalized
+   * `usage` object, so no provider is special-cased (Law #2, full matrix):
+   *
+   *   `usage: { prompt_tokens, completion_tokens, total_tokens,
+   *             prompt_tokens_details: { cached_tokens },
+   *             completion_tokens_details: { reasoning_tokens } }`
+   *
+   * Maps to the rich normalized schema: `prompt_tokens` → inputTokens,
+   * `completion_tokens` → outputTokens (reasoning is a breakdown of it, not
+   * additive — AI-SDK parity), `prompt_tokens_details.cached_tokens` →
+   * cacheReadTokens, `completion_tokens_details.reasoning_tokens` →
+   * reasoningTokens, `total_tokens` → provider-authoritative totalTokens.
+   *
+   * `rawOutput` is the response body string; a streamed gateway (SSE/NDJSON,
+   * `stream: true` with usage in the final chunk) is also handled — every
+   * parseable JSON line is scanned and the LAST recognizable usage wins.
+   * Returns null when no usage is present (empty `usage: {}` included) — the
+   * orchestrator then falls back to external tokenizer counting.
+   */
+  extractUsage(rawOutput: string): TokenUsage | null {
+    if (typeof rawOutput !== 'string') return null;
+    const trimmed = rawOutput.trim();
+    if (trimmed.length === 0) return null;
+
+    // The non-streaming response is a single JSON object; a streamed gateway
+    // emits NDJSON/SSE lines with usage in the final chunk. Collect the whole
+    // string plus every JSON line — a one-line object is seen twice, harmless
+    // (last-wins is idempotent), and the streamed final-chunk usage is caught.
+    const candidates: unknown[] = [];
+    const whole = tryParseJson(trimmed);
+    if (whole !== undefined) candidates.push(whole);
+    for (const line of rawOutput.split(/\r?\n/)) {
+      const t = stripSseDataPrefix(line.trim());
+      if (t.length < 2 || (t[0] !== '{' && t[0] !== '[')) continue;
+      const parsed = tryParseJson(t);
+      if (parsed !== undefined) candidates.push(parsed);
+    }
+
+    let found: TokenUsage | null = null;
+    for (const candidate of candidates) {
+      const usage = extractOpenAIUsage(candidate);
+      if (usage) found = usage; // streamed cumulative usage — last recognizable wins
+    }
+    return found;
+  }
+
   // ─── Internal helpers ──────────────────────────────────────────────
 
   private isSupportedModel(model: string): boolean {
@@ -215,6 +269,78 @@ async function safeText(res: Response): Promise<string> {
   } catch {
     return '';
   }
+}
+
+// ─── Token-usage parsing helpers (extractUsage) ───────────────────────
+
+/**
+ * Pull a normalized {@link TokenUsage} out of one parsed `/chat/completions`
+ * payload. Recognizes the OpenAI-standard `usage` object shared by every
+ * Class-C gateway and OpenAI-shape API (OpenRouter/LiteLLM/vLLM/DeepSeek/Qwen).
+ * Returns null when the payload carries no recognizable token numbers.
+ */
+function extractOpenAIUsage(payload: unknown): TokenUsage | null {
+  const obj = asObject(payload);
+  if (!obj) return null;
+  const usage = asObject(obj['usage']);
+  if (!usage) return null;
+
+  const promptTokens = readNum(usage, 'prompt_tokens') ?? readNum(usage, 'input_tokens');
+  const completionTokens = readNum(usage, 'completion_tokens') ?? readNum(usage, 'output_tokens');
+  // No real token numbers (e.g. an empty `usage: {}`) → nothing to capture.
+  if (promptTokens === undefined && completionTokens === undefined) return null;
+
+  // cache-read: OpenAI/OpenRouter standard `prompt_tokens_details.cached_tokens`;
+  // DeepSeek-direct `prompt_cache_hit_tokens`; legacy `cached_input_tokens`.
+  const cacheReadTokens =
+    readNum(asObject(usage['prompt_tokens_details']), 'cached_tokens') ??
+    readNum(usage, 'prompt_cache_hit_tokens') ??
+    readNum(usage, 'cached_input_tokens') ??
+    0;
+
+  // reasoning: OpenAI o1/o3 + OpenRouter `completion_tokens_details.reasoning_tokens`.
+  // It is a breakdown of completion_tokens (not additive) — surfaced as a detail.
+  const reasoningTokens = readNum(asObject(usage['completion_tokens_details']), 'reasoning_tokens');
+
+  // total: provider-reported `total_tokens` is authoritative; else the
+  // normalizer fills inputTokens + outputTokens.
+  const totalTokens = readNum(usage, 'total_tokens');
+
+  return normalizeUsage({
+    inputTokens: promptTokens ?? 0,
+    outputTokens: completionTokens ?? 0,
+    cacheReadTokens,
+    ...(reasoningTokens !== undefined ? { reasoningTokens } : {}),
+    ...(totalTokens !== undefined ? { totalTokens } : {}),
+  });
+}
+
+/** Parse JSON, returning `undefined` (never throwing) on malformed input. */
+function tryParseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Narrow to a plain object (not null, not array). */
+function asObject(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+/** Read a non-negative finite number from an object key, else undefined. */
+function readNum(obj: Record<string, unknown> | undefined, key: string): number | undefined {
+  if (!obj) return undefined;
+  const v = obj[key];
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined;
+}
+
+/** Strip a leading SSE `data:` field marker so streamed chunks parse as JSON. */
+function stripSseDataPrefix(line: string): string {
+  return line.startsWith('data:') ? line.slice(5).trim() : line;
 }
 
 // ─── Presets ─────────────────────────────────────────────────────────

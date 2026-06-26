@@ -47,6 +47,29 @@ export const CODEX_TIER_MODELS = {
   get economy() { return (getModelForProviderTier('codex', 'economy') ?? 'gpt-4.1-mini') as OpenAIModel; },
 };
 
+/**
+ * Worker Output Contract (Class-A, spec §Class-A) — args appended at SPAWN time so
+ * `codex exec` emits a per-run usage envelope on stdout as JSONL, captured into
+ * `.tasks/task-{id}.log`. The orchestrator's provider-agnostic
+ * `tryExtractUsageViaAdapter` then feeds that log to {@link CodexAdapter.extractUsage}
+ * to pull REAL token counts (the `token_count` event's `total_token_usage`) instead of
+ * defaulting to 0/0.
+ *
+ * `--json` = "Print events to stdout as JSONL" (verified present: `codex exec --help`,
+ * codex-cli 0.138.0). Mirrors the Claude path's `usageEmitArgs: ['--output-format','json']`
+ * (`subprocess.ts`) and Gemini's `--output-format json` (`gemini.ts`) — Law #2 provider
+ * parity. Kept OUT of {@link CodexAdapter.buildArgs} / {@link CodexAdapter.buildCommand}
+ * deliberately: the structured-output flag affects only the live spawn, never the
+ * unit-tested arg-shape nor the dry-run display string.
+ *
+ * The very same `token_count` events are persisted by codex to its native session store
+ * (`$CODEX_HOME/sessions/**\/*.jsonl`, tokscale pattern), so the stdout envelope and the
+ * session-store file share ONE shape — `extractUsage` parses either source identically,
+ * and a future session-store reader (for spawn paths that don't capture stdout) needs no
+ * new parser.
+ */
+export const CODEX_USAGE_EMIT_ARGS: readonly string[] = ['--json'];
+
 /** Auth modes supported by Codex CLI */
 export type CodexAuthMode = 'api_key' | 'subscription' | 'none';
 
@@ -122,6 +145,11 @@ export class CodexAdapter implements ProviderAdapter {
     const logFd = openSync(logPath, 'a');
 
     const args = this.buildArgs(model, prompt, opts);
+    // Worker Output Contract (Class-A): append the usage-emit flag at LIVE SPAWN only,
+    // so the worker log carries a parseable per-run usage envelope. Kept out of
+    // buildArgs so the dry-run / arg-shape contract (and its unit tests) stays unchanged.
+    // See {@link CODEX_USAGE_EMIT_ARGS}.
+    args.push(...CODEX_USAGE_EMIT_ARGS);
 
     // Build env — inject API key from DECKENT_OPENAI_API_KEY if available
     const spawnEnv = { ...process.env };
@@ -355,22 +383,28 @@ export class CodexAdapter implements ProviderAdapter {
   // ─── extractUsage() ────────────────────────────────────────────────
 
   /**
-   * Extract real token usage from Codex CLI stdout (capture, not re-count).
+   * Extract real token usage from Codex CLI output (capture, not re-count).
    *
-   * `codex exec` emits either a single JSON object or a newline-delimited JSON
-   * event stream (`--json`). Token usage appears in one of two native shapes:
+   * Spawned workers carry {@link CODEX_USAGE_EMIT_ARGS} (`--json`), so `codex exec`
+   * prints a newline-delimited JSON event stream to stdout (captured in the worker
+   * `.log`); the same events are persisted to codex's native session store
+   * (`$CODEX_HOME/sessions/**\/*.jsonl`). Either source feeds this parser identically.
+   * Token usage appears in one of two native shapes:
    *   (a) OpenAI Chat Completions usage (the shape openai-compatible.ts parses):
    *       `{ "usage": { "prompt_tokens", "completion_tokens", "total_tokens",
-   *                     "prompt_tokens_details": { "cached_tokens" } } }`
+   *                     "prompt_tokens_details": { "cached_tokens" },
+   *                     "completion_tokens_details": { "reasoning_tokens" } } }`
    *   (b) Codex token-count event (Rust CLI):
    *       `{ "type":"token_count", "info": { "total_token_usage": {
-   *            "input_tokens", "cached_input_tokens", "output_tokens", "total_tokens" } } }`
-   *       (also accepted nested under `msg.info`, top-level `total_token_usage`,
-   *       or with the counts placed directly on `info`).
+   *            "input_tokens", "cached_input_tokens", "output_tokens",
+   *            "reasoning_output_tokens", "total_tokens" } } }`
+   *       (also accepted nested under `msg.info`, top-level `total_token_usage`, the
+   *       per-turn `last_token_usage` as fallback, or counts placed directly on `info`).
    *
-   * Codex reports CUMULATIVE totals, so when several usage payloads appear the
-   * LAST recognizable one wins. Returns null when `rawOutput` carries no usage —
-   * the orchestrator then falls back to external tokenizer counting.
+   * `reasoning_*` tokens (folded into output by codex/OpenAI) are surfaced separately as
+   * `reasoningTokens`. Codex reports CUMULATIVE totals, so when several usage payloads
+   * appear the LAST recognizable one wins. Returns null when `rawOutput` carries no usage
+   * — the orchestrator then falls back to external tokenizer counting.
    */
   extractUsage(rawOutput: string): TokenUsage | null {
     if (typeof rawOutput !== 'string') return null;
@@ -573,6 +607,10 @@ function extractUsageFromPayload(payload: unknown): TokenUsage | null {
         readNum(asObject(usage['prompt_tokens_details']), 'cached_tokens') ??
         readNum(usage, 'cached_input_tokens') ??
         0;
+      // o1/o3 reasoning tokens (a subset of completion_tokens, surfaced as a detail).
+      const reasoning =
+        readNum(asObject(usage['completion_tokens_details']), 'reasoning_tokens') ??
+        readNum(usage, 'reasoning_tokens');
       return normalizeUsage({
         inputTokens: promptTokens ?? 0,
         outputTokens: completionTokens ?? 0,
@@ -580,19 +618,29 @@ function extractUsageFromPayload(payload: unknown): TokenUsage | null {
         ...(readNum(usage, 'total_tokens') !== undefined
           ? { totalTokens: readNum(usage, 'total_tokens') }
           : {}),
+        ...(reasoning !== undefined ? { reasoningTokens: reasoning } : {}),
       });
     }
   }
 
-  // (b) Codex token_count event — `total_token_usage` nested under info /
-  // msg.info / top-level, or the counts placed directly on `info`.
+  // (b) Codex token_count event — counts live in `total_token_usage` (cumulative,
+  // preferred) or `last_token_usage` (per-turn delta, fallback), nested under info /
+  // msg.info / top-level, or placed directly on `info`. `--json` emits these on stdout;
+  // the native session store (`$CODEX_HOME/sessions/**/*.jsonl`) persists the same shape.
   const info = asObject(obj['info']) ?? asObject(asObject(obj['msg'])?.['info']);
   const totals =
-    asObject(obj['total_token_usage']) ?? asObject(info?.['total_token_usage']) ?? info;
+    asObject(obj['total_token_usage']) ??
+    asObject(info?.['total_token_usage']) ??
+    asObject(obj['last_token_usage']) ??
+    asObject(info?.['last_token_usage']) ??
+    info;
   if (totals) {
     const input = readNum(totals, 'input_tokens') ?? readNum(totals, 'prompt_tokens');
     const output = readNum(totals, 'output_tokens') ?? readNum(totals, 'completion_tokens');
     if (input !== undefined || output !== undefined) {
+      // Codex reports reasoning as `reasoning_output_tokens` (folded into output_tokens).
+      const reasoning =
+        readNum(totals, 'reasoning_output_tokens') ?? readNum(totals, 'reasoning_tokens');
       return normalizeUsage({
         inputTokens: input ?? 0,
         outputTokens: output ?? 0,
@@ -600,6 +648,7 @@ function extractUsageFromPayload(payload: unknown): TokenUsage | null {
         ...(readNum(totals, 'total_tokens') !== undefined
           ? { totalTokens: readNum(totals, 'total_tokens') }
           : {}),
+        ...(reasoning !== undefined ? { reasoningTokens: reasoning } : {}),
       });
     }
   }

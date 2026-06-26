@@ -20,6 +20,7 @@ import {
   SubprocessSpawnBackend,
   CLAUDE_SUBPROCESS_CONFIG,
 } from './subprocess.js';
+import { normalizeUsage, type TokenUsage } from '../core/token-usage.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -417,6 +418,102 @@ export class ClaudeAdapter implements ProviderAdapter {
     }
     return raw;
   }
+
+  // ─── extractUsage() ────────────────────────────────────────────────
+
+  /**
+   * Extract REAL per-run token usage from Claude CLI `--output-format json`
+   * stdout (capture, not re-count) — the Worker Output Contract Class-A source.
+   *
+   * `CLAUDE_SUBPROCESS_CONFIG.usageEmitArgs` makes the worker emit the envelope
+   * into `.tasks/task-{id}.log`:
+   *   `{ type:"result", usage:{ input_tokens, output_tokens,
+   *      cache_read_input_tokens, cache_creation_input_tokens } }`
+   * (proof-of-function, Sprint 328: the agent tool-loop — and its `.result`
+   * write — is unaffected by json output; only stdout serialization changes).
+   *
+   * The worker log fd captures BOTH stdout and stderr, so the envelope may be
+   * preceded by other lines — we scan every parseable JSON payload (whole string
+   * + each line) and keep the last one carrying usage (a single envelope in
+   * practice; last-wins is idempotent — mirrors codex.extractUsage). Anthropic's
+   * native field names are mapped onto the provider-agnostic {@link TokenUsage}
+   * via {@link normalizeUsage}; `cache_creation_input_tokens` maps to BOTH
+   * `cacheCreationTokens` and `cacheWriteTokens` (the cross-provider cache-write
+   * name, per the token-usage.ts provider matrix).
+   *
+   * Returns `null` when no usage is present — the orchestrator then falls back to
+   * tokenizer estimation (`source: 'tokenizer-fallback'`).
+   */
+  extractUsage(rawOutput: string): TokenUsage | null {
+    if (typeof rawOutput !== 'string') return null;
+    const trimmed = rawOutput.trim();
+    if (trimmed.length === 0) return null;
+
+    // Collect every parseable JSON payload: the whole string (single envelope,
+    // possibly pretty-printed) plus each JSON-looking line (mixed stdout+stderr).
+    const candidates: unknown[] = [];
+    const whole = tryParseJson(trimmed);
+    if (whole !== undefined) candidates.push(whole);
+    for (const line of rawOutput.split(/\r?\n/)) {
+      const t = line.trim();
+      if (t.length < 2 || t[0] !== '{') continue;
+      const parsed = tryParseJson(t);
+      if (parsed !== undefined) candidates.push(parsed);
+    }
+
+    let found: TokenUsage | null = null;
+    for (const candidate of candidates) {
+      const usage = claudeUsageFromEnvelope(candidate);
+      if (usage) found = usage; // last recognizable usage wins
+    }
+    return found;
+  }
+}
+
+// ─── Token-usage parsing helpers ──────────────────────────────────────
+
+/** Parse JSON, returning `undefined` (never throwing) on malformed input. */
+function tryParseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Read a non-negative finite number from `obj[key]`, else undefined. */
+function readNonNegInt(obj: Record<string, unknown>, key: string): number | undefined {
+  const v = obj[key];
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined;
+}
+
+/**
+ * Pull a normalized {@link TokenUsage} out of one Claude CLI JSON envelope
+ * candidate, recognizing the `usage` object's Anthropic field names. Returns
+ * null when the payload carries no usage numbers (empty/absent `usage`).
+ */
+function claudeUsageFromEnvelope(payload: unknown): TokenUsage | null {
+  if (payload === null || typeof payload !== 'object') return null;
+  const usageRaw = (payload as { usage?: unknown }).usage;
+  if (usageRaw === null || typeof usageRaw !== 'object') return null;
+  const usage = usageRaw as Record<string, unknown>;
+
+  const inputTokens = readNonNegInt(usage, 'input_tokens');
+  const outputTokens = readNonNegInt(usage, 'output_tokens');
+  if (inputTokens === undefined && outputTokens === undefined) return null;
+
+  const cacheRead = readNonNegInt(usage, 'cache_read_input_tokens');
+  const cacheCreation = readNonNegInt(usage, 'cache_creation_input_tokens');
+
+  return normalizeUsage({
+    inputTokens: inputTokens ?? 0,
+    outputTokens: outputTokens ?? 0,
+    ...(cacheRead !== undefined ? { cacheReadTokens: cacheRead } : {}),
+    // Anthropic cache_creation = cross-provider cache-write (token-usage.ts matrix).
+    ...(cacheCreation !== undefined
+      ? { cacheCreationTokens: cacheCreation, cacheWriteTokens: cacheCreation }
+      : {}),
+  });
 }
 
 // ─── Factory ─────────────────────────────────────────────────────────

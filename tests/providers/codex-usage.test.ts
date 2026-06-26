@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { tmpdir } from 'node:os';
-import { CodexAdapter } from '../../src/providers/codex.js';
+import { CodexAdapter, CODEX_USAGE_EMIT_ARGS } from '../../src/providers/codex.js';
 
 // `extractUsage` is a pure stdout parser — no spawn, no fs. Construct the
 // adapter directly against a tmpdir (the constructor performs no I/O).
@@ -39,7 +39,7 @@ describe('CodexAdapter.extractUsage', () => {
     });
   });
 
-  it('parses a Codex token_count NDJSON event stream', () => {
+  it('parses a Codex token_count NDJSON event stream (incl. reasoning_output_tokens)', () => {
     const raw = [
       JSON.stringify({ type: 'task_started' }),
       JSON.stringify({ type: 'agent_message', message: 'done' }),
@@ -57,12 +57,14 @@ describe('CodexAdapter.extractUsage', () => {
       }),
     ].join('\n');
     const usage = adapter.extractUsage(raw);
+    // reasoning_output_tokens → reasoningTokens (folded into output; total is authoritative).
     expect(usage).toEqual({
       inputTokens: 2048,
       outputTokens: 256,
       cacheReadTokens: 512,
       cacheCreationTokens: 0,
       totalTokens: 2304,
+      reasoningTokens: 64,
       source: 'provider-adapter',
     });
   });
@@ -105,5 +107,109 @@ describe('CodexAdapter.extractUsage', () => {
 
   it('ignores an empty usage object (no real numbers reported)', () => {
     expect(adapter.extractUsage(JSON.stringify({ usage: {} }))).toBeNull();
+  });
+
+  // ─── Usage-emit wiring (Worker Output Contract, Class-A) ───────────────
+
+  it('exposes the usage-emit flag so spawned workers emit a per-run envelope', () => {
+    // The spawn path appends these args so `codex exec` prints JSONL events
+    // (incl. token_count) to stdout → .log → extractUsage. `--json` is verified
+    // present via `codex exec --help` (codex-cli 0.138.0).
+    expect(CODEX_USAGE_EMIT_ARGS).toEqual(['--json']);
+  });
+
+  it('extracts per-run usage from a realistic `codex exec --json` event stream (contract)', () => {
+    // Shape mirrors codex-cli `--json` stdout: lifecycle + agent events, then
+    // CUMULATIVE token_count snapshots (each carries total + last). Last wins.
+    const raw = [
+      JSON.stringify({ type: 'task_started', model: 'gpt-5' }),
+      JSON.stringify({
+        type: 'token_count',
+        info: {
+          total_token_usage: {
+            input_tokens: 1500,
+            cached_input_tokens: 400,
+            output_tokens: 120,
+            reasoning_output_tokens: 30,
+            total_tokens: 1620,
+          },
+          last_token_usage: { input_tokens: 1500, output_tokens: 120, total_tokens: 1620 },
+          model_context_window: 272000,
+        },
+      }),
+      JSON.stringify({ type: 'agent_message', message: 'patch applied' }),
+      JSON.stringify({
+        type: 'token_count',
+        info: {
+          total_token_usage: {
+            input_tokens: 3200,
+            cached_input_tokens: 900,
+            output_tokens: 540,
+            reasoning_output_tokens: 110,
+            total_tokens: 3740,
+          },
+          last_token_usage: { input_tokens: 1700, output_tokens: 420, total_tokens: 2120 },
+          model_context_window: 272000,
+        },
+      }),
+      JSON.stringify({ type: 'task_complete' }),
+    ].join('\n');
+    const usage = adapter.extractUsage(raw);
+    expect(usage).toEqual({
+      inputTokens: 3200,
+      outputTokens: 540,
+      cacheReadTokens: 900,
+      cacheCreationTokens: 0,
+      totalTokens: 3740,
+      reasoningTokens: 110,
+      source: 'provider-adapter',
+    });
+  });
+
+  it('falls back to last_token_usage when total_token_usage is absent', () => {
+    const raw = JSON.stringify({
+      type: 'token_count',
+      info: {
+        last_token_usage: {
+          input_tokens: 80,
+          cached_input_tokens: 16,
+          output_tokens: 24,
+          reasoning_output_tokens: 8,
+        },
+      },
+    });
+    const usage = adapter.extractUsage(raw);
+    expect(usage).toEqual({
+      inputTokens: 80,
+      outputTokens: 24,
+      cacheReadTokens: 16,
+      cacheCreationTokens: 0,
+      totalTokens: 104, // input+output when provider omits total
+      reasoningTokens: 8,
+      source: 'provider-adapter',
+    });
+  });
+
+  it('maps OpenAI completion_tokens_details.reasoning_tokens → reasoningTokens', () => {
+    const raw = JSON.stringify({
+      model: 'gpt-5',
+      usage: {
+        prompt_tokens: 900,
+        completion_tokens: 300,
+        total_tokens: 1200,
+        prompt_tokens_details: { cached_tokens: 100 },
+        completion_tokens_details: { reasoning_tokens: 128 },
+      },
+    });
+    const usage = adapter.extractUsage(raw);
+    expect(usage).toEqual({
+      inputTokens: 900,
+      outputTokens: 300,
+      cacheReadTokens: 100,
+      cacheCreationTokens: 0,
+      totalTokens: 1200,
+      reasoningTokens: 128,
+      source: 'provider-adapter',
+    });
   });
 });

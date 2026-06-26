@@ -46,6 +46,18 @@ export interface SubprocessProviderConfig {
    * @returns Shell command string
    */
   buildCommandString(model: ModelType, promptPath: string, opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove' | 'reasoningEffort'>): string;
+  /**
+   * Extra CLI args appended at SPAWN time so the provider emits a per-run usage
+   * envelope on stdout — captured into `.tasks/task-{id}.log` so the orchestrator's
+   * `adapter.extractUsage` can pull REAL token counts (Worker Output Contract,
+   * Class-A CLI-agents). Kept out of {@link buildArgs}/{@link buildCommandString}
+   * deliberately: the structured-output flag affects only the live spawn, never the
+   * unit-tested arg-shape nor the dry-run display string. For Claude this is
+   * `['--output-format', 'json']` (proof-of-function verified the agent tool-loop —
+   * and its `.result` write — is unaffected by json output). Omitted (undefined) →
+   * the provider emits no usage envelope and extraction falls back to estimation.
+   */
+  readonly usageEmitArgs?: readonly string[];
 }
 
 /**
@@ -86,6 +98,11 @@ export const CLAUDE_SUBPROCESS_CONFIG: SubprocessProviderConfig = {
     cmd += ` < ${promptPath}`;
     return cmd;
   },
+  // Worker Output Contract (Class-A): make the Claude CLI emit a per-run usage
+  // envelope (`{type:"result", usage:{input_tokens,output_tokens,
+  // cache_read_input_tokens,cache_creation_input_tokens}}`) on stdout so
+  // ClaudeAdapter.extractUsage can capture real token counts from the worker log.
+  usageEmitArgs: ['--output-format', 'json'],
 };
 
 // ─── SubprocessWorkerEntry ────────────────────────────────────────────
@@ -146,7 +163,15 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     const logPath = join(tasksDir, `task-${taskId}.log`);
     const logFd = openSync(logPath, 'a');
 
-    const args = this.providerConfig.buildArgs(model, opts);
+    // Worker Output Contract: append the provider's usage-emit flag(s) at spawn
+    // time only (NOT inside buildArgs) so the per-run usage envelope lands in the
+    // worker log for adapter.extractUsage, while the dry-run/display path and the
+    // unit-tested buildArgs shape stay byte-stable. Configs without usageEmitArgs
+    // (custom/codex) spawn exactly as before.
+    const baseArgs = this.providerConfig.buildArgs(model, opts);
+    const args = this.providerConfig.usageEmitArgs
+      ? [...baseArgs, ...this.providerConfig.usageEmitArgs]
+      : baseArgs;
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
       stdio: ['pipe', logFd, logFd],

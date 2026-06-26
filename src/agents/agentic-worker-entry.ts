@@ -36,6 +36,7 @@ import {
   type AgenticRunnerResult,
   type SelfAssessment,
 } from './agentic-worker-runner.js';
+import { normalizeUsage } from '../core/token-usage.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -295,6 +296,23 @@ async function buildResultFromRunner(
   const notes = diffNote
     ? `${runResult.notes}\n[diff] ${diffNote}`
     : runResult.notes;
+  // Class-B usage capture (spec §Class-B): the runner accumulates the provider's
+  // HTTP-response usage (ollama prompt_eval_count→input, eval_count→output) across
+  // EVERY agentic loop turn and returns the running total. Funnel that accumulated
+  // count through the canonical provider-agnostic `normalizeUsage` (token-usage.ts,
+  // 328-001) so any malformed/negative provider number is clamped to an honest
+  // non-negative integer — a fabricated count never reaches `.result`. We then
+  // project back to the api-surface `EntryTokenUsage` (the exact 5 fields Brain
+  // ingests). `cacheReadTokens` stays 0: this loop is ollama-only (local inference,
+  // no remote prompt cache, no reasoning split). openai-compatible / bedrock Class-B
+  // usage is captured in their OWN adapters' `extractUsage` (they do not route
+  // through this ollama `/api/chat` runner). The `??` on input/output is a seam for
+  // legacy/partial test mocks that pre-date T-234-002.
+  const normalized = normalizeUsage({
+    inputTokens: runResult.tokenUsage?.inputTokens,
+    outputTokens: runResult.tokenUsage?.outputTokens,
+    source: 'provider-adapter',
+  });
   return {
     taskId: runResult.taskId,
     filesChanged: runResult.filesChanged,
@@ -310,11 +328,9 @@ async function buildResultFromRunner(
     selfAssessment: runResult.selfAssessment,
     notes,
     tokenUsage: {
-      // Runner always sets tokenUsage (every return path); the `??` is a seam
-      // for legacy/partial test mocks that pre-date T-234-002.
-      inputTokens: runResult.tokenUsage?.inputTokens ?? 0,
-      outputTokens: runResult.tokenUsage?.outputTokens ?? 0,
-      cacheReadTokens: 0,
+      inputTokens: normalized.inputTokens,
+      outputTokens: normalized.outputTokens,
+      cacheReadTokens: normalized.cacheReadTokens,
       provider: runResult.tokenUsage?.provider ?? 'ollama',
       model,
     },

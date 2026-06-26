@@ -27,6 +27,16 @@ export type TokenUsageSource = 'provider-adapter' | 'tokenizer-fallback';
  * Provider-agnostic, fully-populated token usage for a single worker run.
  * All numeric fields are non-negative integers; `totalTokens` is the sum the
  * caller can rely on (filled by {@link normalizeUsage} when not provided).
+ *
+ * Optional fields (`cacheWriteTokens`, `reasoningTokens`) are absent when the
+ * provider did not report them — consumers should treat absence as 0 via `?? 0`.
+ *
+ * Provider matrix:
+ * - Anthropic: `cache_creation_input_tokens` → `cacheWriteTokens` (and `cacheCreationTokens`);
+ *   `cache_read_input_tokens` → `cacheReadTokens`
+ * - OpenAI: `completion_tokens_details.reasoning_tokens` → `reasoningTokens`
+ * - Gemini: `thoughtsTokenCount` → `reasoningTokens`
+ * - Ollama: `eval_count` → `outputTokens` (already covered)
  */
 export interface TokenUsage {
   /** Non-cached input/prompt tokens. */
@@ -37,7 +47,26 @@ export interface TokenUsage {
   cacheReadTokens: number;
   /** Tokens written to the prompt cache on this call (cache creation). 0 when none. */
   cacheCreationTokens: number;
-  /** Total tokens — provider-reported when available, else `inputTokens + outputTokens`. */
+  /**
+   * Tokens written to the prompt cache — cross-provider standardized name (AI-SDK parity).
+   * Maps to Anthropic `cache_creation_input_tokens`. Absent when provider did not report it;
+   * treat absence as 0.
+   */
+  cacheWriteTokens?: number;
+  /**
+   * Reasoning / thinking tokens consumed — separate from output tokens when the provider
+   * reports them independently (OpenAI o1/o3 `reasoning_tokens`, Gemini `thoughtsTokenCount`).
+   * Absent when provider did not report them; treat absence as 0. When reasoning is folded
+   * into `outputTokens` by the provider, this field is absent and `totalTokens` still reflects
+   * the true cost.
+   */
+  reasoningTokens?: number;
+  /**
+   * Total tokens — provider-reported when available (may include reasoning/cache nuances the
+   * simple `inputTokens + outputTokens` sum misses); otherwise filled as `inputTokens + outputTokens`.
+   * When reasoning tokens are additive (not folded into outputTokens), supply an explicit
+   * provider-reported `totalTokens` for accurate accounting.
+   */
   totalTokens: number;
   /** Provenance of the counts. */
   source: TokenUsageSource;
@@ -58,6 +87,10 @@ export interface RawTokenUsage {
   outputTokens?: number;
   cacheReadTokens?: number;
   cacheCreationTokens?: number;
+  /** Cross-provider cache-write tokens (Anthropic cache_creation, AI-SDK parity). */
+  cacheWriteTokens?: number;
+  /** Reasoning / thinking tokens (OpenAI reasoning_tokens, Gemini thoughtsTokenCount). */
+  reasoningTokens?: number;
   totalTokens?: number;
   source?: TokenUsageSource;
 }
@@ -89,7 +122,8 @@ export function normalizeUsage(raw: RawTokenUsage = {}): TokenUsage {
   const cacheCreationTokens = toCount(raw.cacheCreationTokens);
   const totalTokens =
     raw.totalTokens !== undefined ? toCount(raw.totalTokens) : inputTokens + outputTokens;
-  return {
+
+  const base: TokenUsage = {
     inputTokens,
     outputTokens,
     cacheReadTokens,
@@ -97,4 +131,10 @@ export function normalizeUsage(raw: RawTokenUsage = {}): TokenUsage {
     totalTokens,
     source: raw.source ?? 'provider-adapter',
   };
+
+  // Sparse optional fields: only included when provider reported them. Absence = 0 for consumers.
+  if (raw.cacheWriteTokens !== undefined) base.cacheWriteTokens = toCount(raw.cacheWriteTokens);
+  if (raw.reasoningTokens !== undefined) base.reasoningTokens = toCount(raw.reasoningTokens);
+
+  return base;
 }
