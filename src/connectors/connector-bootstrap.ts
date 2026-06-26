@@ -672,6 +672,17 @@ export async function bootstrapConnectorCommands(
         const connector = deps.makeConnector ? deps.makeConnector(id) : await loadConnector(id);
         if (!connector) continue;
         const chatId = String(cfg.chat_id);
+        // 🔴 Per-channel gate (incoming-command-router) admits ONLY these chat ids; a
+        // sender whose channelId is not here is dropped BEFORE onChat. It MUST also admit
+        // identity-bound channels (e.g. groups) — otherwise a group message is dropped
+        // before the identity layer (getBinding → resolve → L2 gate) ever runs. Bound
+        // channel ids come from config.identity.channels keys (`<connector>:<channelId>`).
+        const identityChannelIds = deps.identityCfg?.enabled && deps.identityCfg.channels
+          ? Object.keys(deps.identityCfg.channels)
+              .filter((k) => k.startsWith(`${id}:`))
+              .map((k) => k.slice(id.length + 1))
+          : [];
+        const authorizedChatIds = [chatId, ...identityChannelIds];
         // BOT-LEN: lossless send — split any over-limit text into Telegram-safe
         // parts (never cut). Single chokepoint for every outbound bot message
         // (command acks, bot-action results, chat replies). The onChat path's own
@@ -746,7 +757,7 @@ export async function bootstrapConnectorCommands(
         };
 
         const commandRouter = makeIncomingCommandRouter({
-            authorizedChatIds: [chatId],
+            authorizedChatIds,
             resolve,
             reply: send,
             lang,

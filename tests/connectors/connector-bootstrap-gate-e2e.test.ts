@@ -202,6 +202,47 @@ describe('connector-bootstrap I-1 — per-user gate is LIVE through the real boo
     }
   });
 
+  it('REGRESSION (escaped bug): a bound GROUP whose chat_id ≠ notify chat_id is admitted — not dropped by the per-channel gate', async () => {
+    // The bug: authorizedChatIds = [notify chat_id] only, so a group message (different
+    // channelId) was dropped at incoming-command-router BEFORE the identity layer ran.
+    // The earlier e2e fixtures conflated notify + group into the same 'chan-1', masking it.
+    const store = new IdentityStore(join(root, '.deckent', 'identity.db'));
+    try {
+      store.upsertIdentity({ connector: 'telegram', externalId: 'op-1', tenantId: 'firmax', principalId: 'ali', role: 'operator', verified: true, method: 'otp', updatedAt: TS() });
+    } finally {
+      store.close();
+    }
+    const fakeConnector = makeFakeConnector();
+    const seen: Array<ResolvedPrincipal | undefined> = [];
+    const handle = await bootstrapConnectorCommands(
+      root,
+      { telegram: { enabled: true, token: 'fake-token-12345', chat_id: 'owner-dm' } }, // notify = owner DM
+      {
+        makeConnector: () => fakeConnector,
+        identityCfg: {
+          enabled: true,
+          provider: { kind: 'local' },
+          roleMap: { operator: { role: 'operator', permissions: ['order:read', 'order:write'] } },
+          channels: { 'telegram:grp-9': { tenantId: 'firmax', projectPath: root, mode: 'tenant-locked' } }, // group ≠ notify
+        },
+        lang: 'en',
+        chat: (async (_c: string, _t: string, _m?: unknown, _l?: string, principal?: ResolvedPrincipal): Promise<string> => {
+          seen.push(principal);
+          return runCapability(registry, 'order.cancel', {}, capCtx(root, _c, principal), _c, noopSink, 'auto');
+        }) as never,
+      },
+    );
+    try {
+      // Fire from the GROUP channel (NOT the notify chat_id). Pre-fix: dropped → nothing runs.
+      fakeConnector._fire({ id: 'g1', connector: 'telegram' as ConnectorId, fromUser: 'op-1', channelId: 'grp-9', text: 'cancel order 7', timestamp: TS() });
+      await new Promise<void>((r) => setTimeout(r, 80));
+      expect(fakeConnector.sent.some((t) => t.includes('order cancelled now')), 'a group message must reach the identity gate, not be dropped by the per-channel gate').toBe(true);
+      expect(seen.at(-1)).toMatchObject({ userId: 'ali', role: 'operator' });
+    } finally {
+      await handle.dispose();
+    }
+  });
+
   it('opt-out: identity absent → no binding seeded, sender flows to chat with NO principal (gate no-op)', async () => {
     seedIdentities();
     const fakeConnector = makeFakeConnector();
