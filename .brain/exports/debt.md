@@ -9,6 +9,15 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-328-003 | Tech debt from 328-003: Class-A codex usage-emit. ROOT CAUSE: codex `exec --full | normal | sprint-328 | resolved |
+| debt-327-001 | Tech debt from 327-001: docs/LIVE-PROOF.md created with the required single-para | normal | sprint-327 | resolved |
+| debt-326-003 | Tech debt from 326-003: VERIFY FAILED tsc=undefined vitest=undefined. Implemente | normal | sprint-326 | resolved |
+| debt-326-004 | Tech debt from 326-004: Cascade-skipped (lifecycle-robustness P0-A): dependency  | normal | sprint-326 | resolved |
+| debt-326-006 | Tech debt from 326-006: Cascade-skipped (lifecycle-robustness P0-A): dependency  | normal | sprint-326 | resolved |
+| debt-325-001 | Tech debt from 325-001: Fixed two structured-plan parser bugs in task-builder.ts | normal | sprint-325 | resolved |
+| debt-323-004 | Tech debt from 323-004: A18 — cross-verify REFUTED advisory→block enforcement-pa | normal | sprint-323 | resolved |
+| debt-318-002 | Tech debt from 318-002: R4-SPRINTID divergent-collapse — 3 getCurrentSprintId →  | normal | sprint-318 | resolved |
+| debt-313-014 | Tech debt from 313-014: Read-only audit of src/agents/worker.ts (745 lines). Wro | normal | sprint-313 | resolved |
 | debt-308-003 | Tech debt from 308-003: ADR-064-W wire complete.
 
 ## Changes

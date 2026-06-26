@@ -8029,3 +8029,86 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 311-004: ADR-010-W — cli-highlight + zod ADR-attribution (doc-only) (DONE)
 
 ---
+## Sprint 326 — sprint-326
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-26
+**Duration:** 2397s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 19 |
+| Completed | 19 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 2396970ms |
+
+### Tasks
+
+- 326-001: Result Zod schema + validator (the spine) (DONE)
+- 326-002: result-assembler (orchestrator-owned, git-authoritative) (DONE)
+- 326-003: token capture — extractUsage adapter contract + codex + normalizer (DONE)
+- 326-004: tokenizer-fallback (usage-raporlamayan provider) (GO_WITH_TECH_DEBT)
+- 326-005: remove worker token self-count placeholder (DONE)
+- 326-006: cost — calculateActualCost (cross-provider, local→$0) (DONE)
+- 326-007: structured-JSONL log-event contract (DONE)
+- 326-008: complete-stream capture into log (DONE)
+- 326-009: archive-then-delete log integrity (DONE)
+- 326-010: live SSE stream wire (dead-stream fix) (DONE)
+- 326-011: dashboard live log-renderer + result-display (DONE)
+- 326-012: Auditor 2nd-layer validation + finding-ledger (DONE)
+- 326-013: estimate-vs-actual reconciler (DONE)
+
+---
+## Sprint 327 — sprint-327
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-26
+**Duration:** 56s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 56374ms |
+
+### Tasks
+
+- 327-001: live-proof doc note (GO_WITH_TECH_DEBT)
+
+---
+## Sprint 328 — sprint-328
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-26
+**Duration:** 1367s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1367032ms |
+
+### Tasks
+
+- 328-001: rich normalized usage schema (foundation) (DONE)
+- 328-002: Class-A claude usage-emit (CLI-agent, native source) (DONE)
+- 328-003: Class-A codex usage-emit (CLI-agent, native source) (GO_WITH_TECH_DEBT)
+- 328-004: Class-A gemini verify + extractUsage→result (CLI-agent) (DONE)
+- 328-005: Class-B API usage-accumulate → result (HTTP-response providers) (DONE)
+- 328-006: Class-C OpenRouter first-class (unified gateway, API side) (DONE)
+
+---

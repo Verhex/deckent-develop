@@ -1,5 +1,240 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-328 Learnings
+- Sprint sprint-328 Learnings: ## Sprint sprint-328 Learnings
+- Class-A codex usage-emit (CLI-agent, native source): GO_WITH_TECH_DEBT — Class-A codex usage-emit. ROOT CAUSE: codex `exec --full-auto` emitted NO structured usage, so the worker .log was prose
+
+## Gains
+- 328-001 — rich normalized usage schema (foundation) — Added `cacheWriteTokens?: number` and `reasoningTokens?: number` to `TokenUsage`, `RawTokenUsage`...
+- 328-002 — Class-A claude usage-emit (CLI-agent, native source) — Class-A claude usage-emit implemented via Approach 1 (--output-format json envelope), chosen by P...
+- 328-004 — Class-A gemini verify + extractUsage→result (CLI-agent) — Class-A gemini usage-capture: VERIFIED + COMPLETED.
+- 328-005 — Class-B API usage-accumulate → result (HTTP-response providers) — Class-B HTTP-response usage accumulation → .result.tokenUsage.
+- 328-006 — Class-C OpenRouter first-class (unified gateway, API side) — Class-C OpenRouter first-class (unified gateway, API side).
+
+## Sprint sprint-327 Learnings
+- Sprint sprint-327 Learnings: ## Sprint sprint-327 Learnings
+- live-proof doc note: GO_WITH_TECH_DEBT — docs/LIVE-PROOF.md created with the required single-paragraph note. No source files touched. tsc unaffected (doc-only ta
+
+## Sprint sprint-326 Learnings
+- Sprint sprint-326 Learnings: ## Sprint sprint-326 Learnings
+- tokenizer-fallback (usage-raporlamayan provider): GO_WITH_TECH_DEBT — Cascade-skipped (lifecycle-robustness P0-A): dependency 326-003 ended NO_GO/MANUAL_REVIEW, so this dependent was never d
+
+## Gains
+- 326-001 — Result Zod schema + validator (the spine) — Implemented the Worker Output Contract result spine (spec §1.2).
+- 326-002 — result-assembler (orchestrator-owned, git-authoritative) — Cascade-skipped (lifecycle-robustness P0-A): dependency 326-003 ended NO_GO/MANUAL_REVIEW, so thi...
+- 326-003 — token capture — extractUsage adapter contract + codex + normalizer — VERIFY FAILED tsc=undefined vitest=undefined.
+- 326-005 — remove worker token self-count placeholder — Spec §1.1 / plan Task 2.3 — removed the worker token self-count placeholder.
+- 326-006 — cost — calculateActualCost (cross-provider, local→$0) — Cascade-skipped (lifecycle-robustness P0-A): dependency 326-003 ended NO_GO/MANUAL_REVIEW, so thi...
+- 326-007 — structured-JSONL log-event contract — Phase 4.1 (spec §2.2): created src/core/log-event.ts with LogEvent/LogEventType/StreamLogEvent + ...
+- 326-008 — complete-stream capture into log — Phase 4.2 (spec §2.1, plan Task 4.2): created src/orchestra/spawn-backend-subprocess.ts — the pro...
+- 326-009 — archive-then-delete log integrity — Implemented spec §2.4 archive-then-delete log integrity in src/cli/commands/cleanup.ts:
+- …and 4 more delivered
+
+## Sprint sprint-325 Learnings
+- Sprint sprint-325 Learnings: ## Sprint sprint-325 Learnings
+- Planner structured-parse — `- Model:` → forceModel + `- Dependencies: N` index→slot-id: GO_WITH_TECH_DEBT — Fixed two structured-plan parser bugs in task-builder.ts:
+
+**Bug 1 — `- Model: opus` → forceModel not set:**
+In both `pa
+
+## Gains
+- 325-002 — honest-gate deletion false-positive — meşru-deletion ≠ stub/boundary-violation — Fixed two false-positive NO_GO cases in enforceHonestResultGate.
+- 325-003 — enforcement A14 — applyTechDebtDowngrade wire (flag-gated) — Implemented enforcement A14: applyTechDebtDowngrade wired in sprint-finalizer.ts (step 10b2) with...
+- 325-004 — enforcement B6 — cost-gate cumulative spend warn (flag-gated) — Implemented cumulative spend-gate warn system (flag-gated, warn-only, never blocks).
+- 325-005 — enforcement B1 — worker hard-deny (enforce_rbac honor, flag-gated) — Surgical fix to checkWorkerAuthority in src/agents/worker.ts: added optional 7th parameter `opts?...
+
+## Sprint sprint-324 Learnings
+- Sprint sprint-324 Learnings: ## Sprint sprint-324 Learnings
+- KES lazy-loader (mekanik): NO_GO — Zero prod-caller verified: `grep -rn lazyLoad|LazyMap|LazyHandle src --include=*.ts | grep -v test | grep -v lazy-loader
+- KES api/rate-limiter (per-IP duplicate): NO_GO — Zero-caller proof: grep across all of src/ shows api/rate-limiter.ts is only self-referencing; enterprise-endpoint.ts:57
+
+## Gains
+- 324-001 — config-flags — yeni feature flag'leri (tek-sahip config dosyaları) — Added three new optional feature flags (all default-off):
+- 324-004 — result-merger split — detectOverlaps WIRE + mergeResults KES — All goCriteria met:
+- 324-005 — sandbox `--sandbox` flag WIRE (no-Docker hafif izolasyon tier) — Wired --sandbox flag to SandboxSpawnBackend via a SandboxBackend adapter class in spawn-backend.ts.
+- 324-006 — task-retry WIRE + exponential backoff — ## What was done
+- 324-007 — routing-v2 — agent-cache + skill→agent affinity (skill-first reorder) — All three deliverables implemented:
+- 324-008 — whatsapp connector WIRE — Added 'whatsapp' to SUPPORTED array (now ReadonlyArray<'telegram'|'discord'|'whatsapp'>).
+- 324-009 — connector-pool WIRE (broadcast-to-all) — Added `broadcastAll()` to ConnectorPool (delegates to existing `broadcast()` with all registered ...
+
+## Sprint sprint-323 Learnings
+- Sprint sprint-323 Learnings: ## Sprint sprint-323 Learnings
+- A14 — applyTechDebtDowngrade zero-caller (verify-delta downgrade ölü): NO_GO — DESIGN DECISION (made, evidence-backed): SUPERSEDE/DELETE the verify-delta downgrade layer — NOT wire. EXECUTION is bloc
+- A18 — cross-verify REFUTED advisory→block: GO_WITH_TECH_DEBT — A18 — cross-verify REFUTED advisory→block enforcement-path, flag-gated + default-OFF.
+
+WHAT CHANGED (src/orchestra/cross
+- R4 — getCurrentSprintId canonical tamamlama (318 tech-debt kapat): NO_GO — OBSOLETE-WITHIN-SCOPE — sprint-318 already fully canonicalized getCurrentSprintId for everything reachable from this tas
+- R4 — isNoColor tek-form doğrula (318 obsolete-check): NO_GO — DISK-VERIFY: Sprint-318 (318-001 R4-ISNOCOLOR) görevi zaten tam olarak tamamlamış. Herhangi bir değişiklik yapılmadı — g
+- /provider switch adapter rebuild (chat-native): GO_WITH_TECH_DEBT — ## What Was Done
+
+### src/cli/commands/chat-native.ts
+1. Added try/catch around `opts.switchProvider?.(arg)` in the /pro
+- selectBestAgent skill-affinity wire (ADR-075 dead-code): GO_WITH_TECH_DEBT — ADR-075 skill→agent affinity wired into the activation scoring path, flag-gated + default-off.
+
+DISK-VERIFY (NO_GO preco
+- MCP status failedTasks gerçek NO_GO sayısı (verify): NO_GO — OBSOLETE — Sprint-316 (316-002 R5-FAILEDTASKS) already fixed this. Disk-verify shows:
+
+- src/mcp/tools/status.ts:176-195
+- runtime-scope-check bare require() → ESM import: GO_WITH_TECH_DEBT — DONE ITEMS (all goCriteria core items):,- bare require() replaced with ESM dynamic import() in emitViolationEvent,- .js extension preserved in the dynamic import path,- tsc --noEmit: PASSES (0 errors),- Targeted test file tests/nervous/runtime-scope-check.test.ts: 6/6 PASS,  - Brain context does not throw,  - Worker context throws synchronously (NervousScopeViolationError),  - Error name/message/component/ADR-037 all correct,  - vi.mock intercepts dynamic import() → event-bus.emit IS called (not stderr),  - stderr NOT called when event-bus available (fallback no longer triggered),  - stderr fallback fires when emit throws (honest-fail path works),  - DECKENT_WORKER_MODE values other than '1' do not trigger,,TECH DEBT (one open item, out of scope):,- tests/nervous/runtime-scope.test.ts test 4 ('should emit violation event on deckent-event channel') FAILS,  after this fix. That test was written for the BROKEN require() behavior:,  it accepted (mockEmit || stderrWritten) and passed because synchronous require(),  failure always wrote to stderr. Now that emitViolationEvent uses async dynamic import(),,  the check happens before the Promise resolves. The test needs an 'await flushMicrotasks()',  before its assertions — but that file is outside my scope (tests/nervous/runtime-scope.test.ts).,  This needs a follow-up task to update runtime-scope.test.ts test 4 with proper async handling.,,APPROACH TAKEN:,  emitViolationEvent now uses 'void import(...).then(...).catch(...)' — the canonical,  ESM fire-and-forget pattern. Dynamic import() is intercepted by vitest's vi.mock() hoisting,,  proving the event-bus path is actually reached. The stderr .catch() path is the honest-fail,  fallback for when the module truly cannot be loaded.
+- C4 — dashboard dead-component cleanup (zero-caller): NO_GO — ## Finding: All 5 Zero-Caller Candidates Are Protected by External Tests
+
+### Zero-caller components identified (grep ve
+
+## Gains
+- 323-001 — A9 — enforceAdrCompliance fail-open + PROD-unwired karar — Design-first task.
+- 323-003 — A15 — runHonestyCheck ölü-stub temizliği (R4-dup hijyen) — runHonestyCheck dead-stub removed (R4-dup hygiene).
+- 323-005 — B6 — cost-gate daily/monthly enforce + cumulative-spend katmanı — B6 — cost-gate daily/monthly enforce (warn-only) + cumulative-spend layer.
+- 323-006 — ROLE_CAPABILITY_MAP true-unification (core-general ↔ nervous-worker) — ROLE_CAPABILITY_MAP true-unification — OWNERSHIP unified into core (faithful, ADR-008-safe).
+- 323-009 — R4 — parseVitestOutput disambiguation/canonical (baseline-tracker) — Disambiguation analysis complete.
+- 323-010 — R4 — NervousSystemConfig V1→V2 full migration — R4 — NervousSystemConfig V1→V2 full migration, achieved at the TYPE level (the only level my file...
+- 323-011 — R4 — useApi 2× disambiguation (dashboard hook vs helper) — Disambiguation complete.
+- 323-012 — VS Code extension 2× impl dedup — Created extensions/vscode/extension.ts as the canonical merged VS Code extension entry point.
+- …and 14 more delivered
+
+## Sprint sprint-322 Learnings
+- Sprint sprint-322 Learnings: ## Sprint sprint-322 Learnings
+
+## Gains
+- 322-001 — R-EVALRESULT-CLEANUP — deprecated alias temizliği (321 TECH_DEBT kapat) — alias-cleanup, finalize→Sync, davranış birebir.
+- 322-002 — R-ROLECAP-DISAMBIG — nervous ROLE_CAPABILITY_MAP rename (false-collision) — false-collision rename, true-unif defer.
+- 322-003 — R-MAXWORKERS-CANONICAL — system-profile canonical + capacity-algo dispozisyonu — R-MAXWORKERS-CANONICAL — disposition = DISAMBIGUATE-RENAME (faithful pure-rename, zero behavior c...
+
+## Sprint sprint-321 Learnings
+- Sprint sprint-321 Learnings: ## Sprint sprint-321 Learnings
+
+## Gains
+- 321-001 — R321-EVALRESULT-DISAMBIG — sprint-controller evaluateResult disambiguation (007-corrected) — DISAMBIGUATION-rename (007-corrected, NOT collapse).
+- 321-002 — R321-WAITRESULTS-KES — result-evaluator dead DI-variant temizle (008-corrected, artık unblocked) — R321-WAITRESULTS-KES — DI-variant waitForResults (result-evaluator.ts:377) CUT.
+- 321-003 — R321-ALERTDEDUP-RECHECK — alert-dedup divergence dispozisyonu (010-corrected) — R321-ALERTDEDUP-RECHECK (010-corrected).
+- 321-004 — R321-EXTRACTKW-DISAMBIG — 3-4× extractKeywords farklı-gövde rename — PREMISE INVALIDATED BY GROUND TRUTH — task is obsolete (superseded by sprint-318, commit eae5c80b).
+
+## Sprint sprint-320 Learnings
+- Sprint sprint-320 Learnings: ## Sprint sprint-320 Learnings
+
+## Gains
+- 320-001 — VERIFY-COLLISION-A — collision-verify dosyasına satır ekle (A) — Successfully created docs/COLLISION-VERIFY.md with required line 'Task A — collision serialize ve...
+- 320-002 — VERIFY-COLLISION-B — collision-verify dosyasına satır ekle (B) — Task B line successfully added to docs/COLLISION-VERIFY.md.
+
+## Sprint sprint-319 Learnings
+- Sprint sprint-319 Learnings: ## Sprint sprint-319 Learnings
+- B-WAITRESULTS-KES — waitForResults dead DI-variant temizle: NO_GO
+
+## Gains
+- 319-001 — B-MAXWORKERS-WIRE — top-level config.max_workers'ı honor et — B-MAXWORKERS-WIRE — top-level config.max_workers is now honored as an explicit override.
+- 319-002 — B-MIRROR — builtin-skills .deckent mirror drift (finalize side-effect) — ROOT CAUSE (disk-verified): builtin-skills-quality.test.ts:70 asserts .deckent/skills/<id>/SKILL....
+- 319-003 — B-HANDOFF-PRUNE — handoff-registry per-sprint storage temizliği — B-HANDOFF-PRUNE — added HandoffProtocol.pruneCompletedSprints(currentSprintTaskIds: Set<string>) ...
+- 319-004 — B-RATELIMITER-DISAMBIG — 3× RateLimiter sahte-çakışma rename — rename-only, davranış birebir.
+- 319-005 — B-CROSSSPRINT-DISAMBIG — 2× CrossSprintAnalyzer rename — B-CROSSSPRINT-DISAMBIG — pure disambiguation rename, behavior birebir korundu (zero-behavior-chan...
+- 319-006 — B-NERVOUSCONFIG-V1 — NervousSystemConfig V1 disambiguation — PURE DISAMBIGUATION-RENAME, davranış birebir (zero behavior change).
+- 319-007 — B-EVALRESULT-DEDUP — evaluateResult sync-duplicate collapse — B-EVALRESULT-DEDUP — NO_GO (architect-sanctioned escape: sprint-controller version is LIVE + sync...
+- 319-009 — B-MCPCATALOG-SSOT — MCP tool-catalog drift tek-kaynağa — B-MCPCATALOG-SSOT — MCP tool-catalog drift collapsed to a single source.
+- …and 3 more delivered
+
+## Sprint sprint-318 Learnings
+- Sprint sprint-318 Learnings: ## Sprint sprint-318 Learnings
+- R4-SPRINTID — getCurrentSprintId core-canonical + active→state semantik (3 dosya → 1): GO_WITH_TECH_DEBT — R4-SPRINTID divergent-collapse — 3 getCurrentSprintId → 1 core-canonical.
+
+SOURCE-OF-TRUTH (read + diffed, not assumed):
+- R4-VITESTPARSE — parseVitestOutput disambiguation (sahte-SSOT → rename): NO_GO — rename-only, davranış birebir. Pure-rename disambiguation of 3 same-named-but-genuinely-different functions (sahte-SSOT 
+
+## Gains
+- 318-001 — R4-ISNOCOLOR — isNoColor superset SSOT (3 imza → 1) — R4-ISNOCOLOR — collapsed 3 divergent isNoColor into the architect-chosen canonical SSOT in src/cl...
+- 318-004 — R4-KEYWORDS — extractKeywords core-canonical superset (3 gövde → 1, param'lı) — R4-KEYWORDS SSOT collapse complete.
+
+## Sprint sprint-317 Learnings
+- Sprint sprint-317 Learnings: ## Sprint sprint-317 Learnings
+
+## Gains
+- 317-001 — CACHE-EXP-1 — scratch note 1 — Created cache-test-scratch/note-1.md with single-line content as specified.
+- 317-002 — CACHE-EXP-2 — scratch note 2 — Created cache-test-scratch/note-2.md with single line: '# Cache experiment note 2 — warm-share va...
+- 317-003 — CACHE-EXP-3 — scratch note 3 — Created cache-test-scratch/note-3.md with single-line content as specified.
+- 317-004 — CACHE-EXP-4 — scratch note 4 — Created cache-test-scratch/note-4.md with single line: '# Cache experiment note 4 — warm-share va...
+
+## Sprint sprint-316 Learnings
+- Sprint sprint-316 Learnings: ## Sprint sprint-316 Learnings
+
+## Gains
+- 316-001 — R5-VARIANT — assignVariant balanced assignment (untracked random fix) — ## Fix Applied
+- 316-002 — R5-FAILEDTASKS — MCP status failedTasks gerçek NO_GO sayısı — ## Fix Summary
+- 316-003 — R5-AGENTSTATS — agent sprint-stats mentions≠success — ## Root cause
+- 316-004 — R5-NOGORATE — noGoRate birim tutarlılığı (%-vs-fraction) — pre-fix-red / post-fix-green kanıtı:
+
+## Sprint sprint-315 Learnings
+- Sprint sprint-315 Learnings: ## Sprint sprint-315 Learnings
+
+## Gains
+- 315-001 — AUDIT cli#6 — cli code-audit (5 categories, code-only) — AUDIT cli#6 (cluster-80) complete — read all 14 scope files in full (recall, recover, remember, r...
+- 315-002 — AUDIT cli#7 — cli code-audit (5 categories, code-only) — AUDIT cli#7 — read-only code-audit of 14 cli files (spawn/start/status/sync/test-run/upgrade/usag...
+- 315-003 — AUDIT cli#8 — cli code-audit (5 categories, code-only) — AUDIT cli#8 — read-only code-audit of 14 cli/helpers files (codex-config, config-reader, cursor-c...
+- 315-004 — AUDIT cli#9 — cli code-audit (5 categories, code-only) — Read-only code-audit of cli#9 (14 helper files).
+- 315-005 — AUDIT cli#10 — cli code-audit (5 categories, code-only) — AUDIT cli#10 (cluster-84) — read all 14 files FULLY, wrote 5-category code-only audit to deckent-...
+- 315-006 — AUDIT cli#11 — cli code-audit (5 categories, code-only)
+- 315-007 — AUDIT mcp-client#1 — mcp-client code-audit (5 categories, code-only) — AUDIT mcp-client#1 — code-only, read-only audit of src/mcp-client/{broker,config,registry,types}.ts.
+- 315-008 — AUDIT dashboard#1 — dashboard code-audit (5 categories, code-only) — AUDIT dashboard#1 (cluster-87) — read-only code audit of all 18 in-scope files (4 analytics modul...
+- …and 7 more delivered
+
+## Sprint sprint-314 Learnings
+- Sprint sprint-314 Learnings: ## Sprint sprint-314 Learnings
+
+## Gains
+- 314-001 — AUDIT agent#3 — agent code-audit (5 categories, code-only) — AUDIT agent#3 (read-only code audit) of 5 files — src/agent/session.ts, tools/registry.ts, tools/...
+- 314-002 — AUDIT api#1 — api code-audit (5 categories, code-only) — AUDIT api#1 — read-only code audit of 8 src/api files (auth-me-endpoint, auth, autonomous-endpoin...
+- 314-003 — AUDIT api#2 — api code-audit (5 categories, code-only) — AUDIT api#2 (cluster-62) — read-only code audit of 8 api modules.
+- 314-004 — AUDIT api#3 — api code-audit (5 categories, code-only) — Read-only code-audit of api cluster api#3 (8 files, all read in full): src/api/process-endpoint.t...
+- 314-005 — AUDIT api#4 — api code-audit (5 categories, code-only) — AUDIT api#4 — terminal cluster (8 files, code-only, read-only).
+- 314-006 — AUDIT api#5 — api code-audit (5 categories, code-only) — Read-only audit of src/api/watcher.ts (28 LoC) and src/api/worker-logs.ts (254 LoC), plus their t...
+- 314-007 — AUDIT mcp#1 — mcp code-audit (5 categories, code-only) — AUDIT mcp#1 — code-only structural audit of 10 mcp files (helpers/enrich.ts, helpers/format.ts, h...
+- 314-008 — AUDIT mcp#2 — mcp code-audit (5 categories, code-only) — AUDIT mcp#2 — code-only, read-only audit of 10 files (resources/retro.ts, resources/tasks.ts, ser...
+- …and 12 more delivered
+
+## Sprint sprint-313 Learnings
+- Sprint sprint-313 Learnings: ## Sprint sprint-313 Learnings
+- AUDIT agents#4 — agents code-audit (5 categories, code-only): NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=0, untrackedFiles=64
+- AUDIT agents#5 — agents code-audit (5 categories, code-only): GO_WITH_TECH_DEBT — Read-only audit of src/agents/worker.ts (745 lines). Wrote deckent-last-analyze/cluster-57.md with 11 findings across 4 
+- AUDIT agent#3 — agent code-audit (5 categories, code-only): NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=0, untrackedFiles=63
+- AUDIT api#1 — api code-audit (5 categories, code-only): NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=0, untrackedFiles=63
+- AUDIT api#2 — api code-audit (5 categories, code-only): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [56 
+- AUDIT api#3 — api code-audit (5 categories, code-only): NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=0, untrackedFiles=63
+- AUDIT api#4 — api code-audit (5 categories, code-only): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [56 
+- AUDIT api#5 — api code-audit (5 categories, code-only): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [56 
+- AUDIT mcp#1 — mcp code-audit (5 categories, code-only): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [56 
+- AUDIT mcp#2 — mcp code-audit (5 categories, code-only): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [56 
+
+## Gains
+- 313-001 — AUDIT core#22 — core code-audit (5 categories, code-only) — Read-only code audit of core#22 (8 files, all read in full): system-profile.ts, task-types.ts, te...
+- 313-002 — AUDIT core#23 — core code-audit (5 categories, code-only) — Read-only audit completed.
+- 313-003 — AUDIT nervous#1 — nervous code-audit (5 categories, code-only) — AUDIT nervous#1 — read-only code audit of 6 files (action-handlers.ts, action-registry.ts, author...
+- 313-004 — AUDIT nervous#2 — nervous code-audit (5 categories, code-only) — AUDIT nervous#2 (cluster-47) — read-only code audit of 6 detector modules: agent-routing-anomaly....
+- 313-005 — AUDIT nervous#3 — nervous code-audit (5 categories, code-only) — AUDIT nervous#3 — read-only structural code-audit of 6 nervous detector files.
+- 313-006 — AUDIT nervous#4 — nervous code-audit (5 categories, code-only) — AUDIT nervous#4 — read-only structural code-audit of 6 files (src/nervous/dispatcher.ts, executor...
+- 313-007 — AUDIT nervous#5 — nervous code-audit (5 categories, code-only) — AUDIT nervous#5 — read-only code-audit of 5 src/nervous/ modules (panic-gate.ts, proposer.ts, rec...
+- 313-008 — AUDIT monitor#1 — monitor code-audit (5 categories, code-only) — Read-only audit complete.
+- …and 6 more delivered
+
+## Sprint sprint-312 Learnings
+- Sprint sprint-312 Learnings: ## Sprint sprint-312 Learnings
+- AUDIT core#22 — core code-audit (5 categories, code-only): NO_GO
+- AUDIT core#23 — core code-audit (5 categories, code-only): NO_GO
+- AUDIT nervous#1 — nervous code-audit (5 categories, code-only): NO_GO
+- AUDIT nervous#2 — nervous code-audit (5 categories, code-only): NO_GO
+- AUDIT nervous#3 — nervous code-audit (5 categories, code-only): NO_GO
+- AUDIT nervous#4 — nervous code-audit (5 categories, code-only): NO_GO
+- AUDIT nervous#5 — nervous code-audit (5 categories, code-only): NO_GO
+- AUDIT monitor#1 — monitor code-audit (5 categories, code-only): NO_GO
+- AUDIT monitor#2 — monitor code-audit (5 categories, code-only): NO_GO
+- AUDIT agents#1 — agents code-audit (5 categories, code-only): NO_GO
+
+## Gains
+- 312-001 — AUDIT orchestra#1 — orchestra code-audit (5 categories, code-only) — Read-only code-audit of orchestra#1 cluster (7 files, full read): adr-selector.ts, authority-enfo...
+- 312-002 — AUDIT orchestra#2 — orchestra code-audit (5 categories, code-only) — Read-only code-audit of orchestra#2 cluster (7 files, every line): authority-adapter, backlog-eva...
+- 312-003 — AUDIT orchestra#3 — orchestra code-audit (5 categories, code-only) — Read-only code-audit of orchestra cluster #3 (7 files, every line read): flow-reporter.ts, goal-p...
+- 312-004 — AUDIT orchestra#4 — orchestra code-audit (5 categories, code-only) — Read-only code audit of orchestra#4 (autonomous v2 mission-store cluster): mission-dispatch.ts, m...
+- 312-005 — AUDIT orchestra#5 — orchestra code-audit (5 categories, code-only) — Read-only code-audit of orchestra#5 cluster (7 files: mission-view.ts, sqlite-mission-store.ts, p...
+- 312-006 — AUDIT orchestra#6 — orchestra code-audit (5 categories, code-only) — Read-only code-audit of orchestra#6 cluster (7 source files, all fully read): reactive/repo-watch...
+- 312-007 — AUDIT orchestra#7 — orchestra code-audit (5 categories, code-only) — Read-only code audit of orchestra#7 cluster (7 files, fully read).
+- 312-008 — AUDIT orchestra#8 — orchestra code-audit (5 categories, code-only) — Read-only code-audit of orchestra cluster #8 (7 files, every line read): conflict-resolver.ts, co...
+- …and 33 more delivered
+
 ## Sprint sprint-311 Learnings
 - Sprint sprint-311 Learnings: ## Sprint sprint-311 Learnings
 

@@ -2,6 +2,59 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint328] - 2026-06-26
+
+### Added
+
+- rich normalized usage schema (foundation)
+- Class-A claude usage-emit (CLI-agent, native source)
+- Class-A gemini verify + extractUsage→result (CLI-agent)
+- Class-B API usage-accumulate → result (HTTP-response providers)
+- Class-C OpenRouter first-class (unified gateway, API side)
+
+### Changed
+
+- Class-A codex usage-emit (CLI-agent, native source) (completed with tech debt)
+
+
+_Tasks: 6 total, 6 done, 1 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint327] - 2026-06-26
+
+
+### Changed
+
+- live-proof doc note (completed with tech debt)
+
+
+_Tasks: 1 total, 1 done, 1 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint326] - 2026-06-26
+
+### Added
+
+- Result Zod schema + validator (the spine)
+- result-assembler (orchestrator-owned, git-authoritative)
+- token capture — extractUsage adapter contract + codex + normalizer
+- remove worker token self-count placeholder
+- cost — calculateActualCost (cross-provider, local→$0)
+- structured-JSONL log-event contract
+- complete-stream capture into log
+- archive-then-delete log integrity
+- dashboard live log-renderer + result-display
+- Auditor 2nd-layer validation + finding-ledger
+
+### Changed
+
+- tokenizer-fallback (usage-raporlamayan provider) (completed with tech debt)
+
+### Fixed
+
+- live SSE stream wire (dead-stream fix)
+
+
+_Tasks: 19 total, 19 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint311] - 2026-06-19
 
 ### Added

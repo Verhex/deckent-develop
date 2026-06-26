@@ -91,12 +91,12 @@ _Total: 31 MCP tools_
 | `docs` | deckent docs |
 | `doctor` | deckent doctor |
 | `doctor-checks` | deckent doctor-checks |
-| `doctor-format` | deckent doctor-format |
 | `evolve` | deckent evolve |
 | `explain` | deckent explain |
 | `features` | deckent features |
 | `finalize` | deckent finalize |
 | `flow` | deckent flow |
+| `gateway` | deckent gateway |
 | `heartbeat` | deckent heartbeat |
 | `help` | deckent help |
 | `history` | deckent history |

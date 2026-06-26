@@ -85,44 +85,35 @@
 | adr-091 | Project-Scoped Messaging Gateway — Control-Plane Daemon + Spawned Per-Project Runtimes | accepted |
 
 ## Recent Learnings
-- **Sprint sprint-311 Learnings** (sprint-311): ## Sprint sprint-311 Learnings
+- **Sprint sprint-328 Learnings** (sprint-328): ## Sprint sprint-328 Learnings
+- Class-A codex usage-emit (CLI-agent, native source): GO_WITH_TECH_DEBT — Class-A cod...
+- **Sprint sprint-327 Learnings** (sprint-327): ## Sprint sprint-327 Learnings
+- live-proof doc note: GO_WITH_TECH_DEBT — docs/LIVE-PROOF.md created with the require...
+- **Sprint sprint-326 Learnings** (sprint-326): ## Sprint sprint-326 Learnings
+- tokenizer-fallback (usage-raporlamayan provider): GO_WITH_TECH_DEBT — Cascade-skippe...
+- **Sprint sprint-325 Learnings** (sprint-325): ## Sprint sprint-325 Learnings
+- Planner structured-parse — `- Model:` → forceModel + `- Dependencies: N` index→slot-...
+- **Sprint sprint-324 Learnings** (sprint-324): ## Sprint sprint-324 Learnings
+- KES lazy-loader (mekanik): NO_GO — Zero prod-caller verified: `grep -rn lazyLoad|Laz...
+- **Sprint sprint-323 Learnings** (sprint-323): ## Sprint sprint-323 Learnings
+- A14 — applyTechDebtDowngrade zero-caller (verify-delta downgrade ölü): NO_GO — DESIG...
+- **Sprint sprint-322 Learnings** (sprint-322): ## Sprint sprint-322 Learnings
 
 ## Gains
-- 311-001 — ADR-001-W — "Node 18" → "Node 24+" sweep (LIVE src only) — ADR-0...
-- **Sprint sprint-310 Learnings** (sprint-310): ## Sprint sprint-310 Learnings
+- 322-001 — R-EVALRESULT-CLEANUP — deprecated alias temizliği (321 TECH_DEBT...
+- **Sprint sprint-321 Learnings** (sprint-321): ## Sprint sprint-321 Learnings
 
 ## Gains
-- 310-001 — ENT-3-SEC — /api/autonomous/lineage tenant-scope (anti-IDOR) — E...
-- **Sprint sprint-308 Learnings** (sprint-308): ## Sprint sprint-308 Learnings
-- ADR-064-W — wire planDispatch into live dispatch-path: GO_WITH_TECH_DEBT — ADR-064-W...
-- **Sprint sprint-307 Learnings** (sprint-307): ## Sprint sprint-307 Learnings
+- 321-001 — R321-EVALRESULT-DISAMBIG — sprint-controller evaluateResult disa...
+- **Sprint sprint-320 Learnings** (sprint-320): ## Sprint sprint-320 Learnings
 
 ## Gains
-- 307-001 — LIVE-W1b fix — adaptive threshold additive (preserve base-case s...
-- **Sprint sprint-306 Learnings** (sprint-306): ## Sprint sprint-306 Learnings
-- ENT-3 — audit causal-lineage propagation + endpoint: NO_GO
+- 320-001 — VERIFY-COLLISION-A — collision-verify dosyasına satır ekle (A) —...
+- **Sprint sprint-319 Learnings** (sprint-319): ## Sprint sprint-319 Learnings
+- B-WAITRESULTS-KES — waitForResults dead DI-variant temizle: NO_GO
 
 ## Gains
-- 306-001 — PRO...
-- **Sprint sprint-305 Learnings** (sprint-305): ## Sprint sprint-305 Learnings
-
-## Gains
-- 305-001 — SCOPE-W1 impl — SCOPE_INSUFFICIENT_CHANNEL + escalation emit — S...
-- **Sprint sprint-304 Learnings** (sprint-304): ## Sprint sprint-304 Learnings
-
-## Gains
-- 304-001 — DATA-W1 impl — synthetic timeout result tokenUsage (both branche...
-- **Sprint sprint-303 Learnings** (sprint-303): ## Sprint sprint-303 Learnings
-- GATE-W2 — toggle-independent proactive lethal-guard: GO_WITH_TECH_DEBT — All 7 DoD i...
-- **Sprint sprint-302 Learnings** (sprint-302): ## Sprint sprint-302 Learnings
-
-## Gains
-- 302-001 — IDLE-SPIN fix + error-handling allowlist — ## Bug Fix Report
-- 3...
-- **Sprint sprint-300 Learnings** (sprint-300): ## Sprint sprint-300 Learnings
-
-## Gains
-- 300-001 — Revert enterprise read-gate + tenant-filter missions-audit — All...
+- 319-00...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -164,5 +155,8 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
+- Violation pattern: file_outside_scope
+- Violation pattern: stale_heartbeat
+- Violation pattern: file_outside_scope
 
-_Total entries: 692 | Generated: 2026-06-20_
+_Total entries: 755 | Generated: 2026-06-26_
