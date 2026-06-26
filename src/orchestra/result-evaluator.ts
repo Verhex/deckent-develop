@@ -1933,6 +1933,13 @@ export function isConfirmedStub(
  * This is the Sprint 164 164-006 scenario (worker tried to write DIRECTIVES.md
  * which was outside its scope). Returns the violating paths (empty = clean).
  */
+/**
+ * Deckent control/governance *.md files that drive orchestration or agent
+ * behaviour. A worker writing one of these out-of-scope is a real boundary
+ * violation — they are EXEMPT from the low-risk `*.md` doc tolerance below.
+ */
+const CONTROL_MD_FILES = new Set(['DIRECTIVES.md', 'CLAUDE.md', 'AGENTS.md', 'GEMINI.md']);
+
 export function findBoundaryViolations(result: TaskResult, task: Task): string[] {
   const filesWrite = task.scope?.filesWrite ?? [];
   if (filesWrite.length === 0) return [];
@@ -1955,7 +1962,10 @@ export function findBoundaryViolations(result: TaskResult, task: Task): string[]
     if (protocolFiles.has(norm)) continue;
     // Doc files (*.md) are never boundary violations — low-risk documentation,
     // analogous to test-file scope-auto-expand (task-builder.ts BOUNDARY-TEST-PATTERN).
-    if (norm.endsWith('.md')) continue;
+    // EXCEPTION: deckent control/governance files (DIRECTIVES.md drives the sprint;
+    // CLAUDE/AGENTS/GEMINI.md are agent instructions) stay violations (Scenario-f).
+    const base = norm.split('/').pop() ?? norm;
+    if (norm.endsWith('.md') && !CONTROL_MD_FILES.has(base)) continue;
     // Scope-directory containment check
     const dirs = task.scope?.directories ?? [];
     const insideDir = dirs.some(d => {

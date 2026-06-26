@@ -627,11 +627,13 @@ describe('parseStructuredDirectives — forceModel/forceEffort', () => {
     expect(tasks[0].forceModel).toBeUndefined();
   });
 
-  it('passes through unrecognized model values verbatim (consistent with ModelEffort pattern)', () => {
+  it('drops an unrecognized model for a non-adapter provider (validates against ALL_MODELS)', () => {
     const content = '## Task 1: Bad Model\nModel: gpt4\n\n### Description\nTest.';
     const tasks = parseStructuredDirectives(content);
-    // Model is now parsed verbatim — downstream routing validates per-provider
-    expect(tasks[0].forceModel).toBe('gpt4');
+    // No provider → default (claude, non-adapter) → `gpt4` is not in ALL_MODELS,
+    // so it is dropped to undefined. Adapter-providers (ollama) pass raw tags
+    // through — covered in task-builder-ollama-flow.test.ts. (Sprint-235 contract.)
+    expect(tasks[0].forceModel).toBeUndefined();
   });
 
   it('parses "Effort: high" into forceEffort', () => {

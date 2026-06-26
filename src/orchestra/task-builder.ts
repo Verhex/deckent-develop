@@ -895,13 +895,22 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
     const parsedProvider = (rawProvider && VALID_PROVIDERS_ALL.includes(rawProvider) ? rawProvider : undefined) as ProviderName | undefined;
 
     // Extract optional Model: override (e.g., "Model: opus", "Model: qwen3.6:27b")
-    // Parsed verbatim — consistent with ModelEffort pattern. Downstream routing/spawn
-    // validates model availability per-provider; no upfront ALL_MODELS gatekeeping here.
+    // Adapter-providers (ollama/codex/gemini) accept raw model tags not in the
+    // static ALL_MODELS list (pass-through); non-adapter providers (claude)
+    // validate — a gibberish model is dropped to undefined. Restores the
+    // Sprint-235 contract that 325-001 lost when it added verbatim `- Model:` parse.
     const modelLine = lines.find(l => /^[\s-]*Model:\s*/i.test(l.trim()));
     const forceModel = modelLine
       ? modelLine.trim().replace(/^-\s+/, '').replace(/^Model:\s*/i, '').trim().toLowerCase()
       : undefined;
-    const parsedForceModel = (forceModel || undefined) as ModelType | undefined;
+    const parsedForceModel = (
+      !forceModel
+        ? undefined
+        : (parsedProvider && isAdapterProvider(parsedProvider)) ||
+            (ALL_MODELS as readonly string[]).includes(forceModel)
+          ? forceModel
+          : undefined
+    ) as ModelType | undefined;
 
     // Extract optional Effort: override (e.g., "Effort: max")
     const effortLine = lines.find(l => /^[\s-]*Effort:\s*/i.test(l.trim()));
@@ -1037,10 +1046,19 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
         // VALID_PROVIDERS_ALL is the canonical extended source (includes 'ollama').
         const parsedProvider = (rawProvider && VALID_PROVIDERS_ALL.includes(rawProvider) ? rawProvider : undefined) as ProviderName | undefined;
 
-        // Extract Model override — parsed verbatim (consistent with ModelEffort pattern).
+        // Extract Model override — adapter-providers pass raw tags through;
+        // non-adapter (claude) validates against ALL_MODELS (Sprint-235 contract;
+        // 325-001 verbatim-parse regression fix).
         const modelLine = allLines.find(l => /Model:\s*/i.test(l));
         const rawModel = modelLine ? modelLine.replace(/.*Model:\s*/i, '').trim().toLowerCase() : undefined;
-        const parsedForceModel = (rawModel || undefined) as ModelType | undefined;
+        const parsedForceModel = (
+          !rawModel
+            ? undefined
+            : (parsedProvider && isAdapterProvider(parsedProvider)) ||
+                (ALL_MODELS as readonly string[]).includes(rawModel)
+              ? rawModel
+              : undefined
+        ) as ModelType | undefined;
 
         // Extract Effort override
         const effortLine = allLines.find(l => /Effort:\s*/i.test(l));
