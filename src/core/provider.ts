@@ -726,11 +726,27 @@ export async function resolveProviderWithFallback(
  * Only the provider-specific key is included in each override entry — the worker
  * process should only receive the key it needs, not the full .deck contents.
  *
- * @param secrets  Key-value pairs loaded from the .deck file
- * @returns  Map of ProviderName → { ENV_VAR: value } for each provider with a key
+ * Per-provider credential isolation is load-bearing (F1-014): each override map
+ * carries ONLY its own provider's key, with zero cross-leak — see
+ * tests/core/auth-matrix.test.ts.
+ *
+ * Config-driven providers (F1-012): when `providerDefs` is supplied, every
+ * `openai-compatible` definition with an `apiKeyEnv` is ALSO honored — its deck
+ * secret `DECKENT_<apiKeyEnv>` is applied to `process.env[apiKeyEnv]` and added
+ * to the override map under the provider's name. This mirrors the built-in
+ * openai-compat convention exactly (DeepSeek `DEEPSEEK_API_KEY` ↔
+ * `DECKENT_DEEPSEEK_API_KEY`), so adding a provider needs NO code change.
+ * Omitting `providerDefs` (or passing none) leaves the built-in behavior
+ * byte-for-byte unchanged — backward-compat is load-bearing.
+ *
+ * @param secrets       Key-value pairs loaded from the .deck file
+ * @param providerDefs  Optional config-driven provider definitions
+ *                      (`config.providers.registry`) — config precedence.
+ * @returns  Map of provider name → { ENV_VAR: value } for each provider with a key
  */
 export function applyDeckSecretsToEnv(
   secrets: Record<string, string>,
+  providerDefs?: ProviderDefinition[],
 ): Record<string, Record<string, string>> {
   const providerEnvOverrides: Record<string, Record<string, string>> = {};
 
@@ -775,7 +791,98 @@ export function applyDeckSecretsToEnv(
     providerEnvOverrides['zhipu'] = { ZHIPU_API_KEY: zhipuKey };
   }
 
+  // Config-driven openai-compatible providers (F1-012, zero-hardcode): apply
+  // each declared provider's deck secret (`DECKENT_<apiKeyEnv>`) to its
+  // `apiKeyEnv`, keeping per-provider isolation. Applied AFTER built-ins so a
+  // config entry takes precedence on collision. CLI-kind entries
+  // (claude/codex/gemini/ollama aliases) use session/host auth and are covered
+  // by the built-in mappings above — they carry no `apiKeyEnv`, so are skipped.
+  if (Array.isArray(providerDefs)) {
+    for (const def of providerDefs) {
+      const kind = def?.type ?? def?.adapter;
+      if (kind !== 'openai-compatible') continue;
+      const name = typeof def?.name === 'string' ? def.name.trim() : '';
+      const apiKeyEnv = typeof def?.apiKeyEnv === 'string' ? def.apiKeyEnv.trim() : '';
+      if (!name || !apiKeyEnv) continue;
+      const deckKey = `DECKENT_${apiKeyEnv}`;
+      const value = secrets[deckKey];
+      if (value && value.length > 0) {
+        process.env[apiKeyEnv] = value;
+        providerEnvOverrides[name] = { [apiKeyEnv]: value };
+      }
+    }
+  }
+
   return providerEnvOverrides;
+}
+
+// ─── OpenAI-Compatible Candidate Resolution (F1-012) ─────────────────
+
+/** Built-in openai-compat preset keys — mirrors `OPENAI_COMPAT_PRESETS`. */
+type BuiltinOpenAICompatPreset = 'deepseek' | 'qwen' | 'glm';
+
+/**
+ * A single openai-compatible provider candidate for bootstrap registration.
+ * Built-in candidates carry a `preset` (constructed via `OPENAI_COMPAT_PRESETS`);
+ * config-driven candidates carry explicit `baseURL` + `models` (constructed via
+ * `OpenAICompatibleAdapter`). The two are mutually exclusive.
+ */
+export interface OpenAICompatCandidate {
+  /** Registry name, e.g. 'deepseek' | 'groq'. */
+  name: string;
+  /** Env var holding the API key — registration is gated on its presence. */
+  apiKeyEnv: string;
+  /** Built-in preset (set for the byte-for-byte built-in providers). */
+  preset?: BuiltinOpenAICompatPreset;
+  /** Explicit base URL (set for config-driven providers). */
+  baseURL?: string;
+  /** Explicit model ids (set for config-driven providers). */
+  models?: string[];
+}
+
+/**
+ * Built-in openai-compatible candidates (byte-for-byte today's behavior).
+ * Endpoints/models live in `OPENAI_COMPAT_PRESETS`; here we only need the
+ * registry name, the api-key env var (the registration gate), and the preset.
+ */
+const BUILTIN_OPENAI_COMPAT_CANDIDATES: readonly OpenAICompatCandidate[] = [
+  { name: 'deepseek', apiKeyEnv: 'DEEPSEEK_API_KEY',  preset: 'deepseek' },
+  { name: 'qwen',     apiKeyEnv: 'DASHSCOPE_API_KEY', preset: 'qwen'     },
+  { name: 'zhipu',    apiKeyEnv: 'ZHIPU_API_KEY',     preset: 'glm'      },
+];
+
+/**
+ * Resolve the full set of openai-compatible provider candidates — the built-in
+ * presets (DeepSeek/Qwen/Zhipu) MERGED with config-declared `openai-compatible`
+ * providers (F1-012, zero-hardcode). A config entry with the same name as a
+ * built-in REPLACES it (config precedence). Incomplete config entries (missing
+ * name/apiKeyEnv/baseUrl/models) are omitted here — the config-driven
+ * registration block surfaces a friendly skip reason for them.
+ *
+ * Passing no `providerDefs` returns exactly the built-in candidates, so the
+ * bootstrap registration path is byte-for-byte unchanged when no registry is
+ * configured (backward-compat is load-bearing).
+ */
+export function resolveOpenAICompatCandidates(
+  providerDefs?: ProviderDefinition[],
+): OpenAICompatCandidate[] {
+  const merged: OpenAICompatCandidate[] = BUILTIN_OPENAI_COMPAT_CANDIDATES.map(c => ({ ...c }));
+  if (Array.isArray(providerDefs)) {
+    for (const def of providerDefs) {
+      const kind = def?.type ?? def?.adapter;
+      if (kind !== 'openai-compatible') continue;
+      const name = typeof def?.name === 'string' ? def.name.trim() : '';
+      const apiKeyEnv = typeof def?.apiKeyEnv === 'string' ? def.apiKeyEnv.trim() : '';
+      const baseURL = typeof def?.baseUrl === 'string' ? def.baseUrl.trim() : '';
+      const models = Array.isArray(def?.models) ? def.models : [];
+      if (!name || !apiKeyEnv || !baseURL || models.length === 0) continue;
+      const candidate: OpenAICompatCandidate = { name, apiKeyEnv, baseURL, models };
+      const idx = merged.findIndex(c => c.name === name);
+      if (idx >= 0) merged[idx] = candidate; // config precedence over built-in
+      else merged.push(candidate);
+    }
+  }
+  return merged;
 }
 
 // ─── Bootstrap Providers ────────────────────────────────────────────
@@ -828,7 +935,9 @@ export async function bootstrapProviders(
   let providerEnvOverrides: Record<string, Record<string, string>> = {};
   if (config.auth_mode !== 'subscription') {
     const secrets = loadDeckSecrets(root);
-    providerEnvOverrides = applyDeckSecretsToEnv(secrets);
+    // F1-012: pass the config-driven registry so a declared openai-compat
+    // provider's deck secret (`DECKENT_<apiKeyEnv>`) is applied to its env var.
+    providerEnvOverrides = applyDeckSecretsToEnv(secrets, config.providers?.registry);
   }
 
   const detected = await detectAvailableProviders();
@@ -897,22 +1006,27 @@ export async function bootstrapProviders(
     }
   }
 
-  // ─── Bootstrap OpenAI-compatible providers (DeepSeek, Qwen, Zhipu/GLM) ──
-  // Register an OpenAICompatibleAdapter for each provider whose API key is
-  // present in process.env (either from .deck via applyDeckSecretsToEnv above
-  // or from the host environment directly). No key → skip gracefully (ADR-014).
-  const openaiCompatCandidates = [
-    { name: 'deepseek', envKey: 'DEEPSEEK_API_KEY',  preset: 'deepseek' as const },
-    { name: 'qwen',     envKey: 'DASHSCOPE_API_KEY', preset: 'qwen'     as const },
-    { name: 'zhipu',    envKey: 'ZHIPU_API_KEY',     preset: 'glm'      as const },
-  ];
-  const anyOpenAICompatKey = openaiCompatCandidates.some(c => Boolean(process.env[c.envKey]));
+  // ─── Bootstrap OpenAI-compatible providers (built-in + config-driven) ──
+  // Built-in DeepSeek/Qwen/Zhipu MERGED with config-declared openai-compatible
+  // providers (F1-012, zero-hardcode — config precedence). Register an adapter
+  // for each candidate whose API key is present in process.env (either from
+  // .deck via applyDeckSecretsToEnv above or from the host env directly). No key
+  // → skip gracefully (ADR-014). A config-declared provider WITHOUT its key here
+  // is still registered (unconditionally) by the config-driven block below, so
+  // `worker_provider=<name>` resolves and fails honestly at send-time rather
+  // than silently falling back — hence config candidates skip silently here.
+  const openaiCompatCandidates = resolveOpenAICompatCandidates(config.providers?.registry);
+  const anyOpenAICompatKey = openaiCompatCandidates.some(c => Boolean(process.env[c.apiKeyEnv]));
   if (anyOpenAICompatKey) {
-    const { OPENAI_COMPAT_PRESETS } = await import('../providers/openai-compatible.js');
+    const { OPENAI_COMPAT_PRESETS, OpenAICompatibleAdapter } = await import('../providers/openai-compatible.js');
     for (const candidate of openaiCompatCandidates) {
-      const apiKey = process.env[candidate.envKey];
+      const apiKey = process.env[candidate.apiKeyEnv];
       if (!apiKey) {
-        skipped.push({ name: candidate.name as unknown as ProviderName, reason: `${candidate.envKey} not set` });
+        // Built-in presets keep today's friendly skip reason; config-declared
+        // providers are registered (unconditionally) by the config block below.
+        if (candidate.preset) {
+          skipped.push({ name: candidate.name as unknown as ProviderName, reason: `${candidate.apiKeyEnv} not set` });
+        }
         continue;
       }
       if (registry.hasProvider(candidate.name)) {
@@ -920,7 +1034,14 @@ export async function bootstrapProviders(
         continue;
       }
       try {
-        const adapter = OPENAI_COMPAT_PRESETS[candidate.preset]();
+        const adapter = candidate.preset
+          ? OPENAI_COMPAT_PRESETS[candidate.preset]()
+          : new OpenAICompatibleAdapter({
+              name: candidate.name,
+              baseURL: candidate.baseURL!,
+              apiKeyEnv: candidate.apiKeyEnv,
+              models: candidate.models!,
+            });
         registry.registerProvider(adapter);
         registered.push(candidate.name as unknown as ProviderName);
       } catch {
@@ -1003,6 +1124,19 @@ export async function bootstrapProviders(
       } catch {
         skipped.push({ name: name as ProviderName, reason: `Failed to create adapter for provider "${name}"` });
       }
+    }
+  }
+
+  // Collapse duplicate registrations (order-preserving): a config-driven
+  // openai-compat provider whose API key is present registers via BOTH the
+  // candidate loop AND the config-driven block (idempotent) — keep a single
+  // entry so `registered[0]`, the Connector mirror, and the return value are
+  // clean. No-op for the built-in-only path.
+  if (registered.length > 1) {
+    const unique = Array.from(new Set(registered));
+    if (unique.length !== registered.length) {
+      registered.length = 0;
+      registered.push(...unique);
     }
   }
 

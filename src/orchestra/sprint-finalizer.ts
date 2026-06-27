@@ -67,6 +67,9 @@ import {
 // ─── Result Collector ─────────────────────────────────────────────
 import { buildResultsMap } from './result-collector.js';
 
+// ─── Handoff Protocol (B-HANDOFF-PRUNE — Sprint 331 331-006 storage-prune hook) ──
+import { HandoffProtocol } from './handoff-protocol.js';
+
 // ─── KPI Collection (Sprint 330 Task 8 — non-blocking finalize hook) ──
 // orchestra → core import: ADR-008 allowed direction (core never imports orchestra).
 import { recordKpiMeasurements } from '../core/kpi/collection.js';
@@ -593,6 +596,42 @@ export async function maybeRunDocTrackingSync(
   } catch (e) {
     debugLog('finalizeSprint:docTrackingSync', e);
     return { ran: true };
+  }
+}
+
+
+// ═══ Stale Handoff Pruning (B-HANDOFF-PRUNE — Sprint 331 331-006) ═
+
+/**
+ * B-HANDOFF-PRUNE (Sprint 331 331-006) — prune stale cross-sprint handoff files
+ * at sprint finalize.
+ *
+ * `.tasks/handoffs/` is an append-only registry: every handoff ever written
+ * stays on disk forever, so the directory grows without bound across sprints.
+ * B-HANDOFF-STALE (Sprint 318) scoped the observability *summary* to the current
+ * sprint, but the storage itself kept accumulating; this deletes the stale files
+ * whose endpoints are BOTH outside the current sprint, leaving in-flight
+ * (current-sprint) handoffs untouched.
+ *
+ * Non-blocking + fail-safe: derives the current-sprint task-id set from
+ * `sprint.tasks` and delegates to `HandoffProtocol.pruneCompletedSprints` (the
+ * membership rule + deletion live there, already unit-tested — not re-implemented
+ * here). Any error is swallowed via debugLog so it can NEVER fail or block
+ * finalize. Mirrors the other end-of-sprint storage-retention hooks
+ * (runBudgetedDecay / cleanTasksArchive / sprintFileRetention).
+ *
+ * @param projectRoot - Project root directory (handoffs live under
+ *   `<projectRoot>/.tasks/handoffs/`). Always the caller's root — never cwd.
+ * @param sprint - The completed sprint; its `tasks[].id` are the in-flight set.
+ * @returns the number of stale handoff files pruned (0 on any failure or empty registry).
+ */
+export function pruneStaleHandoffs(projectRoot: string, sprint: Sprint): number {
+  try {
+    const currentSprintTaskIds = new Set(sprint.tasks.map(t => t.id));
+    return new HandoffProtocol(projectRoot).pruneCompletedSprints(currentSprintTaskIds);
+  } catch (e) {
+    debugLog('finalizeSprint:pruneStaleHandoffs', e);
+    return 0;
   }
 }
 
@@ -1460,6 +1499,17 @@ export async function finalizeSprint(
     debugLog('finalizeSprint:sprintFileRetention',
       `Retention complete: archived=${retentionResult.archived.length}, countersDeleted=${retentionResult.countersDeleted.length}, forensicMoved=${retentionResult.forensicMoved.length}, bytesFreed=${retentionResult.bytesFreed}`);
   } catch (e) { debugLog('finalizeSprint:sprintFileRetention', e); }
+
+  // 12e. Prune stale cross-sprint handoff files (B-HANDOFF-PRUNE — Sprint 331 331-006).
+  // `.tasks/handoffs/` is an append-only registry that grows without bound across
+  // sprints. pruneStaleHandoffs deletes handoffs whose endpoints are BOTH outside
+  // THIS sprint, keeping in-flight ones. Self-contained + fail-safe (never throws) —
+  // it can never fail or block finalize. Groups with the 12c/12d storage-retention hooks.
+  debugLog('finalizeSprint:breadcrumb', 'Step 12e (pruneStaleHandoffs) — entering');
+  const prunedHandoffs = pruneStaleHandoffs(projectRoot, sprint);
+  if (prunedHandoffs > 0) {
+    debugLog('finalizeSprint:pruneStaleHandoffs', `Pruned ${prunedHandoffs} stale handoff file(s)`);
+  }
 
   // 13. Write job completion summary to .deckent/runtime/jobs/ for MCP polling and CLI notification
   debugLog('finalizeSprint:breadcrumb', 'Step 13 (jobSummary) — entering');

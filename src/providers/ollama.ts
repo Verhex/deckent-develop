@@ -154,6 +154,19 @@ export interface OllamaDetectionResult {
 // ─── OllamaAdapter ───────────────────────────────────────────────────
 
 /**
+ * Result returned by `OllamaAdapter.checkHealthGate()`.
+ * Never throws — callers can gate dispatch decisions on `available` directly.
+ */
+export interface HealthGateResult {
+  /** True only when the host is reachable AND the requested model (if any) is installed. */
+  available: boolean;
+  /** Human-readable explanation — actionable on false. */
+  reason: string;
+  /** Installed model names from `/api/tags` (empty when host is unreachable). */
+  models: string[];
+}
+
+/**
  * OllamaAdapter — ProviderAdapter for a locally hosted Ollama server.
  *
  * Talks HTTP to `http://localhost:11434` by default; override via
@@ -327,6 +340,68 @@ export class OllamaAdapter implements ProviderAdapter {
     } catch {
       return false;
     }
+  }
+
+  // ─── checkHealthGate() ─────────────────────────────────────────────
+
+  /**
+   * Pre-dispatch health gate — probes `/api/tags` and reports whether the
+   * adapter is ready to serve `requestedModel` (or any model when omitted).
+   *
+   * Design goals (AS-2 §4A Phase-2):
+   * - Never throws; host-down returns `available: false` with an actionable reason.
+   * - Non-blocking: probe runs through the injectable `fetchImpl` + `PROBE_TIMEOUT_MS`.
+   * - No silent fallback to another provider — honest fail only.
+   * - Returns the full installed model list so callers can surface alternatives.
+   */
+  async checkHealthGate(requestedModel?: string): Promise<HealthGateResult> {
+    let models: string[] = [];
+    try {
+      const res = await this.fetchWithTimeout(`${this.host}/api/tags`);
+      if (!res.ok) {
+        return {
+          available: false,
+          reason: `Ollama /api/tags returned HTTP ${res.status} — host may be starting up`,
+          models: [],
+        };
+      }
+      const body = (await res.json()) as { models?: { name: string }[] };
+      models = Array.isArray(body?.models)
+        ? body.models.map(m => m.name).filter((n): n is string => typeof n === 'string' && n.length > 0)
+        : [];
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return {
+        available: false,
+        reason: `Ollama host unreachable (${this.host}): ${msg}`,
+        models: [],
+      };
+    }
+
+    if (models.length === 0) {
+      return {
+        available: false,
+        reason: 'Ollama host reachable but no models installed — run `ollama pull <model>`',
+        models: [],
+      };
+    }
+
+    if (requestedModel !== undefined) {
+      const found = models.includes(requestedModel);
+      if (!found) {
+        return {
+          available: false,
+          reason: `Model "${requestedModel}" not found in Ollama (installed: ${models.join(', ')})`,
+          models,
+        };
+      }
+    }
+
+    return {
+      available: true,
+      reason: `Ollama ready — ${models.length} model${models.length === 1 ? '' : 's'} available`,
+      models,
+    };
   }
 
   // ─── detect() ──────────────────────────────────────────────────────

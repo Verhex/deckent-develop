@@ -578,6 +578,32 @@ registry.set('DECKENT_E071', {
   ],
 });
 
+// ─── Catalog & KPI Error Codes (DECKENT_E072-E073) ──────────────────
+
+registry.set('DECKENT_E072', {
+  message: 'catalog source HTTP fetch failed',
+  suggestion: 'No action required — the enrichment source is optional and the sync continues with the remaining catalog sources',
+  whatHappened: 'An optional model-catalog enrichment source (models.dev / OpenRouter) returned a non-OK HTTP status.',
+  why: 'The remote catalog endpoint was unreachable, rate-limited, or returned a server error at sync time.',
+  howToFix: [
+    'No action required — the failing source is skipped gracefully and the catalog is built from the remaining sources',
+    'Check the remote endpoint status (models.dev / openrouter.ai) if enrichment data is consistently missing',
+    'Retry the registry sync once the remote endpoint recovers',
+  ],
+});
+
+registry.set('DECKENT_E073', {
+  message: 'KPI definition formula error',
+  suggestion: 'Use only catalog measure IDs in the formula — see BASE_MEASURES in src/core/kpi/measure-catalog.ts',
+  whatHappened: 'A KPI definition references an identifier in its formula that is not a known catalog measure.',
+  why: 'KPI formulas may only use measure IDs registered in the base measure catalog; an unknown identifier cannot be evaluated.',
+  howToFix: [
+    'Check the formula for typos in measure IDs',
+    'List the valid measure IDs in src/core/kpi/measure-catalog.ts (BASE_MEASURES)',
+    'Replace the unknown identifier with a valid catalog measure ID',
+  ],
+});
+
 // ─── ErrorRegistry API ──────────────────────────────────────────────
 
 export const ErrorRegistry = {

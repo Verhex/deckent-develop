@@ -28,6 +28,9 @@ import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { getCurrentSprintId } from '../../monitor/sprint-state.js';
 import { KpiService } from '../../core/kpi/kpi-service.js';
 import type { KpiView } from '../../core/kpi/kpi-service.js';
+import { loadKpiDefinitions } from '../../core/kpi/kpi-definitions.js';
+import type { KpiDefinitionSpec } from '../../core/kpi/kpi-definitions.js';
+import type { ResultRow } from '../../core/kpi/kpi-store.js';
 import type { KpiFormat } from '../../core/kpi/types.js';
 
 // ─── Value formatting (exported — reused by the retro scorecard, Task 10) ─────
@@ -65,10 +68,73 @@ function directionArrow(direction: 'up' | 'down'): string {
   return direction === 'down' ? '↓' : '↑';
 }
 
+// ─── Trend rendering ──────────────────────────────────────────────────────────
+
+/**
+ * Render `KpiService.getTrend()` results as JSON or a table.
+ *
+ * Column headers reuse existing kpi.* message keys.
+ * "Sprint" as the period column label is a language-neutral technical term
+ * (used as-is in Turkish throughout the codebase — e.g. `status.sprint_active`).
+ */
+function renderTrend(
+  kpiId: string,
+  series: ResultRow[],
+  def: KpiDefinitionSpec | undefined,
+  lang: string,
+  jsonMode: boolean,
+): void {
+  if (jsonMode) {
+    print(JSON.stringify({
+      kpiId,
+      series: series.map(r => ({
+        periodKey: r.periodKey,
+        value: r.value,
+        status: r.status,
+      })),
+    }, null, 2));
+    return;
+  }
+
+  if (series.length === 0) {
+    print(getMessage('kpi.no_data', lang, { sprint: kpiId }));
+    return;
+  }
+
+  const title = def
+    ? (lang === 'tr' ? def.title.tr : def.title.en)
+    : kpiId;
+  print(getMessage('kpi.title', lang, { sprint: title }));
+  print('');
+
+  const headers = [
+    'Sprint',
+    getMessage('kpi.header_value', lang),
+    getMessage('kpi.header_target', lang),
+    getMessage('kpi.header_status', lang),
+  ];
+
+  const rows = series.map(r => {
+    const formatted = def
+      ? `${formatKpiValue(r.value, def.format)} ${directionArrow(def.direction)}`
+      : String(r.value);
+    const target = def
+      ? formatKpiValue(r.target, def.format)
+      : (r.target !== null ? String(r.target) : '—');
+    return [r.periodKey, formatted, target, r.status];
+  });
+
+  print(formatTable(headers, rows));
+}
+
 // ─── Command options + injectable deps ────────────────────────────────────────
 
 export interface KpiCommandOptions {
   sprint?: string;
+  /** --trend <kpiId>: render trend series instead of the scorecard. */
+  trend?: string;
+  /** --n <count>: number of sprints to include in the trend (default 10). */
+  n?: string | number;
   json?: boolean;
 }
 
@@ -77,6 +143,8 @@ export interface KpiDeps {
   currentSprintFn?: (root: string) => string | null;
   /** Read the effective UI language from config. */
   configFn?: (root: string) => Promise<{ language?: string }>;
+  /** Override the DB path (for hermetic tests). Defaults to <root>/.brain/memory.db. */
+  dbPathFn?: (root: string) => string;
 }
 
 async function defaultConfigFn(root: string): Promise<{ language?: string }> {
@@ -93,12 +161,38 @@ export async function runKpiCommand(
   const root = resolveProjectRoot();
   const configFn = deps.configFn ?? defaultConfigFn;
   const currentSprintFn = deps.currentSprintFn ?? getCurrentSprintId;
+  const dbPathFn = deps.dbPathFn ?? ((r: string) => join(r, BRAIN_DIR, MEMORY_DB_FILE));
 
   const cfg = await configFn(root);
   const lang = getLanguage(cfg.language);
 
+  const dbPath = dbPathFn(root);
+
+  // ─── Trend mode ─────────────────────────────────────────────────────────
+  if (options.trend) {
+    const kpiId = options.trend;
+    const n = Math.max(1, parseInt(String(options.n ?? 10), 10) || 10);
+    const defs = loadKpiDefinitions();
+    const def = defs.find(d => d.id === kpiId);
+
+    if (!existsSync(dbPath)) {
+      renderTrend(kpiId, [], def, lang, options.json ?? false);
+      return;
+    }
+
+    const svc = new KpiService(dbPath);
+    let series: ResultRow[] = [];
+    try {
+      series = svc.getTrend(kpiId, n);
+    } finally {
+      svc.close();
+    }
+    renderTrend(kpiId, series, def, lang, options.json ?? false);
+    return;
+  }
+
+  // ─── Scorecard mode ──────────────────────────────────────────────────────
   const sprintId = options.sprint ?? currentSprintFn(root);
-  const dbPath = join(root, BRAIN_DIR, MEMORY_DB_FILE);
 
   // No active sprint, or no KPI store yet → no data (never create the DB as a
   // side effect of a read-only command).
@@ -173,6 +267,8 @@ export function registerKpi(program: Command): void {
     .command('kpi')
     .description('Show the KPI scorecard for the current (or a specific) sprint')
     .option('--sprint <id>', 'Sprint id to score (defaults to the current sprint)')
+    .option('--trend <kpiId>', 'Show trend series for a specific KPI')
+    .option('-n, --n <count>', 'Number of sprints to include in the trend (default 10)')
     .option('--json', 'Output raw JSON')
     .action(async (opts) => {
       await runKpiCommand(opts);

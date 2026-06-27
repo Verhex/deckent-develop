@@ -37,6 +37,16 @@ import {
   getCurrentSprintId,
   SCOPE_INSUFFICIENT_CHANNEL,
 } from '../orchestra/event-stream.js';
+// Spec Pillar 1 (two-path parity, 330-021): the protected worker-safety invariants
+// are rendered by the SAME source builders the CLI path uses, so the agentic path
+// carries byte-for-byte-identical scope / goNogo / verify-precedence text and a
+// CLI-only rule can never be reworded or dropped here. (No circular dep: the
+// orchestra/core modules never import agents/*.)
+import {
+  buildScopeBlock,
+  buildDodBlock,
+  buildVerifyPrecedenceNote,
+} from '../orchestra/prompt-god-template.js';
 
 // ─── Public types ───────────────────────────────────────────────────────────
 
@@ -66,6 +76,14 @@ export interface AgenticRunnerOptions {
   prompt: string;
   scope: AgenticRunnerScope;
   goNogo: AgenticRunnerGoNogo;
+  /**
+   * Optional pre-rendered operative-ADR block (the CLI path's `adrBlock`) — the
+   * mandatory architectural constraints carrying ADR operative-state. Injected
+   * verbatim into the system prompt so the agentic path carries the SAME protected
+   * ADR text as the CLI path (Spec Pillar 1 parity, 330-021). Omitted (never faked)
+   * when no ADRs apply; the caller renders it the same way for both paths.
+   */
+  operativeAdrs?: string;
   /** Project root — resolves relative paths; also the `cwd` for tool execution. */
   projectRoot: string;
   /** Default 25; spec §6 config-surfaced cap. */
@@ -153,36 +171,96 @@ interface OllamaChatResponse {
 
 // ─── System prompt ──────────────────────────────────────────────────────────
 
-function buildSystemPrompt(
+/**
+ * Build the agentic worker system prompt under the SAME protected-set invariants
+ * the CLI path guarantees (Spec Pillar 1 — two-path parity, 330-021).
+ *
+ * deckent has two worker-prompt paths: CLI/Codex/Gemini → `buildTaskPrompt`, and
+ * this Ollama agentic path. Any worker-safety invariant guaranteed on path 1 MUST
+ * be guaranteed on path 2, or rules leak on the agentic path. The four protected
+ * elements are therefore rendered by the SAME source builders the CLI path uses, so
+ * they are byte-for-byte diff-equal across both paths and a CLI-only rule can never
+ * be reworded or dropped here:
+ *   - scope             → {@link buildScopeBlock}        (auditor boundary / filesWrite allow-list)
+ *   - goNogo            → {@link buildDodBlock}          (Definition-of-Done / goCriteria)
+ *   - verify-precedence → {@link buildVerifyPrecedenceNote} (targeted-tests-only override, T0)
+ *   - operative-ADR     → `operativeAdrs` verbatim       (mandatory constraints + operative-state)
+ *
+ * The agentic-specific guidance (five-tool surface, scope-violation self-correct
+ * loop, informational read paths, tech-debt note) is preserved ADDITIVELY on top —
+ * existing agentic behavior is unchanged.
+ *
+ * Exported so the prompt-protected-set parity test can diff it against the CLI
+ * source builders (`tests/agents/agentic-prompt-parity.test.ts`).
+ *
+ * @param operativeAdrs Optional pre-rendered operative-ADR block (== CLI `adrBlock`).
+ *   Injected verbatim as a mandatory-constraints section when present; omitted
+ *   (never faked) when absent, so the protected ADR text is identical to path 1
+ *   whenever the caller supplies it.
+ */
+export function buildSystemPrompt(
   scope: AgenticRunnerScope,
   goNogo: AgenticRunnerGoNogo,
+  operativeAdrs?: string,
 ): string {
-  const filesWrite = scope.filesWrite.length > 0 ? scope.filesWrite.join(', ') : '(none)';
-  const dirs = scope.directories.length > 0 ? scope.directories.join(', ') : '(none)';
-  const reads = scope.filesRead && scope.filesRead.length > 0 ? scope.filesRead.join(', ') : '(any file under project root)';
-  // Advisor sharpening #3: include scope verbatim so the model doesn't burn
-  // iterations proposing out-of-scope paths.
-  return [
+  // PROTECTED elements — rendered by the shared CLI source builders so the two
+  // paths carry byte-identical invariant text (genuine parity, not a paraphrase).
+  // `emitHostConfigNote=false`: the optional host-config portability note is
+  // boilerplate, not a safety invariant — the filesWrite allow-list (the protected
+  // part) is always rendered. The parity test builds its source with the same flag.
+  const scopeBlock = buildScopeBlock(
+    {
+      directories: scope.directories,
+      filesRead: scope.filesRead ?? [],
+      filesWrite: scope.filesWrite,
+    },
+    [],
+    false,
+  );
+  const dodBlock = buildDodBlock(goNogo);
+  const verifyPrecedence = buildVerifyPrecedenceNote();
+
+  const reads = scope.filesRead && scope.filesRead.length > 0
+    ? scope.filesRead.join(', ')
+    : '(any file under project root)';
+  const adrBlock = operativeAdrs && operativeAdrs.trim() ? operativeAdrs.trim() : '';
+
+  const lines: string[] = [
     'You are a deckent agentic worker. You have five tools: read_file, write_file, edit_file, run_bash, task_done.',
     'You MUST end your work by calling task_done with an honest selfAssessment (DONE / GO_WITH_TECH_DEBT / NO_GO).',
-    '',
-    '## Task Scope (HARD-ENFORCED on writes/edits)',
-    `- Allowed write files: ${filesWrite}`,
-    `- Allowed write directories: ${dirs}`,
-    `- Read paths (informational): ${reads}`,
-    'Any write_file or edit_file targeting a path outside the above is rejected with an error string. Read the error and self-correct — do NOT retry the same path.',
-    '',
-    '## Definition of Done (goCriteria)',
-    goNogo.goCriteria,
-    '',
-    '## NO-GO if',
-    goNogo.noGoCriteria,
-    '',
-    '## Tech-debt acceptable',
-    goNogo.techDebtAcceptable ?? '(none specified)',
-    '',
+  ];
+
+  // operative-ADR (PROTECTED) — mandatory architectural constraints carrying ADR
+  // operative-state. Injected verbatim (same text the CLI path carries); absent
+  // — not faked — when no ADRs apply.
+  if (adrBlock) {
+    lines.push('', adrBlock);
+  }
+
+  // scope (PROTECTED) — auditor boundary / filesWrite allow-list, shared builder —
+  // followed by the agentic-specific runtime-enforcement note (additive).
+  lines.push('', scopeBlock);
+  lines.push(
+    `Read paths (informational): ${reads}`,
+    'Any write_file or edit_file targeting a path outside the scope above is rejected with an error string. Read the error and self-correct — do NOT retry the same path.',
+  );
+
+  // goNogo (PROTECTED) — Definition-of-Done, shared builder. dodBlock carries its
+  // own leading/trailing newline; pushing it as one element keeps it diff-equal.
+  lines.push(dodBlock);
+
+  // Tech-debt acceptable (agentic-specific, additive).
+  lines.push('## Tech-debt acceptable', goNogo.techDebtAcceptable ?? '(none specified)');
+
+  // verify-precedence (PROTECTED, T0) — targeted-tests-only override note. The
+  // agentic loop runs tests via run_bash, so the targeted-mode note always applies.
+  lines.push('', verifyPrecedence, '');
+
+  lines.push(
     'Work in small, verifiable steps. Run verification commands (e.g. tsc, vitest, pytest) via run_bash before calling task_done. Be honest in self-assessment.',
-  ].join('\n');
+  );
+
+  return lines.join('\n');
 }
 
 // ─── Tool argument parsing (advisor #1) ─────────────────────────────────────
@@ -275,6 +353,7 @@ export async function runAgenticWorker(
     prompt,
     scope,
     goNogo,
+    operativeAdrs,
     projectRoot,
     maxIterations = DEFAULT_MAX_ITERATIONS,
     fetchImpl = ((...args) => fetch(...args)) as typeof fetch,
@@ -285,7 +364,7 @@ export async function runAgenticWorker(
   const dispatcher = injectedDispatcher ?? buildDefaultDispatcher(projectRoot);
 
   const messages: OllamaMessage[] = [
-    { role: 'system', content: buildSystemPrompt(scope, goNogo) },
+    { role: 'system', content: buildSystemPrompt(scope, goNogo, operativeAdrs) },
     { role: 'user', content: prompt },
   ];
 

@@ -54,6 +54,7 @@ import { registerEnterpriseRoutes, handleEnterpriseTenantWrite, handleEnterprise
 import { resolveChatProvider } from '../core/config.js';
 import { resolveChatAdapter } from '../cli/commands/chat-provider-parity.js';
 import { registerCoverageRoutes } from './coverage-endpoint.js';
+import { registerKpiEndpoint } from './kpi-endpoint.js';
 import { registerDocsHealthRoute } from './docs-health-endpoint.js';
 import { registerAuthMeRoute, deriveRequestPrincipal } from './auth-me-endpoint.js';
 import { registerOidcCallbackRoute } from './oidc-callback-endpoint.js';
@@ -824,6 +825,9 @@ async function handleRequest(
     if (registerEnterpriseRoutes(url, method, res, projectRoot, rateLimiter ? { rateLimiter } : {}, req)) return;
     // Coverage history + brain budget: /api/coverage
     if (registerCoverageRoutes(url, res, projectRoot)) return;
+    // Sprint KPI scorecard: /api/kpi[?sprint=&tenantId=] (331-009) — req threaded so
+    // tenant scope derives from the verified principal (anti-IDOR, A1/A2).
+    if (registerKpiEndpoint(url, res, projectRoot, req)) return;
     // Docs health (doc-tracking ADR-090): /api/docs/health
     if (registerDocsHealthRoute(url, res, projectRoot)) return;
     // Auth identity: /api/auth/me (277-001)

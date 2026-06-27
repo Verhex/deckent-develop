@@ -479,6 +479,53 @@ export function buildBrainEvaluationReason(
 }
 
 /**
+ * Sprint 207 P1-2 (forensic Sprint 206): persist Brain's verdict back to a
+ * task's `.result` file. Until this existed the Brain decision lived only in
+ * the audit ledger (`.deckent/evaluations/*.json`); inspecting a `.result`
+ * showed the worker's self-claim ("DONE") with no trace of WHY a FIX was
+ * spawned — the exact observability gap that made the Sprint 206 false-FIX
+ * cascade hard to see. `brainEvaluation` + `brainEvaluationReason` are
+ * Brain-owned fields written alongside (never overwriting) the worker's
+ * selfAssessment; every other result field is preserved byte-for-byte.
+ *
+ * MF-5 (Sprint 331 — Task 331-014): extracted verbatim from the inline
+ * EVALUATE-phase block so the FIX phase can mirror the SAME enrichment shape,
+ * closing the `-fix.result` format-inconsistency (a fix-result previously
+ * carried no Brain verdict). The shared function guarantees the two phases
+ * produce an identical block rather than copy-paste drifting. `rubricScores`
+ * stay intentionally audit-only (written separately to `.deckent/evaluations/`
+ * via {@link writeEvaluationAudit}) and are deliberately NOT mirrored here.
+ *
+ * Fail-soft & non-blocking: a missing `.result` is a silent no-op; any
+ * read/write error is debugLog'd and never aborts the caller (EVALUATE or FIX).
+ *
+ * @internal Exported for unit testing only.
+ */
+export function persistBrainVerdict(
+  projectRoot: string,
+  taskId: string,
+  evaluation: TaskEvaluation,
+  rubricScore: number,
+  gated: { honest: boolean; violation?: string },
+  result: Pick<TaskResult, 'testsPassed' | 'selfAssessment'>,
+): void {
+  try {
+    const resultPath = join(projectRoot, '.tasks', `task-${taskId}.result`);
+    if (existsSync(resultPath)) {
+      const persisted = readJsonSafe<TaskResult & { brainEvaluation?: string; brainEvaluationReason?: string }>(resultPath);
+      if (persisted) {
+        const verdictLabel = toAuditDecision(evaluation);
+        persisted.brainEvaluation = verdictLabel;
+        persisted.brainEvaluationReason = buildBrainEvaluationReason(
+          rubricScore, evaluation, verdictLabel, gated, result,
+        );
+        writeFileSync(resultPath, JSON.stringify(persisted, null, 2) + '\n', 'utf-8');
+      }
+    }
+  } catch (e) { debugLog('persistBrainVerdict', e); }
+}
+
+/**
  * Adapter: map a task's rubric-registry TaskType to the audit-trail's
  * screaming-snake {@link AuditRuleSet} union.
  */
@@ -1539,26 +1586,10 @@ export async function runEvaluatePhase(
         evaluations.set(task.id, evaluation);
 
         // Sprint 207 P1-2 (forensic Sprint 206): persist Brain's verdict back to the
-        // .result file. Until now the Brain decision lived only in the audit ledger
-        // (.deckent/evaluations/*.json); inspecting a .result showed the worker's
-        // self-claim ("DONE") with no trace of WHY a FIX was spawned — the exact
-        // observability gap that made the Sprint 206 false-FIX cascade hard to see.
-        // brainEvaluation + brainEvaluationReason are Brain-owned fields written
-        // alongside (never overwriting) the worker's selfAssessment.
-        try {
-          const resultPath = join(projectRoot, '.tasks', `task-${task.id}.result`);
-          if (existsSync(resultPath)) {
-            const persisted = readJsonSafe<TaskResult & { brainEvaluation?: string; brainEvaluationReason?: string }>(resultPath);
-            if (persisted) {
-              const verdictLabel = toAuditDecision(evaluation);
-              persisted.brainEvaluation = verdictLabel;
-              persisted.brainEvaluationReason = buildBrainEvaluationReason(
-                rubricResult.totalScore, evaluation, verdictLabel, gated, result,
-              );
-              writeFileSync(resultPath, JSON.stringify(persisted, null, 2) + '\n', 'utf-8');
-            }
-          }
-        } catch (e) { debugLog('runEvaluatePhase:persistBrainVerdict', e); }
+        // .result file so a .result shows WHY a FIX was spawned, not just the worker's
+        // self-claim. Shared with the FIX phase via persistBrainVerdict (MF-5,
+        // Sprint 331) so both phases write the identical brainEvaluation block.
+        persistBrainVerdict(projectRoot, task.id, evaluation, rubricResult.totalScore, gated, result);
 
         // Sprint 161 Task 2 (T-003): per-task forensic audit record.
         // Joins the rubric outcome with the task's rubric definition
@@ -2172,6 +2203,18 @@ export async function runFixPhase(
           const fixEval = toTaskEvaluation(fixRubricResult);
           handleEvaluation(projectRoot, fixTask, fixEval, fixResult);
           evaluations.set(fixTask.id, fixEval);
+
+          // MF-5 (Sprint 331 — Task 331-014): mirror the EVALUATE-phase
+          // brain-verdict enrichment onto the `-fix.result` file so a fix-result
+          // carries the same brainEvaluation block as the main .result
+          // (result-format consistency — previously the FIX path wrote none).
+          // FIX has no honest-gate, so pass honest:true; the NO_GO veto cause
+          // (if any) still derives from fixResult.testsPassed / selfAssessment.
+          // persistBrainVerdict is fail-soft → non-blocking for the FIX phase.
+          persistBrainVerdict(
+            projectRoot, fixTask.id, fixEval, fixRubricResult.totalScore,
+            { honest: true }, fixResult,
+          );
           if (fixEval === TaskEvaluation.DONE && fixTask.fixForTaskId) {
             resolveDebt(projectRoot, `debt-${fixTask.fixForTaskId}`, sprint.id);
           }

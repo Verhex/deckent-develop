@@ -222,7 +222,14 @@ const CACHE_READ_DISCOUNT = 0.10; // api fallback when config has no cacheRead p
 /** Real token usage for a regime-priced run (cache fields optional). */
 export interface RegimeCostUsage {
   inputTokens: number;
-  outputTokens: number;
+  /**
+   * Measured output tokens. `null`/`undefined` means the output side was NOT captured
+   * (e.g. a provider that streamed without a final usage block) — distinct from a real
+   * `0`. An unmeasured output is priced as 0 here but flagged via
+   * {@link RegimeCostResult.outputUnmeasured} so downstream (KPI/ledger) does not mistake
+   * an under-count for a genuine zero.
+   */
+  outputTokens: number | null;
   /** Measured cache-read (hit) tokens — FREE in subscription, discounted in api. */
   cacheReadTokens?: number;
   /** Measured cache-creation (write) tokens — the 1.25×input premium driver. */
@@ -247,6 +254,13 @@ export interface RegimeCostResult {
    * `null` when there is no input-side activity to measure.
    */
   measuredHitRatio: number | null;
+  /**
+   * Honest under-count signal: `true` only when the output side was `null`/`undefined`
+   * (NOT captured), so `value` omits output cost and is an UNDER-COUNT. `false` for a real
+   * `0` output and for any measured output. Lets downstream (KPI/ledger) distinguish a
+   * genuinely-zero output from "not measured" instead of silently trusting `value`.
+   */
+  outputUnmeasured: boolean;
 }
 
 /**
@@ -312,7 +326,10 @@ function resolveInOutPricePerToken(
  *                         defaults: cacheWrite = 1.25×in, cacheRead = 0.10×in).
  *
  * `measuredHitRatio` is always derived from the supplied counts — the hit-ratio is
- * measured, never assumed.
+ * measured, never assumed. `outputUnmeasured` is set when `usage.outputTokens` is
+ * `null`/`undefined` (output never captured, NOT a real `0`): the cost is still computed
+ * from the input/cache side but flagged as an under-count so downstream can tell the two
+ * apart.
  */
 export function calculateRegimeCost(
   usage: RegimeCostUsage,
@@ -322,6 +339,11 @@ export function calculateRegimeCost(
   registry: ModelRegistry = modelRegistry,
 ): RegimeCostResult {
   const input = Math.max(0, usage.inputTokens || 0);
+  // Honest under-count signal (defense-in-depth): a `null`/`undefined` output side was NOT
+  // measured — distinct from a real `0`. We still price it as 0 (arithmetic unchanged) but
+  // flag it so a downstream KPI/ledger never mistakes an under-count for a genuine zero.
+  // Loose `== null` matches both null and undefined; a real `0` is excluded.
+  const outputUnmeasured = usage.outputTokens == null;
   const output = Math.max(0, usage.outputTokens || 0);
   const cacheRead = Math.max(0, usage.cacheReadTokens ?? 0);
   const cacheWrite = Math.max(0, usage.cacheCreationTokens ?? 0);
@@ -331,7 +353,7 @@ export function calculateRegimeCost(
   const measuredHitRatio = inputSide > 0 ? cacheRead / inputSide : null;
 
   if (regime === 'local') {
-    return { regime, value: 0, currency: 'USD', isLimitBurn: false, pricingSource: 'local', measuredHitRatio };
+    return { regime, value: 0, currency: 'USD', isLimitBurn: false, pricingSource: 'local', measuredHitRatio, outputUnmeasured };
   }
 
   const price = resolveInOutPricePerToken(model, config, registry);
@@ -343,6 +365,7 @@ export function calculateRegimeCost(
       isLimitBurn: false,
       pricingSource: `unknown-model:${model}`,
       measuredHitRatio,
+      outputUnmeasured,
     };
   }
   const { input: inUsd, output: outUsd, source, configPricing } = price;
@@ -354,7 +377,7 @@ export function calculateRegimeCost(
       safeCost(input, inUsd, `${model}.input`) +
       safeCost(output, outUsd, `${model}.output`) +
       safeCost(cacheWrite, inUsd * CACHE_WRITE_PREMIUM, `${model}.cacheWrite`);
-    return { regime, value, currency: 'USD', isLimitBurn: true, pricingSource: source, measuredHitRatio };
+    return { regime, value, currency: 'USD', isLimitBurn: true, pricingSource: source, measuredHitRatio, outputUnmeasured };
   }
 
   // regime === 'api' — standard metered economics. Cache prices come from the
@@ -367,7 +390,7 @@ export function calculateRegimeCost(
     safeCost(output, outUsd, `${model}.output`) +
     safeCost(cacheRead, cacheReadUsd, `${model}.cacheRead`) +
     safeCost(cacheWrite, cacheWriteUsd, `${model}.cacheWrite`);
-  return { regime, value, currency: 'USD', isLimitBurn: false, pricingSource: source, measuredHitRatio };
+  return { regime, value, currency: 'USD', isLimitBurn: false, pricingSource: source, measuredHitRatio, outputUnmeasured };
 }
 
 // ─── Actual Cost (post-run, from real token usage) ─────────────────────────

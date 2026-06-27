@@ -52,8 +52,17 @@ export const CODEX_TIER_MODELS = {
  * `codex exec` emits a per-run usage envelope on stdout as JSONL, captured into
  * `.tasks/task-{id}.log`. The orchestrator's provider-agnostic
  * `tryExtractUsageViaAdapter` then feeds that log to {@link CodexAdapter.extractUsage}
- * to pull REAL token counts (the `token_count` event's `total_token_usage`) instead of
- * defaulting to 0/0.
+ * to pull REAL token counts instead of defaulting to 0/0.
+ *
+ * What codex actually emits (verified against the live `codex-cli 0.138.0` binary —
+ * `codex exec --json` startup stream captured directly): the **v2 thread/turn/item
+ * event model** with a flat top-level `type`, and the per-run usage carried on the
+ * terminal `turn.completed` event:
+ *   `{"type":"turn.completed","usage":{"input_tokens","cached_input_tokens",
+ *      "output_tokens","reasoning_output_tokens","total_tokens"}}`
+ * (older codex builds / the session store emit the classic
+ * `{...,"msg":{"type":"token_count","info":{"total_token_usage":{…}}}}` shape — both
+ * are recognized by {@link CodexAdapter.extractUsage}, so no source-specific parser).
  *
  * `--json` = "Print events to stdout as JSONL" (verified present: `codex exec --help`,
  * codex-cli 0.138.0). Mirrors the Claude path's `usageEmitArgs: ['--output-format','json']`
@@ -62,11 +71,9 @@ export const CODEX_TIER_MODELS = {
  * deliberately: the structured-output flag affects only the live spawn, never the
  * unit-tested arg-shape nor the dry-run display string.
  *
- * The very same `token_count` events are persisted by codex to its native session store
- * (`$CODEX_HOME/sessions/**\/*.jsonl`, tokscale pattern), so the stdout envelope and the
- * session-store file share ONE shape — `extractUsage` parses either source identically,
- * and a future session-store reader (for spawn paths that don't capture stdout) needs no
- * new parser.
+ * The same events are persisted by codex to its native session store
+ * (`$CODEX_HOME/sessions/**\/*.jsonl`, tokscale pattern), so a future session-store
+ * reader (for spawn paths that don't capture stdout) needs no new parser.
  */
 export const CODEX_USAGE_EMIT_ARGS: readonly string[] = ['--json'];
 
@@ -390,11 +397,14 @@ export class CodexAdapter implements ProviderAdapter {
    * `.log`); the same events are persisted to codex's native session store
    * (`$CODEX_HOME/sessions/**\/*.jsonl`). Either source feeds this parser identically.
    * Token usage appears in one of two native shapes:
-   *   (a) OpenAI Chat Completions usage (the shape openai-compatible.ts parses):
-   *       `{ "usage": { "prompt_tokens", "completion_tokens", "total_tokens",
-   *                     "prompt_tokens_details": { "cached_tokens" },
-   *                     "completion_tokens_details": { "reasoning_tokens" } } }`
-   *   (b) Codex token-count event (Rust CLI):
+   *   (a) `usage` object — the codex-cli v2 `turn.completed` event (what
+   *       `codex exec --json`, codex-cli 0.138.0, emits per run) AND the OpenAI
+   *       Chat Completions shape, both via the same branch:
+   *       `{ "type":"turn.completed", "usage": { "input_tokens", "cached_input_tokens",
+   *            "output_tokens", "reasoning_output_tokens", "total_tokens" } }`
+   *       (OpenAI variant: `prompt_tokens`/`completion_tokens` +
+   *       `prompt_tokens_details.cached_tokens` + `completion_tokens_details.reasoning_tokens`).
+   *   (b) Codex token-count event (older builds / session store):
    *       `{ "type":"token_count", "info": { "total_token_usage": {
    *            "input_tokens", "cached_input_tokens", "output_tokens",
    *            "reasoning_output_tokens", "total_tokens" } } }`
@@ -597,7 +607,12 @@ function extractUsageFromPayload(payload: unknown): TokenUsage | null {
   const obj = asObject(payload);
   if (!obj) return null;
 
-  // (a) OpenAI Chat Completions usage object.
+  // (a) `usage` object — covers BOTH the OpenAI Chat Completions shape
+  // (`prompt_tokens`/`completion_tokens`/`*_tokens_details`) AND the codex-CLI v2
+  // exec `turn.completed` event (`{"type":"turn.completed","usage":{"input_tokens",
+  // "cached_input_tokens","output_tokens","reasoning_output_tokens","total_tokens"}}`),
+  // which is what `codex exec --json` (codex-cli 0.138.0) actually emits per run.
+  // The OpenAI keys are tried first, then the codex-native keys as fallbacks.
   const usage = asObject(obj['usage']);
   if (usage) {
     const promptTokens = readNum(usage, 'prompt_tokens') ?? readNum(usage, 'input_tokens');
@@ -607,10 +622,13 @@ function extractUsageFromPayload(payload: unknown): TokenUsage | null {
         readNum(asObject(usage['prompt_tokens_details']), 'cached_tokens') ??
         readNum(usage, 'cached_input_tokens') ??
         0;
-      // o1/o3 reasoning tokens (a subset of completion_tokens, surfaced as a detail).
+      // Reasoning tokens (a subset of output, surfaced as a detail): OpenAI o1/o3
+      // report `completion_tokens_details.reasoning_tokens`; codex's v2 `usage`
+      // reports the native `reasoning_output_tokens` (folded into output_tokens).
       const reasoning =
         readNum(asObject(usage['completion_tokens_details']), 'reasoning_tokens') ??
-        readNum(usage, 'reasoning_tokens');
+        readNum(usage, 'reasoning_tokens') ??
+        readNum(usage, 'reasoning_output_tokens');
       return normalizeUsage({
         inputTokens: promptTokens ?? 0,
         outputTokens: completionTokens ?? 0,

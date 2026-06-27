@@ -30,6 +30,7 @@ import { registerModelsTool } from './models.js';
 import { registerAutonomousTool } from './autonomous.js';
 import { registerProcessTool } from './process.js';
 import { registerUsageTool } from './usage.js';
+import { registerKpiTool } from './kpi.js';
 
 /**
  * One entry in the canonical MCP tool catalog.
@@ -90,6 +91,7 @@ export const TOOL_CATALOG: McpToolCatalogEntry[] = [
   { name: 'deckent_autonomous', description: 'Autonomous engine control surface (status/start/stop/backlog list-add-approve-reject, cron)', readOnly: false },
   { name: 'deckent_process', description: 'Process-mode execution surface (submit an ExecutionRequest → policy-gated auto-run or park; status/result by executionId)', readOnly: false },
   { name: 'deckent_usage', description: 'Show token/limit consumption from Claude Code transcripts (model table or sprint task breakdown + cache-gate)', readOnly: true },
+  { name: 'deckent_kpi', description: 'Show the KPI scorecard for a sprint — returns { sprintId, kpis } with cost, token, cache, retry, completion, and quality metrics', readOnly: true },
 ];
 
 /** Canonical count of registered MCP tools, derived from {@link TOOL_CATALOG}. */
@@ -127,4 +129,5 @@ export function registerTools(server: McpServer): void {
   registerAutonomousTool(server);
   registerProcessTool(server);
   registerUsageTool(server);
+  registerKpiTool(server);
 }

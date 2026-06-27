@@ -7,6 +7,7 @@
 // NETWORK-ZERO: pure module, no I/O, no network.
 
 import { z } from 'zod';
+import { ErrorRegistry } from '../errors.js';
 import { BASE_MEASURES } from './measure-catalog.js';
 import { evaluateFormula, FormulaError } from './formula-evaluator.js';
 
@@ -79,8 +80,8 @@ function buildSampleMeasures(): Record<string, number> {
  *    identifier in the formula is a known catalog measure ID — throws `Error`
  *    on unknown-identifier (catalog-external measure reference).
  *
- * @throws {z.ZodError}  On schema validation failure.
- * @throws {Error}       On formula referencing a non-catalog identifier.
+ * @throws {z.ZodError}    On schema validation failure.
+ * @throws {DeckentError}  (code DECKENT_E073) On formula referencing a non-catalog identifier.
  */
 export function validateKpiDefinition(raw: unknown): KpiDefinitionSpec {
   const def = KPI_DEFINITION_SCHEMA.parse(raw);
@@ -90,7 +91,9 @@ export function validateKpiDefinition(raw: unknown): KpiDefinitionSpec {
     evaluateFormula(def.formula, sample);
   } catch (err) {
     if (err instanceof FormulaError) {
-      throw new Error(`KPI "${def.id}" formula error: ${err.message}`);
+      throw ErrorRegistry.createError('DECKENT_E073', {
+        message: `KPI "${def.id}" formula error: ${err.message}`,
+      });
     }
     throw err;
   }

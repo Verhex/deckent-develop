@@ -22,6 +22,8 @@ import { loadDeckSecrets } from '../../src/core/deck-file.js';
 import {
   bootstrapProviders,
   ProviderRegistry,
+  applyDeckSecretsToEnv,
+  resolveOpenAICompatCandidates,
 } from '../../src/core/provider.js';
 import type { ResolvedConfig, ProviderDefinition } from '../../src/core/config-types.js';
 
@@ -74,6 +76,7 @@ describe('bootstrapProviders — config-driven provider registry (F1-012)', () =
     delete process.env['ZHIPU_API_KEY'];
     delete process.env['OPENAI_API_KEY'];
     delete process.env['GOOGLE_API_KEY'];
+    delete process.env['GROQ_API_KEY'];
     delete process.env['OLLAMA_HOST'];
     delete process.env['DECKENT_OLLAMA_HOST'];
     originalFetch = stubFetch(false); // Ollama unreachable → built-ins all skip
@@ -217,5 +220,161 @@ describe('bootstrapProviders — config-driven provider registry (F1-012)', () =
     const result = await bootstrapProviders(makeConfig([def]), ROOT, registry);
     expect(registry.size).toBe(sizeAfterFirst); // no duplicate registration
     expect(result.registered).toContain('groq');
+  });
+
+  // ── 5) All-3-sites end-to-end (F1-012 goCriteria) ───────────────────────
+
+  it('registers an arbitrary openai-compat provider through ALL 3 sites with NO union edit', async () => {
+    // .deck carries the config provider's secret under the canonical convention.
+    vi.mocked(loadDeckSecrets).mockReturnValue({ DECKENT_GROQ_API_KEY: 'gsk-secret-123' });
+    const def: ProviderDefinition = {
+      name: 'groq', // arbitrary string — NOT in the ProviderName union
+      type: 'openai-compatible',
+      baseUrl: 'https://api.groq.com/openai/v1',
+      apiKeyEnv: 'GROQ_API_KEY',
+      models: ['llama-3.1-70b-versatile'],
+    };
+    const result = await bootstrapProviders(makeConfig([def]), ROOT, registry);
+
+    // Site 1 — adapter resolvable (registered + resolvable from the registry).
+    expect(result.registered).toContain('groq');
+    expect(registry.hasProvider('groq')).toBe(true);
+    expect(registry.getProvider('groq').name).toBe('groq');
+    // No duplicate despite registering via both the candidate loop + config block.
+    // (String() keeps the comparison type-safe — 'groq' is not in ProviderName.)
+    expect(result.registered.filter(n => String(n) === 'groq')).toHaveLength(1);
+
+    // Site 2 — candidate-listed (merged into the openai-compat SSOT).
+    const candidates = resolveOpenAICompatCandidates([def]);
+    expect(candidates.map(c => c.name)).toContain('groq');
+
+    // Site 3 — secret-env applied via apiKeyEnv (deck secret → process.env),
+    // with per-provider isolation in the returned override map.
+    expect(process.env['GROQ_API_KEY']).toBe('gsk-secret-123');
+    expect(result.providerEnvOverrides['groq']).toEqual({ GROQ_API_KEY: 'gsk-secret-123' });
+  });
+
+  it('config-absent path leaves the openai-compat candidate set byte-for-byte (backward-compat)', async () => {
+    // No registry → bootstrap must not register groq, and the built-in candidate
+    // SSOT is exactly the three built-ins (claude/codex/gemini/ollama unaffected).
+    const result = await bootstrapProviders(makeConfig(), ROOT, registry);
+    expect(registry.hasProvider('groq')).toBe(false);
+    expect(result.registered).not.toContain('groq');
+    expect(resolveOpenAICompatCandidates().map(c => c.name)).toEqual(['deepseek', 'qwen', 'zhipu']);
+  });
+});
+
+// ─── resolveOpenAICompatCandidates — merged SSOT (F1-012 site 2) ─────────────
+
+describe('resolveOpenAICompatCandidates — built-in + config merge (F1-012)', () => {
+  it('returns exactly the three built-in presets when no registry is supplied', () => {
+    const builtins = resolveOpenAICompatCandidates();
+    expect(builtins.map(c => c.name)).toEqual(['deepseek', 'qwen', 'zhipu']);
+    // Built-ins are preset-backed (no explicit baseURL/models).
+    expect(builtins.every(c => c.preset && !c.baseURL && !c.models)).toBe(true);
+  });
+
+  it('merges a config-declared openai-compat provider as a candidate', () => {
+    const merged = resolveOpenAICompatCandidates([
+      { name: 'groq', type: 'openai-compatible', baseUrl: 'https://api.groq.com/openai/v1', apiKeyEnv: 'GROQ_API_KEY', models: ['llama-3.1-70b-versatile'] },
+    ]);
+    const groq = merged.find(c => c.name === 'groq');
+    expect(groq).toBeDefined();
+    expect(groq!.apiKeyEnv).toBe('GROQ_API_KEY');
+    expect(groq!.baseURL).toBe('https://api.groq.com/openai/v1');
+    expect(groq!.models).toEqual(['llama-3.1-70b-versatile']);
+    expect(groq!.preset).toBeUndefined(); // config-driven, not a preset
+  });
+
+  it('config precedence: a config entry replaces the built-in of the same name', () => {
+    const merged = resolveOpenAICompatCandidates([
+      { name: 'deepseek', type: 'openai-compatible', baseUrl: 'https://proxy.internal/v1', apiKeyEnv: 'DEEPSEEK_API_KEY', models: ['deepseek-chat'] },
+    ]);
+    // Still one 'deepseek' entry, now config-backed (explicit baseURL, no preset).
+    expect(merged.filter(c => c.name === 'deepseek')).toHaveLength(1);
+    const deepseek = merged.find(c => c.name === 'deepseek')!;
+    expect(deepseek.baseURL).toBe('https://proxy.internal/v1');
+    expect(deepseek.preset).toBeUndefined();
+  });
+
+  it('omits incomplete config entries and ignores non-openai-compat kinds', () => {
+    const merged = resolveOpenAICompatCandidates([
+      // missing baseUrl + models → not candidate-listed
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { name: 'incomplete', type: 'openai-compatible', apiKeyEnv: 'X_KEY' } as any,
+      // CLI-kind alias → not an openai-compat candidate
+      { name: 'claude-fast', type: 'claude' },
+    ]);
+    expect(merged.map(c => c.name)).toEqual(['deepseek', 'qwen', 'zhipu']);
+  });
+});
+
+// ─── applyDeckSecretsToEnv — config-aware deck secrets (F1-012 site 3) ───────
+
+describe('applyDeckSecretsToEnv — config-driven providers (F1-012)', () => {
+  const TOUCHED = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY'] as const;
+  let saved: Record<string, string | undefined>;
+
+  beforeEach(() => {
+    saved = {};
+    for (const k of TOUCHED) {
+      saved[k] = process.env[k];
+      delete process.env[k];
+    }
+  });
+
+  afterEach(() => {
+    for (const k of TOUCHED) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  });
+
+  it('applies a config openai-compat provider deck secret via DECKENT_<apiKeyEnv>', () => {
+    const overrides = applyDeckSecretsToEnv(
+      { DECKENT_GROQ_API_KEY: 'gsk-xyz' },
+      [{ name: 'groq', type: 'openai-compatible', baseUrl: 'https://api.groq.com/openai/v1', apiKeyEnv: 'GROQ_API_KEY', models: ['m'] }],
+    );
+    expect(process.env['GROQ_API_KEY']).toBe('gsk-xyz');
+    // Per-provider isolation: the override map carries ONLY groq's key.
+    expect(overrides['groq']).toEqual({ GROQ_API_KEY: 'gsk-xyz' });
+    expect(overrides['groq']!['ANTHROPIC_API_KEY']).toBeUndefined();
+  });
+
+  it('config + built-in providers coexist with zero cross-leak', () => {
+    const overrides = applyDeckSecretsToEnv(
+      { DECKENT_CLAUDE_API_KEY: 'sk-ant', DECKENT_GROQ_API_KEY: 'gsk' },
+      [{ name: 'groq', type: 'openai-compatible', baseUrl: 'https://api.groq.com/openai/v1', apiKeyEnv: 'GROQ_API_KEY', models: ['m'] }],
+    );
+    expect(overrides['claude']).toEqual({ ANTHROPIC_API_KEY: 'sk-ant' });
+    expect(overrides['groq']).toEqual({ GROQ_API_KEY: 'gsk' });
+    expect(overrides['claude']!['GROQ_API_KEY']).toBeUndefined();
+    expect(overrides['groq']!['ANTHROPIC_API_KEY']).toBeUndefined();
+  });
+
+  it('no-op when the config provider has no matching deck secret', () => {
+    const overrides = applyDeckSecretsToEnv(
+      {}, // no DECKENT_MISTRAL_API_KEY present
+      [{ name: 'mistral', type: 'openai-compatible', baseUrl: 'https://api.mistral.ai/v1', apiKeyEnv: 'MISTRAL_API_KEY', models: ['mistral-large'] }],
+    );
+    expect(overrides['mistral']).toBeUndefined();
+    expect(process.env['MISTRAL_API_KEY']).toBeUndefined();
+  });
+
+  it('CLI-kind config aliases carry no apiKeyEnv → no deck mapping', () => {
+    const overrides = applyDeckSecretsToEnv(
+      { DECKENT_CLAUDE_API_KEY: 'sk-ant' },
+      [{ name: 'claude-fast', type: 'claude' }],
+    );
+    // Built-in claude mapping still applies; the CLI alias produces no entry.
+    expect(overrides['claude']).toEqual({ ANTHROPIC_API_KEY: 'sk-ant' });
+    expect(overrides['claude-fast']).toBeUndefined();
+  });
+
+  it('omitting providerDefs leaves built-in behavior byte-for-byte', () => {
+    const withArg = applyDeckSecretsToEnv({ DECKENT_OPENAI_API_KEY: 'o' }, []);
+    const without = applyDeckSecretsToEnv({ DECKENT_OPENAI_API_KEY: 'o' });
+    expect(withArg).toEqual(without);
+    expect(without['codex']).toEqual({ OPENAI_API_KEY: 'o' });
   });
 });

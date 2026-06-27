@@ -32,6 +32,33 @@ const REAL_ENVELOPE = JSON.stringify({
   },
 });
 
+// Faithful opus `--output-format json` envelope reproducing the Sprint 330
+// 330-019/330-020 quirk: the top-level `usage` carries real input + cache
+// counts but OMITS `output_tokens`, while the generated-token count is reported
+// under the nested camelCase `modelUsage['claude-opus-4-8'].outputTokens`. The
+// last-wins parser read only `usage.output_tokens`, so output collapsed to 0
+// for opus while input/cacheRead/cost stayed real.
+const REAL_OPUS_ENVELOPE = JSON.stringify({
+  type: 'result',
+  subtype: 'success',
+  is_error: false,
+  num_turns: 18,
+  result: 'Done.',
+  session_id: 'a1b2c3d4-0000-4aaa-9bbb-ccccddddeeee',
+  total_cost_usd: 0.48217,
+  usage: {
+    input_tokens: 27,
+    cache_creation_input_tokens: 18044,
+    cache_read_input_tokens: 1352908,
+    // NOTE: no top-level `output_tokens` — the opus envelope quirk under test.
+    server_tool_use: { web_search_requests: 0, web_fetch_requests: 0 },
+    service_tier: 'standard',
+  },
+  modelUsage: {
+    'claude-opus-4-8': { inputTokens: 27, outputTokens: 18432, costUSD: 0.48217 },
+  },
+});
+
 describe('ClaudeAdapter.extractUsage', () => {
   let adapter: ClaudeAdapter;
 
@@ -56,6 +83,22 @@ describe('ClaudeAdapter.extractUsage', () => {
       totalTokens: 222, // input + output when the envelope reports no explicit total
       source: 'provider-adapter',
     });
+  });
+
+  it('recovers opus output_tokens from modelUsage when the top-level usage omits it (goNogo RED→GREEN)', () => {
+    const usage = adapter.extractUsage(REAL_OPUS_ENVELOPE);
+    expect(usage).not.toBeNull();
+    // Pre-fix the parser read only `usage.output_tokens` (absent) → output 0.
+    // The fix recovers the REAL count from modelUsage — a real number, not null/0.
+    expect(usage?.outputTokens).toBe(18432);
+    expect(typeof usage?.outputTokens).toBe('number');
+    // Input / cache / total stay correct and are NOT taken from modelUsage.
+    expect(usage?.inputTokens).toBe(27);
+    expect(usage?.cacheReadTokens).toBe(1352908);
+    expect(usage?.cacheCreationTokens).toBe(18044);
+    expect(usage?.cacheWriteTokens).toBe(18044);
+    expect(usage?.totalTokens).toBe(27 + 18432);
+    expect(usage?.source).toBe('provider-adapter');
   });
 
   it('maps a no-cache envelope without emitting sparse cache-write/reasoning fields', () => {

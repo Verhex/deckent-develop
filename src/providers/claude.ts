@@ -488,18 +488,57 @@ function readNonNegInt(obj: Record<string, unknown>, key: string): number | unde
 }
 
 /**
+ * Sum the per-model `outputTokens` reported under a Claude CLI envelope's
+ * `modelUsage` map — the camelCase, nested telemetry block
+ * (`{ "claude-opus-4-8": { inputTokens, outputTokens, costUSD } }`).
+ *
+ * Opus `--output-format json` runs intermittently OMIT the top-level
+ * `usage.output_tokens` while still reporting the real generated-token count
+ * here (observed Sprint 330, tasks 330-019/330-020). Reading it as a fallback
+ * keeps capture FAITHFUL — `modelUsage[*].outputTokens` is a real field the
+ * envelope itself reports, never a fabricated number. Returns `undefined` when
+ * no `modelUsage` entry carries a usable output count, so the caller can keep
+ * `undefined` as the honest "no output reported anywhere" signal.
+ */
+function modelUsageOutputTokens(envelope: Record<string, unknown>): number | undefined {
+  const modelUsage = envelope.modelUsage;
+  if (modelUsage === null || typeof modelUsage !== 'object') return undefined;
+  let sum = 0;
+  let sawOutput = false;
+  for (const entry of Object.values(modelUsage as Record<string, unknown>)) {
+    if (entry === null || typeof entry !== 'object') continue;
+    const out = readNonNegInt(entry as Record<string, unknown>, 'outputTokens');
+    if (out !== undefined) {
+      sum += out;
+      sawOutput = true;
+    }
+  }
+  return sawOutput ? sum : undefined;
+}
+
+/**
  * Pull a normalized {@link TokenUsage} out of one Claude CLI JSON envelope
  * candidate, recognizing the `usage` object's Anthropic field names. Returns
  * null when the payload carries no usage numbers (empty/absent `usage`).
+ *
+ * Output-token capture is robust to the opus envelope quirk where the top-level
+ * `usage.output_tokens` is absent: the count is recovered from the nested
+ * `modelUsage` block via {@link modelUsageOutputTokens} (see Sprint 330
+ * 330-019/330-020). Top-level `output_tokens` stays the primary source — the
+ * `modelUsage` fallback only engages when the top-level field is genuinely not
+ * a number (absent/null), never overriding a real top-level value and never
+ * fabricating output when neither source reports it.
  */
 function claudeUsageFromEnvelope(payload: unknown): TokenUsage | null {
   if (payload === null || typeof payload !== 'object') return null;
-  const usageRaw = (payload as { usage?: unknown }).usage;
+  const envelope = payload as Record<string, unknown>;
+  const usageRaw = envelope.usage;
   if (usageRaw === null || typeof usageRaw !== 'object') return null;
   const usage = usageRaw as Record<string, unknown>;
 
   const inputTokens = readNonNegInt(usage, 'input_tokens');
-  const outputTokens = readNonNegInt(usage, 'output_tokens');
+  const outputTokens =
+    readNonNegInt(usage, 'output_tokens') ?? modelUsageOutputTokens(envelope);
   if (inputTokens === undefined && outputTokens === undefined) return null;
 
   const cacheRead = readNonNegInt(usage, 'cache_read_input_tokens');

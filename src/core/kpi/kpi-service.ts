@@ -15,6 +15,7 @@ import type { ResultRow } from './kpi-store.js';
 import { loadKpiDefinitions } from './kpi-definitions.js';
 import type { KpiDefinitionSpec } from './kpi-definitions.js';
 import { computeSprintKpis } from './rollup-engine.js';
+import { backfillFromHistory } from './kpi-backfill.js';
 import type { KpiGrain, KpiStatus } from './types.js';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
@@ -54,12 +55,37 @@ export class KpiService {
   private readonly tenantId: string;
   private readonly defs: KpiDefinitionSpec[];
   private readonly store: KpiStore;
+  /** Self-healing backfill runs at most once per service instance (see ensureBackfill). */
+  private backfillDone = false;
 
   constructor(dbPath: string, opts?: KpiServiceOptions) {
     this.dbPath = dbPath;
     this.tenantId = opts?.tenantId ?? 'default';
     this.defs = loadKpiDefinitions(opts?.customDefs);
     this.store = new KpiStore(dbPath);
+  }
+
+  /**
+   * Self-heal the KPI store from persisted sprint history on first read.
+   *
+   * A DB with sprint records but no forward-collected measurements (e.g. sprints
+   * finalized before the KPI build — the 009 data-gap) would otherwise read back
+   * all-null KPIs. backfillFromHistory derives the missing measurements through
+   * the SAME SSOT pipeline the live/rollup paths use, so values never drift; it is
+   * idempotent (already-measured sprints are skipped) and tenant-scoped.
+   *
+   * Runs once per instance and is strictly best-effort: backfill is a telemetry
+   * sidecar, so any failure is swallowed and NEVER breaks the primary read (the
+   * caller simply sees null results for sprints that could not be reconstructed).
+   */
+  private ensureBackfill(): void {
+    if (this.backfillDone) return;
+    this.backfillDone = true;
+    try {
+      backfillFromHistory(this.dbPath, this.tenantId);
+    } catch {
+      // Best-effort self-healing — a backfill failure must not fail the read.
+    }
   }
 
   /**
@@ -74,6 +100,10 @@ export class KpiService {
    * KPIs with no data at all (no results, no measurements) yield `result: null`.
    */
   listSprintViews(sprintId: string): KpiView[] {
+    // 0. Self-heal: backfill measurements from sprint history if this is a fresh
+    //    (forward-collection-gap) DB. Idempotent + same SSOT evaluator → no drift.
+    this.ensureBackfill();
+
     // 1. Try pre-computed results (rollup path).
     let results = this.store.getResults(this.tenantId, 'sprint', sprintId);
 
@@ -112,6 +142,9 @@ export class KpiService {
    * @param n      Maximum number of results to return.
    */
   getTrend(kpiId: string, n: number): ResultRow[] {
+    // Self-heal first so a fresh DB yields a populated trend (same SSOT, idempotent).
+    this.ensureBackfill();
+
     const db = new Database(this.dbPath);
     try {
       const rows = db.prepare(`

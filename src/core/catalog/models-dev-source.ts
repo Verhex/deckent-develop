@@ -19,6 +19,7 @@
  * Sprint 330 Task 330-014 (Spec Pillar 4 — F1-PCACHE).
  */
 
+import { ErrorRegistry } from '../errors.js';
 import { normalizeProviderId } from './catalog-source.js';
 import type { ModelCatalogSource } from './catalog-source.js';
 import { CACHE_ARCHETYPE, type CacheArchetype, type CatalogEntry } from './types.js';
@@ -152,7 +153,9 @@ export class ModelsDevSource implements ModelCatalogSource {
     try {
       const res = await this.fetchFn(MODELS_DEV_URL);
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status} ${res.statusText}`);
+        throw ErrorRegistry.createError('DECKENT_E072', {
+          message: `HTTP ${res.status} ${res.statusText}`,
+        });
       }
       raw = await res.json();
     } catch (err) {

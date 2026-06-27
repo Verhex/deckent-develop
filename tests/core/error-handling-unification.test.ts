@@ -661,6 +661,111 @@ describe('Error handling completeness', () => {
   });
 });
 
+// ─── F1 catalog/KPI codes (E072–E073) + the 3 migrated throw sites ──
+// Sprint 331 FIX-#1: kpi-definitions.ts / models-dev-source.ts / openrouter-source.ts
+// migrated their generic `throw new Error` to ErrorRegistry.createError. These assert the
+// new codes are registered and that each site produces a DeckentError — while the catalog
+// graceful `return []` contract and the KPI formula message stay intact.
+
+describe('Catalog & KPI error codes (E072–E073)', () => {
+  for (const code of ['DECKENT_E072', 'DECKENT_E073']) {
+    it(`${code} is registered`, () => {
+      expect(ErrorRegistry.has(code)).toBe(true);
+    });
+
+    it(`${code} has message and suggestion`, () => {
+      const entry = ErrorRegistry.get(code);
+      expect(entry).toBeDefined();
+      expect(entry!.message.length).toBeGreaterThan(0);
+      expect(entry!.suggestion.length).toBeGreaterThan(0);
+    });
+
+    it(`${code} createError returns DeckentError carrying the code`, () => {
+      const err = ErrorRegistry.createError(code);
+      expect(err).toBeInstanceOf(DeckentError);
+      expect(err.code).toBe(code);
+    });
+  }
+});
+
+describe('kpi-definitions.ts — validateKpiDefinition throws DeckentError E073', () => {
+  it('throws DeckentError E073 on a catalog-external formula identifier (message preserved)', async () => {
+    const { validateKpiDefinition } = await import('../../src/core/kpi/kpi-definitions.js');
+    const bad = {
+      id: 'bad_formula_e073',
+      title: { en: 'Bad', tr: 'Kötü' },
+      formula: 'not_a_measure / sprint_count',
+      unit: 'count',
+      format: 'number',
+      direction: 'down',
+      grain: 'sprint',
+      tier: 'custom',
+    };
+    expect(() => validateKpiDefinition(bad)).toThrow(DeckentError);
+    try {
+      validateKpiDefinition(bad);
+    } catch (e) {
+      expect(e).toBeInstanceOf(DeckentError);
+      expect((e as DeckentError).code).toBe('DECKENT_E073');
+      // formula message preserved: carries the offending identifier + the KPI id
+      expect((e as DeckentError).message).toContain('not_a_measure');
+      expect((e as DeckentError).message).toContain('bad_formula_e073');
+    }
+  });
+});
+
+describe('catalog sources — HTTP error produces DeckentError E072 (graceful [] preserved)', () => {
+  /** Mock fetch resolving with a non-OK HTTP status. */
+  function httpErrorFetch(status: number): typeof globalThis.fetch {
+    return vi.fn().mockResolvedValue({
+      ok: false,
+      status,
+      statusText: 'Server Error',
+      json: async () => null,
+    }) as unknown as typeof globalThis.fetch;
+  }
+
+  it('ModelsDevSource: produces DeckentError E072 on HTTP error yet still returns []', async () => {
+    const { ModelsDevSource } = await import('../../src/core/catalog/models-dev-source.js');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const createErr = vi.spyOn(ErrorRegistry, 'createError');
+
+    const src = new ModelsDevSource(httpErrorFetch(503));
+    await expect(src.fetch()).resolves.toEqual([]); // graceful contract preserved (never propagates)
+
+    expect(createErr).toHaveBeenCalledWith(
+      'DECKENT_E072',
+      expect.objectContaining({ message: expect.stringContaining('HTTP') }),
+    );
+    const produced = createErr.mock.results[0]?.value as DeckentError;
+    expect(produced).toBeInstanceOf(DeckentError);
+    expect(produced.code).toBe('DECKENT_E072');
+
+    createErr.mockRestore();
+    warn.mockRestore();
+  });
+
+  it('OpenRouterSource: produces DeckentError E072 on HTTP error yet still returns []', async () => {
+    const { OpenRouterSource } = await import('../../src/core/catalog/openrouter-source.js');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const createErr = vi.spyOn(ErrorRegistry, 'createError');
+
+    const src = new OpenRouterSource(httpErrorFetch(429));
+    await expect(src.fetch()).resolves.toEqual([]); // graceful contract preserved (never propagates)
+
+    expect(createErr).toHaveBeenCalledWith(
+      'DECKENT_E072',
+      expect.objectContaining({ message: expect.stringContaining('HTTP') }),
+    );
+    const produced = createErr.mock.results[0]?.value as DeckentError;
+    expect(produced).toBeInstanceOf(DeckentError);
+    expect(produced.code).toBe('DECKENT_E072');
+
+    createErr.mockRestore();
+    warn.mockRestore();
+  });
+});
+
 // ─── check-error-handling.mjs: npm run lint:errors process-level tests ─────
 
 describe('npm run lint:errors — process-level invocation', () => {

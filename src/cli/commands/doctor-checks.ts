@@ -18,6 +18,12 @@ const DECISIONS_EXPORT_RELATIVE = 'exports/decisions.md';
 import { MemoryStore } from '../../core/memory-store.js';
 import { ErrorRegistry } from '../../core/errors.js';
 import { isDeckFileCommitted } from '../../core/deck-file.js';
+import {
+  detectStaleDaemons,
+  listDeckentProcesses,
+  type StaleDaemon,
+  type ProcessListResult,
+} from '../../core/daemon-hygiene.js';
 import type { CIBaseline, CIReport } from '../helpers/output.js';
 
 export interface DoctorCheck {
@@ -476,6 +482,148 @@ export async function runProviderDiagnostics(root: string): Promise<ProviderAvai
     createGeminiAdapter(root),
   ];
   return runProviderDiagnosticsImpl(adapters);
+}
+
+// ─── Stale-Daemon Hygiene Advisory (B-ZOMBIE, Sprint 331, Task 331-007) ───────
+//
+// Surfaces the core `detectStaleDaemons` result as advisory doctor lines: a list
+// of long-lived deckent daemons (a stale `dist/mcp/server.js`, old bot/serve/
+// watch from a prior build) plus a copy-paste kill hint, OR a single PASS line.
+// ADVISORY ONLY — this NEVER kills a process, NEVER throws, and NEVER fails the
+// doctor run (an unsupported platform or a listing failure both degrade to a
+// benign PASS note).
+//
+// i18n: messages.ts (src/cli/helpers/) is outside this task's write-scope, so —
+// following the existing project precedent (doctor.ts `authProbeLoggedOutLine`)
+// — the en/tr strings live in a local structured table served by a
+// getMessage-shaped lookup (English default, {var} substitution). These keys
+// should be centralized into messages.ts in a follow-up when it is in scope.
+
+const DAEMON_MESSAGES: Record<string, Record<'en' | 'tr', string>> = {
+  'doctor.daemon_header': {
+    en: 'Daemon Hygiene:',
+    tr: 'Daemon Hijyeni:',
+  },
+  'doctor.daemon_clean': {
+    en: 'No stale deckent daemons detected.',
+    tr: 'Eskimiş deckent daemon süreci bulunamadı.',
+  },
+  'doctor.daemon_found': {
+    en: '{count} stale deckent daemon(s) detected (advisory — deckent never auto-kills):',
+    tr: '{count} eskimiş deckent daemon süreci bulundu (tavsiye — deckent asla otomatik öldürmez):',
+  },
+  'doctor.daemon_entry': {
+    en: 'PID {pid} — {kind}, running for {age}',
+    tr: 'PID {pid} — {kind}, {age} süredir çalışıyor',
+  },
+  'doctor.daemon_kill_hint': {
+    en: 'To stop them, run: {killCmd}   (Windows: {winKillCmd})',
+    tr: 'Durdurmak için çalıştırın: {killCmd}   (Windows: {winKillCmd})',
+  },
+  'doctor.daemon_unsupported': {
+    en: 'Process listing not supported on {platform} — stale-daemon check skipped.',
+    tr: '{platform} platformunda süreç listeleme desteklenmiyor — eskimiş daemon kontrolü atlandı.',
+  },
+  'doctor.daemon_check_failed': {
+    en: 'Could not list processes — stale-daemon check skipped (advisory).',
+    tr: 'Süreç listesi alınamadı — eskimiş daemon kontrolü atlandı (tavsiye).',
+  },
+};
+
+/** getMessage-shaped local lookup for the daemon-hygiene strings (en/tr, EN default). */
+function daemonMsg(key: string, lang: string, vars?: Record<string, string>): string {
+  const entry = DAEMON_MESSAGES[key];
+  const normLang: 'en' | 'tr' = lang === 'tr' ? 'tr' : 'en';
+  const template = entry ? (entry[normLang] ?? entry.en) : key;
+  if (!vars) return template;
+  return template.replace(/\{(\w+)\}/g, (_, varName: string) => vars[varName] ?? `{${varName}}`);
+}
+
+/** Human-readable elapsed age (e.g. `2h 5m`, `45m`, `30s`, `1d 3h`). Pure. */
+function formatDaemonAge(totalSec: number): string {
+  if (totalSec < 60) return `${totalSec}s`;
+  const days = Math.floor(totalSec / 86_400);
+  const hours = Math.floor((totalSec % 86_400) / 3_600);
+  const mins = Math.floor((totalSec % 3_600) / 60);
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (mins > 0) parts.push(`${mins}m`);
+  return parts.length > 0 ? parts.join(' ') : `${totalSec}s`;
+}
+
+/**
+ * Pure formatter: stale-daemon list → advisory lines. A clean result yields a
+ * single `[PASS]` line; otherwise a `[WARN]` count, one line per daemon, and a
+ * cross-platform copy-paste kill hint. i18n en/tr. Never throws.
+ */
+export function formatDaemonHygieneLines(staleDaemons: StaleDaemon[], lang: string = 'en'): string[] {
+  const lines: string[] = [daemonMsg('doctor.daemon_header', lang)];
+  if (staleDaemons.length === 0) {
+    lines.push(`  [PASS] ${daemonMsg('doctor.daemon_clean', lang)}`);
+    return lines;
+  }
+  lines.push(`  [WARN] ${daemonMsg('doctor.daemon_found', lang, { count: String(staleDaemons.length) })}`);
+  for (const daemon of staleDaemons) {
+    lines.push(`         ${daemonMsg('doctor.daemon_entry', lang, {
+      pid: String(daemon.pid),
+      kind: daemon.kind,
+      age: formatDaemonAge(daemon.elapsedSec),
+    })}`);
+  }
+  const pids = staleDaemons.map((d) => d.pid);
+  const killCmd = `kill ${pids.join(' ')}`;
+  const winKillCmd = pids.map((p) => `taskkill /F /PID ${p}`).join(' & ');
+  lines.push(`         ${daemonMsg('doctor.daemon_kill_hint', lang, { killCmd, winKillCmd })}`);
+  return lines;
+}
+
+/** Result of {@link checkDaemonHygiene} — the flagged daemons + rendered lines. */
+export interface DaemonHygieneResult {
+  staleDaemons: StaleDaemon[];
+  /** Rendered, i18n'd advisory/PASS lines ready to print under the doctor output. */
+  lines: string[];
+}
+
+/**
+ * ADVISORY daemon-hygiene check. Lists host processes via the injectable seam
+ * (defaults to the real cross-platform lister), flags stale deckent daemons, and
+ * renders the advisory lines. It NEVER kills a process, NEVER throws, and NEVER
+ * fails the doctor run — an unsupported platform or any listing error degrades to
+ * a benign PASS note. `lister` is injectable so callers/tests stay hermetic.
+ */
+export async function checkDaemonHygiene(opts: {
+  lang?: string;
+  lister?: () => Promise<ProcessListResult>;
+  minAgeSec?: number;
+} = {}): Promise<DaemonHygieneResult> {
+  const lang = opts.lang ?? 'en';
+  try {
+    const lister = opts.lister ?? (() => listDeckentProcesses());
+    const result = await lister();
+    if (!result.supported) {
+      return {
+        staleDaemons: [],
+        lines: [
+          daemonMsg('doctor.daemon_header', lang),
+          `  [PASS] ${daemonMsg('doctor.daemon_unsupported', lang, { platform: result.platform })}`,
+        ],
+      };
+    }
+    const staleDaemons = detectStaleDaemons(
+      result.processes,
+      opts.minAgeSec != null ? { minAgeSec: opts.minAgeSec } : {},
+    );
+    return { staleDaemons, lines: formatDaemonHygieneLines(staleDaemons, lang) };
+  } catch {
+    return {
+      staleDaemons: [],
+      lines: [
+        daemonMsg('doctor.daemon_header', lang),
+        `  [PASS] ${daemonMsg('doctor.daemon_check_failed', lang)}`,
+      ],
+    };
+  }
 }
 
 export function runPreFlightHealthCheck(root: string): PreFlightResult {

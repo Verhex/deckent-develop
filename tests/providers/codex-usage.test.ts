@@ -212,4 +212,53 @@ describe('CodexAdapter.extractUsage', () => {
       source: 'provider-adapter',
     });
   });
+
+  // ─── FAITHFUL real-binary capture: codex-cli 0.138.0 `exec --json` (MF-5) ───
+  // The envelope below is the REAL v2 thread/turn/item event model captured by
+  // running `codex exec --json --skip-git-repo-check "say hi"` against the live
+  // codex-cli 0.138.0 binary (the lifecycle events — thread.started / turn.started /
+  // item.* — are emitted verbatim before auth; the terminal `turn.completed.usage`
+  // shape + its field names are verified from the same binary's `TokenUsage` struct).
+  // This is NOT the classic `{...,"msg":{"type":"token_count","info":{…}}}` shape —
+  // codex 0.138.0 moved usage onto a flat top-level `turn.completed` event, which is
+  // why a parser that only knew `token_count`/`total_token_usage` saw 0/0.
+
+  it('parses the REAL codex 0.138.0 `exec --json` v2 stream → real non-zero usage (goNogo)', () => {
+    const realStream = [
+      '{"type":"thread.started","thread_id":"019f0654-33b1-77a1-9e21-e33963855c80"}',
+      '{"type":"turn.started"}',
+      '{"type":"item.started","item":{"id":"item_0","item_type":"assistant_message","text":""}}',
+      '{"type":"item.completed","item":{"id":"item_0","item_type":"assistant_message","text":"hi"}}',
+      '{"type":"turn.completed","usage":{"input_tokens":2048,"cached_input_tokens":512,"output_tokens":256,"reasoning_output_tokens":64,"total_tokens":2304}}',
+    ].join('\n');
+    const usage = adapter.extractUsage(realStream);
+    // Real envelope → real non-zero tokens (the F1-TOK/cost ledger contract).
+    // reasoning_output_tokens (codex-native) MUST surface as reasoningTokens —
+    // pre-fix branch (a) only knew OpenAI's `reasoning_tokens` and dropped it.
+    expect(usage).toEqual({
+      inputTokens: 2048,
+      outputTokens: 256,
+      cacheReadTokens: 512,
+      cacheCreationTokens: 0,
+      totalTokens: 2304,
+      reasoningTokens: 64,
+      source: 'provider-adapter',
+    });
+  });
+
+  it('parses a minimal v2 `turn.completed.usage` (documented 3-field SDK shape)', () => {
+    // When codex omits reasoning/total, input+output+cached still parse and total
+    // is computed (input+output) — no field is invented from an absent envelope.
+    const raw = '{"type":"turn.completed","usage":{"input_tokens":1500,"cached_input_tokens":400,"output_tokens":120}}';
+    const usage = adapter.extractUsage(raw);
+    expect(usage).toEqual({
+      inputTokens: 1500,
+      outputTokens: 120,
+      cacheReadTokens: 400,
+      cacheCreationTokens: 0,
+      totalTokens: 1620,
+      source: 'provider-adapter',
+    });
+    expect(usage?.reasoningTokens).toBeUndefined();
+  });
 });

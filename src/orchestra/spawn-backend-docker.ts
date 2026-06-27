@@ -776,26 +776,36 @@ export class DockerSpawnBackend implements SpawnBackend {
     // get the deterministic Deckent value, not whatever the host shell carries.
     dockerArgs.push('-e', WORKER_NODE_OPTIONS);
 
-    // Sprint 214 T-214-001 — provider + auth-aware env forwarding.
+    // Sprint 214 T-214-001 + F1-014r (Sprint 331) — provider + auth-aware env
+    // forwarding with a RUNTIME per-worker NON-LEAK invariant: each container
+    // receives ONLY its own provider's credential env var, never a foreign one
+    // (canonical provider→key map mirrors provider.ts applyDeckSecretsToEnv:
+    // claude→ANTHROPIC_API_KEY, codex→OPENAI_API_KEY, gemini→GOOGLE_API_KEY).
     //
-    // ANTHROPIC_API_KEY MUST NOT leak into the container when the worker is a
-    // claude provider in subscription mode: the claude CLI prefers the env var
-    // over the mounted ~/.claude session, so forwarding the host key silently
-    // demotes `auth_mode: subscription` into API mode → Tier-1 timeout under
-    // post-beta budgets. Forward Anthropic key ONLY when useApiOnly === true
-    // (line 474 already requires it for that branch). For non-claude providers
-    // the key is irrelevant — strip it to avoid cross-provider auth confusion.
-    //
-    // OPENAI_API_KEY / GOOGLE_API_KEY are forwarded only when the spawned
-    // provider can actually use them (codex/gemini). DECKENT_DEBUG is auth-
-    // orthogonal and always forwarded when set on the host.
-    if (useApiOnly && process.env.ANTHROPIC_API_KEY) {
-      dockerArgs.push('-e', `ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY}`);
-    }
-    if (providerBinary !== 'claude' && process.env.OPENAI_API_KEY) {
+    // - claude: ANTHROPIC_API_KEY MUST NOT leak in subscription mode — the claude
+    //   CLI prefers the env var over the mounted ~/.claude session, so forwarding
+    //   the host key silently demotes `auth_mode: subscription` into API mode →
+    //   Tier-1 timeout → the exact mass-synthetic-NO_GO that killed Sprint 213
+    //   (ADR-076). Forward it ONLY in api mode (useApiOnly; the throw above already
+    //   requires the key to be present for that branch).
+    // - codex → OPENAI_API_KEY only; gemini → GOOGLE_API_KEY only. The previous
+    //   blanket `providerBinary !== 'claude'` guard forwarded BOTH OPENAI and
+    //   GOOGLE to ANY non-claude worker, so a codex worker leaked GOOGLE_API_KEY
+    //   and a gemini worker leaked OPENAI_API_KEY whenever a dev had several
+    //   provider keys in the host env (mixed-provider sprint). Gating each key to
+    //   its own provider makes the cross-leak structurally impossible (F1-014r).
+    // - ollama is host-only: getProviderCommandSpec returns null and the spawn
+    //   honest-fails above before reaching here, so it never receives any key.
+    // This is an explicit per-provider allowlist by design — a new provider must
+    // add its own credential forward here (auditable), never inherit one.
+    // DECKENT_DEBUG is auth-orthogonal and always forwarded when set on the host.
+    if (providerBinary === 'claude') {
+      if (useApiOnly && process.env.ANTHROPIC_API_KEY) {
+        dockerArgs.push('-e', `ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY}`);
+      }
+    } else if (providerBinary === 'codex' && process.env.OPENAI_API_KEY) {
       dockerArgs.push('-e', `OPENAI_API_KEY=${process.env.OPENAI_API_KEY}`);
-    }
-    if (providerBinary !== 'claude' && process.env.GOOGLE_API_KEY) {
+    } else if (providerBinary === 'gemini' && process.env.GOOGLE_API_KEY) {
       dockerArgs.push('-e', `GOOGLE_API_KEY=${process.env.GOOGLE_API_KEY}`);
     }
     if (process.env.DECKENT_DEBUG) {
