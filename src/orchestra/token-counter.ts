@@ -235,6 +235,11 @@ export function tryExtractUsageViaAdapter(
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
         cacheReadTokens: usage.cacheReadTokens,
+        // Preserve the REAL cache-creation (limit-dominant cost) + provenance the
+        // adapter parsed — the old 3-field reconstruct silently dropped both, so the
+        // Step-0 (registered-adapter) path under-counted cost vs the Step-1 path.
+        cacheCreationTokens: usage.cacheCreationTokens,
+        source: usage.source,
       };
     }
   }
