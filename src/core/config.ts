@@ -918,6 +918,12 @@ export function validateConfig(config: DeckentConfig): string[] {
         errors.push(`Invalid value '${v}' for field 'gate.max_tech_debt_ratio'. Must be a number in [0, 1].`);
       }
     }
+    if (g.verify_delta_downgrade !== undefined && typeof g.verify_delta_downgrade !== 'boolean') {
+      errors.push(`Invalid value '${g.verify_delta_downgrade}' for field 'gate.verify_delta_downgrade'. Must be a boolean.`);
+    }
+    if (g.enforce_adr_compliance !== undefined && typeof g.enforce_adr_compliance !== 'boolean') {
+      errors.push(`Invalid value '${g.enforce_adr_compliance}' for field 'gate.enforce_adr_compliance'. Must be a boolean.`);
+    }
   }
 
   // ─── deckent_style validation ───────────────────────────────────────

@@ -6,7 +6,7 @@ import type { WorkerAuthorityResult, AuthorityAuditContext } from '../nervous/au
 import type { ExecutionRequest } from '../core/work-model.js';
 import type { ResolvedConfig } from '../core/config-types.js';
 
-// `enforce_rbac` is not yet declared on ResolvedConfig (MASTER-PLAN backlog).
+// `enforce_rbac` IS declared on ResolvedConfig (config-types.ts:934).
 // Intersection cast mirrors the sprint-spawner.ts token_throttle_ms pattern.
 type ConfigWithRbac = ResolvedConfig & { enforce_rbac?: boolean };
 

@@ -142,6 +142,9 @@ export async function runTaskMode(
         overrides,
         learningData: [],
         config: { ...config.routing_config, agentMinScore: config.agent_min_score },
+        // ADR-075 (343-007): thread the skill→agent affinity flag. Default-off →
+        // option is false → byte-identical routing (engine already guards on it).
+        skillAgentAffinity: config.routing?.skill_agent_affinity ?? false,
         sprintId: '',
         taskId: task.id,
         projectRoot,

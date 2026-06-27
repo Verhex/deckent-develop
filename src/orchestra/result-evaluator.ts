@@ -1,6 +1,6 @@
 // ═══ Result Evaluator — Pure evaluation module ═══════════════════════
 // Extracted from brain.ts (Sprint 036).
-// Contains: evaluateResult, isDocTask, getRecentSprintStats
+// Contains: evaluateWithRubric (canonical), isDocTask, getRecentSprintStats
 // tryCodeVerifiedDone migrated to auditor.ts (Sprint 138) — re-exported here.
 // No side effects, no file writes — evaluation logic only.
 
@@ -8,10 +8,8 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Task, TaskResult, EvaluationRubric, RubricScore, EvaluationResult, NoGoCategory } from '../core/types.js';
-import { TaskEvaluation } from '../core/types.js';
 import { BRAIN_DIR, SPRINTS_DIR, TASKS_DIR, ARCHIVE_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
-import { validateWorkerCoverage } from './coverage-validator.js';
 import { reconcileSpuriousNoGo, reconcileRubricNoGo } from './mid-sprint-adapter.js';
 import { getRubric, coverageOptional } from './rubric-registry.js';
 import type { DiskVerifyResult } from './disk-verify.js';
@@ -93,123 +91,6 @@ export function isDocTask(task: Task): boolean {
   const dirs = task.scope?.directories ?? [];
   if (dirs.length === 0) return false;
   return dirs.every(d => !isSourceCodeDir(d));
-}
-
-// ─── evaluateResult ──────────────────────────────────────────────────
-
-/**
- * Evaluates a worker's task result and returns DONE, GO_WITH_TECH_DEBT, or NO_GO.
- *
- * Brain makes the final call — worker selfAssessment is only a hint, not the decision.
- *
- * Evaluation order:
- * 1. selfAssessment NO_GO → NO_GO (hard failure always respected)
- * 2. tests failed → NO_GO (regardless of self-assessment)
- * 3. doc task → DONE (skip coverage)
- * 4. vitest JSON coverage mismatch → GO_WITH_TECH_DEBT
- * 5. tests pass + new test files written → DONE
- * 6. tests pass + no new tests + coverage < coverageThreshold → GO_WITH_TECH_DEBT
- * 7. coverage >= coverageThreshold → DONE
- * 8. worker hint GO_WITH_TECH_DEBT (fallback only) → GO_WITH_TECH_DEBT
- * 9. default → DONE
- *
- * @deprecated Use evaluateWithRubric() instead. This function uses a simpler grading
- * algorithm without rubric scoring. Sprint phases already use evaluateWithRubric()
- * for consistent EVALUATE and FIX phase evaluation. This function is retained only
- * for backward compatibility with CLI finalize command.
- */
-export async function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string, coverageThreshold = 90, projectRoot?: string): Promise<TaskEvaluation> {
-  // Step 1a: Sprint 145 — TIMEOUT_WITH_WORK: worker was killed but has partial work
-  // Attempt reconciliation via Spurious NO_GO helper if projectRoot available
-  if ((result.selfAssessment as string) === 'TIMEOUT_WITH_WORK') {
-    if (projectRoot) {
-      const reconciled = await reconcileSpuriousNoGo(result, task, projectRoot);
-      if (reconciled.decision === 'GO_WITH_TECH_DEBT') {
-        debugLog('evaluateResult:reconcile', `Task ${task.id}: TIMEOUT_WITH_WORK reconciled → GO_WITH_TECH_DEBT`);
-        return TaskEvaluation.GO_WITH_TECH_DEBT;
-      }
-    }
-    // Fallback: treat TIMEOUT_WITH_WORK as GO_WITH_TECH_DEBT even without reconciliation
-    return TaskEvaluation.GO_WITH_TECH_DEBT;
-  }
-
-  // Step 1: Hard failures — NO_GO regardless of self-assessment
-  // Sprint 145: Before giving up, check if git diff shows substantial work
-  if (result.selfAssessment === 'NO_GO') {
-    if (projectRoot) {
-      const reconciled = await reconcileSpuriousNoGo(result, task, projectRoot);
-      if (reconciled.reconciled && reconciled.decision === 'GO_WITH_TECH_DEBT') {
-        debugLog('evaluateResult:reconcile', `Task ${task.id}: Spurious NO_GO reconciled → GO_WITH_TECH_DEBT (${reconciled.linesChanged} lines changed)`);
-        return TaskEvaluation.GO_WITH_TECH_DEBT;
-      }
-    }
-    return TaskEvaluation.NO_GO;
-  }
-
-  // Step 1b: Bash unavailable tolerance — environment constraint, not code quality
-  // When Bash tool is unavailable (session-env ENOENT), worker cannot run tsc/vitest,
-  // so testsPassed=false and coverage=0 are expected. Accept as GO_WITH_TECH_DEBT
-  // if the worker's self-assessment is not NO_GO and code changes were applied.
-  if (!result.testsPassed && isBashUnavailable(result)) {
-    return TaskEvaluation.GO_WITH_TECH_DEBT;
-  }
-
-  if (!result.testsPassed) return TaskEvaluation.NO_GO;
-
-  // Step 2: Doc tasks — DONE if tests pass (skip coverage)
-  if (isDocTask(task)) return TaskEvaluation.DONE;
-
-  // Step 3: Brain makes the final call based on objective criteria
-  // Worker self-assessment is just a HINT, not the final decision
-
-  // Check: did worker write new test files?
-  const hasNewTests = result.filesChanged?.some(f =>
-    f.includes('.test.') || f.includes('.spec.')
-  ) ?? false;
-
-  // Step 3a: Validate task-specific goNogo criteria from DIRECTIVES
-  // If goCriteria contains specific verification patterns, validate notes match
-  if (task.goNogo?.goCriteria && task.goNogo.goCriteria.length > 30) {
-    // Task has specific criteria — check that worker notes address them
-    const notes = result.notes ?? '';
-    const criteria = task.goNogo.goCriteria.toLowerCase();
-    // If criteria mention specific verification but notes are empty → tech debt
-    if (notes.length < 20 && criteria.includes('grep')) {
-      return TaskEvaluation.GO_WITH_TECH_DEBT;
-    }
-  }
-
-  // Check: vitest coverage validation (if JSON available)
-  if (vitestJsonOutput !== undefined) {
-    const coverageCheck = validateWorkerCoverage({
-      reportedCoverage: result.coverage,
-      vitestJsonOutput,
-      taskScope: { directories: task.scope?.directories ?? [] },
-    });
-    if (coverageCheck && coverageCheck.level === 'WARNING') {
-      return TaskEvaluation.GO_WITH_TECH_DEBT;
-    }
-  }
-
-  // If tests pass AND worker wrote tests → DONE
-  if (result.testsPassed && hasNewTests) {
-    return TaskEvaluation.DONE;
-  }
-
-  // If tests pass but no new tests AND coverage < coverageThreshold → TECH_DEBT
-  if (result.testsPassed && !hasNewTests && result.coverage < coverageThreshold) {
-    return TaskEvaluation.GO_WITH_TECH_DEBT;
-  }
-
-  // Coverage >= coverageThreshold with passing tests → DONE
-  if (result.coverage >= coverageThreshold) return TaskEvaluation.DONE;
-
-  // Default: respect worker hint for edge cases only
-  if (result.selfAssessment === 'GO_WITH_TECH_DEBT') {
-    return TaskEvaluation.GO_WITH_TECH_DEBT;
-  }
-
-  return TaskEvaluation.DONE;
 }
 
 // ─── Aggregate Verdict (Sprint 179 W0-1 — Bug A foundation) ──────────

@@ -17,7 +17,9 @@ import { formatStartResponse, formatErrorResponse, wrapResponse } from '../helpe
 import { isSprintLocked } from '../../core/multi-ide.js';
 import { initCostConfig, loadCostConfig } from '../../core/cost-config-loader.js';
 import { resolveBillingModeForAuth, type TaskCostInput } from '../../core/cost-calculator.js';
-import { evaluateCostGate, buildCostGateErrorPayload } from '../../core/cost-gate.js';
+import { evaluateCostGate, evaluateSpendWarnAtSpawn, buildCostGateErrorPayload } from '../../core/cost-gate.js';
+import { writeEvent } from '../../core/event-stream.js';
+import { notifyAsync } from '../../core/notify.js';
 import {
   getIpcDir,
   IPC_CONFIG_FILE,
@@ -228,6 +230,24 @@ export function registerStartTool(server: McpServer): void {
                 estimated: gate.estimate.costRealistic,
                 budget: gate.estimate.budgetUsd,
               });
+            }
+
+            // ─── PRE-SPAWN CUMULATIVE-SPEND WARN-GATE (B6 — warn-only) ──
+            // Mirrors the CLI advisory. Flag-gated by cost_limits.enforce_spend_gate
+            // (default-off): projects this sprint's estimate onto already-logged
+            // daily/monthly spend and emits a NON-BLOCKING COST_LIMIT_WARN when a
+            // rolling limit is crossed. The estimate gate above is untouched;
+            // flag-off / under-limit → no read, no event, start unchanged.
+            // TODO(phase2, post-beta): hard pre-spawn block unless acknowledged.
+            const spendWarn = evaluateSpendWarnAtSpawn({
+              root,
+              costConfig,
+              sprintEstimateUsd: gate.estimate.costRealistic,
+            });
+            if (spendWarn) {
+              writeEvent(root, planForCost.id, 'brain', 'user', spendWarn.type, { ...spendWarn, sprintId: planForCost.id });
+              notifyAsync('progress', planForCost.id, 'Cost limit warning', spendWarn.message);
+              debugLog('start:costGate:spendWarn', spendWarn);
             }
 
             // Reuse the cost-gate pre-plan to estimate sprint duration. Computed

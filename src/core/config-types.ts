@@ -109,6 +109,19 @@ export interface GateConfig {
    *  severe debt (completionRatio < 0.5) → GATE_FAILURE.
    *  Absent or 0 = feature disabled (default-off). */
   max_tech_debt_ratio?: number;
+  /** Per-task EVALUATE-phase verify-delta downgrade (DECKENT-TRIAGE A14, Sprint 343).
+   *  When true, a DONE task whose task-start verify-delta baseline shows the
+   *  delivered files-changed delta fell short is downgraded via
+   *  applyTechDebtDowngrade (DONE → GO_WITH_TECH_DEBT; severe < 0.5 → NO_GO).
+   *  Absent/false = disabled (default-off, byte-identical). No baseline on disk
+   *  → no downgrade. */
+  verify_delta_downgrade?: boolean;
+  /** Per-task EVALUATE-phase ADR-compliance enforcement (DECKENT-TRIAGE A9, Sprint 343).
+   *  When true, the worker's changed files are scanned for ADR-006/008/010
+   *  violations; a failing verdict downgrades the task to NO_GO so the standard
+   *  FIX path triggers. The enforcer fails OPEN (an internal error never blocks
+   *  the task). Absent/false = disabled (default-off, byte-identical). */
+  enforce_adr_compliance?: boolean;
 }
 
 // ─── Cost Guard Config ───────────────────────────────────────────────

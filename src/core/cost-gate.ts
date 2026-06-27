@@ -18,7 +18,7 @@ import {
   type SprintCostEstimate,
   type EstimateOptions,
 } from './cost-calculator.js';
-import type { CostConfig } from './cost-config-loader.js';
+import { readSpendWindow, type CostConfig } from './cost-config-loader.js';
 import type { ExecutionBudget } from './work-model.js';
 
 // ─── Input / Output Types ───────────────────────────────────────────────────
@@ -272,6 +272,65 @@ export function checkSpendGate(input: SpendGateCheckInput): CostLimitWarnEvent |
   }
 
   return null;
+}
+
+// ─── Pre-Spawn Cumulative-Spend Warn-Gate (B6 — warn-only) ─────────────────
+
+export interface SpendWarnAtSpawnInput {
+  /** Project root — the resource ledger (spend log) lives under it. */
+  root: string;
+  /** Loaded cost config (provides daily_max_usd / monthly_max_usd / enforce_spend_gate). */
+  costConfig: CostConfig;
+  /** This sprint's cost estimate, projected on top of the already-logged spend. */
+  sprintEstimateUsd: number;
+  /**
+   * Spend-window reader override. Defaults to the real `readSpendWindow` over the
+   * resource ledger; tests inject a stub so no real resource-log is read. Invoked
+   * ONLY when `enforce_spend_gate` is on — the flag-off path does zero I/O.
+   * (Mirrors the injectable seam of `emitFinalizeSpendAdvisory`.)
+   */
+  readSpendWindow?: (root: string, window: 'day' | 'month') => number;
+}
+
+/**
+ * B6 (DECKENT-TRIAGE-PLAN) — PRE-SPAWN cumulative-spend warn-gate.
+ *
+ * The pre-spawn cost gate (`evaluateCostGate`) enforces only the per-sprint
+ * ESTIMATE against `auto_confirm_below_usd` / `sprint_max_usd`; it never looks
+ * at rolling daily/monthly spend (that was only gated at FINALIZE via
+ * `emitFinalizeSpendAdvisory`). This helper closes that gap on the spawn path
+ * WITHOUT touching the estimate gate: when `enforce_spend_gate` is on
+ * (default-off) it projects this sprint's estimate on top of the already-logged
+ * day/month spend (read through `readSpendWindow`) and returns a
+ * `COST_LIMIT_WARN` when a window limit is breached.
+ *
+ * WARN-ONLY — never blocks. The HARD pre-spawn block (refuse-unless-acknowledged)
+ * is a deliberate post-beta follow-up — see TODO(phase2) at the two call sites.
+ *
+ * Flag-off short-circuit: when `enforce_spend_gate` is falsy the helper returns
+ * null BEFORE the reader is resolved or the ledger is touched — zero I/O, zero
+ * side effects, byte-for-byte unchanged spawn behavior. The projection +
+ * threshold math is delegated entirely to {@link checkSpendGate} (no re-impl).
+ */
+export function evaluateSpendWarnAtSpawn(
+  input: SpendWarnAtSpawnInput,
+): CostLimitWarnEvent | null {
+  const { root, costConfig, sprintEstimateUsd } = input;
+
+  // Flag-off (the default) → no ledger read, no event. Short-circuits BEFORE the
+  // reader is resolved/called, so the common spawn path is a true no-op.
+  if (!costConfig.cost_limits.enforce_spend_gate) return null;
+
+  const readSpend =
+    input.readSpendWindow ??
+    ((r: string, window: 'day' | 'month'): number => readSpendWindow(r, window));
+
+  return checkSpendGate({
+    spentDayUsd: readSpend(root, 'day'),
+    spentMonthUsd: readSpend(root, 'month'),
+    sprintEstimateUsd,
+    costConfig,
+  });
 }
 
 // ─── Convenience: structured error payload for MCP ──────────────────────────

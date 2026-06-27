@@ -96,7 +96,7 @@ import { showSplashIfEnabled } from '../cli/helpers/splash.js';
 import { calculateMetrics } from './sprint-reporter.js';
 
 // ─── Rubric-Based Evaluation ─────────────────────────────────────
-import { evaluateWithRubric, reconcileEvaluationSpuriousNoGo } from './result-evaluator.js';
+import { evaluateWithRubric, reconcileEvaluationSpuriousNoGo, applyTechDebtDowngrade } from './result-evaluator.js';
 
 // ─── Honest Result Gate (Sprint 165 Task 1 — Bug X Fix) ─────────
 // Single canonical honesty boundary. Applied before evaluateWithRubric
@@ -167,6 +167,14 @@ import {
 // GO_WITH_TECH_DEBT tasks. Config-gated default-OFF (config.cross_verify.enabled);
 // when disabled the wire below never calls runCrossVerify, so behavior is unchanged.
 import { runCrossVerify } from './cross-verify-runner.js';
+
+// ─── EVALUATE-phase enforcement gates (DECKENT-TRIAGE A14 + A9, Sprint 343) ──
+// READ-only consumers of two existing-but-unconsumed enforcement primitives,
+// both flag-gated default-off (config.gate.*). computeVerifyDelta reads the
+// worker's task-start verify-delta baseline; enforceAdrCompliance scans changed
+// files for ADR-006/008/010 violations (fails OPEN on internal error).
+import { computeVerifyDelta } from '../agents/worker-lifecycle.js';
+import { enforceAdrCompliance } from './authority-enforcer.js';
 
 // ─── Sprint Controller (safe circular — all usages inside function bodies) ──
 import {
@@ -1579,6 +1587,84 @@ export async function runEvaluatePhase(
               result.notes = result.notes ? `${result.notes}\n${enfNote}` : enfNote;
             }
           } catch (e) { debugLog('runEvaluatePhase:crossVerify', e); }
+        }
+
+        // ─── EVALUATE-phase enforcement gates (DECKENT-TRIAGE A14 + A9) ─────────
+        // Two flag-gated, default-off gates wiring existing-but-unconsumed
+        // enforcement primitives into this per-task loop. Both are byte-for-byte
+        // no-ops when their flag is unset/absent. Each is wrapped in try/catch so
+        // a gate fault logs + falls through (never drops the EVALUATE loop),
+        // mirroring the gates above.
+
+        // (A14) verify-delta downgrade — a DONE that survived rubric scoring is
+        // re-checked against the worker's task-start verify-delta baseline. When
+        // the delivered files-changed delta fell short, applyTechDebtDowngrade
+        // downgrades DONE → GO_WITH_TECH_DEBT (or severe < 0.5 → NO_GO). No
+        // baseline on disk → computeVerifyDelta returns null → unchanged.
+        if (
+          resolvedConfig?.gate?.verify_delta_downgrade === true &&
+          evaluation === TaskEvaluation.DONE
+        ) {
+          try {
+            const filesChangedActual = result.filesChanged?.length ?? 0;
+            const testFailActual = result.testsPassed === false ? 1 : 0;
+            const expectedFilesChangedCount = task.scope?.filesWrite?.length;
+            const vd = computeVerifyDelta(
+              projectRoot, task.id, filesChangedActual, testFailActual, expectedFilesChangedCount,
+            );
+            if (vd) {
+              const downgrade = applyTechDebtDowngrade('DONE', result, vd.completionRatio);
+              if (downgrade.downgraded) {
+                evaluation = downgrade.decision === 'NO_GO'
+                  ? TaskEvaluation.NO_GO
+                  : TaskEvaluation.GO_WITH_TECH_DEBT;
+                try {
+                  const sidVd = getCurrentSprintId(projectRoot) ?? sprint.id;
+                  writeEvent(
+                    projectRoot, sidVd, 'brain', 'auditor',
+                    'BRAIN→AUDITOR:TECH_DEBT_DOWNGRADE',
+                    {
+                      taskId: task.id,
+                      completionRatio: downgrade.completionRatio,
+                      reason: downgrade.reason,
+                      originalVerdict: 'DONE',
+                      upgradedVerdict: downgrade.decision,
+                      timestamp: new Date().toISOString(),
+                    },
+                  );
+                } catch (e) { debugLog('runEvaluatePhase:verifyDeltaDowngrade:event', e); }
+                const vdNote = `[verify-delta downgrade] ${downgrade.reason ?? ''}`.trim();
+                result.notes = result.notes ? `${result.notes}\n${vdNote}` : vdNote;
+                debugLog('runEvaluatePhase:verifyDeltaDowngrade',
+                  `task=${task.id} DONE→${evaluation} (${downgrade.reason ?? ''})`);
+              }
+            }
+          } catch (e) { debugLog('runEvaluatePhase:verifyDeltaDowngrade', e); }
+        }
+
+        // (A9) ADR-compliance — scan the worker's changed files for ADR-006/008/010
+        // violations. A failing verdict downgrades the task to NO_GO with the
+        // violation reason so the standard FIX path triggers. enforceAdrCompliance
+        // fails OPEN internally (returns pass:true on any enforcer error); the
+        // outer try/catch preserves that fail-open even if the call itself throws,
+        // so an enforcer bug can never block all tasks.
+        if (resolvedConfig?.gate?.enforce_adr_compliance === true) {
+          try {
+            const sidAdr = getCurrentSprintId(projectRoot) ?? sprint.id;
+            const adrVerdict = enforceAdrCompliance(
+              projectRoot, sidAdr, task.id, result.filesChanged ?? [],
+            );
+            if (adrVerdict.pass === false) {
+              evaluation = TaskEvaluation.NO_GO;
+              const reason = adrVerdict.violations
+                .map(v => `${v.adrId}: ${v.description}`)
+                .join('; ');
+              const adrNote = `[ADR-compliance ENFORCED NO_GO] ${reason}`.trim();
+              result.notes = result.notes ? `${result.notes}\n${adrNote}` : adrNote;
+              debugLog('runEvaluatePhase:adrCompliance',
+                `task=${task.id} → NO_GO (${adrVerdict.violations.length} violation(s))`);
+            }
+          } catch (e) { debugLog('runEvaluatePhase:adrCompliance', e); }
         }
 
         debugLog('runEvaluatePhase:task', `task=${task.id} selfAssessment=${result.selfAssessment} evaluation=${evaluation} testsPassed=${result.testsPassed}`);

@@ -1,11 +1,18 @@
 // VS Code extension entrypoint for Deckent IDE integration.
 // Sprint 214-010: real activation + workspace deckent detection.
-// Dependency-injected (VsCodeApi) so the activation logic is testable without a vscode runtime.
+// Sprint 343-005: status-bar integration, proper disposal via context.subscriptions.
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface ExtensionContext {
   subscriptions: { dispose(): void }[];
+}
+
+export interface StatusBarItem {
+  text: string;
+  tooltip: string;
+  show(): void;
+  dispose(): void;
 }
 
 export interface WorkspaceApi {
@@ -18,20 +25,36 @@ export interface VsCodeApi {
   };
   window: {
     showInformationMessage(message: string): void;
+    createStatusBarItem(id: string, alignment: number, priority: number): StatusBarItem;
   };
   workspace?: WorkspaceApi;
 }
 
-// ─── State ───────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const COMMANDS = ['deckent.startSprint', 'deckent.showDashboard'] as const;
 const DECKENT_MARKERS = ['.deckent/config.json', '.deckent/sprint-state.json'] as const;
+const STATUS_BAR_ID = 'deckent';
+const STATUS_BAR_ALIGNMENT = 1; // StatusBarAlignment.Left
+const STATUS_BAR_PRIORITY = 100;
+const STATUS_BAR_TEXT = '$(rocket) Deckent';
+const STATUS_BAR_TOOLTIP = 'Deckent — AI Agent Orchestrator';
+
+// ─── State ───────────────────────────────────────────────────────────────────
 
 let detectedDeckent = false;
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 export function activate(context: ExtensionContext, vscode: VsCodeApi): void {
+  // Status bar — created via injected API so dispose is handled by subscriptions.
+  const bar = vscode.window.createStatusBarItem(STATUS_BAR_ID, STATUS_BAR_ALIGNMENT, STATUS_BAR_PRIORITY);
+  bar.text = STATUS_BAR_TEXT;
+  bar.tooltip = STATUS_BAR_TOOLTIP;
+  bar.show();
+  context.subscriptions.push(bar);
+
+  // Commands — disposables pushed so VS Code cleans up on deactivate.
   for (const commandId of COMMANDS) {
     const disposable = vscode.commands.registerCommand(commandId, () => {
       vscode.window.showInformationMessage(`Deckent: ${commandId}`);

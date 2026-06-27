@@ -74,8 +74,9 @@ export function scanCodeAST(content: string, fileName: string): string[] {
     const esmRequire = createRequire(import.meta.url);
     ts = esmRequire('typescript') as typeof import('typescript');
   } catch {
-    // TypeScript not available at runtime — skip AST scanning
-    return [];
+    // TypeScript not available at runtime — return sentinel so callers can distinguish
+    // "scanner could not run" from "scanner ran and found nothing" (silent-pass security gap)
+    return ['__SANDBOX_UNAVAILABLE__:typescript-not-installed'];
   }
 
   const violations: string[] = [];

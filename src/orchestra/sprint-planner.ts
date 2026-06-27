@@ -108,6 +108,11 @@ import { AgentPoolManager } from '../core/agent-pool.js';
 import { selectAgent } from '../core/agent-selector.js';
 import { routeTaskV2 } from '../core/routing-engine.js';
 import type { UserOverride } from '../core/routing-types.js';
+import {
+  InMemoryAgentSelectionSink,
+  recordAgentSelection,
+  summarizeAgentDistribution,
+} from '../core/routing-affinity-observability.js';
 
 // ─── Sub-module imports ──────────────────────────────────────────
 import { resolveTaskModel, parsePatterns, deduplicatePatterns } from './model-selector.js';
@@ -590,6 +595,12 @@ export async function planSprint(
         debugLog('planSprint:evolved-rules', e);
       }
 
+      // ADR-075 routing-balance gate (343-007): accumulate per-task agent
+      // selections so the affinity distribution can be measured BEFORE the flag
+      // is defaulted on. In-memory, non-blocking, never throws.
+      const affinitySink = new InMemoryAgentSelectionSink();
+      const skillAgentAffinity = config.routing?.skill_agent_affinity ?? false;
+
       for (const task of tasks) {
         try {
           const overrides: UserOverride[] = [];
@@ -609,6 +620,9 @@ export async function planSprint(
             overrides,
             learningData,
             config: { ...config.routing_config, agentMinScore: config.agent_min_score },
+            // ADR-075 (343-007): thread the skill→agent affinity flag. Default-off →
+            // option is false → byte-identical routing (engine already guards on it).
+            skillAgentAffinity,
             sprintId,
             taskId: task.id,
             projectRoot,
@@ -616,6 +630,15 @@ export async function planSprint(
 
           task.assignedAgent = decision.agentId ?? 'generic';
           task.assignedSkills = decision.skillIds;
+
+          // Routing-balance observability — the affinity reasoning line is emitted
+          // only for the WINNING agent that actually received the bonus, so its
+          // presence is a faithful per-task "affinity influenced this choice" signal.
+          recordAgentSelection(affinitySink, {
+            taskId: task.id,
+            agentId: task.assignedAgent,
+            affinityApplied: decision.reasoning.some((r) => r.includes('skill-affinity:')),
+          });
           task.routingMeta = {
             taskDNA: decision.taskDNA,
             confidence: decision.agentConfidence,
@@ -680,6 +703,14 @@ export async function planSprint(
           debugLog('planSprint:routing-v2', `V2 routing failed for task ${task.id}: ${taskErr}`);
         }
       }
+
+      // ADR-075 routing-balance gate (343-007): surface the agent-distribution
+      // snapshot (counts per agent + % affinity-influenced) for the dogfood
+      // measurement that must precede any default-on. Dev-only (DECKENT_DEBUG).
+      debugLog(
+        'planSprint:routing-affinity',
+        `affinity=${skillAgentAffinity} distribution: ${JSON.stringify(summarizeAgentDistribution(affinitySink.records))}`,
+      );
     } catch (poolErr) {
       debugLog('planSprint:routing-v2', `V2 routing pool loading failed: ${poolErr}`);
     }

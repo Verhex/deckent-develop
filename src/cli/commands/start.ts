@@ -18,7 +18,9 @@ import { bootstrapNotifyDispatcher, resolveWebhookBootstrapOption } from '../../
 import { buildConnectorAdapterWithKpiSummary, buildSprintKpiSummaryFn } from '../../connectors/kpi-summary-dispatch.js';
 import { loadCostConfig, initCostConfig } from '../../core/cost-config-loader.js';
 import { estimateSprintCost, formatEstimate, resolveBillingModeForAuth, type TaskCostInput } from '../../core/cost-calculator.js';
-import { evaluateCostGate } from '../../core/cost-gate.js';
+import { evaluateCostGate, evaluateSpendWarnAtSpawn } from '../../core/cost-gate.js';
+import { writeEvent } from '../../core/event-stream.js';
+import { notifyAsync } from '../../core/notify.js';
 import { existsSync, unlinkSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -393,6 +395,25 @@ export function registerStart(program: Command): void {
               printError(new Error(gate.message + ' (CLI: override with --force.)'));
               process.exitCode = 1;
               return;
+            }
+
+            // ─── PRE-SPAWN CUMULATIVE-SPEND WARN-GATE (B6 — warn-only) ──
+            // The estimate gate above checks only THIS sprint's cost. This
+            // advisory additionally projects the estimate on top of already-
+            // logged daily/monthly spend and WARNS (never blocks) when a rolling
+            // limit would be crossed. Flag-gated by cost_limits.enforce_spend_gate
+            // (default-off): flag-off / under-limit → no read, no event, sprint
+            // start byte-for-byte unchanged.
+            // TODO(phase2, post-beta): hard pre-spawn block unless acknowledged.
+            const spendWarn = evaluateSpendWarnAtSpawn({
+              root,
+              costConfig,
+              sprintEstimateUsd: gate.estimate.costRealistic,
+            });
+            if (spendWarn) {
+              writeEvent(root, planForCost.id, 'brain', 'user', spendWarn.type, { ...spendWarn, sprintId: planForCost.id });
+              print(`⚠️  [cost-advisory] ${spendWarn.message}`);
+              notifyAsync('progress', planForCost.id, 'Cost limit warning', spendWarn.message);
             }
 
             // Auto-confirm threshold

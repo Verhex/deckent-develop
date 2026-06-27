@@ -326,12 +326,31 @@ export interface ChatNativeOptions {
   mcpConfirm?: McpConfirmFn;
   /**
    * AS2-P2 — REPL `/provider` switcher parity. Called when the user types
-   * `/provider <name>` in the loop; the caller (e.g. createSwitchableProvider)
-   * rebuilds the underlying adapter. When omitted the switch is acknowledged
-   * (confirmation message emitted) but no adapter rebuild occurs. Default-off
-   * for backward compatibility with callers that don't wire a switcher.
+   * `/provider <name>` in the loop; the caller (e.g. {@link createSwitchableProvider})
+   * rebuilds the underlying adapter IN-PLACE so the next turn uses the new
+   * provider. The callback validates the name against the registry and THROWS
+   * (ProviderNotFoundError) for an unknown provider — it never silently falls
+   * back to claude (Yasa #2); the loop surfaces the throw as an honest error.
+   *
+   * Sprint 343 R7 — when this is OMITTED the loop NO LONGER fakes a "switched"
+   * confirmation. A fixed single-provider / `--once` session cannot swap its
+   * adapter, so `/provider <name>` reports HONESTLY that switching is
+   * unavailable (see {@link ChatNativeOptions.switchUnavailable}) instead of
+   * claiming a swap that never happened. Default-off preserves backward
+   * compatibility for callers that don't wire a switcher.
    */
   switchProvider?: (providerName: string) => void;
+  /**
+   * Sprint 343 R7 — honest notice formatter for the case above: `/provider
+   * <name>` typed in a session that has NO {@link ChatNativeOptions.switchProvider}
+   * wired. Called with the requested provider name; the returned string is
+   * emitted verbatim instead of a fake "switched" confirmation. i18n-first: the
+   * mechanism stays string-free — the caller injects an already-localized
+   * formatter; when omitted an English default is used (the entry-point phase-2
+   * wire should pass a `getMessage('tui.switch_unavailable', lang, { name })`
+   * backed formatter once that key is added to messages.ts).
+   */
+  switchUnavailable?: (providerName: string) => string;
 }
 
 const DEFAULT_MAX_TURNS = 50;
@@ -571,19 +590,34 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       memStore?.appendChatTurn(sessionId, 'assistant', interrText);
       continue;
     }
-    // AS2-P2 — `/provider` switcher parity: handle here (before the slash
-    // registry which returns 'none' for /provider) so Path-C (HTTP/terminal)
-    // has the same UX as the Ink REPL (app.tsx line ~431). The switchProvider
-    // callback rebuilds the underlying adapter; when omitted the confirmation
-    // is still emitted so the user knows the command was received.
+    // AS2-P2 / Sprint 343 R7 — `/provider` switcher parity: handle here (before
+    // the slash registry which returns 'none' for /provider) so Path-C
+    // (HTTP/terminal) has the same UX as the Ink REPL (app.tsx line ~431). Three
+    // honest branches:
+    //   - no arg                  → usage hint (unchanged).
+    //   - arg, NO switchProvider  → HONEST "switching unavailable" notice that
+    //     echoes the requested name. A fixed single-provider / `--once` session
+    //     cannot rebuild its adapter, so we MUST NOT fake a "switched"
+    //     confirmation for a swap that never happened (Yasa #2). i18n-first:
+    //     caller injects a localized `switchUnavailable` formatter; English
+    //     default otherwise (string-free mechanism + injected label).
+    //   - arg, switchProvider     → rebuild in-place (the callback resolves the
+    //     name from the registry and THROWS for an unknown provider — never a
+    //     silent claude fallback). Success → tui.switched; throw → honest error.
     if (line === '/provider' || line.startsWith('/provider ')) {
       const arg = line.slice('/provider'.length).trim();
       let replyText: string;
       if (arg.length === 0) {
         replyText = getMessage('tui.switch_usage', lang);
+      } else if (!opts.switchProvider) {
+        replyText = opts.switchUnavailable
+          ? opts.switchUnavailable(arg)
+          : `Provider switching is unavailable in this session — cannot switch to ` +
+            `"${arg}" (no provider switcher is wired). Restart with a switchable ` +
+            `provider to use /provider.`;
       } else {
         try {
-          opts.switchProvider?.(arg);
+          opts.switchProvider(arg);
           replyText = `${getMessage('tui.switched', lang)}: ${arg}`;
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
@@ -1025,6 +1059,26 @@ export function createSubscriptionChatAdapter(
   };
 }
 
+// ─── TODO(phase2): wire a switchable provider into the prod entry points ─────
+//
+// Sprint 343 R7 — `runChatNativeLoop` switches providers correctly WHEN a
+// `switchProvider` callback is supplied (createSwitchableProvider below) and now
+// reports HONESTLY ("switching unavailable") when one is NOT. The remaining gap
+// is the two PRODUCTION entry points, which still build a FIXED provider and omit
+// `switchProvider`, so `/provider` reports "unavailable" there today. Both files
+// are OFF this task's single-file surface (chat-native.ts only), so the wire is
+// deferred — this module already exposes everything they need:
+//   • src/cli/entry.ts (~:669, non-Ink native loop) — builds `provider` via
+//     buildReplProvider(providerName), which spans the FULL provider matrix
+//     (claude/codex/gemini/ollama/deepseek/qwen/glm). The subscription-only
+//     createSwitchableProvider here is NOT a drop-in there; wrap buildReplProvider
+//     in a rebuild-on-switch proxy — the Ink REPL already does exactly this via
+//     src/cli/repl/provider-switch.ts::createSwitchableProvider(initial, rebuild)
+//     — then pass its switchProvider + a getMessage('tui.switch_unavailable')-
+//     backed `switchUnavailable` formatter into runChatNativeLoop.
+//   • src/cli/commands/chat.ts (~:500/:522, --native paths) — build the provider
+//     via createSwitchableProvider({ registry }) and pass its switchProvider.
+//
 // ─── Switchable Provider (AS2-P2) ───────────────────────────────────
 //
 // Factory that builds a stable proxy ChatProviderAdapter around a mutable

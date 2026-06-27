@@ -315,6 +315,9 @@ export function registerRun(program: Command): void {
             overrides,
             learningData: [],
             config: cfg ? { ...cfg.routing_config, agentMinScore: cfg.agent_min_score } : undefined,
+            // ADR-075 (343-007): thread the skill→agent affinity flag. Default-off →
+            // option is false → byte-identical routing (engine already guards on it).
+            skillAgentAffinity: cfg?.routing?.skill_agent_affinity ?? false,
             sprintId: '',
             taskId: task.id,
             projectRoot: root,
