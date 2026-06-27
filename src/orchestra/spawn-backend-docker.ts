@@ -12,6 +12,7 @@ import type { ModelType } from '../core/types.js';
 import { getProviderForModel, UnknownModelError } from '../core/task-types.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { getProviderCommandSpec, buildProviderCommand } from '../core/provider-command-spec.js';
+import { buildSuggestedImageCmd } from '../core/worker-image-check.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 import { DeckentError } from '../core/errors.js';
@@ -346,6 +347,32 @@ export function getProviderBinaryForModel(model: ModelType): string {
   return 'claude';
 }
 
+/**
+ * F1-005 (Sprint 332): assemble the provider-aware `docker build` invocation a
+ * worker's provider needs — the build-arg threading the spawn side surfaces when
+ * the worker image cannot run the requested provider's CLI.
+ *
+ * Delegates the build-arg mapping to {@link buildSuggestedImageCmd} (core, the
+ * single source of truth shared with `deckent image build` / doctor /
+ * `checkWorkerImage`) so the codex/gemini opt-in args stay in lock-step with
+ * `Dockerfile.worker`:
+ *   - claude → no `--build-arg` (today's lean default image, byte-for-byte);
+ *   - codex  → `--build-arg INSTALL_CODEX=true`;
+ *   - gemini → `--build-arg INSTALL_GEMINI=true`;
+ *   - any other / host-only (e.g. ollama, which never reaches the docker backend)
+ *     → no `--build-arg` (lean image).
+ *
+ * Pure — exported for unit tests; never executed here. We only surface the command
+ * in an honest-fail so the operator rebuilds the image with the right CLI, instead
+ * of a silent claude fallback that would run a codex/gemini task on a claude-only
+ * image (Yasa #2 + the ADR-076 auth-precedence lesson). The build context stays
+ * the literal `.` from buildSuggestedImageCmd (operator runs it from the project
+ * root) — no `process.cwd()` is consulted.
+ */
+export function workerImageBuildCmdForProvider(image: string, provider: string): string {
+  return buildSuggestedImageCmd(image, [provider]);
+}
+
 /** Result of a single health-check inspect call. */
 export interface HealthCheckResult {
   /** Container is running normally — proceed with monitor. */
@@ -516,13 +543,25 @@ export class DockerSpawnBackend implements SpawnBackend {
     effectiveTimeout: number,
     tasksDir: string,
   ): void {
-    // Guard: verify Docker image exists before attempting spawn
+    // F1-005 (Sprint 332): resolve this worker's provider up-front so the image
+    // readiness honest-fail below can name the EXACT provider-aware rebuild
+    // command. codex/gemini CLIs are opt-in build-args in Dockerfile.worker; claude
+    // is the lean default. (Re-used downstream for the ProviderCommandSpec lookup.)
+    const provider = modelRegistry.get(model)?.provider ?? 'claude';
+
+    // Guard: verify Docker image exists before attempting spawn.
     const imageCheck = spawnSync('docker', ['images', '-q', this.image], {
       encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
     });
     if (!imageCheck.stdout?.trim()) {
+      // Provider-aware honest-fail: a codex/gemini worker whose CLI is not in the
+      // image must receive its OWN build-arg rebuild command — never a silent
+      // claude fallback that would run the wrong CLI (Yasa #2 + the ADR-076
+      // auth-precedence lesson). claude → lean default image (no build-arg).
       throw new SpawnBackendError(
-        `Docker image '${this.image}' not found. Run: docker build -f Dockerfile.worker -t ${this.image} .`,
+        `Docker image '${this.image}' not ready for provider '${provider}' — `
+        + `the requested provider's CLI is not in the image. `
+        + `Build it with: ${workerImageBuildCmdForProvider(this.image, provider)}`,
         'docker',
       );
     }
@@ -557,7 +596,6 @@ export class DockerSpawnBackend implements SpawnBackend {
     // `--dangerously-skip-permissions`) for EVERY provider (Sprint 249 root
     // cause: codex/gemini binaries rejected the claude-only flags).
     const containerPromptPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/${promptFileName}`;
-    const provider = modelRegistry.get(model)?.provider ?? 'claude';
     const spec = getProviderCommandSpec(provider);
     if (!spec) {
       // Host-only / unknown provider (e.g. ollama) reached the docker backend.

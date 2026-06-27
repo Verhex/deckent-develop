@@ -8,14 +8,14 @@ Build: tsc
 Runtime: Node.js >=24.0.0
 Platform: macOS, Linux, WSL2
 <!-- AUTOGEN:START id="identity-tests" -->
-Tests: 25,174 descriptors (parsed from tests/**/*.test.ts(x))
+Tests: 25,323 descriptors (parsed from tests/**/*.test.ts(x))
 Coverage: 88.58%
 <!-- AUTOGEN:END id="identity-tests" -->
 Dashboard Tests: 413
 <!-- AUTOGEN:START id="identity-summary" -->
-Sprints: 331+ (active)
+Sprints: 332+ (active)
 CLI Commands: 62+
-MCP: 36 tools, 8 resources
+MCP: 37 tools, 8 resources
 Agents: 15 built-in + 2 custom
 Skills: 21 built-in
 Providers: Claude, Codex, Gemini
@@ -27,11 +27,11 @@ Features: **Memory V2 DB-First (SQLite FTS5, dual-layer i18n normalize, 96% cont
 | Metric | Value |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-331 |
-| MCP Tools | 36 |
+| Sprint | sprint-332 |
+| MCP Tools | 37 |
 | MCP Resources | 8 |
 | CLI Commands | 62+ |
-| Dashboard Pages | 19 |
+| Dashboard Pages | 20 |
 | Agents | 15 built-in + 2 custom |
 | Skills | 21 built-in |
 | Providers | 3 (Claude, Codex, Gemini) |

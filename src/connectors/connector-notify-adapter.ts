@@ -21,6 +21,7 @@ import type { Notification, NotificationAdapter } from '../core/notification-dis
 import type { IMessageConnector, InlineButton } from './types.js';
 import type { ConnectorPool } from './connector-pool.js';
 import { chunkMessage } from './message-format.js';
+import { debugLog } from '../core/utils.js';
 
 /** A started (outbound) connector plus the chat id notifications are sent to. */
 export interface ConnectorTarget {
@@ -31,6 +32,13 @@ export interface ConnectorTarget {
 export interface ConnectorNotifyOptions {
   /** Per-send timeout in ms (default 5000) — caps a slow/unreachable platform. */
   timeoutMs?: number;
+  /**
+   * Optional KPI summary hook — called after a `sprint-finalized` notification is
+   * delivered. Returns the formatted summary string to broadcast, or null/undefined
+   * to skip. Non-blocking: a throw or rejection is caught and logged, never
+   * propagated to the caller.
+   */
+  kpiSummaryFn?: (sprintId: string) => Promise<string | null | undefined>;
 }
 
 const PRIORITY_EMOJI: Record<string, string> = {
@@ -179,6 +187,30 @@ export function makeConnectorNotificationAdapter(
           ).catch(() => undefined), // per-target isolation: a failure never propagates
         ),
       );
+
+      // KPI summary hook: opt-in, non-blocking sprint-finalized broadcast.
+      // A throw or rejection is caught and logged; it NEVER fails the notify path.
+      if (notification.event === 'sprint-finalized' && opts.kpiSummaryFn) {
+        try {
+          const summary = await opts.kpiSummaryFn(notification.sprintId);
+          if (summary) {
+            await Promise.all(
+              targets.map((t) =>
+                withTimeout(
+                  t.connector.sendMessage({
+                    connector: t.connector.id,
+                    channelId: t.chatId,
+                    text: summary,
+                  }),
+                  timeoutMs,
+                ).catch(() => undefined),
+              ),
+            );
+          }
+        } catch (err) {
+          debugLog('connector-notify-adapter:kpi-summary', err);
+        }
+      }
     },
   };
 }

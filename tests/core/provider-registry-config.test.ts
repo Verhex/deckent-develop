@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // Prevent child_process calls from hitting real CLI tools (claude/codex/gemini)
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
+  spawn: vi.fn(),
 }));
 
 // Prevent .deck file I/O in tests

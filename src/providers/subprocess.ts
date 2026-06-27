@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import type { ModelType } from '../core/types.js';
 import { CLAUDE_MODELS } from '../core/types.js';
 import type { ProviderAdapter, ProviderSpawnOptions } from '../core/provider.js';
-import { ProviderError } from '../core/provider.js';
+import { ProviderError, buildCliInvocation } from '../core/provider.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { resolveReasoningEffort } from '../core/reasoning-effort.js';
@@ -129,14 +129,30 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
   private readonly projectDir: string;
   private readonly workers = new Map<string, SubprocessWorkerEntry>();
   private readonly providerConfig: SubprocessProviderConfig;
+  /** Host platform — injectable so cross-platform branches are testable without a real spawn. */
+  private readonly platform: NodeJS.Platform;
+  /** Spawn impl — injectable so tests never launch a real process. */
+  private readonly spawnImpl: typeof spawn;
 
   /** Default timeout in ms before a worker is killed automatically (0 = no timeout) */
   protected defaultTimeoutMs: number;
 
-  constructor(projectDir: string, opts?: { defaultTimeoutMs?: number; providerConfig?: SubprocessProviderConfig }) {
+  constructor(
+    projectDir: string,
+    opts?: {
+      defaultTimeoutMs?: number;
+      providerConfig?: SubprocessProviderConfig;
+      /** Override host platform (DEP0190 cross-platform seam; defaults to `process.platform`). */
+      platform?: NodeJS.Platform;
+      /** Override the spawn impl (test hermeticity; defaults to `node:child_process` `spawn`). */
+      spawnImpl?: typeof spawn;
+    },
+  ) {
     this.projectDir = projectDir;
     this.defaultTimeoutMs = opts?.defaultTimeoutMs ?? 0;
     this.providerConfig = opts?.providerConfig ?? CLAUDE_SUBPROCESS_CONFIG;
+    this.platform = opts?.platform ?? process.platform;
+    this.spawnImpl = opts?.spawnImpl ?? spawn;
     this.name = this.providerConfig.name;
     this.supportedModels = this.providerConfig.supportedModels;
   }
@@ -172,6 +188,10 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     const args = this.providerConfig.usageEmitArgs
       ? [...baseArgs, ...this.providerConfig.usageEmitArgs]
       : baseArgs;
+    // SPAWN-1 (DEP0190 + ADR-006): cross-platform shell-free invocation. On win32 this
+    // routes through `cmd.exe /c <cli> <args…>` (shell:false) so the .cmd/.ps1 wrapper is
+    // resolved via PATHEXT while args stay a discrete escaped array — never shell:true+array.
+    const inv = buildCliInvocation(this.providerConfig.cliCommand, args, this.platform);
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
       stdio: ['pipe', logFd, logFd],
@@ -181,13 +201,12 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
         LANG: process.env['LANG'] ?? 'en_US.UTF-8',
         PYTHONIOENCODING: 'utf-8',
       },
-      // Windows: shell:true needed to resolve .cmd/.ps1 wrappers (e.g. claude.cmd)
-      shell: process.platform === 'win32',
+      shell: inv.shell,
     };
 
-    const child = spawn(this.providerConfig.cliCommand, args, spawnOpts);
+    const child = this.spawnImpl(inv.command, inv.args, spawnOpts);
     // BUG-26: DON'T close logFd here — keep open until child exits
-    // On Windows with shell:true, closing FD before child inherits causes empty logs
+    // On Windows the cmd.exe wrapper child inherits the FD; closing it before inherit causes empty logs
 
     // Write initial heartbeat
     this.writeHeartbeat(taskId, dir, 'EXECUTING', 0);
@@ -272,10 +291,12 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
 
   async isAvailable(): Promise<boolean> {
     return new Promise((resolve) => {
-      const child = spawn(this.providerConfig.cliCommand, ['--version'], {
+      // SPAWN-1: shell-free cross-platform probe (see spawn() — win32 → cmd.exe /c wrapper).
+      const inv = buildCliInvocation(this.providerConfig.cliCommand, ['--version'], this.platform);
+      const child = this.spawnImpl(inv.command, inv.args, {
         stdio: 'pipe',
         timeout: 5_000,
-        shell: process.platform === 'win32',
+        shell: inv.shell,
       });
       child.once('exit', (code) => resolve(code === 0));
       child.once('error', () => resolve(false));

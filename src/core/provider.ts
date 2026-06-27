@@ -379,16 +379,60 @@ export function parseSemverFromOutput(raw: string | undefined): string | undefin
   return match ? match[1] : undefined;
 }
 
+/** Injectable seams for {@link detectCliVersion} so tests never spawn a real process. */
+export interface CliInvocationDeps {
+  /** Override the host platform (defaults to `process.platform`). */
+  platform?: NodeJS.Platform;
+  /** Override the synchronous spawn impl (defaults to `node:child_process` `spawnSync`). */
+  spawnSyncImpl?: typeof spawnSync;
+}
+
+/**
+ * Build a cross-platform, **shell-free** invocation tuple for a CLI command
+ * (`{ command, args, shell:false }` — always safe to spread into spawn/spawnSync).
+ *
+ * Windows provider CLIs ship as `.cmd`/`.ps1` wrappers on PATH. A bare
+ * `spawn('claude', args, { shell:false })` cannot launch a batch wrapper —
+ * CreateProcess rejects non-PE files, and post-CVE-2024-27980 Node refuses
+ * `.cmd`/`.bat` without a shell — which is why the old code reached for
+ * `shell:true`. But `shell:true` WITH an args array is the exact Node DEP0190
+ * condition AND concatenates the args into one command string (the ADR-006
+ * command-injection surface). The fix routes through `cmd.exe /c <cmd> <args…>`
+ * with `shell:false`: cmd.exe resolves the wrapper via PATHEXT while Node passes
+ * each arg as a discrete, escaped argv entry — closing both the deprecation and
+ * the injection hole. POSIX needs no wrapper: the binary is a real executable,
+ * spawned directly with no shell (behaviour byte-for-byte unchanged).
+ */
+export function buildCliInvocation(
+  cmd: string,
+  args: string[],
+  platform: NodeJS.Platform = process.platform,
+): { command: string; args: string[]; shell: false } {
+  if (platform === 'win32') {
+    return { command: 'cmd.exe', args: ['/c', cmd, ...args], shell: false };
+  }
+  return { command: cmd, args, shell: false };
+}
+
 /**
  * Try to detect a CLI tool version by running `<cmd> --version`.
  * Returns the version string on success, undefined on failure.
+ * Cross-platform & shell-free via {@link buildCliInvocation} (DEP0190 + ADR-006 safe).
  * @internal
  */
-export function detectCliVersion(cmd: string, args: string[] = ['--version']): string | undefined {
+export function detectCliVersion(
+  cmd: string,
+  args: string[] = ['--version'],
+  deps: CliInvocationDeps = {},
+): string | undefined {
+  const spawnSyncImpl = deps.spawnSyncImpl ?? spawnSync;
   try {
-    // Windows: spawnSync needs shell:true to find .cmd/.ps1 wrappers in PATH
-    const isWindows = process.platform === 'win32';
-    const result = spawnSync(cmd, args, { encoding: 'utf-8', timeout: 5000, shell: isWindows });
+    const inv = buildCliInvocation(cmd, args, deps.platform);
+    const result = spawnSyncImpl(inv.command, inv.args, {
+      encoding: 'utf-8',
+      timeout: 5000,
+      shell: inv.shell,
+    });
     if (result.status === 0 && result.stdout) {
       return result.stdout.trim();
     }

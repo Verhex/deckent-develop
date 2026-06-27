@@ -17,8 +17,16 @@ export interface Segment {
 }
 
 export interface StreamSegmenter {
-  /** Feed a streamed chunk; emits any units that completed. */
-  feed(chunk: string): void;
+  /**
+   * Feed a streamed chunk; emits any units that completed.
+   * Accepts a decoded `string` (the production path — provider already decoded)
+   * OR raw UTF-8 `Uint8Array` bytes. Byte chunks are decoded with streaming
+   * semantics so a multi-byte code point (Turkish ç/ğ/ı/İ/ö/ş/ü, em-dash, emoji)
+   * split across a chunk boundary is held as an incomplete tail and completed by
+   * the next chunk — never bisected into U+FFFD. String feeds pass through
+   * byte-for-byte unchanged.
+   */
+  feed(chunk: string | Uint8Array): void;
   /** End of turn: emit the trailing partial line / any open block. */
   flush(): void;
   /** The current in-progress (incomplete) line, for a small live preview. */
@@ -49,6 +57,11 @@ export function createStreamSegmenter(emit: (seg: Segment) => void): StreamSegme
   let buf = '';                          // incomplete trailing text (no newline yet)
   let mode: 'prose' | 'code' | 'table' = 'prose';
   let block: string[] = [];              // accumulating code/table lines
+  // Stateful streaming UTF-8 decoder, created lazily only when raw bytes are fed.
+  // `{ stream: true }` emits whole code points and buffers an incomplete
+  // multi-byte tail across feeds — so a Turkish/emoji code point straddling a
+  // chunk boundary is never garbled. (TextDecoder is a Node 24+ global — ADR-001.)
+  let decoder: TextDecoder | null = null;
 
   const flushTable = (): void => {
     if (block.length === 0) return;
@@ -78,8 +91,10 @@ export function createStreamSegmenter(emit: (seg: Segment) => void): StreamSegme
   };
 
   return {
-    feed(chunk: string): void {
-      buf += chunk;
+    feed(chunk: string | Uint8Array): void {
+      buf += typeof chunk === 'string'
+        ? chunk
+        : (decoder ??= new TextDecoder('utf-8')).decode(chunk, { stream: true });
       let nl: number;
       while ((nl = buf.indexOf('\n')) !== -1) {
         handleLine(buf.slice(0, nl));
@@ -87,6 +102,9 @@ export function createStreamSegmenter(emit: (seg: Segment) => void): StreamSegme
       }
     },
     flush(): void {
+      // Drain any residual bytes the streaming decoder is still holding; a stream
+      // truncated mid-codepoint yields a faithful U+FFFD rather than a silent drop.
+      if (decoder) { buf += decoder.decode(); decoder = null; }
       if (buf.length > 0) { handleLine(buf); buf = ''; }
       if (mode === 'code' && block.length > 0) { emit({ kind: 'block', markdown: block.join('\n') }); block = []; }
       else if (mode === 'table') flushTable();

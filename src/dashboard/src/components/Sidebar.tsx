@@ -23,6 +23,7 @@ import { navGroups, navItems } from "../nav-items.js";
 import { cn } from "../lib/utils.js";
 import { useTranslation } from "../i18n/LanguageProvider.js";
 import { useNervousStatus } from "../hooks/useNervousStatus.js";
+import { BarChart2 } from "lucide-react";
 
 export type { NavItem, NavGroup } from "../nav-items.js";
 export { navGroups, navItems };
@@ -70,6 +71,24 @@ export function SidebarNavLinks({ onNavigate }: SidebarNavLinksProps) {
                 )}
               </NavLink>
             ))}
+            {groupLabel === "watch" && (
+              <NavLink
+                to="/kpi"
+                onClick={onNavigate}
+                data-testid="nav-kpi"
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200",
+                    isActive
+                      ? "bg-zinc-800 text-zinc-100 border-l-2 border-gold"
+                      : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200 border-l-2 border-transparent",
+                  )
+                }
+              >
+                <BarChart2 className="h-4 w-4" />
+                {t("nav.kpi")}
+              </NavLink>
+            )}
           </div>
         </div>
       ))}

@@ -19,6 +19,12 @@ import { computeSprintKpis } from './rollup-engine.js';
 
 /** Provider token / cost totals for a sprint. */
 export interface UsageTotals {
+  /**
+   * Total sprint cost (USD), provider-agnostic. Real-cost-first: the producer
+   * (buildUsageTotals) sums each result's provider-reported `cost.usd` when present
+   * and only estimates from tokens for results that report no cost. `0` is a valid
+   * authoritative value (e.g. an all-local/ollama sprint), never a "missing" marker.
+   */
   costUsd: number;
   inputTokens: number;
   outputTokens: number;

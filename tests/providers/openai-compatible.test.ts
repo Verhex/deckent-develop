@@ -8,6 +8,11 @@
  *   - Error path: non-2xx throws ProviderError; missing key throws
  *   - Unsupported model throws ProviderError
  */
+import { EventEmitter } from 'node:events';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import {
@@ -205,13 +210,44 @@ describe('OPENAI_COMPAT_PRESETS', () => {
   });
 });
 
-describe('OpenAICompatibleAdapter spawn-mode stubs', () => {
-  it('spawn() throws — HTTP-only adapter', () => {
-    const adapter = makeAdapter(mockFetchOk({}));
-    expect(() => adapter.spawn('t1', 'test-model-a' as never, 'prompt')).toThrow(/HTTP-only/);
+describe('OpenAICompatibleAdapter spawn-mode (F1-013 agentic HTTP worker)', () => {
+  // spawn() is no longer an HTTP-only stub — it launches the http-agentic-worker
+  // loop as a subprocess. We inject a fake spawn + entry path so no real process
+  // fires; the deep agentic behavior is covered in tests/agents/http-agentic-worker.test.ts.
+  function makeSpawnableAdapter(projectDir: string, spawnImpl: unknown): OpenAICompatibleAdapter {
+    return new OpenAICompatibleAdapter({
+      name: 'test-provider',
+      baseURL: 'https://api.example.com/v1',
+      apiKeyEnv: 'TEST_PROVIDER_KEY',
+      models: ['test-model-a', 'test-model-b'],
+      projectDir,
+      workerEntryPath: '/fake/dist/agents/http-agentic-worker.js',
+      spawnImpl: spawnImpl as typeof import('node:child_process').spawn,
+    });
+  }
+
+  it('spawn() no longer throws — launches the node agentic-worker entry', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'oai-compat-spawn-'));
+    try {
+      const calls: { command: string; args: ReadonlyArray<string> }[] = [];
+      const fakeSpawn = (command: string, args: ReadonlyArray<string>): EventEmitter => {
+        calls.push({ command, args });
+        return new EventEmitter();
+      };
+      const adapter = makeSpawnableAdapter(dir, fakeSpawn);
+
+      expect(() => adapter.spawn('t1', 'test-model-a' as never, 'prompt')).not.toThrow();
+      expect(calls).toHaveLength(1);
+      expect(calls[0]!.command).toBe('node');
+      expect(calls[0]!.args[0]).toBe('/fake/dist/agents/http-agentic-worker.js');
+      expect(calls[0]!.args[1]).toBe('t1');
+      expect(adapter.listWorkers()).toContain('t1');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
-  it('listWorkers() returns empty array', () => {
+  it('listWorkers() returns empty array before any spawn', () => {
     const adapter = makeAdapter(mockFetchOk({}));
     expect(adapter.listWorkers()).toEqual([]);
   });

@@ -259,10 +259,18 @@ export function registerConfig(program: Command): void {
           for (const field of result.addedFields) {
             print(`  + ${field}`);
           }
+          // CFG-1: surface legacy → canonical renames (e.g. mode: pro_plan → economic)
+          // so a rename-only migration is not reported as a bare "Added 0 field(s)".
+          for (const rename of result.renamedFields ?? []) {
+            print(`  ~ ${rename}`);
+          }
         } else {
           print(getMessage('config.migrate_complete', lang, { count: String(result.addedFields.length) }));
           for (const field of result.addedFields) {
             print(`  + ${field}`);
+          }
+          for (const rename of result.renamedFields ?? []) {
+            print(`  ~ ${rename}`);
           }
           if (result.backupPath) {
             print(getMessage('config.migrate_backup', lang, { path: result.backupPath }));

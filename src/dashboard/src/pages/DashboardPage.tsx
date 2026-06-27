@@ -19,6 +19,7 @@ import { fetchJson, postJson, ApiError } from "../lib/api";
 import type { DashboardState, Alert } from "../types";
 import { useLiveData } from "../lib/use-live-data";
 import { DirectivesEditor } from "../components/DirectivesEditor";
+import { KpiCard } from "../components/KpiCard";
 
 // WelcomeScreen: shown when no active sprint
 interface WelcomeScreenProps {
@@ -461,6 +462,9 @@ export default function DashboardPage() {
             : <ActivityFeed state={state} hasSprint={!!state} />}
         </div>
       </div>
+
+      {/* KPI Scorecard — additive, below worker grid */}
+      <KpiCard />
 
       {/* Alerts Section */}
       {alerts.length > 0 && (

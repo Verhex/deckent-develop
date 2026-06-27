@@ -25,6 +25,13 @@ export interface MigrationResult {
   migrated: boolean;
   /** Fields that were added during migration */
   addedFields: string[];
+  /**
+   * Legacy → canonical renames applied during migration, as human-readable
+   * descriptors (e.g. `mode: pro_plan → economic`). Optional so callers/mocks
+   * that predate this field still satisfy the interface. CFG-1: surfaced so
+   * `config migrate` reports the mode rewrite instead of a bare "Added 0 field(s)".
+   */
+  renamedFields?: string[];
   /** Path to the backup file (if created) */
   backupPath: string | null;
   /** Error message if migration failed */
@@ -216,11 +223,15 @@ export function migrateConfig(
   };
 
   let legacyRenamed = false;
+  const renamedFields: string[] = [];
 
   // Migrate top-level mode field
   if (typeof existing['mode'] === 'string' && LEGACY_MODE_MAP[existing['mode']]) {
-    existing['mode'] = LEGACY_MODE_MAP[existing['mode']];
+    const from = existing['mode'];
+    const to = LEGACY_MODE_MAP[from] as string;
+    existing['mode'] = to;
     legacyRenamed = true;
+    renamedFields.push(`mode: ${from} → ${to}`);
   }
 
   // Migrate modes object keys
@@ -233,6 +244,7 @@ export function migrateConfig(
         }
         delete existingModes[oldName];
         legacyRenamed = true;
+        renamedFields.push(`modes.${oldName} → modes.${newName}`);
       }
     }
     // Remove usage_thresholds from all modes (Sprint 089 removal)
@@ -253,6 +265,7 @@ export function migrateConfig(
     return {
       migrated: false,
       addedFields: [],
+      renamedFields: [],
       backupPath: null,
     };
   }
@@ -261,6 +274,7 @@ export function migrateConfig(
     return {
       migrated: true,
       addedFields: missingFields,
+      renamedFields,
       backupPath: null,
     };
   }
@@ -305,6 +319,7 @@ export function migrateConfig(
   return {
     migrated: true,
     addedFields: missingFields,
+    renamedFields,
     backupPath,
   };
 }

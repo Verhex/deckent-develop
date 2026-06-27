@@ -1657,6 +1657,20 @@ export async function readAuthMode(
  * @throws {ConfigValidationError} When the merged result fails validation
  */
 export function validatePartialConfig(partial: Partial<DeckentConfig>): void {
+  // CFG-1: normalize a legacy `mode` alias (e.g. pro_plan → economic) IN PLACE
+  // before validation, mirroring the read path (loadConfig → resolveMode at the
+  // top of mergeConfigs). VALID_MODES intentionally lists only canonical names,
+  // so a legacy `mode` left on disk would otherwise make validateConfig reject
+  // EVERY `config set <unrelated-key>` write. Normalizing here both unblocks the
+  // write AND persists the canonical value, because callers (config set / import
+  // / MCP set) write the SAME object back to disk after this returns. Canonical
+  // and unknown values pass through unchanged (resolveMode is a no-op for them).
+  if (typeof partial.mode === 'string') {
+    const canonical = resolveMode(partial.mode);
+    if (canonical !== partial.mode) {
+      partial.mode = canonical as PlanMode;
+    }
+  }
   const merged = deepMerge(createDefaultConfig(), partial);
   validateConfig(merged);
 }

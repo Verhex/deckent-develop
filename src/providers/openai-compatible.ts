@@ -5,12 +5,22 @@
 // adapter + preset map covers them all. No new runtime dep — Node built-in
 // fetch only (ADR-010).
 //
-// This adapter is **HTTP-only**: `spawn()` is not supported (workers run
-// inside the calling process via `send()`). Spawn-mode callers should pick
-// a CLI-spawn provider (claude/codex/gemini) instead.
+// `send()` is the synchronous chat entry; `spawn()` (F1-013, Sprint 332) runs a
+// real headless **agentic sprint worker** by launching the provider-agnostic
+// `http-agentic-worker` loop as a subprocess (mirrors OllamaAdapter's spawn
+// lifecycle). The loop drives this adapter's tool-aware `send()` through the
+// chat-tool-exec executor with ADR-037 scope enforcement.
 //
 // Wiring (registerProvider) lives in 214-016; this file only defines the
 // adapter + presets.
+import {
+  spawn as nodeSpawn,
+  type ChildProcess,
+  type SpawnOptions as NodeSpawnOptions,
+} from 'node:child_process';
+import { writeFileSync, mkdirSync, existsSync, openSync, closeSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { ModelType } from '../core/types.js';
 import type {
   ProviderAdapter,
@@ -18,13 +28,29 @@ import type {
   ProviderAvailabilityDetail,
 } from '../core/provider.js';
 import { ProviderError } from '../core/provider.js';
+import { TASKS_DIR } from '../core/constants.js';
 import { normalizeUsage, type TokenUsage } from '../core/token-usage.js';
 
 // ─── Wire types (OpenAI /chat/completions) ───────────────────────────
 
+/**
+ * OpenAI chat message. The `tool` role + `tool_calls`/`tool_call_id`/`name`
+ * fields are the agentic tool-calling superset (F1-013) — additive and
+ * back-compat: a plain system/user/assistant message is still valid.
+ */
 export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
+  tool_calls?: OpenAIToolCallWire[];
+  tool_call_id?: string;
+  name?: string;
+}
+
+/** OpenAI tool-call wire shape (request echo + response). */
+export interface OpenAIToolCallWire {
+  id?: string;
+  type?: 'function';
+  function: { name: string; arguments: string | Record<string, unknown> };
 }
 
 export interface ChatCompletionOptions {
@@ -34,6 +60,12 @@ export interface ChatCompletionOptions {
   maxTokens?: number;
   /** Stop sequences. */
   stop?: string[];
+  /**
+   * Tool schemas (OpenAI `tools` array) advertised to the model for an agentic
+   * tool-calling round (F1-013). When set, the parsed `choices[0].message.
+   * tool_calls` are surfaced on {@link ChatCompletionResult.toolCalls}.
+   */
+  tools?: readonly unknown[];
 }
 
 export interface ChatCompletionResult {
@@ -45,6 +77,27 @@ export interface ChatCompletionResult {
   };
   /** Resolved model id echoed by upstream (for telemetry). */
   model?: string;
+  /** Parsed `choices[0].message.tool_calls` when the model requested tools (F1-013). */
+  toolCalls?: OpenAIToolCallWire[];
+}
+
+/**
+ * Default path to the compiled HTTP agentic worker entry (F1-013). Resolved
+ * from this module's own URL — production: `dist/providers/openai-compatible.js`
+ * → `dist/agents/http-agentic-worker.js`. Tests inject a stub via the
+ * `workerEntryPath` constructor option.
+ */
+const DEFAULT_HTTP_WORKER_ENTRY_PATH = fileURLToPath(
+  new URL('../agents/http-agentic-worker.js', import.meta.url),
+);
+
+/** Tracks a spawned agentic worker subprocess for lifecycle (kill/timeout). */
+interface HttpWorkerEntry {
+  taskId: string;
+  process: ChildProcess;
+  logPath: string;
+  spawnedAt: string;
+  timeoutHandle?: ReturnType<typeof setTimeout>;
 }
 
 // ─── Adapter config ──────────────────────────────────────────────────
@@ -60,6 +113,17 @@ export interface OpenAICompatibleConfig {
   models: readonly string[];
   /** Optional fetch override for tests (defaults to global fetch). */
   fetchImpl?: typeof fetch;
+  /**
+   * Project root used by `spawn()` for `.tasks/` heartbeat + log files (F1-013).
+   * Defaults to `process.cwd()`; `spawn(opts.projectDir)` overrides per-call.
+   */
+  projectDir?: string;
+  /** Override the compiled agentic-worker entry path (tests stub it). */
+  workerEntryPath?: string;
+  /** Override `node:child_process.spawn` (tests capture launch args, no real process). */
+  spawnImpl?: typeof nodeSpawn;
+  /** Auto-kill timeout (ms) for a spawned worker; 0 = no timeout. */
+  defaultTimeoutMs?: number;
 }
 
 // ─── Adapter ─────────────────────────────────────────────────────────
@@ -71,6 +135,11 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
   readonly supportedModels: readonly ModelType[];
 
   private readonly fetchImpl: typeof fetch;
+  private readonly projectDir: string;
+  private readonly workerEntryPath: string;
+  private readonly spawnImpl: typeof nodeSpawn;
+  private readonly defaultTimeoutMs: number;
+  private readonly workers = new Map<string, HttpWorkerEntry>();
 
   constructor(config: OpenAICompatibleConfig) {
     this.name = config.name;
@@ -79,6 +148,10 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
     // Models are stringly-typed in the registry until ModelType is widened.
     this.supportedModels = config.models as unknown as readonly ModelType[];
     this.fetchImpl = config.fetchImpl ?? ((...args) => fetch(...args));
+    this.projectDir = config.projectDir ?? process.cwd();
+    this.workerEntryPath = config.workerEntryPath ?? DEFAULT_HTTP_WORKER_ENTRY_PATH;
+    this.spawnImpl = config.spawnImpl ?? nodeSpawn;
+    this.defaultTimeoutMs = config.defaultTimeoutMs ?? 0;
   }
 
   // ─── send() — primary HTTP entry ────────────────────────────────────
@@ -114,6 +187,10 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
     if (opts?.temperature !== undefined) body['temperature'] = opts.temperature;
     if (opts?.maxTokens !== undefined) body['max_tokens'] = opts.maxTokens;
     if (opts?.stop !== undefined) body['stop'] = opts.stop;
+    // F1-013 agentic round: advertise tool schemas so the model can emit
+    // `tool_calls`. Absent for a plain chat — keeps the request byte-identical
+    // to today's behavior when `tools` is unset.
+    if (opts?.tools !== undefined && opts.tools.length > 0) body['tools'] = opts.tools;
 
     const res = await this.fetchImpl(`${this.baseURL}/chat/completions`, {
       method: 'POST',
@@ -133,7 +210,7 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
     }
 
     const json = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
+      choices?: Array<{ message?: { content?: string; tool_calls?: unknown } }>;
       usage?: { prompt_tokens?: number; completion_tokens?: number };
       model?: string;
     };
@@ -148,6 +225,9 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
     if (typeof json?.model === 'string') {
       result.model = json.model;
     }
+    // F1-013: surface the model's tool_calls (when present) for the agentic loop.
+    const toolCalls = normalizeToolCalls(json?.choices?.[0]?.message?.tool_calls);
+    if (toolCalls.length > 0) result.toolCalls = toolCalls;
     return result;
   }
 
@@ -182,21 +262,114 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
     };
   }
 
-  // ─── Spawn-mode stubs (HTTP-only adapter) ──────────────────────────
+  // ─── Spawn-mode (F1-013 agentic HTTP worker) ───────────────────────
 
-  spawn(_taskId: string, _model: ModelType, _prompt: string, _opts?: ProviderSpawnOptions): void {
-    throw new ProviderError(
-      `${this.name} is an HTTP-only adapter — use send() instead of spawn()`,
-      this.name,
+  /**
+   * Launch a real headless agentic sprint worker (F1-013). Spawns the
+   * provider-agnostic `http-agentic-worker` loop as a `node` subprocess — the
+   * loop reads `.tasks/task-{id}.json`, drives THIS adapter's tool-aware
+   * `send()` through the chat-tool-exec executor (scope-enforced, ADR-037), and
+   * writes a structured `.result`. Lifecycle (workers map, heartbeat, timeout
+   * SIGKILL, kill SIGTERM, exit cleanup) mirrors OllamaAdapter.
+   *
+   * `prompt` is read from the task JSON by the subprocess (parity with the
+   * Ollama path), so the ProviderAdapter signature is honored without forwarding
+   * the string. v1 = ONE task; concurrency parity is a phase-2 follow-up.
+   */
+  spawn(taskId: string, model: ModelType, _prompt: string, opts?: ProviderSpawnOptions): void {
+    if (this.workers.has(taskId)) {
+      throw new ProviderError(`Worker for task "${taskId}" is already running`, this.name);
+    }
+    if (!this.isSupportedModel(String(model))) {
+      throw new ProviderError(
+        `Unsupported model "${String(model)}" for ${this.name}. Supported: ${this.supportedModels.join(', ')}`,
+        this.name,
+      );
+    }
+
+    const dir = opts?.projectDir ?? this.projectDir;
+    const tasksDir = join(dir, TASKS_DIR);
+    if (!existsSync(tasksDir)) mkdirSync(tasksDir, { recursive: true });
+
+    const logPath = join(tasksDir, `task-${taskId}.log`);
+    const logFd = openSync(logPath, 'a');
+
+    const spawnOpts: NodeSpawnOptions = {
+      cwd: dir,
+      stdio: ['ignore', logFd, logFd],
+      env: { ...process.env, ...(opts?.env ?? {}) },
+    };
+
+    // argv = [entry, taskId, model, baseURL, apiKeyEnv, providerName]. The
+    // subprocess reconstructs the adapter from these + the inherited apiKey env.
+    const child = this.spawnImpl(
+      'node',
+      [this.workerEntryPath, taskId, String(model), this.baseURL, this.apiKeyEnv, this.name],
+      spawnOpts,
     );
+    closeSync(logFd);
+
+    this.writeHeartbeat(taskId, dir, 'EXECUTING');
+
+    const entry: HttpWorkerEntry = {
+      taskId,
+      process: child,
+      logPath,
+      spawnedAt: new Date().toISOString(),
+    };
+
+    const timeoutMs = opts?.taskTimeoutSeconds
+      ? opts.taskTimeoutSeconds * 1000
+      : this.defaultTimeoutMs;
+    if (timeoutMs > 0) {
+      entry.timeoutHandle = setTimeout(() => {
+        this.killWithSignal(taskId, 'SIGKILL');
+      }, timeoutMs);
+    }
+
+    this.workers.set(taskId, entry);
+
+    child.once('exit', () => {
+      const w = this.workers.get(taskId);
+      if (w?.timeoutHandle) clearTimeout(w.timeoutHandle);
+      this.workers.delete(taskId);
+    });
   }
 
-  kill(_taskId: string): void {
-    // No-op: nothing to kill in an HTTP-only adapter.
+  kill(taskId: string): void {
+    this.killWithSignal(taskId, 'SIGTERM');
   }
 
   listWorkers(): string[] {
-    return [];
+    return Array.from(this.workers.keys());
+  }
+
+  private killWithSignal(taskId: string, signal: NodeJS.Signals): void {
+    const entry = this.workers.get(taskId);
+    if (!entry) {
+      throw new ProviderError(`No running worker for task "${taskId}"`, this.name);
+    }
+    if (entry.timeoutHandle) clearTimeout(entry.timeoutHandle);
+    entry.process.kill(signal);
+    this.workers.delete(taskId);
+  }
+
+  private writeHeartbeat(taskId: string, dir: string, status: string): void {
+    const hbPath = join(dir, TASKS_DIR, `task-${taskId}.hb`);
+    const hb = {
+      workerId: `${this.name}-${taskId}`,
+      taskId,
+      status,
+      currentAction: `${this.name} HTTP agentic worker running`,
+      timestamp: new Date().toISOString(),
+      filesChangedCount: 0,
+      sequence: 0,
+    };
+    try {
+      writeFileSync(hbPath, JSON.stringify(hb, null, 2), 'utf-8');
+    } catch {
+      // Non-fatal: a heartbeat write failure must not stop the worker.
+    }
   }
 
   buildCommand(model: ModelType, _promptPath: string): string {
@@ -269,6 +442,38 @@ async function safeText(res: Response): Promise<string> {
   } catch {
     return '';
   }
+}
+
+/**
+ * Normalize the upstream `choices[0].message.tool_calls` into the agentic
+ * {@link OpenAIToolCallWire} shape. Tolerant of partial gateways: drops entries
+ * without a function name; keeps `arguments` as the JSON string (the loop parses
+ * it). Returns `[]` for any non-array / absent value.
+ */
+function normalizeToolCalls(raw: unknown): OpenAIToolCallWire[] {
+  if (!Array.isArray(raw)) return [];
+  const out: OpenAIToolCallWire[] = [];
+  for (const entry of raw) {
+    if (entry === null || typeof entry !== 'object') continue;
+    const e = entry as Record<string, unknown>;
+    const fn = e['function'];
+    if (fn === null || typeof fn !== 'object') continue;
+    const name = (fn as Record<string, unknown>)['name'];
+    if (typeof name !== 'string' || name.length === 0) continue;
+    const args = (fn as Record<string, unknown>)['arguments'];
+    out.push({
+      ...(typeof e['id'] === 'string' ? { id: e['id'] } : {}),
+      type: 'function',
+      function: {
+        name,
+        arguments:
+          typeof args === 'string' || (args !== null && typeof args === 'object')
+            ? (args as string | Record<string, unknown>)
+            : '{}',
+      },
+    });
+  }
+  return out;
 }
 
 // ─── Token-usage parsing helpers (extractUsage) ───────────────────────

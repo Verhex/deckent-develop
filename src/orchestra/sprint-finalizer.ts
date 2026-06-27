@@ -638,45 +638,115 @@ export function pruneStaleHandoffs(projectRoot: string, sprint: Sprint): number 
 
 // ═══ KPI Usage Totals (Sprint 330 Task 8) ════════════════════════
 
-// Opus-tier public per-token prices (USD). Phase-1 estimate only.
+// Opus-tier public per-token prices (USD). Estimate-only FALLBACK — applied per
+// result only when that result carries no provider-reported `cost` (Sprint 332).
 const OPUS_PRICE_INPUT_USD = 5e-6;
 const OPUS_PRICE_OUTPUT_USD = 25e-6;
 const OPUS_PRICE_CACHE_READ_USD = 0.5e-6;
 
 /**
- * Aggregate per-task `tokenUsage` across a sprint's results into the
- * provider-agnostic {@link UsageTotals} consumed by the KPI collection pipeline.
+ * Per-result Opus-tier cost estimate (USD) from a result's token counts — the
+ * conservative single-tier FALLBACK used only when a result reports no `cost.usd`.
+ * Null-safe: a missing `tokenUsage` estimates to 0.
+ */
+function estimateResultCost(usage: TaskResult['tokenUsage']): number {
+  if (!usage) return 0;
+  return (
+    (usage.inputTokens ?? 0) * OPUS_PRICE_INPUT_USD +
+    (usage.outputTokens ?? 0) * OPUS_PRICE_OUTPUT_USD +
+    (usage.cacheReadTokens ?? 0) * OPUS_PRICE_CACHE_READ_USD
+  );
+}
+
+/**
+ * Aggregate per-task usage across a sprint's results into the provider-agnostic
+ * {@link UsageTotals} consumed by the KPI collection pipeline.
  *
- * Cost is a Phase-1 ESTIMATE: token counts × Opus-tier public list price. This is
- * deliberately a single-tier approximation — results carry no per-task model/provider
- * split at this layer, and the public Opus rate is the conservative upper bound for a
- * Claude-default fleet.
+ * Cost is REAL-cost-first (Sprint 332 332-002, fix #3): each result contributes its
+ * provider-reported `result.cost.usd` when present — the F1-TOK/cost-config
+ * ground-truth landed sprint-330 — and falls back to the Opus-tier token estimate
+ * ONLY for a result that carries no `cost`. Fully provider-agnostic: a
+ * Codex/Gemini/local result's real spend is summed verbatim, and `cost.usd === 0`
+ * (local/ollama) is an authoritative zero, never re-estimated.
  *
- * Pure + total: results without `tokenUsage` contribute 0 (so a sprint with no usage
- * telemetry yields all-zero totals, never a crash), and the function never throws.
+ * Token counts are still summed across all results regardless of cost source.
  *
- * TODO(phase2): replace the public-tier estimate with limit-ledger ground-truth cost
- * (real provider-reported spend) once the per-task ledger is wired through finalize.
+ * Pure + total + null-safe: a result with no `tokenUsage` and no `cost` contributes
+ * 0 (so a sprint with no usage telemetry yields all-zero totals, never a crash), and
+ * the function never throws.
  */
 export function buildUsageTotals(results: readonly TaskResult[]): UsageTotals {
   let inputTokens = 0;
   let outputTokens = 0;
   let cacheRead = 0;
+  let costUsd = 0;
 
   for (const result of results) {
     const usage = result.tokenUsage;
-    if (!usage) continue;
-    inputTokens += usage.inputTokens ?? 0;
-    outputTokens += usage.outputTokens ?? 0;
-    cacheRead += usage.cacheReadTokens ?? 0;
+    if (usage) {
+      inputTokens += usage.inputTokens ?? 0;
+      outputTokens += usage.outputTokens ?? 0;
+      cacheRead += usage.cacheReadTokens ?? 0;
+    }
+
+    // REAL provider-reported cost wins (provider-agnostic ground truth); the
+    // Opus-tier estimate is used only when this result reports no `cost`.
+    const realCost = result.cost?.usd;
+    costUsd += typeof realCost === 'number' && Number.isFinite(realCost)
+      ? realCost
+      : estimateResultCost(usage);
   }
 
-  const costUsd =
-    inputTokens * OPUS_PRICE_INPUT_USD +
-    outputTokens * OPUS_PRICE_OUTPUT_USD +
-    cacheRead * OPUS_PRICE_CACHE_READ_USD;
-
   return { costUsd, inputTokens, outputTokens, cacheRead };
+}
+
+
+// ═══ KPI Forward-Collection Hook (Sprint 332 332-002) ═════════════
+
+/**
+ * Forward-collection hook: record the just-finalized sprint's 11 base KPI
+ * measurements into `<projectRoot>/.brain/memory.db` at finalize time.
+ *
+ * Extracted from the inline finalizeSprint block (Sprint 332 332-002, fix #2) so
+ * the success path is a first-class, independently unit-testable seam —
+ * finalizeSprint itself spawns subprocesses (git diff + runSelfAuditGate → tsc/
+ * vitest) and cannot be driven hermetically. The forward path is what makes a
+ * sprint's KPIs carry REAL non-zero cost/tokens; the read-path backfill
+ * (kpi-backfill.ts) only reconstructs zero-telemetry rows for sprints that were
+ * never forward-collected, so a working forward hook is the SSOT for real numbers.
+ *
+ * NON-BLOCKING + fail-safe: any failure (DB locked/missing, compute error) is
+ * swallowed via debugLog so it can NEVER block or fail finalize. SprintMetrics →
+ * SprintMetricsLike field mapping is explicit (totalTasks→tasksTotal, etc.); tenant
+ * is the Phase-1 'default'.
+ *
+ * @returns true when measurements were recorded; false when a throw was swallowed.
+ */
+export function recordSprintKpis(
+  projectRoot: string,
+  sprintId: string,
+  metrics: Pick<SprintMetrics, 'totalTasks' | 'completedTasks' | 'noGoTasks' | 'boundaryViolations'>,
+  results: readonly TaskResult[],
+): boolean {
+  try {
+    recordKpiMeasurements(
+      join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE),
+      sprintId,
+      'default',
+      {
+        tasksTotal: metrics.totalTasks,
+        tasksDone: metrics.completedTasks,
+        noGo: metrics.noGoTasks,
+        boundaryViolations: metrics.boundaryViolations,
+      },
+      results,
+      buildUsageTotals(results),
+    );
+    return true;
+  } catch (e) {
+    debugLog('finalizeSprint:kpiCollection', e);
+    return false;
+  }
 }
 
 
@@ -780,28 +850,12 @@ export async function finalizeSprint(
   const metrics = calculateMetrics(sprint, evaluations, results, freshDebt);
   sprint.metrics = metrics;
 
-  // ─── KPI collection hook (Sprint 330 Task 8) — NON-BLOCKING ──────
-  // Record the sprint's 11 base KPI measurements into memory.db. This is a
-  // best-effort telemetry sidecar: any failure (DB locked, missing, compute
-  // error) is swallowed via debugLog so it can NEVER block or fail finalize.
-  // Existing finalize behavior is preserved byte-for-byte. SprintMetrics →
-  // SprintMetricsLike field mapping is explicit (totalTasks→tasksTotal, etc.);
-  // tenant is the Phase-1 'default'.
-  try {
-    recordKpiMeasurements(
-      join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE),
-      sprint.id,
-      'default',
-      {
-        tasksTotal: metrics.totalTasks,
-        tasksDone: metrics.completedTasks,
-        noGo: metrics.noGoTasks,
-        boundaryViolations: metrics.boundaryViolations,
-      },
-      results,
-      buildUsageTotals(results),
-    );
-  } catch (e) { debugLog('finalizeSprint:kpiCollection', e); }
+  // ─── KPI forward-collection hook (Sprint 330 Task 8; hardened 332-002) ──
+  // Record the sprint's 11 base KPI measurements into memory.db. Extracted into
+  // recordSprintKpis so the success path is an independently unit-testable seam
+  // (finalizeSprint spawns subprocesses → not hermetically callable). Best-effort
+  // + fail-safe: NEVER blocks or fails finalize; finalize behavior is unchanged.
+  recordSprintKpis(projectRoot, sprint.id, metrics, results);
 
   // ─── METRIC_EMITTED: sprint summary metrics ──────────────────────
   // Emitted in parallel with metrics.jsonl so Auditor and Dashboard

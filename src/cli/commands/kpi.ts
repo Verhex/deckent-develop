@@ -19,6 +19,7 @@
 
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
+import Database from 'better-sqlite3';
 import type { Command } from 'commander';
 import { print, formatTable } from '../helpers/output.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
@@ -152,6 +153,47 @@ async function defaultConfigFn(root: string): Promise<{ language?: string }> {
   return { language: (cfg as Record<string, unknown>)['language'] as string | undefined };
 }
 
+// ─── Sprint resolution fallback (read-only) ─────────────────────────────────────
+
+/**
+ * Latest finalized sprint that actually has KPI results in the store.
+ *
+ * Final fallback for a bare `deckent kpi` once the current sprint is finalized:
+ * `getCurrentSprintId` returns null (no ACTIVE sprint), yet the store still holds
+ * the just-finalized sprint's `kpi_results` — surface those instead of an empty
+ * scorecard.
+ *
+ * Strictly read-only and side-effect-free:
+ *   - opened with `{ readonly, fileMustExist }` → NEVER creates or migrates the DB
+ *     (the caller also guards with existsSync; this is belt-and-suspenders),
+ *   - a single SELECT, no rollup/backfill write on the resolution path,
+ *   - any error (e.g. a memory.db with no KPI schema yet → "no such table")
+ *     degrades to null rather than crashing,
+ *   - the connection is always closed in `finally`.
+ *
+ * Ordering: `computed_at` DESC (most recently computed sprint wins), with
+ * `period_key` DESC as a deterministic tiebreak. Tenant-scoped.
+ */
+function latestSprintWithResults(dbPath: string, tenantId: string): string | null {
+  let db: Database.Database | null = null;
+  try {
+    db = new Database(dbPath, { readonly: true, fileMustExist: true });
+    const row = db.prepare(`
+      SELECT period_key
+      FROM kpi_results
+      WHERE tenant_id = ? AND grain = 'sprint'
+      ORDER BY computed_at DESC, period_key DESC
+      LIMIT 1
+    `).get(tenantId) as { period_key: string } | undefined;
+    return row?.period_key ?? null;
+  } catch {
+    // Missing KPI schema / unreadable store → honest "no data", never a crash.
+    return null;
+  } finally {
+    db?.close();
+  }
+}
+
 // ─── Run command ──────────────────────────────────────────────────────────────
 
 export async function runKpiCommand(
@@ -192,11 +234,21 @@ export async function runKpiCommand(
   }
 
   // ─── Scorecard mode ──────────────────────────────────────────────────────
-  const sprintId = options.sprint ?? currentSprintFn(root);
+  // Resolution precedence:
+  //   1. explicit --sprint
+  //   2. active sprint (status SSOT — getCurrentSprintId)
+  //   3. latest finalized sprint that actually has KPI results in the store
+  //      (a bare `deckent kpi` after the current sprint is finalized: there is
+  //       no ACTIVE sprint, but the store still holds the finalized results).
+  const dbExists = existsSync(dbPath);
+  let sprintId = options.sprint ?? currentSprintFn(root);
+  if (!sprintId && dbExists) {
+    sprintId = latestSprintWithResults(dbPath, 'default');
+  }
 
-  // No active sprint, or no KPI store yet → no data (never create the DB as a
+  // No sprint to score, or no KPI store yet → no data (never create the DB as a
   // side effect of a read-only command).
-  if (!sprintId || !existsSync(dbPath)) {
+  if (!sprintId || !dbExists) {
     if (options.json) {
       print(JSON.stringify({ sprintId: sprintId ?? null, kpis: [] }, null, 2));
     } else {

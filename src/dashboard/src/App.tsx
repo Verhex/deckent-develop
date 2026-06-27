@@ -23,6 +23,7 @@ import DocsHealthPage from "./pages/DocsHealthPage";
 import MissionsPage from "./pages/MissionsPage";
 import LoginPage from "./pages/LoginPage";
 import CallbackPage from "./pages/CallbackPage";
+import KpiTrendPage from "./pages/KpiTrendPage";
 
 function App() {
   return (
@@ -50,6 +51,7 @@ function App() {
                 <Route path="/directives" element={<DirectivesPage />} />
                 <Route path="/docs-health" element={<DocsHealthPage />} />
                 <Route path="/missions" element={<MissionsPage />} />
+                <Route path="/kpi" element={<KpiTrendPage />} />
               </Route>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/auth/callback" element={<CallbackPage />} />

@@ -616,6 +616,27 @@ export const en = {
   'docs_health.col_state': 'state',
   'docs_health.col_score': 'score',
   'docs_health.col_path': 'path',
+
+  // KPI Dashboard (Faz-2)
+  'nav.kpi': 'KPI',
+  'kpi.scorecard_title': 'KPI Scorecard',
+  'kpi.trend_title': 'KPI Trend',
+  'kpi.no_data_title': 'No KPI data',
+  'kpi.no_data_desc': 'KPI metrics will appear here once a sprint has completed.',
+  'kpi.empty_series_title': 'No trend data',
+  'kpi.empty_series_desc': 'No trend data available for this KPI.',
+  'kpi.select_kpi': 'Select a KPI to view',
+  'kpi.target': 'Target',
+  'kpi.value': 'Value',
+  'kpi.status_healthy': 'Healthy',
+  'kpi.status_warning': 'Warning',
+  'kpi.status_critical': 'Critical',
+  'kpi.status_unknown': 'Unknown',
+  'kpi.direction_up': 'Higher is better',
+  'kpi.direction_down': 'Lower is better',
+  'kpi.sprint_label': 'Sprint',
+  'kpi.period': 'Period',
+  'kpi.series_value': 'Value',
 } as const;
 
 export type TranslationKey = keyof typeof en;

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/logo.png" width="140" alt="deckent — circuit kraken emblem" />
+  <img src="https://raw.githubusercontent.com/VerhexIO/deckent/main/docs/assets/logo.png" width="140" alt="deckent — circuit kraken emblem" />
 </p>
 
 <h1 align="center">deckent</h1>
@@ -7,7 +7,7 @@
 <p align="center"><strong>Describe what you want. Watch a team of AI agents build it — in parallel, with quality gates, on a budget you approve, remembering everything for next time.</strong></p>
 
 <!-- AUTOGEN:START id="badges" -->
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-25174%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![coverage](https://img.shields.io/badge/coverage-88.58%25-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-331%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-25323%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![coverage](https://img.shields.io/badge/coverage-88.58%25-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-332%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
 <!-- AUTOGEN:END id="badges" -->
 
 ---
@@ -283,7 +283,7 @@ deckent is provider-agnostic to the core. Configure providers in `.deckent/confi
 
 Or skip model names entirely and let the **model registry** (14 models across 4 tiers — `premium_plus` / `premium` / `standard` / `economy`) pick the equivalent model for whatever provider you chose, via `model_strategy.brain_tier` / `worker_tier`. Pricing is fetched live (with a bundled fallback), so cost estimates stay honest.
 
-→ Full guide: [docs/reference/multi-provider.md](docs/reference/multi-provider.md)
+→ Full guide: [docs/reference/multi-provider.md](https://github.com/VerhexIO/deckent/blob/main/docs/reference/multi-provider.md)
 
 ---
 
@@ -312,7 +312,7 @@ Or skip model names entirely and let the **model registry** (14 models across 4 
 
 The codebase is layered: `orchestra/` (the sprint engine), `core/` (config, memory, model registry, routing), `agents/` (worker lifecycle), `monitor/` (Auditor), `nervous/` (proactive detectors), `providers/` + `mcp-client/` (model backends), `api/` + `dashboard/` (web surfaces), `mcp/` (the MCP server), and `cli/` (Commander + the REPL).
 
-→ [Architecture](docs/architecture/architecture.md) · [Sprint Lifecycle](docs/architecture/sprint-lifecycle.md) · [Memory System](docs/architecture/memory-system.md)
+→ [Architecture](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/architecture.md) · [Sprint Lifecycle](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/sprint-lifecycle.md) · [Memory System](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/memory-system.md)
 
 ---
 
@@ -324,7 +324,7 @@ deckent ships an MCP server, so any MCP-compatible tool can drive it:
 claude mcp add deckent -- npx deckent-mcp     # any MCP client works the same way
 ```
 
-**35 tools + 8 resources** over stdio. → [docs/reference/mcp-guide.md](docs/reference/mcp-guide.md)
+**35 tools + 8 resources** over stdio. → [docs/reference/mcp-guide.md](https://github.com/VerhexIO/deckent/blob/main/docs/reference/mcp-guide.md)
 
 ---
 
@@ -341,10 +341,10 @@ claude mcp add deckent -- npx deckent-mcp     # any MCP client works the same wa
 
 ## Documentation
 
-- [Getting Started](docs/guide/getting-started.md) · [First Sprint](docs/guide/first-sprint.md) · [Chat Mode](docs/guide/chat-mode.md)
-- [Multi-Provider Guide](docs/reference/multi-provider.md) · [Docker Backend](docs/guide/docker-backend.md) · [Configuration Reference](docs/reference/config-reference.md)
-- [Architecture](docs/architecture/architecture.md) · [Sprint Lifecycle](docs/architecture/sprint-lifecycle.md) · [Memory System](docs/architecture/memory-system.md) · [MCP Guide](docs/reference/mcp-guide.md)
-- [Cookbook: Add a REST API](docs/cookbook/add-rest-api.md) · [Cookbook: Fix a Bug](docs/cookbook/fix-bug.md) · [Troubleshooting](docs/development/troubleshooting.md)
+- [Getting Started](https://github.com/VerhexIO/deckent/blob/main/docs/guide/getting-started.md) · [First Sprint](https://github.com/VerhexIO/deckent/blob/main/docs/guide/first-sprint.md) · [Chat Mode](https://github.com/VerhexIO/deckent/blob/main/docs/guide/chat-mode.md)
+- [Multi-Provider Guide](https://github.com/VerhexIO/deckent/blob/main/docs/reference/multi-provider.md) · [Docker Backend](https://github.com/VerhexIO/deckent/blob/main/docs/guide/docker-backend.md) · [Configuration Reference](https://github.com/VerhexIO/deckent/blob/main/docs/reference/config-reference.md)
+- [Architecture](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/architecture.md) · [Sprint Lifecycle](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/sprint-lifecycle.md) · [Memory System](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/memory-system.md) · [MCP Guide](https://github.com/VerhexIO/deckent/blob/main/docs/reference/mcp-guide.md)
+- [Cookbook: Add a REST API](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/add-rest-api.md) · [Cookbook: Fix a Bug](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/fix-bug.md) · [Troubleshooting](https://github.com/VerhexIO/deckent/blob/main/docs/development/troubleshooting.md)
 
 ---
 
@@ -361,8 +361,8 @@ MIT — [Alperen @ Verhex](https://deckent.ai)
 **GitHub:** [github.com/VerhexIO/deckent](https://github.com/VerhexIO/deckent) · **Website:** [deckent.ai](https://deckent.ai) · **Türkçe:** [README-TR.md](README-TR.md)
 
 <!-- AUTOGEN:START id="stat-counts" -->
-- **36 MCP tools** + **8 MCP resources**
+- **37 MCP tools** + **8 MCP resources**
 - **15 built-in agents** (+2 custom)
 - **21 built-in skills**
-- **19 dashboard pages**
+- **20 dashboard pages**
 <!-- AUTOGEN:END id="stat-counts" -->

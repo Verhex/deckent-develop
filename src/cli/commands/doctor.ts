@@ -41,7 +41,7 @@ import {
   parseMemoryString,
 } from '../../orchestra/spawn-backend-docker.js';
 import { promptConfirm } from '../helpers/prompt.js';
-import { runProviderDiagnostics } from './doctor-checks.js';
+import { runProviderDiagnostics, checkDaemonHygiene } from './doctor-checks.js';
 import { detectEnvironment } from '../../core/environment.js';
 import { loadDeckSecrets, validateDeckFile, KNOWN_DECK_KEYS, isDeckFileCommitted } from '../../core/deck-file.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
@@ -405,6 +405,13 @@ export interface HumanDoctorInput {
   workerResources?: WorkerResourcesInfo;
   /** Optional UI language for probe diagnostics (en|tr). Defaults to 'en'. */
   lang?: string;
+  /**
+   * Optional (B-ZOMBIE, Task 332-006): pre-rendered, i18n'd advisory daemon-hygiene
+   * lines (a stale-daemon list + kill hint, or a clean PASS) produced by
+   * {@link checkDaemonHygiene}. Rendered verbatim. Absent → the section is omitted
+   * (no regression for existing callers).
+   */
+  daemonHygieneLines?: string[];
 }
 
 /**
@@ -962,6 +969,15 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
   // --- Worker Resources (Sprint 271, Task 271-006) ---
   if (input.workerResources) {
     lines.push(...formatWorkerResourcesLines(input.workerResources, input.lang ?? 'en'));
+    lines.push('');
+  }
+
+  // --- Daemon Hygiene (B-ZOMBIE, Task 332-006) ---
+  // Advisory only: surfaces long-lived stale deckent daemons (+ a copy-paste kill
+  // hint) or a clean PASS. Pre-rendered / i18n'd by checkDaemonHygiene; it NEVER
+  // auto-kills, NEVER throws, and NEVER affects the readiness/exit-code computation.
+  if (input.daemonHygieneLines && input.daemonHygieneLines.length > 0) {
+    lines.push(...input.daemonHygieneLines);
     lines.push('');
   }
 
@@ -1582,6 +1598,13 @@ export function registerDoctor(program: Command): void {
           }
         } catch { /* use default */ }
 
+        // B-ZOMBIE (Task 332-006): advisory stale-daemon hygiene. Surfaces long-lived
+        // deckent daemons (a stale dist/mcp/server.js, or bot/serve/watch left from a
+        // prior build) + a copy-paste kill hint, or a clean PASS. checkDaemonHygiene
+        // NEVER kills a process, NEVER throws (it swallows every error internally), and
+        // is purely advisory — it does NOT touch result.ok / process.exitCode.
+        const daemonHygiene = await checkDaemonHygiene({ lang });
+
         print(formatHumanDoctor({
           result,
           providers,
@@ -1597,6 +1620,7 @@ export function registerDoctor(program: Command): void {
           workerImage,
           workerResources,
           lang,
+          daemonHygieneLines: daemonHygiene.lines,
         }));
 
         // F1-IMG consent (ADR-063): only the explicit --fix-image flag, plus an
