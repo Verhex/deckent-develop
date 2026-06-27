@@ -217,29 +217,62 @@ export async function askBrain(
 // ─── Brain-Side Question Handlers ──────────────────────────────────
 // Moved from result-collector.ts — Brain auto-answers worker questions.
 
+/** Options for {@link handleWorkerQuestion} / {@link checkWorkerQuestions}. */
+export interface HandleWorkerQuestionOptions {
+  /**
+   * Flag-gated, default-off (mirrors config `honor_worker_question_action`).
+   * When `true` AND the worker's question carries a `suggestedAction`, Brain
+   * writes that action into the answer instead of the hardcoded `'continue'`.
+   * When omitted/false, or when no `suggestedAction` is present, behaviour is
+   * byte-for-byte the historical `'continue'` auto-answer.
+   */
+  honorWorkerQuestionAction?: boolean;
+}
+
 /**
  * Handle a single worker question by writing an auto-answer.
- * In the current implementation, Brain auto-responds with 'continue'.
- * Future: integrate with Human Checkpoint for interactive approval.
+ *
+ * By default (flag off) Brain auto-responds with `'continue'` — the historical
+ * "Future: Human Checkpoint" stub behaviour. When
+ * `options.honorWorkerQuestionAction` is `true` (config `honor_worker_question_action`)
+ * AND the worker supplied a `suggestedAction` (`'skip' | 'abort' | 'retry' | 'continue'`),
+ * Brain honors that requested action instead of the hardcoded continue.
  *
  * @returns The answer that was written, or undefined if no question was found
  */
 export function handleWorkerQuestion(
   projectRoot: string,
   taskId: string,
+  options?: HandleWorkerQuestionOptions,
 ): BrainAnswer | undefined {
   const question = readQuestionFile(projectRoot, taskId);
   if (!question) return undefined;
 
-  const answer: BrainAnswer = {
-    taskId,
-    action: 'continue',
-    message: 'Auto-continue: Brain acknowledged question',
-    timestamp: new Date().toISOString(),
-  };
+  // Flag-gated (default-off): honor the worker's requested action only when the
+  // flag is ON and a suggestedAction was actually supplied. Otherwise fall back
+  // to the historical 'continue' auto-answer, byte-for-byte.
+  const honored: QuestionAction =
+    options?.honorWorkerQuestionAction === true && question.suggestedAction !== undefined
+      ? question.suggestedAction
+      : 'continue';
+
+  const answer: BrainAnswer =
+    honored === 'continue'
+      ? {
+          taskId,
+          action: 'continue',
+          message: 'Auto-continue: Brain acknowledged question',
+          timestamp: new Date().toISOString(),
+        }
+      : {
+          taskId,
+          action: honored,
+          message: `Auto-${honored}: Brain honored worker's suggested action`,
+          timestamp: new Date().toISOString(),
+        };
 
   writeAnswerFile(projectRoot, answer);
-  debugLog('handleWorkerQuestion', `Auto-answered question for task ${taskId}: "${question.question}"`);
+  debugLog('handleWorkerQuestion', `Auto-answered question for task ${taskId} with '${honored}': "${question.question}"`);
   return answer;
 }
 
@@ -250,19 +283,21 @@ export function handleWorkerQuestion(
  * @param projectRoot - Project root directory
  * @param taskIds - All task IDs in the sprint
  * @param collectedIds - Already collected (finished) task IDs
+ * @param options - Forwarded to {@link handleWorkerQuestion} (flag-gated suggestedAction honoring)
  * @returns Array of task IDs that had questions answered
  */
 export function checkWorkerQuestions(
   projectRoot: string,
   taskIds: Set<string>,
   collectedIds: Set<string>,
+  options?: HandleWorkerQuestionOptions,
 ): string[] {
   const answered: string[] = [];
   for (const taskId of taskIds) {
     if (collectedIds.has(taskId)) continue;
     const questionPath = getQuestionPath(projectRoot, taskId);
     if (existsSync(questionPath)) {
-      const result = handleWorkerQuestion(projectRoot, taskId);
+      const result = handleWorkerQuestion(projectRoot, taskId, options);
       if (result) answered.push(taskId);
     }
   }

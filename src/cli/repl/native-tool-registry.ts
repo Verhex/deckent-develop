@@ -13,6 +13,8 @@ import { createToolExecDispatcher } from '../commands/chat-tool-exec.js';
 import { createCliToolDispatcher } from '../commands/chat-tool-bridge.js';
 import { classifyTool } from './tool-permissions.js';
 import type { McpToolDispatcher } from '../commands/chat-native.js';
+import { SkillPoolManager } from '../../core/skill-pool.js';
+import { SkillLoadingCache } from '../../core/skill-cache.js';
 
 /** Minimal structural shape of the buildMcpBridge return (chat-mcp-bridge.ts). */
 export interface NativeMcpBridge {
@@ -25,6 +27,12 @@ export interface NativeToolRegistryOptions {
   cwd: () => string;
   /** Optional connected MCP bridge — its tools register as confirm-tier defs. */
   mcpBridge?: NativeMcpBridge;
+  /**
+   * Optional skill-dispatch seam (F11). When omitted, the live skill-pool path
+   * (`createDefaultSkillDispatcher`) is used. `dispatch(skillId, args)` reuses the
+   * established `McpToolDispatcher` contract — tests inject a fake to stay hermetic.
+   */
+  skillDispatcher?: McpToolDispatcher;
 }
 
 const LEGACY_TIER: Record<'read' | 'confirm' | 'always', ToolPermissionTier> = {
@@ -83,6 +91,31 @@ function defineFromDispatcher(
   };
 }
 
+/**
+ * Default skill-dispatch path (F11) — the same loader a worker's skill-injection
+ * uses, so the native REPL agent reaches a deckent skill with worker parity. NO
+ * re-implementation of skill execution: existence is resolved through the live
+ * `SkillPoolManager` (skill-pool) and the guidance body through `SkillLoadingCache`
+ * (the SKILL.md content loader). Project root is resolved per-call via `cwd()` so
+ * the REPL's /cd is followed live (mirrors the exec dispatcher) — no wiring change
+ * is required at the caller. Returns the resolved skill guidance, or a tagged
+ * `[mcp-error]` string (→ ok:false via toolResultFrom) for an unknown/empty skill.
+ */
+function createDefaultSkillDispatcher(cwd: () => string): McpToolDispatcher {
+  return {
+    async dispatch(skillId, _args) {
+      const root = cwd();
+      const skill = new SkillPoolManager(root).getSkill(skillId);
+      if (!skill) return `[mcp-error] deckent_skill_dispatch: unknown skill: ${skillId}`;
+      const cached = new SkillLoadingCache(root).loadAndCache(skillId);
+      const guidance = (cached?.content ?? '').trim() || (skill.description ?? '').trim();
+      return guidance.length > 0
+        ? guidance
+        : `[mcp-error] deckent_skill_dispatch: skill has no guidance content: ${skillId}`;
+    },
+  };
+}
+
 export function buildNativeToolRegistry(opts: NativeToolRegistryOptions): ToolRegistry {
   const registry = new ToolRegistry();
 
@@ -99,6 +132,38 @@ export function buildNativeToolRegistry(opts: NativeToolRegistryOptions): ToolRe
     const tier = LEGACY_TIER[classifyTool(name, {})];
     registry.register(defineFromDispatcher(name, `Run the ${name} deckent command.`, genericSchema, tier, cli));
   }
+
+  // Skill-dispatch tool (F11) — worker parity: lets the native REPL agent invoke a
+  // deckent skill by id and receive its expert guidance as a tool_result. Delegates
+  // to the live skill-pool/cache path by default, or an injected seam (tests). Read-
+  // only (resolves guidance, no side-effects) → 'silent'. Metadata is technical/model-
+  // facing (NOT user-facing i18n). TODO(phase2): a web_search tool stays OUT of scope
+  // here — it needs an in-session approval UI / permission-gate, not the single no-op
+  // gate these tools share.
+  const skillDispatcher = opts.skillDispatcher ?? createDefaultSkillDispatcher(opts.cwd);
+  registry.register({
+    name: 'deckent_skill_dispatch',
+    description: "Invoke a deckent skill by id (skillId + optional args); returns the skill's expert guidance to apply in this turn.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        skillId: { type: 'string', description: 'The skill id to dispatch (see deckent_skill_list).' },
+        args: { type: 'object', additionalProperties: true, description: 'Optional skill arguments.' },
+      },
+      required: ['skillId'],
+    },
+    category: 'skill',
+    tier: 'silent',
+    source: 'builtin',
+    handler: async (toolArgs) => {
+      const skillId = typeof toolArgs['skillId'] === 'string' ? toolArgs['skillId'].trim() : '';
+      if (skillId.length === 0) return { ok: false, output: '[mcp-error] deckent_skill_dispatch: skillId required' };
+      const skillArgs = (toolArgs['args'] && typeof toolArgs['args'] === 'object' && !Array.isArray(toolArgs['args']))
+        ? (toolArgs['args'] as Record<string, unknown>)
+        : {};
+      return toolResultFrom(await skillDispatcher.dispatch(skillId, skillArgs));
+    },
+  });
 
   // MCP tools (external) — always 'confirm' (never silent); single gate via no-op confirm.
   if (opts.mcpBridge) {

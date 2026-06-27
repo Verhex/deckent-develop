@@ -24,6 +24,7 @@ import {
 } from '../core/file-lock.js';
 import { markPending, markActive, clearPending } from '../core/active-workers.js';
 import { authHealthCheck } from '../agents/worker.js';
+import { BASE_PROVIDER_CREDENTIAL_ENV } from '../providers/cross-provider-keys.js';
 import type { SpawnBackend, SpawnBackendOptions } from './spawn-backend.js';
 import { SpawnBackendError, checkLethalGuard } from './spawn-backend.js';
 
@@ -837,14 +838,24 @@ export class DockerSpawnBackend implements SpawnBackend {
     // This is an explicit per-provider allowlist by design — a new provider must
     // add its own credential forward here (auditable), never inherit one.
     // DECKENT_DEBUG is auth-orthogonal and always forwarded when set on the host.
+    //
+    // F1-014 phase-2: the credential env var NAME for each provider is sourced from
+    // the shared BASE_PROVIDER_CREDENTIAL_ENV map (providers/cross-provider-keys.ts)
+    // — the SAME single source of truth the subprocess backend's scrub set derives
+    // from, so the two allowlists can never drift. Behaviour is byte-for-byte the
+    // prior explicit literals: claude forwards ANTHROPIC_API_KEY ONLY in api mode
+    // (ADR-076), codex forwards OPENAI_API_KEY only, gemini GOOGLE_API_KEY only.
+    const claudeKeyEnv = BASE_PROVIDER_CREDENTIAL_ENV.claude;
+    const codexKeyEnv = BASE_PROVIDER_CREDENTIAL_ENV.codex;
+    const geminiKeyEnv = BASE_PROVIDER_CREDENTIAL_ENV.gemini;
     if (providerBinary === 'claude') {
-      if (useApiOnly && process.env.ANTHROPIC_API_KEY) {
-        dockerArgs.push('-e', `ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY}`);
+      if (useApiOnly && process.env[claudeKeyEnv]) {
+        dockerArgs.push('-e', `${claudeKeyEnv}=${process.env[claudeKeyEnv]}`);
       }
-    } else if (providerBinary === 'codex' && process.env.OPENAI_API_KEY) {
-      dockerArgs.push('-e', `OPENAI_API_KEY=${process.env.OPENAI_API_KEY}`);
-    } else if (providerBinary === 'gemini' && process.env.GOOGLE_API_KEY) {
-      dockerArgs.push('-e', `GOOGLE_API_KEY=${process.env.GOOGLE_API_KEY}`);
+    } else if (providerBinary === 'codex' && process.env[codexKeyEnv]) {
+      dockerArgs.push('-e', `${codexKeyEnv}=${process.env[codexKeyEnv]}`);
+    } else if (providerBinary === 'gemini' && process.env[geminiKeyEnv]) {
+      dockerArgs.push('-e', `${geminiKeyEnv}=${process.env[geminiKeyEnv]}`);
     }
     if (process.env.DECKENT_DEBUG) {
       dockerArgs.push('-e', `DECKENT_DEBUG=${process.env.DECKENT_DEBUG}`);

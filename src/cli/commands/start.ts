@@ -15,7 +15,7 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { promptConfirm } from '../helpers/prompt.js';
 import { bootstrapNotifyDispatcher, resolveWebhookBootstrapOption } from '../../core/notify-bootstrap.js';
-import { buildConnectorNotificationAdapter } from '../../connectors/connector-bootstrap.js';
+import { buildConnectorAdapterWithKpiSummary, buildSprintKpiSummaryFn } from '../../connectors/kpi-summary-dispatch.js';
 import { loadCostConfig, initCostConfig } from '../../core/cost-config-loader.js';
 import { estimateSprintCost, formatEstimate, resolveBillingModeForAuth, type TaskCostInput } from '../../core/cost-calculator.js';
 import { evaluateCostGate } from '../../core/cost-gate.js';
@@ -290,8 +290,11 @@ export function registerStart(program: Command): void {
         // BOT-001: also fan notifications out to configured messaging connectors
         // (Telegram/Discord) so they reach the operator's phone. Fail-safe — a
         // misconfigured connector logs + skips, never blocks the sprint.
-        const connectorAdapter = await buildConnectorNotificationAdapter(
-          config.notify_connectors, {},
+        // KPI Faz-2: forward a sprint-end KPI summary fn — broadcast (non-blocking)
+        // to connectors on sprint-finalized. No-op when no connectors are configured.
+        const connectorAdapter = await buildConnectorAdapterWithKpiSummary(
+          config.notify_connectors,
+          { kpiSummaryFn: buildSprintKpiSummaryFn(root, lang) },
         );
         bootstrapNotifyDispatcher({
           projectRoot: root,

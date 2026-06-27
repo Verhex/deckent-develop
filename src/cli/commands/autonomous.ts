@@ -28,7 +28,7 @@ import {
 import { FlowRegistry } from '../../core/flow-registry.js';
 import { notifyAsync } from '../../core/notify.js';
 import { bootstrapNotifyDispatcher, resolveWebhookBootstrapOption } from '../../core/notify-bootstrap.js';
-import { buildConnectorNotificationAdapter } from '../../connectors/connector-bootstrap.js';
+import { buildConnectorAdapterWithKpiSummary, buildSprintKpiSummaryFn } from '../../connectors/kpi-summary-dispatch.js';
 import { nextRun } from '../../core/scheduled-flow.js';
 import type { ScheduledFlow } from '../../core/scheduled-flow.js';
 import type { SelfDispatchPolicy } from '../../core/self-dispatch.js';
@@ -675,8 +675,11 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
   // does (mirrors start.ts). Without the connector adapter, autonomous notify()
   // only reached the local TTY; with `deckent bot listen` up, the pushed park is
   // approvable straight from Telegram. Silent no-op otherwise (§4G).
-  const connectorAdapter = await buildConnectorNotificationAdapter(
-    resolvedConfig.notify_connectors, {},
+  // KPI Faz-2: forward a sprint-end KPI summary fn (non-blocking, connector
+  // broadcast on sprint-finalized). No-op when no connectors are configured.
+  const connectorAdapter = await buildConnectorAdapterWithKpiSummary(
+    resolvedConfig.notify_connectors,
+    { kpiSummaryFn: buildSprintKpiSummaryFn(root, lang) },
   );
   bootstrapNotifyDispatcher({
     projectRoot: root,

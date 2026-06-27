@@ -36,6 +36,12 @@ const TOOL_COMMANDS: Readonly<Record<string, readonly string[]>> = {
   deckent_agent_list: ['agent', 'list'],
   deckent_skill_list: ['skill', 'list'],
   deckent_feature_query: ['features'],
+  // Cost/observability (read-only). `cost` is a parent command — `cost show` prints
+  // budget limits, per-model pricing, and today's spend. `kpi` (bare) prints the
+  // scorecard for the current sprint. Exposed to the phone bot (bot-agentic.ts
+  // READ_ONLY_BOT_TOOLS). deckent_usage is arg-aware → special-cased in cliArgsFor.
+  deckent_cost: ['cost', 'show'],
+  deckent_kpi: ['kpi'],
   // config: show (no _rest) is read-only; `config set/import/migrate` mutate
   // config.json and are confirm-gated one layer up (run.tsx classifyTool).
   deckent_config: ['config'],

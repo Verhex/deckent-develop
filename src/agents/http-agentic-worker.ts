@@ -29,10 +29,13 @@
 // name map, test-command sniff) is re-created here because the runner does not
 // export it and must not be edited.
 //
+// SCOPE_INSUFFICIENT event-stream emission parity with the Ollama runner landed
+// in phase-2 (334-005): an out-of-scope write/edit now ALSO emits the same
+// WORKER→BRAIN:SCOPE_INSUFFICIENT event (same channel + payload + writeEvent
+// helper) the Ollama runner emits, in addition to feeding the error to the model.
+//
 // v1 scope: ONE task uçtan uca. Explicit phase-2 follow-ups (noted, not stubbed):
 //   TODO(phase2): multi-worker concurrency on a single adapter instance.
-//   TODO(phase2): SCOPE_INSUFFICIENT event-stream emission parity with the
-//                 Ollama runner (here the scope error is fed to the model only).
 //   TODO(phase2): full ollama tool-loop parity surface (streaming, tool retries).
 
 import { fileURLToPath } from 'node:url';
@@ -46,6 +49,12 @@ import {
 import type { McpToolDispatcher } from '../cli/commands/chat-native.js';
 import { OLLAMA_TOOLS } from './agentic-worker-tools.js';
 import { isPathInScope } from './scope-guard.js';
+import {
+  writeEvent,
+  getCurrentSprintId,
+  SCOPE_INSUFFICIENT_CHANNEL,
+  type DeckentEvent,
+} from '../orchestra/event-stream.js';
 import {
   buildSystemPrompt,
   DEFAULT_MAX_ITERATIONS,
@@ -111,6 +120,22 @@ export type HttpAgenticSend = (
   opts: { tools: readonly unknown[] },
 ) => Promise<HttpAgenticTurn>;
 
+/**
+ * Injected event-stream emitter — the seam that makes scope-violation emission
+ * hermetic. Production binds {@link buildDefaultEmitEvent} (the EXACT Ollama-runner
+ * contract: `getCurrentSprintId` gate → `writeEvent(projectRoot, sprintId, source,
+ * target, channel, payload)`); tests inject a fake recorder so the emission is
+ * asserted with no disk write. The `(source, target, channel, payload)` shape
+ * mirrors `writeEvent`, so the reused SCOPE_INSUFFICIENT contract is fully visible
+ * to the seam — no new event shape is introduced.
+ */
+export type HttpAgenticEventEmitter = (
+  source: DeckentEvent['source'],
+  target: DeckentEvent['target'],
+  channel: string,
+  payload: unknown,
+) => void;
+
 /** Token usage returned by the loop. `provider` is configurable (not ollama-fixed). */
 export interface HttpAgenticTokenUsage {
   inputTokens: number;
@@ -155,6 +180,12 @@ export interface HttpAgenticRunnerOptions {
    * Scope-guard wraps the call BEFORE dispatch either way.
    */
   dispatcher?: McpToolDispatcher;
+  /**
+   * Optional event-stream emitter override. Default mirrors the Ollama runner's
+   * SCOPE_INSUFFICIENT contract (write to the project's event stream when a sprint
+   * is active, no-op otherwise). Tests inject a fake to assert emission hermetically.
+   */
+  emitEvent?: HttpAgenticEventEmitter;
   logger?: (line: string) => void;
 }
 
@@ -200,6 +231,20 @@ function buildDefaultDispatcher(projectRoot: string): McpToolDispatcher {
       if (!mapped) return `[mcp-error] unknown tool: ${name}`;
       return inner.dispatch(mapped, args);
     },
+  };
+}
+
+// ─── Scope-violation event emitter (Ollama-runner contract parity) ────────────
+// Mirrors agentic-worker-runner.ts: gate on an active sprint id, then writeEvent
+// to the project event stream. Same channel + payload + helper as the Ollama
+// runner — no new event shape. No active sprint id → no-op (e.g. ad-hoc invocations
+// and the existing hermetic loop tests that do not seed sprint-state).
+function buildDefaultEmitEvent(projectRoot: string): HttpAgenticEventEmitter {
+  return (source, target, channel, payload) => {
+    const sprintId = getCurrentSprintId(projectRoot);
+    if (sprintId) {
+      writeEvent(projectRoot, sprintId, source, target, channel, payload);
+    }
   };
 }
 
@@ -256,10 +301,12 @@ export async function runHttpAgenticWorker(
     maxIterations = DEFAULT_MAX_ITERATIONS,
     send,
     dispatcher: injectedDispatcher,
+    emitEvent: injectedEmitEvent,
     logger = () => undefined,
   } = opts;
 
   const dispatcher = injectedDispatcher ?? buildDefaultDispatcher(projectRoot);
+  const emitEvent = injectedEmitEvent ?? buildDefaultEmitEvent(projectRoot);
 
   const messages: HttpAgenticMessage[] = [
     { role: 'system', content: buildSystemPrompt(scope, goNogo, operativeAdrs) },
@@ -375,6 +422,17 @@ export async function runHttpAgenticWorker(
         const targetPath = String(args['path'] ?? '');
         if (!isPathInScope(targetPath, scope, projectRoot)) {
           const errMsg = `[scope-violation] ${name}: path "${targetPath}" is outside the assigned task scope. Allowed files: ${scope.filesWrite.join(', ') || '(none)'} ; Allowed directories: ${scope.directories.join(', ') || '(none)'}. Choose a path inside the scope or call task_done with NO_GO if no in-scope path is suitable.`;
+          // Provider-symmetric observability (Yasa #2): emit the SAME
+          // WORKER→BRAIN:SCOPE_INSUFFICIENT event the Ollama runner emits so the
+          // Auditor/Brain see scope violations from HTTP-provider workers too. One
+          // event per violation. The model-facing error feed below is unchanged.
+          emitEvent('worker', 'brain', SCOPE_INSUFFICIENT_CHANNEL, {
+            taskId,
+            attemptedPath: targetPath,
+            reason: errMsg,
+            goCriteria: goNogo.goCriteria,
+            currentScope: { filesWrite: scope.filesWrite, directories: scope.directories },
+          });
           messages.push({ role: 'tool', content: errMsg, tool_call_id: callId, name });
           logger(`[http-agentic] scope rejection: ${targetPath}`);
           continue;

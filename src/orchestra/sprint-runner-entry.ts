@@ -224,9 +224,13 @@ async function main(): Promise<void> {
     // so lifecycle notify() calls reach the operator's terminal + notify-log.jsonl
     // instead of being silently dropped (the "safe-but-deaf" gap).
     // BOT-001: fan notifications out to messaging connectors (Telegram/Discord) too.
-    const { buildConnectorNotificationAdapter } = await import('../connectors/connector-bootstrap.js');
-    const connectorAdapter = await buildConnectorNotificationAdapter(
-      config.notify_connectors, {},
+    // KPI Faz-2: forward a sprint-end KPI summary fn (non-blocking, connector
+    // broadcast on sprint-finalized). No-op when no connectors are configured.
+    const { buildConnectorAdapterWithKpiSummary, buildSprintKpiSummaryFn } =
+      await import('../connectors/kpi-summary-dispatch.js');
+    const connectorAdapter = await buildConnectorAdapterWithKpiSummary(
+      config.notify_connectors,
+      { kpiSummaryFn: buildSprintKpiSummaryFn(projectRoot, config.language) },
     );
     bootstrapNotifyDispatcher({
       projectRoot,

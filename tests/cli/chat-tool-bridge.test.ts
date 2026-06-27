@@ -76,6 +76,9 @@ describe('createCliToolDispatcher — chat-tool-bridge.ts', () => {
     ['deckent_agent_list', ['agent', 'list']],
     ['deckent_skill_list', ['skill', 'list']],
     ['deckent_feature_query', ['features']],
+    // Phone-bot cost/observability surface (bot-agentic READ_ONLY_BOT_TOOLS).
+    ['deckent_cost', ['cost', 'show']],
+    ['deckent_kpi', ['kpi']],
   ])('%s → spawns %j', async (tool, expectedArgs) => {
     const spawnFn = vi.fn().mockResolvedValue('ok') as unknown as CliToolSpawnFn;
     const d = createCliToolDispatcher({ spawnFn });

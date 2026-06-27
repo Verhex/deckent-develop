@@ -18,6 +18,8 @@ import { ProviderError, buildCliInvocation } from '../core/provider.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { resolveReasoningEffort } from '../core/reasoning-effort.js';
+import type { ProviderDefinition } from '../core/config-types.js';
+import { resolveCrossProviderCredentialKeys } from './cross-provider-keys.js';
 
 // ─── SubprocessProviderConfig ───────────────────────────────────────
 /**
@@ -105,40 +107,6 @@ export const CLAUDE_SUBPROCESS_CONFIG: SubprocessProviderConfig = {
   usageEmitArgs: ['--output-format', 'json'],
 };
 
-// ─── Cross-provider credential keys (F1-014 NON-LEAK scrub set) ───────
-/**
- * Every provider credential env var deckent may place on the host `process.env`.
- * This is the SCRUB set for the subprocess child env: the child starts from the
- * host env with ALL of these removed, then ONLY the worker's own provider
- * credential is re-injected via `opts.env` (the override map from
- * `applyDeckSecretsToEnv`). Without this scrub the child would inherit the FULL
- * host env and leak EVERY provider's key into EVERY worker — including handing a
- * subscription claude worker an `ANTHROPIC_API_KEY` (the claude CLI prefers the
- * env key over the `~/.claude` session → silent API-mode demotion → Tier-1
- * timeout → the mass-synthetic-NO_GO that killed Sprint 213; ADR-076, F1-014).
- *
- * Source-of-truth is the provider→key mapping in `core/provider.ts`
- * `applyDeckSecretsToEnv` (claude→ANTHROPIC_API_KEY, codex→OPENAI_API_KEY,
- * gemini→GOOGLE_API_KEY, deepseek→DEEPSEEK_API_KEY, qwen→DASHSCOPE_API_KEY,
- * zhipu→ZHIPU_API_KEY). The docker backend (`spawn-backend-docker.ts`) keeps a
- * parallel per-provider FORWARD allowlist; the two are intentionally aligned —
- * each provider's credential is forwarded to ITS worker only, never cross-leaked.
- *
- * TODO(phase2): unify this scrub-set with the docker forward-allowlist behind a
- * single exported provider→credential-env map in `core/` (e.g. a field on
- * `ProviderCommandSpec`) so a new provider's credential is registered in exactly
- * one place. Config-driven providers (F1-012) with arbitrary `apiKeyEnv` are not
- * covered by this static set and would need that unified map to be fully scrubbed.
- */
-const CROSS_PROVIDER_CREDENTIAL_KEYS: readonly string[] = [
-  'ANTHROPIC_API_KEY',
-  'OPENAI_API_KEY',
-  'GOOGLE_API_KEY',
-  'DEEPSEEK_API_KEY',
-  'DASHSCOPE_API_KEY',
-  'ZHIPU_API_KEY',
-];
-
 // ─── SubprocessWorkerEntry ────────────────────────────────────────────
 interface SubprocessWorkerEntry {
   taskId: string;
@@ -167,6 +135,13 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
   private readonly platform: NodeJS.Platform;
   /** Spawn impl — injectable so tests never launch a real process. */
   private readonly spawnImpl: typeof spawn;
+  /**
+   * F1-014 phase-2: the cross-provider credential SCRUB set for this backend —
+   * the static base set ∪ any config-declared provider's `apiKeyEnv` (F1-012
+   * registry). Resolved once at construction from the shared single-source-of-
+   * truth resolver; absent registry → byte-for-byte the static base set.
+   */
+  private readonly crossProviderCredentialKeys: readonly string[];
 
   /** Default timeout in ms before a worker is killed automatically (0 = no timeout) */
   protected defaultTimeoutMs: number;
@@ -180,6 +155,14 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
       platform?: NodeJS.Platform;
       /** Override the spawn impl (test hermeticity; defaults to `node:child_process` `spawn`). */
       spawnImpl?: typeof spawn;
+      /**
+       * F1-012 config-driven provider registry (`config.providers?.registry`).
+       * When supplied, each declared provider's `apiKeyEnv` joins the scrub set
+       * so a custom `openai-compatible` provider's credential is never leaked
+       * cross-provider into a foreign worker (F1-014 phase-2). Absent → the
+       * static base scrub behaviour is unchanged.
+       */
+      providerRegistry?: readonly ProviderDefinition[];
     },
   ) {
     this.projectDir = projectDir;
@@ -187,6 +170,9 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     this.providerConfig = opts?.providerConfig ?? CLAUDE_SUBPROCESS_CONFIG;
     this.platform = opts?.platform ?? process.platform;
     this.spawnImpl = opts?.spawnImpl ?? spawn;
+    this.crossProviderCredentialKeys = resolveCrossProviderCredentialKeys(
+      opts?.providerRegistry ? { registry: opts.providerRegistry } : undefined,
+    );
     this.name = this.providerConfig.name;
     this.supportedModels = this.providerConfig.supportedModels;
   }
@@ -229,7 +215,8 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     // F1-014 (Sprint 333) — per-worker auth NON-LEAK for the subprocess backend.
     // Mirror the docker backend's runtime per-provider allowlist as a SCRUB+inject:
     //   1. base = host process.env (carries PATH/HOME/LANG/… non-secret vars),
-    //   2. SCRUB every provider credential key (CROSS_PROVIDER_CREDENTIAL_KEYS) so a
+    //   2. SCRUB every provider credential key (this.crossProviderCredentialKeys —
+    //      the shared static base set ∪ any F1-012 config provider's apiKeyEnv) so a
     //      mixed-provider fleet never leaks a foreign key into this worker — and a
     //      subscription claude worker never inherits ANTHROPIC_API_KEY (ADR-076),
     //   3. re-inject ONLY this worker's own credential via opts.env (the per-provider
@@ -239,7 +226,7 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     // trusted. A no-secret / single-provider spawn keeps PATH/LANG byte-for-byte and
     // simply carries no provider key. Pure JS map-ops — identical on every platform.
     const childEnv: NodeJS.ProcessEnv = { ...process.env };
-    for (const key of CROSS_PROVIDER_CREDENTIAL_KEYS) {
+    for (const key of this.crossProviderCredentialKeys) {
       delete childEnv[key];
     }
     if (opts?.env) {
@@ -430,7 +417,13 @@ function ensureDir(dir: string): void {
 
 export function createSubprocessBackend(
   projectDir: string,
-  opts?: { defaultTimeoutMs?: number; providerConfig?: SubprocessProviderConfig },
+  opts?: {
+    defaultTimeoutMs?: number;
+    providerConfig?: SubprocessProviderConfig;
+    /** F1-012 config-driven provider registry (`config.providers?.registry`) — its
+     *  `apiKeyEnv` keys join the cross-provider scrub set (F1-014 phase-2). */
+    providerRegistry?: readonly ProviderDefinition[];
+  },
 ): SubprocessSpawnBackend {
   return new SubprocessSpawnBackend(projectDir, opts);
 }

@@ -41,14 +41,13 @@ const READ_ONLY_BOT_TOOLS: ReadonlySet<string> = new Set([
   'deckent_skill_list',
   'deckent_feature_query',
   'deckent_memory_query',
-  // Cost/usage/observability surface — read-only, fast, no state change. Mirrors the
-  // MCP TOOL_CATALOG readOnly flag for these tools (src/mcp/tools/index.ts). Exposed so
-  // the phone bot can answer "bugünkü maliyet / token kullanımı / KPI" from live data.
+  // Cost/usage observability surface — read-only, fast, no state change. Each MUST
+  // also be wired in cliArgsFor (chat-tool-bridge.ts) → CLI subcommand, else the bot's
+  // inner dispatcher refuses it with "tool not allowed". Exposed so the phone bot can
+  // answer "bugünkü maliyet / token kullanımı / KPI" from live data.
   'deckent_cost',
   'deckent_usage',
   'deckent_kpi',
-  'deckent_help',
-  'deckent_nervous_status',
 ]);
 
 /** True when a tool changes state / is destructive → must be approval-gated. */
@@ -289,15 +288,15 @@ export const DECKENT_BOT_SYSTEM_PROMPT = [
   'deckent_analyze_project, deckent_review, deckent_explain, deckent_agent_list,',
   'deckent_skill_list, deckent_feature_query, deckent_memory_query{query},',
   'deckent_cost (bugünkü harcama), deckent_usage (token/limit kullanımı),',
-  'deckent_kpi (KPI skor kartı), deckent_help, deckent_nervous_status.',
+  'deckent_kpi (KPI skor kartı).',
   '',
   'Durum-değiştiren tool\'lar (insan ONAYI gerekir, sen çağırsan bile HEMEN',
-  'çalışmaz): deckent_plan{directive}, deckent_set_directives{directive},',
-  'deckent_start, deckent_run, deckent_kill, deckent_cleanup, deckent_recover,',
-  'deckent_sync, deckent_config, deckent_autonomous, deckent_process,',
-  'deckent_checkpoint. Bunları çağırdığında sistem bir onay-kapısı açar; kullanıcı',
-  'mesajdaki Onayla/Reddet butonuna basana (ya da "approve <id>" yazana) kadar',
-  'HİÇBİR ŞEY yapılmaz. Asla "yaptım/başlattım" deme — onay istendiğini söyle.',
+  'çalışmaz): deckent_plan{directive}, deckent_set_directives{content},',
+  'deckent_config, deckent_autonomous{action}, deckent_sync, deckent_kill,',
+  'deckent_cleanup, deckent_recover, deckent_checkpoint. Bunları çağırdığında',
+  'sistem bir onay-kapısı açar; kullanıcı mesajdaki Onayla/Reddet butonuna basana',
+  '(ya da "approve <id>" yazana) kadar HİÇBİR ŞEY yapılmaz. Asla "yaptım/başlattım"',
+  'deme — onay istendiğini söyle.',
   '',
   'Aksiyon gerekmeyen sorulara normal metinle, kullanıcının dilinde cevap ver.',
 ].join('\n');

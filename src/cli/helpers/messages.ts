@@ -1935,6 +1935,12 @@ const MESSAGES: MessageMap = {
     en: '❌ Rejected',
     tr: '❌ Reddedildi',
   },
+  // Ack returned when a risky deckent_* TOOL's approval was delivered as a buttoned
+  // message (the user has Approve/Reject buttons) — the tool-side twin of cap.approval.ack.
+  'tool.approval.ack': {
+    en: 'Approval requested for {tool} — tap Approve/Reject on the message above; nothing has run yet.',
+    tr: '{tool} için onay istendi — yukarıdaki mesajda Onayla/Reddet butonuna bas; henüz hiçbir şey çalışmadı.',
+  },
 
   // ─── capability: screenshot ──────────────────────────────────────────
   'cap.screenshot.title': {

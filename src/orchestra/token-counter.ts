@@ -17,8 +17,9 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { TASKS_DIR } from '../core/constants.js';
-import type { TokenUsage } from '../core/task-types.js';
+import type { ProviderName, TokenUsage } from '../core/task-types.js';
 import type { ProviderAdapter } from '../core/provider.js';
+import { readNativeUsage, type NativeUsageQuery } from '../providers/session-usage-store.js';
 
 // ─── Internal helpers ───────────────────────────────────────────────
 
@@ -254,4 +255,43 @@ export function tryLoadCliLogTokens(projectRoot: string, taskId: string): TokenU
     }
   }
   return null;
+}
+
+// ─── Provenance-tagged resolver ─────────────────────────────────────
+// Sprint 334 Task 334-001 (P0 TOKEN-REAL-CAPTURE).
+
+/**
+ * Resolve the most authoritative {@link TokenUsage} for a worker and tag its
+ * provenance via {@link TokenUsage.source}. Resolution order (most → least real):
+ *
+ *   1. **session-store** — the provider's NATIVE per-session usage
+ *      ({@link readNativeUsage}). The ONLY source that carries real
+ *      `cacheCreationTokens` (the limit-dominant cost the heuristic missed
+ *      entirely). Returned verbatim — it already self-tags `source:
+ *      'session-store'`.
+ *   2. **envelope** — the Claude CLI `--output-format json` side-channel
+ *      ({@link tryLoadCliLogTokens}). Tagged `source: 'envelope'`.
+ *   3. **estimate** — the caller's heuristic fallback, passed in. The heuristic
+ *      (`result-collector.estimateTokenUsage`) is injected rather than imported
+ *      so this module stays pure and free of an import cycle (result-collector
+ *      imports this module). Tagged `source: 'estimate'` — an honest self-label,
+ *      NOT a measurement.
+ *
+ * `fallbackEstimate` is returned (source-tagged) only when no real source
+ * exists, so the estimate path stays byte-equivalent to today EXCEPT the new
+ * honest `source` tag. Pure: the only disk reads are the tolerant, read-only
+ * helpers above.
+ */
+export function resolveTokenUsage(
+  provider: ProviderName,
+  query: NativeUsageQuery,
+  fallbackEstimate: TokenUsage,
+): TokenUsage {
+  const native = readNativeUsage(provider, query);
+  if (native) return native; // already source: 'session-store'
+
+  const envelope = tryLoadCliLogTokens(query.projectRoot, query.taskId);
+  if (envelope) return { ...envelope, source: 'envelope' };
+
+  return { ...fallbackEstimate, source: 'estimate' };
 }

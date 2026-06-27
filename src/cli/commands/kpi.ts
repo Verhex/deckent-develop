@@ -33,6 +33,8 @@ import { loadKpiDefinitions } from '../../core/kpi/kpi-definitions.js';
 import type { KpiDefinitionSpec } from '../../core/kpi/kpi-definitions.js';
 import type { ResultRow } from '../../core/kpi/kpi-store.js';
 import type { KpiFormat } from '../../core/kpi/types.js';
+import { buildKpiBreachAdvisory } from '../../core/kpi/breach-advisor.js';
+import type { ScorecardLang } from '../../core/kpi/scorecard.js';
 
 // ─── Value formatting (exported — reused by the retro scorecard, Task 10) ─────
 
@@ -310,6 +312,12 @@ export async function runKpiCommand(
   });
 
   print(formatTable(headers, rows));
+
+  const advisory = buildKpiBreachAdvisory(views, lang as ScorecardLang);
+  if (advisory) {
+    print('');
+    print(advisory);
+  }
 }
 
 // ─── Registration ─────────────────────────────────────────────────────────────

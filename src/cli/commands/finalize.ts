@@ -6,7 +6,7 @@ import { TaskEvaluation, SprintStatus, SprintPhase } from '../../core/types.js';
 import { TASKS_DIR, BRAIN_DIR, DECKENT_DIR } from '../../core/constants.js';
 import { finalizeSprint } from '../../orchestra/brain.js';
 import { evaluateResultSync } from '../../orchestra/sprint-controller.js';
-import { terminateOwnedSprintProcess, clearPid } from '../../orchestra/sprint-pid-manager.js';
+import { terminateOwnedSprintProcess, clearPid, readPid } from '../../orchestra/sprint-pid-manager.js';
 import { loadConfig } from '../../core/config.js';
 import { debugLog } from '../../core/utils.js';
 import { print, printError } from '../helpers/output.js';
@@ -225,6 +225,36 @@ export function registerFinalize(program: Command): void {
         if (isSprintAlreadyFinalized(root, sprintId) && !opts.force) {
           print(`Sprint ${sprintId} has already been finalized. Use --force to re-finalize.`);
           return;
+        }
+
+        // P0-C RECURRENCE (sprint-333, task 334-003): on a NORMAL (non-force)
+        // finalize the owned `deckent start` coordinator can still be alive and
+        // linger post-close (idle event-loop — observed ~27min in sprint-333).
+        // The `--force` branch above already terminates it; mirror that here for
+        // the normal path so a lingering coordinator cannot keep running / re-
+        // finalize on its own timeout. ORDERING: this MUST run before
+        // `finalizeSprint`, whose step-15 persistFinalSprintState→clearPid wipes
+        // the pid file the ownership-guarded terminator reads. SELF-GUARD: never
+        // signal ourselves when finalize runs IN the coordinator (recorded pid
+        // === process.pid); verifySprintOwnership already refuses a recycled
+        // ('reused') pid. The terminator is delegated to sprint-pid-manager — not
+        // re-implemented here.
+        // TODO(phase2): the deeper "why does an idle coordinator linger ~27min"
+        //   (unref'd-handle audit) is out of scope here — this delivers the
+        //   requested SIGTERM-at-finalize mitigation only.
+        if (!opts.force) {
+          try {
+            const recordedPid = readPid(root, sprintId);
+            if (recordedPid !== null && recordedPid !== process.pid) {
+              const term = terminateOwnedSprintProcess(root, sprintId);
+              if (term.action === 'killed') {
+                print(`Terminated orphan sprint process (PID ${term.pid}) so it cannot race this finalize.`);
+              } else if (term.action === 'skipped-reused') {
+                print(`Note: the PID recorded for ${sprintId} was recycled by the OS — not signalling; check for a stray process manually.`);
+              }
+              clearPid(root, sprintId);
+            }
+          } catch (e) { debugLog('finalize:normalOrphanTerminate', e); }
         }
 
         // FINALIZE Duration fix (Sprint 268): the CLI-built sprint object had

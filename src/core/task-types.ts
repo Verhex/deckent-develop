@@ -411,6 +411,24 @@ export interface TokenUsage {
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens?: number;
+  /**
+   * Cache-CREATION (write) tokens — the limit-dominant cost the heuristic
+   * estimator missed entirely (it only ever set cacheRead). Real value flows
+   * from the provider's native session-store (sprint-334 TOKEN-REAL-CAPTURE);
+   * priced by cost-calculator's existing `RegimeCostUsage.cacheCreationTokens`.
+   * Additive optional — absent on legacy/estimate-only usage.
+   */
+  cacheCreationTokens?: number;
+  /**
+   * Provenance of these counts — set honestly by the resolver so consumers can
+   * tell a real measurement from an estimate:
+   *   - `'session-store'` — REAL, summed from the provider's native per-session
+   *     usage store (the only source carrying real `cacheCreationTokens`).
+   *   - `'envelope'` — the Claude CLI `--output-format json` side-channel.
+   *   - `'estimate'` — heuristic fallback (NOT a measurement).
+   * Additive optional + open string for forward providers; absent = unknown/legacy.
+   */
+  source?: 'session-store' | 'envelope' | 'estimate' | string;
   provider?: ProviderName;
   model?: ModelType;
 }
