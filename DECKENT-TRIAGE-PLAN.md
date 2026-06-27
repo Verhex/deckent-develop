@@ -1,6 +1,6 @@
 # DECKENT TRIAGE PLANI — Bulgu Havuzu → A-fix / B-karar / C-cleanup (+ R1-R8)
 
-> **Amaç:** Cross-check havuzundaki ~431 crit/high (+ medium/low kuyruğu) bulguyu **üç kovaya** ayır, A'ları R1-R8 kök-nedene bağla, B-kararları Alperen'in önüne getir. Bu doküman fix-kampanyasının **SSOT backlog**'u. Kaynak: `deckent-last-standing-crosscheck.md` (Phase-1 CC ⨯ Phase-2 deckent). Her satır file:line taşır; "bazıları zaten sistemsel karardı" → o satırlar **Bucket B**'ye düştü, A'ya değil.
+> **Amaç:** Cross-check havuzundaki ~431 crit/high (+ medium/low kuyruğu) bulguyu **üç kovaya** ayır, A'ları R1-R8 kök-nedene bağla, B-kararları Alperen'in önüne getir. Bu doküman fix-kampanyasının **SSOT backlog**'u. Kaynak: `docs/audits/last-standing-2026-06/deckent-last-standing-crosscheck.md` (Phase-1 CC ⨯ Phase-2 deckent). Her satır file:line taşır; "bazıları zaten sistemsel karardı" → o satırlar **Bucket B**'ye düştü, A'ya değil.
 
 ---
 ## 🌙 OVERNIGHT OTONOM OTURUM LOG (2026-06-22) — Alperen sabah review
@@ -464,4 +464,4 @@ Self-improvement makinesini besleyen sayılar sahte → sistem kendi drift'ini g
 **Kapsam:** 80 ADR × (ship-scope + aksiyon) = **80 tek-tek karar. Madde atlanmaz.**
 
 ---
-_Kaynak: deckent-last-standing-crosscheck.md (Phase-1 CC ⨯ Phase-2 deckent) · 2026-06-21 triage · file:line-grounded, doc-inference yok._
+_Kaynak: docs/audits/last-standing-2026-06/deckent-last-standing-crosscheck.md (Phase-1 CC ⨯ Phase-2 deckent) · 2026-06-21 triage · file:line-grounded, doc-inference yok._
