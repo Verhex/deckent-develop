@@ -294,8 +294,8 @@ describe('cost-config-loader', () => {
   describe('Baseline validation (bundled pricing data)', () => {
     it('baseline config passes unit safety for all models', () => {
       const config = loadCostConfig(tmpDir, { forceReload: true });
-      expect(config.providers.anthropic?.models['claude-opus-4-6']?.input_cost_per_token).toBe(0.000005);
-      expect(config.providers.anthropic?.models['claude-opus-4-6']?.output_cost_per_token).toBe(0.000025);
+      expect(config.providers.anthropic?.models['claude-opus-4-8']?.input_cost_per_token).toBe(0.000005);
+      expect(config.providers.anthropic?.models['claude-opus-4-8']?.output_cost_per_token).toBe(0.000025);
       // Sonnet 4.6 should be 1M context
       expect(config.providers.anthropic?.models['claude-sonnet-4-6']?.max_input_tokens).toBe(1000000);
       // Haiku 4.5

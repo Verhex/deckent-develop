@@ -25,7 +25,7 @@ describe('pricing-updater', () => {
   describe('fetchLiteLLMPricing', () => {
     it('fetches and parses LiteLLM JSON', async () => {
       const mockData = {
-        'claude-opus-4-6': {
+        'claude-opus-4-8': {
           input_cost_per_token: 0.000005,
           output_cost_per_token: 0.000025,
           litellm_provider: 'anthropic',
@@ -43,8 +43,8 @@ describe('pricing-updater', () => {
       );
 
       const data = await fetchLiteLLMPricing();
-      expect(data['claude-opus-4-6']).toBeDefined();
-      expect(data['claude-opus-4-6']?.input_cost_per_token).toBe(0.000005);
+      expect(data['claude-opus-4-8']).toBeDefined();
+      expect(data['claude-opus-4-8']?.input_cost_per_token).toBe(0.000005);
     });
 
     it('throws on HTTP error', async () => {
@@ -66,7 +66,7 @@ describe('pricing-updater', () => {
       const mockData = {
         data: [
           {
-            id: 'anthropic/claude-opus-4-6',
+            id: 'anthropic/claude-opus-4-8',
             name: 'Claude Opus 4.6',
             pricing: { prompt: '0.000005', completion: '0.000025' },
           },
@@ -83,7 +83,7 @@ describe('pricing-updater', () => {
 
       const models = await fetchOpenRouterPricing();
       expect(models).toHaveLength(1);
-      expect(models[0]?.id).toBe('anthropic/claude-opus-4-6');
+      expect(models[0]?.id).toBe('anthropic/claude-opus-4-8');
     });
   });
 
@@ -92,7 +92,7 @@ describe('pricing-updater', () => {
       initCostConfig(tmpDir);
 
       const mockLiteLLM = {
-        'claude-opus-4-6': {
+        'claude-opus-4-8': {
           input_cost_per_token: 0.000006, // DELTA: was 0.000005
           output_cost_per_token: 0.000025,
           cache_read_input_token_cost: 0.0000005,
@@ -123,14 +123,14 @@ describe('pricing-updater', () => {
       // Dry-run: file should NOT be modified
       const configPath = join(tmpDir, '.deckent', 'cost-config.json');
       const content = JSON.parse(readFileSync(configPath, 'utf-8'));
-      expect(content.providers.anthropic.models['claude-opus-4-6'].input_cost_per_token).toBe(0.000005);
+      expect(content.providers.anthropic.models['claude-opus-4-8'].input_cost_per_token).toBe(0.000005);
     });
 
     it('writes file when not dry-run', async () => {
       initCostConfig(tmpDir);
 
       const mockLiteLLM = {
-        'claude-opus-4-6': {
+        'claude-opus-4-8': {
           input_cost_per_token: 0.000006,
           output_cost_per_token: 0.000025,
           litellm_provider: 'anthropic',
@@ -156,7 +156,7 @@ describe('pricing-updater', () => {
 
       const configPath = join(tmpDir, '.deckent', 'cost-config.json');
       const content = JSON.parse(readFileSync(configPath, 'utf-8'));
-      expect(content.providers.anthropic.models['claude-opus-4-6'].input_cost_per_token).toBe(0.000006);
+      expect(content.providers.anthropic.models['claude-opus-4-8'].input_cost_per_token).toBe(0.000006);
       expect(content._update_source).toBe('litellm');
     });
 
@@ -176,7 +176,7 @@ describe('pricing-updater', () => {
             return {
               ok: true,
               json: async () => ({
-                'claude-opus-4-6': {
+                'claude-opus-4-8': {
                   input_cost_per_token: 0.000005,
                   output_cost_per_token: 0.000025,
                   litellm_provider: 'anthropic',
@@ -207,7 +207,7 @@ describe('pricing-updater', () => {
             return {
               ok: true,
               json: async () => ({
-                'claude-opus-4-6': {
+                'claude-opus-4-8': {
                   input_cost_per_token: 5, // WRONG — per-MTok instead of per-token
                   output_cost_per_token: 25,
                   litellm_provider: 'anthropic',
@@ -271,7 +271,7 @@ describe('pricing-updater', () => {
         warnings: [],
         deltaReport: [
           {
-            model: 'anthropic/claude-opus-4-6',
+            model: 'anthropic/claude-opus-4-8',
             field: 'input_cost_per_token',
             oldValue: 0.000005,
             newValue: 0.000006,
@@ -281,7 +281,7 @@ describe('pricing-updater', () => {
         dryRun: false,
       };
       const output = formatUpdateResult(result);
-      expect(output).toContain('anthropic/claude-opus-4-6');
+      expect(output).toContain('anthropic/claude-opus-4-8');
       expect(output).toContain('+20.0%');
     });
 
