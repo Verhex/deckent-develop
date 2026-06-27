@@ -87,13 +87,21 @@ export function extractTokenUsageFromClaudeCli(raw: unknown): TokenUsage | null 
   if (inputTokens === null && outputTokens === null) return null;
 
   const cacheReadTokens = coerceTokens(usage['cache_read_input_tokens']) ?? 0;
+  // cache-CREATION (cache-write) — the limit-dominant cost (Anthropic 1.25×input). The
+  // old parser dropped it, so even when the real envelope was read the cache-write cost
+  // stayed invisible. Map to BOTH cacheCreationTokens + cacheWriteTokens (cross-provider).
+  const cacheCreationTokens = coerceTokens(usage['cache_creation_input_tokens']) ?? 0;
   const modelRaw = (payload === null ? raw : payload) as { model?: unknown };
   const model = typeof modelRaw?.model === 'string' ? modelRaw.model : undefined;
+  const inp = inputTokens ?? 0;
+  const out = outputTokens ?? 0;
 
   return {
-    inputTokens: inputTokens ?? 0,
-    outputTokens: outputTokens ?? 0,
+    inputTokens: inp,
+    outputTokens: out,
     cacheReadTokens,
+    cacheCreationTokens,
+    source: 'cli-log',
     provider: 'claude',
     ...(model ? { model: model as TokenUsage['model'] } : {}),
   };
@@ -166,6 +174,11 @@ export function mergeWithWorkerClaim(
     inputTokens: measured.inputTokens,
     outputTokens: measured.outputTokens,
     cacheReadTokens: measured.cacheReadTokens ?? workerReported.cacheReadTokens ?? 0,
+    // Preserve the REAL cache-creation (limit-dominant cost) + provenance from the
+    // measured envelope — the old merge dropped them, so cost silently under-counted
+    // cache-write and the .result lost its source tag even when measured-real.
+    cacheCreationTokens: measured.cacheCreationTokens ?? workerReported.cacheCreationTokens,
+    source: measured.source ?? workerReported.source,
     provider: measured.provider ?? workerReported.provider,
     model: measured.model ?? workerReported.model,
   };

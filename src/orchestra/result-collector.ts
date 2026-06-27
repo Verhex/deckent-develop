@@ -439,6 +439,35 @@ export function estimateTokenUsage(task: Task, result: TaskResult): TokenUsage {
  * and no real claim, tokenUsage is left as-is (undefined or the stub) —
  * downstream cost/metrics already tolerate a missing tokenUsage.
  */
+/**
+ * CLI-agent providers whose REAL per-task usage lands in `.tasks/task-{id}.log` as a
+ * `--output-format json` / `--json` envelope (parsed by the provider adapter's
+ * extractUsage). For these, the docker/tmux backend dumps the envelope to `.log` only
+ * AFTER the container exits — which can lag the agent-written `.result` by a second or
+ * two. {@link waitForCliLog} closes that race so enrichment reads the REAL envelope
+ * instead of falling through to the fabricated heuristic.
+ */
+const CLI_USAGE_LOG_PROVIDERS = new Set(['claude', 'codex', 'gemini']);
+
+/** Wait (bounded) for a CLI worker's `.log` to be written + non-empty. Returns as soon
+ *  as it appears, or after `timeoutMs` (then enrichment falls back to the heuristic). */
+export async function waitForCliLog(
+  projectRoot: string,
+  taskId: string,
+  timeoutMs = 8000,
+): Promise<void> {
+  const logPath = join(projectRoot, TASKS_DIR, `task-${taskId}.log`);
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      const s = await stat(logPath);
+      if (s.size > 0) return;
+    } catch { /* not written yet */ }
+    if (Date.now() >= deadline) return;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+}
+
 export function enrichResultTokenUsage(
   result: TaskResult,
   task: Task | undefined,
@@ -516,6 +545,10 @@ export function enrichResultCost(
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
         cacheReadTokens: usage.cacheReadTokens,
+        // G6 fix: carry cache-CREATION tokens into cost. Anthropic prices cache-write
+        // at 1.25× input (the limit-dominant cost per F1-TOK); dropping it silently
+        // under-counted every cache-using task. calculateActualCost already prices it.
+        cacheCreationTokens: usage.cacheCreationTokens,
       },
       model,
       provider,
@@ -713,8 +746,20 @@ export async function waitForResults(
               } catch (e) { debugLog('collectResults:syntheticDiskVerifyEmit', e); }
             }
           }
-          enrichResultTokenUsage(result, taskMap.get(taskId), projectRoot);
-          enrichResultCost(result, taskMap.get(taskId), projectRoot);
+          // Close the CLI-log race: the docker/tmux backend dumps the usage envelope to
+          // .log only AFTER the container exits, which can lag the agent-written .result.
+          // (subprocess streams it live → no race; tests pass no backend → no wait.)
+          const enrichTask = taskMap.get(taskId);
+          const backendName = spawnOpts?.spawnBackend?.name ?? config?.spawn_backend;
+          const postExitLogBackend = backendName === 'docker' || backendName === 'tmux';
+          if (enrichTask && postExitLogBackend && CLI_USAGE_LOG_PROVIDERS.has(enrichTask.provider as string)) {
+            // The .log is dumped only after the container exits, which can lag the
+            // agent-written .result by 20-30s on a multi-turn task — wait generously
+            // (returns the instant the .log appears, so prompt dumps cost nothing).
+            await waitForCliLog(projectRoot, taskId, 45000);
+          }
+          enrichResultTokenUsage(result, enrichTask, projectRoot);
+          enrichResultCost(result, enrichTask, projectRoot);
           sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, result.filesChanged);
           // Persist the orchestrator-enriched tokenUsage + cost back to the .result FILE.
           // enrichResultTokenUsage/enrichResultCost mutate the in-memory result only;

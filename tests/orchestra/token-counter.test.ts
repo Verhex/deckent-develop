@@ -33,6 +33,8 @@ describe('token-counter — extractTokenUsageFromClaudeCli', () => {
       inputTokens: 15420,
       outputTokens: 3200,
       cacheReadTokens: 89000,
+      cacheCreationTokens: 1024,
+      source: 'cli-log',
       provider: 'claude',
       model: 'claude-opus-4-7',
     });
@@ -198,6 +200,8 @@ describe('token-counter — tryLoadCliLogTokens', () => {
       inputTokens: 9999,
       outputTokens: 333,
       cacheReadTokens: 4444,
+      cacheCreationTokens: 0,
+      source: 'cli-log',
       provider: 'claude',
       model: 'claude-opus-4-7',
     });

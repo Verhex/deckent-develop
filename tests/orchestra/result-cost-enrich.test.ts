@@ -49,6 +49,25 @@ describe('enrichResultCost — cost in every result', () => {
     expect(r.cost!.isLocal).toBe(false);
   });
 
+  it('cache-creation tokens are priced into cost (G6 — limit-dominant cache-write)', () => {
+    const withCacheWrite = makeResult({
+      inputTokens: 100_000,
+      cacheCreationTokens: 1_000_000, // 1M cache-write ≈ 1.25×$5 = $6.25
+      provider: 'claude' as never,
+      model: 'claude-opus-4-6' as never,
+    });
+    const withoutCacheWrite = makeResult({
+      inputTokens: 100_000,
+      provider: 'claude' as never,
+      model: 'claude-opus-4-6' as never,
+    });
+    enrichResultCost(withCacheWrite, undefined, root());
+    enrichResultCost(withoutCacheWrite, undefined, root());
+    // Pre-G6 enrichResultCost dropped cacheCreationTokens → the two costs were EQUAL.
+    // After the fix the cache-write is priced in → the cache-writing run costs strictly more.
+    expect(withCacheWrite.cost!.usd).toBeGreaterThan(withoutCacheWrite.cost!.usd);
+  });
+
   it('local/ollama usage → cost set with usd 0 and isLocal true', () => {
     const r = makeResult({
       inputTokens: 1000,

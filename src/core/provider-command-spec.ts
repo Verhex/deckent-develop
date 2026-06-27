@@ -73,7 +73,15 @@ export interface ProviderCommandSpec {
 export const PROVIDER_COMMAND_SPECS: Readonly<Record<string, ProviderCommandSpec>> = {
   claude: {
     binary: 'claude',
-    baseArgs: ['-p', '-'],
+    // `--output-format json` makes the print-mode run emit a single result envelope
+    // ({ type:'result', usage:{ input_tokens, output_tokens, cache_read_input_tokens,
+    // cache_creation_input_tokens }, total_cost_usd, session_id }) on stdout → captured
+    // to `.log` → ClaudeAdapter.extractUsage reads the REAL per-task usage (incl. the
+    // limit-dominant cacheCreation). Mirrors the gemini spec (which already carries the
+    // flag) + the subprocess backend's usageEmitArgs. Without it the default docker/tmux
+    // path fell back to the fabricated heuristic (cacheRead=input×4) — the long-standing
+    // "token counter never works" gap for the most-used config.
+    baseArgs: ['-p', '-', '--output-format', 'json'],
     modelFlag: '--model',
     approvalArgs: ['--dangerously-skip-permissions'],
     allowedToolsFlag: '--allowedTools',
@@ -83,7 +91,11 @@ export const PROVIDER_COMMAND_SPECS: Readonly<Record<string, ProviderCommandSpec
   },
   codex: {
     binary: 'codex',
-    baseArgs: ['exec', '--skip-git-repo-check'],
+    // `--json` makes `codex exec` emit JSONL events incl. `token_count` / `turn.completed`
+    // usage → captured to `.log` → CodexAdapter.extractUsage sums the REAL per-task usage
+    // (incl. cached_input + reasoning). Mirrors the host adapter's CODEX_USAGE_EMIT_ARGS;
+    // without it the docker codex path fell back to the heuristic.
+    baseArgs: ['exec', '--skip-git-repo-check', '--json'],
     modelFlag: '--model',
     // Container is the external sandbox → bypass codex's internal sandbox+approvals.
     approvalArgs: ['--dangerously-bypass-approvals-and-sandbox'],

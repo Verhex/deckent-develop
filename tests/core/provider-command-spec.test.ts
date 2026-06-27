@@ -19,7 +19,7 @@ describe('buildProviderCommand', () => {
     // environments that are externally sandboxed" (a docker container) → full
     // autonomy. Prompt via stdin (no positional/cat — robust for large prompts).
     const cmd = buildProviderCommand(PROVIDER_COMMAND_SPECS.codex, 'gpt-5.5', P, { autoApprove: true });
-    expect(cmd).toBe('codex exec --skip-git-repo-check --model gpt-5.5 --dangerously-bypass-approvals-and-sandbox');
+    expect(cmd).toBe('codex exec --skip-git-repo-check --json --model gpt-5.5 --dangerously-bypass-approvals-and-sandbox');
     expect(cmd).not.toContain('--full-auto');
   });
 
@@ -31,7 +31,7 @@ describe('buildProviderCommand', () => {
 
   it('claude: stdin prompt (-p -), apiId, allowedTools + dangerously-skip-permissions on autoApprove', () => {
     const cmd = buildProviderCommand(PROVIDER_COMMAND_SPECS.claude, 'claude-opus-4-8', P, { autoApprove: true, allowedTools: 'Read,Write' });
-    expect(cmd).toBe('claude -p - --model claude-opus-4-8 --allowedTools "Read,Write" --dangerously-skip-permissions');
+    expect(cmd).toBe('claude -p - --output-format json --model claude-opus-4-8 --allowedTools "Read,Write" --dangerously-skip-permissions');
   });
 
   it('claude without autoApprove omits dangerously-skip-permissions', () => {

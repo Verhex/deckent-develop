@@ -12,6 +12,9 @@ import type { ModelType } from '../core/types.js';
 import { getProviderForModel, UnknownModelError } from '../core/task-types.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { getProviderCommandSpec, buildProviderCommand } from '../core/provider-command-spec.js';
+import { createClaudeAdapter } from '../providers/claude.js';
+import { createCodexAdapter } from '../providers/codex.js';
+import { createGeminiAdapter } from '../providers/gemini.js';
 import { buildSuggestedImageCmd } from '../core/worker-image-check.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
@@ -320,6 +323,52 @@ export const WORKER_NODE_OPTIONS = 'NODE_OPTIONS=--max-old-space-size-percentage
  *
  * Unknown models also fall back to 'claude' as a safe default (legacy).
  */
+/** Provider CLI binary → adapter factory, for parsing the worker's usage envelope. */
+const USAGE_ADAPTER_FACTORIES: Record<string, (root: string) => { extractUsage?: (raw: string) => unknown }> = {
+  claude: createClaudeAdapter,
+  codex: createCodexAdapter,
+  gemini: createGeminiAdapter,
+};
+
+/**
+ * Patch a worker's `.result` with the REAL token usage parsed from its CLI envelope
+ * (captured container stdout). Provider-agnostic: dispatches to the model's provider
+ * adapter, whose extractUsage parses its native usage shape incl. cacheCreation. The
+ * agent cannot self-report token counts (they live only in the CLI envelope), and the
+ * orchestrator's post-collect enrichment races the post-exit `.log` dump — so writing
+ * the real usage HERE (at the source, the moment the envelope is captured) is the
+ * authoritative fix. No-op + never throws when no parseable envelope is present.
+ */
+function patchResultUsageFromEnvelope(
+  tasksDir: string,
+  taskId: string,
+  model: ModelType,
+  logContent: string,
+): void {
+  try {
+    const factory = USAGE_ADAPTER_FACTORIES[getProviderBinaryForModel(model)];
+    if (!factory) return;
+    const usage = factory(process.cwd()).extractUsage?.(logContent) as
+      | { inputTokens?: number; outputTokens?: number; provider?: string; model?: string }
+      | null
+      | undefined;
+    if (!usage || ((usage.inputTokens ?? 0) <= 0 && (usage.outputTokens ?? 0) <= 0)) return;
+    const resultPath = join(tasksDir, `task-${taskId}.result`);
+    if (!existsSync(resultPath)) return;
+    const r = JSON.parse(readFileSync(resultPath, 'utf-8')) as {
+      tokenUsage?: { provider?: string; model?: string };
+    };
+    r.tokenUsage = {
+      ...usage,
+      provider: usage.provider ?? r.tokenUsage?.provider,
+      model: r.tokenUsage?.model ?? usage.model ?? model,
+    };
+    writeFileSync(resultPath, JSON.stringify(r, null, 2), 'utf-8');
+  } catch (e) {
+    debugLog('docker-backend:usage-patch', e);
+  }
+}
+
 export function getProviderBinaryForModel(model: ModelType): string {
   let provider: string;
   try {
@@ -1436,6 +1485,12 @@ export class DockerSpawnBackend implements SpawnBackend {
         if (logContent.trim()) {
           const logPath = join(tasksDir, `task-${taskId}.log`);
           writeFileSync(logPath, logContent, 'utf-8');
+          // Patch the .result with REAL token usage parsed from the CLI envelope in the
+          // captured container stdout — at the SOURCE, sidestepping the orchestrator
+          // enrich-timing race (the .log lands only after the container exits, which can
+          // lag the agent-written .result by 20-30s). The agent cannot know its own token
+          // counts; they live only in the --output-format json / --json envelope here.
+          patchResultUsageFromEnvelope(tasksDir, taskId, model, logContent);
         }
       } catch (e) { debugLog('docker-backend:log-extract', e); }
 
