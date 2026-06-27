@@ -7,6 +7,7 @@ import { ensureDeckentImport, debugLog } from '../../core/utils.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -465,10 +466,11 @@ export function registerSync(program: Command): void {
       // --- Adapter file sync ---
       if (!opts.gitOnly) {
         if (!existsSync(join(root, DECKENT_FILE))) {
+          const deckentNotFoundMsg = getMessage('sync.deckent_not_found', getLanguage());
           if (opts.json) {
-            console.log(JSON.stringify({ error: 'DECKENT.md not found. Run deckent init first.' }));
+            console.log(JSON.stringify({ error: deckentNotFoundMsg }));
           } else {
-            printError(new Error('DECKENT.md not found. Run deckent init first.'));
+            printError(new Error(deckentNotFoundMsg));
           }
           process.exitCode = 1;
           return;

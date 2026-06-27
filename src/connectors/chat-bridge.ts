@@ -27,7 +27,7 @@ import {
 import { createCliToolDispatcher } from '../cli/commands/chat-tool-bridge.js';
 import { createPersistentClaudeSession } from '../cli/commands/chat-session.js';
 import { classifyActionRisk, type AgenticAction } from '../cli/commands/agentic-confirm.js';
-import { makeGatedDispatcher, hasRealPendingCheckpoint, buildBotSystemPrompt } from './bot-agentic.js';
+import { makeGatedDispatcher, hasRealPendingCheckpoint, buildBotSystemPrompt, summarizeArgs } from './bot-agentic.js';
 import { parkBotAction, isSprintScopedDestructive, attachApprovalMessageId } from './bot-action-store.js';
 import { getCurrentSprintId } from '../monitor/sprint-state.js';
 import { createBuiltinRegistry, buildMediaSink, runCapability } from './capabilities/index.js';
@@ -87,6 +87,40 @@ export function makeSendApproval(
     }
     await connector.sendMessage(msg);
     return ''; // sendMessage-only: sent but no id available
+  };
+}
+
+/**
+ * Tool-side analogue of `makeSendApproval`: build a buttoned approval sender for a
+ * risky deckent_* TOOL (not a capability — there is no CapabilityRegistry preview,
+ * so the body is `tool(args-summary)`). Same Approve/Reject inline buttons + same
+ * `approvalCallbackData` contract, so a button press resolves through the identical
+ * `approve <id>` path that text already uses. This is what gives risky deckent_*
+ * tools a buttoned approval (in groups too) — previously only capabilities had one.
+ *
+ * Returns the platform message-id when available, `''` when sent without an id, or
+ * `false` when the connector has no send surface (→ caller uses the legacy text).
+ */
+export function makeSendToolApproval(
+  connector: PerTurnConnector,
+  lang: string,
+): (channelId: string, id: string, tool: string, args: Record<string, unknown>) => Promise<string | false> {
+  return async (channelId, id, tool, args) => {
+    if (typeof connector.sendMessage !== 'function') return false;
+    const header = getMessage('cap.approval.header', lang); // generic "Approval required — not executed"
+    const argStr = summarizeArgs(args);
+    const html = markdownToTelegramHtml(`🔐 ${header}\n${tool}(${argStr})`);
+    const buttons: ReadonlyArray<ReadonlyArray<{ text: string; callbackData: string }>> = [[
+      { text: getMessage('cap.btn.approve', lang), callbackData: approvalCallbackData('approve', id) },
+      { text: getMessage('cap.btn.reject', lang), callbackData: approvalCallbackData('reject', id) },
+    ]];
+    const msg = { connector: connector.id as ConnectorId, channelId, text: html, parseMode: 'HTML' as const, buttons };
+    if (connector.sendMessageReturningId) {
+      const mid = await connector.sendMessageReturningId(msg);
+      return mid ?? '';
+    }
+    await connector.sendMessage(msg);
+    return '';
   };
 }
 
@@ -295,6 +329,9 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
       // absent (no-media sentinel), makeSendApproval returns false and the dispatcher
       // falls back to the legacy "type approve <id>" text.
       const sendApprovalFn = makeSendApproval(mediaConn as PerTurnConnector, capRegistry, lang);
+      // Tool-side buttoned approval (risky deckent_* tools). Same per-turn connector;
+      // absent send surface → returns false → dispatcher falls back to legacy text.
+      const sendToolApprovalFn = makeSendToolApproval(mediaConn as PerTurnConnector, lang);
       const capGate = {
         has: (id: string) => capRegistry.has(id),
         resolve: (id: string) => {
@@ -336,6 +373,14 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
         hasPendingCheckpoint: () => hasRealPendingCheckpoint(root),
         lang,
         capabilities: capGate,
+        // Buttoned approval for risky deckent_* tools (group buttons). Mirrors
+        // capGate.sendApproval: send → store the message id so the resolver can
+        // edit it on approve/reject; return false → dispatcher uses legacy text.
+        sendToolApproval: async (id: string, tool: string, args: Record<string, unknown>): Promise<boolean> => {
+          const mid = await sendToolApprovalFn(sessionId, id, tool, args);
+          if (mid !== false && mid !== '') attachApprovalMessageId(root, id, mid);
+          return mid !== false;
+        },
       });
       confirm = async () => true; // gating lives in the wrapper, not here
     } else {

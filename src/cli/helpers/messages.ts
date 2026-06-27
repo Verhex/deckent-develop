@@ -185,6 +185,36 @@ const MESSAGES: MessageMap = {
     tr: 'Sonuç: {passed}/{total} kontrol geçti',
   },
 
+  // ─── doctor: daemon hygiene (B-ZOMBIE i18n-centralization, Task 333-010) ──
+  'doctor.daemon_header': {
+    en: 'Daemon Hygiene:',
+    tr: 'Daemon Hijyeni:',
+  },
+  'doctor.daemon_clean': {
+    en: 'No stale deckent daemons detected.',
+    tr: 'Eskimiş deckent daemon süreci bulunamadı.',
+  },
+  'doctor.daemon_found': {
+    en: '{count} stale deckent daemon(s) detected (advisory — deckent never auto-kills):',
+    tr: '{count} eskimiş deckent daemon süreci bulundu (tavsiye — deckent asla otomatik öldürmez):',
+  },
+  'doctor.daemon_entry': {
+    en: 'PID {pid} — {kind}, running for {age}',
+    tr: 'PID {pid} — {kind}, {age} süredir çalışıyor',
+  },
+  'doctor.daemon_kill_hint': {
+    en: 'To stop them, run: {killCmd}   (Windows: {winKillCmd})',
+    tr: 'Durdurmak için çalıştırın: {killCmd}   (Windows: {winKillCmd})',
+  },
+  'doctor.daemon_unsupported': {
+    en: 'Process listing not supported on {platform} — stale-daemon check skipped.',
+    tr: '{platform} platformunda süreç listeleme desteklenmiyor — eskimiş daemon kontrolü atlandı.',
+  },
+  'doctor.daemon_check_failed': {
+    en: 'Could not list processes — stale-daemon check skipped (advisory).',
+    tr: 'Süreç listesi alınamadı — eskimiş daemon kontrolü atlandı (tavsiye).',
+  },
+
   // ─── doctor: worker image readiness + --fix-image (F1-IMG, Sprint 270 — 270-008) ──
   'doctor.image_ready': {
     en: 'Worker image ready — provider CLIs + ca-certificates present',
@@ -573,6 +603,34 @@ const MESSAGES: MessageMap = {
   'init.next_step_start': {
     en: '  2. Run `deckent start` to begin your first sprint',
     tr: '  2. İlk sprint\'i başlatmak için `deckent start` çalıştırın',
+  },
+
+  // ─── evolve command ─────────────────────────────────────────────────
+  'evolve.no_sprint_data': {
+    en: 'No sprint data found. Run some sprints first to see evolution trends.',
+    tr: 'Sprint verisi bulunamadı. Evrim trendlerini görmek için önce birkaç sprint çalıştırın.',
+  },
+  'evolve.report_header': {
+    en: '\nEvolution Report — {count} sprints analyzed\n',
+    tr: '\nEvrim Raporu — {count} sprint analiz edildi\n',
+  },
+  'evolve.nogo_trend': {
+    en: 'NO_GO trend: {icon} {direction}',
+    tr: 'NO_GO trendi: {icon} {direction}',
+  },
+  'evolve.agent_trends': {
+    en: 'Agent Trends:',
+    tr: 'Ajan Trendleri:',
+  },
+  'evolve.skill_trends': {
+    en: 'Skill Trends:',
+    tr: 'Yetenek Trendleri:',
+  },
+
+  // ─── sync command ────────────────────────────────────────────────────
+  'sync.deckent_not_found': {
+    en: 'DECKENT.md not found. Run deckent init first.',
+    tr: 'DECKENT.md bulunamadı. Önce deckent init çalıştırın.',
   },
 
   // ─── set-directives command ──────────────────────────────────────────

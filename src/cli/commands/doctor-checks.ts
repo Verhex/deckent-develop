@@ -25,6 +25,7 @@ import {
   type ProcessListResult,
 } from '../../core/daemon-hygiene.js';
 import type { CIBaseline, CIReport } from '../helpers/output.js';
+import { getMessage } from '../helpers/messages.js';
 
 export interface DoctorCheck {
   name: string;
@@ -492,52 +493,6 @@ export async function runProviderDiagnostics(root: string): Promise<ProviderAvai
 // ADVISORY ONLY — this NEVER kills a process, NEVER throws, and NEVER fails the
 // doctor run (an unsupported platform or a listing failure both degrade to a
 // benign PASS note).
-//
-// i18n: messages.ts (src/cli/helpers/) is outside this task's write-scope, so —
-// following the existing project precedent (doctor.ts `authProbeLoggedOutLine`)
-// — the en/tr strings live in a local structured table served by a
-// getMessage-shaped lookup (English default, {var} substitution). These keys
-// should be centralized into messages.ts in a follow-up when it is in scope.
-
-const DAEMON_MESSAGES: Record<string, Record<'en' | 'tr', string>> = {
-  'doctor.daemon_header': {
-    en: 'Daemon Hygiene:',
-    tr: 'Daemon Hijyeni:',
-  },
-  'doctor.daemon_clean': {
-    en: 'No stale deckent daemons detected.',
-    tr: 'Eskimiş deckent daemon süreci bulunamadı.',
-  },
-  'doctor.daemon_found': {
-    en: '{count} stale deckent daemon(s) detected (advisory — deckent never auto-kills):',
-    tr: '{count} eskimiş deckent daemon süreci bulundu (tavsiye — deckent asla otomatik öldürmez):',
-  },
-  'doctor.daemon_entry': {
-    en: 'PID {pid} — {kind}, running for {age}',
-    tr: 'PID {pid} — {kind}, {age} süredir çalışıyor',
-  },
-  'doctor.daemon_kill_hint': {
-    en: 'To stop them, run: {killCmd}   (Windows: {winKillCmd})',
-    tr: 'Durdurmak için çalıştırın: {killCmd}   (Windows: {winKillCmd})',
-  },
-  'doctor.daemon_unsupported': {
-    en: 'Process listing not supported on {platform} — stale-daemon check skipped.',
-    tr: '{platform} platformunda süreç listeleme desteklenmiyor — eskimiş daemon kontrolü atlandı.',
-  },
-  'doctor.daemon_check_failed': {
-    en: 'Could not list processes — stale-daemon check skipped (advisory).',
-    tr: 'Süreç listesi alınamadı — eskimiş daemon kontrolü atlandı (tavsiye).',
-  },
-};
-
-/** getMessage-shaped local lookup for the daemon-hygiene strings (en/tr, EN default). */
-function daemonMsg(key: string, lang: string, vars?: Record<string, string>): string {
-  const entry = DAEMON_MESSAGES[key];
-  const normLang: 'en' | 'tr' = lang === 'tr' ? 'tr' : 'en';
-  const template = entry ? (entry[normLang] ?? entry.en) : key;
-  if (!vars) return template;
-  return template.replace(/\{(\w+)\}/g, (_, varName: string) => vars[varName] ?? `{${varName}}`);
-}
 
 /** Human-readable elapsed age (e.g. `2h 5m`, `45m`, `30s`, `1d 3h`). Pure. */
 function formatDaemonAge(totalSec: number): string {
@@ -558,14 +513,14 @@ function formatDaemonAge(totalSec: number): string {
  * cross-platform copy-paste kill hint. i18n en/tr. Never throws.
  */
 export function formatDaemonHygieneLines(staleDaemons: StaleDaemon[], lang: string = 'en'): string[] {
-  const lines: string[] = [daemonMsg('doctor.daemon_header', lang)];
+  const lines: string[] = [getMessage('doctor.daemon_header', lang)];
   if (staleDaemons.length === 0) {
-    lines.push(`  [PASS] ${daemonMsg('doctor.daemon_clean', lang)}`);
+    lines.push(`  [PASS] ${getMessage('doctor.daemon_clean', lang)}`);
     return lines;
   }
-  lines.push(`  [WARN] ${daemonMsg('doctor.daemon_found', lang, { count: String(staleDaemons.length) })}`);
+  lines.push(`  [WARN] ${getMessage('doctor.daemon_found', lang, { count: String(staleDaemons.length) })}`);
   for (const daemon of staleDaemons) {
-    lines.push(`         ${daemonMsg('doctor.daemon_entry', lang, {
+    lines.push(`         ${getMessage('doctor.daemon_entry', lang, {
       pid: String(daemon.pid),
       kind: daemon.kind,
       age: formatDaemonAge(daemon.elapsedSec),
@@ -574,7 +529,7 @@ export function formatDaemonHygieneLines(staleDaemons: StaleDaemon[], lang: stri
   const pids = staleDaemons.map((d) => d.pid);
   const killCmd = `kill ${pids.join(' ')}`;
   const winKillCmd = pids.map((p) => `taskkill /F /PID ${p}`).join(' & ');
-  lines.push(`         ${daemonMsg('doctor.daemon_kill_hint', lang, { killCmd, winKillCmd })}`);
+  lines.push(`         ${getMessage('doctor.daemon_kill_hint', lang, { killCmd, winKillCmd })}`);
   return lines;
 }
 
@@ -605,8 +560,8 @@ export async function checkDaemonHygiene(opts: {
       return {
         staleDaemons: [],
         lines: [
-          daemonMsg('doctor.daemon_header', lang),
-          `  [PASS] ${daemonMsg('doctor.daemon_unsupported', lang, { platform: result.platform })}`,
+          getMessage('doctor.daemon_header', lang),
+          `  [PASS] ${getMessage('doctor.daemon_unsupported', lang, { platform: result.platform })}`,
         ],
       };
     }
@@ -619,8 +574,8 @@ export async function checkDaemonHygiene(opts: {
     return {
       staleDaemons: [],
       lines: [
-        daemonMsg('doctor.daemon_header', lang),
-        `  [PASS] ${daemonMsg('doctor.daemon_check_failed', lang)}`,
+        getMessage('doctor.daemon_header', lang),
+        `  [PASS] ${getMessage('doctor.daemon_check_failed', lang)}`,
       ],
     };
   }

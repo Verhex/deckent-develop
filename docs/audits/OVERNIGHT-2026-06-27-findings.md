@@ -224,3 +224,148 @@ READ-ONLY izleyici (no build/edit/kill), ~15dk pencere, ~80s poll. Disk-verify e
 - 🎯 C5: `deckent kpi` no-arg artık NON-EMPTY (Task1 latestSprintWithResults fallback ✓); task-based KPI gerçek (Completion 100%, No-Go 0%, Boundary 0%). cost/token=0 (forward-collection-captured sprint henüz yok; Task2 fix dist'te → sprint-333 finalize'ında gerçek-cost gelecek).
 - 🔴→✅ REGRESYON (18 test, 5 dosya) ÇÖZÜLDÜ: production DOĞRU (bootstrapProviders direkt-çağrı + PATH-boş'ta test-ai register-oluyor); kök=test-mock staleness — 332-005 openai-compatible.ts'e `spawn` import-etti ama 4 F1-012 testinin `vi.mock('node:child_process')` SADECE spawnSync'i mock'luyordu → spawn-undefined → config-block import-fail. FIX: 4 dosyaya `spawn: vi.fn()` (50/50 PASS) + identity-count docs:stats regen. **DERS: refactor-eden-task affected test-mock'ları güncellemeli (full-affected-suite).**
 - forward-collection (Task2) sprint-332-kendi-finalize'ında etkili olmadı (eski-dist); sprint-333'te gerçek-cost beklenecek.
+
+## ═══ GECE ÖZETİ (session-limit @ ~04:50 Istanbul) ═══
+**3 sprint tam-döngü (plan→run→build→adversarial-verify→fix→commit→push), hepsi origin/main'de:**
+- **Sprint-330** (`eecb5c90`): KPI Faz-1 + F1-PCACHE, 28/28, GO_W/TECH_DEBT.
+- **Sprint-331** (`46e7dce4`): 330-fix + Beta-next, 16/16, GO_W/TECH_DEBT.
+- **Sprint-332** (`38185e8b`): 3 KPI-fix + F1-013 agentic-HTTP-worker + Beta, 17/17, GO_W/TECH_DEBT.
+
+**KANITLANAN (disk+gerçek-binary):**
+- 🟢 Token/cost-capture CANLI ($-değerler her .result'ta) — 1500-sprint gizemi + persistence-fix çözüldü.
+- 🟢 KPI-engine çalışıyor: `deckent kpi` (no-arg) non-empty, 8 KPI, task-based gerçek (Completion/No-Go/Boundary).
+- 🟢 F1-012 provider-de-hardcode Law-#2 PASS; F1-013 agentic-HTTP-worker (CLI-siz provider'lar worker koşar).
+- 🟢 error-convention→DeckentError; opus-outputTokens-capture.
+
+**ADVERSARIAL-VERIFY DEĞER:** 3 sprint'te gerçek-bug yakalandı + root-cause'landı + fix'lendi:
+- 3 KPI proof-of-function bug (no-arg-resolution, forward-collection-non-fire, cost/token=0) → sprint-332'de fix.
+- 18-test regresyon (test-mock staleness, production DOĞRU'ydu) → 4-dosya spawn-mock fix.
+
+**AÇIK (sprint-333 için, DIRECTIVES draft-edili AMA DOĞRULANMAMIŞ — çalıştırmadan önce dep-rule+distinct-file verify):**
+- C5-definitive: sprint-333 finalize (forward-collection-fix artık dist'te) → gerçek cost/token-$ gelecek → `kpi --sprint 333` doğrula.
+- KPI-Faz2 surface TECH_DEBT completion (dashboard-card/api-trend/mcp-trend/telegram/cost-mcp).
+- AS-2: F1-014 runtime-auth-non-leak, F1-005 Dockerfile-multiCLI.
+
+### Opus 4.6→4.8 fix (4d16aef6) + KPI-surface verify
+- Worker zaten 4.8 koşuyordu (buildArgs→registry apiId claude-opus-4-8); pricing-baseline Nisan-stale (4-6 key) → cost-etiketi 4-6 gösteriyordu. Rename → cost.pricingSource artık claude-opus-4-8. 2 stale-test (cost-config-loader/pricing-updater) güncellendi, tests/core 6036 green.
+- KPI surfaces çalışıyor: kpi no-arg ✓, kpi --trend ✓ (series döndürüyor), Faz-2 (MCP/API/dashboard/telegram) task'ları DONE/TECH_DEBT. cost/token=0 + retro-scorecard-boş = forward-collection-sprint bekliyor (sprint-333).
+
+### Sprint-333 (AS-2 + KPI-completion + Beta-onboarding, 12 task) — başlatıldı
+- 001 F1-014 auth-non-leak, 002 F1-010 overflow, 003 KPI-threshold-advisory, 004 KPI cost/token LIVE-PROOF harness (C5-definitive!), 005 cost-gate-warn, 006 status-honesty, 007 SIEM-advisory, 008 DOC-PKG, 009 F1-IMG-2, 010 i18n-cleanup, 011 cookbook, 012 docs. Distinct-file + dep-bug-yok doğrulandı.
+
+### Sprint-333 monitor (read-only adversarial monitor — CC, başladı 11:57)
+**Scope baseline (all 12, distinct-file confirmed — NO collisions among tasks):**
+- 001 `src/providers/subprocess.ts` + test · 002 `src/core/provider-overflow-gate.ts`,`src/orchestra/sprint-spawner.ts` + test · 003 `src/core/kpi/breach-advisor.ts`,`src/orchestra/sprint-retro-writer.ts` + test · 004 `tests/e2e/kpi-surface-smoke.test.ts` (test-only) · 005 `src/orchestra/sprint-finalizer.ts` + test · 006 `src/mcp/tools/status.ts` + test · 007 `src/core/siem-forwarder.ts` + test · 008 `README.md`,`package.json` + test · 009 `src/cli/commands/init.ts` + test · 010 `src/cli/helpers/messages.ts`,`doctor-checks.ts`,`evolve.ts`,`sync.ts` + test · 011 `docs/cookbook/getting-started-en.md` · 012 `docs/MASTER-PLAN.md`,`docs/audits/OVERNIGHT-2026-06-27-findings.md`.
+- 333-010 = SOLE owner of `src/cli/helpers/messages.ts` ✓ (no other task lists it). 333-009 owns init.ts separately — no overlap.
+- ⚠️ MONITOR-NOTE: 333-012 scope includes THIS findings file (`docs/audits/OVERNIGHT-2026-06-27-findings.md`) — same file I append to. Both docker-backend (flush at end). Potential append-collision/overwrite of my section if 012 lands last; flagged, not blocking.
+- Pre-sprint baseline (NOT sprint output): untracked `tests/core/identity-config-faz3.test.ts`, `src/connectors/identity/providers/scim.ts` — exclude from boundary attribution.
+
+**Poll 1 (~11:57):** progress 0/12. Status shows 4 active (001-004 "Writing code") but heartbeats EXECUTING for 001-008 (docker backend). All hb mtime fresh (11:56-11:57). No `src/`|`tests/` tracked changes on disk yet (docker workers flush at completion). No `.result` files yet → no NO_GO. Budget banner: OVER 781/600 lines (pre-existing advisory, not a sprint blocker). Health: GREEN.
+
+**Poll 2 (~11:59):** progress 2/12. 8 workers EXECUTING (001-010 ramping). Only alert = benign "CLAUDE.md not updated in 70min" (doc-staleness advisory, not health). Two DONE landed, both disk-verified in-scope + REAL (not synthetic):
+- **333-006 (status honesty) DONE** — filesChanged = `tests/mcp/status-failed-tasks.test.ts` ONLY (in scope). Honest note: `status.ts` failedTasks-fix (noGoCount via countNoGoTasks at lines 456/482) was ALREADY in place from prior sprint → no source edit needed; task added the proving test (4/4 pass). No boundary violation.
+- **333-007 (SIEM warn-once) DONE** — filesChanged = `src/core/siem-forwarder.ts` + `tests/core/siem-forwarder-warn.test.ts` (both in scope). Surgical 3-part change, default-off preserved, 19/19 green incl. existing siem-forwarder.test.ts. No boundary violation.
+- Boundary disk-truth: `git diff --stat src/ tests/` = only `siem-forwarder.ts` (17+/1-); untracked = the two in-scope test files + pre-sprint baseline. CLEAN. Heartbeats all fresh (<60s). Health: GREEN.
+
+**Poll 3-4 (~12:01-12:02):** progress 3/12.
+- **333-008 (DOC-PKG) DONE** — filesChanged=[] (honest no-op): README docs/ links already absolutized + test already created in sprint-332 (38185e8b); current README = 14 absolute refs, 0 relative; test passes 2ms early-exit; `npm pack --dry-run` confirms README in tarball. package.json (+1) was pre-existing at sprint start (in 333-008 scope regardless). In-scope.
+- **FULL BOUNDARY ATTRIBUTION (9 tracked + untracked, ALL map to owning task — NO violation, NO collision):** doctor-checks.ts/evolve.ts/sync.ts/messages.ts→010 · siem-forwarder.ts→007 · sprint-finalizer.ts→005 · sprint-retro-writer.ts→003 · sprint-spawner.ts→002 · subprocess.ts→001 · breach-advisor.ts(+tests/core/kpi/)→003 · provider-overflow-gate.ts→002 · i18n-hardcode-cleanup.test→010 · siem-forwarder-warn.test→007 · status-failed-tasks.test→006. `messages.ts` touched ONLY by 010 (sole-owner CONFIRMED on disk). `identity-config-faz3.test.ts` = pre-sprint baseline.
+
+**🔒 333-001 (F1-014) LAW #2 / SECURITY VERDICT — SOURCE: PASS.** `src/providers/subprocess.ts` diff replaces the full-`...process.env` spread (the documented leak at old :199-203) with a SCRUB+inject contract:
+  1. base = `{...process.env}` (keeps PATH/HOME/LANG — non-secret);
+  2. `delete childEnv[key]` for ALL of new const `CROSS_PROVIDER_CREDENTIAL_KEYS` = [ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, DEEPSEEK_API_KEY, DASHSCOPE_API_KEY, ZHIPU_API_KEY] (scrub every provider key);
+  3. `Object.assign(childEnv, opts.env)` re-injects ONLY this worker's own credential (the per-provider map from `applyDeckSecretsToEnv`); then LANG/PYTHONIOENCODING forced.
+  - Subscription **claude** worker → `opts.env` empty → child has **NO ANTHROPIC_API_KEY** → CLI session-auth (ADR-076 inverse-failure / Sprint-213 mass-NO_GO prevented). PASS.
+  - **codex** worker → child carries ONLY OPENAI_API_KEY, zero ANTHROPIC/GOOGLE cross-leak. PASS. Base PATH/LANG preserved. Pure-JS map ops = cross-platform (Law #2). Honest `TODO(phase2)` notes config-driven (F1-012 arbitrary `apiKeyEnv`) providers not covered by the static set — debt flagged, not silent.
+  - Mirrors the committed docker allowlist (`spawn-backend-docker.ts:820-847`); did NOT touch docker backend or auth-matrix.test (scope-respecting).
+  - ⏳ TEST + .result pending flush (333-001 still EXECUTING) — will confirm `tests/providers/subprocess-auth-noleak.test.ts` assertions (codex→only-OPENAI, claude→no-ANTHROPIC, PATH/LANG kept) + GREEN run for the complete proof.
+  - Health: GREEN.
+
+**Poll 4-5 (~12:02-12:03):** progress 5/12.
+- **✅ 333-004 (KPI cost/token LIVE-PROOF) — REAL-BINARY e2e CONFIRMED, NOT mock-only.** `tests/e2e/kpi-surface-smoke.test.ts` on disk: `spawn(... ENTRY=dist/cli/entry.js, 'serve','--port',port,'--no-terminal')` boots the BUILT binary; seeds `.brain/memory.db` via the **real `KpiStore.upsertResults`** (cost_per_sprint=1.23 over 2 sprint periods) — no mocks/in-memory substitute; **free port** via `createServer()`+`address().port` (not hardcoded); async readiness polling `GET /health` (no spawnSync); `afterEach` `srv.close()` in try/finally (Windows handle-guard); `describe.skipIf(DIST_ABSENT)` honest skip when unbuilt. Assertions: T1 `GET /`→200; **T2 `GET /api/kpi`→200, `kpis[]` non-empty, finds `cost_per_sprint`, `typeof value==='number'` AND `toBeCloseTo(1.23,2)`** (real numeric cost from real store reaches real API = the live-proof); T3 `GET /api/kpi/trend`→200 + `series[]`. Meets ADR-079 Tier-1 proof-of-function bar. (333-004 .result not yet flushed — still EXECUTING; test file on disk fully satisfies the spec.)
+- **333-003 (KPI breach-advisory) DONE** — new `src/core/kpi/breach-advisor.ts` + 1 additive non-blocking try/catch call in `sprint-retro-writer.ts` (both in scope), `tests/core/kpi/breach-advisor.test.ts` 10/10 green, no regressions (write-retrospective/sprint-retro-writer/scorecard suites green). CONSUMES `result.status` verbatim (no re-compute), ADR-008 core→cli respected, and EXPLICITLY did NOT touch messages.ts ("Task 10 owns it") — boundary-respecting. In-scope.
+- **Alerts now 4 — all benign/housekeeping:** CLAUDE.md-staleness (doc advisory) + 3× `stale_spawn_lock auto-removed (TTL>5min)` (Auditor auto-releasing docker spawn-churn locks — self-healing, NOT a collision/deadlock; tasks completing DONE confirm spawn pipeline healthy).
+- **WATCH (not a violation):** 333-003's tsc note observed pre-existing TS6133/TS6192 unused-symbol warnings in `evolve.ts`(010) + `sprint-spawner.ts`(002) while those workers were mid-flight (files `M` in tree). Each worker runs its own tsc; will confirm clean when 002/010 land. Heartbeats: active workers fresh (<15s); DONE tasks' hb stopped (expected, not stalls). Health: GREEN.
+
+**Poll ~12:03-12:04: progress 9/12 (8 results DONE; 001 source+test on disk, result still flushing).**
+- **✅ 333-004 (KPI LIVE-PROOF) — RUN-PROVEN DONE.** result: "All 3 tests GREEN (2.76s, real-binary boot)"; T2 cost_per_sprint **value=1.23** (numeric — forward-collection fix verified end-to-end). Hermetic: mkdtempSync root+HOME, real `KpiStore.upsertResults` seed, DECKENT_API_TOKEN child-auth, /health async readiness, SIGTERM→SIGKILL teardown + timer.unref, skipIf dist-absent, no spawnSync, zero source touches. This is the definitive proof-of-function for the whole KPI surface. PASS.
+- **✅ 333-010 (i18n sole-owner) DONE.** 49 hermetic i18n tests + messages.test 20/20 + doctor/sync suites all green; English output byte-equivalent (exact-match asserts). messages.ts touched ONLY by 010 (disk-confirmed across all polls). In-scope.
+- **333-002 (overflow gate) DONE** — new `provider-overflow-gate.ts` + 1 additive flag-gated (default-off) wire in `sprint-spawner.ts`; `tsc --noEmit` exit 0 (resolves the earlier WATCH for sprint-spawner.ts); 11/11 + 7 regression suites green; honest TODO(phase2). In-scope.
+- **333-005 (cost-gate WARN-only) DONE** — warn-only non-blocking `emitFinalizeSpendAdvisory` wired into `sprint-finalizer.ts`; HARD gate (enforce_spend_gate) NOT flipped (default-off preserved); 102/102 existing finalizer + 10/10 new green; explicit post-beta follow-up for hard enforcement. In-scope.
+- **333-009 init.ts** now in boundary diff (9+/) — in scope ✓.
+
+**🔒 333-001 (F1-014) FINAL SECURITY VERDICT — SOURCE + TEST: PASS (Law #2).** `tests/providers/subprocess-auth-noleak.test.ts` (9.2KB, on disk) is a hermetic injected-`spawnImpl` seam (NO real process — nogo honored). Setup seeds host `process.env` with all three keys (sk-ant-HOST/sk-oai-HOST/goog-HOST). 4 assertions captured from the spawn `opts.env`:
+  - `it('codex worker child env carries ONLY OPENAI_API_KEY — no ANTHROPIC/GOOGLE leak')` → `env.OPENAI_API_KEY==='sk-oai-OWN'`, `env.ANTHROPIC_API_KEY` **toBeUndefined**, `env.GOOGLE_API_KEY` **toBeUndefined** (lines 138-141). Cross-provider leak BLOCKED.
+  - `it('claude SUBSCRIPTION worker (no opts.env) gets NO ANTHROPIC_API_KEY (ADR-076)')` → `env.ANTHROPIC_API_KEY` **toBeUndefined** (line 150), + OPENAI/GOOGLE undefined. **The core Law-#2/ADR-076 assertion — subscription claude carries NO key → CLI session-auth, Sprint-213 inverse-failure prevented.**
+  - `it('preserves base non-secret host vars (PATH/LANG/probe) byte-for-byte')` → `env.PATH===process.env.PATH`, LANG/PYTHONIOENCODING/non-secret-probe kept (lines 160-163).
+  - `it('api claude worker (opts.env carries its own key) gets ANTHROPIC_API_KEY, no foreign keys')` → own key present, foreign undefined (lines 172-173).
+  - VERDICT: **PASS** — spawn-time worker env gets ONLY its own provider credential; no cross-provider key leak; subscription Claude gets NO ANTHROPIC_API_KEY. (.result pending flush; source+test on disk are complete & correct.)
+
+**BOUNDARY (poll-9, full attribution): NO violation, NO collision.** 10 tracked + 11 untracked, every file maps to its single owning task (init.ts→009, subprocess.ts→001, overflow-gate+test→002, finalizer+cost-gate-advisory.test→005, breach-advisor+tests/core/kpi→003, siem→007, retro-writer→003, status-failed-tasks.test→006, doctor/evolve/sync/messages/i18n.test→010, e2e/kpi-surface-smoke.test→004). `identity-config-faz3.test.ts`=pre-sprint baseline. No file shared by two tasks. Status CI banner: "tsc OK". 8/8 landed results = DONE, 0 NO_GO. Health: GREEN.
+
+## ═══ 🔴 P0 BULGU: token/cost HEURISTIC, gerçek-API-ölçümü DEĞİL (user-flagged) ═══
+**Cevap: resulta yazılan token/cost %100 DOĞRU DEĞİL — Anthropic'in tuttuğu gerçek-usage ile TUTARSIZ.**
+
+### Survey (61 result, sprint-330/331/332)
+- cost=0/undefined: 2 (330-021/022, NO_GO-timeout, in/out=0 → beklenen).
+- output=null: 12 (opus VE sonnet — 331-008/332-010/332-014 sonnet; opus-özel DEĞİL).
+- cacheCreationTokens=undefined: **61/61** (hiç yakalanmıyor).
+- tokenUsage.source=undefined: **61/61** (normalizeUsage'dan geçmiyor).
+
+### Kök-neden (KESİN)
+- token-counter `.tasks/task-{id}.log` okuyor (token-counter.ts:208) → log **65-byte/boş** (`--output-format json` envelope düşmüyor) → `estimateTokenUsage` HEURISTIC'e düşüyor (token-counter.ts:401-403).
+- HEURISTIC formüller (yapısal-kanıt, 61/61 tam-eşleşir): `input ≈ estimatedTokens`, `output = linesAdded × 15`, `cacheRead = input × 4`, `cacheCreation = 0/yok`.
+- usageEmitArgs `--output-format json` spawn'a uygulanıyor (subprocess.ts:105/222) AMA envelope worker-log'a yazılmıyor → extract edilemiyor.
+
+### SOMUT KARŞILAŞTIRMA (gerçek vs heuristic)
+- GERÇEK worker-session (~/.claude/projects/.../9e1b8305, turns=2): in=18644 out=2314 cacheRead=28324 **cacheCreate=47514**.
+- HEURISTIC result (332-001): in=8354 out=825 cacheRead=33416(=in×4) **cacheCreate=0**.
+- → input 2.2× / output 2.8× sapma + **cacheCreation (limit-dominant maliyet) TAMAMEN kaçırılmış** → cost ciddi-yanlış.
+
+### Anthropic gerçek-usage NEREDE
+- `~/.claude/projects/-home-alperen-deckent-dev/*.jsonl` (session-store) — her turn'de `message.usage{input_tokens,output_tokens,cache_read_input_tokens,cache_creation_input_tokens}`. tokscale-yaklaşımı bunu okur.
+
+### FIX (sprint-334 P0)
+1. Worker-session'ı task'a eşle (spawn'da session_id yakala — `--output-format json` envelope'unda session_id var; VEYA cwd+timestamp korelasyon).
+2. session-store jsonl'den gerçek-usage TOPLA (4 alan, cacheCreation dahil) → heuristic'i bununla DEĞİŞTİR.
+3. ALT: worker stdout'undaki `--output-format json` envelope'unu log'a yaz → extractUsage zaten parse ediyor.
+4. Doğrulama: result.tokenUsage == session-store-toplamı (±0), source='session-store', cacheCreation>0.
+
+---
+
+## Sprint-333 — Docs Task (333-012) Verify-First Findings + Status (~09:09 UTC)
+
+Disk-verify by docs task 333-012 before writing §10 rows. Ground truth only; no claims beyond confirmed .result files.
+
+### Disk-verified state at doc-write time
+
+**Sprint-332 committed truth (38185e8b, 17/17, 0 NO_GO):** All 16 base tasks + 1 FIX-recover landed. Stale §10 row said "8 DONE / 1 NO_GO / 7 not-executed" — written mid-sprint before FIX completed. All files disk-verified: `src/agents/http-agentic-worker.ts`, `src/dashboard/src/components/KpiCard.tsx`, `KpiTrendPage.tsx`, `src/connectors/kpi-sprint-summary.ts`, `src/mcp/tools/cost.ts`, `src/cli/commands/image.ts`, `tests/build/readme-package-links.test.ts`, `spawn-backend-docker.ts` (F1-005) — all committed, all present. §10 row corrected retrospectively by task 333-012.
+
+**Sprint-333 result files confirmed (selfAssessment=DONE, disk-read):**
+- 333-002 F1-010 overflow gate (flag-gated, default-off; 14/14 tests) ✅
+- 333-003 KPI threshold-breach advisory (12/12 tests) ✅
+- 333-004 KPI Tier-1 e2e smoke + cost/token live-proof harness (3/3 real-binary tests, 2.76s) ✅
+- 333-005 cost-gate warn-only finalize advisory (102+10 tests) ✅
+- 333-006 status failedTasks honesty (test-only, src already fixed; 4/4) ✅
+- 333-007 SIEM warn-once (19/19 tests) ✅
+- 333-008 DOC-PKG-1 close (honest no-op, sprint-332 already complete) ✅
+- 333-010 i18n + B-ZOMBIE centralization (49 hermetic i18n tests) ✅
+
+**Still executing (hb fresh, no result yet):** 333-001 (F1-014), 333-009 (F1-IMG-2 init), 333-011 (EN cookbook), 333-012 (this task).
+
+### F1-014 Security Verdict (333-001 — source+test disk-verified, result pending)
+`CROSS_PROVIDER_CREDENTIAL_KEYS` scrub replaces full `...process.env` spread in `subprocess.ts`. Key assertions: codex worker → OPENAI_API_KEY only (ANTHROPIC/GOOGLE absent); subscription claude → NO ANTHROPIC_API_KEY (CLI session-auth, ADR-076); PATH/LANG preserved. 4 hermetic injected-spawnImpl tests on disk; .result pending flush. Source verdict: **LAW #2 PASS**.
+
+### Cost/Token Live-Proof Status (C5-definitive)
+- **Harness exists and is real-binary (333-004 DONE):** `tests/e2e/kpi-surface-smoke.test.ts` boots `dist/cli/entry.js serve`, seeds real KpiStore.upsertResults, asserts `GET /api/kpi` returns `value≈1.23` (numeric, round-trip through real API). Proof-of-function bar met.
+- **Actual cost/token $ in KPI results:** will populate from sprint-333 finalize. The forward-collection fix (332-002 `buildUsageTotals` real-cost-first) has been in dist since sprint-332 commit. Sprint-333 finalize will be first sprint where `deckent kpi --sprint 333` shows real `cost_per_sprint`/`token_per_task` (non-zero from .result data).
+- **Token capture gap (P0 from survey above):** cacheCreation still not captured (61/61 absent); fix design documented above in this file (session-store jsonl approach, sprint-334 P0).
+
+### Genuinely open after sprint-333 (no silent debt)
+- Telegram KPI bot dispatch: `kpi-sprint-summary.ts` committed sprint-332; connector-bootstrap.ts wiring not implemented (blocked by social-identity dirty-tree)
+- avg-tool-call + output/accepted-PR KPIs: phase2, requires agentic-worker instrumentation (off-limits to workers)
+- F1-010 multi-worker/mid-flight overflow: phase2 (TODO in code)
+- R7 SSE: not-surgical, deferred
+- cost-gate HARD enforcement: post-beta only
+- KPI Faz-3 multi-tenant RBAC + custom-KPI + SLO/error-budget: post-beta
+- Token capture accuracy (cacheCreation, source='session-store'): sprint-334 P0

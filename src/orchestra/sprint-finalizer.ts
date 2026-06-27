@@ -75,6 +75,14 @@ import { HandoffProtocol } from './handoff-protocol.js';
 import { recordKpiMeasurements } from '../core/kpi/collection.js';
 import type { UsageTotals } from '../core/kpi/collection.js';
 
+// ─── Cumulative Spend Advisory (B6 — warn-only finalize hook, Sprint 333 333-005) ──
+// orchestra → core import: ADR-008 allowed direction (core never imports orchestra).
+// checkSpendGate is pure + flag-gated; spend-window read + cost-config load live in core.
+import { checkSpendGate } from '../core/cost-gate.js';
+import type { CostLimitWarnEvent } from '../core/cost-gate.js';
+import { readSpendWindow, loadCostConfig } from '../core/cost-config-loader.js';
+import type { CostConfig } from '../core/cost-config-loader.js';
+
 // ─── Debt Manager ─────────────────────────────────────────────────
 import { runDecay, auditBrainBudget } from './debt-manager.js';
 import { runDocTrackingSync } from '../core/doc-tracking/sync.js';
@@ -750,6 +758,103 @@ export function recordSprintKpis(
 }
 
 
+// ═══ Cumulative Spend Advisory (B6 — warn-only, never blocks) ═════
+// DECKENT-TRIAGE-PLAN B6 / Sprint 333 333-005.
+
+/**
+ * Injectable advisory emitter — receives the {@link CostLimitWarnEvent} and
+ * surfaces it (event stream, console, …). Injectable so the finalize hook is
+ * hermetically unit-testable without the real event-stream writer / stdout.
+ */
+export type CostLimitAdvisoryEmitter = (event: CostLimitWarnEvent) => void;
+
+/** Test seams + reference-time injection for {@link emitFinalizeSpendAdvisory}. */
+export interface FinalizeSpendAdvisoryOptions {
+  /** Override the advisory emitter (default: writeEvent + console.warn). */
+  emit?: CostLimitAdvisoryEmitter;
+  /** Override the spend-window reader (default: readSpendWindow over the resource ledger). */
+  readSpend?: (root: string, window: 'day' | 'month') => number;
+  /** Override the cost-config loader (default: loadCostConfig). */
+  loadConfig?: (root: string) => CostConfig;
+  /** Fixed reference timestamp (ISO) threaded into the default readSpendWindow. */
+  now?: string;
+}
+
+/**
+ * B6 (DECKENT-TRIAGE-PLAN) — cost-gate daily/monthly WARN-ONLY wire.
+ *
+ * At sprint finalize, project this sprint's realized cost on top of the
+ * already-logged cumulative spend (daily + monthly windows from the resource
+ * ledger) and, when `cost_limits.enforce_spend_gate` is enabled AND a window
+ * limit is breached, EMIT a `BRAIN→USER:COST_LIMIT_WARN` advisory.
+ *
+ * VISIBILITY ONLY — warn-only, NON-BLOCKING. The HARD spend gate (turning
+ * `enforce_spend_gate` into an actual block / `COST_GATE_EXCEEDED`) is a
+ * deliberate POST-BETA follow-up (DECKENT-TRIAGE-PLAN B6 step 3) and is NOT
+ * implemented here — finalize is never blocked or failed by this hook.
+ *
+ * The spend math is delegated ENTIRELY to readSpendWindow + checkSpendGate
+ * (no re-implementation). READ-only against the spend ledger; the only write
+ * is the advisory event itself (default emitter). When the flag is off (the
+ * default) checkSpendGate returns null → zero side effects → finalize output
+ * is byte-for-byte unchanged.
+ *
+ * NON-BLOCKING + fail-safe: the whole body is wrapped so any failure (ledger
+ * missing, config parse error, emitter throw) is swallowed via debugLog and
+ * can NEVER fail or block finalize. Mirrors the recordSprintKpis /
+ * pruneStaleHandoffs end-of-sprint fail-safe seam pattern.
+ *
+ * @param projectRoot - Project root (resource ledger + cost-config live under it).
+ * @param sprintId - Current sprint id (carried on the advisory event).
+ * @param sprintCostUsd - This sprint's realized cost (buildUsageTotals(results).costUsd).
+ * @param opts - Injectable test seams (emit / readSpend / loadConfig / now).
+ * @returns the emitted advisory, or null when no breach / flag off / on error.
+ */
+export function emitFinalizeSpendAdvisory(
+  projectRoot: string,
+  sprintId: string,
+  sprintCostUsd: number,
+  opts?: FinalizeSpendAdvisoryOptions,
+): CostLimitWarnEvent | null {
+  try {
+    const readSpend =
+      opts?.readSpend ??
+      ((root: string, window: 'day' | 'month'): number =>
+        readSpendWindow(root, window, opts?.now ? { now: opts.now } : undefined));
+    const loadConfig = opts?.loadConfig ?? ((root: string): CostConfig => loadCostConfig(root));
+
+    const costConfig = loadConfig(projectRoot);
+
+    // Delegate ALL spend math to checkSpendGate (flag-gated, pure). It returns
+    // null when enforce_spend_gate is off (default) or both windows are within
+    // limits — so the common path is a no-op.
+    const warn = checkSpendGate({
+      spentDayUsd: readSpend(projectRoot, 'day'),
+      spentMonthUsd: readSpend(projectRoot, 'month'),
+      sprintEstimateUsd: sprintCostUsd,
+      costConfig,
+    });
+    if (!warn) return null;
+
+    const emit =
+      opts?.emit ??
+      ((event: CostLimitWarnEvent): void => {
+        // Default emitter — visibility only, both non-blocking:
+        //   1. structured BRAIN→USER:COST_LIMIT_WARN event (dashboard / status tail / auditor).
+        //      Channel is the literal event.type — no CHANNELS constant needed.
+        //   2. console.warn so a CLI operator sees the advisory inline.
+        writeEvent(projectRoot, sprintId, 'brain', 'user', event.type, { ...event, sprintId });
+        console.warn(`⚠️  [cost-advisory] ${event.message}`);
+      });
+    emit(warn);
+    return warn;
+  } catch (e) {
+    debugLog('finalizeSprint:spendAdvisory', e);
+    return null;
+  }
+}
+
+
 // ═══ Finalize Sprint ══════════════════════════════════════════════
 
 /**
@@ -856,6 +961,17 @@ export async function finalizeSprint(
   // (finalizeSprint spawns subprocesses → not hermetically callable). Best-effort
   // + fail-safe: NEVER blocks or fails finalize; finalize behavior is unchanged.
   recordSprintKpis(projectRoot, sprint.id, metrics, results);
+
+  // ─── Cumulative spend advisory (B6 — warn-only, Sprint 333 333-005) ──
+  // Project this sprint's realized cost (buildUsageTotals → the same usage/cost
+  // already aggregated for KPIs above) onto the rolling daily/monthly ledger spend
+  // and, when cost_limits.enforce_spend_gate is on AND a window cap is breached,
+  // EMIT a BRAIN→USER:COST_LIMIT_WARN advisory. Warn-only + NON-BLOCKING: the hook
+  // is self-fail-safe (swallows every throw) and checkSpendGate is flag-gated
+  // default-off, so the flag-off common path is a no-op and finalize is byte-for-byte
+  // unchanged. The HARD spend gate (enforce_spend_gate as a real block) is a
+  // deliberate POST-BETA follow-up — NOT flipped here.
+  emitFinalizeSpendAdvisory(projectRoot, sprint.id, buildUsageTotals(results).costUsd);
 
   // ─── METRIC_EMITTED: sprint summary metrics ──────────────────────
   // Emitted in parallel with metrics.jsonl so Auditor and Dashboard

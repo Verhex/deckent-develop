@@ -15,6 +15,9 @@ import { debugLog } from '../core/utils.js';
 // ADR-008 allowed direction: core never imports orchestra).
 import { KpiService } from '../core/kpi/kpi-service.js';
 import { renderScorecardMarkdown } from '../core/kpi/scorecard.js';
+// Sprint 333 Task 333-003 — KPI Faz-2 threshold-breach advisory (appended after
+// the scorecard; advisory-only, non-blocking — never alters sprint outcome).
+import { buildKpiBreachAdvisory } from '../core/kpi/breach-advisor.js';
 import { assessQuality } from './quality-assessor.js';
 import {
   formatDuration,
@@ -735,6 +738,17 @@ export function writeRetrospective(
       try {
         const views = kpiSvc.listSprintViews(sprint.id);
         scorecardMarkdown = renderScorecardMarkdown(sprint.id, views, 'en');
+        // Sprint 333 Task 333-003 (KPI Faz-2): append the threshold-breach
+        // advisory directly after the scorecard table. Additive + non-blocking —
+        // wrapped in its own try/catch so a breach-advisor failure NEVER fails
+        // retro generation (advisory only, never alters the sprint outcome).
+        // Empty/all-healthy → '' → no section appended (honest no-op).
+        try {
+          const advisory = buildKpiBreachAdvisory(views, 'en');
+          if (advisory) scorecardMarkdown += `\n\n${advisory}`;
+        } catch (e) {
+          debugLog('writeRetrospective:kpiBreachAdvisory', e);
+        }
       } finally {
         kpiSvc.close();
       }

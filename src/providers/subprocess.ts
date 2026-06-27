@@ -105,6 +105,40 @@ export const CLAUDE_SUBPROCESS_CONFIG: SubprocessProviderConfig = {
   usageEmitArgs: ['--output-format', 'json'],
 };
 
+// ─── Cross-provider credential keys (F1-014 NON-LEAK scrub set) ───────
+/**
+ * Every provider credential env var deckent may place on the host `process.env`.
+ * This is the SCRUB set for the subprocess child env: the child starts from the
+ * host env with ALL of these removed, then ONLY the worker's own provider
+ * credential is re-injected via `opts.env` (the override map from
+ * `applyDeckSecretsToEnv`). Without this scrub the child would inherit the FULL
+ * host env and leak EVERY provider's key into EVERY worker — including handing a
+ * subscription claude worker an `ANTHROPIC_API_KEY` (the claude CLI prefers the
+ * env key over the `~/.claude` session → silent API-mode demotion → Tier-1
+ * timeout → the mass-synthetic-NO_GO that killed Sprint 213; ADR-076, F1-014).
+ *
+ * Source-of-truth is the provider→key mapping in `core/provider.ts`
+ * `applyDeckSecretsToEnv` (claude→ANTHROPIC_API_KEY, codex→OPENAI_API_KEY,
+ * gemini→GOOGLE_API_KEY, deepseek→DEEPSEEK_API_KEY, qwen→DASHSCOPE_API_KEY,
+ * zhipu→ZHIPU_API_KEY). The docker backend (`spawn-backend-docker.ts`) keeps a
+ * parallel per-provider FORWARD allowlist; the two are intentionally aligned —
+ * each provider's credential is forwarded to ITS worker only, never cross-leaked.
+ *
+ * TODO(phase2): unify this scrub-set with the docker forward-allowlist behind a
+ * single exported provider→credential-env map in `core/` (e.g. a field on
+ * `ProviderCommandSpec`) so a new provider's credential is registered in exactly
+ * one place. Config-driven providers (F1-012) with arbitrary `apiKeyEnv` are not
+ * covered by this static set and would need that unified map to be fully scrubbed.
+ */
+const CROSS_PROVIDER_CREDENTIAL_KEYS: readonly string[] = [
+  'ANTHROPIC_API_KEY',
+  'OPENAI_API_KEY',
+  'GOOGLE_API_KEY',
+  'DEEPSEEK_API_KEY',
+  'DASHSCOPE_API_KEY',
+  'ZHIPU_API_KEY',
+];
+
 // ─── SubprocessWorkerEntry ────────────────────────────────────────────
 interface SubprocessWorkerEntry {
   taskId: string;
@@ -192,15 +226,32 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     // routes through `cmd.exe /c <cli> <args…>` (shell:false) so the .cmd/.ps1 wrapper is
     // resolved via PATHEXT while args stay a discrete escaped array — never shell:true+array.
     const inv = buildCliInvocation(this.providerConfig.cliCommand, args, this.platform);
+    // F1-014 (Sprint 333) — per-worker auth NON-LEAK for the subprocess backend.
+    // Mirror the docker backend's runtime per-provider allowlist as a SCRUB+inject:
+    //   1. base = host process.env (carries PATH/HOME/LANG/… non-secret vars),
+    //   2. SCRUB every provider credential key (CROSS_PROVIDER_CREDENTIAL_KEYS) so a
+    //      mixed-provider fleet never leaks a foreign key into this worker — and a
+    //      subscription claude worker never inherits ANTHROPIC_API_KEY (ADR-076),
+    //   3. re-inject ONLY this worker's own credential via opts.env (the per-provider
+    //      override map from applyDeckSecretsToEnv; empty in subscription mode → the
+    //      worker gets NO key and authenticates via the CLI's session instead).
+    // opts.env is the single source of truth for credentials; host env keys are never
+    // trusted. A no-secret / single-provider spawn keeps PATH/LANG byte-for-byte and
+    // simply carries no provider key. Pure JS map-ops — identical on every platform.
+    const childEnv: NodeJS.ProcessEnv = { ...process.env };
+    for (const key of CROSS_PROVIDER_CREDENTIAL_KEYS) {
+      delete childEnv[key];
+    }
+    if (opts?.env) {
+      Object.assign(childEnv, opts.env);
+    }
+    // BUG-19: Set UTF-8 encoding environment for Windows (forced last, unchanged).
+    childEnv['LANG'] = process.env['LANG'] ?? 'en_US.UTF-8';
+    childEnv['PYTHONIOENCODING'] = 'utf-8';
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
       stdio: ['pipe', logFd, logFd],
-      // BUG-19: Set UTF-8 encoding environment for Windows
-      env: {
-        ...process.env,
-        LANG: process.env['LANG'] ?? 'en_US.UTF-8',
-        PYTHONIOENCODING: 'utf-8',
-      },
+      env: childEnv,
       shell: inv.shell,
     };
 

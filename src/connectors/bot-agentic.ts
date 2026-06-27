@@ -41,6 +41,14 @@ const READ_ONLY_BOT_TOOLS: ReadonlySet<string> = new Set([
   'deckent_skill_list',
   'deckent_feature_query',
   'deckent_memory_query',
+  // Cost/usage/observability surface — read-only, fast, no state change. Mirrors the
+  // MCP TOOL_CATALOG readOnly flag for these tools (src/mcp/tools/index.ts). Exposed so
+  // the phone bot can answer "bugünkü maliyet / token kullanımı / KPI" from live data.
+  'deckent_cost',
+  'deckent_usage',
+  'deckent_kpi',
+  'deckent_help',
+  'deckent_nervous_status',
 ]);
 
 /** True when a tool changes state / is destructive → must be approval-gated. */
@@ -121,6 +129,21 @@ export interface GatedDispatcherDeps {
    * the single-chokepoint invariant.
    */
   readonly capabilities?: CapabilityGate;
+  /**
+   * Optional: send a buttoned approval message for a risky deckent_* TOOL (not a
+   * capability) — the tool-side analogue of `capabilities.sendApproval`. When
+   * present and it returns true, the parked tool's approval was delivered as an
+   * interactive (Approve/Reject button) message, so the dispatcher returns a short
+   * ack instead of the legacy "type approve <id>" text. Returns false (or rejects)
+   * → the dispatcher falls back to the legacy parked-action text. Omitted → legacy
+   * text always (byte-for-byte unchanged). This is what makes group approvals
+   * buttoned: risky deckent_* tools previously had NO button path, only capabilities did.
+   */
+  readonly sendToolApproval?: (
+    id: string,
+    tool: string,
+    args: Record<string, unknown>,
+  ) => Promise<boolean>;
 }
 
 /**
@@ -162,7 +185,13 @@ export function makeGatedDispatcher(deps: GatedDispatcherDeps): McpToolDispatche
       }
       if (isRiskyBotTool(name)) {
         const id = deps.park(name, args);
-        return parkedActionMessage(id, name, args, lang);
+        // Prefer a buttoned approval (same UX as capabilities) so the user taps
+        // Approve/Reject instead of typing "approve <id>" — works in groups too.
+        // sendToolApproval absent or failing → legacy parked text (unchanged).
+        const sent = deps.sendToolApproval
+          ? await deps.sendToolApproval(id, name, args).catch(() => false)
+          : false;
+        return sent ? toolApprovalRequestedAck(name, lang) : parkedActionMessage(id, name, args, lang);
       }
       try {
         return await deps.inner.dispatch(name, args);
@@ -181,6 +210,16 @@ export function makeGatedDispatcher(deps: GatedDispatcherDeps): McpToolDispatche
  */
 function approvalRequestedAck(capId: string, lang: string): string {
   return getMessage('cap.approval.ack', lang, { cap: capId });
+}
+
+/**
+ * Short ack returned when a risky deckent_* TOOL's approval was delivered as a
+ * buttoned message (the user already has Approve/Reject buttons). The tool-side
+ * analogue of `approvalRequestedAck`; the model relays that approval was requested
+ * and awaits the decision rather than dumping the "type approve <id>" text.
+ */
+function toolApprovalRequestedAck(tool: string, lang: string): string {
+  return getMessage('tool.approval.ack', lang, { tool });
 }
 
 /**
@@ -221,7 +260,7 @@ function noPendingCheckpointMessage(lang: string): string {
   return 'No checkpoint is awaiting approval — the sprint is not blocked; nothing to do.';
 }
 
-function summarizeArgs(args: Record<string, unknown>): string {
+export function summarizeArgs(args: Record<string, unknown>): string {
   const keys = Object.keys(args ?? {});
   if (keys.length === 0) return '';
   return keys
@@ -248,13 +287,17 @@ export const DECKENT_BOT_SYSTEM_PROMPT = [
   'Salt-okunur tool\'lar (anında çalışır): deckent_status (sprint durumu),',
   'deckent_history, deckent_retro, deckent_doctor, deckent_models,',
   'deckent_analyze_project, deckent_review, deckent_explain, deckent_agent_list,',
-  'deckent_skill_list, deckent_feature_query, deckent_memory_query{query}.',
+  'deckent_skill_list, deckent_feature_query, deckent_memory_query{query},',
+  'deckent_cost (bugünkü harcama), deckent_usage (token/limit kullanımı),',
+  'deckent_kpi (KPI skor kartı), deckent_help, deckent_nervous_status.',
   '',
   'Durum-değiştiren tool\'lar (insan ONAYI gerekir, sen çağırsan bile HEMEN',
-  'çalışmaz): deckent_plan{directive}, deckent_kill, deckent_cleanup,',
-  'deckent_recover, deckent_sync, deckent_checkpoint. Bunları çağırdığında sistem',
-  'bir onay-kapısı açar; kullanıcı "approve <id>" yazana kadar HİÇBİR ŞEY yapılmaz.',
-  'Asla "yaptım/başlattım" deme — onay istendiğini söyle.',
+  'çalışmaz): deckent_plan{directive}, deckent_set_directives{directive},',
+  'deckent_start, deckent_run, deckent_kill, deckent_cleanup, deckent_recover,',
+  'deckent_sync, deckent_config, deckent_autonomous, deckent_process,',
+  'deckent_checkpoint. Bunları çağırdığında sistem bir onay-kapısı açar; kullanıcı',
+  'mesajdaki Onayla/Reddet butonuna basana (ya da "approve <id>" yazana) kadar',
+  'HİÇBİR ŞEY yapılmaz. Asla "yaptım/başlattım" deme — onay istendiğini söyle.',
   '',
   'Aksiyon gerekmeyen sorulara normal metinle, kullanıcının dilinde cevap ver.',
 ].join('\n');

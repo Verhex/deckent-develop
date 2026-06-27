@@ -32,6 +32,15 @@ import { resolveEffectiveWorkers } from '../core/config.js';
 // client.ts) so the dead-code path of Sprint 141 becomes live (Sprint 198 30k
 // tpm Tier-1 felaketi önleyici).
 import { nextDelayMs, sleep } from '../core/token-quota.js';
+import type { RateLimitState } from '../core/token-quota.js';
+
+// ─── Provider Overflow Gate (F1-010, Sprint 333 Task 333-002) ──────
+// Pre-spawn dynamic subscription→API overflow decision (flag-gated, default-off).
+// Tier-preservation is delegated to resolveWithOverflow inside the gate.
+import {
+  decidePreSpawnOverflow,
+  type ProviderOverflowConfig,
+} from '../core/provider-overflow-gate.js';
 
 /**
  * Read `token_throttle_ms` from a ResolvedConfig via a local cast — the field
@@ -59,6 +68,26 @@ function readTokenThrottleMs(config: ResolvedConfig): number {
 function readRetryTransientFailures(config: ResolvedConfig | undefined): boolean {
   if (!config) return false;
   return (config as ResolvedConfig & { retry_transient_failures?: boolean }).retry_transient_failures === true;
+}
+
+/**
+ * Read the `provider_overflow` block (F1-010 dynamic subs→API overflow) from a
+ * ResolvedConfig via a local cast. The field is not yet promoted to
+ * config-types.ts (out of Sprint 333 Task 333-002 scope). Pattern mirrors
+ * `readTokenThrottleMs` / `readRetryTransientFailures` above.
+ *
+ * Returns `undefined` when absent or malformed → the gate stays disabled
+ * (default-off), so the spawn path is byte-for-byte unchanged.
+ */
+function readProviderOverflowConfig(config: ResolvedConfig): ProviderOverflowConfig | undefined {
+  const raw = (config as ResolvedConfig & { provider_overflow?: ProviderOverflowConfig }).provider_overflow;
+  if (!raw || typeof raw !== 'object') return undefined;
+  return {
+    dynamic: raw.dynamic === true,
+    apiProvider: typeof raw.apiProvider === 'string'
+      ? (raw.apiProvider as ProviderOverflowConfig['apiProvider'])
+      : undefined,
+  };
 }
 
 // ─── Core — system profile ────────────────────────────────────────
@@ -548,6 +577,44 @@ export async function spawnWorkers(
       freshTask = JSON.parse(raw) as Task;
     } catch (e) {
       debugLog('spawnWorkers:freshTaskRead', e);
+    }
+
+    // ─── F1-010 — Dynamic pre-spawn subs→API overflow gate (flag-gated) ──
+    // When `config.provider_overflow.dynamic === true` AND this worker's
+    // subscription provider is currently rate-limited AND an API overflow target
+    // is configured, overflow THIS worker onto an equivalent-tier API model so
+    // the fleet keeps throughput. Default (undefined/off) → the block is skipped
+    // entirely → spawn behavior is byte-for-byte unchanged. Tier-preservation is
+    // delegated to the gate (→ resolveWithOverflow); never re-implemented here.
+    // Applied BEFORE the prompt/model/provider are read below so the swap flows
+    // into buildWorkerPrompt, `model`, resolveTaskProvider and the persisted json.
+    //
+    // TODO(phase2): plumb a live pre-spawn RateLimitState into `overflowSignal`.
+    // There is no global rate-limit tracker today (workers own the API call), so
+    // the signal is null at spawn-time and the gate returns no_limit (no-op) —
+    // the FIX-phase reactive failover (mid-sprint-adapter.applyRateLimitFailover)
+    // covers the post-429 path until the pre-spawn signal + multi-worker
+    // rebalancing land. See provider-overflow-gate.ts TODO(phase2).
+    const overflowConfig = readProviderOverflowConfig(config);
+    if (overflowConfig?.dynamic === true) {
+      const overflowSignal: RateLimitState | null = null; // TODO(phase2): live signal
+      const decision = decidePreSpawnOverflow({
+        task,
+        rateLimitState: overflowSignal,
+        providerConfig: overflowConfig,
+      });
+      if (decision.overflowProvider) {
+        debugLog(
+          'spawnWorkers:overflow',
+          `Task ${task.id}: pre-spawn overflow ${String(task.provider)}/${task.model} → `
+          + `${String(decision.overflowProvider)}/${decision.overflowModel ?? task.model} (${decision.reason})`,
+        );
+        task.provider = decision.overflowProvider;
+        if (decision.overflowModel) task.model = decision.overflowModel as Task['model'];
+        task.authMode = 'api';
+      } else if (decision.advisory) {
+        debugLog('spawnWorkers:overflow', `Task ${task.id}: ${decision.advisory}`);
+      }
     }
 
     const agentPrompt = await resolveAgentPrompt(projectRoot, task);

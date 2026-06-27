@@ -52,6 +52,12 @@ export interface SiemForwarderOptions {
    * Default: 3. Set to 0 to disable retries (drop on first error).
    */
   maxRetries?: number;
+  /**
+   * Advisory warn function called once (per instance) when a flush occurs with
+   * no transport configured. Defaults to `console.warn`. Inject in tests to
+   * capture the advisory without writing to stderr.
+   */
+  warn?: (message: string) => void;
 }
 
 // ─── Public interface ─────────────────────────────────────────────────────────
@@ -98,9 +104,11 @@ export function createSiemForwarder(opts: SiemForwarderOptions = {}): SiemForwar
   const flushEvery = opts.flushEvery ?? 5_000;
   const maxBatch = opts.maxBatch ?? 100;
   const maxRetries = opts.maxRetries ?? 3;
+  const warn = opts.warn ?? console.warn;
 
   let buffer: SiemRecord[] = [];
   let timer: ReturnType<typeof setInterval> | undefined;
+  let warnedNoTransport = false;
 
   if (flushEvery > 0) {
     timer = setInterval(() => {
@@ -132,7 +140,15 @@ export function createSiemForwarder(opts: SiemForwarderOptions = {}): SiemForwar
     const batch = buffer.splice(0, buffer.length);
 
     if (!transport) {
-      // Default-off: no transport — discard batch silently.
+      // Default-off: no transport — discard batch. Emit a one-time advisory so
+      // operators know forwarding is unconfigured and events are being dropped.
+      if (!warnedNoTransport) {
+        warnedNoTransport = true;
+        warn(
+          '[siem-forwarder] no transport configured — audit events are being discarded. ' +
+            'Set opts.transport to enable SIEM forwarding.',
+        );
+      }
       return;
     }
 

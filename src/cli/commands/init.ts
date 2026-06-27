@@ -10,6 +10,9 @@
  * Split from 1566 LoC monolith (Sprint 144 Task 1).
  */
 
+import { spawn as nodeSpawn } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { PlanMode } from '../../core/types.js';
 import { generateSetupRecommendation } from '../auto-setup.js';
@@ -29,9 +32,13 @@ import {
   planInstall,
 } from '../../core/provisioner.js';
 import { print, printError } from '../helpers/output.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { detectAvailableProviders } from '../../core/provider.js';
+import { DECKENT_DIR } from '../../core/constants.js';
+import { DEFAULT_WORKER_IMAGE } from '../../core/worker-image-check.js';
+import { handleImageBuild } from './image.js';
+import type { ImageBuildOptions } from './image.js';
 import {
   detectIDEEnvironment,
   getMCPGuidance,
@@ -112,6 +119,190 @@ export {
   generateBootContent,
 } from './init-templates.js';
 
+// ─── Opt-in worker-image build offer (F1-IMG-2) ─────────────────────
+//
+// Onboarding integration for the standalone `deckent image build` command
+// (image.ts). After the core init steps, when docker is available and the
+// worker image is absent, OFFER (opt-in only) to build it — delegating to the
+// existing handleImageBuild (never re-implemented here). Honest-skip with an
+// actionable message when docker is absent; never auto-build without opt-in;
+// never block init on docker. CI / non-interactive / --no-image → no prompt,
+// default skip (the heavy build stays opt-in; `deckent image build` remains the
+// explicit unattended path).
+//
+// ADR-001 ESM .js imports + Node 24. ADR-010 Node built-ins only.
+
+/** Outcome of the onboarding worker-image offer — surfaced for callers + tests. */
+export type WorkerImageOfferOutcome =
+  | 'opted-out' // --no-image / --yes / non-interactive → no prompt, no build
+  | 'docker-absent' // docker unavailable → honest skip, init continues
+  | 'image-present' // already built → silent skip
+  | 'declined' // user said no at the opt-in prompt
+  | 'built' // handleImageBuild succeeded (exit 0)
+  | 'build-failed'; // handleImageBuild returned non-zero
+
+export interface WorkerImageOfferOptions {
+  /** Auto-accept CI flag (`init --yes`) — treated as "no prompt, default skip" (never auto-builds). */
+  yes?: boolean;
+  /** Explicit opt-out (`init --no-image`). */
+  noImage?: boolean;
+  /** Non-interactive context (no TTY / piped / CI) — never prompt. */
+  nonInteractive?: boolean;
+  /** Language code (en|tr). */
+  lang?: string;
+  /** Image tag override; defaults to config `worker_image` then DEFAULT_WORKER_IMAGE. */
+  image?: string;
+}
+
+/** Injectable seams — defaults wire the real docker probes + handleImageBuild; tests inject mocks. */
+export interface WorkerImageOfferSeams {
+  /** Is the docker daemon available? Default: async `docker info` exit 0. */
+  isDockerAvailable?: () => Promise<boolean>;
+  /** Is the worker image already built locally? Default: async `docker image inspect <tag>` exit 0. */
+  isWorkerImagePresent?: (image: string) => Promise<boolean>;
+  /** Opt-in confirm prompt. Default: promptConfirm(msg, false). */
+  confirm?: (message: string) => Promise<boolean>;
+  /** Build delegate — defaults to handleImageBuild (image.ts); never re-implemented. */
+  buildImage?: (opts: ImageBuildOptions) => Promise<number>;
+}
+
+interface ResolvedWorkerImagePlan {
+  image: string;
+  withCodex: boolean;
+  withGemini: boolean;
+}
+
+/**
+ * Resolve the image tag + provider build-args from the just-written project
+ * config, mirroring the sibling helpers (init-steps.maybeProvisionDockerImage /
+ * upgrade.reprovisionWorkerImageAfterUpgrade). Best-effort: any read/parse
+ * failure falls back to DEFAULT_WORKER_IMAGE with claude-only build-args.
+ */
+function resolveWorkerImagePlan(root: string, imageOverride?: string): ResolvedWorkerImagePlan {
+  let image = imageOverride?.trim() || DEFAULT_WORKER_IMAGE;
+  let providers: string[] = [];
+  try {
+    const configPath = join(root, DECKENT_DIR, 'config.json');
+    if (existsSync(configPath)) {
+      const cfg = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+      if (!imageOverride) {
+        const workerImage = cfg['worker_image'];
+        if (typeof workerImage === 'string' && workerImage.trim()) image = workerImage.trim();
+      }
+      providers = [cfg['worker_provider'], cfg['brain_provider']].filter(
+        (p): p is string => typeof p === 'string' && p.length > 0,
+      );
+    }
+  } catch {
+    /* defaults — never block init on a config read */
+  }
+  return {
+    image,
+    withCodex: providers.includes('codex'),
+    withGemini: providers.includes('gemini'),
+  };
+}
+
+/** Resolve docker daemon availability via async `docker info` (never spawnSync). */
+function probeDockerAvailable(): Promise<boolean> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (value: boolean): void => {
+      if (!settled) {
+        settled = true;
+        resolve(value);
+      }
+    };
+    try {
+      const child = nodeSpawn('docker', ['info'], { stdio: 'ignore' });
+      child.on('error', () => done(false));
+      child.on('close', (code) => done(code === 0));
+    } catch {
+      done(false);
+    }
+  });
+}
+
+/** Resolve worker-image presence via async `docker image inspect <tag>` (never spawnSync). */
+function probeWorkerImagePresent(image: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (value: boolean): void => {
+      if (!settled) {
+        settled = true;
+        resolve(value);
+      }
+    };
+    try {
+      const child = nodeSpawn('docker', ['image', 'inspect', image], { stdio: 'ignore' });
+      child.on('error', () => done(false));
+      child.on('close', (code) => done(code === 0));
+    } catch {
+      done(false);
+    }
+  });
+}
+
+/**
+ * Offer (opt-in) to build the deckent-worker docker image during onboarding.
+ *
+ * Never throws and never blocks init: every docker problem resolves to an
+ * honest skip outcome. Builds ONLY when interactive, docker is available, the
+ * image is absent, and the user confirms. Delegates the actual build to the
+ * existing {@link handleImageBuild} (image.ts) — the build is never
+ * re-implemented here.
+ */
+export async function maybeOfferWorkerImageBuild(
+  root: string,
+  options: WorkerImageOfferOptions = {},
+  seams: WorkerImageOfferSeams = {},
+): Promise<WorkerImageOfferOutcome> {
+  const lang = getLanguage(options.lang);
+
+  // CI / non-interactive / explicit opt-out → never prompt, never auto-build.
+  // A heavy multi-GB image build is opt-in only; `deckent image build` remains
+  // the explicit unattended path.
+  if (options.noImage || options.yes || options.nonInteractive) {
+    return 'opted-out';
+  }
+
+  const isDockerAvailable = seams.isDockerAvailable ?? probeDockerAvailable;
+  if (!(await isDockerAvailable())) {
+    // Honest skip — never silent, never block init.
+    // TODO(phase2): add i18n key init.worker_image_docker_absent (messages.ts owned by Task 10).
+    print(
+      '\n  Docker not found — skipped the isolated worker image. ' +
+        'Install Docker and run `deckent image build` later to enable container workers.',
+    );
+    return 'docker-absent';
+  }
+
+  const plan = resolveWorkerImagePlan(root, options.image);
+
+  const isWorkerImagePresent = seams.isWorkerImagePresent ?? probeWorkerImagePresent;
+  if (await isWorkerImagePresent(plan.image)) {
+    return 'image-present'; // already built — nothing to offer
+  }
+
+  // docker present + image absent → OPT-IN prompt.
+  // TODO(phase2): add i18n key init.worker_image_offer (messages.ts owned by Task 10).
+  const question = `  Build the isolated worker image (${plan.image}) now? (Docker)`;
+  const confirm = seams.confirm ?? ((message: string) => promptConfirm(message, false));
+  if (!(await confirm(question))) {
+    print(`  ${getMessage('doctor.image_fix_declined', lang)}`);
+    return 'declined';
+  }
+
+  const buildImage = seams.buildImage ?? handleImageBuild;
+  const code = await buildImage({
+    tag: plan.image,
+    lang: options.lang,
+    withCodex: plan.withCodex,
+    withGemini: plan.withGemini,
+  });
+  return code === 0 ? 'built' : 'build-failed';
+}
+
 // ─── registerInit — ADR-012 pattern ────────────────────────────────
 
 export function registerInit(program: Command): void {
@@ -129,7 +320,8 @@ export function registerInit(program: Command): void {
     .option('--repair', 'Show which init steps failed and how to fix them')
     .option('-y, --yes', 'Install all missing prerequisites without prompting (CI)')
     .option('--no-install', 'Detect missing prerequisites but never install them (legacy hint-only)')
-    .action(async (options: { auto?: boolean; manual?: boolean; cursor?: boolean; claudeCode?: boolean; env?: string; allEnvs?: boolean; upgrade?: boolean; force?: boolean; repair?: boolean; yes?: boolean; install?: boolean }) => {
+    .option('--no-image', 'Skip the opt-in worker Docker image build offer (no prompt)')
+    .action(async (options: { auto?: boolean; manual?: boolean; cursor?: boolean; claudeCode?: boolean; env?: string; allEnvs?: boolean; upgrade?: boolean; force?: boolean; repair?: boolean; yes?: boolean; install?: boolean; image?: boolean }) => {
       const root = resolveProjectRoot();
       const failedSteps: Array<{ step: string; error: string }> = [];
 
@@ -338,6 +530,20 @@ export function registerInit(program: Command): void {
           print('  Created GEMINI.md for Gemini integration');
         } else if (detectedEnv === 'cursor') {
           print('  Created .cursor/rules/deckent.mdc for Cursor integration');
+        }
+
+        // ── Opt-in worker Docker image build offer (F1-IMG-2) ────────
+        // Additive, non-fatal: never blocks init, never auto-builds without
+        // opt-in. CI / non-interactive / --no-image → silent default skip.
+        try {
+          await maybeOfferWorkerImageBuild(root, {
+            yes: options.yes,
+            noImage: options.image === false,
+            nonInteractive: !process.stdin.isTTY,
+            lang: language,
+          });
+        } catch {
+          /* worker-image offer is non-fatal — never block init */
         }
 
         print(formatNextSteps(language));
