@@ -42,6 +42,14 @@ export default defineConfig({
     'audits/**',
     'launch/**',
     'governance/**',
+    // Memory dumps / drafts / personal notes — not user-facing docs, and their
+    // raw frontmatter + free-form prose (unescaped `:` in YAML, `{{ }}`, `<...>`)
+    // break VitePress's YAML/Vue compiler. Excluded so the published site builds.
+    'core-memory/**',
+    'cookbook/**',
+    'benchmark/**',
+    'alperen-analysis/**',
+    'comparison/**',
     'SPRINT-LOG.md',
     'CHANGELOG.md',
   ],

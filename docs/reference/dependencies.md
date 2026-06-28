@@ -2,13 +2,13 @@
 
 All runtime dependencies are governed by the **minimal + ADR-justified** principle (ADR-010). Every package must be traceable to an accepted ADR. Arbitrary additions without ADR backing are forbidden.
 
-For the full history and amendment log, see [ADR-010](../architecture/adr/010-single-runtime-dependency.md).
+For the full history and amendment log, see [ADR-010](../adr/010-tek-runtime-dependency-commander-js.md).
 
 ## Current Inventory
 
 | Package | Version | Purpose | Governing ADR |
 |---------|---------|---------|---------------|
-| `commander` | `^13.0.0` | CLI command framework | [ADR-010](../architecture/adr/010-single-runtime-dependency.md) |
+| `commander` | `^13.0.0` | CLI command framework | [ADR-010](../adr/010-tek-runtime-dependency-commander-js.md) |
 | `@modelcontextprotocol/sdk` | `^1.27.1` | MCP server/client transport | ADR-017: MCP-Native Provider Adapters |
 | `better-sqlite3` | `^12.10.0` | Memory V2 DB — SQLite + FTS5 | ADR-088: Memory V2 — DB-First Architecture |
 | `telegraf` | `^4.16.0` | Telegram connector | ADR-016: External Messaging Connectors |

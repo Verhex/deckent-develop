@@ -65,7 +65,7 @@ Slash-check'ten sonra: `classifyAgenticIntent(line)` → agentic intent (status/
 ### DALGA B — Provider-Parity (5-fleet)
 
 **221-005 — Ollama-local + openai-compat REPL round-trip (zero-API):**
-`entry.ts` REPL provider-resolve'a `ollama` dalı eklendi: `chat_provider==='ollama'` → `buildOllamaReplAdapter` (OllamaAdapter, localhost:11434, API-key YOK). `openai-compat` dalı: `OPENAI_COMPAT_PRESETS` + `OpenAICompatPresetName` (DeepSeek/Qwen/GLM). NET-error wrapping: ECONNREFUSED → açık hata "Ollama (http://localhost:11434) erişilemedi: <reason>". Mevcut `createSubscriptionChatAdapter` pattern genişletildi — yeniden yazma değil.
+`entry.ts` REPL provider-resolve'a `ollama` dalı eklendi: `chat_provider==='ollama'` → `buildOllamaReplAdapter` (OllamaAdapter, localhost:11434, API-key YOK). `openai-compat` dalı: `OPENAI_COMPAT_PRESETS` + `OpenAICompatPresetName` (DeepSeek/Qwen/GLM). NET-error wrapping: ECONNREFUSED → açık hata "Ollama (`http://localhost:11434`) erişilemedi: &lt;reason&gt;". Mevcut `createSubscriptionChatAdapter` pattern genişletildi — yeniden yazma değil.
 
 **221-006 — Provider-parity test matrisi (resolveChatAdapter):**
 `chat-provider-parity.ts` — `resolveChatAdapter(provider, config)`: tek giriş noktası tüm provider'ları (claude/codex/gemini/ollama/openai-compat) eşit yolla adapter'a map eder. 5 provider için aynı sözleşme (sendMessage→response) test edildi. Parity garantisi.

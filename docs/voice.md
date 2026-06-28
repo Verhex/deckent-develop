@@ -3,7 +3,7 @@
 **Voice is default-off.** Enabling it adds inbound speech-to-text (STT) and outbound
 text-to-speech (TTS) to any deckent Telegram bot. The voice backend is your choice: a cloud
 API with zero setup, your own self-hosted model, or any HTTP service that implements the
-[deckent Voice Contract](../examples/voice-wrapper/README.md).
+[deckent Voice Contract](https://github.com/VerhexIO/deckent/blob/main/examples/voice-wrapper/README.md).
 
 ---
 
@@ -67,7 +67,7 @@ and the bot starts without voice (no error). A missing key is a silent no-op, no
 ### (b) `provider: "local"` — your own backend
 
 deckent calls any HTTP service that implements the
-[deckent Voice HTTP Contract](../examples/voice-wrapper/README.md#2-the-deckent-voice-http-contract).
+[deckent Voice HTTP Contract](https://github.com/VerhexIO/deckent/blob/main/examples/voice-wrapper/README.md#2-the-deckent-voice-http-contract).
 You choose the engine (VoxCPM2, Piper, XTTS, Coqui, whisper.cpp, a cloud proxy — any stack).
 
 deckent ships a reference implementation you can run as-is or fork:
@@ -92,7 +92,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 > **⚠️ Security — no authentication.** The wrapper has no auth; keep it on `127.0.0.1`
 > (the `run.sh` default). Binding to `0.0.0.0` or a public interface lets anyone reachable
 > drive your GPU and read generated audio. See the
-> [wrapper README](../examples/voice-wrapper/README.md#step-4--start-the-server) for
+> [wrapper README](https://github.com/VerhexIO/deckent/blob/main/examples/voice-wrapper/README.md#step-4--start-the-server) for
 > mitigation options (reverse proxy, firewall, private network).
 
 **Config:**
@@ -289,7 +289,7 @@ replies (`tts: "off"`), or synthesize all replies without accepting inbound voic
 auto-detect. Use it when you know all callers speak one language and want to avoid the occasional
 mis-detection. Omit it to keep auto-detect (recommended for multi-lingual bots).
 
-See also: [`examples/voice-wrapper/README.md` §2 `/stt` contract](../examples/voice-wrapper/README.md#post-stt--speech-to-text).
+See also: [`examples/voice-wrapper/README.md` §2 `/stt` contract](https://github.com/VerhexIO/deckent/blob/main/examples/voice-wrapper/README.md#post-stt--speech-to-text).
 
 ---
 
@@ -324,7 +324,7 @@ ignored at runtime.
 
 For the full detail — complete pronunciation table, unit map, pass order, curl example, and
 extension format — see
-[`examples/voice-wrapper/README.md` §5 Text normalization](../examples/voice-wrapper/README.md#5-text-normalization-turkish).
+[`examples/voice-wrapper/README.md` §5 Text normalization](https://github.com/VerhexIO/deckent/blob/main/examples/voice-wrapper/README.md#5-text-normalization-turkish).
 
 ---
 
@@ -472,8 +472,8 @@ occur; the LLM receives no voice context and behavior is byte-identical to a non
 
 ## 10. Cross-links
 
-- **Reference wrapper + full contract doc:** [`examples/voice-wrapper/README.md`](../examples/voice-wrapper/README.md)
-- **Design spec:** [`docs/superpowers/specs/2026-06-25-voice-product-feature-design.md`](superpowers/specs/2026-06-25-voice-product-feature-design.md)
+- **Reference wrapper + full contract doc:** [`examples/voice-wrapper/README.md`](https://github.com/VerhexIO/deckent/blob/main/examples/voice-wrapper/README.md)
+- **Design spec:** [`docs/superpowers/specs/2026-06-25-voice-product-feature-design.md`](https://github.com/VerhexIO/deckent/blob/main/docs/superpowers/specs/2026-06-25-voice-product-feature-design.md)
 - **`VoiceConfig` type:** `src/connectors/voice/types.ts`
 - **`VoiceAdapter` factory:** `src/connectors/voice/types.ts` — `createVoiceAdapter(cfg, deck)`
 - **OpenAI adapter:** `src/connectors/voice/openai-voice.ts` — `makeOpenAIVoiceAdapter(client)` (testable entry-point), `createOpenAIVoiceAdapter(deck)` (production)

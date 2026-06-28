@@ -71,20 +71,20 @@ features:
 ### Architecture
 
 - [Architecture Overview](guide/architecture-overview.md)
-- [Agent & Skill Architecture](architecture/agent-skill-architecture.md)
-- [Authority Matrix](architecture/authority-matrix.md)
-- [Memory System](architecture/memory-system.md)
-- [Sprint Lifecycle](architecture/sprint-lifecycle.md)
+- [Agent & Skill Architecture](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/agent-skill-architecture.md)
+- [Authority Matrix](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/authority-matrix.md)
+- [Memory System](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/memory-system.md)
+- [Sprint Lifecycle](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/sprint-lifecycle.md)
 - [ADR Index](adr-index.md)
 
 ### Cookbook
 
-- [Cookbook Index](cookbook/index.md)
-- [First Sprint](cookbook/01-first-sprint.md)
-- [Multi-Provider Fleet](cookbook/02-multi-provider-fleet.md)
-- [Memory Recall](cookbook/03-memory-recall.md)
-- [Autonomous Mode](cookbook/04-autonomous-mode.md)
-- [Recover a Stuck Sprint](cookbook/09-recover-stuck-sprint.md)
+- [Cookbook Index](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/index.md)
+- [First Sprint](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/01-first-sprint.md)
+- [Multi-Provider Fleet](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/02-multi-provider-fleet.md)
+- [Memory Recall](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/03-memory-recall.md)
+- [Autonomous Mode](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/04-autonomous-mode.md)
+- [Recover a Stuck Sprint](https://github.com/VerhexIO/deckent/blob/main/docs/cookbook/09-recover-stuck-sprint.md)
 
 ### Features
 

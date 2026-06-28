@@ -444,4 +444,4 @@ To enable them:
 - [Docker Backend Guide](docker-backend.md) — Docker setup and configuration
 - [Configuration Reference](../reference/config-reference.md) — All config options
 - [Multi-Provider Reference](../reference/multi-provider.md) — Full provider reference with env vars
-- [DIRECTIVES Format Guide](../../DECKENT.md) — Full task directive syntax
+- [DIRECTIVES Format Guide](https://github.com/VerhexIO/deckent/blob/main/DECKENT.md) — Full task directive syntax

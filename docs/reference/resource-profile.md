@@ -193,7 +193,7 @@ When enabled:
 - **Start:** SPAWN phase (first worker spawned)
 - **Stop:** CLEANUP phase (after all results collected)
 - **Interval:** Every `interval_ms` milliseconds (default 5000 ms = 5 sec)
-- **Source:** `docker stats --no-stream --format '{{json .}}'` (live container metrics)
+- **Source:** <span v-pre>`docker stats --no-stream --format '{{json .}}'`</span> (live container metrics)
 
 ### Metrics Collected
 

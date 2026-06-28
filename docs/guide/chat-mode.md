@@ -213,5 +213,5 @@ This is experimental (SP-1 M3). The default will change in a future milestone (M
 - [Installation](installation.md) — Install and initialize deckent
 - [First Sprint](first-sprint.md) — Sprint-mode walkthrough
 - [Terminal](terminal.md) — Embedded web terminal in the dashboard
-- [Memory](../architecture/memory-system.md) — How chat history is stored and searched
+- [Memory](https://github.com/VerhexIO/deckent/blob/main/docs/architecture/memory-system.md) — How chat history is stored and searched
 - [Config Reference](../reference/config.md) — `chat_provider` and related settings

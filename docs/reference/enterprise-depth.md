@@ -313,7 +313,7 @@ Sprint 277 closes the backend OIDC foundation and wires the dashboard authentica
 
 ### Identity & Role Display
 
--   **AuthStatus component** (`src/dashboard/src/components/AuthStatus.tsx`): Renders logged-in user display ("Logged in as: <name>") or static mode ("Local session"), optional role badge, logout button. Uses `useAuth().identity` and `useAuth().logout()`. Placed in AppShell header for visibility.
+-   **AuthStatus component** (`src/dashboard/src/components/AuthStatus.tsx`): Renders logged-in user display ("Logged in as: &lt;name&gt;") or static mode ("Local session"), optional role badge, logout button. Uses `useAuth().identity` and `useAuth().logout()`. Placed in AppShell header for visibility.
 
 ### Manual Token Input (Testing)
 
