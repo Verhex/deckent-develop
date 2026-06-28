@@ -12,7 +12,7 @@
 //
 // All tests are hermetic — no real process spawns, no file I/O outside tmpdir.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   assertNotLethalWithoutApproval,
   isLockedPanicAction,
@@ -23,6 +23,25 @@ import {
   SpawnBackendError,
 } from '../../src/orchestra/spawn-backend.js';
 import { DockerSpawnBackend } from '../../src/orchestra/spawn-backend-docker.js';
+
+// Hermeticity: the non-lethal SubprocessBackend cases below (no actionId /
+// WORKER_RESPAWN) intentionally pass the lethal guard, so without this mock the
+// wrapper delegates to the real SubprocessSpawnBackend, which `spawn('claude', …)`
+// — an async ENOENT in any environment without the claude CLI (e.g. CI). That
+// rejection escapes the test's synchronous try/catch and surfaces as an
+// "Unhandled Error: spawn claude ENOENT", which makes Vitest exit non-zero even
+// though every test passes. The lethal guard (`checkLethalGuard`) runs in
+// spawn-backend.ts BEFORE this delegate, so a no-op spawn keeps the guard-wiring
+// assertions intact while preventing the real child process.
+vi.mock('../../src/providers/subprocess.js', async (importActual) => {
+  const actual = await importActual<typeof import('../../src/providers/subprocess.js')>();
+  return {
+    ...actual,
+    SubprocessSpawnBackend: class extends actual.SubprocessSpawnBackend {
+      spawn(): void { /* no-op — hermetic: verify guard wiring, not real spawn */ }
+    },
+  };
+});
 
 // ─── assertNotLethalWithoutApproval unit tests ────────────────────────────────
 
