@@ -54,5 +54,9 @@ describe('C-04 mid-sprint-adapter shell-injection hardening', () => {
     expect(existsSync(sentinel)).toBe(false);
     expect(typeof out.passRatio).toBe('number');
     expect(typeof out.passed).toBe('boolean');
-  });
+    // defaultRunVitestScopeCheck spawns a real vitest subprocess (cold start +
+    // module load), which can exceed the 10s default under CI load on the
+    // slower Node 26.x runner. Give it a generous ceiling so this hardening
+    // assertion is timing-robust, not flaky.
+  }, 60_000);
 });
