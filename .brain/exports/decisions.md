@@ -9519,3 +9519,525 @@ G1: GLOBAL control-plane daemon (`deckent gateway`, home `~/.deckent/gateway/`) 
 - G1 follow-up'a ertelendi: pairing allowlist + `/pending` + approval-callback resolution + idle-evict. UYARI: Gateway pairing land etmeden PUBLİKE AÇILMAMALI (şu an isAuthorized hep-true).
 - Alt-projeler: G2 (grammY transport + webhook + Discord parity), G3 (per-session memory/isolation).
 - Spec: docs/superpowers/specs/2026-06-20-messaging-gateway-g1-design.md; plan: docs/superpowers/plans/2026-06-20-messaging-gateway-g1.md; kod main bc45eef5.
+
+---
+
+## adr-092: Connector-Surface Social Identity RBAC Authorization
+
+**Status:** accepted
+
+# ADR-092: Connector-Surface Social Identity RBAC Authorization
+
+**Status:** accepted
+
+**Date:** 2026-06-26
+
+**Sprint:** 329
+
+---
+
+**Context:**
+
+Deckent'in messaging connector katmanı (Telegram, Discord, WhatsApp ve gelecek adaptörler), kullanıcı mesajlarını herhangi bir kimlik doğrulaması olmaksızın işliyordu. Sprint 329 öncesinde:
+
+1. **Kimlik belirsizliği:** Connector'a gelen her mesajın göndericisi (`fromUser`) yalnızca platform-bazlı bir string (örn. Telegram user ID) olarak biliniyordu — hangi deckent tenant'ına veya projesine ait olduğu, hangi izinlere sahip olduğu bilinmiyordu.
+
+2. **Yetkilendirme yoktu:** Her platform kullanıcısı, connector'ın desteklediği tüm yetenekleri (capabilities) doğrudan tetikleyebiliyordu. Ayrıcalık yükseltme, yetkisiz sprint tetikleme ve kimliksiz komut çalıştırma açıklarına zemin hazırlıyordu.
+
+3. **ADR-037 sınırlı kapsamı:** ADR-037 Brain-Auditor-Worker authority matrix'ini tanımlar ve worker-runtime düzeyinde advisory bir RBAC uygular. Ancak ADR-037 connector mesaj yüzeyini kapsamaz — gelen harici mesajların kim tarafından gönderildiğini, hangi tenant'a bağlı olduğunu ve hangi `resource:action` çiftine izin verildiğini belirleyecek bir mekanizma yoktu.
+
+4. **Fail-open riski:** Yetkilendirme yokken varsayılan davranış açık (fail-open) idi — sisteme ulaşan her mesaj işleme alınıyordu. Bu, enterprise ortamlarda kabul edilemez bir güvenlik açığıdır.
+
+5. **Opt-in gereksinimi:** Kimlik doğrulamanın zorunlu tutulması, mevcut tekil kullanıcı kurulumlarını kırabilir. Özellik, açıkça yapılandırıldığında (`identity.enabled: true`) aktif olmalı; kapalı durum geriye-dönük uyumluluk korumalıdır.
+
+**Decision:**
+
+Connector mesaj yüzeyi için fail-closed, opt-in, tenant-scoped bir RBAC yetkilendirme katmanı (L2) tanımlanır. Bu karar ADR-037'yi supersede etmez — ADR-037 internal Brain/Auditor/Worker authority matrix'ini yönetir; bu ADR yalnızca **harici connector mesaj yüzeyini** kapsar.
+
+### Temel Prensipler
+
+1. **Principal Resolution (Kaynak Çözümleme):** Connector'a gelen her mesajın göndericisi (`fromUser`), yetkilendirme kararı vermeden önce bir `ResolvedPrincipal`'a çözümlenir. Bu çözümleme tenant-scoped'dur: aynı Telegram user ID, farklı deckent projelerinde farklı principal'lara çözümlenebilir.
+
+2. **Fail-Closed (Kapalı Hata) at Capability Execution (L2):** Yetkilendirme başarısız olursa — principal bulunamaz, permission eşleşmez veya identity alt-sistemi erişilemez durumda ise — yetenek (capability) çalıştırılmaz. `rbac.unauthorized` mesajı gönderilir. Açıkça izin verilmeyen her eylem yasaktır.
+
+3. **`resource:action` Permission Model:** Her yetenek, `resource:action` formatında bir izin gerektirir (örn. `sprint:start`, `status:read`, `order:write`). Bu izinler principal'ın rollerine atanır ve MemoryStore'da tenant-scoped olarak saklanır.
+
+4. **Opt-In (`identity.enabled`):** `identity.enabled: false` (varsayılan) olduğunda L2 yetkilendirme devre dışıdır — connector mevcut per-channel behavior'ı korur. Böylece geriye-dönük uyumluluk sağlanır ve tek kullanıcılı kurulumlar etkilenmez.
+
+5. **Kimlik Bağlama (Identity Binding):** Platform kullanıcısını bir deckent principal'ına bağlamak için `verify_prompt` akışı kullanılır. Bağlantı kurulmamış kanallarda `identity.binding_unconfigured` mesajı döner.
+
+6. **ADR-037'den Farkı:** ADR-037 advisory/soft runtime enforcement uygular — worker.ts `checkWorkerAuthority()` ihlalde `return true` der (yalnız log + emit). Bu ADR'nin L2'si **hard-block**'dur: `fromUser` için authorized değilse yetenek hiç çalıştırılmaz, sadece loglanmaz.
+
+### Yetkilendirme Akışı
+
+```
+Gelen mesaj (platform event)
+  └─► ConnectorCapabilityRouter
+        └─► IdentityService.resolveFromUser(fromUser, channelId, tenantId)
+              ├─ Principal bulunamadı → identity.verify_prompt → STOP
+              ├─ Kanal yapılandırılmamış → identity.binding_unconfigured → STOP
+              └─ Principal bulundu → RbacService.check(principal, 'resource:action')
+                    ├─ DENY → rbac.unauthorized → STOP (fail-closed)
+                    └─ ALLOW → capability.execute(ctx) → PROCEED
+```
+
+### Uygulama Referansları
+
+- Engine: `src/connectors/identity/` — `IdentityService`, `RbacService`, `ResolvedPrincipal` tip tanımları
+- Spec: `docs/superpowers/specs/2026-06-26-social-identity-rbac-design.md`
+- i18n keys: `src/cli/helpers/messages.ts` — `rbac.unauthorized`, `identity.verify_prompt`, `identity.binding_unconfigured`
+
+### Faz-1b — Binding Aktivasyonu (final review I-1)
+
+Faz-1b, per-user gate'i canlı yolda aktive eder: `bot.ts` `config.identity`'i `bootstrapConnectorCommands`'a threadler (presence-guard), ve bootstrap `config.identity.channels` map'inden her kanal için `setBinding(chatKey, binding)` ile **config-declared** binding'leri seed eder (idempotent upsert). Bunsuz `getBinding()` daima null döner → `turnPrincipal` undefined → L2 gate no-op'tu (özellik inert). Kapsam: `tests/connectors/connector-bootstrap-gate-e2e.test.ts` (gerçek bootstrap→onMessage→onChat→getBinding→resolveIdentity→`runCapability` yolu).
+
+**Ertelenen takip (deferred follow-up):** dinamik per-kanal binding yönetimi — admin `/bind` komutu (runtime kanal bağlama) + pairing→binding köprüsü. Faz-1b yalnız config'te tanımlı kanalları aktive eder; runtime mutasyon sonraki dilim.
+
+### Faz 3 — Enterprise-IdP Adapter (Sprint 329)
+
+`providers/scim.ts` (SCIM 2.0) ve `providers/oidc-claims.ts` (Entra / Teams JWT claims) **implemente edildi ve live**. Bu iki adapter `IdentityDirectoryProvider` portunu implemente eder; çekirdek `resolve()` / `sync()` kontratı değişmedi.
+
+**Kritik tasarım noktası (Alperen, 2026-06-26):** `resolve()` = **saf-local, SIFIR network** — hot-path her zaman local SQLite store'u okur, IdP'ye asla doğrudan bağlanmaz. `sync()` = **out-of-band background** — IdP pull-sync ayrı scheduled süreçte çalışır, mesaj hot-path'ini bloke etmez.
+
+**Açıkça deferred follow-up (no-silent-debt):**
+- **SCIM webhook push-sync:** Real-time IdP→deckent push bildirimi. Şu an scheduled pull. Sonraki dilim.
+- **OIDC token-refresh:** Long-lived oturumda access-token otomatik yenileme. Şu an sync re-trigger ile kapatılıyor. Sonraki dilim.
+- **Multi-IdP round-robin / fallback:** Aynı anda birden fazla kurumsal IdP. Şu an tek aktif enterprise adapter. Sonraki dilim.
+
+---
+
+**Consequences (+):**
+
+- Enterprise ortamlarda multi-user, multi-tenant connector deployment güvenli hale gelir
+- Fail-closed default: yetkisiz mesajlar hiçbir zaman capability execution'a ulaşmaz
+- Opt-in tasarım: mevcut tekil kullanıcı kurulumları değişiklik gerektirmez
+- `resource:action` permission granülaritesi: farklı roller için farklı yetenek subsets tanımlanabilir
+- i18n-first: kullanıcıya dönen tüm hata mesajları `getMessage()` üzerinden EN + TR destekli
+- ADR-037 ile çelişmez — iç orchestration ve dış mesaj yüzeyi ayrı katmanlar halinde korunur
+
+**Consequences (-):**
+
+- `identity.enabled: true` yapılandırması olmadan L2 çalışmaz — operatör aktif kurulum gerektirir
+- Principal resolution katmanı, her mesaj için bir DB lookup maliyeti ekler (MemoryStore cache ile azaltılabilir)
+- Kanal başına yapılandırma yükü: her platform adaptörünün `channelId + tenantId` tuple'ını doğru iletmesi gerekir
+- Kimlik bağlama akışı (verify_prompt) UX tasarımı platform başına farklılık gösterebilir
+
+**Alternatives Considered:**
+
+- **API key per message:** Her mesaja platform dışında bir API key ekleme. Reddedildi: UX kırıcı, WhatsApp/Discord gibi platform'larda uygulama yüksek friction.
+- **IP/webhook allowlist only:** Bağlantıyı platform seviyesinde güvenceye alma. Reddedildi: per-user granülarite sağlamaz, çok kullanıcılı kanalları destekleyemez.
+- **ADR-037 kapsamını genişletme:** Advisory L2'yi fail-closed yapma. Reddedildi: ADR-037 internal agent authority'yi yönetir; connector yüzeyini karıştırmak sorumluluk karmaşası yaratır. Ayrı ADR daha temiz separation of concerns sağlar.
+- **Always-on (opt-out):** Kimlik doğrulamayı varsayılan açık yapma. Reddedildi: mevcut kurulumları kırar, geçiş süreci kompleks olur; opt-in ile smooth adoption sağlanır.
+
+**References:**
+
+- ADR-037: Brain-Auditor-Worker Authority Matrix — internal orchestration RBAC (bu ADR'nin kapsamı dışında)
+- ADR-034: Multi-Project Isolation — tenant-scoped boundary'ler
+- ADR-035: Brain ↔ Worker ↔ Auditor Verification Protocol — event stream integrity
+- `src/connectors/identity/` — IdentityService + RbacService engine
+- `docs/superpowers/specs/2026-06-26-social-identity-rbac-design.md` — tam teknik spec
+- NIST SP 800-162: ABAC — least privilege, fail-closed prensipleri
+- `src/cli/helpers/messages.ts` — i18n keys: `rbac.unauthorized`, `identity.verify_prompt`, `identity.binding_unconfigured`
+
+
+---
+
+## adr-093: Real Token/Cost Capture via Provider-Native Usage Stores
+
+**Status:** accepted
+
+# ADR-093: Real Token/Cost Capture via Provider-Native Usage Stores
+
+**Status:** accepted
+
+**Date:** 2026-06-27
+
+**Sprint:** 334
+
+---
+
+**Context:**
+
+Every worker `.result` file since the beginning of the codebase carried **heuristic token/cost
+estimates** — not real usage reported by the provider. A structural audit across 61 consecutive
+`.result` files confirmed the pattern with 100% incidence:
+
+- `cacheReadInputTokens = inputTokens × 4` (exactly, every case)
+- `outputTokens = linesAdded × 15` (exactly, every case)
+- `cacheCreationInputTokens = undefined` (61/61 — the field was never populated)
+- `tokenUsage.source = undefined` (61/61 — no provenance tag)
+
+Root cause: `src/orchestra/token-counter.ts` reads `.tasks/task-{id}.log` and
+`.tasks/task-{id}.cli-output.json` looking for a `--output-format json` envelope that never lands
+in those files (workers write ≈65-byte stdout there, not the full JSON envelope). The fallback
+path — `estimateTokenUsage` (token-counter.ts:401-403) — was therefore activated for every task
+without exception.
+
+The consequence was a compounding inaccuracy: `cacheCreationInputTokens` — the **limit-dominant
+cost component** (charged at 1.25× the base input rate per the cost-calculator at
+`cost-calculator.ts:349/387`) — was structurally zero in every sprint's cost rollup. A real worker
+session produced `cacheCreation=47514` tokens (a dominant fraction of total cost) while the
+heuristic reported `cacheCreation=0` for the same session — a complete miss.
+
+The ground truth exists and is accessible: the Claude provider writes per-turn usage to a
+session-store jsonl under `~/.claude/projects/{slugified-cwd}/*.jsonl`. Each turn's
+`message.usage` object carries all four fields: `input_tokens`, `output_tokens`,
+`cache_read_input_tokens`, and `cache_creation_input_tokens`. Summing these across all turns of a
+worker session gives the real usage reported by the provider — identical to what Anthropic bills.
+
+No analogous on-disk store existed for the Codex or Gemini providers at the time of this decision.
+
+---
+
+**Decision:**
+
+Introduce a **provider-agnostic native-usage-store seam** as the authoritative source of truth for
+token/cost capture, with the heuristic path retained as an honest, labeled last-resort fallback.
+
+### Part A — `TokenUsage` type extension (additive)
+
+Two optional fields are added to `TokenUsage` in `src/core/task-types.ts`:
+
+- `cacheCreationTokens?: number` — real cache-write tokens (previously always missing)
+- `source?: 'session-store' | 'envelope' | 'estimate' | string` — provenance tag
+
+Both fields are strictly additive and optional. Existing consumers that do not read them are
+unaffected. The `cacheCreationTokens` field name is aligned with the cost-calculator's
+`RegimeCostUsage.cacheCreationTokens` field (`:236`) so the cost pipeline auto-corrects with
+**zero changes** to `cost-calculator.ts`.
+
+### Part B — `session-usage-store.ts` (new pure module)
+
+`src/providers/session-usage-store.ts` exposes a single public function:
+
+```
+readNativeUsage(
+  provider: string,
+  opts: {
+    projectRoot: string;
+    taskId: string;
+    sessionId?: string;
+    spawnWindow?: { start: number; end: number };
+    sessionRoot?: string;   // injectable — defaults to ~/.claude/projects/{slug}
+  }
+): Promise<RealUsage | null>
+```
+
+For `provider === 'claude'`, the function:
+
+1. Resolves the session jsonl directory from `sessionRoot` (injectable; defaults to the
+   slugified-cwd path under `~/.claude/projects/`). The `sessionRoot` parameter is the test
+   hermeticity seam — **the real `~/.claude` is never read in any test**.
+2. Identifies the correct `.jsonl` file by matching `session_id` (when available from a prior
+   spawn envelope) or by correlating on modification timestamp within the `spawnWindow`.
+3. Reads and parses the jsonl line-by-line, summing every `message.usage` object's four fields
+   across all turns.
+4. Returns a `RealUsage` object with `inputTokens`, `outputTokens`, `cacheReadTokens`, and
+   `cacheCreationTokens` — all real values summed from the provider's store.
+
+For `provider === 'codex'` and `provider === 'gemini'`: returns `null` immediately with a
+`// TODO(phase2)` comment noting that each provider's own native usage store should be plugged
+here. This is a documented, honest extension point (Law #2 — every environment). A `null` result
+propagates to the heuristic fallback, preserving current behavior for these providers.
+
+Returns `null` on any I/O or parse error (session jsonl absent, malformed lines, etc.) — never
+throws.
+
+### Part C — `token-counter.ts` priority chain
+
+`src/orchestra/token-counter.ts` is updated to apply a strict priority order before reaching the
+heuristic:
+
+1. **Session-store read** (`readNativeUsage`) — if a non-null result is returned, build the
+   `TokenUsage` from summed real usage and set `source = 'session-store'`.
+2. **Envelope extraction** — if the existing `extractUsage` path finds a well-formed
+   `--output-format json` envelope, use it and set `source = 'envelope'`.
+3. **Heuristic fallback** — `estimateTokenUsage` is called only when both (1) and (2) yield
+   nothing. The estimate result is returned unchanged in shape, but `source` is set to
+   `'estimate'` as an explicit, honest provenance label. The estimate algorithm itself is not
+   modified — behavior is byte-equivalent for consumers that relied on the estimates.
+
+The `source` tag is the single most operationally useful addition: it lets any downstream
+consumer (dashboard, retro, auditor) distinguish a real measurement from an estimate without
+inspecting token ratios.
+
+### Test hermeticity requirement
+
+All tests for `session-usage-store.ts` and the updated `token-counter.ts` must use an injected
+`sessionRoot` pointing to a tmpdir fixture. The fixture must contain at least two turns with
+real-shaped `message.usage` objects (including `cache_creation_input_tokens > 0`) so the sum
+assertion covers the dominant cost field. No test may read from the real `~/.claude` directory.
+
+---
+
+**Consequences (+):**
+
+- `cacheCreationInputTokens` is now captured for Claude-provider workers, closing the largest
+  cost-accuracy gap. The existing `cost-calculator.ts` (`cacheWrite = cacheCreationTokens ?? 0`,
+  `:349/:387`) picks up the real value with no changes to the cost-calculator.
+- `source = 'session-store'` gives every downstream consumer a machine-readable provenance tag
+  so heuristic estimates are no longer indistinguishable from real measurements.
+- Codex and Gemini are first-class documented extension points — the `null` return with
+  `TODO(phase2)` is an explicit seam, not a silent omission (Law #2).
+- Test hermeticity is enforced by design: the `sessionRoot` injection parameter prevents any test
+  from accidentally touching the developer's real `~/.claude` directory.
+- No changes are required to `cost-calculator.ts`, `collection.ts`, `sprint-finalizer.ts`, or
+  any other consumer — the `TokenUsage` extension is additive, and `cost-calculator.ts` already
+  reads `cacheCreationTokens ?? 0`.
+
+**Consequences (-):**
+
+- Only Claude is a real implementation today; Codex and Gemini fall back to the heuristic path
+  until phase-2 extensions are written.
+- Session jsonl correlation relies on a spawn-time window when `session_id` is not captured from
+  the spawn envelope. On high-concurrency machines with many simultaneous workers, the correlation
+  window must be conservative to avoid false matches.
+- The `~/.claude/projects/{slug}` path is platform-specific. Cross-platform path resolution
+  (macOS, Linux, Windows native, WSL) must be handled inside `session-usage-store.ts`; the
+  injectable `sessionRoot` is also the platform-portability escape hatch for future adapters.
+- Heuristic estimates remain in the fallback path for sessions where no native store is readable.
+  The `source = 'estimate'` tag makes this visible, but does not eliminate the inaccuracy.
+
+**Alternatives Considered:**
+
+- **Parse the `--output-format json` stdout envelope directly:** the envelope is written to the
+  provider process's stdout, not to `.tasks/task-{id}.log` or `.tasks/task-{id}.cli-output.json`.
+  The task log capture path never receives it. Fixing the log capture to intercept the envelope
+  would require invasive changes to the spawn/pipe architecture. Rejected: higher blast radius,
+  same data available from the session-store with simpler read-only access.
+- **Instrument token counts at spawn time via a middleware:** insert a pass-through byte counter
+  around the provider's stdio streams. Rejected: provider-specific framing, fragile under
+  streaming/chunking, requires changes across all provider adapters. The session-store is the
+  provider's own authoritative record and requires no stream interception.
+- **Retain the heuristic permanently, accept the inaccuracy:** the heuristic was structurally
+  wrong for `cacheCreationTokens` (always zero) and linearly wrong for `inputTokens` (correlated
+  with lines-added, not real model context). The `cacheCreationInputTokens` miss meant the most
+  expensive token category was invisible to all cost reporting. Rejected: materially misleads
+  sprint cost decisions and KPI targets.
+- **Provider SDK call to fetch usage post-completion:** query the Anthropic Messages API usage
+  endpoint after the worker session ends. Rejected: requires an additional API credential path,
+  adds network I/O to every finalize cycle, and is redundant when the session-store already holds
+  the same data locally.
+
+**References:**
+
+- `src/providers/session-usage-store.ts` — new pure module (provider-native usage reader)
+- `src/core/task-types.ts` — `TokenUsage` type (additive `cacheCreationTokens`, `source` fields)
+- `src/orchestra/token-counter.ts` — updated priority chain (session-store → envelope → estimate)
+- `tests/providers/session-usage-store.test.ts` — hermetic fixture-based test
+- `tests/orchestra/token-counter-real-usage.test.ts` — integration test with tmpdir sessionRoot
+- `src/core/cost-calculator.ts:349/387` — `RegimeCostUsage.cacheCreationTokens` (no edit needed)
+- ADR-076: Auth-Precedence Fix — established the provider auth-isolation contract that this ADR
+  builds on (subscription vs API mode; no cross-provider credential leak)
+- ADR-066: Provider Independence — multi-provider backend parity principle (this ADR's
+  provider-agnostic seam is a direct application)
+- ADR-087: Async I/O and Test Hermeticity Standard — the `sessionRoot` injection pattern follows
+  the test hermeticity requirements mandated by this ADR
+- `docs/audits/OVERNIGHT-2026-06-27-findings.md` — root-cause analysis and session-store ground
+  truth proof that motivated this decision
+
+
+---
+
+## adr-094: Flag-Gated Enforcement Vein
+
+**Status:** accepted
+
+# ADR-094: Flag-Gated Enforcement Vein
+
+**Status:** accepted
+
+**Date:** 2026-06-27
+
+**Sprint:** 343
+
+---
+
+**Context:**
+
+ADR-037 (Brain-Auditor-Worker Authority Matrix) explicitly documented that its enforcement model is
+**V1.0 deliberately soft**. The header note in ADR-037 states verbatim: "Layer 2 (runtime) is
+ADVISORY / SOFT — a violation is logged + emitted to the event stream but does **not** block the
+action." Four concrete enforcement gates existed in the codebase in a computed-but-not-enforced or
+reachable-but-untested state at the time of this decision:
+
+**Gate B1 — RBAC worker hard-deny (`enforceRbac`):**
+`config-types.ts:836` declares `enforce_rbac?: boolean`. The hard-deny path exists in
+`nervous/authority-matrix.ts:351-353` (`opts.enforceRbac === true → deny`, else soft-warn). The
+flag is threaded from `sprint-runtime.ts:30-31` to `checkWorkerAuthority`. However,
+`agents/worker.ts:602-620` `checkWorkerAuthority` returns `true` on both branches — even with the
+flag set, the worker side never denies. Additionally, deckent-dev's own config never set
+`enforce_rbac: true`, so the hard path shipped untested in the live pipeline.
+
+**Gate B6 — cumulative spend warn-gate (`cost_limits.enforce_spend_gate`):**
+`cost-config-loader.ts:74-75` defines and validates `daily_max_usd` / `monthly_max_usd`. The
+existing gate in `core/cost-gate.ts:119` enforces only `auto_confirm_below_usd` — a per-sprint
+estimate check before spawn confirm, not a cumulative rolling spend gate. No code compared actual
+rolling spend against the daily/monthly limits. The `readSpendWindow` function and the
+`BRAIN→USER:COST_LIMIT_WARN` event path did not exist.
+
+**Gate A9 — ADR-compliance hard-deny (`gate.enforce_adr_compliance`):**
+The ADR-compliance checker (`enforceAdrCompliance`) ran and emitted findings but the result was
+never wired to a hard-deny outcome. Findings were advisory, not gate-blocking.
+
+**Gate A14 — tech-debt-ratio downgrade (`gate.max_tech_debt_ratio`):**
+`result-evaluator.ts:1285` `applyTechDebtDowngrade` was implemented but had zero callers
+(verified). The sprint tech-debt ratio was computed but never fed back into sprint outcome
+decisions. The sibling B-REGGATE half (`runSelfAuditGate` in `sprint-finalizer.ts:250`) was
+already fixed to fire `GATE_FAILURE` on net-new `delta.fail`; the tech-debt-ratio downgrade
+remained a dead code path.
+
+The risk of flipping these gates to default-on for all users was high: grading semantics change,
+workers that had previously succeeded with scope warnings would begin failing, and cumulative spend
+interruptions could stall production sprints for users who had never set `daily_max_usd`. A
+post-GA-V2 hard-flip was the right trajectory, but the enforcement code paths needed to be proved
+correct — in a live pipeline — before any global flip.
+
+---
+
+**Decision:**
+
+Introduce a **flag-gated enforcement vein**: all four gates are implemented and correct behind
+config flags that default to `false` (product behavior is byte-identical to pre-ADR state). Only
+deckent-dev's gitignored `.deckent/config.json` enables hard-mode, dogfooding each gate against
+real sprint traffic to validate correctness before a future global flip.
+
+### Gate B1 — `enforce_rbac` (RBAC worker hard-deny)
+
+`agents/worker.ts:checkWorkerAuthority` is updated to honor `opts.enforceRbac`: when
+`enforceRbac === true` and a scope-violation is detected, the function returns `false` (deny)
+instead of the unconditional `true`. All existing callers continue to pass `enforceRbac: false`
+(or omit it), so the default path is byte-identical. The stale comment in `sprint-runtime.ts:9`
+("not yet declared") is removed. Deckent-dev's gitignored config sets `enforce_rbac: true` to
+exercise the hard-deny path on real workers.
+
+### Gate B6 — `cost_limits.enforce_spend_gate` (cumulative spend warn-gate)
+
+`readSpendWindow(projectRoot, 'day' | 'month')` is added over the existing
+`.deckent/settings/resource-log.jsonl` ledger (the same source as the limit-ledger work). In the
+pre-spawn cost gate (`cost-gate.ts`, alongside the existing estimate check), `projectedSpend =
+spentThisWindow + sprintEstimate` is computed; if `projectedSpend > daily_max_usd` (or monthly)
+**and** `cost_limits.enforce_spend_gate === true`, a `BRAIN→USER:COST_LIMIT_WARN` event is emitted
+and a notification is sent — warn-only, the sprint still proceeds. With `enforce_spend_gate ===
+false` (the default) or when spend is under the limit, no event is emitted. A future hard-block
+variant (returning `COST_GATE_EXCEEDED`) is a post-beta flip, not part of this ADR.
+
+### Gate A9 — `gate.enforce_adr_compliance` (ADR-compliance gate, fail-open preserved)
+
+The ADR-compliance checker (`enforceAdrCompliance`) is wired into the sprint evaluation path. When
+`gate.enforce_adr_compliance === true`, a compliance violation produces a hard-deny outcome
+(task result downgraded to `NO_GO` or sprint gate to `FAIL`). When the flag is `false` (default),
+compliance violations remain advisory — findings are emitted to the event stream and dashboard but
+do not block the outcome. **Fail-open is the explicit and permanent default for this gate** because
+ADR-compliance findings can surface on tasks that pre-date a newly accepted ADR; a hard-deny by
+default would retroactively fail tasks that were correct at the time of writing.
+
+### Gate A14 — `gate.max_tech_debt_ratio` (tech-debt-ratio downgrade)
+
+`applyTechDebtDowngrade` in `result-evaluator.ts` is wired into `finalizeSprint` /
+`runSelfAuditGate` after per-task evaluation: if the sprint's tech-debt ratio exceeds
+`gate.max_tech_debt_ratio` **and** the field is set (it is absent / `undefined` by default), the
+sprint outcome is downgraded (`DONE → GO_WITH_TECH_DEBT` or `GATE_FAILURE`). When the field is
+absent or set to `0` / `null`, the function is not called — current behavior is preserved
+byte-identically. Before wiring, the function's logic is verified against the current result rubric
+(the function is 200+ sprints old); if it no longer matches, it is deleted and a KES candidate is
+logged rather than force-wired with a stale contract.
+
+### Config shape (deckent-dev gitignored `.deckent/config.json`)
+
+```json
+{
+  "enforce_rbac": true,
+  "cost_limits": {
+    "enforce_spend_gate": true
+  },
+  "gate": {
+    "enforce_adr_compliance": true,
+    "max_tech_debt_ratio": 0.3
+  }
+}
+```
+
+All four keys are absent from the committed config defaults — their absence is the default-off
+guarantee. The gitignored file is the only activation vector; a clean checkout or a user who has
+never touched these keys sees no behavior change.
+
+### Test requirements
+
+Faithful tests assert both branches for each gate:
+
+- **B1:** flag-on + a worker writing outside `scope.filesWrite` → `checkWorkerAuthority` returns
+  `false` / `evaluateAuthority` returns `deny`. Flag-off → returns `true` (byte-identical).
+- **B6:** resource-log ledger seeded past `daily_max_usd` + flag-on → `COST_LIMIT_WARN` event
+  emitted, sprint proceeds. Flag-off or under-limit → no event.
+- **A9:** a task with a known ADR violation + flag-on → outcome downgraded to `NO_GO` / gate
+  `FAIL`. Flag-off → advisory finding only, outcome unchanged.
+- **A14:** sprint debt-ratio above `max_tech_debt_ratio` + flag set → outcome downgraded. Flag
+  absent → `applyTechDebtDowngrade` not called, outcome unchanged.
+
+All tests use tmpdir fixtures and injected config; no test reads gitignored local state (ADR-087
+hermeticity requirement).
+
+---
+
+**Consequences (+):**
+
+- Product behavior is byte-identical for all users on a clean checkout — zero regression risk
+  from this ADR's merge.
+- Deckent-dev exercises all four hard paths on real sprint traffic, giving high confidence before
+  any future global flip.
+- Each gate has a single, explicit config key — operators who want to opt in before GA-V2 can do
+  so by setting the relevant key; the behavior is documented and predictable.
+- The `enforce_adr_compliance` fail-open default is an explicit design choice recorded in this
+  ADR, not a gap — it prevents retroactive failures on pre-ADR tasks.
+- ADR-037 V1.0 advisory enforcement remains intact for all users; this ADR adds a tested, proven
+  upgrade path without changing the current layer-2 contract.
+
+**Consequences (-):**
+
+- Deckent-dev's gitignored config is not committed, so the dogfood state is invisible to code
+  review. Sprint retro notes and auditor alerts are the only observable proof that hard paths ran.
+- Four separate config keys for four gates increases config surface; future consolidation into a
+  single `enforcement_mode: 'strict' | 'advisory'` toggle is a valid simplification (post-GA-V2).
+- `gate.max_tech_debt_ratio` will not be wired if `applyTechDebtDowngrade`'s contract is found
+  stale during implementation review — in that case the gate ships as a documented stub with a KES
+  candidate logged, not as a forced wire.
+- The fail-open default for `enforce_adr_compliance` means ADR violations can accumulate
+  undetected until an operator explicitly enables the gate; the dashboard advisory display is the
+  only passive signal.
+
+**Alternatives Considered:**
+
+- **Default-on for all users immediately:** rejected — grading semantics change for all existing
+  users without notice; workers that previously succeeded with scope warnings would begin failing;
+  cumulative spend interruptions could stall production sprints for users who never set
+  `daily_max_usd`. The value of proving correctness in dogfood before a global flip outweighs
+  the cost of a deferred hard-flip.
+- **Single `enforcement_mode: 'strict'` flag covering all four gates:** simpler config surface,
+  but coupling the gates means a user cannot opt into spend-warn without also enabling RBAC
+  hard-deny. Per-gate flags give finer-grained rollout control and are the correct choice pre-GA.
+- **Hard-flip B1 only, leave the others advisory:** partially addresses ADR-037's intent but
+  leaves the cost and tech-debt gates untested. The consistent flag-gated pattern across all four
+  gates reduces cognitive load and makes the GA-V2 flip a single policy decision.
+- **Remove `applyTechDebtDowngrade` without wiring:** the function is dead code and a KES
+  candidate. Deletion is preferred over a forced wire if the logic is found stale; this ADR
+  records that decision point explicitly rather than silently wiring a mismatched function.
+
+**References:**
+
+- `agents/worker.ts:602-620` — `checkWorkerAuthority` (B1 hard-deny seam)
+- `nervous/authority-matrix.ts:351-353` — existing hard-deny branch (B1, reachable but untested)
+- `sprint-runtime.ts:30-31` — `enforce_rbac` flag threading
+- `core/cost-gate.ts:119` — existing estimate gate (B6 extension point)
+- `cost-config-loader.ts:74-75` — `daily_max_usd` / `monthly_max_usd` definitions
+- `.deckent/settings/resource-log.jsonl` — rolling spend ledger (B6 data source)
+- `result-evaluator.ts:1285` — `applyTechDebtDowngrade` (A14 dead caller)
+- `sprint-finalizer.ts:250` — `runSelfAuditGate` (A9/A14 wire point)
+- `config-types.ts:836` — `enforce_rbac` field declaration
+- `DESIGN-ENFORCEMENT-VEIN.md` — root-cause analysis and design spec that motivated this ADR
+- ADR-037: Brain-Auditor-Worker Authority Matrix — RBAC Protocol V1.0 — the advisory layer this
+  ADR builds a proven upgrade path on top of
+- ADR-087: Async I/O and Test Hermeticity Standard — test hermeticity requirements for all gate
+  tests in this ADR
+- ADR-093: Real Token/Cost Capture via Provider-Native Usage Stores — companion sprint-343 ADR
+  establishing provider-agnostic seam patterns this ADR follows for flag injection

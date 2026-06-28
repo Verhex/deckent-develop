@@ -2,6 +2,48 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint344] - 2026-06-27
+
+### Added
+
+- 008-redo — skill-sandbox AST-scan honest-fail when TypeScript is unavailable
+
+### Changed
+
+- 009-redo — getMessage deduplicated prod-warn on missing i18n key (completed with tech debt)
+
+### Fixed
+
+- 002-redo — B1 RBAC: fix the stale `enforce_rbac` comment in sprint-runtime.ts (+ verify worker honor)
+
+
+_Tasks: 3 total, 3 done, 1 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint343] - 2026-06-27
+
+### Added
+
+- Track A — EVALUATE-phase enforcement gates (A14 verify-delta downgrade + A9 ADR-compliance), flag-gated default-off
+- Track B — R4: consolidate the two VS Code extension trees onto the canonical one (delete the stub)
+- Track D — skill-sandbox AST-scan honest-fail when TypeScript is unavailable (no silent no-op)
+- Track D — `getMessage` deduplicated prod-warn on missing i18n key (visibility without spam)
+- Track E — ADR-094: flag-gated enforcement-vein seam (verify-delta · ADR-compliance · spend-warn · RBAC hard-deny)
+- Track E — LAST-STANDING campaign closeout findings note (NEW dated doc; NOT MASTER-PLAN/TRIAGE)
+
+### Changed
+
+- Track A — B6 cumulative-spend warn-gate at PRE-SPAWN (daily/monthly), flag-gated default-off (completed with tech debt)
+- Track B — R4: remove the dead `@deprecated async evaluateResult`, leave `evaluateWithRubric` canonical (completed with tech debt)
+- Track C — native-chat `/provider` switch rebuilds the adapter (wire the callback) (completed with tech debt)
+- Track C — routing-affinity (ADR-075): thread `skill_agent_affinity` config → RoutingOptions + balance-observability, default-off (completed with tech debt)
+
+### Fixed
+
+- Track A — B1 RBAC: worker `checkWorkerAuthority` honors `enforceRbac` (hard-deny) + stale-comment fix, flag-gated default-off
+
+
+_Tasks: 12 total, 12 done, 4 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint328] - 2026-06-26
 
 ### Added

@@ -8112,3 +8112,59 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 328-006: Class-C OpenRouter first-class (unified gateway, API side) (DONE)
 
 ---
+## Sprint 343 — sprint-343
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-27
+**Duration:** 1432s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 12 |
+| Completed | 12 |
+| Tech Debt | 4 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1432022ms |
+
+### Tasks
+
+- 343-001: Track A — EVALUATE-phase enforcement gates (A14 verify-delta downgrade + A9 ADR-compliance), flag-gated default-off (DONE)
+- 343-002: Track A — B1 RBAC: worker `checkWorkerAuthority` honors `enforceRbac` (hard-deny) + stale-comment fix, flag-gated default-off (DONE)
+- 343-003: Track A — B6 cumulative-spend warn-gate at PRE-SPAWN (daily/monthly), flag-gated default-off (GO_WITH_TECH_DEBT)
+- 343-004: Track B — R4: remove the dead `@deprecated async evaluateResult`, leave `evaluateWithRubric` canonical (GO_WITH_TECH_DEBT)
+- 343-005: Track B — R4: consolidate the two VS Code extension trees onto the canonical one (delete the stub) (DONE)
+- 343-006: Track C — native-chat `/provider` switch rebuilds the adapter (wire the callback) (GO_WITH_TECH_DEBT)
+- 343-007: Track C — routing-affinity (ADR-075): thread `skill_agent_affinity` config → RoutingOptions + balance-observability, default-off (GO_WITH_TECH_DEBT)
+- 343-008: Track D — skill-sandbox AST-scan honest-fail when TypeScript is unavailable (no silent no-op) (DONE)
+- 343-009: Track D — `getMessage` deduplicated prod-warn on missing i18n key (visibility without spam) (DONE)
+- 343-010: Track E — ADR-094: flag-gated enforcement-vein seam (verify-delta · ADR-compliance · spend-warn · RBAC hard-deny) (DONE)
+- 343-011: Track E — LAST-STANDING campaign closeout findings note (NEW dated doc; NOT MASTER-PLAN/TRIAGE) (DONE)
+
+---
+## Sprint 344 — sprint-344
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-27
+**Duration:** 130s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 129509ms |
+
+### Tasks
+
+- 344-001: 002-redo — B1 RBAC: fix the stale `enforce_rbac` comment in sprint-runtime.ts (+ verify worker honor) (DONE)
+- 344-002: 008-redo — skill-sandbox AST-scan honest-fail when TypeScript is unavailable (DONE)
+- 344-003: 009-redo — getMessage deduplicated prod-warn on missing i18n key (GO_WITH_TECH_DEBT)
+
+---

@@ -1251,3 +1251,16 @@ src/orchestra/sprint-phases.ts(1807,23): error TS1005: ',' expected.
 BLOCKED: Shell metacharacter detected in heartbeat command: "npx vitest run --reporter=verbose 2>&1 | tail -5"
 ```
 
+
+## Heartbeat — 2026-06-27T18:12:35.473Z
+
+- ❌ `tsc --noEmit`
+```
+
+```
+
+- ❌ `npx vitest run --reporter=verbose 2>&1 | tail -5`
+```
+BLOCKED: Shell metacharacter detected in heartbeat command: "npx vitest run --reporter=verbose 2>&1 | tail -5"
+```
+

@@ -9,6 +9,37 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-344-003 | Tech debt from 344-003: Added module-level `_missingKeyWarnedInProd = new Set<st | normal | sprint-344 | resolved |
+| debt-343-003 | Tech debt from 343-003: B6 pre-spawn cumulative-spend WARN-gate (flag-gated defa | normal | sprint-343 | resolved |
+| debt-343-004 | Tech debt from 343-004: GREP PROOF — zero prod callers confirmed:
+  grep -rn 'ev | normal | sprint-343 | resolved |
+| debt-343-006 | Tech debt from 343-006: DECKENT-TRIAGE R7 — native-chat `/provider` switch now b | normal | sprint-343 | resolved |
+| debt-343-007 | Tech debt from 343-007: Track C — ADR-075 skill→agent affinity ENABLEMENT (defau | normal | sprint-343 | resolved |
+| rollback-sprint-341 | Sprint sprint-341 rollback SUCCESS | normal | sprint-341 | resolved |
+| rollback-sprint-340 | Sprint sprint-340 rollback SUCCESS | normal | sprint-340 | resolved |
+| rollback-sprint-336 | Sprint sprint-336 rollback SUCCESS | normal | sprint-336 | resolved |
+| rollback-sprint-335 | Sprint sprint-335 rollback SUCCESS | normal | sprint-335 | resolved |
+| debt-334-003 | Tech debt from 334-003: P0-C RECURRENCE fix: the NORMAL (non-force) finalize pat | normal | sprint-334 | resolved |
+| debt-334-006 | Tech debt from 334-006: KPI Faz-2 — sprint-end KPI summary now dispatched to con | normal | sprint-334 | resolved |
+| debt-334-007 | Tech debt from 334-007: Surgical fix: added 2 imports (buildKpiBreachAdvisory +  | normal | sprint-334 | resolved |
+| debt-333-009 | Tech debt from 333-009: F1-IMG-2 — opt-in worker-image build offer integrated in | normal | sprint-333 | resolved |
+| debt-333-010 | Tech debt from 333-010: messages.ts: added 7 doctor.daemon_* keys, 5 evolve.* ke | normal | sprint-333 | resolved |
+| debt-332-001 | Tech debt from 332-001: FIX-#1: `deckent kpi` (no --sprint) emitted `{ sprintId: | normal | sprint-332 | resolved |
+| debt-332-003 | Tech debt from 332-003: SPAWN-1 — Node DEP0190 `shell:true`+args-array Windows f | normal | sprint-332 | resolved |
+| debt-332-004 | Tech debt from 332-004: CFG-1 fix — legacy `mode` no longer blocks `config set`. | normal | sprint-332 | resolved |
+| debt-332-006 | Tech debt from 332-006: Wired the already-built checkDaemonHygiene (doctor-check | normal | sprint-332 | resolved |
+| debt-332-009 | Tech debt from 332-009: KPI Faz-2 trend surface. NEW src/api/kpi-trend-endpoint. | normal | sprint-332 | resolved |
+| debt-332-011 | Tech debt from 332-011: F1-IMG-2 — `deckent image build` standalone command upgr | normal | sprint-332 | resolved |
+| debt-332-015 | Tech debt from 332-015: Created src/mcp/tools/cost.ts with registerCostTool(serv | normal | sprint-332 | resolved |
+| debt-331-007 | Tech debt from 331-007: B-ZOMBIE stale-daemon hygiene. Built the detection engin | normal | sprint-331 | resolved |
+| debt-331-008 | Tech debt from 331-008: All goCriteria met:
+
+1. tsc --noEmit: one pre-existing e | normal | sprint-331 | resolved |
+| debt-331-009 | Tech debt from 331-009: KPI Faz-2 /api/kpi HTTP endpoint (Tier-1 surface).
+
+WHAT | normal | sprint-331 | resolved |
+| debt-331-015 | Tech debt from 331-015: Implemented `kpi --trend <kpiId> [--n <count>] [--json]` | normal | sprint-331 | resolved |
+| debt-330-009 | Tech debt from 330-009: tsc --noEmit: exit 0 (0 new errors). Targeted test tests | normal | sprint-330 | resolved |
 | debt-328-003 | Tech debt from 328-003: Class-A codex usage-emit. ROOT CAUSE: codex `exec --full | normal | sprint-328 | resolved |
 | debt-327-001 | Tech debt from 327-001: docs/LIVE-PROOF.md created with the required single-para | normal | sprint-327 | resolved |
 | debt-326-003 | Tech debt from 326-003: VERIFY FAILED tsc=undefined vitest=undefined. Implemente | normal | sprint-326 | resolved |

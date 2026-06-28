@@ -83,37 +83,42 @@
 | adr-089 | Backend-Agnostic Worker Observation + Per-Worker Independent Backends | accepted |
 | adr-090 | Documentation Tracking & Staleness (DCR + content-hash + multi-signal) | accepted |
 | adr-091 | Project-Scoped Messaging Gateway — Control-Plane Daemon + Spawned Per-Project Runtimes | accepted |
+| adr-092 | Connector-Surface Social Identity RBAC Authorization | accepted |
+| adr-093 | Real Token/Cost Capture via Provider-Native Usage Stores | accepted |
+| adr-094 | Flag-Gated Enforcement Vein | accepted |
 
 ## Recent Learnings
-- **Sprint sprint-328 Learnings** (sprint-328): ## Sprint sprint-328 Learnings
-- Class-A codex usage-emit (CLI-agent, native source): GO_WITH_TECH_DEBT — Class-A cod...
-- **Sprint sprint-327 Learnings** (sprint-327): ## Sprint sprint-327 Learnings
-- live-proof doc note: GO_WITH_TECH_DEBT — docs/LIVE-PROOF.md created with the require...
-- **Sprint sprint-326 Learnings** (sprint-326): ## Sprint sprint-326 Learnings
-- tokenizer-fallback (usage-raporlamayan provider): GO_WITH_TECH_DEBT — Cascade-skippe...
-- **Sprint sprint-325 Learnings** (sprint-325): ## Sprint sprint-325 Learnings
-- Planner structured-parse — `- Model:` → forceModel + `- Dependencies: N` index→slot-...
-- **Sprint sprint-324 Learnings** (sprint-324): ## Sprint sprint-324 Learnings
-- KES lazy-loader (mekanik): NO_GO — Zero prod-caller verified: `grep -rn lazyLoad|Laz...
-- **Sprint sprint-323 Learnings** (sprint-323): ## Sprint sprint-323 Learnings
-- A14 — applyTechDebtDowngrade zero-caller (verify-delta downgrade ölü): NO_GO — DESIG...
-- **Sprint sprint-322 Learnings** (sprint-322): ## Sprint sprint-322 Learnings
+- **Sprint sprint-342 Learnings** (sprint-342): ## Sprint sprint-342 Learnings
 
 ## Gains
-- 322-001 — R-EVALRESULT-CLEANUP — deprecated alias temizliği (321 TECH_DEBT...
-- **Sprint sprint-321 Learnings** (sprint-321): ## Sprint sprint-321 Learnings
+- 342-001 — live-proof marker file — File already existed with correct conte...
+- **Sprint sprint-341 Learnings** (sprint-341): ## Sprint sprint-341 Learnings
 
 ## Gains
-- 321-001 — R321-EVALRESULT-DISAMBIG — sprint-controller evaluateResult disa...
-- **Sprint sprint-320 Learnings** (sprint-320): ## Sprint sprint-320 Learnings
+- 341-001 — live-proof marker file — File docs/audits/token-capture-live-pro...
+- **Sprint sprint-340 Learnings** (sprint-340): ## Sprint sprint-340 Learnings
 
 ## Gains
-- 320-001 — VERIFY-COLLISION-A — collision-verify dosyasına satır ekle (A) —...
-- **Sprint sprint-319 Learnings** (sprint-319): ## Sprint sprint-319 Learnings
-- B-WAITRESULTS-KES — waitForResults dead DI-variant temizle: NO_GO
+- 340-001 — live-proof marker file — File docs/audits/token-capture-live-pro...
+- **Sprint sprint-339 Learnings** (sprint-339): ## Sprint sprint-339 Learnings
+- **Sprint sprint-338 Learnings** (sprint-338): ## Sprint sprint-338 Learnings
 
 ## Gains
-- 319-00...
+- 338-001 — live-proof marker file — File docs/audits/token-capture-live-pro...
+- **Sprint sprint-337 Learnings** (sprint-337): ## Sprint sprint-337 Learnings
+
+## Gains
+- 337-001 — live-proof marker file — File exists at docs/audits/token-captur...
+- **Sprint sprint-336 Learnings** (sprint-336): ## Sprint sprint-336 Learnings
+
+## Gains
+- 336-001 — live-proof marker file — File docs/audits/token-capture-live-pro...
+- **Sprint sprint-335 Learnings** (sprint-335): ## Sprint sprint-335 Learnings
+- live-proof marker file: NO_GO — Created docs/audits/token-capture-live-proof.md with...
+- **Sprint sprint-334 Learnings** (sprint-334): ## Sprint sprint-334 Learnings
+- P0-C recurrence — terminate the orphan start-process at NORMAL finalize (not only --...
+- **Sprint sprint-333 Learnings** (sprint-333): ## Sprint sprint-333 Learnings
+- DOC-PKG-1 — no dangling `docs/` link survives in the published tarball (Beta onboard...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -158,5 +163,7 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
+- Violation pattern: file_outside_scope
+- Violation pattern: file_outside_scope
 
-_Total entries: 755 | Generated: 2026-06-26_
+_Total entries: 830 | Generated: 2026-06-27_

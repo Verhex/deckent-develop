@@ -1,5 +1,160 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-342 Learnings
+- Sprint sprint-342 Learnings: ## Sprint sprint-342 Learnings
+
+## Gains
+- 342-001 — live-proof marker file — File already existed with correct content matching goCriteria exactly: heading '# Token Capture L...
+
+## Sprint sprint-341 Learnings
+- Sprint sprint-341 Learnings: ## Sprint sprint-341 Learnings
+
+## Gains
+- 341-001 — live-proof marker file — File docs/audits/token-capture-live-proof.md exists with correct heading '# Token Capture Live-Pr...
+
+## Sprint sprint-340 Learnings
+- Sprint sprint-340 Learnings: ## Sprint sprint-340 Learnings
+
+## Gains
+- 340-001 — live-proof marker file — File docs/audits/token-capture-live-proof.md already existed with correct content matching goCrit...
+
+## Sprint sprint-339 Learnings
+- Sprint sprint-339 Learnings: ## Sprint sprint-339 Learnings
+
+## Sprint sprint-338 Learnings
+- Sprint sprint-338 Learnings: ## Sprint sprint-338 Learnings
+
+## Gains
+- 338-001 — live-proof marker file — File docs/audits/token-capture-live-proof.md exists with exactly '# Token Capture Live-Proof' hea...
+
+## Sprint sprint-337 Learnings
+- Sprint sprint-337 Learnings: ## Sprint sprint-337 Learnings
+
+## Gains
+- 337-001 — live-proof marker file — File exists at docs/audits/token-capture-live-proof.md with the required heading '# Token Capture...
+
+## Sprint sprint-336 Learnings
+- Sprint sprint-336 Learnings: ## Sprint sprint-336 Learnings
+
+## Gains
+- 336-001 — live-proof marker file — File docs/audits/token-capture-live-proof.md already existed and contained exactly the required h...
+
+## Sprint sprint-335 Learnings
+- Sprint sprint-335 Learnings: ## Sprint sprint-335 Learnings
+- live-proof marker file: NO_GO — Created docs/audits/token-capture-live-proof.md with the required heading '# Token Capture Live-Proof' and the specified
+
+## Sprint sprint-334 Learnings
+- Sprint sprint-334 Learnings: ## Sprint sprint-334 Learnings
+- P0-C recurrence — terminate the orphan start-process at NORMAL finalize (not only --force): GO_WITH_TECH_DEBT — P0-C RECURRENCE fix: the NORMAL (non-force) finalize path now terminates a still-alive owned `deckent start` coordinator
+- KPI Faz-2 — Telegram/connector sprint-end KPI summary dispatch (wired WITHOUT connector-bootstrap.ts): GO_WITH_TECH_DEBT — KPI Faz-2 — sprint-end KPI summary now dispatched to connectors, wired WITHOUT touching connector-bootstrap.ts.
+
+Key des
+- KPI Faz-2 — surface the threshold-breach advisory in the `deckent kpi` CLI: GO_WITH_TECH_DEBT — Surgical fix: added 2 imports (buildKpiBreachAdvisory + ScorecardLang) and 4 lines after print(formatTable) in kpi.ts ta
+
+## Gains
+- 334-001 — P0 — TOKEN-REAL-CAPTURE: replace heuristic token/cost with Anthropic's REAL session-store usage (THE top fix) — P0 TOKEN-REAL-CAPTURE — replaced heuristic-only token capture with the provider's REAL native ses...
+- 334-002 — F1-014 phase-2 — unify + dynamic-ize the cross-provider credential scrub (config-driven apiKeyEnv coverage) — F1-014 phase-2 — unified + dynamic-ized the cross-provider credential scrub behind ONE source of ...
+- 334-004 — A20 — `handleWorkerQuestion` honors the worker's suggestedAction (flag-gated default-off) — A20 — handleWorkerQuestion now honors the worker's question.suggestedAction behind a flag-gated, ...
+- 334-005 — F1-013 phase-2 — http-agentic-worker SCOPE_INSUFFICIENT event-stream emission parity — F1-013 phase-2: HTTP agentic worker now emits the SAME WORKER→BRAIN:SCOPE_INSUFFICIENT event the ...
+- 334-008 — W-H — EN multi-provider + cost/KPI cookbook recipe (Beta onboarding) — Created docs/cookbook/multi-provider-and-cost-en.md with all required content.
+- 334-009 — docs — sprint-334 campaign findings note (NEW dated doc; NOT MASTER-PLAN/TRIAGE) — Wrote docs/audits/OVERNIGHT-2026-06-28-findings.md (190 lines, 11.9 KB).
+- 334-010 — ADR-093 — real token/cost capture via provider-native usage stores (architecture record) — ADR-093 written to docs/adr/093-real-token-usage-capture.md (189 lines).
+- 334-011 — F11 — wire skill-dispatch into the native REPL tool registry (parity slice) — F11 parity slice: registered ONE new `deckent_skill_dispatch` tool in buildNativeToolRegistry.
+
+## Sprint sprint-333 Learnings
+- Sprint sprint-333 Learnings: ## Sprint sprint-333 Learnings
+- DOC-PKG-1 — no dangling `docs/` link survives in the published tarball (Beta onboarding): NO_GO — Sprint-332 commit 38185e8b already completed this task in full. Analysis: README.md had 9 relative docs/ links; sprint-3
+- F1-IMG-2 — `deckent init`/`upgrade` opt-in worker-image build integration (Beta onboarding): GO_WITH_TECH_DEBT — F1-IMG-2 — opt-in worker-image build offer integrated into `deckent init`.
+
+WHAT LANDED (src/cli/commands/init.ts, addit
+- i18n-first cleanup — evolve/sync hardcoded strings + B-ZOMBIE daemon-string centralization (sole messages.ts owner): GO_WITH_TECH_DEBT — messages.ts: added 7 doctor.daemon_* keys, 5 evolve.* keys, 1 sync.deckent_not_found key — all with en+tr translations.,doctor-checks.ts: removed local DAEMON_MESSAGES dict + daemonMsg helper (42 lines); imported getMessage from messages.ts; replaced all 8 daemonMsg() calls with getMessage().,evolve.ts: imported getMessage + getLanguage; added lang = getLanguage() in renderReport; replaced 5 hardcoded console.log strings with getMessage() calls.,sync.ts: imported getMessage + getLanguage; replaced both occurrences of 'DECKENT.md not found. Run deckent init first.' with getMessage('sync.deckent_not_found', getLanguage()).,tests/cli/i18n-hardcode-cleanup.test.ts: created 49 hermetic tests — all green.,tsc --noEmit: 0 new errors.,Targeted tests: tests/cli/i18n-hardcode-cleanup.test.ts 49/49, messages.test.ts 20/20, doctor-ux.test.ts 14/14, doctor-profile.test.ts 18/18, doctor-json.test.ts 6/6, sync.test.ts 3/3 — all green.,English output text is byte-equivalent to prior literals (verified by exact-match assertions in tests).,No unrelated reformatting or logic changes.
+
+## Gains
+- 333-001 — F1-014 — spawn-time per-worker auth NON-LEAK for the subprocess backend (AS-2) — F1-014 — closed the SUBPROCESS (local, non-docker) backend per-worker auth NON-LEAK gap.
+- 333-002 — F1-010 — dynamic subs→API overflow gate (flag-gated, default-off) (AS-2) — F1-010 dynamic pre-spawn subs→API overflow gate, flag-gated + default-off.
+- 333-003 — KPI Faz-2 — threshold-breach advisory (status surfaced, not just stored)
+- 333-004 — KPI Faz-2 — Tier-1 REAL-BINARY e2e smoke harness (proof-of-function + cost/token live-proof) — Created hermetic Tier-1 e2e harness at tests/e2e/kpi-surface-smoke.test.ts.
+- 333-005 — B6 — cost-gate daily/monthly WARN-ONLY wire (visibility, never blocks) — B6 cost-gate daily/monthly WARN-ONLY finalize wire.
+- 333-006 — status honesty — `failedTasks` reports real NO_GO count (CLI/MCP contract) — The status.ts fix (failedTasks: noGoCount instead of hardcoded 0) was already in place at lines 4...
+- 333-007 — B7 — SIEM forwarder: missing-transport silent discard → advisory warn — Surgical 3-part change to siem-forwarder.ts: (1) added optional `warn?: (message: string) => void...
+- 333-011 — W-H — EN getting-started cookbook doc (Beta onboarding) — Created docs/cookbook/getting-started-en.md (new file under existing docs/cookbook/ dir).
+
+## Sprint sprint-332 Learnings
+- Sprint sprint-332 Learnings: ## Sprint sprint-332 Learnings
+- `deckent kpi` no-arg latest-finalized fallback (proof-of-function blocker — fix #1): GO_WITH_TECH_DEBT — FIX-#1: `deckent kpi` (no --sprint) emitted `{ sprintId: null, kpis: [] }` once a sprint was finalized because getCurren
+- SPAWN-1 — Node DEP0190 `shell:true` Windows fix (cross-platform + ADR-006): GO_WITH_TECH_DEBT — SPAWN-1 — Node DEP0190 `shell:true`+args-array Windows fix at BOTH live sites, closing the deprecation noise AND the ADR
+- CFG-1 — legacy `mode` no longer blocks `config set` (Windows beta install-blocker): GO_WITH_TECH_DEBT — CFG-1 fix — legacy `mode` no longer blocks `config set`.
+
+ROOT CAUSE: asymmetry between the READ path (loadConfig → reso
+- 331-007 B-ZOMBIE — wire `checkDaemonHygiene` live into `deckent doctor`: GO_WITH_TECH_DEBT — Wired the already-built checkDaemonHygiene (doctor-checks.ts:595) LIVE into `deckent doctor`. Pre-wire: grep `daemon` in
+- KPI Faz-2 — `GET /api/kpi/trend` HTTP endpoint (Tier-1 surface): GO_WITH_TECH_DEBT — KPI Faz-2 trend surface. NEW src/api/kpi-trend-endpoint.ts: registerKpiTrendEndpoint(url,res,projectRoot,req?) serves GE
+- F1-IMG-2 — `deckent image build` standalone command (Beta onboarding): GO_WITH_TECH_DEBT — F1-IMG-2 — `deckent image build` standalone command upgraded to the new contract.
+
+GROUND-TRUTH RECONCILIATION (disk-ver
+- W-B parity — `deckent_cost` MCP tool (CLI/MCP surface parity): GO_WITH_TECH_DEBT — Created src/mcp/tools/cost.ts with registerCostTool(server, deps) and getCostView(root, deps). Delegates entirely to loa
+
+## Gains
+- 332-002 — forward-collection fire at finalize + REAL per-task cost/token capture (fix #2 + #3) — Pre-fix RED is genuine: recordSprintKpis did not exist (inline anonymous block) AND buildUsageTot...
+- 332-005 — F1-013 — agentic HTTP-worker v1 (CLI-less providers run real workers) — F1-013 agentic HTTP-worker v1 — CLI-less (OpenAI-compatible / Bedrock-shape / API) providers can ...
+- 332-007 — F11-012 — Ink render-path UTF-8/Türkçe chunk-boundary guard — F11-012 Ink render-path UTF-8/Türkçe chunk-boundary guard.
+- 332-008 — KPI Faz-2 dashboard surface — scorecard card + trend page (Tier-1) — AUTH_FAILED: claude --version exitCode=null stdout=""
+- 332-010 — KPI Faz-2 — `deckent_kpi` MCP tool gains `trend` mode — Extended deckent_kpi MCP tool with optional trend mode.
+- 332-012 — DOC-PKG-1 — README links resolve on a fresh `npm i` (Beta onboarding) — Fixed 19 relative docs/ references in README.md by rewriting them to absolute canonical GitHub UR...
+- 332-013 — F1-005 — Dockerfile.worker multi-CLI build-arg (opt-in codex/gemini) — F1-005 spawn-side: thread the per-worker provider into the docker build/image selection so a code...
+- 332-014 — KPI Faz-2 — Telegram/connector sprint-end KPI summary — All goCriteria met:
+- …and 1 more delivered
+
+## Sprint sprint-331 Learnings
+- Sprint sprint-331 Learnings: ## Sprint sprint-331 Learnings
+- B-ZOMBIE — stale-daemon hygiene surfaced in `deckent doctor`: GO_WITH_TECH_DEBT — B-ZOMBIE stale-daemon hygiene. Built the detection engine + advisory renderer (all hermetically tested, green); two foll
+- KPI Faz-2 — `deckent_kpi` MCP tool surface: GO_WITH_TECH_DEBT — All goCriteria met:
+
+1. tsc --noEmit: one pre-existing error in src/providers/claude.ts:503 (TS6133 — unused var in scop
+- KPI Faz-2 — `/api/kpi` HTTP endpoint (Tier-1 surface): GO_WITH_TECH_DEBT — KPI Faz-2 /api/kpi HTTP endpoint (Tier-1 surface).
+
+WHAT:
+- NEW src/api/kpi-endpoint.ts: registerKpiEndpoint(url,res,pro
+- KPI Faz-2 — `deckent kpi --trend <kpiId>` CLI (surface existing getTrend): GO_WITH_TECH_DEBT — Implemented `kpi --trend <kpiId> [--n <count>] [--json]` in kpi.ts:
+
+- Added `renderTrend()` internal function that dele
+
+## Gains
+- 331-001 — Error-convention fix — 3 generic throws → DeckentError registry (sprint-330 fix #1) — Migrated the 3 remaining generic `throw new Error(...)` in src/core to the DeckentError registry ...
+- 331-002 — opus outputTokens:null robust capture — claude.ts extractUsage (sprint-330 fix #2) — Root cause (disk-verified via /tmp/probe.mjs): the opus `--output-format json` result envelope in...
+- 331-003 — KPI live-backfill — `deckent kpi` computes from sprint history (sprint-330 fix #3, closes 009) — KPI live-backfill (009 data-gap / sprint-330 fix #3) — self-healing read-path reconstruction of K...
+- 331-004 — F1-012 — de-hardcode the 3 provider-registration sites (config-driven registry) — F1-012 — de-hardcoded the 3 provider-registration sites in src/core/provider.ts so a config.provi...
+- 331-005 — F1-DF — ship `Dockerfile.worker` in the npm package (Beta install-blocker) — Surgical one-line addition to package.json files[]: added '"Dockerfile.worker"' between 'assets' ...
+- 331-006 — B-HANDOFF-STALE — wire `pruneCompletedSprints` into sprint finalize (storage prune) — Wired HandoffProtocol.pruneCompletedSprints into sprint finalize as a non-blocking storage-prune ...
+- 331-010 — Ollama `/api/tags` health-gate before routing (Phase-2 hardening) — Added `HealthGateResult` interface (exported) and `checkHealthGate(requestedModel?: string): Prom...
+- 331-011 — Codex token-capture parity — tokenUsage no longer zero (MF-5) — MF-5 codex tokenUsage=0 — FAITHFUL real-envelope capture + honest root cause + surgical in-scope ...
+- …and 4 more delivered
+
+## Sprint sprint-330 Learnings
+- Sprint sprint-330 Learnings: ## Sprint sprint-330 Learnings
+- i18n labels + `deckent kpi` CLI command (Tier-1): GO_WITH_TECH_DEBT — tsc --noEmit: exit 0 (0 new errors). Targeted test tests/kpi/kpi-format.test.ts: 8/8 pass (currency/percent/number/durat
+
+## Gains
+- 330-001 — shared types + base-measure catalog (foundation) — Created src/core/kpi/types.ts with all required types (MeasureKind, AggMethod, BaseMeasure, KpiDi...
+- 330-002 — sandboxed formula-evaluator (SSOT) — Sandboxed formula-evaluator (SSOT) implemented per DIRECTIVES Task 2 + spec §6.
+- 330-003 — KpiStore — better-sqlite3 tables, tenant-filtered — KpiStore (better-sqlite3, tenant-filtered) implemented per spec §7 + DIRECTIVES Task 3, following...
+- 330-004 — KPI definitions — zod schema + 8 builtin KPIs + config loader — KPI_DEFINITION_SCHEMA (zod, strict, follows NERVOUS_SYSTEM_SCHEMA pattern config.ts:286) + KpiDef...
+- 330-005 — rollup-engine — fold → compute results + direction-aware status — rollup-engine implemented per DIRECTIVES Task 5 + spec §7/§8/§11.
+- 330-006 — collection — derive base measures from sprint data + record pipeline — Implemented deriveMeasurements (pure, no I/O) + recordKpiMeasurements (open/close own KpiStore).
+- 330-007 — KpiService facade — list sprint views + trend (live fallback) — KpiService facade implemented per DIRECTIVES Task 7 spec.
+- 330-008 — wire collection into sprint-finalizer (non-blocking hook) — Wired KPI collection into sprint-finalizer as a NON-BLOCKING hook + added exported buildUsageTotals.
+- …and 13 more delivered
+
+## Sprint sprint-329 Learnings
+- Sprint sprint-329 Learnings: ## Sprint sprint-329 Learnings
+
+## Gains
+- 329-001 — identity config — scim/oidc provider kind + provider-specific config (foundation) — Added LocalIdentityProviderConfig, ScimIdentityProviderConfig, OidcClaimsIdentityProviderConfig i...
+- 329-002 — SCIM 2.0 directory provider — sync() pulls Users+Groups → IdentityStore — ScimIdentityProvider implements IdentityDirectoryProvider (id='scim', edition defaults to 'enterp...
+- 329-003 — OIDC-claims provider — role+tenant from ID-token claims (verify-bind OIDC yolu) — Implemented OidcClaimsIdentityProvider + pure principalFromClaims function.
+- 329-004 — factory wiring — createIdentityProvider supports scim + oidc-claims — Expanded CreateProviderOptions to a discriminated union (local | scim | oidc-claims).
+- 329-005 — bootstrap sync wiring — background sync() opt-in + role-map groupKey live (Tier-1) — Bootstrap sync wiring (background sync() opt-in + role-map groupKey live), strictly within the 2-...
+- 329-006 — docs — spec §3.3/§11 güncelle + ADR-092 amend (scim/oidc live) — §3.3 güncellendi: başlığa 'Faz 3 ✅ Sprint 329' eklendi; scim+oidc-claims live, resolve=saf-local/...
+
 ## Sprint sprint-328 Learnings
 - Sprint sprint-328 Learnings: ## Sprint sprint-328 Learnings
 - Class-A codex usage-emit (CLI-agent, native source): GO_WITH_TECH_DEBT — Class-A codex usage-emit. ROOT CAUSE: codex `exec --full-auto` emitted NO structured usage, so the worker .log was prose
