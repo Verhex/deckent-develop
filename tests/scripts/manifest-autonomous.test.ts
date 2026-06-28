@@ -17,7 +17,7 @@ import { spawn } from 'node:child_process';
 const __dirname = join(fileURLToPath(import.meta.url), '..');
 const PROJECT_ROOT = join(__dirname, '../../');
 const SYNC_MANIFEST_PATH = join(PROJECT_ROOT, 'scripts/sync-manifest.mjs');
-const MANIFEST_PATH = join(PROJECT_ROOT, '.deckent/features-manifest.json');
+const MANIFEST_PATH = join(PROJECT_ROOT, '.deckent/settings/features-manifest.json');
 
 // ─── helper: run script, collect stdout ──────────────────────────────────────
 

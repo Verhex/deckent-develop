@@ -268,6 +268,9 @@ describe('DECKENT→USER:NOTIFY Sprint Lifecycle E2E', () => {
       summary: 'Summary',
       details: 'Details',
       sprintId: 'sprint-151',
+      // owningPid defaults to process.pid (dispatcher) for orphan-process
+      // tracking — assert presence + type, never the dynamic value.
+      owningPid: expect.any(Number),
     });
   });
 });

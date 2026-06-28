@@ -14,7 +14,12 @@ vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
 }));
 
-vi.mock('../../src/core/config.js', () => ({
+// Spread the real config module so its exported constants (e.g.
+// DEFAULT_APPROVE_TIMEOUT_ATTENDED_MS, pulled in transitively by the server's
+// dependency graph) stay defined; only loadConfig is stubbed so the test drives
+// config loading without touching disk.
+vi.mock('../../src/core/config.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/config.js')>()),
   loadConfig: vi.fn(),
 }));
 

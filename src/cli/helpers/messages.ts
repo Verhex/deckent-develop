@@ -2021,8 +2021,6 @@ const MESSAGES: MessageMap = {
   },
 };
 
-const _missingKeyWarnedInProd = new Set<string>();
-
 /**
  * Get a localized message by key.
  * Supports variable interpolation with {varName} placeholders.
@@ -2036,9 +2034,6 @@ export function getMessage(
   const entry = MESSAGES[key];
   if (!entry) {
     if (process.env['NODE_ENV'] !== 'production') {
-      process.stderr.write(`[getMessage] missing i18n key: "${key}" (lang: ${lang})\n`);
-    } else if (!_missingKeyWarnedInProd.has(key)) {
-      _missingKeyWarnedInProd.add(key);
       process.stderr.write(`[getMessage] missing i18n key: "${key}" (lang: ${lang})\n`);
     }
     return key;

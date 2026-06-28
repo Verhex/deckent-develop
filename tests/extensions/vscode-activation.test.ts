@@ -17,6 +17,12 @@ function makeVsCodeApi(): VsCodeApi {
     },
     window: {
       showInformationMessage: vi.fn(),
+      createStatusBarItem: vi.fn().mockReturnValue({
+        text: '',
+        tooltip: '',
+        show: vi.fn(),
+        dispose: vi.fn(),
+      }),
     },
   };
 }
@@ -53,7 +59,7 @@ describe('extensions/vscode scaffold (212-013)', () => {
 
   it('activate pushes command disposables to subscriptions', () => {
     activate(context, vscode);
-    expect(context.subscriptions.length).toBe(2);
+    expect(context.subscriptions.length).toBe(3); // 2 command disposables + 1 status-bar item
   });
 
   it('deactivate is callable without throwing', () => {

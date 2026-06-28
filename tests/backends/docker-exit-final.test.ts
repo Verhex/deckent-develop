@@ -26,7 +26,11 @@ vi.mock('../../src/core/utils.js', () => ({
   debugLog: vi.fn(),
 }));
 
-vi.mock('../../src/core/constants.js', () => ({
+// Spread the real constants so newly-added exports (e.g. SPRINT_ACTIVE_FILE,
+// pulled in transitively by the backend's dependency graph) never break this
+// mock; only TASKS_DIR is overridden to keep the sandbox deterministic.
+vi.mock('../../src/core/constants.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../src/core/constants.js')>()),
   TASKS_DIR: '.tasks',
 }));
 
@@ -131,6 +135,12 @@ describe('Docker Worker Exit Pattern Final Fix (Sprint 149)', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
+    // Bypass the host-side claude auth health-check (Sprint 194 W-AUTH A-1):
+    // these tests exercise the container-exit fallback path, which only runs
+    // AFTER spawn — without the bypass the pre-spawn auth gate short-circuits
+    // and no container is ever launched. DECKENT_AUTH_SKIP=1 is the documented
+    // test/local escape hatch (worker.ts authHealthCheck).
+    vi.stubEnv('DECKENT_AUTH_SKIP', '1');
     backend = new DockerSpawnBackend('/test/project', {
       image: 'test-image:latest',
       timeoutSeconds: 600,
@@ -139,6 +149,7 @@ describe('Docker Worker Exit Pattern Final Fix (Sprint 149)', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('should write fallback .result with signal_info when SIGKILL (exit 137) and no result', () => {

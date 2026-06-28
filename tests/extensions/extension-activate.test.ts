@@ -26,6 +26,12 @@ function makeVsCodeApi(workspace?: WorkspaceApi): VsCodeApi {
     },
     window: {
       showInformationMessage: vi.fn(),
+      createStatusBarItem: vi.fn().mockReturnValue({
+        text: '',
+        tooltip: '',
+        show: vi.fn(),
+        dispose: vi.fn(),
+      }),
     },
     workspace,
   };
@@ -53,7 +59,7 @@ describe('extensions/vscode activation (214-010)', () => {
     const ids = calls.map(([id]) => id);
     expect(ids).toContain('deckent.startSprint');
     expect(ids).toContain('deckent.showDashboard');
-    expect(context.subscriptions.length).toBe(2);
+    expect(context.subscriptions.length).toBe(3); // 2 command disposables + 1 status-bar item
   });
 
   it('detects deckent workspace when .deckent/config.json marker is present', () => {
@@ -100,7 +106,7 @@ describe('extensions/vscode activation (214-010)', () => {
     activate(context, vscode);
 
     expect(isDeckentDetected()).toBe(false);
-    expect(context.subscriptions.length).toBe(2);
+    expect(context.subscriptions.length).toBe(3); // 2 command disposables + 1 status-bar item
   });
 
   it('detects via alternate sprint-state.json marker (CLI/MCP fallback)', () => {

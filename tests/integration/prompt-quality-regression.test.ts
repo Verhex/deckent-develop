@@ -367,7 +367,11 @@ describe('Prompt Quality Regression (Sprint 181-001/002)', () => {
 
     // ── Metadata sanity ──────────────────────────────────────────────────
     expect(metadata.agent).toBe('devops-engineer');
-    expect(metadata.skills).toContain('devops-engineer');
+    // WP-17 dedup: a skill whose name matches the assigned agent
+    // ('devops-engineer') is intentionally dropped — the agent persona is the
+    // authoritative copy, so injecting the same-named skill double-spends tokens
+    // on ~40% overlapping content. Non-colliding skills ('ci-testing') stay.
+    expect(metadata.skills).not.toContain('devops-engineer');
     expect(metadata.skills).toContain('ci-testing');
     expect(metadata.charCount).toBeGreaterThan(1000);
 

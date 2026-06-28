@@ -56,7 +56,7 @@ describe('DockerSpawnBackend', () => {
       } as any);
 
       expect(() => backend.spawn('001-001', 'sonnet', 'test prompt'))
-        .toThrow("Docker image 'test-image:latest' not found");
+        .toThrow("Docker image 'test-image:latest' not ready for provider 'claude'");
     });
 
     it('should throw a SpawnBackendError instance with correct backendName', () => {

@@ -5,7 +5,7 @@
 Deckent ships an MCP server that exposes orchestration to MCP-compatible IDEs (Claude Code, Cursor, etc.). The tools below are registered in `src/mcp/tools/*.ts` and surfaced via `deckent-mcp` stdio transport.
 
 <!-- AUTOGEN:START id="mcp-tools" -->
-> 35 tools registered. Generated from `src/mcp/tools/*.ts`.
+> 37 tools registered. Generated from `src/mcp/tools/*.ts`.
 
 | Tool | Title | Description |
 |------|-------|-------------|
@@ -16,6 +16,7 @@ Deckent ships an MCP server that exposes orchestration to MCP-compatible IDEs (C
 | `deckent_checkpoint` | Checkpoint Management | List, approve, or reject human checkpoints in sprint lifecycle. Checkpoints pause sprint execution at configured phases (plan/evaluate/fix) until a human approves or rejects. Use action=list to see pending checkpoints, action=approve/reject with sprintId and phase to respond. |
 | `deckent_cleanup` | Sprint Cleanup | Remove sprint artifacts and optionally trim memory budget. Deletes all task files (.json, .plan, .hb, .result, .paused, .log) from .tasks/ and all lock files from .locks/. With decay=true, also runs memory decay on .brain/ files if they exceed the line budget (trims MEMORY.md, RETRO.md, sprint logs). Use dryRun=true first to preview what would be deleted. Typically run after a sprint completes (deckent_review) or before starting a fresh sprint after kill. |
 | `deckent_config` | Config Manager | Read, get, or set Deckent configuration values in .deckent/config.json. Three actions: |
+| `deckent_cost` | Cost | Show the cost configuration: budget limits, per-model pricing (input/output per MTok), |
 | `deckent_docs` | Managed Docs | Manage user-defined documents in sprint lifecycle. Actions: |
 | `deckent_doctor` | Health Check | Run Deckent health checks and diagnose environment issues. Checks: Node.js version, git availability, tmux installation, Claude CLI auth, workspace directories (.deckent/, .brain/, .tasks/), brain memory budget, tech debt level, stale lock files. Returns a healthScore (0-100) and per-check pass/fail status with recommendations. Use when a sprint fails unexpectedly or before starting a new sprint. If issues found: fix them, then re-run doctor until healthScore reaches 100. |
 | `deckent_explain` | Sprint Explanation | Explain what a sprint did in human-friendly language. Reads the sprint log from .brain/sprints/ and the retrospective from the Memory V2 DB to generate a summary including goal, task outcomes (completed/failed/tech debt), duration, and key learnings. Use after a sprint completes to get a quick overview. Supports specific sprint lookup, verbose mode for full details, and JSON output. |
@@ -24,6 +25,7 @@ Deckent ships an MCP server that exposes orchestration to MCP-compatible IDEs (C
 | `deckent_history` | Sprint History | Read archived sprint log files from .brain/sprints/. Returns the last N sprint markdown logs sorted by sprint ID, plus a trend analysis (improving/declining/stable) based on task completion rates across sprints. Use to understand long-term project health, compare sprint performance, or review past decisions. Each sprint log contains task outcomes, model usage, and learning notes. |
 | `deckent_init` | Initialize Deckent | Initialize a Deckent project in the current directory. Creates all required directories (.deckent/, .brain/, .tasks/, .locks/, .claude/rules/) and configuration files (config.json, DECKENT.md, DIRECTIVES.md, brain files). Safe to re-run — existing config fields are preserved via merge, and files are only written if missing. After init, run deckent_set_directives → deckent_plan → deckent_start. |
 | `deckent_kill` | Kill Worker | Stop one or all running workers. Sets task status to PAUSED, removes heartbeat files, and releases any file locks owned by the task. Use when a worker is stuck (stale heartbeat), consuming too many resources, or needs to be restarted. After killing, run deckent_cleanup to remove task artifacts, then deckent_start to restart. CLI parity (ADR-022-V2 + Sprint 189 T-009): force + userExplicit are pass-through panic-guard bypass markers — even when both are set the bypass is only logged (audit-trail), kill itself still requires explicit user intent (feedback_sprint_kill_always_ask_user). |
+| `deckent_kpi` | KPI Scorecard | Show the KPI scorecard for a sprint (default) or trend series for a single KPI. |
 | `deckent_memory_query` | Memory Query | Search project memory — ADRs, sprint learnings, patterns, technical debt. |
 | `deckent_models` | Model Catalog | Browse and manage the Deckent model catalog. |
 | `deckent_nervous_accept` | Nervous Accept | Accept a pending Nervous System notification/action. |

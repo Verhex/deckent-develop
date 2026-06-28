@@ -260,6 +260,12 @@ function emitSprintEvent(
   }
 }
 
+/**
+ * Emits a `SPRINT_PHASE_CHANGE` event as the sprint transitions between
+ * lifecycle phases (PLAN → SPAWN → EXECUTE → …). Consumed by the NervousObserver
+ * and the live status/dashboard subscribers; never throws (emission failures are
+ * swallowed by {@link emitSprintEvent} so a listener error cannot break the sprint).
+ */
 export function emitPhaseChange(oldPhase: string, newPhase: string, sprintId: string): void {
   emitSprintEvent('SPRINT_PHASE_CHANGE', { oldPhase, newPhase, sprintId });
 }

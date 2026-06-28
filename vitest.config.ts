@@ -11,11 +11,22 @@ export default defineConfig({
     // cores, that teardown RPC starved and tripped vitest's "Timeout calling
     // onTaskUpdate" → exit 1 (the months-long Coverage-job failure that blocked
     // coverage report + build from ever running). Bounding forks to the core
-    // count under CI gives each fork CPU to finish its teardown RPC. Local dev
-    // keeps full parallelism (maxForks undefined).
+    // count under CI gives each fork CPU to finish its teardown RPC.
+    //
+    // Memory cap (Alperen, 2026-06-28): local runs MUST stay ≤16GB. Unbounded
+    // local forks meant one fork per core (e.g. 20 cores → ~40GB peak), which
+    // OOM-crashed WSL and starved VS Code. Budget ~3.5GB/fork → 4 forks ≈ 14GB
+    // locally (under the 16GB ceiling, with headroom for the editor); CI runners
+    // (16GB, 2-core) stay at 2. Override with VITEST_MAX_FORKS=N on machines
+    // with different headroom (e.g. VITEST_MAX_FORKS=2 for a tighter cap).
     pool: 'forks',
     poolOptions: {
-      forks: { maxForks: process.env.CI ? 2 : undefined },
+      forks: {
+        maxForks: process.env.VITEST_MAX_FORKS
+          ? Math.max(1, Number(process.env.VITEST_MAX_FORKS))
+          : (process.env.CI ? 2 : 4),
+        minForks: 1,
+      },
     },
     teardownTimeout: 30000,
     coverage: {

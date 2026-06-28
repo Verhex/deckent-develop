@@ -109,9 +109,9 @@ describe('MCP tool catalog SSOT (index.ts)', () => {
       expect(extraInCatalog).toEqual([]);
     });
 
-    it('MCP_TOOL_COUNT, TOOL_CATALOG.length and registered count are all equal (35)', () => {
+    it('MCP_TOOL_COUNT, TOOL_CATALOG.length and registered count are all equal (37)', () => {
       const { names } = captureRegistrations();
-      expect(TOOL_CATALOG.length).toBe(35);
+      expect(TOOL_CATALOG.length).toBe(37);
       expect(MCP_TOOL_COUNT).toBe(TOOL_CATALOG.length);
       expect(names.length).toBe(MCP_TOOL_COUNT);
     });
@@ -158,7 +158,7 @@ describe('MCP tool catalog SSOT (index.ts)', () => {
         expect(names.has(name), `deckent_help missing ${name}`).toBe(true);
       }
       // Old drift was 23; the single source guarantees 35.
-      expect(names.size).toBe(35);
+      expect(names.size).toBe(37);
     });
   });
 

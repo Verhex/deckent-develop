@@ -22,7 +22,7 @@ import {
   SprintPhase, SprintStatus, TaskStatus,
 } from '../../src/core/types.js';
 import type { Sprint, Task } from '../../src/core/types.js';
-import { DECKENT_DIR, TASKS_DIR } from '../../src/core/constants.js';
+import { DECKENT_DIR, RECENT_WORKS_DIR, TASKS_DIR } from '../../src/core/constants.js';
 import {
   persistPhaseTransition,
 } from '../../src/orchestra/sprint-phases.js';
@@ -72,7 +72,9 @@ function makeSprint(id: string, tasks: Task[]): Sprint {
 }
 
 function readEventsJsonl(root: string, sprintId: string): Array<{ sequence: number; channel: string }> {
-  const filePath = join(root, DECKENT_DIR, `${sprintId}-events.jsonl`);
+  // Sprint 318 (B-AUTONOMOUS-LOG): per-sprint event files live under
+  // RECENT_WORKS_DIR (.deckent/recently-works/), not the .deckent/ root.
+  const filePath = join(root, RECENT_WORKS_DIR, `${sprintId}-events.jsonl`);
   if (!existsSync(filePath)) return [];
   const raw = readFileSync(filePath, 'utf-8');
   return raw

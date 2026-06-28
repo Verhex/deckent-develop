@@ -975,7 +975,7 @@ deckent web --dev
 > Hand-curated sections above are produced by `scripts/generate-cli-docs.ts`; this block is maintained by `scripts/gen-reference-docs.mjs`.
 
 <!-- AUTOGEN:START id="cli" -->
-> 153 commands. Generated from `src/cli/commands/*.ts`.
+> 170 commands. Generated from `src/cli/commands/*.ts`.
 
 | Command | Description |
 |---------|-------------|
@@ -994,19 +994,24 @@ deckent web --dev
 | `deckent audit [sprint-id]` | Run Brain Self-Audit Gate for a sprint, or query/export/retain audit log events (query \| compliance \| forward \| retention) |
 | `deckent audit-verify` | Verify the audit HMAC chain (I4 invariant — tamper-evident audit log) |
 | `deckent auto` | Auto-detect mode from context |
-| `deckent autonomous` | Autonomous runtime — authority-bounded continuous loop (F3-009) |
+| `deckent autonomous` | Autonomous runtime — authority-bounded continuous loop |
+| `deckent autonomous-mission` | Manage autonomous v2 missions — list missions, goal missions |
 | `deckent backlog` | Manage the autonomous backlog (add / list / remove entries) |
 | `deckent baseline-refresh` | Refresh directives_protection baseline to current DIRECTIVES.md content |
 | `deckent budget` | View or set cost budgets |
+| `deckent build` | Build the deckent-worker Docker image from the packaged Dockerfile.worker |
 | `deckent chat` | Start a conversational session with Deckent. Uses your installed AI CLI. |
 | `deckent check <role> <action>` | Check whether a role has permission to perform an action |
 | `deckent checkpoint` | Manage human checkpoints — list, approve, or reject pending checkpoints |
+| `deckent cleanup` | Sweep stray autonomous run-artifacts (task-run-*, _*.pid) from .tasks/ |
 | `deckent cleanup` | Clean up after a sprint |
 | `deckent config` | Show or modify project configuration |
 | `deckent cost` | User Safety Shield — cost management & estimation |
 | `deckent create <name>` | Create a custom agent (use --prompt/--description for wizard-style setup) |
 | `deckent create <name>` | Create a new plugin scaffold |
 | `deckent create <name>` | Create a custom skill |
+| `deckent create-goal <goal>` | Create a Type-2 goal mission (runs until the goal is reached) |
+| `deckent create-list <title>` | Create a Type-1 list mission from N work-items |
 | `deckent dashboard` | Show terminal dashboard with auto-refresh (see also: deckent status --watch) |
 | `deckent delete <name>` | Delete an agent from the pool |
 | `deckent delete <name>` | Delete a skill |
@@ -1024,9 +1029,9 @@ deckent web --dev
 | `deckent explain` | Explain what the last sprint did in human-friendly language |
 | `deckent export` | Export memory.db to .brain/exports/*.md |
 | `deckent export [file]` | Export config to stdout or a file |
-| `deckent features` | List features from .deckent/features-manifest.json by category |
+| `deckent features` | List features from .deckent/settings/features-manifest.json by category |
 | `deckent finalize` | Finalize a sprint: update MEMORY.md, RETRO.md, IDENTITY.md, config, run decay |
-| `deckent flow` | Manage scheduled flows (F3 process mode) |
+| `deckent flow` | Manage scheduled flows (process mode) |
 | `deckent get <key>` | Get a configuration value by key (supports dot notation) |
 | `deckent get <name>` | Show details for an MCP server (from merged view) |
 | `deckent global <style>` | Set global default (sprint\|task) |
@@ -1035,6 +1040,7 @@ deckent web --dev
 | `deckent help-info` | Show quick-reference help (localized) |
 | `deckent history` | Show sprint history |
 | `deckent history` | View nervous system action history |
+| `deckent image` | Worker Docker image management |
 | `deckent import <file>` | Import config from a JSON file |
 | `deckent info <dir>` | Show plugin info (accepts absolute or relative path) |
 | `deckent info <name>` | Show detailed agent information |
@@ -1044,7 +1050,9 @@ deckent web --dev
 | `deckent install <source>` | Install a skill from local path or git URL (supports version pinning: url#tag) |
 | `deckent keys` | List all config parameter keys |
 | `deckent kill [taskId]` | Kill a running worker |
+| `deckent kpi` | Show the KPI scorecard for the current (or a specific) sprint |
 | `deckent list` | List all agents in the pool |
+| `deckent list` | List all missions (summary table) |
 | `deckent list` | List autonomous backlog entries |
 | `deckent list` | List all checkpoints |
 | `deckent list` | Show current authority matrix with all presets |
@@ -1069,8 +1077,10 @@ deckent web --dev
 | `deckent override <actionId> <policy>` | Set a per-action policy override |
 | `deckent pending` | List parked approvals awaiting human accept/reject |
 | `deckent plan` | Plan a sprint without executing it |
+| `deckent plan <goal>` | Decompose a high-level goal into a lightweight autonomous backlog (Phase 1) |
 | `deckent plugin` | Manage plugins |
 | `deckent process` | Switch to process mode (continuous request-handling \u2014 ERP / automation via MCP + REST) |
+| `deckent process` | Process-mode execution surface — submit tasks/capabilities and poll their status (ADR-022 CLI/MCP parity) |
 | `deckent publish <skillPath>` | Validate, sign (Ed25519) and publish a skill to the marketplace |
 | `deckent rbac` | Role-based access control — check permissions and list roles |
 | `deckent rebuild` | Rebuild memory.db from .brain/exports/*.md files |
@@ -1091,6 +1101,7 @@ deckent web --dev
 | `deckent report` | Show cross-sprint agent/skill trend report |
 | `deckent reset` | Reset all action overrides to preset defaults |
 | `deckent resources` | Show live docker worker resource usage or analyze resource log |
+| `deckent result <executionId>` | Show the full result of a submission (status + lastResult) |
 | `deckent resume <sprintId>` | Resume a sprint from its latest checkpoint |
 | `deckent retro` | Show the latest sprint retrospective |
 | `deckent review` | Review pending relations from backfill preview |
@@ -1100,6 +1111,7 @@ deckent web --dev
 | `deckent run` | Run managed doc updates without a sprint |
 | `deckent run` | Run the flow-runtime tick once (--once) or start the daemon |
 | `deckent run <description>` | Run a single one-shot task without a sprint cycle |
+| `deckent scan` | Hash + timestamp + rank all docs; write front-matter; sync memory.db |
 | `deckent search <query>` | Search skills in the marketplace registry |
 | `deckent serve` | Start HTTP API server with SSE support |
 | `deckent set` | Set a nervous system configuration value |
@@ -1115,14 +1127,19 @@ deckent web --dev
 | `deckent stats <name>` | Show sprint-by-sprint performance for an agent |
 | `deckent status` | Show autonomous runtime summary (pending + last audit events) |
 | `deckent status` | Show whether the bot daemon is running |
+| `deckent status` | Report tracked docs by rank + stale state |
 | `deckent status` | Show the current sprint dashboard |
+| `deckent status <executionId>` | Poll the status of a prior submission by executionId |
 | `deckent stop` | Signal the autonomous loop to stop cleanly |
 | `deckent stop` | Stop the bot daemon |
+| `deckent submit <description>` | Submit an ExecutionRequest (policy-gated: read-only auto-runs, side-effecting parks for approval) |
+| `deckent sync` | Update memory.db only (no front-matter writes) |
 | `deckent sync` | Sync adapter files and detect out-of-band changes since last sprint |
 | `deckent task` | Switch to task mode |
 | `deckent test` | Run a test sprint (no retro, no memory update, no decay) |
 | `deckent test <name>` | Test a plugin: validate manifest and entrypoint, run hooks if available |
 | `deckent tier <model>` | Look up the tier of a specific model by ID or API ID |
+| `deckent track` | Track doc freshness (hash + DCR + stale) |
 | `deckent undo <action-id>` | Undo a recent reversible action |
 | `deckent update` | Fetch latest pricing from LiteLLM + OpenRouter |
 | `deckent update <name>` | Update an installed skill from its original source |
@@ -1130,6 +1147,6 @@ deckent web --dev
 | `deckent update <source>` | Update a plugin (remove existing and re-install from source) |
 | `deckent upgrade` | Self-update deckent |
 | `deckent usage` | Show token/limit consumption from Claude Code transcripts |
-| `deckent watch` | Live tmux split view: dashboard + worker panes |
-| `deckent web` | Start web dashboard with API server |
+| `deckent watch` | Follow a live worker (docker logs / tmux pane / subprocess log) with --follow &lt;taskId&gt;, or open the tmux dashboard split |
+| `deckent web` | Start web dashboard with API server (deprecated — use `deckent serve |
 <!-- AUTOGEN:END id="cli" -->

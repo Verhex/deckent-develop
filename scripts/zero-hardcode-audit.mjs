@@ -30,10 +30,21 @@ const MODEL_VERSION_PATTERN = /claude-(opus|sonnet|haiku)-\d+(-[\w]+)+/g;
 
 // ─── Allowlist ────────────────────────────────────────────────────────────
 
-/** Files exempt from scanning (relative to project root, forward slashes). */
+/**
+ * Files exempt from scanning (relative to project root, forward slashes).
+ * These are canonical model-definition maps — the single source of truth for
+ * model identifiers — not business logic that risks drift. Listing a stale ID
+ * here is the file's purpose, so they are intentionally exempt:
+ *  - model-registry.ts / model-catalog.ts — deckent's own model registry.
+ *  - providers/bedrock.ts — AWS Bedrock InvokeModel identifier map (a distinct
+ *    namespace, e.g. `anthropic.claude-opus-4-5`, that cannot reference the registry).
+ *  - cli/repl/native-transport.ts — per-transport DEFAULT_MODEL fallback map.
+ */
 const ALLOWLIST_RELATIVE = new Set([
   'src/core/model-registry.ts',
   'src/core/model-catalog.ts',
+  'src/providers/bedrock.ts',
+  'src/cli/repl/native-transport.ts',
 ]);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────

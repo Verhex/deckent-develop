@@ -11,6 +11,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lockfile-sync:
+    name: Lockfile Sync Guard
+    runs-on: ubuntu-latest
+    # Root cause of the months-long CI outage: package-lock.json drifted from
+    # package.json, so every job's `npm ci` failed with a cryptic EUSAGE error.
+    # This guard runs FIRST and FAST, turning that failure into an actionable
+    # message before the heavy test matrix ever spins up. `npm ci` itself still
+    # enforces the lock downstream — this just surfaces drift early and clearly.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: npm
+      - name: Verify package-lock.json is in sync with package.json
+        run: |
+          npm install --package-lock-only --ignore-scripts
+          if ! git diff --quiet -- package-lock.json; then
+            echo "::error file=package-lock.json::package-lock.json is out of sync with package.json. Run 'npm install' locally and commit the regenerated package-lock.json."
+            echo "--- drift (package-lock.json) ---"
+            git --no-pager diff --stat -- package-lock.json
+            exit 1
+          fi
+          echo "package-lock.json is in sync with package.json."
+
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest
@@ -204,6 +229,16 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run ci:rebuild-native
+      - name: Build dist (required by dist-dependent e2e/smoke tests)
+        # The coverage job runs the FULL suite (vitest run --coverage over all
+        # tests/**), which includes dist-dependent e2e tests — npm-pack-smoke
+        # packs the tarball and asserts dist/cli/entry.js + dist/mcp/server.js
+        # are present; cli-bin-invocation spawns the compiled binary. Without a
+        # prior build these fail (no dist) or silently skip. Building here makes
+        # the coverage environment match the build job's verified artifacts.
+        # Coverage is instrumented from src/ via vitest transform, so a built
+        # dist/ does not change the measured numbers.
+        run: npm run build
       - name: Run tests with coverage (threshold gate enforced)
         # Threshold violation = exit 1 = job FAIL = CI red.
         run: npm run test:coverage
