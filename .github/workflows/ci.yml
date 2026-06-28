@@ -229,16 +229,18 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run ci:rebuild-native
-      - name: Build dist (required by dist-dependent e2e/smoke tests)
+      - name: Install dashboard dependencies (for build:all → dashboard bundle)
+        run: npm install --prefix src/dashboard --ignore-scripts 2>/dev/null || true
+      - name: Build dist + dashboard (required by dist-dependent e2e/smoke tests)
         # The coverage job runs the FULL suite (vitest run --coverage over all
         # tests/**), which includes dist-dependent e2e tests — npm-pack-smoke
-        # packs the tarball and asserts dist/cli/entry.js + dist/mcp/server.js
-        # are present; cli-bin-invocation spawns the compiled binary. Without a
-        # prior build these fail (no dist) or silently skip. Building here makes
-        # the coverage environment match the build job's verified artifacts.
+        # packs the tarball and asserts dist/cli/entry.js, dist/mcp/server.js AND
+        # dist/dashboard/index.html are present; cli-bin-invocation spawns the
+        # compiled binary. `build:all` (not `build`) is required so the dashboard
+        # bundle lands in dist/dashboard. Without it these fail (no dist) or skip.
         # Coverage is instrumented from src/ via vitest transform, so a built
         # dist/ does not change the measured numbers.
-        run: npm run build
+        run: npm run build:all
       - name: Run tests with coverage (threshold gate enforced)
         # Threshold violation = exit 1 = job FAIL = CI red.
         run: npm run test:coverage

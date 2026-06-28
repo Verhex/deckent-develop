@@ -499,7 +499,11 @@ function main() {
 
   console.log('');
   console.log('Audit complete (read-only — no code was modified).');
-  process.exit(0);
+  // Do NOT call process.exit(0) here: with large piped stdout (the --json report
+  // can exceed 150KB) an explicit exit terminates the process before the final
+  // pipe buffer is flushed, truncating the captured output (the JSON `summary`
+  // tail). Set the code and let the event loop drain stdout, then exit naturally.
+  process.exitCode = 0;
 }
 
 // Only run main() when invoked directly (not when imported by tests)

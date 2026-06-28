@@ -24,8 +24,22 @@ function runAuditScript(extraArgs: string[] = []): Promise<{ status: number; std
     child.stdout.setEncoding('utf-8');
     child.stdout.on('data', (d: string) => { stdout += d; });
     const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error('audit script timeout (120s)')); }, 120_000);
+    // Resolve only once BOTH the process has exited AND its stdout stream has
+    // fully drained ('end'). For large output (the audit prints thousands of
+    // lines) 'close' can fire while the final pipe chunk — which carries the
+    // JSON `summary` tail — is still buffered, truncating the captured stdout.
+    let exitCode: number | null = null;
+    let processClosed = false;
+    let streamEnded = false;
+    const tryResolve = () => {
+      if (processClosed && streamEnded) {
+        clearTimeout(timer);
+        resolve_({ status: exitCode ?? -1, stdout });
+      }
+    };
+    child.stdout.on('end', () => { streamEnded = true; tryResolve(); });
     child.on('error', (err) => { clearTimeout(timer); reject(err); });
-    child.on('close', (code) => { clearTimeout(timer); resolve_({ status: code ?? -1, stdout }); });
+    child.on('close', (code) => { exitCode = code; processClosed = true; tryResolve(); });
   });
 }
 
