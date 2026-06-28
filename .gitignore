@@ -49,6 +49,10 @@ coverage/
 .deckent/routing/
 .deckent/config.json
 .deckent/config.json.bak.*
+# Identity provider runtime DB (ADR-092) — local state, like .brain/memory.db
+.deckent/identity.db
+.deckent/identity.db-wal
+.deckent/identity.db-shm
 .deckent/crashes/*.log
 !.deckent/crashes/.gitkeep
 .deckent/settings.local.json
@@ -168,6 +172,7 @@ docs/core-memory/
 # swept by git clean/stash — gitignoring removed git's protection. Track them, don't ignore.
 # The separate PUBLIC product repo excludes these via its own export tooling, not gitignore here.
 .brain/archive/
+!.brain/archive/
 # Test temp dir leaks + editor backups (not source)
 .test-archive-debt-*/
 *.md.bak
