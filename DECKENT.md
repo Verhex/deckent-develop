@@ -3,6 +3,12 @@
 ## Identity
 @.deckent/workspace/IDENTITY.md
 
+## 🧭 Aktif Yön (2026-06-29 pivot — Hermes-vs-Deckent analiz turu)
+İş-planı SSOT: `docs/MASTER-PLAN.md` (tek pillar-tablo; eski hali `docs/archive/MASTER-PLAN-archived-2026-06-29.md`). Yön detayı: `.analysis/hermes-vs-deckent-direction-decisions.md`.
+- **Terminal** = ana yönetim+kullanım yüzeyi (tool-driven, derin, full-control+yormayan); iş CLI değil terminalden (CLI/MCP opsiyonel). **Dashboard** = yalnız izleme.
+- **P0:** training-trace WIRE · runtime-wide ApprovalBroker (çok-ortam canlı onay) · Hermes-rol-model tool + progressive disclosure · global-install+proje-scope · DIRECTIVES 0-kırılganlık.
+- **Koru (yeniden-yazma YOK):** deterministik 8-faz eval-backed orchestration · kapalı outcome→routing→promotion öğrenme · governance-by-construction.
+
 ## Rules
 - Brain is the ONLY orchestrator — workers never plan
 - Workers stay within assigned scope (directories + filesWrite)

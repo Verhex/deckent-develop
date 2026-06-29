@@ -62,7 +62,8 @@ Auto-memory lazy yüklenir (topic dosyaları yalnız okunca gelir); bu yüzden g
 - **Sprint'ler CLI'dan** (`env -u ANTHROPIC_API_KEY deckent …`), MCP'den start/run/plan değil.
 - **Disk-verify ground truth** — Brain sentetik NO_GO'ya güvenme; `git diff --stat`/`git ls-files` ile doğrula.
 - **haiku yalnız doc** — kod/tsx'e route etme.
-- **İş-takip SSOT** = `docs/MASTER-PLAN.md` §10 + memory `work_tracking_ledger`; aktif öncelikler MEMORY.md tepesinde pinned.
+- **İş-takip SSOT** = `docs/MASTER-PLAN.md` (tek pillar-tablo, 209 madde, Durum+Tarih sütunlu) + memory `work_tracking_ledger`; aktif öncelikler MEMORY.md tepesinde pinned. Eski plan: `docs/archive/MASTER-PLAN-archived-2026-06-29.md`.
+- **🧭 Aktif Yön (2026-06-29 pivot — Hermes-vs-Deckent analiz turu):** terminal = ana yönetim+kullanım yüzeyi (tool-driven, derin, **full-control + yormayan**; iş CLI değil terminalden, CLI/MCP opsiyonel) · dashboard = yalnız izleme. **P0:** training-trace WIRE · runtime-wide ApprovalBroker (çok-ortam canlı onay) · Hermes-rol-model tool + progressive disclosure · global-install+proje-scope · DIRECTIVES 0-kırılganlık. **Koru (yeniden-yazma YOK):** deterministik 8-faz eval-backed orchestration · kapalı outcome→routing→promotion öğrenme · governance-by-construction. Detay: `.analysis/hermes-vs-deckent-direction-decisions.md` + memory `project_hermes_deckent_direction_2026_06`.
 </operating_rules>
 
 <rules>
@@ -131,12 +132,12 @@ Komutlar: `deckent status`, `deckent history`, `deckent retro`, `deckent recall 
 ## Sprint Metrics
 | Metric | Value |
 |--------|-------|
-| Sprint | sprint-344 |
-| Total Tasks | 3 |
-| Completed | 3 |
-| Tech Debt | 1 |
-| No-Go | 0 |
-| Duration | 2dk 9sn |
+| Sprint | sprint-346 |
+| Total Tasks | 24 |
+| Completed | 13 |
+| Tech Debt | 0 |
+| No-Go | 11 |
+| Duration | 14dk 34sn |
 | Coverage | N/A |
 
 ## Active Debt
@@ -145,5 +146,4 @@ _No tech debt record._
 ## Agent Performance
 | Agent | Tasks | Done | Success |
 |-------|-------|------|--------|
-| security-auditor | 1 | 1 | 100% |
-| bug-fixer | 2 | 2 | 100% |
+| doc-writer | 24 | 13 | 54% |

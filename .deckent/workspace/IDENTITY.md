@@ -6,7 +6,8 @@ Language: TypeScript (ESM)
 Test: vitest
 Build: tsc
 Runtime: Node.js >=24.0.0
-Platform: macOS, Linux, WSL2
+Platform: macOS, Linux, Windows (native), WSL2
+Direction (2026-06-29 pivot): terminal-first ürün (tool-driven, derin, full-control+yormayan); dashboard=yalnız izleme. P0: training-trace WIRE · runtime-wide ApprovalBroker · Hermes-rolemodel tool+progressive-disclosure · global-install+proje-scope · DIRECTIVES 0-kırılganlık. Moat KORU (deterministik orchestration + kapalı-öğrenme + governance). SSOT: docs/MASTER-PLAN.md · detay: .analysis/hermes-vs-deckent-direction-decisions.md
 <!-- AUTOGEN:START id="identity-tests" -->
 Tests: 25,323 descriptors (parsed from tests/**/*.test.ts(x))
 Coverage: 88.58%

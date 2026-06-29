@@ -1,143 +1,168 @@
-# Deckent — Ana Plan (Türkçe)
+# Deckent — Ana Plan (Türkçe okuma-companion'ı)
 
-> **Durum:** KANONİK geliştirme planının Türkçe sürümü. İngilizce kaynak + her zaman güncel: [`docs/MASTER-PLAN.md`](MASTER-PLAN.md). Bu TR sürüm Alperen incelemesi için; çelişki olursa EN sürüm esastır.
-> **Son uyum:** 2026-06-02 (Sprint 218 kapandı, Sprint 219 aktif). **Sürüm:** v1.0.0-beta.1.
-> **Doküman rolleri:** `MASTER-PLAN.md` = NASIL geliştiriyoruz (yol haritası — geliştirme SSOT). `docs/vision/blueprint.md` = deckent NE'dir/NEREDE (kimlik SSOT).
-
----
-
-## 1. Kuzey Yıldızı & Vizyon
-
-**Deckent, makinende yaşayan, sprint'lerini çalıştıran ve asla eve telefon etmeyen, kur-ve-çalıştır bir AI agent orkestratörüdür.**
-
-Üç değişmez sütun:
-1. **Sağlayıcı-bağımsız** — herhangi bir LLM: bulut aboneliği *veya* yerel Ollama, sıfır-API-key seçeneğiyle. Vendor kilidi yok.
-2. **Sohbet-odaklı** — `claude` gibi çalışan native chat REPL (`deckent` / `deckent chat`); terminal, web UI ve IDE'den erişilir.
-3. **Üç-yüz (Trinity)** — tek motor, üç kitle: geliştirici / kurum / birey.
-
-**Lisans & model:** MIT, sonsuza dek ücretsiz. "Pro" katman yok, "team" planı yok, kapılı-özellikli enterprise edition yok. Dogfood döngüsünü çalıştıran aynı kod 10.000 kişilik şirkette de çalışır (ADR-033).
-
-**Moat — evrimsel mimari:** Deckent her sprint'ten öğrenir. Brain kendi retro'larını okur, routing sonuçları agent/skill seçimini besler, prompt-evolution + adaptive-agent davranışı zamanla ayarlar. Bu kendini-iyileştirme döngüsü — tek bir özellik değil — ana farklılaştırıcıdır.
-
-**Konumlandırma (2026-06-02 — "anti-X" dili YOK; kıyasla, kötüleme):** Deckent, **açık bir agent'ın god-level orkestre + enterprise katmanı** — ve bu gücü **tek bir kullanıcının bile zahmetsiz kullanabileceği** kadar kolay. Bir geliştiricinin laptop'undan 10.000 kişilik kuruma kadar tek MIT ürün. **"Open source for open world."** Rakipleri (Devin, Cursor, Claude Code, Cowork, Perplexity, açık agent CLI'lar) yetenek üzerinden kıyaslarız; asla "anti-X" konumlanmayız.
-
-**Veri mimarisi:** İki dik (ortogonal) DB kavramı:
-1. **Deckent'in kendi orkestrasyon belleği** = `.brain/memory.db` — gömülü **SQLite + FTS5**, per-proje, zero-config, asla-eve-telefon-etmez. ADR/sprint/retro/pattern/debt tek kaynağı. **SQLite KALIR** — hedef proje Postgres/Oracle kullansa bile taşınmaz.
-2. **Hedef projenin verisi** (örn. Postgres/Oracle ERP) = connector/capability işi — Capability Broker (F8 `db.query`/`erp.read`, önce read-only) + RBAC + onay kapısı ile erişilir.
-- **Vektör DB / embeddings:** opsiyonel post-GA (semantik recall); yerel embeddings (RTX 5090 Ollama) — never-calls-home korunur. FTS5 mevcut ölçekte yeterli.
-
-**Pozisyon evrimi:** Deckent artık sadece "kurduğun ürün" değil — **AI runtime ekosistemi**: (a) bireysel geliştiricinin orkestratörü, (b) bireyin otonom agent'ı, (c) kurumun god-level orkestrasyon ekosistemi — milyon-kullanıcı/ortam/agent ölçeğinde. Kolay kurulum, düşük gereksinim, öğrenen/evrilen. Enterprise (ERP dahil) ayrı edition değil, *runtime hedefi* (ADR-033 geçerli).
+> **Rol:** Kanonik iş-planının **Türkçe okuma + önceliklendirme companion'ı**. **Canlı tek-kaynak (SSOT)** —
+> 9-sütunlu wide tablo + gelecekteki **Sıra** sütunu — `docs/MASTER-PLAN.md`'dedir; çelişki olursa **o** esastır.
+> **Yenileme:** 2026-06-29 (analiz turu + Alperen detaylı yön pass-2 + Codex gap-fold). **Arşiv:** `docs/archive/MASTER-PLAN-archived-2026-06-29.md`.
+> **Kaynaklar:** `.analysis/hermes-vs-deckent-claude-analysis.md` · `.analysis/hermes-vs-deckent-analysis.md` · `.analysis/hermes-vs-deckent-direction-decisions.md`.
+> İm: ⬜ Açık · 🟡/◑ Kısmi · 🔬 Araştırma · ⏸️ Ertelendi · ✅ Tamam. Kaynak: A=Alperen · CL=Claude · CX=Codex(gap) · MP=eski-backlog.
+> **Sıralama:** Önceliklendirme adımında **Sıra** sütunu / satır-reorder yapılacak (Alperen ile — sonraki adım).
 
 ---
 
-## 2. Trinity — Üç Yüz (olgunluk)
+## 1. Kuzey Yıldızı (2026-06-29)
+**Deckent = local-first AI orkestrasyon kabuğu. Terminal çalıştırır · Dashboard açıklar · Çekirdek orkestre eder · Enterprise yönetir.**
+- **Terminal** = ana yönetim+kullanım penceresi (kalp); **tam kontrol + yormayan + tam işlevsellik (esneklik=kabul-edilmez)**;
+  tool-driven + conversational; iş CLI değil terminalden — ama zorlamadan (CLI/MCP opsiyonel).
+- **Dashboard** = yalnız izleme/görsel-anlama; **chat Desktop-app tarafında**; sonra Electron CC-Desktop ürünü.
+- **Çekirdek Hermes'ten daha derin → terminal+tool'da daha İYİ olmak zorunda.** Kopyalama yok: rol-model al, daha iyisini kur.
+- **Deckent global kurulur (sistem-seviye), öğrenimler proje-scope.**
 
-| Yüz | Kitle | Mod | Olgunluk | 100%'e açık |
-|-----|-------|-----|----------|-------------|
-| **AI Geliştirici** | Geliştirici | Sprint Mode | ~90% | F1-004/005 docker provider-aware → 95% |
-| **AI Sistem İşçisi** | Kurum | Process Mode | ~80% | F3-004 k8s + F7-006 enterprise UI → 90%+ |
-| **AI Asistan** | Birey | Chat Mode | ~80% | F2 streaming + native-chat-everywhere + otonom REPL → 90%+ |
+## 2. Yeni/Önemli Eklemeler (bu tur)
+- **APP Protocol + SDK** (topluluk-hediyesi, MCP gibi) · **DIRECTIVES 0-kırılganlık** (tüm modlar) · **ONB global-install + proje-scope** ·
+  **worker-prompt token-opt** + scope'u TOOL ile çöz · **agent-skill expansion** · **PROV first-class** (cost/limit/bildirim/fallback/hız/kalite/güvenlik) +
+  subs-paket + sözleşme-engelleri · **APR §11 tam** (broker/store/eventstream/shell-client/worker-gate/policy/fallback/contract) ·
+  **TERM §9 tam** (Ask/Run/Control + simple-task-flow + /connect + resume + busy + catalog-badge + compat-matrix + RPC) ·
+  **ADR-layering + AEGIS-redesign + modülerleşme** (solo/enterprise) · **6-dil i18n** · **WIN Azure-ERP** · **PERF local/VPS** · izole-ortam + git-soyutlama.
 
-Tek motordan üç yüz; paralel olgunlaşır, sırayla değil.
-
----
-
-## 3. Güncel Durum (Sprint 218 kapandı, 2026-06-02)
-
-- **Sprint 218 ✅ DONE** — Dashboard God-Level: git self-mutation guard (deckent-dev tree reset koruması), sprint-start detach (serve donmuyor), 4 hollow sayfa route+sidebar'a bağlandı, ChatPage gerçek round-trip, native UI (theme/use-live-data/Layout). ADR-080. Dashboard 8 sayfa **tarayıcıda doğrulandı** (Layout navItems kök-fix).
-- **Sprint 216 ✅ DONE** — Proof-of-Function DoD (ADR-079): `isUserSurfaceTask` Tier-0/1, sprint-içi Smoke gate, serve localhost API-token auto-mint FIXED (run-proven /api/status 200). Sprint 216 git-reset-wipe olayı → Sprint 218'de kurtarıldı + git-guard eklendi.
-- **Sprint 211-215:** F5 evrim wire (6 modül canlı, ADR-075), routing skill→agent affinity, CI-hermeticity kalıcı (test:ci-sim), 8-provider fleet (DeepSeek/Qwen/GLM register + overflow), evrim moat görünür.
-- **Test:** ~18.880 geçti + dashboard ~742, 0 fail, `tsc` temiz. CI yeşil.
-- **Memory katmanı işlevsel (kanıtlı 2026-06-02):** memory.db 6MB, 487 entry (adr/sprint/retro/pattern/debt/memory), 11 tablo, FTS5 dual-layer i18n recall (TR+EN). Token-azaltma + AI-projeyi-unutmama amacı gerçek.
-- **Motor:** PLAN→SPAWN→EXECUTE→EVALUATE→FIX→RETRO→DECAY→CLEANUP; 3 backend (docker/tmux/subprocess); 15 agent + 21 skill; routing-engine v2; Memory V2; 32 MCP tool + 8 resource; 49+ CLI; React dashboard (8+ sayfa) + embedded terminal; VS Code extension.
-
-**🔴 Proof-of-Function dersi:** "DONE" ≠ kullanıcı-çalışıyor. Mock test wiring'i kanıtlar, UX'i değil. User-surface task'lar gerçek-binary `Smoke:` ile doğrulanır (ADR-079, kodda canlı).
-
----
-
-## 4. Özellik Matrisi (F1-F10 özet)
-
-- **F1 Sağlayıcı bağımsızlık ~95%** — Ollama + 8-provider fleet (Claude/Gemini/Codex subs + DeepSeek/Qwen/GLM API + local). Kalan: docker provider-aware (F1-004/005).
-- **F2 Native Chat ~90%** — tool-use loop, memory, session resume ✅. Kalan: gerçek streaming (F2-007, Sprint 219), native SDK Path C (F2-008), **`deckent` argümansız agentic REPL (Sprint 219)**.
-- **F3 Process Mode ~85%** — tenant, scheduled-flows, event triggers ✅. Kalan: k8s pod-exec, Workflow Composer.
-- **F4 Enterprise ✅ 100%** — RBAC, audit (HMAC), rate-limit, enterprise config. Kalan (ops): SSO/SIEM derinlik.
-- **F5 Evrimsel ~90%** — 6 modül canlı (ADR-075). Kalan: aktif identity-mutation ölçek (F5-008 ~70%).
-- **F6 Auth Esneklik ~50%** — model katalog ✅. Kalan: hybrid mode tam-wire, auth matrix test, API aktivasyon (post-beta).
-- **F7 Dashboard ~95%** — 8 sayfa route+sidebar, god-level UI, run-proven. Kalan: terminal polish (F7-004), enterprise sayfa API-token.
-- **F8 Capability Broker** ⬜ önerildi (ERP `db.query`/`erp.read` soyutlaması).
-- **F9 MCP Client** ⬜ önerildi (dış MCP server'ları tüketme — yüksek değer).
-- **F10 Policy Engine** ⚠️ kısmi (RBAC+activation+condition birleştirme).
-
----
-
-## 5. Alt-Projeler (Agentic-OS Pipeline)
-- **#1 Embedded Web Terminal** ✅ GA (ADR-062).
-- **#2 Self-security** ⬜ başlamadı.
-- **#3 Milyon-ölçek** ⚠️ kısmi (multi-tenant/mTLS/k8s).
-- **#4 Enterprise entegrasyonlar** ✅ çekirdek (SSO/SIEM ops).
-- **#5 Local LLM (Ollama/CUDA)** ⚠️ kısmi (adapter canlı, fully-local preset eksik).
-- **#ERP** ⬜ önerildi — deckent kurumun *içinde*: süreç otomasyonu, DB read-only, kontrollü yönetim. F3 + F8 + RBAC üstüne.
+## 3. Pillar + Öncelik Haritası
+| Pillar | Açıklama | Öncelik |
+|---|---|---|
+| TERM | Terminal-shell (3-mod + simple-flow + /connect + chat + kategorili-komut + onay-etkileşimi + compat) | P0 |
+| APR | Runtime-wide ApprovalBroker + tam §11 (store/eventstream/policy/fallback/contract) + çok-ortam relay | P0 |
+| TRN | Training-trace WIRE + label + pipeline mükemmelleştir (usage-cost kritik) | P0 |
+| TOOL | Hermes rol-model + progressive disclosure + registry-mekaniği + scope-via-tools + agent-skill expansion | P0 |
+| ONB | global-install + proje-scope + sohbetle setup + zengin doctor | P0 |
+| MOAT | Çekirdeği koru + güven-bug'ları + worker-prompt-opt + çok-backend orkestre + izole-ortam | P0/sürekli |
+| DASH | İzleme-only + observability panel-seti (chat→Desktop) | P1 |
+| PROV | first-class cost/limit/fallback + subs-paket + sözleşme-engeli + maliyet-uygun matris | P0/P1 |
+| MEM | kırılım + hız + kullanım-denetimi + UserMemory + background-review | P1 |
+| MODE | tüm modlar uçtan-uca + DIRECTIVES 0-kırılganlık + cost-limit organizma | P0/P1 |
+| WIN | native Windows + tmux/docker gözlem + Azure-ERP kalp-adayı | P1/P2 |
+| MSG | integration layer + session-continuity | P1 |
+| MCP | sığ→enterprise + trust gate | P1 |
+| DESK | Desktop+Mobile app + chat (terminal-sonrası) | P2 |
+| ENT | theater-temizliği + tek-policy-gateway + IFS-write (sonra) | P2 |
+| GOV | ADR-tutarlılık + ADR-layering + AEGIS-RD + layer-cleanup + dormant + god-object | P1/P2 |
+| PERF | local-RAM/worker + VPS/VDS + cold-start/index/observability | P1/P2 |
+| DOCS/I18N/OFFLINE/SDK/LAUNCH | docs + 6-dil + air-gap + APP/SDK + modülerleşme + OSS/GA | P1/P2 |
 
 ---
 
-## 6. Native Chat Everywhere + Otonom Agentic (öncelik)
+## 4. İş Maddeleri (pillar-gruplu — okuma + önceliklendirme)
 
-Hedef: `deckent` terminalde `claude` gibi native conversational agentic REPL. **Sprint 219 = "Native Agentic Deckent":** `deckent` argümansız → agentic REPL, doğal dil → MCP aksiyon (onay kapılı) + session persist + F2 streaming.
+> Aynı maddeler; canlı 9-sütun + Sıra `MASTER-PLAN.md`'de.
 
-**🤖 Otonom agentic runtime (yön):** on-demand sprint'in ötesinde — deckent **sürekli + yetki-sınırlı** çalışır (sipariş takip, MRP, müşteri talebi → RBAC+onay sınırında aksiyon). Temel: F3 + scheduled-flows + nervous + Capability Broker (F8 ERP) + ADR-037. Sprint 219-014 iskelet.
+### 🟥 P0 — Publish-öncesi kalp
+
+**TERM — Terminal** (tam-işlevsellik şart, esneklik yok)
+- **TERM-1** Açılış health snapshot (provider/model/auth/MCP/mem/cwd/mode) [A·CL·⬜]
+- **TERM-LIVE** Çalışırken canlı run-status footer (1-5 satır, 5 soru) + provider-health+auth [CX·A·⬜]
+- **TERM-MODE** Ask/Run/Control 3-mod shell (read-only / plan→approve→run→eval / yönetim) [CX·⬜]
+- **TERM-FLOW** Simple-task altın akış: NL prompt→plan-preview→approve→run→evaluate [CX·A·⬜] ⭐ en yüksek-sinyal
+- **TERM-2** Conversational chat (Hermes user-msg); bg-tamamlanan→yeni turn [A·⬜]
+- **TERM-3** Kategorili komut keşfi (Core/Run/Memory/MCP/Enterprise/Danger; tek registry) [A·CL·CX·⬜]
+- **TERM-4** Tool-driven terminal (CLI değil; CLI/MCP opsiyonel) [A·⬜]
+- **TERM-CONNECT** `/connect` wizard (provider/MCP/IDE/Windows-shell + auto-detect + health-badge) [CX·⬜]
+- **TERM-5** Görsel/işlevsel tutarlı-yormayan dil + sade risk-dili (Oku/Değiştir/Çalıştır/Otonom) [A·CX·🔬]
+- **DIR-1** Terminalde NL "planla" → DIRECTIVES üret (el-yazımı sabit-format yerine) [A·⬜]
+- _(P1 TERM: TERM-CAT, TERM-RESUME, TERM-BUSY, TERM-COMPAT, TERM-SIMPLE, TERM-RPC, F2-008, F11-014/016, TERM-NAT, F7-004, REPL-001 — aşağıda)_
+
+**APR — Approval/Control** (§11 SIFIR-kayıp)
+- **APR-1** Runtime-wide ApprovalBroker (event; worker emit→suspend→resume) [A·CL·CX·⬜] ⭐ İLK madde
+- **APR-SHELLCLIENT** Ink approval card (y/n/a/d) REPL altında [CX·⬜]
+- **APR-WORKERGATE** WorkerApprovalGate (riskli aksiyon öncesi broker-karar bekle) [CX·⬜]
+- **APR-DUALSTREAM** Terminal çift-stream (run-status + approval) + confirm-queue runtime-wide [CX·⬜]
+- **APR-2** Çok-kanallı canlı relay + "xx'de onaylandı" cross-broadcast [A·⬜]
+- **APR-EVENTSTREAM** ApprovalEventStream (terminal/dashboard/API/Slack/Teams) [CX·⬜]
+- **APR-STORE** ApprovalStore durable persist (restart-survive) [CX·⬜]
+- **APR-CONTRACT** Tam kontrat (requester/summary↔details/scope-7/risk-5/policy-4/default-4/tenant-user) [CX·A·⬜]
+- **APR-POLICY** ApprovalPolicy karar-motoru (risk/role/tenant/scope/timeout) [CX·⬜]
+- **APR-FALLBACK** FallbackResolver (terminal-yok → deny/pause/timeout/escalation) [CX·⬜]
+- **APR-4** Redaction/secret-masking (raw vs masked-arg) [CL·CX·⬜]
+- _(P1: APR-ALLOWSCOPE, APR-CLIENTS, APR-HISTORY, APPROVE-007b, CKPT-1 — aşağıda)_
+
+**TRN — Training-trajectory** (usage-cost kritik, atlamayalım)
+- **TRN-1** trace-recorder → sprint-worker turn'lerine WIRE (redacted+labeled) [A·CL·⬜]
+- **TRN-2** trace-recorder → native-REPL WIRE (0-caller) [CL·⬜]
+- **TRN-3** cc-trace-extractor driver (0-caller) [CL·⬜]
+
+**TOOL — Tool sistemi** ("deckenti deckent yapan")
+- **TOOL-1** Deckent fonksiyonlarını tool-yüzeyine taşı (terminal-native dispatch) [A·⬜]
+- **TOOL-2** Progressive tool/action disclosure: core + searchable bridge [A·CL·CX·⬜]
+- **TOOL-SCOPE** Scope-enforcement'ı prompt yerine TOOL ile çöz (worker out-of-scope tool-gated) [A·⬜]
+- _(P1: TOOL-CORE, TOOL-REG, TOOL-CAT, AGSK-1 agent-skill-expansion, PARITY-1; P2: TOOL-CU, TOOL-4)_
+
+**ONB — Onboarding** (global-install revizyonu)
+- **ONB-GLOBAL** Global/sistem-kurulum + proje-scope katman + öğrenimler proje-scope (Deckent global-tutarlı) [A·⬜] ⭐ kesin-revize
+- **ONB-1** install→init wizard (provider/auth/MCP/workspace/mode + sistem-tarama) [A·CL·⬜]
+- **ONB-CHAT** "deckent" → sohbetle tüm setup + Deckent özellik-önerir (CLI/MCP yine çalışır) [A·⬜]
+- **ONB-2** Zengin doctor (--fix + windows-native + auth-state probe) [A·CL·⬜]
+
+**MOAT — Koru/sertleştir + token-opt**
+- **MOAT-1** WORKTREE-MERGE-RACE (8-wide'da 3/11 source-merge düştü) [MP·⬜] 🔴
+- **MOAT-2** ORPHAN-START-PROC (normal-completion coordinator lingers) [MP·⬜] 🟠
+- **MOAT-4** Deterministik orchestration + kapalı-öğrenme + governance KORU [A·CL·✅(koru)]
+- **WP-OPT** Worker-prompt token-opt (aynı kalitede min-token + tekrar-azalt; scope→TOOL) [A·⬜]
+
+**Diğer P0:** **PROV-FC** (first-class cost/limit/bildirim/fallback/hız/kalite/güvenlik) [A·⬜] · **F1-TOK** token/limit-ledger [MP·🟡] · **DIR-2** DIRECTIVES 0-kırılganlık tüm modlar+ilk-proje-safety [A·⬜] · **MEM-4** self-evrim koru [A·✅]
+
+### 🟧 P1 — Solo benimsenme + olgunlaşma
+
+**TERM (kalan):** TERM-CAT tool/action-catalog+badge [CX·CL] · TERM-RESUME recent-session+`/resume` picker [CX] · TERM-BUSY `/queue`+`/interrupt`+`/steer`+mid-run-steer [CX] · TERM-COMPAT REPL compat-matrisi [CX] · TERM-SIMPLE Simple-Mode 5-7 komut [CX] · TERM-RPC ortak session/action RPC [CX·CL] · F2-008 native-SDK [MP·A] · F11-014 multi-provider parity [🟡] · F11-016 Ink stabilizasyon [🟡] · TERM-NAT native-default-flip [🟡] · F7-004 terminal-hardening [🟡] · REPL-001 slash-parity.
+
+**APR (kalan):** APR-ALLOWSCOPE scoped-always-allow+expiry [CX] · APR-CLIENTS Slack/Teams+API [CX] · APR-HISTORY dashboard audit-report [CX] · APPROVE-007b · CKPT-1.
+
+**TRN (kalan):** TRN-LABEL outcome-taksonomi (success/partial/cancel/NO_GO) [CX] · TRN-4 pipeline-mükemmel [A·CL] · TOK-AUT [🟡].
+
+**TOOL (kalan):** TOOL-CORE eager-core-set [CX] · TOOL-REG registry-mekaniği (cache/toolset/dynamic-schema/generation-memo/shadow) [CX·CL] · TOOL-CAT catalog+trust-tier [CX·CL] · **AGSK-1 agent-skill expansion (kritik)** [A] · PARITY-1.
+
+**ONB (kalan):** ONB-HONEST dürüst-mesaj [CX] · ONB-DISCOVERY CLI-auto-detect [CX] · PSL-6 [🟡] · CFG-1 · DOCTOR-1.
+
+**DASH:** DASH-1 scope-freeze+observability (chat→Desktop) [A·CL·CX] · DASH-PANELS panel-seti [CX·◑] · DASH-2 pending-approval-viewer [A·CL] · DASH-D3 ölü-alan-envanteri [MP].
+
+**PROV:** PROV-1 oauth-subs↔api metrik [A] · PROV-SUBS subs-paket [A] · PROV-CONTRACT sözleşme-engeli+fix (Gemini-CLI subs) [A] · PROV-MATRIX maliyet-uygun-seçim [A] · F1-LIM[✅] · F1-CB[✅] · F1-010 overflow · F1-AD model-detect · F1-PD[🟡] · F1-PCACHE[🟡] · F1-IMG-2 · F1-009r · MF-4/5/7/9 · PSL-2/3/4 · AS2-P3 · AS4-P1 · ROUTE-1[🟡].
+
+**MEM:** MEM-1 kullanım-denetimi[🔬] · MEM-2 kırılım(proje/session) · MEM-3 DB-hız/index · MEM-REVIEW background-review-worker [CX·CL] · UMEM-1 UserMemory.
+
+**MODE:** MODE-1 process-executor · MODE-2 lifecycle-kernel · MODE-3 cost-limit-scheduling · MODE-4 scheduled-run-UX · AUT-9[🟡] · IDLE-SPIN.
+
+**WIN:** WIN-1 native-profil · WIN-PATHS data-dir-split [CX] · WIN-2 tmux/docker-gözlem · WIN-3 ölçek-spawn · SPAWN-1 DEP0190.
+
+**MSG:** MSG-1 integration-layer · MSG-CONT session-continuity [CX] · MSG-2 pairing-onay-buton · MSG-3 WhatsApp · BOT-2d.
+
+**MCP:** MCP-1 sığ→enterprise[🟡] · F9-001 broker-wire · F9-002 discovery+shadow-policy · F9-003 trust-gate.
+
+**MOAT/ORCH (kalan):** MOAT-3 sentetik-NO_GO/eval-vs-disk · ORCH-BE çok-backend-kusursuz-orkestre [A·🟡] · MOAT-ISO izole-ortam-kontrol [A] · MOAT-VCS proje-takip-soyutlama(git) [A].
+
+**GOV (P1):** WM-5 provider-free-enforce[🟡] · LAYER-1 core→cli-inversiyon · DORMANT-1 kablosuz-güvenlik🔴 · DORMANT-2 no-op-knob · DORMANT-3 duplikat · DEADMOD wire-vs-kes · COMM-2 tipli-worker-mesaj · ADR-GOV ADR-tutarlılık · **ADR-LAYER ADR-katmanlama(deckent/proje/global)** [A] · GOV-GATE first-user-gate [CX] · WATCH-W · WM-2 · SEC-1.
+
+**PERF (P1):** **PERF-LOCAL local-RAM/worker-denge** [A] · **PERF-VPS VPS/VDS-ideal-akış** [A] · PERF-1 cold-start · PERF-2 query-index/spawn-SLA · PERF-5 coverage-ratchet.
+
+**DOCS (P1):** DOC-1 docs-perfection[🟡] · DOC-PKG-1 README-link-fix · GITIGN-RT runtime-state-untrack · GA-1 npm-publish.
+
+### 🟦 P2 — Sonraki dalga / ertelenmiş
+
+**DESK:** DESK-CHAT chat→Desktop (eski CHAT-A) [A] · DESK-1 App(Desktop+Mobile,Electron)+interaktif-dashboard [MP·A] · DESK-2 productization(CC-Desktop) [A] · FB-1 opt-in-telemetri.
+
+**ENT:** ENT-T1 theater-temizliği(rbac_roles/rate_rules) [CL] · ENT-T2 enforce_rbac-manuel-path [CL] · **ENT-GATEWAY tek-Enterprise-Policy-Gateway** [CX] · ENT-ROLLOUT L0/L1-read-first [CX] · ENT-1/2/3/5[🟡] · F8-003[🟡] · ERP-1 write-side[⏸️] · ERP-2 IFS-round-trip[⏸️] · SCALE-1/2 · WIN-ERP Azure-ERP-kalp-adayı [A] · TEAM-1.
+
+**GOV/SDK (P2):** **ADR-REVISION** (yalnız-Alperen-onayı, 80-ADR)[⏸️] · **AEGIS-RD** AEGIS→Deckent-özel-global-agentic-metod [A] · **MODULARIZE** deckent-solo/enterprise iki-lisans (ADR-revizyon-sonrası)[⏸️] · **APP-1** Agentic-Process-Protocol+SDK topluluk-hediyesi [A] · SDK-1 embed-SDK[⏸️] · GOV-CROSSWALK[◑] · WM-3/4 · GODOBJ · PERF-3/4 · DOC-2/35.
+
+**I18N/OFFLINE:** **I18N-6** 6-dil(en/tr/zh+3) sıfır-hardcode [A] · AS7-1/2/3/4 air-gap.
+
+**LAUNCH:** GA-2 repo-flip+scrub · GA-3 .github+landing · HUB-1 DeckentHub · PB-1 Voice · PB-3 AEGIS-method.
 
 ---
 
-## 7. İş Streamleri (özet)
-- W-A OSS GA blocker ✅ | W-B doc-drift ⚠️ | W-C native chat (Path B✅, A/C devam) | W-D dashboard ✅ (Sprint 218) | W-E evrim ✅ | W-F provider ✅P0 | W-G API test ✅ | W-H doküman ⚠️ | W-I OSS publish ⬜ | W-J milyon-ölçek hardening ⬜ post-beta | W-K dead-code wire ✅
+## 5. Korunacak Moat (yeniden-yazma YOK)
+Deterministik 8-faz eval-backed orchestration · Kahn dependency-wave + atomic file-lock · 9-adım eval + disk-vs-claim dürüstlüğü ·
+kapalı outcome→routing→promotion öğrenme döngüsü (en güçlü subsystem) · governance-by-construction (yapısal read-only) · 2x test
+disiplini · HMAC tamper-evident memory.
+
+## 6. Bağlayıcı Kurallar (özet)
+🔒 3 yasa (çift-bakış+ölçek · her-ortam cross-platform · MVP ASLA) · Türkçe · `.brain/memory.db` silinmez · sprint'te build/login yok ·
+sprint kill/cleanup + commit Alperen-onayı · disk-verify · proof-of-function · i18n-first (asla hardcode).
 
 ---
 
-## 8. İş / Lansman / OSS
-- **Model:** MIT, ücretsiz, self-hosted. **TEK ÜRÜN** — open-core/Odoo-tarzı ayrı Enterprise Edition YOK (karar 2026-06-02). Enterprise yetenekleri aynı kodun modüler açık katmanları (`core` + `enterprise-layer`). ADR-033.
-- **Beta:** v1.0.0-beta.1, OSS public beta 2026-06-01. İlk `npm publish` = Alperen manuel.
-- **Kıyaslama (kötüleme değil):** çok-agent paralel + sprint lifecycle + scope enforcement + memory/learning + multi-provider + MCP-native birleştiren tek OSS aracı. **"Open source for open world."**
-- **Yayın boru hattı eksikleri (GA):** secret-scrub (gitleaks/git-filter-repo) — public flip öncesi ŞART; `.github/` ISSUE/PR template (kısmen var), 96%-claim doğrula, threat-model, landing page. → Sprint 220.
-
----
-
-## 9. Beta Kapıları
-20 kapı geçti: tsc temiz, ~18.880 test + dashboard 742, coverage, 32 MCP + 49 CLI, npm pack, cross-platform, multi-provider, i18n, Memory V2, sıfır CRITICAL debt, ADR governance, disk-verify gate. **CI YEŞİL** (aylarca kırıktı, Sprint 214'te yeşertildi). Kalan: README badge sync, 96%-claim benchmark, messaging trio token aktivasyon, M1-M4 monitoring.
-
----
-
-## 10. Sıralama (Sprint 219+)
-- **219** 🔄 **AKTİF** — Native Agentic Deckent (16 task, 7 dalga, 10 worker). DALGA A: `deckent` argümansız → agentic REPL, chat round-trip, REPL UX god-level. DALGA B: agentic tool-use (doğal dil → MCP aksiyon, onay kapısı, session persist). DALGA C: F2 streaming (token-stream SSE + dashboard render). DALGA D: dashboard nav tek-kaynak + cache-bust (8-sayfa kalıcı). DALGA E: TR MASTER-PLAN + ADR-081. DALGA F: blueprint.md + otonom runtime iskeleti. DALGA G: plan-akış wire-gap (routeTaskV2 surface-bonus + Smoke-field taşıma).
-- **220 adayı** — GA-readiness (secret-scrub + .github + 96%-claim + threat-model) + otonom agentic tam-wire + onboarding/everywhere (6-senaryo preset).
-- **post-beta** — provider/local-LLM, milyon-ölçek hardening (OTel), self-security, F8/F9/F10 ekosistem.
-- **gated** — Voice (10K star), Mobile (50K star).
-
----
-
-## 11. Çapa Kuralları / DNA
-- **MVP yok, hep god-level** ("bu god-level mi?").
-- **Disk-verify + run-verify ground truth** — Brain verdict'e değil, diske/gerçek-koşuya güven.
-- **Proof-of-Function DoD** — user-surface DONE = gerçek-binary kanıt.
-- **Subscription-first** (API mode beta'da yasak).
-- **npm publish = Alperen manuel.**
-- **Karpathy 4-disiplin** worker çapası.
-- **git self-mutation guard** — deckent-dev tree'sinde worker-spawn reset YAPMAZ (ADR-039).
-- **ADR-033** tek-ürün · **ADR-037** RBAC · **ADR-040** nervous · **ADR-079** Proof-of-Function · **ADR-080** dashboard.
-
----
-
-## 12. Riskler
-1. Routing collapse (refactorer-ağırlığı) → surface-bonus + diversity guard (çözülüyor).
-2. Native-chat scope creep → sıkı sıra.
-3. Doc-reality drift → MASTER-PLAN tek SSOT.
-4. ✅ git self-mutation (Sprint 216 kaybı) → guard ile çözüldü.
-5. ✅ CI red → çözüldü (hermeticity).
-
----
-
-## 13. Kapsam Dışı (kayıpsız kayıt)
-Cloud SaaS (ADR-033 red), Microsoft-ekosistem core (opsiyonel post-GA), LangSmith (never-calls-home ihlali), ayrı Enterprise Edition (tek-ürün kararı), extra provider adapter'lar (P3+), `deckentd` daemon (gereksiz).
-
----
-
-*Geliştirme tek-kaynağı EN sürümdür: [`docs/MASTER-PLAN.md`](MASTER-PLAN.md). Bu TR özet ilerleyişe göre senkronlanır.*
+*Canlı tek-kaynak (wide tablo + Sıra sütunu): `docs/MASTER-PLAN.md`. Tam detay/done-history: `docs/archive/MASTER-PLAN-archived-2026-06-29.md`. Çelişki olursa EN sürüm esas.*
