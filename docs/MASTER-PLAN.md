@@ -275,6 +275,14 @@
 | LOCALE-W | GOV·I18N | Instruction-file adapter locale-leak fix (pure-adapter, per-doc lang) — ADR-013-W + ADR-029-W | ADR-rev | P1 | — | ⬜ | — | ADR-G-004/G-015; I18N-6 bağ |
 | MEM-VECTOR | MEM | Memory vector-layer (sqlite-vec opt-in, never-calls-home) semantic-recall | ADR-rev | P2 | MEM-3 | ⬜ | — | ADR-G-035 tomorrow |
 | SELFMOD-W | GOV·MOAT | Self-modify detection P1-P3 rollback-guard wire-ya-formalize + global-install discrimination | ADR-rev | P2 | ROLE-GUARD | ⬜ | — | ADR-G-021 tomorrow (P1-P3 dormant) |
+| LINT-SPAWNSYNC | GOV | `lint-no-spawnsync` mechanical hard-gate (yeni spawnSync allowlist-dışı→fail; hot-path-folder reddi) | ADR-rev | P0 | — | ⬜ | — | ADR-D-002-W1; lint-test-hermeticity modeli |
+| STATE-RESOLVER | GOV·ONB·MOAT | Tek env-aware state-path resolver (DECKENT_HOME/BRAIN_HOME/HOME); ~150 hardcoded .deckent/.brain join→resolver (0 bugün) | ADR-rev | P1 | — | ⬜ | — | ADR-D-002 W3-precond; cross-cut ADR-G-001 global-install + ADR-G-017 isolation; ONB-GLOBAL bağ |
+| CISIM-OVERLAY | GOV | `test:ci-sim` rename→sandbox-overlay (HOME/DECKENT_HOME/BRAIN_HOME→tmpdir; SIGKILL-safe) | ADR-rev | P1 | STATE-RESOLVER | ⬜ | — | ADR-D-002-W3; resolver'a gated; rename SIGTERM-safe yeter |
+| TEST-NETDENY | GOV | Default-suite network/docker/provider default-deny + integration-profile tag | ADR-rev | P1 | — | ⬜ | — | ADR-D-002-W4 |
+| TEST-ENVSNAP | GOV | env/cwd/timer/port/TZ snapshot-restore helper'ları (C7 SHOULD→MUST) | ADR-rev | P1 | — | ⬜ | — | ADR-D-002-W5 |
+| TEST-LOCALFULL | GOV·DOCS | `test:local-full` canonical bounded-script (≤16GB WSL, fork-bounded, split root/dashboard) | ADR-rev | P1 | — | ⬜ | — | ADR-D-002-W6; feedback_vitest_16gb |
+| TEST-INTTAX | GOV | Integration-test profile taksonomisi (unit/hermetic-CI/integration/provider-smoke) | ADR-rev | P2 | — | ⬜ | — | ADR-D-002-W7 |
+| TAXONOMY-READPATH | GOV | ADR taksonomi-kolonları (adr_class/immutable/scope/source_authority/enforcement_level) memory-store read-mapping'e bağla (şu an WRITE-ONLY; getById expose etmiyor) + class/scope-aware-recall'ı kolon-tabanlı doğrula | ADR-rev | P1 | — | ⬜ | — | ADR-G-019; migration kolon-yazdı, read-path eksik |
 
 ---
 
