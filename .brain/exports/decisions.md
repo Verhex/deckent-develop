@@ -812,8 +812,8 @@ Compliance is tracked by the `ADR-006` compliance check (code-key `checkAdr006`,
 
 # ADR-G-004: Instruction-File Adapter & Multi-Env Generation
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=`ensureDeckentImport` never-overwrite guarantee + `agent-templates.ts` per-env generators + `docs.json` pure-adapter exclusion (ADR-013-W locale-leak fix) → tomorrow=data/registry-driven generator (low-maintenance) + global+project scope
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-013 (DECKENT.md Adapter Pattern), ADR-018 (Multi-Environment Config Generation) · **Supersedes:** —
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=`ensureDeckentImport` never-overwrite guarantee + per-env adapter provisioning + **pure-adapter law** (host instruction files carry NO deckent-authored volatile content, NOT managed-docs) — **⚠️ NOT yet code-true: `claude-md` + `agents-md` are still in `docs.json` as managed-docs (DOCS-PURE-ADAPTER, P0)** → tomorrow=data/registry-driven generator (low-maintenance) + full pure-adapter alignment + global+project scope
+**Status:** accepted (provisional — DOCS-PURE-ADAPTER P0: CLAUDE.md/AGENTS.md still managed-docs; + CURSOR-TARGET-UNIFY + agent-templates disposition) · **Date:** 2026-06-30 · **Absorbs:** ADR-013 (DECKENT.md Adapter Pattern), ADR-018 (Multi-Environment Config Generation) · **Supersedes:** —
 **Crosswalk:** ADR-013 + ADR-018 → ADR-G-004
 
 ---
@@ -822,46 +822,55 @@ Compliance is tracked by the `ADR-006` compliance check (code-key `checkAdr006`,
 
 Two early decisions converged on one law. ADR-013 (Sprint 15) solved a data-loss bug: `deckent init` used to overwrite `CLAUDE.md`, destroying user customizations. ADR-018 (Sprint 046) solved a breadth problem: every IDE / agent host expects its own instruction file (Claude → `CLAUDE.md`, Codex → `AGENTS.md`, Gemini → `GEMINI.md`, Cursor → `.cursor/rules/deckent.mdc`), in different formats and paths.
 
-Both resolved to the **same pattern**: `DECKENT.md` is the single source of truth, and every host-specific file is a **thin adapter** carrying only an `@DECKENT.md` reference — never deckent-authored content, never overwritten. ADR-018's originally-proposed IDE-specific targets (`config.toml`, `settings.json`, `mcp.json`) converged onto this thin-adapter shape instead.
+Both resolved to the **same pattern**: `DECKENT.md` is the single source of truth, and every host-specific file is a **pure adapter** carrying only a `DECKENT.md` reference plus the **user's own** content — never deckent-authored content, never overwritten. ADR-018's originally-proposed IDE-specific targets (`config.toml`, `settings.json`, `mcp.json`) converged onto this thin-adapter shape instead.
 
-A Sprint 281 amendment (ADR-013-W) closed a conflict with the managed-docs system (ADR-029 → ADR-G-015): `docs.json` had been listing `CLAUDE.md` / `AGENTS.md` as *managed-docs*, so every sprint's RETRO render stamped Turkish headings onto these English adapters — a recurring **locale-leak** needing manual revert each sprint. The fix: these files are **pure adapters, NOT managed-docs**; remove them from `docs.json` so nothing renders into them and the leak ends at the root.
+A Sprint 281 amendment (ADR-013-W) surfaced a conflict with the managed-docs system (ADR-029 → ADR-G-015): `docs.json` lists `CLAUDE.md` / `AGENTS.md` as **managed-docs**, so every sprint's RETRO render stamps status sections (Sprint Metrics, Agent Performance) — originally with Turkish headings — onto these host instruction files, a recurring **locale-leak**. The **correct root fix is to make these files pure adapters**: a host instruction file (which is the *user's / project's* file) must never carry deckent's volatile orchestration status — that data belongs only in deckent's own surfaces (`.brain/exports/summary.md`, the dashboard, `deckent status`) and is **referenced, not duplicated** into core files.
+
+> **State-of-code (2026-06-30, honest):** this root fix is **NOT done**. `claude-md` + `agents-md` are **still in `docs.json`** — `claude-md` with `autoSections: ["Sprint Metrics", "Active Debt", "Agent Performance"]` (+ protected `Architecture`/`Commands`), `agents-md` with `autoSections: ["Agent Performance"]`; the seed `docs.json.template` carries `claude-md` too, propagating it to new projects; and `tests/core/task-166-005-docs-identity.test.ts` currently *requires* the `agents-md` managed entry. A partial mitigation narrowed the auto-sections (English headings, protected user-sections) but did **not** remove them. Stamping last-sprint metrics onto core instruction files is the wrong architecture; **DOCS-PURE-ADAPTER (P0)** completes the removal.
 
 ## Decision (Today)
 
-### 1. Single source + pure adapters
-`DECKENT.md` is the one source of truth. `CLAUDE.md`, `AGENTS.md` (+ optional `.codex/AGENTS.md`), `GEMINI.md`, and `.cursor/rules/deckent.mdc` are **pure adapters**: they hold only the injected `@DECKENT.md` reference plus whatever the user writes. They are **never overwritten** and are **not managed-docs** (ADR-013-W) — no sprint render touches them, so no locale-leak.
+### 1. Single source + pure adapters (no volatile content on host files)
+`DECKENT.md` is the one source of truth. `CLAUDE.md`, `AGENTS.md` (+ optional `.codex/AGENTS.md`), `GEMINI.md`, and `.cursor/rules/deckent.mdc` are **pure adapters**: they hold only the injected `DECKENT.md` reference plus whatever the **user** writes. They are **never overwritten** and **must not be managed-docs** — no sprint render, metric, debt table, or agent-performance section is ever stamped into them. Deckent's volatile orchestration status lives **only** in deckent-owned surfaces (`.brain/exports/summary.md`, dashboard, `deckent status`) and host files reference it, never copy it. (This is the constitutional rule; `claude-md`/`agents-md` are removed from `docs.json` by DOCS-PURE-ADAPTER to make it true.)
 
 ### 2. Never-overwrite mechanism
-`ensureDeckentImport` (`src/core/utils.ts`) idempotently injects/preserves the `@DECKENT.md` reference; `deckent sync` (`src/cli/commands/sync.ts`) re-synchronizes all adapters. Init is idempotent and safe — re-running never clobbers user content.
+`ensureDeckentImport` (`src/core/utils.ts`) idempotently injects/preserves the reference. It is **reference-aware**: *any* mention of `DECKENT.md` satisfies the requirement — the `@DECKENT.md` auto-load import **or** a plain on-demand "see DECKENT.md" — and the `@` auto-load form is prepended **only when no reference exists at all**, so a deliberate on-demand (context-trim) choice is respected, never forced back to auto-load. `deckent sync` (`src/cli/commands/sync.ts`) re-synchronizes all adapters. Init is idempotent and safe — re-running never clobbers user content.
 
-### 3. Per-environment generation
-Per-host generators live in `src/cli/helpers/agent-templates.ts` (`generateAgentsMd`, `generateGeminiMd`, `generateCursorRules`, …). `deckent init --all-envs` provisions every environment's adapter in one command. Each generator is an independent module, so adding an environment is additive today.
+### 3. Per-environment provisioning
+Production init provisions adapters **additively** via `applyEnvConfig` → `ensureDeckentImport` (`src/cli/commands/init-steps.ts`), producing pure-adapter files (reference + user content). `deckent init --all-envs` provisions every environment in one command.
 
-| Host | Adapter file (today's real target) |
+> **Legacy surface (not today's enforcement):** `src/cli/helpers/agent-templates.ts` (`generateAgentsMd` / `generateGeminiMd` / `generateCursorRules`) generates **rich** content (project name, commands, rules) — i.e. *not* pure adapters — and has **no production caller** (referenced only by tests). It must not be cited as the live mechanism; its disposition (wire to a correct generator, or mark `@deprecated` / remove) is **AGENT-TEMPLATES-DISPOSITION**.
+
+| Host | Adapter file (single real target) |
 |---|---|
 | Claude Code | `CLAUDE.md` |
 | Codex | `AGENTS.md` (+ optional `.codex/AGENTS.md`) |
 | Gemini | `GEMINI.md` |
 | Cursor | `.cursor/rules/deckent.mdc` |
 
+> **Cursor target is currently scattered** — `cursor-config.ts` writes `.cursor/rules/deckent.mdc`, an init message says `.cursor/rules/deckent.md`, and `sync.ts` treats `.cursor/rules` as a *directory* target. CURSOR-TARGET-UNIFY collapses these to the single `.cursor/rules/deckent.mdc` file.
+
 ## Intent / Roadmap (Tomorrow)
 
-- **Data/registry-driven generator (low-maintenance).** Today each environment is a hand-written generator function. As providers/environments multiply, one hardcoded function per host does not scale — the crosswalk maintenance-note is explicit: move to a **data/registry-driven generator** (one engine + a host registry describing path/format), so a new environment is a registry entry, not new code. This keeps maintenance burden flat as the host matrix grows (Immutable Law #2 — EVERY ENVIRONMENT).
-- **Global + project scope.** Adapter generation/sync becomes scope-aware: a global install seeds host adapters at the user-global layer; project init seeds them per-project — consistent with ADR-G-001's layering.
-- **Provider-adapter parity.** As the Brain itself becomes provider-agnostic (ADR-G-008, BRAIN-PROVIDER-SELFUPDATE), the instruction-file adapter registry is the doc-side sibling of the provider adapter registry — same registry-driven philosophy.
+- **DOCS-PURE-ADAPTER (P0) — make the pure-adapter law code-true.** Remove `claude-md` + `agents-md` from `.deckent/settings/docs.json` **and** the seed `docs.json.template`; update `tests/core/task-166-005-docs-identity.test.ts` and add a regression test asserting the four adapter files are **NOT** managed-docs. The Sprint-Metrics / Active-Debt / Agent-Performance data already lives in `.brain/exports/summary.md` (git-tracked) + the dashboard + `deckent status`, so removal loses no information — it stops polluting the user's core instruction files.
+- **CURSOR-TARGET-UNIFY (P1).** Collapse the Cursor target to the single `.cursor/rules/deckent.mdc` file across `init-steps.ts`, `cursor-config.ts`, and `sync.ts` (no `.md` message, no dir-as-file).
+- **AGENT-TEMPLATES-DISPOSITION (P1).** Decide the fate of the test-only `agent-templates.ts` rich generators: either make them produce pure adapters (and wire them), or mark `@deprecated` / remove (DEADMOD-style).
+- **Data/registry-driven generator (low-maintenance).** Replace one hand-written function per host with a single engine + host registry (path/format), so a new environment is a registry entry, not new code — keeping maintenance flat as the host matrix grows (Immutable Law #2 — EVERY ENVIRONMENT).
+- **Global + project scope.** Adapter generation/sync becomes scope-aware: a global install seeds host adapters at the user-global layer; project init seeds them per-project (consistent with ADR-G-001's layering).
+- **Provider-adapter parity.** As the Brain becomes provider-agnostic (ADR-G-008), the instruction-file adapter registry is the doc-side sibling of the provider adapter registry — same registry-driven philosophy.
 
 ## Consequences
 
-**(+)** User instruction files are never destroyed; one source (`DECKENT.md`) stays authoritative across every host; the pure-adapter-not-managed-doc rule (ADR-013-W) kills the locale-leak at its root; `--all-envs` gives one-command multi-IDE setup; independent generators make new hosts additive today and a registry will make them trivial tomorrow.
+**(+)** User instruction files are never destroyed *and* never polluted with deckent's volatile status — one source (`DECKENT.md`) stays authoritative, status stays in deckent-owned surfaces; the pure-adapter law kills the locale-leak at its true root (host files simply are not render targets); `--all-envs` gives one-command multi-IDE setup; reference-aware injection respects on-demand context-trim.
 
-**(−)** Today's per-env generator functions are still hand-maintained (registry-driven is roadmap), so each new host is real code until then; the never-overwrite guarantee depends on `docs.json` keeping these files out of managed-docs — a regression there would reopen the locale-leak (guarded by the ADR-013-W exclusion); scope-aware global+project generation is forward-looking.
+**(−)** **Not yet code-true:** `claude-md` + `agents-md` are still managed-docs in `docs.json` (+ seed template + a test that requires the entry), so until DOCS-PURE-ADAPTER lands the locale-leak's root remains and sprint metrics still stamp onto core files. The Cursor target is scattered (CURSOR-TARGET-UNIFY) and the `agent-templates.ts` generators are test-only legacy (AGENT-TEMPLATES-DISPOSITION). Per-env generators are still hand-maintained until the registry-driven engine lands; scope-aware global+project generation is forward-looking.
 
 ## References / Absorbed
 
-- **Absorbs:** ADR-013 (DECKENT.md Adapter Pattern — single-source + thin adapter + never-overwrite), ADR-018 (Multi-Environment Config Generation — per-env generators, `--all-envs`).
-- **Implementation:** `src/core/utils.ts` (`ensureDeckentImport`), `src/cli/commands/sync.ts` (`deckent sync`), `src/cli/helpers/agent-templates.ts` (`generateAgentsMd` / `generateGeminiMd` / `generateCursorRules`).
-- **Born work-item:** ADR-013-W (pure-adapter / `docs.json` exclusion / locale-leak root-fix); data/registry-driven low-maintenance generator (crosswalk maintenance-note → MASTER-PLAN).
-- **Cross-ref:** ADR-G-015 (Managed-Docs — the system these files are deliberately excluded from), ADR-G-001 (Layered Config & Scope), ADR-G-008 (Provider Abstraction — sibling adapter-registry philosophy), Immutable Law #2 (EVERY ENVIRONMENT — cross-platform/host matrix).
+- **Absorbs:** ADR-013 (DECKENT.md Adapter Pattern — single-source + thin adapter + never-overwrite), ADR-018 (Multi-Environment Config Generation — per-env provisioning, `--all-envs`).
+- **Implementation:** `src/core/utils.ts` (`ensureDeckentImport`, reference-aware), `src/cli/commands/init-steps.ts` (`applyEnvConfig` — real additive path), `src/cli/commands/sync.ts` (`deckent sync`). **Legacy/test-only:** `src/cli/helpers/agent-templates.ts` (rich generators, no prod caller).
+- **Born work-items:** **DOCS-PURE-ADAPTER** (P0 — remove `claude-md`/`agents-md` from `docs.json` + seed template + update/add tests; adapters are not managed-docs) · **CURSOR-TARGET-UNIFY** (P1 — single `.cursor/rules/deckent.mdc`) · **AGENT-TEMPLATES-DISPOSITION** (P1 — wire-or-deprecate the test-only generators) · data/registry-driven low-maintenance generator (crosswalk maintenance-note).
+- **Cross-ref:** ADR-G-015 (Managed-Docs — the system these host files are deliberately excluded from; legitimate managed-docs like `docs/vision/*` and `beta-tracker` stay), ADR-G-001 (Layered Config & Scope), ADR-G-008 (Provider Abstraction — sibling adapter-registry philosophy), Immutable Law #2 (EVERY ENVIRONMENT).
 - **Direction:** `.analysis/adr-review-crosswalk.md` rows 013, 018.
 
 
@@ -933,8 +942,8 @@ Config values may reference secrets as `"$DECK:KEY"` (e.g. `"token": "$DECK:DISC
 
 # ADR-G-006: Routing & Selection (Learned Model/Effort + Agent/Skill)
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=`routeTaskV2` multi-signal selection (intent domain-enrichment + domain-match-bonus + skill→agent affinity + surface-aware bonus) + live routing-diversity test + CI imbalance guard; V1 decision-engine fully purged → tomorrow=learned Routing V3 (per-task-type outcome matrix auto-updating from real results, new-model auto-adopt on merit, vector-selection over task-kind×cost×latency×risk×provider-health×outcome; project+provider-scoped, user-manageable) — ROUTE-1+ · PROV-MATRIX · F1-AD
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-015 (TaskRouter 6-level) + ADR-028 (Decision-Engine V1→V2→V3) + ADR-072 (Routing Balance multi-signal) + ADR-073 (Routing Live Validation + FIX-prompt) + ADR-075 Part-B (skill→agent affinity)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=`routeTaskV2` multi-signal selection (intent domain-enrichment + domain-match-bonus + surface-aware bonus; skill→agent affinity config-enableable, default-off) + live routing-diversity test + routing-distribution script — **⚠️ V1-purge is MANDATED but NOT yet executed: V1 is still live (`['v1','v2']` config, type union, planner `?? 'v1'` default-fallback, `decision-engine.ts`) → ROUTE-V1-PURGE (P0)** → tomorrow=learned Routing V3 (per-task-type outcome matrix auto-updating from real results, new-model auto-adopt on merit, vector-selection over task-kind×cost×latency×risk×provider-health×outcome; project+provider-scoped, user-manageable) — ROUTE-1+ · PROV-MATRIX · F1-AD
+**Status:** accepted (provisional — ROUTE-V1-PURGE P0: V1 still live; + routing-version-label cleanup + affinity-default decision) · **Date:** 2026-06-30 · **Absorbs:** ADR-015 (TaskRouter 6-level) + ADR-028 (Decision-Engine V1→V2→V3) + ADR-072 (Routing Balance multi-signal) + ADR-073 (Routing Live Validation + FIX-prompt) + ADR-075 Part-B (skill→agent affinity)
 **Crosswalk:** 015 (+028+072+073+075B) → ADR-G-006
 
 > **Authoring note (Alperen):** an ADR's documentation must explain both **today AND tomorrow** through its target-intent, transparently — "this matters and is critical to us." This ADR is the first-class application of the ADR-AUTHORING-STD (ADR-G-019: document today + tomorrow, transparently).
@@ -943,15 +952,15 @@ Config values may reference secrets as `"$DECK:KEY"` (e.g. `"token": "$DECK:DISC
 
 ## Context
 
-Routing decides, per task: which agent, which skills, which provider, which model, which effort. The old stack was a 6-level router (ADR-015) plus a V1 decision-engine (ADR-028) that was superseded by V2 (`routeTaskV2`) but never removed; plus a chronic distribution-skew problem (one agent winning ~12/16 tasks) that ADR-072/073/075B mitigated with domain-enrichment, domain-match-bonus, skill→agent affinity, a live-diversity test, and a CI imbalance guard. The 2026-06-30 review consolidates routing into one ADR, **purges V1 entirely**, and commits to a **learned, evolving** selection model (V3).
+Routing decides, per task: which agent, which skills, which provider, which model, which effort. The old stack was a 6-level router (ADR-015) plus a V1 decision-engine (ADR-028) that was superseded by V2 (`routeTaskV2`) but **never removed**; plus a chronic distribution-skew problem (one agent winning ~12/16 tasks) that ADR-072/073/075B mitigated with domain-enrichment, domain-match-bonus, skill→agent affinity, a live-diversity test, and a routing-distribution guard. The 2026-06-30 review consolidates routing into one ADR, **mandates the complete removal of V1** (decided — "izi bile kalmayacak"), and commits to a **learned, evolving** selection model (V3).
 
 ---
 
 ## Decision (Today)
 
-- **`routeTaskV2` is the routing engine.** Selection combines: intent domain-enrichment (scope-path → api/security/design/data/devops/docs intent), **domain-match bonus (+3)**, **skill→agent affinity** (`SKILL_AGENT_MAP` + affinity-bonus), surface-aware bonus (ADR-G-009 Tier-1 → api-builder/frontend-designer/ci-guardian), and `force-*` overrides (preserved).
-- **Guards:** live routing-diversity test (single-agent ≤60%, ≥4 distinct agents on a mixed set) + CI imbalance guard (`routing-distribution.mjs --ci`, >80% → fail). **FIX-prompt enrichment** (original-task + NO_GO-reason injected; `selectFixAgent` mirrors original agent, not bug-fixer-by-default).
-- **🔴 V1 PURGE:** the V1 decision-engine (`DecisionOrchestrator` + `routing_engine:'v1'` config + V1 tests + manifest entry + every reference) is **deleted entirely — "izi bile kalmayacak"** (in an orchestration this comprehensive, V1 is unacceptable).
+- **`routeTaskV2` is the routing engine.** Selection combines: intent domain-enrichment (scope-path → api/security/design/data/devops/docs intent), **domain-match bonus (+3)**, surface-aware bonus (ADR-G-009 Tier-1 → api-builder/frontend-designer/ci-guardian), and `force-*` overrides (preserved). **Skill→agent affinity** (`SKILL_AGENT_MAP` + affinity-bonus) is a **config-enableable** signal, **default-off** today (`skillAgentAffinity ?? false`) — a real selection lever once enabled, not an always-on default (AFFINITY-DEFAULT-DECISION: make default-on, or keep config-gated by design).
+- **Guards:** live routing-diversity test (single-agent ≤60%, ≥4 distinct agents on a mixed set) + a **routing-distribution script** (`routing-distribution.mjs --ci`, >80% → fail) wired in CI — note it is **advisory in practice**: with no `.deckent/routing/learnings.json` data it passes vacuously, so it is "script + tests + optional guard", not a hard standalone gate. **FIX-prompt enrichment** (original-task + NO_GO-reason injected). `selectFixAgent` is **not** bug-fixer-by-default: it **preserves the model (identity)** and applies a **fresh-eyes agent rotation** (a complementary agent — e.g. architect→code-reviewer), while **preserving the original agent for specific failure modes** (test / doc / bug / exit-no-result) and rotating only for the generic case.
+- **🔴 V1 removal — DECIDED + MANDATORY, NOT yet executed.** The decision stands: the V1 decision-engine must be deleted entirely — "izi bile kalmayacak" (in an orchestration this comprehensive, V1 is unacceptable). **State-of-code (2026-06-30, honest): V1 is still live** — `config.ts` accepts `['v1', 'v2']`, the config type is `'v1' | 'v2'`, `sprint-planner.ts` uses `config.routing_engine ?? 'v1'` (so V1 is even the **default fallback** when unset — itself a bug, the default is `'v2'`), `src/orchestra/decision-engine.ts` is still in the repo, plus V1 tests + a `decision-orchestrator-v1` manifest entry. **ROUTE-V1-PURGE (P0)** executes the deletion: config value + type + planner fallback (→ `'v2'`) + `decision-engine.ts` + manifest + tests, every reference.
 
 ---
 
@@ -973,23 +982,23 @@ V2 is sufficient *today* but **not the target**. V3 = a **learned model/effort s
 </routing-v3>
 ```
 
-(= ROUTE-1+ / ROUTE-V1-PURGE / PROV-MATRIX, fusing outcome-tracker + F5 + F1-AD — the Codex ModelPolicyEngine convergence.) Distribution balance remains a **continuously-monitored** target (the +3 bonus is the first link; ADR-G-023 affinity + WM-7 language-mismatch-penalty deepen it).
+(= ROUTE-1+ / ROUTE-V1-PURGE / PROV-MATRIX, fusing outcome-tracker + F5 + F1-AD — the Codex ModelPolicyEngine convergence.) Distribution balance remains a **continuously-monitored** target (the +3 bonus is the first link; ADR-G-023 affinity + WM-7 language-mismatch-penalty deepen it). **Routing-version labelling** is also cleaned up here: `routeTaskV2` currently returns `routingVersion: 'v3'` while the planner stamps `'v2'` on the task — today's engine is V2, so the label is reconciled (ROUTING-VERSION-LABEL) rather than left to imply V3 already ships.
 
 ---
 
 ## Consequences
 
-**(+)** One routing law; V1 gone; selection is multi-signal and diversity-guarded today, and learned/auditable tomorrow. New models adopt on merit without hardcoded IDs. User + project scoping.
+**(+)** One routing law; selection is multi-signal and diversity-guarded today, and learned/auditable tomorrow. New models adopt on merit without hardcoded IDs. User + project scoping.
 
-**(−)** Distribution skew is mitigated, not solved (recurred at Sprint 211 as refactorer-heavy) — balance stays a monitored target until V3. V3 (learned matrix) is roadmap; today is V2 + guards.
+**(−)** **V1 is not yet gone** — the purge is decided + mandatory but pending (ROUTE-V1-PURGE, P0); until then V1 remains a valid config value and the planner's default fallback. Distribution skew is mitigated, not solved (recurred at Sprint 211 as refactorer-heavy) — and the skill→agent affinity lever that would deepen the fix is **default-off** today (AFFINITY-DEFAULT-DECISION). The `routingVersion` label is inconsistent (`'v3'` returned vs `'v2'` stamped — ROUTING-VERSION-LABEL). V3 (learned matrix) is roadmap; today is V2 + guards.
 
 ---
 
 ## References / Absorbed
 
-- **Absorbs:** ADR-015 + ADR-028 (V1-purge) + ADR-072 + ADR-073 + ADR-075 Part-B.
+- **Absorbs:** ADR-015 + ADR-028 (V1 lineage — purge mandated, pending) + ADR-072 + ADR-073 + ADR-075 Part-B.
 - **Cross-ref:** ADR-G-008 (provider/model registry, cost) · ADR-G-009 (surface-aware routing, eval) · ADR-G-023 (agent/skill taxonomy, affinity) · ADR-G-032 (evolution — outcome signal) · ADR-G-028 (work taxonomy).
-- **Born / MASTER-PLAN:** ROUTE-1+ (Routing V3) · ROUTE-V1-PURGE · PROV-MATRIX · F1-AD.
+- **Born / MASTER-PLAN:** **ROUTE-V1-PURGE** (P0 — delete V1 config/type/planner-fallback/`decision-engine.ts`/manifest/tests entirely) · ROUTE-1+ (Routing V3) · PROV-MATRIX · F1-AD · **ROUTING-VERSION-LABEL** (P2 — reconcile `'v3'`-return vs `'v2'`-stamp + planner `?? 'v2'` default) · **AFFINITY-DEFAULT-DECISION** (P1 — skill→agent affinity default-on vs config-gated-by-design).
 - **Memory:** `feedback_agent_routing_imbalance`.
 
 
@@ -1002,7 +1011,7 @@ V2 is sufficient *today* but **not the target**. V3 = a **learned model/effort s
 # ADR-G-007: External Messaging Connectors & Integration Layer
 
 **Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=config-gated + lazy-load + fail-safe (per-target timeout-guarded, error-isolated) connectors + project-scoped session/pairing gateway (auth-gate pending) → tomorrow=integration-layer (MSG-1) + multi-channel ApprovalBroker relay (APR-2) + pairing onCallback wire + WhatsApp wire (MSG-3) + pairing hard-auth before public exposure
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-016 (External Messaging Connectors), ADR-091 (Project-Scoped Messaging Gateway) · **Supersedes:** —
+**Status:** accepted (amendment — grammy-not-telegraf, whatsapp config-type gap, secret-policy-not-hard-enforced; gateway-auth + ApprovalBroker already honestly marked) · **Date:** 2026-06-30 · **Absorbs:** ADR-016 (External Messaging Connectors), ADR-091 (Project-Scoped Messaging Gateway) · **Supersedes:** —
 **Crosswalk:** ADR-016 + ADR-091 → ADR-G-007
 
 > **Note:** ADR-091 (Project-Scoped Messaging Gateway) lived in `memory.db` (`type='adr'`) but was never exported to `docs/adr/` — a real doc↔DB drift. Folding it into ADR-G-007 closes that drift; no standalone export is created (per crosswalk row #091). The gateway today ships **without** a hard pairing-auth gate, so it must not be exposed on a public network until the pairing onCallback + auth work (MSG-1/APR-2) lands — see Intent/Roadmap.
@@ -1033,9 +1042,11 @@ The subsystem's non-negotiable invariants were forged from operational pain: a s
     connector-pool.ts   — ConnectorPool: register / broadcast / lifecycle
   </contract-and-pool>
   <adapters>
-    telegram.ts   — Telegram (telegraf, runtime dep)
+    telegram.ts   — Telegram (grammY — replaced Telegraf in G2a; runtime dep)
     discord.ts    — Discord (discord.js, OPTIONAL dep, lazy-imported)
-    whatsapp.ts   — WhatsApp (adapter present; full wire = MSG-3, see Tomorrow)
+    whatsapp.ts   — WhatsApp (adapter present + runtime-SUPPORTED in bootstrap, but
+      the public notify_connectors config type is still telegram|discord only —
+      whatsapp needs a cast today; full config-type + wire = MSG-3, see Tomorrow)
   </adapters>
   <outbound>
     connector-notify-adapter.ts — ConnectorNotificationAdapter implements the
@@ -1065,10 +1076,10 @@ The subsystem's non-negotiable invariants were forged from operational pain: a s
 
 ### 2. Invariants (the law)
 
-- **Config-gated.** A connector is inert unless `notify_connectors: { telegram|discord: { enabled, token: "$DECK:…", chat_id } }` enables it. Tokens are referenced through `$DECK:` interpolation (**ADR-G-005**) — never stored inline.
+- **Config-gated.** A connector is inert unless `notify_connectors: { telegram|discord: { enabled, token: "$DECK:…", chat_id } }` enables it. Tokens **should** be referenced through `$DECK:` interpolation (**ADR-G-005**), not stored inline — this is **policy + a bootstrap guard** (an unresolved `$DECK:` token is logged + skipped), **not** a hard schema rejection: a raw inline token is currently still accepted. Fail-closed schema enforcement is a hardening item (SECRET-INLINE-ENFORCE).
 - **Lazy.** Optional deps (e.g. `discord.js`) are lazy-imported; a missing optional dependency logs and is skipped, never breaks process load (dependency policy: **ADR-D-005**).
 - **Fail-safe.** Every send is timeout-guarded and per-target error-isolated. A slow, hung, or erroring platform never blocks or fails the sprint lifecycle.
-- **Adding a platform** = one new adapter implementing `BaseConnector` + one `notify_connectors` entry. No core change.
+- **Adding a platform** today = a new adapter implementing `BaseConnector` + a `notify_connectors` entry **+ edits to the `SUPPORTED` list and the `notify_connectors` config type** (so it is not yet zero-core-change). The **zero-core-change ideal** — pure adapter + registry entry — is the MSG-1 integration-layer/registry roadmap (CONNECTOR-PLATFORM-REGISTRY).
 
 ### 3. Project-scoped session/pairing gateway (absorbs ADR-091)
 
@@ -1099,12 +1110,12 @@ The gateway scopes inbound sessions per-project and brokers a pairing handshake 
 - **Absorbs:** ADR-016 (External Messaging Connectors — `BaseConnector`/`ConnectorPool`, adapters, outbound notify, inbound pipeline, agentic bot, bootstrap; originally Sprint-044 AI-provider lifecycle, repurposed 2026-06-11) + ADR-091 (Project-Scoped Messaging Gateway — session/pairing, drift-fixed here).
 - **Provider lineage:** the original Sprint-044 AI-provider `Connector` responsibility moved to **ADR-G-008** (Provider Abstraction, Fleet & Native-Usage) — `connector` now means *messaging*, not *provider*.
 - **Secret interpolation:** **ADR-G-005** (Secret File System & Zero-Worker-Exposure) — `$DECK:` token references.
-- **Dependency policy:** **ADR-D-005** (Dependency Policy & Inventory) — `telegraf` runtime dep, `discord.js` optional/lazy.
+- **Dependency policy:** **ADR-D-005** (Dependency Policy & Inventory) — `grammy` runtime dep (replaced `telegraf` in G2a), `discord.js` optional/lazy.
 - **Approval spine:** **ADR-G-022** (Nervous System) — ApprovalBroker unification (APR-1/APR-2).
 - **Enterprise identity:** **ADR-G-031** (Enterprise Foundation) — connector social-identity RBAC, fail-CLOSED, tenant-scoped (absorbs old ADR-092); **ADR-G-020** (Authority, Roles, Flow & Enforcement) for the approval/authority contract.
 - **Surface parity:** **ADR-G-011** (Surface Parity & Thin-Wrapper) — bot tool-surface ≡ CLI ≡ MCP ≡ terminal.
 - **Wiring contracts:** WIRE-001 (`NotificationAdapter` notify dispatcher), BOT-1 (humanized bot-agent), BOT-2d (bounded chat history).
-- **Born work-items:** MSG-1 (integration layer), APR-2 (multi-channel approval relay), MSG-3 (WhatsApp wire), PAIRING-AUTH (onCallback + hard-auth gate), BOT-TOOL-SURFACE (cost/usage/kpi + group-button approval).
+- **Born work-items:** MSG-1 (integration layer), APR-2 (multi-channel approval relay), MSG-3 (WhatsApp wire — incl. `notify_connectors` config-type so whatsapp is first-class = CONNECTOR-CONFIG-TYPE), PAIRING-AUTH (onCallback + hard-auth gate), BOT-TOOL-SURFACE (cost/usage/kpi + group-button approval), CONNECTOR-PLATFORM-REGISTRY (zero-core-change platform registry under MSG-1), SECRET-INLINE-ENFORCE (fail-closed schema rejection of inline tokens).
 - **Direction:** memory `project_messaging_gateway_rearch` (gateway in main, build+T9 pending, ⚠️ auth-gate-less — do not expose publicly), `project_bot_tool_surface_and_group_buttons`, `feedback_telegram_rich_approval_bot`; `.analysis/hermes-vs-deckent-direction-decisions.md` (runtime-wide ApprovalBroker = P0).
 
 
@@ -1134,11 +1145,16 @@ deckent is **provider-free**: any provider (subscription-CLI or API or local) ca
 <provider-abstraction>
   <resolver>getProviderForModel (SSOT, in task-types.ts) — model → provider.</resolver>
   <backends>provider-free across subprocess / tmux / Docker (host-adapter for
-    codex/gemini + per-provider OAuth mount; ollama host-route).</backends>
+    codex/gemini + per-provider OAuth mount; ollama host-route). Caveat: docker
+    binary-resolution falls back to Claude for an unknown/unsupported model — legacy
+    safety, honest-fail pending (PROVIDER-FREE-HARDEN / WM-5).</backends>
   <fleet>3 CLI-subscription (claude/codex/gemini) + N HTTP-API via one
-    OpenAICompatibleAdapter (DeepSeek/Qwen/GLM/Mistral/Groq — same /chat/completions) +
-    local Ollama. ProviderName = open string. Mixed-fleet dogfood-proven (Sprint 249:
-    15 tasks / 4 real providers).</fleet>
+    OpenAICompatibleAdapter (DeepSeek/Qwen/zhipu-GLM/Mistral/Groq — same /chat/completions) +
+    local Ollama + Bedrock (AWS-creds-gated, F1-015). ProviderName is open at RUNTIME
+    (validateProviderName + a string-keyed adapter Map); the TS type is still a closed
+    union ('claude'|'codex'|'gemini'|'ollama') — type-level open-id migration pending
+    (PROVIDER-NAME-TYPE). Mixed-fleet dogfood-proven (Sprint 249: 15 tasks / 4 real
+    providers).</fleet>
   <auth-precedence>subscription mode → ANTHROPIC_API_KEY NOT forwarded into the
     container (~/.claude session mount instead); API mode forwards. No cross-provider
     credential leak. (Ends the `env -u ANTHROPIC_API_KEY` workaround.)</auth-precedence>
@@ -1157,9 +1173,9 @@ deckent is **provider-free**: any provider (subscription-CLI or API or local) ca
 ## Intent / Roadmap (Tomorrow)
 
 - **Brain provider-failover + lossless self-update** (ADR-G-025): the Brain itself fails over Claude→OpenAI/Codex losslessly; the adapter abstraction is what makes a provider-agnostic Brain possible (today Claude-Brain, tomorrow GPT-5.5-Brain).
-- **🔴 ADR-066-W:** `?? 'claude'` default-provider drift (3→9 occurrences) → re-audit + consolidate to `getDefaultProviderName()` (the contract: ≤3, justified). (WM-5 provider-free hard-enforce family.)
-- **🔴 Subscription→API overflow wire (F1-010):** `resolveWithOverflow` is built but **0-caller (dormant)** — wire it to the spawn-error/FIX path (tier-preserving overflow on quota-exceeded).
-- **Native-usage phase-2:** Codex/Gemini own usage stores (today `null`→estimate fallback; honest seam).
+- **ADR-066-W:** `?? 'claude'` default-provider drift → consolidate to `getDefaultProviderName()`. **Measured by grep, not a fixed number** (current audit: ~8 textual matches → ~3 genuine provider-default-drift in `model-tier-guard.ts:186` / `provider.ts:1193` / `config.ts:107`; the rest are the canonical `getDefaultProviderName` impl, a guidance comment, and legitimate CLI-binary defaults `binary ?? 'claude'`). Consolidate the real-drift set (contract: ≤3, justified). (WM-5 provider-free hard-enforce family.)
+- **Subscription→API overflow (F1-010):** `resolveWithOverflow` is **wired** — the pre-spawn overflow gate (`provider-overflow-gate.ts`) delegates to it (flag-gated, default-off) and the reactive 429/FIX failover path uses it. The remaining work is graduating the flag to a **live rate-limit signal** (today no live signal drives it), not the initial wire.
+- **Native-usage phase-2:** Claude reads its native session-store today (real cacheCreation); Codex/Gemini use adapter envelope parsers today, with their own session-stores as phase-2 (today `null`→estimate fallback; honest seam).
 - **Subscription-package support** (PROV-SUBS) + **opt-in hosted-deckent-core** as an *optional* provider (ADR-G-016: BYO default, hosted never required) + first-class cost/limit/notify/fallback (PROV-FC).
 
 ---
@@ -1168,7 +1184,7 @@ deckent is **provider-free**: any provider (subscription-CLI or API or local) ca
 
 **(+)** True provider-freedom: any subscription/API/local provider, any backend, with accurate provider-native cost (real cacheCreation) and leak-free auth-precedence. The abstraction enables a provider-agnostic, failover-capable Brain. 3rd-party cost advantage (DeepSeek ~1/30th) accessible.
 
-**(−)** Overflow is dormant (born F1-010); the `?? 'claude'` invariant drifted (born ADR-066-W); Codex/Gemini native-usage is phase-2 (estimate fallback today). Hosted-core/subs-package are roadmap.
+**(−)** Overflow is wired but lacks a **live rate-limit signal** (born F1-010); the `?? 'claude'` default-provider drift (~3 real sites by grep) awaits consolidation (born ADR-066-W); the TS `ProviderName` type is still a closed union (PROVIDER-NAME-TYPE); docker binary-resolution Claude-fallback on an unknown model is a known caveat (PROVIDER-FREE-HARDEN); Codex/Gemini native-usage is phase-2 (estimate fallback today). Hosted-core/subs-package are roadmap.
 
 ---
 
@@ -1176,7 +1192,7 @@ deckent is **provider-free**: any provider (subscription-CLI or API or local) ca
 
 - **Absorbs:** ADR-017 + ADR-066 + ADR-077 + ADR-093 + ADR-076-A + ADR-078-B.
 - **Cross-ref:** ADR-G-025 (Brain failover/self-update) · ADR-G-006 (routing/model-selection) · ADR-G-012 (tiers) · ADR-G-014 (backends) · ADR-G-005 (.deck per-provider keys) · ADR-D-002 (test-hermeticity for sessionRoot) · F1-TOK/F1-CB (cost ledger).
-- **Born:** ADR-066-W (`?? 'claude'` consolidate) · F1-010 (overflow wire) · native-usage-phase-2 · PROV-FC · PROV-SUBS.
+- **Born:** ADR-066-W (`?? 'claude'` grep-audit consolidate) · F1-010 (overflow **live rate-limit signal**) · PROVIDER-NAME-TYPE (type-level open-id migration) · PROVIDER-FREE-HARDEN (docker unknown-provider honest-fail) · native-usage-phase-2 · PROV-FC · PROV-SUBS.
 - **Memory:** `project_deckent_runtime_ecosystem` · `project_api_mode_deferred_post_beta` · `feedback_container_auth_precedence`.
 
 
@@ -1212,16 +1228,23 @@ Evaluation must judge work **honestly and for real**, across any language, witho
     code→detected-stack commands.</language-agnostic>
   <coverage-exemption signal-based="true">if a worker changed a test file
     (.test.*/.spec.*) coverage is optional — AGENT-INDEPENDENT + idempotent +
-    deterministic (derived from result.filesChanged, disk ground-truth). Replaces the
-    leaky agent-name allowlist (070 false-FIX root).</coverage-exemption>
+    deterministic (derived from result.filesChanged, disk ground-truth). Signal-based is
+    the canonical/primary path; a transitional agent-allowlist bridge
+    (COVERAGE_OPTIONAL_AGENTS, P0-2: refactorer/code-reviewer) still remains, checked
+    first (070 false-FIX root → COVERAGE-BRIDGE-RETIRE).</coverage-exemption>
   <zero-hard-code>any string a running deckent can derive from live data MUST NOT be
     hardcoded — model IDs read from the live registry (bundled snapshot = offline
-    fallback only); no stale `claude-opus-4-6` in cost/status output.</zero-hard-code>
+    fallback only); no stale `claude-opus-4-6` in cost/status output. Scope = user-facing
+    cost/status OUTPUT (display labels derived from the live registry); test fixtures,
+    backward aliases, and the pricing-baseline snapshot are excluded — not a repo-wide
+    literal ban.</zero-hard-code>
   <proof-of-function>isUserSurfaceTask (Tier-1) = touches src/cli/commands/ |
     src/dashboard/ | src/api/ (orthogonal to TaskType). Tier-1 DoD = Tier-0 +
     a recorded REAL-BINARY run via the `Smoke:` directive. A mocked unit test alone =
-    GO_WITH_TECH_DEBT, never DONE. Sprint-inner gate (proof-of-function.ts, async spawn,
-    host-side) auto-downgrades DONE→GO_WTD on smoke-fail + emits PROOF_OF_FUNCTION_MISMATCH.
+    GO_WITH_TECH_DEBT, never DONE. The verify module (proof-of-function.ts, async spawn,
+    host-side) runs the smoke + returns failed/passed/no-op; the EVALUATE phase
+    (sprint-phases.ts) applies the DONE→GO_WTD downgrade + emits PROOF_OF_FUNCTION_MISMATCH
+    (applyProofOfFunctionGate = the reusable helper form).
     Surface-aware routing prefers api-builder/frontend-designer/ci-guardian.</proof-of-function>
 </evaluation-integrity>
 ```
@@ -1241,9 +1264,9 @@ The "wired ≠ working" principle is permanent: structural/disk proof (Tier-0) i
 
 ## Consequences
 
-**(+)** Evaluation is honest across languages, gaming-proof (signal/disk-derived, not agent-name), zero-hardcode, and run-verified for user surfaces. Hollow-DONE is structurally impossible for Tier-1. False-NO_GO on doc/audit/non-TS tasks eliminated.
+**(+)** Evaluation is honest across languages, gaming-proof (signal/disk-derived, not agent-name), zero-hardcode, and run-verified for user surfaces. Hollow-DONE is structurally impossible for a Tier-1 task **that carries a valid `Smoke:`** (an absent `Smoke:` is a no-op today — see below). False-NO_GO on doc/audit/non-TS tasks eliminated.
 
-**(−)** Tier-1 gate adds EVALUATE latency (only when `Smoke:` present; absent → no-op). Workers may forget the `Smoke:` line (anchored in worker rules; FIX-phase pressure catches it). Hard-enforcement of A9/A14 is roadmap (today the vein is dogfood-flag).
+**(−)** Tier-1 gate adds EVALUATE latency (only when `Smoke:` present; absent → no-op, **not fail-closed**) — workers may forget the `Smoke:` line (anchored in worker rules + FIX-phase pressure; fail-closed Smoke-required is SMOKE-REQUIRED-ENFORCE). The coverage-exemption still keeps a transitional agent-allowlist bridge alongside the signal path (COVERAGE-BRIDGE-RETIRE). Hard-enforcement of A9/A14 is roadmap (today the vein is dogfood-flag).
 
 ---
 
@@ -1251,7 +1274,7 @@ The "wired ≠ working" principle is permanent: structural/disk proof (Tier-0) i
 
 - **Absorbs:** ADR-019 + ADR-070 + ADR-079.
 - **Cross-ref:** ADR-G-028 (Work Taxonomy — TaskKind×TechStack, the deriver inputs) · ADR-G-020 (enforcement vein A9/A14) · ADR-G-006 (surface-aware routing) · ADR-G-018 (verification protocol channels) · ADR-G-025 (worker-live-trace / observability).
-- **Born / MASTER-PLAN:** WM-7 (criteria-deriver) · XVER-1 (cross-verify) · zero-hardcode (`feedback_zero_hardcode_live_data`).
+- **Born / MASTER-PLAN:** WM-7 (criteria-deriver) · XVER-1 (cross-verify) · COVERAGE-BRIDGE-RETIRE (retire `COVERAGE_OPTIONAL_AGENTS` once signal-path proven) · SMOKE-REQUIRED-ENFORCE (fail-closed Smoke for Tier-1 vs today's no-op) · zero-hardcode (`feedback_zero_hardcode_live_data`).
 - **Memory:** `feedback_proof_of_function_dod` · `feedback_zero_hardcode_live_data`.
 
 

@@ -1,7 +1,7 @@
 # ADR-G-007: External Messaging Connectors & Integration Layer
 
 **Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=config-gated + lazy-load + fail-safe (per-target timeout-guarded, error-isolated) connectors + project-scoped session/pairing gateway (auth-gate pending) → tomorrow=integration-layer (MSG-1) + multi-channel ApprovalBroker relay (APR-2) + pairing onCallback wire + WhatsApp wire (MSG-3) + pairing hard-auth before public exposure
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-016 (External Messaging Connectors), ADR-091 (Project-Scoped Messaging Gateway) · **Supersedes:** —
+**Status:** accepted (amendment — grammy-not-telegraf, whatsapp config-type gap, secret-policy-not-hard-enforced; gateway-auth + ApprovalBroker already honestly marked) · **Date:** 2026-06-30 · **Absorbs:** ADR-016 (External Messaging Connectors), ADR-091 (Project-Scoped Messaging Gateway) · **Supersedes:** —
 **Crosswalk:** ADR-016 + ADR-091 → ADR-G-007
 
 > **Note:** ADR-091 (Project-Scoped Messaging Gateway) lived in `memory.db` (`type='adr'`) but was never exported to `docs/adr/` — a real doc↔DB drift. Folding it into ADR-G-007 closes that drift; no standalone export is created (per crosswalk row #091). The gateway today ships **without** a hard pairing-auth gate, so it must not be exposed on a public network until the pairing onCallback + auth work (MSG-1/APR-2) lands — see Intent/Roadmap.
@@ -32,9 +32,11 @@ The subsystem's non-negotiable invariants were forged from operational pain: a s
     connector-pool.ts   — ConnectorPool: register / broadcast / lifecycle
   </contract-and-pool>
   <adapters>
-    telegram.ts   — Telegram (telegraf, runtime dep)
+    telegram.ts   — Telegram (grammY — replaced Telegraf in G2a; runtime dep)
     discord.ts    — Discord (discord.js, OPTIONAL dep, lazy-imported)
-    whatsapp.ts   — WhatsApp (adapter present; full wire = MSG-3, see Tomorrow)
+    whatsapp.ts   — WhatsApp (adapter present + runtime-SUPPORTED in bootstrap, but
+      the public notify_connectors config type is still telegram|discord only —
+      whatsapp needs a cast today; full config-type + wire = MSG-3, see Tomorrow)
   </adapters>
   <outbound>
     connector-notify-adapter.ts — ConnectorNotificationAdapter implements the
@@ -64,10 +66,10 @@ The subsystem's non-negotiable invariants were forged from operational pain: a s
 
 ### 2. Invariants (the law)
 
-- **Config-gated.** A connector is inert unless `notify_connectors: { telegram|discord: { enabled, token: "$DECK:…", chat_id } }` enables it. Tokens are referenced through `$DECK:` interpolation (**ADR-G-005**) — never stored inline.
+- **Config-gated.** A connector is inert unless `notify_connectors: { telegram|discord: { enabled, token: "$DECK:…", chat_id } }` enables it. Tokens **should** be referenced through `$DECK:` interpolation (**ADR-G-005**), not stored inline — this is **policy + a bootstrap guard** (an unresolved `$DECK:` token is logged + skipped), **not** a hard schema rejection: a raw inline token is currently still accepted. Fail-closed schema enforcement is a hardening item (SECRET-INLINE-ENFORCE).
 - **Lazy.** Optional deps (e.g. `discord.js`) are lazy-imported; a missing optional dependency logs and is skipped, never breaks process load (dependency policy: **ADR-D-005**).
 - **Fail-safe.** Every send is timeout-guarded and per-target error-isolated. A slow, hung, or erroring platform never blocks or fails the sprint lifecycle.
-- **Adding a platform** = one new adapter implementing `BaseConnector` + one `notify_connectors` entry. No core change.
+- **Adding a platform** today = a new adapter implementing `BaseConnector` + a `notify_connectors` entry **+ edits to the `SUPPORTED` list and the `notify_connectors` config type** (so it is not yet zero-core-change). The **zero-core-change ideal** — pure adapter + registry entry — is the MSG-1 integration-layer/registry roadmap (CONNECTOR-PLATFORM-REGISTRY).
 
 ### 3. Project-scoped session/pairing gateway (absorbs ADR-091)
 
@@ -98,10 +100,10 @@ The gateway scopes inbound sessions per-project and brokers a pairing handshake 
 - **Absorbs:** ADR-016 (External Messaging Connectors — `BaseConnector`/`ConnectorPool`, adapters, outbound notify, inbound pipeline, agentic bot, bootstrap; originally Sprint-044 AI-provider lifecycle, repurposed 2026-06-11) + ADR-091 (Project-Scoped Messaging Gateway — session/pairing, drift-fixed here).
 - **Provider lineage:** the original Sprint-044 AI-provider `Connector` responsibility moved to **ADR-G-008** (Provider Abstraction, Fleet & Native-Usage) — `connector` now means *messaging*, not *provider*.
 - **Secret interpolation:** **ADR-G-005** (Secret File System & Zero-Worker-Exposure) — `$DECK:` token references.
-- **Dependency policy:** **ADR-D-005** (Dependency Policy & Inventory) — `telegraf` runtime dep, `discord.js` optional/lazy.
+- **Dependency policy:** **ADR-D-005** (Dependency Policy & Inventory) — `grammy` runtime dep (replaced `telegraf` in G2a), `discord.js` optional/lazy.
 - **Approval spine:** **ADR-G-022** (Nervous System) — ApprovalBroker unification (APR-1/APR-2).
 - **Enterprise identity:** **ADR-G-031** (Enterprise Foundation) — connector social-identity RBAC, fail-CLOSED, tenant-scoped (absorbs old ADR-092); **ADR-G-020** (Authority, Roles, Flow & Enforcement) for the approval/authority contract.
 - **Surface parity:** **ADR-G-011** (Surface Parity & Thin-Wrapper) — bot tool-surface ≡ CLI ≡ MCP ≡ terminal.
 - **Wiring contracts:** WIRE-001 (`NotificationAdapter` notify dispatcher), BOT-1 (humanized bot-agent), BOT-2d (bounded chat history).
-- **Born work-items:** MSG-1 (integration layer), APR-2 (multi-channel approval relay), MSG-3 (WhatsApp wire), PAIRING-AUTH (onCallback + hard-auth gate), BOT-TOOL-SURFACE (cost/usage/kpi + group-button approval).
+- **Born work-items:** MSG-1 (integration layer), APR-2 (multi-channel approval relay), MSG-3 (WhatsApp wire — incl. `notify_connectors` config-type so whatsapp is first-class = CONNECTOR-CONFIG-TYPE), PAIRING-AUTH (onCallback + hard-auth gate), BOT-TOOL-SURFACE (cost/usage/kpi + group-button approval), CONNECTOR-PLATFORM-REGISTRY (zero-core-change platform registry under MSG-1), SECRET-INLINE-ENFORCE (fail-closed schema rejection of inline tokens).
 - **Direction:** memory `project_messaging_gateway_rearch` (gateway in main, build+T9 pending, ⚠️ auth-gate-less — do not expose publicly), `project_bot_tool_surface_and_group_buttons`, `feedback_telegram_rich_approval_bot`; `.analysis/hermes-vs-deckent-direction-decisions.md` (runtime-wide ApprovalBroker = P0).

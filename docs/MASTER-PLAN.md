@@ -122,7 +122,7 @@
 | F1-TOK | PROV | Token/limit ledger (cacheWrite-dominant; subscription cost-eşdeğeri) | MP | P0 | — | 🟡 | — | infra ✅, capture build-gate; usage-cost kritik |
 | F1-LIM | PROV | Resource-aware spawn + algıla→park | MP | P1 | — | ✅ | 2026-06-10 | — |
 | F1-CB | PROV | Cost billing-mode = auth_mode (subscription→$0) | MP | P1 | — | ✅ | 2026-06-09 | — |
-| F1-010 | PROV | Subscription→API overflow load-balancing (limit→başka provider) | MP | P1 | F1-TOK | ⬜ | — | fallback ailesi |
+| F1-010 | PROV | Subscription→API overflow: gate WIRED (provider-overflow-gate delegate, flag-gated default-off + 429-failover); KALAN = flag→live rate-limit signal | MP | P1 | F1-TOK | 🟡 | — | ADR-G-008; dormant değil |
 | F1-AD | PROV | Autonomous subscription-model detection (live capability, zero-hardcode) | MP | P1 | — | ⬜ | — | "kullanıcıyı yormazdık" |
 | F1-PD | PROV | Parametrik model/provider (DB-persist + reconcile) | MP | P1 | F1-AD | 🟡 | — | — |
 | F1-PCACHE | PROV | Provider-agnostik worker-prompt & cache (5-archetype) | MP | P1 | — | 🟡 | — | per-provider kalan |
@@ -172,7 +172,7 @@
 | MSG-1 | MSG | Integration layer (connector pairing/authz/session standardı) | A·CL | P1 | — | ⬜ | — | genel-yapı uyumu |
 | MSG-CONT | MSG | Connector output → session continuity (reply = devam eden sohbet) | CX | P1 | MSG-1 | ⬜ | — | §3.4 |
 | MSG-2 | MSG | Pairing-onay butonu wire (onCallback — G1 ertelenmiş) | A·CL | P1 | APR-2 | ⬜ | — | gateway-daemon.ts:87-90 |
-| MSG-3 | MSG | WhatsApp connector (dormant → wire / ADR-G-007 amend) | MP·CL | P1 | — | ⬜ | — | CONN-W1 |
+| MSG-3 | MSG | WhatsApp connector (dormant → wire / ADR-G-007 amend) + notify_connectors config-type (whatsapp first-class; runtime-SUPPORTED ama public-type telegram·discord, cast→typed) | MP·CL | P1 | — | ⬜ | — | CONN-W1; config-types:405 |
 | BOT-2d | MSG | Bounded multi-turn bot chat-memory + Discord/WhatsApp delivery verify | MP | P1 | — | ⬜ | — | — |
 | MCP-1 | MCP | MCP server-client sığ→enterprise olgunlaştırma (umbrella) | A | P1 | — | 🟡 | — | server-client devam |
 | F9-001 | MCP | McpClientBroker → live REPL/chat wire (0-caller) | MP | P1 | — | ⬜ | — | default-OFF |
@@ -243,7 +243,7 @@
 | PB-1 | LAUNCH | Voice (STT/wake/TTS) — 10K-star gate | MP | P2 | — | ⏸️ | — | post-beta |
 | PB-3 | LAUNCH | AEGIS methodology Phase-1 (AEGIS-RD'den sonra) | MP | P2 | AEGIS-RD | ⏸️ | — | post-beta |
 | ROLE-GUARD | MOAT·GOV | Brain/orchestrator kod-yazamaz — pid/role guard (tool-enforce) | ADR-rev | P1 | TOOL-1 | ⬜ | — | ADR-G-020/021 |
-| ROUTE-V1-PURGE | PROV·GOV | V1 routing TAMAMEN sil (DecisionOrchestrator+config+test+ref, izi-bile-kalmasın) | ADR-rev | P1 | — | ⬜ | — | ADR-G-006 |
+| ROUTE-V1-PURGE | PROV·GOV | V1 routing TAMAMEN sil: config `['v1','v2']`+type-union + planner `?? 'v1'` default-fallback (→`'v2'`) + decision-engine.ts + manifest + test + ref (izi-bile-kalmasın) | ADR-rev | P0 | — | ⬜ | — | ADR-G-006; hâlâ canlı |
 | DEP-TOOL | TOOL | Dependency analiz/öneri/kontrol/düzenleme toolu (terminal-trackable, DIRECTIVES-bağımsız) | ADR-rev | P0 | TOOL-1 | ⬜ | — | ADR-G-026; DIRECTIVES kalkınca kritik |
 | BRAIN-FAILOVER | MOAT·PROV·APR | Brain-crash provider-failover (Claude→OpenAI) + auditor-onay + nervous + escalation(otonom→retry→kill) | ADR-rev | P1 | — | ⬜ | — | ADR-G-025 |
 | WORKER-LIVE-TRACE | TERM·DASH·TRN | Per-worker canlı durum (dashboard/terminal/CLI/MCP, insan+sistem, canlı+snapshot) | ADR-rev | P0 | TERM-LIVE | ⬜ | — | ADR-G-025; .log yetersiz |
@@ -268,7 +268,7 @@
 | DECKENT-LOG | DOCS·MODE | sprint-log → deckent-log rename + multi-mode (task/process/autonomous/flow/mission) | ADR-rev | P1 | — | ⬜ | — | ADR-G-015/024 |
 | CONFIG-CUSTOMIZE | ONB·TERM·GOV | Custom-tier + NL-terminal TÜM-ayar customize (ONB-CHAT) + her config-knob KODDA-gerçek | ADR-rev | P1 | — | ⬜ | — | ADR-G-012; DORMANT-2 honesty |
 | ADR-064-W | MOAT·GOV | `planDispatch` wire — **🔴 SOMUT DİVERGENCE bulundu:** model(planContinuous: DONE+fix-aggregate, MRR-yok, collision-yok) ↔ runtime(respawnEligibleTasks: DONE∪MRR+collision-graph, fix-aggregate-yok). Wire = 3-semantik (MRR+fix-agg+collision) tek-superset reconcile + 246-satır execution(event/metric/adaptive-timeout/checkpoint/throttle/host-adapter)-rewrite. Olduğu-gibi-wire MRR-unblock(S280)+collision REGRESSE eder. **Dedicated scheduler-correctness task + tam dispatch-test şart.** | ADR-rev | P1 | — | ⬜ | — | ADR-G-026; interim comment-fix done (f68c8595) |
-| ADR-066-W | PROV·GOV | `?? 'claude'` drift 3→9 → re-audit + getDefaultProviderName konsolide | ADR-rev | P1 | — | ⬜ | — | ADR-G-008; WM-5 |
+| ADR-066-W | PROV·GOV | `?? 'claude'` drift → getDefaultProviderName konsolide; grep-ölç (sabit-sayı yok): ~8 textual → ~3 real-drift (model-tier-guard/provider:1193/config:107), kalan=canonical+comment+CLI-binary-default | ADR-rev | P1 | — | ⬜ | — | ADR-G-008; WM-5 |
 | ADR-087-W | GOV | Residual ~15 spawnSync (auditor.ts) → async-spawn migration | ADR-rev | P1 | — | ⬜ | — | ADR-D-002 |
 | GOCRIT-USERFEAT | TOOL·MODE | Per-task goNogo/goCriteria üretimini hard-coded yerine USER-FACING parametrik özellik (per-task/per-work kriter-üretimi) | A | P2 | — | ⬜ | — | memory-merge: 06-19 gözlem, planner-çıktısı çok temiz+başarılı |
 | ADR-002-W | GOV·DOCS | Node16→nodenext tsconfig migration + Node-18-reference purge (Node-24+ sweep) | ADR-rev | P2 | — | ⬜ | — | ADR-D-001 tomorrow |
@@ -301,6 +301,17 @@
 | DECK-OVERWRITE-GUARD | GOV | createDeckTemplate existing-`.deck`-varsa no-op (ya `.deck.example`); şu an writeFileSync unconditional → re-init secret-loss | ADR-rev | P1 | — | ⬜ | — | ADR-G-005; deck-file:155 |
 | DECK-KEYS-SYNC | GOV | `KNOWN_DECK_KEYS` → built-ins + dynamic provider-key pattern (`DECKENT_*_API_KEY`/WEBHOOK_KEY); DEEPSEEK/DASHSCOPE/ZHIPU "unknown"-warning fix | ADR-rev | P1 | — | ⬜ | — | ADR-G-005; deck-file:11 |
 | DECK-HARDEN | GOV | `.deck` write `0o600` (signature.ts deseni) + `.npmignore`'a `.deck` ekle (defense-in-depth) | ADR-rev | P2 | — | ⬜ | — | ADR-G-005 |
+| DOCS-PURE-ADAPTER | GOV | 🔴 claude-md+agents-md'yi docs.json+seed-template'ten çıkar (host-files NOT managed-docs); test:166-005 güncelle + "adapters not managed" regression; metrics summary.md/dashboard'da kalır | ADR-rev | P0 | — | ⬜ | — | ADR-G-004; çekirdek-dosyaya metric-stamp yanlış |
+| CURSOR-TARGET-UNIFY | GOV | Cursor target tek `.cursor/rules/deckent.mdc`'ye indir (init-steps `.md`-mesaj + sync dir-as-file + cursor-config `.mdc` dağınık) | ADR-rev | P1 | — | ⬜ | — | ADR-G-004; sync:435/init-steps:348 |
+| AGENT-TEMPLATES-DISPOSITION | GOV | agent-templates.ts test-only rich-generators: pure-adapter'a çevir+wire ya da @deprecated/kaldır (prod-caller yok) | ADR-rev | P1 | — | ⬜ | — | ADR-G-004; DEADMOD-style |
+| ROUTING-VERSION-LABEL | PROV | routeTaskV2 `:504 routingVersion:'v3'` ↔ planner `:645 'v2'` stamp tutarsız; reconcile + planner `??'v1'`→`??'v2'` latent-default-bug | ADR-rev | P2 | — | ⬜ | — | ADR-G-006 |
+| AFFINITY-DEFAULT-DECISION | PROV | skill→agent affinity (`skillAgentAffinity ?? false`) default-on mu config-gated-by-design mi karar; imbalance-fix derinliği buna bağlı | ADR-rev | P1 | — | ⬜ | — | ADR-G-006; feedback_agent_routing_imbalance |
+| CONNECTOR-PLATFORM-REGISTRY | MSG | zero-core-change platform-ekleme: SUPPORTED+config-type yerine registry/plugin entry-point (MSG-1 altı) | ADR-rev | P2 | MSG-1 | ⬜ | — | ADR-G-007 |
+| SECRET-INLINE-ENFORCE | GOV | connector token inline-raw schema-reddi (fail-closed); şu an yalnız unresolved-$DECK-skip + policy | ADR-rev | P2 | — | ⬜ | — | ADR-G-007 |
+| PROVIDER-NAME-TYPE | PROV | ProviderName type-level open-id migration (closed-union `'claude'|'codex'|'gemini'|'ollama'` → BuiltinProviderName + açık string-id; runtime zaten açık) | ADR-rev | P2 | — | ⬜ | — | ADR-G-008; task-types:38 |
+| PROVIDER-FREE-HARDEN | PROV·GOV | docker binary-resolution unknown/unsupported model → legacy Claude fallback yerine honest-fail | ADR-rev | P2 | WM-5 | ⬜ | — | ADR-G-008; spawn-backend-docker:373 |
+| COVERAGE-BRIDGE-RETIRE | GOV | signal-path kanıtlanınca COVERAGE_OPTIONAL_AGENTS allowlist-bridge'i (P0-2 refactorer/code-reviewer) kaldır | ADR-rev | P2 | — | ⬜ | — | ADR-G-009; rubric-registry:240 |
+| SMOKE-REQUIRED-ENFORCE | GOV | Tier-1 Smoke yoksa no-op yerine fail-closed (hollow-DONE'a karşı); şu an worker-rule+FIX-pressure | ADR-rev | P2 | — | ⬜ | — | ADR-G-009; proof-of-function:277 |
 
 ---
 

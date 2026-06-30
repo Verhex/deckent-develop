@@ -24,16 +24,23 @@ Evaluation must judge work **honestly and for real**, across any language, witho
     code→detected-stack commands.</language-agnostic>
   <coverage-exemption signal-based="true">if a worker changed a test file
     (.test.*/.spec.*) coverage is optional — AGENT-INDEPENDENT + idempotent +
-    deterministic (derived from result.filesChanged, disk ground-truth). Replaces the
-    leaky agent-name allowlist (070 false-FIX root).</coverage-exemption>
+    deterministic (derived from result.filesChanged, disk ground-truth). Signal-based is
+    the canonical/primary path; a transitional agent-allowlist bridge
+    (COVERAGE_OPTIONAL_AGENTS, P0-2: refactorer/code-reviewer) still remains, checked
+    first (070 false-FIX root → COVERAGE-BRIDGE-RETIRE).</coverage-exemption>
   <zero-hard-code>any string a running deckent can derive from live data MUST NOT be
     hardcoded — model IDs read from the live registry (bundled snapshot = offline
-    fallback only); no stale `claude-opus-4-6` in cost/status output.</zero-hard-code>
+    fallback only); no stale `claude-opus-4-6` in cost/status output. Scope = user-facing
+    cost/status OUTPUT (display labels derived from the live registry); test fixtures,
+    backward aliases, and the pricing-baseline snapshot are excluded — not a repo-wide
+    literal ban.</zero-hard-code>
   <proof-of-function>isUserSurfaceTask (Tier-1) = touches src/cli/commands/ |
     src/dashboard/ | src/api/ (orthogonal to TaskType). Tier-1 DoD = Tier-0 +
     a recorded REAL-BINARY run via the `Smoke:` directive. A mocked unit test alone =
-    GO_WITH_TECH_DEBT, never DONE. Sprint-inner gate (proof-of-function.ts, async spawn,
-    host-side) auto-downgrades DONE→GO_WTD on smoke-fail + emits PROOF_OF_FUNCTION_MISMATCH.
+    GO_WITH_TECH_DEBT, never DONE. The verify module (proof-of-function.ts, async spawn,
+    host-side) runs the smoke + returns failed/passed/no-op; the EVALUATE phase
+    (sprint-phases.ts) applies the DONE→GO_WTD downgrade + emits PROOF_OF_FUNCTION_MISMATCH
+    (applyProofOfFunctionGate = the reusable helper form).
     Surface-aware routing prefers api-builder/frontend-designer/ci-guardian.</proof-of-function>
 </evaluation-integrity>
 ```
@@ -53,9 +60,9 @@ The "wired ≠ working" principle is permanent: structural/disk proof (Tier-0) i
 
 ## Consequences
 
-**(+)** Evaluation is honest across languages, gaming-proof (signal/disk-derived, not agent-name), zero-hardcode, and run-verified for user surfaces. Hollow-DONE is structurally impossible for Tier-1. False-NO_GO on doc/audit/non-TS tasks eliminated.
+**(+)** Evaluation is honest across languages, gaming-proof (signal/disk-derived, not agent-name), zero-hardcode, and run-verified for user surfaces. Hollow-DONE is structurally impossible for a Tier-1 task **that carries a valid `Smoke:`** (an absent `Smoke:` is a no-op today — see below). False-NO_GO on doc/audit/non-TS tasks eliminated.
 
-**(−)** Tier-1 gate adds EVALUATE latency (only when `Smoke:` present; absent → no-op). Workers may forget the `Smoke:` line (anchored in worker rules; FIX-phase pressure catches it). Hard-enforcement of A9/A14 is roadmap (today the vein is dogfood-flag).
+**(−)** Tier-1 gate adds EVALUATE latency (only when `Smoke:` present; absent → no-op, **not fail-closed**) — workers may forget the `Smoke:` line (anchored in worker rules + FIX-phase pressure; fail-closed Smoke-required is SMOKE-REQUIRED-ENFORCE). The coverage-exemption still keeps a transitional agent-allowlist bridge alongside the signal path (COVERAGE-BRIDGE-RETIRE). Hard-enforcement of A9/A14 is roadmap (today the vein is dogfood-flag).
 
 ---
 
@@ -63,5 +70,5 @@ The "wired ≠ working" principle is permanent: structural/disk proof (Tier-0) i
 
 - **Absorbs:** ADR-019 + ADR-070 + ADR-079.
 - **Cross-ref:** ADR-G-028 (Work Taxonomy — TaskKind×TechStack, the deriver inputs) · ADR-G-020 (enforcement vein A9/A14) · ADR-G-006 (surface-aware routing) · ADR-G-018 (verification protocol channels) · ADR-G-025 (worker-live-trace / observability).
-- **Born / MASTER-PLAN:** WM-7 (criteria-deriver) · XVER-1 (cross-verify) · zero-hardcode (`feedback_zero_hardcode_live_data`).
+- **Born / MASTER-PLAN:** WM-7 (criteria-deriver) · XVER-1 (cross-verify) · COVERAGE-BRIDGE-RETIRE (retire `COVERAGE_OPTIONAL_AGENTS` once signal-path proven) · SMOKE-REQUIRED-ENFORCE (fail-closed Smoke for Tier-1 vs today's no-op) · zero-hardcode (`feedback_zero_hardcode_live_data`).
 - **Memory:** `feedback_proof_of_function_dod` · `feedback_zero_hardcode_live_data`.
