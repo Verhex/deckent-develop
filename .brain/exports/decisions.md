@@ -760,22 +760,27 @@ This is a **security invariant** (command-injection = zero), not a stylistic pre
 
 Async `spawn` is the **default rule** (ADR-D-002, Test Infrastructure & Hermeticity — `spawnSync` blocks the event loop and causes CI timeouts; absorbed old ADR-087 async-io-hermeticity). `spawnSync` is the **sanctioned exception**, permitted only for **short, trusted, non-hot-path one-shots**. When `spawnSync` *is* used (within that sanctioned exception), it MUST follow the §1 security pattern — array-args, no `shell: true`.
 
-### 3. Documented `shell:true` carve-outs (narrow, deliberate)
+### 3. Windows-conditional shell carve-outs (census — narrow, deliberate)
 
-- `src/core/plugin-hooks.ts` — sandboxed plugin-hook execution.
-- `src/core/provider.ts` — Windows-only, to resolve `.cmd`/`.ps1` wrapper binaries on `PATH`.
+Code-grounded census (2026-06-30) — the carve-outs are **Windows-conditional** (`shell: isWindows` / `shell: process.platform === 'win32'`), not unconditional `shell:true`:
 
-These carve-outs **never interpolate untrusted input** into a command string (args remain arrays / fixed). They are the only sanctioned `shell:true` sites.
+- `src/core/plugin-hooks.ts` — sandboxed plugin-hook execution (Windows-conditional).
+- `src/core/provisioner.ts` · `src/core/subscription.ts` · `src/providers/subprocess.ts` — Windows wrapper / provisioning calls (Windows-conditional shell).
+- `src/core/provider.ts` is **no longer a `shell:true` carve-out** — it moved to the **SPAWN-1 pattern** (`cmd.exe /c` + `shell:false`: cmd.exe resolves the `.cmd`/`.ps1` wrapper via `PATHEXT` while Node keeps `shell:false`, side-stepping the DEP0190 injection edge). This is the **target pattern the remaining carve-outs migrate toward**.
+
+Every carve-out **must keep args as arrays and never interpolate untrusted input** into a command string. The enumerated set above is the only sanctioned shell-using surface; a new one requires an ADR-G-002 amendment (tracked: SPAWN-1 carve-out-census + hardening).
 
 ### 4. Enforcement (today — advisory)
 
-Compliance is tracked by the `ADR-006` compliance check (code-key `checkAdr006`, retained verbatim in code for stability — old ADR-006 **is** this record, now ADR-G-002) in `src/orchestra/authority-enforcer.ts` — a compile-time scan. Per ADR-G-020 (RBAC V1.0) this is **advisory/soft**: it warns + emits an audit signal, it does **not** hard-block.
+Compliance is tracked by the `ADR-006` compliance check (code-key `checkAdr006`, retained verbatim in code for stability — old ADR-006 **is** this record, now ADR-G-002) in `src/orchestra/authority-enforcer.ts` — a compile-time scan.
+
+**Scan limitation (honest):** `checkAdr006` matches **literal `shell: true`** only. It does **not** catch conditional `shell: <expr>` (`shell: isWindows`, `shell: process.platform === 'win32'`), `execSync(commandString)`, or template/concat command construction — so the §1 invariant is only **partially** machine-enforced (born-item SHELL-SCAN-EXTEND). Per ADR-G-020 V1.0 the check is **advisory/soft** (warns + emits, no hard-block) by default; the ADR-094 **A9 gate is flag-gated** — when enabled it can downgrade a violation to NO_GO (default-off / fail-open today).
 
 ---
 
 ## Intent / Roadmap (Tomorrow)
 
-- **Enforcement advisory→runtime:** today the ADR-006 scan only warns; tomorrow a subprocess constructed with `shell:true` + interpolated untrusted input is **blocked, not merely logged** — via the ADR-094 flag-gated enforcement vein graduating to default-on under ADR-G-020's authority layer (the same inviolability vein that carries every ADR-G law).
+- **Enforcement advisory→runtime:** today the ADR-006 scan only warns (and only on literal `shell:true`); tomorrow a subprocess constructed with `shell:true` + interpolated untrusted input is **blocked, not merely logged** — via the ADR-094 flag-gated enforcement vein graduating to default-on under ADR-G-020's authority layer. The runtime gate **wires the existing `spawn-safety.ts` `assertSpawnSafe`** (binary-whitelist + arg-sanitization — today a 0-caller primitive) into the spawn/backend callsites, and **extends `checkAdr006` beyond literal `shell:true`** (conditional-shell + `execSync` + command-string — SHELL-SCAN-EXTEND).
 - **Windows carve-out hardening (SPAWN-1):** Node `DEP0190` (`shell:true` + args array) Windows leak + injection fix — tighten the `provider.ts` `.cmd`/`.ps1` resolution so the carve-out can never become an injection surface, moving toward a platform-adapter that resolves wrapper binaries without `shell:true` where the runtime allows. (MASTER-PLAN: SPAWN-1.)
 - **Backend convergence:** as worker spawn moves to heterogeneous backends (ADR-G-014 — docker/subprocess/tmux/firecracker/cloud), the array-args invariant is carried **uniformly** across every backend adapter, never re-derived per backend.
 
@@ -783,9 +788,9 @@ Compliance is tracked by the `ADR-006` compliance check (code-key `checkAdr006`,
 
 ## Consequences
 
-**(+)** Command-injection surface is **zero by construction**; the invariant is backend- and sync/async-independent; the `shell:true` carve-outs are explicit, enumerated, and auditable. A single security law covers every subprocess path the product takes on any host.
+**(+)** The array-args paths are **injection-free by construction**; the invariant is backend- and sync/async-independent; the shell carve-outs are explicit, enumerated, and auditable. A single security law covers every subprocess path the product takes on any host. (Residual: a few `execSync('<static git command>')` calls run a *static* command through a shell — no untrusted interpolation, low-risk — and any variable-command `execSync` paths migrate to `execFileSync`/array-args; born-item EXECSYNC-MIGRATE.)
 
-**(−)** `shell:true` carve-outs still exist (plugin-hooks, Windows wrapper resolution) and rely on the discipline that args stay arrays. Today's enforcement is **advisory** (the `authority-enforcer` scan warns; ADR-G-020 V1.0 is soft), so a violation is caught at scan/audit time, not hard-blocked at runtime — that is the ADR-094 + SPAWN-1 roadmap. The Windows `DEP0190` carve-out is a known sharp-edge until SPAWN-1 lands.
+**(−)** Windows-conditional shell carve-outs still exist (plugin-hooks, provisioner, subscription, subprocess) and rely on the discipline that args stay arrays. Enforcement is **advisory AND partial**: `checkAdr006` catches only literal `shell: true` (not conditional-shell / `execSync` / command-strings — SHELL-SCAN-EXTEND), warns rather than hard-blocks (ADR-G-020 V1.0 soft; ADR-094 A9 flag-gated), and the strong `spawn-safety.ts` primitive (`assertSpawnSafe`) is a 0-caller, not yet wired. The Windows `DEP0190` carve-out is a known sharp-edge until SPAWN-1 lands.
 
 ---
 
@@ -795,7 +800,7 @@ Compliance is tracked by the `ADR-006` compliance check (code-key `checkAdr006`,
 - **Axis partner:** ADR-D-002 (Test Infrastructure & Hermeticity — async-`spawn` default, `spawnSync` sanctioned exception; absorbed old ADR-087 async-io-hermeticity).
 - **Backend partner:** ADR-G-014 (Spawn Backend, Options & Observation — uniform invariant across backends; absorbed old ADR-007 SpawnOptions + ADR-089).
 - **Enforcement partner:** ADR-G-020 (Authority, Roles, Flow & Enforcement — advisory→hard) + ADR-094 (flag-gated enforcement vein).
-- **Born work-items:** SPAWN-1 (Windows `DEP0190` carve-out hardening — MASTER-PLAN, P1).
+- **Born work-items:** SPAWN-1 (Windows `DEP0190` carve-out hardening + carve-out-census + `spawn-safety.ts` `assertSpawnSafe` wiring — MASTER-PLAN, P1) · SHELL-SCAN-EXTEND (`checkAdr006` → conditional-shell + `execSync` + command-string detection) · EXECSYNC-MIGRATE (variable-command `execSync` → `execFileSync`/array-args; cross-ref ADR-087-W).
 - **Direction:** `.analysis/adr-review-crosswalk.md` (row 006 → ADR-G-002), `.analysis/adr-governance-redesign-plan.md`.
 
 
@@ -862,14 +867,14 @@ Per-host generators live in `src/cli/helpers/agent-templates.ts` (`generateAgent
 
 ---
 
-## adr-g-005: Secret File System & Zero-Worker-Exposure
+## adr-g-005: Secret File System (Dedicated `.deck` + Per-Provider Credential Model)
 
 **Status:** accepted
 
-# ADR-G-005: Secret File System & Zero-Worker-Exposure
+# ADR-G-005: Secret File System (Dedicated `.deck` + Per-Provider Credential Model)
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=`.deck` + `DECKENT_` prefix registry + `ensureDeckGitignore` (auto) + host-side-only consumers (never on the worker-spawn path) → tomorrow=global+project scope secret resolution, same zero-exposure invariant across all backends
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-014 (.deck Secret File System) · **Supersedes:** —
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=`.deck` + `DECKENT_` registry + `ensureDeckGitignore` (auto) + `$DECK:KEY` interpolation + **per-provider env-forward to workers** (NOT zero-exposure — `.deck` is readable via the project-root mount) → tomorrow=**DECK-WORKER-ISOLATION** (exclude `.deck` from the worker mount + narrow the env-forward) → true zero-exposure across all backends; global+project scope
+**Status:** accepted (file-separation + per-provider credential model live; **true zero-worker-exposure is roadmap — DECK-WORKER-ISOLATION, not yet enforced**) · **Date:** 2026-06-30 · **Absorbs:** ADR-014 (.deck Secret File System) · **Supersedes:** —
 **Crosswalk:** ADR-014 → ADR-G-005
 
 ---
@@ -878,36 +883,45 @@ Per-host generators live in `src/cli/helpers/agent-templates.ts` (`generateAgent
 
 Provider API keys originally lived in `.env`, which collided with the user's own project `.env`: deckent's `DECKENT_`-prefixed keys polluted the user file and complicated `.gitignore` management. ADR-014 (Sprint 044) separated deckent secrets into a dedicated **`.deck`** file, auto-added to `.gitignore` at init, so the user's `.env` is never touched.
 
-A Sprint 281 re-audit (classification: BOTH — secret hygiene is directly user-product security) re-verified the core against the code and **strengthened the isolation claim**. The original ADR said "Brain injects only the needed keys per task scope." In today's reality that is not selective-injection at all — it is **zero exposure**: `.deck` never enters the worker-spawn path (there is no deck-transport in the docker backend), and every consumer is host-side. The "workers never see `.deck`" guarantee is therefore *more strictly* true than originally written.
+A Sprint 281 re-audit (classification: BOTH — secret hygiene is directly user-product security) re-verified the core. The original ADR said "Brain injects only the needed keys per task scope," and a later draft over-strengthened this to "zero exposure / workers cannot read `.deck` under any backend." **The 2026-06-30 code-grounded review corrects that over-claim.** deckent does **not** *explicitly* transport `.deck` to a worker — but two real paths expose secrets to the worker today: (a) the **docker backend mounts the project root** (read-only) at `/workspace`, and `.deck` lives in the project root with **no exclusion**, so a worker **can read `/workspace/.deck`**; (b) host-side, `.deck` → `process.env` (`loadDeckSecrets`) and the docker backend **forwards the provider key per-provider** into the container (`-e ANTHROPIC_API_KEY` for api-mode). The honest model is therefore **dedicated-file separation + a per-provider credential allowlist**, not zero-exposure. Closing both gaps is the DECK-WORKER-ISOLATION roadmap item.
 
 ## Decision (Today)
 
 ### 1. Dedicated secret file
-deckent's secrets live in a separate **`.deck`** file using a `DECKENT_`-prefixed key registry. The user's `.env` is never read or written. `ensureDeckGitignore` adds `.deck` to `.gitignore` automatically at init; `isDeckFileCommitted` guards against an accidentally-committed secret file. Core helpers: `parseDeckFile` / `loadDeckSecrets` / `validateDeckFile` / `createDeckTemplate` / `ensureDeckGitignore` / `isDeckFileCommitted` (`src/core/deck-file.ts`).
+deckent's secrets live in a separate **`.deck`** file using a `DECKENT_`-prefixed key registry (`KNOWN_DECK_KEYS` + dynamic provider keys — see DECK-KEYS-SYNC). The user's `.env` is never read or written. `ensureDeckGitignore` adds `.deck` to `.gitignore` automatically at init; `isDeckFileCommitted` guards against an accidentally-committed secret file. Core helpers: `parseDeckFile` / `loadDeckSecrets` / `validateDeckFile` / `createDeckTemplate` / `ensureDeckGitignore` / `isDeckFileCommitted` (`src/core/deck-file.ts`).
 
-### 2. Zero-worker-exposure (stronger than selective-inject)
-`.deck` is **never on the worker-spawn path** — workers cannot read it under any backend (no deck-transport in the docker backend). All secret consumers are **host-side only**: provider bootstrap auto-register (`provider.ts`, ADR-077 Part-C → ADR-G-008), `server.ts`, `doctor.ts`, and config interpolation. This is a zero-exposure invariant, not a per-task filter.
+### 2. Worker credential model — per-provider env-allowlist (NOT zero-exposure today)
+
+deckent does not *explicitly* copy `.deck` into a worker, but the worker is **not** isolated from it today:
+
+- **Project-root mount exposes the file.** The docker backend mounts the project root **read-only** at `/workspace` (`spawn-backend-docker.ts`), and `.deck` is in the project root with **no exclusion** — so a worker can `read('/workspace/.deck')`. Subprocess/host backends run the worker inside the project root directly.
+- **Credentials are env-forwarded.** Host-side, `.deck` → `process.env` (`loadDeckSecrets`, `provider.ts`); the docker backend then forwards the **provider key** into the container per-provider (`-e ANTHROPIC_API_KEY` for api-mode). A worker therefore sees its **own provider credential** in env.
+- **Most consumers are host-side** (provider bootstrap auto-register — ADR-G-008 / ADR-077 Part-C, `server.ts`, `doctor.ts`, `$DECK:KEY` config interpolation), which limits *broad* secret spread — but it is a **per-provider allowlist, not a zero-exposure invariant**.
+
+**True zero-worker-exposure** — excluding `.deck` from the worker mount and narrowing/removing the env-forward (e.g. a host-side credential broker) — is the **DECK-WORKER-ISOLATION** roadmap item, not today's reality.
 
 ### 3. `$DECK:KEY` interpolation + signing
-Config values may reference secrets as `"$DECK:KEY"` (e.g. `"token": "$DECK:DISCORD_TOKEN"`), resolved at runtime host-side from `.deck` with a missing-secret warning (`src/core/deck-interpolation.ts`). Ed25519 signing for secret / skill-publish signatures uses `@noble/ed25519` + `@noble/hashes` (`src/core/signature.ts`); per the ADR-D-005 amendment these two crypto dependencies are governed here.
+Config values may reference secrets as `"$DECK:KEY"` (e.g. `"token": "$DECK:DISCORD_TOKEN"`), resolved at runtime host-side from `.deck` with a missing-secret warning (`src/core/deck-interpolation.ts`). Ed25519 signing for secret / skill-publish signatures uses `@noble/ed25519` + `@noble/hashes` (`src/core/signature.ts`, private key written `0o600`); per the ADR-D-005 amendment these two crypto dependencies are governed here.
 
 ## Intent / Roadmap (Tomorrow)
 
-- **Global + project scope.** Today `.deck` is effectively project-local. As deckent ships global-install + project-scope (ADR-G-001 layering), secrets resolve across a **global `~/.deck`** (machine-wide provider keys set once) and a **project `.deck`** (per-repo overrides), with the same zero-worker-exposure invariant and the same precedence spine as config (global < project).
-- **Multi-tenant secret isolation.** The host-side-only consumer model is the foundation for per-tenant secret scoping (enterprise) — secrets never cross the worker boundary regardless of backend (docker / subprocess / future firecracker / cloud).
-- **Consent + provisioning tie-in.** Secret setup folds into the conversational onboarding / consent flow (ADR-G-030) so a user provisions provider keys without hand-editing `.deck`.
+- **🔴 DECK-WORKER-ISOLATION (P0) — make zero-exposure true.** Exclude `.deck` from the docker project-root mount (a `.deck`-stripped overlay, a mount sub-path, or moving the worker workspace out of the project root) **and** narrow the env-forward so a worker receives only the minimum credential it needs — ideally via a host-side credential broker rather than raw env. Until this lands, the `.deck` file is worker-readable and the provider key is env-forwarded.
+- **Global + project scope.** Today `.deck` is effectively project-local. As deckent ships global-install + project-scope (ADR-G-001 layering), secrets resolve across a **global `~/.deck`** (machine-wide provider keys set once) and a **project `.deck`** (per-repo overrides), same precedence spine as config (global < project).
+- **Multi-tenant secret isolation.** Once DECK-WORKER-ISOLATION holds, the host-side-only consumer model becomes the foundation for per-tenant secret scoping (enterprise) — secrets never crossing the worker boundary regardless of backend (docker / subprocess / future firecracker / cloud).
+- **Consent + provisioning tie-in.** Secret setup folds into the conversational onboarding / consent flow (ADR-G-030) so a user provisions provider keys without hand-editing `.deck` (and `createDeckTemplate` must never overwrite an existing `.deck` — DECK-OVERWRITE-GUARD).
 
 ## Consequences
 
-**(+)** deckent secrets are fully separated from the user's `.env`; auto-gitignore + committed-file guard prevent accidental leaks; the zero-worker-exposure invariant is architecturally enforced (no transport path) rather than policy-enforced, so it holds across backends; `$DECK:KEY` interpolation keeps raw secrets out of config files; signing deps are governed, not ad-hoc.
+**(+)** deckent secrets are fully separated from the user's `.env`; auto-gitignore + committed-file guard prevent accidental git leaks; the per-provider env-allowlist limits a worker to its own provider credential rather than the whole secret set; `$DECK:KEY` interpolation keeps raw secrets out of config files; signing deps are governed, not ad-hoc.
 
-**(−)** The strong isolation depends on no backend ever adding a deck-transport to workers — a future backend must preserve the invariant explicitly; global+project secret scope is roadmap (today effectively project-local); `$DECK:KEY` resolution failures surface as warnings, so a missing secret degrades at runtime rather than blocking up front (acceptable, but must stay visible).
+**(−)** **The headline "zero-worker-exposure" is NOT yet true:** the docker project-root mount exposes `.deck` to the worker (read-only, no exclusion) and the provider credential is env-forwarded — a worker sees its own credential and can read the secret file (DECK-WORKER-ISOLATION, P0). Other gaps: `createDeckTemplate` writes `.deck` unconditionally and can **overwrite an existing secret file** on re-init (DECK-OVERWRITE-GUARD); `KNOWN_DECK_KEYS` (9 keys) drifts from real usage (`DECKENT_DEEPSEEK_API_KEY`, `DASHSCOPE`, `ZHIPU`, `WEBHOOK_KEY` warn as "unknown" — DECK-KEYS-SYNC); `.deck` is written without `0o600` perms and is absent from `.npmignore` (defense-in-depth — DECK-HARDEN, though `package.json` `files` currently excludes it from publish). Global+project secret scope is roadmap.
 
 ## References / Absorbed
 
-- **Absorbs:** ADR-014 (.deck Secret File System — dedicated file, `DECKENT_` registry, auto-gitignore, worker non-exposure).
-- **Implementation:** `src/core/deck-file.ts` (parse/load/validate/template/gitignore/committed-guard), `src/core/deck-interpolation.ts` (`$DECK:KEY`), `src/core/signature.ts` (Ed25519, `@noble/ed25519` + `@noble/hashes`).
-- **Cross-ref:** ADR-D-005 (Dependency Policy & Inventory — crypto-deps bridge), ADR-G-008 (Provider Abstraction — bootstrap auto-register, host-side consumer; ADR-077 Part-C), ADR-G-001 (Layered Config & Scope — shared global<project precedence), ADR-G-030 (Consent-Based Provisioning — secret-setup onboarding).
+- **Absorbs:** ADR-014 (.deck Secret File System — dedicated file, `DECKENT_` registry, auto-gitignore).
+- **Implementation:** `src/core/deck-file.ts` (parse/load/validate/template/gitignore/committed-guard), `src/core/deck-interpolation.ts` (`$DECK:KEY`), `src/core/signature.ts` (Ed25519, `@noble/ed25519` + `@noble/hashes`), `src/orchestra/spawn-backend-docker.ts` (project-root mount + per-provider env-forward).
+- **Cross-ref:** ADR-D-005 (Dependency Policy — crypto-deps bridge), ADR-G-008 (Provider Abstraction — bootstrap auto-register, host-side consumer; ADR-077 Part-C), ADR-G-001 (Layered Config & Scope — shared global<project precedence), ADR-G-014 (Spawn Backend — the mount/env model lives here), ADR-G-030 (Consent-Based Provisioning — secret-setup onboarding), ADR-G-031 (multi-tenant secret scoping).
+- **Born work-items:** **DECK-WORKER-ISOLATION** (P0 — exclude `.deck` from worker mount + narrow env-forward) · DECK-OVERWRITE-GUARD (P1 — `createDeckTemplate` no-op-if-exists) · DECK-KEYS-SYNC (P1 — `KNOWN_DECK_KEYS` → built-ins + dynamic provider-key pattern) · DECK-HARDEN (P2 — `.deck` `0o600` + `.npmignore` entry).
 - **Direction:** global+project secret scope (MASTER-PLAN); `.analysis/adr-review-crosswalk.md` row 014.
 
 

@@ -168,7 +168,7 @@
 | WIN-2 | WIN | tmux/docker local gözlemlenebilirlik (worker izleme, ölçeklenebilir) | A | P1 | — | ⬜ | — | "izlenebilir ölçek" |
 | WIN-3 | WIN | Ölçeklenebilir spawn (ERP + milyon-user) | A | P1 | — | ⬜ | — | — |
 | WIN-ERP | WIN·ENT | Azure/Windows-ERP enterprise katmanı (IBM/Oracle/dünya-devleri ölçeği) — kalp adayı | A | P2 | — | ⬜ | — | — |
-| SPAWN-1 | WIN | Node DEP0190 (shell:true+args) Windows leak + injection fix | MP | P1 | — | ⬜ | — | ADR-G-002 carve-out |
+| SPAWN-1 | WIN·GOV | DEP0190 (shell:true+args) Windows leak+injection fix + carve-out-census (provider→cmd.exe/shell:false; provisioner/subscription/subprocess hardening) + spawn-safety.ts assertSpawnSafe wire (0-caller) | MP·ADR-rev | P1 | — | ⬜ | — | ADR-G-002 |
 | MSG-1 | MSG | Integration layer (connector pairing/authz/session standardı) | A·CL | P1 | — | ⬜ | — | genel-yapı uyumu |
 | MSG-CONT | MSG | Connector output → session continuity (reply = devam eden sohbet) | CX | P1 | MSG-1 | ⬜ | — | §3.4 |
 | MSG-2 | MSG | Pairing-onay butonu wire (onCallback — G1 ertelenmiş) | A·CL | P1 | APR-2 | ⬜ | — | gateway-daemon.ts:87-90 |
@@ -295,6 +295,12 @@
 | CONFIG-ENV-SYNC | GOV·DOCS | env-layer set karar (curated-5 mi `DECKENT_MAX_WORKERS`/`MODEL` expand mi) + architecture.md Config-Layers mirror-sync + global-config migrate | ADR-rev | P1 | — | ⬜ | — | ADR-G-001; arch.md drift |
 | CONFIG-CACHE-GLOBAL | GOV | loadConfig cache-key'e global-mtime + env-snapshot ekle (long-running'de global/env değişimi kaçıyor; şu an project-mtime-only) | ADR-rev | P2 | — | ⬜ | — | ADR-G-001; config.ts:1325 |
 | CONFIG-LOCK | GOV | G>U>D publisher-invariant-lock (deepMerge→lock-aware; lower-scope ADR-G-backed setting'i gevşetemez) | ADR-rev | P2 | — | ⬜ | — | ADR-G-001/G-019/G-020; şu an pure last-wins |
+| SHELL-SCAN-EXTEND | GOV | checkAdr006 regex genişlet: literal `shell:true` → conditional-shell (`shell:isWindows`/`process.platform`) + `execSync(cmd)` + template/concat command-string | ADR-rev | P1 | — | ⬜ | — | ADR-G-002; authority-enforcer:473 |
+| EXECSYNC-MIGRATE | GOV | variable-command `execSync` → `execFileSync`/array-args (worker-verify/heartbeat-daemon öncelik; static-git low-risk) | ADR-rev | P2 | — | ⬜ | — | ADR-G-002; 087-W bağ |
+| DECK-WORKER-ISOLATION | GOV·ENT | 🔴 `.deck`'i docker project-root-mount'tan exclude/overlay + env-forward narrow (host-side broker) → gerçek zero-worker-exposure | ADR-rev | P0 | — | ⬜ | — | ADR-G-005; güvenlik-iddiası kod-true değil |
+| DECK-OVERWRITE-GUARD | GOV | createDeckTemplate existing-`.deck`-varsa no-op (ya `.deck.example`); şu an writeFileSync unconditional → re-init secret-loss | ADR-rev | P1 | — | ⬜ | — | ADR-G-005; deck-file:155 |
+| DECK-KEYS-SYNC | GOV | `KNOWN_DECK_KEYS` → built-ins + dynamic provider-key pattern (`DECKENT_*_API_KEY`/WEBHOOK_KEY); DEEPSEEK/DASHSCOPE/ZHIPU "unknown"-warning fix | ADR-rev | P1 | — | ⬜ | — | ADR-G-005; deck-file:11 |
+| DECK-HARDEN | GOV | `.deck` write `0o600` (signature.ts deseni) + `.npmignore`'a `.deck` ekle (defense-in-depth) | ADR-rev | P2 | — | ⬜ | — | ADR-G-005 |
 
 ---
 

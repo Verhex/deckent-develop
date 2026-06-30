@@ -13,7 +13,7 @@
 | adr-g-001 | Layered Config & Scope Precedence | accepted |
 | adr-g-002 | spawnSync Security Pattern | accepted |
 | adr-g-004 | Instruction-File Adapter & Multi-Env Generation | accepted |
-| adr-g-005 | Secret File System & Zero-Worker-Exposure | accepted |
+| adr-g-005 | Secret File System (Dedicated `.deck` + Per-Provider Credential Model) | accepted |
 | adr-g-006 | Routing & Selection (Learned Model/Effort + Agent/Skill) | accepted |
 | adr-g-007 | External Messaging Connectors & Integration Layer | accepted |
 | adr-g-008 | Provider Abstraction, Fleet & Native-Usage | accepted |
