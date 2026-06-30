@@ -2493,13 +2493,18 @@ deckent runs in two fundamentally different modes: **dogfood** (deckent modifyin
     P3 post-task auto-checkpoint (MCP-restart resume).
     P4 USER PROJECTS = NO-OP (detectDeckentRepo=false → zero overhead).
   </policy>
-  <live-value>the proven, live consumer is the ROLLBACK-GUARD: detectDeckentRepo gates
-    rollback.ts at BOTH ends — createSafetyPoint becomes a no-op AND rollbackToSafetyPoint's
-    `git reset --hard` is skipped on deckent's own tree, so deckent can never wipe its own
-    uncommitted source (self-git-mutation protection; worker-rollback + the self-modifying
-    write-guard share the same gate). User projects get full rollback semantics
-    (detectDeckentRepo=false). P1–P3 are largely dormant; in practice deckent-dev
-    self-modifying runs go through the manual dispatch path (ADR-D-007).</live-value>
+  <live-value>the proven, live consumers of detectDeckentRepo are: the ROLLBACK-GUARD
+    (rollback.ts at BOTH ends — createSafetyPoint no-op AND rollbackToSafetyPoint's
+    `git reset --hard` skipped on deckent's own tree; worker-rollback.ts shares the gate),
+    so deckent can never wipe its own uncommitted source; AND the agentic self-modify
+    guard (agent/guards/self-modifying.ts — write-elevation gated on detectDeckentRepo).
+    User projects get full rollback semantics (detectDeckentRepo=false).
+    P1–P3 are NOT WIRED (not merely "dormant"): the `isSelfModifyingSprint` flag IS
+    threaded worker → authority (the `src/**`/`tests/**` write-exception in
+    authority-enforcer.ts) but it DEFAULTS FALSE and no live detector sets it; the
+    `isSelfModifyingSprint()` and `enforceSelfModifyingTask()` functions are defined but
+    have NO production caller. In practice deckent-dev self-modifying runs go through the
+    manual dispatch path (ADR-D-007).</live-value>
 </self-modify-detection>
 ```
 
@@ -2518,7 +2523,7 @@ deckent runs in two fundamentally different modes: **dogfood** (deckent modifyin
 
 **(+)** deckent protects its own source/git during dogfood and imposes zero overhead on user projects (P4 no-op). The rollback-guard is a real, working defense against self-git-mutation. The discrimination scales to global-install + many user projects.
 
-**(−)** P1–P3 are dormant (the automated sequential-wave/checkpoint didn't land; manual-dispatch covers it) — born work-item to wire-or-formalize. `package.json name` is a heuristic (a fork could rename — accepted edge case). ROLE-GUARD pid/process enforcement is roadmap.
+**(−)** P1–P3 are **not wired** (the `isSelfModifyingSprint` flag defaults false with no live detector; the detector functions `isSelfModifyingSprint()`/`enforceSelfModifyingTask()` are 0-caller; manual-dispatch covers self-modify today) — SELFMOD-W must wire-or-formally-adopt ADR-D-007, and SELFMOD-CLEANUP removes-or-wires the unused detector functions (incl. the experimental user-project source-pattern path in `enforceSelfModifyingTask`). `package.json name` is a heuristic (a fork could rename — hardening to a publisher-signed marker is roadmap, treated as a *security boundary*). ROLE-GUARD pid/process enforcement is roadmap.
 
 ---
 
@@ -2526,7 +2531,7 @@ deckent runs in two fundamentally different modes: **dogfood** (deckent modifyin
 
 - **Absorbs:** ADR-039.
 - **Cross-ref:** ADR-G-020 (ROLE-GUARD / authority) · ADR-D-007 (manual dispatch — the live dogfood path) · ADR-G-017 (multi-project isolation) · ADR-G-025 (self-modify + rebuild/restart on crash-recovery).
-- **Born / MASTER-PLAN:** ROLE-GUARD · P1-P3-wire-or-formalize · global-install-discrimination.
+- **Born / MASTER-PLAN:** ROLE-GUARD · SELFMOD-W (P1-P3 wire-or-formally-adopt ADR-D-007 — a *security boundary*, P1) · SELFMOD-CLEANUP (remove-or-wire the 0-caller `isSelfModifyingSprint()`/`enforceSelfModifyingTask()` detector functions) · global-install-discrimination (package.json-name → publisher-signed marker).
 - **Memory:** `project_deckent_self_git_mutation_bug`.
 
 
@@ -2538,7 +2543,7 @@ deckent runs in two fundamentally different modes: **dogfood** (deckent modifyin
 
 # ADR-G-022: Nervous System — Proactive Meta-Orchestrator
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=locked safety-floor (5 actions never auto) + config-gated opt-in (default-off) → tomorrow=non-blocking controlled activation + ApprovalBroker-unified approval (runtime-wide)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=locked safety-floor (5 actions never auto) + config-gated opt-in (default-off) → tomorrow=non-blocking controlled activation + ApprovalBroker-unified approval (runtime-wide; today a shared durable pending-approval READER hub, not yet one broker)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-040 (Nervous System Architecture)
 **Crosswalk:** ADR-040 → ADR-G-022
 
@@ -2548,7 +2553,7 @@ deckent runs in two fundamentally different modes: **dogfood** (deckent modifyin
 
 ## Context
 
-Brain/Auditor/Worker are **reactive** — errors surface in retro, after the fact. ADR-040 added a **proactive** meta-layer (`src/nervous/`): Observer → DetectorRegistry → DecisionEngine → Proposer → Dispatcher → Executor, with 4 autonomy presets, 5 locked safety-floors, a 30-action registry, and (now) 12 detectors. The 2026-06-30 review keeps the architecture and adds four requirements: **generalize the action vocabulary** (language/project-agnostic), make it **non-blocking + controlled**, treat it as an **enterprise-layer strength**, and **unify its approval with the runtime ApprovalBroker**.
+Brain/Auditor/Worker are **reactive** — errors surface in retro, after the fact. ADR-040 added a **proactive** meta-layer (`src/nervous/`): Observer → DetectorRegistry → DecisionEngine → Proposer → Dispatcher → Executor, with 4 autonomy presets, 5 locked safety-floors, a 30-action registry, and 12 runtime detectors (config-surface = 16 slots: 5 active + 11 reserve; whole system default-off). The 2026-06-30 review keeps the architecture and adds four requirements: **generalize the action vocabulary** (language/project-agnostic), make it **non-blocking + controlled**, treat it as an **enterprise-layer strength**, and **unify its approval with the runtime ApprovalBroker**.
 
 ---
 
@@ -2557,7 +2562,8 @@ Brain/Auditor/Worker are **reactive** — errors surface in retro, after the fac
 ```xml
 <nervous-system>
   <pipeline>Observer (EventBus + fs-watch + cron-tick + lifecycle) → DetectorRegistry
-    (12 detectors) → DecisionEngine (AuthorityMatrix preset lookup) → Proposer (throttle)
+    (12 runtime detectors; 16 config slots = 5 active + 11 reserve) → DecisionEngine
+    (AuthorityMatrix preset lookup) → Proposer (throttle)
     → Dispatcher (MCP/CLI/File adapters) → Executor (autonomous|suggest-timeout|approve).</pipeline>
   <autonomy presets="strict|balanced|autopilot|full-auto"/>
   <safety-floor locked="5">KILL_LIVE_SPRINT · MANUAL_FILE_DELETE · COST_OVER_THRESHOLD ·
@@ -2567,7 +2573,7 @@ Brain/Auditor/Worker are **reactive** — errors surface in retro, after the fac
 </nervous-system>
 ```
 
-Executor approve-mode: non-safety-floor actions 10s-timeout→auto-proceed; safety-floor unconditional. Cross-process approval round-trip + `edit` live (modifiedPayload).
+Executor approve-mode: non-safety-floor actions auto-proceed on a **presence-aware** timeout (config-keyed — `approve_timeout_attended_ms` ~30s when a human is attending, `approve_timeout_unattended_ms` ~5s when not — NOT a fixed 10s; the CLI enable-message still says 10s and must be single-sourced — NERVOUS-TIMEOUT-SSOT); safety-floor unconditional. Cross-process approval round-trip + `edit` live (modifiedPayload).
 
 > **Note:** In deckent-dev the config flip is currently OFF (`nervous_system.enabled: false`); re-enable is a separate decision. The Sprint-281 NERV-W1 fix replaced a stub action-handler (which silently dropped every approved action) with the real `createActionHandler` — the action-hand now actually executes.
 
@@ -2575,9 +2581,9 @@ Executor approve-mode: non-safety-floor actions 10s-timeout→auto-proceed; safe
 
 ## Intent / Roadmap (Tomorrow)
 
-- **NERVOUS-ACTION-GENERALIZE:** the action registry is TS/deckent-specific (`NPM_PUBLISH`, `COMMIT_PUSH`, `SRC_MODIFICATION`). Generalize to **language/project-agnostic** concepts (`NPM_PUBLISH` → `PUBLISH`, etc.) so it works for Python/C++/Go/any project (the ADR-G-009 language-agnostic pattern, applied to actions).
+- **NERVOUS-ACTION-GENERALIZE:** the action registry is TS/deckent-specific — real actions include `SRC_MODIFICATION`, `COMMIT_PUSH`, `DIRECTIVES_WRITE`, `SPRINT_START` (note: `NPM_PUBLISH` is an *illustrative* target, not a current registry action). Generalize to **language/project-agnostic** concepts (a publish action → `PUBLISH`, etc.) so it works for Python/C++/Go/any project (the ADR-G-009 language-agnostic pattern, applied to actions).
 - **NERVOUS-NONBLOCK:** "enabled → obstructive" must be solved — non-blocking + controlled activation (fixes the observer fs.watch/CPU loop + approval-block). Opened to dogfood AND user channels critically + controlled rollout.
-- **APR unification:** the nervous Executor approval (autonomous/suggest/approve + safety-floor + cross-process + edit) **merges with the runtime-wide ApprovalBroker** (APR-1/APR-2) — nervous becomes one approval-source on a multi-channel live-relay bus.
+- **APR unification:** today a shared durable pending-approval **reader hub** (`core/pending-approvals.ts`) serves nervous + autonomous approvals across surfaces — but it is a reader, not one runtime-wide ApprovalBroker. The nervous Executor approval (autonomous/suggest/approve + safety-floor + cross-process + edit) **merges with the runtime-wide ApprovalBroker** (APR-1/APR-2) — nervous becomes one approval-source on a multi-channel live-relay bus.
 - **NERVOUS-ENTERPRISE:** position nervous as the enterprise-layer's proactive governance/control power (ADR-G-016 "enterprise = governance depth"); controlled rollout dogfood→user.
 
 ---
@@ -2586,7 +2592,7 @@ Executor approve-mode: non-safety-floor actions 10s-timeout→auto-proceed; safe
 
 **(+)** Errors are caught before retro; 4 presets + per-action override + 5 safety-floors give granular, audit-trailed control. A major moat + enterprise strength. APR-unification (tomorrow) makes it the proactive arm of one approval bus.
 
-**(−)** The action vocabulary is not yet language-agnostic (dogfood-only utility today); "enabled→obstructive" is unsolved (born NERVOUS-NONBLOCK); config currently OFF in deckent-dev; APR-unification + enterprise-controlled-rollout are roadmap.
+**(−)** The action vocabulary is not yet language-agnostic (dogfood-only utility today; `NPM_PUBLISH` is illustrative, not a real action); the detector surface is 16 config slots but 12 runtime / 5 default-active; the approve-timeout is presence-aware but the CLI message is stale (NERVOUS-TIMEOUT-SSOT); approval today is a shared reader-hub, not one ApprovalBroker (APR); "enabled→obstructive" is unsolved (NERVOUS-NONBLOCK); config currently OFF in deckent-dev; enterprise-controlled-rollout is roadmap.
 
 ---
 
@@ -2594,7 +2600,7 @@ Executor approve-mode: non-safety-floor actions 10s-timeout→auto-proceed; safe
 
 - **Absorbs:** ADR-040.
 - **Cross-ref:** ADR-G-020 (authority — nervous may restart Brain, never codes) · ADR-G-009 (language-agnostic pattern, applied to actions) · ADR-G-016 (enterprise = governance depth) · ADR-G-032 (mutation-approval checkpoint) · APR (ApprovalBroker).
-- **Born / MASTER-PLAN:** NERVOUS-ACTION-GENERALIZE · NERVOUS-NONBLOCK · NERVOUS-ENTERPRISE · APR-1/APR-2.
+- **Born / MASTER-PLAN:** NERVOUS-ACTION-GENERALIZE · NERVOUS-NONBLOCK · NERVOUS-ENTERPRISE · NERVOUS-TIMEOUT-SSOT (single-source the approve-timeout across ADR / executor / CLI-message) · APR-1/APR-2.
 - **Memory:** `project_nervous_observer_feedback_loop_rootcause` · `project_nervous_activation_plan`.
 
 
@@ -2606,7 +2612,7 @@ Executor approve-mode: non-safety-floor actions 10s-timeout→auto-proceed; safe
 
 # ADR-G-023: Agent/Skill Taxonomy
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=Agent=vertical-domain-expert / Skill=horizontal-capability taxonomy + `selectAgent`/`selectSkills` routing + `AgentRoutingHealth` advisory 40%-threshold (detector-monitored, not hard-enforced) → tomorrow=catalog expansion (AGSK-1) + routing-balance (ADR-G-006) + user-custom agent/skill (ADR-UG / ADR-UP)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=Agent=vertical-domain-expert / Skill=horizontal-capability taxonomy + `routeTaskV2`/`selectBestAgent`/`selectBestSkills` routing (legacy `selectAgent`/`selectSkills` helpers feed it) + `AgentRoutingHealth` advisory 40%-threshold (detector-monitored, not hard-enforced) → tomorrow=catalog expansion (AGSK-1) + routing-balance (ADR-G-006) + user-custom agent/skill (ADR-UG / ADR-UP)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-041 (Agent Taxonomy — Horizontal Skills vs Vertical Agents) · **Supersedes:** —
 **Crosswalk:** ADR-041 → ADR-G-023
 
@@ -2632,13 +2638,14 @@ Sprint 148 shipped the reform package: archive `test-writer`, add `testing-exper
     A deep specialist in ONE domain. Examples: architect (system design, module
     management), security-auditor (vulnerabilities, OWASP), frontend-designer
     (UI/UX, components), doc-writer (docs, README, CHANGELOG), bug-fixer
-    (debugging, regression). `.deckent/agents/` holds 15 built-in agents
-    (excluding temp/archive).
+    (debugging, regression). The packaged built-in SOURCE is `src/core/builtins/agents/`
+    (15 agents); `.deckent/agents/` is the workspace-installed POOL (15, excl temp/archive).
   </agent>
   <skill kind="horizontal">
     A cross-cutting capability ANY agent may use. Examples: testing-expert
-    (vitest, coverage — auto-activates on scope tests/** or *.test.ts),
-    typescript-expert (TS type system), documentation-writer (Markdown, JSDoc).
+    (vitest, coverage — favored on a tests/** scope; see §2.2 for the actual
+    two-path mechanism), typescript-expert (TS type system), documentation-writer
+    (Markdown, JSDoc).
   </skill>
   <invariant>
     Testing is a HORIZONTAL skill — architect writes tests, bug-fixer writes
@@ -2651,8 +2658,8 @@ Sprint 148 shipped the reform package: archive `test-writer`, add `testing-exper
 ### 2. Routing rules
 
 1. **Intent classifier** — `testing` is **not** a primary intent. A `tests/**` scope adds a `test-coverage` *tag* (`routing-engine.ts` `'test-coverage'` → +2) instead.
-2. **`selectSkills()`** — if scope is `tests/**` or `filesWrite` includes `*.test.ts`, `testing-expert` is auto-added.
-3. **`selectAgent()`** — chosen by the task's primary intent (core-dev → architect, bug-fix → bug-fixer, …), independent of model/effort selection.
+2. **Skill auto-activation (two paths today)** — the legacy `selectSkills()` helper (`skill-selector.ts`) hard-adds `testing-expert` when scope is `tests/**` or `filesWrite` includes `*.test.ts`; the **main Router-V2 `selectBestSkills()`** instead *favors* it via the `test-coverage` tag → `+2` score (`routing-engine.ts`), **NOT** via the manifest `autoActivate` field. The built-in `testing-expert` manifest still carries a **dead `intent.primary: testing` activation rule** (testing is no longer a primary intent) plus an unused `autoActivate` field — both must be cleaned and the two paths reconciled (SKILL-MANIFEST-CLEANUP).
+3. **Agent selection** — `selectAgent()` (legacy `agent-selector.ts` helper) scores by primary intent (core-dev → architect, bug-fix → bug-fixer, …); the **main decision path is `routeTaskV2()` → `selectBestAgent()` + `selectAgentByFallback()`** (Router-V2). Independent of model/effort selection.
 4. **`AgentRoutingHealth`** — anomaly threshold `ANOMALY_THRESHOLD_RATE = 0.40` (`detectors/agent-routing.ts`): no single agent should exceed ~40% of assignments. This is a **detector-monitored advisory** (the nervous-system detector *warns*), **not** a hard gate.
 
 ### 3. Distribution reality (honest)
@@ -2675,7 +2682,7 @@ The taxonomy itself (vertical/horizontal, test=skill) is sound and durably enfor
 
 **(+)** Routing classification is correct (test is a skill, not an agent), so the `AgentRoutingHealth` detector measures real anomalies instead of a false 100%; the Beta-GA UX is legible ("why this agent?" is answerable); and skills are reusable economy — `testing-expert` serves many agents instead of one agent monopolizing a keyword. The taxonomy is reconfirmed across Sprints 148/149/150/166 and is stable product law.
 
-**(−)** Distribution balance is a *moving* target, not a closed one — the monopoly recurs (refactorer-weight) and is mitigated, not eliminated, by ADR-G-006; the 40% threshold is advisory (warned), not hard-enforced. Sprint-147 `test-writer` stats were archived (not lost). A user project that defined a custom `test-writer` agent hits a breaking change and may need a migration adapter.
+**(−)** Distribution balance is a *moving* target, not a closed one — the monopoly recurs (refactorer-weight) and is mitigated, not eliminated, by ADR-G-006; the 40% threshold is advisory (warned), not hard-enforced. The testing-expert auto-activation runs through two paths (legacy `selectSkills` hard-add + Router-V2 tag-score) and the built-in manifest still carries a dead `intent.primary: testing` rule + an unused `autoActivate` field (SKILL-MANIFEST-CLEANUP). Sprint-147 `test-writer` stats were archived (not lost). A user project that defined a custom `test-writer` agent hits a breaking change and may need a migration adapter.
 
 ---
 
@@ -2687,7 +2694,7 @@ The taxonomy itself (vertical/horizontal, test=skill) is sound and durably enfor
 - **Authority:** **ADR-G-020** (Authority, Roles, Flow & Enforcement) — `test-writer` removed from the authority matrix (old ADR-037 RBAC).
 - **Evaluation:** **ADR-G-009** (Evaluation Integrity) — `testing-expert` as a horizontal capability under coverage-aware evaluation.
 - **User layers:** **ADR-G-019** (ADR Governance & 4-Layer Taxonomy) — user-custom agent/skill via ADR-UG / ADR-UP (precedence G>U>D).
-- **Born work-items:** AGSK-1 (agent/skill catalog expansion + scale-to-hundreds/thousands), ROUTING-BALANCE (owned by ADR-G-006), USER-CUSTOM-AGENT-SKILL (ADR-UG/UP + custom-agent migration adapter).
+- **Born work-items:** AGSK-1 (agent/skill catalog expansion + scale-to-hundreds/thousands), ROUTING-BALANCE (owned by ADR-G-006), USER-CUSTOM-AGENT-SKILL (ADR-UG/UP + custom-agent migration adapter), SKILL-MANIFEST-CLEANUP (remove dead `intent.primary:testing` + wire-or-remove `autoActivate` in testing-expert/ci-testing manifests; reconcile Router-V2 `selectBestSkills` with the manifest).
 - **Direction:** memory `feedback_agent_routing_imbalance`, `docs/architecture/agents.md`, `docs/architecture/agent-skill-architecture.md`.
 
 
@@ -2726,14 +2733,17 @@ deckent runs work in distinct execution paradigms. ADR-042 shipped a dual mode (
   </style>
   <style-vs-surface>style = execution paradigm (sprint|task|process). Surfaces
     (CLI/REPL/dashboard/MCP/bot) are access ON TOP of a style — a surface is NOT a style.</style-vs-surface>
-  <tenant>TenantContext + resolveTenant (env DECKENT_TENANT_ID → config → 'local').
-    'local' = single-tenant/dev, backward-compatible.</tenant>
+  <tenant>TenantContext + resolveTenant (opts → DECKENT_TENANT_ID env → 'local'; the
+    doc-comment says "config" but NO config step is read). 'local' = single-tenant/dev,
+    backward-compatible. NOTE: this resolveTenant is 0-caller dormant — live tenant
+    resolution is replicated separately in the API endpoints (kpi-endpoint etc.) plus
+    actor.tenantId → entry.tenant → audit/API filter (see Note below).</tenant>
 </mode-architecture>
 ```
 
 > **Clarification — "autonomous" has distinct referents (ties to AUTO-NAMING):** (1) the **autonomous *engine*** (`src/orchestra/autonomous/`) is the agentic *runtime of `process` mode* — NOT a separate `deckent_style` today (`process` is the style; the autonomous engine is *how* a process runs). (2) **autonomous as a roadmap *mode*** is the named member of the future comprehensive mode-set (flow / mission / autonomous). (3) **`deckent mode auto`** is a third, unrelated thing — the sprint|task auto-*detect* selector. These three "auto/autonomous" usages are disambiguated under the MODE-RENAME (born **AUTO-NAMING**), so a user is never left guessing which "auto" they invoked.
 
-> **Note — two open accept-day decisions (carried from ADR-067):** (1) **tenant-threading** — `resolveTenant` is 0-caller (dormant); tenant landed differently (config-flag `strict_tenant` + memory `tenant_id` column + audit-scope). Either wire `TenantContext`-threading OR amend the decision to the realized shape — not both. (2) **AUTO-NAMING** — `deckent mode auto` (sprint|task auto-DETECT) vs "autonomous engine" (the always-running process runtime) are two different "auto"s → user-confusion risk; clarify under the rename.
+> **Note — three open accept-day decisions:** (1) **tenant-threading** — `resolveTenant` is 0-caller (dormant); tenant landed differently (config-flag `strict_tenant` + memory `tenant_id` column + audit-scope). Either wire `TenantContext`-threading OR amend the decision to the realized shape — not both. (2) **AUTO-NAMING** — `deckent mode auto` (sprint|task auto-DETECT) vs "autonomous engine" (the always-running process runtime) are two different "auto"s → user-confusion risk; clarify under the rename. (3) **process-style enforcement** — `deckent process submit` does NOT check `deckent_style=process`; the `process-runtime` helper clones the style per-kind so the style-guards pass regardless. It works, but it is a **soft surface**, not a config-gated mode — decide soft-surface vs config-gated (PROCESS-STYLE-GATE).
 
 ---
 
@@ -2750,7 +2760,7 @@ deckent runs work in distinct execution paradigms. ADR-042 shipped a dual mode (
 
 **(+)** One mode law spanning dual→triple styles; the autonomous engine is recognized as the `process` runtime; style≠surface clears a recurring confusion. Backward-compatible (`local` tenant, sprint default).
 
-**(−)** "sprint" rename is pervasive and not yet done (born MODE-RENAME). Two open decisions (tenant-threading dormant, AUTO-NAMING collision). DIR-2 0-fragility across all modes is roadmap.
+**(−)** "sprint" rename is pervasive and not yet done (born MODE-RENAME — even the `config` category is still labelled "Sprint"). Three open decisions (tenant-threading dormant, AUTO-NAMING collision, process-style soft-surface vs config-gated). The `deckent mode` help/description still reads "sprint|task" though the command accepts `process` (MODE-HELP-FIX). DIR-2 0-fragility across all modes is roadmap.
 
 ---
 
@@ -2758,7 +2768,7 @@ deckent runs work in distinct execution paradigms. ADR-042 shipped a dual mode (
 
 - **Absorbs:** ADR-042 + ADR-067.
 - **Cross-ref:** ADR-G-001 (3-layer config) · ADR-G-031 (enterprise multi-tenancy on `process`) · ADR-G-020 (per-mode authority) · ADR-G-025 (process resilience) · ADR-G-015 (deckent-log multi-mode).
-- **Born / MASTER-PLAN:** MODE-RENAME · AUTO-NAMING · ADR-067-TENANT (threading decision) · DIR-2 · MODE-2 · MODE-1 (process executor).
+- **Born / MASTER-PLAN:** MODE-RENAME (incl. `config` "Sprint" category) · AUTO-NAMING · ADR-067-TENANT (threading decision) · PROCESS-STYLE-GATE (process soft-surface vs config-gated) · MODE-HELP-FIX (`deckent mode` description/error → sprint|task|process) · DIR-2 · MODE-2 · MODE-1 (process executor).
 - **Memory:** `project_automation_usability_state` · `project_autonomous_first_dogfood_grand_vision`.
 
 

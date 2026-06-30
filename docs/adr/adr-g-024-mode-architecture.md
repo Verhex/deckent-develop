@@ -27,14 +27,17 @@ deckent runs work in distinct execution paradigms. ADR-042 shipped a dual mode (
   </style>
   <style-vs-surface>style = execution paradigm (sprint|task|process). Surfaces
     (CLI/REPL/dashboard/MCP/bot) are access ON TOP of a style — a surface is NOT a style.</style-vs-surface>
-  <tenant>TenantContext + resolveTenant (env DECKENT_TENANT_ID → config → 'local').
-    'local' = single-tenant/dev, backward-compatible.</tenant>
+  <tenant>TenantContext + resolveTenant (opts → DECKENT_TENANT_ID env → 'local'; the
+    doc-comment says "config" but NO config step is read). 'local' = single-tenant/dev,
+    backward-compatible. NOTE: this resolveTenant is 0-caller dormant — live tenant
+    resolution is replicated separately in the API endpoints (kpi-endpoint etc.) plus
+    actor.tenantId → entry.tenant → audit/API filter (see Note below).</tenant>
 </mode-architecture>
 ```
 
 > **Clarification — "autonomous" has distinct referents (ties to AUTO-NAMING):** (1) the **autonomous *engine*** (`src/orchestra/autonomous/`) is the agentic *runtime of `process` mode* — NOT a separate `deckent_style` today (`process` is the style; the autonomous engine is *how* a process runs). (2) **autonomous as a roadmap *mode*** is the named member of the future comprehensive mode-set (flow / mission / autonomous). (3) **`deckent mode auto`** is a third, unrelated thing — the sprint|task auto-*detect* selector. These three "auto/autonomous" usages are disambiguated under the MODE-RENAME (born **AUTO-NAMING**), so a user is never left guessing which "auto" they invoked.
 
-> **Note — two open accept-day decisions (carried from ADR-067):** (1) **tenant-threading** — `resolveTenant` is 0-caller (dormant); tenant landed differently (config-flag `strict_tenant` + memory `tenant_id` column + audit-scope). Either wire `TenantContext`-threading OR amend the decision to the realized shape — not both. (2) **AUTO-NAMING** — `deckent mode auto` (sprint|task auto-DETECT) vs "autonomous engine" (the always-running process runtime) are two different "auto"s → user-confusion risk; clarify under the rename.
+> **Note — three open accept-day decisions:** (1) **tenant-threading** — `resolveTenant` is 0-caller (dormant); tenant landed differently (config-flag `strict_tenant` + memory `tenant_id` column + audit-scope). Either wire `TenantContext`-threading OR amend the decision to the realized shape — not both. (2) **AUTO-NAMING** — `deckent mode auto` (sprint|task auto-DETECT) vs "autonomous engine" (the always-running process runtime) are two different "auto"s → user-confusion risk; clarify under the rename. (3) **process-style enforcement** — `deckent process submit` does NOT check `deckent_style=process`; the `process-runtime` helper clones the style per-kind so the style-guards pass regardless. It works, but it is a **soft surface**, not a config-gated mode — decide soft-surface vs config-gated (PROCESS-STYLE-GATE).
 
 ---
 
@@ -51,7 +54,7 @@ deckent runs work in distinct execution paradigms. ADR-042 shipped a dual mode (
 
 **(+)** One mode law spanning dual→triple styles; the autonomous engine is recognized as the `process` runtime; style≠surface clears a recurring confusion. Backward-compatible (`local` tenant, sprint default).
 
-**(−)** "sprint" rename is pervasive and not yet done (born MODE-RENAME). Two open decisions (tenant-threading dormant, AUTO-NAMING collision). DIR-2 0-fragility across all modes is roadmap.
+**(−)** "sprint" rename is pervasive and not yet done (born MODE-RENAME — even the `config` category is still labelled "Sprint"). Three open decisions (tenant-threading dormant, AUTO-NAMING collision, process-style soft-surface vs config-gated). The `deckent mode` help/description still reads "sprint|task" though the command accepts `process` (MODE-HELP-FIX). DIR-2 0-fragility across all modes is roadmap.
 
 ---
 
@@ -59,5 +62,5 @@ deckent runs work in distinct execution paradigms. ADR-042 shipped a dual mode (
 
 - **Absorbs:** ADR-042 + ADR-067.
 - **Cross-ref:** ADR-G-001 (3-layer config) · ADR-G-031 (enterprise multi-tenancy on `process`) · ADR-G-020 (per-mode authority) · ADR-G-025 (process resilience) · ADR-G-015 (deckent-log multi-mode).
-- **Born / MASTER-PLAN:** MODE-RENAME · AUTO-NAMING · ADR-067-TENANT (threading decision) · DIR-2 · MODE-2 · MODE-1 (process executor).
+- **Born / MASTER-PLAN:** MODE-RENAME (incl. `config` "Sprint" category) · AUTO-NAMING · ADR-067-TENANT (threading decision) · PROCESS-STYLE-GATE (process soft-surface vs config-gated) · MODE-HELP-FIX (`deckent mode` description/error → sprint|task|process) · DIR-2 · MODE-2 · MODE-1 (process executor).
 - **Memory:** `project_automation_usability_state` · `project_autonomous_first_dogfood_grand_vision`.

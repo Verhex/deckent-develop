@@ -1,6 +1,6 @@
 # ADR-G-023: Agent/Skill Taxonomy
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=Agent=vertical-domain-expert / Skill=horizontal-capability taxonomy + `selectAgent`/`selectSkills` routing + `AgentRoutingHealth` advisory 40%-threshold (detector-monitored, not hard-enforced) → tomorrow=catalog expansion (AGSK-1) + routing-balance (ADR-G-006) + user-custom agent/skill (ADR-UG / ADR-UP)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=Agent=vertical-domain-expert / Skill=horizontal-capability taxonomy + `routeTaskV2`/`selectBestAgent`/`selectBestSkills` routing (legacy `selectAgent`/`selectSkills` helpers feed it) + `AgentRoutingHealth` advisory 40%-threshold (detector-monitored, not hard-enforced) → tomorrow=catalog expansion (AGSK-1) + routing-balance (ADR-G-006) + user-custom agent/skill (ADR-UG / ADR-UP)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-041 (Agent Taxonomy — Horizontal Skills vs Vertical Agents) · **Supersedes:** —
 **Crosswalk:** ADR-041 → ADR-G-023
 
@@ -26,13 +26,14 @@ Sprint 148 shipped the reform package: archive `test-writer`, add `testing-exper
     A deep specialist in ONE domain. Examples: architect (system design, module
     management), security-auditor (vulnerabilities, OWASP), frontend-designer
     (UI/UX, components), doc-writer (docs, README, CHANGELOG), bug-fixer
-    (debugging, regression). `.deckent/agents/` holds 15 built-in agents
-    (excluding temp/archive).
+    (debugging, regression). The packaged built-in SOURCE is `src/core/builtins/agents/`
+    (15 agents); `.deckent/agents/` is the workspace-installed POOL (15, excl temp/archive).
   </agent>
   <skill kind="horizontal">
     A cross-cutting capability ANY agent may use. Examples: testing-expert
-    (vitest, coverage — auto-activates on scope tests/** or *.test.ts),
-    typescript-expert (TS type system), documentation-writer (Markdown, JSDoc).
+    (vitest, coverage — favored on a tests/** scope; see §2.2 for the actual
+    two-path mechanism), typescript-expert (TS type system), documentation-writer
+    (Markdown, JSDoc).
   </skill>
   <invariant>
     Testing is a HORIZONTAL skill — architect writes tests, bug-fixer writes
@@ -45,8 +46,8 @@ Sprint 148 shipped the reform package: archive `test-writer`, add `testing-exper
 ### 2. Routing rules
 
 1. **Intent classifier** — `testing` is **not** a primary intent. A `tests/**` scope adds a `test-coverage` *tag* (`routing-engine.ts` `'test-coverage'` → +2) instead.
-2. **`selectSkills()`** — if scope is `tests/**` or `filesWrite` includes `*.test.ts`, `testing-expert` is auto-added.
-3. **`selectAgent()`** — chosen by the task's primary intent (core-dev → architect, bug-fix → bug-fixer, …), independent of model/effort selection.
+2. **Skill auto-activation (two paths today)** — the legacy `selectSkills()` helper (`skill-selector.ts`) hard-adds `testing-expert` when scope is `tests/**` or `filesWrite` includes `*.test.ts`; the **main Router-V2 `selectBestSkills()`** instead *favors* it via the `test-coverage` tag → `+2` score (`routing-engine.ts`), **NOT** via the manifest `autoActivate` field. The built-in `testing-expert` manifest still carries a **dead `intent.primary: testing` activation rule** (testing is no longer a primary intent) plus an unused `autoActivate` field — both must be cleaned and the two paths reconciled (SKILL-MANIFEST-CLEANUP).
+3. **Agent selection** — `selectAgent()` (legacy `agent-selector.ts` helper) scores by primary intent (core-dev → architect, bug-fix → bug-fixer, …); the **main decision path is `routeTaskV2()` → `selectBestAgent()` + `selectAgentByFallback()`** (Router-V2). Independent of model/effort selection.
 4. **`AgentRoutingHealth`** — anomaly threshold `ANOMALY_THRESHOLD_RATE = 0.40` (`detectors/agent-routing.ts`): no single agent should exceed ~40% of assignments. This is a **detector-monitored advisory** (the nervous-system detector *warns*), **not** a hard gate.
 
 ### 3. Distribution reality (honest)
@@ -69,7 +70,7 @@ The taxonomy itself (vertical/horizontal, test=skill) is sound and durably enfor
 
 **(+)** Routing classification is correct (test is a skill, not an agent), so the `AgentRoutingHealth` detector measures real anomalies instead of a false 100%; the Beta-GA UX is legible ("why this agent?" is answerable); and skills are reusable economy — `testing-expert` serves many agents instead of one agent monopolizing a keyword. The taxonomy is reconfirmed across Sprints 148/149/150/166 and is stable product law.
 
-**(−)** Distribution balance is a *moving* target, not a closed one — the monopoly recurs (refactorer-weight) and is mitigated, not eliminated, by ADR-G-006; the 40% threshold is advisory (warned), not hard-enforced. Sprint-147 `test-writer` stats were archived (not lost). A user project that defined a custom `test-writer` agent hits a breaking change and may need a migration adapter.
+**(−)** Distribution balance is a *moving* target, not a closed one — the monopoly recurs (refactorer-weight) and is mitigated, not eliminated, by ADR-G-006; the 40% threshold is advisory (warned), not hard-enforced. The testing-expert auto-activation runs through two paths (legacy `selectSkills` hard-add + Router-V2 tag-score) and the built-in manifest still carries a dead `intent.primary: testing` rule + an unused `autoActivate` field (SKILL-MANIFEST-CLEANUP). Sprint-147 `test-writer` stats were archived (not lost). A user project that defined a custom `test-writer` agent hits a breaking change and may need a migration adapter.
 
 ---
 
@@ -81,5 +82,5 @@ The taxonomy itself (vertical/horizontal, test=skill) is sound and durably enfor
 - **Authority:** **ADR-G-020** (Authority, Roles, Flow & Enforcement) — `test-writer` removed from the authority matrix (old ADR-037 RBAC).
 - **Evaluation:** **ADR-G-009** (Evaluation Integrity) — `testing-expert` as a horizontal capability under coverage-aware evaluation.
 - **User layers:** **ADR-G-019** (ADR Governance & 4-Layer Taxonomy) — user-custom agent/skill via ADR-UG / ADR-UP (precedence G>U>D).
-- **Born work-items:** AGSK-1 (agent/skill catalog expansion + scale-to-hundreds/thousands), ROUTING-BALANCE (owned by ADR-G-006), USER-CUSTOM-AGENT-SKILL (ADR-UG/UP + custom-agent migration adapter).
+- **Born work-items:** AGSK-1 (agent/skill catalog expansion + scale-to-hundreds/thousands), ROUTING-BALANCE (owned by ADR-G-006), USER-CUSTOM-AGENT-SKILL (ADR-UG/UP + custom-agent migration adapter), SKILL-MANIFEST-CLEANUP (remove dead `intent.primary:testing` + wire-or-remove `autoActivate` in testing-expert/ci-testing manifests; reconcile Router-V2 `selectBestSkills` with the manifest).
 - **Direction:** memory `feedback_agent_routing_imbalance`, `docs/architecture/agents.md`, `docs/architecture/agent-skill-architecture.md`.

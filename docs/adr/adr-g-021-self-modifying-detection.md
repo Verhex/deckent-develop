@@ -29,13 +29,18 @@ deckent runs in two fundamentally different modes: **dogfood** (deckent modifyin
     P3 post-task auto-checkpoint (MCP-restart resume).
     P4 USER PROJECTS = NO-OP (detectDeckentRepo=false → zero overhead).
   </policy>
-  <live-value>the proven, live consumer is the ROLLBACK-GUARD: detectDeckentRepo gates
-    rollback.ts at BOTH ends — createSafetyPoint becomes a no-op AND rollbackToSafetyPoint's
-    `git reset --hard` is skipped on deckent's own tree, so deckent can never wipe its own
-    uncommitted source (self-git-mutation protection; worker-rollback + the self-modifying
-    write-guard share the same gate). User projects get full rollback semantics
-    (detectDeckentRepo=false). P1–P3 are largely dormant; in practice deckent-dev
-    self-modifying runs go through the manual dispatch path (ADR-D-007).</live-value>
+  <live-value>the proven, live consumers of detectDeckentRepo are: the ROLLBACK-GUARD
+    (rollback.ts at BOTH ends — createSafetyPoint no-op AND rollbackToSafetyPoint's
+    `git reset --hard` skipped on deckent's own tree; worker-rollback.ts shares the gate),
+    so deckent can never wipe its own uncommitted source; AND the agentic self-modify
+    guard (agent/guards/self-modifying.ts — write-elevation gated on detectDeckentRepo).
+    User projects get full rollback semantics (detectDeckentRepo=false).
+    P1–P3 are NOT WIRED (not merely "dormant"): the `isSelfModifyingSprint` flag IS
+    threaded worker → authority (the `src/**`/`tests/**` write-exception in
+    authority-enforcer.ts) but it DEFAULTS FALSE and no live detector sets it; the
+    `isSelfModifyingSprint()` and `enforceSelfModifyingTask()` functions are defined but
+    have NO production caller. In practice deckent-dev self-modifying runs go through the
+    manual dispatch path (ADR-D-007).</live-value>
 </self-modify-detection>
 ```
 
@@ -54,7 +59,7 @@ deckent runs in two fundamentally different modes: **dogfood** (deckent modifyin
 
 **(+)** deckent protects its own source/git during dogfood and imposes zero overhead on user projects (P4 no-op). The rollback-guard is a real, working defense against self-git-mutation. The discrimination scales to global-install + many user projects.
 
-**(−)** P1–P3 are dormant (the automated sequential-wave/checkpoint didn't land; manual-dispatch covers it) — born work-item to wire-or-formalize. `package.json name` is a heuristic (a fork could rename — accepted edge case). ROLE-GUARD pid/process enforcement is roadmap.
+**(−)** P1–P3 are **not wired** (the `isSelfModifyingSprint` flag defaults false with no live detector; the detector functions `isSelfModifyingSprint()`/`enforceSelfModifyingTask()` are 0-caller; manual-dispatch covers self-modify today) — SELFMOD-W must wire-or-formally-adopt ADR-D-007, and SELFMOD-CLEANUP removes-or-wires the unused detector functions (incl. the experimental user-project source-pattern path in `enforceSelfModifyingTask`). `package.json name` is a heuristic (a fork could rename — hardening to a publisher-signed marker is roadmap, treated as a *security boundary*). ROLE-GUARD pid/process enforcement is roadmap.
 
 ---
 
@@ -62,5 +67,5 @@ deckent runs in two fundamentally different modes: **dogfood** (deckent modifyin
 
 - **Absorbs:** ADR-039.
 - **Cross-ref:** ADR-G-020 (ROLE-GUARD / authority) · ADR-D-007 (manual dispatch — the live dogfood path) · ADR-G-017 (multi-project isolation) · ADR-G-025 (self-modify + rebuild/restart on crash-recovery).
-- **Born / MASTER-PLAN:** ROLE-GUARD · P1-P3-wire-or-formalize · global-install-discrimination.
+- **Born / MASTER-PLAN:** ROLE-GUARD · SELFMOD-W (P1-P3 wire-or-formally-adopt ADR-D-007 — a *security boundary*, P1) · SELFMOD-CLEANUP (remove-or-wire the 0-caller `isSelfModifyingSprint()`/`enforceSelfModifyingTask()` detector functions) · global-install-discrimination (package.json-name → publisher-signed marker).
 - **Memory:** `project_deckent_self_git_mutation_bug`.
