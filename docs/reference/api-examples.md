@@ -24,12 +24,18 @@ deckent web              # API + web dashboard
 
 ## 1. Authentication
 
-POST endpoints are protected by an optional Bearer token. Configure in `.deckent/config.json`:
+**All `/api/*` endpoints require a Bearer token** — both GET and POST. The bearer is verified before any route handler runs (`server.ts:454`). Configure the token in `.deckent/config.json`:
 
 ```json
 {
-  "apiToken": "your-secret-token-here"
+  "api_auth_token": "your-secret-token-here"
 }
+```
+
+Or via environment variable (takes precedence over config):
+
+```sh
+export DECKENT_API_TOKEN=your-secret-token-here
 ```
 
 Generate a cryptographically random token:
@@ -38,25 +44,33 @@ Generate a cryptographically random token:
 node -e "require('node:crypto').randomBytes(32, (_, b) => console.log(b.toString('hex')))"
 ```
 
-Include the token in all POST requests:
+Include the token in all requests:
 
 ```sh
-# With token
+# GET request with token
+curl http://localhost:3100/api/status \
+  -H "Authorization: Bearer your-secret-token-here"
+
+# POST request with token
 curl -X POST http://localhost:3100/api/start \
   -H "Authorization: Bearer your-secret-token-here" \
   -H "Content-Type: application/json" \
   -d '{}'
-
-# Without token (when auth is disabled — no apiToken in config)
-curl -X POST http://localhost:3100/api/start \
-  -H "Content-Type: application/json" \
-  -d '{}'
 ```
 
-**Response on missing/invalid token (401):**
+**Loopback auto-mint:** When no token is configured and the server binds to `127.0.0.1` (the default), a random token is minted at startup and injected into `index.html` as `window.__DECKENT_API_TOKEN__`. The dashboard reads this automatically — which is why the dashboard works without explicit token configuration on localhost. Remote callers and CLI tools always need an explicit token.
+
+**SSE endpoints:** Because `EventSource` cannot set `Authorization` headers, SSE endpoints also accept `?token=<token>` as a query parameter:
+
+```sh
+# SSE subscription with token in query string (for EventSource clients)
+curl -N "http://localhost:3100/api/events?token=your-secret-token-here"
+```
+
+**Response on missing token (401):**
 ```json
 {
-  "error": "Unauthorized — provide Authorization: Bearer <token>"
+  "error": "Unauthorized"
 }
 ```
 
@@ -66,10 +80,11 @@ curl -X POST http://localhost:3100/api/start \
 
 ### `GET /api/status`
 
-Returns the current `DashboardState` JSON — sprint phase, worker agents, progress counters, alerts, and usage metrics.
+Returns the current `DashboardState` JSON — sprint phase, worker agents, progress counters, alerts, and usage metrics. Returns an idle response (not 404) when no sprint is active.
 
 ```sh
-curl http://localhost:3100/api/status
+curl http://localhost:3100/api/status \
+  -H "Authorization: Bearer $DECKENT_API_TOKEN"
 ```
 
 **Example response:**
@@ -107,7 +122,8 @@ curl http://localhost:3100/api/status
 Returns the latest sprint log with metrics and task list.
 
 ```sh
-curl http://localhost:3100/api/sprint
+curl http://localhost:3100/api/sprint \
+  -H "Authorization: Bearer $DECKENT_API_TOKEN"
 ```
 
 **Example response:**
@@ -135,7 +151,8 @@ curl http://localhost:3100/api/sprint
 Returns an array of all sprint log summaries, oldest to newest.
 
 ```sh
-curl http://localhost:3100/api/history
+curl http://localhost:3100/api/history \
+  -H "Authorization: Bearer $DECKENT_API_TOKEN"
 ```
 
 **Example response:**
@@ -153,7 +170,8 @@ curl http://localhost:3100/api/history
 Returns the current project configuration from `.deckent/config.json`.
 
 ```sh
-curl http://localhost:3100/api/config
+curl http://localhost:3100/api/config \
+  -H "Authorization: Bearer $DECKENT_API_TOKEN"
 ```
 
 **Example response:**
@@ -180,7 +198,8 @@ curl http://localhost:3100/api/config
 Runs all system health checks and returns results.
 
 ```sh
-curl http://localhost:3100/api/doctor
+curl http://localhost:3100/api/doctor \
+  -H "Authorization: Bearer $DECKENT_API_TOKEN"
 ```
 
 **Example response:**
@@ -201,10 +220,11 @@ curl http://localhost:3100/api/doctor
 
 ### `GET /api/memory`
 
-Returns the contents of `.brain/MEMORY.md` as a JSON-wrapped string.
+Returns the contents of `.brain/exports/memory.md` (auto-generated from `memory.db` — not `.brain/MEMORY.md`) as a JSON-wrapped string.
 
 ```sh
-curl http://localhost:3100/api/memory
+curl http://localhost:3100/api/memory \
+  -H "Authorization: Bearer $DECKENT_API_TOKEN"
 ```
 
 **Example response:**
@@ -218,10 +238,11 @@ curl http://localhost:3100/api/memory
 
 ### `GET /api/debt`
 
-Returns the contents of `.brain/DEBT.md` as a JSON-wrapped string.
+Returns the contents of `.brain/exports/debt.md` (auto-generated from `memory.db`) as a JSON-wrapped string.
 
 ```sh
-curl http://localhost:3100/api/debt
+curl http://localhost:3100/api/debt \
+  -H "Authorization: Bearer $DECKENT_API_TOKEN"
 ```
 
 **Example response:**
@@ -238,7 +259,8 @@ curl http://localhost:3100/api/debt
 Polls the status of a background sprint job started via `POST /api/start`.
 
 ```sh
-curl http://localhost:3100/api/job/job-1711000000000
+curl http://localhost:3100/api/job/job-1711000000000 \
+  -H "Authorization: Bearer $DECKENT_API_TOKEN"
 ```
 
 **Status: running**
@@ -274,7 +296,8 @@ curl http://localhost:3100/api/job/job-1711000000000
 Returns the task JSON and terminal log for a specific worker.
 
 ```sh
-curl http://localhost:3100/api/worker/025-003/log
+curl http://localhost:3100/api/worker/025-003/log \
+  -H "Authorization: Bearer $DECKENT_API_TOKEN"
 ```
 
 **Example response:**
@@ -295,10 +318,15 @@ curl http://localhost:3100/api/worker/025-003/log
 
 ### `GET /api/events` (SSE)
 
-Opens a Server-Sent Events stream. The server pushes `DashboardState` JSON updates whenever `.dashboard` changes.
+Opens a Server-Sent Events stream. The server pushes `DashboardState` JSON updates whenever `.dashboard` changes. Also pushes typed live-event frames (`event: hb`, `event: result`) from the live-event bridge (DASH-RT-1).
 
 ```sh
-curl -N http://localhost:3100/api/events
+# cURL — use Authorization header
+curl -N http://localhost:3100/api/events \
+  -H "Authorization: Bearer $DECKENT_API_TOKEN"
+
+# EventSource clients cannot set headers — use ?token= query param instead
+curl -N "http://localhost:3100/api/events?token=$DECKENT_API_TOKEN"
 ```
 
 **Stream output:**
@@ -486,11 +514,15 @@ curl -X POST http://localhost:3100/api/config \
 const BASE_URL = 'http://localhost:3100';
 const TOKEN = process.env.DECKENT_API_TOKEN ?? '';
 
+// All /api/* endpoints require auth — both GET and POST
 const headers = (extra: HeadersInit = {}): HeadersInit => ({
   'Content-Type': 'application/json',
   ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
   ...extra,
 });
+
+// For GET requests without a body
+const authHeaders = (): HeadersInit => TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {};
 ```
 
 ---
@@ -514,7 +546,7 @@ interface DashboardState {
 }
 
 async function getStatus(): Promise<DashboardState> {
-  const res = await fetch(`${BASE_URL}/api/status`);
+  const res = await fetch(`${BASE_URL}/api/status`, { headers: authHeaders() });
   if (!res.ok) throw new Error(`Status ${res.status}: ${await res.text()}`);
   return res.json() as Promise<DashboardState>;
 }
@@ -539,7 +571,7 @@ interface SprintSummary {
 }
 
 async function getHistory(): Promise<SprintSummary[]> {
-  const res = await fetch(`${BASE_URL}/api/history`);
+  const res = await fetch(`${BASE_URL}/api/history`, { headers: authHeaders() });
   if (!res.ok) throw new Error(`Status ${res.status}`);
   return res.json() as Promise<SprintSummary[]>;
 }
@@ -569,7 +601,7 @@ async function startSprint(autoApprove = false): Promise<string> {
 
 async function pollJob(jobId: string, intervalMs = 5000): Promise<unknown> {
   while (true) {
-    const res = await fetch(`${BASE_URL}/api/job/${jobId}`);
+    const res = await fetch(`${BASE_URL}/api/job/${jobId}`, { headers: authHeaders() });
     if (!res.ok) throw new Error(`Job poll failed: ${res.status}`);
     const job = await res.json() as { id: string; status: string; result?: unknown; error?: string };
 
@@ -701,6 +733,8 @@ console.log('Worker killed');
 
 ### Browser (EventSource)
 
+`EventSource` cannot send `Authorization` headers, so pass the token as a `?token=` query parameter:
+
 ```html
 <!DOCTYPE html>
 <html>
@@ -708,7 +742,12 @@ console.log('Worker killed');
   <pre id="out"></pre>
   <script>
     const out = document.getElementById('out');
-    const es = new EventSource('http://localhost:3100/api/events');
+    const token = window.__DECKENT_API_TOKEN__ ?? 'your-token-here';
+
+    // Localhost: the dashboard auto-injects window.__DECKENT_API_TOKEN__
+    // Remote: pass the token explicitly via ?token=
+    const url = `http://localhost:3100/api/events?token=${encodeURIComponent(token)}`;
+    const es = new EventSource(url);
 
     es.onmessage = (event) => {
       const state = JSON.parse(event.data);
@@ -731,11 +770,16 @@ console.log('Worker killed');
 ```ts
 import { createParser, type ParsedEvent } from 'eventsource-parser';
 
+const TOKEN = process.env['DECKENT_API_TOKEN'] ?? '';
+
 async function subscribeToEvents(
   onUpdate: (state: unknown) => void,
   signal?: AbortSignal,
 ): Promise<void> {
-  const res = await fetch('http://localhost:3100/api/events', { signal });
+  const res = await fetch('http://localhost:3100/api/events', {
+    headers: { Authorization: `Bearer ${TOKEN}` },
+    signal,
+  });
   if (!res.ok || !res.body) throw new Error(`SSE connect failed: ${res.status}`);
 
   const parser = createParser((event: ParsedEvent) => {
@@ -778,8 +822,12 @@ setTimeout(() => controller.abort(), 60_000);
 ```ts
 import http from 'node:http';
 
+const TOKEN = process.env['DECKENT_API_TOKEN'] ?? '';
+
 function subscribeSSE(onData: (state: unknown) => void): () => void {
-  const req = http.get('http://localhost:3100/api/events', (res) => {
+  const req = http.get('http://localhost:3100/api/events', {
+    headers: { Authorization: `Bearer ${TOKEN}` },
+  }, (res) => {
     let buffer = '';
 
     res.on('data', (chunk: Buffer) => {
@@ -907,9 +955,12 @@ function pollDashboard(
   onUpdate: (state: unknown) => void,
   intervalMs = 2000,
 ): () => void {
+  const token = process.env['DECKENT_API_TOKEN'] ?? '';
   const id = setInterval(async () => {
     try {
-      const res = await fetch('http://localhost:3100/api/status');
+      const res = await fetch('http://localhost:3100/api/status', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) onUpdate(await res.json());
     } catch {
       // network error — retry on next tick
@@ -925,10 +976,12 @@ setTimeout(stop, 60_000);
 
 ### SSE — `GET /api/events`
 
-Receive pushed updates only when the dashboard file changes (debounced 500 ms).
+Receive pushed updates only when the dashboard file changes (debounced 500 ms). Requires auth — use `?token=` for `EventSource` (cannot set headers):
 
 ```ts
-const es = new EventSource('http://localhost:3100/api/events');
+const token = window.__DECKENT_API_TOKEN__ ?? process.env['DECKENT_API_TOKEN'] ?? '';
+// Browser: use ?token= (EventSource cannot set Authorization headers)
+const es = new EventSource(`http://localhost:3100/api/events?token=${encodeURIComponent(token)}`);
 es.onmessage = (e) => console.log('Push:', JSON.parse(e.data));
 ```
 
@@ -940,7 +993,7 @@ es.onmessage = (e) => console.log('Push:', JSON.parse(e.data));
 | Latency | Up to `intervalMs` | ~500 ms (debounce) |
 | Load | Every N ms regardless of changes | Only on change |
 | Reconnect | Automatic (new request each time) | `EventSource` auto-reconnects |
-| Auth | None needed (GET) | None needed (GET) |
+| Auth | Bearer header (or `?token=` for EventSource) | Same |
 | Works in Node.js | Yes (native fetch) | Yes (fetch + stream) |
 | Works in browser | Yes | Yes (native `EventSource`) |
 | Firewall/proxy friendly | Yes | Needs keep-alive support |

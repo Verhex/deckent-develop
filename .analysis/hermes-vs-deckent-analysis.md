@@ -613,3 +613,108 @@ Dashboard baslangicta approval vermese bile gormeli. Sonra enterprise/pro modda 
 Kisa hukum:
 
 Deckent Shell'in yonetim penceresi olabilmesi icin ana eksik **runtime-wide ApprovalBroker + terminal event subscription**. Bu cozulmeden terminal sadece sprint baslatan pencere olur. Bu cozulurse terminal gercek control plane'e donusur; dashboard da ayni event'leri gorsellestiren observability penceresi haline gelir.
+
+## 12. Codex Opinion — Yikilacak / Korunacak / Yeniden Paketlenecek Alanlar
+
+Bu bolum yorumdur; kaynak siniri yine kod ve mevcut plan gercegidir. Deckent 340+ sprintte cok kisa surede sifirdan dogup dogfood ile buyumus bir sistem. Bu, iki seyi ayni anda dogurmus:
+
+1. Cekirdek orkestrasyon kapasitesi gercek ve degerli.
+2. Urun yuzeyinde biriken deneysel katmanlar artik sade bir product shape'e indirilmeli.
+
+Bu nedenle dogru strateji "her seyi bitir" degil; **dogru seyi koru, yanlis yuzeyi yik, guclu cekirdegi daha basit bir urune paketle**.
+
+### 12.1 Yikilip yeniden yapilmasi gerekenler
+
+| Alan | Neden yikilmali | Yeni yon |
+|---|---|---|
+| Dashboard'un ana urun gibi konumlanmasi | Dashboard'a feature ekledikce urun karmasiklasiyor; terminal/run control zihinsel modeli bulaniyor | Dashboard = observability, timeline, trace, audit, outcome, approval viewer |
+| REPL/terminalde parcali komut deneyimi | Slash, provider, MCP, approval, autonomous ve sprint yuzeyleri var ama tek product shell gibi hissettirmiyor | Deckent Shell = health snapshot + simple task + run control + approval |
+| Local confirm queue ile runtime approval'in karismasi | Local tool confirm ana terminalde calisir, ama worker/docker/subprocess approval'i ayni mekanizma degil | Runtime-wide ApprovalBroker + ShellApprovalClient |
+| Feature-by-feature dashboard kontrol paneli | Her ozelligi dashboard'a koymak development'i ve UX'i sisiriyor | Dashboard sadece calisan runtime'i aciklar; aksiyon terminal/shell ve ileride app'ten |
+| Kurulum sonrasi belirsiz provider/MCP/auth akisi | Kullanici "deckent calisti ama neye bagli, hazir mi?" sorusunda kaliyor | First-run Connection Center: provider, auth, MCP, local model, workspace, approval mode |
+| Static/kalabalik tool exposure | MCP/connector/enterprise action sayisi buyudukce model ve kullanici yuzeyi sisiyor | Progressive tool/action discovery: search, describe, call; policy/risk rozetleri |
+| Legacy plan dokumani sekli | MASTER-PLAN artik tarihsel ledger + backlog dump; yeni sprint karari icin agir | Archive + yeni short product master plan + old-ID crosswalk |
+| Config/doctor/output no-op veya misleading yuzeyleri | Kullanici guveni kirilir; "ayar var ama calismiyor" hissi urunu oldurur | Dürüst ayar ilkesi: ya gercek etkili ya UI/docs/schema'dan sil |
+
+Buradaki "yikmak" kodu toptan silmek anlamina gelmez. Bir cok parca once **feature flag / hidden advanced / archive** seviyesine alinabilir. Ama kullaniciya sunulan product shape yeniden kurulmalidir.
+
+### 12.2 Korunmasi gereken cekirdekler
+
+| Alan | Neden korunmali | Yapilacak is |
+|---|---|---|
+| Sprint lifecycle | Deckent'in Hermes/Cursor/Claude Code'dan ayrildigi ana guc: plan, spawn, evaluate, fix, retro | UX basitlestir; lifecycle'i saklama |
+| Worker orchestration + dependency waves | Multi-agent dogfooding'in gercek motoru | Merge/race/reliability fixleriyle sertlestir |
+| Evaluation/FIX/retro sistemi | "Agentic run ecosystem" iddiasinin kaniti | False NO_GO, eval-vs-disk, result consistency sorunlarini kapat |
+| Provider registry/model registry | Provider-neutral gelecek icin dogru temel | Live capability detection + model policy engine ekle |
+| Memory/outcome/evolution altyapisi | Deckent AI fine-tune ve routing evolution icin veri omurgasi | UserMemory/RunMemory/TrainingTrace ayrimi yap |
+| MCP server/catalog | External host ve tool ekosistemi icin degerli | Progressive exposure + trust/approval gate ile sadeleştir |
+| Process/capability/ERP envelope | Enterprise ve IFS hedefi icin dogru foundation | Solo publish'i bloke etmeden read-first enterprise track'e koy |
+| Native-agent core | Terminali kendi agent loop'una tasima stratejisi dogru | Default flip'i publish gate'e degil, provable stabilization gate'e bagla |
+
+### 12.3 Elden gecirilmesi gerekenler
+
+| Alan | Sorun | Netlestirme |
+|---|---|---|
+| `deckent` default acilisi | REPL var ama ilk 10 dakika yeterince rehberli degil | Ilk ekran: ready state, provider, model, auth, MCP, next action |
+| `/help` ve slash menu | Komut listesi buyudukce urun bilgi mimarisi zayiflar | Kategori: Ask, Run, Control, Memory, MCP, Enterprise, Danger |
+| Provider/model/effort routing | Mevcut sistem deterministik ama "akilli model secimi" gibi sunulmamali | ModelPolicyEngine: cost, latency, risk, task kind, provider health, outcome history |
+| Windows native | Kodda destek parcali; product promise net degil | Windows profile: installer, PATH, service/logs, doctor, provider auth, PTY smoke |
+| Dashboard terminal dock | Kullanissiz degil ama mental model bulanik | "Open shell" opsiyonel; dashboard'un ana rolu izleme |
+| Enterprise yuzeyi | Cok guclu hedefler var ama solo launch'i bogabilir | Enterprise'i Layer 4/5 olarak tut; solo UI bitmeden main product'a tasima |
+| Docs | Cok dokuman var ama publish kullanicisi icin fazla | Docs-from-code: install, quickstart, first run, provider setup, troubleshooting |
+
+### 12.4 Dogfooding ile 5x hiz varsayimi
+
+Deckent'in bugune kadar 3 ayda 340+ sprintle bu seviyeye gelmesi onemli bir veri. Bu, dogfooding'in hiz kazandirdigini gosteriyor. Ancak ayni veri bir riski de gosteriyor: cok hizli dogfood, bazen **product shape yerine sistem genisligi** uretir.
+
+Bu nedenle 5x hiz ancak su kosullarda guvenli olur:
+
+- Sprint'ler product layer'a gore kisitlanir; her sprint yeni feature degil, kullanici akisi kapatir.
+- Her sprint sonunda "ilk kullanici bunu daha kolay kullanir mi?" sorusu zorunlu gate olur.
+- Dashboard'a yeni ozellik eklemek default cevap olmaz; once terminal/shell ve event modeli dogrulanir.
+- Kapanmis gibi gorunen feature'lar smoke degil, first-run path uzerinde canli denenir.
+- Worktree merge race, orphan process, config/doctor yalanlari gibi guven kirici bug'lar P0 kabul edilir.
+
+### 12.5 Publish oncesi yikim/sadelestirme sirasi
+
+| Sira | Is | Hedef |
+|---|---|---|
+| 1 | MASTER-PLAN archive + yeni short Product Plan | Karar ve sprint uretimi sadeleşir |
+| 2 | First-run path dondur: `deckent` -> health -> connect -> first task | Solo adoption omurgasi |
+| 3 | Dashboard scope freeze | Dashboard yeni feature degil, observability uzerine odaklanir |
+| 4 | ApprovalBroker P0 slice | Long-running run'larda ana terminal gercek control plane olur |
+| 5 | Provider/Auth/Image/Doctor sade fixleri | Kurulum ve ilk hata deneyimi toparlanir |
+| 6 | Routing/model policy v0 | "hangi model bu isi yapar" karari explainable olur |
+| 7 | Docs/npm/package polish | Public beta guvenilir gorunur |
+
+### 12.6 Yeni Master Plan icin onerilen cekirdek cumle
+
+Yeni plan su cumle etrafinda kurulabilir:
+
+> Deckent is a local-first AI orchestration shell: terminal runs, dashboard explains, core orchestrates, enterprise governs.
+
+Bu cumle master plan icin pratik karar filtresi verir:
+
+- Terminalde run/control/approval yoksa publish UX eksiktir.
+- Dashboard calisan seyi aciklamiyorsa gereksizdir.
+- Core orchestration'a hizmet etmeyen feature post-publish'e gider.
+- Enterprise policy solo kullanimi zorlastiriyorsa katman ayrimina cekilir.
+
+### 12.7 Son karar
+
+Deckent'in yikilmasi gereken kismi cekirdek degil; **urun yuzeyinin daginikligi**. Sprint motoru, provider registry, memory/evolution, MCP, process/capability ve enterprise envelope korunmali. Yikilacak olan sey, bunlarin kullaniciya ayni anda ve esit agirlikta sunulmasi.
+
+Publish oncesi hedef:
+
+```text
+deckent acilir
+hazirlik durumunu soyler
+kullanici ilk isi verir
+Deckent planlar
+kullanici onaylar
+run ilerler
+gerektiginde ayni terminal onay ister
+dashboard bunu sade ve guvenilir gosterir
+```
+
+Bu akış kusursuz hissetmeden enterprise katmanina agirlik vermek erken olur. Solo urun benimsenirse enterprise icin hem veri, hem guven, hem topluluk, hem de Deckent AI fine-tune yakiti dogar.

@@ -46,12 +46,14 @@ PENDING → CLAIMED → EXECUTING → TESTING → DOCUMENTING → DONE
   "currentAction": "Brief description of current action",
   "timestamp": "<new Date().toISOString() — UTC ISO 8601>",
   "filesChangedCount": 0,
-  "sequence": 0
+  "sequence": 0,
+  "progress": 0
 }
 ```
 
 - `timestamp`: always `new Date().toISOString()` — never hardcode
 - `sequence`: increment on every update
+- `progress`: 0–100 integer; `calculateProgress()` in `src/agents/worker.ts` derives it from `status` + `filesChangedCount`
 - Auditor alerts if `now − timestamp > 2 minutes`
 
 ### Plan file format

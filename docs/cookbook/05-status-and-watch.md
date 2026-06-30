@@ -16,7 +16,7 @@ Shows the current sprint dashboard: worker list, task completion count, active p
 deckent status --watch
 ```
 
-Refreshes every 2 seconds using `fs.watch()` (falls back to polling when filesystem events are unavailable). Press `Ctrl+C` to exit. Use this during long sprints to keep an eye on progress without streaming logs.
+Refreshes on file-change events (`fs.watch()`), with a 5-second heartbeat fallback; or polling every 2 seconds when file-watch is unavailable. Press `Ctrl+C` to exit. Use this during long sprints to keep an eye on progress without streaming logs.
 
 ## Event-Driven Follow Mode
 
@@ -60,7 +60,7 @@ Prints the current sprint's task dependency graph as a Mermaid diagram (read fro
 
 | Flag | Description |
 |------|-------------|
-| `--watch` | Auto-refresh every 2 seconds |
+| `--watch` | Event-driven refresh (`fs.watch` + 5s fallback); 2-second polling when file-watch unavailable |
 | `--follow`, `-f` | Event-driven refresh (EventBus + 5s fallback) |
 | `--json` | Raw JSON output |
 | `--verbose` | Include agent/skill assignment detail |

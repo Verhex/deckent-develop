@@ -2,8 +2,11 @@
 
 Complete operating instructions for running deckent's autonomous engine: enabling it,
 defining work, running it, **monitoring it**, approving parked work, stopping it safely,
-and troubleshooting. For the architecture/concepts, see
-[`autonomous-engine.md`](./autonomous-engine.md).
+and troubleshooting.
+
+**Related docs (authoritative on their topic — don't duplicate here):**
+- [`autonomous-engine.md`](./autonomous-engine.md) — concepts, architecture, dispatch paths, and security model.
+- [`autonomous.md`](./autonomous.md) — CLI reference (all subcommands, options, and MCP parity).
 
 > **Safety first.** The engine is **flag-gated and disabled by default**. When enabled, an
 > `auto`-policy entry will spawn a real worker (or sprint) that edits your repository.
@@ -181,7 +184,7 @@ A `--max-iterations N` run stops itself after N cycles.
 
 ---
 
-## 9. Reactive triggers (optional, flag-gated — first slice)
+## 9. Reactive triggers (optional, flag-gated)
 
 When `config.autonomous.reactive.enabled` is true, the engine also reacts to **nervous-system
 detections**: a detection → a declarative `reactive-map.json` rule → a durable backlog entry
@@ -201,11 +204,37 @@ detections**: a detection → a declarative `reactive-map.json` rule → a durab
   ]
 }
 ```
-> **Current limitation (honest):** the reactive bridge is **attach-only** today — the nervous
-> observer is not driven inside `start`, and built-in detectors are EXECUTE-phase-gated, so
-> **live detections do not yet flow**. The mechanism is built and unit-tested; making
-> detections flow (observer-driving / user-registered detectors) and the webhook + repo-watch
-> sources are the next slice.
+
+**N1 (live detection — landed):** `deckent autonomous start` now drives the built-in nervous
+detectors live via `createNervousSystemIfEnabled({ observerActiveInAnyPhase: true })`. Detectors
+previously required an active sprint phase to fire; the `observerActiveInAnyPhase` flag bypasses
+that gate so detections actually flow inside the autonomous loop — no hosted sprint needed. This
+is gated by `config.nervous_system.enabled` (default-off); the autonomous runtime itself has no
+EXECUTE-phase restriction any more.
+
+**N2 (three source types — landed):** reactive ingestion supports three parallel sources, all
+sharing one ingester + reactive-map:
+
+| Source | Config flag | What it watches |
+|--------|-------------|-----------------|
+| Nervous-detector | `autonomous.reactive.enabled` | Built-in detectors (debt trend, stale agents, …) |
+| Repo-watch | `autonomous.reactive.repo_watch.enabled` | Working-tree file changes |
+| Webhook | `autonomous.reactive.webhook.enabled` | External HTTP events (drained from `.deckent/autonomous/reactive-inbox.jsonl`) |
+
+Every reactive event flows through the same backlog ingester → `reactive-map.json` rule match
+→ durable backlog entry → normal three-gate lifecycle (RBAC → policy → EffectClass).
+
+To enable the nervous-detector source:
+
+```json
+{
+  "nervous_system": { "enabled": true },
+  "autonomous": {
+    "enabled": true,
+    "reactive": { "enabled": true, "map_path": ".deckent/autonomous/reactive-map.json" }
+  }
+}
+```
 
 ---
 
@@ -307,7 +336,7 @@ retried then dropped per the forwarder's fail-safe contract — they never abort
 | Loop runs but nothing executes (always `no_trigger`) | Backlog has no `pending` due entry. `deckent autonomous backlog list` / check `status`. |
 | Entry stuck `parked` | It's `approval-required`/risky → `deckent autonomous pending` then `approve`. |
 | Entry → `failed` | Read `.tasks/task-<id>.result` `notes` + the audit line in `autonomous-events.jsonl`. |
-| Reactive entries never appear | Reactive is attach-only (see §9) and/or `reactive.enabled` is false / map empty. |
+| Reactive entries never appear | `nervous_system.enabled` is false, or `autonomous.reactive.enabled` is false, or the reactive-map has no matching rule (see §9). |
 | Worker didn't spawn (provider error) | Provider not reachable (ollama down) or auth missing for claude. |
 | Every entry ends `denied` | `rbac_policy.enabled` is true with role `viewer` (no `execute`) — raise to `operator`/`admin` or disable the flag (§11). |
 

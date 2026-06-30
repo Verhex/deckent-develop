@@ -75,11 +75,11 @@ deckent doctor
 Expected output:
 
 ```
-  node_version   v24.0.0 (>=24 required)      [pass]
-  git            git 2.43.0                    [pass]
-  tmux           tmux 3.3a                     [pass]
-  claude_cli     claude 1.2.3                  [pass]
-  workspace      .deckent/ not found           [fail]
+  [PASS] Node.js        v24.0.0 (>=24 required)
+  [PASS] git            git 2.43.0
+  [PASS] tmux           tmux 3.3a
+  [PASS] Claude CLI     claude 1.2.3
+  [FAIL] Workspace      .deckent/ not found
 ```
 
 The `workspace` check will fail until you initialize a project. That is expected at this stage.
@@ -97,13 +97,13 @@ deckent init
 
 The wizard will prompt you for:
 
-- **Project name** -- for example, `my-project`
+- **Language** -- `en` (English) or `tr` (Turkish)
 - **Plan mode** -- a resource/cost preset (it does NOT ask for a subscription tier or price):
   - `Performance` -- up to 8 parallel workers, premium Brain (Opus)
   - `Balanced` -- up to 5 parallel workers, standard Brain (Sonnet)
   - `Economic` -- up to 3 parallel workers, economy models
   - `API` -- API-key billing mode (set `ANTHROPIC_API_KEY`)
-- **Language** -- `en` (English) or `tr` (Turkish)
+- **Project name** -- for example, `my-project`
 
 After initialization, your project will contain:
 

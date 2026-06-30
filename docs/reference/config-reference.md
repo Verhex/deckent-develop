@@ -61,7 +61,6 @@ These fields sit at the root of `.deckent/config.json`:
 | `language` | `"en"` or `"tr"` | `"en"` | CLI output language. |
 | `projectName` | `string` | `"deckent-project"` | Project name shown in dashboard and logs. |
 | `version` | `string` | (from package.json) | Deckent version. Usually not set manually. |
-| `brain_planning` | `BrainPlanningMode` | `"auto"` | Planning mode. Can also be set per-mode. |
 | `brain_provider` | `ProviderName` | `"claude"` | Provider for Brain planning and evaluation. One of: `claude`, `codex`, `gemini`, `ollama`. Canonical form is the grouped `providers: { brain, worker }`; these flat keys are the deprecated alias. |
 | `worker_provider` | `ProviderName` | `"claude"` | Default provider for worker tasks. |
 | `fallback_provider` | `ProviderName` | -- | Fallback provider when primary fails. |
@@ -557,41 +556,11 @@ How workers are launched and their resource limits.
 | Key | Default (code) | Values | Description |
 |-----|----------------|--------|-------------|
 | `spawn_backend` | `"docker"` (config.ts:769, ADR-027) | `docker \| tmux \| subprocess \| auto` | Worker spawn mechanism. Also selects the timeout min/max band (see section 17). `tmux` is deprecated (spawn-backend.ts:263). |
-| `deckent_style` | `"sprint"` (config.ts:868) | `sprint \| task` | Runtime style. `sprint` = multi-task orchestration; `task` = one-shot assistant mode (task-mode-runner.ts:25). |
-| `worker_memory_limit` | `"2g"` (raw — not on `DeckentConfig` type) | e.g. `"2g"`, `"512m"` | Docker `--memory` cgroup limit per worker (spawn-backend-docker.ts:490). |
-| `worker_memory_swap` | `"3g"` (raw) | e.g. `"3g"` | Docker `--memory-swap` limit per worker (spawn-backend-docker.ts:491). |
+| `deckent_style` | `"sprint"` (config.ts:868) | `sprint \| task \| process` | Runtime style. `sprint` = multi-task orchestration; `task` = one-shot assistant mode; `process` = continuous ERP/business-automation via MCP+REST (config-types.ts:735). |
+| `worker_memory_limit` | `undefined` (falls back to `"4g"` via DEFAULT_WORKER_MEMORY_LIMIT) | e.g. `"2g"`, `"512m"` | Docker `--memory` cgroup limit per worker (config-types.ts:314). Swap auto-derived as `limit × 1.5`. When unset the spawn backend uses `'4g'`. |
 | `worker_memory_limit_by_kind` | undefined (optional) | object with kind→memory mappings | Per-task-kind memory limit override (Sprint 272, F1-LIM). Keys are canonical `TaskKind` values (e.g., `"code"`, `"doc"`). Values are memory strings (e.g., `"1.5g"`, `"768m"`). When set, overrides global `worker_memory_limit` for matching kinds. Swap is derived as `memory × 1.5`. Falls back to global `worker_memory_limit` for unmatched kinds. Validation: memory strings must parse successfully (same as `worker_memory_limit`). |
 
-> `worker_memory_limit` / `worker_memory_swap` / `worker_memory_limit_by_kind` are Docker-backend-only extensions read directly from raw config (and surfaced by `deckent doctor`); they are not part of the typed `DeckentConfig`.
-
----
-
-## 12.1. Cache Warm Configuration
-
-Optional configuration block for F1-TOK Faz 2 (Sprint 274): warmup strategy to optimize shared prompt-prefix caching when spawning a fleet of workers.
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `cache_warm.enabled` | boolean | `false` | Master on/off switch. When `false`, no cache-warm behavior. |
-| `cache_warm.warm_delay_ms` | number | `45000` | Delay (milliseconds) before spawning non-warmer workers in the first wave. Range: 5000–180000 (5s–3m). Allows the first worker to write the shared prompt-prefix to cache before the fleet starts. |
-
-### Behavior
-
-- **Disabled (default):** `cache_warm.enabled: false` — zero behavioral change, all workers spawn immediately.
-- **Enabled:** First dispatch-eligible task in the sprint's first SPAWN wave launches immediately. Remaining tasks delay by `warm_delay_ms`, allowing the first worker's cache-write to finish before followers read.
-- **Single-task sprints:** No delay (only one task).
-- **Fail-safe:** If `warm_delay_ms` timer fails, normal spawn flow resumes without retrying.
-
-### Example Config
-
-```json
-{
-  "cache_warm": {
-    "enabled": true,
-    "warm_delay_ms": 45000
-  }
-}
-```
+> `worker_memory_limit` / `worker_memory_limit_by_kind` are typed on `DeckentConfig` (config-types.ts:308-314). Swap is auto-derived at `limit × 1.5` — it is not a configurable field.
 
 ---
 
@@ -601,7 +570,7 @@ Optional configuration block for Sprint 276 PLAN-INT-1: pre-plan directive inter
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `plan.interrogate` | boolean | `false` | Enable directive interrogation before planning. When `true`, Brain generates structural questions (pain-vs-feature, minimal wedge, hidden capabilities, premises, effort alternatives) and displays them via `node:readline/promises`. User can approve a revised DIRECTIVES.md draft or proceed with the original. Non-interactive environments skip interrogation silently. |
+| `plan.interrogate` | boolean | `false` | Enable directive interrogation before planning. When `true`, Brain generates structural questions (pain-vs-feature, minimal wedge, hidden capabilities, premises, effort alternatives) and displays them via `node:readline/promises`. User can approve a revised DIRECTIVES.md draft or proceed with the original. Non-interactive environments skip interrogation silently. CT:753. |
 
 ### Behavior
 
@@ -622,7 +591,7 @@ Optional configuration block for Sprint 276 PLAN-INT-1: pre-plan directive inter
 
 ---
 
-## 12.3. Cross Verify Configuration
+## 12.3. Cross Verify Configuration (with `enforce_refuted`)
 
 Optional configuration block for Sprint 276 XVER-1: cross-provider adversarial verification. **Default-off** — absent block = disabled. When enabled, high-stakes tasks (security/auth/P0/risk-tagged) are verified by a different provider using adversarial refutation logic.
 
@@ -631,6 +600,7 @@ Optional configuration block for Sprint 276 XVER-1: cross-provider adversarial v
 | `cross_verify.enabled` | boolean | `false` | Master on/off switch. Must be present (non-optional) when the block exists. |
 | `cross_verify.high_stakes_only` | boolean | `true` | Only verify high-stakes tasks (security/auth/P0/risk-tagged). When `false`, every completed task gets verified. Default keeps verification lean. |
 | `cross_verify.verifier_priority` | string[] | `["codex", "gemini", "claude"]` | Provider selection order for the verifier. Task provider is excluded; first available alternative is used. If no second provider exists, verification is skipped (honest fail-safe). |
+| `cross_verify.enforce_refuted` | boolean | `false` | When `true`, a REFUTED verdict on a high-stakes DONE/GO_WITH_TECH_DEBT task causes the evaluation layer to downgrade it to NO_GO (triggering the standard FIX path, Task 323-004/A18). When `false` (default), the verdict is advisory-only — persisted + surfaced as an event but never enforced (byte-identical to pre-XVER behavior, ADR-070). CT:85. |
 
 ### Behavior
 

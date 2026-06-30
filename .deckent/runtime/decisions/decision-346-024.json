@@ -1,0 +1,79 @@
+{
+  "taskId": "346-024",
+  "sprintId": "sprint-346",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "346-024",
+        "title": "F24 — fix top-level docs",
+        "scope": [
+          "docs/",
+          "docs/audits/doc-refresh-2026-06/",
+          "scripts/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "documentation-writer",
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 2 (medium task, 2 module(s), effort=normal)"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "346-024",
+        "title": "F24 — fix top-level docs",
+        "scope": [
+          "docs/",
+          "docs/audits/doc-refresh-2026-06/",
+          "scripts/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "documentation-writer",
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [documentation-writer, typescript-expert]"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "346-024",
+        "title": "F24 — fix top-level docs",
+        "scope": [
+          "docs/",
+          "docs/audits/doc-refresh-2026-06/",
+          "scripts/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "documentation-writer",
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: doc-writer"
+    }
+  ],
+  "decidedAt": "2026-06-28T12:59:36.260Z"
+}

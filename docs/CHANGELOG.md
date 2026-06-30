@@ -2,6 +2,39 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint346] - 2026-06-28
+
+
+### Fixed
+
+- F01 — fix guide onboarding-core
+- F02 — fix guide concepts
+- F03 — fix guide autonomous & learning
+- F04 — fix guide nervous, dashboard & REPL
+- F05 — fix guide workers, troubleshooting & misc
+- F06 — fix guide providers & backends
+- F10 — fix reference MCP (hand-authored only)
+- F11 — fix reference routing, execution & dependencies
+- F12 — fix reference enterprise (+ broken self-anchors)
+- F13 — fix reference ops & security
+
+
+_Tasks: 24 total, 13 done, 0 tech debt, 11 no-go_
+
+## [1.0.0-beta.1-sprint345] - 2026-06-28
+
+### Added
+
+- A01 — guide onboarding-core
+- A02 — guide onboarding-concepts
+- A03 — guide autonomous & learning
+- A04 — guide nervous, dashboard & REPL
+- A05 — guide workers, troubleshooting & misc
+- A06 — guide providers & backends
+
+
+_Tasks: 6 total, 6 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint344] - 2026-06-27
 
 ### Added

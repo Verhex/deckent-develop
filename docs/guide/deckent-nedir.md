@@ -110,7 +110,7 @@ Per-task provider override, fallback zinciri ve cost-gate ile maliyet yönetimi 
 | **Connectors** | `src/connectors/` | Discord, Telegram, WhatsApp adaptörleri; incoming router; chat-bridge (16 modül) |
 | **Providers** | `src/providers/` | Claude, Codex, Gemini, Ollama, OpenAI-uyumlu adaptörleri (7 modül) |
 | **API** | `src/api/` | HTTP API sunucusu, SSE, rate limiter, enterprise endpoint'ler (18 modül) |
-| **MCP** | `src/mcp/` | 34 araç + 8 kaynak; stdio transport (46 modül) |
+| **MCP** | `src/mcp/` | 37 araç + 8 kaynak; stdio transport (46 modül) |
 | **CLI** | `src/cli/` | 55+ komut, helpers, REPL giriş noktası (89 komut dosyası) |
 | **Dashboard** | `src/dashboard/` | React + Vite + Tailwind web arayüzü (16 sayfa) |
 
@@ -134,7 +134,7 @@ deckent retro           # Retrospektif gör
 deckent recall "sorgu"  # Belleği ara
 ```
 
-### MCP (34 Araç + 8 Kaynak)
+### MCP (37 Araç + 8 Kaynak)
 
 `claude mcp add deckent -- npx deckent-mcp` ile Claude Code'a eklenir. Sprint lifecycle, memory query, status, docs, audit, nervous ve autonomous araçları dahil. Tam liste: `docs/reference/mcp-tools.md`.
 
@@ -197,7 +197,7 @@ MCP kaynakları: `deckent://dashboard`, `deckent://directives`, `deckent://memor
 | Node.js | ≥ 24.0.0 |
 | Platform | macOS, Linux, WSL2 |
 | Test sayısı | 20.668+ (88.58% coverage) |
-| MCP araç | 34 |
+| MCP araç | 37 |
 | MCP kaynak | 8 |
 | CLI komut | 55+ |
 | Dashboard sayfası | 16 |

@@ -1,6 +1,6 @@
 # MCP Module Overview
 
-The Deckent MCP server (`src/mcp/`) exposes the full Deckent orchestration surface as a Model Context Protocol server using the stdio transport. It is registered with Claude Code via `claude mcp add deckent -- npx deckent-mcp`, which launches it as a long-lived child process that communicates over stdin/stdout. The server publishes **35 tools** and **8 resources** organized across sprint lifecycle management, memory, autonomous execution, Nervous System integration, and enterprise process mode. A singleton lock (`mcp-server.pid`) prevents multiple concurrent server instances in the same project root.
+The Deckent MCP server (`src/mcp/`) exposes the full Deckent orchestration surface as a Model Context Protocol server using the stdio transport. It is registered with Claude Code via `claude mcp add deckent -- npx deckent-mcp`, which launches it as a long-lived child process that communicates over stdin/stdout. The server publishes **37 tools** and **8 resources** organized across sprint lifecycle management, memory, autonomous execution, Nervous System integration, and enterprise process mode. A singleton lock (`mcp-server.pid`) prevents multiple concurrent server instances in the same project root.
 
 ---
 
@@ -50,7 +50,7 @@ Resources follow the same pattern in `src/mcp/resources/index.ts`, calling `regi
 
 ---
 
-## Tools (35)
+## Tools (37)
 
 ### Init / Config
 
@@ -62,6 +62,7 @@ Resources follow the same pattern in `src/mcp/resources/index.ts`, calling `regi
 | `deckent_sync` | No | No | Synchronize agent/skill manifests, regenerate routing rules from `.brain/memory.db` ADRs, and update `.claude/rules/`. |
 | `deckent_analyze_project` | Yes | No | Detect project stack (language, frameworks, build tool, test runner) and technical context by scanning `package.json`, lock files, and directory layout. Returns a `ProjectProfile`. |
 | `deckent_doctor` | Yes | No | Run health checks: config validity, stale locks in `.locks/`, memory budget in `.brain/`, provider availability, and dependency graph. Reports issues and remediation steps. |
+| `deckent_cost` | Yes | No | Return cost configuration and pricing view: budget limits, per-provider and per-model pricing, enabled model list, and today's spend window from the resource log. Read-only; no DB writes. |
 | `deckent_help` | Yes | No | Return runtime capabilities, current project status, and a usage guide derived from the live config and `DECKENT_MCP_INSTRUCTIONS`. |
 
 ### Sprint Lifecycle
@@ -100,6 +101,7 @@ Resources follow the same pattern in `src/mcp/resources/index.ts`, calling `regi
 | `deckent_watch` | Yes | No | Subscribe to the live sprint event stream. Backfills recent events from the JSONL file for the active sprint and then pushes new events via `notifications/message` (MCP log channel) as they arrive. |
 | `deckent_audit` | Yes | No | Run the Brain Self-Audit Gate for a completed sprint: executes `tsc --noEmit`, selected vitest suites, and honesty checks on task result files. Returns a structured report without modifying any files. |
 | `deckent_usage` | Yes | No | Show token and cost consumption from Claude Code transcript files. Returns a model breakdown table or per-task sprint breakdown, including cache-read hit rates and a cache gate cost summary. |
+| `deckent_kpi` | Yes | No | Sprint KPI scorecard and trend analysis. Scorecard mode returns all KPI values for a given sprint; trend mode returns a time-series for a single KPI across sprints. Delegates to `KpiService` (SSOT); no DB writes. |
 
 ### Autonomous
 

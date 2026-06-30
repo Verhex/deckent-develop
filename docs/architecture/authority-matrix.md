@@ -317,9 +317,10 @@ Beyond the Brain/Auditor/Worker separation, workers themselves have a **role tax
 |---|---|---|
 | `admin` | All capabilities (full trust) | CI/CD pipelines, privileged ops |
 | `engineer` | All except `erp-write` and `tenant-scope` | Standard development tasks |
+| `operator` | `fs-read`, `fs-write`, `network`, `db-query`, `erp-read`, `shell`, `mcp-tool` | Execute/dispatch + read; excludes dev-admin caps (`db-write`, `erp-write`, `approval`, `provider-pin`, `gpu`, `tenant-scope`) |
 | `viewer` | `fs-read`, `db-query`, `erp-read` only | Read-only analysis, audits |
 
-Role → capability mapping is defined in `ROLE_CAPABILITY_MAP` (`src/nervous/authority-matrix.ts:210-221`). The `admin` role has all 13 capabilities; `engineer` has 11 (excludes enterprise-admin caps); `viewer` has 3 (read-only).
+Role → capability mapping is defined in `WORKER_ROLE_CAPABILITY_MAP` (`src/nervous/authority-matrix.ts:213`). The `admin` role has all 13 capabilities; `engineer` has 11 (excludes enterprise-admin caps); `operator` has 7 (execute/dispatch + read; excludes dev-admin caps); `viewer` has 3 (read-only).
 
 #### Authority Check
 

@@ -1,128 +1,469 @@
-# DIRECTIVES — LAST-STANDING CLOSEOUT (re-run): land the 3 merge-gapped tasks (002·008·009)
+# DIRECTIVES — DOC-REFRESH FIX (Phase 2 of 2): repair the live doc set from the A-audit
 
 ## Goal
-Sprint-343 (LAST-STANDING CLOSEOUT) self-reported 11/11 DONE, but a code-level disk-verify proved a
-**worktree merge-back gap**: 8/11 tasks landed in `main`, but THREE tasks' SOURCE edits never merged
-(their NEW test files DID merge) → the tree is currently test-RED for them. This focused re-run lands
-exactly those three. Each is small, well-specified, and its faithful test **already exists in the tree
-from sprint-343** — so the re-run applies ONLY the source edit and makes the pre-existing test pass.
+Apply the code-verified fixes catalogued by the Phase-1 analysis sprint (sprint-345) to deckent's LIVE
+documentation. Each FIX task reads its source findings file `docs/audits/doc-refresh-2026-06/A<NN>-*.md`,
+**re-verifies each finding against the actual source code** (do NOT blindly trust the audit — disk-verify;
+the audit is a prior worker's claim), and surgically edits ONLY its assigned docs so every claim becomes
+TRUE against the current codebase and every cross-reference resolves.
 
-**Disk-verified gap (the work to land):**
-- **002 — B1 RBAC:** `src/orchestra/sprint-runtime.ts:9` still carries the STALE comment "`enforce_rbac`
-  is not yet declared on ResolvedConfig" (it IS declared at `config-types.ts:921`). Worker note (343)
-  said the `worker.ts` `checkWorkerAuthority` enforceRbac hard-deny was ALREADY landed (sprint-325
-  `476a77ac`) — VERIFY that on disk; only add it if genuinely absent. Landed test:
-  `tests/agents/worker-authority-enforce.test.ts`.
-- **008 — skill-sandbox honest-fail:** `src/core/marketplace/skill-sandbox.ts:78` still has the silent
-  `return []` when `require('typescript')` fails (sentinel absent on disk). Landed test:
-  `tests/core/skill-sandbox-honest-fail.test.ts`.
-- **009 — getMessage dedup prod-warn:** `src/cli/helpers/messages.ts` missing-key branch still has NO
-  deduplicated production warning (only the dev-warn). Landed test:
-  `tests/cli/get-message-missing-key-warn.test.ts`.
+Two audiences (3 Yasa #1): end users + deckent dogfood. Fixes must be correct for both.
 
-**Records of truth (READ FIRST, do not edit):**
-- The original full specs are in `DECKENT-TRIAGE-PLAN.md` (READ-ONLY) + the sprint-343 results
-  (`.tasks/task-343-{002,008,009}.result` — the worker's own files_changed + notes).
-- The three faithful tests already in-tree ARE the contract — read each test, implement the source so it
-  passes (do NOT rewrite a passing test; only adjust a test if its original contract is provably wrong,
-  and say why in the result).
-
-## 🔒 BAĞLAYICI — her task
-- **DISTINCT-FILE (KRİTİK):** 3 task, **sıfır-dosya-kesişimi** (002→sprint-runtime.ts[+worker.ts only if
-  needed], 008→skill-sandbox.ts, 009→messages.ts). Hiçbir iki task aynı dosyaya yazmaz. Test dosyaları
-  **zaten main'de** — worker onları YENİDEN OLUŞTURMAZ (yalnız okur + geçirir); bir testi yalnızca
-  orijinal kontratı kanıtlanır biçimde yanlışsa düzeltir (gerekçeyle).
-- **3 YASA:** dual-lens (dogfood+ürün) · cross-platform/provider-agnostic honest-fail · NO-MVP/god-level.
-- **Cerrahi + additive:** mevcut davranış byte-for-byte korunur; minimum-diff; ESM `.js` import zorunlu;
-  `process.cwd()` YASAK → `join(root, …)`; mevcut export-imzaları kırılmaz.
-- **i18n-first:** kullanıcı-görünür string `getMessage` (en/tr). Task 009 = getMessage'ın KENDİSİNİ
-  sertleştirir; yeni mesaj-anahtarı EKLEMEZ.
-- **Hermetik test (zorunlu):** tmpdir, async (no `spawnSync`), no HOME/`.deckent`-leak, network mock'lı.
-  `tsc --noEmit` 0-yeni-hata; değişen modülü import eden affected-suite yeşil. **No haiku** (kod).
-- **Tier:** 009 (`src/cli/helpers/`) + 002/008 (orchestra/core internal) = **Tier-0** (unit-test
-  sufficient — bunlar surface-command DEĞİL; mevcut landed-test geçince DONE).
-- **Dependencies:** 3 task bağımsız → hiçbirinde `- Dependencies:` satırı YOKTUR.
-- **Self-verify-on-disk (merge-back-gap'e karşı):** her task `.result`'ında, yaptığı kaynak-değişikliğin
-  GERÇEKTEN dosyada olduğunu kanıtlayan bir grep-çıktısı raporlar (örn. `grep -n __SANDBOX_UNAVAILABLE__
-  src/core/marketplace/skill-sandbox.ts`). DONE = kaynak-edit dosyada + landed-test yeşil.
+## 🔒 BAĞLAYICI — her task (binding)
+- **DISTINCT-FILE (KRİTİK):** each task's `Files:` list is its SOLE write set. No two tasks write the
+  same physical doc. Never edit a doc not in your `Files:` list (note in result if you spot an issue
+  elsewhere). This prevents the worktree merge-back collision seen in sprint-343.
+- **RE-VERIFY before editing (disk-verify ground truth):** for every fix you apply, confirm the code
+  truth yourself with `git grep`/Read and cite `file:line` in your result. If a finding is wrong or
+  already-correct on disk, SKIP it and say so — do not introduce a regression to satisfy a stale finding.
+- **Surgical / minimum-diff:** change ONLY what a finding flags. Preserve correct prose byte-for-byte.
+  No reflow, no reorganform, no rewrite of a section that is already accurate. Prefer small edits.
+- **NEVER touch AUTO sections or frozen tiers:**
+  - AUTO (do not hand-edit): `docs/reference/mcp-tools.md` (whole file — `npm run docs:ref`), the
+    `<!-- AUTOGEN:START … -->`/`END` blocks inside `docs/reference/cli.md` + `agents.md`, and the numeric
+    "by the Numbers"/"Sprint History"/"Sprint Metrics" autoSections inside `docs/vision/VISION.md` /
+    `VISION-TR.md`. Edit ONLY hand-curated/protected prose around them.
+  - FROZEN Tier-4 (do not touch at all): `docs/audits/**` (except your own A-file is READ-only here),
+    `docs/superpowers/**`, `docs/analysis/**`, `docs/archive/**`, `docs/adr/NNN-*.md` bodies.
+- **Cross-refs:** fix dead links the audit found and add the missing cross-refs it recommends, using
+  correct relative paths that resolve on disk.
+- **i18n / language:** keep each doc in its existing language (TR docs stay TR, EN docs stay EN). Where
+  the audit flags a TR↔EN parity gap, bring the lagging file up to parity in ITS language. Do not
+  hardcode the other language.
+- **3 YASA:** dual-lens · every-environment (fix wrong/single-platform claims to the full matrix) ·
+  NO-MVP/god-level (replace "TODO/coming soon/MVP" placeholders with real, code-true content — or, if
+  the feature genuinely does not exist, state its status honestly; never claim vision = shipped).
+- **No build/install/login:** read-only verification only (`git grep`, Read). Do NOT run `npm run build`,
+  `npm install`, `npm run docs:generate-cli`, or `/login`. (Host runs the final lint/build verification.)
+- **Honest result:** list `files_changed`, the specific findings applied vs skipped (with reason), and a
+  grep proof for at least the P0 fixes. selfAssessment reflects reality.
+- **No haiku** (code-verification + technical prose).
 
 ---
 
-## Task 1: 002-redo — B1 RBAC: fix the stale `enforce_rbac` comment in sprint-runtime.ts (+ verify worker honor)
+## Task 1: F01 — fix guide onboarding-core
 - Model: sonnet
 - Effort: normal
-- Agent: security-auditor
-- Skills: typescript-expert, security-specialist, testing-expert
-- Files: src/orchestra/sprint-runtime.ts, src/agents/worker.ts
-- Scope: src/orchestra/, src/agents/, tests/agents/
+- Agent: doc-writer
+- Skills: documentation-writer, typescript-expert
+- Files: docs/guide/getting-started.md, docs/guide/getting-started-en.md, docs/guide/installation.md, docs/guide/quickstart.md
+- Scope: docs/guide/, docs/audits/doc-refresh-2026-06/, src/cli/
 ### Description
-The sprint-343 002 worker's source edit did not merge. Disk-verify NOW: `src/orchestra/sprint-runtime.ts:9`
-still says "`enforce_rbac` is not yet declared on ResolvedConfig (MASTER-PLAN backlog)" — that comment is
-STALE (the flag IS declared at `config-types.ts:921`). **Fix:** correct/remove that stale comment so it
-states `enforce_rbac` IS declared on ResolvedConfig (no logic change; the `:30` cast read stays
-byte-for-byte). Then VERIFY on disk that `src/agents/worker.ts` `checkWorkerAuthority` honors
-`opts.enforceRbac` (deny on real scope-violation when the flag is on, soft-allow default-off) — the
-sprint-343 note claimed this already landed (sprint-325 `476a77ac`); if `grep -n enforceRbac
-src/agents/worker.ts` confirms the honor-branch is present, leave worker.ts UNCHANGED (report the grep
-proof); only if it is genuinely absent, add the minimal flag-on deny branch (default-off byte-for-byte).
-The faithful test `tests/agents/worker-authority-enforce.test.ts` ALREADY exists in-tree (landed
-sprint-343) — read it, make it pass, do NOT rewrite it. Tier-0.
+Source findings: `docs/audits/doc-refresh-2026-06/A01-guide-onboarding-core.md`. Apply its fixes after
+re-verifying vs `src/cli/`: correct the wrong `doctor` output examples in all four docs, fix the stale
+MCP tool count, the quickstart init-ordering bug, and the TR/EN content drift between getting-started.md
+and getting-started-en.md (both are EN — normalize the `--`/em-dash typography + wording). Do not alter
+correct command examples.
 ### goNogo
-- goCriteria: `src/orchestra/sprint-runtime.ts` no longer claims `enforce_rbac` is undeclared (grep proof
-  in result: `grep -c 'not yet declared' src/orchestra/sprint-runtime.ts` → 0); worker.ts enforceRbac
-  honor verified present (grep proof) OR added minimally if absent; the existing
-  `tests/agents/worker-authority-enforce.test.ts` is GREEN; `tsc --noEmit` 0-new; affected agents/orchestra
-  tests GREEN.
-- nogo: changing the `enforce_rbac` cast-read logic; flipping the product soft default; rewriting a
-  passing test; touching config-types.ts / authority-matrix.ts / sprint-spawner.ts; `process.cwd()`.
+- goCriteria: every A01 P0/P1 applied or explicitly skipped-with-reason; doctor examples match real
+  `deckent doctor` output; all internal links resolve; diff is surgical (only flagged lines).
+- nogo: editing docs outside Files; rewriting accurate sections; introducing a dead link.
 
-## Task 2: 008-redo — skill-sandbox AST-scan honest-fail when TypeScript is unavailable
+## Task 2: F02 — fix guide concepts
 - Model: sonnet
 - Effort: normal
-- Agent: bug-fixer
-- Skills: typescript-expert, testing-expert
-- Files: src/core/marketplace/skill-sandbox.ts
-- Scope: src/core/, tests/core/
+- Agent: doc-writer
+- Skills: documentation-writer, typescript-expert
+- Files: docs/guide/first-sprint.md, docs/guide/concepts.md, docs/guide/deckent-nedir.md, docs/guide/feature-matrix.md, docs/guide/faq.md
+- Scope: docs/guide/, docs/audits/doc-refresh-2026-06/, src/orchestra/, src/nervous/, src/cli/
 ### Description
-The sprint-343 008 worker's source edit did not merge. Disk-verify NOW: `src/core/marketplace/
-skill-sandbox.ts:78` still does a silent `return []` when `require('typescript')` fails (the
-`__SANDBOX_UNAVAILABLE__` sentinel is absent on disk), so a sandbox scan on a host without the TS
-compiler reports ZERO violations — indistinguishable from a clean scan (the dangerous silent-pass for a
-security gate). **Fix (matching the already-landed test):** replace the silent empty return with the
-explicit unavailable sentinel the test expects — read `tests/core/skill-sandbox-honest-fail.test.ts`
-(already in-tree) for the exact expected contract (the sprint-343 worker used
-`['__SANDBOX_UNAVAILABLE__:typescript-not-installed']` returned through the existing
-`validateSkillSafety` loop so it surfaces in `SafetyReport.issues` → `safe:false`); implement exactly
-what the landed test asserts. The happy path (TS present → real AST scan) stays byte-for-byte. Do NOT
-rewrite the test. Tier-0. `skill-sandbox.ts` is this task's SOLE write.
+Source: `A02-guide-concepts.md`. Re-verify vs `src/orchestra/` + `src/nervous/`. Fix the simplified FAQ
+nervous pipeline (it omits 2 of the 8 stages — bring it to the full `observer→…→history` set or clearly
+label it a simplified view), correct any stale concept/lifecycle claim, and fix first-sprint commands vs
+`src/cli/`. Keep `deckent-nedir.md` in Turkish.
 ### goNogo
-- goCriteria: `grep -n __SANDBOX_UNAVAILABLE__ src/core/marketplace/skill-sandbox.ts` shows the sentinel
-  on disk (grep proof in result); the already-landed `tests/core/skill-sandbox-honest-fail.test.ts` is
-  GREEN; TS-present happy path unchanged; `tsc --noEmit` 0-new; affected core tests GREEN.
-- nogo: keeping the silent empty-array no-op; a new runtime dependency; redesigning the scanner API;
-  changing the happy-path output; rewriting the landed test.
+- goCriteria: A02 findings applied/skipped-with-reason; FAQ pipeline accurate or explicitly labelled
+  simplified; lifecycle/concept claims verified; links resolve; surgical diff.
+- nogo: out-of-scope edits; unverified rewrites.
 
-## Task 3: 009-redo — getMessage deduplicated prod-warn on missing i18n key
+## Task 3: F03 — fix guide autonomous & learning
 - Model: sonnet
-- Effort: low
-- Agent: bug-fixer
-- Skills: typescript-expert, testing-expert
-- Files: src/cli/helpers/messages.ts
-- Scope: src/cli/helpers/, tests/cli/
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer, typescript-expert
+- Files: docs/guide/autonomous.md, docs/guide/autonomous-engine.md, docs/guide/autonomous-operations.md, docs/guide/evolution-and-learning.md
+- Scope: docs/guide/, docs/audits/doc-refresh-2026-06/, src/orchestra/
 ### Description
-The sprint-343 009 worker's source edit did not merge. Disk-verify NOW: `src/cli/helpers/messages.ts`
-`getMessage` missing-key branch still has NO deduplicated production warning (only the existing
-non-production dev-warn at `:2037`). **Fix (matching the already-landed test):** add a module-level
-`Set<string>` (the sprint-343 worker named it `_missingKeyWarnedInProd`) before `getMessage`; in the
-missing-key branch, emit ONE stderr warning per UNIQUE key even in production (dedup via the Set), while
-the non-production dev-warn stays unchanged; the fallback return value (`key`) is unchanged. Read
-`tests/cli/get-message-missing-key-warn.test.ts` (already in-tree) for the exact contract and implement
-to pass it. No new i18n key, no message-catalog edit, no signature change. `messages.ts` is clean (not
-dirty) and is this task's SOLE write. Tier-0.
+Source: `A03-guide-autonomous.md`. Re-verify vs `src/orchestra/`. Fix the stale §9 reactive "attach-only"
+claim (superseded by the N1 fix), and add explicit cross-refs between the three overlapping autonomous
+docs (keep one authoritative; have the others defer with a link rather than duplicating). Don't delete
+accurate operational content.
 ### goNogo
-- goCriteria: `grep -n 'missingKeyWarned\|_missingKeyWarnedInProd' src/cli/helpers/messages.ts` shows the
-  dedup set on disk (grep proof in result); the already-landed `tests/cli/get-message-missing-key-warn.test.ts`
-  is GREEN (prod warns once per key, second call no warn, present key never warns, return value still the
-  raw key); `tsc --noEmit` 0-new; affected messages tests GREEN.
-- nogo: warning on every call (must dedup); changing the fallback return value or `getMessage` signature;
-  throwing on a missing key; editing the message catalog; rewriting the landed test.
+- goCriteria: §9 stale claim corrected vs source; autonomous-trio cross-refs added; overlap reduced or
+  cross-linked; links resolve; surgical diff.
+- nogo: out-of-scope edits; deleting accurate content; unverified claims.
+
+## Task 4: F04 — fix guide nervous, dashboard & REPL
+- Model: sonnet
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer, typescript-expert
+- Files: docs/guide/nervous-system.md, docs/guide/dashboard.md, docs/guide/chat-mode.md, docs/guide/terminal.md, docs/guide/terminal-tr.md
+- Scope: docs/guide/, docs/audits/doc-refresh-2026-06/, src/nervous/, src/dashboard/, src/api/, src/cli/
+### Description
+Source: `A04-guide-nervous-ui.md`. Re-verify vs `src/nervous/`, `src/dashboard/`, `src/api/`, `src/cli/`.
+Fix the `NERVOUS-TODO.md` dead link and any other flagged gaps. Keep terminal.md (EN) ↔ terminal-tr.md
+(TR) at feature parity in their respective languages. The 12 detectors were verified accurate — do not
+change them.
+### goNogo
+- goCriteria: A04 findings applied; dead link fixed; terminal TR↔EN parity preserved; links resolve;
+  surgical diff.
+- nogo: out-of-scope edits; changing already-correct detector list.
+
+## Task 5: F05 — fix guide workers, troubleshooting & misc
+- Model: sonnet
+- Effort: high
+- Agent: doc-writer
+- Skills: documentation-writer, typescript-expert
+- Files: docs/guide/workers.md, docs/guide/architecture-overview.md, docs/guide/config-recovery.md, docs/guide/troubleshooting.md, docs/guide/ram-experiment.md
+- Scope: docs/guide/, docs/audits/doc-refresh-2026-06/, src/agents/, src/core/
+### Description
+Source: `A05-guide-workers-ops.md`. workers.md is STALE/HIGH — re-verify vs `src/agents/worker.ts` +
+the extracted `worker-lifecycle.ts`. Fix: missing lifecycle states, wrong `.plan` format, wrong lock
+thresholds, incomplete API table; add the note that `worker.ts` is a re-export router since Sprint 144
+and list the extracted modules. Fix architecture-overview module map vs `src/`. Keep ram-experiment data.
+### goNogo
+- goCriteria: workers.md lifecycle/plan/lock/API corrected vs `src/agents/` with grep proof; module map
+  accurate; links resolve; surgical diff.
+- nogo: out-of-scope edits; unverified lifecycle claims.
+
+## Task 6: F06 — fix guide providers & backends
+- Model: sonnet
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer, typescript-expert
+- Files: docs/guide/multi-provider.md, docs/guide/multi-provider-fleet.md, docs/guide/local-model-workers.md, docs/guide/docker-backend.md, docs/guide/docker-memory.md
+- Scope: docs/guide/, docs/audits/doc-refresh-2026-06/, src/providers/, src/core/
+### Description
+Source: `A06-guide-providers.md`. The multi-provider-fleet.md routing table is factually WRONG — re-verify
+vs `src/core/routing-engine.ts` / `model-registry.ts` and correct it. Model IDs were verified MATCH — keep
+them. Fix any platform (WSL/macOS/Linux/Windows) claim flagged. Keep Docker content accurate to the spawn
+backend.
+### goNogo
+- goCriteria: routing table corrected vs source with proof; model IDs unchanged (still registry-true);
+  platform claims fixed; links resolve; surgical diff.
+- nogo: changing correct model IDs; out-of-scope edits.
+
+## Task 7: F07 — fix reference CLI (hand-curated only)
+- Model: sonnet
+- Effort: high
+- Agent: doc-writer
+- Skills: documentation-writer, typescript-expert
+- Files: docs/reference/cli.md, docs/reference/cli-commands.md
+- Scope: docs/reference/, docs/audits/doc-refresh-2026-06/, src/cli/
+### Description
+Source: `A07-reference-cli.md`. Re-verify EVERY change vs `src/cli/entry.ts` + `src/cli/commands/*`.
+Add the 5 undocumented commands (gateway, kpi, image, process, autonomous-mission) to the hand-curated
+sections; remove the phantom flags (`archive-debt --dry-run`/`--max-archive-size`) that trigger Commander
+errors; add the missing flags (serve/doctor/recall/run/recover/init/plan/start per A07); update the
+"Last updated Sprint 286" stamp. **Do NOT edit the `<!-- AUTOGEN:START id="cli" -->`…`END` block in
+cli.md — it is in sync (A28). Edit only hand-curated prose/tables.**
+### goNogo
+- goCriteria: 5 missing commands added; phantom flags removed; missing flags added; all verified vs
+  `src/cli/` with grep proof; AUTOGEN block untouched; links resolve.
+- nogo: editing the AUTOGEN block; inventing flags not in source; out-of-scope edits.
+
+## Task 8: F08 — fix reference config
+- Model: sonnet
+- Effort: high
+- Agent: doc-writer
+- Skills: documentation-writer, typescript-expert
+- Files: docs/reference/config.md, docs/reference/config-reference.md
+- Scope: docs/reference/, docs/audits/doc-refresh-2026-06/, src/core/
+### Description
+Source: `A08-reference-config.md`. Re-verify vs `src/core/config-types.ts` + `config.ts`. Fix the 5 wrong
+defaults, add the 20 missing keys, remove the 4 phantom (doc-only) keys, and fix the stale claims
+(`deckent_style` missing `'process'`, `docker_max_timeout` 6× constraint, `worker_memory_limit` default,
+`max_workers` "inert", `cache_warm` phantom). Cite `config-types.ts:line` for each corrected default.
+### goNogo
+- goCriteria: 5 wrong defaults corrected, 20 missing keys added, 4 phantom keys removed — each verified
+  vs `config-types.ts` with line proof; links resolve; surgical diff.
+- nogo: adding keys not in source; out-of-scope edits.
+
+## Task 9: F09 — fix reference API
+- Model: sonnet
+- Effort: high
+- Agent: doc-writer
+- Skills: documentation-writer, typescript-expert
+- Files: docs/reference/api.md, docs/reference/api-endpoints.md, docs/reference/api-examples.md, docs/reference/api-surface.md
+- Scope: docs/reference/, docs/audits/doc-refresh-2026-06/, src/api/, src/agents/, src/orchestra/
+### Description
+Source: `A09-reference-api.md`. Re-verify vs `src/api/`. CRITICAL P0: correct the auth model — GET
+endpoints are NOT auth-exempt; all `/api/*` GET routes go through `bearerAuthMiddleware` since Sprint 191
+(verify in `server.ts`). Fix the rate-limiter class name, add the ~15 undocumented endpoints, fix stale
+line refs in api-endpoints.md, and the api-surface.md schema drift (`TaskResult.rubricScores` deprecated,
+`TaskResult.crossVerify` not in task-types.ts, missing `TRANSITION`/`MANUAL_REVIEW_REQUIRED` phases).
+api-surface.md is Tier-1 — keep it precise.
+### goNogo
+- goCriteria: auth model corrected with `server.ts:line` proof; rate-limiter name fixed; missing
+  endpoints added; api-surface schema reconciled vs task-types.ts; links resolve.
+- nogo: leaving the false "GET = no auth" claim; out-of-scope edits.
+
+## Task 10: F10 — fix reference MCP (hand-authored only)
+- Model: sonnet
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer, typescript-expert
+- Files: docs/reference/mcp-guide.md, docs/reference/mcp-overview.md, docs/reference/mcp-resources.md
+- Scope: docs/reference/, docs/audits/doc-refresh-2026-06/, src/mcp/
+### Description
+Source: `A10-reference-mcp.md`. Re-verify vs `src/mcp/`. Fix the 7 hand-authored issues, notably the
+resource table showing 5/8 in mcp-guide.md (add the missing retro/tasks/agents resources to reach 8).
+**Do NOT edit `docs/reference/mcp-tools.md` — it is AUTO-generated and in sync (A28); it is not in your
+Files list.** Tool count 37 is correct — keep it.
+### goNogo
+- goCriteria: 7 issues fixed; resource table 8/8 vs `src/mcp/`; mcp-tools.md untouched; links resolve.
+- nogo: editing mcp-tools.md; changing the correct 37 count.
+
+## Task 11: F11 — fix reference routing, execution & dependencies
+- Model: sonnet
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer, typescript-expert
+- Files: docs/reference/stack-aware-routing.md, docs/reference/multi-provider.md, docs/reference/execution-request.md, docs/reference/event-channels.md, docs/reference/dependencies.md, docs/reference/provider-free.md
+- Scope: docs/reference/, docs/audits/doc-refresh-2026-06/, src/core/, src/orchestra/, package.json
+### Description
+Source: `A12-reference-routing.md`. CRITICAL P0: `dependencies.md` lists `telegraf` but the actual dep is
+`grammy` (verify in `package.json`) — fix it. Add the missing `RoutingResult` fields
+(agentScore/skillScores/skillConfidence) to the doc per `routing-engine.ts`. Re-verify routing constants
+vs `routing-engine.ts` (they were ✅ — keep). Note: `reference/multi-provider.md` is THIS task's file
+(distinct from the guide one).
+### goNogo
+- goCriteria: telegraf→grammy fixed with `package.json` proof; RoutingResult fields added vs
+  `routing-engine.ts`; correct constants unchanged; links resolve.
+- nogo: editing guide/multi-provider.md (not yours); out-of-scope edits.
+
+## Task 12: F12 — fix reference enterprise (+ broken self-anchors)
+- Model: sonnet
+- Effort: high
+- Agent: doc-writer
+- Skills: documentation-writer, typescript-expert
+- Files: docs/reference/enterprise-depth.md, docs/reference/enterprise-foundation.md, docs/reference/enterprise-integrations.md
+- Scope: docs/reference/, docs/audits/doc-refresh-2026-06/, src/core/, src/api/
+### Description
+Source: `A13-reference-enterprise.md` + the A28 global link ledger. P0: `enterprise-integrations.md`
+describes `strict_tenant_isolation` as fully enforcing MemoryStore isolation, but the flag is NOT wired
+into the main MemoryStore instantiation paths (only audit-CLI) — re-verify and rewrite the claim to state
+the honest current state (do NOT claim vision = shipped; note the wiring gap). Fix the 5 broken in-page
+ToC self-anchors in enterprise-integrations.md (#1-ssoidc-integration, #2-siem…, #3-compliance…,
+#6-capability…, #13-enterprise-dashboard…) so they match current section slugs. Keep correctly-labelled
+SHIPPED claims (policy-engine.ts:121, rbac.ts:90 verified).
+### goNogo
+- goCriteria: strict_tenant_isolation claim made honest with code proof; 5 self-anchors resolve (verify
+  against the actual headings); SHIPPED labels accurate; links resolve.
+- nogo: leaving vision-as-shipped; out-of-scope edits.
+
+## Task 13: F13 — fix reference ops & security
+- Model: sonnet
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer, typescript-expert, security-specialist
+- Files: docs/reference/performance.md, docs/reference/resource-profile.md, docs/reference/health-check.md, docs/reference/security.md, docs/reference/migration-guide.md
+- Scope: docs/reference/, docs/audits/doc-refresh-2026-06/, src/
+### Description
+Source: `A14-reference-ops-security.md`. Fix the factually-wrong "Brain cannot write config" claim
+(re-verify: `sprint-finalizer.ts` DOES write `.deckent/config.json`). Correct the budget example default
+threshold. Ensure RBAC/ADR-037 is described as runtime-advisory/soft (not hard-blocking) per the actual
+worker enforcement. Fix the Docker "hard block" overstatement. Verify health-check vs `deckent doctor`.
+### goNogo
+- goCriteria: config-write claim corrected with `sprint-finalizer.ts` proof; RBAC soft-enforcement
+  accurate; doctor claims verified; links resolve; surgical diff.
+- nogo: overstating RBAC as hard-blocking; out-of-scope edits.
+
+## Task 14: F14 — fix reference features/glossary/lifecycle (+ glossary dedup)
+- Model: sonnet
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer, typescript-expert
+- Files: docs/reference/features.md, docs/reference/lifecycle-diagram.md, docs/reference/glossary.md, docs/glossary.md
+- Scope: docs/reference/, docs/audits/doc-refresh-2026-06/, src/orchestra/
+### Description
+Source: `A15-reference-misc.md`. P0: in features.md, `heartbeat-daemon`, `handoff-protocol`,
+`shared-memory` are misclassified as Dormant but are wired/default-on — re-verify and move them to the
+correct Active/Lightly-Used tables. Fix lifecycle-diagram.md (CLEANUP ≠ SprintPhase enum; add
+DIRECTIVE/TRANSITION/COMPLETE) vs `src/orchestra/sprint-controller.ts`. Resolve the
+`reference/glossary.md` ↔ `docs/glossary.md` DUPLICATION in ONE coherent move: make ONE canonical (the
+fuller `reference/glossary.md`) and turn the other into a short pointer/redirect (keep its links alive);
+fix the unresolvable Blueprint §-references in reference/glossary.md. You own BOTH glossary files.
+### goNogo
+- goCriteria: Dormant misclassifications fixed with source proof; lifecycle phases match the enum;
+  glossary duplication resolved (one canonical + pointer) with no dead links; links resolve.
+- nogo: leaving two competing glossaries; out-of-scope edits.
+
+## Task 15: F15 — fix cookbook recipes 01–05 + index
+- Model: sonnet
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer, typescript-expert
+- Files: docs/cookbook/index.md, docs/cookbook/01-first-sprint.md, docs/cookbook/02-multi-provider-fleet.md, docs/cookbook/03-memory-recall.md, docs/cookbook/04-autonomous-mode.md, docs/cookbook/05-status-and-watch.md
+- Scope: docs/cookbook/, docs/audits/doc-refresh-2026-06/, src/cli/
+### Description
+Source: `A16-cookbook-01-05.md`. Recipes 01–05 mostly PASS — apply only flagged fixes after re-verifying
+commands vs `src/cli/`. In index.md, add entries for the two files missing from the list
+(`getting-started-en.md`, `multi-provider-and-cost-en.md`) OR mark them as superseded drafts — pick based
+on whether they are current (they are owned by F17; just add the index links). Keep passing recipes intact.
+### goNogo
+- goCriteria: flagged recipe fixes applied vs `src/cli/`; index.md lists every existing recipe (no
+  missing, no dead); links resolve; surgical diff.
+- nogo: rewriting passing recipes; out-of-scope edits.
+
+## Task 16: F16 — fix cookbook recipes 06–10
+- Model: sonnet
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer, typescript-expert
+- Files: docs/cookbook/06-checkpoints-approval.md, docs/cookbook/07-tech-debt-tracking.md, docs/cookbook/08-cost-and-budget.md, docs/cookbook/09-recover-stuck-sprint.md, docs/cookbook/10-nervous-alerts.md
+- Scope: docs/cookbook/, docs/audits/doc-refresh-2026-06/, src/cli/
+### Description
+Source: `A17-cookbook-06-10.md`. Apply flagged command/behavior fixes after re-verifying vs `src/cli/`
+(checkpoint/approval, cost/budget gate, recover, nervous). Most commands verified ✅ — only fix the
+flagged ones.
+### goNogo
+- goCriteria: flagged fixes applied with `src/cli/` proof; correct commands untouched; links resolve.
+- nogo: rewriting accurate recipes; out-of-scope edits.
+
+## Task 17: F17 — fix cookbook task-recipes & meta (+ fix-bug anchor)
+- Model: sonnet
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer, typescript-expert
+- Files: docs/cookbook/add-rest-api.md, docs/cookbook/fix-bug.md, docs/cookbook/getting-started-en.md, docs/cookbook/multi-provider-and-cost-en.md, docs/cookbook/update-docs.md
+- Scope: docs/cookbook/, docs/audits/doc-refresh-2026-06/, src/cli/, docs/DOC-POLICY.md
+### Description
+Source: `A18-cookbook-tasks.md` + A28 link ledger. Fix the Node version drift (≥18 → the real minimum;
+verify in `package.json` engines), the `deckent@beta` → `deckent` install-tag drift, and the dead link in
+fix-bug.md:229 (`/docs/architecture/sprint-lifecycle.md#fix` — the `#fix` anchor was removed; repoint to a
+valid anchor or remove). Reconcile `update-docs.md` with `docs/DOC-POLICY.md` (read-only ref). Verify
+commands vs `src/cli/`.
+### goNogo
+- goCriteria: Node version + install-tag corrected vs `package.json`; fix-bug #fix dead link resolved;
+  update-docs consistent with DOC-POLICY; links resolve.
+- nogo: out-of-scope edits; leaving the dead anchor.
+
+## Task 18: F18 — fix architecture/architecture.md (the master map)
+- Model: sonnet
+- Effort: high
+- Agent: doc-writer
+- Skills: documentation-writer, system-architect, typescript-expert
+- Files: docs/architecture/architecture.md
+- Scope: docs/architecture/, docs/audits/doc-refresh-2026-06/, src/
+### Description
+Source: `A19-architecture-main.md`. Re-verify the module map vs the real `src/` tree. Add the
+undocumented modules (`src/agent/` singular, `src/mcp-client/`, `src/training/`) to §2, correct the stale
+"25 modules" count, and update the `worker.ts` lifecycle description (part now in `worker-lifecycle.ts`).
+This is a large file — keep the diff surgical (only the flagged module-map sections).
+### goNogo
+- goCriteria: undocumented modules added; module count corrected vs `src/`; worker.ts description updated
+  with proof; surgical diff; links resolve.
+- nogo: rewriting accurate sections; out-of-scope edits.
+
+## Task 19: F19 — fix architecture (authority, agents, memory, lifecycle, stray ADRs)
+- Model: sonnet
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer, system-architect, typescript-expert
+- Files: docs/architecture/agent-skill-architecture.md, docs/architecture/agents.md, docs/architecture/authority-matrix.md, docs/architecture/memory-system.md, docs/architecture/sprint-lifecycle.md, docs/architecture/adr/010-single-runtime-dependency.md, docs/architecture/adr/adr-090-ink-repl.md
+- Scope: docs/architecture/, docs/audits/doc-refresh-2026-06/, src/core/, src/agents/, src/orchestra/
+### Description
+Sources: `A20-architecture-authority.md` + `A21-architecture-memory-lifecycle.md`. Fix authority-matrix.md
+(1 naming error + 1 omission) vs the real authority code; fix the 2 high-priority gaps + 3 stale line
+numbers in memory-system.md vs `memory-store.ts`; reconcile sprint-lifecycle.md phases vs
+`sprint-controller.ts`. For the two stray `architecture/adr/*` files: add a banner pointing to the
+canonical `docs/adr/` (do NOT move/delete them). Memory/lifecycle models were mostly ✅ — surgical fixes only.
+### goNogo
+- goCriteria: authority naming/omission fixed; memory gaps + line numbers corrected vs `memory-store.ts`;
+  lifecycle phases reconciled; stray-ADR pointer banner added; links resolve.
+- nogo: moving/deleting ADRs; rewriting accurate sections; out-of-scope edits.
+
+## Task 20: F20 — fix development core guides (+ worker-guide dedup)
+- Model: sonnet
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer, typescript-expert
+- Files: docs/development/agent-guide.md, docs/development/brain-guide.md, docs/development/worker-guide.md, docs/development/smoke-verify.md, docs/worker-guide.md
+- Scope: docs/development/, docs/audits/doc-refresh-2026-06/, src/orchestra/, src/agents/
+### Description
+Source: `A22-development-core.md`. Fix brain-guide.md `evaluateResult()` stale logic + add the missing
+`evaluateWithRubric()` mention (verify vs `src/orchestra/`). CRITICAL: resolve the worker-guide
+DUPLICATION — `docs/development/worker-guide.md` and top-level `docs/worker-guide.md` contradict on
+heartbeat format, lifecycle states, and verify-loop scope. You own BOTH: make ONE canonical (verify the
+correct heartbeat fields incl. `currentAction`/`currentFile` vs `src/agents/worker.ts`) and have the
+other defer to it (pointer), with no contradictions. agent-guide.md + smoke-verify.md are publishable —
+touch only if flagged.
+### goNogo
+- goCriteria: brain-guide evaluateResult corrected + evaluateWithRubric added; worker-guide contradiction
+  resolved (one canonical, correct heartbeat fields vs source); links resolve.
+- nogo: leaving the two worker-guides contradictory; out-of-scope edits.
+
+## Task 21: F21 — fix development tool guides
+- Model: sonnet
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer, typescript-expert
+- Files: docs/development/dashboard-guide.md, docs/development/plugin-guide.md, docs/development/repo-sync.md, docs/development/troubleshooting.md
+- Scope: docs/development/, docs/audits/doc-refresh-2026-06/, src/dashboard/, scripts/
+### Description
+Source: `A23-development-tools.md`. Fix dashboard-guide.md stale page count (→ 20) + missing route rows +
+output dir; fix repo-sync.md EXCLUDE path name; fix troubleshooting.md §2.1 nvm version. plugin-guide.md
+was ✅ ACCURATE — leave it unless re-verify shows a flagged issue.
+### goNogo
+- goCriteria: page count + routes + output dir fixed vs `src/dashboard/`; repo-sync EXCLUDE path
+  corrected; nvm version fixed; links resolve; surgical diff.
+- nogo: editing accurate plugin-guide content; out-of-scope edits.
+
+## Task 22: F22 — fix vision cluster (protected prose only)
+- Model: sonnet
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer
+- Files: docs/vision/VISION.md, docs/vision/VISION-TR.md, docs/vision/agentic-run-ecosystem.md, docs/vision/roadmap.md
+- Scope: docs/vision/, docs/audits/doc-refresh-2026-06/
+### Description
+Source: `A24-vision.md`. Fix the stale "89 ADRs / through ADR-089" in the PROTECTED prose of VISION.md +
+VISION-TR.md (current highest accepted is ADR-094) — Mission section + Distinctive table. Remove the stale
+duplicate "Sprint Metrikleri" (sprint-285) AUTO block left in VISION-TR.md. Add the `⚠️ SUPERSEDED →
+MASTER-PLAN` banner to `docs/vision/roadmap.md` (match the format in `docs/release/roadmap.md`) and fix
+its 3 dead `docs/ROADMAP-GOD-LEVEL.md` links (remove or repoint — that file does not exist). **Do NOT
+edit the numeric "by the Numbers"/"Sprint History" AUTO sections in VISION.md/VISION-TR.md** beyond
+removing the orphaned duplicate block. Keep VISION-TR in Turkish.
+### goNogo
+- goCriteria: ADR count corrected to current in both files' protected prose; orphan AUTO block removed;
+  roadmap SUPERSEDED banner added; 3 dead links fixed; VISION↔TR parity; links resolve.
+- nogo: editing live AUTO numeric sections; content-rewriting the superseded roadmap beyond the banner.
+
+## Task 23: F23 — fix launch cluster
+- Model: sonnet
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer
+- Files: docs/launch/announce-final.md, docs/launch/blog-devto-launch.md, docs/launch/blog-hashnode-launch.md, docs/launch/discord-bot-setup.md, docs/launch/telegram-bot-setup.md
+- Scope: docs/launch/, docs/audits/doc-refresh-2026-06/, src/connectors/, package.json
+### Description
+Source: `A26-launch.md`. Repo URL + install command were ✅ — keep. Fix the inconsistent Node.js version
+requirement (verify `package.json` engines) and the 2 bot-setup discrepancies vs `src/connectors/`
+(re-verify the Telegram/Discord setup steps against the actual adapter/gateway code). Only edit the launch
+files that A26 flagged (listed in Files). Do not touch announcement files with no findings.
+### goNogo
+- goCriteria: Node version made consistent vs `package.json`; bot-setup steps corrected vs
+  `src/connectors/` with proof; no false product claims; links resolve.
+- nogo: editing non-flagged launch files; out-of-scope edits.
+
+## Task 24: F24 — fix top-level docs
+- Model: sonnet
+- Effort: normal
+- Agent: doc-writer
+- Skills: documentation-writer, typescript-expert
+- Files: docs/index.md, docs/adr-index.md, docs/voice.md, docs/DOC-POLICY.md
+- Scope: docs/, docs/audits/doc-refresh-2026-06/, scripts/
+### Description
+Source: `A28-toplevel-global-integrity.md`. In index.md fix any dead doc-hub link and resolve the
+"Features being rewritten" placeholder (either link the now-current feature docs or keep an honest
+status). Reconcile adr-index.md against the ADRs actually present in `docs/adr/` (add missing / remove
+extra) — note `docs:ref` owns `docs/adr/README.md`, but `adr-index.md` is hand-maintained. Apply any
+DOC-POLICY.md correction A28 flagged. Do NOT touch the giant MASTER-PLAN/SPRINT-LOG/CHANGELOG bodies (out
+of scope — structure only, no edits this sprint). glossary.md + worker-guide.md are owned by F14/F20 — not
+yours.
+### goNogo
+- goCriteria: index.md links resolve + placeholder resolved honestly; adr-index reconciled vs `docs/adr/`;
+  DOC-POLICY corrections applied; surgical diff.
+- nogo: editing glossary.md/worker-guide.md (owned elsewhere); editing MASTER-PLAN/SPRINT-LOG bodies.

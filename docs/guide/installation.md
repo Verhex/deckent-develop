@@ -66,11 +66,11 @@ deckent doctor
 Expected output on a freshly initialized project:
 
 ```
-  node_version   v24.0.0 (>=24 required)      [pass]
-  git            git 2.43.0                    [pass]
-  tmux           tmux 3.3a                     [pass]
-  claude_cli     claude 1.2.3                  [pass]
-  workspace      .deckent/ found               [pass]
+  [PASS] Node.js        v24.0.0 (>=24 required)
+  [PASS] git            git 2.43.0
+  [PASS] tmux           tmux 3.3a
+  [PASS] Claude CLI     claude 1.2.3
+  [PASS] Workspace      .deckent/ found
 ```
 
 Before `deckent init`, the `workspace` row shows `[fail]` — that is expected.

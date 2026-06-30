@@ -67,6 +67,26 @@ deckent <command> [options]
 - [`deckent serve`](#serve) — Start the HTTP API server with SSE support
 - [`deckent web`](#web) — Start the web dashboard with API server
 
+### Analytics
+
+- [`deckent kpi`](#kpi) — Show KPI scorecard for the current or a specific sprint
+
+### Connectors & Integrations
+
+- [`deckent gateway`](#gateway) — Manage the connector gateway daemon (listen/start/stop/status/pair)
+
+### Docker Image
+
+- [`deckent image`](#image) — Worker Docker image management
+
+### Process Mode
+
+- [`deckent process`](#process) — Process-mode execution surface — submit tasks and poll status
+
+### Autonomous Missions
+
+- [`deckent autonomous-mission`](#autonomous-mission) — Manage autonomous v2 missions (create-list/create-goal/list)
+
 ---
 
 # Project Setup
@@ -87,6 +107,12 @@ Initialize a new Deckent project in the current directory. Creates .deckent/, .b
 | `--claude-code` | Configure for Claude Code environment (default) |
 | `--env <envs>` | Comma-separated environments to configure (codex,cursor,gemini,vscode,shell) |
 | `--all-envs` | Configure ALL environment configs |
+| `--upgrade` | Update existing files while preserving user customizations (merge strategy) |
+| `--force` | Force overwrite of existing env files without warning |
+| `--repair` | Show which init steps failed and how to fix them |
+| `-y, --yes` | Install all missing prerequisites without prompting (CI/non-interactive) |
+| `--no-install` | Detect missing prerequisites but never install them (hint-only) |
+| `--no-image` | Skip the opt-in worker Docker image build offer (no prompt) |
 
 **Examples:**
 
@@ -95,6 +121,7 @@ deckent init
 deckent init --auto
 deckent init --env codex,cursor
 deckent init --all-envs
+deckent init -y --no-image
 ```
 
 ---
@@ -154,10 +181,13 @@ Start a new sprint. Optionally pass a one-line description for zero-config mode 
 | Flag | Description |
 |------|-------------|
 | `--auto-approve` | Auto-approve worker actions (--dangerously-skip-permissions) |
-| `--sandbox-mode` | Run in sandbox mode (Docker) |
+| `--sandbox-mode` | Run in sandbox mode (git stash + restore) |
+| `--sandbox` | Use sandbox spawn backend (memory-cap + path-jail isolation, no Docker required) |
 | `--dry-run` | Plan sprint without spawning workers |
 | `--force` | Skip doctor pre-flight checks |
 | `--watch` | Automatically open watch mode after sprint spawns workers |
+| `--timeout <ms>` | Sprint timeout in milliseconds _(default: 30 minutes)_ |
+| `--force-directives` | Override existing DIRECTIVES.md in zero-config mode |
 
 **Examples:**
 
@@ -166,6 +196,7 @@ deckent start
 deckent start "Add JWT authentication to the Express API"
 deckent start --dry-run
 deckent start --force --watch
+deckent start "Fix login bug" --timeout 600000
 ```
 
 ---
@@ -181,7 +212,10 @@ Plan the next sprint without executing it. Reads DIRECTIVES.md, checks usage, an
 | Flag | Description |
 |------|-------------|
 | `--no-confirm` | Skip confirmation, auto-approve plan |
+| `-y, --yes` | Non-interactive: auto-approve the plan (DRAFT → PENDING) without prompting |
 | `--structured` | Force structured parsing (skip AI planner) |
+| `--dry-run` | Show plan without writing task files to disk |
+| `--interrogate` | Challenge directives with structural questions before planning |
 
 **Examples:**
 
@@ -189,6 +223,8 @@ Plan the next sprint without executing it. Reads DIRECTIVES.md, checks usage, an
 deckent plan
 deckent plan --no-confirm
 deckent plan --structured
+deckent plan --interrogate
+deckent plan --dry-run
 ```
 
 ---
@@ -509,13 +545,19 @@ Run a single one-shot task without a sprint cycle. Creates a minimal task, spawn
 | Flag | Description |
 |------|-------------|
 | `--model <model>` | Model to use. Options: opus, sonnet, haiku, gpt-4.1, o3, o4-mini, gemini-2.5-pro, gemini-2.5-flash _(default: `sonnet`)_ |
+| `--model-effort <level>` | Native model reasoning-effort (claude: low\|medium\|high\|xhigh\|max, codex: minimal\|low\|medium\|high). Opt-in; unsupported/invalid levels are ignored |
 | `--scope <dir>` | Worker scope directory _(default: `./`)_ |
+| `--timeout <ms>` | Maximum wait time in milliseconds _(default: `300000`)_ |
+| `--keep` | Keep task files after completion (skip cleanup) |
+| `--auto-approve` | Pass auto-approve flag to the worker |
+| `--verbose` | Stream worker log output to stdout in real-time |
 
 **Examples:**
 
 ```bash
 deckent run "Fix the login page redirect bug"
 deckent run "Add input validation" --model opus --scope src/api/
+deckent run "Refactor auth module" --model-effort high --verbose
 ```
 
 ---
@@ -934,12 +976,18 @@ Start the HTTP API server with SSE support. Exposes REST endpoints for dashboard
 | Flag | Description |
 |------|-------------|
 | `--port <number>` | Port to listen on _(default: `3100`)_ |
+| `--dev` | Enable dev proxy mode — expects Vite dev server on --dev-port |
+| `--dev-port <number>` | Vite dev server port for --dev proxy mode _(default: `5173`)_ |
+| `--host <addr>` | Bind address for the server _(default: `127.0.0.1`)_ |
+| `--no-terminal` | Disable the embedded web terminal |
 
 **Examples:**
 
 ```bash
 deckent serve
 deckent serve --port 8080
+deckent serve --dev --dev-port 5173
+deckent serve --host 0.0.0.0
 ```
 
 ---
@@ -966,6 +1014,197 @@ deckent web --dev
 ```
 
 ---
+
+# Analytics
+
+## `kpi`
+
+Show the KPI scorecard for the current (or a specific) sprint. Displays pass/fail status for each registered KPI definition against actual sprint metrics.
+
+**Usage:** `deckent kpi`
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--sprint <id>` | Sprint ID to score _(defaults to the current sprint)_ |
+| `--trend <kpiId>` | Show trend series for a specific KPI across sprints |
+| `-n, --n <count>` | Number of sprints to include in the trend _(default: `10`)_ |
+| `--json` | Output raw JSON |
+
+**Examples:**
+
+```bash
+deckent kpi
+deckent kpi --sprint sprint-340
+deckent kpi --trend success_rate -n 20
+deckent kpi --json
+```
+
+---
+
+# Connectors & Integrations
+
+## `gateway`
+
+Manage the connector gateway daemon — the bridge between external messaging adapters (Telegram, Discord, WhatsApp) and deckent projects.
+
+**Usage:** `deckent gateway <subcommand>`
+
+**Subcommands:**
+
+| Subcommand | Description |
+|------------|-------------|
+| `listen` | Print queued inbound messages from the gateway daemon |
+| `start` | Start the gateway daemon process in the background |
+| `stop` | Stop the running gateway daemon |
+| `status` | Show gateway daemon status (running/stopped, PID) |
+| `pair list` | List pending pairing requests |
+| `pair approve <code> <project>` | Approve a pairing request and bind it to a project |
+| `pair reject <code>` | Reject a pairing request |
+
+All subcommands accept `--lang <code>` for language override (`en`\|`tr`).
+
+**Examples:**
+
+```bash
+deckent gateway start
+deckent gateway status
+deckent gateway pair list
+deckent gateway pair approve ABC123 /my/project
+deckent gateway stop
+```
+
+---
+
+# Docker Image
+
+## `image`
+
+Worker Docker image management.
+
+**Usage:** `deckent image <subcommand>`
+
+#### `build`
+
+Build the deckent-worker Docker image from the packaged Dockerfile.worker.
+
+**Usage:** `deckent image build`
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--tag <tag>` | Docker image tag to build _(default: `deckent-worker`)_ |
+| `--dry-run` | Print the resolved Dockerfile path + build plan without building |
+| `--with-codex` | Install Codex CLI in the image (`INSTALL_CODEX=true` build-arg) |
+| `--with-gemini` | Install Gemini CLI in the image (`INSTALL_GEMINI=true` build-arg) |
+| `--with-ollama` | Install Ollama CLI in the image (`INSTALL_OLLAMA=true` build-arg) |
+
+**Examples:**
+
+```bash
+deckent image build
+deckent image build --tag my-worker:latest --with-codex
+deckent image build --dry-run
+```
+
+---
+
+# Process Mode
+
+## `process`
+
+Process-mode execution surface — submit tasks/capabilities and poll their status (ADR-022 CLI/MCP parity). Submissions are policy-gated: read-only tasks auto-run; side-effecting tasks park for approval.
+
+**Usage:** `deckent process <subcommand>`
+
+#### `submit <description>`
+
+Submit an ExecutionRequest.
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--kind <kind>` | Execution kind: `task` (default), `sprint`, `capability` |
+| `--scope-dir <dir>` | Scope directory for a code task (drives risk classification) |
+| `--provider <provider>` | Provider override |
+| `--model <model>` | Model override |
+| `--root <path>` | Project root override |
+
+#### `status <executionId>`
+
+Poll the status of a prior submission by executionId.
+
+#### `result <executionId>`
+
+Show the full result of a submission (status + lastResult).
+
+**Examples:**
+
+```bash
+deckent process submit "Add OAuth2 to the API" --kind task
+deckent process status exec-abc123
+deckent process result exec-abc123
+```
+
+---
+
+# Autonomous Missions (v2)
+
+## `autonomous-mission`
+
+Manage autonomous v2 missions — structured work bundles that run under an authority-bounded loop. Distinct from `deckent autonomous` (continuous loop) — missions are discrete, goal-oriented execution units.
+
+**Usage:** `deckent autonomous-mission <subcommand>`
+
+#### `create-list <title>`
+
+Create a Type-1 list mission from N explicit work items.
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--items-file <path>` | JSON file containing an array of `{kind, spec?, id?}` items |
+| `--id <id>` | Mission ID _(auto-generated if omitted)_ |
+| `--tenant <tenant>` | Tenant identifier |
+| `--deliver-to <channel>` | Delivery channel for settlement notification |
+
+#### `create-goal <goal>`
+
+Create a Type-2 goal mission that runs until the goal is reached.
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--accept <criteria>` | Acceptance criteria string |
+| `--title <title>` | Mission title _(defaults to goal text)_ |
+| `--id <id>` | Mission ID _(auto-generated if omitted)_ |
+| `--tenant <tenant>` | Tenant identifier |
+| `--deliver-to <channel>` | Delivery channel for settlement notification |
+
+#### `list`
+
+List all missions in a summary table.
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output as JSON |
+| `--tenant <tenant>` | Filter by tenant |
+
+**Examples:**
+
+```bash
+deckent autonomous-mission create-list "Q3 Backlog" --items-file items.json
+deckent autonomous-mission create-goal "Migrate auth to OAuth2" --accept "all tests pass"
+deckent autonomous-mission list
+deckent autonomous-mission list --json
+```
 
 ---
 

@@ -374,6 +374,5 @@ Aşağıdaki 7 detector `enabled: false` ile gelir. Projenize göre açabilirsin
 
 - ADR-040: Nervous System Architecture (accepted Sprint 147, realized Sprint 180)
 - Design spec: `docs/superpowers/specs/2026-04-20-deckent-nervous-system-design.md`
-- NERVOUS-TODO baseline: `NERVOUS-TODO.md` (§11.2 6-step activation, §11.3 3-Faz roadmap, §11.10 4 locked decisions)
 - Crisis Stabilization §6: `docs/superpowers/specs/2026-05-21-crisis-stabilization-initiative.md`
 - Sprint 180 plan: `docs/superpowers/plans/2026-05-24-sprint-180-hybrid-beta-nervous.md`

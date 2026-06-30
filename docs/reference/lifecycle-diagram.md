@@ -9,16 +9,18 @@ Source of truth: `docs/reference/api-surface.md` and `DECKENT.md`.
 
 ```mermaid
 flowchart TD
+    DIRECTIVE["**0 · DIRECTIVE**\nSprint initialized\nBrain reads DIRECTIVES.md\nInitial SprintPhase before PLAN"]
     PLAN["**1 · PLAN**\nBrain reads DIRECTIVES\nCreates task JSON files in .tasks/"]
-    SPAWN["**2 · SPAWN**\nWorkers launched via tmux / subprocess\nAuditor scan loop starts"]
+    SPAWN["**2 · SPAWN**\nWorkers launched via tmux / subprocess\nAuditor scan loop starts\nHeartbeatDaemon starts (default-on)"]
     WAVE_BUILD["**2a · WAVE_BUILD** ★\nKahn topological sort\nDependency waves built in parallel\n_(when dependency_pipeline_enabled = true — ADR-045)_"]
     EXECUTE["**3 · EXECUTE**\nWorkers run their tasks\nWrite heartbeat .hb files"]
     EVALUATE["**4 · EVALUATE**\nBrain collects .result files\nDecision: GO · NO-GO · TECH_DEBT"]
     FIX["**5 · FIX**\nFailed tasks retried\n_(configurable timeout)_"]
     RETRO["**6 · RETRO**\nRetrospective written\nto memory.db"]
     DECAY["**7 · DECAY**\nMemory trimmed if\n.brain/ exceeds budget"]
-    CLEANUP["**8 · CLEANUP**\nTask files archived\nLocks released · Session closed"]
+    COMPLETE["**8 · COMPLETE**\nTask files archived\nLocks released · Session closed\nSprintPhase.COMPLETE emitted"]
 
+    DIRECTIVE --> PLAN
     PLAN --> SPAWN
     SPAWN -.->|"dependency_pipeline_enabled = true"| WAVE_BUILD
     WAVE_BUILD --> EXECUTE
@@ -28,12 +30,14 @@ flowchart TD
     EVALUATE -->|"all pass"| RETRO
     FIX --> RETRO
     RETRO --> DECAY
-    DECAY --> CLEANUP
+    DECAY --> COMPLETE
 
     style WAVE_BUILD fill:#fffde7,stroke:#f9a825,stroke-dasharray:5
 ```
 
-*Eight sequential phases; WAVE_BUILD (2a) is a conditional sub-step of SPAWN that groups tasks into parallel dependency waves when the pipeline is enabled.*
+*Nine sequential phases (0–8); WAVE_BUILD (2a) is a conditional sub-step of SPAWN that groups tasks into parallel dependency waves when the pipeline is enabled.*
+
+> **SprintPhase enum note** (`src/core/sprint-types.ts`): The canonical enum values are `DIRECTIVE · PLAN · SPAWN · EXECUTE · EVALUATE · FIX · RETRO · DECAY · TRANSITION · COMPLETE`. `TRANSITION` is the inter-phase state emitted by `emitPhaseChange()` between each arrow above — it does not appear as a sequential node in the diagram. The terminal state after DECAY is `COMPLETE` (not `CLEANUP`; `CLEANUP` is a code-comment label for the operations that run inside the COMPLETE phase).
 
 ---
 

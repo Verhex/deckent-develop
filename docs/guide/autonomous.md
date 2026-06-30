@@ -403,3 +403,12 @@ Work-generator triggers have the **lowest priority** among trigger sources (back
 - `deckent_autonomous` (MCP, `action: 'approve'/'reject'`) — resolve parked triggers via MCP
 - [`deckent nervous-subscribe`](../reference/mcp-tools.md) — subscribe to nervous-system notifications
 - [`deckent nervous-status`](../reference/mcp-tools.md) — show nervous system status
+
+---
+
+## Related Docs
+
+| Doc | Scope |
+|-----|-------|
+| [`autonomous-engine.md`](./autonomous-engine.md) | Concepts, architecture, three-gate governance, dispatch paths, security model — **authoritative on how the engine works** |
+| [`autonomous-operations.md`](./autonomous-operations.md) | Step-by-step: enable, define work, run, monitor, approve, stop, troubleshoot — **authoritative on operating the engine** |

@@ -14,6 +14,8 @@ Deckent is organized as a multi-agent sprint orchestrator. The main runtime flow
 
 `agents/` is the worker execution layer. Workers claim tasks, respect file scope and locks, write heartbeats, execute assigned work, and emit result files using the shared `.tasks/` contract; adaptive agent modules support runtime adjustment without making workers into planners.
 
+The worker entry point (`worker.ts`) was refactored in Sprint 144 from a 1 670-LoC god object into a re-export router backed by four focused modules: `worker-lifecycle.ts` (state machine, atomic writes, SIGTERM shutdown), `worker-verify.ts` (build and test verification loops), `worker-log.ts` (structured log I/O), and `worker-rollback.ts` (git-stash scope snapshots). All public symbols remain importable from `worker.ts` for backward compatibility.
+
 ## `nervous/`
 
 `nervous/` is the proactive meta-orchestrator described by ADR-040. It observes repository and sprint signals through detectors, evaluates them with a decision engine and authority matrix, proposes actions, dispatches approved work, checks runtime scope, and records history without replacing the Brain's sprint authority.

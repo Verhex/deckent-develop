@@ -21,7 +21,7 @@ deckent serve --port 8080
 The serve process runs in the foreground. The dashboard stays responsive even when a sprint
 is running because sprint execution is detached from the serve event loop.
 
-## The 16 Pages
+## The 20 Pages
 
 ### 1. Dashboard (`/`)
 
@@ -117,6 +117,30 @@ authenticated. Redirects to the configured IdP for SSO login.
 
 OIDC callback handler. Receives the authorization code from the IdP after login and
 exchanges it for an id_token via `POST /api/auth/oidc/exchange`.
+
+### 17. Autonomous (`/autonomous`)
+
+Autonomous engine control surface. View and manage the autonomous mission backlog, approve
+or reject missions, and start or stop the engine. Integrates with the nervous system to
+surface pending engine decisions that require user action.
+
+### 18. Docs Health (`/docs-health`)
+
+Documentation health dashboard. Shows broken links, stale source references, and coverage
+gaps detected by the docs-health scanner. Use this page to monitor documentation quality
+across the project and track outstanding documentation debt.
+
+### 19. Missions (`/missions`)
+
+Mission tracking for autonomous engine runs. Lists active and completed missions with their
+outcomes, task counts, and durations. Provides a history view of all autonomous runs
+initiated by the engine.
+
+### 20. KPI (`/kpi`)
+
+Sprint KPI scorecard. Displays cost, token usage, cache hit rate, retry rate, task
+completion rate, and quality metrics for a sprint. Data is sourced from the
+`deckent_kpi` MCP tool and the sprint retrospective record.
 
 ## Starting a Sprint via the DIRECTIVES Editor
 

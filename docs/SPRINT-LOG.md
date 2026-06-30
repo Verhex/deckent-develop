@@ -8168,3 +8168,142 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 344-003: 009-redo — getMessage deduplicated prod-warn on missing i18n key (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 345 — sprint-345
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-06-28
+**Duration:** 1117s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1117266ms |
+
+### Tasks
+
+- 345-001: A01 — guide onboarding-core (DONE)
+- 345-002: A02 — guide onboarding-concepts (DONE)
+- 345-003: A03 — guide autonomous & learning (DONE)
+- 345-004: A04 — guide nervous, dashboard & REPL (DONE)
+- 345-005: A05 — guide workers, troubleshooting & misc (DONE)
+- 345-006: A06 — guide providers & backends (DONE)
+- 345-007: A07 — reference CLI (cli.md + cli-commands.md) (DONE)
+- 345-008: A08 — reference config (config.md + config-reference.md) (DONE)
+- 345-009: A09 — reference API (api / endpoints / examples / surface) (DONE)
+- 345-010: A10 — reference MCP (guide / overview / tools[AUTO] / resources) (DONE)
+- 345-011: A11 — reference agents, skills & marketplace (DONE)
+- 345-012: A12 — reference routing, execution & dependencies (DONE)
+- 345-013: A13 — reference enterprise (depth / foundation / integrations) (DONE)
+- 345-014: A14 — reference ops & security (DONE)
+- 345-015: A15 — reference misc (features / glossary / lifecycle) (DONE)
+- 345-016: A16 — cookbook recipes 01–05 + index (DONE)
+- 345-017: A17 — cookbook recipes 06–10 (DONE)
+- 345-018: A18 — cookbook task-recipes & meta (DONE)
+- 345-019: A19 — architecture/architecture.md (the 78KB map) (DONE)
+- 345-020: A20 — architecture agents, authority & stray ADRs (DONE)
+- 345-021: A21 — architecture memory & sprint-lifecycle (DONE)
+- 345-022: A22 — development guides (brain / worker / agent / smoke) (DONE)
+- 345-023: A23 — development guides (dashboard / plugin / repo-sync / troubleshooting) (DONE)
+- 345-024: A24 — vision cluster (DONE)
+- 345-025: A25 — strategy, benchmark, design & governance (DONE)
+- 345-026: A26 — launch cluster (DONE)
+- 345-027: A27 — release cluster (DONE)
+- 345-028: A28 — top-level docs + GLOBAL cross-ref & auto-doc integrity (DONE)
+
+---
+## Sprint 346 — sprint-346
+
+**Status:** COMPLETE
+**Date:** 2026-06-28
+**Duration:** 874s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 24 |
+| Completed | 13 |
+| Tech Debt | 0 |
+| No-Go | 11 |
+| Coverage | NaN% |
+| Duration | 874405ms |
+
+### Tasks
+
+- 346-001: F01 — fix guide onboarding-core (DONE)
+- 346-002: F02 — fix guide concepts (DONE)
+- 346-003: F03 — fix guide autonomous & learning (DONE)
+- 346-004: F04 — fix guide nervous, dashboard & REPL (DONE)
+- 346-005: F05 — fix guide workers, troubleshooting & misc (DONE)
+- 346-006: F06 — fix guide providers & backends (DONE)
+- 346-007: F07 — fix reference CLI (hand-curated only) (NO_GO)
+- 346-008: F08 — fix reference config (NO_GO)
+- 346-009: F09 — fix reference API (NO_GO)
+- 346-010: F10 — fix reference MCP (hand-authored only) (DONE)
+- 346-011: F11 — fix reference routing, execution & dependencies (DONE)
+- 346-012: F12 — fix reference enterprise (+ broken self-anchors) (DONE)
+- 346-013: F13 — fix reference ops & security (DONE)
+- 346-014: F14 — fix reference features/glossary/lifecycle (+ glossary dedup) (NO_GO)
+- 346-015: F15 — fix cookbook recipes 01–05 + index (DONE)
+- 346-016: F16 — fix cookbook recipes 06–10 (DONE)
+- 346-017: F17 — fix cookbook task-recipes & meta (+ fix-bug anchor) (NO_GO)
+- 346-018: F18 — fix architecture/architecture.md (the master map) (NO_GO)
+- 346-019: F19 — fix architecture (authority, agents, memory, lifecycle, stray ADRs) (NO_GO)
+- 346-020: F20 — fix development core guides (+ worker-guide dedup) (NO_GO)
+- 346-021: F21 — fix development tool guides (DONE)
+- 346-022: F22 — fix vision cluster (protected prose only) (NO_GO)
+- 346-023: F23 — fix launch cluster (NO_GO)
+- 346-024: F24 — fix top-level docs (NO_GO)
+
+---
+## Sprint 346 — sprint-346
+
+**Status:** COMPLETE
+**Date:** 2026-06-28
+**Duration:** 1142s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 24 |
+| Completed | 13 |
+| Tech Debt | 0 |
+| No-Go | 11 |
+| Coverage | NaN% |
+| Duration | 1142249ms |
+
+### Tasks
+
+- 346-001: F01 — fix guide onboarding-core (DONE)
+- 346-002: F02 — fix guide concepts (DONE)
+- 346-003: F03 — fix guide autonomous & learning (DONE)
+- 346-004: F04 — fix guide nervous, dashboard & REPL (DONE)
+- 346-005: F05 — fix guide workers, troubleshooting & misc (DONE)
+- 346-006: F06 — fix guide providers & backends (DONE)
+- 346-007: F07 — fix reference CLI (hand-curated only) (NO_GO)
+- 346-008: F08 — fix reference config (NO_GO)
+- 346-009: F09 — fix reference API (NO_GO)
+- 346-010: F10 — fix reference MCP (hand-authored only) (DONE)
+- 346-011: F11 — fix reference routing, execution & dependencies (DONE)
+- 346-012: F12 — fix reference enterprise (+ broken self-anchors) (DONE)
+- 346-013: F13 — fix reference ops & security (DONE)
+- 346-014: F14 — fix reference features/glossary/lifecycle (+ glossary dedup) (NO_GO)
+- 346-015: F15 — fix cookbook recipes 01–05 + index (DONE)
+- 346-016: F16 — fix cookbook recipes 06–10 (DONE)
+- 346-017: F17 — fix cookbook task-recipes & meta (+ fix-bug anchor) (NO_GO)
+- 346-018: F18 — fix architecture/architecture.md (the master map) (NO_GO)
+- 346-019: F19 — fix architecture (authority, agents, memory, lifecycle, stray ADRs) (NO_GO)
+- 346-020: F20 — fix development core guides (+ worker-guide dedup) (NO_GO)
+- 346-021: F21 — fix development tool guides (DONE)
+- 346-022: F22 — fix vision cluster (protected prose only) (NO_GO)
+- 346-023: F23 — fix launch cluster (NO_GO)
+- 346-024: F24 — fix top-level docs (NO_GO)
+
+---

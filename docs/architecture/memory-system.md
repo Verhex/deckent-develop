@@ -39,7 +39,7 @@
 
 ## Memory V2 DB Schema
 
-The single source of truth for all Brain knowledge is `.brain/memory.db` (SQLite). The schema contains **5 tables + 1 FTS5 virtual table** (`src/core/memory-store.ts:99-237`):
+The single source of truth for all Brain knowledge is `.brain/memory.db` (SQLite). The schema contains **5 tables + 1 FTS5 virtual table** (`src/core/memory-store.ts:99-286`, including FTS5 sync triggers at 241–286):
 
 | Table | Type | Description |
 |---|---|---|
@@ -228,7 +228,7 @@ Each ADR follows MADR v3 hybrid format (ADR-036):
 | Max entries | No hard limit — grows indefinitely |
 | Decay | **Never decayed** (`decay_exempt = true`) |
 | Ownership | Brain writes via `MemoryStore.upsert()`; agents read |
-| Current count | 89 ADRs (ADR-001 through ADR-089; see `docs/adr/` for full list) |
+| Current count | 94 ADRs (ADR-001 through ADR-094; see `docs/adr/` for full list) |
 
 > ADR governance was formalized in Sprint 138 (ADR-036). For the
 > authoritative list query `store.getByType('adr')` or see `docs/adr/`.
@@ -275,8 +275,36 @@ Decay always runs at sprint end. If total DB entry count ≤ configured budget (
 Step 1 — MemoryStore.decay(currentSprintNum, decayAfterSprints)
          Soft-deletes non-exempt entries older than decayAfterSprints sprints
          (decay_exempt=false entries only; ADRs are always exempt)
-Step 2 — Return DecayResult with before/after DB entry counts
+         Guard: sprint_num > 0 — entries with sprint_num=0 (schema default)
+         are permanently preserved regardless of age (see note below)
+Step 2 — Return { deletedCount, aborted? } from MemoryStore.decay()
+         Outer runDecay() wraps this into a full DecayResult struct
 ```
+
+> **`sprint_num > 0` preservation guard:** The decay query includes
+> `AND sprint_num > 0` in its WHERE clause (`memory-store.ts:921–927`).
+> Entries inserted without an explicit `sprint_num` receive the schema default
+> of `0` and are **permanently preserved** — they are never soft-deleted
+> regardless of age, budget, or `force` flag. This protects entries created
+> outside a sprint context (e.g., init-time bootstrapping, manual `store.insert`
+> calls). Developers inserting entries that should be subject to decay must set
+> `sprint_num` to a positive integer.
+
+> **Catastrophic decay guard:** Before soft-deleting, `MemoryStore.decay()`
+> checks whether the candidate batch would wipe an outsized fraction of the DB
+> (`memory-store.ts:903–950`):
+>
+> ```typescript
+> const CATASTROPHIC_BATCH_MIN = 3;          // minimum batch size to trigger guard
+> const CATASTROPHIC_RATIO = 0.5;            // ≥ 50% of non-exempt active entries
+> ```
+>
+> If the batch contains ≥ 3 entries **and** would soft-delete ≥ 50% of all
+> non-exempt active entries, `decay()` aborts immediately and returns
+> `{ deletedCount: 0, aborted: true }` with a `console.warn`. No entries are
+> touched. This prevents a misconfigured `decaySprints` value or a data anomaly
+> from accidentally wiping most of the knowledge base. When debugging "decay
+> did not run", check whether `aborted: true` is present in the return value.
 
 > The V1 5-step file-based decay pipeline (remove patterns → remove debt rows
 > → archive sprints → trim MEMORY.md sections → hard-truncate) is preserved in
@@ -285,7 +313,7 @@ Step 2 — Return DecayResult with before/after DB entry counts
 
 ### `runDecay` Function Signature
 ```typescript
-// src/orchestra/debt-manager.ts:542 (re-exported via src/orchestra/brain.ts)
+// src/orchestra/debt-manager.ts:650 (re-exported via src/orchestra/brain.ts)
 export function runDecay(
   projectRoot: string,
   sprintId: string,

@@ -40,11 +40,11 @@ deckent doctor
 Expected output:
 
 ```
-  node_version   v24.0.0 (>=24 required)      [pass]
-  git            git 2.43.0                    [pass]
-  tmux           tmux 3.3a                     [pass]
-  claude_cli     claude 1.2.3                  [pass]
-  workspace      .deckent/ not found           [fail]
+  [PASS] Node.js        v24.0.0 (>=24 required)
+  [PASS] git            git 2.43.0
+  [PASS] tmux           tmux 3.3a
+  [PASS] Claude CLI     claude 1.2.3
+  [FAIL] Workspace      .deckent/ not found
 ```
 
 The `workspace` check fails until you initialize a project — that is expected.
@@ -98,7 +98,7 @@ Start a conversational session. Ask questions, brainstorm goals, or trigger task
 deckent chat
 ```
 
-Deckent will connect to your installed AI CLI (Claude, Codex, or Gemini) and attach the Deckent MCP server, giving the assistant access to all 34 Deckent tools.
+Deckent will connect to your installed AI CLI (Claude, Codex, or Gemini) and attach the Deckent MCP server, giving the assistant access to all 37 Deckent tools.
 
 Example session:
 

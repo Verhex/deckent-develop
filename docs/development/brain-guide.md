@@ -93,7 +93,8 @@ When `dependency_pipeline_enabled: true` (default), `spawnWorkers()` builds depe
 | `planSprint(root, config, ctx, rec)` | sprint-planner | Creates task JSONs in `.tasks/`, routes v2, returns `Sprint` |
 | `spawnWorkers(root, sprint, config)` | sprint-spawner | Spawns workers via configured backend (docker/tmux/subprocess) |
 | `waitForResults(root, sprint, timeout)` | sprint-controller | Polls `.tasks/task-*.result` (default timeout: 30min) |
-| `evaluateResult(result, task, vitestJson?, threshold?)` | sprint-controller | Pure: DONE / GO_WITH_TECH_DEBT / NO_GO |
+| `evaluateResultSync(result, task, vitestJson?, threshold?)` | sprint-controller | Sync pure fast-path: DONE / GO_WITH_TECH_DEBT / NO_GO (CLI finalize fallback) |
+| `evaluateWithRubric(result, task, rubric?)` | result-evaluator | **Primary** rubric-based evaluator: returns `EvaluationResult` with `totalScore`, `rubricScores`, `decision` |
 | `handleEvaluation(root, task, eval, result)` | debt-manager | Writes debt to DB, creates fix tasks, updates task status |
 | `handleCrossDependencies(root, sprint, evals)` | debt-manager | Creates cross-fix tasks for causal NO_GOs |
 | `writeRetrospective(root, sprint, evals, metrics)` | sprint-reporter | Writes retro entry to memory.db + exports |
@@ -136,16 +137,33 @@ See `docs/reference/api-surface.md` for the full schema.
 
 ## GO/NO-GO Evaluation
 
-`evaluateResult()` is a **pure function** — no side effects:
+There are two evaluators; they are distinct and must NOT be collapsed:
+
+### `evaluateResultSync()` — sync fast-path (sprint-controller)
+
+`evaluateResultSync()` is a **pure sync function** — no side effects, no git I/O. Used by the CLI `finalize` re-grade fallback where no async suspension is desired. Renamed from `evaluateResult` → `evaluateResultSync` in Sprint 321 (R321-EVALRESULT-DISAMBIG).
 
 ```
 selfAssessment === 'NO_GO'             → TaskEvaluation.NO_GO
 selfAssessment === 'GO_WITH_TECH_DEBT' → TaskEvaluation.GO_WITH_TECH_DEBT
-selfAssessment === 'DONE':
-  testsPassed === false                → TaskEvaluation.NO_GO
-  coverage < threshold (default 90)   → TaskEvaluation.GO_WITH_TECH_DEBT
-  else                                → TaskEvaluation.DONE
+testsPassed === false                  → TaskEvaluation.NO_GO
+isDocTask(task)                        → TaskEvaluation.DONE  (skip coverage)
+coverage < threshold (default 90)      → TaskEvaluation.GO_WITH_TECH_DEBT
+else                                   → TaskEvaluation.DONE
 ```
+
+### `evaluateWithRubric()` — primary production evaluator (result-evaluator)
+
+`evaluateWithRubric()` is the **canonical rubric-based evaluator** used in the EVALUATE and FIX sprint phases. It performs schema validation, task-type-aware rubric selection (audit / doc-write / code via `rubric-registry`), and weighted criterion scoring. Returns an `EvaluationResult` with `totalScore`, `rubricScores[]`, and `decision`.
+
+Score thresholds (default rubric):
+```
+totalScore >= passingScore            → DONE
+totalScore >= passingScore * 0.7      → GO_WITH_TECH_DEBT
+totalScore <  passingScore * 0.7      → NO_GO
+```
+
+The deprecated `evaluateResult()` (async, also in `result-evaluator`) performs Spurious-NO_GO / TIMEOUT_WITH_WORK git reconciliation and is retained only for backward compatibility.
 
 ### Evaluation Outcomes
 

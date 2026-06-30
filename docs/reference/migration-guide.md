@@ -197,10 +197,14 @@ deckent sync
 ### Verification
 
 ```bash
+# Verify DECKENT.md exists and is referenced by CLAUDE.md and AGENTS.md
+ls DECKENT.md && grep "@DECKENT.md" CLAUDE.md AGENTS.md
+
+# Then run doctor to confirm overall project health
 deckent doctor
-# Expected: ✓ DECKENT.md found
-# Expected: ✓ CLAUDE.md references DECKENT.md
 ```
+
+> **Note:** `deckent doctor` does not include a check for DECKENT.md or CLAUDE.md references — use the manual commands above to verify the file structure.
 
 ---
 

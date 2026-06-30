@@ -1264,3 +1264,41 @@ BLOCKED: Shell metacharacter detected in heartbeat command: "npx vitest run --re
 BLOCKED: Shell metacharacter detected in heartbeat command: "npx vitest run --reporter=verbose 2>&1 | tail -5"
 ```
 
+
+## Heartbeat — 2026-06-28T12:27:54.388Z
+
+- ❌ `tsc --noEmit`
+```
+tra/sprint-phases.ts(1924,13): error TS1005: ',' expected.
+src/orchestra/sprint-phases.ts(1924,23): error TS1005: ',' expected.
+src/providers/cross-provider-keys.ts(33,12): error TS1005: ',' expected.
+src/providers/cross-provider-keys.ts(33,22): error TS1005: ',' expected.
+src/providers/cross-provider-keys.ts(33,28): error TS1005: ',' expected.
+src/providers/cross-provider-keys.ts(33,35): error TS1005: '>' expected.
+src/providers/cross-provider-keys.ts(33,44): error TS1109: Expression expected.
+```
+
+- ❌ `npx vitest run --reporter=verbose 2>&1 | tail -5`
+```
+BLOCKED: Shell metacharacter detected in heartbeat command: "npx vitest run --reporter=verbose 2>&1 | tail -5"
+```
+
+
+## Heartbeat — 2026-06-28T13:00:34.261Z
+
+- ❌ `tsc --noEmit`
+```
+tra/sprint-phases.ts(1924,13): error TS1005: ',' expected.
+src/orchestra/sprint-phases.ts(1924,23): error TS1005: ',' expected.
+src/providers/cross-provider-keys.ts(33,12): error TS1005: ',' expected.
+src/providers/cross-provider-keys.ts(33,22): error TS1005: ',' expected.
+src/providers/cross-provider-keys.ts(33,28): error TS1005: ',' expected.
+src/providers/cross-provider-keys.ts(33,35): error TS1005: '>' expected.
+src/providers/cross-provider-keys.ts(33,44): error TS1109: Expression expected.
+```
+
+- ❌ `npx vitest run --reporter=verbose 2>&1 | tail -5`
+```
+BLOCKED: Shell metacharacter detected in heartbeat command: "npx vitest run --reporter=verbose 2>&1 | tail -5"
+```
+

@@ -42,7 +42,7 @@ The Brain orchestrates the sprint but cannot modify Operator-level configuration
 | Capability | Allowed | Denied |
 |---|---|---|
 | **Read** | All files | — |
-| **Write** | `.tasks/`, `.contracts/`, `.brain/`, `.dashboard` | `AGENTS.md`, `DIRECTIVES.md`, `.deckent/config.json` |
+| **Write** | `.tasks/`, `.contracts/`, `.brain/`, `.dashboard`, `.deckent/config.json` (limited fields via sprint-finalizer) | `AGENTS.md`, `DIRECTIVES.md` |
 | **Execute** | `claude -p` (spawn workers), `tmux` (create/kill windows) | Direct source code writes |
 | **Git** | `commit`, `push` (with Operator approval) | Force-push, branch deletion |
 
@@ -270,7 +270,7 @@ Deckent supports three operating modes with different risk/convenience trade-off
 | **Worker scope creep** | Worker writes outside assigned directory | Auditor `git diff` scan + BoundaryViolation alert (advisory for CLI/tmux V1.0; hard block for Docker/local-model workers) |
 | **Stale/zombie worker** | Worker crashes, holds locks forever | Stale heartbeat + stale lock detection |
 | **Deadlocked tasks** | Task A depends on B depends on A | Kahn's algorithm circular dependency detection |
-| **Brain overreach** | Brain modifies DIRECTIVES or config | `--allowedTools` excludes those file paths |
+| **Brain overreach** | Brain modifies DIRECTIVES or Operator-only files | `--allowedTools` excludes `DIRECTIVES.md` and `AGENTS.md`; `.deckent/config.json` is partially writable by Brain (limited fields only via sprint-finalizer) |
 | **Concurrent write conflict** | Two workers write the same file | `.locks/` file-based mutex |
 | **Memory budget overflow** | `.brain/` exceeds 900 lines | Brain's `runDecay` forced at budget limit |
 | **Sprint abandonment** | Error mid-sprint leaves tasks incomplete | `runSprint` wraps all phases in try/catch; always reaches COMPLETE |
@@ -299,7 +299,7 @@ Deckent supports three operating modes with different risk/convenience trade-off
 └─────────────────────────────────────────────────┘
 ```
 
-Each boundary is enforced independently — a compromised Worker cannot escalate to Brain-level writes, and the Auditor cannot create tasks or spawn agents.
+In V1.0, scope boundary violations for CLI/tmux workers are detected and logged (audit trail via event stream + Auditor `git diff --stat` scan) but **not hard-blocked at runtime** — see ADR-037. The Auditor cannot create tasks or spawn agents. Docker workers can optionally hard-block with `enforceRbac: true`. Full Layer-2 runtime enforcement is a V2 goal per ADR-037.
 
 ---
 
@@ -309,7 +309,7 @@ The module import graph is itself a security boundary. Circular imports are expl
 
 | Rule | Enforcement |
 |---|---|
-| Brain is the **only** module that imports from tmux, auditor, worker | `tsc --noEmit` + code review |
+| **Brain-family modules** (sprint-controller + extracted phase organics) are the only modules that import tmux/auditor/worker — per ADR-008 Sprint 281 amendment | `npm run lint:adr` + `tsc --noEmit` |
 | Planner imports **only** from `core/` | Prevents planner from accessing execution context |
 | Auditor reads task files **from disk** (no brain import) | Prevents auditor from being manipulated by brain state |
 | Worker reads task files **from disk** (no brain import) | Prevents worker from accessing orchestration secrets |
@@ -320,7 +320,7 @@ This ensures that even if a worker module is compromised, it cannot call Brain o
 
 ## 8. Configuration Security
 
-The `.deckent/config.json` file controls system behavior (model limits, plan mode, sprint IDs). It is writable only by the Operator:
+The `.deckent/config.json` file controls system behavior (model limits, plan mode, sprint IDs). It is managed by the Operator; Brain may update a limited set of fields at sprint end:
 
 ```json
 {
@@ -330,7 +330,7 @@ The `.deckent/config.json` file controls system behavior (model limits, plan mod
 }
 ```
 
-Brain reads this file but cannot write it. Workers have no access to it. Changes to config require operator intervention, preventing agents from modifying their own constraints.
+Brain may update limited config fields (e.g., `agent_min_score`, `coverage_aspirational`, `last_sprint_id`) at sprint end via `sprint-finalizer.ts:applyAdaptiveThresholds()` — this is by design per ADR-037 authority matrix. Brain **cannot** write Operator-level fields (`DIRECTIVES.md`, `AGENTS.md`). Workers have no access to the config file.
 
 ---
 

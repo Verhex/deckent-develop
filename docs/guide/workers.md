@@ -57,22 +57,64 @@ Brain spawns worker
 
 ## 2. Worker Lifecycle
 
+Three distinct state representations exist in the worker system. Do not conflate them.
+
+### 2a. Task-File Status (`TaskStatus`)
+
+Recorded in `.tasks/task-{id}.json`. The Brain and Auditor read this field.
+
 ```
-PENDING ──► CLAIMED ──► EXECUTING ──► TESTING ──► DOCUMENTING ──► DONE
-                                                                    │
-                                                                    └──► NO_GO
+PENDING ──► CLAIMED ──► EXECUTING ──► DONE
+                                       │
+                                       └──► NO_GO
 ```
 
-| Phase | Status | What Happens |
-|-------|--------|--------------|
-| 1. Claim | `PENDING → CLAIMED` | Read task file, mark as claimed |
-| 2. Heartbeat | `EXECUTING` | Write initial `.hb` file before any work |
-| 3. Plan | `EXECUTING` | Write `.plan` file with execution strategy |
-| 4. Lock | — | Acquire file locks before writing |
-| 5. Code | `CODING` | Implement within scope, update heartbeat |
-| 6. Test | `TESTING` | Run `tsc --noEmit` and `npx vitest run` |
-| 7. Document | `DOCUMENTING` | Update docs, write final notes |
-| 8. Result | `DONE` or `NO_GO` | Write `.result` file, release all locks |
+### 2b. Worker Process Lifecycle (`WorkerLifecycleState`)
+
+Tracked by `WorkerStateMachine` in `worker-lifecycle.ts`. Drives Docker-stop / orphan detection.
+
+```
+SPAWNING ──► STARTING ──► EXECUTING ──► VERIFYING ──► TESTING ──► WRITING_RESULT ──► DONE ──► EXITED
+                              │                                          │
+                              └──────────────────────────────────────►ERROR ──► EXITED
+                              └──────────────────────────────────────►ORPHAN
+```
+
+| State | Meaning |
+|-------|---------|
+| `SPAWNING` | Backend is launching the container/process |
+| `STARTING` | Worker process started, reading task |
+| `EXECUTING` | Worker is implementing the task |
+| `VERIFYING` | Running `tsc --noEmit` (type check) |
+| `TESTING` | Running test suite |
+| `WRITING_RESULT` | Writing `.result` file to disk |
+| `DONE` | `.result` written, exiting normally |
+| `EXITED` | Process has exited |
+| `ERROR` | Unrecoverable error encountered |
+| `ORPHAN` | Worker lost contact; Brain detected via stale heartbeat |
+
+Valid transitions are defined in `VALID_TRANSITIONS` (`worker-lifecycle.ts`). Stoppable states: `SPAWNING`, `STARTING`, `EXECUTING`, `VERIFYING`, `TESTING`, `WRITING_RESULT`. Terminal states: `DONE`, `EXITED`, `ERROR`, `ORPHAN`.
+
+### 2c. Heartbeat Status (`AgentStatus`)
+
+Written to `.tasks/task-{id}.hb` by the worker. The Auditor reads this every 30 s.
+
+```
+EXECUTING ──► CODING ──► VERIFYING ──► TESTING ──► DOCUMENTING ──► DONE
+```
+
+### 2d. Phase-to-Status Mapping
+
+| Phase | Task Status | Heartbeat Status | Lifecycle State |
+|-------|-------------|-----------------|-----------------|
+| 1. Claim | `CLAIMED` | — | `STARTING` |
+| 2. Heartbeat init | `EXECUTING` | `EXECUTING` | `EXECUTING` |
+| 3. Plan | `EXECUTING` | `EXECUTING` | `EXECUTING` |
+| 4. Lock + Code | `EXECUTING` | `CODING` | `EXECUTING` |
+| 5. Type check | `EXECUTING` | `VERIFYING` | `VERIFYING` |
+| 6. Test | `TESTING` | `TESTING` | `TESTING` |
+| 7. Document | `DOCUMENTING` | `DOCUMENTING` | `WRITING_RESULT` |
+| 8. Result | `DONE` or `NO_GO` | `DONE` | `DONE` |
 
 ---
 
@@ -122,7 +164,7 @@ The heartbeat file **MUST** be created before any work begins. The Auditor monit
 ```
 
 **Update rules:**
-- `status`: EXECUTING → CODING → TESTING → DOCUMENTING
+- `status`: EXECUTING → CODING → VERIFYING → TESTING → DOCUMENTING
 - `currentAction`: describe what you're doing right now
 - `sequence`: increment on every update
 - `filesChangedCount`: reflect actual files modified
@@ -134,21 +176,29 @@ The heartbeat file **MUST** be created before any work begins. The Auditor monit
 
 ## 5. Step 3 — Plan Writing
 
-Before writing any code, workers must document their execution plan in `.tasks/task-{id}.plan`.
+Before writing any code, workers must write their execution plan to `.tasks/task-{id}.plan` using `writeTaskPlan()`. The file is written as **JSON** matching the `TaskPlan` interface (`src/core/task-types.ts`).
 
-```markdown
-# Task {id}: {title}
+**`TaskPlan` schema:**
 
-## Approach
-- Describe your strategy for completing this task
-- List the files you will modify and why
-
-## Files to Modify
-- `src/path/to/file.ts` — what changes and why
-
-## Expected Outcome
-- What the end state should look like
+```json
+{
+  "taskId": "{taskId}",
+  "workerId": "w-{taskId}",
+  "filesToCreate": ["list/of/files/to/create.ts"],
+  "filesToModify": ["list/of/files/to/modify.ts"],
+  "executionSteps": [
+    "Step 1: Read task scope and identify affected files",
+    "Step 2: Implement changes to X",
+    "Step 3: Run tsc --noEmit, fix errors",
+    "Step 4: Run targeted tests, fix failures"
+  ],
+  "testStrategy": "Run targeted vitest tests covering changed files",
+  "documentationPlan": "Update relevant docs if public API or behavior changed",
+  "estimatedDurationMin": 30
+}
 ```
+
+LLM workers may write freeform prose into the `executionSteps` array; the field is `string[]` and any length is valid.
 
 **Why write a plan first?**
 
@@ -185,8 +235,9 @@ src/auth/jwt.ts  →  .locks/src__auth__jwt.ts.lock
 
 | Threshold | Auditor Action |
 |-----------|----------------|
-| > 5 minutes | WARNING alert |
-| > 15 minutes | CRITICAL alert, Brain notified |
+| > 5 minutes | WARNING alert (`stale_lock` boundary violation logged) |
+
+`checkStaleLocks()` in `src/monitor/auditor.ts` uses a single 300 000 ms (5 min) threshold. There is no second CRITICAL tier for file locks.
 
 **Critical rule:** Always release locks in a `finally` block. Use `releaseAllLocks(projectRoot, workerId)` on exit.
 
@@ -373,23 +424,84 @@ If your task depends on another task's output and it has not arrived:
 
 ## 16. Worker API Reference
 
-All functions are exported from `src/agents/worker.ts`:
+> **Sprint 144 God Object Split:** `worker.ts` was refactored from 1 670 LoC into a re-export router plus four extracted modules. `worker.ts` retains core task I/O and re-exports everything for backward compatibility — all public symbols remain importable from `src/agents/worker.ts`.
+>
+> | Module | Responsibility |
+> |--------|---------------|
+> | `worker.ts` | Core task I/O (read, claim, heartbeat, result, scope check) + re-export router |
+> | `worker-lifecycle.ts` | State machine, atomic write, SIGTERM shutdown, verify-delta, feedback loop |
+> | `worker-verify.ts` | Build & test verification loops (`tsc`, vitest), coverage parse |
+> | `worker-log.ts` | Structured log formatting & I/O |
+> | `worker-rollback.ts` | Git-stash scope snapshot and rollback (Sprint 177) |
+> | `core/file-lock.ts` | Lock acquire / release / check (delegated from worker.ts) |
+
+### Core task I/O (`worker.ts`)
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `readTask` | `(root, taskId) → Task` | Read task JSON file |
 | `claimTask` | `(root, taskId, workerId) → Task` | Mark task as CLAIMED |
-| `writeTaskPlan` | `(root, plan: TaskPlan) → void` | Write `.plan` file |
-| `createHeartbeat` | `(workerId, taskId, status, action, file?, seq?) → Heartbeat` | Create heartbeat object |
-| `writeHeartbeat` | `(root, heartbeat) → void` | Write `.hb` file |
-| `acquireLock` | `(root, filePath, workerId, taskId) → LockInfo` | Acquire file lock |
+| `writeTaskPlan` | `(root, plan: TaskPlan) → void` | Write `.plan` file (JSON) |
+| `createHeartbeat` | `(workerId, taskId, status, action, ...) → Heartbeat` | Create heartbeat object |
+| `writeHeartbeat` | `(root, heartbeat) → void` | Write `.hb` file + emit event |
+| `writeResult` | `(root, result: TaskResult) → void` | Atomic `.result` write + update status |
+| `verifyResultPersisted` | `(root, taskId) → { persisted, size }` | Post-write fsync verification |
+| `updateTaskStatus` | `(root, taskId, status) → Task` | Update task status in JSON |
+| `finalizeHeartbeat` | `(root, taskId, delayMs?) → void` | Remove `.hb` on task completion |
+| `isWithinScope` | `(filePath, scope, root?) → boolean` | Check scope membership (symlink-safe) |
+| `checkWorkerAuthority` | `(filePath, scope, root, taskId, ...) → boolean` | ADR-037 authority check + emit |
+| `emitWorkerQuestion` | `(root, taskId, question, ...) → void` | Worker → Brain question event |
+| `authHealthCheck` | `(root, taskId, ...) → AuthHealthCheckResult` | Pre-spawn Claude CLI auth check |
+| `getSharedMemory` | `(root, ttlMs?) → SharedMemory` | Inter-worker shared memory |
+| `setupTaskSnapshot` | `(root, taskId) → string \| null` | Git-stash pre-spawn snapshot |
+| `calculateProgress` | `(heartbeat) → number` | 0–100 progress from heartbeat status |
+
+### Lock operations (`core/file-lock.ts` via re-exports)
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `acquireLock` | `(root, filePath, workerId, taskId) → LockInfo` | Acquire file lock (O_EXCL atomic) |
 | `releaseLock` | `(root, filePath, workerId) → void` | Release specific lock |
 | `checkLock` | `(root, filePath) → LockInfo \| null` | Read lock without acquiring |
 | `releaseAllLocks` | `(root, workerId) → number` | Release all locks, returns count |
-| `writeResult` | `(root, result: TaskResult) → void` | Write `.result` + update status |
-| `updateTaskStatus` | `(root, taskId, status) → Task` | Update task status in JSON |
-| `isWithinScope` | `(filePath, scope) → boolean` | Check scope membership |
-| `readWorkerLog` | `(root, taskId) → string \| null` | Read tmux log file |
+
+### Lifecycle state machine (`worker-lifecycle.ts` via re-exports)
+
+| Export | Kind | Description |
+|--------|------|-------------|
+| `WorkerStateMachine` | class | Track and validate lifecycle state transitions |
+| `VALID_TRANSITIONS` | const | Allowed next-states per current state |
+| `STOPPABLE_STATES` | const | States where `docker stop` is needed |
+| `TERMINAL_STATES` | const | States where worker has already exited |
+| `atomicWriteFileSync` | fn | `tmp → fsync → rename` write guarantee |
+| `createFeedbackLoop` | fn | Zero-initialized retry tracker |
+| `computeVerifyDelta` | fn | Compare baseline vs end-state for honest assessment |
+
+### Verification (`worker-verify.ts` via re-exports)
+
+| Export | Kind | Description |
+|--------|------|-------------|
+| `enforceVerifyLoop` | fn | Async gate: `tsc` + `vitest` up to 3 attempts |
+| `runCompilationLoop` | fn | Sync compilation retry loop with heartbeat updates |
+| `runTestVerifyLoop` | fn | Sync test retry loop |
+| `isDocOnlyScope` | fn | Returns `true` when scope has no source dirs → skip verify |
+| `parseCoverageSummary` | fn | Parse `coverage-summary.json` for real coverage % |
+
+### Log helpers (`worker-log.ts` via re-exports)
+
+| Export | Kind | Description |
+|--------|------|-------------|
+| `readWorkerLog` | fn | Read tmux log file for a task |
+| `appendWorkerLog` | fn | Append a structured log entry |
+| `formatWorkerLog` | fn | Format log for display |
+
+### Rollback (`worker-rollback.ts` via re-exports)
+
+| Export | Kind | Description |
+|--------|------|-------------|
+| `snapshotWorkerScope` | fn | Git-stash current scope before work |
+| `rollbackWorkerScope` | fn | Restore stash on NO_GO |
+| `dropWorkerSnapshot` | fn | Drop stash on DONE/GO_WITH_TECH_DEBT |
 
 ---
 
@@ -438,4 +550,4 @@ From `.claude/rules/worker-default.md` and Blueprint §5.3:
 - **Rules:** `.claude/rules/worker-default.md`
 - **Contract:** `docs/reference/api-surface.md`
 - **RBAC:** ADR-037 (`.brain/exports/decisions.md`)
-- **Types:** `src/core/types.ts` — `Task`, `TaskResult`, `TaskPlan`, `Heartbeat`, `LockInfo`, `TaskScope`
+- **Types:** `src/core/task-types.ts` — `Task`, `TaskResult`, `TaskPlan`, `TaskScope`, `TaskStatus`; `src/core/monitoring-types.ts` — `Heartbeat`, `AgentStatus`, `LockInfo` (`src/core/types.ts` is a barrel re-export)

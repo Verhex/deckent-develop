@@ -208,6 +208,27 @@ Refresh the `directives_protection` detector baseline to the current `DIRECTIVES
 deckent nervous baseline-refresh
 ```
 
+### `deckent nervous enable`
+
+Enable the Nervous System and optionally set the authority mode in one command, without manually editing `config.json`.
+
+```bash
+deckent nervous enable
+deckent nervous enable --mode balanced
+deckent nervous enable --mode autopilot
+```
+
+### `deckent nervous recommendations`
+
+Show the Brain inbox — nervous proposals awaiting disposition (nervous-proposes, Brain-disposes). Alias: `deckent nervous recs`.
+
+```bash
+deckent nervous recommendations
+deckent nervous recommendations --all
+deckent nervous recommendations --limit 20
+deckent nervous recommendations --dismiss <id>
+```
+
 ---
 
 ## MCP Tools (for Claude Code integration)
@@ -259,12 +280,10 @@ All Nervous System config lives under `nervous_system` in `.deckent/config.json`
       "kill-and-respawn": "approve",
       "expand-scope": "reject"
     },
-    "notifications": {
-      "throttle_ms": 300000,
-      "quiet_hours": {
-        "start": "22:00",
-        "end": "08:00"
-      }
+    "throttle_ms": 300000,
+    "quiet_hours": {
+      "start": "22:00",
+      "end": "08:00"
     }
   }
 }

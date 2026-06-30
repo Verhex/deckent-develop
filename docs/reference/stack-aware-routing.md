@@ -52,13 +52,17 @@ Resolves user overrides, applies the activation scores, selects the top agent an
 ```typescript
 interface RoutingDecision {
   agentId: string | null;
+  agentScore: number;                         // activation score of the selected agent (0–100)
+  agentConfidence: ConfidenceLevel;           // 'high' | 'medium' | 'low' | 'uncertain'
   skillIds: string[];
-  confidence: ConfidenceLevel;   // 'high' | 'medium' | 'low' | 'uncertain'
-  reasoning: string[];
+  skillScores: Map<string, number>;           // activation score per selected skill
+  skillConfidence: ConfidenceLevel;           // overall confidence of the skill selection
+  overrideSource: OverrideSource;             // 'none' | 'task-directive' | 'sprint-directive' | 'project-config'
   taskDNA: TaskDNA;
-  overrideSource: OverrideSource;
-  overrideWarnings: string[];
-  skillBudget: SkillBudget;
+  reasoning: string[];
+  contextFit?: 'ok' | 'tight' | 'overflow';  // how well the task fits the model's context window
+  routingVersion: 'v2' | 'v3';
+  overrideWarnings?: string[];
 }
 ```
 

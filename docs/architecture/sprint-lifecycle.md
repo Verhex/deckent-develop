@@ -135,6 +135,14 @@ SprintPhase.PLAN
 
 ## Phase 2a: WAVE_BUILD — Dependency Wave Sorting
 
+> ⚠️ **WAVE_BUILD is an internal implementation detail of `runSpawnPhase`, not a
+> formal `SprintPhase` enum value.** There is no `SprintPhase.WAVE_BUILD` in
+> `sprint-types.ts` and no `emitPhaseChange(SPAWN, WAVE_BUILD, ...)` event fires.
+> The topological sort and scope collision detection happen inside
+> `src/orchestra/sprint-spawner.ts` as part of the SPAWN phase — invisible to
+> external event observers. Subscribers listening for phase events will only see
+> `PLAN → SPAWN → EXECUTE`, not a distinct WAVE_BUILD signal.
+
 **Active when:** `dependency_pipeline_enabled: true` (default `true` in `src/core/config.ts`; override in `.deckent/config.json` for manual wave management per ADR-047)
 
 **ADR reference:** [ADR-045](../adr/045-wave-based-execution-semantics.md) — Wave-Based Execution Semantics
@@ -588,6 +596,20 @@ class BrainError extends Error {
 ```
 
 **Usage limit handling:** If usage limits are hit mid-sprint, tasks are paused (status → `PAUSED`, state saved to `.tasks/*.paused`), resumed after limit resets. Sprint is never abandoned.
+
+---
+
+## SprintPhase Enum — Full Value Set
+
+The `SprintPhase` enum (`src/core/sprint-types.ts:7-18`) defines **10 values**, not 9. The
+lifecycle phases documented above (DIRECTIVE through COMPLETE) cover 9 of them. The tenth:
+
+| Enum value | In SprintPhase enum? | emitPhaseChange call? | Notes |
+|---|---|---|---|
+| `TRANSITION` | ✅ defined (`sprint-types.ts:16`) | ❌ never emitted | Reserved for dashboard display; `src/dashboard/src/pages/DashboardPage.tsx` colours it as "secondary". Not used in the sprint lifecycle event stream. |
+
+`SprintPhase.TRANSITION` will not appear in any `SPRINT_PHASE_CHANGE` event during normal
+sprint execution. It exists for future or dashboard-side use only.
 
 ---
 

@@ -120,8 +120,9 @@ src/
 │   ├── model-selector.ts    ← Task model resolution
 │   └── ...                  ← decision-engine, learning, collaboration modules
 │
-├── agents/                  ← Worker agent runtime (25 modules)
-│   ├── worker.ts            ← Worker lifecycle, heartbeat, result writing
+├── agents/                  ← Worker agent runtime (26 modules)
+│   ├── worker.ts            ← Task I/O, claim, heartbeat, result (Sprint 144 split: lifecycle → worker-lifecycle.ts)
+│   ├── worker-lifecycle.ts  ← Worker state machine, shutdown, atomic writes, feedback loop
 │   ├── adaptive-agent.ts    ← Runtime agent adaptation
 │   ├── worker-ipc.ts        ← WorkerChannel, ChannelRegistry — process.send IPC
 │   ├── shared-context.ts    ← SharedContext — inter-agent communication

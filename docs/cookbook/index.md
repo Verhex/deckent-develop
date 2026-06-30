@@ -15,3 +15,5 @@ Here's an index of practical recipes to help you use Deckent effectively:
 - [add-rest-api.md: Add a new REST API endpoint to an Express or FastAPI project.](./add-rest-api.md)
 - [fix-bug.md: Diagnose and fix a failing test with the bug-fixer agent.](./fix-bug.md)
 - [update-docs.md: Update stale documentation and automate recurring doc sections with Managed Docs.](./update-docs.md)
+- [getting-started-en.md: End-to-end onboarding guide — install, provider setup, init, plan, start, review, and KPI basics.](./getting-started-en.md)
+- [multi-provider-and-cost-en.md: Configure a mixed-provider fleet and understand cost visibility, budgets, usage reporting, and KPI scorecards.](./multi-provider-and-cost-en.md)

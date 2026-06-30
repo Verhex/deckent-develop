@@ -11,7 +11,7 @@ For the full history and amendment log, see [ADR-010](../adr/010-tek-runtime-dep
 | `commander` | `^13.0.0` | CLI command framework | [ADR-010](../adr/010-tek-runtime-dependency-commander-js.md) |
 | `@modelcontextprotocol/sdk` | `^1.27.1` | MCP server/client transport | ADR-017: MCP-Native Provider Adapters |
 | `better-sqlite3` | `^12.10.0` | Memory V2 DB — SQLite + FTS5 | ADR-088: Memory V2 — DB-First Architecture |
-| `telegraf` | `^4.16.0` | Telegram connector | ADR-016: External Messaging Connectors |
+| `grammy` | `^1.44.0` | Telegram connector (grammY framework) | ADR-016: External Messaging Connectors |
 | `zod` | `^3.25.0` | Plan/config schema validation | ADR-004: Layered Config Merge — runtime schema validation for config merge + plan validation |
 | `@noble/ed25519` | `^2.3.0` | Ed25519 `.deck` signing | ADR-014: .deck Secret File System |
 | `@noble/hashes` | `^1.8.0` | SHA-512 `.deck` key derivation | ADR-014: .deck Secret File System |
@@ -22,6 +22,8 @@ For the full history and amendment log, see [ADR-010](../adr/010-tek-runtime-dep
 | `react-dom` | `^19.2.7` | Web dashboard render | ADR-080: Dashboard God-Level |
 | `cli-highlight` | `^2.1.11` | REPL syntax highlighting | ADR-081 / ADR-083: sub-feature of Native Agentic REPL — REPL UX syntax coloring; governed by the REPL ADR family |
 | `discord.js` *(optional)* | `^14.26.3` | Discord connector (lazy/optional) | ADR-016: External Messaging Connectors |
+| `nodemailer` *(optional)* | `^6.9.14` | Email connector (SMTP outbound) | ADR-016: External Messaging Connectors |
+| `openai` *(optional)* | `^4.103.0` | OpenAI voice connector (Whisper transcription + TTS) | ADR-016: External Messaging Connectors |
 
 ## Policy
 
@@ -29,4 +31,4 @@ For the full history and amendment log, see [ADR-010](../adr/010-tek-runtime-dep
 - **Removing a dependency:** Update this table and the ADR-010 amendment log.
 - **Version bumps:** Do not require an ADR amendment unless the package's role changes.
 
-_Last updated: 2026-06-19 (ADR-010-W resolution — cli-highlight + zod ADR references added)_
+_Last updated: 2026-06-28 (F11 fix: telegraf → grammy; added nodemailer + openai optional deps)_

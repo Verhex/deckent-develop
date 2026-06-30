@@ -7,7 +7,7 @@
 ## Overview
 
 The Deckent web dashboard is a React 19 + Vite 6 + Tailwind 4 SPA served by `deckent serve`.
-Source lives in `src/dashboard/`. Built assets are output to `src/dashboard/dist/` and served as static files by the HTTP API process.
+Source lives in `src/dashboard/`. Built assets are output to `dist/dashboard/` (canonical, via `npm run build:dashboard`) or `src/dashboard/dist/` (manual `cd src/dashboard && npm run build`) and served as static files by the HTTP API process.
 
 Stack:
 - **React 19** with React Router 7
@@ -146,7 +146,7 @@ The legacy `deckent web` command also starts the dashboard but lacks dev-proxy a
 
 ---
 
-## Dashboard Pages (16)
+## Dashboard Pages (20)
 
 Pages are defined in `src/dashboard/src/App.tsx` and `src/dashboard/src/pages/`.
 
@@ -166,6 +166,10 @@ Pages are defined in `src/dashboard/src/App.tsx` and `src/dashboard/src/pages/`.
 | Settings | `/settings` | App settings |
 | Status | `/status` | Detailed sprint phase status |
 | Workers | `/workers` | Active worker details |
+| Autonomous | `/autonomous` | Autonomous mode configuration |
+| Docs Health | `/docs-health` | Documentation health status |
+| Missions | `/missions` | Missions management |
+| KPI Trends | `/kpi` | KPI trend charts and analytics |
 | Login | `/login` | OIDC login page |
 | Auth Callback | `/auth/callback` | OIDC callback handler |
 
@@ -183,7 +187,7 @@ src/dashboard/
     App.tsx               # Router + layout
     routes.tsx            # Route path constants
     main.tsx              # React entry
-    pages/                # One file per page (16 pages)
+    pages/                # One file per page (20 pages)
     components/           # Shared UI components
     hooks/                # Custom React hooks
     i18n/                 # EN/TR translation strings

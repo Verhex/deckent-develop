@@ -40,14 +40,14 @@ deckent doctor
 Expected output:
 
 ```
-  node_version   v24.0.0 (>=24 required)      [pass]
-  git            git 2.43.0                    [pass]
-  tmux           tmux 3.3a                     [pass]
-  claude_cli     claude 1.2.3                  [pass]
-  workspace      .deckent/ not found           [fail]
+  [PASS] Node.js        v24.0.0 (>=24 required)
+  [PASS] git            git 2.43.0
+  [PASS] tmux           tmux 3.3a
+  [PASS] Claude CLI     claude 1.2.3
+  [FAIL] Workspace      .deckent/ not found
 ```
 
-The `workspace` check fails until you initialize a project -- that is expected.
+The `workspace` check fails until you initialize a project — that is expected.
 
 ---
 
@@ -60,9 +60,9 @@ npx deckent init
 
 The wizard asks for:
 
-- **Language** -- `en` or `tr`
-- **Plan mode** -- `Performance`, `Balanced`, `Economic`, or `API`
-- **Project name** -- e.g. `my-project`
+- **Language** — `en` or `tr`
+- **Plan mode** — `Performance`, `Balanced`, `Economic`, or `API`
+- **Project name** — e.g. `my-project`
 
 After init, your project looks like this:
 
@@ -98,7 +98,7 @@ Start a conversational session. Ask questions, brainstorm goals, or trigger task
 deckent chat
 ```
 
-Deckent will connect to your installed AI CLI (Claude, Codex, or Gemini) and attach the Deckent MCP server, giving the assistant access to all 34 Deckent tools.
+Deckent will connect to your installed AI CLI (Claude, Codex, or Gemini) and attach the Deckent MCP server, giving the assistant access to all 37 Deckent tools.
 
 Example session:
 
@@ -110,7 +110,7 @@ You: Start a sprint to add a /health endpoint
 Deckent: [creates DIRECTIVES.md and starts the sprint] Done, spawning workers...
 ```
 
-See [Chat Mode](chat-mode.md) for a complete walkthrough of naïve and task-driven conversations.
+See [Chat Mode](chat-mode.md) for a complete walkthrough of conversational and task-driven sessions.
 
 ### Option B: Sprint Interface
 
@@ -123,7 +123,7 @@ deckent set-directives --file goals.md   # writes DIRECTIVES.md (--content "<tex
 Or edit `DIRECTIVES.md` manually:
 
 ```markdown
-# DIRECTIVES -- Sprint 1
+# DIRECTIVES — Sprint 1
 
 ## Goal: Build a REST API with user authentication
 
@@ -146,7 +146,7 @@ Each `## Task N:` block becomes a parallel worker agent.
 **Tips:**
 - Be specific about files to create or modify
 - Define scope so workers stay within boundaries
-- Include test requirements -- workers run tests before marking done
+- Include test requirements — workers run tests before marking done
 
 ---
 
@@ -190,7 +190,7 @@ deckent status
 ```
 
 ```
-Sprint sprint-001 -- EVALUATE phase
+Sprint sprint-001 — EVALUATE phase
 
   TASK        STATUS   MODEL    ASSESSMENT
   001-001     DONE     sonnet   DONE
@@ -218,9 +218,9 @@ cat .tasks/task-001-001.result
 
 Evaluation values:
 
-- **DONE** -- All criteria met
-- **GO_WITH_TECH_DEBT** -- Complete with known debt (logged in `.brain/exports/debt.md`)
-- **NO_GO** -- Failed; Brain logs it for retry in the next sprint
+- **DONE** — All criteria met
+- **GO_WITH_TECH_DEBT** — Complete with known debt (logged in `.brain/exports/debt.md`)
+- **NO_GO** — Failed; Brain logs it for retry in the next sprint
 
 ---
 

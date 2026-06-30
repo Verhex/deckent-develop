@@ -21,6 +21,8 @@ This document lists all Deckent features categorized by their activity level. It
 | task-builder | `task-builder.ts` | Worker prompt builder + DIRECTIVES parser |
 | result-evaluator | `result-evaluator.ts` | GO/NO-GO/TECH_DEBT evaluation with rubric scoring |
 | auditor | `auditor.ts` | 30s scan loop + 3-pipeline verification + authority enforcement |
+| heartbeat-daemon | `heartbeat-daemon.ts` | Brain-side daemon: starts at SPAWN, monitors worker .hb files, stops at CLEANUP. Default-on (`enableHeartbeatDaemon !== false`); wired via `createAndStartHeartbeatDaemon` in sprint-controller. |
+| handoff-protocol | `handoff-protocol.ts` | Structured worker-to-worker handoff records. Unconditionally imported and wired by sprint-controller (`wireHandoffsForCompletedTasks` at EXECUTE→EVALUATE transition). |
 | event-stream | `event-stream.ts` | ADR-035 structured event log (15 channel codes) |
 | routing-engine-v2 | `routing-engine.ts`, `intent-classifier.ts`, `activation-engine.ts` | Intent-based task routing with confidence scoring |
 | model-registry | `model-registry.ts`, `model-equivalence.ts`, `mode-presets.ts` | 13 models, 3 providers, tier-based routing |
@@ -76,9 +78,6 @@ These features are implemented but not yet wired into the sprint lifecycle:
 
 | Feature | Blocked By |
 |---------|------------|
-| heartbeat-daemon | No sprint-controller auto-wiring |
-| shared-memory | No integration point in worker prompt or spawn |
-| handoff-protocol | No integration point |
 | multi-agent-pipeline | No sprint integration |
 | human-checkpoint-cli | Opt-in config, rarely set |
 

@@ -151,7 +151,7 @@ Use --force to skip pre-flight checks.
 **Solution:**
 ```bash
 # Option 1: Fix the underlying issue (recommended)
-nvm install 22 && brew install tmux
+nvm install 24 && brew install tmux
 
 # Option 2: Skip pre-flight (use with caution)
 deckent start --force

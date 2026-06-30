@@ -8,19 +8,19 @@ All integrations are disabled by default and must be explicitly configured and w
 
 **Contents**
 
-1. [SSO/OIDC Integration](#1-ssoidc-integration)
-2. [SIEM Event Forwarding](#2-siem-event-forwarding-srccoresiemforwarderts)
-3. [Compliance Reporting](#3-compliance-reporting-srcccorecompliance-reportts)
+1. [SSO/OIDC Integration](#1-ssooidc-integration)
+2. [SIEM Event Forwarding](#2-siem-event-forwarding-srccoresiem-forwarderts)
+3. [Compliance Reporting](#3-compliance-reporting-srccorecompliance-reportts)
 4. [Audit Log Retention & Rotation](#4-audit-log-retention--rotation-srccoreaudit-retentionts)
 5. [Read-Only Data Access](#5-read-only-data-access)
-6. [Capability Invocation Auditing](#6-capability-invocation-auditing-srcccorecapability-audit-bridgets)
+6. [Capability Invocation Auditing](#6-capability-invocation-auditing-srccorecapability-audit-bridgets)
 7. [JWKS Key Resolution](#7-jwks-key-resolution-srccoreauth-jwksts)
 8. [Terminal OIDC Auth Provider](#8-terminal-oidc-auth-provider-srcapiterminalauth-providerts)
 9. [SIEM Network Transports](#9-siem-network-transports)
 10. [ERP Read Capability](#10-erp-read-capability-srccorecapability-handlers-erpts)
 11. [Scheduled Flows](#11-scheduled-flows)
 12. [Event-Driven Triggers](#12-event-driven-triggers)
-13. [Enterprise Dashboard API](#13-enterprise-dashboard-api-srcapienterprise-endpoitts)
+13. [Enterprise Dashboard API](#13-enterprise-dashboard-api-srcapienterprise-endpointts)
 
 ## 1. SSO/OIDC Integration
 
@@ -81,6 +81,8 @@ This module generates a structured report summarizing the application's complian
 After `deckent audit retention --apply` has moved the chain's head into an archive file (section 4), the live event stream alone is a truncated chain. The compliance CLI therefore verifies the chain over **archive + live**, in that order.
 
 - **`runComplianceReport(root, sprintId, flags)`** (`src/cli/commands/audit.ts`): Builds the report over the full retained audit trail by concatenating `[...readArchivedAuditEvents(root, sprintId), ...readAuditEvents(root, sprintId)]` before calling `generateComplianceReport`. Control flags (`rbacEnabled`, `tenantIsolation`) are injected by the caller — the CLI derives them from config (`autonomous.rbac_policy.enabled`, `strict_tenant_isolation`).
+
+  **Honest scope — `strict_tenant_isolation` wiring gap**: The compliance report reflects the `strict_tenant_isolation` config value as the reported `tenantIsolation` posture. However, this config flag is **not automatically wired into the main MemoryStore instantiation paths**. All core orchestration paths (`sprint-finalizer`, `debt-manager`, `task-builder`, etc.) call `new MemoryStore(dbPath)` without passing `strictTenantIsolation: true`. Only the audit-CLI itself reads and forwards the flag to the compliance report input. **Setting `strict_tenant_isolation: true` in `.deckent/config.json` does NOT enforce row-level tenant isolation in the primary memory DB at runtime** — the compliance report will show "Tenant Isolation: ON" but the MemoryStore queries will still include `OR tenant_id IS NULL` in the main execution paths. This is a known wiring gap tracked for future resolution.
 - **`readArchivedAuditEvents(root, sprintId)`** (`src/core/audit-query.ts`): Reads the audit payloads that a retention apply moved into `.deckent/<sprintId>-events-archive.jsonl`. The archive holds the chain's **HEAD partition**, so chain verification on a retained stream must run on `[...archived, ...live]` — the live stream's head anchors to the last archived record. A missing archive yields `[]`; malformed lines are skipped and non-audit channels are excluded (never throws).
 - **Honest limit — pruning vs. tamper-evidence**: `prune` (age-expired) records are **truly deleted**, not archived. If HMAC'd records were pruned, the surviving chain reports broken **by design**: permanent deletion is the GDPR-style tradeoff against tamper-evidence. A broken-chain report after pruning HMAC'd head records is the honest signal of that deletion, not a bug.
 - **CLI Wire**: `deckent audit compliance --sprint <id> [--json]`. Exit code 0 when the chain is intact, 1 when broken, 2 on error.

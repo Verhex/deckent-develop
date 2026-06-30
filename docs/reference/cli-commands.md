@@ -1,6 +1,6 @@
 # CLI Command Inventory
 
-> Complete inventory of all Deckent CLI commands. Last updated Sprint 286.
+> Complete inventory of all Deckent CLI commands. Last updated Sprint 346.
 > **Total:** 57+ top-level commands + subcommands
 
 ## Quick Reference
@@ -63,6 +63,11 @@
 | 54 | `evolve` | Evolution analysis — cross-sprint trends and prompt suggestions | — |
 | 55 | `bot` | Manage external bot connectors (Discord, Telegram) | — |
 | 56 | `mcp` | Manage MCP servers (Claude-parity add/list/remove/get) | — |
+| 57 | `gateway` | Manage the connector gateway daemon (listen/start/stop/status/pair) | — |
+| 58 | `kpi` | Show the KPI scorecard for the current or a specific sprint | — |
+| 59 | `image` | Worker Docker image management (build subcommand) | — |
+| 60 | `process` | Process-mode execution surface — submit tasks and poll status | — |
+| 61 | `autonomous-mission` | Manage autonomous v2 missions (create-list/create-goal/list) | — |
 | — | `help-info` | Show quick-reference help (alias: `info`) | `deckent_help` |
 
 ---
@@ -84,11 +89,15 @@ Initialize a new Deckent project in the current directory.
 | `--upgrade` | Update existing files while preserving user customizations (merge strategy) |
 | `--force` | Force overwrite of existing env files without warning |
 | `--repair` | Show which init steps failed and how to fix them |
+| `-y, --yes` | Install all missing prerequisites without prompting (CI/non-interactive) |
+| `--no-install` | Detect missing prerequisites but never install them (hint-only) |
+| `--no-image` | Skip the opt-in worker Docker image build offer (no prompt) |
 
 **Example:**
 ```bash
 deckent init --auto
 deckent init --env codex,cursor --force
+deckent init -y --no-image
 ```
 
 **MCP:** `deckent_init`
@@ -143,6 +152,7 @@ Start a new sprint (optionally with a one-line description for zero-config mode)
 |--------|-------------|
 | `--auto-approve` | Auto-approve worker actions (--dangerously-skip-permissions) |
 | `--sandbox-mode` | Run in sandbox mode (git stash + restore) |
+| `--sandbox` | Use sandbox spawn backend (memory-cap + path-jail isolation, no Docker required) |
 | `--dry-run` | Plan sprint without spawning workers |
 | `--force` | Skip doctor pre-flight checks |
 | `--watch` | Automatically open watch mode after sprint spawns workers |
@@ -168,6 +178,7 @@ Plan a sprint without executing it.
 |--------|-------------|
 | `--interrogate` | Pre-plan interrogation: challenge DIRECTIVES with 5 structural questions (pain-vs-feature, narrowest wedge, hidden capabilities, premises, effort alternatives), suggest revisions before PLAN phase. Optional: skipped silently with `--no-confirm` or in non-interactive mode. |
 | `--no-confirm` | Skip confirmation, auto-approve plan |
+| `-y, --yes` | Non-interactive: auto-approve the plan (DRAFT → PENDING) without prompting |
 | `--structured` | Force structured parsing (skip AI) |
 | `--dry-run` | Show plan without writing task files to disk |
 
@@ -290,11 +301,13 @@ Recover from a crashed or stuck sprint (audit + cleanup + archive).
 | `--dry-run` | Preview what would be cleaned without making changes |
 | `--force` | Skip interactive confirmation |
 | `--skip-audit` | Skip the audit step |
+| `--json` | Output recovery result as JSON |
 
 **Example:**
 ```bash
 deckent recover --dry-run
 deckent recover --force
+deckent recover --json
 ```
 
 ---
@@ -438,6 +451,9 @@ Check system dependencies and health.
 | `--legacy` | Use legacy output format |
 | `--json` | Output results as JSON |
 | `--pre-flight` | Run pre-flight health check before sprint spawn |
+| `--providers` | Show detailed provider diagnostics (binary, version, auth) for Claude/Codex/Gemini |
+| `--memory` | Show host RAM detection (/proc/meminfo first, os.totalmem fallback) and suggested max_workers |
+| `--ram-experiment` | Show 6-worker × 2g RAM scenario verdict (Safe/Risky) based on current config and host RAM |
 | `--fix-image` | Enable interactive worker image rebuild (consent-based, ADR-063) |
 
 **Provider Auth Probing:**
@@ -650,6 +666,7 @@ Run a single one-shot task without a sprint cycle.
 | Option | Description |
 |--------|-------------|
 | `--model <model>` | Model to use (default: sonnet) |
+| `--model-effort <level>` | Native model reasoning-effort (claude: low\|medium\|high\|xhigh\|max, codex: minimal\|low\|medium\|high). Opt-in; unsupported/invalid levels are ignored |
 | `--scope <dir>` | Worker scope directory (default: ./) |
 | `--timeout <ms>` | Maximum wait time (default: 300000) |
 | `--keep` | Keep task files after completion |
@@ -905,6 +922,7 @@ Search project memory — ADRs, sprint learnings, patterns, debt.
 | `-n, --limit <n>` | Max results |
 | `--sprint-min <n>` | Minimum sprint number |
 | `-m, --mode <mode>` | FTS5 token join mode: or (default) \| and |
+| `--json` | Output results as JSON |
 
 **Example:**
 ```bash
@@ -1201,8 +1219,10 @@ Start HTTP API server with SSE support.
 | Option | Description |
 |--------|-------------|
 | `--port <number>` | Port to listen on |
-| `--dev` | Enable dev proxy mode (expects Vite dev server) |
-| `--dev-port <number>` | Vite dev server port for --dev proxy mode |
+| `--dev` | Enable dev proxy mode (expects Vite dev server on --dev-port) |
+| `--dev-port <number>` | Vite dev server port for --dev proxy mode (default: 5173) |
+| `--host <addr>` | Bind address for the server (default: 127.0.0.1) |
+| `--no-terminal` | Disable the embedded web terminal |
 
 **First-Run Output:**
 On startup, `deckent serve` displays a user-friendly banner showing:
@@ -1245,19 +1265,18 @@ deckent web --dev
 
 ### `deckent archive-debt`
 
-Archive resolved debt items from .brain/DEBT.md.
+Report tech-debt status and archive resolved debt items from memory.db.
 
 | Option | Description |
 |--------|-------------|
-| `--dry-run` | Preview what would be archived |
-| `--count` | Show count of items and exit |
-| `--before <sprint>` | Only archive items before this sprint ID |
-| `--max-archive-size <bytes>` | Max archive file size before rotation |
+| `--count` | Show only the open/resolved counts |
+| `--before <sprint>` | Also report resolved items originating before this sprint ID |
 
 **Example:**
 ```bash
-deckent archive-debt --dry-run
+deckent archive-debt
 deckent archive-debt --before sprint-140
+deckent archive-debt --count
 ```
 
 ---
@@ -1475,6 +1494,175 @@ Show worker resource usage (CPU, memory, I/O) from the REPL.
 
 ---
 
+## Connectors & Integrations
+
+### `deckent gateway`
+
+Manage the connector gateway daemon — the bridge between external messaging adapters (Telegram, Discord, WhatsApp) and deckent projects.
+
+| Subcommand | Description |
+|------------|-------------|
+| `listen` | Print queued inbound messages from the gateway daemon |
+| `start` | Start the gateway daemon process in the background |
+| `stop` | Stop the running gateway daemon |
+| `status` | Show gateway daemon status (running/stopped, PID) |
+| `pair list` | List pending pairing requests |
+| `pair approve <code> <project>` | Approve a pairing request and bind it to a project |
+| `pair reject <code>` | Reject a pairing request |
+
+All subcommands accept `--lang <code>` for language override (en\|tr).
+
+**Example:**
+```bash
+deckent gateway start
+deckent gateway status
+deckent gateway pair list
+deckent gateway pair approve ABC123 /my/project
+```
+
+---
+
+## Analytics
+
+### `deckent kpi`
+
+Show the KPI scorecard for the current (or a specific) sprint. Displays pass/fail status for each registered KPI definition against actual sprint metrics.
+
+| Option | Description |
+|--------|-------------|
+| `--sprint <id>` | Sprint ID to score (defaults to the current sprint) |
+| `--trend <kpiId>` | Show trend series for a specific KPI across sprints |
+| `-n, --n <count>` | Number of sprints to include in the trend (default: 10) |
+| `--json` | Output raw JSON |
+
+**Example:**
+```bash
+deckent kpi
+deckent kpi --sprint sprint-340
+deckent kpi --trend success_rate -n 20
+deckent kpi --json
+```
+
+---
+
+## Docker Image Management
+
+### `deckent image`
+
+Worker Docker image management.
+
+#### `deckent image build`
+
+Build the deckent-worker Docker image from the packaged Dockerfile.worker.
+
+| Option | Description |
+|--------|-------------|
+| `--tag <tag>` | Docker image tag to build (default: deckent-worker) |
+| `--dry-run` | Print the resolved Dockerfile path + build plan without building |
+| `--with-codex` | Install Codex CLI in the image (INSTALL_CODEX=true build-arg) |
+| `--with-gemini` | Install Gemini CLI in the image (INSTALL_GEMINI=true build-arg) |
+| `--with-ollama` | Install Ollama CLI in the image (INSTALL_OLLAMA=true build-arg) |
+
+**Example:**
+```bash
+deckent image build
+deckent image build --tag my-worker:latest --with-codex
+deckent image build --dry-run
+```
+
+---
+
+## Process Mode
+
+### `deckent process`
+
+Process-mode execution surface — submit tasks/capabilities and poll their status (ADR-022 CLI/MCP parity). Submissions are policy-gated: read-only tasks auto-run; side-effecting tasks park for approval.
+
+#### `deckent process submit <description>`
+
+Submit an ExecutionRequest.
+
+| Option | Description |
+|--------|-------------|
+| `--kind <kind>` | Execution kind: task (default), sprint, capability |
+| `--scope-dir <dir>` | Scope directory for a code task (drives risk classification) |
+| `--provider <provider>` | Provider override |
+| `--model <model>` | Model override |
+| `--root <path>` | Project root override |
+
+#### `deckent process status <executionId>`
+
+Poll the status of a prior submission.
+
+| Option | Description |
+|--------|-------------|
+| `--root <path>` | Project root override |
+
+#### `deckent process result <executionId>`
+
+Show the full result of a submission (status + lastResult).
+
+| Option | Description |
+|--------|-------------|
+| `--root <path>` | Project root override |
+
+**Example:**
+```bash
+deckent process submit "Add OAuth2 to the API" --kind task
+deckent process status exec-abc123
+deckent process result exec-abc123
+```
+
+---
+
+## Autonomous Missions (v2)
+
+### `deckent autonomous-mission`
+
+Manage autonomous v2 missions — structured work bundles that run under an authority-bounded loop. Distinct from `deckent autonomous` (continuous loop) — missions are discrete, goal-oriented execution units.
+
+#### `deckent autonomous-mission create-list <title>`
+
+Create a Type-1 list mission from N explicit work items.
+
+| Option | Description |
+|--------|-------------|
+| `--items-file <path>` | JSON file containing an array of `{kind, spec?, id?}` items |
+| `--id <id>` | Mission ID (auto-generated if omitted) |
+| `--tenant <tenant>` | Tenant identifier |
+| `--deliver-to <channel>` | Delivery channel for settlement notification |
+
+#### `deckent autonomous-mission create-goal <goal>`
+
+Create a Type-2 goal mission that runs until the goal is reached.
+
+| Option | Description |
+|--------|-------------|
+| `--accept <criteria>` | Acceptance criteria string |
+| `--title <title>` | Mission title (defaults to goal text) |
+| `--id <id>` | Mission ID (auto-generated if omitted) |
+| `--tenant <tenant>` | Tenant identifier |
+| `--deliver-to <channel>` | Delivery channel for settlement notification |
+
+#### `deckent autonomous-mission list`
+
+List all missions in a summary table.
+
+| Option | Description |
+|--------|-------------|
+| `--json` | Output as JSON |
+| `--tenant <tenant>` | Filter by tenant |
+
+**Example:**
+```bash
+deckent autonomous-mission create-list "Q3 Backlog" --items-file items.json
+deckent autonomous-mission create-goal "Migrate auth to OAuth2" --accept "all tests pass"
+deckent autonomous-mission list
+deckent autonomous-mission list --json
+```
+
+---
+
 ## MCP Tool Parity Summary (ADR-022-V2)
 
 | CLI Command | MCP Tool | Parity |
@@ -1535,9 +1723,14 @@ Show worker resource usage (CPU, memory, I/O) from the REPL.
 | `evolve` | — | CLI only |
 | `bot` | — | CLI only |
 | `mcp` | — | CLI only |
+| `gateway` | — | CLI only |
+| `kpi` | — | CLI only |
+| `image` | — | CLI only |
+| `process` | — | CLI only |
+| `autonomous-mission` | — | CLI only |
 
-**Coverage:** 25/57 commands have MCP tool counterparts (44% parity).
+**Coverage:** 25/62 commands have MCP tool counterparts (40% parity).
 
 ---
 
-_Updated: 2026-06-14 | Sprint 286 | Deckent v1.0.0-beta.1_
+_Updated: 2026-06-28 | Sprint 346 | Deckent v1.0.0-beta.1_

@@ -26,5 +26,4 @@ When acting as Worker: @.codex/rules/worker-default.md
 ## Agent Performance
 | Agent | Tasks | Done | Success |
 |-------|-------|------|--------|
-| security-auditor | 1 | 1 | 100% |
-| bug-fixer | 2 | 2 | 100% |
+| doc-writer | 24 | 13 | 54% |

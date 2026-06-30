@@ -13,19 +13,27 @@ Workers may also self-flag: a worker that writes `selfAssessment: "GO_WITH_TECH_
 ```bash
 # Report debt status — open vs. resolved counts from memory.db
 deckent archive-debt
+
+# Show only counts (suppress the explanatory note)
+deckent archive-debt --count
+
+# Also show how many resolved items originate before a given sprint
+deckent archive-debt --before sprint-280
 ```
 
-This command reads the Memory V2 SQLite DB and prints a summary of open and resolved debt items. Example output:
+This command reads the Memory V2 SQLite DB and prints a count summary of open and resolved debt items. Example output:
 
 ```
 Tech debt (memory.db): 3 open, 12 resolved.
+Resolved debt is retained in memory.db and pruned by sprint decay —
+no manual archival step is needed (Task #4f, saf DB-first).
+```
 
-Open items:
-  debt-285-003  [normal]  Tech debt from 285-003: retry limit reached ...
-  debt-284-007  [high]    Tech debt from 284-007: coverage below threshold ...
-  debt-281-001  [normal]  Tech debt from 281-001: edge case unhandled ...
+To see individual debt items by keyword, use `deckent recall`:
 
-Resolved debt is retained in memory.db and pruned by sprint decay — no manual archive needed.
+```bash
+deckent recall "debt" --type debt
+deckent recall "coverage" --type debt --limit 10
 ```
 
 ## Search Debt by Keyword

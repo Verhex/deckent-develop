@@ -13,7 +13,7 @@ Deckent, [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) üzeri
    - [Claude Code](#claude-code)
    - [VS Code (Cline / Continue)](#vs-code)
    - [Cursor](#cursor)
-3. [31 MCP Tool Referansı](#31-mcp-tool-referansı)
+3. [37 MCP Tool Referansı](#37-mcp-tool-referansı)
    - [deckent_init](#1-deckent_init)
    - [deckent_set_directives](#2-deckent_set_directives)
    - [deckent_plan](#3-deckent_plan)
@@ -30,6 +30,9 @@ Deckent, [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) üzeri
    - [deckent://memory](#3-deckentmemory)
    - [deckent://debt](#4-deckentdebt)
    - [deckent://config](#5-deckentconfig)
+   - [deckent://retro](#6-deckentretro)
+   - [deckent://tasks](#7-deckenttasks)
+   - [deckent://agents](#8-decktentagents)
 5. [Tipik Kullanım Akışları](#tipik-kullanım-akışları)
 
 ---
@@ -42,7 +45,7 @@ Claude Code / IDE (MCP client)
          │  stdio transport
          ▼
 deckent-mcp process (src/mcp/server.ts)
-    ├── 31 Tools  (src/mcp/tools/)
+    ├── 37 Tools  (src/mcp/tools/)
     └──  8 Resources (src/mcp/resources/)
          │
          ▼
@@ -183,9 +186,9 @@ Alternatif olarak `~/.cursor/mcp.json` dosyasına ekleyin:
 
 ---
 
-## 31 MCP Tool Referansı
+## 37 MCP Tool Referansı
 
-Tüm tool'lar `src/mcp/tools/` altında tanımlanmıştır. Blueprint §21'de listelenen tam tablo:
+Tüm tool'lar `src/mcp/tools/` altında tanımlanmıştır. Tam araç listesi ve açıklamaları için `docs/reference/mcp-tools.md` (otomatik oluşturulur) veya `mcp-overview.md` bölümüne bakın. Aşağıdaki tablo en sık kullanılan **10 temel aracı** kapsar:
 
 | Tool | Dosya | Amaç |
 |------|-------|-------|
@@ -465,7 +468,7 @@ Tüm tool'lar `src/mcp/tools/` altında tanımlanmıştır. Blueprint §21'de li
 
 ### 7. deckent_retro
 
-**Amaç:** `.brain/RETRO.md` dosyasından en son sprint retrospektifini okur.
+**Amaç:** `.brain/memory.db` üzerinden en son sprint retrospektifini okur (type=`retro`). DB-first — legacy `.brain/RETRO.md` dosyası artık üretilmez.
 
 **Parametreler:** Yok
 
@@ -629,9 +632,12 @@ Resource'lar IDE'nin context penceresine otomatik olarak dahil edilebilir. `deck
 |---|---|---|---|
 | `deckent://dashboard` | `application/json` | `.dashboard` | Anlık sprint durumu |
 | `deckent://directives` | `text/markdown` | `DIRECTIVES.md` | Aktif sprint hedefleri |
-| `deckent://memory` | `text/markdown` | `.brain/exports/memory.md (generated snapshot)` | Öğrenilmiş desenler |
-| `deckent://debt` | `application/json` | `memory.db (debt type entries, exported to .brain/exports/debt.md)` | Teknik borç kalemleri |
+| `deckent://memory` | `text/markdown` | `.brain/memory.db` (type=`memory`) | Öğrenilmiş desenler |
+| `deckent://debt` | `application/json` | `.brain/memory.db` (type=`debt`) | Teknik borç kalemleri |
 | `deckent://config` | `application/json` | `.deckent/config.json` | Proje konfigürasyonu |
+| `deckent://retro` | `text/markdown` | `.brain/memory.db` (type=`retro`) | Son sprint retrospektifi |
+| `deckent://tasks` | `application/json` | `.tasks/task-*.json` | Aktif görev listesi |
+| `deckent://agents` | `application/json` | `.deckent/agents/*/agent.json` | Kayıtlı ajan havuzu |
 
 ---
 
@@ -681,9 +687,9 @@ Resource'lar IDE'nin context penceresine otomatik olarak dahil edilebilir. `deck
 
 ### 3. deckent://memory
 
-**Açıklama:** `.brain/exports/memory.md (Memory V2 generated snapshot — actual data in memory.db)` içeriği — önceki sprintlerden öğrenilen desenler. Max 100 satır. Brain her sprint başında bu resource'u okur.
+**Açıklama:** Önceki sprintlerden öğrenilen desenler. `.brain/memory.db` üzerinden DB-first okur (type=`memory`). Brain her sprint başında bu resource'u okur. Veritabanı yoksa boş string döner.
 
-**Kaynak Dosya:** `.brain/exports/memory.md (Memory V2 generated snapshot — actual data in memory.db)`
+**Kaynak Dosya:** `.brain/memory.db` (type=`memory`)
 
 **Örnek Çıktı:**
 
@@ -749,6 +755,98 @@ Resource'lar IDE'nin context penceresine otomatik olarak dahil edilebilir. `deck
 ```
 
 **Kaynak:** `src/mcp/resources/config.ts` | Blueprint §21
+
+---
+
+### 6. deckent://retro
+
+**Açıklama:** Son sprint retrospektifi. `.brain/memory.db` üzerinden DB-first okur (type=`retro`, ilk kayıt). Retrospektif yoksa boş string döner.
+
+**Kaynak Dosya:** `.brain/memory.db` (type=`retro`)
+
+**Örnek Çıktı:**
+
+```markdown
+# Sprint 345 Retrospective
+
+## Gains
+- Doc refresh pipeline completed in one sprint
+- VitePress dead-link gate now green
+
+## Losses
+- Two tasks required FIX iteration due to stale ADR descriptions
+
+## Decisions
+- ADR-093: dead-link enforcement added to CI
+```
+
+**Kaynak:** `src/mcp/resources/retro.ts` | Blueprint §7 (RETRO phase)
+
+---
+
+### 7. deckent://tasks
+
+**Açıklama:** `.tasks/task-*.json` dosyalarından ayrıştırılan aktif görev listesi. Sprint yokken `{ tasks: [] }` döner.
+
+**Kaynak Dosya:** `.tasks/task-*.json` (JSON)
+
+**Örnek Çıktı:**
+
+```json
+{
+  "tasks": [
+    {
+      "id": "346-001",
+      "title": "Fix overview",
+      "status": "DONE",
+      "model": "sonnet",
+      "priority": "HIGH"
+    },
+    {
+      "id": "346-002",
+      "title": "Fix guide",
+      "status": "EXECUTING",
+      "model": "sonnet",
+      "priority": "NORMAL"
+    }
+  ]
+}
+```
+
+**Kaynak:** `src/mcp/resources/tasks.ts`
+
+---
+
+### 8. deckent://agents
+
+**Açıklama:** `.deckent/agents/*/agent.json` dosyalarından kayıtlı ajan havuzu. Yerleşik ajanlar bellekte tutulur; yalnızca özel/geçici ajanlar dosya olarak görünür.
+
+**Kaynak Dosya:** `.deckent/agents/*/agent.json` (JSON)
+
+**Örnek Çıktı:**
+
+```json
+{
+  "agents": [
+    {
+      "id": "doc-writer",
+      "title": "Doc Writer",
+      "domains": ["docs"],
+      "totalUses": 28,
+      "successRate": 0.21
+    },
+    {
+      "id": "api-builder",
+      "title": "API Builder",
+      "domains": ["api", "backend"],
+      "totalUses": 14,
+      "successRate": 0.86
+    }
+  ]
+}
+```
+
+**Kaynak:** `src/mcp/resources/agents.ts`
 
 ---
 

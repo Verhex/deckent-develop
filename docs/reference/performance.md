@@ -314,8 +314,8 @@ Memory V2 uses SQLite as the single source of truth. Markdown files under `.brai
 deckent doctor
 
 # Output example:
-# ✓ Brain Budget  247/600 lines
-# ○ Brain Budget  612/600 lines — OVER BUDGET, run cleanup --decay
+# ✓ Brain Budget  247/900 entries
+# ○ Brain Budget  950/900 entries — OVER BUDGET, run cleanup --decay
 ```
 
 Or check directly:
@@ -325,10 +325,10 @@ deckent memory stats
 
 ### 4.3 Decay and Compression
 
-When `.brain/` exceeds 600 lines, Brain automatically triggers decay at the end of the sprint (DECAY phase). You can also trigger it manually:
+When `.brain/memory.db` exceeds 900 entries, Brain automatically triggers decay at the end of the sprint (DECAY phase). You can also trigger it manually:
 
 ```bash
-# Automatic decay (only runs if over 600 lines)
+# Automatic decay (only runs if over 900 entries)
 deckent cleanup --decay
 
 # Force decay even if under budget

@@ -39,7 +39,7 @@ the exit code.
 | # | Check | Required | What it verifies |
 |---|-------|----------|-----------------|
 | 1 | Platform | optional | macOS/Linux/WSL2 fully supported; Windows advisory (subprocess-only) |
-| 2 | Node.js | **required** | Node is in PATH; version ≥ 24 |
+| 2 | Node.js | **required** | Node is in PATH; version ≥ 18 (runtime gate); ADR-001 requires ≥ 24 for full validation |
 | 3 | git | **required** | git is in PATH; needed for rollback, safety points, branch management |
 | 4 | tmux | conditional | Not required when `spawn_backend` is `docker` or `subprocess` |
 | 5 | Docker | conditional | Required when `spawn_backend = docker`; image `deckent-worker:latest` must exist |
@@ -79,11 +79,13 @@ Runs `node --version` and parses the major version.
 
 | Result | Meaning |
 |--------|---------|
-| `v24.x.x (>=24 required)` | Pass |
-| `not found` | Node is not in PATH — install Node.js ≥ 24 |
-| `v18.x.x found but >=24 required` | Upgrade Node.js |
+| `v24.x.x (>=18 required)` | Pass |
+| `not found` | Node is not in PATH — install Node.js ≥ 18 (≥ 24 recommended per ADR-001) |
+| `v17.x.x found but >=18 required` | Upgrade Node.js to at least v18; upgrade to v24+ for full ADR-001 compliance |
 
-**Required:** Yes. Sprint will not start if Node.js is missing or too old.
+**Required:** Yes. Sprint will not start if Node.js is missing or below v18.
+
+**Note:** The runtime gate enforces `major >= 18`. ADR-001 (amended 2026-06-11) sets the architecture-validated baseline at Node 24+. Users on Node 18–23 will pass `deckent doctor` but run below the fully-validated baseline.
 
 ---
 
@@ -159,14 +161,13 @@ Checks that `.deckent/` directory exists in the project root.
 
 ### 8 · Brain Dir
 
-Checks `.brain/` directory and required export files
-(`exports/summary.md`, `exports/decisions.md`, `exports/memory.md`).
+Checks that `.brain/` directory exists and that at least one of the following is present: `memory.db` (V2 primary), `exports/decisions.md` (V2 generated export), or legacy `DECISIONS.md`.
 
 | Result | Meaning |
 |--------|---------|
 | `All brain files present` | Pass |
 | `.brain/ missing` | Run `deckent init` or `deckent memory export` |
-| `Missing: exports/summary.md` | Run `deckent memory export` to regenerate |
+| `.brain/ found but memory store missing` | Run `deckent memory export` to regenerate; or `deckent init` |
 
 **Note:** The primary store is the SQLite database (`.brain/memory.db`). Export files are
 generated snapshots for git tracking and context injection; they are regenerated automatically
@@ -193,8 +194,8 @@ Checks that `DIRECTIVES.md` exists and contains content.
 
 ### 10 · Brain Budget
 
-Counts lines in `.brain/exports/*.md` files and compares to the configured budget
-(set via the top-level `memory_budget` key in `.deckent/config.json`).
+Counts entries in `.brain/memory.db` (via `MemoryStore.totalCount()`) and compares to the configured budget
+(set via the top-level `memory_budget` key in `.deckent/config.json`; default: **900**).
 
 | Result | Meaning |
 |--------|---------|
@@ -309,4 +310,4 @@ deckent doctor --json | tee doctor-report.json
 ```
 
 For hermetic CI environments, the Docker backend is strongly recommended — it eliminates
-the tmux check and provides consistent container isolation. See `docs/guide/docker-backend.md`.
+the tmux check and provides consistent container isolation.

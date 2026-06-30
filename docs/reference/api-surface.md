@@ -182,7 +182,7 @@ Each task is stored as `.tasks/task-{id}.json`:
     "noGoCriteria": "string",
     "techDebtAcceptable": "string"
   },
-  "status": "DRAFT | PENDING | CLAIMED | EXECUTING | TESTING | DOCUMENTING | DONE | NO_GO | PAUSED",
+  "status": "DRAFT | PENDING | CLAIMED | EXECUTING | TESTING | DOCUMENTING | DONE | NO_GO | PAUSED | MANUAL_REVIEW_REQUIRED",
   "sprintId": "sprint-NNN",
   "createdAt": "ISO 8601",
   "assignedAgent": "string (agent id or 'generic')",
@@ -198,8 +198,15 @@ Each task is stored as `.tasks/task-{id}.json`:
   "routingMeta": {
     "taskDNA": "object (optional — TaskDNA used for v2 routing decisions)",
     "confidence": "string (optional — routing confidence score)",
-    "routingVersion": "v1 | v2 (optional — routing engine version used)"
-  }
+    "routingVersion": "v1 | v2 (optional — routing engine version used)",
+    "rerouteCount": "number (optional — number of times this task has been rerouted)"
+  },
+  "type": "TaskKind (optional — WM-2a per-task kind override)",
+  "backend": "'docker' | 'tmux' | 'subprocess' (optional — per-task spawn backend, Sprint 252)",
+  "modelEffort": "string (optional — reasoning effort override, Sprint 252 F1-RE)",
+  "fixMode": "'verify-only' | 'amend' | 're-implement' (optional — Sprint 196 FIX-phase strategy)",
+  "smoke": "{ command: string; expect: string } (optional — Tier-1 proof-of-function directive, ADR-079)",
+  "actor": "ActorContext (optional — Sprint 196 task actor context)"
 }
 ```
 
@@ -209,6 +216,7 @@ Each completed task writes `.tasks/task-{id}.result`:
 ```json
 {
   "taskId": "001-001",
+  "workerId": "string (worker that produced this result)",
   "filesChanged": ["src/file.ts", "tests/file.test.ts"],
   "linesAdded": 120,
   "linesRemoved": 30,
@@ -216,6 +224,11 @@ Each completed task writes `.tasks/task-{id}.result`:
   "coverage": 95.2,
   "selfAssessment": "DONE | GO_WITH_TECH_DEBT | NO_GO",
   "notes": "Brief summary of what was done",
+  "agentId": "string (optional — agent ID that produced this result)",
+  "skillIds": ["string[] (optional — skill IDs used during execution)"],
+  "completedAt": "ISO 8601 (optional)",
+  "durationMs": "number (optional)",
+  "feedbackLoop": "FeedbackLoop (optional — tsc/test verify retry metrics, Sprint 165+)",
   "tokenUsage": {
     "inputTokens": 15420,
     "outputTokens": 3200,
@@ -223,12 +236,19 @@ Each completed task writes `.tasks/task-{id}.result`:
     "provider": "claude",
     "model": "opus"
   },
+  "cost": {
+    "usd": 0.042,
+    "currency": "USD",
+    "pricingSource": "anthropic",
+    "isLocal": false
+  },
   "rubricScores": {
     "correctness": 90,
     "test_coverage": 85,
     "scope_compliance": 100,
     "documentation": 70
   },
+  "evaluationDecision": "DONE | GO_WITH_TECH_DEBT | NO_GO (optional — Brain's final evaluation, may differ from selfAssessment)",
   "sharedNotes": [
     {
       "key": "string",
@@ -243,6 +263,14 @@ Each completed task writes `.tasks/task-{id}.result`:
   }
 }
 ```
+
+**Note on `rubricScores` field:**
+
+- **Deprecated since Sprint 146.** Worker self-reported scores were removed in favour of the Quality Assessor (`assessQuality()` in `quality-assessor.ts`). The field is retained in the interface for backward compatibility with existing result files — do not populate it in new workers.
+
+**Note on `crossVerify` field:**
+
+- **Advisory only.** The `crossVerify` field is not a typed field in the `TaskResult` interface (`src/core/task-types.ts`) — it is written at runtime when `config.cross_verify.enabled: true` and a verifier provider is available. Task `selfAssessment` and `evaluationDecision` are NOT automatically downgraded based on this field; human/Brain review decides next steps.
 
 **Note on `sharedNotes` field:**
 
@@ -269,16 +297,20 @@ Each completed task writes `.tasks/task-{id}.result`:
 
 ## Sprint Phases
 
-Sprint lifecycle follows these phases in order:
-1. **PLAN** — Brain reads DIRECTIVES, plans tasks, writes task JSON files
-2. **SPAWN** — Workers spawned via tmux or subprocess, auditor scan loop starts
-2a. **WAVE_BUILD** — When `dependency_pipeline_enabled: true` (`config.ts:600` default `true`; added Sprint 156, confirmed Sprint 169 H5 per ADR-045; deckent-dev project overrides to `false` via `.deckent/config.json` — Brain manages waves manually per ADR-047), tasks are sorted into dependency waves via Kahn's topological algorithm; each wave runs in parallel, subsequent waves unblock only after all blocking tasks reach DONE. ADR-045.
-3. **EXECUTE** — Workers execute tasks, write heartbeats (.hb files)
-4. **EVALUATE** — Brain waits for results, evaluates (GO/NO-GO/TECH_DEBT)
-5. **FIX** — Failed tasks retried (optional, configurable timeout)
-6. **RETRO** — Retrospective written to the memory.db `retro` entry
-7. **DECAY** — Memory trimmed if .brain/ exceeds budget
-8. **CLEANUP** — Task files archived, locks released, sprint complete
+Sprint lifecycle phases — canonical values from `SprintPhase` enum (`src/core/sprint-types.ts`):
+
+1. **DIRECTIVE** — Initial directive-reading phase before planning
+2. **PLAN** — Brain reads DIRECTIVES, plans tasks, writes task JSON files
+3. **SPAWN** — Workers spawned via tmux, subprocess, or Docker; auditor scan loop starts. When `dependency_pipeline_enabled: true` (ADR-045), tasks are sorted into dependency waves via Kahn's topological algorithm and each wave executes before subsequent waves unblock.
+4. **EXECUTE** — Workers execute tasks, write heartbeats (.hb files)
+5. **EVALUATE** — Brain waits for results, evaluates (GO/NO-GO/TECH_DEBT)
+6. **FIX** — Failed tasks retried (optional, configurable timeout)
+7. **RETRO** — Retrospective written to the memory.db `retro` entry
+8. **DECAY** — Memory trimmed if .brain/ exceeds budget
+9. **TRANSITION** — Inter-phase transition state (e.g. between SPAWN and EXECUTE)
+10. **COMPLETE** — Sprint complete; task files archived, locks released
+
+> **Note:** `WAVE_BUILD` is a logical sub-phase within SPAWN (dependency wave sorting), not a `SprintPhase` enum value. `CLEANUP` is not a `SprintPhase` enum value — the cleanup action happens as part of `COMPLETE`.
 
 ## Worker Scope Rules
 

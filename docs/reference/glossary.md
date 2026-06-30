@@ -3,6 +3,8 @@
 > Bu sözlük Deckent'in tüm teknik terimlerini alfabetik sırayla listeler.
 > Her terim için kısa bir tanım ve ilgili referans bağlantısı verilmiştir.
 
+> **Blueprint §N referansları:** `Blueprint §N` notasyonu, `docs/archive/blueprint.md` dosyasının `N.` başlıklı bölümüne işaret eder (örn. `§5` → `# 5. Agent System`). Dosya arşivlenmiş orijinal mimari spesifikasyondur; mevcut gerçek kaynak `DECKENT.md` ve `docs/reference/api-surface.md`'dedir.
+
 ---
 
 ## A

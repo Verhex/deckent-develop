@@ -1,0 +1,88 @@
+{
+  "taskId": "346-020",
+  "sprintId": "sprint-346",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "346-020",
+        "title": "F20 — fix development core guides (+ worker-guide dedup)",
+        "scope": [
+          "docs/development/",
+          "docs/audits/doc-refresh-2026-06/",
+          "src/orchestra/",
+          "src/agents/",
+          "tests/orchestra/",
+          "tests/agents/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "documentation-writer",
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 3 (large task, 3 module(s), effort=normal)"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "346-020",
+        "title": "F20 — fix development core guides (+ worker-guide dedup)",
+        "scope": [
+          "docs/development/",
+          "docs/audits/doc-refresh-2026-06/",
+          "src/orchestra/",
+          "src/agents/",
+          "tests/orchestra/",
+          "tests/agents/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "documentation-writer",
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [documentation-writer, typescript-expert]"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "346-020",
+        "title": "F20 — fix development core guides (+ worker-guide dedup)",
+        "scope": [
+          "docs/development/",
+          "docs/audits/doc-refresh-2026-06/",
+          "src/orchestra/",
+          "src/agents/",
+          "tests/orchestra/",
+          "tests/agents/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "documentation-writer",
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: doc-writer"
+    }
+  ],
+  "decidedAt": "2026-06-28T12:59:36.254Z"
+}

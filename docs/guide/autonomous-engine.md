@@ -261,15 +261,17 @@ ones park for human approval (risk-tagged park). Description-keyword signals
   `pending` / `approve` / `reject` (`backlog_add` supports `cron` + `capability` + `capabilityArgs` +
   `connector` params). `start` only clears the stop marker — the long-running loop process itself
   is launched via the CLI (`deckent autonomous start`).
-- **Reactive triggers (sub-project 2 — first slice landed, attach-only).** A nervous-detector
-  bridge is built and unit-tested: a detection → declarative reactive-map
-  (`.deckent/autonomous/reactive-map.json`, match on `groupKey`/`risk`/`severity`) → a
-  durable backlog entry (via an ingester, deduped), flag-gated by
-  `config.autonomous.reactive.enabled` (default-off). It is **attach-only** in `start`: the
-  nervous observer is not driven and built-in detectors are EXECUTE-phase-gated, so **live
-  detections do not yet flow**. Making detections actually flow (driving the observer /
-  user-registered detectors) and the **webhook + repo-watch** sources are the sub-project 2
-  continuation.
+- **Reactive triggers (N1 + N2 — landed).** The reactive ingestion pipeline is complete.
+  **N1:** `deckent autonomous start` drives the built-in nervous detectors live via
+  `createNervousSystemIfEnabled({ observerActiveInAnyPhase: true })` — bypasses the
+  EXECUTE-phase gate so detections flow without a hosted sprint (requires
+  `config.nervous_system.enabled: true`). **N2:** three parallel reactive source types share
+  one ingester + `reactive-map.json`: nervous-detector (`autonomous.reactive.enabled`),
+  repo-watch (`autonomous.reactive.repo_watch.enabled`), and webhook
+  (`autonomous.reactive.webhook.enabled`). Every detection follows the same
+  detection → reactive-map rule → durable backlog entry → three-gate lifecycle path.
+  See [operations guide §9](./autonomous-operations.md#9-reactive-triggers-optional-flag-gated)
+  for configuration details.
 - **Concurrency** is serial in pass 1 (`ExecutionPool` size 1); the interface is built so
   a bounded concurrent pool swaps in without loop changes.
 - **`deckent solo/develop/enterprise` packaging** is a future modular-install direction;
@@ -280,6 +282,8 @@ ones park for human approval (risk-tagged park). Description-keyword signals
 
 ## References
 
+- **Operations guide (authoritative on running, monitoring, and troubleshooting):** [`autonomous-operations.md`](./autonomous-operations.md)
+- **CLI reference (subcommands, options, MCP parity):** [`autonomous.md`](./autonomous.md)
 - Spec: `docs/superpowers/specs/2026-06-07-autonomous-execution-engine-design.md`
 - Plan: `docs/superpowers/plans/2026-06-07-autonomous-execution-engine.md`
 - ADRs: ADR-037 (RBAC), ADR-040 (nervous approval), ADR-055 (EffectClass), ADR-079

@@ -19,7 +19,7 @@
 | `last_sprint_id` | `string` | — | — | Son tamamlanan sprint ID'si (orn. `'sprint-150'`). Brain tarafindan otomatik guncellenir. |
 | `detected_env` | `string \| null` | `null` | — | Otomatik tespit edilen ortam: `'vscode'`, `'codex'`, `'gemini'`, `'cursor'`, `'tmux'`, `'shell'`, veya `null`. |
 | `version` | `string` | DECKENT_VERSION | — | Config dosyasinin olusturuldugu Deckent surumu. |
-| `deckent_style` | `'sprint' \| 'task'` | `'sprint'` | `DECKENT_STYLE` | Calisma modu: `'sprint'` (developer orchestration) veya `'task'` (tek seferlik). |
+| `deckent_style` | `'sprint' \| 'task' \| 'process'` | `'sprint'` | `DECKENT_STYLE` | Calisma modu: `'sprint'` (developer orchestration), `'task'` (tek seferlik), `'process'` (ERP/business-automation via MCP+REST). CT:735. |
 
 ---
 
@@ -31,6 +31,9 @@
 | `modes` | `Record<PlanMode, PlanModeConfig>` | (preset) | Her mod icin konfigürasyon: `max_workers`, `brain_model`, `default_model`, `haiku_allowed`, `brain_planning`. |
 | `model_strategy` | `Partial<ModelStrategy>` | (mode preset) | Tier-tabanli model secim stratejisi. Mode preset ile merge edilir, user override oncelikli. |
 | `providers` | `{ brain?, worker?, fallback?, overrides? }` | — | Gruplanmis provider konfig. **Flat `brain_provider`/`worker_provider` kaldirildI** (Sprint 150 Karar 3+4). |
+| `provider_overrides` | `Record<string, ProviderName>` | `undefined` | Per-task-type provider override. Anahtar: TaskType string, deger: provider adi. CT:334. |
+| `cost_optimization` | `boolean` | `false` | Otomatik olarak en ucuz capable provider'i sec. CT:352. |
+| `api_keys` | `Record<string, string>` | `undefined` | Opsiyon API anahtarlari (env var tercih edilir). CT:356. |
 
 ### PlanModeConfig
 
@@ -75,13 +78,14 @@
 | `spawn_backend` | `'docker' \| 'tmux' \| 'subprocess'` | `'docker'` | — | Worker calistirma backend'i. Docker izolasyon varsayilan (ADR-027, Sprint 177). |
 | `docker_image` | `string` | `'deckent-worker:latest'` | — | Docker worker container imaji. |
 | `docker_timeout` | `number` | `1200` | — | Docker container timeout (saniye). |
-| `worker_memory_limit` | `string` | `'2g'` | — | Docker-only: worker container bellek limiti (orn. `'2g'`, `'512m'`). Typed `DeckentConfig`'ta yok, raw config. |
-| `worker_memory_swap` | `string` | `'3g'` | — | Docker-only: worker container swap limiti. `worker_memory_limit`'ten buyuk olmali. Typed `DeckentConfig`'ta yok, raw config. |
+| `worker_memory_limit` | `string` | `undefined` (falls back to `'4g'`) | — | Docker-only: worker container bellek limiti (orn. `'2g'`, `'512m'`). Unset = spawn backend DEFAULT_WORKER_MEMORY_LIMIT `'4g'`. CT:314. Swap auto-derived as `limit × 1.5`. |
 | `worker_memory_limit_by_kind` | `object` | `undefined` | — | Per-task-kind Docker bellek limiti override. Anahtar: TaskKind (`'code'`, `'doc'`), deger: bellek string (`'1.5g'`). |
 | `multi_ide_mode` | `boolean` | `false` | — | Birden fazla IDE ortamini destekle. |
 | `chat_provider` | `'claude' \| 'codex' \| 'gemini' \| 'ollama'` | — | — | REPL/chat icin isteğe bagli provider override. Yok ise `brain_provider` -> `'claude'` zinciri izlenir. Sprint 220. |
 | `pre_sprint_tests` | `boolean` | `false` | — | Sprint baslangicinda tam test suite calistir. Varsayilan `false` — bloke eder, opt-in. Sprint 255. |
 | `strict_tenant_isolation` | `boolean` | `false` | — | NULL-tenant satirlari filtrele (Enterprise multi-tenant). Sprint 261. |
+| `enforce_least_privilege` | `boolean` | `false` | — | Capability en-az-yetki hard-flip (F8-003). `true` ise `ROLE_CAPABILITY_MAP[actor.role]`'dan grant turetilir; eksik capability `capability.denied` audit event ile hard-reddedilir. CT:288. |
+| `risk_gate_enabled` | `boolean` | `false` | — | HIGH-risk capability verb'leri hard-park eder (F10-002). `true` ise autonomous policy-engine 'permit' verdikten sonra HIGH-risk (shell/db-write/erp-write) girisleri PARK'lenir. CT:293. |
 | `token_throttle_ms` | `number` | `500` | — | Worker spawn oncesi throttle (ms). 0 = devre disi. Sprint 202. |
 
 > **Sprint 150 Degisiklik:** `claude_backend` kaldirildi — `spawn_backend` kullanin.
@@ -102,6 +106,9 @@
 | `memory.decay_after_sprints` | `number` | `20` | V2 decay suresi. |
 | `memory.export_md` | `boolean` | `true` | DB'den .md snapshot'lari cikart. |
 | `memory.export_trigger` | `'sprint_end' \| 'every_write' \| 'manual'` | `'sprint_end'` | Export tetikleme zamani. |
+| `memory.semantic_provider` | `'claude' \| 'openai' \| 'local' \| null` | `undefined` | Semantic arama provider'i. `search: 'semantic'` veya `'hybrid'` gerektirir. CT:527. |
+| `memory.custom_types` | `string[]` | `undefined` | Kullanici tanimli ek entry type'lari (built-in type'lara ek). CT:535. |
+| `memory.keyword_aliases` | `Record<string, string[]>` | `undefined` | i18n keyword alias'lari (diller-arasi arama icin). CT:537. |
 
 ---
 
@@ -171,6 +178,8 @@
 | `routing_config.skillMinScore` | `number` | — | v2 routing: skill min. skor. |
 | `routing_config.confidenceThreshold` | `number` | — | v2 routing: guven esigi. |
 | `routing_config.maxSkillsDefault` | `number` | — | v2 routing: task basi max. skill. |
+| `routing.skill_agent_affinity` | `boolean` | `false` | Secilen skill'lerde basari gecmisi olan agent'lari tercih et (opt-in tuning). CT:608. |
+| `routing.agent_cache` | `boolean` | `false` | Ayni sprint icindeki task'larda agent secimini cache'le (routing overhead azaltir). CT:610. |
 
 ---
 
@@ -192,6 +201,24 @@
 | `notify_on_complete` | `boolean` | `false` | Sprint bitiminde bildirim gonder. |
 | `notify_channel` | `string \| null` | `null` | Bildirim kanali: `'slack'`, `'discord'`, `'email'`, `'webhook'`. |
 | `notify_url` | `string \| null` | `null` | Webhook URL. |
+| `notify_connectors` | `Partial<Record<'telegram'\|'discord', {...}>>` | `undefined` | Giden mesajlasma connector'lari (BOT-001). Her entry: `{ enabled, token, chat_id }`. Token `$DECK:` interpolasyonu destekler. `notify_channel`/`notify_url`'un yerini alir. CT:405. |
+| `bot_capabilities` | `BotCapabilitiesConfig` | `undefined` | Bot capability framework (flag-gate, opt-in default-off). Aktif capability'leri, approval policy'lerini ve SMTP mail konfigi kontrol eder. CT:417. |
+| `identity` | `{ enabled, provider?, owner?, roleMap?, channels?, verify?, enforcement? }` | `undefined` | ADR-092 per-user RBAC — connector message surface icin kimlik/yetki gating. `enabled: false` = per-channel davranis korunur. CT:423. |
+
+---
+
+## Native Transport & Bot Agent
+
+Yerel/uyumlu LLM'ler ve giden mesaj humanizer'i (BOT-1).
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `ollama_host` | `string` | `undefined` | Yerel Ollama endpoint (orn. `"http://127.0.0.1:11434"`). Native agent + bot-agent tarafindan kullanilir. CT:435. |
+| `native_model` | `string` | `undefined` | Native transport icin wire model ID'si (orn. `"qwen3.6:27b"`). CT:437. |
+| `openai_base_url` | `string` | `undefined` | OpenAI-uyumlu base URL (OpenAI/OpenRouter/vLLM). CT:439. |
+| `bot_agent.enabled` | `boolean` | `false` | BOT-1 bot-agent — giden connector mesajlarini (Telegram/Discord) natural language'a cevirir. CT:441. |
+| `bot_agent.persona` | `string` | `undefined` | Rephrase prompt'una eklenen ton/kisilik. |
+| `bot_agent.providers` | `Array<'ollama'\|'claude'\|'openai'>` | `['ollama','claude','openai']` | Provider tercih sirasi. |
 
 ---
 
@@ -220,7 +247,7 @@
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `timeout.docker_min_timeout` | `number` | `1200` | Docker min. timeout (saniye, >=300). |
-| `timeout.docker_max_timeout` | `number` | `7200` | Docker max. timeout (saniye, <=14400). |
+| `timeout.docker_max_timeout` | `number` | `7200` | Docker max. timeout (saniye, <=86400 = 24 saat; Sprint 186'da 4 saatten 24 saate yukseltildi). |
 | `timeout.tmux_min_timeout` | `number` | `900` | Tmux min. timeout. |
 | `timeout.tmux_max_timeout` | `number` | `5400` | Tmux max. timeout. |
 | `timeout.subprocess_min_timeout` | `number` | `600` | Subprocess min. timeout. |
@@ -244,18 +271,7 @@ Docker worker kaynak izleme (Sprint 271). Varsayilan devre disi — `opt-in`.
 |-----|------|---------|-------------|
 | `resource_monitor.enabled` | `boolean` | `false` | Master switch. |
 | `resource_monitor.interval_ms` | `number` | `5000` | Ornekleme araligi (ms, min 1000). |
-| `resource_monitor.log_path` | `string` | `'.deckent/resource-log.jsonl'` | JSONL log dosyasi yolu. |
-
----
-
-## Cache Warm
-
-Prompt-cache isi tutma (Sprint 274 F1-TOK Faz 2). Varsayilan devre disi — `opt-in`.
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `cache_warm.enabled` | `boolean` | `false` | Master switch. |
-| `cache_warm.warm_delay_ms` | `number` | `45000` | Ilk dalgada 2. ve sonraki worker'lara uygulanan gecikme (ms, 5000-180000). |
+| `resource_monitor.log_path` | `string` | `'.deckent/settings/resource-log.jsonl'` | JSONL log dosyasi yolu (proje kokuyle goreceli). CT:65. |
 
 ---
 
@@ -278,6 +294,7 @@ Capraz-provider tersleyici dogrulama (Sprint 276 XVER-1). Varsayilan devre disi 
 | `cross_verify.enabled` | `boolean` | `false` | Master switch. |
 | `cross_verify.high_stakes_only` | `boolean` | `true` | Yalniz yuksek-riskli task'lari dogrula (security/auth/P0/risk-tagged). |
 | `cross_verify.verifier_priority` | `string[]` | `['codex','gemini','claude']` | Dogrulayici provider secim sirasi. |
+| `cross_verify.enforce_refuted` | `boolean` | `false` | `true` ise REFUTED verdict DONE/GO_WITH_TECH_DEBT task'i NO_GO'ya dusurmek icin hard-block olarak uygulanir. `false` = yalnizca advisory (ADR-070 byte-uyumlu). CT:85. |
 
 ---
 
@@ -330,6 +347,8 @@ Otonom yurutme motoru (Sprint 226, ADR-040). Her alt-blok varsayilan devre disi 
 |-----|------|---------|-------------|
 | `nervous_system.enabled` | `boolean` | `false` | Proaktif meta-orchestrator. |
 | `nervous_system.mode` | `NervousAuthorityMode` | `'balanced'` | Otorite modu: `'strict'`, `'balanced'`, `'autopilot'`, `'full-auto'`. |
+| `nervous_system.approve_timeout_ms` | `number` | `10000` | Safety-floor olmayan `approve` aksiyonlarinda otomatik-onay penceresi (ms). `0` veya negatif = auto-proceed devre disi (surudan onay beklenir). CT:831. |
+| `nervous_system.worker_respawn` | `boolean` | `false` | `true` ise WORKER_RESPAWN aksiyonu sprint-controller'in lifecycle'u uzerinden isletilir (yarisa karismasiz). `false` = yalnizca onerir. CT:835. |
 | `nervous_system.actionOverrides` | `Record<string, NervousApprovalPolicy>` | `{}` | Aksiyon-basi onay politikasi override. |
 | `nervous_system.safety_floor.locked_actions` | `string[]` | (5 aksiyon) | Asla otomatik calistirilmayan aksiyonlar. |
 | `nervous_system.safety_floor.cost_threshold_usd` | `number` | `110` | Maliyet uyarisi esigi (USD). |

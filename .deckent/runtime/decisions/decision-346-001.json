@@ -1,0 +1,82 @@
+{
+  "taskId": "346-001",
+  "sprintId": "sprint-346",
+  "steps": [
+    {
+      "step": 2,
+      "name": "routing-step-2",
+      "input": {
+        "taskId": "346-001",
+        "title": "F01 — fix guide onboarding-core",
+        "scope": [
+          "docs/guide/",
+          "docs/audits/doc-refresh-2026-06/",
+          "src/cli/",
+          "tests/cli/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "documentation-writer",
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 2 (medium task, 2 module(s), effort=normal)"
+    },
+    {
+      "step": 3,
+      "name": "routing-step-3",
+      "input": {
+        "taskId": "346-001",
+        "title": "F01 — fix guide onboarding-core",
+        "scope": [
+          "docs/guide/",
+          "docs/audits/doc-refresh-2026-06/",
+          "src/cli/",
+          "tests/cli/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "documentation-writer",
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Skills forced by override: [documentation-writer, typescript-expert]"
+    },
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "346-001",
+        "title": "F01 — fix guide onboarding-core",
+        "scope": [
+          "docs/guide/",
+          "docs/audits/doc-refresh-2026-06/",
+          "src/cli/",
+          "tests/cli/"
+        ],
+        "intent": "documentation"
+      },
+      "output": {
+        "agent": "doc-writer",
+        "skills": [
+          "documentation-writer",
+          "typescript-expert"
+        ],
+        "confidence": "high"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent forced by override: doc-writer"
+    }
+  ],
+  "decidedAt": "2026-06-28T12:59:36.216Z"
+}

@@ -23,7 +23,7 @@ Legend: `✅` means the capability is directly exposed on that surface. `—` me
 
 ## Source Notes
 
-- MCP availability is based on the registered tool list in `src/mcp/tools/`, which contains 34 registered tools.
+- MCP availability is based on the registered tool list in `src/mcp/tools/`, which contains 37 registered tools.
 - CLI availability is based on `DECKENT.md` and registered CLI command modules.
 - Dashboard availability is based on routed dashboard pages and API flows in `src/dashboard/src` and `src/api/server.ts`.
 - The Dashboard includes an embedded terminal, but terminal access is not counted as native Dashboard availability in this table.

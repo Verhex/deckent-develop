@@ -96,7 +96,7 @@ What happens under the hood:
 5. **FIX phase** -- Failed tasks are retried with enriched prompts (optional, configurable timeout)
 6. **RETRO phase** -- Brain writes a retrospective to the memory DB, updates sprint learnings
 7. **DECAY phase** -- Old memory entries are pruned to stay within the budget
-8. **CLEANUP phase** -- Task files are archived, file locks released, the sprint is marked complete
+8. **COMPLETE phase** -- Cleanup operations run (task files archived, file locks released); the sprint is marked complete
 
 ### Watching Workers Live
 

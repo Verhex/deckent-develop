@@ -172,7 +172,7 @@ You can also search past conversations:
 
 ## Path B — External AI CLI (deckent chat)
 
-`deckent chat` (without `--native`) launches Path B: it attaches your installed AI CLI (Claude Code, Codex, or Gemini) to the deckent MCP server, giving the external AI access to all 34 deckent MCP tools.
+`deckent chat` (without `--native`) launches Path B: it attaches your installed AI CLI (Claude Code, Codex, or Gemini) to the deckent MCP server, giving the external AI access to all 37 deckent MCP tools.
 
 ```bash
 deckent chat              # auto-detect best available provider

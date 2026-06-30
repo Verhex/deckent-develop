@@ -9,7 +9,7 @@
 A **sprint** is one cycle of planning, executing, and evaluating work. Each sprint has a unique ID (e.g., `sprint-001`) and follows a fixed lifecycle:
 
 ```
-PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
+PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → COMPLETE
 ```
 
 1. **PLAN** -- Brain reads your `DIRECTIVES.md` and creates task JSON files in `.tasks/`
@@ -19,7 +19,7 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 5. **FIX** -- Failed tasks are retried (configurable timeout); Brain enriches the retry prompt with failure context
 6. **RETRO** -- Brain writes a retrospective to the memory DB and updates project learnings
 7. **DECAY** -- Old memory entries are pruned to stay within the sprint budget
-8. **CLEANUP** -- Task files are archived, file locks are released, the sprint is marked complete
+8. **COMPLETE** -- Cleanup operations run (task files archived, file locks released); the sprint is marked complete
 
 Sprints are never left incomplete. If a worker stalls, the auditor detects it and Brain handles the failure.
 
@@ -49,7 +49,7 @@ Key properties:
 - **model** -- Which AI model runs the task (`opus`, `sonnet`, or `haiku`)
 - **effort** -- Expected complexity (`low`, `normal`, `high`)
 - **scope** -- Directories and files the worker may access
-- **status** -- Lifecycle state: PENDING → CLAIMED → EXECUTING → TESTING → DONE
+- **status** -- Lifecycle state: DRAFT → PENDING → CLAIMED → EXECUTING → TESTING → DOCUMENTING → DONE (terminal success); NO_GO (terminal failure); PAUSED (blocked by a failed dependency); MANUAL_REVIEW_REQUIRED (result evidence exists but no `.result` file)
 
 ### Task Results
 
@@ -75,7 +75,7 @@ The **Brain** is the orchestrator. There is exactly one Brain per sprint. It:
 - Evaluates results
 - Writes retrospectives and updates memory
 
-Brain is the only agent that imports from all other modules. It is the single point of coordination.
+Brain and its orchestration layer are the only components that import worker-execution modules (tmux, auditor, worker). Workers and the auditor do not import Brain.
 
 ### Worker
 

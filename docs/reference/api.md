@@ -1705,7 +1705,15 @@ Start the server with `deckent serve` (API only) or `deckent web` (API + web das
 
 ### Authentication
 
-POST endpoints are protected by an optional Bearer token. GET endpoints (including `/api/events`) do **not** require authentication.
+**All `/api/*` endpoints require a valid Bearer token** — both GET and POST (`server.ts:454`). Exempt paths are: `/health`, `/api/health`, `/api/auth/oidc/exchange`.
+
+SSE endpoints (`/api/events`, `/api/chat/stream`, `/api/workers/:taskId/logs/stream`) also accept a `?token=<token>` query parameter because `EventSource` (browser API) cannot set `Authorization` headers.
+
+**Token resolution order (highest priority first):**
+
+1. `DECKENT_API_TOKEN` environment variable
+2. `config.api_auth_token` (canonical config key — snake_case)
+3. Loopback auto-mint: when binding to `127.0.0.1`/`::1` with no configured token, a random token is minted at startup and injected into `index.html` via `window.__DECKENT_API_TOKEN__`. This makes the dashboard work without explicit configuration — but auth is still enforced.
 
 **Enabling auth:** Set the token via environment variable or project config:
 
@@ -1714,14 +1722,10 @@ POST endpoints are protected by an optional Bearer token. GET endpoints (includi
 export DECKENT_API_TOKEN=your-secret-token
 
 # Or in .deckent/config.json
-{ "api_token": "your-secret-token" }
+{ "api_auth_token": "your-secret-token" }
 ```
 
-If no token is configured, auth is disabled and a warning is printed to stderr:
-
-```
-[deckent:warn] API server running without authentication. Set DECKENT_API_TOKEN or config.api_token to enable auth.
-```
+Set `DECKENT_API_AUTH_DISABLED=1` to bypass bearer auth entirely (stderr warning printed). Terminal endpoints ignore this flag and always enforce their own token.
 
 **Request header for protected routes:**
 
@@ -1729,13 +1733,14 @@ If no token is configured, auth is disabled and a warning is printed to stderr:
 Authorization: Bearer <token>
 ```
 
-**Auth error response (401):**
+**Auth error responses:**
 
 ```json
-{ "error": "Unauthorized — provide Authorization: Bearer <token>" }
+{ "error": "Unauthorized" }
 ```
+`401` — missing token; `403` — token present but wrong (constant-time SHA-256 compare via `timingSafeEqual`).
 
-Token comparison uses SHA-256 + `timingSafeEqual` to prevent timing side-channel attacks. Tokens with incorrect scheme (not `Bearer`) are rejected.
+Token comparison uses SHA-256 + `timingSafeEqual` to prevent timing side-channel attacks. Tokens with incorrect scheme (not `Bearer`) are rejected with `401`.
 
 ---
 
@@ -1745,14 +1750,26 @@ Token comparison uses SHA-256 + `timingSafeEqual` to prevent timing side-channel
 function createHttpServer(projectRoot: string, opts?: HttpServerOptions): HttpApi
 
 interface HttpServerOptions {
-  port?: number;       // Default: 3100
-  staticDir?: string;  // Serve static files from this directory (deckent web)
-  apiToken?: string;   // Bearer token for POST endpoints
-  host?: string;       // Bind address. Default: '127.0.0.1'
+  port?: number;                    // Default: 3100
+  staticDir?: string;               // Serve static files from this directory (deckent web)
+  apiToken?: string;                // Bearer token for all /api/* endpoints
+  host?: string;                    // Bind address. Default: '127.0.0.1'
+  autoGenerateToken?: boolean;      // Auto-generate a random token if none provided
+  rateLimit?: number;               // Max requests per minute per IP. Default: 100. Set 0 to disable.
+  rateLimitExemptLoopback?: boolean; // Exempt loopback callers from rate limiter. Default: true.
+  terminalBackend?: SessionBackend; // PTY session backend for embedded terminal (Sprint 175)
+  oidc?: {                          // OIDC JWT bearer verification (Sprint 267)
+    issuer: string;
+    audience?: string;
+    algorithm: 'HS256' | 'RS256';
+    key: string;
+  };
 }
 
 interface HttpApi {
   server: Server;
+  terminalToken?: string;           // Terminal auth token (test-exposed; set when terminal enabled)
+  terminalManager?: PtySessionManager; // PTY session manager (test-exposed; set when terminal enabled)
   close(): Promise<void>;
 }
 ```
@@ -1777,13 +1794,20 @@ All error responses use HTTP status codes and return JSON:
 
 | Status | Meaning |
 |--------|---------|
+| `200` | Normal success |
+| `201` | Terminal session created (`POST /api/terminal/sessions`) |
+| `202` | Sprint start accepted, running in background (`POST /api/start`) |
 | `400` | Bad request — invalid JSON body or failed schema validation |
-| `401` | Unauthorized — missing or invalid Bearer token on a POST route |
-| `403` | Forbidden — path traversal attempt on static file serving |
-| `404` | Not found — resource does not exist (no active sprint, missing file, etc.) |
+| `401` | Unauthorized — missing Bearer token |
+| `403` | Forbidden — wrong Bearer token, CORS preflight from disallowed origin, static path traversal |
+| `404` | Not found — resource does not exist (job, sprint log, missing file, etc.) |
 | `405` | Method not allowed — HTTP method not supported for this route |
-| `409` | Conflict — sprint already running when `POST /api/start` is called |
+| `409` | Conflict — sprint already running (`POST /api/start`), active tasks during cleanup, terminal session quota |
+| `413` | Payload too large — body exceeds 1 MB |
+| `422` | Unprocessable — `POST /api/config` failed `validatePartialConfig()`, returns `{error: {details[]}}` |
+| `429` | Too Many Requests — rate limit exceeded (remote IPs only) |
 | `500` | Internal server error — unexpected failure |
+| `503` | Service unavailable — `/api/output-stream` when output collector is unavailable |
 
 ---
 
@@ -1793,9 +1817,9 @@ All error responses use HTTP status codes and return JSON:
 
 Returns the current dashboard state from the `.dashboard` file.
 
-**Authentication:** Not required.
+**Authentication:** Required (Bearer token). See [Authentication](#authentication).
 
-**Response `200`:**
+**Response `200` — active sprint:**
 
 ```json
 {
@@ -1811,10 +1835,10 @@ Returns the current dashboard state from the `.dashboard` file.
 }
 ```
 
-**Error `404`:** `{ "error": "No active sprint" }` — returned when no `.dashboard` file exists.
+**Response `200` — no active sprint (idle):** Returns `{idle: true, sprint: {phase: 'IDLE', status: 'IDLE', id: ...}, lastSprint: {...}}`. **This endpoint never returns `404`** — a missing or completed sprint returns a 200 idle response with the last sprint summary (`reconcileStatusResponse`, `server.ts:495`).
 
 ```bash
-curl http://localhost:3100/api/status
+curl -H "Authorization: Bearer $DECKENT_API_TOKEN" http://localhost:3100/api/status
 ```
 
 ---
@@ -1823,7 +1847,7 @@ curl http://localhost:3100/api/status
 
 Returns the latest sprint log parsed from `.brain/sprints/sprint-NNN.md`.
 
-**Authentication:** Not required.
+**Authentication:** Required (Bearer token).
 
 **Response `200`:**
 
@@ -1856,7 +1880,7 @@ curl http://localhost:3100/api/sprint
 
 Returns all sprint logs as an array, sorted oldest-first.
 
-**Authentication:** Not required.
+**Authentication:** Required (Bearer token).
 
 **Response `200`:** Array of sprint log objects (same shape as `/api/sprint` metrics, plus `id` field). Returns `[]` if no sprint logs exist.
 
@@ -1870,7 +1894,7 @@ curl http://localhost:3100/api/history
 
 Returns the project configuration from `.deckent/config.json`.
 
-**Authentication:** Not required.
+**Authentication:** Required (Bearer token).
 
 **Response `200`:**
 
@@ -1896,7 +1920,7 @@ curl http://localhost:3100/api/config
 
 Runs system health checks and returns results.
 
-**Authentication:** Not required.
+**Authentication:** Required (Bearer token).
 
 **Response `200`:**
 
@@ -1927,7 +1951,7 @@ of truth — see [Memory V2 Export Pipeline](#memory-v2-export-pipeline)). To re
 the snapshot programmatically use `deckent memory export` or call the underlying
 exporter (`exports/memory.md` is rewritten after every sprint finalize).
 
-**Authentication:** Not required.
+**Authentication:** Required (Bearer token).
 
 **Response `200`:**
 
@@ -1950,7 +1974,7 @@ JSON-wrapped string. The export is auto-generated from `memory.db` (single sourc
 of truth — see [Memory V2 Export Pipeline](#memory-v2-export-pipeline)). To refresh
 the snapshot programmatically use `deckent memory export`.
 
-**Authentication:** Not required.
+**Authentication:** Required (Bearer token).
 
 **Response `200`:**
 
@@ -1970,7 +1994,7 @@ curl http://localhost:3100/api/debt
 
 Returns the status of an async sprint job started via `POST /api/start`.
 
-**Authentication:** Not required.
+**Authentication:** Required (Bearer token).
 
 **Path parameter:** `jobId` — the job ID returned by `POST /api/start` (format: `job-<timestamp>`).
 
@@ -2013,7 +2037,7 @@ curl http://localhost:3100/api/job/job-1710768000000
 
 Returns the task JSON and terminal log output for a specific worker.
 
-**Authentication:** Not required.
+**Authentication:** Required (Bearer token).
 
 **Path parameter:** `taskId` — task identifier (e.g. `001-001`).
 
@@ -2049,7 +2073,7 @@ curl http://localhost:3100/api/worker/001-001/log
 
 Opens a Server-Sent Events (SSE) stream. The server pushes a `data:` line containing the full dashboard state as JSON whenever the `.dashboard` file changes. Changes are debounced at 500ms.
 
-**Authentication:** Not required.
+**Authentication:** Required (Bearer token).
 
 **Response headers:**
 
@@ -2236,7 +2260,7 @@ Merges the provided fields into the project config (`/.deckent/config.json`) and
 
 **Authentication:** Required if `api_token` is configured.
 
-**Request body:** Any JSON object. Keys are merged with the existing config using shallow merge (`{ ...existing, ...body }`).
+**Request body:** Any JSON object. Keys are **deep-merged** with the existing config using `deepMerge(existing, body)` — nested objects are recursively merged, not overwritten.
 
 ```json
 { "mode": "economic", "language": "en" }

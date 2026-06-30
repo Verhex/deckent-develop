@@ -174,7 +174,7 @@ For full config recovery (merge with template defaults), see
 npx tsc --noEmit
 
 # Common causes:
-# - .js extension missing on ESM imports (ADR-002: Node16 resolution)
+# - .js extension missing on ESM imports (ADR-001: Node16/ESM resolution baseline)
 # - New type not exported from core/types.ts
 # - Circular import (ADR-008: Brain-central import rule)
 ```
@@ -197,8 +197,7 @@ npx vitest run tests/path/to/failing.test.ts
 npm run test:ci-sim
 ```
 
-Known pre-existing failures: ~67 tests in the full suite depend on stale model-id
-expectations or live provider connections. Run only targeted tests for your changed files.
+Pre-existing failures exist in the full suite (stale model-id expectations, live provider connections). Run only targeted test files for your changed modules — do not run the full suite to assess your change.
 
 ---
 

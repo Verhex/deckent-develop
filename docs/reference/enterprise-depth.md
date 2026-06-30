@@ -98,22 +98,32 @@ A helper function, `verifyAuditChain(events)`, can be used to validate the entir
 
 By default, Deckent's database queries are permissive, allowing a tenant to see its own data **plus** any data where `tenant_id IS NULL`. This ensures backward compatibility with legacy, non-multi-tenant entries.
 
-For strict multi-tenancy, this behavior can be disabled.
+For strict multi-tenancy, this behavior can be tightened at the `MemoryStore` level.
 
 -   **Source**: `src/core/memory-store.ts`
 -   **Config Flag**: `strict_tenant_isolation: boolean`
 
-### Configuration
+### What the flag does (and does not do)
 
-To enable strict isolation, set the flag in `.deckent/config.json`:
+The `MemoryStore` constructor (`src/core/memory-store.ts:88`) accepts a `{ strictTenantIsolation?: boolean }` option. When `strictTenantIsolation: true` is passed at construction time, all tenant-scoped queries omit the `OR tenant_id IS NULL` clause — ensuring that a tenant's queries return only records explicitly assigned to its `tenant_id`.
 
-```json
-{
-  "strict_tenant_isolation": true
-}
+**Wiring gap (current state)**: The `strict_tenant_isolation` config flag is **not automatically propagated** to the main MemoryStore instantiation paths. All core orchestration paths — `sprint-finalizer`, `debt-manager`, `task-builder`, `sprint-planner`, MCP tools, and others — call `new MemoryStore(dbPath)` without reading or forwarding the config flag. As a result, **setting `strict_tenant_isolation: true` in `.deckent/config.json` does NOT enforce row-level isolation in the memory DB at runtime**; those paths continue to return `tenant_id IS NULL` rows alongside the requesting tenant's data.
+
+The flag is currently read and forwarded in two places only:
+- `src/mcp/tools/audit.ts` — passes it as the `tenantIsolation` input field to `generateComplianceReport()`
+- `src/cli/commands/audit.ts` — same, for the `deckent audit compliance` CLI
+
+This means the compliance report will accurately reflect the config intent (`tenantIsolation: true`) but the underlying MemoryStore queries in the main execution paths are unaffected.
+
+### Configuration (for future callers)
+
+When instantiating a `MemoryStore` that must enforce strict isolation, pass the flag explicitly:
+
+```typescript
+const store = new MemoryStore(dbPath, { strictTenantIsolation: config.strict_tenant_isolation });
 ```
 
-When `true`, all database queries in `memory-store.ts` are modified to **omit** the `OR tenant_id IS NULL` clause. This guarantees that a tenant can only access records explicitly assigned to its `tenant_id`, closing any potential for data leakage from the global (NULL) scope.
+Until the main orchestration paths are updated to wire this option, `strict_tenant_isolation: true` in `.deckent/config.json` is an intent flag only — it does not automatically close the `NULL-tenant` visibility gap in sprint execution, retro, or task-builder paths.
 
 ## 5. Capability Broker & Handlers
 
