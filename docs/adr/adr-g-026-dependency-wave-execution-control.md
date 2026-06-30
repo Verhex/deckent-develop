@@ -27,13 +27,13 @@ Multi-task work executes in dependency order. ADR-045 wired `respawnEligibleTask
 </dependency-execution>
 ```
 
-> **🔴 ADR-064-W:** the pure planner `planDispatch` (returns DispatchPlan/mode) is **tested-but-UNWIRED** (0 runtime callers); `dispatchTick` decides imperatively via `processQueue`/`maybeRespawn` → test-vs-runtime drift risk. Wire `planDispatch` so the pinned model == the live path.
+> **🔴 ADR-064-W:** the pure planner `planDispatch` (returns DispatchPlan/mode) is **tested-but-UNWIRED** (0 runtime callers); `dispatchTick` decides imperatively via `processQueue`/`maybeRespawn`. **The drift is concrete, not just "unwired":** the model's dependency-satisfied set is `DONE + fixForTaskId`-aggregate **ONLY (no `MANUAL_REVIEW_REQUIRED`)**, while the live `respawnEligibleTasks` unblocks on `DONE ∪ MRR` (the Sprint-280 deadlock-fix). **Naively wiring `planDispatch` would REGRESS the MRR-unblock.** So ADR-064-W must FIRST reconcile the model with the runtime contract (MRR-unblock + collision-graph + the live side-effects: `DEPENDENCY_BLOCKED` event, metrics, checkpoint), THEN wire — so the pinned model == the live path without regression.
 
 ---
 
 ## Intent / Roadmap (Tomorrow)
 
-- **🔴 DEP-TOOL:** today dependency capture depends on the AI tool writing it correctly into DIRECTIVES. **DIRECTIVES is being removed** → dependency must be analyzable / suggestible / controllable / editable via a **TOOL**, terminal-trackable, DIRECTIVES-independent. Even when the AI doesn't catch a dependency, a suggestion+control tool surfaces it. Critical + must be correct.
+- **🔴 DEP-TOOL:** today dependency capture depends on the AI tool writing it correctly into DIRECTIVES (parsed in `task-builder.ts`), and the CLI/MCP only **observe** the graph (`status --graph` mermaid `<sprint>-depgraph.mmd`, MCP `dependencyGraph`) — there is **no propose/edit/control tool**. **DIRECTIVES is being removed** → dependency must be analyzable / suggestible / controllable / editable via a **TOOL**, terminal-trackable, DIRECTIVES-independent (graph analysis, edge add/remove, dry-run wave preview, CLI/MCP parity). Even when the AI doesn't catch a dependency, a suggestion+control tool surfaces it. Critical + must be correct.
 - **ADR-064-W:** wire `planDispatch` (close the test-vs-runtime drift).
 - Wave-robustness under the MOAT (MOAT-1 worktree-merge-race tie).
 
@@ -43,7 +43,7 @@ Multi-task work executes in dependency order. ADR-045 wired `respawnEligibleTask
 
 **(+)** Continuous dependency-aware dispatch (no wasted wave-barrier latency) with an operator rollback escape; one of deckent's strongest features, dogfood-proven. MRR-unblock prevents deadlock.
 
-**(−)** Dependency correctness currently relies on AI-written DIRECTIVES (born DEP-TOOL, critical once DIRECTIVES is removed). `planDispatch` is unwired (born ADR-064-W, drift risk). Large-sprint wave-robustness is a monitored concern.
+**(−)** Dependency correctness currently relies on AI-written DIRECTIVES (born DEP-TOOL, critical once DIRECTIVES is removed; today only graph-observation, no control). `planDispatch` is unwired AND its model diverges from the runtime on the MRR-unblock rule (DONE+fix vs DONE∪MRR) — wiring it naively would regress the Sprint-280 deadlock-fix (born ADR-064-W: reconcile-then-wire). The `config-recovery.md` doc still shows `dependency_pipeline_enabled=false` vs the runtime `true` (CONFIG-RECOVERY-FIX). Large-sprint wave-robustness is a monitored concern.
 
 ---
 
