@@ -47,7 +47,7 @@ Dead/dormant code is disposed of by a **design pass, not a mechanical delete** (
 ## Intent / Roadmap (Tomorrow)
 
 - **GODOBJ — cohesion re-split:** re-split the re-grown coordinators (`sprint-controller.ts` regrowth) on cohesion lines, folded into the **MOD-SPLIT** module-boundary inventory (community↔enterprise layer map). No separate work-item — this record carries it.
-- **DEADMOD / DORMANT-3 — dormant-sweep:** the deferred dead-code sweep — e.g. `batch-stats.ts` (still unremoved, 0-caller), `brain-context.ts` / `decision-replay.ts` / `multi-agent.ts` (0-production-caller dormant) — folds into the post-migration dormant-audit sweep ([[project_product_repo_migration_push]]: "re-run the dormant scan once the work settles"). No separate urgent item.
+- **DEADMOD / DORMANT-3 — dormant-sweep:** the deferred dead-code sweep — e.g. `batch-stats.ts` (still unremoved, 0-caller), `brain-context.ts` / `decision-replay.ts` / `multi-agent.ts` (0-production-caller dormant) — folds into the post-migration dormant-audit sweep ([[project_clean_repo_migration_and_training_data]]: "re-run the dormant scan once the work settles"). No separate urgent item.
 
 ---
 

@@ -64,4 +64,4 @@ The token cost of full-content + multi-channel context is real (noticed in ADR-0
 - **Absorbs:** ADR-048 (incl. its Sprint-182 content amendment) + ADR-060.
 - **Cross-ref:** ADR-G-034 (TOOL-SCOPE — scope via tool, prompt shrink) · ADR-G-014 (cross-backend) · ADR-G-035 (memory — context source) · ADR-G-020 (scope authority) · ADR-G-006 (skill/agent selection → channels).
 - **Born / MASTER-PLAN:** WP-OPT (token-opt, no-truncation) · COMM-1/COMM-2 · buildWorkerContext-coordinator.
-- **Memory:** `feedback_prompt_completeness_over_brevity` · `feedback_worker_prompt_engineering_god_level`.
+- **Memory:** `feedback_prompt_completeness_over_brevity`.

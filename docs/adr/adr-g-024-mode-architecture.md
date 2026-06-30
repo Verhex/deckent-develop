@@ -60,4 +60,4 @@ deckent runs work in distinct execution paradigms. ADR-042 shipped a dual mode (
 - **Absorbs:** ADR-042 + ADR-067.
 - **Cross-ref:** ADR-G-001 (3-layer config) · ADR-G-031 (enterprise multi-tenancy on `process`) · ADR-G-020 (per-mode authority) · ADR-G-025 (process resilience) · ADR-G-015 (deckent-log multi-mode).
 - **Born / MASTER-PLAN:** MODE-RENAME · AUTO-NAMING · ADR-067-TENANT (threading decision) · DIR-2 · MODE-2 · MODE-1 (process executor).
-- **Memory:** `project_automation_usability_state` · `project_autonomous_engine_direction`.
+- **Memory:** `project_automation_usability_state` · `project_autonomous_first_dogfood_grand_vision`.

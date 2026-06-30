@@ -55,4 +55,4 @@ Old ADR-065 proposed two continuously-synced repos: a private `deckent-develop` 
 - **Absorbs / Rewrites:** ADR-065 (continuous-sync two-repo → single-repo + one-time migration).
 - **Cross-ref:** ADR-G-016 (Product Vision — MOD-SPLIT license axis, SEPARATE) · ADR-D-006 (code architecture) · ADR-G-019 (ADR-D convention under the taxonomy) · GA-2 (MASTER-PLAN).
 - **Born / MASTER-PLAN:** ENTERPRISE-REPO-STRATEGY · MODULARIZE · CODE-LAYERS (5-layer, separate discussion) · GA-2.
-- **Memory:** `project_clean_repo_migration_and_training_data` · `project_product_repo_migration_push`.
+- **Memory:** `project_clean_repo_migration_and_training_data` · `project_clean_repo_migration_and_training_data`.

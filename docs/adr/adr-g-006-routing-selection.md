@@ -57,4 +57,4 @@ V2 is sufficient *today* but **not the target**. V3 = a **learned model/effort s
 - **Absorbs:** ADR-015 + ADR-028 (V1-purge) + ADR-072 + ADR-073 + ADR-075 Part-B.
 - **Cross-ref:** ADR-G-008 (provider/model registry, cost) · ADR-G-009 (surface-aware routing, eval) · ADR-G-023 (agent/skill taxonomy, affinity) · ADR-G-032 (evolution — outcome signal) · ADR-G-028 (work taxonomy).
 - **Born / MASTER-PLAN:** ROUTE-1+ (Routing V3) · ROUTE-V1-PURGE · PROV-MATRIX · F1-AD.
-- **Memory:** `feedback_agent_routing_imbalance` · `feedback_fix_prompt_quality`.
+- **Memory:** `feedback_agent_routing_imbalance`.

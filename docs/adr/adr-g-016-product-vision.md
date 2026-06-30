@@ -84,4 +84,4 @@ This is the **MOD-SPLIT** refinement: the community↔enterprise boundary is gov
 - **Absorbs:** ADR-033 (Product Vision — Product Not Service + MOD-SPLIT amendment).
 - **Cross-ref:** ADR-G-031 (Enterprise Foundation — the governance-depth layer) · ADR-D-008 (Repo Strategy — separate axis) · ADR-G-033 (Dashboard/DESK — local-first app) · ADR-G-008 (hosted-core = optional provider).
 - **Born work-items:** MOD-SPLIT-CLARIFY (community=all-features / enterprise=governance-depth) · MODULARIZE · CODE-LAYERS (5-layer, separate discussion).
-- **Memory:** `project_deckent_positioning` · `project_community_pro_split_strategy` · `feedback_dual_perspective_dogfood_product`.
+- **Memory:** `project_community_pro_split_strategy` · `project_community_pro_split_strategy` · `feedback_dual_perspective_dogfood_product`.

@@ -73,4 +73,4 @@ The foundation is real engineering (OIDC security, HMAC chain, guarded surfaces)
 - **Absorbs:** ADR-068 + ADR-069 + ADR-071 Part-F4 + ADR-074 Part-B + ADR-092.
 - **Cross-ref:** ADR-G-016 (enterprise = governance depth, MOD-SPLIT) · ADR-G-020 (internal authority — distinct from connector L2) · ADR-G-024 (process/tenant) · ADR-G-017 (multi-project isolation) · ADR-G-007 (connectors) · ADR-G-035 (tenant_id/audit-hmac).
 - **Born / MASTER-PLAN:** ENT-* (god-level gaps) · MODULARIZE · AUT-2 (webhook-listener) · dynamic /bind (connector pairing→binding).
-- **Memory:** `project_social_identity_rbac_engine` · `project_deckent_positioning`.
+- **Memory:** `project_social_identity_rbac_engine` · `project_community_pro_split_strategy`.

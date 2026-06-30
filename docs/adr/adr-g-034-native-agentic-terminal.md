@@ -70,4 +70,4 @@
 - **Absorbs:** ADR-081 + ADR-074A + ADR-082A + ADR-083 + ADR-086.
 - **Cross-ref:** ADR-G-033 (dashboard = observability; chat→DESK) · ADR-G-025 (WORKER-LIVE-TRACE) · ADR-G-008 (provider-parity/fleet) · ADR-G-022 (/nervous) · ADR-G-031 (enterprise slash) · ADR-G-009 (proof-of-function for surface tasks).
 - **Born / MASTER-PLAN:** TERM-* · TOOL-1/2 (progressive-disclosure) · APR (ApprovalBroker) · TOOL-SCOPE · WP-OPT · DESK-1.
-- **Memory:** `project_deckent_native_terminal_agent` · `project_ink_native_repl` · `project_hermes_deckent_direction_2026_06`.
+- **Memory:** `project_deckent_native_terminal_agent` · `project_hermes_deckent_direction_2026_06`.

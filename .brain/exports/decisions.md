@@ -386,7 +386,7 @@ Dead/dormant code is disposed of by a **design pass, not a mechanical delete** (
 ## Intent / Roadmap (Tomorrow)
 
 - **GODOBJ — cohesion re-split:** re-split the re-grown coordinators (`sprint-controller.ts` regrowth) on cohesion lines, folded into the **MOD-SPLIT** module-boundary inventory (community↔enterprise layer map). No separate work-item — this record carries it.
-- **DEADMOD / DORMANT-3 — dormant-sweep:** the deferred dead-code sweep — e.g. `batch-stats.ts` (still unremoved, 0-caller), `brain-context.ts` / `decision-replay.ts` / `multi-agent.ts` (0-production-caller dormant) — folds into the post-migration dormant-audit sweep ([[project_product_repo_migration_push]]: "re-run the dormant scan once the work settles"). No separate urgent item.
+- **DEADMOD / DORMANT-3 — dormant-sweep:** the deferred dead-code sweep — e.g. `batch-stats.ts` (still unremoved, 0-caller), `brain-context.ts` / `decision-replay.ts` / `multi-agent.ts` (0-production-caller dormant) — folds into the post-migration dormant-audit sweep ([[project_clean_repo_migration_and_training_data]]: "re-run the dormant scan once the work settles"). No separate urgent item.
 
 ---
 
@@ -542,7 +542,7 @@ Old ADR-065 proposed two continuously-synced repos: a private `deckent-develop` 
 - **Absorbs / Rewrites:** ADR-065 (continuous-sync two-repo → single-repo + one-time migration).
 - **Cross-ref:** ADR-G-016 (Product Vision — MOD-SPLIT license axis, SEPARATE) · ADR-D-006 (code architecture) · ADR-G-019 (ADR-D convention under the taxonomy) · GA-2 (MASTER-PLAN).
 - **Born / MASTER-PLAN:** ENTERPRISE-REPO-STRATEGY · MODULARIZE · CODE-LAYERS (5-layer, separate discussion) · GA-2.
-- **Memory:** `project_clean_repo_migration_and_training_data` · `project_product_repo_migration_push`.
+- **Memory:** `project_clean_repo_migration_and_training_data` · `project_clean_repo_migration_and_training_data`.
 
 
 ---
@@ -863,7 +863,7 @@ V2 is sufficient *today* but **not the target**. V3 = a **learned model/effort s
 - **Absorbs:** ADR-015 + ADR-028 (V1-purge) + ADR-072 + ADR-073 + ADR-075 Part-B.
 - **Cross-ref:** ADR-G-008 (provider/model registry, cost) · ADR-G-009 (surface-aware routing, eval) · ADR-G-023 (agent/skill taxonomy, affinity) · ADR-G-032 (evolution — outcome signal) · ADR-G-028 (work taxonomy).
 - **Born / MASTER-PLAN:** ROUTE-1+ (Routing V3) · ROUTE-V1-PURGE · PROV-MATRIX · F1-AD.
-- **Memory:** `feedback_agent_routing_imbalance` · `feedback_fix_prompt_quality`.
+- **Memory:** `feedback_agent_routing_imbalance`.
 
 
 ---
@@ -1748,7 +1748,7 @@ This is the **MOD-SPLIT** refinement: the community↔enterprise boundary is gov
 - **Absorbs:** ADR-033 (Product Vision — Product Not Service + MOD-SPLIT amendment).
 - **Cross-ref:** ADR-G-031 (Enterprise Foundation — the governance-depth layer) · ADR-D-008 (Repo Strategy — separate axis) · ADR-G-033 (Dashboard/DESK — local-first app) · ADR-G-008 (hosted-core = optional provider).
 - **Born work-items:** MOD-SPLIT-CLARIFY (community=all-features / enterprise=governance-depth) · MODULARIZE · CODE-LAYERS (5-layer, separate discussion).
-- **Memory:** `project_deckent_positioning` · `project_community_pro_split_strategy` · `feedback_dual_perspective_dogfood_product`.
+- **Memory:** `project_community_pro_split_strategy` · `project_community_pro_split_strategy` · `feedback_dual_perspective_dogfood_product`.
 
 
 ---
@@ -2556,7 +2556,7 @@ deckent runs work in distinct execution paradigms. ADR-042 shipped a dual mode (
 - **Absorbs:** ADR-042 + ADR-067.
 - **Cross-ref:** ADR-G-001 (3-layer config) · ADR-G-031 (enterprise multi-tenancy on `process`) · ADR-G-020 (per-mode authority) · ADR-G-025 (process resilience) · ADR-G-015 (deckent-log multi-mode).
 - **Born / MASTER-PLAN:** MODE-RENAME · AUTO-NAMING · ADR-067-TENANT (threading decision) · DIR-2 · MODE-2 · MODE-1 (process executor).
-- **Memory:** `project_automation_usability_state` · `project_autonomous_engine_direction`.
+- **Memory:** `project_automation_usability_state` · `project_autonomous_first_dogfood_grand_vision`.
 
 
 ---
@@ -2791,7 +2791,7 @@ The token cost of full-content + multi-channel context is real (noticed in ADR-0
 - **Absorbs:** ADR-048 (incl. its Sprint-182 content amendment) + ADR-060.
 - **Cross-ref:** ADR-G-034 (TOOL-SCOPE — scope via tool, prompt shrink) · ADR-G-014 (cross-backend) · ADR-G-035 (memory — context source) · ADR-G-020 (scope authority) · ADR-G-006 (skill/agent selection → channels).
 - **Born / MASTER-PLAN:** WP-OPT (token-opt, no-truncation) · COMM-1/COMM-2 · buildWorkerContext-coordinator.
-- **Memory:** `feedback_prompt_completeness_over_brevity` · `feedback_worker_prompt_engineering_god_level`.
+- **Memory:** `feedback_prompt_completeness_over_brevity`.
 
 
 ---
@@ -2980,7 +2980,7 @@ iframe/separate-server xterm — cross-origin auth complexity, no shared token. 
 - **Dashboard host:** **ADR-G-033** (Dashboard — Observability Surface) — hosts the dock; pivot makes the dashboard observability-only.
 - **Governance / lifecycle context:** **ADR-G-019** (ADR Governance — runtime constraint record), **ADR-G-021** (Self-Modifying Detection — terminal touches `src/api/`+`src/dashboard/` → dogfood mode), **ADR-G-026** (Dependency-Wave Execution — implemented over a 5-wave sequence), **ADR-D-007** (Manual Subagent Dispatch — wave-gate transitions during dogfood).
 - **Born work-items:** DESK (desktop-app integration), TERM-RPC (terminal RPC unification across web/native/CLI/MCP), ENTERPRISE-REMOTE (sub-#3 k8s/SSH/SSO backends, sub-#4 audit-export/SIEM), DOCK-UI-FIX (collapsed dock-bar z-index — product sprint).
-- **Direction:** `docs/superpowers/specs/2026-05-19-embedded-web-terminal-design.md`, memory `project_embedded_web_terminal`, `project_dashboard_chat_audit_20260611`; `.analysis/hermes-vs-deckent-direction-decisions.md` (terminal=primary surface, dashboard=monitoring-only).
+- **Direction:** `docs/superpowers/specs/2026-05-19-embedded-web-terminal-design.md`, memory `project_embedded_web_terminal`; `.analysis/hermes-vs-deckent-direction-decisions.md` (terminal=primary surface, dashboard=monitoring-only).
 
 
 ---
@@ -3163,7 +3163,7 @@ The foundation is real engineering (OIDC security, HMAC chain, guarded surfaces)
 - **Absorbs:** ADR-068 + ADR-069 + ADR-071 Part-F4 + ADR-074 Part-B + ADR-092.
 - **Cross-ref:** ADR-G-016 (enterprise = governance depth, MOD-SPLIT) · ADR-G-020 (internal authority — distinct from connector L2) · ADR-G-024 (process/tenant) · ADR-G-017 (multi-project isolation) · ADR-G-007 (connectors) · ADR-G-035 (tenant_id/audit-hmac).
 - **Born / MASTER-PLAN:** ENT-* (god-level gaps) · MODULARIZE · AUT-2 (webhook-listener) · dynamic /bind (connector pairing→binding).
-- **Memory:** `project_social_identity_rbac_engine` · `project_deckent_positioning`.
+- **Memory:** `project_social_identity_rbac_engine` · `project_community_pro_split_strategy`.
 
 
 ---
@@ -3339,7 +3339,7 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
 
 **(+)** Sprint-start no longer freezes the dashboard — the serve process stays responsive across long sprints (detach invariant). All eight god-level surfaces are reachable; evolution/nervous/enterprise/memory data appear in the UI for the first time. The live-data spine eliminates skeleton thrash and recovers gracefully from connection loss; centralized theme tokens give dark/light consistency with zero runtime overhead and no new dependency. The dashboard is now a credible **observability** plane the pivot can build on, and the AppShell IA cleanly separates "Observe / Manage / Converse" so the Tomorrow reframe (chat → Desktop) is a relocation, not a rewrite.
 
-**(−) Known / deferred — tracked for the Chat/Dashboard product-sprint** (memory `project_dashboard_chat_audit_20260611`):
+**(−) Known / deferred — tracked for the Chat/Dashboard product-sprint**:
 - **chat-HOLLOW** — `POST /api/chat` (`server.ts:813`) is **classifier-only** (the adapter never enters `buildChatReply`), and `ChatPage` swallows the stream error (`:382-384`); when the live stream is empty the classifier's *"I didn't understand"* reply stays visible. Frontend-wire and serve-side `resolveChatAdapter` SSOT both exist (Sprint 269) — the gap is the classifier-only POST + swallowed stream error, prime suspect being the EventSource-GET Bearer-header impossibility (auth-gate) or an in-serve CLI spawn failure (ADR-080 §3 v3-diagnosis, ADR-082 #2).
 - **duplicate-sidebar** — post-S219 drift: `Layout.tsx` renders its own `navGroups` while `Sidebar.tsx` `navItems` remains a **stale duplicate**, so Workers/Directives are not reachable from nav. Collapse to a single nav source in the product-sprint (ADR-080 §2 drift, UX-audit #3).
 - **alert-spam ×59** — the "CLAUDE.md not updated" auditor alert repeated ×59; dedup either regressed or does not cover this auditor-alert path (ADR-082 #3, UX-audit #4).
@@ -3367,7 +3367,7 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
   - **ADR-G-009** (Evaluation Integrity / Proof-of-Function) — the dashboard is Tier-1 user-surface; the freeze and hollow-page defects were `wired ≠ working` failures caught by real-binary smoke.
   - **ADR-G-016** (Product Vision) / **ADR-G-010** (Output, Terminal-UX & Brand) — god-level / no-MVP bar; no-emoji + lucide-react + shared theme tokens.
 - **Born work-items:** **DASH** (serve-token-inject · routing chart · control-panel surfacing · onboarding view — from old 072/073/076 side-items) · **Chat/Dashboard product-sprint** (chat-HOLLOW · duplicate-sidebar · alert-spam · enterprise-CRUD) · **DESK-1** (Desktop app) — all to MASTER-PLAN.
-- **Direction:** `.analysis/adr-review-crosswalk.md` (rows 080/078/082/083), `.analysis/hermes-vs-deckent-direction-decisions.md`, memory `project_hermes_deckent_direction_2026_06` · `project_dashboard_chat_audit_20260611` · `feedback_dashboard_no_emoji_lucide` · `feedback_governance_aligns_with_direction_pivot`.
+- **Direction:** `.analysis/adr-review-crosswalk.md` (rows 080/078/082/083), `.analysis/hermes-vs-deckent-direction-decisions.md`, memory `project_hermes_deckent_direction_2026_06` · `feedback_dashboard_no_emoji_lucide` · `feedback_governance_aligns_with_direction_pivot`.
 
 
 ---
@@ -3448,7 +3448,7 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
 - **Absorbs:** ADR-081 + ADR-074A + ADR-082A + ADR-083 + ADR-086.
 - **Cross-ref:** ADR-G-033 (dashboard = observability; chat→DESK) · ADR-G-025 (WORKER-LIVE-TRACE) · ADR-G-008 (provider-parity/fleet) · ADR-G-022 (/nervous) · ADR-G-031 (enterprise slash) · ADR-G-009 (proof-of-function for surface tasks).
 - **Born / MASTER-PLAN:** TERM-* · TOOL-1/2 (progressive-disclosure) · APR (ApprovalBroker) · TOOL-SCOPE · WP-OPT · DESK-1.
-- **Memory:** `project_deckent_native_terminal_agent` · `project_ink_native_repl` · `project_hermes_deckent_direction_2026_06`.
+- **Memory:** `project_deckent_native_terminal_agent` · `project_hermes_deckent_direction_2026_06`.
 
 
 ---
