@@ -241,6 +241,34 @@
 | HUB-1 | LAUNCH | DeckentHub backend live (registry.deckent.dev) + moderation | MP | P2 | — | ⬜ | — | — |
 | PB-1 | LAUNCH | Voice (STT/wake/TTS) — 10K-star gate | MP | P2 | — | ⏸️ | — | post-beta |
 | PB-3 | LAUNCH | AEGIS methodology Phase-1 (AEGIS-RD'den sonra) | MP | P2 | AEGIS-RD | ⏸️ | — | post-beta |
+| ROLE-GUARD | MOAT·GOV | Brain/orchestrator kod-yazamaz — pid/role guard (tool-enforce) | ADR-rev | P1 | TOOL-1 | ⬜ | — | ADR-G-020/021 |
+| ROUTE-V1-PURGE | PROV·GOV | V1 routing TAMAMEN sil (DecisionOrchestrator+config+test+ref, izi-bile-kalmasın) | ADR-rev | P1 | — | ⬜ | — | ADR-G-006 |
+| DEP-TOOL | TOOL | Dependency analiz/öneri/kontrol/düzenleme toolu (terminal-trackable, DIRECTIVES-bağımsız) | ADR-rev | P0 | TOOL-1 | ⬜ | — | ADR-G-026; DIRECTIVES kalkınca kritik |
+| BRAIN-FAILOVER | MOAT·PROV·APR | Brain-crash provider-failover (Claude→OpenAI) + auditor-onay + nervous + escalation(otonom→retry→kill) | ADR-rev | P1 | — | ⬜ | — | ADR-G-025 |
+| WORKER-LIVE-TRACE | TERM·DASH·TRN | Per-worker canlı durum (dashboard/terminal/CLI/MCP, insan+sistem, canlı+snapshot) | ADR-rev | P0 | TERM-LIVE | ⬜ | — | ADR-G-025; .log yetersiz |
+| BRAIN-SELFUPDATE | PROV·MOAT | Brain provider/model-agnostik kayıpsız self-update (bugün Claude, yarın GPT-5.5) | ADR-rev | P1 | — | ⬜ | — | ADR-G-025/008 |
+| BRAIN-DEATH-PROC | MOAT·APR | Brain-death fallback/retry sistem+user adımları + `finalize --force` trigger + tool | ADR-rev | P1 | — | ⬜ | — | ADR-G-025; finalize-force-orphan |
+| LEARNINGS-QUALITY | MEM·MOAT | Brain Learnings/Gains gerçek-öğrenilmiş-içerik (yarım-değil), aranabilir; dogfood+user | ADR-rev | P1 | — | ⬜ | — | ADR-G-035/032 |
+| EVOLUTION-SELECTIVE-SCALE | MOAT·MEM·PERF | Evolution-loop yalnız KULLANILAN agent/skill'i güncelle (toplu-değil) + 300-agent/1000-skill ölçek | ADR-rev | P1 | — | ⬜ | — | ADR-G-032; basic-ilk-hata |
+| TASKTYPE-EXPAND | MOAT·GOV | Daha fazla TaskKind (db-migration/package-publish/infra/security) + user-custom (UG/UP) | ADR-rev | P1 | — | ⬜ | — | ADR-G-028 |
+| NERVOUS-GENERALIZE | MODE·GOV | Nervous action-vocab language/proje-agnostik (NPM_PUBLISH→PUBLISH; python/c++/any) | ADR-rev | P1 | — | ⬜ | — | ADR-G-022 |
+| NERVOUS-NONBLOCK | MODE·MOAT | Nervous-enabled non-blocking + kontrollü-aktivasyon (fs.watch/CPU + approval-block fix) | ADR-rev | P1 | — | ⬜ | — | ADR-G-022 |
+| NERVOUS-ENTERPRISE | ENT | Nervous = enterprise-katman proaktif-governance/control gücü; kontrollü-rollout | ADR-rev | P2 | — | ⬜ | — | ADR-G-022 |
+| AUTH-MULTIMODE | GOV·MODE | Authority-matrix TÜM modlar + global/proje path-scope + per-mode rol/akış/continuation | ADR-rev | P1 | — | ⬜ | — | ADR-G-020 |
+| AUTH-USER-CUSTOM | GOV·ENT | User-customize authority-matrix (ADR-UG/UP; G-baseline inviolable, G>U>D) | ADR-rev | P2 | — | ⬜ | — | ADR-G-020 |
+| ENFORCE-GENERALIZE | GOV·ENT | RBAC enforcement dogfood-only→user-side genelleştir (lint:adr/authority-enforcer) | ADR-rev | P2 | — | ⬜ | — | ADR-G-020 |
+| POLICY-ENGINE-EVAL | GOV·ENT | Centralized policy-engine (OPA/Rego veya embedded) RE-EVAL (ADR-010-dogma kalktı) | ADR-rev | P2 | — | ⬜ | — | ADR-G-019/020 |
+| MODE-RENAME | TERM·MODE·GOV | "sprint" → user/enterprise/dev/teams evrensel-kavram (run/job/mission...) | ADR-rev | P1 | — | ⬜ | — | ADR-G-024; sürekli-hatırlatma |
+| AUTO-NAMING | TERM·MODE | "mode auto"(detect) vs "autonomous engine"(motor) adlandırma-çakışması netleştir | ADR-rev | P2 | — | ⬜ | — | ADR-G-024 |
+| ADR-067-TENANT | ENT | TenantContext-threading wire-ya-amend (resolveTenant 0-caller; strict_tenant+kolon canlı) | ADR-rev | P2 | — | ⬜ | — | ADR-G-024 |
+| ENT-REPO-STRATEGY | ENT·LAUNCH | Enterprise-repo (deckent açık + deck-ent private?) + tek-repo→bir-kerelik-migration | ADR-rev | P2 | — | ⬜ | — | ADR-D-008; geri-dönülmez |
+| CODE-LAYERS | ENT·GOV·ARCH | 5-katman kod-mimarisi (deckent-core → deckent-custom) — ayrı tartışma | ADR-rev | P2 | — | ⬜ | — | ADR-G-016/D-008 |
+| MANAGED-DOCS-MINIMIZE | DOCS | Auto-md-update'i NECESSARY-docs'a indir; user-projede deckent-yazmaz (track-only) | ADR-rev | P1 | — | ⬜ | — | ADR-G-015 |
+| DECKENT-LOG | DOCS·MODE | sprint-log → deckent-log rename + multi-mode (task/process/autonomous/flow/mission) | ADR-rev | P1 | — | ⬜ | — | ADR-G-015/024 |
+| CONFIG-CUSTOMIZE | ONB·TERM·GOV | Custom-tier + NL-terminal TÜM-ayar customize (ONB-CHAT) + her config-knob KODDA-gerçek | ADR-rev | P1 | — | ⬜ | — | ADR-G-012; DORMANT-2 honesty |
+| ADR-064-W | MOAT·GOV | `planDispatch` wire (tested-but-UNWIRED 0-caller → test-vs-runtime drift) | ADR-rev | P1 | — | ⬜ | — | ADR-G-026 |
+| ADR-066-W | PROV·GOV | `?? 'claude'` drift 3→9 → re-audit + getDefaultProviderName konsolide | ADR-rev | P1 | — | ⬜ | — | ADR-G-008; WM-5 |
+| ADR-087-W | GOV | Residual ~15 spawnSync (auditor.ts) → async-spawn migration | ADR-rev | P1 | — | ⬜ | — | ADR-D-002 |
 
 ---
 
