@@ -1943,11 +1943,11 @@ This is the **MOD-SPLIT** refinement: the community↔enterprise boundary is gov
 
 # ADR-G-017: Multi-Project Isolation
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=4-layer isolation (per-project directory + AES-256-GCM per-project credential-encryption + symlink-aware `realpath` scope + global/project config boundary); runtime scope enforcement **advisory/soft** (ADR-G-020 V1) → tomorrow=hard-enforce scope (ADR-G-020 Layer-2 V2 + TOOL-SCOPE) + enterprise multi-tenancy as a modular layer (ADR-G-031)
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-034 (Multi-Project Isolation — Per-Project Security Boundaries) · **Supersedes:** —
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=4-layer isolation model — per-project directory (real) + AES-256-GCM credential encryption (shipped but a **single GLOBAL vault**, per-project keying NOT built) + symlink-aware `realpath` scope (helper+tests only, **NOT wired into runtime authority**) + global/project config boundary (real); runtime scope enforcement **advisory/soft** (ADR-G-020 V1) → tomorrow=hard-enforce scope (ADR-G-020 Layer-2 V2 + TOOL-SCOPE) + enterprise multi-tenancy as a modular layer (ADR-G-031)
+**Status:** accepted (provisional — Layer-2 per-project credential-keying + Layer-3 symlink-authority-wire are NOT shipped; global vault + helper-only today) · **Date:** 2026-06-30 · **Absorbs:** ADR-034 (Multi-Project Isolation — Per-Project Security Boundaries) · **Supersedes:** —
 **Crosswalk:** ADR-034 → ADR-G-017
 
-> **Note:** The symlink-aware scope check (`isWithinScope()`) **is** implemented (`fs.realpathSync()` → boolean), but per ADR-G-020 V1 runtime scope enforcement is **advisory/soft** — a violation is warned + event-emitted, not hard-blocked. "Vulnerability closed / `ScopeViolationError` thrown / blocks" therefore describes the **design intent**, not today's runtime guarantee; the hard-flip is post-GA V2.
+> **Note (code-grounded, 2 corrections):** (1) The symlink-aware `isWithinScope()` helper **is** implemented (`fs.realpathSync()` → boolean) **and test-covered, but is NOT wired into the live authority path** — runtime `checkWorkerAuthority()` → `checkAuthority()` uses **path-normalization only** (`normalizePath` + prefix-match, no `realpathSync`), i.e. exactly the "path-normalization-only" approach this ADR's rejected-alternatives calls insufficient. So the symlink-bypass threat is closed at the helper/test level, not in enforcement (SYMLINK-AUTHORITY-WIRE). (2) Even when wired, ADR-G-020 V1 runtime scope enforcement is **advisory/soft** (warn + event, not hard-block); the hard-flip is post-GA V2. "Vulnerability closed / blocks" = design intent, not today's runtime guarantee.
 
 ---
 
@@ -1964,7 +1964,7 @@ A Sprint-132 security audit surfaced the concrete threats this ADR closes:
 3. **Global-state pollution** — one project's `.deckent/config.json` edit silently changes another project's behavior.
 4. **Symlink-cycle DoS** — recursive symlinks spin the scope resolver forever.
 
-Sprint-133 had already shipped AES-256-GCM per-project credential encryption, strengthening the foundation; what remained un-formalized was the scope-bypass defense and the global/project config-sharing rules.
+Sprint-133 shipped AES-256-GCM credential encryption — **but as a single GLOBAL vault** (`~/.deckent/credentials/` + `~/.deckent/.keyring`), **not** the per-project, projectRoot-keyed model this ADR's Layer-2 originally described (that per-project keying was planned in Sprint 134 and **never built** — design-doc §4.2). What also remained un-formalized was the scope-bypass defense and the global/project config-sharing rules.
 
 ---
 
@@ -1980,19 +1980,28 @@ Multi-project isolation is **four layers**:
     files, heartbeat, result, lock), .locks/ (file locks). No cross-reference:
     a project's .brain holds only that project's history.
   </layer>
-  <layer n="2" name="Per-Project Credential Encryption" status="shipped (Sprint 133)">
-    .deckent/credentials.enc encrypted with AES-256-GCM
-    (src/core/credential-encryption.ts: ALGORITHM='aes-256-gcm', createCipheriv;
-    src/core/credentials.ts). The key derives from the per-project projectRoot path
-    hash, so a sibling project's credentials.enc is keyed differently — cross-read
-    fails. Distinct from the .deck/Ed25519 secret system of ADR-G-005 (complementary).
+  <layer n="2" name="Credential Encryption" status="PARTIAL — global vault shipped; per-project NOT built">
+    AES-256-GCM credential encryption IS shipped (src/core/credential-encryption.ts:
+    ALGORITHM='aes-256-gcm', createCipheriv) — but as a SINGLE GLOBAL VAULT:
+    ~/.deckent/credentials/<provider>.json, encrypted with one master key in
+    ~/.deckent/.keyring (or DECKENT_MASTER_KEY), shared across ALL projects. The
+    per-project .deckent/credentials.enc + projectRoot/HKDF key-derivation +
+    sibling-cross-read-fail was PLANNED (Sprint 134) but NEVER IMPLEMENTED (design-doc
+    §4.2 explicitly: "NOT YET IMPLEMENTED ... cross-project credential decryption
+    protection does not currently apply"). So sibling-project credential isolation does
+    NOT currently hold — it is a global vault (CRED-PER-PROJECT). Distinct from the
+    .deck/Ed25519 secret system of ADR-G-005 (complementary).
   </layer>
-  <layer n="3" name="Symlink-Aware Scope Enforcement" status="implemented; advisory at runtime">
+  <layer n="3" name="Symlink-Aware Scope Enforcement" status="HELPER ONLY — not wired into runtime authority">
     isWithinScope() (src/agents/worker.ts) resolves the target with fs.realpathSync()
-    before matching, so a symlink pointing outside scope resolves to its real path and
-    fails the match; a recursive symlink (ELOOP) also fails. NOTE: the function returns
-    a boolean and the violation is WARNED + event-emitted (ADR-G-020 V1 advisory) — it
-    does not itself throw or hard-block. Throw/block = design intent (V2).
+    before matching (symlink outside scope → real path → fails; recursive ELOOP → fails),
+    and is test-covered. BUT it is NOT called by the live authority path: runtime
+    checkWorkerAuthority() → checkAuthority() (authority-enforcer.ts) does
+    path-normalization-ONLY (normalizePath + prefix-match, no realpathSync) — the very
+    approach §rejected-alternatives calls insufficient against symlink bypass. So the
+    symlink defense exists as a helper+tests, NOT in enforcement (SYMLINK-AUTHORITY-WIRE).
+    Even once wired, the violation is advisory (warn + event, ADR-G-020 V1) — throw/block
+    is design intent (V2).
   </layer>
   <layer n="4" name="Global vs Project Config Boundary" status="documented">
     ~/.deckent/config.json (global) vs .deckent/config.json (project), explicit
@@ -2038,7 +2047,7 @@ Sandboxed worker process (chroot/namespace) — over-complex, cross-platform-inc
 
 **(+)** The Sprint-132 symlink scope-bypass finding is addressed by design (`realpathSync` resolution + ELOOP handling); per-project isolation rules are now formal and testable; the global/project config boundary is documented, so a new field's scope is explicit; credential isolation (AES-256-GCM, per-project-keyed) is formalized; and "multi-project ≠ multi-tenant" is settled, preventing wrong-direction PRs.
 
-**(−)** `isWithinScope()` now performs a `realpathSync()` disk I/O per check (cost), and must handle a deleted symlink target gracefully; ELOOP detection leans on an OS error code (behavior may differ across platforms). The runtime guarantee is **advisory today** — the boolean is computed and emitted but does not hard-block until V2 (ADR-G-020). The config-boundary table must be updated whenever a new field is added, or its sharing rule is ambiguous.
+**(−)** **Two of the four layers are not yet enforced as described:** Layer-2 credential encryption is a single GLOBAL vault, not per-project-keyed — sibling credential isolation does NOT hold (CRED-PER-PROJECT); Layer-3's symlink-safe `isWithinScope()` is a helper+tests but the live `checkAuthority()` is path-normalization-only — symlink-bypass is not closed in enforcement (SYMLINK-AUTHORITY-WIRE). When wired, `isWithinScope()` adds a `realpathSync()` disk I/O per check and must handle deleted symlink targets + cross-platform ELOOP; and the runtime guarantee stays **advisory** until V2 (ADR-G-020). Project-root resolution is `process.cwd()`-based (ROOT-DISCIPLINE: needs explicit `ctx.projectRoot`/`--root` for shared MCP/daemon hosts). The config-boundary table must be updated whenever a new field is added.
 
 ---
 
@@ -2051,7 +2060,7 @@ Sandboxed worker process (chroot/namespace) — over-complex, cross-platform-inc
 - **Enforcement authority:** **ADR-G-020** (Authority, Roles, Flow & Enforcement) — advisory→hard scope flip (V1→V2, ADR-G-020 vein).
 - **Enterprise layer:** **ADR-G-031** (Enterprise Foundation) — multi-tenancy as a modular layer atop this model.
 - **Consent / telemetry:** **ADR-G-030** (Consent-Based Provisioning & Install) — FB-1 opt-in telemetry consent gate.
-- **Born work-items:** TOOL-SCOPE (scope analyze/approve/edit tool + hard-enforce), ENTERPRISE-MULTI-TENANCY (ADR-G-031 ENT-* modular layer), FB-1 (consent-gated opt-in telemetry sender).
+- **Born work-items:** **CRED-PER-PROJECT** (per-project `.deckent/credentials.enc` + projectRoot/HKDF key-derivation + sibling-cross-read-fail — the planned-not-built Layer-2; P1) · **SYMLINK-AUTHORITY-WIRE** (wire `isWithinScope` realpathSync into `checkWorkerAuthority`/`checkAuthority` — close symlink-bypass in enforcement; P1) · **ROOT-DISCIPLINE** (explicit `ctx.projectRoot`/`--root` for MCP/REPL/daemon; cwd-fallback non-canonical) · TOOL-SCOPE (scope analyze/approve/edit tool + hard-enforce) · ENTERPRISE-MULTI-TENANCY (ADR-G-031 ENT-* modular layer) · FB-1 (consent-gated opt-in telemetry sender).
 - **Direction:** `docs/design/multi-project-isolation.md`, memory `project_air_gapped_offline_pillar`, `feedback_zero_hardcode_live_data`; `.analysis/hermes-vs-deckent-direction-decisions.md` (global-install + project-scope = P0).
 
 
@@ -2063,8 +2072,8 @@ Sandboxed worker process (chroot/namespace) — over-complex, cross-platform-inc
 
 # ADR-G-018: Verification Protocol & Event-Stream
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=versioned protocol v1.0 + append-only `.deckent/sprint-NNN-events.jsonl` (`src/core/event-stream.ts`) + 28+ additive channels + fail-safe write (never crashes a run) + permanent dual transport → tomorrow=APR approval-channels + COMM-2 typed vocabulary + PROGRESS naming-fix + per-mode channel completion (jointly with ADR-G-020)
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-035 (Brain ↔ Worker ↔ Auditor Verification Protocol Standard) · **Supersedes:** —
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=versioned protocol v1.0 + append-only `.deckent/recently-works/<sprintId>-events.jsonl` (`src/core/event-stream.ts`; 2-file size-capped rotation) + ~30 additive channels (canonical = the `CHANNELS` map) + fail-safe write (never crashes a run) + permanent dual transport → tomorrow=APR approval-channels + COMM-2 typed vocabulary + PROGRESS naming-fix + per-mode channel completion (jointly with ADR-G-020)
+**Status:** accepted (amendment — doc-drift fixed: event-path, ~30 channels, single-process sequence, rotation-implemented, core-messages coverage) · **Date:** 2026-06-30 · **Absorbs:** ADR-035 (Brain ↔ Worker ↔ Auditor Verification Protocol Standard) · **Supersedes:** —
 **Crosswalk:** ADR-035 → ADR-G-018
 
 > **Mechanism vs policy (cross-ref, NOT merge):** This ADR is the **mechanism** — the message envelope, the channel codes, the transport. **Who may send/receive on which channel** is **policy**, owned by ADR-G-020 (Authority). The two are deliberately **cross-referenced, not merged**: channels (here) and channel-rights (there) are separate cohesive concerns, each kept whole.
@@ -2087,7 +2096,7 @@ Heavier transports were considered and rejected at design time for a **zero-infr
 
 ### 1. Versioned message protocol (v1.0) + append-only event-stream
 
-All Brain ↔ Worker ↔ Auditor messages are recorded, in order, to an append-only **`.deckent/sprint-NNN-events.jsonl`** stream (`src/core/event-stream.ts`; `src/orchestra/event-stream.ts` is a re-export shim since the Sprint 279 core-move). The stream is the **canonical-read truth**; the protocol is forward-compatible (extra payload fields are ignored).
+All protocol-managed **core** Brain ↔ Worker ↔ Auditor messages are recorded, in order, to an append-only **`.deckent/recently-works/<sprintId>-events.jsonl`** stream (`src/core/event-stream.ts`; `src/orchestra/event-stream.ts` is a re-export shim since the Sprint 279 core-move). The stream is the **canonical-read truth**; the protocol is forward-compatible (extra payload fields are ignored). (Coverage caveat: standard `worker.ts` mirrors `.result`/`.hb` to the stream, but some agentic entry paths — `agentic-worker-entry.ts`, `http-agentic-worker.ts` — write `.result`/`.hb` directly without an event-mirror; backend-parity is pending — EVENT-MIRROR-PARITY.)
 
 ```json
 {
@@ -2103,13 +2112,13 @@ All Brain ↔ Worker ↔ Auditor messages are recorded, in order, to an append-o
 }
 ```
 
-- `sequence` — run-monotonic integer from 1 (atomic `nextSequence()` counter).
+- `sequence` — run-monotonic integer from 1. `nextSequence()` is a persisted file counter, **monotonic within a single process** but read-modify-write **without a lock** — multi-process concurrent writers are not yet atomicity-guaranteed (SEQ-ATOMIC).
 - `target: "*"` — broadcast.
 - `correlationId` / `causationId` — optional message-lineage (additive; consumers ignoring them stay compatible).
 
-### 2. 28+ channel codes (additive — protocol stays 1.0)
+### 2. ~30 channel codes (additive — protocol stays 1.0; canonical = the `CHANNELS` map)
 
-The original 15 V1.0 channels — `BRAIN→WORKER:TASK_ASSIGN`, `WORKER→BRAIN:HEARTBEAT/RESULT/QUESTION`, `BRAIN→WORKER:ANSWER`, `WORKER→AUDITOR:CODE_VERIFY_REQUEST`, `AUDITOR→BRAIN:VERIFICATION_RESULT/SCOPE_COLLISION_DETECTED/ADR_VIOLATION/GATE_COMPUTED/LOAD_REPORT_WRITTEN`, `BRAIN→*:METRIC_EMITTED/SPRINT_PHASE_CHANGE`, `BRAIN→WORKER:FIX_REQUEST`, `DECKENT→USER:NOTIFY` — remain **verbatim**. 13 were **added** since (ORPHAN_HB_DETECTED, AUTHORITY_VIOLATION, TIMEOUT_ASSIGN/WARNING/CAP_EXCEEDED/EXTEND, NEVER_DISPATCHED, SPAWN_BLOCKED, DEPENDENCY_BLOCKED, DEPENDENCY_RESOLVED_BY_FIX, AUTH_FAILED, CONTAINER_PATH_SANITIZED, PROGRESS). Channels are **additive by design**, so `protocol_version` stays `'1.0'`; a breaking change would bump to `2.0`.
+The original 15 V1.0 channels — `BRAIN→WORKER:TASK_ASSIGN`, `WORKER→BRAIN:HEARTBEAT/RESULT/QUESTION`, `BRAIN→WORKER:ANSWER`, `WORKER→AUDITOR:CODE_VERIFY_REQUEST`, `AUDITOR→BRAIN:VERIFICATION_RESULT/SCOPE_COLLISION_DETECTED/ADR_VIOLATION/GATE_COMPUTED/LOAD_REPORT_WRITTEN`, `BRAIN→*:METRIC_EMITTED/SPRINT_PHASE_CHANGE`, `BRAIN→WORKER:FIX_REQUEST`, `DECKENT→USER:NOTIFY` — remain **verbatim**. 13 were **added** since (ORPHAN_HB_DETECTED, AUTHORITY_VIOLATION, TIMEOUT_ASSIGN/WARNING/CAP_EXCEEDED/EXTEND, NEVER_DISPATCHED, SPAWN_BLOCKED, DEPENDENCY_BLOCKED, DEPENDENCY_RESOLVED_BY_FIX, AUTH_FAILED, CONTAINER_PATH_SANITIZED, PROGRESS, NERVOUS_NOTIFICATION, NERVOUS_APPROVAL_CONSUMED). The canonical list is the `CHANNELS` map in `src/core/event-stream.ts` (~30 today — count not pinned here). Channels are **additive by design**, so `protocol_version` stays `'1.0'`; a breaking change would bump to `2.0`.
 
 ### 3. Lineage & forward-compatibility
 
@@ -2121,7 +2130,7 @@ The original 15 V1.0 channels — `BRAIN→WORKER:TASK_ASSIGN`, `WORKER→BRAIN:
 <fail-safe>
   <rule>writeEvent() is try/catch → console.warn + returns null on failure
         (disk full, permission) — a run NEVER halts on event-stream I/O error.</rule>
-  <rule>Sequence monotonicity via a process-level atomic counter.</rule>
+  <rule>Sequence monotonicity via a persisted counter — single-process monotonic; multi-process atomicity needs a lock (SEQ-ATOMIC).</rule>
 </fail-safe>
 ```
 
@@ -2131,8 +2140,8 @@ The original 15 V1.0 channels — `BRAIN→WORKER:TASK_ASSIGN`, `WORKER→BRAIN:
 <dual-transport status="permanent" fail-safe="yes">
   <layer kind="file-based">.tasks/*.hb heartbeat + .tasks/*.result — the LIVE PRIMARY
     read path (result-collector.ts, worker.ts, ADR-D-007 manual-dispatch).</layer>
-  <layer kind="event-stream">.deckent/sprint-NNN-events.jsonl — the canonical-READ,
-    replayable, version-negotiated layer.</layer>
+  <layer kind="event-stream">.deckent/recently-works/<sprintId>-events.jsonl — the
+    canonical-READ, replayable, version-negotiated layer (2-file size-capped rotation).</layer>
   <decision>BOTH are preserved PERMANENTLY as a fail-safe pair. ADR-035's original
     "Backward-Compatibility Roadmap" (file-based soft-deprecated by Sprint 140, REMOVED
     by Sprint 142) is REJECTED — it never materialized (file-based was still live-primary
@@ -2156,7 +2165,7 @@ The original 15 V1.0 channels — `BRAIN→WORKER:TASK_ASSIGN`, `WORKER→BRAIN:
 
 **(+)** Every Brain/Worker/Auditor message is versioned, replayable, and independently verifiable (the Sprint-137 "DONE shortcut" is closeable — the Auditor becomes an active verifier); additive channels grow without breaking consumers; the stream is fail-safe and zero-infrastructure; the dual transport is a durable safety net. Mechanism (channels) and policy (channel-rights, ADR-G-020) stay cleanly separated, each cohesive.
 
-**(−)** Per-event disk I/O grows the `.jsonl` (rotation/cleanup is a deferred concern); the sequence counter must stay atomic under concurrent multi-worker writes; the `PROGRESS` naming deviation and the per-mode channel gaps are open until the roadmap items land; channel-rights enforcement is advisory/soft today (ADR-G-020 V1.0).
+**(−)** Per-event disk I/O grows the `.jsonl` — **rotation is implemented** (MAX_EVENT_FILE_BYTES cap, 2-file rotate-to-`.1`), not deferred; the sequence counter is single-process-monotonic but **not multi-process atomic** (no lock — SEQ-ATOMIC); some agentic entry paths write `.result`/`.hb` without an event-mirror (EVENT-MIRROR-PARITY); the `PROGRESS` naming deviation and per-mode channel gaps are open until the roadmap items land; channel-rights enforcement is advisory/soft today (ADR-G-020 V1.0).
 
 ---
 
@@ -2165,7 +2174,7 @@ The original 15 V1.0 channels — `BRAIN→WORKER:TASK_ASSIGN`, `WORKER→BRAIN:
 - **Absorbs:** ADR-035 (Brain ↔ Worker ↔ Auditor Verification Protocol Standard — protocol v1.0, event-stream, channel codes, fail-safe, dual transport).
 - **Policy partner (cross-ref, NOT merged):** ADR-G-020 (Authority, Roles, Flow & Enforcement — owns channel send/receive rights, the no-worker→worker mediated-bus rule = COMM-2, and per-mode channel-rights).
 - **Cross-ref:** ADR-G-014 (Spawn Backend & Observation — cross-backend observability rests on this stream) · ADR-G-025 (Process Resilience & Live Observability — the PROGRESS / WORKER-LIVE-TRACE structured progress-stream) · ADR-G-022 (Nervous System — proactive triggers over the bus) · ADR-G-024 (Mode Architecture — per-mode channels) · ADR-G-019 (ADR Governance — DB-first storage / taxonomy).
-- **Born work-items:** APR (approval-channels) · COMM-2 (typed mediated-bus vocabulary) · PROGRESS naming-fix · per-mode channel completion.
+- **Born work-items:** APR (approval-channels) · COMM-2 (typed mediated-bus vocabulary) · PROGRESS naming-fix · per-mode channel completion · SEQ-ATOMIC (multi-process sequence lock) · EVENT-MIRROR-PARITY (agentic entry paths emit event-mirror) · EVENT-CHANNELS-DOC-SYNC (`event-channels.md` path + ~30-channel snapshot).
 - **Direction:** `.analysis/adr-review-crosswalk.md` (row 035 → ADR-G-018).
 
 
@@ -2177,8 +2186,8 @@ The original 15 V1.0 channels — `BRAIN→WORKER:TASK_ASSIGN`, `WORKER→BRAIN:
 
 # ADR-G-019: ADR Governance & 4-Layer Taxonomy
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=MADR-v3 + `lint:adr` validator + DB-first prompt-injection (structural/advisory) → tomorrow=ADR-G enforcement-engine (immutable runtime-validation via ADR-G-020 + its flag-gated vein, old ADR-094)
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-036 (ADR Governance Integration) · **Supersedes:** —
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=MADR-v3 + `lint:adr` validator (status/required-sections/dup-id; NOT yet class-metadata hard-validate) + DB-first taxonomy columns (write-only — read-path mapping pending) + prompt-injection via legacy-id `adr-selector` (structural/advisory) → tomorrow=ADR-G enforcement-engine (immutable runtime-validation via ADR-G-020 + its flag-gated vein, old ADR-094) + ADR-VALIDATOR-HARDEN + TAXONOMY-READPATH + ADR-SELECTOR-MIGRATE
+**Status:** accepted (provisional — taxonomy decided + write-path live; lint:adr class-validation + DB read-path mapping + adr-selector class-awareness are partial) · **Date:** 2026-06-30 · **Absorbs:** ADR-036 (ADR Governance Integration) · **Supersedes:** —
 **Crosswalk:** ADR-036 → ADR-G-019
 
 > **Meta-note:** This is the governance-of-the-governance ADR. It defines the four ADR classes, their precedence, authoring standard, storage, and enforcement model. Every other ADR (ADR-G-*, ADR-D-*, and runtime-born ADR-UG-*/ADR-UP-*) is created, classified, stored, injected, and enforced according to this document.
@@ -2253,11 +2262,11 @@ Every ADR — **especially ADR-G** — documents **both today and tomorrow, tran
 Context  →  Decision (Today: current-state)  →  Intent/Roadmap (Tomorrow: target-intent + why)  →  Consequences
 ```
 
-Static "this is how it is now" is insufficient; an ADR must also state "this is where we are going, and why," so LLM-agents, contributors, and users all work aligned with the evolution direction. Large/complex ADRs (e.g. ADR-G-020, ADR-G-031, ADR-G-035) additionally use **XML-schema / explicit-heading section separation** for unambiguous structure. Format is MADR-v3 hybrid; the `**Status:**` field and the class-metadata header are mandatory and validated by `lint:adr`.
+Static "this is how it is now" is insufficient; an ADR must also state "this is where we are going, and why," so LLM-agents, contributors, and users all work aligned with the evolution direction. Large/complex ADRs (e.g. ADR-G-020, ADR-G-031, ADR-G-035) additionally use **XML-schema / explicit-heading section separation** for unambiguous structure. Format is MADR-v3 hybrid. **Validation scope (today):** `lint:adr` validates the `**Status:**` field, the required sections (Context / Decision / Consequence), and duplicate ids — it does **NOT** yet hard-validate the class-metadata header (Class / Scope / Immutable / Source / Enforcement) or the today/tomorrow authoring-standard (ADR-VALIDATOR-HARDEN). The class-metadata header is mandatory by convention, enforced at review, not by the validator.
 
 ### 5. Storage, Recall & Injection (DB-first — see ADR-G-035)
 
-ADRs live **DB-first** in `memory.db` (SSOT); `docs/adr/*.md` + `.brain/exports/decisions.md` are generated views. The `entries` schema carries class-aware columns — `adr_class` (G/D/UG/UP), `scope` (global/project), `immutable`, `source`, `enforcement_level` (ADR-G-035). Recall is **class/scope-aware**: a worker in a user project is injected ADR-G (always) + the relevant ADR-UG/UP, and never ADR-D; a deckent-dev worker also gets ADR-D. Injection into brain/worker/auditor prompts is automatic (`adr-selector.ts` + Task-DNA relevance). Editing an ADR means updating **both** the `.md` and the DB so doc == DB (ADR-G-035 sync invariant).
+ADRs live **DB-first** in `memory.db` (SSOT); `docs/adr/*.md` + `.brain/exports/decisions.md` are generated views. The `entries` schema carries class-aware columns — `adr_class` (G/D/UG/UP), `scope` (global/project), `immutable`, `source`, `enforcement_level` (ADR-G-035). **State-of-code (honest):** these columns are currently **WRITE-ONLY** — `insert` populates them, but `rowToEntry` does not map them back and `upsert` does not diff them, so structured **class/scope-aware recall is not yet wired** (TAXONOMY-READPATH). Today the **id-prefix** (`adr-g-NNN` / `adr-d-NNN`) carries the class, and recall is FTS5 + Task-DNA relevance over id/content. Injection into brain/worker/auditor prompts runs through `adr-selector.ts`, which still uses **legacy-flat id presets** (`adr-001`, `adr-087`, …) + numeric-only explicit-extraction (`ADR-012`, not `ADR-G-019`) — stale post-migration (ADR-SELECTOR-MIGRATE). The **class/scope-aware recall described next is the TARGET**, not today's behavior: a worker in a user project gets ADR-G (always) + relevant ADR-UG/UP and never ADR-D; a deckent-dev worker also gets ADR-D. Editing an ADR means updating **both** the `.md` and the DB so doc == DB (ADR-G-035 sync invariant).
 
 ### 6. Roles
 
@@ -2278,7 +2287,7 @@ deckent **observes** user ADRs (UG/UP) and **adheres** to them at every layer (w
 
 **(+)** Authority is now expressible: "user tightens but cannot violate G" is enforceable; contributor-only rules never leak to end users; immutable laws have a single trusted source. The review's 89→~42 consolidation is itself an application of this taxonomy (G vs D split). Today+tomorrow authoring keeps agents aligned with direction, not just current state.
 
-**(−)** Two intentional numbering gaps (G-003→absorbed in G-020, D-003→folded to G-014) — documented, not back-filled. The enforcement-engine (ADR-G inviolability) is roadmap, not today — today's protection is injection + advisory `lint:adr` + the ADR-094 dogfood vein (now within ADR-G-020). ADR-U management is a forward surface (MASTER-PLAN), so today only G/D are populated.
+**(−)** The taxonomy is decided and the write-path is live, but the **tooling is partial**: `lint:adr` does not hard-validate the class-metadata header (ADR-VALIDATOR-HARDEN); the DB class-columns are write-only so class-aware recall is not yet wired (TAXONOMY-READPATH); `adr-selector.ts` still uses legacy-flat ids (ADR-SELECTOR-MIGRATE). Two intentional numbering gaps (G-003→absorbed in G-020, D-003→folded to G-014) — documented, not back-filled. The enforcement-engine (ADR-G inviolability) is roadmap — today's protection is injection + advisory `lint:adr` + the ADR-094 dogfood vein (now within ADR-G-020). ADR-U management is a forward surface, so today only G/D are populated.
 
 ---
 
@@ -2288,7 +2297,7 @@ deckent **observes** user ADRs (UG/UP) and **adheres** to them at every layer (w
 - **Enforcement partner:** ADR-G-020 (Authority, Roles, Flow & Enforcement) + ADR-094 vein (now within G-020).
 - **Storage substrate:** ADR-G-035 (Memory Architecture — class-aware schema columns, FTS5, sync invariant).
 - **Governs:** every ADR-G-*, ADR-D-*, and runtime ADR-UG-*/ADR-UP-*.
-- **Born work-items:** ADR-AUTHORING-STD (this doc §4), ADR-LAYER (install-wiring), POLICY-ENGINE-EVAL.
+- **Born work-items:** ADR-AUTHORING-STD (this doc §4), ADR-LAYER (install-wiring), POLICY-ENGINE-EVAL, **ADR-VALIDATOR-HARDEN** (lint:adr → hard-validate class-metadata + today/tomorrow standard), **TAXONOMY-READPATH** (map `adr_class`/`scope`/`immutable`/… in `rowToEntry` + `upsert` → real class-aware recall), **ADR-SELECTOR-MIGRATE** (`adr-selector.ts` legacy-flat ids → class-aware `adr-g/d-NNN` scheme).
 - **Direction:** `.analysis/adr-governance-redesign-plan.md`, `.analysis/hermes-vs-deckent-direction-decisions.md`, memory `feedback_adr_documents_today_and_tomorrow` · `feedback_governance_aligns_with_direction_pivot`.
 
 
@@ -2301,7 +2310,7 @@ deckent **observes** user ADRs (UG/UP) and **adheres** to them at every layer (w
 # ADR-G-020: Authority, Roles, Flow & Enforcement (Multi-Mode RBAC)
 
 **Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=3-layer (compile-lint + runtime-advisory + post-hoc audit-trail) → tomorrow=Layer-2 HARD-flip (ADR-094 vein → default-on, post-GA-V2) + ROLE-GUARD + policy-engine
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-037 (RBAC V1.0) + ADR-G-003 (Brain Role Separation, born 2026-06-30) + ADR-094 (Flag-Gated Enforcement Vein)
+**Status:** accepted (authority constitution + hardening roadmap; enforcement is mixed advisory/hard by surface, two surfaces not yet single-SSOT) · **Date:** 2026-06-30 · **Absorbs:** ADR-037 (RBAC V1.0) + ADR-G-003 (Brain Role Separation, born 2026-06-30) + ADR-094 (Flag-Gated Enforcement Vein)
 **Crosswalk:** ADR-037 (+born G-003 + 094) → ADR-G-020
 
 > **Foundational note (Alperen, 2026-06-30):** "Bu ADR bizim kod işleyişimiz — çok dikkatli ve doğru tasarlanmalı; hem deckent-dogfood hem user tarafı için kusursuz olmalı. Bu ADR bir sürü iyi ve kötü tecrübenin nihai ürünüdür." This document is the distillation of 200+ sprints of orchestration experience; it is global (ADR-G) but its file-path matrix spans BOTH global and project scope, and its authority model is **user-customizable** within the inviolable G-baseline.
@@ -2325,7 +2334,7 @@ ADR-G-020 consolidates all three: the role/authority matrix, the Brain orchestra
 ### 1. Roles & Separation of Duties
 
 ```xml
-<roles separation-of-duties="enforced">
+<roles separation-of-duties="specified (surface-dependent enforcement)">
   <role id="Architect" actor="human" power="strategic">
     Vision, DIRECTIVES/charter authoring, approval of critical-irreversible actions.
     No tactical mid-run intervention.
@@ -2350,7 +2359,9 @@ ADR-G-020 consolidates all three: the role/authority matrix, the Brain orchestra
 </roles>
 ```
 
-**Assessment rule:** both the worker's **self-assessment** AND the Brain's **brain-assessment** are written for every task (separation of assessment from verification; the two perspectives are recorded distinctly, not collapsed).
+**Enforcement is surface-dependent (not uniformly hard):** `authority-enforcer.ts` is **soft/advisory** (`EnforcementMode='soft'` default — warn + emit, caller proceeds); the agentic `scope-guard.ts` **hard-rejects** out-of-scope write/edit; the worker `enforceRbac` flag → **hard-deny**. So separation-of-duties is *specified + selectively enforced*, not uniformly blocked (Layer-2 HARD-flip = §Roadmap).
+
+**Assessment rule (design intent):** both the worker's **self-assessment** AND the Brain's assessment are recorded per task, distinctly. Today the field naming/path varies — `evaluationDecision` is the canonical Brain-side field on `TaskResult`, `brainAssessment` is set on the autonomous-backlog path, and `selfAssessment` is the fallback for crash-recovered / manual results — so "two distinct assessments every task" is the target, not yet a uniform invariant (ASSESS-CONTRACT standardizes it).
 
 ### 2. Authority Matrix (file / channel / lifecycle)
 
@@ -2363,10 +2374,15 @@ ADR-G-020 consolidates all three: the role/authority matrix, the Brain orchestra
     Auditor: read-all, write NONE (except its own .dashboard/audit sinks).
   </file-access>
   <event-stream-rights>
-    Channel-level send/receive rights over the ADR-G-018 event-stream
-    (28+ channels). No worker→worker direct messaging — all mediated through the
-    Brain bus (transport-invariant; typed vocabulary = COMM-2). Event-stream
-    per-mode channel gaps are reconciled with ADR-G-018.
+    Channel-level send/receive rights over the ADR-G-018 event-stream. Today the
+    authority-enforcer channel allow/deny matrix covers the CORE ~15 channels, NOT the
+    full ~30 of ADR-G-018 (NERVOUS_* + the 13 added channels are not yet in the rights
+    matrix) — channel-rights lag the channel set (CHANNEL-RIGHTS-SYNC, via COMM-2).
+    No worker→worker DIRECT messaging — all mediated through the Brain bus
+    (transport-invariant; typed vocabulary = COMM-2), with ONE controlled exception: a
+    read-mostly shared-memory dir (.tasks/shared/) for lightweight inter-worker
+    coordination — a sanctioned exception, not direct messaging. Per-mode channel gaps
+    are reconciled with ADR-G-018.
   </event-stream-rights>
   <lifecycle-actions>
     Per-role permission for plan/spawn/evaluate/fix/finalize/kill/cleanup actions,
@@ -2390,7 +2406,10 @@ The matrix is **ADR-G (inviolable baseline)** but **user-customizable**: a user 
   <layer n="1" kind="compile-time">lint / authority-static-check (active)</layer>
   <layer n="2" kind="runtime" v1="advisory/soft">
     V1.0 reality: violation logged + emitted, NOT blocked (checkWorkerAuthority
-    returns true). The flag-gated vein (below) is the proven upgrade path.
+    returns true). The flag-gated vein (below) is the proven upgrade path. NOTE: runtime
+    authority lives in TWO surfaces today — authority-enforcer.ts (file/path + channel
+    matrix) and nervous/authority-matrix.ts (capability/RBAC, advisory-default /
+    hard-under-enforce_rbac) — not yet a single SSOT (AUTHORITY-SSOT).
   </layer>
   <layer n="3" kind="post-hoc">audit-trail + git diff --stat boundary scan (active)</layer>
   <flag-gated-vein source="ADR-094" default="off-for-users">
@@ -2425,7 +2444,7 @@ Given size/criticality, this ADR uses **XML-schema section separation** (above) 
 
 **(+)** One inviolable, machine-parseable authority law spanning all modes + global/project scope, with a *proven* (dogfooded) enforcement upgrade path instead of advisory-forever. Brain-never-codes is first-class + tool-enforceable. User-customizable without weakening the core (G>U>D). Connector-surface RBAC (ADR-G-031) and self-modify guard (ADR-G-021) compose on top.
 
-**(−)** Layer-2 hard-enforcement is roadmap (today advisory/soft) — real protection today is compile-time lint + Auditor `git diff --stat` + the dogfood vein, not a runtime block for users. ROLE-GUARD pid/process enforcement is a born work-item. The 4 enforcement gates add config surface (future consolidation into one `enforcement_mode: strict|advisory` toggle is a candidate, post-GA-V2). `A9` ADR-compliance is permanently fail-open by design (prevents retroactive failures).
+**(−)** Layer-2 hard-enforcement is roadmap (today advisory/soft, **surface-dependent** — authority-enforcer soft, agentic scope-guard hard, worker `enforceRbac`-flag hard) — real protection today is compile-time lint + Auditor `git diff --stat` + the dogfood vein, not a uniform runtime block for users. Authority lives in **two surfaces** (authority-enforcer + nervous/authority-matrix) not yet unified (AUTHORITY-SSOT); the channel-rights matrix covers ~15 of ADR-G-018's ~30 channels (CHANNEL-RIGHTS-SYNC); the self/brain assessment contract varies by path (ASSESS-CONTRACT); the "no worker→worker" rule has a controlled `.tasks/shared/` exception. ROLE-GUARD pid/process enforcement is a born work-item. The 4 enforcement gates add config surface (future consolidation into one `enforcement_mode: strict|advisory` toggle, post-GA-V2). `A9` ADR-compliance is permanently fail-open by design (prevents retroactive failures).
 
 ---
 
@@ -2433,7 +2452,7 @@ Given size/criticality, this ADR uses **XML-schema section separation** (above) 
 
 - **Absorbs:** ADR-037 (Authority Matrix RBAC V1.0) · ADR-G-003 (Brain Role Separation — born, now Rule in §1) · ADR-094 (Flag-Gated Enforcement Vein — now §5 vein).
 - **Cross-ref:** ADR-G-018 (Verification Protocol & Event-Stream — channels this matrix governs) · ADR-G-019 (ADR Governance — the enforcement-engine partner) · ADR-G-021 (Self-Modifying Detection) · ADR-G-024 (Mode Architecture — the modes in §3) · ADR-G-031 (Enterprise — connector-surface RBAC builds on this) · ADR-G-014 (Spawn/worktree — scope enforcement).
-- **Born work-items:** ROLE-GUARD (pid/role tool-enforce) · POLICY-ENGINE-EVAL · ENFORCE-GENERALIZE · AUTH-MULTIMODE · AUTH-USER-CUSTOM · COMM-2.
+- **Born work-items:** ROLE-GUARD (pid/role tool-enforce) · POLICY-ENGINE-EVAL · ENFORCE-GENERALIZE · AUTH-MULTIMODE · AUTH-USER-CUSTOM · COMM-2 · **AUTHORITY-SSOT** (unify authority-enforcer + nervous/authority-matrix into one surface) · **CHANNEL-RIGHTS-SYNC** (authority channel-matrix → ADR-G-018 ~30 set) · **ASSESS-CONTRACT** (standardize selfAssessment / brainAssessment / evaluationDecision).
 - **Memory:** `feedback_trust_brain_eval_not_worker` · `project_deckent_self_git_mutation_bug` · `project_social_identity_rbac_engine`.
 
 

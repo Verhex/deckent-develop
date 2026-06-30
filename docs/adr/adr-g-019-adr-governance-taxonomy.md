@@ -1,7 +1,7 @@
 # ADR-G-019: ADR Governance & 4-Layer Taxonomy
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=MADR-v3 + `lint:adr` validator + DB-first prompt-injection (structural/advisory) → tomorrow=ADR-G enforcement-engine (immutable runtime-validation via ADR-G-020 + its flag-gated vein, old ADR-094)
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-036 (ADR Governance Integration) · **Supersedes:** —
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=MADR-v3 + `lint:adr` validator (status/required-sections/dup-id; NOT yet class-metadata hard-validate) + DB-first taxonomy columns (write-only — read-path mapping pending) + prompt-injection via legacy-id `adr-selector` (structural/advisory) → tomorrow=ADR-G enforcement-engine (immutable runtime-validation via ADR-G-020 + its flag-gated vein, old ADR-094) + ADR-VALIDATOR-HARDEN + TAXONOMY-READPATH + ADR-SELECTOR-MIGRATE
+**Status:** accepted (provisional — taxonomy decided + write-path live; lint:adr class-validation + DB read-path mapping + adr-selector class-awareness are partial) · **Date:** 2026-06-30 · **Absorbs:** ADR-036 (ADR Governance Integration) · **Supersedes:** —
 **Crosswalk:** ADR-036 → ADR-G-019
 
 > **Meta-note:** This is the governance-of-the-governance ADR. It defines the four ADR classes, their precedence, authoring standard, storage, and enforcement model. Every other ADR (ADR-G-*, ADR-D-*, and runtime-born ADR-UG-*/ADR-UP-*) is created, classified, stored, injected, and enforced according to this document.
@@ -76,11 +76,11 @@ Every ADR — **especially ADR-G** — documents **both today and tomorrow, tran
 Context  →  Decision (Today: current-state)  →  Intent/Roadmap (Tomorrow: target-intent + why)  →  Consequences
 ```
 
-Static "this is how it is now" is insufficient; an ADR must also state "this is where we are going, and why," so LLM-agents, contributors, and users all work aligned with the evolution direction. Large/complex ADRs (e.g. ADR-G-020, ADR-G-031, ADR-G-035) additionally use **XML-schema / explicit-heading section separation** for unambiguous structure. Format is MADR-v3 hybrid; the `**Status:**` field and the class-metadata header are mandatory and validated by `lint:adr`.
+Static "this is how it is now" is insufficient; an ADR must also state "this is where we are going, and why," so LLM-agents, contributors, and users all work aligned with the evolution direction. Large/complex ADRs (e.g. ADR-G-020, ADR-G-031, ADR-G-035) additionally use **XML-schema / explicit-heading section separation** for unambiguous structure. Format is MADR-v3 hybrid. **Validation scope (today):** `lint:adr` validates the `**Status:**` field, the required sections (Context / Decision / Consequence), and duplicate ids — it does **NOT** yet hard-validate the class-metadata header (Class / Scope / Immutable / Source / Enforcement) or the today/tomorrow authoring-standard (ADR-VALIDATOR-HARDEN). The class-metadata header is mandatory by convention, enforced at review, not by the validator.
 
 ### 5. Storage, Recall & Injection (DB-first — see ADR-G-035)
 
-ADRs live **DB-first** in `memory.db` (SSOT); `docs/adr/*.md` + `.brain/exports/decisions.md` are generated views. The `entries` schema carries class-aware columns — `adr_class` (G/D/UG/UP), `scope` (global/project), `immutable`, `source`, `enforcement_level` (ADR-G-035). Recall is **class/scope-aware**: a worker in a user project is injected ADR-G (always) + the relevant ADR-UG/UP, and never ADR-D; a deckent-dev worker also gets ADR-D. Injection into brain/worker/auditor prompts is automatic (`adr-selector.ts` + Task-DNA relevance). Editing an ADR means updating **both** the `.md` and the DB so doc == DB (ADR-G-035 sync invariant).
+ADRs live **DB-first** in `memory.db` (SSOT); `docs/adr/*.md` + `.brain/exports/decisions.md` are generated views. The `entries` schema carries class-aware columns — `adr_class` (G/D/UG/UP), `scope` (global/project), `immutable`, `source`, `enforcement_level` (ADR-G-035). **State-of-code (honest):** these columns are currently **WRITE-ONLY** — `insert` populates them, but `rowToEntry` does not map them back and `upsert` does not diff them, so structured **class/scope-aware recall is not yet wired** (TAXONOMY-READPATH). Today the **id-prefix** (`adr-g-NNN` / `adr-d-NNN`) carries the class, and recall is FTS5 + Task-DNA relevance over id/content. Injection into brain/worker/auditor prompts runs through `adr-selector.ts`, which still uses **legacy-flat id presets** (`adr-001`, `adr-087`, …) + numeric-only explicit-extraction (`ADR-012`, not `ADR-G-019`) — stale post-migration (ADR-SELECTOR-MIGRATE). The **class/scope-aware recall described next is the TARGET**, not today's behavior: a worker in a user project gets ADR-G (always) + relevant ADR-UG/UP and never ADR-D; a deckent-dev worker also gets ADR-D. Editing an ADR means updating **both** the `.md` and the DB so doc == DB (ADR-G-035 sync invariant).
 
 ### 6. Roles
 
@@ -101,7 +101,7 @@ deckent **observes** user ADRs (UG/UP) and **adheres** to them at every layer (w
 
 **(+)** Authority is now expressible: "user tightens but cannot violate G" is enforceable; contributor-only rules never leak to end users; immutable laws have a single trusted source. The review's 89→~42 consolidation is itself an application of this taxonomy (G vs D split). Today+tomorrow authoring keeps agents aligned with direction, not just current state.
 
-**(−)** Two intentional numbering gaps (G-003→absorbed in G-020, D-003→folded to G-014) — documented, not back-filled. The enforcement-engine (ADR-G inviolability) is roadmap, not today — today's protection is injection + advisory `lint:adr` + the ADR-094 dogfood vein (now within ADR-G-020). ADR-U management is a forward surface (MASTER-PLAN), so today only G/D are populated.
+**(−)** The taxonomy is decided and the write-path is live, but the **tooling is partial**: `lint:adr` does not hard-validate the class-metadata header (ADR-VALIDATOR-HARDEN); the DB class-columns are write-only so class-aware recall is not yet wired (TAXONOMY-READPATH); `adr-selector.ts` still uses legacy-flat ids (ADR-SELECTOR-MIGRATE). Two intentional numbering gaps (G-003→absorbed in G-020, D-003→folded to G-014) — documented, not back-filled. The enforcement-engine (ADR-G inviolability) is roadmap — today's protection is injection + advisory `lint:adr` + the ADR-094 dogfood vein (now within ADR-G-020). ADR-U management is a forward surface, so today only G/D are populated.
 
 ---
 
@@ -111,5 +111,5 @@ deckent **observes** user ADRs (UG/UP) and **adheres** to them at every layer (w
 - **Enforcement partner:** ADR-G-020 (Authority, Roles, Flow & Enforcement) + ADR-094 vein (now within G-020).
 - **Storage substrate:** ADR-G-035 (Memory Architecture — class-aware schema columns, FTS5, sync invariant).
 - **Governs:** every ADR-G-*, ADR-D-*, and runtime ADR-UG-*/ADR-UP-*.
-- **Born work-items:** ADR-AUTHORING-STD (this doc §4), ADR-LAYER (install-wiring), POLICY-ENGINE-EVAL.
+- **Born work-items:** ADR-AUTHORING-STD (this doc §4), ADR-LAYER (install-wiring), POLICY-ENGINE-EVAL, **ADR-VALIDATOR-HARDEN** (lint:adr → hard-validate class-metadata + today/tomorrow standard), **TAXONOMY-READPATH** (map `adr_class`/`scope`/`immutable`/… in `rowToEntry` + `upsert` → real class-aware recall), **ADR-SELECTOR-MIGRATE** (`adr-selector.ts` legacy-flat ids → class-aware `adr-g/d-NNN` scheme).
 - **Direction:** `.analysis/adr-governance-redesign-plan.md`, `.analysis/hermes-vs-deckent-direction-decisions.md`, memory `feedback_adr_documents_today_and_tomorrow` · `feedback_governance_aligns_with_direction_pivot`.

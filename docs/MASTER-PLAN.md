@@ -325,6 +325,17 @@
 | PRODUCT-IDENTITY-GUARD | GOV | CI/docs-lint product-identity guard: required-cloud / default-network / paywall / native-only-platform claim yakala (şu an discipline-only) | ADR-rev | P2 | — | ⬜ | — | ADR-G-016 |
 | NEVER-PHONE-HOME-POLICY | GOV | marketplace/model-catalog network carve-out açık-policy + --offline escape + test (core ZERO-network; model-catalog default-fetch→opt-out) | ADR-rev | P2 | — | ⬜ | — | ADR-G-016; model-catalog:313 |
 | README-VISION-ALIGN | DOCS | README/roadmap: "no subscription"→"no Deckent subscription" + WSL2-not-native-Windows + license-taxonomy (features-MIT vs governance-licensed) hizala | ADR-rev | P2 | — | ⬜ | — | ADR-G-016; README:333 |
+| CRED-PER-PROJECT | GOV·SEC | 🔴 per-project .deckent/credentials.enc + projectRoot/HKDF key-derivation + sibling-cross-read-fail (Sprint-134 planlandı, YAPILMADI; bugün global vault) | ADR-rev | P1 | — | ⬜ | — | ADR-G-017; design-doc §4.2 |
+| SYMLINK-AUTHORITY-WIRE | GOV·SEC | 🔴 isWithinScope (realpathSync) → checkWorkerAuthority/checkAuthority'ye wire (runtime symlink-bypass kapat; şu an path-normalize-only = ADR-reddedilen) | ADR-rev | P1 | TOOL-SCOPE | ⬜ | — | ADR-G-017; authority-enforcer:339 |
+| ROOT-DISCIPLINE | GOV | MCP/REPL/daemon'da explicit ctx.projectRoot/--root standardı (process.cwd() fallback kalır ama canonical değil); multi-project same-host | ADR-rev | P2 | — | ⬜ | — | ADR-G-017; process.ts:20 |
+| SEQ-ATOMIC | GOV | event-stream nextSequence multi-process atomicity (read-modify-write lock); şu an single-process-monotonic | ADR-rev | P2 | — | ⬜ | — | ADR-G-018; event-stream:240 |
+| EVENT-MIRROR-PARITY | GOV | agentic entry-path (agentic-worker-entry/http-agentic-worker) event-mirror yazsın (.result/.hb direkt→stream parity) | ADR-rev | P2 | — | ⬜ | — | ADR-G-018; agentic-worker-entry:121 |
+| EVENT-CHANNELS-DOC-SYNC | DOCS | event-channels.md path (recently-works/<id>-events.jsonl) + ~30-channel snapshot ADR ile sync (stale: eski path+kanal) | ADR-rev | P2 | — | ⬜ | — | ADR-G-018; event-channels.md:3 |
+| ADR-VALIDATOR-HARDEN | GOV | lint:adr → class-metadata header (Class/Scope/Immutable/Source/Enforcement) + today/tomorrow standardını hard-validate; şu an status+section+dup-id | ADR-rev | P2 | — | ⬜ | — | ADR-G-019; adr-validator:9 |
+| ADR-SELECTOR-MIGRATE | GOV | adr-selector.ts legacy-flat id-preset (adr-001/087) + numeric-only extraction → class-aware adr-g/d-NNN scheme (post-migration stale) | ADR-rev | P1 | — | ⬜ | — | ADR-G-019; adr-selector:59 |
+| AUTHORITY-SSOT | GOV·SEC | 2 authority-surface birleştir: authority-enforcer (path/channel) + nervous/authority-matrix (capability/RBAC) → tek-SSOT | ADR-rev | P1 | — | ⬜ | — | ADR-G-020; iki yüzey |
+| CHANNEL-RIGHTS-SYNC | GOV | authority-enforcer channel-rights matrix (~15) → ADR-G-018 ~30 set (NERVOUS_* + 13-added eksik); COMM-2 altı | ADR-rev | P2 | COMM-2 | ⬜ | — | ADR-G-020/018 |
+| ASSESS-CONTRACT | GOV | selfAssessment/brainAssessment/evaluationDecision kontratını standardize (her-task 2-distinct-assessment invariant) | ADR-rev | P2 | — | ⬜ | — | ADR-G-020; finalize:129 |
 
 ---
 

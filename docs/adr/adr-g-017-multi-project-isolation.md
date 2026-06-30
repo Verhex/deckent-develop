@@ -1,10 +1,10 @@
 # ADR-G-017: Multi-Project Isolation
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=4-layer isolation (per-project directory + AES-256-GCM per-project credential-encryption + symlink-aware `realpath` scope + global/project config boundary); runtime scope enforcement **advisory/soft** (ADR-G-020 V1) → tomorrow=hard-enforce scope (ADR-G-020 Layer-2 V2 + TOOL-SCOPE) + enterprise multi-tenancy as a modular layer (ADR-G-031)
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-034 (Multi-Project Isolation — Per-Project Security Boundaries) · **Supersedes:** —
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=4-layer isolation model — per-project directory (real) + AES-256-GCM credential encryption (shipped but a **single GLOBAL vault**, per-project keying NOT built) + symlink-aware `realpath` scope (helper+tests only, **NOT wired into runtime authority**) + global/project config boundary (real); runtime scope enforcement **advisory/soft** (ADR-G-020 V1) → tomorrow=hard-enforce scope (ADR-G-020 Layer-2 V2 + TOOL-SCOPE) + enterprise multi-tenancy as a modular layer (ADR-G-031)
+**Status:** accepted (provisional — Layer-2 per-project credential-keying + Layer-3 symlink-authority-wire are NOT shipped; global vault + helper-only today) · **Date:** 2026-06-30 · **Absorbs:** ADR-034 (Multi-Project Isolation — Per-Project Security Boundaries) · **Supersedes:** —
 **Crosswalk:** ADR-034 → ADR-G-017
 
-> **Note:** The symlink-aware scope check (`isWithinScope()`) **is** implemented (`fs.realpathSync()` → boolean), but per ADR-G-020 V1 runtime scope enforcement is **advisory/soft** — a violation is warned + event-emitted, not hard-blocked. "Vulnerability closed / `ScopeViolationError` thrown / blocks" therefore describes the **design intent**, not today's runtime guarantee; the hard-flip is post-GA V2.
+> **Note (code-grounded, 2 corrections):** (1) The symlink-aware `isWithinScope()` helper **is** implemented (`fs.realpathSync()` → boolean) **and test-covered, but is NOT wired into the live authority path** — runtime `checkWorkerAuthority()` → `checkAuthority()` uses **path-normalization only** (`normalizePath` + prefix-match, no `realpathSync`), i.e. exactly the "path-normalization-only" approach this ADR's rejected-alternatives calls insufficient. So the symlink-bypass threat is closed at the helper/test level, not in enforcement (SYMLINK-AUTHORITY-WIRE). (2) Even when wired, ADR-G-020 V1 runtime scope enforcement is **advisory/soft** (warn + event, not hard-block); the hard-flip is post-GA V2. "Vulnerability closed / blocks" = design intent, not today's runtime guarantee.
 
 ---
 
@@ -21,7 +21,7 @@ A Sprint-132 security audit surfaced the concrete threats this ADR closes:
 3. **Global-state pollution** — one project's `.deckent/config.json` edit silently changes another project's behavior.
 4. **Symlink-cycle DoS** — recursive symlinks spin the scope resolver forever.
 
-Sprint-133 had already shipped AES-256-GCM per-project credential encryption, strengthening the foundation; what remained un-formalized was the scope-bypass defense and the global/project config-sharing rules.
+Sprint-133 shipped AES-256-GCM credential encryption — **but as a single GLOBAL vault** (`~/.deckent/credentials/` + `~/.deckent/.keyring`), **not** the per-project, projectRoot-keyed model this ADR's Layer-2 originally described (that per-project keying was planned in Sprint 134 and **never built** — design-doc §4.2). What also remained un-formalized was the scope-bypass defense and the global/project config-sharing rules.
 
 ---
 
@@ -37,19 +37,28 @@ Multi-project isolation is **four layers**:
     files, heartbeat, result, lock), .locks/ (file locks). No cross-reference:
     a project's .brain holds only that project's history.
   </layer>
-  <layer n="2" name="Per-Project Credential Encryption" status="shipped (Sprint 133)">
-    .deckent/credentials.enc encrypted with AES-256-GCM
-    (src/core/credential-encryption.ts: ALGORITHM='aes-256-gcm', createCipheriv;
-    src/core/credentials.ts). The key derives from the per-project projectRoot path
-    hash, so a sibling project's credentials.enc is keyed differently — cross-read
-    fails. Distinct from the .deck/Ed25519 secret system of ADR-G-005 (complementary).
+  <layer n="2" name="Credential Encryption" status="PARTIAL — global vault shipped; per-project NOT built">
+    AES-256-GCM credential encryption IS shipped (src/core/credential-encryption.ts:
+    ALGORITHM='aes-256-gcm', createCipheriv) — but as a SINGLE GLOBAL VAULT:
+    ~/.deckent/credentials/<provider>.json, encrypted with one master key in
+    ~/.deckent/.keyring (or DECKENT_MASTER_KEY), shared across ALL projects. The
+    per-project .deckent/credentials.enc + projectRoot/HKDF key-derivation +
+    sibling-cross-read-fail was PLANNED (Sprint 134) but NEVER IMPLEMENTED (design-doc
+    §4.2 explicitly: "NOT YET IMPLEMENTED ... cross-project credential decryption
+    protection does not currently apply"). So sibling-project credential isolation does
+    NOT currently hold — it is a global vault (CRED-PER-PROJECT). Distinct from the
+    .deck/Ed25519 secret system of ADR-G-005 (complementary).
   </layer>
-  <layer n="3" name="Symlink-Aware Scope Enforcement" status="implemented; advisory at runtime">
+  <layer n="3" name="Symlink-Aware Scope Enforcement" status="HELPER ONLY — not wired into runtime authority">
     isWithinScope() (src/agents/worker.ts) resolves the target with fs.realpathSync()
-    before matching, so a symlink pointing outside scope resolves to its real path and
-    fails the match; a recursive symlink (ELOOP) also fails. NOTE: the function returns
-    a boolean and the violation is WARNED + event-emitted (ADR-G-020 V1 advisory) — it
-    does not itself throw or hard-block. Throw/block = design intent (V2).
+    before matching (symlink outside scope → real path → fails; recursive ELOOP → fails),
+    and is test-covered. BUT it is NOT called by the live authority path: runtime
+    checkWorkerAuthority() → checkAuthority() (authority-enforcer.ts) does
+    path-normalization-ONLY (normalizePath + prefix-match, no realpathSync) — the very
+    approach §rejected-alternatives calls insufficient against symlink bypass. So the
+    symlink defense exists as a helper+tests, NOT in enforcement (SYMLINK-AUTHORITY-WIRE).
+    Even once wired, the violation is advisory (warn + event, ADR-G-020 V1) — throw/block
+    is design intent (V2).
   </layer>
   <layer n="4" name="Global vs Project Config Boundary" status="documented">
     ~/.deckent/config.json (global) vs .deckent/config.json (project), explicit
@@ -95,7 +104,7 @@ Sandboxed worker process (chroot/namespace) — over-complex, cross-platform-inc
 
 **(+)** The Sprint-132 symlink scope-bypass finding is addressed by design (`realpathSync` resolution + ELOOP handling); per-project isolation rules are now formal and testable; the global/project config boundary is documented, so a new field's scope is explicit; credential isolation (AES-256-GCM, per-project-keyed) is formalized; and "multi-project ≠ multi-tenant" is settled, preventing wrong-direction PRs.
 
-**(−)** `isWithinScope()` now performs a `realpathSync()` disk I/O per check (cost), and must handle a deleted symlink target gracefully; ELOOP detection leans on an OS error code (behavior may differ across platforms). The runtime guarantee is **advisory today** — the boolean is computed and emitted but does not hard-block until V2 (ADR-G-020). The config-boundary table must be updated whenever a new field is added, or its sharing rule is ambiguous.
+**(−)** **Two of the four layers are not yet enforced as described:** Layer-2 credential encryption is a single GLOBAL vault, not per-project-keyed — sibling credential isolation does NOT hold (CRED-PER-PROJECT); Layer-3's symlink-safe `isWithinScope()` is a helper+tests but the live `checkAuthority()` is path-normalization-only — symlink-bypass is not closed in enforcement (SYMLINK-AUTHORITY-WIRE). When wired, `isWithinScope()` adds a `realpathSync()` disk I/O per check and must handle deleted symlink targets + cross-platform ELOOP; and the runtime guarantee stays **advisory** until V2 (ADR-G-020). Project-root resolution is `process.cwd()`-based (ROOT-DISCIPLINE: needs explicit `ctx.projectRoot`/`--root` for shared MCP/daemon hosts). The config-boundary table must be updated whenever a new field is added.
 
 ---
 
@@ -108,5 +117,5 @@ Sandboxed worker process (chroot/namespace) — over-complex, cross-platform-inc
 - **Enforcement authority:** **ADR-G-020** (Authority, Roles, Flow & Enforcement) — advisory→hard scope flip (V1→V2, ADR-G-020 vein).
 - **Enterprise layer:** **ADR-G-031** (Enterprise Foundation) — multi-tenancy as a modular layer atop this model.
 - **Consent / telemetry:** **ADR-G-030** (Consent-Based Provisioning & Install) — FB-1 opt-in telemetry consent gate.
-- **Born work-items:** TOOL-SCOPE (scope analyze/approve/edit tool + hard-enforce), ENTERPRISE-MULTI-TENANCY (ADR-G-031 ENT-* modular layer), FB-1 (consent-gated opt-in telemetry sender).
+- **Born work-items:** **CRED-PER-PROJECT** (per-project `.deckent/credentials.enc` + projectRoot/HKDF key-derivation + sibling-cross-read-fail — the planned-not-built Layer-2; P1) · **SYMLINK-AUTHORITY-WIRE** (wire `isWithinScope` realpathSync into `checkWorkerAuthority`/`checkAuthority` — close symlink-bypass in enforcement; P1) · **ROOT-DISCIPLINE** (explicit `ctx.projectRoot`/`--root` for MCP/REPL/daemon; cwd-fallback non-canonical) · TOOL-SCOPE (scope analyze/approve/edit tool + hard-enforce) · ENTERPRISE-MULTI-TENANCY (ADR-G-031 ENT-* modular layer) · FB-1 (consent-gated opt-in telemetry sender).
 - **Direction:** `docs/design/multi-project-isolation.md`, memory `project_air_gapped_offline_pillar`, `feedback_zero_hardcode_live_data`; `.analysis/hermes-vs-deckent-direction-decisions.md` (global-install + project-scope = P0).
