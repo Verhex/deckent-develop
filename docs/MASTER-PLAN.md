@@ -198,7 +198,7 @@
 | SCALE-2 | ENT | Distributed agent mesh (cross-node schedule + shared mem/lock) | MP | P2 | — | ⬜ | — | — |
 | SEC-1 | ENT | Sub-#2 self-security (prompt/command guard + planner state-hygiene) | MP | P1 | — | ⬜ | — | — |
 | WM-5 | GOV | Provider-free hard-enforcement (CLAUDE_AUTH guard + flag-leak) | MP | P1 | — | 🟡 | — | high-risk parça |
-| LAYER-1 | GOV | core→cli/orchestra inversiyon temizliği (CORE-W1+ORCH-W1+API-W1+ADR-D-004-W) | MP | P1 | — | ⬜ | — | logic core'a, yüzey thin |
+| LAYER-1 | GOV | Layer-1 import-direction cleanup (census: core→orchestra=1·core→cli=1·orch→cli=5·api→cli=6; ADR-008-W+CORE-W1+ORCH-W1+API-W1) | MP | P1 | — | ⬜ | — | ADR-D-004; logic core'a, yüzey thin; routing-engine:32 |
 | DORMANT-1 | GOV | Kablosuz güvenlik wire (cascade-detector+spawn-safety+sandbox.ts) | MP·CL | P1 | — | ⬜ | — | 🔴 |
 | DORMANT-2 | GOV | No-op config-knob temizliği wire-or-remove (CORE-W4+ADR-G-012-W) | MP·CL | P1 | — | ⬜ | — | ayar-dürüstlüğü; CONFIG-CUSTOMIZE honesty |
 | DORMANT-3 | GOV | Duplikat/dormant disposition (RateLimiter×3/12-orchestra-mod/cli-helpers) | MP | P1 | — | ⬜ | — | — |
@@ -283,6 +283,9 @@
 | TEST-LOCALFULL | GOV·DOCS | `test:local-full` canonical bounded-script (≤16GB WSL, fork-bounded, split root/dashboard) | ADR-rev | P1 | — | ⬜ | — | ADR-D-002-W6; feedback_vitest_16gb |
 | TEST-INTTAX | GOV | Integration-test profile taksonomisi (unit/hermetic-CI/integration/provider-smoke) | ADR-rev | P2 | — | ⬜ | — | ADR-D-002-W7 |
 | TAXONOMY-READPATH | GOV | ADR taksonomi-kolonları (adr_class/immutable/scope/source_authority/enforcement_level) memory-store read-mapping'e bağla (şu an WRITE-ONLY; getById expose etmiyor) + class/scope-aware-recall'ı kolon-tabanlı doğrula | ADR-rev | P1 | — | ⬜ | — | ADR-G-019; migration kolon-yazdı, read-path eksik |
+| MESSAGES-CORE | GOV·I18N | i18n kök-neden: `getMessage` cli/helpers/messages.ts'te → core+orchestra 3 yukarı-import (directive-interrogator+mission-deliver+flow-reporter) → messages.ts'i core/'a taşı (CORE-W1 + 2 ORCH-W1-edge tek-fix) | ADR-rev | P1 | — | ⬜ | — | ADR-D-004-W9; LOCALE-W/ADR-G-004 bağ |
+| D004-ENFORCE | GOV | Layer-1 enforcement-maturity: exception-registry data-file (W5) + hard graph-gate full-edge-scan + Brain-family allowlist (W6, ADR-G-020 hard-flip) | ADR-rev | P1 | — | ⬜ | — | ADR-D-004-W5/W6; ADR-094 vein |
+| D004-CAPRELOC | GOV·ARCH | Capability-relocation: tmux/spawn-backend orchestra→core/runtime (provider-adapter downward; D004-E1 exception dissolves) | ADR-rev | P2 | — | ⬜ | — | ADR-D-004-W8; S279 event-stream-move precedent |
 
 ---
 

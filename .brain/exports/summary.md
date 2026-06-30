@@ -5,7 +5,7 @@
 |-----|-------|--------|
 | adr-d-001 | Build Baseline (TypeScript · ESM · Node 24+ · nodenext) | accepted |
 | adr-d-002 | Test Infrastructure & Hermeticity | accepted |
-| adr-d-004 | Brain Central Import — One-Way Dependency | accepted |
+| adr-d-004 | Layer-1 Import Direction (Brain-Family Boundary) | accepted |
 | adr-d-005 | Dependency Policy & Inventory (All Deps + Rationale) | accepted |
 | adr-d-006 | Code Architecture Conventions | accepted |
 | adr-d-007 | Manual Subagent Dispatch (Dogfood Survival-Fallback) | accepted |
