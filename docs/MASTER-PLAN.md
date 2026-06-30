@@ -1,11 +1,12 @@
 # Deckent — Master Plan (Tek İş-Planı Tablosu)
 
-**Yenileme:** 2026-06-29 — Hermes-vs-Deckent analiz turu + Alperen detaylı yön (pass-2) + Codex gap-fold.
+**Yenileme:** 2026-06-29 — Hermes-vs-Deckent analiz turu + Alperen detaylı yön (pass-2) + Codex gap-fold. · **2026-06-30** — ADR-redesign-hizalama (4-katman ADR-G/D taksonomi + `## ADR Traceability` + born/gap-items + stale-ref-fix).
 **Arşiv (lossless, eski plan tam hali):** `docs/archive/MASTER-PLAN-archived-2026-06-29.md` (1329 satır).
 **Kaynaklar:** `.analysis/hermes-vs-deckent-claude-analysis.md` (Claude) · `.analysis/hermes-vs-deckent-analysis.md` (Codex) · `.analysis/hermes-vs-deckent-direction-decisions.md` (Alperen yön-kararları).
 
 > **SSOT.** Tüm açık iş bu tek tablodadır. Done-history + her maddenin tam detayı arşivde; bu tablo **ileriye-dönük tracker**.
 > `docs/MASTER-PLAN-TR.md` = Türkçe okuma-companion'ı (aynı maddeler, pillar-gruplu).
+> **ADR-grounded:** her item bir ADR-G/D'ye trace eder — bkz. **`## ADR Traceability`** (41 ADR → item, %100 coverage). Taksonomi: 4-katman ADR-G(anayasa)/D(dev)/UG/UP, precedence **G>U>D**.
 > **Sıralama:** Önceliklendirme adımında **Sıra** sütunu eklenecek / satırlar yürütme-sırasına dizilecek (Alperen ile, bir sonraki adım).
 
 ### Nasıl kullanılır (Excel gibi filtrele)
@@ -127,7 +128,7 @@
 | F1-PCACHE | PROV | Provider-agnostik worker-prompt & cache (5-archetype) | MP | P1 | — | 🟡 | — | per-provider kalan |
 | F1-IMG-2 | PROV·WIN | Standalone `deckent image build` + init/upgrade | MP | P1 | — | ⬜ | — | F1-DF ✅ unblocked |
 | F1-009r | PROV | Live-keys mixed-provider sprint e2e testi | MP | P1 | — | ⬜ | — | — |
-| F1-015 | PROV | Bedrock SigV4 (+Vertex) | MP | P2 | — | ⬜ | — | ADR-010 no-SDK |
+| F1-015 | PROV | Bedrock SigV4 (+Vertex) | MP | P2 | — | ⬜ | — | ADR-D-005 dep-policy (no-SDK) |
 | MF-4 | PROV | Docker degradation provider-aware (claude-hardcode kaldır) | MP | P1 | PSL-1 | ⬜ | — | — |
 | MF-5 | PROV | Result-format consistency (-fix.result brainEval; codex tokenUsage) | MP | P1 | — | ⬜ | — | — |
 | MF-7 | PROV | FIX-phase retry verification strategy değişimi | MP | P1 | — | ⬜ | — | — |
@@ -167,11 +168,11 @@
 | WIN-2 | WIN | tmux/docker local gözlemlenebilirlik (worker izleme, ölçeklenebilir) | A | P1 | — | ⬜ | — | "izlenebilir ölçek" |
 | WIN-3 | WIN | Ölçeklenebilir spawn (ERP + milyon-user) | A | P1 | — | ⬜ | — | — |
 | WIN-ERP | WIN·ENT | Azure/Windows-ERP enterprise katmanı (IBM/Oracle/dünya-devleri ölçeği) — kalp adayı | A | P2 | — | ⬜ | — | — |
-| SPAWN-1 | WIN | Node DEP0190 (shell:true+args) Windows leak + injection fix | MP | P1 | — | ⬜ | — | ADR-006 carve-out |
+| SPAWN-1 | WIN | Node DEP0190 (shell:true+args) Windows leak + injection fix | MP | P1 | — | ⬜ | — | ADR-G-002 carve-out |
 | MSG-1 | MSG | Integration layer (connector pairing/authz/session standardı) | A·CL | P1 | — | ⬜ | — | genel-yapı uyumu |
 | MSG-CONT | MSG | Connector output → session continuity (reply = devam eden sohbet) | CX | P1 | MSG-1 | ⬜ | — | §3.4 |
 | MSG-2 | MSG | Pairing-onay butonu wire (onCallback — G1 ertelenmiş) | A·CL | P1 | APR-2 | ⬜ | — | gateway-daemon.ts:87-90 |
-| MSG-3 | MSG | WhatsApp connector (dormant → wire / ADR-016 amend) | MP·CL | P1 | — | ⬜ | — | CONN-W1 |
+| MSG-3 | MSG | WhatsApp connector (dormant → wire / ADR-G-007 amend) | MP·CL | P1 | — | ⬜ | — | CONN-W1 |
 | BOT-2d | MSG | Bounded multi-turn bot chat-memory + Discord/WhatsApp delivery verify | MP | P1 | — | ⬜ | — | — |
 | MCP-1 | MCP | MCP server-client sığ→enterprise olgunlaştırma (umbrella) | A | P1 | — | 🟡 | — | server-client devam |
 | F9-001 | MCP | McpClientBroker → live REPL/chat wire (0-caller) | MP | P1 | — | ⬜ | — | default-OFF |
@@ -197,15 +198,15 @@
 | SCALE-2 | ENT | Distributed agent mesh (cross-node schedule + shared mem/lock) | MP | P2 | — | ⬜ | — | — |
 | SEC-1 | ENT | Sub-#2 self-security (prompt/command guard + planner state-hygiene) | MP | P1 | — | ⬜ | — | — |
 | WM-5 | GOV | Provider-free hard-enforcement (CLAUDE_AUTH guard + flag-leak) | MP | P1 | — | 🟡 | — | high-risk parça |
-| LAYER-1 | GOV | core→cli/orchestra inversiyon temizliği (CORE-W1+ORCH-W1+API-W1+ADR-008-W) | MP | P1 | — | ⬜ | — | logic core'a, yüzey thin |
+| LAYER-1 | GOV | core→cli/orchestra inversiyon temizliği (CORE-W1+ORCH-W1+API-W1+ADR-D-004-W) | MP | P1 | — | ⬜ | — | logic core'a, yüzey thin |
 | DORMANT-1 | GOV | Kablosuz güvenlik wire (cascade-detector+spawn-safety+sandbox.ts) | MP·CL | P1 | — | ⬜ | — | 🔴 |
-| DORMANT-2 | GOV | No-op config-knob temizliği wire-or-remove (CORE-W4+ADR-021-W) | MP·CL | P1 | — | ⬜ | — | ayar-dürüstlüğü |
+| DORMANT-2 | GOV | No-op config-knob temizliği wire-or-remove (CORE-W4+ADR-G-012-W) | MP·CL | P1 | — | ⬜ | — | ayar-dürüstlüğü; CONFIG-CUSTOMIZE honesty |
 | DORMANT-3 | GOV | Duplikat/dormant disposition (RateLimiter×3/12-orchestra-mod/cli-helpers) | MP | P1 | — | ⬜ | — | — |
 | DEADMOD | GOV | 4 zero-caller-ama-dökümanlı modül WIRE-vs-KES (design pass) | MP | P1 | — | ⬜ | — | — |
 | COMM-2 | GOV | Tipli Brain-aracılı worker-mesaj vocabulary (DEPENDENCY_REQUEST...) | MP | P1 | — | ⬜ | — | COMM-1 v0 ✅ |
-| ADR-GOV | GOV | ADR-türevi tutarlılık (001/002/008/010/013/028/029/064/066/087-W + CORE-W8) | MP | P1 | — | ⬜ | — | governance-dürüstlük |
-| ADR-LAYER | GOV | ADR katmanlama (deckent/proje/global) + ilk-user basit, komut+sohbetle genişler | A | P1 | — | ⬜ | — | 🆕 |
-| ADR-REVISION | GOV | ADR değişim/sil/yeniden-yaz — YALNIZ Alperen denetim+onayı | A·MP | P2 | — | ⏸️ | — | 80-ADR re-review; irreversible |
+| ADR-GOV | GOV | ADR-türevi -W tutarlılık şemsiyesi (yeni-G/D şema): ADR-002-W·D-004-W·G-012-W·LOCALE-W·ROUTE-V1-PURGE(028) + tracked 064-W/066-W/087-W | MP | P1 | — | ⬜ | — | governance-dürüstlük |
+| ADR-LAYER | GOV | ✅ 4-katman taksonomi (ADR-G/D/UG/UP, G>U>D) CANLI; KALAN: UG/UP user-ADR-authoring (ilk-user basit, NL komut+sohbetle genişler) | A | P1 | — | 🟡 | 2026-06-30 | ADR-G-019; taxonomy✅, user-authoring bekliyor |
+| ADR-REVISION | GOV | ✅ 89→41 re-review/renumber/migration DONE (2026-06-30); KALAN: ADR-content refinement (Alperen ADR-içerik review) | A·MP | P1 | — | 🟡 | 2026-06-30 | sistem-side ✅; content-side bekliyor; değişim YALNIZ Alperen-onayı (ADR-G-019) |
 | AEGIS-RD | GOV | AEGIS ADR'yi Deckent-özel global-uygulanabilir agentic metoda yeniden tasarla | A | P2 | ADR-REVISION | ⬜ | — | "uzun/saçma" |
 | GOV-GATE | GOV | Per-sprint "ilk-user için daha kolay mı?" zorunlu gate + first-run-path LIVE test | CX | P1 | — | ⬜ | — | §12.4 metodoloji |
 | GOV-CROSSWALK | GOV | MASTER-PLAN eski-ID→yeni-ID crosswalk (residual) | CX | P2 | — | ◑ | — | büyük ölçüde reframe'de |
@@ -257,7 +258,7 @@
 | AUTH-MULTIMODE | GOV·MODE | Authority-matrix TÜM modlar + global/proje path-scope + per-mode rol/akış/continuation | ADR-rev | P1 | — | ⬜ | — | ADR-G-020 |
 | AUTH-USER-CUSTOM | GOV·ENT | User-customize authority-matrix (ADR-UG/UP; G-baseline inviolable, G>U>D) | ADR-rev | P2 | — | ⬜ | — | ADR-G-020 |
 | ENFORCE-GENERALIZE | GOV·ENT | RBAC enforcement dogfood-only→user-side genelleştir (lint:adr/authority-enforcer) | ADR-rev | P2 | — | ⬜ | — | ADR-G-020 |
-| POLICY-ENGINE-EVAL | GOV·ENT | Centralized policy-engine (OPA/Rego veya embedded) RE-EVAL (ADR-010-dogma kalktı) | ADR-rev | P2 | — | ⬜ | — | ADR-G-019/020 |
+| POLICY-ENGINE-EVAL | GOV·ENT | Centralized policy-engine (OPA/Rego veya embedded) RE-EVAL (ADR-D-005-dogma, eski-010, kalktı) | ADR-rev | P2 | — | ⬜ | — | ADR-G-019/020 |
 | MODE-RENAME | TERM·MODE·GOV | "sprint" → user/enterprise/dev/teams evrensel-kavram (run/job/mission...) | ADR-rev | P1 | — | ⬜ | — | ADR-G-024; sürekli-hatırlatma |
 | AUTO-NAMING | TERM·MODE | "mode auto"(detect) vs "autonomous engine"(motor) adlandırma-çakışması netleştir | ADR-rev | P2 | — | ⬜ | — | ADR-G-024 |
 | ADR-067-TENANT | ENT | TenantContext-threading wire-ya-amend (resolveTenant 0-caller; strict_tenant+kolon canlı) | ADR-rev | P2 | — | ⬜ | — | ADR-G-024 |
@@ -269,6 +270,68 @@
 | ADR-064-W | MOAT·GOV | `planDispatch` wire — **🔴 SOMUT DİVERGENCE bulundu:** model(planContinuous: DONE+fix-aggregate, MRR-yok, collision-yok) ↔ runtime(respawnEligibleTasks: DONE∪MRR+collision-graph, fix-aggregate-yok). Wire = 3-semantik (MRR+fix-agg+collision) tek-superset reconcile + 246-satır execution(event/metric/adaptive-timeout/checkpoint/throttle/host-adapter)-rewrite. Olduğu-gibi-wire MRR-unblock(S280)+collision REGRESSE eder. **Dedicated scheduler-correctness task + tam dispatch-test şart.** | ADR-rev | P1 | — | ⬜ | — | ADR-G-026; interim comment-fix done (f68c8595) |
 | ADR-066-W | PROV·GOV | `?? 'claude'` drift 3→9 → re-audit + getDefaultProviderName konsolide | ADR-rev | P1 | — | ⬜ | — | ADR-G-008; WM-5 |
 | ADR-087-W | GOV | Residual ~15 spawnSync (auditor.ts) → async-spawn migration | ADR-rev | P1 | — | ⬜ | — | ADR-D-002 |
+| GOCRIT-USERFEAT | TOOL·MODE | Per-task goNogo/goCriteria üretimini hard-coded yerine USER-FACING parametrik özellik (per-task/per-work kriter-üretimi) | A | P2 | — | ⬜ | — | memory-merge: 06-19 gözlem, planner-çıktısı çok temiz+başarılı |
+| ADR-002-W | GOV·DOCS | Node16→nodenext tsconfig migration + Node-18-reference purge (Node-24+ sweep) | ADR-rev | P2 | — | ⬜ | — | ADR-D-001 tomorrow |
+| LOCALE-W | GOV·I18N | Instruction-file adapter locale-leak fix (pure-adapter, per-doc lang) — ADR-013-W + ADR-029-W | ADR-rev | P1 | — | ⬜ | — | ADR-G-004/G-015; I18N-6 bağ |
+| MEM-VECTOR | MEM | Memory vector-layer (sqlite-vec opt-in, never-calls-home) semantic-recall | ADR-rev | P2 | MEM-3 | ⬜ | — | ADR-G-035 tomorrow |
+| SELFMOD-W | GOV·MOAT | Self-modify detection P1-P3 rollback-guard wire-ya-formalize + global-install discrimination | ADR-rev | P2 | ROLE-GUARD | ⬜ | — | ADR-G-021 tomorrow (P1-P3 dormant) |
+
+---
+
+## ADR Traceability — 41 ADR → MASTER-PLAN izi (2026-06-30)
+
+> Her aktif ADR'in **tomorrow/roadmap**'i bir MASTER-PLAN item'ına bağlı **VEYA** ✅ current-state (pending-iş yok). **Coverage = %100** (gap'ler ADR-002-W·LOCALE-W·MEM-VECTOR·SELFMOD-W ile kapatıldı). ADR-içerik = `docs/adr/adr-g|d-NNN-*.md`; karar-kaydı = `.analysis/adr-review-crosswalk.md` · özet [[project_adr_taxonomy_redesign_2026_06]].
+
+### ADR-G (34 — anayasa/runtime, immutable, user+dogfood)
+| ADR · konu | MASTER-PLAN izi |
+|---|---|
+| G-001 Layered-Config&Scope | CFG-1 · ONB-GLOBAL · CONFIG-CUSTOMIZE |
+| G-002 spawnSync-Security | SPAWN-1 · WM-5 (enforce→runtime) |
+| G-004 Instruction-Adapter/Multi-Env | LOCALE-W · I18N-6 |
+| G-005 Secret-FS | ✅ current-state |
+| G-006 Routing&Selection | ROUTE-1 · ROUTE-V1-PURGE · PROV-MATRIX |
+| G-007 Messaging-Connectors | MSG-1/2/3 |
+| G-008 Provider-Abstraction/Fleet | PROV-* · F1-* · ADR-066-W · AS2/AS4 |
+| G-009 Eval-Integrity | MOAT-3 · proof-of-function (≈✅) |
+| G-010 Output/Terminal-UX/Brand | TERM-5 · TERM-LIVE |
+| G-011 Surface-Parity | PARITY-1 · LAYER-1 · WATCH-W |
+| G-012 Plan-Tier/Config-Customize | CONFIG-CUSTOMIZE · CFG-1 · DORMANT-2 |
+| G-013 Graceful-Shutdown/Lifecycle | MOAT-2 · MF-9 |
+| G-014 Spawn-Backend/Observation | ORCH-BE · MOAT-ISO · WATCH-W · WORKER-LIVE-TRACE |
+| G-015 Managed-Docs/Tracking | MANAGED-DOCS-MINIMIZE · DECKENT-LOG |
+| G-016 Product-Vision | MODULARIZE · CODE-LAYERS · MOD-SPLIT-CLARIFY |
+| G-017 Multi-Project-Isolation | TOOL-SCOPE · ENT-2 |
+| G-018 Verification/Event-Stream | COMM-2 · TERM-LIVE · APR-* |
+| G-019 ADR-Governance/4-Layer | ADR-LAYER · ADR-REVISION (≈✅ sistem-side) |
+| G-020 Authority/Roles/Enforcement | AUTH-MULTIMODE · AUTH-USER-CUSTOM · ENFORCE-GENERALIZE · POLICY-ENGINE-EVAL · ROLE-GUARD |
+| G-021 Self-Modify-Detection | ROLE-GUARD · SELFMOD-W |
+| G-022 Nervous-System | NERVOUS-GENERALIZE · NERVOUS-NONBLOCK · NERVOUS-ENTERPRISE |
+| G-023 Agent/Skill-Taxonomy | AGSK-1 |
+| G-024 Mode-Architecture | MODE-RENAME · AUTO-NAMING · ADR-067-TENANT · DIR-2 · MODE-2 |
+| G-025 Resilience/Recovery/LiveObs | BRAIN-FAILOVER · WORKER-LIVE-TRACE · BRAIN-SELFUPDATE · BRAIN-DEATH-PROC |
+| G-026 Dependency-Wave | DEP-TOOL · ADR-064-W |
+| G-027 Prompt-Lifecycle/Worker-Ctx | WP-OPT · F1-PCACHE |
+| G-028 Work-Taxonomy | TASKTYPE-EXPAND · WM-2 |
+| G-029 Embedded-Web-Terminal | ✅ done; DESK-1 · TERM-RPC (tomorrow) |
+| G-030 Consent-Provisioning/Install | ONB-CHAT · ONB-1 · PSL-6 · ONB-GLOBAL |
+| G-031 Enterprise-Foundation | ENT-* · ADR-067-TENANT · NERVOUS-ENTERPRISE |
+| G-032 Self-Learning/Evolution | EVOLUTION-SELECTIVE-SCALE · LEARNINGS-QUALITY · EVO-2 |
+| G-033 Dashboard-Observability | DASH-1 · DASH-PANELS · DASH-D3 |
+| G-034 Native-Agentic-Terminal | TERM-NAT · TOOL-2 · F11-* · TERM-* |
+| G-035 Memory-Architecture | ✅ schema-migration; MEM-2/3 · MEM-VECTOR · LEARNINGS-QUALITY |
+
+### ADR-D (7 — dev/contributor, build-konvansiyonu)
+| ADR · konu | MASTER-PLAN izi |
+|---|---|
+| D-001 Build-Baseline | ✅ done; ADR-002-W (nodenext) |
+| D-002 Test-Infra/Hermeticity | ADR-087-W |
+| D-004 Brain-Central-Import | LAYER-1 (D-004-W) |
+| D-005 Dependency-Policy | ✅ reframe-done; POLICY-ENGINE-EVAL · F1-015 |
+| D-006 Code-Architecture-Conventions | GODOBJ · DEADMOD · DORMANT-3 |
+| D-007 Manual-Subagent-Dispatch | ✅ current-state; BRAIN-DEATH-PROC (G-025) |
+| D-008 Develop/Product-Repo | ENTERPRISE-REPO-STRATEGY · GA-2 · MODULARIZE |
+
+> Not: G-003 = ADR-G-020'ye absorbe (Brain role-sep, Kural-4); D-003 = boş (007→G-014); arşiv 005/009/038; sil 061 (→AEGIS-RD).
 
 ---
 
