@@ -1,1630 +1,1878 @@
 # Architecture Decision Records (auto-generated)
 
-## adr-001: TypeScript + ESM
+## adr-d-001: Build Baseline (TypeScript · ESM · Node 24+ · nodenext)
 
 **Status:** accepted
 
-# ADR-001: TypeScript + ESM
+# ADR-D-001: Build Baseline (TypeScript · ESM · Node 24+ · nodenext)
+
+**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=tsconfig (`module`/`moduleResolution`) + `package.json` `engines` floor + `npm run lint` (tsc --noEmit) → tomorrow=`Node16`→`nodenext` migration (ADR-002-W) + Node-18-reference purge (ADR-001 Node-24+ sweep)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-001 (TypeScript + ESM), ADR-002 (Node16 Module Resolution) · **Supersedes:** —
+**Crosswalk:** ADR-001 + ADR-002 → ADR-D-001
+
+> **Scope note:** This is a contributor-only build convention (how deckent is compiled) — ADR-D, dev install. It does not change runtime behavior a user observes; it governs the toolchain a contributor builds against.
+
+---
+
+## Context
+
+Deckent is a Node.js orchestration tool shipped as a CLI + MCP server + library. Two foundational build decisions were recorded separately at Sprint 044 but describe one concern — *how the codebase is compiled and resolved*: the language/module system (ADR-001, TypeScript + ESM) and the TypeScript module-resolution mode (ADR-002, `Node16`). ESM is the modern standard; Node 24+ ships `globalThis.fetch`, native test primitives, and the language features the codebase relies on, and is the validated runtime floor (`package.json` `engines: { node: ">=24.0.0" }`, decided 2026-06-11).
+
+A subtlety the old ADR-002 already clarified: **`Node16` here is the TypeScript module-resolution *mode name*, not a Node.js runtime pin.** It selects Node's native ESM/CJS resolution algorithm — stable since Node 16, identical on Node 18/20/22/24+. With TypeScript 5.x and this codebase's `.js`-extension-only ESM imports, `Node16` is functionally equivalent to `nodenext`. Merging the two records removes the recurring confusion between the mode name and the runtime floor.
+
+---
+
+## Decision (Today)
+
+- **Language / module system:** TypeScript with `"type": "module"` (ESM). CommonJS interop via `esModuleInterop`.
+- **Runtime floor:** Node **24+** is the single supported baseline (`engines: { node: ">=24.0.0" }`). No `Node 18` baseline references anywhere — code comments, error messages, CI matrices, docs, agent/skill prompts.
+- **Module resolution:** `"module": "Node16"` + `"moduleResolution": "Node16"` in `tsconfig` (current state). This enforces:
+  - **`.js` extensions mandatory on all relative imports** — `import { foo } from './bar'` fails; `'./bar.js'` is required (the recurring ESM gotcha, see `CLAUDE.md`).
+  - No index-file auto-resolution; `package.json` `exports` are honored.
+- **Verification:** `npm run lint` (`tsc --noEmit`) is the build-baseline gate contributors run before marking work done.
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **`Node16` → `nodenext` migration (ADR-002-W):** now that Node 24+ is the validated floor, migrate `module`/`moduleResolution` from `Node16` → `nodenext` so the resolver *tracks the actual runtime* instead of pinning a legacy mode name. Functionally equivalent for the current `.js`-ESM codebase (zero behavior change expected) but forward-correct as Node's resolution evolves.
+- **Node-18-reference purge (ADR-001 sweep):** complete removal of residual `Node 18` references (≈8 src files + CI at last count) so version checks, fetch-availability notes, and CI all target Node 24+. The `engines` field is already `>=24.0.0`; this is a comment/doc/CI sweep, tracked as a MASTER-PLAN work-item.
+
+---
+
+## Consequences
+
+**(+)** One coherent build baseline instead of two overlapping records; modern toolchain; explicit `.js` imports make resolution unambiguous and align source with the runtime; the mode-name-vs-runtime confusion is documented once and resolved.
+
+**(−)** The mandatory `.js`-extension discipline is recurring friction for contributors and AI workers alike (a frequent source of build errors). Two sweeps remain open — the `Node16`→`nodenext` migration (ADR-002-W) and the residual Node-18-reference purge — so "today" still carries a legacy mode name and stale version strings until they land.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-001 (TypeScript + ESM; Node-24+ floor), ADR-002 (Node16 Module Resolution; mode-name clarification + nodenext forward-decision).
+- **Born work-items:** ADR-002-W (`Node16`→`nodenext`), ADR-001 Node-24+ sweep (Node-18-reference purge). (MASTER-PLAN.)
+- **Cross-ref:** ADR-D-005 (Dependency Policy — the runtime deps built on this baseline), ADR-D-002 (Test Infrastructure — the test suite runs on this baseline), ADR-G-019 (this is an ADR-D contributor convention under the governance taxonomy).
+- **Gotcha of record:** `.js` import-extension requirement (`CLAUDE.md` Gotchas).
+
+
+---
+
+## adr-d-002: Test Infrastructure & Hermeticity
 
 **Status:** accepted
 
-**Date:** 2026-04-16
+# ADR-D-002: Test Infrastructure & Hermeticity
 
----
-
-**Decision:** Use TypeScript with `"type": "module"` (ESM) as the project foundation. **Node 24+ is the validated runtime floor** (decided 2026-06-11).
-**Context:** Deckent is a Node.js CLI tool requiring **Node >=24** (`package.json` `engines: { node: ">=24.0.0" }`). ESM is the modern standard. Node 24+ ships `globalThis.fetch`, native test runner primitives, and the language features the codebase relies on.
-**Consequence:** All imports must use `.js` extensions. CommonJS interop via `esModuleInterop`. **Node 24+ is the single supported baseline — no `Node 18` references anywhere** (code comments, error messages, CI matrices, docs, agent/skill prompts). Version checks, fetch-availability notes, and CI must target Node 24+. See MASTER-PLAN "ADR-Analizi Türetilen İşler → ADR-001: Node 24+ tam-sweep".
-
----
-
-**Amendment log:** 2026-06-11 — Node baseline 18+ → **24+** (Alperen kararı). `engines` zaten `>=24.0.0`; kalan `Node 18` referansları (≈8 src dosyası + CI) sweep ile temizlenecek (MASTER-PLAN iş-maddesi).
-
-
----
-
-## adr-002: Node16 Module Resolution
-
-**Status:** accepted
-
-# ADR-002: Node16 Module Resolution
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Decision:** Use `"module": "Node16"` and `"moduleResolution": "Node16"` in tsconfig.
-**Context:** TypeScript 5.2+ requires these to match. Node16 resolution enforces `.js` extensions and `package.json` exports.
-**Consequence:** Explicit `.js` in all relative imports. No index file auto-resolution.
-
-**Note:** `Node16` here is the **TypeScript module-resolution mode name, not a Node.js runtime pin**. It selects Node's native ESM/CJS resolution algorithm — stable since Node 16 and identical in Node 18/20/22/24+. The project requires Node `>=24` (`package.json` `engines`) and runs on current Node. With TypeScript 5.x, `Node16` is functionally equivalent to `NodeNext` for this codebase (which uses only `.js`-extension ESM imports); `NodeNext` simply tracks future Node resolution changes automatically.
-
-**Forward-looking decision (2026-06-11, Alperen):** Now that **Node 24+ is the validated floor** (ADR-001), migrate `module`/`moduleResolution` from `Node16` → **`nodenext`** so the resolver tracks the actual runtime instead of pinning a legacy mode name. Functionally equivalent for the current `.js`-ESM codebase (zero behavior change expected) but forward-correct. Tracked as MASTER-PLAN "ADR-Analizi Türetilen İşler → ADR-002-W".
-
----
-
-**Amendment log:** 2026-06-11 — (1) Note baseline 18→24 (ADR-001 ile hizalı). (2) İleriye-dönük karar: `Node16` → `nodenext` migrasyonu (iş-maddesi ADR-002-W).
-
-
----
-
-## adr-003: vitest over Jest
-
-**Status:** accepted
-
-# ADR-003: vitest over Jest
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Decision:** Use vitest for testing.
-**Context:** Native ESM support, faster startup, v8 coverage provider, compatible API.
-**Consequence:** Tests in `tests/` directory, `vitest.config.ts` at root.
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review re-audit, full code-verification)
-
-**Classification: BOTH** (test-altyapı kanunu; user-projeleri de deckent'in test-discipline'ına güvenir).
-
-**Re-verified:** vitest `^3.0.0` + `@vitest/coverage-v8` package.json'da; jest bağımlılığı/configi SIFIR (tek "jest" izi dashboard'ın `@testing-library/jest-dom` matcher-lib'i — vitest'le kullanılan DOM-matcher, ihlal değil) · v8 coverage-provider (`vitest.config.ts:22`) · `tests/` altında 1435 test-dosyası ✓. **Evrim:** tek-config → çift-config (`vitest.dashboard.config.ts` ayrı dashboard-suite); fork-bounding/CI-hermeticity ayarları config'e işlendi (ADR-087 Async I/O & Test Hermeticity Standard bu ADR'nin disiplin-tamamlayıcısıdır). md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-004: Layered Config Merge (defaults → global → project → env)
-
-**Status:** accepted
-
-# ADR-004: Layered Config Merge (defaults → global → project → env)
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Decision:** Config loads in **layered precedence (4 effective layers, last wins):** hardcoded defaults → `~/.deckent/config.json` (global) → `.deckent/config.json` (project) → **environment-variable overrides** (env wins). Originally specified as 3 *file* layers; the runtime env-override layer makes 4 effective layers.
-**Context:** Users need global defaults (plan type, language), per-project overrides, and per-invocation env overrides (CI / one-off runs).
-**Consequence:** `deepMerge` function handles nested object merge. Arrays are replaced, not merged. `undefined` values are skipped. Env overrides apply last (`DECKENT_*` vars).
-
-**Note:** This ADR records the original **3-layer** decision. At runtime an additional **environment-variable override layer** sits on top (e.g. `DECKENT_BRAIN_PROVIDER`, `DECKENT_MAX_WORKERS`), so the effective precedence is: defaults → `~/.deckent/config.json` → `.deckent/config.json` → **env overrides** (env wins). See `src/core/config.ts` and the "Config Layers" section of `docs/architecture/architecture.md` (Layer 4 — Environment Variables). Behavior unchanged; documentation alignment only.
-
----
-
-**Amendment log:** 2026-06-11 — Başlık + Decision "3-Layer" → **"Layered (4 effective: defaults → global → project → env)"** netleştirildi (Alperen onayı). Davranış değişmedi; env-override katmanı (config.ts:1342) zaten canlı. md+db senkron.
-
-
----
-
-## adr-005: Synchronous I/O
-
-**Status:** deprecated
-
-# ADR-005: Synchronous I/O
-
-**Status:** deprecated
-
-**Date:** 2026-04-16
-
-**Superseded by:** ADR-087 (Async I/O & Test Hermeticity Standard) — the active, agent-injected async/hermeticity law. A deprecated ADR does not carry active guidance to workers; ADR-087 does.
-
----
-
-> **Note:** Sprint 132 CRITICAL #1 — Senkron I/O hot path performans sorunlarına yol açtı. Yeni modüller async I/O kullanmalıdır. **→ Aktif kural artık [ADR-087](087-async-io-hermeticity-standard.md).**
-
-**Decision:** Wave 2 modülleri (tmux, auditor, worker) senkron I/O kullanır.
-**Context:** tmux komutları <100ms, lock dosyaları <1KB, auditor 30s cycle'da birkaç küçük JSON okur. Async overhead gereksiz.
-**Consequence:** Tüm fonksiyonlar senkron. Gelecekte performans sorunları çıkarsa async'e geçilebilir.
-
----
-
-**Amendment log:** 2026-06-11 — ADR-087 (Async I/O & Test Hermeticity Standard, accepted) ile **superseded**. Aktif async/hermeticity kuralı artık ADR-087'de (agent-inject) — bu deprecated kayıt yalnız tarihsel (Alperen ADR-review).
-
-
----
-
-## adr-006: spawnSync Security Pattern
-
-**Status:** accepted
-
-# ADR-006: spawnSync Security Pattern
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Decision:** Tüm subprocess çağrıları **array-args** ile çalıştırılır — `spawn(binary, [...args])` / `spawnSync(binary, [...args])` — **`shell: true` YOK**, shell-interpretation yok. Bu bir **GÜVENLİK invariant'ıdır** (command-injection sıfır) ve **`spawn` ile `spawnSync` ikisi için de** geçerlidir. **Sync-vs-async AYRI bir eksendir** ve [ADR-087](087-async-io-hermeticity-standard.md) tarafından yönetilir (async `spawn` default; `spawnSync` yalnız ADR-087'nin dar istisnaları için).
-**Context:** Command injection riski sıfıra indirilmeli. Prompt ve diğer kullanıcı girdileri argument array olarak geçer. Bu güvenlik kuralı, sync-vs-async tercihinden bağımsızdır.
-**Consequence:** Template literal veya string concat ile komut oluşturmak yasak. Varsayılan kural: `{ shell: true }` kullanılmaz. Array-args invariant'ı async `spawn`'a da uygulanır (ADR-087 async'i mandatory kılar; güvenlik deseni değişmez).
-
-**Note (documented exceptions):** The `spawnSync(binary, [...args])` array-args rule is the default and is the security baseline. There are **deliberate, narrowly-scoped exceptions** where `shell: true` is used:
-- `src/core/plugin-hooks.ts` — sandboxed plugin hook execution.
-- `src/core/provider.ts` — Windows only, to resolve `.cmd`/`.ps1` wrapper binaries on `PATH`.
-
-These exceptions never interpolate untrusted input into a command string (args remain arrays / fixed). Compliance is tracked by the ADR-006 check in `src/orchestra/authority-enforcer.ts` (compile-time scan; per ADR-037 V1.0 this is **advisory/soft** — it warns + emits, does not hard-block). Behavior unchanged; documentation alignment only.
-
----
-
-**Amendment log:** 2026-06-11 — Lafız ADR-087 ile uzlaştırıldı (Alperen ADR-review). ADR-006 artık **güvenlik invariant'ı** (array-args + `shell:true`-yok, `spawn`+`spawnSync` ikisi için); **sync-vs-async** ekseni ADR-087'ye devredildi (async `spawn` default, spawnSync = ADR-087 istisnası). Davranış değişmedi; çelişki giderildi.
-
-
----
-
-## adr-007: SpawnOptions Interface
-
-**Status:** accepted
-
-# ADR-007: SpawnOptions Interface
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Decision:** `SpawnOptions { allowedTools?: string; autoApprove?: boolean }` tmux modülünde tanımlanır.
-**Context:** Blueprint 15 gereği her ajan `--allowedTools` ile kısıtlanır. `autoApprove` ise `--dangerously-skip-permissions` ekler.
-**Consequence:** Brain, worker scope'una göre allowedTools string'i hesaplar. SpawnOptions her spawn fonksiyonuna opsiyonel parametre olarak geçer.
-
-**Note (evolution):** This is the original/foundational decision and remains accurate — `SpawnOptions` is still defined in the tmux module (`src/orchestra/tmux.ts`, re-exported via `src/orchestra/index.ts`). With multi-provider support the concept was **extended** (not replaced): `ProviderSpawnOptions` in `src/core/provider.ts` and `SpawnBackendOptions extends ProviderSpawnOptions` in `src/orchestra/spawn-backend.ts` (see ADR-017 MCP-Native Provider Adapters, ADR-027 Hybrid Spawn Backend). `allowedTools`/`autoApprove` semantics are unchanged. Documentation alignment only.
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review re-audit, full code-verification)
-
-**Classification: dogfood-ağırlıklı** (iç spawn-sözleşmesi; `--allowedTools` güvenlik etkisi kullanıcıya dolaylı yansır).
-
-**Re-verified (gövde-okuma; mevcut Note da doğru çıktı):** `SpawnOptions { allowedTools?, autoApprove? }` (`tmux.ts:19-21`), tüketim `:106-107/:120`, `autoApprove → --dangerously-skip-permissions` (`:125`) ✓ · re-export (`orchestra/index.ts:55`) ✓ · genişleme-zinciri `ProviderSpawnOptions` (`provider.ts:10`) → `SpawnBackendOptions` (`spawn-backend.ts:51`) ✓ · "Brain scope'tan allowedTools hesaplar" canlı: `sprint-spawner.ts:198/504/611` (writeTargets→allowedTools) ✓.
-
-**Evrim:** autoApprove semantiği Docker-backend'e **per-provider** taşındı (`spawn-backend-docker.ts:551`, Sprint 249 kökü — her provider'ın kendi bypass-flag'i: claude `--dangerously-skip-permissions`, codex `--dangerously-bypass-approvals-and-sandbox`, gemini yolo); Claude CLI root'ta bypass'ı reddettiğinden container host-user olarak koşar (`:598/:688`). md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-008: Brain Merkezi Import — Tek Yönlü Bağımlılık
-
-**Status:** accepted
-
-# ADR-008: Brain Merkezi Import — Tek Yönlü Bağımlılık
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Decision:** Brain, projede diğer modülleri (tmux, auditor, worker) import eden TEK modüldür. Diğer modüller brain'i import etmez.
-**Context:** Döngüsel import'lar Node.js ESM'de tanımsız davranışa yol açar. Brain orkestratör rolünde — tmux/auditor/worker'ı çağırır ama onlar brain'den bağımsız çalışır.
-**Consequence:** `grep -r "from.*brain" src/orchestra/tmux.ts src/monitor/auditor.ts src/agents/worker.ts` her zaman boş sonuç vermeli. Yeni modüller eklenirken bu kural korunmalı.
-
-**Note (current enforcement & refinement):** The enforced lint (`src/orchestra/authority-enforcer.ts`, ADR-008 check) specifically scans the **import direction `core/ → orchestra/`**: `core/` must not depend on `orchestra/`; the orchestra Brain layer is the only place that imports `orchestra/` internals — a broader rule than the original `from.*brain` grep. Per ADR-037 V1.0 this check is **advisory/soft** (warns + emits, does not hard-block). After the god-object split, `src/orchestra/brain.ts` is a thin re-export layer; the actual importer is `sprint-controller`, and `planner` imports only from `core/`. The canonical refined statement of these import rules lives in `CLAUDE.md` and `docs/reference/api-surface.md` (Module Import Rules). Behavior unchanged; documentation alignment only.
-
-**Sprint 279 (WK-import):** the `core/audit-writer.ts` + `core/audit-query.ts` → `orchestra/event-stream.js` cycle was resolved by **moving `event-stream` into `core/`** (`src/core/event-stream.ts`; `orchestra/event-stream.ts` is now a re-export shim). 
-
-**🔴 Residual violation (2026-06-11 ADR-review, tracked):** ONE `core/ → orchestra/` import remains — `src/core/routing-engine.ts:30` imports `analyzeSkillInMemory` from `../orchestra/ecosystem-intelligence.js`. The advisory/soft enforcement (ADR-037 V1.0) let it persist. Fix tracked as MASTER-PLAN "ADR-Analizi Türetilen İşler → ADR-008-W" (move the consumed function/module to `core/`, or invert the dependency).
-
----
-
-**Amendment log:** 2026-06-11 — Note'a Sprint-279 cycle-fix (event-stream→core/) + **kalan 1 ihlal** (routing-engine→ecosystem-intelligence) kaydedildi; ADR-008-W iş-maddesi açıldı (Alperen ADR-review).
-
----
-
-## Amendment — Sprint 281 (2026-06-11, faz-2 orchestra-analizi: "Brain-ailesi" tanımı)
-
-**Kanun-güncellemesi (Alperen onaylı):** Orijinal lafız "tmux/auditor/worker'ı import eden TEK modül Brain'dir" der; ADR-024/026 god-object split'i Brain'i kasıtlı olarak organlara böldü. Bugün tmux/auditor/worker'ı import eden 10+ orchestra-modülü var ve bunlar İHLAL DEĞİL — Brain'in split-organlarıdır. Kural şöyle netleştirilir:
-
-> **Brain-ailesi** = `sprint-controller` + ondan extract edilen faz/yardımcı organlar: `sprint-phases`, `sprint-spawner`, `sprint-lifecycle`, `sprint-planner`, `sprint-finalizer`, `sprint-utils`, `result-collector`, `result-evaluator`, `debt-manager`, `resource-monitor` + spawn-soyutlaması (`spawn-backend`, `spawn-backend-docker`) + ince re-export `brain.ts`/`index.ts`. **tmux/auditor/worker'ı YALNIZ Brain-ailesi import edebilir.** Aile-dışı orchestra-modülü, cli/, api/, mcp/ bu üçlüyü doğrudan import edemez. Tek-yön ilkesi değişmez: tmux/auditor/worker brain'i import etmez; `core/` hiçbir üst-katmanı import etmez.
-
-**Faz-2 tespitleri (MASTER-PLAN ORCH-W):** (1) `debt-manager → agents/worker.js` importu aile-içi ama amaç-incelemesi bekliyor (ORCH-W2). (2) **Ters-yön sızıntı:** `task-mode-runner.ts:18-19 → cli/commands/run+spawn` — 302-LoC `spawnWorkerMultiProvider` spawn-mantığı CLI'da yaşıyor ve orchestra ona bağımlı; fix = spawn-mantığını orchestra'ya taşı, cli thin-wrapper (ORCH-W1). (3) `sprint-finalizer:85`/`sprint-phases:88` → cli/helpers (presentation/splash) — orchestra→cli importları temizlenecek (ORCH-W1). (4) İkinci core→cli ihlali `directive-interrogator.ts:18` (CORE-W1). md+db senkron (Alperen ADR-review).
-
-**Sanctioned-exception — provider CLI-spawn adapter'ları (faz-2 providers-analizi, Alperen onaylı):** `src/providers/claude.ts` → `orchestra/tmux.js` (killWorker/listWorkers/ensureSession/isSessionActive/cleanupPromptFile) importu **ihlal DEĞİL** — ADR-017 (MCP-Native Provider Adapters) + ADR-027 (Hybrid Spawn Backend) gereği CLI-spawn adapter'ı tmux-backend'ini sarmalar; bu, ailenin spawn-soyutlama koluna (`spawn-backend` ailesi) paralel meşru bağdır. Kural-netleştirme: **provider-adapter'lar tmux/spawn-backend'i sarmalayabilir; auditor/worker'ı ASLA import edemez; tmux/auditor/worker yine brain'i/provider'ı import etmez** (tek-yön korunur). Geniş ilke aynı kalır: iş-mantığı core/orchestra'da yaşar; cli/api/mcp thin yüzeydir (API-W1 sistemik api→cli inversiyonu bu ilkeyle temizlenecek).
-
-
----
-
-## adr-009: DEBT.md Markdown Tablo Formatı
-
-**Status:** deprecated
-
-# ADR-009: DEBT.md Markdown Tablo Formatı
-
-**Status:** deprecated
-
-**Date:** 2026-04-16
-
-**Superseded by:** ADR-088 (Memory V2 — DB-First Architecture). Debt — like all brain knowledge — now lives in `.brain/memory.db` (`type='debt'`); `.brain/exports/debt.md` is a generated export, not the source.
-
----
-
-**Decision:** DEBT.md, 9 kolonlu markdown tablo formatında tutulur. Brain `parseDebtTable`/`generateDebtTable` ile programatik okuma/yazma yapar.
-**Context:** DebtItem interface'inin tüm alanlarını (id, description, originTaskId, originSprintId, priority, sprintsOpen, resolved, resolvedInSprintId, createdAt) saklamalıyız. JSON yerine markdown tercih edildi çünkü git diff'lerde okunabilir.
-**Consequence:** Tablo parse'ı `|` split + `slice(1,-1)` ile yapılır. Boş kolon değerleri korunur. Yeni kolon eklemek parse/generate'i güncellemeyi gerektirir.
-
-**Note (superseded by Memory V2 — DB-first):** This ADR records the **V1 design** where `DEBT.md` was the hand-maintained source of truth. Under **Memory V2**, technical debt lives in `.brain/memory.db` (SQLite, entries with `type='debt'` — see `src/orchestra/debt-manager.ts`, `store.getByType('debt')`); `.brain/exports/debt.md` is now a **generated export**, not the source. The original `parseDebtTable`/`generateDebtTable` markdown model is superseded by `MemoryStore` (consistent with the Memory V2 model in `docs/architecture/memory-system.md` and `docs/reference/api-surface.md`). Behavior unchanged; documentation alignment only.
-
----
-
-**Amendment log:** 2026-06-11 — Status `accepted` → **`deprecated`** (Note zaten "superseded" diyordu, status çelişiyordu). **Superseded by ADR-088** (Memory V2 — DB-First Architecture, yeni accepted, agent-inject) — Memory V2'nin ilk resmî ADR'si; bu eski V1 DEBT.md kararını genelleştirir (Alperen ADR-review).
-
-
----
-
-## adr-010: Tek Runtime Dependency — commander.js
-
-**Status:** accepted
-
-# ADR-010: Tek Runtime Dependency — commander.js
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Decision:** CLI tek runtime dependency olarak `commander@^13.0.0` kullanır. chalk, inquirer, picocolors gibi ek kütüphaneler eklenmez.
-**Context:** Deckent CLI minimal footprint hedefler. Node 18+ built-in'leri (readline/promises, Unicode support) çoğu ihtiyacı karşılar. Renk desteği modern terminallerde Unicode ile sağlanabilir.
-**Consequence:** `package.json` dependencies bölümünde yalnızca `commander` bulunur. Renkli çıktı gerekirse ileride `picocolors` (1.3KB) eklenebilir.
-
----
-
-## Amendment — Sprint 172 (BA-03 Verified)
-
-**Date:** 2026-05-18
-
-**Context:** BA-03 audit confirmed that `package.json` now contains 7 runtime dependencies, not 1. The original ADR was written at Sprint 044 when deckent was CLI-only. Since then, MCP server (ADR-017), Memory V2 (SQLite), connector adapters (ADR-016), and cryptographic identity (ADR-014) were added — each justified by an accepted ADR. The "single dependency" phrasing is a CLI-era artifact and is misleading for the current product scope.
-
-**Decision:** The governing principle is updated to: **minimal + ADR-justified dependencies**. Each runtime dependency must be traceable to an accepted ADR. Arbitrary additions without ADR backing remain forbidden.
-
-`commander` remains the only dependency that is purely cosmetic/CLI-convenience. All other dependencies serve foundational product capabilities.
-
-**Current runtime dependency inventory:**
-
-| Package | Version | Purpose | Governing ADR |
-|---------|---------|---------|---------------|
-| `commander` | `^13.0.0` | CLI command framework | ADR-010 (this record) |
-| `@modelcontextprotocol/sdk` | `^1.27.1` | MCP server/client transport | ADR-017: MCP-Native Provider Adapters |
-| `better-sqlite3` | `^12.9.0` | Memory V2 DB — FTS5 search, SQLite storage | Memory V2 Architecture (Sprint 154+) |
-| `telegraf` | `^4.16.0` | Telegram connector adapter | ADR-016: Connector Module — provider lifecycle |
-| `zod` | `^3.25.0` | Plan/config schema validation at runtime | Task planner validation (Sprint 044+) |
-| `@noble/ed25519` | `^2.3.0` | Ed25519 signing for `.deck` secret files | ADR-014: .deck Secret File System |
-| `@noble/hashes` | `^1.8.0` | SHA-512 hashing for `.deck` key derivation | ADR-014: .deck Secret File System |
-| `node-pty` | `^1.0.0` | Interactive PTY for embedded web terminal (claude/gemini/codex/shell sessions) | ADR-062: Embedded Web Terminal |
-| `ws` | `^8.18.0` | Browser WebSocket transport for terminal stream (audited zero-dep; hand-rolled RFC6455 rejected as a security surface) | ADR-062: Embedded Web Terminal |
-
-**Consequence:** The principle shifts from "1 dependency" to "minimum necessary, every dependency ADR-backed". Any new runtime dependency proposal must include an ADR reference or a new ADR. The dependency count (9) reflects the full product scope — CLI + MCP + Memory + Connectors + Crypto + Embedded Web Terminal (Sprint 175).
-
----
-
-## Amendment 2 — Sprint 281 (2026-06-11 ADR-review, Alperen)
-
-The Sprint-172 inventory (9 deps) drifted. Current `package.json` has **13 runtime dependencies + 1 optional**. Refreshed inventory with governing ADRs:
-
-| Package | Version | Purpose | Governing ADR |
-|---------|---------|---------|---------------|
-| `commander` | `^13.0.0` | CLI command framework | ADR-010 |
-| `@modelcontextprotocol/sdk` | `^1.27.1` | MCP server/client transport | ADR-017 |
-| `better-sqlite3` | `^12.10.0` | Memory V2 DB — SQLite + FTS5 | **ADR-088** (Memory V2 — DB-First) |
-| `telegraf` | `^4.16.0` | Telegram connector | ADR-016 |
-| `zod` | `^3.25.0` | Runtime schema-validation (plan/config); single-purpose, replaces hand-rolled validation | **ADR-010** (this record — sanctioned runtime dep) |
-| `@noble/ed25519` | `^2.3.0` | Ed25519 `.deck` signing | ADR-014 |
-| `@noble/hashes` | `^1.8.0` | SHA-512 `.deck` key derivation | ADR-014 |
-| `@lydell/node-pty` | `^1.2.0-beta.12` | PTY for embedded web terminal (renamed from `node-pty`) | ADR-062 |
-| `ws` | `^8.18.0` | WebSocket terminal transport | ADR-062 |
-| `ink` | `^7.0.5` | Native REPL (React-for-CLI) | ADR-081 / ADR-083 (Native Agentic REPL) |
-| `react` | `^19.2.7` | Ink REPL + web dashboard | ADR-081 (REPL) / ADR-080 (Dashboard) |
-| `react-dom` | `^19.2.7` | Web dashboard render | ADR-080 (Dashboard) |
-| `cli-highlight` | `^2.1.11` | REPL syntax highlighting for native agentic REPL output | **ADR-081 / ADR-083** (Native Agentic REPL / REPL-UX) |
-| `discord.js` *(optional)* | `^14.26.3` | Discord connector (lazy/optional) | ADR-016 |
-
-**✅ All deps ADR-backed (ADR-010-W closed, Sprint 311):** `cli-highlight` → ADR-081/083 (Native REPL / REPL-UX); `zod` → ADR-010 (this record, sanctioned runtime dep). `ink`/`react` → ADR-081/083/080 (REPL + Dashboard). All 13 runtime + 1 optional dependencies in this table now carry a non-empty Governing-ADR.
-
-**Amendment log:** 2026-06-11 — inventory 9→13(+1) güncellendi; `node-pty`→`@lydell/node-pty` rename, `ink`/`react`/`react-dom`/`cli-highlight`/`discord.js` eklendi, `better-sqlite3`→ADR-088 atfı; ADR-backing-eksik dep'ler (cli-highlight, zod) ADR-010-W'ye kayıt edildi (Alperen ADR-review). md+db senkron.
-2026-06-19 (Sprint 311, ADR-010-W kapatma) — `cli-highlight` → ADR-081/083 atfı; `zod` → ADR-010 (this record) formal backing; ADR-backing-gaps paragrafı ✅ closed olarak güncellendi. Tüm dep'ler artık ADR-backed.
-
-
----
-
-## adr-011: node:readline/promises — Built-in Prompt
-
-**Status:** accepted
-
-# ADR-011: node:readline/promises — Built-in Prompt
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Decision:** **Basit, non-interaktif CLI prompt'ları** (text, select, confirm) için `node:readline/promises` modülü kullanılır. Rich/interaktif kullanıcı yüzeyi bu ADR'nin kapsamı DEĞİL (aşağıya bakın).
-**Context:** `inquirer` (1.2MB) veya `prompts` (200KB) eklemek yerine Node 24+ built-in API basit prompt'lar için yeterli. Basit wrapper'lar (`promptText`, `promptSelect`, `promptConfirm`, `src/cli/helpers/prompt.ts`) init wizard + confirm ihtiyacını karşılar.
-**Consequence:** `readline/promises` **basit-prompt** için minimal built-in olarak kalır (init wizard, confirm, headless/script bağlamı). **Rich UI artık deckent'in TEMEL-CORE özelliğidir** (Alperen 2026-06-11): `ink` (Native REPL/TUI — ADR-081/083) + React web dashboard (ADR-080) birinci-sınıf kullanıcı/enterprise yüzeyleri. Bu ADR'nin orijinal "Phase 3'te ink eklenebilir" tahmini gerçekleşti ve core'a yükseldi. İki katman **çelişmez** — iş-bölümü: `readline`=basit prompt, `ink`/`react`=rich UI.
-
----
-
-**Amendment log:** 2026-06-11 — Node 18→24; kapsam "basit prompt" olarak netleştirildi; **rich UI (ink/react) temel-core özellik** olarak kaydedildi (önceki "Phase 3 maybe" → realized + elevated). Çelişki yok, iş-bölümü açıklandı. Line-11 typo ("adrGerekirse") temizlendi (Alperen ADR-review). md+db senkron.
-
-
----
-
-## adr-012: register\<Name\>(program) Pattern
-
-**Status:** accepted
-
-# ADR-012: register\<Name\>(program) Pattern
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Decision:** Her CLI komutu kendi dosyasında tanımlanır ve `register<Name>(program: Command): void` fonksiyonu export eder.
-**Context:** Tek dosyada tüm komutları tanımlamak bakım zorluğu yaratır. Ayrı dosyalar bağımsız test, kolay ekleme/çıkarma sağlar.
-**Consequence:** Her CLI komutu `src/cli/commands/` altında kendi dosyasında; entry point (`src/cli/index.ts`) her biri için bir `register<Name>(program)` çağrısı yapar. Yeni komut eklemek: dosya oluştur + `index.ts`'e import + `register` çağrısı ekle. (Güncel komut/dosya sayısı drift-eğilimli olduğu için burada sabit yazılmaz — kanonik liste auto-generated `docs/reference/cli.md`'de; çapraz-kontrol: `grep -c 'register[A-Z][A-Za-z]*(program' src/cli/index.ts`.)
-
-
----
-
-## adr-013: DECKENT.md Adapter Pattern (Sprint 15)
-
-**Status:** accepted
-
-# ADR-013: DECKENT.md Adapter Pattern (Sprint 15)
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Context:** CLAUDE.md'yi init sırasında overwrite etmek kullanıcı değişikliklerini kaybettiriyordu.
-
-**Decision:** DECKENT.md = tek gerçek kaynak. CLAUDE.md ve AGENTS.md adaptör dosyalar — sadece `@DECKENT.md` referansı enjekte edilir (ensureDeckentImport). Asla üzerine yazılmaz.
-
-**Consequences:**
-- Init idempotent ve güvenli
-- Kullanıcının CLAUDE.md özelleştirmeleri korunur
-- Gelecek provider'lar (Codex, Gemini) için adapter pattern genişletilebilir
-- `deckent sync` komutu adapter'ları yeniden senkronize eder
-
-**Note (realized):** The "extensible to future providers" consequence is now realized. Thin `@DECKENT.md` adapters exist for Gemini (`GEMINI.md`) and Codex (root `AGENTS.md`, optional `.codex/AGENTS.md`) alongside `CLAUDE.md` (Claude Code) and `.cursor/rules` (Cursor), all maintained via `ensureDeckentImport` (`src/core/utils.ts`) and `deckent sync` (`src/cli/commands/sync.ts`). `DECKENT.md` remains the single source of truth; adapters are never overwritten. Consistent with `DECKENT.md` and `CONTRIBUTING.md`. Behavior unchanged; documentation alignment only.
-
----
-
-**🔴 Amendment — Sprint 281 (2026-06-11, Alperen ADR-review): ADR-013 ↔ ADR-029 çelişkisi + locale-leak kök-çözümü (seçenek A).**
-
-Çelişki: ADR-013 "CLAUDE.md/AGENTS.md asla üzerine yazılmaz" derken `.deckent/docs.json` bunları **managed-docs** olarak listeliyordu (`claude-md`→CLAUDE.md, `agents-md`→AGENTS.md) → ADR-029 render'ı her sprint (RETRO) bu EN-adapter'lara TR-başlık (`Metric→Metrik`) basıyordu = tekrarlayan **locale-leak** (her sprint manuel revert).
-
-**Karar (seçenek A):** CLAUDE.md/AGENTS.md (ve GEMINI.md/.cursor) **SAF adapter**'dır — managed-docs DEĞİL. Sadece `@DECKENT.md` referansı (`ensureDeckentImport`) + kullanıcı içeriği; bu ADR'nin "asla overwrite edilmez" garantisi mutlaktır. → docs.json'dan `claude-md`/`agents-md` çıkarılacak (deckent-dev + product init default'u) → render yok → locale-leak kökten biter. İş-maddesi: MASTER-PLAN "ADR-Analizi Türetilen İşler → ADR-013-W". Çift-bakış: dogfood (yerel leak biter) + product (user projelerinde CLAUDE.md bozulmaz).
-
-
----
-
-## adr-014: .deck Secret File System (Sprint 044)
-
-**Status:** accepted
-
-# ADR-014: .deck Secret File System (Sprint 044)
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Context:** Provider API key'leri .env'de tutmak proje .env dosyasıyla çakışıyordu. Kullanıcının mevcut .env içeriği DECKENT_ prefix'li key'lerle kirleniyor, .gitignore yönetimi karmaşıklaşıyordu.
-
-**Decision:** Ayrı `.deck` dosyası oluşturuldu. DECKENT_ prefix'li key'ler bu dosyada tutulur. Init sırasında `.deck` otomatik olarak `.gitignore`'a eklenir.
-
-**Consequence:** Worker'lar `.deck` içeriğini görmez. Brain sadece gerekli key'leri task scope'una göre inject eder. Kullanıcının .env dosyası hiç dokunulmaz.
-
-**Note (evolution):** This records the original Sprint 044 decision. The `.deck` system has since grown (decision intent unchanged): (1) **`$DECK:KEY` config interpolation** — config values like `"token": "$DECK:DISCORD_TOKEN"` are resolved at runtime from `.deck` (`src/core/deck-interpolation.ts`, `src/core/deck-file.ts`); (2) **Ed25519 signing** — `src/core/signature.ts` uses `@noble/ed25519` + `@noble/hashes` for secret/skill-publish signatures. Per the ADR-010 Amendment, those two crypto dependencies are governed by this ADR. Behavior unchanged; documentation alignment only.
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review re-audit, full code-verification)
-
-**Classification: BOTH** (secret-hijyeni doğrudan user-product güvenliği).
-
-**Re-verified (gövde-okuma):** `.deck` çekirdeği tam — `parseDeckFile/loadDeckSecrets/validateDeckFile/createDeckTemplate/ensureDeckGitignore/isDeckFileCommitted` (`deck-file.ts:45-185`), gitignore-auto init'e wire'lı ✓ · `DECKENT_` prefix key-registry (:10-13) ✓ · `$DECK:KEY` interpolation (`deck-interpolation.ts:3/:10`, missing-secret warn) ✓ · Ed25519 (`signature.ts:5-6`, `@noble/ed25519@^2.3.0` + `@noble/hashes` — ADR-010 governance-köprüsü tutuyor) ✓.
-
-**Consequence-düzeltmesi (izolasyon iddiadan GÜÇLÜ):** "Brain sadece gerekli key'leri task scope'una göre inject eder" cümlesi günün gerçeğinde **seçici-inject değil, sıfır-maruziyet**tir — `.deck` worker-spawn yoluna hiç girmez (docker-backend'de deck-transport yok); tüketiciler tamamen host-side (`provider.ts` bootstrap auto-register ADR-077 Part-C, `server.ts`, `doctor.ts`, interpolation). Worker'lar `.deck` içeriğini görmez iddiası bu haliyle daha katı biçimde doğrudur. md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-015: TaskRouter Module — 6-level routing (Sprint 044)
-
-**Status:** accepted
-
-# ADR-015: TaskRouter Module — 6-level routing (Sprint 044)
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Context:** Task → provider atama mantığı sprint-controller'da inline'dı ve genişletilemezdi. Yeni routing kuralı eklemek sprint-controller'ı her seferinde değiştirmeyi gerektiriyordu.
-
-**Decision:** Ayrı `TaskRouter` modülü oluşturuldu. 6 seviyeli öncelik sırası: config → force → agent → skill → worker → fallback.
-
-**Consequence:** Yeni routing kuralları sprint-controller'a dokunmadan eklenebilir. Her seviye bağımsız test edilebilir. Router, task metadata'sını (model, effort, scope) okuyarak otomatik provider seçimi yapar.
-
-**Note (evolution):** The `TaskRouter` module is still current — `src/orchestra/task-router.ts` (`routeTask`, `TaskRouterConfig`) performs per-task provider + agent + skill routing. The **agent/skill selection it delegates to evolved to v2**: `src/core/routing-engine.ts` (`routeTaskV2`) "replaces `selectAgent()` + `selectSkills()` with a unified, intent-based decision" (3-layer: intent-classifier → activation-engine → routing-engine) per **ADR-028 (Decision-Engine V1→V2)**, default since Sprint 067. The original 6-level priority (config → force → agent → skill → worker → fallback) remains the foundational design. Behavior unchanged; documentation alignment only.
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review re-audit, full code-verification)
-
-**Classification: BOTH** (routing = mixed-fleet ürün-vaadi; `- Provider:` per-task override doğrudan user-yüzü).
-
-**Re-verified (gövde-okuma):** Modül-ayrıklığı gerçek — `routeTask` (`task-router.ts:248`) + `TaskRouterConfig` (:29), **sprint-controller'da 0 referans**; tüketiciler decision-engine / task-mode-runner / mid-sprint-adapter / sprint-planner / sprint-spawner ✓ · 6-seviyeli öncelik canlı (docblock :235-241 + body :279+), günün bileşimi: 1 config-override (`skill_routing`) → 2 `forceModel` → 3 **`task.provider`** (per-task `- Provider:` override — sonradan eklenen seviye) → 4 agent-tercihi → 5 availability-guard → 6 registry-default ✓ · Note'un `routeTaskV2` delegasyonu (`routing-engine.ts:267`) ✓.
-
-**Evrim (Note-sonrası 4 kazanım):** WM-2c **SSOT routing-key** (:280-284 — kanonik `task.type → taskKindToIntent → INTENT_TO_ROUTING_KEY`, legacy `detectTaskType` geri-uyum) · Sprint 219-015 surface-agent bonus (:254-257, `applyUserSurfaceBonus` — refactorer-collapse önleyici, ADR-079) · Sprint 202 registry-default fallback (:262-266 — pure-Ollama config sessizce claude'a düşmez) · `resolveWorkerAuth` per-task auth-precedence (:170-182, `task.authMode > config.auth_mode > 'subscription'`). md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-016: External Messaging Connectors (Discord / Telegram / WhatsApp + Bot)
-
-**Status:** accepted
-
-# ADR-016: External Messaging Connectors (Discord / Telegram / WhatsApp + Bot)
-
-**Status:** accepted
-
-**Date:** 2026-04-16 (original) · repurposed 2026-06-11
-
----
-
-**Decision (current):** External messaging connectors live in `src/connectors/` as a lifecycle-managed subsystem:
-- **Contract + pool:** `base-connector.ts` (`BaseConnector` interface) + `connector-pool.ts` (`ConnectorPool` — register / broadcast / lifecycle).
-- **Per-platform adapters:** Telegram (`telegram.ts`, `telegraf` runtime dep), Discord (`discord.ts`, `discord.js` **optional** dep, lazy-imported), WhatsApp (`whatsapp.ts`).
-- **Outbound notify:** `connector-notify-adapter.ts` (`ConnectorNotificationAdapter` — implements the WIRE-001 `NotificationAdapter` contract; each `DECKENT→USER:NOTIFY` goes to each connector's own `chat_id`, per-target timeout-guarded + fail-isolated).
-- **Inbound pipeline:** `incoming-router.ts` → `incoming-command-router.ts` / `incoming-command-resolver.ts` (route inbound messages to actions, e.g. approve/reject).
-- **Agentic bot:** `bot-agentic.ts` / `bot-daemon.ts` / `bot-commands.ts` / `bot-action-store.ts` (`deckent bot listen`; humanized replies — see BOT-1).
-- **Multi-turn:** `chat-bridge.ts` (`ChatMemoryAdapter`, bounded history — BOT-2d).
-- **Bootstrap:** `connector-bootstrap.ts` reads `notify_connectors` config, lazy-imports enabled connectors (missing optional dep → log+skip), starts OUTBOUND.
-
-**Context:** Operators need deckent to reach them on their phone (sprint approvals, checkpoints, alerts) and to reply back (inbound approve/reject). The subsystem must be **config-gated** (`notify_connectors: { telegram|discord: { enabled, token: "$DECK:…", chat_id } }`), **lazy** (optional deps never break load), and **fail-safe** (a slow/hung platform never blocks the sprint lifecycle — every send is timeout-guarded + per-target error-isolated).
-
-**Consequence:** Adding a platform = a new adapter implementing `BaseConnector` + a `notify_connectors` entry. Discord stays an `optionalDependency` (ADR-010). Telegram is a runtime dep (`telegraf`). Connectors are a first-class **product** surface for non-coder/enterprise reach (cross-ref BOT-1 humanized bot-agent, §4G human-interaction-wire). Cross-ref: ADR-010 (deps), WIRE-001 (notify dispatcher), `$DECK:` interpolation (ADR-014).
-
----
-
-**Original decision (Sprint 044 — SUPERSEDED):** ADR-016 originally recorded an **AI-provider** health/lifecycle `Connector` abstraction (runtime health-check, lazy init, auditor integration, `.dashboard` health metrics). That AI-provider responsibility moved to `src/core/provider.ts` `ProviderAdapter` (`isAvailable()`, multi-provider registry) per **ADR-017 (MCP-Native Provider Adapters)**; the `Connector` class itself moved to `src/core/session-interface.ts` (evolved role). The term **"connector"** + the `src/connectors/` namespace now mean **external messaging connectors** (this ADR's current subject).
-
----
-
-**Amendment log:** 2026-06-11 — ADR **repurposed** from "AI-provider lifecycle Connector" → **"External Messaging Connectors"** to match the codebase's current meaning of `connector` (closes a governance gap: the 16-file messaging/bot subsystem had no ADR). AI-provider lifecycle part marked superseded-by-ADR-017 (Alperen ADR-review). md+db synced.
-
-
----
-
-## adr-017: MCP-Native Provider Adapters (Sprint 045)
-
-**Status:** accepted
-
-# ADR-017: MCP-Native Provider Adapters (Sprint 045)
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Context:** Codex/Gemini adapter'ları mock komutlar kullanıyordu. Gerçek CLI davranışı test edilemiyordu.
-
-**Decision:** Gerçek CLI komutlarına geçiş: `codex exec --full-auto` ve `gemini -p --output-format json`. Adapter'lar gerçek binary'leri wrap eder.
-
-**Consequence:** Gerçek provider'larla uçtan uca test mümkün. CI ortamında binary yoksa `describe.skipIf` ile testler atlanır. Mock adapter'lar yalnızca unit test scope'unda kalır.
-
-**Note (current scope, refreshed 2026-06-11):** The real-CLI ProviderAdapter decision holds and has **expanded to a multi-provider fleet** (ADR-066 Provider Independence, ADR-077 Multi-Provider 8-Fleet + OpenAI-Compatible HTTP Adapter). Adapters now live in `src/providers/` (**7**): `claude.ts`, `codex.ts`, `gemini.ts`, **`ollama.ts`**, **`openai-compatible.ts`**, `sandbox.ts`, `subprocess.ts` — behind the `ProviderAdapter` interface + `ProviderRegistry` (`src/core/provider.ts`). Integration tests use `describe.skipIf` (`tests/providers/*`).
-
-**Per-provider flags (host vs docker — ProviderCommandSpec, Sprint 252 PSL-1):**
-- **codex:** host path keeps `codex exec --full-auto` (backward-compat; Rust CLI ignores it harmlessly, `--approval-mode full-auto` also accepted); the **docker** container path uses `--dangerously-bypass-approvals-and-sandbox` via `ProviderCommandSpec` + per-provider OAuth mount.
-- **gemini:** `gemini -p … --output-format json` (also `stream-json`/NDJSON); docker path adds yolo / skip-trust (autoApprove-gated for security) + OAuth mount.
-
-Per the ADR-010 Amendment this ADR is also the governing record for the `@modelcontextprotocol/sdk` runtime dependency (MCP server/client transport, `src/mcp/server.ts`).
-
----
-
-**Amendment log:** 2026-06-11 — Note refreshed: adapter list 5→**7** (ollama + openai-compatible eklendi); codex host `--full-auto` vs docker `--dangerously-bypass` (ProviderCommandSpec PSL-1) + gemini yolo/skip-trust ayrımı; cross-ref ADR-066/077 (Alperen ADR-review). Davranış değişmedi; md+db senkron.
-
-
----
-
-## adr-018: Multi-Environment Config Generation (Sprint 046)
-
-**Status:** accepted
-
-# ADR-018: Multi-Environment Config Generation (Sprint 046)
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Context:** Her IDE/ortam farklı config dosyası bekliyor. Codex, Gemini, Cursor, VS Code farklı format ve yol tercihlerine sahip.
-
-**Decision:** Ortam başına **`@DECKENT.md` adapter generator** (ADR-013 deseni): Codex → `AGENTS.md`, Gemini → `GEMINI.md`, Cursor → `.cursor/rules/deckent.mdc`, Claude → `CLAUDE.md`. Generator'lar `src/cli/helpers/agent-templates.ts` (`generateAgentsMd`/`generateGeminiMd`/`generateCursorRules`). `deckent init --all-envs` tüm ortamları tek seferde hazırlar. *(Orijinal Sprint-046 önerisi IDE-özel dosyalardı — config.toml/settings.json/mcp.json — ama @DECKENT.md adapter desenine yakınsadı; aşağıdaki Note + ADR-013.)*
-
-**Consequence:** Kullanıcı tek komutla tüm IDE entegrasyonlarını kurar. Her generator bağımsız modül, yeni ortam eklemek kolaylaşır. Adapter'lar üzerine yazılmaz — `ensureDeckentImport` / `deckent sync` ile sadece `@DECKENT.md` referansı korunur (ADR-013; orijinal `writeIfNotExists` ifadesinin yerini alır).
-
-**Note (evolved targets):** The per-environment generation decision still stands, but the concrete file targets converged on the **ADR-013 thin `@DECKENT.md` adapter** pattern (not the IDE-specific files originally proposed):
-- Codex → `AGENTS.md` (not `config.toml`)
-- Gemini → `GEMINI.md` (not `settings.json`)
-- Cursor → `.cursor/rules/deckent.mdc` (not `mcp.json`)
-- Claude → `CLAUDE.md`
-
-Generators live in `src/cli/helpers/agent-templates.ts` (`generateAgentsMd`, `generateGeminiMd`, …); the never-overwrite guarantee is provided by `ensureDeckentImport` / `deckent sync` (ADR-013), superseding the original `writeIfNotExists` phrasing. Behavior unchanged; documentation alignment only.
-
----
-
-**Amendment log:** 2026-06-11 — Decision-body gerçek hedeflere güncellendi (config.toml/settings.json/mcp.json → AGENTS.md/GEMINI.md/.cursor/rules @DECKENT.md adapter, ADR-013); Consequence `writeIfNotExists` → `ensureDeckentImport`. Decision artık tek başına yanıltmıyor (Alperen ADR-review). md+db senkron.
-
-
----
-
-## adr-019: Language-Agnostic Worker Verify (Sprint 046)
-
-**Status:** accepted
-
-# ADR-019: Language-Agnostic Worker Verify (Sprint 046)
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-> ✅ **Reconciliation note (Sprint 178, 2026-05-20).** The implementation gap
-> previously flagged in this ADR has been closed. The codebase now implements
-> the decision as written:
->
-> - **`STACK_COMMANDS` map** lives in `src/core/stack-detector.ts` and covers
->   18 stacks: typescript, javascript, python, go, rust, java_maven,
->   java_gradle, kotlin_maven, kotlin_gradle, csharp, swift, c_cmake, c_make,
->   ruby, php, dart, flutter (and an empty-fallback path for `unknown`).
-> - **`detectFullStack(projectRoot)`** (`src/core/stack-detector.ts`) returns
->   `FullStackResult { language, framework, buildTool, testFramework,
->   commands: { build, test, lint } }` using a 4-layer detection chain
->   (user override → exclusive marker → file-count weighted → fallback).
-> - **Runtime verify is stack-aware:** `src/agents/worker-verify.ts` exports
->   `getVerifyCommands()`, `verifyCompilation()`, and `verifyTests()`; both
->   verify functions dispatch the stack-detected `build` / `test` command
->   (vitest gets the `--reporter=verbose` flag; other runners get the bare
->   command with optional scope args). Empty build/test commands are treated
->   as "skip — language not supported", returning success.
-> - **Worker barrel** (`src/agents/worker.ts`) re-exports
->   `getVerifyCommands`, `verifyCompilation`, `verifyTests` so existing
->   imports remain stable.
-> - **Coverage:** `tests/agents/worker-verify-lang.test.ts` (20 tests, all
->   GREEN as of Sprint 178) exercises TypeScript, Python, Java Maven /
->   Gradle, Go, Rust, C CMake / Make, plus failure paths and scope arg
->   forwarding.
->
-> Per **ADR-037 V1.0** the verify loop remains advisory / prompt-driven
-> rather than code-enforced (`enforceVerifyLoop`/`runTestVerifyLoop` retain
-> their advisory call surface). That property is orthogonal to ADR-019 —
-> ADR-019 only mandates that *when* the verify loop runs, it dispatches the
-> correct stack command. Hard runtime enforcement is tracked separately
-> under ADR-037 V2 (post-GA).
-
-**Context:** Worker verify loop sadece `tsc --noEmit` ve `vitest run` çalıştırıyordu. TypeScript dışı projelerde Deckent kullanılamıyordu.
-
-**Decision:** `STACK_COMMANDS` ile dil bazlı build/test komutu belirlendi: Python → `pytest`, Go → `go test ./...`, Rust → `cargo test`. `.deckent/project-stack.json` dosyasından stack okunur.
-
-**Consequence:** Deckent TypeScript dışı projelerde de çalışır. Verify döngüsü stack-aware hale geldi. Yeni dil eklemek `STACK_COMMANDS` map'ine bir entry eklemekle yapılır.
-
----
-
-**Cross-ref — eval-side companion (WM-7, Sprint 254):** This ADR governs the **verify-command** side (stack-aware `build`/`test` dispatch). The **evaluation-criteria** side is its companion: `src/core/criteria-deriver.ts` (`deriveBaseCriteria(kind, stack, commands)` — never hardcodes `tsc`; doc→files-on-disk, audit→findings, code→detected stack commands) + `src/core/coverage-adapters.ts` (per-stack `testFilePattern`/`coverageCommand`, `isCoverageMeasurable`) + `src/core/work-model.ts` (`COVERAGE_MEASURABLE_STACKS`). Together they ensure a C++/Go task is NOT false-NO_GO'd for "tsc not clean" / "no vitest coverage". The WM-7 evaluation-integrity work has no standalone ADR yet (MASTER-PLAN work-item, DONE Sprint 254) — cross-ref ADR-070 (Brain Evaluation Integrity); a dedicated eval-criteria ADR is a candidate (assessed during ADR-070 review).
-
-**Amendment log:** 2026-06-11 — eval-side companion (WM-7: criteria-deriver / coverage-adapters / work-model) cross-ref'i eklendi (Alperen ADR-review). md+db senkron.
-
-
----
-
-## adr-020: Rich Sprint Output — multi-section summary (Sprint 044)
-
-**Status:** accepted
-
-# ADR-020: Rich Sprint Output — multi-section summary (Sprint 044)
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Context:** Sprint sonuç çıktısı tek satır metric'ti. Kullanıcı kaç task tamamlandı, hangi dosyalar değişti, ne öğrenildi gibi bilgilere erişemiyordu.
-
-**Decision (intent):** Tek-satır metric yerine **zengin çok-bölümlü** sprint çıktısı; ANSI renk + `NO_COLOR` env var desteği.
-
-**Consequence:** Her sprint sonunda kullanıcı tam resmi görür; `NO_COLOR` ile CI-friendly düz metin.
-
-**Note (verified current structure — deep-checked):** The original "7 sections: Header / Results / Changes / Tests / Agents / Learnings / Next Steps" list is **stale**. As implemented today:
-- **`RETRO.md`** (`src/orchestra/sprint-retro-writer.ts`) has **5 sections**: `## Summary`, `## Highlights`, `## Issues`, `## Metrics`, `## Learnings` (plus a `### Quality Dimensions` subsection). Highlights/Issues are emitted only when non-empty.
-- **`.brain/sprints/sprint-NNN.md`** (`src/orchestra/sprint-docs-updater.ts`) is a **task-oriented log** (`## Task {id}: {title}` → `### Description`), *not* the same structure as the retro (the "same 7-section" claim no longer holds).
-- **`NO_COLOR`** is honored — verified in `src/cli/helpers/splash.ts` (plain text when `NO_COLOR` set).
-
-The rich-multi-section decision stands; the concrete section set evolved (canonical = the modules above + `deckent retro` / `deckent history` output). Behavior unchanged; documentation alignment only.
-
----
-
-**Amendment log:** 2026-06-11 — Başlık "7-section" → "multi-section" (gerçek = 5-section RETRO + task-log; "7" yanıltıcıydı, Note zaten doğru yapıyı veriyor). Dosya-adı eski kalır (numara-stabilite). Alperen ADR-review. md+db senkron.
-
+**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=vitest (`tests/` + dual `vitest.config.ts` / `vitest.dashboard.config.ts`) + 3 hermeticity artifacts (`test:ci-sim` · `lint-test-hermeticity` · `sandbox-home`) + agent-injected async/hermetic rule + auditor/reviewer flags a new `spawnSync` (advisory) → tomorrow=ADR-087-W residual `spawnSync` migration (`auditor.ts`) + `test:ci-sim` SIGKILL-hardening
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-003 (vitest over Jest) + ADR-087 (Async I/O & Test Hermeticity Standard) + ADR-078 Part-A (CI-Hermeticity artifacts) · **Supersedes:** ADR-005 (Synchronous I/O — archived)
+**Crosswalk:** ADR-003 (+ ADR-087 + ADR-078-A) → ADR-D-002
 
----
-
-## adr-021: Kraken ASCII Brand Identity (Sprint 044)
-
-**Status:** accepted
-
-
-# ADR-021: Kraken ASCII Brand Identity (Sprint 044)
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Context:** Deckent'in görsel bir kimliği yoktu. CLI araçlarında ilk izlenim önemli.
-
-**Decision:** Kraken ASCII mascot: teal gövde (#4DB8A4), bold-gold DECKENT yazısı (#C4A855), dim "AI Agent Orchestrator" tagline.
-
-**Consequence:** Marka tanınırlığı artar. ASCII art sabit string olarak tutulur, runtime üretilmez.
-
-**Note (verified — deep-checked vs `src/cli/helpers/splash.ts`):**
-- **Path:** `src/cli/helpers/splash.ts` (not `src/cli/splash.ts`). `KRAKEN_ASCII` is a fixed `const` string; not generated at runtime — ✓.
-- **Colors verified accurate:** `TEAL = \x1b[38;2;77;184;164m` → `#4DB8A4`; `BOLD_GOLD = \x1b[1;38;2;196;168;85m` → `#C4A855`; version + tagline dim.
-- **Visibility gate:** splash is shown when **`config.output_splash` is true** (`showSplashIfEnabled` returns `null` otherwise) — not hard-wired to `--version`/`init`.
-- **`NO_COLOR` correction:** with `NO_COLOR` set the splash is **NOT skipped** — `showSplash` returns the **plain-text** splash (Kraken + `DECKENT v<ver>` + tagline, no ANSI). There is **no `CI` env-var handling** in `splash.ts` (the original "NO_COLOR/CI → splash skipped" wording was inaccurate).
-
-Behavior unchanged; documentation alignment only.
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review re-audit, full code-verification)
-
-**Classification: user-product** (marka = ürün ilk-izlenimi).
-
-**Re-verified (Note'un tüm iddiaları gövdeden doğru):** `KRAKEN_ASCII` sabit const (`splash.ts:4`, runtime-üretim yok) · TEAL `38;2;77;184;164` = #4DB8A4 (:12) · BOLD_GOLD `1;38;2;196;168;85` = #C4A855 (:13) · NO_COLOR → plain-text döner, atlanmaz (:23-30) · CI env-handling yok ✓.
-
-**Yeni bulgu — `output_splash` config-düğmesi no-op (dormant çift):** `showSplash` canlı ama yalnız **ilk sprint'te** tüketiliyor (`sprint-phases.ts:665-669`, `sprint.number===1`, gate'siz doğrudan çağrı). Config-gate'li wrapper **`showSplashIfEnabled` = zero-caller**; `output_splash` key'i her katmanda mevcut (default `true` `config.ts:1117`, şema `:1890`, dashboard ConfigPage + i18n en/tr) ama onu okuyan kod hiç çağrılmıyor → kullanıcı ayarı değiştirse davranış değişmez. "Settings özellikler kayıp" deseninin birebir örneği. **İş kaydı: ADR-021-W** (MASTER-PLAN) — sprint-phases çağrısını `showSplashIfEnabled`'a bağla (gerçek gate) veya knob'u şemadan kaldır; dashboard ConfigPage yüzeyi de hizalanır. md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-022: CLI/MCP Feature Parity — Parametre Eşitleme + Eksik Komutlar
-
-**Status:** accepted
-
-# ADR-022: CLI/MCP Feature Parity — Parametre Eşitleme + Eksik Komutlar
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
-**Supersedes:** ADR-022 v1 (Sprint 067) — see **History** below
-
----
-
-**Context:** Sprint 085'te MCP tool parametreleştirilmesi tamamlandı. `deckent_init`, `deckent_start`, `deckent_status`, `deckent_doctor`, `deckent_retro`, `deckent_history` araçlarına CLI karşılıkları olanlarla eşit parametreler eklendi. Ayrıca `deckent_agent_list` ve `deckent_skill_list` araçları CLI-only olan `deckent agent list` ve `deckent skill list` komutlarını MCP'ye getirdi.
-
-**Decision:** CLI-only komutlar altyapı/terminal işlemleridir ve MCP'de yer almaz:
-- **Altyapı:** `attach`, `spawn` — tmux oturum yönetimi *(`watch` bu listeden ÇIKARILDI — 2026-06-11: `deckent_watch` MCP zaten var; watch parity + backend-agnostic olmalı, bkz. ADR-089 + amendment)*
-- **Sunucu/UI:** `dashboard`, `web`, `serve` — arabirim başlatma
-- **Kurulum:** `upgrade`, `onboard` — setup sihirbazları
-- **Eklenti:** `plugin install`, `plugin list`, `plugin create` — eklenti yönetimi
-
-MCP-only komut yoktur — her MCP aracının bir CLI karşılığı vardır. Ortak iş mantığı `src/core/` veya `src/orchestra/` altında paylaşılır; CLI (`register<Name>(program)`) ve MCP (`server.registerTool()`) yalnızca thin wrapper'dır ve aynı core fonksiyonu çağırır.
-
-**Consequence:**
-- Kullanıcı CLI'da yapabildiği her şeyi MCP (Claude Code, VS Code, JetBrains) üzerinden de yapabilir
-- Parametre parity: tüm MCP araçları CLI komutlarıyla aynı giriş/çıkış şemasını kullanır
-- Altyapı komutları (attach, web, serve, plugin) bilinçli olarak yalnız CLI'da tutulur
-- README, CONTRIBUTING ve docs güncellenirken her iki taraf da sayılmalı
-
-> **Note (point-in-time figures):** The Sprint 085 decision text quoted parity counts ("19 MCP = 19 CLI", "MCP 16→19", "CLI 32→33"). Those are **Sprint 085 snapshot values and are now outdated** — the principle (every MCP tool has a CLI counterpart; infra/UI commands are CLI-only) is what stands. Current canonical counts are auto-generated — see `docs/reference/cli.md` and `docs/reference/mcp-tools.md` (`npm run docs:ref`). Behavior unchanged; documentation alignment only.
-
----
-
-## History — ADR-022 v1 (Sprint 067, superseded)
-
-> Original decision, preserved for historical context. Superseded by the
-> accepted decision above (Sprint 085).
-
-**Status:** superseded
-
-**Context (v1):** CLI'da 33+ komut, MCP'de 16 tool + 9 resource vardı. CLI'da olan bazı özellikler (spawn, attach, watch, agent, skill, plugin, onboard, upgrade, explain, finalize, dashboard, web, serve, archive-debt, quick-start, test-run, skill-marketplace) MCP tarafında yoktu. Kullanıcılar CLI'dan MCP'ye geçtiğinde özellik kaybı yaşıyordu. Ayrıca MCP tool'ları ile CLI komutları farklı kod yolları kullanıyordu — CLI doğrudan fonksiyon çağırırken MCP HTTP/stdio üzerinden wrapper çalıştırıyordu.
-
-**Decision (v1):** CLI ve MCP tam özellik eşliği sağlanmalı; her yeni CLI komutu aynı zamanda MCP tool olarak da kaydedilmeli; ortak iş mantığı `src/core/`/`src/orchestra/` altında paylaşılan fonksiyonlarda, CLI ve MCP yalnız thin wrapper.
-
----
-
-**Amendment — 2026-06-11 (Alperen ADR-review): `watch` parity + backend-agnostic.**
-
-`watch`, "intentionally CLI-only altyapı" listesinden ÇIKARILDI. Gerçek: `deckent_watch` MCP tool zaten var (`src/mcp/tools/watch.ts`) AMA CLI `watch` (tmux-split) ile MCP `deckent_watch` (event-stream subscribe) **semantik olarak ayrışmış** = parity ihlali. Bu ADR'nin "bir komut CLI'da neyse MCP'de de aynı işi görmeli" ilkesine göre **birleştirilmeli**. Ayrıca `watch` tmux'a sabitlenmemeli — worker hangi backend'de (docker/subprocess/tmux/ileride firecracker/cloud) ise orada izlemeli. Tam karar + gelecek vizyonu (per-worker bağımsız backend): **ADR-089 (Backend-Agnostic Worker Observation)**. İş-maddesi: MASTER-PLAN "ADR-Analizi Türetilen İşler → WATCH-W". md+db senkron.
-
-**Consequence (v1):** Kullanıcı CLI'daki her şeyi MCP üzerinden de yapabilir; test coverage iki kat artabilir; yeni özellik maliyeti artar (2 wrapper) ama tutarlılık garantilenir. (v2'de bu, "altyapı komutları intentional CLI-only" ile rafine edildi.)
-
-
----
-
-## adr-023: Plan Tier Generalizasyonu — Provider-Agnostic Tier İsimleri (Sprint 072)
-
-**Status:** accepted
-
-# ADR-023: Plan Tier Generalizasyonu — Provider-Agnostic Tier İsimleri (Sprint 072)
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Context:** Plan tier isimleri Claude'a özgüydü: `max_plan`, `max5x_plan`, `pro_plan`. Bu isimler Codex ve Gemini kullanıcıları için anlamsızdı. Provider-agnostic bir CLI olarak Deckent, belirli bir sağlayıcıya atıfta bulunmamalı.
-
-**Decision:** Tier isimleri genelleştirildi:
-- `max_plan` → `performance` (en yüksek kalite, en yüksek maliyet)
-- `max5x_plan` → `balanced` (kalite/maliyet dengesi)
-- `pro_plan` → `economic` (düşük maliyet, temel görevler)
-- `unlimited` korundu (sınırsız kullanım planları için)
-
-Init wizard da güncellendi: "Select your Claude plan" → "Select your plan". Eski isimler geriye dönük uyumluluk için config migration'da alias olarak tanındı.
-
-**Consequence:** Yeni kullanıcılar provider-agnostic terminoloji görür. Mevcut config'ler autoMigrateOnLoad ile otomatik güncellenir. Tüm belgeler yeni tier isimlerini kullanır. DECKENT.md ve CLAUDE.md provider.ts model equivalence tablosunu güncellenmiş tier isimleriyle gösterir.
-
-**Note (verified vs `src/core/config.ts`):** `max_plan→performance`, `max5x_plan→balanced`, `pro_plan→economic` confirmed (alias map at `config.ts:75+`; `autoMigrateOnLoad` recognizes legacy names ✓). **Correction:** `unlimited` was **not preserved as a standalone tier** — it was remapped to **`api`** (`config.ts:78` → `unlimited: 'api'`, alias-only for backward compatibility). The canonical tier set is `VALID_MODES = ['performance', 'balanced', 'economic', 'api']` (`config.ts:91`); there is no live `unlimited` tier. Behavior unchanged; documentation alignment only.
-
-
----
-
-## adr-024: sprint-controller.ts God Object Split — sprint-phases.ts Extract (Sprint 072)
-
-**Status:** accepted
-
-# ADR-024: sprint-controller.ts God Object Split — sprint-phases.ts Extract (Sprint 072)
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Context:** `sprint-controller.ts` 1300+ satıra büyüdü ve 8 sprint fazının tamamını içeriyordu. Bu durum bakım güçlüğü, yüksek cognitive load ve bağımsız test yazımını zorlaştırıyordu. Sprint 036'daki brain.ts split'inin ardından sprint-controller da god object haline geldi.
-
-**Decision:** Sprint fazları `sprint-phases.ts` adlı yeni dosyaya çıkarıldı. `runSprint()` içindeki 7 faz fonksiyonu extract edildi:
-- `runPlanPhase`, `runSpawnPhase`, `runEvaluatePhase`, `runFixPhase`
-- `runRetroPhase`, `runDecayPhase`, `runCleanupPhase`
-
-`sprint-controller.ts` orchestration mantığını korur, fazları import eder. Backward compatibility sprint-controller re-export layer üzerinden sağlandı.
-
-**Consequence:** Her faz bağımsız olarak test edilebilir. `sprint-controller.ts` boyutu önemli ölçüde azaldı. Yeni faz eklemek veya mevcut fazı değiştirmek tek dosyayı etkiler. orchestra/ modül sayısı 36'dan 37'ye çıktı.
-
-**Note (evolution):** This records the Sprint 072 **first step** — `sprint-phases.ts` exists and `sprint-controller.ts` shrank from 1300+ to ~780 LoC. The god-object split **continued well beyond this**: see **ADR-026 (God Object Split Stratejisi — Faz 1-3, Sprint 076)** plus `brain.ts` becoming a thin re-export layer. `orchestra/` now contains many dedicated `sprint-*` modules (`sprint-planner`, `sprint-spawner`, `sprint-finalizer`, `sprint-retro-writer`, `sprint-utils`, `sprint-checkpoint`, `sprint-metrics`, `sprint-lifecycle`, `sprint-docs-updater`, …); the original `runPlanPhase`/`runSpawnPhase`/… naming evolved into those modules' functions (`planSprint`, `spawnWorkers`, …). The "orchestra 36→37" figure is a Sprint-072 snapshot and is now far higher (drift-prone — canonical module counts are not pinned in ADRs). Behavior unchanged; documentation alignment only.
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review re-audit, full code-verification)
-
-**Classification: dogfood** (iç mimari hijyen; user'a dolaylı yansır).
-
-**Re-verified + Note'ta 2 düzeltme:**
-1. **7 faz fonksiyonunun 7'si de orijinal adlarıyla CANLI** — `sprint-phases.ts`: `runPlanPhase:631`, `runSpawnPhase:744`, `runEvaluatePhase:1078`, `runFixPhase:1782`, `runRetroPhase:1997`, `runDecayPhase:2094`, `runCleanupPhase:2108`. Note'un "isimler `planSprint`/`spawnWorkers`'a evrildi" cümlesi yanlış/abartılıydı — `run*Phase` API'si duruyor; `sprint-*` modül-ailesi (bugün 12+ modül, orchestra toplam 94 .ts) onun YANINA büyüdü.
-2. **God-object yeniden-büyüme bulgusu:** Note "~780 LoC'a indi" der; Sprint 136 kaydı "1890→209 slim"; bugün `sprint-controller.ts` = **1513 LoC** — slim-sonrası ~145 sprint'te kademeli geri-büyüme. Split kararının kendisi geçerli (controller hâlâ fazları import eder, `:70`; `brain.ts` 53-satır ince re-export ✓) ancak boyut-disiplini sürdürülemedi. **Bağlantı:** ADR-026 amendment'indeki MOD-SPLIT modülerlik çalışması (community/enterprise modüler ayrım) controller'ı yeniden ele alırken bu regrowth kapsama dahil edilir — ayrı iş-maddesi açılmadı, ADR-026 kaydına not düşüldü. md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-025: Graceful Shutdown Stratejisi — SIGINT → interruptActiveSprint (Sprint 076)
-
-**Status:** accepted
-
-# ADR-025: Graceful Shutdown Stratejisi — SIGINT → interruptActiveSprint (Sprint 076)
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Context:** Kullanıcı Ctrl+C yaptığında veya process SIGINT aldığında, çalışan sprint aniden sonlanıyordu. Worker'lar temizlenmeden çıkıyor, task dosyaları yarım kalıyor, tmux sessionlar arka planda çalışmaya devam ediyordu. Bu durum .tasks/ dizininde stale heartbeat ve kilit dosyalarına yol açıyordu.
-
-**Decision:** `entry.ts` içindeki SIGINT handler genişletildi:
-1. `interruptActiveSprint()` çağrılır — aktif sprintin graceful shutdown koordinasyonunu yapar
-2. `killAllSessions()` çağrılır — tüm tmux session'larını temizler
-3. İşlem sırayla yapılır: önce sprint state kayıt, sonra session kill
-
-**Consequence:** Ctrl+C sonrası temiz state bırakılır. Sprint INTERRUPTED olarak işaretlenir, review komutu bu durumu gösterir. Worker'lar SIGTERM sinyali alır ve kendi .hb dosyalarını DONE olarak işaretleyebilir. `deckent cleanup` sonrasında orphan dosya kalmaz.
-
-**Note (verified — module locations):** Mechanism confirmed against code: `interruptActiveSprint()` is defined in `src/orchestra/sprint-lifecycle.ts` (marks task INTERRUPTED, aborts heartbeat, releases locks, kills workers); `killAllSessions()` lives in `src/orchestra/tmux.ts` ("Called on SIGINT for graceful shutdown"); the SIGINT handler is wired in `src/cli/entry.ts` (which exists alongside `src/cli/index.ts`). Behavior unchanged; documentation alignment only.
-
----
-
-**Amendment log:** 2026-06-11 — Companion notu: Sprint 279 (DASH-001) `killAllWorkers()` (`tmux.ts:217`) eklendi — `killAllSessions()`'ın per-worker varyantı (tek worker ya da `/api/kill/all` için, subprocess/docker backend'lerini de kapsar). Graceful-shutdown mekanizması değişmedi (Alperen ADR-review). md+db senkron.
-
-
----
-
-## adr-026: God Object Split Stratejisi — Faz 1-3 Tamamlandı (Sprint 076)
-
-**Status:** accepted
-
-# ADR-026: God Object Split Stratejisi — Faz 1-3 Tamamlandı (Sprint 076)
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Context:** `sprint-controller.ts` zamanla god object haline geldi (1300+ satır). Sprint 036'da brain.ts split'i yapılmıştı ama sprint-controller yeniden şişti. Test ve bakım güçlüğü arttı.
-
-**Decision:** 3 fazlı kademeli split stratejisi:
-- **Faz 1 (Sprint 072):** `sprint-phases.ts` — 7 sprint faz fonksiyonu extract edildi (`runPlanPhase`, `runSpawnPhase`, vb.)
-- **Faz 2 (Sprint 075):** `sprint-utils.ts` — shared sprint utility fonksiyonları extract edildi
-- **Faz 3 (Sprint 076):** `result-collector.ts` — `waitForResults()` ve IPC+fs.watch döngüsü extract edildi
-
-Her fazda backward compatibility sprint-controller re-export layer üzerinden korundu.
-
-**Consequence:** `sprint-controller.ts` orchestration koordinatörü rolüne döndü — iş mantığı bağımsız modüllerde. orchestra/ modül sayısı 37'den 47'ye çıktı. Her yeni modül bağımsız unit test kapsamı kazandı. Kademeli split stratejisi büyük refactor riskini minimize etti.
-
-**Note (verified / evolution):** Faz 1-3 confirmed against code — `sprint-phases.ts`, `sprint-utils.ts`, `result-collector.ts` (`waitForResults` + IPC) all exist; `src/orchestra/brain.ts` is a ~53-line *"Slim Re-export Layer"* re-exporting from `sprint-controller.js` ✓. The split **continued past Faz 3** (many more dedicated `sprint-*` modules now — see the ADR-024 note). The "orchestra 37→47" figure is a Sprint-076 snapshot and is now far higher (drift-prone — canonical module counts are not pinned in ADRs; see `docs/architecture/architecture.md`). Behavior unchanged; documentation alignment only.
-
----
-
-**Forward link — modularization groundwork for MOD-SPLIT (Alperen 2026-06-11):** The kademeli god-object split (this ADR + ADR-024) is the **modular foundation** the future **Community/Pro split (MOD-SPLIT, MASTER-PLAN §8)** will build on. Final shape (ADR-033 amendment, Sprint 281): **SAME codebase + modular enterprise-layer** — community = MIT, enterprise module separately licensed; NOT a fork / separate product / 2-repo split. The clean module boundaries established here (independent `sprint-*` / `core/` modules, thin re-export coordinators) are exactly what enables drawing the community↔enterprise line + a license-loadable enterprise layer. The MOD-SPLIT prereq "modül sınırı envanteri (enterprise-layer dosya haritası)" leverages this split work. Cross-ref: §8 MOD-SPLIT, ADR-065, ADR-033 (amendment DONE — Sprint 281).
-
-**Amendment log:** 2026-06-11 — MOD-SPLIT modülerleştirme-temeli forward-link'i eklendi (Alperen ADR-review); MASTER-PLAN §8 MOD-SPLIT'e ADR-026 ref edildi. Aynı gün re-audit'te forward-link nihai MOD-SPLIT kararıyla düzeltildi (2-repo→aynı-kod-tabanı-modüler; pending→DONE). md+db senkron.
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review re-audit, full code-verification)
-
-**Classification: dogfood** (mimari strateji; MOD-SPLIT temeli üzerinden ürün-yapısına dolaylı etki).
-
-**Re-verified (Faz 1-3'ün üçü de gövde-okuma):** Faz 1 `sprint-phases.ts` — 7 faz-fonksiyonu orijinal adlarıyla canlı (ADR-024 amendment kanıtları) ✓ · Faz 2 `sprint-utils.ts` — 22 export, 456 LoC ✓ · Faz 3 `result-collector.ts` — `waitForResults` (:505, fs.watch + fallback-polling) + IPC `ipc-registry` köprüsü (:29-34) ✓ · backward-compat re-export'lar `sprint-controller.ts:173/:176` ✓.
-
-**Bakım-bayrağı (ADR-024 re-audit'inden devir):** `sprint-controller.ts` bugün **1513 LoC** — Sprint 136 slim'i (209 LoC) sonrası kademeli geri-büyüme. Split-stratejisi geçerli; boyut-disiplini sürdürülemedi. MOD-SPLIT modül-sınırı envanteri çıkarılırken controller yeniden ele alınır (ayrı iş-maddesi yok, bu kayıt yeterli). md+db senkron (Alperen ADR-review).
-
-
----
+> **Scope note:** Contributor-only test conventions (how deckent is built + verified) — ADR-D, dev install, agent-injected to dev/dogfood workers. The discipline's *outcome* (a hermetic, trustworthy suite) is what users rely on, but the *convention itself* is contributor-facing — hence ADR-D, not ADR-G.
 
-## adr-027: Hybrid Spawn Backend (Sprint 123, Revisited Sprint 139)
+> **Supersession:** ADR-087 **supersedes ADR-005** (Synchronous I/O). ADR-005 is **archived** (no active number; historical record kept) — its async successor is now an active, agent-injected law, not a buried deprecated-Note.
 
-**Status:** accepted
-
-# ADR-027: Hybrid Spawn Backend (Sprint 123, Revisited Sprint 139)
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
----
-
-**Decision:** Hibrit backend desteği **kalıcı olarak reddedildi** (Option B: reject). Mevcut tek-backend modeli yeterli ve Sprint 139 backend parity çalışması bu kararı güçlendirdi. `SpawnBackendFactory` docker → tmux → subprocess fallback zinciriyle TEK bir backend seçer; hibrit mod (worker Docker'da, auditor subprocess olarak) implementasyona alınmayacak.
-
-**Context (Sprint 123 — Özgün):** Auditor scan loop `sprint-controller.ts` içinde in-process olarak çalışır — tmux/subprocess/docker backend'lerinden tamamen bağımsızdır. Worker'lar backend üzerinden spawn edilirken auditor dosya sistemi üzerinden `.hb` heartbeat dosyalarını okur. Auditor'ın backend seçimiyle hiçbir doğrudan bağlantısı olmadığından, hibrit mod için ayrı bir mekanizma gerekmez. Worker isolation Docker container'larıyla sağlanmaktadır.
-
-**Sprint 139 Revisit Analizi:**
-
-Sprint 139'da 3 backend'in (Docker, subprocess, tmux) E2E test coverage'ı tamamlandı ve aşağıdaki bulgular elde edildi:
-
-1. **ADR-035 Event Stream (Sprint 138) hibrit gereksinimini ortadan kaldırıyor:** `.deckent/sprint-NNN-events.jsonl` append-only event stream tüm backend'lerin üzerinde ortak iletişim kanalı sağlıyor. Worker hangi backend'de çalışırsa çalışsın, auditor event stream'den okuyarak bağımsız doğrulama yapabiliyor. "Auditor'ın ayrı process olarak çalışması" senaryosu event stream sayesinde zaten çözüldü.
-
-2. **3-backend parity (Sprint 139 Task 17-19):** Docker, subprocess ve tmux backend'lerinin her biri kendi E2E test suite'ine sahip. Her backend `SpawnBackend` arayüzünü tam olarak implement ediyor. Hybrid senaryosu için gereken "farklı backend'lerin birbirini tamamlaması" ihtiyacı yok — her backend zaten tam özellikli.
-
-3. **Hibrit senaryosunun anlamsızlığı:** "Worker Docker'da, auditor subprocess olarak" senaryosu ADR-035 sonrasında gereksiz:
-   - Auditor zaten in-process (sprint-controller içinde)
-   - Event stream file-based olduğundan tüm backend'ler transparently mesaj üretiyor
-   - Docker worker'lar shared `.tasks/` volume üzerinden heartbeat ve event yazıyor
-
-4. **Complexity cost vs benefit:** Hibrit backend implementasyonu `SpawnBackend` interface'ini genişletmeyi, multi-backend lifecycle yönetimi eklemeyi ve `SpawnBackendFactory` sinyal koordinasyonu yazmayı gerektirir — zero user-visible benefit karşılığında ~400 LoC complexity.
-
-5. **Product vision uyumu (ADR-033):** "Kur-çalıştır" prensibi konfigürasyon complexity'sini minimumda tutar. Kullanıcının "hangi backend'i ne için kullanayım?" sorusuna cevap vermek zorunda kalması ürün deneyimini kırar.
-
-**Karar Rationale (Alperen'e Sunulan):**
-
-| Seçenek | Değerlendirme | Karar |
-|---------|--------------|-------|
-| **Option A:** Sprint 140'ta hybrid implement et | ADR-035 event stream zaten bu ihtiyacı karşılıyor; ek complexity getirir, net fayda yok | **Reddedildi** |
-| **Option B:** Kalıcı olarak reddet (tek backend at a time) | Mevcut model çalışıyor, test coverage tam, event stream entegrasyonu sorunsuz | **Kabul edildi** |
-| **Option C:** Yeniden ertele | 3. deferred → kararsızlık işareti; net karar verilmeli | **Reddedildi** |
-
-**Consequence(s):**
-- Hibrit backend implementasyonu yapılmayacak — kalıcı karar.
-- `SpawnBackendFactory` tek-backend-seçer semantiğini korur.
-- Event stream (ADR-035) hibrit senaryosunun gerçek ihtiyacını (cross-backend observability) doldurdu.
-- Sprint 140'ta backend ile ilgili çalışma olursa: mevcut 3 backend'in stabilizasyonu ve edge case fix'i üzerine yoğunlaşılır, hibrit mod değil.
-- Distributed sprint execution ihtiyacı doğarsa (Sprint 145+), bu ADR revisit edilmeli ve event stream üzerine inşa edilen lightweight coordinator pattern değerlendirilmeli.
-
-**References:**
-- Sprint 123 özgün deferred kararı
-- ADR-035: Brain ↔ Worker ↔ Auditor Verification Protocol — event stream hibrit ihtiyacı ortadan kaldırdı
-- Sprint 139 Task 17: Docker E2E tests
-- Sprint 139 Task 18: Tmux E2E tests
-- Sprint 139 Task 19: Subprocess E2E tests (DONE — 33 test, 1.2s)
-- ADR-033: Product Vision — complexity minimization principle
-
----
-
-## Amendment — Sprint 281 (2026-06-11, Alperen ADR-review): kapsam ayrımı + ADR-089 supersession
-
-ADR-027'nin orijinal "hibrit backend KALICI reddedildi" kararı **dar yorumda hâlâ geçerli, geniş yorumda superseded** — ayırmak gerekiyor:
-
-**✅ Hâlâ geçerli (rol-split reddi):** "Worker Docker'da + auditor AYRI subprocess olarak" senaryosu reddedilmeye devam eder. Auditor in-process kalır; cross-backend gözlemlenebilirlik event-stream (ADR-035) ile çözülür. Rol-bazlı backend-mixing'e gerek yok.
-
-**🔄 Superseded ("sprint başına tek backend" iddiası → ADR-089):** ADR-027 yazıldığında SpawnBackendFactory sprint için TEK backend seçiyordu. Bugün:
-- **Per-task backend override CANLI:** `sprint-spawner.ts` `effectiveBackend = task.backend && task.backend !== config.spawn_backend ? SpawnBackendFactory.create({ backend: task.backend, … }) : backend` (`- Backend: docker|tmux|subprocess` DIRECTIVES, Sprint 252 PSL-1 + mixed-fleet 248-254). Farklı task'lar farklı backend'de koşabiliyor.
-- **ADR-089 (Backend-Agnostic Worker Observation + Per-Worker Independent Backends):** açık vizyon = her worker/akış bağımsız backend (tmux/docker/firecracker/cloud/ollama-host). ADR-027'nin öngördüğü "distributed execution gerekirse revisit (Sprint 145+)" noktası geldi.
-
-**Net:** Bu ADR artık yalnız **rol-split-hibrit reddini** temsil eder; **heterojen per-worker backend** ADR-089 tarafından yönetilir (kabul edildi). "Hibrit kalıcı red" çerçevesi geniş anlamda ADR-089'a devredildi.
-
-**Amendment log:** 2026-06-11 — kapsam ayrıldı (rol-split-reddi geçerli ↔ tek-backend-per-sprint ADR-089'a superseded); per-task override + ADR-089 cross-ref'lendi (Alperen ADR-review). md+db senkron.
-
-
----
-
-## adr-028: Decision-Engine V1 → V2 Routing Migration
-
-**Status:** accepted
-
-# ADR-028: Decision-Engine V1 → V2 Routing Migration
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
-**Accepted:** Sprint 130
-
----
-
-**Context:** Sprint 031'de keyword-based DecisionOrchestrator tasarlandı (6-step pipeline). Sprint 066'da intent-based V2 routing engine (routeTaskV2) ile değiştirildi.
-
-**Decision:** V1 kod silinmeyecek — referans implementasyonu olarak korunacak. @deprecated ile işaretlendi.
-
-**Consequences:** 4 kaynak dosya + 38 test maintained but unused in production. decision-logger.ts hâlâ V2 tarafından kullanılıyor.
-
-**Note (verified vs code):** V2 confirmed — `routeTaskV2` in `src/core/routing-engine.ts`; `src/core/config.ts` defaults `routing_engine: 'v2'` and accepts `['v1','v2']` (V1 retained, selectable, `@deprecated`). Provenance: per `CLAUDE.md`/`IDENTITY.md` routing v2 has been the default since Sprint 067 (V2 introduced Sprint 066). The "4 source files / 38 tests" figures are a point-in-time snapshot (legacy V1 surface, not pinned). Behavior unchanged; documentation alignment only.
-
----
-
-**Amendment — 2026-06-11 (ADR-review, code-alignment): V1 confirmed live + 2 minor inconsistencies.** `DecisionOrchestrator` (V1) is real (`src/orchestra/decision-engine.ts:101`), selectable via `routing_engine: 'v1'`, V2 default — ADR accurate. Two minor drifts found:
-1. **features-manifest mislabel:** the Dead Features list (`docs/reference/features.md`, auto-generated) marks `decision-orchestrator-v1` as **dead/superseded**, but per this ADR V1 is **deprecated-but-retained-selectable** (reference impl), not dead. Manifest classification should read "deprecated/retained", not "dead".
-2. **planner fallback:** `src/orchestra/sprint-planner.ts:468` uses `config.routing_engine ?? 'v1'` while `config.ts:1130` defaults to `'v2'` — with a fully-loaded config the `?? 'v1'` never fires, but it is an inconsistent default (should be `?? 'v2'`). 
-
-Both tracked as MASTER-PLAN "ADR-Analizi Türetilen İşler → ADR-028-W" (low priority). md+db senkron.
-
-
----
-
-## adr-029: Managed-Docs Universalization — Sprint Lifecycle Template-Based Document Generation
-
-**Status:** accepted
-
-# ADR-029: Managed-Docs Universalization — Sprint Lifecycle Template-Based Document Generation
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
-**Accepted:** Sprint 131
-
----
-
-**Context:**
-Önceki sprintlerde `sprint-reporter.ts` içindeki `updateProjectDocs()` fonksiyonu yalnızca hard-coded dokümanlara (CLAUDE.md, IDENTITY.md, README.md gibi) güncelleme yapabiliyordu. Kullanıcı kendi dokümanlarını (ARCHITECTURE.md, ONBOARDING.md, KPI dashboards) sprint döngüsüne dahil etmek istediğinde doğrudan `sprint-reporter.ts` kodunu değiştirmek zorunda kalıyordu. Bu durum:
-- Kullanıcı konfigürasyonunu kaynak koduyla karıştırıyordu (separation of concerns ihlali)
-- Her sprint sonrasında kullanıcı dokümanları stale kalıyordu
-- Multi-language (TR/EN) proje dokümanları için tutarsız içerik üretiliyordu
-- Plugin sistemi yok — yeni bölüm türü eklemek kaynak kodu değişikliği gerektiriyordu
-
-Deckent'in hedef vizyonu "sprint lifecycle'ı herhangi bir proje türüne uygulayabilme" iken, doküman sistemi TypeScript mono-repo'ya hard-coded kalmıştı.
-
-**Decision:**
-`src/orchestra/managed-docs/` modül paketi oluşturuldu. Sprint finalizasyonunda `updateProjectDocs()` built-in updater'lardan sonra `runManagedDocUpdates()` çağırır. Sistem şu bileşenlerden oluşur:
-
-1. **`.deckent/docs.json` konfigürasyon şeması** — `ManagedDocEntry` arayüzü: `path`, `autoSections`, `protectedSections`, `skills`, `maxLines`, `templates` alanları. Kullanıcı hangi dosyanın hangi bölümlerinin otomatik güncelleneceğini bildirir.
-2. **`SectionGenerator` arayüzü** — `{ id, patterns, patternsByLang, generate(ctx) }`. Her generator bir bölüm başlığı deseni eşleştirir ve `DocUpdateContext`'ten markdown içeriği üretir.
-3. **`content-generators.ts`** — 8 built-in generator: sprint-metrics, active-debt, sprint-history, agent-performance, changelog, test-coverage, module-map, dependencies. Generator registry runtime-extensible.
-4. **`section-updater.ts`** — Mevcut dosyayı parse eder, sadece `autoSections` bölümlerini değiştirir, `protectedSections` ve kullanıcı içeriğini korur.
-5. **`managed-doc-runner.ts`** — Orchestration: config okuma → user generator yükleme → cache kontrol → içerik üretimi → bölüm güncelleme → cache yazma.
-
-Yeni doküman eklemek sıfır kaynak kodu değişikliği gerektirir — sadece `.deckent/docs.json` düzenlemesi yeterlidir.
-
-**Consequences (+):**
-- Kullanıcı herhangi bir markdown dokümanı sprint döngüsüne dahil edebilir
-- `protectedSections` ile el ile yazılan bölümler hiç dokunulmaz
-- `autoSections` match case-insensitive ve kısmi eşleşme destekler (TR/EN başlıkları)
-- `templates` alanıyla built-in generator olmayan bölümler için `{{placeholder}}` syntax ile custom içerik tanımlanabilir
-- `maxLines` ile uzun otomatik bölümler kırpılır
-
-**Consequences (-):**
-- `.deckent/docs.json` yoksa sistem hiçbir şey yapmaz — opt-in
-- Büyük projelerde onlarca doküman için sprint bitişinde ek I/O yükü
-- `section-updater.ts` markdown heading parse'ı stdlib yokluğundan regex-based — edge case'ler mümkün
-
-**Alternatives Considered:**
-- Hard-coded `sprint-reporter.ts` güncellemeleri — ölçeklenmez, kullanıcı özelleştirme yok, her yeni bölüm tipi kaynak kodu değişikliği gerektirir
-- Harici template engine (Handlebars, Mustache) — runtime dependency, format vendor lock-in, ADR-010 minimal-dependency politikasıyla çelişir
-- Ayrı CLI komutu (`deckent docs run`) — sprint döngüsüne entegre değil, kullanıcıların her seferinde manuel çağırması gerekir, tutarsız state riski
-- Git-based template merge (patch stratejisi) — conflict resolution kompleks, merge çakışmaları kullanıcı deneyimini bozar
-
-**Migration Impact:**
-Mevcut projeler `.deckent/docs.json` oluşturmadan bu sistemi kullanmaz — backward-compat sağlanmıştır. İlk kez etkinleştirmek için `deckent docs add <path>` komutu veya dosyayı manuel oluşturmak yeterlidir.
-
-**References:**
-- Sprint 131 — feat: Managed Docs Universalization (commit hash omitted: pre-migration private-repo SHA, not resolvable in the public repo history)
-- Kaynak: `src/orchestra/managed-docs/managed-doc-runner.ts`, `types.ts`, `docs-config.ts`
-- Entegrasyon noktası: `src/orchestra/sprint-reporter.ts` → `updateProjectDocs()` → `runManagedDocUpdates()`
-
-> **Note (verified):** Managed-docs system confirmed in code — `src/orchestra/managed-docs/` (incl. `docs-config.ts`) exists and `.deckent/docs.json` is present. Behavior unchanged; documentation alignment + repo-migration cleanup only (dead old-repo commit SHA removed).
-
----
-
-**🔴 Amendment — 2026-06-11 (ADR-review): i18n LOCALE-LEAK root cause + fix (recurring K/O bug).**
-
-**Symptom:** every sprint's RETRO render writes **Turkish** section headers/content into **English** managed docs (`CLAUDE.md`, `AGENTS.md`, `VISION.md`, `beta-tracker.md`, `blueprint.md`) — e.g. `Metric|Value`→`Metrik|Değer`, `Total Tasks`→`Toplam Task`. Manually reverted every sprint (Sprint 279/280).
-
-**Root cause (code-confirmed):** `src/orchestra/managed-docs/content-generators.ts:67` → `return ctx.config?.language === 'tr' ? TR : EN;` — generators pick content language from the **project-default locale** (`ctx.config.language`, =`tr` for deckent-dev), **NOT the target language of the doc being written**. `ManagedDocEntry` has `patternsByLang` (for matching section titles in multiple languages) but **no `lang` field** for the doc's target language. In `.deckent/docs.json`, `vision-en` (VISION.md) and `vision-tr` (VISION-TR.md) are separate entries but both have `lang=None` → both render TR → the EN one leaks.
-
-**Fix (two parts):**
-1. **Per-doc locale (this ADR — ADR-029-W):** add a `lang` field to `ManagedDocEntry`; generators use `entry.lang ?? ctx.config.language` so each doc renders in ITS target language. Set `vision-en.lang='en'`, `vision-tr.lang='tr'`, `beta-tracker.lang='en'`, `blueprint.lang='en'`, etc. → EN docs render EN, TR docs render TR.
-2. **Pure-adapter exclusion (ADR-013-W):** `CLAUDE.md`/`AGENTS.md` are adapters, not managed docs — remove from `docs.json` entirely (ADR-013 option A). 
-
-Together these end the recurring leak at the root. Tracked: MASTER-PLAN "ADR-Analizi Türetilen İşler → ADR-029-W" (+ ADR-013-W). md+db senkron.
-
----
-
-
----
-
-## adr-030: Template Engine + Plugin Loader — Managed-Docs Render Pipeline
-
-**Status:** accepted
-
-# ADR-030: Template Engine + Plugin Loader — Managed-Docs Render Pipeline
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
-**Accepted:** Sprint 131
-
----
-
-**Context:**
-Managed-Docs sistemi built-in `SectionGenerator`'ları sprint context'inden markdown üretir. Ancak bazı kullanıcılar:
-- TypeScript yazmadan özel bölüm içeriği oluşturmak istiyor
-- Proje-spesifik metrikler üretmek için kendi JavaScript mantığını çalıştırmak istiyor
-- Farklı dillerdeki bölüm başlıkları için aynı generator'ı kullanmak istiyor
-
-Built-in generator sistemi genişletilemez yapıda kalırsa, her yeni section türü `content-generators.ts` kaynak kodu değişikliği gerektirir.
-
-**Decision:**
-İki katmanlı extensibility sistemi tasarlandı:
-
-**Katman 1: Template Renderer (`template-renderer.ts`)**
-- `&#123;&#123;path.to.value&#125;&#125;` placeholder syntax — `DocUpdateContext`'e karşı çözümlenir
-- `buildTemplateScope()` — sprint result, config, metrikler, agent/skill sayıları, paket versiyonu gibi standart değerleri scope'a ekler
-- `resolvePath()` — nokta-ayrılmış yol üzerinden nested nesne/Map erişimi
-- `renderTemplate()` — regex replace, unresolved placeholder → boş string (non-fatal)
-- Konfigürasyon-level: `ManagedDocEntry.templates: Record<sectionTitle, templateString>`
-
-**Katman 2: Plugin Loader (`plugin-loader.ts`)**
-- `.deckent/generators/` dizininden kullanıcı generator'ları yüklenir
-- **Format A — Declarative JSON** (`.json` uzantısı): `{ id, patterns, patternsByLang, template }` — güvenli, kod çalıştırmaz, `renderTemplate()` ile işlenir
-- **Format B — Executable MJS** (`.mjs` uzantısı): `default export` olarak `SectionGenerator` — `loadUserGeneratorsAsync()` ile dinamik import, sprint pipeline'da *varsayılan olarak* çalışmaz (`--with-plugins` flag gerekir)
-- User generator'lar built-in generator'lardan **önce** denenir (override semantiği)
-
-Güvenlik kararı: JSON generator'lar `loadUserGeneratorsSync()` ile sync olarak sprint içinde çalışır; MJS generator'lar ise ayrı `loadUserGeneratorsAsync()` çağrısı gerektirir ve yalnızca güvenilen kaynaklardan yüklenmelidir.
-
-**Consequences (+):**
-- Template syntax öğrenme eğrisi düşük — `&#123;&#123;metrics.coveragePercent&#125;&#125;%` yeterli
-- JSON format code review kolaylığı ve static analysis uyumluluğu sağlar
-- MJS format güçlü extensibility (herhangi bir hesaplama yapılabilir)
-- User generator'lar built-in'leri override edebilir — proje-spesifik davranış mümkün
-
-**Consequences (-):**
-- MJS generator'lar için güvenlik modeli geliştirilmemiş — keyfi kod çalıştırma riski
-- `buildTemplateScope()` context-snapshot; generator çalışırken yeni değerler scope'a giremez
-- `renderTemplate()` hata toleransı (unresolved → empty string) sessiz hataları gizleyebilir
-
-**Alternatives Considered:**
-- Sadece built-in generator'lar — extensibility yok, her özelleştirme PR gerektirir
-- Tam template engine (Nunjucks, EJS) — ağır bağımlılık, XSS riski context-injection'da
-- WebAssembly sandbox'lı plugin'ler — aşırı karmaşıklık, current requirements ötesinde
-
-**References:**
-- Sprint 131 — Template Engine + Plugin Loader (commit hash omitted: pre-migration private-repo SHA, not resolvable in the public repo history)
-- Kaynak: `src/orchestra/managed-docs/template-renderer.ts`, `plugin-loader.ts`
-- Güvenlik notu: MJS loader gelecekte `src/core/plugin-loader.ts` SkillSandbox entegrasyonuyla güçlendirilebilir (Sprint 133 Task 1)
-
-> **Note (verified):** Confirmed in code — `src/orchestra/managed-docs/template-renderer.ts` and `plugin-loader.ts` exist (two-layer render pipeline as described). Behavior unchanged; documentation alignment + repo-migration cleanup only (dead old-repo commit SHA removed).
-
----
-
-**Amendment log — 2026-06-11 (ADR-review, security status):** The flagged MJS arbitrary-code risk (Consequences −) is currently **latent, not active**: `loadUserGeneratorsAsync()` (the MJS/executable loader) is **NOT wired into the sprint pipeline** (`plugin-loader.ts:70` — "not currently wired … reserved for CLI `docs run --with-plugins`"). Only the safe **JSON declarative** loader (`loadUserGeneratorsSync`) runs in-sprint. **Guard for the future:** if MJS executable generators are ever wired (the reserved `--with-plugins` path), the SkillSandbox integration (Sprint 133 ref) MUST land first — no unsandboxed MJS in the sprint pipeline. md+db senkron (Alperen ADR-review).
-
----
-
-
----
-
-## adr-031: Content Hash Cache — Sprint Dokümanları Hash-Based Invalidation
-
-**Status:** accepted
-
-# ADR-031: Content Hash Cache — Sprint Dokümanları Hash-Based Invalidation
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
-**Accepted:** Sprint 131
-
 ---
-
-**Context:**
-`runManagedDocUpdates()` her sprint bitişinde tüm konfigüre edilmiş dokümanlar için içerik üretimi çalıştırır. Büyük projelerde:
-- 10+ managed doküman, her biri için built-in generator chain çalışır
-- `readdirSync`, `readFileSync`, `JSON.parse` → her doküman için disk I/O
-- AgentPoolManager, SkillPoolManager, modelRegistry instantiation → her bölüm üretiminde
-
-Eğer sprint aralarında doküman içeriği ve konfigürasyon değişmediyse (örn. hotfix sprint — yalnızca küçük bug düzeltmeleri), tüm bu işlem gereksizdir.
-
-Sprint 132 audit'i sync I/O'yu 799 kaynak satırda tespit etti. Cache olmaksızın managed-docs bu sayıyı her sprint'te anlamlı ölçüde artırır.
-
-**Decision:**
-**Dual-key SHA-1 cache** tasarlandı (`doc-cache.ts`):
-
-- **Cache dosyası:** `.deckent/cache/managed-docs-cache.json` — `Record<docId, { entryHash, fileHash, updatedAt }>`
-- **`entryHash`:** `ManagedDocEntry`'nin `autoSections + templates + protectedSections + maxLines` alanlarının JSON serialization hash'i — konfigürasyon değişikliklerini tespit eder
-- **`fileHash`:** Hedef dosyanın mevcut içeriğinin hash'i — dışarıdan yapılan değişiklikleri (manuel düzenleme, başka araç) tespit eder
-- **`contentHash(input)`:** `node:crypto` SHA-1, 40 hex karakter — çarpışma-güvenli yerel cache invalidation için yeterli
-- **Cache skip mantığı:** `cached.entryHash === entryHash && cached.fileHash === fileHash` → `reason: 'cached_no_change'`, generator çalışmaz
-- **Cache yenileme:** Doküman güncellendikten sonra yeni `fileHash` yazılır; hiç değişmese bile `updatedAt` güncellenir
-- **Cache temizleme:** `clearDocCache()` → CLI `docs run --no-cache` tarafından çağrılır
-
-**Consequences (+):**
-- Değişmeyen dokümanlar için sıfır I/O — repeated sprint'lerde anlamlı hız farkı
-- Cache dosyası küçük (doküman başına ~100 byte JSON), `.gitignore`'a eklenebilir
-- İki ayrı key sayesinde konfigürasyon değişikliği veya dosya değişikliği ikisi de ayrı ayrı invalidation tetikler
-- `--no-cache` escape hatch ile kullanıcı her zaman tam yenileme yapabilir
-
-**Consequences (-):**
-- SHA-1 artık kriptografik güvenlik için önerilmez — ancak burada yalnızca cache invalidation için kullanılıyor, güvenlik riski yok
-- Cache dosyası stale olabilir (örn. generator mantığı kaynak kodda değiştiğinde) — major version bump'ta `clearDocCache()` çağrılmalı
-- `node:crypto` ek I/O — ancak tek `createHash` çağrısı generator chain I/O'sunu geçemez
 
-**Alternatives Considered:**
-- mtime-based invalidation — symlink ve cross-filesystem mount'larda güvenilmez; WSL2 üzerinde mtime'lar zaman zaman tutarsız davranır
-- MD5 hash — SHA-1 kadar hızlı, ancak SHA-1 Node.js `crypto` built-in API'de standart ve daha yaygın kabul görür
-- In-memory cache (process lifetime) — Sprint restart'larında ve yeni terminal session'larında korunmaz; uzun-süren sprint'lerde tutarlı ama genel çözüm değil
-- No cache — her sprint'te gereksiz I/O (rejected, Sprint 132 audit bulgusu: 799 sync I/O hot path)
-- File watcher (fs.watch) — event-driven invalidation gereksiz karmaşıklık, doküman sayısı az, polling yeterli
+## Context
 
-**Cache Key Design Rationale:**
-Dual-key (entryHash + fileHash) tasarımı şu senaryoları bağımsız olarak ele alır:
-- Sadece konfigürasyon değişti (yeni autoSection eklendi) → entryHash değişir, rebuild gerekir
-- Sadece dosya değişti (kullanıcı manual düzenledi) → fileHash değişir, rebuild gerekir
-- İkisi de değişmedi → cache hit, rebuild atlanır
-Tek-key (yalnızca fileHash) konfigürasyon değişikliklerini gözden kaçırırdı.
+Three dev-class decisions describe one concern — *how deckent's test suite is framed, written, and kept hermetic*:
 
-**References:**
-- Sprint 131 — Content Hash Cache (commit hash omitted: pre-migration private-repo SHA, not resolvable in the public repo history)
-- Kaynak: `src/orchestra/managed-docs/doc-cache.ts`, `managed-doc-runner.ts`
-- İlgili: Sprint 132 Task 4 (loadConfig module-level cache) — benzer dual-key pattern, aynı motivasyon
+- **ADR-003 (2026-04-16)** chose **vitest over Jest** (native ESM, faster startup, v8 coverage, Jest-compatible API).
+- **ADR-005** originally mandated synchronous I/O; Sprint 132 hot-path performance problems **deprecated** it. Its replacement guidance (async + hermeticity) then lived only in a *deprecated* ADR's Note plus the CLAUDE.md worker rules — and **deprecated ADRs carry no active law to the agents** (Alperen, 2026-06-11: "deprecated ADR işe yaramaz; async + hermeticity diğer modeller de görmeli").
+- **ADR-087 (2026-06-11)** closed that governance gap: async I/O + test hermeticity, elevated into an **accepted, agent-injected** ADR that every worker model reads.
+- **ADR-078 Part-A (Sprint 215)** built the three permanent hermeticity artifacts (`test:ci-sim`, `lint-test-hermeticity`, `sandbox-home`) — battle-tested in the Sprint 214–215 CI green-up.
 
-> **Note (verified / evolution):** Dual-key cache (`entryHash` + `fileHash`) confirmed in `src/orchestra/managed-docs/doc-cache.ts` (`contentHash()`). **Extended in Sprint 166 (Bug S fix):** sprint-aware invalidation was added — caches are now forced-invalidated across sprints and pre-Sprint-166 cache entries are intentionally invalidated, so the original two-key model now has a third (sprint) dimension. Behavior unchanged; documentation alignment + repo-migration cleanup only (dead old-repo commit SHA removed).
+The 2026-06-30 review merges them into one ADR-D and records the ADR-005 supersession explicitly.
 
 ---
 
+## Decision (Today)
 
----
-
-## adr-032: i18n Pattern System — TR/EN İçerik Çeşitliliği Desteği
-
-**Status:** accepted
-
-# ADR-032: i18n Pattern System — TR/EN İçerik Çeşitliliği Desteği
-
-**Status:** accepted
-
-**Date:** 2026-04-16
-
-**Accepted:** Sprint 131
-
----
+### 1. Test framework — vitest (over Jest)
 
-**Context:**
-Deckent TR ve EN kullanıcı tabanına sahip. Sprint 131 öncesinde:
-- `content-generators.ts` built-in generator'ları yalnızca İngilizce başlık desenleri eşleştiriyordu
-- Türkçe dokümanlar (`## Sprint Metrikleri`, `## Agent Performansı`) için generator match yoktu
-- Sabit string'ler (tablo başlıkları, hata mesajları) EN-only hard-coded
-- Kullanıcı Türkçe bölüm başlığı kullandığında generator hiç çalışmıyor, bölüm boş kalıyordu
+vitest is the test framework: native ESM, fast startup, v8 coverage (`@vitest/coverage-v8`), Jest-compatible API. Tests live under `tests/`; configuration is **dual** — `vitest.config.ts` (root suite) + `vitest.dashboard.config.ts` (dashboard suite). Jest dependency/config is **zero** (the only `jest` trace is the dashboard's `@testing-library/jest-dom` DOM-matcher, used *with* vitest — not a violation). Fork-bounding / CI-hermeticity settings are baked into config.
 
-Sprint 092'de `Dashboard i18n` implementasyonu (React tarafı) yapılmıştı; ancak server-side doküman üretim sistemi dil-agnostik hale getirilmemişti.
+> **Note:** local full-suite runs are memory-capped (≤16 GB; `VITEST_MAX_FORKS=2` + split batches) — a single-process full run OOMs under WSL. (Binding dev constraint; memory `feedback_vitest_16gb_local_cap`.)
 
-**Decision:**
-İki katmanlı i18n stratejisi:
+### 2. No `spawnSync` for subprocesses — async `spawn`
 
-**Katman 1: `patternsByLang` — Dil-Spesifik Başlık Eşleştirme**
-`SectionGenerator` arayüzüne `patternsByLang?: Record<string, string[]>` eklendi:
-```typescript
-{
-  patterns: ['sprint metrics', 'metrics'],
-  patternsByLang: {
-    tr: ['sprint metrikleri', 'metrikler', 'sprint istatistikleri'],
-    de: ['sprint-metriken', 'metriken'],
-    es: ['métricas', 'estadísticas del sprint'],
-  }
-}
+```xml
+<async-spawn>
+  <rule>All subprocess invocation uses async spawn (node:child_process)
+        + Promise.allSettled batching — never spawnSync.</rule>
+  <why>spawnSync blocks the event loop → CI timeouts + O(n) scan contention
+       (Sprint 279 WK-7: the auditor's 30s scan ran a per-worker spawnSync('docker', …)).</why>
+  <sanctioned-exception>The ADR-G-002 spawnSync security pattern (array-args, no shell)
+       for SHORT, TRUSTED, non-hot-path one-shots is the SOLE permitted spawnSync use.</sanctioned-exception>
+</async-spawn>
 ```
-`findGenerator()` hem `patterns` hem tüm `patternsByLang` değerlerini birleştirerek arar. Konfigürasyon dil anahtarı kullanılmaz — tüm diller her zaman aranır (language-agnostic match). Bu yaklaşım mixed-language dokümanları da destekler.
 
-**Katman 2: `I18nStrings` — Üretilen İçerik Lokalizasyonu**
-`content-generators.ts` içinde:
-- `I18nStrings` interface — tablo başlıkları, durum mesajları, hata string'leri
-- `EN` ve `TR` sabit objeleri — compile-time derleme, runtime yük yok
-- `i18n(ctx)` helper — `ctx.config?.language === 'tr' ? TR : EN` — EN default
-- Her built-in generator `i18n(ctx)` çağırır: `const s = i18n(ctx)` → `| ${s.metric} | ${s.value} |`
+### 3. Hot-path I/O async; one-shot startup may stay sync
 
-Dil konfigürasyonu: `.deckent/config.json`'da `"language": "tr"` veya `"en"`. `buildStandaloneDocContext()` config.json'dan okur, sprint pipeline'da `ctx.config.language` üzerinden taşınır.
+Hot-path file/network I/O — loops, scan cycles, worker dispatch, large reads — MUST be async. A **one-shot small config read at startup** (`readFileSync` of a <1 KB JSON) MAY stay sync: the Sprint 132 perf failure was hot-path, not startup.
 
-**Consequences (+):**
-- Tüm built-in generator'lar TR ve EN çıktı üretir — zero configuration
-- `patternsByLang` ile DE, ES, FR gibi yeni diller ekleme kolaylığı — tek obje değişikliği
-- User-defined JSON generator'lar da `patternsByLang` kullanabilir — tam extensibility
-- Mixed-language dokümanlarda hem Türkçe hem İngilizce başlıklar eşleşir
+### 4. Tests hermetic
 
-**Consequences (-):**
-- Yalnızca TR ve EN tam string tablosu — DE/ES/FR için `patternsByLang` match yapar ama içerik EN çıkar
-- `i18n()` helper context-based, statik — runtime dil değişimi desteklenmiyor (sprint restart gerektirir)
-- Yeni built-in string eklemek hem `EN` hem `TR` objelerini güncellemeyi gerektirir — senkronizasyon riski
+```xml
+<hermeticity>
+  <rule>All test I/O under os.tmpdir() (e.g. withSandboxHome()); cleaned up in afterEach.
+        Never write to project root or real HOME.</rule>
+  <rule>NEVER read gitignored local state — .deckent/config.json, .brain/memory.db,
+        ~/.deckent, .deck/ — they are absent on a fresh checkout.</rule>
+  <rule>No real network / docker. Assume the only files present are those committed to git.</rule>
+  <verify>npm run test:ci-sim — the canonical hermetic reproducer.</verify>
+</hermeticity>
+```
 
-**Alternatives Considered:**
-- ICU message format (i18next, formatjs) — ağır bağımlılık, Deckent minimal-dependency politikasıyla çelişir (ADR-010)
-- Harici `.json` locale dosyaları — runtime file I/O, deployment karmaşıklığı
-- Yalnızca İngilizce — TR kullanıcı deneyimini kırar, Deckent TR-first tasarım vizyonuyla çelişir
-- Enum-based dil anahtarı yerine string — `'tr' | 'en'` union type daha iyi tip güvenliği sağlardı (gelecek iyileştirme)
+### 5. The three hermeticity artifacts (ADR-078 Part-A)
 
-**References:**
-- Sprint 131 — i18n Pattern System (commit hash omitted: pre-migration private-repo SHA, not resolvable in the public repo history)
-- Kaynak: `src/orchestra/managed-docs/content-generators.ts` (I18nStrings, EN, TR, i18n)
-- Kaynak: `src/orchestra/managed-docs/types.ts` (`patternsByLang` field)
-- İlgili: Sprint 092 Dashboard i18n (React tarafı), Sprint 084 i18n kapsam genişletmesi
+```xml
+<hermeticity-artifacts>
+  <artifact path="scripts/test-ci-sim.mjs" cmd="npm run test:ci-sim">
+    Renames .deckent/config.json + .brain/memory.db + .brain/ to backups, runs
+    CI=1 vitest run, restores in try/finally (no state lost even on crash — covers
+    SIGTERM, not SIGKILL). Reproduces the clean-machine CI environment locally in seconds.</artifact>
+  <artifact path="scripts/lint-test-hermeticity.mjs">
+    Scans tests/**/*.ts for readFileSync of gitignored state without a skip-if-absent
+    guard; reports file:line violations; maintains a skip-pattern allowlist.</artifact>
+  <artifact path="tests/helpers/sandbox-home.ts">
+    withSandboxHome(fn) / useSandboxHome() — redirect process.env.HOME to a unique
+    os.tmpdir() dir per test, cleaned up after; nested calls independent.</artifact>
+</hermeticity-artifacts>
+```
 
-> **Note (verified):** `patternsByLang` is present in `src/orchestra/managed-docs/types.ts` and the `I18nStrings`/`EN`/`TR`/`i18n()` localization layer in `content-generators.ts` — the two-layer i18n design described above is confirmed in code. (Line numbers dropped — drift-prone.) Behavior unchanged; documentation alignment + repo-migration cleanup only (dead old-repo commit SHA removed).
+### 6. Agent-injected
 
----
+This async + hermeticity rule is **agent-injected**: every worker model (Claude / Codex / Gemini) in the dev/dogfood environment reads it via ADR prompt-injection, and it is anchored in `.claude/rules/karpathy-discipline.md` ("CUSTOM — Test Hermeticity"). It is no longer a buried deprecated-Note; it is an enforced, injected decision. (Per ADR-G-019 class/scope-aware recall, ADR-D reaches dev/dogfood workers, not user-project workers.)
 
-**🔴 Amendment — 2026-06-11 (ADR-review): Layer-2 = locale-leak root + definitive per-language separation principle (Alperen).**
+### 7. Routing
 
-**Finding:** Layer 2's `i18n(ctx)` = `ctx.config?.language === 'tr' ? TR : EN` chooses content language from the **project-default locale**, NOT the **target language of the doc being rendered**. In a TR-default project this writes Turkish headers/content into **English** docs (CLAUDE.md/AGENTS.md/VISION.md/beta-tracker.md/blueprint.md) — the recurring locale-leak (same root identified in ADR-029). Layer 1 (`patternsByLang`, language-agnostic matching) is fine; Layer 2 (content generation) is the leak.
-
-**Principle (Alperen 2026-06-11):** **Kesin dil-ayrımı.** Multi-language projects are allowed (some docs EN, some TR — `vision-en` + `vision-tr`), but **in the selected language the entire flow must be flawless** — never mixed TR/EN within one doc. Each doc/flow renders cleanly in ITS OWN declared language.
-
-**Fix:** `i18n()` (and all generators) must honor **per-doc language**: `entry.lang ?? ctx.config.language`. Each `ManagedDocEntry` declares its `lang`; the render is flawless in that language. Tracked: ADR-029-W + ADR-013-W (CLAUDE/AGENTS → pure adapters). This is the i18n-quality bar ([[feedback_god_level_i18n_quality_bar]]) applied to managed-docs. md+db senkron.
+CI / test-infra tasks (pipeline fixes, hermetic reproducer) route to the **ci-guardian** agent + **ci-testing** skill (`activation-engine.ts`), so CI-hygiene work gets the right specialization automatically.
 
 ---
 
+## Intent / Roadmap (Tomorrow)
+
+- **ADR-087-W — residual `spawnSync` migration:** ~15 `spawnSync` calls remain in `auditor.ts` (including the ADR-G-002 enforcement string + `gatherCiBaseline`); migrate them to async `spawn`. The auditor's liveness probes are **already** async-batched (Sprint 279); this closes the remaining tail. (MASTER-PLAN: ADR-087-W.)
+- **`test:ci-sim` SIGKILL-hardening:** the rename/restore `try/finally` covers SIGTERM but not SIGKILL (stranded backups then need a manual rename) — a crash-safe restore is a candidate refinement.
 
 ---
 
-## adr-033: Product Vision — Product Not Service
+## Consequences
+
+**(+)** One dev-class law frames the suite (vitest), forbids event-loop-blocking `spawnSync` (with the ADR-G-002 security carve-out as the sole exception), and makes hermeticity structurally enforceable (`test:ci-sim` reproducer + `lint-test-hermeticity` guard + `sandbox-home` helper). The async/hermetic rule is agent-injected, so every dev/dogfood worker writes hermetic, non-blocking code by default. ADR-005's archival removes a dead deprecated-Note from the active set.
+
+**(−)** ~15 residual `spawnSync` calls in `auditor.ts` await ADR-087-W migration; `test:ci-sim` is not SIGKILL-safe; enforcement is advisory (the auditor/reviewer **flags** a new `spawnSync` outside the exception — it is not a hard block). Local full-suite runs require the ≤16 GB fork-bounded batch discipline.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-003 (vitest over Jest) · ADR-087 (Async I/O & Test Hermeticity Standard — async spawn, hot-path-async, hermetic tests, agent-injected) · ADR-078 Part-A (CI-Hermeticity artifacts: `test-ci-sim` + `lint-test-hermeticity` + `sandbox-home`).
+- **Supersedes:** ADR-005 (Synchronous I/O — **archived**; the async successor is now this active, injected law).
+- **Cross-ref:** ADR-G-002 (spawnSync Security Pattern — the sanctioned array-args exception; sync-vs-async is the orthogonal axis this ADR owns) · ADR-D-001 (Build Baseline — the TS/ESM/Node toolchain the suite runs on) · ADR-G-019 (ADR Governance — ADR-D class/scope-aware injection to dev/dogfood workers).
+- **Born work-items:** ADR-087-W (residual `spawnSync` migration in `auditor.ts`) · `test:ci-sim` SIGKILL-hardening (candidate).
+- **Direction:** `.analysis/adr-review-crosswalk.md` (rows 003 + 087 + 078-A → ADR-D-002), `.claude/rules/karpathy-discipline.md`, memory `project_ci_green_root_causes` · `project_test_home_leak` · `feedback_vitest_16gb_local_cap`.
+</content>
+
+
+---
+
+## adr-d-004: Brain Central Import — One-Way Dependency
 
 **Status:** accepted
 
-# ADR-033: Product Vision — Product Not Service
+# ADR-D-004: Brain Central Import — One-Way Dependency
+
+**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=`authority-enforcer.ts` ADR-008 check + `core/ → orchestra/` import-direction scan (advisory/soft per ADR-037 V1.0 — warns + emits, does not hard-block) → tomorrow=LAYER-1 inversion cleanup (residual violations) + hard-flip under the ADR-G-020 enforcement-engine
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-008 (Brain Merkezi Import — Tek Yönlü Bağımlılık) · **Supersedes:** —
+**Crosswalk:** ADR-008 → ADR-D-004 (role-separation split out → ADR-G-020)
+
+> **Scope note:** This ADR is about **import direction / code hygiene only**. The "Brain orchestrates but never authors code" *role-separation* concern was separated out during the 2026-06-30 review and now lives in **ADR-G-020** (Authority Matrix, Rule-4 / ROLE-GUARD). Do not put role-separation here — this is purely the module-dependency-direction convention.
+
+---
+
+## Context
+
+Cyclic imports produce undefined behavior in Node.js ESM. Deckent's layering avoids cycles by keeping a strict one-way dependency direction: the orchestration (Brain) layer imports the lower layers; the lower layers never import upward. The original ADR-008 stated this as "Brain is the only module that imports tmux/auditor/worker," verified by a `from.*brain` grep.
+
+That phrasing aged in two ways. First, the god-object split (ADR-D-006, ex-024/026) deliberately broke the monolithic Brain into many `sprint-*` organs — so "the only importer" is no longer a single file. Second, the *real* enforced invariant turned out to be broader and more precise than the original grep, and code drift left a handful of genuine inversions. This record restates the rule against today's module map and lists the residual violations as cleanup work.
+
+---
+
+## Decision (Today)
+
+### 1. The enforced invariant — `core/` must not import `orchestra/`
+
+The live lint (`src/orchestra/authority-enforcer.ts`, ADR-008 check) scans the **import direction `core/ → orchestra/`**: `core/` must not depend on `orchestra/`. This is broader and more accurate than the original `from.*brain` grep. Per ADR-037 V1.0 the check is **advisory/soft** — it warns and emits an audit signal, it does not hard-block.
+
+### 2. The "Brain-family" — who may import tmux/auditor/worker
+
+The Sprint-281 amendment defined the family precisely, since the split organs are *not* violations:
+
+> **Brain-family** = `sprint-controller` + its extracted phase/helper organs (`sprint-phases`, `sprint-spawner`, `sprint-lifecycle`, `sprint-planner`, `sprint-finalizer`, `sprint-utils`, `result-collector`, `result-evaluator`, `debt-manager`, `resource-monitor`) + the spawn abstraction (`spawn-backend`, `spawn-backend-docker`) + the thin re-export shims (`brain.ts` / `index.ts`).
+
+Only the Brain-family may import `tmux` / `auditor` / `worker`. Family-external orchestra modules, `cli/`, `api/`, and `mcp/` must not import those three directly. The one-way principle is invariant: **tmux/auditor/worker never import brain; `core/` never imports any upper layer.**
+
+### 3. Sanctioned exceptions + a resolved cycle
+
+- **Provider CLI-spawn adapters** (`src/providers/claude.ts` → `orchestra/tmux.js` for `killWorker`/`listWorkers`/`ensureSession`/…) are **not** violations: per ADR-017 + ADR-027→ADR-G-014, a CLI-spawn adapter legitimately wraps the tmux/spawn-backend arm. Rule: provider adapters may wrap tmux/spawn-backend; they may **never** import auditor/worker; the one-way direction still holds.
+- **Resolved cycle (Sprint 279):** the `core/audit-writer` + `core/audit-query` → `orchestra/event-stream` cycle was fixed by **moving `event-stream` into `core/`** (`src/core/event-stream.ts`); `orchestra/event-stream.ts` is now a re-export shim.
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+**LAYER-1 inversion cleanup** — the advisory enforcement let several genuine inversions persist; each is a tracked work-item:
+
+- **ADR-008-W:** `src/core/routing-engine.ts:30` imports `analyzeSkillInMemory` from `../orchestra/ecosystem-intelligence.js` — the one remaining `core/ → orchestra/` import. Fix: move the consumed function/module into `core/`, or invert the dependency.
+- **ORCH-W1 (reverse-direction leak):** `task-mode-runner.ts → cli/commands/run + spawn` — a ~302-LoC `spawnWorkerMultiProvider` lives in CLI and orchestra depends on it; move the spawn logic into orchestra and make CLI a thin wrapper. Also `sprint-finalizer` / `sprint-phases → cli/helpers` (presentation/splash) imports.
+- **CORE-W1:** `directive-interrogator.ts:18` — a second `core/ → cli/` violation.
+- **API-W1:** the systemic `api/ → cli/` inversion (business logic lives in core/orchestra; cli/api/mcp are thin surfaces).
+
+When ADR-G-020's enforcement-engine graduates (ADR-094 flag-gated vein → default-on), this advisory import check can **hard-flip** to a blocking gate.
+
+---
+
+## Consequences
+
+**(+)** Clean, cycle-free one-way layering; a precise, code-verified statement of which modules may import the orchestration internals; thin cli/api/mcp surfaces with business logic concentrated in core/orchestra; the god-object split is reconciled with the rule (its organs are family members, not violations).
+
+**(−)** Advisory/soft enforcement (ADR-037 V1.0) allowed real inversions to accrue — four open cleanup items (ADR-008-W, ORCH-W1/W2, CORE-W1, API-W1). Until the G-020 enforcement-engine hard-flips, the invariant is documentation + warn-level signal, not a blocking gate.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-008 (one-way import direction; Brain-family definition; sanctioned provider-adapter exception; Sprint-279 event-stream cycle-fix).
+- **Split out:** role-separation ("Brain never authors code") → **ADR-G-020** (Authority Matrix Rule-4 / ROLE-GUARD).
+- **Cross-ref:** ADR-D-006 (the god-object split created the Brain-family organs), ADR-G-014 (Spawn Backend — provider-adapter wrapping), ADR-017 (provider adapters), ADR-027→ADR-G-014 (hybrid spawn), ADR-G-019 (ADR-D contributor convention under the taxonomy).
+- **Born work-items:** ADR-008-W, ORCH-W1 / ORCH-W2, CORE-W1, API-W1 (LAYER-1 inversion cleanup). The canonical refined statement of these import rules also lives in `CLAUDE.md` and `docs/reference/api-surface.md` (Module Import Rules).
+
+
+---
+
+## adr-d-005: Dependency Policy & Inventory (All Deps + Rationale)
 
 **Status:** accepted
 
-**Date:** 2026-04-11
+# ADR-D-005: Dependency Policy & Inventory (All Deps + Rationale)
 
-**Sprint:** 134
+**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=per-dependency rationale in the living inventory + exact-version pin + audited source → tomorrow=keep the inventory current as deps grow + automated audit / SBOM gate
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-010 (Tek Runtime Dependency → Dependency Policy), ADR-011 (node:readline built-in prompt) · **Supersedes:** —
+**Crosswalk:** ADR-010 + ADR-011 → ADR-D-005
 
----
-
-**Context:**
-Deckent, Sprint 134 itibarıyla kritik bir kavramsal dönüm noktasına ulaştı. 130+ sprint sürecinde organik büyüme, zaman zaman "SaaS platform" ya da "kurumsal servis" yönünde baskı yarattı: cloud deployment fikirleri, paywall tartışmaları, enterprise tier düşünceleri, SOC2 sertifikasyonu önerileri. Bu baskıların tamamı tek bir tutarsızlık kaynağından besleniyor:
-
-**Deckent'in ne olduğu hiçbir zaman formal olarak kayıt altına alınmamıştı.**
-
-Kullanıcı deneyimi gözlemleri:
-- Yeni geliştirici `npx deckent init && deckent start` ile <5 dakikada sprint başlatabilmeli
-- Kurulum, lisans, bulut hesabı, API anahtarı, ödeme bilgisi gerektirmemeli
-- Deckent offline çalışabilmeli (Claude Code local session ile)
-- Her proje kendi `.deckent/` dizinine sahip — veri hiçbir yerde paylaşılmıyor
-
-Sprint 133 post-mortem'de "product-not-service" ifadesi üç ayrı bağlamda kullanıldı ve herhangi bir şekilde formalize edilmedi. Sprint 134 DIRECTIVES bu boşluğu kapatmak için T-007'yi "DOKUNULAMAZ VİZYON" olarak işaretledi.
-
-Referans bellek: proje hafızası — `memory.db` entry `project_vision_product_not_service` (Memory V2; `deckent recall "product not service"`)
-
-**Decision:**
-Deckent bir **üründür (product)**, **servis değildir (not service)**.
-
-Bu kararın dört dokunulamaz prensibi:
-
-1. **Product, not service** — Deckent bulutta yaşamaz. Kullanıcının makinesinde çalışır. Bir API endpoint'e bağımlı değildir. Sunucu yoktur, uptime SLA'sı yoktur, oncall ekibi yoktur.
-
-2. **Kur-çalıştır kolay** — `npx deckent init && deckent start` iki komutla tam işlevsel bir sprint orkestrasyon sistemi kurulur. Kurulum friction'ı sıfıra yakın olmalıdır. Wizard, interaktif setup, README-first onboarding.
-
-3. **Açık kaynak, ücretsiz** — Deckent'in hiçbir özelliği ödeme duvarının arkasında olamaz. Tüm core özellikler MIT lisansı altında. Topluluk katkısı teşvik edilir. Fiyatlandırma modeli yoktur.
-
-4. **Herkese, her yerde** — macOS, Linux, WSL2, Docker, CI ortamları. Dil engeli yoktur (TR/EN i18n). Bant genişliği kısıtlı ortamlarda çalışır. Local model desteği roadmap'te.
-
-**Kaldırılan / Yasak Boyutlar:**
-
-Bu karar aşağıdaki yönlerin Deckent roadmap'inden kalıcı olarak çıkarıldığını ilan eder:
-
-| Boyut | Neden Yasak |
-|-------|-------------|
-| SaaS model | Sunucu bağımlılığı yaratır, product kimliğiyle çelişir |
-| Cloud-hosted deployment | Kullanıcı verisini dışarı taşır, gizlilik ilkesini kırar |
-| Paywall / premium tier | Açık kaynak taahhüdüyle uyumsuz |
-| Enterprise edition | İki kod tabanı yaratır, topluluk bölünmesine yol açar |
-| SOC2 / ISO 27001 sertifikasyonu | Kurumsal servis modeli gerektirir, ürün kimliğiyle çelişir |
-| Oncall / SLA / uptime monitoring | Servis sorumluluğu gerektirir — ürün mimarisinde geçersiz |
-| Multi-tenant cloud infrastructure | ADR-034 ile net ayrım: multi-project ≠ multi-tenant SaaS |
-| Subscription billing | Ödeme altyapısı = servis olmak demektir |
-| Vendor lock-in | Belirli bir bulut sağlayıcısına bağımlılık kabul edilemez |
-
-**Korunan / Güçlendirilen Boyutlar:**
-
-Bu karar aşağıdaki yönlerin öncelikli geliştirme alanları olduğunu teyit eder:
-
-| Boyut | Gerekçe |
-|-------|---------|
-| Local observability | Kullanıcı kendi sprint metriklerini kendi makinesinde görür (T-011) |
-| God object split | Modüler, anlaşılabilir kod = ürün kalitesi (T-009, T-010) |
-| Task dependency pipeline | Gerçek orkestrasyon zekası, ürün değer önerisi (T-001) |
-| Distribution | `npx deckent` — sıfır kurulum, her yerde çalışır |
-| Setup wizard | İlk deneyim mükemmel olmalı — kur-çalıştır hedefi |
-| Local model support | Offline-first, API key gerektirmeyen sprint modu (roadmap) |
-| i18n / TR-EN | Ürün her kullanıcıya kendi dilinde konuşur |
-| Cross-platform | macOS + Linux + WSL2 + Docker = herkese her yerde |
-| Açık kaynak ekosistemi | OpenHands, Aider, OpenClaw ile ittifak — değer paylaşımı |
-
-**Consequences (+):**
-
-- Tüm mühendislik kararları net bir lens üzerinden geçer: "Bu özellik local product deneyimini mi güçlendiriyor?"
-- Roadmap tartışmalarında "SaaS yapalım mı?" sorusu geçerliliğini yitirir — ADR-033 referans gösterilir
-- Katkıda bulunanlar ürün kimliğini anlar, yanlış yönlü PR'lar azalır
-- OpenHands ve Aider gibi open-source CLI araçlarla ekosistem uyumu artar
-- Kullanıcı trust'ı: veri asla dışarı çıkmıyor, garantisi var
-
-**Consequences (-):**
-
-- Gelecekte kurumsal gelir modeli kurmak isteyenler için kapı kapalı
-- Hosting hizmeti sunmak isteyen community fork'ları bu ADR'a aykırı davranır
-- "Managed Deckent cloud" gibi ticari girişimlerin core repo'ya merge edilmesi reddedilir
-- SaaS rakiplerine karşı "anında erişim" avantajı kaybolur (kurulum gerekir, kayıt yok)
-
-**Alternatives Considered:**
-
-- **Freemium SaaS** — Ücretsiz tier + premium bulut özellikleri. Reddedildi: iki kimlik yaratır, açık kaynak taahhüdünü sulandırır.
-- **Enterprise self-hosted** — Kurumsal lisans, on-prem deployment. Reddedildi: farklı destek altyapısı gerektirir, topluluktan kopuş başlar.
-- **Hibrit model** — Core açık kaynak, bulut senkronizasyon eklentisi. Reddedildi: "her şey local" ilkesini kırar, veri akışı gizlilik sorusu yaratır.
-- **Platform agnostik (karar erteleme)** — Şimdilik karar verme, her iki yöne açık kal. Reddedildi: belirsizlik mühendislik maliyeti yaratır, yanlış yönlü feature'lar birikmesine neden olur.
-
-**References:**
-
-- Sprint 134 DIRECTIVES — "DOKUNULAMAZ VİZYON" bölümü
-- Proje hafızası: `memory.db` entry `project_vision_product_not_service` (Memory V2)
-- ADR-034: Multi-Project Isolation (kardeş ADR — multi-project ≠ SaaS multi-tenant)
-- ADR-010: Minimal Dependencies (bağımlılık minimizasyonu, product kimliğiyle uyumlu)
-- `docs/vision/roadmap.md` — Halka açık yol haritası, product vizyonu pazarlama diliyle
-- OpenClaw GitHub — kur-çalıştır referans implementasyon
-- Sprint 134 design spec: `docs/superpowers/specs/2026-04-11-sprint-134-design.md`
-- ADR-008: Module Import Rules — brain/worker sınır disiplini tek-kod-tabanı product kimliğini güçlendirir (SaaS servis katmanına ihtiyaç bırakmaz, community fork'lar aynı sınırları korur)
+> **Reframe note (2026-06-30):** The old "single / minimal runtime dependency" dogma is **removed**. A dependency *count target* is the wrong discipline — it would block essential capabilities (LLM/AI providers, MCP, embedded SQL memory, crypto, PTY, rich UI). The real discipline is **merit-based selection + security rigor**, recorded in a living inventory. This is a contributor-only build policy (ADR-D, dev install).
 
 ---
 
-## Amendment — Sprint 281 (2026-06-11, Alperen): Modüler-lisans rafinmanı (MOD-SPLIT) — İHLAL DEĞİL
+## Context
 
-ADR-033'ün 4 dokunulamaz çekirdek ilkesi (product-not-service, kur-çalıştır-kolay, herkese-her-yerde, local-first/privacy) **AYNEN GEÇERLİDİR.** Tek rafine edilen boyut **lisanslama yapısı**:
+ADR-010 was written at Sprint 044 when deckent was CLI-only and declared a **single runtime dependency** (`commander`), with `chalk`/`inquirer`/`prompts` explicitly excluded. That CLI-era dogma drifted as the product grew: the Sprint-172 inventory recorded 9 runtime deps, the Sprint-281 inventory 13 + 1 optional — each one ADR-justified (MCP server, Memory V2 / SQLite, connectors, crypto identity, embedded terminal, native REPL, dashboard).
 
-**Karar (rafine):** deckent **TEK ürün, TEK kod tabanı** olarak devam eder ("böyle başladık böyle devam edeceğiz"). Enterprise yetenekleri **ayrı ürün/fork DEĞİL** — **aynı kod tabanında modüler, eklenebilir bir katman** (`core` + `enterprise-layer`). Lisans yapısı:
-- **Community çekirdek: MIT, ücretsiz** (değişmedi — tüm bireysel/temel kullanım).
-- **Enterprise modül: FARKLI lisanslı** (MIT değil) — ama **aynı kod tabanında modüler katman**, lisansla eklenir/etkinleşir. 
-
-**Bu bir ADR-033 ihlali DEĞİLDİR:** "Enterprise edition yasak" satırının asıl gerekçesi **"iki kod tabanı + topluluk bölünmesi"** idi — bu rafinman **tam tersine tek-kod-tabanını korur** (ayrı repo/fork yok, modüler katman). "Paywall" community çekirdeği değil yalnız enterprise-modülü kapsar; bireysel kullanıcı için hiçbir şey ödeme-duvarı arkasına geçmez.
-
-**Güncellenen YASAK/İZİN:** "Enterprise edition (ayrı kod tabanı)" → hâlâ YASAK (ayrı kod tabanı/fork yok). "Enterprise modül (aynı kod tabanı, farklı lisans)" → İZİNLİ (yeni). SaaS/cloud-hosted/vendor-lock-in → hâlâ YASAK (değişmedi).
-
-İş planı: MASTER-PLAN §8 MOD-SPLIT bu yapıya göre güncellendi (aynı kod tabanı + modüler enterprise-layer + farklı lisans). Cross-ref: [[project_community_pro_split_strategy]], [[project_product_repo_migration_push]], ADR-034 (multi-project ≠ multi-tenant). md+db senkron.
+The 2026-06-30 review made the drift official policy: **artificially constraining the dependency surface is wrong.** "We can't manage one-time deps" is a false economy — the LLM/AI provider integrations, MCP transport, FTS5 memory, and rich terminal/dashboard are core capabilities that *require* real, well-chosen dependencies. The Hermes lesson is not minimalism but **discipline**: every dependency chosen on merit, version-pinned, source-audited, and its security surface justified. ADR-010's count-based framing is retired; the governing artifact becomes a **dependency policy + living inventory**. ADR-011 (the built-in `node:readline` prompt decision) folds in here as one applied instance of "use a built-in where it genuinely suffices" — not as a constraint, just the right tool for one narrow case.
 
 ---
+
+## Decision (Today)
+
+### 1. Policy — merit-based, not count-based
+
+- Every runtime dependency is admitted on **merit**: it delivers a real capability, with **rationale + alternatives-considered** recorded in the inventory below. **There is no count cap.**
+- **Security discipline is mandatory** for every dependency: version pinned, source audited, and any non-trivial security surface explicitly justified (e.g. `ws` chosen over a hand-rolled RFC6455 implementation specifically to avoid owning that attack surface; `@noble/*` chosen as audited zero-dep crypto).
+- **Built-in-first where a built-in genuinely suffices** — a heuristic, not a dogma. Simple, non-interactive prompts (text / select / confirm) use `node:readline/promises` (`src/cli/helpers/prompt.ts`: `promptText` / `promptSelect` / `promptConfirm`), which serves the init wizard + confirm + headless/script contexts without a `inquirer`-class dependency. **Rich UI is a first-class core feature** via `ink` + `react` (native REPL/TUI, ADR-081/083) and the React web dashboard (ADR-080). The two layers do not conflict — readline = simple prompt, ink/react = rich UI.
+
+### 2. Living inventory (current `package.json`)
+
+| Package | Purpose & why-chosen | Governing ADR |
+|---------|----------------------|---------------|
+| `commander@^13.0.0` | CLI command framework; the one purely-CLI-convenience dep. Alt: hand-rolled arg parsing (rejected — ergonomics/maintenance). | ADR-010 (this record) |
+| `@modelcontextprotocol/sdk@^1.27.1` | MCP server/client (stdio) transport. | ADR-017 |
+| `better-sqlite3@^12.10.0` | Memory V2 DB — synchronous embedded SQLite + FTS5 full-text. | ADR-088 |
+| `telegraf@^4.16.0` | Telegram connector adapter. | ADR-016 |
+| `zod@^3.25.0` | Runtime schema-validation (plan/config); single-purpose, replaces hand-rolled validation. | ADR-010 (sanctioned) |
+| `@noble/ed25519@^2.3.0` | Ed25519 signing for `.deck` secret files; audited zero-dep crypto. | ADR-014 |
+| `@noble/hashes@^1.8.0` | SHA-512 key derivation for `.deck`; same audited-crypto family. | ADR-014 |
+| `@lydell/node-pty@^1.2.0-beta.12` | Interactive PTY for the embedded web terminal (claude/gemini/codex/shell). Renamed from `node-pty`. | ADR-062 |
+| `ws@^8.18.0` | Browser WebSocket transport for the terminal stream; **audited — hand-rolled RFC6455 rejected as a security surface.** | ADR-062 |
+| `ink@^7.0.5` | Native agentic REPL/TUI (React-for-CLI). | ADR-081 / ADR-083 |
+| `react@^19.2.7` | Ink REPL + web dashboard render tree. | ADR-081 / ADR-080 |
+| `react-dom@^19.2.7` | Web dashboard render. | ADR-080 |
+| `cli-highlight@^2.1.11` | REPL syntax highlighting for native-agentic output. | ADR-081 / ADR-083 |
+| `discord.js@^14.26.3` *(optional)* | Discord connector (lazy / optional). | ADR-016 |
+
+Every entry carries a non-empty governing ADR (ADR-010-W closed, Sprint 311). `node:readline/promises` is a **built-in, not a dependency** — listed in §1 for the prompt-layer rationale, absorbing ADR-011.
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **Keep the inventory current as deps grow** — and it *will* grow as providers, connectors, runtimes, and enterprise surfaces expand. Every addition carries rationale + alternatives + a security note in this table; this ADR is the living ledger, not a one-time snapshot (the 1→9→13 drift is exactly why a count target failed).
+- **Automated audit / SBOM gate** — candidate CI step to enforce the security discipline (pin + audit) mechanically instead of by review.
+- **Unblocks POLICY-ENGINE-EVAL** — removing the minimal-dep dogma unblocks evaluating a centralized policy engine (OPA/Rego or embedded) for ADR-G enforcement; the old "can't add a dependency" objection no longer applies (see ADR-G-019 / ADR-G-020).
+
+---
+
+## Consequences
+
+**(+)** An honest, scalable policy: no false "1 dependency" claim, every dependency traceable to a governing ADR with rationale, and essential capabilities are not blocked. Security discipline (pin + audit + justified surface) is explicit. Built-in-first survives as guidance without becoming a straitjacket.
+
+**(−)** A living inventory requires active maintenance and is drift-prone (it already drifted twice). Security discipline is enforced by review today — there is no automated SBOM/audit gate yet. The reframe also leaves a documentation lag: rule files still cite ADR-010's old framing (see note below).
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-010 (Tek Runtime Dependency → minimal+ADR-justified → **reframed to merit-based policy + inventory**), ADR-011 (node:readline/promises built-in prompt → §1 prompt-layer rationale).
+- **Per-dependency governing ADRs:** ADR-016 (connectors), ADR-017 (MCP), ADR-062 (embedded terminal — `node-pty`, `ws`), ADR-081/083 (native REPL — `ink`, `cli-highlight`), ADR-080 (dashboard — `react`/`react-dom`), ADR-014 (`.deck` crypto), ADR-088 (Memory V2 / SQLite).
+- **Unblocks:** POLICY-ENGINE-EVAL (ADR-G-019 / ADR-G-020).
+- **Cross-ref:** ADR-G-019 (ADR-D contributor convention under the taxonomy).
+
+> **Note:** `karpathy-discipline.md` and `worker-default.md` still cite "ADR-010 (Tek Runtime Dependency)" as a minimal-dependency rule. Under this reframe the **built-in-first heuristic survives** as worker guidance, but the **single/minimal-dependency dogma is removed** — those rule files' ADR references are updated in the migration phase (Faz-3C).
 
 
 ---
 
-## adr-034: Multi-Project Isolation — Per-Project Security Boundaries
+## adr-d-006: Code Architecture Conventions
 
 **Status:** accepted
 
-# ADR-034: Multi-Project Isolation — Per-Project Security Boundaries
+# ADR-D-006: Code Architecture Conventions
+
+**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=`register<Name>` command convention + cohesion-based module boundaries + 4-tier dead-code disposition policy (advisory, design-pass) → tomorrow=GODOBJ cohesion re-split (MOD-SPLIT) + dead-code dormant-sweep (DEADMOD / DORMANT-3)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-012 (register pattern), ADR-024 (sprint-controller god-object split), ADR-026 (god-object split strategy), ADR-038 (Dead Code Disposition — **policy only**; Sprint-139 module list archived) · **Supersedes:** —
+**Crosswalk:** ADR-012 + ADR-024 + ADR-026 + ADR-038-policy → ADR-D-006
+
+> **Scope note:** Contributor-only code-structure conventions (how deckent's source is organized) — ADR-D, dev install. ADR-038 is folded **as durable policy only**; its Sprint-139-specific audit/module list is archived as a historical record, not part of this convention.
+
+---
+
+## Context
+
+Deckent's source is held together by a few durable structural conventions. As the codebase grew, three recurring concerns were captured piecemeal across four ADRs: command registration consistency (ADR-012), god-object growth (ADR-024 sprint-controller split, ADR-026 phased split strategy), and dead-code accumulation (ADR-038 disposition audit). The point-in-time figures in those records drifted badly (orchestra module counts, controller LoC) and the Sprint-139 audit's specific module list is now historical.
+
+This ADR consolidates the **durable conventions** and discards the snapshots. Crucially, the 2026-06-30 review corrected the god-object framing: the boundary is **functional cohesion / correct responsibility**, **not a line-count dogma** — Hermes runs 15-18K-LOC files fine; a long file is not the problem, a *mixed-responsibility* file is.
+
+---
+
+## Decision (Today)
+
+### 1. `register<Name>(program)` command pattern
+
+Each CLI command lives in its own file under `src/cli/commands/` and exports `register<Name>(program: Command): void`. The entry point (`src/cli/index.ts`) calls one `register<Name>(program)` per command. Adding a command = new file + import + `register` call. Independent files give independent test + easy add/remove. (Command/file counts are drift-prone and are **not** pinned here — canonical list in the auto-generated `docs/reference/cli.md`; cross-check `grep -c 'register[A-Z][A-Za-z]*(program' src/cli/index.ts`.)
+
+### 2. Cohesion-based module boundaries — NOT a LoC dogma
+
+Modules split on **functional cohesion / correct responsibility boundary**, not on line count. **A long file is acceptable; a mixed-responsibility file is the defect.** The god-object split is the canonical application:
+
+- `brain.ts` was split (Sprint 036), then `sprint-controller.ts` (which re-grew) was split in phases — **Faz 1** `sprint-phases.ts` (the 7 phase functions `runPlanPhase`…`runCleanupPhase`, all still live under their original names), **Faz 2** `sprint-utils.ts`, **Faz 3** `result-collector.ts` (`waitForResults` + IPC/fs.watch). The `sprint-*` module family grew *alongside* the phase functions, not by renaming them.
+- Backward compatibility is preserved by **thin re-export coordinators** (`brain.ts` ~53-line "Slim Re-export Layer").
+- **Maintenance flag (honest):** `sprint-controller.ts` re-grew to ~1513 LoC after a Sprint-136 slim to 209 LoC. The split *decision* stands (controller still imports its phases; coordinators stay thin) but size-discipline was not self-sustaining — boundary correctness, not size, is the rule, and the regrowth is folded into the GODOBJ re-split (below).
+- These clean module boundaries are the **modular foundation MOD-SPLIT** (same codebase + license-loadable enterprise layer; ADR-G-016) builds on.
+
+### 3. Dead-code disposition policy — 4-tier, design-pass, with rollback
+
+Dead/dormant code is disposed of by a **design pass, not a mechanical delete** (removing value-bearing architectural knowledge is itself a cost). Every disposition picks one of four tiers and records rationale + rollback:
+
+| Tier | When | Action | Rollback |
+|------|------|--------|----------|
+| **Remove** | genuinely valueless, 0-caller, cheaply re-derivable | delete source + tests | `git revert` single commit (record the pre-delete hash) |
+| **Defer** | tied to a named roadmap item | keep + `@deprecated` JSDoc + `// DEFERRED: reassess <milestone>` marker | remove the marker, wire it in |
+| **Deprecate / protect** | kept as reference under a governing ADR | keep; status change requires that ADR's amendment | N/A |
+| **False-positive** | "0-caller" report is wrong (actively imported) | correct the audit, keep the module | N/A |
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **GODOBJ — cohesion re-split:** re-split the re-grown coordinators (`sprint-controller.ts` regrowth) on cohesion lines, folded into the **MOD-SPLIT** module-boundary inventory (community↔enterprise layer map). No separate work-item — this record carries it.
+- **DEADMOD / DORMANT-3 — dormant-sweep:** the deferred dead-code sweep — e.g. `batch-stats.ts` (still unremoved, 0-caller), `brain-context.ts` / `decision-replay.ts` / `multi-agent.ts` (0-production-caller dormant) — folds into the post-migration dormant-audit sweep ([[project_product_repo_migration_push]]: "re-run the dormant scan once the work settles"). No separate urgent item.
+
+---
+
+## Consequences
+
+**(+)** Durable conventions survive while drift-prone snapshots are dropped; the cohesion-not-LoC boundary prevents both god-objects *and* pointless file-shattering; the disposition policy preserves architectural knowledge with explicit rollback; the modular boundaries seed MOD-SPLIT.
+
+**(−)** Cohesion is a judgment call with no mechanical gate — the controller regrowth proves size-discipline is not self-sustaining. The dormant-sweep is deferred, so several known 0-caller modules linger with maintenance cost (tsc time, IDE noise, contributor confusion).
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-012 (register pattern), ADR-024 (sprint-controller → sprint-phases split, Faz-1), ADR-026 (phased god-object split, Faz 1-3). **Folds policy from** ADR-038 (4-tier disposition + rollback + design-pass-not-mechanical-delete) — its Sprint-139 audit/module list is **archived** (historical record, not active convention).
+- **Cross-ref:** ADR-D-004 (the split created the Brain-family organs the one-way-import rule names), ADR-G-016 (Product Vision / MOD-SPLIT — community↔enterprise = governance/audit depth, not feature-gating), ADR-065 → ADR-D-008 (repo strategy / MODULARIZE), ADR-G-019 (ADR-D convention under the taxonomy).
+- **Born work-items:** GODOBJ (cohesion re-split, MOD-SPLIT), DEADMOD / DORMANT-3 (dormant-audit sweep).
+
+> **Note:** ADR-038's Kademe-3 "deprecate/protect" tier protected the ADR-028 V1 decision-engine modules. That protection is superseded by the routing-V1 purge decision (ROUTE-V1-PURGE, ADR-028 → ADR-G-006) — the V1 modules are slated for **full removal**, not indefinite protection.
+
+
+---
+
+## adr-d-007: Manual Subagent Dispatch (Dogfood Survival-Fallback)
 
 **Status:** accepted
 
-**Date:** 2026-04-11
+# ADR-D-007: Manual Subagent Dispatch (Dogfood Survival-Fallback)
 
-**Sprint:** 134
+**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=Alperen review-gate (`git diff --stat` per subagent) + worktree isolation + TDD skip-count baseline (manual, dogfood-only) → tomorrow=parity with Brain-autonomous primary; this protocol stays as the last-resort
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-047 (Manuel Subagent Dispatch Protocol) · **Supersedes:** —
+**Crosswalk:** ADR-047 → ADR-D-007 (Brain-Death automated *procedure* split out → ADR-G-025)
 
----
-
-**Context:**
-
-Deckent, tek bir kullanıcının aynı makinesinde birden fazla proje orkestre etmesini destekler. Her proje kendi `.deckent/`, `.brain/`, `.tasks/` dizinlerine sahiptir ve bu izolasyon fiilen var olsa da hiçbir zaman formal olarak tanımlanmamıştır.
-
-**KRİTİK AYIRIM: multi-project ≠ SaaS multi-tenant.**
-
-Bu ADR, aynı kullanıcının aynı makinede yan yana çalıştırdığı birden fazla proje arasındaki izolasyonu tanımlar. 10.000 tenant'ın paylaştığı bir sunucu senaryosu (SaaS multi-tenant) Deckent'in kapsamı dışındadır ve ADR-033 tarafından kalıcı olarak yasaklanmıştır.
-
-Sprint 132 Week 1 güvenlik denetimi şu bulguları ortaya çıkardı:
-- MEDIUM #10: Worker scope check'i symlink'leri takip etmiyor — `fs.realpath()` ile resolve edilmiş hedef path'in scope içinde olduğu doğrulanmıyor
-- LOW #4: Sibling project dizinlerine erişim denetimi yalnızca scope matcher'a dayanıyor — scope dışı proje dosyalarına symlink oluşturularak bypass edilebilir
-- LOW #7: Global `~/.deckent/config.json` hangi alanların paylaşıldığını, hangilerinin proje-özgü olduğunu belgelemiyor
-
-Sprint 133'te implementasyonu tamamlanan AES-256-GCM per-project credential encryption bu izolasyonun temelini güçlendirdi; ancak scope bypass ve global state paylaşım kuralları formal olarak tanımlanmamıştı.
-
-Tehdit modeli:
-1. **Sibling project scope bypass** — Proje A'daki worker, `../proje-b/src/secret.ts` yoluna symlink oluşturup scope check'i geçerek Proje B'nin kaynak koduna erişir
-2. **Credential leakage** — Global config'deki proje-özgü API anahtarları yanlışlıkla sibling proje tarafından okunur
-3. **Global state pollution** — Bir proje'nin `.deckent/config.json` değişikliği global config'i etkiler, diğer projelerin davranışını değiştirir
-4. **Symlink cycle DoS** — Recursive symlink'ler scope resolver'ı sonsuz döngüye sokar
-
-**Decision:**
-
-Deckent multi-project izolasyonu şu dört katmandan oluşur:
-
-### Katman 1: Per-Project Directory Isolation (Mevcut, Formalize Ediliyor)
-
-Her proje kendi bağımsız dizin yapısına sahiptir:
-- `.deckent/` — proje konfigürasyonu, agent/skill pool, metric data
-- `.brain/` — karar kayıtları, bellek, retrospektif, desenler
-- `.tasks/` — sprint task dosyaları, heartbeat, result, lock
-- `.locks/` — file lock dosyaları
-
-Bu dizinler arasında cross-reference yoktur. Bir projenin `.brain/MEMORY.md`'si yalnızca o projenin sprint geçmişini içerir.
-
-### Katman 2: Per-Project Credential Encryption
-
-Sprint 133'te implementasyonu tamamlanan sistem:
-- Her proje `.deckent/credentials.enc` dosyasına AES-256-GCM ile şifrelenmiş credential'lar saklar
-- Encryption key per-project `projectRoot` path hash'inden türetilir
-- Sibling proje'nin `.deckent/credentials.enc` dosyası farklı key ile şifrelenmiştir — çapraz okuma başarısız olur
-- Decryption yalnızca proje dizini context'inde gerçekleşir
-
-### Katman 3: Symlink-Aware Scope Enforcement
-
-`isWithinScope()` fonksiyonu symlink-aware hale getirilir:
-- `fs.realpathSync()` ile path resolve edilir — symlink hedef dosyanın gerçek konumu belirlenir
-- Resolve edilmiş path scope matcher'a verilir
-- Symlink hedefi scope dışındaysa → `ScopeViolationError` fırlatılır
-- Recursive symlink (cycle) tespit edilirse → `ScopeViolationError` fırlatılır (`ELOOP` error code)
-
-### Katman 4: Global vs Project-Specific Config Boundary
-
-`~/.deckent/config.json` (global) ile `.deckent/config.json` (proje) arasında net ayrım:
-
-| Alan | Scope | Paylaşım Kuralı |
-|------|-------|------------------|
-| `brain_provider`, `worker_provider` | Global OR Project | Proje override'ı tercih edilir |
-| `max_workers` | Global OR Project | Proje override'ı tercih edilir |
-| `brain_planning` | Global OR Project | Proje override'ı tercih edilir |
-| `min_tier`, `mode_preset` | Global OR Project | Proje override'ı tercih edilir |
-| `OPENAI_API_KEY`, `GOOGLE_API_KEY` | Environment | İşletim sistemi env var, config'de saklanmaz |
-| `telemetry_enabled` | Global OR Project (default **false**) | **Opt-in, default-OFF** — settable boolean (`config.ts:1862`, `options:['true','false']`), DASHBOARD'da `PLANNED_CATEGORY`. ⚠️ "hard-coded/always-false" DEĞİL (2026-06-11 düzeltme). Phone-home garantisi **sender-yokluğundan** gelir — bkz. amendment. |
-| `verify_loop` | Project | Proje-özgü, global default true |
-| `auto_archive_directives` | Project | Proje-özgü |
-| Agent/skill pool | Project | Per-project `.deckent/agents/`, `.deckent/skills/` |
-| Sprint history | Project | Per-project `.brain/sprints/` |
-
-API anahtarları config dosyalarında saklanmaz — environment variable olarak iletilir. Bu, global config'in credential leakage vektörü olmasını engeller.
-
-**Consequences (+):**
-
-- Symlink scope bypass güvenlik açığı kapatılır (Sprint 132 MEDIUM #10)
-- Per-project izolasyon kuralları formal ve test edilebilir hale gelir
-- Global vs project config boundary belgelenir — yeni alan eklenirken hangi scope'a ait olduğu açıktır
-- Credential isolation zaten AES-256-GCM ile sağlanıyor — bu ADR formalize eder
-- "multi-project ≠ multi-tenant" ayrımı netleşir — yanlış yönlü PR'lar önlenir
-
-**Consequences (-):**
-
-- `isWithinScope()` artık `fs.realpathSync()` çağrısı yapar — her scope check'te bir disk I/O ekstra
-- `realpathSync()` symlink hedefi silinmişse hata fırlatır — hata yönetimi gerekir
-- Recursive symlink tespiti `ELOOP` error code'una dayanır — farklı OS'lerde davranış farkı olabilir
-- Global config boundary kuralları yeni alan eklendiğinde güncellenmeli — yoksa belirsiz paylaşım kuralı oluşur
-
-**Alternatives Considered:**
-
-- **Sandboxed worker process** — Her worker'ı chroot/namespace ile izole et. Reddedildi: aşırı karmaşıklık, cross-platform uyumsuzluk (macOS chroot sınırlı), Deckent ürün kimliğiyle orantısız.
-- **Yalnızca path normalization** — `path.normalize()` ile `..` segmentlerini çöz, symlink'leri ignore et. Reddedildi: hardlink ve symlink bypass'ı hâlâ mümkün.
-- **Worker-level filesystem virtualization** — Sanal dosya sistemi katmanı. Reddedildi: Node.js native fs API uyumsuz, performans maliyeti yüksek.
-- **Yalnızca dökümantasyon** — İzolasyon kurallarını belgeleyip enforce etme. Reddedildi: güvenlik açığı açık kalır, audit bulgusu kapatılmaz.
-- **Docker isolation per project** — Her projeyi ayrı container'da çalıştır. Reddedildi: Docker dependency = kurulum friction, ADR-033'ün "kur-çalıştır" ilkesiyle çelişir.
-
-**References:**
-
-- Sprint 132 Week 1 güvenlik denetimi — MEDIUM #10 (symlink scope bypass)
-- Sprint 133 credential encryption implementasyonu (AES-256-GCM per-project)
-- ADR-033: Product Vision — Product Not Service (multi-tenant yasağı)
-- ADR-004: 3-Layer Config Merge (global vs project config mekanizması)
-- `src/agents/worker.ts:isWithinScope()` — symlink-aware scope check implementasyonu
-- `docs/design/multi-project-isolation.md` — detaylı tasarım dokümanı ve test stratejisi
+> **Role note (2026-06-30 reframe):** This protocol is **demoted from "primary operating mode" → "survival-fallback."** Brain-autonomous orchestration (`deckent plan --structured && deckent start`) is the primary path (live since ~Sprint 270). This manual, human-guided worktree-repair protocol is the **last resort** — when Brain is broken/unreliable or the autonomous flow deadlocks (it was used in Sprint 280). The *automated* Brain-DEATH recovery PROCEDURE (provider-failover / retry / `finalize --force`) is **not** here — it lives in **ADR-G-025**. ADR-D-007 is only the dogfood manual repair protocol.
 
 ---
 
-> **Note (verified vs code + ADR-037 V1.0):**
-> - **Katman 2 (AES-256-GCM) confirmed:** `src/core/credential-encryption.ts` (`ALGORITHM = 'aes-256-gcm'`, `createCipheriv`) + `src/core/credentials.ts` — a real per-project credential-encryption system, distinct from the `.deck`/Ed25519 system of ADR-014.
-> - **Katman 3 (symlink-aware scope) — accuracy correction:** The symlink resolution **is** implemented — `isWithinScope()` (`src/agents/worker.ts`) calls `realpathSync()` and returns a **boolean**. However, it does **not** itself throw `ScopeViolationError`, and per **ADR-037 V1.0** runtime scope enforcement is **advisory/soft** (a violation is warned + event-emitted but does **not** hard-block; hard-flip is post-GA V2 — see `docs/architecture/authority-matrix.md`). Therefore "vulnerability is closed / `ScopeViolationError` thrown / blocks" describes the **design intent**, not the current runtime guarantee.
->
-> Behavior unchanged; documentation alignment only. (An unrelated, stale "Büyük Dosya Split Analizi (Sprint 130)" appendix — long since completed via ADR-024/026 — was removed from this ADR.)
+## Context
+
+Sprint 164-168 hit a chicken-and-egg paradox: Brain's orchestration pipeline was partly broken, and a broken Brain cannot autonomously repair itself (you can't plan/dispatch through the pipeline you're trying to fix). The escape was **human-guided (Alperen-guided) manual subagent dispatch** — and it worked: across 23+ incidents (Sprints 164-168) it delivered **zero sprint abandonment**. In Sprint 168 the organically-grown survival pattern was hardened into a formal, repeatable protocol (8 parallel + 1 sequential subagents under git-worktree isolation, dual-eval-gated).
+
+Since ~Sprint 270 the operating reality inverted: deckent-dev runs **Brain-autonomous** (the autonomous dogfood loop *is* `deckent plan --structured && deckent start` — Sprints 277-280 ran that way). So this protocol is no longer the primary mode; its role is **survival-fallback**, and this ADR records it as such.
 
 ---
 
-**🔴 Amendment — 2026-06-11 (ADR-review, Katman-4 accuracy correction): telemetry "hard-coded false" → settable opt-in (default-off), no sender wired.**
+## Decision (Today)
 
-The Layer-4 config-boundary table previously said `telemetry_enabled: Hard-coded FALSE | ADR-033 gereği her zaman false`. **This was inaccurate** (caught during a too-shallow first-pass review). Verified vs code:
-- `telemetry_enabled` is a **settable boolean config field** — `config.ts:1862` `{ type:'boolean', default:false, options:['true','false'], category:'Telemetry' }` (+ a `telemetry_anonymous` sibling). It is **default-OFF opt-in**, NOT hard-coded/always-false. The dashboard ConfigPage lists it under **`PLANNED_CATEGORY`** (`ConfigPage.tsx:135`).
-- **No telemetry SENDER is wired** — `grep` finds zero `sendTelemetry`/phone-home/network call gated on `telemetry_enabled`; the only consumers are the config schema + dashboard UI + i18n. So **deckent does not phone home today regardless of the flag** — the privacy guarantee currently holds via *absence of a sender*, NOT via a hard-coded-false flag.
-- **Forward:** the actual opt-in telemetry is **FB-1** (MASTER-PLAN §S — "deckent self-operation feedback loop, opt-in, ships OFF, explicit consent, operation-metrics-only, never project content"). When FB-1 is built, it MUST respect default-off + consent (ADR-063 consent-based) + the air-gapped/never-phone-home pillar ([[project_air_gapped_offline_pillar]]). API keys remain env-only (config references the var NAME, never stores the value — `config.ts:425/1798`).
+The hardened manual subagent dispatch protocol (dogfood survival-fallback) rests on seven principles:
 
-**Correct statement:** privacy/no-phone-home is preserved (no sender), but the mechanism is "no telemetry transport implemented + default-off opt-in flag", not "hard-coded false". ADR-033's never-phone-home intent holds via this. md+db senkron (Alperen ADR-review — first pass was shallow, re-verified all 4 layers).
+1. **Worktree isolation** — `git worktree add ../deckent-sprint-NNN-<CLUSTER>` per cluster/subagent. Parallel subagents cannot collide; each works in its own worktree and never touches `main` until the end-of-sprint rebase + merge cascade.
+2. **File authority matrix** — a STRICT `scope.filesWrite` per subagent; the matrix **cannot be widened** (a new subagent gets a new row; an existing row is never grown). Enforced by the Alperen review gate via `git diff --stat`; out-of-scope write → subagent retry. (ADR-037 RBAC, manual-dispatch form.)
+3. **Wave structure (cascade-reverse)** — dispatch the **cascade endpoint** (the most-depended-on module) **first**, so upstream fixes build on an already-clean base instead of multiplying a bad contract downstream.
+4. **Wave 1.5 serial gate** — a human-in-the-loop (Alperen) checkpoint after the cascade-endpoint fix + any critical-contract write, before downstream waves base their work on it.
+5. **TDD enforcement gate** — failing-test-first → minimal implementation → pass → atomic commit per cycle; **adding `skip` is forbidden** (baseline skip count preserved); the subagent `.result` must carry `tests_skipped_added: 0`, and the review gate verifies the skip-count delta.
+6. **Lock pattern** — a dispatch lock file (`.deckent/sprint-NNN-dispatch-locks.json`) tracks each subagent `pending → active → done → merged`; shared files (e.g. `sprint-finalizer.ts`) use a **sequential lock** (next subagent can't go `active` until the prior is `done`).
+7. **Manual survival fallback** — when Brain orchestration is NO_GO/unreliable, the **Sprint N+0.5 replay** pattern runs manual dispatch: the failed cluster becomes Sprint N+0.5's first task, worktree isolation is re-established, and fixes are **persistent** (no regression). **Catch-22 prevention:** Sprint N+0.5 can *always* start, even with a broken Brain — `Sprint N NO_GO → Sprint N+0.5 BLOCKED` is forbidden.
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+Brain-autonomous remains the primary path; the seven principles have **largely reached parity** with it, which is exactly why this protocol is now a fallback rather than the default:
+
+| ADR-D-007 principle | Brain-autonomous parity (today) |
+|---------------------|----------------------------------|
+| Worktree isolation | spawn-time isolation |
+| File authority matrix | `scope.filesWrite` + advisory auditor (ADR-037 V1.0) |
+| TDD / eval gate | Brain GO/NO_GO + CC disk-verify close-out |
+| Wave structure | `dependency_pipeline_enabled=true` (live multi-wave) |
+| Wave 1.5 serial gate | `deckent_checkpoint` + human-approved sprint-start |
+| Lock pattern | `.locks/` + spawn-time lock |
+| Manual survival fallback | `deckent recover` / `deckent run` + CC manual intervention |
+
+This ADR stays **accepted (deliberately not deprecated):** Principle-7 (Manual Survival Fallback) carries permanent value and **was actually used in Sprint 280** (worker-timeout deadlock → `TaskStop` + manual sprint-state finalize + hand-corrections). The *automated* Brain-DEATH procedure — provider-failover (Claude → OpenAI/Codex, lossless), escalation (autonomous → approved-retry → kill), and the `finalize --force` trigger — is the forward surface and lives in **ADR-G-025** (BRAIN-DEATH-PROCEDURE work-item; see [[feedback_finalize_force_orphan_state]]).
+
+---
+
+## Consequences
+
+**(+)** Zero sprint abandonment across 23+ repair incidents; a documented, repeatable last-resort that Alperen and Brain don't have to re-invent under pressure; worktree isolation makes parallel repair safe (8 subagents, no conflict — Sprint 168 dogfood proof); the TDD gate prevents regression (baseline skip count held).
+
+**(−)** Human-intensive — the review gate requires manual approval per subagent and the Wave 1.5 serial gate adds time. Worktree management is overhead (9 worktrees + cleanup; forgotten worktrees consume disk). And it is now *only* a fallback — the primary path is Brain-autonomous, so this protocol is exercised rarely and must be kept current against drift.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-047 (Manuel Subagent Dispatch Protocol — 7 principles + Sprint-168 hardening + Sprint-281 role reframe to survival-fallback).
+- **Split out:** the automated Brain-DEATH recovery **procedure** (failover / retry / `finalize --force`) → **ADR-G-025** (Process Resilience, Recovery & Live Observability).
+- **Cross-ref:** ADR-G-020 (Authority Matrix — file-authority / RBAC; the manual review gate is its dogfood form), ADR-G-014 (Spawn Backend, Options & Observation — worktree/spawn isolation), ADR-G-026 (Dependency-Wave Execution — `dependency_pipeline_enabled`), ADR-G-018 (Verification Protocol — the `.result` contract), ADR-046 → ADR-G-015 (finalize hook chain), ADR-G-019 (ADR-D convention under the taxonomy).
+- **Born work-item:** BRAIN-DEATH-PROCEDURE (ADR-G-025 + this ADR), tied to [[feedback_finalize_force_orphan_state]].
 
 
 ---
 
-## adr-035: Brain ↔ Worker ↔ Auditor Verification Protocol Standard (Sprint 138)
+## adr-d-008: Develop / Product Repo Strategy
 
 **Status:** accepted
 
-# ADR-035: Brain ↔ Worker ↔ Auditor Verification Protocol Standard (Sprint 138)
+# ADR-D-008: Develop / Product Repo Strategy
 
-**Status:** accepted
+**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** release process (manual migration; audit-immutable policy)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs / Rewrites:** ADR-065 (Develop/Product Two-Repo Split)
+**Crosswalk:** ADR-065 → ADR-D-008 (REWRITE)
 
-**Date:** 2026-04-14
-
-**Sprint:** 138
+> **Decision change (Alperen, 2026-06-30):** ADR-065's continuous-sync two-repo model will NOT be applied. We continue from a SINGLE repo; when the product reaches its final state we MOVE the code to the `deckent` repo — a one-time migration, not an ongoing sync script.
 
 ---
 
-**Context:**
+## Context
 
-Sprint 137 meta-dogfood analizi kritik bir iletişim sorununu ortaya koydu: Task 137-001 worker `status: DONE exitCode: 0` bildirdi, ancak vitest 53 fail test bıraktı. Worker "kod var" → DONE kısayolu. Bu sapmanın temel nedeni, Brain ↔ Worker ↔ Auditor arasındaki mesaj akışının formal bir protokole sahip olmamasıydı — her bileşen kendi dosya formatını üretiyordu (.hb heartbeat, .result, git diff çıktısı) ama bu mesajlar versiyonlanmış, kanonik, parse edilebilir değildi.
+Old ADR-065 proposed two continuously-synced repos: a private `deckent-develop` (full history) and a public `deckent` (orphan-commit snapshots) kept in sync by `scripts/sync-to-product.mjs`. After 200+ sprints the develop repo is heavy with internal artifacts (`.brain/`, `.deckent/archive/`, `docs/audits/`) that are noise for public users, and historical audit reports were once corrupted by an automated counter (the audit-immutable concern). The 2026-06-30 review **rewrites** the strategy: drop the continuous-sync model in favor of a single repo + a one-time migration, and leave the enterprise-layer repo question open.
 
-Sorunlar:
+---
 
-1. **Doğrulama eksikliği:** Worker `DONE` bildirdiğinde Auditor bağımsız doğrulama yapamıyordu. Auditor sadece `.result` dosyasının varlığını kontrol ediyor, içeriğinin doğruluğunu değil.
-2. **Kanal belirsizliği:** `WORKER→BRAIN` yönünde sadece `.result` dosyası vardı; `WORKER→AUDITOR` doğrudan iletişim kanalı yoktu.
-3. **Replay edilemezlik:** Sprint sonunda hangi olayların hangi sırada yaşandığını reconstruct etmek imkânsızdı. `.hb` timestamp'leri kaba granülaritede, `.result` tek snapshot.
-4. **Mesaj versiyonlaması yok:** Yeni alan eklendiğinde eski consumer'lar uyumsuz hale geliyordu. Örn. Sprint 136 `rubricScores` alanı eski Brain evaluate kodunu bozdu.
+## Decision (Today)
 
-Sprint 138 bu sorunu formal mesaj protokolü ile çözer. Dosya tabanlı state (`.hb`, `.result`) geriye dönük uyumluluk için Sprint 142'ye kadar devam eder, ancak event stream kanonik truth olur.
+```xml
+<repo-strategy>
+  <single-repo>Development continues in ONE repo (currently `deckent-develop`).
+    No ongoing develop→product sync script.</single-repo>
+  <one-time-migration>When the product reaches its final state, the code is MOVED
+    (one-time) to the `deckent` repo. (Irreversible — archive the training-data mine /
+    sensitive history BEFORE migrating; cf. project_clean_repo_migration_and_training_data.)</one-time-migration>
+  <audit-immutable>Historical audit reports (docs/audits/sprint-NNN/) remain immutable
+    after a sprint closes. Enforced primarily by registry-absence: docs/audits/** is
+    NEVER registered in .deckent/docs.json (managed-docs never touches unregistered docs).
+    A literal path-guard would be defense-in-depth.</audit-immutable>
+</repo-strategy>
+```
 
-**Decision:**
+> **Axis clarity:** This (develop↔product) is the **vitrine axis** (private internals → public product). It is SEPARATE from the **license/governance axis** (community ↔ enterprise, ADR-G-016 MOD-SPLIT = single codebase + modular enterprise-layer, NOT a fork). Do not conflate.
 
-Brain ↔ Worker ↔ Auditor iletişimi için versiyonlanmış mesaj protokolü (Protocol Version 1.0). Append-only event stream (`.deckent/sprint-NNN-events.jsonl`) tüm mesajları sıralı olarak kaydeder. Dosya tabanlı state paralel devam eder (fail-safe fallback), ancak event stream kanonik gerçek kabul edilir.
+---
 
-### Mesaj Formatı
+## Intent / Roadmap (Tomorrow)
+
+- **🔴 ENTERPRISE-REPO-STRATEGY (open):** how to manage the enterprise layer — candidate: `deckent` (open community/solo) + `deck-ent` (private enterprise layer). Undecided; ties ADR-G-016 MODULARIZE + the CODE-LAYERS 5-layer architecture (deckent-core → deckent-custom), discussed separately.
+- **GA-2:** the one-time public migration (`deckent-develop` → `deckent`) at product-final + sensitive-scrub + monorepo/split decision.
+- Possible literal `docs/audits/**` path-guard (defense-in-depth over registry-absence).
+
+---
+
+## Consequences
+
+**(+)** No ongoing sync-script maintenance / EXCLUDE-list drift; a single source of truth during development, with a clean one-time public migration when ready. Audit immutability preserved. The vitrine axis is explicitly separated from the license axis.
+
+**(−)** The one-time migration is irreversible (requires pre-migration archival of training-data/sensitive history). The enterprise-layer repo question is open (deckent + deck-ent?), pending the modularization + code-layers discussion.
+
+---
+
+## References / Absorbed
+
+- **Absorbs / Rewrites:** ADR-065 (continuous-sync two-repo → single-repo + one-time migration).
+- **Cross-ref:** ADR-G-016 (Product Vision — MOD-SPLIT license axis, SEPARATE) · ADR-D-006 (code architecture) · GA-2 (MASTER-PLAN).
+- **Born / MASTER-PLAN:** ENTERPRISE-REPO-STRATEGY · MODULARIZE · CODE-LAYERS (5-layer, separate discussion) · GA-2.
+- **Memory:** `project_clean_repo_migration_and_training_data` · `project_product_repo_migration_push`.
+
+
+---
+
+## adr-g-001: Layered Config & Scope Precedence
+
+**Status:** accepted
+
+# ADR-G-001: Layered Config & Scope Precedence
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=`config.ts` `deepMerge` layered load (defaults→global→project→env, last-wins) + `autoMigrateOnLoad`, structural-deterministic → tomorrow=scope-aware resolution bound to global-install+project topology, config-precedence mirrors the ADR-G-019 G>U>D analogue
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-004 (Layered Config Merge) · **Supersedes:** —
+**Crosswalk:** ADR-004 → ADR-G-001
+
+---
+
+## Context
+
+deckent runs in three overlapping configuration realities at once: a machine-wide default a user sets once (plan tier, language), a per-project override checked in beside a repo, and a per-invocation override for CI / one-off runs. ADR-004 (2026-04-16) fixed the precedence: hardcoded defaults form the floor, `~/.deckent/config.json` (global) layers on top, `.deckent/config.json` (project) on top of that, and `DECKENT_*` environment variables win last. Documented originally as "3-layer" (three *file* layers), the live runtime adds the env-override layer, making **four effective layers**. The merge is a `deepMerge` (`src/core/config.ts`): nested objects merge, arrays are replaced (not concatenated), and `undefined` values are skipped so a partial upper layer never erases a lower one.
+
+That precedence works and is live-proven, but it was framed as an internal config detail. The 2026-06-30 ADR review reframed it as a **global constitution-level law**: config layering is the runtime sibling of the ADR taxonomy's own G>U>D precedence (ADR-G-019), and it must scale cleanly onto the global-install + project-scope topology deckent is moving toward.
+
+## Decision (Today)
+
+Config loads in **layered precedence — four effective layers, last wins**:
+
+```
+defaults (hardcoded floor)
+  → ~/.deckent/config.json        (global, user-machine-wide)
+    → .deckent/config.json        (project, per-repo)
+      → DECKENT_* env overrides   (per-invocation; env always wins)
+```
+
+- Merge is `deepMerge` (`src/core/config.ts`): nested objects deep-merge; **arrays are replaced, not merged**; `undefined` values are skipped (a sparse upper layer never nulls a lower one).
+- Env overrides apply last via the `DECKENT_*` namespace (e.g. `DECKENT_BRAIN_PROVIDER`, `DECKENT_MAX_WORKERS`) — the CI / one-off escape hatch.
+- `autoMigrateOnLoad` upgrades legacy config shapes on read, so an older `~/.deckent/config.json` keeps working without a manual edit.
+- The architecture doc's "Config Layers" section (Layer 4 — Environment Variables) is the human-facing mirror of this loader.
+
+This is a structural, deterministic guarantee — the loader *always* applies the precedence; there is no code path that reads a single layer in isolation.
+
+## Intent / Roadmap (Tomorrow)
+
+- **Scope-aware resolution tied to install topology.** As deckent ships as a global install + project-scope product, the two file layers gain explicit identity: `~/.deckent/config.json` is the **user-global** scope and `.deckent/config.json` is the **user-project** scope. Config resolution becomes scope-addressable, not merely precedence-ordered.
+- **Config precedence mirrors ADR G>U>D.** The config layering is the operational analogue of the ADR-G-019 precedence: publisher defaults (floor) < user-global < user-project for *additive/tightening* keys, while any publisher-locked invariant (an ADR-G-backed setting) cannot be loosened by a lower-priority file. The two precedence systems (config-merge and ADR-authority) are kept conceptually aligned so a user reasons about both the same way.
+- **Tenant/scope extension.** Multi-tenant + global-install layering (per-host, per-org) extends the same `deepMerge` spine rather than introducing a parallel mechanism.
+
+## Consequences
+
+**(+)** One deterministic, well-understood merge spine covers machine defaults, project overrides, and CI escape hatches; `undefined`-skip + array-replace semantics make partial layers safe and predictable; `autoMigrateOnLoad` keeps old configs forward-compatible; reframing as ADR-G ties config precedence to the project's governance precedence so the two never drift.
+
+**(−)** Array-replace (not merge) is a deliberate sharp edge — a project layer that sets an array fully replaces the global one, which can surprise; the scope-aware + G>U>D-analogue binding is roadmap (today the layers are precedence-ordered but not yet formally scope-addressed); env-override breadth (`DECKENT_*`) must stay documented so a CI override is never silently shadowed.
+
+## References / Absorbed
+
+- **Absorbs:** ADR-004 (Layered Config Merge — defaults→global→project→env, `deepMerge` semantics, 4-effective-layer clarification).
+- **Implementation:** `src/core/config.ts` (`deepMerge`, env-override layer, `autoMigrateOnLoad`); `docs/architecture/architecture.md` "Config Layers" (Layer 4 — Environment Variables).
+- **Precedence sibling:** ADR-G-019 (ADR Governance & 4-Layer Taxonomy — the G>U>D precedence this config layering mirrors).
+- **Cross-ref:** ADR-G-012 (Plan Tier & Config Customization — every config-knob real-in-code), ADR-G-005 (Secret File System — shared global<project scope spine).
+- **Direction:** global-install + project-scope topology (MASTER-PLAN ADR-LAYER / install-wiring); `.analysis/adr-review-crosswalk.md` row 004.
+
+
+---
+
+## adr-g-002: spawnSync Security Pattern
+
+**Status:** accepted
+
+# ADR-G-002: spawnSync Security Pattern
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=array-args security invariant + ADR-006 compile-time scan in `authority-enforcer.ts` (advisory/soft per ADR-G-020) + documented `shell:true` carve-outs → tomorrow=runtime-enforced (advisory→hard via ADR-094 flag-gated vein within ADR-G-020) + Windows carve-out hardened (SPAWN-1)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-006 (spawnSync Security Pattern) · **Supersedes:** —
+**Crosswalk:** ADR-006 → ADR-G-002
+
+---
+
+## Context
+
+Command-injection risk must be driven to zero. Every subprocess invocation in deckent carries potentially untrusted input — prompts, user config, file paths, project content. The original ADR-006 (2026-04-16) established **array-args + no `shell: true`** as a security invariant; the 2026-06-11 amendment reconciled its wording with the async-io axis, clarifying that the **security pattern is independent of the sync-vs-async choice** (the security rule applies to `spawn` and `spawnSync` alike; the sync/async decision is a separate axis).
+
+The 2026-06-30 review confirmed this as **ADR-G** (Global / Constitution): it is a runtime law that ships to every user and constrains every subsystem — LLM-generated subprocess code **cannot** violate it. It is not a contributor convention; it is how the product *behaves* on every host.
+
+---
+
+## Decision (Today)
+
+### 1. Security invariant — array-args, no shell
+
+```xml
+<spawn-security-invariant>
+  <rule>All subprocess calls run as spawn(binary, [...args]) / spawnSync(binary, [...args]).</rule>
+  <rule>shell: true is forbidden by default — no shell interpretation.</rule>
+  <rule>Untrusted input (prompts, user input, paths) passes ONLY as argument-array
+        elements; it is NEVER interpolated into a command string.</rule>
+  <rule>Template-literal / string-concat command construction is forbidden.</rule>
+  <scope>Applies to BOTH spawn and spawnSync — orthogonal to the sync/async axis.</scope>
+</spawn-security-invariant>
+```
+
+This is a **security invariant** (command-injection = zero), not a stylistic preference.
+
+### 2. Sync-vs-async is a separate axis (ADR-D-002)
+
+Async `spawn` is the **default rule** (ADR-D-002, Test Infrastructure & Hermeticity — `spawnSync` blocks the event loop and causes CI timeouts; absorbed old ADR-087 async-io-hermeticity). `spawnSync` is the **sanctioned exception**, permitted only for **short, trusted, non-hot-path one-shots**. When `spawnSync` *is* used (within that sanctioned exception), it MUST follow the §1 security pattern — array-args, no `shell: true`.
+
+### 3. Documented `shell:true` carve-outs (narrow, deliberate)
+
+- `src/core/plugin-hooks.ts` — sandboxed plugin-hook execution.
+- `src/core/provider.ts` — Windows-only, to resolve `.cmd`/`.ps1` wrapper binaries on `PATH`.
+
+These carve-outs **never interpolate untrusted input** into a command string (args remain arrays / fixed). They are the only sanctioned `shell:true` sites.
+
+### 4. Enforcement (today — advisory)
+
+Compliance is tracked by the ADR-006 check in `src/orchestra/authority-enforcer.ts` — a compile-time scan. Per ADR-G-020 (RBAC V1.0) this is **advisory/soft**: it warns + emits an audit signal, it does **not** hard-block.
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **Enforcement advisory→runtime:** today the ADR-006 scan only warns; tomorrow a subprocess constructed with `shell:true` + interpolated untrusted input is **blocked, not merely logged** — via the ADR-094 flag-gated enforcement vein graduating to default-on under ADR-G-020's authority layer (the same inviolability vein that carries every ADR-G law).
+- **Windows carve-out hardening (SPAWN-1):** Node `DEP0190` (`shell:true` + args array) Windows leak + injection fix — tighten the `provider.ts` `.cmd`/`.ps1` resolution so the carve-out can never become an injection surface, moving toward a platform-adapter that resolves wrapper binaries without `shell:true` where the runtime allows. (MASTER-PLAN: SPAWN-1.)
+- **Backend convergence:** as worker spawn moves to heterogeneous backends (ADR-G-014 — docker/subprocess/tmux/firecracker/cloud), the array-args invariant is carried **uniformly** across every backend adapter, never re-derived per backend.
+
+---
+
+## Consequences
+
+**(+)** Command-injection surface is **zero by construction**; the invariant is backend- and sync/async-independent; the `shell:true` carve-outs are explicit, enumerated, and auditable. A single security law covers every subprocess path the product takes on any host.
+
+**(−)** `shell:true` carve-outs still exist (plugin-hooks, Windows wrapper resolution) and rely on the discipline that args stay arrays. Today's enforcement is **advisory** (the `authority-enforcer` scan warns; ADR-G-020 V1.0 is soft), so a violation is caught at scan/audit time, not hard-blocked at runtime — that is the ADR-094 + SPAWN-1 roadmap. The Windows `DEP0190` carve-out is a known sharp-edge until SPAWN-1 lands.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-006 (spawnSync Security Pattern — array-args security invariant + documented carve-outs).
+- **Axis partner:** ADR-D-002 (Test Infrastructure & Hermeticity — async-`spawn` default, `spawnSync` sanctioned exception; absorbed old ADR-087 async-io-hermeticity).
+- **Backend partner:** ADR-G-014 (Spawn Backend, Options & Observation — uniform invariant across backends; absorbed old ADR-007 SpawnOptions + ADR-089).
+- **Enforcement partner:** ADR-G-020 (Authority, Roles, Flow & Enforcement — advisory→hard) + ADR-094 (flag-gated enforcement vein).
+- **Born work-items:** SPAWN-1 (Windows `DEP0190` carve-out hardening — MASTER-PLAN, P1).
+- **Direction:** `.analysis/adr-review-crosswalk.md` (row 006 → ADR-G-002), `.analysis/adr-governance-redesign-plan.md`.
+
+
+---
+
+## adr-g-004: Instruction-File Adapter & Multi-Env Generation
+
+**Status:** accepted
+
+# ADR-G-004: Instruction-File Adapter & Multi-Env Generation
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=`ensureDeckentImport` never-overwrite guarantee + `agent-templates.ts` per-env generators + `docs.json` pure-adapter exclusion (ADR-013-W locale-leak fix) → tomorrow=data/registry-driven generator (low-maintenance) + global+project scope
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-013 (DECKENT.md Adapter Pattern), ADR-018 (Multi-Environment Config Generation) · **Supersedes:** —
+**Crosswalk:** ADR-013 + ADR-018 → ADR-G-004
+
+---
+
+## Context
+
+Two early decisions converged on one law. ADR-013 (Sprint 15) solved a data-loss bug: `deckent init` used to overwrite `CLAUDE.md`, destroying user customizations. ADR-018 (Sprint 046) solved a breadth problem: every IDE / agent host expects its own instruction file (Claude → `CLAUDE.md`, Codex → `AGENTS.md`, Gemini → `GEMINI.md`, Cursor → `.cursor/rules/deckent.mdc`), in different formats and paths.
+
+Both resolved to the **same pattern**: `DECKENT.md` is the single source of truth, and every host-specific file is a **thin adapter** carrying only an `@DECKENT.md` reference — never deckent-authored content, never overwritten. ADR-018's originally-proposed IDE-specific targets (`config.toml`, `settings.json`, `mcp.json`) converged onto this thin-adapter shape instead.
+
+A Sprint 281 amendment (ADR-013-W) closed a conflict with the managed-docs system (ADR-029 → ADR-G-015): `docs.json` had been listing `CLAUDE.md` / `AGENTS.md` as *managed-docs*, so every sprint's RETRO render stamped Turkish headings onto these English adapters — a recurring **locale-leak** needing manual revert each sprint. The fix: these files are **pure adapters, NOT managed-docs**; remove them from `docs.json` so nothing renders into them and the leak ends at the root.
+
+## Decision (Today)
+
+### 1. Single source + pure adapters
+`DECKENT.md` is the one source of truth. `CLAUDE.md`, `AGENTS.md` (+ optional `.codex/AGENTS.md`), `GEMINI.md`, and `.cursor/rules/deckent.mdc` are **pure adapters**: they hold only the injected `@DECKENT.md` reference plus whatever the user writes. They are **never overwritten** and are **not managed-docs** (ADR-013-W) — no sprint render touches them, so no locale-leak.
+
+### 2. Never-overwrite mechanism
+`ensureDeckentImport` (`src/core/utils.ts`) idempotently injects/preserves the `@DECKENT.md` reference; `deckent sync` (`src/cli/commands/sync.ts`) re-synchronizes all adapters. Init is idempotent and safe — re-running never clobbers user content.
+
+### 3. Per-environment generation
+Per-host generators live in `src/cli/helpers/agent-templates.ts` (`generateAgentsMd`, `generateGeminiMd`, `generateCursorRules`, …). `deckent init --all-envs` provisions every environment's adapter in one command. Each generator is an independent module, so adding an environment is additive today.
+
+| Host | Adapter file (today's real target) |
+|---|---|
+| Claude Code | `CLAUDE.md` |
+| Codex | `AGENTS.md` (+ optional `.codex/AGENTS.md`) |
+| Gemini | `GEMINI.md` |
+| Cursor | `.cursor/rules/deckent.mdc` |
+
+## Intent / Roadmap (Tomorrow)
+
+- **Data/registry-driven generator (low-maintenance).** Today each environment is a hand-written generator function. As providers/environments multiply, one hardcoded function per host does not scale — the crosswalk maintenance-note is explicit: move to a **data/registry-driven generator** (one engine + a host registry describing path/format), so a new environment is a registry entry, not new code. This keeps maintenance burden flat as the host matrix grows (Immutable Law #2 — EVERY ENVIRONMENT).
+- **Global + project scope.** Adapter generation/sync becomes scope-aware: a global install seeds host adapters at the user-global layer; project init seeds them per-project — consistent with ADR-G-001's layering.
+- **Provider-adapter parity.** As the Brain itself becomes provider-agnostic (ADR-G-008, BRAIN-PROVIDER-SELFUPDATE), the instruction-file adapter registry is the doc-side sibling of the provider adapter registry — same registry-driven philosophy.
+
+## Consequences
+
+**(+)** User instruction files are never destroyed; one source (`DECKENT.md`) stays authoritative across every host; the pure-adapter-not-managed-doc rule (ADR-013-W) kills the locale-leak at its root; `--all-envs` gives one-command multi-IDE setup; independent generators make new hosts additive today and a registry will make them trivial tomorrow.
+
+**(−)** Today's per-env generator functions are still hand-maintained (registry-driven is roadmap), so each new host is real code until then; the never-overwrite guarantee depends on `docs.json` keeping these files out of managed-docs — a regression there would reopen the locale-leak (guarded by the ADR-013-W exclusion); scope-aware global+project generation is forward-looking.
+
+## References / Absorbed
+
+- **Absorbs:** ADR-013 (DECKENT.md Adapter Pattern — single-source + thin adapter + never-overwrite), ADR-018 (Multi-Environment Config Generation — per-env generators, `--all-envs`).
+- **Implementation:** `src/core/utils.ts` (`ensureDeckentImport`), `src/cli/commands/sync.ts` (`deckent sync`), `src/cli/helpers/agent-templates.ts` (`generateAgentsMd` / `generateGeminiMd` / `generateCursorRules`).
+- **Born work-item:** ADR-013-W (pure-adapter / `docs.json` exclusion / locale-leak root-fix); data/registry-driven low-maintenance generator (crosswalk maintenance-note → MASTER-PLAN).
+- **Cross-ref:** ADR-G-015 (Managed-Docs — the system these files are deliberately excluded from), ADR-G-001 (Layered Config & Scope), ADR-G-008 (Provider Abstraction — sibling adapter-registry philosophy), Immutable Law #2 (EVERY ENVIRONMENT — cross-platform/host matrix).
+- **Direction:** `.analysis/adr-review-crosswalk.md` rows 013, 018.
+
+
+---
+
+## adr-g-005: Secret File System & Zero-Worker-Exposure
+
+**Status:** accepted
+
+# ADR-G-005: Secret File System & Zero-Worker-Exposure
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=`.deck` + `DECKENT_` prefix registry + `ensureDeckGitignore` (auto) + host-side-only consumers (never on the worker-spawn path) → tomorrow=global+project scope secret resolution, same zero-exposure invariant across all backends
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-014 (.deck Secret File System) · **Supersedes:** —
+**Crosswalk:** ADR-014 → ADR-G-005
+
+---
+
+## Context
+
+Provider API keys originally lived in `.env`, which collided with the user's own project `.env`: deckent's `DECKENT_`-prefixed keys polluted the user file and complicated `.gitignore` management. ADR-014 (Sprint 044) separated deckent secrets into a dedicated **`.deck`** file, auto-added to `.gitignore` at init, so the user's `.env` is never touched.
+
+A Sprint 281 re-audit (classification: BOTH — secret hygiene is directly user-product security) re-verified the core against the code and **strengthened the isolation claim**. The original ADR said "Brain injects only the needed keys per task scope." In today's reality that is not selective-injection at all — it is **zero exposure**: `.deck` never enters the worker-spawn path (there is no deck-transport in the docker backend), and every consumer is host-side. The "workers never see `.deck`" guarantee is therefore *more strictly* true than originally written.
+
+## Decision (Today)
+
+### 1. Dedicated secret file
+deckent's secrets live in a separate **`.deck`** file using a `DECKENT_`-prefixed key registry. The user's `.env` is never read or written. `ensureDeckGitignore` adds `.deck` to `.gitignore` automatically at init; `isDeckFileCommitted` guards against an accidentally-committed secret file. Core helpers: `parseDeckFile` / `loadDeckSecrets` / `validateDeckFile` / `createDeckTemplate` / `ensureDeckGitignore` / `isDeckFileCommitted` (`src/core/deck-file.ts`).
+
+### 2. Zero-worker-exposure (stronger than selective-inject)
+`.deck` is **never on the worker-spawn path** — workers cannot read it under any backend (no deck-transport in the docker backend). All secret consumers are **host-side only**: provider bootstrap auto-register (`provider.ts`, ADR-077 Part-C → ADR-G-008), `server.ts`, `doctor.ts`, and config interpolation. This is a zero-exposure invariant, not a per-task filter.
+
+### 3. `$DECK:KEY` interpolation + signing
+Config values may reference secrets as `"$DECK:KEY"` (e.g. `"token": "$DECK:DISCORD_TOKEN"`), resolved at runtime host-side from `.deck` with a missing-secret warning (`src/core/deck-interpolation.ts`). Ed25519 signing for secret / skill-publish signatures uses `@noble/ed25519` + `@noble/hashes` (`src/core/signature.ts`); per the ADR-010 amendment these two crypto dependencies are governed here.
+
+## Intent / Roadmap (Tomorrow)
+
+- **Global + project scope.** Today `.deck` is effectively project-local. As deckent ships global-install + project-scope (ADR-G-001 layering), secrets resolve across a **global `~/.deck`** (machine-wide provider keys set once) and a **project `.deck`** (per-repo overrides), with the same zero-worker-exposure invariant and the same precedence spine as config (global < project).
+- **Multi-tenant secret isolation.** The host-side-only consumer model is the foundation for per-tenant secret scoping (enterprise) — secrets never cross the worker boundary regardless of backend (docker / subprocess / future firecracker / cloud).
+- **Consent + provisioning tie-in.** Secret setup folds into the conversational onboarding / consent flow (ADR-G-030) so a user provisions provider keys without hand-editing `.deck`.
+
+## Consequences
+
+**(+)** deckent secrets are fully separated from the user's `.env`; auto-gitignore + committed-file guard prevent accidental leaks; the zero-worker-exposure invariant is architecturally enforced (no transport path) rather than policy-enforced, so it holds across backends; `$DECK:KEY` interpolation keeps raw secrets out of config files; signing deps are governed, not ad-hoc.
+
+**(−)** The strong isolation depends on no backend ever adding a deck-transport to workers — a future backend must preserve the invariant explicitly; global+project secret scope is roadmap (today effectively project-local); `$DECK:KEY` resolution failures surface as warnings, so a missing secret degrades at runtime rather than blocking up front (acceptable, but must stay visible).
+
+## References / Absorbed
+
+- **Absorbs:** ADR-014 (.deck Secret File System — dedicated file, `DECKENT_` registry, auto-gitignore, worker non-exposure).
+- **Implementation:** `src/core/deck-file.ts` (parse/load/validate/template/gitignore/committed-guard), `src/core/deck-interpolation.ts` (`$DECK:KEY`), `src/core/signature.ts` (Ed25519, `@noble/ed25519` + `@noble/hashes`).
+- **Cross-ref:** ADR-010 (dependency governance — crypto-deps bridge), ADR-G-008 (Provider Abstraction — bootstrap auto-register, host-side consumer; ADR-077 Part-C), ADR-G-001 (Layered Config & Scope — shared global<project precedence), ADR-G-030 (Consent-Based Provisioning — secret-setup onboarding).
+- **Direction:** global+project secret scope (MASTER-PLAN); `.analysis/adr-review-crosswalk.md` row 014.
+
+
+---
+
+## adr-g-006: Routing & Selection (Learned Model/Effort + Agent/Skill)
+
+**Status:** accepted
+
+# ADR-G-006: Routing & Selection (Learned Model/Effort + Agent/Skill)
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** routing-engine contract (routeTaskV2; V1 purged)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-015 (TaskRouter 6-level) + ADR-028 (Decision-Engine V1→V2→V3) + ADR-072 (Routing Balance multi-signal) + ADR-073 (Routing Live Validation + FIX-prompt) + ADR-075 Part-B (skill→agent affinity)
+**Crosswalk:** 015 (+028+072+073+075B) → ADR-G-006
+
+> **Authoring note (Alperen):** "Bunun ADR/dokümante kısmı bugünü VE yarını hedef-niyetlerle açıklasın, şeffaf olsun. Bu bizim için önemli ve kritik." This ADR is the first-class application of the ADR-AUTHORING-STD (today + tomorrow, transparent).
+
+---
+
+## Context
+
+Routing decides, per task: which agent, which skills, which provider, which model, which effort. The old stack was a 6-level router (ADR-015) plus a V1 decision-engine (ADR-028) that was superseded by V2 (`routeTaskV2`) but never removed; plus a chronic distribution-skew problem (one agent winning ~12/16 tasks) that ADR-072/073/075B mitigated with domain-enrichment, domain-match-bonus, skill→agent affinity, a live-diversity test, and a CI imbalance guard. The 2026-06-30 review consolidates routing into one ADR, **purges V1 entirely**, and commits to a **learned, evolving** selection model (V3).
+
+---
+
+## Decision (Today)
+
+- **`routeTaskV2` is the routing engine.** Selection combines: intent domain-enrichment (scope-path → api/security/design/data/devops/docs intent), **domain-match bonus (+3)**, **skill→agent affinity** (`SKILL_AGENT_MAP` + affinity-bonus), surface-aware bonus (ADR-G-009 Tier-1 → api-builder/frontend-designer/ci-guardian), and `force-*` overrides (preserved).
+- **Guards:** live routing-diversity test (single-agent ≤60%, ≥4 distinct agents on a mixed set) + CI imbalance guard (`routing-distribution.mjs --ci`, >80% → fail). **FIX-prompt enrichment** (original-task + NO_GO-reason injected; `selectFixAgent` mirrors original agent, not bug-fixer-by-default).
+- **🔴 V1 PURGE:** the V1 decision-engine (`DecisionOrchestrator` + `routing_engine:'v1'` config + V1 tests + manifest entry + every reference) is **deleted entirely — "izi bile kalmayacak"** (in an orchestration this comprehensive, V1 is unacceptable).
+
+---
+
+## Intent / Roadmap (Tomorrow) — Learned Routing V3
+
+V2 is sufficient *today* but **not the target**. V3 = a **learned model/effort selection matrix**:
+
+```xml
+<routing-v3 intent="learned + auditable">
+  <learn>per-task-type outcome metrics (success / quality / cost / latency) → the
+    model/effort matrix auto-updates from real results.</learn>
+  <auto-adopt>new models auto-adopted on merit (e.g. opus-4.9 &gt; 4.8; live capability,
+    zero-hardcode — F1-AD).</auto-adopt>
+  <vector-select>natural selection over (task-kind × cost × latency × risk ×
+    provider-health × outcome).</vector-select>
+  <scope>project + provider scoped; USER-manageable; force-* preserved.</scope>
+  <transparency>the ADR documents today AND tomorrow with target-intent — this is
+    important and critical to us.</transparency>
+</routing-v3>
+```
+
+(= ROUTE-1+ / ROUTE-V1-PURGE / PROV-MATRIX, fusing outcome-tracker + F5 + F1-AD — the Codex ModelPolicyEngine convergence.) Distribution balance remains a **continuously-monitored** target (the +3 bonus is the first link; ADR-G-023 affinity + WM-7 language-mismatch-penalty deepen it).
+
+---
+
+## Consequences
+
+**(+)** One routing law; V1 gone; selection is multi-signal and diversity-guarded today, and learned/auditable tomorrow. New models adopt on merit without hardcoded IDs. User + project scoping.
+
+**(−)** Distribution skew is mitigated, not solved (recurred at Sprint 211 as refactorer-heavy) — balance stays a monitored target until V3. V3 (learned matrix) is roadmap; today is V2 + guards.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-015 + ADR-028 (V1-purge) + ADR-072 + ADR-073 + ADR-075 Part-B.
+- **Cross-ref:** ADR-G-008 (provider/model registry, cost) · ADR-G-009 (surface-aware routing, eval) · ADR-G-023 (agent/skill taxonomy, affinity) · ADR-G-032 (evolution — outcome signal) · ADR-G-028 (work taxonomy).
+- **Born / MASTER-PLAN:** ROUTE-1+ (Routing V3) · ROUTE-V1-PURGE · PROV-MATRIX · F1-AD.
+- **Memory:** `feedback_agent_routing_imbalance` · `feedback_fix_prompt_quality`.
+
+
+---
+
+## adr-g-007: External Messaging Connectors & Integration
+
+**Status:** accepted
+
+# ADR-G-007: External Messaging Connectors & Integration
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=config-gated + lazy-load + fail-safe (per-target timeout-guarded, error-isolated) connectors + project-scoped session/pairing gateway (auth-gate pending) → tomorrow=integration-layer (MSG-1) + multi-channel ApprovalBroker relay (APR-2) + pairing onCallback wire + WhatsApp wire (MSG-3) + pairing hard-auth before public exposure
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-016 (External Messaging Connectors), ADR-091 (Project-Scoped Messaging Gateway) · **Supersedes:** —
+**Crosswalk:** ADR-016 + ADR-091 → ADR-G-007
+
+> **Note:** ADR-091 (Project-Scoped Messaging Gateway) lived in `memory.db` (`type='adr'`) but was never exported to `docs/adr/` — a real doc↔DB drift. Folding it into ADR-G-007 closes that drift; no standalone export is created (per crosswalk row #091). The gateway today ships **without** a hard pairing-auth gate, so it must not be exposed on a public network until the pairing onCallback + auth work (MSG-1/APR-2) lands — see Intent/Roadmap.
+
+---
+
+## Context
+
+Operators need deckent to reach them where they already are — their phone — for sprint approvals, checkpoint gates, and alerts, and to reply back inbound (approve/reject) without opening a terminal. This is a first-class **product** surface: it is how a non-coder operator or an enterprise on-call rotation supervises an autonomous run from anywhere, and how deckent's "AI proposes, human approves" law (ADR-G-031 F3) reaches a human across channels.
+
+Two decisions are merged here, because in the current codebase they are one subsystem:
+
+- **ADR-016 (External Messaging Connectors)** defined the lifecycle-managed `src/connectors/` subsystem — the `BaseConnector` contract, the per-platform adapters (Telegram/Discord/WhatsApp), outbound notification dispatch, the inbound approve/reject pipeline, and the agentic bot. ADR-016 was originally (Sprint 044) an **AI-provider** health/lifecycle `Connector` abstraction; that responsibility moved to `src/core/provider.ts` `ProviderAdapter` (now governed by **ADR-G-008**), and the term *connector* + the `src/connectors/` namespace were repurposed to mean **external messaging connectors**. That repurpose closed a governance gap (a 16-file messaging/bot subsystem with no ADR).
+- **ADR-091 (Project-Scoped Messaging Gateway)** added a project-scoped **session/pairing** gateway (`src/connectors/gateway/`) so that a single bot process can serve multiple projects with per-project session isolation and a pairing handshake — the re-architecture of the Telegram experience from the ground up.
+
+The subsystem's non-negotiable invariants were forged from operational pain: a slow or hung messaging platform must **never** block the sprint lifecycle, an absent optional dependency must **never** break process load, and a misconfigured channel must **never** leak a credential.
+
+---
+
+## Decision (Today)
+
+### 1. Connector subsystem (`src/connectors/`)
+
+```xml
+<connector-subsystem root="src/connectors/">
+  <contract-and-pool>
+    base-connector.ts   — BaseConnector interface (the per-platform contract)
+    connector-pool.ts   — ConnectorPool: register / broadcast / lifecycle
+  </contract-and-pool>
+  <adapters>
+    telegram.ts   — Telegram (telegraf, runtime dep)
+    discord.ts    — Discord (discord.js, OPTIONAL dep, lazy-imported)
+    whatsapp.ts   — WhatsApp (adapter present; full wire = MSG-3, see Tomorrow)
+  </adapters>
+  <outbound>
+    connector-notify-adapter.ts — ConnectorNotificationAdapter implements the
+      WIRE-001 NotificationAdapter contract; each DECKENT→USER:NOTIFY goes to
+      every connector's own chat_id, per-target timeout-guarded + fail-isolated.
+  </outbound>
+  <inbound>
+    incoming-router.ts → incoming-command-router.ts / incoming-command-resolver.ts
+      — route inbound messages to actions (approve / reject / status).
+  </inbound>
+  <bot>
+    bot-agentic.ts / bot-daemon.ts / bot-commands.ts / bot-action-store.ts
+      — `deckent bot listen`; humanized replies (BOT-1).
+    chat-bridge.ts — ChatMemoryAdapter, bounded multi-turn history (BOT-2d).
+  </bot>
+  <bootstrap>
+    connector-bootstrap.ts — reads `notify_connectors` config, lazy-imports
+      enabled connectors (missing optional dep → log + skip), starts OUTBOUND.
+  </bootstrap>
+  <gateway scope="project">                          <!-- absorbs ADR-091 -->
+    gateway/ — project-scoped session + pairing: one bot process serves many
+      projects; per-project session isolation + a pairing handshake binds a
+      chat to a project. (Telegram experience re-architecture.)
+  </gateway>
+</connector-subsystem>
+```
+
+### 2. Invariants (the law)
+
+- **Config-gated.** A connector is inert unless `notify_connectors: { telegram|discord: { enabled, token: "$DECK:…", chat_id } }` enables it. Tokens are referenced through `$DECK:` interpolation (**ADR-G-005**) — never stored inline.
+- **Lazy.** Optional deps (e.g. `discord.js`) are lazy-imported; a missing optional dependency logs and is skipped, never breaks process load (dependency policy: **ADR-D-005**).
+- **Fail-safe.** Every send is timeout-guarded and per-target error-isolated. A slow, hung, or erroring platform never blocks or fails the sprint lifecycle.
+- **Adding a platform** = one new adapter implementing `BaseConnector` + one `notify_connectors` entry. No core change.
+
+### 3. Project-scoped session/pairing gateway (absorbs ADR-091)
+
+The gateway scopes inbound sessions per-project and brokers a pairing handshake so one running bot can supervise multiple projects without cross-project session bleed. **Today's honest limitation:** the gateway has **no hard pairing-auth gate** yet — pairing is established but not cryptographically enforced on every inbound callback — so it is safe for trusted/local use but **must not be exposed publicly** until the pairing onCallback + auth work lands (Tomorrow). This is an explicitly-marked debt, not silent.
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **MSG-1 — Integration layer.** A formal integration layer above the per-platform adapters: a uniform inbound/outbound message envelope, retry/backoff, and delivery-receipt semantics, so new channels (Slack, Teams, email, webhook) plug in without per-adapter glue.
+- **APR-2 — Multi-channel approval relay.** Approval requests fan out across every paired channel and the **first** authoritative human response wins, routed through the unified **ApprovalBroker** (the runtime-wide approval spine that also serves nervous-system approvals — **ADR-G-022**). One approval, any channel.
+- **Pairing onCallback + hard-auth.** Wire the pairing callback end-to-end and gate every inbound callback behind the pairing identity, so the gateway becomes safe to expose beyond a trusted host. Connector-side identity/RBAC graduates into the enterprise connector-identity model (**ADR-G-031**, fail-CLOSED L2-RBAC) and the authority layer (**ADR-G-020**).
+- **WhatsApp wire (MSG-3).** Complete the WhatsApp adapter to outbound+inbound parity with Telegram.
+- **Bot tool-surface.** Expose cost/usage/kpi as bot-callable tools and gate risky tools (start/run/process, publish) behind a button-confirm approval in DMs and groups — under the same surface-parity contract as CLI/MCP/terminal (**ADR-G-011**).
+
+---
+
+## Consequences
+
+**(+)** deckent reaches a human on their phone and takes back a decision — the approval loop closes across channels, which is what makes an autonomous run supervisable for a non-coder and an enterprise alike. The subsystem is fail-safe by construction (a dead platform never stalls a sprint), config-gated (no accidental phone-home), and extensible (new platform = new adapter). Folding ADR-091 into this record fixes a real doc↔DB drift and makes the gateway's session/pairing model part of the connector law rather than an orphan.
+
+**(−)** The project-scoped gateway today lacks a hard pairing-auth gate — a marked debt that bounds it to trusted/local use until MSG-1/APR-2 land (it must not be made public before then). WhatsApp is adapter-present but not fully wired (MSG-3). The bot tool-surface and group-button approval are built but pending build+restart, and a detached-exec gap exists for start/run/process (tracked in `project_bot_tool_surface_and_group_buttons`). ApprovalBroker unification (APR-2) is roadmap — today approvals route through the existing nervous-accept path, not yet a single multi-channel broker.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-016 (External Messaging Connectors — `BaseConnector`/`ConnectorPool`, adapters, outbound notify, inbound pipeline, agentic bot, bootstrap; originally Sprint-044 AI-provider lifecycle, repurposed 2026-06-11) + ADR-091 (Project-Scoped Messaging Gateway — session/pairing, drift-fixed here).
+- **Provider lineage:** the original Sprint-044 AI-provider `Connector` responsibility moved to **ADR-G-008** (Provider Abstraction, Fleet & Native-Usage) — `connector` now means *messaging*, not *provider*.
+- **Secret interpolation:** **ADR-G-005** (Secret File System & Zero-Worker-Exposure) — `$DECK:` token references.
+- **Dependency policy:** **ADR-D-005** (Dependency Policy & Inventory) — `telegraf` runtime dep, `discord.js` optional/lazy.
+- **Approval spine:** **ADR-G-022** (Nervous System) — ApprovalBroker unification (APR-1/APR-2).
+- **Enterprise identity:** **ADR-G-031** (Enterprise Foundation) — connector social-identity RBAC, fail-CLOSED, tenant-scoped (absorbs old ADR-092); **ADR-G-020** (Authority, Roles, Flow & Enforcement) for the approval/authority contract.
+- **Surface parity:** **ADR-G-011** (Surface Parity & Thin-Wrapper) — bot tool-surface ≡ CLI ≡ MCP ≡ terminal.
+- **Wiring contracts:** WIRE-001 (`NotificationAdapter` notify dispatcher), BOT-1 (humanized bot-agent), BOT-2d (bounded chat history).
+- **Born work-items:** MSG-1 (integration layer), APR-2 (multi-channel approval relay), MSG-3 (WhatsApp wire), PAIRING-AUTH (onCallback + hard-auth gate), BOT-TOOL-SURFACE (cost/usage/kpi + group-button approval).
+- **Direction:** memory `project_messaging_gateway_rearch` (gateway in main, build+T9 pending, ⚠️ auth-gate-less — do not expose publicly), `project_bot_tool_surface_and_group_buttons`, `feedback_telegram_rich_approval_bot`; `.analysis/hermes-vs-deckent-direction-decisions.md` (runtime-wide ApprovalBroker = P0).
+
+
+---
+
+## adr-g-008: Provider Abstraction, Fleet & Native-Usage
+
+**Status:** accepted
+
+# ADR-G-008: Provider Abstraction, Fleet & Native-Usage
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** provider-neutrality (no hardcoded provider; `getProviderForModel` SSOT)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-017 (MCP-Native Provider Adapters) + ADR-066 (Provider Independence) + ADR-077 (8-Fleet OpenAI-Compatible) + ADR-093 (Real Token/Cost Capture) + ADR-076 Part-A (Auth-Precedence) + ADR-078 Part-B (8-provider bootstrap/overflow)
+**Crosswalk:** 017 (+066+077+093+076A+078B) → ADR-G-008
+
+---
+
+## Context
+
+deckent is **provider-free**: any provider (subscription-CLI or API or local) can run any task on any backend. The pieces accreted across sprints — MCP-native adapters (017), backend parity (066), an OpenAI-compatible HTTP adapter for the no-CLI fleet (077), real provider-native usage capture (093), the subscription↔API auth-precedence fix (076A), and 8-provider bootstrap/overflow (078B). The 2026-06-30 review unifies them into one provider law and connects it to Brain provider-failover (ADR-G-025).
+
+---
+
+## Decision (Today)
+
+```xml
+<provider-abstraction>
+  <resolver>getProviderForModel (SSOT, in task-types.ts) — model → provider.</resolver>
+  <backends>provider-free across subprocess / tmux / Docker (host-adapter for
+    codex/gemini + per-provider OAuth mount; ollama host-route).</backends>
+  <fleet>3 CLI-subscription (claude/codex/gemini) + N HTTP-API via one
+    OpenAICompatibleAdapter (DeepSeek/Qwen/GLM/Mistral/Groq — same /chat/completions) +
+    local Ollama. ProviderName = open string. Mixed-fleet dogfood-proven (Sprint 249:
+    15 tasks / 4 real providers).</fleet>
+  <auth-precedence>subscription mode → ANTHROPIC_API_KEY NOT forwarded into the
+    container (~/.claude session mount instead); API mode forwards. No cross-provider
+    credential leak. (Ends the `env -u ANTHROPIC_API_KEY` workaround.)</auth-precedence>
+  <native-usage>session-usage-store reads the provider's own per-turn usage
+    (~/.claude/projects/*.jsonl) → REAL cacheCreationTokens (the limit-dominant cost
+    component, previously always 0); TokenUsage.source ∈ {session-store, envelope,
+    estimate}; priority chain session-store → envelope → estimate. (sessionRoot injectable
+    = test-hermetic; the real ~/.claude is never read in tests.)</native-usage>
+</provider-abstraction>
+```
+
+3rd-party-API providers (DeepSeek/Qwen/GLM) are separate accounts/keys — they do **not** violate the Anthropic-Tier-1-API beta deferral (which applies to Anthropic API only).
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **Brain provider-failover + lossless self-update** (ADR-G-025): the Brain itself fails over Claude→OpenAI/Codex losslessly; the adapter abstraction is what makes a provider-agnostic Brain possible (today Claude-Brain, tomorrow GPT-5.5-Brain).
+- **🔴 ADR-066-W:** `?? 'claude'` default-provider drift (3→9 occurrences) → re-audit + consolidate to `getDefaultProviderName()` (the contract: ≤3, justified). (WM-5 provider-free hard-enforce family.)
+- **🔴 Subscription→API overflow wire (F1-010):** `resolveWithOverflow` is built but **0-caller (dormant)** — wire it to the spawn-error/FIX path (tier-preserving overflow on quota-exceeded).
+- **Native-usage phase-2:** Codex/Gemini own usage stores (today `null`→estimate fallback; honest seam).
+- **Subscription-package support** (PROV-SUBS) + **opt-in hosted-deckent-core** as an *optional* provider (ADR-G-016: BYO default, hosted never required) + first-class cost/limit/notify/fallback (PROV-FC).
+
+---
+
+## Consequences
+
+**(+)** True provider-freedom: any subscription/API/local provider, any backend, with accurate provider-native cost (real cacheCreation) and leak-free auth-precedence. The abstraction enables a provider-agnostic, failover-capable Brain. 3rd-party cost advantage (DeepSeek ~1/30th) accessible.
+
+**(−)** Overflow is dormant (born F1-010); the `?? 'claude'` invariant drifted (born ADR-066-W); Codex/Gemini native-usage is phase-2 (estimate fallback today). Hosted-core/subs-package are roadmap.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-017 + ADR-066 + ADR-077 + ADR-093 + ADR-076-A + ADR-078-B.
+- **Cross-ref:** ADR-G-025 (Brain failover/self-update) · ADR-G-006 (routing/model-selection) · ADR-G-012 (tiers) · ADR-G-014 (backends) · ADR-G-005 (.deck per-provider keys) · ADR-D-002 (test-hermeticity for sessionRoot) · F1-TOK/F1-CB (cost ledger).
+- **Born:** ADR-066-W (`?? 'claude'` consolidate) · F1-010 (overflow wire) · native-usage-phase-2 · PROV-FC · PROV-SUBS.
+- **Memory:** `project_deckent_runtime_ecosystem` · `project_api_mode_deferred_post_beta` · `feedback_container_auth_precedence`.
+
+
+---
+
+## adr-g-009: Evaluation Integrity (Language-Agnostic Verify · Coverage-Exemption · Proof-of-Function)
+
+**Status:** accepted
+
+# ADR-G-009: Evaluation Integrity (Language-Agnostic Verify · Coverage-Exemption · Proof-of-Function)
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** eval-integrity (signal-based + deterministic + run-verify gate; "wired ≠ working")
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-019 (Language-Agnostic Worker Verify) + ADR-070 (Brain Evaluation Integrity) + ADR-079 (Proof-of-Function DoD)
+**Crosswalk:** 019 (+070+079) → ADR-G-009
+
+> **Moat note:** Honest, real evaluation is a core deckent differentiator. This ADR makes evaluation language-agnostic, gaming-proof, and run-verified — the "wired ≠ working" law.
+
+---
+
+## Context
+
+Evaluation must judge work **honestly and for real**, across any language, without false NO_GO or hollow DONE. Three problems were solved across sprints: (019) a single code-rubric falsely failed audit/doc tasks and assumed a TS toolchain on non-TS stacks; (070) an agent-name allowlist produced false-FIX cascades and stale hardcoded model IDs leaked into cost output; (079) a mocked unit test stamped DONE on a `serve` that was actually 401-broken ("hollow DONE"). The 2026-06-30 review unifies these into one evaluation-integrity law.
+
+---
+
+## Decision (Today)
+
+```xml
+<evaluation-integrity>
+  <language-agnostic>verify criteria derived by task-kind × tech-stack (WM-7
+    criteria-deriver): a C++ project is NOT held to `tsc`-clean; coverage is required
+    only on COVERAGE_MEASURABLE_STACKS. doc→files-on-disk, audit→findings,
+    code→detected-stack commands.</language-agnostic>
+  <coverage-exemption signal-based="true">if a worker changed a test file
+    (.test.*/.spec.*) coverage is optional — AGENT-INDEPENDENT + idempotent +
+    deterministic (derived from result.filesChanged, disk ground-truth). Replaces the
+    leaky agent-name allowlist (070 false-FIX root).</coverage-exemption>
+  <zero-hard-code>any string a running deckent can derive from live data MUST NOT be
+    hardcoded — model IDs read from the live registry (bundled snapshot = offline
+    fallback only); no stale `claude-opus-4-6` in cost/status output.</zero-hard-code>
+  <proof-of-function>isUserSurfaceTask (Tier-1) = touches src/cli/commands/ |
+    src/dashboard/ | src/api/ (orthogonal to TaskType). Tier-1 DoD = Tier-0 +
+    a recorded REAL-BINARY run via the `Smoke:` directive. A mocked unit test alone =
+    GO_WITH_TECH_DEBT, never DONE. Sprint-inner gate (proof-of-function.ts, async spawn,
+    host-side) auto-downgrades DONE→GO_WTD on smoke-fail + emits PROOF_OF_FUNCTION_MISMATCH.
+    Surface-aware routing prefers api-builder/frontend-designer/ci-guardian.</proof-of-function>
+</evaluation-integrity>
+```
+
+The "wired ≠ working" principle is permanent: structural/disk proof (Tier-0) is insufficient for user surfaces; only a real-binary run closes a Tier-1 task.
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **Hard-enforce path** via ADR-G-020's flag-gated vein: A9 (ADR-compliance — permanently fail-open by design) + A14 (tech-debt-ratio downgrade) graduate from dogfood-flag to default at GA-V2.
+- **More stacks** in the language-agnostic deriver (the stack matrix grows with provider/environment expansion — Law #2).
+- **Deeper signal-based eval** (WM-7 extensions: language-mismatch-penalty, stack-aware coverage) — "measurement-gap ≠ quality-failure" generalized.
+- **Cross-verify** (XVER-1): different-provider adversarial verification feeding evaluation as an advisory signal.
+
+---
+
+## Consequences
+
+**(+)** Evaluation is honest across languages, gaming-proof (signal/disk-derived, not agent-name), zero-hardcode, and run-verified for user surfaces. Hollow-DONE is structurally impossible for Tier-1. False-NO_GO on doc/audit/non-TS tasks eliminated.
+
+**(−)** Tier-1 gate adds EVALUATE latency (only when `Smoke:` present; absent → no-op). Workers may forget the `Smoke:` line (anchored in worker rules; FIX-phase pressure catches it). Hard-enforcement of A9/A14 is roadmap (today the vein is dogfood-flag).
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-019 + ADR-070 + ADR-079.
+- **Cross-ref:** ADR-G-028 (Work Taxonomy — TaskKind×TechStack, the deriver inputs) · ADR-G-020 (enforcement vein A9/A14) · ADR-G-006 (surface-aware routing) · ADR-G-018 (verification protocol channels) · ADR-G-025 (worker-live-trace / observability).
+- **Born / MASTER-PLAN:** WM-7 (criteria-deriver) · XVER-1 (cross-verify) · zero-hardcode (`feedback_zero_hardcode_live_data`).
+- **Memory:** `feedback_proof_of_function_dod` · `feedback_zero_hardcode_live_data`.
+
+
+---
+
+## adr-g-010: Output, Terminal-UX & Brand
+
+**Status:** accepted
+
+# ADR-G-010: Output, Terminal-UX & Brand
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=rich multi-section output modules (`sprint-retro-writer.ts` / `sprint-docs-updater.ts`) + `NO_COLOR` honored + fixed `KRAKEN_ASCII` brand const (`splash.ts`) → tomorrow=terminal concise/live (TERM-LIVE) + dashboard rich-detail (ADR-G-033) + `output_splash` real-gate-or-remove (ADR-021-W)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-020 (Rich Sprint Output — multi-section), ADR-021 (Kraken ASCII Brand Identity) · **Supersedes:** —
+**Crosswalk:** ADR-020 + ADR-021 → ADR-G-010
+
+---
+
+## Context
+
+First impressions and run-readability are product surfaces, not internal plumbing. Two early decisions converged here:
+
+- **ADR-020 (Rich Sprint Output):** sprint output was a single-line metric — a user could not see how many tasks completed, which files changed, or what was learned. The fix: rich, multi-section output with ANSI color + `NO_COLOR` support.
+- **ADR-021 (Kraken ASCII Brand Identity):** deckent had no visual identity; in a CLI tool the first impression matters. The fix: a Kraken ASCII mascot + brand palette. The Sprint-281 re-audit classified this **user-product** (brand = the product's first impression).
+
+Both are **ADR-G** (Global / Constitution): they define how *every user* reads deckent's output and sees its brand on every surface. The 2026-06-30 review merged them as "Output, Terminal-UX & Brand" and aligned them with the terminal-center pivot (terminal = concise/live, dashboard = rich detail).
+
+> Note: ADR-083 ("Output & Terminal UX") was flagged a merge-candidate for ADR-020; the final taxonomy routed ADR-083 into ADR-G-033 (Dashboard, `083D`) and ADR-G-034 (Native Agentic Terminal). ADR-G-010 therefore absorbs only ADR-020 + ADR-021 and cross-references those two for the surface evolution.
+
+---
+
+## Decision (Today)
+
+### A. Rich multi-section output
+
+Sprint output is **rich + multi-section** (not a single-line metric), with ANSI color and **`NO_COLOR`** env-var support for CI-friendly plain text. The original "7-section" list is **stale**; the concrete current structure is:
+
+```xml
+<output-structure>
+  <doc path=".brain/sprints/RETRO.md" writer="src/orchestra/sprint-retro-writer.ts">
+    5 sections: Summary · Highlights · Issues · Metrics · Learnings
+    (+ Quality Dimensions subsection). Highlights/Issues emitted only when non-empty.
+  </doc>
+  <doc path=".brain/sprints/sprint-NNN.md" writer="src/orchestra/sprint-docs-updater.ts">
+    task-oriented log: "## Task {id}: {title}" → "### Description"
+    (not the same structure as the retro).
+  </doc>
+  <canonical>the modules above + `deckent retro` / `deckent history` output.</canonical>
+</output-structure>
+```
+
+### B. Kraken brand identity
+
+```xml
+<brand-identity source="src/cli/helpers/splash.ts">
+  <ascii const="KRAKEN_ASCII" generated="false"/>   <!-- fixed const, not runtime-generated -->
+  <color name="TEAL"      body     ansi="\x1b[38;2;77;184;164m"   hex="#4DB8A4"/>
+  <color name="BOLD_GOLD" wordmark ansi="\x1b[1;38;2;196;168;85m" hex="#C4A855"/>  <!-- "DECKENT" -->
+  <tagline dim="true">AI Agent Orchestrator</tagline>             <!-- + version, dim -->
+  <no-color>NOT skipped — showSplash() returns the PLAIN-TEXT splash
+            (Kraken + "DECKENT v<ver>" + tagline, no ANSI). No CI env-var handling.</no-color>
+</brand-identity>
+```
+
+### C. Visibility gate (known dormant)
+
+The splash is meant to be shown when `config.output_splash` is true, via `showSplashIfEnabled`. **Today that gated wrapper is zero-caller:** `sprint-phases.ts` calls `showSplash` directly only on the **first sprint** (`sprint.number === 1`), gateless. So `output_splash` is a **no-op knob** — toggling it changes nothing. Tracked as **ADR-021-W** (a textbook "settings feature lost" instance).
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **Surface split (pivot-aligned):** **terminal = concise / live summary** — the TERM-LIVE run-status footer (what's running / where / approval? / next / risk; fed by ADR-G-025 worker-live-trace); **dashboard = rich detail** — the full per-task results, changes, and metrics move to ADR-G-033 (Dashboard observability surface). The rich-multi-section content migrates to the dashboard; the terminal carries a tight live status, not a wall of text.
+- **`output_splash` real-gate-or-remove (ADR-021-W / DORMANT-2):** either wire `sprint-phases` to `showSplashIfEnabled` (a real gate, with the dashboard ConfigPage surface aligned) or remove the knob from the schema — settings honesty (no no-op config knobs).
+- **Brand carried cross-surface:** the Kraken identity extends consistently to dashboard / native terminal / desktop (one brand, all surfaces).
+
+---
+
+## Consequences
+
+**(+)** Users get the full picture of a run, brand recognition from the first invocation, and clean CI output via `NO_COLOR`. The merge unifies output + brand under one terminal-UX law. The today+tomorrow split keeps the pivot (terminal concise, dashboard rich) explicit so agents and contributors build toward it.
+
+**(−)** `output_splash` is a **no-op knob today** (dormant config-honesty debt — ADR-021-W); the concrete section set already drifted from the original "7-section" text (canonical is now the modules, not a count). The terminal/dashboard split is roadmap — today the rich output still lands largely in the terminal/files, not yet routed to the dashboard.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-020 (Rich Sprint Output — multi-section), ADR-021 (Kraken ASCII Brand Identity).
+- **Surface partners:** ADR-G-033 (Dashboard — rich detail; absorbed `083D`), ADR-G-034 (Native Agentic Terminal — absorbed ADR-083 REPL-UX), ADR-G-025 (Process Resilience & Live Observability — TERM-LIVE / worker-live-trace).
+- **Parity:** ADR-G-011 (Surface Parity & Thin-Wrapper — output consistent across CLI/MCP/terminal).
+- **Born work-items:** ADR-021-W (`output_splash` real-gate-or-remove = DORMANT-2, MASTER-PLAN P1), TERM-LIVE (live run-status footer, P0).
+- **Direction:** `.analysis/adr-review-crosswalk.md` (rows 020/021 → ADR-G-010), `.analysis/hermes-vs-deckent-direction-decisions.md` (terminal-center pivot).
+
+
+---
+
+## adr-g-011: Surface Parity & Thin-Wrapper
+
+**Status:** accepted
+
+# ADR-G-011: Surface Parity & Thin-Wrapper
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=shared core (`src/core/` · `src/orchestra/`) + thin CLI/MCP wrappers + auto-generated parity refs (`docs/reference/cli.md` · `mcp-tools.md`) → tomorrow=CLI≡MCP≡terminal/tool parity + LAYER-1 structural enforcement + WATCH-W backend-agnostic
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-022 (CLI/MCP Feature Parity) · **Supersedes:** —
+**Crosswalk:** ADR-022 → ADR-G-011
+
+---
+
+## Context
+
+Users switching from the CLI to an MCP host (Claude Code, VS Code, JetBrains) experienced **feature loss** — capabilities reachable from the CLI were missing in MCP. Worse, CLI and MCP used **different code paths** (CLI called functions directly while MCP ran wrappers over HTTP/stdio), so the two surfaces could drift in behavior, not just in coverage. ADR-022 (Sprint 067 v1 → Sprint 085 v2) established **feature parity + thin-wrapper**: one core, surfaces are thin.
+
+The 2026-06-30 review confirmed this as **ADR-G** (Global / Constitution — "critical support" law): the same capability must be reachable over the same core from every surface. It then extended the law to the terminal-center pivot (CLI ≡ MCP ≡ terminal/tool).
+
+---
+
+## Decision (Today)
+
+### 1. CLI ≡ MCP over one core
+
+Every MCP tool has a CLI counterpart; **there are no MCP-only commands.** Shared business logic lives in `src/core/` or `src/orchestra/`; the CLI (`register<Name>(program)`) and MCP (`server.registerTool()`) are **thin wrappers that call the same core function**. Parameter parity holds: MCP tools use the same input/output schema as their CLI commands.
+
+### 2. Intentional CLI-only (infra / UI / setup)
+
+These are infrastructure/terminal operations, deliberately kept CLI-only:
+
+```xml
+<cli-only reason="infrastructure / interface / setup — not core capability">
+  <group kind="infra">attach · spawn</group>           <!-- tmux session mgmt -->
+  <group kind="server-ui">dashboard · web · serve</group> <!-- interface launch -->
+  <group kind="setup">upgrade · onboard</group>          <!-- setup wizards -->
+  <group kind="plugin">plugin install · plugin list · plugin create</group>
+</cli-only>
+```
+
+### 3. `watch` is NOT CLI-only (2026-06-11 correction)
+
+`deckent_watch` MCP already exists, but CLI `watch` (tmux-split) and MCP `deckent_watch` (event-stream subscribe) **semantically diverged** = a parity violation. Per this ADR they must be **unified** and made **backend-agnostic** (observe the worker wherever it runs — ADR-G-014, which absorbed ADR-089). Work-item: **WATCH-W**.
+
+### 4. Counts are not load-bearing
+
+The Sprint-085 parity counts ("19 MCP = 19 CLI", "MCP 16→19", "CLI 32→33") are **stale snapshots**. The principle stands; canonical counts are **auto-generated** — `docs/reference/cli.md` + `docs/reference/mcp-tools.md` via `npm run docs:ref`.
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **CLI ≡ MCP ≡ terminal/tool:** as the native agentic terminal (ADR-G-034) becomes the primary management+usage surface and tool-driven invocation grows, parity **extends** — the same capability is reachable from CLI, MCP, the terminal, and tool-calls, all thin over one core. The dashboard remains **observe-only** (no command-execution divergence — ADR-G-033).
+- **LAYER-1 structural enforcement:** the `core→cli/orchestra` import-inversion cleanup (CORE-W1 + ORCH-W1 + API-W1 + ADR-008-W) — logic lives in core, every surface stays thin; enforced **structurally** so a wrapper cannot accrete business logic. (MASTER-PLAN: LAYER-1.)
+- **WATCH-W backend-agnostic parity:** `watch` observes the worker wherever it runs (docker/subprocess/tmux/firecracker/cloud) with **one semantic** across CLI + MCP (ADR-G-014 Observation).
+
+---
+
+## Consequences
+
+**(+)** A user can do anything from any surface; new capability is built **once** in core and surfaced thinly; auto-generated refs prevent count-drift. The thin-wrapper law is precisely what makes the terminal-center pivot cheap — the terminal is just one more thin surface over the same core.
+
+**(−)** Two-or-more wrappers per capability raise the per-feature cost (every core feature needs CLI + MCP + terminal surfacing). The thin-wrapper discipline is enforced **structurally only as a roadmap item** (LAYER-1); today a surface could still accrete logic (caught at review, not blocked). `watch` parity is an open divergence until WATCH-W lands.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-022 (CLI/MCP Feature Parity — thin-wrapper, shared core, intentional CLI-only, `watch`-parity correction).
+- **Surface partners:** ADR-G-034 (Native Agentic Terminal — primary surface), ADR-G-033 (Dashboard — observe-only), ADR-G-029 (Embedded Web Terminal), ADR-G-010 (Output, Terminal-UX & Brand — consistent output across surfaces).
+- **Backend partner:** ADR-G-014 (Spawn Backend, Options & Observation — absorbed ADR-089 backend-agnostic watch; WATCH-W).
+- **Structure substrate:** ADR-D-004 (Brain Central Import — one-way dependency) + ADR-D-006 (Code Architecture Conventions) — the import-direction LAYER-1 cleans.
+- **Governance:** ADR-G-019 (taxonomy), ADR-G-020 (authority / enforcement).
+- **Born work-items:** LAYER-1 (core→surface inversion cleanup, MASTER-PLAN P1), WATCH-W (backend-agnostic watch + CLI/MCP parity, P1).
+- **Direction:** `.analysis/adr-review-crosswalk.md` (row 022 → ADR-G-011), `.analysis/hermes-vs-deckent-direction-decisions.md` (terminal-center pivot).
+
+
+---
+
+## adr-g-012: Plan Tier & Config Customization
+
+**Status:** accepted
+
+# ADR-G-012: Plan Tier & Config Customization
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=`config.ts` `VALID_MODES` provider-agnostic tier set + `autoMigrateOnLoad` legacy-alias map (validated on load) → tomorrow=common/standard + custom tier + NL-terminal customize-ALL-settings (ONB-CHAT), every config-knob real-in-code (honesty / zero-hardcode)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-023 (Plan Tier Generalizasyonu — Provider-Agnostic Tier İsimleri) · **Supersedes:** —
+**Crosswalk:** ADR-023 → ADR-G-012
+
+---
+
+## Context
+
+Plan tier names were Claude-specific — `max_plan`, `max5x_plan`, `pro_plan` — meaningless to Codex or Gemini users. A provider-agnostic CLI must not bake one provider's vocabulary into its core config surface. ADR-023 (Sprint 072) generalized the tier names and changed the init wizard from "Select your Claude plan" to "Select your plan," keeping legacy names as backward-compatible aliases.
+
+A code-verification note corrected one detail: `unlimited` was **not** preserved as a standalone tier — it was remapped to `api`. The canonical tier set today is `VALID_MODES = ['performance', 'balanced', 'economic', 'api']` (`src/core/config.ts`), with no live `unlimited` tier.
+
+The 2026-06-30 review expanded the decision's scope from "rename tiers" to "**config customization as a first-class, honest surface**": provider-agnostic standard tiers PLUS a user-defined custom tier, customizable conversationally (NL-terminal / ONB-CHAT), under the hard rule that **every config-knob is real-in-code** — no dormant settings that look configurable but do nothing (DORMANT-2 honesty, zero-hardcode).
+
+## Decision (Today)
+
+### 1. Provider-agnostic tier names
+The canonical tier set is `VALID_MODES = ['performance', 'balanced', 'economic', 'api']` (`src/core/config.ts`):
+
+| Tier | Meaning |
+|---|---|
+| `performance` | highest quality, highest cost (was `max_plan`) |
+| `balanced` | quality/cost balance (was `max5x_plan`) |
+| `economic` | low cost, basic tasks (was `pro_plan`) |
+| `api` | metered API usage (was `unlimited`, remapped — no standalone `unlimited` tier) |
+
+### 2. Backward-compatible migration
+`autoMigrateOnLoad` recognizes the legacy names as aliases (`max_plan→performance`, `max5x_plan→balanced`, `pro_plan→economic`, `unlimited→api`) and upgrades existing configs on read. The init wizard reads "Select your plan" (provider-neutral). All docs use the new names.
+
+### 3. Honest config surface (seed)
+Tier selection is real-in-code: a chosen tier maps to actual model-equivalence behavior via the provider layer (ADR-G-008), not a cosmetic label. This is the seed of the broader config-customization honesty rule below.
+
+## Intent / Roadmap (Tomorrow)
+
+- **Common/standard + custom tiers.** Beyond the standard provider-agnostic set, users define their **own custom tier** (their own quality/cost/model mapping), so the tier system is a template, not a fixed enum — consistent for solo users and configurable for enterprises.
+- **NL-terminal customize-ALL-settings (ONB-CHAT).** Every setting — tier included — is customizable conversationally from the native terminal (CONFIG-CUSTOMIZE / ONB-CHAT), prioritizing ease + consistency over hand-editing JSON. This is part of the terminal-as-primary-surface direction.
+- **Every config-knob real-in-code (honesty / zero-hardcode).** A binding constraint: a setting that appears in config MUST have a genuine, live effect in code. No dormant/cosmetic knobs (DORMANT-2 honesty); no hardcoded value masquerading as configurable (zero-hardcode). Config customization is only trustworthy if every knob is wired.
+
+## Consequences
+
+**(+)** Provider-agnostic terminology serves Codex / Gemini / any-provider users equally; `autoMigrateOnLoad` makes the rename invisible to existing users; reframing as ADR-G binds tier/config customization to the honesty + zero-hardcode laws so a knob can never become a lie; the custom-tier + NL-customize direction makes config a first-class product surface, not an internal file.
+
+**(−)** Today only the standard tier set is live — custom tiers and NL-terminal customize-all are roadmap (CONFIG-CUSTOMIZE / CFG-1); the every-knob-real rule (DORMANT-2 honesty) is a standing audit obligation that must be enforced continuously as settings are added, or it regresses; tier semantics ultimately depend on the provider layer (ADR-G-008), so the two must evolve together.
+
+## References / Absorbed
+
+- **Absorbs:** ADR-023 (Plan Tier Generalizasyonu — provider-agnostic tier names, wizard rename, alias migration).
+- **Implementation:** `src/core/config.ts` (`VALID_MODES`, `autoMigrateOnLoad`, legacy-alias map).
+- **Born work-items:** CONFIG-CUSTOMIZE (common/standard + custom tier + NL-terminal customize-ALL via ONB-CHAT + ease/consistency + every-knob-real-in-code), CFG-1, DORMANT-2 (config-knob honesty audit).
+- **Cross-ref:** ADR-G-008 (Provider Abstraction, Fleet & Native-Usage — tier→model-equivalence resolution; original merge-candidate 066/077), ADR-G-001 (Layered Config & Scope), ADR-G-019 (ADR-AUTHORING-STD today+tomorrow framing), ADR-G-030 (Consent / Onboarding — ONB-CHAT NL-setup).
+- **Direction:** terminal-as-primary-surface pivot (`.analysis/hermes-vs-deckent-direction-decisions.md`); `.analysis/adr-review-crosswalk.md` row 023.
+
+
+---
+
+## adr-g-013: Graceful Shutdown & Lifecycle
+
+**Status:** accepted
+
+# ADR-G-013: Graceful Shutdown & Lifecycle
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=SIGINT handler (`entry.ts`) → `interruptActiveSprint()` + `killAllSessions()`/`killAllWorkers()` (`sprint-lifecycle.ts` · `tmux.ts`) + INTERRUPTED state → tomorrow=mode-independent lifecycle + ORPHAN-START-PROC fix (MOAT-2) + ROLE-GUARD process-role teardown
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-025 (Graceful Shutdown Strategy) · **Supersedes:** —
+**Crosswalk:** ADR-025 → ADR-G-013
+
+> Note: the crosswalk flagged ADR-043 / ADR-044 as merge-candidates ("Lifecycle & Reliability"); the final taxonomy kept them **separate** as ADR-G-025 (Process Resilience, Recovery & Live Observability). ADR-G-013 absorbs **only ADR-025**; ADR-G-025 is the sibling lifecycle ADR (cross-referenced, not merged).
+
+---
+
+## Context
+
+When a user hits Ctrl+C, or the process receives SIGINT, a running sprint used to terminate **abruptly** — workers exited without cleanup, task files were left half-written, tmux sessions kept running in the background, and `.tasks/` accrued stale heartbeat + lock files. ADR-025 (Sprint 076) extended the SIGINT handler to coordinate a graceful shutdown.
+
+The 2026-06-30 review confirmed this as **ADR-G** (Global / Constitution): clean teardown is a runtime lifecycle law every user relies on — an orphaned process or a half-written task directory is a trust violation. The review tied it to the live MOAT bugs (orphan coordinator) and to mode-independence (the same guarantee across every mode, not just sprint).
+
+---
+
+## Decision (Today)
+
+**SIGINT graceful shutdown** — the `entry.ts` SIGINT handler runs, in order:
+
+```xml
+<sigint-shutdown handler="src/cli/entry.ts">
+  <step n="1" fn="interruptActiveSprint()" module="src/orchestra/sprint-lifecycle.ts">
+    coordinates graceful shutdown of the active sprint:
+    marks tasks INTERRUPTED · aborts heartbeat · releases locks · kills workers.
+  </step>
+  <step n="2" fn="killAllSessions()" module="src/orchestra/tmux.ts">
+    cleans all tmux sessions ("Called on SIGINT for graceful shutdown").
+  </step>
+  <order>sprint-state save FIRST, then session kill.</order>
+</sigint-shutdown>
+```
+
+**Result:** a clean state after Ctrl+C. The sprint is marked **INTERRUPTED** (`deckent review` surfaces it); workers receive SIGTERM and can mark their own `.hb` DONE; `deckent cleanup` leaves no orphan files.
+
+**Companion:** `killAllWorkers()` (`tmux.ts:217`) — the per-worker variant of `killAllSessions()` (single worker, or `/api/kill/all`), which also covers the subprocess/docker backends, not only tmux.
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **ORPHAN-START-PROC fix (MOAT-2):** a normal-completion coordinator process can **linger** (recurrence-flagged 🟠) — close the lifecycle so the coordinator always exits on completion, not only on SIGINT. This is a trust-moat: no orphan process survives a clean run. (MASTER-PLAN: MOAT-2, P0.)
+- **Mode-independent lifecycle:** graceful shutdown is **uniform across every mode** (sprint | task | process | autonomous | flow — ADR-G-024 Mode Architecture), not sprint-specific; each mode tears down its own workers / sessions / locks the same way.
+- **ROLE-GUARD process-role teardown:** shutdown respects **process roles** (ADR-G-020 / ROLE-GUARD — Brain/orchestrator vs worker) so the correct role coordinates teardown and no role-process is orphaned; worker kill is **backend-agnostic** (subprocess/docker/tmux/firecracker) via ADR-G-014.
+
+---
+
+## Consequences
+
+**(+)** Ctrl+C always leaves a clean state — INTERRUPTED sprint, released locks, no orphan tmux sessions; the per-worker variant covers non-tmux backends; `deckent review` surfaces the interruption honestly rather than presenting a silent half-run.
+
+**(−)** Today the clean teardown is reliable **on SIGINT**, but the **normal-completion path can still leave a lingering coordinator** (MOAT-2, open 🟠). Mode-independence and ROLE-GUARD process-role teardown are roadmap, so non-sprint modes do not yet share the identical lifecycle guarantees.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-025 (Graceful Shutdown Strategy — SIGINT → `interruptActiveSprint()` + `killAllSessions()`; `killAllWorkers()` companion).
+- **Sibling lifecycle ADR (cross-ref, not merged):** ADR-G-025 (Process Resilience, Recovery & Live Observability — absorbed ADR-043 Brain Crash Recovery + ADR-044 State Observability).
+- **Mode partner:** ADR-G-024 (Mode Architecture — mode-independent lifecycle).
+- **Backend partner:** ADR-G-014 (Spawn Backend, Options & Observation — backend-agnostic worker kill).
+- **Authority partner:** ADR-G-020 (Authority, Roles, Flow & Enforcement — ROLE-GUARD process-role teardown).
+- **Born work-items:** MOAT-2 (ORPHAN-START-PROC — normal-completion coordinator lingers, MASTER-PLAN P0).
+- **Direction:** `.analysis/adr-review-crosswalk.md` (row 025 → ADR-G-013), `.analysis/hermes-vs-deckent-direction-decisions.md`.
+
+
+---
+
+## adr-g-014: Spawn Backend, Options & Observation
+
+**Status:** accepted
+
+# ADR-G-014: Spawn Backend, Options & Observation
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=`SpawnBackendFactory` (docker→tmux→subprocess fallback) + per-task backend override + `SpawnOptions`/`ProviderSpawnOptions`/`SpawnBackendOptions` chain + `watch --follow` (docker `logs -f`) + auditor-in-process role-split red-line (scope advisory/soft per ADR-G-020) → tomorrow=firecracker/cloud/ollama-host backends + WATCH-W (CLI≡MCP unify) + per-worker backend declaration + WORKER-LIVE-TRACE
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-027 (Hybrid Spawn Backend) + ADR-007 (SpawnOptions Interface) + ADR-089 (Backend-Agnostic Worker Observation) · **Supersedes:** —
+**Crosswalk:** ADR-027 (+ ADR-007 fold + ADR-089 merge) → ADR-G-014
+
+> **Note (ADR-D-003 vacancy):** old ADR-007 (SpawnOptions) was a dev-class candidate, but the spawn-options contract is inseparable from the backend it spawns onto — so it is **folded here** into the global spawn law. This is why the dev-class number **ADR-D-003 is intentionally vacant** (documented, not back-filled).
+
+---
+
+## Context
+
+Three spawn-layer decisions, recorded separately, describe one cohesive concern — *how deckent launches a worker, with what options, and how that worker is observed wherever it runs*:
+
+- **ADR-007 (2026-04-16)** defined `SpawnOptions { allowedTools?, autoApprove? }`: Brain computes an `--allowedTools` restriction from each worker's scope, and `autoApprove` adds the provider's permission-bypass flag.
+- **ADR-027 (Sprint 123 → revisited Sprint 139)** addressed hybrid backends. Its original verdict — "hybrid backend permanently rejected, one backend at a time" — was **split** by the 2026-06-11 review: the *role-split* form ("worker in Docker + auditor as a separate subprocess") stays rejected, but the *single-backend-per-sprint* claim is **superseded** — per-task backend override is now live and heterogeneous per-worker backends are embraced.
+- **ADR-089 (2026-06-11)** made `watch` **backend-agnostic** — observe a worker on whatever backend it actually runs — and flagged the CLI/MCP `watch` semantic divergence as a parity violation to remove.
+
+The 2026-06-30 review merges all three into one ADR-G law (runtime behavior the product carries to every user), **preserving the role-mix red-line** while **embracing the heterogeneous-backend vision**.
+
+---
+
+## Decision (Today)
+
+### 1. Hybrid spawn backend — `SpawnBackendFactory`
+
+deckent spawns workers onto one of three backends through `SpawnBackendFactory`, with a **docker → tmux → subprocess** fallback chain. Each backend fully implements the `SpawnBackend` interface (E2E-covered, Sprint 139 Tasks 17–19); no backend is a partial citizen.
+
+### 2. Per-worker / per-task independent backends
+
+Backend selection is **per-worker, not per-sprint**. `sprint-spawner.ts` resolves an `effectiveBackend` per task — a `- Backend: docker|tmux|subprocess` directive (Sprint 252 PSL-1, mixed-fleet Sprint 248–254) overrides the run default, so different workers in the same run can execute on different backends. Heterogeneous fleets (some workers on tmux, some on docker) are first-class.
+
+### 3. Role-mix red-line — PRESERVED (from ADR-027)
+
+```xml
+<role-mix-redline>
+  <preserved>Brain is NEVER a worker; the Auditor runs IN-PROCESS (sprint-controller),
+    independent of any spawn backend.</preserved>
+  <rejected>Role-based backend-mixing — "worker in Docker + auditor as a SEPARATE
+    subprocess" — remains rejected. The auditor needs no backend of its own.</rejected>
+  <why>Cross-backend observability is solved by the append-only event-stream (ADR-G-018),
+    NOT by giving each role its own backend. Per-WORKER heterogeneity (§2) is embraced;
+    per-ROLE backend-split is not.</why>
+</role-mix-redline>
+```
+
+### 4. SpawnOptions interface (folds ADR-007)
+
+```xml
+<spawn-options>
+  <base>SpawnOptions { allowedTools?: string; autoApprove?: boolean }  (tmux module)</base>
+  <chain>ProviderSpawnOptions (core/provider.ts) → SpawnBackendOptions extends
+    ProviderSpawnOptions (orchestra/spawn-backend.ts) — multi-provider extension;
+    allowedTools/autoApprove semantics UNCHANGED.</chain>
+  <allowedTools>Brain computes the --allowedTools restriction from the worker's
+    scope.filesWrite (sprint-spawner writeTargets → allowedTools).</allowedTools>
+  <autoApprove>Maps to each provider's own permission-bypass flag, per-provider:
+    claude --dangerously-skip-permissions · codex --dangerously-bypass-approvals-and-sandbox
+    · gemini yolo. (Claude CLI rejects bypass as root → the docker backend runs host-user.)</autoApprove>
+</spawn-options>
+```
+
+The array-args security invariant (ADR-G-002) is carried **uniformly** across every backend adapter — never re-derived per backend.
+
+### 5. Backend-agnostic `watch` (folds ADR-089)
+
+`deckent watch [worker]` observes a worker on **whatever backend it actually runs** — resolved per-worker from sprint/worker state, never hardwired to tmux:
+
+```xml
+<backend-agnostic-watch>
+  <docker>docker logs -f  (watch --follow, WK-5 Sprint 279)</docker>
+  <subprocess>stdout/stderr pipe stream</subprocess>
+  <tmux>session attach</tmux>
+  <roadmap>firecracker microVM / cloud log-API / ollama-host</roadmap>
+  <resolution>one observation core resolves worker → backend → stream;
+    backend-forcing flags (--docker / --tmux) select an explicit view.</resolution>
+</backend-agnostic-watch>
+```
+
+### 6. CLI / MCP watch-parity — no semantic split
+
+`deckent watch` (CLI) and `deckent_watch` (MCP) are the **same capability over the same core** (ADR-G-011 thin-wrapper). The current divergence — CLI `watch` = tmux-split vs MCP `deckent_watch` = event-stream subscribe — is a **parity violation to be removed** (work-item WATCH-W): one core resolves worker→backend→stream, and CLI + MCP are thin wrappers over it. A command does the same job on both surfaces.
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **New backends (roadmap):** firecracker microVM, cloud, and ollama-host backends — so deckent scales from a laptop to a heterogeneous fleet. Each plugs in by implementing a **spawn adapter + an observe adapter**; no `watch`/orchestrator rewrite. (ADR-027's "revisit when distributed execution is needed" point has arrived; this is ORCH-BE.)
+- **WATCH-W:** unify the CLI=tmux-split vs MCP=event-stream divergence into one backend-agnostic observation core with one semantic across CLI + MCP. (MASTER-PLAN: WATCH-W, P1.)
+- **Per-worker backend declaration:** each worker/flow declares its own execution backend in the task spec; both the orchestrator (spawn) and the observation layer (watch) are backend-pluggable.
+- **Ties WORKER-LIVE-TRACE (ADR-G-025):** the per-worker live progress-stream observes a worker on any backend, everywhere (terminal / CLI / MCP / dashboard), live or last-snapshot — `.log` tailing is insufficient.
+
+---
+
+## Consequences
+
+**(+)** One spawn law spans launch + options + observation across a heterogeneous backend fleet; per-worker backends are embraced while the role-mix red-line (Brain≠worker, auditor in-process) holds; `watch` follows a worker onto any backend; the `SpawnOptions` contract and the array-args invariant are uniform across every backend. New backends are additive (an adapter pair), not a rewrite.
+
+**(−)** The CLI/MCP `watch` semantic split is a live parity violation until WATCH-W lands; firecracker/cloud/ollama-host backends are roadmap (not built); per-worker backend declaration in the task spec is forward-looking. Scope/file-authority enforcement on each backend is advisory/soft today (ADR-G-020 V1.0).
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-027 (Hybrid Spawn Backend — role-split red-line preserved; single-backend-per-sprint superseded) · ADR-007 (SpawnOptions Interface — folded; **ADR-D-003 intentionally vacant**) · ADR-089 (Backend-Agnostic Worker Observation + per-worker independent backends + CLI/MCP watch-parity).
+- **Cross-ref:** ADR-G-011 (Surface Parity & Thin-Wrapper — CLI≡MCP, WATCH-W) · ADR-G-018 (Verification Protocol & Event-Stream — cross-backend observability substrate) · ADR-G-020 (Authority, Roles, Flow & Enforcement — worktree/scope enforcement, autoApprove security) · ADR-G-025 (Process Resilience & Live Observability — WORKER-LIVE-TRACE) · ADR-G-002 (spawnSync Security Pattern — array-args invariant, uniform per backend) · ADR-G-008 (Provider Abstraction & Fleet — per-provider bypass flags).
+- **Born work-items:** WATCH-W (backend-agnostic watch + CLI/MCP unify, P1) · ORCH-BE (firecracker/cloud/ollama-host backends + per-worker backend declaration) · WORKER-LIVE-TRACE (with ADR-G-025).
+- **Direction:** `.analysis/adr-review-crosswalk.md` (rows 027 + 007 + 089 → ADR-G-014), `.analysis/hermes-vs-deckent-direction-decisions.md`.
+</content>
+</invoke>
+
+
+---
+
+## adr-g-015: Managed-Docs (Core-Gen) + Tracking / Staleness
+
+**Status:** accepted
+
+# ADR-G-015: Managed-Docs (Core-Gen) + Tracking / Staleness
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** post-finalize hook (unconditional invocation) + doc-tracking scan
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-029 (Managed-Docs Universalization) + ADR-030 (Template Engine + Plugin Loader) + ADR-031 (Content Hash Cache) + ADR-032 (i18n Pattern) + ADR-046 (Brain Self-Update Hook) + ADR-090 (Documentation Tracking & Staleness)
+**Crosswalk:** 029 (+030+031+032+046+090) → ADR-G-015
+
+> **Reframe note (Alperen, 2026-06-30):** deckent does NOT auto-write a user's project docs. In a user project, AI tools manage documentation; deckent only **tracks staleness** (DB-queryable: which docs are current, which lag the code). Auto-doc generation is **minimal and deckent-core-only**. The old "sprint-log" becomes **"deckent-log"** (multi-mode, not sprint-only).
+
+---
+
+## Context
+
+deckent maintains a set of managed documents (CLAUDE.md auto-sections, IDENTITY, exports). The machinery (template engine, content-hash cache, i18n pattern, the post-finalize self-update hook with its step-ordering contract and FS↔DB bi-directional sync) was spread across ADR-029/030/031/032/046, and a separate doc-tracking/staleness system (DCR + multi-signal) arrived as ADR-090. The 2026-06-30 review unifies them and applies a key reframe: **minimize auto-generation, and never write a user's project docs — only track their staleness.**
+
+---
+
+## Decision (Today)
+
+```xml
+<managed-docs>
+  <core-gen scope="deckent-core-only" mode="minimal">
+    template-engine + content-hash cache (fileHash+entryHash+sprintId, sprint-aware) +
+    i18n pattern layer. Generates only NECESSARY core docs (not a bulk md-sweep).
+  </core-gen>
+  <self-update-hook>post-finalize step-ordering contract (memoryExport → adrInsert →
+    ruleRegen), UNCONDITIONAL invocation, ground-truth verification, and FS↔DB
+    BI-DIRECTIONAL sync (syncAdrFilesToDb forward + exportAdrsToFs reverse) — the
+    mechanism that makes the md+DB ADR-edit invariant safe (ADR-G-035).</self-update-hook>
+  <tracking scope="all-repos incl. user-project">
+    DCR (doc-rank, 0=most-critical) + body content-hash + last_updated + multi-signal
+    stale (content-drift + age + code-drift) in a separate doc_tracking table
+    (better-sqlite3, additive). CLI `deckent docs track scan|status|sync`; CI-gate
+    (CRITICAL_STALE→non-zero); MCP/dashboard health.
+  </tracking>
+  <user-project rule="track-not-write">deckent does NOT auto-write project-specific
+    docs — AI tools do; deckent tracks which are stale/current via the DB.</user-project>
+</managed-docs>
+```
+
+The "sprint-log" is renamed **"deckent-log"** and spans multiple modes (task/process/autonomous/flow/mission/sprint), not sprint-only.
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **MANAGED-DOCS-MINIMIZE:** reduce auto-md-updates to the necessary core docs only; remove bulk per-md regeneration; user-project = track-not-write (ADR-090 realization).
+- **DECKENT-LOG:** complete the sprint-log → deckent-log rename + multi-mode coverage.
+- **Code-drift + CI-gate + MCP/dashboard** (ADR-090 Phase-2, already largely landed) generalized to user projects.
+- The MJS template plugin-loader, if ever wired, requires a SkillSandbox (latent security).
+
+---
+
+## Consequences
+
+**(+)** One managed-docs + tracking law; the FS↔DB bi-directional sync is exactly what makes the md+DB ADR-edit method safe (idempotent re-sync). User docs stay the user's (track-not-write) — respects the product-vision boundary. Staleness is machine-detectable across the whole repo.
+
+**(−)** "Minimal auto-gen" is a reframe to implement (born: MANAGED-DOCS-MINIMIZE); some bulk-md generation still exists. The deckent-log rename is partial. The plugin-loader is latent (unwired security).
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-029 + ADR-030 + ADR-031 + ADR-032 + ADR-046 + ADR-090.
+- **Cross-ref:** ADR-G-035 (DB sync invariant — the md+DB pair) · ADR-G-019 (ADR export) · ADR-G-004 (instruction-file adapter) · ADR-G-024 (modes — deckent-log multi-mode).
+- **Born / MASTER-PLAN:** MANAGED-DOCS-MINIMIZE · DECKENT-LOG · I18N-6 (6-lang).
+- **Memory:** `project_docs_security_features_redoc` · `project_claude_md_doc_bloat_cleanup`.
+
+
+---
+
+## adr-g-016: Product Vision — Product, Not Service
+
+**Status:** accepted
+
+# ADR-G-016: Product Vision — Product, Not Service
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** identity-constitution (every feature/decision validated against the 4 principles)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-033 (Product Vision — Product Not Service, + MOD-SPLIT amendment)
+**Crosswalk:** ADR-033 → ADR-G-016
+
+> **Identity note (Alperen, 2026-06-30):** "Bunu geliştikçe netleştireceğiz ama temel tüm özellikleri içeren katmanımız deckent-core'dur — onu her zaman koruyup geliştireceğiz. Enterprise katman aslında daha katı kontrollü ve disiplinli bir üründür; **işlev farkı yoktur**, denetim ve yönetim mekanizması farkı vardır." This is the product-identity constitution; it evolves and sharpens as the product matures, but its core principles are inviolable.
+
+---
+
+## Context
+
+Deckent is a **product, not a service** (old ADR-033, Sprint 134): a local-first AI orchestration tool anyone can install and run, open-source and free for the community, for everyone everywhere — privacy-preserving, never phoning home. As the direction matured (modularization, an optional hosted core, a desktop/mobile app, an enterprise layer, opt-in telemetry), the strict 2026-04 forbidden-list (no SaaS / no cloud / no enterprise-edition / no subscription) needed reconciliation: how do these optional layers coexist with "product, not service" without compromising the identity? This ADR records that reconciliation (decision (a) of the 2026-06-30 review).
+
+---
+
+## Decision (Today)
+
+### 1. Four inviolable principles
+
+```xml
+<product-identity immutable="true">
+  <principle id="1">Product, not service — the core is NEVER mahkum (bound) to any cloud.</principle>
+  <principle id="2">Easy to install & run — "kur-çalıştır", anyone can.</principle>
+  <principle id="3">Open-source, community-free — the community core is free (MIT).</principle>
+  <principle id="4">Everyone, everywhere — solo user → largest enterprise; every OS/environment.</principle>
+  <invariant>Local-first · privacy-preserving · never-phone-home (telemetry opt-in + consent only).</invariant>
+</product-identity>
+```
+
+### 2. Community-core = ALL features; optional layers must not compromise it
+
+The **community core (`deckent-core`)** contains **every base feature**, is always protected and developed, and stays **local-first + free + no-required-cloud + privacy** forever. **Optional layers are permitted** *only as long as they do not compromise the core's local-first / free / privacy guarantees*:
+
+```xml
+<optional-layers permitted-if="core-guarantees-intact">
+  <layer name="enterprise-module" license="separate">modular, same codebase, NOT a fork</layer>
+  <layer name="hosted-deckent-core" mode="opt-in" default="BYO">hosted is never required; the core never depends on it</layer>
+  <layer name="desktop-mobile-app" kind="local-first-client">not a cloud; ADR-G-033/DESK</layer>
+  <layer name="enterprise-console">on the modular enterprise layer</layer>
+  <layer name="telemetry" mode="opt-in-consent">never-phone-home by default</layer>
+</optional-layers>
+```
+
+"Servis değil" means *the core is never bound to a cloud*; hosted/app/console are **additional options**, not a mandate.
+
+### 3. Community ↔ Enterprise = governance depth, NOT feature-gating
+
+```xml
+<mod-split>
+  <community-core>ALL features. Always protected + developed. Full functionality.</community-core>
+  <enterprise-layer>
+    SAME functionality — NO feature-gating. The difference is depth of CONTROL,
+    DISCIPLINE, AUDIT/GOVERNANCE and MANAGEMENT (RBAC hard-enforcement, audit
+    immutability, tenant management, policy governance, compliance, delegated
+    approval). Enterprise = "the same product, more strictly governed."
+  </enterprise-layer>
+  <structure>Single codebase + modular enterprise-layer (separately licensed). NOT a fork, NOT a separate repo of features.</structure>
+</mod-split>
+```
+
+This is the **MOD-SPLIT** refinement: the community↔enterprise boundary is governance/audit/management depth, not a paywalled feature set. (Repo strategy — the private-develop ↔ public-product axis, and a possible `deckent` + `deck-ent` split — is a *separate* axis handled in ADR-D-008; not to be conflated with this license/governance axis.)
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- This vision **sharpens as the product matures** (Alperen) — the optional layers (hosted-core, app, enterprise-console) are designed but their exact shape clarifies with delivery.
+- **MODULARIZE** (deckent-solo / deckent-enterprise, two licenses, single codebase) lands *after* the ADR revision (MASTER-PLAN: MODULARIZE; ties ADR-G-031 enterprise foundation + the CODE-LAYERS 5-layer architecture, discussed separately).
+- The enterprise layer's depth = the god-level gaps mapped in ADR-G-031 (management-plane, custom-RBAC, hard-enforcement-V2, runtime-tenant-isolation, SCIM, audit-export/compliance).
+
+---
+
+## Consequences
+
+**(+)** The identity is reconcilable with growth: optional cloud/app/enterprise layers are explicitly permitted *without* turning the core into a service, because the core never depends on them. The community user gets the full product free; enterprise pays for governance depth, not features — a clear, honest boundary.
+
+**(−)** "Optional layers must not compromise core guarantees" is a design constraint that must be re-checked per feature (e.g., a hosted-core offering must keep BYO the default). The exact enterprise-layer shape is still maturing (forward work). The repo-strategy axis (ADR-D-008) is easy to conflate with the license axis — kept explicitly separate.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-033 (Product Vision — Product Not Service + MOD-SPLIT amendment).
+- **Cross-ref:** ADR-G-031 (Enterprise Foundation — the governance-depth layer) · ADR-D-008 (Repo Strategy — separate axis) · ADR-G-033 (Dashboard/DESK — local-first app) · ADR-G-008 (hosted-core = optional provider).
+- **Born work-items:** MOD-SPLIT-CLARIFY (community=all-features / enterprise=governance-depth) · MODULARIZE · CODE-LAYERS (5-layer, separate discussion).
+- **Memory:** `project_deckent_positioning` · `project_community_pro_split_strategy` · `feedback_dual_perspective_dogfood_product`.
+
+
+---
+
+## adr-g-017: Multi-Project Isolation
+
+**Status:** accepted
+
+# ADR-G-017: Multi-Project Isolation
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=4-layer isolation (per-project directory + AES-256-GCM per-project credential-encryption + symlink-aware `realpath` scope + global/project config boundary); runtime scope enforcement **advisory/soft** (ADR-G-020 V1) → tomorrow=hard-enforce scope (ADR-G-020 Layer-2 V2 + TOOL-SCOPE) + enterprise multi-tenancy as a modular layer (ADR-G-031)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-034 (Multi-Project Isolation — Per-Project Security Boundaries) · **Supersedes:** —
+**Crosswalk:** ADR-034 → ADR-G-017
+
+> **Note:** The symlink-aware scope check (`isWithinScope()`) **is** implemented (`fs.realpathSync()` → boolean), but per ADR-G-020 V1 runtime scope enforcement is **advisory/soft** — a violation is warned + event-emitted, not hard-blocked. "Vulnerability closed / `ScopeViolationError` thrown / blocks" therefore describes the **design intent**, not today's runtime guarantee; the hard-flip is post-GA V2.
+
+---
+
+## Context
+
+A single user routinely orchestrates several projects side-by-side on one machine. Each project owns its own `.deckent/`, `.brain/`, `.tasks/`, and `.locks/` directories; the isolation existed in practice but had never been formally defined, threat-modeled, or made testable.
+
+**Critical distinction — multi-project ≠ multi-tenant.** This ADR governs isolation between *one user's* projects on *one machine*. The SaaS scenario of 10,000 tenants sharing a server is a **different** problem, deliberately out of scope here and constrained by the product-vision ADR (**ADR-G-016**); enterprise multi-tenancy arrives later as a *modular* layer (**ADR-G-031**), never by weakening this per-project model.
+
+A Sprint-132 security audit surfaced the concrete threats this ADR closes:
+
+1. **Sibling-project scope bypass** — a worker in Project A creates a symlink to `../project-b/src/secret.ts` and slips past a path-only scope check.
+2. **Credential leakage** — project-specific API material in global config is read by a sibling project.
+3. **Global-state pollution** — one project's `.deckent/config.json` edit silently changes another project's behavior.
+4. **Symlink-cycle DoS** — recursive symlinks spin the scope resolver forever.
+
+Sprint-133 had already shipped AES-256-GCM per-project credential encryption, strengthening the foundation; what remained un-formalized was the scope-bypass defense and the global/project config-sharing rules.
+
+---
+
+## Decision (Today)
+
+Multi-project isolation is **four layers**:
+
+```xml
+<isolation-layers>
+  <layer n="1" name="Per-Project Directory Isolation" status="formalized">
+    Each project owns independent directory roots — .deckent/ (config, agent/skill
+    pool, metrics), .brain/ (decisions, memory, retro, patterns), .tasks/ (task
+    files, heartbeat, result, lock), .locks/ (file locks). No cross-reference:
+    a project's .brain holds only that project's history.
+  </layer>
+  <layer n="2" name="Per-Project Credential Encryption" status="shipped (Sprint 133)">
+    .deckent/credentials.enc encrypted with AES-256-GCM
+    (src/core/credential-encryption.ts: ALGORITHM='aes-256-gcm', createCipheriv;
+    src/core/credentials.ts). The key derives from the per-project projectRoot path
+    hash, so a sibling project's credentials.enc is keyed differently — cross-read
+    fails. Distinct from the .deck/Ed25519 secret system of ADR-G-005 (complementary).
+  </layer>
+  <layer n="3" name="Symlink-Aware Scope Enforcement" status="implemented; advisory at runtime">
+    isWithinScope() (src/agents/worker.ts) resolves the target with fs.realpathSync()
+    before matching, so a symlink pointing outside scope resolves to its real path and
+    fails the match; a recursive symlink (ELOOP) also fails. NOTE: the function returns
+    a boolean and the violation is WARNED + event-emitted (ADR-G-020 V1 advisory) — it
+    does not itself throw or hard-block. Throw/block = design intent (V2).
+  </layer>
+  <layer n="4" name="Global vs Project Config Boundary" status="documented">
+    ~/.deckent/config.json (global) vs .deckent/config.json (project), explicit
+    sharing rules below.
+  </layer>
+</isolation-layers>
+```
+
+### Layer 4 — config boundary (sharing rules)
+
+| Field | Scope | Sharing rule |
+|------|-------|--------------|
+| `brain_provider`, `worker_provider` | Global OR Project | project override wins |
+| `max_workers` | Global OR Project | project override wins |
+| `brain_planning` | Global OR Project | project override wins |
+| `min_tier`, `mode_preset` | Global OR Project | project override wins |
+| `OPENAI_API_KEY`, `GOOGLE_API_KEY` | Environment | OS env var only — never stored in config |
+| `telemetry_enabled` | Global OR Project (default **false**) | **opt-in, default-OFF** settable boolean; no sender wired (see below) |
+| `verify_loop` | Project | project-specific, global default `true` |
+| `auto_archive_directives` | Project | project-specific |
+| Agent/skill pool | Project | per-project `.deckent/agents/`, `.deckent/skills/` |
+| Sprint history | Project | per-project `.brain/sprints/` |
+
+API keys are **never** stored in config files — config references the variable *name*, never the value (`config.ts:425/1798`); they are passed via environment. This removes global config as a credential-leakage vector. Layered config merge mechanics are governed by **ADR-G-001**.
+
+**Telemetry accuracy (correcting a prior overstatement):** `telemetry_enabled` is a **settable, default-OFF opt-in** boolean (`config.ts:1862`), *not* a "hard-coded false." No telemetry **sender** is wired — a `grep` finds zero phone-home calls gated on the flag — so the no-phone-home guarantee currently holds via **absence of a sender**, not via a hard-coded flag. The real opt-in telemetry is forward work (**FB-1**) and, when built, must honor default-off + explicit consent (**ADR-G-030**) and the air-gapped / never-phone-home pillar.
+
+### Rejected alternatives (and why)
+
+Sandboxed worker process (chroot/namespace) — over-complex, cross-platform-incompatible (macOS chroot limited), disproportionate to the product. Path-normalization-only — hardlink/symlink bypass still possible. Worker-level FS virtualization — Node `fs` incompatible, high cost. Docs-only — leaves the audit finding open. Docker-per-project — install friction, conflicts with the "install and run" principle (**ADR-G-016**).
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **Hard-enforce scope (V2).** The advisory scope check becomes a **hard block**: a write outside `scope.filesWrite` is denied, not merely warned. This rides the **ADR-G-020** Layer-2 enforcement upgrade (the ADR-094 flag-gated vein graduating to default-on, post-GA V2) plus a **TOOL-SCOPE** tool that makes scope analysis/approval/edit first-class and terminal-trackable.
+- **Enterprise multi-tenancy as a modular layer.** Genuine SaaS multi-tenant isolation (per-tenant boundaries, k8s pod isolation, tenant-scoped audit) is built **on top** of this per-project model as the enterprise layer (**ADR-G-031**), never by relaxing it. multi-project remains the solo/local truth; multi-tenant is additive.
+- **FB-1 opt-in telemetry.** A consent-gated, default-OFF self-operation feedback loop (operation-metrics only, never project content) under **ADR-G-030** consent + the air-gapped pillar — wiring the sender that today deliberately does not exist.
+
+---
+
+## Consequences
+
+**(+)** The Sprint-132 symlink scope-bypass finding is addressed by design (`realpathSync` resolution + ELOOP handling); per-project isolation rules are now formal and testable; the global/project config boundary is documented, so a new field's scope is explicit; credential isolation (AES-256-GCM, per-project-keyed) is formalized; and "multi-project ≠ multi-tenant" is settled, preventing wrong-direction PRs.
+
+**(−)** `isWithinScope()` now performs a `realpathSync()` disk I/O per check (cost), and must handle a deleted symlink target gracefully; ELOOP detection leans on an OS error code (behavior may differ across platforms). The runtime guarantee is **advisory today** — the boolean is computed and emitted but does not hard-block until V2 (ADR-G-020). The config-boundary table must be updated whenever a new field is added, or its sharing rule is ambiguous.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-034 (Multi-Project Isolation — Per-Project Security Boundaries; 4-layer model, Sprint-132 audit, Sprint-133 AES credential encryption, telemetry-accuracy amendment).
+- **Product boundary:** **ADR-G-016** (Product Vision — Product Not Service) — multi-tenant out-of-scope at the core; "install and run" principle.
+- **Config merge:** **ADR-G-001** (Layered Config & Scope Precedence) — global vs project mechanics.
+- **Secret system:** **ADR-G-005** (Secret File System & Zero-Worker-Exposure) — `.deck`/Ed25519; complementary to and distinct from Layer-2 AES-256-GCM credential encryption.
+- **Enforcement authority:** **ADR-G-020** (Authority, Roles, Flow & Enforcement) — advisory→hard scope flip (V1→V2, ADR-094 vein).
+- **Enterprise layer:** **ADR-G-031** (Enterprise Foundation) — multi-tenancy as a modular layer atop this model.
+- **Consent / telemetry:** **ADR-G-030** (Consent-Based Provisioning & Install) — FB-1 opt-in telemetry consent gate.
+- **Born work-items:** TOOL-SCOPE (scope analyze/approve/edit tool + hard-enforce), ENTERPRISE-MULTI-TENANCY (ADR-G-031 ENT-* modular layer), FB-1 (consent-gated opt-in telemetry sender).
+- **Direction:** `docs/design/multi-project-isolation.md`, memory `project_air_gapped_offline_pillar`, `feedback_zero_hardcode_live_data`; `.analysis/hermes-vs-deckent-direction-decisions.md` (global-install + project-scope = P0).
+
+
+---
+
+## adr-g-018: Verification Protocol & Event-Stream
+
+**Status:** accepted
+
+# ADR-G-018: Verification Protocol & Event-Stream
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=versioned protocol v1.0 + append-only `.deckent/sprint-NNN-events.jsonl` (`src/core/event-stream.ts`) + 28+ additive channels + fail-safe write (never crashes a run) + permanent dual transport → tomorrow=APR approval-channels + COMM-2 typed vocabulary + PROGRESS naming-fix + per-mode channel completion (jointly with ADR-G-020)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-035 (Brain ↔ Worker ↔ Auditor Verification Protocol Standard) · **Supersedes:** —
+**Crosswalk:** ADR-035 → ADR-G-018
+
+> **Mechanism vs policy (cross-ref, NOT merge):** This ADR is the **mechanism** — the message envelope, the channel codes, the transport. **Who may send/receive on which channel** is **policy**, owned by ADR-G-020 (Authority). The two are deliberately **cross-referenced, not merged**: channels (here) and channel-rights (there) are separate cohesive concerns, each kept whole.
+
+---
+
+## Context
+
+Sprint 137 meta-dogfood surfaced a verification gap: a worker reported `DONE` while vitest still had 53 failing tests — the "code exists → DONE" shortcut. The root cause was the absence of a **formal, versioned, parseable protocol** for Brain ↔ Worker ↔ Auditor messages; each component emitted its own ad-hoc file format (`.hb` heartbeat, `.result`, git-diff output) that could not be independently verified, replayed, or version-negotiated.
+
+ADR-035 (Sprint 138) answered with a versioned message protocol + an append-only event-stream as the canonical-read layer, with file-based state continuing in parallel as a fail-safe. The 2026-06-30 review confirms it as **ADR-G** (the orchestration backbone every subsystem speaks over) and resolves the one piece of ADR-035 that did not age well — its "remove file-based by Sprint 142" roadmap (see Decision §5).
+
+Heavier transports were considered and rejected at design time for a **zero-infrastructure, fail-safe** posture: gRPC/Protobuf (schema-compiler toolchain), WebSocket (Docker port-mapping + container reachability), Redis Pub/Sub and SQLite (external/heavier substrate). The append-only `.jsonl` stream needs no daemon, no port, and degrades safely.
+
+> **Note:** the original Redis/SQLite rejection cited the old minimal-dependency rule (since reframed to merit-based selection, ADR-D-005); the append-only-`.jsonl` choice nonetheless stands on its own **fail-safe + zero-infra** grounds, independent of that reframe.
+
+---
+
+## Decision (Today)
+
+### 1. Versioned message protocol (v1.0) + append-only event-stream
+
+All Brain ↔ Worker ↔ Auditor messages are recorded, in order, to an append-only **`.deckent/sprint-NNN-events.jsonl`** stream (`src/core/event-stream.ts`; `src/orchestra/event-stream.ts` is a re-export shim since the Sprint 279 core-move). The stream is the **canonical-read truth**; the protocol is forward-compatible (extra payload fields are ignored).
 
 ```json
 {
@@ -1634,8410 +1882,1623 @@ Brain ↔ Worker ↔ Auditor iletişimi için versiyonlanmış mesaj protokolü 
   "source": "worker | brain | auditor | deckent",
   "target": "brain | worker | auditor | user | *",
   "channel": "CHANNEL_CODE",
-  "payload": {}
+  "payload": {},
+  "correlationId": "…",
+  "causationId": "…"
 }
 ```
 
-- `sequence`: sprint başından itibaren monoton artan tam sayı, 1'den başlar
-- `protocol_version`: sabit "1.0" (Sprint 138), yeni majör değişiklikler 2.0 olacak
-- `target: "*"`: broadcast mesaj (tüm consumer'lar dinler)
-- `payload`: kanal koduna göre değişir, JSON object, forward-compatible (ekstra alanlar ignore edilir)
+- `sequence` — run-monotonic integer from 1 (atomic `nextSequence()` counter).
+- `target: "*"` — broadcast.
+- `correlationId` / `causationId` — optional message-lineage (additive; consumers ignoring them stay compatible).
 
-### Kanal Kodları (15 adet, Protocol Version 1.0)
+### 2. 28+ channel codes (additive — protocol stays 1.0)
 
-**Brain ↔ Worker Kanalları:**
-| Kanal | Kaynak | Hedef | Açıklama |
-|-------|--------|-------|----------|
-| `BRAIN→WORKER:TASK_ASSIGN` | brain | worker | Task atama, scope + model + skills payload'ı |
-| `WORKER→BRAIN:HEARTBEAT` | worker | brain | Periyodik canlılık sinyali (30s interval) |
-| `WORKER→BRAIN:RESULT` | worker | brain | Task sonucu (selfAssessment, filesChanged, rubricScores) |
-| `WORKER→BRAIN:QUESTION` | worker | brain | Checkpoint/blocker sorusu |
-| `BRAIN→WORKER:ANSWER` | brain | worker | Checkpoint cevabı veya blocker çözümü |
+The original 15 V1.0 channels — `BRAIN→WORKER:TASK_ASSIGN`, `WORKER→BRAIN:HEARTBEAT/RESULT/QUESTION`, `BRAIN→WORKER:ANSWER`, `WORKER→AUDITOR:CODE_VERIFY_REQUEST`, `AUDITOR→BRAIN:VERIFICATION_RESULT/SCOPE_COLLISION_DETECTED/ADR_VIOLATION/GATE_COMPUTED/LOAD_REPORT_WRITTEN`, `BRAIN→*:METRIC_EMITTED/SPRINT_PHASE_CHANGE`, `BRAIN→WORKER:FIX_REQUEST`, `DECKENT→USER:NOTIFY` — remain **verbatim**. 13 were **added** since (ORPHAN_HB_DETECTED, AUTHORITY_VIOLATION, TIMEOUT_ASSIGN/WARNING/CAP_EXCEEDED/EXTEND, NEVER_DISPATCHED, SPAWN_BLOCKED, DEPENDENCY_BLOCKED, DEPENDENCY_RESOLVED_BY_FIX, AUTH_FAILED, CONTAINER_PATH_SANITIZED, PROGRESS). Channels are **additive by design**, so `protocol_version` stays `'1.0'`; a breaking change would bump to `2.0`.
 
-**Worker ↔ Auditor Kanalları:**
-| Kanal | Kaynak | Hedef | Açıklama |
-|-------|--------|-------|----------|
-| `WORKER→AUDITOR:CODE_VERIFY_REQUEST` | worker | auditor | Worker result'ını bağımsız doğrulama talebi |
-| `AUDITOR→BRAIN:VERIFICATION_RESULT` | auditor | brain | Doğrulama sonucu: PASS \| DOWNGRADE \| FAIL |
-| `AUDITOR→BRAIN:SCOPE_COLLISION_DETECTED` | auditor | brain | İki worker aynı dosyaya yazıyor, plan-time bypass |
-| `AUDITOR→BRAIN:ADR_VIOLATION` | auditor | brain | Pilot ADR kural ihlali (ADR-006, ADR-008, ADR-010) |
-| `AUDITOR→BRAIN:GATE_COMPUTED` | auditor | brain | Sprint gate hesaplandı (PASS \| WARNING \| FAIL) |
-| `AUDITOR→BRAIN:LOAD_REPORT_WRITTEN` | auditor | brain | load-test-report.md yazıldı |
+### 3. Lineage & forward-compatibility
 
-**Broadcast / Sprint Kanalları:**
-| Kanal | Kaynak | Hedef | Açıklama |
-|-------|--------|-------|----------|
-| `BRAIN→*:METRIC_EMITTED` | brain | * | Sprint metric noktası (coverage, duration, worker count) |
-| `BRAIN→WORKER:FIX_REQUEST` | brain | worker | NO_GO sonrası fix yeniden deneği |
-| `BRAIN→*:SPRINT_PHASE_CHANGE` | brain | * | Faz geçişi (PLAN→SPAWN→EXECUTE→...) |
+`source` / `target` / `channel` / `payload` is the fixed core; `correlationId` / `causationId` add causal lineage. New consumers read `protocol_version`; unknown payload fields are ignored — old consumers never break on additive growth.
 
-**User Notification (Sprint 139 Seed):**
-| Kanal | Kaynak | Hedef | Açıklama |
-|-------|--------|-------|----------|
-| `DECKENT→USER:NOTIFY` | deckent | user | Kullanıcıya bildirim (Sprint 139 dispatcher, Sprint 138'de sadece tanımlı) |
+### 4. Fail-safe (never blocks a run)
 
-### Backward Compatibility Roadmap
-
-| Sprint | Durum |
-|--------|-------|
-| Sprint 138 | `.hb` + `.result` dosyaları **paralel devam eder**, event stream ek katman |
-| Sprint 139-140 | Event stream primary, file-based secondary |
-| Sprint 140+ | File-based **soft-deprecated** (consumer'lar event stream'e migrate edilir) |
-| Sprint 142 | File-based **removed** (sadece event stream) |
-
-### Fail-Safe Davranış
-
-Event stream write başarısız olursa (disk tam, permission hata) → `console.warn` + file-based fallback. Sprint asla event stream I/O hatası nedeniyle durmamalı.
-
-**Consequences (+):**
-
-- Sprint sonunda tüm olaylar replay edilebilir → post-mortem analiz mümkün
-- Auditor `WORKER→AUDITOR:CODE_VERIFY_REQUEST` ile aktif doğrulayıcı rolüne geçer (Sprint 137 kısayol kapatılır)
-- `SCOPE_COLLISION_DETECTED` plan-time saptanabilir → manual wave barrier ihtiyacı azalır
-- Protocol versiyonlaması → breaking change'ler kontrollü, consumer'lar protocol_version'ı okur
-- `DECKENT→USER:NOTIFY` kanalı Sprint 139 dispatcher'a temiz extension point sağlar
-
-**Consequences (-):**
-
-- Her olay için disk I/O artışı — `.jsonl` append performance testi gerekebilir
-- `sequence` monotonicity multi-worker concurrent write'ta race condition riski — atomik increment gerekir (file lock veya process-level counter)
-- Event stream büyüyebilir — Sprint 143'te rotation/cleanup mekanizması düşünülmeli
-- Sprint 142 file-based remove, legacy consumer'lar için migration burden
-
-**Alternatives Considered:**
-
-- **gRPC/Protobuf:** Tip güvenli, binary verimli. Reddedildi — schema compiler toolchain bağımlılığı, Node.js subprocess'lerde kurulum karmaşıklığı, Deckent "kur-çalıştır" ilkesiyle çelişiyor (ADR-010).
-- **WebSocket:** Gerçek zamanlı, bidirektional. Reddedildi — Docker backend'de port mapping karmaşıklığı, Worker container'ların WebSocket server'a erişimi garanti değil, HTTP API zaten var.
-- **Redis Pub/Sub:** Yüksek throughput, kanıtlı. Reddedildi — ADR-010 tek runtime dependency ilkesi ihlali, ADR-033 "kur-çalıştır" product vizyonuyla çelişiyor, Redis kurulu olmayan makinelerde sıfır fallback.
-- **SQLite:** ACID garantili, structured query. Reddedildi — dosya tabanlı append'den daha karmaşık, basit olmak Deckent kimliğinin temelidir, WAL mode multi-writer complexity ekler.
-- **Mevcut dosya tabanlı devam:** Değişiklik yok, `.hb` + `.result` yeterli. Reddedildi — Sprint 137 meta-dogfood canlı kanıtı: file-based state functional doğrulama yapmıyor, replay imkânsız.
-
-**References:**
-
-- Sprint 137 Task 137-001 retrospektif — worker DONE kısayolu canlı kanıtı
-- Sprint 138 design spec: `docs/superpowers/specs/2026-04-14-sprint-138-architectural-pivot-design.md` Section 6
-- Sprint 138 plan: `docs/superpowers/plans/2026-04-14-sprint-138-architectural-pivot-plan.md`
-- ADR-008: Brain Merkezi Import — mesaj akışı sınır disiplini
-- ADR-010: Minimal Dependencies — Redis/SQLite reddetme gerekçesi
-- ADR-033: Product Vision — WebSocket/Redis reddetme gerekçesi (kur-çalıştır)
-- `src/orchestra/event-stream.ts` — Sprint 138 Task 4 implementasyonu
-- `src/monitor/auditor.ts` — Sprint 138 Task 3 Auditor Authority Extension
-- `.deckent/sprint-138-events.jsonl` — canlı runtime event log
-
-> **Note (verified vs code, Sprint 172):** `src/orchestra/event-stream.ts` exists and implements the versioned protocol + channel codes ✓. **However, the "Backward Compatibility Roadmap" did not materialize:** the table projects file-based state soft-deprecated by Sprint 140 and **removed by Sprint 142** — but at Sprint 172 the file-based `.hb`/`.result` mechanism is still the **live primary** path (`src/orchestra/result-collector.ts`, `src/agents/worker.ts`; the ADR-047 manual-dispatch flow reads `.tasks/task-*.result`). The event stream is an **additive layer**, not the sole canonical truth in practice. "Event stream = canonical truth / file-based removed by 142" is design intent, not the current runtime state (consistent with the ADR-037 V1.0 advisory framing in `docs/architecture/authority-matrix.md`). Behavior unchanged; documentation alignment only.
-
----
-
-**Amendment — 2026-06-11 (ADR-review, full code-verification):**
-
-1. **Module location:** the canonical implementation moved `src/orchestra/event-stream.ts` → **`src/core/event-stream.ts`** (Sprint 279 WK-import, ADR-008 core→orchestra cycle fix); `src/orchestra/event-stream.ts` is now a ~1KB re-export shim. References/Note paths above predate the move.
-2. **Channel codes 15 → 28 (additive, protocol still 1.0):** all original 15 V1.0 channels remain **verbatim**; 13 were added since (ORPHAN_HB_DETECTED, AUTHORITY_VIOLATION, TIMEOUT_ASSIGN/WARNING/CAP_EXCEEDED/EXTEND, NEVER_DISPATCHED, SPAWN_BLOCKED, DEPENDENCY_BLOCKED, DEPENDENCY_RESOLVED_BY_FIX, AUTH_FAILED, CONTAINER_PATH_SANITIZED, PROGRESS — Sprint 280). Additive channels are forward-compatible per this ADR's own design, so `protocol_version` stays `'1.0'`. ⚠️ Naming-convention deviation: `PROGRESS` is a bare code (not `SOURCE→TARGET:NAME` like every other channel) — future channels should follow the convention.
-3. **Message envelope gained optional lineage fields** `correlationId`/`causationId` (additive — consumers ignoring them stay compatible).
-4. **Re-verified (body-read):** fail-safe (`writeEvent` try/catch → `console.warn` + `null`, never crashes the sprint) ✓; `nextSequence()` monotonic counter ✓; Sprint-172 Note's "file-based still live primary" finding **still true today** (Sprint 280 confirmed: result-collector reads `.tasks/*.result`).
-
-md+db senkron (Alperen ADR-review).
-
----
-
-
----
-
-## adr-036: ADR Governance Integration — Mandatory Architecture Decision Enforcement
-
-**Status:** accepted
-
-# ADR-036: ADR Governance Integration — Mandatory Architecture Decision Enforcement
-
-**Status:** accepted
-
-**Date:** 2026-04-14
-
-**Sprint:** 138
-
----
-
-**Context:**
-
-Deckent 135+ sprint boyunca `.brain/DECISIONS.md` dosyasında mimari kararları (ADR) kayıt altına aldı. Ancak bu ADR'ler yalnızca bilgilendirme amaçlıydı — brain veya worker'lar tarafından aktif olarak okunmuyor, uyumluluk kontrol edilmiyordu. Açık kaynak repoya geçişle birlikte kullanıcılar kendi `.brain/DECISIONS.md` dosyalarını yazıp Deckent'tan enforce ettirmeyi bekleyecek.
-
-Sorunlar:
-1. ADR format standardize değildi — bazı ADR'lerde Status alanı vardı, bazılarında yoktu
-2. Worker prompt'larında ADR bilgisi yoktu — worker'lar mimari kısıtlamalardan habersiz çalışıyordu
-3. ADR yaşam döngüsü (accepted → deprecated → superseded) takip edilemiyordu
-4. ADR governance CI pipeline'a entegre değildi — format hataları build'de yakalanmıyordu
-
-**Decision:**
-
-ADR governance'ı kullanıcı-facing ürün özelliğine dönüştürmek. 5 bileşen:
-
-1. **MADR v3 Hibrit Format:** Tüm ADR'lere zorunlu `**Status:**` alanı eklendi. Geçerli değerler: accepted, deprecated, superseded, proposed, rejected. Parantezli açıklama desteklenir (örn. `accepted (Sprint 131)`).
-
-2. **Mandatory Read Wiring:** DECKENT.md'ye `@.brain/DECISIONS.md` referansı eklendi. brain.md ve worker-default.md kurallarına ADR compliance zorunluluğu eklendi.
-
-3. **Worker Prompt ADR Injection:** `buildWorkerPrompt()` fonksiyonu `.brain/DECISIONS.md` içeriğini worker prompt'una enjekte eder. Worker'lar mimari kısıtlamaları bilir, ihlal durumunda NO_GO + ADR amendment proposal yazar.
-
-4. **Validator Script:** `scripts/adr-validator.mjs` — format doğrulama, status enum kontrolü, duplicate ID tespiti. `npm run lint:adr` ile CI'da çalıştırılır.
-
-5. **ADR/SDL Naming Split:** `.brain/DECISIONS.md` = ADR (kalıcı mimari kararlar), `.deckent/decisions/*.json` = SDL (sprint taktik kararları).
-
-**Consequences (+):**
-- Worker'lar her sprint'te mimari kısıtlamaları bilir — bilinçsiz ihlaller azalır
-- `npm run lint:adr` CI pipeline'da format tutarlılığını garanti eder
-- Kullanıcılar kendi projelerinde ADR governance'ı kurabilir
-- MADR v3 standardıyla uyumlu format — topluluk alışkanlıklarıyla uyum
-
-**Consequences (-):**
-- Worker prompt boyutu ADR injection ile büyür (~3000 char ek)
-- Validator basit regex-based — karmaşık markdown edge case'leri gözden kaçabilir
-- ADR enforcement runtime'da değil, compile-time'da — aktif kod analizi yok
-
-**References:**
-- Sprint 138 Task 138-001 implementasyonu
-- `scripts/adr-validator.mjs` — validator script
-- `src/orchestra/task-builder.ts:loadADRContent()` — prompt injection
-- ADR-013: DECKENT.md Adapter Pattern — mandatory read wiring pattern
-- MADR v3: https://adr.github.io/madr/
-
-> **Note (verified / Memory V2 reconciliation):** Confirmed in code — `scripts/adr-validator.mjs` + `npm run lint:adr` (format/status-enum/duplicate-ID) and the MADR v3 mandatory `**Status:**` enum are real; the "enforcement is compile-time, not runtime" caveat is accurate (consistent with ADR-037 V1.0). **However, the ADR store evolved (Memory V2, DB-first):** `.brain/DECISIONS.md` is **no longer a live hand-maintained file**. ADRs live in `.brain/memory.db` (`type='adr'`), synced from `docs/adr/*.md` via ADR-046 (`syncAdrFilesToDb`) and exported to `.brain/exports/decisions.md`. Worker-prompt ADR injection is DB-based (`src/orchestra/adr-selector.ts`), not a raw `.brain/DECISIONS.md` read; the brain/worker/auditor rules now state "Query ADRs via MemoryStore — never parse .md files". Read every `.brain/DECISIONS.md` mention above as **shorthand for the ADR governance store** (DB + `docs/adr/` + `exports/decisions.md`) — consistent with ADR-009 (superseded by ADR-088), `docs/architecture/memory-system.md`, and `CLAUDE.md`. Behavior unchanged; documentation alignment only.
-
----
-
-**Amendment — 2026-06-11 (ADR-review, full code-verification):**
-
-1. **References correction:** `src/orchestra/task-builder.ts:loadADRContent()` **no longer exists** — the live injection path is the DB query in `task-builder.ts` (`store.getByType('adr').filter(a => a.status === 'accepted')`, ~lines 1200/1377) ranked by `src/orchestra/adr-selector.ts` (relevance + mandatory-ADR floor). The Note's "DB-based, not raw file read" framing was already correct; the References line was stale.
-2. **Validator target:** `scripts/adr-validator.mjs` validates the **generated export** `.brain/exports/decisions.md` (`adr-validator.mjs:166`) — i.e. it effectively validates the DB content (ADR-088 DB-first). Authoring flow: edit `docs/adr/*.md` → sync to DB → `deckent memory export` → `lint:adr`.
-3. **File→DB sync is live:** `syncAdrFilesToDb` (`src/core/adr-file-sync.ts:158`, the ADR-046 hook) runs at post-finalize (`identity-generator.ts:588`) + via the memory CLI — `docs/adr/*.md` is the authoring surface, DB the runtime source.
-4. **Live-proven during this very review:** `lint:adr` caught a real status-enum violation in the newly-authored ADR-089 (`accepted (…) · … (proposed)` mixed status) → fixed to a clean `accepted` + body note → `✓ 78 ADRs validated`. The governance loop works end-to-end. ⚠️ Outstanding warnings (non-fatal): adr-080/081/082/083/086 missing `**Decision:**`/`**Context:**` fields — to be addressed when the file-by-file review reaches them.
-
-md+db senkron (Alperen ADR-review).
-
----
-
-
----
-
-## adr-037: Brain-Auditor-Worker Authority Matrix — RBAC Protocol V1.0
-
-**Status:** accepted
-
-# ADR-037: Brain-Auditor-Worker Authority Matrix — RBAC Protocol V1.0
-
-**Status:** accepted
-
-**Date:** 2026-04-15
-
-**Sprint:** 138
-
----
-
-> ⚠️ **V1.0 enforcement reality (read this first — this is the canonical source other docs cite).**
-> This ADR defines the **intended** RBAC model. What is actually enforced today (Sprint 172):
-> - **Layer 1 (compile-time lint) + Layer 3 (audit-trail) are ACTIVE.**
-> - **Layer 2 (runtime) is ADVISORY / SOFT** — a violation is logged + emitted
->   to the event stream but does **not** block the action
->   (`src/orchestra/authority-enforcer.ts` is always-soft; `src/agents/worker.ts`
->   `checkWorkerAuthority` returns `true` even on a detected violation).
-> - `enforceVerifyLoop()` / `runTestVerifyLoop()` are **prompt instructions,
->   not code-enforced** (0 runtime callers).
-> - The hard-blocking Layer-2 is **intentionally absent in V1.0** and is a
->   **post-GA V2 hard-flip** — *not* "Sprint 139 scope" (that completion did
->   not land; it remains advisory at Sprint 172).
-> - Therefore the **"Fail-Closed"** principle and all ❌/"yasaklanmış" cells
->   below are **design intent**, not a current runtime guarantee.
->
-> This matches the honest framing in `CLAUDE.md`, `.claude/rules/worker-default.md`,
-> and `docs/architecture/authority-matrix.md`. Also: `.brain/DECISIONS.md` and the
-> `MEMORY.md`/`RETRO.md` line numbers in the matrix below are **Memory-V2
-> shorthand / outdated V1 budgets** — ADRs live in `.brain/memory.db`
-> (`type='adr'`); canonical line budgets are in `src/core/constants.ts`.
-
-**Context:**
-
-Deckent'in üç temel bileşeni — Brain (orkestratör), Auditor (doğrulayıcı), Worker (uygulayıcı) — Sprint 138'e kadar örtük güven (implicit trust) modeliyle çalışıyordu. Yetki sınırları `.claude/rules/*.md` dosyalarında doğal dil kuralları olarak tanımlı, ancak bu kurallar:
-
-1. **Enforceable değildi:** Worker'ın scope dışına yazması yalnızca post-hoc `git diff` ile tespit ediliyordu. Brain'in `src/**`'e doğrudan müdahalesi engelleyen mekanizma yoktu. Auditor'ın kaynak kod yazmasını engelleyen tek şey doğal dil talimatıydı.
-
-2. **Formal olarak tanımlı değildi:** ADR-008 Brain merkezi import kuralını, ADR-034 per-project izolasyonu, ADR-035 mesaj protokolünü tanımlıyordu — ama bu üç ADR'nin kesişiminde oluşan "kim neyi yapabilir?" sorusu hiçbir yerde tek tablo olarak cevaplanmıyordu.
-
-3. **Enterprise ölçeğe hazır değildi:** Milyon kullanıcı hedefiyle (Q3 2026 vizyonu), bir bileşenin yetkisini aştığında ne olacağının deterministik, denetlenebilir, versiyonlanmış bir protokolü yoktu. NIST SP 800-162 (ABAC) ve RBAC standartları referans alınmalıydı.
-
-4. **Sprint 137-138 canlı kanıtları:**
-   - Sprint 137 Task 137-001: Worker `DONE` bildirdi, vitest 53 fail — worker kendi doğrulama yetkisini aşıyordu (self-assessment = judge of own work).
-   - Sprint 138 Task 138-003: Auditor Authority Extension 3-Pipeline ile auditor aktif doğrulayıcı oldu, ama bu yetki genişlemesi formal RBAC kaydı olmadan yapıldı.
-   - Sprint 138 Task 138-004: Event stream kanal kodları (ADR-035) "source" ve "target" alanlarıyla örtük role bilgisi taşıyor, ama hangi kanalı kimin kullanabileceği tanımlı değil.
-
-5. **Tehdit modeli (ADR-034'ü genişletir):**
-   - **Privilege escalation:** Worker'ın `.brain/DECISIONS.md`'yi değiştirerek kendi scope kurallarını gevşetmesi
-   - **Lateral movement:** Worker A'nın Worker B'nin task dosyalarını okuması/yazması
-   - **Audit bypass:** Brain'in auditor verification'ı atlayarak doğrudan GO kararı vermesi
-   - **Role confusion:** Auditor'ın kaynak kodu yazması (audit bağımsızlığını bozar)
-
-**Decision:**
-
-Brain, Auditor ve Worker bileşenleri için formal Role-Based Access Control (RBAC) authority matrix tanımlanır. Bu matrix, Protocol Version 1.0 (ADR-035) üzerine inşa edilir ve her bileşenin dosya sistemi erişim hakları, event stream kanal kullanım hakları ve sprint yaşam döngüsü eylem yetkilerini belirler.
-
-### Temel Prensipler
-
-1. **Least Privilege (En Az Yetki):** Her bileşen yalnızca görevini yerine getirmek için gereken minimum yetkilere sahiptir. Ek yetki açıkça tanımlanmalı ve bu ADR'de kayıt altına alınmalıdır.
-
-2. **Separation of Duties (Görev Ayrılığı):** Aynı bileşen hem uygulayıcı hem denetleyici olamaz. Worker kod yazar, Auditor doğrular, Brain karar verir. Bu üçlü hiçbir bileşende birleşmez.
-
-3. **Auditability (Denetlenebilirlik):** Her yetki kullanımı event stream'e (ADR-035) kaydedilir. Yetkisiz erişim girişimleri `SCOPE_VIOLATION` olayı olarak loglanır.
-
-4. **Fail-Closed (Kapalı Hata):** Yetki doğrulaması başarısız olursa varsayılan karar "erişim yok" olur. Açıkça izin verilmeyen her eylem yasaklanmış kabul edilir.
-
-### Brain Authority Matrix
-
-Brain, sprint orkestratörüdür. Planlama, karar verme ve koordinasyon yetkilerine sahiptir.
-
-**Dosya Sistemi — YAZMA İZNİ:**
-
-| Yol Pattern | İzin | Gerekçe |
-|-------------|------|---------|
-| `.tasks/*` | ✅ WRITE | Task JSON oluşturma, durum güncelleme, sprint yönetimi |
-| `.deckent/config.json` | ✅ WRITE | Konfigürasyon güncelleme (config set komutu) |
-| `.deckent/sprint-state.json` | ✅ WRITE | Sprint faz geçişi, aktif sprint kaydı |
-| `.deckent/sprint-*-events.jsonl` | ✅ APPEND | Event stream yazma (yalnızca append, overwrite yasak) |
-| `.deckent/sprint-*-checkpoint.json` | ✅ WRITE | Checkpoint yazma (resume capability) |
-| `.deckent/sprint-*-metrics.jsonl` | ✅ APPEND | Metrik noktaları kaydetme |
-| `.deckent/cache/*` | ✅ WRITE | Managed-docs cache, build cache |
-| `.brain/MEMORY.md` | ✅ WRITE | Sprint öğrenimleri kaydetme (max 300 satır) |
-| `.brain/RETRO.md` | ✅ WRITE | Retrospektif yazma (overwrite, max 120 satır) |
-| `.brain/DEBT.md` | ✅ WRITE | Teknik borç tablosu yönetimi |
-| `.brain/PATTERNS.md` | ✅ WRITE | Desen kayıtları güncelleme |
-| `.brain/sprints/sprint-*.md` | ✅ WRITE | Sprint log dosyaları (max 80 satır) |
-| `.brain/archive/*` | ✅ WRITE | Sprint arşivleme (DIRECTIVES, tasks) |
-
-**Dosya Sistemi — YAZMA YASAĞI:**
-
-| Yol Pattern | İzin | Gerekçe |
-|-------------|------|---------|
-| `src/**` | ❌ DENY | Brain kaynak kodu yazmaz — ADR-038 istisnası hariç (gelecek ADR) |
-| `tests/**` | ❌ DENY | Brain test yazmaz — worker görevi |
-| `.brain/DECISIONS.md` | ❌ DENY | ADR'ler yalnızca insan (Alperen) veya ADR governance süreci ile değişir |
-| `docs/vision/roadmap.md` | ❌ DENY | Vizyon dokümanı yalnızca insan tarafından güncellenir |
-| `.dashboard` | ❌ DENY | Auditor'ın münhasır yazma alanı |
-| `.locks/*` | ❌ DENY | Lock yönetimi auditor + worker sorumluluğu |
-
-**Sprint Yaşam Döngüsü Eylemleri:**
-
-| Eylem | İzin | Koşul |
-|-------|------|-------|
-| Task oluşturma (PLAN fazı) | ✅ | DIRECTIVES.md okunmuş olmalı |
-| Worker spawn | ✅ | SPAWN fazı aktif olmalı |
-| Worker kill | ✅ | Timeout veya NO_GO sonrası |
-| GO / NO_GO / GO_WITH_TECH_DEBT label | ✅ | EVALUATE fazı aktif olmalı |
-| Cross-dependency fix spawn | ✅ | FIX fazı aktif, bağımlılık analizi tamamlanmış |
-| Auditor doğrulamasını atlama | ❌ | Brain, auditor verification sonuçlarını beklemek ZORUNDADIR |
-| Kendi kararını doğrulama | ❌ | Self-audit gate (Sprint 134 T-014) auditor tarafından kontrol edilir |
-
-**Event Stream Kanal Hakları (ADR-035 V1.0):**
-
-| Kanal | Hak | Rol |
-|-------|-----|-----|
-| `BRAIN→WORKER:TASK_ASSIGN` | ✅ EMIT | Kaynak |
-| `BRAIN→WORKER:ANSWER` | ✅ EMIT | Kaynak |
-| `BRAIN→WORKER:FIX_REQUEST` | ✅ EMIT | Kaynak |
-| `BRAIN→*:METRIC_EMITTED` | ✅ EMIT | Kaynak |
-| `BRAIN→*:SPRINT_PHASE_CHANGE` | ✅ EMIT | Kaynak |
-| `WORKER→BRAIN:*` | ✅ CONSUME | Hedef |
-| `AUDITOR→BRAIN:*` | ✅ CONSUME | Hedef |
-| `WORKER→AUDITOR:*` | ❌ | Ne kaynak ne hedef |
-| `DECKENT→USER:NOTIFY` | ❌ | Deckent CLI katmanı sorumlu |
-
-### Auditor Authority Matrix
-
-Auditor, bağımsız doğrulayıcıdır. Gözlemleme, doğrulama ve raporlama yetkilerine sahiptir. Kaynak kodu ASLA yazmaz.
-
-**Dosya Sistemi — YAZMA İZNİ:**
-
-| Yol Pattern | İzin | Gerekçe |
-|-------------|------|---------|
-| `.dashboard` | ✅ WRITE | Sprint durumu dashboard'u (30s scan cycle'da overwrite) |
-| `.deckent/sprint-*-gate.json` | ✅ WRITE | Sprint gate hesaplama sonucu |
-| `.deckent/sprint-*-events.jsonl` | ✅ APPEND | Event stream'e doğrulama sonuçları yazma |
-| `docs/audits/*` | ✅ WRITE | Audit raporları, load-test raporları |
-| `.brain/PATTERNS.md` | ✅ APPEND | Yeni pattern ekleme (mevcut içerik korunur, yalnızca append) |
-
-**Dosya Sistemi — OKUMA İZNİ:**
-
-| Yol Pattern | İzin | Gerekçe |
-|-------------|------|---------|
-| `.tasks/*.hb` | ✅ READ | Worker heartbeat kontrolü (stale detection) |
-| `.tasks/*.result` | ✅ READ | Worker sonuç doğrulaması |
-| `.tasks/*.json` | ✅ READ | Task tanımı okuma (scope doğrulama) |
-| `.locks/*` | ✅ READ + WRITE | Stale lock tespiti ve temizleme (>5 min) |
-| `src/**` | ✅ READ | Kod analizi, ADR compliance kontrolü (sadece okuma!) |
-| `tests/**` | ✅ READ | Test sonuç doğrulaması |
-| `.brain/DECISIONS.md` | ✅ READ | ADR compliance kontrolü |
-| `git diff --stat` | ✅ EXEC | Boundary violation tespiti |
-
-**Dosya Sistemi — YAZMA YASAĞI:**
-
-| Yol Pattern | İzin | Gerekçe |
-|-------------|------|---------|
-| `src/**` | ❌ DENY | Auditor kaynak kodu ASLA yazmaz — audit bağımsızlığı |
-| `tests/**` | ❌ DENY | Auditor test yazmaz — bağımsızlık ilkesi |
-| `.tasks/*.json` | ❌ DENY | Task tanımı değiştirme yetkisi yok — Brain münhasır |
-| `.brain/MEMORY.md` | ❌ DENY | Bellek yönetimi Brain sorumluluğu |
-| `.brain/RETRO.md` | ❌ DENY | Retrospektif yazma Brain sorumluluğu |
-| `.brain/DECISIONS.md` | ❌ DENY | ADR değişikliği governance süreci gerektirir |
-| `.deckent/sprint-state.json` | ❌ DENY | Sprint faz geçişi Brain sorumluluğu |
-
-**Sprint Yaşam Döngüsü Eylemleri:**
-
-| Eylem | İzin | Koşul |
-|-------|------|-------|
-| Verification 3-pipeline (`verifyWorkerResult`) | ✅ | Worker `.result` dosyası mevcut |
-| Functional verification (`verifyFunctional`) | ✅ | EXECUTE veya EVALUATE fazı |
-| Tech debt validation (`validateTechDebt`) | ✅ | Worker GO_WITH_TECH_DEBT bildirdi |
-| ADR compliance check (`checkADRCompliance`) | ✅ | Pilot ADR'ler (ADR-006, ADR-008, ADR-010) |
-| Sprint gate hesaplama (`GATE_COMPUTED`) | ✅ | EVALUATE fazı tamamlandı |
-| PASS / DOWNGRADE / FAIL verdict | ✅ | 3-pipeline sonucu |
-| GO / NO_GO label kararı | ❌ | Brain münhasır — auditor yalnızca verdict önerir |
-| Worker spawn / kill | ❌ | Brain münhasır |
-| Task oluşturma / değiştirme | ❌ | Brain münhasır |
-
-**Event Stream Kanal Hakları (ADR-035 V1.0):**
-
-| Kanal | Hak | Rol |
-|-------|-----|-----|
-| `AUDITOR→BRAIN:VERIFICATION_RESULT` | ✅ EMIT | Kaynak |
-| `AUDITOR→BRAIN:SCOPE_COLLISION_DETECTED` | ✅ EMIT | Kaynak |
-| `AUDITOR→BRAIN:ADR_VIOLATION` | ✅ EMIT | Kaynak |
-| `AUDITOR→BRAIN:GATE_COMPUTED` | ✅ EMIT | Kaynak |
-| `AUDITOR→BRAIN:LOAD_REPORT_WRITTEN` | ✅ EMIT | Kaynak |
-| `WORKER→AUDITOR:CODE_VERIFY_REQUEST` | ✅ CONSUME | Hedef |
-| `BRAIN→*:SPRINT_PHASE_CHANGE` | ✅ CONSUME | Broadcast dinleyici |
-| `BRAIN→*:METRIC_EMITTED` | ✅ CONSUME | Broadcast dinleyici |
-| `BRAIN→WORKER:*` | ❌ | Ne kaynak ne hedef |
-| `WORKER→BRAIN:*` | ❌ | Ne kaynak ne hedef (Brain'e ait) |
-
-### Worker Authority Matrix
-
-Worker, görev uygulayıcısıdır. Atanan task scope'u içinde kaynak kodu yazar, test çalıştırır ve sonuç raporlar.
-
-**Dosya Sistemi — YAZMA İZNİ:**
-
-| Yol Pattern | İzin | Koşul |
-|-------------|------|-------|
-| `scope.filesWrite` (task JSON'dan) | ✅ WRITE | Yalnızca atanan task'ın scope.filesWrite listesindeki dosyalar |
-| `scope.directories` (task JSON'dan) | ✅ WRITE | Yalnızca atanan task'ın scope.directories içindeki yeni dosyalar |
-| `.tasks/task-{ownId}.hb` | ✅ WRITE | Kendi heartbeat dosyası |
-| `.tasks/task-{ownId}.result` | ✅ WRITE | Kendi sonuç dosyası |
-| `.tasks/task-{ownId}.plan` | ✅ WRITE | Kendi yürütme planı |
-| `.tasks/task-{ownId}.verify-delta.json` | ✅ WRITE | Honest assessment kanıt dosyası |
-| `.locks/{ownScope}` | ✅ WRITE | Kendi scope'undaki dosyalar için lock alma/bırakma |
-
-**Dosya Sistemi — OKUMA İZNİ:**
-
-| Yol Pattern | İzin | Koşul |
-|-------------|------|-------|
-| `.tasks/task-{ownId}.json` | ✅ READ | Kendi task tanımı |
-| `scope.filesRead` (task JSON'dan) | ✅ READ | Task scope'undaki okuma listesi |
-| `.brain/DECISIONS.md` | ✅ READ | ADR compliance kontrolü (zorunlu okuma — ADR-036) |
-| `.locks/*` | ✅ READ | File lock kontrolü (yazma öncesi) |
-| `DIRECTIVES.md` | ✅ READ | Sprint hedefleri bağlamı |
-
-**Dosya Sistemi — YAZMA YASAĞI:**
-
-| Yol Pattern | İzin | Gerekçe |
-|-------------|------|---------|
-| `.tasks/task-{otherId}.*` | ❌ DENY | Başka worker'ın dosyalarına erişim yasak — lateral movement engeli |
-| `.brain/DECISIONS.md` | ❌ DENY | ADR değişikliği governance süreci gerektirir — privilege escalation engeli |
-| `.brain/MEMORY.md` | ❌ DENY | Brain münhasır |
-| `.brain/RETRO.md` | ❌ DENY | Brain münhasır |
-| `.deckent/sprint-state.json` | ❌ DENY | Sprint durumu Brain münhasır |
-| `.dashboard` | ❌ DENY | Auditor münhasır |
-| `docs/audits/*` | ❌ DENY | Auditor münhasır |
-| Scope dışı `src/**` | ❌ DENY | Scope violation — auditor `git diff --stat` ile tespit eder |
-
-**Sprint Yaşam Döngüsü Eylemleri:**
-
-| Eylem | İzin | Koşul |
-|-------|------|-------|
-| Task claim (PENDING → CLAIMED) | ✅ | Task kendisine atanmış olmalı |
-| Kod yazma | ✅ | Scope dahilinde |
-| Test çalıştırma (`tsc --noEmit`, `vitest run`) | ✅ | Verify loop (max 3 attempt) |
-| Self-assessment yazma | ✅ | Honest assessment kuralları geçerli (ADR-035 V1.0 honest block) |
-| Checkpoint question (`WORKER→BRAIN:QUESTION`) | ✅ | Blocker durumunda |
-| Başka worker'ı spawn/kill | ❌ | Brain münhasır |
-| Sprint faz değiştirme | ❌ | Brain münhasır |
-| GO / NO_GO kararı | ❌ | Brain münhasır — worker yalnızca self-assessment yazar |
-| Verification çalıştırma | ❌ | Auditor münhasır — worker kendi çalışmasını judge edemez |
-
-**Event Stream Kanal Hakları (ADR-035 V1.0):**
-
-| Kanal | Hak | Rol |
-|-------|-----|-----|
-| `WORKER→BRAIN:HEARTBEAT` | ✅ EMIT | Kaynak |
-| `WORKER→BRAIN:RESULT` | ✅ EMIT | Kaynak |
-| `WORKER→BRAIN:QUESTION` | ✅ EMIT | Kaynak |
-| `WORKER→AUDITOR:CODE_VERIFY_REQUEST` | ✅ EMIT | Kaynak |
-| `BRAIN→WORKER:TASK_ASSIGN` | ✅ CONSUME | Hedef |
-| `BRAIN→WORKER:ANSWER` | ✅ CONSUME | Hedef |
-| `BRAIN→WORKER:FIX_REQUEST` | ✅ CONSUME | Hedef |
-| `BRAIN→*:SPRINT_PHASE_CHANGE` | ✅ CONSUME | Broadcast dinleyici |
-| `AUDITOR→BRAIN:*` | ❌ | Ne kaynak ne hedef (Brain'e ait) |
-| `BRAIN→*:METRIC_EMITTED` | ❌ | Worker metrik tüketmez |
-
-### Cross-Role Interaction Rules (Çapraz Rol Kuralları)
-
-**Kural 1: Separation of Assessment and Verification**
-Worker self-assessment yazar (DONE / GO_WITH_TECH_DEBT / NO_GO). Auditor bağımsız olarak doğrular (PASS / DOWNGRADE / FAIL). Brain her iki sonucu değerlendirerek nihai GO / NO_GO kararı verir. Hiçbir bileşen hem uygulayıcı hem doğrulayıcı olamaz.
-
-**Kural 2: No Direct Worker-to-Worker Communication**
-Worker'lar birbirleriyle doğrudan iletişim kuramaz. Tüm koordinasyon Brain üzerinden yapılır. Worker A'nın Worker B'nin çıktısına ihtiyacı varsa, Brain dependency resolution yapar (FIX fazı, cross-dep priority).
-
-**Kural 3: Auditor Independence**
-Auditor hiçbir koşulda kaynak kodu (src/**, tests/**) yazmaz. Bu kural ADR-037'nin "dokunulamaz" maddesidir. Auditor bağımsızlığı kırılırsa self-audit mekanizması anlamsızlaşır.
-
-**Kural 4: Brain Orchestration Boundary**
-Brain planlama, koordinasyon ve karar verme yapar. Doğrudan kaynak kod üretimi yapmaz (src/** yazma yasağı). Brain'in kodu etkilemesi gereken durumlarda worker spawn eder. İstisna: gelecek ADR-038 meta-refactoring capability (şu an tanımlı değil, bu ADR'de referans olarak belirtilmiştir).
-
-**Kural 5: Event Stream Integrity**
-Her bileşen yalnızca kendi kanal haklarında belirtilen kanalları kullanabilir. Event stream append-only'dir — mevcut event'ler değiştirilemez veya silinemez. Event stream bozulması durumunda file-based fallback devreye girer (ADR-035 backward compatibility).
-
-### Enforcement Mekanizması
-
-**Katman 1 — Compile-Time (Static)**
-- `npm run lint:adr` ADR-037 authority matrix'ini parse eder ve scope kurallarını doğrular
-- Worker prompt injection (ADR-036) authority matrix'i worker'a bildirir
-- `isWithinScope()` fonksiyonu (ADR-034) symlink-aware dosya erişim kontrolü yapar
-
-**Katman 2 — Runtime (Dynamic)**
-- Auditor 30s scan cycle: `git diff --stat` ile scope violation tespiti
-- Event stream `source` alanı doğrulaması: yanlış source ile yazılan event → `SCOPE_VIOLATION` alert
-- File lock çakışma tespiti: aynı dosyaya iki worker yazarsa → `SCOPE_COLLISION_DETECTED` event
-
-**Katman 3 — Post-Hoc (Audit Trail)**
-- Event stream replay: sprint sonunda tüm yetki kullanımları reconstruct edilebilir
-- `.deckent/sprint-*-gate.json`: sprint gate hesaplamasında authority violation sayısı raporlanır
-- `docs/audits/sprint-*/`: her sprint'in audit raporu authority matrix compliance içerir
-
-### Versioning & Evolution
-
-Bu RBAC matrix Protocol Version 1.0 ile birlikte tanımlanmıştır. Değişiklikler:
-
-| Değişiklik Türü | Gereksinim |
-|-----------------|------------|
-| Yeni yetki ekleme (izin genişletme) | Bu ADR'ye amendment + `npm run lint:adr` geçmeli |
-| Yetki kaldırma (izin daraltma) | Bu ADR'ye amendment + etkilenen bileşen testleri güncellenmeli |
-| Yeni rol ekleme | Yeni ADR (ADR-037 bu ADR'yi supersede eder) |
-| Kanal hakkı değişikliği | ADR-035 ve bu ADR birlikte güncellenmeli |
-
-**Consequences (+):**
-
-- Her bileşenin yetki sınırları tek tablo olarak okunabilir — onboarding kolaylığı
-- Privilege escalation vektörleri (worker → `.brain/DECISIONS.md` yazma) formal olarak kapatılır
-- Audit trail event stream üzerinden reconstruct edilebilir — post-mortem analiz mümkün
-- Enterprise-ready RBAC pattern: NIST SP 800-162 prensiplerine uyumlu (least privilege, separation of duties, fail-closed)
-- Yeni bileşen eklendiğinde (örn. Notifier, Scheduler) authority matrix genişletme pattern'ı belirli
-- Sprint 137/138 canlı kanıtlarından türetilen kurallar — teorik değil, gerçek ihlallerden öğrenilmiş
-
-**Consequences (-):**
-
-- Authority matrix bakımı gerektirir — her yeni dosya pattern'ı veya kanal eklenmesinde güncellenmeli
-- Runtime enforcement henüz tam değil (Sprint 139 scope) — şu an compile-time + audit trail ağırlıklı
-- Matrix karmaşıklığı yeni katkıda bulunanlar için başlangıçta zorlayıcı olabilir
-- File-system level enforcement (OS capability) implementasyonu yok — güven modeli hâlâ process-level
-
-**Alternatives Considered:**
-
-- **Implicit trust (örtük güven):** Sprint 138'e kadarki model. Reddedildi: Sprint 137 canlı kanıtı gösterdi ki worker self-assessment güvenilmez, formal boundary'ler gerekli.
-- **OS-level capability model (Linux capabilities, seccomp):** Her bileşen ayrı process, OS-level file permission. Reddedildi: cross-platform uyumsuzluk (macOS seccomp yok), Docker backend'de container-in-container karmaşıklığı, ADR-033 "kur-çalıştır" ilkesiyle çelişir.
-- **CI lint-only enforcement:** Authority matrix'i yalnızca CI pipeline'da kontrol et, runtime'da enforce etme. Reddedildi: runtime violation'lar CI'da yakalanamaz, post-hoc tespit yetersiz (Sprint 137 kanıtı).
-- **Centralized policy engine (OPA/Rego):** Policy-as-code engine. Reddedildi: ADR-010 tek runtime dependency ilkesi ihlali, kur-çalıştır friction'ı artırır, Deckent'in mevcut ölçeği için overkill.
-- **Per-sprint dynamic RBAC:** Her sprint'te farklı yetki matrisi. Reddedildi: öngörülemezlik yaratır, debug zorlaştırır, authority matrix'in sabit olması güvenlik garantisi verir.
-
-**References:**
-
-- NIST SP 800-162: Guide to Attribute Based Access Control (ABAC) Definition and Considerations — least privilege, separation of duties prensipleri
-- ADR-008: Brain Merkezi Import — tek yönlü bağımlılık (import boundary = authority boundary temeli)
-- ADR-034: Multi-Project Isolation — per-project security boundaries (symlink-aware scope enforcement)
-- ADR-035: Brain ↔ Worker ↔ Auditor Verification Protocol Standard V1.0 — event stream kanal kodları
-- ADR-036: ADR Governance Integration — mandatory read wiring, validator enforcement
-- Sprint 137 Task 137-001 retrospektif — worker self-assessment güvenilmezlik kanıtı
-- Sprint 138 Task 138-003 — Auditor Authority Extension 3-Pipeline implementasyonu
-- Sprint 134 T-014 — Brain Self-Audit Gate
-- `.claude/rules/brain.md`, `.claude/rules/auditor.md`, `.claude/rules/worker-default.md` — mevcut doğal dil yetki kuralları (bu ADR ile formalize edildi)
-- `src/agents/worker.ts:isWithinScope()` — runtime scope check implementasyonu
-- `src/monitor/auditor.ts:verifyWorkerResult()` — 3-pipeline verification implementasyonu
-
----
-
-## Amendment — Sprint 281 (2026-06-11, Alperen ADR-review + tartışma)
-
-**Classification: BOTH (dogfood + user-product).** Bu ADR yalnız deckent-iç değil — kullanıcılar kendi projelerinde multi-agent sprint koşturur; RBAC/audit, user + enterprise için **ürün ADR'sidir**.
-
-**1. Re-verification (2026-06-11, gövde-okuma):** Header-note'un V1.0 iddiaları bugün de birebir doğru — `checkWorkerAuthority` (worker.ts:584+) violation'da `console.warn('[ADR-037 soft]')` + `emitAuthorityViolation` (event-trail, Layer-3 canlı) ama **`return true`** (advisory); `enforceVerifyLoop`/`runTestVerifyLoop` 0 runtime-caller (yalnız re-export + doc-comment; worker-default template dürüstçe belgeler); Layer-1 aktif (`lint:adr` ADR-036 review'inde canlı kanıtlandı).
-
-**2. Kural 2 rafinmanı — transport-invariant + tipli mesaj-vocabulary (tartışma sonucu):**
-
-Kural 2'nin doğru okunuşu: **doğrudan peer-kanal YASAK** (socket, başka worker'ın task-dosyasına yazma/okuma, gate'siz context-enjeksiyonu); **TÜM worker-to-worker semantiği Brain-aracılı, event-stream'li mesaj-bus'tan geçer (worker→Brain→worker)**. Gerekçe: rol-gaspı (worker'ın Brain'leşmesi), lateral kontaminasyon (gate'siz talimat enjeksiyonu), denetlenemezlik (event-stream bypass → replay kırılır), scope-koalisyonu, loop'ta görünmez-deadlock + sonsuz-gevezelik (auto-mode token-yangını).
-
-- **Sprint 278 COMM-1 (worker_comms: sharedNotes/handoffNotes/SharedMemory) bu kurala UYUMLUDUR** — Brain-aracılıdır (worker `.result`'a yazar → Brain spawn-time enjekte eder), doğrudan peer-kanal değildir. COMM-1 = mediated-bus'ın v0'ı.
-- **Mesaj-TİPİ vocabulary genişleyebilir (COMM-2, MASTER-PLAN); transport-invariant DEĞİŞMEZ.** Planlanan tipler: `DEPENDENCY_REQUEST` (worker talep eder, **Brain karar verir** — spawn/route/ret), `PAUSED_WAITING_DEPENDENCY` (birinci-sınıf park-durumu: auditor stale-kill yapmaz, timeout/bütçeli — sonsuz park imkansız), `CONTRACT_PUBLISH` (tipli interface/şema ilanı), `INFO_REQUEST/RESPONSE` (üretici-worker'a Brain-yönlendirmeli soru), bounded loop-bütçeleri (review-loop'lar max-iterasyon/mesaj sınırlı).
-- **Worker ASLA Brain rolü üstlenmez — tip-tasarımıyla yapısal garanti:** worker mesajları yalnız **TALEP / YAYIN / SORU** olabilir; **ATAMA / SPAWN / DEĞERLENDİRME / scope-değişikliği** tipleri worker'a kapalıdır. Spawn-kararı, scope, GO/NO-GO Brain-münhasır kalır (matrix değişmedi). Her mesaj event-streamed + Brain-politika-filtreli + bütçeli.
-
-Kullanım ufku: keşfedilen-bağımlılık (worker iş ortasında "X lazım" der → Brain spawn eder → worker parka girer → kontrat döner), paralel interface-tutarlılığı, reviewer↔implementer loop'ları, auto-mode uzun akışlar — hepsi mediated-bus üzerinde, sonsuz senaryo tek invariant'la güvenli.
-
-md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-038: Dead Code Disposition — Sprint 139 Audit Results
-
-**Status:** accepted
-
-# ADR-038: Dead Code Disposition — Sprint 139 Audit Results
-
-**Status:** accepted
-
-**Date:** 2026-04-15
-
-**Sprint:** 139
-
----
-
-**Context:**
-
-Sprint 139 Dead Code Audit (Task 139-037 `scripts/dead-code-audit.mjs`) 11 modülü analiz etti ve 4 kategoride sınıflandırdı: Dead (6 modül, ~1042 LoC), Dormant/ADR-protected (4 modül, ~495 LoC), Active (1 modül — false positive). Audit, Sprint 132'deki güvenlik denetiminden gelen şüphelileri ve ADR-028 koruması altındaki V1 decision engine ekosistemini kapsadı.
-
-Sorun: 1042 satır dead code bakım maliyeti yaratıyor (tsc derleme süresi, IDE noise, yeni katkıda bulunanlar için kafa karışıklığı). Ancak bazı dead modüller gelecek roadmap öğeleriyle (distributed execution Sprint 145+, ML-driven routing) doğrudan ilişkili — acele silme değerli mimari bilgiyi kaybettirir.
-
-**Decision:**
-
-Sprint 139 dead code audit sonuçları için 4 kademeli disposition kararı:
-
-### Kademe 1: Remove (Sprint 140 Adım 4)
-
-Aşağıdaki modüller **tamamen silinecek** (kaynak + test dosyaları):
-
-| Modül | LoC | Gerekçe |
-|-------|-----|---------|
-| `src/orchestra/learning-decay.ts` | 151 | Deprecated learning sistemiyle bağlı, V2 routing farklı decay mekanizması kullanıyor. Pattern basit — gerekirse 30 dakikada yeniden yazılır. |
-| `src/orchestra/learning-migration.ts` | 229 | Hardcoded keyword-to-taskType mapping, eski veri formatı migrasyonu. Yeni learning sistemi kurulursa sıfırdan tasarlanmalı. |
-| `src/orchestra/batch-stats.ts` | 141 | Queue + delayed batch write pattern'ı jenerik. Gerekirse `node:stream` veya basit buffer ile yeniden implement edilir. Mevcut implementation 0 consumer. |
-
-**Toplam:** 3 modül, ~521 LoC silme, 3 test dosyası silme.
-
-**Rollback planı:** `git revert` ile tek commit geri alınır. Silme öncesi son commit hash'i `docs/audits/sprint-139/dead-code-decisions.md`'de kayıt altına alınır.
-
-### Kademe 2: Defer (Sprint 145+ Değerlendirme)
-
-Aşağıdaki modüller **silinmeyecek** — gelecek roadmap öğeleriyle doğrudan ilişkili:
-
-| Modül | LoC | Gelecek Bağlantı | Yeniden Değerlendirme |
-|-------|-----|-------------------|----------------------|
-| `src/orchestra/combination-scorer.ts` | 101 | ML-driven routing scoring, outcome-tracker entegrasyonu | Sprint 145 (routing evolution) |
-| `src/orchestra/handoff-protocol.ts` | 152 | Distributed execution, multi-task artifact exchange | Sprint 145 (distributed sprint) |
-| `src/orchestra/brain-context.ts` | 268 | Context-aware planner enrichment, planner.ts entegrasyonu | Sprint 142 (planner evolution) |
-
-**Toplam:** 3 modül, ~521 LoC korunacak. Test dosyaları da korunur.
-
-Bu modüller `@deprecated` JSDoc tag'i ile işaretlenecek ve dosya başına `// DEFERRED: ADR-038, reassess Sprint 145` yorumu eklenecek. Sprint 145'te yeniden değerlendirilecek — ya revive edilecek (dogfood + test), ya da silinecek.
-
-**Rollback planı:** `@deprecated` tag kaldırılır, modül aktif routing'e bağlanır.
-
-### Kademe 3: Deprecate + Warning (ADR-028 Amendment — Sprint 142+)
-
-ADR-028 koruması altındaki 4 dormant modül statüsü değişmiyor:
-
-| Modül | LoC | ADR-028 Statüsü |
-|-------|-----|------------------|
-| `src/orchestra/decision-engine.ts` | 170 | Korunuyor — V1 referans |
-| `src/orchestra/decision-replay.ts` | 150 | Korunuyor — audit tool |
-| `src/orchestra/decision-steps/agent-step.ts` | 83 | Korunuyor — V1 step |
-| `src/orchestra/decision-steps/scope-step.ts` | 92 | Korunuyor — V1 step |
-
-**Toplam:** 4 modül, ~495 LoC — ADR-028 amendment gerektirir, Sprint 142+ değerlendirilecek.
-
-Bu ADR, ADR-028'in removal'ını TALEP ETMİYOR — yalnızca Sprint 142'de reassessment öneriyor. V2 routing engine 10+ sprint boyunca stabil çalıştığında, V1 referans değerinin devam edip etmediği yeniden değerlendirilmeli.
-
-### Kademe 4: False Positive Düzeltme
-
-`src/orchestra/parallel-pipeline.ts` dead code olarak **yanlış raporlanmıştır**. Modül 4 src/ dosyası tarafından aktif olarak import edilmektedir (`sprint-spawner.ts`, `sprint-controller.ts`, `conflict-resolver.ts`). Rapordaki "0 import" yalnızca `PipelineTask` type export'u için geçerlidir — modülün kendisi kritik altyapıdır. Dead code raporundan çıkarılmalıdır.
-
-**Consequences (+):**
-
-- 521 LoC dead code güvenle silinecek (Sprint 140 Adım 4) — derleme süresi ve IDE noise azalır
-- 521 LoC yüksek değerli kod korunacak — gelecek roadmap öğeleri için yatırım kaybı önlenir
-- Her karar formal gerekçe, risk değerlendirmesi ve rollback planı ile belgelenmiştir
-- False positive (parallel-pipeline) düzeltilerek audit doğruluğu artırılmıştır
-- ADR-028 dormant modülleri Sprint 142'de reassessment'a takvimlenmiştir
-
-**Consequences (-):**
-
-- Deferred modüller (521 LoC) bakım yükü devam eder — `@deprecated` tag + periodic reassessment gerektirir
-- Sprint 145 reassessment'ta modüllerin hâlâ relevant olup olmadığı belirsiz — roadmap değişebilir
-- ADR-028 dormant modüller artık 15+ sprint boyunca untouched — reference value tartışmalı
-
-**Alternatives Considered:**
-
-- **Tümünü sil:** 1042 LoC + 495 LoC = ~1537 LoC silme. Reddedildi: combination-scorer ve handoff-protocol'ün yeniden yazım maliyeti yüksek, mimari bilgi kaybı.
-- **Hiçbirini silme:** Tüm dead code korunsun. Reddedildi: learning-decay/migration/batch-stats gerçekten değersiz, bakım maliyeti artıyor.
-- **Tümünü deprecate:** `@deprecated` işaretle, silme erteleme. Reddedildi: learning-decay/migration/batch-stats için deprecation gereksiz — doğrudan silme daha temiz.
-- **Monorepo archive:** Dead kodu `packages/archive/` dizinine taşı. Reddedildi: ADR-010 minimal dependency, monorepo yapısı yok.
-
-**References:**
-
-- Sprint 139 Task 139-037: `scripts/dead-code-audit.mjs` — audit tool
-- Sprint 139 Task 139-037: `docs/audits/sprint-139/dead-code-report.md` — audit raporu
-- ADR-028: Decision-Engine V1 → V2 Routing Migration — dormant modül koruması
-- ADR-033: Product Vision — bakım maliyeti minimizasyonu
-- `docs/audits/sprint-139/dead-code-decisions.md` — detaylı decision matrix
-
-> **Note (actual disposition as of Sprint 172 — verified vs `src/orchestra/`):** The plan was only partially realized and partly diverged:
-> - **Kademe 1 (Remove):** `learning-decay.ts` ✓ removed, `learning-migration.ts` ✓ removed, but **`batch-stats.ts` still exists** (was not deleted).
-> - **Kademe 2 (Defer):** `handoff-protocol.ts` and `brain-context.ts` are still present as planned, but **`combination-scorer.ts` was removed** (diverged from "defer / reassess Sprint 145").
-> - **Kademe 3 (ADR-028 V1):** `decision-engine.ts`, `decision-replay.ts`, `decision-steps/agent-step.ts`, `decision-steps/scope-step.ts` all still present — accurate ✓.
-> - **Kademe 4 (false positive):** `parallel-pipeline.ts` confirmed present and actively imported — accurate ✓.
->
-> Behavior unchanged; documentation alignment only (records the real outcome vs the original plan).
-
----
-
-## Sprint 230 Disposition Re-verification (2026-06-05)
-
-### `src/orchestra/multi-agent.ts` — NEW ENTRY (absent from original ADR-038)
-
-**Re-verification result:** 0-caller in production `src/` code confirmed.
-
-```
-grep -rl "from.*multi-agent" src/   # → empty (no production import)
-grep -rl "multi-agent" src/ --include="*.ts" | grep -v "multi-agent.ts"
-# → src/mcp/server.ts (doc comment only), src/cli/helpers/cursor-config.ts (doc comment only)
+```xml
+<fail-safe>
+  <rule>writeEvent() is try/catch → console.warn + returns null on failure
+        (disk full, permission) — a run NEVER halts on event-stream I/O error.</rule>
+  <rule>Sequence monotonicity via a process-level atomic counter.</rule>
+</fail-safe>
 ```
 
-**Test callers (blocking deletion):**
-- `tests/orchestra/multi-agent.test.ts` — imports `definePipeline`, `runPipeline`, `PipelineStep`, `PipelineExecutor`
-- `tests/core/error-handling-unification.test.ts` — dynamically imports `definePipeline`
+### 5. Dual transport is PERMANENT (file-based `.hb`/`.result` + event-stream)
 
-**Disposition decision: DEFER — test cleanup required before deletion.**
-`multi-agent.ts` is a 0-caller orphan in production code. However, deleting the source file
-without also removing its test callers would break the test suite. Removing those test files
-was outside the Sprint 230 task scope. The module is retained; a future sprint must: (1)
-confirm no wiring value, (2) remove `tests/orchestra/multi-agent.test.ts` and the
-`multi-agent` sections in `tests/core/error-handling-unification.test.ts`, then (3) delete
-`src/orchestra/multi-agent.ts`.
-
-**Rollback:** N/A — no deletion performed.
-
----
-
-### `src/orchestra/decision-replay.ts` — RE-VERIFIED (Kademe 3 status unchanged)
-
-**Re-verification result:** 0-caller in production `src/` code confirmed.
-
-```
-grep -rl "from.*decision-replay" src/   # → empty (no production import)
+```xml
+<dual-transport status="permanent" fail-safe="yes">
+  <layer kind="file-based">.tasks/*.hb heartbeat + .tasks/*.result — the LIVE PRIMARY
+    read path (result-collector.ts, worker.ts, ADR-D-007 manual-dispatch).</layer>
+  <layer kind="event-stream">.deckent/sprint-NNN-events.jsonl — the canonical-READ,
+    replayable, version-negotiated layer.</layer>
+  <decision>BOTH are preserved PERMANENTLY as a fail-safe pair. ADR-035's original
+    "Backward-Compatibility Roadmap" (file-based soft-deprecated by Sprint 140, REMOVED
+    by Sprint 142) is REJECTED — it never materialized (file-based was still live-primary
+    at Sprint 172 and Sprint 280) and is now decided AGAINST: the event-stream is a
+    canonical-read layer ON TOP of file-based state, never a replacement for it.</decision>
+</dual-transport>
 ```
 
-**Test callers (maintaining Kademe 3 protection):**
-- `tests/orchestra/decision-replay.test.ts` — imports `replayDecision`, `diffDecisions`
-- `tests/core/non-null-safety.test.ts` — imports `diffDecisions`
-
-**Disposition decision: KEEP — ADR-028 protection unchanged.**
-`decision-replay.ts` remains in Kademe 3 (ADR-028 V1 reference / audit tool). Production
-0-caller status confirmed as of Sprint 230. Test callers also prevent safe deletion without
-broader scope. ADR-028 amendment required before disposal; scheduled for reassessment
-Sprint 142+ (original plan), now overdue — escalate in next architecture review.
-
-**Rollback:** N/A — no changes to source file.
-
 ---
 
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full disk re-verification)
-
-**Classification: dogfood-only** (deckent'in kendi modül-disposition kararları).
-
-Tüm disposition iddiaları bugünkü diske + production-caller'lara karşı yeniden doğrulandı:
-
-1. **🟢 `handoff-protocol.ts` REVIVED — DORMANT → LIVE (Sprint 278 COMM-1).** Kademe-2 defer'ının öngördüğü "ya revive (dogfood+test) ya sil" yolunun **revive** çıkışı gerçekleşti: artık `task-builder.ts` + `sprint-controller.ts` tarafından production-import ediliyor (worker_comms handoff enjeksiyonu). Kademe-2'den çıkar — ACTIVE.
-2. **`batch-stats.ts` silinmesi HÂLÂ yapılmadı** (Kademe-1 planı, Sprint 140 hedefliydi) — dosya duruyor, 0-caller. ~141 LoC.
-3. **Gecikmiş reassessment'lar:** `brain-context.ts` (hâlâ 0-production-caller; reassess S142 planı → 139 sprint gecikmiş), `decision-replay.ts` (S230 teyitli 0-caller), `multi-agent.ts` (S278 "disposition" task'ı durumu teyit etti ama dispose etmedi — hâlâ 0-caller, deprecation-marker yok). **Karar:** bunlar + batch-stats silmesi, **ertelenmiş dormant-audit sweep'ine katlanır** ([[project_product_repo_migration_push]] — Alperen: "dormant taramasını işler bitince yeniden yapacağız"); ayrı acil iş açılmaz.
-4. **Yan-bulgu (manifest-mislabel ailesi, ADR-028-W ile aynı):** features.md dead-features `parallel-pipeline-manager`'ı "superseded" listeler ama `parallel-pipeline.ts` mevcut + production-import'lu (Kademe-4 false-positive düzeltmesi hâlâ geçerli).
-
-md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-039: Self-Modifying Task Detection — Deckent Dogfood vs User Project Discrimination
-
-**Status:** accepted
-
-# ADR-039: Self-Modifying Task Detection — Deckent Dogfood vs User Project Discrimination
-
-**Status:** accepted
-
-**Date:** 2026-04-15
-
-**Sprint:** 139
-
----
-
-**Context:**
-
-Deckent iki farklı modda çalışır:
-
-1. **Deckent-Dogfood modu:** Deckent kendi kaynak kodunu sprint ile değiştirir (örn. Sprint 139 Wave 5 `src/orchestra/` modülleri). Bu durumda Brain'in runtime cache'i invalidate olur, MCP server eski kodu çalıştırır ve `tsc` rebuild gerekir. Sprint 138 Layer 4 fail'in root cause'u tam olarak budur: worker `src/orchestra/sprint-finalizer.ts`'i değiştirdi ama Brain hâlâ eski pre-build cache'teki kodu çalıştırıyordu.
-
-2. **Kullanıcı-Projesi modu:** Deckent, kullanıcının projesini (Rails app, React app, Go service vb.) orkestre eder. Kullanıcının kaynak kodu Deckent'in runtime'ını etkilemez — cache invalidation ve MCP restart gereksizdir.
-
-Bu iki mod arasındaki ayrım hiçbir yerde formalize edilmemişti. Sonuçlar:
-
-- Sprint 138 Task 6 (Layer 4 Wire Forensic Fix): 3-sprint üst üste runtime fail. Worker `sprint-finalizer.ts`'i değiştirdi, Brain eski kodu çalıştırdı, gate.json/load-report/metrics.jsonl üretilmedi.
-- Self-modifying sprint'lerde parallel execution riskli: iki worker aynı anda `src/orchestra/` modüllerini değiştirirse tsc rebuild çakışır.
-- Kullanıcı projelerinde gereksiz restart/rebuild overhead: her sprint sonunda MCP restart tetiklemek anlamsız.
-
-**Decision:**
-
-`src/orchestra/self-modifying-detector.ts` modülü ile runtime self-modification tespiti. Üç public fonksiyon:
-
-### 1. `detectDeckentRepo(projectRoot: string): boolean`
-
-Proje dizininin Deckent'in kendi repo'su olup olmadığını tespit eder. İki koşulun **ikisi birden** sağlanmalı:
-- `.deckent/` dizini mevcut (gerekli ama yeterli değil — kullanıcı projeleri de bunu içerir)
-- `package.json` dosyasının `name` alanı `'deckent'` (kesin ayırıcı)
-
-### 2. `isSelfModifying(task: Pick<Task, 'scope'>, projectRoot: string): boolean`
-
-Tek bir task'ın Deckent'in kendi kaynak kodunu değiştirip değiştirmediğini tespit eder. İki koşul:
-- `detectDeckentRepo(projectRoot) === true`
-- Task'ın `scope.directories` veya `scope.filesWrite` listesinde en az bir Deckent source pattern'ı bulunuyor
-
-**Deckent Source Patterns:**
-```
-src/core/
-src/orchestra/
-src/monitor/
-src/agents/
-src/cli/
-src/mcp/
-src/providers/
-src/api/
-src/dashboard/
-.deckent/agents/
-.deckent/skills/
-```
-
-### 3. `isSelfModifyingSprint(tasks: ReadonlyArray<Pick<Task, 'scope'>>, projectRoot: string): boolean`
-
-Sprint seviyesinde tespit: en az bir task self-modifying ise sprint self-modifying kabul edilir.
-
-### Policy Kararları
-
-**P1: Sequential Execution Zorunluluğu**
-Self-modifying task'lar aynı wave içinde **sequential** çalıştırılmalı (parallel: false). İki worker aynı anda `src/orchestra/` modüllerini değiştirirse tsc rebuild race condition oluşur.
-
-**P2: Wave 0 Self-Boot Gate (Gelecek Sprint)**
-Self-modifying sprint tespit edildiğinde Brain otomatik Wave 0 `tsc && vitest run` gate prepend eder — mevcut codebase sağlığı doğrulanır. Bu ADR tasarımı tanımlar, runtime wiring Sprint 140+ scope.
-
-**P3: Post-Task Auto-Checkpoint**
-Self-modifying task tamamlandıktan sonra otomatik checkpoint yazılır (sprint-checkpoint.ts). MCP restart gerekiyorsa checkpoint'ten resume edilebilir.
-
-**P4: Kullanıcı Projelerinde No-Op**
-`detectDeckentRepo() === false` → tüm self-modifying kontrolleri atlanır. Zero overhead kullanıcı projeleri için.
-
-### Integration Points
-
-| Entegrasyon | Dosya | Açıklama | Sprint |
-|-------------|-------|----------|--------|
-| Detection API | `self-modifying-detector.ts` | 3 public fonksiyon | Sprint 139 (bu ADR) |
-| Spawner wave sequencing | `sprint-spawner.ts` | `isSelfModifyingSprint` → sequential wave | Sprint 140+ |
-| Finalizer MCP restart hook | `sprint-finalizer.ts` | Post-task rebuild + MCP restart | Sprint 140+ |
-| Event stream integration | `event-stream.ts` | `BRAIN→*:SELF_MODIFY_DETECTED` channel | Sprint 140+ |
-
-**Consequences (+):**
-
-- Sprint 138 Layer 4 fail root cause formalize edildi — gelecekte aynı hata sınıfı önlenir
-- Kullanıcı projeleri sıfır overhead — `detectDeckentRepo()` tek `readFileSync` + JSON.parse
-- Self-modifying sprint'ler runtime-aware: Brain cache invalidation, sequential execution, auto-checkpoint
-- Deckent-dogfood sprint'lerde `tsc` rebuild race condition riski ortadan kalkar (sequential wave)
-- ADR-035 event stream'e `SELF_MODIFY_DETECTED` channel eklenebilir (Sprint 140+ extension point)
-
-**Consequences (-):**
-
-- `package.json` name check heuristic — fork'lar farklı name kullanabilir (edge case, kabul edilebilir)
-- Deckent source pattern listesi bakım gerektirir — yeni `src/` alt dizini eklenirse güncellenmeli
-- Wave 0 gate ve MCP restart wiring Sprint 140+ ertelendi — Sprint 139'da yalnızca detection API
-
-**Alternatives Considered:**
-
-- **Compile-time detection (tsc plugin):** TypeScript compiler plugin ile import graph analizi. Reddedildi: plugin maintenance cost yüksek, runtime'da tsc plugin API instabil.
-- **Git-based detection (`git diff --name-only`):** Değişen dosyaları git'ten oku. Reddedildi: plan-time'da (sprint başlamadan) henüz değişiklik yok — scope'tan tespit etmek daha erken ve daha güvenilir.
-- **Environment variable (`DECKENT_DOGFOOD=1`):** Manual flag. Reddedildi: ADR-033 "kur-çalıştır" ilkesi — otomatik tespit tercih edilir, kullanıcı konfigürasyon burden'ı minimize edilmeli.
-- **Tüm sprint'leri self-modifying kabul et:** Her sprint sonrası rebuild + restart. Reddedildi: kullanıcı projeleri için gereksiz overhead, Sprint 138 audit 799 sync I/O hot path bulgusuyla çelişir.
-
-**References:**
-
-- Sprint 138 Task 6: Layer 4 Runtime Wire Forensic Fix — root cause (Brain pre-build cache)
-- Sprint 138 Task 4: Event Stream + Plan-Time Scope Collision Detection — sequential wave pattern
-- ADR-035: Brain ↔ Worker ↔ Auditor Verification Protocol — event stream extension point
-- ADR-033: Product Vision — kur-çalıştır ilkesi (otomatik detection, manual flag değil)
-- ADR-037: RBAC Authority Matrix — Brain/Worker dosya erişim sınırları
-- `src/orchestra/self-modifying-detector.ts` — Sprint 139 implementasyonu
-- `src/orchestra/sprint-spawner.ts` — Sprint 140+ sequential wave wiring
-
-> **Note (verified vs code, Sprint 172):** The **detection API is real** — `src/orchestra/self-modifying-detector.ts` exports `detectDeckentRepo`, `isSelfModifying`, `isSelfModifyingSprint`, consumed by `src/orchestra/authority-enforcer.ts` and `src/agents/worker.ts`. **However, the "Sprint 140+ Integration Points" did not land:** there is no sequential-wave wiring in `sprint-spawner.ts`, no MCP-restart hook in `sprint-finalizer.ts`, no `SELF_MODIFY_DETECTED` channel in `event-stream.ts`, and the P2 Wave-0 gate is unwired. In practice deckent-dev self-modifying sprints are handled via **ADR-047 (Manuel Subagent Dispatch)** — manual, isolated dispatch — rather than the projected automated sequential-wave / rebuild-restart orchestration. Behavior unchanged; documentation alignment only (records actual state vs the original roadmap).
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full caller-trace)
-
-**Classification: BOTH** (P4 "user-projede sıfır-overhead no-op" = ürün davranışı; self-mod koruması = dogfood).
-
-**Consumer-claim düzeltmesi (Sprint-172 Note'undaki imprecision):** `authority-enforcer.ts` ve `worker.ts` detector'ı **import etmez** — yalnız `isSelfModifyingSprint` **bayrak-parametresini** kabul ederler (enforcer `AuthorityCheck.isSelfModifyingSprint?:48`, worker `checkWorkerAuthority(..., isSelfModifyingSprint=false)`). Caller-trace (2026-06-11): **bu bayrağı hesaplayıp geçen production caller YOK** — worker-side `checkWorkerAuthority` zaten 0-prod-caller (ADR-037 V1.0 by-design), auditor-side `checkAuthority`'ye de hiçbir yerde `isSelfModifyingSprint:true` geçilmiyor. → **enforcer:302'deki self-mod relaxation dalı fiilen DORMANT** (bayrak asla true olmaz).
-
-**Detector'ın gerçek canlı tüketicisi:** `src/orchestra/rollback.ts:107/178` — `detectDeckentRepo` ile deckent-repo'da rollback-guard (kendi git-ağacını koruma; self-git-mutation bug ailesine karşı gerçek, çalışan koruma). Bugün ADR-039'un canlı değeri budur; sprint-seviye self-mod akışı (P1 sequential, P2 Wave-0 gate, P3 auto-checkpoint) tamamen inmemiş/dormant durumda ve pratik ADR-047 manuel-dispatch ile yürüyor.
-
-**Disposition:** dormant bayrak-zinciri + inmemiş P1-P3 entegrasyonları, **ertelenmiş dormant-audit sweep'ine** katlanır (ADR-038 amendment'i ile aynı karar — yeni acil iş açılmaz). md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-040: Nervous System Architecture — Proactive Meta-Orchestrator
-
-**Status:** accepted
-
-# ADR-040: Nervous System Architecture — Proactive Meta-Orchestrator
-
-**Status:** accepted
-
-**Date:** 2026-04-20
-
-**Sprint:** sprint-147
-
----
-
-## Context
-
-Deckent'in Sprint 144–146 boyunca yaşanan canlı olaylar, proaktif bir meta-katmana olan ihtiyacı kanıtladı:
-
-- **Sprint 145 08:14 TRT**: DIRECTIVES.md, EXECUTE fazında template'e döndü (463 byte — içerik silinmiş). Sprint duraklayarak manuel müdahale gerektirdi.
-- **Sprint 145 test-writer anomalisi**: 14/17 task (%53) aynı agent'a route edildi — normal dağılım %40 eşiğini aştı. Brain fark etmedi, sadece retro sonrası görüldü.
-- **Sprint 146 T-146-005 `string;` corruption**: Bir task'ın assignedAgent alanı geçerli bir agent ID yerine TypeScript syntax kalıntısı içeriyordu. Sprint sonuna kadar fark edilmedi.
-- **Sprint 146 dead SDL write**: Sprint Decision Log yazma girişimi sırasında silent failure oluştu, record kayboldu.
-
-Bu olayların ortak paydası: mevcut mimaride Brain/Auditor/Worker üçlüsü **reaktif** çalışıyor — hata oluştuktan sonra retro'da görülüyor. Proaktif bir gözlemci katman yoktu.
-
-## Decision
-
-`src/nervous/` altında **Proactive Meta-Orchestrator** (Nervous System) inşa edildi. Sprint 147'nin 22 task'ı bu kararı hayata geçirdi.
-
-### Mimari Pipeline
-
-```
-Observer → DetectorRegistry → DecisionEngine → Proposer → Dispatcher → Executor
-```
-
-**Observer** (`T-147-004`): 4 event source — EventBus, Filesystem watcher (.tasks/, .brain/, DIRECTIVES.md, .deckent/), 15s Cron tick, Sprint lifecycle events (SPRINT_PHASE_CHANGE, SPRINT_RETRO_COMPLETE).
-
-**DetectorRegistry** — 5 MVP detector:
-- `StaleWorkerDetector` (T-147-009): 3dk+ HB yok → WORKER_RESPAWN suggest
-- `ScopeCollisionMonitor` (T-147-010): PLAN/EXECUTE fazında çakışan filesWrite → SCOPE_COLLISION_REORDER
-- `DebtTrendAnalyzer` (T-147-011): Son 3 sprint >%15 debt rate → DEBT_REPRIORITIZE
-- `AgentRoutingHealth` (T-147-012): Agent ID corruption (`string;` pattern) + %40 anomaly detection
-- `DirectivesMidSprintProtection` (T-147-013): EXECUTE/FIX fazında DIRECTIVES.md template'e dönüşünü tespit + emergency restore
-
-**DecisionEngine** (T-147-005): DetectorResult → AuthorityMatrix lookup → DecisionOutput (policy + risk + safetyFloor flag).
-
-**AuthorityMatrix** (T-147-003): 4 preset:
-- `strict`: low→suggest-30m, medium/high→approve
-- `balanced`: low→autonomous, medium→suggest-30m, high→approve  
-- `autopilot`: low/medium→autonomous, high→suggest-5m
-- `full-auto`: all→autonomous (safety floor hariç)
-
-**5 Locked Safety Floor** (asla override edilemez):
-KILL_LIVE_SPRINT, MANUAL_FILE_DELETE, COST_OVER_THRESHOLD, DESTRUCTIVE_GIT, ADR_DEPRECATE_ACCEPTED
-
-**Proposer** (T-147-006): Throttle (5dk groupKey dedup) + severity filter + NervousNotification builder.
-
-**Executor** (T-147-007): 3 mod — autonomous (hemen), suggest-timeout (timer + auto-apply), approve (user decision bekler). Reversible undo desteği.
-
-**Dispatcher** (T-147-018): Context detection (MCP env / TTY) + 3 adapter — MCP, CLI, File. Cross-channel dedup.
-
-**History** (T-147-008): `.deckent/nervous-history.jsonl` append-only audit trail. 30-day retention.
-
-### Action Registry
-
-30 eylem, 4 kategori (T-147-002):
-- Low risk (8): DEAD_EVENT_STREAM_CLEANUP, ORPHAN_TASK_ARCHIVE, LOG_ROTATION, CACHE_INVALIDATE, STALE_LOCK_RELEASE, IPC_DIR_CLEANUP, DEBT_TRENDING_REPORT, METRIC_EMIT
-- Medium risk (11): DIRECTIVES_WRITE, PROMPT_BUILDER_TWEAK, SKILL_ROUTING_ADJUST, DEBT_REPRIORITIZE, WORKER_RESPAWN, SCOPE_COLLISION_REORDER, ADR_DRAFT, RETRO_AUGMENT, AGENT_PERFORMANCE_FLAG, SPRINT_GATE_ADJUST, TASK_DEPENDENCY_REWIRE
-- High risk (11): SPRINT_START, SPRINT_STOP, SRC_MODIFICATION, COMMIT_CREATE, COMMIT_PUSH, AGENT_DISABLE, COST_THRESHOLD_RAISE, ADR_ACCEPT, PROVIDER_SWITCH, CONFIG_MIGRATE, NPM_PUBLISH
-
-### User Interface
-
-**CLI** (T-147-014): `deckent nervous` — dashboard, accept/reject/edit/undo/history/log subcommands.
-
-**CLI Config** (T-147-015): `deckent config nervous set mode <preset>` + per-action override.
-
-**MCP Tools** (T-147-016): 5 yeni tool — deckent_nervous_subscribe, deckent_nervous_accept, deckent_nervous_reject, deckent_nervous_status, deckent_nervous_config. Toplam 27 MCP tool.
-
-**Config Schema** (T-147-017): `nervous_system` section — 3-layer config merge. Default: enabled=false (Sprint 148'de true).
-
-**Sprint Controller Hook** (T-147-021): Her phase geçişinde EventBus'a SPRINT_PHASE_CHANGE + SPRINT_RETRO_COMPLETE emit.
-
-## Consequences
-
-### Positive
-- **Proaktif görünürlük**: Hata olmadan önce tespit edilir, kullanıcıya önerilir.
-- **Autonomy control**: 4 preset + per-action override ile granüler kontrol. Safety floor garantisi.
-- **Audit trail**: Her eylem JSONL history'de, undo destekli.
-- **Sprint 145/146 bug'ları yakalanabilir hale geldi**: AgentRoutingHealth T-147-012 direkt olarak `string;` corruption'ı tespit eder.
-- **CLI/MCP parity**: ADR-022-v2 gereği her CLI komutu MCP tool olarak da erişilebilir.
-
-### Negative
-- **Complexity artışı**: ~3500+ LoC yeni modül. Sprint 148'de canlı dogfood gerekli.
-- **enabled=false başlangıç**: Sprint 148 aktifleştirme + Sprint 149 doc sprint zorunlu.
-- **Self-modifying risk**: Deckent kendi `src/nervous/`'ini yazıyor — ADR-039 self-modifying detection aktif tutulmalı.
-- **FS watcher overhead**: 4 dizin izleme — low-traffic projelerde ≤1% CPU, high-traffic'de monitoring gerekebilir.
-
-## References
-
-### Sprint 145 Canlı Kanıtlar
-- DIRECTIVES.md mid-sprint template bug (08:14 TRT, EXECUTE fazı, 463 byte)
-- test-writer %53 anomaly (14/17 task, tek agent overload)
-- Sprint 145 T-145-006 NotifyDispatcher foundation (Nervous Dispatcher base)
-- Sprint 145 T-145-003 EventBus (Observer subscription base)
-
-### Sprint 146 Kanıtlar
-- T-146-005: `string;` agent corruption (assignedAgent geçersiz değer)
-- T-146-012: ADR-040 placeholder types (nervous-types.ts ~190 LoC, status=proposed)
-- Sprint 146 retro: 16/17 done, avg rubric 94
-
-### Sprint 147 Implementation Tasks
-- T-147-001: nervous-types.ts genişletme (ObserverEvent, DetectorContext, ActionDefinition, ExecutionRecord)
-- T-147-002: action-registry.ts (30 eylem, risk matrix)
-- T-147-003: authority-matrix.ts (4 preset, resolvePolicy, safety floor)
-- T-147-004: observer.ts (NervousObserver, 4 source)
-- T-147-005: decision-engine.ts (DecisionEngine, quiet hours)
-- T-147-006: proposer.ts (Proposer, throttle, groupKey)
-- T-147-007: executor.ts (Executor, 3 mod, pending approvals)
-- T-147-008: history.ts (NervousHistory, JSONL, undo, prune)
-- T-147-009: detectors/stale-worker.ts
-- T-147-010: detectors/scope-collision.ts
-- T-147-011: detectors/debt-trend.ts
-- T-147-012: detectors/agent-routing.ts (string; corruption detector)
-- T-147-013: detectors/directives-protection.ts (emergency restore)
-- T-147-014: cli/commands/nervous.ts (deckent nervous)
-- T-147-015: cli/commands/config-nervous.ts (deckent config nervous)
-- T-147-016: mcp/tools/nervous.ts (5 MCP tool)
-- T-147-017: core/config.ts nervous_system schema extension
-- T-147-018: nervous/dispatcher.ts (3 adapter, context detection)
-- T-147-019: tests/nervous/integration/ (40+ test suite)
-- T-147-020: tests/e2e/nervous-flow.test.ts (canlı sprint sim)
-- T-147-021: orchestra/sprint-controller.ts lifecycle event emit
-- T-147-022: ADR-040 accept (bu kayıt)
-
-### Design Spec
-- `docs/superpowers/specs/2026-04-20-deckent-nervous-system-design.md` (583 satır, 14 section)
-
----
-
-> **Note (verified vs code, Sprint 172):** `src/nervous/` exists with the full pipeline modules (observer, detector-registry, decision-engine, proposer, dispatcher, executor, authority-matrix, history, runtime-scope-check, detectors/) and the **sprint-controller EventBus hook is wired** (`src/orchestra/sprint-controller.ts` — `emitSprintEvent('SPRINT_PHASE_CHANGE', …)`, "always fires, subscribers optional"). The MCP `deckent_nervous_*` tools exist. Consistent with this ADR's own caveats, the Nervous System is **config-gated / opt-in**: the proactive Observer pipeline is not the default active path, and in practice deckent-dev operates self-modifying sprints via ADR-047 (Manuel Subagent Dispatch) rather than autonomous nervous execution. The "Toplam 27 MCP tool" figure (under "MCP Tools") is a Sprint-147 snapshot — the current count is higher (~31, drift-prone; canonical: `docs/reference/mcp-tools.md`). Behavior unchanged; documentation alignment only.
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (kullanıcı preset konfigüre eder, bildirim alır, onaylar/reddeder/düzenler — ürün özelliği; + dogfood meta-koruması).
-
-**Re-verified verbatim:** 5 Locked Safety Floor (`authority-matrix.ts:24`, `Object.freeze`) ✓ · 4 preset + per-action override ✓ · action-registry **tam 30** ✓ · pipeline modülleri ✓ · "config-gated opt-in" tespiti hâlâ doğru ✓.
-
-**Davranış-evrimi (Sprint 279-280 — bu ADR'nin Executor/CLI semantiğini günceller):**
-
-1. **Executor "approve" modu nüanslandı (Sprint 279 WK-nervous, panic-gate wire):** non-SAFETY_FLOOR `approve` action'ları artık **10s hard-timeout → auto-proceed** (`awaitPanicGateApproval` → `handleApprove`; `isLockedPanicAction` muafiyet-kontrolü). **SAFETY_FLOOR action'ları muaf — koşulsuz sonsuz-bekler** (kullanıcı çözene dek). Orijinal "approve = user decision bekler" ifadesi artık yalnız SAFETY_FLOOR için koşulsuz geçerli.
-2. **`edit` subcommand uçtan-uca CANLI (Sprint 280 APPROVE-007b):** `ApprovalRequest.modifiedPayload` IPC transport + executor merge (`{...orijinal, ...modifiedPayload}` yalnız 'accepted'ta; yokken byte-aynı) + bootstrap poller forward + REPL `/nervous edit <id> <k=v|json>`. ADR'nin başta listelediği edit artık gerçekten çalışır.
-3. **Cross-process approval round-trip (§4G APPROVE-004/005/007, ~Sprint 233):** Executor'a DI `PendingApprovalStore` (CLI-okunur `.deckent/nervous-pending.json`) + `ipcQueue.startPolling → executor.resolveApproval` wire + CLI accept/reject→IPC route (heartbeat-liveness'lı) — onaylar CLI/MCP/REPL'den canlı executor'a ulaşır (eskiden sessizce düşüyordu).
-4. **Detector 5 → 12 (additive):** + build-failure-recurrence, dead-event-stream, token-spike, task-mode-idle, notification-delivery-health, scope-collision-rate, agent-routing-anomaly. 5-MVP listesi Sprint-147 snapshot'ı.
-
-md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-041: Agent Taxonomy — Horizontal Skills vs Vertical Agents
-
-**Status:** accepted
-
-# ADR-041: Agent Taxonomy — Horizontal Skills vs Vertical Agents
-
-**Status:** accepted
-
-**Date:** 2026-04-21
-
-**Sprint:** sprint-150
-
----
-
-## Status
-accepted (Sprint 150 — reconfirmed with Sprint 150 dogfood evidence)
-
-## Context
-
-Sprint 146-147 canlı kanıtları agent taxonomy problemini açığa çıkardı:
-
-- **Sprint 145:** test-writer 14/27 (%52) — beklenmedik yüksek atama oranı
-- **Sprint 146:** test-writer 9/17 (%53) — anomali devam ediyor
-- **Sprint 147:** test-writer 22/22 (%100) — **kritik eşik aşıldı**, ADR gereksinimi tetiklendi
-
-AgentRoutingHealth detector (Sprint 147 T-147-003) %95 anomaly threshold'u aşıldığını bildirdi. `test-writer` agent, "test" keyword'ü içeren her task'a (scope=tests/ dahil) atanıyordu. Bu durum şu sorunlara yol açtı:
-
-1. **Yanlış taxonomik sınıflandırma:** "Test yazmak" bir yatay beceridir (her agent yapabilir), dikey uzmanlık alanı değil.
-2. **Routing dağılımı bozukluğu:** Tek agent %100 atamasıyla anomaly detector anlamsız hale geldi.
-3. **Beta GA UX problemi:** Kullanıcılar "neden her task test-writer'a gidiyor?" sorusunu soruyor.
-4. **Intent classifier yanlışlığı:** 'testing' primary intent olarak tanımlanması her test/ scope task'ı yanlış sınıflandırıyordu.
-
-Sprint 148 Block A (T-148-001..T-148-005) reform paketini hayata geçirdi:
-- test-writer agent arşivlendi (T-148-001)
-- testing-expert skill auto-activation eklendi (T-148-002)
-- Intent classifier 'testing' primary intent kaldırıldı, 'test-coverage' tag sistemi eklendi (T-148-003)
-- Router V2 agent fallback chain güncellendi — test-writer yok (T-148-004)
-- 15 agent PROMPT.md rubric spec temizlendi (T-148-005)
-
-## Decision
-
-Agent taxonomy şu şekilde reorganize edildi:
-
-**Agent = Dikey Uzmanlık** — belirli bir domain'de derin bilgi:
-- `architect` — sistem tasarımı, modül yönetimi
-- `security-auditor` — güvenlik açıkları, OWASP
-- `frontend-designer` — UI/UX, component tasarımı
-- `doc-writer` — dokümantasyon, README, CHANGELOG
-- `bug-fixer` — hata ayıklama, regression
-- vb.
-
-**Skill = Yatay Beceri** — herhangi bir agent tarafından kullanılabilir:
-- `testing-expert` — test yazımı, vitest, coverage (scope tests/** veya *.test.ts ile auto-activate)
-- `typescript-expert` — TypeScript tip sistemi
-- `documentation-writer` — Markdown, JSDoc
-- vb.
-
-**Test, yatay beceridir** — architect da test yazar, bug-fixer da. test-writer agent'ı gereksizdir.
-
-### Routing Kuralları
-
-1. Intent classifier: 'testing' artık primary intent değil. Scope tests/** → 'test-coverage' tag eklenir.
-2. selectSkills(): scope tests/** veya filesWrite *.test.ts içeriyorsa testing-expert otomatik eklenir.
-3. selectAgent(): task primary intent'e göre seçilir (core-dev → architect, bug-fix → bug-fixer, vb.)
-4. AgentRoutingHealth: threshold %40 — hiçbir agent %40'ı aşmamalı.
-
-## Consequences
-
-**(+) Routing dağılımı dengelendi** — Sprint 148 hedef: hiçbir agent %43'ü aşmamalı (architect borderline kabul edilebilir — multi-block varlığı nedeniyle).
-
-**(+) AgentRoutingHealth detector anlamlı** — Artık gerçek anomalileri yakalayabilir, false %100 görüntüsü ortadan kalktı.
-
-**(+) Beta GA UX temizlendi** — Kullanıcılar routing kararlarını anlayabiliyor; "test-writer neden her yerde?" sorusu sorulmaz.
-
-**(+) Skill ekonomisi** — testing-expert birden fazla agent ile çalışabilir. Tek-agent monopolisi yerine skill reuse.
-
-**(-) Sprint 147 test-writer stats arşivlendi** — Tarihsel performans verileri kaybedilmedi, arşivlendi (`.deckent/agents/archive/test-writer-removed-sprint-148/`).
-
-**(-) Breaking change** — Özel (custom) `test-writer` agent tanımlayan kullanıcı projeleri migration adapter gerektirebilir.
-
-## Dogfood Kanıtları (Sprint 149 + Sprint 150 Acceptance)
-
-- **Sprint 148 Test-Writer Atama:** Sprint 148 reform sonrası 27 task arasında test-writer = 0 atama (baseline %95'ten %0'a)
-- **Sprint 149 Gate 6:** `grep test-writer .tasks/*.json | wc -l` = 0 — enforcement canlı
-- **AgentRoutingHealth:** Sprint 148 anomaly algısı = 0 false positive (detector artık anlamlı)
-- **ADR-037 RBAC:** test-writer authority matrix'ten çıkarıldı (Sprint 149 T-149-025 doğrusu)
-- **Sprint 150 Gate 6:** Sprint 150 38 task arasında test-writer assigned = 0 — taxonomy reform kalıcı
-- **Sprint 150 AgentRoutingHealth:** Anomaly threshold %40 altında — routing dağılımı dengeli
-
-## Implementation Status
-
-- **Sprint 148 T-148-001:** test-writer archive ✅
-- **Sprint 148 T-148-002:** testing-expert auto-activation ✅
-- **Sprint 148 T-148-003:** Intent classifier refactor ✅
-- **Sprint 148 T-148-004:** Router V2 fallback chain ✅
-- **Sprint 148 T-148-005:** Agent PROMPT.md cleanup ✅
-- **Sprint 149 T-149-025:** ADR ACCEPT + evidence recorded ✅
-- **Sprint 150 T-150-025:** ADR-041 reconfirmed with Sprint 150 dogfood — test-writer=0 in 38-task sprint ✅
-
-## References
-
-- Sprint 146 T-146-005: string; corruption — test-writer agent.json bozulması
-- Sprint 147 T-147-003: AgentRoutingHealth detector — %95 anomaly detection
-- Sprint 148 T-148-001..005: Reform implementation package
-- ADR-037: Brain-Auditor-Worker Authority Matrix RBAC V1.0
-- ADR-040: Nervous System Architecture — AgentRoutingHealth detector integration
-
-> **Note (verified vs code, Sprint 172):** Confirmed accurate — `.deckent/agents/` holds **15 built-in agents** (excluding temp/archive); `test-writer` is removed and archived under `.deckent/agents/archive/test-writer-removed-sprint-148/`. The Agent=vertical / Skill=horizontal taxonomy is consistent with `docs/architecture/agents.md` and `docs/architecture/agent-skill-architecture.md`. This decision was further **re-reconfirmed in Sprint 166** (per `DECKENT.md`) — still in force. Behavior unchanged; documentation alignment only.
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (taksonomi ürün-kanunudur — kullanıcı agent/skill yüzeylerini görür; custom-agent breaking-change etkisi de user-facing).
-
-**Re-verified:** 15 built-in agent + test-writer yok + arşiv duruyor ✓ · testing-expert auto-activation (`'test-coverage'` tag → +2, `routing-engine.ts:887`) ✓ · `ANOMALY_THRESHOLD_RATE = 0.40` (`detectors/agent-routing.ts:23`) ✓ · routing'de test-writer izi yok ✓.
-
-**Dağılım-hedefi gerçekliği:** Taksonomi kararı (vertical/horizontal, test=yatay-beceri) sağlam ve kalıcı-enforce'lu. Ancak Consequences'taki "routing dağılımı dengelendi" hedefi pratikte **kronik nüksetti** — test-writer monopolünün yerini dönem dönem **refactorer-ağırlığı** aldı (örn. Sprint 211: 12/16 task; bkz. memory `feedback_agent_routing_imbalance`). Mitigasyonlar: **ADR-072** (Agent Routing Balance — multi-signal scoring) + **ADR-075** (skill→agent affinity). %40 threshold'u **detector-izlemeli advisory'dir** (AgentRoutingHealth uyarır), hard-enforce değildir — dağılım dengesi sürekli-izlenen bir hedef olarak kalır. md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-042: Hybrid Mode Architecture — Sprint + Task Dual Modes
-
-**Status:** accepted
-
-# ADR-042: Hybrid Mode Architecture — Sprint + Task Dual Modes
-
-**Status:** accepted
-
-**Date:** 2026-04-21
-
-**Sprint:** sprint-150
-
----
-
-## Status
-accepted (proposed Sprint 150 → accepted: dual-mode shipped & verified in code, Sprint 172)
-
-## Context
-
-Deckent'in iki farklı kullanım paradigması var:
-
-1. **Developer Orchestration (Sprint Mode):** Yazılım geliştiriciler için — çoklu agent, sprint lifecycle (PLAN→SPAWN→EXECUTE→EVALUATE), DIRECTIVES.md tabanlı, CI/CD entegrasyonu. Mevcut ana kullanım senaryosu.
-
-2. **Life Assistant (Task Mode):** Gündelik kullanıcılar için — tek seferlik görevler, doğal dil, anlık cevap, messaging connector entegrasyonu (Discord/Telegram). Sprint 149 Block A ile temel hazırlandı.
-
-Bu iki mod, aynı Deckent çekirdeği üzerinde çalışır ancak farklı ön yüz davranışı, routing mantığı ve UX beklentisi gerektirir:
-
-- **Sprint Mode'da:** Brain aktif, DIRECTIVES.md zorunlu, multi-worker paralel, retro/memory lifecycle var.
-- **Task Mode'da:** Brain bypass, tek worker, anında sonuç, messaging connector üzerinden input.
-
-Tek bir config key ile toggle edilebilir olmalı: `deckent_style: "sprint" | "task"`.
-
-## Decision
-
-`deckent_style` config key (ADR-004 3-layer merge uyumlu) ile hybrid mod mimarisi:
-
-```typescript
-// src/core/config-types.ts
-export interface DeckentConfig {
-  /** Active runtime style */
-  deckent_style?: 'sprint' | 'task';
-}
-```
-
-**Routing Mantığı:**
-
-```
-deckent_style === 'sprint' → runSprint() → PLAN/SPAWN/EXECUTE/EVALUATE lifecycle
-deckent_style === 'task'   → runTaskMode() → single worker, instant result
-```
-
-**CLI Entry Point:**
-
-```bash
-deckent mode sprint   # Switch to sprint mode
-deckent mode task     # Switch to task mode  
-deckent mode auto     # Auto-detect from context (git+DIRECTIVES → sprint)
-deckent mode show     # Show current mode
-```
-
-**Config Hierarchy (ADR-004):**
-
-```
-env DECKENT_STYLE=task (highest)
-  → .deckent/config.json { "deckent_style": "task" }
-    → ~/.deckent/config.json { "deckent_style": "sprint" }
-      → default: "sprint"
-```
-
-**Nervous System Integration:**
-
-- `TaskModeIdleDetector` — task modunda 5+ dakika idle → kullanıcı hatırlatması
-- `AgentRoutingHealth` — her iki modda da aktif
-
-## Consequences
-
-**(+) Dual Audience:** Developer ve life assistant kullanıcılar aynı ürünü kullanabilir, farklı mod ile.
-
-**(+) DeckentHub Ekosistemi:** Task mode'a yönelik life assistant skill'leri (spotify-control, calendar, weather) hub'da ilk sınıfı oluşturur. Hub'ın değeri iki katına çıkar.
-
-**(+) Messaging Connector Zemin:** Block C connector'ları (Discord/Telegram) task mode ile anlamlı olur. Sprint mode'da "deploy yap" komutu → sprint trigger; task mode'da "hava durumu?" → anlık cevap.
-
-**(+) ADR-040 Uyumlu:** Nervous system detector pipeline her iki modda çalışır. Mode-specific detector (TaskModeIdleDetector) eklendi.
-
-**(-) Mode-Aware Code Complexity:** sprint-controller.ts, task-mode-runner.ts, event-stream — her biri mode check gerektiriyor. "Sprint mi task mı?" sorusu kodun birçok yerinde sorulacak.
-
-**(-) Test Matrix Genişlemesi:** Her özellik artık 2 modda test edilmeli. Sprint 149+ test budget'ı ~%30 artacak.
-
-**(-) Kullanıcı Karmaşası:** "Hangi modda mıyım?" sorusu. `deckent mode show` ile mittige edildi, ancak onboarding UX dikkat gerektirir.
-
-## Implementation Plan
-
-- **Sprint 149 T-149-001:** `deckent_style` config key (3-layer merge) ✅
-- **Sprint 149 T-149-002:** `deckent mode` CLI command ✅  
-- **Sprint 149 T-149-003:** Sprint controller mode-aware routing ✅
-- **Sprint 149 T-149-004:** Nervous system TaskModeIdleDetector ✅
-- **Sprint 150 T-150-001:** `deckent_style` config key 3-layer integration (reconfirm + validation) 🔄
-- **Sprint 150 T-150-002:** `deckent mode` CLI command (mode show/sprint/task/auto/global) 🔄
-- **Sprint 150 T-150-003:** Sprint controller mode-aware routing (task-mode-runner.ts) 🔄
-- **Sprint 150 T-150-004:** Nervous system TaskModeIdleDetector (task-mode-idle.ts) 🔄
-- **Sprint 151+:** Task mode full UX (onboarding flow, mode indicator, messaging auto-route)
-
-## References
-
-- ADR-004: 3-Layer Config Merge — config hierarchy
-- ADR-040: Nervous System Architecture — detector pipeline
-- ADR-041: Agent Taxonomy — skill vs agent distinction (task mode reuses same pool)
-- Sprint 149 DIRECTIVES Block A — mode architecture implementation
-- Sprint 148 competitive analysis: OpenClaw life assistant mode comparison
-
-> **Note (verified vs code → status promoted, Sprint 172):** This ADR was marked `proposed` but the dual-mode is **shipped and verified**: `src/orchestra/task-mode-runner.ts` (`runTaskMode()`), `src/cli/commands/mode.ts` (`VALID_STYLES = ['sprint','task']`, `deckent mode sprint|task|auto`), the `deckent_style` config key (3-layer merge, ADR-004), and `README.md` presents Dual Mode as a core feature. Status therefore promoted **proposed → accepted** (governance-approved). The `🔄` items above (T-150-003/004 full task-mode UX, idle detector) reflect Sprint-150-era progress markers; the core toggle + runner are in place. `.brain/exports/summary.md`/`memory.db` will reflect `accepted` after the next `syncAdrFilesToDb` (docs/adr → DB). Behavior unchanged; documentation alignment only.
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (dual-audience ürünün özü; mode-toggle user-facing).
-
-**Re-verified:** `runTaskMode` (task-mode-runner.ts:93) ✓ · `VALID_STYLES=['sprint','task']` (mode.ts:10) ✓ · `deckent_style` config (config-types.ts:529/800) ✓ · task-mode-idle detector ✓.
-
-**1. Task-mode → otonom motorun yürütme-primitifi oldu.** `runTaskMode` artık **5 canlı production tüketicili** — en önemlisi `autonomous/execute-dispatcher.ts` (durable backlog `kind=task` → runTaskMode; F3-009). Sprint-172'de "core toggle + runner yerinde" idi; bugün task-mode otonom yürütmenin omurgası.
-
-**2. Üçüncü mod PLANLI: `process` (ADR-067, proposed — Alperen).** Bu ADR'nin dual'i (sprint|task) mevcut-gemideki kanundur; yön **üçlü**: gerekçe (Alperen 2026-06-11 review) — (a) **"sprint" evrensel bir kavram değil** (geliştirici-dışı kullanıcı için adlandırma/UX sorunu), (b) **task-mode agentic DEĞİL** (tek-atışlık worker, agentic loop yok) → uzun-ömürlü + agentic üçüncü mod = **process**. Kod-durumu: `'process'` henüz `deckent_style` değeri değil; temeller inmiş (`scheduled-flow.ts`, `flow.ts` CLI, `tenant-context.ts`, `event-trigger.ts`) ve **otonom motor (F3-009) fiilen onun agentic runtime'ı**. Tam karar + style-entegrasyonu ADR-067'nin kendi review/kabulünde ele alınır.
-
-**3. Style ≠ Surface netleştirmesi:** ADR-081'in native agentic REPL'i (çıplak `deckent`) bir **etkileşim-yüzeyidir**, üçüncü bir `deckent_style` DEĞİL — style yürütme-paradigmasını (sprint|task|gelecekte-process), yüzeyler (CLI/REPL/dashboard/MCP/bot) onun üstündeki erişimi tanımlar.
-
-md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-043: Brain Crash Recovery Protocol
-
-**Status:** accepted
-
-# ADR-043: Brain Crash Recovery Protocol
-
-**Status:** accepted
-
-**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
-
-**Date:** 2026-05-13
-
-**Sprint:** Sprint 163 (backfill — implementation sprints: 160, 161, 162)
-
----
-
-## Status
-
-accepted (Sprint 163 — Sprint 160 T-001 + Sprint 161 T-002 + Sprint 162 T-004 birleşik implementasyonunun geriye dönük belgelenmesi)
-
----
-
-## Context
-
-Sprint 159–161 forensic analizinde Brain crash recovery'nin üç kritik eksikliği tespit edildi:
-
-**1. Negatif `durationMs` bug (`durationMs: -106`)**
-Sprint state dosyası (`sprint-state.json`) crash öncesi `startTime` doğru yazılmıştı; ancak crash sonrası Brain yeniden başladığında `durationMs` hesaplaması yanlış referans zamanı kullanıyordu. Sonuç: negatif süre değerleri dashboard'da görünür hale geldi, sprint metrikleri güvenilmez oldu.
-
-**2. Stale EXECUTING task'lar `handleEvaluation`'a girmedi**
-Brain crash anında bazı task'lar `EXECUTING` statüsünde kalmış olabiliyordu. Yeniden başlamada bu task'ların `.result` dosyaları disk'te varken Brain bunları `handleEvaluation` pipeline'ına sokmuyordu. Görünürde tamamlanmış iş kayboluyordu; sprint döngüsü yanlış `NO_GO` veya eksik evaluate ile kapanıyordu.
-
-**3. Sensitive data exception log'unda leak riski**
-Unhandled exception yakalanmadığı durumlarda `process.on('uncaughtException')` handler yoktu. Stack trace'ler içinde `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` gibi environment variable değerleri doğrudan log'a yazılabiliyordu. Bu durum ADR-034 (Multi-Project Isolation) güvenlik sınırlarını ihlal edebilirdi.
-
-Bu üç sorun birbirinden bağımsız commit'lerde düzeltildi (Sprint 160 T-001, Sprint 161 T-002, Sprint 162 T-004) ancak bir recovery protokolü olarak ADR'ye alınmamıştı. ADR-043 bu protokolü resmî hale getirir.
-
----
-
-## Decision
-
-Brain için **3-katman crash recovery protokolü** zorunlu kılınır:
-
-### Katman 1 — Entry-Point Exception Handler (Sprint 160 T-001)
-
-**Commit:** `9c184a3`
-
-Process boot'ta `installCrashHandlers()` çağrısı yapılır. Bu fonksiyon:
-
-- `process.on('uncaughtException', handler)` kaydeder
-- `process.on('unhandledRejection', handler)` kaydeder
-- Her handler `redactSensitive(error.message + stack)` çağrısıyla API key/token pattern'lerini log'a yazmadan önce `***REDACTED***` ile değiştirir
-
-`redactSensitive()` regex coverage:
-- `sk-ant-...` (Anthropic API key pattern)
-- `Bearer <token>`
-- `OPENAI_API_KEY=<value>`
-- `GOOGLE_API_KEY=<value>`
-- Genel `apiKey: "..."` JSON pattern
-
-**Zorunluluk:** `sprint-controller.ts` veya entry-point binary'de `installCrashHandlers()` process boot'un ilk satırlarında çağrılmalıdır. Handler kurulmadan sprint başlatılamaz.
-
-### Katman 2 — Atomic Checkpoint Write (Sprint 161 T-002)
-
-**Commit:** `8cefed0`
-
-Sprint execution boyunca periyodik checkpoint yazımı yapılır (`sprint_checkpoint_interval` config anahtarı, `config.ts:602` default `5`; Sprint 139 yüksek-riskli sprint'lerde `3`'e override edilir). Checkpoint atomicity kuralı:
-
-1. `computeEventStreamOffset()` ile o ana kadar yazılan event sayısı hesaplanır
-2. `completedTasks` listesi checkpoint'e eklenir (boş array YASAK — en az 1 completed task varsa populate edilmeli)
-3. `checkpointNumber` her yazımda artırılır
-4. Dosya **doğrudan hedef path'e yazılmaz** — önce `.tmp` suffix'li geçici dosyaya yazılır, ardından `renameSync()` ile atomik rename yapılır
-
-Bu pattern, yarı yazılmış checkpoint'in okunan geçersiz state'e yol açmasını önler. `renameSync()` POSIX sistemlerde atomik garantilidir.
-
-**Checkpoint schema zorunlu alanları:**
-```json
-{
-  "checkpointNumber": "<integer >= 1>",
-  "eventStreamOffset": "<integer > 0>",
-  "completedTasks": ["<taskId>", "..."],
-  "sprintId": "<sprint-NNN>",
-  "timestamp": "<ISO 8601>"
-}
-```
-
-### Katman 3 — State Recovery on Restart (Sprint 162 T-004)
-
-`restoreSprintFromCheckpoint()` fonksiyonu Brain restart'ında checkpoint'i okur ve 3 action'dan birini seçer:
-
-| Koşul | Action | Açıklama |
-|---|---|---|
-| Checkpoint yok | `fresh` | Yeni sprint başlat, geçmiş state yok |
-| Tüm task'lar DONE veya NO_GO | `complete` | Sprint zaten tamamlanmış, cleanup'a geç |
-| Stale EXECUTING task'lar var + `.result` mevcutsa | `resume-evaluate` | `.result` dosyasını `handleEvaluation`'a sok |
-
-**`resume-evaluate` ayırt etme kuralı:**
-Stale EXECUTING task için `.tasks/task-NNN.result` dosyası disk'te mevcutsa → worker iş bitirmiş, Brain crash etmişti → result `handleEvaluation`'a girer.
-`.result` yoksa → worker da crash etmiş veya henüz tamamlamamış → task EXECUTING kalır, timeout beklenir.
-
-**`durationMs` fix:**
-`restoreSprintFromCheckpoint()` içinde sprint `startTime` checkpoint'ten restore edilir. `durationMs` hesabı `Date.now() - restoredStartTime.getTime()` olarak yapılır. Bu negatif durationMs bug'ını ortadan kaldırır.
+## Intent / Roadmap (Tomorrow)
+
+- **APR approval-channels:** the ApprovalBroker (cross-environment live approval) sends/receives over dedicated event-stream channels — the protocol becomes the transport for human-in-the-loop approval. (MASTER-PLAN: APR.)
+- **COMM-2 typed vocabulary:** the "no worker→worker direct messaging — all mediated through the Brain bus" rule (policy in ADR-G-020) becomes a **typed message vocabulary** (DEPENDENCY_REQUEST, …) over this stream — transport-invariant, machine-checkable.
+- **PROGRESS naming-fix:** `PROGRESS` is a bare code, deviating from the `SOURCE→TARGET:NAME` convention every other channel follows; it (and any future channel) is normalized to the convention.
+- **Per-mode channel completion (jointly with ADR-G-020):** the channel set is sprint-centric; process / autonomous / flow / mission modes (ADR-G-024) need their channel gaps closed — reconciled **with ADR-G-020**, which owns per-mode channel-rights.
 
 ---
 
 ## Consequences
 
-### Olumlu
+**(+)** Every Brain/Worker/Auditor message is versioned, replayable, and independently verifiable (the Sprint-137 "DONE shortcut" is closeable — the Auditor becomes an active verifier); additive channels grow without breaking consumers; the stream is fail-safe and zero-infrastructure; the dual transport is a durable safety net. Mechanism (channels) and policy (channel-rights, ADR-G-020) stay cleanly separated, each cohesive.
 
-- **Brain restart sonrası state korunur.** `resume-evaluate` action ile tamamlanmış worker sonuçları kaybolmaz.
-- **Negatif `durationMs` giderildi.** Sprint metrikleri crash sonrasında da anlamlı değerler gösterir.
-- **Sensitive data exception log'una sızmaz.** `redactSensitive()` API key/token değerlerini process crash loglarından temizler.
-- **External observer crash öncesi state'i restore edebilir.** Atomic checkpoint, makul bir tutarlılık noktası sağlar.
-- **Checkpoint integrity.** `.tmp` + `renameSync()` pattern sayesinde yarı yazılmış checkpoint asla okunmaz.
-
-### Olumsuz
-
-- **Checkpoint overhead.** Her `sprint_checkpoint_interval` (default 5) I/O yapılır. Yoğun sprint'lerde disk I/O artar; ancak `renameSync()` maliyeti genellikle ihmal edilebilir.
-- **`resume-evaluate` sadece `.result` varlığına bakar.** Worker `.result` yazmış ama dosya bozuksa (JSON parse hatası) evaluate fail olabilir. Bu durum için `handleEvaluation` içinde JSON parse guard eklenmesi önerilir (sonraki sprint).
-- **`installCrashHandlers()` zorunluluğu entegrasyon testi gerektirir.** Handler'ın gerçekten kurulduğunu doğrulamak için boot-sequence test eklenmeli.
+**(−)** Per-event disk I/O grows the `.jsonl` (rotation/cleanup is a deferred concern); the sequence counter must stay atomic under concurrent multi-worker writes; the `PROGRESS` naming deviation and the per-mode channel gaps are open until the roadmap items land; channel-rights enforcement is advisory/soft today (ADR-G-020 V1.0).
 
 ---
 
-## Alternatives Considered
+## References / Absorbed
 
-### (a) No-recovery (fresh restart)
-
-Brain crash sonrası her zaman temiz başlatma yapılır, partial state yok sayılır.
-
-**Reddedildi:** Partial work kaybı kabul edilemez. Özellikle uzun sprint'lerde (60+ dakika) tamamlanmış worker sonuçları sıfırlanır. Sprint duration ve task count metrikleri hatalı olur.
-
-### (b) Full memory checkpoint
-
-Her task completion'da tüm sprint state (task tree, event stream, memory context) tam olarak serialize edilir.
-
-**Reddedildi:** Performance overhead çok yüksek. Event stream büyük sprint'lerde MB-seviyesine çıkabilir; her task sonrası tam serialize → write maliyetli. Mevcut periyodik checkpoint (5 dk interval, sadece completed list + offset) yeterli recovery granülaritesi sağlıyor.
-
-### (c) Crash-only exception handler (no checkpoint)
-
-Sadece `uncaughtException` handler ekle, checkpoint yazma yok.
-
-**Reddedildi:** Sensitive data leak'i önler ama state recovery sağlamaz. Sprint 160 T-001 tek başına yetersiz; Katman 2 ve 3 olmadan stale task sorunu devam eder.
-
----
-
-## References
-
-- **Sprint 160 T-001** — `installCrashHandlers()` + `redactSensitive()` implementation, commit `9c184a3`
-- **Sprint 161 T-002** — Atomic checkpoint write (`.tmp` + `renameSync`), commit `8cefed0`
-- **Sprint 162 T-004** — `restoreSprintFromCheckpoint()` 3-action state recovery discrimination
-- **ADR-034** — Multi-Project Isolation (sensitive data boundary)
-- **ADR-035** — Brain ↔ Worker ↔ Auditor Verification Protocol (state integrity)
-- **ADR-036** — ADR Governance Integration (mandatory read for all agents)
-
----
-
-## Memory DB Insert
-
-Sprint 163 sonunda aşağıdaki pattern ile `memory.db`'ye eklendi:
-
-```typescript
-store.insert({
-  type: 'adr',
-  id: 'adr-043',
-  title: 'Brain Crash Recovery Protocol',
-  status: 'accepted',
-  sprint_id: 'sprint-163',
-  tags: ['recovery', 'crash', 'brain', 'observability'],
-  body: '3-katman crash recovery: exception handler + atomic checkpoint + state recovery on restart',
-});
-```
-
----
-
-## Notes
-
-Bu ADR, Sprint 160–162 boyunca üç ayrı commit'te gerçekleştirilen implementasyonun geriye dönük belgelenmesidir. ADR-043 olmadan Sprint 163 governance borcu kapanmış sayılmıyordu. ADR-036 (ADR Governance Integration) gereği tüm kabul edilen mimari kararlar kayıt altına alınmak zorundadır.
-
-> **Note (verified vs code, Sprint 172):** Confirmed accurate against the codebase — referenced commits `9c184a3` (Sprint 160 T-001) and `8cefed0` (Sprint 161 T-002) **exist in this repo's git history** (real provenance, not migration-dead refs). The protocol's three layers are wired: `installCrashHandlers()` (`src/orchestra/sprint-runner-entry.ts`), `redactSensitive()` (`src/core/redact-sensitive.ts` + `src/orchestra/sensitive-redactor.ts`), and `restoreSprintFromCheckpoint()` + `computeEventStreamOffset()` (`src/orchestra/sprint-checkpoint.ts`). One naming correction applied above: the checkpoint interval is the `sprint_checkpoint_interval` config key (`config.ts:602`, default `5`), not a `CHECKPOINT_INTERVAL` constant. Behavior unchanged; documentation alignment only.
-
----
-
-**Amendment — 2026-06-11 (ADR-review, re-verification + battle-tested kaydı).** **Classification: BOTH** (crash-recovery kullanıcı projelerinde de aynı şekilde çalışır — ürün dayanıklılığı). Re-verified: `installCrashHandlers({ipcDir, jobId})` boot'ta çağrılı (sprint-runner-entry.ts:194) ✓ · atomic `.tmp`+`renameSync` (sprint-checkpoint.ts:220) ✓ · `restoreSprintFromCheckpoint` (:618, canlı caller sprint-controller) ✓ · `sprint_checkpoint_interval` default 5 (config.ts:1148) ✓. **Battle-tested:** protokol gerçek crash'lerde kanıtlandı — Sprint 267 makine-uykusu crash (6/6 task kurtarıldı) + Sprint 270 WSL-VM crash (sıralı tek-container kurtarma); Sprint 272 GHOST-FINALIZE fix'i checkpoint-artığı temizliğini ekledi (start'ın checkpoint-kalıntısında dürüst davranması). md+db senkron (Alperen ADR-review).
+- **Absorbs:** ADR-035 (Brain ↔ Worker ↔ Auditor Verification Protocol Standard — protocol v1.0, event-stream, channel codes, fail-safe, dual transport).
+- **Policy partner (cross-ref, NOT merged):** ADR-G-020 (Authority, Roles, Flow & Enforcement — owns channel send/receive rights, the no-worker→worker mediated-bus rule = COMM-2, and per-mode channel-rights).
+- **Cross-ref:** ADR-G-014 (Spawn Backend & Observation — cross-backend observability rests on this stream) · ADR-G-025 (Process Resilience & Live Observability — the PROGRESS / WORKER-LIVE-TRACE structured progress-stream) · ADR-G-022 (Nervous System — proactive triggers over the bus) · ADR-G-024 (Mode Architecture — per-mode channels) · ADR-G-019 (ADR Governance — DB-first storage / taxonomy).
+- **Born work-items:** APR (approval-channels) · COMM-2 (typed mediated-bus vocabulary) · PROGRESS naming-fix · per-mode channel completion.
+- **Direction:** `.analysis/adr-review-crosswalk.md` (row 035 → ADR-G-018).
+</content>
 
 
 ---
 
-## adr-044: Sprint State Observability Contract
+## adr-g-019: ADR Governance & 4-Layer Taxonomy
 
 **Status:** accepted
 
-# ADR-044: Sprint State Observability Contract
+# ADR-G-019: ADR Governance & 4-Layer Taxonomy
 
-**Status:** accepted
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=MADR-v3 + `lint:adr` validator + DB-first prompt-injection (structural/advisory) → tomorrow=ADR-G enforcement-engine (immutable runtime-validation via ADR-G-020 + ADR-094 flag-gated vein)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-036 (ADR Governance Integration) · **Supersedes:** —
+**Crosswalk:** ADR-036 → ADR-G-019
 
-**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
-
-**Date:** 2026-05-13
-
-**Sprint:** Sprint 163 (governance record — implementation: Sprint 162 T-003)
-
----
-
-## Status
-
-accepted (Sprint 163 — Sprint 162 T-003 tarafından implement edilmiş contract'ın geriye dönük ADR kaydı)
+> **Meta-note:** This is the governance-of-the-governance ADR. It defines the four ADR classes, their precedence, authoring standard, storage, and enforcement model. Every other ADR (ADR-G-*, ADR-D-*, and runtime-born ADR-UG-*/ADR-UP-*) is created, classified, stored, injected, and enforced according to this document.
 
 ---
 
 ## Context
 
-Sprint 159–161 forensic analizi, `sprint-state.json` dosyasının sprint'in gerçek
-lifecycle ilerlemesini yansıtmadığını ortaya koydu:
+Deckent's earlier governance (old ADR-036, Sprint 138) established: MADR-v3 hybrid format, a mandatory-read wiring, worker-prompt ADR injection (`adr-selector.ts`), a `lint:adr` validator (`scripts/adr-validator.mjs`), DB-first storage (ADRs in `memory.db` `type='adr'`, synced from `docs/adr/*.md`, exported to `.brain/exports/decisions.md`). That system worked — `lint:adr` is live-proven, ADR injection reaches workers — but it had **one flat class**: every ADR was an undifferentiated "deckent-internal" decision.
 
-- Dosya `phase: "SPAWN", status: "PLANNING"` durumunda donuk kalıyor, EXECUTE →
-  EVALUATE → RETRO → CLEANUP geçişleri diske yansımıyordu.
-- External observer'lar (CLI `deckent status`, recovery modülü, dashboard) sprint'in
-  gerçek fazını göremiyor, `sprint-state.json`'ı okuyarak yanlış kararlar alıyordu.
-- Crash sonrası restart'ta hangi fazdan devam edileceği belirsizdi; `restoreSprintFromCheckpoint`
-  stale EXECUTING task'ları tanıyamıyordu.
-- Per-task değerlendirme kararları (`DONE / NO_GO / GO_WITH_TECH_DEBT`) yalnızca
-  in-memory'de yaşıyor, post-sprint forensic için yeniden inşa edilemiyordu.
+The 2026-06-30 full ADR review (89 ADRs, one-by-one) surfaced the gap: ADRs serve **four different audiences with different authority and lifecycle**, and conflating them is wrong —
+- some are **inviolable runtime laws** the product carries to every user (how deckent *behaves*),
+- some are **contributor conventions** that ship only with the dev install (how deckent is *built*),
+- and the *user* needs their own ADR layer (global + per-project) that deckent **observes and adheres to** without ever weakening the product's own laws.
 
-Bu körlük Sprint 159–161 boyunca "Brain'in ne yaptığı belirsiz" şikayetinin teknik
-köküdür. Sprint 162 T-003, `sprint-phases.ts:persistPhaseTransition` wire'ını ve
-`evaluation-audit-trail.ts:writeEvaluationAudit` çağrısını ekleyerek bu boşluğu kapattı.
+A flat model cannot express "the user may tighten but never violate deckent's core law," nor "this rule is contributor-only and must not reach an end user's prompt," nor "this law is immutable and fed only from the publisher's main repo." ADR-G-019 introduces the layered taxonomy that does.
 
 ---
 
-## Decision
+## Decision (Today)
 
-### 1. Phase Transition Persistence (Zorunlu)
+### 1. Four ADR Classes
 
-Her `sprint.phase` mutation'ından sonra `persistPhaseTransition(projectRoot, sprint, phase, status)`
-çağrısı **ZORUNLUDUR**. Aşağıdaki call-site'lar tanımlanmıştır:
-
-| Faz Fonksiyonu    | Phase Argümanı | Status Argümanı   |
-|-------------------|----------------|-------------------|
-| `runPlanPhase`    | `PLAN`         | `PLANNING`        |
-| `runSpawnPhase`   | `SPAWN`        | `RUNNING` → sonra `ACTIVE` |
-| `runEvaluatePhase`| `EVALUATE`     | `EVALUATING`      |
-| `runFixPhase`     | `FIX`          | `FIXING`          |
-
-**Uygulama kuralları:**
-
-- Atomic write pattern zorunlu: geçici `.tmp` dosyasına yaz, `renameSync` ile hedef
-  yola taşı. Partial write ortamı bozmamalı.
-- Fail-soft `try/catch` wrap zorunlu: `persistPhaseTransition` fırlatmamalı, hata
-  `debugLog` ile yutulmalıdır. Brain lifecycle'ı state-file yazma hatasıyla ölmemelidir.
-- Fonksiyon imzası:
-
-```typescript
-export function persistPhaseTransition(
-  projectRoot: string,
-  sprint: Sprint,
-  phase: SprintPhase,
-  status: SprintStatus,
-): void
+```xml
+<adr-taxonomy>
+  <class id="ADR-G" name="Global / Constitution">
+    deckent's core function laws (worker/brain/auditor/nervous + every subsystem):
+    runtime behavior, orchestration, security/RBAC, evaluation integrity, memory,
+    isolation, capability, approval, proof-of-function. LLMs CANNOT violate.
+    immutable=yes · source=publisher (main repo only) · scope=global+project ·
+    ships in BOTH global install AND every project install · applies to
+    dogfood AND user (solo → largest enterprise, million-scale).
+  </class>
+  <class id="ADR-D" name="Dogfooding / Dev">
+    how deckent is BUILT — contributor conventions (language/build/test/code-structure/
+    dependency policy). source=publisher+contributor · revised under approval ·
+    ships ONLY with the dev install (deckent@dev / upgrade @dev) · audience=contributors.
+  </class>
+  <class id="ADR-UG" name="User Global">
+    the USER's own global ADRs (across all their projects / a Windows host).
+    source=user · user-managed · ships in the user's global install ·
+    deckent OBSERVES + adheres (worker/brain/auditor honor it). Starts empty; born at runtime.
+  </class>
+  <class id="ADR-UP" name="User Project">
+    the USER's project-specific ADRs. source=user · user-managed · per-project ·
+    deckent OBSERVES + adheres. Starts empty; born at runtime.
+  </class>
+</adr-taxonomy>
 ```
 
-### 2. Per-Task Evaluation Audit (Zorunlu)
+### 2. Precedence — **G > U > D**
 
-Her task evaluation sonrası `writeEvaluationAudit(projectRoot, sprintId, taskId, attemptNum, input)`
-çağrısı **ZORUNLUDUR**. Audit kaydı şu schema'yı izler:
+On conflict, **ADR-G wins** (the user cannot violate deckent's core law). The user layer (UG/UP) overrides dev conventions (D) for the user's own environment. A user **may tighten** their own layer (add stricter UG/UP rules) but **may never loosen** an ADR-G. ADR-D governs only the deckent-development environment and never overrides a runtime law a user relies on.
 
-```typescript
-interface EvaluationAuditRecord {
-  taskId: string;
-  sprintId: string;
-  attemptNum: number;
-  decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
-  ruleSet: AuditRuleSet;           // hangi rubrik çalıştı
-  criterionScores: Record<string, number | null>;
-  schemaValidation: SchemaValidationResult;
-  rationale: string;               // human-readable karar gerekçesi
-  timestamp: string;               // ISO 8601 UTC
-}
+```
+ADR-G  (immutable, publisher)      ── highest, inviolable
+  ▲
+ADR-UG / ADR-UP (user-managed)     ── user tightens / customizes within G
+  ▲
+ADR-D  (dev/contributor)           ── lowest, dev-environment only
 ```
 
-Dosya yolu: `.deckent/evaluations/<sprintId>/<taskId>-attempt-<N>.json` (`EVALUATIONS_DIR` sabiti — `constants.ts:27`)
+### 3. Numbering — class-internal + crosswalk
 
-FIX-phase retry'ları `attemptNum` ile ayırt edilir; orijinal EVAL kaydının üzerine yazılmaz.
+IDs are **class-internal sequential**: `ADR-G-001..NNN`, `ADR-D-001..NNN`. The U classes start empty and are created at runtime (`ADR-UG-001..`, `ADR-UP-001..` per user/project). The old flat `ADR-NNN` → new mapping is preserved in `.analysis/adr-review-crosswalk.md` (and, post-migration, in the DB `metadata.legacy_id`). Deprecated ADRs are **archived** (no active number; historical record kept), not renumbered. Intentional gaps (a number absorbed into another ADR) are documented, not back-filled.
 
-### 3. Memory DB Insert Pattern
+### 4. Authoring Standard (ADR-AUTHORING-STD)
 
-ADR kabul edildiğinde aşağıdaki pattern ile memory.db'ye insert yapılır:
+Every ADR — **especially ADR-G** — documents **both today and tomorrow, transparently**:
 
-```typescript
-store.insert({
-  type: 'adr',
-  id: 'adr-044',
-  title: 'Sprint State Observability Contract',
-  status: 'accepted',
-  sprint_id: 'sprint-163',
-  tags: ['observability', 'sprint-state', 'audit-trail', 'phase-transition'],
-});
+```
+Context  →  Decision (Today: current-state)  →  Intent/Roadmap (Tomorrow: target-intent + why)  →  Consequences
+```
+
+Static "this is how it is now" is insufficient; an ADR must also state "this is where we are going, and why," so LLM-agents, contributors, and users all work aligned with the evolution direction. Large/complex ADRs (e.g. ADR-G-020, ADR-G-031, ADR-G-035) additionally use **XML-schema / explicit-heading section separation** for unambiguous structure. Format is MADR-v3 hybrid; the `**Status:**` field and the class-metadata header are mandatory and validated by `lint:adr`.
+
+### 5. Storage, Recall & Injection (DB-first — see ADR-G-035)
+
+ADRs live **DB-first** in `memory.db` (SSOT); `docs/adr/*.md` + `.brain/exports/decisions.md` are generated views. The `entries` schema carries class-aware columns — `adr_class` (G/D/UG/UP), `scope` (global/project), `immutable`, `source`, `enforcement_level` (ADR-G-035). Recall is **class/scope-aware**: a worker in a user project is injected ADR-G (always) + the relevant ADR-UG/UP, and never ADR-D; a deckent-dev worker also gets ADR-D. Injection into brain/worker/auditor prompts is automatic (`adr-selector.ts` + Task-DNA relevance). Editing an ADR means updating **both** the `.md` and the DB so doc == DB (ADR-G-035 sync invariant).
+
+### 6. Roles
+
+deckent **observes** user ADRs (UG/UP) and **adheres** to them at every layer (worker/brain/auditor); it **evolves customize-tools** per environment to satisfy them. The publisher alone feeds ADR-G (immutable). Contributors propose ADR-D under approval. Users author UG/UP via natural-language/chat/desktop (no hand-editing required).
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **ADR-G enforcement-engine:** today ADR-G is carried by injection + advisory validation; tomorrow it is **runtime-inviolable** — LLM output that would breach an ADR-G is blocked, not merely logged. The mechanism is the ADR-094 flag-gated enforcement vein graduating to default-on (post-GA-V2) under ADR-G-020's authority layer, plus a centralized policy engine candidate (POLICY-ENGINE-EVAL — OPA/Rego or embedded; ADR-D-005 reframe removed the minimal-dep blocker).
+- **ADR-U management surface:** users create/edit/retire ADR-UG/ADR-UP conversationally (native terminal + desktop app + CLI/MCP); deckent generates per-environment **customize-tools** to honor them and can contribute generalizable patterns back to the main repo.
+- **Install-wiring:** global install seeds ADR-G; `@dev` install adds ADR-D; user install opens the ADR-UG/UP skeleton. (MASTER-PLAN: ADR-LAYER.)
+- **Class/scope-aware vector recall:** ADR-G-035's opt-in local-embedding vector layer (never-calls-home) extends class/scope-aware retrieval to semantic matching.
+
+---
+
+## Consequences
+
+**(+)** Authority is now expressible: "user tightens but cannot violate G" is enforceable; contributor-only rules never leak to end users; immutable laws have a single trusted source. The review's 89→~42 consolidation is itself an application of this taxonomy (G vs D split). Today+tomorrow authoring keeps agents aligned with direction, not just current state.
+
+**(−)** Two intentional numbering gaps (G-003→absorbed in G-020, D-003→folded to G-014) — documented, not back-filled. The enforcement-engine (ADR-G inviolability) is roadmap, not today — today's protection is injection + advisory `lint:adr` + the ADR-094 dogfood vein. ADR-U management is a forward surface (MASTER-PLAN), so today only G/D are populated.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-036 (ADR Governance Integration — MADR-v3, lint:adr, DB-first injection).
+- **Enforcement partner:** ADR-G-020 (Authority, Roles, Flow & Enforcement) + ADR-094 vein (now within G-020).
+- **Storage substrate:** ADR-G-035 (Memory Architecture — class-aware schema columns, FTS5, sync invariant).
+- **Governs:** every ADR-G-*, ADR-D-*, and runtime ADR-UG-*/ADR-UP-*.
+- **Born work-items:** ADR-AUTHORING-STD (this doc §4), ADR-LAYER (install-wiring), POLICY-ENGINE-EVAL.
+- **Direction:** `.analysis/adr-governance-redesign-plan.md`, `.analysis/hermes-vs-deckent-direction-decisions.md`, memory `feedback_adr_documents_today_and_tomorrow` · `feedback_governance_aligns_with_direction_pivot`.
+
+
+---
+
+## adr-g-020: Authority, Roles, Flow & Enforcement (Multi-Mode RBAC)
+
+**Status:** accepted
+
+# ADR-G-020: Authority, Roles, Flow & Enforcement (Multi-Mode RBAC)
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=3-layer (compile-time lint + runtime advisory/soft + post-hoc audit-trail) → tomorrow=Layer-2 HARD-flip (ADR-094 flag-gated vein graduating default-on, post-GA-V2) + ROLE-GUARD (pid/role tool-enforce) + centralized policy-engine
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-037 (RBAC V1.0) + ADR-G-003 (Brain Role Separation, born 2026-06-30) + ADR-094 (Flag-Gated Enforcement Vein)
+**Crosswalk:** ADR-037 (+born G-003 + 094) → ADR-G-020
+
+> **Foundational note (Alperen, 2026-06-30):** "Bu ADR bizim kod işleyişimiz — çok dikkatli ve doğru tasarlanmalı; hem deckent-dogfood hem user tarafı için kusursuz olmalı. Bu ADR bir sürü iyi ve kötü tecrübenin nihai ürünüdür." This document is the distillation of 200+ sprints of orchestration experience; it is global (ADR-G) but its file-path matrix spans BOTH global and project scope, and its authority model is **user-customizable** within the inviolable G-baseline.
+
+---
+
+## Context
+
+ADR-037 (Sprint 139) introduced the Brain↔Auditor↔Worker authority matrix with four principles (least-privilege, separation-of-duties, auditability, fail-closed) — but documented its enforcement as **V1.0 deliberately soft**: Layer-2 runtime is advisory (`checkWorkerAuthority` returns `true` even on violation; violations are logged + emitted, not blocked). Three further gaps surfaced in the 2026-06-30 review:
+
+1. The matrix was written for **sprint mode only**, and its file-path rules assumed a single project scope.
+2. "Brain never writes code" (the orchestrator-boundary, Rule-4) deserved first-class statement — it was briefly born as a separate ADR-G-003 before being recognized as this matrix's core.
+3. Enforcement was advisory-only with no proven upgrade path; ADR-094 (Sprint 343) later built a flag-gated enforcement vein dogfooded in deckent-dev — that vein belongs *inside* this authority law.
+
+ADR-G-020 consolidates all three: the role/authority matrix, the Brain orchestration boundary, and the enforcement engine — generalized across **all execution modes**, across **global+project scope**, and made **user-customizable** without ever weakening the core.
+
+---
+
+## Decision (Today)
+
+### 1. Roles & Separation of Duties
+
+```xml
+<roles separation-of-duties="enforced">
+  <role id="Architect" actor="human" power="strategic">
+    Vision, DIRECTIVES/charter authoring, approval of critical-irreversible actions.
+    No tactical mid-run intervention.
+  </role>
+  <role id="Brain" actor="orchestrator" cardinality="singleton" power="orchestrate">
+    Plan · route · evaluate · finalize. **NEVER writes code** (src/** DENY) — code is
+    authored by workers / the AI tool the user runs in the terminal. (Absorbs ADR-G-003:
+    "Brain Role Separation — Orchestrator, Never Code-Author"; enforced by tool + pid/role
+    guard = ROLE-GUARD.)
+  </role>
+  <role id="Worker" actor="generator" cardinality="N-parallel" power="execute">
+    Code/action + tests, STRICT to scope.filesWrite. Writes its own self-assessment.
+  </role>
+  <role id="Auditor" actor="adversary" process="separate" power="verify">
+    Adversarial verification, ADR-compliance, RBAC scan, fresh-context critique.
+    NEVER writes code — reads + scores only. Independent of Brain's assessment.
+  </role>
+  <role id="Nervous" actor="meta-orchestrator" power="proactive-heal">
+    Proactive health monitoring; may restart Brain / propose recovery; never writes code.
+    (ADR-G-022.)
+  </role>
+</roles>
+```
+
+**Assessment rule:** both the worker's **self-assessment** AND the Brain's **brain-assessment** are written for every task (separation of assessment from verification; the two perspectives are recorded distinctly, not collapsed).
+
+### 2. Authority Matrix (file / channel / lifecycle)
+
+```xml
+<authority-matrix scope="global+project">
+  <file-access>
+    Per-component scope.filesWrite / filesRead, resolved over BOTH global paths
+    (~/.deckent, global ADRs) AND project paths (.deckent, .brain, .tasks, src/**).
+    Brain: DENY src/** + tests/**. Worker: ALLOW only declared scope.filesWrite.
+    Auditor: read-all, write NONE (except its own .dashboard/audit sinks).
+  </file-access>
+  <event-stream-rights>
+    Channel-level send/receive rights over the ADR-G-018 event-stream
+    (28+ channels). No worker→worker direct messaging — all mediated through the
+    Brain bus (transport-invariant; typed vocabulary = COMM-2). Event-stream
+    per-mode channel gaps are reconciled with ADR-G-018.
+  </event-stream-rights>
+  <lifecycle-actions>
+    Per-role permission for plan/spawn/evaluate/fix/finalize/kill/cleanup actions,
+    per mode (see §3).
+  </lifecycle-actions>
+</authority-matrix>
+```
+
+### 3. Multi-Mode — role · flow · continuation
+
+The authority matrix applies across **every execution mode** — `task` / `process` / `autonomous` / `flow` / `mission` / `sprint` (universal naming per ADR-G-024; "sprint" jargon is being retired). For each mode the ADR documents the **role assignment + flow + continuation mechanism** — including the **autonomous** continuation (how Brain's role persists across an autonomous loop, how a long-running process resumes). The matrix is mode-agnostic at its core; modes differ only in which lifecycle actions are active and which approval tiers apply.
+
+### 4. User-Customizable Authority (within the G-baseline)
+
+The matrix is **ADR-G (inviolable baseline)** but **user-customizable**: a user defines their own authority rules for their files / work-environment / agentic processes via the ADR-UG/ADR-UP layer. Precedence is **G > U > D** — the user may **tighten** (add stricter authority) but **never violate** the G-baseline. deckent *observes* the user's matrix and evolves per-environment customize-tools to honor it.
+
+### 5. Enforcement — 3 layers + flag-gated vein (absorbs ADR-094)
+
+```xml
+<enforcement>
+  <layer n="1" kind="compile-time">lint / authority-static-check (active)</layer>
+  <layer n="2" kind="runtime" v1="advisory/soft">
+    V1.0 reality: violation logged + emitted, NOT blocked (checkWorkerAuthority
+    returns true). The flag-gated vein (below) is the proven upgrade path.
+  </layer>
+  <layer n="3" kind="post-hoc">audit-trail + git diff --stat boundary scan (active)</layer>
+  <flag-gated-vein source="ADR-094" default="off-for-users">
+    4 gates implemented behind config flags, default-off (product byte-identical):
+    B1 enforce_rbac (worker hard-deny) · B6 cost_limits.enforce_spend_gate (cumulative
+    spend warn) · A9 gate.enforce_adr_compliance (fail-OPEN permanent default — pre-ADR
+    tasks must not retroactively fail) · A14 gate.max_tech_debt_ratio (downgrade).
+    deckent-dev's gitignored config enables hard-mode → dogfoods each gate on real
+    traffic before any global flip.
+  </flag-gated-vein>
+</enforcement>
+```
+
+### 6. Structure of this ADR
+
+Given size/criticality, this ADR uses **XML-schema section separation** (above) for the matrix, roles, and enforcement so the contract is machine-parseable and unambiguous — required for correct prompt-injection and for the future enforcement engine.
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **Layer-2 HARD-flip (post-GA-V2):** the ADR-094 vein graduates to default-on; an ADR-G violation is **blocked**, not logged. Backed by **ROLE-GUARD** (pid/role tool-enforce: the Brain/orchestrator process *cannot* write code; enforcement at the tool/process layer, not prompt-trust).
+- **Centralized policy-engine RE-EVAL (POLICY-ENGINE-EVAL):** OPA/Rego or an embedded engine for the authority/RBAC decisions — the ADR-D-005 dependency reframe removed the minimal-dep blocker.
+- **Generalized enforcement (ENFORCE-GENERALIZE):** the enforcement engine ships to **user projects**, not dogfood-only — `lint:adr` / authority-enforcer flawless on the user side too.
+- **COMM-2 typed mediated-bus:** the no-worker-to-worker rule becomes a typed message vocabulary (DEPENDENCY_REQUEST, …) over the Brain bus.
+- **Per-mode event-stream completion:** close the ADR-G-018 channel gaps for process/autonomous/flow/mission.
+- **User-authority management surface:** users author/edit their ADR-UG/UP authority rules conversationally (ADR-G-019 ADR-U management).
+
+---
+
+## Consequences
+
+**(+)** One inviolable, machine-parseable authority law spanning all modes + global/project scope, with a *proven* (dogfooded) enforcement upgrade path instead of advisory-forever. Brain-never-codes is first-class + tool-enforceable. User-customizable without weakening the core (G>U>D). Connector-surface RBAC (ADR-G-031) and self-modify guard (ADR-G-021) compose on top.
+
+**(−)** Layer-2 hard-enforcement is roadmap (today advisory/soft) — real protection today is compile-time lint + Auditor `git diff --stat` + the dogfood vein, not a runtime block for users. ROLE-GUARD pid/process enforcement is a born work-item. The 4 enforcement gates add config surface (future consolidation into one `enforcement_mode: strict|advisory` toggle is a candidate, post-GA-V2). `A9` ADR-compliance is permanently fail-open by design (prevents retroactive failures).
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-037 (Authority Matrix RBAC V1.0) · ADR-G-003 (Brain Role Separation — born, now Rule in §1) · ADR-094 (Flag-Gated Enforcement Vein — now §5 vein).
+- **Cross-ref:** ADR-G-018 (Verification Protocol & Event-Stream — channels this matrix governs) · ADR-G-019 (ADR Governance — the enforcement-engine partner) · ADR-G-021 (Self-Modifying Detection) · ADR-G-024 (Mode Architecture — the modes in §3) · ADR-G-031 (Enterprise — connector-surface RBAC builds on this) · ADR-G-014 (Spawn/worktree — scope enforcement).
+- **Born work-items:** ROLE-GUARD (pid/role tool-enforce) · POLICY-ENGINE-EVAL · ENFORCE-GENERALIZE · AUTH-MULTIMODE · AUTH-USER-CUSTOM · COMM-2.
+- **Memory:** `feedback_trust_brain_eval_not_worker` · `project_deckent_self_git_mutation_bug` · `project_social_identity_rbac_engine`.
+
+
+---
+
+## adr-g-021: Self-Modifying Detection — Dogfood ↔ User-Project Discrimination
+
+**Status:** accepted
+
+# ADR-G-021: Self-Modifying Detection — Dogfood ↔ User-Project Discrimination
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** runtime detection + rollback-guard (protects deckent's own git tree)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-039 (Self-Modifying Task Detection)
+**Crosswalk:** ADR-039 → ADR-G-021
+
+> **Note (Alperen, 2026-06-30):** "Bu ADR'de düzenlenmeli — kodumuz buna dayanıyor; gayet detaylı ve düzgün ele alacağız." This is a safety law the codebase depends on; it must be handled in detail and correctly.
+
+---
+
+## Context
+
+deckent runs in two fundamentally different modes: **dogfood** (deckent modifying its OWN source — runtime cache invalidation, MCP-restart, tsc-rebuild matter) and **user-project** (deckent orchestrating a user's Rails/React/Go/… project — the user's code never affects deckent's runtime). Conflating them caused the Sprint-138 Layer-4 class of failure (Brain ran stale pre-build cache after a worker rewrote `src/orchestra/`). ADR-039 formalized detection; the 2026-06-30 review elevates it to a global safety law and connects it to global-install discrimination + ROLE-GUARD.
+
+---
+
+## Decision (Today)
+
+```xml
+<self-modify-detection>
+  <detect>detectDeckentRepo(root) = `.deckent/` exists AND package.json name === 'deckent'
+    (both required; the name is the exact discriminator). isSelfModifying(task) =
+    detectDeckentRepo AND task scope touches a deckent source pattern (src/core, src/orchestra,
+    src/agents, src/cli, src/mcp, src/providers, src/api, src/monitor, src/dashboard,
+    .deckent/agents, .deckent/skills).</detect>
+  <policy>
+    P1 self-modifying tasks run SEQUENTIAL (parallel tsc-rebuild race avoided).
+    P2 self-modifying process → Wave-0 `tsc && vitest` health gate (design).
+    P3 post-task auto-checkpoint (MCP-restart resume).
+    P4 USER PROJECTS = NO-OP (detectDeckentRepo=false → zero overhead).
+  </policy>
+  <live-value>the proven, live consumer is the ROLLBACK-GUARD: detectDeckentRepo gates
+    rollback.ts so deckent never `reset --hard`s its own git tree (self-git-mutation
+    protection). P1–P3 are largely dormant; in practice deckent-dev self-modifying runs
+    go through the manual dispatch path (ADR-D-007).</live-value>
+</self-modify-detection>
+```
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **P1–P3 wire OR formalize-the-reality:** either wire the sequential-wave / Wave-0-gate / auto-checkpoint, OR formally adopt the ADR-D-007 manual-dispatch reality as the dogfood self-modify path (no silent dormancy).
+- **Global-install discrimination:** with deckent installed **globally** and used across N user projects, the "deckent's own repo ↔ every user project" discrimination becomes critical (the detector must be robust per-project).
+- **Merge with ROLE-GUARD** (ADR-G-020): the self-protection (don't mutate deckent's own code/git) and the Brain-never-codes boundary are the same self-protection family — pid/role + repo-detection enforced together at the tool layer.
+
+---
+
+## Consequences
+
+**(+)** deckent protects its own source/git during dogfood and imposes zero overhead on user projects (P4 no-op). The rollback-guard is a real, working defense against self-git-mutation. The discrimination scales to global-install + many user projects.
+
+**(−)** P1–P3 are dormant (the automated sequential-wave/checkpoint didn't land; manual-dispatch covers it) — born work-item to wire-or-formalize. `package.json name` is a heuristic (a fork could rename — accepted edge case). ROLE-GUARD pid/process enforcement is roadmap.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-039.
+- **Cross-ref:** ADR-G-020 (ROLE-GUARD / authority) · ADR-D-007 (manual dispatch — the live dogfood path) · ADR-G-017 (multi-project isolation) · ADR-G-025 (self-modify + rebuild/restart on crash-recovery).
+- **Born / MASTER-PLAN:** ROLE-GUARD · P1-P3-wire-or-formalize · global-install-discrimination.
+- **Memory:** `project_deckent_self_git_mutation_bug`.
+
+
+---
+
+## adr-g-022: Nervous System — Proactive Meta-Orchestrator
+
+**Status:** accepted
+
+# ADR-G-022: Nervous System — Proactive Meta-Orchestrator
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** locked safety-floor (5 actions never auto) + controlled activation
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-040 (Nervous System Architecture)
+**Crosswalk:** ADR-040 → ADR-G-022
+
+> **Strength note (Alperen, 2026-06-30):** Nervous is one of deckent's tremendous powers — a key enterprise-layer strength (proactive governance/control). Its ADR, tool, and code must all be very correct; it must be opened to BOTH dogfood and user channels critically, correctly, and in a CONTROLLED way (it can be obstructive when naively enabled).
+
+---
+
+## Context
+
+Brain/Auditor/Worker are **reactive** — errors surface in retro, after the fact. ADR-040 added a **proactive** meta-layer (`src/nervous/`): Observer → DetectorRegistry → DecisionEngine → Proposer → Dispatcher → Executor, with 4 autonomy presets, 5 locked safety-floors, a 30-action registry, and (now) 12 detectors. The 2026-06-30 review keeps the architecture and adds four requirements: **generalize the action vocabulary** (language/project-agnostic), make it **non-blocking + controlled**, treat it as an **enterprise-layer strength**, and **unify its approval with the runtime ApprovalBroker**.
+
+---
+
+## Decision (Today)
+
+```xml
+<nervous-system>
+  <pipeline>Observer (EventBus + fs-watch + cron-tick + lifecycle) → DetectorRegistry
+    (12 detectors) → DecisionEngine (AuthorityMatrix preset lookup) → Proposer (throttle)
+    → Dispatcher (MCP/CLI/File adapters) → Executor (autonomous|suggest-timeout|approve).</pipeline>
+  <autonomy presets="strict|balanced|autopilot|full-auto"/>
+  <safety-floor locked="5">KILL_LIVE_SPRINT · MANUAL_FILE_DELETE · COST_OVER_THRESHOLD ·
+    DESTRUCTIVE_GIT · ADR_DEPRECATE_ACCEPTED — never auto, unconditional human wait.</safety-floor>
+  <actions count="30" risk="low|medium|high"/>
+  <activation default="config-gated opt-in"/>
+</nervous-system>
+```
+
+Executor approve-mode: non-safety-floor actions 10s-timeout→auto-proceed; safety-floor unconditional. Cross-process approval round-trip + `edit` live (modifiedPayload).
+
+> **Note:** In deckent-dev the config flip is currently OFF (`nervous_system.enabled: false`); re-enable is a separate decision. The Sprint-281 NERV-W1 fix replaced a stub action-handler (which silently dropped every approved action) with the real `createActionHandler` — the action-hand now actually executes.
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **NERVOUS-ACTION-GENERALIZE:** the action registry is TS/deckent-specific (`NPM_PUBLISH`, `COMMIT_PUSH`, `SRC_MODIFICATION`). Generalize to **language/project-agnostic** concepts (`NPM_PUBLISH` → `PUBLISH`, etc.) so it works for Python/C++/Go/any project (the ADR-G-009 language-agnostic pattern, applied to actions).
+- **NERVOUS-NONBLOCK:** "enabled → obstructive" must be solved — non-blocking + controlled activation (fixes the observer fs.watch/CPU loop + approval-block). Opened to dogfood AND user channels critically + controlled rollout.
+- **APR unification:** the nervous Executor approval (autonomous/suggest/approve + safety-floor + cross-process + edit) **merges with the runtime-wide ApprovalBroker** (APR-1/APR-2) — nervous becomes one approval-source on a multi-channel live-relay bus.
+- **NERVOUS-ENTERPRISE:** position nervous as the enterprise-layer's proactive governance/control power (ADR-G-016 "enterprise = governance depth"); controlled rollout dogfood→user.
+
+---
+
+## Consequences
+
+**(+)** Errors are caught before retro; 4 presets + per-action override + 5 safety-floors give granular, audit-trailed control. A major moat + enterprise strength. APR-unification (tomorrow) makes it the proactive arm of one approval bus.
+
+**(−)** The action vocabulary is not yet language-agnostic (dogfood-only utility today); "enabled→obstructive" is unsolved (born NERVOUS-NONBLOCK); config currently OFF in deckent-dev; APR-unification + enterprise-controlled-rollout are roadmap.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-040.
+- **Cross-ref:** ADR-G-020 (authority — nervous may restart Brain, never codes) · ADR-G-009 (language-agnostic pattern, applied to actions) · ADR-G-016 (enterprise = governance depth) · ADR-G-032 (mutation-approval checkpoint) · APR (ApprovalBroker).
+- **Born / MASTER-PLAN:** NERVOUS-ACTION-GENERALIZE · NERVOUS-NONBLOCK · NERVOUS-ENTERPRISE · APR-1/APR-2.
+- **Memory:** `project_nervous_observer_feedback_loop_rootcause` · `project_nervous_activation_plan`.
+
+
+---
+
+## adr-g-023: Agent/Skill Taxonomy
+
+**Status:** accepted
+
+# ADR-G-023: Agent/Skill Taxonomy
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=Agent=vertical-domain-expert / Skill=horizontal-capability taxonomy + `selectAgent`/`selectSkills` routing + `AgentRoutingHealth` advisory 40%-threshold (detector-monitored, not hard-enforced) → tomorrow=catalog expansion (AGSK-1) + routing-balance (ADR-G-006) + user-custom agent/skill (ADR-UG / ADR-UP)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-041 (Agent Taxonomy — Horizontal Skills vs Vertical Agents) · **Supersedes:** —
+**Crosswalk:** ADR-041 → ADR-G-023
+
+---
+
+## Context
+
+deckent's worker fleet is selected along two orthogonal axes — *which specialist* (agent) and *which cross-cutting capability* (skill). Conflating those axes broke routing. Sprint 145-147 live evidence showed the `test-writer` agent capturing an ever-larger share of tasks — 52% → 53% → **100%** by Sprint 147 — because it matched the `test` keyword (including any `tests/` scope). The `AgentRoutingHealth` detector crossed its anomaly threshold and triggered an ADR.
+
+The root cause was a **taxonomic error**: "writing tests" is a *horizontal capability* every agent applies, not a *vertical domain* of its own. Modeling it as an agent produced four failures — wrong classification, a degenerate routing distribution (one agent at 100% made the anomaly detector meaningless), a Beta-GA UX problem ("why does everything go to test-writer?"), and an intent-classifier that mislabeled every `tests/` task as primary-intent `testing`.
+
+Sprint 148 shipped the reform package: archive `test-writer`, add `testing-expert` skill auto-activation, drop `testing` as a primary intent (replaced by a `test-coverage` *tag*), update the Router-V2 fallback chain, and clean 15 agent `PROMPT.md` rubrics. The taxonomy was reconfirmed with Sprint 149/150/166 dogfood evidence and is user-facing product law — users see and route against agent/skill surfaces, and custom-agent breaking-change impact is user-facing too.
+
+---
+
+## Decision (Today)
+
+### 1. Two orthogonal axes
+
+```xml
+<agent-skill-taxonomy>
+  <agent kind="vertical">
+    A deep specialist in ONE domain. Examples: architect (system design, module
+    management), security-auditor (vulnerabilities, OWASP), frontend-designer
+    (UI/UX, components), doc-writer (docs, README, CHANGELOG), bug-fixer
+    (debugging, regression). `.deckent/agents/` holds 15 built-in agents
+    (excluding temp/archive).
+  </agent>
+  <skill kind="horizontal">
+    A cross-cutting capability ANY agent may use. Examples: testing-expert
+    (vitest, coverage — auto-activates on scope tests/** or *.test.ts),
+    typescript-expert (TS type system), documentation-writer (Markdown, JSDoc).
+  </skill>
+  <invariant>
+    Testing is a HORIZONTAL skill — architect writes tests, bug-fixer writes
+    tests. A dedicated `test-writer` agent is therefore redundant and is removed
+    (archived under .deckent/agents/archive/test-writer-removed-sprint-148/).
+  </invariant>
+</agent-skill-taxonomy>
+```
+
+### 2. Routing rules
+
+1. **Intent classifier** — `testing` is **not** a primary intent. A `tests/**` scope adds a `test-coverage` *tag* (`routing-engine.ts` `'test-coverage'` → +2) instead.
+2. **`selectSkills()`** — if scope is `tests/**` or `filesWrite` includes `*.test.ts`, `testing-expert` is auto-added.
+3. **`selectAgent()`** — chosen by the task's primary intent (core-dev → architect, bug-fix → bug-fixer, …), independent of model/effort selection.
+4. **`AgentRoutingHealth`** — anomaly threshold `ANOMALY_THRESHOLD_RATE = 0.40` (`detectors/agent-routing.ts`): no single agent should exceed ~40% of assignments. This is a **detector-monitored advisory** (the nervous-system detector *warns*), **not** a hard gate.
+
+### 3. Distribution reality (honest)
+
+The taxonomy itself (vertical/horizontal, test=skill) is sound and durably enforced — `test-writer` stays at 0 assignments across post-reform sprints (148: 0/27, 150: 0/38). But the *distribution-balance* goal has **chronically recurred**: `test-writer`'s monopoly was periodically replaced by `refactorer`-weight (e.g. Sprint 211: 12/16). That imbalance is mitigated — not solved — by multi-signal scoring and skill→agent affinity (now both inside **ADR-G-006**); the 40% threshold remains a continuously-monitored advisory target, not a guarantee.
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **AGSK-1 — catalog expansion.** Grow the built-in agent and skill catalog beyond the current 15 agents, each as a clean vertical/horizontal split, with every new agent carrying a rubric-quality `PROMPT.md`. Scale target: the catalog and its routing must stay sane at hundreds of agents / thousands of skills.
+- **Routing balance.** The recurring single-agent monopoly is owned by **ADR-G-006** (Routing & Selection) — multi-signal scoring + `SKILL_AGENT_MAP` skill→agent affinity + a diversity guard (≤60%). This ADR defines the *taxonomy*; ADR-G-006 owns *balanced selection over* it.
+- **User-custom agent/skill.** Users define their own agents (vertical) and skills (horizontal) per global host / per project, expressed as **ADR-UG / ADR-UP** layers — deckent observes and routes against them under the ADR-G-baseline (precedence G>U>D, **ADR-G-019**). A custom `test-writer` in a user project may need a migration adapter (the one breaking change).
+
+---
+
+## Consequences
+
+**(+)** Routing classification is correct (test is a skill, not an agent), so the `AgentRoutingHealth` detector measures real anomalies instead of a false 100%; the Beta-GA UX is legible ("why this agent?" is answerable); and skills are reusable economy — `testing-expert` serves many agents instead of one agent monopolizing a keyword. The taxonomy is reconfirmed across Sprints 148/149/150/166 and is stable product law.
+
+**(−)** Distribution balance is a *moving* target, not a closed one — the monopoly recurs (refactorer-weight) and is mitigated, not eliminated, by ADR-G-006; the 40% threshold is advisory (warned), not hard-enforced. Sprint-147 `test-writer` stats were archived (not lost). A user project that defined a custom `test-writer` agent hits a breaking change and may need a migration adapter.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-041 (Agent Taxonomy — Horizontal Skills vs Vertical Agents; test-writer removal, `testing-expert` auto-activation, intent-classifier refactor, Router-V2 fallback, 15-agent rubric cleanup; Sprint 281 distribution-reality amendment).
+- **Routing & balance:** **ADR-G-006** (Routing & Selection) — multi-signal scoring (old ADR-072) + skill→agent affinity `SKILL_AGENT_MAP` + diversity guard (old ADR-075B); owns balanced selection over this taxonomy.
+- **Detector:** **ADR-G-022** (Nervous System) — `AgentRoutingHealth` detector (old ADR-040) surfaces the advisory 40% threshold.
+- **Authority:** **ADR-G-020** (Authority, Roles, Flow & Enforcement) — `test-writer` removed from the authority matrix (old ADR-037 RBAC).
+- **Evaluation:** **ADR-G-009** (Evaluation Integrity) — `testing-expert` as a horizontal capability under coverage-aware evaluation.
+- **User layers:** **ADR-G-019** (ADR Governance & 4-Layer Taxonomy) — user-custom agent/skill via ADR-UG / ADR-UP (precedence G>U>D).
+- **Born work-items:** AGSK-1 (agent/skill catalog expansion + scale-to-hundreds/thousands), ROUTING-BALANCE (owned by ADR-G-006), USER-CUSTOM-AGENT-SKILL (ADR-UG/UP + custom-agent migration adapter).
+- **Direction:** memory `feedback_agent_routing_imbalance`, `docs/architecture/agents.md`, `docs/architecture/agent-skill-architecture.md`.
+
+
+---
+
+## adr-g-024: Mode Architecture (Universal Naming · sprint | task | process)
+
+**Status:** accepted
+
+# ADR-G-024: Mode Architecture (Universal Naming · sprint | task | process)
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** `deckent_style` config + mode-aware routing
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-042 (Hybrid Mode Architecture) + ADR-067 (Process Mode + Tenant Isolation)
+**Crosswalk:** 042 (+067) → ADR-G-024
+
+> **Naming directive (Alperen, 2026-06-30, repeated):** "Sprint" is developer jargon — we will RENAME it to a universal concept that works for user AND enterprise AND dev AND teams. Proceed carefully on all mode/process work because of this rename.
+
+---
+
+## Context
+
+deckent runs work in distinct execution paradigms. ADR-042 shipped a dual mode (`deckent_style: sprint | task`): sprint = developer orchestration (Brain active, multi-worker, lifecycle); task = single-shot life-assistant. ADR-067 added the foundation for a **third** style, `process` (long-lived + agentic + multi-tenant — `TenantContext`). The 2026-06-30 review consolidates them, commits to the third mode, and binds the universal-naming rename.
+
+---
+
+## Decision (Today)
+
+```xml
+<mode-architecture>
+  <style key="deckent_style" values="sprint | task | process" config="3-layer (ADR-G-001)">
+    <sprint>developer orchestration — Brain active, multi-worker, full lifecycle.</sprint>
+    <task>single-shot — Brain bypass, instant result. (Now also the autonomous engine's
+      execution primitive: durable backlog kind=task → runTaskMode.)</task>
+    <process>long-lived + AGENTIC + multi-tenant (TenantContext); the autonomous engine
+      (src/orchestra/autonomous/) is its agentic runtime.</process>
+  </style>
+  <style-vs-surface>style = execution paradigm (sprint|task|process). Surfaces
+    (CLI/REPL/dashboard/MCP/bot) are access ON TOP of a style — a surface is NOT a style.</style-vs-surface>
+  <tenant>TenantContext + resolveTenant (env DECKENT_TENANT_ID → config → 'local').
+    'local' = single-tenant/dev, backward-compatible.</tenant>
+</mode-architecture>
+```
+
+> **Note — two open accept-day decisions (carried from ADR-067):** (1) **tenant-threading** — `resolveTenant` is 0-caller (dormant); tenant landed differently (config-flag `strict_tenant` + memory `tenant_id` column + audit-scope). Either wire `TenantContext`-threading OR amend the decision to the realized shape — not both. (2) **AUTO-NAMING** — `deckent mode auto` (sprint|task auto-DETECT) vs "autonomous engine" (the always-running process runtime) are two different "auto"s → user-confusion risk; clarify under the rename.
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **🔴 MODE-RENAME:** retire "sprint" jargon → a universal/inclusive concept (run/job/mission/deckent-log…) for user/enterprise/dev/teams. Touches the whole mode/process vocabulary — proceed carefully.
+- **Comprehensive mode-model:** sprint(renamed)/task/process + flow/mission/autonomous as a coherent set; **DIR-2** (DIRECTIVES 0-fragility across ALL modes + first-project safety) + **MODE-2** (mode-independent lifecycle kernel: retro/decay/cleanup).
+- Resolve the two open decisions (tenant-threading, AUTO-NAMING).
+- Enterprise multi-tenancy (ADR-G-031) builds on `process` mode.
+
+---
+
+## Consequences
+
+**(+)** One mode law spanning dual→triple styles; the autonomous engine is recognized as the `process` runtime; style≠surface clears a recurring confusion. Backward-compatible (`local` tenant, sprint default).
+
+**(−)** "sprint" rename is pervasive and not yet done (born MODE-RENAME). Two open decisions (tenant-threading dormant, AUTO-NAMING collision). DIR-2 0-fragility across all modes is roadmap.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-042 + ADR-067.
+- **Cross-ref:** ADR-G-001 (3-layer config) · ADR-G-031 (enterprise multi-tenancy on `process`) · ADR-G-020 (per-mode authority) · ADR-G-025 (process resilience) · ADR-G-015 (deckent-log multi-mode).
+- **Born / MASTER-PLAN:** MODE-RENAME · AUTO-NAMING · ADR-067-TENANT (threading decision) · DIR-2 · MODE-2 · MODE-1 (process executor).
+- **Memory:** `project_automation_usability_state` · `project_autonomous_engine_direction`.
+
+
+---
+
+## adr-g-025: Process Resilience, Recovery & Live Observability
+
+**Status:** accepted
+
+# ADR-G-025: Process Resilience, Recovery & Live Observability
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** runtime contract (crash-handlers installed at boot; persistence + recovery mandatory)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-043 (Brain Crash Recovery) + ADR-044 (State Observability Contract) + ADR-047 Brain-death-procedure aspect
+**Crosswalk:** ADR-043 + ADR-044 → ADR-G-025
+
+> **Naming:** "sprint" → "süreç/process" (universal mode naming, ADR-G-024). This contract governs the resilience + observability of any orchestration *process*, not just a sprint.
+
+---
+
+## Context
+
+Brain crash-recovery (old ADR-043) and state-observability (old ADR-044) were two halves of one concern: a process must be **durable, observable, and recoverable**. ADR-043 gave a 3-layer recovery (battle-tested in real crashes — Sprint 267 machine-sleep, Sprint 270 WSL-VM). ADR-044 gave phase-transition persistence + per-task evaluation audit. The 2026-06-30 review merged them and added three Alperen-directed requirements: **provider-failover on Brain crash**, **per-worker live tracking**, and a formal **Brain-death procedure**.
+
+---
+
+## Decision (Today)
+
+### 1. 3-Layer Crash Recovery (from ADR-043)
+
+```xml
+<crash-recovery>
+  <layer n="1">Entry-point exception handlers (uncaughtException/unhandledRejection)
+    + redactSensitive() — API keys/tokens never leak to crash logs.</layer>
+  <layer n="2">Atomic checkpoint write (.tmp + renameSync; sprint_checkpoint_interval)
+    — half-written checkpoints never read.</layer>
+  <layer n="3">State recovery on restart (restoreSprintFromCheckpoint: fresh|complete|
+    resume-evaluate) — completed-worker results survive a Brain crash; durationMs fix.</layer>
+</crash-recovery>
+```
+
+### 2. State Observability (from ADR-044)
+
+Every phase mutation calls `persistPhaseTransition` (atomic, fail-soft); every task evaluation calls `writeEvaluationAudit` (`.deckent/evaluations/<id>/...`) — post-mortem reconstructable GO/NO_GO rationale.
+
+### 3. Brain-crash Provider-Failover  *(NEW — Alperen 2026-06-30)*
+
+```xml
+<provider-failover>
+  After a bounded delay on Brain failure, the Brain (PID / wherever it runs) FAILS OVER
+  from its current provider (e.g. Claude) to an equivalent (OpenAI/Codex), handing over
+  the ENTIRE process + current state LOSSLESSLY.
+  <supervision>Auditor verifies + APPROVES the takeover. Nervous may be triggered.</supervision>
+  <escalation>autonomous first → on autonomous-failure: approved-retry → else: kill-process.</escalation>
+</provider-failover>
+```
+
+This rests on **Brain provider/model-agnostic self-update**: today Claude is Brain; if tomorrow Codex/GPT-5.5 becomes Brain, the system proceeds **losslessly** (provider-neutral handover; cross-ref ADR-G-008 adapter).
+
+### 4. Per-Worker Live Observability  *(NEW — Alperen 2026-06-30)*
+
+During EXECUTE, each worker's **instant status** is trackable by **human AND system**, **everywhere** (dashboard + terminal + CLI + MCP), live or last-snapshot:
+
+```
+worker-1: starting provider (claude) → running checks → understood context
+        → writing .plan → evaluating plan-phase → …
+```
+
+`.log` files are insufficient — a **structured progress-stream** is required (ties TERM-LIVE run-status footer + ADR-G-033 dashboard + ADR-G-009/TRN trace). (= WORKER-LIVE-TRACE.)
+
+### 5. Brain-death Procedure  *(folds ADR-047 procedure aspect)*
+
+A formal procedure for Brain death: fallback/retry **steps at system AND user level**, and **at which stage `deckent finalize --force` (or equivalent) is triggered** — plus the **tool** that drives it. (The dogfood *manual worktree-repair* protocol is separate, in ADR-D-007; this is the automated/user-level recovery procedure.)
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **Failover + escalation engine** (provider-failover + auditor-approved-takeover + nervous-trigger + autonomous→retry→kill ladder) — today the recovery is single-provider; tomorrow it is provider-failover-capable.
+- **WORKER-LIVE-TRACE** wired to TERM-LIVE + ADR-G-033 dashboard + MCP — the structured per-worker progress-stream replaces `.log` tailing.
+- **Dashboard-reconcile** (ADR-044's known gap): finalize must reconcile `.dashboard`/`/api/status` with sprint-state (no stale "EXECUTE %80" after COMPLETE).
+- **BRAIN-DEATH-PROCEDURE tool** + tie to `feedback_finalize_force_orphan_state`.
+- **Brain-provider-self-update** lossless across providers (cross-ref ADR-G-008).
+
+---
+
+## Consequences
+
+**(+)** Process state is durable, observable, recoverable, and (tomorrow) provider-resilient — the orchestration survives crashes, sleeps, and provider failures. Per-worker live-trace closes the #1 observability gap ("x is doing what, right now?"). Battle-tested core (Sprint 267/270).
+
+**(−)** Provider-failover + escalation + worker-live-trace + brain-death-tool are roadmap (born work-items); today = the proven 3-layer recovery + persist/audit. Dashboard-reconcile gap is known/open (product-sprint).
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-043 (Crash Recovery) + ADR-044 (State Observability) + ADR-047 (Brain-death procedure aspect).
+- **Cross-ref:** ADR-G-008 (provider failover/self-update) · ADR-G-022 (nervous trigger) · ADR-G-020 (auditor authority for takeover-approval) · ADR-G-033 (dashboard) · ADR-G-009/TRN (trace) · ADR-G-024 (process naming).
+- **Born:** BRAIN-FAILOVER · WORKER-LIVE-TRACE · BRAIN-PROVIDER-SELFUPDATE · BRAIN-DEATH-PROCEDURE.
+
+
+---
+
+## adr-g-026: Dependency-Wave Execution & Control
+
+**Status:** accepted
+
+# ADR-G-026: Dependency-Wave Execution & Control
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** dispatch contract (continuous per-tick; legacy-FIFO escape)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-045 (Wave-Based Execution Semantics) + ADR-064 (TOPP Continuous Dispatch)
+**Crosswalk:** 045 (+064) → ADR-G-026
+
+> **Note (Alperen):** The Kahn-topological dependency pipeline is one of our greatest features and it works correctly. But it depends on the dependency being correctly written by the AI tool into DIRECTIVES — and we are removing DIRECTIVES. So dependency must also be analyzable/controllable via our TOOLS. Critical and must be correct.
+
+---
+
+## Context
+
+Multi-task work executes in dependency order. ADR-045 wired `respawnEligibleTasks` (Kahn topological sort) so dependent tasks spawn when their deps complete — a "wave" model. ADR-064 (TOPP) removed the wave-barrier: continuous per-tick re-evaluation (a task spawns the instant its deps are satisfied, no barrier), with a `DECKENT_LEGACY_FIFO` rollback escape and a predecessor-digest in the prompt. Both are dogfood-live (flag flipped 2026-06-10; Sprint 279/280 multi-wave proven). The 2026-06-30 review merges them and adds a TOOL layer for dependency control (since DIRECTIVES is being removed).
+
+---
+
+## Decision (Today)
+
+```xml
+<dependency-execution>
+  <pipeline>Kahn-topological dep resolution (respawnEligibleTasks). Dependency-satisfied
+    set = DONE ∪ MANUAL_REVIEW_REQUIRED (MRR only when disk-deliverable exists; EXECUTING
+    still blocks). config dependency_pipeline_enabled=true (dogfood-live).</pipeline>
+  <dispatch model="continuous">dispatchTick per-tick: a task spawns the instant ANY dep
+    completes — no wave-barrier (TOPP). DECKENT_LEGACY_FIFO=1 = operator rollback to the
+    pre-TOPP one-per-tick FIFO. Predecessor-digest embedded in the spawned prompt.</dispatch>
+</dependency-execution>
+```
+
+> **🔴 ADR-064-W:** the pure planner `planDispatch` (returns DispatchPlan/mode) is **tested-but-UNWIRED** (0 runtime callers); `dispatchTick` decides imperatively via `processQueue`/`maybeRespawn` → test-vs-runtime drift risk. Wire `planDispatch` so the pinned model == the live path.
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **🔴 DEP-TOOL:** today dependency capture depends on the AI tool writing it correctly into DIRECTIVES. **DIRECTIVES is being removed** → dependency must be analyzable / suggestible / controllable / editable via a **TOOL**, terminal-trackable, DIRECTIVES-independent. Even when the AI doesn't catch a dependency, a suggestion+control tool surfaces it. Critical + must be correct.
+- **ADR-064-W:** wire `planDispatch` (close the test-vs-runtime drift).
+- Wave-robustness under the MOAT (MOAT-1 worktree-merge-race tie).
+
+---
+
+## Consequences
+
+**(+)** Continuous dependency-aware dispatch (no wasted wave-barrier latency) with an operator rollback escape; one of deckent's strongest features, dogfood-proven. MRR-unblock prevents deadlock.
+
+**(−)** Dependency correctness currently relies on AI-written DIRECTIVES (born DEP-TOOL, critical once DIRECTIVES is removed). `planDispatch` is unwired (born ADR-064-W, drift risk). Large-sprint wave-robustness is a monitored concern.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-045 + ADR-064.
+- **Cross-ref:** ADR-G-024 (modes — dependency execution within a process) · ADR-G-034 (terminal — DEP-TOOL surface) · ADR-G-014 (spawn) · ADR-G-009 (eval — MRR/disk-proof) · MOAT-1.
+- **Born / MASTER-PLAN:** DEP-TOOL · ADR-064-W (planDispatch wire).
+- **Memory:** `feedback_scale_up_autonomous`.
+
+
+---
+
+## adr-g-027: Prompt Lifecycle & Worker-Context
+
+**Status:** accepted
+
+# ADR-G-027: Prompt Lifecycle & Worker-Context
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** lifecycle contract (write/persist/archive across all backends) + content-completeness (truncation forbidden)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-048 (Prompt Lifecycle Contract) + ADR-060 (Self-Awareness Propagation — 5-channel context)
+**Crosswalk:** 048 (+060) → ADR-G-027
+
+> **Note (Alperen, 2026-06-30):** ADR-060 is "a masterpiece" — fold it into the current direction. The token situation was already noticed here; improve it WITHOUT sacrificing the worker's access or quality. This ADR is comprehensive and must be very well designed.
+
+---
+
+## Context
+
+A worker prompt has two intertwined concerns: where it physically lives (tmpfile lifecycle) and what it semantically contains (context). ADR-048 defined the **tmpfile lifecycle** — `.prompt-*.txt`/`.worker-*.sh` write→persist→archive across all three spawn backends, with active-worker protection (a per-worker kill must not delete a live worker's prompt) — plus a content layer: **no truncation** (full skill + full ADR injection; prompt-completeness > token-saving). ADR-060 ("masterpiece") defined the **5-channel worker-context** (init / sync / memory / manifest / skill-declare / enrichment) that composes the prompt, and explicitly flagged the **token-budget** trade-off. The 2026-06-30 review unifies them.
+
+---
+
+## Decision (Today)
+
+```xml
+<prompt-lifecycle>
+  <tmpfile backends="docker|tmux|subprocess uniform">
+    write at spawn → PERSIST until process cleanup → archive (move, not delete) to
+    .tasks/archive/. Per-worker kill must NOT delete OTHER live workers' prompts
+    (active-worker protection via getActiveWorkerIds; cross-sprint orphans archived at startup).
+  </tmpfile>
+  <content-completeness rule="truncation FORBIDDEN">
+    full SKILL.md per assigned skill + full relevant-ADR content injected. No
+    "(content truncated)" markers in worker prompts. Philosophy: prompt-completeness >
+    token-saving. ADR relevance threshold (min 0.3) + agent-prompt single-source (PROMPT.md).
+  </content-completeness>
+  <worker-context channels="init·sync·manifest·skill-declare·enrichment">
+    Channel-5 enrichment is live (dependency .result propagation) and grew via COMM-1
+    (cross-worker SharedMemory notes + upstream handoffs injected, config-gated).
+    The coordinated buildWorkerContext() bundle is the roadmap form.
+  </worker-context>
+</prompt-lifecycle>
+```
+
+### Token discipline — improve WITHOUT sacrificing access/quality
+
+The token cost of full-content + multi-channel context is real (noticed in ADR-060). The rule: **reduce tokens without reducing the worker's access or output quality** — i.e., optimize *how* (cache, structure, scope-via-tool) not *what* (never truncate skill/ADR/context).
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **WP-OPT:** token-optimize the worker prompt at the SAME quality — minimize tokens + reduce repetition, **but truncation stays forbidden**. The big lever is moving scope-enforcement out of the prompt into a TOOL (**TOOL-SCOPE**, ADR-G-034) so the prompt shrinks without losing capability.
+- **Coordinated `buildWorkerContext()`** (ADR-060 form): the 5 channels composed under one coordinator (today they're independent builders + COMM-1).
+- **Cross-backend** new backends inherit the lifecycle contract (ADR-G-014: firecracker/cloud).
+- Generic/provider-agnostic prompt vocabulary.
+
+---
+
+## Consequences
+
+**(+)** Worker prompts physically survive correctly (no active-worker prompt loss) and semantically carry complete skill/ADR/dependency context — the worker never works blind or on truncated guidance. The token concern is addressed by *how* (scope→tool, cache), not by cutting context.
+
+**(−)** Token cost of full-content is real until WP-OPT (scope→TOOL-SCOPE) lands — born work-item. The coordinated `buildWorkerContext()` is roadmap (independent builders + COMM-1 today). tmux/subprocess have lifecycle asymmetries (documented).
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-048 (incl. its Sprint-182 content amendment) + ADR-060.
+- **Cross-ref:** ADR-G-034 (TOOL-SCOPE — scope via tool, prompt shrink) · ADR-G-014 (cross-backend) · ADR-G-035 (memory — context source) · ADR-G-020 (scope authority) · ADR-G-006 (skill/agent selection → channels).
+- **Born / MASTER-PLAN:** WP-OPT (token-opt, no-truncation) · COMM-1/COMM-2 · buildWorkerContext-coordinator.
+- **Memory:** `feedback_prompt_completeness_over_brevity` · `feedback_worker_prompt_engineering_god_level`.
+
+
+---
+
+## adr-g-028: Work Taxonomy (TaskKind × TechStack) & Evaluation
+
+**Status:** accepted
+
+# ADR-G-028: Work Taxonomy (TaskKind × TechStack) & Evaluation
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** gaming-proof (Object.freeze registries; scope-shape detection) + EffectClass → policy-gate
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-053 (TaskType Taxonomy) + ADR-055 (Hybrid Scoring 5-Layer Pipeline)
+**Crosswalk:** 053 (+055) → ADR-G-028
+
+> **Note (Alperen, 2026-06-30):** We advanced the TaskKind/EffectClass concepts a lot — we should add MORE types here; the core 3 are too narrow.
+
+---
+
+## Context
+
+deckent must know *what kind* of work a task is, to judge it correctly and gate it safely. ADR-053 defined 3 TaskTypes (audit / document-write / code-development) with scope-shape detection + an EffectClass (reversibility tag) — the canonical work-model (WM-2 `work-model.ts`), extended to a second axis TechStackKind (WM-7). ADR-055 proposed a 5-layer Hybrid Scoring pipeline; the formal pipeline was never built, but its goals were realized organically (honest-gate, criteria-deriver, EffectClass→policy-gate, XVER-1, ADR-070). The 2026-06-30 review unifies the taxonomy + evaluation and commits to expanding the type set.
+
+---
+
+## Decision (Today)
+
+```xml
+<work-taxonomy ssot="src/core/work-model.ts (WM-2)">
+  <task-kind>audit | document-write | code-development. Detected by scope-shape
+    (filesWrite/directories), NOT title/description (gaming-proof). Priority:
+    audit → document-write → code-development. Object.freeze registries.</task-kind>
+  <effect-class>pure | reversible | idempotent | compensable | critical-irreversible.
+    Feeds the autonomous policy-gate (WM-6): pure/reversible → auto-run; risky classes →
+    PARK (human approval). gaming-proof (a worker cannot self-downgrade to skip the gate).</effect-class>
+  <tech-stack>TechStackKind (WM-7) = the SECOND axis. Evaluation is TaskKind × TechStack:
+    a C++ project is not held to tsc-clean; coverage required only on
+    COVERAGE_MEASURABLE_STACKS (cross-ref ADR-G-009).</tech-stack>
+  <scoring>the ADR-055 5-layer pipeline was NOT built as a formal module; its layers are
+    realized organically — Layer-1 schema (validateResultSchema), Layer-2 gates
+    (honest-gate + reconcileSpuriousNoGo + disk-verify), Layer-3 quality (tip-rubric +
+    WM-7 criteria-deriver), Layer-4 EffectClass→policy-gate, Layer-5 XVER-1 cross-verify.</scoring>
+</work-taxonomy>
+```
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **🔴 TASKTYPE-EXPAND:** the core 3 kinds are too narrow → add more TaskKinds (db-migration, package-publish, infrastructure-provision, security-patch, …) — each with its own rubric + effect-class + detection — plus **user-custom task-types** (ADR-UG/UP). The concepts (TaskKind × TechStack × EffectClass) are advanced enough to carry this.
+- **Scoring consolidation:** decide whether to build the formal 5-layer pipeline (consolidating the organic gates — ADR-D-006 god-object-split pattern) OR formalize the organic architecture. Open architectural choice.
+- **EffectClass→approval** ties the runtime ApprovalBroker (APR) for critical-irreversible.
+
+---
+
+## Consequences
+
+**(+)** Work is judged by what it actually IS (kind × stack × effect), gaming-proof, with risky work parked behind approval. The canonical work-model (WM-2) is the single SSOT for the three consumers (rubric/routing/adr-selector). EffectClass→policy-gate is live in the autonomous engine.
+
+**(−)** Only 3 core kinds today (born TASKTYPE-EXPAND); user-custom kinds are roadmap. The formal scoring pipeline is unbuilt (organic gates carry it; consolidation is an open choice).
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-053 + ADR-055.
+- **Cross-ref:** ADR-G-009 (evaluation integrity — the deriver consumes this taxonomy) · ADR-G-006 (routing uses task-kind) · ADR-G-020 (EffectClass→approval gate) · ADR-G-032 (evolution outcome by kind) · APR (critical-irreversible approval).
+- **Born / MASTER-PLAN:** TASKTYPE-EXPAND · scoring-consolidation · user-custom-task-type (UG/UP).
+- **Memory:** `project_task_type_taxonomy_vision`.
+
+
+---
+
+## adr-g-029: Embedded Web Terminal (Remote PTY)
+
+**Status:** accepted
+
+# ADR-G-029: Embedded Web Terminal (Remote PTY)
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=PTY sessions + WS gateway + bypass-independent **fail-CLOSED** auth (RCE-invariant) + structured-audit-only (no raw-output persist) + command/prompt guard + `AuthProvider`/`SessionBackend` seams → tomorrow=Desktop-app integration + enterprise-remote backends (k8s/SSH/SSO, audit-export/SIEM — sub-#3/#4) + TERM-RPC unification with the primary native terminal
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-062 (Embedded Web Terminal — PTY Sessions, WS Gateway, Auth & Audit) · **Supersedes:** —
+**Crosswalk:** ADR-062 → ADR-G-029
+
+> **Note (pivot-reframe):** This is the **secondary / remote-access** PTY surface (a dockable terminal in the dashboard / desktop app, and the seam for enterprise remote exec) — it is **NOT** the primary terminal. The primary management+usage surface is the **native agentic terminal** (**ADR-G-034**). This record governs the remote-PTY security model; the day-to-day driving surface is ADR-G-034.
+
+---
+
+## Context
+
+The dashboard (React + Vite + Tailwind) monitors sprints but offered no way to run interactive AI tools (`claude`, `gemini`, `codex`, `deckent`) or a shell from the browser — users context-switched between dashboard and terminal during supervision. Sprint 175 added an embedded terminal as sub-project #1 of a 4-part roadmap (#2 prompt/command guard, #3 multi-tenant/k8s isolation, #4 enterprise external integration).
+
+Because a browser-reachable shell is a remote-code-execution surface, the security invariants are non-negotiable and were fixed in the verified spec before a line shipped. Sub-project #2 (the security guard) has since been **delivered**; #3 and #4 remain deferred. Under the 2026 product pivot, the dashboard becomes **observability-only** and the day-to-day interactive surface moves to the native terminal and a desktop app — so this embedded terminal is reframed as the *remote/secondary* PTY surface, and its hardened auth/audit model becomes the foundation for enterprise remote exec.
+
+---
+
+## Decision (Today)
+
+A self-contained terminal subsystem under `src/api/terminal/`, wired by `src/api/server.ts` (HTTP control routes `GET/POST/DELETE /api/terminal/sessions` + localhost-only bootstrap-token injection) and `src/cli/commands/serve.ts` (`--host`, `--no-terminal`).
+
+```xml
+<module-boundary root="src/api/terminal/">
+  <core>
+    types.ts           — TenantId, SessionKind, AiTool, CreateSessionInput, SessionMeta, AuditAction, AuditEvent
+    auth-provider.ts   — AuthProvider interface + LocalTokenAuthProvider (SHA-256 + crypto.timingSafeEqual)
+    session-backend.ts — SessionBackend interface + LocalPtyBackend (@lydell/node-pty)
+    session-manager.ts — PtySessionManager (Map by sessionId, bounded ring buffer, attach/detach, idle reaper)
+    audit.ts           — TerminalAudit (structured lifecycle events → memory.db, tenant-scoped)
+    ws-gateway.ts      — attachTerminalGateway (HTTP upgrade → auth → bridge)
+  </core>
+  <security sub-project="#2 — DELIVERED">
+    command-guard.ts · prompt-guard.ts · outbound-limiter.ts · audit-integrity.ts (+ tests/security/)
+  </security>
+</module-boundary>
+```
+
+### Security invariants (the RCE law — never relax)
+
+```xml
+<invariants>
+  <inv id="1" name="bypass-independent auth, fail-CLOSED">
+    Terminal WebSocket auth is INDEPENDENT of and STRICTER than
+    DECKENT_API_AUTH_DISABLED. Disabling the global REST API auth gate does NOT
+    open the shell. LocalTokenAuthProvider DELIBERATELY ignores that env flag.
+    Violating this is a direct RCE vector — the invariant must never be relaxed.
+  </inv>
+  <inv id="2" name="token delivery">
+    Per-server-start token, injected into index.html ONLY for 127.0.0.1/::1
+    callers (window.__DECKENT_TERMINAL_TOKEN__), presented via
+    Sec-WebSocket-Protocol: deckent.<token> — never via query string, cookie, or
+    a plain HTTP Authorization header on the WS upgrade.
+  </inv>
+  <inv id="3" name="structured-audit-only">
+    Raw PTY output (ANSI sequences, keystrokes, command output) is NEVER persisted
+    to disk or memory.db — it is PII-adjacent and may contain passwords/keys. Only
+    structured, low-volume lifecycle events (created/attached/detached/killed) are
+    stored, tenant-scoped (additive tenant_id column, non-destructive ALTER TABLE).
+  </inv>
+  <inv id="4" name="reattach boundary">
+    A session survives client disconnect (tab close, network blip) and reattaches
+    with scrollback replay from an in-memory bounded ring buffer (default 256 KiB).
+    It does NOT survive a server restart (in-memory only); disk persistence is backlog.
+  </inv>
+  <inv id="5" name="enterprise seams from day one">
+    AuthProvider + SessionBackend interfaces exist with exactly one impl each
+    (LocalTokenAuthProvider, LocalPtyBackend). Remote backends (k8s exec, Docker
+    exec, SSH) and SSO are sub-project #3 implementations of these interfaces.
+  </inv>
+</invariants>
+```
+
+### Gateway flow & config
+
+`attachTerminalGateway(server, deps)` hooks `server.on('upgrade')`: extract token from `Sec-WebSocket-Protocol` → `AuthProvider.verifyToken()` **before** any session spawn or WS accept (failure → `401` + destroy) → on success bridge PTY⇄WS → on close `manager.detach()` (session stays alive for reattach). `PtySessionManager` caps `maxSessions` (default 10) and exempts `deckent`-kind sessions from idle-kill so active sprints are never interrupted. `TerminalConfig` on `DeckentConfig` (`terminal` key): `enabled` (true), `bind` (`127.0.0.1`), `maxSessions` (10), `idleTimeoutMs` (30 min), `scrollbackBytes` (256 KiB), `allowShellKind` (true). `LocalPtyBackend` spawn uses array args + `shell:false` (except the `win32` npm wrapper), per **ADR-G-002**.
+
+### Rejected alternatives (and why)
+
+iframe/separate-server xterm — cross-origin auth complexity, no shared token. Hand-rolled RFC6455 server — frame-parsing/masking security surface; `ws` is audited. Persist raw PTY output — PII/secrets exposure, breaks invariant #3. Global auth-bypass applies to terminal — direct RCE vector (invariant #1). Unbounded sessions/buffer — DoS.
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **Desktop-app integration (DESK).** The richest interactive surface migrates to a desktop app; the embedded web terminal becomes the in-browser/remote companion to it rather than the primary driving surface (which is the native terminal, **ADR-G-034**).
+- **Enterprise-remote backends (sub-#3 / sub-#4).** Implement `SessionBackend` for k8s pod-exec / Docker-exec / SSH and `AuthProvider` for SSO; add multi-tenant isolation (**ADR-G-031**), audit export, and SIEM hooks. The audit trail's `tenantId` already prepares this (**ADR-G-017** → ADR-G-031).
+- **TERM-RPC unification.** Converge the embedded web terminal, the native agentic terminal (ADR-G-034), and CLI/MCP onto one terminal RPC contract, so a session looks the same whether driven from the browser, the native REPL, or a remote enterprise client — under the surface-parity law (**ADR-G-011**) and worker live-trace (**ADR-G-025** WORKER-LIVE-TRACE).
+
+---
+
+## Consequences
+
+**(+)** The dashboard/desktop gains real interactive terminal capability with a security-by-default posture: localhost-only token injection, bypass-independent fail-CLOSED auth, no raw-output persistence — the RCE surface stays closed, verified live (`deckent serve` auto-mints the token and enables the dock for localhost). The `AuthProvider`/`SessionBackend` seams make enterprise remote exec an *implementation* of an existing interface, not a rewrite. Reattach survives disconnect without server-side storage. Sub-#2 command/prompt guard is delivered.
+
+**(−)** `@lydell/node-pty` is a native addon — requires a platform prebuilt/compile (`npm install` fails *loudly* on an unsupported platform — an honest, not silent, failure). Sessions are in-memory: a server restart drops them (disk persistence is backlog). `scrollbackBytes` caps history (pipe to a file for full logs). A non-localhost `--host` requires the user to manage their own TLS + token delivery (no built-in HTTPS). A known UI bug — the collapsed dock-bar overlaps the sidebar (z-index/layout) — is cosmetic and deferred to the product sprint. Sub-#3 (multi-tenant/k8s) and sub-#4 (enterprise external) remain deferred.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-062 (Embedded Web Terminal — module boundary, 5 security invariants, gateway flow, `TerminalConfig`; Sprint 281 amendment: sub-#2 delivered, `node-pty`→`@lydell/node-pty`, dependency-pipeline flag now `true`, known UI bug noted).
+- **Primary surface:** **ADR-G-034** (Native Agentic Terminal) — the primary management+usage terminal; this record is the *secondary/remote* PTY.
+- **Spawn security:** **ADR-G-002** (spawnSync Security Pattern) — `LocalPtyBackend` array-args, `shell:false` (except win32 wrapper).
+- **Dependency policy:** **ADR-D-005** (Dependency Policy & Inventory) — `ws` + `@lydell/node-pty` (originally `node-pty`) justified deps.
+- **Secrets:** **ADR-G-005** (Secret File System) — terminal token uses `randomUUID()` (crypto-random), complementary to `.deck`.
+- **Interface pattern:** **ADR-G-007** (External Messaging Connectors) — `AuthProvider`/`SessionBackend` follow the same interface + local-impl pattern as connectors.
+- **Isolation / tenancy:** **ADR-G-017** (Multi-Project Isolation) — audit `tenantId` prepares the trail; **ADR-G-031** (Enterprise Foundation) — sub-#3/#4 multi-tenant/k8s/SIEM, enterprise-remote.
+- **Surface & observability:** **ADR-G-011** (Surface Parity & Thin-Wrapper) + **ADR-G-025** (Process Resilience & Live Observability — WORKER-LIVE-TRACE) — TERM-RPC unification target.
+- **Dashboard host:** **ADR-G-033** (Dashboard — Observability Surface) — hosts the dock; pivot makes the dashboard observability-only.
+- **Governance / lifecycle context:** **ADR-G-019** (ADR Governance — runtime constraint record), **ADR-G-021** (Self-Modifying Detection — terminal touches `src/api/`+`src/dashboard/` → dogfood mode), **ADR-G-026** (Dependency-Wave Execution — implemented over a 5-wave sequence), **ADR-D-007** (Manual Subagent Dispatch — wave-gate transitions during dogfood).
+- **Born work-items:** DESK (desktop-app integration), TERM-RPC (terminal RPC unification across web/native/CLI/MCP), ENTERPRISE-REMOTE (sub-#3 k8s/SSH/SSO backends, sub-#4 audit-export/SIEM), DOCK-UI-FIX (collapsed dock-bar z-index — product sprint).
+- **Direction:** `docs/superpowers/specs/2026-05-19-embedded-web-terminal-design.md`, memory `project_embedded_web_terminal`, `project_dashboard_chat_audit_20260611`; `.analysis/hermes-vs-deckent-direction-decisions.md` (terminal=primary surface, dashboard=monitoring-only).
+
+
+---
+
+## adr-g-030: Consent-Based Provisioning & Install
+
+**Status:** accepted
+
+# ADR-G-030: Consent-Based Provisioning & Install
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=single provisioner module, consent-gated + OS-aware + `npm`-whitelist + **no-silent-sudo** (a reusable trust-DNA consent anchor) → tomorrow=natural-language setup (ONB-CHAT) + onboarding wizard (ONB-1) + consent-gated provider auth-probe (PSL-6) + global-install
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-063 (Consent-Based Prerequisite Provisioning) · **Supersedes:** —
+**Crosswalk:** ADR-063 → ADR-G-030
+
+---
+
+## Context
+
+`deckent init` / `deckent doctor` originally only **detected** missing prerequisites and printed a hint string — there was no install path anywhere in the codebase (`spawnSync('npm', ['install', …])` was simply absent), even though the blueprint claimed "tmux auto-installed on first run." For the public beta the critical-path goal is a frictionless install ("anyone can install & use it"): a non-developer running `deckent init` should be guided to a working setup, not handed a list of manual `npm i -g` commands.
+
+But silently installing global packages or running an OS package manager is a security- and **trust**-sensitive act. It must never happen without explicit user consent. This tension — frictionless setup vs. no-surprise-installs — is resolved by making consent a hard gate, and the resulting pattern is reusable across every "install a missing prerequisite" surface deckent will ever grow.
+
+---
+
+## Decision (Today)
+
+A single provisioning module (`src/core/provisioner.ts`) is the source of truth for *how a prerequisite is installed* — consent-gated and OS-aware:
+
+```xml
+<provisioner module="src/core/provisioner.ts">
+  <step name="planInstall(tool, opts)" kind="pure">
+    Deterministic ToolId → InstallPlan mapping:
+      claude / codex / gemini → method='npm-global' (npm install -g <pkg>)
+      tmux                    → method='os-package' (OS-aware: apt/dnf/pacman/brew)
+      node / docker           → method='manual' (NEVER auto-installed: runtime / privileged)
+  </step>
+  <step name="installTool" kind="guarded-exec">
+    Only 'npm-global' plans auto-execute, and ONLY when consent === true.
+    Array args, shell:false (shell:true ONLY on win32 for the npm .cmd wrapper).
+    Executable checked against PROVISIONER_BIN_WHITELIST (frozen ['npm'];
+    sh/bash intentionally ABSENT). Non-zero exit → { status:'failed' } (never throws).
+    'os-package' / 'manual' are surfaced as an instruction string the user runs —
+    NO SILENT SUDO.
+  </step>
+  <step name="provisionMissing" kind="orchestration">
+    mode ∈ prompt | yes | no-install
+      prompt (default) — per-tool consent prompt (node:readline promptConfirm helper)
+      yes (CLI --yes, MCP installMissing:true) — install all without prompting (CI)
+      no-install (CLI --no-install) — legacy hint-only behavior preserved (backward compat)
+  </step>
+  <invariant name="single source of truth">
+    getProviderInstallHint (both doctor.ts and doctor-format.ts copies) delegates the
+    package mapping to planInstall — one mapping, three call-sites, legacy hint format kept.
+  </invariant>
+  <invariant name="MCP parity">
+    deckent_init gains an installMissing opt-in. MCP has no interactive consent channel,
+    so it is explicit opt-in (=== CLI --yes); default reports only.
+  </invariant>
+</provisioner>
+```
+
+### The trust-DNA anchor (reusable)
+
+The consent pattern is **not** scoped to first-run provisioning — it is the canonical anchor for *every* "install/prepare a missing prerequisite" surface. It already generalized: Sprint-270 F1-IMG applied the same gate to docker-image preparation — `deckent doctor --fix-image` **never** builds without an explicit flag + interactive consent, and the code cites this ADR directly. **Every** future such surface — including the PSL-6 provider auth-probe family — is bound by this ADR's three invariants: **consent-gated**, **whitelist-restricted spawn**, **no silent sudo**.
+
+### Rejected alternatives (and why)
+
+Silent auto-install (no consent) — violates user trust and the security DNA. Keep hint-only — fails the frictionless-install goal. Bundle provider CLIs as deps — bloats the package and conflicts with the dependency-minimalism/provider-agnostic posture (**ADR-D-005**, **ADR-G-008**).
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+- **ONB-CHAT — natural-language setup.** Setup happens conversationally in the native terminal ("set me up for a TypeScript project with Claude") — deckent plans, asks consent, and provisions, instead of the user running discrete commands. The consent gate is unchanged; the *surface* becomes NL.
+- **ONB-1 — onboarding wizard.** A guided first-run wizard that walks a non-developer from zero to a working setup, each install step consent-gated by this module.
+- **PSL-6 — consent-gated provider auth-probe.** Probing/establishing provider auth (the "is `claude` logged in?" / "install + authenticate" family) runs under this same consent + whitelist + no-silent-sudo contract — provider CLI package names (`@anthropic-ai/claude-code`, `@openai/codex`, `@google/gemini-cli`) stay centralized in `planInstall` (**ADR-G-008**).
+- **Global-install.** A global `deckent` install seeds the consent-anchored provisioning flow so the same guarantees hold across all of a user's projects (paired with project-scope, **ADR-G-001** / **ADR-G-017**).
+
+---
+
+## Consequences
+
+**(+)** `deckent init` becomes a real provisioner and closes the blueprint reality gap, while staying security-preserving: consent-gated, whitelist + shell-free spawn (companion to the **ADR-G-002** spawnSync pattern + `spawn-safety.ts`), no silent sudo. The single source of truth removes a duplicated install-hint mapping across three sites (DRY). It is backward compatible — `--no-install` preserves the prior hint-only behavior exactly. The pattern proved reusable (F1-IMG docker-image), so consent is now a load-bearing trust primitive, not a one-off.
+
+**(−)** Global `npm i -g` may need elevated permissions on some setups — failures are *reported with the manual command* (graceful, non-fatal) rather than auto-escalating. OS-package installs (tmux on Linux) still require a manual user `sudo` step — by design. Provider CLI package names are centralized, so a vendor rename is a one-place update — but it *is* a place that must be maintained. The richer surfaces (ONB-CHAT, ONB-1, PSL-6, global-install) are roadmap; today the consent gate exists at the `provisionMissing` / `--fix-image` layer, not yet in a conversational wizard.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** ADR-063 (Consent-Based Prerequisite Provisioning — `planInstall`/`installTool`/`provisionMissing`, `PROVISIONER_BIN_WHITELIST` frozen `['npm']`, 23 tests; Sprint 281 amendment: consent-pattern reused by F1-IMG docker-image anchor).
+- **Spawn security:** **ADR-G-002** (spawnSync Security Pattern) — array-args / shell-free invariant; `PROVISIONER_BIN_WHITELIST` is a companion to `spawn-safety.ts`.
+- **Dependency policy:** **ADR-D-005** (Dependency Policy & Inventory) — installs *external* CLIs on consent rather than bundling them; also the `node:readline`/`promptConfirm` consent-prompt helper.
+- **Provider abstraction:** **ADR-G-008** (Provider Abstraction, Fleet & Native-Usage) — centralized provider CLI package names; PSL-6 auth-probe is provider-side.
+- **Product promise:** **ADR-G-016** (Product Vision — Product Not Service) — the "anyone can install & use" / install-and-run promise; air-gapped / never-phone-home pillar.
+- **Scope / install:** **ADR-G-001** (Layered Config & Scope Precedence) + **ADR-G-017** (Multi-Project Isolation) — global-install + project-scope; FB-1 opt-in telemetry inherits this consent gate.
+- **Governance:** **ADR-G-019** (ADR Governance) — runtime contract record for the provisioning capability.
+- **Born work-items:** ONB-CHAT (NL setup), ONB-1 (onboarding wizard), PSL-6 (consent-gated provider auth-probe), GLOBAL-INSTALL (seed consent-anchored provisioning across projects).
+- **Direction:** memory `project_air_gapped_offline_pillar`, `project_deckent_everyone_everywhere`, `feedback_proactive_blocker_disclosure`; `.analysis/hermes-vs-deckent-direction-decisions.md` (ONB = P0, global-install + project-scope = P0).
+
+
+---
+
+## adr-g-031: Enterprise Foundation (Tenant · RBAC · Audit · Scheduled-Flows · Connector-Identity)
+
+**Status:** accepted
+
+# ADR-G-031: Enterprise Foundation (Tenant · RBAC · Audit · Scheduled-Flows · Connector-Identity)
+
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** opt-in (enterprise-config default-off) → governance-depth layer (ADR-G-016)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-068 (Enterprise Foundation) + ADR-069 (Event-Driven Triggers + RBAC) + ADR-071 Part-F4 (RBAC hierarchy + audit-writer + enterprise-config) + ADR-092 (Connector Social Identity RBAC)
+**Crosswalk:** 068 (+069+071F4+092) → ADR-G-031
+
+> **Note (Alperen, 2026-06-30):** This foundation takes its FINAL form inside the enterprise layer (MOD-SPLIT / deck-ent). The community core has the same functionality; enterprise = depth of governance/audit/management (ADR-G-016), not gated features.
+
+---
+
+## Context
+
+To run deckent in enterprise environments — multi-tenant, audited, role-controlled, scheduled — a foundation accreted across sprints: scheduled-flows + audit-query + multi-tenant (068), event-triggers + RBAC `can()` (069), RBAC hierarchy + audit-writer + enterprise-config (071-F4), and a **connector-surface social-identity RBAC** (092, fail-closed, opt-in, tenant-scoped, with SCIM/OIDC adapters). The 2026-06-30 review unifies them into one enterprise-foundation law that finalizes in the modular enterprise layer.
+
+---
+
+## Decision (Today)
+
+```xml
+<enterprise-foundation opt-in="enterprise-config default-off">
+  <tenant>TenantContext (ADR-G-024) + per-tenant isolationRoot + strict_tenant flag +
+    memory tenant_id column + audit-scope.</tenant>
+  <rbac>Role hierarchy (admin ⊃ operator ⊃ viewer) + Permission matrix + can() +
+    enforceRbac (disabled→NO_OP). 4 live consumers (autonomous runtime-loop, OIDC auth-me,
+    enterprise-endpoint, rbac CLI).</rbac>
+  <audit>writeAuditEvent + queryAudit (RBAC-gated) + HMAC chain (audit_prev_hmac/audit_hmac)
+    + audit-integrity + SIEM HTTP transport + exportAuditLog (SOC2/GDPR JSON/CSV).</audit>
+  <flows>scheduled-flow (full-cron nextRun) + flow-registry + event-trigger/matchTrigger
+    (webhook/event match) → autonomous engine bridge.</flows>
+  <connector-identity scope="external messaging surface" model="fail-CLOSED, opt-in">
+    L2 RBAC on the connector message surface (DISTINCT from ADR-G-020 internal advisory):
+    principal-resolution (tenant-scoped) → resource:action permission → HARD-BLOCK on
+    unauthorized. identity.enabled opt-in (default off = backward-compatible). SCIM 2.0 +
+    OIDC/Entra adapters; resolve()=pure-local zero-network, sync()=out-of-band background.
+  </connector-identity>
+</enterprise-foundation>
+```
+
+All enterprise features are **opt-in (default-off)** — a community/single-tenant deployment is byte-identical.
+
+---
+
+## Intent / Roadmap (Tomorrow) — god-level enterprise
+
+The foundation is real engineering (OIDC security, HMAC chain, guarded surfaces) but **half-way to god-level enterprise**. The mapped gaps = the MASTER-PLAN ENT-* set, realized in the **enterprise layer** (ADR-G-016 MOD-SPLIT):
+
+```xml
+<god-level-gaps>
+  <gap n="1">Management plane — admin UI to CRUD tenants/roles/rate (today read-only).</gap>
+  <gap n="2">Custom RBAC — custom roles / permission-matrix / per-resource ACL (today 3 fixed roles).</gap>
+  <gap n="3">Hard enforcement — ADR-G-020 Layer-2 hard-flip (today advisory; post-GA-V2).</gap>
+  <gap n="4">Runtime tenant isolation — k8s pod-exec (today config/path-scoping).</gap>
+  <gap n="5">Provisioning — SCIM webhook push / directory-sync (today OIDC login + pull-sync).</gap>
+  <gap n="6">Audit-export / compliance pack — SOC2/GDPR evidence tooling (SIEM transport exists).</gap>
+</god-level-gaps>
 ```
 
 ---
 
 ## Consequences
 
-### Olumlu
+**(+)** A real, opt-in, multi-tenant + RBAC + audit + scheduled + connector-identity enterprise foundation, all live and consumer-wired, byte-identical for community users. Connector-surface RBAC is fail-closed (stronger than the internal advisory layer) — safe for multi-user messaging deployments.
 
-- **Dashboard real-time tracking.** `deckent status` artık gerçek sprint fazını
-  gösterir; PLAN → SPAWN → EVALUATE → RETRO geçişleri disk'te görünür olur.
-- **Crash recovery determinizmi.** `restoreSprintFromCheckpoint` her fazda tutarlı
-  state görür; negatif `durationMs` (-106ms bug) ortadan kalkar.
-- **Post-sprint forensic.** `.deckent/evaluations/<sprintId>/` dizinindeki audit kayıtları ile
-  her task'ın değerlendirme kararı, kullanılan rubrik ve skor dağılımı yeniden
-  inşa edilebilir; Brain'in neden DONE/NO_GO dediği açıklanabilir.
-- **Spurious NO_GO tespiti.** Audit trail `rationale` field'ı `reconcileSpuriousNoGo`
-  çağrısı yapıldığında override gerekçesini kaydeder; ADR-044 bu field'ı zorunlu kılar.
-
-### Olumsuz
-
-- **Ek disk I/O.** Her faz geçişinde ve her task evaluation'da dosya yazılır. Atomic
-  rename pattern bu riski düşürür; ancak yüksek task sayılı sprintlerde (50+) I/O
-  baskısı ölçülmelidir.
-- **Fail-soft gizler sorunları.** `persistPhaseTransition` hataları `debugLog`'a
-  düşer, kullanıcıya alert olarak yansımaz. State file yazma başarısız olursa
-  gözlemlenebilirlik zinciri sessizce kırılır. Uzun vadede metrics/alert entegrasyonu
-  gerekir.
+**(−)** Six mapped gaps to god-level enterprise (management-plane, custom-RBAC, hard-enforce-V2, k8s-tenant, SCIM-push, audit-export) — all in the enterprise layer, not today. HTTP webhook-listener (069 AUT-2) unbuilt. Hard-enforcement is roadmap (ADR-G-020 vein).
 
 ---
 
-## Alternatives Considered
+## References / Absorbed
 
-### (a) Event-Stream-Only Observability
-
-Sprint events stream (`events.jsonl`) tüm faz geçişlerini kayıt altına alabilir;
-ayrıca snapshot dosyası gerekmez.
-
-**Neden reddedildi:** Event stream'den anlık faz durumunu okumak tüm satırları
-yeniden işlemeyi gerektirir. `sprint-state.json` snapshot'ı O(1) okuma sağlar.
-Recovery modülü ve CLI status komutu snapshot'a ihtiyaç duyar.
-
-### (b) Synchronous DB Write
-
-Her faz geçişinde doğrudan `memory.db`'ye INSERT yapmak yerine sadece dosya
-yazmak yerine DB çağrısı yapmak.
-
-**Neden reddedildi:** `better-sqlite3` senkron API kilit çakışması riski taşır;
-Brain main loop'u bloke edebilir. Dosya-tabanlı atomic rename pattern daha düşük
-latency ve kilit riski sunar. DB export ayrıca `deckent memory export` ile manuel
-veya sprint sonu otomatik tetiklenebilir.
-
----
-
-## References
-
-- Sprint 162 T-003 — `sprint-phases.ts:persistPhaseTransition` wire implementation
-- `evaluation-audit-trail.ts` — Sprint 157 T-001 survivor (`6c337b0`), per-task audit write path
-- Sprint 162 result forensic — `sprint-state.json` phase transition disk visibility kanıtı
-- ADR-043 — Brain Crash Recovery Protocol (bağlı: recovery modülü bu observability contract'ına dayanır)
-- ADR-035 — Brain ↔ Worker ↔ Auditor Verification Protocol (audit trail bu protokolü destekler)
-- Sprint 159–161 stalled forensic — `.tasks/archive/sprint-160-stalled/`, `.tasks/archive/sprint-161-stalled/`
-
----
-
-## Notes
-
-Bu ADR, Sprint 162 T-003 tarafından implement edilen `persistPhaseTransition` wire'ının
-ve `evaluation-audit-trail.ts` entegrasyonunun geriye dönük governance kaydıdır.
-ADR-053'te olduğu gibi: uygulama önce yazıldı, ADR tasarım kararlarını geç ama eksiksiz
-kayıt altına almaktadır. Sprint 163 ile kabul edilmiştir.
-
-> **Note (deep-verified vs code, Sprint 172):** Decision §1'deki **4 call-site tablosu kod ile birebir doğrulandı** (`src/orchestra/sprint-phases.ts`): `runPlanPhase`→`PLAN/PLANNING` (`:447`), `runSpawnPhase`→`SPAWN/sprint.status`→`SPAWN/ACTIVE` (`:550`/`:553`), `runEvaluatePhase`→`EVALUATE/EVALUATING` (`:736`), `runFixPhase`→`FIX/FIXING` (`:1100`). `runRetroPhase` için call-site yoktur ve ADR de listelemez (tutarlı). Tek nüans: `runSpawnPhase` ilk çağrıda status argümanı literal `RUNNING` değil dinamik `sprint.status`'tur (ADR'nin "RUNNING → ACTIVE" ifadesi yaklaşık). `persistPhaseTransition`/`writeEvaluationAudit`/`reconcileSpuriousNoGo` fonksiyonları kodda mevcut; referans commit `6c337b0` (Sprint 157 T-001 survivor) repo git geçmişinde gerçek. Yukarıda audit yol düzeltmesi uygulandı: `.tasks/audit/...` → `.deckent/evaluations/<sprintId>/<taskId>-attempt-<N>.json` (`EVALUATIONS_DIR`, `constants.ts:27`). Behavior unchanged; documentation alignment only.
-
----
-
-**Amendment — 2026-06-11 (ADR-review, re-verification + bilinen boşluk).** **Classification: BOTH** (`deckent status`/dashboard gözlemlenebilirliği user-facing ürün yüzeyi).
-
-**Re-verified (güncel satırlar):** 4 call-site canlı — PLAN:652, SPAWN:761/767, EVALUATE:1177, FIX:1795 ✓ · `writeEvaluationAudit` 3 call-site ✓ · `EVALUATIONS_DIR` (constants.ts:27) ✓.
-
-**🟡 Bilinen gözlemlenebilirlik-boşluğu (UX-denetimi 2026-06-11, canlı serve+playwright):** Contract `sprint-state.json` + evaluations audit-trail için ÇALIŞIYOR; ancak hedefin ("external observer gerçek durumu görür") **dashboard yüzeyinde deliği var** — sprint finalize sonrası auditor scan'i durduğu için **`.dashboard` snapshot'ı donuk kalır** ve `/api/status` (`server.ts readDashboardJson`) sprint-state'in `COMPLETED`'ı ile **reconcile etmez**: Sprint 280'de dashboard, sprint COMPLETE iken "EXECUTE %80, ~21dk kaldı" gösterdi; Chat sayfası ("Aktif sprint yok") doğruydu → yüzeyler-arası tutarsız kaynak. Fix: finalize'da terminal `.dashboard` yaz **veya** `/api/status` sprint-state-öncelikli reconcile — Chat/Dashboard product-sprint'inde ele alınır (bkz. memory `project_dashboard_chat_audit_20260611` bulgu #2). md+db senkron (Alperen ADR-review).
+- **Absorbs:** ADR-068 + ADR-069 + ADR-071 Part-F4 + ADR-092.
+- **Cross-ref:** ADR-G-016 (enterprise = governance depth, MOD-SPLIT) · ADR-G-020 (internal authority — distinct from connector L2) · ADR-G-024 (process/tenant) · ADR-G-017 (multi-project isolation) · ADR-G-007 (connectors) · ADR-G-035 (tenant_id/audit-hmac).
+- **Born / MASTER-PLAN:** ENT-* (god-level gaps) · MODULARIZE · AUT-2 (webhook-listener) · dynamic /bind (connector pairing→binding).
+- **Memory:** `project_social_identity_rbac_engine` · `project_deckent_positioning`.
 
 
 ---
 
-## adr-045: Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire
+## adr-g-032: Self-Learning & Evolution Loop
 
 **Status:** accepted
 
-# ADR-045: Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire
+# ADR-G-032: Self-Learning & Evolution Loop
 
-**Status:** accepted
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** moat-preserve (the closed outcome→routing→promotion loop must not be rewritten — only deepened)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-074 Part-C (F5 evolution wire) + ADR-075 Part-A (6 evolution-module real callers) + ADR-078 Part-C (Active Identity-Mutation Loop)
+**Crosswalk:** 074C + 075A + 078C → ADR-G-032
 
-**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
-
-**Date:** 2026-05-13
-
-**Sprint:** Sprint 164 (implementation contract — Task 4 wire implementation bu ADR'a uyumlu yazılır)
-
----
-
-## Status
-
-accepted (Sprint 164 — implementation'dan ÖNCE yazılan contract ADR; ADR-036 Sprint 138 ADR Governance disiplinine uygun)
+> **Moat note:** This is deckent's strongest differentiator — the closed **outcome → routing → promotion** learning loop. MOAT-4: PRESERVE (never rewrite; only deepen). The pivot explicitly protects it.
 
 ---
 
 ## Context
 
-Sprint 134 T-007'de `respawnEligibleTasks` fonksiyonu `sprint-spawner` modülünde tanımlandı
-(Kahn's algorithm topological sort + `enforceWaveDependency` çağrısı + slot kontrolü).
-Ancak fonksiyon runtime'da **hiçbir yerden çağrılmıyordu** — call-site eksikti.
-
-Bu eksiklik 5 sprint boyunca görünmez kaldı:
-
-- **Sprint 156-002:** Default `dependency_pipeline_enabled: false → true` flip yapıldı
-  (`GO_WITH_TECH_DEBT` kararı). Wire eksikliği bu flipte tespit edilmedi.
-- **Sprint 161 stalled forensic:** Wave 1 (3 task) spawn oldu; Wave 2 (T4 bağımlı T2'ye) ve
-  Wave 3 (T5 bağımlı T1+T2+T4'e) hayalet kaldı. Sprint hang — `waitForResults` sonsuza
-  kadar bekledi çünkü eligible task'lar hiç spawn edilmedi.
-- **Sprint 164 forensic analizi:** 6 ayrı kanıtla (KESİN güven) bug doğrulandı:
-  1. `respawnEligibleTasks` definition Sprint 134'ten beri var, call-site yok
-  2. `spawnWorkers` Wave 2+ task'larını `activeTasks` ve `queuedTasks` listelerinden çıkarıyor
-  3. `waitForResults` dep-blind FIFO loop — yalnızca ilk `queuedTasks`'tan shift ediyor
-  4. `task.status` EXECUTING'de kalıp DONE'a inline mutate edilmiyor; `respawnEligibleTasks`
-     `t.status === TaskStatus.DONE` filter'ı çalıştırınca eligible task bulamıyor
-  5. `processQueue` FIFO sonrası dep-aware respawn çağrısı yok
-  6. `collectResults` result topladıktan sonra in-memory status sync yapmıyor
-
-**Sonuç:** `dependency_pipeline_enabled: true` flag set edilmesine rağmen multi-wave execution
-semantiği hiçbir zaman çalışmamış; tüm sprint'ler legacy FIFO modunda devam etmiştir.
+deckent learns across runs: outcomes feed routing, routing feeds agent/skill selection, success/failure feeds promotion/retirement, and agent identity itself mutates toward better performance. The pieces were built across sprints but repeatedly shipped as **dead code** (def-file present, no external caller — the `feedback_directive_kanit_letter_vs_goal` error). ADR-074C wired the suggestion path; ADR-075A added 6 real external callers; ADR-078C closed the loop with active identity-mutation. The 2026-06-30 review consolidates them into one moat-ADR and records a **basic scaling error** Alperen flagged.
 
 ---
 
-## Decision
+## Decision (Today)
 
-Yol B (wire) — 3 değişiklik yapılır. Bu 3 madde Task 4 implementasyonu için **binding contract**:
+### 1. The Loop — modules with real runtime callers
 
-### 1. `collectResults` İçinde Inline Status Mutation
-
-Bir `.result` dosyası toplandığında `taskMap.get(taskId)` referansı üzerinden in-memory
-task status mutation yapılır. Worker `selfAssessment` alanına göre:
-
-| selfAssessment değeri       | Yeni status           |
-|-----------------------------|-----------------------|
-| `DONE`                      | `TaskStatus.DONE`     |
-| `NO_GO`                     | `TaskStatus.NO_GO`    |
-| `GO_WITH_TECH_DEBT`         | `TaskStatus.DONE`     |
-
-`GO_WITH_TECH_DEBT` → `DONE` map'i bilinçli bir karardır: dependency filter
-`t.status === TaskStatus.DONE` kontrolü yapar; debt ile kapanan task'ların bağımlısını
-bloke etmemesi gerekir (ADR-045 Consequences bölümüne bkz.).
-
-`taskMap` zaten `Map<string, Task>` kullanıyor; `taskMap.get(taskId)` referansı
-`sprint.tasks` array'indeki aynı objeye işaret eder (referans paylaşımı). In-memory
-mutation yeterli — EVALUATE phase sonrası disk'e yazılır (mevcut pipeline korunur).
-
-**Rationale:** `respawnEligibleTasks` eligible task hesabı için `sprint.tasks` üzerinden
-`t.status === TaskStatus.DONE` filter'ı çalıştırır. EVALUATE phase öncesi inline
-mutation olmadan bu filter her zaman boş döner — Wave 2/3 task'ları asla eligible olmaz.
-
-### 2. `waitForResults` Ana Döngüsünde Dep-Aware Respawn
-
-`waitForResults` içinde, her `processQueue(newlyCollected)` çağrısının ardından
-`dependency_pipeline_enabled` kontrolü ile dallanma yapılır:
-
-```typescript
-if (config.dependency_pipeline_enabled) {
-  await respawnEligibleTasks(projectRoot, sprint, config, spawnOpts);
-}
-// else: legacy FIFO — processQueue yeterli, queuedTasks shift ile devam
+```xml
+<evolution-loop>
+  <signal>outcome-tracker (per-agent/task-type success, NO_GO patterns)</signal>
+  <propose>prompt-evolution (rule-based prompt-improvement suggestion) · adaptive-agent (skill add/remove proposal)</propose>
+  <apply>promotion-pipeline.applyAdaptation / IdentityMutationOpts — low-success →
+    mutate agent identity (systemPrompt + skill repertoire) → record parent in
+    agent-genealogy → versioned A/B-testable variant (agentId-v{N+1}); requiresApproval-gated
+    (nervous checkpoint); active-task agents not mutated mid-run.</apply>
+  <govern>agent-genealogy (lineage) · agent-retirement (LRU/low-success retire) ·
+    specialization-drift (scope-creep detect) · prompt-rollback (revert if worse) ·
+    cross-sprint-analyzer (improving/degrading trends)</govern>
+</evolution-loop>
 ```
 
-`config: ResolvedConfig` parametresi `waitForResults` signature'a eklenir. Caller'lar
-(`sprint-controller.ts::runFullSprint` ve `sprint-phases.ts::runEvaluatePhase` giriş noktaları)
-parameter pass-through ile güncellenir — davranış değişikliği yok, sadece forwarding.
+All wired with real external callers (ADR-075A) — the loop *runs*, not just exists. (API is **class-based** — `AgentGenealogy`/`AgentRetirement`/`SpecializationDriftDetector`/`PromptRollback`; proof at class-name level, not bare function grep.)
 
-İlk `collectResults + processQueue` bloğunun sonrasında da aynı respawn çağrısı yapılır:
-race-safe initial pass — Wave 1 ilk turda done olduysa Wave 2 hemen eligible olur.
+### 2. 🔴 Selective + Scalable Update  *(Alperen 2026-06-30 — "basic ilk hata")*
 
-**Legacy compatibility:** `dependency_pipeline_enabled: false` (Sprint 164 default) durumunda
-`if` branch'i çalışmaz; `waitForResults` mevcut FIFO davranışını korur. Geriye uyumlu.
-
-### 3. `respawnEligibleTasks` Slot Kontrolü Korunur
-
-`sprint-spawner` modülündeki mevcut `slotsAvailable = maxWorkers - currentlyExecuting` kontrolü
-**değiştirilmez**. Bu kontrol çift spawn'ı engeller. `enforceWaveDependency` çağrısı korunur.
-`wave.respawn` metric emit'i ve `BRAIN→WORKER:DEPENDENCY_BLOCKED` event emit'leri zaten
-implement — artık gerçekten tetiklenecek.
-
-**Config freeze:** `dependency_pipeline_enabled` değeri Sprint 164'te `false` olarak kalır.
-Config flip Sprint 165'te Alperen onayı ile yapılır (canlı retry + smoke test).
+```xml
+<selective-scale severity="critical">
+  TODAY'S ERROR: the loop updates ALL agents/skills in BULK each run (even keyed by
+  last-used-sprint). WRONG.
+  RULE: update ONLY the agents/skills actually USED in that run (selective).
+  SCALE TEST: must remain manageable at 300 agents / 1000 skills — indexed lookup,
+  lazy load, selective-update. The loop must be very well organized.
+</selective-scale>
+```
 
 ---
 
-## Alternatives Considered
+## Intent / Roadmap (Tomorrow)
 
-### (a) Yol A — Feature Burial (Flag Deprecate)
-
-`dependency_pipeline_enabled` flag'i deprecated işaretlenir, `respawnEligibleTasks` kodu
-silinir, tüm sprint'ler legacy FIFO ile devam eder.
-
-**Neden reddedildi:** Alperen açık wire kararı verdi. Sprint 134 T-005 priority+dependencies
-altyapısı ve Sprint 134 T-007 chain scheduler, multi-wave execution için tasarlandı. Bu altyapı
-5 sprint boyunca sessizce var; bury seçeneği Sprint 134 T-007 design intent'ini kalıcı olarak
-iptal eder. Product roadmap açısından dependency-aware execution kritik özellik — burial değil
-completion gerekli.
-
-### (b) Disk-Based Status Read
-
-`respawnEligibleTasks`, in-memory task status yerine `.result` dosyasının mevcudiyetine bakarak
-eligible task'ları belirler (`existsSync('.tasks/task-NNN.result')`).
-
-**Neden reddedildi:** Disk I/O overhead her respawn döngüsünde N task × `existsSync` çağrısı
-anlamına gelir. In-memory `task.status` zaten otoriter kaynak — `collectResults` result'ı okur,
-in-memory map'i günceller. Disk-based check tutarsız state yaratabilir (result yazıldı ama
-in-memory henüz güncellenmedi durumu). Memory-first mimari tercih edilir (ADR-005 deprecated
-olmasına rağmen in-memory state consistency prensibi geçerli).
-
-### (c) Status Mutation Sadece EVALUATE Phase'de
-
-`task.status` mutasyonu yalnızca `runEvaluatePhase` içinde yapılır; EXECUTE devam ederken
-in-memory status değişmez.
-
-**Neden reddedildi:** `respawnEligibleTasks` EVALUATE phase'e girmeden önce `waitForResults`
-ana döngüsü içinden çağrılır. EVALUATE-only mutation, respawn çağrısı anında `t.status` hâlâ
-`EXECUTING` olduğu için eligible task bulamaz — wire çalışmaz. Inline mutation (Decision 1)
-timing sorununu çözer: `collectResults` result toplar → status mutate → `processQueue` →
-`respawnEligibleTasks` → eligible Wave 2 task'lar bulunur → spawn edilir.
+- **EVOLUTION-SELECTIVE-SCALE:** rebuild the update path to touch only used agents/skills + indexed/lazy access → manages 300-agent/1000-skill fleets. (Today's bulk-update is the explicit defect to fix.)
+- **LEARNINGS-QUALITY** (ADR-G-035): the recorded Learnings/Gains are "nice but half-baked / not genuinely learned" — perfect the learned-content so the loop's memory is real, for dogfood AND user.
+- **Identity-mutation at scale:** 1000+-variant validation (F5-008r) + auto-apply (after the human-review advisory phase proves signal quality).
 
 ---
 
 ## Consequences
 
-### Olumlu
+**(+)** The differentiating moat is closed-loop and live (not proposed): underperforming agents are actually mutated, genealogy-tracked, A/B-verified. Outcome data drives routing + promotion continuously.
 
-- **Wave 2/3 task'lar spawn olur.** Dependency-aware execution semantiği ilk kez runtime'da
-  gerçek anlamda çalışır. Multi-wave sprint planları (priority + dependencies ile) uygulanabilir.
-- **Sprint 161 stalled senaryosu fix'lenir.** 3 spawn + 2 hayalet → 5/5 spawn. `waitForResults`
-  artık tüm task'ların tamamlanmasını bekleyebilir.
-- **Sprint 134 T-007 design intent tamamlanır.** Chain scheduler runtime kanıtı kazanır;
-  5 sprintlik call-site borcu kapanır.
-- **`BRAIN→WORKER:DEPENDENCY_BLOCKED` event'leri gerçekten yayınlanır.** `wave.respawn` metriği
-  meaningful veri içerir; observability zinciri tamamlanır.
-
-### Olumsuz
-
-- **`task.status` mutation timing değişir.** EVALUATE phase öncesi DONE/NO_GO status set edilir.
-  EVALUATE phase içindeki status okumaları bu mutasyonun farkında olmalı; mevcut EVALUATE
-  logic'i tekrar status set ederse duplicate mutation olur (idempotent — problem yok).
-- **`evaluate-phase idempotency` regression riski.** Sprint 159 survivor test
-  (`evaluate-phase-idempotency`) status mutation timing değişikliğini test eder. Task 4
-  bu testi bozmamak zorunda; bozulursa Auditor + Alperen onayıyla test güncellenebilir.
-- **Auditor `git diff --stat` boundary'yi etkilemez.** In-memory status mutation disk yazısı
-  yapmaz — Auditor scope violation detection sistemi bu değişiklikten etkilenmez (ADR-037 safe).
-
-### Risk Mitigation
-
-- **Sprint 159 survivor test:** `evaluate-phase-idempotency` 6-case regression suite mevcut;
-  Task 4 bu testi PASS etmek zorunda.
-- **Sprint 165 smoke:** `dependency_pipeline_enabled: true` flip + 3-task multi-wave smoke
-  sprint ile canlı doğrulama yapılır. Wire production'da kanıtlanmadan Sprint 165 geçmez.
-- **Sprint 166 rollback opsiyonu:** Flag `false`'a geri çevrilebilir. Wire kodu `disabled mod`'da
-  mevcut `if (config.dependency_pipeline_enabled)` branch atlayarak legacy davranışa döner.
-  Wire kodu silinmek zorunda değil; rollback non-destructive.
+**(−)** The bulk-update scaling error (§2) must be fixed before large agent/skill catalogs (born: EVOLUTION-SELECTIVE-SCALE). Learned-content quality is an open gap (LEARNINGS-QUALITY). Mutation auto-apply is gated behind an advisory-proof phase (today suggestions are advisory, requiresApproval for identity-mutation).
 
 ---
 
-## References
+## References / Absorbed
 
-1. **Sprint 134 T-007 spec** — `respawnEligibleTasks` + Kahn's algorithm chain dependency
-   scheduler tasarımı (+620 LoC, Sprint 139 Wave 1 Early Wire Bootstrap)
-2. **Sprint 156-002 flip commit** — `dependency_pipeline_enabled: false → true` default değişimi
-   (`GO_WITH_TECH_DEBT` — wire eksikliği bu sprintte tespit edilmedi)
-3. **Sprint 161 stalled task archive** — `.tasks/archive/sprint-161-stalled/` Wave 2/3 hayalet
-   forensic kanıtı (3 spawn + 2 hayalet → sprint hang)
-4. **Sprint 162 spurious NO_GO bug ve Sprint 163 T1 fix** — Status mutation timing dersleri;
-   in-memory `task.status` sync önemi (ADR-045 Decision 1'in doğrudan öncülü)
-5. **ADR-036: ADR Governance Integration** — Bu ADR'ı mandatory read yapan kural; Sprint 138
-   ADR Governance disiplini gereği implementation'dan önce yazılır
-6. **ADR-037: Brain-Auditor-Worker Authority Matrix** — Wire implementasyonu RBAC sınırlarını
-   ihlal etmemeli; in-memory mutation Auditor'ın `git diff --stat` boundary sistemini bypass
-   etmez (disk write yok)
-7. **ADR-039: Self-Modifying Task Detection** — Deckent dogfood discrimination — wire kendi
-   sprint planlamasını etkilemiyor; `respawnEligibleTasks` sadece mevcut sprint task'larını
-   re-evaluates eder, yeni task yaratmaz
-
----
-
-## Memory DB Insert Pattern
-
-Worker bu ADR'ı tamamladıktan sonra aşağıdaki pattern ile `memory.db`'ye insert yapılır:
-
-```typescript
-store.insert({
-  type: 'adr',
-  id: 'adr-045',
-  title: 'Wave-Based Execution Semantics — respawnEligibleTasks Runtime Wire',
-  status: 'accepted',
-  sprint_id: 'sprint-164',
-  tags: ['dep-pipeline', 'wave-execution', 'task-status', 'wire', 'sprint-134-completion'],
-  body: 'Yol B wire: collectResults inline status mutation + waitForResults dep-aware respawn + respawnEligibleTasks slot kontrolü korunur. Sprint 161 stalled fix. dependency_pipeline_enabled: false (Sprint 165 flip için bekletilir).',
-});
-```
-
-Markdown dosyası `deckent memory export` ile auto-regenerate edilir. ADR-036 Memory V2
-DB-first kuralı gereği bu manuel DECISIONS.md güncellemesi DEĞİL, DB insert + export
-pipeline'ı ile yönetilir.
-
----
-
-## Notes
-
-Bu ADR, `dependency_pipeline_enabled: true` Yol B wire implementasyonunun (Task 4) **contract
-belgesidir** — implementation'dan önce yazılır. Task 4 worker bu ADR'ı okumak ve Decision
-bölümündeki 3 maddeye uymak zorundadır. Sapma → NO_GO + ADR amendment proposal (ADR-036 mandatory).
-
-Sprint 165 ile `dependency_pipeline_enabled: false → true` config flip + canlı multi-wave smoke
-test yapıldıktan sonra bu ADR production-validated olarak işaretlenir.
-
-> **Note (deep-verified vs code, Sprint 172):** Bu contract ADR'nin **3 Decision maddesi de kodda birebir indi** (gövde gelecek-zamanlı kalmıştır; aşağıdaki güncel gerçektir):
-> - **§1** → `src/orchestra/result-collector.ts:123-131` `applyStatusMutation` — 3-satır tablo (`DONE→DONE`, `GO_WITH_TECH_DEBT→DONE`, `NO_GO→NO_GO`) ve debt-DONE rationale yorumu ADR ile birebir.
-> - **§2** → `result-collector.ts:379-387` `maybeRespawn` — `if (!config?.dependency_pipeline_enabled) return` legacy-FIFO no-op + fail-soft try/catch + `respawnEligibleTasks(projectRoot, sprint, config, spawnOpts)`. Tek nüans: respawn statik değil **lazy dynamic-import** (`loadRespawn()`) ile yüklenir — sözleşme sapması değil, ADR-008 tek-yönlü bağımlılık dostu.
-> - **§3** → `src/orchestra/sprint-spawner.ts` — slot kontrolü korundu (`:507` `slotsAvailable = max(0, maxWorkers - currentlyExecuting)`), `enforceWaveDependency` korundu (`:486`), `BRAIN→WORKER:DEPENDENCY_BLOCKED` (`:493`) ve `wave.respawn` metric (`:576`) gerçekten tetikleniyor; eligible filtresi `t.status === TaskStatus.DONE` (`:477`).
->
-> **deckent-dev gerçeği:** Bu projede `.deckent/config.json` `dependency_pipeline_enabled: false` — Wave geçişleri bilinçle Brain-manuel (ADR-047, Sprint 164-171 kanıtlı). ADR'deki "Sprint 165 flip → production-validated" **kullanıcı-projesi default yolunu** tanımlar (`config.ts` kod default `true`, ADR-045 Sprint 169 H5'te `docs/reference/api-surface.md`'de teyitli); dogfood'da flag `false` kalır, rollback non-destructive (`if` branch atlanır). Behavior unchanged; documentation alignment only. **(⚠️ Bu paragraf Sprint-172 anlık görüntüsüdür — aşağıdaki amendment'le superseded: dogfood da artık `true`.)**
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (kullanıcı-projelerinde default `true` — çekirdek ürün yürütme-semantiği; dogfood'da da artık canlı).
-
-**1. 🟢 deckent-dev DOGFOOD FLIP: `false` → `true` — CANLI-KANITLI.** `.deckent/config.json:84` artık `dependency_pipeline_enabled: true` (flip ~2026-06-10, [[feedback_scale_up_autonomous]] — "wave makinesini yük altında test etme" amacıyla). Canlı kanıt: **Sprint 279** kademeli worker-spawn timestamp'leri (wave-geçişleri otomatik) + **Sprint 280** 3-wave yürütme gözlendi (Wave-1 001-004 paralel · Wave-2 005-008 "Waiting for deps" · Wave-3 009/010 queued) ve dependency-parse zinciri doğrulandı (DIRECTIVES `- Dependencies:` → task-JSON `dependencies[]` %100; eski parse-gap kapalı). ADR'nin "production-validated" hedefi kullanıcı-yolu + dogfood'da gerçekleşti. ADR-047 Brain-manuel wave yönetimi artık zorunlu-yol değil (fallback olarak durur).
-
-**2. Semantik genişlemesi — dependency-tatmin seti `DONE ∪ MANUAL_REVIEW_REQUIRED` (Sprint 280, commit `9f966eeb`).** `respawnEligibleTasks`'in `doneTasks` seti artık `MANUAL_REVIEW_REQUIRED` statüsünü de bağımlılık-tatmin sayar (`sprint-spawner.ts:735`): MRR yalnız worker timeout'unda **disk-kanıtı varken** atanır (deliverable diskte; review/FIX kuyruğunda) — bağımlısını sonsuza bloke etmesi Sprint 280'de canlı deadlock yarattı (007-MRR → 009/010 hayalet → EXECUTE idle). Hâlâ-koşan (EXECUTING) upstream bloke etmeye devam eder. Kanıt: `tests/orchestra/respawn-mrr-unblock.test.ts` (4 test: MRR-unblock, DONE-korunum, EXECUTING-bloke, multi-dependent).
-
-**3. Doc-fix:** DECKENT.md'deki stale "deckent-dev bilinçle false" satırı bu amendment'le birlikte güncellendi. md+db senkron (Alperen ADR-review).
+- **Absorbs:** ADR-074 Part-C + ADR-075 Part-A + ADR-078 Part-C.
+- **Cross-ref:** ADR-G-035 (memory substrate + LEARNINGS-QUALITY) · ADR-G-006 (routing — consumes outcomes) · ADR-G-023 (agent/skill taxonomy) · ADR-G-022 (nervous — mutation approval checkpoint) · ADR-G-020 (requiresApproval gate).
+- **Born:** EVOLUTION-SELECTIVE-SCALE (🔴 critical) · LEARNINGS-QUALITY.
+- **Memory:** `project_autonomous_first_dogfood_grand_vision` · `feedback_directive_kanit_letter_vs_goal` · MOAT-4 (preserve).
 
 
 ---
 
-## adr-046: Brain Self-Update Hook Architecture
+## adr-g-033: Dashboard (Observability Surface)
 
 **Status:** accepted
 
-# ADR-046: Brain Self-Update Hook Architecture
+# ADR-G-033: Dashboard (Observability Surface)
 
-**Status:** accepted
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=god-level observability dashboard run-proven live (AppShell + reachable pages + sprint-start **detach** + stale-while-revalidate live-data + SSE WorkerGrid + evolution/coverage endpoints; Tier-1 Proof-of-Function smoke per ADR-G-009) → tomorrow=**observability-only contract** — interactive chat relocates to the Desktop app (DESK-1); the dashboard never becomes the primary surface (the native terminal, ADR-G-034, is primary)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-080 · ADR-078 (Part D) · ADR-082 (Parts B/C) · ADR-083 (Dalga D) · **Supersedes:** —
+**Crosswalk:** ADR-080 + ADR-078(D) + ADR-082(B/C) + ADR-083(D) → ADR-G-033
 
-**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
-
-**Date:** 2026-05-13
-
-**Sprint:** Sprint 166 (implementation contract — T1/T2/T3 fixes bu ADR'ın kontratına göre yazıldı)
-
----
-
-## Status
-
-accepted (Sprint 166 — 4 root cause forensic + Sprint 154-165 arasında kırık self-update döngüsünün kapanması)
+> **Meta-note:** This ADR governs deckent's **web dashboard**. Per the 2026-06-29 strategic pivot, the dashboard is the **observability surface** — *"the dashboard explains."* The **primary** management+usage surface is the native agentic terminal (ADR-G-034, tool-driven, full-control-without-fatigue); **interactive** chat is forward-relocated to the Desktop app (DESK-1, Electron). The dashboard is a read/monitor plane, not the product's control center. The "Today" section records the god-level dashboard as built and run-proven; the "Tomorrow" section reframes its role under the pivot.
 
 ---
 
 ## Context
 
-Sprint 154-165 boyunca Brain'in post-finalize self-update döngüsü **yarım çalıştı**: Brain her sprint sonunda
-dosyaları güncellediğini "sanıyordu" ama gerçekte dört kritik hook ya hiç tetiklenmiyordu ya da yanlış
-çalışıyordu. Sprint 166 forensic analizi dört root cause tespit etti:
+Through Sprints 215–221 the dashboard was driven from a functional-skeleton to a god-level surface, but every step exposed the gap between *files-on-disk* and *user-reachable, freeze-free, live* — exactly the `wired ≠ working` law (ADR-G-009). A real-binary browser audit (`npx deckent serve`, 2026-06-01) and follow-up run-verify passes surfaced a cluster of defects that a no-MVP product (ADR-G-016) cannot ship:
 
-### Bug M — ADR Insert Hook Eksikliği
+- **Sprint-start froze the dashboard.** `src/api/server.ts` called `runSprint(...)` *inside* the `POST /api/start` HTTP handler. `runSprint` is a long-running async operation that blocked the Node.js event loop, so the serve process stopped answering any further HTTP request — the UI fell into an unrecoverable skeleton-loading state. ADR-079's smoke gate did not cover the sprint-start path, so the freeze went undetected until a manual session.
+- **Hollow pages.** Sprint 215 wrote four page files (`EvolutionPage`, `NervousPage`, `EnterprisePage`, `MemoryExplorerPage`) to disk, but `App.tsx` carried only 7 routes and `Sidebar.tsx` only 6 links — none of the four were reachable. A DONE verdict based on file-existence, not navigation, is a Tier-1 wire-gap by ADR-G-009.
+- **Chat was status-only.** `ChatPage.tsx` dispatched every message to the `status` intent regardless of input; the real `POST /api/chat` round-trip was never called from the browser.
+- **Static worker grid + stale status.** `WorkerGrid` loaded a fixed first-6 and never reflected later spawn/done transitions; `StatusPage` showed done work as still "working"; `History` always reported 0% coverage; the debt page had no filter; `EnterprisePage` showed empty data without an injected Bearer token; an auditor alert ("CLAUDE.md not updated") repeated as SPAM.
+- **Skeleton-grade UX.** No stale-while-revalidate fetching, inconsistent dark/light tokens, layout shift on data load, no connection-loss recovery — below the god-level bar of ADR-G-016 / no-MVP (ADR-G-016).
 
-`sprint-finalizer.ts:1197` çevresindeki `runPostFinalizeHooks` çağrısında `adrInsert` step yoktu.
-ADR-043, ADR-044, ADR-045 `docs/adr/` dizinine yazıldı; ancak `memory.db`'ye hiçbir zaman insert
-edilmedi. Brain ADR tabanlı kararlar alırken en güncel governance veriye erişemiyordu.
-
-**Kanıt:** `sqlite3 .brain/memory.db "SELECT COUNT(*) FROM entries WHERE type='adr'"` → Sprint 166
-öncesi `adr-042`'de duruyordu; `docs/adr/` dizininde 3 yeni ADR (043/044/045) mevcuttu.
-
-### Bug N — Manuel Finalize Path'inde onRuleRegen Eksikliği
-
-`sprint-phases.ts:1238` ve `sprint-finalizer.ts:1197` Brain'in otomatik finalize path'ini doğru
-şekilde yönetiyordu; ancak `cli/commands/finalize.ts:166` içindeki `finalizeSprint(...)` çağrısında
-`onRuleRegen` parametresi yoktu. Sprint 152'den itibaren manuel finalize kullanılan tüm dönemlerde
-`.claude/rules/*.md` dosyaları 13 sprint boyunca stale kaldı.
-
-**Kanıt:** `grep -n "onRuleRegen" src/cli/commands/finalize.ts` → Sprint 166 T2 öncesi 0 match.
-
-### Bug S — Cache Key Sprint-Agnostik Olduğundan Doc Sync Atlıyordu
-
-`src/orchestra/managed-docs/doc-cache.ts` cache key'i `fileHash + entryHash` olarak hesaplıyordu;
-sprint ID dahil değildi. Aynı dosya aynı sprint'te birden fazla kez finalize edildiğinde (veya farklı
-sprint'lerde içerik değişmediyse) cache hit oluyordu ve CLAUDE.md güncellenmiyordu. Sprint 152'den
-beri `cached_no_change` skip path aktifti.
-
-**Kanıt:** Sprint 130-151 working chain commit zinciri vs Sprint 152+ `cached_no_change` log analizi.
-
-### Bug Y2 — Doc Sync Ground-Truth Eksikliği
-
-Sprint 164 commit `a4f3be4`'te koordinatör agent prompt'una "16 agent" yanlış inject edildi (gerçek: 15).
-5 anchor `.md` dosyası yanlış güncellendi. Doc sync agent'larının prompt'a inject ettiği sayım gerçek
-dosya sistemine karşılaştırılmıyordu.
-
-**Ortak Pattern:** 4 bug da aynı mimari eksiklikten kaynaklanıyordu — post-finalize hook chain'i
-**opsiyonel callback'ler** ve **partial wiring** ile tasarlanmıştı. Yeni step eklendiğinde veya mevcut
-step'in wire'ı eksik kaldığında sessizce atlanıyordu. Hiçbir hook **koşulsuz invocation** garantisi
-vermiyordu.
+Underneath the bug-fixing, the dashboard's *role* also moved. The 2026-06-29 pivot makes the **native terminal** the primary surface and recasts the dashboard as **observability-only**. The implementation work below is real and run-proven; the pivot does not delete it — it **reframes** what the dashboard is *for*, and routes interactive control to the terminal (ADR-G-034) and Desktop (DESK-1).
 
 ---
 
-## Decision
+## Decision (Today)
 
-Brain post-finalize hook chain için **Step Ordering Contract** zorunlu kılınır. Bu kontrat
-`src/core/identity-generator.ts → runPostFinalizeHooks()` implementasyonuna kodlanır ve bu ADR ile
-dokümante edilir.
+The dashboard is a **god-level observability surface**: a freeze-free React SPA (Vite + ADR-D-001 TS/ESM) that renders live sprint, worker, evolution, memory, nervous, and enterprise state through a single AppShell, with detached sprint-start and a stale-while-revalidate live-data spine. No new runtime dependency was introduced (ADR-D-005 / ex-010); no emoji — lucide-react icons only (brand consistency, ADR-G-010).
 
-### Step Ordering Contract (Section 5.1)
+### 1. AppShell + Information Architecture
 
-Post-finalize hook'lar aşağıdaki sırayla çalışır. Sıralama değiştirilemez — değişiklik bu ADR'ın
-amendment'ını gerektirir (ADR-036 mandatory).
+`src/dashboard/src/components/AppShell.tsx` is the single top-level shell (replacing ad-hoc per-page layout): a CSS-grid header + sidebar + content, responsive breakpoints (mobile stacked / tablet collapsed-nav / desktop full sidebar), and a dark/light token system propagated via `data-theme`. The eight god-level surfaces are reachable through the AppShell navigation:
 
-| Step | Adı             | Hedef                                      | Zorunluluk |
-|------|-----------------|--------------------------------------------|------------|
-| 1    | memoryExport    | `exports/*.md` regenerate                  | Koşulsuz   |
-| 2    | identityRegen   | `PROJECT-IDENTITY.md` update               | Deprecated (Sprint 168'de kaldırılır) |
-| 3    | adrInsert       | `docs/adr/*.md` → `memory.db` upsert       | Koşulsuz   |
-| 4    | ruleRegen       | `.claude/rules/*.md` regenerate            | Koşullu (callback mevcut ise) |
+```xml
+<dashboard-surfaces nav="AppShell" reachable="8" routes="11">
+  <page id="sprint"     route="/status"          source="StatusPage"          state="live sprint phase + per-task done/working/no_go"/>
+  <page id="overview"   route="/"                source="home/dashboard"      state="sprint summary + KPI"/>
+  <page id="evolution"  route="/evolution"       source="EvolutionPage"       state="genealogy tree · retirement timeline · prompt-diff (→ ADR-G-032)"/>
+  <page id="memory"     route="/memory-explorer" source="MemoryExplorerPage"  state="FTS5 search · ADR timeline · debt table (→ ADR-G-035)"/>
+  <page id="enterprise" route="/enterprise"      source="EnterprisePage"      state="tenant list · RBAC matrix · audit log · rate-limit (read-first V1; → ADR-G-031)"/>
+  <page id="nervous"    route="/nervous"         source="NervousPage"         state="pending-approval · accept/reject · panic-guard · detector status (→ ADR-G-022)"/>
+  <page id="terminal"   route="/terminal"        source="terminal-sessions"   state="multi-session PTY + history ring buffer (→ ADR-G-029)"/>
+  <page id="chat"       route="/chat"            source="ChatPage"            state="round-trip + slash (→ relocates to DESK-1 — see Tomorrow)"/>
+  <!-- auxiliary routes (Debt · History · Directives) bring the route table to 11 total (ADR-080 §2) -->
+</dashboard-surfaces>
+```
 
-**Step 3, Step 4'ten ÖNCE çalışmak ZORUNDADIR.** Sprint 166'da kabul edilen ADR-046 gibi yeni ADR'ler
-Step 3'te `memory.db`'ye insert edilir; Step 4'te regenerate edilen `.claude/rules/*.md` dosyaları
-bu insert'ten sonra çalışır. Sıralama ters olursa yeni ADR'ler kurallar güncellenmeden önce kayıt
-altına alınamaz.
+### 2. Sprint-Start DETACH — never block the serve event-loop
 
-### Mimari Prensipler
+`src/api/sprint-job-runner.ts` exports `startSprintDetached(sprintId, root)`, which spawns the sprint as a **detached child** (`detached: true, stdio: 'ignore'`) and immediately `child.unref()`s it; `POST /api/start` in `server.ts` calls it **instead of** `runSprint`. The HTTP response returns before the sprint begins executing — the serve event loop is never blocked, and the dashboard stays responsive throughout a long sprint. A detached child (not a Worker thread, which shares the same libuv loop for I/O) is the clean isolation boundary. This is the load-bearing invariant of this ADR: **the observability surface must never freeze the process that serves it.**
 
-**1. Koşulsuz Invocation (Unconditional Invocation Pattern)**
+### 3. Live-Data Spine — stale-while-revalidate + SSE WorkerGrid + theme tokens
 
-Her hook **her finalize döngüsünde** çalışır. Opsiyonel callback tasarımı yerine doğrudan çağrı kullanılır.
-`skipXxx` flag'leri sadece test izolasyonu ve acil devre-dışı bırakma senaryoları için mevcuttur;
-production deploy'da hiçbiri aktif olmamalıdır.
+- **`src/dashboard/src/lib/use-live-data.ts`** — SSE/polling hook with stale-while-revalidate semantics: serves cached data immediately on mount, revalidates in the background, shows a *reconnecting* indicator (not a skeleton) on connection loss, and aborts in-flight requests on unmount via `AbortController`. Achieved in ~80 LoC (no React Query / SWR — ADR-D-005).
+- **`src/dashboard/src/components/WorkerGrid.tsx`** — consumes `use-live-data`/SSE so the worker list is **real-time**: the fixed-6 limit is removed and later spawn/done transitions render live (ADR-082 Dalga B). This grid is the dashboard projection of per-worker live state (the dashboard endpoint of WORKER-LIVE-TRACE, ADR-G-025).
+- **`StatusPage.tsx`** — task state (done/working/no_go) and phase indicator are real-time (ADR-082 Dalga B); **`RefreshButton.tsx`** adds user-triggered refetch with a 10 s cooldown.
+- **`src/dashboard/src/lib/theme.ts`** — centralized design-token map (color/spacing/radius/shadow, dark+light) consumed via CSS custom properties; no hard-coded hex in components (ADR-G-010 brand/output consistency).
 
-**Rationale:** Bug M ve Bug N'nin ortak kökü optional wiring'di. `opts.onRuleRegen` callback yoksa
-Step 4 sessizce atlanıyordu. Koşulsuz pattern bu "sessiz atlanma" riskini ortadan kaldırır.
+### 4. Reachable Pages — wire + backing endpoints
 
-**2. Cache Key Kompletliği (Complete Cache Key)**
+- **Wire:** four routes added to `App.tsx` (`/evolution`, `/nervous`, `/enterprise`, `/memory-explorer`) and matching lucide-react links to the sidebar; the route table is 11 total and every page is reachable by nav + direct URL (ADR-080 §2).
+- **`src/api/evolution-endpoint.ts`** — three read-only GET endpoints registered in `server.ts`: `/api/evolution/genealogy`, `/api/evolution/retirement`, `/api/evolution/prompt-metrics` (graceful empty arrays when no data) — the dashboard window onto the evolution loop (ADR-G-032).
+- **`src/api/coverage-endpoint.ts`** — `/api/coverage` reads sprint coverage from memory.db/results so `History` shows real coverage, not a hard-coded 0% (ADR-082 Dalga C).
+- **`DebtPage.tsx`** — sprint/severity/status filter dropdowns + search (ADR-082 Dalga C).
+- **`EnterprisePage.tsx`** — F4/enterprise endpoints auth-wired with a Bearer token; auditor alerts deduped + provider-neutral (CLAUDE/GEMINI/AGENTS). Read-first: **no write actions in V1 — a deliberate decision, not a defect** (see Consequences and ADR-G-031).
 
-Managed-docs pipeline'ında her cache key şunları ZORUNLU olarak içerir:
-- `fileHash` — hedef dosya içerik hash'i
-- `entryHash` — generator entry config hash'i
-- `sprintId` — mevcut sprint identifier
+### 5. Chat round-trip (Today) — parity with the terminal
 
-Eksik `sprintId` → cache hit → `cached_no_change` skip → doc sync sessizce atlanır.
-Bu Bug S'in tam tanımıdır.
+`ChatPage.tsx` POSTs to `/api/chat` with a Bearer token and renders the streamed assistant reply, with multi-turn history, loading, and error states; a slash-command input (`/status`, `/recall`) maps to the backend agentic path (ADR-082 Dalga B / ADR-083 Dalga D), reaching parity with the native terminal's slash registry (ADR-G-034). The serve-side `resolveChatAdapter` SSOT (Sprint 269) backs the stream endpoint.
 
-**3. Single Registration Target**
+> Note: the chat round-trip is present and wired both client- and serve-side, but is **not** considered fully working today — the live-stream defect is recorded in Consequences (−) and the surface is forward-relocated (Tomorrow).
 
-Her hook sadece bir yerde registration point'e sahip olur:
-- **Brain otomatik path:** `sprint-finalizer.ts` → `runPostFinalizeHooks()`
-- **Manuel path:** `cli/commands/finalize.ts` → `finalizeSprint({ onRuleRegen: ... })`
+---
 
-Her iki path da aynı `PostFinalizeHookOptions` interface'ini kullanır. Yeni hook eklendiğinde her iki
-path'e aynı anda eklenmek ZORUNDADIR (Bug N dersi: sadece bir path'e eklemek 13 sprint stale'e yol açar).
+## Intent / Roadmap (Tomorrow)
 
-**4. Ground-Truth Verification**
-
-Doc sync agent'ları (type='doc') inject edilen sayısal iddiayı (`N agents`, `M tools`) çalıştırma
-öncesi gerçek dosya sistemi ile doğrulamak ZORUNDADIR. Doğrulama whitelist:
-`.deckent/ground-truth-overrides.json`.
-
-### Step Ordering Contract Değişikliği Protokolü
-
-Step sıralamasını değiştirmek için:
-1. Bu ADR'ı supersede eden yeni ADR yazılır
-2. `runPostFinalizeHooks()` JSDoc bloğu güncellenir
-3. `tests/core/identity-generator-step-order.test.ts` regression test güncellenir
-4. Sprint finalize log'unda step execution order doğrulanır
+- **Observability-only contract (the pivot's core reframe).** The dashboard's durable role is **monitoring + explanation** — *"the dashboard explains."* Read/observe surfaces (sprint, worker-live-trace, evolution, memory, nervous, enterprise audit) are the dashboard's mandate; it is **not** the product's control center and **does not** become the primary surface. Primary management+usage is the **native agentic terminal (ADR-G-034)** — tool-driven, deep, full-control-without-fatigue.
+- **Interactive chat moves to the Desktop app (DESK-1, Electron, later).** Conversational/agentic interaction graduates off the web dashboard into the desktop client; the dashboard retains at most a read-only conversation view. Until DESK-1 lands, today's `ChatPage` remains as the interim surface (with the known live-stream gap below).
+- **Enterprise read → write (V2 management-plane).** The V1 read-first EnterprisePage evolves into a god-level **management plane** with custom-RBAC CRUD, tenant management, and audit-export — tracked as ADR-G-031's enterprise gap (ENT-*), gated behind the enterprise layer (control/governance depth, not feature-gating; ADR-G-016).
+- **WorkerGrid → WORKER-LIVE-TRACE.** The live worker grid becomes the dashboard projection of the per-worker live-trace contract (executing → checking → context-understood → writing .plan → evaluating), shared across dashboard/terminal/CLI/MCP (ADR-G-025).
+- **Dashboard follow-ups (DASH bucket).** Serve-token-inject for the EventSource auth path, routing-diversity chart, control-panel surfacing, and an onboarding view land under the MASTER-PLAN **DASH** work-item (born from old 072/073/076 side-items).
 
 ---
 
 ## Consequences
 
-### Olumlu
+**(+)** Sprint-start no longer freezes the dashboard — the serve process stays responsive across long sprints (detach invariant). All eight god-level surfaces are reachable; evolution/nervous/enterprise/memory data appear in the UI for the first time. The live-data spine eliminates skeleton thrash and recovers gracefully from connection loss; centralized theme tokens give dark/light consistency with zero runtime overhead and no new dependency. The dashboard is now a credible **observability** plane the pivot can build on, and the AppShell IA cleanly separates "Observe / Manage / Converse" so the Tomorrow reframe (chat → Desktop) is a relocation, not a rewrite.
 
-- **ADR-043/044/045/046 memory.db'ye insert edildi.** Brain ADR-bazlı kararlar için artık güncel
-  governance veriye erişebilir. Sprint 166 sonrası query: `searchMemory(store, {type:['adr']})` doğru
-  döner.
-- **`.claude/rules/*.md` artık manuel finalize'da da güncellenir.** Bug N kapandı — 13 sprint stale
-  borcu bitti. Multi-provider sync (Bug Q) ile `.codex/rules/`, `.gemini/rules/`, `.cursor/rules/`
-  da aynı anda güncellenir.
-- **CLAUDE.md her sprint'te güncellenir.** Bug S kapandı — sprint-aware cache key ile her yeni sprint
-  cache miss üretir ve doc sync çalışır.
-- **Doc sync agent'ları inject öncesi ground-truth doğrular.** Bug Y2 kapandı — `ls | wc -l` vs
-  whitelist kontrolü ile yanlış sayım propagasyonu engellenir.
-- **Yeni hook eklenmesi için anchor.** Sprint 167-168 M1-M4 monitoring hook'ları (örn. token budget
-  tracker, stale_md detector) bu contract'a uygun olarak Step 5+ olarak eklenir. Her yeni step bu
-  ADR'ı referans alır.
-
-### Olumsuz
-
-- **Step 2 (identityRegen) deprecated yükü.** Sprint 168'e kadar kod'da kalır. `skipIdentityRegen`
-  flag'i olmayan caller'lar eski behavior'ı almaya devam eder. Migration: managed-docs zincirine devret.
-- **onRuleRegen opsiyonelliği korundu.** Step 4 hâlâ callback-conditional — ancak artık cli finalize
-  path'inde callback zorunlu geçiriliyor (Bug N fix). Test coverage bu bağlantıyı korur.
-- **Cache key migration backward-compat yükü.** Eski cache entry'leri `sprintId` içermiyor — ilk
-  sprint'te her entry cache miss yapar (beklenen davranış, bütçe etkisi minimal).
-
-### M1-M4 Monitoring Falsifiable Claims (Sprint 167-168)
-
-Bu ADR'ın kontrakt doğruluğu 4 ölçüm kanalı ile izlenir:
-
-| Kanal | Metrik | Beklenti (Sprint 167+) |
-|-------|--------|------------------------|
-| M1    | `memory.db SELECT COUNT(*) WHERE type='adr'` | Her yeni ADR dosyası → +1 entry |
-| M2    | `ls .claude/rules/*.md` mtime | Her finalize → mtime güncellenir |
-| M3    | `grep "sprint-NNN" CLAUDE.md` | Her sprint → yeni sprint ID'si CLAUDE.md'de |
-| M4    | `stale_md detector emitAlert` | CLAUDE.md mtime > 70min ise alarm |
-
-Sprint 167'de dependency_pipeline_enabled flip + M1-M4 baseline tracking ile bu claim'ler
-ilk kez ölçülebilir hale gelir.
-
-### Sprint 170 Refactor Trigger
-
-Aşağıdaki koşullardan biri gerçekleşirse Sprint 170'te hook chain refactor tetiklenir:
-
-1. Step sayısı 6'yı geçerse (yeni M1-M4 monitoring hook'ları + billing hook + event emit)
-2. `runPostFinalizeHooks()` LoC > 150 olursa (şu an ~85 LoC)
-3. Step 2 (identityRegen deprecated) Sprint 168'den geçerse ve hâlâ kodda ise
-
-Refactor hedefi: hook chain'i `PostFinalizeStepRegistry` pattern'ına taşımak
-(ADR-026 God Object Split Stratejisi prensipleri ile).
+**(−) Known / deferred — tracked for the Chat/Dashboard product-sprint** (memory `project_dashboard_chat_audit_20260611`):
+- **chat-HOLLOW** — `POST /api/chat` (`server.ts:813`) is **classifier-only** (the adapter never enters `buildChatReply`), and `ChatPage` swallows the stream error (`:382-384`); when the live stream is empty the classifier's *"I didn't understand"* reply stays visible. Frontend-wire and serve-side `resolveChatAdapter` SSOT both exist (Sprint 269) — the gap is the classifier-only POST + swallowed stream error, prime suspect being the EventSource-GET Bearer-header impossibility (auth-gate) or an in-serve CLI spawn failure (ADR-080 §3 v3-diagnosis, ADR-082 #2).
+- **duplicate-sidebar** — post-S219 drift: `Layout.tsx` renders its own `navGroups` while `Sidebar.tsx` `navItems` remains a **stale duplicate**, so Workers/Directives are not reachable from nav. Collapse to a single nav source in the product-sprint (ADR-080 §2 drift, UX-audit #3).
+- **alert-spam ×59** — the "CLAUDE.md not updated" auditor alert repeated ×59; dedup either regressed or does not cover this auditor-alert path (ADR-082 #3, UX-audit #4).
+- **enterprise read-only** — EnterprisePage "read-first (no write actions)" is **V1-by-design, not a defect**; the real product gap is the **V2 management-plane CRUD** (ADR-G-031 god-level gap #1).
+- **Structural tradeoffs:** detached sprint-start means the serve process holds no direct reference to the running sprint — status is read via `/api/status` / `.dashboard` (no change from prior behavior); non-SSE pages fall back to fixed-interval polling; `DirectivesEditor` is a plain textarea (no syntax highlighting); the REPL status-line has no dashboard-bar parity yet.
 
 ---
 
-## Alternatives Considered
-
-### (a) Optional Callback Pattern Korunur
-
-Mevcut `onRuleRegen?: callback` tasarımı korunur, eksik wire'lar tek tek patch edilir.
-
-**Neden reddedildi:** Bu yaklaşım Bug N'yi tekil olarak fix eder ama pattern'ı korur. Her yeni hook
-için aynı wiring hatası tekrarlanabilir. Sprint 166 forensic'i 4 bağımsız wiring hatasını aynı anda
-ortaya koydu — pattern değişikliği gerekli.
-
-### (b) Event-Driven Hook Dispatch
-
-`EventEmitter` pattern: `finalizeEmitter.emit('post-finalize', opts)`. Hook'lar listener olarak kayıt
-olur. Execution order belirsiz.
-
-**Neden reddedildi:** Step ordering contract ile çelişir. EventEmitter sıralaması listener registration
-sırasına bağlıdır — `once()` vs `on()` race condition riski. Explicit step ordering okunabilirliği ve
-test edilebilirliği daha yüksek; 4 step için EventEmitter overhead gereksiz karmaşıklık.
-
-### (c) Database-Only Hook Registration
-
-Tüm hook'lar `memory.db`'ye kayıt olur; finalize döngüsü DB'yi okuyarak hangi hook'ların çalışacağını
-belirler.
-
-**Neden reddedildi:** Finalize döngüsünün DB'ye bağımlılığını artırır. DB yoksa veya kilitliyse
-hiçbir hook çalışmaz. Mevcut in-process step chain daha güvenilir; DB sadece persistence layer
-olarak kalmalı (ADR-008 Brain merkezi import prensibi).
-
----
-
-## References
-
-1. **Sprint 154-165 forensic analizi** — 4 root cause (M, N, S, Y2) tespiti
-2. **Sprint 166 T1** — `src/core/adr-file-sync.ts` + `identity-generator.ts` Step 3 wire (Bug M fix)
-3. **Sprint 166 T2** — `cli/commands/finalize.ts:166` onRuleRegen wire (Bug N fix)
-4. **Sprint 166 T3** — `doc-cache.ts` sprint-aware cache key (Bug S fix)
-5. **Sprint 166 T4** — Ground-truth verification 3-layer defense (Bug Y2 fix)
-6. **ADR-036** — ADR Governance Integration — mandatory read; bu ADR ADR-036 disiplinine uygun
-7. **ADR-037** — Brain-Auditor-Worker Authority Matrix — hook chain RBAC sınırlarını ihlal etmez
-8. **ADR-026** — God Object Split Stratejisi — Sprint 170 refactor trigger referansı
-9. **ADR-031** — Content Hash Cache — Bug S root cause (sprint ID eksik cache key)
-
----
-
-## Memory DB Insert Pattern
-
-Bu ADR'ın `memory.db`'ye insert edilmesi `syncAdrFilesToDb()` aracılığıyla otomatik gerçekleşir
-(Sprint 166 T1 — Bug M fix). Alperen'in `npx deckent memory rebuild` çalıştırmasının ardından:
-
-```typescript
-// adr-file-sync.ts syncAdrFilesToDb() output (expected):
-{
-  inserted: 1,   // adr-046 (yeni)
-  updated: 3,    // adr-043, adr-044, adr-045 (eksik idiler)
-  skipped: 42,   // mevcut ve değişmemiş ADR'lar
-  errors: [],
-  ids: ['adr-046', 'adr-043', 'adr-044', 'adr-045'],
-}
-```
-
-Doğrulama: `sqlite3 .brain/memory.db "SELECT id FROM entries WHERE id='adr-046'"` → 1 row.
-
----
-
-## Notes
-
-Bu ADR, Sprint 154-165 boyunca birikmiş "Brain self-update yarım çalışıyor" borcunun resmi
-kapanış belgesidir. T1-T3 fix'leri bu ADR'ın Step Ordering Contract'ına uygun yazıldı; test
-coverage (`tests/core/identity-generator-step-order.test.ts`) kontratı kalıcı kılar.
-
-Sprint 167-168 için M1-M4 monitoring baseline ve Sprint 170 refactor trigger bu ADR'a
-kodlanmıştır — gelecek sprint'ler bu kararı referans alarak genişletebilir.
-
----
-
-## Amendment — Sprint 168 C0a-4 (BUG-CC fix)
-
-**Date:** 2026-05-14
-**Author:** Alperen Sartaçoğlu
-**Sprint:** sprint-168
-**Cluster:** A.4 (BUG-CC closure)
-**Decision reference:** `.deckent/sprint-168-archive-decision.txt` (Alperen Pre-Flight Step 16 — Option B)
-
-### Step 12 Default Behavior Flip — `archiveDirectives`
-
-Bu amendment, ADR-046 Step Ordering Contract'ın **Step 12 (archiveDirectives)** adımında
-default davranışı değiştirir. Step sırası, idempotency garantileri ve diğer kontrat
-maddeleri **aynen geçerli** kalır.
-
-#### Önceki (Sprint 138–167 davranışı)
-
-```ts
-// finalizeSprint Step 12 (legacy)
-const autoArchive = rawCfg?.['auto_archive_directives'] ?? true;  // default TRUE
-if (autoArchive) archiveDirectives(projectRoot, sprint.id, 'CLEANUP');
-```
-
-- Sprint finalize'da `DIRECTIVES.md` her zaman placeholder ile **overwrite** edilirdi.
-- Archive copy yazılırdı (`.brain/archive/DIRECTIVES-sprint-NNN.md`).
-- Mid-sprint yanlış invocation veya yan etki → DIRECTIVES.md kaybı = sprint context kaybı.
-
-#### Yeni (Sprint 168+ davranışı)
-
-```ts
-// finalizeSprint Step 12 (Sprint 168 C0a-4)
-const autoArchive = rawCfg?.['auto_archive_directives'] ?? false;  // default FALSE
-archiveDirectives(projectRoot, sprint.id, 'CLEANUP', { autoArchive: autoArchive === true });
-```
-
-```ts
-// archiveDirectives implementation (Sprint 168 C0a-4)
-export interface ArchiveDirectivesOptions {
-  autoArchive?: boolean;  // default false — PRESERVE working DIRECTIVES.md
-}
-
-export function archiveDirectives(
-  projectRoot: string,
-  sprintId: string,
-  phase?: string,
-  options: ArchiveDirectivesOptions = {},
-): void { /* ... */ }
-```
-
-- **Default:** `DIRECTIVES.md` **KORUNUR** (preserve). Archive copy her zaman yazılır.
-- **Opt-in:** `auto_archive_directives: true` → eski legacy davranış
-  (placeholder overwrite). Resmi `deckent` orchestrator için açık opt-in gerekir.
-
-#### Gerekçe
-
-Sprint 167 BUG-CC live evidence (Phase 1+2 forensic — `.audit/sprint-167/T5-brain-debug-phase1.md`,
-`phase2.md` Cluster A.4):
-- DIRECTIVES.md placeholder ile overwrite olduktan sonra, **mevcut sprint context'i kayboldu**.
-- Recovery için `emergencyRestoreDirectives` reaktif workaround gerekti — ancak orijinal
-  içerik (description, kanıt blokları, custom directives) tam restore edilemedi.
-- Conservative "preserve by default" davranışı, kayıp riskini sıfıra indirir; archive copy
-  yine de audit trail için garanti.
-
-#### Test Invariant
-
-Default preserve davranışı kalıcı test ile garanti altına alındı:
-
-```
-tests/orchestra/archive-directives-default-preserve.test.ts
-  ✓ preserves DIRECTIVES.md by default (auto_archive_directives=false)
-  ✓ overwrites DIRECTIVES.md when autoArchive=true (opt-in legacy)
-  ✓ skips silently when DIRECTIVES.md does not exist
-  ✓ phase guard still rejects non-CLEANUP/COMPLETE phases (default preserve)
-```
-
-#### Backward Compatibility
-
-Mevcut konfigürasyonlar:
-- `auto_archive_directives` config flag'i tanımlı **değilse** → yeni default (false, preserve).
-- `auto_archive_directives: true` ayarlı projeler → legacy davranış aynen devam eder.
-- `auto_archive_directives: false` ayarlı projeler → davranış değişmez (zaten preserve).
-
-#### Step Ordering Contract — Değişmedi
-
-ADR-046'nın orijinal Step Ordering Contract maddeleri (Step 1–13 sırası, idempotency,
-dual-write garantileri) bu amendment'tan **etkilenmez**. Sadece Step 12'nin "side-effect
-default'u" değiştirildi; sıra ve hook architecture aynen geçerli.
-
----
-
-## Amendment — Sprint 169 H1 (Bi-Directional FS↔DB Sync)
-
-**Date:** 2026-05-15
-**Author:** Alperen Sartaçoğlu
-**Sprint:** sprint-169
-**Decision reference:** DIRECTIVES.md Task 8 (H1 ADR DB→FS Export Pipeline)
-
-ADR-046 orijinalde **forward direction** (FS→DB) `syncAdrFilesToDb()` aracılığıyla Sprint 166'da
-kurulmuştu. Bu amendment **reverse direction** (DB→FS) ekler ve bi-directional kontratı resmileştirir:
-
-| Direction | Function | Location | Trigger |
-|-----------|----------|----------|---------|
-| Forward (FS→DB) | `syncAdrFilesToDb()` | `src/core/adr-file-sync.ts` | Post-finalize Step 3 |
-| Reverse (DB→FS) | `exportAdrsToFs()` | `src/core/memory-export.ts` | Manual / CI gate |
-
-### Reverse Sync Rules
-
-1. **Manual edit wins** — if a file's mtime is newer than the DB `updated_at`, the file is preserved
-   unchanged (DB→FS write is skipped).
-2. **Idempotent** — re-running `exportAdrsToFs` with the same DB state produces no changes
-   (`written=0, updated=0`) when all files are up-to-date.
-3. **Missing fields** — DB entries with empty sprint, content, or date fields render as
-   `_To be backfilled_` placeholders.
-4. **MADR v3 passthrough** — if DB content already starts with a `#` header, it is written
-   as-is without further wrapping.
-
-### Conflict Resolution
-
-| Condition | Winner | Action |
-|-----------|--------|--------|
-| File mtime > DB updated_at | File (manual edit) | Skip — no write |
-| File mtime ≤ DB updated_at | DB | Overwrite file |
-| File does not exist | DB | Create new file |
-
-### CLI Wrapper
-
-```bash
-node scripts/memory/export-adr-fs.mjs [--dry-run] [--db <path>] [--adr-dir <path>]
-```
-
-### Step Ordering (Section 5.1 unchanged)
-
-The reverse sync runs **outside** the post-finalize hook chain — it is a manual operator tool,
-not an automatic step. The Step Ordering Contract (Steps 1–13) defined above is **unaffected**
-by this amendment.
-
-### OSS GA Anchor
-
-This amendment is a prerequisite for the Sprint 170 OSS GA public flip. The CI gate
-(`scripts/memory/export-adr-fs.mjs --dry-run`) must report `written=0` before the public
-flip proceeds.
-
-### References
-
-1. **Sprint 166 T1** — `src/core/adr-file-sync.ts` forward sync implementation (Bug M fix)
-2. **Sprint 169 H1** — `src/core/memory-export.ts` reverse sync implementation
-3. **ADR-036** — ADR Governance Integration (mandatory amendment protocol)
-
----
-
-> **Note (deep-verified vs code, Sprint 172):** Bu ADR'nin tüm somut iddiaları kodla doğrulandı:
-> - **§5.1 Step Ordering Contract (4-hook) doğru:** `src/core/identity-generator.ts:341-346` JSDoc — Step 1 `memoryExport` → Step 2 `identityRegen` → Step 3 `adrInsert` → Step 4 `ruleRegen`, ve "Step 3 must run BEFORE Step 4 so that newly accepted ADRs (e.g. ADR-046)…" birebir. Invariant testleri mevcut: `tests/core/identity-generator-step-order.test.ts` + `tests/core/adr-046-step-ordering-invariant.test.ts`.
-> - **Bug M (Step 3 adrInsert):** `src/core/adr-file-sync.ts` `syncAdrFilesToDb()` mevcut (FS→DB upsert, non-destructive). **Önemli numaralandırma açıklığı:** Sprint 168 Amendment'taki "Step 12 (archiveDirectives) / Steps 1–13" ifadesi bu §5.1 **4-hook `runPostFinalizeHooks` kontratı DEĞİL**, ayrı `finalizeSprint` CLEANUP zincirinin (`src/cli/commands/finalize.ts`) 13-adımlı numaralandırmasıdır. İki numaralandırma farklı kapsamlardır; §5.1 kontratı 4 hook olarak geçerlidir.
-> - **Bug N:** `cli/commands/finalize.ts:166` "Bug N fix (Sprint 166-T2)" + `:176 onRuleRegen` wire ✓.
-> - **Bug S:** `src/orchestra/managed-docs/doc-cache.ts:67-68` `computeCacheKey(entryHash, fileHash, sprintId?)` → sprint-aware key, `sprintId` yoksa legacy `entryHash:fileHash` (backward-compat clause doğru) ✓.
-> - **Bug Y2:** `.deckent/ground-truth-overrides.json` mevcut; whitelist iddiası doğru ✓.
-> - **Step 2 (identityRegen):** kod `@deprecated Sprint 166 (ADR-046)`, "Sprint 168 C0a-1 (BUG-GG) made the default runtime behavior to skip Step 2 — NO LONGER invoked". `PROJECT-IDENTITY.md` kaldırıldı, `.deckent/workspace/IDENTITY.md` (managed-docs) ile ikame edildi (`docs/reference/api-surface.md` ile hizalı). §5.1'deki "Sprint 168'de kaldırılır" runtime-skip default'unu doğru özetler.
-> - **Sprint 169 H1 Amendment:** `src/core/memory-export.ts:305 exportAdrsToFs()` + `scripts/memory/export-adr-fs.mjs` mevcut ✓.
-> - **İleri-dönük iddialar (gerçekleşme durumu):** "Sprint 167'de dependency_pipeline_enabled flip + M1-M4 baseline" ve "Sprint 170 hook chain refactor trigger" tasarım-niyeti/falsifiable hedeflerdir. deckent-dev'de `dependency_pipeline_enabled` bilinçle `false` kalır (Brain-manuel wave, ADR-045 + ADR-047); M1-M4 izleme kanalları ve Sprint 170 `PostFinalizeStepRegistry` refactor'ı koşullu/post-GA — bu projede otomatik tetiklenmez. "Memory DB Insert Pattern" bloğundaki `inserted:1 / updated:3` çıktısı Sprint-166 dönemi bir tahmin snapshot'ıdır, güncel literal durum değildir.
-> - **Duplicate dosya:** `046-brain-self-update-hook.md` artık `# ADR-NNN:` H1 + `**Status:**` taşımayan bir insan/link redirect'idir; `adr-file-sync` onu `skipped` sayar, bu canonical `adr-046` entry'sini ezemez.
->
-> Behavior unchanged; documentation alignment only.
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (post-finalize hook'lar kullanıcı projelerinde de çalışır — CLAUDE.md güncellemesi, rule-regen, ADR-sync ürün davranışıdır).
-
-1. **Duplicate-dosya teyidi (yapısal bulgu kapandı):** `046-brain-self-update-hook.md` bilinçli bir **redirect tasarımıdır** — kasıtlı olarak `# ADR-NNN:` H1 ve `**Status:**` taşımaz, böylece `parseAdrFile()` null döner ve `syncAdrFilesToDb()` onu `skipped` sayar; canonical `adr-046` entry'sini asla ezemez (rationale dosya-içi HTML-yorumda). **Her iki dosya da korunur** — redirect, eski linklerin insan-okur sürekliliği içindir. ADR-review'in başlangıç taraması bunu "duplicate hata" sanmıştı; kasıtlı-tasarım olarak doğrulandı.
-2. **Re-verified:** invariant testler (`tests/core/identity-generator-step-order.test.ts` + `adr-046-step-ordering-invariant.test.ts`) ✓ · forward `syncAdrFilesToDb` post-finalize'da canlı (`identity-generator.ts:588`) ✓ · reverse `exportAdrsToFs` (`memory-export.ts:317`) ✓. **Bu bi-directional FS↔DB kontratı, 2026-06-11 ADR-review'inin md+db eş-zamanlı güncelleme metodolojisini güvenli kılan mekanizmadır** (md edit → db update → post-finalize re-sync idempotent).
-3. **Staleness düzeltmesi:** Sprint-172 Note'undaki "deckent-dev'de `dependency_pipeline_enabled` bilinçle `false` kalır" cümlesi **superseded** — flag 2026-06-10'da `true`'ya çevrildi ve multi-wave canlı-kanıtlı (bkz. ADR-045 Sprint-281 amendment).
-
-md+db senkron (Alperen ADR-review).
+## References / Absorbed
+
+- **Absorbs:**
+  - **ADR-080** (Dashboard God-Level) — sprint-start detach (`sprint-job-runner.ts`), hollow-page wire (`App.tsx` + `Sidebar.tsx`), chat real round-trip, `DirectivesEditor`, god-level UI foundation (`use-live-data.ts` · `theme.ts` · `Layout.tsx`).
+  - **ADR-078 Part D** (Dashboard God-Level) — `AppShell.tsx`, `terminal-sessions.ts`, `EnterprisePage` / `MemoryExplorerPage` / `NervousPage` / `EvolutionPage`, and `src/api/evolution-endpoint.ts`.
+  - **ADR-082 Parts B/C** (Dashboard-v2 Canlı) — `WorkerGrid` SSE real-time, `StatusPage`/`RefreshButton`, `coverage-endpoint.ts`, `DebtPage` filters, `EnterprisePage` auth-wire + alert dedup.
+  - **ADR-083 Dalga D** (Dashboard claude-code-UX) — `ChatPage` streaming + slash, conversation-centric `Layout` (Observe/Manage/Converse IA).
+- **Cross-refs:**
+  - **ADR-G-034** (Native Agentic Terminal) — the **primary** management+usage surface; the dashboard is observability-only beside it.
+  - **DESK-1** (Desktop app, Electron) — destination for interactive chat (MASTER-PLAN).
+  - **ADR-G-022** (Nervous System) — NervousPage consumes pending-approval / accept-reject / detector status.
+  - **ADR-G-031** (Enterprise Foundation) — EnterprisePage tenant/RBAC/audit; V1 read-first → V2 management-plane CRUD.
+  - **ADR-G-032** (Self-Learning & Evolution Loop) — EvolutionPage + evolution-endpoint are its observability window.
+  - **ADR-G-025** (Process Resilience & Live Observability) — WorkerGrid is the dashboard endpoint of WORKER-LIVE-TRACE.
+  - **ADR-G-035** (Memory Architecture) — MemoryExplorerPage FTS5 search / ADR timeline / debt table.
+  - **ADR-G-029** (Embedded Web Terminal) — the `/terminal` page's PTY/session backend.
+  - **ADR-G-009** (Evaluation Integrity / Proof-of-Function) — the dashboard is Tier-1 user-surface; the freeze and hollow-page defects were `wired ≠ working` failures caught by real-binary smoke.
+  - **ADR-G-016** (Product Vision) / **ADR-G-010** (Output, Terminal-UX & Brand) — god-level / no-MVP bar; no-emoji + lucide-react + shared theme tokens.
+- **Born work-items:** **DASH** (serve-token-inject · routing chart · control-panel surfacing · onboarding view — from old 072/073/076 side-items) · **Chat/Dashboard product-sprint** (chat-HOLLOW · duplicate-sidebar · alert-spam · enterprise-CRUD) · **DESK-1** (Desktop app) — all to MASTER-PLAN.
+- **Direction:** `.analysis/adr-review-crosswalk.md` (rows 080/078/082/083), `.analysis/hermes-vs-deckent-direction-decisions.md`, memory `project_hermes_deckent_direction_2026_06` · `project_dashboard_chat_audit_20260611` · `feedback_dashboard_no_emoji_lucide` · `feedback_governance_aligns_with_direction_pivot`.
+</content>
+</invoke>
 
 
 ---
 
-## adr-047: Manuel Subagent Dispatch Protocol
+## adr-g-034: Native Agentic Terminal
 
 **Status:** accepted
 
-# ADR-047: Manuel Subagent Dispatch Protocol
+# ADR-G-034: Native Agentic Terminal
 
-**Status:** accepted
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** product-surface contract (bare `deckent` = native agentic terminal; risky actions confirm-gated)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-081 (Native Agentic Deckent) + ADR-074 Part-A (native-chat round-trip) + ADR-082 Part-A (real-LLM-wire) + ADR-083 (REPL-UX + provider-parity + local-model) + ADR-086 (Native CLI Parity F11)
+**Crosswalk:** 081 (+074A+082A+083+086) → ADR-G-034
 
-**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator — post-repair)
-
-**Date:** 2026-05-14
-
-**Sprint:** Sprint 168 (Brain Repair Phase — hardened protocol formalization)
-
----
-
-## Status
-
-accepted (Sprint 168 — Sprint 164-168 manuel survival pattern proven across 23+ incidents; formal
-protocol kontrat olarak dokümante edildi. Sprint 169+ Brain otonom orchestration hedefinin anchor ADR'ı.)
+> **Pivot note (2026-06-29):** The terminal is deckent's **PRIMARY management + usage surface** — tool-driven, full-control + non-tiring, full-functionality (flexibility is not acceptable). Work happens *from the terminal*, not via memorized CLI subcommands — but without forcing it (CLI/MCP remain optional access). At the level of Claude Code / Hermes / Codex / OpenClaw. The dashboard (ADR-G-033) is observability-only; the terminal is where you *do*.
 
 ---
 
 ## Context
 
-### Brain Self-Orchestration Chicken-and-Egg Paradox
-
-Sprint 164-168 boyunca Brain'in orchestration pipeline'ı kısmen kırıktı. Kırık Brain'i tamir etmek
-için Brain'in otonom orchestration'ını kullanmak mümkün değildi — bu klasik bir **chicken-and-egg
-paradox**u oluşturuyordu:
-
-- Brain kendi spawn pipeline'ını kırık bulduğunda, task dispatch edemedi
-- Kırık Brain üzerinden plan yapılamadı (RC1 parser bare token, RC2 collision subscribe yoktu)
-- Brain finalize hook chain'i kısmen çalışıyordu (ADR-046 — Step 2/4/5 partial implementation)
-- Bu kısırlaşma döngüsünü kırmak için insan-güdümlü (Alperen-guided) manuel dispatch gerekti
-
-### Sprint 164-168 Manuel Survival Pattern (23+ Incident)
-
-| Sprint | Manuel Dispatch Kullanım Gerekçesi |
-|--------|-------------------------------------|
-| 164 | Brain spawn pipeline crash — workaround: manuel task assignment |
-| 165 | Finalize hook eksik — manuel memory export + RETRO.md yaz |
-| 166 | Bug M+N+S+Y2+... forensic — manuel Brain repair sprint (11/11 task done) |
-| 167 | Audit + debug phase 1+2 — 10 bug x 5 cluster forensic investigation |
-| 168 | Brain Repair Phase — 8 anchor task hardened manuel dispatch |
-
-Bu pattern, otonom Brain orchestration'ın güvenilmez olduğu dönemlerde **projenin ilerlemesinin devam
-etmesini sağladı**. 23+ incident boyunca zero sprint abandonment (hiçbir sprint yarım bırakılmadı).
-
-### Phase 1+2 Audit Evidence (Sprint 167)
-
-Sprint 167 T5 forensic audit (`.audit/sprint-167/T5-brain-debug-phase1.md` +
-`T5-brain-debug-phase2.md`) 5 architectural cluster tespit etti:
-
-- **Cluster A:** Brain Finalize Hook Chain Implementation Gap (4 bug: BUG-CC/DD/EE/GG)
-- **Cluster B:** Locking Infrastructure Asymmetry — SpawnLock symmetric cleanup eksik
-- **Cluster C:** Plan-Spawn Integration Disconnect — 3 baglanti kopuklugu
-- **Cluster D:** Sprint Metrics Math — null/undefined guard eksik
-- **Cluster E:** Worker Lifecycle Mismatch — non-selective prompt cleanup cascade
-
-**Phase 4.5 trigger tetiklendi:** Her cluster için 3+ basarisiz önceki fix girisimi mevcut (Cluster A:
-Sprint 166 T1/T2/T5/T11 — 4 wire fix, Sprint 167'de hala kismi; Cluster B: Sprint 156 T-10'dan beri 11
-sprint asimetrik; Cluster C: Sprint 138 T4'ten beri 29 sprint disconnect).
-
-### Sprint 168 Formalization Gerekçesi
-
-Sprint 168'de "manuel subagent dispatch" ilk kez **hardened protocol** olarak biçimlendirildi:
-
-- **v1 to v5 eval zinciri:** systematic-debugging (Agent A: 79 to 96/100) + devil's advocate (Agent B: 22 to 26/100)
-- **Çift hedef basarili:** Agent A >=95 APPROVED, Agent B <30 SHIP_AS_IS
-- **8 paralel + 1 sequential subagent** git worktree isolation ile dispatch edildi
-- Bu ADR o protokolü kalici mimari kontrat olarak dokümante eder
+`deckent` with no arguments originally printed help. Across Sprints 219–224 it became a real native agentic REPL: bare `deckent` → conversational agentic terminal with real LLM round-trip, natural-language→action dispatch, token streaming, a confirm-gate for risky actions, session persistence, a live slash-registry, a status-line, an enterprise-command bridge, provider-parity across a 5-fleet (incl. local Ollama), and claude-code-grade polish (terminal-mode input, brand thinking-indicator, an agentic write/edit/read/bash tool layer, permission-memory). The view evolved to **Ink** (React-for-CLI) as the default. The 2026-06-30 review consolidates this lineage into the surface that the strategic pivot makes **primary**.
 
 ---
 
-## Decision
+## Decision (Today)
 
-Brain repair veya Brain orchestration'ın güvenilmez oldugu sprint'lerde **Hardened Manuel Subagent
-Dispatch Protocol** uygulanir. Bu protokol yedi zorunlu prensibe dayanir:
+### 1. Bare `deckent` = native agentic terminal
 
-### 1. Worktree Isolation (Git Worktree Per Cluster)
-
-Her cluster/subagent için ayri git worktree olusturulur:
-
-```bash
-git worktree add ../deckent-sprint-NNN-<CLUSTER_ID> main
+```xml
+<native-terminal default-view="ink">
+  <launch>bare `deckent` → agentic REPL (shouldLaunchDefaultRepl); --help/--version/
+    subcommands preserved; non-TTY graceful.</launch>
+  <agentic>NL → deckent action dispatch (status/recall/plan/...) via McpToolDispatcher;
+    agentic-DO tool layer (write/edit/read/bash, &lt;deckent_tool&gt; provider-agnostic),
+    scope-bounded to session cwd.</agentic>
+  <safety>confirm-gate for risky actions (start/kill/cleanup/write → y/a/N);
+    safe actions (status/recall) auto. Permission-memory (.deckent/settings.local.json,
+    gitignored) — claude-code-style "always".</safety>
+  <session>turns persisted to memory.db; reopening resumes context.</session>
+  <stream>F2 token-by-token streaming (SSE); thinking-indicator (kraken brand).</stream>
+  <slash>LIVE slash-registry derived from deckent's capability catalog (zero-hardcode):
+    /help /status /recall /plan /nervous /clear /exit + enterprise group (/audit /rbac
+    /flow /cost — visible in enterprise mode, present-but-hidden in user mode).</slash>
+  <status-line>config-driven (provider + active-process + cwd); customizable, can be off.</status-line>
+</native-terminal>
 ```
 
-**Zorunluluk:** Paralel subagent'lar ayni dosyalarda çakisma yapamaz. Subagent kendi worktree'sinde
-çalisir, main branch'e dokunmaz. Sprint sonu rebase + merge cascade order ile yapilir.
+### 2. Provider-parity (5-fleet) + local-model
 
-**Örnek (Sprint 168):**
+`resolveChatAdapter` is the single entry point mapping all providers (claude/codex/gemini/ollama/openai-compat) to an adapter via one contract. **Ollama-local is first-class** (zero-API-key, localhost:11434, explicit NET-error) — the "tomorrow deckent-AI with a local model" foundation. Provider fallback chain config-driven (`chat_provider ?? brain_provider ?? 'claude'` + optional `local_fallback`).
 
-```
-../deckent-sprint-168-C0e      (cascade endpoint — first merge)
-../deckent-sprint-168-C0b      (locking)
-../deckent-sprint-168-C0c      (plan-to-spawn integration)
-../deckent-sprint-168-C0a-1    (hook chain step 2)
-../deckent-sprint-168-C0a-2    (hook chain step 4, sequential)
-../deckent-sprint-168-C0a-3    (hook chain step 5, sequential)
-../deckent-sprint-168-C0a-4    (hook chain step 12, sequential)
-../deckent-sprint-168-C0d      (metrics, isolated)
-../deckent-sprint-168-ADR-047  (governance doc, paralel)
-```
+### 3. User / Enterprise mode
 
-### 2. File Authority Matrix
-
-Her subagent için STRICT `scope.filesWrite` tanimlanir. Subagent bu matrisin disina çikamaz:
-
-| Subagent | scope.filesWrite (yazma yetkisi) |
-|----------|----------------------------------|
-| C0e | src/providers/claude.ts, src/orchestra/sprint-lifecycle.ts, src/orchestra/spawn-backend.ts, src/orchestra/tmux.ts, src/core/active-workers.ts (NEW), docs/adr/048-*.md, tests/providers/, tests/orchestra/ |
-| C0b | src/core/file-lock.ts, src/monitor/auditor.ts (lock binding only), src/orchestra/spawn-backend-docker.ts:933 (on-exit hook only), tests/core/, tests/monitor/ |
-| C0c | src/orchestra/planner.ts, src/orchestra/task-builder.ts, src/orchestra/decision-engine.ts, src/orchestra/sprint-controller.ts (TASK_ASSIGN re-read only), tests/orchestra/ |
-| C0a-1 | src/core/identity-generator.ts, tests/core/identity-regen-default-skip.test.ts |
-| C0a-2 | src/core/rule-generator.ts, src/orchestra/sprint-finalizer.ts (Step 4 only), tests/core/, tests/orchestra/ |
-| C0a-3 | src/orchestra/sprint-retro-writer.ts, src/orchestra/sprint-finalizer.ts (Step 5 only), tests/orchestra/ |
-| C0a-4 | src/orchestra/sprint-docs-updater.ts, docs/adr/046-*.md (amendment), src/orchestra/sprint-finalizer.ts (Step 12 only), tests/orchestra/ |
-| C0d | src/orchestra/sprint-reporter.ts veya managed-doc-runner.ts, tests/orchestra/ |
-| ADR-047 | docs/adr/047-*.md (sadece) |
-
-**Alperen review gate:** Her subagent commit sonrasi `git diff --stat` ile file authority matrix
-disina yazim yapilip yapilmadigi kontrol edilir. Ihlal: subagent retry.
-
-### 3. Wave Structure (Cascade'in Tersine)
-
-Task dispatch sirasi, **bagimlilik cascade'inin tersine** organize edilir. Cascade endpoint'i
-(en çok bagimlilik alan modül) **önce** fix edilir — cascade upstream'leri düzeltmeden önce
-temiz bir taban saglar:
-
-```
-Cascade graph (bagimlilik yönü):
-  RC1 (parser) -> Brain TASK_ASSIGN payload
-  RC3 (cache)  -> Brain TASK_ASSIGN payload
-  RC2 (collision) -> Brain TASK_ASSIGN payload
-                                     |
-  RC4 (SpawnLock) -> spawn lock conflict
-                                     |
-  BUG-HH (claude.ts cleanup) -> ALL prompts deleted  <- ENDPOINT
-                                     |
-  Cluster A (Hook Chain Steps) -> finalize failures
-```
-
-**Dispatch wave order (cascade endpoint first):**
-
-| Wave | Subagents | Kosul |
-|------|-----------|-------|
-| **Wave 1** (paralel) | C0e (cascade endpoint) + ADR-047 | Hemen baslar |
-| **Wave 1.5** | Alperen CHECKPOINT | Wave 1 DONE sonrasi |
-| **Wave 2** (paralel) | C0b + C0c + C0a-1 + C0d | Wave 1.5 geçti ise |
-| **Wave 3** (sequential) | C0a-2 -> C0a-3 -> C0a-4 | Wave 2 DONE sonrasi |
-
-**Merge order** (cascade endpoint first, bagimlilik sirasiyla):
-
-1. C0e merge
-2. C0b
-3. C0c
-4. C0a-1 / C0a-2 / C0a-3 / C0a-4 (sequential)
-5. C0d
-6. ADR-047
-
-### 4. Wave 1.5 Serial Gate
-
-**Wave 1.5 serial gate**, kritik kontrat dogrulama için insan-in-the-loop (Alperen) checkpoint'tir.
-C0e gibi cascade endpoint fix'ler tamamlandiktan sonra, Wave 2 baslamadan önce asagidakiler
-seri olarak dogrulanir:
-
-```
-Wave 1.5 Checklist:
-  [ ] C0e DONE + commit hash verified
-  [ ] ADR-048 MADR v3 format compliance check
-  [ ] Cross-backend audit dogrula (Docker + Subprocess + Tmux uniformity)
-  [ ] npx deckent memory rebuild veya backfill script -> ADR-048 DB insert verify
-  [ ] .deckent/decisions/sprint-NNN-C0e-done.json write (audit trail)
-  [ ] npx vitest run skip count delta kontrol (>0 ise retry)
-  [ ] Wave 2 dispatch onay
-```
-
-**Gerekçe:** Sprint 166 T11 paterni. Cascade endpoint'in biraktigi kontrat (ADR-048) downstream
-subagent'lar (Wave 2) tarafindan baz alinir. Kontrat hataliYsa Wave 2 hatAyi çogaltir. Serial gate
-bu riski engeller.
-
-### 5. TDD Enforcement Gate
-
-Her subagent için zorunlu TDD disiplini:
-
-1. **Failing test ÖNCE yaz** (TDD red phase) — Implementation öncesi
-2. **Run test -> FAIL bekle** — Red dogruLandi
-3. **Minimal implementation** — Sadece testi geçirecek kadar
-4. **Run test -> PASS bekle** — Green dogruLandi
-5. **Atomic commit per step** — Her TDD cycle ayri commit
-6. **Skip ekleme YASAK** — Baseline skip count (Sprint 168: 41) korunur
-7. **Test PASS olmadan commit YASAK**
-
-**TDD enforcement gate kuralLari:**
-
-- Subagent `.result` dosyasinda `tests_skipped_added: 0` field ZORUNLU
-- Alperen review gate: subagent commit sonrasi `npx vitest run` + skip count delta kontrol
-- Skip artisi tespit edilirse subagent retry veya manuel fix
-- Vitest baseline tolerance: `pass>=16395 + fail<=2 + skip<=41`
-
-**Gerekçe:** Sprint 164-167 skip drift (41 inherited skips). TDD enforcement gate yeni regression
-ve technical debt birikmesini engeller. Phase 4.5 trigger kosullarindan biri de "çok sayida
-basarisiz fix" — TDD bu döngüyü önler.
-
-### 6. Lock Pattern
-
-Shared file conflict'i önlemek için dispatch lock dosyasi kullanilir:
-
-```json
-{
-  "version": "1.0",
-  "sprint": "sprint-NNN",
-  "subagents": {
-    "C0a-1": {
-      "worktree": "../deckent-sprint-NNN-C0a-1",
-      "status": "pending|active|done|merged",
-      "files_owned": [
-        "src/core/identity-generator.ts",
-        "tests/core/identity-regen-default-skip.test.ts"
-      ],
-      "started_at": null,
-      "done_at": null,
-      "commit_hash": null
-    }
-  }
-}
-```
-
-**Lock file path:** `.deckent/sprint-NNN-dispatch-locks.json`
-
-**Status transitions:** `pending -> active -> done -> merged`
-
-**Sequential lock:** PaylasiLan dosyalar için (örn. `sprint-finalizer.ts`) önceki subagent
-`done` olmadan sonraki `active` olamaz. C0a-2/3/4 bu kurala tabidir.
-
-### 7. Manual Survival Fallback
-
-Brain orchestration NO_GO veya güvenilmez ise Sprint N+0.5 replay paterni devreye girer:
-
-| Sprint N Sonucu | Sprint N+0.5 Mod |
-|-----------------|------------------|
-| **GO** | Brain otonom (`deckent plan + start` normal flow) |
-| **GO_WITH_TECH_DEBT** | Brain yari otonom (Brain spawn, Alperen monitoring) |
-| **NO_GO** | Manuel subagent dispatch replay (Sprint N paterni, bu ADR) |
-
-**NO_GO durumu protocol:**
-
-- Sprint N'nin fail eden cluster Sprint N+0.5'in ilk task'i olur (gap closure)
-- Yeni sprint DIRECTIVES.md Sprint N fail evidence ile baslar
-- Worktree isolation Sprint N+0.5 için yeniden kurulur
-- TDD enforcement gate ayni baseline kurallari ile devam eder
-
-**Recursion kabul:** Brain repair sirasinda Brain bypass GEREKLI olabilir. Sprint N sonu Brain
-otonom OLMAYABILIR — bu durumda Sprint N+0.5 hala manuel survival ile çalisir AMA Sprint N'nin
-fix'leri persistent'tir (regression yok). Hedefler gerekirse Sprint N+2'ye kayabilir.
-
-**Catch-22 önleme:** Sprint N NO_GO -> Sprint N+0.5 BLOCKED zinciri YASAK. Sprint N+0.5 her zaman
-basLAYabilir — Brain kirik olsa dahi manuel dispatch ile.
+`resolveChatMode`: `user` (default, simple — chat + basic slash) | `enterprise` (audit/rbac/flow/cost slash visible). Capability is **always present**; mode only filters the `/help` visibility ("kullanılmasa da kullanılabilir").
 
 ---
 
-## Architectural Principles
+## Intent / Roadmap (Tomorrow)
 
-Bu protokolün alti temel mimari prensibi:
-
-### 1. Worktree Isolation (Subagent Çakisma Protection)
-
-Paralel subagent'lar ayri git worktree'lerde çalisir. Çakisma tespit edilirse resolve yerine
-isolation güçlendirilir. Bir subagent'in hatasi digerini kirletmez.
-
-### 2. File Authority Matrix (Scope Kontrolü)
-
-Her subagent için STRICT yazma yetkisi tanimlanir ve Alperen review gate ile denetlenir.
-ADR-037 RBAC prensiplerine uygun. Scope ihlali -> retry. Matrix genisletilemez (yeni subagent
-için yeni satir eklenir, mevcut satir büyütülemez).
-
-### 3. TDD Enforcement Gate (Regression Protection)
-
-Failing test -> fix -> pass döngüsü zorunludur. Skip ekleme YASAK — bu kural "test geçti" ile
-"test var" arasindaki boslugu kapatir. Alperen review gate skip count delta'yi dogrular.
-
-### 4. Wave-Based Execution (Cascade Order)
-
-Dispatch cascade'in tersine organize edilir. Endpoint fix edilmeden upstream fix yapilmaz.
-Bu "fix birini bozdu" riskini minimize eder ve her wave'in stabil bir temel üzerine insa
-edilmesini saglar.
-
-### 5. Wave 1.5 Serial Gate (Kritik Kontrat Dogrulama)
-
-Cascade endpoint fix + kritik ADR yazimi sonrasi insan onayLi serial checkpoint. Downstream
-subagent'lar hatali bir kontrAti baz almadan önce dogrulama yapilir.
-
-### 6. Manual Survival Fallback (Catch-22 Önleme)
-
-Brain repair sirasinda Brain bypass gereklidir — bu paradoks kabul edilir ve explicit fallback
-semantigi ile yönetilir. Hiçbir sprint yarim birakilmaz.
+- **TOOL progressive-disclosure** (Hermes-rolemodel + better): deckent's functions move to a tool-surface; core tool-set eager + a searchable bridge (search/describe/call). Terminal is tool-driven; CLI/MCP optional. (MASTER-PLAN: TOOL-1/TOOL-2.)
+- **WORKER-LIVE-TRACE** in-terminal (ADR-G-025): live per-worker run-status footer (TERM-LIVE).
+- **Runtime-wide ApprovalBroker integration** (APR): risky tool/worker actions emit → terminal live → suspend/resume; multi-channel relay.
+- **Scope-enforcement via TOOL, not prompt** (TOOL-SCOPE): worker out-of-scope is tool-gated → shrinks worker prompts (WP-OPT).
+- **Desktop app** (ADR-G-033/DESK): interactive chat moves to the Electron desktop app later; the native terminal stays the power surface.
 
 ---
 
 ## Consequences
 
-### Olumlu
+**(+)** The product's primary individual surface is a real, agentic, multi-provider, polished terminal at parity with the best CLIs — the pivot's "terminal runs" thesis is shipped. Local-model foundation enables offline/air-gapped + cost-free dogfooding. Enterprise capability is reachable but unobtrusive.
 
-- **Sprint 164-168 sprint abandonment = 0.** 23+ incident'ta zero sprint abandonment.
-  Manuel dispatch protokolü bu basArIyi mümkün kildi.
-- **Brain repair sprint'lerinde formal protocol.** Dokümante ve tekrarlanabilir — gelecek
-  Brain kirik dönemlerinde Alperen ve Brain protokolü bilir, icat etmek zorunda kalmaz.
-- **Worktree isolation paralel çalismAyi güvenli kilar.** 8 subagent paralel çalisti,
-  conflict yasAnmadi (Sprint 168 dogfood kaniti).
-- **TDD enforcement gate regression önledi.** Baseline 41 skip Sprint 168 sonu <=41 korundu.
-- **Sprint 169+ Brain otonom hedefinin anchor'i.** Sprint 168 GO -> Brain otonom mümkün.
-  Bu ADR o gecisin ön kosulunu belgeler.
-- **ADR-047 + ADR-048 memory.db'ye insert edildi.** Brain ADR-bazli kararlar için güncel
-  governance veriye erisebilir (ADR-046 M1 monitoring metrik).
-
-### Olumsuz
-
-- **Manuel dispatch human-intensive.** Alperen review gate her subagent için manuel onay
-  gerektirir. Wave 1.5 serial gate ek zaman alir (30-60 dk tahmin). Brain otonom öncesi
-  bu overhead devam eder.
-- **Worktree yönetimi complexity.** 9 worktree + cleanup = sprint sonu ek adim. Unutulursa
-  disk space birikMesi (her worktree full repo clone).
-- **Sprint N+0.5 pattern manuel kalir.** Brain otonom saglanana kadar her repair sprint
-  bu protokolü tekrar uygulAyacak. Recursion paradoksu çözülmeden bu overhead sürer.
-- **Sprint 169 hedefi kayabilir.** Sprint 168 GO_WTD veya NO_GO durumunda Sprint 169 OSS GA
-  Sprint 170+'a ertelenebilir (Manual Survival Fallback Section 7 semantigi).
+**(−)** TOOL progressive-disclosure, WORKER-LIVE-TRACE, ApprovalBroker integration, and TOOL-SCOPE are roadmap (the "must be BETTER than Hermes at tool+terminal" bar is forward work). A minor drift exists (`entry.ts` keeps inline provider-resolve branches vs the `resolveChatAdapter` SSOT — consolidation candidate). Dashboard-chat is being de-emphasized in favor of this surface + the desktop app.
 
 ---
 
-## Compliance
+## References / Absorbed
 
-### Sprint 168 Dogfood Evidence
-
-Sprint 168 bu protokolün ilk **hardened** uygulamasidir:
-
-| Kontrol | Beklenti | Gerçek |
-|---------|----------|--------|
-| Anchor task sayisi | 8 paralel + 1 sequential | 8 + ADR-047 = 9 subagent |
-| Worktree isolation | 9 ayri worktree | Olusturuldu (git worktree list dogruladi) |
-| File authority matrix | Her subagent STRICT scope | DIRECTIVES.md + plan Section file authority matrix |
-| Wave structure | 4 wave (1, 1.5, 2, 3) | DIRECTIVES.md Wave Structure uygulandi |
-| Wave 1.5 serial gate | ADR-048 + cross-backend audit | Wave 1 (C0e) DONE sonrasi Alperen CHECKPOINT |
-| TDD enforcement gate | 0 yeni skip (baseline 41) | Subagent .result + Alperen review gate |
-| Lock pattern | .deckent/sprint-168-dispatch-locks.json | Olusturuldu |
-| Manual survival fallback | Sprint 168 NO_GO -> Sprint 168.5 replay | Explicit DIRECTIVES.md Sprint 168.5 section |
-| ADR-047 yazili | Sprint 168 Wave 1 | Bu dokuman |
-
-### Sprint 169+ Brain Otonom Hedefi
-
-Sprint 168 GO -> Brain otonom `deckent plan + start` normal flow.
-
-Bu ADR'in protokolü Sprint 169+ Brain otonom orchestration ile **protocol parity** saglamalidir:
-
-| ADR-047 Protokol | Brain Otonom Esdeğeri |
-|------------------|-----------------------|
-| Worktree isolation | git worktree add -> Brain spawn-time isolation |
-| File authority matrix | scope.filesWrite RBAC (ADR-037 V1.0 — compile-time lint + audit-trail; runtime advisory/soft, bloke etmez; hard-flip post-GA V2) |
-| TDD enforcement gate | Brain GO/NO_GO evaluation (result evaluator) |
-| Wave structure | dependency_pipeline_enabled — Wave scheduling (kod default true; deckent-dev'de bilinçle `false`, Wave geçişleri Brain-manuel — bkz. aşağıdaki not) |
-| Wave 1.5 serial gate | Human checkpoint MCP tool (deckent_checkpoint) |
-| Lock pattern | .locks/ infrastructure (ADR-037) |
-| Manual survival fallback | deckent recover + deckent run chain |
-
-Brain otonom Sprint 169'da bu 7 kontrol için parity saglandiysa manuel dispatch yerine `deckent plan`
-+ `deckent start` kullanilir. Parity eksikse ADR-047 paterni devam eder.
-
-### Sprint 168.5 Compliance
-
-Sprint 168 sonucu ne olursa olsun Sprint 168.5 basLAYabilir:
-
-- Sprint 168 GO -> Brain otonom Sprint 168.5
-- Sprint 168 GO_WTD -> Yari otonom (Brain spawn, Alperen monitoring)
-- Sprint 168 NO_GO -> Sprint 168.5 bu ADR ile manuel dispatch replay
-
-Sprint 168.5 scope: C1 Memory Relations, C2 Bug Z3 Safety, H1-H5 OSS pre-flip hazirlik.
-
----
-
-## Alternatives Considered
-
-### (a) Brain Otonom ile Sprint 168 Yürütme
-
-Brain'in kirik pipeline'ina ragmen `deckent plan + start` kullanmak.
-
-**Neden reddedildi:** Phase 1+2 audit kanAtladi ki RC1 parser + RC4 SpawnLock + BUG-HH cascade
-aktifken Brain spawn 7/7 task'ta basarisiz oldu (Sprint 167 canli kanit). Brain'i kirik Brain
-ile tamir etmek — paradox çözümsüz. Manuel dispatch tek güvenilir yol.
-
-### (b) Tek Büyük Subagent (Monolithic Fix)
-
-Tüm 10 bug'i tek subagent ile fix etmek.
-
-**Neden reddedildi:** 5 cluster x farkli modül -> scope collision riski. Tek subagent hata
-yapinca rollback zorlasir. Paralel worktree ile 8 subagent her cluster'i bagmsiz fix eder
-ve hata izolasyonu kolaydir.
-
-### (c) Sequential (No Paralel) Dispatch
-
-8 subagent sirayla, worktree olmadan.
-
-**Neden reddedildi:** Tahmini süre ~35h sequential. Paralel + wave ile ~10-15h. Worktree
-olmadan sequential conflict riski ayni kalir. Paralel + isolation daha hizli ve güvenli.
-
-### (d) Human-Driven (No Subagent — Alperen Codes Directly)
-
-Alperen tüm fix'leri kendisi yazar.
-
-**Neden reddedildi:** 10 bug x 5 cluster ~35h kodlama. Subagent dispatch hem hiz hem expertise
-saglar. Subagent dispatch bu projenin product vision'inin dogfood'udur (deckent ile deckent repair).
-
----
-
-## Related ADRs
-
-- **ADR-046:** Brain Self-Update Hook Architecture — Step Ordering Contract. Bu ADR'in
-  hook chain (Cluster A) fix'leri ADR-046 kontratina uygun yazildi. Wave 3 subagent'lar
-  (C0a-2/3/4) ADR-046 Step 4/5/12'yi fix ediyor.
-- **ADR-037:** Brain-Auditor-Worker Authority Matrix — RBAC Protocol V1.0. File authority
-  matrix bu ADR'in scope.filesWrite kontratini manuel dispatch için genisletir. Auditor
-  boundary violation detection bu protokolde Alperen review gate olarak uygulanir.
-- **ADR-035:** Brain-Worker-Auditor Verification Protocol Standard. TDD enforcement
-  gate ve Alperen review gate bu ADR'in 15-channel verification protocol'ünün manuel
-  uyarlamasidir. Subagent .result dosyasi V1.0 verification protocol'e uygun format kullanir.
-- **ADR-040:** Nervous System Architecture — Proactive Meta-Orchestrator. Manuel dispatch
-  sirasinda Nervous System pasif (observer) modda çalisir — Brain orchestration devredisi iken.
-- **ADR-045:** Wave-Based Execution Semantics. Brain otonom wave scheduling (dependency_pipeline)
-  ile ADR-047 wave structure paraleli: cascade endpoint'i önce fix etmek, dep_pipeline_enabled
-  topological ordering ile esdeger.
-
----
-
-## References
-
-1. **Sprint 168 Spec (v5):** `docs/superpowers/specs/2026-05-14-sprint-168-design.md`
-   — Section 3.2 Execution: Hardened Manuel Subagent Dispatch (dispatch mechanism, file
-   authority matrix, lock pattern, TDD enforcement gate, manual survival fallback)
-2. **Sprint 168 Plan:** `docs/superpowers/plans/2026-05-14-sprint-168-plan.md`
-   — Section "Subagent Dispatch Runbook" (worktree setup, file authority matrix, dispatch
-   sequence, cluster prompts)
-3. **Sprint 167 T5 Phase 1 Audit:** `.audit/sprint-167/T5-brain-debug-phase1.md`
-   — 10 bug x 5 cluster forensic, Phase 4.5 trigger evidence, 23+ incident history
-4. **Sprint 167 T5 Phase 2 Audit:** `.audit/sprint-167/T5-brain-debug-phase2.md`
-   — Pattern analysis, working vs broken reference compare, cross-cluster dependencies
-5. **ADR-046 Sprint 168 Amendment:** `docs/adr/046-brain-self-update-hook-architecture.md`
-   — Step 12 archiveDirectives default=false amendment (C0a-4)
-6. **ADR-048 Prompt Lifecycle Contract:** `docs/adr/048-prompt-lifecycle-contract.md`
-   — C0e subagent tarafindan yazilan cross-backend prompt persistence kontrAti
-
----
-
-## Notes
-
-Bu ADR, Sprint 164-168 boyunca organik olarak gelisen manuel survival pattern'inin **retrospektif
-formalizasyonudur**. Pattern gerçek sprint'lerde test edildi, 23+ incident'ta zero abandonment
-sagladi, ve Sprint 168'de hardened protocol olarak standartlastirildi.
-
-Sprint 169+ için hedef: bu ADR'da belgelenen 7 protokol prensibinin Brain otonom orchestration
-ile tam parity saglamasi. O noktada ADR-047 "deprecated in favor of Brain otonom" olacak —
-bu basarinin belgesi olarak arsivde kalacak.
-
-**Sprint 168 final eval zinciri:**
-v1 (fc91fcd): brainstorming -> v5 (f63a8f6): Agent A 96/100 + Agent B 26/100 — cift hedef basarili.
-Bu ADR Sprint 168 GO kararinin mimari anchor'idir.
-
----
-
-> **Note (verified vs code + operating reality, Sprint 172):**
-> - **Provenance ✓:** commit `fc91fcd` (Sprint 168 design v1) ve `f63a8f6` (v5 patch) repo git geçmişinde gerçek; `docs/superpowers/specs/2026-05-14-sprint-168-design.md` + `docs/superpowers/plans/2026-05-14-sprint-168-plan.md` mevcut.
-> - **ADR-047 deprecated DEĞİL — hâlâ aktif işletim modu.** §Consequences/§"Sprint 169+ Brain Otonom Hedefi"/§Notes "Sprint 169+ Brain otonom → ADR-047 deprecated olacak" hedefi **gerçekleşmedi**. deckent-dev Sprint 172+ boyunca bu protokolle (manuel subagent dispatch) yürütülmeye devam ediyor — bu doküman turu dahil. Brain-otonom protocol parity sağlanmadı; ADR-047 bu projenin fiilî kanonik işletim modudur (CLAUDE.md/DECKENT.md ile hizalı).
-> - **ADR-037 düzeltmesi (parity tablosu):** "runtime enforcement" iddiası ADR-037 V1.0 gerçeğine çekildi — compile-time lint + audit-trail aktif; runtime **advisory/soft, bloke ETMEZ** (Layer-2 0-caller `authority-enforcer.ts` always-soft + `worker.ts` violation→true; hard-flip post-GA V2). Manuel dispatch'te bu kontrol fiilen **Alperen review gate** (`git diff --stat`) ile uygulanır — kod-enforce değil.
-> - **dependency_pipeline_enabled:** `.deckent/config.json` `false` (Brain-manuel Wave, ADR-045 + bu ADR). "Sprint 167 flip" deckent-dev'de gerçekleşmedi; öz-referans ironisi — flip'in olmama nedeni tam da bu ADR'ın tarif ettiği manuel mod. Kod default `true` kullanıcı-projesi yoludur.
-> - **Dangling ref:** §Context/§References'taki `.audit/sprint-167/T5-brain-debug-phase1.md` + `phase2.md` belirtilen yolda **mevcut değil** (transient `.audit/` dizini — forensic artefaktlar arşivlendi/silindi; iddialar formalizasyona dayanır, dosya erişimine değil).
-> - **Numaralandırma:** "Step 2/4/5 partial" (§Context) ve §"Related ADRs"daki "Step 4/5/12" — ADR-046'da netleştirildiği gibi `finalizeSprint` 13-adım CLEANUP zinciri numaralandırmasıdır, ADR-046 §5.1'in 4-hook `runPostFinalizeHooks` kontratı değil.
->
-> Behavior unchanged; documentation alignment only.
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review): Rol değişimi — birincil işletim modu → survival-fallback
-
-**Classification: dogfood-only** (deckent'in kendi onarımı/orkestrasyonu için Alperen-güdümlü protokol; parity-tablosu ürün özelliklerine köprü kurar).
-
-**İşletim-gerçekliği güncellemesi (Sprint-172 Note'u superseded):** Note'un "ADR-047 hâlâ fiilî kanonik işletim modu" tespiti artık geçerli DEĞİL. Sprint ~270'ten itibaren deckent-dev **Brain-otonom** çalışır: otonom dogfood-loop'un kendisi `deckent plan --structured && deckent start` akışıdır (Sprint 277/278/279/280 bu yolla koştu — manuel subagent dispatch değil). ADR'nin §"Sprint 169+ Brain Otonom Hedefi" parity tablosu **büyük ölçüde gerçekleşti:**
-
-- **Wave structure:** `dependency_pipeline_enabled=true` — canlı multi-wave (Sprint 279/280 kademeli wave yürütme; ADR-045 Sprint-281 amendment). Note'un "pipeline false / flip gerçekleşmedi" cümlesi superseded.
-- **File authority:** scope.filesWrite + auditor advisory (ADR-037 V1.0 tasarımı gereği) ✓ · **TDD/eval gate:** Brain GO/NO_GO + CC disk-verify close-out zinciri ✓ · **Checkpoint:** `deckent_checkpoint` + insan-onaylı sprint-start ✓ · **Lock pattern:** `.locks/` + spawn-time lock ✓ · **Survival fallback:** `deckent recover`/`run` + CC manuel müdahale ✓.
-
-**Rol kararı (Alperen):** ADR'nin kendi öngörüsü "parity sağlanınca deprecated olacak" idi — ancak **deprecated YAPILMAZ**: Prensip-7 (Manual Survival Fallback) kalıcı değer taşır ve **Sprint 280'de fiilen kullanıldı** (worker-timeout deadlock'unda TaskStop + manuel sprint-state finalize + CC el-düzeltmeleri — protokolün fallback-yüzü). ADR **accepted kalır**; rolü **"birincil işletim modu" → "survival-fallback"** olarak güncellenir: Brain-otonom birincil yoldur, Brain güvenilmez/kırık olduğunda ya da otonom akış düğümlendiğinde bu protokol devreye girer. md+db senkron (Alperen ADR-review).
+- **Absorbs:** ADR-081 + ADR-074A + ADR-082A + ADR-083 + ADR-086.
+- **Cross-ref:** ADR-G-033 (dashboard = observability; chat→DESK) · ADR-G-025 (WORKER-LIVE-TRACE) · ADR-G-008 (provider-parity/fleet) · ADR-G-022 (/nervous) · ADR-G-031 (enterprise slash) · ADR-G-009 (proof-of-function for surface tasks).
+- **Born / MASTER-PLAN:** TERM-* · TOOL-1/2 (progressive-disclosure) · APR (ApprovalBroker) · TOOL-SCOPE · WP-OPT · DESK-1.
+- **Memory:** `project_deckent_native_terminal_agent` · `project_ink_native_repl` · `project_hermes_deckent_direction_2026_06`.
 
 
 ---
 
-## adr-048: Prompt Lifecycle Contract
+## adr-g-035: Memory Architecture (DB-First, FTS5, Self-Learning Substrate)
 
 **Status:** accepted
 
-# ADR-048: Prompt Lifecycle Contract
+# ADR-G-035: Memory Architecture (DB-First, FTS5, Self-Learning Substrate)
 
-**Status:** accepted
-**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
-**Date:** 2026-05-14
-**Sprint:** Sprint 168 (Brain Repair Phase, Cluster E fix)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** sync-invariant (any write keeps content_norm + FTS5 + entry_history + audit_hmac consistent; direct SQL UPDATE forbidden)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-088 (Memory V2 — DB-First) · **Supersedes:** ADR-009 (DEBT.md markdown table — archived)
+**Crosswalk:** ADR-088 → ADR-G-035
 
----
-
-## Status
-
-accepted (Sprint 168 C0e fix — Sprint 167 BUG-HH live evidence, cascade endpoint).
-
-## Context
-
-Sprint 167 audit's live forensic evidence (`.audit/sprint-167/T5-brain-debug-phase1.md` BUG-HH §393-468, `phase2.md` Cluster E §249-369) documented that `src/providers/claude.ts:129 _cleanupOrphanedPromptFiles()` was **non-selective**: every call to `ClaudeAdapter.kill(taskId)` deleted **every** `.tasks/.prompt-*.txt` file in the project, including the prompt files belonging to still-active workers.
-
-This violated the implicit contract documented inline at `src/orchestra/spawn-backend-docker.ts:941-942` (Sprint 156 Task 4):
-
-> `.prompt-*.txt` AND `.worker-*.sh` tmpfiles persist until sprint cleanup. Both are archived together by `archivePromptFiles()` during sprint cleanup phase.
-
-Sprint 167 BUG-HH live replay: when **any** worker was killed (orphan cleanup, scope violation, retry-fix kill), the remaining active workers lost their `.prompt-*.txt` source and several wrote NO_GO stub `.result` files because the Claude CLI could not re-read the prompt mid-execution.
-
-Cascade significance: this BUG-HH was the **endpoint** of Sprint 167's cascade chain. Any kill triggered by Cluster B (spawn-lock asymmetry), Cluster C (plan↔spawn disconnect), or Cluster A (sprint-finalizer step ordering) cascaded into BUG-HH and corrupted the entire sprint. Fixing C0e (this ADR) closes the cascade so that B/C/A fixes ship without downstream sprint corruption.
-
-Three additional gaps surfaced from the forensic:
-
-1. **No cross-sprint orphan handling.** If a sprint crashes mid-execution (Brain SIGKILL, power loss), its `.prompt-*.txt` files remain in `.tasks/` and pollute the next sprint's working set with no archival.
-2. **No cross-backend uniformity.** Only the Docker backend had a documented persist-until-cleanup contract. The Subprocess (`spawn-backend.ts`) and Tmux (`tmux.ts`) backends had no contract comment, so future maintainers had no guarantee the lifecycle would remain consistent.
-3. **Duplicate active-worker lookup.** `auditor.ts:2162-2168` already maintained an active-worker pattern (via `hb.workerId`), but the pattern was not shared as a helper. Selective filter on claude.ts needed an equivalent lookup (via `hb.taskId`, matching Docker prompt filename embedding `.prompt-{taskId}-{promptId}.txt`).
-
-## Decision
-
-`.tasks/.prompt-*.txt` and `.tasks/.worker-*.sh` tmpfiles follow this lifecycle contract across **all three** spawn backends (Docker, Tmux, Subprocess):
-
-1. **Write at spawn:** Worker spawn writes prompt to `.tasks/` (Docker: `spawn-backend-docker.ts:226-232`; Tmux: `tmux.ts:writePromptFile()`; Subprocess: passes via argv/stdin, no file).
-2. **Persist until sprint cleanup:** During the sprint, prompt files are PRESERVED. Per-worker `kill()` MUST NOT delete prompts belonging to other live workers.
-3. **Archive at sprint cleanup:** `archivePromptFiles(tasksDir, sprintId)` (`spawn-backend-docker.ts:982`) is the single atomic operation that moves all `.prompt-*.txt` and `.worker-*.sh` files to `.tasks/archive/sprint-{sprintId}/`. Move (not delete) preserves post-mortem forensic value.
-4. **Active filter at cleanup edge cases:** `ClaudeAdapter._cleanupOrphanedPromptFiles(activeTaskIds?)` applies a selective filter via the shared helper `getActiveWorkerIds()` (`src/core/active-workers.ts`). A prompt is deleted only when its embedded taskId is absent from the active heartbeat set. When the caller omits `activeTaskIds`, the helper auto-defaults to `getActiveWorkerIds(this.projectDir)`.
-5. **Cross-sprint orphan cleanup:** `cleanupPreviousSprintOrphans(projectRoot, previousSprintId)` (`src/orchestra/sprint-lifecycle.ts`) is invoked at sprint startup. It calls `archivePromptFiles(tasksDir, previousSprintId)` — orphans from a crashed prior sprint are archived (not lost, not retained as noise).
-6. **Cross-backend uniformity:** All three backends carry an inline `Sprint 168 C0e Cross-Backend Contract` comment so the persist-until-cleanup contract is discoverable from any backend source file.
-
-## Architectural Principles
-
-- **Single source of truth.** `archivePromptFiles()` in `spawn-backend-docker.ts:982` is the one atomic operation responsible for moving tmpfiles. Sprint-end cleanup, cross-sprint startup cleanup, and any future periodic sweeper all delegate to this function.
-- **Active worker protection.** Selective filter via `getActiveWorkerIds()` (`src/core/active-workers.ts`). Helper returns `taskId` because Docker prompt filenames embed `taskId` (`.prompt-{taskId}-{promptId}.txt`). Auditor's existing `workerId`-based pattern (`auditor.ts:2162-2168`) is intentionally NOT replaced — it serves a different downstream (lock cleanup) and the two patterns are complementary.
-- **Sprint boundary respected.** Intra-sprint kill DOES NOT trigger archive (cleanup is per-sprint-end). Cross-sprint orphans DO archive (the startup hook explicitly moves them to the previous sprint's archive folder).
-- **Backend agnostic.** Three backends share the same lifecycle contract via inline `Sprint 168 C0e Cross-Backend Contract` markers; future backends (e.g. MCP) inherit the same contract.
-
-## Consequences
-
-**Positive:**
-
-- BUG-HH eradicated — `_cleanupOrphanedPromptFiles()` protects active workers via taskId selective filter, so the Sprint 167 cascade endpoint is closed.
-- Cluster B (spawn-lock asymmetry), Cluster C (plan↔spawn disconnect), Cluster A (sprint-finalizer step ordering) kill operations no longer corrupt the active worker set as a side effect.
-- Three backends share an explicit, discoverable persist-until-cleanup contract — multi-provider users (Docker + Tmux + Subprocess) get consistent behavior.
-- Cross-sprint orphans no longer pollute the next sprint's `.tasks/` — they are archived under the previous sprint id.
-- `getActiveWorkerIds()` shared helper deduplicates the active-worker enumeration that previously lived only as an inline expression in `auditor.ts`; future callers (Sprint 168.5+) can reuse it.
-
-**Negative:**
-
-- During the sprint, `.tasks/.prompt-*.txt` files persist on disk — for a typical sprint with ~50-100 prompts at ~10KB each, this is ~500KB-1MB of disk space until sprint-end archive. Acceptable trade-off against forensic value.
-- Tmux backend prompt filenames use random hex (`tmux.ts:60 writePromptFile`), NOT the embedded-taskId pattern of Docker. The selective filter `file.includes(\`-${id}-\`)` therefore does NOT protect tmux prompts (random hex tokens never match a taskId). Tmux prompt protection relies on tmux's per-window kill semantics (the prompt is only meaningful for the killed window) plus the sprint-end archive sweep, not on the selective filter. Subprocess backend writes no `.prompt-*.txt` at all, so the selective filter is also a no-op there. This asymmetry is intentional and documented inline in `tmux.ts:writePromptFile()` and `spawn-backend.ts` TmuxBackend.spawn().
-- Sprint cleanup phase is a single atomic operation. If `archivePromptFiles()` fails partway, the next sprint's startup hook (`cleanupPreviousSprintOrphans`) recovers the remainder — but a fully-corrupted `.tasks/archive/` directory would require manual recovery (operator intervention).
-
-## Compliance
-
-**Verification (Sprint 168 test suite):**
-
-- `tests/core/active-workers.test.ts` — 4 cases: taskId extraction, empty dir, malformed JSON tolerance, missing directory tolerance.
-- `tests/providers/claude-cleanup-active-protected.test.ts` — 3 cases: explicit active list protection, default-from-heartbeat fallback, no-active legacy delete-all.
-- `tests/orchestra/sprint-startup-prev-sprint-orphan.test.ts` — 3 cases: single orphan archive, empty-directory idempotency, multi-file archive.
-- `tests/orchestra/cross-backend-prompt-uniformity.test.ts` — 2 cases: contract keyword presence across all 3 backends, Sprint 168 C0e marker presence on the two newly-annotated backends.
-
-**Runtime evidence required for ratification:**
-
-- Sprint 168 Brain otonom smoke test (Plan Section "Brain Otonom Smoke Test Runbook" — 3-task complex). Expected: kill of task 3 preserves prompts of tasks 1+2.
-- Sprint 168.5 production replay: previous sprint's `.tasks/.prompt-*.txt` files must be archived into `.tasks/archive/sprint-168/` at Sprint 168.5 startup.
-
-## Related ADRs
-
-- **ADR-046**: Brain Self-Update Hook Architecture — Step 12 archive-directives pattern parallels this archive-prompts pattern; both share the "single atomic operation at sprint boundary" principle.
-- **ADR-037**: Brain-Auditor-Worker Authority Matrix — RBAC scope. Sprint cleanup is a Brain authority; Auditor reads but does not write tmpfiles.
-- **ADR-035**: Brain ↔ Worker ↔ Auditor Verification Protocol Standard. The `.prompt-*.txt` file is verification-channel evidence; protecting it preserves the chain.
-- **ADR-038**: Dead Code Disposition — earlier audit established that tmpfiles have forensic value; this ADR formalizes the persist-until-cleanup contract that follows from that principle.
-
-## References
-
-- Sprint 167 T5 Brain Debug Phase 1: `.audit/sprint-167/T5-brain-debug-phase1.md` §393-468 (BUG-HH forensic).
-- Sprint 167 T5 Brain Debug Phase 2: `.audit/sprint-167/T5-brain-debug-phase2.md` §249-369 (Cluster E cascade pattern).
-- Sprint 168 plan: `docs/superpowers/plans/2026-05-14-sprint-168-plan.md` lines 409-832 (Task 1 C0e TDD steps).
-- Sprint 168 spec v5: `docs/superpowers/specs/2026-05-14-sprint-168-design.md` Cluster E section.
-- Sprint 156 Task 4: original `archivePromptFiles()` introduction (`spawn-backend-docker.ts:982-1011`) — the persist-until-cleanup contract this ADR extends.
-
----
-
-> **Note (deep-verified vs code, Sprint 172):** §Decision 4 + §Architectural Principles kod ile **birebir doğrulandı:**
-> - `_cleanupOrphanedPromptFiles(activeTaskIds?)` — opsiyonel param, yoksa `getActiveWorkerIds(this.projectDir)` default (`src/providers/claude.ts:147,150`); selective filter `active.some(id => file.includes(\`-${id}-\`))` (`:157`) ve Docker `.prompt-{taskId}-{promptId}.txt` yorumu birebir.
-> - `getActiveWorkerIds()` (`src/core/active-workers.ts:67`) `.hb` dosyalarından `hb.taskId` döndürür; JSDoc'u (`:55-57`) "auditor.ts:2162-2168 workerId pattern KASITLI değiştirilmedi, iki pattern tamamlayıcı" der — §Arch Principles ile aynen. Tolerance (malformed/empty/missing → boş) test 4-case ile uyumlu.
-> - **Pozitif nüans (ADR metninde yok):** `getActiveWorkerIds` ek olarak `PENDING_SPAWNS` (henüz `.hb` yazmamış spawn) ile **union** yapar — §Decision 4 kontratının süperseti (çelişki değil, erken-spawn koruması).
-> - **Fonksiyon/test ✓:** `cleanupPreviousSprintOrphans` (`sprint-lifecycle.ts:236`, `archivePromptFiles` çağırır), `archivePromptFiles` (`spawn-backend-docker.ts:1003`); 4 test dosyası (`active-workers`, `claude-cleanup-active-protected`, `sprint-startup-prev-sprint-orphan`, `cross-backend-prompt-uniformity`) mevcut.
-> - **Satır-ref drift'i:** ADR `claude.ts:129` → gerçek def `:147` (call `:123`); `archivePromptFiles` `:982` → gerçek export `:1003`. Fonksiyonlar mevcut, yalnız satır numaraları eski (kod büyüdü).
-> - **§Decision 6 hassasiyet düzeltmesi:** "All three backends carry an inline `Sprint 168 C0e Cross-Backend Contract` comment" abartılıdır — C0e marker yalnız `src/orchestra/spawn-backend.ts` + `src/orchestra/tmux.ts`'te (2 yeni-annote backend); `claude.ts`/`spawn-backend-docker.ts`'te yoktur (Docker'da orijinal Sprint 156 persist-until-cleanup yorumu vardır). ADR'ın kendi §Compliance maddesi zaten daha hassas ("the two newly-annotated backends"); §Decision 6 ile §Compliance arasındaki ifade farkı §Compliance lehine okunmalıdır.
-> - **Dangling ref:** §Context + §References'taki `.audit/sprint-167/T5-brain-debug-phase1.md` + `phase2.md` belirtilen yolda mevcut değil (transient `.audit/` — ADR-047 ile aynı; iddialar forensic formalizasyona dayanır). `docs/superpowers/plans|specs/2026-05-14-sprint-168-*` referansları mevcut ✓.
->
-> Behavior unchanged; documentation alignment only.
-
----
-
-## Amendments
-
-### Sprint 182 Amendment — Worker Prompt Quality Contract (2026-05-21)
-
-**Status:** accepted (Sprint 182 Wave 3, Crisis Stabilization Initiative §8d)
-**Trigger:** Sprint 181 sistem testi 8 worker prompt quality bulgusu (`docs/superpowers/specs/2026-05-21-worker-prompt-quality-fixes.md`) + anchor memory `feedback_prompt_completeness_over_brevity.md` (token-tasarruf YASAK felsefesi).
-
-ADR-048'in orijinal kapsamı (Sprint 168) `.prompt-*.txt` ve `.worker-*.sh` **tmpfile lifecycle** (yaz/persist/arşivle) ile sınırlıdır. Bu amendment, aynı lifecycle'ın **render/inject aşamasına** dair eksik kontratı şu altı kuralla tamamlar:
-
-1. **Worker prompt truncation YASAK.** `prompt-god-template.ts` içindeki skill section'ı (`EFFORT_TOKEN_MAP`, `perItemMax`, `sectionMax`, `truncateAtParagraph`, `if (... > sectionMax) break`) ve ADR section'ı `ADR_SECTION_MAX = 6000` cap'i kaldırılmıştır. Her atanmış skill **full SKILL.md**, her ilgili ADR **full content** inject edilir. `"(content truncated)"`, `"(ADR content truncated for prompt size)"` gibi marker'lar worker prompt'larında **bulunmaz**. Felsefi temel: prompt tamamlığı > token-tasarrufu (anchor: `feedback_prompt_completeness_over_brevity`).
-2. **Agent prompt single source = `PROMPT.md`.** `agent-pool.ts::getAgentPrompt(id)` öncelik sırası: (a) `PROMPT.md` (kanonik), (b) yoksa `agent.json::systemPrompt` (degraded warning ile fallback — hard fail YOK). `systemPrompt` + `PROMPT.md` **concatenation YASAK**. `agent.json::systemPrompt` schema'sı routing scoring + UI display için korunur ama prompt injection pipeline'ına girmez.
-3. **DIRECTIVES `Files:` → `task.scope.filesWrite`.** `task-builder.ts::parseDirectives` DIRECTIVES'ten gelen `Files:` satırını parse edip `task.scope.filesWrite` array'ine map'ler. Liste boşsa `Scope:` dizinlerinden inferred listing. Fallback string'i (`"(determined by your task scope)"`) açıkça formüle edilir — sessiz default YOK.
-4. **Title / Description ayrı render.** `## Task N: <title>` parse'tan title, `### Description` heading'den sonrası description. Render template'te title kendi satırında, description ayrı paragrafta — markdown korunur. Duplicate `title — description` birleşik satırı **kaldırılmıştır**.
-5. **ADR threshold-based selection (default 0.3).** `selectRelevantAdrs(task, allAdrs, maxCount, minScore)` signature genişletildi. Relevance score'u `minScore` (default **0.3**, configurable `.deckent/config.json::prompt.adr_min_relevance`) altında kalan ADR atlanır. 0 ADR kalırsa `=== Mandatory Architecture Rules (ADR) ===` blok header'ı dahil basılmaz (boş blok render yok).
-6. **Agent override semantic warning.** `forceAgent` atandığında: (a) activation rules `taskDNA` üzerinde çalıştırılır, (b) min score (default 0.3) altıysa **warning emit** (severity=`warn`, PLAN devam eder, override honored), (c) `Task.routingMeta.overrideWarnings: string[]` field'a kayıt yazılır. Override iptal değildir — semantic skew sadece görünür kılınır.
-
-**Implementation tasks (Sprint 182 Wave 3):**
-
-- **182-007** W3-PQ-1 — F1 `${IDEMPOTENCY_KEY}` injection fix (`src/orchestra/prompt-god-template.ts:455`)
-- **182-008** W3-PQ-2 — F2 + F3 truncation kaldır (skill + ADR full content)
-- **182-009** W3-PQ-3 — F4 Agent prompt single source = PROMPT.md (`src/core/agent-pool.ts::getAgentPrompt`)
-- **182-010** W3-PQ-4 — F5 + F6 DIRECTIVES parser fix (Files → filesWrite + title/description ayrı)
-- **182-011** W3-PQ-5 — F7 ADR relevance threshold default 0.3 (`selectRelevantAdrs` + `prompt.adr_min_relevance` config)
-- **182-012** W3-PQ-6 — F8 Agent override semantic warning (`Task.routingMeta.overrideWarnings`)
-- **182-013** W3-PQ-7 — Integration smoke: Sprint 181-001/002 prompt regression snapshot
-
-**Verification (Sprint 182 GO/NO_GO §GATE-3 PROMPT QUALITY):**
-
-- 7 PQ task DONE → ADR-048 amendment land
-- `tests/orchestra/prompt-god-template-skill-completeness.test.ts` + `prompt-god-template-adr-completeness.test.ts` PASS (truncation yok)
-- `tests/orchestra/agent-prompt-single-source.test.ts` PASS (PROMPT.md kanonik, fallback warning)
-- `tests/orchestra/directives-files-to-scope.test.ts` + `directives-title-description-split.test.ts` PASS
-- `tests/orchestra/prompt-god-template-adr-relevance.test.ts` PASS (threshold filter + config override)
-- `tests/orchestra/agent-override-semantic-check.test.ts` PASS (low score warning + override honored + routingMeta field)
-- `tests/integration/prompt-quality-regression.test.ts` PASS (Sprint 181-001/002 snapshot diff before/after)
-
-**Relation to original ADR-048 scope:**
-
-Sprint 168 ADR-048 = **tmpfile lifecycle** (write → persist → archive). Bu amendment = **prompt content lifecycle** (compose → render → inject → consume). İki katman birlikte "Prompt Lifecycle Contract"in tam karşılığını verir: bir prompt fiziksel olarak nerede yaşar (Sprint 168) **ve** semantic olarak ne içerir (Sprint 182). §Decision 1-6 (tmpfile) ve bu §Amendment §1-6 (content) **tamamlayıcıdır**, çelişmez.
-
-**Backward compatibility:**
-
-- `agent.json::systemPrompt` schema korunur (silinmez) — UI display + routing scoring katmanı için.
-- `forceAgent` override mekanizması kalır — yalnızca semantic skew warning ile zenginleştirilir.
-- `prompt.adr_min_relevance` config opsiyoneldir; tanımlanmazsa default 0.3 uygulanır.
-- DIRECTIVES `Files:` field'ı opsiyoneldir; eski format (yalnızca `Scope:`) inferred listing fallback'i ile çalışmaya devam eder.
-
-**Related amendments:** —
-**Supersedes:** —
-**Superseded by:** —
-
----
-
-### Sprint 281 Amendment — Re-verification + Live Proof (2026-06-11, ADR-review)
-
-**Classification: BOTH** (prompt lifecycle kullanıcı projelerindeki worker'ları doğrudan etkiler — tmpfile + content katmanlarının ikisi de ürün davranışı).
-
-**Re-verified (her iki katman, gövde-okuma):**
-- **Tmpfile (S168):** selective filter (`claude.ts:160/168`) + `getActiveWorkerIds` — `PENDING_SPAWNS` union dahil (`active-workers.ts:17-26`, S172-Note'un "süperset" nüansı geçerli) + `cleanupPreviousSprintOrphans` (`sprint-lifecycle.ts:236`) + `archivePromptFiles` (`spawn-backend-docker.ts:1410` — satır-drift, fonksiyon mevcut) + 4 test dosyası ✓.
-- **Content (S182):** truncation-grep'in kalan 6 hit'i incelendi — **ihlal değil**: `prompt-god-template.ts:290-291/320-321` kaldırmayı belgeleyen yorumlar; `:522 truncateAtParagraph` yalnız **dependency-NOTES özeti** için (`DEPENDENCY_NOTES_MAX_CHARS` — skill/ADR içeriği değil, Amendment-§1 kapsamı dışı, meşru). `minScore`/`adr_min_relevance` canlı (`prompt-god-template.ts:324/333` + `config.prompt`), `overrideWarnings` (`task-types.ts:311`), `getAgentPrompt` PROMPT.md-kanonik (`agent-pool.ts:603-610`) ✓.
-
-**Canlı kanıt (Sprint 279/280):** Sprint 280 worker-prompt'u (`.tasks/.prompt-280-007-*.txt`) **full SKILL.md** içerikli gözlendi (truncation-yok kuralı canlı); Sprint 279 prompt'ları `.tasks/archive/sprint-279/` altında arşivli (persist→archive lifecycle canlı). İki katman da üretimde çalışıyor. md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-053: TaskType Taxonomy — Audit / Document-Write / Code-Development + Extensibility Roadmap
-
-**Status:** accepted
-
-# ADR-053: TaskType Taxonomy — Audit / Document-Write / Code-Development + Extensibility Roadmap
-
-**Status:** accepted
-
-**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
-
-**Date:** 2026-05-12
-
-**Sprint:** Sprint 156
-
----
-
-## Status
-
-accepted (proposed Sprint 156 → accepted Sprint 172: çekirdek 3-tip taxonomy `rubric-registry.ts`'te shipped & kod-doğrulandı; Extensibility Roadmap + Tek-Kaynak reconciliation deferred/unrealized — aşağıdaki nota bkz.)
+> **Substrate note:** This is the storage substrate the rest of the governance stands on — ADR-G-019 (class-aware ADR storage/recall/injection), ADR-G-032 (self-learning loop), and the LEARNINGS-QUALITY work all read/write through it. Its schema is **extended here to carry the 4-layer ADR taxonomy** (`adr_class`/`scope`/`immutable`/`source`/`enforcement_level`).
 
 ---
 
 ## Context
 
-Deckent sprint lifecycle boyunca farklı türlerde görevler yürütülür: kaynak kodu yazan worker'lar, denetim raporu üreten worker'lar, yalnızca markdown belgeler oluşturan worker'lar. Sprint 154'e kadar tüm bu görevler tek bir `CODE_RUBRIC` ile değerlendiriliyordu. Bu tasarım Spring 153 ve 154'te ciddi bir sorun ortaya çıkardı: **Bug B** olarak kayıt altına alınan bu hata, `docs/audits/` altına yalnızca tek bir `.md` dosyası yazan audit task'larının `test_coverage: null` döndürmesi nedeniyle hatalı `NO_GO` kararı almasına neden oluyordu. Kod rubriği `test_coverage` için belirlenmiş bir eşik değeri beklediğinden, bu değer yokken görev başarısız sayılıyordu.
-
-Bu sorun görevlerin ne yaptığına dair eksik bir modellemenin belirtisiydi. Deckent'in değerlendirme katmanı (Brain'in `result-evaluator.ts` bileşeni) görevi *tipine* göre değil yalnızca tek bir rubrik üzerinden yargılıyordu. Bu durum şu soruları gündeme getirdi:
-
-1. Bir audit görevi neden kod kapsamı beklesin?
-2. Bir doküman yazma görevi neden `correctness` skoru için test çalıştırsın?
-3. Bir kod geliştirme görevi neden `audit_completeness` kriteriyle ölçülsün?
-
-Ayrıca **task routing** (ADR-015), **agent selection** (ADR-041) ve **EffectClass** (Sprint 156 T-011) gibi bileşenler de görev tipinden faydalanabilirdi; ancak ortak bir tip tanımı yoktu. `task-router.ts`, `adr-selector.ts`, `task-analyzer.ts` ve yeni eklenen `rubric-registry.ts` her biri kendi `TaskType` tanımını yapıyordu. Bu tutarsızlık kodu anlamayı güçleştiriyor, yeni bileşenler eklendiğinde drift yaratıyordu.
-
-Son olarak genişletilebilirlik eksikti. İleride `db-migration`, `package-publish`, `infrastructure-provision` gibi görev tipleri eklendiğinde bunları nereye yerleştirecek, hangi rubriği, hangi effect sınıfını atayacaktık? Açık bir taxonomi olmadan her ekleme ad-hoc olurdu.
+Brain knowledge originally lived as hand-maintained markdown (DEBT.md, MEMORY.md, DECISIONS.md). It did not scale: a 96 KB ADR file, no search, merge conflicts, no decay or history. Memory V2 (old ADR-088) replaced it with a **DB-first** model — SQLite (`better-sqlite3`) is the single source of truth; `.md` files are generated exports for git review/diff. The 2026-06-30 ADR redesign adds a requirement on top: the memory must store the **4-layer ADR taxonomy** (ADR-G-019) class/scope/immutability metadata and support **class/scope-aware recall + injection**.
 
 ---
 
-## Decision
+## Decision (Today)
 
-Deckent'te **üç temel TaskType** tanımlanır ve `rubric-registry.ts` içinde `src/orchestra/rubric-registry.ts` tek kaynak olarak tutulur:
+### 1. DB-first, exports are views
 
-```typescript
-export type TaskType = 'audit' | 'document-write' | 'code-development';
+All brain knowledge — ADRs, learnings, retros, tech-debt, patterns, identity — is stored **DB-first** in `.brain/memory.db`. `docs/adr/*.md` + `.brain/exports/*.md` (`summary/decisions/memory/debt`) are **generated exports, not sources of truth**. Code reads via `MemoryStore` (`store.getByType('adr')`, `searchMemory(...)`) — never by parsing `.md`. `.brain/memory.db` is gitignored (rebuildable from exports via `memory-import`); `.brain/exports/*.md` are git-tracked.
+
+### 2. Schema (5 tables + FTS5) — extended for the ADR taxonomy
+
+```xml
+<schema>
+  <table name="entries">
+    id, type, source, title, content, summary, *_norm, status, priority,
+    sprint_id, sprint_num, lang, decay_exempt, metadata, tenant_id, timestamps,
+    audit_prev_hmac, audit_hmac,
+    <!-- NEW (ADR-G-019 taxonomy): -->
+    adr_class,          <!-- G | D | UG | UP (null for non-ADR entries) -->
+    scope,              <!-- global | project -->
+    immutable,          <!-- bool -->
+    source_authority,   <!-- publisher | contributor | user -->
+    enforcement_level   <!-- advisory | runtime | hard -->
+  </table>
+  <table name="tags"/>
+  <table name="relations">references|supersedes|caused_by|resolves|blocks|depends_on</table>
+  <table name="entry_history">field-level change tracking</table>
+  <table name="schema_version"/>
+  <fts5 name="entries_fts">title/content/summary/tag_text + turkishNormalize variants (8 cols)</fts5>
+</schema>
 ```
 
-### Tip Tanımları
+The new taxonomy columns are **additive** (ALTER TABLE, `schema_version` bump, backup-guarded migration via `better-sqlite3` — never a destructive rebuild). FTS5 is preserved.
 
-**`audit`** — Tek bir denetim raporu dosyası üreten, kodda değişiklik yapmayan görevler.
-- Tespit kuralı: `scope.filesWrite` tam olarak 1 girdi içermeli, bu girdi `docs/audits/` ile başlamalı ve `.md` ile bitmeli; `scope.directories` kaynak kodu dizini içermemeli.
-- Örnek: T-152-016 ADR Compliance Scan, T-001 Workflow Verify.
-- Rubrik: `AUDIT_RUBRIC` — `audit_completeness`, `finding_count`, `citation_density`, `migration_triage`.
-- EffectClass: `pure` (sadece okuma + rapor yazma).
+### 3. Search — dual-layer, class/scope-aware
 
-**`document-write`** — `docs/` altında (ancak `docs/audits/` dışında) bir veya birden fazla markdown belgesi üreten görevler.
-- Tespit kuralı: Tüm `scope.filesWrite` girdileri `docs/` ile başlamalı ve `.md` ile bitmeli; hiçbiri `docs/audits/` ile başlamamalı; kaynak dizin içermemeli.
-- Örnek: ADR draft yazma, ROADMAP güncelleme, sprint retrospective belgesi.
-- Rubrik: `DOC_WRITE_RUBRIC` — `correctness`, `word_count`, `scope_compliance`, `documentation_quality`.
-- EffectClass: `reversible` (git restore ile geri alınabilir).
+`searchMemory()` runs **two layers**: original text + `turkishNormalize()` (TR/EN/DE ≈100% recall). For ADRs, recall is **class/scope-aware** (ADR-G-019): a user-project worker is injected ADR-G (always) + relevant ADR-UG/UP, never ADR-D; a deckent-dev worker also gets ADR-D. Correct FTS5 shape: `SELECT e.* FROM entries_fts f JOIN entries e ON e.rowid=f.rowid WHERE entries_fts MATCH ?`.
 
-**`code-development`** — Yukarıdaki kriterlere uymayan tüm görevler (varsayılan).
-- Tespit kuralı: `audit` veya `document-write` kategorisine girmeyen her görev.
-- Kapsam: kaynak kodu değişikliği, test yazma, refactoring, konfigürasyon değişikliği.
-- Rubrik: `CODE_RUBRIC` — `correctness`, `test_coverage`, `scope_compliance`, `documentation`.
-- EffectClass: `reversible` (çalışma ağacı değişiklikleri, git ile geri alınabilir).
+### 4. Sync invariant + decay + audit
 
-### Tespit Önceliği
+Any write through `MemoryStore.insert/upsert/update` keeps `content_norm` + FTS5 + `entry_history` + `audit_hmac` consistent; **direct SQL `UPDATE` is forbidden** (misses norm/FTS5/audit). **Editing an ADR/entry means updating BOTH the `.md` AND the DB** (doc == DB; regenerate exports with `deckent memory export`). `store.decay(currentSprintNum, decayAfterSprints)`; `decay_exempt=1` for permanent governance (ADRs, identity). HMAC chain (`audit_prev_hmac`/`audit_hmac`) = tamper-evident.
 
-```
-audit (ilk eşleşme kazanır)
-  ↓ hayır
-document-write
-  ↓ hayır
-code-development (varsayılan)
-```
+### 5. Surfaces
 
-`audit`, `document-write`'tan önce değerlendirilir çünkü denetim raporları da `docs/` altında yaşar; ancak daha katı bir şekle sahiptir (tek dosya, `docs/audits/` prefix).
+CLI `deckent recall|remember|memory rebuild|export|stats`; MCP `deckent_memory_query`; config `memory.backend/search/decay_after_sprints`. Brain auto-query: Task-DNA → relevant ADR/pattern/memory injected at PLAN/SPAWN/EVALUATE.
 
-### Tek Kaynak Prensibi
+---
 
-`rubric-registry.ts` bu taxonominin **tek doğruluk kaynağı** olacak. `task-router.ts:45`, `adr-selector.ts:45` ve `task-analyzer.ts:4` içindeki çakışan `TaskType` tanımları `rubric-registry.ts`'ten re-export ile hizalanacak veya kendi spesifik alanlarını koruyan ama birbiriyle çakışmayan ayrı tipler olarak adlandırılacak. Bu çakışma ADR-008 (tek yönlü bağımlılık) ihlali riski taşımaktadır; yeniden yapılandırma ayrı bir sprint task olarak planlanmalıdır.
+## Intent / Roadmap (Tomorrow)
 
-### Extensibility Roadmap
-
-Mevcut üç tip temel bir taxonomiyi temsil eder. Aşağıdaki tipler **gelecek sprint'lerde** eklenebilir:
-
-| Gelecek TaskType | EffectClass | Rubrik Odağı | Öncelik |
-|---|---|---|---|
-| `db-migration` | `idempotent` | migration atomicity, rollback plan | Sprint 162 |
-| `package-publish` | `critical-irreversible` | publish gate, version bump, changelogs | Sprint 163 |
-| `infrastructure-provision` | `compensable` | IaC diff, rollback script, approval gate | Sprint 165 |
-| `security-patch` | `reversible` | CVE fix correctness, regression coverage | Sprint 162 |
-
-Her yeni tip şu genişletme noktalarını güncellemelidir:
-1. `TaskType` union (`rubric-registry.ts`)
-2. `RUBRIC_REGISTRY` kaydı
-3. `EFFECT_CLASS_REGISTRY` kaydı
-4. `isXxxTask()` tespit fonksiyonu
-
-Bu dört nokta `rubric-registry.ts` içinde bir arada tutulduğundan, değişim lokal kalır ve sürünüm (drift) riski düşer.
-
-### ADR-053 ile İlgili Enforcement
-
-Sprint 156 T-009 (`assertSpawnSafe`) ve T-010 (Runtime File Lock) güvenlik katmanları; task tipine duyarlı kararlar alabilmek için `detectTaskType()` fonksiyonunu çağırabilir. Örneğin, `critical-irreversible` tipinde bir task spawn edilmeden önce ADR-037 RBAC gereği Alperen onayı alınmalıdır.
+- **Opt-in vector layer (MEM):** a local-embedding semantic layer (`sqlite-vec`, Ollama-local embeddings, **never-calls-home**) added *alongside* FTS5 — class/scope-aware semantic recall. Opt-in; FTS5 stays the default (preserves ADR-D-005 dependency discipline + the never-phone-home moat). This was the deliberate "evolve better-sqlite, don't migrate to a vector DB" decision.
+- **Scope layers (MEM-2):** project / session / global memory partitions (mirroring the ADR-UG/UP scope split).
+- **Index / SLA (MEM-3):** query-index + worker-spawn/recall SLA (PERF-2).
+- **LEARNINGS-QUALITY:** Brain Learnings/Gains today read "nice but half-baked / not genuinely learned." Perfect the *content* of the self-learning record (real learned-content, searchable) — for dogfood AND user. (Substrate for ADR-G-032's loop.)
 
 ---
 
 ## Consequences
 
-### Olumlu
+**(+)** One SQLite SSOT scales where markdown did not: search, decay, history, HMAC-audit, class/scope-aware ADR injection. The taxonomy columns make ADR-G-019's precedence/immutability machine-enforceable. Exports keep git review/diff. The never-calls-home property is preserved (local embeddings only, when the vector layer lands).
 
-- **Yanlış NO_GO oranı düşer.** Audit ve doküman görevleri artık uygulanamaz kriterleri (coverage) taşımayan rubriklerle değerlendiriliyor. Sprint 154 Bug B'nin tekrarlanması engellendi.
-- **Routing doğruluğu artar.** Agent seçimi (ADR-041), skill routing (ADR-015) ve ADR önerileri (`adr-selector.ts`) artık daha kesin bir tip üzerinden çalışabilir.
-- **Genişletilebilirlik.** Yeni görev tipleri dört noktayı güncelleyerek eklenir; mevcut kodu bozmaz.
-- **Güvenlik.** `RUBRIC_REGISTRY` ve `EFFECT_CLASS_REGISTRY` `Object.freeze()` ile korunur; runtime mutasyonu engellenir. Bu, bir worker'ın kendi tipini `critical-irreversible`'dan `reversible`'a düşürerek onay geçidini atlamasını önler.
-- **Gözlemlenebilirlik.** `detectTaskType()` dönüş değeri sprint metriklerine ve audit loglarına eklenebilir; hangi görevlerin hangi tipte değerlendirildiği izlenebilir.
+**(−)** `memory.db` is gitignored → rebuildable but not diffable (exports are the diff surface). The dual-write invariant (md + DB) is a discipline contributors must follow. The vector layer is roadmap/opt-in, not today. LEARNINGS-QUALITY is an open quality gap (the loop runs; the content needs to become genuinely-learned).
 
-### Olumsuz
-
-- **Sınır vakaları belirsiz.** `isAuditTask()` kuralları katıdır (tek dosya, `docs/audits/`). Hybrid bir görev (hem kaynak kodu hem de audit raporu) `code-development` olarak sınıflandırılır ve audit_completeness değerlendirilmez. Bu durum scope ayrımını zorunlu kılar — ama bu zaten ADR-034 Multi-Project Isolation ile uyumludur.
-- **Mevcut `TaskType` çakışmaları.** `task-router.ts:45` (`'code' | 'test' | 'doc' | 'design' | 'unknown'`) ve `adr-selector.ts:45` kendi tip tanımlarını korur. Hizalama ayrı bir task gerektirir; şimdilik `rubric-registry.ts` yetki alanı yalnızca değerlendirme katmanı ile sınırlıdır.
-- **Tespit, scope shape'e bağlı.** Başlık veya açıklama metninden değil `scope.filesWrite` ve `scope.directories` örüntülerinden tespit yapılır. Bu gaming-proof olmayı sağlar; ancak yanlış scope tanımlamaları (Brain planning hatası) yanlış tip tespitine yol açabilir. ADR-036 validation, scope'u DIRECTIVES'e karşı doğrulamalıdır.
-
----
-
-## Related ADRs
-
-- **ADR-015** — TaskRouter Module: mevcut `task-router.ts` içindeki `TaskType` bu ADR ile hizalanacak.
-- **ADR-035** — Verification Protocol: `CODE_VERIFY_REQUEST` kanalının tetiklenmesi task tipine göre farklılaşabilir (audit task'lar için kod doğrulaması anlamsız).
-- **ADR-037** — RBAC: `critical-irreversible` EffectClass → Alperen onay gating.
-- **ADR-041** — Agent Taxonomy: Horizontal skill seçimi task tipine göre filtrelenebilir (doc görevleri için `testing-expert` önerme).
-- **ADR-055** — Hybrid Scoring Pipeline (proposed): Bu ADR'nin TaskType'ları Hybrid Scoring'in Layer 1 (Schema) ve Layer 4 (Outcome) katmanlarına girdi sağlar.
-- **Karpathy 4-Discipline Anchor** (`.claude/rules/karpathy-discipline.md`, Sprint 191 eklendi): Worker agent'ların her TaskType'ı *nasıl* yürüttüğünü belirleyen execution-time disiplin kuralları. TaskType sınıflandırması Brain tarafından (plan-time), 4-discipline uygulaması Worker tarafından (execute-time) yapılır — iki katman tamamlayıcıdır. Her TaskType için vurgu farklılıkları:
-  - **`audit`**: Discipline 1 (Think-first: `scope.filesRead` listesindeki kaynak dosyalar rapor yazmadan önce tamamen okunmalı), Discipline 3 (Surgical: tek output dosyası constraint'i, izin verilmemiş dosyaya yazma → otomatik Auditor flag), Discipline 4 (Goal-Driven: her bulgu goCriteria'daki audit kriteri ile birebir eşlenmeli, izlenemeyen bulgu notta not edilmeli).
-  - **`document-write`**: Discipline 1 (Think-first: içerik yapısı taslak olarak planlanmalı), Discipline 2 (Simplicity-First: talep edilmeyen bölüm veya ek dosya eklenmemeli — YAGNI), Discipline 4 (Goal-Driven: her başlık ve paragraf goCriteria doküman kalitesi kriteriyle eşlenmeli).
-  - **`code-development`**: Tüm 4 discipline eşit ağırlıkla uygulanır; Discipline 3 (Surgical Changes) özellikle kritik — `scope.filesWrite` sınırı dışına çıkmak Auditor tarafından `git diff --stat` ile otomatik tespit edilir ve sprint NO_GO'ya yol açabilir.
-
----
-
-## Notes
-
-Bu ADR, `rubric-registry.ts` içinde `Sprint 154 Bug B fix` olarak hayata geçirilen uygulamanın geriye dönük belgelenmesidir. Uygulama önce yazıldı; ADR, tasarım kararlarını geç de olsa kayıt altına almaktadır. Sprint 156 dogfood pratiğine göre bu geç-ADR pattern'i kabul edilebilir — ancak ileride tercih edilen sıra şudur: ADR draft → Sprint task → Implementation.
-
-> **Note (verified vs code → status promoted, Sprint 172):** Çekirdek taxonomy **shipped & kod-doğrulandı** (ADR-042 emsali): `src/orchestra/rubric-registry.ts:21` `TaskType = 'audit' | 'document-write' | 'code-development'`; `AUDIT_RUBRIC`/`DOC_WRITE_RUBRIC`/`RUBRIC_REGISTRY` `Object.freeze` (`:92-95`); `isAuditTask`/`detectTaskType` öncelik `audit → document-write → code-development` (`:166-169`) §Tespit Önceliği ile birebir. Bu nedenle status **proposed → accepted** (governance-onaylı). **Deferred/unrealized (gövde gelecek-zamanlı kalmıştır):**
-> - **Extensibility Roadmap** tablosundaki hedef sprint'ler (db-migration/security-patch Sprint 162, package-publish Sprint 163, infrastructure-provision Sprint 165) **geçti ve gerçekleşmedi** — Sprint 172 itibarıyla hâlâ 3 temel tip; gelecek tipler yalnız `rubric-registry.ts:272-273`'te "reserved for future" yorumu olarak durur. Roadmap niyet-beyanıdır, taahhüt değil.
-> - **Tek Kaynak Prensibi** uygulanmadı: `task-router.ts:45` (`'code'|'test'|'doc'|'design'|'unknown'`) ve `adr-selector.ts:45` çakışan `TaskType` tanımları Sprint 172'ye dek hâlâ bağımsızdır (ADR §Olumsuz bunu zaten kendi flag'ler — `rubric-registry.ts` yetkisi yalnız değerlendirme katmanıyla sınırlı kalır).
->
-> Memory'deki taxonomy-vision (ADR-053/055/060 taslak seti) bağlamı korunur; yalnız ADR-053'ün **doğrulanmış çekirdeği** accepted'a alındı, geniş vizyon kapsamı değil. Behavior unchanged; documentation alignment only.
-
-> **Amendment — Sprint 191 (Karpathy cross-reference):** Sprint 191 Worker Discipline Anchor projesi `.claude/rules/karpathy-discipline.md` dosyasını ve `worker-default.md` Karpathy 4-Discipline Anchor bölümünü ekledi. Bu ADR, execute-time disiplin kurallarının **plan-time** tamamlayıcısıdır: ADR-053 *hangi* rubrikle değerlendirileceğini belirler (Brain sorumluluğu, plan-time), Karpathy 4-discipline *nasıl* yürütüleceğini belirler (Worker sorumluluğu, execute-time). §Related ADRs'e Karpathy Anchor referansı eklendi. Behavior unchanged; no code change.
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review): Deferred maddeler GERÇEKLEŞTİ
-
-**Classification: BOTH** (değerlendirme adaleti kullanıcı-ürün kanunudur — kullanıcının doc/audit task'ları uygulanamaz kriterlerle false-NO_GO yememeli).
-
-Sprint-172 Note'unun "deferred/unrealized" işaretlediği iki madde o zamandan gerçekleşti (kod-doğrulandı 2026-06-11):
-
-1. **🟢 Tek Kaynak Prensibi UYGULANDI — WM-2 canonical work-model (Sprint 238-240).** `src/core/work-model.ts` artık taxonominin canonical SSOT'u; üç tüketici de bağlı: `rubric-registry.ts:12` (`taskKindToRubric`), `task-router.ts:15` (`taskKindToIntent`), `adr-selector.ts:12` (`taskKindToAdrDomain`). Çakışan bağımsız `TaskType` tanımları sorunu kapandı; çekirdek 3-tip + `Object.freeze` + tespit-önceliği `rubric-registry.ts:23/169`'da birebir korunur.
-
-2. **🟢 EffectClass → otonom 3-gate ENFORCE — WM-6 (Sprint 241).** `src/orchestra/autonomous/policy-gate.ts` (G3 risk-gate) `EffectClass`'ı `rubric-registry`'den tüketir: pure/reversible → auto-run, riskli sınıflar → **park (insan onayı)**. ADR'nin "critical-irreversible → onay-gating" enforcement vizyonu otonom motorda canlıdır.
-
-3. **🟢 İkinci eksen: TechStackKind — WM-7 (Sprint 254).** Taxonomy `TaskKind × TechStack` iki-eksenli değerlendirmeye genişledi: `work-model.ts` `TechStackKind` + `normalizeTechStack` + `COVERAGE_MEASURABLE_STACKS`; `criteria-deriver.ts` tip+stack-duyarlı GO/NO-GO türetir (doc→files-on-disk, audit→findings, code→tespit-edilen stack komutları — C++ projeye tsc-clean dayatılmaz; ADR-019 cross-ref).
-
-**Hâlâ niyet-beyanı:** Extensibility-Roadmap'in gelecek tipleri (db-migration / package-publish / infrastructure-provision / security-patch) eklenmedi — 3 temel tip + iki-eksen güncel durumdur. md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-055: Hybrid Scoring 5-Layer Pipeline — Schema / Gates / Quality / Outcome / Auditor
-
-**Status:** proposed
-
-# ADR-055: Hybrid Scoring 5-Layer Pipeline — Schema / Gates / Quality / Outcome / Auditor
-
-**Status:** proposed
-
-**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
-
-**Date:** 2026-05-12
-
-**Sprint:** Sprint 156
-
----
-
-## Status
-
-proposed (Sprint 156 — EffectClass seed implementasyonu T-011'de tamamlandı; tam pipeline ayrı sprint'e bırakıldı)
-
----
-
-## Context
-
-Deckent'in değerlendirme sistemi Sprint 139'a kadar `result-evaluator.ts` içindeki tek bir `DEFAULT_RUBRIC` etrafında yapılandırılmıştı. Bu rubrik dört kriter içeriyordu: `correctness`, `test_coverage`, `scope_compliance`, `documentation`. Basit ve tahmin edilebilirdi, ancak birkaç sistemsel sorunun kaynağıydı:
-
-**Sprint 153 ve Sprint 154 Bug B:** Audit raporları ve doküman yazma görevleri `test_coverage: null` döndürüyordu. Rubrik bu alanı zorunlu sayıyordu. Sonuç: geçerli çıktılar üretilmesine rağmen `NO_GO` kararı. ADR-053 (TaskType Taxonomy) bu hatayı rubriği görev tipine göre seçerek giderdi — ancak bu düzeltme değerlendirmenin **şeklini** değiştirdi, **derinliğini** değil.
-
-**Tek katmanlı değerlendirmenin kör noktaları:**
-1. **Schema geçersizliği önceden yakalanmıyor.** Bir `.result` dosyası eksik alan içeriyorsa değerlendirme skoru hesaplanmaya çalışır, ancak anlamsız bir skora ulaşır. Schema doğrulaması skorlamadan önce yapılmalıydı.
-2. **Gate koşulları yoktu.** Bazı durumlar sayısal skor olmaksızın kesin `NO_GO` gerektiriyordu: scope ihlali, ADR compliance hatası, heartbeat zaman aşımı. Bu koşullar rubrik içinde `0` ağırlıklı kriterler olarak temsil ediliyordu — doğru yapı değildi.
-3. **EffectClass (reversibility) skor üzerinde etkisi yoktu.** `critical-irreversible` görevler daha yüksek `correctness` eşiği veya zorunlu Auditor doğrulamasına tabi olmalıydı; ancak tek rubrik bunu ifade edemiyordu.
-4. **Auditor ve Brain bağımsız değerlendirme yapıyordu.** Auditor kendi scan sonuçlarını `.dashboard` dosyasına yazıyordu; Brain ise yalnızca `.result` dosyasını okuyordu. İki perspektif birleştirilmiyordu.
-5. **Outcome verisi geri besleme döngüsüne girmiyordu.** Görev tipine ve EffectClass'a göre geçmiş outcome verileri (başarı oranı, token kullanımı) değerlendirmeyi etkileyen bir sinyal olabilirdi.
-
-Bu sorunların toplamı, değerlendirmenin yüzeysel kaldığını ve gerçek görev kalitesini her zaman doğru yansıtmadığını ortaya koydu. Daha derin, çok katmanlı bir değerlendirme altyapısına ihtiyaç vardı.
-
----
-
-## Decision
-
-**5-katmanlı Hybrid Scoring Pipeline** tasarlanır. Her katman girdiye bağımsız olarak çalışır ve kendi kararını `PipelineLayerResult` olarak üretir:
-
-```
-Layer 1: Schema Validation
-  ↓ PASS / FAIL (hard gate)
-Layer 2: Gate Conditions
-  ↓ PASS / BLOCK (hard gate)
-Layer 3: Quality Scoring
-  ↓ numeric score [0–100]
-Layer 4: Outcome Weighting
-  ↓ weighted score [0–100]
-Layer 5: Auditor Verification
-  ↓ auditor signal (optional, async)
-       ↓
-  Final Decision: DONE / GO_WITH_TECH_DEBT / NO_GO
-```
-
-### Katman 1 — Schema Validation
-
-Her `.result` dosyası önce JSON schema'ya karşı doğrulanır. Eksik zorunlu alanlar (`taskId`, `selfAssessment`, `filesChanged`, `tokenUsage`) pipeline'ı durdurur ve doğrudan `NO_GO` döndürür. Bu doğrulama zaten Sprint 155'te `validateResultSchema()` fonksiyonu ile hayata geçirilmiştir — ADR-055 bu davranışı resmen Layer 1 olarak sınıflandırır.
-
-```typescript
-interface Layer1Result {
-  pass: boolean;
-  missingFields: string[];
-  invalidFields: { field: string; reason: string }[];
-}
-```
-
-### Katman 2 — Gate Conditions
-
-Sayısal skorla ifade edilemeyen ikili (binary) koşullar burada değerlendirilir. Bir gate başarısız olursa pipeline `NO_GO` döndürür; skora ulaşılmaz.
-
-| Gate ID | Koşul | Kaynak |
-|---------|-------|--------|
-| `G-001` | Scope ihlali yok (`git diff --stat` scope dışı dosya içermemeli) | Auditor scan |
-| `G-002` | ADR compliance: görev sonucu kabul edilmiş ADR'yi ihlal etmemeli | `adr-validator.mjs` |
-| `G-003` | Heartbeat timeout aşılmamış | `.hb` dosya timestamp |
-| `G-004` | Self-modifying task tespiti negatif | `self-modifying-detector.ts` |
-| `G-005` | `critical-irreversible` EffectClass için Alperen onayı alınmış | Checkpoint mechanism |
-
-```typescript
-interface Layer2Result {
-  pass: boolean;
-  blockedByGates: string[];   // gate IDs that failed
-  gateDetails: Record<string, string>;
-}
-```
-
-### Katman 3 — Quality Scoring
-
-ADR-053 tarafından belirlenen görev tipine uygun rubrik (CODE_RUBRIC, AUDIT_RUBRIC, DOC_WRITE_RUBRIC) uygulanır. Mevcut `result-evaluator.ts` mantığı bu katmana karşılık gelir.
-
-```typescript
-interface Layer3Result {
-  score: number;          // 0–100
-  passingScore: number;
-  rubricId: 'code' | 'audit' | 'doc-write';
-  criteriaBreakdown: Record<string, number>;
-}
-```
-
-### Katman 4 — Outcome Weighting
-
-EffectClass ve görev tipi bazlı geçmiş outcome verileri (başarı oranı, ortalama retry sayısı) ağırlık çarpanı olarak uygulanır. Bu katman Layer 3 skorunu yukarı veya aşağı çeker:
-
-- `critical-irreversible` görevler: passingScore eşiği 70 → 85 yükseltilir.
-- `pure` (audit) görevler: passingScore eşiği 70 → 65 düşürülebilir (no-retry semantics).
-- Geçmiş 5 sprint ortalama başarı oranı < %50 olan agent: skor × 0.9 çarpanı.
-
-```typescript
-interface Layer4Result {
-  adjustedScore: number;    // Layer 3 score × weight
-  adjustedThreshold: number;
-  effectClass: EffectClass;
-  outcomeModifier: number;  // multiplier applied
-}
-```
-
-### Katman 5 — Auditor Verification (Asenkron)
-
-Auditor'ın bağımsız scan sonuçları (`.dashboard` dosyası) Layer 4 kararını onaylayabilir veya veto edebilir. Bu katman asenkron ve opsiyoneldir; Auditor sonucu zamanında gelmezse varsayılan olarak Layer 4 kararı korunur.
-
-```typescript
-interface Layer5Result {
-  auditorSignal: 'confirm' | 'veto' | 'absent';
-  auditorNotes?: string;
-  finalDecision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
-}
-```
-
-### Final Decision Matrisi
-
-```
-Layer1 FAIL              → NO_GO (schema invalid)
-Layer2 BLOCK             → NO_GO (gate violated)
-Layer4 adjustedScore ≥ adjustedThreshold:
-  + Layer5 confirm/absent → DONE
-  + Layer5 veto           → GO_WITH_TECH_DEBT
-Layer4 adjustedScore < adjustedThreshold:
-  + delta < 10            → GO_WITH_TECH_DEBT
-  + delta ≥ 10            → NO_GO
-```
-
-### Uygulama Yolu
-
-Sprint 156'da yalnızca **seed** tamamlandı:
-- Layer 1: `validateResultSchema()` (`result-evaluator.ts`) — canlı
-- Layer 3: ADR-053 TaskType rubric selection — canlı
-- Layer 4 girdi: `EffectClass` (`rubric-registry.ts` T-011) — canlı
-
-Tam pipeline entegrasyonu Sprint 157+ roadmap:
-- `src/orchestra/scoring-pipeline.ts` — yeni modül
-- `runScoringPipeline(task, result, auditorSnapshot): ScoringPipelineResult`
-- `result-evaluator.ts` yeniden düzenleme: `evaluateResult()` → pipeline çağrısı
-
----
-
-## Consequences
-
-### Olumlu
-
-- **Daha az yanlış NO_GO.** Schema ve gate katmanları sayısal skor hesaplanmadan önce açık ihlalleri yakalar; rubrik puanlamayı anlamsız vakaların üzerine uygulama riskini ortadan kaldırır.
-- **EffectClass entegrasyonu.** `critical-irreversible` görevler artık yüksek eşikle ve zorunlu onay gapıyla değerlendirilir. ADR-037 RBAC ile uyumlu.
-- **Auditor-Brain entegrasyonu.** İki bağımsız perspektif (Brain değerlendirmesi + Auditor scan) birleştirilerek daha güvenilir kararlar üretilir. ADR-035 doğrulama protokolü bu birleşimi zaten öngörüyordu.
-- **Genişletilebilirlik.** Yeni gate koşulları (`G-006`, ...) pipeline'a eklenir; mevcut rubrik değişmez. Yeni katmanlar (Layer 6: ML scoring) ileride eklenebilir.
-- **Gözlemlenebilirlik.** Her katman kendi `PipelineLayerResult`'ını üretir; sprint metriklerine her katmanda hangi kararın verildiği kaydedilebilir. "Layer 2'de bloklanan task sayısı" gibi metrikler NO_GO sebeplerini ayrıştırır.
-
-### Olumsuz
-
-- **Pipeline gecikmesi.** 5 katmanın ardışık çalışması değerlendirme süresini artırır. Layer 5 (async Auditor) bekleme süresi sprint toplam süresini uzatabilir. Timeout mekanizması zorunlu.
-- **Karmaşıklık artışı.** `result-evaluator.ts`'in tek-fonksiyon yapısından pipeline mimarisine geçiş test yükümlülüğü doğurur. Her katmanın birim testi yazılmalıdır.
-- **Gate G-005 (Alperen onayı) bloklama riski.** `critical-irreversible` görevlerde Alperen cevap vermezse sprint donar. Timeout + fallback (GO_WITH_TECH_DEBT + onay kuyruğu) tasarlanmalıdır.
-- **Outcome verisi bootstrap sorunu.** Layer 4 geçmiş başarı oranlarına güvenir; ancak yeni bir agent veya görev tipi için bu veri yoktur. `outcomeModifier = 1.0` (nötr) başlangıç değeri ile bootstrap edilmelidir.
-
----
-
-## Related ADRs
-
-- **ADR-035** — Verification Protocol Standard: Layer 5 (Auditor Verification) bu ADR'nin `CODE_VERIFY_REQUEST` / `VERIFICATION_RESULT` kanallarını kullanır.
-- **ADR-036** — ADR Governance: Layer 2 Gate G-002 (`adr-validator.mjs` entegrasyonu) bu ADR tarafından yönlendirilir.
-- **ADR-037** — RBAC Protocol: Layer 2 Gate G-005 (Alperen onayı) `critical-irreversible` görevler için RBAC gate gerektirir.
-- **ADR-041** — Agent Taxonomy: Layer 4 outcome weighting, agent başarı oranı verilerini `agent-pool.ts` kayıtlarından çeker.
-- **ADR-053** — TaskType Taxonomy (proposed): Layer 1 ve Layer 3'e görev tipi bilgisi sağlar.
-
----
-
-## Notes
-
-Bu ADR Sprint 156 T-011 (EffectClass Annotation) çalışması sırasında ortaya çıkan mimari vizyonu belgeler. `rubric-registry.ts:197` içindeki `// ADR-055 placeholder` yorumu bu ADR'ye işaret eder. Tam uygulama Sprint 157+ roadmap kapsamındadır.
-
-> **Note (verified vs code, Sprint 172 — `proposed` doğru statü):** Yalnız **seed** kod-doğrulandı:
-> - **Layer 1** `validateResultSchema()` → `src/orchestra/result-evaluator.ts:509` mevcut (call `:992`) ✓
-> - **Layer 3** ADR-053 TaskType rubric selection → `rubric-registry.ts` (ADR-053 notunda doğrulandı) ✓
-> - **Layer 4 girdi** `EffectClass` → `src/orchestra/rubric-registry.ts:259` mevcut; placeholder yorumu `:220` (`EffectClass — Reversibility Tag (ADR-055 placeholder)`), `:255 @see ADR-055 (proposed, Sprint 156)` — kod kendisi `proposed` işaretler.
->
-> **Çekirdek karar GERÇEKLEŞMEDİ (gövde gelecek-zamanlı kalmıştır):** `src/orchestra/scoring-pipeline.ts` **yoktur**; `runScoringPipeline` / `ScoringPipelineResult` / `PipelineLayerResult` sembolleri `src/` genelinde **hiç yoktur**. Layer 2 (Gate Conditions G-001..G-005), Layer 5 (Auditor Verification), Final Decision Matrix ve orkestrasyon katmanı uygulanmadı. "Sprint 157+ roadmap" hedefi **geçti ve gerçekleşmedi** (Sprint 172).
->
-> **Statü gerekçesi (ADR-053 kontrastı):** ADR-053 terfi etti çünkü çekirdeği (3-tip taxonomy) shipped'di. ADR-055'in çekirdeği = 5-katman pipeline'ın **kendisi** ve o inşa edilmedi — yalnız çevresel seed'ler mevcut. Bu nedenle status doğru biçimde **`proposed` kalır** (terfi dürüst olmazdı). Satır drift'i: ADR `:197` → gerçek `:220`. Behavior unchanged; documentation alignment only.
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review): Hedef-gerçekleşme haritası — organik birikme vs formal pipeline
-
-**Classification: BOTH** (değerlendirme derinliği/güvenilirliği ürün-kanunu; şekil-kararı hâlâ açık).
-
-**Statü `proposed` KALIR** — formal pipeline hâlâ yok (`scoring-pipeline.ts` mevcut değil, `runScoringPipeline`/`ScoringPipelineResult` 0-sembol, 2026-06-11 doğrulandı). Ancak ADR'nin **hedefleri** o tarihten bu yana pipeline-şekli OLMADAN, organik olarak büyük ölçüde gerçekleşti:
-
-| ADR-055 katmanı | Organik gerçekleşme (kod-doğrulandı) |
-|---|---|
-| Layer 1 Schema | `validateResultSchema` canlı (zaten seed) ✓ |
-| Layer 2 Gates | **honest-gate** (`result-evaluator.ts` ~16 ref) + `reconcileSpuriousNoGo` + disk-verify gate + `applyTechDebtDowngrade` — gate'ler evaluator'a organik birikti (formal G-001..G-005 registry'si değil) |
-| Layer 3 Quality | tip-rubrik (ADR-053) + **WM-7 `criteria-deriver`** (TaskKind × TechStack iki-eksen) ✓ |
-| Layer 4 EffectClass/Outcome | EffectClass → **otonom policy-gate G3** (WM-6, Sprint 241): riskli sınıflar park = G-005 ruhu ENFORCE (otonom motorda) |
-| Layer 5 Bağımsız doğrulama | **XVER-1 cross-verify** (Sprint 276): farklı-provider adversarial verify, advisory-sinyal olarak evaluation'a akar (`src/core/cross-verify.ts` + `.result.crossVerify` field) |
-| "Az yanlış NO_GO" hedefi | **ADR-070** Brain Evaluation Integrity — signal-based coverage exemption (`coverageOptional`), NaN-guard, verdict-persist |
-
-**Açık mimari opsiyon (bu ADR'nin kalan değeri):** evaluator'daki organik gate-birikimi tam da bu ADR'nin öngördüğü yapısal soruna dönüşüyor (tek-modülde katman-karışımı). 5-katman pipeline-şekli, bu organik mekanizmaları **konsolide eden gelecek-refactor hedefi** olarak `proposed` kalır (MASTER-PLAN §A canonical work-model temeli + ADR-026 god-object-split deseniyle uyumlu). Karar o refactor gündeme geldiğinde verilir: pipeline-şekline taşı (bu ADR accept edilir) ya da organik mimariyi resmîleştir (bu ADR reject + yeni ADR). md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-060: Self-Awareness Propagation — 5-Channel Context Enrichment Architecture
-
-**Status:** proposed
-
-# ADR-060: Self-Awareness Propagation — 5-Channel Context Enrichment Architecture
-
-**Status:** proposed
-
-**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
-
-**Date:** 2026-05-12
-
-**Sprint:** Sprint 156
-
----
-
-## Status
-
-proposed (Sprint 156 — kanal 5 (worker-enrichment) T-007 ile seed edildi; tam mimari ayrı sprint'e planlandı)
-
----
-
-## Context
-
-Deckent worker'ları görevlerini bağımsız, izole bir ortamda yürütür. Bu izolasyon kasıtlıdır — ADR-034 (Multi-Project Isolation) ve ADR-037 (RBAC) gereği. Ancak izolasyonun bir yan etkisi vardır: worker'lar proje bağlamından habersiz kalabilir. Bu durum çeşitli sprint'lerde gözlemlenen aşağıdaki sorunların kaynağıdır:
-
-**1. Agent Alignment Drift (Sprint 145–153 boyunca gözlemlendi):** Worker'lar mimari kararlar (ADR'ler) hakkında bilgilendirilmese, uyguladıkları çözümler kabul edilmiş ADR'leri ihlal edebilir. Örneğin, worker `shell: true` kullanarak bir komut çalıştırabilir ve ADR-006 ihlali yaratabilir. Sprint 138'de ADR yönetimi çerçevesi (`queryRelevantADRs()` + `prompt-god-template.ts` "Mandatory Architecture Rules" bloğu) bu sorunun bir kısmını çözdü — ancak bağlam enjeksiyonu yalnızca ADR katmanıyla sınırlı kaldı.
-
-**2. Bağımlılık Sonuçlarının Bilinmezliği (Sprint 135–139 boyunca):** Worker T-002, T-001'in sonucundan haberdar değildi. Sprint 135 T-005 (Planner Priority/Dependencies) ve Sprint 134 T-001 (Task Dependency Pipeline) bağımlılık zincirini pipeline düzeyinde kurdu; ancak T-002 worker'ının prompt'unda T-001'in *ne yaptığı* yer almıyordu. Yalnızca "T-001 tamamlandı" bilgisi vardı. Bu eksiklik Sprint 156 T-007 (Worker Prompt Previous-Result Enrichment) ile giderildi.
-
-**3. Skill ve Agent Bağlamının Parçalı Aktarımı:** Skill seçimi (`selectSkills()`), agent seçimi (`selectAgent()`) ve ADR enjeksiyonu ayrı ayrı fonksiyonlarda gerçekleşiyor, her biri prompt'un farklı bir bölümüne yazıyor. Sonuçta worker prompt'u birbiriyle ilişkili ama koordine edilmemiş bağlam parçalarından oluşuyor. Worker, "Bu skill neden seçildi?" veya "Önceki sprint'teki benzer görevde ne oldu?" bilgisine erişemiyor.
-
-**4. Manifest Uyumsuzluğu.** Worker'ların hangi agent ve skill versiyonunu kullandığını bilmemesi, manifest güncellemesi sonrasında ortaya çıkan uyumsuzlukları Sprint 148'de gözlemlendiği gibi yakalamayı güçleştirdi. Spawn zamanında agent manifest snapshot'ı worker prompt'una eklenseydi, worker beklenen API'yi ve değişiklikleri daha iyi yorumlayabilirdi.
-
-**5. Self-Awareness Eksikliği.** "Self-awareness" terimi burada şu anlama gelir: worker'ın yalnızca kendi görevini değil, görevinin bulunduğu *bağlamı* — sprint kimliği, seçilen agent, seçilen skill'ler, ilgili ADR'ler, bağımlılık sonuçları — bilmesi. Bu bağlam eksikliği, worker'ların tekrarlayan hatalara düşmesine ve Brain'in fazladan FIX döngüsü çalıştırmasına neden olmaktaydı.
-
-Mevcut `prompt-god-template.ts` içindeki `buildHeader()`, `buildAgentBlock()`, `buildSkillBlock()`, `buildDependenciesBlock()`, `buildADRBlock()` fonksiyonları bu bağlam enjeksiyonunu kısmen çözüyor. Ancak koordineli bir mimari eksik. Bu ADR, bağlam yayılımını beş kanalda organize eden bir çerçeve tanımlar.
-
----
-
-## Decision
-
-**Self-Awareness Propagation Architecture** — 5 kanal tanımlanır. Her kanal farklı bir bağlam tipini worker prompt'una taşır. Kanallar `prompt-god-template.ts` içinde `buildWorkerContext()` çatı fonksiyonu altında koordine edilir:
-
-```typescript
-interface WorkerContextBundle {
-  channel1_init:         InitChannel;
-  channel2_sync:         SyncChannel;
-  channel3_manifest:     ManifestChannel;
-  channel4_skill_declare: SkillDeclareChannel;
-  channel5_enrichment:   EnrichmentChannel;
-}
-
-async function buildWorkerContext(task: Task, sprintId: string): Promise<WorkerContextBundle>
-```
-
-### Kanal 1 — Init Channel (Sprint + Task Identity)
-
-Worker'ın kim olduğunu ve nerede çalıştığını aktarır.
-
-**İçerik:**
-- Sprint kimliği ve numarası (`sprint-156`)
-- Task kimliği ve başlığı
-- Seçilen model ve effort seviyesi
-- Scope tanımı (directories, filesRead, filesWrite)
-- GO/NO-GO kriterleri
-
-**Mevcut durum:** `buildHeader()` fonksiyonu bu bilgilerin büyük bölümünü zaten üretiyor. ADR-060, bu fonksiyonun "Kanal 1 sorumluluğu" olduğunu resmen belirler.
-
-**Yeni eklenti:** Sprint kimliğinden türetilen `sprint_sequence_number` (ör. sprint-156 → 156) ve bu sprint'teki görev sırası (ör. "15 task'tan 7.si") worker'a sprint'teki yerini gösterir.
-
-### Kanal 2 — Sync Channel (ADR + Memory Snapshot)
-
-Projenin geçmiş mimari kararlarını ve ilgili sprint öğrenmelerini aktarır.
-
-**İçerik:**
-- İlgili ADR'ler (zaten `queryRelevantADRs()` + `buildADRBlock()` ile yapılıyor)
-- İlgili sprint learnings (hafıza DB'sinden `searchMemory()` ile)
-- Aktif teknik borç maddeleri (görevle ilişkili olanlar)
-
-**Mevcut durum:** ADR enjeksiyonu Sprint 138'de hayata geçti. Öğrenim ve borç snapshot'ı opsiyonel. ADR-060 bu bağlamı zorunlu hale getirir.
-
-**Yeni eklenti:** `sprint_learning_digest` — son 3 sprint'teki benzer görevlerin sonuçlarından çıkarılan 3–5 cümlelik özet.
-
-### Kanal 3 — Manifest Channel (Agent + Skill Version Snapshot)
-
-Görev için seçilen agent ve skill'lerin anlık versiyonlarını aktarır.
-
-**İçerik:**
-- Agent tanımı: isim, versiyon, uzmanlık özeti
-- Her skill için: isim, kapsam, son güncellenme tarihi
-- Agent/skill uyumsuzluğu uyarıları (manifest checksum mevcut versiyonla eşleşmiyorsa)
-
-**Mevcut durum:** `buildAgentBlock()` ve `buildSkillBlock()` prompt içeriğini yazıyor; ancak versiyon ve checksum bilgisi dahil değil.
-
-**Yeni eklenti:** `manifest_checksum` alanı — spawn zamanındaki agent.json hash değeri. Worker bunu bilirse, manifest güncellemesini fark edebilir ve Not uygulanamaz durumlarda Brain'i uyarabilir.
-
-### Kanal 4 — Skill Declare Channel (Active Skill Instructions)
-
-Seçilen skill'lerin tam içeriğini aktarır (önceden kısmen yapılıyor).
-
-**İçerik:**
-- Her skill'in tam `SKILL_PROMPT` içeriği
-- Skill prioritization: çakışan talimatlar için öncelik sırası
-- Anti-pattern listesi: bu skill'i kullanan worker'ların önceki sprint'lerde yaptığı yaygın hatalar
-
-**Mevcut durum:** Skill içerikleri `buildSkillBlock()` ile zaten ekleniyor. ADR-060, anti-pattern listesini yeni bir eklenti olarak tanımlar.
-
-**Yeni eklenti:** `skill_anti_patterns` — `outcome-tracker.ts` kayıtlarından çıkarılan, bu skill ile yapılan yaygın hatalar listesi. Ör: "react-specialist skill kullanırken 3 sprint boyunca `useEffect` cleanup eksikliği gözlemlendi."
-
-### Kanal 5 — Enrichment Channel (Dependency Result Propagation)
-
-Bağımlılık görevlerinin sonuçlarını aktarır.
-
-**İçerik:**
-- Her bağımlılık task'ı için `.result` dosyasından `selfAssessment`, `filesChanged`, `notes` alanları
-- Bağımlılık tamamlanmamışsa: "Beklemede (henüz tamamlanmadı)"
-- Bağımlılık NO_GO ise: NO_GO sebebi ve önerilen çözüm
-
-**Mevcut durum:** Sprint 156 T-007 (Worker Prompt Previous-Result Enrichment) bu kanalı hayata geçirdi. `buildDependenciesBlock()` fonksiyonu güncellendi: artık yalnızca task ID listesi değil, her bağımlılığın `.result` içeriği embed ediliyor.
-
-**Format örneği:**
-```markdown
-## Dependency 154-001 (DONE)
-- Files: src/orchestra/rubric-registry.ts (+196 satır)
-- Self-assessment: DONE
-- Notes: TaskType taxonomy oluşturuldu. audit/document-write/code-development tipleri ve rubric registry.
-```
-
-### Koordinasyon
-
-Tüm kanallar `buildWorkerContext()` içinde birleşir ve tek bir `WorkerContextBundle` nesnesi döndürülür. Bu nesne `spawn-backend-docker.ts` ve `spawn-backend.ts` içinde kullanılarak final worker prompt'u oluşturulur. Token bütçesi aşılırsa (max context window) kanallar öncelik sırasına göre kısaltılır:
-
-```
-1 → 2 → 3 → 4 → 5  (öncelik sırası: 1 en yüksek)
-Kanal 5 (enrichment) en büyük ve en ilk kesilendir.
-```
-
----
-
-## Consequences
-
-### Olumlu
-
-- **Alignment drift azalır.** Worker'lar ADR'leri, geçmiş öğrenmeleri ve önceki bağımlılık sonuçlarını bilerek çalışır. Sprint 154 boyunca gözlemlenen tekrarlayan hataların önemli bir kısmı bağlam eksikliğinden kaynaklandı.
-- **FIX döngüsü sayısı düşer.** Daha zengin bağlam, ilk denemede daha iyi çıktı anlamına gelir. Sprint sonuçlarında FIX → DONE oranı izlenerek doğrulanabilir.
-- **Manifest uyumsuzluğu erken yakalanır.** Kanal 3 sayesinde worker, kullandığı agent'ın beklenmedik şekilde güncellendiğini görebilir ve Brain'i uyarabilir.
-- **Skill anti-pattern öğrenmesi döngüsel hale gelir.** Her sprint'te `outcome-tracker.ts` yeni anti-pattern verisi üretir; kanal 4 bunu sonraki worker'lara iletir. Bu öğrenme döngüsü ADR-036 (ADR governance) ile uyumludur.
-
-### Olumsuz
-
-- **Prompt token maliyeti artışı.** 5 kanal, mevcut prompt boyutuna önemli bir ek yük getirir. Kanal 5 (dependency enrichment) özellikle büyük olabilir — 10+ bağımlılıklı bir görevde potansiyel olarak binlerce token. Token bütçesi yönetimi ve kanal önceliklendirmesi zorunlu.
-- **Uygulama süresi.** Tam 5-kanal entegrasyonu `prompt-god-template.ts`'in yeniden yapılandırılmasını gerektiriyor. Sprint 156 yalnızca Kanal 5'i tamamladı; kalan kanallar Sprint 157+ roadmap.
-- **Anti-pattern veri kalitesi.** Kanal 4 anti-pattern verisi `outcome-tracker.ts` kayıtlarına bağımlı. Erken sprint'lerde veri yetersiz olacak; anti-pattern listesi boş döner. Bu durumda kanal 4 gürültü değil sessizlik üretmeli.
-- **Manifest checksum false-positive riski.** Kanal 3 checksum eşleşmezliği uyarı üretir; ancak her güncelleme gerçek bir uyumsuzluk değildir (ör. JSDoc güncellemesi). Uyarı seviyesi "warning" olmalı; "block" olmamalı.
-
----
-
-## Related ADRs
-
-- **ADR-007** — SpawnOptions Interface: `buildWorkerContext()` sonucu spawn options aracılığıyla worker'a iletilir.
-- **ADR-035** — Verification Protocol: Kanal 2 (Sync) öğrenme snapshot'ı, `CODE_VERIFY_REQUEST` kanalı hakkında worker'a önceki deneyimleri aktarabilir.
-- **ADR-036** — ADR Governance: Kanal 2 zorunlu ADR enjeksiyonunu formalize eder; `queryRelevantADRs()` bu kanalın uygulamasıdır.
-- **ADR-041** — Agent Taxonomy: Kanal 3 (Manifest) agent seçim gerekçesini ve versiyon bilgisini aktarır.
-- **ADR-053** — TaskType Taxonomy (proposed): Kanal 1 (Init) görev tipini aktarır; kanal 4 bu tipe özgü anti-pattern verisi içerebilir.
-- **ADR-055** — Hybrid Scoring Pipeline (proposed): Kanal 1 ve 2'deki bağlam bilgisi, Layer 4 (Outcome Weighting) ve Layer 5 (Auditor) skorlamaya girdi sağlar.
-
----
-
-## Notes
-
-"Self-awareness" terimi bilerek seçilmiştir ve şu anlamı taşır: worker'ın yalnızca görevini değil, görevinin sistemdeki *yerini* bilmesi. Bu kavramsal çerçeve ADR-040 (Nervous System Architecture) ile örtüşür — nervous system sistemin genel durumunu izlerken, self-awareness kanalları bu bilgiyi görev düzeyinde yayar.
-
-Sprint 156 T-007'nin tamamlanması Kanal 5'in canlıya alındığını kanıtlar. Kalan 4 kanal (özellikle Kanal 1 için sprint_sequence_number ve Kanal 3 için manifest_checksum) Sprint 157 ADR consolidation sprint'inde hayata geçirilecektir.
-
-> **Note (verified vs code, Sprint 172 — `proposed` doğru statü):** Yalnız **seed + mevcut bağımsız builder'lar** kod-doğrulandı:
-> - **Kanal 5 seed (Sprint 156 T-007) GERÇEK:** `src/orchestra/prompt-god-template.ts:93` `buildDependenciesBlock(task.dependencies, ctx.dependencies, ctx.tasksDir)`; `:223-238` `.tasks/task-{id}.result` okuyup `selfAssessment` vb. embed eder — §Kanal 5 "Mevcut durum" ile birebir ✓.
-> - Önceden var olan builder'lar mevcut: `buildAgentBlock` (`:124`), `buildSkillBlock` (`:131`), `buildDependenciesBlock` (`:291`) ✓.
->
-> **Çekirdek karar GERÇEKLEŞMEDİ (gövde gelecek-zamanlı kalmıştır):** Koordineli 5-kanal çatı mimarisi `buildWorkerContext()` ve `WorkerContextBundle` interface'i `src/` genelinde **yoktur** — builder'lar bağımsız çalışır, ADR'nin önerdiği koordinatör altında birleşmez. Kanal 1-4 "Yeni eklenti"leri (`sprint_sequence_number`, `manifest_checksum`, `skill_anti_patterns`) kodda **hiç yoktur**. "Sprint 157+ / Sprint 157 ADR consolidation" roadmap hedefi **geçti ve gerçekleşmedi** (Sprint 172).
->
-> **Statü gerekçesi (ADR-055 ile tutarlı, ADR-053 kontrastı):** Bu ADR'nin çekirdeği = koordineli `buildWorkerContext()` mimarisi ve o inşa edilmedi — yalnız Kanal 5 seed + çevresel builder'lar mevcut. Bu nedenle status doğru biçimde **`proposed` kalır** (terfi dürüst olmazdı; ADR-053 ise çekirdeği shipped olduğu için terfi etmişti). Behavior unchanged; documentation alignment only.
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review): Kanal-5 genişlemesi + statü teyidi
-
-**Classification: BOTH** (worker-bağlam kalitesi kullanıcı projelerindeki çıktı kalitesini doğrudan etkiler).
-
-**Re-verified:** `buildWorkerContext`/`WorkerContextBundle` koordinatörü hâlâ yok (0-sembol); Kanal 1-4 "Yeni eklenti"leri (`sprint_sequence_number`/`manifest_checksum`/`skill_anti_patterns`) hâlâ yok → **`proposed` kalır**.
-
-**🟢 Kanal-5 organik GENİŞLEDİ (Sprint-172 sonrası):**
-1. **COMM-1 (Sprint 278):** Enrichment artık dependency-`.result`'ların ötesinde — **SharedMemory cross-worker notları + Upstream Handoff'lar** worker-prompt'una enjekte edilir (`task-builder.ts:1267-1290`, config-gated `worker_comms: { inject_shared, inject_handoffs }`). Kanal-5'in "bağımlılık-sonuç yayılımı" vizyonu, çapraz-worker bağlam paylaşımına büyüdü (ADR-037 Sprint-281 amendment'inin Brain-aracılı mesaj-bus invariant'ı içinde).
-2. **ADR-048 S182 amendment:** full-content injection (skill/ADR truncation-yasak) Kanal-2/4'ün içerik-teslimini koordinatörsüz güçlendirdi.
-
-ADR-055 ile aynı kalıp: hedefler kısmen organik gerçekleşiyor; koordineli 5-kanal çatısı **açık mimari opsiyon** olarak `proposed` kalır (worker-prompt yeniden-yapılandırma gündeme geldiğinde — WP-stream — karar verilir). md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-061: AEGIS — Agentic Effect-Governed Iterative Stewardship Methodology
-
-**Status:** proposed
-
-# ADR-061: AEGIS — Agentic Effect-Governed Iterative Stewardship Methodology
-
-**Status:** proposed
-
-**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
-
-**Date:** 2026-05-15
-
-**Sprint:** Sprint 170 (planning phase, implementation Sprint 175-200)
-
----
-
-## Status
-
-proposed (Sprint 175 başlangıç, Sprint 200 god-level GA launch ile birlikte canonical)
-
----
-
-## Context
-
-Deckent Sprint 170 itibarıyla 14+ özgün mimari yapı içerir (Brain-Worker-Auditor 3-tier, Memory V2 SQLite FTS5, ADR Governance Integration ADR-036, RBAC Authority Matrix ADR-037, EffectClass taksonomisi, Self-Modifying Detection ADR-039, Nervous System ADR-040, TaskType Taxonomy ADR-053 (Sprint 172 accepted — çekirdek shipped), Hybrid Scoring 5-Layer ADR-055 proposed, Wave-Based Execution ADR-045, Brain Self-Update Hook ADR-046, Manuel Subagent Dispatch ADR-047, Prompt Lifecycle ADR-048, Sprint Checkpoint+Resume ADR-043, Sprint State Observability ADR-044). Bu yapılar **kompozit bir disiplin** oluşturuyor; ancak **resmi bir adı ve yayınlanabilir spesifikasyonu yok**. Topluluk + akademik dünya + enterprise pazarda Deckent'i konumlandırmak için disiplinin **tek isim altında formel manifestosu** zorunlu.
-
-Sprint 170 öncesi yapılan kapsamlı metodoloji araştırması (4 paralel research agent, ~95 metodoloji taraması) iki temel bulgu ortaya koydu:
-
-**Birinci bulgu — Deckent zaten convergent endüstri patternlerinin %85'ini içerir:**
-Klasik SE'den (DDD strategic + Hexagonal + Lean + CQRS/Event Sourcing + TDD + Trunk-Based Development + Crystal-family + Specification by Example), AI-era patternlerinden (Generator-Critic split, Reflection+Memory, Plan-Execute-Evaluate triad, Anthropic'in Orchestrator-Worker + Evaluator/Optimizer harness'i, MetaGPT'nin role-based SOP encoding'i, Voyager'ın lifelong-learning skill library'si, Constitutional AI'ın principle-based governance'ı), Process/DevOps'tan (SRE error budgets + blameless postmortems, Toyota Production System Jidoka/Andon, Shape Up appetite-driven cycles, CNCF tiered graduation, SOX segregation of duties, OpenSSF SLSA provenance) — Deckent her birinden bir parça benimsemiş ve birleştirmiş.
-
-**İkinci bulgu — 7 boyutta hiçbir mevcut metodoloji Deckent'i tek başına kapsamıyor:**
-1. Multi-mode lifecycle discipline (kod/task/process üçlemesi) for AI agents — yok
-2. Cross-session/cross-sprint institutional memory with decay + governance + FTS retrieval — Reflexion per-task only, Generative Agents per-simulation only
-3. Runtime ADR governance for AI-generated decisions (Constitutional AI training-time only, Deckent runtime-enforceable)
-4. Self-Modifying Task Detection (dogfood vs user project discrimination) — hiçbir framework adresiyor
-5. Multi-dimensional outcome scoring beyond math/code (PRM math-only, Deckent generic)
-6. Provenance manifest for AI-generated artifacts (SLSA build-only, AI provenance gap)
-7. Adversarial verification at lifecycle scale (VSDD single-developer scope, Deckent multi-mode multi-agent)
-
-Sprint 170 itibarıyla Deckent OSS GA hazırlığında. **Resmi metodoloji adı + manifestosu olmadan dış dünya Deckent'i** Cursor (IDE-agent), Devin (autonomous SWE), Hermes (life assistant), MetaGPT (multi-agent framework), VSDD (solo-dev verification) gibi mevcut kategorilere yanlış konumlandırır. AEGIS bu boşluğu doldurur — Deckent'in mevcut disiplinine resmi kimlik verir, **kategori liderliği** iddiasını mümkün kılar.
-
----
-
-## Decision
-
-**AEGIS — Agentic Effect-Governed Iterative Stewardship** Deckent'in resmi metodolojisi olarak benimsenir. AEGIS **mode-agnostic** bir disiplin: Sprint Mode (kod orkestrasyon), Task Mode (life assistant single-task), Process Mode (ERP/business süreç orkestrasyon) — üçünde de aynı çekirdek ile çalışır, mode-spesifik kalibrasyonu EffectClass dağılımı ve verification tier seçimi belirler.
-
-### AEGIS Spesifikasyonu
-
-#### A. 3 Mimari Katman
-
-```
-┌─────────────────────────────────────────┐
-│ KATMAN 1: AWARENESS                     │
-│ Nervous System (ADR-040) +              │
-│ Self-Modifying Detection (ADR-039) +    │
-│ Brain Self-Audit Gate +                 │
-│ Sprint State Observability (ADR-044)    │
-├─────────────────────────────────────────┤
-│ KATMAN 2: IMPROVEMENT                   │
-│ Outcome Tracker + Synergy Matrix +      │
-│ Rule Evolver +                          │
-│ Promotion Pipeline +                    │
-│ Mid-Sprint Adapter (Fresh-Eyes) +       │
-│ Quality Assessor                        │
-├─────────────────────────────────────────┤
-│ KATMAN 3: HEALING                       │
-│ Sprint Checkpoint+Resume (ADR-043) +    │
-│ Manuel Subagent Dispatch (ADR-047) +    │
-│ Notification Dispatcher +               │
-│ Spawn Safety + Crash Recovery           │
-└─────────────────────────────────────────┘
-```
-
-Üç katman birbirine ortogonal ve her workflow'da paralel çalışır. AWARENESS kendini bilir, IMPROVEMENT kendini geliştirir, HEALING kendini onarır. Bu üçleme **AI orkestrasyon disiplininin foundational invariant'ıdır** — herhangi bir katman eksik kalırsa sistem regresyon riski taşır.
-
-#### B. 5 Rol (Separation of Duties — SOX + Linux Foundation governance ilham)
-
-| Rol | Sorumluluk | Yetki Sınırı |
-|-----|-----------|--------------|
-| **Architect** (insan) | Strategic vision, Charter (DIRECTIVES) yazımı, EffectClass critical-irreversible için onay | Stratejik karar, taktik müdahale yok |
-| **Brain** (orchestrator, singleton) | Plan, route, evaluate, finalize | Asla kod yazmaz (ADR-008 single import direction) |
-| **Workers** (generators, paralel N) | Code/action + property test + DbC contract üretir | scope.filesWrite STRICT (ADR-037 RBAC) |
-| **Auditor** (adversary, separate process) | Adversarial verification, ADR compliance, RBAC enforcement, fresh-context critique | Asla kod yazmaz, sadece okur + skor verir |
-| **Nervous** (meta-orchestrator) | Proaktif sağlık izleme, Brain'i izler, recovery proposer | Brain'i restart edebilir, kod değiştirmez |
-
-#### C. 8 Artifact (Specification by Example + SLSA + Living Documentation birleşimi)
-
-1. **Charter** — DIRECTIVES.md, Given/When/Then formalize edilmiş public spec
-2. **Tasks** — `.tasks/*.json` + EffectClass + verification tier + mode annotation
-3. **Properties** — `tests/properties/` PBT specs (fast-check or domain-specific)
-4. **Contracts** — Zod schemas at module boundaries (Sprint 169 sonrası mevcut, formalize)
-5. **Adversary Reports** — `.audit/<sprint>/<task>-adverse.md` (yeni)
-6. **Provenance Manifest** — `.deckent/provenance/<sprint>.json` Ed25519 imzalı SLSA-style (yeni)
-7. **Memory** — `.brain/memory.db` + exports (mevcut Memory V2)
-8. **ADRs** — mandatory runtime constraints (mevcut ADR-036 governance)
-
-#### D. 9 Phase Lifecycle
-
-Mevcut Deckent 8-phase (PLAN/SPAWN/EXECUTE/EVALUATE/FIX/RETRO/DECAY/CLEANUP) **5 yenilikle** AEGIS canonical lifecycle'a evrim:
-
-```
-Phase 1: SHAPE
-  - Spec by Example formalization (Given/When/Then in Charter)
-  - Optional: N-planner debate (multi-agent debate at planning, Du et al 2023)
-  - Error-budget gate (SRE — önceki sprint NO_GO oranı eşik aşıyorsa freeze)
-  - Provenance seed
-
-Phase 2: GOVERN  [YENİ EXPLICIT PHASE]
-  - ADR compliance check (ADR-036)
-  - EffectClass classification per task
-  - RBAC matrix activation (ADR-037)
-  - Verification tier per EffectClass
-
-Phase 3: SPAWN
-  - Worker dispatch (tmux/subprocess/Docker per ADR-027)
-  - Provenance manifest update
-
-Phase 4: EXECUTE
-  - Worker writes property + impl + DbC contract
-  - [YENİ] Andon authority — worker proactively raises halt (Toyota Jidoka)
-  - **Karpathy 4-Discipline** worker execution contract (Sprint 191): Think-Before-Coding → Simplicity-First → Surgical-Changes → Goal-Driven-Execution (`.claude/rules/karpathy-discipline.md`). Discipline 4 (honest self-assessment + Goal-Driven Execution) = AEGIS Principle 3 (Adversarial Verification by Default) worker-side expression.
-  - Heartbeat scan (Auditor)
-
-Phase 5: ADVERSE  [YENİ EXPLICIT PHASE]
-  - Fresh-context Auditor critique (VSDD Sarcasmotron pattern adopted)
-  - Property + mutation + contract checks
-  - Differential testing (cross-provider for compensable+ EffectClass)
-  - "Zero-slop" exit criterion (VSDD inheritance)
-
-Phase 6: EVALUATE
-  - Hybrid Scoring 5-Layer (ADR-055)
-  - Schema → Gates → Quality → Outcome → Auditor signal
-  - Decision: DONE / GO_WITH_TECH_DEBT / NO_GO
-
-Phase 7: REVIEW  [YENİ — Scrum Sprint Review eşdeğeri]
-  - User-facing demonstration
-  - Architect sees diff, decides FIX priorities
-  - Distinct from internal RETRO
-
-Phase 8: FIX
-  - [YENİ alt-step] Explicit ROOT-CAUSE + 5-Whys discipline
-  - Incident vs Problem distinction (ITIL inheritance)
-  - ADR amendment if Problem (architectural fix)
-  - Mid-Sprint Adapter rerouting (Fresh-Eyes Rotation)
-
-Phase 9: COOL-DOWN  [YENİ — DECAY+CLEANUP+RETRO merged, Shape Up cool-down framing]
-  - Sprint learnings → memory.db (Reflexion verbal RL)
-  - SLSA-style provenance export (signed manifest)
-  - Memory decay (existing)
-  - Agent/skill promotion-pipeline (existing)
-  - Lock release + archive
-```
-
-#### E. Verification Stack — EffectClass-Aware (3-Tier)
-
-| EffectClass | Tier 1 (always) | Tier 2 (recommended) | Tier 3 (mandatory) |
-|-------------|----------------|---------------------|---------------------|
-| **pure** | Branded types + PBT + Zod + Stryker diff + DbC | — | — |
-| **reversible** | All Tier 1 | Mutation 75+, Model-Based Testing | — |
-| **idempotent** | All Tier 1 + idempotency property | Differential cross-provider | — |
-| **compensable** | All Tier 1 + compensation contract DbC | Stateful PBT (do/undo invariant), canary | TLA+ if multi-component |
-| **critical-irreversible** | All Tier 1, contracts non-removable | Mutation 90+, MBT, fuzz | **TLA+ specification mandatory** |
-
-Tier 1 (~10% test runtime overhead) her sprint default. Tier 2 (~3-5 sprint deployment) yüksek risk task'larında. Tier 3 (~weeks-months investment) sadece critical-irreversible için.
-
-#### F. Mode Applicability — Sprint / Task / Process
-
-AEGIS üç modda da aynı çekirdek ile çalışır, mode-spesifik kalibrasyon:
-
-| Boyut | Sprint Mode (kod) | Task Mode (life assistant) | Process Mode (ERP/business) |
-|-------|-------------------|---------------------------|---------------------------|
-| **EffectClass dağılımı** | %70 reversible, %25 idempotent, %5 critical-irreversible | %50 idempotent, %30 reversible, %20 compensable | %40 compensable, %30 critical-irreversible, %20 idempotent, %10 pure |
-| **Verification tier modal** | Tier 1 default, Tier 2 selective | Tier 1 sufficient | **Tier 2 default, Tier 3 mandatory for critical-irreversible** |
-| **Phase emphasis** | Tüm 9 faz dengeli | Phase 1-4 + Phase 9 (REVIEW/FIX skip optional) | **Phase 2 GOVERN + Phase 5 ADVERSE çift kalın** (compliance + audit trail) |
-| **Charter format** | DIRECTIVES.md + Given/When/Then per task | Single-task prompt + outcome | BPMN-like business process spec + compliance metadata |
-| **Provenance ağırlık** | Recommended | Optional | **Mandatory** (regulatory audit) |
-| **N-planner debate** | Optional (high-effort sprint için) | Skip | **Mandatory** (financial transactions) |
-| **Architect onayı** | Sadece critical-irreversible | Sadece critical-irreversible | **Her compensable+ workflow** |
-
-Mode toggle Deckent config'de `deckent_style: sprint | task | process` (ADR-042 Hybrid Mode Architecture proposed temeli).
-
-### AEGIS Çekirdek 8 Prensip
-
-Manifesto-style canonical principles:
-
-1. **Multi-Agent Separation of Duties** — Tek agent hem yazıp hem doğrulamaz. Brain plans, Worker executes, Auditor adversarially verifies. Concentration of power = anti-pattern.
-
-2. **Effect-Aware Verification Rigor** — Bir task'ın blast radius'una orantılı doğrulama uygulanır. `pure` PBT yeterli, `critical-irreversible` TLA+ + Architect approval zorunlu.
-
-3. **Adversarial Verification by Default** — Verification kendini doğrulayan jenerator değil, ayrı süreçteki Auditor'dur. Generator-critic separation gaming-proof discipline'ın foundation'ıdır.
-
-4. **Runtime Governance Enforcement** — Architectural decisions (ADRs / corporate policy / regulations) plan-time'da düşünülmez, runtime'da Brain prompt enrichment + Auditor compliance check ile uygulanır.
-
-5. **Cross-Workflow Institutional Memory** — Her workflow'un öğrenmesi memory.db'ye düşer, decay ile yaşar, FTS5 ile retrieve edilir, ADR'ye yükselir. Single-session amnezi anti-pattern.
-
-6. **Self-* Triad Discipline** — Awareness (kendini bilme), Improvement (kendini geliştirme), Healing (kendini onarma) ortogonal katmanlardır. Üçü olmadan AI orkestrasyon production-grade olamaz.
-
-7. **Provenance as First-Class Artifact** — Her AI-generated output `(workflow, agent, model, prompt-hash, EffectClass, timestamp)` provenance manifest'ine düşer. Ed25519 imzalı, audit-ready.
-
-8. **Mode-Agnostic Discipline, Mode-Specific Calibration** — AEGIS Sprint/Task/Process üç modda aynı çekirdek ile çalışır. Mode-spesifik fark yalnızca EffectClass dağılımı + verification tier seçimi + phase emphasis.
-
----
-
-## Consequences
-
-### Olumlu
-
-- **Kategori liderliği iddiası mümkün olur.** Deckent "yet another orchestrator" değil, **AEGIS-compliant ilk açık kaynak AI orkestratörü** olarak konumlanır. TDD/BDD/DDD/SDD/VDD/VSDD ailesinin doğal yeni üyesi, **mode-agnostic** olduğu için akademik + enterprise + open-source community'de **eşi olmayan konum**.
-
-- **Multi-mode vizyonu (Sprint+Task+Process) tek metodoloji altında birleşir.** Process Mode ERP/business pivot'u (Sprint 200 god-level hedef) için **mevcut mimariye doğal eşleme**. Pazarlama tek mesaj: "AEGIS — discipline that works across code, life, and business."
-
-- **Akademik citation kapısı açılır.** AEGIS makalesi (target venues: ICSE/FSE software engineering, NeurIPS multi-agent track) dollspace-gay/VSDD prior art credit + Anthropic agent harness + Constitutional AI runtime adaptation üzerine **yapısal katkı** olarak yayınlanabilir. Sprint 200 god-level GA için academic prestige multiplier.
-
-- **Enterprise sales narrative netleşir.** "We use AEGIS methodology" enterprise CISO/CTO için tanıdık-ama-ileri sound. SOC 2 + ISO 27001 audit'larında verification tier mapping + provenance manifest **compliance evidence** olarak doğrudan kullanılabilir.
-
-- **Community standard yaratma fırsatı.** agentskills.io tarzı agentaegis.io standard repo'su, AEGIS-compliant AI orchestrator certification, Deckent **standart belirleyici** rolü alır. Apache way "lazy consensus" + CNCF tiered graduation patterns AEGIS ekosistem governance'ına uyar.
-
-- **Existing Deckent disiplini retroaktif olarak isimlenir.** Worker contract, ADR-036 governance, Auditor RBAC, EffectClass, Hybrid Scoring — hepsi AEGIS phase/role/artifact'larıyla **net eşleme**. Yeniden çalışma yok, sadece adlandırma + 5 yeni faz/gate (REVIEW + andon + 5-Whys + provenance + cool-down).
-
-- **Hermes/Cursor/Devin/OpenClaw rakiplerinden mimari farklılaşma** AEGIS bayrağı altında somut tek mesaj: "Mode-agnostic, governance-enforced, adversarial-verified, multi-agent orchestration discipline." Hiçbir rakip bu kombinasyonu sunmuyor.
-
-### Olumsuz
-
-- **5 yeni faz/gate implementation maliyeti.** REVIEW phase MCP tool, Andon authority worker contract extension, 5-Whys ROOT-CAUSE alt-step, Provenance manifest schema + Ed25519 signing infrastructure, COOL-DOWN consolidation — Sprint 175-185 arası ~5 sprint implementation work, ~3000-5000 LoC.
-
-- **Mode-spesifik kalibrasyon spec maliyeti.** Process Mode için BPMN-like Charter format + compliance metadata schema + Architect approval workflow yeni tasarım gerektirir. Sprint Mode'dan Process Mode'a port etmek mimari refactor (~Sprint 195+ vertical pilot).
-
-- **TLA+ entegrasyonu TypeScript dünyasında zayıf.** `respawnEligibleTasks` + `detectScopeCollisions` için TLA+ spec yazımı + maintenance senior expertise + ekosistem dışı tooling. Tier 3 mandatory uygulaması gerçekten critical-irreversible task'lar için makul, ama TS-native alternative (Z3 binding + branded types) Sprint 195+ exploration gerektirir.
-
-- **AEGIS adı brand çakışma riski.** "Aegis" yazılım ekosisteminde başka projelerde kullanılıyor (örn. AEGIS authenticator, çeşitli security ürünleri). Trademark araştırması Sprint 172 OSS GA öncesi şart. Alternatif aday isimler: MAVEN (Multi-Agent Verified Effect-aware orchestratioN), PRISM (Plan-Run-Inspect-Score-Memorize), OAGD (Orchestrated Adversarial Governance Discipline).
-
-- **Methodology learning curve.** Deckent yeni kullanıcılar için mevcut 8-phase lifecycle bile dik öğrenme; AEGIS 9-phase + 3-layer + 5-role + 8-artifact + 8-principle daha da dik. Documentation site + tutorial + video walkthrough Sprint 172-175 paralel deliverable.
-
-- **Multi-mode unified discipline iddiası provable mı?** Sprint Mode dogfood'u 170 sprint kanıt verdi; Task Mode + Process Mode için canlı kanıt **yok**. AEGIS spec teorik olarak mode-agnostic olsa da empirical validation Sprint 195+ ERP procurement vertical pilot ile gelecek. Önce Sprint Mode'da AEGIS-compliant pilot, sonra Task Mode (Sprint 185-190), sonra Process Mode (Sprint 195-200).
-
-- **Self-Awareness Propagation (ADR-060 proposed) AEGIS'in 5-channel context enrichment adımıyla uyumlu mu test edilmeli.** ADR-060 + ADR-061 entegrasyonu proposed→accepted sürecinde paralel review.
-
----
-
-## Implementation Roadmap
-
-### Phase 0: Pre-Implementation (Sprint 170-174)
-- ADR-061 review + accept (Architect onayı)
-- Brand/trademark araştırması (AEGIS vs alternatif isimler)
-- Manifesto draft + landing page mockup
-- Documentation site structure planning
-
-### Phase 1: Foundation (Sprint 175-180)
-- Phase 5 ADVERSE explicit phase wire (mevcut Auditor → fresh-context mode + Sarcasmotron-style prompt template)
-- Phase 7 REVIEW MCP tool (`deckent_review` user-facing demonstration)
-- Phase 9 COOL-DOWN consolidation (DECAY + CLEANUP + RETRO merge + provenance export)
-- AEGIS principle enforcement in Brain prompt enrichment
-
-### Phase 2: Verification Stack (Sprint 181-188)
-- fast-check entegrasyonu (Tier 1 PBT)
-- Branded types core/types.ts'te (TaskId, SprintId, WorkerId)
-- Stryker mutation testing diff-mode CI gate
-- Zod schema migration `.contracts/api-surface.md` prose → schemas
-- DbC assertion library + boundary insertion
-
-### Phase 3: Provenance + Governance (Sprint 189-194)
-- Provenance manifest schema v1
-- Ed25519 signing infrastructure (mevcut hub Ed25519 reuse)
-- Worker andon authority (proactive halt) implementation
-- 5-Whys ROOT-CAUSE structured FIX phase
-
-### Phase 4: Mode Expansion (Sprint 195-200)
-- Task Mode AEGIS adaptation (Sprint 185-190 paralel)
-- Process Mode ERP procurement vertical pilot (Sprint 195-200)
-- TLA+ pilot: `respawnEligibleTasks` + `detectScopeCollisions` (critical-irreversible coverage)
-- AEGIS-compliant skill certification spec (agentaegis.io standard draft)
-- Sprint 200 god-level GA launch — AEGIS canonical methodology
-
-### Phase 5: Ecosystem (Sprint 200+)
-- Academic paper submission (ICSE 2027 / FSE 2027 / NeurIPS 2026 multi-agent track)
-- agentaegis.io spec repo public
-- AEGIS-compliant orchestrator certification program
-- Hub plugin: AEGIS-mandatory verification tier metadata
-
----
-
-## Related ADRs
-
-- **ADR-036** — ADR Governance Integration: AEGIS Phase 2 GOVERN'in foundation, runtime ADR injection.
-- **ADR-037** — RBAC Authority Matrix: AEGIS 5-rol separation of duties'in foundation.
-- **ADR-038** — Dead Code Disposition + Spawn Safety: AEGIS Layer 3 HEALING içinde.
-- **ADR-039** — Self-Modifying Task Detection: AEGIS Layer 1 AWARENESS içinde, dogfood discrimination.
-- **ADR-040** — Nervous System: AEGIS Layer 1 AWARENESS'in çekirdeği.
-- **ADR-041** — Agent Taxonomy: AEGIS 5-rol + Workers içinde 15 vertical agent + 21 horizontal skill.
-- **ADR-042** — Hybrid Mode Architecture (Sprint 172 accepted — dual-mode shipped): AEGIS mode applicability'nin foundation, Sprint+Task+Process toggle.
-- **ADR-043** — Brain Crash Recovery: AEGIS Layer 3 HEALING içinde.
-- **ADR-044** — Sprint State Observability Contract: AEGIS Layer 1 AWARENESS içinde.
-- **ADR-045** — Wave-Based Execution: AEGIS Phase 3 SPAWN içinde Kahn topological.
-- **ADR-046** — Brain Self-Update Hook: AEGIS Phase 9 COOL-DOWN içinde provenance + memory update.
-- **ADR-047** — Manuel Subagent Dispatch: AEGIS Layer 3 HEALING içinde, kritik kırık recovery.
-- **ADR-048** — Prompt Lifecycle Contract: AEGIS Phase 3 SPAWN + Phase 9 COOL-DOWN cleanup contract.
-- **ADR-053** — TaskType Taxonomy (Sprint 172 accepted — çekirdek 3-tip taxonomy shipped; Roadmap/Tek-Kaynak deferred): AEGIS Phase 2 GOVERN içinde EffectClass classification dependency.
-- **ADR-055** — Hybrid Scoring 5-Layer (proposed): AEGIS Phase 6 EVALUATE'in canonical implementation.
-- **ADR-060** — Self-Awareness Propagation (proposed): AEGIS Layer 1 AWARENESS 5-channel context enrichment specification.
-- **Karpathy 4-Discipline Anchor** (`.claude/rules/karpathy-discipline.md`, Sprint 191 eklendi): AEGIS Phase 4 EXECUTE'in **worker-side canonical contract'ı**. 4 disiplin AEGIS prensipleriyle eşlenir: Discipline 1 (Think-Before-Coding) ↔ AEGIS Principle #5 (Cross-Workflow Institutional Memory — read before act), Discipline 3 (Surgical Changes) ↔ AEGIS ADR-037 RBAC scope.filesWrite enforcement, Discipline 4 (Goal-Driven + honest self-assessment) ↔ AEGIS Principle #3 (Adversarial Verification by Default — worker self-critique tier). Karpathy discipline, AEGIS Phase 4 Andon authority'nin yazılı norm halidir.
-
-**Prior art credit:**
-- **dollspace-gay/VSDD** — Adversarial verification via fresh-context critique pattern (AEGIS Phase 5 ADVERSE inheritance).
-- **dollspace-gay/VDD** — Builder-Adversary separation foundation.
-- **Anthropic** — Building Effective Agents + Effective Harnesses for Long-Running Agents (AEGIS lifecycle pattern source).
-- **Madaan et al** — Self-Refine (AEGIS Mid-Sprint Adapter pattern source).
-- **Bai et al / Anthropic** — Constitutional AI (AEGIS runtime ADR governance source).
-- **Lightman et al / OpenAI** — PRM "Let's Verify Step by Step" (AEGIS Phase 6 EVALUATE Hybrid Scoring source).
-- **Hong et al** — MetaGPT role-based SOP encoding (AEGIS 5-role separation parallel).
-- **Wang et al** — Voyager skill library (AEGIS skill registry promotion-pipeline parallel).
-- **Du et al** — Multi-Agent Debate (AEGIS Phase 1 SHAPE optional N-planner debate source).
-- **OpenSSF** — SLSA build provenance (AEGIS provenance manifest source).
-- **Toyota Production System** — Jidoka/Andon (AEGIS Phase 4 EXECUTE worker andon authority source).
-- **Google SRE** — Error budgets + blameless postmortems (AEGIS Phase 1 SHAPE error-budget gate source).
-- **Shape Up (Basecamp)** — Cool-down framing (AEGIS Phase 9 COOL-DOWN naming source).
-- **Adzic** — Specification by Example (AEGIS Charter Given/When/Then formalization source).
-
----
-
-## Notes
-
-### Naming Rationale
-
-**AEGIS** seçimi şu kriterlere dayanır:
-
-1. **Mode-agnostic** — "Sprint" / "Code" / "Test" gibi mode-specific terim içermez. Sprint Mode + Task Mode + Process Mode üçü için aynı geçerli.
-2. **Acronym açılımı disipline foundational** — Agentic (AI agent-native) + Effect-Governed (EffectClass + ADR governance) + Iterative (lifecycle loops) + Stewardship (multi-role responsibility, Brain orchestrates, Auditor watches, Nervous heals).
-3. **Yunan mitoloji çağrışımı** — Athena'nın kalkanı (shield) — Reversibility Layer + Self-Healing + RBAC discipline'ın doğal sembolü. Marka için güçlü hikaye.
-4. **5 harf, kolay söylenir, akılda kalır** — Marketing/launch için kritik.
-5. **TDD/BDD/DDD/SDD/VDD/VSDD ailesinden çıkar ama doğal evrim** — Acronym pattern bozulur (XDD değil), bu da "yeni kategori" mesajı verir.
-
-**Trademark riski:** "Aegis" yazılım dünyasında çeşitli security/auth ürünlerinde kullanılıyor (AEGIS authenticator, AEGIS encryption library, vb). Sprint 172 OSS GA öncesi:
-- USPTO/EUIPO trademark araştırması
-- "Agentic Effect-Governed Iterative Stewardship" full-name explicit claim ile çakışma azaltılır
-- Domain araştırması: aegis.dev / agentaegis.io / aegis-method.org
-
-**Alternatif isim adayları (Architect final kararı için):**
-
-| Aday | Açılım | Avantaj | Dezavantaj |
-|------|--------|---------|------------|
-| **AEGIS** (önerilen) | Agentic Effect-Governed Iterative Stewardship | Mode-agnostic, mitolojik metafor, 5 harf | Trademark çakışma riski |
-| **MAVEN** | Multi-Agent Verified Effect-aware orchestratioN | "Expert" connotation, friendly | Apache Maven brand confusion |
-| **PRISM** | Plan-Run-Inspect-Score-Memorize | Phase-as-acronym, mode-agnostic | Generic, çok proje var |
-| **OAGD** | Orchestrated Adversarial Governance Discipline | TDD/BDD ailesinden, akademik | Söylenmesi zor (oh-ay-jee-dee) |
-| **HELIX** | Hybrid Effect-aware Lifecycle with Iterative eXamination | Spiral metafor, görsel | "X" zorlama, kelime uzun |
-
-### Geç-ADR Pattern Devam Ediyor
-
-ADR-053 ve ADR-055 gibi, ADR-061 de **mevcut Deckent disiplinin retroaktif belgelenmesi + ileriye dönük formal extension'ı**. Implementasyon önce yazıldı (Brain-Worker-Auditor + 50+ ADR + 14+ self-* layer), AEGIS bunlara isim verir + 5 yeni faz/gate ekler. Sprint 156 dogfood pratiğine göre bu geç-ADR pattern'i kabul edilebilir.
-
-İleride tercih edilen sıra: ADR proposed → Architect review → ADR accepted → Implementation Sprint task'ları. AEGIS için bu sıra Sprint 175 itibarıyla uygulanır.
-
-### Open Source Standard İddiası
-
-Sprint 200 god-level GA sonrası AEGIS'in **agentskills.io tarzı açık standart** repo'sunu açmak (agentaegis.io draft) Deckent'i ekosistem-shaping rolüne taşır. CNCF Sandbox başvurusu, OpenSSF Best Practices Badge, MIT/Apache 2.0 license üçlüsü ile **vendor-neutral standart** iddiası mümkün. Bu Sprint 200+ Phase 5 Ecosystem roadmap'inde detaylanır.
-
-### AEGIS vs VSDD Karşılaştırma Özeti
-
-| Boyut | dollspace-gay/VSDD | AEGIS |
-|-------|-------------------|-------|
-| Scope | Solo developer workflow | Multi-mode (Sprint/Task/Process) AI orchestration |
-| Phases | 6 (Spec/TDD/Adverse/Feedback/Formal/Convergence) | 9 (Shape/Govern/Spawn/Execute/Adverse/Evaluate/Review/Fix/Cool-down) |
-| Roles | 4 (Architect/Builder/Tracker/Adversary) | 5 (Architect/Brain/Workers/Auditor/Nervous) |
-| Memory | Ephemeral (per session) | Persistent (memory.db + decay + FTS) |
-| Governance | Spec supremacy | ADR runtime enforcement (ADR-036) |
-| Multi-agent | Builder vs Adversary 1:1 | Brain-Workers-Auditor-Nervous N:N |
-| Mode | Single (developer) | Three (code/task/process) |
-| Provenance | Implicit (git) | Explicit (signed manifest) |
-| Self-* layers | Yok | 3 katman (Awareness/Improvement/Healing) |
-| Process scale | Single dev | Sprint + organization |
-
-AEGIS VSDD'nin **superset'idir** — VSDD prensiplerinin çoğunu (adversarial verification, fresh-context critique, spec supremacy, anti-slop bias, formal hardening) içerir + multi-agent orchestration + multi-mode + persistent memory + governance layer + self-* triad ekler.
-
----
-
-**İmza (proposed):** Brain (orchestrator)
-**Diriliş:** Sprint 175 implementation Phase 1 başlangıç ile birlikte canonical
-**Sonraki revize:** Sprint 200 god-level GA sonrası empirical validation feedback ile v2.0
-
----
-
-> **Note (status reconciliation + reality, Sprint 172):**
-> - **`proposed` doğru statü:** AEGIS bilinçli ileri-dönük manifestodur; 9-phase/3-layer/5-role/8-artifact spec'in 5 yeni faz/gate'i (REVIEW, andon, 5-Whys, provenance, COOL-DOWN) ve Implementation Roadmap (Sprint 175-200) **henüz başlamadı** (Sprint 172). ADR kendisi her yerde bunu dürüstçe işaretler — overclaim yok.
-> - **Çapraz-ADR statü uzlaştırması:** ADR-061 yazıldığında `(proposed)` etiketli iki ADR bu doküman turunda terfi etti — **ADR-042** (Hybrid Mode, dual-mode shipped → accepted) ve **ADR-053** (TaskType, çekirdek shipped → accepted; Roadmap/Tek-Kaynak deferred). §Context + §Related ADRs referansları buna göre güncellendi. **ADR-055 + ADR-060 `proposed` kalır** (çekirdekleri inşa edilmedi — bu ADR'lerdeki notlara bkz.); ADR-061 onları doğru biçimde `proposed` gösterir.
-> - **Açık Architect kararı:** "Trademark/isim araştırması Sprint 172 OSS GA öncesi şart" (§Consequences + §Notes, 3×) — Sprint 172 = şu an. AEGIS vs MAVEN/PRISM/OAGD/HELIX seçimi + "Aegis" trademark çakışma riski **çözülmemiş bir Architect kararıdır**; bu not onu yüzeye çıkarır, karara bağlamaz.
-> - Ground-truth tutarlı: "15 vertical agent + 21 horizontal skill" (§Related ADR-041) güncel kataloğla eşleşir.
->
-> Behavior unchanged; documentation alignment only.
-
-> **Amendment — Sprint 191 (Karpathy cross-reference):** Sprint 191 Worker Discipline Anchor projesi `.claude/rules/karpathy-discipline.md` dosyasını ekledi (4 disiplin: Think-Before-Coding, Simplicity-First, Surgical-Changes, Goal-Driven-Execution). Bu amendment AEGIS Phase 4 EXECUTE lifecycle adımına Karpathy 4-Discipline Anchor referansını ve §Related ADRs'e Karpathy Anchor cross-reference'ını ekler. Karpathy discipline AEGIS prensipleri #3 (Adversarial Verification — Discipline 4 honest self-assessment) ve #1 (Separation of Duties — Discipline 3 scope.filesWrite enforcement) ile örtüşür. No behavior change; documentation cross-reference only.
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review)
-
-**Classification: BOTH** (metodoloji ürünün kamusal kimlik iddiasıdır; manifesto-aşamasında).
-
-**Re-verified — `proposed` doğru kalır:** Roadmap Phase 0-5 inmedi (`.deckent/provenance/` yok, fast-check/Stryker dependency'leri yok, andon-authority yok, `src/aegis/` yok); MASTER-PLAN ile tutarlı ("PB-3: AEGIS Phase 1 foundation — post-beta if approved"; public-standard track Phase 1-4 ship'e dek deferred).
-
-1. **ADVERSE-ruhu organik parça indi:** **XVER-1 cross-verify** (Sprint 276, `src/core/cross-verify.ts` + `.result.crossVerify` advisory) = Phase-5 ADVERSE'in "differential / adversarial farklı-provider doğrulama" ruhunun canlı ilk parçası — ADR-055/060 ile aynı organik-gerçekleşme kalıbı (formal faz inşa edilmeden hedefin bir dilimi üretimde).
-2. **Mode-üçlüsü hizası:** AEGIS'in `sprint|task|process` mode-applicability tablosu, ADR-042 Sprint-281 amendment'inin üçlü-yön kararıyla (process modu = ADR-067 proposed; gerekçe: "sprint evrensel kavram değil + task-mode agentic değil") birebir örtüşür — AEGIS bu yönün metodoloji-katmanı olarak konumlanır.
-3. **İsim/trademark Architect-kararı açık kalır** (AEGIS vs MAVEN/PRISM/OAGD/HELIX + trademark araştırması) — post-beta Phase-0 kapısında çözülür; şimdilik baskı yok.
-
-md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-062: Embedded Web Terminal — PTY Sessions, WS Gateway, Auth & Audit
-
-**Status:** accepted
-
-# ADR-062: Embedded Web Terminal — PTY Sessions, WS Gateway, Auth & Audit
-
-**Status:** accepted
-
-**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
-
-**Date:** 2026-05-19
-
-**Sprint:** Sprint 175 (Embedded Web Terminal — Sub-project #1/4)
-
----
-
-## Status
-
-accepted — implements the VSCode-like dockable terminal feature for the deckent dashboard.
-Sub-project #1/4; sub-projects #2 (prompt/command guard), #3 (multi-tenant/k8s isolation),
-#4 (enterprise external integration) are deferred to separate sprints.
-
-> **Numbering note (Sprint 175, RESOLVED):** A collision with
-> `docs/adr/062-consent-based-provisioning.md` (Sprint 175 Workstream A, same date)
-> was resolved by renaming the consent-based ADR to `063-consent-based-provisioning.md`.
-> This file retains `062-` per its spec/plan precedent. `memory.db` `adr-062` already
-> points to this Embedded Web Terminal record.
-
----
-
-## Context
-
-The deckent dashboard (React + Vite + Tailwind) provides sprint monitoring but offers no
-way to run interactive AI tools (`claude`, `gemini`, `codex`, `deckent`) or a shell session
-directly from the browser. Users must switch between the dashboard and a terminal, breaking
-focus during sprint supervision.
-
-Sprint 172–174 stabilised the dashboard and completed OSS GA preparation. Sprint 175 adds
-an embedded terminal as sub-project #1 of a 4-part roadmap.
-
-Key constraints established in the verified spec (`docs/superpowers/specs/2026-05-19-embedded-web-terminal-design.md`):
-
-1. **Security invariant (§1c.2):** The terminal WebSocket auth is **independent of and
-   stricter than** `DECKENT_API_AUTH_DISABLED`. Disabling the global API auth gate does
-   NOT open the shell. This invariant must never be relaxed (RCE surface if violated).
-
-2. **Auth delivery (§1c):** The token is generated per-server-start, injected into the
-   index.html page only for `127.0.0.1`/`::1` callers as `window.__DECKENT_TERMINAL_TOKEN__`,
-   and presented via the `Sec-WebSocket-Protocol` subprotocol header (never in a plain HTTP
-   Authorization header on the WS upgrade).
-
-3. **Audit invariant:** Raw PTY output (ANSI sequences, user keystrokes, command output)
-   is **never persisted** to disk or `memory.db`. Only structured, low-volume audit events
-   (session created/attached/detached/killed) are stored, scoped by `tenantId`.
-
-4. **Reattach boundary:** A PTY session survives client disconnect (browser tab closed,
-   network blip) and can be reattached with scrollback replay. It does NOT survive a server
-   restart (in-memory only). Disk persistence is a post-#1 backlog item.
-
-5. **Enterprise seams (§1d):** `AuthProvider` and `SessionBackend` interfaces are defined
-   from day one, with exactly one implementation each (`LocalTokenAuthProvider`,
-   `LocalPtyBackend`). Multi-tenant SSO, remote backends, and k8s pod exec are deferred
-   to sub-project #3.
-
----
-
-## Decision
-
-A self-contained terminal subsystem is added under `src/api/terminal/` with the following
-components and contracts:
-
-### Module Boundary
-
-```
-src/api/terminal/
-  types.ts          — shared types (TenantId, SessionKind, AiTool, CreateSessionInput,
-                       SessionMeta, AuditAction, AuditEvent)
-  auth-provider.ts  — AuthProvider interface + LocalTokenAuthProvider
-  session-backend.ts — SessionBackend interface + LocalPtyBackend (node-pty)
-  session-manager.ts — PtySessionManager (Map, bounded ring buffer, attach/detach, reaper)
-  audit.ts          — TerminalAudit (structured events → memory.db, tenant-scoped)
-  ws-gateway.ts     — attachTerminalGateway (HTTP upgrade → auth → bridge)
-```
-
-`src/api/server.ts` wires the gateway, exposes HTTP control routes (`GET/POST/DELETE
-/api/terminal/sessions`), and injects the bootstrap token into `index.html` for localhost
-callers only.
-
-`src/cli/commands/serve.ts` adds `--host <addr>` (default `127.0.0.1`) and `--no-terminal`
-options; non-localhost `--host` without explicit token triggers a security warning and
-leaves terminal disabled unless the user opts in explicitly.
-
-### AuthProvider Interface
-
-```typescript
-interface AuthProvider {
-  verifyToken(token: string): boolean | Promise<boolean>;
-}
-```
-
-`LocalTokenAuthProvider` implements this with SHA-256 + `crypto.timingSafeEqual`. It
-deliberately ignores `DECKENT_API_AUTH_DISABLED` — auth bypass applies only to the REST
-API, not to the PTY shell.
-
-### SessionBackend Interface
-
-```typescript
-interface SessionBackend {
-  spawn(input: CreateSessionInput, tenantId: TenantId): PtySession;
-}
-```
-
-`LocalPtyBackend` wraps `node-pty` for in-process PTY spawning. Remote backends (k8s exec,
-Docker exec, SSH) are sub-project #3 implementations of this interface.
-
-### PtySessionManager
-
-- Sessions stored in a `Map<string, PtySessionEntry>` keyed by `sessionId` (UUID).
-- Each session holds an in-memory bounded ring buffer (configurable `scrollbackBytes`,
-  default 256 KiB) for reattach replay. Buffer does not overflow to disk.
-- `detach(sessionId)` releases the client WebSocket reference without killing the PTY
-  process. `kill(sessionId)` terminates the process and removes the entry.
-- Idle reaper runs on a configurable interval; deckent-managed sessions (kind `deckent`)
-  are exempt from idle-kill to avoid interrupting active sprints.
-- `maxSessions` cap (default 10) rejects new spawns when the limit is reached.
-
-### WS Gateway
-
-`attachTerminalGateway(server, deps)` hooks `server.on('upgrade')`:
-
-1. Token is extracted from `Sec-WebSocket-Protocol: deckent.<token>` — never from
-   query string or cookie.
-2. `AuthProvider.verifyToken()` is called **before** any session is spawned or a WebSocket
-   is accepted. On failure: `socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')` + destroy.
-3. On success: `new WebSocket(socket)` with `handleProtocols` returning the matched
-   subprotocol; gateway forwards PTY output → WS and WS data → PTY stdin/resize.
-4. On WS close: `manager.detach(sessionId)` — session remains alive for reattach.
-
-### TerminalConfig
-
-Added to `DeckentConfig` via the `terminal` key:
-
-```typescript
-interface TerminalConfig {
-  enabled: boolean;          // default: true
-  bind: string;              // default: '127.0.0.1'
-  maxSessions: number;       // default: 10
-  idleTimeoutMs: number;     // default: 1_800_000 (30 min)
-  scrollbackBytes: number;   // default: 262_144 (256 KiB)
-  allowShellKind: boolean;   // default: true
-}
-```
-
-### Audit
-
-`TerminalAudit.record(event)` writes structured `AuditEvent` objects (session lifecycle
-only) to `memory.db` via the existing `MemoryStore`. The `memory.db` schema gains an
-additive `tenant_id TEXT` column via a non-destructive `ALTER TABLE` migration guarded by
-`schema_version`. Raw PTY bytes are never passed to this function.
-
-### Frontend
-
-A `DockPanel` component wraps a `TerminalPanel` (multi-tab, `TerminalTabs` + `TerminalView`
-using `@xterm/xterm`). The dock is mounted outside the React Router `<Outlet>` in
-`Layout.tsx` so it persists across route navigation. The WS hook (`useTerminalSocket`)
-reads `window.__DECKENT_TERMINAL_TOKEN__` and presents it via the `Sec-WebSocket-Protocol`
-subprotocol.
-
----
-
-## Consequences
-
-### Positive
-
-- Dashboard gains real interactive terminal capability without leaving the browser.
-- Security-by-default: localhost-only token injection, bypass-independent auth, no raw
-  output persistence — RCE surface stays closed.
-- Enterprise extensibility built in from day one via `AuthProvider`/`SessionBackend` seams.
-- Reattach survives browser disconnect without server-side storage.
-- Audit trail (structured events only) integrates with existing `memory.db` infrastructure.
-
-### Negative / Risks
-
-- `node-pty` is a native addon — requires platform-specific prebuilt or compilation.
-  Handled by `node-pty`'s prebuilt binary system; `npm install` fails loudly if a platform
-  is unsupported (acceptable failure mode, not silent).
-- PTY sessions are in-memory: a server restart loses all sessions. Disk persistence is a
-  post-#1 backlog item (acceptable, documented boundary).
-- `scrollbackBytes` cap means long-running sessions lose early output after the buffer
-  wraps. Users requiring full history should pipe to a log file inside the PTY.
-- The `--host` non-localhost path requires users to manage their own TLS + token delivery
-  (no HTTPS termination built in); spec §5 documents this explicitly.
-
----
-
-## Alternatives Considered
-
-- **xtermjs hosted via iframe / separate server:** Rejected — cross-origin auth complexity,
-  no shared token injection, user must manage a second process.
-- **Hand-rolled RFC6455 WebSocket server:** Rejected — security surface (frame parsing bugs,
-  masking errors); `ws` library is audited with zero runtime deps of its own.
-- **Persist raw PTY output to `memory.db`:** Rejected — ANSI escape sequences + keystrokes
-  are PII-adjacent and exceed the "structured audit only" security invariant. Raw output
-  may contain passwords, API keys, and personal data.
-- **Global auth bypass applies to terminal too:** Rejected — `DECKENT_API_AUTH_DISABLED`
-  was designed for local dev API convenience, not for shell access. Conflating the two would
-  create an RCE vector (spec §1c.2, B-022).
-- **No session limit / unbounded ring buffer:** Rejected — DoS vector; bounded defaults
-  with configurable overrides are the correct trade-off.
-
----
-
-## Related ADRs
-
-- **ADR-006** — spawnSync Security Pattern: `LocalPtyBackend` spawn uses array args,
-  `shell: false` (except `win32` npm wrapper), mirroring the existing secure spawn pattern.
-- **ADR-010** — Minimal runtime dependencies: `ws` + `node-pty` added as the 8th and 9th
-  runtime deps, both ADR-justified (this record).
-- **ADR-014** — .deck Secret File System: terminal token uses `randomUUID()` (crypto-random,
-  not `.deck`-managed); complementary, not conflicting.
-- **ADR-016** — Connector Module: `AuthProvider`/`SessionBackend` follow the same
-  interface + local-impl pattern established for connectors.
-- **ADR-034** — Multi-Project Isolation: `tenantId` on audit events prepares the audit
-  trail for multi-project isolation when sub-project #3 lands.
-- **ADR-036** — ADR Governance Integration: this ADR is the runtime constraint record for
-  the terminal subsystem; enforced via Brain prompt enrichment.
-- **ADR-039** — Self-Modifying Task Detection: terminal touches `src/api/` + `src/dashboard/`
-  → dogfood mode triggered → sequential execution mandatory (verified in DIRECTIVES).
-- **ADR-045** — Wave-Based Execution Semantics: terminal implementation uses 5-wave
-  sequential structure (Wave 0→4) due to self-modifying-detector dogfood mode.
-- **ADR-047** — Manuel Subagent Dispatch Protocol: wave gate transitions are Brain-managed
-  manually per this ADR (dependency_pipeline_enabled: false for deckent-dev project).
-
-## Notes
-
-DB sync: this `.md` is intended for upsert into `memory.db` via the ADR-046 `adrInsert`
-post-finalize hook (`adr-file-sync.ts`) — never via destructive rebuild.
-
-Sub-project roadmap:
-- **#1 (this sprint):** Core terminal: PTY sessions, WS gateway, auth, audit, frontend dock
-- **#2:** Security: prompt/command guard — prevent dangerous command patterns
-- **#3:** Multi-tenant isolation: `AuthProvider`/`SessionBackend` k8s/SSO implementations
-- **#4:** Enterprise external integration: remote PTY backends, audit export, SIEM hooks
-
-**İmza:** Brain (orchestrator) — Sprint 175 Wave 0.
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (dashboard-terminal tamamen user-facing ürün yüzeyi; enterprise audit-zinciri dahil).
-
-1. **🟢 Sub-project #2 DELIVERED.** Notes'taki roadmap'in "#2: Security — prompt/command guard" maddesi teslim edildi: `src/api/terminal/` ADR'nin 6 modülüne ek **4 güvenlik modülü** içerir — `command-guard.ts`, `prompt-guard.ts`, `outbound-limiter.ts`, `audit-integrity.ts` (+ `tests/security/` suite'leri). Sub-#3 (multi-tenant/k8s) + #4 (enterprise external) hâlâ deferred.
-2. **Re-verified (güvenlik-invariant'lar birebir):** `LocalTokenAuthProvider` "DELIBERATELY ignores `DECKENT_API_AUTH_DISABLED`" + `timingSafeEqual` SHA-256 (`auth-provider.ts:45/50/66`) ✓ · token yalnız `Sec-WebSocket-Protocol: deckent.<token>` (`ws-gateway.ts:27/34`) ✓. **Canlı kanıt (2026-06-11 UX-denetimi):** `deckent serve` terminal-token auto-mint + "embedded PTY enabled (token auto-injected for localhost)" gözlendi; dock dashboard'da çalışır.
-3. **Dependency rename:** `node-pty` → **`@lydell/node-pty`** (`session-backend.ts:1`; ADR-010 Amendment-2'de kayıtlı) — bu ADR'deki `node-pty` bahisleri eski-isim olarak okunmalı; karar değişmedi.
-4. **Stale ref düzeltmesi:** Related-ADR-047 satırındaki "dependency_pipeline_enabled: false for deckent-dev" superseded — flag artık `true`, multi-wave canlı (ADR-045 Sprint-281 amendment).
-5. **🟡 Bilinen UI-bug (product-sprint'e):** collapsed Terminal dock-bar'ı sidebar YÖNET bölümünü örtüyor (layout/z-index; UX-denetim 2026-06-11 bulgu #5, `project_dashboard_chat_audit_20260611`). Fonksiyonel değil görsel; Chat/Dashboard product-sprint'inde düzeltilir.
-
-md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-063: Consent-Based Prerequisite Provisioning
-
-**Status:** accepted
-
-# ADR-063: Consent-Based Prerequisite Provisioning
-
-> **Numbering note (Sprint 175):** This ADR was originally numbered 062 alongside
-> `062-embedded-web-terminal.md` (Sprint 175 concurrent work). Renamed to 063 to
-> resolve the collision; the Embedded Web Terminal ADR retains 062 per its
-> spec/plan precedent.
-
-**Status:** accepted
-**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
-**Date:** 2026-05-19
-**Sprint:** Sprint 175 (1 Haziran Beta — Kusursuz Kurulum Deneyimi, Workstream A)
-
----
-
-## Status
-
-accepted — implements the blueprint §3.4 "anyone can install & use" promise. Documents an
-implemented + TDD-tested capability (`src/core/provisioner.ts`, 23 tests). Geç-ADR pattern
-(implementation-first documentation), accepted Deckent practice (cf. ADR-053, ADR-061 Notes).
-
-## Context
-
-`deckent init` / `deckent doctor` only **detected** missing prerequisites and printed a hint
-string (`getProviderInstallHint` in `doctor.ts:410` + duplicated in `doctor-format.ts:69`).
-blueprint §3.4 falsely claimed "tmux auto-installed on first run if missing" — no install path
-existed anywhere (`spawnSync('npm', ['install', ...])` was absent from the codebase).
-
-For the 1 Haziran OSS public beta the critical-path goal is a frictionless install experience
-("Deckent herkesin kurabileceği kolaylık"). A non-developer running `deckent init` should be
-guided to a working setup, not handed a list of manual `npm i -g` commands. But silently
-installing global packages / running OS package managers is a security- and trust-sensitive
-action that must not happen without explicit user consent.
-
-## Decision
-
-A single provisioning module (`src/core/provisioner.ts`) is the source of truth for "how is a
-prerequisite installed", consent-gated and OS-aware:
-
-1. **`planInstall(tool, opts)`** — deterministic, pure mapping `ToolId → InstallPlan`:
-   - `claude/codex/gemini` → `method: 'npm-global'`, `npm install -g <pkg>`
-   - `tmux` → `method: 'os-package'` — OS-aware instruction (apt/dnf/pacman/brew)
-   - `node`, `docker` → `method: 'manual'` — never auto-installed (runtime / privileged)
-2. **`installTool`** — only `npm-global` plans are auto-executed, and only when
-   `consent === true`. Array args, `shell: false` (shell:true ONLY on win32 for the npm `.cmd`
-   wrapper, mirroring `provider.ts:detectCliVersion`). Executable checked against
-   `PROVISIONER_BIN_WHITELIST` (frozen, `['npm']` — `sh`/`bash` intentionally absent). Non-zero
-   exit returns `{ status: 'failed' }` (never throws). `os-package`/`manual` are surfaced as an
-   instruction string the user runs themselves — **no silent sudo**.
-3. **`provisionMissing`** — orchestration: `mode` ∈ `prompt | yes | no-install`.
-   - `prompt` (default) — per-tool consent prompt
-   - `yes` (CLI `--yes`, MCP `installMissing:true`) — install all without prompting (CI)
-   - `no-install` (CLI `--no-install`) — legacy hint-only behavior preserved (backward compat)
-4. **Single source of truth** — `getProviderInstallHint` (both `doctor.ts` and
-   `doctor-format.ts` copies) now delegates the package mapping to `planInstall`; legacy hint
-   string format preserved (no test/UX regression).
-5. **MCP parity** — `deckent_init` gains an `installMissing` opt-in (MCP has no interactive
-   consent channel, so it is explicit opt-in === CLI `--yes`; default reports only).
-
-## Alternatives Considered
-
-- **Silent auto-install (no consent).** Rejected — installing global npm packages / OS
-  packages without consent violates user trust and the security DNA (ROADMAP §11 anchor #9).
-- **Keep hint-only.** Rejected — does not meet the beta "frictionless install" goal.
-- **Bundle provider CLIs as deps.** Rejected — bloats the package, conflicts with ADR-010
-  (minimal runtime dependencies) and provider-agnostic vision.
-
-## Consequences
-
-### Positive
-- `deckent init` becomes a real provisioner — closes the blueprint §3.4 reality gap.
-- Security-preserving: consent-gated, whitelist + shell-free spawn (companion to ADR-006
-  spawnSync pattern + `spawn-safety.ts`), no silent sudo.
-- Single source of truth removes the duplicated install-hint mapping (DRY across 3 sites).
-- Backward compatible: `--no-install` preserves the prior hint-only behavior exactly.
-
-### Negative / Risks
-- Global `npm i -g` may require elevated permissions on some setups; failures are reported
-  with the manual command (graceful, non-fatal) rather than auto-escalating.
-- OS-package (tmux) still requires a manual user step on Linux (sudo) — by design.
-- Provider CLI package names (`@anthropic-ai/claude-code`, `@openai/codex`,
-  `@google/gemini-cli`) are now centralized; if a vendor renames a package, update one place.
-
-## Related ADRs
-
-- **ADR-006** — spawnSync Security Pattern: provisioner spawn obeys the array-args /
-  shell-free invariant; `PROVISIONER_BIN_WHITELIST` is a companion to `spawn-safety.ts`.
-- **ADR-010** — Minimal runtime dependencies: provisioner installs *external* CLIs on
-  consent rather than bundling them as deps.
-- **ADR-011** — node:readline/promises prompt: the interactive consent prompt uses the
-  existing `promptConfirm` helper.
-- **ADR-036** — ADR Governance: this ADR is the runtime contract for the provisioning
-  capability; written as governance record for the implemented behavior.
-
-## Notes
-
-ADR number selected as the next free slot above the highest existing ADR (061). Slots
-049–052 / 054 / 056–059 are intentionally left for the TaskType-taxonomy ADR family
-(ADR-053/055/060 already exist; cf. `project-task-type-taxonomy-vision` memory) to avoid
-cross-family collision. Verified against both `docs/adr/` and `memory.db` (`type='adr'`).
-
-DB sync: this `.md` is upserted into `memory.db` via the ADR-046 `adrInsert` post-finalize
-hook (`adr-file-sync.ts`) — never via destructive rebuild (cf. `feedback_db_silmek_yasak`).
-
-**İmza:** Brain (orchestrator) — Sprint 175 Workstream A, behavior implemented + 23 tests PASS.
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review)
-
-**Classification: BOTH** (kurulum-deneyimi ürünün ilk-temas yüzeyi; consent güven-DNA'sıdır).
-
-**Re-verified:** `planInstall` (:80) / `installTool` (:122) / `PROVISIONER_BIN_WHITELIST` frozen `['npm']` (:58, runtime-check :129) / 23 test birebir ✓.
-
-**🟢 Consent-deseni yeniden-kullanılabilir anchor'a dönüştü:** Sprint 270 F1-IMG, docker-image hazırlama akışına aynı deseni uyguladı — `deckent doctor --fix-image` **açık flag + interaktif onay** olmadan ASLA build etmez (`doctor.ts:610` bu ADR'yi açıkça cite eder). Gelecekteki her "eksik-önkoşulu kur" yüzeyi (PSL-6 auth-probe ailesi dahil) bu ADR'nin consent-gated + whitelist + no-silent-sudo invariant'ına tabidir. md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-064: TOPP — Continuous Dispatch (Wave-Barrier Removal)
-
-**Status:** accepted
-
-# ADR-064: TOPP — Continuous Dispatch (Wave-Barrier Removal)
-
-**Status:** accepted
-
-**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
-
-**Date:** 2026-05-20
-
-**Sprint:** Sprint 178 (Task 5 / fix-007 — TOPP B+C implementation)
-
-**Supersedes (in part):** ADR-045 §3 "Wave-Based Execution Semantics" —
-the wave-barrier between Wave N completion and Wave N+1 spawn is replaced
-by continuous, per-tick re-evaluation.
-
----
-
-## Status
-
-accepted — contract written before the unified dispatch wire, per
-ADR-036 ADR Governance discipline.
-
----
-
-## Context
-
-ADR-045 §3 codified "wave-based execution": when
-`dependency_pipeline_enabled: true`, Brain spawns tasks in topological
-waves and only re-evaluates eligible PENDING tasks after Wave N completes.
-The runtime wire (`respawnEligibleTasks`) lands one wave at a time, so
-Wave N+1 cannot start until at least one Wave N task completes AND the
-main loop reaches the next `await maybeRespawn()` call.
-
-`waitForResults` currently maintains two parallel spawn paths:
-
-```ts
-const newlyCollected = await collectResults();
-await processQueue(newlyCollected);  // legacy FIFO drain
-await maybeRespawn();                // dep-pipeline re-eval
-```
-
-These paths are mutually exclusive at the data level (the FIFO queue only
-has entries when `dependency_pipeline_enabled === false`; otherwise the
-queue is empty and only `maybeRespawn` does work). The dual-call sequence
-is a vestigial structure from before the wave-pipeline existed and creates
-three concrete problems:
-
-1. **Sprint 179 fan-out blocked.** Sprint 179 plans 12 parallel tasks
-   with shallow dep chains. Under wave-barrier semantics, the throughput
-   collapses to ⌈12/maxWorkers⌉ ticks — for `maxWorkers=2` that is 6
-   serial wave boundaries before all 12 finish. Continuous dispatch
-   collapses that to a single ladder fill + reactive spawn loop.
-
-2. **Code duplication.** `processQueue` and `maybeRespawn` re-derive
-   roughly the same predicate ("which PENDING task is eligible given the
-   current set of DONE deps?") in two different forms. Bugs (Sprint
-   161/164/165 hayalet-task family) repeatedly arose because the two
-   paths diverged on edge cases (deps in the queue tail, force-rescan
-   races, the `assignedTaskIds` idempotency guard).
-
-3. **No documented rollback.** When a wave-barrier removal lands in
-   production and breaks an unforeseen edge case, there is no flag-flip
-   to restore prior behavior. The operator's only escape is a hot revert.
-
----
-
-## Decision
-
-We introduce a single, flag-agnostic dispatch entry — `planDispatch(state)`
-(pure planner) plus `dispatchTick(newlyCollected)` (closure-scoped async
-wrapper inside `waitForResults`). The two existing internal helpers
-(`processQueue` + `maybeRespawn`) are no longer invoked directly from
-the main loop; `dispatchTick` calls them in sequence and supplements them
-with the `DECKENT_LEGACY_FIFO=1` rollback escape.
-
-### `planDispatch(state) → DispatchPlan`
-
-Pure function. Inputs: sprint state, config, maxWorkers, assigned/
-collected sets, FIFO queue, newly-completed task IDs. Outputs:
-`{ toSpawn: Task[]; toKill: string[]; mode: 'continuous' | 'legacy-fifo' }`.
-
-Two modes:
-
-- **continuous** (default — applies whether `dependency_pipeline_enabled`
-  is true or false): every tick re-evaluates eligible PENDING tasks.
-  Drains the FIFO queue first (respecting deps when the pipeline flag is
-  on), then fills remaining slots from PENDING tasks via the standard
-  dep-aware filter. The result: as soon as ANY task completes, the next
-  eligible task spawns within the same tick. There is no implicit
-  barrier between waves.
-
-- **legacy-fifo** (active when `DECKENT_LEGACY_FIFO=1`): drains exactly
-  one queue entry per completed task ID and emits a `toKill` for the
-  freed slot. This is the pre-Sprint-178 contract preserved verbatim as
-  an escape hatch.
-
-### `dispatchTick(newlyCollected)` — internal closure
-
-Wraps `planDispatch` plus the actual spawn/kill calls. Lives inside
-`waitForResults` because it depends on closure state
-(`spawnIfNotAssigned`, `queueBackend`, etc.). When
-`DECKENT_LEGACY_FIFO=1`, `dispatchTick` short-circuits to the legacy
-`processQueue` path and skips `maybeRespawn`, preserving exact pre-Sprint
-178 semantics.
-
-### TOPP C — Predecessor digest in `buildDependenciesBlock`
-
-Already shipped in `prompt-god-template.ts` via `formatDependencyEntry()`
-(Sprint 146 Task 005). When a Wave N+1 task spawns, its prompt's
-"## Dependencies" section embeds a per-predecessor digest:
-
-```
-## Dependency pred-1 (DONE)
-- Files: src/foo.ts, src/bar.ts (+42/-7)
-- Notes: <truncated 500 chars from predecessor result>
-```
-
-ADR-064 adopts this format as the official TOPP C contract and the
-`tests/orchestra/topp-continuous-dispatch.test.ts` G7 test pins it.
-
----
-
-## Consequences
-
-### Easier
-- Sprint 179 12-task fan-out runs with continuous spawn — no per-wave
-  barrier. Throughput approaches `maxWorkers` regardless of wave depth.
-- `processQueue` and `maybeRespawn` remain as internal back-compat
-  shims but the call site is now a single function call, simplifying
-  future refactors.
-- Operators can pin pre-Sprint-178 behavior without a source revert:
-  `DECKENT_LEGACY_FIFO=1` flips the mode.
-
-### Harder
-- The dispatch state surface (`DispatchState`) is larger than either of
-  the two functions it replaces. Tests now have to construct sprint +
-  config + assigned/collected sets rather than mock a single closure.
-- The continuous mode does more work per tick (PENDING re-scan even when
-  no completion happened). Mitigation: the inner loop is O(n) over
-  `sprint.tasks` and breaks early once `slotsAvailable` is hit — the
-  dominant cost is FS polling, not scheduling.
-
-### Risks
-- Wave-barrier regressions on user projects with very large sprints
-  (>50 tasks). Mitigation: `DECKENT_LEGACY_FIFO=1` escape hatch is the
-  documented rollback. Telemetry: the `mode` field on `DispatchPlan` is
-  logged via debugLog so post-mortems can confirm which path ran.
-
----
-
-## Alternatives Considered
-
-1. **Inline both helpers into the main loop** — rejected. The two
-   helpers are public exports referenced by existing tests
-   (`task-queue.test.ts`, `result-collector.test.ts`) and removing them
-   would break those suites. Keeping them as internal shims preserves
-   the public API surface.
-
-2. **Drop the FIFO queue entirely** — rejected. The
-   `dependency_pipeline_enabled: false` mode is the documented contract
-   for user projects that opt out of wave scheduling (ADR-045 §2). The
-   queue is part of that contract.
-
-3. **Replace `respawnEligibleTasks` with a new function** — rejected.
-   `respawnEligibleTasks` does more than spawn — it writes events, emits
-   metrics, writes sprint checkpoints. Replacing it would require
-   re-implementing five orthogonal concerns. Wrapping it inside
-   `dispatchTick` preserves all of those side-effects.
-
----
-
-## Rollout
-
-- Land in Sprint 178 as Task 005 (continued as 178-007-fix).
-- `DECKENT_LEGACY_FIFO=1` ships disabled by default.
-- Sprint 179 12-task fan-out is the first dogfood of continuous mode.
-- If Sprint 179 surfaces a regression, the rollback is `export
-  DECKENT_LEGACY_FIFO=1` in the environment — no source revert needed.
-
----
-
-## References
-
-- ADR-045 §3 (wave-barrier semantics — superseded in part)
-- ADR-035 (verification protocol)
-- ADR-036 (ADR Governance)
-- Sprint 178 plan: `docs/superpowers/plans/2026-05-22-sprint-178-modernization-topp.md`
-- Tests: `tests/orchestra/topp-continuous-dispatch.test.ts` (G1-G10 matrix)
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (continuous throughput user-projelerinde aynı; `DECKENT_LEGACY_FIFO` operatör-escape'i ürün özelliği).
-
-**✅ Davranışsal sözleşme CANLI (re-verified + canlı-kanıt):** `dispatchTick` ana-loop'un tek dispatch-girişi (`result-collector.ts:938` initial-pass + `:1005` per-tick); continuous=default; `DECKENT_LEGACY_FIFO=1` escape gerçek (`:757` maybeRespawn short-circuit → legacy-FIFO korunur). Sprint 279/280 canlı-kanıt: bağımlılıklar temizlendikçe anında spawn, wave-barrier yok (ADR-045 Sprint-281 amendment'le tutarlı).
-
-**🔴 Mimari sapma — planner-bypass (tested-but-unwired):** ADR'nin "dispatchTick, `planDispatch`'e (pure) delege eder" iddiası ve `result-collector.ts:180` yorumu **koda uymuyor**: `dispatchTick` gövdesi yalnız `await processQueue(...); await maybeRespawn();` — `planDispatch(...)` (:227, `DispatchPlan`/`mode` döndüren saf planlayıcı) **runtime'da 0-caller**. G1-G10 testleri saf-modeli pinler; canlı yol kararları `processQueue`/`maybeRespawn` içinde imperatif verir → **test-vs-runtime sapma riski** (testler yeşilken canlı semantik sessizce farklılaşabilir). Bu, W-K AS-1'in "planDispatch wire" maddesinin hâlâ inmediği anlamına gelir. Fix: MASTER-PLAN "ADR-Analizi Türetilen İşler → **ADR-064-W**" — dispatchTick'i `planDispatch` üzerinden geçir (pinlenen model = canlı yol), `:180` yorumunu o zamana dek düzelt-veya-işaretle. md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-065: Develop / Product Two-Repo Split
-
-**Status:** accepted
-
-# ADR-065: Develop / Product Two-Repo Split
-
-**Status:** accepted
-
-**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
-
-**Date:** 2026-05-31
-
-**Sprint:** Sprint 201 (Task 201-004 — repo-split ADR + audit-report immutable note)
-
----
-
-## Status
-
-accepted — two-repo model adopted as of Sprint 201 pre-launch preparation.
-
----
-
-## Context
-
-Deckent's development history lives in a single internal repo (`deckent-develop`).
-After 200+ sprints of dogfood the repo contains large internal directories that
-are noise for public users:
-
-| Directory | Approx. files | Contents |
-|-----------|:------------:|----------|
-| `.brain/` | 2 554 | sprint logs, memory.db exports, patterns, retro history |
-| `.deckent/archive/` | 1 511 | archived task files from past sprints |
-| `docs/audits/` | hundreds | per-sprint internal audit reports |
-| `docs/alperen-analysis/`, `docs/superpowers/`, etc. | hundreds | internal analysis, Alperen-personal notes |
-| `DIRECTIVES.md` | 1 | sprint-in-progress instructions (user noise) |
-
-Publishing this raw history to a public GitHub repo creates two problems:
-
-1. **Vitrin/internal conflict.** A prospective user landing on the GitHub page sees
-   hundreds of internal files and thousands of sprint artifacts before reading a
-   single line of product docs. Trust erodes.
-2. **Security surface.** Sprint internals can embed partial API keys (captured
-   during dogfood), personal notes, and in-progress decisions not meant for public
-   consumption.
-
-Additionally, Sprint 200 surfaced the **audit-report drift incident**: an automated
-counter (`managed-docs` sprint-metrics generator) modified
-`docs/audits/sprint-139/dead-code-report.md`, changing the historical dead-code
-count `864` to the current `870`. The change was caught and reverted, but it
-revealed a policy gap — historical audit reports were not explicitly marked as
-immutable, and the managed-docs tooling had no guard against touching them.
-
----
-
-## Decision
-
-Maintain **two separate git repositories**:
-
-| Repo | Purpose | History | Visibility |
-|------|---------|---------|-----------|
-| `deckent-develop` | Full development repo — sprint work, dogfood, internals | Complete history, all sprint artifacts | Private |
-| `deckent` | Product repo — clean public snapshot for users and npm | Orphan commits (no internal history) | Public (VerhexIO/deckent) |
-
-Synchronisation from develop → product is performed via the `scripts/sync-to-product.mjs`
-script (ADR companion: Sprint 201 Task 201-003). The script:
-- Uses `git archive HEAD` to extract only git-tracked files.
-- Applies an EXCLUDE list that strips all internal directories.
-- Runs a security gate (real key scan) before staging.
-- Produces a staging directory; **push is always a manual human action** (public-publish blast-radius).
-
-The npm package (`package.json` `files` field: `dist/`, `bin/`, `README.md`,
-`LICENSE`) is unaffected by the repo split — it was already narrowly scoped.
-
-### Audit-report Immutable Policy
-
-Historical sprint audit reports (`docs/audits/sprint-NNN/`) are **immutable** after
-the sprint that produced them closes. They record a verified snapshot of codebase
-health at a point in time; retroactive counter updates destroy their evidentiary
-value.
-
-Enforcement:
-- `docs/audits/` is **not** and **must not** be listed in `.deckent/docs.json`
-  (the managed-docs registry). The managed-docs system touches only the 11
-  explicitly registered docs (CLAUDE/VISION/beta-tracker/IDENTITY/blueprint/
-  AGENTS/TOOLS/BOOT/WORKER-GUIDE).
-- Any PR or sprint task that modifies a file under `docs/audits/sprint-NNN/`
-  for a closed sprint must be blocked unless the change is purely additive
-  (appending a post-hoc note) and is signed off by the product owner.
-- Root cause of the Sprint 200 incident: the sprint-metrics generator ran over
-  a file it should not have had access to. The generator now explicitly skips
-  `docs/audits/**` paths.
-
----
-
-## Consequences
-
-### Easier
-- Public GitHub vitrine (`VerhexIO/deckent`) contains only product-relevant files:
-  `src/`, `dist/`, `docs/` (reference + guide), `README.md`, `LICENSE`.
-- Internal sprint history remains fully intact in `deckent-develop` — no history loss.
-- npm publish pipeline is unchanged (`npm publish` already uses the `files` field).
-- Historical audit reports are protected from automated modification.
-
-### Harder
-- Every public release requires running `sync-to-product.mjs --apply` and then a
-  manual `git push` to the product repo — one extra step per release cycle.
-- Contributors who fork the product repo do not see sprint history; they must be
-  directed to `deckent-develop` for full context.
-- The EXCLUDE list in `sync-to-product.mjs` must be kept in sync with new
-  internal directories. It is the single authoritative list — no config duplication.
-
-### Risks
-- **Stale EXCLUDE list.** If a new internal directory is created in `deckent-develop`
-  and is not added to EXCLUDE before the next sync, it leaks into the product repo.
-  Mitigation: `sync-to-product.mjs --dry-run` output is reviewed before `--apply`.
-- **Orphan commit chain.** Product repo has no shared history with develop repo.
-  `git blame` across repos is impossible. Mitigation: commit messages in the product
-  repo reference the develop sprint ID (e.g., `"sync from deckent-develop sprint-201"`).
-
----
-
-## Alternatives Considered
-
-1. **Single public repo with `.gitignore` for internals** — rejected. `.gitignore`
-   prevents tracking new files but cannot hide already-tracked files retroactively
-   without `git rm --cached`. More importantly, the full sprint history (`.brain/`,
-   `.deckent/archive/`, `docs/audits/`) would remain in the git object store and be
-   visible via `git log --all`. The vitrin/internal conflict is not resolved.
-
-2. **git-subtree / git-filter-repo to produce a filtered history** — rejected.
-   `git filter-repo` produces a rewritten history that diverges from `deckent-develop`
-   at the first commit. Any future cherry-pick or merge between the two repos becomes
-   a manual conflict-resolution exercise. Orphan commits (our choice) are simpler:
-   the product repo does not pretend to share history with the develop repo.
-
-3. **Monorepo with path-scoped publish (`npm publish --workspace`)** — rejected.
-   Deckent is a single npm package, not a monorepo of packages. A monorepo structure
-   would add tooling complexity (Turborepo, Nx, or similar) with no benefit.
-
-4. **Private npm registry for the product package** — rejected. The product vision
-   (ADR-033) is an open-source tool; a private registry contradicts that goal.
-
----
-
-## References
-
-- ADR-033 (Product Vision — Product Not Service)
-- ADR-036 (ADR Governance Integration)
-- ADR-029 (Managed-Docs Universalization) — the 11-doc registry that explicitly
-  excludes `docs/audits/`
-- Sprint 201 Task 201-003 — `scripts/sync-to-product.mjs` implementation
-- Sprint 200 incident: automated counter modified `docs/audits/sprint-139/dead-code-report.md`
-  (historical `864` → `870`); change reverted in commit cf1ab8e2
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (mekanizma dogfood-iç; çıktısı ürünün kamusal vitrini).
-
-1. **Re-verified:** `scripts/sync-to-product.mjs` (dry-run/`--apply` + `EXCLUDE` :26 + `isExcluded` :65 + security-gate) ✓ · `docs/audits` docs.json'da YOK (immutable-policy fiilen korunur) ✓ · remotes ADR modeliyle uyumlu (origin=deckent-develop; product'a push manuel/staging) ✓.
-2. **Claim-hassasiyeti (immutable-enforcement):** "generator artık `docs/audits/**`'i explicitly skips" ifadesinin **literal path-guard'ı managed-docs kodunda yok** — koruma **registry-yokluğu** ile sağlanır (kayıtlı-olmayan doc'a runner dokunmaz). Geçerli savunma; ancak kural netleştirilir: **`docs/audits/**` HİÇBİR ZAMAN `.deckent/docs.json`'a register edilemez** (tek koruma hattı budur; ileride bir literal path-guard eklenirse defense-in-depth olur).
-3. **Eksen-netleştirmesi (MOD-SPLIT karışıklığını önle):** Bu ADR'nin "two-repo"su = **private-develop ↔ public-product vitrin** ekseni. ADR-033 Sprint-281 amendment'indeki MOD-SPLIT kararı ("ayrı repo/fork YOK — tek kod tabanı + modüler enterprise-layer") **community/enterprise lisans eksenidir** — farklı eksen, çelişki yok: tek kod tabanı (community+enterprise modüler) private-develop'ta yaşar, public-product'a sync'lenir.
-4. **Aktif güncellik:** Bu ADR, yürürlükteki **develop→product geçiş** hedefinin (Alperen 2026-06-11: "işlevsellikleri bitir + kodu düzelt + süreci tamamla") resmi mekanizmasıdır; geçiş günü `sync-to-product.mjs --dry-run` review → `--apply` → manuel push akışı uygulanır.
-
-md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-066: Provider Independence — Multi-Provider Backend Parity
-
-**Status:** accepted
-
-# ADR-066: Provider Independence — Multi-Provider Backend Parity
-
-**Status:** accepted
-
-**Deciders:** Alperen Sartaçoğlu (product owner), Brain (orchestrator)
-
-**Date:** 2026-05-31
-
-**Sprint:** Sprint 202 (foundation) + Sprint 203 (Docker provider-aware completion)
-
----
-
-## Status
-
-accepted — provider-free architecture completed across all backends (subprocess, tmux, Docker).
-
----
-
-## Context
-
-Deckent launched with Claude as the only supported AI provider. Over 200+ sprints of dogfood, three other providers were added — Codex (OpenAI), Gemini (Google), and Ollama (local) — but support was uneven:
-
-| Backend | Claude | Codex | Gemini | Ollama |
-|---------|--------|-------|--------|--------|
-| subprocess | ✓ | ✓ | ✓ | ✓ (Sprint 202) |
-| tmux | ✓ | ✓ | ✓ | ✓ (Sprint 202) |
-| Docker | ✓ | ✗ | ✗ | ✗ |
-
-The Docker backend (`spawn-backend-docker.ts`) had three hardcoded Claude assumptions:
-1. **Binary:** `const claudeCmd = 'claude ...'` — always spawned the `claude` CLI regardless of model/provider
-2. **Auth:** `~/.claude` volume mount — only Claude session auth was mounted into the container
-3. **Image:** `Dockerfile.worker` installed only `@anthropic-ai/claude-code` — no Codex/Gemini CLI available
-
-Additionally, the codebase had accumulated 10 hardcoded `?? 'claude'` default provider fallbacks, some of which were unjustified short-circuits rather than legitimate last-resort defaults. This made provider routing leaky — even when Codex or Gemini was configured, edge paths silently fell back to Claude.
-
----
-
-## Decision
-
-Provider independence is implemented in two sprint phases:
-
-### Phase 1 — Foundation (Sprint 202)
-
-1. **Ollama bootstrap** — `bootstrapFromCatalog()` added to startup wire; Ollama is now a first-class provider with model registry entries (local tier, HTTP transport, no API key required).
-2. **Model registry** — `model-registry.ts` extended to 13 models across 3 providers + Ollama local. `getProviderForModel(model)` is the single source of truth for model→provider resolution.
-3. **Hardcode reduction** — `?? 'claude'` occurrences reduced from 10 to ≤3. Remaining occurrences are legitimate last-resort config defaults with inline justification comments.
-4. **Token quota** — `token-quota.ts` introduced to track token usage per provider per sprint.
-
-### Phase 2 — Docker Provider-Aware (Sprint 203)
-
-#### Provider Binary Selection (Task 203-001)
-
-`spawn-backend-docker.ts` calls `getProviderForModel(model)` to determine the provider, then selects `providerBinary` accordingly:
-
-| Provider | Binary | Notes |
-|----------|--------|-------|
-| `claude` | `claude` | Default; session auth via `~/.claude` mount |
-| `codex` | `codex` | Requires `OPENAI_API_KEY` env var |
-| `gemini` | `gemini` | Requires `GOOGLE_API_KEY` env var |
-| `ollama` | HTTP curl | Special-case: container calls host Ollama via `host.docker.internal` |
-
-The Docker command is constructed around `providerBinary` — no more hardcoded `claude` binary string.
-
-#### Provider-Aware Auth (Task 203-002)
-
-Container auth is provider-specific:
-
-- **Claude** → `~/.claude` directory mounted read-only + session auth (subscription mode)
-- **Codex** → `OPENAI_API_KEY` passed via `--env` (already in passthrough list at line 524; no mount needed)
-- **Gemini** → `GOOGLE_API_KEY` passed via `--env` (same passthrough mechanism)
-- **Subscription default** → when no API key env is present, falls back to Claude subscription auth
-
-Auth selection is driven by `provider` field on the task, resolved before container startup.
-
-#### Dockerfile Multi-CLI (Task 203-003)
-
-`Dockerfile.worker` defaults to Claude-only (lean image). Codex and Gemini CLIs are opt-in via build args:
-
-```dockerfile
-ARG INSTALL_CODEX=false
-ARG INSTALL_GEMINI=false
-```
-
-When `INSTALL_CODEX=true`, `@openai/codex` is installed during build. When `INSTALL_GEMINI=true`, the Gemini CLI is installed. This keeps the default image size minimal while enabling multi-provider Docker workers for teams that need them.
-
----
-
-## Consequences
-
-### Easier
-- Any provider (Claude, Codex, Gemini, Ollama) can run in the Docker backend — full parity with subprocess/tmux backends
-- `getProviderForModel()` is the single authoritative model→provider resolver across all backends
-- Dockerfile default remains lean (Claude-only); multi-provider teams opt in via build args
-- `?? 'claude'` fallbacks are documented and justified — no more silent routing surprises
-
-### Harder
-- Docker builds for multi-provider teams require explicit `--build-arg` flags when building the worker image
-- Ollama in Docker requires `host.docker.internal` hostname resolution — Linux Docker hosts may need `--add-host=host.docker.internal:host-gateway` in the container run command
-- Auth passthrough per provider must be kept in sync with the env passthrough list in `spawn-backend-docker.ts`
-
-### Risks
-- **Codex/Gemini CLI availability** — `@openai/codex` and the Gemini CLI package names may differ from what is published; the Dockerfile install is conditional with a comment noting this. Verify package names before enabling.
-- **Ollama host networking** — Ollama HTTP path skips the binary dispatch entirely; if Ollama is not reachable from the container, the task fails with a curl error (not a clear provider error). A future ADR should address Ollama-in-Docker networking.
-- **Remaining 3 `?? 'claude'` defaults** — these are legitimate final defaults (config layer, CLI entry point, recovery path) but must not increase. Any new `?? 'claude'` addition requires justification comment.
-
----
-
-## Alternatives Considered
-
-1. **Provider-specific Docker images** — one image per provider (`deckent-worker-claude`, `deckent-worker-codex`). Rejected: multiplies image maintenance burden; users would need to pull different images per sprint configuration.
-
-2. **Single fat image with all CLIs** — always install claude + codex + gemini in one image. Rejected: image size ~3–4x larger; most users only need one provider; violates lean-default principle.
-
-3. **Provider resolution at task-router level only** — keep Docker always-Claude, route multi-provider tasks to subprocess. Rejected: breaks the backend-agnostic contract; Docker backend must be a full peer of subprocess/tmux.
-
-4. **Environment variable override without binary swap** — keep `claude` binary but pass `--provider` flag. Rejected: Claude CLI does not accept Codex or Gemini model endpoints; binary must match provider.
-
----
-
-## References
-
-- ADR-023 (Plan Tier Generalizasyonu — Provider-Agnostic Tier İsimleri)
-- ADR-027 (Hybrid Spawn Backend)
-- Sprint 202 — F1-P0 provider-free foundation (Ollama + model registry + hardcode reduction)
-- Sprint 203 — F1-P1 Docker provider-aware (binary selection + auth + Dockerfile build-args)
-- `src/orchestra/spawn-backend-docker.ts` — Docker backend implementation
-- `src/core/model-registry.ts` — `getProviderForModel()` canonical resolver
-- `Dockerfile.worker` — ARG INSTALL_CODEX / ARG INSTALL_GEMINI build args
-- `docs/reference/provider-free.md` — user-facing provider-free guide
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (multi-provider ürünün çekirdek vaadi).
-
-1. **Konum-düzeltmesi:** canonical resolver `getProviderForModel` **`src/core/task-types.ts`'te** yaşar (docker backend `:12`'den import eder, `:322`'de kullanır) — model-registry.ts'te yalnız yorum-referansı vardır. Karar değişmedi; konum-bilgisi düzeltildi.
-2. **🔴 Invariant-drift — `?? 'claude'` 3 → 9:** "≤3 kalmalı, artmamalı, her yenisi justification ister" sözleşmesi bozuldu — bugün **9 gerçek-kod occurrence** (provider.ts:889, config.ts:92, cross-verify-runner.ts:215, sprint-utils.ts:214, +5). `sprint-utils.ts:203`'ün kendi yorumu bile "tekrar `?? 'claude'` yazma, `getDefaultProviderName()` kullan" der. Fix: MASTER-PLAN "ADR-Analizi Türetilen İşler → **ADR-066-W**" (9'unu re-audit: azalt / justify-comment'le / `getDefaultProviderName()`'e konsolide; WM-5 provider-free hard-enforcement kalanıyla aynı aile).
-3. **🟢 Mimari evrim (S248-254 + ADR-077 — auth-tablosunu süpersede eder):** Codex/Gemini artık yalnız "API-key-env" değil — **gerçek host-adapter worker'lar** (`isAdapterProvider` host-route, S248) + **per-provider OAuth/subscription mount'ları docker'da** (`~/.codex`, `~/.gemini`, S252 PSL-1 `ProviderCommandSpec`) + MF-2 lazy adapter re-bootstrap + **F1-CB billing-follows-auth** (subscription/local=$0). Ollama'nın docker-curl özel-vakası → **host-adapter default-route**'a evrildi (`wantsHostAdapter`). 8-fleet + OpenAI-compatible HTTP adapter = ADR-077. Bu ADR'nin "parity" kararı geçerli; auth/binary tabloları S203-dönemi snapshot'tır.
-
-md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-067: Process Mode + Tenant Isolation — F3 Foundation
-
-**Status:** proposed
-
-# ADR-067: Process Mode + Tenant Isolation — F3 Foundation
-
-**Status:** proposed
-
-**Date:** 2026-05-31
-
----
-
-## Context
-
-Deckent üç yüz hedefler: AI Developer (Sprint Mode), AI Asistan (Chat Mode), AI System Worker (Process Mode). Process Mode, şirketlerin Deckent'i background agent olarak çalıştırabileceği, scheduled flows, multi-tenant izolasyon ve audit chain'in olduğu mimaridir. F3 sub-project bu yüzü hedefler.
-
-Sprint 204 itibarıyla Process Mode için temel kararlar alınmıştır:
-1. **Tenant izolasyon modeli**: Her tenant kendi `isolationRoot` dizinine sahip (`.deckent/tenants/<tenantId>/`). Sprint izolasyonu, task lock'ları, memory snapshots — hepsi tenant-scoped.
-2. **tenantId resolver**: `resolveTenant()` — env `DECKENT_TENANT_ID` veya config `tenantId` alanından okur; yoksa `'local'` default (single-tenant/geliştirici modu).
-3. **Path scoping**: `TenantContext.isolationRoot` = `<projectRoot>/.deckent/tenants/<tenantId>`. Tüm tenant-scoped I/O bu yol üzerinden yapılır.
-
-Bu kararlar `src/core/tenant-context.ts` skeleton ile hayata geçirilmiştir (Sprint 204 Task 8).
-
----
-
-## Decision
-
-- `TenantContext` tipi zorunlu alanlar: `tenantId` (string), `isolationRoot` (string), `createdAt` (ISO 8601).
-- `resolveTenant(projectRoot, config?)` — deterministik resolver: env önceliği > config > `'local'`.
-- Tüm Process Mode bileşenleri (scheduled flows, cron, session dispatch) `TenantContext`'i parametre olarak alır.
-- `'local'` tenant = single-tenant/geliştirici modu — Sprint Mode ile backward-compatible.
-- Multi-tenant gerçek runtime (k8s pod-exec, audit shard) F3-002/F3-003 ile gelecek.
-
----
-
-## Consequences
-
-**Positive:**
-- Sprint Mode etkilenmez — `tenantId: 'local'` mevcut davranışı korur.
-- Process Mode yeni bileşenleri başından tenant-scoped — sonradan refactor yok.
-- `isolationRoot` path helper her tenant için dosya sistemi izolasyonu sağlar.
-
-**Negative:**
-- F3-002 (scheduled flows) ve F3-003 (k8s pod-exec) henüz implement edilmedi — bu ADR sadece tip + resolver kararını kapsar.
-- Gerçek çok-kiracılı yetkilendirme (OIDC, audit shard) F4 kapsamında.
-
----
-
-## Alternatives Considered
-
-- **Global singleton tenant state** — test izolasyonunu bozar, parallel sprint desteği yok.
-- **Config-only tenant ID (env yok)** — CI ortamlarında env override esnekliği kaybolur.
-- **Flat `.deckent/<tenantId>-*` prefix** — dizin izolasyonu yerine prefix karmaşası yaratır.
-
----
-
-## References
-
-- Sprint 204 Task 8 — `src/core/tenant-context.ts` skeleton (tenant isolation foundation)
-- ADR-034: Multi-Project Isolation — Per-Project Security Boundaries
-- ADR-062: Embedded Web Terminal (tenant-scoped session hook interface mevcut)
-- ROADMAP F3: Process Mode sub-project tracker
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (Process Mode = üçüncü ürün-yüzü; multi-tenancy = enterprise-ürün).
-
-**Re-verified:** `TenantContext` + `resolveTenant` birebir (env `DECKENT_TENANT_ID` → config → `'local'`; `tenant-context.ts:37/43`) ✓ · **F3-002 çekirdeği İNDİ:** scheduled-flow full-cron `nextRun` (`core/scheduled-flow.ts:140`, AUT-4) + flow→backlog bridge (AUT-3 `makeFlowBacklogBridge`) + durable backlog/3-gate/ExecutionPool/capability-dispatch — **otonom motor (F3-009) fiilen Process-Mode'un agentic runtime'ıdır** ve büyük ölçüde inşa edilmiştir (flag-gated, default-off).
-
-**🔴 Threading-kararı GERÇEKLEŞMEDİ — tenant farklı şekle dağıldı:** `resolveTenant` **0-caller (dormant)**; "tüm Process-Mode bileşenleri `TenantContext` parametre alır" kararı yerine tenant-gerçekliği şöyle indi: `strict_tenant` config-flag (Sprint 261) + memory-store `tenant_id` kolonu (tenant-scoped entries/audit) + audit-MCP tenant-scope + backlog entry'de düz `tenant?: string`. **Accept-günü karar:** ya `TenantContext`-threading'i gerçekten wire et, ya bu Decision'ı gerçekleşen-şekle (config-flag + kolon + alan) amend et — ikisi birden değil.
-
-**Terminoloji hizalamaları (ADR-042 Sprint-281 amendment ile):**
-1. Context'teki "Chat Mode" ifadesi → Chat/REPL bir **etkileşim-yüzeyidir**; yürütme-style üçlüsü **`sprint | task | process`**'tir (Alperen gerekçesi: "sprint evrensel kavram değil" + "task-mode agentic değil" → process = uzun-ömürlü + agentic üçüncü style).
-2. **"auto" adlandırma-çakışması (accept-günü çözülmeli):** `deckent mode auto` = bağlamdan sprint|task **auto-DETECT** komutu; "**autonomous engine**" = sürekli-çalışan motor (F3-009, Process-Mode runtime'ı). İki "auto" farklı kavram — kullanıcı-karışıklığı riski; Process-Mode style-entegrasyonunda adlandırma netleştirilir.
-
-md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-068: Enterprise Foundation — Audit Query + Multi-Tenant + Scheduled Flows
-
-**Status:** accepted
-
-# ADR-068: Enterprise Foundation — Audit Query + Multi-Tenant + Scheduled Flows
-
-**Status:** accepted
-
-**Date:** 2026-05-31 · promoted 2026-06-11 (Sprint 281 ADR-review — üç katman da shipped)
-
----
-
-## Context
-
-F4 sub-project hedefi: Deckent'i kurumsal ortamlarda çalıştırılabilir hale getirmek — SOC2/GDPR uyumlu audit trail, OIDC/SSO auth, scheduled flow runtime ve çok-kiracılı yetkilendirme. Sprint 205 itibarıyla F4'ün ilk bileşenleri implement edilmiş ancak resmi ADR kaydı yoktu.
-
-F3 (Process Mode) sprint 205'te tamamlanan bileşenler:
-- `src/core/scheduled-flow.ts` — ScheduledFlow tipi + parseCronExpr + nextRun iskeleti (Sprint 205 Task 5)
-- `src/core/flow-registry.ts` — CRUD + JSON persist (Sprint 205 Task 6)
-- `src/cli/commands/flow.ts` — `deckent flow list/add` CLI (Sprint 205 Task 7)
-
-F4'ün Sprint 205'te başlayan bileşeni:
-- `src/core/audit-query.ts` — mevcut event-stream üzerinden tenant/action/time-range filtreli sorgu (Sprint 205 Task 8)
-
-Bu bileşenler ADR-034 (multi-project isolation) ve ADR-067 (process mode + tenant isolation) üzerine inşa edilmiştir.
-
----
-
-## Decision
-
-Enterprise Foundation üç katmandan oluşur:
-
-**Katman 1: Scheduled Flows**
-- `ScheduledFlow` tipi zorunlu alanlar: `id`, `cronExpr`, `action`, `tenantId`, `enabled`.
-- `parseCronExpr(expr)` — 5-alan standart cron parse + validation (`* */5 0-23` gibi aralık ve joker).
-- `nextRun(flow, from)` — bir sonraki çalışma zamanı hesabı iskeleti (basit, tam scheduler değil).
-- `FlowRegistry` — in-memory CRUD + `.deckent/flows/<tenantId>/flows.json` persist.
-- `deckent flow list | add` CLI (ADR-012 register pattern).
-
-**Katman 2: Audit Query**
-- `queryAudit(params)` — mevcut event-stream (event-stream.ts) üzerinden okuma; yeni audit yazımı yok.
-- Filtre boyutları: `tenantId`, `action`, `timeRange` (`from`/`to` ISO 8601).
-- Çıktı: `AuditQueryResult[]` — timestamp, action, tenantId, payload özeti.
-- Read-only — mevcut audit chain ve HMAC imzasını değiştirmez.
-
-**Katman 3: Multi-Tenant Yetkilendirme (ileride)**
-- ADR-067 `TenantContext` üzerine OIDC/SSO yetkilendirme katmanı eklenir (F4-001).
-- Audit export API (F4-002) audit-query.ts üzerine inşa edilir.
-- Rate/resource limits (F4-003) tenant-scoped throttle ile yönetilir.
-
----
-
-## Consequences
-
-**Positive:**
-- Scheduled flows F3 temelini tamamlar — Process Mode'un kronik olarak eksik olan cron katmanını kapatır.
-- Audit query read-only tasarımı mevcut audit chain'i bozmaz — zero regression riski.
-- `tenantId` parametresi her katmanda taşınır — F4-001 OIDC entegrasyonu sonradan refactor gerektirmez.
-- `'local'` tenant default backward-compat — Sprint Mode etkilenmez (ADR-067 ile tutarlı).
-
-**Negative:**
-- Gerçek cron scheduler runtime (k8s CronJob, OS cron) F3-003 kapsamında — bu ADR yalnızca tip + parse katmanı.
-- Audit export compliance (SOC2/GDPR sertifikasyon paketi) F4-002'de ayrı ADR gerektirecek.
-- `audit-query.ts` şu an event-stream dosya I/O'ya bağlı — veritabanı-backed audit store ileride migration gerektirebilir.
-
----
-
-## Alternatives Considered
-
-- **Her bileşen için ayrı ADR** — scheduled-flow, flow-registry ve audit-query ayrı ADR'ler olabilirdi. Ancak bunlar aynı F4 enterprise hedefini paylaşan küçük bileşenler; tek foundation ADR'si daha az overhead oluşturur. Gelecekte bileşen büyüdüğünde supersede edilebilir.
-- **Audit için harici SIEM entegrasyonu (Datadog, Splunk)** — runtime dep ekler, self-hosted senaryolarda çalışmaz, ADR-010 (tek runtime dep) ile çelişir. Event-stream üzerinden read-only query daha az bağımlılık.
-- **Flow registry için SQLite (memory.db)** — memory.db sprint/ADR/memory verisi için tasarlanmış; flow runtime verisi farklı schema ve lifecycle gerektirir. Ayrı JSON persist daha temiz izolasyon sağlar.
-
----
-
-## References
-
-- Sprint 205 Task 5 — `src/core/scheduled-flow.ts` (ScheduledFlow, parseCronExpr, nextRun)
-- Sprint 205 Task 6 — `src/core/flow-registry.ts` (FlowRegistry, CRUD, persist)
-- Sprint 205 Task 7 — `src/cli/commands/flow.ts` (deckent flow list/add)
-- Sprint 205 Task 8 — `src/core/audit-query.ts` (queryAudit, AuditQueryResult)
-- ADR-034: Multi-Project Isolation — Per-Project Security Boundaries
-- ADR-067: Process Mode + Tenant Isolation — F3 Foundation
-- ROADMAP F3/F4: Process Mode + Enterprise sub-project tracker
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review): proposed → accepted + god-level boşluk-haritası
-
-**Classification: BOTH** (enterprise-temel ürünün kendisi).
-
-**Terfi gerekçesi (ADR-042/053 emsali — üç katman da shipped, kod-doğrulandı):**
-- **Katman-1 ✅:** `flow-registry.ts` + `flow.ts` CLI + `parseCronExpr` (:46) + **full-cron `nextRun`** (AUT-4; "iskelet" aşıldı) + flow→backlog bridge (AUT-3 — flow'lar gerçekten koşar).
-- **Katman-2 ✅:** `queryAudit` (:65, read-only) + üstüne **audit-HMAC chain** (S261; memory-store `audit_prev_hmac`/`audit_hmac`) + `audit-integrity.ts` + SIEM HTTP transport (`siem-transport-http.ts`).
-- **Katman-3 ✅ ("ileride" değil, İNDİ):** OIDC exchange endpoint canlı (`server.ts:745`, 277-007, config-gated, RS256-pinned/PKCE/fail-closed) + `/api/auth/me` RBAC-rolleri + enterprise rate-limits (**ADR-074**) + `strict_tenant` (S261) + auth-precedence (**ADR-076**). Teslim-eden ADR'ler: 074 (RBAC/Audit/Rate), 076 (auth-precedence), 277-007 (OIDC).
-
-**⚖️ Dürüst derinlik-değerlendirmesi (Alperen sorusu: "yüzeysel mi, god-level mi?"):** Bu temel **gerçek ve ciddi mühendisliktir, yüzeysel değildir** (OIDC güvenlik detayları, HMAC-zincir, guard'lı terminal). Ancak **god-level-enterprise'a YARI YOLDUR** — kalan boşluklar (hepsi zaten haritalı, yeni iş açılmadı):
-1. **Yönetim-düzlemi yok** — Enterprise UI salt-okunur; admin UI'dan tenant/rol/rate CRUD yapamaz (UX-denetim 2026-06-11 bulgu #6 → F7/DESK-1 control-plane).
-2. **RBAC statik** — 3 sabit rol; custom-rol/izin-matrisi/per-resource ACL yok.
-3. **Enforcement advisory** — ADR-037 V1.0 soft; enterprise hard-enforcement V2 hard-flip'te (post-GA).
-4. **Tenant izolasyonu config-seviyesi** — path-scoping + flag; runtime izolasyon (k8s pod-exec F3-003) inşa edilmedi.
-5. **Provisioning yok** — OIDC login-only; SCIM/directory-sync yok.
-6. **Audit-export/compliance-paketi yok** (F4-002) — SIEM-transport var, paketleme yok; SOC2 bilinçli-kapsam-dışı (ADR-033) ama MOD-SPLIT enterprise-layer'ı compliance-evidence tooling taşıyabilir.
-
-md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-069: Event-Driven Triggers + RBAC — F3 Webhook & F4 Role-Based Access Control
-
-**Status:** accepted
-
-# ADR-069: Event-Driven Triggers + RBAC — F3 Webhook & F4 Role-Based Access Control
-
-**Status:** accepted
-
-**Date:** 2026-05-31 · promoted 2026-06-11 (Sprint 281 ADR-review — decided-scope shipped + canlı-tüketimli)
-
----
-
-## Context
-
-Sprint 206 iki yeni bileşen ekledi:
-
-**F3-003 — Event-Driven Triggers (`event-trigger.ts`)**
-Scheduled flows (ADR-068, F3-002) yalnızca cron-tabanlı tetikleyicileri destekliyordu. Webhook veya external event kaynaklı akışlar için tip + eşleştirme katmanı yoktu. `matchTrigger(event, triggers)` fonksiyonu gelen bir event'i kayıtlı trigger listesiyle karşılaştırarak hangi flow'ların tetikleneceğini belirler. Gerçek HTTP webhook listener bu ADR kapsamı dışındadır — yalnızca tip + matcher katmanı tanımlanmıştır.
-
-**F4-001 — RBAC Role-Based Access Control (`rbac.ts`)**
-F4 enterprise alt-projesi audit-query (ADR-068 Katman 2) ile başladı; ancak erişim denetimi yoktu. Herhangi bir tenant, herhangi bir kaynağa erişebiliyordu. `can(role, action, tenantId)` check fonksiyonu role → permission matrisini tanımlar. Gerçek auth/session entegrasyonu bu ADR kapsamı dışındadır — iskelettir.
-
-Her iki bileşen de ADR-067 (`TenantContext`, `tenantId` zorunlu alan) üzerine inşa edilmiştir.
-
----
-
-## Decision
-
-### EventTrigger (F3-003)
-
-`EventTrigger` tip tanımı:
-```typescript
-export interface EventTrigger {
-  id: string;
-  eventType: string;   // 'webhook' | 'custom' | 'system'
-  source: string;      // trigger kaynağı (URL, servis adı, vb.)
-  action: string;      // tetiklenecek flow action'ı
-  tenantId: string;    // ADR-067 zorunlu alan
-  enabled: boolean;
-}
-```
-
-`matchTrigger(event, triggers)` semantiği:
-- `tenantId` eşleşmesi zorunlu — tenant izolasyonu ADR-067 ile tutarlı.
-- `eventType` eşleşmesi zorunlu.
-- `enabled: false` olan trigger'lar atlanır.
-- Eşleşen trigger'lar döndürülür (çoklu eşleşme desteklenir).
-
-### RBAC (F4-001)
-
-`Role` ve `Permission` tanımı:
-```typescript
-export type Role = 'admin' | 'operator' | 'viewer';
-
-export enum Permission {
-  READ   = 'read',
-  WRITE  = 'write',
-  DELETE = 'delete',
-  ADMIN  = 'admin',
-}
-```
-
-`can(role, action, tenantId)` matrix:
-- `admin`: tüm izinler (READ + WRITE + DELETE + ADMIN)
-- `operator`: READ + WRITE
-- `viewer`: yalnızca READ
-- `tenantId` parametresi tenant-scoping için geçirilir; gerçek tenant doğrulaması F4-002'de eklenir.
-
-Bilinmeyen rol → tüm izinler reddedilir (fail-secure).
-
----
-
-## Consequences
-
-**Positive:**
-- event-trigger.ts webhook/event akışını scheduled-flow ile aynı tenant-scoping modelinde birleştirir.
-- RBAC iskelet fail-secure — bilinmeyen rol tüm izinleri reddeder, sonradan genişletmek güvenli.
-- `tenantId` her iki bileşende zorunlu — ADR-067 ile tam uyum.
-- HTTP webhook listener gereksinimsiz — matcher test edilebilir, bağımsız.
-
-**Negative:**
-- event-trigger.ts gerçek HTTP listener içermiyor — F3-003 tam tamamlanmadı, ek sprint gerekecek.
-- `can()` gerçek auth session'a bağlı değil — F4-002'de OIDC/SSO entegrasyonu gerektirir.
-- Role permission matrix hard-coded — kullanıcı-tanımlı rol genişletmesi F4-003 kapsamı.
-
----
-
-## Alternatives Considered
-
-- **Tam HTTP webhook server (F3-003 kapsamında)** — runtime dependency (http server) ekler, ADR-010 (tek runtime dep) ile çelişir; scope ≤200 LoC kısıtını aşardı. Tip + matcher iskeleti daha sonra HTTP katmanına kolayca bağlanabilir.
-- **OIDC/SSO tam entegrasyon (F4-001 kapsamında)** — 200+ LoC, harici auth provider bağımlılığı, sprint effort=normal ile uyumsuz. İskelet → sonraki sprint progressif artış stratejisi tercih edildi.
-- **Rol tabanlı config (JSON roles.json)** — hard-coded matrix config yükünü ortadan kaldırır ama runtime I/O ve validation ekler. Çok küçük bir set için overdesign — ADR-010 minimal dep prensibiyle çelişir.
-- **tenant-aware can() yerine global can()** — ADR-067 izolasyon garantisini zayıflatır. `tenantId` parametresi şimdi taşınmalı yoksa F4-002 refactor maliyeti artar.
-
----
-
-## References
-
-- Sprint 206 Task 5 — `src/core/event-trigger.ts` (EventTrigger, matchTrigger, tenantId)
-- Sprint 206 Task 8 — `src/core/rbac.ts` (Role, Permission, can())
-- ADR-067: Process Mode + Tenant Isolation — F3 Foundation
-- ADR-068: Enterprise Foundation — Audit Query + Multi-Tenant + Scheduled Flows
-- ROADMAP F3-003: event-driven webhook triggers → `✅ DONE Sprint 206-005`
-- ROADMAP F4-001: RBAC iskelet → `🟡 Sprint 206-008 (Role+Permission+can())`
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review): proposed → accepted + canlı-tüketici haritası
-
-**Classification: BOTH** (RBAC/triggers enterprise-ürün çekirdeği).
-
-**Terfi gerekçesi:** Her iki bileşen de decided-scope'unda shipped VE **canlı-tüketimli** (ADR-068 emsali):
-- `matchTrigger` → **`src/core/flow-scheduler.ts`** üretimde tüketiyor (event→flow eşleşmesi canlı).
-- `can()` → **4 canlı production tüketici:** `orchestra/autonomous/runtime-loop.ts` (S261 RBAC-bridge — otonom motor RBAC-gate'li), `api/auth-me-endpoint.ts` (OIDC JWT rol-claim'leri → `can()`), `api/enterprise-endpoint.ts`, `cli/commands/rbac.ts`. **"`can()` gerçek auth-session'a bağlı değil" negatifi ÇÖZÜLDÜ** (ADR-074 Enterprise RBAC/Audit/Rate + ADR-076 auth-precedence + 277-007 OIDC). Fail-secure (bilinmeyen-rol→tüm-izinler-red) korunur.
-
-**Hâlâ geçerli negatifler (yeni iş açılmadı, haritalı):** HTTP webhook-listener inşa edilmedi (AUT-2 — matcher'ın decided-scope'u zaten listener'ı hariç tutuyordu; reactive-trigger'lar şimdilik nervous-reactive bridge üzerinden) · custom-rol/izin-matrisi genişletmesi yok (F4-003; ADR-068 god-level boşluk-haritası #2 ile aynı madde). md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-070: Brain Evaluation Integrity — Signal-Based Coverage Exemption + Zero-Hard-Code Principle
-
-**Status:** accepted
-
-# ADR-070: Brain Evaluation Integrity — Signal-Based Coverage Exemption + Zero-Hard-Code Principle
-
-**Status:** accepted
-
-**Date:** 2026-05-31
-
-**Accepted:** Sprint 207
-
----
-
-## Context
-
-Two systemic problems were identified and fixed in Sprint 207:
-
-### Problem A — False-FIX Cascade from coverage:null
-
-Sprint 206 produced 7 false-FIX cycles where the identical worker result was evaluated as
-`DONE` under `bug-fixer` but `NO_GO` under `refactorer`. The root cause was in
-`coverageOptional()` (rubric-registry.ts): the function used an agent-name allowlist to
-determine whether `coverage:null` was acceptable. `refactorer` was not on the list, so any
-refactoring task that didn't produce a numeric coverage value triggered a NO_GO → FIX loop.
-
-This was a **false signal**: a refactorer that rewrites a function and adds new test files
-clearly exercised the codebase. The absence of a `coverage` number is an instrumentation
-gap, not a quality failure. The agent-based allowlist was a leaky abstraction — it required
-manual maintenance every time a new agent type appeared in the system.
-
-### Problem B — Bundled Hard-Coded Model IDs (Zero-Hard-Code Violation)
-
-`model-registry.ts` contained `apiId: 'claude-opus-4-6'` as a bundled snapshot value. The
-actual current Opus model is `claude-opus-4-8`. This stale hard-code propagated into:
-- `deckent start` cost-estimate output (showed old model name to users)
-- `bootstrapFromCatalog` (models.dev live catalog fetch): apiId was not overriding the
-  bundled snapshot even when the remote catalog had updated entries
-- `cost-calculator.ts` model-label generation: used registry values but the registry itself
-  had stale bundled data
-
-The principle: any string that a running deckent instance can derive from live data MUST NOT
-be hard-coded in source. Bundled snapshots are an offline fallback, not a source of truth.
-
----
-
-## Decision
-
-### Decision A — Signal-Based coverage Exemption (agent-independent)
-
-`coverageOptional(task, result)` was extended with a **signal-based path** that runs before
-the agent-name allowlist check:
-
-```typescript
-if (result) {
-  const wroteTests = result.filesChanged?.some(
-    f => f.includes('.test.') || f.includes('.spec.')
-  ) ?? false;
-  if (wroteTests) return true;
-}
-```
-
-Semantics:
-- If a worker changed at least one test file (`.test.*` or `.spec.*`), coverage is optional.
-- This is **agent-independent** — the same result evaluates identically regardless of which
-  agent ran the task.
-- It is **idempotent** — re-evaluating the same result always produces the same decision.
-- It is **deterministic** — derived entirely from `result.filesChanged`, which is disk-level
-  ground truth.
-
-**Bridge fix (P0-2):** `refactorer` and `code-reviewer` were also added to the
-`COVERAGE_OPTIONAL_AGENTS` allowlist as a bridge. The signal-based path is the permanent
-solution; the allowlist entries prevent regression during the transition.
-
-Implemented in: `src/orchestra/rubric-registry.ts` (Sprint 207 P0-1 + P0-2).
-
-### Decision B — Zero-Hard-Code: Live Registry as Authoritative Source
-
-Three rules now govern model identity strings in deckent:
-
-1. **Bundled snapshot apiId must be kept current at build time.** If the bundled opus entry
-   says `claude-opus-4-6` and the actual model is `claude-opus-4-8`, every cost estimate and
-   status output shown to users is wrong. Bundled values are updated in the same PR as model
-   promotions.
-
-2. **`bootstrapFromCatalog` overrides bundled apiId from live catalog.** If `models.dev`
-   returns an entry for a given model key, its `apiId` field WINS over the bundled snapshot.
-   The bundled value is only used when the catalog is unreachable (offline fallback).
-
-3. **`cost-calculator` and all display paths read `registry.get(model).apiId`
-   parametrically.** No hard-coded `'anthropic/claude-opus-4-6'` or similar strings in
-   display logic. If the registry has a stale value, the display is still consistent — the
-   fix goes in one place (the registry), not scattered across callers.
-
-Implemented in: `src/core/model-registry.ts`, `src/core/model-catalog.ts`,
-`src/core/cost-calculator.ts` (Sprint 207 001/002/003).
-
-### RBAC Gate Wire (F4-001 progress)
-
-As part of Sprint 207 zero-hard-code + F4 work, `audit-query.ts` was wired to RBAC:
-`queryAudit(params, role)` now calls `can(role, 'audit:read', tenantId)` — unauthorized
-roles receive an empty/error response. This moves F4-001 from pure skeleton to enforced gate.
-
----
-
-## Consequences
-
-**Positive:**
-- False-FIX cascade eliminated. The Brain no longer generates unnecessary FIX tasks for
-  `refactorer`/`code-reviewer` results that include new test files.
-- Evaluation is agent-independent: routing decisions cannot change the GO/NO-GO outcome for
-  the same work product.
-- Cost estimates show accurate model names to users without manual bundled-value maintenance.
-- Zero-hard-code principle is now a documented constraint — new callers default to the
-  registry API, not inline strings.
-- RBAC enforcement on audit-query closes the audit access-control gap opened in Sprint 205.
-
-**Negative:**
-- Signal-based path depends on `filesChanged` being populated accurately by workers. A worker
-  that wrote test files but omitted them from `filesChanged` would still get NO_GO. This is
-  intentional: honest result reporting is a separate contract (ADR-035).
-- Bundled apiId updates require a manual step at release time. Automated catalog-to-bundled
-  sync is deferred (no Sprint 207 scope).
-- `bootstrapFromCatalog` apiId override only fires when the network is available. Offline
-  environments always use the bundled value — acceptable, as offline means "last known good."
-
----
-
-## Alternatives Considered
-
-- **Agent allowlist only (no signal path):** Required adding every new agent type manually.
-  Sprint 206's 7 false-FIX cycles were the direct cost of this approach. Rejected.
-- **Disable coverage check entirely:** Removes a meaningful quality signal for tasks that
-  clearly should produce coverage (e.g., new API endpoint with no test files). Rejected.
-- **Remote model catalog as sole source (no bundled fallback):** Breaks offline usage and
-  adds a network call to every startup. ADR-010 (minimal runtime dependency) + offline
-  resilience requirement both argue against this. Rejected.
-- **Hard-coded apiId with comment:** The comment rots; the string stays wrong. Zero-hard-code
-  principle requires the live source to win. Rejected.
-
----
-
-## References
-
-- `src/orchestra/rubric-registry.ts` — `coverageOptional()` signal-based path (Sprint 207 P0-1)
-- `src/core/model-registry.ts` — bundled opus apiId updated to `claude-opus-4-8` (Sprint 207-001)
-- `src/core/model-catalog.ts` — `bootstrapFromCatalog` apiId merge wire (Sprint 207-002)
-- `src/core/cost-calculator.ts` — parametric model-label from registry (Sprint 207-003)
-- `src/core/audit-query.ts` — RBAC gate wire via `can()` (Sprint 207-007)
-- ADR-035: Brain ↔ Worker ↔ Auditor Verification Protocol Standard
-- ADR-037: Brain-Auditor-Worker Authority Matrix — RBAC Protocol V1.0
-- ADR-069: Event-Driven Triggers + RBAC — F3 Webhook & F4 RBAC
-- ROADMAP F4-001: OIDC/SSO AuthProvider impl + RBAC → Sprint 207-007 gate wire
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (değerlendirme adaleti + doğru model/maliyet gösterimi ürün-kanunu).
-
-**Re-verified (üç karar da birebir canlı):** Decision-A signal-based `wroteTests` (`rubric-registry.ts:281-282`) + bridge-allowlist (:246) ✓ · Decision-B bundled apiId'ler **güncel-tutulmuş** — `claude-opus-4-8` (:78) ve `claude-fable-5` (:67, en yeni model dahil; zero-hard-code ilkesi yaşıyor) ✓ · RBAC-gate `queryAudit` → `can(role, Permission.READ, tenantId)` (`audit-query.ts:73`) ✓ (ADR'deki `'audit:read'` ifadesi implementasyonda `Permission.READ` — semantik aynı, imza-nüansı).
-
-**Evrim — sinyal-ilkesi STACK boyutu kazandı (WM-7, Sprint 254):** coverage-muafiyet artık yalnız wroteTests-sinyali değil, **tech-stack-duyarlı** da: `COVERAGE_MEASURABLE_STACKS` (`core/work-model.ts`) vitest-ölçülemez stack'leri (C++/Go/…) coverage-zorunluluğundan muaf tutar — "ölçüm-boşluğu ≠ kalite-hatası" ilkesinin (bu ADR'nin özü) taksonomi-eksenine genişlemesi (ADR-053 Sprint-281 amendment cross-ref). md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-071: F3 Autonomous Mode (Self-Dispatch Guard) + F4 Enterprise RBAC/Tenant/Audit
-
-**Status:** accepted
-
-# ADR-071: F3 Autonomous Mode (Self-Dispatch Guard) + F4 Enterprise RBAC/Tenant/Audit
-
-**Status:** accepted
-
-**Date:** 2026-05-31
-
-**Proposed:** Sprint 208 · promoted 2026-06-11 (Sprint 281 ADR-review — kapsam-ayrımıyla: dayanıklı-çekirdek + F4 canlı; F3-A/B mekanizmaları superseded)
-
----
-
-## Context
-
-Sprint 208 implemented the foundational building blocks for two major roadmap pillars:
-
-### F3 — Autonomous Mode (Process Mode runtime)
-
-Prior to Sprint 208, the scheduled flow system (ADR-068, ADR-069) had:
-- `flow-registry.ts`: flow CRUD storage
-- `flow-scheduler.ts`: `collectDue()` point-in-time query
-- `event-trigger.ts`: event matching skeleton
-
-Missing: a runtime daemon that continuously runs the tick loop, and a **self-dispatch protocol** that lets deckent autonomously decide to trigger sprints based on flow schedules.
-
-The north-star for autonomous mode is: deckent can evaluate whether to start a sprint on its own based on scheduled triggers — but **always requires human approval** before acting. The capability to decide is being built; automated execution without approval is NOT.
-
-### F4 — Enterprise Foundation hardening
-
-Prior to Sprint 208, the enterprise layer had:
-- `rbac.ts`: basic `Role`/`Permission`/`can()` skeleton (ADR-069)
-- `audit-query.ts`: read-only audit filter with RBAC gate (Sprint 207)
-- `tenant-context.ts`: tenant ID type + resolver skeleton (Sprint 204)
-
-Missing: role **hierarchy** (admin inherits operator permissions, operator inherits viewer), **multi-tenant runtime isolation** (path-scoped execution context), structured **audit event writes** (the write counterpart to audit-query), and an **enterprise configuration schema** that gates these features as opt-in.
-
----
-
-## Decision
-
-### F3-A — FlowRuntime Daemon (`flow-runtime.ts`)
-
-`FlowRuntime` class implements a configurable tick-loop daemon:
-- `start(intervalMs)` → setInterval calling `scheduler.collectDue()` each tick
-- `stop()` → clearInterval, graceful shutdown
-- Injectable clock for deterministic testing (no real timer in test)
-- Callbacks: `onDue(dispatches)` → caller decides what to do with due flows
-- Does NOT spawn sprints directly — separation of concerns between scheduling and execution
-
-### F3-B — Self-Dispatch Protocol (`self-dispatch.ts`)
-
-`SelfDispatchPolicy` type defines when and how deckent may propose autonomous action:
-
-```typescript
-export interface SelfDispatchPolicy {
-  trigger: 'scheduled' | 'event' | 'threshold';
-  action: 'plan' | 'start';
-  guard: {
-    requiresApproval: boolean;  // DEFAULT TRUE — always
-    maxConcurrent?: number;
-    cooldownMs?: number;
-  };
-}
-```
-
-`evaluateDispatch(policy, context)` returns a `DispatchDecision`:
-- `allowed: boolean` — whether the policy permits dispatch given the current context
-- `requiresApproval: boolean` — always `true` unless explicitly overridden by operator
-- Does **NOT** call `runSprint()` or `deckent_start` — decision only, no side effects
-
-**requiresApproval default TRUE is non-negotiable.** Self-dispatch autonomous mode enables deckent to form opinions and schedule proposals, but sprint execution requires explicit human confirmation. This preserves the "AI proposes, human approves" contract.
-
-### F3-C — Tenant Runtime Context (`tenant-context.ts` extension)
-
-`withTenant(tenantId, fn)` runtime helper isolates all file path operations to `.deckent/tenants/<tenantId>/`:
-- `currentTenant()` returns active tenant scope (default: root project)
-- Path isolation: `tenantPath(tenantId, relativePath)` → `.deckent/tenants/<id>/<relativePath>`
-- Compatible with flow-registry and audit-query (wire point — not yet wired, next sprint)
-
-### F4-A — RBAC Role Hierarchy (`rbac.ts` extension)
-
-Role hierarchy with inheritance:
-- `admin` inherits all `operator` permissions + gains `tenant:admin` + `audit:read`
-- `operator` inherits all `viewer` permissions + gains `sprint:write` + `flow:manage`
-- `viewer` baseline: `sprint:read`, `audit:read` (read-only)
-- Unknown role → fail-secure (all permissions denied)
-
-Permission matrix added: `sprint:read`, `sprint:write`, `audit:read`, `flow:manage`, `tenant:admin`.
-
-`inheritsPermissionsFrom(role)` utility determines the hierarchy chain for `can()` lookups.
-
-### F4-B — Audit Event Writer (`audit-writer.ts`)
-
-`writeAuditEvent({ tenantId, actor, action, target, metadata })` produces structured audit records compatible with `audit-query.ts` read format:
-- Mandatory fields: `tenantId`, `actor`, `action`, `timestamp` (auto-set)
-- Optional: `target`, `metadata` (JSON object)
-- Round-trip compatible: events written via `writeAuditEvent` are queryable via `queryAudit`
-
-### F4-C — Enterprise Config Schema (`enterprise-config.ts`)
-
-`EnterpriseConfig` type with safe opt-in defaults:
-```typescript
-export interface EnterpriseConfig {
-  tenancy: { enabled: boolean };            // default: false
-  rbac: { enabled: boolean; defaultRole: Role };  // default: false, 'viewer'
-  flow: { maxConcurrent: number };          // default: 1
-}
-```
-
-All enterprise features are **opt-in false** — existing single-tenant deployments are unaffected. Parse/validate follows the 3-layer config merge pattern (ADR-004) but as a separate module (no touch to `config.ts`).
-
----
-
-## Consequences
-
-**Positive:**
-- Autonomous mode capability is being built safely: self-dispatch evaluates and proposes, never executes without approval.
-- RBAC hierarchy closes the permission-inheritance gap — `admin` no longer requires explicit listing of all lower-tier permissions.
-- Tenant runtime context enables future flow-registry and audit-writer to operate in isolated path namespaces per tenant.
-- Audit writer + query round-trip closes the write/read gap in the enterprise audit trail.
-- Enterprise config schema allows progressive feature adoption without touching the core config.ts merge chain.
-
-**Negative:**
-- `requiresApproval: true` in `SelfDispatchPolicy` means true autonomous sprint execution is not yet possible — requires a future opt-in gate per ADR-047 (Manuel Subagent Dispatch Protocol).
-- Tenant path isolation in `withTenant` is advisory in V1 — hard enforcement requires ADR-037 V2 layer (post-GA).
-- `writeAuditEvent` persistence is filesystem-based (append to JSONL) — not yet wired to the SQLite memory.db for queryable indexing (deferred, next sprint).
-- Enterprise features (tenancy, RBAC, flow limits) are all opt-in — operators must explicitly enable; discovery requires documentation.
-
----
-
-## Alternatives Considered
-
-- **Full autonomous execution without approval gate:** Violates the ADR-047 "human in the loop" contract and Alperen's explicit requirement that sprint starts require user confirmation. Rejected unconditionally.
-- **Merge self-dispatch into flow-runtime:** Creates a god object that mixes scheduling with policy evaluation. Keeping them separate allows testing dispatch logic without a running timer. Rejected.
-- **Flat RBAC without hierarchy:** Requires explicitly listing every permission for every role — maintenance burden grows linearly with permission count. Hierarchy reduces this to O(1) additions at each tier level. Rejected.
-- **Audit writer wired to SQLite directly:** Adds `better-sqlite3` dependency to audit-writer module and couples write + read paths tightly. Filesystem JSONL is simpler, independently testable, and already compatible with audit-query's current read strategy. Deferred, not rejected.
-- **Enterprise config merged into config.ts:** Adds enterprise-specific complexity to the shared 3-layer merge chain. Separate module preserves backward compatibility and single-responsibility for the config module. Rejected.
-
----
-
-## References
-
-- Sprint 208 Task 5 — `src/core/flow-runtime.ts` (FlowRuntime daemon, tick-loop)
-- Sprint 208 Task 6 — `src/core/self-dispatch.ts` (SelfDispatchPolicy, evaluateDispatch, requiresApproval)
-- Sprint 208 Task 7 — `src/cli/commands/flow.ts` (`deckent flow run` CLI)
-- Sprint 208 Task 8 — `src/core/tenant-context.ts` (withTenant, currentTenant, tenantPath)
-- Sprint 208 Task 9 — `src/core/rbac.ts` (role hierarchy, PERMISSION_MATRIX)
-- Sprint 208 Task 10 — `src/core/flow-registry.ts` (RBAC gate on flow:manage)
-- Sprint 208 Task 11 — `src/core/audit-writer.ts` (writeAuditEvent)
-- Sprint 208 Task 12 — `src/core/enterprise-config.ts` (EnterpriseConfig, parseEnterprise)
-- ADR-067: Process Mode + Tenant Isolation — F3 Foundation
-- ADR-068: Enterprise Foundation — Audit Query + Multi-Tenant + Scheduled Flows
-- ADR-069: Event-Driven Triggers + RBAC
-- ADR-047: Manuel Subagent Dispatch Protocol (requiresApproval contract)
-- ROADMAP F3-004/F3-005: flow runtime daemon + self-dispatch → Sprint 208 DONE
-- ROADMAP F4-001: RBAC hierarchy → Sprint 208 extension DONE
-- ROADMAP F4-002: audit-writer → Sprint 208 DONE
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review): proposed → accepted + kapsam-ayrımı (ADR-027 deseni)
-
-**Classification: BOTH** (approval-sözleşmesi governance-kanunu; F4 enterprise-katman ürün).
-
-**✅ Dayanıklı çekirdek CANLI (terfi gerekçesi):**
-- **"requiresApproval default TRUE non-negotiable" sözleşmesi mirasçısında yaşar:** otonom motorun `policy-gate.ts` (`'auto' | 'park'` — "park for human approval", G2 per-task-policy + G3 EffectClass-risk) aynı "AI önerir, insan onaylar" kontratının üretim-gerçekleşmesidir. Sprint-start insan-onayı kuralı da yürürlükte.
-- **F4 bileşenlerinin TAMAMI canlı:** RBAC hiyerarşi + `PERMISSION_MATRIX` (`rbac.ts:44`, 4 canlı tüketici — ADR-069 amendment) ✓ · `writeAuditEvent` (`audit-writer.ts:73`; sonradan S261 HMAC-zincirle güçlendi) ✓ · `enterprise-config.ts` ✓ · `withTenant`/`tenantPath` → `flow-registry` tüketiyor ✓.
-
-**🔄 F3-A/B mekanizmaları SUPERSEDED (F3-009 otonom motor):** `flow-runtime.ts` (tick-daemon) + `self-dispatch.ts` (SelfDispatchPolicy/evaluateDispatch) diskte durur ama MASTER-PLAN F3-009 kaydıyla "pre-226 ~%40 foundation — engine tarafından superseded": `buildEngineRuntime` + durable-backlog + hybrid-trigger-source + execute-dispatcher onların yerini aldı. Bu iki iskelet **ertelenmiş dormant-sweep adayıdır** (ADR-038/039 amendment'leriyle aynı havuz). Sözleşme öldü değil — mekanizma değişti, governance-kontratı taşındı. md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-072: Agent Routing Balance (Multi-Signal Scoring) + Dashboard API Auth Hardening
-
-**Status:** accepted
-
-# ADR-072: Agent Routing Balance (Multi-Signal Scoring) + Dashboard API Auth Hardening
-
-**Status:** accepted
-
-**Date:** 2026-05-31
-
-**Accepted:** Sprint 209
-
----
-
-## Context
-
-### Routing Imbalance (Sprint 208 observation)
-
-Sprint 208 completed 16 tasks — 15 of them were routed to the `refactorer` agent. The root cause is a combination of two weaknesses in the routing pipeline:
-
-1. **Coarse intent classification** — `intent-classifier.ts` was collapsing nearly every code task to `intent.primary: "implementation"`. Scope path signals (`src/api/`, `src/auth/`, `src/dashboard/`, etc.) were ignored, so intent carried no domain information.
-
-2. **Single-signal agent scoring** — `routing-engine.ts` selected agents based primarily on their `implementation` activation weight. `refactorer` carries `impl@7`, `architect` carries `impl@6`; all domain-specific agents (api-builder, security-auditor, frontend-designer, data-engineer, devops-engineer) activate on `api`/`security`/`design`/`data`/`devops` intents respectively — intents that never surfaced.
-
-The outcome: 15 built-in agents and 21 skills are registered, yet routing consistently converges on a single agent regardless of task domain. This wastes specialized capability and makes routing outcomes unpredictable as agent pools grow.
-
-### Dashboard Auth-Disabled Dependency (F7-001 blocker)
-
-The dashboard (`src/dashboard/`) and its backing API (`src/api/`) require `DECKENT_API_AUTH_DISABLED=1` to function in development. Without this flag the auth middleware rejects every request — including those from `localhost`. This is unsafe by design because:
-
-- The flag is binary: either auth is fully disabled (insecure for any shared environment) or fully enabled (blocking for local dev).
-- There is no automatic trust path for `localhost` callers that identifies them as the local developer without requiring a pre-issued token.
-- The flag name implies "auth is broken" rather than "auth is appropriately relaxed for local dev".
-
-The goal is a prod-safe default: localhost callers get a time-limited auto-injected token, remote callers must present a valid token, and `DECKENT_API_AUTH_DISABLED` becomes an optional override (not a prerequisite).
-
----
-
-## Decision
-
-### Part A — Intent Classifier Domain Enrichment
-
-`intent-classifier.ts` is extended with scope-path and description-keyword signals that derive a domain-aware intent before falling back to `"implementation"`:
-
-| Scope pattern | Derived intent |
-|---------------|----------------|
-| `src/api/`, `*/routes/`, `*/endpoint*` | `api` |
-| `src/auth/`, `src/security/`, `*/guard*`, `*/middleware*` | `security` |
-| `src/dashboard/`, `src/components/`, `*/ui/`, `*.tsx` | `design` |
-| `src/db/`, `src/models/`, `*/migration*`, `*/schema*` | `data` |
-| `.github/`, `Dockerfile*`, `docker-compose*`, `*/ci/`, `*.yml` CI paths | `devops` |
-| `docs/`, `*.md` | `documentation` |
-| (none matched) | `implementation` (unchanged fallback) |
-
-The classifier inspects both `scope.directories` paths and description keywords. Domain enrichment is additive: existing intent categories are preserved, only the distribution changes.
-
-### Part B — Multi-Signal Agent Scoring
-
-`routing-engine.ts` gains a domain-match bonus layer applied after baseline activation scoring:
-
-- When a task's derived intent matches an agent's declared domain (e.g. `api-builder` domain is `api`), the agent receives a **+3 domain-match bonus** on top of its activation score.
-- `refactorer` and `architect` remain candidates for all tasks (they do not have a narrow domain) but no longer win by default when a domain-specific agent exists.
-- Skill scoring is similarly extended: `api-builder` skill gets a boost for `api` intent, `security-specialist` for `security`, `react-specialist` for `design`, etc.
-- The Sprint 205 fix (scoped temp-agent demotion) is preserved — temp agents without matching scope do not override built-in domain winners.
-
-### Part C — Dashboard API Auth Localhost Auto-Inject
-
-`src/api/auth.ts` is updated so that:
-
-1. Requests from `localhost` / `127.0.0.1` / `::1` receive an automatically generated short-lived token (TTL: 1 hour) injected by the server middleware — no manual token provisioning required for local development.
-2. Requests from non-localhost origins must present a valid `Authorization: Bearer <token>` header.
-3. `DECKENT_API_AUTH_DISABLED=1` remains recognized as an escape hatch (CI environments, integration tests) but is no longer required for normal local dev usage.
-4. Invalid or expired tokens from any origin are rejected with `401 Unauthorized`.
-
-This matches the security posture of other local-dev tools: localhost is implicitly trusted for a short session, remote access requires explicit credentials.
-
----
-
-## Consequences
-
-**Positive:**
-- Domain-aware routing distributes tasks across the full agent pool — api-builder, security-auditor, frontend-designer, data-engineer, and devops-engineer become active participants rather than dormant entries.
-- `routing-distribution.mjs` (Sprint 209-005) can now surface meaningful agent diversity metrics; a single agent dominating >70% will generate a warning.
-- Dashboard works out of the box for local dev without environment variable ceremony.
-- `DECKENT_API_AUTH_DISABLED` flag becomes an optional CI/testing convenience rather than a mandatory prerequisite, improving default security posture.
-
-**Negative:**
-- Domain-match bonus (+3) is a heuristic. Tasks that straddle multiple domains (e.g. "secure API endpoint") may produce less deterministic routing — requires monitoring.
-- Localhost auto-inject relies on request IP detection, which can be spoofed in some network configurations (reverse proxies, Docker bridging). This is acceptable for local dev but must be documented as a limitation.
-- The intent-classifier path-matching is regex-based — edge-case paths may not match expected patterns. A future structured scope type (ADR-007 extension) would be more robust.
-
----
-
-## Alternatives Considered
-
-- **Single-signal scoring only:** Keep routing as-is (refactorer wins by impl@7). Rejected — 208 data shows this produces a degenerate distribution; the intent behind having 15 agents is meaningless if only one is ever selected.
-- **Hard-coded agent override per task type:** Require DIRECTIVES to explicitly name the agent for every task. Rejected — defeats the purpose of automatic routing and increases sprint authoring burden.
-- **Keep `DECKENT_API_AUTH_DISABLED` as-is:** The flag is already present and working. Rejected — it is a security anti-pattern (binary disable) and a usability blocker (required env var for normal local dev).
-- **Full token-based auth from first request:** Require developers to pre-generate and supply an API token even for localhost. Rejected — adds friction for the most common use case (local dev) without meaningful security gain against the threat model (local attacker already has file system access).
-
----
-
-## References
-
-- Sprint 209 Task 1 — `src/core/intent-classifier.ts` (domain enrichment from scope paths)
-- Sprint 209 Task 2 — `src/core/routing-engine.ts` (domain-match bonus scoring)
-- Sprint 209 Task 3 — `src/core/agent-pool.ts` (impl score domain-aware balance)
-- Sprint 209 Task 4 — `src/core/routing-engine.ts` (skill routing diversity)
-- Sprint 209 Task 5 — `scripts/routing-distribution.mjs` (distribution report)
-- Sprint 209 Task 6 — `src/api/auth.ts` (localhost auto-inject, prod-safe default)
-- ADR-015: TaskRouter Module — 6-level routing
-- ADR-028: Decision-Engine V1 → V2 Routing Migration
-- ADR-041: Agent Taxonomy — Horizontal Skills vs Vertical Agents
-- ADR-070: Brain Evaluation Integrity — Zero-Hard-Code Principle
-- ROADMAP F7-001: API auth fix → Sprint 209-006 DONE
-- ROADMAP F7-002: Dashboard live data parity → Sprint 209-007 IN PROGRESS
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (routing-dağılımı + local-dev-auth ürün davranışı).
-
-**Re-verified:** Part-A domain-enrichment canlı (intent-classifier keyword+path patterns) ✓ · Part-B `DOMAIN_MATCH_BONUS = 3` (routing-engine:97) + `routing-distribution.mjs` ✓ · Part-C loopback-auto-trust (auth.ts:23/28, prod-safe) ✓ — **canlı-kanıt 2026-06-11 UX-denetimi:** `deckent serve` token auto-mint + dashboard'a otomatik enjeksiyon bizzat gözlendi.
-
-**Gerçeklik-notu (ADR-041 Sprint-281 amendment'iyle aynı aile):** Part-A/B dengesizliği tek başına çözmedi — **Sprint 211'de nüks** (12/16 refactorer; memory `feedback_agent_routing_imbalance`). Çözüm katmanlı evrildi: **ADR-073** (routing live-validation + FIX-prompt enrichment) + **ADR-075** (skill→agent affinity) + **WM-7** `LANGUAGE_MISMATCH_PENALTY` (S254, polyglot-safe) + `routing-imbalance-guard` script. Bu ADR'nin +3-bonus'u zincirin ilk halkasıdır; dağılım-dengesi sürekli-izlenen hedef olarak kalır.
-
-**Part-C evrimi:** localhost-auto-trust, **ADR-076** (auth-precedence + serve token-inject) ile olgunlaştı — bugünkü canlı davranış 076'nın token-inject akışıdır; bu ADR'nin prod-safe-default ilkesi korunur. md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-073: Routing Live Validation + FIX Prompt Enrichment + Dashboard Control Plane
-
-**Status:** accepted
-
-# ADR-073: Routing Live Validation + FIX Prompt Enrichment + Dashboard Control Plane
-
-**Status:** accepted
-
-**Date:** 2026-05-31
-
-**Accepted:** Sprint 210
-
----
-
-## Context
-
-### Routing Live Validation Gap (Sprint 210 observation)
-
-Sprint 209 landed the multi-signal routing fix (ADR-072: domain enrichment + domain-match bonus +3). However, the plan for Sprint 209 itself was generated before the build+restart — so routing ran against the old code, and 13 of 15 tasks were again assigned to `refactorer`. The code was correct; the live verification was missing.
-
-Sprint 210 is the first sprint executed after `tsc` + MCP restart with the new routing code fully active. Two gaps remained:
-
-1. **No end-to-end routing diversity test** — there was no automated test asserting that `src/api/` tasks route to `api-builder`, `src/auth/` to `security-auditor`, `src/dashboard/` to `frontend-designer`, etc. The routing fix could silently regress.
-2. **No CI imbalance guard** — `routing-distribution.mjs` (Sprint 209-005) generates a report but does not gate CI on routing concentration. A single agent dominating >80% of tasks in a sprint should fail the build.
-
-### FIX Prompt Quality Gap (feedback_fix_prompt_quality)
-
-FIX tasks generated by `debt-manager.ts` had two systematic problems:
-
-1. **Empty task description** — the `=== Task ===` block in the FIX worker prompt was blank. The worker received no context about what the original task was trying to accomplish, what files to touch, or what the NO_GO failure was.
-2. **Wrong agent assignment** — FIX tasks were universally routed to `bug-fixer`. A test-isolation failure does not benefit from 5-Whys/bisect discipline; a documentation task has no business being fixed by a bug-fixer. The mismatch reduced FIX success rate.
-
-These two problems compounded: a worker with no description and the wrong specialization was unlikely to produce a correct fix.
-
-### Dashboard Control Plane Missing (project_dashboard_control_plane, F7-005/F7-008)
-
-The dashboard infrastructure (SSE, useApi, Layout, Sidebar, SprintPhaseTimeline, WorkerCard) was complete, but two high-priority user-facing surfaces were absent:
-
-- **Sprint control panel** — no UI to view real-time sprint phase, worker list, and progress from the browser. Operators had to use CLI exclusively.
-- **Agent/skill routing distribution** — no visual representation of which agents are being selected; the routing imbalance (ADR-072) that drove Sprint 209-210 was invisible to dashboard users.
-- **Onboarding** — first-time users encountered an empty dashboard with no guidance on how to initialize a project, write directives, or start a sprint.
-- **Routing API endpoint** — `RoutingDistribution` component had no backing API; `routing-distribution.mjs` logic existed only as a CLI script.
-
----
-
-## Decision
-
-### Part A — Routing Live Validation
-
-**End-to-end routing diversity test (`tests/core/routing-live-diversity.test.ts`):**
-
-Five canonical task DNA fixtures exercise the full routing pipeline against the live routing engine (post-ADR-072 build):
-
-| Task scope | Expected agent |
-|-----------|----------------|
-| `src/api/` | `api-builder` |
-| `src/auth/` / `src/security/` | `security-auditor` |
-| `src/dashboard/` / `.tsx` | `frontend-designer` |
-| `src/db/` / `src/models/` | `data-engineer` |
-| `src/core/` (generic) | `refactorer` or `architect` |
-
-Each assertion verifies that the selected agent is NOT uniformly `refactorer` — the regression signature of the pre-ADR-072 state.
-
-**CI imbalance guard (`scripts/routing-distribution.mjs --ci` mode):**
-
-A `--ci` flag is added to `routing-distribution.mjs`. In CI mode the script reads the most recent sprint's routing learnings, computes per-agent task share, and exits with code 1 if any single agent holds >80% of tasks. The 80% threshold is configurable via `--threshold <n>`. A companion test (`tests/scripts/routing-imbalance-guard.test.ts`) covers: balanced→exit 0, imbalanced→exit 1, configurable threshold, empty data.
-
-### Part B — FIX Prompt Enrichment
-
-**Original task description injection (`src/orchestra/debt-manager.ts`):**
-
-When `debt-manager.ts` creates a FIX task for a NO_GO result, it now injects the original task's full `description` field and the NO_GO `reason` into the FIX task's `description`. The structure is:
-
-```
-=== Original Task ===
-<originalTask.description>
-
-=== NO_GO Reason ===
-<noGoReason>
-
-=== Fix Instructions ===
-Correct the above failure. Stay within the original task scope.
-```
-
-This guarantees the FIX worker sees what the task was trying to do before it sees what went wrong.
-
-**Agent-type-aware FIX routing (`src/orchestra/debt-manager.ts`):**
-
-FIX task agent selection now mirrors the original task's agent rather than defaulting to `bug-fixer`:
-
-- Original agent was `doc-writer` → FIX agent = `doc-writer`
-- Original agent was a test-focused task → FIX agent = original agent (or `ci-guardian` if `ci-testing` skill was present)
-- Original task had no exit result (worker crash) → FIX agent = original agent re-run
-- `bug-fixer` is assigned only when the original task's description contains explicit bug/error/crash language and the original agent was a generic code agent
-
-This is implemented via `selectFixAgent(originalTask): string` — a pure function that inspects `originalTask.assignedAgent`, `originalTask.assignedSkills`, and `originalTask.description`.
-
-### Part C — Dashboard Control Plane
-
-**Sprint control panel (`src/dashboard/src/components/SprintControlPanel.tsx`):**
-
-A React component using `useSSE` and `useApi` hooks that displays:
-- Current sprint phase (PLAN/SPAWN/EXECUTE/EVALUATE/FIX/RETRO/CLEANUP) with phase timeline
-- Live worker list (status, task, heartbeat age)
-- Task completion progress bar
-- Status action buttons (status check, kill — with confirmation gate)
-
-Reuses existing `SprintPhaseTimeline` and `WorkerCard` components. Renders an empty-state prompt when no sprint is active.
-
-**Agent/skill routing distribution chart (`src/dashboard/src/components/RoutingDistribution.tsx`):**
-
-A bar chart component (following `SprintChart` visual pattern) showing per-agent task share for the most recent sprint. Highlights bars exceeding 80% in red (imbalance warning). Fetches data from `/api/routing/distribution`.
-
-**Routing distribution API endpoint (`src/api/server.ts`):**
-
-`GET /api/routing/distribution` — reads routing learnings, computes agent distribution, returns JSON with `{ agents: { [agentId]: { count, pct } }, imbalanced: boolean }`. Auth-aware (Sprint 209-006 localhost auto-inject applies).
-
-**Onboarding wizard (`src/dashboard/src/components/Onboarding.tsx`):**
-
-Three-step wizard shown to first-time users (no sprint history detected):
-1. **Init** — `deckent init` command with copy button
-2. **Directives** — link to DIRECTIVES.md editor or template
-3. **Start** — `deckent start` with sprint ID input
-
-Each step is independently completable; a "skip" button dismisses the wizard and stores the preference in localStorage.
-
----
-
-## Consequences
-
-**Positive:**
-- Routing diversity is now test-gated — a regression to single-agent domination will fail `vitest run` before it reaches a sprint.
-- FIX workers receive full context (original description + NO_GO reason) — the information gap that caused "worker exited without result" false-FIX cycles is closed.
-- Agent-aware FIX routing reduces the mismatch between task type and fixer specialization; test-isolation failures go back to the original agent or `ci-guardian`, not `bug-fixer`.
-- Dashboard users can observe sprint phase and worker status without leaving the browser.
-- Routing distribution is visible in the dashboard; the imbalance that motivated ADR-072/073 is now self-documenting in the UI.
-- Onboarding reduces the friction for first-time users (sade kişi yüzü).
-
-**Negative:**
-- The 80% CI imbalance threshold is a heuristic. Sprints with legitimately homogeneous tasks (e.g. 10 doc-update tasks) will fail the guard unless the threshold is raised. A `--skip-ci-guard` escape hatch is available for intentional single-agent sprints.
-- `selectFixAgent` introduces a new code path in `debt-manager.ts` that must be kept in sync with the agent pool. If a new agent is added without updating the fix-routing logic, FIX tasks may still default to `bug-fixer`.
-- Onboarding localStorage preference is client-side only — resetting the browser clears it, causing the wizard to reappear.
-
----
-
-## Alternatives Considered
-
-- **Snapshot-based routing test (not live engine):** Mock the routing engine and assert on mock output. Rejected — Sprint 208/209 proved that mocked tests passed while the live engine produced degenerate output. Live engine tests only.
-- **Universal FIX description injection (append to existing):** Append original description to any existing FIX task description. Rejected — structural injection (=== Original Task === block) is more reliable for workers parsing the prompt than freeform appending.
-- **Keep bug-fixer as FIX agent default:** Bug-fixer is a known-good generalist. Rejected — the specialization mismatch (doc task → bug-fixer) reduces FIX success rate and wastes the agent pool's domain expertise.
-- **Dashboard routing chart as full page:** Dedicate a route to routing analytics. Rejected — YAGNI; a component embeddable in the existing agent detail page or overview is sufficient for Sprint 210 scope.
-
----
-
-## References
-
-- Sprint 210 Task 4 — `tests/core/routing-live-diversity.test.ts` (routing live diversity test)
-- Sprint 210 Task 5 — `scripts/routing-distribution.mjs` (--ci mode imbalance guard)
-- Sprint 210 Task 6 — `src/orchestra/debt-manager.ts` (FIX description inject)
-- Sprint 210 Task 7 — `src/orchestra/debt-manager.ts` (FIX agent-type-aware selection)
-- Sprint 210 Task 8 — `src/orchestra/result-evaluator.ts` (NO_GO note accuracy)
-- Sprint 210 Task 9 — `src/dashboard/src/components/SprintControlPanel.tsx`
-- Sprint 210 Task 10 — `src/dashboard/src/components/RoutingDistribution.tsx`
-- Sprint 210 Task 11 — `src/api/server.ts` (routing distribution endpoint)
-- Sprint 210 Task 12 — `src/dashboard/src/components/Onboarding.tsx`
-- ADR-072: Agent Routing Balance (Multi-Signal Scoring) + Dashboard API Auth Hardening
-- ADR-041: Agent Taxonomy — Horizontal Skills vs Vertical Agents
-- ADR-070: Brain Evaluation Integrity — Zero-Hard-Code Principle
-- ROADMAP F7-005: Sprint control panel → Sprint 210-009 DONE
-- ROADMAP F7-008: Onboarding → Sprint 210-012 DONE
-- feedback_fix_prompt_quality: FIX prompt empty description + wrong agent
-- feedback_agent_routing_imbalance: routing diversity live validation
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (FIX-kalitesi + dashboard kontrol-paneli user-facing).
-
-**Re-verified (üç part da canlı):** Part-A live-diversity + imbalance-guard testleri + `--ci` modu (:89) ✓ · Part-B `selectFixAgent` (`debt-manager.ts:145`) + "## Original Task" inject (:328) ✓ · Part-C 3 dashboard bileşeni + `/api/routing/distribution` (`server.ts:544`) ✓.
-
-**Evrim notları:** (1) FIX-prompt formatı zenginleşti — ADR'nin `===`-blokları `##`-başlıklara + **Fix Guidance** bölümüne evrildi (Kanıt-komutlarını-koş, selfAssessment-şişirme-yasak, scope-kal; `debt-manager.ts:340`) — aynı niyet, daha güçlü sözleşme. (2) Part-B **S272 verify-and-complete enrichment** ile genişledi: exit-without-result+disk-kanıtlı FIX'ler "sıfırdan-yap" değil "audit-and-finish" reframe'iyle gider (`applyVerifyAndCompleteEnrichment`). (3) Nüks-bağlamı: fixture-testler geçerken canlı-dağılım S211'de yine skew'ladı — katmanlı mitigasyonlar ADR-072 Sprint-281 amendment'inde haritalı. md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-074: Native Chat Real Round-Trip + Enterprise RBAC/Audit/Rate + F5 Evolution Wire
-
-**Status:** accepted
-
-# ADR-074: Native Chat Real Round-Trip + Enterprise RBAC/Audit/Rate + F5 Evolution Wire
-
-**Status:** accepted
-
-**Date:** 2026-06-01
-
-**Accepted:** Sprint 211
-
----
-
-## Context
-
-### F2 — Native Chat Mock Round-Trip Gap
-
-Sprint 203-204 delivered `chat-native.ts` with tool-use loop, streaming, multi-turn, and resume capabilities. However, the provider call path remained partially mocked — the `ProviderAdapter` was not fully wired through the live registry, and MCP tool dispatch was stubbed. This meant:
-
-1. **No live adapter resolution** — `chat-native.ts` called a provider interface but did not resolve through `ProviderAdapter` + `ProviderRegistry` (subscription CLI spawn path). Real round-trip was missing.
-2. **No MCP tool dispatch** — tool-call responses were not routed to the deckent MCP tool registry (e.g. `deckent_status`, `deckent_memory_query`). Results never fed back into the loop.
-3. **Partial session persistence** — `appendChatTurn` existed but `--resume` did not load the last N turns from `memory.db` on startup.
-
-The chat path was architecturally sound but functionally incomplete for a real user session.
-
-### F4 — Enterprise RBAC/Audit/Rate Enforcement Gap
-
-Sprints 205-210 delivered the enterprise skeleton: `rbac.ts` (role hierarchy, `can()`, `PERMISSION_MATRIX`), `audit-writer.ts` (`writeAuditEvent`), `audit-query.ts` (`queryAudit`), `enterprise-config.ts` (`EnterpriseConfig`, `parseEnterprise`). Three gaps remained:
-
-1. **No runtime enforcement** — `rbac.ts` provided `can()` but no `enforceRbac()` wrapper that checked `config.rbac.enabled` and applied NO_OP when disabled. Sprint/flow entry points were unguarded.
-2. **No compliance export** — audit events were written and queryable, but no `exportAuditLog(format, filter)` function produced SOC2/GDPR-grade JSON or CSV reports with HMAC chain verification.
-3. **No rate/resource limits** — multi-tenant abuse protection (`rate-limiter.ts`, token-bucket or sliding-window per-tenant) was absent, leaving F4-003 unimplemented.
-
-### F5 — Evolution Wire Dormant
-
-Sprint 208 added `evolvePrompt` (rule-based outcome→prompt suggestion) and `adaptive-agent.ts` (adaptation skeleton). Both were 0-caller dormant as of Sprint 210:
-
-1. **`prompt-evolution.ts`** had `evolvePrompt` but no caller wire to `outcome-tracker`. Sprint outcome patterns were not feeding prompt improvement suggestions.
-2. **`adaptive-agent.ts`** adaptation was not confirmed wired to routing/outcome — caller evidence was partial.
-3. **No cross-sprint trend analysis** — no module read last N sprint outcomes and identified improving/degrading patterns (agent success trends, NO_GO patterns, skill effectiveness).
-
----
-
-## Decision
-
-### Part A — F2 Native Chat Real Round-Trip (Sprint 211 Tasks 1-4)
-
-**ProviderAdapter round-trip wire (`chat-native.ts`):**
-
-`chat-native.ts` loop now resolves the active provider through `ProviderRegistry` (subscription CLI spawn path, API mode still deferred per `[[project_api_mode_deferred_post_beta]]`). The mock adapter is replaced by a real `ProviderAdapter` call. Test coverage uses a mock adapter (not real spawn) to verify the round-trip contract.
-
-**MCP tool dispatch wire:**
-
-Tool-call responses from the LLM are dispatched to the deckent MCP tool registry. Read-only tools (`deckent_status`, `deckent_memory_query`) are called; results are injected back into the conversation loop as `tool_result` messages.
-
-**Session persist + resume:**
-
-Each turn is written to `memory.db` via `MemoryStore.appendChatTurn`. `--resume` loads the last session's turns (`getChatHistory`) on startup, restoring multi-turn context window. Truncation applies when history exceeds context limit.
-
-**End-to-end smoke verification:**
-
-`scripts/chat-native-smoke.mjs` simulates the full flow (mock provider + mock tool) end-to-end: user input → adapter → tool dispatch → response → persist → exit. No real subprocess spawn required.
-
-### Part B — F4 Enterprise RBAC/Audit/Rate (Sprint 211 Tasks 5-8)
-
-**RBAC runtime enforcement (`enforceRbac`):**
-
-`rbac.ts` exports `enforceRbac(role, action, tenantId?)` — when `config.rbac.enabled` is true, calls `can()` and throws on denial; when false, returns NO_OP (backwards-compatible). Sprint/flow entry points import this helper.
-
-**Audit compliance export (`audit-export.ts`):**
-
-`exportAuditLog(format: 'json' | 'csv', filter: AuditFilter)` produces a compliant audit report. JSON output is a structured array with HMAC chain verification. CSV output is RFC-4180 with header row. Filter supports tenant, action, and time-range fields. Reads via `audit-query.ts`.
-
-**Rate/resource limit guard (`rate-limiter.ts`):**
-
-Token-bucket sliding-window per-tenant rate limit. `checkLimit(tenantId, action)` returns `{ allowed: boolean, remaining: number, resetAt: number }`. Integrates with `enterprise-config.flow.maxConcurrent`. Enterprise-feature guard — NO_OP when enterprise config absent.
-
-**RBAC CLI grant/revoke (`rbac.ts` CLI):**
-
-`deckent rbac grant <user> <role>` and `revoke` commands complete the RBAC CLI surface (check/roles were Sprint 210-014). Role assignments persist to config/store.
-
-### Part C — F5 Evolution Wire (Sprint 211 Tasks 9-12)
-
-**prompt-evolution → outcome-tracker wire:**
-
-`prompt-evolution.ts` `evolvePrompt` is called from the sprint post-evaluation phase. It reads outcome patterns from `outcome-tracker` (success rate, NO_GO patterns per agent/task type) and generates rule-based prompt improvement suggestions (no LLM call). Suggestions are logged; not auto-applied.
-
-**adaptive-agent runtime wire:**
-
-`adaptive-agent.ts` adaptation is confirmed wired to routing/outcome. Agent success rate triggers skill addition/removal suggestions at sprint boundary. Wire verified with caller evidence.
-
-**Cross-sprint trend analyzer (`cross-sprint-analyzer.ts`):**
-
-Reads last N sprint outcome entries from `memory.db`. Computes per-agent success trends, skill effectiveness scores, and NO_GO pattern recurrence. Returns a structured trend report (improving / degrading / stable per dimension).
-
-**Evrim CLI (`deckent evolve report`):**
-
-`src/cli/commands/evolve.ts` — `deckent evolve report` displays cross-sprint trends and prompt-evolution suggestions. Registered in `src/cli/index.ts` via `registerEvolve` import+call (pattern from ADR-012).
-
----
-
-## Consequences
-
-**Positive:**
-- F2 native chat is functionally complete for real user sessions (provider round-trip + tool dispatch + session resume). Conversational maturity reaches ~80%.
-- F4 enterprise hardening is complete: RBAC enforcement, audit compliance export (SOC2/GDPR-grade), and rate limiting are all available behind the `enterprise-config.rbac.enabled` flag.
-- F5 evolution wire makes `prompt-evolution` and `adaptive-agent` live callers — sprint outcomes now feed improvement suggestions continuously.
-- Cross-sprint trend analysis enables data-driven routing and agent tuning decisions.
-
-**Negative:**
-- F2 round-trip is subscription-CLI only (API mode deferred post-beta per `[[project_api_mode_deferred_post_beta]]`). Streaming canlı (real SSE stream from provider) is a follow-up item.
-- `enforceRbac` is advisory when `config.rbac.enabled: false` — hard-block is opt-in. V2 post-GA will flip default.
-- `rate-limiter.ts` is a limit-check module (not a real throttle queue); actual request queuing is a follow-up.
-- Evolution suggestions are advisory (not auto-applied) — requires human review cycle before automation.
-
----
-
-## Alternatives Considered
-
-- **Fake DONE on F2 round-trip** — marking chat as live without wiring the real `ProviderAdapter` was the Sprint 210 state. Rejected: users would encounter mock responses in production.
-- **Hard-block RBAC always** — removing the NO_OP bypass. Rejected: backwards-incompatible for existing single-tenant deployments without `enterprise-config`.
-- **LLM-based prompt evolution** — using Claude to suggest prompt rewrites. Rejected: circular dependency (orchestrator calling AI to tune AI prompts adds latency and API cost); rule-based outcomes are sufficient for V1.
-- **Separate audit export CLI** — making compliance export a standalone `deckent audit export` command. Deferred: core export logic lands in `audit-export.ts`; CLI wrapper is a follow-up.
-
----
-
-## References
-
-- Sprint 211 — F2 native chat real round-trip + F4 enterprise RBAC/audit/rate + F5 evolution wire
-- ADR-062: Embedded Web Terminal (ws-gateway compatibility for chat round-trip)
-- ADR-069: Event-Driven Triggers + RBAC (F4 foundation)
-- ADR-071: F3 Autonomous Mode + F4 Enterprise RBAC/Tenant/Audit (F4 skeleton)
-- ADR-037: Brain-Auditor-Worker Authority Matrix RBAC V1.0
-- `src/cli/commands/chat-native.ts`, `src/core/rbac.ts`, `src/core/audit-export.ts`, `src/core/rate-limiter.ts`
-- `src/orchestra/prompt-evolution.ts`, `src/agents/adaptive-agent.ts`, `src/orchestra/cross-sprint-analyzer.ts`
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (chat + enterprise + evolution üçü de ürün yüzeyi).
-
-**Re-verified:** Part-B tam — `enforceRbac` (`rbac.ts:120`, disabled→NO_OP) + `exportAuditLog` (`audit-export.ts:40`) + `rate-limiter.ts` ✓ · Part-C tam — `cross-sprint-analyzer.ts` + `evolve.ts` + `prompt-evolution.ts` (runtime-wiring ADR-075/S212 teyitli) ✓.
-
-**Part-A evrim-zinciri:** chat-native'in gerçek-LLM round-trip'i sonraki ADR'lerle olgunlaştı — **ADR-081** (çıplak `deckent` = native agentic Ink-REPL) → **ADR-082** (Native-LLM-Wire canlı) → **ADR-083** (provider-parity) → Sprint 280 `/mcp` broker-wire (G1). CLI-native-chat bugün gerçek, agentic ve multi-provider'dır.
-
-**⚠️ Ayrım-notu (yüzey karışmasın):** 2026-06-11 UX-denetiminin **"dashboard Chat HOLLOW"** bulgusu (NL→"Anlamadım", `project_dashboard_chat_audit_20260611` #1) bu ADR'nin CLI-chat'i DEĞİLDİR — ayrı yüzey olan **dashboard ChatPage**, mevcut `/api/chat/stream` backend'ine NL yönlendirmiyor (S219 endpoint canlı, sayfa command-router'da takılı). Fix Chat/Dashboard product-sprint'inde. md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-075: F5 Evolution Runtime Wiring + Routing Skill→Agent Affinity + Managed-Docs Code-Derived Counts
-
-**Status:** accepted
-
-# ADR-075: F5 Evolution Runtime Wiring + Routing Skill→Agent Affinity + Managed-Docs Code-Derived Counts
-
-**Status:** accepted
-
-**Date:** 2026-06-01
-
-**Accepted:** Sprint 212
-
----
-
-## Context
-
-### Problem A — F5 Evolutionary Modules Had 0 External Callers (Wire-Gap)
-
-Sprint 211 (ADR-074 Part C) wired `prompt-evolution.ts` and `adaptive-agent.ts` with entry-point scaffolding, but a post-sprint disk-verify revealed the wire-gap:
-
-1. **`prompt-evolution.ts` `wirePromptEvolutionFromOutcomes`** — implemented and tested but had 0 external callers outside the def-file and test context. Sprint outcome patterns were not feeding prompt improvement suggestions at runtime.
-2. **`adaptive-agent.ts` `adaptAgentRuntime`** — similarly 0 external callers; agent success rate changes never triggered skill add/remove suggestions at sprint boundary.
-3. **Four dormant evolution modules** — `prompt-rollback.ts`, `agent-genealogy.ts`, `agent-retirement.ts`, `specialization-drift.ts` — all implement+tested but with 0 external callers. Feature-complete in `src/agents/` / `src/orchestra/` but never invoked at runtime.
-
-Root cause: per-task scope splits placed module definition and the intended caller in separate tasks, and kanıt (proof) greps counted the def-file as evidence of wiring. This was the `[[feedback_directive_kanit_letter_vs_goal]]` class of error.
-
-**Effect:** The evolutionary architecture — the core moat and differentiator — was dead code. The self-improvement loop was not running.
-
-### Problem B — Agent Routing Skew (Skill→Agent Signal Missing)
-
-Sprint 210–211 routing analysis revealed persistent skew: despite diverse skill routing (frontend-design, security-specialist, api-builder assigned correctly), agent selection collapsed to 12/16 `refactorer`. The activation engine scored domain match and keyword signals but had no skill→agent affinity signal — skills selected for a task did not influence the agent pool scores.
-
-### Problem C — Managed-Docs Generator Used Hardcoded Module Counts
-
-`content-generators.ts` architecture section generators emitted hardcoded counts: "core 90 modules, orchestra 76." Sprint 211 audit revealed the real numbers: `src/core/` = 111 `.ts` files, `src/orchestra/` = 88. The generator was producing stale documentation on every sprint finalization.
-
----
-
-## Decision
-
-### Part A — F5 Evolutionary Modules: Real Runtime Callers (Sprint 212 Tasks 1–6)
-
-Six external callers were added across the sprint lifecycle — each caller is in a module distinct from the definition file:
-
-1. **`sprint-reporter.ts` → `wirePromptEvolutionFromOutcomes`** (Task 212-001): RETRO/learnings phase calls `collectPromptEvolutionSuggestion()`, writes prompt improvement proposal under `## Prompt Evolution Suggestion` heading in retro output and memory.
-
-2. **`outcome-tracker.ts` → `adaptAgentRuntime`** (Task 212-002): Sprint outcome recording calls `adaptAgentRuntime`; agent success rate triggers skill add/remove suggestions written to outcome metadata.
-
-3. **`promotion-pipeline.ts` → agent-genealogy `recordLineage`** (Task 212-003): temp→permanent agent promotion writes lineage record (parent agent, mutation, sprint) to genealogy store.
-
-4. **`promotion-pipeline.ts` → agent-retirement `retireAgent`** (Task 212-004): demotion/LRU-evict path calls `retireAgent` — low-success temp agents are formally retired with reason; high-success agents are preserved.
-
-5. **`sprint-reporter.ts` → specialization-drift `detectDrift`** (Task 212-005): retro/performance section calls `detectDrift` — agent scope-creep (tasks assigned outside specialization) is detected and reported.
-
-6. **`prompt-evolution.ts` → prompt-rollback `revertPrompt`** (Task 212-006): when an evolved prompt has lower performance than its predecessor, `revertPrompt` is called to recommend rollback to the prior version.
-
-**Proof pattern (verified):** For each caller: `grep -rl "<function>" src/ | grep -v test | grep -v "<def-file>.ts"` returns ≥1 external file.
-
-### Part B — Routing Skill→Agent Affinity Signal (Sprint 212 Task 8)
-
-`activation-engine.ts` adds:
-
-- `SKILL_AGENT_AFFINITY_BONUS = 3` (mirrors `DOMAIN_MATCH_BONUS` in `routing-engine.ts`)
-- `SKILL_AGENT_MAP`: 15 skill→agent pairings covering frontend/security/api/doc/devops/data/perf/arch clusters (e.g. `frontend-design` / `react-specialist` → `frontend-designer`; `security-specialist` → `security-auditor`; `api-builder` skill → `api-builder` agent; `documentation-writer` → `doc-writer`)
-- `getSkillAgentAffinityBonus(agentId, assignedSkills)`: pure function returns cumulative bonus for all matching skills
-
-`refactorer` remains a valid candidate for all task types; the affinity signal prevents it from winning by default in specialized domains. A routing diversity guard test (`tests/core/routing-diversity-guard.test.ts`) asserts single-agent share ≤60% and ≥4 distinct agents across a representative 16-task mixed DNA set (Task 212-009).
-
-### Part C — Managed-Docs Code-Derived Module Counts (Sprint 212 Task 10)
-
-`content-generators.ts` adds:
-
-- `countModules(dir: string): number` — uses `readdirSync` (Node.js built-in `node:fs`, no new runtime dep per ADR-010) to count `.ts` files in a directory at runtime
-- `architecture-map` generator with TR/EN/DE/ES `patternsByLang` entries (ADR-032) — produces per-directory module count table from live disk state
-
-The hardcoded counts are removed. Every sprint finalization regenerates the architecture section from the actual file tree. CLAUDE.md/DECKENT.md module counts are now always accurate after a managed-doc regen cycle.
-
----
-
-## Consequences
-
-**Positive:**
-- F5 evolutionary architecture is now **live** — 6 previously dormant modules are called at runtime during the sprint lifecycle. The self-improvement loop (prompt evolution, adaptive agent tuning, agent genealogy, retirement, drift detection, rollback) runs on every sprint.
-- Routing diversity is structurally protected — skill assignments feed agent scores, preventing specialization collapse to a single agent.
-- Documentation module counts are self-correcting — no manual sync required when new modules are added.
-- Sprint retro now contains a visible "Next Sprint Behavior Changes" section (Task 212-007 via `sprint-retro-writer.ts`) — users see concrete evidence of learning between sprints.
-
-**Negative:**
-- Six additional function calls in sprint-critical paths (reporter, outcome-tracker, promotion-pipeline) add latency on each sprint boundary. Expected impact: <10ms per call (all synchronous, no I/O); acceptable for sprint-boundary (not hot-path) operations.
-- Evolution suggestions remain advisory (not auto-applied). Automation requires a human-review cycle before full autonomy.
-- `countModules` adds one `readdirSync` per directory per sprint finalization — negligible for <200 modules but worth noting for very large monorepos.
-- `SKILL_AGENT_MAP` is a static mapping. New custom agents/skills added by users are not automatically included; users must contribute entries or use the custom generator path (ADR-030).
-
----
-
-## Alternatives Considered
-
-- **Keep entry-point scaffolding, ship "wired" in next milestone** — the Sprint 211 state. Rejected: evolutionary architecture is the core differentiator; shipping it as dead code contradicts ADR-033 Product-Not-Service and the MASTER-PLAN §12 top risk.
-- **Auto-apply evolution suggestions (no advisory phase)** — having `adaptAgentRuntime` directly mutate agent configs instead of suggesting. Rejected: unpredictable behavior in production without human validation cycle; V2 automation after V1 advisory proves signal quality.
-- **Dynamic SKILL_AGENT_MAP from agent manifests** — loading affinity from `.deckent/agents/*/agent.json`. Rejected: adds I/O on every routing call; static map is sufficient for built-in agents; custom affinity is a post-V1 extension point.
-- **LLM-based module count discovery** — using an AI call to derive counts. Rejected: circular dependency and unnecessary; `readdirSync` is accurate and zero-latency.
-
----
-
-## References
-
-- Sprint 212 — F5 evolution crowning + routing skew fix + doc-reality sync
-- ADR-074: Native Chat Real Round-Trip + Enterprise RBAC/Audit/Rate + F5 Evolution Wire (Sprint 211 wire-gap diagnosis)
-- ADR-041: Agent Taxonomy — Horizontal Skills vs Vertical Agents (skill/agent separation)
-- ADR-029: Managed-Docs Universalization (content-generators.ts architecture)
-- ADR-032: i18n Pattern System (patternsByLang for new architecture-map generator)
-- ADR-010: Tek Runtime Dependency (justification for using node:fs built-in only)
-- `[[feedback_directive_kanit_letter_vs_goal]]` — wire-gap lesson: scope must include caller module; proof must exclude def-file
-- `src/orchestra/sprint-reporter.ts`, `src/orchestra/outcome-tracker.ts`, `src/orchestra/promotion-pipeline.ts`
-- `src/orchestra/prompt-evolution.ts`, `src/agents/adaptive-agent.ts`
-- `src/core/activation-engine.ts` (SKILL_AGENT_MAP, getSkillAgentAffinityBonus)
-- `src/orchestra/managed-docs/content-generators.ts` (countModules, architecture-map generator)
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (evolution = çekirdek farklılaştırıcı/moat — ürün hikâyesinin kendisi).
-
-**Re-verified — 6 wire da CANLI, ancak API-nüansı kayda geçer (gelecek denetimler yanılmasın):** Part-A'daki fonksiyon-isimleri (`recordLineage`/`retireAgent`/`detectDrift`/`revertPrompt`) **kavramsaldır** — canlı API **sınıf-temellidir** ve modüller **`src/agents/`**'tadır: `promotion-pipeline.ts:12-13` `AgentGenealogy` + `AgentRetirement` import edip instance-alan olarak tutar (:73-74); `sprint-reporter.ts:377-382` `SpecializationDriftDetector`'ı wire eder (Task 212-005 kod-içi belgeli); `prompt-evolution.ts:10` `PromptRollback`'a delege eder (:164). Yüzeysel fonksiyon-adı-grep'i 0-caller gösterir — **doğru proof-pattern sınıf-adı seviyesindedir** (`grep -rl "AgentGenealogy" src/ | grep -v test | grep -v def-file` ≥1). `wirePromptEvolutionFromOutcomes` (1 dış-caller) + `adaptAgentRuntime` (3) fonksiyon-seviyesinde de doğrulanır.
-
-**Part-B/C re-verified:** `SKILL_AGENT_MAP` + `SKILL_AGENT_AFFINITY_BONUS` (`activation-engine.ts:328-330`) + `routing-diversity-guard.test.ts` ✓ · `countModules` (`content-generators.ts:112`) ✓.
-
-**Evrim:** F5 zinciri sonradan **ADR-078** "Active Identity-Mutation Loop" ile genişledi; ölçek-validasyonu (F5-008r, 1000+-variant) MASTER-PLAN §K'da açık iş. md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-076: Auth-Precedence Fix + User-Facing Surfaces (serve token-inject, Path A chat, IDE extension)
-
-**Status:** accepted
-
-# ADR-076: Auth-Precedence Fix + User-Facing Surfaces (serve token-inject, Path A chat, IDE extension)
-
-**Status:** accepted
-
-**Date:** 2026-06-01
-
-**Accepted:** Sprint 214
-
----
-
-## Context
-
-Sprint 213 was killed (PID-confirmed) because all workers exited with exit-0 and no `.result` files — a mass synthetic NO_GO. Root cause analysis identified three distinct problems that blocked the user-facing surfaces from working end-to-end:
-
-### Problem A — Auth-Precedence Bug (P0, `spawn-backend-docker.ts`)
-
-`spawn-backend-docker.ts` env-forwarding loop (lines 547–553) passed `ANTHROPIC_API_KEY` from the host environment into every Docker container unconditionally, regardless of `auth_mode` or `useApiOnly` state. When the host had `ANTHROPIC_API_KEY` set (common for developers), the container's `claude` CLI detected the key and switched to **API mode** — ignoring `~/.claude` session credentials. With a Tier-1-capped key (30K tokens/min), each worker hit rate limits and timed out → exit-0 → no `.result` → mass synthetic NO_GO.
-
-Users were forced to run `env -u ANTHROPIC_API_KEY npx deckent start` as a workaround, defeating the purpose of `auth_mode: subscription`.
-
-### Problem B — Dashboard `serve` Returns 401 on POST
-
-`npx deckent serve` serves the React dashboard correctly on GET, but every POST action (start sprint, kill, etc.) returned 401. The auto-generated API token (`server.ts` finalToken) was printed to the terminal only — it was never injected into the served `index.html`. The browser had no way to obtain the token for Authorization headers. Workaround: `DECKENT_API_AUTH_DISABLED=1`, which removes all auth.
-
-### Problem C — `deckent chat` Requires Host CLI
-
-`deckent chat` (Path B) works by spawning the user's installed `claude`/`codex`/`gemini` CLI. When no CLI is in PATH, it errors "No AI CLI found" with no guidance. Users with subscription credentials but no standalone CLI are locked out. A Path A embedded chat (server-side ProviderAdapter, no host CLI required) was needed.
-
-### Problem D — IDE Extension Was Scaffold-Only
-
-`extensions/vscode/` was created as an empty scaffold (Sprint 212) with no real activation, commands, sidebar, statusbar, or settings bridge.
-
----
-
-## Decision
-
-### Part A — Provider+Auth-Aware Env-Forwarding
-
-`spawn-backend-docker.ts` env-forwarding updated to be auth-mode-aware:
-
-- **Claude + subscription mode** (`!useApiOnly`, `authMode !== 'api'`): `ANTHROPIC_API_KEY` is **not forwarded** to the container. The `~/.claude` session mount provides credentials instead.
-- **Claude + API mode** (`useApiOnly || authMode === 'api'`): `ANTHROPIC_API_KEY` is forwarded as before.
-- **Codex workers**: `OPENAI_API_KEY` forwarded (provider-specific).
-- **Gemini workers**: `GOOGLE_API_KEY` forwarded (provider-specific).
-
-This is a surgical change: the existing `-e KEY=value` Docker arg generation is guarded by an `if (!isSubscriptionMode || provider !== 'claude')` condition. API-mode behavior is fully preserved.
-
-### Part B — Localhost Token Injection into Served Dashboard
-
-`server.ts` injects `window.__DECKENT_API_TOKEN__` into the served `index.html` **only when binding to localhost** (127.0.0.1 / ::1). Non-localhost binds (production, remote) do not inject the token — security boundary preserved.
-
-The dashboard's `useApi.ts` hook reads `window.__DECKENT_API_TOKEN__` and adds `Authorization: Bearer <token>` to all fetch requests (GET + POST) when the value is present. When absent (remote bind, or auth disabled), requests are made without the header (backward-compatible).
-
-### Part C — Path A Embedded Chat Backend
-
-`src/api/chat-backend.ts` exposes an API/SSE endpoint that bridges browser chat messages to the server-side `runChatNativeLoop` (ProviderAdapter + MCP dispatch). Users can chat without any host CLI installed. The endpoint uses the existing session/auth middleware and supports multi-turn with mock-adapter for tests.
-
-### Part D — VS Code Extension Real Implementation
-
-`extensions/vscode/src/extension.ts` implements `activate(context)` — registers commands, sidebar TreeDataProvider, statusbar item, and settings bridge. Key files:
-- `commands.ts`: `deckent.startSprint` (integrated terminal), `deckent.showDashboard` (openExternal), `deckent.status` (output channel)
-- `sidebar.ts`: TreeDataProvider showing active sprint, workers, task statuses
-- `statusbar.ts`: StatusBarItem with sprint progress (X/Y) + click→dashboard
-- `settings.ts`: bridges `deckent.*` VSCode settings ↔ `.deckent/config.json`
-
-All extension tests mock the `vscode` module — no `vscode` runtime dependency in tests.
-
----
-
-## Consequences
-
-**Positive:**
-- `npx deckent start` with `auth_mode: subscription` now works without `env -u ANTHROPIC_API_KEY`. Sprint 215+ does not require the manual workaround.
-- `npx deckent serve` on localhost is fully functional out-of-the-box — POST actions (start/kill/review) work without any environment variable overrides.
-- Users with subscription credentials but no host CLI can chat via the dashboard.
-- VS Code users get native IDE integration — sidebar, command palette, status bar — without leaving their editor.
-
-**Negative:**
-- The auth-aware forwarding only covers Docker backend. tmux/subprocess backends do not have the same isolation concern (they inherit host env directly without `-e` injection). This asymmetry is acceptable for V1: Docker is the primary backend for subscription mode.
-- Token injection is localhost-only. Remote dashboard deployments still require manual `DECKENT_API_AUTH_DISABLED=1` or a reverse-proxy that handles auth. This is the correct security default.
-- Path A chat backend shares the API server process. High-load chat sessions could affect sprint API responsiveness; process isolation is a post-beta concern (sub-#3).
-
----
-
-## Alternatives Considered
-
-- **Global auth disable as default** — remove the 401 entirely by default. Rejected: eliminates auth protection for any user who runs `deckent serve` on a shared network. Localhost-only token injection is a minimal-risk subset.
-- **Separate chat server process** — run `chat-backend` as a standalone daemon. Rejected: deployment complexity; the existing API server already has the session middleware and MCP integration.
-- **Auth-forwarding opt-in flag in task JSON** — let workers declare `"forwardApiKey": true`. Rejected: unnecessary complexity; the subscription vs API mode is already captured by `authMode` (api-surface.md contract).
-- **VSCode extension as separate npm package** — decouple the extension from the main repo. Rejected: premature split; ADR-065 two-repo strategy is for the develop/product binary split, not IDE extensions. Extensions/vscode stays in the monorepo for the beta phase.
-
----
-
-## References
-
-- Sprint 213 kill incident: mass synthetic NO_GO root cause analysis — `[[feedback_container_auth_precedence]]`
-- Sprint 214 — P0 auth-precedence fix (214-001) + serve token-inject (214-003, 214-004) + Path A chat (214-006, 214-007) + IDE extension (214-009 through 214-013)
-- `src/orchestra/spawn-backend-docker.ts` — env-forwarding auth-aware (Part A)
-- `src/api/server.ts` — localhost token injection (Part B)
-- `src/api/chat-backend.ts` — embedded chat endpoint (Part C)
-- `extensions/vscode/src/extension.ts`, `commands.ts`, `sidebar.ts`, `statusbar.ts`, `settings.ts` — IDE extension (Part D)
-- ADR-027: Hybrid Spawn Backend (Docker auth model)
-- ADR-034: Multi-Project Isolation (per-project security boundaries)
-- ADR-074: Native Chat Real Round-Trip (Path B baseline; this ADR adds Path A)
-- `[[feedback_wiring_pct_vs_user_working]]` — user-working proof requirement
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (auth-akışı + serve/chat/IDE tamamen user-facing).
-
-**Re-verified (dört part da):** Part-A auth-aware forwarding (`spawn-backend-docker.ts:667/677/747` — subscription'da key container'a sızmaz; per-task `Auth:` override zinciri `task-router.ts:51`) ✓ · Part-B `__DECKENT_API_TOKEN__` inject (`server.ts:693/1111/1317`) — **2026-06-11 UX-denetiminde CANLI gözlendi** (serve auto-mint + dashboard 200'leri) ✓ · Part-C `chat-backend.ts` (Path-A, `runChatNativeLoop` köprüsü) mevcut ✓ · Part-D vscode extension gerçek dosyaları ✓.
-
-**🟢 Product-sprint için kritik tespit:** Dashboard-Chat-HOLLOW bulgusunun (UX-denetim #1, `project_dashboard_chat_audit_20260611`) eksiği **yalnız frontend-wiring'dir** — Path-A backend (`chat-backend.ts` + `/api/chat/stream`) bu ADR'yle hazır; `ChatPage.tsx` NL-girdisini ona yönlendirmiyor (command-router'da takılı). Fix-kapsamı = ChatPage→Path-A frontend-wire.
-
-**Uzantı:** Part-A'nın auth-mode temeli üzerine **F1-CB billing-follows-auth** (S254) maliyet-doğruluğunu ekledi (subscription/local=$0). md+db senkron (Alperen ADR-review).
-
----
-
-## Amendment — Sprint 282 (2026-06-11, Part C supersession)
-
-**Part C — `chat-backend.ts` Superseded & Deleted**
-
-The standalone `src/api/chat-backend.ts` module (171 LoC, Sprint 214 T-214-007) was superseded by the integrated chat-handler + chat-stream + resolveChatAdapter family. Sprint 282 T-011 deleted the file and updated Part C references in the ADR. The embedded Path A chat contract (browser message → server-side loop → reply) is now owned by the server.ts HTTP endpoint wiring and the adapter resolution logic, with no separate backend module required.
-
-
----
-
-## adr-077: Multi-Provider 8-Fleet + OpenAI-Compatible HTTP Adapter
-
-**Status:** accepted
-
-# ADR-077: Multi-Provider 8-Fleet + OpenAI-Compatible HTTP Adapter
-
-**Status:** accepted
-
-**Date:** 2026-06-01
-
-**Accepted:** Sprint 214
-
----
-
-## Context
-
-### Provider Architecture Pre-Sprint-214
-
-Deckent's three existing cloud provider adapters (`claude/codex/gemini`) are all **CLI-spawn** adapters: they run the vendor's CLI binary (`claude`, `codex`, `gemini`) as a subprocess and parse stdout. This model works for subscriptions where the CLI handles auth, but it has a hard constraint: **providers without a CLI cannot be added**.
-
-A Sprint 213 provider audit confirmed the architectural fact:
-
-| Provider | CLI available? | API shape |
-|----------|---------------|-----------|
-| Anthropic (Claude) | ✅ `claude` CLI | custom |
-| OpenAI (Codex) | ✅ `codex` CLI | custom |
-| Google (Gemini) | ✅ `gemini` CLI | custom |
-| DeepSeek | ❌ no CLI | OpenAI-compatible |
-| Qwen (Alibaba DashScope) | ❌ no CLI | OpenAI-compatible |
-| GLM / Zhipu AI | ❌ no CLI | OpenAI-compatible |
-| Mistral | ❌ no CLI | OpenAI-compatible |
-| Groq | ❌ no CLI | OpenAI-compatible |
-
-DeepSeek, Qwen, GLM, Mistral, Groq, and every other third-party API provider expose the same REST interface: `POST /chat/completions` with OpenAI-shaped request/response bodies. One HTTP adapter handles all of them.
-
-### Additional Gaps Confirmed by the Audit
-
-1. **`model-catalog.ts` `PROVIDER_MAP`** only maps `anthropic`, `openai`, `google`. New provider names are unmapped → routing fallback to default.
-2. **`ProviderName` type** is hardcoded `'claude' | 'codex' | 'gemini'`. A third-party provider registered in the registry has no type coverage.
-3. **Per-provider API keys** are not stored in `.deck` (ADR-014 secret system). Bootstrap auto-registration does not run when keys are present.
-4. **Simultaneous mix** (3 CLI-subscription + N HTTP-API + local Ollama) was never validated as coexisting in the same registry.
-
-### Business Motivation
-
-F1-009 (8-provider fleet) is a core differentiator: the "provider-free" pillar means users can mix and match any combination of subscription + API + local providers. DeepSeek's cost advantage (~1/30th of Claude Opus), Qwen's multilingual strength, and GLM's China-region availability are concrete user needs. The same sprint workflow that runs on Claude must run seamlessly on DeepSeek.
-
-**Note:** "API mode forbidden during beta" (ADR-074, `[[project_api_mode_deferred_post_beta]]`) applies to **Anthropic Tier-1 API** only. Third-party API providers (DeepSeek, Qwen, GLM) do **not** violate this constraint — they are separate accounts with separate keys and no subscription/API conflict.
-
----
-
-## Decision
-
-### Part A — `OpenAICompatibleAdapter` (HTTP fetch, single adapter for N providers)
-
-`src/providers/openai-compatible.ts` implements the `ProviderAdapter` interface:
-
-- **Config shape:** `{ baseURL: string, apiKeyEnv: string, models: string[], name: string }`
-- **`send(prompt, options)`:** `fetch(baseURL + '/chat/completions', { method: 'POST', headers: { Authorization: 'Bearer <key>', 'Content-Type': 'application/json' }, body: JSON.stringify({ model, messages, ... }) })` — parses `choices[0].message.content` from the JSON response.
-- **`isAvailable()`:** returns `!!process.env[apiKeyEnv]` (or `.deck` secret value if present).
-- **`stream()`:** stub returning async iterator over single message (streaming V2, post-beta, ADR-074 §F2-007).
-- **Built-in presets:**
-  - `DeepSeek`: `baseURL: 'https://api.deepseek.com/v1'`, `apiKeyEnv: 'DEEPSEEK_API_KEY'`
-  - `Qwen/DashScope`: `baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1'`, `apiKeyEnv: 'DASHSCOPE_API_KEY'`
-  - `GLM/Zhipu`: `baseURL: 'https://open.bigmodel.cn/api/paas/v4'`, `apiKeyEnv: 'ZHIPU_API_KEY'`
-
-No new runtime dependencies — Node.js built-in `fetch` (available Node.js ≥18, required ≥24 per ADR-001). ADR-010 (Tek Runtime Dependency) preserved.
-
-### Part B — `PROVIDER_MAP` Extension + Dynamic `ProviderName`
-
-`src/core/model-catalog.ts` extended:
-
-- `PROVIDER_MAP` adds entries for `deepseek`, `qwen`, `zhipu`, and a generic `openai-compat` passthrough key.
-- `ProviderName` type is widened: instead of a closed union, the type becomes `'claude' | 'codex' | 'gemini' | string` (open string for registered provider names). This preserves compile-time checking for the three built-ins while accepting any registered provider at runtime without a type error.
-- `getProviderTier(providerName)` falls back to `'standard'` for unknown providers (safe default).
-
-### Part C — Per-Provider Key Bootstrap + Auto-Register
-
-`src/core/provider.ts` bootstrap phase:
-
-1. Checks for `DEEPSEEK_API_KEY`, `DASHSCOPE_API_KEY`, `ZHIPU_API_KEY` in environment and `.deck` secrets (ADR-014 `readDeckSecret`).
-2. For each present key: instantiates the corresponding `OpenAICompatibleAdapter` preset and calls `registerProvider(name, adapter)`.
-3. Missing key → silent skip (no error, no warning spam). Graceful degradation: users without DeepSeek keys are not affected.
-4. Bootstrap runs once at process start (same lifecycle as Claude/Codex/Gemini registration).
-
-### Part D — Simultaneous Multi-Provider Coexistence Smoke
-
-`scripts/multi-provider-smoke.mjs` validates that 3+ providers (mock claude + mock ollama + real OpenAICompatibleAdapter in test mode) can coexist in the registry and that per-task provider routing selects the correct adapter (not always the first registered). This is a **registry coexistence test**, not a live API call.
-
----
-
-## Consequences
-
-**Positive:**
-- Any OpenAI-API-compatible provider can be added with a 3-line config object — no new adapter file needed.
-- DeepSeek/Qwen/GLM users can run Deckent sprints at dramatically lower cost (DeepSeek-V3 ~$0.27/M tokens vs Claude Sonnet ~$3/M).
-- `ProviderName` widening preserves backward compatibility: existing code that checks `provider === 'claude'` continues to work; new code can pass any registered name.
-- Simultaneous fleet (CLI-subs + HTTP-API + local Ollama) is validated as coexisting.
-
-**Negative:**
-- HTTP adapter latency model differs from CLI-spawn: no local process startup overhead, but every call is a network round-trip. Timeout defaults (currently CLI-spawn tuned) may need adjustment for HTTP providers (lower per-call latency but higher variance).
-- `fetch` error handling is surface-level in V1 (non-200 → throw, no retry). Retry/backoff is a post-beta concern (F1-010 load-balancing).
-- `ProviderName` open-string widening loses exhaustiveness checking. A future dedicated `ProviderRegistry.listRegistered()` return type can restore type safety without closing the union.
-- Bootstrap auto-register reads env at startup only. Hot-add (adding a key at runtime) requires process restart.
-
----
-
-## Alternatives Considered
-
-- **Separate adapter file per provider** (`deepseek-adapter.ts`, `qwen-adapter.ts`, etc.) — rejected: pure duplication; all share the identical `/chat/completions` interface. ADR-010 simplicity principle applies.
-- **`litellm` or `openai` npm package as dependency** — rejected: ADR-010 (Tek Runtime Dependency = commander.js only). Built-in `fetch` is sufficient for `POST /chat/completions`.
-- **Hard-close `ProviderName` union (add `| 'deepseek' | 'qwen' | 'zhipu'`)** — rejected: creates maintenance burden for every future provider. Open string is the correct extensibility point; built-in providers are the exhaustive-check boundary.
-- **User-managed YAML/JSON provider registry** — rejected: over-engineering for V1. Auto-register from env keys is the minimal, correct bootstrap. Custom registry is a post-beta extension point.
-- **Streaming-first adapter** — rejected: streaming is F2-007 (post-beta). Non-streaming works for all sprint task types (code gen, review, docs). Single-turn request/response matches the existing CLI-spawn model.
-
----
-
-## References
-
-- Sprint 214 — F1-009 8-provider (214-014 OpenAICompatibleAdapter, 214-015 PROVIDER_MAP, 214-016 bootstrap, 214-017 smoke)
-- Sprint 213 provider audit — confirmed CLI-spawn vs HTTP-API architectural split
-- `src/providers/openai-compatible.ts` — HTTP adapter implementation (Part A)
-- `src/core/model-catalog.ts` — PROVIDER_MAP + ProviderName dynamic (Part B)
-- `src/core/provider.ts` — bootstrap auto-register (Part C)
-- `scripts/multi-provider-smoke.mjs` — coexistence validation (Part D)
-- ADR-023: Plan Tier Generalizasyonu — provider-agnostic tier names (tier mapping preserved)
-- ADR-066: Provider Independence — Multi-Provider Backend Parity (this ADR extends the fleet)
-- ADR-010: Tek Runtime Dependency (Node built-in fetch, no new npm deps)
-- ADR-014: .deck Secret File System (per-provider key storage)
-- `[[project_deckent_runtime_ecosystem]]` — 8-provider + runtime ecosystem direction
-- `[[project_api_mode_deferred_post_beta]]` — Anthropic Tier-1 API deferred; 3rd-party unaffected
-- DeepSeek API: https://api.deepseek.com/v1 (OpenAI-compatible)
-- Qwen DashScope: https://dashscope.aliyuncs.com/compatible-mode/v1 (OpenAI-compatible)
-- GLM/Zhipu: https://open.bigmodel.cn/api/paas/v4 (OpenAI-compatible)
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (provider-free çekirdek ürün vaadi; 3rd-party maliyet-avantajı doğrudan user-değeri).
-
-**Re-verified (dört part da canlı):** Part-A adapter + 3 preset (`openai-compatible.ts:52/228`) ✓ · Part-B `PROVIDER_MAP` deepseek/qwen/zhipu (`model-catalog.ts:122-124`) ✓ · Part-C bootstrap auto-register + `.deck`-köprüsü (`provider.ts:718-721`, `DECKENT_DEEPSEEK_API_KEY` → env) ✓ · Part-D `multi-provider-smoke.mjs` ✓.
-
-**Canlı evrim:** Sprint 248-254 bu temeli **gerçek mixed-fleet dogfood'una** taşıdı — Sprint 249'da 15 task / 4 gerçek provider eşzamanlı koştu (forensics: `docs/alperen-analysis/2026-06-09-mixed-fleet-sprint249-forensics.md`); **ADR-078** "8-Provider Runtime" bunu runtime'da resmîleştirdi; **F1-CB billing-follows-auth** (S254) 3rd-party maliyet-etiketlerini de doğru-temelledi; ollama/deepseek/qwen/glm kullanıcı-dokümanları S244'te eklendi. md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-078: CI-Hermeticity Standard + 8-Provider Runtime + Active Identity-Mutation Loop + Dashboard God-Level
-
-**Status:** accepted
-
-# ADR-078: CI-Hermeticity Standard + 8-Provider Runtime + Active Identity-Mutation Loop + Dashboard God-Level
-
-**Status:** accepted
-
-**Date:** 2026-06-01
-
-**Accepted:** Sprint 215
-
----
-
-## Context
-
-### CI-Hermeticity Gap
-
-Sprint 214 fixed the immediate CI failures (commit `b67c000`), but the root-cause pattern — tests reading gitignored local state (`.deckent/config.json`, `.brain/memory.db`, `~/.deckent`) — was not structurally prevented. A new test written without awareness of the rule would silently re-couple to local state and break CI on the next push.
-
-Three specific gaps remained:
-
-1. **No local CI reproducer** — no `npm run test:ci-sim` command to hide gitignored files and run the full suite locally before pushing. Developers could not reproduce CI failures on their own machine.
-2. **No lint guard** — no automated check to detect `readFileSync('.deckent/config.json')` without a skip-if-absent guard in test files. A new hermetic violation would only surface in CI (minutes of feedback loop, not seconds).
-3. **No HOME isolation helper** — some tests leaked credential/config dotfiles to the project root by running with the real HOME. No `withSandboxHome()` utility existed to redirect HOME to a tmpdir per-test.
-
-### 8-Provider Fleet Wire-Gap (F1-009)
-
-Sprint 214 built `OpenAICompatibleAdapter` (`src/providers/openai-compatible.ts`) with presets for DeepSeek, Qwen/DashScope, and GLM/Zhipu. The adapter, PROVIDER_MAP extension, and ProviderName type widening were all complete. However a disk-verify finding confirmed that **nothing in `provider.ts` called `registerProvider` for these adapters** — the providers existed in code but were never registered into the runtime registry. DeepSeek/Qwen/GLM were built but dormant (not selectable at runtime).
-
-Two additional gaps accompanied the bootstrap gap:
-- **Subscription→API overflow** — when a subscription provider hits its rate/quota limit, workers had no automatic path to overflow to an equivalent API provider. `authMode` was a static per-task field; no dynamic overflow logic existed.
-- **Per-worker auth/provider uniformity** — task JSON `authMode` field existed but the `provider` + `authMode` resolution chain was not applied uniformly across Sprint/Task/Process modes in `task-router.ts`.
-
-### F5-008 Identity-Mutation Loop Gap
-
-Sprint 212 wired the *suggestion* path for agent evolution: `adaptive-agent` produces adaptation suggestions → `outcome-tracker` records them. Sprint 214 introduced `agent-genealogy.ts` and `agent-retirement.ts` as live modules with external callers. However the **closed-loop** — low success rate triggers an actual mutation of the agent's identity (prompt rewrite + skill repertoire change), which is then recorded in the genealogy and creates a new versioned variant — was not implemented. The mutation stayed at the "proposal" stage; no `applyAdaptation` was called.
-
-### Dashboard God-Level (F7) Gap
-
-Sprint 214 addressed F7-003 layout-level (responsive grid, ThemeProvider dark/light, sidebar/header structure — ~45% complete). The remaining god-level surfaces were untouched:
-
-- F7-004 terminal: multi-session management, command history ring buffer, clipboard helper — ~60% complete
-- F7-006 enterprise view: multi-tenant list, RBAC role matrix, audit log table, rate-limit status — UI completely absent despite F4 backend at 100%
-- F7-007 memory/ADR/debt explorer: FTS5 search, ADR timeline, debt table — ~20% complete
-- F7-009 nervous UI: pending-approval list, accept/reject actions, panic-guard badge, detector status — not built
-- F7-010 evolution dashboard: agent genealogy tree, retirement timeline, prompt-diff viewer — not built (backend modules live, no frontend)
-
-The evolution backend (F5 modules) also lacked a dedicated HTTP API to expose `agent-genealogy`, `agent-retirement`, and `prompt-metrics` data to the dashboard.
-
----
-
-## Decision
-
-### Part A — CI-Hermeticity Standard
-
-Three artifacts establish the hermeticity standard as a permanent, enforced discipline:
-
-**`scripts/test-ci-sim.mjs` (`npm run test:ci-sim`):** Renames `.deckent/config.json`, `.brain/memory.db`, and `.brain/` to temporary backup names before running `CI=1 vitest run`, then restores them in a `try/finally` block regardless of outcome. This script exactly reproduces the CI environment locally — developers can run it before pushing to catch non-hermetic tests within seconds. The restore-on-fail guarantee means no state is ever lost even when the suite crashes.
-
-**`scripts/lint-test-hermeticity.mjs`:** Scans `tests/**/*.ts` files for direct `readFileSync` calls targeting `.deckent/config.json` or `.brain/memory.db` without a skip-if-absent guard or fixture pattern. Reports violations as `file:line` pairs. Can be integrated into CI as a pre-push lint. Maintains an allowlist for files that explicitly use skip-if-absent patterns.
-
-**`tests/helpers/sandbox-home.ts`:** Exports `withSandboxHome(fn)` (async wrapper) and `useSandboxHome()` (beforeEach/afterEach hook factory). Each call redirects `process.env.HOME` to a unique `os.tmpdir()/deckent-sandbox-<uuid>` directory and cleans it up after the test. No project root or real HOME directory is touched. Nested calls are independent. Used by credential, PTY, and config tests.
-
-These three artifacts are anchored in `.claude/rules/karpathy-discipline.md` under the "Test Hermeticity" section so future workers encounter the rule before writing tests.
-
-**Routing standard:** CI-related tasks (test infra, pipeline fixes, hermetic reproducer) are routed to **ci-guardian agent** + **ci-testing skill** via `activation-engine.ts`. This ensures the routing engine selects the right specialization for CI hygiene work automatically.
-
-### Part B — 8-Provider Bootstrap-Register + Overflow + Per-Worker Auth
-
-**Bootstrap-register (`src/core/provider.ts`):** The provider bootstrap phase now checks for `DEEPSEEK_API_KEY`, `DASHSCOPE_API_KEY`, and `ZHIPU_API_KEY` in environment variables and `.deck` secrets (ADR-014). For each present key, the corresponding `OpenAICompatibleAdapter` preset is instantiated and registered via `registerProvider(name, adapter)`. Missing keys are silently skipped — users without DeepSeek keys are unaffected. This is the wire that makes F1-009 runtime-usable: DeepSeek/Qwen/GLM are now selectable at runtime when keys are present.
-
-**Subscription→API overflow (`src/core/provider-overflow.ts`):** New module `resolveWithOverflow(task, registry)` — when a task's primary subscription provider emits a rate/quota-exceeded signal, the function selects an equivalent-tier API provider from the registry as a fallback. The decision is tier-preserving: a `premium` subscription overflow selects a `premium` API provider (not economy). If no equivalent API provider is available, the function degrades gracefully (returns the original provider, no throw). This module integrates with `token-quota.ts` for quota signal detection.
-
-**Per-worker auth resolution (`src/orchestra/task-router.ts`):** The `provider` + `authMode` fields are now resolved first-class for every worker across Sprint/Task/Process modes. Resolution order: DIRECTIVES override (`- Provider:`, `- Auth:`) > config defaults > system default. The resolution is uniform — the same logic path runs regardless of dispatch mode. This pairs with F1-010 overflow so per-worker overflow decisions are consistent.
-
-**Multi-provider smoke (`scripts/multi-provider-fleet-smoke.mjs`):** Registers mock instances of all 8 provider types (claude, codex, gemini, deepseek, qwen, zhipu, ollamaLocal, plus a generic openai-compat) into a registry, routes a mixed task set, and asserts each task lands on the correct adapter. Validates simultaneous coexistence of subscription + API + local providers without interference.
-
-### Part C — Active Identity-Mutation Loop (F5-008)
-
-**`src/orchestra/promotion-pipeline.ts`** extended with `applyAdaptation(agent, proposal, registry)`:
-
-1. When an agent's rolling success rate falls below the configured threshold (default: 60%), `adaptive-agent` has already produced an `AdaptationProposal` (skill additions/removals, prompt delta, specialization hint).
-2. `applyAdaptation` applies the proposal: rewrites the agent's `systemPrompt` field, adjusts `assignedSkills`, records the original identity as the parent in `agent-genealogy.ts` via `recordGenealogy(parent, child)`, and writes a new agent variant with a versioned ID (`agentId-v{N+1}`).
-3. The mutation is guarded: `requiresApproval: true` in the proposal triggers a nervous-system checkpoint before application (ADR-040). Agents in active tasks are not mutated mid-sprint.
-4. The result is an A/B testable variant — both parent and child coexist; the next sprint's routing engine scores both and the winner survives via standard promotion/demotion rules.
-
-This closes the loop: low-success → adaptive-agent proposes → `applyAdaptation` executes → genealogy records → A/B verify. The core moat at scale is now active (not just proposed).
-
-### Part D — Dashboard God-Level
-
-**`src/dashboard/src/components/AppShell.tsx`:** Top-level layout shell replacing ad-hoc layout in individual pages. Defines a CSS grid (header + sidebar + content), responsive breakpoints (mobile: stacked / tablet: side-nav collapsed / desktop: full sidebar), and dark/light token system (`data-theme` attribute propagation). Navigation hierarchy follows information architecture: Sprint → Dashboard → Evolution → Memory → Enterprise → Nervous → Terminal.
-
-**`src/dashboard/src/lib/terminal-sessions.ts`:** Multi-session management (session list, active-session switch, session lifecycle), command history ring buffer (up/down navigation, configurable size), and clipboard helper functions. Designed for the ADR-062 WS gateway interface — session IDs map to PTY instances.
-
-**`src/dashboard/src/pages/EnterprisePage.tsx`:** Tenant list view, RBAC role matrix (admin > operator > viewer columns), audit log table (filterable by tenant/action/time), and rate-limit status per tenant. Consumes existing F4 API endpoints via `useApi`. Read-first (no write actions in V1).
-
-**`src/dashboard/src/pages/MemoryExplorerPage.tsx`:** FTS5 search box (calls `/api/memory/search`), ADR timeline (sorted by sprint, status badge), debt table (open items). Renders ADR content as markdown via `SimpleMarkdown`. Filterable by type (adr/memory/debt/pattern).
-
-**`src/dashboard/src/pages/NervousPage.tsx`:** Pending-approval list (calls `/api/nervous/pending`), accept/reject buttons (calls `nervous_accept`/`nervous_reject` endpoints), panic-guard badge (active/inactive), detector status list. Polls every 30 seconds for new approvals.
-
-**`src/dashboard/src/pages/EvolutionPage.tsx`:** Three tabs — (1) Agent Genealogy Tree: hierarchical node tree from `/api/evolution/genealogy`, child nodes indented by depth; (2) Retirement Timeline: sorted by `retiredAt`, shows id/source/reason/stats; (3) Prompt Diff: table from `/api/evolution/prompt-metrics` showing agentId/version/successRate/trend/experimentStatus.
-
-**`src/api/evolution-endpoint.ts`:** Three read-only GET endpoints registered into `server.ts`:
-- `GET /api/evolution/genealogy` — agent family tree from `agent-genealogy.ts`
-- `GET /api/evolution/retirement` — retired agents from `agent-retirement.ts`
-- `GET /api/evolution/prompt-metrics` — prompt experiment metrics from `prompt-metrics.ts`
-
-All endpoints return empty arrays when no data is present (graceful empty state).
-
----
-
-## Consequences
-
-**Positive:**
-- CI-hermeticity is now a first-class discipline with tooling (`test:ci-sim`), lint enforcement (`lint-test-hermeticity.mjs`), and a reusable helper (`sandbox-home.ts`). Regression from non-hermetic tests is structurally detectable before push.
-- DeepSeek/Qwen/GLM are runtime-usable when API keys are present — F1-009 moves from dormant to ~95% complete. Cost advantage (DeepSeek-V3 ~$0.27/M tokens vs Claude Sonnet ~$3/M) is now accessible.
-- The evolutionary moat is closed-loop: agents that underperform are now actually mutated (not just annotated) — identity-mutation is live with genealogy tracking and A/B testable variants.
-- Dashboard now covers all 7 god-level surfaces (AppShell + terminal-sessions + EnterprisePage + MemoryExplorerPage + NervousPage + EvolutionPage) with F4/F5 data surfaced in UI for the first time.
-
-**Negative:**
-- `test:ci-sim` renames files in-place — if the process is killed between rename and restore (SIGKILL, not SIGTERM), the backup files are stranded. Recovery requires manual rename. The try/finally block covers SIGTERM but not SIGKILL.
-- `applyAdaptation` mutation is guarded by `requiresApproval` but the checkpoint flow adds latency — high-frequency agents with frequent success drops will queue many approvals. Rate-limiting the mutation frequency (e.g., max one mutation per 3 sprints per agent) is a post-beta refinement.
-- Provider overflow relies on a quota-exceeded signal from the adapter — the signal shape is provider-specific and may not be emitted for all failure types (e.g., HTTP 429 vs timeout). Overflow coverage is partial in V1.
-- Dashboard pages use `useApi` with polling — no real-time SSE/WS push. F7-004 terminal real-time requires F2-007 streaming (post-beta).
-
----
-
-## Alternatives Considered
-
-**CI-Hermeticity:**
-- **CI-only enforcement (GitHub Actions env guard)** — rejected: feedback loop is minutes (CI) not seconds (local). Local reproducer is the right layer.
-- **Vitest `globalSetup` that hides files** — considered: more automated but hides the pattern from developers who need to understand why tests fail locally when files are present. Explicit `test:ci-sim` is more educational.
-- **`dotenv-expand` + CI env injection** — rejected: doesn't address `readFileSync` paths at test sites; solves env vars, not file I/O.
-
-**8-Provider Bootstrap:**
-- **User-managed YAML provider registry** — rejected: over-engineering for V1; env-key auto-registration is the minimal, correct bootstrap for three known providers.
-- **Lazy registration (on first routing request)** — considered: avoids startup cost but complicates provider availability checks and `isAvailable()` semantics. Eager bootstrap at startup is simpler and consistent with Claude/Codex/Gemini registration.
-
-**Identity-Mutation Loop:**
-- **Mutation without approval gate** — rejected: uncontrolled identity mutation of active agents could cascade failures across sprints. Checkpoint gate (ADR-040 nervous system) is mandatory.
-- **Separate `mutation-engine.ts` module** — rejected: `promotion-pipeline.ts` already owns the promotion/demotion lifecycle; `applyAdaptation` is a natural extension of the same decision surface. YAGNI (ADR-010 simplicity principle).
-
-**Dashboard:**
-- **Unified mega-page** — rejected: monolithic page defeats information architecture; seven distinct concerns map cleanly to seven routes.
-- **Server-side rendering (SSR)** — rejected: React SPA is the established pattern (Vite + ADR-001 TypeScript); SSR would introduce a new server runtime dependency and is not required for the current read-mostly dashboard.
-
----
-
-## References
-
-- Sprint 215 — CI-hermeticity kalıcılaştır + 8-provider fleet + dashboard god-level + evrim görünürlüğü
-- `scripts/test-ci-sim.mjs` — clean-state CI reproducer (Part A)
-- `scripts/lint-test-hermeticity.mjs` — hermeticity lint guard (Part A)
-- `tests/helpers/sandbox-home.ts` — HOME isolation helper (Part A)
-- `.claude/rules/karpathy-discipline.md` — Test Hermeticity anchor rule (Part A)
-- `src/core/provider.ts` — bootstrap auto-register (Part B)
-- `src/core/provider-overflow.ts` — subscription→API overflow (Part B)
-- `src/orchestra/task-router.ts` — per-worker auth resolution (Part B)
-- `scripts/multi-provider-fleet-smoke.mjs` — 8-provider coexistence validation (Part B)
-- `src/orchestra/promotion-pipeline.ts` — `applyAdaptation` identity-mutation (Part C)
-- `src/orchestra/adaptive-agent.ts` — `AdaptationProposal` source (Part C)
-- `src/orchestra/agent-genealogy.ts` — genealogy record target (Part C)
-- `src/api/evolution-endpoint.ts` — evolution REST API (Part D)
-- `src/dashboard/src/components/AppShell.tsx` — layout shell (Part D)
-- `src/dashboard/src/lib/terminal-sessions.ts` — terminal multi-session (Part D)
-- `src/dashboard/src/pages/EnterprisePage.tsx` — enterprise UI (Part D)
-- `src/dashboard/src/pages/MemoryExplorerPage.tsx` — memory/ADR explorer (Part D)
-- `src/dashboard/src/pages/NervousPage.tsx` — nervous system UI (Part D)
-- `src/dashboard/src/pages/EvolutionPage.tsx` — evolution dashboard (Part D)
-- ADR-077: Multi-Provider 8-Fleet + OpenAI-Compatible HTTP Adapter (bootstrap prerequisite)
-- ADR-075: F5 Evolution Runtime Wiring (identity-mutation closes the F5 loop)
-- ADR-040: Nervous System Architecture (approval gate for identity mutations)
-- ADR-037: Brain-Auditor-Worker Authority Matrix (scope enforcement, hermeticity boundary)
-- ADR-014: .deck Secret File System (per-provider key storage for bootstrap)
-- ADR-010: Tek Runtime Dependency (no new npm deps in hermeticity tooling or overflow module)
-- `[[project_ci_green_root_causes]]` — CI hermeticity root-cause pattern map
-- `[[project_test_home_leak]]` — HOME sandbox motivation
-- `[[project_deckent_runtime_ecosystem]]` — 8-provider + evolving agent + god-level dashboard vision
-- `[[project_dashboard_control_plane]]` — F7 god-level scope
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH.**
-
-1. **Part-A ✓ savaş-testli:** 3 hermeticity-artifact'ı mevcut (`test-ci-sim.mjs` + `lint-test-hermeticity.mjs` + `sandbox-home.ts`); S214-215 CI-yeşertmesinin kalıcı disiplini; karpathy-rules "Test Hermeticity" anchor'ı canlı. (Async/hermeticity kanunu artık **ADR-087**'de agent-inject — bu Part'ın governance-mirasçısı.)
-2. **🔴 Part-B yarım — overflow DORMANT:** bootstrap-register ✓ (`provider.ts:718+`) + per-worker auth-resolution ✓ (`task-router.ts` authMode-zinciri) AMA **`provider-overflow.resolveWithOverflow` 0-caller** — subs→API tier-preserving overflow inşa edildi, spawn-error/FIX yoluna hiç bağlanmadı (MASTER-PLAN W-K(detail) #4'ün tespiti; F1-010 ailesi). **Ertelenmiş dormant-sweep'e katlanır** (zaten W-K maddesi; yeni iş açılmadı).
-3. **Part-C ✓ canlı — API-adı nüansı (ADR-075 deseniyle aynı):** `applyAdaptation(agent, proposal, registry)` ismi kavramsaldır; canlı implementasyon `promotion-pipeline.ts:273+` "F5-008 Active identity-mutation loop" — `IdentityMutationOpts` (:46, `requiresApproval`-gated + variant-fingerprint-idempotent), genealogy'ye `identity-mutation` kaydı (:344). Yüzeysel fonksiyon-adı-grep'i yanıltır.
-4. **Part-D ✓ + tasarım-notu:** evolution-endpoint + 4 sayfa canlı. **EnterprisePage "read-first (no write actions in V1)" bu ADR'nin bilinçli kararıydı** — 2026-06-11 UX-denetiminin "enterprise salt-okunur" bulgusu (#6) V1-by-design'dır; gerçek ürün-boşluğu **V2 yönetim-düzlemi CRUD'udur** (ADR-068 god-level boşluk-haritası #1).
-5. **lint:adr format-notu (kozmetik):** Bu ADR (ve 079-083/086) `## Context`/`## Decision` başlık-stilini kullanır; validator bold-inline `**Decision:**` alanını "recommended" sayar — uyarı substans-dışıdır, içerik tamdır. md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-079: Proof-of-Function DoD — Tier-0/Tier-1 Classification + Sprint-Inner Run-Verify Gate
-
-**Status:** accepted
-
-# ADR-079: Proof-of-Function DoD — Tier-0/Tier-1 Classification + Sprint-Inner Run-Verify Gate
-
-**Status:** accepted
-
-**Date:** 2026-06-01
-
-**Accepted:** Sprint 216
-
----
-
-## Context
-
-### The Hollow-DONE Problem
-
-Sprint 214 shipped "serve token-inject DONE" based on a mocked unit test. A real-binary run on 2026-06-01 (`node dist/cli/entry.js serve`) contradicted that verdict:
-
-- Server boots, dashboard HTML returns HTTP 200 with correct `<title>`.
-- On localhost, **no API token is auto-minted** — `__DECKENT_API_TOKEN__` is absent from the served HTML (log: "No API token configured").
-- `/api/status` returns **401** — every dashboard data call fails.
-- Result: dashboard is **non-functional despite a DONE stamp**.
-
-The root cause was definitional: no distinction existed between *wiring proof* (the function is connected) and *user-working proof* (a real human running the binary gets a working experience). Mocked unit tests can only certify the former.
-
-This gap extended beyond `serve`:
-- `deckent chat` was "wired" (Path A backend connected) but had not been run-verified to produce a real round-trip response.
-- Dashboard pages rendered but every data endpoint returned 401 — invisible behind the mocked-test curtain.
-
-### Missing Classification Signal
-
-`detectTaskType()` in `rubric-registry.ts` classified tasks as `audit`, `document-write`, or `code-development`. There was no signal indicating whether a task touched a **user-facing surface** (CLI command a human runs, dashboard page, API endpoint) versus an **internal structural concern** (provider registration, F5 callers, type fixes, refactors). Without this signal:
-
-- User-surface tasks were evaluated by the same rubric as internal tasks — no run-verify requirement.
-- The routing engine had no way to prefer surface-aware agents (`api-builder`, `frontend-designer`, `ci-guardian`) over the generic `refactorer` for UI/serve/CLI work.
-- DIRECTIVES had no canonical slot for a real-binary smoke command.
-
-### Prior Mitigations That Were Insufficient
-
-- **disk-verify gate** (Sprint 138, ADR-035): verifies files exist on disk — does not boot a server or assert HTTP status.
-- **ADR-076 Part B** (Sprint 214): intended to fix `serve` token injection via a mocked unit test — the test never asserted on real served HTML.
-- **Sprint 215 `test:ci-sim`** (ADR-078): guards hermeticity (no local-state leakage) — not user-working verification.
-
----
-
-## Decision
-
-### Tier Classification — `isUserSurfaceTask()`
-
-A new **parallel boolean** (not a 4th TaskType) `isUserSurfaceTask(task): boolean` is added to `rubric-registry.ts`. It inspects `scope.filesWrite` (and `scope.directories` as fallback) for the following prefixes:
-
-- `src/cli/commands/` — CLI commands a human runs directly
-- `src/dashboard/` — React dashboard pages and components
-- `src/api/` — HTTP API endpoints (serve, chat-backend, memory-search, etc.)
-
-Tasks matching any prefix are **Tier-1 (user-surface)**. All other tasks remain **Tier-0 (internal/structural)**. A single task can be both a `code-development` task and Tier-1 — the tiers are orthogonal to TaskType.
-
-**Tier-0 DoD (unchanged):** unit test + `tsc --noEmit` + structural grep proof. The proof is externally verifiable without running a binary.
-
-**Tier-1 DoD:** all Tier-0 criteria **plus** a recorded real-binary run. Mocked unit test alone = `GO_WITH_TECH_DEBT`, never `DONE`.
-
-### `Smoke:` Directive Line
-
-DIRECTIVES gains a mandatory `Smoke:` line for every Tier-1 task, alongside the existing `Kanıt:` and `Test:` lines:
-
-```
-**Smoke:** `node dist/cli/entry.js serve --port 3211 --no-terminal &` → `curl -s localhost:3211/ | grep -c __DECKENT_API_TOKEN__` ≥1 AND `curl -so/dev/null -w '%{http_code}' localhost:3211/api/status` = 200
-```
-
-`task-builder.ts` parses `- Smoke:` / `**Smoke:**` lines into `task.smoke = { command, expect }` — an optional field on the task JSON schema (`api-surface.md`).
-
-### Sprint-Inner Smoke Gate — `proof-of-function.ts`
-
-`src/orchestra/proof-of-function.ts` exports `verifyProofOfFunction(task, projectRoot, result)`:
-
-1. Checks `isUserSurfaceTask(task)` — if Tier-0, returns `{ passed: true, skipped: true }` immediately (no-op).
-2. Checks `task.smoke` — if absent (no `Smoke:` directive), returns `{ passed: true, skipped: true }` (gate is opt-in via DIRECTIVES authoring).
-3. Executes the smoke command via **async `spawn`** (host-side, not inside the worker container).
-4. Asserts the output against `task.smoke.expect` (regex or substring match).
-5. Returns `{ passed, evidence, command }`.
-
-`result-evaluator.ts` calls `verifyProofOfFunction` after `evaluateWithRubric`. On failure:
-- Downgrades `selfAssessment` from `DONE` → `GO_WITH_TECH_DEBT`.
-- Emits `PROOF_OF_FUNCTION_MISMATCH` on the audit channel (same channel as `DISK_VS_CLAIM_MISMATCH_CHANNEL`).
-- Records evidence in the result notes so the next FIX iteration knows what failed.
-
-Workers do **not** boot servers themselves — the gate runs in the Brain process where `localhost` binds reliably.
-
-### Routing: Surface-Aware Domain Bonus
-
-`routing-engine.ts` `getDomainMatchBonus()` gains a user-surface branch: when `isUserSurfaceTask` is true, domain bonuses are amplified so surface-aware agents beat the generic `refactorer`:
-
-- `dashboard` / UI patterns → `frontend-designer` domain bonus boosted.
-- `api/` / `serve` patterns → `api-builder` domain bonus boosted.
-- `e2e` / test-harness patterns → `ci-guardian` domain bonus boosted.
-
-The same `isUserSurfaceTask` signal is read from `TaskDNA` tags or derived from scope, ensuring routing and gate decisions are driven by the same source.
-
-### Permanent Regression Guard
-
-`scripts/test-e2e-surfaces.mjs` (`npm run test:e2e-surfaces`) boots the real `dist/cli/entry.js serve` binary on a random port (async spawn), asserts:
-- HTTP root `/` returns 200.
-- Served HTML contains `__DECKENT_API_TOKEN__`.
-- `/api/status` returns 200.
-
-Tears down the server in a `try/finally` block. Complements `test:ci-sim` (hermeticity guard) for the user-working axis.
-
----
-
-## Consequences
-
-**Positive:**
-- Hollow-DONE stamps are structurally impossible for Tier-1 tasks: the gate runs in-sprint and auto-downgrades if the binary fails.
-- Routing collapse (`refactorer` dominance on UI/serve tasks) is corrected — surface-aware agents are preferred without manual `forceAgent` overrides.
-- `test:e2e-surfaces` provides a permanent regression guard analogous to `test:ci-sim` for hermeticity.
-- `isUserSurfaceTask()` is a single, stable signal reused by rubric, gate, and routing — no duplication.
-- Workers are not required to understand the classification — it is computed automatically from their declared `scope.filesWrite`.
-
-**Negative:**
-- Tier-1 gate adds latency at EVALUATE phase (smoke command execution). Mitigation: gate only runs when `task.smoke` is present; absent `Smoke:` lines result in an immediate no-op.
-- Workers may forget to add the `Smoke:` directive line. Mitigation: `worker-default.md` anchors the rule; Brain FIX phase catches the missing smoke line through rubric pressure.
-- Real-binary smoke requires a built `dist/` — gate skips (no-op) when `dist/cli/entry.js` is absent (e.g. fresh checkout without a build). Permanent guard `test:e2e-surfaces` has a dist-absent skip-guard for CI.
-- The `Smoke:` format is freeform text parsed with a simple regex — edge cases (multi-line commands, Windows path separators) may require future normalization. V1 scope: single-line command on a Linux/macOS/WSL2 host.
-
----
-
-## Alternatives Considered
-
-**Post-sprint manual verification only** — Brain or Alperen runs smoke commands after the sprint. Rejected: manual gate depends on human discipline, not enforced automatically; the Sprint 214 hollow-DONE passed because no human re-ran the binary post-sprint.
-
-**Add `run-proven` as a 4th TaskType** — classify tasks as `run-proven` instead of a parallel boolean. Rejected: a CLI task that fixes an auth bug is both `code-development` and Tier-1 user-surface. Orthogonal booleans compose correctly; a 4th type forces a choice.
-
-**Always-on smoke (every task, regardless of `Smoke:` presence)** — gate runs even if no `Smoke:` directive is written. Rejected: tasks without a smoke command cannot be verified automatically; forcing the gate would create false NO_GO results for tasks that have no meaningful smoke command. Opt-in via `Smoke:` directive is the correct model.
-
-**Worker-side smoke execution** — worker boots the server and curls it from inside the container. Rejected: containers in Docker backend cannot reliably bind and curl `localhost` (port namespace isolation, no host-network by default). Brain-side execution is the only reliable path.
-
-**Separate post-sprint-smoke pipeline only** — no in-sprint gate, only a post-sprint audit. Rejected: post-sprint-smoke path (`post-sprint-smoke.ts`) exists and is useful for regression checks across all surfaces after a sprint; in-sprint gate is needed so a failed surface causes the *current task* to be reclassified before the retro, not discovered as a regression in the next sprint.
-
----
-
-## References
-
-- `src/orchestra/rubric-registry.ts` — `isUserSurfaceTask()`, `PROOF_OF_FUNCTION_CRITERION`
-- `src/orchestra/proof-of-function.ts` — `verifyProofOfFunction()`, async spawn gate
-- `src/orchestra/result-evaluator.ts` — wire: `verifyProofOfFunction` after `evaluateWithRubric`
-- `src/orchestra/task-builder.ts` — `Smoke:` directive parse → `task.smoke`
-- `src/core/routing-engine.ts` — `getDomainMatchBonus()` surface-aware domain bonus
-- `scripts/test-e2e-surfaces.mjs` — permanent regression guard (`npm run test:e2e-surfaces`)
-- `.claude/rules/karpathy-discipline.md` — "Proof-of-Function DoD" CUSTOM section
-- `.claude/rules/worker-default.md` — "Proof-of-Function (Tier-1 user-surface)" section
-- ADR-035 (Verification Protocol Standard) — prior art for multi-channel verification
-- ADR-070 (Brain Evaluation Integrity) — zero-hard-code principle and signal-based coverage
-- ADR-078 (CI-Hermeticity Standard) — parallel discipline: `test:ci-sim` guards hermeticity, `test:e2e-surfaces` guards user-working
-- Sprint 216 evidence: `serve` localhost auto-mint landed (`src/api/server.ts:921-935`); `/api/status` confirmed 200 run-proven.
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (hollow-DONE engeli = ürün-güvenilirliği; "wired ≠ working" felsefesinin kanunu).
-
-**Re-verified:** `isUserSurfaceTask` (`rubric-registry.ts:220`) + `verifyProofOfFunction` (`proof-of-function.ts:259`) + evaluator-wire (`result-evaluator.ts:49`) + `Smoke:` parser (`task-builder.ts:164`) + `test-e2e-surfaces.mjs` + npm-script ✓.
-
-**Sürekli savaş-kullanımda:** Disiplin her sprint'te fiilen uygulanıyor — Sprint 280 DIRECTIVES'i Tier-1 task'lara `Smoke:`-satırlarıyla yazıldı; `worker-default.md` + `karpathy-discipline.md` anchor'ları canlı; CC close-out zinciri her sprint-sonunda gerçek-binary Tier-1 smoke koşar. 2026-06-11 dashboard/chat UX-denetimi de aynı "wired ≠ working" ilkesinin ürün-ölçeği uygulamasıdır (mocked-yeşilken hollow yüzeyleri canlı-koşu yakaladı — bu ADR'nin doğuş-senaryosunun tekrarı ve teyidi). md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-080: Dashboard God-Level — Sprint-Start Detach + Hollow-Page Wire + Chat Round-Trip + Native UI
-
-**Status:** accepted
-
-# ADR-080: Dashboard God-Level — Sprint-Start Detach + Hollow-Page Wire + Chat Round-Trip + Native UI
-
-**Status:** accepted
-
-**Date:** 2026-06-01
-
-**Accepted:** Sprint 218
-
----
-
-## Context
-
-### Sprint-Start Freezes the Dashboard
-
-A real-binary run on 2026-06-01 (`npx deckent serve`) reproduced a critical defect: starting a sprint from the dashboard UI caused the serve process to freeze. The root cause was `src/api/server.ts` calling `runSprint(...)` directly inside the HTTP request handler — `runSprint` is a long-running async operation that blocked the Node.js event loop, preventing any further HTTP responses. Users saw the dashboard enter a skeleton-loading state with no recovery short of restarting the server.
-
-Sprint 216 established the Proof-of-Function DoD (ADR-079) and proved the serve API was functional, but the sprint-start path was not covered by the smoke gate and the freeze went undetected until a manual browser session.
-
-### Hollow-Page Wire-Gap
-
-Sprint 215 shipped four dashboard pages to `src/dashboard/src/pages/`:
-
-- `EvolutionPage.tsx` (genealogy tree, retirement timeline, prompt-diff viewer)
-- `NervousPage.tsx` (pending-approval list, accept/reject, panic-guard badge)
-- `EnterprisePage.tsx` (tenant list, RBAC role matrix, audit log table)
-- `MemoryExplorerPage.tsx` (FTS5 search, ADR timeline, debt table)
-
-However, `App.tsx` contained only 7 routes (none of the four pages) and `Sidebar.tsx` listed only 6 links. Users could not navigate to any of these pages despite the page files existing on disk. Sprint 215's DONE verdict for F7-009 and F7-010 was based on the page files being written, not on user-reachable navigation — a wire-gap by the definition in ADR-079 Tier-1 criteria.
-
-### Chat Round-Trip Was Status-Only
-
-Sprint 214 wired `chat-backend.ts` (ADR-076 Part C) to provide a server-side conversational path. However, `ChatPage.tsx` only dispatched the user message to the `status` intent handler — it would return the sprint status string regardless of what the user typed. The real `POST /api/chat` endpoint (with Bearer token) was never called from the browser. The wire from frontend to backend was absent.
-
-### UI Was Functional-Skeleton
-
-Post-Sprint-215 the dashboard UI met functional-skeleton standards: data loaded, pages existed, navigation worked for the wired pages. It did not meet the god-level bar established in the project's no-MVP policy — no stale-while-revalidate data fetching, inconsistent dark/light tokens across components, layout shifts on data load, no connection-loss recovery.
-
----
-
-## Decision
-
-### 1. Sprint-Start Detach — `sprint-job-runner.ts`
-
-`src/api/sprint-job-runner.ts` exports `startSprintDetached(sprintId, root)` which spawns the sprint process as a **detached child** (`detached: true, stdio: 'ignore'`) and immediately calls `child.unref()`. The HTTP handler in `server.ts` (`POST /api/start`) is wired to call `startSprintDetached` instead of `runSprint`. The serve event loop is never blocked; the HTTP response returns before the sprint process begins executing. The spawned process continues independently and writes results to `.tasks/`.
-
-### 2. Hollow-Page Wire — `App.tsx` + `Sidebar.tsx`
-
-Four routes are added to `App.tsx`:
-
-```tsx
-<Route path="/evolution" element={<EvolutionPage />} />
-<Route path="/nervous" element={<NervousPage />} />
-<Route path="/enterprise" element={<EnterprisePage />} />
-<Route path="/memory-explorer" element={<MemoryExplorerPage />} />
-```
-
-Four navigation links are added to `Sidebar.tsx` (with matching lucide-react icons and nav labels). The dashboard now has 11 routes total and all four previously-hollow pages are reachable. The existing 7 routes are preserved unchanged.
-
-### 3. Chat Real Round-Trip — `ChatPage.tsx`
-
-`ChatPage.tsx` is updated to `POST` user messages to `/api/chat` with the `Authorization: Bearer <token>` header (via `useApi`). The response body (assistant message) is rendered into the conversation thread. Loading and error states are displayed. The status-only fallback branch is removed. Multi-turn history is accumulated in component state.
-
-### 4. DIRECTIVES Editor — `DirectivesEditor.tsx`
-
-A new `DirectivesEditor.tsx` component provides a textarea for editing `DIRECTIVES.md` content, with `GET /api/directives` load and `POST /api/directives` save (Bearer token). An empty-content guard disables the sprint-start button. This closes the gap where dashboard-initiated sprints submitted no task description, producing zero-task `new sprint` runs.
-
-### 5. God-Level UI Foundation
-
-Three foundational modules establish the native-speed, god-level UI baseline:
-
-- **`src/dashboard/src/lib/use-live-data.ts`** — SSE/polling hook with stale-while-revalidate semantics: serves cached data immediately on mount and revalidates in the background. On connection loss, shows a reconnecting indicator instead of a skeleton. `useEffect` cleanup aborts inflight requests on unmount.
-
-- **`src/dashboard/src/lib/theme.ts`** — Centralised design token map for color, spacing, radius, and shadow in both `dark` and `light` modes. All components consume tokens via CSS custom properties; no hard-coded hex values in component files.
-
-- **`src/dashboard/src/components/Layout.tsx`** — God-level app shell: CSS grid header + sidebar + main content, responsive breakpoints (mobile/tablet/desktop), meaningful loading states (not skeleton) when data is in-flight, consistent spacing and typography hierarchy.
-
----
-
-## Consequences
-
-**Positive:**
-
-- Dashboard sprint-start no longer freezes the UI; HTTP server remains responsive throughout long sprint runs.
-- All 8 dashboard pages (4 previously hollow + 4 existing) are reachable via sidebar navigation and direct URL.
-- Chat provides a genuine conversational round-trip; the `status` intent limitation is lifted.
-- DIRECTIVES editor prevents zero-task sprint launches from the dashboard.
-- `use-live-data` eliminates skeleton thrash on data refresh and recovers gracefully from connection loss.
-- Centralised design tokens (`theme.ts`) enable dark/light consistency without per-component colour overrides.
-
-**Negative / Tradeoffs:**
-
-- Sprint-start detach means the serve process no longer has a direct reference to the running sprint; status must be polled via `.dashboard` or the `/api/status` endpoint (no change from existing behaviour).
-- `DirectivesEditor` is a textarea, not a rich editor — multi-line YAML/Markdown editing without syntax highlighting is adequate for current scope.
-- `use-live-data` SSE path requires an SSE-capable endpoint; pages without SSE fall back to polling at a fixed interval.
-
----
-
-## Alternatives Considered
-
-- **Web Worker for sprint-start** — runs `runSprint` in a Worker thread inside the serve process; avoids child-process IPC complexity. Rejected: Node.js Worker threads share the same libuv event loop for I/O; blocking I/O in the worker still contends with HTTP I/O. Detached child process is the clean isolation boundary.
-
-- **Inline the `status` intent handler** — keep ChatPage calling the existing handler and extend it to detect non-status messages. Rejected: this pattern adds chat intent classification to a UI component; the `POST /api/chat` endpoint already exists and is the correct boundary.
-
-- **React Query / SWR** — third-party data-fetching library for stale-while-revalidate. Rejected: ADR-010 (minimal runtime dependencies); the same semantics are achievable in ~80 LoC with `useRef` + `AbortController` + `EventSource`.
-
-- **CSS-in-JS (styled-components, Emotion)** — for design tokens. Rejected: Tailwind CSS custom-properties approach achieves the same token-sharing with zero runtime overhead and no new dependency.
-
----
-
-## References
-
-- Sprint 218 — Dashboard God-Level Implementation (commit pending)
-- `src/api/sprint-job-runner.ts` — `startSprintDetached`
-- `src/api/server.ts` — `/api/start` handler wire
-- `src/dashboard/src/App.tsx` — route additions
-- `src/dashboard/src/components/Sidebar.tsx` — link additions
-- `src/dashboard/src/pages/ChatPage.tsx` — chat real round-trip
-- `src/dashboard/src/components/DirectivesEditor.tsx` — directives editor
-- `src/dashboard/src/lib/use-live-data.ts` — stale-while-revalidate hook
-- `src/dashboard/src/lib/theme.ts` — centralised design tokens
-- `src/dashboard/src/components/Layout.tsx` — god-level app shell
-- ADR-079 — Proof-of-Function DoD (Tier-1 classification + sprint-inner smoke gate)
-- ADR-076 — Auth-Precedence Fix + User-Facing Surfaces (serve token-inject, Path A chat)
-- ADR-078 — CI-Hermeticity + Dashboard God-Level (Sprint 215 AppShell + page scaffolding)
-- `project_dashboard_realrun_findings` — 2026-06-01 real browser audit that identified the freeze, wire-gap, and chat defects
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification + canlı UX-denetimi)
-
-**Classification: BOTH** (dashboard tamamen user-facing).
-
-**Re-verified:** §1 `startSprintDetached` (`sprint-job-runner.ts:18`, `detached:true`+unref :29) ✓ · §4 `DirectivesEditor.tsx` ✓ · §5 `use-live-data.ts` + `theme.ts` ✓.
-
-**§3 düzeltilmiş gerçeklik (2026-06-11 canlı UX-denetimi + kod-izi; v3-teşhis ADR-083 review'unda düzeltildi):** Frontend-wire bu ADR'nin dediği gibi VAR — `ChatPage.tsx:312/351/391` NL'i `POST /api/chat` + stream'e düşürür. Serve-tarafı adapter-wire de VAR — Sprint 269 B-ChatStream `resolveChatAdapter` SSOT'unu bağladı (`server.ts:1206` resolve + `:643` stream-endpoint tüketimi); bu amendment'ın ilk sürümündeki "serve'de resolveChatAdapter wire eksik" teşhisi YANLIŞTI. **Gerçek zincir:** (1) `POST /api/chat` (`server.ts:813`) **classifier-only** — `buildChatReply`'a adapter hiç girmiyor, "Anlamadım" buradan; (2) ChatPage stream-hatasını yutuyor (`:382-384` onError boş) ve POST-fallback'i her durumda atıyor → canlıda stream boş kaldığında classifier-cevap görünür kalıyor; (3) canlı stream'in neden boş kaldığı ayrıştırılacak — baş şüpheli EventSource GET'inde Bearer-header imkânsızlığı (auth-gate) veya serve-içi claude CLI spawn hatası. Fix Chat/Dashboard product-sprint'inde (memory `project_dashboard_chat_audit_20260611` #1, v3-teşhis).
-
-**§2 sonrası drift:** 4-route+4-link wire'ı indi; ancak S219'da `Layout.tsx` kendi `navGroups`'unu render eder hale geldi ve `Sidebar.tsx` navItems'ı **stale-duplicate** kaldı → bugün Workers/Directives nav'dan erişilemez (UX-denetim #3, duplicate-sidebar) — tek-kaynağa indirme product-sprint'te. md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-081: Native Agentic Deckent — `deckent` argümansız REPL + Agentic Tool-Use + F2 Streaming + Agentic-OS Direction
-
-**Status:** accepted
-
-# ADR-081: Native Agentic Deckent — `deckent` argümansız REPL + Agentic Tool-Use + F2 Streaming + Agentic-OS Direction
-
-**Status:** accepted
-
-**Date:** 2026-06-02
-
-**Accepted:** Sprint 219
-
----
-
-## Context
-
-### `deckent` Argümansız Sadece Help Gösteriyordu
-
-Sprint 219 öncesinde `deckent` komutu argümansız çalıştırıldığında Commander.js'in default davranışı devreye giriyor ve help metni yazdırılıyordu. `deckent chat --native` komutu (`runChatNativeLoop`) mevcut olmasına rağmen kullanıcı doğrudan `deckent` yazarak agentic REPL başlatamıyordu.
-
-Hedef: `claude` komutunun davranışını model almak — argümansız `deckent` → native conversational agentic REPL açılır.
-
-### F2 Streaming "Post-Beta" Olarak Ertelenmiş Durumda
-
-MASTER-PLAN §4 F2-007 (`Streaming live`) durumu `⚠️ in-progress` idi. Path A embedded chat backend (`chat-backend.ts`) mevcut olmasına rağmen gerçek token-streaming (SSE/chunk-by-chunk) yoktu — cevap tek parça geliyordu. Kullanıcı deneyimi `claude` kalitesinin altındaydı.
-
-### Agentic Tool-Use Eksikliği
-
-REPL doğal dil → deckent aksiyonu (status/history/recall) dönüştürme mekanizması yoktu. Kullanıcı "sprint durumu ne?" diyemiyordu — komut satırı subcommand'larını bilmek zorunluydu.
-
-### Onay Kapısı Yoktu
-
-Riskli aksiyonlar (sprint start/kill, dosya yazma) için REPL'de kullanıcı onayı istenmiyor; doğrudan çalıştırılıyordu. Bu, `feedback_deckent_kill_approval_required` ruhuna aykırı.
-
-### Agentic-OS Vizyonu Temel Altyapıdan Yoksundu
-
-ADR-042 (Hybrid Mode), ADR-040 (Nervous System) ve F3 Process Mode parçalar halinde mevcuttu; ancak yetki-sınırlı sürekli otonom mod iskelet bile yoktu.
-
----
-
-## Decision
-
-Sprint 219 yedi dalgada bu boşlukları kapattı:
-
-### DALGA A — Native REPL (219-001, 219-002, 219-003)
-
-**219-001:** `src/cli/entry.ts` güncellendi. `shouldLaunchDefaultRepl(argv)` ve `buildEntryArgv(argv)` yardımcıları eklendi. Bare `deckent` → `deckent chat --native` yönlendirmesi. `--help`/`--version`/subcommand token'ları korunur. TTY değilse graceful.
-
-**219-002:** `runChatNativeLoop` gerçek ProviderAdapter ile mesaj→cevap round-trip'i run-proven olarak doğrulandı. Mock adapter test, prod gerçek. `--once` flag eklendi.
-
-**219-003:** `chat-repl-ux.ts` — readline tabanlı REPL yardımcıları: prompt göstergesi, up/down geçmiş (ring buffer), çok-satır giriş, `/exit` `/clear`, Ctrl-C graceful.
-
-### DALGA B — Agentic Tool-Use (219-004, 219-005, 219-006)
-
-**219-004:** `chat-agentic-dispatch.ts` — doğal dil → deckent MCP aksiyonu eşleme (status/history/recall/plan intent). `McpToolDispatcher` ile çalıştırma. Sonuç REPL'e dön.
-
-**219-005:** `agentic-confirm.ts` — riskli aksiyon sınıflandırma (start/kill/cleanup/write → confirm; status/recall/history → otomatik). y/N prompt. REPL dispatch entegrasyonu.
-
-**219-006:** `agentic-session.ts` — REPL oturumu `memory.db`'ye persist (`ChatTurn`, sessionId). `deckent` tekrar açılınca son oturum resume.
-
-### DALGA C — F2 Streaming (219-007, 219-008)
-
-**219-007:** `src/api/chat-stream.ts` — `streamChatMessage(message, adapter, opts?)`: provider stream chunk'larını `AsyncGenerator<ChatStreamEvent>` olarak yayar. `chunk` event'leri token-by-token, `done` event ile tamamlanır. `adapter.stream` yoksa `adapter.send` fallback. `src/api/server.ts` `/api/chat/stream` SSE endpoint'e wired.
-
-**219-008:** `src/dashboard/src/lib/chat-stream-client.ts` — `/api/chat/stream` SSE tüketir, token'ları akarak ChatPage'de render eder. EventSource + Bearer token auth.
-
-### DALGA D — Dashboard Kalıcı-Fix (219-009, 219-010)
-
-**219-009:** `Sidebar.tsx` `navItems` tek-kaynak export; `Layout.tsx` import eder. Dashboard nav duplikasyonu kaldırıldı. RENDER-based test (gerçek React render → 10 link DOM'da assert).
-
-**219-010:** `dashboard-e2e-smoke.mjs` — cache-bust header doğrulama + bundle hash güncellik + nav link sayısı.
-
-### DALGA E — Dokümanlar (219-011, 219-012)
-
-**219-011:** `docs/MASTER-PLAN-TR.md` — Türkçe vizyon/durum dokümanı.
-
-**219-012:** Bu ADR + MASTER-PLAN status güncellemesi.
-
-### DALGA F — Kimlik + Otonom (219-013, 219-014)
-
-**219-013:** `docs/vision/blueprint.md` baştan-aşağı güncellendi (Sprint 219+ güncel mimari, open source for open world, otonom vizyon).
-
-**219-014:** `src/orchestra/autonomous-runtime.ts` — `runAutonomousCycle(config)` iskeleti: trigger (F3 scheduled + nervous) → RBAC (ADR-037) + onay-kapısı → audit. Gerçek ERP write değil, read-first + öneri + onaylı çalıştırma.
-
-### DALGA G — Plan-Akış Wire-Gap (219-015, 219-016)
-
-**219-015:** `task-router.ts` agent ataması `routeTaskV2`'ye güncellendi (getUserSurfaceBonus + domain-bonus). Surface task'lar artık doğru agent'a (api-builder/frontend-designer) gidiyor.
-
-**219-016:** `task-builder.ts` `plannerTaskToParams` — `smoke` alanını ParsedDirectiveTask'tan task JSON'a propagate. Proof-of-Function gate artık Smoke input'a sahip.
-
----
-
-## Consequences
-
-**Positive:**
-
-- `deckent` argümansız çalıştırıldığında native conversational agentic REPL açılır — `claude` deneyimine eşdeğer.
-- Doğal dil → deckent aksiyonu: "sprint durumu ne?" → `deckent_status` dispatch.
-- Token-streaming ile cevap akan biçimde gelir; kullanıcı bitmesini beklemez.
-- Riskli aksiyonlar onay kapısından geçer; güvenli aksiyonlar anında çalışır.
-- REPL oturumları persist — kapayıp açınca bağlam korunur.
-- Dashboard nav tek-kaynak: duplikasyon giderildi, 8 sayfa daima senkron.
-- F2-007 `⚠️ in-progress` → `✅ DONE`.
-- Routing surface-bonus: cli/commands/→api-builder, dashboard/→frontend-designer.
-- Smoke alanı plan JSON'da dolu → Proof-of-Function gate gerçek input alıyor.
-
-**Negative / Tradeoffs:**
-
-- `/api/chat/stream` SSE endpoint gerektirir; eski `EventSource` desteklemeyen ortamlarda fallback yok (post-beta).
-- Streaming REPL render, non-streaming UI'a göre daha karmaşık state yönetimi gerektirir.
-- Agentic dispatch intent eşleme kural tabanlı (Sprint 219); ML-tabanlı sınıflandırma post-beta.
-- `autonomous-runtime.ts` iskelet; gerçek runtime wire Sprint 220.
-
----
-
-## Alternatives Considered
-
-- **`deckent` argümansız → help yerine interactive mode** — yalnızca bir interaktif menü. Reddedildi: `claude` modeli tercih edildi; REPL hem conversational hem agentic.
-
-- **WebSocket streaming yerine SSE** — çift-yönlü bağlantı, daha düşük overhead. Reddedildi: ADR-062 embedded terminal zaten WS kullanıyor; chat stream unidirectional (server→client); SSE daha basit, no-upgrade required, EventSource nativeDir.
-
-- **REPL'de tam MCP client** (F9-001 extern MCP tüketim) — daha güçlü. Reddedildi: F9 scope ötesi, post-beta. Mevcut `deckent_*` tool'ları McpToolDispatcher aracılığıyla yeterli.
-
-- **Onay kapısı olmaksızın agentic dispatch** — kullanıcı deneyimi daha akıcı. Reddedildi: `feedback_deckent_kill_approval_required` — riskli aksiyonlar için onay zorunlu.
-
----
-
-## References
-
-- Sprint 219 — Native Agentic Deckent implementation
-- `src/cli/entry.ts` — `shouldLaunchDefaultRepl`, `buildEntryArgv` (219-001)
-- `src/cli/commands/chat-native.ts` — `runChatNativeLoop` round-trip (219-002)
-- `src/cli/commands/chat-repl-ux.ts` — REPL UX god-level (219-003)
-- `src/cli/commands/chat-agentic-dispatch.ts` — doğal dil → MCP aksiyon (219-004)
-- `src/cli/commands/agentic-confirm.ts` — riskli aksiyon onay kapısı (219-005)
-- `src/cli/commands/agentic-session.ts` — REPL oturum persist (219-006)
-- `src/api/chat-stream.ts` — `streamChatMessage` + `/api/chat/stream` SSE (219-007)
-- `src/dashboard/src/lib/chat-stream-client.ts` — SSE tüketim + akan render (219-008)
-- `src/orchestra/autonomous-runtime.ts` — `runAutonomousCycle` iskelet (219-014)
-- `src/orchestra/task-router.ts` — routeTaskV2 wire (219-015)
-- `src/orchestra/task-builder.ts` — Smoke field propagation (219-016)
-- ADR-040 — Nervous System Architecture (onay kapısı entegrasyonu)
-- ADR-042 — Hybrid Mode Architecture (Sprint + Task Dual Modes)
-- ADR-074 — Native Chat Real Round-Trip (antecedent)
-- ADR-079 — Proof-of-Function DoD (Smoke gate)
-- ADR-080 — Dashboard God-Level (antecedent — 8-page + Sprint-Start Detach)
-- `feedback_wiring_pct_vs_user_working` — wired ≠ çalışıyor
-- `feedback_proof_of_function_dod` — Smoke gate (gerçek-koşu)
-- `project_deckent_runtime_ecosystem` — agentic os + native
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (çıplak-`deckent` REPL = ürünün ana bireysel yüzü; agentic dispatch + onay-kapısı doğrudan user-deneyimi).
-
-**Re-verified:** Dalga-A `shouldLaunchDefaultRepl` (`entry.ts:62`) + `buildEntryArgv` (:88) ✓ · Dalga-B 3 agentic-modül (chat-agentic-dispatch / agentic-confirm / agentic-session) diskte ✓ · Dalga-C `chat-stream.ts` + `chat-stream-client.ts` ✓ · Dalga-G smoke-propagation (ADR-079 amendment'inde teyitli) ✓.
-
-**Evrim (sonraki sprint'ler bu temeli taşıdı):**
-- Dalga-A/B'nin readline-REPL'i **ADR-083 ile Ink'e** (React-for-CLI) evrildi ve DEFAULT view oldu — engine=loop korunup view-katmanı değişti (`src/cli/repl/` app.tsx, input-bar.tsx vd.); `chat-repl-ux.ts` readline-yardımcıları artık fallback/iç-katman.
-- "Tam MCP client post-beta" reddi gerçekleşti: **Sprint 280 `/mcp` broker-wire** (mcp-bridge → chat-native) Dalga-B dispatch'ini harici-MCP tüketimine genişletti.
-- Dalga-F `autonomous-runtime.ts` iskeleti diskte ancak **superseded-aile** — gerçek otonom motor `src/orchestra/autonomous/` engine'i oldu (ADR-071 amendment'indeki flow-runtime/self-dispatch havuzu; dormant-sweep adayı).
-- 219-009 nav-tek-kaynak fix'i sonradan ters yönde yeniden drift'ledi (Layout navGroups ↔ Sidebar navItems duplicate, 2026-06-11 UX-denetim #3) — kayıt ADR-080 amendment'inde; fix Chat/Dashboard product-sprint'inde. md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-082: Native-LLM-Wire + Nervous-Activation + Dashboard-v2 Canlı
-
-**Status:** accepted
-
-# ADR-082: Native-LLM-Wire + Nervous-Activation + Dashboard-v2 Canlı
-
-**Status:** accepted
-
-**Date:** 2026-06-02
-
-**Accepted:** Sprint 220
-
----
-
-## Context
-
-### Native REPL Gerçek LLM'e Bağlı Değildi
-
-Sprint 219 sonunda `deckent` argümansız çalıştırıldığında REPL açılıyordu (ADR-081, 219-001) ama gerçek bir LLM cevabı dönmüyordu. `createSubscriptionChatAdapter` (chat-native.ts) mevcut olmasına rağmen REPL başlatılırken bu adapter kullanılmıyordu — "provider not yet wired" uyarısı dönüyordu. Kullanıcı deneyimi: REPL açılır, mesaj yazılır, cevap gelmez.
-
-**Kök neden:** `entry.ts` native REPL launch kodu provider resolve etmeden başlatıyordu; adapter sadece chat subcommand'ında aktifti.
-
-### Chat Provider Config-Driven Değildi
-
-Kullanıcı `deckent` REPL için farklı bir provider seçmek istediğinde (örn. Brain=opus ama REPL=ollama-local) bunu konfigürasyon üzerinden yapamıyordu. Provider seçimi hard-coded veya Brain provider'ına bağlıydı. `chat_provider` config key yoktu.
-
-### Nervous System Dormant Kalıyordu
-
-ADR-040 Nervous System mimarisi mevcut; observer, decision-engine, proposer, dispatcher zinciri kodda var. Ancak `.deckent/config.json`'da `nervous_system.enabled: false` olduğundan sistem hiç başlatılmıyordu. `createNervousSystemIfEnabled` bootstrap fonksiyonu da mevcut değildi — sprint-controller nervous'u kendi başlatamıyordu.
-
-**Etki:** ORPHAN_TASK_ARCHIVE, STALE_LOCK_RELEASE gibi proaktif düzeltici aksiyonlar hiç çalışmıyordu.
-
-### Dashboard Worker Grid Statik ve Status Stale
-
-Sprint 219 sonrası dashboard eksiklikleri (run-verify bulguları):
-1. **Worker grid sabit-6:** İlk 6 worker yüklenir, sonraki spawn/done değişimleri yansımaz
-2. **Status sayfası stale:** Done olan işler hâlâ "working" gösterilir; faz göstergesi gerçek zamanlı değil
-3. **Chat hollow:** ChatPage sadece status cevabı verir, gerçek round-trip yok
-4. **Tech-debt filtre yok:** Debt sayfası çok uzun, sprint/severity/status filtresi yok
-5. **Coverage takibi yok:** History sayfasında coverage her zaman 0%
-6. **Enterprise auth-wire eksik:** EnterprisePage API-token olmadan boş veri gösterir
-7. **Alert SPAM:** "CLAUDE.md güncellenmedi" uyarısı sürekli tekrarlanır ve claude-only
-
----
-
-## Decision
-
-Sprint 220 bu boşlukların tamamını kapattı:
-
-### DALGA A — Native REPL Gerçekten Konuşsun
-
-**220-001:** `src/core/config.ts` → yeni opsiyonel `chat_provider` config key eklendi (schema + default undefined). `src/cli/entry.ts` → native REPL başlatılırken `config.chat_provider ?? config.brain_provider ?? 'claude'` fallback zinciri ile provider resolve edilir; `createSubscriptionChatAdapter` doğru provider ile çağrılır. "provider not yet wired" kaldırıldı. Provider yoksa net hata döner.
-
-**220-002:** `src/cli/commands/chat.ts` → `--native` + `--once` / `--message <text>` flag eklendi. Headless/script kullanım desteği.
-
-**220-003:** `src/cli/commands/chat-native.ts` → `classifyAgenticIntent` + `dispatchAgenticIntent` REPL loop'una bağlandı. Kullanıcı mesajı agentic intent ise dispatch + onay; değilse provider'a yönlendirilir.
-
-### DALGA B — Dashboard Tam-Canlı
-
-**220-004:** `WorkerGrid.tsx` → SSE/`useLiveData` hook ile worker listesi real-time; sabit-limit kaldırıldı.
-
-**220-005:** `StatusPage.tsx` → task durumu (done/working/no_go) gerçek zamanlı; faz göstergesi doğru.
-
-**220-006:** `RefreshButton.tsx` → manuel refetch + 10s cooldown (disabled+geri-sayım). Sürekli poll yerine user-tetikli.
-
-**220-007:** `ChatPage.tsx` → `/api/chat` gerçek round-trip + akan cevap (SSE stream-client). Bearer token ile auth.
-
-### DALGA C — Dashboard Polish
-
-**220-008:** `src/api/coverage-endpoint.ts` → sprint coverage memory.db/result'lardan okunur, `/api/coverage` endpoint; server.ts wire.
-
-**220-009:** `DebtPage.tsx` → sprint/severity/status filtre dropdown + arama.
-
-**220-010:** `EnterprisePage.tsx` → Bearer token ile F4 endpoint auth-wire; alerts dedup (sürekli değil, sonda tek uyarı) + provider-neutral (CLAUDE/GEMINI/AGENTS hepsi).
-
-### DALGA D — Nervous Activation (Faz-1)
-
-**220-011:** `src/nervous/bootstrap.ts` → `createNervousSystemIfEnabled(config, root, stateProvider)`: config enabled ise observer+decision+proposer+dispatcher+executor+history zincirini kurar + pipeline wire; değilse null. Sprint-controller config-gated bootstrap'ı çağırır.
-
-**220-012:** `src/nervous/action-handlers.ts` → 8 low-risk handler: `ORPHAN_TASK_ARCHIVE`, `STALE_LOCK_RELEASE`, `DEAD_EVENT_STREAM_CLEANUP`, `DEBT_TRENDING_REPORT` ve diğerleri. Executor'a bağlı; gerçek operasyon.
-
-**220-013:** `.deckent/config.json` → `nervous_system.enabled: true`, `mode: balanced`.
-
-### Provider-Free Mimarisi Korundu
-
-Config-driven provider resolve `claude` default tutar; kullanıcı `chat_provider: ollama-local` ile yerel modele geçebilir. ADR-010 ve ADR-066 provider-independence korundu.
-
----
-
-## Consequences
-
-### Olumlu
-
-- **`deckent` gerçekten konuşur:** REPL → gerçek LLM cevabı. "provider not wired" artık yok.
-- **Config-driven esneklik:** Brain=opus, REPL=ollama-local senaryosu tek config key ile.
-- **Nervous Faz-1 aktif:** ORPHAN_TASK_ARCHIVE, STALE_LOCK_RELEASE aksiyonları çalışır; proaktif sistem bakımı başladı.
-- **Dashboard tam-canlı:** Worker grid real-time, status doğru, chat wired, coverage takip, debt filtreli, enterprise auth'lu, alert deduplu.
-- **ADR-040 gerçeğe taşındı:** Nervous mimarisi kağıt üzerinden aktif sisteme geçti.
-
-### Olumsuz / Sınırlamalar
-
-- **`chat --native --once` hermetic test sınırı:** Gerçek LLM cevabı CI'da test edilemez (API key). Mock adapter ile test yapılır; Tier-1 Smoke gerçek binary ile.
-- **Nervous Faz-1 = low-risk only:** Yüksek-riskli aksiyonlar (sprint kill, dosya yazma) onay kapısı arkasında; Faz-2'ye ertelendi.
-- **OllamaAdapter entegrasyonu:** `chat_provider: ollama-local` config desteği var ancak yerel model yüklü olmayan ortamlarda fallback gerekir.
-- **dashboard canlı-test sınırı:** SSE-based real-time testler mock SSE ile doğrulandı; gerçek sunucu e2e Smoke gate.
-
----
-
-## Alternatives Considered
-
-### Claude Hard-Code (Native REPL)
-
-`entry.ts`'de provider'ı claude olarak hard-code etmek kolaydı. Reddedildi: ADR-066 (Provider Independence) + ADR-010 ihlali; kullanıcı yerel model kullanamaz.
-
-### Nervous Tam Otonom (Faz-1 yerine)
-
-Tüm aksiyonları onaysız çalıştırmak. Reddedildi: ADR-040 opt-in prensibi + yüksek-risk aksiyonlarda `feedback_deckent_kill_approval_required` — insan onayı zorunlu.
-
-### Dashboard Polling (SSE yerine)
-
-30s interval polling ile dashboard güncellemesi. Reddedildi: ADR-080 god-level dashboard = native hız, sıfır freeze; SSE `use-live-data.ts` Sprint 218'de landed.
-
-### Dashboard Alert Tüm-Provider Uyarısı Kaldır
-
-Alerts tamamen kaldırmak yerine dedup seçildi: provider-neutral tek uyarı daha az SPAM, daha fazla bilgi.
-
----
-
-## References
-
-- Sprint 220 — feat: Native-LLM-Wire + Nervous-Activation + Dashboard-v2
-- ADR-081 — Native Agentic Deckent (REPL kabuk — Sprint 219)
-- ADR-040 — Nervous System Architecture (opt-in, proactive meta-orchestrator)
-- ADR-066 — Provider Independence (multi-provider backend parity)
-- ADR-080 — Dashboard God-Level (SSE, live data, chat round-trip)
-- `src/cli/entry.ts` — `chat_provider ?? brain_provider ?? 'claude'` fallback chain
-- `src/nervous/bootstrap.ts` — `createNervousSystemIfEnabled`
-- `src/dashboard/src/components/WorkerGrid.tsx` — SSE real-time worker list
-- Memory: `project_dashboard_realrun_findings` — 11-madde dashboard run-verify bulguları
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (REPL-LLM + dashboard-canlılık ürün-yüzü; nervous dogfood+ürün bakım-otomasyonu).
-
-**Re-verified:** Dalga-A `chat_provider` config (`config.ts:67-76`) + `entry.ts` fallback-zinciri `chat_provider → brain_provider → 'claude'` (:86/:103/:435) ✓ · Dalga-D `createNervousSystemIfEnabled` (`bootstrap.ts:114`) ✓ · Dalga-B/C WorkerGrid + RefreshButton + `coverage-endpoint.ts` + DebtPage severity ✓. Action-handler seti 8→**9 aksiyona büyüdü** (WORKER_RESPAWN vd. sonradan eklendi — CACHE_INVALIDATE, DEAD_EVENT_STREAM_CLEANUP, DEBT_TRENDING_REPORT, IPC_DIR_CLEANUP, LOG_ROTATION, METRIC_EMIT, ORPHAN_TASK_ARCHIVE, STALE_LOCK_RELEASE, WORKER_RESPAWN).
-
-**3 bilinen-durum (2026-06-11):**
-1. **220-013 config-flip bugün geçerli DEĞİL** — canlı `.deckent/config.json` → `nervous_system.enabled: false`; deckent-dev'de sonradan kapatılmış, yeniden-açma kararı ayrı değerlendirilecek. **DÜZELTME (faz-2 nervous-analizi, NERV-W1):** Bu amendment'ın ilk sürümündeki "mekanizma sağlam" ifadesi ve bu ADR'nin "Faz-1 aktif: ORPHAN_TASK_ARCHIVE / STALE_LOCK_RELEASE çalışır" iddiası YANLIŞTI — `sprint-controller.ts:514` bootstrap'ı actionHandler'sız çağırıyordu → `bootstrap.ts` default'u **stubActionHandler** her onaylı aksiyonu `failure: "Action handler not yet wired (W2-1)"` ile düşürüyordu; gerçek 9-aksiyon implementasyonu `createActionHandler` (action-handlers.ts:253) **zero-caller'dı**. Göz/karar/onay zinciri çalışıyordu, aksiyon-eli stub'dı. **Sprint 281 NERV-W1 fix'i:** bootstrap default'u `createActionHandler({ projectRoot })` yapıldı (stub silindi, test-seam korunarak — testler kendi handler'larını inject edebilir); 2 yeni pin-testi + nervous-suite 331/331 yeşil. 220-012'nin 8-handler kodu artık fiilen icra-yolunda.
-2. **220-007 chat round-trip canlı-gap (v3-teşhis):** frontend-wire VAR (ChatPage POST `/api/chat` + stream) ve serve-tarafı adapter-wire de VAR (Sprint 269, `server.ts:1206` `resolveChatAdapter` SSOT) — ilk teşhisteki "serve'de wire eksik" iddiası yanlıştı. Gerçek kök: `POST /api/chat` classifier-only (`server.ts:813`) + ChatPage stream-hata-yutması (`:382-384`) → stream canlıda boş kalınca "Anlamadım" görünür kalıyor (ayrıntı ADR-080 §3 düzeltmesi; UX-denetim #1; fix Chat/Dashboard product-sprint'inde).
-3. **220-010 alert-dedup nüks:** 2026-06-11 denetiminde "CLAUDE.md güncellenmedi" ×59 spam (UX-denetim #4) — dedup ya geriledi ya bu auditor-alert yolunu kapsamıyor. md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-083: REPL-UX-Evolution + Provider-Parity + Local-Model-Foundation
-
-**Status:** accepted
-
-# ADR-083: REPL-UX-Evolution + Provider-Parity + Local-Model-Foundation
-
-**Status:** accepted
-
-**Date:** 2026-06-02
-
-**Accepted:** Sprint 221
-
----
-
-## Context
-
-### REPL Slash-Komutlar Bağlı Değildi
-
-Sprint 220 sonunda `deckent` argümansız REPL gerçekten konuşuyordu (ADR-082, 220-001 run-proven). Ancak `handleReplCommand` (chat-repl-ux.ts) mevcut olmasına rağmen `runChatNativeLoop` bunu çağırmıyordu. `/clear` yazınca provider'a gidiyordu (saçma cevap), `/help` yoktu. REPL loop yalnızca `/exit` ve `/quit` için ayrı hard-coded dal içeriyordu.
-
-**Kök neden:** `runChatNativeLoop` (chat-native.ts:282 `for await`) her satırı doğrudan provider'a iletiyordu; slash-handler wire'ı eksikti.
-
-### Agentic Dispatch Bağlı Değildi (220-004 Carry)
-
-`classifyAgenticIntent`/`dispatchAgenticIntent` (chat-agentic-dispatch.ts) mevcut ancak `runChatNativeLoop`'a bağlı değildi. Kullanıcı "sprint durumu ne" yazdığında gerçek `deckent_status` çağrılmıyor, metin provider'a iletiliyordu.
-
-### Provider-Resolve Eksikti: Ollama ve OpenAI-Compat
-
-220-001 provider-resolve `claude/codex/gemini` için CLI spawn yapıyordu. `OllamaAdapter` (core/ollama-models.ts) + `providers/ollama.ts` (local, zero-API) REPL'e bağlı değildi. Alperen yönü: "her provider'de doğru çalışsın; yarın local-model'le deckent-AI". Ollama (localhost:11434, sıfır API-key) birinci-sınıf olmalıydı.
-
-**OpenAI-compat eksikliği:** DeepSeek/Qwen/GLM gibi OpenAI-uyumlu yerel/uzak modeller REPL'den seçilemiyordu.
-
-### Statik Slash-Registry
-
-`handleReplCommand` yalnızca `/exit`/`/clear`/`/quit` — statik hard-code. Alperen: "/komutları CANLI olsun". Slash listesi dinamik, deckent yetenek kataloğundan türetilmeli; hard-code yasak (ADR-070 zero-hardcode).
-
-### Status-Line Yoktu
-
-REPL'de provider/sprint/dizin bilgisi yoktu. Kullanıcı hangi provider'da, hangi sprint'te olduğunu bilemiyordu. claude-code status-line gibi sade bilgi istendi; özelleştirilebilir.
-
-### Enterprise Yetenekler REPL'den Erişilmiyordu
-
-`audit`/`rbac`/`flow`/`cost` CLI komutları mevcut ancak REPL'den çağrılamıyordu. Alperen: "user VE enterprise tarafında tam-kapsamlı; kullanılmasa da kullanılabilir."
-
-### Dashboard Chat Sade Kalıyordu
-
-Dashboard ChatPage (220-007) gerçek round-trip destekledi ancak slash-komut (status/recall) arayüzü yoktu. Terminal REPL ile parity eksikti.
-
----
-
-## Decision
-
-Sprint 221 bu boşlukların tamamını kapattı — beş dalga halinde:
-
-### DALGA A — REPL Canlı Çekirdek
-
-**221-001 — handleReplCommand canlı slash-wire:**
-`runChatNativeLoop` başında her satır önce `handleReplCommand(line)` (chat-repl-ux.ts:63) kontrolünden geçer: `action:'exit'`→break, `action:'clear'`→transcript temizle+devam, `action:'none'`→mevcut akış (agentic/provider). Caller: `chat-native.ts` (def `chat-repl-ux.ts` dışlanır). Additive — mevcut `/exit` legacy-compat korundu.
-
-**221-002 — classifyAgenticIntent/dispatchAgenticIntent wire (220-004 carry):**
-Slash-check'ten sonra: `classifyAgenticIntent(line)` → agentic intent (status/recall/history) ise riskli-onay sonrası `dispatchAgenticIntent` → sonucu output'a bas; değilse provider turn. Caller: `chat-native.ts`.
-
-**221-003 — Canlı slash-registry (buildSlashRegistry):**
-`chat-slash-registry.ts` — `buildSlashRegistry()`: canlı komut listesi döndürür (`{name, desc, agenticIntent?}`). `/help`(sade liste), `/status`/`/recall`/`/plan`/`/sprint` agentic-intent'e map, `/exit`/`/clear`. `resolveSlash(line, registry)` yardımcısı. Hard-code yok — deckent yetenek kataloğundan türetilir (ADR-070 zero-hardcode). `runChatNativeLoop` 221-001/002 bu registry'yi tüketir.
-
-**221-004 — REPL status-line (config-driven):**
-`chat-status-line.ts` — `renderStatusLine(ctx, config)`: provider + aktif-sprint + dizin (opsiyonel maliyet). `config.chat.status_line` (bool/alanlar) — kapatılabilir, özelleştirilebilir. Hard-code yok. `entry.ts` REPL başında basılır.
-
-### DALGA B — Provider-Parity (5-fleet)
-
-**221-005 — Ollama-local + openai-compat REPL round-trip (zero-API):**
-`entry.ts` REPL provider-resolve'a `ollama` dalı eklendi: `chat_provider==='ollama'` → `buildOllamaReplAdapter` (OllamaAdapter, localhost:11434, API-key YOK). `openai-compat` dalı: `OPENAI_COMPAT_PRESETS` + `OpenAICompatPresetName` (DeepSeek/Qwen/GLM). NET-error wrapping: ECONNREFUSED → açık hata "Ollama (http://localhost:11434) erişilemedi: <reason>". Mevcut `createSubscriptionChatAdapter` pattern genişletildi — yeniden yazma değil.
-
-**221-006 — Provider-parity test matrisi (resolveChatAdapter):**
-`chat-provider-parity.ts` — `resolveChatAdapter(provider, config)`: tek giriş noktası tüm provider'ları (claude/codex/gemini/ollama/openai-compat) eşit yolla adapter'a map eder. 5 provider için aynı sözleşme (sendMessage→response) test edildi. Parity garantisi.
-
-**221-007 — Provider fallback chain (resolveChatProvider):**
-`src/core/config.ts` — `resolveChatProvider(config)`: `chat_provider ?? brain_provider ?? 'claude'` + opsiyonel `chat.local_fallback:'ollama'`. Net-hata sözleşmesi: provider erişilemez → açık mesaj (skeleton değil). ADR-070 zero-hardcode: fallback chain config-driven.
-
-### DALGA C — Enterprise-Terminal + User/Enterprise Mod
-
-**221-008 — Enterprise komut köprüsü (dispatchEnterpriseSlash):**
-`chat-enterprise-bridge.ts` — `dispatchEnterpriseSlash(cmd, args)`: `/audit`/`/rbac`/`/flow`/`/cost` slash'larını mevcut CLI komut handler'larına köprüler (yeni iş yapmaz, çağırır). Slash-registry'ye enterprise grubu eklendi — user-mode'da gizli ama erişilebilir ("kullanılmasa da kullanılabilir"). Caller: köprü modülü (def CLI komutları dışlanır).
-
-**221-009 — User/enterprise mod (resolveChatMode):**
-`chat-mode.ts` — `resolveChatMode(config)`: `user` (default, sade — sohbet+temel slash) | `enterprise` (audit/rbac/flow/cost slash görünür). `config.chat.mode`. Mod, slash-registry görünürlüğünü filtreler — yetenek hep VAR, sadece `/help` listesi sadeleşir. Hard-code yok.
-
-**221-010 — Chat config schema (CHAT_CONFIG_SCHEMA):**
-`src/core/config.ts` — `CHAT_CONFIG_SCHEMA` (Zod): `chat: { provider?, mode?: 'user'|'enterprise', status_line?: bool|fields, local_fallback?, slash_extra? }`. 3-katman merge + sade default. 221-004/007/009 bu şemayı tüketir. ADR-004 (3-Layer Config Merge) uyumlu.
-
-### DALGA D — Dashboard claude-code-UX
-
-**221-011 — Dashboard ChatPage streaming + slash:**
-`src/dashboard/src/pages/ChatPage.tsx` — `/api/chat` (220-007 backend) gerçek round-trip + akan cevap + slash-komut girişi (/status /recall → backend agentic). Bearer token. Terminal REPL ile parity.
-
-**221-012 — Dashboard konuşma-merkezli layout:**
-`src/dashboard/src/components/Layout.tsx` — chat öne-çıkar (varsayılan/üst nav), sade bilgi mimarisi (gruplu nav: Konuş / İzle / Yönet). 10-sayfa korunur, sadeleştirilir.
-
-### DALGA E — Hijyen + ADR + Docs
-
-**221-013 — CLI kurulum/komut-çıktı fix (P0):**
-`src/cli/entry.ts` — argüman-routing doğrulandı: argümansız→REPL, argümanlı (serve/help/status...)→commander.parse. `deckent help`/`deckent serve` terminal'de SESSİZ KALMAZ. Async exit, process hang yok. Sprint 536886c4 commit: `isEntryMain` symlink-aware.
-
-**221-014 — Smoke-219-016 hotfix (smoke field gate):**
-`src/orchestra/task-builder.ts` — parse edilen `smoke` alanı task JSON'a (`task.smoke`) yazılır ve gate (post-sprint-smoke) okur. Uçtan-uca doğrulama.
-
-**221-015 — Bu ADR + MASTER-PLAN güncel** (bu görev).
-
-### Local-Model Foundation (ADR-083 Core Value)
-
-Ollama-local (zero-API, localhost:11434) REPL'de birinci-sınıf — "yarın deckent-AI" altyapısı bu sprintte atıldı:
-- `buildOllamaReplAdapter`: HTTP probe + ECONNREFUSED wrapping
-- `resolveChatAdapter('ollama', config)`: parity test matrisi
-- `resolveChatProvider`: `chat.local_fallback:'ollama'` config
-- `OLLAMA_BUILTIN_MODELS`: qwen2.5-coder:32b/7b, llama3:8b, llama3.2:3b
-
-ADR-010 ve ADR-066 korundu — sıfır yeni runtime dependency, provider-independence sağlandı.
-
----
-
-## Consequences
-
-### Olumlu
-
-- **`deckent` REPL tam-kapsamlı:** canlı slash (handleReplCommand wire) + doğal dil→aksiyon (classifyAgenticIntent/dispatchAgenticIntent wire) + status-line + özelleştirilebilir config.
-- **Provider-parity 5-fleet:** claude/codex/gemini/ollama/openai-compat eşit yoldan adapter'a map; claude bias yok. `resolveChatAdapter` tek giriş noktası.
-- **Ollama-local birinci-sınıf:** zero-API-key, localhost:11434, NET-error açık mesaj. "Yarın deckent-AI" (local-model ile deckent geliştirme) altyapısı.
-- **Enterprise tam-kapsamlı:** `/audit`/`/rbac`/`/flow`/`/cost` slash REPL'den erişilebilir; user-mode'da gizli ama var ("kullanılmasa da kullanılabilir", ADR-033).
-- **User/enterprise mod:** sade default (`user`), opt-in enterprise (`config.chat.mode='enterprise'`). Arayüz karmaşık değil, yetenek eksik değil.
-- **Dashboard parity:** ChatPage slash+stream; Layout chat-first. Terminal ve web aynı UX.
-- **`deckent help`/`deckent serve` terminalde çalışır:** argüman-routing fix (221-013).
-
-### Olumsuz / Sınırlamalar
-
-- **Ollama hermetic test sınırı:** Ollama çalışmayan CI ortamında `buildOllamaReplAdapter` mock adapter ile test edilir; gerçek Ollama round-trip Smoke gate.
-- **openai-compat presets sabit liste:** DeepSeek/Qwen/GLM — yeni OpenAI-compat model eklemek `OPENAI_COMPAT_PRESETS` güncelleme gerektirir (post-beta live-catalog ile çözülür, F6-005).
-- **Enterprise slash güvenlik derinliği:** `dispatchEnterpriseSlash` mevcut CLI handler'ları çağırır; izin kontrolü CLI auth'a devredilir (ADR-037 RBAC V1 advisory — runtime soft, hard-flip post-GA V2).
-- **Status-line dashboard parity:** `renderStatusLine` CLI-only (Sprint 221); dashboard status-bar gelecek sprint.
-
----
-
-## Alternatives Considered
-
-### REPL Hard-Code Slash Listesi
-
-`/exit`/`/clear` yanına `/status` vb. hard-code eklemek kolaydı. Reddedildi: ADR-070 zero-hardcode; sabit liste deckent yeteneği büyüdükçe stale olurdu. `buildSlashRegistry()` dinamik katalog yaklaşımı seçildi.
-
-### Claude Bias — Provider Default Hard-Code
-
-`entry.ts`'de provider'ı `claude` olarak hard-code etmek kolaydı. Reddedildi: ADR-066 (Provider Independence) + "yarın local-model'le deckent-AI" hedefi; `resolveChatAdapter` ile 5-fleet eşit parity.
-
-### Ollama Ayrı Alt-Komut
-
-`deckent chat --provider ollama` ayrı CLI path'i. Reddedildi: mevcut `createSubscriptionChatAdapter` pattern'i genişletmek YAGNI ve surgical — yeni soyutlama gereksiz.
-
-### Enterprise Slash Ayrı Terminal (enterprise-mode zorunlu)
-
-Enterprise komutları yalnızca `DECKENT_CHAT_MODE=enterprise` ile erişilebilir kılmak. Reddedildi: "kullanılmasa da kullanılabilir" prensibi — yetenek hep var, görünürlük modla kontrol edilir.
-
-### Dashboard Tam Yeniden Tasarım
-
-Layout'u sprint içinde sıfırdan yazmak. Reddedildi: Karpathy Discipline 3 (Surgical) — mevcut Layout.tsx genişletildi, chat nav gruplaması eklendi, 10-sayfa korundu.
-
----
-
-## References
-
-- Sprint 221 — feat: REPL tam-kapsam + provider-parity + local-model-foundation (ADR-083)
-- ADR-082 — Native-LLM-Wire (Sprint 220 predecessor: REPL gerçek cevap, config-driven provider)
-- ADR-081 — Native Agentic Deckent (REPL kabuk, Sprint 219)
-- ADR-066 — Provider Independence (multi-provider backend parity)
-- ADR-070 — Brain Evaluation Integrity (zero-hardcode principle)
-- ADR-010 — Tek Runtime Dependency (no new runtime deps)
-- ADR-004 — 3-Layer Config Merge (CHAT_CONFIG_SCHEMA uyumlu)
-- `src/cli/commands/chat-native.ts` — `runChatNativeLoop` + slash-wire + agentic-wire
-- `src/cli/commands/chat-slash-registry.ts` — `buildSlashRegistry`, `resolveSlash`
-- `src/cli/commands/chat-status-line.ts` — `renderStatusLine`
-- `src/cli/commands/chat-enterprise-bridge.ts` — `dispatchEnterpriseSlash`
-- `src/cli/commands/chat-mode.ts` — `resolveChatMode`
-- `src/cli/commands/chat-provider-parity.ts` — `resolveChatAdapter`
-- `src/cli/entry.ts` — `buildOllamaReplAdapter`, `DECKENT_CHAT_PROVIDER` env override, openai-compat branch
-- `src/core/config.ts` — `resolveChatProvider`, `CHAT_CONFIG_SCHEMA`
-- Memory: `project_terminal_dashboard_ux_evolution` — Sprint 221 yönü (claude-code-UX evrim)
-- Memory: `feedback_directive_kanit_letter_vs_goal` — wire-gap (def-dosya dışla, çağıran-modül ölç)
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (REPL ürün-yüzü; ollama-local = air-gapped/maliyet user-değeri; enterprise-slash köprüsü "kullanılmasa da kullanılabilir" ilkesinin taşıyıcısı).
-
-**Re-verified (çağıran-taraf wire'lar gerçek):** Dalga-A `handleReplCommand` + `classifyAgenticIntent/dispatchAgenticIntent` + `buildSlashRegistry/resolveSlash` — `chat-native.ts:10/:13/:15` import + loop-tüketimi ✓ · 5 modül diskte (slash-registry / status-line / mode / enterprise-bridge / provider-parity) ✓ · `resolveChatProvider` (`config.ts:87`) + `resolveChatProviderWithFallback` (:124) + `CHAT_CONFIG_SCHEMA` (:318) ✓ · `buildOllamaReplAdapter` (`entry.ts:205`) + `DECKENT_CHAT_PROVIDER` env-override ✓.
-
-**Evrim:**
-- **Ink-default'a sorunsuz taşındı (ADR-086):** `src/cli/repl/run.tsx` slash-registry'yi tüketiyor — Dalga-A çekirdeği view-değişiminde korundu.
-- **`resolveChatAdapter` SSOT'u serve'e uzadı:** Sprint 269 B-ChatStream `server.ts:1206`'da bu ADR'nin parity-modülünü dashboard chat-stream adapter'ı olarak bağladı (`:643` endpoint-tüketimi) — "tek giriş noktası" hedefi terminal-ötesine geçti.
-
-**Hafif drift:** `entry.ts` REPL-tarafı kendi inline provider-dallarını koruyor (ollama/openai-compat) — `resolveChatAdapter` SSOT'una indirgenmedi; iki resolve-yolu yaşıyor (konsolidasyon adayı, Chat/Dashboard product-sprint'i). Canlı dashboard-chat'in "Anlamadım" davranışının kökü bu ADR'nin parity-modülü DEĞİL — `POST /api/chat` classifier-only + ChatPage stream-hata-yutması (ayrıntı ADR-080 amendment düzeltmesi + UX-denetim #1 v3). md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-086: Native CLI Parity — F11 Feature Set (Sprint 224)
-
-**Status:** accepted
-
-# ADR-086: Native CLI Parity — F11 Feature Set (Sprint 224)
-
-**Status:** accepted
-
-**Date:** 2026-06-02
-
-**Accepted:** Sprint 224
-
----
-
-## Context
-
-### The Gap
-
-After ADR-083 (Sprint 221 — REPL Tam-Kapsam + Provider-Parity), `deckent` had a working
-REPL with agentic dispatch, slash-registry, and status-line. However, a full `claude-code /
-codex / gemini CLI` quality bar remained unmet:
-
-- **Terminal-mode input missing:** readline was in line-mode, not terminal-mode. No ↑/↓
-  history, no ←/→ cursor movement, raw escape sequences leaked to output.
-- **Streaming was chunky:** the Claude `stream_event` envelope was not unwrapped — the
-  entire assistant reply arrived as one block instead of token-by-token.
-- **Thinking indicator had no brand:** a bare spinner, no kraken brand, no fixed-per-prompt
-  verb, no braille-progress.
-- **Agentic-DO had no tool layer:** `deckent` could orchestrate workers but had no own
-  write/edit/read/bash tooling for the REPL session. `<deckent_tool>` protocol for
-  provider-agnostic tool dispatch was absent.
-- **Permission memory was absent:** every agentic action prompted `y/N` with no `always`
-  option — no `.deckent/settings.local.json` persist (claude-code style).
-- **`/nervous` slash was not wired:** `chat-nervous-bridge.ts` existed but was not called
-  from `chat-native.ts` slash handler — `/nervous` returned "Unknown command".
-- **Banner was zero-caller:** `renderBanner` existed in `chat-banner.ts` but `entry.ts`
-  never called it.
-- **AI plan-mode failed silently:** `callBrainPlanner()` collapsed all error types
-  (spawn/timeout/parse/validation/no-provider) into a single `null` and the CLI silently
-  fell back to structured-mode with no explanation.
-
-These gaps collectively kept F11 below `claude-code` quality. Alperen's direction:
-"deckent REPL must offer the FULL feature set + polish + speed of claude-code / codex /
-gemini CLIs — multi-model, multi-provider, native, fast."
-
-### ADR-081/082/083 Foundation
-
-This ADR builds on:
-- **ADR-081** — agentic REPL shell, `runChatNativeLoop` (Sprint 219)
-- **ADR-082** — native LLM wire, config-driven provider, REPL gerçek cevap (Sprint 220)
-- **ADR-083** — REPL tam-kapsam, provider-parity 5-fleet, local-model foundation (Sprint 221)
-
----
-
-## Decision
-
-Sprint 224 closed the F11 parity gap in two phases: hand-coded recovery branch (merged to
-main before dogfood), and parallel deckent dogfood wave (orthogonal, distinct-file tasks).
-
-### Recovery Branch (main — before dogfood)
-
-**F11-002 — Terminal-mode input (224-001):**
-`src/cli/commands/chat-native.ts` — readline switched to `terminal: true` mode. Line-editing
-(↑/↓ history, ←/→ cursor, Del, Ctrl-A/E) work in the REPL. No raw escape leak.
-
-**F11-003 — Real token-by-token streaming (224-011):**
-Claude `stream_event` SSE envelope unwrapped — each text delta rendered immediately. Was
-dumping whole reply at once (chunky/slow); now true streaming.
-
-**F11-004 — Thinking indicator (224-014/018):**
-`● deckent · <fiil>…` kraken-brand colored header. Verb fixed per-prompt (not cycling per
-frame). Braille spinner in the wait region. Sprint 224-018 added color (`chalk` already in
-deps; no new runtime dependency per ADR-010).
-
-**F11-005/wire — Agentic-DO tool layer (224-005/006/wire):**
-`src/cli/commands/chat-agentic-do.ts` — write/edit/read/bash tool layer, provider-agnostic
-`<deckent_tool>` protocol. `dispatchAgenticDo` called from `runChatNativeLoop`. Confirm-gate
-for write/bash (y/a/N). Scope-bounded to REPL session cwd.
-
-**F11-006 — Permission memory (224-016):**
-`.deckent/settings.local.json` — `permissions.allow[]` array, claude-code style 3-way
-`y/a/N` prompt. `a` = always → appended to allow list, not asked again. Gitignored.
-
-### Dogfood Wave (Sprint 224 — parallel deckent workers)
-
-**224-015 — AI plan-mode fix:**
-`callBrainPlanner()` → discriminant union `{ok:true,data}|{ok:false,reason,message}` with
-`reason: spawn_failed|timeout|parse_failed|validation_failed|no_providers`. CLI bootstrap
-logs detailed reason before falling back to structured. Timeout configurable via
-`brain_plan_timeout_ms`.
-
-**224-008 — `/nervous` slash wire:**
-`chat-native.ts` slash handler → `getPendingNervous()` + `renderNervousPrompt()` called on
-`/nervous`. Pending proposals listed with accept/reject flow. Was "Unknown command" before.
-
-**224-009 — Banner wire:**
-`entry.ts` `launchDefaultRepl` calls `renderBanner(ctx)` on TTY at startup (status-line
-adjacent). Zero-caller bug fixed.
-
-**224-010 — Nervous safe re-enable:**
-`.deckent/config.json` `nervous_system.enabled: true` — panic-gate.ts non-blocking (223-006)
-+ observer.ts (223-008) already in main → safe. A/B verified: nervous ON → sprint SPAWN
-not blocked.
-
-**224-027 — Smoke harnesses:**
-`scripts/agentic-do-verify.mjs` — real `dist/cli/entry.js` agentic-write E2E (tmpdir-isolated,
-async spawn, PASS/FAIL). `scripts/repl-smoke-verify.mjs` extended: terminal-mode /
-streaming / permission-memory / `/`-menu all run-proven.
-
-**224-012 (this ADR + MASTER-PLAN update):**
-ADR-086 accepted; MASTER-PLAN §10 Sprint 224 outcome + F11 status updated.
-
----
-
-## Consequences
-
-### Positive
-
-- **Terminal-mode parity:** readline terminal-mode gives ↑/↓ history, cursor movement —
-  matches claude-code CLI UX.
-- **True streaming:** token-by-token rendering from Claude SSE; no more chunky whole-reply.
-- **Brand identity in motion:** kraken `● deckent · <fiil>…` header — recognizable,
-  consistent per ADR-021.
-- **Agentic-DO unblocked:** write/edit/read/bash in REPL session, `<deckent_tool>` protocol
-  provider-agnostic. Agentic-DO E2E smoke run-proven.
-- **Permission memory:** claude-code-style `always` option — power users not prompted
-  repeatedly. `.deckent/settings.local.json` gitignored, per-machine.
-- **`/nervous` slash live:** pending nervous proposals accessible from REPL without leaving
-  the session.
-- **AI planner honest:** discriminant error union surfaces real failure reason; no more
-  silent structured fallback.
-- **Nervous re-enabled:** proactive meta-orchestrator active again after Sprint 223 disable.
-- **Smoke harnesses:** agentic-DO write-verify + REPL smoke all run-proven, not mock-only.
-
-### Negative / Limitations
-
-- **F11-007 (pinned input bar), F11-008 (interactive `/` menu), F11-009 (markdown-stream),
-  F11-010 (token-counter), F11-011 (live activity), F11-012 (UTF-8/Turkish), F11-013
-  (clickable paths):** not in Sprint 224 dogfood scope — REPL render core is coupled and
-  handled by hand in separate session to avoid parallel collision.
-- **F11-014 (multi-provider parity):** codex/gemini per-turn today; persistent + agentic
-  parity post-Sprint 224.
-- **Agentic-DO hermetic test boundary:** real `dist/cli/entry.js` required; smoke skips if
-  `dist/` absent (hermetic CI compliance).
-- **nervous A/B advisory:** SPAWN non-blocking confirmed but nervous runtime still advisory
-  V1 — hard-flip post-GA V2 per ADR-037.
-
----
-
-## Alternatives Considered
-
-### Continue Chunky Streaming (no token-by-token)
-
-Deferring streaming fix would have kept the per-turn latency perception poor. Rejected:
-the streaming wire (`stream_event` unwrap) was a two-file change — surgical, high impact.
-
-### New readline Abstraction Layer
-
-Introduce a separate `terminal-readline.ts` wrapper for TTY mode. Rejected: Karpathy
-Discipline 2 (Simplicity) — a single `terminal: true` option in the existing readline
-init achieved the goal. No new abstraction needed.
-
-### spawnSync for Agentic-DO Tools
-
-`spawnSync` for the bash tool in agentic-DO. Rejected: ADR-006 (spawnSync Security Pattern)
-forbids blocking sync for user commands; CI-hermeticity rule also blocks `spawnSync` in
-tests. Async `spawn` with timeout guard used instead.
-
-### Permission Memory in memory.db
-
-Store `permissions.allow` in SQLite `memory.db`. Rejected: per-machine settings (not
-project-wide knowledge) belong outside the git-tracked memory; `.deckent/settings.local.json`
-(gitignored, flat JSON) matches the claude-code `settings.local.json` pattern.
-
----
-
-## References
-
-- Sprint 224 — feat: Native CLI Parity (F11) + nervous wire + AI plan-fix + smoke harnesses
-- ADR-083 — REPL Tam-Kapsam + Provider-Parity (Sprint 221 predecessor)
-- ADR-082 — Native-LLM-Wire (Sprint 220)
-- ADR-081 — Native Agentic Deckent (Sprint 219)
-- ADR-079 — Proof-of-Function DoD (Tier-0/Tier-1 + Smoke gate)
-- ADR-021 — Kraken ASCII Brand Identity
-- ADR-010 — Tek Runtime Dependency (no new deps — chalk already in deps)
-- ADR-006 — spawnSync Security Pattern (agentic bash tool uses async spawn)
-- `src/cli/commands/chat-native.ts` — terminal-mode readline + `/nervous` wire + agentic-DO wire
-- `src/cli/commands/chat-agentic-do.ts` — `<deckent_tool>` protocol, write/edit/read/bash
-- `src/cli/entry.ts` — `renderBanner` call, permission-memory init
-- `src/orchestra/planner.ts` — discriminant union `callBrainPlanner`
-- `scripts/agentic-do-verify.mjs` — run-proven agentic-write E2E smoke
-- `scripts/repl-smoke-verify.mjs` — REPL smoke harness (terminal/streaming/perms/menu)
-- `.deckent/config.json` — `nervous_system.enabled: true` (re-enabled Sprint 224-010)
-
----
-
-## Amendment — Sprint 281 (2026-06-11, ADR-review, full code-verification)
-
-**Classification: BOTH** (REPL-parity = ürünün claude-code-kalite çıtası; F11 doğrudan user-deneyimi).
-
-**Re-verified:** `/nervous` slash-wire (`chat-native.ts:21-24` import + `:292` wire-root) ✓ · banner-wire (`entry.ts:29` + `:511`) ✓ · planner discriminant-union (`planner.ts:375-386`: spawn_failed/timeout/parse_failed/validation_failed/no_providers) ✓ · permission-memory (`chat-permissions.ts` → `.deckent/settings.local.json`) ✓ · `agentic-do-verify.mjs` + `repl-smoke-verify.mjs` ✓.
-
-**Yeniden-yapılanma (dosya-referansı stale, kavram canlı ve büyümüş):** `chat-agentic-do.ts` artık diskte YOK — `<deckent_tool>` agentic-DO katmanı şu aileye bölündü: `chat-session.ts` (`:83 DECKENT_TOOL_TAG_RE` parser + `--append-system-prompt` enjeksiyonu) + `chat-tool-exec.ts` (`createToolExecDispatcher`, async-spawn bash) + `chat-tool-bridge.ts` + `tool-permissions.ts` (hem `commands/` hem `repl/` katmanında). Bu ADR'nin Referanslar bölümündeki `chat-agentic-do.ts` satırı tarihsel kayıt olarak korunur.
-
-**Negatives-listesi Ink'le kapandı:** F11-007 pinned input-bar (`src/cli/repl/input-bar.tsx`), F11-008 `/` menü, F11-009 markdown-stream vd. Sprint 224+ Ink enterprise-epic'i (E1-E7: markdown/menü/switcher/footer/agentic-diff/paste/default) ile gerçekleşti — ADR'nin "kapsam-dışı" bıraktıkları sonraki el-kodlama oturumlarında tamamlandı (ADR-083 amendment Ink-evrim notu).
-
-**224-010 nervous re-enable bugün geçerli DEĞİL:** canlı `.deckent/config.json` → `nervous_system.enabled: false` — Sprint 223 disable → 224 re-enable → sonradan İKİNCİ kez kapatılmış (ADR-082 amendment'indeki opt-out drift'le aynı kayıt; yeniden-açma kararı ayrı değerlendirilecek). md+db senkron (Alperen ADR-review).
-
-
----
-
-## adr-087: Async I/O & Test Hermeticity Standard
-
-**Status:** accepted
-
-# ADR-087: Async I/O & Test Hermeticity Standard
-
-**Status:** accepted
-
-**Date:** 2026-06-11
-
-**Supersedes:** ADR-005 (Synchronous I/O — deprecated)
-
----
-
-**Decision:** Hot-path I/O and ALL subprocess spawning MUST be asynchronous; ALL tests MUST be hermetic. This is the active, agent-injected successor to the deprecated ADR-005, elevating the rule from a buried deprecated-Note + the CLAUDE.md hermeticity section into an enforced architecture decision that **every worker model (Claude / Codex / Gemini) reads** via ADR prompt-injection.
-
-**Rules (binding for all workers):**
-1. **No `spawnSync` for subprocesses** — use async `spawn` (`node:child_process`). `spawnSync` blocks the event loop → CI timeouts + O(n) scan contention (Sprint 279 WK-7: the auditor's 30s scan ran a per-worker `spawnSync('docker', …)`). Use async `spawn` + `Promise.allSettled` batching. **Sole sanctioned exception:** the ADR-006 spawnSync security pattern (argument-array, no shell) for short, trusted, non-hot-path one-shots.
-2. **Hot-path file/network I/O async** — loops, scan cycles, worker dispatch, large reads. A one-shot small config read at startup (`readFileSync` of a <1KB JSON) MAY stay sync — the Sprint 132 perf failure was hot-path, not startup.
-3. **Tests hermetic** — all I/O under `os.tmpdir()`; never read gitignored local state (`.deckent/config.json`, `.brain/memory.db`, `~/.deckent`, `.deck/`); no real network/docker; assume a fresh checkout. Verify with `npm run test:ci-sim`.
-
-**Context:** ADR-005 deprecated the synchronous-I/O decision after Sprint 132 hot-path performance problems, but its replacement guidance lived ONLY in a *deprecated* ADR's Note plus the CLAUDE.md worker rules — never as an accepted, prompt-injected ADR. Deprecated ADRs do not carry active law to the agents (Alperen 2026-06-11 ADR review: "deprecated ADR işe yaramaz; async + hermeticity diğer modeller de görmeli"). This ADR closes that governance gap.
-
-**Consequence:** New code uses async `spawn` + hermetic tests; reviewers/auditor flag new `spawnSync` (outside the ADR-006 exception). Residual `spawnSync` (Sprint 279 WK-7: ~15 in `auditor.ts` incl. the ADR-006 enforcement string + `gatherCiBaseline`) is tracked for migration in MASTER-PLAN "ADR-Analizi Türetilen İşler → ADR-087-W". Auditor liveness probes are already async-batched (Sprint 279). Cross-ref: ADR-006 (sanctioned spawnSync security pattern), CLAUDE.md "Test Hermeticity", `.claude/rules/karpathy-discipline.md` (CUSTOM — Test Hermeticity).
-
-
----
-
-## adr-088: Memory V2 — DB-First Architecture
-
-**Status:** accepted
-
-# ADR-088: Memory V2 — DB-First Architecture
-
-**Status:** accepted
-
-**Date:** 2026-06-11
-
-**Supersedes:** ADR-009 (DEBT.md Markdown Tablo Formatı — deprecated). Generalizes the same principle to ALL brain knowledge.
-
----
-
-**Decision:** All brain knowledge — ADRs, sprint learnings, retros, technical debt, patterns, identity — is stored **DB-first** in SQLite (`.brain/memory.db`, `better-sqlite3`). The `.brain/exports/*.md` files (`summary.md`, `decisions.md`, `memory.md`, `debt.md`) are **generated exports, not sources of truth**. Code reads knowledge via `MemoryStore` (`store.getByType('adr')`, `searchMemory(...)`) — never by parsing `.md`.
-
-**Schema:** 5 tables — `entries` (id, type, source, title, content, summary, *_norm, status, priority, sprint_id, sprint_num, lang, decay_exempt, metadata, tenant_id, timestamps, audit_prev_hmac, audit_hmac), `tags`, `relations` (references/supersedes/caused_by/resolves/blocks/depends_on), `entry_history` (field-level change tracking), `schema_version` — plus the `entries_fts` **FTS5 virtual table** (8 columns: title/content/summary/tag_text + their `turkishNormalize` variants).
-
-**Search:** FTS5 full-text, **dual-layer** — original text + `turkishNormalize()` (`memory-normalize.ts`) → TR/EN/DE ~100% recall. `searchMemory()` (`memory-query.ts`) runs both layers + `buildAutoQuery()` for Brain auto-query. Correct FTS5 query shape: `SELECT e.* FROM entries_fts f JOIN entries e ON e.rowid = f.rowid WHERE entries_fts MATCH ?`.
-
-**Context:** ADR-009 made `DEBT.md` a hand-maintained markdown table — the same file-as-source model used by the original `MEMORY.md`/`DECISIONS.md`/`RETRO.md`. It did not scale (96K ADR file, no search, merge conflicts, no decay/history). Memory V2 (DB-first) replaced it: SQLite is the single source, `.md` are exports for git review/diff. This decision had **no ADR** until now — a governance gap surfaced in the 2026-06-11 ADR review (Alperen).
-
-**Consequence:**
-- **Modules:** `memory-store.ts` (CRUD, FTS5 sync, tags, relations, decay, history, audit-hmac), `memory-query.ts` (dual-layer search), `memory-export.ts` (DB→.md), `memory-import.ts` (.md→DB), `memory-types.ts`.
-- **Sync invariant:** any write through `MemoryStore.insert/upsert/update` keeps `content_norm` + FTS5 + `entry_history` + `audit_hmac` consistent. Direct SQL `UPDATE` is forbidden (misses norm/FTS5/audit). **Editing an ADR/entry means updating BOTH the `.md` AND the DB** so doc==DB (regenerate exports with `deckent memory export`).
-- **Git:** `.brain/memory.db` is gitignored (rebuildable from exports via `memory-import`); `.brain/exports/*.md` are git-tracked.
-- **decay:** `store.decay(currentSprintNum, decayAfterSprints)`; `decay_exempt=1` for permanent governance (ADRs, identity).
-- **Brain auto-query:** Task DNA → relevant ADR/pattern/memory injected at PLAN/SPAWN/EVALUATE.
-- **CLI:** `deckent recall "q"`, `deckent remember "note"`, `deckent memory rebuild|export|stats`. **MCP:** `deckent_memory_query`. **Config:** `.deckent/config.json` → `memory.backend`, `memory.search`, `memory.decay_after_sprints`.
-
-Cross-ref: ADR-009 (superseded), ADR-036 (ADR Governance Integration — ADRs injected from DB), `docs/reference/api-surface.md` (Memory V2 DB Schema + Query API), DECKENT.md "Memory V2 — DB-First Architecture".
-
-
----
-
-## adr-089: Backend-Agnostic Worker Observation + Per-Worker Independent Backends
-
-**Status:** accepted
-
-# ADR-089: Backend-Agnostic Worker Observation + Per-Worker Independent Backends
-
-**Status:** accepted
-
-> Scope of acceptance: the backend-agnostic-watch principle + CLI/MCP parity are **accepted**; the firecracker/cloud backends are **roadmap** (forward-looking, see "Roadmap (proposed)" below — not yet built).
-
-**Date:** 2026-06-11
-
-**Related:** ADR-022 (CLI/MCP Feature Parity), ADR-027 (Hybrid Spawn Backend), ADR-066 (Provider Independence), WK-5 (docker live-monitor)
-
----
-
-**Decision:**
-
-1. **`watch` is backend-agnostic.** `deckent watch [worker]` observes a worker on **whatever backend it actually runs** — docker (`docker logs -f`), subprocess (stdout/stderr stream), tmux (attach), and (roadmap) firecracker microVM / cloud / ollama-host — resolved **per-worker from sprint/worker state**, NOT hardwired to tmux. "`deckent watch` dediğin worker neredeyse orada çalışır." Backend-forcing flags (`deckent watch --docker`, `--tmux`, …) select an explicit view.
-
-2. **CLI/MCP parity — NO semantic split (ADR-022).** `deckent watch` (CLI) and `deckent_watch` (MCP) are the **same capability over the same core**. The current divergence (CLI `watch` = tmux-split vs MCP `deckent_watch` = event-stream subscribe) is a **parity violation to be removed**: one core resolves worker→backend→stream; CLI + MCP are thin wrappers calling it. A command does the same job in CLI and MCP.
-
-3. **Per-worker independent backends (vision).** Each worker / each flow can declare its **own execution backend** — tmux, docker, firecracker microVM, cloud, ollama-host — chosen independently. Both the orchestrator (spawn) AND the observation layer (watch) are **backend-pluggable**; observation follows the worker wherever it runs.
-
-**Context:** Today `watch` is tmux-centric and CLI/MCP semantics diverged (ADR-022 review, 2026-06-11). Workers already run on docker/tmux/subprocess (ADR-027). Product vision (Alperen 2026-06-11): make EVERY worker + EVERY flow **independently backed** — including future firecracker microVMs + cloud — so deckent scales from a laptop to a heterogeneous fleet and a user can observe ANY worker on ANY backend uniformly. Example: some workers on tmux, some docker, some firecracker, some cloud, some ollama-host — one `watch` UX across all.
-
-**Consequence:**
-- A **backend-observation abstraction** — per-backend attach/stream adapter (`docker logs -f`, subprocess pipe, tmux attach, cloud log API). `watch` resolves the worker's backend from sprint/worker state → dispatches the right stream.
-- CLI + MCP share one observation core (parity); the CLI=tmux / MCP=event-stream divergence is unified.
-- New backends (firecracker, cloud) plug in by implementing a **spawn adapter + observe adapter** — no `watch`/orchestrator rewrite.
-- Builds on ADR-027 (hybrid spawn backend), WK-5 (docker live-monitor `logs -f` + `deckent watch --follow`, Sprint 279).
-
-**Current state (2026-06-11):** docker/tmux/subprocess spawn exist (ADR-027); `watch --follow` docker `logs -f` added (Sprint 279 WK-5); CLI `watch` still tmux-centric; `deckent_watch` MCP = event-stream subscribe (diverged). Backend-agnostic resolution + CLI/MCP unification + firecracker/cloud are **work items** → MASTER-PLAN "ADR-Analizi Türetilen İşler → WATCH-W" + roadmap.
-
-**Roadmap (proposed):** firecracker microVM backend; cloud backend; per-worker backend declaration in the task spec; uniform fleet-wide observation. These are forward-looking (not built); the backend-agnostic-watch + CLI/MCP-parity principle is decided/accepted now.
-
-Cross-ref: ADR-022 (parity), ADR-027 (hybrid spawn), ADR-066 (provider independence), ADR-062 (embedded web terminal — PTY worker-attach), §S DESK-1 (god-level observation surface).
-
-
----
-
-## adr-090: Documentation Tracking & Staleness (DCR + content-hash + multi-signal)
-
-**Status:** accepted
-
-# ADR-090: Documentation Tracking & Staleness (DCR + content-hash + multi-signal)
-
-**Status:** accepted
-
-**Date:** 2026-06-18
-
-**Related:** ADR-029/030/031 (Managed-Docs), ADR-088 (Memory V2 DB-First), ADR-010 (Tek Runtime Dependency), ADR-087 (Async I/O & Test Hermeticity)
-
----
-
-**Context:** Projelerde dokümantasyon karmaşıklaşıyor; hangi doc güncel, hangisi koddan geride, hangisi önemli — körlemesine. `DOC-POLICY.md`'nin 4-katmanlı tiering'i el-bakımlı; ADR-031 content-hash yalnız managed-docs auto-section'ları için. Tüm repo dokümanları için makine-okunur bir tazelik + önem sinyali yok.
-
-**Decision:** Her (geçici-olmayan) `.md` dokümana **DCR (Document Criticality Rank — `doc_rank`, 0=en kritik, sonsuz seviye)** + **gövde-content-hash (sha256)** + **last_updated** ata; bunları hem YAML front-matter'da hem `memory.db` `doc_tracking` tablosunda (ayrı `better-sqlite3` bağlantısı, `entries`'e dokunmadan) izle. **Çok-sinyalli stale**: content-drift + age (rank-duyarlı eşik) + (Faz 2) code-drift; `doc_rank` ile ağırlıklı `priority_score`. Geçici doc (`scratch/` veya `status:draft|temp`) hashlenmez (EXEMPT). Kapsam: tüm repo `**/*.md` − `trackIgnore`. `CLAUDE.md`/`DECKENT.md`/`AGENTS.md`/`GEMINI.md` = DB-only (front-matter enjeksiyonu riskli). Hash gövde-only (front-matter hariç, CRLF→LF + tek trailing `\n` normalize) → metadata yazımı drift-churn yaratmaz. CLI: `deckent docs track scan|status|sync`.
-
-**Consequences (+):** Stale/önemli doc'lar makine-tespitli; takip/öneri/analiz netleşir; DOC-POLICY tiering'inin sayısal genelleştirmesi. Mevcut `doc-cache` (SHA-1) ve MemoryStore bozulmaz (additive). 725-doc canlı tarama proof-of-function ile doğrulandı.
-
-**Consequences (−):** Front-matter mutasyonu git-diff gürültüsü ekler (gövde-only hash ile churn sınırlı); ikinci sqlite bağlantısı (WAL ile güvenli). Age sürekli-sinyal olduğundan bugün commit edilmemiş doc en az DRIFT görünür (DRIFT bilgilendirici, "need attention" yalnız STALE/CRITICAL_STALE'i sayar). Code-drift + CI-gate + MCP/dashboard Faz 2'ye ertelendi.
-
-**References:** `docs/superpowers/specs/2026-06-18-doc-tracking-design.md`, `docs/superpowers/plans/2026-06-18-doc-tracking.md`, `docs/reference/api-surface.md` (doc_tracking şeması).
-
----
-
-**Amendment (Faz 2, 2026-06-18):** code-drift sinyali canlı (`tracks:` glob → `git ls-files` + author-date karşılaştırması, `src/core/doc-tracking/code-drift.ts`; scanner'da wire); `deckent docs track scan --check [--max-rank n]` CI-gate (CRITICAL_STALE → non-zero exit); sprint-finalize hook (`config.doc_tracking.sync_on_finalize`, default OFF, DB-only, fail-safe); MCP `deckent_docs` `track-scan`/`track-status` action'ları; HTTP `GET /api/docs/health` (rank×state heatmap, auth-gated) + dashboard "Docs Health" sayfası (heatmap + drill-down). Tier-1 proof-of-function: serve + `/api/docs/health` 200 (832 doc canlı) + 401 auth-gate + dashboard component test. Spec: `docs/superpowers/specs/2026-06-18-doc-tracking-phase2-design.md`. **Status:** accepted.
-
-
----
-
-## adr-091: Project-Scoped Messaging Gateway — Control-Plane Daemon + Spawned Per-Project Runtimes
-
-**Status:** accepted
-
-# ADR-091: Project-Scoped Messaging Gateway — Control-Plane Daemon + Spawned Per-Project Runtimes
-
-**Status:** accepted
-
-**Date:** 2026-06-20
-
-**Related:** Amends ADR-016 (External Messaging Connectors); aligns with ADR-040 (Nervous), ADR-062 (WS Gateway), ADR-069 (Webhook/RBAC), ADR-025 (Graceful Shutdown), ADR-087 (Async I/O), ADR-089 (Spawn Backend).
-
-## Context
-Telegram/messaging deneyimi baştan-sona re-arch ediliyor (Faz3 transport-önce, tam gateway re-arch). Çok-project bir mesajlaşma gateway tek bot-token başına TEK poller sahiplenmeli (aynı token iki process tarafından poll edilirse Telegram 409 döner), subscription-auth invariant'ını korumalı (ANTHROPIC_API_KEY her worker child'ından silinir) ve per-project crash izolasyonu sağlamalı.
-
-## Decision
-G1: GLOBAL control-plane daemon (`deckent gateway`, home `~/.deckent/gateway/`) token başına TEK connector sahiplenir; project-scoped SessionRegistry (chatKey→project), ProjectRegistry, ve her bound-project için TEK runtime child spawn eden RuntimeSupervisor (`ANTHROPIC_API_KEY` env'den silinmiş). Inbound mesaj → router chat→project binding'ini çözer (explicit `/use`), sonra bound project'in runtime'ına JSON-lines IPC üzerinden route eder (streaming-frame forward-compat). İki-seviyeli secret: bot token gateway-global, project secret runtime-child-local. Topology A (daemon + spawned children).
-
-## Consequences
-- Yeni global home `~/.deckent/gateway/`; per-project `deckent bot` deprecation yolu olarak kalır.
-- Token başına tek poller (409 yok); per-project crash izolasyonu; auth invariant child başına korunur (test-assert'li).
-- G1 follow-up'a ertelendi: pairing allowlist + `/pending` + approval-callback resolution + idle-evict. UYARI: Gateway pairing land etmeden PUBLİKE AÇILMAMALI (şu an isAuthorized hep-true).
-- Alt-projeler: G2 (grammY transport + webhook + Discord parity), G3 (per-session memory/isolation).
-- Spec: docs/superpowers/specs/2026-06-20-messaging-gateway-g1-design.md; plan: docs/superpowers/plans/2026-06-20-messaging-gateway-g1.md; kod main bc45eef5.
-
----
-
-## adr-092: Connector-Surface Social Identity RBAC Authorization
-
-**Status:** accepted
-
-# ADR-092: Connector-Surface Social Identity RBAC Authorization
-
-**Status:** accepted
-
-**Date:** 2026-06-26
-
-**Sprint:** 329
-
----
-
-**Context:**
-
-Deckent'in messaging connector katmanı (Telegram, Discord, WhatsApp ve gelecek adaptörler), kullanıcı mesajlarını herhangi bir kimlik doğrulaması olmaksızın işliyordu. Sprint 329 öncesinde:
-
-1. **Kimlik belirsizliği:** Connector'a gelen her mesajın göndericisi (`fromUser`) yalnızca platform-bazlı bir string (örn. Telegram user ID) olarak biliniyordu — hangi deckent tenant'ına veya projesine ait olduğu, hangi izinlere sahip olduğu bilinmiyordu.
-
-2. **Yetkilendirme yoktu:** Her platform kullanıcısı, connector'ın desteklediği tüm yetenekleri (capabilities) doğrudan tetikleyebiliyordu. Ayrıcalık yükseltme, yetkisiz sprint tetikleme ve kimliksiz komut çalıştırma açıklarına zemin hazırlıyordu.
-
-3. **ADR-037 sınırlı kapsamı:** ADR-037 Brain-Auditor-Worker authority matrix'ini tanımlar ve worker-runtime düzeyinde advisory bir RBAC uygular. Ancak ADR-037 connector mesaj yüzeyini kapsamaz — gelen harici mesajların kim tarafından gönderildiğini, hangi tenant'a bağlı olduğunu ve hangi `resource:action` çiftine izin verildiğini belirleyecek bir mekanizma yoktu.
-
-4. **Fail-open riski:** Yetkilendirme yokken varsayılan davranış açık (fail-open) idi — sisteme ulaşan her mesaj işleme alınıyordu. Bu, enterprise ortamlarda kabul edilemez bir güvenlik açığıdır.
-
-5. **Opt-in gereksinimi:** Kimlik doğrulamanın zorunlu tutulması, mevcut tekil kullanıcı kurulumlarını kırabilir. Özellik, açıkça yapılandırıldığında (`identity.enabled: true`) aktif olmalı; kapalı durum geriye-dönük uyumluluk korumalıdır.
-
-**Decision:**
-
-Connector mesaj yüzeyi için fail-closed, opt-in, tenant-scoped bir RBAC yetkilendirme katmanı (L2) tanımlanır. Bu karar ADR-037'yi supersede etmez — ADR-037 internal Brain/Auditor/Worker authority matrix'ini yönetir; bu ADR yalnızca **harici connector mesaj yüzeyini** kapsar.
-
-### Temel Prensipler
-
-1. **Principal Resolution (Kaynak Çözümleme):** Connector'a gelen her mesajın göndericisi (`fromUser`), yetkilendirme kararı vermeden önce bir `ResolvedPrincipal`'a çözümlenir. Bu çözümleme tenant-scoped'dur: aynı Telegram user ID, farklı deckent projelerinde farklı principal'lara çözümlenebilir.
-
-2. **Fail-Closed (Kapalı Hata) at Capability Execution (L2):** Yetkilendirme başarısız olursa — principal bulunamaz, permission eşleşmez veya identity alt-sistemi erişilemez durumda ise — yetenek (capability) çalıştırılmaz. `rbac.unauthorized` mesajı gönderilir. Açıkça izin verilmeyen her eylem yasaktır.
-
-3. **`resource:action` Permission Model:** Her yetenek, `resource:action` formatında bir izin gerektirir (örn. `sprint:start`, `status:read`, `order:write`). Bu izinler principal'ın rollerine atanır ve MemoryStore'da tenant-scoped olarak saklanır.
-
-4. **Opt-In (`identity.enabled`):** `identity.enabled: false` (varsayılan) olduğunda L2 yetkilendirme devre dışıdır — connector mevcut per-channel behavior'ı korur. Böylece geriye-dönük uyumluluk sağlanır ve tek kullanıcılı kurulumlar etkilenmez.
-
-5. **Kimlik Bağlama (Identity Binding):** Platform kullanıcısını bir deckent principal'ına bağlamak için `verify_prompt` akışı kullanılır. Bağlantı kurulmamış kanallarda `identity.binding_unconfigured` mesajı döner.
-
-6. **ADR-037'den Farkı:** ADR-037 advisory/soft runtime enforcement uygular — worker.ts `checkWorkerAuthority()` ihlalde `return true` der (yalnız log + emit). Bu ADR'nin L2'si **hard-block**'dur: `fromUser` için authorized değilse yetenek hiç çalıştırılmaz, sadece loglanmaz.
-
-### Yetkilendirme Akışı
-
-```
-Gelen mesaj (platform event)
-  └─► ConnectorCapabilityRouter
-        └─► IdentityService.resolveFromUser(fromUser, channelId, tenantId)
-              ├─ Principal bulunamadı → identity.verify_prompt → STOP
-              ├─ Kanal yapılandırılmamış → identity.binding_unconfigured → STOP
-              └─ Principal bulundu → RbacService.check(principal, 'resource:action')
-                    ├─ DENY → rbac.unauthorized → STOP (fail-closed)
-                    └─ ALLOW → capability.execute(ctx) → PROCEED
-```
-
-### Uygulama Referansları
-
-- Engine: `src/connectors/identity/` — `IdentityService`, `RbacService`, `ResolvedPrincipal` tip tanımları
-- Spec: `docs/superpowers/specs/2026-06-26-social-identity-rbac-design.md`
-- i18n keys: `src/cli/helpers/messages.ts` — `rbac.unauthorized`, `identity.verify_prompt`, `identity.binding_unconfigured`
-
-### Faz-1b — Binding Aktivasyonu (final review I-1)
-
-Faz-1b, per-user gate'i canlı yolda aktive eder: `bot.ts` `config.identity`'i `bootstrapConnectorCommands`'a threadler (presence-guard), ve bootstrap `config.identity.channels` map'inden her kanal için `setBinding(chatKey, binding)` ile **config-declared** binding'leri seed eder (idempotent upsert). Bunsuz `getBinding()` daima null döner → `turnPrincipal` undefined → L2 gate no-op'tu (özellik inert). Kapsam: `tests/connectors/connector-bootstrap-gate-e2e.test.ts` (gerçek bootstrap→onMessage→onChat→getBinding→resolveIdentity→`runCapability` yolu).
-
-**Ertelenen takip (deferred follow-up):** dinamik per-kanal binding yönetimi — admin `/bind` komutu (runtime kanal bağlama) + pairing→binding köprüsü. Faz-1b yalnız config'te tanımlı kanalları aktive eder; runtime mutasyon sonraki dilim.
-
-### Faz 3 — Enterprise-IdP Adapter (Sprint 329)
-
-`providers/scim.ts` (SCIM 2.0) ve `providers/oidc-claims.ts` (Entra / Teams JWT claims) **implemente edildi ve live**. Bu iki adapter `IdentityDirectoryProvider` portunu implemente eder; çekirdek `resolve()` / `sync()` kontratı değişmedi.
-
-**Kritik tasarım noktası (Alperen, 2026-06-26):** `resolve()` = **saf-local, SIFIR network** — hot-path her zaman local SQLite store'u okur, IdP'ye asla doğrudan bağlanmaz. `sync()` = **out-of-band background** — IdP pull-sync ayrı scheduled süreçte çalışır, mesaj hot-path'ini bloke etmez.
-
-**Açıkça deferred follow-up (no-silent-debt):**
-- **SCIM webhook push-sync:** Real-time IdP→deckent push bildirimi. Şu an scheduled pull. Sonraki dilim.
-- **OIDC token-refresh:** Long-lived oturumda access-token otomatik yenileme. Şu an sync re-trigger ile kapatılıyor. Sonraki dilim.
-- **Multi-IdP round-robin / fallback:** Aynı anda birden fazla kurumsal IdP. Şu an tek aktif enterprise adapter. Sonraki dilim.
-
----
-
-**Consequences (+):**
-
-- Enterprise ortamlarda multi-user, multi-tenant connector deployment güvenli hale gelir
-- Fail-closed default: yetkisiz mesajlar hiçbir zaman capability execution'a ulaşmaz
-- Opt-in tasarım: mevcut tekil kullanıcı kurulumları değişiklik gerektirmez
-- `resource:action` permission granülaritesi: farklı roller için farklı yetenek subsets tanımlanabilir
-- i18n-first: kullanıcıya dönen tüm hata mesajları `getMessage()` üzerinden EN + TR destekli
-- ADR-037 ile çelişmez — iç orchestration ve dış mesaj yüzeyi ayrı katmanlar halinde korunur
-
-**Consequences (-):**
-
-- `identity.enabled: true` yapılandırması olmadan L2 çalışmaz — operatör aktif kurulum gerektirir
-- Principal resolution katmanı, her mesaj için bir DB lookup maliyeti ekler (MemoryStore cache ile azaltılabilir)
-- Kanal başına yapılandırma yükü: her platform adaptörünün `channelId + tenantId` tuple'ını doğru iletmesi gerekir
-- Kimlik bağlama akışı (verify_prompt) UX tasarımı platform başına farklılık gösterebilir
-
-**Alternatives Considered:**
-
-- **API key per message:** Her mesaja platform dışında bir API key ekleme. Reddedildi: UX kırıcı, WhatsApp/Discord gibi platform'larda uygulama yüksek friction.
-- **IP/webhook allowlist only:** Bağlantıyı platform seviyesinde güvenceye alma. Reddedildi: per-user granülarite sağlamaz, çok kullanıcılı kanalları destekleyemez.
-- **ADR-037 kapsamını genişletme:** Advisory L2'yi fail-closed yapma. Reddedildi: ADR-037 internal agent authority'yi yönetir; connector yüzeyini karıştırmak sorumluluk karmaşası yaratır. Ayrı ADR daha temiz separation of concerns sağlar.
-- **Always-on (opt-out):** Kimlik doğrulamayı varsayılan açık yapma. Reddedildi: mevcut kurulumları kırar, geçiş süreci kompleks olur; opt-in ile smooth adoption sağlanır.
-
-**References:**
-
-- ADR-037: Brain-Auditor-Worker Authority Matrix — internal orchestration RBAC (bu ADR'nin kapsamı dışında)
-- ADR-034: Multi-Project Isolation — tenant-scoped boundary'ler
-- ADR-035: Brain ↔ Worker ↔ Auditor Verification Protocol — event stream integrity
-- `src/connectors/identity/` — IdentityService + RbacService engine
-- `docs/superpowers/specs/2026-06-26-social-identity-rbac-design.md` — tam teknik spec
-- NIST SP 800-162: ABAC — least privilege, fail-closed prensipleri
-- `src/cli/helpers/messages.ts` — i18n keys: `rbac.unauthorized`, `identity.verify_prompt`, `identity.binding_unconfigured`
-
-
----
-
-## adr-093: Real Token/Cost Capture via Provider-Native Usage Stores
-
-**Status:** accepted
-
-# ADR-093: Real Token/Cost Capture via Provider-Native Usage Stores
-
-**Status:** accepted
-
-**Date:** 2026-06-27
-
-**Sprint:** 334
-
----
-
-**Context:**
-
-Every worker `.result` file since the beginning of the codebase carried **heuristic token/cost
-estimates** — not real usage reported by the provider. A structural audit across 61 consecutive
-`.result` files confirmed the pattern with 100% incidence:
-
-- `cacheReadInputTokens = inputTokens × 4` (exactly, every case)
-- `outputTokens = linesAdded × 15` (exactly, every case)
-- `cacheCreationInputTokens = undefined` (61/61 — the field was never populated)
-- `tokenUsage.source = undefined` (61/61 — no provenance tag)
-
-Root cause: `src/orchestra/token-counter.ts` reads `.tasks/task-{id}.log` and
-`.tasks/task-{id}.cli-output.json` looking for a `--output-format json` envelope that never lands
-in those files (workers write ≈65-byte stdout there, not the full JSON envelope). The fallback
-path — `estimateTokenUsage` (token-counter.ts:401-403) — was therefore activated for every task
-without exception.
-
-The consequence was a compounding inaccuracy: `cacheCreationInputTokens` — the **limit-dominant
-cost component** (charged at 1.25× the base input rate per the cost-calculator at
-`cost-calculator.ts:349/387`) — was structurally zero in every sprint's cost rollup. A real worker
-session produced `cacheCreation=47514` tokens (a dominant fraction of total cost) while the
-heuristic reported `cacheCreation=0` for the same session — a complete miss.
-
-The ground truth exists and is accessible: the Claude provider writes per-turn usage to a
-session-store jsonl under `~/.claude/projects/{slugified-cwd}/*.jsonl`. Each turn's
-`message.usage` object carries all four fields: `input_tokens`, `output_tokens`,
-`cache_read_input_tokens`, and `cache_creation_input_tokens`. Summing these across all turns of a
-worker session gives the real usage reported by the provider — identical to what Anthropic bills.
-
-No analogous on-disk store existed for the Codex or Gemini providers at the time of this decision.
-
----
-
-**Decision:**
-
-Introduce a **provider-agnostic native-usage-store seam** as the authoritative source of truth for
-token/cost capture, with the heuristic path retained as an honest, labeled last-resort fallback.
-
-### Part A — `TokenUsage` type extension (additive)
-
-Two optional fields are added to `TokenUsage` in `src/core/task-types.ts`:
-
-- `cacheCreationTokens?: number` — real cache-write tokens (previously always missing)
-- `source?: 'session-store' | 'envelope' | 'estimate' | string` — provenance tag
-
-Both fields are strictly additive and optional. Existing consumers that do not read them are
-unaffected. The `cacheCreationTokens` field name is aligned with the cost-calculator's
-`RegimeCostUsage.cacheCreationTokens` field (`:236`) so the cost pipeline auto-corrects with
-**zero changes** to `cost-calculator.ts`.
-
-### Part B — `session-usage-store.ts` (new pure module)
-
-`src/providers/session-usage-store.ts` exposes a single public function:
-
-```
-readNativeUsage(
-  provider: string,
-  opts: {
-    projectRoot: string;
-    taskId: string;
-    sessionId?: string;
-    spawnWindow?: { start: number; end: number };
-    sessionRoot?: string;   // injectable — defaults to ~/.claude/projects/{slug}
-  }
-): Promise<RealUsage | null>
-```
-
-For `provider === 'claude'`, the function:
-
-1. Resolves the session jsonl directory from `sessionRoot` (injectable; defaults to the
-   slugified-cwd path under `~/.claude/projects/`). The `sessionRoot` parameter is the test
-   hermeticity seam — **the real `~/.claude` is never read in any test**.
-2. Identifies the correct `.jsonl` file by matching `session_id` (when available from a prior
-   spawn envelope) or by correlating on modification timestamp within the `spawnWindow`.
-3. Reads and parses the jsonl line-by-line, summing every `message.usage` object's four fields
-   across all turns.
-4. Returns a `RealUsage` object with `inputTokens`, `outputTokens`, `cacheReadTokens`, and
-   `cacheCreationTokens` — all real values summed from the provider's store.
-
-For `provider === 'codex'` and `provider === 'gemini'`: returns `null` immediately with a
-`// TODO(phase2)` comment noting that each provider's own native usage store should be plugged
-here. This is a documented, honest extension point (Law #2 — every environment). A `null` result
-propagates to the heuristic fallback, preserving current behavior for these providers.
-
-Returns `null` on any I/O or parse error (session jsonl absent, malformed lines, etc.) — never
-throws.
-
-### Part C — `token-counter.ts` priority chain
-
-`src/orchestra/token-counter.ts` is updated to apply a strict priority order before reaching the
-heuristic:
-
-1. **Session-store read** (`readNativeUsage`) — if a non-null result is returned, build the
-   `TokenUsage` from summed real usage and set `source = 'session-store'`.
-2. **Envelope extraction** — if the existing `extractUsage` path finds a well-formed
-   `--output-format json` envelope, use it and set `source = 'envelope'`.
-3. **Heuristic fallback** — `estimateTokenUsage` is called only when both (1) and (2) yield
-   nothing. The estimate result is returned unchanged in shape, but `source` is set to
-   `'estimate'` as an explicit, honest provenance label. The estimate algorithm itself is not
-   modified — behavior is byte-equivalent for consumers that relied on the estimates.
-
-The `source` tag is the single most operationally useful addition: it lets any downstream
-consumer (dashboard, retro, auditor) distinguish a real measurement from an estimate without
-inspecting token ratios.
-
-### Test hermeticity requirement
-
-All tests for `session-usage-store.ts` and the updated `token-counter.ts` must use an injected
-`sessionRoot` pointing to a tmpdir fixture. The fixture must contain at least two turns with
-real-shaped `message.usage` objects (including `cache_creation_input_tokens > 0`) so the sum
-assertion covers the dominant cost field. No test may read from the real `~/.claude` directory.
-
----
-
-**Consequences (+):**
-
-- `cacheCreationInputTokens` is now captured for Claude-provider workers, closing the largest
-  cost-accuracy gap. The existing `cost-calculator.ts` (`cacheWrite = cacheCreationTokens ?? 0`,
-  `:349/:387`) picks up the real value with no changes to the cost-calculator.
-- `source = 'session-store'` gives every downstream consumer a machine-readable provenance tag
-  so heuristic estimates are no longer indistinguishable from real measurements.
-- Codex and Gemini are first-class documented extension points — the `null` return with
-  `TODO(phase2)` is an explicit seam, not a silent omission (Law #2).
-- Test hermeticity is enforced by design: the `sessionRoot` injection parameter prevents any test
-  from accidentally touching the developer's real `~/.claude` directory.
-- No changes are required to `cost-calculator.ts`, `collection.ts`, `sprint-finalizer.ts`, or
-  any other consumer — the `TokenUsage` extension is additive, and `cost-calculator.ts` already
-  reads `cacheCreationTokens ?? 0`.
-
-**Consequences (-):**
-
-- Only Claude is a real implementation today; Codex and Gemini fall back to the heuristic path
-  until phase-2 extensions are written.
-- Session jsonl correlation relies on a spawn-time window when `session_id` is not captured from
-  the spawn envelope. On high-concurrency machines with many simultaneous workers, the correlation
-  window must be conservative to avoid false matches.
-- The `~/.claude/projects/{slug}` path is platform-specific. Cross-platform path resolution
-  (macOS, Linux, Windows native, WSL) must be handled inside `session-usage-store.ts`; the
-  injectable `sessionRoot` is also the platform-portability escape hatch for future adapters.
-- Heuristic estimates remain in the fallback path for sessions where no native store is readable.
-  The `source = 'estimate'` tag makes this visible, but does not eliminate the inaccuracy.
-
-**Alternatives Considered:**
-
-- **Parse the `--output-format json` stdout envelope directly:** the envelope is written to the
-  provider process's stdout, not to `.tasks/task-{id}.log` or `.tasks/task-{id}.cli-output.json`.
-  The task log capture path never receives it. Fixing the log capture to intercept the envelope
-  would require invasive changes to the spawn/pipe architecture. Rejected: higher blast radius,
-  same data available from the session-store with simpler read-only access.
-- **Instrument token counts at spawn time via a middleware:** insert a pass-through byte counter
-  around the provider's stdio streams. Rejected: provider-specific framing, fragile under
-  streaming/chunking, requires changes across all provider adapters. The session-store is the
-  provider's own authoritative record and requires no stream interception.
-- **Retain the heuristic permanently, accept the inaccuracy:** the heuristic was structurally
-  wrong for `cacheCreationTokens` (always zero) and linearly wrong for `inputTokens` (correlated
-  with lines-added, not real model context). The `cacheCreationInputTokens` miss meant the most
-  expensive token category was invisible to all cost reporting. Rejected: materially misleads
-  sprint cost decisions and KPI targets.
-- **Provider SDK call to fetch usage post-completion:** query the Anthropic Messages API usage
-  endpoint after the worker session ends. Rejected: requires an additional API credential path,
-  adds network I/O to every finalize cycle, and is redundant when the session-store already holds
-  the same data locally.
-
-**References:**
-
-- `src/providers/session-usage-store.ts` — new pure module (provider-native usage reader)
-- `src/core/task-types.ts` — `TokenUsage` type (additive `cacheCreationTokens`, `source` fields)
-- `src/orchestra/token-counter.ts` — updated priority chain (session-store → envelope → estimate)
-- `tests/providers/session-usage-store.test.ts` — hermetic fixture-based test
-- `tests/orchestra/token-counter-real-usage.test.ts` — integration test with tmpdir sessionRoot
-- `src/core/cost-calculator.ts:349/387` — `RegimeCostUsage.cacheCreationTokens` (no edit needed)
-- ADR-076: Auth-Precedence Fix — established the provider auth-isolation contract that this ADR
-  builds on (subscription vs API mode; no cross-provider credential leak)
-- ADR-066: Provider Independence — multi-provider backend parity principle (this ADR's
-  provider-agnostic seam is a direct application)
-- ADR-087: Async I/O and Test Hermeticity Standard — the `sessionRoot` injection pattern follows
-  the test hermeticity requirements mandated by this ADR
-- `docs/audits/OVERNIGHT-2026-06-27-findings.md` — root-cause analysis and session-store ground
-  truth proof that motivated this decision
-
-
----
-
-## adr-094: Flag-Gated Enforcement Vein
-
-**Status:** accepted
-
-# ADR-094: Flag-Gated Enforcement Vein
-
-**Status:** accepted
-
-**Date:** 2026-06-27
-
-**Sprint:** 343
-
----
-
-**Context:**
-
-ADR-037 (Brain-Auditor-Worker Authority Matrix) explicitly documented that its enforcement model is
-**V1.0 deliberately soft**. The header note in ADR-037 states verbatim: "Layer 2 (runtime) is
-ADVISORY / SOFT — a violation is logged + emitted to the event stream but does **not** block the
-action." Four concrete enforcement gates existed in the codebase in a computed-but-not-enforced or
-reachable-but-untested state at the time of this decision:
-
-**Gate B1 — RBAC worker hard-deny (`enforceRbac`):**
-`config-types.ts:836` declares `enforce_rbac?: boolean`. The hard-deny path exists in
-`nervous/authority-matrix.ts:351-353` (`opts.enforceRbac === true → deny`, else soft-warn). The
-flag is threaded from `sprint-runtime.ts:30-31` to `checkWorkerAuthority`. However,
-`agents/worker.ts:602-620` `checkWorkerAuthority` returns `true` on both branches — even with the
-flag set, the worker side never denies. Additionally, deckent-dev's own config never set
-`enforce_rbac: true`, so the hard path shipped untested in the live pipeline.
-
-**Gate B6 — cumulative spend warn-gate (`cost_limits.enforce_spend_gate`):**
-`cost-config-loader.ts:74-75` defines and validates `daily_max_usd` / `monthly_max_usd`. The
-existing gate in `core/cost-gate.ts:119` enforces only `auto_confirm_below_usd` — a per-sprint
-estimate check before spawn confirm, not a cumulative rolling spend gate. No code compared actual
-rolling spend against the daily/monthly limits. The `readSpendWindow` function and the
-`BRAIN→USER:COST_LIMIT_WARN` event path did not exist.
-
-**Gate A9 — ADR-compliance hard-deny (`gate.enforce_adr_compliance`):**
-The ADR-compliance checker (`enforceAdrCompliance`) ran and emitted findings but the result was
-never wired to a hard-deny outcome. Findings were advisory, not gate-blocking.
-
-**Gate A14 — tech-debt-ratio downgrade (`gate.max_tech_debt_ratio`):**
-`result-evaluator.ts:1285` `applyTechDebtDowngrade` was implemented but had zero callers
-(verified). The sprint tech-debt ratio was computed but never fed back into sprint outcome
-decisions. The sibling B-REGGATE half (`runSelfAuditGate` in `sprint-finalizer.ts:250`) was
-already fixed to fire `GATE_FAILURE` on net-new `delta.fail`; the tech-debt-ratio downgrade
-remained a dead code path.
-
-The risk of flipping these gates to default-on for all users was high: grading semantics change,
-workers that had previously succeeded with scope warnings would begin failing, and cumulative spend
-interruptions could stall production sprints for users who had never set `daily_max_usd`. A
-post-GA-V2 hard-flip was the right trajectory, but the enforcement code paths needed to be proved
-correct — in a live pipeline — before any global flip.
-
----
-
-**Decision:**
-
-Introduce a **flag-gated enforcement vein**: all four gates are implemented and correct behind
-config flags that default to `false` (product behavior is byte-identical to pre-ADR state). Only
-deckent-dev's gitignored `.deckent/config.json` enables hard-mode, dogfooding each gate against
-real sprint traffic to validate correctness before a future global flip.
-
-### Gate B1 — `enforce_rbac` (RBAC worker hard-deny)
-
-`agents/worker.ts:checkWorkerAuthority` is updated to honor `opts.enforceRbac`: when
-`enforceRbac === true` and a scope-violation is detected, the function returns `false` (deny)
-instead of the unconditional `true`. All existing callers continue to pass `enforceRbac: false`
-(or omit it), so the default path is byte-identical. The stale comment in `sprint-runtime.ts:9`
-("not yet declared") is removed. Deckent-dev's gitignored config sets `enforce_rbac: true` to
-exercise the hard-deny path on real workers.
-
-### Gate B6 — `cost_limits.enforce_spend_gate` (cumulative spend warn-gate)
-
-`readSpendWindow(projectRoot, 'day' | 'month')` is added over the existing
-`.deckent/settings/resource-log.jsonl` ledger (the same source as the limit-ledger work). In the
-pre-spawn cost gate (`cost-gate.ts`, alongside the existing estimate check), `projectedSpend =
-spentThisWindow + sprintEstimate` is computed; if `projectedSpend > daily_max_usd` (or monthly)
-**and** `cost_limits.enforce_spend_gate === true`, a `BRAIN→USER:COST_LIMIT_WARN` event is emitted
-and a notification is sent — warn-only, the sprint still proceeds. With `enforce_spend_gate ===
-false` (the default) or when spend is under the limit, no event is emitted. A future hard-block
-variant (returning `COST_GATE_EXCEEDED`) is a post-beta flip, not part of this ADR.
-
-### Gate A9 — `gate.enforce_adr_compliance` (ADR-compliance gate, fail-open preserved)
-
-The ADR-compliance checker (`enforceAdrCompliance`) is wired into the sprint evaluation path. When
-`gate.enforce_adr_compliance === true`, a compliance violation produces a hard-deny outcome
-(task result downgraded to `NO_GO` or sprint gate to `FAIL`). When the flag is `false` (default),
-compliance violations remain advisory — findings are emitted to the event stream and dashboard but
-do not block the outcome. **Fail-open is the explicit and permanent default for this gate** because
-ADR-compliance findings can surface on tasks that pre-date a newly accepted ADR; a hard-deny by
-default would retroactively fail tasks that were correct at the time of writing.
-
-### Gate A14 — `gate.max_tech_debt_ratio` (tech-debt-ratio downgrade)
-
-`applyTechDebtDowngrade` in `result-evaluator.ts` is wired into `finalizeSprint` /
-`runSelfAuditGate` after per-task evaluation: if the sprint's tech-debt ratio exceeds
-`gate.max_tech_debt_ratio` **and** the field is set (it is absent / `undefined` by default), the
-sprint outcome is downgraded (`DONE → GO_WITH_TECH_DEBT` or `GATE_FAILURE`). When the field is
-absent or set to `0` / `null`, the function is not called — current behavior is preserved
-byte-identically. Before wiring, the function's logic is verified against the current result rubric
-(the function is 200+ sprints old); if it no longer matches, it is deleted and a KES candidate is
-logged rather than force-wired with a stale contract.
-
-### Config shape (deckent-dev gitignored `.deckent/config.json`)
-
-```json
-{
-  "enforce_rbac": true,
-  "cost_limits": {
-    "enforce_spend_gate": true
-  },
-  "gate": {
-    "enforce_adr_compliance": true,
-    "max_tech_debt_ratio": 0.3
-  }
-}
-```
-
-All four keys are absent from the committed config defaults — their absence is the default-off
-guarantee. The gitignored file is the only activation vector; a clean checkout or a user who has
-never touched these keys sees no behavior change.
-
-### Test requirements
-
-Faithful tests assert both branches for each gate:
-
-- **B1:** flag-on + a worker writing outside `scope.filesWrite` → `checkWorkerAuthority` returns
-  `false` / `evaluateAuthority` returns `deny`. Flag-off → returns `true` (byte-identical).
-- **B6:** resource-log ledger seeded past `daily_max_usd` + flag-on → `COST_LIMIT_WARN` event
-  emitted, sprint proceeds. Flag-off or under-limit → no event.
-- **A9:** a task with a known ADR violation + flag-on → outcome downgraded to `NO_GO` / gate
-  `FAIL`. Flag-off → advisory finding only, outcome unchanged.
-- **A14:** sprint debt-ratio above `max_tech_debt_ratio` + flag set → outcome downgraded. Flag
-  absent → `applyTechDebtDowngrade` not called, outcome unchanged.
-
-All tests use tmpdir fixtures and injected config; no test reads gitignored local state (ADR-087
-hermeticity requirement).
-
 ---
-
-**Consequences (+):**
-
-- Product behavior is byte-identical for all users on a clean checkout — zero regression risk
-  from this ADR's merge.
-- Deckent-dev exercises all four hard paths on real sprint traffic, giving high confidence before
-  any future global flip.
-- Each gate has a single, explicit config key — operators who want to opt in before GA-V2 can do
-  so by setting the relevant key; the behavior is documented and predictable.
-- The `enforce_adr_compliance` fail-open default is an explicit design choice recorded in this
-  ADR, not a gap — it prevents retroactive failures on pre-ADR tasks.
-- ADR-037 V1.0 advisory enforcement remains intact for all users; this ADR adds a tested, proven
-  upgrade path without changing the current layer-2 contract.
-
-**Consequences (-):**
-
-- Deckent-dev's gitignored config is not committed, so the dogfood state is invisible to code
-  review. Sprint retro notes and auditor alerts are the only observable proof that hard paths ran.
-- Four separate config keys for four gates increases config surface; future consolidation into a
-  single `enforcement_mode: 'strict' | 'advisory'` toggle is a valid simplification (post-GA-V2).
-- `gate.max_tech_debt_ratio` will not be wired if `applyTechDebtDowngrade`'s contract is found
-  stale during implementation review — in that case the gate ships as a documented stub with a KES
-  candidate logged, not as a forced wire.
-- The fail-open default for `enforce_adr_compliance` means ADR violations can accumulate
-  undetected until an operator explicitly enables the gate; the dashboard advisory display is the
-  only passive signal.
-
-**Alternatives Considered:**
-
-- **Default-on for all users immediately:** rejected — grading semantics change for all existing
-  users without notice; workers that previously succeeded with scope warnings would begin failing;
-  cumulative spend interruptions could stall production sprints for users who never set
-  `daily_max_usd`. The value of proving correctness in dogfood before a global flip outweighs
-  the cost of a deferred hard-flip.
-- **Single `enforcement_mode: 'strict'` flag covering all four gates:** simpler config surface,
-  but coupling the gates means a user cannot opt into spend-warn without also enabling RBAC
-  hard-deny. Per-gate flags give finer-grained rollout control and are the correct choice pre-GA.
-- **Hard-flip B1 only, leave the others advisory:** partially addresses ADR-037's intent but
-  leaves the cost and tech-debt gates untested. The consistent flag-gated pattern across all four
-  gates reduces cognitive load and makes the GA-V2 flip a single policy decision.
-- **Remove `applyTechDebtDowngrade` without wiring:** the function is dead code and a KES
-  candidate. Deletion is preferred over a forced wire if the logic is found stale; this ADR
-  records that decision point explicitly rather than silently wiring a mismatched function.
 
-**References:**
+## References / Absorbed
 
-- `agents/worker.ts:602-620` — `checkWorkerAuthority` (B1 hard-deny seam)
-- `nervous/authority-matrix.ts:351-353` — existing hard-deny branch (B1, reachable but untested)
-- `sprint-runtime.ts:30-31` — `enforce_rbac` flag threading
-- `core/cost-gate.ts:119` — existing estimate gate (B6 extension point)
-- `cost-config-loader.ts:74-75` — `daily_max_usd` / `monthly_max_usd` definitions
-- `.deckent/settings/resource-log.jsonl` — rolling spend ledger (B6 data source)
-- `result-evaluator.ts:1285` — `applyTechDebtDowngrade` (A14 dead caller)
-- `sprint-finalizer.ts:250` — `runSelfAuditGate` (A9/A14 wire point)
-- `config-types.ts:836` — `enforce_rbac` field declaration
-- `DESIGN-ENFORCEMENT-VEIN.md` — root-cause analysis and design spec that motivated this ADR
-- ADR-037: Brain-Auditor-Worker Authority Matrix — RBAC Protocol V1.0 — the advisory layer this
-  ADR builds a proven upgrade path on top of
-- ADR-087: Async I/O and Test Hermeticity Standard — test hermeticity requirements for all gate
-  tests in this ADR
-- ADR-093: Real Token/Cost Capture via Provider-Native Usage Stores — companion sprint-343 ADR
-  establishing provider-agnostic seam patterns this ADR follows for flag injection
+- **Absorbs:** ADR-088 (Memory V2 DB-First). **Supersedes:** ADR-009 (archived).
+- **Cross-ref:** ADR-G-019 (ADR taxonomy — these columns store it) · ADR-G-032 (Self-Learning Loop — runs on this substrate) · ADR-G-031 (tenant_id / audit-hmac enterprise) · ADR-D-005 (dependency policy — sqlite-vec opt-in justification).
+- **Born work-items:** LEARNINGS-QUALITY · MEM-2 (scope-layers) · MEM-3 (index/SLA) · vector-layer (opt-in, never-calls-home).
+- **Direction:** `.analysis/adr-governance-redesign-plan.md` §5 (DB strategy = better-sqlite evrim).

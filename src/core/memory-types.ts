@@ -107,6 +107,12 @@ export interface MemoryEntryV2 {
   metadata: string;
   /** Multi-tenant scope tag. NULL for legacy/single-tenant entries (default). */
   tenant_id?: string | null;
+  /** ADR taxonomy (ADR-G-019): class `G`|`D`|`UG`|`UP`. NULL for non-ADR rows. */
+  adr_class?: string | null;
+  scope?: string | null;
+  immutable?: number | null;
+  source_authority?: string | null;
+  enforcement_level?: string | null;
   /**
    * Sprint 179 W5-12 (I4 invariant): audit HMAC chain fields.
    * Only populated for type='audit' rows inserted via `insertAuditWithHmac`.
@@ -137,6 +143,16 @@ export interface CreateEntryInput {
   metadata?: Record<string, unknown>;
   /** Multi-tenant scope tag (omit for single-tenant default). */
   tenant_id?: string;
+  /** ADR taxonomy (ADR-G-019): class `G`|`D`|`UG`|`UP`. Omit for non-ADR entries. */
+  adr_class?: string;
+  /** ADR taxonomy: `global`|`project` scope. */
+  scope?: string;
+  /** ADR taxonomy: immutable flag (true for ADR-G constitution). */
+  immutable?: boolean;
+  /** ADR taxonomy: authority source `publisher`|`contributor`|`user`. */
+  source_authority?: string;
+  /** ADR taxonomy: enforcement level `advisory`|`runtime`|`hard`. */
+  enforcement_level?: string;
   relations?: Array<{ to_id: string; rel_type: RelationType }>;
 }
 

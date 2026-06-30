@@ -1,5 +1,40 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-346 Learnings
+- Sprint sprint-346 Learnings: ## Sprint sprint-346 Learnings
+- F07 — fix reference CLI (hand-curated only): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [98 
+- F08 — fix reference config: NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=41, untrackedFiles=2
+- F09 — fix reference API: NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=399, untrackedFiles=
+- F14 — fix reference features/glossary/lifecycle (+ glossary dedup): NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=12, untrackedFiles=2
+- F17 — fix cookbook task-recipes & meta (+ fix-bug anchor): NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=0, untrackedFiles=28
+- F18 — fix architecture/architecture.md (the master map): NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=3, untrackedFiles=28
+- F19 — fix architecture (authority, agents, memory, lifecycle, stray ADRs): NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=56, untrackedFiles=2
+- F20 — fix development core guides (+ worker-guide dedup): NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=27, untrackedFiles=2
+- F22 — fix vision cluster (protected prose only): NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=14, untrackedFiles=2
+- F23 — fix launch cluster: NO_GO — Worker timeout — process exceeded time limit and was killed; disk-verify found evidence (linesAdded=0, untrackedFiles=28
+
+## Gains
+- 346-001 — F01 — fix guide onboarding-core — All A01 P0/P1 issues applied:
+- 346-002 — F02 — fix guide concepts — Applied all A02 audit findings.
+- 346-003 — F03 — fix guide autonomous & learning — All three go-criteria met:
+- 346-004 — F04 — fix guide nervous, dashboard & REPL — Applied all 3 A04 audit findings:
+- 346-005 — F05 — fix guide workers, troubleshooting & misc — All MUST FIX items from A05 audit applied:
+- 346-006 — F06 — fix guide providers & backends — Fixed CRITICAL issue A06-MF-1: routing table in multi-provider-fleet.md incorrectly classified co...
+- 346-010 — F10 — fix reference MCP (hand-authored only) — All 7 hand-authored issues from A10-reference-mcp.md fixed:
+- 346-011 — F11 — fix reference routing, execution & dependencies — P0 fix: `telegraf ^4.16.0` → `grammy ^1.44.0` in dependencies.md.
+- …and 5 more delivered
+
+## Sprint sprint-345 Learnings
+- Sprint sprint-345 Learnings: ## Sprint sprint-345 Learnings
+
+## Gains
+- 345-001 — A01 — guide onboarding-core — A01 audit file created.
+- 345-002 — A02 — guide onboarding-concepts — A02 audit report written.
+- 345-003 — A03 — guide autonomous & learning — A03 audit report written.
+- 345-004 — A04 — guide nervous, dashboard & REPL — Deep-verified all 5 guide docs against source code.
+- 345-005 — A05 — guide workers, troubleshooting & misc — A05 audit complete.
+- 345-006 — A06 — guide providers & backends — Audit report A06 written.
+
 ## Sprint sprint-342 Learnings
 - Sprint sprint-342 Learnings: ## Sprint sprint-342 Learnings
 

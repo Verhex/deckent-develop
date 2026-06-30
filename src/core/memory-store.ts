@@ -209,6 +209,24 @@ export class MemoryStore {
     if (!have.has('audit_hmac')) {
       this.db.exec(`ALTER TABLE entries ADD COLUMN audit_hmac TEXT`);
     }
+
+    // ADR-G-019 4-layer taxonomy columns (G/D/UG/UP). Additive, idempotent.
+    // NULL for non-ADR rows. Stores ADR class/scope/immutability for class-aware recall.
+    if (!have.has('adr_class')) {
+      this.db.exec(`ALTER TABLE entries ADD COLUMN adr_class TEXT`);
+    }
+    if (!have.has('scope')) {
+      this.db.exec(`ALTER TABLE entries ADD COLUMN scope TEXT`);
+    }
+    if (!have.has('immutable')) {
+      this.db.exec(`ALTER TABLE entries ADD COLUMN immutable INTEGER`);
+    }
+    if (!have.has('source_authority')) {
+      this.db.exec(`ALTER TABLE entries ADD COLUMN source_authority TEXT`);
+    }
+    if (!have.has('enforcement_level')) {
+      this.db.exec(`ALTER TABLE entries ADD COLUMN enforcement_level TEXT`);
+    }
   }
 
   private createIndexIfNotExists(name: string, ddl: string): void {
@@ -310,6 +328,11 @@ export class MemoryStore {
     const decayExempt = input.decay_exempt ? 1 : 0;
     const metadata = JSON.stringify(input.metadata ?? {});
     const tenantId = input.tenant_id ?? null;
+    const adrClass = input.adr_class ?? null;
+    const adrScope = input.scope ?? null;
+    const immutable = input.immutable == null ? null : (input.immutable ? 1 : 0);
+    const sourceAuthority = input.source_authority ?? null;
+    const enforcementLevel = input.enforcement_level ?? null;
     const relations = input.relations ?? [];
 
     const tagText = tags.join(' ');
@@ -323,12 +346,14 @@ export class MemoryStore {
         id, type, source, title, content, summary,
         tag_text, title_norm, content_norm, summary_norm, tag_norm,
         status, priority, sprint_id, sprint_num, lang,
-        decay_exempt, metadata, tenant_id
+        decay_exempt, metadata, tenant_id,
+        adr_class, scope, immutable, source_authority, enforcement_level
       ) VALUES (
         @id, @type, @source, @title, @content, @summary,
         @tag_text, @title_norm, @content_norm, @summary_norm, @tag_norm,
         @status, @priority, @sprint_id, @sprint_num, @lang,
-        @decay_exempt, @metadata, @tenant_id
+        @decay_exempt, @metadata, @tenant_id,
+        @adr_class, @scope, @immutable, @source_authority, @enforcement_level
       )
     `);
 
@@ -366,6 +391,11 @@ export class MemoryStore {
         decay_exempt: decayExempt,
         metadata,
         tenant_id: tenantId,
+        adr_class: adrClass,
+        scope: adrScope,
+        immutable,
+        source_authority: sourceAuthority,
+        enforcement_level: enforcementLevel,
       });
 
       for (const tag of tags) {

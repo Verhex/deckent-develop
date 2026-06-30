@@ -21,9 +21,9 @@ import { debugLog } from './utils.js';
 
 /** Parsed ADR metadata extracted from a markdown file. */
 export interface ParsedAdr {
-  /** Normalized ID, e.g. `adr-043` (lowercase, 3-digit zero-padded). */
+  /** Normalized ID: new `adr-g-019` / `adr-d-001`, or legacy `adr-043`. */
   id: string;
-  /** Title text without the `ADR-NNN:` prefix. */
+  /** Title text without the `ADR-[G|D-]NNN:` prefix. */
   title: string;
   /** Lowercased status word (accepted, deprecated, proposed, etc.). */
   status: string;
@@ -33,6 +33,14 @@ export interface ParsedAdr {
   sprintNum: number;
   /** Full markdown content. */
   content: string;
+  /** ADR-G-019 taxonomy: class `G`|`D`|`UG`|`UP` (null for legacy un-classed). */
+  adrClass: string | null;
+  /** `global+project` | `dev` (from `**Scope:**` metadata, null if absent). */
+  scope: string | null;
+  /** Immutable flag (from `**Immutable:** yes|no`, null if absent). */
+  immutable: boolean | null;
+  /** `publisher`|`contributor`|`user` (from `**Source:**`, null if absent). */
+  sourceAuthority: string | null;
 }
 
 /** Result of a sync run over a directory of ADR files. */
@@ -46,11 +54,22 @@ export interface AdrSyncResult {
 
 // ─── Parsing ──────────────────────────────────────────────────────
 
-const FILENAME_PATTERN = /^(\d{3,})-.+\.md$/i;
-const H1_PATTERN = /^#\s*ADR-(\d+):\s*(.+)$/m;
+// New 4-layer taxonomy scheme (ADR-G-019): `adr-{class}-{num}-slug.md` + `# ADR-{CLASS}-{num}: Title`.
+const FILENAME_PATTERN_NEW = /^adr-(g|d|ug|up)-(\d+)-.+\.md$/i;
+const H1_PATTERN_NEW = /^#\s*ADR-(G|D|UG|UP)-(\d+):\s*(.+)$/im;
+// Legacy scheme: `NNN-slug.md` + `# ADR-NNN: Title` (fallback, pre-redesign).
+const FILENAME_PATTERN_OLD = /^(\d{3,})-.+\.md$/i;
+const H1_PATTERN_OLD = /^#\s*ADR-(\d+):\s*(.+)$/m;
+// Matches either scheme — used by the directory filter.
+const FILENAME_PATTERN = /^(?:adr-(?:g|d|ug|up)-\d+|\d{3,})-.+\.md$/i;
 const STATUS_PATTERN = /\*\*Status:\*\*\s*([A-Za-z][A-Za-z_-]*)/;
 const SPRINT_PATTERN = /\*\*Sprint:\*\*\s*Sprint\s+(\d+)/i;
 const SPRINT_INLINE_PATTERN = /\bSprint[\s-]+(\d+)\b/i;
+// Class-metadata header (ADR-G-019): `**Class:** ADR-G · **Scope:** … · **Immutable:** yes · **Source:** …`
+const CLASS_META_PATTERN = /\*\*Class:\*\*\s*ADR-(G|D|UG|UP)\b/i;
+const SCOPE_META_PATTERN = /\*\*Scope:\*\*\s*([A-Za-z+]+)/i;
+const IMMUTABLE_META_PATTERN = /\*\*Immutable:\*\*\s*(yes|no|true|false)/i;
+const SOURCE_META_PATTERN = /\*\*Source:\*\*\s*([A-Za-z+]+)/i;
 
 /**
  * Parse a single ADR markdown file.
@@ -65,20 +84,34 @@ export function parseAdrFile(filePath: string): ParsedAdr | null {
     return null;
   }
 
-  // Filename-based ID (authoritative — H1 number is verified against it)
+  // ID + class from filename — new `adr-{class}-{num}-slug.md` (authoritative)
+  // or legacy `{num}-slug.md`.
   const baseName = filePath.split(/[\\/]/).pop() ?? '';
-  const filenameMatch = baseName.match(FILENAME_PATTERN);
-  if (!filenameMatch) {
+  const newName = baseName.match(FILENAME_PATTERN_NEW);
+  const oldName = baseName.match(FILENAME_PATTERN_OLD);
+  let id: string;
+  let adrClass: string | null = null;
+  if (newName) {
+    adrClass = newName[1]!.toUpperCase();
+    id = `adr-${adrClass.toLowerCase()}-${newName[2]!.padStart(3, '0')}`;
+  } else if (oldName) {
+    id = `adr-${oldName[1]!.padStart(3, '0')}`;
+  } else {
     return null;
   }
-  const filenameNum = filenameMatch[1]!.padStart(3, '0');
 
-  // Title — required, from H1 line
-  const h1Match = content.match(H1_PATTERN);
-  if (!h1Match) {
+  // Title — required, from H1 (new `# ADR-G-NNN:` or legacy `# ADR-NNN:`)
+  const h1New = content.match(H1_PATTERN_NEW);
+  const h1Old = content.match(H1_PATTERN_OLD);
+  let title: string;
+  if (h1New) {
+    if (!adrClass) adrClass = h1New[1]!.toUpperCase();
+    title = (h1New[3] ?? '').trim();
+  } else if (h1Old) {
+    title = (h1Old[2] ?? '').trim();
+  } else {
     return null;
   }
-  const title = (h1Match[2] ?? '').trim();
   if (!title) {
     return null;
   }
@@ -89,6 +122,18 @@ export function parseAdrFile(filePath: string): ParsedAdr | null {
     return null;
   }
   const status = (statusMatch[1] ?? '').toLowerCase();
+
+  // Class metadata (ADR-G-019 header line) — class/scope/immutable/source.
+  if (!adrClass) {
+    const cm = content.match(CLASS_META_PATTERN);
+    if (cm) adrClass = cm[1]!.toUpperCase();
+  }
+  const scopeMatch = content.match(SCOPE_META_PATTERN);
+  const scope = scopeMatch ? scopeMatch[1]!.trim().toLowerCase() : null;
+  const immMatch = content.match(IMMUTABLE_META_PATTERN);
+  const immutable = immMatch ? /^(?:yes|true)$/i.test(immMatch[1]!) : null;
+  const srcMatch = content.match(SOURCE_META_PATTERN);
+  const sourceAuthority = srcMatch ? srcMatch[1]!.trim().toLowerCase() : null;
 
   // Sprint extraction — prefer `**Sprint:** Sprint NNN`, fallback to first
   // `Sprint NNN` token in body.
@@ -105,12 +150,16 @@ export function parseAdrFile(filePath: string): ParsedAdr | null {
   const sprintId = sprintNum > 0 ? `sprint-${sprintNum}` : null;
 
   return {
-    id: `adr-${filenameNum}`,
+    id,
     title,
     status,
     sprintId,
     sprintNum,
     content,
+    adrClass,
+    scope,
+    immutable,
+    sourceAuthority,
   };
 }
 
@@ -137,6 +186,11 @@ export function adrToEntryInput(adr: ParsedAdr): CreateEntryInput {
     input.sprint_id = adr.sprintId;
     input.sprint_num = adr.sprintNum;
   }
+  // ADR-G-019 taxonomy columns — written on insert, preserved across updates.
+  if (adr.adrClass) input.adr_class = adr.adrClass;
+  if (adr.scope) input.scope = adr.scope;
+  if (adr.immutable != null) input.immutable = adr.immutable;
+  if (adr.sourceAuthority) input.source_authority = adr.sourceAuthority;
   return input;
 }
 
