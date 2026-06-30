@@ -312,6 +312,19 @@
 | PROVIDER-FREE-HARDEN | PROV·GOV | docker binary-resolution unknown/unsupported model → legacy Claude fallback yerine honest-fail | ADR-rev | P2 | WM-5 | ⬜ | — | ADR-G-008; spawn-backend-docker:373 |
 | COVERAGE-BRIDGE-RETIRE | GOV | signal-path kanıtlanınca COVERAGE_OPTIONAL_AGENTS allowlist-bridge'i (P0-2 refactorer/code-reviewer) kaldır | ADR-rev | P2 | — | ⬜ | — | ADR-G-009; rubric-registry:240 |
 | SMOKE-REQUIRED-ENFORCE | GOV | Tier-1 Smoke yoksa no-op yerine fail-closed (hollow-DONE'a karşı); şu an worker-rule+FIX-pressure | ADR-rev | P2 | — | ⬜ | — | ADR-G-009; proof-of-function:277 |
+| ADR-021-W | TERM·GOV | output_splash config-desc'i gerçek davranışa hizala (sprint-start GERÇEK gate; --version/init ungated) + init/version honor-karar | ADR-rev | P1 | — | ⬜ | — | ADR-G-010; no-op değil, desc-drift |
+| CLI-ONLY-GENERATED | GOV | CLI-only allowlist generated/explicit + alias-map (memory/remember/recall↔deckent_memory_query, features↔deckent_feature_query); statik liste ~8, gerçek ~24 | ADR-rev | P1 | — | ⬜ | — | ADR-G-011; index.ts |
+| CLI-COMMANDS-DOC-SYNC | DOCS | cli-commands.md parity-tablosu generated ya da non-canonical (stale: watch/cost/recover/kpi/process "CLI only" ama MCP-tool var) | ADR-rev | P2 | — | ⬜ | — | ADR-G-011; cli-commands.md:1700 |
+| PARITY-LINT-GATE | GOV | lint-cli-mcp-parity.mjs report-only (exit-0) → CI-gate + alias-map; semantic-parity enforce | ADR-rev | P2 | LAYER-1 | ⬜ | — | ADR-G-011; lint-cli-mcp-parity:8 |
+| CONFIG-MIGRATE-UNLIMITED | GOV | config-migration.ts persistent-map'e `unlimited→api` ekle (runtime alias var ama diske kalıcı yazılmıyor) | ADR-rev | P2 | — | ⬜ | — | ADR-G-012; config-migration:154 |
+| CONFIG-REF-CUSTOM-FIX | DOCS | config-reference.md:661 stale "custom mode fallback" düzelt (validateConfig non-canonical reddediyor, custom roadmap) | ADR-rev | P2 | — | ⬜ | — | ADR-G-012 |
+| SIGTERM-CLEANUP | GOV | entry.ts SIGTERM handler'ını SIGINT interrupt/cleanup-path'ine bağla (şu an if(signal==='SIGINT')-guard'lı, SIGTERM no-op) | ADR-rev | P1 | — | ⬜ | — | ADR-G-013; entry.ts:726 |
+| WORKER-CMD-ARRAY | GOV | inner worker-command string→array-args (provider-command-spec.ts parts.join(' '); controlled-parts low-risk) | ADR-rev | P2 | — | ⬜ | — | ADR-G-014; G-002-family |
+| BACKEND-AUTO-ALIGN | GOV | monitor-adapter auto→tmux ↔ spawn-factory auto→docker hizala (ya da monitor-adapter deprecate); per-worker backend resolution | ADR-rev | P2 | WATCH-W | ⬜ | — | ADR-G-014; monitor-adapter:196 |
+| DB-FS-EXPORT-WIRE | GOV | exportAdrsToFs (DB→FS reverse) finalize/CLI'a wire ya da "available-helper, finalize-enforced değil" beyan (şu an test-only) | ADR-rev | P2 | — | ⬜ | — | ADR-G-015; memory-export:317 |
+| PRODUCT-IDENTITY-GUARD | GOV | CI/docs-lint product-identity guard: required-cloud / default-network / paywall / native-only-platform claim yakala (şu an discipline-only) | ADR-rev | P2 | — | ⬜ | — | ADR-G-016 |
+| NEVER-PHONE-HOME-POLICY | GOV | marketplace/model-catalog network carve-out açık-policy + --offline escape + test (core ZERO-network; model-catalog default-fetch→opt-out) | ADR-rev | P2 | — | ⬜ | — | ADR-G-016; model-catalog:313 |
+| README-VISION-ALIGN | DOCS | README/roadmap: "no subscription"→"no Deckent subscription" + WSL2-not-native-Windows + license-taxonomy (features-MIT vs governance-licensed) hizala | ADR-rev | P2 | — | ⬜ | — | ADR-G-016; README:333 |
 
 ---
 

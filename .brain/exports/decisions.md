@@ -1286,7 +1286,7 @@ The "wired ≠ working" principle is permanent: structural/disk proof (Tier-0) i
 
 # ADR-G-010: Output, Terminal-UX & Brand
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=rich multi-section output modules (`sprint-retro-writer.ts` / `sprint-docs-updater.ts`) + `NO_COLOR` honored + fixed `KRAKEN_ASCII` brand const (`splash.ts`) → tomorrow=terminal concise/live (TERM-LIVE) + dashboard rich-detail (ADR-G-033) + `output_splash` real-gate-or-remove (ADR-021-W)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=rich multi-section output modules (`sprint-retro-writer.ts` / `sprint-docs-updater.ts`) + `NO_COLOR` honored + fixed `KRAKEN_ASCII` brand const (`splash.ts`) → tomorrow=terminal concise/live (TERM-LIVE) + dashboard rich-detail (ADR-G-033) + `output_splash` gate-description-align + init/version decision (ADR-021-W)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-020 (Rich Sprint Output — multi-section), ADR-021 (Kraken ASCII Brand Identity) · **Supersedes:** —
 **Crosswalk:** ADR-020 + ADR-021 → ADR-G-010
 
@@ -1314,12 +1314,14 @@ Sprint output is **rich + multi-section** (not a single-line metric), with ANSI 
 ```xml
 <output-structure>
   <doc path=".brain/sprints/RETRO.md" writer="src/orchestra/sprint-retro-writer.ts">
-    5 sections: Summary · Highlights · Issues · Metrics · Learnings
-    (+ Quality Dimensions subsection). Highlights/Issues emitted only when non-empty.
+    rich multi-section — Summary · Highlights · Issues · Metrics · Agent/Skill
+    Performance · Token Usage · KPI Scorecard · Quality Dimensions · Learnings ·
+    Next-Sprint Behavior Changes (count NOT pinned — canonical = the writer module;
+    sections emitted only when non-empty; Memory-V2 DB-first, .md is the export).
   </doc>
-  <doc path=".brain/sprints/sprint-NNN.md" writer="src/orchestra/sprint-docs-updater.ts">
-    task-oriented log: "## Task {id}: {title}" → "### Description"
-    (not the same structure as the retro).
+  <doc path=".brain/sprints/sprint-NNN.md" writer="src/orchestra/sprint-docs-helpers.ts (buildSprintLogLines)">
+    "# {sprint.id}" → "## Metrics" (table) → "## Agents" → "## Tasks" → optional
+    "## Notes" (NOT a per-task "## Task {id} / ### Description" structure).
   </doc>
   <canonical>the modules above + `deckent retro` / `deckent history` output.</canonical>
 </output-structure>
@@ -1338,15 +1340,15 @@ Sprint output is **rich + multi-section** (not a single-line metric), with ANSI 
 </brand-identity>
 ```
 
-### C. Visibility gate (known dormant)
+### C. Visibility gate (real for sprint-start; init/version ungated)
 
-The splash is meant to be shown when `config.output_splash` is true, via `showSplashIfEnabled`. **Today that gated wrapper is zero-caller:** `sprint-phases.ts` calls `showSplash` directly only on the **first sprint** (`sprint.number === 1`), gateless. So `output_splash` is a **no-op knob** — toggling it changes nothing. Tracked as **ADR-021-W** (a textbook "settings feature lost" instance).
+`config.output_splash` **is a real gate** for the sprint-start splash: `sprint-phases.ts` (`runPlanPhase`) calls **`showSplashIfEnabled(config, DECKENT_VERSION)`** — toggling `output_splash` *does* change it. **But two entry points are ungated:** `deckent --version` (`index.ts`) and `deckent init` (`init.ts`) call `showSplash()` **directly**, so they show regardless of the knob. The drift is in the *description*: the config/dashboard text frames `output_splash` around "init/version", while the runtime gate is on sprint-start. **ADR-021-W** = align the config-description to the real behavior (it gates the sprint-start splash) + decide whether `--version`/`init` should also honor it (today: deliberately ungated brand-first-impression, or wire them).
 
 ---
 
 ## Intent / Roadmap (Tomorrow)
 
-- **Surface split (pivot-aligned):** **terminal = concise / live summary** — the TERM-LIVE run-status footer (what's running / where / approval? / next / risk; fed by ADR-G-025 worker-live-trace); **dashboard = rich detail** — the full per-task results, changes, and metrics move to ADR-G-033 (Dashboard observability surface). The rich-multi-section content migrates to the dashboard; the terminal carries a tight live status, not a wall of text.
+- **Surface split (pivot-aligned):** **terminal = concise / live summary** — the TERM-LIVE run-status footer (what's running / where / approval? / next / risk; fed by ADR-G-025 worker-live-trace); **dashboard = rich detail** — the full per-task results, changes, and metrics move to ADR-G-033 (Dashboard observability surface). The rich-multi-section content migrates to the dashboard; the terminal carries a tight live status, not a wall of text. (Partially implemented already: `status --follow`, the status-line, and `output_mode=quiet` exist; the rich-terminal-finalizer → dashboard split is the open work.)
 - **`output_splash` real-gate-or-remove (ADR-021-W / DORMANT-2):** either wire `sprint-phases` to `showSplashIfEnabled` (a real gate, with the dashboard ConfigPage surface aligned) or remove the knob from the schema — settings honesty (no no-op config knobs).
 - **Brand carried cross-surface:** the Kraken identity extends consistently to dashboard / native terminal / desktop (one brand, all surfaces).
 
@@ -1356,7 +1358,7 @@ The splash is meant to be shown when `config.output_splash` is true, via `showSp
 
 **(+)** Users get the full picture of a run, brand recognition from the first invocation, and clean CI output via `NO_COLOR`. The merge unifies output + brand under one terminal-UX law. The today+tomorrow split keeps the pivot (terminal concise, dashboard rich) explicit so agents and contributors build toward it.
 
-**(−)** `output_splash` is a **no-op knob today** (dormant config-honesty debt — ADR-021-W); the concrete section set already drifted from the original "7-section" text (canonical is now the modules, not a count). The terminal/dashboard split is roadmap — today the rich output still lands largely in the terminal/files, not yet routed to the dashboard.
+**(−)** `output_splash` gates the sprint-start splash but `--version`/`init` are ungated, and the config-description still frames it as "init/version" — a description↔behavior drift (ADR-021-W); the section set is not a fixed count (canonical = the writer modules, retro under-counted "5" before). The terminal/dashboard split is roadmap — today the rich output still lands largely in the terminal/files, not yet routed to the dashboard.
 
 ---
 
@@ -1377,7 +1379,7 @@ The splash is meant to be shown when `config.output_splash` is true, via `showSp
 
 # ADR-G-011: Surface Parity & Thin-Wrapper
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=shared core (`src/core/` · `src/orchestra/`) + thin CLI/MCP wrappers + auto-generated parity refs (`docs/reference/cli.md` · `mcp-tools.md`) → tomorrow=CLI≡MCP≡terminal/tool parity + LAYER-1 structural enforcement + WATCH-W backend-agnostic
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=shared core (`src/core/` · `src/orchestra/`) + CLI/MCP wrappers (thin-INTENT; start/status/watch still carry logic → LAYER-1) + semantic parity + auto-generated parity refs (`docs/reference/cli.md` · `mcp-tools.md`; `cli-commands.md` hand-maintained/stale) → tomorrow=CLI≡MCP≡terminal/tool parity + LAYER-1 structural enforcement + WATCH-W backend-agnostic
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-022 (CLI/MCP Feature Parity) · **Supersedes:** —
 **Crosswalk:** ADR-022 → ADR-G-011
 
@@ -1395,7 +1397,7 @@ The 2026-06-30 review confirmed this as **ADR-G** (Global / Constitution — "cr
 
 ### 1. CLI ≡ MCP over one core
 
-Every MCP tool has a CLI counterpart; **there are no MCP-only commands.** Shared business logic lives in `src/core/` or `src/orchestra/`; the CLI (`register<Name>(program)`) and MCP (`server.registerTool()`) are **thin wrappers that call the same core function**. Parameter parity holds: MCP tools use the same input/output schema as their CLI commands.
+Every MCP tool has a CLI counterpart; **there are no MCP-only commands.** Shared business logic lives in `src/core/` or `src/orchestra/`; the CLI (`register<Name>(program)`) and MCP (`server.registerTool()`) call the same core. **Parity is *semantic*, not 1:1 schema** — surface-specific params are allowed (e.g. MCP `deckent_start` takes `acknowledgeCost`/`dryRun`/`sandbox` while CLI `start` has `--auto-approve`/`--sandbox-mode`/`--force`). The **thin-wrapper is the INTENT, not yet fully true today**: `start`/`status`/`watch` wrappers still carry business logic (MCP `start` does `fork` + orphan-cleanup + cost-gate) — which is exactly why LAYER-1 structural enforcement (below) is still needed.
 
 ### 2. Intentional CLI-only (infra / UI / setup)
 
@@ -1407,6 +1409,12 @@ These are infrastructure/terminal operations, deliberately kept CLI-only:
   <group kind="server-ui">dashboard · web · serve</group> <!-- interface launch -->
   <group kind="setup">upgrade · onboard</group>          <!-- setup wizards -->
   <group kind="plugin">plugin install · plugin list · plugin create</group>
+  <group kind="terminal-interactive">chat · bot · gateway · mcp · image · resources</group>
+  <group kind="local-op">flow · rbac · evolve · mode · resume · heartbeat · finalize · test</group>
+  <note>This static list is INCOMPLETE and drift-prone — the real CLI-only set is ~24
+    (buildProgram registers them). It must become generated/explicit (CLI-ONLY-GENERATED),
+    with an ALIAS-MAP for non-1:1 names (memory/remember/recall ↔ deckent_memory_query,
+    features ↔ deckent_feature_query) so they are not mis-flagged as CLI-only.</note>
 </cli-only>
 ```
 
@@ -1416,14 +1424,14 @@ These are infrastructure/terminal operations, deliberately kept CLI-only:
 
 ### 4. Counts are not load-bearing
 
-The Sprint-085 parity counts ("19 MCP = 19 CLI", "MCP 16→19", "CLI 32→33") are **stale snapshots**. The principle stands; canonical counts are **auto-generated** — `docs/reference/cli.md` + `docs/reference/mcp-tools.md` via `npm run docs:ref`.
+The Sprint-085 parity counts ("19 MCP = 19 CLI", "MCP 16→19", "CLI 32→33") are **stale snapshots**. The principle stands; canonical counts are **auto-generated** — `docs/reference/cli.md` + `docs/reference/mcp-tools.md` via `npm run docs:ref`. **Caveat:** `docs/reference/cli-commands.md` is a *hand-maintained* parity table and is currently **stale** — it marks `watch`/`cost`/`recover`/`kpi`/`process` as "CLI only" although their MCP tools (`deckent_watch`/`_cost`/`_recover`/`_kpi`/`_process`) exist. It must be generated or marked non-canonical (CLI-COMMANDS-DOC-SYNC).
 
 ---
 
 ## Intent / Roadmap (Tomorrow)
 
 - **CLI ≡ MCP ≡ terminal/tool:** as the native agentic terminal (ADR-G-034) becomes the primary management+usage surface and tool-driven invocation grows, parity **extends** — the same capability is reachable from CLI, MCP, the terminal, and tool-calls, all thin over one core. The dashboard remains **observe-only** (no command-execution divergence — ADR-G-033).
-- **LAYER-1 structural enforcement:** the `core→cli/orchestra` import-inversion cleanup (CORE-W1 + ORCH-W1 + API-W1 + ADR-008-W) — logic lives in core, every surface stays thin; enforced **structurally** so a wrapper cannot accrete business logic. (MASTER-PLAN: LAYER-1.)
+- **LAYER-1 structural enforcement:** the `core→cli/orchestra` import-inversion cleanup (CORE-W1 + ORCH-W1 + API-W1 + ADR-008-W) — logic lives in core, every surface stays thin; enforced **structurally** so a wrapper cannot accrete business logic. (MASTER-PLAN: LAYER-1.) The parity check today is `scripts/lint-cli-mcp-parity.mjs` — **report-only (always exits 0, never blocks CI)**; PARITY-LINT-GATE graduates it to a real CI gate with the alias-map, so semantic parity is *enforced*, not merely reported.
 - **WATCH-W backend-agnostic parity:** `watch` observes the worker wherever it runs (docker/subprocess/tmux/firecracker/cloud) with **one semantic** across CLI + MCP (ADR-G-014 Observation).
 
 ---
@@ -1432,7 +1440,7 @@ The Sprint-085 parity counts ("19 MCP = 19 CLI", "MCP 16→19", "CLI 32→33") a
 
 **(+)** A user can do anything from any surface; new capability is built **once** in core and surfaced thinly; auto-generated refs prevent count-drift. The thin-wrapper law is precisely what makes the terminal-center pivot cheap — the terminal is just one more thin surface over the same core.
 
-**(−)** Two-or-more wrappers per capability raise the per-feature cost (every core feature needs CLI + MCP + terminal surfacing). The thin-wrapper discipline is enforced **structurally only as a roadmap item** (LAYER-1); today a surface could still accrete logic (caught at review, not blocked). `watch` parity is an open divergence until WATCH-W lands.
+**(−)** Two-or-more wrappers per capability raise the per-feature cost. The thin-wrapper discipline is enforced **structurally only as a roadmap item** (LAYER-1) — today `start`/`status`/`watch` wrappers do carry logic (caught at review, not blocked); the parity-lint is report-only (PARITY-LINT-GATE); the CLI-only list + `cli-commands.md` are hand-maintained and drift (CLI-ONLY-GENERATED / CLI-COMMANDS-DOC-SYNC). `watch` parity is an open divergence until WATCH-W lands.
 
 ---
 
@@ -1443,7 +1451,7 @@ The Sprint-085 parity counts ("19 MCP = 19 CLI", "MCP 16→19", "CLI 32→33") a
 - **Backend partner:** ADR-G-014 (Spawn Backend, Options & Observation — absorbed ADR-089 backend-agnostic watch; WATCH-W).
 - **Structure substrate:** ADR-D-004 (Brain Central Import — one-way dependency) + ADR-D-006 (Code Architecture Conventions) — the import-direction LAYER-1 cleans.
 - **Governance:** ADR-G-019 (taxonomy), ADR-G-020 (authority / enforcement).
-- **Born work-items:** LAYER-1 (core→surface inversion cleanup, MASTER-PLAN P1), WATCH-W (backend-agnostic watch + CLI/MCP parity, P1).
+- **Born work-items:** LAYER-1 (core→surface inversion cleanup, MASTER-PLAN P1), WATCH-W (backend-agnostic watch + CLI/MCP parity, P1), CLI-ONLY-GENERATED (generated/explicit CLI-only allowlist + alias-map), CLI-COMMANDS-DOC-SYNC (`cli-commands.md` generate-or-non-canonical), PARITY-LINT-GATE (`lint-cli-mcp-parity.mjs` report-only → CI gate + alias-map).
 - **Direction:** `.analysis/adr-review-crosswalk.md` (row 022 → ADR-G-011), `.analysis/hermes-vs-deckent-direction-decisions.md` (terminal-center pivot).
 
 
@@ -1455,7 +1463,7 @@ The Sprint-085 parity counts ("19 MCP = 19 CLI", "MCP 16→19", "CLI 32→33") a
 
 # ADR-G-012: Plan Tier & Config Customization
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=`config.ts` `VALID_MODES` provider-agnostic tier set + `autoMigrateOnLoad` legacy-alias map (validated on load) → tomorrow=common/standard + custom tier + NL-terminal customize-ALL-settings (ONB-CHAT), every config-knob real-in-code (honesty / zero-hardcode)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=`config.ts` `VALID_MODES` provider-agnostic **plan-mode** set (`config.mode`; each maps to a model-tier strategy — economy/standard/premium/premium_plus) + `autoMigrateOnLoad` legacy-alias map (validated on load; persistent `config-migration.ts` map lacks `unlimited`) → tomorrow=common/standard + custom tier + NL-terminal customize-ALL-settings (ONB-CHAT), every config-knob real-in-code (honesty / zero-hardcode)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-023 (Plan Tier Generalizasyonu — Provider-Agnostic Tier İsimleri) · **Supersedes:** —
 **Crosswalk:** ADR-023 → ADR-G-012
 
@@ -1465,16 +1473,16 @@ The Sprint-085 parity counts ("19 MCP = 19 CLI", "MCP 16→19", "CLI 32→33") a
 
 Plan tier names were Claude-specific — `max_plan`, `max5x_plan`, `pro_plan` — meaningless to Codex or Gemini users. A provider-agnostic CLI must not bake one provider's vocabulary into its core config surface. ADR-023 (Sprint 072) generalized the tier names and changed the init wizard from "Select your Claude plan" to "Select your plan," keeping legacy names as backward-compatible aliases.
 
-A code-verification note corrected one detail: `unlimited` was **not** preserved as a standalone tier — it was remapped to `api`. The canonical tier set today is `VALID_MODES = ['performance', 'balanced', 'economic', 'api']` (`src/core/config.ts`), with no live `unlimited` tier.
+A code-verification note corrected two details. **(1) Terminology:** these are **plan modes** (`config.mode`, type `PlanMode`), NOT *model tiers*. The canonical plan-mode set is `VALID_MODES = ['performance', 'balanced', 'economic', 'api']` (`src/core/config.ts`); each plan mode maps to a **model-tier strategy** (`brain_tier`/`worker_tier`/`min_tier`/`max_tier` ∈ `economy`/`standard`/`premium`/`premium_plus`, via `mode-presets.ts`). "Plan mode" and "model tier" are distinct axes — this ADR governs the plan-mode axis. **(2)** `unlimited` was **not** preserved as a standalone mode — it is remapped to `api`.
 
 The 2026-06-30 review expanded the decision's scope from "rename tiers" to "**config customization as a first-class, honest surface**": provider-agnostic standard tiers PLUS a user-defined custom tier, customizable conversationally (NL-terminal / ONB-CHAT), under the hard rule that **every config-knob is real-in-code** — no dormant settings that look configurable but do nothing (DORMANT-2 honesty, zero-hardcode).
 
 ## Decision (Today)
 
-### 1. Provider-agnostic tier names
-The canonical tier set is `VALID_MODES = ['performance', 'balanced', 'economic', 'api']` (`src/core/config.ts`):
+### 1. Provider-agnostic plan-mode names
+The canonical **plan-mode** set (`config.mode`) is `VALID_MODES = ['performance', 'balanced', 'economic', 'api']` (`src/core/config.ts`) — each maps to a model-tier strategy, it is not a tier itself:
 
-| Tier | Meaning |
+| Plan mode | Meaning (→ model-tier strategy) |
 |---|---|
 | `performance` | highest quality, highest cost (was `max_plan`) |
 | `balanced` | quality/cost balance (was `max5x_plan`) |
@@ -1482,7 +1490,7 @@ The canonical tier set is `VALID_MODES = ['performance', 'balanced', 'economic',
 | `api` | metered API usage (was `unlimited`, remapped — no standalone `unlimited` tier) |
 
 ### 2. Backward-compatible migration
-`autoMigrateOnLoad` recognizes the legacy names as aliases (`max_plan→performance`, `max5x_plan→balanced`, `pro_plan→economic`, `unlimited→api`) and upgrades existing configs on read. The init wizard reads "Select your plan" (provider-neutral). All docs use the new names.
+`autoMigrateOnLoad` (`src/core/config.ts`) recognizes the legacy names as aliases (`max_plan→performance`, `max5x_plan→balanced`, `pro_plan→economic`, `unlimited→api`) and upgrades on read. **Gap:** the *persistent* migration map (`src/core/config-migration.ts`) covers only `max_plan`/`max5x_plan`/`pro_plan` — **not `unlimited`** — so `unlimited` is remapped at runtime but not durably rewritten to disk (CONFIG-MIGRATE-UNLIMITED). The init wizard reads "Select your plan" (provider-neutral). All docs use the new names.
 
 ### 3. Honest config surface (seed)
 Tier selection is real-in-code: a chosen tier maps to actual model-equivalence behavior via the provider layer (ADR-G-008), not a cosmetic label. This is the seed of the broader config-customization honesty rule below.
@@ -1497,13 +1505,13 @@ Tier selection is real-in-code: a chosen tier maps to actual model-equivalence b
 
 **(+)** Provider-agnostic terminology serves Codex / Gemini / any-provider users equally; `autoMigrateOnLoad` makes the rename invisible to existing users; reframing as ADR-G binds tier/config customization to the honesty + zero-hardcode laws so a knob can never become a lie; the custom-tier + NL-customize direction makes config a first-class product surface, not an internal file.
 
-**(−)** Today only the standard tier set is live — custom tiers and NL-terminal customize-all are roadmap (CONFIG-CUSTOMIZE / CFG-1); the every-knob-real rule (DORMANT-2 honesty) is a standing audit obligation that must be enforced continuously as settings are added, or it regresses; tier semantics ultimately depend on the provider layer (ADR-G-008), so the two must evolve together.
+**(−)** Today only the standard plan-mode set is live — `validateConfig` **rejects** any non-canonical `config.mode`, so custom modes + NL-terminal customize-all are roadmap (CONFIG-CUSTOMIZE / CFG-1), and a stale "custom mode fallback" line in `docs/reference/config-reference.md` must be corrected. The every-knob-real rule (DORMANT-2 honesty) is a standing audit obligation that regresses if not enforced continuously; the plan-mode→model-tier semantics depend on the provider layer (ADR-G-008), so the two evolve together.
 
 ## References / Absorbed
 
 - **Absorbs:** ADR-023 (Plan Tier Generalizasyonu — provider-agnostic tier names, wizard rename, alias migration).
 - **Implementation:** `src/core/config.ts` (`VALID_MODES`, `autoMigrateOnLoad`, legacy-alias map).
-- **Born work-items:** CONFIG-CUSTOMIZE (common/standard + custom tier + NL-terminal customize-ALL via ONB-CHAT + ease/consistency + every-knob-real-in-code), CFG-1, DORMANT-2 (config-knob honesty audit).
+- **Born work-items:** CONFIG-CUSTOMIZE (common/standard + custom mode/tier + NL-terminal customize-ALL via ONB-CHAT + ease/consistency + every-knob-real-in-code), CFG-1, DORMANT-2 (config-knob honesty audit), CONFIG-MIGRATE-UNLIMITED (add `unlimited→api` to the persistent `config-migration.ts` map), CONFIG-REF-CUSTOM-FIX (correct the stale "custom mode fallback" in `config-reference.md`).
 - **Cross-ref:** ADR-G-008 (Provider Abstraction, Fleet & Native-Usage — tier→model-equivalence resolution; original merge-candidate 066/077), ADR-G-001 (Layered Config & Scope), ADR-G-019 (ADR-AUTHORING-STD today+tomorrow framing), ADR-G-030 (Consent / Onboarding — ONB-CHAT NL-setup).
 - **Direction:** terminal-as-primary-surface pivot (`.analysis/hermes-vs-deckent-direction-decisions.md`); `.analysis/adr-review-crosswalk.md` row 023.
 
@@ -1516,7 +1524,7 @@ Tier selection is real-in-code: a chosen tier maps to actual model-equivalence b
 
 # ADR-G-013: Graceful Shutdown & Lifecycle
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=SIGINT handler (`entry.ts`) → `interruptActiveSprint()` + `killAllSessions()`/`killAllWorkers()` (`sprint-lifecycle.ts` · `tmux.ts`) + INTERRUPTED state → tomorrow=mode-independent lifecycle + ORPHAN-START-PROC fix (MOAT-2) + ROLE-GUARD process-role teardown
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=**SIGINT** handler (`entry.ts`; SIGTERM registered but runs no cleanup) → `interruptActiveSprint()` (task-level INTERRUPTED) + `killAllSessions()` (tmux) (`sprint-lifecycle.ts` · `tmux.ts`) → tomorrow=mode-independent lifecycle + ORPHAN-START-PROC fix (MOAT-2) + ROLE-GUARD process-role teardown
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-025 (Graceful Shutdown Strategy) · **Supersedes:** —
 **Crosswalk:** ADR-025 → ADR-G-013
 
@@ -1545,13 +1553,14 @@ The 2026-06-30 review confirmed this as **ADR-G** (Global / Constitution): clean
   <step n="2" fn="killAllSessions()" module="src/orchestra/tmux.ts">
     cleans all tmux sessions ("Called on SIGINT for graceful shutdown").
   </step>
-  <order>sprint-state save FIRST, then session kill.</order>
+  <order>task-state save FIRST (each in-progress task JSON → INTERRUPTED + heartbeat
+    ABORTED; there is NO sprint-level sprint-state.json persist today), then session kill.</order>
 </sigint-shutdown>
 ```
 
-**Result:** a clean state after Ctrl+C. The sprint is marked **INTERRUPTED** (`deckent review` surfaces it); workers receive SIGTERM and can mark their own `.hb` DONE; `deckent cleanup` leaves no orphan files.
+**Result:** a clean state after Ctrl+C. The sprint's tasks are marked **INTERRUPTED** (`deckent review` surfaces it); workers are terminated **per-backend** (docker: `docker stop --time` graceful; tmux: window/session kill — not a uniform explicit SIGTERM); `deckent cleanup` leaves no orphan files. **Scope:** this runs on **SIGINT only** — `entry.ts` registers a SIGTERM handler too, but it does **not** run `interruptActiveSprint`/`killAllSessions` (the cleanup is `if (signal === 'SIGINT')`-guarded — SIGTERM-CLEANUP).
 
-**Companion:** `killAllWorkers()` (`tmux.ts:217`) — the per-worker variant of `killAllSessions()` (single worker, or `/api/kill/all`), which also covers the subprocess/docker backends, not only tmux.
+**Companion:** `killAllWorkers()` / `killAllSessions()` (`tmux.ts`) are **tmux-scoped** (`tmux kill-session`). Subprocess/docker teardown does **not** come from these — it flows via `interruptActiveSprint()` calling the active **SpawnBackend's** own kill path. Uniform backend-agnostic worker-kill is the ADR-G-014 / ROLE-GUARD roadmap.
 
 ---
 
@@ -1567,7 +1576,7 @@ The 2026-06-30 review confirmed this as **ADR-G** (Global / Constitution): clean
 
 **(+)** Ctrl+C always leaves a clean state — INTERRUPTED sprint, released locks, no orphan tmux sessions; the per-worker variant covers non-tmux backends; `deckent review` surfaces the interruption honestly rather than presenting a silent half-run.
 
-**(−)** Today the clean teardown is reliable **on SIGINT**, but the **normal-completion path can still leave a lingering coordinator** (MOAT-2, open 🟠). Mode-independence and ROLE-GUARD process-role teardown are roadmap, so non-sprint modes do not yet share the identical lifecycle guarantees.
+**(−)** Today the clean teardown runs **on SIGINT only** (SIGTERM is registered but its handler does not run the cleanup — SIGTERM-CLEANUP); interrupt is **task-level** (per-task JSON, no sprint-state.json persist); backend-agnostic worker-kill flows through the SpawnBackend, not `killAllWorkers` (tmux-scoped). The **normal-completion path can still leave a lingering coordinator** (MOAT-2, open 🟠). Mode-independence and ROLE-GUARD process-role teardown are roadmap, so non-sprint modes do not yet share the identical lifecycle guarantees.
 
 ---
 
@@ -1578,7 +1587,7 @@ The 2026-06-30 review confirmed this as **ADR-G** (Global / Constitution): clean
 - **Mode partner:** ADR-G-024 (Mode Architecture — mode-independent lifecycle).
 - **Backend partner:** ADR-G-014 (Spawn Backend, Options & Observation — backend-agnostic worker kill).
 - **Authority partner:** ADR-G-020 (Authority, Roles, Flow & Enforcement — ROLE-GUARD process-role teardown).
-- **Born work-items:** MOAT-2 (ORPHAN-START-PROC — normal-completion coordinator lingers, MASTER-PLAN P0).
+- **Born work-items:** MOAT-2 (ORPHAN-START-PROC — normal-completion coordinator lingers, MASTER-PLAN P0), SIGTERM-CLEANUP (wire the SIGTERM handler to the same interrupt/cleanup path as SIGINT).
 - **Direction:** `.analysis/adr-review-crosswalk.md` (row 025 → ADR-G-013), `.analysis/hermes-vs-deckent-direction-decisions.md`.
 
 
@@ -1590,7 +1599,7 @@ The 2026-06-30 review confirmed this as **ADR-G** (Global / Constitution): clean
 
 # ADR-G-014: Spawn Backend, Options & Observation
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=`SpawnBackendFactory` (docker→tmux→subprocess fallback) + per-task backend override + `SpawnOptions`/`ProviderSpawnOptions`/`SpawnBackendOptions` chain + `watch --follow` (docker `logs -f`) + auditor-in-process role-split red-line (scope advisory/soft per ADR-G-020) → tomorrow=firecracker/cloud/ollama-host backends + WATCH-W (CLI≡MCP unify) + per-worker backend declaration + WORKER-LIVE-TRACE
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=`SpawnBackendFactory` (auto = Windows→subprocess / else→docker; tmux deprecated; explicit-selection — **no fallback chain**) + per-task backend override + `SpawnOptions`/`ProviderSpawnOptions`/`SpawnBackendOptions` chain + `watch --follow` (docker `logs -f`) + auditor-in-process role-split red-line (scope advisory/soft per ADR-G-020) → tomorrow=firecracker/cloud/ollama-host backends + WATCH-W (CLI≡MCP unify) + per-worker backend declaration + WORKER-LIVE-TRACE
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-027 (Hybrid Spawn Backend) + ADR-007 (SpawnOptions Interface) + ADR-089 (Backend-Agnostic Worker Observation) · **Supersedes:** —
 **Crosswalk:** ADR-027 (+ ADR-007 fold + ADR-089 merge) → ADR-G-014
 
@@ -1614,7 +1623,7 @@ The 2026-06-30 review merges all three into one ADR-G law (runtime behavior the 
 
 ### 1. Hybrid spawn backend — `SpawnBackendFactory`
 
-deckent spawns workers onto one of three backends through `SpawnBackendFactory`, with a **docker → tmux → subprocess** fallback chain. Each backend fully implements the `SpawnBackend` interface (E2E-covered, Sprint 139 Tasks 17–19); no backend is a partial citizen.
+deckent spawns workers onto one of three backends through `SpawnBackendFactory`. **`auto` resolves deterministically — Windows → `subprocess`, otherwise → `docker`; `tmux` is deprecated (warns on use); any backend may be selected explicitly. There is NO docker→tmux→subprocess *fallback chain*:** `create()` instantiates the resolved backend, and `createAsync()` checks `isAvailable()` and **throws** if unavailable — it does not silently fall back to another backend. Each backend fully implements the `SpawnBackend` interface (E2E-covered, Sprint 139 Tasks 17–19); no backend is a partial citizen.
 
 ### 2. Per-worker / per-task independent backends
 
@@ -1646,11 +1655,15 @@ Backend selection is **per-worker, not per-sprint**. `sprint-spawner.ts` resolve
     scope.filesWrite (sprint-spawner writeTargets → allowedTools).</allowedTools>
   <autoApprove>Maps to each provider's own permission-bypass flag, per-provider:
     claude --dangerously-skip-permissions · codex --dangerously-bypass-approvals-and-sandbox
-    · gemini yolo. (Claude CLI rejects bypass as root → the docker backend runs host-user.)</autoApprove>
+    · gemini yolo. (Claude CLI rejects bypass as root → the docker backend runs host-user.)
+    SECURITY (explicit): the Docker backend FORCES autoApprove:true (IMMUTABLE,
+    spawn-backend-docker.ts) — a docker worker ALWAYS runs permission-bypassed, BY DESIGN:
+    the container is the isolation boundary, so full autonomy is contained, not gated.
+    Non-container backends honor the opts value. (ADR-G-020 authority context.)</autoApprove>
 </spawn-options>
 ```
 
-The array-args security invariant (ADR-G-002) is carried **uniformly** across every backend adapter — never re-derived per backend.
+The array-args security invariant (ADR-G-002) is carried uniformly for the **outer backend spawn** (the `spawn`/`spawnSync` of the docker/tmux/subprocess process) — never re-derived per backend. **Caveat:** the *inner* worker command is assembled as a joined **string** (`provider-command-spec.ts` `parts.join(' ')`) from controlled parts (model · prompt-FILE path · flags — no untrusted interpolation), not array-args; tightening it is tracked under G-002's command-string concern (WORKER-CMD-ARRAY).
 
 ### 5. Backend-agnostic `watch` (folds ADR-089)
 
@@ -1662,8 +1675,12 @@ The array-args security invariant (ADR-G-002) is carried **uniformly** across ev
   <subprocess>stdout/stderr pipe stream</subprocess>
   <tmux>session attach</tmux>
   <roadmap>firecracker microVM / cloud log-API / ollama-host</roadmap>
-  <resolution>one observation core resolves worker → backend → stream;
-    backend-forcing flags (--docker / --tmux) select an explicit view.</resolution>
+  <resolution>TARGET: one observation core resolves worker → backend → stream.
+    Today the watch path branches per-backend (docker vs heartbeat/log-tail vs tmux);
+    backend-forcing flags (--docker / --tmux) select an explicit view. WATCH-W unifies it.
+    Also: the observe-side `monitor-adapter` selects a CONFIG-level backend and its `auto`
+    resolves to tmux — conflicting with the spawn-factory `auto`→docker; align-or-deprecate
+    (BACKEND-AUTO-ALIGN).</resolution>
 </backend-agnostic-watch>
 ```
 
@@ -1686,7 +1703,7 @@ The array-args security invariant (ADR-G-002) is carried **uniformly** across ev
 
 **(+)** One spawn law spans launch + options + observation across a heterogeneous backend fleet; per-worker backends are embraced while the role-mix red-line (Brain≠worker, auditor in-process) holds; `watch` follows a worker onto any backend; the `SpawnOptions` contract and the array-args invariant are uniform across every backend. New backends are additive (an adapter pair), not a rewrite.
 
-**(−)** The CLI/MCP `watch` semantic split is a live parity violation until WATCH-W lands; firecracker/cloud/ollama-host backends are roadmap (not built); per-worker backend declaration in the task spec is forward-looking. Scope/file-authority enforcement on each backend is advisory/soft today (ADR-G-020 V1.0).
+**(−)** `auto` is deterministic (no fallback chain) and `tmux` is deprecated; the Docker backend forces `autoApprove:true` (contained-by-container, but a docker worker always runs permission-bypassed). The array-args invariant is uniform for the outer spawn but the inner worker-command is a joined string of controlled parts (WORKER-CMD-ARRAY). The CLI/MCP `watch` semantic split is a live parity violation until WATCH-W lands, and the observe-side `monitor-adapter` `auto` disagrees with the spawn-factory `auto` (BACKEND-AUTO-ALIGN); firecracker/cloud/ollama-host backends are roadmap; per-worker backend declaration in the task spec is forward-looking. Scope/file-authority enforcement on each backend is advisory/soft today (ADR-G-020 V1.0).
 
 ---
 
@@ -1694,7 +1711,7 @@ The array-args security invariant (ADR-G-002) is carried **uniformly** across ev
 
 - **Absorbs:** ADR-027 (Hybrid Spawn Backend — role-split red-line preserved; single-backend-per-sprint superseded) · ADR-007 (SpawnOptions Interface — folded; **ADR-D-003 intentionally vacant**) · ADR-089 (Backend-Agnostic Worker Observation + per-worker independent backends + CLI/MCP watch-parity).
 - **Cross-ref:** ADR-G-011 (Surface Parity & Thin-Wrapper — CLI≡MCP, WATCH-W) · ADR-G-018 (Verification Protocol & Event-Stream — cross-backend observability substrate) · ADR-G-020 (Authority, Roles, Flow & Enforcement — worktree/scope enforcement, autoApprove security) · ADR-G-025 (Process Resilience & Live Observability — WORKER-LIVE-TRACE) · ADR-G-002 (spawnSync Security Pattern — array-args invariant, uniform per backend) · ADR-G-008 (Provider Abstraction & Fleet — per-provider bypass flags).
-- **Born work-items:** WATCH-W (backend-agnostic watch + CLI/MCP unify, P1) · ORCH-BE (firecracker/cloud/ollama-host backends + per-worker backend declaration) · WORKER-LIVE-TRACE (with ADR-G-025).
+- **Born work-items:** WATCH-W (backend-agnostic watch + CLI/MCP unify, P1) · ORCH-BE (firecracker/cloud/ollama-host backends + per-worker backend declaration) · WORKER-LIVE-TRACE (with ADR-G-025) · WORKER-CMD-ARRAY (inner worker-command string→array-args, G-002 family) · BACKEND-AUTO-ALIGN (`monitor-adapter` `auto` ↔ spawn-factory `auto`, under WATCH-W).
 - **Direction:** `.analysis/adr-review-crosswalk.md` (rows 027 + 007 + 089 → ADR-G-014), `.analysis/hermes-vs-deckent-direction-decisions.md`.
 
 
@@ -1706,8 +1723,8 @@ The array-args security invariant (ADR-G-002) is carried **uniformly** across ev
 
 # ADR-G-015: Managed-Docs (Core-Gen) + Tracking / Staleness
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=post-finalize self-update hook (UNCONDITIONAL invocation · step-ordering memoryExport→adrInsert→ruleRegen · FS↔DB bi-directional sync) + DCR multi-signal doc-tracking scan + code-derived module-count (`countModules`, zero-hardcode) → tomorrow=MANAGED-DOCS-MINIMIZE (core-only minimal auto-gen + user-project track-not-write) + DECKENT-LOG (sprint-log→deckent-log multi-mode) + code-drift CI-gate generalized to user projects
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-029 (Managed-Docs Universalization) + ADR-030 (Template Engine + Plugin Loader) + ADR-031 (Content Hash Cache) + ADR-032 (i18n Pattern) + ADR-046 (Brain Self-Update Hook) + ADR-090 (Documentation Tracking & Staleness)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=post-finalize self-update hook (ADR-046: UNCONDITIONAL · step-ordering adrInsert→ruleRegen→**deferred guarded memoryExport-last** · FS→DB sync wired, DB→FS reverse test-only) + DCR multi-signal doc-tracking scan (finalize-sync gated default-off) + code-derived module-count (`countModules`, zero-hardcode) — managed-set still includes the CLAUDE/AGENTS host-adapters (→ DOCS-PURE-ADAPTER) → tomorrow=MANAGED-DOCS-MINIMIZE (core-only minimal auto-gen + user-project track-not-write) + DECKENT-LOG (sprint-log→deckent-log multi-mode) + code-drift CI-gate generalized to user projects
+**Status:** accepted (amendment — today split: wired self-update + tracking-scan vs migration-pending minimal-core-only / track-not-write / DB→FS-reverse / deckent-log) · **Date:** 2026-06-30 · **Absorbs:** ADR-029 (Managed-Docs Universalization) + ADR-030 (Template Engine + Plugin Loader) + ADR-031 (Content Hash Cache) + ADR-032 (i18n Pattern) + ADR-046 (Brain Self-Update Hook) + ADR-090 (Documentation Tracking & Staleness)
 **Crosswalk:** 029 (+030+031+032+046+090) → ADR-G-015
 
 > **Reframe note (Alperen, 2026-06-30):** deckent does NOT auto-write a user's project docs. In a user project, AI tools manage documentation; deckent only **tracks staleness** (DB-queryable: which docs are current, which lag the code). Auto-doc generation is **minimal and deckent-core-only**. The old "sprint-log" becomes **"deckent-log"** (multi-mode, not sprint-only).
@@ -1725,20 +1742,26 @@ deckent maintains a set of managed documents (CLAUDE.md auto-sections, IDENTITY,
 ### 1. Core-gen — deckent-core-only, minimal (absorbs ADR-029 / ADR-030 / ADR-031 / ADR-032)
 
 ```xml
-<core-gen scope="deckent-core-only" mode="minimal">
+<core-gen scope="deckent-core (target: minimal)" mode="minimal-target">
   template-engine (ADR-030) + content-hash cache (ADR-031: fileHash+entryHash+sprintId,
-  sprint-aware) + i18n pattern layer (ADR-032). Generates only NECESSARY core docs
-  (not a bulk md-sweep) — the ADR-029 "universalization" reframed to minimal core-only.
+  sprint-aware) + i18n pattern layer (ADR-032). TODAY docs.json manages ~11 docs:
+  deckent-core (IDENTITY · TOOLS · BOOT · WORKER-GUIDE · VISION · blueprint · beta-tracker)
+  PLUS the CLAUDE.md/AGENTS.md host-adapters — the latter must be removed (DOCS-PURE-ADAPTER,
+  ADR-G-004 P0). "Minimal core-only" is the TARGET (MANAGED-DOCS-MINIMIZE), not yet the state.
 </core-gen>
 ```
 
 ### 2. Self-update hook (absorbs ADR-046)
 
 ```xml
-<self-update-hook>post-finalize step-ordering contract (memoryExport → adrInsert →
-  ruleRegen), UNCONDITIONAL invocation, ground-truth verification, and FS↔DB
-  BI-DIRECTIONAL sync (syncAdrFilesToDb forward + exportAdrsToFs reverse) — the
-  mechanism that makes the md+DB ADR-edit invariant safe (ADR-G-035).</self-update-hook>
+<self-update-hook>post-finalize hook (ADR-046), UNCONDITIONAL invocation, ground-truth
+  verification. Real step-ordering: adrInsert → ruleRegen → guarded memoryExport LAST
+  (runPostFinalizeHooks runs with skipMemoryExport:true so the guarded export runs AFTER,
+  capturing the post-Step-3 ADR inserts — NOT memoryExport-first). FS↔DB sync is
+  one-directional in production: syncAdrFilesToDb (FS→DB) is finalize-wired; exportAdrsToFs
+  (DB→FS reverse) is an available helper called only in tests, not finalize-enforced
+  (DB-FS-EXPORT-WIRE). This is the mechanism that makes the md+DB ADR-edit invariant safe
+  (ADR-G-035).</self-update-hook>
 ```
 
 ### 3. Code-derived module-count — `countModules` (ADR-075 Part-C)
@@ -1764,20 +1787,25 @@ reality (zero-hardcode / live-data law):
   DCR (doc-rank, 0=most-critical) + body content-hash + last_updated + multi-signal
   stale (content-drift + age + code-drift) in a separate doc_tracking table
   (better-sqlite3, additive). CLI `deckent docs track scan|status|sync`; CI-gate
-  (CRITICAL_STALE→non-zero); MCP/dashboard health.
+  (CRITICAL_STALE→non-zero); MCP/dashboard health. NOTE: the post-finalize doc-tracking
+  sync is GATED on `doc_tracking.sync_on_finalize` (default-OFF) — distinct from the
+  ADR-046 self-update hook above (which IS unconditional).
 </tracking>
 ```
 
 ### 5. User-project = track-not-write
 
 ```xml
-<user-project rule="track-not-write">deckent does NOT auto-write project-specific
-  docs — AI tools do; deckent tracks which are stale/current via the DB.</user-project>
+<user-project rule="track-not-write (target)">deckent's DIRECTION is to NOT auto-write
+  project-specific docs — AI tools do; deckent tracks which are stale/current via the DB.
+  Today the tracking subcommands are read/scan-only, but `docs run` / `docs add --auto`
+  can still write managed-doc sections — full track-not-write is the active migration
+  (MANAGED-DOCS-MINIMIZE), not yet enforced.</user-project>
 ```
 
 ### 6. deckent-log rename (multi-mode)
 
-The "sprint-log" is renamed **"deckent-log"** and spans multiple modes (task/process/autonomous/flow/mission/sprint), not sprint-only.
+The "sprint-log" is **to be renamed "deckent-log"** spanning multiple modes (task/process/autonomous/flow/mission/sprint), not sprint-only. Today the code still uses `writeSprintLog` / `SPRINT_LOG` / `.brain/sprints/*.md` (DECKENT-LOG, pending).
 
 ---
 
@@ -1794,7 +1822,7 @@ The "sprint-log" is renamed **"deckent-log"** and spans multiple modes (task/pro
 
 **(+)** One managed-docs + tracking law; the FS↔DB bi-directional sync is exactly what makes the md+DB ADR-edit method safe (idempotent re-sync). User docs stay the user's (track-not-write) — respects the product-vision boundary. Staleness is machine-detectable across the whole repo.
 
-**(−)** "Minimal auto-gen" is a reframe to implement (born: MANAGED-DOCS-MINIMIZE); some bulk-md generation still exists. The deckent-log rename is partial. The plugin-loader is latent (unwired security).
+**(−)** "Minimal auto-gen" is a target (MANAGED-DOCS-MINIMIZE) — the managed-set still includes the CLAUDE/AGENTS host-adapters (DOCS-PURE-ADAPTER, P0) and `docs run`/`add --auto` can still write user docs. The post-finalize doc-tracking sync is gated default-off; the DB→FS reverse export (`exportAdrsToFs`) is test-only (DB-FS-EXPORT-WIRE); the self-update step-order is adrInsert→ruleRegen→memoryExport-last (not memoryExport-first). The deckent-log rename is partial. The plugin-loader is latent (unwired security).
 
 ---
 
@@ -1802,7 +1830,7 @@ The "sprint-log" is renamed **"deckent-log"** and spans multiple modes (task/pro
 
 - **Absorbs:** ADR-029 + ADR-030 + ADR-031 + ADR-032 + ADR-046 + ADR-090.
 - **Cross-ref:** ADR-G-035 (DB sync invariant — the md+DB pair) · ADR-G-019 (ADR export) · ADR-G-004 (instruction-file adapter) · ADR-G-024 (modes — deckent-log multi-mode) · ADR-075 Part-C (code-derived module-count `countModules` — folded here; Parts A→ADR-G-032, B→ADR-G-006).
-- **Born / MASTER-PLAN:** MANAGED-DOCS-MINIMIZE · DECKENT-LOG · I18N-6 (6-lang).
+- **Born / MASTER-PLAN:** MANAGED-DOCS-MINIMIZE (core-only + track-not-write) · DECKENT-LOG (sprint-log→deckent-log rename) · DB-FS-EXPORT-WIRE (wire `exportAdrsToFs` DB→FS into finalize/CLI, or declare available-not-enforced) · DOCS-PURE-ADAPTER (G-004 P0 — remove CLAUDE/AGENTS from docs.json) · I18N-6 (6-lang).
 - **Memory:** `project_docs_security_features_redoc` · `project_claude_md_doc_bloat_cleanup`.
 
 
@@ -1814,7 +1842,7 @@ The "sprint-log" is renamed **"deckent-log"** and spans multiple modes (task/pro
 
 # ADR-G-016: Product Vision — Product, Not Service
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=identity-constitution — every feature/decision validated against the 4 inviolable principles (community-core = ALL features; local-first/free/privacy intact) → tomorrow=MOD-SPLIT-CLARIFY + MODULARIZE (deckent-solo/enterprise, single codebase, governance-depth NOT feature-gating) + CODE-LAYERS
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=identity-constitution — every feature/decision validated against the 4 inviolable principles (community-core = ALL features MIT; local-first/free/privacy; core never phones home) — discipline, not yet a CI gate (PRODUCT-IDENTITY-GUARD) → tomorrow=MOD-SPLIT-CLARIFY + license-taxonomy (features-MIT vs governance-assurance-licensed) + MODULARIZE (deckent-solo/enterprise, single codebase, governance-depth NOT feature-gating) + NEVER-PHONE-HOME-POLICY (marketplace/model-catalog network carve-out) + CODE-LAYERS
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-033 (Product Vision — Product Not Service, + MOD-SPLIT amendment)
 **Crosswalk:** ADR-033 → ADR-G-016
 
@@ -1824,7 +1852,7 @@ The "sprint-log" is renamed **"deckent-log"** and spans multiple modes (task/pro
 
 ## Context
 
-Deckent is a **product, not a service** (old ADR-033, Sprint 134): a local-first AI orchestration tool anyone can install and run, open-source and free for the community, for everyone everywhere — privacy-preserving, never phoning home. As the direction matured (modularization, an optional hosted core, a desktop/mobile app, an enterprise layer, opt-in telemetry), the strict 2026-04 forbidden-list (no SaaS / no cloud / no enterprise-edition / no subscription) needed reconciliation: how do these optional layers coexist with "product, not service" without compromising the identity? This ADR records that reconciliation (decision (a) of the 2026-06-30 review).
+Deckent is a **product, not a service** (old ADR-033, Sprint 134): a local-first AI orchestration tool anyone can install and run, open-source and free for the community, for everyone everywhere — privacy-preserving, never phoning home. As the direction matured (modularization, an optional hosted core, a desktop/mobile app, an enterprise layer, opt-in telemetry), the strict 2026-04 forbidden-list (no SaaS / no cloud / no enterprise-edition / no **Deckent** subscription — provider subscriptions are first-class) needed reconciliation: how do these optional layers coexist with "product, not service" without compromising the identity? This ADR records that reconciliation (decision (a) of the 2026-06-30 review).
 
 ---
 
@@ -1837,8 +1865,8 @@ Deckent is a **product, not a service** (old ADR-033, Sprint 134): a local-first
   <principle id="1">Product, not service — the core is NEVER bound (captive) to any cloud.</principle>
   <principle id="2">Easy to install & run — "kur-çalıştır", anyone can.</principle>
   <principle id="3">Open-source, community-free — the community core is free (MIT).</principle>
-  <principle id="4">Everyone, everywhere — solo user → largest enterprise; every OS/environment.</principle>
-  <invariant>Local-first · privacy-preserving · never-phone-home (telemetry opt-in + consent only).</invariant>
+  <principle id="4">Everyone, everywhere — solo user → largest enterprise; every OS/environment (the AIM, Law #2; today Linux/macOS/Windows-WSL2, native-Windows pending).</principle>
+  <invariant>Local-first · privacy-preserving · never-phone-home: core orchestration makes ZERO network calls; telemetry/observability are always-off + local (.deckent/metrics.jsonl). Network exceptions are NON-core + bounded: marketplace (registry.deckent.dev) only on explicit command; model-catalog (models.dev) a default-fetch with 24h-cache + bundled offline fallback (must honor --offline/opt-out) — NEVER-PHONE-HOME-POLICY.</invariant>
 </product-identity>
 ```
 
@@ -1869,7 +1897,13 @@ The **community core (`deckent-core`)** contains **every base feature**, is alwa
     immutability, tenant management, policy governance, compliance, delegated
     approval). Enterprise = "the same product, more strictly governed."
   </enterprise-layer>
-  <structure>Single codebase + modular enterprise-layer (separately licensed). NOT a fork, NOT a separate repo of features.</structure>
+  <structure>Single codebase + modular enterprise-layer (separately licensed). NOT a fork, NOT a separate Edition, NOT a separate repo of features.</structure>
+  <taxonomy clarifies="MIT ↔ separately-licensed — resolves the README tension">
+    (a) base capability / FEATURES = MIT, all, free — README's "no gated features / nothing behind a paywall" holds.
+    (b) governance / compliance ASSURANCE depth = the enterprise layer, separately licensed — hard-RBAC, audit-immutability, tenant isolation, compliance/cert, management-plane. This is NOT a feature set; it is an assurance + control layer over the SAME single codebase (so "no separate Enterprise EDITION" = no fork, while the governance MODULE carries its own license).
+    (c) hosted-access = opt-in, BYO-default, never required.
+    (d) marketplace / model-catalog = network enrichment (explicit / opt-out / offline-fallback).
+  </taxonomy>
 </mod-split>
 ```
 
@@ -1889,7 +1923,7 @@ This is the **MOD-SPLIT** refinement: the community↔enterprise boundary is gov
 
 **(+)** The identity is reconcilable with growth: optional cloud/app/enterprise layers are explicitly permitted *without* turning the core into a service, because the core never depends on them. The community user gets the full product free; enterprise pays for governance depth, not features — a clear, honest boundary.
 
-**(−)** "Optional layers must not compromise core guarantees" is a design constraint that must be re-checked per feature (e.g., a hosted-core offering must keep BYO the default). The exact enterprise-layer shape is still maturing (forward work). The repo-strategy axis (ADR-D-008) is easy to conflate with the license axis — kept explicitly separate.
+**(−)** "Optional layers must not compromise core guarantees" is re-checked per feature (a hosted-core must keep BYO default) — but it is **discipline, not a CI gate** (PRODUCT-IDENTITY-GUARD). The never-phone-home invariant has bounded non-core network exceptions (marketplace explicit-command; model-catalog default-fetch + offline-fallback — NEVER-PHONE-HOME-POLICY). "Every OS" is an aim (today WSL2, not native Windows). The MIT↔separately-licensed boundary needs the taxonomy above to avoid reading as contradictory, and README wording ("no Deckent subscription", not "no subscription") must align (README-VISION-ALIGN). The exact enterprise-layer shape is still maturing; the repo-strategy axis (ADR-D-008) is kept explicitly separate.
 
 ---
 
@@ -1897,7 +1931,7 @@ This is the **MOD-SPLIT** refinement: the community↔enterprise boundary is gov
 
 - **Absorbs:** ADR-033 (Product Vision — Product Not Service + MOD-SPLIT amendment).
 - **Cross-ref:** ADR-G-031 (Enterprise Foundation — the governance-depth layer) · ADR-D-008 (Repo Strategy — separate axis) · ADR-G-033 (Dashboard/DESK — local-first app) · ADR-G-008 (hosted-core = optional provider).
-- **Born work-items:** MOD-SPLIT-CLARIFY (community=all-features / enterprise=governance-depth) · MODULARIZE · CODE-LAYERS (5-layer, separate discussion).
+- **Born work-items:** MOD-SPLIT-CLARIFY (community=all-features / enterprise=governance-depth + the (a)-(d) taxonomy) · MODULARIZE · CODE-LAYERS (5-layer, separate discussion) · PRODUCT-IDENTITY-GUARD (CI/docs-lint: required-cloud / default-network / paywall / native-only claim) · NEVER-PHONE-HOME-POLICY (marketplace/model-catalog network carve-out + --offline + test) · README-VISION-ALIGN ("no Deckent subscription", WSL2-not-native, license-taxonomy).
 - **Memory:** `project_community_pro_split_strategy` · `project_community_pro_split_strategy` · `feedback_dual_perspective_dogfood_product`.
 
 

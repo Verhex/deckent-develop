@@ -1,6 +1,6 @@
 # ADR-G-013: Graceful Shutdown & Lifecycle
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=SIGINT handler (`entry.ts`) → `interruptActiveSprint()` + `killAllSessions()`/`killAllWorkers()` (`sprint-lifecycle.ts` · `tmux.ts`) + INTERRUPTED state → tomorrow=mode-independent lifecycle + ORPHAN-START-PROC fix (MOAT-2) + ROLE-GUARD process-role teardown
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=**SIGINT** handler (`entry.ts`; SIGTERM registered but runs no cleanup) → `interruptActiveSprint()` (task-level INTERRUPTED) + `killAllSessions()` (tmux) (`sprint-lifecycle.ts` · `tmux.ts`) → tomorrow=mode-independent lifecycle + ORPHAN-START-PROC fix (MOAT-2) + ROLE-GUARD process-role teardown
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-025 (Graceful Shutdown Strategy) · **Supersedes:** —
 **Crosswalk:** ADR-025 → ADR-G-013
 
@@ -29,13 +29,14 @@ The 2026-06-30 review confirmed this as **ADR-G** (Global / Constitution): clean
   <step n="2" fn="killAllSessions()" module="src/orchestra/tmux.ts">
     cleans all tmux sessions ("Called on SIGINT for graceful shutdown").
   </step>
-  <order>sprint-state save FIRST, then session kill.</order>
+  <order>task-state save FIRST (each in-progress task JSON → INTERRUPTED + heartbeat
+    ABORTED; there is NO sprint-level sprint-state.json persist today), then session kill.</order>
 </sigint-shutdown>
 ```
 
-**Result:** a clean state after Ctrl+C. The sprint is marked **INTERRUPTED** (`deckent review` surfaces it); workers receive SIGTERM and can mark their own `.hb` DONE; `deckent cleanup` leaves no orphan files.
+**Result:** a clean state after Ctrl+C. The sprint's tasks are marked **INTERRUPTED** (`deckent review` surfaces it); workers are terminated **per-backend** (docker: `docker stop --time` graceful; tmux: window/session kill — not a uniform explicit SIGTERM); `deckent cleanup` leaves no orphan files. **Scope:** this runs on **SIGINT only** — `entry.ts` registers a SIGTERM handler too, but it does **not** run `interruptActiveSprint`/`killAllSessions` (the cleanup is `if (signal === 'SIGINT')`-guarded — SIGTERM-CLEANUP).
 
-**Companion:** `killAllWorkers()` (`tmux.ts:217`) — the per-worker variant of `killAllSessions()` (single worker, or `/api/kill/all`), which also covers the subprocess/docker backends, not only tmux.
+**Companion:** `killAllWorkers()` / `killAllSessions()` (`tmux.ts`) are **tmux-scoped** (`tmux kill-session`). Subprocess/docker teardown does **not** come from these — it flows via `interruptActiveSprint()` calling the active **SpawnBackend's** own kill path. Uniform backend-agnostic worker-kill is the ADR-G-014 / ROLE-GUARD roadmap.
 
 ---
 
@@ -51,7 +52,7 @@ The 2026-06-30 review confirmed this as **ADR-G** (Global / Constitution): clean
 
 **(+)** Ctrl+C always leaves a clean state — INTERRUPTED sprint, released locks, no orphan tmux sessions; the per-worker variant covers non-tmux backends; `deckent review` surfaces the interruption honestly rather than presenting a silent half-run.
 
-**(−)** Today the clean teardown is reliable **on SIGINT**, but the **normal-completion path can still leave a lingering coordinator** (MOAT-2, open 🟠). Mode-independence and ROLE-GUARD process-role teardown are roadmap, so non-sprint modes do not yet share the identical lifecycle guarantees.
+**(−)** Today the clean teardown runs **on SIGINT only** (SIGTERM is registered but its handler does not run the cleanup — SIGTERM-CLEANUP); interrupt is **task-level** (per-task JSON, no sprint-state.json persist); backend-agnostic worker-kill flows through the SpawnBackend, not `killAllWorkers` (tmux-scoped). The **normal-completion path can still leave a lingering coordinator** (MOAT-2, open 🟠). Mode-independence and ROLE-GUARD process-role teardown are roadmap, so non-sprint modes do not yet share the identical lifecycle guarantees.
 
 ---
 
@@ -62,5 +63,5 @@ The 2026-06-30 review confirmed this as **ADR-G** (Global / Constitution): clean
 - **Mode partner:** ADR-G-024 (Mode Architecture — mode-independent lifecycle).
 - **Backend partner:** ADR-G-014 (Spawn Backend, Options & Observation — backend-agnostic worker kill).
 - **Authority partner:** ADR-G-020 (Authority, Roles, Flow & Enforcement — ROLE-GUARD process-role teardown).
-- **Born work-items:** MOAT-2 (ORPHAN-START-PROC — normal-completion coordinator lingers, MASTER-PLAN P0).
+- **Born work-items:** MOAT-2 (ORPHAN-START-PROC — normal-completion coordinator lingers, MASTER-PLAN P0), SIGTERM-CLEANUP (wire the SIGTERM handler to the same interrupt/cleanup path as SIGINT).
 - **Direction:** `.analysis/adr-review-crosswalk.md` (row 025 → ADR-G-013), `.analysis/hermes-vs-deckent-direction-decisions.md`.

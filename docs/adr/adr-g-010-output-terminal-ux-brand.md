@@ -1,6 +1,6 @@
 # ADR-G-010: Output, Terminal-UX & Brand
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=rich multi-section output modules (`sprint-retro-writer.ts` / `sprint-docs-updater.ts`) + `NO_COLOR` honored + fixed `KRAKEN_ASCII` brand const (`splash.ts`) → tomorrow=terminal concise/live (TERM-LIVE) + dashboard rich-detail (ADR-G-033) + `output_splash` real-gate-or-remove (ADR-021-W)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=rich multi-section output modules (`sprint-retro-writer.ts` / `sprint-docs-updater.ts`) + `NO_COLOR` honored + fixed `KRAKEN_ASCII` brand const (`splash.ts`) → tomorrow=terminal concise/live (TERM-LIVE) + dashboard rich-detail (ADR-G-033) + `output_splash` gate-description-align + init/version decision (ADR-021-W)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-020 (Rich Sprint Output — multi-section), ADR-021 (Kraken ASCII Brand Identity) · **Supersedes:** —
 **Crosswalk:** ADR-020 + ADR-021 → ADR-G-010
 
@@ -28,12 +28,14 @@ Sprint output is **rich + multi-section** (not a single-line metric), with ANSI 
 ```xml
 <output-structure>
   <doc path=".brain/sprints/RETRO.md" writer="src/orchestra/sprint-retro-writer.ts">
-    5 sections: Summary · Highlights · Issues · Metrics · Learnings
-    (+ Quality Dimensions subsection). Highlights/Issues emitted only when non-empty.
+    rich multi-section — Summary · Highlights · Issues · Metrics · Agent/Skill
+    Performance · Token Usage · KPI Scorecard · Quality Dimensions · Learnings ·
+    Next-Sprint Behavior Changes (count NOT pinned — canonical = the writer module;
+    sections emitted only when non-empty; Memory-V2 DB-first, .md is the export).
   </doc>
-  <doc path=".brain/sprints/sprint-NNN.md" writer="src/orchestra/sprint-docs-updater.ts">
-    task-oriented log: "## Task {id}: {title}" → "### Description"
-    (not the same structure as the retro).
+  <doc path=".brain/sprints/sprint-NNN.md" writer="src/orchestra/sprint-docs-helpers.ts (buildSprintLogLines)">
+    "# {sprint.id}" → "## Metrics" (table) → "## Agents" → "## Tasks" → optional
+    "## Notes" (NOT a per-task "## Task {id} / ### Description" structure).
   </doc>
   <canonical>the modules above + `deckent retro` / `deckent history` output.</canonical>
 </output-structure>
@@ -52,15 +54,15 @@ Sprint output is **rich + multi-section** (not a single-line metric), with ANSI 
 </brand-identity>
 ```
 
-### C. Visibility gate (known dormant)
+### C. Visibility gate (real for sprint-start; init/version ungated)
 
-The splash is meant to be shown when `config.output_splash` is true, via `showSplashIfEnabled`. **Today that gated wrapper is zero-caller:** `sprint-phases.ts` calls `showSplash` directly only on the **first sprint** (`sprint.number === 1`), gateless. So `output_splash` is a **no-op knob** — toggling it changes nothing. Tracked as **ADR-021-W** (a textbook "settings feature lost" instance).
+`config.output_splash` **is a real gate** for the sprint-start splash: `sprint-phases.ts` (`runPlanPhase`) calls **`showSplashIfEnabled(config, DECKENT_VERSION)`** — toggling `output_splash` *does* change it. **But two entry points are ungated:** `deckent --version` (`index.ts`) and `deckent init` (`init.ts`) call `showSplash()` **directly**, so they show regardless of the knob. The drift is in the *description*: the config/dashboard text frames `output_splash` around "init/version", while the runtime gate is on sprint-start. **ADR-021-W** = align the config-description to the real behavior (it gates the sprint-start splash) + decide whether `--version`/`init` should also honor it (today: deliberately ungated brand-first-impression, or wire them).
 
 ---
 
 ## Intent / Roadmap (Tomorrow)
 
-- **Surface split (pivot-aligned):** **terminal = concise / live summary** — the TERM-LIVE run-status footer (what's running / where / approval? / next / risk; fed by ADR-G-025 worker-live-trace); **dashboard = rich detail** — the full per-task results, changes, and metrics move to ADR-G-033 (Dashboard observability surface). The rich-multi-section content migrates to the dashboard; the terminal carries a tight live status, not a wall of text.
+- **Surface split (pivot-aligned):** **terminal = concise / live summary** — the TERM-LIVE run-status footer (what's running / where / approval? / next / risk; fed by ADR-G-025 worker-live-trace); **dashboard = rich detail** — the full per-task results, changes, and metrics move to ADR-G-033 (Dashboard observability surface). The rich-multi-section content migrates to the dashboard; the terminal carries a tight live status, not a wall of text. (Partially implemented already: `status --follow`, the status-line, and `output_mode=quiet` exist; the rich-terminal-finalizer → dashboard split is the open work.)
 - **`output_splash` real-gate-or-remove (ADR-021-W / DORMANT-2):** either wire `sprint-phases` to `showSplashIfEnabled` (a real gate, with the dashboard ConfigPage surface aligned) or remove the knob from the schema — settings honesty (no no-op config knobs).
 - **Brand carried cross-surface:** the Kraken identity extends consistently to dashboard / native terminal / desktop (one brand, all surfaces).
 
@@ -70,7 +72,7 @@ The splash is meant to be shown when `config.output_splash` is true, via `showSp
 
 **(+)** Users get the full picture of a run, brand recognition from the first invocation, and clean CI output via `NO_COLOR`. The merge unifies output + brand under one terminal-UX law. The today+tomorrow split keeps the pivot (terminal concise, dashboard rich) explicit so agents and contributors build toward it.
 
-**(−)** `output_splash` is a **no-op knob today** (dormant config-honesty debt — ADR-021-W); the concrete section set already drifted from the original "7-section" text (canonical is now the modules, not a count). The terminal/dashboard split is roadmap — today the rich output still lands largely in the terminal/files, not yet routed to the dashboard.
+**(−)** `output_splash` gates the sprint-start splash but `--version`/`init` are ungated, and the config-description still frames it as "init/version" — a description↔behavior drift (ADR-021-W); the section set is not a fixed count (canonical = the writer modules, retro under-counted "5" before). The terminal/dashboard split is roadmap — today the rich output still lands largely in the terminal/files, not yet routed to the dashboard.
 
 ---
 

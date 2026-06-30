@@ -1,6 +1,6 @@
 # ADR-G-014: Spawn Backend, Options & Observation
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=`SpawnBackendFactory` (docker→tmux→subprocess fallback) + per-task backend override + `SpawnOptions`/`ProviderSpawnOptions`/`SpawnBackendOptions` chain + `watch --follow` (docker `logs -f`) + auditor-in-process role-split red-line (scope advisory/soft per ADR-G-020) → tomorrow=firecracker/cloud/ollama-host backends + WATCH-W (CLI≡MCP unify) + per-worker backend declaration + WORKER-LIVE-TRACE
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=`SpawnBackendFactory` (auto = Windows→subprocess / else→docker; tmux deprecated; explicit-selection — **no fallback chain**) + per-task backend override + `SpawnOptions`/`ProviderSpawnOptions`/`SpawnBackendOptions` chain + `watch --follow` (docker `logs -f`) + auditor-in-process role-split red-line (scope advisory/soft per ADR-G-020) → tomorrow=firecracker/cloud/ollama-host backends + WATCH-W (CLI≡MCP unify) + per-worker backend declaration + WORKER-LIVE-TRACE
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-027 (Hybrid Spawn Backend) + ADR-007 (SpawnOptions Interface) + ADR-089 (Backend-Agnostic Worker Observation) · **Supersedes:** —
 **Crosswalk:** ADR-027 (+ ADR-007 fold + ADR-089 merge) → ADR-G-014
 
@@ -24,7 +24,7 @@ The 2026-06-30 review merges all three into one ADR-G law (runtime behavior the 
 
 ### 1. Hybrid spawn backend — `SpawnBackendFactory`
 
-deckent spawns workers onto one of three backends through `SpawnBackendFactory`, with a **docker → tmux → subprocess** fallback chain. Each backend fully implements the `SpawnBackend` interface (E2E-covered, Sprint 139 Tasks 17–19); no backend is a partial citizen.
+deckent spawns workers onto one of three backends through `SpawnBackendFactory`. **`auto` resolves deterministically — Windows → `subprocess`, otherwise → `docker`; `tmux` is deprecated (warns on use); any backend may be selected explicitly. There is NO docker→tmux→subprocess *fallback chain*:** `create()` instantiates the resolved backend, and `createAsync()` checks `isAvailable()` and **throws** if unavailable — it does not silently fall back to another backend. Each backend fully implements the `SpawnBackend` interface (E2E-covered, Sprint 139 Tasks 17–19); no backend is a partial citizen.
 
 ### 2. Per-worker / per-task independent backends
 
@@ -56,11 +56,15 @@ Backend selection is **per-worker, not per-sprint**. `sprint-spawner.ts` resolve
     scope.filesWrite (sprint-spawner writeTargets → allowedTools).</allowedTools>
   <autoApprove>Maps to each provider's own permission-bypass flag, per-provider:
     claude --dangerously-skip-permissions · codex --dangerously-bypass-approvals-and-sandbox
-    · gemini yolo. (Claude CLI rejects bypass as root → the docker backend runs host-user.)</autoApprove>
+    · gemini yolo. (Claude CLI rejects bypass as root → the docker backend runs host-user.)
+    SECURITY (explicit): the Docker backend FORCES autoApprove:true (IMMUTABLE,
+    spawn-backend-docker.ts) — a docker worker ALWAYS runs permission-bypassed, BY DESIGN:
+    the container is the isolation boundary, so full autonomy is contained, not gated.
+    Non-container backends honor the opts value. (ADR-G-020 authority context.)</autoApprove>
 </spawn-options>
 ```
 
-The array-args security invariant (ADR-G-002) is carried **uniformly** across every backend adapter — never re-derived per backend.
+The array-args security invariant (ADR-G-002) is carried uniformly for the **outer backend spawn** (the `spawn`/`spawnSync` of the docker/tmux/subprocess process) — never re-derived per backend. **Caveat:** the *inner* worker command is assembled as a joined **string** (`provider-command-spec.ts` `parts.join(' ')`) from controlled parts (model · prompt-FILE path · flags — no untrusted interpolation), not array-args; tightening it is tracked under G-002's command-string concern (WORKER-CMD-ARRAY).
 
 ### 5. Backend-agnostic `watch` (folds ADR-089)
 
@@ -72,8 +76,12 @@ The array-args security invariant (ADR-G-002) is carried **uniformly** across ev
   <subprocess>stdout/stderr pipe stream</subprocess>
   <tmux>session attach</tmux>
   <roadmap>firecracker microVM / cloud log-API / ollama-host</roadmap>
-  <resolution>one observation core resolves worker → backend → stream;
-    backend-forcing flags (--docker / --tmux) select an explicit view.</resolution>
+  <resolution>TARGET: one observation core resolves worker → backend → stream.
+    Today the watch path branches per-backend (docker vs heartbeat/log-tail vs tmux);
+    backend-forcing flags (--docker / --tmux) select an explicit view. WATCH-W unifies it.
+    Also: the observe-side `monitor-adapter` selects a CONFIG-level backend and its `auto`
+    resolves to tmux — conflicting with the spawn-factory `auto`→docker; align-or-deprecate
+    (BACKEND-AUTO-ALIGN).</resolution>
 </backend-agnostic-watch>
 ```
 
@@ -96,7 +104,7 @@ The array-args security invariant (ADR-G-002) is carried **uniformly** across ev
 
 **(+)** One spawn law spans launch + options + observation across a heterogeneous backend fleet; per-worker backends are embraced while the role-mix red-line (Brain≠worker, auditor in-process) holds; `watch` follows a worker onto any backend; the `SpawnOptions` contract and the array-args invariant are uniform across every backend. New backends are additive (an adapter pair), not a rewrite.
 
-**(−)** The CLI/MCP `watch` semantic split is a live parity violation until WATCH-W lands; firecracker/cloud/ollama-host backends are roadmap (not built); per-worker backend declaration in the task spec is forward-looking. Scope/file-authority enforcement on each backend is advisory/soft today (ADR-G-020 V1.0).
+**(−)** `auto` is deterministic (no fallback chain) and `tmux` is deprecated; the Docker backend forces `autoApprove:true` (contained-by-container, but a docker worker always runs permission-bypassed). The array-args invariant is uniform for the outer spawn but the inner worker-command is a joined string of controlled parts (WORKER-CMD-ARRAY). The CLI/MCP `watch` semantic split is a live parity violation until WATCH-W lands, and the observe-side `monitor-adapter` `auto` disagrees with the spawn-factory `auto` (BACKEND-AUTO-ALIGN); firecracker/cloud/ollama-host backends are roadmap; per-worker backend declaration in the task spec is forward-looking. Scope/file-authority enforcement on each backend is advisory/soft today (ADR-G-020 V1.0).
 
 ---
 
@@ -104,5 +112,5 @@ The array-args security invariant (ADR-G-002) is carried **uniformly** across ev
 
 - **Absorbs:** ADR-027 (Hybrid Spawn Backend — role-split red-line preserved; single-backend-per-sprint superseded) · ADR-007 (SpawnOptions Interface — folded; **ADR-D-003 intentionally vacant**) · ADR-089 (Backend-Agnostic Worker Observation + per-worker independent backends + CLI/MCP watch-parity).
 - **Cross-ref:** ADR-G-011 (Surface Parity & Thin-Wrapper — CLI≡MCP, WATCH-W) · ADR-G-018 (Verification Protocol & Event-Stream — cross-backend observability substrate) · ADR-G-020 (Authority, Roles, Flow & Enforcement — worktree/scope enforcement, autoApprove security) · ADR-G-025 (Process Resilience & Live Observability — WORKER-LIVE-TRACE) · ADR-G-002 (spawnSync Security Pattern — array-args invariant, uniform per backend) · ADR-G-008 (Provider Abstraction & Fleet — per-provider bypass flags).
-- **Born work-items:** WATCH-W (backend-agnostic watch + CLI/MCP unify, P1) · ORCH-BE (firecracker/cloud/ollama-host backends + per-worker backend declaration) · WORKER-LIVE-TRACE (with ADR-G-025).
+- **Born work-items:** WATCH-W (backend-agnostic watch + CLI/MCP unify, P1) · ORCH-BE (firecracker/cloud/ollama-host backends + per-worker backend declaration) · WORKER-LIVE-TRACE (with ADR-G-025) · WORKER-CMD-ARRAY (inner worker-command string→array-args, G-002 family) · BACKEND-AUTO-ALIGN (`monitor-adapter` `auto` ↔ spawn-factory `auto`, under WATCH-W).
 - **Direction:** `.analysis/adr-review-crosswalk.md` (rows 027 + 007 + 089 → ADR-G-014), `.analysis/hermes-vs-deckent-direction-decisions.md`.
