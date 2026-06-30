@@ -23,7 +23,9 @@ export function parseADRs(content) {
     // Sprint 172 fix: auto-generated .brain/exports/decisions.md emits lowercase
     // `## adr-NNN:` headers (canonical, matches DB id casing). Case-insensitive
     // so the validator matches the actual generated format (pre-existing drift).
-    const adrMatch = line.match(/^## (ADR-\d+):\s*(.+)/i);
+    // 4-layer taxonomy (ADR-G-019): `## adr-g-019:` / `## adr-d-001:` (G/D/UG/UP),
+    // plus the legacy `## adr-043:` scheme (case-insensitive, matches DB id casing).
+    const adrMatch = line.match(/^## (ADR-(?:G|D|UG|UP)-\d+|ADR-\d+):\s*(.+)/i);
 
     if (adrMatch) {
       if (currentADR) {
@@ -43,7 +45,9 @@ export function parseADRs(content) {
 
     if (currentADR) {
       // Check for Status field
-      const statusMatch = line.match(/^\*\*Status:\*\*\s*(.+)/);
+      // Stop at the `·` separator — the new ADR-G-019 header packs Status/Date/
+      // Absorbs/Supersedes on one `·`-delimited line; capture only the status word.
+      const statusMatch = line.match(/^\*\*Status:\*\*\s*([^·\n]+)/);
       if (statusMatch) {
         // Extract base status, ignoring parenthetical annotations like "(Sprint 131)"
         const rawStatus = statusMatch[1].trim().toLowerCase();
@@ -60,8 +64,11 @@ export function parseADRs(content) {
         }
       }
 
-      // Also check for markdown heading-style fields within ADR
-      const headingMatch = line.match(/^### (.+)/);
+      // Also check for markdown heading-style fields within ADR (## or ###).
+      // The ADR-start `## adr-NNN:` already `continue`d above, so any heading
+      // reaching here is a section (Context / Decision (Today) / Consequences / …),
+      // matching the new ADR-AUTHORING-STD `##`-section layout (ADR-G-019).
+      const headingMatch = line.match(/^##+ (.+)/);
       if (headingMatch) {
         const fieldName = headingMatch[1].trim();
         if (!currentADR.fields.includes(fieldName)) {

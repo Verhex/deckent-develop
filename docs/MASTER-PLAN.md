@@ -266,7 +266,7 @@
 | MANAGED-DOCS-MINIMIZE | DOCS | Auto-md-update'i NECESSARY-docs'a indir; user-projede deckent-yazmaz (track-only) | ADR-rev | P1 | — | ⬜ | — | ADR-G-015 |
 | DECKENT-LOG | DOCS·MODE | sprint-log → deckent-log rename + multi-mode (task/process/autonomous/flow/mission) | ADR-rev | P1 | — | ⬜ | — | ADR-G-015/024 |
 | CONFIG-CUSTOMIZE | ONB·TERM·GOV | Custom-tier + NL-terminal TÜM-ayar customize (ONB-CHAT) + her config-knob KODDA-gerçek | ADR-rev | P1 | — | ⬜ | — | ADR-G-012; DORMANT-2 honesty |
-| ADR-064-W | MOAT·GOV | `planDispatch` wire (tested-but-UNWIRED 0-caller → test-vs-runtime drift) | ADR-rev | P1 | — | ⬜ | — | ADR-G-026 |
+| ADR-064-W | MOAT·GOV | `planDispatch` wire — **🔴 SOMUT DİVERGENCE bulundu:** model(planContinuous: DONE+fix-aggregate, MRR-yok, collision-yok) ↔ runtime(respawnEligibleTasks: DONE∪MRR+collision-graph, fix-aggregate-yok). Wire = 3-semantik (MRR+fix-agg+collision) tek-superset reconcile + 246-satır execution(event/metric/adaptive-timeout/checkpoint/throttle/host-adapter)-rewrite. Olduğu-gibi-wire MRR-unblock(S280)+collision REGRESSE eder. **Dedicated scheduler-correctness task + tam dispatch-test şart.** | ADR-rev | P1 | — | ⬜ | — | ADR-G-026; interim comment-fix done (f68c8595) |
 | ADR-066-W | PROV·GOV | `?? 'claude'` drift 3→9 → re-audit + getDefaultProviderName konsolide | ADR-rev | P1 | — | ⬜ | — | ADR-G-008; WM-5 |
 | ADR-087-W | GOV | Residual ~15 spawnSync (auditor.ts) → async-spawn migration | ADR-rev | P1 | — | ⬜ | — | ADR-D-002 |
 
