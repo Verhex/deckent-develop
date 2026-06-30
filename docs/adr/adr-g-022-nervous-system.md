@@ -1,6 +1,6 @@
 # ADR-G-022: Nervous System — Proactive Meta-Orchestrator
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** locked safety-floor (5 actions never auto) + controlled activation
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=locked safety-floor (5 actions never auto) + config-gated opt-in (default-off) → tomorrow=non-blocking controlled activation + ApprovalBroker-unified approval (runtime-wide)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-040 (Nervous System Architecture)
 **Crosswalk:** ADR-040 → ADR-G-022
 

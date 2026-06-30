@@ -1,6 +1,6 @@
 # ADR-G-020: Authority, Roles, Flow & Enforcement (Multi-Mode RBAC)
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=3-layer (compile-time lint + runtime advisory/soft + post-hoc audit-trail) → tomorrow=Layer-2 HARD-flip (ADR-094 flag-gated vein graduating default-on, post-GA-V2) + ROLE-GUARD (pid/role tool-enforce) + centralized policy-engine
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=3-layer (compile-lint + runtime-advisory + post-hoc audit-trail) → tomorrow=Layer-2 HARD-flip (ADR-094 vein → default-on, post-GA-V2) + ROLE-GUARD + policy-engine
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-037 (RBAC V1.0) + ADR-G-003 (Brain Role Separation, born 2026-06-30) + ADR-094 (Flag-Gated Enforcement Vein)
 **Crosswalk:** ADR-037 (+born G-003 + 094) → ADR-G-020
 
@@ -77,7 +77,7 @@ ADR-G-020 consolidates all three: the role/authority matrix, the Brain orchestra
 
 ### 3. Multi-Mode — role · flow · continuation
 
-The authority matrix applies across **every execution mode** — `task` / `process` / `autonomous` / `flow` / `mission` / `sprint` (universal naming per ADR-G-024; "sprint" jargon is being retired). For each mode the ADR documents the **role assignment + flow + continuation mechanism** — including the **autonomous** continuation (how Brain's role persists across an autonomous loop, how a long-running process resumes). The matrix is mode-agnostic at its core; modes differ only in which lifecycle actions are active and which approval tiers apply.
+The authority matrix applies across **every execution mode**. Today's three styles (ADR-G-024) are `sprint` / `task` / `process`; the roadmap mode-set adds `flow` / `mission` / `autonomous` (universal naming per ADR-G-024; "sprint" jargon is being retired). For each mode the ADR documents the **role assignment + flow + continuation mechanism** — including the **autonomous** continuation (how Brain's role persists across an autonomous loop, how a long-running process resumes). The matrix is mode-agnostic at its core; modes differ only in which lifecycle actions are active and which approval tiers apply.
 
 ### 4. User-Customizable Authority (within the G-baseline)
 

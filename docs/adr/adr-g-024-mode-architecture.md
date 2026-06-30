@@ -32,6 +32,8 @@ deckent runs work in distinct execution paradigms. ADR-042 shipped a dual mode (
 </mode-architecture>
 ```
 
+> **Clarification — "autonomous" has distinct referents (ties to AUTO-NAMING):** (1) the **autonomous *engine*** (`src/orchestra/autonomous/`) is the agentic *runtime of `process` mode* — NOT a separate `deckent_style` today (`process` is the style; the autonomous engine is *how* a process runs). (2) **autonomous as a roadmap *mode*** is the named member of the future comprehensive mode-set (flow / mission / autonomous). (3) **`deckent mode auto`** is a third, unrelated thing — the sprint|task auto-*detect* selector. These three "auto/autonomous" usages are disambiguated under the MODE-RENAME (born **AUTO-NAMING**), so a user is never left guessing which "auto" they invoked.
+
 > **Note — two open accept-day decisions (carried from ADR-067):** (1) **tenant-threading** — `resolveTenant` is 0-caller (dormant); tenant landed differently (config-flag `strict_tenant` + memory `tenant_id` column + audit-scope). Either wire `TenantContext`-threading OR amend the decision to the realized shape — not both. (2) **AUTO-NAMING** — `deckent mode auto` (sprint|task auto-DETECT) vs "autonomous engine" (the always-running process runtime) are two different "auto"s → user-confusion risk; clarify under the rename.
 
 ---

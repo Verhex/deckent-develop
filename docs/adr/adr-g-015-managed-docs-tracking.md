@@ -1,6 +1,6 @@
 # ADR-G-015: Managed-Docs (Core-Gen) + Tracking / Staleness
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** post-finalize hook (unconditional invocation) + doc-tracking scan
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=post-finalize self-update hook (UNCONDITIONAL invocation · step-ordering memoryExport→adrInsert→ruleRegen · FS↔DB bi-directional sync) + DCR multi-signal doc-tracking scan + code-derived module-count (`countModules`, zero-hardcode) → tomorrow=MANAGED-DOCS-MINIMIZE (core-only minimal auto-gen + user-project track-not-write) + DECKENT-LOG (sprint-log→deckent-log multi-mode) + code-drift CI-gate generalized to user projects
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-029 (Managed-Docs Universalization) + ADR-030 (Template Engine + Plugin Loader) + ADR-031 (Content Hash Cache) + ADR-032 (i18n Pattern) + ADR-046 (Brain Self-Update Hook) + ADR-090 (Documentation Tracking & Staleness)
 **Crosswalk:** 029 (+030+031+032+046+090) → ADR-G-015
 
@@ -16,26 +16,60 @@ deckent maintains a set of managed documents (CLAUDE.md auto-sections, IDENTITY,
 
 ## Decision (Today)
 
+### 1. Core-gen — deckent-core-only, minimal (absorbs ADR-029 / ADR-030 / ADR-031 / ADR-032)
+
 ```xml
-<managed-docs>
-  <core-gen scope="deckent-core-only" mode="minimal">
-    template-engine + content-hash cache (fileHash+entryHash+sprintId, sprint-aware) +
-    i18n pattern layer. Generates only NECESSARY core docs (not a bulk md-sweep).
-  </core-gen>
-  <self-update-hook>post-finalize step-ordering contract (memoryExport → adrInsert →
-    ruleRegen), UNCONDITIONAL invocation, ground-truth verification, and FS↔DB
-    BI-DIRECTIONAL sync (syncAdrFilesToDb forward + exportAdrsToFs reverse) — the
-    mechanism that makes the md+DB ADR-edit invariant safe (ADR-G-035).</self-update-hook>
-  <tracking scope="all-repos incl. user-project">
-    DCR (doc-rank, 0=most-critical) + body content-hash + last_updated + multi-signal
-    stale (content-drift + age + code-drift) in a separate doc_tracking table
-    (better-sqlite3, additive). CLI `deckent docs track scan|status|sync`; CI-gate
-    (CRITICAL_STALE→non-zero); MCP/dashboard health.
-  </tracking>
-  <user-project rule="track-not-write">deckent does NOT auto-write project-specific
-    docs — AI tools do; deckent tracks which are stale/current via the DB.</user-project>
-</managed-docs>
+<core-gen scope="deckent-core-only" mode="minimal">
+  template-engine (ADR-030) + content-hash cache (ADR-031: fileHash+entryHash+sprintId,
+  sprint-aware) + i18n pattern layer (ADR-032). Generates only NECESSARY core docs
+  (not a bulk md-sweep) — the ADR-029 "universalization" reframed to minimal core-only.
+</core-gen>
 ```
+
+### 2. Self-update hook (absorbs ADR-046)
+
+```xml
+<self-update-hook>post-finalize step-ordering contract (memoryExport → adrInsert →
+  ruleRegen), UNCONDITIONAL invocation, ground-truth verification, and FS↔DB
+  BI-DIRECTIONAL sync (syncAdrFilesToDb forward + exportAdrsToFs reverse) — the
+  mechanism that makes the md+DB ADR-edit invariant safe (ADR-G-035).</self-update-hook>
+```
+
+### 3. Code-derived module-count — `countModules` (ADR-075 Part-C)
+
+Managed-docs counts are **code-derived, never hardcoded** — the architecture-map module
+table is generated live from the actual `src/` tree, so a doc count can never drift from
+reality (zero-hardcode / live-data law):
+
+```xml
+<module-count source="src/orchestra/managed-docs/content-generators.ts">
+  countModules(dir) counts live `.ts` modules per key dir (core · orchestra · agents ·
+  nervous · monitor · connectors · providers · api · mcp · cli) → emits the managed-docs
+  architecture module-count table from real file counts, never a hardcoded number.
+  Companion code-derived counters: mcpToolCount, cliCommandCount (registration-source
+  of truth). This is ADR-075 Part-C folded here (Parts A→ADR-G-032, B→ADR-G-006).
+</module-count>
+```
+
+### 4. Doc tracking & staleness (absorbs ADR-090)
+
+```xml
+<tracking scope="all-repos incl. user-project">
+  DCR (doc-rank, 0=most-critical) + body content-hash + last_updated + multi-signal
+  stale (content-drift + age + code-drift) in a separate doc_tracking table
+  (better-sqlite3, additive). CLI `deckent docs track scan|status|sync`; CI-gate
+  (CRITICAL_STALE→non-zero); MCP/dashboard health.
+</tracking>
+```
+
+### 5. User-project = track-not-write
+
+```xml
+<user-project rule="track-not-write">deckent does NOT auto-write project-specific
+  docs — AI tools do; deckent tracks which are stale/current via the DB.</user-project>
+```
+
+### 6. deckent-log rename (multi-mode)
 
 The "sprint-log" is renamed **"deckent-log"** and spans multiple modes (task/process/autonomous/flow/mission/sprint), not sprint-only.
 
@@ -61,6 +95,6 @@ The "sprint-log" is renamed **"deckent-log"** and spans multiple modes (task/pro
 ## References / Absorbed
 
 - **Absorbs:** ADR-029 + ADR-030 + ADR-031 + ADR-032 + ADR-046 + ADR-090.
-- **Cross-ref:** ADR-G-035 (DB sync invariant — the md+DB pair) · ADR-G-019 (ADR export) · ADR-G-004 (instruction-file adapter) · ADR-G-024 (modes — deckent-log multi-mode).
+- **Cross-ref:** ADR-G-035 (DB sync invariant — the md+DB pair) · ADR-G-019 (ADR export) · ADR-G-004 (instruction-file adapter) · ADR-G-024 (modes — deckent-log multi-mode) · ADR-075 Part-C (code-derived module-count `countModules` — folded here; Parts A→ADR-G-032, B→ADR-G-006).
 - **Born / MASTER-PLAN:** MANAGED-DOCS-MINIMIZE · DECKENT-LOG · I18N-6 (6-lang).
 - **Memory:** `project_docs_security_features_redoc` · `project_claude_md_doc_bloat_cleanup`.

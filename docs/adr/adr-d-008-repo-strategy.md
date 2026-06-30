@@ -1,6 +1,6 @@
 # ADR-D-008: Develop / Product Repo Strategy
 
-**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** release process (manual migration; audit-immutable policy)
+**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=single-repo development (no develop→product sync script) + audit-immutable via managed-docs registry-absence (`docs/audits/**` unregistered in `.deckent/docs.json`) → tomorrow=GA-2 one-time `deckent-develop`→`deckent` migration (sensitive-scrub) + enterprise-layer repo decision (ENTERPRISE-REPO-STRATEGY)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs / Rewrites:** ADR-065 (Develop/Product Two-Repo Split)
 **Crosswalk:** ADR-065 → ADR-D-008 (REWRITE)
 
@@ -53,6 +53,6 @@ Old ADR-065 proposed two continuously-synced repos: a private `deckent-develop` 
 ## References / Absorbed
 
 - **Absorbs / Rewrites:** ADR-065 (continuous-sync two-repo → single-repo + one-time migration).
-- **Cross-ref:** ADR-G-016 (Product Vision — MOD-SPLIT license axis, SEPARATE) · ADR-D-006 (code architecture) · GA-2 (MASTER-PLAN).
+- **Cross-ref:** ADR-G-016 (Product Vision — MOD-SPLIT license axis, SEPARATE) · ADR-D-006 (code architecture) · ADR-G-019 (ADR-D convention under the taxonomy) · GA-2 (MASTER-PLAN).
 - **Born / MASTER-PLAN:** ENTERPRISE-REPO-STRATEGY · MODULARIZE · CODE-LAYERS (5-layer, separate discussion) · GA-2.
 - **Memory:** `project_clean_repo_migration_and_training_data` · `project_product_repo_migration_push`.

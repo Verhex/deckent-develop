@@ -106,5 +106,3 @@ The array-args security invariant (ADR-G-002) is carried **uniformly** across ev
 - **Cross-ref:** ADR-G-011 (Surface Parity & Thin-Wrapper — CLI≡MCP, WATCH-W) · ADR-G-018 (Verification Protocol & Event-Stream — cross-backend observability substrate) · ADR-G-020 (Authority, Roles, Flow & Enforcement — worktree/scope enforcement, autoApprove security) · ADR-G-025 (Process Resilience & Live Observability — WORKER-LIVE-TRACE) · ADR-G-002 (spawnSync Security Pattern — array-args invariant, uniform per backend) · ADR-G-008 (Provider Abstraction & Fleet — per-provider bypass flags).
 - **Born work-items:** WATCH-W (backend-agnostic watch + CLI/MCP unify, P1) · ORCH-BE (firecracker/cloud/ollama-host backends + per-worker backend declaration) · WORKER-LIVE-TRACE (with ADR-G-025).
 - **Direction:** `.analysis/adr-review-crosswalk.md` (rows 027 + 007 + 089 → ADR-G-014), `.analysis/hermes-vs-deckent-direction-decisions.md`.
-</content>
-</invoke>

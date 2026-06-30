@@ -104,4 +104,3 @@ The original 15 V1.0 channels — `BRAIN→WORKER:TASK_ASSIGN`, `WORKER→BRAIN:
 - **Cross-ref:** ADR-G-014 (Spawn Backend & Observation — cross-backend observability rests on this stream) · ADR-G-025 (Process Resilience & Live Observability — the PROGRESS / WORKER-LIVE-TRACE structured progress-stream) · ADR-G-022 (Nervous System — proactive triggers over the bus) · ADR-G-024 (Mode Architecture — per-mode channels) · ADR-G-019 (ADR Governance — DB-first storage / taxonomy).
 - **Born work-items:** APR (approval-channels) · COMM-2 (typed mediated-bus vocabulary) · PROGRESS naming-fix · per-mode channel completion.
 - **Direction:** `.analysis/adr-review-crosswalk.md` (row 035 → ADR-G-018).
-</content>

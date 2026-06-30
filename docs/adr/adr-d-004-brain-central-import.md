@@ -1,6 +1,6 @@
 # ADR-D-004: Brain Central Import — One-Way Dependency
 
-**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=`authority-enforcer.ts` ADR-008 check + `core/ → orchestra/` import-direction scan (advisory/soft per ADR-037 V1.0 — warns + emits, does not hard-block) → tomorrow=LAYER-1 inversion cleanup (residual violations) + hard-flip under the ADR-G-020 enforcement-engine
+**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=`authority-enforcer.ts` ADR-008 check + `core/ → orchestra/` import-direction scan (advisory/soft per ADR-G-020 V1.0 — warns + emits, does not hard-block) → tomorrow=LAYER-1 inversion cleanup (residual violations) + hard-flip under the ADR-G-020 enforcement-engine
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-008 (Brain Merkezi Import — Tek Yönlü Bağımlılık) · **Supersedes:** —
 **Crosswalk:** ADR-008 → ADR-D-004 (role-separation split out → ADR-G-020)
 
@@ -20,7 +20,7 @@ That phrasing aged in two ways. First, the god-object split (ADR-D-006, ex-024/0
 
 ### 1. The enforced invariant — `core/` must not import `orchestra/`
 
-The live lint (`src/orchestra/authority-enforcer.ts`, ADR-008 check) scans the **import direction `core/ → orchestra/`**: `core/` must not depend on `orchestra/`. This is broader and more accurate than the original `from.*brain` grep. Per ADR-037 V1.0 the check is **advisory/soft** — it warns and emits an audit signal, it does not hard-block.
+The live lint (`src/orchestra/authority-enforcer.ts`, ADR-008 check) scans the **import direction `core/ → orchestra/`**: `core/` must not depend on `orchestra/`. This is broader and more accurate than the original `from.*brain` grep. Per ADR-G-020 V1.0 the check is **advisory/soft** — it warns and emits an audit signal, it does not hard-block.
 
 ### 2. The "Brain-family" — who may import tmux/auditor/worker
 
@@ -32,7 +32,7 @@ Only the Brain-family may import `tmux` / `auditor` / `worker`. Family-external 
 
 ### 3. Sanctioned exceptions + a resolved cycle
 
-- **Provider CLI-spawn adapters** (`src/providers/claude.ts` → `orchestra/tmux.js` for `killWorker`/`listWorkers`/`ensureSession`/…) are **not** violations: per ADR-017 + ADR-027→ADR-G-014, a CLI-spawn adapter legitimately wraps the tmux/spawn-backend arm. Rule: provider adapters may wrap tmux/spawn-backend; they may **never** import auditor/worker; the one-way direction still holds.
+- **Provider CLI-spawn adapters** (`src/providers/claude.ts` → `orchestra/tmux.js` for `killWorker`/`listWorkers`/`ensureSession`/…) are **not** violations: per ADR-G-008 + ADR-027→ADR-G-014, a CLI-spawn adapter legitimately wraps the tmux/spawn-backend arm. Rule: provider adapters may wrap tmux/spawn-backend; they may **never** import auditor/worker; the one-way direction still holds.
 - **Resolved cycle (Sprint 279):** the `core/audit-writer` + `core/audit-query` → `orchestra/event-stream` cycle was fixed by **moving `event-stream` into `core/`** (`src/core/event-stream.ts`); `orchestra/event-stream.ts` is now a re-export shim.
 
 ---
@@ -54,7 +54,7 @@ When ADR-G-020's enforcement-engine graduates (ADR-094 flag-gated vein → defau
 
 **(+)** Clean, cycle-free one-way layering; a precise, code-verified statement of which modules may import the orchestration internals; thin cli/api/mcp surfaces with business logic concentrated in core/orchestra; the god-object split is reconciled with the rule (its organs are family members, not violations).
 
-**(−)** Advisory/soft enforcement (ADR-037 V1.0) allowed real inversions to accrue — four open cleanup items (ADR-008-W, ORCH-W1/W2, CORE-W1, API-W1). Until the G-020 enforcement-engine hard-flips, the invariant is documentation + warn-level signal, not a blocking gate.
+**(−)** Advisory/soft enforcement (ADR-G-020 V1.0) allowed real inversions to accrue — four open cleanup items (ADR-008-W, ORCH-W1, CORE-W1, API-W1). Until the G-020 enforcement-engine hard-flips, the invariant is documentation + warn-level signal, not a blocking gate.
 
 ---
 
@@ -62,5 +62,5 @@ When ADR-G-020's enforcement-engine graduates (ADR-094 flag-gated vein → defau
 
 - **Absorbs:** ADR-008 (one-way import direction; Brain-family definition; sanctioned provider-adapter exception; Sprint-279 event-stream cycle-fix).
 - **Split out:** role-separation ("Brain never authors code") → **ADR-G-020** (Authority Matrix Rule-4 / ROLE-GUARD).
-- **Cross-ref:** ADR-D-006 (the god-object split created the Brain-family organs), ADR-G-014 (Spawn Backend — provider-adapter wrapping), ADR-017 (provider adapters), ADR-027→ADR-G-014 (hybrid spawn), ADR-G-019 (ADR-D contributor convention under the taxonomy).
-- **Born work-items:** ADR-008-W, ORCH-W1 / ORCH-W2, CORE-W1, API-W1 (LAYER-1 inversion cleanup). The canonical refined statement of these import rules also lives in `CLAUDE.md` and `docs/reference/api-surface.md` (Module Import Rules).
+- **Cross-ref:** ADR-D-006 (the god-object split created the Brain-family organs), ADR-G-014 (Spawn Backend — provider-adapter wrapping), ADR-G-008 (provider adapters), ADR-027→ADR-G-014 (hybrid spawn), ADR-G-019 (ADR-D contributor convention under the taxonomy).
+- **Born work-items:** ADR-008-W, ORCH-W1, CORE-W1, API-W1 (LAYER-1 inversion cleanup). The canonical refined statement of these import rules also lives in `CLAUDE.md` and `docs/reference/api-surface.md` (Module Import Rules).

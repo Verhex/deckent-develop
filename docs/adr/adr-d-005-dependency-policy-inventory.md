@@ -22,26 +22,26 @@ The 2026-06-30 review made the drift official policy: **artificially constrainin
 
 - Every runtime dependency is admitted on **merit**: it delivers a real capability, with **rationale + alternatives-considered** recorded in the inventory below. **There is no count cap.**
 - **Security discipline is mandatory** for every dependency: version pinned, source audited, and any non-trivial security surface explicitly justified (e.g. `ws` chosen over a hand-rolled RFC6455 implementation specifically to avoid owning that attack surface; `@noble/*` chosen as audited zero-dep crypto).
-- **Built-in-first where a built-in genuinely suffices** — a heuristic, not a dogma. Simple, non-interactive prompts (text / select / confirm) use `node:readline/promises` (`src/cli/helpers/prompt.ts`: `promptText` / `promptSelect` / `promptConfirm`), which serves the init wizard + confirm + headless/script contexts without a `inquirer`-class dependency. **Rich UI is a first-class core feature** via `ink` + `react` (native REPL/TUI, ADR-081/083) and the React web dashboard (ADR-080). The two layers do not conflict — readline = simple prompt, ink/react = rich UI.
+- **Built-in-first where a built-in genuinely suffices** — a heuristic, not a dogma. Simple, non-interactive prompts (text / select / confirm) use `node:readline/promises` (`src/cli/helpers/prompt.ts`: `promptText` / `promptSelect` / `promptConfirm`), which serves the init wizard + confirm + headless/script contexts without a `inquirer`-class dependency. **Rich UI is a first-class core feature** via `ink` + `react` (native REPL/TUI, ADR-G-034) and the React web dashboard (ADR-G-033). The two layers do not conflict — readline = simple prompt, ink/react = rich UI.
 
 ### 2. Living inventory (current `package.json`)
 
 | Package | Purpose & why-chosen | Governing ADR |
 |---------|----------------------|---------------|
-| `commander@^13.0.0` | CLI command framework; the one purely-CLI-convenience dep. Alt: hand-rolled arg parsing (rejected — ergonomics/maintenance). | ADR-010 (this record) |
-| `@modelcontextprotocol/sdk@^1.27.1` | MCP server/client (stdio) transport. | ADR-017 |
-| `better-sqlite3@^12.10.0` | Memory V2 DB — synchronous embedded SQLite + FTS5 full-text. | ADR-088 |
-| `telegraf@^4.16.0` | Telegram connector adapter. | ADR-016 |
-| `zod@^3.25.0` | Runtime schema-validation (plan/config); single-purpose, replaces hand-rolled validation. | ADR-010 (sanctioned) |
-| `@noble/ed25519@^2.3.0` | Ed25519 signing for `.deck` secret files; audited zero-dep crypto. | ADR-014 |
-| `@noble/hashes@^1.8.0` | SHA-512 key derivation for `.deck`; same audited-crypto family. | ADR-014 |
-| `@lydell/node-pty@^1.2.0-beta.12` | Interactive PTY for the embedded web terminal (claude/gemini/codex/shell). Renamed from `node-pty`. | ADR-062 |
-| `ws@^8.18.0` | Browser WebSocket transport for the terminal stream; **audited — hand-rolled RFC6455 rejected as a security surface.** | ADR-062 |
-| `ink@^7.0.5` | Native agentic REPL/TUI (React-for-CLI). | ADR-081 / ADR-083 |
-| `react@^19.2.7` | Ink REPL + web dashboard render tree. | ADR-081 / ADR-080 |
-| `react-dom@^19.2.7` | Web dashboard render. | ADR-080 |
-| `cli-highlight@^2.1.11` | REPL syntax highlighting for native-agentic output. | ADR-081 / ADR-083 |
-| `discord.js@^14.26.3` *(optional)* | Discord connector (lazy / optional). | ADR-016 |
+| `commander@^13.0.0` | CLI command framework; the one purely-CLI-convenience dep. Alt: hand-rolled arg parsing (rejected — ergonomics/maintenance). | ADR-D-005 (this record) |
+| `@modelcontextprotocol/sdk@^1.27.1` | MCP server/client (stdio) transport. | ADR-G-008 |
+| `better-sqlite3@^12.10.0` | Memory V2 DB — synchronous embedded SQLite + FTS5 full-text. | ADR-G-035 |
+| `telegraf@^4.16.0` | Telegram connector adapter. | ADR-G-007 |
+| `zod@^3.25.0` | Runtime schema-validation (plan/config); single-purpose, replaces hand-rolled validation. | ADR-D-005 (sanctioned) |
+| `@noble/ed25519@^2.3.0` | Ed25519 signing for `.deck` secret files; audited zero-dep crypto. | ADR-G-005 |
+| `@noble/hashes@^1.8.0` | SHA-512 key derivation for `.deck`; same audited-crypto family. | ADR-G-005 |
+| `@lydell/node-pty@^1.2.0-beta.12` | Interactive PTY for the embedded web terminal (claude/gemini/codex/shell). Renamed from `node-pty`. | ADR-G-029 |
+| `ws@^8.18.0` | Browser WebSocket transport for the terminal stream; **audited — hand-rolled RFC6455 rejected as a security surface.** | ADR-G-029 |
+| `ink@^7.0.5` | Native agentic REPL/TUI (React-for-CLI). | ADR-G-034 |
+| `react@^19.2.7` | Ink REPL + web dashboard render tree. | ADR-G-034 / ADR-G-033 |
+| `react-dom@^19.2.7` | Web dashboard render. | ADR-G-033 |
+| `cli-highlight@^2.1.11` | REPL syntax highlighting for native-agentic output. | ADR-G-034 |
+| `discord.js@^14.26.3` *(optional)* | Discord connector (lazy / optional). | ADR-G-007 |
 
 Every entry carries a non-empty governing ADR (ADR-010-W closed, Sprint 311). `node:readline/promises` is a **built-in, not a dependency** — listed in §1 for the prompt-layer rationale, absorbing ADR-011.
 
@@ -66,7 +66,7 @@ Every entry carries a non-empty governing ADR (ADR-010-W closed, Sprint 311). `n
 ## References / Absorbed
 
 - **Absorbs:** ADR-010 (Tek Runtime Dependency → minimal+ADR-justified → **reframed to merit-based policy + inventory**), ADR-011 (node:readline/promises built-in prompt → §1 prompt-layer rationale).
-- **Per-dependency governing ADRs:** ADR-016 (connectors), ADR-017 (MCP), ADR-062 (embedded terminal — `node-pty`, `ws`), ADR-081/083 (native REPL — `ink`, `cli-highlight`), ADR-080 (dashboard — `react`/`react-dom`), ADR-014 (`.deck` crypto), ADR-088 (Memory V2 / SQLite).
+- **Per-dependency governing ADRs:** ADR-G-007 (connectors), ADR-G-008 (MCP), ADR-G-029 (embedded terminal — `node-pty`, `ws`), ADR-G-034 (native REPL — `ink`, `cli-highlight`), ADR-G-033 (dashboard — `react`/`react-dom`), ADR-G-005 (`.deck` crypto), ADR-G-035 (Memory V2 / SQLite).
 - **Unblocks:** POLICY-ENGINE-EVAL (ADR-G-019 / ADR-G-020).
 - **Cross-ref:** ADR-G-019 (ADR-D contributor convention under the taxonomy).
 

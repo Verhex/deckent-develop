@@ -21,7 +21,7 @@ deckent's secrets live in a separate **`.deck`** file using a `DECKENT_`-prefixe
 `.deck` is **never on the worker-spawn path** — workers cannot read it under any backend (no deck-transport in the docker backend). All secret consumers are **host-side only**: provider bootstrap auto-register (`provider.ts`, ADR-077 Part-C → ADR-G-008), `server.ts`, `doctor.ts`, and config interpolation. This is a zero-exposure invariant, not a per-task filter.
 
 ### 3. `$DECK:KEY` interpolation + signing
-Config values may reference secrets as `"$DECK:KEY"` (e.g. `"token": "$DECK:DISCORD_TOKEN"`), resolved at runtime host-side from `.deck` with a missing-secret warning (`src/core/deck-interpolation.ts`). Ed25519 signing for secret / skill-publish signatures uses `@noble/ed25519` + `@noble/hashes` (`src/core/signature.ts`); per the ADR-010 amendment these two crypto dependencies are governed here.
+Config values may reference secrets as `"$DECK:KEY"` (e.g. `"token": "$DECK:DISCORD_TOKEN"`), resolved at runtime host-side from `.deck` with a missing-secret warning (`src/core/deck-interpolation.ts`). Ed25519 signing for secret / skill-publish signatures uses `@noble/ed25519` + `@noble/hashes` (`src/core/signature.ts`); per the ADR-D-005 amendment these two crypto dependencies are governed here.
 
 ## Intent / Roadmap (Tomorrow)
 
@@ -39,5 +39,5 @@ Config values may reference secrets as `"$DECK:KEY"` (e.g. `"token": "$DECK:DISC
 
 - **Absorbs:** ADR-014 (.deck Secret File System — dedicated file, `DECKENT_` registry, auto-gitignore, worker non-exposure).
 - **Implementation:** `src/core/deck-file.ts` (parse/load/validate/template/gitignore/committed-guard), `src/core/deck-interpolation.ts` (`$DECK:KEY`), `src/core/signature.ts` (Ed25519, `@noble/ed25519` + `@noble/hashes`).
-- **Cross-ref:** ADR-010 (dependency governance — crypto-deps bridge), ADR-G-008 (Provider Abstraction — bootstrap auto-register, host-side consumer; ADR-077 Part-C), ADR-G-001 (Layered Config & Scope — shared global<project precedence), ADR-G-030 (Consent-Based Provisioning — secret-setup onboarding).
+- **Cross-ref:** ADR-D-005 (Dependency Policy & Inventory — crypto-deps bridge), ADR-G-008 (Provider Abstraction — bootstrap auto-register, host-side consumer; ADR-077 Part-C), ADR-G-001 (Layered Config & Scope — shared global<project precedence), ADR-G-030 (Consent-Based Provisioning — secret-setup onboarding).
 - **Direction:** global+project secret scope (MASTER-PLAN); `.analysis/adr-review-crosswalk.md` row 014.

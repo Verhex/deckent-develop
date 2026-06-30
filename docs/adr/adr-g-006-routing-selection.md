@@ -1,10 +1,10 @@
 # ADR-G-006: Routing & Selection (Learned Model/Effort + Agent/Skill)
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** routing-engine contract (routeTaskV2; V1 purged)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=`routeTaskV2` multi-signal selection (intent domain-enrichment + domain-match-bonus + skill→agent affinity + surface-aware bonus) + live routing-diversity test + CI imbalance guard; V1 decision-engine fully purged → tomorrow=learned Routing V3 (per-task-type outcome matrix auto-updating from real results, new-model auto-adopt on merit, vector-selection over task-kind×cost×latency×risk×provider-health×outcome; project+provider-scoped, user-manageable) — ROUTE-1+ · PROV-MATRIX · F1-AD
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-015 (TaskRouter 6-level) + ADR-028 (Decision-Engine V1→V2→V3) + ADR-072 (Routing Balance multi-signal) + ADR-073 (Routing Live Validation + FIX-prompt) + ADR-075 Part-B (skill→agent affinity)
 **Crosswalk:** 015 (+028+072+073+075B) → ADR-G-006
 
-> **Authoring note (Alperen):** "Bunun ADR/dokümante kısmı bugünü VE yarını hedef-niyetlerle açıklasın, şeffaf olsun. Bu bizim için önemli ve kritik." This ADR is the first-class application of the ADR-AUTHORING-STD (today + tomorrow, transparent).
+> **Authoring note (Alperen):** an ADR's documentation must explain both **today AND tomorrow** through its target-intent, transparently — "this matters and is critical to us." This ADR is the first-class application of the ADR-AUTHORING-STD (ADR-G-019: document today + tomorrow, transparently).
 
 ---
 

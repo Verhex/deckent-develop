@@ -85,7 +85,7 @@ Sandboxed worker process (chroot/namespace) — over-complex, cross-platform-inc
 
 ## Intent / Roadmap (Tomorrow)
 
-- **Hard-enforce scope (V2).** The advisory scope check becomes a **hard block**: a write outside `scope.filesWrite` is denied, not merely warned. This rides the **ADR-G-020** Layer-2 enforcement upgrade (the ADR-094 flag-gated vein graduating to default-on, post-GA V2) plus a **TOOL-SCOPE** tool that makes scope analysis/approval/edit first-class and terminal-trackable.
+- **Hard-enforce scope (V2).** The advisory scope check becomes a **hard block**: a write outside `scope.filesWrite` is denied, not merely warned. This rides the **ADR-G-020** Layer-2 enforcement upgrade (the ADR-G-020 flag-gated vein graduating to default-on, post-GA V2) plus a **TOOL-SCOPE** tool that makes scope analysis/approval/edit first-class and terminal-trackable.
 - **Enterprise multi-tenancy as a modular layer.** Genuine SaaS multi-tenant isolation (per-tenant boundaries, k8s pod isolation, tenant-scoped audit) is built **on top** of this per-project model as the enterprise layer (**ADR-G-031**), never by relaxing it. multi-project remains the solo/local truth; multi-tenant is additive.
 - **FB-1 opt-in telemetry.** A consent-gated, default-OFF self-operation feedback loop (operation-metrics only, never project content) under **ADR-G-030** consent + the air-gapped pillar — wiring the sender that today deliberately does not exist.
 
@@ -105,7 +105,7 @@ Sandboxed worker process (chroot/namespace) — over-complex, cross-platform-inc
 - **Product boundary:** **ADR-G-016** (Product Vision — Product Not Service) — multi-tenant out-of-scope at the core; "install and run" principle.
 - **Config merge:** **ADR-G-001** (Layered Config & Scope Precedence) — global vs project mechanics.
 - **Secret system:** **ADR-G-005** (Secret File System & Zero-Worker-Exposure) — `.deck`/Ed25519; complementary to and distinct from Layer-2 AES-256-GCM credential encryption.
-- **Enforcement authority:** **ADR-G-020** (Authority, Roles, Flow & Enforcement) — advisory→hard scope flip (V1→V2, ADR-094 vein).
+- **Enforcement authority:** **ADR-G-020** (Authority, Roles, Flow & Enforcement) — advisory→hard scope flip (V1→V2, ADR-G-020 vein).
 - **Enterprise layer:** **ADR-G-031** (Enterprise Foundation) — multi-tenancy as a modular layer atop this model.
 - **Consent / telemetry:** **ADR-G-030** (Consent-Based Provisioning & Install) — FB-1 opt-in telemetry consent gate.
 - **Born work-items:** TOOL-SCOPE (scope analyze/approve/edit tool + hard-enforce), ENTERPRISE-MULTI-TENANCY (ADR-G-031 ENT-* modular layer), FB-1 (consent-gated opt-in telemetry sender).

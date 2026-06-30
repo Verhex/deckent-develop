@@ -19,7 +19,7 @@ A subtlety the old ADR-002 already clarified: **`Node16` here is the TypeScript 
 ## Decision (Today)
 
 - **Language / module system:** TypeScript with `"type": "module"` (ESM). CommonJS interop via `esModuleInterop`.
-- **Runtime floor:** Node **24+** is the single supported baseline (`engines: { node: ">=24.0.0" }`). No `Node 18` baseline references anywhere — code comments, error messages, CI matrices, docs, agent/skill prompts.
+- **Runtime floor:** Node **24+** is the single supported baseline (`engines: { node: ">=24.0.0" }` — authoritative). Residual `Node 18` mentions (code comments, error messages, CI matrices, docs, agent/skill prompts — ≈8 at last count) are stale and tracked for purge: the `engines` floor is the source of truth; the cleanup is the Node-18-reference purge (ADR-001 Node-24+ sweep, see *Intent / Roadmap* below).
 - **Module resolution:** `"module": "Node16"` + `"moduleResolution": "Node16"` in `tsconfig` (current state). This enforces:
   - **`.js` extensions mandatory on all relative imports** — `import { foo } from './bar'` fails; `'./bar.js'` is required (the recurring ESM gotcha, see `CLAUDE.md`).
   - No index-file auto-resolution; `package.json` `exports` are honored.

@@ -53,6 +53,8 @@ Sprint 148 shipped the reform package: archive `test-writer`, add `testing-exper
 
 The taxonomy itself (vertical/horizontal, test=skill) is sound and durably enforced — `test-writer` stays at 0 assignments across post-reform sprints (148: 0/27, 150: 0/38). But the *distribution-balance* goal has **chronically recurred**: `test-writer`'s monopoly was periodically replaced by `refactorer`-weight (e.g. Sprint 211: 12/16). That imbalance is mitigated — not solved — by multi-signal scoring and skill→agent affinity (now both inside **ADR-G-006**); the 40% threshold remains a continuously-monitored advisory target, not a guarantee.
 
+> **Threshold reconciliation (40% vs ≤60%):** these are **two distinct mechanisms at two layers**, not a contradiction. **40%** is the post-hoc `AgentRoutingHealth` *advisory alarm* (the ADR-G-022 detector *warns* when any agent exceeds ~40% of assignments — it never blocks). **≤60%** is the in-selection *diversity-guard* inside ADR-G-006 — it down-weights an agent approaching ~60% share at route-time. The detector warns earlier (40%) than the guard caps (≤60%); the detector only observes, the guard actively shapes the next selection.
+
 ---
 
 ## Intent / Roadmap (Tomorrow)

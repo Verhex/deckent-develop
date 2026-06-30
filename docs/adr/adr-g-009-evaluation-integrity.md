@@ -1,6 +1,6 @@
 # ADR-G-009: Evaluation Integrity (Language-Agnostic Verify · Coverage-Exemption · Proof-of-Function)
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** eval-integrity (signal-based + deterministic + run-verify gate; "wired ≠ working")
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=language-agnostic verify (TaskKind×TechStack criteria-deriver) + signal-based coverage-exemption (disk-derived, agent-independent, deterministic) + zero-hardcode (live-registry authoritative) + proof-of-function Tier-1 run-verify gate (`Smoke:` real-binary; mock-only=GO_WITH_TECH_DEBT, never DONE) — "wired ≠ working" → tomorrow=hard-enforce A9/A14 via ADR-G-020 flag-gated vein at GA-V2 + more stacks in the deriver (Law #2) + deeper signal-based eval (WM-7: language-mismatch-penalty, stack-aware coverage) + cross-verify (XVER-1)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-019 (Language-Agnostic Worker Verify) + ADR-070 (Brain Evaluation Integrity) + ADR-079 (Proof-of-Function DoD)
 **Crosswalk:** 019 (+070+079) → ADR-G-009
 

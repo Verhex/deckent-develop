@@ -10,7 +10,7 @@
 
 ## Context
 
-A worker prompt has two intertwined concerns: where it physically lives (tmpfile lifecycle) and what it semantically contains (context). ADR-048 defined the **tmpfile lifecycle** — `.prompt-*.txt`/`.worker-*.sh` write→persist→archive across all three spawn backends, with active-worker protection (a per-worker kill must not delete a live worker's prompt) — plus a content layer: **no truncation** (full skill + full ADR injection; prompt-completeness > token-saving). ADR-060 ("masterpiece") defined the **5-channel worker-context** (init / sync / memory / manifest / skill-declare / enrichment) that composes the prompt, and explicitly flagged the **token-budget** trade-off. The 2026-06-30 review unifies them.
+A worker prompt has two intertwined concerns: where it physically lives (tmpfile lifecycle) and what it semantically contains (context). ADR-048 defined the **tmpfile lifecycle** — `.prompt-*.txt`/`.worker-*.sh` write→persist→archive across all three spawn backends, with active-worker protection (a per-worker kill must not delete a live worker's prompt) — plus a content layer: **no truncation** (full skill + full ADR injection; prompt-completeness > token-saving). ADR-060 ("masterpiece") defined the **5-channel worker-context** (init / sync / manifest / skill-declare / enrichment) that composes the prompt, and explicitly flagged the **token-budget** trade-off. The 2026-06-30 review unifies them.
 
 ---
 

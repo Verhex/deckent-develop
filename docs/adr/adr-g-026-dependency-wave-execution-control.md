@@ -1,6 +1,6 @@
 # ADR-G-026: Dependency-Wave Execution & Control
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** dispatch contract (continuous per-tick; legacy-FIFO escape)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=dispatch contract (Kahn-topological dep-resolution + continuous per-tick; legacy-FIFO escape) → tomorrow=DEP-TOOL (terminal dependency control, DIRECTIVES-independent) + planDispatch wire (ADR-064-W)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-045 (Wave-Based Execution Semantics) + ADR-064 (TOPP Continuous Dispatch)
 **Crosswalk:** 045 (+064) → ADR-G-026
 

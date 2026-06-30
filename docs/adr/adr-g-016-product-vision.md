@@ -1,6 +1,6 @@
 # ADR-G-016: Product Vision — Product, Not Service
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** identity-constitution (every feature/decision validated against the 4 principles)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=identity-constitution — every feature/decision validated against the 4 inviolable principles (community-core = ALL features; local-first/free/privacy intact) → tomorrow=MOD-SPLIT-CLARIFY + MODULARIZE (deckent-solo/enterprise, single codebase, governance-depth NOT feature-gating) + CODE-LAYERS
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-033 (Product Vision — Product Not Service, + MOD-SPLIT amendment)
 **Crosswalk:** ADR-033 → ADR-G-016
 
@@ -20,7 +20,7 @@ Deckent is a **product, not a service** (old ADR-033, Sprint 134): a local-first
 
 ```xml
 <product-identity immutable="true">
-  <principle id="1">Product, not service — the core is NEVER mahkum (bound) to any cloud.</principle>
+  <principle id="1">Product, not service — the core is NEVER bound (captive) to any cloud.</principle>
   <principle id="2">Easy to install & run — "kur-çalıştır", anyone can.</principle>
   <principle id="3">Open-source, community-free — the community core is free (MIT).</principle>
   <principle id="4">Everyone, everywhere — solo user → largest enterprise; every OS/environment.</principle>

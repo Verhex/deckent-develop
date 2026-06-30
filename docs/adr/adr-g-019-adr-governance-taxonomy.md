@@ -1,6 +1,6 @@
 # ADR-G-019: ADR Governance & 4-Layer Taxonomy
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=MADR-v3 + `lint:adr` validator + DB-first prompt-injection (structural/advisory) → tomorrow=ADR-G enforcement-engine (immutable runtime-validation via ADR-G-020 + ADR-094 flag-gated vein)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=MADR-v3 + `lint:adr` validator + DB-first prompt-injection (structural/advisory) → tomorrow=ADR-G enforcement-engine (immutable runtime-validation via ADR-G-020 + its flag-gated vein, old ADR-094)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-036 (ADR Governance Integration) · **Supersedes:** —
 **Crosswalk:** ADR-036 → ADR-G-019
 
@@ -90,7 +90,7 @@ deckent **observes** user ADRs (UG/UP) and **adheres** to them at every layer (w
 
 ## Intent / Roadmap (Tomorrow)
 
-- **ADR-G enforcement-engine:** today ADR-G is carried by injection + advisory validation; tomorrow it is **runtime-inviolable** — LLM output that would breach an ADR-G is blocked, not merely logged. The mechanism is the ADR-094 flag-gated enforcement vein graduating to default-on (post-GA-V2) under ADR-G-020's authority layer, plus a centralized policy engine candidate (POLICY-ENGINE-EVAL — OPA/Rego or embedded; ADR-D-005 reframe removed the minimal-dep blocker).
+- **ADR-G enforcement-engine:** today ADR-G is carried by injection + advisory validation; tomorrow it is **runtime-inviolable** — LLM output that would breach an ADR-G is blocked, not merely logged. The mechanism is the flag-gated enforcement vein (old ADR-094, now within ADR-G-020) graduating to default-on (post-GA-V2) under ADR-G-020's authority layer, plus a centralized policy engine candidate (POLICY-ENGINE-EVAL — OPA/Rego or embedded; ADR-D-005 reframe removed the minimal-dep blocker).
 - **ADR-U management surface:** users create/edit/retire ADR-UG/ADR-UP conversationally (native terminal + desktop app + CLI/MCP); deckent generates per-environment **customize-tools** to honor them and can contribute generalizable patterns back to the main repo.
 - **Install-wiring:** global install seeds ADR-G; `@dev` install adds ADR-D; user install opens the ADR-UG/UP skeleton. (MASTER-PLAN: ADR-LAYER.)
 - **Class/scope-aware vector recall:** ADR-G-035's opt-in local-embedding vector layer (never-calls-home) extends class/scope-aware retrieval to semantic matching.
@@ -101,7 +101,7 @@ deckent **observes** user ADRs (UG/UP) and **adheres** to them at every layer (w
 
 **(+)** Authority is now expressible: "user tightens but cannot violate G" is enforceable; contributor-only rules never leak to end users; immutable laws have a single trusted source. The review's 89→~42 consolidation is itself an application of this taxonomy (G vs D split). Today+tomorrow authoring keeps agents aligned with direction, not just current state.
 
-**(−)** Two intentional numbering gaps (G-003→absorbed in G-020, D-003→folded to G-014) — documented, not back-filled. The enforcement-engine (ADR-G inviolability) is roadmap, not today — today's protection is injection + advisory `lint:adr` + the ADR-094 dogfood vein. ADR-U management is a forward surface (MASTER-PLAN), so today only G/D are populated.
+**(−)** Two intentional numbering gaps (G-003→absorbed in G-020, D-003→folded to G-014) — documented, not back-filled. The enforcement-engine (ADR-G inviolability) is roadmap, not today — today's protection is injection + advisory `lint:adr` + the ADR-094 dogfood vein (now within ADR-G-020). ADR-U management is a forward surface (MASTER-PLAN), so today only G/D are populated.
 
 ---
 

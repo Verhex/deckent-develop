@@ -1,6 +1,6 @@
 # ADR-G-025: Process Resilience, Recovery & Live Observability
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** runtime contract (crash-handlers installed at boot; persistence + recovery mandatory)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=runtime contract (crash-handlers at boot + atomic checkpoint + phase/eval persistence; recovery mandatory) → tomorrow=provider-failover + auditor-approved takeover + WORKER-LIVE-TRACE stream
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-043 (Brain Crash Recovery) + ADR-044 (State Observability Contract) + ADR-047 Brain-death-procedure aspect
 **Crosswalk:** ADR-043 + ADR-044 → ADR-G-025
 

@@ -30,9 +30,12 @@ deckent runs in two fundamentally different modes: **dogfood** (deckent modifyin
     P4 USER PROJECTS = NO-OP (detectDeckentRepo=false → zero overhead).
   </policy>
   <live-value>the proven, live consumer is the ROLLBACK-GUARD: detectDeckentRepo gates
-    rollback.ts so deckent never `reset --hard`s its own git tree (self-git-mutation
-    protection). P1–P3 are largely dormant; in practice deckent-dev self-modifying runs
-    go through the manual dispatch path (ADR-D-007).</live-value>
+    rollback.ts at BOTH ends — createSafetyPoint becomes a no-op AND rollbackToSafetyPoint's
+    `git reset --hard` is skipped on deckent's own tree, so deckent can never wipe its own
+    uncommitted source (self-git-mutation protection; worker-rollback + the self-modifying
+    write-guard share the same gate). User projects get full rollback semantics
+    (detectDeckentRepo=false). P1–P3 are largely dormant; in practice deckent-dev
+    self-modifying runs go through the manual dispatch path (ADR-D-007).</live-value>
 </self-modify-detection>
 ```
 
@@ -40,9 +43,10 @@ deckent runs in two fundamentally different modes: **dogfood** (deckent modifyin
 
 ## Intent / Roadmap (Tomorrow)
 
-- **P1–P3 wire OR formalize-the-reality:** either wire the sequential-wave / Wave-0-gate / auto-checkpoint, OR formally adopt the ADR-D-007 manual-dispatch reality as the dogfood self-modify path (no silent dormancy).
-- **Global-install discrimination:** with deckent installed **globally** and used across N user projects, the "deckent's own repo ↔ every user project" discrimination becomes critical (the detector must be robust per-project).
-- **Merge with ROLE-GUARD** (ADR-G-020): the self-protection (don't mutate deckent's own code/git) and the Brain-never-codes boundary are the same self-protection family — pid/role + repo-detection enforced together at the tool layer.
+- **P1–P3 wire OR formalize-the-reality (SELFMOD-W).** Either *wire* the dormant policies into a first-class **self-modify execution lane** — P1 sequential dispatch (no parallel `tsc`-rebuild race on deckent's own `dist/`), P2 a Wave-0 `tsc && vitest` health-gate that must pass before any self-modifying worker spawns, P3 post-task auto-checkpoint so an MCP-restart / runtime-cache-invalidation resumes losslessly — OR *formally adopt* the ADR-D-007 manual-dispatch path as the sanctioned dogfood self-modify route. The bar is **no silent dormancy**: the chosen reality is documented, tested, and enforced, never left implicit.
+- **Global-install discrimination (every-environment law).** With deckent installed **globally** and orchestrating N user projects concurrently — macOS · Linux · Windows-native · WSL — the dogfood↔user decision is made per-process, per-project, potentially millions of times. `detectDeckentRepo` resolves per project-root (never process-global), and the `package.json name === 'deckent'` discriminator is hardened against rename/fork edge-cases with a stronger publisher-signed marker. A misclassification in *either* direction is a safety incident (self-protection skipped on the real repo, or a false-guard/overhead imposed on a user project) — so the detector is treated as a **security boundary**, not a convenience check.
+- **Unify with ROLE-GUARD (ADR-G-020).** Self-git-mutation protection (never `reset --hard` deckent's own tree), the Brain-never-codes orchestrator boundary, and self-modify detection are one **self-protection family** — converged at the tool/process layer: pid/role + repo-detection enforced together, structurally (not prompt-trusted). ROLE-GUARD becomes the single enforcement point where the orchestrator process is *unable* to mutate deckent's own source/git regardless of what any LLM emits.
+- **Compose with multi-project isolation (ADR-G-017).** The dogfood↔user boundary shares the project-boundary substrate with the four isolation layers (directory + cred-encryption + scope-boundary + config-boundary); the discrimination and the isolation guards compose so a worker in user-project-A can never reach deckent's core, its git, or another tenant's tree.
 
 ---
 

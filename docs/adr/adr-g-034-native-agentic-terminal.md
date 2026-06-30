@@ -1,10 +1,10 @@
 # ADR-G-034: Native Agentic Terminal
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** product-surface contract (bare `deckent` = native agentic terminal; risky actions confirm-gated)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=product-surface contract (bare `deckent` = native agentic terminal; risky actions confirm-gated) → tomorrow=TOOL progressive-disclosure + in-terminal WORKER-LIVE-TRACE + runtime-wide ApprovalBroker + scope-via-TOOL enforcement
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-081 (Native Agentic Deckent) + ADR-074 Part-A (native-chat round-trip) + ADR-082 Part-A (real-LLM-wire) + ADR-083 (REPL-UX + provider-parity + local-model) + ADR-086 (Native CLI Parity F11)
 **Crosswalk:** 081 (+074A+082A+083+086) → ADR-G-034
 
-> **Pivot note (2026-06-29):** The terminal is deckent's **PRIMARY management + usage surface** — tool-driven, full-control + non-tiring, full-functionality (flexibility is not acceptable). Work happens *from the terminal*, not via memorized CLI subcommands — but without forcing it (CLI/MCP remain optional access). At the level of Claude Code / Hermes / Codex / OpenClaw. The dashboard (ADR-G-033) is observability-only; the terminal is where you *do*.
+> **Pivot note (2026-06-29):** The terminal is deckent's **PRIMARY management + usage surface** — tool-driven, full-control + non-tiring, full-functionality is non-negotiable (flexibility/cutting-corners is not acceptable). Work happens *from the terminal*, not via memorized CLI subcommands — but without forcing it (CLI/MCP remain optional access). At the level of Claude Code / Hermes / Codex / OpenClaw. The dashboard (ADR-G-033) is observability-only; the terminal is where you *do*.
 
 ---
 

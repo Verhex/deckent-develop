@@ -1,8 +1,8 @@
 # ADR-G-031: Enterprise Foundation (Tenant · RBAC · Audit · Scheduled-Flows · Connector-Identity)
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** opt-in (enterprise-config default-off) → governance-depth layer (ADR-G-016)
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-068 (Enterprise Foundation) + ADR-069 (Event-Driven Triggers + RBAC) + ADR-071 Part-F4 (RBAC hierarchy + audit-writer + enterprise-config) + ADR-092 (Connector Social Identity RBAC)
-**Crosswalk:** 068 (+069+071F4+092) → ADR-G-031
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=opt-in (enterprise-config default-off; community byte-identical) → tomorrow=god-level enterprise governance-depth layer (ADR-G-016 MOD-SPLIT; ENT-* gaps in the modular enterprise layer)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-068 (Enterprise Foundation) + ADR-069 (Event-Driven Triggers + RBAC) + ADR-071 Part-F4 (RBAC hierarchy + audit-writer + enterprise-config) + ADR-074 Part-B (enterprise RBAC-enforce + audit-export + rate-limiter + RBAC-CLI) + ADR-092 (Connector Social Identity RBAC)
+**Crosswalk:** 068 (+069+071F4+074B+092) → ADR-G-031
 
 > **Note (Alperen, 2026-06-30):** This foundation takes its FINAL form inside the enterprise layer (MOD-SPLIT / deck-ent). The community core has the same functionality; enterprise = depth of governance/audit/management (ADR-G-016), not gated features.
 
@@ -25,6 +25,9 @@ To run deckent in enterprise environments — multi-tenant, audited, role-contro
     enterprise-endpoint, rbac CLI).</rbac>
   <audit>writeAuditEvent + queryAudit (RBAC-gated) + HMAC chain (audit_prev_hmac/audit_hmac)
     + audit-integrity + SIEM HTTP transport + exportAuditLog (SOC2/GDPR JSON/CSV).</audit>
+  <rate-limit>TenantRateLimiter — per-tenant token-bucket quota guard (checkLimit(tenantId,
+    action) → allow/deny; maxConcurrent per rolling window, auto-reset). Live snapshot at
+    GET /api/enterprise/rate; admin-only rule CRUD persisted in config (per-action limits = V2).</rate-limit>
   <flows>scheduled-flow (full-cron nextRun) + flow-registry + event-trigger/matchTrigger
     (webhook/event match) → autonomous engine bridge.</flows>
   <connector-identity scope="external messaging surface" model="fail-CLOSED, opt-in">
@@ -59,7 +62,7 @@ The foundation is real engineering (OIDC security, HMAC chain, guarded surfaces)
 
 ## Consequences
 
-**(+)** A real, opt-in, multi-tenant + RBAC + audit + scheduled + connector-identity enterprise foundation, all live and consumer-wired, byte-identical for community users. Connector-surface RBAC is fail-closed (stronger than the internal advisory layer) — safe for multi-user messaging deployments.
+**(+)** A real, opt-in, multi-tenant + RBAC + audit + rate-limit + scheduled + connector-identity enterprise foundation, all live and consumer-wired, byte-identical for community users. Connector-surface RBAC is fail-closed (stronger than the internal advisory layer) — safe for multi-user messaging deployments.
 
 **(−)** Six mapped gaps to god-level enterprise (management-plane, custom-RBAC, hard-enforce-V2, k8s-tenant, SCIM-push, audit-export) — all in the enterprise layer, not today. HTTP webhook-listener (069 AUT-2) unbuilt. Hard-enforcement is roadmap (ADR-G-020 vein).
 
@@ -67,7 +70,7 @@ The foundation is real engineering (OIDC security, HMAC chain, guarded surfaces)
 
 ## References / Absorbed
 
-- **Absorbs:** ADR-068 + ADR-069 + ADR-071 Part-F4 + ADR-092.
+- **Absorbs:** ADR-068 + ADR-069 + ADR-071 Part-F4 + ADR-074 Part-B + ADR-092.
 - **Cross-ref:** ADR-G-016 (enterprise = governance depth, MOD-SPLIT) · ADR-G-020 (internal authority — distinct from connector L2) · ADR-G-024 (process/tenant) · ADR-G-017 (multi-project isolation) · ADR-G-007 (connectors) · ADR-G-035 (tenant_id/audit-hmac).
 - **Born / MASTER-PLAN:** ENT-* (god-level gaps) · MODULARIZE · AUT-2 (webhook-listener) · dynamic /bind (connector pairing→binding).
 - **Memory:** `project_social_identity_rbac_engine` · `project_deckent_positioning`.

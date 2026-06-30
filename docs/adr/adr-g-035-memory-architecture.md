@@ -1,10 +1,10 @@
 # ADR-G-035: Memory Architecture (DB-First, FTS5, Self-Learning Substrate)
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** sync-invariant (any write keeps content_norm + FTS5 + entry_history + audit_hmac consistent; direct SQL UPDATE forbidden)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=sync-invariant (any write keeps content_norm + FTS5 + entry_history + audit_hmac consistent; direct SQL UPDATE forbidden) + additive backup-guarded taxonomy migration (never a destructive rebuild) → tomorrow=opt-in local-embedding vector layer (sqlite-vec, never-calls-home) + scope-layers (MEM-2) + index/SLA (MEM-3)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-088 (Memory V2 — DB-First) · **Supersedes:** ADR-009 (DEBT.md markdown table — archived)
 **Crosswalk:** ADR-088 → ADR-G-035
 
-> **Substrate note:** This is the storage substrate the rest of the governance stands on — ADR-G-019 (class-aware ADR storage/recall/injection), ADR-G-032 (self-learning loop), and the LEARNINGS-QUALITY work all read/write through it. Its schema is **extended here to carry the 4-layer ADR taxonomy** (`adr_class`/`scope`/`immutable`/`source`/`enforcement_level`).
+> **Substrate note:** This is the storage substrate the rest of the governance stands on — ADR-G-019 (class-aware ADR storage/recall/injection), ADR-G-032 (self-learning loop), and the LEARNINGS-QUALITY work all read/write through it. Its schema is **extended here to carry the 4-layer ADR taxonomy** (`adr_class`/`scope`/`immutable`/`source_authority`/`enforcement_level`).
 
 ---
 

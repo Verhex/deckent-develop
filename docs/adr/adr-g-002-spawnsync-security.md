@@ -44,7 +44,7 @@ These carve-outs **never interpolate untrusted input** into a command string (ar
 
 ### 4. Enforcement (today — advisory)
 
-Compliance is tracked by the ADR-006 check in `src/orchestra/authority-enforcer.ts` — a compile-time scan. Per ADR-G-020 (RBAC V1.0) this is **advisory/soft**: it warns + emits an audit signal, it does **not** hard-block.
+Compliance is tracked by the `ADR-006` compliance check (code-key `checkAdr006`, retained verbatim in code for stability — old ADR-006 **is** this record, now ADR-G-002) in `src/orchestra/authority-enforcer.ts` — a compile-time scan. Per ADR-G-020 (RBAC V1.0) this is **advisory/soft**: it warns + emits an audit signal, it does **not** hard-block.
 
 ---
 

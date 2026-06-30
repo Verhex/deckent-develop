@@ -1,6 +1,6 @@
 # ADR-G-032: Self-Learning & Evolution Loop
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** moat-preserve (the closed outcome→routing→promotion loop must not be rewritten — only deepened)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=moat-preserve (the closed outcome→routing→promotion loop must not be rewritten — only deepened) + requiresApproval-gated identity-mutation (nervous checkpoint; no mid-run mutation) → tomorrow=selective+scalable update (only used agents/skills, indexed/lazy at 300-agent/1000-skill) + auto-apply after the advisory-proof phase
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-074 Part-C (F5 evolution wire) + ADR-075 Part-A (6 evolution-module real callers) + ADR-078 Part-C (Active Identity-Mutation Loop)
 **Crosswalk:** 074C + 075A + 078C → ADR-G-032
 

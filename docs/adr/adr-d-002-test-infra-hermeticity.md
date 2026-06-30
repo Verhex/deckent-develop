@@ -110,4 +110,3 @@ CI / test-infra tasks (pipeline fixes, hermetic reproducer) route to the **ci-gu
 - **Cross-ref:** ADR-G-002 (spawnSync Security Pattern — the sanctioned array-args exception; sync-vs-async is the orthogonal axis this ADR owns) · ADR-D-001 (Build Baseline — the TS/ESM/Node toolchain the suite runs on) · ADR-G-019 (ADR Governance — ADR-D class/scope-aware injection to dev/dogfood workers).
 - **Born work-items:** ADR-087-W (residual `spawnSync` migration in `auditor.ts`) · `test:ci-sim` SIGKILL-hardening (candidate).
 - **Direction:** `.analysis/adr-review-crosswalk.md` (rows 003 + 087 + 078-A → ADR-D-002), `.claude/rules/karpathy-discipline.md`, memory `project_ci_green_root_causes` · `project_test_home_leak` · `feedback_vitest_16gb_local_cap`.
-</content>

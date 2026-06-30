@@ -21,7 +21,7 @@ Since ~Sprint 270 the operating reality inverted: deckent-dev runs **Brain-auton
 The hardened manual subagent dispatch protocol (dogfood survival-fallback) rests on seven principles:
 
 1. **Worktree isolation** — `git worktree add ../deckent-sprint-NNN-<CLUSTER>` per cluster/subagent. Parallel subagents cannot collide; each works in its own worktree and never touches `main` until the end-of-sprint rebase + merge cascade.
-2. **File authority matrix** — a STRICT `scope.filesWrite` per subagent; the matrix **cannot be widened** (a new subagent gets a new row; an existing row is never grown). Enforced by the Alperen review gate via `git diff --stat`; out-of-scope write → subagent retry. (ADR-037 RBAC, manual-dispatch form.)
+2. **File authority matrix** — a STRICT `scope.filesWrite` per subagent; the matrix **cannot be widened** (a new subagent gets a new row; an existing row is never grown). Enforced by the Alperen review gate via `git diff --stat`; out-of-scope write → subagent retry. (ADR-G-020 RBAC, manual-dispatch form.)
 3. **Wave structure (cascade-reverse)** — dispatch the **cascade endpoint** (the most-depended-on module) **first**, so upstream fixes build on an already-clean base instead of multiplying a bad contract downstream.
 4. **Wave 1.5 serial gate** — a human-in-the-loop (Alperen) checkpoint after the cascade-endpoint fix + any critical-contract write, before downstream waves base their work on it.
 5. **TDD enforcement gate** — failing-test-first → minimal implementation → pass → atomic commit per cycle; **adding `skip` is forbidden** (baseline skip count preserved); the subagent `.result` must carry `tests_skipped_added: 0`, and the review gate verifies the skip-count delta.
@@ -37,7 +37,7 @@ Brain-autonomous remains the primary path; the seven principles have **largely r
 | ADR-D-007 principle | Brain-autonomous parity (today) |
 |---------------------|----------------------------------|
 | Worktree isolation | spawn-time isolation |
-| File authority matrix | `scope.filesWrite` + advisory auditor (ADR-037 V1.0) |
+| File authority matrix | `scope.filesWrite` + advisory auditor (ADR-G-020 V1.0) |
 | TDD / eval gate | Brain GO/NO_GO + CC disk-verify close-out |
 | Wave structure | `dependency_pipeline_enabled=true` (live multi-wave) |
 | Wave 1.5 serial gate | `deckent_checkpoint` + human-approved sprint-start |

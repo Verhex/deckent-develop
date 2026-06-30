@@ -206,7 +206,7 @@
 | COMM-2 | GOV | Tipli Brain-aracılı worker-mesaj vocabulary (DEPENDENCY_REQUEST...) | MP | P1 | — | ⬜ | — | COMM-1 v0 ✅ |
 | ADR-GOV | GOV | ADR-türevi -W tutarlılık şemsiyesi (yeni-G/D şema): ADR-002-W·D-004-W·G-012-W·LOCALE-W·ROUTE-V1-PURGE(028) + tracked 064-W/066-W/087-W | MP | P1 | — | ⬜ | — | governance-dürüstlük |
 | ADR-LAYER | GOV | ✅ 4-katman taksonomi (ADR-G/D/UG/UP, G>U>D) CANLI; KALAN: UG/UP user-ADR-authoring (ilk-user basit, NL komut+sohbetle genişler) | A | P1 | — | 🟡 | 2026-06-30 | ADR-G-019; taxonomy✅, user-authoring bekliyor |
-| ADR-REVISION | GOV | ✅ 89→41 re-review/renumber/migration DONE (2026-06-30); KALAN: ADR-content refinement (Alperen ADR-içerik review) | A·MP | P1 | — | 🟡 | 2026-06-30 | sistem-side ✅; content-side bekliyor; değişim YALNIZ Alperen-onayı (ADR-G-019) |
+| ADR-REVISION | GOV | ✅ 89→41 re-review/renumber/migration + 41-ADR content-refinement DONE (2026-06-30); değişim YALNIZ Alperen-onayı | A·MP | P1 | — | ✅ | 2026-06-30 | sistem-side ✅ + content-side ✅ (quality-audit + surgical-refine); ADR-G-019 |
 | AEGIS-RD | GOV | AEGIS ADR'yi Deckent-özel global-uygulanabilir agentic metoda yeniden tasarla | A | P2 | ADR-REVISION | ⬜ | — | "uzun/saçma" |
 | GOV-GATE | GOV | Per-sprint "ilk-user için daha kolay mı?" zorunlu gate + first-run-path LIVE test | CX | P1 | — | ⬜ | — | §12.4 metodoloji |
 | GOV-CROSSWALK | GOV | MASTER-PLAN eski-ID→yeni-ID crosswalk (residual) | CX | P2 | — | ◑ | — | büyük ölçüde reframe'de |

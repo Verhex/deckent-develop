@@ -1,6 +1,6 @@
 # ADR-G-008: Provider Abstraction, Fleet & Native-Usage
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** provider-neutrality (no hardcoded provider; `getProviderForModel` SSOT)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=provider-free across backends (`getProviderForModel` SSOT resolver; 3 CLI-subscription + N HTTP-API via one `OpenAICompatibleAdapter` + local Ollama) + leak-free subscription↔API auth-precedence + provider-native real token/cost (`session-usage-store`, real cacheCreation) → tomorrow=provider-agnostic failover Brain (ADR-G-025; Claude→GPT/Codex lossless) + `?? 'claude'` default-drift consolidation (ADR-066-W) + subscription→API overflow wire (F1-010) + Codex/Gemini native-usage phase-2 + subscription-package & opt-in hosted-core (PROV-SUBS · PROV-FC)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-017 (MCP-Native Provider Adapters) + ADR-066 (Provider Independence) + ADR-077 (8-Fleet OpenAI-Compatible) + ADR-093 (Real Token/Cost Capture) + ADR-076 Part-A (Auth-Precedence) + ADR-078 Part-B (8-provider bootstrap/overflow)
 **Crosswalk:** 017 (+066+077+093+076A+078B) → ADR-G-008
 

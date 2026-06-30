@@ -1,4 +1,4 @@
-# ADR-G-007: External Messaging Connectors & Integration
+# ADR-G-007: External Messaging Connectors & Integration Layer
 
 **Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=config-gated + lazy-load + fail-safe (per-target timeout-guarded, error-isolated) connectors + project-scoped session/pairing gateway (auth-gate pending) → tomorrow=integration-layer (MSG-1) + multi-channel ApprovalBroker relay (APR-2) + pairing onCallback wire + WhatsApp wire (MSG-3) + pairing hard-auth before public exposure
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-016 (External Messaging Connectors), ADR-091 (Project-Scoped Messaging Gateway) · **Supersedes:** —

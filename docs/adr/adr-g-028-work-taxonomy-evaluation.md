@@ -1,6 +1,6 @@
 # ADR-G-028: Work Taxonomy (TaskKind × TechStack) & Evaluation
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** gaming-proof (Object.freeze registries; scope-shape detection) + EffectClass → policy-gate
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=gaming-proof (Object.freeze registries; scope-shape detection, not title/description) + EffectClass→policy-gate (WM-6 PARK for risky classes) → tomorrow=EffectClass→runtime ApprovalBroker (critical-irreversible) + expanded TaskKind set + user-custom kinds (ADR-UG/UP)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-053 (TaskType Taxonomy) + ADR-055 (Hybrid Scoring 5-Layer Pipeline)
 **Crosswalk:** 053 (+055) → ADR-G-028
 
@@ -10,7 +10,7 @@
 
 ## Context
 
-deckent must know *what kind* of work a task is, to judge it correctly and gate it safely. ADR-053 defined 3 TaskTypes (audit / document-write / code-development) with scope-shape detection + an EffectClass (reversibility tag) — the canonical work-model (WM-2 `work-model.ts`), extended to a second axis TechStackKind (WM-7). ADR-055 proposed a 5-layer Hybrid Scoring pipeline; the formal pipeline was never built, but its goals were realized organically (honest-gate, criteria-deriver, EffectClass→policy-gate, XVER-1, ADR-070). The 2026-06-30 review unifies the taxonomy + evaluation and commits to expanding the type set.
+deckent must know *what kind* of work a task is, to judge it correctly and gate it safely. ADR-053 defined 3 TaskTypes (audit / document-write / code-development) with scope-shape detection + an EffectClass (reversibility tag) — the canonical work-model (WM-2 `work-model.ts`), extended to a second axis TechStackKind (WM-7). ADR-055 proposed a 5-layer Hybrid Scoring pipeline; the formal pipeline was never built, but its goals were realized organically (honest-gate, criteria-deriver, EffectClass→policy-gate, XVER-1, ADR-G-009). The 2026-06-30 review unifies the taxonomy + evaluation and commits to expanding the type set.
 
 ---
 

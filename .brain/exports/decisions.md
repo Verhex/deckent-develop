@@ -25,7 +25,7 @@ A subtlety the old ADR-002 already clarified: **`Node16` here is the TypeScript 
 ## Decision (Today)
 
 - **Language / module system:** TypeScript with `"type": "module"` (ESM). CommonJS interop via `esModuleInterop`.
-- **Runtime floor:** Node **24+** is the single supported baseline (`engines: { node: ">=24.0.0" }`). No `Node 18` baseline references anywhere — code comments, error messages, CI matrices, docs, agent/skill prompts.
+- **Runtime floor:** Node **24+** is the single supported baseline (`engines: { node: ">=24.0.0" }` — authoritative). Residual `Node 18` mentions (code comments, error messages, CI matrices, docs, agent/skill prompts — ≈8 at last count) are stale and tracked for purge: the `engines` floor is the source of truth; the cleanup is the Node-18-reference purge (ADR-001 Node-24+ sweep, see *Intent / Roadmap* below).
 - **Module resolution:** `"module": "Node16"` + `"moduleResolution": "Node16"` in `tsconfig` (current state). This enforces:
   - **`.js` extensions mandatory on all relative imports** — `import { foo } from './bar'` fails; `'./bar.js'` is required (the recurring ESM gotcha, see `CLAUDE.md`).
   - No index-file auto-resolution; `package.json` `exports` are honored.
@@ -174,7 +174,6 @@ CI / test-infra tasks (pipeline fixes, hermetic reproducer) route to the **ci-gu
 - **Cross-ref:** ADR-G-002 (spawnSync Security Pattern — the sanctioned array-args exception; sync-vs-async is the orthogonal axis this ADR owns) · ADR-D-001 (Build Baseline — the TS/ESM/Node toolchain the suite runs on) · ADR-G-019 (ADR Governance — ADR-D class/scope-aware injection to dev/dogfood workers).
 - **Born work-items:** ADR-087-W (residual `spawnSync` migration in `auditor.ts`) · `test:ci-sim` SIGKILL-hardening (candidate).
 - **Direction:** `.analysis/adr-review-crosswalk.md` (rows 003 + 087 + 078-A → ADR-D-002), `.claude/rules/karpathy-discipline.md`, memory `project_ci_green_root_causes` · `project_test_home_leak` · `feedback_vitest_16gb_local_cap`.
-</content>
 
 
 ---
@@ -185,7 +184,7 @@ CI / test-infra tasks (pipeline fixes, hermetic reproducer) route to the **ci-gu
 
 # ADR-D-004: Brain Central Import — One-Way Dependency
 
-**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=`authority-enforcer.ts` ADR-008 check + `core/ → orchestra/` import-direction scan (advisory/soft per ADR-037 V1.0 — warns + emits, does not hard-block) → tomorrow=LAYER-1 inversion cleanup (residual violations) + hard-flip under the ADR-G-020 enforcement-engine
+**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=`authority-enforcer.ts` ADR-008 check + `core/ → orchestra/` import-direction scan (advisory/soft per ADR-G-020 V1.0 — warns + emits, does not hard-block) → tomorrow=LAYER-1 inversion cleanup (residual violations) + hard-flip under the ADR-G-020 enforcement-engine
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-008 (Brain Merkezi Import — Tek Yönlü Bağımlılık) · **Supersedes:** —
 **Crosswalk:** ADR-008 → ADR-D-004 (role-separation split out → ADR-G-020)
 
@@ -205,7 +204,7 @@ That phrasing aged in two ways. First, the god-object split (ADR-D-006, ex-024/0
 
 ### 1. The enforced invariant — `core/` must not import `orchestra/`
 
-The live lint (`src/orchestra/authority-enforcer.ts`, ADR-008 check) scans the **import direction `core/ → orchestra/`**: `core/` must not depend on `orchestra/`. This is broader and more accurate than the original `from.*brain` grep. Per ADR-037 V1.0 the check is **advisory/soft** — it warns and emits an audit signal, it does not hard-block.
+The live lint (`src/orchestra/authority-enforcer.ts`, ADR-008 check) scans the **import direction `core/ → orchestra/`**: `core/` must not depend on `orchestra/`. This is broader and more accurate than the original `from.*brain` grep. Per ADR-G-020 V1.0 the check is **advisory/soft** — it warns and emits an audit signal, it does not hard-block.
 
 ### 2. The "Brain-family" — who may import tmux/auditor/worker
 
@@ -217,7 +216,7 @@ Only the Brain-family may import `tmux` / `auditor` / `worker`. Family-external 
 
 ### 3. Sanctioned exceptions + a resolved cycle
 
-- **Provider CLI-spawn adapters** (`src/providers/claude.ts` → `orchestra/tmux.js` for `killWorker`/`listWorkers`/`ensureSession`/…) are **not** violations: per ADR-017 + ADR-027→ADR-G-014, a CLI-spawn adapter legitimately wraps the tmux/spawn-backend arm. Rule: provider adapters may wrap tmux/spawn-backend; they may **never** import auditor/worker; the one-way direction still holds.
+- **Provider CLI-spawn adapters** (`src/providers/claude.ts` → `orchestra/tmux.js` for `killWorker`/`listWorkers`/`ensureSession`/…) are **not** violations: per ADR-G-008 + ADR-027→ADR-G-014, a CLI-spawn adapter legitimately wraps the tmux/spawn-backend arm. Rule: provider adapters may wrap tmux/spawn-backend; they may **never** import auditor/worker; the one-way direction still holds.
 - **Resolved cycle (Sprint 279):** the `core/audit-writer` + `core/audit-query` → `orchestra/event-stream` cycle was fixed by **moving `event-stream` into `core/`** (`src/core/event-stream.ts`); `orchestra/event-stream.ts` is now a re-export shim.
 
 ---
@@ -239,7 +238,7 @@ When ADR-G-020's enforcement-engine graduates (ADR-094 flag-gated vein → defau
 
 **(+)** Clean, cycle-free one-way layering; a precise, code-verified statement of which modules may import the orchestration internals; thin cli/api/mcp surfaces with business logic concentrated in core/orchestra; the god-object split is reconciled with the rule (its organs are family members, not violations).
 
-**(−)** Advisory/soft enforcement (ADR-037 V1.0) allowed real inversions to accrue — four open cleanup items (ADR-008-W, ORCH-W1/W2, CORE-W1, API-W1). Until the G-020 enforcement-engine hard-flips, the invariant is documentation + warn-level signal, not a blocking gate.
+**(−)** Advisory/soft enforcement (ADR-G-020 V1.0) allowed real inversions to accrue — four open cleanup items (ADR-008-W, ORCH-W1, CORE-W1, API-W1). Until the G-020 enforcement-engine hard-flips, the invariant is documentation + warn-level signal, not a blocking gate.
 
 ---
 
@@ -247,8 +246,8 @@ When ADR-G-020's enforcement-engine graduates (ADR-094 flag-gated vein → defau
 
 - **Absorbs:** ADR-008 (one-way import direction; Brain-family definition; sanctioned provider-adapter exception; Sprint-279 event-stream cycle-fix).
 - **Split out:** role-separation ("Brain never authors code") → **ADR-G-020** (Authority Matrix Rule-4 / ROLE-GUARD).
-- **Cross-ref:** ADR-D-006 (the god-object split created the Brain-family organs), ADR-G-014 (Spawn Backend — provider-adapter wrapping), ADR-017 (provider adapters), ADR-027→ADR-G-014 (hybrid spawn), ADR-G-019 (ADR-D contributor convention under the taxonomy).
-- **Born work-items:** ADR-008-W, ORCH-W1 / ORCH-W2, CORE-W1, API-W1 (LAYER-1 inversion cleanup). The canonical refined statement of these import rules also lives in `CLAUDE.md` and `docs/reference/api-surface.md` (Module Import Rules).
+- **Cross-ref:** ADR-D-006 (the god-object split created the Brain-family organs), ADR-G-014 (Spawn Backend — provider-adapter wrapping), ADR-G-008 (provider adapters), ADR-027→ADR-G-014 (hybrid spawn), ADR-G-019 (ADR-D contributor convention under the taxonomy).
+- **Born work-items:** ADR-008-W, ORCH-W1, CORE-W1, API-W1 (LAYER-1 inversion cleanup). The canonical refined statement of these import rules also lives in `CLAUDE.md` and `docs/reference/api-surface.md` (Module Import Rules).
 
 
 ---
@@ -281,26 +280,26 @@ The 2026-06-30 review made the drift official policy: **artificially constrainin
 
 - Every runtime dependency is admitted on **merit**: it delivers a real capability, with **rationale + alternatives-considered** recorded in the inventory below. **There is no count cap.**
 - **Security discipline is mandatory** for every dependency: version pinned, source audited, and any non-trivial security surface explicitly justified (e.g. `ws` chosen over a hand-rolled RFC6455 implementation specifically to avoid owning that attack surface; `@noble/*` chosen as audited zero-dep crypto).
-- **Built-in-first where a built-in genuinely suffices** — a heuristic, not a dogma. Simple, non-interactive prompts (text / select / confirm) use `node:readline/promises` (`src/cli/helpers/prompt.ts`: `promptText` / `promptSelect` / `promptConfirm`), which serves the init wizard + confirm + headless/script contexts without a `inquirer`-class dependency. **Rich UI is a first-class core feature** via `ink` + `react` (native REPL/TUI, ADR-081/083) and the React web dashboard (ADR-080). The two layers do not conflict — readline = simple prompt, ink/react = rich UI.
+- **Built-in-first where a built-in genuinely suffices** — a heuristic, not a dogma. Simple, non-interactive prompts (text / select / confirm) use `node:readline/promises` (`src/cli/helpers/prompt.ts`: `promptText` / `promptSelect` / `promptConfirm`), which serves the init wizard + confirm + headless/script contexts without a `inquirer`-class dependency. **Rich UI is a first-class core feature** via `ink` + `react` (native REPL/TUI, ADR-G-034) and the React web dashboard (ADR-G-033). The two layers do not conflict — readline = simple prompt, ink/react = rich UI.
 
 ### 2. Living inventory (current `package.json`)
 
 | Package | Purpose & why-chosen | Governing ADR |
 |---------|----------------------|---------------|
-| `commander@^13.0.0` | CLI command framework; the one purely-CLI-convenience dep. Alt: hand-rolled arg parsing (rejected — ergonomics/maintenance). | ADR-010 (this record) |
-| `@modelcontextprotocol/sdk@^1.27.1` | MCP server/client (stdio) transport. | ADR-017 |
-| `better-sqlite3@^12.10.0` | Memory V2 DB — synchronous embedded SQLite + FTS5 full-text. | ADR-088 |
-| `telegraf@^4.16.0` | Telegram connector adapter. | ADR-016 |
-| `zod@^3.25.0` | Runtime schema-validation (plan/config); single-purpose, replaces hand-rolled validation. | ADR-010 (sanctioned) |
-| `@noble/ed25519@^2.3.0` | Ed25519 signing for `.deck` secret files; audited zero-dep crypto. | ADR-014 |
-| `@noble/hashes@^1.8.0` | SHA-512 key derivation for `.deck`; same audited-crypto family. | ADR-014 |
-| `@lydell/node-pty@^1.2.0-beta.12` | Interactive PTY for the embedded web terminal (claude/gemini/codex/shell). Renamed from `node-pty`. | ADR-062 |
-| `ws@^8.18.0` | Browser WebSocket transport for the terminal stream; **audited — hand-rolled RFC6455 rejected as a security surface.** | ADR-062 |
-| `ink@^7.0.5` | Native agentic REPL/TUI (React-for-CLI). | ADR-081 / ADR-083 |
-| `react@^19.2.7` | Ink REPL + web dashboard render tree. | ADR-081 / ADR-080 |
-| `react-dom@^19.2.7` | Web dashboard render. | ADR-080 |
-| `cli-highlight@^2.1.11` | REPL syntax highlighting for native-agentic output. | ADR-081 / ADR-083 |
-| `discord.js@^14.26.3` *(optional)* | Discord connector (lazy / optional). | ADR-016 |
+| `commander@^13.0.0` | CLI command framework; the one purely-CLI-convenience dep. Alt: hand-rolled arg parsing (rejected — ergonomics/maintenance). | ADR-D-005 (this record) |
+| `@modelcontextprotocol/sdk@^1.27.1` | MCP server/client (stdio) transport. | ADR-G-008 |
+| `better-sqlite3@^12.10.0` | Memory V2 DB — synchronous embedded SQLite + FTS5 full-text. | ADR-G-035 |
+| `telegraf@^4.16.0` | Telegram connector adapter. | ADR-G-007 |
+| `zod@^3.25.0` | Runtime schema-validation (plan/config); single-purpose, replaces hand-rolled validation. | ADR-D-005 (sanctioned) |
+| `@noble/ed25519@^2.3.0` | Ed25519 signing for `.deck` secret files; audited zero-dep crypto. | ADR-G-005 |
+| `@noble/hashes@^1.8.0` | SHA-512 key derivation for `.deck`; same audited-crypto family. | ADR-G-005 |
+| `@lydell/node-pty@^1.2.0-beta.12` | Interactive PTY for the embedded web terminal (claude/gemini/codex/shell). Renamed from `node-pty`. | ADR-G-029 |
+| `ws@^8.18.0` | Browser WebSocket transport for the terminal stream; **audited — hand-rolled RFC6455 rejected as a security surface.** | ADR-G-029 |
+| `ink@^7.0.5` | Native agentic REPL/TUI (React-for-CLI). | ADR-G-034 |
+| `react@^19.2.7` | Ink REPL + web dashboard render tree. | ADR-G-034 / ADR-G-033 |
+| `react-dom@^19.2.7` | Web dashboard render. | ADR-G-033 |
+| `cli-highlight@^2.1.11` | REPL syntax highlighting for native-agentic output. | ADR-G-034 |
+| `discord.js@^14.26.3` *(optional)* | Discord connector (lazy / optional). | ADR-G-007 |
 
 Every entry carries a non-empty governing ADR (ADR-010-W closed, Sprint 311). `node:readline/promises` is a **built-in, not a dependency** — listed in §1 for the prompt-layer rationale, absorbing ADR-011.
 
@@ -325,7 +324,7 @@ Every entry carries a non-empty governing ADR (ADR-010-W closed, Sprint 311). `n
 ## References / Absorbed
 
 - **Absorbs:** ADR-010 (Tek Runtime Dependency → minimal+ADR-justified → **reframed to merit-based policy + inventory**), ADR-011 (node:readline/promises built-in prompt → §1 prompt-layer rationale).
-- **Per-dependency governing ADRs:** ADR-016 (connectors), ADR-017 (MCP), ADR-062 (embedded terminal — `node-pty`, `ws`), ADR-081/083 (native REPL — `ink`, `cli-highlight`), ADR-080 (dashboard — `react`/`react-dom`), ADR-014 (`.deck` crypto), ADR-088 (Memory V2 / SQLite).
+- **Per-dependency governing ADRs:** ADR-G-007 (connectors), ADR-G-008 (MCP), ADR-G-029 (embedded terminal — `node-pty`, `ws`), ADR-G-034 (native REPL — `ink`, `cli-highlight`), ADR-G-033 (dashboard — `react`/`react-dom`), ADR-G-005 (`.deck` crypto), ADR-G-035 (Memory V2 / SQLite).
 - **Unblocks:** POLICY-ENGINE-EVAL (ADR-G-019 / ADR-G-020).
 - **Cross-ref:** ADR-G-019 (ADR-D contributor convention under the taxonomy).
 
@@ -437,7 +436,7 @@ Since ~Sprint 270 the operating reality inverted: deckent-dev runs **Brain-auton
 The hardened manual subagent dispatch protocol (dogfood survival-fallback) rests on seven principles:
 
 1. **Worktree isolation** — `git worktree add ../deckent-sprint-NNN-<CLUSTER>` per cluster/subagent. Parallel subagents cannot collide; each works in its own worktree and never touches `main` until the end-of-sprint rebase + merge cascade.
-2. **File authority matrix** — a STRICT `scope.filesWrite` per subagent; the matrix **cannot be widened** (a new subagent gets a new row; an existing row is never grown). Enforced by the Alperen review gate via `git diff --stat`; out-of-scope write → subagent retry. (ADR-037 RBAC, manual-dispatch form.)
+2. **File authority matrix** — a STRICT `scope.filesWrite` per subagent; the matrix **cannot be widened** (a new subagent gets a new row; an existing row is never grown). Enforced by the Alperen review gate via `git diff --stat`; out-of-scope write → subagent retry. (ADR-G-020 RBAC, manual-dispatch form.)
 3. **Wave structure (cascade-reverse)** — dispatch the **cascade endpoint** (the most-depended-on module) **first**, so upstream fixes build on an already-clean base instead of multiplying a bad contract downstream.
 4. **Wave 1.5 serial gate** — a human-in-the-loop (Alperen) checkpoint after the cascade-endpoint fix + any critical-contract write, before downstream waves base their work on it.
 5. **TDD enforcement gate** — failing-test-first → minimal implementation → pass → atomic commit per cycle; **adding `skip` is forbidden** (baseline skip count preserved); the subagent `.result` must carry `tests_skipped_added: 0`, and the review gate verifies the skip-count delta.
@@ -453,7 +452,7 @@ Brain-autonomous remains the primary path; the seven principles have **largely r
 | ADR-D-007 principle | Brain-autonomous parity (today) |
 |---------------------|----------------------------------|
 | Worktree isolation | spawn-time isolation |
-| File authority matrix | `scope.filesWrite` + advisory auditor (ADR-037 V1.0) |
+| File authority matrix | `scope.filesWrite` + advisory auditor (ADR-G-020 V1.0) |
 | TDD / eval gate | Brain GO/NO_GO + CC disk-verify close-out |
 | Wave structure | `dependency_pipeline_enabled=true` (live multi-wave) |
 | Wave 1.5 serial gate | `deckent_checkpoint` + human-approved sprint-start |
@@ -488,7 +487,7 @@ This ADR stays **accepted (deliberately not deprecated):** Principle-7 (Manual S
 
 # ADR-D-008: Develop / Product Repo Strategy
 
-**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** release process (manual migration; audit-immutable policy)
+**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=single-repo development (no develop→product sync script) + audit-immutable via managed-docs registry-absence (`docs/audits/**` unregistered in `.deckent/docs.json`) → tomorrow=GA-2 one-time `deckent-develop`→`deckent` migration (sensitive-scrub) + enterprise-layer repo decision (ENTERPRISE-REPO-STRATEGY)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs / Rewrites:** ADR-065 (Develop/Product Two-Repo Split)
 **Crosswalk:** ADR-065 → ADR-D-008 (REWRITE)
 
@@ -541,7 +540,7 @@ Old ADR-065 proposed two continuously-synced repos: a private `deckent-develop` 
 ## References / Absorbed
 
 - **Absorbs / Rewrites:** ADR-065 (continuous-sync two-repo → single-repo + one-time migration).
-- **Cross-ref:** ADR-G-016 (Product Vision — MOD-SPLIT license axis, SEPARATE) · ADR-D-006 (code architecture) · GA-2 (MASTER-PLAN).
+- **Cross-ref:** ADR-G-016 (Product Vision — MOD-SPLIT license axis, SEPARATE) · ADR-D-006 (code architecture) · ADR-G-019 (ADR-D convention under the taxonomy) · GA-2 (MASTER-PLAN).
 - **Born / MASTER-PLAN:** ENTERPRISE-REPO-STRATEGY · MODULARIZE · CODE-LAYERS (5-layer, separate discussion) · GA-2.
 - **Memory:** `project_clean_repo_migration_and_training_data` · `project_product_repo_migration_push`.
 
@@ -657,7 +656,7 @@ These carve-outs **never interpolate untrusted input** into a command string (ar
 
 ### 4. Enforcement (today — advisory)
 
-Compliance is tracked by the ADR-006 check in `src/orchestra/authority-enforcer.ts` — a compile-time scan. Per ADR-G-020 (RBAC V1.0) this is **advisory/soft**: it warns + emits an audit signal, it does **not** hard-block.
+Compliance is tracked by the `ADR-006` compliance check (code-key `checkAdr006`, retained verbatim in code for stability — old ADR-006 **is** this record, now ADR-G-002) in `src/orchestra/authority-enforcer.ts` — a compile-time scan. Per ADR-G-020 (RBAC V1.0) this is **advisory/soft**: it warns + emits an audit signal, it does **not** hard-block.
 
 ---
 
@@ -777,7 +776,7 @@ deckent's secrets live in a separate **`.deck`** file using a `DECKENT_`-prefixe
 `.deck` is **never on the worker-spawn path** — workers cannot read it under any backend (no deck-transport in the docker backend). All secret consumers are **host-side only**: provider bootstrap auto-register (`provider.ts`, ADR-077 Part-C → ADR-G-008), `server.ts`, `doctor.ts`, and config interpolation. This is a zero-exposure invariant, not a per-task filter.
 
 ### 3. `$DECK:KEY` interpolation + signing
-Config values may reference secrets as `"$DECK:KEY"` (e.g. `"token": "$DECK:DISCORD_TOKEN"`), resolved at runtime host-side from `.deck` with a missing-secret warning (`src/core/deck-interpolation.ts`). Ed25519 signing for secret / skill-publish signatures uses `@noble/ed25519` + `@noble/hashes` (`src/core/signature.ts`); per the ADR-010 amendment these two crypto dependencies are governed here.
+Config values may reference secrets as `"$DECK:KEY"` (e.g. `"token": "$DECK:DISCORD_TOKEN"`), resolved at runtime host-side from `.deck` with a missing-secret warning (`src/core/deck-interpolation.ts`). Ed25519 signing for secret / skill-publish signatures uses `@noble/ed25519` + `@noble/hashes` (`src/core/signature.ts`); per the ADR-D-005 amendment these two crypto dependencies are governed here.
 
 ## Intent / Roadmap (Tomorrow)
 
@@ -795,7 +794,7 @@ Config values may reference secrets as `"$DECK:KEY"` (e.g. `"token": "$DECK:DISC
 
 - **Absorbs:** ADR-014 (.deck Secret File System — dedicated file, `DECKENT_` registry, auto-gitignore, worker non-exposure).
 - **Implementation:** `src/core/deck-file.ts` (parse/load/validate/template/gitignore/committed-guard), `src/core/deck-interpolation.ts` (`$DECK:KEY`), `src/core/signature.ts` (Ed25519, `@noble/ed25519` + `@noble/hashes`).
-- **Cross-ref:** ADR-010 (dependency governance — crypto-deps bridge), ADR-G-008 (Provider Abstraction — bootstrap auto-register, host-side consumer; ADR-077 Part-C), ADR-G-001 (Layered Config & Scope — shared global<project precedence), ADR-G-030 (Consent-Based Provisioning — secret-setup onboarding).
+- **Cross-ref:** ADR-D-005 (Dependency Policy & Inventory — crypto-deps bridge), ADR-G-008 (Provider Abstraction — bootstrap auto-register, host-side consumer; ADR-077 Part-C), ADR-G-001 (Layered Config & Scope — shared global<project precedence), ADR-G-030 (Consent-Based Provisioning — secret-setup onboarding).
 - **Direction:** global+project secret scope (MASTER-PLAN); `.analysis/adr-review-crosswalk.md` row 014.
 
 
@@ -807,11 +806,11 @@ Config values may reference secrets as `"$DECK:KEY"` (e.g. `"token": "$DECK:DISC
 
 # ADR-G-006: Routing & Selection (Learned Model/Effort + Agent/Skill)
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** routing-engine contract (routeTaskV2; V1 purged)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=`routeTaskV2` multi-signal selection (intent domain-enrichment + domain-match-bonus + skill→agent affinity + surface-aware bonus) + live routing-diversity test + CI imbalance guard; V1 decision-engine fully purged → tomorrow=learned Routing V3 (per-task-type outcome matrix auto-updating from real results, new-model auto-adopt on merit, vector-selection over task-kind×cost×latency×risk×provider-health×outcome; project+provider-scoped, user-manageable) — ROUTE-1+ · PROV-MATRIX · F1-AD
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-015 (TaskRouter 6-level) + ADR-028 (Decision-Engine V1→V2→V3) + ADR-072 (Routing Balance multi-signal) + ADR-073 (Routing Live Validation + FIX-prompt) + ADR-075 Part-B (skill→agent affinity)
 **Crosswalk:** 015 (+028+072+073+075B) → ADR-G-006
 
-> **Authoring note (Alperen):** "Bunun ADR/dokümante kısmı bugünü VE yarını hedef-niyetlerle açıklasın, şeffaf olsun. Bu bizim için önemli ve kritik." This ADR is the first-class application of the ADR-AUTHORING-STD (today + tomorrow, transparent).
+> **Authoring note (Alperen):** an ADR's documentation must explain both **today AND tomorrow** through its target-intent, transparently — "this matters and is critical to us." This ADR is the first-class application of the ADR-AUTHORING-STD (ADR-G-019: document today + tomorrow, transparently).
 
 ---
 
@@ -869,11 +868,11 @@ V2 is sufficient *today* but **not the target**. V3 = a **learned model/effort s
 
 ---
 
-## adr-g-007: External Messaging Connectors & Integration
+## adr-g-007: External Messaging Connectors & Integration Layer
 
 **Status:** accepted
 
-# ADR-G-007: External Messaging Connectors & Integration
+# ADR-G-007: External Messaging Connectors & Integration Layer
 
 **Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=config-gated + lazy-load + fail-safe (per-target timeout-guarded, error-isolated) connectors + project-scoped session/pairing gateway (auth-gate pending) → tomorrow=integration-layer (MSG-1) + multi-channel ApprovalBroker relay (APR-2) + pairing onCallback wire + WhatsApp wire (MSG-3) + pairing hard-auth before public exposure
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-016 (External Messaging Connectors), ADR-091 (Project-Scoped Messaging Gateway) · **Supersedes:** —
@@ -990,7 +989,7 @@ The gateway scopes inbound sessions per-project and brokers a pairing handshake 
 
 # ADR-G-008: Provider Abstraction, Fleet & Native-Usage
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** provider-neutrality (no hardcoded provider; `getProviderForModel` SSOT)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=provider-free across backends (`getProviderForModel` SSOT resolver; 3 CLI-subscription + N HTTP-API via one `OpenAICompatibleAdapter` + local Ollama) + leak-free subscription↔API auth-precedence + provider-native real token/cost (`session-usage-store`, real cacheCreation) → tomorrow=provider-agnostic failover Brain (ADR-G-025; Claude→GPT/Codex lossless) + `?? 'claude'` default-drift consolidation (ADR-066-W) + subscription→API overflow wire (F1-010) + Codex/Gemini native-usage phase-2 + subscription-package & opt-in hosted-core (PROV-SUBS · PROV-FC)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-017 (MCP-Native Provider Adapters) + ADR-066 (Provider Independence) + ADR-077 (8-Fleet OpenAI-Compatible) + ADR-093 (Real Token/Cost Capture) + ADR-076 Part-A (Auth-Precedence) + ADR-078 Part-B (8-provider bootstrap/overflow)
 **Crosswalk:** 017 (+066+077+093+076A+078B) → ADR-G-008
 
@@ -1062,7 +1061,7 @@ deckent is **provider-free**: any provider (subscription-CLI or API or local) ca
 
 # ADR-G-009: Evaluation Integrity (Language-Agnostic Verify · Coverage-Exemption · Proof-of-Function)
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** eval-integrity (signal-based + deterministic + run-verify gate; "wired ≠ working")
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=language-agnostic verify (TaskKind×TechStack criteria-deriver) + signal-based coverage-exemption (disk-derived, agent-independent, deterministic) + zero-hardcode (live-registry authoritative) + proof-of-function Tier-1 run-verify gate (`Smoke:` real-binary; mock-only=GO_WITH_TECH_DEBT, never DONE) — "wired ≠ working" → tomorrow=hard-enforce A9/A14 via ADR-G-020 flag-gated vein at GA-V2 + more stacks in the deriver (Law #2) + deeper signal-based eval (WM-7: language-mismatch-penalty, stack-aware coverage) + cross-verify (XVER-1)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-019 (Language-Agnostic Worker Verify) + ADR-070 (Brain Evaluation Integrity) + ADR-079 (Proof-of-Function DoD)
 **Crosswalk:** 019 (+070+079) → ADR-G-009
 
@@ -1547,8 +1546,6 @@ The array-args security invariant (ADR-G-002) is carried **uniformly** across ev
 - **Cross-ref:** ADR-G-011 (Surface Parity & Thin-Wrapper — CLI≡MCP, WATCH-W) · ADR-G-018 (Verification Protocol & Event-Stream — cross-backend observability substrate) · ADR-G-020 (Authority, Roles, Flow & Enforcement — worktree/scope enforcement, autoApprove security) · ADR-G-025 (Process Resilience & Live Observability — WORKER-LIVE-TRACE) · ADR-G-002 (spawnSync Security Pattern — array-args invariant, uniform per backend) · ADR-G-008 (Provider Abstraction & Fleet — per-provider bypass flags).
 - **Born work-items:** WATCH-W (backend-agnostic watch + CLI/MCP unify, P1) · ORCH-BE (firecracker/cloud/ollama-host backends + per-worker backend declaration) · WORKER-LIVE-TRACE (with ADR-G-025).
 - **Direction:** `.analysis/adr-review-crosswalk.md` (rows 027 + 007 + 089 → ADR-G-014), `.analysis/hermes-vs-deckent-direction-decisions.md`.
-</content>
-</invoke>
 
 
 ---
@@ -1559,7 +1556,7 @@ The array-args security invariant (ADR-G-002) is carried **uniformly** across ev
 
 # ADR-G-015: Managed-Docs (Core-Gen) + Tracking / Staleness
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** post-finalize hook (unconditional invocation) + doc-tracking scan
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=post-finalize self-update hook (UNCONDITIONAL invocation · step-ordering memoryExport→adrInsert→ruleRegen · FS↔DB bi-directional sync) + DCR multi-signal doc-tracking scan + code-derived module-count (`countModules`, zero-hardcode) → tomorrow=MANAGED-DOCS-MINIMIZE (core-only minimal auto-gen + user-project track-not-write) + DECKENT-LOG (sprint-log→deckent-log multi-mode) + code-drift CI-gate generalized to user projects
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-029 (Managed-Docs Universalization) + ADR-030 (Template Engine + Plugin Loader) + ADR-031 (Content Hash Cache) + ADR-032 (i18n Pattern) + ADR-046 (Brain Self-Update Hook) + ADR-090 (Documentation Tracking & Staleness)
 **Crosswalk:** 029 (+030+031+032+046+090) → ADR-G-015
 
@@ -1575,26 +1572,60 @@ deckent maintains a set of managed documents (CLAUDE.md auto-sections, IDENTITY,
 
 ## Decision (Today)
 
+### 1. Core-gen — deckent-core-only, minimal (absorbs ADR-029 / ADR-030 / ADR-031 / ADR-032)
+
 ```xml
-<managed-docs>
-  <core-gen scope="deckent-core-only" mode="minimal">
-    template-engine + content-hash cache (fileHash+entryHash+sprintId, sprint-aware) +
-    i18n pattern layer. Generates only NECESSARY core docs (not a bulk md-sweep).
-  </core-gen>
-  <self-update-hook>post-finalize step-ordering contract (memoryExport → adrInsert →
-    ruleRegen), UNCONDITIONAL invocation, ground-truth verification, and FS↔DB
-    BI-DIRECTIONAL sync (syncAdrFilesToDb forward + exportAdrsToFs reverse) — the
-    mechanism that makes the md+DB ADR-edit invariant safe (ADR-G-035).</self-update-hook>
-  <tracking scope="all-repos incl. user-project">
-    DCR (doc-rank, 0=most-critical) + body content-hash + last_updated + multi-signal
-    stale (content-drift + age + code-drift) in a separate doc_tracking table
-    (better-sqlite3, additive). CLI `deckent docs track scan|status|sync`; CI-gate
-    (CRITICAL_STALE→non-zero); MCP/dashboard health.
-  </tracking>
-  <user-project rule="track-not-write">deckent does NOT auto-write project-specific
-    docs — AI tools do; deckent tracks which are stale/current via the DB.</user-project>
-</managed-docs>
+<core-gen scope="deckent-core-only" mode="minimal">
+  template-engine (ADR-030) + content-hash cache (ADR-031: fileHash+entryHash+sprintId,
+  sprint-aware) + i18n pattern layer (ADR-032). Generates only NECESSARY core docs
+  (not a bulk md-sweep) — the ADR-029 "universalization" reframed to minimal core-only.
+</core-gen>
 ```
+
+### 2. Self-update hook (absorbs ADR-046)
+
+```xml
+<self-update-hook>post-finalize step-ordering contract (memoryExport → adrInsert →
+  ruleRegen), UNCONDITIONAL invocation, ground-truth verification, and FS↔DB
+  BI-DIRECTIONAL sync (syncAdrFilesToDb forward + exportAdrsToFs reverse) — the
+  mechanism that makes the md+DB ADR-edit invariant safe (ADR-G-035).</self-update-hook>
+```
+
+### 3. Code-derived module-count — `countModules` (ADR-075 Part-C)
+
+Managed-docs counts are **code-derived, never hardcoded** — the architecture-map module
+table is generated live from the actual `src/` tree, so a doc count can never drift from
+reality (zero-hardcode / live-data law):
+
+```xml
+<module-count source="src/orchestra/managed-docs/content-generators.ts">
+  countModules(dir) counts live `.ts` modules per key dir (core · orchestra · agents ·
+  nervous · monitor · connectors · providers · api · mcp · cli) → emits the managed-docs
+  architecture module-count table from real file counts, never a hardcoded number.
+  Companion code-derived counters: mcpToolCount, cliCommandCount (registration-source
+  of truth). This is ADR-075 Part-C folded here (Parts A→ADR-G-032, B→ADR-G-006).
+</module-count>
+```
+
+### 4. Doc tracking & staleness (absorbs ADR-090)
+
+```xml
+<tracking scope="all-repos incl. user-project">
+  DCR (doc-rank, 0=most-critical) + body content-hash + last_updated + multi-signal
+  stale (content-drift + age + code-drift) in a separate doc_tracking table
+  (better-sqlite3, additive). CLI `deckent docs track scan|status|sync`; CI-gate
+  (CRITICAL_STALE→non-zero); MCP/dashboard health.
+</tracking>
+```
+
+### 5. User-project = track-not-write
+
+```xml
+<user-project rule="track-not-write">deckent does NOT auto-write project-specific
+  docs — AI tools do; deckent tracks which are stale/current via the DB.</user-project>
+```
+
+### 6. deckent-log rename (multi-mode)
 
 The "sprint-log" is renamed **"deckent-log"** and spans multiple modes (task/process/autonomous/flow/mission/sprint), not sprint-only.
 
@@ -1620,7 +1651,7 @@ The "sprint-log" is renamed **"deckent-log"** and spans multiple modes (task/pro
 ## References / Absorbed
 
 - **Absorbs:** ADR-029 + ADR-030 + ADR-031 + ADR-032 + ADR-046 + ADR-090.
-- **Cross-ref:** ADR-G-035 (DB sync invariant — the md+DB pair) · ADR-G-019 (ADR export) · ADR-G-004 (instruction-file adapter) · ADR-G-024 (modes — deckent-log multi-mode).
+- **Cross-ref:** ADR-G-035 (DB sync invariant — the md+DB pair) · ADR-G-019 (ADR export) · ADR-G-004 (instruction-file adapter) · ADR-G-024 (modes — deckent-log multi-mode) · ADR-075 Part-C (code-derived module-count `countModules` — folded here; Parts A→ADR-G-032, B→ADR-G-006).
 - **Born / MASTER-PLAN:** MANAGED-DOCS-MINIMIZE · DECKENT-LOG · I18N-6 (6-lang).
 - **Memory:** `project_docs_security_features_redoc` · `project_claude_md_doc_bloat_cleanup`.
 
@@ -1633,7 +1664,7 @@ The "sprint-log" is renamed **"deckent-log"** and spans multiple modes (task/pro
 
 # ADR-G-016: Product Vision — Product, Not Service
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** identity-constitution (every feature/decision validated against the 4 principles)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=identity-constitution — every feature/decision validated against the 4 inviolable principles (community-core = ALL features; local-first/free/privacy intact) → tomorrow=MOD-SPLIT-CLARIFY + MODULARIZE (deckent-solo/enterprise, single codebase, governance-depth NOT feature-gating) + CODE-LAYERS
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-033 (Product Vision — Product Not Service, + MOD-SPLIT amendment)
 **Crosswalk:** ADR-033 → ADR-G-016
 
@@ -1653,7 +1684,7 @@ Deckent is a **product, not a service** (old ADR-033, Sprint 134): a local-first
 
 ```xml
 <product-identity immutable="true">
-  <principle id="1">Product, not service — the core is NEVER mahkum (bound) to any cloud.</principle>
+  <principle id="1">Product, not service — the core is NEVER bound (captive) to any cloud.</principle>
   <principle id="2">Easy to install & run — "kur-çalıştır", anyone can.</principle>
   <principle id="3">Open-source, community-free — the community core is free (MIT).</principle>
   <principle id="4">Everyone, everywhere — solo user → largest enterprise; every OS/environment.</principle>
@@ -1813,7 +1844,7 @@ Sandboxed worker process (chroot/namespace) — over-complex, cross-platform-inc
 
 ## Intent / Roadmap (Tomorrow)
 
-- **Hard-enforce scope (V2).** The advisory scope check becomes a **hard block**: a write outside `scope.filesWrite` is denied, not merely warned. This rides the **ADR-G-020** Layer-2 enforcement upgrade (the ADR-094 flag-gated vein graduating to default-on, post-GA V2) plus a **TOOL-SCOPE** tool that makes scope analysis/approval/edit first-class and terminal-trackable.
+- **Hard-enforce scope (V2).** The advisory scope check becomes a **hard block**: a write outside `scope.filesWrite` is denied, not merely warned. This rides the **ADR-G-020** Layer-2 enforcement upgrade (the ADR-G-020 flag-gated vein graduating to default-on, post-GA V2) plus a **TOOL-SCOPE** tool that makes scope analysis/approval/edit first-class and terminal-trackable.
 - **Enterprise multi-tenancy as a modular layer.** Genuine SaaS multi-tenant isolation (per-tenant boundaries, k8s pod isolation, tenant-scoped audit) is built **on top** of this per-project model as the enterprise layer (**ADR-G-031**), never by relaxing it. multi-project remains the solo/local truth; multi-tenant is additive.
 - **FB-1 opt-in telemetry.** A consent-gated, default-OFF self-operation feedback loop (operation-metrics only, never project content) under **ADR-G-030** consent + the air-gapped pillar — wiring the sender that today deliberately does not exist.
 
@@ -1833,7 +1864,7 @@ Sandboxed worker process (chroot/namespace) — over-complex, cross-platform-inc
 - **Product boundary:** **ADR-G-016** (Product Vision — Product Not Service) — multi-tenant out-of-scope at the core; "install and run" principle.
 - **Config merge:** **ADR-G-001** (Layered Config & Scope Precedence) — global vs project mechanics.
 - **Secret system:** **ADR-G-005** (Secret File System & Zero-Worker-Exposure) — `.deck`/Ed25519; complementary to and distinct from Layer-2 AES-256-GCM credential encryption.
-- **Enforcement authority:** **ADR-G-020** (Authority, Roles, Flow & Enforcement) — advisory→hard scope flip (V1→V2, ADR-094 vein).
+- **Enforcement authority:** **ADR-G-020** (Authority, Roles, Flow & Enforcement) — advisory→hard scope flip (V1→V2, ADR-G-020 vein).
 - **Enterprise layer:** **ADR-G-031** (Enterprise Foundation) — multi-tenancy as a modular layer atop this model.
 - **Consent / telemetry:** **ADR-G-030** (Consent-Based Provisioning & Install) — FB-1 opt-in telemetry consent gate.
 - **Born work-items:** TOOL-SCOPE (scope analyze/approve/edit tool + hard-enforce), ENTERPRISE-MULTI-TENANCY (ADR-G-031 ENT-* modular layer), FB-1 (consent-gated opt-in telemetry sender).
@@ -1952,7 +1983,6 @@ The original 15 V1.0 channels — `BRAIN→WORKER:TASK_ASSIGN`, `WORKER→BRAIN:
 - **Cross-ref:** ADR-G-014 (Spawn Backend & Observation — cross-backend observability rests on this stream) · ADR-G-025 (Process Resilience & Live Observability — the PROGRESS / WORKER-LIVE-TRACE structured progress-stream) · ADR-G-022 (Nervous System — proactive triggers over the bus) · ADR-G-024 (Mode Architecture — per-mode channels) · ADR-G-019 (ADR Governance — DB-first storage / taxonomy).
 - **Born work-items:** APR (approval-channels) · COMM-2 (typed mediated-bus vocabulary) · PROGRESS naming-fix · per-mode channel completion.
 - **Direction:** `.analysis/adr-review-crosswalk.md` (row 035 → ADR-G-018).
-</content>
 
 
 ---
@@ -1963,7 +1993,7 @@ The original 15 V1.0 channels — `BRAIN→WORKER:TASK_ASSIGN`, `WORKER→BRAIN:
 
 # ADR-G-019: ADR Governance & 4-Layer Taxonomy
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=MADR-v3 + `lint:adr` validator + DB-first prompt-injection (structural/advisory) → tomorrow=ADR-G enforcement-engine (immutable runtime-validation via ADR-G-020 + ADR-094 flag-gated vein)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=MADR-v3 + `lint:adr` validator + DB-first prompt-injection (structural/advisory) → tomorrow=ADR-G enforcement-engine (immutable runtime-validation via ADR-G-020 + its flag-gated vein, old ADR-094)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-036 (ADR Governance Integration) · **Supersedes:** —
 **Crosswalk:** ADR-036 → ADR-G-019
 
@@ -2053,7 +2083,7 @@ deckent **observes** user ADRs (UG/UP) and **adheres** to them at every layer (w
 
 ## Intent / Roadmap (Tomorrow)
 
-- **ADR-G enforcement-engine:** today ADR-G is carried by injection + advisory validation; tomorrow it is **runtime-inviolable** — LLM output that would breach an ADR-G is blocked, not merely logged. The mechanism is the ADR-094 flag-gated enforcement vein graduating to default-on (post-GA-V2) under ADR-G-020's authority layer, plus a centralized policy engine candidate (POLICY-ENGINE-EVAL — OPA/Rego or embedded; ADR-D-005 reframe removed the minimal-dep blocker).
+- **ADR-G enforcement-engine:** today ADR-G is carried by injection + advisory validation; tomorrow it is **runtime-inviolable** — LLM output that would breach an ADR-G is blocked, not merely logged. The mechanism is the flag-gated enforcement vein (old ADR-094, now within ADR-G-020) graduating to default-on (post-GA-V2) under ADR-G-020's authority layer, plus a centralized policy engine candidate (POLICY-ENGINE-EVAL — OPA/Rego or embedded; ADR-D-005 reframe removed the minimal-dep blocker).
 - **ADR-U management surface:** users create/edit/retire ADR-UG/ADR-UP conversationally (native terminal + desktop app + CLI/MCP); deckent generates per-environment **customize-tools** to honor them and can contribute generalizable patterns back to the main repo.
 - **Install-wiring:** global install seeds ADR-G; `@dev` install adds ADR-D; user install opens the ADR-UG/UP skeleton. (MASTER-PLAN: ADR-LAYER.)
 - **Class/scope-aware vector recall:** ADR-G-035's opt-in local-embedding vector layer (never-calls-home) extends class/scope-aware retrieval to semantic matching.
@@ -2064,7 +2094,7 @@ deckent **observes** user ADRs (UG/UP) and **adheres** to them at every layer (w
 
 **(+)** Authority is now expressible: "user tightens but cannot violate G" is enforceable; contributor-only rules never leak to end users; immutable laws have a single trusted source. The review's 89→~42 consolidation is itself an application of this taxonomy (G vs D split). Today+tomorrow authoring keeps agents aligned with direction, not just current state.
 
-**(−)** Two intentional numbering gaps (G-003→absorbed in G-020, D-003→folded to G-014) — documented, not back-filled. The enforcement-engine (ADR-G inviolability) is roadmap, not today — today's protection is injection + advisory `lint:adr` + the ADR-094 dogfood vein. ADR-U management is a forward surface (MASTER-PLAN), so today only G/D are populated.
+**(−)** Two intentional numbering gaps (G-003→absorbed in G-020, D-003→folded to G-014) — documented, not back-filled. The enforcement-engine (ADR-G inviolability) is roadmap, not today — today's protection is injection + advisory `lint:adr` + the ADR-094 dogfood vein (now within ADR-G-020). ADR-U management is a forward surface (MASTER-PLAN), so today only G/D are populated.
 
 ---
 
@@ -2086,7 +2116,7 @@ deckent **observes** user ADRs (UG/UP) and **adheres** to them at every layer (w
 
 # ADR-G-020: Authority, Roles, Flow & Enforcement (Multi-Mode RBAC)
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=3-layer (compile-time lint + runtime advisory/soft + post-hoc audit-trail) → tomorrow=Layer-2 HARD-flip (ADR-094 flag-gated vein graduating default-on, post-GA-V2) + ROLE-GUARD (pid/role tool-enforce) + centralized policy-engine
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=3-layer (compile-lint + runtime-advisory + post-hoc audit-trail) → tomorrow=Layer-2 HARD-flip (ADR-094 vein → default-on, post-GA-V2) + ROLE-GUARD + policy-engine
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-037 (RBAC V1.0) + ADR-G-003 (Brain Role Separation, born 2026-06-30) + ADR-094 (Flag-Gated Enforcement Vein)
 **Crosswalk:** ADR-037 (+born G-003 + 094) → ADR-G-020
 
@@ -2163,7 +2193,7 @@ ADR-G-020 consolidates all three: the role/authority matrix, the Brain orchestra
 
 ### 3. Multi-Mode — role · flow · continuation
 
-The authority matrix applies across **every execution mode** — `task` / `process` / `autonomous` / `flow` / `mission` / `sprint` (universal naming per ADR-G-024; "sprint" jargon is being retired). For each mode the ADR documents the **role assignment + flow + continuation mechanism** — including the **autonomous** continuation (how Brain's role persists across an autonomous loop, how a long-running process resumes). The matrix is mode-agnostic at its core; modes differ only in which lifecycle actions are active and which approval tiers apply.
+The authority matrix applies across **every execution mode**. Today's three styles (ADR-G-024) are `sprint` / `task` / `process`; the roadmap mode-set adds `flow` / `mission` / `autonomous` (universal naming per ADR-G-024; "sprint" jargon is being retired). For each mode the ADR documents the **role assignment + flow + continuation mechanism** — including the **autonomous** continuation (how Brain's role persists across an autonomous loop, how a long-running process resumes). The matrix is mode-agnostic at its core; modes differ only in which lifecycle actions are active and which approval tiers apply.
 
 ### 4. User-Customizable Authority (within the G-baseline)
 
@@ -2261,9 +2291,12 @@ deckent runs in two fundamentally different modes: **dogfood** (deckent modifyin
     P4 USER PROJECTS = NO-OP (detectDeckentRepo=false → zero overhead).
   </policy>
   <live-value>the proven, live consumer is the ROLLBACK-GUARD: detectDeckentRepo gates
-    rollback.ts so deckent never `reset --hard`s its own git tree (self-git-mutation
-    protection). P1–P3 are largely dormant; in practice deckent-dev self-modifying runs
-    go through the manual dispatch path (ADR-D-007).</live-value>
+    rollback.ts at BOTH ends — createSafetyPoint becomes a no-op AND rollbackToSafetyPoint's
+    `git reset --hard` is skipped on deckent's own tree, so deckent can never wipe its own
+    uncommitted source (self-git-mutation protection; worker-rollback + the self-modifying
+    write-guard share the same gate). User projects get full rollback semantics
+    (detectDeckentRepo=false). P1–P3 are largely dormant; in practice deckent-dev
+    self-modifying runs go through the manual dispatch path (ADR-D-007).</live-value>
 </self-modify-detection>
 ```
 
@@ -2271,9 +2304,10 @@ deckent runs in two fundamentally different modes: **dogfood** (deckent modifyin
 
 ## Intent / Roadmap (Tomorrow)
 
-- **P1–P3 wire OR formalize-the-reality:** either wire the sequential-wave / Wave-0-gate / auto-checkpoint, OR formally adopt the ADR-D-007 manual-dispatch reality as the dogfood self-modify path (no silent dormancy).
-- **Global-install discrimination:** with deckent installed **globally** and used across N user projects, the "deckent's own repo ↔ every user project" discrimination becomes critical (the detector must be robust per-project).
-- **Merge with ROLE-GUARD** (ADR-G-020): the self-protection (don't mutate deckent's own code/git) and the Brain-never-codes boundary are the same self-protection family — pid/role + repo-detection enforced together at the tool layer.
+- **P1–P3 wire OR formalize-the-reality (SELFMOD-W).** Either *wire* the dormant policies into a first-class **self-modify execution lane** — P1 sequential dispatch (no parallel `tsc`-rebuild race on deckent's own `dist/`), P2 a Wave-0 `tsc && vitest` health-gate that must pass before any self-modifying worker spawns, P3 post-task auto-checkpoint so an MCP-restart / runtime-cache-invalidation resumes losslessly — OR *formally adopt* the ADR-D-007 manual-dispatch path as the sanctioned dogfood self-modify route. The bar is **no silent dormancy**: the chosen reality is documented, tested, and enforced, never left implicit.
+- **Global-install discrimination (every-environment law).** With deckent installed **globally** and orchestrating N user projects concurrently — macOS · Linux · Windows-native · WSL — the dogfood↔user decision is made per-process, per-project, potentially millions of times. `detectDeckentRepo` resolves per project-root (never process-global), and the `package.json name === 'deckent'` discriminator is hardened against rename/fork edge-cases with a stronger publisher-signed marker. A misclassification in *either* direction is a safety incident (self-protection skipped on the real repo, or a false-guard/overhead imposed on a user project) — so the detector is treated as a **security boundary**, not a convenience check.
+- **Unify with ROLE-GUARD (ADR-G-020).** Self-git-mutation protection (never `reset --hard` deckent's own tree), the Brain-never-codes orchestrator boundary, and self-modify detection are one **self-protection family** — converged at the tool/process layer: pid/role + repo-detection enforced together, structurally (not prompt-trusted). ROLE-GUARD becomes the single enforcement point where the orchestrator process is *unable* to mutate deckent's own source/git regardless of what any LLM emits.
+- **Compose with multi-project isolation (ADR-G-017).** The dogfood↔user boundary shares the project-boundary substrate with the four isolation layers (directory + cred-encryption + scope-boundary + config-boundary); the discrimination and the isolation guards compose so a worker in user-project-A can never reach deckent's core, its git, or another tenant's tree.
 
 ---
 
@@ -2301,7 +2335,7 @@ deckent runs in two fundamentally different modes: **dogfood** (deckent modifyin
 
 # ADR-G-022: Nervous System — Proactive Meta-Orchestrator
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** locked safety-floor (5 actions never auto) + controlled activation
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=locked safety-floor (5 actions never auto) + config-gated opt-in (default-off) → tomorrow=non-blocking controlled activation + ApprovalBroker-unified approval (runtime-wide)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-040 (Nervous System Architecture)
 **Crosswalk:** ADR-040 → ADR-G-022
 
@@ -2422,6 +2456,8 @@ Sprint 148 shipped the reform package: archive `test-writer`, add `testing-exper
 
 The taxonomy itself (vertical/horizontal, test=skill) is sound and durably enforced — `test-writer` stays at 0 assignments across post-reform sprints (148: 0/27, 150: 0/38). But the *distribution-balance* goal has **chronically recurred**: `test-writer`'s monopoly was periodically replaced by `refactorer`-weight (e.g. Sprint 211: 12/16). That imbalance is mitigated — not solved — by multi-signal scoring and skill→agent affinity (now both inside **ADR-G-006**); the 40% threshold remains a continuously-monitored advisory target, not a guarantee.
 
+> **Threshold reconciliation (40% vs ≤60%):** these are **two distinct mechanisms at two layers**, not a contradiction. **40%** is the post-hoc `AgentRoutingHealth` *advisory alarm* (the ADR-G-022 detector *warns* when any agent exceeds ~40% of assignments — it never blocks). **≤60%** is the in-selection *diversity-guard* inside ADR-G-006 — it down-weights an agent approaching ~60% share at route-time. The detector warns earlier (40%) than the guard caps (≤60%); the detector only observes, the guard actively shapes the next selection.
+
 ---
 
 ## Intent / Roadmap (Tomorrow)
@@ -2492,6 +2528,8 @@ deckent runs work in distinct execution paradigms. ADR-042 shipped a dual mode (
 </mode-architecture>
 ```
 
+> **Clarification — "autonomous" has distinct referents (ties to AUTO-NAMING):** (1) the **autonomous *engine*** (`src/orchestra/autonomous/`) is the agentic *runtime of `process` mode* — NOT a separate `deckent_style` today (`process` is the style; the autonomous engine is *how* a process runs). (2) **autonomous as a roadmap *mode*** is the named member of the future comprehensive mode-set (flow / mission / autonomous). (3) **`deckent mode auto`** is a third, unrelated thing — the sprint|task auto-*detect* selector. These three "auto/autonomous" usages are disambiguated under the MODE-RENAME (born **AUTO-NAMING**), so a user is never left guessing which "auto" they invoked.
+
 > **Note — two open accept-day decisions (carried from ADR-067):** (1) **tenant-threading** — `resolveTenant` is 0-caller (dormant); tenant landed differently (config-flag `strict_tenant` + memory `tenant_id` column + audit-scope). Either wire `TenantContext`-threading OR amend the decision to the realized shape — not both. (2) **AUTO-NAMING** — `deckent mode auto` (sprint|task auto-DETECT) vs "autonomous engine" (the always-running process runtime) are two different "auto"s → user-confusion risk; clarify under the rename.
 
 ---
@@ -2529,7 +2567,7 @@ deckent runs work in distinct execution paradigms. ADR-042 shipped a dual mode (
 
 # ADR-G-025: Process Resilience, Recovery & Live Observability
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** runtime contract (crash-handlers installed at boot; persistence + recovery mandatory)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=runtime contract (crash-handlers at boot + atomic checkpoint + phase/eval persistence; recovery mandatory) → tomorrow=provider-failover + auditor-approved takeover + WORKER-LIVE-TRACE stream
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-043 (Brain Crash Recovery) + ADR-044 (State Observability Contract) + ADR-047 Brain-death-procedure aspect
 **Crosswalk:** ADR-043 + ADR-044 → ADR-G-025
 
@@ -2626,7 +2664,7 @@ A formal procedure for Brain death: fallback/retry **steps at system AND user le
 
 # ADR-G-026: Dependency-Wave Execution & Control
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** dispatch contract (continuous per-tick; legacy-FIFO escape)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=dispatch contract (Kahn-topological dep-resolution + continuous per-tick; legacy-FIFO escape) → tomorrow=DEP-TOOL (terminal dependency control, DIRECTIVES-independent) + planDispatch wire (ADR-064-W)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-045 (Wave-Based Execution Semantics) + ADR-064 (TOPP Continuous Dispatch)
 **Crosswalk:** 045 (+064) → ADR-G-026
 
@@ -2699,7 +2737,7 @@ Multi-task work executes in dependency order. ADR-045 wired `respawnEligibleTask
 
 ## Context
 
-A worker prompt has two intertwined concerns: where it physically lives (tmpfile lifecycle) and what it semantically contains (context). ADR-048 defined the **tmpfile lifecycle** — `.prompt-*.txt`/`.worker-*.sh` write→persist→archive across all three spawn backends, with active-worker protection (a per-worker kill must not delete a live worker's prompt) — plus a content layer: **no truncation** (full skill + full ADR injection; prompt-completeness > token-saving). ADR-060 ("masterpiece") defined the **5-channel worker-context** (init / sync / memory / manifest / skill-declare / enrichment) that composes the prompt, and explicitly flagged the **token-budget** trade-off. The 2026-06-30 review unifies them.
+A worker prompt has two intertwined concerns: where it physically lives (tmpfile lifecycle) and what it semantically contains (context). ADR-048 defined the **tmpfile lifecycle** — `.prompt-*.txt`/`.worker-*.sh` write→persist→archive across all three spawn backends, with active-worker protection (a per-worker kill must not delete a live worker's prompt) — plus a content layer: **no truncation** (full skill + full ADR injection; prompt-completeness > token-saving). ADR-060 ("masterpiece") defined the **5-channel worker-context** (init / sync / manifest / skill-declare / enrichment) that composes the prompt, and explicitly flagged the **token-budget** trade-off. The 2026-06-30 review unifies them.
 
 ---
 
@@ -2764,7 +2802,7 @@ The token cost of full-content + multi-channel context is real (noticed in ADR-0
 
 # ADR-G-028: Work Taxonomy (TaskKind × TechStack) & Evaluation
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** gaming-proof (Object.freeze registries; scope-shape detection) + EffectClass → policy-gate
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=gaming-proof (Object.freeze registries; scope-shape detection, not title/description) + EffectClass→policy-gate (WM-6 PARK for risky classes) → tomorrow=EffectClass→runtime ApprovalBroker (critical-irreversible) + expanded TaskKind set + user-custom kinds (ADR-UG/UP)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-053 (TaskType Taxonomy) + ADR-055 (Hybrid Scoring 5-Layer Pipeline)
 **Crosswalk:** 053 (+055) → ADR-G-028
 
@@ -2774,7 +2812,7 @@ The token cost of full-content + multi-channel context is real (noticed in ADR-0
 
 ## Context
 
-deckent must know *what kind* of work a task is, to judge it correctly and gate it safely. ADR-053 defined 3 TaskTypes (audit / document-write / code-development) with scope-shape detection + an EffectClass (reversibility tag) — the canonical work-model (WM-2 `work-model.ts`), extended to a second axis TechStackKind (WM-7). ADR-055 proposed a 5-layer Hybrid Scoring pipeline; the formal pipeline was never built, but its goals were realized organically (honest-gate, criteria-deriver, EffectClass→policy-gate, XVER-1, ADR-070). The 2026-06-30 review unifies the taxonomy + evaluation and commits to expanding the type set.
+deckent must know *what kind* of work a task is, to judge it correctly and gate it safely. ADR-053 defined 3 TaskTypes (audit / document-write / code-development) with scope-shape detection + an EffectClass (reversibility tag) — the canonical work-model (WM-2 `work-model.ts`), extended to a second axis TechStackKind (WM-7). ADR-055 proposed a 5-layer Hybrid Scoring pipeline; the formal pipeline was never built, but its goals were realized organically (honest-gate, criteria-deriver, EffectClass→policy-gate, XVER-1, ADR-G-009). The 2026-06-30 review unifies the taxonomy + evaluation and commits to expanding the type set.
 
 ---
 
@@ -3052,9 +3090,9 @@ Silent auto-install (no consent) — violates user trust and the security DNA. K
 
 # ADR-G-031: Enterprise Foundation (Tenant · RBAC · Audit · Scheduled-Flows · Connector-Identity)
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** opt-in (enterprise-config default-off) → governance-depth layer (ADR-G-016)
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-068 (Enterprise Foundation) + ADR-069 (Event-Driven Triggers + RBAC) + ADR-071 Part-F4 (RBAC hierarchy + audit-writer + enterprise-config) + ADR-092 (Connector Social Identity RBAC)
-**Crosswalk:** 068 (+069+071F4+092) → ADR-G-031
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=opt-in (enterprise-config default-off; community byte-identical) → tomorrow=god-level enterprise governance-depth layer (ADR-G-016 MOD-SPLIT; ENT-* gaps in the modular enterprise layer)
+**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-068 (Enterprise Foundation) + ADR-069 (Event-Driven Triggers + RBAC) + ADR-071 Part-F4 (RBAC hierarchy + audit-writer + enterprise-config) + ADR-074 Part-B (enterprise RBAC-enforce + audit-export + rate-limiter + RBAC-CLI) + ADR-092 (Connector Social Identity RBAC)
+**Crosswalk:** 068 (+069+071F4+074B+092) → ADR-G-031
 
 > **Note (Alperen, 2026-06-30):** This foundation takes its FINAL form inside the enterprise layer (MOD-SPLIT / deck-ent). The community core has the same functionality; enterprise = depth of governance/audit/management (ADR-G-016), not gated features.
 
@@ -3077,6 +3115,9 @@ To run deckent in enterprise environments — multi-tenant, audited, role-contro
     enterprise-endpoint, rbac CLI).</rbac>
   <audit>writeAuditEvent + queryAudit (RBAC-gated) + HMAC chain (audit_prev_hmac/audit_hmac)
     + audit-integrity + SIEM HTTP transport + exportAuditLog (SOC2/GDPR JSON/CSV).</audit>
+  <rate-limit>TenantRateLimiter — per-tenant token-bucket quota guard (checkLimit(tenantId,
+    action) → allow/deny; maxConcurrent per rolling window, auto-reset). Live snapshot at
+    GET /api/enterprise/rate; admin-only rule CRUD persisted in config (per-action limits = V2).</rate-limit>
   <flows>scheduled-flow (full-cron nextRun) + flow-registry + event-trigger/matchTrigger
     (webhook/event match) → autonomous engine bridge.</flows>
   <connector-identity scope="external messaging surface" model="fail-CLOSED, opt-in">
@@ -3111,7 +3152,7 @@ The foundation is real engineering (OIDC security, HMAC chain, guarded surfaces)
 
 ## Consequences
 
-**(+)** A real, opt-in, multi-tenant + RBAC + audit + scheduled + connector-identity enterprise foundation, all live and consumer-wired, byte-identical for community users. Connector-surface RBAC is fail-closed (stronger than the internal advisory layer) — safe for multi-user messaging deployments.
+**(+)** A real, opt-in, multi-tenant + RBAC + audit + rate-limit + scheduled + connector-identity enterprise foundation, all live and consumer-wired, byte-identical for community users. Connector-surface RBAC is fail-closed (stronger than the internal advisory layer) — safe for multi-user messaging deployments.
 
 **(−)** Six mapped gaps to god-level enterprise (management-plane, custom-RBAC, hard-enforce-V2, k8s-tenant, SCIM-push, audit-export) — all in the enterprise layer, not today. HTTP webhook-listener (069 AUT-2) unbuilt. Hard-enforcement is roadmap (ADR-G-020 vein).
 
@@ -3119,7 +3160,7 @@ The foundation is real engineering (OIDC security, HMAC chain, guarded surfaces)
 
 ## References / Absorbed
 
-- **Absorbs:** ADR-068 + ADR-069 + ADR-071 Part-F4 + ADR-092.
+- **Absorbs:** ADR-068 + ADR-069 + ADR-071 Part-F4 + ADR-074 Part-B + ADR-092.
 - **Cross-ref:** ADR-G-016 (enterprise = governance depth, MOD-SPLIT) · ADR-G-020 (internal authority — distinct from connector L2) · ADR-G-024 (process/tenant) · ADR-G-017 (multi-project isolation) · ADR-G-007 (connectors) · ADR-G-035 (tenant_id/audit-hmac).
 - **Born / MASTER-PLAN:** ENT-* (god-level gaps) · MODULARIZE · AUT-2 (webhook-listener) · dynamic /bind (connector pairing→binding).
 - **Memory:** `project_social_identity_rbac_engine` · `project_deckent_positioning`.
@@ -3133,7 +3174,7 @@ The foundation is real engineering (OIDC security, HMAC chain, guarded surfaces)
 
 # ADR-G-032: Self-Learning & Evolution Loop
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** moat-preserve (the closed outcome→routing→promotion loop must not be rewritten — only deepened)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=moat-preserve (the closed outcome→routing→promotion loop must not be rewritten — only deepened) + requiresApproval-gated identity-mutation (nervous checkpoint; no mid-run mutation) → tomorrow=selective+scalable update (only used agents/skills, indexed/lazy at 300-agent/1000-skill) + auto-apply after the advisory-proof phase
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-074 Part-C (F5 evolution wire) + ADR-075 Part-A (6 evolution-module real callers) + ADR-078 Part-C (Active Identity-Mutation Loop)
 **Crosswalk:** 074C + 075A + 078C → ADR-G-032
 
@@ -3225,7 +3266,7 @@ All wired with real external callers (ADR-075A) — the loop *runs*, not just ex
 
 Through Sprints 215–221 the dashboard was driven from a functional-skeleton to a god-level surface, but every step exposed the gap between *files-on-disk* and *user-reachable, freeze-free, live* — exactly the `wired ≠ working` law (ADR-G-009). A real-binary browser audit (`npx deckent serve`, 2026-06-01) and follow-up run-verify passes surfaced a cluster of defects that a no-MVP product (ADR-G-016) cannot ship:
 
-- **Sprint-start froze the dashboard.** `src/api/server.ts` called `runSprint(...)` *inside* the `POST /api/start` HTTP handler. `runSprint` is a long-running async operation that blocked the Node.js event loop, so the serve process stopped answering any further HTTP request — the UI fell into an unrecoverable skeleton-loading state. ADR-079's smoke gate did not cover the sprint-start path, so the freeze went undetected until a manual session.
+- **Sprint-start froze the dashboard.** `src/api/server.ts` called `runSprint(...)` *inside* the `POST /api/start` HTTP handler. `runSprint` is a long-running async operation that blocked the Node.js event loop, so the serve process stopped answering any further HTTP request — the UI fell into an unrecoverable skeleton-loading state. ADR-G-009's smoke gate did not cover the sprint-start path, so the freeze went undetected until a manual session.
 - **Hollow pages.** Sprint 215 wrote four page files (`EvolutionPage`, `NervousPage`, `EnterprisePage`, `MemoryExplorerPage`) to disk, but `App.tsx` carried only 7 routes and `Sidebar.tsx` only 6 links — none of the four were reachable. A DONE verdict based on file-existence, not navigation, is a Tier-1 wire-gap by ADR-G-009.
 - **Chat was status-only.** `ChatPage.tsx` dispatched every message to the `status` intent regardless of input; the real `POST /api/chat` round-trip was never called from the browser.
 - **Static worker grid + stale status.** `WorkerGrid` loaded a fixed first-6 and never reflected later spawn/done transitions; `StatusPage` showed done work as still "working"; `History` always reported 0% coverage; the debt page had no filter; `EnterprisePage` showed empty data without an injected Bearer token; an auditor alert ("CLAUDE.md not updated") repeated as SPAM.
@@ -3327,8 +3368,6 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
   - **ADR-G-016** (Product Vision) / **ADR-G-010** (Output, Terminal-UX & Brand) — god-level / no-MVP bar; no-emoji + lucide-react + shared theme tokens.
 - **Born work-items:** **DASH** (serve-token-inject · routing chart · control-panel surfacing · onboarding view — from old 072/073/076 side-items) · **Chat/Dashboard product-sprint** (chat-HOLLOW · duplicate-sidebar · alert-spam · enterprise-CRUD) · **DESK-1** (Desktop app) — all to MASTER-PLAN.
 - **Direction:** `.analysis/adr-review-crosswalk.md` (rows 080/078/082/083), `.analysis/hermes-vs-deckent-direction-decisions.md`, memory `project_hermes_deckent_direction_2026_06` · `project_dashboard_chat_audit_20260611` · `feedback_dashboard_no_emoji_lucide` · `feedback_governance_aligns_with_direction_pivot`.
-</content>
-</invoke>
 
 
 ---
@@ -3339,11 +3378,11 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
 
 # ADR-G-034: Native Agentic Terminal
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** product-surface contract (bare `deckent` = native agentic terminal; risky actions confirm-gated)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=product-surface contract (bare `deckent` = native agentic terminal; risky actions confirm-gated) → tomorrow=TOOL progressive-disclosure + in-terminal WORKER-LIVE-TRACE + runtime-wide ApprovalBroker + scope-via-TOOL enforcement
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-081 (Native Agentic Deckent) + ADR-074 Part-A (native-chat round-trip) + ADR-082 Part-A (real-LLM-wire) + ADR-083 (REPL-UX + provider-parity + local-model) + ADR-086 (Native CLI Parity F11)
 **Crosswalk:** 081 (+074A+082A+083+086) → ADR-G-034
 
-> **Pivot note (2026-06-29):** The terminal is deckent's **PRIMARY management + usage surface** — tool-driven, full-control + non-tiring, full-functionality (flexibility is not acceptable). Work happens *from the terminal*, not via memorized CLI subcommands — but without forcing it (CLI/MCP remain optional access). At the level of Claude Code / Hermes / Codex / OpenClaw. The dashboard (ADR-G-033) is observability-only; the terminal is where you *do*.
+> **Pivot note (2026-06-29):** The terminal is deckent's **PRIMARY management + usage surface** — tool-driven, full-control + non-tiring, full-functionality is non-negotiable (flexibility/cutting-corners is not acceptable). Work happens *from the terminal*, not via memorized CLI subcommands — but without forcing it (CLI/MCP remain optional access). At the level of Claude Code / Hermes / Codex / OpenClaw. The dashboard (ADR-G-033) is observability-only; the terminal is where you *do*.
 
 ---
 
@@ -3420,11 +3459,11 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
 
 # ADR-G-035: Memory Architecture (DB-First, FTS5, Self-Learning Substrate)
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** sync-invariant (any write keeps content_norm + FTS5 + entry_history + audit_hmac consistent; direct SQL UPDATE forbidden)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=sync-invariant (any write keeps content_norm + FTS5 + entry_history + audit_hmac consistent; direct SQL UPDATE forbidden) + additive backup-guarded taxonomy migration (never a destructive rebuild) → tomorrow=opt-in local-embedding vector layer (sqlite-vec, never-calls-home) + scope-layers (MEM-2) + index/SLA (MEM-3)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-088 (Memory V2 — DB-First) · **Supersedes:** ADR-009 (DEBT.md markdown table — archived)
 **Crosswalk:** ADR-088 → ADR-G-035
 
-> **Substrate note:** This is the storage substrate the rest of the governance stands on — ADR-G-019 (class-aware ADR storage/recall/injection), ADR-G-032 (self-learning loop), and the LEARNINGS-QUALITY work all read/write through it. Its schema is **extended here to carry the 4-layer ADR taxonomy** (`adr_class`/`scope`/`immutable`/`source`/`enforcement_level`).
+> **Substrate note:** This is the storage substrate the rest of the governance stands on — ADR-G-019 (class-aware ADR storage/recall/injection), ADR-G-032 (self-learning loop), and the LEARNINGS-QUALITY work all read/write through it. Its schema is **extended here to carry the 4-layer ADR taxonomy** (`adr_class`/`scope`/`immutable`/`source_authority`/`enforcement_level`).
 
 ---
 
