@@ -1,7 +1,7 @@
 # ADR-D-007: Manual Subagent Dispatch (Dogfood Survival-Fallback)
 
 **Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=Alperen review-gate (`git diff --stat` per subagent) + worktree isolation + TDD skip-count baseline (manual, dogfood-only) → tomorrow=parity with Brain-autonomous primary; this protocol stays as the last-resort
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-047 (Manuel Subagent Dispatch Protocol) · **Supersedes:** —
+**Status:** accepted (survival-fallback — documented parity-gaps in Roadmap) · **Date:** 2026-06-30 · **Absorbs:** ADR-047 (Manuel Subagent Dispatch Protocol) · **Supersedes:** —
 **Crosswalk:** ADR-047 → ADR-D-007 (Brain-Death automated *procedure* split out → ADR-G-025)
 
 > **Role note (2026-06-30 reframe):** This protocol is **demoted from "primary operating mode" → "survival-fallback."** Brain-autonomous orchestration (`deckent plan --structured && deckent start`) is the primary path (live since ~Sprint 270). This manual, human-guided worktree-repair protocol is the **last resort** — when Brain is broken/unreliable or the autonomous flow deadlocks (it was used in Sprint 280). The *automated* Brain-DEATH recovery PROCEDURE (provider-failover / retry / `finalize --force`) is **not** here — it lives in **ADR-G-025**. ADR-D-007 is only the dogfood manual repair protocol.
@@ -32,17 +32,17 @@ The hardened manual subagent dispatch protocol (dogfood survival-fallback) rests
 
 ## Intent / Roadmap (Tomorrow)
 
-Brain-autonomous remains the primary path; the seven principles have **largely reached parity** with it, which is exactly why this protocol is now a fallback rather than the default:
+Brain-autonomous remains the primary path; the seven principles have **reached parity with documented gaps** (the **Gap / caveat** column below) — enough that this protocol is now a fallback rather than the default, but the gaps are exactly why it retains real safety value (above all the still-open WORKTREE-MERGE-RACE):
 
-| ADR-D-007 principle | Brain-autonomous parity (today) |
-|---------------------|----------------------------------|
-| Worktree isolation | spawn-time isolation |
-| File authority matrix | `scope.filesWrite` + advisory auditor (ADR-G-020 V1.0) |
-| TDD / eval gate | Brain GO/NO_GO + CC disk-verify close-out |
-| Wave structure | `dependency_pipeline_enabled=true` (live multi-wave) |
-| Wave 1.5 serial gate | `deckent_checkpoint` + human-approved sprint-start |
-| Lock pattern | `.locks/` + spawn-time lock |
-| Manual survival fallback | `deckent recover` / `deckent run` + CC manual intervention |
+| ADR-D-007 principle | Brain-autonomous parity (today) | Gap / caveat (code-grounded) |
+|---|---|---|
+| Worktree isolation | spawn-time isolation | **MOAT-1 WORKTREE-MERGE-RACE (P0, open 🔴): the autonomous merge dropped 3/11 source-merges at 8-wide — manual worktree isolation is still strictly safer.** |
+| File authority matrix | `scope.filesWrite` + auditor (ADR-G-020 V1.0) | **Enforcement is uneven: the agentic worker *hard-rejects* out-of-scope write/edit (`scope-guard.ts`); tmux/legacy spawn is *advisory* (auditor `git diff --stat`, warn-not-block). Uniformity tracked as TOOL-SCOPE.** |
+| TDD / eval gate | Brain GO/NO_GO + CC disk-verify close-out | **`tests_skipped_added:0` is a MANUAL review-gate only — the auditor gates on fail-delta (`delta.fail>0`), not skip-delta. Not yet an automatic Brain gate (skip-gate-decision).** |
+| Wave structure | `dependency_pipeline_enabled=true` (live multi-wave) | Live (config `true`). ⚠ `docs/guide/config-recovery.md` still pushes the legacy `false` — user-facing drift (CONFIG-RECOVERY-FIX). |
+| Wave 1.5 serial gate | `deckent_checkpoint` + human-approved sprint-start | **CLI vs MCP diverge: MCP rejects re-decide of a non-pending checkpoint; the CLI helper writes status unconditionally (CHECKPOINT-PARITY).** |
+| Lock pattern | `.locks/` + spawn-time lock | parity |
+| Manual survival fallback | `deckent recover` / `deckent run` + CC manual intervention | parity — Principle-7 is permanent value (used in Sprint 280) |
 
 This ADR stays **accepted (deliberately not deprecated):** Principle-7 (Manual Survival Fallback) carries permanent value and **was actually used in Sprint 280** (worker-timeout deadlock → `TaskStop` + manual sprint-state finalize + hand-corrections). The *automated* Brain-DEATH procedure — provider-failover (Claude → OpenAI/Codex, lossless), escalation (autonomous → approved-retry → kill), and the `finalize --force` trigger — is the forward surface and lives in **ADR-G-025** (BRAIN-DEATH-PROCEDURE work-item; see [[feedback_finalize_force_orphan_state]]).
 
@@ -52,7 +52,7 @@ This ADR stays **accepted (deliberately not deprecated):** Principle-7 (Manual S
 
 **(+)** Zero sprint abandonment across 23+ repair incidents; a documented, repeatable last-resort that Alperen and Brain don't have to re-invent under pressure; worktree isolation makes parallel repair safe (8 subagents, no conflict — Sprint 168 dogfood proof); the TDD gate prevents regression (baseline skip count held).
 
-**(−)** Human-intensive — the review gate requires manual approval per subagent and the Wave 1.5 serial gate adds time. Worktree management is overhead (9 worktrees + cleanup; forgotten worktrees consume disk). And it is now *only* a fallback — the primary path is Brain-autonomous, so this protocol is exercised rarely and must be kept current against drift.
+**(−)** Human-intensive — the review gate requires manual approval per subagent and the Wave 1.5 serial gate adds time. Worktree management is overhead (9 worktrees + cleanup; forgotten worktrees consume disk). And it is now *only* a fallback — the primary path is Brain-autonomous, so this protocol is exercised rarely and must be kept current against drift. **Parity is real but not complete: the Roadmap table documents five gaps** — the open WORKTREE-MERGE-RACE (MOAT-1), uneven scope-enforcement (agentic-hard vs tmux-advisory), a manual-only skip-gate, CLI/MCP checkpoint divergence, and a `config-recovery.md` doc still pushing the legacy flag.
 
 ---
 
@@ -61,4 +61,4 @@ This ADR stays **accepted (deliberately not deprecated):** Principle-7 (Manual S
 - **Absorbs:** ADR-047 (Manuel Subagent Dispatch Protocol — 7 principles + Sprint-168 hardening + Sprint-281 role reframe to survival-fallback).
 - **Split out:** the automated Brain-DEATH recovery **procedure** (failover / retry / `finalize --force`) → **ADR-G-025** (Process Resilience, Recovery & Live Observability).
 - **Cross-ref:** ADR-G-020 (Authority Matrix — file-authority / RBAC; the manual review gate is its dogfood form), ADR-G-014 (Spawn Backend, Options & Observation — worktree/spawn isolation), ADR-G-026 (Dependency-Wave Execution — `dependency_pipeline_enabled`), ADR-G-018 (Verification Protocol — the `.result` contract), ADR-046 → ADR-G-015 (finalize hook chain), ADR-G-019 (ADR-D convention under the taxonomy).
-- **Born work-item:** BRAIN-DEATH-PROCEDURE (ADR-G-025 + this ADR), tied to [[feedback_finalize_force_orphan_state]].
+- **Born work-items:** BRAIN-DEATH-PROCEDURE (ADR-G-025 + this ADR), tied to [[feedback_finalize_force_orphan_state]] · **CONFIG-RECOVERY-FIX** (`config-recovery.md` `dependency_pipeline_enabled=false` → document as legacy/fallback, not the default) · **CHECKPOINT-PARITY** (CLI add the MCP pending-guard, or declare MCP the canonical checkpoint surface) · **skip-gate-decision** (`tests_skipped_added` — keep manual-only and say so, or wire skip-delta into the auditor gate) · scope-enforcement uniformity → **TOOL-SCOPE**.

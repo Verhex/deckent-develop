@@ -528,7 +528,7 @@ Dead/dormant code is disposed of by a **design pass, not a mechanical delete** (
 # ADR-D-007: Manual Subagent Dispatch (Dogfood Survival-Fallback)
 
 **Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=Alperen review-gate (`git diff --stat` per subagent) + worktree isolation + TDD skip-count baseline (manual, dogfood-only) → tomorrow=parity with Brain-autonomous primary; this protocol stays as the last-resort
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-047 (Manuel Subagent Dispatch Protocol) · **Supersedes:** —
+**Status:** accepted (survival-fallback — documented parity-gaps in Roadmap) · **Date:** 2026-06-30 · **Absorbs:** ADR-047 (Manuel Subagent Dispatch Protocol) · **Supersedes:** —
 **Crosswalk:** ADR-047 → ADR-D-007 (Brain-Death automated *procedure* split out → ADR-G-025)
 
 > **Role note (2026-06-30 reframe):** This protocol is **demoted from "primary operating mode" → "survival-fallback."** Brain-autonomous orchestration (`deckent plan --structured && deckent start`) is the primary path (live since ~Sprint 270). This manual, human-guided worktree-repair protocol is the **last resort** — when Brain is broken/unreliable or the autonomous flow deadlocks (it was used in Sprint 280). The *automated* Brain-DEATH recovery PROCEDURE (provider-failover / retry / `finalize --force`) is **not** here — it lives in **ADR-G-025**. ADR-D-007 is only the dogfood manual repair protocol.
@@ -559,17 +559,17 @@ The hardened manual subagent dispatch protocol (dogfood survival-fallback) rests
 
 ## Intent / Roadmap (Tomorrow)
 
-Brain-autonomous remains the primary path; the seven principles have **largely reached parity** with it, which is exactly why this protocol is now a fallback rather than the default:
+Brain-autonomous remains the primary path; the seven principles have **reached parity with documented gaps** (the **Gap / caveat** column below) — enough that this protocol is now a fallback rather than the default, but the gaps are exactly why it retains real safety value (above all the still-open WORKTREE-MERGE-RACE):
 
-| ADR-D-007 principle | Brain-autonomous parity (today) |
-|---------------------|----------------------------------|
-| Worktree isolation | spawn-time isolation |
-| File authority matrix | `scope.filesWrite` + advisory auditor (ADR-G-020 V1.0) |
-| TDD / eval gate | Brain GO/NO_GO + CC disk-verify close-out |
-| Wave structure | `dependency_pipeline_enabled=true` (live multi-wave) |
-| Wave 1.5 serial gate | `deckent_checkpoint` + human-approved sprint-start |
-| Lock pattern | `.locks/` + spawn-time lock |
-| Manual survival fallback | `deckent recover` / `deckent run` + CC manual intervention |
+| ADR-D-007 principle | Brain-autonomous parity (today) | Gap / caveat (code-grounded) |
+|---|---|---|
+| Worktree isolation | spawn-time isolation | **MOAT-1 WORKTREE-MERGE-RACE (P0, open 🔴): the autonomous merge dropped 3/11 source-merges at 8-wide — manual worktree isolation is still strictly safer.** |
+| File authority matrix | `scope.filesWrite` + auditor (ADR-G-020 V1.0) | **Enforcement is uneven: the agentic worker *hard-rejects* out-of-scope write/edit (`scope-guard.ts`); tmux/legacy spawn is *advisory* (auditor `git diff --stat`, warn-not-block). Uniformity tracked as TOOL-SCOPE.** |
+| TDD / eval gate | Brain GO/NO_GO + CC disk-verify close-out | **`tests_skipped_added:0` is a MANUAL review-gate only — the auditor gates on fail-delta (`delta.fail>0`), not skip-delta. Not yet an automatic Brain gate (skip-gate-decision).** |
+| Wave structure | `dependency_pipeline_enabled=true` (live multi-wave) | Live (config `true`). ⚠ `docs/guide/config-recovery.md` still pushes the legacy `false` — user-facing drift (CONFIG-RECOVERY-FIX). |
+| Wave 1.5 serial gate | `deckent_checkpoint` + human-approved sprint-start | **CLI vs MCP diverge: MCP rejects re-decide of a non-pending checkpoint; the CLI helper writes status unconditionally (CHECKPOINT-PARITY).** |
+| Lock pattern | `.locks/` + spawn-time lock | parity |
+| Manual survival fallback | `deckent recover` / `deckent run` + CC manual intervention | parity — Principle-7 is permanent value (used in Sprint 280) |
 
 This ADR stays **accepted (deliberately not deprecated):** Principle-7 (Manual Survival Fallback) carries permanent value and **was actually used in Sprint 280** (worker-timeout deadlock → `TaskStop` + manual sprint-state finalize + hand-corrections). The *automated* Brain-DEATH procedure — provider-failover (Claude → OpenAI/Codex, lossless), escalation (autonomous → approved-retry → kill), and the `finalize --force` trigger — is the forward surface and lives in **ADR-G-025** (BRAIN-DEATH-PROCEDURE work-item; see [[feedback_finalize_force_orphan_state]]).
 
@@ -579,7 +579,7 @@ This ADR stays **accepted (deliberately not deprecated):** Principle-7 (Manual S
 
 **(+)** Zero sprint abandonment across 23+ repair incidents; a documented, repeatable last-resort that Alperen and Brain don't have to re-invent under pressure; worktree isolation makes parallel repair safe (8 subagents, no conflict — Sprint 168 dogfood proof); the TDD gate prevents regression (baseline skip count held).
 
-**(−)** Human-intensive — the review gate requires manual approval per subagent and the Wave 1.5 serial gate adds time. Worktree management is overhead (9 worktrees + cleanup; forgotten worktrees consume disk). And it is now *only* a fallback — the primary path is Brain-autonomous, so this protocol is exercised rarely and must be kept current against drift.
+**(−)** Human-intensive — the review gate requires manual approval per subagent and the Wave 1.5 serial gate adds time. Worktree management is overhead (9 worktrees + cleanup; forgotten worktrees consume disk). And it is now *only* a fallback — the primary path is Brain-autonomous, so this protocol is exercised rarely and must be kept current against drift. **Parity is real but not complete: the Roadmap table documents five gaps** — the open WORKTREE-MERGE-RACE (MOAT-1), uneven scope-enforcement (agentic-hard vs tmux-advisory), a manual-only skip-gate, CLI/MCP checkpoint divergence, and a `config-recovery.md` doc still pushing the legacy flag.
 
 ---
 
@@ -588,7 +588,7 @@ This ADR stays **accepted (deliberately not deprecated):** Principle-7 (Manual S
 - **Absorbs:** ADR-047 (Manuel Subagent Dispatch Protocol — 7 principles + Sprint-168 hardening + Sprint-281 role reframe to survival-fallback).
 - **Split out:** the automated Brain-DEATH recovery **procedure** (failover / retry / `finalize --force`) → **ADR-G-025** (Process Resilience, Recovery & Live Observability).
 - **Cross-ref:** ADR-G-020 (Authority Matrix — file-authority / RBAC; the manual review gate is its dogfood form), ADR-G-014 (Spawn Backend, Options & Observation — worktree/spawn isolation), ADR-G-026 (Dependency-Wave Execution — `dependency_pipeline_enabled`), ADR-G-018 (Verification Protocol — the `.result` contract), ADR-046 → ADR-G-015 (finalize hook chain), ADR-G-019 (ADR-D convention under the taxonomy).
-- **Born work-item:** BRAIN-DEATH-PROCEDURE (ADR-G-025 + this ADR), tied to [[feedback_finalize_force_orphan_state]].
+- **Born work-items:** BRAIN-DEATH-PROCEDURE (ADR-G-025 + this ADR), tied to [[feedback_finalize_force_orphan_state]] · **CONFIG-RECOVERY-FIX** (`config-recovery.md` `dependency_pipeline_enabled=false` → document as legacy/fallback, not the default) · **CHECKPOINT-PARITY** (CLI add the MCP pending-guard, or declare MCP the canonical checkpoint surface) · **skip-gate-decision** (`tests_skipped_added` — keep manual-only and say so, or wire skip-delta into the auditor gate) · scope-enforcement uniformity → **TOOL-SCOPE**.
 
 
 ---
@@ -689,16 +689,16 @@ defaults (hardcoded floor)
 ```
 
 - Merge is `deepMerge` (`src/core/config.ts`): nested objects deep-merge; **arrays are replaced, not merged**; `undefined` values are skipped (a sparse upper layer never nulls a lower one).
-- Env overrides apply last via the `DECKENT_*` namespace (e.g. `DECKENT_BRAIN_PROVIDER`, `DECKENT_MAX_WORKERS`) — the CI / one-off escape hatch.
-- `autoMigrateOnLoad` upgrades legacy config shapes on read, so an older `~/.deckent/config.json` keeps working without a manual edit.
+- Env overrides apply last via a **curated `DECKENT_*` allowlist** (today: `DECKENT_BRAIN_PROVIDER`, `DECKENT_WORKER_PROVIDER`, `DECKENT_MODE`, `DECKENT_LANGUAGE`, `DECKENT_STYLE`) — the CI / one-off escape hatch. It is a *specific curated set*, **not** an arbitrary `DECKENT_*`→any-key mapping; keys documented elsewhere but **unwired** (e.g. `DECKENT_MAX_WORKERS`, `DECKENT_MODEL`) are tracked in CONFIG-ENV-SYNC.
+- `autoMigrateOnLoad` upgrades legacy **project** config shapes on read (`migrateConfig(projectConfigPath)`); the global `~/.deckent/config.json` is read + merged but **not** auto-migrated today (tracked: CONFIG-ENV-SYNC / global-migrate).
 - The architecture doc's "Config Layers" section (Layer 4 — Environment Variables) is the human-facing mirror of this loader.
 
-This is a structural, deterministic guarantee — the loader *always* applies the precedence; there is no code path that reads a single layer in isolation.
+This is a structural, deterministic guarantee for the **runtime effective config**: every effective-config consumer goes through `loadConfig` (the layered path). Raw/admin helpers (`readGlobalConfig`, `loadGlobalConfig`) intentionally read a single layer by design and are *not* effective-config consumers. **Caching caveat:** precedence is exact on cold/forced load, but a long-running process caches keyed on the *project* config mtime only — so a global-config or env-var change is re-read only via `clearConfigCache` / `DECKENT_CONFIG_RELOAD=1` / `force` / a project-mtime change (CONFIG-CACHE-GLOBAL).
 
 ## Intent / Roadmap (Tomorrow)
 
 - **Scope-aware resolution tied to install topology.** As deckent ships as a global install + project-scope product, the two file layers gain explicit identity: `~/.deckent/config.json` is the **user-global** scope and `.deckent/config.json` is the **user-project** scope. Config resolution becomes scope-addressable, not merely precedence-ordered.
-- **Config precedence mirrors ADR G>U>D.** The config layering is the operational analogue of the ADR-G-019 precedence: publisher defaults (floor) < user-global < user-project for *additive/tightening* keys, while any publisher-locked invariant (an ADR-G-backed setting) cannot be loosened by a lower-priority file. The two precedence systems (config-merge and ADR-authority) are kept conceptually aligned so a user reasons about both the same way.
+- **Config precedence mirrors ADR G>U>D (roadmap).** The config layering is the operational analogue of the ADR-G-019 precedence: publisher defaults (floor) < user-global < user-project for *additive/tightening* keys, while any publisher-locked invariant (an ADR-G-backed setting) *must not* be loosened by a lower-priority file. **Today the merge is pure last-wins `deepMerge` with no invariant-lock — a project layer CAN currently override a global setting; the lock is roadmap (CONFIG-LOCK), not yet enforced.** The two precedence systems (config-merge and ADR-authority) are kept conceptually aligned so a user reasons about both the same way.
 - **Tenant/scope extension.** Multi-tenant + global-install layering (per-host, per-org) extends the same `deepMerge` spine rather than introducing a parallel mechanism.
 
 ## Consequences
@@ -713,6 +713,7 @@ This is a structural, deterministic guarantee — the loader *always* applies th
 - **Implementation:** `src/core/config.ts` (`deepMerge`, env-override layer, `autoMigrateOnLoad`); `docs/architecture/architecture.md` "Config Layers" (Layer 4 — Environment Variables).
 - **Precedence sibling:** ADR-G-019 (ADR Governance & 4-Layer Taxonomy — the G>U>D precedence this config layering mirrors).
 - **Cross-ref:** ADR-G-012 (Plan Tier & Config Customization — every config-knob real-in-code), ADR-G-005 (Secret File System — shared global<project scope spine).
+- **Born work-items:** CONFIG-ENV-SYNC (curate-vs-expand the env-layer set incl. `DECKENT_MAX_WORKERS`/`DECKENT_MODEL` + sync the `architecture.md` Config-Layers mirror), CONFIG-CACHE-GLOBAL (cache-key incl. global-mtime + env-snapshot for long-running correctness), CONFIG-LOCK (G>U>D publisher-invariant-lock → ADR-G-019/G-020).
 - **Direction:** global-install + project-scope topology (MASTER-PLAN ADR-LAYER / install-wiring); `.analysis/adr-review-crosswalk.md` row 004.
 
 

@@ -289,6 +289,12 @@
 | DEP-POLICY-WIRE | GOV | Legacy ADR-010 enforcement retire — authority-enforcer:461 whitelist + auditor:2172 maxCount:3 → inventory-drift advisory; karpathy-discipline.md:42 (.claude+.codex) + layer4-runtime.test:168 merit-based | ADR-rev | P0 | — | ⬜ | — | ADR-D-005; "code-true"-yap; meşru-dep şu an false-NO_GO+warning |
 | DEPS-DOC-SYNC | DOCS·GOV | dependencies.md merit-based + package.json sync (13+3, grammy/nodemailer/openai) + adr-index/README ADR-010→D-005 redirect + drift-lint | ADR-rev | P1 | — | ⬜ | — | ADR-D-005; SSOT=package.json |
 | CLI-CONV-CLEANUP | GOV | register-convention 2 istisna: registerCostCommand normalize + skill-marketplace subcommand exception-doc + index.test:109 "28 command" count de-hardcode | ADR-rev | P2 | — | ⬜ | — | ADR-D-006 §1 |
+| CONFIG-RECOVERY-FIX | DOCS | config-recovery.md `dependency_pipeline_enabled=false` → legacy/fallback belgele (canlı config `true`; ADR-047-era drift) | ADR-rev | P1 | — | ⬜ | — | ADR-D-007; user-facing |
+| CHECKPOINT-PARITY | GOV | CLI checkpoint'e MCP pending-guard ekle (ya da MCP-canonical-doc); CLI unconditional-write ↔ MCP non-pending-reject | ADR-rev | P2 | — | ⬜ | — | ADR-D-007; mcp:64↔cli:47 |
+| SKIP-GATE-DECISION | GOV | `tests_skipped_added` gate: manual-only-net ya da skip-delta'yı auditor-gate'e wire (şu an fail-delta gate'liyor) | ADR-rev | P2 | — | ⬜ | — | ADR-D-007; auditor:3117 |
+| CONFIG-ENV-SYNC | GOV·DOCS | env-layer set karar (curated-5 mi `DECKENT_MAX_WORKERS`/`MODEL` expand mi) + architecture.md Config-Layers mirror-sync + global-config migrate | ADR-rev | P1 | — | ⬜ | — | ADR-G-001; arch.md drift |
+| CONFIG-CACHE-GLOBAL | GOV | loadConfig cache-key'e global-mtime + env-snapshot ekle (long-running'de global/env değişimi kaçıyor; şu an project-mtime-only) | ADR-rev | P2 | — | ⬜ | — | ADR-G-001; config.ts:1325 |
+| CONFIG-LOCK | GOV | G>U>D publisher-invariant-lock (deepMerge→lock-aware; lower-scope ADR-G-backed setting'i gevşetemez) | ADR-rev | P2 | — | ⬜ | — | ADR-G-001/G-019/G-020; şu an pure last-wins |
 
 ---
 
