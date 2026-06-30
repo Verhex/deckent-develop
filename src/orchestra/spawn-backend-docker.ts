@@ -30,6 +30,7 @@ import { authHealthCheck } from '../agents/worker.js';
 import { BASE_PROVIDER_CREDENTIAL_ENV } from '../providers/cross-provider-keys.js';
 import type { SpawnBackend, SpawnBackendOptions } from './spawn-backend.js';
 import { SpawnBackendError, checkLethalGuard } from './spawn-backend.js';
+import { getDefaultProviderName } from './sprint-utils.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
@@ -597,7 +598,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     // readiness honest-fail below can name the EXACT provider-aware rebuild
     // command. codex/gemini CLIs are opt-in build-args in Dockerfile.worker; claude
     // is the lean default. (Re-used downstream for the ProviderCommandSpec lookup.)
-    const provider = modelRegistry.get(model)?.provider ?? 'claude';
+    const provider = modelRegistry.get(model)?.provider ?? getDefaultProviderName();
 
     // Guard: verify Docker image exists before attempting spawn.
     const imageCheck = spawnSync('docker', ['images', '-q', this.image], {

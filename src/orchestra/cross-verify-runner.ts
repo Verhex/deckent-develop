@@ -34,6 +34,7 @@ import { TASKS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
 import { providerRegistry } from '../core/provider.js';
 import { decideCrossVerify } from '../core/cross-verify.js';
+import { getDefaultProviderName } from './sprint-utils.js';
 import {
   buildRefutePrompt,
   parseRefuteVerdict,
@@ -221,7 +222,7 @@ export async function runCrossVerify(
 
   try {
     const xv = config.cross_verify;
-    const taskProvider: ProviderName = task.provider ?? 'claude';
+    const taskProvider: ProviderName = task.provider ?? getDefaultProviderName();
     const availableProviders =
       opts.availableProviders ?? (providerRegistry.listProviders() as ProviderName[]);
 

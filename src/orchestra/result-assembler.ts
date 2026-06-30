@@ -34,6 +34,7 @@ import { debugLog } from '../core/utils.js';
 import type { Task, TaskScope } from '../core/task-types.js';
 import type { TokenUsage } from '../core/token-usage.js';
 import { validateTaskResult, type TaskResultV1 } from '../core/task-result-schema.js';
+import { getDefaultProviderName } from './sprint-utils.js';
 
 // ─── Input contract ──────────────────────────────────────────────────────────
 
@@ -210,7 +211,7 @@ export async function assembleResult(input: AssembleInput): Promise<TaskResultV1
     taskId: task.id,
     sprintId: task.sprintId,
     workerId: identity.workerId,
-    provider: identity.provider ?? task.provider ?? 'claude',
+    provider: identity.provider ?? task.provider ?? getDefaultProviderName(),
     model: identity.model ?? task.forceModel ?? task.model,
     modelEffort: identity.modelEffort ?? task.modelEffort,
     agent: identity.agent ?? task.assignedAgent ?? null,

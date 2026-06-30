@@ -7,6 +7,7 @@ import { getCurrentSprintId } from '../../core/event-stream.js';
 import { isSessionActive, createWatchLayout, attachToWorkerPane, TmuxError } from '../../orchestra/tmux.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getDefaultProviderName } from '../../orchestra/sprint-utils.js';
 
 /** H) Export cleanupWatchWindow so cleanup.ts can call it. */
 export function cleanupWatchWindow(): void {
@@ -72,7 +73,7 @@ export function getTaskProvider(root: string, taskId: string): string {
   if (!existsSync(taskPath)) return 'claude';
   try {
     const data = JSON.parse(readFileSync(taskPath, 'utf-8')) as { provider?: string };
-    return data.provider ?? 'claude';
+    return data.provider ?? getDefaultProviderName();
   } catch {
     return 'claude';
   }
