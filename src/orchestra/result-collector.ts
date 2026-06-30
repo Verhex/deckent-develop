@@ -181,11 +181,19 @@ export function buildResultsMap(results: TaskResult[]): Map<string, TaskResult> 
 }
 
 // ═══ TOPP B — Continuous Dispatch Planner (Sprint 178 / ADR-064) ══
-// Unifies legacy FIFO queue drain and dep-pipeline re-evaluation under a
-// single pure function. The waitForResults main loop invokes dispatchTick
-// (the async wrapper) which delegates to planDispatch (pure) to decide
-// which tasks to spawn/kill on a given tick. See ADR-064 for the
-// rationale that supersedes ADR-045 §3 wave-barrier semantics.
+// `planDispatch` is the PURE, flag-agnostic, unit-tested model of one dispatch
+// tick — legacy FIFO drain + dep-pipeline re-evaluation — the canonical spec for
+// the spawn/kill decision (supersedes ADR-045 §3 wave-barrier semantics).
+//
+// ⚠️ ADR-064-W (tracked): planDispatch is the pinned MODEL, NOT yet the live
+// DRIVER. The runtime `dispatchTick` (below) still executes imperatively via
+// `processQueue` + `maybeRespawn`; the latter delegates to `respawnEligibleTasks`,
+// which ALSO emits DEPENDENCY_BLOCKED events, the `wave.respawn` metric, and sprint
+// checkpoints. Routing execution through planDispatch must (a) port those
+// side-effects — else an observability/checkpoint regression — and (b) account for
+// planDispatch mutating `remainingQueue` (shift). That focused unification is
+// tracked as ADR-064-W; until then the dispatch tests keep planDispatch and the
+// imperative path logically equivalent.
 
 /**
  * Input state for one dispatch tick.
