@@ -202,7 +202,7 @@
 | DORMANT-1 | GOV | Kablosuz güvenlik wire (cascade-detector+spawn-safety+sandbox.ts) | MP·CL | P1 | — | ⬜ | — | 🔴 |
 | DORMANT-2 | GOV | No-op config-knob temizliği wire-or-remove (CORE-W4+ADR-G-012-W) | MP·CL | P1 | — | ⬜ | — | ayar-dürüstlüğü; CONFIG-CUSTOMIZE honesty |
 | DORMANT-3 | GOV | Duplikat/dormant disposition (RateLimiter×3/12-orchestra-mod/cli-helpers) | MP | P1 | — | ⬜ | — | — |
-| DEADMOD | GOV | 4 zero-caller-ama-dökümanlı modül WIRE-vs-KES (design pass) | MP | P1 | — | ⬜ | — | — |
+| DEADMOD | GOV | Dormant-sweep + audit-seed cleanup: batch-stats (removed ama dead-code-audit:92 seed stale) + brain-context/multi-agent (0-caller, marker✗→DEFERRED/KES) + decision-replay (V1→ROUTE-V1-PURGE) | MP·ADR-rev | P1 | — | ⬜ | — | ADR-D-006; 4-tier design-pass |
 | COMM-2 | GOV | Tipli Brain-aracılı worker-mesaj vocabulary (DEPENDENCY_REQUEST...) | MP | P1 | — | ⬜ | — | COMM-1 v0 ✅ |
 | ADR-GOV | GOV | ADR-türevi -W tutarlılık şemsiyesi (yeni-G/D şema): ADR-002-W·D-004-W·G-012-W·LOCALE-W·ROUTE-V1-PURGE(028) + tracked 064-W/066-W/087-W | MP | P1 | — | ⬜ | — | governance-dürüstlük |
 | ADR-LAYER | GOV | ✅ 4-katman taksonomi (ADR-G/D/UG/UP, G>U>D) CANLI; KALAN: UG/UP user-ADR-authoring (ilk-user basit, NL komut+sohbetle genişler) | A | P1 | — | 🟡 | 2026-06-30 | ADR-G-019; taxonomy✅, user-authoring bekliyor |
@@ -214,7 +214,7 @@
 | WM-2 | GOV | 5 TaskType enum → tek SSOT | MP | P1 | — | 🟡 | — | — |
 | WM-3 | GOV | EnvironmentType non-code domain | MP | P2 | — | 🟡 | — | — |
 | WM-4 | GOV | RequirementProfile consume | MP | P2 | — | 🟡 | — | — |
-| GODOBJ | GOV | God-object split (result-evaluator/auditor/server/doctor) | MP | P2 | — | ⬜ | — | — |
+| GODOBJ | GOV | God-object cohesion re-split: sprint-controller ~1609 LoC (header "Thin" stale) → checkpoint/heartbeat-monitor/grace-kill-liveness/snapshot-pid-cleanup + result-evaluator/auditor/server/doctor | MP·ADR-rev | P2 | — | ⬜ | — | ADR-D-006; MOD-SPLIT |
 | PERF-LOCAL | PERF | Local RAM/worker dengesi optimize (kullanıcı kendi sistemi, autonomous) | A | P1 | — | ⬜ | — | — |
 | PERF-VPS | PERF | VPS/VDS ideal-operation akışları | A | P1 | — | ⬜ | — | — |
 | PERF-1 | PERF | Cold-start <500ms (lazy-load + cache lazy-loader) | MP | P1 | — | ⬜ | — | ~2s bugün |
@@ -288,6 +288,7 @@
 | D004-CAPRELOC | GOV·ARCH | Capability-relocation: tmux/spawn-backend orchestra→core/runtime (provider-adapter downward; D004-E1 exception dissolves) | ADR-rev | P2 | — | ⬜ | — | ADR-D-004-W8; S279 event-stream-move precedent |
 | DEP-POLICY-WIRE | GOV | Legacy ADR-010 enforcement retire — authority-enforcer:461 whitelist + auditor:2172 maxCount:3 → inventory-drift advisory; karpathy-discipline.md:42 (.claude+.codex) + layer4-runtime.test:168 merit-based | ADR-rev | P0 | — | ⬜ | — | ADR-D-005; "code-true"-yap; meşru-dep şu an false-NO_GO+warning |
 | DEPS-DOC-SYNC | DOCS·GOV | dependencies.md merit-based + package.json sync (13+3, grammy/nodemailer/openai) + adr-index/README ADR-010→D-005 redirect + drift-lint | ADR-rev | P1 | — | ⬜ | — | ADR-D-005; SSOT=package.json |
+| CLI-CONV-CLEANUP | GOV | register-convention 2 istisna: registerCostCommand normalize + skill-marketplace subcommand exception-doc + index.test:109 "28 command" count de-hardcode | ADR-rev | P2 | — | ⬜ | — | ADR-D-006 §1 |
 
 ---
 
