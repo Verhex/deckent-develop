@@ -286,6 +286,8 @@
 | MESSAGES-CORE | GOV·I18N | i18n kök-neden: `getMessage` cli/helpers/messages.ts'te → core+orchestra 3 yukarı-import (directive-interrogator+mission-deliver+flow-reporter) → messages.ts'i core/'a taşı (CORE-W1 + 2 ORCH-W1-edge tek-fix) | ADR-rev | P1 | — | ⬜ | — | ADR-D-004-W9; LOCALE-W/ADR-G-004 bağ |
 | D004-ENFORCE | GOV | Layer-1 enforcement-maturity: exception-registry data-file (W5) + hard graph-gate full-edge-scan + Brain-family allowlist (W6, ADR-G-020 hard-flip) | ADR-rev | P1 | — | ⬜ | — | ADR-D-004-W5/W6; ADR-094 vein |
 | D004-CAPRELOC | GOV·ARCH | Capability-relocation: tmux/spawn-backend orchestra→core/runtime (provider-adapter downward; D004-E1 exception dissolves) | ADR-rev | P2 | — | ⬜ | — | ADR-D-004-W8; S279 event-stream-move precedent |
+| DEP-POLICY-WIRE | GOV | Legacy ADR-010 enforcement retire — authority-enforcer:461 whitelist + auditor:2172 maxCount:3 → inventory-drift advisory; karpathy-discipline.md:42 (.claude+.codex) + layer4-runtime.test:168 merit-based | ADR-rev | P0 | — | ⬜ | — | ADR-D-005; "code-true"-yap; meşru-dep şu an false-NO_GO+warning |
+| DEPS-DOC-SYNC | DOCS·GOV | dependencies.md merit-based + package.json sync (13+3, grammy/nodemailer/openai) + adr-index/README ADR-010→D-005 redirect + drift-lint | ADR-rev | P1 | — | ⬜ | — | ADR-D-005; SSOT=package.json |
 
 ---
 
