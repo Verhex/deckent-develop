@@ -448,7 +448,10 @@ describe('buildWorkerPrompt', () => {
     expect(prompt).toContain('## What To Do');
     expect(prompt).toContain('1. Read the task scope carefully');
     expect(prompt).toContain('Write the code changes');
-    expect(prompt).toContain('Document:');
+    // PCOMP-W2: step-4 no longer orders doc edits (which contradicted filesWrite);
+    // doc staleness is reported via a docImpact: note in the result instead.
+    expect(prompt).toContain('Doc-impact:');
+    expect(prompt).toContain('docImpact:');
     expect(prompt).toContain('Report: write your result file');
     expect(prompt).toContain('## CRITICAL VERIFY STEPS');
     expect(prompt).toContain('tsc --noEmit');

@@ -1,7 +1,7 @@
 // ─── Task Creation & Directive Parsing ─────────────────────────────
 // Extracted from brain.ts — task construction, scope extraction, directive parsing
 import { z } from 'zod';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   Task, TaskScope, GoNoGoCriteria, ModelType, TaskEffort, TaskPriority,
@@ -21,7 +21,37 @@ import { MemoryStore } from '../core/memory-store.js';
 import type { MemoryEntryV2 } from '../core/memory-types.js';
 import { searchMemory } from '../core/memory-query.js';
 import { BRAIN_DIR, MEMORY_DB_FILE, PROJECT_CONFIG_PATH } from '../core/constants.js';
-import { selectRelevantAdrs, buildAdrPromptSection } from './adr-selector.js';
+import { selectRelevantAdrs, buildAdrPromptSection, classifyInjectionTier } from './adr-selector.js';
+import type { AdrRelevance } from './adr-selector.js';
+
+/**
+ * PCOMP-W3 (injection audit): persist every ADR-injection decision so a false
+ * positive (e.g. Routing-ADR G-006 injected into a CRASH-REDACT task) is
+ * reproducible from its recorded score + matched signals instead of guesswork.
+ * One JSONL line per prompt build → `.deckent/prompts/injection-audit.jsonl`.
+ * Fail-soft: an audit-write failure never blocks prompt construction.
+ */
+export function logInjectionAudit(
+  projectRoot: string,
+  task: { title?: string; description?: string } & { id?: string },
+  ranked: AdrRelevance[],
+): void {
+  try {
+    const dir = join(projectRoot, '.deckent', 'prompts');
+    mkdirSync(dir, { recursive: true });
+    const line = JSON.stringify({
+      ts: new Date().toISOString(),
+      task: task.id ?? task.title ?? '(unknown)',
+      adrs: ranked.map(r => ({
+        id: r.adrId,
+        score: Number(r.score.toFixed(3)),
+        tier: classifyInjectionTier(r),
+        reasons: r.matchReasons,
+      })),
+    });
+    appendFileSync(join(dir, 'injection-audit.jsonl'), line + '\n', 'utf-8');
+  } catch (e) { debugLog('logInjectionAudit', e); }
+}
 import { readBaseline } from './baseline-tracker.js';
 import { buildTaskPrompt } from './prompt-god-template.js';
 import type { SprintContext, SharedContextEntry, UpstreamHandoffEntry } from './prompt-god-template.js';
@@ -1240,6 +1270,7 @@ export function queryRelevantADRs(taskDescription: string, taskScope: string[], 
       if (task) {
         const ranked = selectRelevantAdrs(task, allAdrs, 3);
         if (ranked.length === 0) return '';
+        logInjectionAudit(root, task, ranked);
         return buildAdrPromptSection(ranked, 'full', allAdrs, 'operative', true);
       }
 
@@ -1266,6 +1297,7 @@ export function queryRelevantADRs(taskDescription: string, taskScope: string[], 
         if (results.length === 0) return '';
         return results.map(r => `## ${r.entry.id}: ${r.entry.title}\n\n${r.entry.content}`).join('\n\n---\n\n');
       }
+      logInjectionAudit(root, pseudoTask, ranked);
       return buildAdrPromptSection(ranked, 'full', allAdrs, 'operative', true);
     } finally {
       store.close();

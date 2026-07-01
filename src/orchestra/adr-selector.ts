@@ -430,6 +430,33 @@ const OPERATIVE_END = '<!-- worker-operative-end -->';
  * Extract the operative section from ADR content when markers are present.
  * Returns null if no valid marker pair found (caller falls back to full content).
  */
+/**
+ * PCOMP-W4 (tiered injection): classify a selected ADR's injection tier.
+ * - 'governing' — explicitly referenced in the task text (`Governing: ADR-G-025`,
+ *   or any ADR-id mention): the task's contract ADR → full operative body.
+ * - 'constraint' — selected by scoring only (scope/keyword/intent): a background
+ *   constraint → condensed render (Active-constraint line + Contract section +
+ *   pointer). Full-body injection of marginal matches was measured at ~40-50%
+ *   dead weight per worker prompt (sprint-348-005 analysis).
+ */
+export function classifyInjectionTier(adr: AdrRelevance): 'governing' | 'constraint' {
+  return adr.matchReasons.includes('explicit-ref') ? 'governing' : 'constraint';
+}
+
+/**
+ * PCOMP-W4: extract the `## Contract` section (through the next `## ` header).
+ * ADR-D house style keeps the immutable core there — for a Tier-2 (constraint)
+ * ADR it is the one section a worker must still honor verbatim.
+ */
+export function extractContractSection(content: string): string | null {
+  const m = /^##\s+Contract\b.*$/im.exec(content);
+  if (!m) return null;
+  const after = content.slice(m.index + m[0].length);
+  const nextHdr = /^##\s+/m.exec(after);
+  const body = (nextHdr ? after.slice(0, nextHdr.index) : after).trim();
+  return body || null;
+}
+
 export function extractOperativeSection(content: string): string | null {
   const startIdx = content.indexOf(OPERATIVE_START);
   const endIdx = content.indexOf(OPERATIVE_END);
@@ -489,6 +516,23 @@ export function buildAdrPromptSection(
 
     if (mode === 'full') {
       const rawContent = entry?.content ?? `(content not available for ${adr.adrId})`;
+
+      // PCOMP-W4 (tiered injection): in operative render, only the GOVERNING ADR
+      // (explicit-ref — the task's contract) gets a full operative body. Every
+      // scoring-selected ADR is a background constraint: render the Active-
+      // constraint line + the Contract section (if any) + a pointer. This is what
+      // removes the measured ~40-50% dead weight (full D-004/G-006 bodies on a
+      // CRASH-REDACT task) while keeping the binding rule text verbatim.
+      if (adrRender === 'operative' && classifyInjectionTier(adr) === 'constraint') {
+        const distilled = distillActiveConstraint(rawContent, entry?.summary);
+        const constraintHead = distilled ? `**Active constraint:** ${distilled}\n\n` : '';
+        const contract = extractContractSection(rawContent);
+        const contractBlock = contract ? `### Contract (binding)\n\n${contract}\n\n` : '';
+        sections.push(
+          `## ${adr.adrId}: ${adr.title}\n\n${constraintHead}${contractBlock}[background constraint — full text: .brain/memory.db ${adr.adrId}]`,
+        );
+        continue;
+      }
 
       // PROMPT-W1 (a): scope-gating. For code-development tasks, an ADR whose
       // text does NOT reference the task scope (no scope-path-match) is a

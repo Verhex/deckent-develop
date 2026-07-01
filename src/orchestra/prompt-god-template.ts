@@ -559,6 +559,24 @@ export function buildScopeBlock(scope: TaskScope, outWarnings: string[], emitHos
     ? `\n\nWhen writing host-facing config (hooks in \`.claude/settings.json\`, scripts in \`package.json\`, CI workflows), NEVER hard-code your container working directory (e.g. \`/workspace/...\`). That path does not exist on the user's host machine and will break at runtime. Use a portable form instead: \`$CLAUDE_PROJECT_DIR/...\`, a path relative to the project root, or a bare command resolved via PATH.`
     : '';
 
+  // PCOMP-W1 (single write authority — sprint-348-005 prompt analysis): the old
+  // template printed TWO conflicting authorities ("ONLY modify in these
+  // directories" [7 dirs] vs "ONLY write to these files" [2 files]) — ambiguous
+  // for both the worker and the auditor. Canonical rule: when an explicit
+  // filesWrite list exists it is the SOLE write authority and the directory list
+  // is READ/context scope only; the directory-fallback wording applies only when
+  // no Files: list was declared (PQ-4 F5 behaviour preserved).
+  if (sanitized.filesWrite.length > 0) {
+    return `## Scope Rules
+READ/context scope — you may read these directories to understand the code:
+${scopeDirs}
+
+WRITE authority (canonical — the ONLY files you may create or modify):
+${scopeFiles}
+
+A directory appearing in the read scope does NOT grant write permission there — the write list above is the single authority, and the auditor flags any write outside it. If a change seems needed in a file you cannot write, note it in your .result \`notes\` instead of editing it.${hostConfigNote}`;
+  }
+
   return `## Scope Rules
 You may ONLY modify files in these directories:
 ${scopeDirs}
@@ -1021,7 +1039,8 @@ interface RenderInput {
  */
 export function buildVerifyPrecedenceNote(verificationMode: 'targeted' | 'doc' = 'targeted'): string {
   if (verificationMode === 'doc') return '';
-  return `> Verify-precedence (this task overrides your persona): the CRITICAL VERIFY STEPS above are the single authority on how to verify THIS task. Where your agent persona or a skill says "run the full test suite", "all existing tests must pass (zero regressions)", or "always write a regression test", defer to the targeted-only guidance above — run only the test file(s) covering the module(s) you changed, and treat pre-existing unrelated failures as NOT a NO_GO.`;
+  return `> Verify-precedence (this task overrides your persona): the CRITICAL VERIFY STEPS above are the single authority on how to verify THIS task. Where your agent persona or a skill says "run the full test suite", "all existing tests must pass (zero regressions)", or "always write a regression test", defer to the targeted-only guidance above — run only the test file(s) covering the module(s) you changed, and treat pre-existing unrelated failures as NOT a NO_GO.
+> Result-precedence (PCOMP-W6): your ONLY output contract is the .result file format defined below. Where your persona defines a different output/report format (severity-graded finding reports, audit checklists, threat-model writeups), that format applies — at most — to prose INSIDE the \`notes\` field; it never replaces or restructures the result schema, and it never turns an implementation task into a review report.`;
 }
 
 /**
@@ -1117,7 +1136,7 @@ ${dodBlock}${idempotencyBlock}`);
 1. Read the task scope carefully — understand what files you may touch
 2. Write your execution plan to .tasks/task-${task.id}.plan BEFORE coding — outline your approach, files to modify, and expected changes
 3. Write the code changes described above
-4. Document: update relevant docs if your changes affect them
+4. Doc-impact: if your change makes any doc/ADR text stale, do NOT edit docs outside your write authority — add a \`docImpact:\` line to your .result \`notes\` naming the doc + what became stale (the orchestrator turns these into follow-up tasks). Only edit a doc that is explicitly IN your write list.
 5. Report: write your result file to .tasks/task-${task.id}.result`);
 
   // Verify steps — Sprint 250 MF-1: Tier-0 doc-only tasks must NOT run the full
