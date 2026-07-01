@@ -355,6 +355,7 @@
 | 418 | AUTHORITY-SSOT | GOV·SEC | 2 authority-surface birleştir: authority-enforcer (path/channel) + nervous/authority-matrix (capability/RBAC) → tek-SSOT | ADR-rev | P1 | — | ⬜ | — | ADR-G-020; iki yüzey |
 | 419 | CHANNEL-RIGHTS-SYNC | GOV | authority-enforcer channel-rights matrix (~15) → ADR-G-018 ~30 set (NERVOUS_* + 13-added eksik); COMM-2 altı | ADR-rev | P2 | COMM-2 | ⬜ | — | ADR-G-020/018 |
 | 420 | ASSESS-CONTRACT | GOV | selfAssessment/brainAssessment/evaluationDecision kontratını standardize (her-task 2-distinct-assessment invariant) | ADR-rev | P2 | — | ⬜ | — | ADR-G-020; finalize:129 |
+| 421 | REASONING-FLAG-RECONCILE | PROV | capabilities.reasoning semantiğini 'Anthropic extended-thinking destekliyor'a çevir → tüm Claude (opus/sonnet/haiku) true, o-series (o3/o4-mini/gemini-pro) ayrı; metadata-only (gate DEĞİL, resolveReasoningEffort provider'a bakar), gerçek reasoning ModelEffort→--effort ayrı kol | A·CX | P3 | — | ⬜ | — | G-008; sonnet-5 audit türevi; davranış değişmez |
 
 ---
 
@@ -371,7 +372,7 @@
 | G-005 Secret-FS | ✅ current-state |
 | G-006 Routing&Selection | ROUTE-1 · ROUTE-V1-PURGE · PROV-MATRIX |
 | G-007 Messaging-Connectors | MSG-1/2/3 |
-| G-008 Provider-Abstraction/Fleet | PROV-* · F1-* · ADR-066-W · AS2/AS4 |
+| G-008 Provider-Abstraction/Fleet | PROV-* · F1-* · ADR-066-W · AS2/AS4 · REASONING-FLAG-RECONCILE |
 | G-009 Eval-Integrity | MOAT-3 · proof-of-function (≈✅) |
 | G-010 Output/Terminal-UX/Brand | TERM-5 · TERM-LIVE |
 | G-011 Surface-Parity | PARITY-1 · LAYER-1 · WATCH-W |
