@@ -46,7 +46,7 @@ function makeConfig(overrides: Partial<CostConfig> = {}): CostConfig {
         billing_modes_supported: ['api', 'subscription'],
         default_billing_mode: 'subscription',
         models: {
-          'claude-sonnet-4-6': {
+          'claude-sonnet-5': {
             input_cost_per_token: 0.000003,
             output_cost_per_token: 0.000015,
             max_input_tokens: 200000,
@@ -142,7 +142,7 @@ describe('getCostView — data shape', () => {
     const config = makeConfig();
     const view = getCostView('/tmp/test-root', { configFn: () => config, spendFn: () => 0 });
     expect(view.providers).toHaveProperty('anthropic');
-    const m = view.providers['anthropic']!.models['claude-sonnet-4-6'];
+    const m = view.providers['anthropic']!.models['claude-sonnet-5'];
     expect(m).toBeDefined();
     expect(m!.inputPerMTok).toBeCloseTo(3.0);
     expect(m!.outputPerMTok).toBeCloseTo(15.0);
@@ -177,7 +177,7 @@ describe('getCostView — data shape', () => {
           enabled: false,
           billing_modes_supported: ['api'],
           models: {
-            'claude-sonnet-4-6': {
+            'claude-sonnet-5': {
               input_cost_per_token: 0.000003,
               output_cost_per_token: 0.000015,
               max_input_tokens: 200000,

@@ -202,7 +202,7 @@ describe('LocalStaticSource', () => {
               enabled: true,
               billing_modes_supported: ['api'],
               models: {
-                'claude-sonnet-4-6': {
+                'claude-sonnet-5': {
                   input_cost_per_token: 3e-6,
                   output_cost_per_token: 1.5e-5,
                   cache_read_input_token_cost: 3e-7,
@@ -223,7 +223,7 @@ describe('LocalStaticSource', () => {
       const src = new LocalStaticSource(tmpDir);
       const entries = await src.fetch();
 
-      const sonnet = entries.find((e) => e.modelId === 'claude-sonnet-4-6');
+      const sonnet = entries.find((e) => e.modelId === 'claude-sonnet-5');
       expect(sonnet?.providerId).toBe('anthropic');
       expect(sonnet?.price.input).toBe(3e-6);
       expect(sonnet?.cacheArchetype).toBe(CACHE_ARCHETYPE.EXPLICIT_MARKER);

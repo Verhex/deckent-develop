@@ -20,6 +20,7 @@ import { loadMcpServers, type McpServersMap } from '../../mcp-client/config.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { theme } from './theme.js';
+import { getMessage } from './messages.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -227,26 +228,8 @@ export async function buildHealthSnapshot(
 
 // ─── Render (i18n-first, NO_COLOR via `theme`) ──────────────────────────
 //
-// messages.ts is outside this task's write scope — following the existing
-// doctor-checks.ts precedent (authProbeLoggedOutLine), new user-facing
-// strings live in a small LOCAL en/tr map here. Should be centralized into
-// messages.ts in a follow-up (see this task's .result docImpact note).
-
-const LOCAL_MESSAGES: Readonly<Record<string, { en: string; tr: string }>> = {
-  'health.auth': { en: 'auth', tr: 'oturum' },
-  'health.mcp': { en: 'mcp', tr: 'mcp' },
-  'health.mem': { en: 'mem', tr: 'bellek' },
-  'health.mode': { en: 'mode', tr: 'mod' },
-  'health.unknown': { en: 'unknown', tr: 'bilinmiyor' },
-  'health.logged_in': { en: 'logged in', tr: 'oturum açık' },
-  'health.logged_out': { en: 'logged out', tr: 'oturum kapalı' },
-};
-
-function healthMsg(key: string, lang: string): string {
-  const entry = LOCAL_MESSAGES[key];
-  if (!entry) return key;
-  return lang === 'tr' ? entry.tr : entry.en;
-}
+// health.* keys live in messages.ts (Task 15 — MESSAGES-KEYS migrated the
+// local en/tr fallback map that previously lived here; see 351-001).
 
 function statusColor(status: HealthFieldStatus, text: string): string {
   if (status === 'ok') return theme.success(text);
@@ -256,13 +239,13 @@ function statusColor(status: HealthFieldStatus, text: string): string {
 
 /** Technical labels (ids/counts) render as-is; only a genuine 'unknown' status is localized. */
 function genericLabel(field: HealthField, lang: string): string {
-  return field.status === 'unknown' ? healthMsg('health.unknown', lang) : field.label;
+  return field.status === 'unknown' ? getMessage('health.unknown', lang) : field.label;
 }
 
 function authLabelText(field: HealthField, lang: string): string {
-  if (field.label === 'logged-in') return healthMsg('health.logged_in', lang);
-  if (field.label === 'logged-out') return healthMsg('health.logged_out', lang);
-  return healthMsg('health.unknown', lang);
+  if (field.label === 'logged-in') return getMessage('health.logged_in', lang);
+  if (field.label === 'logged-out') return getMessage('health.logged_out', lang);
+  return getMessage('health.unknown', lang);
 }
 
 /** Compact single-line render — "tek-bakış" (ADR-G-010: terminal stays concise). */
@@ -276,10 +259,10 @@ export function renderHealthSnapshot(snapshot: HealthSnapshot, lang: string): st
 
   const segments = [
     statusColor(snapshot.provider.status, providerModel),
-    `${healthMsg('health.auth', lang)}: ${statusColor(snapshot.auth.status, authLabelText(snapshot.auth, lang))}`,
-    `${healthMsg('health.mcp', lang)}: ${statusColor(snapshot.mcp.status, genericLabel(snapshot.mcp, lang))}`,
-    `${healthMsg('health.mem', lang)}: ${statusColor(snapshot.memory.status, genericLabel(snapshot.memory, lang))}`,
-    `${healthMsg('health.mode', lang)}: ${statusColor(snapshot.mode.status, genericLabel(snapshot.mode, lang))}`,
+    `${getMessage('health.auth', lang)}: ${statusColor(snapshot.auth.status, authLabelText(snapshot.auth, lang))}`,
+    `${getMessage('health.mcp', lang)}: ${statusColor(snapshot.mcp.status, genericLabel(snapshot.mcp, lang))}`,
+    `${getMessage('health.mem', lang)}: ${statusColor(snapshot.memory.status, genericLabel(snapshot.memory, lang))}`,
+    `${getMessage('health.mode', lang)}: ${statusColor(snapshot.mode.status, genericLabel(snapshot.mode, lang))}`,
   ];
 
   return `${segments.join(' · ')}  ${theme.muted(snapshot.cwd)}`;

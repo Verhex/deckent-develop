@@ -1,5 +1,21 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-352 Learnings
+- Sprint sprint-352 Learnings: ## Sprint sprint-352 Learnings
+- W5C — kind-affinity, config-gated (row 447, YENİDEN-KOŞUM): GO_WITH_TECH_DEBT — PCOMP-W5C kind-affinity, config-gated via RoutingOptions.kindAffinity (default-off) — re-run of never-dispatched 351-018
+- ROUTING-VERSION-LABEL — 'v3'-return vs 'v2'-stamp uzlaştır (ADR-G-006 P2): GO_WITH_TECH_DEBT — ADR-G-006 P2 ROUTING-VERSION-LABEL reconcile. (1) src/core/routing-engine.ts:513 — routeTaskV2's RoutingDecision.routing
+
+## Gains
+- 352-001 — TOOL-2 — progressive disclosure köprüsü (row 21 YENİDEN-KOŞUM) — TOOL-2 progressive disclosure bridge, built strictly on top of TOOL-1 (src/core/tool-registry.ts,...
+- 352-002 — EXEC-THROW-HUNT — waitForResults istisna-avı + tick-zırhı (row 452 🔴) — EXEC-THROW-HUNT (born-452/453).
+- 352-003 — EVAL-AUDIT-REVIVE — ölü audit-trail'i canlandır (row 451 🔴) — Root cause (file:line + git-trail, disk-verified): the OLD `.deckent/evaluations/` path being sta...
+- 352-004 — SWEEP2 — stale model-ID part-2 (row 431 kalanı, YENİDEN-KOŞUM) — Canonical source: src/core/model-registry.ts BUILTIN_MODELS — sonnet apiId = 'claude-sonnet-5' (o...
+- 352-005 — DPP — dead provision-helper purge/consent (row 208, YENİDEN-KOŞUM) — Disk-verify (goCriteria evidence step) DONE: full-repo grep of src/** (750 .ts files, excluding d...
+- 352-006 — CFG-1 — legacy `mode` config-set blokajı (row 209, YENİDEN-KOŞUM) — Disk-verified the 351-016/CFG-1 claim ('legacy mode value blocks config-set'): it is ALREADY FIXED.
+- 352-007 — DOCTOR-1 — backend-aware platform-check (row 210, YENİDEN-KOŞUM) — Root cause: checkPlatform() in src/cli/commands/doctor.ts took no spawnBackend param and uncondit...
+- 352-009 — TOOL-CORE — core-tool-set eager listesi wire (row 23, P1) — TOOL-CORE: new pure module src/core/tool-core.ts built strictly on top of TOOL-2 (ToolSearchIndex...
+- …and 5 more delivered
+
 ## Sprint sprint-350 Learnings
 - Sprint sprint-350 Learnings: ## Sprint sprint-350 Learnings
 

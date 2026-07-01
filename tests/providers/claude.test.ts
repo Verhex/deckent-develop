@@ -4,6 +4,7 @@ import { ClaudeAdapter, createClaudeAdapter } from '../../src/providers/claude.j
 import type { ClaudeBackend } from '../../src/providers/claude.js';
 import type { ProviderSpawnOptions } from '../../src/core/provider.js';
 import { ProviderError } from '../../src/core/provider.js';
+import { modelRegistry } from '../../src/core/model-registry.js';
 
 // ─── Mock tmux module ────────────────────────────────────────────────
 
@@ -355,7 +356,7 @@ describe('ClaudeAdapter', () => {
     it('should pass the real model apiId (not the short alias) to --model', () => {
       // alias → real version-pinned name via registry (live from models.dev)
       expect(adapter.buildCommand('opus', '/p')).toContain('--model claude-opus-4-8');
-      expect(adapter.buildCommand('sonnet', '/p')).toContain('--model claude-sonnet-4-6');
+      expect(adapter.buildCommand('sonnet', '/p')).toContain(`--model ${modelRegistry.resolveApiId('sonnet')}`);
       expect(adapter.buildCommand('haiku', '/p')).toContain('--model claude-haiku-4-5-20251001');
       // never the bare alias
       expect(adapter.buildCommand('opus', '/p')).not.toContain('--model opus ');

@@ -475,10 +475,10 @@ export async function planSprint(
   // ─── Routing: V2 intent-based engine (routeTaskV2) ────────────────────────
   // V1 (keyword-based DecisionOrchestrator) was removed by ROUTE-V1-PURGE
   // (ADR-G-006); config validation accepts only 'v2', so the former
-  // `if (routingVersion === 'v2')` guard was permanently true and is
-  // collapsed here (ROUTE-V1-DEADBRANCH-COLLAPSE). The routing-meta
-  // `routingVersion: 'v3'`-vs-`'v2'`-stamp reconcile below remains open
-  // separately as ROUTING-VERSION-LABEL.
+  // `if (routingVersion === 'v2')` guard was permanently true and was
+  // collapsed here (ROUTE-V1-DEADBRANCH-COLLAPSE). routeTaskV2's returned
+  // `decision.routingVersion` and the routing-meta stamp below are both
+  // `'v2'` (ROUTING-VERSION-LABEL, ADR-G-006 P2 — reconciled).
   // V2: Unified intent-based routing via routeTaskV2
   try {
     const agentPool = new AgentPoolManager(projectRoot);

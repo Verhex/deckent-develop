@@ -46,6 +46,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-352 Learnings** (sprint-352): ## Sprint sprint-352 Learnings
+- W5C — kind-affinity, config-gated (row 447, YENİDEN-KOŞUM): GO_WITH_TECH_DEBT — PCOM...
 - **Sprint sprint-350 Learnings** (sprint-350): ## Sprint sprint-350 Learnings
 
 ## Gains
@@ -77,10 +79,6 @@
 ## Gains
 - 340-001 — live-proof marker file — File docs/audits/token-capture-live-pro...
 - **Sprint sprint-339 Learnings** (sprint-339): ## Sprint sprint-339 Learnings
-- **Sprint sprint-338 Learnings** (sprint-338): ## Sprint sprint-338 Learnings
-
-## Gains
-- 338-001 — live-proof marker file — File docs/audits/token-capture-live-pro...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -130,4 +128,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: stale_heartbeat
 
-_Total entries: 824 | Generated: 2026-07-01_
+_Total entries: 829 | Generated: 2026-07-01_

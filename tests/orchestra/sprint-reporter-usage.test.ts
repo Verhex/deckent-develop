@@ -9,7 +9,7 @@ import type { SprintUsageSummary, CacheGateReport } from '../../src/core/limit-l
 function makeRecord(overrides: Partial<UsageRecord> = {}): UsageRecord {
   return {
     ts: '2026-06-10T10:00:00.000Z',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     sessionFile: 'session-001.jsonl',
     projectDir: 'my-project',
     in: 1000,
@@ -25,7 +25,7 @@ function makeSummary(overrides: Partial<SprintUsageSummary> = {}): SprintUsageSu
     tasks: [
       {
         taskId: '001-001',
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         calls: 3,
         in: 1000,
         out: 200,
@@ -37,7 +37,7 @@ function makeSummary(overrides: Partial<SprintUsageSummary> = {}): SprintUsageSu
       },
       {
         taskId: '001-002',
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         calls: 2,
         in: 800,
         out: 150,
@@ -233,7 +233,7 @@ describe('buildLimitBurnRow', () => {
 // ─── buildSprintLimitBurnRow — sprint-scoped production wire ─────────────────
 
 const SONNET_PRICES: LedgerPrices = {
-  'claude-sonnet-4-6': { in: 0.000003, out: 0.000015 },
+  'claude-sonnet-5': { in: 0.000003, out: 0.000015 },
 };
 
 describe('buildSprintLimitBurnRow', () => {

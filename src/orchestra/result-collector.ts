@@ -286,14 +286,35 @@ function planContinuous(state: DispatchState): DispatchPlan {
   }
 
   // Step 1 — drain the FIFO queue first (respecting deps if pipeline is on).
-  while (toSpawn.length < slotsAvailable && state.remainingQueue.length > 0) {
-    const next = popEligibleFromQueue(state.remainingQueue, state.assignedTaskIds);
-    if (!next) break;
-    if (depPipelineEnabled && next.dependencies && next.dependencies.length > 0) {
-      const allDone = next.dependencies.every(dep => doneIds.has(dep));
-      if (!allDone) continue; // deps not yet satisfied — drop, will re-emerge via PENDING scan
+  //
+  // born-452 dep-drop fix: an index-scan, NOT a shift-while-pop. The prior
+  // implementation called popEligibleFromQueue() — which shift()s the head off
+  // remainingQueue — and only THEN checked whether its dependencies were done,
+  // `continue`-ing past a dep-blocked entry after it had already been removed
+  // from the queue. That permanently dropped the task from remainingQueue (it
+  // could only be recovered by the separate Step-2 PENDING scan below, which is
+  // not guaranteed to still have a free slot by the time it runs). Here, an
+  // entry is only ever spliced OUT when it is actually selected (spawn-eligible)
+  // or already assigned elsewhere (which legitimately needs no requeue) — a
+  // dep-not-ready entry is left in place in the queue and simply skipped this
+  // tick, to be re-checked on a later tick once its dependency completes.
+  let queueIndex = 0;
+  while (toSpawn.length < slotsAvailable && queueIndex < state.remainingQueue.length) {
+    const candidate = state.remainingQueue[queueIndex];
+    if (!candidate) { queueIndex++; continue; }
+    if (state.assignedTaskIds.has(candidate.id)) {
+      state.remainingQueue.splice(queueIndex, 1); // already spawned elsewhere — drop, no requeue needed
+      continue;
     }
-    toSpawn.push(next);
+    if (depPipelineEnabled && candidate.dependencies && candidate.dependencies.length > 0) {
+      const allDone = candidate.dependencies.every(dep => doneIds.has(dep));
+      if (!allDone) {
+        queueIndex++; // deps not yet satisfied — stay queued, check the next entry
+        continue;
+      }
+    }
+    state.remainingQueue.splice(queueIndex, 1);
+    toSpawn.push(candidate);
   }
 
   // Step 2 — fill remaining slots from PENDING tasks (dep-aware).
@@ -314,6 +335,9 @@ function planContinuous(state: DispatchState): DispatchPlan {
   return { toSpawn, toKill: [], mode: 'continuous' };
 }
 
+// Used by planLegacyFifo only — planContinuous's Step 1 uses its own dep-aware
+// index-scan above (born-452 dep-drop fix) since this shift-while-pop shape
+// has no notion of dependencies and would drop a dep-blocked entry.
 function popEligibleFromQueue(
   queue: Task[],
   assigned: ReadonlySet<string>,
@@ -632,6 +656,22 @@ export async function resolveSkillPrompts(
 }
 
 /**
+ * Build the write-scope tool-allowlist targets for a spawn.
+ *
+ * born-452 THROW-ADAYLARI: extracted so the undefined-scope throw path is
+ * unit-testable in isolation. `task.scope.directories` / `task.scope.filesWrite`
+ * are typed as required arrays, but a task loaded from a malformed/legacy
+ * on-disk JSON is not runtime-validated — spreading an undefined array
+ * (`...undefined`) throws "is not iterable". Defaulting both to `[]` here
+ * closes that path without changing behavior for any well-formed task.
+ */
+export function buildSpawnWriteTargets(task: Pick<Task, 'scope'>): string[] {
+  const directories = task.scope?.directories ?? [];
+  const filesWrite = task.scope?.filesWrite ?? [];
+  return ['.tasks/', ...directories, ...filesWrite].filter(Boolean);
+}
+
+/**
  * Wait for task result files to appear on disk using fs.watch with fallback polling.
  * Supports queued task execution: as workers finish, queued tasks are spawned.
  * @param projectRoot - Project root directory
@@ -656,6 +696,8 @@ export async function waitForResults(
   const unlimited = timeout === 0;
   const WATCH_FALLBACK_MS = 5_000;
   const PROGRESS_LOG_INTERVAL_MS = 5 * 60 * 1000; // 5 min
+  // born-452 tick-armor: a same-error escalation ceiling — see the main loop below.
+  const MAX_CONSECUTIVE_SAME_TICK_ERRORS = 5;
   const startTime = Date.now();
   let lastProgressLog = startTime;
   const results: TaskResult[] = [];
@@ -973,14 +1015,25 @@ export async function waitForResults(
   const spawnIfNotAssigned = async (nextTask: Task): Promise<boolean> => {
     if (assignedTaskIds.has(nextTask.id)) return false;
     assignedTaskIds.add(nextTask.id);
-    const queueAgentPrompt = await resolveAgentPrompt(projectRoot, nextTask);
-    const queueSkillPrompts = await resolveSkillPrompts(projectRoot, nextTask);
-    const prompt = buildWorkerPrompt(nextTask, queueAgentPrompt, queueSkillPrompts);
-    const writeTargets = ['.tasks/', ...nextTask.scope.directories, ...nextTask.scope.filesWrite].filter(Boolean);
-    const allowedTools = writeTargets.length > 0
-      ? `Read,Write(${writeTargets.join(',')}),Edit(${writeTargets.join(',')}),Bash,Glob,Grep`
-      : 'Read,Write,Edit,Bash,Glob,Grep';
+    // born-452 THROW-ADAYLARI: the try/catch used to start only at the backend-spawn
+    // call below, leaving prompt resolution + template rendering (resolveAgentPrompt /
+    // resolveSkillPrompts / buildWorkerPrompt — the latter renders the full worker
+    // prompt via buildTaskPrompt, which does unguarded property access on task.scope)
+    // OUTSIDE it. A throw there propagated straight past this function with
+    // `nextTask.id` already added to assignedTaskIds and never rolled back — a
+    // permanent self-inflicted "assigned but never spawned" deadlock for that task,
+    // matching row-452's "queued tasks never spawned" symptom independent of whether
+    // the caller happens to survive the throw (e.g. via the main-loop tick-armor).
+    // Widening the try/catch to cover the whole spawn attempt makes any failure in
+    // this sequence retryable next tick instead of a silent permanent stall.
     try {
+      const queueAgentPrompt = await resolveAgentPrompt(projectRoot, nextTask);
+      const queueSkillPrompts = await resolveSkillPrompts(projectRoot, nextTask);
+      const prompt = buildWorkerPrompt(nextTask, queueAgentPrompt, queueSkillPrompts);
+      const writeTargets = buildSpawnWriteTargets(nextTask);
+      const allowedTools = writeTargets.length > 0
+        ? `Read,Write(${writeTargets.join(',')}),Edit(${writeTargets.join(',')}),Bash,Glob,Grep`
+        : 'Read,Write,Edit,Bash,Glob,Grep';
       if (queueBackend) {
         queueBackend.spawn(nextTask.id, nextTask.model, prompt, {
           allowedTools,
@@ -1263,28 +1316,59 @@ export async function waitForResults(
 
   // Use fs.watch with fallback polling (5s instead of 15s)
   const watcher = createResultWatcher(projectRoot, WATCH_FALLBACK_MS);
+  // born-452 tick-armor: a single tick-step throwing (collectResults /
+  // drainNervousRespawns / dispatchTick / forceRescanIfIdle / dispatchReadyTasks /
+  // cascadeSkipDeadBlocked) used to propagate straight out of this function —
+  // sprint-351 EXECUTE died mid-run from exactly this (born-453 instrumented the
+  // surfacing; this closes the survival gap). A tick that throws is now
+  // debugLog'd + counted instead of killing the loop. Only when the SAME error
+  // repeats on more than MAX_CONSECUTIVE_SAME_TICK_ERRORS consecutive ticks do we
+  // rethrow — an infinite identical-error tight-loop is a real failure, not a
+  // transient one, and the sprint-controller's EXECUTE-ERROR-SURFACE catch is the
+  // right place to report it.
+  let consecutiveTickErrors = 0;
+  let lastTickErrorSignature: string | null = null;
   try {
     while (unlimited || Date.now() - startTime < timeout) {
       ipcWakeupPromise = makeIpcWakeupPromise();
       // Race: fs.watch / fallback-poll vs IPC heartbeat wakeup
       await Promise.race([watcher.waitForChange(), ipcWakeupPromise]);
-      const newlyCollected = await collectResults();
-      // N3: action any cooperative nervous respawn-requests before dispatch (no-op
-      // unless config.nervous_system.worker_respawn). Single-owner — no race.
-      await drainNervousRespawns();
-      // ADR-064 (TOPP B): unified dispatch tick — main loop spawn entry.
-      // Continuous dispatch — re-evaluate eligible Wave N+1 tasks each
-      // tick when dependency_pipeline_enabled is true; honor
-      // DECKENT_LEGACY_FIFO=1 rollback escape inside dispatchTick itself.
-      await dispatchTick(newlyCollected);
-      // Sprint 165 Bug Y — force re-scan idle slots for hayalet PENDING tasks
-      // (legacy FIFO mode and dependency pipeline mode both benefit).
-      await forceRescanIfIdle();
-      // Sprint 272 T2 — dispatch dependency-just-satisfied PENDING tasks NOW so
-      // the collection-done check below is only reached once every ready task
-      // is dispatched-and-awaited (never a synthetic NO_GO for unran work).
-      await dispatchReadyTasks();
-      await cascadeSkipDeadBlocked();
+      try {
+        const newlyCollected = await collectResults();
+        // N3: action any cooperative nervous respawn-requests before dispatch (no-op
+        // unless config.nervous_system.worker_respawn). Single-owner — no race.
+        await drainNervousRespawns();
+        // ADR-064 (TOPP B): unified dispatch tick — main loop spawn entry.
+        // Continuous dispatch — re-evaluate eligible Wave N+1 tasks each
+        // tick when dependency_pipeline_enabled is true; honor
+        // DECKENT_LEGACY_FIFO=1 rollback escape inside dispatchTick itself.
+        await dispatchTick(newlyCollected);
+        // Sprint 165 Bug Y — force re-scan idle slots for hayalet PENDING tasks
+        // (legacy FIFO mode and dependency pipeline mode both benefit).
+        await forceRescanIfIdle();
+        // Sprint 272 T2 — dispatch dependency-just-satisfied PENDING tasks NOW so
+        // the collection-done check below is only reached once every ready task
+        // is dispatched-and-awaited (never a synthetic NO_GO for unran work).
+        await dispatchReadyTasks();
+        await cascadeSkipDeadBlocked();
+        consecutiveTickErrors = 0;
+        lastTickErrorSignature = null;
+      } catch (tickErr) {
+        const signature = tickErr instanceof Error
+          ? `${tickErr.name}:${tickErr.message}`
+          : String(tickErr);
+        consecutiveTickErrors = signature === lastTickErrorSignature ? consecutiveTickErrors + 1 : 1;
+        lastTickErrorSignature = signature;
+        debugLog(
+          'waitForResults:tickArmor',
+          `tick step threw (consecutive-same-error=${consecutiveTickErrors}/${MAX_CONSECUTIVE_SAME_TICK_ERRORS}): ${signature}`,
+        );
+        metric('waitForResults.tick_error', 1, { consecutive: String(consecutiveTickErrors) });
+        if (consecutiveTickErrors > MAX_CONSECUTIVE_SAME_TICK_ERRORS) {
+          debugLog('waitForResults:tickArmor:escalate', `same error repeated >${MAX_CONSECUTIVE_SAME_TICK_ERRORS}× consecutively — escalating: ${signature}`);
+          throw tickErr instanceof Error ? tickErr : new Error(signature);
+        }
+      }
       if (collected.size === taskIds.size) break;
       // Check for pending worker questions and auto-answer them
       checkWorkerQuestions(projectRoot, taskIds, collected);

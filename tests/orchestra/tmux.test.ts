@@ -20,6 +20,7 @@ import {
 import { ValidationError } from '../../src/core/validators.js';
 import type { ProviderAdapter } from '../../src/core/provider.js';
 import type { ModelType } from '../../src/core/types.js';
+import { modelRegistry } from '../../src/core/model-registry.js';
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
@@ -141,7 +142,7 @@ describe.skipIf(isWindows)('spawnWorker', () => {
     expect(args).toContain('deckent:w-task-001');
     const cmdArg = args.find((a) => a.includes('claude'));
     expect(cmdArg).toBeDefined();
-    expect(cmdArg).toContain('claude -p - --model claude-sonnet-4-6');
+    expect(cmdArg).toContain(`claude -p - --model ${modelRegistry.resolveApiId('sonnet')}`);
     // Sprint 170 P0-3: taskId-aware prompt filename (collision-safe, mirrors Docker)
     expect(cmdArg).toContain('.prompt-task-001-abcdef01.txt');
   });
@@ -223,7 +224,7 @@ describe.skipIf(isWindows)('spawnWorker', () => {
     const args = sendKeysCall![1] as string[];
     const cmdArg = args.find((a) => a.includes('claude'));
     expect(cmdArg).toBeDefined();
-    expect(cmdArg).toContain('--model claude-sonnet-4-6');
+    expect(cmdArg).toContain(`--model ${modelRegistry.resolveApiId('sonnet')}`);
     expect(cmdArg).toContain('-p -');
     expect(cmdArg).toContain('< ');
     expect(cmdArg).not.toContain('--allowedTools');
@@ -297,10 +298,10 @@ describe.skipIf(isWindows)('startAuditor', () => {
       ['new-window', '-t', 'deckent', '-n', 'auditor', '-c', '/project'],
       expect.objectContaining({ encoding: 'utf-8' }),
     );
-    // send-keys with --model claude-sonnet-4-6
+    // send-keys with the resolved sonnet apiId
     const sendKeysArgs = mockedSpawnSync.mock.calls[2]![1] as string[];
     const cmdArg = sendKeysArgs.find((a) => a.includes('claude'));
-    expect(cmdArg).toContain('--model claude-sonnet-4-6');
+    expect(cmdArg).toContain(`--model ${modelRegistry.resolveApiId('sonnet')}`);
   });
 
   it('skips new-window when auditor window already exists', () => {
@@ -512,7 +513,7 @@ function createMockAdapter(overrides?: Partial<ProviderAdapter>): ProviderAdapte
 describe.skipIf(isWindows)('buildWorkerCommand', () => {
   it('produces Claude CLI command without adapter (backward compat)', () => {
     const cmd = buildWorkerCommand('sonnet', '/tmp/prompt.txt');
-    expect(cmd).toBe('claude -p - --model claude-sonnet-4-6 < /tmp/prompt.txt');
+    expect(cmd).toBe(`claude -p - --model ${modelRegistry.resolveApiId('sonnet')} < /tmp/prompt.txt`);
   });
 
   it('includes --allowedTools when opts provided (no adapter)', () => {
@@ -597,7 +598,7 @@ describe.skipIf(isWindows)('buildWorkerCommand', () => {
     const cmd = buildWorkerCommand('sonnet', '/tmp/prompt.txt');
     expect(cmd).not.toContain('timeout');
     expect(cmd).not.toContain('WORKER_TIMEOUT');
-    expect(cmd).toBe('claude -p - --model claude-sonnet-4-6 < /tmp/prompt.txt');
+    expect(cmd).toBe(`claude -p - --model ${modelRegistry.resolveApiId('sonnet')} < /tmp/prompt.txt`);
   });
 
   it('uses custom timeout seconds when provided', () => {
@@ -616,7 +617,7 @@ describe.skipIf(isWindows)('buildWorkerCommand', () => {
   it('does not wrap timeout when timeoutSeconds is 0', () => {
     const cmd = buildWorkerCommand('sonnet', '/proj/.tasks/.prompt-z.txt', undefined, undefined, '003-001', 0);
     expect(cmd).not.toContain('timeout');
-    expect(cmd).toContain('claude -p - --model claude-sonnet-4-6');
+    expect(cmd).toContain(`claude -p - --model ${modelRegistry.resolveApiId('sonnet')}`);
   });
 
   it('WORKER_TIMEOUT_SECONDS has the expected default value', () => {
@@ -668,7 +669,7 @@ describe.skipIf(isWindows)('spawnWorker with adapter', () => {
     const args = sendKeysCall![1] as string[];
     const cmdArg = args.find((a) => a.includes('claude'));
     expect(cmdArg).toBeDefined();
-    expect(cmdArg).toContain('claude -p - --model claude-sonnet-4-6');
+    expect(cmdArg).toContain(`claude -p - --model ${modelRegistry.resolveApiId('sonnet')}`);
   });
 });
 

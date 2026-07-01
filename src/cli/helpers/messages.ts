@@ -2047,6 +2047,16 @@ const MESSAGES: MessageMap = {
     en: 'This channel is not configured for per-user authorization.',
     tr: 'Bu kanal kullanıcı-bazlı yetkilendirme için yapılandırılmamış.',
   },
+
+  // ─── Open Health Snapshot (Task 15 — MESSAGES-KEYS, migrated from
+  // health-snapshot.ts LOCAL_MESSAGES; text byte-identical, see 351-001) ────
+  'health.auth': { en: 'auth', tr: 'oturum' },
+  'health.mcp': { en: 'mcp', tr: 'mcp' },
+  'health.mem': { en: 'mem', tr: 'bellek' },
+  'health.mode': { en: 'mode', tr: 'mod' },
+  'health.unknown': { en: 'unknown', tr: 'bilinmiyor' },
+  'health.logged_in': { en: 'logged in', tr: 'oturum açık' },
+  'health.logged_out': { en: 'logged out', tr: 'oturum kapalı' },
 };
 
 /**

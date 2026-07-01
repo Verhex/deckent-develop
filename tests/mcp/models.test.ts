@@ -36,7 +36,7 @@ const MODEL_OPUS: ModelDefinition = {
 
 const MODEL_SONNET: ModelDefinition = {
   id: 'sonnet',
-  apiId: 'claude-sonnet-4-6',
+  apiId: 'claude-sonnet-5',
   provider: 'claude',
   tier: 'standard',
   contextWindow: 200_000,

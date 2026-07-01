@@ -12,7 +12,7 @@ function makeRecord(
 ): UsageRecord {
   return {
     ts,
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     sessionFile,
     projectDir: 'test-project',
     in: 1000,

@@ -22,6 +22,7 @@ import {
 } from '../../src/orchestra/planner.js';
 import { providerRegistry } from '../../src/core/provider.js';
 import { BRAIN_PLAN_TIMEOUT_MS } from '../../src/core/constants.js';
+import { modelRegistry } from '../../src/core/model-registry.js';
 
 const mockedSpawnSync = vi.mocked(spawnSync);
 
@@ -284,8 +285,8 @@ describe('buildPlannerSpawnArgs', () => {
   it('builds generic args when adapter lacks buildPlannerCommand', () => {
     const adapter = makeMockAdapter();
     const result = buildPlannerSpawnArgs(adapter, 'my prompt', 'sonnet');
-    // Sprint 238 İŞ5: planner passes the real apiId (claude-sonnet-4-6), not the alias.
-    expect(result.args).toEqual(['-p', 'my prompt', '--model', 'claude-sonnet-4-6', '--output-format', 'json']);
+    // Sprint 238 İŞ5: planner passes the real apiId (live from the registry), not the alias.
+    expect(result.args).toEqual(['-p', 'my prompt', '--model', modelRegistry.resolveApiId('sonnet'), '--output-format', 'json']);
   });
 
   it('extracts "codex" from codex adapter buildCommand', () => {
@@ -366,7 +367,7 @@ describe('callBrainPlanner with adapter', () => {
 
     expect(mockedSpawnSync).toHaveBeenCalledWith(
       'codex',
-      expect.arrayContaining(['--model', 'claude-sonnet-4-6']),
+      expect.arrayContaining(['--model', modelRegistry.resolveApiId('sonnet')]),
       expect.any(Object),
     );
   });
@@ -472,7 +473,7 @@ describe('callZeroConfigPlanner', () => {
 
     expect(mockedSpawnSync).toHaveBeenCalledWith(
       'codex',
-      expect.arrayContaining(['--model', 'claude-sonnet-4-6']),
+      expect.arrayContaining(['--model', modelRegistry.resolveApiId('sonnet')]),
       expect.any(Object),
     );
   });

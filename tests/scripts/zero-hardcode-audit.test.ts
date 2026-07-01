@@ -60,7 +60,7 @@ describe('isCommentLine', () => {
   });
 
   it('identifies JSDoc /** opener lines', () => {
-    expect(isCommentLine('  /** Raw model string from API response (e.g. "claude-sonnet-4-6") */')).toBe(true);
+    expect(isCommentLine('  /** Raw model string from API response (e.g. "claude-sonnet-4-7") */')).toBe(true);
   });
 
   it('returns false for regular code lines', () => {
@@ -87,17 +87,17 @@ export { MODEL };
 
   it('detects hardcoded sonnet model string in code', () => {
     const path = writeTmp('violation-sonnet.ts', `
-const id = "claude-sonnet-4-6";
+const id = "claude-sonnet-4-7";
 `);
     const violations = scanFile(path);
     expect(violations.length).toBeGreaterThanOrEqual(1);
-    expect(violations[0].match).toBe('claude-sonnet-4-6');
+    expect(violations[0].match).toBe('claude-sonnet-4-7');
   });
 
   it('skips hardcoded model string in comment lines', () => {
     const path = writeTmp('comment-only.ts', `
 // Normalize: "anthropic/claude-opus-4-6" → "claude-opus-4-6"
-// * example: claude-sonnet-4-6
+// * example: claude-sonnet-4-7
 `);
     const violations = scanFile(path);
     expect(violations.length).toBe(0);

@@ -17,6 +17,7 @@ import {
 } from '../../src/core/model-equivalence.js';
 import type { ProviderAdapter } from '../../src/core/provider.js';
 import type { ModelType, ProviderName } from '../../src/core/types.js';
+import { modelRegistry } from '../../src/core/model-registry.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -78,7 +79,7 @@ describe('Claude Adapter Smoke Tests', () => {
 
   it('buildCommand without opts produces clean command', () => {
     const cmd = adapter.buildCommand('sonnet', '/tmp/task.txt');
-    expect(cmd).toBe('claude -p - --model claude-sonnet-4-6 < /tmp/task.txt');
+    expect(cmd).toBe(`claude -p - --model ${modelRegistry.resolveApiId('sonnet')} < /tmp/task.txt`);
   });
 
   it('isAvailable returns boolean (checks claude --version)', async () => {

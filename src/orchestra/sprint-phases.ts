@@ -610,6 +610,61 @@ function toAuditSchemaValidation(
   return { valid: true, missingFields: [], coverageRelaxed };
 }
 
+/**
+ * 352-003 (EVAL-AUDIT-REVIVE): single forensic-audit write path shared by
+ * every EVALUATE-phase branch that reaches a task-evaluation decision.
+ *
+ * RC (disk-verify, git-trail): the inline writeEvaluationAudit block
+ * (formerly duplicated only at the collectedIds.has(task.id) top-of-loop
+ * site) was never reached by the three alternate branches inside
+ * runEvaluatePhase that also call handleEvaluation + evaluations.set —
+ * extension-hit (late .result during the runtime-extension poll window),
+ * alive-grace-hit (late .result during the 60s liveness grace-poll), and
+ * the timeout/synthetic-NO_GO branch (no .result ever collected). The
+ * first two HAVE a rubric result; the third does not. Both shapes must
+ * still produce a decision + rationale record — this function is the
+ * single call site all four branches now share.
+ *
+ * `rubricResult` omitted → rubric'siz path: criterionScores=[], totalScore=0,
+ * schemaValidation flags the missing `.result` explicitly (not a passing
+ * schema — there was never a result to validate). `rationaleOverride` lets
+ * the rubric'siz caller supply a human-readable cause (e.g. liveness status)
+ * instead of the rubric-derived rationale, which would otherwise degenerate
+ * to "0 criteria, 0 passed" and lose the actual reason.
+ *
+ * Fail-soft: any audit-write error is debugLog'd but must not abort the
+ * EVALUATE loop — mirrors every other best-effort block in this phase.
+ */
+export function writeTaskEvaluationAudit(
+  projectRoot: string,
+  sprintId: string,
+  task: Task,
+  evaluation: TaskEvaluation,
+  rubricResult?: EvaluationResult,
+  rationaleOverride?: string,
+): void {
+  try {
+    const rubricScores = rubricResult?.rubricScores ?? [];
+    const totalScore = rubricResult?.totalScore ?? 0;
+    const auditCriteria = toAuditCriterionScores(task, rubricScores);
+    const auditSchema = rubricResult
+      ? toAuditSchemaValidation(task, rubricScores)
+      : { valid: false, missingFields: ['result'], coverageRelaxed: false };
+    const auditDecision = toAuditDecision(evaluation);
+    const rationale = rationaleOverride ?? buildDecisionRationale(
+      auditDecision, totalScore, auditCriteria, auditSchema,
+    );
+    writeEvaluationAudit(projectRoot, sprintId, task.id, 1, {
+      ruleSet: toAuditRuleSet(task),
+      schemaValidation: auditSchema,
+      criterionScores: auditCriteria,
+      totalScore,
+      decision: auditDecision,
+      decisionRationale: rationale,
+    });
+  } catch (e) { debugLog('writeTaskEvaluationAudit', e); }
+}
+
 /** Write error dashboard state — mirrors sprint-controller's private helper */
 function safeDashboardUpdate(
   projectRoot: string,
@@ -1697,24 +1752,9 @@ export async function runEvaluatePhase(
         // Joins the rubric outcome with the task's rubric definition
         // (for threshold + weight) and writes a JSON file under
         // .deckent/evaluations/<sprintId>/<taskId>-attempt-1.json.
-        // Fail-soft: any audit-write error is debugLog'd but must not
-        // abort the evaluation pipeline.
-        try {
-          const auditCriteria = toAuditCriterionScores(task, rubricResult.rubricScores);
-          const auditSchema = toAuditSchemaValidation(task, rubricResult.rubricScores);
-          const auditDecision = toAuditDecision(evaluation);
-          const rationale = buildDecisionRationale(
-            auditDecision, rubricResult.totalScore, auditCriteria, auditSchema,
-          );
-          writeEvaluationAudit(projectRoot, sprint.id, task.id, 1, {
-            ruleSet: toAuditRuleSet(task),
-            schemaValidation: auditSchema,
-            criterionScores: auditCriteria,
-            totalScore: rubricResult.totalScore,
-            decision: auditDecision,
-            decisionRationale: rationale,
-          });
-        } catch (e) { debugLog('runEvaluatePhase:writeEvaluationAudit', e); }
+        // 352-003: shared writer — see writeTaskEvaluationAudit doc comment
+        // for why this can no longer be an inline block local to this branch.
+        writeTaskEvaluationAudit(projectRoot, sprint.id, task, evaluation, rubricResult);
 
         // DECKENT→USER:NOTIFY (Hot Fix H6) — task-done / task-no-go, fail-safe
         try {
@@ -1815,6 +1855,7 @@ export async function runEvaluatePhase(
             const evaluation = toTaskEvaluation(rubricResult);
             handleEvaluation(projectRoot, task, evaluation, lateResult);
             evaluations.set(task.id, evaluation);
+            writeTaskEvaluationAudit(projectRoot, sprint.id, task, evaluation, rubricResult);
             continue;
           }
           debugLog(
@@ -1906,6 +1947,7 @@ export async function runEvaluatePhase(
             const graceEval = toTaskEvaluation(graceRubric);
             handleEvaluation(projectRoot, task, graceEval, graceResult);
             evaluations.set(task.id, graceEval);
+            writeTaskEvaluationAudit(projectRoot, sprint.id, task, graceEval, graceRubric);
             continue;
           }
           debugLog(
@@ -1939,6 +1981,14 @@ export async function runEvaluatePhase(
         debugLog('runEvaluatePhase:timeout', `task=${task.id} — no result collected, marking NO_GO (timeout/missing) liveness=${liveness.status} reclassified=${gated.reclassified}`);
         handleEvaluation(projectRoot, task, TaskEvaluation.NO_GO, syntheticResult);
         evaluations.set(task.id, TaskEvaluation.NO_GO);
+        // 352-003 (EVAL-AUDIT-REVIVE): no .result was ever collected, so no
+        // rubric ever ran — the "rubric'siz" path. writeTaskEvaluationAudit
+        // still writes a decision + rationale record (no rubricResult arg),
+        // so the forensic ledger has no silent gap for timeout NO_GOs.
+        writeTaskEvaluationAudit(
+          projectRoot, sprint.id, task, TaskEvaluation.NO_GO, undefined,
+          `${syntheticResult.notes ?? 'no result collected'}${gated.reclassified ? ' (reclassified=MANUAL_REVIEW_REQUIRED)' : ''}`,
+        );
         if (gated.reclassified) {
           task.status = TaskStatus.MANUAL_REVIEW_REQUIRED;
           try {

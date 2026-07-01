@@ -50,7 +50,7 @@ const MODEL_OPUS: ModelDefinition = {
 
 const MODEL_SONNET: ModelDefinition = {
   id: 'sonnet',
-  apiId: 'claude-sonnet-4-6',
+  apiId: 'claude-sonnet-5',
   provider: 'claude',
   tier: 'standard',
   contextWindow: 200_000,
@@ -119,7 +119,7 @@ describe('findModel', () => {
   });
 
   it('finds a model by apiId', () => {
-    const found = findModel([MODEL_OPUS, MODEL_SONNET], 'claude-sonnet-4-6');
+    const found = findModel([MODEL_OPUS, MODEL_SONNET], 'claude-sonnet-5');
     expect(found).toBe(MODEL_SONNET);
   });
 

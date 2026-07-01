@@ -2,6 +2,29 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint352] - 2026-07-01
+
+### Added
+
+- TOOL-2 — progressive disclosure köprüsü (row 21 YENİDEN-KOŞUM)
+- EXEC-THROW-HUNT — waitForResults istisna-avı + tick-zırhı (row 452 🔴)
+- EVAL-AUDIT-REVIVE — ölü audit-trail'i canlandır (row 451 🔴)
+- SWEEP2 — stale model-ID part-2 (row 431 kalanı, YENİDEN-KOŞUM)
+- DPP — dead provision-helper purge/consent (row 208, YENİDEN-KOŞUM)
+- CFG-1 — legacy `mode` config-set blokajı (row 209, YENİDEN-KOŞUM)
+- DOCTOR-1 — backend-aware platform-check (row 210, YENİDEN-KOŞUM)
+- TOOL-CORE — core-tool-set eager listesi wire (row 23, P1)
+- TOOL-SCOPE — out-of-scope yazımı tool-gate'le (row 22, P0)
+- APR-2 — çok-kanallı onay-relay çekirdeği (row 67, P0)
+
+### Changed
+
+- W5C — kind-affinity, config-gated (row 447, YENİDEN-KOŞUM) (completed with tech debt)
+- ROUTING-VERSION-LABEL — 'v3'-return vs 'v2'-stamp uzlaştır (ADR-G-006 P2) (completed with tech debt)
+
+
+_Tasks: 15 total, 15 done, 2 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint350] - 2026-07-01
 
 ### Added

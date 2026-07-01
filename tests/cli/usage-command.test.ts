@@ -36,7 +36,7 @@ import type { SprintUsageSummary } from '../../src/core/limit-ledger-report.js';
 const SAMPLE_RECORDS: UsageRecord[] = [
   {
     ts: '2026-06-09T10:00:00.000Z',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     sessionFile: 'session-abc.jsonl',
     projectDir: 'proj-a',
     in: 50_000,
@@ -46,7 +46,7 @@ const SAMPLE_RECORDS: UsageRecord[] = [
   },
   {
     ts: '2026-06-09T11:00:00.000Z',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     sessionFile: 'session-abc.jsonl',
     projectDir: 'proj-a',
     in: 48_000,
@@ -67,7 +67,7 @@ const SAMPLE_RECORDS: UsageRecord[] = [
 ];
 
 const SAMPLE_PRICES: LedgerPrices = {
-  'claude-sonnet-4-6': { in: 3e-6, out: 15e-6 },
+  'claude-sonnet-5': { in: 3e-6, out: 15e-6 },
   'claude-haiku-4-5-20251001': { in: 0.8e-6, out: 4e-6 },
 };
 
@@ -130,7 +130,7 @@ describe('usage command', () => {
     // Header should mention "7 days"
     expect(calls.some((s) => s.includes('7'))).toBe(true);
     // Table output should contain model name
-    expect(calls.some((s) => s.includes('claude-sonnet-4-6'))).toBe(true);
+    expect(calls.some((s) => s.includes('claude-sonnet-5'))).toBe(true);
     // Table output should contain haiku model
     expect(calls.some((s) => s.includes('claude-haiku'))).toBe(true);
     // Totals row
@@ -172,7 +172,7 @@ describe('usage command', () => {
     const sprintRecords: UsageRecord[] = [
       {
         ts: '2026-06-09T10:00:00.000Z',
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         sessionFile: 'session-task1.jsonl',
         projectDir: 'proj',
         in: 60_000,
@@ -240,7 +240,7 @@ describe('usage command', () => {
     const sprintRecords: UsageRecord[] = [
       {
         ts: '2026-06-09T10:00:00.000Z',
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         sessionFile: 'session-s1.jsonl',
         projectDir: 'proj',
         in: 50_000,

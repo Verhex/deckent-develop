@@ -287,6 +287,14 @@ export interface RoutingOptions {
    */
   skillAgentAffinity?: boolean;
   /**
+   * Enable kind-affinity bonus (PCOMP-W5C, Sprint 352-008). Default-off.
+   * When true, `getKindAffinityBonus` is folded into agent scoring: the
+   * 'refactorer' agent gets +KIND_AFFINITY_BONUS on a 'refactor'-kind task and
+   * KIND_AFFINITY_CODE_DEV_PENALTY on a 'code-development'-kind task. Flag-off
+   * is byte-identical to pre-352-008 routing.
+   */
+  kindAffinity?: boolean;
+  /**
    * Enable agent selection cache. Default-off.
    * When true, selectBestAgent results are memoized via agentSelectionCache.
    * Cache key includes selected skill IDs so affinity-on cache is correct.
@@ -333,6 +341,7 @@ export function routeTaskV2(
   const reasoning: string[] = [];
   const overrideWarnings: string[] = [];
   const skillAgentAffinityEnabled = options?.skillAgentAffinity ?? false;
+  const kindAffinityEnabled = options?.kindAffinity ?? false;
   const agentCacheEnabled = options?.agentCache ?? false;
 
   // Step 1: Classify task intent
@@ -452,7 +461,7 @@ export function routeTaskV2(
     if (!cacheHit) {
       const agentResult = selectBestAgent(
         taskDNA, agentPool, cfg, learningData, allExcludeAgents, task.type,
-        skillIds, skillAgentAffinityEnabled,
+        skillIds, skillAgentAffinityEnabled, kindAffinityEnabled,
       );
       agentId = agentResult.agentId;
       agentScore = agentResult.score;
@@ -501,7 +510,7 @@ export function routeTaskV2(
     taskDNA,
     reasoning,
     contextFit,
-    routingVersion: 'v3' as const,
+    routingVersion: 'v2' as const,
     overrideWarnings: overrideWarnings.length > 0 ? overrideWarnings : undefined,
   };
 }
@@ -574,6 +583,29 @@ export function getRoleMismatchPenalty(agentRole: AgentRole, taskKind?: TaskKind
   return compatible ? 0 : -3;
 }
 
+/** PCOMP-W5C (Sprint 352-008, config-gated, default-off): +bonus when 'refactorer' faces its named specialty. */
+export const KIND_AFFINITY_BONUS = 3;
+/** PCOMP-W5C: −penalty countering refactorer's generic impl@7 (agent-pool.ts) auto-winning the catch-all kind. */
+export const KIND_AFFINITY_CODE_DEV_PENALTY = -2;
+
+/**
+ * PCOMP-W5C (kind-affinity signal, config-gated default-off, Sprint 352-008):
+ * a task's TaskKind carries a request-shape signal that today only touches
+ * one agent by name — 'refactor' explicitly asks for a restructuring pass
+ * (refactorer's named specialty), while 'code-development' is the generic
+ * catch-all kind that must not let refactorer's baseline impl@7 activation
+ * score (see agent-pool.ts) auto-win ties against a domain-specialized
+ * candidate. Agent-ID-scoped (not role-scoped, unlike getRoleMismatchPenalty):
+ * every agent other than 'refactorer' gets 0 regardless of kind. Undefined
+ * kind or a non-'refactorer' agent → no opinion (no penalty, no bonus).
+ */
+export function getKindAffinityBonus(agentId: string, taskKind?: TaskKind): number {
+  if (agentId !== 'refactorer' || !taskKind) return 0;
+  if (taskKind === 'refactor') return KIND_AFFINITY_BONUS;
+  if (taskKind === 'code-development') return KIND_AFFINITY_CODE_DEV_PENALTY;
+  return 0;
+}
+
 function selectBestAgent(
   taskDNA: TaskDNA,
   pool: AgentPool,
@@ -583,6 +615,7 @@ function selectBestAgent(
   taskKind?: TaskKind,
   assignedSkills?: string[],
   skillAgentAffinity?: boolean,
+  kindAffinity?: boolean,
 ): { agentId: string | null; score: number; confidence: ConfidenceLevel; reasoning: string[] } {
   const candidates: ScoredCandidate[] = [];
   const reasoning: string[] = [];
@@ -650,12 +683,18 @@ function selectBestAgent(
       reasoning.push(`Agent '${id}' role-mismatch penalty: ${rolePenalty} (role=${getAgentRole(agent)}, taskKind=${taskKind})`);
     }
 
-    const finalScore = result.score + bonus + domainBonus + surfaceBonus + rolePenalty;
+    // PCOMP-W5C: kind-affinity signal — config-gated, default-off (see RoutingOptions.kindAffinity).
+    const kindBonus = kindAffinity ? getKindAffinityBonus(id, taskKind) : 0;
+    if (kindBonus !== 0) {
+      reasoning.push(`Agent '${id}' kind-affinity bonus: ${kindBonus > 0 ? '+' : ''}${kindBonus} (taskKind=${taskKind})`);
+    }
+
+    const finalScore = result.score + bonus + domainBonus + surfaceBonus + rolePenalty + kindBonus;
 
     if (finalScore >= cfg.agentMinScore) {
       candidates.push({
         id,
-        rawScore: result.score + domainBonus + surfaceBonus + rolePenalty,
+        rawScore: result.score + domainBonus + surfaceBonus + rolePenalty + kindBonus,
         learningBonus: bonus,
         finalScore,
         matchedRules: result.matchedRules,

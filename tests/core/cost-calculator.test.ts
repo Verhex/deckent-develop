@@ -30,7 +30,7 @@ const TEST_CONFIG: CostConfig = {
           deckent_aliases: ['opus'],
           enabled: true,
         },
-        'claude-sonnet-4-6': {
+        'claude-sonnet-5': {
           input_cost_per_token: 0.000003,
           output_cost_per_token: 0.000015,
           cache_creation_input_token_cost: 0.00000375,
@@ -254,7 +254,7 @@ describe('cost-calculator', () => {
       expect(est.perProvider.anthropic?.taskCount).toBe(3);
       expect(est.perProvider.openai?.taskCount).toBe(1);
       expect(est.perProvider.anthropic?.models['claude-opus-4-6']?.taskCount).toBe(1);
-      expect(est.perProvider.anthropic?.models['claude-sonnet-4-6']?.taskCount).toBe(2);
+      expect(est.perProvider.anthropic?.models['claude-sonnet-5']?.taskCount).toBe(2);
     });
   });
 

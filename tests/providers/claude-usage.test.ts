@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { tmpdir } from 'node:os';
 import { ClaudeAdapter } from '../../src/providers/claude.js';
 import { CLAUDE_SUBPROCESS_CONFIG } from '../../src/providers/subprocess.js';
+import { modelRegistry } from '../../src/core/model-registry.js';
 
 // `extractUsage` is a pure stdout parser — no spawn, no fs. The ClaudeAdapter
 // constructor performs no I/O for the default (tmux) backend, so we can build it
@@ -169,7 +170,7 @@ describe('CLAUDE_SUBPROCESS_CONFIG usage-emit wiring', () => {
   it('keeps the usage-emit flag OUT of buildArgs (spawn-only) so the arg-shape seam is stable', () => {
     const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('sonnet');
     expect(args).not.toContain('--output-format');
-    expect(args).toEqual(['-p', '-', '--model', 'claude-sonnet-4-6']);
+    expect(args).toEqual(['-p', '-', '--model', modelRegistry.resolveApiId('sonnet')]);
   });
 
   it('keeps the usage-emit flag OUT of buildCommandString (dry-run display stays stable)', () => {

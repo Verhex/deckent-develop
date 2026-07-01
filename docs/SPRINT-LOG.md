@@ -8386,3 +8386,39 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 350-006: STALE-MODEL-ID-SWEEP — 30 test dosyasında sonnet-ID güncelle (row 431) (DONE)
 
 ---
+## Sprint 352 — sprint-352
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-01
+**Duration:** 1205s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 15 |
+| Completed | 15 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1204857ms |
+
+### Tasks
+
+- 352-001: TOOL-2 — progressive disclosure köprüsü (row 21 YENİDEN-KOŞUM) (DONE)
+- 352-002: EXEC-THROW-HUNT — waitForResults istisna-avı + tick-zırhı (row 452 🔴) (DONE)
+- 352-003: EVAL-AUDIT-REVIVE — ölü audit-trail'i canlandır (row 451 🔴) (DONE)
+- 352-004: SWEEP2 — stale model-ID part-2 (row 431 kalanı, YENİDEN-KOŞUM) (DONE)
+- 352-005: DPP — dead provision-helper purge/consent (row 208, YENİDEN-KOŞUM) (DONE)
+- 352-006: CFG-1 — legacy `mode` config-set blokajı (row 209, YENİDEN-KOŞUM) (DONE)
+- 352-007: DOCTOR-1 — backend-aware platform-check (row 210, YENİDEN-KOŞUM) (DONE)
+- 352-008: W5C — kind-affinity, config-gated (row 447, YENİDEN-KOŞUM) (GO_WITH_TECH_DEBT)
+- 352-009: TOOL-CORE — core-tool-set eager listesi wire (row 23, P1) (DONE)
+- 352-010: TOOL-SCOPE — out-of-scope yazımı tool-gate'le (row 22, P0) (DONE)
+- 352-011: APR-2 — çok-kanallı onay-relay çekirdeği (row 67, P0) (DONE)
+- 352-012: AUDIT-TENANT — audit event'lerinde gerçek tenant (row 59, P2) (DONE)
+- 352-013: ROUTING-VERSION-LABEL — 'v3'-return vs 'v2'-stamp uzlaştır (ADR-G-006 P2) (GO_WITH_TECH_DEBT)
+- 352-014: PROMPT-COMMENT-REFRESH — stale tmux-yorumları (row 91, P3) (DONE)
+- 352-015: MESSAGES-KEYS — bekleyen i18n anahtarları (tek-yetkili görev) (DONE)
+
+---

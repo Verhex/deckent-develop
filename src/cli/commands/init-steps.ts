@@ -678,6 +678,15 @@ export interface ProvisionDockerImageOpts {
  *
  * Returns the exit code from handleImageBuild (0 = success), or undefined when
  * no build was needed.
+ *
+ * @deprecated DEAD-PROVISION-PURGE (ADR-G-030, disk-verified sprint-352-005):
+ * confirmed 0 production call-sites — `deckent init` wires the consent-gated
+ * worker-image offer in init.ts instead (which prompts before building; this
+ * helper ignores the `yes` opt it declares and would auto-build silently if
+ * ever re-wired). Do not add a new call-site for this function; use the
+ * consent-gated init.ts path. DEFERRED pending a follow-up task with write
+ * access to upgrade.ts + tests/cli/img2-init-fold.test.ts to remove this
+ * function (and its upgrade.ts sibling) and their dedicated unit tests.
  */
 export async function maybeProvisionDockerImage(
   root: string,

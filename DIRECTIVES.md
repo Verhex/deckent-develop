@@ -1,361 +1,288 @@
-# DIRECTIVES — OVERNIGHT ROUND 4 (BIG): pivot-P0 genişleme + borç-temizliği (18 task)
+# DIRECTIVES — OVERNIGHT ROUND 6: APR-ailesi tamamlama + TERM-çekirdek + güvenlik (16 task)
 
 ## Goal
-Strategic-pivot P0 pillar'larını genişlet (TERM açılış+keşif · TOOL registry+disclosure ·
-APR broker+masking · TRN pipeline · MOAT-3 dürüst-durum) ve 10 kalite/güvenlik borcunu kapat.
-Her task: önce DISK-VERIFY (`git grep`/Read, `file:line` cite), sonra hermetik-testli implementasyon.
-Yasa #1 çift-bakış · Yasa #2 cross-platform · Yasa #3 god-level/no-MVP.
+APR pillar'ını üretim-şekline getir (store/policy/workergate/fallback/eventstream — broker+contract+
+relay DİSKTE), TERM çekirdek-dilimlerini indir (live-footer/3-mod/chat-turn/connect/DIR-1/tool-bridge),
+DECK-SUBPROC-BROKER 🔴 güvenlik-borcunu kapat, 352-debt'lerini ADR-temiz çöz. DISK-VERIFY → hermetik-test.
+Yasa #1/#2/#3.
 
-## 🔒 BAĞLAYICI — her task (binding)
-- **DISTINCT-FILE:** `Files:` = tek yazım-otoriten; read-dizinleri yazım izni VERMEZ; scope-dışı bulgu → result `notes` (`docImpact:` konvansiyonu dahil).
-- **DISK-VERIFY first:** iddiayı diskte doğrula + cite; zaten-doğruysa kanıtla SKIP.
-- **ADR kontrat · surgical minimum-diff · davranış koru · YAGNI.**
-- **Test hermeticity:** tmpdir+afterEach; proje-kökü/HOME'a yazma; spawnSync yok; gerçek-provider çağrısı yok.
-- **No build/install/login.** `tsc --noEmit` + yalnız HEDEFLİ test dosyaların.
-- **i18n-first:** yeni user-facing string yalnız `getMessage(key, lang)` (en+tr çifti).
-- **Honest result** (files_changed + kanıt + selfAssessment). **No haiku.**
+## 🔒 BAĞLAYICI — her task
+- **DISTINCT-FILE** (Files=tek yazım-otorite; scope-dışı → notes/docImpact).
+- **DISK-VERIFY first** (`file:line`); zaten-doğruysa kanıtla SKIP.
+- **ADR kontrat** (özellikle D-004 import-yönü: core→orchestra ASLA) · surgical · YAGNI.
+- **Hermetik test** (tmpdir; gerçek-provider/spawnSync yok). **No build/install/login.**
+- **i18n**: yeni key yetkisi YALNIZ Task 16'da; diğerleri ihtiyacı notes'a yazar.
+- **Honest result. No haiku.**
 
 ---
 
-## Task 1: TERM-1 — açılış health-snapshot (row 38, pivot-P0)
+## Task 1: SCOPECHECK-CORE — realpath scope-check primitive'ini core'a taşı (352-010 ADR-debt)
 - Model: sonnet
 - Effort: high
 - Skills: typescript-expert
-- Files: src/cli/helpers/health-snapshot.ts, src/cli/entry.ts, tests/cli/health-snapshot.test.ts
-- Scope: src/cli/, src/core/, tests/cli/, docs/adr/
+- Files: src/core/scope-check.ts, src/orchestra/authority-enforcer.ts, src/core/tool-scope-gate.ts, tests/core/scope-check.test.ts
+- Scope: src/core/, src/orchestra/, tests/core/, docs/adr/
 - Dependencies: none
 ### Description
-Governing: ADR-G-010 (terminal UX) + pivot-P0 TERM ("hazır mıyım?"). `deckent` açılışında (REPL
-bootstrap — `launchDefaultRepl`, entry.ts) tek-bakış health-snapshot: provider/model (canlı
-registry'den, hardcode YOK) · auth-durumu (probe var: provider-auth-probe) · MCP erişilebilirliği ·
-bellek/budget özeti · cwd + aktif-mode. Yeni saf modül `buildHealthSnapshot(root)` (I/O fail-soft,
-her alan "unknown"a dürüşt düşer) + entry.ts'te REPL-öncesi compact render (i18n-first; NO_COLOR
-saygılı). Snapshot toplama <500ms hedef (yavaş probe'lar timeout'lu). Tier-1 surface: result'a
-`Smoke: node dist/cli/entry.js --version → sürüm basılır` yerine gerçek snapshot-smoke öner
-(host koşar).
+Governing: ADR-D-004 (C1: core→orchestra ASLA) + ADR-G-017. 352-010 doğru yakaladı: tool-scope-gate
+(core) authority-enforcer'dan (orchestra) import EDEMEZ. W9-deseni (messages→core taşıma emsali):
+realpath-tabanlı `isWithinScope` + parent-çözümleme yardımcılarını `src/core/scope-check.ts`'e TAŞI
+(davranış birebir — 351-inen symlink testleri referans); authority-enforcer artık core'dan import
+eder (aşağı-yön ✓); tool-scope-gate'in geçici kopyası/duplikasyonu varsa core'a bağlanır. Import-yönü
+grep-kanıtı result'a.
 ### goNogo
-- goCriteria: buildHealthSnapshot hermetik testli (mock probe'lar; alan-alan fail-soft kanıtı);
-  render i18n-key'li (en+tr); canlı model-ID hardcode edilmemiş (registry'den — test eder);
-  entry.ts wire minimal-diff; `tsc --noEmit` temiz.
-- nogo: hardcoded model/provider adı; açılışı bloklayan yavaş probe; İngilizce-hardcode metin.
+- goCriteria: isWithinScope tek-kaynak core'da; authority-enforcer + tool-scope-gate ondan import;
+  authority-enforcer-symlink + tool-scope-gate testleri YEŞİL (davranış-koruma); core→orchestra
+  import=0 (grep-kanıt); `tsc` temiz.
+- nogo: davranış değişikliği; çift-tanım bırakmak.
 
-## Task 2: TERM-3 — kategorili komut-registry (row 42, pivot-P0)
+## Task 2: APR-STORE — durable approval store (row 31)
 - Model: sonnet
 - Effort: high
 - Skills: typescript-expert
-- Files: src/cli/command-registry.ts, tests/cli/command-registry.test.ts
-- Scope: src/cli/, src/core/, tests/cli/, docs/adr/
-- Dependencies: none
-### Description
-Governing: ADR-G-011 (CLI/MCP parity) + pivot TERM-3. TEK cross-surface komut-kataloğu modülü:
-her deckent komutu için {name, category (Core|Run|Memory|MCP|Enterprise|Danger), risk
-(Oku|Değiştir|Çalıştır|Otonom — TERM-5 sade-risk-dili), scope, summaryKey (i18n), surfaces
-(cli|mcp|repl)}. Mevcut komut listesini DİSKTEN çıkar (src/cli/commands/ register-pattern +
-mcp tools listesi) — elle-uydurma YOK; kayıt-eksiği testte yakalansın (registry ⊇ registered
-commands). Salt-veri + query API (byCategory/byRisk/search); UI-wiring follow-up (result notes).
-### goNogo
-- goCriteria: registry gerçek komut-envanterini kapsar (test, disk-taramayla karşılaştırır);
-  kategori/risk enum'ları spec'teki gibi; query API testli; `tsc --noEmit` temiz.
-- nogo: uydurulmuş komut listesi; UI değişikliği; i18n'siz görünür metin.
-
-## Task 3: TOOL-1 — deckent tool-registry çekirdeği (row 20, pivot-P0)
-- Model: sonnet
-- Effort: high
-- Skills: typescript-expert, api-builder
-- Files: src/core/tool-registry.ts, tests/core/tool-registry.test.ts
-- Scope: src/core/, src/mcp/, tests/core/, docs/adr/
-- Dependencies: none
-### Description
-Governing: pivot-P0 TOOL-1 ("deckenti deckent yapan") + ADR-G-011. Deckent fonksiyonlarını
-terminal-native TOOL yüzeyine taşıyan çekirdek: `ToolDefinition` {name, description, paramsSchema
-(zod), risk, category, handlerRef} + `ToolRegistry` (register/get/list/validate-params). MCP
-tools (src/mcp/tools/) tanımlarından SEED et — çift-tanım değil, tek-kaynak adaptörü (MCP tool
-→ ToolDefinition köprüsü; disk-verify MCP tool-tanım şekli). Dispatch ÇALIŞTIRMA yok (yalnız
-registry+validation; dispatch TOOL-2+cutover işi). Cross-surface (REPL/MCP/CLI aynı registry'yi
-okuyacak — bugün sadece modül+test).
-### goNogo
-- goCriteria: registry MCP-tool-setinden seed'lenir (test: bilinen tool adları mevcut; params
-  şeması valide eder/reddeder); handler ÇAĞRILMAZ (saf katalog); `tsc --noEmit` temiz.
-- nogo: MCP tanımlarının kopyala-yapıştır çiftlenmesi; gerçek exec; circular import (mcp→core→mcp).
-
-## Task 4: TOOL-2 — progressive disclosure köprüsü (row 21, pivot-P0)
-- Model: sonnet
-- Effort: high
-- Skills: typescript-expert
-- Files: src/core/tool-search.ts, tests/core/tool-search.test.ts
-- Scope: src/core/, tests/core/, docs/adr/
-- Dependencies: TOOL-1
-### Description
-Governing: pivot-P0 TOOL-2 (§7.1 "BM25 modeli, daha iyisi"). TOOL-1 registry'si üstüne
-search/describe/call-plan köprüsü: `searchTools(query, {limit})` (token-tabanlı skorlama:
-name-exact > name-partial > description-token; deterministik sıralama), `describeTool(name)`
-(tam şema), `planCall(name, args)` (validate + risk-etiketli çağrı-planı döner — EXEC YOK).
-Core-set kavramı: `coreTools()` eager-listesi (status/plan/run/start/review/help/memory-query —
-TOOL-CORE row 23'ün temeli). Hepsi saf + hermetik.
-### goNogo
-- goCriteria: arama deterministik + alakalı (test: 'sprint başlat' → start önde); describe tam
-  şema döner; planCall invalid-args'ı reddeder + risk etiketi taşır; coreTools listesi spec'teki
-  7'yi içerir; `tsc --noEmit` temiz.
-- nogo: gerçek tool-exec; nondeterministik skorlama; TOOL-1 dosyalarına yazma.
-
-## Task 5: APR-1 — ApprovalBroker çekirdeği (row 29, pivot-P0 "en kritik")
-- Model: sonnet
-- Effort: high
-- Skills: typescript-expert, api-builder
-- Files: src/core/approval-broker.ts, tests/core/approval-broker.test.ts
+- Files: src/core/approval-store.ts, tests/core/approval-store.test.ts
 - Scope: src/core/, tests/core/, docs/adr/
 - Dependencies: none
 ### Description
-Governing: pivot-P0 APR-1 (§11.1) + ADR-G-020. Runtime-wide, EVENT-tabanlı (stdin DEĞİL)
-ApprovalBroker: sprint-350'de inen `approval-contract.ts`'i (disk-verify) kullanır.
-`ApprovalBroker` {submit(request)→pending (dosya-backed store: .deckent/approvals/, atomic
-tmp+rename, JSONL ya da dosya-per-request), on('pending'|'decided') EventEmitter, decide(id,
-decision)→resolve + awaiting-promise resume, list(pending), expire(now) TTL-süpürme}.
-Çok-process gerçeği: store DOSYA-tabanlı (başka process decide edebilir — poll/watch seam
-injectable). Worker-suspend/resume mekaniği ve kanal-relay'ler (APR-2) follow-up — burada
-broker çekirdeği + store + event.
+Broker'ın dosya-per-request deseni (disk-verify approval-broker.ts storeDir) üstüne durable katman:
+`ApprovalStore` {load(dir)→{pending,approved,denied,expired}, transition(id,to,decision), index()
+restart-survive (yeniden-taramayla kurtarma), prune(olderThan)}. Atomic tmp+rename; broker'ı
+YENİDEN-YAZMA — store'u broker'ın kullandığı dizin-şemasıyla uyumlu yap (şemayı cite et).
 ### goNogo
-- goCriteria: submit→pending persist (atomic yazım test); decide→promise resume + event; expire
-  TTL testi; ikinci-process-decide simülasyonu (store'a dışarıdan yazılan decision'ı watch/poll
-  seam'i görür); contract-tipleri approval-contract'tan import (yeniden-tanım YOK); `tsc` temiz.
-- nogo: stdin-etkileşimi; contract-tiplerini çiftlemek; non-atomic store yazımı.
+- goCriteria: restart-simülasyonu (yeni instance diskten tam-durum kurar); transition-atomiklik;
+  broker'ın yazdığı gerçek-şekilli fixture'la uyum testi; `tsc` temiz.
+- nogo: broker-içini değiştirmek; şema-uydurmak.
 
-## Task 6: APR-4 — onay redaction/masking (row 37, pivot-P0)
+## Task 3: APR-POLICY — karar-motoru (row 32)
 - Model: sonnet
-- Effort: normal
+- Effort: high
 - Skills: typescript-expert, secure-coding
-- Files: src/core/approval-masking.ts, tests/core/approval-masking.test.ts
+- Files: src/core/approval-policy.ts, tests/core/approval-policy.test.ts
 - Scope: src/core/, tests/core/, docs/adr/
 - Dependencies: none
 ### Description
-Governing: APR-4 (§11.7) + ADR-G-025. ApprovalRequest'in maskedArgs/rawArgsRef ayrımını dolduran
-modül: `maskArgs(raw)` → redactSensitive-tabanlı masked görünüm (komut-string'i, env-değerleri,
-path'lerdeki credential'lar) + `storeRawArgs(root, id, raw)` → .deckent/approvals/raw/ altına
-0600-perm, atomic; `resolveRawArgs(root, ref)` yalnız explicit çağrıyla. Serileşen request'e raw
-ASLA girmez (contract zaten dışlıyor — testle kanıtla).
+approval-contract enum'ları (scope-7/risk-5/policy-4/default-4 — disk-verify) üstüne saf karar-motoru:
+`decidePolicy(request, rules)` → auto-approve|notify|require-approval|deny + gerekçe. Kural-şeması:
+{match: {scope?,risk?,requester?,tenantId?}, action, timeoutMs?}; ilk-eşleşen kazanır; eşleşme-yoksa
+request.defaultAction'a göre GÜVENLİ taraf (deny>defer>escalate>allow sıralamasında asla yükseltme).
+Timeout-aşımı → defaultAction. Tamamı deterministik+saf.
 ### goNogo
-- goCriteria: sk-/Bearer/API_KEY/password= maskelenir (test); raw ayrı-dosyada 0600 + atomic;
-  request-JSON'unda raw'ın izi yok; `tsc` temiz.
-- nogo: raw'ın request'e sızması; maskeleme mask-formatını mevcut redactSensitive'den saptırmak.
+- goCriteria: enum-matrisi testleri (kritik: risk=critical asla auto-approve — kural öyle dese bile
+  deny'a clamp + gerekçe); ilk-eşleşen; default-güvenli; `tsc` temiz.
+- nogo: IO; contract-tiplerini çiftlemek; critical-auto-approve'a izin.
 
-## Task 7: TRN-4 — training-pipeline mükemmelleştirme (row 80, pivot-P1)
+## Task 4: APR-WORKERGATE — riskli-aksiyon önü worker kapısı (row 34)
 - Model: sonnet
 - Effort: high
 - Skills: typescript-expert
-- Files: src/training/pipeline.ts, tests/training/trn4-pipeline.test.ts
-- Scope: src/training/, src/core/, src/agent/, tests/training/, docs/adr/
+- Files: src/core/approval-worker-gate.ts, tests/core/approval-worker-gate.test.ts
+- Scope: src/core/, tests/core/, docs/adr/
 - Dependencies: none
 ### Description
-Governing: TRN-4 ("Hermes shipped-grade") + ADR-G-009. sprint-350'de inen TRN-1/2/3 wire'larını
-disk-verify et (trace-recorder çıktı-şekli), sonra pipeline modülü: trace → ShareGPT-format
-dönüştürücü + compressor (tool-result truncation politikalı) + label-zenginleştirme (outcome/
-agent/model) + redaction-pass (çift-kontrol). Girdi: .deckent/training/ trace'leri; çıktı:
-ShareGPT JSONL. Deterministik; büyük-trace'te bellek-güvenli (satır-akışlı).
+Worker'ın riskli tool/aksiyon öncesi broker'dan karar beklemesi: `WorkerApprovalGate`
+{guard(actionDesc)→Promise<allow|deny>} — approval-masking ile maskedArgs kurar, broker.submit,
+decision'ı await (policy auto-approve ise anında), timeout→FallbackResolver-seam (inject edilir;
+default deny). Worker-loop wiring follow-up (notes) — burada çekirdek+testler (fake broker/policy).
 ### goNogo
-- goCriteria: fixture-trace → geçerli ShareGPT JSONL (şema-testli); truncation politikası testli;
-  redaction çift-pass kanıtı; satır-akışlı (dev dosyada tüm-dosya-belleğe-alma yok — test yaklaşık
-  kanıt yeterli); `tsc` temiz.
-- nogo: format uydurup ShareGPT'den sapmak; redaction'sız çıktı.
+- goCriteria: auto-approve anında-allow; require→decide-resume; timeout→injected-fallback; raw-args
+  gate'ten geçmez (masked); `tsc` temiz.
+- nogo: gerçek broker-IO'suz test edilemez tasarım (seam şart); worker koduna yazmak.
 
-## Task 8: MOAT-3 — NOT_DISPATCHED dürüst-durum (row 87, P1)
+## Task 5: APR-FALLBACK — FallbackResolver (row 35)
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/core/approval-fallback.ts, tests/core/approval-fallback.test.ts
+- Scope: src/core/, tests/core/, docs/adr/
+- Dependencies: none
+### Description
+Terminal-yok/karar-gelmedi durumları: `resolveFallback(request, ctx)` → deny|pause|timeout-default|
+escalate(dashboard/API-kanalı) — sonsuz-takılma ASLA (her yol sonlu). ctx: {channelsAlive, expiresAt,
+policyDefault}. Saf + deterministik.
+### goNogo
+- goCriteria: her ctx-kombinasyonu sonlu-karar (property-test tarzı tablo); expiry→default;
+  kanal-yokken critical→deny; `tsc` temiz.
+- nogo: IO; sonsuz-bekleme yolu.
+
+## Task 6: APR-EVENTSTREAM — çok-client yayın (row 68)
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/core/approval-eventstream.ts, tests/core/approval-eventstream.test.ts
+- Scope: src/core/, tests/core/, docs/adr/
+- Dependencies: none
+### Description
+Relay (disk-verify approval-relay.ts) üstüne çok-client pub: `ApprovalEventStream`
+{subscribe(clientId, filter?)→AsyncIterable/callback, publish stream'i relay-event'lerinden}, geç-katılan
+client'a pending-backfill, kopan client'ın kuyruğu sınırlı (backpressure: maxBuffer + drop-oldest +
+işaret). Terminal/dashboard/API adaptörleri follow-up.
+### goNogo
+- goCriteria: 2-client farklı-filter testi; backfill; backpressure-drop işaretli; unsubscribe sızdırmaz;
+  `tsc` temiz.
+- nogo: relay-içini değiştirmek; sınırsız-buffer.
+
+## Task 7: TERM-LIVE — canlı run-status footer üretici (row 43)
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/cli/helpers/live-footer.ts, tests/cli/live-footer.test.ts
+- Scope: src/cli/, src/core/, tests/cli/, docs/adr/
+- Dependencies: none
+### Description
+Saf render-modülü: `buildLiveFooter(state)` → 1-5 satır (5 soru: ne çalışıyor / ne kadar oldu /
+provider-health / auth-state / sıradaki-ne). state-feed seam (heartbeat/sprint-state okuyucusundan
+inject); NO_COLOR-duyarlı; genişlik-kırpma. REPL-wiring follow-up.
+### goNogo
+- goCriteria: 5-soru alanları; NO_COLOR; genişlik-kırpma; boş-state dürüst "idle"; `tsc` temiz.
+- nogo: doğrudan dosya-okuma (seam şart); i18n-key ekleme (ihtiyacı notes'a → Task 16).
+
+## Task 8: TERM-MODE — Ask/Run/Control 3-mod makinesi (row 39)
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/cli/repl/term-mode.ts, tests/cli/term-mode.test.ts
+- Scope: src/cli/, tests/cli/, docs/adr/
+- Dependencies: none
+### Description
+Saf durum-makinesi: modlar Ask(read-only)/Run(plan→approve→run→eval)/Control(yönetim); geçiş-komutları
++ mod-başına izinli-aksiyon-sınıfları (command-registry risk-alanıyla hizalı — disk-verify
+src/cli/command-registry.ts) + Ask-modunda mutasyon-aksiyonu → reddet+öner. UI follow-up.
+### goNogo
+- goCriteria: geçiş-matrisi testli; Ask'ta Değiştir/Çalıştır-riskli aksiyonlar reddedilir; registry
+  risk-enum'uyla tutarlılık testi; `tsc` temiz.
+- nogo: registry'ye yazmak; UI.
+
+## Task 9: TERM-2 — chat-turn çekirdeği (row 41)
 - Model: sonnet
 - Effort: high
 - Skills: typescript-expert
-- Files: src/orchestra/result-evaluator.ts, src/orchestra/sprint-phases.ts, src/core/task-types.ts, tests/orchestra/moat3-not-dispatched.test.ts
+- Files: src/cli/repl/chat-turn-queue.ts, tests/cli/chat-turn-queue.test.ts
+- Scope: src/cli/, src/core/, tests/cli/, docs/adr/
+- Dependencies: none
+### Description
+Hermes-user-msg kuralı: bg-tamamlanan iş MID-TURN enjekte edilmez → YENİ turn olarak kuyruklanır.
+`ChatTurnQueue` {enqueueBg(event), userTurnActive flag, drainAsTurns()→sıralı turn-payload'ları,
+coalesce(aynı-kaynak ardışık event'ler)}. REPL-loop wiring follow-up.
+### goNogo
+- goCriteria: aktif-turn sırasında bg-event kuyruklanır (enjekte edilmez); turn-bitince drain sıralı;
+  coalesce testli; `tsc` temiz.
+- nogo: repl-loop dosyalarına yazmak.
+
+## Task 10: TERM-CONNECT — /connect sihirbaz çekirdeği (row 46)
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/cli/helpers/connect-wizard.ts, tests/cli/connect-wizard.test.ts
+- Scope: src/cli/, src/core/, tests/cli/, docs/adr/
+- Dependencies: none
+### Description
+Saf çekirdek: `detectRuntime(probes)` → {providers[detected/auth-state], mcp, ide, winShell} +
+`planConnectSteps(detection, hedef)` → adım-listesi (komut + açıklama-key + risk). Probe'lar inject
+(gerçek-CLI çağrısı testte yok); mevcut provider-auth-probe/doctor yardımcılarını YENİDEN-KULLAN
+(disk-verify; çiftleme yok). UI follow-up.
+### goNogo
+- goCriteria: injected-probe matrisiyle detection; plan-adımları deterministik; mevcut probe
+  yardımcıları import (grep-kanıt); `tsc` temiz.
+- nogo: gerçek probe/exec; doctor'ı değiştirmek.
+
+## Task 11: DIR-1 — NL→DIRECTIVES üretici çekirdeği (row 48)
+- Model: sonnet
+- Effort: high
+- Skills: typescript-expert
+- Files: src/orchestra/directives-builder.ts, tests/orchestra/directives-builder.test.ts
 - Scope: src/orchestra/, src/core/, tests/orchestra/, docs/adr/
 - Dependencies: none
 ### Description
-Governing: MOAT-3 (sentetik-NO_GO güven sorunu; sprint-347/348'de canlı yaşandı: spawn/dispatch
-hiç olmadığında worker "NO_GO" görünüyor — yalan). Dispatch-hiç-olmamış (spawn-fail, container
-hiç start etmemiş, .result+.hb+log hiçbiri yok) task'ler evaluation'da **NOT_DISPATCHED** ayrı
-dürüst-durumuyla işaretlensin: TaskEvaluation enum'una ekle, evaluate-fazı disk-kanıtına göre
-ayırt etsin (result yok + hb yok + worker-start izi yok → NOT_DISPATCHED; result yok ama hb/iz
-var → mevcut synthetic-NO_GO). FIX-fazı NOT_DISPATCHED'ı "re-dispatch aday" sayar (worker-suçu
-değil); rapor/summary ayrı sayaç gösterir. Geriye-uyum: mevcut NO_GO akışları bozulmaz.
+DIRECTIVES-kırılganlığına son: yapılandırılmış-niyetten (tasks[]: {title,desc,files,scope,deps,model,
+skills,goCriteria[],nogo[]}) kanonik DIRECTIVES.md ÜRETEN deterministik builder + round-trip garanti:
+ürettiğini parseStructuredDirectives (disk-verify task-builder.ts parser'ı) kayıpsız geri-okur.
+LLM-katmanı follow-up — bu görev format-SSOT'u kurar (0-kırılganlık temeli).
 ### goNogo
-- goCriteria: enum+ayrım testli (üç senaryo: dispatch-yok / worker-öldü-izli / normal-NO_GO);
-  FIX-fazı sınıflandırması testli; summary sayacı; mevcut evaluate testleri yeşil; `tsc` temiz.
-- nogo: NO_GO semantiğini genişletip ayrımı bulanıklaştırma; disk-kanıtsız sınıflandırma.
+- goCriteria: round-trip testi (build→parse→derin-eşitlik; Files/Deps/goNogo dahil); parser'a YAZMADAN
+  uyum; kanonik-format tek-yer; `tsc` temiz.
+- nogo: parser'ı değiştirmek; LLM-çağrısı.
 
-## Task 9: PGID — worker process-group teardown (row 432-MOAT, G-013)
+## Task 12: TERM-4 — tool-driven dispatch köprüsü (row 44)
+- Model: sonnet
+- Effort: high
+- Skills: typescript-expert
+- Files: src/core/tool-dispatch.ts, tests/core/tool-dispatch.test.ts
+- Scope: src/core/, tests/core/, docs/adr/
+- Dependencies: none
+### Description
+TOOL-1/2 (registry+search+planCall DİSKTE) üstüne yürütme-köprüsü: `dispatchToolCall(plan, {confirm,
+execImpl})` — planCall-çıktısını alır, risk≥eşik → confirm-seam'den onay (APR-workergate'e bağlanacak;
+burada inject), execImpl-seam'iyle çalıştırır (gerçek-exec inject; testte fake), sonuç+telemetri döner.
+Deterministik hata-sarmalama (throw→structured error).
+### goNogo
+- goCriteria: risk-eşiği confirm-akışı; execImpl-inject; hata-sarmalama; registry/search dosyalarına
+  yazmadan; `tsc` temiz.
+- nogo: gerçek komut-exec; UI.
+
+## Task 13: WS-TENANT — gerçek tenant propagasyonu (352-012 debt, DOĞRU dosyayla)
 - Model: sonnet
 - Effort: normal
 - Skills: typescript-expert
-- Files: src/providers/subprocess.ts, tests/providers/pgid-teardown.test.ts
-- Scope: src/providers/, src/core/, tests/providers/, docs/adr/
+- Files: src/api/terminal/ws-gateway.ts, tests/api/ws-tenant-propagation.test.ts
+- Scope: src/api/, src/core/, tests/api/, docs/adr/
 - Dependencies: none
 ### Description
-Governing: ADR-G-013 (MOAT-2 e2e bulgusu). SIGKILL-escalation doğrudan worker'ı öldürür ama
-grandchild'ları DEĞİL (kanıt: sh-wrapped worker'da sleep orphan kaldı). Fix: POSIX'te worker'ı
-`detached: true` (yeni process-group lideri) spawn et + killWithSignal grubu hedeflesin
-(`process.kill(-pid, sig)`); Windows'ta detached semantiği farklı — platform-dallı (win32'te
-mevcut tek-pid davranışı korunur + dürüst debugLog; taskkill /T follow-up notu). MOAT-2'nin
-child.unref() + hbInterval düzenleri AYNEN korunur (moat2-linger testleri yeşil kalmalı).
+Governing: ADR-G-029. 352-012 disk-verify'ı: kusur ws-gateway.ts:119/128'de (auth.deny/auth.ok
+tenantId:'local' hardcode) — auth-context'ten gerçek principal-tenant'ı geçir (tenantOf() deseni
+:152'de zaten var — disk-verify + yeniden-kullan); context-yoksa dürüst 'local' fallback.
 ### goNogo
-- goCriteria: POSIX'te spawn detached + grup-kill (mock-spawn testi: kill(-pid) çağrısı);
-  win32 dalı davranış-koruyucu; tests/providers/subprocess*.test.ts + moat2-linger yeşil;
-  `tsc` temiz.
-- nogo: MOAT-2 unref/escalation davranışını bozmak; gerçek-sinyal testleri.
+- goCriteria: tenant'lı bağlamda event gerçek-tenant taşır (test); fallback 'local'; mevcut
+  ws-gateway/audit testleri yeşil; `tsc` temiz.
+- nogo: yeni hardcode; audit-sink zincirini bozmak.
 
-## Task 10: RVDC — finalizer ölü-V1-branch çöküşü (row 425)
+## Task 14: DECK-SUBPROC-BROKER — subprocess .deck izolasyonu (row 422 🔴 P0)
 - Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/orchestra/sprint-finalizer.ts, src/orchestra/sprint-planner.ts, tests/orchestra/rvdc-deadbranch.test.ts
-- Scope: src/orchestra/, src/core/, tests/orchestra/, docs/adr/
-- Dependencies: none
-### Description
-Governing: ADR-G-006 (ROUTE-V1-PURGE follow-up). Finalizer'daki artık-ölü `if(routingVersion
-!== 'v2')` V1-stats-branch'i (~61 satır; agent.json'a yazar) davranış-hassas dedent'le kaldır —
-V2/learnings.json yolu TEK yol kalsın; planner+finalizer'daki vestigial tek-değerli
-version-guard'ları temizle. DİKKAT: double-count-guard mantığı finalize kritik-yolu — önce
-mevcut testleri koş, minimum-diff, sonra tekrar koş.
-### goNogo
-- goCriteria: V1-branch yok (grep-kanıt); stats yalnız learnings-yoluna; mevcut finalize/stats
-  testleri yeşil; yeni regression-test (v2-default akışı stats'ı BİR kez sayar); `tsc` temiz.
-- nogo: stats çift-sayımı; agent.json-yazımının yanlışlıkla tamamen kaybı (learnings-yolu
-  agent-stats güncellemesini zaten yapıyorsa onu koru — disk-verify).
-
-## Task 11: RV2C — Route-V2 integration coverage (row 426)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert, testing-expert
-- Files: tests/orchestra/route-v2-integration.test.ts
-- Scope: tests/, src/, docs/adr/
-- Dependencies: none
-### Description
-Governing: ADR-G-006. Silinen V1-only integration testlerinin (full-sprint-e2e/error-recovery/
-project-type routing) V2-eşdeğerleri: routeTaskV2 üzerinden (a) karışık-görevli mini-set'te
-çeşitlilik (tek-agent ≤%60), (b) monorepo-tipi çok-dizinli görev routing'i, (c) force-*
-override'ların korunması, (d) role-mismatch penalty'nin canlı etkisi (reviewer implement-task'ta
-seçilmez — gerçek agent-pool fixture'ıyla). Salt-test task'ı; src'ye DOKUNMA.
-### goNogo
-- goCriteria: 4 senaryo hermetik testli (gerçek DB'siz — fixture pool); suite yeşil; `tsc` temiz.
-- nogo: src değişikliği; gerçek .brain/memory.db okuma.
-
-## Task 12: APDD — auditor PILOT_ADR_RULES dedup/taxonomy-fix (row 423)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/monitor/auditor.ts, tests/monitor/apdd-pilot-rules.test.ts
-- Scope: src/monitor/, src/core/, tests/monitor/, docs/adr/
-- Dependencies: none
-### Description
-Governing: ADR-G-019 (taxonomy) + row 423. `PILOT_ADR_RULES`/checkADRCompliance'daki DB-gated
-kural anahtarları eski `ADR-006/008` — taxonomy-rename sonrası DB-id'ler `adr-g/d-NNN` →
-eşleşmeyen kural = ölü/redundant. Disk-verify: hangi kurallar hangi id'yle ölü; yeni-id'lere
-remap ET ya da gerçekten-redundant'sa (authority-enforcer zaten kapsıyorsa) SİL — seçimini
-kanıtla gerekçelendir. Auditor'un diğer davranışı bozulmaz.
-### goNogo
-- goCriteria: ölü-anahtar kanıtı (file:line + DB-id listesi); remap-veya-sil kararı gerekçeli;
-  auditor testleri yeşil + yeni test (kural gerçek taxonomy-id'yle ateşlenir YA DA silinmiş);
-  `tsc` temiz.
-- nogo: kanıtsız silme; taxonomy-id'siz yeni hardcode.
-
-## Task 13: EAA — evaluation-audit atomic yazım (ADR-G-025 born)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/orchestra/evaluation-audit-trail.ts, tests/orchestra/eaa-atomic.test.ts
-- Scope: src/orchestra/, src/core/, tests/orchestra/, docs/adr/
-- Dependencies: none
-### Description
-Governing: ADR-G-025 (EVAL-AUDIT-ATOMIC born). `writeEvaluationAudit` düz `writeFileSync` —
-checkpoint/phase-persistence'ın kullandığı `.tmp`+`renameSync` atomik desenine geçir (aynı
-dosyadaki mevcut desenleri disk-verify + aynısını uygula). Yarım-yazılmış audit post-mortem'i
-bozmasın. Davranış/format değişmez.
-### goNogo
-- goCriteria: tmp+rename kanıtı (test: yazım-anı kesintisi simülasyonu → ya eski ya yeni, asla
-  yarım); mevcut audit-trail testleri yeşil; `tsc` temiz.
-- nogo: format değişikliği; ekstra I/O katmanı.
-
-## Task 14: SWEEP2 — stale model-ID süpürme part-2 (row 431 kalanı)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert, testing-expert
-- Files: tests/core/model-registry.test.ts, tests/core/cost-calculator.test.ts, tests/scripts/zero-hardcode-audit.test.ts, tests/core/limit-ledger-cache-gate.test.ts, tests/orchestra/tmux.test.ts, tests/orchestra/sprint-reporter-usage.test.ts, tests/orchestra/reconciler.test.ts, tests/orchestra/planner.test.ts, tests/mcp/cost-tool.test.ts, tests/providers/claude-usage.test.ts, tests/catalog/catalog-types.test.ts, tests/mcp/usage-tool.test.ts, tests/mcp/models.test.ts, tests/providers/claude.test.ts, tests/catalog/catalog-registry.test.ts, tests/cli/models.test.ts, tests/cli/usage-command.test.ts, tests/e2e/tmux-backend.test.ts, tests/e2e/provider-smoke.test.ts
-- Scope: tests/, src/core/, docs/adr/
-- Dependencies: none
-### Description
-Governing: [[feedback_zero_hardcode_live_data]] + row 431 (part-1 sprint-350'de). Listelenen 19
-dosyada `claude-sonnet-4-6` → kanonik güncel ID (kaynağı model-registry/catalog'dan cite et;
-sprint-350-006'nın kanıtını yeniden-kullanabilirsin). Testin NİYETİ "alias güncel modele çözülür"
-ise registry-tabanlı assertion'a çevir; ID-fix ötesinde yeniden-yapılandırma YOK. Her dosyanın
-suite'ini koş.
-### goNogo
-- goCriteria: 19 dosya güncel + suite'leri yeşil; kanonik-kaynak cite; kalan-stale=0 (grep-kanıt
-  result'ta); `tsc` temiz.
-- nogo: davranışsal test değişikliği; listedışı dosya.
-
-## Task 15: DPP — dead provision-helper purge/consent (row 208, P1·SEC)
-- Model: sonnet
-- Effort: normal
+- Effort: high
 - Skills: typescript-expert, secure-coding
-- Files: src/cli/commands/init-steps.ts, src/cli/commands/init.ts, tests/cli/dpp-provision.test.ts
-- Scope: src/cli/, src/core/, tests/cli/, docs/adr/
+- Files: src/core/deck-broker.ts, tests/core/deck-broker.test.ts
+- Scope: src/core/, src/providers/, tests/core/, docs/adr/
 - Dependencies: none
 ### Description
-Governing: ADR-G-030 + row 208 ("consent-bypass riski"). `maybeProvisionDockerImage` /
-`reprovisionWorkerImageAfterUpgrade` helper'larının call-site'sizlik iddiasını disk-verify et;
-gerçekten ölülerse SİL (ADR-D-006 dead-code disposition); bir call-site varsa consent-zorunlu
-yap (explicit onay-parametresi olmadan docker-build ASLA). Riskli-miras: sessiz docker-image
-build'i kullanıcı-onayı olmadan çalışmamalı.
+Governing: ADR-G-005/G-017 (Sıra-2'nin docker-half'i inmişti; subprocess-half bu). Subprocess-worker
+host-process'tir → `.deck`'i diskten OKUYABİLİR (mount-trick yok; bugün yalnız env-scrub). Host-side
+credential-broker ÇEKİRDEĞİ: `DeckBroker` {resolveForTask(taskId, provider)→yalnız-o-task'ın-ihtiyacı
+secret'lar, audit-log'lu erişim, TTL'li tek-kullanımlık handoff (env-injection değeri olarak)};
+worker'a dosya-yolu ASLA verilmez. subprocess.ts wiring follow-up (notes'a tam plan) — burada broker
++ testler. Cross-ref: applyDeckSecretsToEnv mevcut akışı (disk-verify) — broker onu besleyecek şekilde.
 ### goNogo
-- goCriteria: 0-caller kanıtı (grep) → silme + testler yeşil; YA DA call-site'li → consent-gate
-  testli; hiçbir yol sessiz-build bırakmaz; `tsc` temiz.
-- nogo: davranışı sessizce değiştirip init'i kırmak; kanıtsız silme.
+- goCriteria: task-scoped resolve (başka task'ın secret'ı dönmez — test); erişim-audit kaydı; TTL/
+  tek-kullanım; `.deck`-yolu API'den sızmaz; `tsc` temiz.
+- nogo: subprocess.ts'i bu görevde değiştirmek; broker'ı bypass eden helper.
 
-## Task 16: CFG-1 — legacy `mode` config-set blokajı (row 209, P1)
+## Task 15: WPOPT-DEDUP — worker-prompt tekrar-analizi + güvenli kırpım (row 89 dilimi)
 - Model: sonnet
 - Effort: normal
 - Skills: typescript-expert
-- Files: src/core/config.ts, tests/core/cfg1-legacy-mode.test.ts
-- Scope: src/core/, src/cli/, tests/core/, docs/adr/
+- Files: src/orchestra/prompt-god-template.ts, tests/orchestra/wpopt-dedup.test.ts
+- Scope: src/orchestra/, tests/orchestra/, docs/adr/
 - Dependencies: none
 ### Description
-Governing: row 209 ("resolveMode wire; 3-yol tutarsız"). Legacy `mode` değeri tüm config-set'i
-blokluyor iddiasını disk-verify et (validateConfig / config-set yolu / resolveMode üçlüsü);
-kök-neden: legacy on-disk değer validation'ı düşürüyor. Fix: routing_engine v1→v2 coercion
-desenini (aynı dosyada mevcut — disk-verify) legacy-mode için uygula: oku-anında coerce +
-migrateConfig kalıcılaştır; `deckent config set` legacy-mode'lu dosyada çalışır hale gelsin.
+Governing: ADR-G-027 + row 89 ("aynı kalitede min-token"). Disk-verify: template segmentlerinde
+TEKRAR eden yönerge blokları (örn. heartbeat-format iki yerde, verify-kuralları çift-anlatım) —
+kanıt-listesi çıkar; YALNIZ birebir-tekrar olanları tek-yere indir (anlam-kaybı sıfır; W4-tarzı
+politika-değişikliği DEĞİL). prompt-determinism + segmentation testleri yeşil kalmalı; kırpım-önü/
+sonu byte-ölçümü result'a.
 ### goNogo
-- goCriteria: legacy-mode'lu fixture-config'de set başarılı (hermetik test, tmpdir); coercion
-  + migrate testli; mevcut config testleri yeşil; `tsc` temiz.
-- nogo: legacy değeri sessizce SİLMEK (coerce et, veri kaybetme); validation'ı gevşetmek.
+- goCriteria: tekrar-kanıtı file:line listesi; yalnız birebir-tekrar kırpımı; determinism/segmentation
+  suite yeşil; ölçüm (önce/sonra byte) result'ta; `tsc` temiz.
+- nogo: içerik-politikası değişikliği; testleri güncelleyerek anlam-kaybı gizleme.
 
-## Task 17: DOCTOR-1 — backend-aware platform-check (row 210, P1·WIN)
+## Task 16: MESSAGES-KEYS-2 — round-6 i18n anahtarları (tek-yetkili)
 - Model: sonnet
 - Effort: normal
 - Skills: typescript-expert
-- Files: src/cli/commands/doctor.ts, tests/cli/doctor-backend-aware.test.ts
-- Scope: src/cli/, src/core/, tests/cli/, docs/adr/
-- Dependencies: none
+- Files: src/cli/helpers/messages.ts, tests/cli/messages-round6-keys.test.ts
+- Scope: src/cli/, tests/cli/, docs/adr/
+- Dependencies: TERM-LIVE, TERM-MODE, TERM-CONNECT
 ### Description
-Governing: row 210 + Yasa #2. doctor'ın Platform-check'i backend-blind: Windows+docker
-kombinasyonunda yanlış teşhis; ayrıca brain-budget label eksik/yanıltıcı. Disk-verify
-(runDoctorChecks platform/backend dalları), sonra: check'ler configured spawn_backend'i hesaba
-katsın (docker-varken tmux-yokluğu FAIL değil; win32+subprocess honest-support satırı);
-brain-budget label'ı gerçek kaynağından. i18n-first.
+Round-6 TERM görevlerinin notes'larında bildirdiği key-ihtiyaçlarını topla (bu sprint'in .result
+dosyaları .tasks/ altında) + en+tr çiftleriyle ekle; anahtar-çakışması ve fallback-davranışı testli.
+Yalnız anahtar-ekleme (yapı değişikliği yok).
 ### goNogo
-- goCriteria: backend-matrisli testler (docker/tmux/subprocess × linux/win32 mock-platform);
-  yanlış-FAIL senaryosu düzeldi (regression-test); i18n-key'ler en+tr; `tsc` temiz.
-- nogo: gerçek docker/tmux çağrısı testte; platform-string hardcode.
-
-## Task 18: W5C — kind-affinity routing sinyali, config-gated (row 447, P2)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/core/routing-engine.ts, tests/core/w5c-kind-affinity.test.ts
-- Scope: src/core/, tests/core/, docs/adr/
-- Dependencies: none
-### Description
-Governing: row 447 (349-005 analiz) + ADR-G-006. refactorer feature-add'e atanıyor (davranış-koruma
-misyonuyla çelişki; Sprint-211 refactorer-heavy nüksü). İMPLEMENTER-İÇİ ince-sinyal: TaskKind
-'refactor' → refactorer +bonus; 'code-development' → refactorer hafif-penalty (−2). **Config-gated,
-DEFAULT-OFF** (`routing.kindAffinity ?? false`) — dağılım-değişikliği Alperen sabah-onayına kadar
-kapalı kalır; flag-off yolu byte-identical. Mevcut role-signal (getRoleMismatchPenalty) desenini
-aynala.
-### goNogo
-- goCriteria: flag-off → skor byte-identical (test); flag-on → refactor-task'ta refactorer öne,
-  feature-task'ta geriler (fixture-pool testi); routing-diversity testleri yeşil; `tsc` temiz.
-- nogo: default-on; role-signal'i bozmak.
+- goCriteria: bildirilen her ihtiyaç karşılandı (kaynak-task cite); en+tr çift; messages testleri yeşil.
+- nogo: tek-dilli key; yapısal değişiklik.

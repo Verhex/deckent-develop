@@ -9,6 +9,8 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-352-008 | Tech debt from 352-008: PCOMP-W5C kind-affinity, config-gated via RoutingOptions | normal | sprint-352 | resolved |
+| debt-352-013 | Tech debt from 352-013: ADR-G-006 P2 ROUTING-VERSION-LABEL reconcile. (1) src/co | normal | sprint-352 | resolved |
 | debt-344-003 | Tech debt from 344-003: Added module-level `_missingKeyWarnedInProd = new Set<st | normal | sprint-344 | resolved |
 | debt-343-003 | Tech debt from 343-003: B6 pre-spawn cumulative-spend WARN-gate (flag-gated defa | normal | sprint-343 | resolved |
 | debt-343-004 | Tech debt from 343-004: GREP PROOF — zero prod callers confirmed:

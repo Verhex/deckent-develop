@@ -274,7 +274,7 @@ describe('suggestCheaperModel', () => {
 
   it('resolves a concrete apiId through its tier keyword', () => {
     expect(suggestCheaperModel('claude-opus-4-8')).toBe('sonnet');
-    expect(suggestCheaperModel('claude-sonnet-4-6')).toBe('haiku');
+    expect(suggestCheaperModel('claude-sonnet-5')).toBe('haiku');
   });
 
   it('is case-insensitive', () => {

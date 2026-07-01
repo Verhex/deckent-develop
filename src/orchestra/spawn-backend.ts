@@ -138,9 +138,11 @@ export class TmuxBackend implements SpawnBackend {
     // Sprint 168 C0e Cross-Backend Contract: tmpfiles persist until sprint cleanup,
     // archived together by archivePromptFiles() during sprint cleanup phase.
     // (Same as Docker backend spawn-backend-docker.ts:941-942 — Sprint 156 Task 4.)
-    // Tmux backend's prompt files are named with random hex (no embedded taskId),
-    // so the active-worker selective filter in claude.ts._cleanupOrphanedPromptFiles
-    // does NOT protect them — see ADR-048 Consequences (Negative).
+    // Sprint 170 P0-3: tmux worker prompt files embed taskId
+    // (`.prompt-{taskId}-{hash}.txt`, see tmux.ts writePromptFile), so the
+    // active-worker selective filter in claude.ts._cleanupOrphanedPromptFiles
+    // DOES protect them. Only the taskId-less Auditor prompt keeps the legacy
+    // hex-only name — see ADR-048 Consequences (Negative) for the history.
     const dir = opts?.projectDir ?? this.projectDir;
     ensureSession();
     tmuxSpawnWorker(taskId, model, prompt, dir, {

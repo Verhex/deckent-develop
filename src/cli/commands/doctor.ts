@@ -69,9 +69,29 @@ export function isRunningInWSL(): boolean {
   }
 }
 
-export function checkPlatform(): DoctorCheck {
+export function checkPlatform(spawnBackend?: string): DoctorCheck {
   const currentPlatform = platform();
   if (currentPlatform === 'win32') {
+    // Backend-aware (DOCTOR-1, row 210): tmux genuinely doesn't run natively on
+    // Windows, but docker (Docker Desktop) and subprocess backends work fine there.
+    // Reporting "UNSUPPORTED" regardless of the configured backend is a misdiagnosis
+    // when the user has explicitly opted into docker or subprocess.
+    if (spawnBackend === 'docker') {
+      return {
+        name: 'Platform',
+        passed: true,
+        message: 'Windows (docker backend — fully supported via Docker Desktop; tmux not required)',
+        required: false,
+      };
+    }
+    if (spawnBackend === 'subprocess') {
+      return {
+        name: 'Platform',
+        passed: true,
+        message: 'Windows (subprocess backend — fully supported; tmux not required)',
+        required: false,
+      };
+    }
     return {
       name: 'Platform',
       passed: false,
@@ -1262,7 +1282,7 @@ export function checkDocker(spawnBackend?: string): DoctorCheck {
 
 export function runDoctorChecks(root: string, providerNames?: string[], spawnBackend?: string): DoctorResult {
   const checks: DoctorCheck[] = [
-    checkPlatform(),
+    checkPlatform(spawnBackend),
     checkNode(), checkGit(), checkTmux(providerNames, spawnBackend), checkDocker(spawnBackend), checkClaude(),
     checkWorkspace(root), checkBrainDir(root), checkDirectives(root),
     checkBrainBudget(root), checkDebt(root), checkStaleLocks(root),

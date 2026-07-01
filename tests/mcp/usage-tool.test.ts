@@ -40,7 +40,7 @@ function buildMockServer(): {
 function makeRecord(overrides: Partial<UsageRecord> = {}): UsageRecord {
   return {
     ts: '2026-06-10T00:00:00.000Z',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     sessionFile: 'session-001.jsonl',
     projectDir: 'test-project',
     in: 1000,
@@ -79,7 +79,7 @@ describe('getUsageData — window mode', () => {
   it('(3) returns model summary array when records exist', async () => {
     const { getUsageData } = await import('../../src/mcp/tools/usage.js');
     const records: UsageRecord[] = [
-      makeRecord({ model: 'claude-sonnet-4-6', in: 2000, out: 400 }),
+      makeRecord({ model: 'claude-sonnet-5', in: 2000, out: 400 }),
       makeRecord({ model: 'claude-haiku-4-5', in: 500, out: 100, cacheRead: 200, cacheWrite: 100 }),
     ];
     const result = await getUsageData(
@@ -89,7 +89,7 @@ describe('getUsageData — window mode', () => {
     expect(result).toHaveProperty('models');
     expect((result as { models: unknown[] }).models).toHaveLength(2);
     const models = (result as { models: Array<{ model: string; calls: number }> }).models;
-    expect(models.some((m) => m.model === 'claude-sonnet-4-6')).toBe(true);
+    expect(models.some((m) => m.model === 'claude-sonnet-5')).toBe(true);
   });
 
   it('(4) returns empty message when no records found', async () => {
@@ -111,7 +111,7 @@ describe('getUsageData — window mode', () => {
     );
     const models = (result as { models: Array<Record<string, unknown>> }).models ?? [];
     expect(models[0]).toMatchObject({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-sonnet-5',
       calls: 1,
       in: 3000,
       out: 600,

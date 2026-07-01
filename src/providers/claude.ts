@@ -172,11 +172,13 @@ export class ClaudeAdapter implements ProviderAdapter {
    *
    * Filter pattern matches Docker spawn naming
    * `.prompt-{taskId}-{promptId}[-fix].txt` (spawn-backend-docker.ts:226-230).
-   * Tmux backend uses random-hex filenames (no embedded taskId, see
-   * tmux.ts:60 writePromptFile) — the selective filter will not match those,
-   * so legacy tmux orphan prompts are still cleaned via the fall-through
-   * branch. See ADR-048 Consequences (Negative) for cross-backend asymmetry
-   * documentation.
+   * Sprint 170 P0-3 closed the tmux/Docker asymmetry: tmux worker prompts now
+   * embed taskId the same way (`.prompt-{taskId}-{hash}.txt`, see tmux.ts
+   * writePromptFile), so this selective filter protects them too. Only the
+   * Auditor prompt (spawned without a taskId, tmux.ts writePromptFile(dir,
+   * 'auditor')) keeps the legacy hex-only name and is cleaned via the
+   * fall-through branch. See ADR-048 Consequences (Negative) for the
+   * cross-backend asymmetry history.
    *
    * @param activeTaskIds Optional explicit list of active task IDs. When
    *   omitted, falls back to `getActiveWorkerIds(this.projectDir)` which
