@@ -24,6 +24,7 @@ import {
   verifyWorkerResult,
   parseADRs,
   checkADRCompliance,
+  checkDependencyInventoryDrift,
   // Sprint 139 — cache invalidation + multi-signal stale detection
   readHeartbeatCached,
   clearHeartbeatCache,
@@ -1701,53 +1702,71 @@ describe('checkADRCompliance', () => {
     expect(violations).toHaveLength(0);
   });
 
-  it('count_check: suppresses ADR-010 global dep advisory when changedFiles does NOT include package.json', () => {
-    // ADR-NOISE fix: a doc-only task should not trigger the global dep-count advisory.
+  // DEP-POLICY-WIRE (ADR-D-005): the ADR-010 count_check ("dep count > 3 →
+  // advisory") is retired. The replacement is the merit-based inventory-drift
+  // advisory: any dep count is fine, but each dep must be documented in
+  // docs/reference/dependencies.md. It fires only on a package.json change and
+  // only warns (never NO_GO). The count-based tests are rewritten accordingly.
+
+  it('inventory-drift: no advisory when changedFiles excludes package.json', () => {
     mockedExistsSync.mockReturnValue(true);
-    mockAuditorMemStore.getByType.mockImplementation((type: string) => {
-      if (type === 'adr') return [
-        { id: 'adr-010', type: 'adr', title: 'Minimal Runtime Deps', status: 'accepted', content: 'Keep dep count low.', metadata: '{}', created_at: '', updated_at: '', deleted_at: null },
-      ];
-      return [];
-    });
+    mockAuditorMemStore.getByType.mockReturnValue([]);
     mockedReadFileSync.mockImplementation((p: unknown) => {
       const path = String(p);
-      if (path.endsWith('package.json')) {
-        // Many deps — would trigger advisory IF count_check ran.
-        return JSON.stringify({ dependencies: { a: '1', b: '2', c: '3', d: '4' } });
-      }
+      // Even an undocumented dep must not fire on a doc-only / src-only task.
+      if (path.endsWith('package.json')) return JSON.stringify({ dependencies: { 'mystery-dep': '1' } });
       return '';
     });
 
-    // changedFiles does NOT include package.json
     const violations = checkADRCompliance('/tmp/test', ['docs/README.md', 'src/core/types.ts']);
-    expect(violations).toHaveLength(0);
+    expect(violations.filter(v => v.adrId === 'adr-d-005')).toHaveLength(0);
   });
 
-  it('count_check: emits ADR-010 dep advisory when changedFiles INCLUDES package.json and count exceeds max', () => {
-    // Behaviour-preserving: tasks that actually touch package.json still get the advisory.
+  it('inventory-drift: warns (severity warning, never NO_GO) for each undocumented package.json dep', () => {
     mockedExistsSync.mockReturnValue(true);
-    mockAuditorMemStore.getByType.mockImplementation((type: string) => {
-      if (type === 'adr') return [
-        { id: 'adr-010', type: 'adr', title: 'Minimal Runtime Deps', status: 'accepted', content: 'Keep dep count low.', metadata: '{}', created_at: '', updated_at: '', deleted_at: null },
-      ];
-      return [];
-    });
+    mockAuditorMemStore.getByType.mockReturnValue([]);
     mockedReadFileSync.mockImplementation((p: unknown) => {
       const path = String(p);
       if (path.endsWith('package.json')) {
-        // maxCount in rule is 3; 4 deps exceeds it.
-        return JSON.stringify({ dependencies: { a: '1', b: '2', c: '3', d: '4' } });
+        return JSON.stringify({
+          dependencies: { commander: '1', 'mystery-dep': '2' },
+          optionalDependencies: { openai: '3' },
+        });
+      }
+      if (path.endsWith('dependencies.md')) {
+        // documents commander + openai, but NOT mystery-dep
+        return '# Dependencies\n- `commander` — CLI framework\n- `openai` — optional provider\n';
       }
       return '';
     });
 
-    // changedFiles DOES include package.json
-    const violations = checkADRCompliance('/tmp/test', ['package.json', 'src/core/types.ts']);
-    expect(violations).toHaveLength(1);
-    expect(violations[0]!.adrId).toBe('ADR-010');
-    expect(violations[0]!.severity).toBe('warning');
-    expect(violations[0]!.violation).toContain('exceeds max');
+    const violations = checkADRCompliance('/tmp/test', ['package.json']);
+    const drift = violations.filter(v => v.adrId === 'adr-d-005');
+    expect(drift).toHaveLength(1);
+    expect(drift[0]!.violation).toContain('mystery-dep');
+    expect(drift[0]!.severity).toBe('warning'); // advisory — never 'error'/NO_GO
+  });
+
+  it('inventory-drift: no advisory when every dep is documented (any count is fine)', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockAuditorMemStore.getByType.mockReturnValue([]);
+    mockedReadFileSync.mockImplementation((p: unknown) => {
+      const path = String(p);
+      // Six deps — the retired count-cap (>3) would have fired; merit-based does not.
+      if (path.endsWith('package.json')) {
+        return JSON.stringify({ dependencies: { commander: '1', zod: '2', ink: '3', react: '4', ws: '5', grammy: '6' } });
+      }
+      if (path.endsWith('dependencies.md')) return '`commander` `zod` `ink` `react` `ws` `grammy`';
+      return '';
+    });
+
+    const violations = checkADRCompliance('/tmp/test', ['package.json']);
+    expect(violations.filter(v => v.adrId === 'adr-d-005')).toHaveLength(0);
+  });
+
+  it('checkDependencyInventoryDrift (direct): returns [] when package.json is not in the changeset', () => {
+    mockedReadFileSync.mockReturnValue('' as never);
+    expect(checkDependencyInventoryDrift('/tmp/test', ['src/core/types.ts'])).toEqual([]);
   });
 });
 

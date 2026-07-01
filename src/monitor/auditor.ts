@@ -2068,10 +2068,9 @@ export interface ParsedADR {
 
 /** An enforcement rule for an ADR */
 export interface ADREnforcementRule {
-  type: 'grep_forbid' | 'grep_require' | 'count_check';
+  type: 'grep_forbid' | 'grep_require';
   pattern?: string;
   targetFiles?: string[];
-  maxCount?: number;
 }
 
 /** An ADR violation found by compliance check */
@@ -2132,12 +2131,73 @@ const PILOT_ADR_RULES: Map<string, ADREnforcementRule> = new Map([
     pattern: 'from.*brain',
     targetFiles: ['src/orchestra/tmux.ts', 'src/monitor/auditor.ts', 'src/agents/worker.ts'],
   } as ADREnforcementRule],
-  // ADR-010: Minimal runtime dependencies
-  ['ADR-010', {
-    type: 'count_check',
-    maxCount: 3,
-  } as ADREnforcementRule],
+  // DEP-POLICY-WIRE (ADR-D-005): the ADR-010 `count_check` (maxCount:3) rule was
+  // REMOVED. The minimal-dep dogma is retired — dependency count is not a
+  // discipline — and this rule was doubly dead: it fired only when an accepted DB
+  // ADR with id `ADR-010` existed, but the taxonomy rename left no such id. The
+  // replacement is a standalone, non-DB-gated inventory-drift advisory
+  // (checkDependencyInventoryDrift), invoked below.
 ]);
+
+/**
+ * DEP-POLICY-WIRE (ADR-D-005): dependency inventory-drift advisory.
+ *
+ * The retired ADR-010 count-cap ("≤ N runtime deps") is replaced by the
+ * merit-based policy: a dependency is admitted at ANY count, but every one MUST
+ * carry a rationale entry in `docs/reference/dependencies.md`. This warns
+ * (severity `warning` — NEVER a NO_GO) for each `package.json` runtime/optional
+ * dependency whose name is absent from that inventory.
+ *
+ * Fires only when `package.json` is in the changeset. STANDALONE by design — NOT
+ * gated on a DB ADR id, because the taxonomy rename (`adr-010` absorbed into
+ * `adr-d-005`) left the id-matched PILOT_ADR_RULES mechanism silently dead; an
+ * id-gated advisory would inherit that dormancy. Substring match is deliberate:
+ * for an advisory, over-matching (a missed drift) is safer than a false warning.
+ * Exported for unit tests.
+ */
+export function checkDependencyInventoryDrift(
+  projectRoot: string,
+  changedFiles: string[],
+): ADRViolation[] {
+  const touchesPackageJson = changedFiles.some(
+    f => f === 'package.json' || f.endsWith('/package.json'),
+  );
+  if (!touchesPackageJson) return [];
+
+  let pkg: { dependencies?: Record<string, string>; optionalDependencies?: Record<string, string> };
+  try {
+    pkg = JSON.parse(readFileSync(join(projectRoot, 'package.json'), 'utf-8'));
+  } catch {
+    return []; // package.json unreadable/malformed — not a drift finding
+  }
+
+  let inventory: string;
+  try {
+    inventory = readFileSync(join(projectRoot, 'docs', 'reference', 'dependencies.md'), 'utf-8');
+  } catch {
+    return []; // no inventory doc to assess against — stay silent (advisory)
+  }
+
+  const deps = [
+    ...Object.keys(pkg.dependencies ?? {}),
+    ...Object.keys(pkg.optionalDependencies ?? {}),
+  ];
+  const violations: ADRViolation[] = [];
+  for (const dep of deps) {
+    if (!inventory.includes(dep)) {
+      violations.push({
+        adrId: 'adr-d-005',
+        adrTitle: 'Dependency Policy & Inventory',
+        violation:
+          `Runtime dependency "${dep}" has no rationale entry in `
+          + `docs/reference/dependencies.md (ADR-D-005: every dependency is admitted `
+          + `on merit and MUST be documented). Advisory — add a rationale row.`,
+        severity: 'warning',
+      });
+    }
+  }
+  return violations;
+}
 
 /**
  * Check ADR compliance for changed files against pilot enforcement rules.
@@ -2157,6 +2217,12 @@ export function checkADRCompliance(
   if (changedFiles.length === 0) {
     return violations;
   }
+
+  // DEP-POLICY-WIRE (ADR-D-005): inventory-drift advisory runs FIRST and
+  // independently of the DB-gated PILOT rules below — those match on legacy ADR
+  // ids (ADR-006/008/010) that no longer exist in the DB after the taxonomy
+  // rename, so they are dormant; this advisory must not inherit that fate.
+  violations.push(...checkDependencyInventoryDrift(projectRoot, changedFiles));
 
   // DB-first: load ADRs from MemoryStore
   let adrs: ParsedADR[] = [];
@@ -2211,30 +2277,6 @@ export function checkADRCompliance(
             }
           } catch { /* file not readable — skip */ }
         }
-        break;
-      }
-      case 'count_check': {
-        if (rule.maxCount === undefined) break;
-        // Only fire when changedFiles actually includes package.json — firing on every
-        // task regardless of changed files produces global advisory noise (ADR-NOISE fix).
-        const touchesPackageJson = changedFiles.some(
-          f => f === 'package.json' || f.endsWith('/package.json'),
-        );
-        if (!touchesPackageJson) break;
-        try {
-          const pkgPath = join(projectRoot, 'package.json');
-          const pkgContent = readFileSync(pkgPath, 'utf-8');
-          const pkg = JSON.parse(pkgContent) as { dependencies?: Record<string, string> };
-          const depCount = Object.keys(pkg.dependencies ?? {}).length;
-          if (depCount > rule.maxCount) {
-            violations.push({
-              adrId: adr.id,
-              adrTitle: adr.title,
-              violation: `Runtime dependency count (${depCount}) exceeds max (${rule.maxCount})`,
-              severity: 'warning',
-            });
-          }
-        } catch { /* package.json not readable — skip */ }
         break;
       }
     }

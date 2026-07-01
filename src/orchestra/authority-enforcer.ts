@@ -436,9 +436,16 @@ export function emitAuthorityViolation(
 }
 
 // ─── Layer 4: ADR Compliance Enforcement ────────────────────────────
-// Runtime checks for ADR-006 (spawnSync shell:true), ADR-008 (core→orchestra
-// import), ADR-010 (package.json deps whitelist). Violations produce NO_GO +
-// amendment proposals. Fail-safe: enforcer errors → task continues.
+// Runtime checks for ADR-006 (spawnSync shell:true) and ADR-008 (core→orchestra
+// import). Violations produce NO_GO + amendment proposals. Fail-safe: enforcer
+// errors → task continues.
+//
+// DEP-POLICY-WIRE (ADR-D-005): the former ADR-010 package.json deps WHITELIST
+// (NO_GO for any dep outside a 4-package set) was REMOVED here — the minimal-dep
+// dogma is retired (deckent legitimately ships 13+3 merit-chosen deps), so the
+// whitelist NO_GO'd every real dependency change. Dependency policy is now a
+// non-blocking inventory-drift ADVISORY in the auditor
+// (checkDependencyInventoryDrift), not a hard enforcer gate.
 
 /** A single ADR compliance violation found in worker output. */
 export interface AdrViolation {
@@ -457,14 +464,6 @@ export interface AdrComplianceResult {
   /** If the enforcer itself failed, this captures the error message */
   enforcerError?: string;
 }
-
-/** Allowed runtime dependencies per ADR-010 (amended Sprint 143). */
-const ADR010_DEPS_WHITELIST = new Set([
-  'commander',
-  'better-sqlite3',
-  '@modelcontextprotocol/sdk',
-  'zod',
-]);
 
 /**
  * ADR-006: Check for `shell: true` in spawnSync/execSync calls.
@@ -524,38 +523,6 @@ function checkAdr008(taskId: string, filePath: string, content: string): AdrViol
 }
 
 /**
- * ADR-010: Check package.json dependencies against whitelist.
- * Only applies when package.json is in the changed files list.
- */
-function checkAdr010(taskId: string, filePath: string, content: string): AdrViolation[] {
-  const violations: AdrViolation[] = [];
-  const normalizedPath = filePath.replace(/\\/g, '/');
-  if (!normalizedPath.endsWith('package.json')) return violations;
-
-  try {
-    const pkg = JSON.parse(content) as { dependencies?: Record<string, string> };
-    if (!pkg.dependencies) return violations;
-
-    for (const dep of Object.keys(pkg.dependencies)) {
-      if (!ADR010_DEPS_WHITELIST.has(dep)) {
-        violations.push({
-          taskId,
-          adrId: 'adr-010',
-          file: filePath,
-          line: 0,
-          description: `ADR-010 violation: runtime dependency "${dep}" is not in the allowed whitelist [${[...ADR010_DEPS_WHITELIST].join(', ')}].`,
-          amendmentProposal: `Remove "${dep}" from dependencies, or amend ADR-010 with justification for adding it.`,
-        });
-      }
-    }
-  } catch {
-    // Malformed package.json — not an ADR violation, skip
-  }
-
-  return violations;
-}
-
-/**
  * Enforce ADR compliance on worker-changed files.
  *
  * Scans the listed files for violations of ADR-006, ADR-008, and ADR-010.
@@ -597,11 +564,8 @@ export function enforceAdrCompliance(
       if (file.endsWith('.ts')) {
         violations.push(...checkAdr008(taskId, file, content));
       }
-
-      // ADR-010: package.json deps whitelist check
-      if (file.endsWith('package.json')) {
-        violations.push(...checkAdr010(taskId, file, content));
-      }
+      // DEP-POLICY-WIRE (ADR-D-005): the ADR-010 package.json deps whitelist
+      // check was removed — dependency policy is a non-blocking advisory now.
     }
 
     // Emit breadcrumb events for each violation
@@ -668,6 +632,4 @@ export const _testing = {
   AUTHORITY_MATRIX,
   checkAdr006,
   checkAdr008,
-  checkAdr010,
-  ADR010_DEPS_WHITELIST,
 };

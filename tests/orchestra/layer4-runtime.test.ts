@@ -11,7 +11,7 @@ import {
   _testing,
 } from '../../src/orchestra/authority-enforcer.js';
 
-const { checkAdr006, checkAdr008, checkAdr010, ADR010_DEPS_WHITELIST } = _testing;
+const { checkAdr006, checkAdr008 } = _testing;
 
 describe('Layer 4 Runtime ADR Compliance', () => {
   let tmpDir: string;
@@ -113,66 +113,11 @@ const mod = require('../orchestra/brain.js');
     });
   });
 
-  // ─── ADR-010: package.json deps whitelist ─────────────────────────
-
-  describe('ADR-010: package.json deps whitelist', () => {
-    it('should pass for whitelisted dependencies', () => {
-      const content = JSON.stringify({
-        dependencies: {
-          'commander': '^13.0.0',
-          'better-sqlite3': '^12.9.0',
-          '@modelcontextprotocol/sdk': '^1.27.1',
-          'zod': '^3.25.0',
-        },
-      });
-      const violations = checkAdr010('T-003', 'package.json', content);
-      expect(violations).toHaveLength(0);
-    });
-
-    it('should detect non-whitelisted dependency', () => {
-      const content = JSON.stringify({
-        dependencies: {
-          'commander': '^13.0.0',
-          'chalk': '^5.0.0',
-        },
-      });
-      const violations = checkAdr010('T-003', 'package.json', content);
-      expect(violations).toHaveLength(1);
-      expect(violations[0].adrId).toBe('adr-010');
-      expect(violations[0].description).toContain('chalk');
-    });
-
-    it('should detect multiple non-whitelisted dependencies', () => {
-      const content = JSON.stringify({
-        dependencies: {
-          'commander': '^13.0.0',
-          'chalk': '^5.0.0',
-          'inquirer': '^9.0.0',
-        },
-      });
-      const violations = checkAdr010('T-003', 'package.json', content);
-      expect(violations).toHaveLength(2);
-    });
-
-    it('should skip non-package.json files', () => {
-      const content = JSON.stringify({ dependencies: { chalk: '1.0' } });
-      const violations = checkAdr010('T-003', 'src/types.ts', content);
-      expect(violations).toHaveLength(0);
-    });
-
-    it('should handle malformed package.json gracefully', () => {
-      const violations = checkAdr010('T-003', 'package.json', 'not valid json{{{');
-      expect(violations).toHaveLength(0);
-    });
-
-    it('should have correct whitelist entries', () => {
-      expect(ADR010_DEPS_WHITELIST.has('commander')).toBe(true);
-      expect(ADR010_DEPS_WHITELIST.has('better-sqlite3')).toBe(true);
-      expect(ADR010_DEPS_WHITELIST.has('@modelcontextprotocol/sdk')).toBe(true);
-      expect(ADR010_DEPS_WHITELIST.has('zod')).toBe(true);
-      expect(ADR010_DEPS_WHITELIST.size).toBe(4);
-    });
-  });
+  // ─── ADR-010 whitelist REMOVED (DEP-POLICY-WIRE / ADR-D-005) ───────
+  // The former `checkAdr010` NO_GO'd any package.json dependency outside a
+  // 4-package whitelist — the retired minimal-dep dogma. It is gone from the
+  // enforcer; dependency policy is now a non-blocking inventory-drift advisory
+  // in the auditor (checkDependencyInventoryDrift, covered in the auditor tests).
 
   // ─── enforceAdrCompliance integration ─────────────────────────────
 
@@ -224,20 +169,23 @@ const mod = require('../orchestra/brain.js');
       expect(result.violations.some(v => v.adrId === 'adr-008')).toBe(true);
     });
 
-    it('should enforce ADR-010 on package.json', () => {
+    it('does NOT NO_GO on package.json dependencies (DEP-POLICY-WIRE / ADR-D-005)', () => {
+      // The retired ADR-010 whitelist would fail this (lodash/express/etc. are not
+      // in the old 4-package set). Merit-based policy: the enforcer never NO_GO's
+      // on a dependency change — dependency policy is a non-blocking advisory now.
       writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({
         dependencies: {
           'commander': '^13.0.0',
           'lodash': '^4.17.0',
+          'express': '^4.0.0',
         },
       }));
 
       const result = enforceAdrCompliance(tmpDir, 'sprint-143', 'T-014', [
         'package.json',
       ]);
-      expect(result.pass).toBe(false);
-      expect(result.violations.some(v => v.adrId === 'adr-010')).toBe(true);
-      expect(result.violations.some(v => v.description.includes('lodash'))).toBe(true);
+      expect(result.violations.some(v => v.adrId === 'adr-010')).toBe(false);
+      expect(result.violations.some(v => v.file.endsWith('package.json'))).toBe(false);
     });
 
     it('should emit breadcrumb events for violations', () => {
