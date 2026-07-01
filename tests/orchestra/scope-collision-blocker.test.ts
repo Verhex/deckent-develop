@@ -16,7 +16,7 @@ import {
   handleScopeCollision,
   type ScopeCollisionPayload,
   type SpawnDecision,
-} from '../../src/orchestra/decision-engine.js';
+} from '../../src/orchestra/scope-collision.js';
 
 describe('handleScopeCollision (Sprint 168 C0c RC2)', () => {
   it('returns block decision on overlap', () => {

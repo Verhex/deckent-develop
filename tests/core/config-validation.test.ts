@@ -260,9 +260,9 @@ describe('validateConfig', () => {
 
   // ─── routing_engine validation ────────────────────────────────────
 
-  it('accepts routing_engine = v1', () => {
-    const config = buildConfig({ routing_engine: 'v1' });
-    expect(() => validateConfig(config)).not.toThrow();
+  it('rejects routing_engine = v1 (ROUTE-V1-PURGE / ADR-G-006)', () => {
+    const config = buildConfig({ routing_engine: 'v1' as 'v2' });
+    expect(() => validateConfig(config)).toThrow(ConfigValidationError);
   });
 
   it('accepts routing_engine = v2', () => {
@@ -277,7 +277,7 @@ describe('validateConfig', () => {
   });
 
   it('throws ConfigValidationError for invalid routing_engine', () => {
-    const config = buildConfig({ routing_engine: 'v3' as 'v1' });
+    const config = buildConfig({ routing_engine: 'v3' as 'v2' });
     expect(() => validateConfig(config)).toThrow(ConfigValidationError);
     try {
       validateConfig(config);

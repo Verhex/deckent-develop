@@ -335,19 +335,6 @@
   ],
   "dead": [
     {
-      "id": "decision-orchestrator-v1",
-      "label": "Decision Orchestrator V1 — Keyword-Based Routing (Deprecated)",
-      "files": [
-        "src/orchestra/decision-engine.ts",
-        "src/orchestra/decision-logger.ts",
-        "src/orchestra/decision-replay.ts"
-      ],
-      "description": "Sprint 031 V1 keyword-based routing. @deprecated since Sprint 066. Superseded by routeTaskV2().",
-      "deprecatedSince": "Sprint 066",
-      "supersededBy": "routing-engine-v2",
-      "adrRef": "ADR-028"
-    },
-    {
       "id": "parallel-pipeline-manager-standalone",
       "label": "ParallelPipelineManager — Legacy Wave Builder (Superseded)",
       "files": [

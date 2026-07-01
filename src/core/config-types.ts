@@ -600,8 +600,9 @@ export interface DeckentConfig {
   adaptive_config?: AdaptiveConfig;
 
   // ─── Routing Engine v2 ─────────────────────────────────────────────
-  /** Routing engine version: 'v1' (keyword-based), 'v2' (intent-based). Default: 'v2' */
-  routing_engine?: 'v1' | 'v2';
+  /** Routing engine version. Only 'v2' (intent-based, `routeTaskV2`) exists — V1
+   *  (keyword-based) was removed by ROUTE-V1-PURGE (ADR-G-006). Default: 'v2'. */
+  routing_engine?: 'v2';
   /** Routing behaviour tuning flags (all default-off, opt-in). */
   routing?: {
     /** Prefer agents that have a history of success with the selected skills (default: false). */
@@ -1027,8 +1028,8 @@ export interface ResolvedConfig {
   // Rubric-Based Evaluation
   evaluation_rubric?: Partial<EvaluationRubric>;
   rubric_max_retries?: number;
-  // Routing Engine v2
-  routing_engine?: 'v1' | 'v2';
+  // Routing Engine v2 (V1 removed — ROUTE-V1-PURGE / ADR-G-006)
+  routing_engine?: 'v2';
   routing_config?: {
     agentMinScore?: number;
     skillMinScore?: number;

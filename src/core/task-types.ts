@@ -308,7 +308,7 @@ export interface Task {
   routingMeta?: {
     taskDNA?: unknown;
     confidence?: string;
-    routingVersion?: 'v1' | 'v2';
+    routingVersion?: 'v2';
     /** Number of mid-sprint reroute attempts applied to this task */
     rerouteCount?: number;
     /**

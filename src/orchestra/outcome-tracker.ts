@@ -22,7 +22,7 @@ export interface RoutingOutcome {
   evaluation: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
   coverage: number;
   qualityScore?: number; // 0-100 from QualityAssessor
-  routingVersion: 'v1' | 'v2';
+  routingVersion: 'v2';
   /**
    * Advisory skill add/remove suggestion produced by adaptAgentRuntime
    * over recent ResultEntry history. Never auto-applied — Brain reviews.

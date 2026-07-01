@@ -133,7 +133,7 @@ beforeEach(() => {
   backendSpawn = vi.fn();
   vi.mocked(SpawnBackendFactory.create).mockReturnValue({ name: 'docker', spawn: backendSpawn } as never);
   // routing_engine v1 → registerRun skips the V2 routing block (kept out of scope here)
-  vi.mocked(loadConfig).mockResolvedValue({ language: 'en', spawn_backend: 'docker', routing_engine: 'v1' } as never);
+  vi.mocked(loadConfig).mockResolvedValue({ language: 'en', spawn_backend: 'docker', routing_engine: 'v2' } as never);
 });
 
 afterEach(() => {

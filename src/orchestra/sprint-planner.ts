@@ -51,7 +51,6 @@ import { detectProjectStack, detectFullStack } from '../core/stack-detector.js';
 import { normalizeTechStack, rubricTypeToKind } from '../core/work-model.js';
 import { detectTaskType } from './rubric-registry.js';
 import { SkillPoolManager } from '../core/skill-pool.js';
-import { selectSkills } from '../core/skill-selector.js';
 
 // ─── Planner ─────────────────────────────────────────────────────
 import { callBrainPlanner, callBrainPlannerWithReason } from './planner.js';
@@ -105,7 +104,6 @@ import { detectDeadlocks } from '../monitor/auditor.js';
 
 // ─── Agent Pool & Selection ──────────────────────────────────────
 import { AgentPoolManager } from '../core/agent-pool.js';
-import { selectAgent } from '../core/agent-selector.js';
 import { routeTaskV2 } from '../core/routing-engine.js';
 import type { UserOverride } from '../core/routing-types.js';
 import {
@@ -474,8 +472,12 @@ export async function planSprint(
     );
   }
 
-  // ─── Routing: V2 (intent-based) or V1 (keyword-based) ─────────────────────
-  const routingVersion = config.routing_engine ?? 'v1';
+  // ─── Routing: V2 intent-based engine (routeTaskV2) ────────────────────────
+  // V1 (keyword-based DecisionOrchestrator) was removed by ROUTE-V1-PURGE
+  // (ADR-G-006). The default fallback is now 'v2' (was the latent-bug 'v1'); only
+  // 'v2' is a valid config value. The single-value guard is left for the
+  // ROUTING-VERSION-LABEL (P2) reconcile, not a V1 trace.
+  const routingVersion = config.routing_engine ?? 'v2';
 
   if (routingVersion === 'v2') {
     // V2: Unified intent-based routing via routeTaskV2
@@ -714,78 +716,7 @@ export async function planSprint(
     } catch (poolErr) {
       debugLog('planSprint:routing-v2', `V2 routing pool loading failed: ${poolErr}`);
     }
-  } else {
-
-  // V1: Agent selection (non-fatal -- if pool fails, continue with generic workers)
-  try {
-    const agentPool = new AgentPoolManager(projectRoot);
-    const pool = agentPool.loadAgents();
-    for (const task of tasks) {
-      try {
-        // If DIRECTIVES specified Agent: override, use it directly
-        if (task.forceAgent) {
-          task.assignedAgent = task.forceAgent;
-          debugLog(
-            'planSprint:agent-selection',
-            `Task ${task.id} → forceAgent=${task.forceAgent} (DIRECTIVES override)`,
-          );
-        } else {
-          const result = selectAgent(task, pool);
-          task.assignedAgent = result.agent?.id ?? 'generic';
-          if (result.agent?.preferredModel && !task.forceModel) {
-            task.model = result.agent.preferredModel;
-          }
-          debugLog(
-            'planSprint:agent-selection',
-            `Task ${task.id} → agent=${task.assignedAgent}, score=${result.score}, reason=${result.reason}`,
-          );
-        }
-      } catch (taskErr) {
-        debugLog('planSprint:agent-selection', `Agent selection failed for task ${task.id}: ${taskErr}`);
-      }
-    }
-  } catch (poolErr) {
-    debugLog('planSprint:agent-pool', `Agent pool loading failed: ${poolErr}`);
   }
-
-  // Skill selection (non-fatal -- if skill modules fail, continue without skills)
-  try {
-    const projectStack = detectProjectStack(projectRoot);
-    const skillPool = new SkillPoolManager(projectRoot);
-    const skills = skillPool.loadSkills();
-
-    if (skills.size > 0) {
-      for (const task of tasks) {
-        try {
-          if (task.forceSkills && task.forceSkills.length > 0) {
-            task.assignedSkills = task.forceSkills;
-            debugLog(
-              'planSprint:skill-selection',
-              `Task ${task.id} → forceSkills=[${task.forceSkills.join(', ')}] (DIRECTIVES override)`,
-            );
-          } else {
-            const agentInfo = task.assignedAgent && task.assignedAgent !== 'generic'
-              ? { id: task.assignedAgent, expertise: [] as string[] }
-              : undefined;
-            const result = selectSkills(task, projectStack, skills, agentInfo);
-            if (result.skills.length > 0) {
-              task.assignedSkills = result.skills.map(s => s.id);
-            }
-            debugLog(
-              'planSprint:skill-selection',
-              `Task ${task.id} → skills=[${(task.assignedSkills ?? []).join(', ')}]`,
-            );
-          }
-        } catch (taskErr) {
-          debugLog('planSprint:skill-selection', `Skill selection failed for task ${task.id}: ${taskErr}`);
-        }
-      }
-    }
-  } catch (poolErr) {
-    debugLog('planSprint:skill-pool', `Skill pool loading failed: ${poolErr}`);
-  }
-
-  } // end V1 else block
 
   // Write task files (skip in dry-run mode)
   if (!options?.dryRun) {

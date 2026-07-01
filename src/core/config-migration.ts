@@ -92,7 +92,7 @@ function setNestedValue(obj: Record<string, unknown>, path: string, value: unkno
  * Returns a list of missing top-level field names (and `modes.<mode>.<field>` paths).
  *
  * Fields added since sprint-066 that old configs will receive on migration:
- * - routing_engine: 'v1' (routing engine version, added sprint-066)
+ * - routing_engine: 'v2' (routing engine version; V1 removed by ROUTE-V1-PURGE / ADR-G-006)
  */
 export function getMissingFields(existing: Record<string, unknown>): string[] {
   const defaults = createDefaultConfig() as unknown as Record<string, unknown>;
@@ -253,6 +253,15 @@ export function migrateConfig(
         delete (modeConfig as Record<string, unknown>)['usage_thresholds'];
       }
     }
+  }
+
+  // ROUTE-V1-PURGE (ADR-G-006): rewrite the retired routing_engine 'v1' → 'v2' on
+  // disk. V1 routing is deleted and validateConfig now rejects 'v1', so a legacy
+  // value must be upgraded for the migrated file to load.
+  if (existing['routing_engine'] === 'v1') {
+    existing['routing_engine'] = 'v2';
+    legacyRenamed = true;
+    renamedFields.push('routing_engine: v1 → v2');
   }
 
   // Sprint 150 Decision 3+4: Remove duplicate keys (claude_backend, flat provider fields)

@@ -151,8 +151,8 @@ import { writeEvent, CHANNELS, getCurrentSprintId, readSequence } from './event-
 // wrapper) were imported here. The BRAIN→SPAWN:BLOCKED emit logic mirrors
 // the wrapper inline so callers of consultCollisionDecision (recovery paths)
 // remain functional and the spawn pipeline gets the same closure semantics.
-import { handleScopeCollision } from './decision-engine.js';
-import type { ScopeCollisionPayload } from './decision-engine.js';
+import { handleScopeCollision } from './scope-collision.js';
+import type { ScopeCollisionPayload } from './scope-collision.js';
 
 // ─── Dependency Scheduler (Sprint 139 Task 028 + 029) ───────────
 import {

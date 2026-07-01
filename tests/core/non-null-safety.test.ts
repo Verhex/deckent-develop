@@ -15,7 +15,6 @@ import { PromptMetrics } from '../../src/agents/prompt-metrics.js';
 import { AgentGenealogy } from '../../src/agents/agent-genealogy.js';
 import type { PromptVersion } from '../../src/agents/prompt-version.js';
 import { WorkerChannel, WorkerSideChannel } from '../../src/agents/worker-ipc.js';
-import { diffDecisions } from '../../src/orchestra/decision-replay.js';
 import { buildWorkerPrompt, createTask } from '../../src/orchestra/task-builder.js';
 import { ConflictResolver } from '../../src/orchestra/conflict-resolver.js';
 import { deduplicateAlerts } from '../../src/monitor/auditor.js';
@@ -219,37 +218,7 @@ describe('WorkerChannel safe handler registration', () => {
   });
 });
 
-// ─── 11. diffDecisions: no non-null assertions in comparison ────────
-describe('diffDecisions safety', () => {
-  it('detects no diffs for identical results', () => {
-    const result = {
-      analysis: { type: 'feature' as const, complexity: 5, keywords: [] },
-      agent: null,
-      skills: [],
-      model: 'sonnet' as const,
-      effort: 'normal' as const,
-      scope: { directories: [], filesRead: [], filesWrite: [] },
-      decisionLog: [],
-    };
-    const diffs = diffDecisions(result, { ...result });
-    expect(diffs).toEqual([]);
-  });
-
-  it('detects model change', () => {
-    const a = {
-      analysis: { type: 'feature' as const, complexity: 5, keywords: [] },
-      agent: null,
-      skills: [],
-      model: 'sonnet' as const,
-      effort: 'normal' as const,
-      scope: { directories: [], filesRead: [], filesWrite: [] },
-      decisionLog: [],
-    };
-    const b = { ...a, model: 'opus' as const };
-    const diffs = diffDecisions(a, b);
-    expect(diffs.some(d => d.includes('Model changed'))).toBe(true);
-  });
-});
+// ─── 11. (removed) diffDecisions was V1 decision-replay — purged by ROUTE-V1-PURGE ─
 
 // ─── 12. buildWorkerPrompt: safe skill header length ────────────────
 describe('buildWorkerPrompt safe skill section', () => {

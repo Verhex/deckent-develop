@@ -11,7 +11,7 @@
  * the second call returns the updated contents.
  *
  * The companion helper consultCollisionDecision() wraps the pure
- * decision-engine.ts handler with a BRAIN→SPAWN:BLOCKED event emit.
+ * scope-collision.ts handler with a BRAIN→SPAWN:BLOCKED event emit.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFileSync, mkdirSync, rmSync, readFileSync, existsSync, mkdtempSync } from 'node:fs';

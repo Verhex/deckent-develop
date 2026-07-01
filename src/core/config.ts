@@ -932,8 +932,9 @@ export function validateConfig(config: DeckentConfig): string[] {
   }
 
   // ─── Routing Engine validation ──────────────────────────────────────
+  // V1 removed (ROUTE-V1-PURGE / ADR-G-006): only 'v2' is a valid value.
   if (config.routing_engine !== undefined) {
-    const validRoutingEngines = ['v1', 'v2'] as const;
+    const validRoutingEngines = ['v2'] as const;
     if (!(validRoutingEngines as readonly string[]).includes(config.routing_engine)) {
       errors.push(`Invalid value '${config.routing_engine}' for field 'routing_engine'. Valid: ${validRoutingEngines.join(', ')}`);
     }
@@ -1393,6 +1394,16 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
   // Resolve legacy mode aliases so 'max_plan' → 'performance' etc.
   config.mode = resolveMode(config.mode) as PlanMode;
 
+  // ROUTE-V1-PURGE (ADR-G-006): coerce the retired routing_engine 'v1' → 'v2'.
+  // V1 routing is deleted, and validateConfig now REJECTS 'v1' — so an existing
+  // install with a legacy on-disk `routing_engine: 'v1'` would throw here and fail
+  // every sprint. Silently upgrade the in-memory value (the on-disk file is
+  // migrated by migrateConfig / `deckent config migrate`). Also stops a literal
+  // 'v1' from reaching the finalizer's legacy stats path (`??` won't catch it).
+  if ((config as { routing_engine?: string }).routing_engine === 'v1') {
+    (config as { routing_engine?: string }).routing_engine = 'v2';
+  }
+
   // ─── Grouped providers → flat provider fields ──────────────────────
   // Runtime-only projection. Must run BEFORE env var overrides so env vars win.
   // (Sprint 150 Decision 4 — grouped `providers` is canonical in JSON; flat
@@ -1676,6 +1687,11 @@ export function validatePartialConfig(partial: Partial<DeckentConfig>): void {
     if (canonical !== partial.mode) {
       partial.mode = canonical as PlanMode;
     }
+  }
+  // ROUTE-V1-PURGE (ADR-G-006): same legacy-normalize for routing_engine — a
+  // stale on-disk 'v1' must not reject an unrelated `config set` write.
+  if ((partial as { routing_engine?: string }).routing_engine === 'v1') {
+    (partial as { routing_engine?: string }).routing_engine = 'v2';
   }
   const merged = deepMerge(createDefaultConfig(), partial);
   validateConfig(merged);
@@ -2218,6 +2234,12 @@ export function mergeConfigs(
 
   // Resolve legacy mode aliases so 'max_plan' → 'performance' etc.
   config.mode = resolveMode(config.mode) as PlanMode;
+
+  // ROUTE-V1-PURGE (ADR-G-006): coerce the retired routing_engine 'v1' → 'v2'
+  // (legacy on-disk value; validateConfig now rejects 'v1'). Mirror of loadConfig.
+  if ((config as { routing_engine?: string }).routing_engine === 'v1') {
+    (config as { routing_engine?: string }).routing_engine = 'v2';
+  }
 
   validateConfig(config);
 

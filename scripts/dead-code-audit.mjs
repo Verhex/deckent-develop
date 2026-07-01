@@ -42,27 +42,10 @@ const reportDirOverride = reportDirIdx !== -1 && args[reportDirIdx + 1]
 
 // ─── Known suspects (Sprint 132 audit + ADR-028) ──────────────────────────
 
+// NOTE: the V1 decision-engine / decision-replay / decision-steps suspects were
+// removed here — those modules were fully deleted by ROUTE-V1-PURGE (ADR-G-006),
+// so they can no longer be dead-code suspects.
 const KNOWN_SUSPECTS = [
-  {
-    module: 'src/orchestra/decision-engine.ts',
-    reason: 'V1 DecisionOrchestrator — deprecated by ADR-028, kept as reference',
-    adrProtected: true,
-  },
-  {
-    module: 'src/orchestra/decision-replay.ts',
-    reason: 'V1 decision replay — deprecated by ADR-028, kept as reference',
-    adrProtected: true,
-  },
-  {
-    module: 'src/orchestra/decision-steps/agent-step.ts',
-    reason: 'V1 agent step — deprecated by ADR-028, kept as reference',
-    adrProtected: true,
-  },
-  {
-    module: 'src/orchestra/decision-steps/scope-step.ts',
-    reason: 'V1 scope step — deprecated by ADR-028, kept as reference',
-    adrProtected: true,
-  },
   {
     module: 'src/orchestra/learning-decay.ts',
     reason: 'Sprint 132 audit suspect — not imported by any src/ file',

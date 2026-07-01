@@ -350,8 +350,8 @@ export function applyAdaptiveTimeout(
 //
 // Both functions are fail-safe under standard sprint-controller convention.
 
-import { handleScopeCollision } from './decision-engine.js';
-import type { ScopeCollisionPayload, SpawnDecision } from './decision-engine.js';
+import { handleScopeCollision } from './scope-collision.js';
+import type { ScopeCollisionPayload, SpawnDecision } from './scope-collision.js';
 import { writeEvent, CHANNELS, getCurrentSprintId } from './event-stream.js';
 
 // ─── Disk-Verify Gate (Sprint 199 199-001 — Synthetic NO_GO Kaynak 7) ──
@@ -563,7 +563,7 @@ export function readTaskJsonFresh(projectRoot: string, taskId: string): Task {
 /**
  * Sprint 168 C0c RC2 — wire-layer consult for scope collision decisions.
  *
- * Calls the pure decision function from decision-engine.ts, then — when the
+ * Calls the pure decision function from scope-collision.ts, then — when the
  * decision is 'block' — emits a BRAIN→SPAWN:BLOCKED structured event via
  * the event stream so observers (Auditor dashboard, history replay) see the
  * blocked spawn.
@@ -939,7 +939,8 @@ export async function runSprint(
     );
   }
 
-  const routingVersionForFix = config.routing_engine ?? 'v1';
+  // ROUTE-V1-PURGE (ADR-G-006): default 'v2' (was the latent-bug 'v1' default).
+  const routingVersionForFix = config.routing_engine ?? 'v2';
 
   const spawnBackend: SpawnBackend | undefined = opts?.spawnBackend
     ?? (config.spawn_backend

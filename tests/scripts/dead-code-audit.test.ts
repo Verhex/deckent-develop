@@ -89,12 +89,9 @@ describe('auditKnownSuspects', () => {
     }
   });
 
-  it('categorizes ADR-protected modules as Dormant', () => {
-    const results = auditKnownSuspects();
-    const decisionEngine = results.find(r => r.module.includes('decision-engine.ts'));
-    expect(decisionEngine).toBeDefined();
-    expect(decisionEngine!.category).toBe('Dormant');
-  });
+  // NOTE: the 'categorizes ADR-protected modules as Dormant' case was removed —
+  // its only fixtures were the V1 decision-engine/replay/steps suspects, all
+  // deleted by ROUTE-V1-PURGE (ADR-G-006). No ADR-protected suspect remains.
 
   it('categorizes unimported modules as Dead', () => {
     const results = auditKnownSuspects();

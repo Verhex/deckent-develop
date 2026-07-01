@@ -1182,7 +1182,12 @@ export async function finalizeSprint(
   }
 
   // 8b. Update agent/skill stats
-  const routingVersion = (opts?.config as Record<string, unknown> | undefined)?.['routing_engine'] as string | undefined;
+  // ROUTE-V1-PURGE (ADR-G-006): default 'v2'. Previously an unset routing_engine
+  // read as undefined, making `routingVersion !== 'v2'` TRUE — so the finalizer ran
+  // the legacy V1 stats path (write to agent.json) by default. V2 is the engine, so
+  // the SSOT path (learnings.json) is now the default. The now-dead V1 branch below
+  // is a behavior-sensitive collapse → ROUTE-V1-DEADBRANCH-COLLAPSE (born follow-up).
+  const routingVersion = ((opts?.config as Record<string, unknown> | undefined)?.['routing_engine'] as string | undefined) ?? 'v2';
 
   // F5 evolution wire (B11): record per-task use of each agent's CURRENT prompt
   // version so prompt-analytics / /api/evolution/prompt-metrics see real

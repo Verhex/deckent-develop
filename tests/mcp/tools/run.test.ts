@@ -158,9 +158,11 @@ describe('deckent_run MCP — WM-1b routing', () => {
     expect(writtenCall).toBeDefined();
   });
 
-  it('skips routing when routing_engine is v1', async () => {
+  it('always routes via routeTaskV2 (V1 purged — ROUTE-V1-PURGE / ADR-G-006)', async () => {
+    // Previously this asserted routing_engine=v1 SKIPPED routeTaskV2. V1 is gone,
+    // so routing now always flows through routeTaskV2 regardless of config.
     vi.mocked(loadConfig).mockResolvedValue({
-      routing_engine: 'v1',
+      routing_engine: 'v2',
       spawn_backend: 'subprocess',
     } as never);
 
@@ -171,6 +173,6 @@ describe('deckent_run MCP — WM-1b routing', () => {
     const handler = server.tools.get('deckent_run')!.handler;
     await handler({ description: 'do work', model: 'sonnet', autoApprove: true });
 
-    expect(vi.mocked(routeTaskV2)).not.toHaveBeenCalled();
+    expect(vi.mocked(routeTaskV2)).toHaveBeenCalled();
   });
 });
