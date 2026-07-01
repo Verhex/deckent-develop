@@ -128,22 +128,3 @@ When acting as Worker: @.claude/rules/worker-default.md
 ## Live Status
 Canlı sprint, debt, agent performance ve ADR durumu için: `@.brain/exports/summary.md` (auto-generated her sprint sonu).
 Komutlar: `deckent status`, `deckent history`, `deckent retro`, `deckent recall "<sorgu>"`.
-
-## Sprint Metrics
-| Metric | Value |
-|--------|-------|
-| Sprint | sprint-346 |
-| Total Tasks | 24 |
-| Completed | 13 |
-| Tech Debt | 0 |
-| No-Go | 11 |
-| Duration | 14dk 34sn |
-| Coverage | N/A |
-
-## Active Debt
-_No tech debt record._
-
-## Agent Performance
-| Agent | Tasks | Done | Success |
-|-------|-------|------|--------|
-| doc-writer | 24 | 13 | 54% |

@@ -30,7 +30,6 @@ import { MemoryStore } from '../core/memory-store.js';
 import { MEMORY_DB_FILE } from '../core/constants.js';
 import { ACTIVE_EXECUTION_STATUSES, COMPLETED_STATUSES } from '../core/heartbeat-types.js';
 import { DEFAULT_HEARTBEAT_TIMEOUT_MS } from '../core/config.js';
-import { emitAlert } from './alert-emitter.js';
 import { validateTaskResult } from '../core/task-result-schema.js';
 import {
   closeFinding,
@@ -1194,19 +1193,6 @@ export interface ScanResult {
   dependencyViolations?: DependencyViolation[];
 }
 
-// B-STALEMD (Sprint 318): the stale_md detector ran every ~30s scan and emitted a
-// METRIC_EMITTED event each time → an 18-min sprint produced 39 identical stale_md
-// events (59% of the event stream). CLAUDE.md is an intentionally-stable doc, so a
-// 70-min mtime is the NORMAL state, not news. Throttle to emit only on STATE CHANGE
-// (a newly-detected staleness, keyed by mtime) instead of every scan. Module-level
-// state is fine for the long-lived auditor process; reset between sprints/tests.
-let lastStaleMdMtimeMs: number | null = null;
-
-/** Reset the stale_md emit-throttle (sprint boundary / test isolation). */
-export function resetStaleMdThrottle(): void {
-  lastStaleMdMtimeMs = null;
-}
-
 export function runScanCycle(
   projectRoot: string,
   currentSprintId: string,
@@ -1322,34 +1308,12 @@ export function runScanCycle(
     // were folded into it.
     detectPatterns(projectRoot, allViolations, currentSprintId);
 
-    // Sprint 166 Bug W: stale_md detector (M4 monitoring).
-    // CLAUDE.md mtime > 70 min triggers emitAlert so the dashboard surface shows staleness.
-    try {
-      const claudeMdPath = join(projectRoot, 'CLAUDE.md');
-      if (existsSync(claudeMdPath)) {
-        const { mtimeMs } = statSync(claudeMdPath);
-        const staleThresholdMs = 70 * 60 * 1000;
-        if (Date.now() - mtimeMs > staleThresholdMs) {
-          // B-STALEMD: emit only on state CHANGE (new mtime), not every scan —
-          // a perpetually-stale stable doc keeps the same mtime, so this fires
-          // once per staleness rather than flooding the event stream each cycle.
-          if (mtimeMs !== lastStaleMdMtimeMs) {
-            lastStaleMdMtimeMs = mtimeMs;
-            emitAlert(projectRoot, currentSprintId, {
-              type: 'stale_md',
-              message: `CLAUDE.md has not been updated in over 70 minutes (mtime: ${new Date(mtimeMs).toISOString()})`,
-              source: 'auditor:stale_md_detector',
-              mtimeMs,
-            });
-          }
-        } else {
-          // No longer stale → reset so a future staleness re-emits once.
-          lastStaleMdMtimeMs = null;
-        }
-      }
-    } catch {
-      // stale_md check failure must not break scan loop
-    }
+    // stale_md detector REMOVED (ADR-G-004 / DOCS-PURE-ADAPTER). It watched
+    // CLAUDE.md's mtime and alerted at >70 min on the assumption that deckent
+    // stamps CLAUDE.md every sprint. Under the pure-adapter law CLAUDE.md is
+    // the user's own file and is NEVER stamped, so the detector fired a
+    // permanent false-positive. Legitimate user-doc freshness (content-hash +
+    // doc-code ratio + rank) is already covered by doc-tracking (ADR-090).
 
     // Sprint 138: Emit lock state snapshot to event stream
     if (lockResult.locks.length > 0) {

@@ -2,12 +2,6 @@
   "version": 1,
   "docs": [
     {
-      "id": "claude-md",
-      "path": "CLAUDE.md",
-      "autoSections": ["Sprint Metrics", "Active Debt", "Agent Performance"],
-      "protectedSections": ["Architecture", "Commands"]
-    },
-    {
       "id": "vision-en",
       "path": "docs/vision/VISION.md",
       "autoSections": ["Deckent by the Numbers", "Sprint History", "Sprint Metrics"],
@@ -42,12 +36,6 @@
       "path": "docs/vision/blueprint.md",
       "autoSections": ["Live Metrics"],
       "protectedSections": []
-    },
-    {
-      "id": "agents-md",
-      "path": "AGENTS.md",
-      "autoSections": ["Agent Performance"],
-      "protectedSections": ["Identity", "Architecture"]
     },
     {
       "id": "tools-md",

@@ -100,14 +100,17 @@ export function seedDocsConfig(projectRoot: string): void {
     }
   }
 
-  // Fallback: inline default if template file not found
+  // Fallback: inline default if template file not found. Mirrors the
+  // docs.json.template — host instruction files (CLAUDE.md/AGENTS.md/…) are
+  // NOT managed-docs under the pure-adapter law (ADR-G-004 / DOCS-PURE-ADAPTER),
+  // so the only seeded entry is the deckent-owned IDENTITY.md surface.
   if (!template) {
     template = {
       version: 1,
       docs: [{
-        id: 'claude-md',
-        path: 'CLAUDE.md',
-        autoSections: ['Sprint Metrics'],
+        id: 'identity-md',
+        path: '.deckent/workspace/IDENTITY.md',
+        autoSections: ['Project Status'],
         protectedSections: [],
       }],
     };

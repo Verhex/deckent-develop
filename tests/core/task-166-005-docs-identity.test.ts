@@ -5,22 +5,40 @@ import { join } from 'node:path';
 
 const PROJECT_ROOT = join(import.meta.dirname ?? __dirname, '..', '..');
 
-describe('docs.json schema validation (Bug R fix)', () => {
-  it('contains AGENTS.md entry with correct autoSections and protectedSections', () => {
-    const docsJsonPath = join(PROJECT_ROOT, '.deckent', 'settings', 'docs.json');
-    const raw = readFileSync(docsJsonPath, 'utf-8');
-    const parsed = JSON.parse(raw) as { docs: Array<{ id: string; path: string; autoSections: string[]; protectedSections: string[] }> };
+// ─── Pure-adapter law regression (ADR-G-004 / DOCS-PURE-ADAPTER) ─────────
+// Host instruction files are pure adapters (only the injected @DECKENT.md
+// reference + the user's own content). They must NEVER be managed-docs — no
+// sprint render, metric table, debt table, or agent-performance section is
+// stamped into them. Deckent's volatile orchestration status lives ONLY in
+// deckent-owned surfaces (.brain/exports/summary.md, dashboard, `deckent
+// status`). This regression asserts none of the four adapter targets appear
+// in the live docs.json OR the seed template that propagates to new projects.
+// (Supersedes the former "agents-md must be present" assertion — that entry
+// was the locale-leak root ADR-G-004 removes.)
+const ADAPTER_FILES = ['CLAUDE.md', 'AGENTS.md', 'GEMINI.md', '.cursor/rules/deckent.mdc'];
 
-    const agentsEntry = parsed.docs.find(d => d.id === 'agents-md');
-    expect(agentsEntry, 'agents-md entry missing from .deckent/docs.json').toBeDefined();
-    expect(agentsEntry!.path).toBe('AGENTS.md');
-    // The auto-managed section list was narrowed to only `Agent Performance`
-    // after `Built-in Agents` and `Last Updated` were folded into the static
-    // protected portion of AGENTS.md. The protected-sections contract is the
-    // load-bearing half of Bug R; assert it explicitly.
-    expect(agentsEntry!.autoSections).toContain('Agent Performance');
-    expect(agentsEntry!.protectedSections).toContain('Identity');
-    expect(agentsEntry!.protectedSections).toContain('Architecture');
+function readDocsConfig(relPath: string): Array<{ id: string; path: string }> {
+  const raw = readFileSync(join(PROJECT_ROOT, ...relPath.split('/')), 'utf-8');
+  const parsed = JSON.parse(raw) as { docs: Array<{ id: string; path: string }> };
+  return parsed.docs;
+}
+
+describe('pure-adapter law: host files are NOT managed-docs (ADR-G-004)', () => {
+  it('live .deckent/settings/docs.json lists no host adapter file', () => {
+    const docs = readDocsConfig('.deckent/settings/docs.json');
+    for (const f of ADAPTER_FILES) {
+      expect(docs.find(d => d.path === f), `${f} must not be a managed-doc (pure-adapter law)`).toBeUndefined();
+    }
+    // Belt-and-suspenders: the legacy IDs must be gone too.
+    expect(docs.find(d => d.id === 'claude-md')).toBeUndefined();
+    expect(docs.find(d => d.id === 'agents-md')).toBeUndefined();
+  });
+
+  it('seed docs.json.template propagates no host adapter file to new projects', () => {
+    const docs = readDocsConfig('src/cli/commands/init-templates/docs.json.template');
+    for (const f of ADAPTER_FILES) {
+      expect(docs.find(d => d.path === f), `${f} must not seed into new projects (pure-adapter law)`).toBeUndefined();
+    }
   });
 });
 

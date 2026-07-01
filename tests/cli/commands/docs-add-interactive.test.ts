@@ -20,20 +20,24 @@ afterEach(cleanup);
 // ─── seedDocsConfig ──────────────────────────────────────────────────────
 
 describe('seedDocsConfig', () => {
-  it('creates docs.json with default template content', () => {
-    // The seed template now includes both `claude-md` and `identity-md`
-    // (see src/cli/commands/init-templates/docs.json.template). Only the
-    // claude-md entry is asserted in detail; the identity-md addition is
-    // covered by managed-docs identity tests elsewhere.
+  it('creates docs.json with default template content (pure-adapter: no host files)', () => {
+    // Under the pure-adapter law (ADR-G-004 / DOCS-PURE-ADAPTER) the seed
+    // template seeds only the deckent-owned IDENTITY.md surface — host
+    // instruction files (CLAUDE.md/AGENTS.md/…) are NOT managed-docs and must
+    // not be seeded into new projects (that was the locale-leak root cause).
     seedDocsConfig(TEST_ROOT);
     const config = loadDocsConfig(TEST_ROOT);
     expect(config).not.toBeNull();
     expect(config!.version).toBe(1);
     expect(config!.docs.length).toBeGreaterThanOrEqual(1);
-    const claudeEntry = config!.docs.find(d => d.id === 'claude-md');
-    expect(claudeEntry).toBeDefined();
-    expect(claudeEntry!.path).toBe('CLAUDE.md');
-    expect(claudeEntry!.autoSections).toEqual(['Sprint Metrics']);
+    // No host adapter file is ever seeded.
+    expect(config!.docs.find(d => d.id === 'claude-md')).toBeUndefined();
+    expect(config!.docs.find(d => d.path === 'CLAUDE.md')).toBeUndefined();
+    expect(config!.docs.find(d => d.path === 'AGENTS.md')).toBeUndefined();
+    // The deckent-owned IDENTITY.md surface remains a legitimate managed-doc.
+    const identityEntry = config!.docs.find(d => d.id === 'identity-md');
+    expect(identityEntry).toBeDefined();
+    expect(identityEntry!.path).toBe('.deckent/workspace/IDENTITY.md');
   });
 
   it('does not overwrite existing config', () => {

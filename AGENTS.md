@@ -22,8 +22,3 @@ When acting as Worker: @.codex/rules/worker-default.md
 
 ## Identity
 @.deckent/workspace/IDENTITY.md
-
-## Agent Performance
-| Agent | Tasks | Done | Success |
-|-------|-------|------|--------|
-| doc-writer | 24 | 13 | 54% |
