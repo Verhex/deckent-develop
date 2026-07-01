@@ -8,7 +8,7 @@
 > `docs/MASTER-PLAN-TR.md` = Türkçe okuma-companion'ı (aynı maddeler, pillar-gruplu).
 > **ADR-grounded:** her item bir ADR-G/D'ye trace eder — bkz. **`## ADR Traceability`** (41 ADR → item, %100 coverage). Taksonomi: 4-katman ADR-G(anayasa)/D(dev)/UG/UP, precedence **G>U>D**.
 > **Sıralama (Sıra sütunu — 2026-07-01, Codex↔Claude sentezi):** Excel'de **Sıra**-sort → tek yürütme-akışı. Wave-bant: **W0 (1-19)** truth/security + dogfood-blocker (ADR-iddia≠kod olanlar önce) · **W1 (20-49)** terminal product-loop (planla→onayla→çalıştır→değerlendir) · **W2 (50-199)** provider/routing/memory/resilience · **W3 (200-299)** onboarding/surface-breadth · **W4 (300+)** strategic (GA-1 gate: W0+min-W1 sonrası).
-> **Epic-kümeleri (parent → ordered children; Sıra-number bu sırayı yansıtır):** **TOOL-1** ⊃ tool-registry/disclosure/catalog (TOOL-2/CORE/REG/CAT · TERM-CAT) · **APR-1** ⊃ contract/store/policy/shell/workergate/fallback (multi-client APR-2/eventstream W2) · **WORKER-LIVE-TRACE** = live-obs SSOT (terminal 1. / dashboard 2. consumer; TERM-LIVE·DASH-PANELS·WATCH-W) · **STATE-RESOLVER** = global-install/isolation precondition (W0) · **ENT-GATEWAY** ⊃ RBAC-enforce ailesi (ENT-T1·ENT-1·WM-5·ENFORCE-GENERALIZE) · config-knob ailesi (CONFIG-CUSTOMIZE·CACHE-GLOBAL·LOCK·ENV-SYNC).
+> **Epic-kümeleri (parent → ordered children; Sıra-number bu sırayı yansıtır):** **TOOL-1** ⊃ tool-registry/disclosure/catalog (TOOL-2/CORE/REG/CAT · TERM-CAT) · **APR-1** ⊃ contract/store/policy/shell/workergate/fallback (multi-client APR-2/eventstream W2) · **WORKER-LIVE-TRACE** = live-obs SSOT (terminal 1. / dashboard 2. consumer; TERM-LIVE·DASH-PANELS·WATCH-W) · **STATE-RESOLVER** = global-install/isolation precondition (W0) · **ENT-GATEWAY** ⊃ RBAC-enforce ailesi (ENT-T1·ENT-1·WM-5·ENFORCE-GENERALIZE) · config-knob ailesi (CONFIG-CUSTOMIZE·CACHE-GLOBAL·LOCK·ENV-SYNC) · **AUDIENCE-EXPAND** ⊃ down-market (MODE-RENAME·AUTO-NAMING·DECKENT-LOG·ONB-CHAT·ONB-HONEST·CONFIG-CUSTOMIZE) + up-market/enterprise (BUDGET-SCOPE·COMPANY-PORT·CONFIG-REVISION·CRED-PER-PROJECT·ENT-1/2/5·APR-1·social-RBAC; blueprint `.analysis/paperclip-vs-deckent-comparison.md`).
 
 ### Nasıl kullanılır (Excel gibi filtrele)
 - **Durum** = ⬜ Açık · 🟡 Kısmi · 🔬 Araştırma · ⏸️ Ertelendi · ✅ Tamam. **Kaynak** = `A` Alperen · `CL` Claude · `CX` Codex(gap) · `MP` eski-backlog. **Önc** = P0/P1/P2.
@@ -212,6 +212,10 @@
 | 314 | SCALE-1 | ENT | Million-scale (RemoteTokenAuth+mTLS+HSM+Redis-cluster) | MP | P2 | — | ⬜ | — | sub-#3 |
 | 315 | SCALE-2 | ENT | Distributed agent mesh (cross-node schedule + shared mem/lock) | MP | P2 | — | ⬜ | — | — |
 | 316 | SEC-1 | ENT | Sub-#2 self-security (prompt/command guard + planner state-hygiene) | MP | P1 | — | ⬜ | — | — |
+| 429 | AUDIENCE-EXPAND | ENT·ONB·TERM·LAUNCH | 🎯 Çatı-epic: developer-tool → **herkes / her-kesim** ürünleşmesi. İki kanat — (a) aşağı-pazar/non-teknik: terminoloji-dejargon + sohbetle-onboarding · (b) yukarı-pazar/enterprise: secrets·budget·tenancy·approval·portability·config-rollback. Bugün dağınık olan bu niyeti tek izlenebilir çatı altında topla + ölçülebilir yap | A·CL | P1 | — | ⬜ | — | B-öneri (2026-07-01 Alperen-kabul). Down-market children: MODE-RENAME·AUTO-NAMING·DECKENT-LOG·ONB-CHAT·ONB-HONEST·CONFIG-CUSTOMIZE. Up-market children: BUDGET-SCOPE·COMPANY-PORT·CONFIG-REVISION·CRED-PER-PROJECT·ENT-1/2/5·APR-1·social-RBAC. Enterprise blueprint: `.analysis/paperclip-vs-deckent-comparison.md` §5a/§6b |
+| 430 | BUDGET-SCOPE | ENT·MOAT | Hiyerarşik budget-policy: company→agent→project scope + hard-stop (pause/cancel) + override; mevcut pre-spawn cost-gate'i scope-hiyerarşisiyle genişlet (solo runaway-cost korkusu + enterprise per-team cap) | CL | P1 | — | ⬜ | — | AUDIENCE-EXPAND up-market. paperclip §6b#2: `budgets.ts:648`·`pauseAndCancelScopeForBudget`·`getInvocationBlock`; DK cost-gate var scope yok |
+| 431 | COMPANY-PORT | ENT·ONB | Workspace **portability**: agent/skill/config export/import bundle + secret-scrubbing (değer asla export, import'ta taze) + collision (rename/skip/replace) — reusable-workspace = enterprise onboarding/fleet | CL | P2 | ENT-2 | ⬜ | — | AUDIENCE-EXPAND up-market. paperclip §6b#7: `exportBundle`/`importBundle`; DK'de yok |
+| 432 | CONFIG-REVISION | ENT·GOV | Runtime agent/config **revisioning + rollback**: in-txn snapshot + diff + forward-rolling rollback (history immutable) + secret-marker koruması; governance-by-construction'ı runtime-rollback ile tamamla | CL | P2 | — | ⬜ | — | AUDIENCE-EXPAND up-market. paperclip §6b#6: `agents.ts:447` snapshot·`:735` rollback; ROLLBACK-MECH-DEAD (427) sprint-file-rollback FARKLI konu |
 | 317 | WM-5 | GOV | Provider-free hard-enforcement (CLAUDE_AUTH guard + flag-leak) | MP | P1 | — | 🟡 | — | high-risk parça |
 | 318 | LAYER-1 | GOV | Layer-1 import-direction cleanup (census: core→orchestra=1·core→cli=1·orch→cli=5·api→cli=6; ADR-008-W+CORE-W1+ORCH-W1+API-W1) | MP | P1 | — | ⬜ | — | ADR-D-004; logic core'a, yüzey thin; routing-engine:32 |
 | 319 | DORMANT-1 | GOV | Kablosuz güvenlik wire (cascade-detector+spawn-safety+sandbox.ts) | MP·CL | P1 | — | ⬜ | — | 🔴 |
@@ -387,7 +391,7 @@
 | G-013 Graceful-Shutdown/Lifecycle | MOAT-2 · MF-9 |
 | G-014 Spawn-Backend/Observation | ORCH-BE · MOAT-ISO · WATCH-W · WORKER-LIVE-TRACE |
 | G-015 Managed-Docs/Tracking | MANAGED-DOCS-MINIMIZE · DECKENT-LOG |
-| G-016 Product-Vision | MODULARIZE · CODE-LAYERS |
+| G-016 Product-Vision | MODULARIZE · CODE-LAYERS · AUDIENCE-EXPAND (çatı; cross-ADR: children G-024/G-030/G-031) |
 | G-017 Multi-Project-Isolation | TOOL-SCOPE · ENT-2 |
 | G-018 Verification/Event-Stream | COMM-2 · TERM-LIVE · APR-* |
 | G-019 ADR-Governance/4-Layer | ADR-LAYER · ADR-REVISION (≈✅ sistem-side) |
@@ -402,7 +406,7 @@
 | G-028 Work-Taxonomy | TASKTYPE-EXPAND · WM-2 |
 | G-029 Embedded-Web-Terminal | RCE-model+guards✅ audit-wiring⏳ (provisional); AUDIT-WIRE · TERM-CONFIG-WIRE · AUDIT-TENANT · DESK-1 · TERM-RPC |
 | G-030 Consent-Provisioning/Install | ONB-CHAT · ONB-1 · PSL-6 · ONB-GLOBAL · PKG-NAME-SSOT · DEAD-PROVISION-PURGE |
-| G-031 Enterprise-Foundation | ENT-* (RATE-ENFORCE-WIRE→ENT-T1 · AUDIT-SECRET-WIRE→ENT-3) · ENT-CONFIG-SSOT · CAP-PERM-TAG · ADR-067-TENANT · NERVOUS-ENTERPRISE |
+| G-031 Enterprise-Foundation | ENT-* (RATE-ENFORCE-WIRE→ENT-T1 · AUDIT-SECRET-WIRE→ENT-3) · ENT-CONFIG-SSOT · CAP-PERM-TAG · ADR-067-TENANT · NERVOUS-ENTERPRISE · BUDGET-SCOPE · COMPANY-PORT · CONFIG-REVISION (AUDIENCE-EXPAND up-market) |
 | G-032 Self-Learning/Evolution | EVOLUTION-SELECTIVE-SCALE · IDENTITY-MUTATION-WIRE · LEARNINGS-QUALITY · EVO-2 |
 | G-033 Dashboard-Observability | DASH-1 · DASH-PANELS · DASH-D3 · DASH-EMOJI-FIX |
 | G-034 Native-Agentic-Terminal | TERM-NAT · TOOL-2 · F11-* · TERM-* · PROVIDER-SSOT · SLASH-MODE-WIRE · NL-DISPATCH-DECISION |
