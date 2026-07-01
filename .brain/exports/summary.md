@@ -46,6 +46,13 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-349 Learnings** (sprint-349): ## Sprint sprint-349 Learnings
+
+## Gains
+- 349-001 — DOCKER-FIXPACK — stale-shadow EACCES + inert kind-memlimit (rows...
+- **Sprint sprint-347 Learnings** (sprint-347): ## Sprint sprint-347 Learnings
+- W0-8 STATE-RESOLVER — env-aware state-path resolver primitive: NO_GO
+- W0-9 CRED-PER...
 - **Sprint sprint-346 Learnings** (sprint-346): ## Sprint sprint-346 Learnings
 - F07 — fix reference CLI (hand-curated only): NO_GO — Worker exited without writing r...
 - **Sprint sprint-345 Learnings** (sprint-345): ## Sprint sprint-345 Learnings
@@ -74,12 +81,6 @@
 
 ## Gains
 - 337-001 — live-proof marker file — File exists at docs/audits/token-captur...
-- **Sprint sprint-336 Learnings** (sprint-336): ## Sprint sprint-336 Learnings
-
-## Gains
-- 336-001 — live-proof marker file — File docs/audits/token-capture-live-pro...
-- **Sprint sprint-335 Learnings** (sprint-335): ## Sprint sprint-335 Learnings
-- live-proof marker file: NO_GO — Created docs/audits/token-capture-live-proof.md with...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -127,5 +128,6 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: file_outside_scope
 - Violation pattern: doc_sync_ground_truth_mismatch
+- Violation pattern: stale_heartbeat
 
-_Total entries: 814 | Generated: 2026-07-01_
+_Total entries: 821 | Generated: 2026-07-01_

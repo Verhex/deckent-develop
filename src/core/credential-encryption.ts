@@ -82,14 +82,23 @@ export function getMasterKey(options?: { keyringPath?: string }): Buffer {
 /**
  * Encrypt a plaintext string using AES-256-GCM.
  * Returns IV, ciphertext, and auth tag as hex strings.
+ *
+ * `aad` (Additional Authenticated Data) is optional and NOT stored in the returned
+ * payload — the caller must supply the identical `aad` value to `decrypt()`. Binding
+ * an entry's ciphertext to e.g. its own key name (349-003 CRED-HARDEN-PACK) makes the
+ * auth tag fail to verify if the ciphertext is later relabeled/permuted onto a
+ * different key, turning a silent entry-swap into a loud decrypt failure.
  */
-export function encrypt(plaintext: string, masterKey: Buffer): EncryptedPayload {
+export function encrypt(plaintext: string, masterKey: Buffer, aad?: string): EncryptedPayload {
   if (masterKey.length !== KEY_BYTES) {
     throw new CredentialEncryptionError(`Master key must be ${KEY_BYTES} bytes`);
   }
 
   const iv = randomBytes(IV_BYTES);
   const cipher = createCipheriv(ALGORITHM, masterKey, iv);
+  if (aad) {
+    cipher.setAAD(Buffer.from(aad, 'utf-8'));
+  }
 
   let ciphertext = cipher.update(plaintext, 'utf-8', 'hex');
   ciphertext += cipher.final('hex');
@@ -104,9 +113,10 @@ export function encrypt(plaintext: string, masterKey: Buffer): EncryptedPayload 
 
 /**
  * Decrypt an encrypted payload using AES-256-GCM.
- * Throws CredentialEncryptionError if decryption fails (wrong key or tampered data).
+ * Throws CredentialEncryptionError if decryption fails (wrong key, tampered data, or
+ * `aad` mismatched against what was passed to `encrypt()`).
  */
-export function decrypt(encrypted: EncryptedPayload, masterKey: Buffer): string {
+export function decrypt(encrypted: EncryptedPayload, masterKey: Buffer, aad?: string): string {
   if (masterKey.length !== KEY_BYTES) {
     throw new CredentialEncryptionError(`Master key must be ${KEY_BYTES} bytes`);
   }
@@ -115,6 +125,9 @@ export function decrypt(encrypted: EncryptedPayload, masterKey: Buffer): string 
     const iv = Buffer.from(encrypted.iv, 'hex');
     const tag = Buffer.from(encrypted.tag, 'hex');
     const decipher = createDecipheriv(ALGORITHM, masterKey, iv);
+    if (aad) {
+      decipher.setAAD(Buffer.from(aad, 'utf-8'));
+    }
     decipher.setAuthTag(tag);
 
     let plaintext = decipher.update(encrypted.ciphertext, 'hex', 'utf-8');

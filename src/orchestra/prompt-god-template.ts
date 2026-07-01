@@ -11,7 +11,7 @@ import type { Task, TaskScope } from '../core/task-types.js';
 import type { MemoryEntryV2 } from '../core/memory-types.js';
 import { selectRelevantAdrs, buildAdrPromptSection } from './adr-selector.js';
 import { sanitizeScope } from './scope-sanitizer.js';
-import { truncateAtParagraph, inferTaskDomains } from './task-builder.js';
+import { truncateAtParagraph, inferTaskDomains, logInjectionAudit } from './task-builder.js';
 import { getDefaultProviderName } from './sprint-utils.js';
 import {
   reorderLeadingT0,
@@ -443,12 +443,21 @@ function buildAdrBlock(
 
   for (const r of filtered) outIds.push(r.adrId);
 
+  // PCOMP-W3 (injection audit): this is the LIVE injection call-site — record
+  // the decision (id + score + tier + reasons) so a false positive is
+  // reproducible from data. Fail-soft inside logInjectionAudit.
+  logInjectionAudit(process.cwd(), task, filtered);
+
   // PROMPT-W1 (a): scope-gate ADR bodies for code-development tasks so that
   // ADRs not intersecting the task scope render as a condensed head+summary+
   // pointer instead of their full amendment-log body. Other task kinds (and
   // tasks with no `type`) keep the full render → backward-safe.
   const scopeGated = task.type === 'code-development';
-  const content = buildAdrPromptSection(filtered, 'full', allAdrs, 'full', scopeGated);
+  // PCOMP-W4 (tiered injection): 'operative' render — only the GOVERNING ADR
+  // (explicit-ref) gets its full Decision body; scoring-selected ADRs render
+  // condensed (Active-constraint + Contract + pointer). Measured before the
+  // fix: ~40-50% of a worker prompt was non-governing ADR body (sprint-348-005).
+  const content = buildAdrPromptSection(filtered, 'full', allAdrs, 'operative', scopeGated);
   if (!content) return '';
 
   return `=== Mandatory Architecture Rules (ADR) ===\nAll accepted ADRs below are mandatory constraints. Violating an accepted ADR requires a NO_GO result + ADR amendment proposal.\n\n${content}\n`;
@@ -1080,6 +1089,46 @@ export function buildPreExistingFailuresNote(preExistingFailures?: number): stri
   return `The Full test suite has ${preExistingFailures} pre-existing unrelated failures, measured at this sprint's baseline (stale model-id expectations, env-dependent provider/ollama tests). These pre-existing failures MUST NOT cause a NO_GO — they are not your responsibility. ${tail}`;
 }
 
+/**
+ * Trigger substrings that mark a task as touching a process-exit path (PCOMP-W8).
+ * Matched case-insensitively against title + description + goCriteria.
+ */
+const EXIT_PATH_TRIGGERS = [
+  'process.exit',
+  'process.kill',
+  'sigterm',
+  'sigkill',
+  'sigint',
+  'formatfatalandexit',
+  'fatal handler',
+  'exit code',
+];
+
+/**
+ * Build the exit-path test-strategy hint (PCOMP-W8).
+ *
+ * Workers burn their 3-attempt verify budget on process-terminating targets: a
+ * task touching `process.exit` / `process.kill` / a signal handler / a fatal
+ * handler needs its test to mock `process.exit`, but the prompt never said so
+ * (live case: 348-005 `formatFatalAndExit`, where the test called the real exit
+ * and killed the verify run). Pure substring match against
+ * {@link EXIT_PATH_TRIGGERS} — no match returns '' so a non-matching task's
+ * CRITICAL VERIFY STEPS block renders byte-identical to before; a match returns
+ * exactly ONE hint line, prefixed with its own leading newline+indent so callers
+ * can splice it directly onto the preceding line without an extra blank line
+ * appearing when the hint is empty.
+ */
+export function buildExitPathTestHint(task: {
+  title?: string;
+  description?: string;
+  goNogo?: { goCriteria?: string };
+}): string {
+  const haystack = `${task.title ?? ''}\n${task.description ?? ''}\n${task.goNogo?.goCriteria ?? ''}`.toLowerCase();
+  const isExitPathTask = EXIT_PATH_TRIGGERS.some(trigger => haystack.includes(trigger));
+  if (!isExitPathTask) return '';
+  return "\n   Exit-path test hint: mock `process.exit` (e.g. `vi.spyOn(process, 'exit').mockImplementation(...)`), assert the exit code without terminating the test process, and never call the real exit in tests.";
+}
+
 function renderSegments(input: RenderInput): PromptSegment[] {
   const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, task, effort, idempotencyKey, emitIdempotency, preExistingFailures } = input;
 
@@ -1171,7 +1220,7 @@ Check the project's TOOLS.md or package.json scripts to find the right commands.
    Examples: \`tsc --noEmit\` (TypeScript), \`mypy\` (Python), \`go vet ./...\` (Go), \`cargo check\` (Rust)
 2. **TARGETED test file(s) only** — run ONLY the test file(s) that cover the module(s) you changed (max 3 attempts)
    Example: \`npx vitest run tests/orchestra/my-module.test.ts\` — do NOT run the Full test suite (\`npx vitest run\` without args).
-   ${buildPreExistingFailuresNote(preExistingFailures)}
+   ${buildPreExistingFailuresNote(preExistingFailures)}${buildExitPathTestHint(task)}
 
 If BOTH pass → selfAssessment = "DONE"
 If minor issues remain → selfAssessment = "GO_WITH_TECH_DEBT" with details in notes

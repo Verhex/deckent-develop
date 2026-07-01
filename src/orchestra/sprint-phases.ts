@@ -2374,10 +2374,52 @@ export async function runFixPhase(
 // ═══ Phase 6+7: RETRO + DECAY ═════════════════════════════════════
 
 /**
+ * Returned by {@link runRetroPhase} when `finalizeSprint` throws. Fail-soft is
+ * preserved (the sprint does not crash) but the failure is no longer silently
+ * swallowed into an `undefined` return — callers can check `finalizeFailed`
+ * instead of rendering an unqualified "Complete!" (ADR-G-025, 349-002).
+ */
+export interface RetroPhaseFailure {
+  finalizeFailed: true;
+  error: string;
+}
+
+/**
+ * Build the localized, honest user notice shown when `finalizeSprint` throws
+ * inside the RETRO phase (i18n-FIRST: en+tr).
+ *
+ * Co-located here rather than in `src/cli/helpers/messages.ts` because that
+ * file is outside this task's write-scope — same constraint documented at
+ * `providerLimitFixSkipMessage` in provider-failure-classifier.ts (ADR-D-004
+ * ORCH-W1: orchestra/ → cli/ is a tracked import-direction inversion).
+ */
+function finalizeFailedMessage(
+  lang: string,
+  errorMessage: string,
+): { title: string; summary: string } {
+  const isTr = lang === 'tr';
+  return isTr
+    ? {
+        title: 'Sprint kapanışı (finalize) başarısız',
+        summary:
+          `RETRO fazında finalizeSprint hata verdi — retro/memory/export/arşiv adımları ` +
+          `tamamlanmamış olabilir: ${errorMessage}`,
+      }
+    : {
+        title: 'Sprint finalize failed',
+        summary:
+          `finalizeSprint threw during the RETRO phase — retro/memory/export/archive ` +
+          `steps may be incomplete: ${errorMessage}`,
+      };
+}
+
+/**
  * Run the RETRO phase (includes DECAY via finalizeSprint).
  * In test mode, only calculates metrics without writing retro/memory files.
  * Mutates `sprint` (status, phase, metrics) in place.
- * @returns Computed sprint metrics, or undefined if calculation failed
+ * @returns Computed sprint metrics; a {@link RetroPhaseFailure} marker if
+ *   `finalizeSprint` threw (fail-soft — not re-thrown); or undefined if
+ *   metrics calculation failed in test mode.
  */
 export async function runRetroPhase(
   projectRoot: string,
@@ -2386,7 +2428,7 @@ export async function runRetroPhase(
   results: TaskResult[],
   config: ResolvedConfig,
   testMode?: boolean,
-): Promise<SprintMetrics | undefined> {
+): Promise<SprintMetrics | RetroPhaseFailure | undefined> {
   if (!testMode) {
     try {
       sprint.status = SprintStatus.RETROSPECTIVE;
@@ -2460,8 +2502,22 @@ export async function runRetroPhase(
         onRuleRegen: async (root: string): Promise<void> => { await regenerateRules(root); },
       });
     } catch (err) {
-      safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
-      return undefined;
+      const message = err instanceof Error ? err.message : String(err);
+      safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${message}`);
+
+      // ADR-G-025 / 349-002 — a finalize failure must be SURFACED, not just
+      // logged to the dashboard: (1) stderr, (2) the notify pipeline,
+      // (3) a returned marker so a caller never renders an unqualified
+      // "Complete!" over a lost retro/memory/export/archive. Fail-soft is
+      // preserved — no re-throw.
+      const lang = config.language ?? 'en';
+      const msg = finalizeFailedMessage(lang, message);
+      console.error(`[retro] ${msg.summary}`);
+      try {
+        void notify('human-checkpoint-required', sprint.id, msg.title, msg.summary, message);
+      } catch (e) { debugLog('runRetroPhase:finalizeFailed:notify', e); }
+
+      return { finalizeFailed: true, error: message };
     }
   } else {
     try {

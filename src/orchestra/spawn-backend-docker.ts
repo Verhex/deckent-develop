@@ -4,7 +4,7 @@
 // Results collected via shared .tasks/ volume mount.
 
 import { spawnSync, spawn as nodeSpawn } from 'node:child_process';
-import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync, openSync, fsyncSync, closeSync, readdirSync, renameSync, rmdirSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync, openSync, fsyncSync, closeSync, readdirSync, renameSync, rmdirSync, chmodSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { homedir, totalmem } from 'node:os';
@@ -553,9 +553,34 @@ export function buildDeckShadowMountArgs(deckExists: boolean, shadowHostPath: st
  * by the host file mode, so host write permission does not weaken the isolation.
  *
  * Exported for unit tests (idempotency regression).
+ *
+ * STALE-SHADOW-PERMS fix (Sprint 349): `writeFileSync`'s `mode` option only
+ * applies when the file is CREATED — against a pre-existing file the call
+ * opens `O_WRONLY|O_TRUNC` and `mode` is ignored entirely. A shadow left
+ * read-only (0o400) by an older build (or a foreign-permission artifact)
+ * therefore makes the O_TRUNC write throw `EACCES` and fail the whole SPAWN
+ * phase (live-observed: sprint-347 first launch). Converge ANY pre-existing
+ * perm state to writable before writing: try `chmodSync` first (cheap,
+ * preserves the file/inode); if that fails (e.g. Windows ACL semantics, or a
+ * foreign-owned file chmod can't fix), fall back to removing the stale file
+ * so the write below re-creates it fresh via its CREATE-path `mode`. Both
+ * guards are best-effort and never throw through — a genuinely unwritable
+ * path still surfaces an honest error from the final `writeFileSync`.
  */
 export function ensureDeckShadowFile(tasksDir: string): string {
   const shadowHostPath = join(tasksDir, '.deck-shadow');
+  if (existsSync(shadowHostPath)) {
+    try {
+      chmodSync(shadowHostPath, 0o600);
+    } catch (e) {
+      debugLog('docker-backend:deck-shadow-chmod', e);
+      try {
+        unlinkSync(shadowHostPath);
+      } catch (unlinkErr) {
+        debugLog('docker-backend:deck-shadow-unlink', unlinkErr);
+      }
+    }
+  }
   writeFileSync(shadowHostPath, '', { mode: 0o600 });
   return shadowHostPath;
 }

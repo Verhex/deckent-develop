@@ -52,7 +52,7 @@ function makeTask(title: string, description: string, dirs: string[] = []) {
 // adr-037 has strong keyword match and preset bonus for security/orchestration.
 const POOL: MemoryEntryV2[] = [
   makeAdr('adr-001', 'TypeScript + ESM', 'TypeScript ESM module system for all source files.', 1),
-  makeAdr('adr-008', 'Brain Merkezi Import', 'Brain is the only importer of orchestra modules.', 8),
+  makeAdr('adr-008', 'Brain Merkezi Import', 'Brain is the only importer of orchestra modules — enforced across sprint-planner.ts and task-router imports.', 8),
   makeAdr('adr-010', 'Tek Runtime Dependency', 'commander.js is the only runtime dependency.', 10),
   makeAdr('adr-012', 'register<Name>(program) Pattern', 'All CLI commands use register<Name>(program) pattern. ADR-012 defines the canonical CLI registration contract.', 12),
   makeAdr('adr-015', 'TaskRouter Module', 'TaskRouter implements 6-level routing for sprint task assignment.', 44),
@@ -214,11 +214,13 @@ describe('selectRelevantAdrs — explicit ADR reference forcing', () => {
 
   // Test 8 — No explicit refs → backward-compatible scoring behavior unchanged
   it('behaves identically to original scoring when no explicit refs present', () => {
-    const task = makeTask(
-      'Sprint planner routing refactor',
-      'Refactor sprint planner task-router logic in orchestra.',
-      ['src/orchestra/'],
-    );
+    // PCOMP-W3 granularity: strong matches now come from the FILE-level scope
+    // intersection (both ADRs cite sprint-planner/task-router files) + keywords.
+    const task = {
+      title: 'Sprint planner routing refactor',
+      description: 'Refactor sprint planner task-router logic in orchestra.',
+      scope: { directories: ['src/orchestra/'], filesRead: [], filesWrite: ['src/orchestra/sprint-planner.ts'] },
+    };
 
     const results = selectRelevantAdrs(task, POOL, 3, 146);
 

@@ -23,20 +23,6 @@ export interface AdrRelevance {
 // ─── Scope → ADR Path Keywords ───────────────────────────────────────
 
 /** Map well-known directory prefixes to ADR-relevant keywords */
-const SCOPE_PATH_KEYWORDS: Record<string, string[]> = {
-  'src/orchestra/': ['orchestra', 'sprint', 'brain', 'routing', 'planner', 'evaluator'],
-  'src/core/':      ['core', 'config', 'types', 'memory', 'provider', 'model'],
-  'src/cli/':       ['cli', 'command', 'commander', 'readline', 'prompt'],
-  'src/mcp/':       ['mcp', 'tool', 'resource', 'stdio'],
-  'src/agents/':    ['agent', 'worker', 'spawn', 'heartbeat'],
-  'src/providers/': ['provider', 'adapter', 'claude', 'codex', 'gemini'],
-  'src/api/':       ['api', 'http', 'sse', 'server'],
-  'src/dashboard/': ['dashboard', 'react', 'vite', 'tailwind', 'frontend'],
-  'tests/':         ['test', 'vitest', 'coverage', 'mock'],
-  'docs/':          ['documentation', 'docs', 'managed-docs', 'template'],
-  'scripts/':       ['script', 'audit', 'ci'],
-};
-
 // ─── Task Type ADR Preset Matrix ─────────────────────────────────────
 
 /**
@@ -162,31 +148,51 @@ const SCOPE_MATCH_REASON = 'scope-path-match';
  * Score based on scope path match.
  * If ADR content mentions directories or keywords related to task scope, +0.4.
  */
-function scoreScopeMatch(adr: MemoryEntryV2, taskDirs: string[]): { score: number; reason: string | null } {
-  if (taskDirs.length === 0) return { score: 0, reason: null };
+function scoreScopeMatch(
+  adr: MemoryEntryV2,
+  taskDirs: string[],
+  taskFiles: string[] = [],
+): { score: number; reason: string | null } {
+  if (taskDirs.length === 0 && taskFiles.length === 0) return { score: 0, reason: null };
 
   const adrText = `${adr.title} ${adr.content}`.toLowerCase();
   let matched = false;
 
-  for (const dir of taskDirs) {
-    // Direct path mention in ADR
-    if (adrText.includes(dir.replace(/\/$/, '').toLowerCase())) {
+  // PCOMP-W3 root-cause fix (granularity — live-verified on sprint-349-005): the
+  // old check matched at DIRECTORY level (`adrText.includes('src/orchestra')`) plus
+  // per-layer keyword lists ('routing', 'sprint', …). A layer root like
+  // `src/orchestra/` covers half the repo, so EVERY orchestra task scope-matched
+  // the Routing ADR (G-006) — a pure attention-dilution false positive. Scope-match
+  // now means a real code-graph intersection:
+  //   1. FILE level (strong): the ADR text mentions one of the task's write files
+  //      — full path or a specific basename (generic basenames excluded).
+  //   2. DIR level: only a directory DEEPER than a bare layer root counts
+  //      (`src/cli/helpers/` yes; `src/orchestra/` alone no).
+  // Text-level topical relevance is scoreKeywordMatch's job — keeping keywords
+  // here double-counted the same signal into the scope axis.
+  const GENERIC_BASENAMES = new Set(['index.ts', 'types.ts', 'utils.ts', 'index.js']);
+  for (const f of taskFiles) {
+    const full = f.toLowerCase().replace(/\\/g, '/');
+    const base = full.split('/').pop() ?? '';
+    const stem = base.replace(/\.[a-z]+$/, ''); // ADRs cite modules both ways: `brain.ts` and `sprint-controller`
+    if (
+      adrText.includes(full) ||
+      (base.length > 5 && !GENERIC_BASENAMES.has(base) && adrText.includes(base)) ||
+      (stem.length > 5 && adrText.includes(stem))
+    ) {
       matched = true;
       break;
     }
-    // Check scope path keywords
-    for (const [prefix, keywords] of Object.entries(SCOPE_PATH_KEYWORDS)) {
-      if (dir.startsWith(prefix)) {
-        for (const kw of keywords) {
-          if (adrText.includes(kw)) {
-            matched = true;
-            break;
-          }
-        }
+  }
+
+  if (!matched) {
+    for (const dir of taskDirs) {
+      const clean = dir.replace(/\/$/, '').toLowerCase().replace(/\\/g, '/');
+      if (clean.split('/').filter(Boolean).length >= 3 && adrText.includes(clean)) {
+        matched = true;
+        break;
       }
-      if (matched) break;
     }
-    if (matched) break;
   }
 
   return matched
@@ -335,6 +341,7 @@ export function selectRelevantAdrs(
   const intent = task.type != null ? taskKindToAdrDomain(task.type) : classifyTaskIntent(task);
   const taskText = `${task.title ?? ''} ${task.description ?? ''}`;
   const taskDirs = task.scope?.directories ?? [];
+  const taskFiles = task.scope?.filesWrite ?? [];
 
   // Build a normalized-id lookup map for the pool
   const adrPool = allAdrs.filter(adr => adr.type === 'adr' && adr.status === 'accepted');
@@ -360,7 +367,7 @@ export function selectRelevantAdrs(
     const reasons: string[] = ['explicit-ref'];
     let totalScore = 1.0; // base score ensures explicit refs sort to the front if needed
 
-    const scope = scoreScopeMatch(entry, taskDirs);
+    const scope = scoreScopeMatch(entry, taskDirs, taskFiles);
     if (scope.reason) { totalScore += scope.score; reasons.push(scope.reason); }
 
     const keyword = scoreKeywordMatch(entry, taskText);
@@ -392,7 +399,7 @@ export function selectRelevantAdrs(
       const reasons: string[] = [];
       let totalScore = 0;
 
-      const scope = scoreScopeMatch(adr, taskDirs);
+      const scope = scoreScopeMatch(adr, taskDirs, taskFiles);
       if (scope.reason) { totalScore += scope.score; reasons.push(scope.reason); }
 
       const keyword = scoreKeywordMatch(adr, taskText);
@@ -457,12 +464,23 @@ export function extractContractSection(content: string): string | null {
   return body || null;
 }
 
-export function extractOperativeSection(content: string): string | null {
+/**
+ * PCOMP-W4: the marker-only slice — an ADR author's explicit
+ * `<!-- worker-operative-start/end -->` pin of the worker-relevant content.
+ * Used by the constraint-tier condensed render (author's pick beats heuristics).
+ */
+export function extractMarkedSlice(content: string): string | null {
   const startIdx = content.indexOf(OPERATIVE_START);
   const endIdx = content.indexOf(OPERATIVE_END);
   if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
     return content.slice(startIdx + OPERATIVE_START.length, endIdx).trim();
   }
+  return null;
+}
+
+export function extractOperativeSection(content: string): string | null {
+  const marked = extractMarkedSlice(content);
+  if (marked !== null) return marked;
   // ADR-TAXONOMY fallback: the current ADR format carries no operative-marker
   // comments — the `## Decision (Today)` section IS the operative rule set. Return
   // it (through to the next `## ` header) so a worker sees the decision, not the
@@ -526,6 +544,15 @@ export function buildAdrPromptSection(
       if (adrRender === 'operative' && classifyInjectionTier(adr) === 'constraint') {
         const distilled = distillActiveConstraint(rawContent, entry?.summary);
         const constraintHead = distilled ? `**Active constraint:** ${distilled}\n\n` : '';
+        // Author-pinned operative markers take precedence: the ADR author already
+        // chose the worker-relevant slice — use it as the condensed body.
+        const marked = extractMarkedSlice(rawContent);
+        if (marked) {
+          sections.push(
+            `## ${adr.adrId}: ${adr.title}\n\n${constraintHead}${marked}\n\n[full text: .brain/memory.db ${adr.adrId}]`,
+          );
+          continue;
+        }
         const contract = extractContractSection(rawContent);
         const contractBlock = contract ? `### Contract (binding)\n\n${contract}\n\n` : '';
         sections.push(
@@ -555,13 +582,11 @@ export function buildAdrPromptSection(
         continue;
       }
 
-      let content = rawContent;
-      if (adrRender === 'operative') {
-        const operative = extractOperativeSection(rawContent);
-        if (operative !== null) {
-          content = `${operative}\n\n[full text: .brain/memory.db ${adr.adrId}]`;
-        }
-      }
+      // Reaching here in 'operative' render means the ADR is GOVERNING (Tier-1):
+      // it keeps its FULL body — the task's contract is zero-loss by policy
+      // (W4 spec + feedback_prompt_completeness_over_brevity). 'full' render
+      // (legacy callers) also lands here unchanged.
+      const content = rawContent;
       // WP-20: surface the operative constraint as a 1-line head ABOVE the full
       // body. The body (amendment history included) stays contiguous below it, so
       // there is zero content loss (completeness rule) — the distillation only

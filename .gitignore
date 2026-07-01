@@ -197,3 +197,4 @@ docs/audits/sprint-139/dead-code-report.md
 
 # Stray non-project doc (Claude system-prompt artifact, not deckent source) — keep on disk, out of repo
 claude-fable-x.md
+.deckent/prompts/

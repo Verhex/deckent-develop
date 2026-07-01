@@ -1,5 +1,23 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-349 Learnings
+- Sprint sprint-349 Learnings: ## Sprint sprint-349 Learnings
+
+## Gains
+- 349-001 — DOCKER-FIXPACK — stale-shadow EACCES + inert kind-memlimit (rows 434+433) — Both defects addressed within the granted write scope (src/orchestra/spawn-backend-docker.ts + ne...
+- 349-002 — FINALIZE-ERROR-SURFACE — swallowed finalize failures become visible (row 436) — Fixed the swallowed-finalize catch path in runRetroPhase (src/orchestra/sprint-phases.ts, was ~:2...
+- 349-003 — CRED-HARDEN-PACK — AAD binding + atomic writes + Windows honesty (row 438) — CRED-HARDEN-PACK (a)+(b)+(c) all implemented within the credential-encryption.ts / credentials-pe...
+- 349-004 — REDACT-COVERAGE — extend the secret-mask allowlist (row 437) — REDACT-COVERAGE: extended redactSensitive() with 4 new anchored, bounded-quantifier patterns appe...
+- 349-005 — PCOMP-W8 — test-strategy hints for exit-path tasks (row 445) — Added exported pure function buildExitPathTestHint(task) in src/orchestra/prompt-god-template.ts ...
+
+## Sprint sprint-347 Learnings
+- Sprint sprint-347 Learnings: ## Sprint sprint-347 Learnings
+- W0-8 STATE-RESOLVER — env-aware state-path resolver primitive: NO_GO
+- W0-9 CRED-PER-PROJECT — per-project encrypted credential store 🔴: NO_GO
+- W0-10 SYMLINK-AUTHORITY-WIRE — close the runtime symlink scope-bypass 🔴: NO_GO
+- W0-11 AUDIT-WIRE — persist terminal audit to MemoryStore + HMAC chain: NO_GO
+- W0-12 CRASH-REDACT — redact secrets from fatal crash output 🔴: NO_GO
+
 ## Sprint sprint-346 Learnings
 - Sprint sprint-346 Learnings: ## Sprint sprint-346 Learnings
 - F07 — fix reference CLI (hand-curated only): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [98 

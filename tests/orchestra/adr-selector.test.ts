@@ -187,11 +187,15 @@ describe('adr-selector', () => {
 
   // Test 4: Scope match score is correct
   it('assigns scope-path-match score correctly', () => {
-    const task = makeTask(
-      'Some task',
-      'Working on orchestra module',
-      ['src/orchestra/'],
-    );
+    // PCOMP-W3 granularity: scope-match is a FILE-level code-graph intersection —
+    // the ADR cites `sprint-controller`, the task writes sprint-controller.ts.
+    // A bare layer dir (src/orchestra/) alone no longer scope-matches (that was
+    // the G-006 false-positive factory).
+    const task = {
+      title: 'Some task',
+      description: 'Working on orchestra module',
+      scope: { directories: ['src/orchestra/'], filesRead: [], filesWrite: ['src/orchestra/sprint-controller.ts'] },
+    };
 
     const results = selectRelevantAdrs(task, MOCK_ADRS, 10, 146);
 

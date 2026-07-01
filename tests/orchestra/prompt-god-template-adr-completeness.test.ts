@@ -90,7 +90,9 @@ describe('buildTaskPrompt — ADR completeness (F3, Sprint 182 PQ-2)', () => {
         makeAdr('adr-001', 'TypeScript + ESM core configuration', longContent, 1),
       ],
     });
-    const result = buildTaskPrompt(makeTask(), ctx);
+    // PCOMP-W4: full-body completeness is the GOVERNING-tier guarantee — pin the
+    // ADR via an explicit ref in the task text (scoring-only ADRs render condensed).
+    const result = buildTaskPrompt(makeTask({ description: 'Verify per ADR-001 that the governing ADR content is rendered in full with no truncation cap' }), ctx);
 
     expect(result.metadata.adrIds).toContain('adr-001');
     expect(result.prompt).toContain(longContent);
@@ -131,7 +133,9 @@ describe('buildTaskPrompt — ADR completeness (F3, Sprint 182 PQ-2)', () => {
         makeAdr('adr-008', 'Brain Merkezi Import', adr8, 50),
       ],
     });
-    const result = buildTaskPrompt(makeTask(), ctx);
+    // PCOMP-W4: all three are pinned as governing (explicit refs) — the
+    // completeness guarantee under tiered injection applies to Tier-1.
+    const result = buildTaskPrompt(makeTask({ description: 'Implements ADR-001 + ADR-002 + ADR-008 in full' }), ctx);
 
     expect(result.metadata.adrIds).toHaveLength(3);
     expect(result.metadata.adrIds).toEqual(expect.arrayContaining(['adr-001', 'adr-002', 'adr-008']));

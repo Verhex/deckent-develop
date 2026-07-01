@@ -1,8 +1,9 @@
 import { hkdfSync } from 'node:crypto';
 import { realpathSync } from 'node:fs';
-import { mkdir, readFile, writeFile, chmod } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, chmod, rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DECKENT_DIR } from './constants.js';
+import { debugLog } from './utils.js';
 import {
   encrypt,
   decrypt,
@@ -102,17 +103,44 @@ async function loadFile(canonicalProjectRoot: string): Promise<PerProjectCredent
   return parsed as PerProjectCredentialFile;
 }
 
+/**
+ * Persist the credential store atomically: write the full contents to a temp file,
+ * then `rename()` it onto the real path. A rename is atomic on POSIX and Windows NTFS
+ * (single filesystem-metadata op), so a crash or a concurrent `saveFile()` call can
+ * never leave `credentials.enc` half-written — readers always see either the old
+ * complete file or the new complete file, never a torn write (349-003 CRED-HARDEN-PACK,
+ * same tmp+rename pattern as src/orchestra/sprint-checkpoint.ts writeCheckpoint).
+ */
 async function saveFile(canonicalProjectRoot: string, file: PerProjectCredentialFile): Promise<void> {
   const dir = join(canonicalProjectRoot, DECKENT_DIR);
   await mkdir(dir, { recursive: true, mode: 0o700 });
 
   const filePath = credentialsFilePath(canonicalProjectRoot);
-  await writeFile(filePath, JSON.stringify(file, null, 2) + '\n', { encoding: 'utf-8', mode: 0o600 });
+  const tmpPath = `${filePath}.tmp`;
+  await writeFile(tmpPath, JSON.stringify(file, null, 2) + '\n', { encoding: 'utf-8', mode: 0o600 });
+
+  try {
+    await rename(tmpPath, filePath);
+  } catch (renameErr) {
+    try {
+      await unlink(tmpPath);
+    } catch {
+      // Best-effort cleanup: if unlink also fails, the original renameErr below is
+      // what the caller needs to see — a leftover .tmp file is harmless (overwritten
+      // by the next successful save) and never mistaken for the real store.
+    }
+    throw renameErr;
+  }
 
   try {
     await chmod(filePath, 0o600);
-  } catch {
-    // Best-effort: some file systems may not support chmod.
+  } catch (err) {
+    // Best-effort: Windows-native chmod is a documented no-op (no POSIX permission
+    // bits), so this is expected to "fail" silently-by-design there. Log honestly
+    // rather than swallow so a genuine POSIX permission failure is visible.
+    // Windows-native ACL-based hardening is a tracked follow-up (SYMLINK-AUTHORITY-WIRE
+    // sibling work under ADR-G-017) — not implemented here.
+    debugLog('credentials-per-project:saveFile:chmod', err);
   }
 }
 
@@ -138,7 +166,10 @@ export async function setCredential(projectRoot: string, key: string, value: str
   const derivedKey = deriveProjectKey(canonicalRoot);
 
   const file = await loadFile(canonicalRoot);
-  file.entries[key] = encrypt(value, derivedKey);
+  // AAD-bind the ciphertext to its own key name (349-003 CRED-HARDEN-PACK): an
+  // attacker with file-write who relabels/swaps entries between key names can no
+  // longer make getCredential silently return the wrong secret — see getCredential.
+  file.entries[key] = encrypt(value, derivedKey, key);
   await saveFile(canonicalRoot, file);
 }
 
@@ -164,7 +195,26 @@ export async function getCredential(projectRoot: string, key: string): Promise<s
   if (!entry) return null;
 
   const derivedKey = deriveProjectKey(canonicalRoot);
-  return decrypt(entry, derivedKey); // propagates CredentialEncryptionError on wrong key / tampered data
+
+  // AAD-bound path first: entries written by setCredential (349-003 onward) are
+  // encrypted with aad = their own key name, so this is the correct decrypt for
+  // every current entry AND is what rejects a swapped/relabeled entry (its actual
+  // ciphertext was bound to a *different* key name's AAD, so the tag fails to
+  // verify against `key`).
+  try {
+    return decrypt(entry, derivedKey, key);
+  } catch (aadErr) {
+    // BACKWARD-COMPAT fallback: entries written before AAD binding existed have no
+    // AAD at all. Retry without AAD so pre-existing credentials.enc files keep
+    // decrypting without a migration step. If this also fails, the entry is either
+    // genuinely tampered/wrong-key OR was swapped from a different key's AAD-bound
+    // slot — either way it must throw, not silently fall through.
+    try {
+      return decrypt(entry, derivedKey);
+    } catch {
+      throw aadErr; // propagates CredentialEncryptionError on wrong key / tampered / swapped data
+    }
+  }
 }
 
 export { CredentialEncryptionError };

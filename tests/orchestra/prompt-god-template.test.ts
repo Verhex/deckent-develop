@@ -76,7 +76,14 @@ describe('buildTaskPrompt', () => {
       description: 'Build a config validation engine in src/core/',
       scope: { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/config-validator.ts'] },
     });
-    const ctx = makeCtx();
+    // PCOMP-W3 granularity: selection needs a real signal (file citation or
+    // keyword), not a bare layer-dir match — give the fixture ADR a realistic
+    // file citation like real ADRs carry.
+    const ctx = makeCtx({
+      allAdrs: [
+        makeAdr('adr-001', 'TypeScript + ESM', 'Core configuration law: config-validator.ts and config.ts follow strict ESM.', 1),
+      ],
+    });
     const result = buildTaskPrompt(task, ctx);
 
     expect(result.metadata.agent).toBe('architect');
@@ -159,7 +166,9 @@ describe('buildTaskPrompt', () => {
     const longContent = `**Context:** TypeScript ESM configuration.\n\n**Decision:** Use ESM.\n\n${longLines}`;
     expect(longContent.length).toBeGreaterThan(3000);
 
-    const task = makeTask();
+    // PCOMP-W4: pin adr-001 as governing (explicit ref) — full-body completeness
+    // is the Tier-1 guarantee; scoring-only ADRs render condensed by design.
+    const task = makeTask({ description: 'Implements ADR-001 TypeScript ESM configuration in full' });
     const ctx = makeCtx({
       allAdrs: [
         makeAdr('adr-001', 'TypeScript + ESM', longContent, 1),
