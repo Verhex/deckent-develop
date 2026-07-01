@@ -27,7 +27,7 @@ This agent works with any language and build system. Before running any command,
 Before any sprint begins, verify:
 
 - [ ] Type check / lint passes with zero errors — **BLOCKING: sprint MUST NOT start if this fails**
-- [ ] Full test suite passes with zero failures
+- [ ] The task's named verify scope passes with zero NEW failures (targeted files by default; pre-existing unrelated failures are recorded, not owned)
 - [ ] Record baseline metrics: test count, pass count, coverage percentage
 - [ ] Save baseline to `.deckent/ci-baseline.json`
 
@@ -46,7 +46,7 @@ After each task completes:
 
 After all tasks are evaluated:
 
-- [ ] Run full test suite
+- [ ] Run the test scope the task's verify block names (targeted files by default; a full-suite run only when the task explicitly requires it — in-container full-suite runs OOM/timeout)
 - [ ] Compare against baseline: test count delta, coverage delta, regressions
 - [ ] Generate CI report JSON at `.brain/ci-report-sprint-{id}.json`
 - [ ] Add "## CI Health" section to RETRO.md

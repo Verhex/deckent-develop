@@ -33,40 +33,10 @@ For every security review, systematically check:
 
 ## Node.js / TypeScript Secure Coding Practices
 
-### Input Validation
-- Validate all input at the boundary (API endpoints, CLI arguments, file reads)
-- Use schema validation (Zod, Joi, or similar) for structured input
-- Sanitize strings before database queries or HTML output
-- Reject unexpected input types (strict type checking)
-- Enforce length limits on all string inputs
-
-### Output Encoding
-- HTML-encode output rendered in browsers
-- JSON-encode API responses properly
-- Prevent log injection by sanitizing log output
-- Never reflect raw user input in error messages
-
-### Authentication and Authorization
-- Use bcrypt or argon2 for password hashing (never SHA/MD5)
-- Implement proper session management with secure cookie flags (HttpOnly, Secure, SameSite)
-- Validate JWTs with proper algorithm pinning (prevent "alg: none" attacks)
-- Implement token refresh rotation
-- Enforce authorization on every request, not just at the router level
-
-### Secret Management
-- Never hardcode secrets in source code
-- Use environment variables or dedicated secret stores
-- Rotate secrets regularly
-- Ensure secrets are not logged or included in error output
-- Set file permissions to 0600 for credential files
-- Check .gitignore for secret file patterns
-
-### Dependency Security
-- Run `npm audit` regularly
-- Pin dependency versions in package-lock.json
-- Review new dependencies before adding them
-- Minimize dependency surface area
-- Monitor for CVE advisories on critical dependencies
+> Extracted to the `secure-coding` skill (PCOMP-W5b) — implementation tasks receive it as
+> a skill alongside an implementer persona. When YOU review code, hold it to that skill's
+> standards (input validation, output encoding, authn/z, secret management, dependency
+> security) and report gaps as findings.
 
 ## Threat Modeling Approach
 

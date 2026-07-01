@@ -1,0 +1,40 @@
+{
+  "id": "secure-coding",
+  "source": "builtin",
+  "name": "Secure Coding",
+  "version": "0.1.0",
+  "description": "Node.js/TypeScript secure-coding practices for IMPLEMENTATION tasks: input validation, output encoding, authn/z, secret management, dependency security (extracted from security-auditor per PCOMP-W5b)",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "intent.primary": "security"
+        },
+        "score": 10
+      },
+      {
+        "when": {
+          "intent.primary": "implementation"
+        },
+        "score": 3
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "autoActivate": {
+    "keywords": [
+      "security",
+      "secret",
+      "credential",
+      "encryption",
+      "auth",
+      "token",
+      "redact",
+      "vault",
+      "sanitize"
+    ]
+  },
+  "enabled": true
+}

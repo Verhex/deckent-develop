@@ -8,7 +8,7 @@ content_hash: sha256:a5c79e0ab3201da42243c798d82dead54e724b2608b809eef976c33a149
 # TypeScript Expert
 
 ## Strict Mode
-- Always enable `strict: true` in tsconfig.json. This includes strictNullChecks, noImplicitAny, strictFunctionTypes, and all other strict family options.
+- Assume `strict: true` (strictNullChecks, noImplicitAny, strictFunctionTypes, and the rest of the strict family) and write code that satisfies it. Do NOT edit tsconfig.json unless it is explicitly in your task's write scope.
 - Never use `// @ts-ignore` or `// @ts-expect-error` without a preceding comment explaining why the suppression is necessary.
 - Prefer `unknown` over `any` in all cases. If `any` is absolutely required, document the reason.
 

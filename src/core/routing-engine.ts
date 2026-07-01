@@ -34,7 +34,7 @@ import { resolveComposition } from './skill-selector.js';
 import { modelRegistry } from './model-registry.js';
 import { normalizeTechStack, taskKindToIntent } from './work-model.js';
 import type { TaskKind, TechStackKind } from './work-model.js';
-import { getAgentDomain, type AgentDomain } from './agent-pool.js';
+import { getAgentDomain, getAgentRole, type AgentDomain, type AgentRole } from './agent-pool.js';
 import { debugLog } from './utils.js';
 
 // ─── Agent Fallback Chain ──────────────────────────────────────────────────
@@ -553,6 +553,27 @@ export function evaluateForceAgentSemantic(
 
 // ─── Agent Selection ────────────────────────────────────────────────────────
 
+/**
+ * PCOMP-W5 (persona role signal): the roles a task kind actually needs. An
+ * `audit` task wants a reviewer/analyst persona; every other kind ships a diff
+ * and wants an implementer. Undefined kind → no opinion (no penalty).
+ */
+export function getRoleMismatchPenalty(agentRole: AgentRole, taskKind?: TaskKind): number {
+  if (!taskKind) return 0;
+  const wantsReview = taskKind === 'audit';
+  const compatible = wantsReview
+    ? agentRole === 'reviewer' || agentRole === 'analyst'
+    : agentRole === 'implementer';
+  // −3 by design, NOT the analysis' −5 strawman: it exactly cancels the +3
+  // domain-match bonus, so a domain-specialized reviewer (today the ONLY agent
+  // carrying the `security` domain is the reviewer security-auditor) still
+  // competes on activation merit for a security implement-task instead of being
+  // hard-excluded in favor of a generic agent with zero domain knowledge. The
+  // long-term winning combo is implementer + secure-coding skill (PCOMP-W5b);
+  // this signal tips ties that way without degrading today's routing.
+  return compatible ? 0 : -3;
+}
+
 function selectBestAgent(
   taskDNA: TaskDNA,
   pool: AgentPool,
@@ -622,12 +643,19 @@ function selectBestAgent(
       reasoning.push(`Agent '${id}' user-surface bonus: +${surfaceBonus} (domains=[${taskDNA.domains.map(d => d.name).join(', ')}])`);
     }
 
-    const finalScore = result.score + bonus + domainBonus + surfaceBonus;
+    // PCOMP-W5: role-mismatch signal — a review/analyst persona on an implement
+    // task (or vice versa) is the output-format-conflict failure class.
+    const rolePenalty = getRoleMismatchPenalty(getAgentRole(agent), taskKind);
+    if (rolePenalty !== 0) {
+      reasoning.push(`Agent '${id}' role-mismatch penalty: ${rolePenalty} (role=${getAgentRole(agent)}, taskKind=${taskKind})`);
+    }
+
+    const finalScore = result.score + bonus + domainBonus + surfaceBonus + rolePenalty;
 
     if (finalScore >= cfg.agentMinScore) {
       candidates.push({
         id,
-        rawScore: result.score + domainBonus + surfaceBonus,
+        rawScore: result.score + domainBonus + surfaceBonus + rolePenalty,
         learningBonus: bonus,
         finalScore,
         matchedRules: result.matchedRules,

@@ -70,7 +70,7 @@ Use the test framework matching your project's stack. The principles are the sam
 - Use inline snapshots for small values. Use file snapshots only when inline is impractical.
 
 ## CI Integration
-- Run the full test suite on every pull request. Block merging on test failure.
+- CI-pipeline design: the PR pipeline runs the full suite and blocks merge on failure. (This is pipeline guidance — as a worker, YOUR verify scope is the task's verify block: targeted test files by default.)
 - Parallelize test execution across workers for speed.
 - Cache dependencies and build artifacts to reduce CI time.
 - Run slow tests (E2E, integration) on a separate schedule or only for merge commits.
