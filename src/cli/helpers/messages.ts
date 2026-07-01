@@ -2057,6 +2057,55 @@ const MESSAGES: MessageMap = {
   'health.unknown': { en: 'unknown', tr: 'bilinmiyor' },
   'health.logged_in': { en: 'logged in', tr: 'oturum açık' },
   'health.logged_out': { en: 'logged out', tr: 'oturum kapalı' },
+
+  // ─── TERM-LIVE footer labels (Task 16 — MESSAGES-KEYS-2, sole-authority
+  // addition; cited by 353-007's docImpact note; en text is byte-identical to
+  // live-footer.ts's DEFAULT_LIVE_FOOTER_LABELS so a future REPL-wiring task
+  // can swap options.labels for getMessage(...) calls with no visible diff) ──
+  'live_footer.idle': { en: 'idle', tr: 'boşta' },
+  'live_footer.running': { en: 'Running', tr: 'Çalışıyor' },
+  'live_footer.elapsed': { en: 'Elapsed', tr: 'Geçen süre' },
+  'live_footer.provider': { en: 'Provider', tr: 'Sağlayıcı' },
+  'live_footer.auth': { en: 'Auth', tr: 'Oturum' },
+  'live_footer.next': { en: 'Next', tr: 'Sıradaki' },
+  'live_footer.healthy': { en: 'healthy', tr: 'sağlıklı' },
+  'live_footer.degraded': { en: 'degraded', tr: 'sorunlu' },
+  'live_footer.unknown': { en: 'unknown', tr: 'bilinmiyor' },
+  'live_footer.logged_in': { en: 'logged-in', tr: 'oturum açık' },
+  'live_footer.logged_out': { en: 'logged-out', tr: 'oturum kapalı' },
+
+  // ─── TERM-CONNECT /connect step descriptions (Task 16 — MESSAGES-KEYS-2,
+  // sole-authority addition; cited by 353-010's docImpact note — the exact 7
+  // descriptionKey values already emitted by connect-wizard.ts's ConnectStep
+  // objects) ──────────────────────────────────────────────────────────────
+  'connect.step.install_cli': {
+    en: 'Install the {provider} CLI: {instruction}',
+    tr: '{provider} CLI\'ını kurun: {instruction}',
+  },
+  'connect.step.login': {
+    en: 'Log in to {provider}.',
+    tr: '{provider} hesabına giriş yapın.',
+  },
+  'connect.step.mcp_unsupported': {
+    en: '{host} does not support MCP attachment yet.',
+    tr: '{host} henüz MCP bağlantısını desteklemiyor.',
+  },
+  'connect.step.attach_mcp': {
+    en: 'Attach deckent to {host} via MCP.',
+    tr: 'Deckent\'i MCP üzerinden {host}\'a bağlayın.',
+  },
+  'connect.step.ide_cursor_setup': {
+    en: 'Set up the Cursor IDE integration.',
+    tr: 'Cursor IDE entegrasyonunu kurun.',
+  },
+  'connect.step.ide_terminal_guidance': {
+    en: 'Running in a plain terminal — no IDE integration needed.',
+    tr: 'Düz bir terminalde çalışıyorsunuz — IDE entegrasyonu gerekmiyor.',
+  },
+  'connect.step.wsl_recommended': {
+    en: 'WSL is recommended over {shell} for the best experience.',
+    tr: 'En iyi deneyim için {shell} yerine WSL önerilir.',
+  },
 };
 
 /**

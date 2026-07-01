@@ -1,0 +1,232 @@
+// ─── DIRECTIVES.md Builder — NL→DIRECTIVES üretici çekirdeği (DIR-1) ───────
+//
+// Deterministic generator: structured intent (tasks[]: {title,desc,files,scope,
+// deps,model,skills,goCriteria[],nogo[]}) → canonical DIRECTIVES.md text.
+//
+// Round-trip contract: buildDirectives(intent) output is read back losslessly by
+// the UNCHANGED parseStructuredDirectives (task-builder.ts) — title/scope/files/
+// deps/model/effort/skills land in its native ParsedDirectiveTask fields. That
+// parser has no dedicated goCriteria/nogo field (it treats everything after
+// `### Description` as one opaque description string), so goCriteria/nogo are
+// serialized into a `### goNogo` sub-block INSIDE that description text — a
+// format this module owns both ends of (extractGoNogo mirrors buildDirectives'
+// own writer) without touching or duplicating the parser itself.
+//
+// This task deliberately stops at markdown generation — no LLM call, no NL
+// understanding. The NL→structured-intent step is an explicit follow-up.
+
+import type { ModelType, TaskEffort } from '../core/types.js';
+import type { ParsedDirectiveTask } from './task-builder.js';
+
+// ═══ Types ═══════════════════════════════════════════════════════════════
+
+export interface DirectiveBuildTask {
+  title: string;
+  desc: string;
+  files: string[];
+  scope: string[];
+  deps: string[];
+  model?: ModelType;
+  effort?: TaskEffort;
+  /** undefined = auto-select (omit `Skills:` line); [] = explicitly none (`Skills: none`). */
+  skills?: string[];
+  goCriteria: string[];
+  nogo: string[];
+}
+
+export interface DirectiveBuildIntent {
+  /** Document title suffix, e.g. "# DIRECTIVES — <title>". Purely cosmetic — discarded
+   * by parseStructuredDirectives (everything before the first `## Task N:` heading is
+   * ignored), so it is only guarded against fracturing that first split. */
+  title?: string;
+  /** Optional `## Goal` prose section. Same discard/guard rule as `title`. */
+  goal?: string;
+  tasks: DirectiveBuildTask[];
+}
+
+export interface ExtractedGoNogo {
+  goCriteria: string[];
+  nogo: string[];
+}
+
+// ═══ Fragility guards (0-kırılganlık foundation) ════════════════════════
+//
+// parseStructuredDirectives scans directive-label lines (Model:/Files:/etc.) and
+// `## Task N:` headings ANYWHERE in a task block, not just where this builder
+// intends them. Free-text fields (title/desc/goCriteria/nogo items) that happen
+// to contain one of those patterns would silently corrupt parsing — a stray
+// `## Task 2:` line would fracture the block split; a stray `Model:` line would
+// override the task's actual model. Reject such input outright rather than
+// emit a directive that *looks* well-formed but parses wrong.
+
+const RESERVED_LABEL_RE =
+  /^\s*-?\s*(?:Model|Effort|Provider|Agent|Skills|Dependencies|Priority|Auth|Backend|ModelEffort|Test|Smoke|Files?|Dosya|Scope|Kapsam)\s*:/i;
+const TASK_HEADING_RE = /^##\s+(?:G[öo]rev|Task)\s+\d+[^:]*:/m;
+const SECTION_HEADING_RE = /^\s*###\s+(?:Description|goNogo)\b/im;
+
+function assertNoHeadingCollision(field: string, value: string): void {
+  if (TASK_HEADING_RE.test(value)) {
+    throw new Error(
+      `directives-builder: "${field}" contains a "## Task N:" heading pattern — would fracture parseStructuredDirectives' block split`,
+    );
+  }
+  if (SECTION_HEADING_RE.test(value)) {
+    throw new Error(
+      `directives-builder: "${field}" contains a reserved "### Description"/"### goNogo" heading`,
+    );
+  }
+}
+
+function assertSafeField(field: string, value: string): void {
+  assertNoHeadingCollision(field, value);
+  for (const rawLine of value.split('\n')) {
+    if (RESERVED_LABEL_RE.test(rawLine)) {
+      throw new Error(
+        `directives-builder: "${field}" contains a reserved directive-label line ("${rawLine.trim()}") — would be mis-parsed as a task directive`,
+      );
+    }
+  }
+}
+
+function assertNoDelimiterCollision(field: string, items: readonly string[], delimiter: string): void {
+  for (const item of items) {
+    if (item.includes(delimiter)) {
+      throw new Error(
+        `directives-builder: "${field}" item "${item}" contains the "${delimiter}" join delimiter — would not round-trip`,
+      );
+    }
+  }
+}
+
+function assertNonEmpty(field: string, value: string): void {
+  if (!value.trim()) throw new Error(`directives-builder: "${field}" must not be empty`);
+}
+
+// ═══ Writer ══════════════════════════════════════════════════════════════
+
+function normalizeScopeDir(dir: string): string {
+  return dir.endsWith('/') ? dir : `${dir}/`;
+}
+
+function validateTask(task: DirectiveBuildTask): void {
+  assertNonEmpty('title', task.title);
+  assertNonEmpty('desc', task.desc);
+  if (task.files.length === 0) throw new Error('directives-builder: "files" must contain at least one entry (DISTINCT-FILE)');
+  if (task.goCriteria.length === 0) throw new Error('directives-builder: "goCriteria" must contain at least one entry');
+  if (task.nogo.length === 0) throw new Error('directives-builder: "nogo" must contain at least one entry');
+
+  assertSafeField('title', task.title);
+  assertSafeField('desc', task.desc);
+  for (const item of task.goCriteria) assertSafeField('goCriteria item', item);
+  for (const item of task.nogo) assertSafeField('nogo item', item);
+
+  assertNoDelimiterCollision('files', task.files, ',');
+  assertNoDelimiterCollision('scope', task.scope, ',');
+  assertNoDelimiterCollision('deps', task.deps, ',');
+  if (task.skills) assertNoDelimiterCollision('skills', task.skills, ',');
+  assertNoDelimiterCollision('goCriteria', task.goCriteria, ';');
+  assertNoDelimiterCollision('nogo', task.nogo, ';');
+}
+
+function buildTaskBlock(task: DirectiveBuildTask, seq: number): string[] {
+  validateTask(task);
+
+  const lines: string[] = [];
+  lines.push(`## Task ${seq}: ${task.title}`);
+  if (task.model) lines.push(`- Model: ${task.model}`);
+  if (task.effort) lines.push(`- Effort: ${task.effort}`);
+  if (task.skills !== undefined) {
+    lines.push(`- Skills: ${task.skills.length > 0 ? task.skills.join(', ') : 'none'}`);
+  }
+  lines.push(`- Files: ${task.files.join(', ')}`);
+  lines.push(`- Scope: ${task.scope.map(normalizeScopeDir).join(', ')}`);
+  lines.push(`- Dependencies: ${task.deps.length > 0 ? task.deps.join(', ') : 'none'}`);
+  lines.push('### Description');
+  lines.push(task.desc.trim());
+  lines.push('### goNogo');
+  lines.push(`- goCriteria: ${task.goCriteria.join('; ')}`);
+  lines.push(`- nogo: ${task.nogo.join('; ')}`);
+  return lines;
+}
+
+/**
+ * Build a canonical DIRECTIVES.md document from structured intent. Deterministic —
+ * identical input always produces identical output (no LLM call, no clock/random).
+ */
+export function buildDirectives(intent: DirectiveBuildIntent): string {
+  if (!intent.tasks || intent.tasks.length === 0) {
+    throw new Error('directives-builder: intent.tasks must contain at least one task');
+  }
+  if (intent.title) assertNoHeadingCollision('title', intent.title);
+  if (intent.goal) assertNoHeadingCollision('goal', intent.goal);
+
+  const lines: string[] = [];
+  lines.push(`# DIRECTIVES — ${intent.title ?? 'Structured Sprint'}`);
+  if (intent.goal) {
+    lines.push('');
+    lines.push('## Goal');
+    lines.push(intent.goal.trim());
+  }
+  intent.tasks.forEach((task, idx) => {
+    lines.push('');
+    lines.push(...buildTaskBlock(task, idx + 1));
+  });
+  return `${lines.join('\n').trimEnd()}\n`;
+}
+
+// ═══ Reader ══════════════════════════════════════════════════════════════
+
+const GO_NOGO_HEADING_RE = /^\s*###\s+goNogo\s*$/im;
+
+function splitCriteriaLine(section: string, label: 'goCriteria' | 'nogo'): string[] {
+  const lineRe = new RegExp(`^\\s*-\\s*${label}\\s*:\\s*(.*)$`, 'im');
+  const match = lineRe.exec(section);
+  if (!match?.[1]) return [];
+  return match[1]
+    .split(';')
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Read the `### goNogo` sub-block back out of a real ParsedDirectiveTask.description
+ * string. Symmetric counterpart to buildTaskBlock's own `### goNogo` writer — not a
+ * general-purpose markdown parser.
+ */
+export function extractGoNogo(description: string): ExtractedGoNogo {
+  const headingMatch = GO_NOGO_HEADING_RE.exec(description);
+  if (!headingMatch) return { goCriteria: [], nogo: [] };
+  const section = description.slice(headingMatch.index + headingMatch[0].length);
+  return {
+    goCriteria: splitCriteriaLine(section, 'goCriteria'),
+    nogo: splitCriteriaLine(section, 'nogo'),
+  };
+}
+
+function extractDescBody(description: string): string {
+  const headingMatch = GO_NOGO_HEADING_RE.exec(description);
+  if (!headingMatch) return description.trim();
+  return description.slice(0, headingMatch.index).trim();
+}
+
+/**
+ * Reconstruct a DirectiveBuildTask from a real ParsedDirectiveTask (the output of
+ * task-builder.ts's parseStructuredDirectives). Used to verify the round-trip
+ * contract: buildDirectives → parseStructuredDirectives → reconstructBuildTask
+ * must deep-equal the original intent task.
+ */
+export function reconstructBuildTask(parsed: ParsedDirectiveTask): DirectiveBuildTask {
+  const { goCriteria, nogo } = extractGoNogo(parsed.description);
+  return {
+    title: parsed.title,
+    desc: extractDescBody(parsed.description),
+    files: [...parsed.scope.filesWrite],
+    scope: [...parsed.scope.directories],
+    deps: parsed.dependencies ?? [],
+    model: parsed.forceModel,
+    effort: parsed.forceEffort,
+    skills: parsed.forceSkills,
+    goCriteria,
+    nogo,
+  };
+}

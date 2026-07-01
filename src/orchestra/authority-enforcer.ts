@@ -6,9 +6,10 @@
 // and emitted to the event stream but do NOT block the action.
 // Sprint 140+: Hard enforcement (planned).
 
-import { normalize, join, dirname, basename } from 'node:path';
-import { readFileSync, realpathSync } from 'node:fs';
+import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { writeEvent } from './event-stream.js';
+import { normalizePath, resolveRealPath, isWithinScope } from '../core/scope-check.js';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -56,11 +57,8 @@ export interface AuthorityCheckRequest {
 }
 
 // ─── Path Pattern Matching ───────────────────────────────────────────
-
-/** Normalize a path for consistent matching (forward slashes, no trailing slash). */
-function normalizePath(p: string): string {
-  return normalize(p).split('\\').join('/').replace(/\/$/, '');
-}
+// normalizePath lives in core/scope-check.ts (single source, ADR-D-004 SCOPECHECK-CORE) —
+// imported above; re-used here for the static glob-pattern matcher below.
 
 /** Check if a file path matches a glob-like pattern (supports trailing /**). */
 function pathMatches(filePath: string, pattern: string): boolean {
@@ -93,110 +91,13 @@ function pathMatches(filePath: string, pattern: string): boolean {
 
 // ─── Symlink-Aware Scope Containment (ADR-G-017 SYMLINK-AUTHORITY-WIRE) ──
 //
-// Plain path-normalize/prefix-match (pathMatches above) is the ADR-rejected
-// method for scope containment: a symlink placed inside scope.filesWrite or
-// scope.directories that resolves outside the scope root passes a pure
-// string comparison. The helpers below resolve the REAL filesystem path of
-// both the target and every scope root before comparing, closing that gap.
-
-/**
- * Resolve the canonical real path of `absolutePath`.
- *
- * A target that does not exist yet (e.g. a new file the worker is about to
- * create) has no realpath of its own — this walks up to the nearest existing
- * ancestor, resolves that, and rejoins the missing tail so new-file creation
- * within scope is not rejected.
- *
- * Returns `null` when the path cannot be safely resolved (symlink cycle —
- * ELOOP — or no existing ancestor found at all). Callers MUST treat `null`
- * as "does not match" (fail-closed), never as "matches everything".
- */
-function resolveRealPath(absolutePath: string): string | null {
-  let current = normalize(absolutePath);
-  const missingTail: string[] = [];
-
-  while (true) {
-    try {
-      const real = realpathSync(current);
-      const resolved = missingTail.length > 0
-        ? join(real, ...[...missingTail].reverse())
-        : real;
-      return normalizePath(resolved);
-    } catch (err: unknown) {
-      const code = err instanceof Error && 'code' in err
-        ? (err as NodeJS.ErrnoException).code
-        : undefined;
-
-      // Symlink cycle — unresolvable, fail closed rather than guess.
-      if (code === 'ELOOP') return null;
-
-      const parent = dirname(current);
-      if (parent === current) return null; // reached filesystem root — unresolvable
-
-      missingTail.push(basename(current));
-      current = parent;
-    }
-  }
-}
-
-/** Result of a symlink-aware scope containment check. */
-interface ScopeContainmentResult {
-  within: boolean;
-  matchedVia?: 'filesWrite' | 'directory';
-  matchedPattern?: string;
-}
-
-/**
- * Check whether `target` (relative to `projectRoot`) is contained within the
- * worker's assigned scope, resolving the REAL path of the target and of
- * every scope root first — a symlink inside scope whose real target escapes
- * the scope root is rejected even though its nominal path matched.
- *
- * `scopeDirectories` entries are containment boundaries: the target's real
- * path must resolve inside the directory's own real path.
- *
- * `scopeFilesWrite` entries authorize one exact file by nominal name (there
- * is no sub-boundary to nest inside); the realpath check instead guards
- * against that exact assigned file having been replaced by a symlink that
- * escapes the project root entirely (a planted-symlink / TOCTOU attack —
- * comparing the target's realpath to the *same* entry's realpath would be
- * circular when the two nominal strings are identical).
- */
-function isWithinScope(
-  target: string,
-  projectRoot: string,
-  scopeDirectories: string[],
-  scopeFilesWrite: string[],
-): ScopeContainmentResult {
-  const realTarget = resolveRealPath(join(projectRoot, target));
-  if (realTarget === null) return { within: false };
-
-  const normalizedTarget = normalizePath(target);
-  const filesWriteMatch = scopeFilesWrite.find((f) => normalizePath(f) === normalizedTarget);
-  if (filesWriteMatch !== undefined) {
-    const realProjectRoot = resolveRealPath(projectRoot);
-    if (realProjectRoot !== null) {
-      const rootWithSlash = realProjectRoot.endsWith('/') ? realProjectRoot : `${realProjectRoot}/`;
-      if (realTarget === realProjectRoot || realTarget.startsWith(rootWithSlash)) {
-        return { within: true, matchedVia: 'filesWrite', matchedPattern: filesWriteMatch };
-      }
-    }
-    // Nominal match, but the real path escapes the project root — fall
-    // through (do not also let it match a directory rule below by accident;
-    // no scopeDirectories entry should legitimately contain an escaped path).
-  }
-
-  for (const dir of scopeDirectories) {
-    const realDir = resolveRealPath(join(projectRoot, dir));
-    if (realDir === null) continue;
-    const dirWithSlash = realDir.endsWith('/') ? realDir : `${realDir}/`;
-    if (realTarget === realDir || realTarget.startsWith(dirWithSlash)) {
-      return { within: true, matchedVia: 'directory', matchedPattern: dir };
-    }
-  }
-
-  return { within: false };
-}
+// resolveRealPath / isWithinScope now live in core/scope-check.ts (single
+// source, ADR-D-004 SCOPECHECK-CORE — dissolves the Sprint-352 duplicate)
+// and are imported above. Plain path-normalize/prefix-match (pathMatches
+// above) remains the ADR-rejected method for scope containment: a symlink
+// placed inside scope.filesWrite or scope.directories that resolves outside
+// the scope root passes a pure string comparison, which is why the worker
+// dynamic scope check below calls isWithinScope instead.
 
 // ─── Authority Matrix (ADR-037) ──────────────────────────────────────
 

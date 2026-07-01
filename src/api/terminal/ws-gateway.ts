@@ -83,6 +83,12 @@ export function attachTerminalGateway(server: Server, deps: GatewayDeps): void {
       // (audit `auth.deny` + close 4401).
       void (async () => {
         let authorized = false;
+        // AUDIT-TENANT (ADR-G-029 invariant #3, born row-59): real tenant for
+        // the pre-session auth.ok/auth.deny events, when one is resolvable
+        // from auth-context. Only the mTLS seam resolves a tenant this early
+        // (token-only auth carries no tenant claim) — honest 'local' fallback
+        // otherwise, mirroring the tenantOf() pattern used inside bridge().
+        let authTenant: TenantId = 'local';
         if (deps.auth.verifyAsync) {
           ws.pause();
           try {
@@ -112,11 +118,12 @@ export function attachTerminalGateway(server: Server, deps: GatewayDeps): void {
           }
           ws.resume();
           if (certTenant === null) authorized = false;
+          else authTenant = certTenant;
         }
         if (!authorized) {
           deps.audit.record({
             action: 'auth.deny',
-            tenantId: 'local',
+            tenantId: authTenant,
             detail: 'ws upgrade rejected',
             at: new Date().toISOString(),
           });
@@ -125,7 +132,7 @@ export function attachTerminalGateway(server: Server, deps: GatewayDeps): void {
         }
         deps.audit.record({
           action: 'auth.ok',
-          tenantId: 'local',
+          tenantId: authTenant,
           detail: 'ws upgrade accepted',
           at: new Date().toISOString(),
         });
@@ -234,7 +241,7 @@ function bridge(ws: WebSocket, deps: GatewayDeps): void {
         for (const m of matches) {
           deps.audit.record({
             action: 'guard.block',
-            tenantId: 'local',
+            tenantId: tenantOf(),
             sessionId,
             detail: formatGuardDetail(m, 'blocked'),
             at: new Date().toISOString(),
@@ -266,7 +273,7 @@ function bridge(ws: WebSocket, deps: GatewayDeps): void {
       deps.manager.detach(sessionId, onData); // detach ≠ kill (tmux-like)
       deps.audit.record({
         action: 'session.detach',
-        tenantId: 'local',
+        tenantId: tenantOf(),
         sessionId,
         detail: '',
         at: new Date().toISOString(),

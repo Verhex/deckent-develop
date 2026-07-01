@@ -8422,3 +8422,40 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 352-015: MESSAGES-KEYS — bekleyen i18n anahtarları (tek-yetkili görev) (DONE)
 
 ---
+## Sprint 353 — sprint-353
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-01
+**Duration:** 1209s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 16 |
+| Completed | 16 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1208769ms |
+
+### Tasks
+
+- 353-001: SCOPECHECK-CORE — realpath scope-check primitive'ini core'a taşı (352-010 ADR-debt) (DONE)
+- 353-002: APR-STORE — durable approval store (row 31) (DONE)
+- 353-003: APR-POLICY — karar-motoru (row 32) (DONE)
+- 353-004: APR-WORKERGATE — riskli-aksiyon önü worker kapısı (row 34) (DONE)
+- 353-005: APR-FALLBACK — FallbackResolver (row 35) (DONE)
+- 353-006: APR-EVENTSTREAM — çok-client yayın (row 68) (DONE)
+- 353-007: TERM-LIVE — canlı run-status footer üretici (row 43) (DONE)
+- 353-008: TERM-MODE — Ask/Run/Control 3-mod makinesi (row 39) (DONE)
+- 353-009: TERM-2 — chat-turn çekirdeği (row 41) (DONE)
+- 353-010: TERM-CONNECT — /connect sihirbaz çekirdeği (row 46) (DONE)
+- 353-011: DIR-1 — NL→DIRECTIVES üretici çekirdeği (row 48) (DONE)
+- 353-012: TERM-4 — tool-driven dispatch köprüsü (row 44) (DONE)
+- 353-013: WS-TENANT — gerçek tenant propagasyonu (352-012 debt, DOĞRU dosyayla) (DONE)
+- 353-014: DECK-SUBPROC-BROKER — subprocess .deck izolasyonu (row 422 🔴 P0) (DONE)
+- 353-015: WPOPT-DEDUP — worker-prompt tekrar-analizi + güvenli kırpım (row 89 dilimi) (DONE)
+- 353-016: MESSAGES-KEYS-2 — round-6 i18n anahtarları (tek-yetkili) (DONE)
+
+---

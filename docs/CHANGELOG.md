@@ -2,6 +2,24 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint353] - 2026-07-01
+
+### Added
+
+- SCOPECHECK-CORE — realpath scope-check primitive'ini core'a taşı (352-010 ADR-debt)
+- APR-STORE — durable approval store (row 31)
+- APR-POLICY — karar-motoru (row 32)
+- APR-WORKERGATE — riskli-aksiyon önü worker kapısı (row 34)
+- APR-FALLBACK — FallbackResolver (row 35)
+- APR-EVENTSTREAM — çok-client yayın (row 68)
+- TERM-LIVE — canlı run-status footer üretici (row 43)
+- TERM-MODE — Ask/Run/Control 3-mod makinesi (row 39)
+- TERM-2 — chat-turn çekirdeği (row 41)
+- TERM-CONNECT — /connect sihirbaz çekirdeği (row 46)
+
+
+_Tasks: 16 total, 16 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint352] - 2026-07-01
 
 ### Added
