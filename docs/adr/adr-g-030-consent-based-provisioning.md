@@ -40,9 +40,14 @@ A single provisioning module (`src/core/provisioner.ts`) is the source of truth 
       yes (CLI --yes, MCP installMissing:true) — install all without prompting (CI)
       no-install (CLI --no-install) — legacy hint-only behavior preserved (backward compat)
   </step>
-  <invariant name="single source of truth">
-    getProviderInstallHint (both doctor.ts and doctor-format.ts copies) delegates the
-    package mapping to planInstall — one mapping, three call-sites, legacy hint format kept.
+  <invariant name="single source of truth — install EXECUTION only">
+    The install-EXECUTION package mapping is centralized: planInstall (NPM_PKG) +
+    doctor.ts getProviderInstallHint delegate to one mapping. NOTE (honest scope): the
+    install-HINT strings shown in provider diagnostics / chat / onboard / error messages
+    are NOT yet centralized — the `@anthropic-ai/claude-code` / `@openai/codex` /
+    `@google/gemini-cli` literals are still hardcoded across 13+ sites (errors.ts,
+    claude/codex/gemini.ts, messages.ts, wizard.ts, chat.ts, doctor.ts, onboard.ts), so a
+    vendor rename is NOT a one-place update today → born PKG-NAME-SSOT.
   </invariant>
   <invariant name="MCP parity">
     deckent_init gains an installMissing opt-in. MCP has no interactive consent channel,
@@ -53,7 +58,7 @@ A single provisioning module (`src/core/provisioner.ts`) is the source of truth 
 
 ### The trust-DNA anchor (reusable)
 
-The consent pattern is **not** scoped to first-run provisioning — it is the canonical anchor for *every* "install/prepare a missing prerequisite" surface. It already generalized: Sprint-270 F1-IMG applied the same gate to docker-image preparation — `deckent doctor --fix-image` **never** builds without an explicit flag + interactive consent, and the code cites this ADR directly. **Every** future such surface — including the PSL-6 provider auth-probe family — is bound by this ADR's three invariants: **consent-gated**, **whitelist-restricted spawn**, **no silent sudo**.
+The consent pattern is **not** scoped to first-run provisioning — it is the canonical anchor for *every* "install/prepare a missing prerequisite" surface. It already generalized to docker-image preparation, which has since grown its own surfaces, all consent-preserving: `deckent doctor --fix-image` (Sprint-270 F1-IMG) **never** builds without an explicit flag + interactive consent; `deckent image build` is a standalone explicit command; and `deckent init` offers a worker-image build via `maybeOfferWorkerImageBuild` — opt-in only (builds ONLY when interactive + docker present + image absent + user confirms; CI / `--yes` / `--no-image` → opted-out, never auto-build). Explicit-command self-update (`deckent upgrade`) is treated as its own consent — the user invoked it — but stays bound by the whitelist + no-silent-sudo spawn rules. **Every** future such surface — including the PSL-6 provider auth-probe family — is bound by this ADR's three invariants: **consent-gated**, **whitelist-restricted spawn**, **no silent sudo**.
 
 ### Rejected alternatives (and why)
 
@@ -74,7 +79,7 @@ Silent auto-install (no consent) — violates user trust and the security DNA. K
 
 **(+)** `deckent init` becomes a real provisioner and closes the blueprint reality gap, while staying security-preserving: consent-gated, whitelist + shell-free spawn (companion to the **ADR-G-002** spawnSync pattern + `spawn-safety.ts`), no silent sudo. The single source of truth removes a duplicated install-hint mapping across three sites (DRY). It is backward compatible — `--no-install` preserves the prior hint-only behavior exactly. The pattern proved reusable (F1-IMG docker-image), so consent is now a load-bearing trust primitive, not a one-off.
 
-**(−)** Global `npm i -g` may need elevated permissions on some setups — failures are *reported with the manual command* (graceful, non-fatal) rather than auto-escalating. OS-package installs (tmux on Linux) still require a manual user `sudo` step — by design. Provider CLI package names are centralized, so a vendor rename is a one-place update — but it *is* a place that must be maintained. The richer surfaces (ONB-CHAT, ONB-1, PSL-6, global-install) are roadmap; today the consent gate exists at the `provisionMissing` / `--fix-image` layer, not yet in a conversational wizard.
+**(−)** Global `npm i -g` may need elevated permissions on some setups — failures are *reported with the manual command* (graceful, non-fatal) rather than auto-escalating. OS-package installs (tmux on Linux) still require a manual user `sudo` step — by design. Provider CLI package names are centralized for install *execution* (one place), but the install-*hint* strings are duplicated across 13+ UX/diagnostic sites — a vendor rename is NOT yet one-place (born PKG-NAME-SSOT). Two exported helpers carry a pre-consent-gate auto-build semantic (`maybeProvisionDockerImage` / `reprovisionWorkerImageAfterUpgrade`) but are currently DEAD-CODE (no live call-site) — they must be purged or made consent-mandatory before any re-wiring (born DEAD-PROVISION-PURGE). The richer surfaces (ONB-CHAT, ONB-1, PSL-6, global-install) are roadmap; today the consent gate exists at the `provisionMissing` / `--fix-image` / `image build` / init-offer layer, not yet in a conversational wizard.
 
 ---
 
@@ -87,5 +92,5 @@ Silent auto-install (no consent) — violates user trust and the security DNA. K
 - **Product promise:** **ADR-G-016** (Product Vision — Product Not Service) — the "anyone can install & use" / install-and-run promise; air-gapped / never-phone-home pillar.
 - **Scope / install:** **ADR-G-001** (Layered Config & Scope Precedence) + **ADR-G-017** (Multi-Project Isolation) — global-install + project-scope; FB-1 opt-in telemetry inherits this consent gate.
 - **Governance:** **ADR-G-019** (ADR Governance) — runtime contract record for the provisioning capability.
-- **Born work-items:** ONB-CHAT (NL setup), ONB-1 (onboarding wizard), PSL-6 (consent-gated provider auth-probe), GLOBAL-INSTALL (seed consent-anchored provisioning across projects).
+- **Born work-items:** ONB-CHAT (NL setup), ONB-1 (onboarding wizard), PSL-6 (consent-gated provider auth-probe), GLOBAL-INSTALL (seed consent-anchored provisioning across projects), PKG-NAME-SSOT (centralize the 13+ hardcoded provider install-hint literals onto planInstall/NPM_PKG), DEAD-PROVISION-PURGE (purge or consent-gate the dead consent-less docker-build helpers `maybeProvisionDockerImage` / `reprovisionWorkerImageAfterUpgrade`).
 - **Direction:** memory `project_air_gapped_offline_pillar`, `project_deckent_everyone_everywhere`, `feedback_proactive_blocker_disclosure`; `.analysis/hermes-vs-deckent-direction-decisions.md` (ONB = P0, global-install + project-scope = P0).

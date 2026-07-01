@@ -49,6 +49,12 @@
 | TERM-SIMPLE | TERM | Simple Mode edition (basic-user'a 5-7 core komut; advanced ertelenir) | CX | P1 | TERM-3 | ⬜ | — | §3.3/§5.1 |
 | TERM-5 | TERM | Görsel+işlevsel tutarlı/yormayan dil + sade risk-dili (Oku/Değiştir/Çalıştır/Otonom) | A·CX | P0 | — | 🔬 | — | tam-işlevsellik şart |
 | TERM-RPC | TERM | Ortak session/action RPC protokolü (REPL+dashboard+desktop+gateway) | CX·CL | P1 | — | ⬜ | — | §9.5; Hermes tui_gateway modeli |
+| PROVIDER-SSOT | TERM | entry.ts inline buildReplProvider → resolveChatAdapter tekleştir (bare-REPL provider SSOT) | A·CX | P2 | — | ⬜ | — | G-034 #1; ADR minor-drift |
+| SLASH-MODE-WIRE | TERM | filterRegistryByMode'u Ink+legacy /help path'e bağla (enterprise slash user-mode'da gizlensin; şu an full-registry) | A·CX | P2 | — | ⬜ | — | G-034 #3; delivered ama unwired |
+| NL-DISPATCH-DECISION | TERM | agenticDispatch default aç/kapa kararı (NL→status/recall/plan direkt dispatch); açılmazsa ADR "slash+tool dispatch" der | A·CX | P2 | — | ⬜ | — | G-034 #4; default-off |
+| AUDIT-WIRE | TERM·SEC | Terminal audit production sink no-op (server.ts:1473, store-seam yok) → MemoryStore + integrity-config bağla; lifecycle event persist + HMAC chain aktif olsun | A·CX | P1 | — | ⬜ | — | G-029 inv#3 clause-2; audit-denetim deliği |
+| TERM-CONFIG-WIRE | TERM | TerminalConfig (maxSessions/idleTimeoutMs/scrollbackBytes/allowShellKind/bind/outboundDailyQuota) runtime'a bağla; şu an hardcoded-default + schema-only | A·CX | P2 | — | ⬜ | — | G-029; user override edemiyor |
+| AUDIT-TENANT | TERM·SEC | WS auth.ok/auth.deny tenantId:'local' hardcoded → gerçek principal-tenant propagate (mTLS/JWKS sonrası izolasyon) | A·CX | P2 | AUDIT-WIRE | ⬜ | — | G-029; enterprise-tenant |
 | DIR-1 | TERM | Terminalde NL "planla" → DIRECTIVES üret (sabit-format el-yazımı yerine) | A | P0 | TERM-2 | ⬜ | — | DIRECTIVES kırılganlığı |
 | F2-008 | TERM | Native SDK round-trip (zero-CLI-prereq) | MP·A | P1 | — | ⬜ | — | §16 SP-1; APP-1 ile |
 | F11-014 | TERM | Multi-provider native REPL parity (codex/gemini/ollama=claude) | MP | P1 | F2-008 | 🟡 | — | gemini key-gated |
@@ -99,6 +105,8 @@
 | ONB-HONEST | ONB | Doctor "hazır/eksik/tek-tık-fix" non-teknik dürüst mesaj | CX | P1 | ONB-2 | ⬜ | — | §3.1 |
 | ONB-DISCOVERY | ONB | Provider CLI discovery wizard / kurulu-CLI auto-detect | CX | P1 | ONB-1 | ⬜ | — | §5.3 |
 | PSL-6 | ONB | Provider login/OAuth-binding + doctor gerçek-auth probe | MP | P1 | ONB-2 | 🟡 | — | CLI-present≠logged-in |
+| PKG-NAME-SSOT | ONB | Provider install-hint paket-adları 13+ yerde hardcoded → planInstall/NPM_PKG'ye centralize (vendor-rename tek-yer) | A·CX | P3 | — | ⬜ | — | G-030; execution SSOT var, hint yok |
+| DEAD-PROVISION-PURGE | ONB·SEC | Consent'siz dead docker-build helper'ları (maybeProvisionDockerImage/reprovisionWorkerImageAfterUpgrade) sil ya da consent-zorunlu yap | A·CX | P2 | — | ⬜ | — | G-030 #4; riskli miras, call-site yok |
 | CFG-1 | ONB | Legacy `mode` tüm config-set'i blokluyor (3-yol tutarsız) | MP | P1 | — | ⬜ | — | resolveMode wire |
 | DOCTOR-1 | ONB·WIN | doctor Platform-check backend-blind (Win+docker) + brain-budget label | MP | P1 | — | ⬜ | — | — |
 | MOAT-1 | MOAT | WORKTREE-MERGE-RACE: 8-wide'da 3/11 source-merge düştü | MP | P0 | — | ⬜ | — | güven-bug 🔴 |
@@ -106,6 +114,8 @@
 | MOAT-3 | MOAT | Sentetik-NO_GO / eval-vs-disk güven (NOT_DISPATCHED dürüst-durum) | MP | P1 | — | ⬜ | — | DISP-W1 |
 | MOAT-4 | MOAT | Deterministik orchestration + kapalı-öğrenme + governance-by-construction KORU | A·CL | P0 | — | ✅ | — | yeniden-yazma yok |
 | WP-OPT | MOAT | Worker-prompt token-opt: aynı kalitede min-token + tekrar-azalt (scope-blok→TOOL-SCOPE) | A | P0 | TOOL-SCOPE | ⬜ | — | promptlar çok uzun |
+| PROMPT-TXT-OPT | MOAT | `worker_prompt_txt_file` config-gate: prompt-tmpfile-persist opt-out (stdin-stream her zaman = delivery; tmpfile = dev/forensic görünürlük). docker+tmux gate-ON persist, subprocess=stdin-only gate-OFF referansı. Default true (backward-safe), product-guidance false | A·CX | P2 | — | ⬜ | — | G-027; disk/inode+privacy-surface, dolaylı context-token |
+| PROMPT-COMMENT-REFRESH | MOAT | `claude.ts:173` + `spawn-backend.ts:141` stale "tmux random-hex/korunmaz" yorumları → Sprint-170 gerçeği (taskId-embedded, worker-prompt korunuyor; yalnız Auditor hex-only) | A·CX | P3 | — | ⬜ | — | G-027; mis-audit riski |
 | ORCH-BE | MOAT | Çok-backend kusursuz orkestre (subprocess/docker/tmux + firecracker/k8s) | A | P1 | — | 🟡 | — | ana güç |
 | MOAT-ISO | MOAT | İzole-ortam kontrolleri çoğaldıkça (firecracker/k8s) doğru kontrol | A | P1 | ORCH-BE | ⬜ | — | — |
 | MOAT-VCS | MOAT | Proje-takip soyutlaması (şu an git; pluggable diğer VCS/ortam) | A | P1 | — | ⬜ | — | git ≠ GitHub |
@@ -114,6 +124,7 @@
 | DASH-PANELS | DASH | Observability panel-seti (timeline/DAG/mission-flow/run-trace/approval-history/token-cost/outcome-evolution/ERP-flow) | CX | P1 | DASH-1 | ◑ | — | bazısı mevcut |
 | DASH-2 | DASH | Pending-approval viewer (çok-kanal, blocker değil) | A·CL | P1 | APR-1 | ⬜ | — | pending-approvals.ts var |
 | DASH-D3 | DASH | Ölü-alan envanteri (playwright 14-route) + embedded-terminal bütünlüğü | MP | P1 | — | ⬜ | — | SONRAKİ-OTURUM |
+| DASH-EMOJI-FIX | DASH | 2 residual ⚠ emoji → lucide-react (WorkerGrid.tsx:26 + DirectivesEditor.tsx:97); no-emoji kuralı | A·CX | P2 | — | ⬜ | — | G-033 #4; bağlayıcı no-emoji |
 | PROV-FC | PROV | First-class cost+limit+bildirim + fallback-yakalama + hız+kalite+güvenlik (denge değil, hepsi first-class) | A | P0 | — | ⬜ | — | "deckent bunu yapan araç" algısı |
 | PROV-1 | PROV | oauth-subs ↔ api eşzamanlı kullanım metriği | A | P1 | — | ⬜ | — | güç-metriği |
 | PROV-SUBS | PROV | Subscription-paket desteği (subs, sadece api+local değil) | A | P1 | — | ⬜ | — | Hermes api+local; biz subs de |
@@ -148,6 +159,7 @@
 | MEM-1 | MEM | Memory kullanım-denetimi ("her çalışmada okunuyor/yazılıyor mu") | A | P1 | — | 🔬 | — | wiring-vs-working |
 | MEM-2 | MEM | Kırılım/scope katmanları: project / session / other-gereklilik | A | P1 | — | ⬜ | — | DB kırılımları |
 | MEM-3 | MEM | DB hız/index (query SLA) | A·MP | P1 | — | ⬜ | — | PERF-2 |
+| SCHEMA-VERSION-BUMP | MEM | schema_version bump (=1 kalmış) + migration backup-guard + direct-SQL migration-only API ayrımı | A·CX | P3 | — | ⬜ | — | G-035 #5; getRawDb escape |
 | MEM-4 | MEM·MOAT | Self-evrim döngüsü koru (ihtiyaç-duydukça-kullan + kullanımla-geliş) | A | P1 | — | ✅ | — | en güçlü subsystem (koru) |
 | MEM-REVIEW | MEM | Background memory/skill review worker (post-run opt-in; Hermes fork-agent ~10 turn) | CX·CL | P1 | — | ⬜ | — | §3.5; aktif review |
 | MEM-HYGIENE | MEM | Interrupted-turn guard + next-turn memory prefetch | CX | P2 | — | ⬜ | — | §3.5 |
@@ -183,14 +195,16 @@
 | DESK-CHAT | DESK | Chat → Desktop-app tarafına (dashboard-chat değil) | A | P2 | DESK-1 | ⬜ | — | eski CHAT-A reframe |
 | DESK-1 | DESK | App (Desktop+Mobile, Electron) + real-time interactive dashboard (non-coder) | MP·A | P2 | DASH-1 | ⬜ | — | CC-Desktop vizyonu; terminal-sonrası |
 | FB-1 | DESK | Opt-in self-operation feedback loop (ships OFF, telemetri) | MP | P2 | DESK-1 | ⬜ | — | §16 SP-4; gizlilik-kritik |
-| ENT-T1 | ENT | "Theater" temizliği: rbac_roles + rate_rules enforce-or-remove | CL | P2 | — | ⬜ | — | §7.3 no-op |
+| ENT-T1 | ENT | "Theater" temizliği: rbac_roles + rate_rules enforce-or-remove | CL | P2 | — | ⬜ | — | §7.3 no-op; RATE-ENFORCE-WIRE (G-031): persist rate_rules→TenantRateLimiter binding (dead-config) |
 | ENT-T2 | ENT | enforce_rbac manuel-sprint spawn path'ine bağla (autonomous-only) | CL | P2 | — | ⬜ | — | §7.4 |
 | ENT-GATEWAY | ENT | Tek Enterprise Policy Gateway (API+MCP+connector+process+autonomous tek enforcement) | CX | P2 | — | ⬜ | — | §5.5 unification |
 | ENT-ROLLOUT | ENT | Read-only L0/L1 rollout-first (write/execute L3+ onaylı+audit'li) | CX | P2 | — | ⬜ | — | §5.5 |
 | ENT-1 | ENT | Hard-enforced RBAC (sprint worker-spawn path) | MP | P2 | ENT-T2 | 🟡 | — | Task.requirements plumbing |
 | ENT-2 | ENT | Hard multi-tenancy (real actor.tenantId e2e) | MP | P2 | — | 🟡 | — | — |
-| ENT-3 | ENT | Audit immutability (durable signed sink + retention wire) | MP | P2 | — | 🟡 | — | hash-chain var |
+| ENT-3 | ENT | Audit immutability (durable signed sink + retention wire) | MP | P2 | — | 🟡 | — | hash-chain var; AUDIT-SECRET-WIRE (G-031): HMAC secret public-literal 'deckent-audit' → secret-manager threading (writer+export) |
 | ENT-5 | ENT | SSO/OIDC gerçek-IdP smoke + SIEM network transports | MP | P2 | — | 🟡 | — | JWKS+PKCE landed |
+| ENT-CONFIG-SSOT | ENT | parseEnterpriseConfig runtime read-path yap (şu an unused; config piecemeal: strict_tenant/rbac_policy/identity/rbac_roles/rate_rules) | A·CX | P2 | — | ⬜ | — | G-031 #1 |
+| CAP-PERM-TAG | ENT·SEC | Connector built-in capability'lere requiredPermission ekle (L2 HARD-BLOCK universal; şu an 10'dan 1'i tagged) | A·CX | P2 | — | ⬜ | — | G-031 #6 |
 | F8-003 | ENT | Capability least-privilege grant-set actor.role'den türet+enforce | MP | P2 | — | 🟡 | — | — |
 | ERP-1 | ENT | ERP write-side (AYRI ARC; CompiledMutation + write-driver + sert approval) | MP | P2 | APR-1 | ⏸️ | — | post-beta; IFS test-ortamı |
 | ERP-2 | ENT | IFS gerçek round-trip (test-ortamı creds + entity/projection map) | MP | P2 | — | ⏸️ | — | read-side ✅ |
@@ -251,7 +265,8 @@
 | BRAIN-DEATH-PROC | MOAT·APR | Brain-death fallback/retry sistem+user adımları + `finalize --force` trigger + tool | ADR-rev | P1 | — | ⬜ | — | ADR-G-025; finalize-force-orphan |
 | LEARNINGS-QUALITY | MEM·MOAT | Brain Learnings/Gains gerçek-öğrenilmiş-içerik (yarım-değil), aranabilir; dogfood+user | ADR-rev | P1 | — | ⬜ | — | ADR-G-035/032 |
 | EVOLUTION-SELECTIVE-SCALE | MOAT·MEM·PERF | Evolution-loop yalnız KULLANILAN agent/skill'i güncelle (toplu-değil) + 300-agent/1000-skill ölçek | ADR-rev | P1 | — | ⬜ | — | ADR-G-032; basic-ilk-hata |
-| TASKTYPE-EXPAND | MOAT·GOV | Daha fazla TaskKind (db-migration/package-publish/infra/security) + user-custom (UG/UP) | ADR-rev | P1 | — | ⬜ | — | ADR-G-028 |
+| IDENTITY-MUTATION-WIRE | MOAT | runIdentityMutation'ı finalize'a bağla (explicit approval-queue/nervous-checkpoint/non-active-agent guard); şu an test-only, production caller yok | A·CX | P2 | EVOLUTION-SELECTIVE-SCALE | ⬜ | — | ADR-G-032 #1; capability delivered ama unwired |
+| TASKTYPE-EXPAND | MOAT·GOV | Canonical TaskKind type-level DONE (11 kind, work-model.ts); kalan = productization: rubric-detection (hâlâ 3-class scope-shape) + EFFECT_CLASS_REGISTRY (hâlâ 3-map) + routing'e taşı, her kind kendi rubric+effect+detection; + user-custom (UG/UP) | ADR-rev | P1 | — | ◑ | — | ADR-G-028; type-level✅ detection/policy⏳ |
 | NERVOUS-GENERALIZE | MODE·GOV | Nervous action-vocab language/proje-agnostik (NPM_PUBLISH→PUBLISH; python/c++/any) | ADR-rev | P1 | — | ⬜ | — | ADR-G-022 |
 | NERVOUS-NONBLOCK | MODE·MOAT | Nervous-enabled non-blocking + kontrollü-aktivasyon (fs.watch/CPU + approval-block fix) | ADR-rev | P1 | — | ⬜ | — | ADR-G-022 |
 | NERVOUS-ENTERPRISE | ENT | Nervous = enterprise-katman proaktif-governance/control gücü; kontrollü-rollout | ADR-rev | P2 | — | ⬜ | — | ADR-G-022 |
@@ -289,7 +304,7 @@
 | TEST-ENVSNAP | GOV | env/cwd/timer/port/TZ snapshot-restore helper'ları (C7 SHOULD→MUST) | ADR-rev | P1 | — | ⬜ | — | ADR-D-002-W5 |
 | TEST-LOCALFULL | GOV·DOCS | `test:local-full` canonical bounded-script (≤16GB WSL, fork-bounded, split root/dashboard) | ADR-rev | P1 | — | ⬜ | — | ADR-D-002-W6; feedback_vitest_16gb |
 | TEST-INTTAX | GOV | Integration-test profile taksonomisi (unit/hermetic-CI/integration/provider-smoke) | ADR-rev | P2 | — | ⬜ | — | ADR-D-002-W7 |
-| TAXONOMY-READPATH | GOV | ADR taksonomi-kolonları (adr_class/immutable/scope/source_authority/enforcement_level) memory-store read-mapping'e bağla (şu an WRITE-ONLY; getById expose etmiyor) + class/scope-aware-recall'ı kolon-tabanlı doğrula | ADR-rev | P1 | — | ⬜ | — | ADR-G-019; migration kolon-yazdı, read-path eksik |
+| TAXONOMY-READPATH | GOV | ADR taksonomi-kolonları (adr_class/immutable/scope/source_authority/enforcement_level) memory-store read-mapping'e bağla (rowToEntry döndürmüyor + buildFilterClauses class/scope-filtre yok + adr-file-sync enforcement_level parse yok + upsert taxonomy-update yok) → class/scope-aware recall/injection | ADR-rev | P1 | — | ⬜ | — | ADR-G-019+G-035; migration+insert yazdı, read-path eksik |
 | MESSAGES-CORE | GOV·I18N | i18n kök-neden: `getMessage` cli/helpers/messages.ts'te → core+orchestra 3 yukarı-import (directive-interrogator+mission-deliver+flow-reporter) → messages.ts'i core/'a taşı (CORE-W1 + 2 ORCH-W1-edge tek-fix) | ADR-rev | P1 | — | ⬜ | — | ADR-D-004-W9; LOCALE-W/ADR-G-004 bağ |
 | D004-ENFORCE | GOV | Layer-1 enforcement-maturity: exception-registry data-file (W5) + hard graph-gate full-edge-scan + Brain-family allowlist (W6, ADR-G-020 hard-flip) | ADR-rev | P1 | — | ⬜ | — | ADR-D-004-W5/W6; ADR-094 vein |
 | D004-CAPRELOC | GOV·ARCH | Capability-relocation: tmux/spawn-backend orchestra→core/runtime (provider-adapter downward; D004-E1 exception dissolves) | ADR-rev | P2 | — | ⬜ | — | ADR-D-004-W8; S279 event-stream-move precedent |
@@ -378,15 +393,15 @@
 | G-024 Mode-Architecture | MODE-RENAME · AUTO-NAMING · ADR-067-TENANT · DIR-2 · MODE-2 |
 | G-025 Resilience/Recovery/LiveObs | BRAIN-FAILOVER · WORKER-LIVE-TRACE · BRAIN-SELFUPDATE · BRAIN-DEATH-PROC |
 | G-026 Dependency-Wave | DEP-TOOL · ADR-064-W |
-| G-027 Prompt-Lifecycle/Worker-Ctx | WP-OPT · F1-PCACHE |
+| G-027 Prompt-Lifecycle/Worker-Ctx | WP-OPT · F1-PCACHE · PROMPT-TXT-OPT · PROMPT-COMMENT-REFRESH |
 | G-028 Work-Taxonomy | TASKTYPE-EXPAND · WM-2 |
-| G-029 Embedded-Web-Terminal | ✅ done; DESK-1 · TERM-RPC (tomorrow) |
-| G-030 Consent-Provisioning/Install | ONB-CHAT · ONB-1 · PSL-6 · ONB-GLOBAL |
-| G-031 Enterprise-Foundation | ENT-* · ADR-067-TENANT · NERVOUS-ENTERPRISE |
-| G-032 Self-Learning/Evolution | EVOLUTION-SELECTIVE-SCALE · LEARNINGS-QUALITY · EVO-2 |
-| G-033 Dashboard-Observability | DASH-1 · DASH-PANELS · DASH-D3 |
-| G-034 Native-Agentic-Terminal | TERM-NAT · TOOL-2 · F11-* · TERM-* |
-| G-035 Memory-Architecture | ✅ schema-migration; MEM-2/3 · MEM-VECTOR · LEARNINGS-QUALITY |
+| G-029 Embedded-Web-Terminal | RCE-model+guards✅ audit-wiring⏳ (provisional); AUDIT-WIRE · TERM-CONFIG-WIRE · AUDIT-TENANT · DESK-1 · TERM-RPC |
+| G-030 Consent-Provisioning/Install | ONB-CHAT · ONB-1 · PSL-6 · ONB-GLOBAL · PKG-NAME-SSOT · DEAD-PROVISION-PURGE |
+| G-031 Enterprise-Foundation | ENT-* (RATE-ENFORCE-WIRE→ENT-T1 · AUDIT-SECRET-WIRE→ENT-3) · ENT-CONFIG-SSOT · CAP-PERM-TAG · ADR-067-TENANT · NERVOUS-ENTERPRISE |
+| G-032 Self-Learning/Evolution | EVOLUTION-SELECTIVE-SCALE · IDENTITY-MUTATION-WIRE · LEARNINGS-QUALITY · EVO-2 |
+| G-033 Dashboard-Observability | DASH-1 · DASH-PANELS · DASH-D3 · DASH-EMOJI-FIX |
+| G-034 Native-Agentic-Terminal | TERM-NAT · TOOL-2 · F11-* · TERM-* · PROVIDER-SSOT · SLASH-MODE-WIRE · NL-DISPATCH-DECISION |
+| G-035 Memory-Architecture | DB-first+FTS5✅ taxonomy-readpath⏳ (provisional); TAXONOMY-READPATH · SCHEMA-VERSION-BUMP · MEM-2/3 · MEM-VECTOR · LEARNINGS-QUALITY |
 
 ### ADR-D (7 — dev/contributor, build-konvansiyonu)
 | ADR · konu | MASTER-PLAN izi |

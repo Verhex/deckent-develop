@@ -18,12 +18,23 @@ deckent must know *what kind* of work a task is, to judge it correctly and gate 
 
 ```xml
 <work-taxonomy ssot="src/core/work-model.ts (WM-2)">
-  <task-kind>audit | document-write | code-development. Detected by scope-shape
-    (filesWrite/directories), NOT title/description (gaming-proof). Priority:
-    audit → document-write → code-development. Object.freeze registries.</task-kind>
+  <task-kind>Canonical TaskKind (work-model.ts:27, SSOT) = code-development · test ·
+    documentation · audit · security · refactor · devops · config · design · data · generic.
+    Plan-time RUBRIC-detection is a 3-class projection of that canonical set — audit |
+    document-write | code-development — detected by scope-shape (filesWrite/directories),
+    NOT title/description (gaming-proof), priority audit → document-write → code-development.
+    `document-write` is the legacy RubricTaskType (rubric/effect view); its canonical
+    counterpart is `documentation`. Object.freeze registries.</task-kind>
   <effect-class>pure | reversible | idempotent | compensable | critical-irreversible.
-    Feeds the autonomous policy-gate (WM-6): pure/reversible → auto-run; risky classes →
-    PARK (human approval). gaming-proof (a worker cannot self-downgrade to skip the gate).</effect-class>
+    TWO derivation paths: (a) rubric/task path — EFFECT_CLASS_REGISTRY (frozen 3-map:
+    audit=pure, document-write/code-development=reversible) for task evaluation; (b)
+    autonomous/process path — computeEntryEffectClass derives the full 5-class from
+    keyword+kind+scope+capability, failing SAFE to critical-irreversible when unknown.
+    Gate (WM-6): policy `risk-tagged` ENFORCES (pure/reversible → auto, risky → PARK);
+    policy `auto` is a trusted-authority OVERRIDE that bypasses EffectClass; policy
+    `approval-required` always parks. Process-mode is safe-by-default (emits risk-tagged
+    entries → EffectClass, not the submitter, decides). gaming-proof: frozen registries
+    mean a worker cannot self-downgrade critical-irreversible → reversible to skip the gate.</effect-class>
   <tech-stack>TechStackKind (WM-7) = the SECOND axis. Evaluation is TaskKind × TechStack:
     a C++ project is not held to tsc-clean; coverage required only on
     COVERAGE_MEASURABLE_STACKS (cross-ref ADR-G-009).</tech-stack>
@@ -38,7 +49,7 @@ deckent must know *what kind* of work a task is, to judge it correctly and gate 
 
 ## Intent / Roadmap (Tomorrow)
 
-- **🔴 TASKTYPE-EXPAND:** the core 3 kinds are too narrow → add more TaskKinds (db-migration, package-publish, infrastructure-provision, security-patch, …) — each with its own rubric + effect-class + detection — plus **user-custom task-types** (ADR-UG/UP). The concepts (TaskKind × TechStack × EffectClass) are advanced enough to carry this.
+- **🔴 TASKTYPE-EXPAND:** the type/adaptor level has ALREADY started — the canonical TaskKind set is 11 kinds live (work-model.ts). The remaining work is *productization*: carry that expansion down into plan-time **rubric-detection** (still a 3-class scope-shape projection) + **EFFECT_CLASS_REGISTRY** (still a 3-map) + routing, each new kind with its own rubric + effect-class + detection — plus **user-custom task-types** (ADR-UG/UP). The concepts (TaskKind × TechStack × EffectClass) are advanced enough to carry this.
 - **Scoring consolidation:** decide whether to build the formal 5-layer pipeline (consolidating the organic gates — ADR-D-006 god-object-split pattern) OR formalize the organic architecture. Open architectural choice.
 - **EffectClass→approval** ties the runtime ApprovalBroker (APR) for critical-irreversible.
 
@@ -48,7 +59,7 @@ deckent must know *what kind* of work a task is, to judge it correctly and gate 
 
 **(+)** Work is judged by what it actually IS (kind × stack × effect), gaming-proof, with risky work parked behind approval. The canonical work-model (WM-2) is the single SSOT for the three consumers (rubric/routing/adr-selector). EffectClass→policy-gate is live in the autonomous engine.
 
-**(−)** Only 3 core kinds today (born TASKTYPE-EXPAND); user-custom kinds are roadmap. The formal scoring pipeline is unbuilt (organic gates carry it; consolidation is an open choice).
+**(−)** Canonical TaskKind is 11-kind type-level live, but plan-time rubric-detection + EFFECT_CLASS_REGISTRY are still a 3-class view — the productization gap is born TASKTYPE-EXPAND; user-custom kinds are roadmap. The formal scoring pipeline is unbuilt (organic gates carry it; consolidation is an open choice).
 
 ---
 

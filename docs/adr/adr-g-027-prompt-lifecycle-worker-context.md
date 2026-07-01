@@ -1,6 +1,6 @@
 # ADR-G-027: Prompt Lifecycle & Worker-Context
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** lifecycle contract (write/persist/archive across all backends) + content-completeness (truncation forbidden)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** lifecycle contract (stdin-delivery always; tmpfile-persist config-gated via `worker_prompt_txt_file`) + content-completeness (skill + scope-relevant-ADR never truncated; transport-digest bounded WITHOUT access-loss)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-048 (Prompt Lifecycle Contract) + ADR-060 (Self-Awareness Propagation — 5-channel context)
 **Crosswalk:** 048 (+060) → ADR-G-027
 
@@ -18,15 +18,26 @@ A worker prompt has two intertwined concerns: where it physically lives (tmpfile
 
 ```xml
 <prompt-lifecycle>
-  <tmpfile backends="docker|tmux|subprocess uniform">
-    write at spawn → PERSIST until process cleanup → archive (move, not delete) to
-    .tasks/archive/. Per-worker kill must NOT delete OTHER live workers' prompts
-    (active-worker protection via getActiveWorkerIds; cross-sprint orphans archived at startup).
+  <tmpfile persist="config-gated: worker_prompt_txt_file (default true = backward-safe)">
+    prompt is ALWAYS delivered via stdin-stream (the shell never interprets it → injection-safe).
+    tmpfile-PERSIST (.prompt-{taskId}-{hash}.txt at spawn → persist until process cleanup →
+    archive move-not-delete to .tasks/archive/) is an OPTIONAL dev/forensic VISIBILITY layer,
+    NOT the delivery mechanism: docker+tmux persist when the gate is ON; subprocess is
+    stdin-only (the reference form of gate=OFF). Gate=OFF stops the file writes + the disk /
+    privacy surface WITHOUT losing prompt delivery. Per-worker kill must NOT delete OTHER live
+    workers' prompts (active-worker protection via getActiveWorkerIds; cross-sprint orphans
+    archived at startup); explicit kill hard-deletes the KILLED task's OWN prompt.
   </tmpfile>
-  <content-completeness rule="truncation FORBIDDEN">
-    full SKILL.md per assigned skill + full relevant-ADR content injected. No
-    "(content truncated)" markers in worker prompts. Philosophy: prompt-completeness >
-    token-saving. ADR relevance threshold (min 0.3) + agent-prompt single-source (PROMPT.md).
+  <content-completeness rule="skill + scope-relevant-ADR never truncated">
+    full SKILL.md per assigned skill + full scope-relevant-ADR body injected — no
+    "(content truncated)" markers on skill/ADR bodies. Two SANCTIONED bounds reduce TRANSPORT
+    tokens WITHOUT reducing ACCESS (full source stays on disk / one pointer away): (1) in
+    code-development tasks, background ADRs (not scope-intersecting) render as active-constraint
+    head + summary + [full: …] pointer while scope-intersecting ADRs stay full-body; (2) the
+    dependency DIGEST is char-bounded (Sprint-183 anti-balloon: notes≤500, entry≤2000 + marker)
+    while the raw .result stays full on disk. Philosophy: prompt-completeness > token-saving —
+    optimize the HOW (scope→tool, bounded-digest+disk, prompt-cache) never the WHAT. ADR
+    relevance threshold (min 0.3) + agent-prompt single-source (PROMPT.md).
   </content-completeness>
   <worker-context channels="init·sync·manifest·skill-declare·enrichment">
     Channel-5 enrichment is live (dependency .result propagation) and grew via COMM-1
@@ -55,7 +66,7 @@ The token cost of full-content + multi-channel context is real (noticed in ADR-0
 
 **(+)** Worker prompts physically survive correctly (no active-worker prompt loss) and semantically carry complete skill/ADR/dependency context — the worker never works blind or on truncated guidance. The token concern is addressed by *how* (scope→tool, cache), not by cutting context.
 
-**(−)** Token cost of full-content is real until WP-OPT (scope→TOOL-SCOPE) lands — born work-item. The coordinated `buildWorkerContext()` is roadmap (independent builders + COMM-1 today). tmux/subprocess have lifecycle asymmetries (documented).
+**(−)** Token cost of full-content is real until WP-OPT (scope→TOOL-SCOPE) lands — born work-item. The coordinated `buildWorkerContext()` is roadmap (independent builders + COMM-1 today). Backend lifecycle differs by design: docker+tmux persist a tmpfile, subprocess is stdin-only; the `worker_prompt_txt_file` gate makes persistence opt-out everywhere (PROMPT-TXT-OPT born). tmux tmpfile parity was CLOSED in Sprint-170 (taskId-embedded name → active-worker protection); only the Auditor path stays hex-only, and stale pre-170 comments in `claude.ts`/`spawn-backend.ts` still describe the old behavior (PROMPT-COMMENT-REFRESH born).
 
 ---
 
@@ -63,5 +74,5 @@ The token cost of full-content + multi-channel context is real (noticed in ADR-0
 
 - **Absorbs:** ADR-048 (incl. its Sprint-182 content amendment) + ADR-060.
 - **Cross-ref:** ADR-G-034 (TOOL-SCOPE — scope via tool, prompt shrink) · ADR-G-014 (cross-backend) · ADR-G-035 (memory — context source) · ADR-G-020 (scope authority) · ADR-G-006 (skill/agent selection → channels).
-- **Born / MASTER-PLAN:** WP-OPT (token-opt, no-truncation) · COMM-1/COMM-2 · buildWorkerContext-coordinator.
+- **Born / MASTER-PLAN:** WP-OPT (token-opt, no-truncation) · PROMPT-TXT-OPT (`worker_prompt_txt_file` gate — tmpfile-persist opt-out; subprocess = gate-off reference) · PROMPT-COMMENT-REFRESH (stale pre-170 tmux comments) · COMM-1/COMM-2 · buildWorkerContext-coordinator.
 - **Memory:** `feedback_prompt_completeness_over_brevity`.

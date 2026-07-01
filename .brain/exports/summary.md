@@ -128,4 +128,4 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 814 | Generated: 2026-06-30_
+_Total entries: 814 | Generated: 2026-07-01_

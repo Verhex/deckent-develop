@@ -1,7 +1,7 @@
 # ADR-G-029: Embedded Web Terminal (Remote PTY)
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=PTY sessions + WS gateway + bypass-independent **fail-CLOSED** auth (RCE-invariant) + structured-audit-only (no raw-output persist) + command/prompt guard + `AuthProvider`/`SessionBackend` seams → tomorrow=Desktop-app integration + enterprise-remote backends (k8s/SSH/SSO, audit-export/SIEM — sub-#3/#4) + TERM-RPC unification with the primary native terminal
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-062 (Embedded Web Terminal — PTY Sessions, WS Gateway, Auth & Audit) · **Supersedes:** —
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=PTY sessions + WS gateway + bypass-independent **fail-CLOSED** auth (RCE-invariant) + raw-output NEVER persisted (structural) + structured-audit-persistence code-delivered, runtime-UNWIRED (no-op sink → born AUDIT-WIRE) + command/prompt guard + `AuthProvider` (Local·Oidc·Jwks-async·mTLS-seam)/`SessionBackend` seams → tomorrow=Desktop-app integration + enterprise-remote backends (k8s/SSH/SSO, audit-export/SIEM — sub-#3/#4) + TERM-RPC unification with the primary native terminal
+**Status:** accepted (provisional — RCE-model + command/prompt guards live, but terminal-audit runtime-wiring is NOT wired [AUDIT-WIRE]: inv#3 clause-2 no-op sink; TerminalConfig hardcoded [TERM-CONFIG-WIRE]) · **Date:** 2026-06-30 · **Absorbs:** ADR-062 (Embedded Web Terminal — PTY Sessions, WS Gateway, Auth & Audit) · **Supersedes:** —
 **Crosswalk:** ADR-062 → ADR-G-029
 
 > **Note (pivot-reframe):** This is the **secondary / remote-access** PTY surface (a dockable terminal in the dashboard / desktop app, and the seam for enterprise remote exec) — it is **NOT** the primary terminal. The primary management+usage surface is the **native agentic terminal** (**ADR-G-034**). This record governs the remote-PTY security model; the day-to-day driving surface is ADR-G-034.
@@ -12,7 +12,7 @@
 
 The dashboard (React + Vite + Tailwind) monitors sprints but offered no way to run interactive AI tools (`claude`, `gemini`, `codex`, `deckent`) or a shell from the browser — users context-switched between dashboard and terminal during supervision. Sprint 175 added an embedded terminal as sub-project #1 of a 4-part roadmap (#2 prompt/command guard, #3 multi-tenant/k8s isolation, #4 enterprise external integration).
 
-Because a browser-reachable shell is a remote-code-execution surface, the security invariants are non-negotiable and were fixed in the verified spec before a line shipped. Sub-project #2 (the security guard) has since been **delivered**; #3 and #4 remain deferred. Under the 2026 product pivot, the dashboard becomes **observability-only** and the day-to-day interactive surface moves to the native terminal and a desktop app — so this embedded terminal is reframed as the *remote/secondary* PTY surface, and its hardened auth/audit model becomes the foundation for enterprise remote exec.
+Because a browser-reachable shell is a remote-code-execution surface, the security invariants are non-negotiable and were fixed in the verified spec before a line shipped. Sub-project #2 (the security guard — command/prompt guard, outbound-limiter) has since been **delivered**; its audit-integrity module is code-delivered but the production sink is a no-op (runtime wiring is born AUDIT-WIRE); #3 and #4 remain deferred. Under the 2026 product pivot, the dashboard becomes **observability-only** and the day-to-day interactive surface moves to the native terminal and a desktop app — so this embedded terminal is reframed as the *remote/secondary* PTY surface, and its hardened auth/audit model becomes the foundation for enterprise remote exec.
 
 ---
 
@@ -30,8 +30,9 @@ A self-contained terminal subsystem under `src/api/terminal/`, wired by `src/api
     audit.ts           — TerminalAudit (structured lifecycle events → memory.db, tenant-scoped)
     ws-gateway.ts      — attachTerminalGateway (HTTP upgrade → auth → bridge)
   </core>
-  <security sub-project="#2 — DELIVERED">
-    command-guard.ts · prompt-guard.ts · outbound-limiter.ts · audit-integrity.ts (+ tests/security/)
+  <security sub-project="#2 — guards DELIVERED, audit-wiring born">
+    command-guard.ts · prompt-guard.ts · outbound-limiter.ts (all delivered) ·
+    audit-integrity.ts (module-delivered; production sink is no-op → runtime AUDIT-WIRE) (+ tests/security/)
   </security>
 </module-boundary>
 ```
@@ -53,10 +54,18 @@ A self-contained terminal subsystem under `src/api/terminal/`, wired by `src/api
     a plain HTTP Authorization header on the WS upgrade.
   </inv>
   <inv id="3" name="structured-audit-only">
-    Raw PTY output (ANSI sequences, keystrokes, command output) is NEVER persisted
-    to disk or memory.db — it is PII-adjacent and may contain passwords/keys. Only
-    structured, low-volume lifecycle events (created/attached/detached/killed) are
-    stored, tenant-scoped (additive tenant_id column, non-destructive ALTER TABLE).
+    Clause-1 (STRUCTURAL — always enforced): Raw PTY output (ANSI sequences,
+    keystrokes, command output) is NEVER persisted to disk or memory.db.
+    TerminalAudit.record() only ever serializes action/sessionId/detail/at, never the
+    PTY stream — this holds regardless of sink, so it is a true invariant.
+    Clause-2 (runtime-UNWIRED): the structured, low-volume lifecycle events
+    (created/attached/detached/killed) are DESIGNED to be stored tenant-scoped
+    (additive tenant_id column, non-destructive ALTER TABLE) with an HMAC integrity
+    chain — but the production sink is currently a no-op (server.ts:1473, with no seam
+    to pass a real store), so nothing is persisted and the chain never runs → born
+    AUDIT-WIRE. Additionally, WS auth events (auth.ok/auth.deny) are tenantId:'local'
+    hardcoded while lifecycle events resolve the real tenant via session-meta → born
+    AUDIT-TENANT.
   </inv>
   <inv id="4" name="reattach boundary">
     A session survives client disconnect (tab close, network blip) and reattaches
@@ -64,16 +73,20 @@ A self-contained terminal subsystem under `src/api/terminal/`, wired by `src/api
     It does NOT survive a server restart (in-memory only); disk persistence is backlog.
   </inv>
   <inv id="5" name="enterprise seams from day one">
-    AuthProvider + SessionBackend interfaces exist with exactly one impl each
-    (LocalTokenAuthProvider, LocalPtyBackend). Remote backends (k8s exec, Docker
-    exec, SSH) and SSO are sub-project #3 implementations of these interfaces.
+    AuthProvider now has THREE impls — LocalTokenAuthProvider (default, SHA-256 +
+    timingSafeEqual), OidcAuthProvider (HS256/RS256, alg:none rejected, confusion-safe),
+    JwksAuthProvider (RS256-pinned, async via verifyAsync) — plus an mTLS
+    verifyClientCert seam; server.ts selects Jwks when terminal_oidc_jwks is configured,
+    else LocalToken. SessionBackend still has exactly one impl (LocalPtyBackend). The
+    remaining remote backends (k8s exec, Docker exec, SSH) are sub-project #3
+    implementations of these interfaces.
   </inv>
 </invariants>
 ```
 
 ### Gateway flow & config
 
-`attachTerminalGateway(server, deps)` hooks `server.on('upgrade')`: extract token from `Sec-WebSocket-Protocol` → `AuthProvider.verifyToken()` **before** any session spawn or WS accept (failure → `401` + destroy) → on success bridge PTY⇄WS → on close `manager.detach()` (session stays alive for reattach). `PtySessionManager` caps `maxSessions` (default 10) and exempts `deckent`-kind sessions from idle-kill so active sprints are never interrupted. `TerminalConfig` on `DeckentConfig` (`terminal` key): `enabled` (true), `bind` (`127.0.0.1`), `maxSessions` (10), `idleTimeoutMs` (30 min), `scrollbackBytes` (256 KiB), `allowShellKind` (true). `LocalPtyBackend` spawn uses array args + `shell:false` (except the `win32` npm wrapper), per **ADR-G-002**.
+`attachTerminalGateway(server, deps)` hooks `server.on('upgrade')`: extract token from `Sec-WebSocket-Protocol` → verify via `AuthProvider.verify()`/`verifyAsync()` **before bridge/session-spawn** — `wss.handleUpgrade()` completes the WS handshake but the socket is PAUSED pre-auth (no PTY data flows during sync or async-JWKS verification) and `bridge()` (the only WS⇄session pipe) is reached strictly after an accept; a deny records `auth.deny` and closes the WS with app-code **4401** (not a pre-upgrade HTTP 401) → on success bridge PTY⇄WS → on close `manager.detach()` (session stays alive for reattach). `PtySessionManager` caps `maxSessions` and exempts `deckent`-kind sessions from idle-kill so active sprints are never interrupted. **Config wiring today:** only `terminal.enabled` + `terminal_oidc_jwks` are read from `DeckentConfig` at runtime; `maxSessions` (10) / `idleTimeoutMs` (30 min) / `scrollbackBytes` (256 KiB) are HARDCODED to the config defaults (not yet user-overridable) and `bind` / `allowShellKind` / `outboundDailyQuotaBytes` are schema-defined but not runtime-enforced → born TERM-CONFIG-WIRE. `LocalPtyBackend` spawn uses array args + `shell:false` (except the `win32` npm wrapper), per **ADR-G-002**.
 
 ### Rejected alternatives (and why)
 
@@ -93,7 +106,7 @@ iframe/separate-server xterm — cross-origin auth complexity, no shared token. 
 
 **(+)** The dashboard/desktop gains real interactive terminal capability with a security-by-default posture: localhost-only token injection, bypass-independent fail-CLOSED auth, no raw-output persistence — the RCE surface stays closed, verified live (`deckent serve` auto-mints the token and enables the dock for localhost). The `AuthProvider`/`SessionBackend` seams make enterprise remote exec an *implementation* of an existing interface, not a rewrite. Reattach survives disconnect without server-side storage. Sub-#2 command/prompt guard is delivered.
 
-**(−)** `@lydell/node-pty` is a native addon — requires a platform prebuilt/compile (`npm install` fails *loudly* on an unsupported platform — an honest, not silent, failure). Sessions are in-memory: a server restart drops them (disk persistence is backlog). `scrollbackBytes` caps history (pipe to a file for full logs). A non-localhost `--host` requires the user to manage their own TLS + token delivery (no built-in HTTPS). A known UI bug — the collapsed dock-bar overlaps the sidebar (z-index/layout) — is cosmetic and deferred to the product sprint. Sub-#3 (multi-tenant/k8s) and sub-#4 (enterprise external) remain deferred.
+**(−)** `@lydell/node-pty` is a native addon — requires a platform prebuilt/compile (`npm install` fails *loudly* on an unsupported platform — an honest, not silent, failure). Sessions are in-memory: a server restart drops them (disk persistence is backlog). `scrollbackBytes` caps history (pipe to a file for full logs). A non-localhost `--host` requires the user to manage their own TLS + token delivery (no built-in HTTPS) — note the CLI currently REFUSES to enable the terminal on a non-localhost bind (safer than the ADR's "TLS + token delivery" framing). The terminal audit trail is not yet wired at runtime (no-op production sink → AUDIT-WIRE) and `TerminalConfig` values are hardcoded (TERM-CONFIG-WIRE). A known UI bug — the collapsed dock-bar overlaps the sidebar (z-index/layout) — is cosmetic and deferred to the product sprint. Sub-#3 (multi-tenant/k8s) and sub-#4 (enterprise external) remain deferred.
 
 ---
 

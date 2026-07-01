@@ -1,6 +1,6 @@
 # ADR-G-033: Dashboard (Observability Surface)
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=god-level observability dashboard run-proven live (AppShell + reachable pages + sprint-start **detach** + stale-while-revalidate live-data + SSE WorkerGrid + evolution/coverage endpoints; Tier-1 Proof-of-Function smoke per ADR-G-009) → tomorrow=**observability-only contract** — interactive chat relocates to the Desktop app (DESK-1); the dashboard never becomes the primary surface (the native terminal, ADR-G-034, is primary)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=god-level observability dashboard run-proven live (Layout shell + reachable pages + sprint-start **detach** + stale-while-revalidate live-data + REST-poll WorkerGrid with SSE bridge at DashboardPage + evolution/coverage endpoints; Tier-1 Proof-of-Function smoke per ADR-G-009) → tomorrow=**observability-only contract** — interactive chat relocates to the Desktop app (DESK-1); the dashboard never becomes the primary surface (the native terminal, ADR-G-034, is primary)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-080 · ADR-078 (Part D) · ADR-082 (Parts B/C) · ADR-083 (Dalga D) · **Supersedes:** —
 **Crosswalk:** ADR-080 + ADR-078(D) + ADR-082(B/C) + ADR-083(D) → ADR-G-033
 
@@ -24,23 +24,23 @@ Underneath the bug-fixing, the dashboard's *role* also moved. The 2026-06-29 piv
 
 ## Decision (Today)
 
-The dashboard is a **god-level observability surface**: a freeze-free React SPA (Vite + ADR-D-001 TS/ESM) that renders live sprint, worker, evolution, memory, nervous, and enterprise state through a single AppShell, with detached sprint-start and a stale-while-revalidate live-data spine. No new runtime dependency was introduced (ADR-D-005 / ex-010); no emoji — lucide-react icons only (brand consistency, ADR-G-010).
+The dashboard is a **god-level observability surface**: a freeze-free React SPA (Vite + ADR-D-001 TS/ESM) that renders live sprint, worker, evolution, memory, nervous, and enterprise state through a single **Layout** shell (App.tsx wires `Layout`; `AppShell.tsx` exists as an alternative shell but is not the mounted one), with detached sprint-start and a stale-while-revalidate live-data spine. No new runtime dependency was introduced (ADR-D-005 / ex-010); no-emoji — lucide-react icons only — is the RULE (brand consistency, ADR-G-010), with 2 residual ⚠ drift sites (WorkerGrid / DirectivesEditor) tracked as born DASH-EMOJI-FIX.
 
 ### 1. AppShell + Information Architecture
 
-`src/dashboard/src/components/AppShell.tsx` is the single top-level shell (replacing ad-hoc per-page layout): a CSS-grid header + sidebar + content, responsive breakpoints (mobile stacked / tablet collapsed-nav / desktop full sidebar), and a dark/light token system propagated via `data-theme`. The eight god-level surfaces are reachable through the AppShell navigation:
+`src/dashboard/src/components/Layout.tsx` is the mounted top-level shell (App.tsx routes render inside `<Layout />`; `AppShell.tsx` is a designed alternative that is not currently wired): a header + sidebar + content with a dark/light token system propagated via `data-theme`, a single-source nav (`nav-items.ts` → `navGroups`/`navItems`), and an embedded terminal dock (`TerminalPanel`). The eight god-level surfaces are reachable through the Layout navigation:
 
 ```xml
-<dashboard-surfaces nav="AppShell" reachable="8" routes="11">
+<dashboard-surfaces nav="Layout (nav-items.ts SSOT)" reachable="8" routes="~21 (18 protected; the '11' was a Sprint-221 snapshot)">
   <page id="sprint"     route="/status"          source="StatusPage"          state="live sprint phase + per-task done/working/no_go"/>
   <page id="overview"   route="/"                source="home/dashboard"      state="sprint summary + KPI"/>
   <page id="evolution"  route="/evolution"       source="EvolutionPage"       state="genealogy tree · retirement timeline · prompt-diff (→ ADR-G-032)"/>
   <page id="memory"     route="/memory-explorer" source="MemoryExplorerPage"  state="FTS5 search · ADR timeline · debt table (→ ADR-G-035)"/>
-  <page id="enterprise" route="/enterprise"      source="EnterprisePage"      state="tenant list · RBAC matrix · audit log · rate-limit (read-first V1; → ADR-G-031)"/>
+  <page id="enterprise" route="/enterprise"      source="EnterprisePage"      state="tenant · RBAC · audit · rate-limit — full CRUD (POST+DELETE) wired dashboard-side (→ ADR-G-031; backend enforcement-authoritativeness is the remaining gap)"/>
   <page id="nervous"    route="/nervous"         source="NervousPage"         state="pending-approval · accept/reject · panic-guard · detector status (→ ADR-G-022)"/>
-  <page id="terminal"   route="/terminal"        source="terminal-sessions"   state="multi-session PTY + history ring buffer (→ ADR-G-029)"/>
+  <page id="terminal"   route="(dock, NOT a route)" source="TerminalPanel"     state="multi-session PTY dock embedded in Layout — not a /terminal nav route (→ ADR-G-029)"/>
   <page id="chat"       route="/chat"            source="ChatPage"            state="round-trip + slash (→ relocates to DESK-1 — see Tomorrow)"/>
-  <!-- auxiliary routes (Debt · History · Directives) bring the route table to 11 total (ADR-080 §2) -->
+  <!-- App.tsx carries ~21 routes total (18 protected); the "11" figure is a Sprint-221 snapshot (ADR-080 §2) -->
 </dashboard-surfaces>
 ```
 
@@ -51,7 +51,7 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
 ### 3. Live-Data Spine — stale-while-revalidate + SSE WorkerGrid + theme tokens
 
 - **`src/dashboard/src/lib/use-live-data.ts`** — SSE/polling hook with stale-while-revalidate semantics: serves cached data immediately on mount, revalidates in the background, shows a *reconnecting* indicator (not a skeleton) on connection loss, and aborts in-flight requests on unmount via `AbortController`. Achieved in ~80 LoC (no React Query / SWR — ADR-D-005).
-- **`src/dashboard/src/components/WorkerGrid.tsx`** — consumes `use-live-data`/SSE so the worker list is **real-time**: the fixed-6 limit is removed and later spawn/done transitions render live (ADR-082 Dalga B). This grid is the dashboard projection of per-worker live state (the dashboard endpoint of WORKER-LIVE-TRACE, ADR-G-025).
+- **`src/dashboard/src/components/WorkerGrid.tsx`** — consumes `use-live-data` via **REST polling (3s interval) as its source of truth**, so the worker list is real-time: the fixed-6 limit is removed and later spawn/done transitions render live (ADR-082 Dalga B). NOTE: SSE push is handled at the **DashboardPage** level, not inside WorkerGrid — the "SSE WorkerGrid" phrasing is a Sprint-221 snapshot. This grid is the dashboard projection of per-worker live state (the dashboard endpoint of WORKER-LIVE-TRACE, ADR-G-025).
 - **`StatusPage.tsx`** — task state (done/working/no_go) and phase indicator are real-time (ADR-082 Dalga B); **`RefreshButton.tsx`** adds user-triggered refetch with a 10 s cooldown.
 - **`src/dashboard/src/lib/theme.ts`** — centralized design-token map (color/spacing/radius/shadow, dark+light) consumed via CSS custom properties; no hard-coded hex in components (ADR-G-010 brand/output consistency).
 
@@ -61,7 +61,7 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
 - **`src/api/evolution-endpoint.ts`** — three read-only GET endpoints registered in `server.ts`: `/api/evolution/genealogy`, `/api/evolution/retirement`, `/api/evolution/prompt-metrics` (graceful empty arrays when no data) — the dashboard window onto the evolution loop (ADR-G-032).
 - **`src/api/coverage-endpoint.ts`** — `/api/coverage` reads sprint coverage from memory.db/results so `History` shows real coverage, not a hard-coded 0% (ADR-082 Dalga C).
 - **`DebtPage.tsx`** — sprint/severity/status filter dropdowns + search (ADR-082 Dalga C).
-- **`EnterprisePage.tsx`** — F4/enterprise endpoints auth-wired with a Bearer token; auditor alerts deduped + provider-neutral (CLAUDE/GEMINI/AGENTS). Read-first: **no write actions in V1 — a deliberate decision, not a defect** (see Consequences and ADR-G-031).
+- **`EnterprisePage.tsx`** — F4/enterprise endpoints auth-wired with a Bearer token; auditor alerts deduped + provider-neutral (CLAUDE/GEMINI/AGENTS). Now carries **full tenant/RBAC/rate CRUD** (`mutate()` → POST+DELETE `/api/enterprise/{tenants,rbac,rate}`) — the Sprint-221 "read-first V1, no write actions" framing is SUPERSEDED. The remaining gap is not the UI but backend enforcement-authoritativeness of custom RBAC/rate rules + the V2 management-plane (ADR-G-031 gap #1).
 
 ### 5. Chat round-trip (Today) — parity with the terminal
 
@@ -85,11 +85,12 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
 
 **(+)** Sprint-start no longer freezes the dashboard — the serve process stays responsive across long sprints (detach invariant). All eight god-level surfaces are reachable; evolution/nervous/enterprise/memory data appear in the UI for the first time. The live-data spine eliminates skeleton thrash and recovers gracefully from connection loss; centralized theme tokens give dark/light consistency with zero runtime overhead and no new dependency. The dashboard is now a credible **observability** plane the pivot can build on, and the AppShell IA cleanly separates "Observe / Manage / Converse" so the Tomorrow reframe (chat → Desktop) is a relocation, not a rewrite.
 
-**(−) Known / deferred — tracked for the Chat/Dashboard product-sprint**:
-- **chat-HOLLOW** — `POST /api/chat` (`server.ts:813`) is **classifier-only** (the adapter never enters `buildChatReply`), and `ChatPage` swallows the stream error (`:382-384`); when the live stream is empty the classifier's *"I didn't understand"* reply stays visible. Frontend-wire and serve-side `resolveChatAdapter` SSOT both exist (Sprint 269) — the gap is the classifier-only POST + swallowed stream error, prime suspect being the EventSource-GET Bearer-header impossibility (auth-gate) or an in-serve CLI spawn failure (ADR-080 §3 v3-diagnosis, ADR-082 #2).
-- **duplicate-sidebar** — post-S219 drift: `Layout.tsx` renders its own `navGroups` while `Sidebar.tsx` `navItems` remains a **stale duplicate**, so Workers/Directives are not reachable from nav. Collapse to a single nav source in the product-sprint (ADR-080 §2 drift, UX-audit #3).
-- **alert-spam ×59** — the "CLAUDE.md not updated" auditor alert repeated ×59; dedup either regressed or does not cover this auditor-alert path (ADR-082 #3, UX-audit #4).
-- **enterprise read-only** — EnterprisePage "read-first (no write actions)" is **V1-by-design, not a defect**; the real product gap is the **V2 management-plane CRUD** (ADR-G-031 god-level gap #1).
+**(−) Status of the Sprint-221 known-defects (most RESOLVED since; verified 2026-07-01)**:
+- **chat-HOLLOW — RESOLVED (since):** `resolveChatReply` (chat-handler.ts) now routes a natural-language message to `adapter.send()` with an honest i18n error on failure — no silent classifier fallback — and an EventSource token fallback was added (server.ts:1292). The classifier-only POST + auth-gate defects are fixed. Remaining: full end-to-end chat-working still needs a live-run verify (wiring ≠ working, ADR-G-009).
+- **duplicate-sidebar — RESOLVED (since):** nav collapsed to a single source (`nav-items.ts` `navGroups` → `navItems` flatMap) consumed by `Layout.tsx`; the stale `Sidebar.tsx` duplicate is gone, Workers/Directives are reachable.
+- **alert-spam ×59 — RESOLVED (since):** `DashboardPage` dedups alerts by key with a running count (`dedupMap`, :274) — the ×59 repeat collapses to one entry.
+- **enterprise read-only — SUPERSEDED:** EnterprisePage now has tenant/RBAC/rate CRUD (POST+DELETE); the real gap moved to backend enforcement-authoritativeness + V2 management-plane (ADR-G-031 gap #1), not missing write UI.
+- **emoji-drift — OPEN:** 2 raw ⚠ glyphs remain against the no-emoji/lucide-react rule (`WorkerGrid.tsx:26` reconnecting text + `DirectivesEditor.tsx:97` disabled hint) → born DASH-EMOJI-FIX.
 - **Structural tradeoffs:** detached sprint-start means the serve process holds no direct reference to the running sprint — status is read via `/api/status` / `.dashboard` (no change from prior behavior); non-SSE pages fall back to fixed-interval polling; `DirectivesEditor` is a plain textarea (no syntax highlighting); the REPL status-line has no dashboard-bar parity yet.
 
 ---
@@ -112,5 +113,5 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
   - **ADR-G-029** (Embedded Web Terminal) — the `/terminal` page's PTY/session backend.
   - **ADR-G-009** (Evaluation Integrity / Proof-of-Function) — the dashboard is Tier-1 user-surface; the freeze and hollow-page defects were `wired ≠ working` failures caught by real-binary smoke.
   - **ADR-G-016** (Product Vision) / **ADR-G-010** (Output, Terminal-UX & Brand) — god-level / no-MVP bar; no-emoji + lucide-react + shared theme tokens.
-- **Born work-items:** **DASH** (serve-token-inject · routing chart · control-panel surfacing · onboarding view — from old 072/073/076 side-items) · **Chat/Dashboard product-sprint** (chat-HOLLOW · duplicate-sidebar · alert-spam · enterprise-CRUD) · **DESK-1** (Desktop app) — all to MASTER-PLAN.
+- **Born work-items:** **DASH** (serve-token-inject · routing chart · control-panel surfacing · onboarding view — from old 072/073/076 side-items) · **DASH-EMOJI-FIX** (2 residual ⚠ → lucide-react) · **DESK-1** (Desktop app) — all to MASTER-PLAN. (The old Chat/Dashboard product-sprint items — chat-HOLLOW · duplicate-sidebar · alert-spam · enterprise read→write — are largely resolved; see Consequences.)
 - **Direction:** `.analysis/adr-review-crosswalk.md` (rows 080/078/082/083), `.analysis/hermes-vs-deckent-direction-decisions.md`, memory `project_hermes_deckent_direction_2026_06` · `feedback_dashboard_no_emoji_lucide` · `feedback_governance_aligns_with_direction_pivot`.

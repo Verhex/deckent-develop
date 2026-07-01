@@ -2945,7 +2945,7 @@ Multi-task work executes in dependency order. ADR-045 wired `respawnEligibleTask
 
 # ADR-G-027: Prompt Lifecycle & Worker-Context
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** lifecycle contract (write/persist/archive across all backends) + content-completeness (truncation forbidden)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** lifecycle contract (stdin-delivery always; tmpfile-persist config-gated via `worker_prompt_txt_file`) + content-completeness (skill + scope-relevant-ADR never truncated; transport-digest bounded WITHOUT access-loss)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-048 (Prompt Lifecycle Contract) + ADR-060 (Self-Awareness Propagation — 5-channel context)
 **Crosswalk:** 048 (+060) → ADR-G-027
 
@@ -2963,15 +2963,26 @@ A worker prompt has two intertwined concerns: where it physically lives (tmpfile
 
 ```xml
 <prompt-lifecycle>
-  <tmpfile backends="docker|tmux|subprocess uniform">
-    write at spawn → PERSIST until process cleanup → archive (move, not delete) to
-    .tasks/archive/. Per-worker kill must NOT delete OTHER live workers' prompts
-    (active-worker protection via getActiveWorkerIds; cross-sprint orphans archived at startup).
+  <tmpfile persist="config-gated: worker_prompt_txt_file (default true = backward-safe)">
+    prompt is ALWAYS delivered via stdin-stream (the shell never interprets it → injection-safe).
+    tmpfile-PERSIST (.prompt-{taskId}-{hash}.txt at spawn → persist until process cleanup →
+    archive move-not-delete to .tasks/archive/) is an OPTIONAL dev/forensic VISIBILITY layer,
+    NOT the delivery mechanism: docker+tmux persist when the gate is ON; subprocess is
+    stdin-only (the reference form of gate=OFF). Gate=OFF stops the file writes + the disk /
+    privacy surface WITHOUT losing prompt delivery. Per-worker kill must NOT delete OTHER live
+    workers' prompts (active-worker protection via getActiveWorkerIds; cross-sprint orphans
+    archived at startup); explicit kill hard-deletes the KILLED task's OWN prompt.
   </tmpfile>
-  <content-completeness rule="truncation FORBIDDEN">
-    full SKILL.md per assigned skill + full relevant-ADR content injected. No
-    "(content truncated)" markers in worker prompts. Philosophy: prompt-completeness >
-    token-saving. ADR relevance threshold (min 0.3) + agent-prompt single-source (PROMPT.md).
+  <content-completeness rule="skill + scope-relevant-ADR never truncated">
+    full SKILL.md per assigned skill + full scope-relevant-ADR body injected — no
+    "(content truncated)" markers on skill/ADR bodies. Two SANCTIONED bounds reduce TRANSPORT
+    tokens WITHOUT reducing ACCESS (full source stays on disk / one pointer away): (1) in
+    code-development tasks, background ADRs (not scope-intersecting) render as active-constraint
+    head + summary + [full: …] pointer while scope-intersecting ADRs stay full-body; (2) the
+    dependency DIGEST is char-bounded (Sprint-183 anti-balloon: notes≤500, entry≤2000 + marker)
+    while the raw .result stays full on disk. Philosophy: prompt-completeness > token-saving —
+    optimize the HOW (scope→tool, bounded-digest+disk, prompt-cache) never the WHAT. ADR
+    relevance threshold (min 0.3) + agent-prompt single-source (PROMPT.md).
   </content-completeness>
   <worker-context channels="init·sync·manifest·skill-declare·enrichment">
     Channel-5 enrichment is live (dependency .result propagation) and grew via COMM-1
@@ -3000,7 +3011,7 @@ The token cost of full-content + multi-channel context is real (noticed in ADR-0
 
 **(+)** Worker prompts physically survive correctly (no active-worker prompt loss) and semantically carry complete skill/ADR/dependency context — the worker never works blind or on truncated guidance. The token concern is addressed by *how* (scope→tool, cache), not by cutting context.
 
-**(−)** Token cost of full-content is real until WP-OPT (scope→TOOL-SCOPE) lands — born work-item. The coordinated `buildWorkerContext()` is roadmap (independent builders + COMM-1 today). tmux/subprocess have lifecycle asymmetries (documented).
+**(−)** Token cost of full-content is real until WP-OPT (scope→TOOL-SCOPE) lands — born work-item. The coordinated `buildWorkerContext()` is roadmap (independent builders + COMM-1 today). Backend lifecycle differs by design: docker+tmux persist a tmpfile, subprocess is stdin-only; the `worker_prompt_txt_file` gate makes persistence opt-out everywhere (PROMPT-TXT-OPT born). tmux tmpfile parity was CLOSED in Sprint-170 (taskId-embedded name → active-worker protection); only the Auditor path stays hex-only, and stale pre-170 comments in `claude.ts`/`spawn-backend.ts` still describe the old behavior (PROMPT-COMMENT-REFRESH born).
 
 ---
 
@@ -3008,7 +3019,7 @@ The token cost of full-content + multi-channel context is real (noticed in ADR-0
 
 - **Absorbs:** ADR-048 (incl. its Sprint-182 content amendment) + ADR-060.
 - **Cross-ref:** ADR-G-034 (TOOL-SCOPE — scope via tool, prompt shrink) · ADR-G-014 (cross-backend) · ADR-G-035 (memory — context source) · ADR-G-020 (scope authority) · ADR-G-006 (skill/agent selection → channels).
-- **Born / MASTER-PLAN:** WP-OPT (token-opt, no-truncation) · COMM-1/COMM-2 · buildWorkerContext-coordinator.
+- **Born / MASTER-PLAN:** WP-OPT (token-opt, no-truncation) · PROMPT-TXT-OPT (`worker_prompt_txt_file` gate — tmpfile-persist opt-out; subprocess = gate-off reference) · PROMPT-COMMENT-REFRESH (stale pre-170 tmux comments) · COMM-1/COMM-2 · buildWorkerContext-coordinator.
 - **Memory:** `feedback_prompt_completeness_over_brevity`.
 
 
@@ -3038,12 +3049,23 @@ deckent must know *what kind* of work a task is, to judge it correctly and gate 
 
 ```xml
 <work-taxonomy ssot="src/core/work-model.ts (WM-2)">
-  <task-kind>audit | document-write | code-development. Detected by scope-shape
-    (filesWrite/directories), NOT title/description (gaming-proof). Priority:
-    audit → document-write → code-development. Object.freeze registries.</task-kind>
+  <task-kind>Canonical TaskKind (work-model.ts:27, SSOT) = code-development · test ·
+    documentation · audit · security · refactor · devops · config · design · data · generic.
+    Plan-time RUBRIC-detection is a 3-class projection of that canonical set — audit |
+    document-write | code-development — detected by scope-shape (filesWrite/directories),
+    NOT title/description (gaming-proof), priority audit → document-write → code-development.
+    `document-write` is the legacy RubricTaskType (rubric/effect view); its canonical
+    counterpart is `documentation`. Object.freeze registries.</task-kind>
   <effect-class>pure | reversible | idempotent | compensable | critical-irreversible.
-    Feeds the autonomous policy-gate (WM-6): pure/reversible → auto-run; risky classes →
-    PARK (human approval). gaming-proof (a worker cannot self-downgrade to skip the gate).</effect-class>
+    TWO derivation paths: (a) rubric/task path — EFFECT_CLASS_REGISTRY (frozen 3-map:
+    audit=pure, document-write/code-development=reversible) for task evaluation; (b)
+    autonomous/process path — computeEntryEffectClass derives the full 5-class from
+    keyword+kind+scope+capability, failing SAFE to critical-irreversible when unknown.
+    Gate (WM-6): policy `risk-tagged` ENFORCES (pure/reversible → auto, risky → PARK);
+    policy `auto` is a trusted-authority OVERRIDE that bypasses EffectClass; policy
+    `approval-required` always parks. Process-mode is safe-by-default (emits risk-tagged
+    entries → EffectClass, not the submitter, decides). gaming-proof: frozen registries
+    mean a worker cannot self-downgrade critical-irreversible → reversible to skip the gate.</effect-class>
   <tech-stack>TechStackKind (WM-7) = the SECOND axis. Evaluation is TaskKind × TechStack:
     a C++ project is not held to tsc-clean; coverage required only on
     COVERAGE_MEASURABLE_STACKS (cross-ref ADR-G-009).</tech-stack>
@@ -3058,7 +3080,7 @@ deckent must know *what kind* of work a task is, to judge it correctly and gate 
 
 ## Intent / Roadmap (Tomorrow)
 
-- **🔴 TASKTYPE-EXPAND:** the core 3 kinds are too narrow → add more TaskKinds (db-migration, package-publish, infrastructure-provision, security-patch, …) — each with its own rubric + effect-class + detection — plus **user-custom task-types** (ADR-UG/UP). The concepts (TaskKind × TechStack × EffectClass) are advanced enough to carry this.
+- **🔴 TASKTYPE-EXPAND:** the type/adaptor level has ALREADY started — the canonical TaskKind set is 11 kinds live (work-model.ts). The remaining work is *productization*: carry that expansion down into plan-time **rubric-detection** (still a 3-class scope-shape projection) + **EFFECT_CLASS_REGISTRY** (still a 3-map) + routing, each new kind with its own rubric + effect-class + detection — plus **user-custom task-types** (ADR-UG/UP). The concepts (TaskKind × TechStack × EffectClass) are advanced enough to carry this.
 - **Scoring consolidation:** decide whether to build the formal 5-layer pipeline (consolidating the organic gates — ADR-D-006 god-object-split pattern) OR formalize the organic architecture. Open architectural choice.
 - **EffectClass→approval** ties the runtime ApprovalBroker (APR) for critical-irreversible.
 
@@ -3068,7 +3090,7 @@ deckent must know *what kind* of work a task is, to judge it correctly and gate 
 
 **(+)** Work is judged by what it actually IS (kind × stack × effect), gaming-proof, with risky work parked behind approval. The canonical work-model (WM-2) is the single SSOT for the three consumers (rubric/routing/adr-selector). EffectClass→policy-gate is live in the autonomous engine.
 
-**(−)** Only 3 core kinds today (born TASKTYPE-EXPAND); user-custom kinds are roadmap. The formal scoring pipeline is unbuilt (organic gates carry it; consolidation is an open choice).
+**(−)** Canonical TaskKind is 11-kind type-level live, but plan-time rubric-detection + EFFECT_CLASS_REGISTRY are still a 3-class view — the productization gap is born TASKTYPE-EXPAND; user-custom kinds are roadmap. The formal scoring pipeline is unbuilt (organic gates carry it; consolidation is an open choice).
 
 ---
 
@@ -3088,8 +3110,8 @@ deckent must know *what kind* of work a task is, to judge it correctly and gate 
 
 # ADR-G-029: Embedded Web Terminal (Remote PTY)
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=PTY sessions + WS gateway + bypass-independent **fail-CLOSED** auth (RCE-invariant) + structured-audit-only (no raw-output persist) + command/prompt guard + `AuthProvider`/`SessionBackend` seams → tomorrow=Desktop-app integration + enterprise-remote backends (k8s/SSH/SSO, audit-export/SIEM — sub-#3/#4) + TERM-RPC unification with the primary native terminal
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-062 (Embedded Web Terminal — PTY Sessions, WS Gateway, Auth & Audit) · **Supersedes:** —
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=PTY sessions + WS gateway + bypass-independent **fail-CLOSED** auth (RCE-invariant) + raw-output NEVER persisted (structural) + structured-audit-persistence code-delivered, runtime-UNWIRED (no-op sink → born AUDIT-WIRE) + command/prompt guard + `AuthProvider` (Local·Oidc·Jwks-async·mTLS-seam)/`SessionBackend` seams → tomorrow=Desktop-app integration + enterprise-remote backends (k8s/SSH/SSO, audit-export/SIEM — sub-#3/#4) + TERM-RPC unification with the primary native terminal
+**Status:** accepted (provisional — RCE-model + command/prompt guards live, but terminal-audit runtime-wiring is NOT wired [AUDIT-WIRE]: inv#3 clause-2 no-op sink; TerminalConfig hardcoded [TERM-CONFIG-WIRE]) · **Date:** 2026-06-30 · **Absorbs:** ADR-062 (Embedded Web Terminal — PTY Sessions, WS Gateway, Auth & Audit) · **Supersedes:** —
 **Crosswalk:** ADR-062 → ADR-G-029
 
 > **Note (pivot-reframe):** This is the **secondary / remote-access** PTY surface (a dockable terminal in the dashboard / desktop app, and the seam for enterprise remote exec) — it is **NOT** the primary terminal. The primary management+usage surface is the **native agentic terminal** (**ADR-G-034**). This record governs the remote-PTY security model; the day-to-day driving surface is ADR-G-034.
@@ -3100,7 +3122,7 @@ deckent must know *what kind* of work a task is, to judge it correctly and gate 
 
 The dashboard (React + Vite + Tailwind) monitors sprints but offered no way to run interactive AI tools (`claude`, `gemini`, `codex`, `deckent`) or a shell from the browser — users context-switched between dashboard and terminal during supervision. Sprint 175 added an embedded terminal as sub-project #1 of a 4-part roadmap (#2 prompt/command guard, #3 multi-tenant/k8s isolation, #4 enterprise external integration).
 
-Because a browser-reachable shell is a remote-code-execution surface, the security invariants are non-negotiable and were fixed in the verified spec before a line shipped. Sub-project #2 (the security guard) has since been **delivered**; #3 and #4 remain deferred. Under the 2026 product pivot, the dashboard becomes **observability-only** and the day-to-day interactive surface moves to the native terminal and a desktop app — so this embedded terminal is reframed as the *remote/secondary* PTY surface, and its hardened auth/audit model becomes the foundation for enterprise remote exec.
+Because a browser-reachable shell is a remote-code-execution surface, the security invariants are non-negotiable and were fixed in the verified spec before a line shipped. Sub-project #2 (the security guard — command/prompt guard, outbound-limiter) has since been **delivered**; its audit-integrity module is code-delivered but the production sink is a no-op (runtime wiring is born AUDIT-WIRE); #3 and #4 remain deferred. Under the 2026 product pivot, the dashboard becomes **observability-only** and the day-to-day interactive surface moves to the native terminal and a desktop app — so this embedded terminal is reframed as the *remote/secondary* PTY surface, and its hardened auth/audit model becomes the foundation for enterprise remote exec.
 
 ---
 
@@ -3118,8 +3140,9 @@ A self-contained terminal subsystem under `src/api/terminal/`, wired by `src/api
     audit.ts           — TerminalAudit (structured lifecycle events → memory.db, tenant-scoped)
     ws-gateway.ts      — attachTerminalGateway (HTTP upgrade → auth → bridge)
   </core>
-  <security sub-project="#2 — DELIVERED">
-    command-guard.ts · prompt-guard.ts · outbound-limiter.ts · audit-integrity.ts (+ tests/security/)
+  <security sub-project="#2 — guards DELIVERED, audit-wiring born">
+    command-guard.ts · prompt-guard.ts · outbound-limiter.ts (all delivered) ·
+    audit-integrity.ts (module-delivered; production sink is no-op → runtime AUDIT-WIRE) (+ tests/security/)
   </security>
 </module-boundary>
 ```
@@ -3141,10 +3164,18 @@ A self-contained terminal subsystem under `src/api/terminal/`, wired by `src/api
     a plain HTTP Authorization header on the WS upgrade.
   </inv>
   <inv id="3" name="structured-audit-only">
-    Raw PTY output (ANSI sequences, keystrokes, command output) is NEVER persisted
-    to disk or memory.db — it is PII-adjacent and may contain passwords/keys. Only
-    structured, low-volume lifecycle events (created/attached/detached/killed) are
-    stored, tenant-scoped (additive tenant_id column, non-destructive ALTER TABLE).
+    Clause-1 (STRUCTURAL — always enforced): Raw PTY output (ANSI sequences,
+    keystrokes, command output) is NEVER persisted to disk or memory.db.
+    TerminalAudit.record() only ever serializes action/sessionId/detail/at, never the
+    PTY stream — this holds regardless of sink, so it is a true invariant.
+    Clause-2 (runtime-UNWIRED): the structured, low-volume lifecycle events
+    (created/attached/detached/killed) are DESIGNED to be stored tenant-scoped
+    (additive tenant_id column, non-destructive ALTER TABLE) with an HMAC integrity
+    chain — but the production sink is currently a no-op (server.ts:1473, with no seam
+    to pass a real store), so nothing is persisted and the chain never runs → born
+    AUDIT-WIRE. Additionally, WS auth events (auth.ok/auth.deny) are tenantId:'local'
+    hardcoded while lifecycle events resolve the real tenant via session-meta → born
+    AUDIT-TENANT.
   </inv>
   <inv id="4" name="reattach boundary">
     A session survives client disconnect (tab close, network blip) and reattaches
@@ -3152,16 +3183,20 @@ A self-contained terminal subsystem under `src/api/terminal/`, wired by `src/api
     It does NOT survive a server restart (in-memory only); disk persistence is backlog.
   </inv>
   <inv id="5" name="enterprise seams from day one">
-    AuthProvider + SessionBackend interfaces exist with exactly one impl each
-    (LocalTokenAuthProvider, LocalPtyBackend). Remote backends (k8s exec, Docker
-    exec, SSH) and SSO are sub-project #3 implementations of these interfaces.
+    AuthProvider now has THREE impls — LocalTokenAuthProvider (default, SHA-256 +
+    timingSafeEqual), OidcAuthProvider (HS256/RS256, alg:none rejected, confusion-safe),
+    JwksAuthProvider (RS256-pinned, async via verifyAsync) — plus an mTLS
+    verifyClientCert seam; server.ts selects Jwks when terminal_oidc_jwks is configured,
+    else LocalToken. SessionBackend still has exactly one impl (LocalPtyBackend). The
+    remaining remote backends (k8s exec, Docker exec, SSH) are sub-project #3
+    implementations of these interfaces.
   </inv>
 </invariants>
 ```
 
 ### Gateway flow & config
 
-`attachTerminalGateway(server, deps)` hooks `server.on('upgrade')`: extract token from `Sec-WebSocket-Protocol` → `AuthProvider.verifyToken()` **before** any session spawn or WS accept (failure → `401` + destroy) → on success bridge PTY⇄WS → on close `manager.detach()` (session stays alive for reattach). `PtySessionManager` caps `maxSessions` (default 10) and exempts `deckent`-kind sessions from idle-kill so active sprints are never interrupted. `TerminalConfig` on `DeckentConfig` (`terminal` key): `enabled` (true), `bind` (`127.0.0.1`), `maxSessions` (10), `idleTimeoutMs` (30 min), `scrollbackBytes` (256 KiB), `allowShellKind` (true). `LocalPtyBackend` spawn uses array args + `shell:false` (except the `win32` npm wrapper), per **ADR-G-002**.
+`attachTerminalGateway(server, deps)` hooks `server.on('upgrade')`: extract token from `Sec-WebSocket-Protocol` → verify via `AuthProvider.verify()`/`verifyAsync()` **before bridge/session-spawn** — `wss.handleUpgrade()` completes the WS handshake but the socket is PAUSED pre-auth (no PTY data flows during sync or async-JWKS verification) and `bridge()` (the only WS⇄session pipe) is reached strictly after an accept; a deny records `auth.deny` and closes the WS with app-code **4401** (not a pre-upgrade HTTP 401) → on success bridge PTY⇄WS → on close `manager.detach()` (session stays alive for reattach). `PtySessionManager` caps `maxSessions` and exempts `deckent`-kind sessions from idle-kill so active sprints are never interrupted. **Config wiring today:** only `terminal.enabled` + `terminal_oidc_jwks` are read from `DeckentConfig` at runtime; `maxSessions` (10) / `idleTimeoutMs` (30 min) / `scrollbackBytes` (256 KiB) are HARDCODED to the config defaults (not yet user-overridable) and `bind` / `allowShellKind` / `outboundDailyQuotaBytes` are schema-defined but not runtime-enforced → born TERM-CONFIG-WIRE. `LocalPtyBackend` spawn uses array args + `shell:false` (except the `win32` npm wrapper), per **ADR-G-002**.
 
 ### Rejected alternatives (and why)
 
@@ -3181,7 +3216,7 @@ iframe/separate-server xterm — cross-origin auth complexity, no shared token. 
 
 **(+)** The dashboard/desktop gains real interactive terminal capability with a security-by-default posture: localhost-only token injection, bypass-independent fail-CLOSED auth, no raw-output persistence — the RCE surface stays closed, verified live (`deckent serve` auto-mints the token and enables the dock for localhost). The `AuthProvider`/`SessionBackend` seams make enterprise remote exec an *implementation* of an existing interface, not a rewrite. Reattach survives disconnect without server-side storage. Sub-#2 command/prompt guard is delivered.
 
-**(−)** `@lydell/node-pty` is a native addon — requires a platform prebuilt/compile (`npm install` fails *loudly* on an unsupported platform — an honest, not silent, failure). Sessions are in-memory: a server restart drops them (disk persistence is backlog). `scrollbackBytes` caps history (pipe to a file for full logs). A non-localhost `--host` requires the user to manage their own TLS + token delivery (no built-in HTTPS). A known UI bug — the collapsed dock-bar overlaps the sidebar (z-index/layout) — is cosmetic and deferred to the product sprint. Sub-#3 (multi-tenant/k8s) and sub-#4 (enterprise external) remain deferred.
+**(−)** `@lydell/node-pty` is a native addon — requires a platform prebuilt/compile (`npm install` fails *loudly* on an unsupported platform — an honest, not silent, failure). Sessions are in-memory: a server restart drops them (disk persistence is backlog). `scrollbackBytes` caps history (pipe to a file for full logs). A non-localhost `--host` requires the user to manage their own TLS + token delivery (no built-in HTTPS) — note the CLI currently REFUSES to enable the terminal on a non-localhost bind (safer than the ADR's "TLS + token delivery" framing). The terminal audit trail is not yet wired at runtime (no-op production sink → AUDIT-WIRE) and `TerminalConfig` values are hardcoded (TERM-CONFIG-WIRE). A known UI bug — the collapsed dock-bar overlaps the sidebar (z-index/layout) — is cosmetic and deferred to the product sprint. Sub-#3 (multi-tenant/k8s) and sub-#4 (enterprise external) remain deferred.
 
 ---
 
@@ -3249,9 +3284,14 @@ A single provisioning module (`src/core/provisioner.ts`) is the source of truth 
       yes (CLI --yes, MCP installMissing:true) — install all without prompting (CI)
       no-install (CLI --no-install) — legacy hint-only behavior preserved (backward compat)
   </step>
-  <invariant name="single source of truth">
-    getProviderInstallHint (both doctor.ts and doctor-format.ts copies) delegates the
-    package mapping to planInstall — one mapping, three call-sites, legacy hint format kept.
+  <invariant name="single source of truth — install EXECUTION only">
+    The install-EXECUTION package mapping is centralized: planInstall (NPM_PKG) +
+    doctor.ts getProviderInstallHint delegate to one mapping. NOTE (honest scope): the
+    install-HINT strings shown in provider diagnostics / chat / onboard / error messages
+    are NOT yet centralized — the `@anthropic-ai/claude-code` / `@openai/codex` /
+    `@google/gemini-cli` literals are still hardcoded across 13+ sites (errors.ts,
+    claude/codex/gemini.ts, messages.ts, wizard.ts, chat.ts, doctor.ts, onboard.ts), so a
+    vendor rename is NOT a one-place update today → born PKG-NAME-SSOT.
   </invariant>
   <invariant name="MCP parity">
     deckent_init gains an installMissing opt-in. MCP has no interactive consent channel,
@@ -3262,7 +3302,7 @@ A single provisioning module (`src/core/provisioner.ts`) is the source of truth 
 
 ### The trust-DNA anchor (reusable)
 
-The consent pattern is **not** scoped to first-run provisioning — it is the canonical anchor for *every* "install/prepare a missing prerequisite" surface. It already generalized: Sprint-270 F1-IMG applied the same gate to docker-image preparation — `deckent doctor --fix-image` **never** builds without an explicit flag + interactive consent, and the code cites this ADR directly. **Every** future such surface — including the PSL-6 provider auth-probe family — is bound by this ADR's three invariants: **consent-gated**, **whitelist-restricted spawn**, **no silent sudo**.
+The consent pattern is **not** scoped to first-run provisioning — it is the canonical anchor for *every* "install/prepare a missing prerequisite" surface. It already generalized to docker-image preparation, which has since grown its own surfaces, all consent-preserving: `deckent doctor --fix-image` (Sprint-270 F1-IMG) **never** builds without an explicit flag + interactive consent; `deckent image build` is a standalone explicit command; and `deckent init` offers a worker-image build via `maybeOfferWorkerImageBuild` — opt-in only (builds ONLY when interactive + docker present + image absent + user confirms; CI / `--yes` / `--no-image` → opted-out, never auto-build). Explicit-command self-update (`deckent upgrade`) is treated as its own consent — the user invoked it — but stays bound by the whitelist + no-silent-sudo spawn rules. **Every** future such surface — including the PSL-6 provider auth-probe family — is bound by this ADR's three invariants: **consent-gated**, **whitelist-restricted spawn**, **no silent sudo**.
 
 ### Rejected alternatives (and why)
 
@@ -3283,7 +3323,7 @@ Silent auto-install (no consent) — violates user trust and the security DNA. K
 
 **(+)** `deckent init` becomes a real provisioner and closes the blueprint reality gap, while staying security-preserving: consent-gated, whitelist + shell-free spawn (companion to the **ADR-G-002** spawnSync pattern + `spawn-safety.ts`), no silent sudo. The single source of truth removes a duplicated install-hint mapping across three sites (DRY). It is backward compatible — `--no-install` preserves the prior hint-only behavior exactly. The pattern proved reusable (F1-IMG docker-image), so consent is now a load-bearing trust primitive, not a one-off.
 
-**(−)** Global `npm i -g` may need elevated permissions on some setups — failures are *reported with the manual command* (graceful, non-fatal) rather than auto-escalating. OS-package installs (tmux on Linux) still require a manual user `sudo` step — by design. Provider CLI package names are centralized, so a vendor rename is a one-place update — but it *is* a place that must be maintained. The richer surfaces (ONB-CHAT, ONB-1, PSL-6, global-install) are roadmap; today the consent gate exists at the `provisionMissing` / `--fix-image` layer, not yet in a conversational wizard.
+**(−)** Global `npm i -g` may need elevated permissions on some setups — failures are *reported with the manual command* (graceful, non-fatal) rather than auto-escalating. OS-package installs (tmux on Linux) still require a manual user `sudo` step — by design. Provider CLI package names are centralized for install *execution* (one place), but the install-*hint* strings are duplicated across 13+ UX/diagnostic sites — a vendor rename is NOT yet one-place (born PKG-NAME-SSOT). Two exported helpers carry a pre-consent-gate auto-build semantic (`maybeProvisionDockerImage` / `reprovisionWorkerImageAfterUpgrade`) but are currently DEAD-CODE (no live call-site) — they must be purged or made consent-mandatory before any re-wiring (born DEAD-PROVISION-PURGE). The richer surfaces (ONB-CHAT, ONB-1, PSL-6, global-install) are roadmap; today the consent gate exists at the `provisionMissing` / `--fix-image` / `image build` / init-offer layer, not yet in a conversational wizard.
 
 ---
 
@@ -3296,7 +3336,7 @@ Silent auto-install (no consent) — violates user trust and the security DNA. K
 - **Product promise:** **ADR-G-016** (Product Vision — Product Not Service) — the "anyone can install & use" / install-and-run promise; air-gapped / never-phone-home pillar.
 - **Scope / install:** **ADR-G-001** (Layered Config & Scope Precedence) + **ADR-G-017** (Multi-Project Isolation) — global-install + project-scope; FB-1 opt-in telemetry inherits this consent gate.
 - **Governance:** **ADR-G-019** (ADR Governance) — runtime contract record for the provisioning capability.
-- **Born work-items:** ONB-CHAT (NL setup), ONB-1 (onboarding wizard), PSL-6 (consent-gated provider auth-probe), GLOBAL-INSTALL (seed consent-anchored provisioning across projects).
+- **Born work-items:** ONB-CHAT (NL setup), ONB-1 (onboarding wizard), PSL-6 (consent-gated provider auth-probe), GLOBAL-INSTALL (seed consent-anchored provisioning across projects), PKG-NAME-SSOT (centralize the 13+ hardcoded provider install-hint literals onto planInstall/NPM_PKG), DEAD-PROVISION-PURGE (purge or consent-gate the dead consent-less docker-build helpers `maybeProvisionDockerImage` / `reprovisionWorkerImageAfterUpgrade`).
 - **Direction:** memory `project_air_gapped_offline_pillar`, `project_deckent_everyone_everywhere`, `feedback_proactive_blocker_disclosure`; `.analysis/hermes-vs-deckent-direction-decisions.md` (ONB = P0, global-install + project-scope = P0).
 
 
@@ -3329,20 +3369,34 @@ To run deckent in enterprise environments — multi-tenant, audited, role-contro
   <tenant>TenantContext (ADR-G-024) + per-tenant isolationRoot + strict_tenant flag +
     memory tenant_id column + audit-scope.</tenant>
   <rbac>Role hierarchy (admin ⊃ operator ⊃ viewer) + Permission matrix + can() +
-    enforceRbac (disabled→NO_OP). 4 live consumers (autonomous runtime-loop, OIDC auth-me,
-    enterprise-endpoint, rbac CLI).</rbac>
+    enforceRbac. Enforcement is TWO-conditional: (a) rbac.enabled must be true
+    (disabled→NO_OP, default-off), AND (b) the caller must pass a role — role-OPTIONAL
+    call-sites (e.g. flow-registry.addFlow(flow, role?)) bypass the check when no role is
+    supplied, and most built-in paths do not supply one. Hard/universal enforcement is
+    gap-3 (ADR-G-020 L2 hard-flip, post-GA-V2). 4 live consumers (autonomous runtime-loop,
+    OIDC auth-me, enterprise-endpoint, rbac CLI).</rbac>
   <audit>writeAuditEvent + queryAudit (RBAC-gated) + HMAC chain (audit_prev_hmac/audit_hmac)
-    + audit-integrity + SIEM HTTP transport + exportAuditLog (SOC2/GDPR JSON/CSV).</audit>
+    + audit-integrity + SIEM HTTP transport + exportAuditLog (SOC2/GDPR JSON/CSV). NOTE: the
+    v2 keyed-HMAC secret is a PUBLIC source literal (AUDIT_HMAC_SECRET='deckent-audit') — the
+    chain is tamper-EVIDENT for accidental corruption but NOT tamper-proof against an actor
+    who knows the (public) key; production secret-manager threading through both writer +
+    export is a tracked follow-up → born AUDIT-SECRET-WIRE.</audit>
   <rate-limit>TenantRateLimiter — per-tenant token-bucket quota guard (checkLimit(tenantId,
-    action) → allow/deny; maxConcurrent per rolling window, auto-reset). Live snapshot at
-    GET /api/enterprise/rate; admin-only rule CRUD persisted in config (per-action limits = V2).</rate-limit>
+    action) → allow/deny; maxConcurrent per rolling window, auto-reset) EXISTS as a class.
+    NOTE: GET /api/enterprise/rate reflects the server's IP-based limiter snapshot, and
+    admin-CRUD'd `rate_rules` are PERSISTED in config but NOT yet bound to runtime
+    enforcement (no rule→TenantRateLimiter wiring; per-action limits = V2) → born
+    RATE-ENFORCE-WIRE.</rate-limit>
   <flows>scheduled-flow (full-cron nextRun) + flow-registry + event-trigger/matchTrigger
     (webhook/event match) → autonomous engine bridge.</flows>
   <connector-identity scope="external messaging surface" model="fail-CLOSED, opt-in">
     L2 RBAC on the connector message surface (DISTINCT from ADR-G-020 internal advisory):
     principal-resolution (tenant-scoped) → resource:action permission → HARD-BLOCK on
-    unauthorized. identity.enabled opt-in (default off = backward-compatible). SCIM 2.0 +
-    OIDC/Entra adapters; resolve()=pure-local zero-network, sync()=out-of-band background.
+    unauthorized. NOTE: the HARD-BLOCK only fires for capabilities that DECLARE a
+    requiredPermission — today only 1 of ~10 built-in capabilities is permission-tagged, so
+    the gate is opt-in per-capability, not yet universal → born CAP-PERM-TAG. identity.enabled
+    opt-in (default off = backward-compatible). SCIM 2.0 + OIDC/Entra adapters;
+    resolve()=pure-local zero-network, sync()=out-of-band background.
   </connector-identity>
 </enterprise-foundation>
 ```
@@ -3357,7 +3411,9 @@ The foundation is real engineering (OIDC security, HMAC chain, guarded surfaces)
 
 ```xml
 <god-level-gaps>
-  <gap n="1">Management plane — admin UI to CRUD tenants/roles/rate (today read-only).</gap>
+  <gap n="1">Management plane — CRUD endpoints for tenants/roles/rate now EXIST
+    (/api/enterprise/tenants|rbac|rate POST/DELETE); the remaining gap is that custom
+    RBAC/rate rules are not yet AUTHORITATIVE in enforcement + there is no admin UI.</gap>
   <gap n="2">Custom RBAC — custom roles / permission-matrix / per-resource ACL (today 3 fixed roles).</gap>
   <gap n="3">Hard enforcement — ADR-G-020 Layer-2 hard-flip (today advisory; post-GA-V2).</gap>
   <gap n="4">Runtime tenant isolation — k8s pod-exec (today config/path-scoping).</gap>
@@ -3372,7 +3428,7 @@ The foundation is real engineering (OIDC security, HMAC chain, guarded surfaces)
 
 **(+)** A real, opt-in, multi-tenant + RBAC + audit + rate-limit + scheduled + connector-identity enterprise foundation, all live and consumer-wired, byte-identical for community users. Connector-surface RBAC is fail-closed (stronger than the internal advisory layer) — safe for multi-user messaging deployments.
 
-**(−)** Six mapped gaps to god-level enterprise (management-plane, custom-RBAC, hard-enforce-V2, k8s-tenant, SCIM-push, audit-export) — all in the enterprise layer, not today. HTTP webhook-listener (069 AUT-2) unbuilt. Hard-enforcement is roadmap (ADR-G-020 vein).
+**(−)** Six mapped gaps to god-level enterprise (management-plane, custom-RBAC, hard-enforce-V2, k8s-tenant, SCIM-push, audit-export) — all in the enterprise layer, not today. Beyond those, several foundation pieces are wired only partially: `parseEnterpriseConfig` is the INTENDED enterprise-config SSOT but is not yet the runtime read-path (config is still read piecemeal — strict_tenant_isolation / autonomous.rbac_policy / identity / rbac_roles / rate_rules → born ENT-CONFIG-SSOT); persisted `rate_rules` are not bound to runtime enforcement (RATE-ENFORCE-WIRE); the audit HMAC secret is a public literal (AUDIT-SECRET-WIRE); connector capability permission-tagging is 1-of-~10 (CAP-PERM-TAG); RBAC enforcement is role-optional (bypassed when no role is passed). HTTP webhook-listener (069 AUT-2) unbuilt. Hard-enforcement is roadmap (ADR-G-020 vein).
 
 ---
 
@@ -3380,7 +3436,7 @@ The foundation is real engineering (OIDC security, HMAC chain, guarded surfaces)
 
 - **Absorbs:** ADR-068 + ADR-069 + ADR-071 Part-F4 + ADR-074 Part-B + ADR-092.
 - **Cross-ref:** ADR-G-016 (enterprise = governance depth, MOD-SPLIT) · ADR-G-020 (internal authority — distinct from connector L2) · ADR-G-024 (process/tenant) · ADR-G-017 (multi-project isolation) · ADR-G-007 (connectors) · ADR-G-035 (tenant_id/audit-hmac).
-- **Born / MASTER-PLAN:** ENT-* (god-level gaps) · MODULARIZE · AUT-2 (webhook-listener) · dynamic /bind (connector pairing→binding).
+- **Born / MASTER-PLAN:** ENT-* (god-level gaps) · MODULARIZE · AUT-2 (webhook-listener) · dynamic /bind (connector pairing→binding) · ENT-CONFIG-SSOT (parseEnterpriseConfig → runtime read-path) · RATE-ENFORCE-WIRE (persisted rate_rules → TenantRateLimiter enforcement) · AUDIT-SECRET-WIRE (secret-manager-sourced HMAC key through writer+export) · CAP-PERM-TAG (requiredPermission on all built-in capabilities).
 - **Memory:** `project_social_identity_rbac_engine` · `project_community_pro_split_strategy`.
 
 
@@ -3393,7 +3449,7 @@ The foundation is real engineering (OIDC security, HMAC chain, guarded surfaces)
 # ADR-G-032: Self-Learning & Evolution Loop
 
 **Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=moat-preserve (the closed outcome→routing→promotion loop must not be rewritten — only deepened) + requiresApproval-gated identity-mutation (nervous checkpoint; no mid-run mutation) → tomorrow=selective+scalable update (only used agents/skills, indexed/lazy at 300-agent/1000-skill) + auto-apply after the advisory-proof phase
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-074 Part-C (F5 evolution wire) + ADR-075 Part-A (6 evolution-module real callers) + ADR-078 Part-C (Active Identity-Mutation Loop)
+**Status:** accepted (provisional — core outcome→routing→promotion/demotion loop LIVE; identity-mutation capability delivered but production-unwired [IDENTITY-MUTATION-WIRE], test-only; bulk-update selective-scale defect open [EVOLUTION-SELECTIVE-SCALE]) · **Date:** 2026-06-30 · **Absorbs:** ADR-074 Part-C (F5 evolution wire) + ADR-075 Part-A (6 evolution-module real callers) + ADR-078 Part-C (Active Identity-Mutation Loop)
 **Crosswalk:** 074C + 075A + 078C → ADR-G-032
 
 > **Moat note:** This is deckent's strongest differentiator — the closed **outcome → routing → promotion** learning loop. MOAT-4: PRESERVE (never rewrite; only deepen). The pivot explicitly protects it.
@@ -3413,25 +3469,31 @@ deckent learns across runs: outcomes feed routing, routing feeds agent/skill sel
 ```xml
 <evolution-loop>
   <signal>outcome-tracker (per-agent/task-type success, NO_GO patterns)</signal>
-  <propose>prompt-evolution (rule-based prompt-improvement suggestion) · adaptive-agent (skill add/remove proposal)</propose>
-  <apply>promotion-pipeline.applyAdaptation / IdentityMutationOpts — low-success →
+  <propose>prompt-evolution (rule-based prompt-improvement suggestion) · adaptive-agent (skill add/remove proposal). ADVISORY — suggestion-only, re-exported via sprint-reporter, NOT auto-applied to any agent (evolvePrompt "does not mutate any agent").</propose>
+  <apply>promotion-pipeline.runIdentityMutation / IdentityMutationOpts — low-success →
     mutate agent identity (systemPrompt + skill repertoire) → record parent in
     agent-genealogy → versioned A/B-testable variant (agentId-v{N+1}); requiresApproval-gated
-    (nervous checkpoint); active-task agents not mutated mid-run.</apply>
-  <govern>agent-genealogy (lineage) · agent-retirement (LRU/low-success retire) ·
-    specialization-drift (scope-creep detect) · prompt-rollback (revert if worse) ·
-    cross-sprint-analyzer (improving/degrading trends)</govern>
+    (nervous checkpoint); active-task agents not mutated mid-run. NOTE: this capability is
+    delivered + unit-tested but NOT yet wired into the production finalize/planner path
+    (promotion-pipeline.ts:285, only test callers today) — finalize applies stat-based
+    promote/demote, not identity mutation → born IDENTITY-MUTATION-WIRE.</apply>
+  <govern>agent-genealogy (lineage) + agent-retirement (LRU/low-success retire) are live in
+    the finalize promotion path; specialization-drift (scope-creep detect) + prompt-rollback
+    (revert if worse) + cross-sprint-analyzer (improving/degrading trends) are advisory /
+    report-surface today (re-exported via sprint-reporter, not auto-acting).</govern>
 </evolution-loop>
 ```
 
-All wired with real external callers (ADR-075A) — the loop *runs*, not just exists. (API is **class-based** — `AgentGenealogy`/`AgentRetirement`/`SpecializationDriftDetector`/`PromptRollback`; proof at class-name level, not bare function grep.)
+The core is wired with real external callers (ADR-075A) — outcome→routing→promotion/demotion *runs*, not just exists. Exceptions, marked in the NOTEs above: the `<apply>` identity-mutation step has only test callers today, and the `<propose>`/`<govern>` drift/rollback/prompt-evolution helpers are advisory. (API is **class-based** — `AgentGenealogy`/`AgentRetirement`/`SpecializationDriftDetector`/`PromptRollback`; proof at class-name level, not bare function grep.)
 
 ### 2. 🔴 Selective + Scalable Update  *(Alperen 2026-06-30 — "basic ilk hata")*
 
 ```xml
 <selective-scale severity="critical">
   TODAY'S ERROR: the loop updates ALL agents/skills in BULK each run (even keyed by
-  last-used-sprint). WRONG.
+  last-used-sprint). WRONG. CODE: finalize syncs every learnings.agentPerformance +
+  skillPerformance record to manifests (sprint-finalizer.ts:1332/1363) and the learning
+  bonus scans all-historical performance (outcome-tracker.ts:433) — neither indexed/lazy.
   RULE: update ONLY the agents/skills actually USED in that run (selective).
   SCALE TEST: must remain manageable at 300 agents / 1000 skills — indexed lookup,
   lazy load, selective-update. The loop must be very well organized.
@@ -3450,7 +3512,7 @@ All wired with real external callers (ADR-075A) — the loop *runs*, not just ex
 
 ## Consequences
 
-**(+)** The differentiating moat is closed-loop and live (not proposed): underperforming agents are actually mutated, genealogy-tracked, A/B-verified. Outcome data drives routing + promotion continuously.
+**(+)** The differentiating moat is closed-loop and live (not proposed): outcome data drives routing + promotion/demotion continuously, genealogy-tracked. The deeper identity-mutation step (systemPrompt+skill → A/B-testable variant) is built + unit-tested but its production wiring into finalize is still born work (IDENTITY-MUTATION-WIRE) — today finalize applies stat-based promote/demote, and prompt-evolution/specialization-drift are advisory suggestions.
 
 **(−)** The bulk-update scaling error (§2) must be fixed before large agent/skill catalogs (born: EVOLUTION-SELECTIVE-SCALE). Learned-content quality is an open gap (LEARNINGS-QUALITY). Mutation auto-apply is gated behind an advisory-proof phase (today suggestions are advisory, requiresApproval for identity-mutation).
 
@@ -3460,7 +3522,7 @@ All wired with real external callers (ADR-075A) — the loop *runs*, not just ex
 
 - **Absorbs:** ADR-074 Part-C + ADR-075 Part-A + ADR-078 Part-C.
 - **Cross-ref:** ADR-G-035 (memory substrate + LEARNINGS-QUALITY) · ADR-G-006 (routing — consumes outcomes) · ADR-G-023 (agent/skill taxonomy) · ADR-G-022 (nervous — mutation approval checkpoint) · ADR-G-020 (requiresApproval gate).
-- **Born:** EVOLUTION-SELECTIVE-SCALE (🔴 critical) · LEARNINGS-QUALITY.
+- **Born:** EVOLUTION-SELECTIVE-SCALE (🔴 critical) · LEARNINGS-QUALITY · IDENTITY-MUTATION-WIRE (wire runIdentityMutation into finalize behind explicit approval-queue / nervous-checkpoint / non-active-agent guard — today test-only).
 - **Memory:** `project_autonomous_first_dogfood_grand_vision` · `feedback_directive_kanit_letter_vs_goal` · MOAT-4 (preserve).
 
 
@@ -3472,7 +3534,7 @@ All wired with real external callers (ADR-075A) — the loop *runs*, not just ex
 
 # ADR-G-033: Dashboard (Observability Surface)
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=god-level observability dashboard run-proven live (AppShell + reachable pages + sprint-start **detach** + stale-while-revalidate live-data + SSE WorkerGrid + evolution/coverage endpoints; Tier-1 Proof-of-Function smoke per ADR-G-009) → tomorrow=**observability-only contract** — interactive chat relocates to the Desktop app (DESK-1); the dashboard never becomes the primary surface (the native terminal, ADR-G-034, is primary)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=god-level observability dashboard run-proven live (Layout shell + reachable pages + sprint-start **detach** + stale-while-revalidate live-data + REST-poll WorkerGrid with SSE bridge at DashboardPage + evolution/coverage endpoints; Tier-1 Proof-of-Function smoke per ADR-G-009) → tomorrow=**observability-only contract** — interactive chat relocates to the Desktop app (DESK-1); the dashboard never becomes the primary surface (the native terminal, ADR-G-034, is primary)
 **Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-080 · ADR-078 (Part D) · ADR-082 (Parts B/C) · ADR-083 (Dalga D) · **Supersedes:** —
 **Crosswalk:** ADR-080 + ADR-078(D) + ADR-082(B/C) + ADR-083(D) → ADR-G-033
 
@@ -3496,23 +3558,23 @@ Underneath the bug-fixing, the dashboard's *role* also moved. The 2026-06-29 piv
 
 ## Decision (Today)
 
-The dashboard is a **god-level observability surface**: a freeze-free React SPA (Vite + ADR-D-001 TS/ESM) that renders live sprint, worker, evolution, memory, nervous, and enterprise state through a single AppShell, with detached sprint-start and a stale-while-revalidate live-data spine. No new runtime dependency was introduced (ADR-D-005 / ex-010); no emoji — lucide-react icons only (brand consistency, ADR-G-010).
+The dashboard is a **god-level observability surface**: a freeze-free React SPA (Vite + ADR-D-001 TS/ESM) that renders live sprint, worker, evolution, memory, nervous, and enterprise state through a single **Layout** shell (App.tsx wires `Layout`; `AppShell.tsx` exists as an alternative shell but is not the mounted one), with detached sprint-start and a stale-while-revalidate live-data spine. No new runtime dependency was introduced (ADR-D-005 / ex-010); no-emoji — lucide-react icons only — is the RULE (brand consistency, ADR-G-010), with 2 residual ⚠ drift sites (WorkerGrid / DirectivesEditor) tracked as born DASH-EMOJI-FIX.
 
 ### 1. AppShell + Information Architecture
 
-`src/dashboard/src/components/AppShell.tsx` is the single top-level shell (replacing ad-hoc per-page layout): a CSS-grid header + sidebar + content, responsive breakpoints (mobile stacked / tablet collapsed-nav / desktop full sidebar), and a dark/light token system propagated via `data-theme`. The eight god-level surfaces are reachable through the AppShell navigation:
+`src/dashboard/src/components/Layout.tsx` is the mounted top-level shell (App.tsx routes render inside `<Layout />`; `AppShell.tsx` is a designed alternative that is not currently wired): a header + sidebar + content with a dark/light token system propagated via `data-theme`, a single-source nav (`nav-items.ts` → `navGroups`/`navItems`), and an embedded terminal dock (`TerminalPanel`). The eight god-level surfaces are reachable through the Layout navigation:
 
 ```xml
-<dashboard-surfaces nav="AppShell" reachable="8" routes="11">
+<dashboard-surfaces nav="Layout (nav-items.ts SSOT)" reachable="8" routes="~21 (18 protected; the '11' was a Sprint-221 snapshot)">
   <page id="sprint"     route="/status"          source="StatusPage"          state="live sprint phase + per-task done/working/no_go"/>
   <page id="overview"   route="/"                source="home/dashboard"      state="sprint summary + KPI"/>
   <page id="evolution"  route="/evolution"       source="EvolutionPage"       state="genealogy tree · retirement timeline · prompt-diff (→ ADR-G-032)"/>
   <page id="memory"     route="/memory-explorer" source="MemoryExplorerPage"  state="FTS5 search · ADR timeline · debt table (→ ADR-G-035)"/>
-  <page id="enterprise" route="/enterprise"      source="EnterprisePage"      state="tenant list · RBAC matrix · audit log · rate-limit (read-first V1; → ADR-G-031)"/>
+  <page id="enterprise" route="/enterprise"      source="EnterprisePage"      state="tenant · RBAC · audit · rate-limit — full CRUD (POST+DELETE) wired dashboard-side (→ ADR-G-031; backend enforcement-authoritativeness is the remaining gap)"/>
   <page id="nervous"    route="/nervous"         source="NervousPage"         state="pending-approval · accept/reject · panic-guard · detector status (→ ADR-G-022)"/>
-  <page id="terminal"   route="/terminal"        source="terminal-sessions"   state="multi-session PTY + history ring buffer (→ ADR-G-029)"/>
+  <page id="terminal"   route="(dock, NOT a route)" source="TerminalPanel"     state="multi-session PTY dock embedded in Layout — not a /terminal nav route (→ ADR-G-029)"/>
   <page id="chat"       route="/chat"            source="ChatPage"            state="round-trip + slash (→ relocates to DESK-1 — see Tomorrow)"/>
-  <!-- auxiliary routes (Debt · History · Directives) bring the route table to 11 total (ADR-080 §2) -->
+  <!-- App.tsx carries ~21 routes total (18 protected); the "11" figure is a Sprint-221 snapshot (ADR-080 §2) -->
 </dashboard-surfaces>
 ```
 
@@ -3523,7 +3585,7 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
 ### 3. Live-Data Spine — stale-while-revalidate + SSE WorkerGrid + theme tokens
 
 - **`src/dashboard/src/lib/use-live-data.ts`** — SSE/polling hook with stale-while-revalidate semantics: serves cached data immediately on mount, revalidates in the background, shows a *reconnecting* indicator (not a skeleton) on connection loss, and aborts in-flight requests on unmount via `AbortController`. Achieved in ~80 LoC (no React Query / SWR — ADR-D-005).
-- **`src/dashboard/src/components/WorkerGrid.tsx`** — consumes `use-live-data`/SSE so the worker list is **real-time**: the fixed-6 limit is removed and later spawn/done transitions render live (ADR-082 Dalga B). This grid is the dashboard projection of per-worker live state (the dashboard endpoint of WORKER-LIVE-TRACE, ADR-G-025).
+- **`src/dashboard/src/components/WorkerGrid.tsx`** — consumes `use-live-data` via **REST polling (3s interval) as its source of truth**, so the worker list is real-time: the fixed-6 limit is removed and later spawn/done transitions render live (ADR-082 Dalga B). NOTE: SSE push is handled at the **DashboardPage** level, not inside WorkerGrid — the "SSE WorkerGrid" phrasing is a Sprint-221 snapshot. This grid is the dashboard projection of per-worker live state (the dashboard endpoint of WORKER-LIVE-TRACE, ADR-G-025).
 - **`StatusPage.tsx`** — task state (done/working/no_go) and phase indicator are real-time (ADR-082 Dalga B); **`RefreshButton.tsx`** adds user-triggered refetch with a 10 s cooldown.
 - **`src/dashboard/src/lib/theme.ts`** — centralized design-token map (color/spacing/radius/shadow, dark+light) consumed via CSS custom properties; no hard-coded hex in components (ADR-G-010 brand/output consistency).
 
@@ -3533,7 +3595,7 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
 - **`src/api/evolution-endpoint.ts`** — three read-only GET endpoints registered in `server.ts`: `/api/evolution/genealogy`, `/api/evolution/retirement`, `/api/evolution/prompt-metrics` (graceful empty arrays when no data) — the dashboard window onto the evolution loop (ADR-G-032).
 - **`src/api/coverage-endpoint.ts`** — `/api/coverage` reads sprint coverage from memory.db/results so `History` shows real coverage, not a hard-coded 0% (ADR-082 Dalga C).
 - **`DebtPage.tsx`** — sprint/severity/status filter dropdowns + search (ADR-082 Dalga C).
-- **`EnterprisePage.tsx`** — F4/enterprise endpoints auth-wired with a Bearer token; auditor alerts deduped + provider-neutral (CLAUDE/GEMINI/AGENTS). Read-first: **no write actions in V1 — a deliberate decision, not a defect** (see Consequences and ADR-G-031).
+- **`EnterprisePage.tsx`** — F4/enterprise endpoints auth-wired with a Bearer token; auditor alerts deduped + provider-neutral (CLAUDE/GEMINI/AGENTS). Now carries **full tenant/RBAC/rate CRUD** (`mutate()` → POST+DELETE `/api/enterprise/{tenants,rbac,rate}`) — the Sprint-221 "read-first V1, no write actions" framing is SUPERSEDED. The remaining gap is not the UI but backend enforcement-authoritativeness of custom RBAC/rate rules + the V2 management-plane (ADR-G-031 gap #1).
 
 ### 5. Chat round-trip (Today) — parity with the terminal
 
@@ -3557,11 +3619,12 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
 
 **(+)** Sprint-start no longer freezes the dashboard — the serve process stays responsive across long sprints (detach invariant). All eight god-level surfaces are reachable; evolution/nervous/enterprise/memory data appear in the UI for the first time. The live-data spine eliminates skeleton thrash and recovers gracefully from connection loss; centralized theme tokens give dark/light consistency with zero runtime overhead and no new dependency. The dashboard is now a credible **observability** plane the pivot can build on, and the AppShell IA cleanly separates "Observe / Manage / Converse" so the Tomorrow reframe (chat → Desktop) is a relocation, not a rewrite.
 
-**(−) Known / deferred — tracked for the Chat/Dashboard product-sprint**:
-- **chat-HOLLOW** — `POST /api/chat` (`server.ts:813`) is **classifier-only** (the adapter never enters `buildChatReply`), and `ChatPage` swallows the stream error (`:382-384`); when the live stream is empty the classifier's *"I didn't understand"* reply stays visible. Frontend-wire and serve-side `resolveChatAdapter` SSOT both exist (Sprint 269) — the gap is the classifier-only POST + swallowed stream error, prime suspect being the EventSource-GET Bearer-header impossibility (auth-gate) or an in-serve CLI spawn failure (ADR-080 §3 v3-diagnosis, ADR-082 #2).
-- **duplicate-sidebar** — post-S219 drift: `Layout.tsx` renders its own `navGroups` while `Sidebar.tsx` `navItems` remains a **stale duplicate**, so Workers/Directives are not reachable from nav. Collapse to a single nav source in the product-sprint (ADR-080 §2 drift, UX-audit #3).
-- **alert-spam ×59** — the "CLAUDE.md not updated" auditor alert repeated ×59; dedup either regressed or does not cover this auditor-alert path (ADR-082 #3, UX-audit #4).
-- **enterprise read-only** — EnterprisePage "read-first (no write actions)" is **V1-by-design, not a defect**; the real product gap is the **V2 management-plane CRUD** (ADR-G-031 god-level gap #1).
+**(−) Status of the Sprint-221 known-defects (most RESOLVED since; verified 2026-07-01)**:
+- **chat-HOLLOW — RESOLVED (since):** `resolveChatReply` (chat-handler.ts) now routes a natural-language message to `adapter.send()` with an honest i18n error on failure — no silent classifier fallback — and an EventSource token fallback was added (server.ts:1292). The classifier-only POST + auth-gate defects are fixed. Remaining: full end-to-end chat-working still needs a live-run verify (wiring ≠ working, ADR-G-009).
+- **duplicate-sidebar — RESOLVED (since):** nav collapsed to a single source (`nav-items.ts` `navGroups` → `navItems` flatMap) consumed by `Layout.tsx`; the stale `Sidebar.tsx` duplicate is gone, Workers/Directives are reachable.
+- **alert-spam ×59 — RESOLVED (since):** `DashboardPage` dedups alerts by key with a running count (`dedupMap`, :274) — the ×59 repeat collapses to one entry.
+- **enterprise read-only — SUPERSEDED:** EnterprisePage now has tenant/RBAC/rate CRUD (POST+DELETE); the real gap moved to backend enforcement-authoritativeness + V2 management-plane (ADR-G-031 gap #1), not missing write UI.
+- **emoji-drift — OPEN:** 2 raw ⚠ glyphs remain against the no-emoji/lucide-react rule (`WorkerGrid.tsx:26` reconnecting text + `DirectivesEditor.tsx:97` disabled hint) → born DASH-EMOJI-FIX.
 - **Structural tradeoffs:** detached sprint-start means the serve process holds no direct reference to the running sprint — status is read via `/api/status` / `.dashboard` (no change from prior behavior); non-SSE pages fall back to fixed-interval polling; `DirectivesEditor` is a plain textarea (no syntax highlighting); the REPL status-line has no dashboard-bar parity yet.
 
 ---
@@ -3584,7 +3647,7 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
   - **ADR-G-029** (Embedded Web Terminal) — the `/terminal` page's PTY/session backend.
   - **ADR-G-009** (Evaluation Integrity / Proof-of-Function) — the dashboard is Tier-1 user-surface; the freeze and hollow-page defects were `wired ≠ working` failures caught by real-binary smoke.
   - **ADR-G-016** (Product Vision) / **ADR-G-010** (Output, Terminal-UX & Brand) — god-level / no-MVP bar; no-emoji + lucide-react + shared theme tokens.
-- **Born work-items:** **DASH** (serve-token-inject · routing chart · control-panel surfacing · onboarding view — from old 072/073/076 side-items) · **Chat/Dashboard product-sprint** (chat-HOLLOW · duplicate-sidebar · alert-spam · enterprise-CRUD) · **DESK-1** (Desktop app) — all to MASTER-PLAN.
+- **Born work-items:** **DASH** (serve-token-inject · routing chart · control-panel surfacing · onboarding view — from old 072/073/076 side-items) · **DASH-EMOJI-FIX** (2 residual ⚠ → lucide-react) · **DESK-1** (Desktop app) — all to MASTER-PLAN. (The old Chat/Dashboard product-sprint items — chat-HOLLOW · duplicate-sidebar · alert-spam · enterprise read→write — are largely resolved; see Consequences.)
 - **Direction:** `.analysis/adr-review-crosswalk.md` (rows 080/078/082/083), `.analysis/hermes-vs-deckent-direction-decisions.md`, memory `project_hermes_deckent_direction_2026_06` · `feedback_dashboard_no_emoji_lucide` · `feedback_governance_aligns_with_direction_pivot`.
 
 
@@ -3597,7 +3660,7 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
 # ADR-G-034: Native Agentic Terminal
 
 **Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=product-surface contract (bare `deckent` = native agentic terminal; risky actions confirm-gated) → tomorrow=TOOL progressive-disclosure + in-terminal WORKER-LIVE-TRACE + runtime-wide ApprovalBroker + scope-via-TOOL enforcement
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-081 (Native Agentic Deckent) + ADR-074 Part-A (native-chat round-trip) + ADR-082 Part-A (real-LLM-wire) + ADR-083 (REPL-UX + provider-parity + local-model) + ADR-086 (Native CLI Parity F11)
+**Status:** accepted (provisional — primary terminal-surface shipped; slash-mode-filter + NL-dispatch not wired to the default Ink path [SLASH-MODE-WIRE / NL-DISPATCH-DECISION], slash-registry is a static catalog not capability-derived) · **Date:** 2026-06-30 · **Absorbs:** ADR-081 (Native Agentic Deckent) + ADR-074 Part-A (native-chat round-trip) + ADR-082 Part-A (real-LLM-wire) + ADR-083 (REPL-UX + provider-parity + local-model) + ADR-086 (Native CLI Parity F11)
 **Crosswalk:** 081 (+074A+082A+083+086) → ADR-G-034
 
 > **Pivot note (2026-06-29):** The terminal is deckent's **PRIMARY management + usage surface** — tool-driven, full-control + non-tiring, full-functionality is non-negotiable (flexibility/cutting-corners is not acceptable). Work happens *from the terminal*, not via memorized CLI subcommands — but without forcing it (CLI/MCP remain optional access). At the level of Claude Code / Hermes / Codex / OpenClaw. The dashboard (ADR-G-033) is observability-only; the terminal is where you *do*.
@@ -3618,28 +3681,33 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
 <native-terminal default-view="ink">
   <launch>bare `deckent` → agentic REPL (shouldLaunchDefaultRepl); --help/--version/
     subcommands preserved; non-TTY graceful.</launch>
-  <agentic>NL → deckent action dispatch (status/recall/plan/...) via McpToolDispatcher;
-    agentic-DO tool layer (write/edit/read/bash, &lt;deckent_tool&gt; provider-agnostic),
-    scope-bounded to session cwd.</agentic>
+  <agentic>Default surface = slash + model-emitted &lt;deckent_tool&gt; dispatch via
+    McpToolDispatcher; agentic-DO tool layer (write/edit/read/bash, provider-agnostic),
+    scope-bounded to session cwd. NL → deckent action dispatch (status/recall/plan,
+    classified pre-provider) is OPT-IN — `agenticDispatch` defaults to false and the Ink
+    path does not enable it → born NL-DISPATCH-DECISION.</agentic>
   <safety>confirm-gate for risky actions (start/kill/cleanup/write → y/a/N);
     safe actions (status/recall) auto. Permission-memory (.deckent/settings.local.json,
     gitignored) — claude-code-style "always".</safety>
   <session>turns persisted to memory.db; reopening resumes context.</session>
   <stream>F2 token-by-token streaming (SSE); thinking-indicator (kraken brand).</stream>
-  <slash>LIVE slash-registry derived from deckent's capability catalog (zero-hardcode):
+  <slash>slash-registry from a static canonical SLASH_CATALOG (kod-içi single source of
+    truth; buildSlashRegistry() = SLASH_CATALOG.slice() — NOT capability-catalog-derived):
     /help /status /recall /plan /nervous /clear /exit + enterprise group (/audit /rbac
-    /flow /cost — visible in enterprise mode, present-but-hidden in user mode).</slash>
+    /flow /cost). Mode-based hiding (visible in enterprise, hidden in user) is DESIGNED
+    (resolveChatMode/filterRegistryByMode) but the Ink path currently passes the FULL
+    registry (run.tsx:235) — hiding not yet wired → born SLASH-MODE-WIRE.</slash>
   <status-line>config-driven (provider + active-process + cwd); customizable, can be off.</status-line>
 </native-terminal>
 ```
 
 ### 2. Provider-parity (5-fleet) + local-model
 
-`resolveChatAdapter` is the single entry point mapping all providers (claude/codex/gemini/ollama/openai-compat) to an adapter via one contract. **Ollama-local is first-class** (zero-API-key, localhost:11434, explicit NET-error) — the "tomorrow deckent-AI with a local model" foundation. Provider fallback chain config-driven (`chat_provider ?? brain_provider ?? 'claude'` + optional `local_fallback`).
+`resolveChatAdapter` is the intended single entry point mapping all providers (claude/codex/gemini/ollama/openai-compat) to an adapter via one contract — though the bare-REPL boot still uses an inline `buildReplProvider` (entry.ts) instead (the minor drift noted in Consequences → born PROVIDER-SSOT). **Ollama-local is first-class** (zero-API-key, localhost:11434, explicit NET-error) — the "tomorrow deckent-AI with a local model" foundation. Provider fallback chain config-driven (`chat_provider ?? brain_provider ?? 'claude'` + optional `local_fallback`).
 
 ### 3. User / Enterprise mode
 
-`resolveChatMode`: `user` (default, simple — chat + basic slash) | `enterprise` (audit/rbac/flow/cost slash visible). Capability is **always present**; mode only filters the `/help` visibility ("kullanılmasa da kullanılabilir").
+`resolveChatMode`: `user` (default, simple — chat + basic slash) | `enterprise` (audit/rbac/flow/cost slash visible). Capability is **always present**; mode is INTENDED to filter `/help` visibility ("kullanılmasa da kullanılabilir") — but `filterRegistryByMode` is not yet wired into the Ink/legacy path (they render the full registry today) → born SLASH-MODE-WIRE.
 
 ---
 
@@ -3657,7 +3725,7 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
 
 **(+)** The product's primary individual surface is a real, agentic, multi-provider, polished terminal at parity with the best CLIs — the pivot's "terminal runs" thesis is shipped. Local-model foundation enables offline/air-gapped + cost-free dogfooding. Enterprise capability is reachable but unobtrusive.
 
-**(−)** TOOL progressive-disclosure, WORKER-LIVE-TRACE, ApprovalBroker integration, and TOOL-SCOPE are roadmap (the "must be BETTER than Hermes at tool+terminal" bar is forward work). A minor drift exists (`entry.ts` keeps inline provider-resolve branches vs the `resolveChatAdapter` SSOT — consolidation candidate). Dashboard-chat is being de-emphasized in favor of this surface + the desktop app.
+**(−)** TOOL progressive-disclosure, WORKER-LIVE-TRACE, ApprovalBroker integration, and TOOL-SCOPE are roadmap (the "must be BETTER than Hermes at tool+terminal" bar is forward work). Several pieces are delivered-but-not-default: the `src/agent/*` native-agent engine is flag-gated (`DECKENT_NATIVE_AGENT=1` / `--native`, default OFF — M4 cutover pending); `entry.ts` keeps an inline `buildReplProvider` vs the `resolveChatAdapter` SSOT (born PROVIDER-SSOT); the mode-filter + NL-dispatch are not wired to the default Ink path (born SLASH-MODE-WIRE / NL-DISPATCH-DECISION). Dashboard-chat is being de-emphasized in favor of this surface + the desktop app.
 
 ---
 
@@ -3677,8 +3745,8 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
 
 # ADR-G-035: Memory Architecture (DB-First, FTS5, Self-Learning Substrate)
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=sync-invariant (any write keeps content_norm + FTS5 + entry_history + audit_hmac consistent; direct SQL UPDATE forbidden) + additive backup-guarded taxonomy migration (never a destructive rebuild) → tomorrow=opt-in local-embedding vector layer (sqlite-vec, never-calls-home) + scope-layers (MEM-2) + index/SLA (MEM-3)
-**Status:** accepted · **Date:** 2026-06-30 · **Absorbs:** ADR-088 (Memory V2 — DB-First) · **Supersedes:** ADR-009 (DEBT.md markdown table — archived)
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=sync-invariant (any write keeps content_norm + FTS5 + entry_history consistent; audit_hmac is audit-rows-only, NOT every entry; direct SQL UPDATE is a discipline, not enforced — a getRawDb escape hatch exists) + additive idempotent taxonomy migration (never a destructive rebuild; schema_version bump + backup-guard are born, not yet wired) → tomorrow=opt-in local-embedding vector layer (sqlite-vec, never-calls-home) + scope-layers (MEM-2) + index/SLA (MEM-3)
+**Status:** accepted (provisional — DB-first+FTS5+exports shipped; taxonomy storage partial + class/scope-aware recall unwired [TAXONOMY-READPATH]; HMAC audit-rows-only; schema_version not bumped) · **Date:** 2026-06-30 · **Absorbs:** ADR-088 (Memory V2 — DB-First) · **Supersedes:** ADR-009 (DEBT.md markdown table — archived)
 **Crosswalk:** ADR-088 → ADR-G-035
 
 > **Substrate note:** This is the storage substrate the rest of the governance stands on — ADR-G-019 (class-aware ADR storage/recall/injection), ADR-G-032 (self-learning loop), and the LEARNINGS-QUALITY work all read/write through it. Its schema is **extended here to carry the 4-layer ADR taxonomy** (`adr_class`/`scope`/`immutable`/`source_authority`/`enforcement_level`).
@@ -3720,15 +3788,15 @@ All brain knowledge — ADRs, learnings, retros, tech-debt, patterns, identity �
 </schema>
 ```
 
-The new taxonomy columns are **additive** (ALTER TABLE, `schema_version` bump, backup-guarded migration via `better-sqlite3` — never a destructive rebuild). FTS5 is preserved.
+The new taxonomy columns are **additive + idempotent** (ALTER TABLE guarded by a column-existence check — never a destructive rebuild); FTS5 is preserved. NOTE: `SCHEMA_VERSION` is still `1` (not yet bumped) and there is no automatic backup-guard around the migration (backup is a separate `deckent memory backup` command) → born SCHEMA-VERSION-BUMP.
 
-### 3. Search — dual-layer, class/scope-aware
+### 3. Search — dual-layer (class/scope-aware = roadmap)
 
-`searchMemory()` runs **two layers**: original text + `turkishNormalize()` (TR/EN/DE ≈100% recall). For ADRs, recall is **class/scope-aware** (ADR-G-019): a user-project worker is injected ADR-G (always) + relevant ADR-UG/UP, never ADR-D; a deckent-dev worker also gets ADR-D. Correct FTS5 shape: `SELECT e.* FROM entries_fts f JOIN entries e ON e.rowid=f.rowid WHERE entries_fts MATCH ?`.
+`searchMemory()` runs **two layers**: original text + `turkishNormalize()` (TR/EN/DE ≈100% recall). Correct FTS5 shape: `SELECT e.* FROM entries_fts f JOIN entries e ON e.rowid=f.rowid WHERE entries_fts MATCH ?`. The **class/scope-aware** intent (ADR-G-019: a user-project worker gets ADR-G always + relevant ADR-UG/UP, never ADR-D; a deckent-dev worker also gets ADR-D) is NOT yet real — the taxonomy read-path is unwired: `rowToEntry()` does not return the `adr_class`/`scope`/`immutable`/`source_authority`/`enforcement_level` columns, `buildFilterClauses()` has no class/scope filter, and `adr-file-sync` does not parse `enforcement_level`. So the write side stores taxonomy (insert-only) but recall/injection is still class-flat → born TAXONOMY-READPATH (shared with ADR-G-019).
 
 ### 4. Sync invariant + decay + audit
 
-Any write through `MemoryStore.insert/upsert/update` keeps `content_norm` + FTS5 + `entry_history` + `audit_hmac` consistent; **direct SQL `UPDATE` is forbidden** (misses norm/FTS5/audit). **Editing an ADR/entry means updating BOTH the `.md` AND the DB** (doc == DB; regenerate exports with `deckent memory export`). `store.decay(currentSprintNum, decayAfterSprints)`; `decay_exempt=1` for permanent governance (ADRs, identity). HMAC chain (`audit_prev_hmac`/`audit_hmac`) = tamper-evident.
+Any write through `MemoryStore.insert/upsert/update` keeps `content_norm` + FTS5 + `entry_history` consistent; **direct SQL `UPDATE` is discouraged** (misses norm/FTS5) — but this is a discipline, NOT enforced: `getRawDb()` is an escape hatch and a few migration/backfill paths (`memory-import`) do use `UPDATE entries` directly. **Editing an ADR/entry means updating BOTH the `.md` AND the DB** (doc == DB; regenerate exports with `deckent memory export`). `store.decay(currentSprintNum, decayAfterSprints)`; `decay_exempt=1` for permanent governance (ADRs, identity). The HMAC chain (`audit_prev_hmac`/`audit_hmac`, tamper-evident) is applied to **audit rows** via `insertAuditWithHmac`, NOT to every memory-entry write.
 
 ### 5. Surfaces
 
@@ -3757,5 +3825,5 @@ CLI `deckent recall|remember|memory rebuild|export|stats`; MCP `deckent_memory_q
 
 - **Absorbs:** ADR-088 (Memory V2 DB-First). **Supersedes:** ADR-009 (archived).
 - **Cross-ref:** ADR-G-019 (ADR taxonomy — these columns store it) · ADR-G-032 (Self-Learning Loop — runs on this substrate) · ADR-G-031 (tenant_id / audit-hmac enterprise) · ADR-D-005 (dependency policy — sqlite-vec opt-in justification).
-- **Born work-items:** LEARNINGS-QUALITY · MEM-2 (scope-layers) · MEM-3 (index/SLA) · vector-layer (opt-in, never-calls-home).
+- **Born work-items:** TAXONOMY-READPATH (rowToEntry + buildFilterClauses class/scope filter + adr-file-sync enforcement_level parse + upsert taxonomy-update → class/scope-aware recall/injection; shared with ADR-G-019) · SCHEMA-VERSION-BUMP (schema_version bump + backup-guard + direct-SQL migration-only API) · LEARNINGS-QUALITY · MEM-2 (scope-layers) · MEM-3 (index/SLA) · vector-layer (opt-in, never-calls-home).
 - **Direction:** `.analysis/adr-governance-redesign-plan.md` §5 (DB strategy = better-sqlite evrim).
