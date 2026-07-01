@@ -60,13 +60,14 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
   },
   {
     id: 'sonnet',
-    apiId: 'claude-sonnet-4-6',
+    apiId: 'claude-sonnet-5',
     provider: 'claude',
     tier: 'standard',
-    contextWindow: 200_000,
+    contextWindow: 1_000_000,
     costPerMillion: { input: 3, output: 15 },
     capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: false },
     status: 'ga',
+    maxOutputTokens: 128_000,
   },
   {
     id: 'haiku',
