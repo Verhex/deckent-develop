@@ -109,7 +109,7 @@ import { writePhaseCheckpoint, restoreSprintFromCheckpoint } from './sprint-chec
 import { eventBus } from './event-bus.js';
 
 // ─── Notify (DECKENT→USER:NOTIFY wire — Hot Fix H6) ─────────────
-import { notify } from '../core/notify.js';
+import { notify, notifyAsync } from '../core/notify.js';
 
 // ─── Directives Protection Baseline (Sprint 177 Task 5) ──────────
 import { getActiveDirectivesProtection } from '../nervous/observer.js';
@@ -1211,7 +1211,21 @@ export async function runSprint(
       const sprintTimeoutMs = resolveSprintTimeoutMs(opts?.timeoutMs, config);
       results = await waitForResults(projectRoot, sprint, sprintTimeoutMs, taskQueue, { autoApprove: opts?.autoApprove, spawnBackend }, config);
     } catch (err) {
-      safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
+      // EXECUTE-ERROR-SURFACE (born-453, sprint-351 live case — sibling of the
+      // 350-002 finalize fix): this catch used to swallow a mid-EXECUTE throw
+      // into a dashboard line that the COMPLETE-time dashboard overwrite then
+      // destroyed — the sprint marched on with a PARTIAL result set (351: 12/18
+      // collected, queue abandoned, one worker still running) and nothing told
+      // the operator. Keep the fail-soft (do not crash the sprint), but SURFACE:
+      // stderr + notify + debugLog with stack, and record the abort on the
+      // sprint object so downstream phases/summary can qualify their counts.
+      const msg = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error ? err.stack : undefined;
+      debugLog('runSprint:EXECUTE:aborted', `${msg}\n${stack ?? ''}`);
+      process.stderr.write(`[execute] waitForResults threw — EXECUTE aborted early with ${results.length}/${sprint.tasks.length} results collected: ${msg}\n`);
+      try { notifyAsync('progress', sprint.id, 'EXECUTE aborted early', `${msg} (${results.length}/${sprint.tasks.length} collected)`); } catch { /* fail-safe */ }
+      (sprint as Sprint & { executeAborted?: string }).executeAborted = msg;
+      safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${msg}`);
     }
 
     // Post-collect sweep
