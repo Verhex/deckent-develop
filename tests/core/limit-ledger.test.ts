@@ -20,7 +20,7 @@ function makeLine(opts: {
     timestamp: opts.ts ?? '2026-06-10T10:00:00.000Z',
     message: {
       id: opts.id ?? 'msg-001',
-      model: opts.model ?? 'claude-sonnet-4-6',
+      model: opts.model ?? 'claude-sonnet-5',
       usage: {
         input_tokens: opts.inputTokens ?? 1000,
         output_tokens: opts.outputTokens ?? 200,
@@ -83,7 +83,7 @@ describe('parseTranscriptUsage', () => {
     });
 
     expect(records).toHaveLength(1);
-    expect(records[0]!.model).toBe('claude-sonnet-4-6');
+    expect(records[0]!.model).toBe('claude-sonnet-5');
     expect(records[0]!.in).toBe(500);
     expect(records[0]!.out).toBe(100);
     expect(records[0]!.sessionFile).toBe('session1.jsonl');
@@ -307,12 +307,12 @@ describe('parseTranscriptUsage', () => {
 describe('limitCost', () => {
   it('computes in·$in + out·$out + cacheWrite·1.25·$in with known numbers', () => {
     const prices: LedgerPrices = {
-      'claude-sonnet-4-6': { in: 0.000003, out: 0.000015 },
+      'claude-sonnet-5': { in: 0.000003, out: 0.000015 },
     };
     const records: UsageRecord[] = [
       {
         ts: null,
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         sessionFile: 's.jsonl',
         projectDir: 'p',
         in: 10_000,
@@ -356,12 +356,12 @@ describe('limitCost', () => {
 
   it('cacheWrite costs 1.25× input rate', () => {
     const prices: LedgerPrices = {
-      'claude-sonnet-4-6': { in: 0.000003, out: 0.000015 },
+      'claude-sonnet-5': { in: 0.000003, out: 0.000015 },
     };
     const onlyCacheWrite: UsageRecord[] = [
       {
         ts: null,
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         sessionFile: 's.jsonl',
         projectDir: 'p',
         in: 0,
@@ -395,13 +395,13 @@ describe('limitCost', () => {
 
   it('sums across multiple records and models', () => {
     const prices: LedgerPrices = {
-      'claude-sonnet-4-6': { in: 0.000003, out: 0.000015 },
+      'claude-sonnet-5': { in: 0.000003, out: 0.000015 },
       'claude-opus-4-6': { in: 0.000005, out: 0.000025 },
     };
     const records: UsageRecord[] = [
       {
         ts: null,
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         sessionFile: 's.jsonl',
         projectDir: 'p',
         in: 1_000,
@@ -427,7 +427,7 @@ describe('limitCost', () => {
   });
 
   it('returns 0 for empty records array', () => {
-    const prices: LedgerPrices = { 'claude-sonnet-4-6': { in: 0.000003, out: 0.000015 } };
+    const prices: LedgerPrices = { 'claude-sonnet-5': { in: 0.000003, out: 0.000015 } };
     expect(limitCost([], prices)).toBe(0);
   });
 
@@ -435,7 +435,7 @@ describe('limitCost', () => {
     const records: UsageRecord[] = [
       {
         ts: null,
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         sessionFile: 's.jsonl',
         projectDir: 'p',
         in: 10_000,

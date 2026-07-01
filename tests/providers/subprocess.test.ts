@@ -4,6 +4,7 @@ import { SubprocessSpawnBackend, createSubprocessBackend, CLAUDE_SUBPROCESS_CONF
 import type { SubprocessProviderConfig } from '../../src/providers/subprocess.js';
 import type { ProviderSpawnOptions } from '../../src/core/provider.js';
 import type { ModelType } from '../../src/core/types.js';
+import { modelRegistry } from '../../src/core/model-registry.js';
 
 // ─── Mock node:child_process ─────────────────────────────────────────
 
@@ -125,7 +126,7 @@ describe('SubprocessSpawnBackend', () => {
       const [, args] = mockSpawn.mock.calls[0];
       const modelIdx = args.indexOf('--model');
       expect(modelIdx).toBeGreaterThan(-1);
-      expect(args[modelIdx + 1]).toBe('claude-sonnet-4-6');
+      expect(args[modelIdx + 1]).toBe(modelRegistry.resolveApiId('sonnet'));
     });
 
     it('should write prompt via stdin', () => {
@@ -661,7 +662,7 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
 
   it('should export CLAUDE_SUBPROCESS_CONFIG with buildArgs producing correct args', () => {
     const args = CLAUDE_SUBPROCESS_CONFIG.buildArgs('sonnet');
-    expect(args).toEqual(['-p', '-', '--model', 'claude-sonnet-4-6']);
+    expect(args).toEqual(['-p', '-', '--model', modelRegistry.resolveApiId('sonnet')]);
   });
 
   it('should export CLAUDE_SUBPROCESS_CONFIG with buildCommandString producing correct command', () => {

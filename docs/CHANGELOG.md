@@ -2,6 +2,45 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint350] - 2026-07-01
+
+### Added
+
+- TRN-1 — trace-recorder'ı sprint-worker turn'lerine WIRE (row 76)
+- TRN-2 — trace-recorder'ı native-REPL'e WIRE (row 77)
+- TRN-3 — cc-trace-extractor driver (row 78)
+- APR-CONTRACT — ApprovalRequest tam kontratı (row 30)
+- SIGTERM-CLEANUP — SIGTERM'i SIGINT temizlik-yoluna bağla (ADR-G-013 born)
+- STALE-MODEL-ID-SWEEP — 30 test dosyasında sonnet-ID güncelle (row 431)
+
+
+_Tasks: 6 total, 6 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint349] - 2026-07-01
+
+### Added
+
+- FINALIZE-ERROR-SURFACE — swallowed finalize failures become visible (row 436)
+- CRED-HARDEN-PACK — AAD binding + atomic writes + Windows honesty (row 438)
+- REDACT-COVERAGE — extend the secret-mask allowlist (row 437)
+- PCOMP-W8 — test-strategy hints for exit-path tasks (row 445)
+
+### Fixed
+
+- DOCKER-FIXPACK — stale-shadow EACCES + inert kind-memlimit (rows 434+433)
+
+
+_Tasks: 5 total, 5 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint347] - 2026-07-01
+
+### Added
+
+- No completed tasks
+
+
+_Tasks: 5 total, 0 done, 0 tech debt, 5 no-go_
+
 ## [1.0.0-beta.1-sprint346] - 2026-06-28
 
 

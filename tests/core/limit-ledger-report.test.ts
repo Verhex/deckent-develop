@@ -15,7 +15,7 @@ import type { UsageRecord, LedgerPrices } from '../../src/core/limit-ledger.js';
 function makeRecord(overrides: Partial<UsageRecord> = {}): UsageRecord {
   return {
     ts: '2026-06-10T10:00:00.000Z',
-    model: 'claude-sonnet-4-6',
+    model: 'claude-sonnet-5',
     sessionFile: 'session-abc.jsonl',
     projectDir: 'my-project',
     in: 1000,
@@ -184,12 +184,12 @@ describe('summarizeSprint', () => {
 
   it('computes limitCost using provided prices', () => {
     const prices: LedgerPrices = {
-      'claude-sonnet-4-6': { in: 0.000003, out: 0.000015 },
+      'claude-sonnet-5': { in: 0.000003, out: 0.000015 },
     };
     const records = [
       makeRecord({
         sessionFile: 's.jsonl',
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-5',
         in: 10_000,
         out: 2_000,
         cacheRead: 5_000,
@@ -282,13 +282,13 @@ describe('summarizeSprint', () => {
   it('selects dominant model by call count', () => {
     const records = [
       makeRecord({ sessionFile: 's.jsonl', model: 'claude-haiku-4-5' }),
-      makeRecord({ sessionFile: 's.jsonl', model: 'claude-sonnet-4-6' }),
-      makeRecord({ sessionFile: 's.jsonl', model: 'claude-sonnet-4-6' }),
+      makeRecord({ sessionFile: 's.jsonl', model: 'claude-sonnet-5' }),
+      makeRecord({ sessionFile: 's.jsonl', model: 'claude-sonnet-5' }),
     ];
     const taskMap = { 's.jsonl': '273-014' };
 
     const summary = summarizeSprint(records, taskMap);
-    expect(summary.tasks[0]!.model).toBe('claude-sonnet-4-6');
+    expect(summary.tasks[0]!.model).toBe('claude-sonnet-5');
   });
 
   it('returns empty tasks and zero totals for empty records', () => {

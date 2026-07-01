@@ -8307,3 +8307,82 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 346-024: F24 — fix top-level docs (NO_GO)
 
 ---
+## Sprint 347 — sprint-347
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-01
+**Duration:** 289s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 5 |
+| Coverage | 0.0% |
+| Duration | 288707ms |
+
+### Tasks
+
+- 347-001: W0-8 STATE-RESOLVER — env-aware state-path resolver primitive (NO_GO)
+- 347-002: W0-9 CRED-PER-PROJECT — per-project encrypted credential store 🔴 (NO_GO)
+- 347-003: W0-10 SYMLINK-AUTHORITY-WIRE — close the runtime symlink scope-bypass 🔴 (NO_GO)
+- 347-004: W0-11 AUDIT-WIRE — persist terminal audit to MemoryStore + HMAC chain (NO_GO)
+- 347-005: W0-12 CRASH-REDACT — redact secrets from fatal crash output 🔴 (NO_GO)
+
+---
+## Sprint 349 — sprint-349
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-01
+**Duration:** 554s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 554015ms |
+
+### Tasks
+
+- 349-001: DOCKER-FIXPACK — stale-shadow EACCES + inert kind-memlimit (rows 434+433) (DONE)
+- 349-002: FINALIZE-ERROR-SURFACE — swallowed finalize failures become visible (row 436) (DONE)
+- 349-003: CRED-HARDEN-PACK — AAD binding + atomic writes + Windows honesty (row 438) (DONE)
+- 349-004: REDACT-COVERAGE — extend the secret-mask allowlist (row 437) (DONE)
+- 349-005: PCOMP-W8 — test-strategy hints for exit-path tasks (row 445) (DONE)
+
+---
+## Sprint 350 — sprint-350
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-01
+**Duration:** 703s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 703271ms |
+
+### Tasks
+
+- 350-001: TRN-1 — trace-recorder'ı sprint-worker turn'lerine WIRE (row 76) (DONE)
+- 350-002: TRN-2 — trace-recorder'ı native-REPL'e WIRE (row 77) (DONE)
+- 350-003: TRN-3 — cc-trace-extractor driver (row 78) (DONE)
+- 350-004: APR-CONTRACT — ApprovalRequest tam kontratı (row 30) (DONE)
+- 350-005: SIGTERM-CLEANUP — SIGTERM'i SIGINT temizlik-yoluna bağla (ADR-G-013 born) (DONE)
+- 350-006: STALE-MODEL-ID-SWEEP — 30 test dosyasında sonnet-ID güncelle (row 431) (DONE)
+
+---

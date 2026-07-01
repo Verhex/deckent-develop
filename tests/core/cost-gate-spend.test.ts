@@ -48,7 +48,7 @@ function makeCostConfig(opts?: {
         enabled: true,
         billing_modes_supported: ['api'],
         models: {
-          'claude-sonnet-4-6': {
+          'claude-sonnet-5': {
             input_cost_per_token: 0.000003,
             output_cost_per_token: 0.000015,
             max_input_tokens: 200_000,

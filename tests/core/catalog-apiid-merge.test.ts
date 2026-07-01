@@ -40,7 +40,7 @@ describe('mergeApiIdOverrides', () => {
   it('bundled apiId is preserved when no remote entry matches', () => {
     const existing = [
       makeModel('opus', 'claude-opus-4-8'),
-      makeModel('sonnet', 'claude-sonnet-4-6'),
+      makeModel('sonnet', 'claude-sonnet-5'),
     ];
     const remote: ModelDefinition[] = []; // no remote models at all
 
@@ -48,7 +48,7 @@ describe('mergeApiIdOverrides', () => {
 
     expect(result).toHaveLength(2);
     expect(result.find(m => m.id === 'opus')?.apiId).toBe('claude-opus-4-8');
-    expect(result.find(m => m.id === 'sonnet')?.apiId).toBe('claude-sonnet-4-6');
+    expect(result.find(m => m.id === 'sonnet')?.apiId).toBe('claude-sonnet-5');
   });
 
   it('merge is idempotent — applying twice gives same result', () => {

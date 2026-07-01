@@ -71,7 +71,7 @@
 | 67 | APR-2 | APR | Çok-kanallı canlı onay relay + "xx'de onaylandı" cross-broadcast | A | P0 | APR-1 | ⬜ | — | telegram/whatsapp/terminal/dashboard |
 | 68 | APR-EVENTSTREAM | APR | ApprovalEventStream (çok-client pub: terminal/dashboard/API/Slack/Teams) | CX | P0 | APR-2 | ⬜ | — | §11.3 |
 | 31 | APR-STORE | APR | ApprovalStore durable persist (pending/approved/denied/expired; restart-survive) | CX | P0 | APR-1 | ⬜ | — | §11.3/§11.7; memory-promise değil |
-| 30 | APR-CONTRACT | APR | ApprovalRequest tam kontrat (requester/summary↔details/scopeId; scope-7/risk-5/policy-4/default-4 enum; tenant/user) | CX·A | P0 | APR-1 | ⬜ | — | §11.2; SIFIR-kayıp |
+| 30 | APR-CONTRACT | APR | ApprovalRequest tam kontrat (requester/summary↔details/scopeId; scope-7/risk-5/policy-4/default-4 enum; tenant/user) | CX·A | P0 | APR-1 | ✅ | 2026-07-02 | §11.2; SIFIR-kayıp  → sprint-350-004 DONE: approval-contract.ts tam kontrat (scope-7/risk-5/policy-4/default-4 enum, zod, rawArgs serileşemez-kanıtlı) |
 | 32 | APR-POLICY | APR | ApprovalPolicy karar-motoru (risk/role/tenant/scope/timeout → karar) | CX | P0 | APR-CONTRACT | ⬜ | — | §11.3 |
 | 35 | APR-FALLBACK | APR | FallbackResolver (terminal-yok → deny/pause/timeout/dashboard-API escalation; sonsuz-takılma yok) | CX | P0 | APR-1 | ⬜ | — | §11.6 P0 |
 | 37 | APR-4 | APR | Onay redaction/secret-masking (raw-command vs masked-arg ayrı) | CL·CX | P0 | APR-CONTRACT | ⬜ | — | §11.7 |
@@ -82,9 +82,9 @@
 | 73 | CKPT-1 | APR | Worker askBrain auto-continue → gerçek human-checkpoint | MP | P1 | APR-1 | ⬜ | — | — |
 | 74 | DEFER-001 | APR | Autonomous MCP + API/dashboard approval surface (remote/OAuth) | MP | P2 | APR-2 | ⬜ | — | — |
 | 75 | DEFER-002 | APR | Nervous MCP undo/edit + askBrain escalation | MP | P2 | APR-1 | ⬜ | — | — |
-| 76 | TRN-1 | TRN | trace-recorder → sprint-worker turn'lerine WIRE (redacted+labeled) | A·CL | P0 | — | ⬜ | — | §7.2 en kritik; 0-caller |
-| 77 | TRN-2 | TRN | trace-recorder → native-REPL WIRE (buildTurnRecorder 0-caller) | CL | P0 | — | ⬜ | — | trace-wire.ts:20 |
-| 78 | TRN-3 | TRN | cc-trace-extractor driver (CLI/sprint-hook; 0-caller) | CL | P0 | — | ⬜ | — | cc-trace-extractor.ts:51 |
+| 76 | TRN-1 | TRN | trace-recorder → sprint-worker turn'lerine WIRE (redacted+labeled) | A·CL | P0 | — | ✅ | 2026-07-02 | §7.2 en kritik; 0-caller  → sprint-350-001 DONE: output-collector→trace-recorder wire, training_trace.enabled gate (default-off), redacted+labeled, fail-soft; test |
+| 77 | TRN-2 | TRN | trace-recorder → native-REPL WIRE (buildTurnRecorder 0-caller) | CL | P0 | — | ✅ | 2026-07-02 | trace-wire.ts:20  → sprint-350-002 DONE: buildTurnRecorder REPL-turn seam wire, flag-gated, fail-soft; test |
+| 78 | TRN-3 | TRN | cc-trace-extractor driver (CLI/sprint-hook; 0-caller) | CL | P0 | — | ✅ | 2026-07-02 | cc-trace-extractor.ts:51  → sprint-350-003 GO_WITH_TECH_DEBT: `deckent trace extract` CLI + JSONL + redaction; debt=notes bak (Smoke host-side sabah koşulacak) |
 | 79 | TRN-LABEL | TRN | Run-outcome etiket taksonomisi (success/partial/cancelled/NO_GO) training+memory | CX | P1 | TRN-1 | ⬜ | — | §3.5 |
 | 80 | TRN-4 | TRN | Pipeline mükemmelleştir (ShareGPT/compressor/label/redact) | A·CL | P1 | TRN-1 | ⬜ | — | Hermes shipped-grade |
 | 81 | TOK-AUT | TRN | tokenUsage autonomous task-mode 0/0/0 enrichment fix | MP | P1 | — | 🟡 | — | WP-4 ailesi |
@@ -233,7 +233,7 @@
 | 429 | AUDIENCE-EXPAND | ENT·ONB·TERM·LAUNCH | 🎯 Çatı-epic: developer-tool → **herkes / her-kesim** ürünleşmesi. İki kanat — (a) aşağı-pazar/non-teknik: terminoloji-dejargon + sohbetle-onboarding · (b) yukarı-pazar/enterprise: secrets·budget·tenancy·approval·portability·config-rollback. Bugün dağınık olan bu niyeti tek izlenebilir çatı altında topla + ölçülebilir yap | A·CL | P1 | — | ⬜ | — | B-öneri (2026-07-01 Alperen-kabul). Down-market children: MODE-RENAME·AUTO-NAMING·DECKENT-LOG·ONB-CHAT·ONB-HONEST·CONFIG-CUSTOMIZE. Up-market children: BUDGET-SCOPE·COMPANY-PORT·CONFIG-REVISION·CRED-PER-PROJECT·ENT-1/2/5·APR-1·social-RBAC. Enterprise blueprint: `.analysis/paperclip-vs-deckent-comparison.md` §5a/§6b |
 | 430 | BUDGET-SCOPE | ENT·MOAT | Hiyerarşik budget-policy: company→agent→project scope + hard-stop (pause/cancel) + override; mevcut pre-spawn cost-gate'i scope-hiyerarşisiyle genişlet (solo runaway-cost korkusu + enterprise per-team cap) | CL | P1 | — | ⬜ | — | AUDIENCE-EXPAND up-market. paperclip §6b#2: `budgets.ts:648`·`pauseAndCancelScopeForBudget`·`getInvocationBlock`; DK cost-gate var scope yok |
 | 431 | COMPANY-PORT | ENT·ONB | Workspace **portability**: agent/skill/config export/import bundle + secret-scrubbing (değer asla export, import'ta taze) + collision (rename/skip/replace) — reusable-workspace = enterprise onboarding/fleet | CL | P2 | ENT-2 | ⬜ | — | AUDIENCE-EXPAND up-market. paperclip §6b#7: `exportBundle`/`importBundle`; DK'de yok |
-| 432 | CONFIG-REVISION | ENT·GOV | Runtime agent/config **revisioning + rollback**: in-txn snapshot + diff + forward-rolling rollback (history immutable) + secret-marker koruması; governance-by-construction'ı runtime-rollback ile tamamla | CL | P2 | — | ⬜ | — | AUDIENCE-EXPAND up-market. paperclip §6b#6: `agents.ts:447` snapshot·`:735` rollback; ROLLBACK-MECH-DEAD (427) sprint-file-rollback FARKLI konu |
+| 449 | CONFIG-REVISION | ENT·GOV | Runtime agent/config **revisioning + rollback**: in-txn snapshot + diff + forward-rolling rollback (history immutable) + secret-marker koruması; governance-by-construction'ı runtime-rollback ile tamamla | CL | P2 | — | ⬜ | — | AUDIENCE-EXPAND up-market. paperclip §6b#6: `agents.ts:447` snapshot·`:735` rollback; ROLLBACK-MECH-DEAD (427) sprint-file-rollback FARKLI konu |
 | 317 | WM-5 | GOV | Provider-free hard-enforcement (CLAUDE_AUTH guard + flag-leak) | MP | P1 | — | 🟡 | — | high-risk parça |
 | 318 | LAYER-1 | GOV | Layer-1 import-direction cleanup (census: core→orchestra=1·core→cli=1·orch→cli=5·api→cli=6; ADR-008-W+CORE-W1+ORCH-W1+API-W1) | MP | P1 | — | ⬜ | — | ADR-D-004; logic core'a, yüzey thin; routing-engine:32 |
 | 319 | DORMANT-1 | GOV | Kablosuz güvenlik wire (cascade-detector+spawn-safety+sandbox.ts) | MP·CL | P1 | — | ⬜ | — | 🔴 |

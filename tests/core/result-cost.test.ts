@@ -29,7 +29,7 @@ const TEST_CONFIG: CostConfig = {
           deckent_aliases: ['opus', 'claude-opus-4-8'],
           enabled: true,
         },
-        'claude-sonnet-4-6': {
+        'claude-sonnet-5': {
           input_cost_per_token: 0.000003,
           output_cost_per_token: 0.000015,
           cache_creation_input_token_cost: 0.00000375,
@@ -162,7 +162,7 @@ describe('calculateActualCost', () => {
     it('omitted cache fields contribute $0', () => {
       const cost = calculateActualCost(
         { inputTokens: 100_000, outputTokens: 100_000 } as ActualCostUsage,
-        'claude-sonnet-4-6',
+        'claude-sonnet-5',
         'claude',
         TEST_CONFIG,
       );

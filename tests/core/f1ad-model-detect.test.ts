@@ -48,8 +48,8 @@ const BUILTIN_CLAUDE_IDS = BUILTIN_MODELS
 
 describe('parseCliModelOutput', () => {
   it('parses JSON array of strings', () => {
-    const raw = JSON.stringify(['claude-opus-4-8', 'claude-sonnet-4-6']);
-    expect(parseCliModelOutput(raw, 'claude')).toEqual(['claude-opus-4-8', 'claude-sonnet-4-6']);
+    const raw = JSON.stringify(['claude-opus-4-8', 'claude-sonnet-5']);
+    expect(parseCliModelOutput(raw, 'claude')).toEqual(['claude-opus-4-8', 'claude-sonnet-5']);
   });
 
   it('parses JSON { models: [{ id }] }', () => {
@@ -122,7 +122,7 @@ describe('probeProviderModels', () => {
 describe('reconcileModels', () => {
   it('CLI ids come first', () => {
     const cli = ['claude-mythos-5', 'claude-opus-4-8'];
-    const catalog = ['claude-sonnet-4-6'];
+    const catalog = ['claude-sonnet-5'];
     const builtin = ['haiku'];
     const result = reconcileModels(cli, catalog, builtin);
     expect(result[0]).toBe('claude-mythos-5');

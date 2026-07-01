@@ -36,5 +36,12 @@
       "sanitize"
     ]
   },
-  "enabled": true
+  "enabled": true,
+  "stats": {
+    "totalUses": 2,
+    "successRate": 1,
+    "avgCoverage": 0,
+    "lastUsedInSprint": "sprint-350",
+    "successCount": 2
+  }
 }

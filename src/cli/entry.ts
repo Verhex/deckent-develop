@@ -721,14 +721,16 @@ process.on('unhandledRejection', (reason: unknown) => {
 });
 
 // ─── Graceful Shutdown ───────────────────────────────────────────────────────
-function onSignal(signal: string): void {
+// ADR-G-013 (SIGTERM-CLEANUP): SIGINT and SIGTERM share the identical cleanup
+// path — a `kill <pid>` / systemd stop / docker stop of the coordinator must
+// leave the same clean state (INTERRUPTED tasks, released locks, killed tmux
+// sessions) as Ctrl+C, not an orphaned sprint.
+export function onSignal(signal: string): void {
   process.stderr.write(`\nReceived ${signal}, exiting…\n`);
-  if (signal === 'SIGINT') {
-    // Interrupt active sprint: mark tasks INTERRUPTED, heartbeats ABORTED, release locks
-    try { interruptActiveSprint(); } catch { /* non-fatal */ }
-    // Kill tmux sessions used by workers
-    try { killAllSessions(); } catch { /* non-fatal */ }
-  }
+  // Interrupt active sprint: mark tasks INTERRUPTED, heartbeats ABORTED, release locks
+  try { interruptActiveSprint(); } catch { /* non-fatal */ }
+  // Kill tmux sessions used by workers
+  try { killAllSessions(); } catch { /* non-fatal */ }
   process.exit(0);
 }
 

@@ -13,6 +13,7 @@ import {
   resolveApiModelId,
   UnknownModelError,
 } from '../../src/core/task-types.js';
+import { modelRegistry } from '../../src/core/model-registry.js';
 import type {
   ClaudeModel,
   OpenAIModel,
@@ -336,7 +337,7 @@ describe('Re-export from types.ts barrel', () => {
 describe('MODEL_API_IDS', () => {
   it('maps Claude aliases to actual API model IDs', () => {
     expect(MODEL_API_IDS['opus']).toBe('claude-opus-4-8');
-    expect(MODEL_API_IDS['sonnet']).toBe('claude-sonnet-4-6');
+    expect(MODEL_API_IDS['sonnet']).toBe(modelRegistry.resolveApiId('sonnet'));
     expect(MODEL_API_IDS['haiku']).toBe('claude-haiku-4-5-20251001');
   });
 
@@ -368,7 +369,7 @@ describe('MODEL_API_IDS', () => {
 describe('resolveApiModelId', () => {
   it('resolves Claude aliases to full API model IDs', () => {
     expect(resolveApiModelId('opus')).toBe('claude-opus-4-8');
-    expect(resolveApiModelId('sonnet')).toBe('claude-sonnet-4-6');
+    expect(resolveApiModelId('sonnet')).toBe(modelRegistry.resolveApiId('sonnet'));
     expect(resolveApiModelId('haiku')).toBe('claude-haiku-4-5-20251001');
   });
 

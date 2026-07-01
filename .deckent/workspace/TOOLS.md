@@ -140,9 +140,10 @@ _Total: 33 MCP tools_
 | `status` | deckent status |
 | `sync` | deckent sync |
 | `test-run` | deckent test-run |
+| `trace-extract` | deckent trace-extract |
 | `upgrade` | deckent upgrade |
 | `usage` | deckent usage |
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 93 CLI command modules_
+_Total: 94 CLI command modules_

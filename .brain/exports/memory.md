@@ -1,5 +1,16 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-350 Learnings
+- Sprint sprint-350 Learnings: ## Sprint sprint-350 Learnings
+
+## Gains
+- 350-001 — TRN-1 — trace-recorder'ı sprint-worker turn'lerine WIRE (row 76) — 0-caller claim (disk-verified): `grep -rn "trace-recorder" src --include=*.ts` shows the ONLY pro...
+- 350-002 — TRN-2 — trace-recorder'ı native-REPL'e WIRE (row 77) — DISK-VERIFY: the task's '0-caller' claim is FALSE on disk.
+- 350-003 — TRN-3 — cc-trace-extractor driver (row 78) — Built `deckent trace extract <input>` driving src/training/cc-trace-extractor.ts::extractFromSess...
+- 350-004 — APR-CONTRACT — ApprovalRequest tam kontratı (row 30) — APR-CONTRACT foundation module delivered per spec (row 30, §11.2, ADR-G-020).
+- 350-005 — SIGTERM-CLEANUP — SIGTERM'i SIGINT temizlik-yoluna bağla (ADR-G-013 born) — ADR-G-013 SIGTERM-CLEANUP: removed the `if (signal === 'SIGINT')` guard in entry.ts onSignal() so...
+- 350-006 — STALE-MODEL-ID-SWEEP — 30 test dosyasında sonnet-ID güncelle (row 431) — Canonical-ID source (disk-verified): src/core/model-registry.ts:61-71 — BUILTIN_MODELS entry { id...
+
 ## Sprint sprint-349 Learnings
 - Sprint sprint-349 Learnings: ## Sprint sprint-349 Learnings
 

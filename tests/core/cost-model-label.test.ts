@@ -109,7 +109,8 @@ describe('cost-model-label (207-003)', () => {
     expect(output).toContain('anthropic/');
     // Both claude models should be listed
     expect(output).toContain('claude-opus-4-8');
-    // sonnet apiId from registry (claude-sonnet-4-6 — unchanged in 207-001)
+    // sonnet apiId comes from the live registry (currently claude-sonnet-5) — loose
+    // prefix match so this stays valid across future sonnet apiId bumps.
     expect(output).toMatch(/anthropic\/claude-sonnet/);
   });
 });
