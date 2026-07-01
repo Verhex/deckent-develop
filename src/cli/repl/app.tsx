@@ -19,6 +19,9 @@ import type { SlashRegistry } from '../commands/chat-slash-registry.js';
 import type { ActiveSelection } from './provider-switch.js';
 import { createStreamSegmenter, type StreamSegmenter } from './stream-segmenter.js';
 import { measuredOnTurnEnd } from './native-elapsed.js';
+import { buildLiveFooter, type LiveFooterState } from '../helpers/live-footer.js';
+import { initialTermModeState, applyModeCommand, type TermMode, type TermModeState } from './term-mode.js';
+import { createChatTurnQueue, type ChatTurnQueue, type ChatTurnBgEvent, type ChatTurnPayload } from './chat-turn-queue.js';
 
 export type ConfirmAnswer = 'y' | 'a' | 'n';
 // toolName is optional: the dispatcher passes it so an 'a' (always) decision can
@@ -103,6 +106,30 @@ export function createConfirmQueue(onChange: () => void): ConfirmQueue {
   return { enqueue, answer, head, size: () => pending.length };
 }
 
+/**
+ * REPL-SURFACE-WIRE (354-001) — pure, testable helpers.
+ *
+ * app.tsx is a mounted Ink component (no ink-testing-library dependency in
+ * this repo — see tests/cli/repl-tool-multi-tag-repro.test.ts, sprint 285 —
+ * so it cannot be rendered in tests). Decision logic that a follow-up test
+ * needs to exercise is pulled out as plain, JSX-free exports, same pattern as
+ * `createConfirmQueue` above.
+ */
+
+/** Resolve the mode-indicator label (Ask/Run/Control). English fallback until
+ * a caller wires localized labels (messages round-7, Task 354-016). */
+export function resolveModeLabel(mode: TermMode, labels: Pick<ReplLabels, 'modeAsk' | 'modeRun' | 'modeControl'>): string {
+  if (mode === 'ask') return labels.modeAsk ?? 'Ask';
+  if (mode === 'run') return labels.modeRun ?? 'Run';
+  return labels.modeControl ?? 'Control';
+}
+
+/** Map drained ChatTurnPayloads (ChatTurnQueue.drainAsTurns()) to the flat
+ * turn-text format the 'bg' Turn role renders — one string per payload. */
+export function bgPayloadsToTurnTexts(payloads: readonly ChatTurnPayload[]): string[] {
+  return payloads.map((p) => p.events.map((e) => e.summary).join('\n'));
+}
+
 /** A completed tool action, rendered as a claude-code-style change block. The
  * caller (run.tsx) localizes `verb`/`note`; the App owns the colored layout. */
 export interface ToolInfo {
@@ -131,6 +158,12 @@ export interface ReplLabels {
   queueCleared: string; // "kuyruk temizlendi"
   cdTo: string;         // "dizin"
   cdFail: string;       // "dizin değiştirilemedi"
+  /** Mode-indicator labels (Ask/Run/Control) — REPL-SURFACE-WIRE (354-001)
+   * seam; optional, English fallback until messages round-7 (Task 354-016)
+   * wires en/tr keys through run.tsx. */
+  modeAsk?: string;
+  modeRun?: string;
+  modeControl?: string;
 }
 
 /**
@@ -174,6 +207,18 @@ export interface ReplAppProps {
   lang?: string;
   /** When set (native flag on), drives the turn INSTEAD of runChatNativeLoop. */
   nativeEngine?: (input: string, cbs: { output: (text: string) => void; onTurnEnd: (stats: { inputTokens: number; outputTokens: number }) => void }) => Promise<void>;
+  /** repl_surface.enabled config-flag seam (default-off). The caller (run.tsx)
+   * resolves the real project-config flag and passes it here; absent/false →
+   * this component renders byte-identical to the pre-354-001 App. */
+  replSurfaceEnabled?: boolean;
+  /** Live-footer state-feed seam (buildLiveFooter, helpers/live-footer.ts).
+   * Polled on an interval while `replSurfaceEnabled` is true; the real
+   * heartbeat/dashboard-state reader is Task 354-014 (STATE-FEED). */
+  stateFeed?: () => LiveFooterState;
+  /** Registers the sink used to enqueue a background-completed event.
+   * Buffered by ChatTurnQueue and drained as brand-new turn(s) at turn-end —
+   * NEVER injected mid-turn (Hermes rule, chat-turn-queue.ts). */
+  registerBgEventSink?: (enqueue: (event: ChatTurnBgEvent) => void) => void;
 }
 
 type ApprovalMode = 'suggest' | 'auto-edit' | 'full-auto';
@@ -183,7 +228,7 @@ interface TurnStats { elapsedMs: number; tokens?: number; }
 // (prose lines / finished code+table blocks) that flow into <Static> as they
 // complete, then a 'foot' (⏱ stats). Each lands in scrollback immediately, so
 // the user reads in real time and the dynamic region stays tiny (no drift).
-interface Turn { id: number; role: 'user' | 'head' | 'seg' | 'foot' | 'tool'; text: string; tool?: ToolInfo; stats?: TurnStats; }
+interface Turn { id: number; role: 'user' | 'head' | 'seg' | 'foot' | 'tool' | 'bg'; text: string; tool?: ToolInfo; stats?: TurnStats; }
 
 const TEAL = '#4DB8A4';
 const GOLD = '#C4A855';
@@ -239,6 +284,17 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
     );
   }
   if (turn.role === 'head') return <Box marginTop={1}><DeckentHeader /></Box>;
+  if (turn.role === 'bg') {
+    // Background-completed-work turn (ChatTurnQueue.drainAsTurns()) — flows in
+    // as its OWN new turn, never folded into an in-flight reply.
+    return (
+      <Box flexDirection="column" marginTop={1}>
+        {turn.text.split('\n').map((line, i) => (
+          <Text key={i} dimColor><Text color={GOLD}>{'» '}</Text>{line}</Text>
+        ))}
+      </Box>
+    );
+  }
   if (turn.role === 'foot') {
     const s = turn.stats;
     return <Text dimColor>{`⏱ ${s ? (s.elapsedMs / 1000).toFixed(1) : '0'}s${s?.tokens ? ` · ${s.tokens} tok` : ''}`}</Text>;
@@ -249,7 +305,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, registerBgEventSink } = props;
   const { exit } = useApp();
   const [selection, setSelection] = useState<ActiveSelection>(initialSelection);
   const [approval, setApproval] = useState<ApprovalMode>('suggest');
@@ -276,6 +332,13 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     confirmQueue.current = createConfirmQueue(() => setConfirm(confirmQueue.current!.head()));
   }
   const started = useRef(false);
+
+  // REPL-SURFACE-WIRE (354-001) seam state — inert unless replSurfaceEnabled;
+  // when it stays false (the default) none of this affects the render output.
+  const [termMode, setTermMode] = useState<TermModeState>(initialTermModeState());
+  const [footerLines, setFooterLines] = useState<string[]>([]);
+  const bgQueue = useRef<ChatTurnQueue | null>(null);
+  if (bgQueue.current === null) bgQueue.current = createChatTurnQueue();
 
   const pushTurn = (role: Turn['role'], text: string): void =>
     setTurns((t) => [...t, { id: idRef.current++, role, text }]);
@@ -309,6 +372,23 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     });
   }, [registerToolSink]);
 
+  // Live-footer state-feed seam: poll it while enabled (Task 354-014 wires the
+  // real heartbeat/dashboard-state reader; this component only renders it).
+  useEffect(() => {
+    if (!replSurfaceEnabled || !stateFeed) { setFooterLines([]); return; }
+    const tick = (): void => setFooterLines(buildLiveFooter(stateFeed()));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [replSurfaceEnabled, stateFeed]);
+
+  // Background-completed-work sink: buffered by ChatTurnQueue — never
+  // injected mid-turn (drained only at turn-end, see inputIter below).
+  useEffect(() => {
+    if (!registerBgEventSink) return;
+    registerBgEventSink((event) => bgQueue.current!.enqueueBg(event));
+  }, [registerBgEventSink]);
+
   useEffect(() => {
     if (started.current) return;
     started.current = true;
@@ -337,8 +417,18 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           setQueued([...queue.current]);
           pushTurn('user', line);
           setWorking(true);
+          if (replSurfaceEnabled) bgQueue.current!.userTurnActive = true;
           yield line;
           finalizeReply(); // turn finished streaming → close it out
+          if (replSurfaceEnabled) {
+            bgQueue.current!.userTurnActive = false;
+            // Drain buffered bg-completed work as brand-new turn(s) — never
+            // injected mid-turn (Hermes rule; drainAsTurns() itself no-ops
+            // while userTurnActive is true, so this can only fire post-turn).
+            for (const text of bgPayloadsToTurnTexts(bgQueue.current!.drainAsTurns())) {
+              pushTurn('bg', text);
+            }
+          }
           setWorking(false);
         }
         await new Promise<void>((r) => { wake.current = r; });
@@ -412,6 +502,18 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (trimmed.toLowerCase() === '/clear') {
       setTurns([]); setPartial(''); headPushed.current = false;
       return;
+    }
+    // /ask · /run · /control — term-mode.ts transition commands (354-001 seam).
+    // Inert unless replSurfaceEnabled: keeps flag-off behavior byte-identical
+    // (these strings fall through to a normal chat message, exactly as before).
+    if (replSurfaceEnabled) {
+      const modeCmd = trimmed.toLowerCase();
+      if (modeCmd === '/ask' || modeCmd === '/run' || modeCmd === '/control') {
+        pushTurn('user', trimmed);
+        const result = applyModeCommand(termMode, modeCmd);
+        if (result.changed) setTermMode(result.state);
+        return;
+      }
     }
     // /cd <path> — change the working dir (file tools + status follow it live).
     const cd = trimmed.match(/^\/cd(?:\s+(.+))?$/i);
@@ -491,6 +593,16 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           {queued.map((q, i) => (
             <Text key={i} dimColor>{`  ⋯ ${labels.queued} ${i + 1}: ${q.length > 60 ? q.slice(0, 60) + '…' : q}`}</Text>
           ))}
+        </Box>
+      )}
+
+      {/* REPL-SURFACE-WIRE (354-001): mode indicator + live-footer — both
+          inert unless replSurfaceEnabled (flag-off render stays byte-identical
+          to the pre-354-001 App). */}
+      {replSurfaceEnabled && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text color={GOLD} bold>{`[${resolveModeLabel(termMode.mode, labels)}]`}</Text>
+          {footerLines.map((line, i) => <Text key={i} dimColor>{line}</Text>)}
         </Box>
       )}
 

@@ -8459,3 +8459,39 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 353-016: MESSAGES-KEYS-2 — round-6 i18n anahtarları (tek-yetkili) (DONE)
 
 ---
+## Sprint 354 — sprint-354
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-01
+**Duration:** 1424s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 15 |
+| Completed | 15 |
+| Tech Debt | 4 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1423503ms |
+
+### Tasks
+
+- 354-001: REPL-SURFACE-WIRE — footer+mode+queue'yu Ink-app'e bağla (GO_WITH_TECH_DEBT)
+- 354-002: TOOL-REPL-WIRE — deckent tool-yüzeyini native-tool-registry'ye köprüle (DONE)
+- 354-003: APR-SHELLCLIENT — Ink onay-kartı (row 33) (DONE)
+- 354-004: APR-DUALSTREAM — çift-bölge kompozitörü (row 36) (DONE)
+- 354-005: WORKERGATE-WIRE — riskli worker-tool'ları gate'le (flag-gated) (DONE)
+- 354-006: DECKBROKER-WIRE — subprocess secret'ları broker'dan (flag-gated) (DONE)
+- 354-007: TERM-FLOW — altın-akış orkestratörü (row 40) (DONE)
+- 354-008: DIR1-CMD — `deckent plan-nl` + komut-kayıtları (index.ts TEK-yetkili) (DONE)
+- 354-009: CONNECT-CMD — `deckent connect` komutu (kayıtsız — kayıt Task 8'de) (DONE)
+- 354-010: MOAT3-FIXPHASE — NOT_DISPATCHED → FIX re-dispatch (GO_WITH_TECH_DEBT)
+- 354-011: DEBT-LEDGER-COVERAGE — self-DEBT'ler neden ledger'a düşmüyor (GO_WITH_TECH_DEBT)
+- 354-012: APR-RULES-LOAD — policy-kuralları config'ten (saf yükleyici) (GO_WITH_TECH_DEBT)
+- 354-013: APR-EXPIRY-DRIVER — TTL süpürücü (G-013-güvenli) (DONE)
+- 354-014: STATE-FEED — live-footer gerçek besleme (DONE)
+- 354-015: MESSAGES-KEYS-3 — round-7 i18n (tek-yetkili) (DONE)
+
+---

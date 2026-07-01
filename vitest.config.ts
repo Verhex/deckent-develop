@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    include: ['tests/**/*.test.ts'],
+    include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     exclude: ['tests/dashboard/**', 'node_modules'],
     testTimeout: 10000,
     // CI-CD stability (Sprint 214): the Coverage job ran on a 2-core GitHub

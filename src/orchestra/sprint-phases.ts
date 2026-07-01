@@ -2493,6 +2493,127 @@ export async function runFixPhase(
       }
     }
     escalateDebt(projectRoot);
+
+    // ─── NOT_DISPATCHED Re-Dispatch Execution (Sprint 354 354-010 — MOAT-3 FIX-half) ──
+    // 351-008 built the classification above (reDispatchCandidateTaskIds, kept OUT
+    // of the NO_GO blame-fix pipeline). This block actually re-queues each
+    // candidate's ORIGINAL task for one honest re-dispatch attempt — never a
+    // synthetic "-fix" task, since no worker ever ran to blame. Capped at exactly
+    // ONE round via a disk marker (`.tasks/task-{id}.redispatch-attempted`,
+    // written BEFORE the attempt so even a crash mid-round burns the budget, not
+    // just a successful dispatch) — so a resumed/re-entrant FIX phase can never
+    // retry the same task a second time (no infinite loop). A task whose marker
+    // already exists stays honestly NOT_DISPATCHED; its one round is spent.
+    // Deliberately isolated at the very end of the phase (after escalateDebt) so
+    // it can never reorder or interfere with the existing NO_GO fix wave above.
+    try {
+      const { reDispatchCandidateTaskIds } = classifyFixPhaseTasks(evaluations);
+      if (reDispatchCandidateTaskIds.length > 0) {
+        const eligible: Task[] = [];
+        let exhausted = 0;
+        for (const taskId of reDispatchCandidateTaskIds) {
+          const markerPath = join(tasksPath, `task-${taskId}.redispatch-attempted`);
+          if (existsSync(markerPath)) {
+            exhausted += 1;
+            continue;
+          }
+          const originalTask = sprint.tasks.find(t => t.id === taskId);
+          if (originalTask) eligible.push(originalTask);
+        }
+
+        let succeeded = 0;
+        let failed = 0;
+        let stillNotDispatched = 0;
+
+        if (eligible.length > 0) {
+          for (const t of eligible) {
+            try {
+              writeFileSync(
+                join(tasksPath, `task-${t.id}.redispatch-attempted`),
+                new Date().toISOString(),
+                'utf-8',
+              );
+            } catch (e) { debugLog('runFixPhase:reDispatch:marker', e); }
+            t.status = TaskStatus.PENDING;
+            persistTaskStatus(projectRoot, sprint, t.id);
+          }
+
+          const reDispatchSprint: Sprint = {
+            ...sprint,
+            tasks: eligible,
+            workers: eligible.map(t => `w-${t.id}`),
+          };
+          const reDispatchTimeout = (config as unknown as Record<string, unknown>).fix_phase_timeout as number | undefined
+            ?? opts?.fixPhaseTimeoutMs
+            ?? 1_800_000;
+          await spawnWorkers(projectRoot, reDispatchSprint, config, { autoApprove: opts?.autoApprove, spawnBackend });
+          const reDispatchResults = await waitForResults(
+            projectRoot, reDispatchSprint, reDispatchTimeout, undefined, { spawnBackend }, config,
+          );
+
+          for (const rTask of eligible) {
+            const rResult = reDispatchResults.find(r => r.taskId === rTask.id);
+            if (!rResult) {
+              // Second attempt also produced no result. Disk-evidence check one
+              // more time (same classifier the EVALUATE phase uses): no .hb/.log
+              // trace → the retry budget is exhausted, stays honestly
+              // NOT_DISPATCHED (no third attempt). A trace this round means a
+              // worker actually ran and crashed — a real NO_GO, not a dispatch gap.
+              const evidence = gatherDispatchTraceEvidence(projectRoot, rTask.id);
+              if (classifyMissingResultDispatch(evidence) === 'NOT_DISPATCHED') {
+                stillNotDispatched += 1;
+                evaluations.set(rTask.id, TaskEvaluation.NOT_DISPATCHED);
+              } else {
+                failed += 1;
+                const syntheticResult: TaskResult = {
+                  taskId: rTask.id,
+                  workerId: rTask.assignedWorker ?? 'unknown',
+                  filesChanged: [],
+                  linesAdded: 0,
+                  linesRemoved: 0,
+                  testsPassed: false,
+                  coverage: 0,
+                  selfAssessment: 'NO_GO',
+                  notes: 'Re-dispatch attempt produced no result (worker crashed/timed out) — dispatch itself ran this round.',
+                };
+                handleEvaluation(projectRoot, rTask, TaskEvaluation.NO_GO, syntheticResult);
+                evaluations.set(rTask.id, TaskEvaluation.NO_GO);
+              }
+              continue;
+            }
+            const rRubricResult = await reconcileEvaluationSpuriousNoGo(
+              evaluateWithRubric(rResult, rTask, undefined, projectRoot), rResult, rTask, projectRoot);
+            const rEval = toTaskEvaluation(rRubricResult);
+            handleEvaluation(projectRoot, rTask, rEval, rResult);
+            evaluations.set(rTask.id, rEval);
+            if (rEval === TaskEvaluation.NO_GO) failed += 1; else succeeded += 1;
+          }
+        }
+
+        // Separate summary counter (goCriteria: "summary'de ayrı sayaç") — always
+        // emitted whenever there was at least one re-dispatch CANDIDATE, even when
+        // every candidate was `exhausted` (marker already spent, none `eligible`).
+        // Reporting only on a non-empty dispatch would silently drop the exhausted
+        // count from every observable surface. Kept as a forensic event (matches
+        // RE_DISPATCH_CANDIDATES style above) rather than a sprint-reporter.ts
+        // field change (out of write scope).
+        try {
+          const sidForRd = getCurrentSprintId(projectRoot) ?? sprint.id;
+          writeEvent(
+            projectRoot, sidForRd, 'brain', 'worker',
+            'BRAIN→WORKER:RE_DISPATCH_RESULT',
+            {
+              attempted: eligible.length,
+              succeeded,
+              failed,
+              stillNotDispatched,
+              exhausted,
+              timestamp: new Date().toISOString(),
+            },
+          );
+        } catch (e) { debugLog('runFixPhase:reDispatchResult:event', e); }
+      }
+    } catch (e) { debugLog('runFixPhase:reDispatchExecution', e); }
   } catch (err) {
     safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
   }

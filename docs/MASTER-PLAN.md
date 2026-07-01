@@ -38,7 +38,7 @@
 | 38 | TERM-1 | TERM | Açılış health snapshot (provider/model/auth/MCP/mem/cwd/mode) | A·CL | P0 | — | ✅ | 2026-07-02 | "hazır mıyım?"  → 351-001 DONE: buildHealthSnapshot (fail-soft, registry-canlı, i18n) + entry wire; test |
 | 43 | TERM-LIVE | TERM | Çalışırken canlı run-status footer (1-5 satır, 5 soru) + provider-health+auth state | CX·A | P0 | TERM-1 | ✅ | 2026-07-02 | §10.1; ne çalışıyor/nerede/onay?/sonraki/risk  → 353-007 DONE: buildLiveFooter (5-soru, NO_COLOR, seam-feed) |
 | 39 | TERM-MODE | TERM | Ask / Run / Control 3-mod shell (read-only / plan→approve→run→eval / yönetim) | CX | P0 | — | ✅ | 2026-07-02 | §9.4 organizan kavram  → 353-008 DONE: Ask/Run/Control durum-makinesi (registry-risk hizalı) |
-| 40 | TERM-FLOW | TERM | Simple-task altın akış: NL prompt→plan-preview→approve→run→evaluate | CX·A | P0 | TERM-MODE | ⬜ | — | §9.5 P0×2; en yüksek-sinyal |
+| 40 | TERM-FLOW | TERM | Simple-task altın akış: NL prompt→plan-preview→approve→run→evaluate | CX·A | P0 | TERM-MODE | ✅ | 2026-07-02 | §9.5 P0×2; en yüksek-sinyal  → 354-007 DONE: golden-flow orkestratörü (seam'li, iptal-temiz) |
 | 41 | TERM-2 | TERM | Conversational chat yüzeyi (Hermes user-msg); bg-tamamlanan iş → yeni turn | A | P0 | TERM-1 | ✅ | 2026-07-02 | mid-turn enjekte değil  → 353-009 DONE: ChatTurnQueue (bg→yeni-turn, mid-turn-enjekte-yok, coalesce) |
 | 42 | TERM-3 | TERM | Kategorili komut keşfi (slash→kategori/risk/scope; tek cross-surface registry) | A·CL·CX | P0 | — | ✅ | 2026-07-02 | Core/Run/Memory/MCP/Enterprise/Danger  → 351-002 DONE: command-registry (kategori/risk/surfaces, disk-envanter testli) |
 | 44 | TERM-4 | TERM | Tool-driven terminal (CLI değil; CLI/MCP opsiyonel access) | A | P0 | TOOL-1 | ✅ | 2026-07-02 | "isterse CC'den CLI/MCP"  → 353-012 DONE: tool-dispatch köprüsü (risk-eşik confirm-seam + execImpl-inject) |
@@ -65,9 +65,9 @@
 | 65 | F7-004 | TERM | Terminal hardening (multi-session/history/copy-paste) | MP | P1 | — | 🟡 | — | — |
 | 66 | REPL-001 | TERM | REPL /autonomous+/mcp+/nervous dispatch parity | MP | P1 | MCP-1 | ⬜ | — | — |
 | 29 | APR-1 | APR | Runtime-wide ApprovalBroker (event, stdin değil; worker emit→suspend→resume) | A·CL·CX | P0 | — | ✅ | 2026-07-02 | §11.1; İLK madde, en kritik  → 351-005 DONE: ApprovalBroker çekirdek (atomic store + event + decide-resume + TTL + dış-process-decide seam) |
-| 33 | APR-SHELLCLIENT | APR | ShellApprovalClient — Ink approval card (y/n/a/d) REPL altında | CX | P0 | APR-1 | ⬜ | — | §11.3 |
+| 33 | APR-SHELLCLIENT | APR | ShellApprovalClient — Ink approval card (y/n/a/d) REPL altında | CX | P0 | APR-1 | ✅ | 2026-07-02 | §11.3  → 354-003 DONE(+CC tsx-config fix): Ink approval-card (y/n/a/d, masked, çoklu-pending) |
 | 34 | APR-WORKERGATE | APR | WorkerApprovalGate (riskli tool/aksiyon öncesi broker'dan karar bekle) | CX | P0 | APR-1 | ✅ | 2026-07-02 | §11.3; worker-yan gate  → 353-004 DONE: WorkerApprovalGate (masked, auto/require/timeout-fallback) |
-| 36 | APR-DUALSTREAM | APR | Terminal çift-stream (run-status + approval aynı anda) + confirm-queue'yu runtime-wide genişlet | CX | P0 | APR-1 | ⬜ | — | §11.4 |
+| 36 | APR-DUALSTREAM | APR | Terminal çift-stream (run-status + approval aynı anda) + confirm-queue'yu runtime-wide genişlet | CX | P0 | APR-1 | ✅ | 2026-07-02 | §11.4  → 354-004 DONE: dual-stream kompozitörü (approval-öncelik, status-min-1) |
 | 67 | APR-2 | APR | Çok-kanallı canlı onay relay + "xx'de onaylandı" cross-broadcast | A | P0 | APR-1 | ✅ | 2026-07-02 | telegram/whatsapp/terminal/dashboard  → 352-011 DONE: relay çekirdeği (cross-broadcast + maskedArgs + kanal-hata-izolasyonu) |
 | 68 | APR-EVENTSTREAM | APR | ApprovalEventStream (çok-client pub: terminal/dashboard/API/Slack/Teams) | CX | P0 | APR-2 | ✅ | 2026-07-02 | §11.3  → 353-006 DONE: ApprovalEventStream (backfill + backpressure-drop işaretli) |
 | 31 | APR-STORE | APR | ApprovalStore durable persist (pending/approved/denied/expired; restart-survive) | CX | P0 | APR-1 | ✅ | 2026-07-02 | §11.3/§11.7; memory-promise değil  → 353-002 DONE: ApprovalStore (restart-survive index, atomic transition) |

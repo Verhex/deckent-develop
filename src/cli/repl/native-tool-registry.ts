@@ -7,6 +7,7 @@
 // names ('read'|'confirm'|'always') map to the engine's ('silent'|'confirm'|
 // 'always'); read→silent. (MCP tool source is a deferred follow-up.)
 
+import { z } from 'zod';
 import { ToolRegistry } from '../../agent/tools/registry.js';
 import type { ToolDefinition, ToolPermissionTier, ToolResult } from '../../agent/tools/types.js';
 import { createToolExecDispatcher } from '../commands/chat-tool-exec.js';
@@ -15,6 +16,20 @@ import { classifyTool } from './tool-permissions.js';
 import type { McpToolDispatcher } from '../commands/chat-native.js';
 import { SkillPoolManager } from '../../core/skill-pool.js';
 import { SkillLoadingCache } from '../../core/skill-cache.js';
+import {
+  ToolRegistry as CoreToolRegistry,
+  type ToolCategory as CoreToolCategory,
+  type ToolRiskLevel as CoreToolRiskLevel,
+} from '../../core/tool-registry.js';
+import { ToolSearchIndex } from '../../core/tool-search.js';
+import { summarizeEagerSchema, deferredIndexLine } from '../../core/tool-core.js';
+import {
+  dispatchToolCall,
+  DEFAULT_RISK_THRESHOLD,
+  type ConfirmFn,
+  type ExecImplFn,
+  type ToolDispatchPlan,
+} from '../../core/tool-dispatch.js';
 
 /** Minimal structural shape of the buildMcpBridge return (chat-mcp-bridge.ts). */
 export interface NativeMcpBridge {
@@ -33,6 +48,33 @@ export interface NativeToolRegistryOptions {
    * established `McpToolDispatcher` contract — tests inject a fake to stay hermetic.
    */
   skillDispatcher?: McpToolDispatcher;
+  /**
+   * TOOL-REPL-WIRE (354-002) progressive-disclosure bridge — `tool_surface.enabled`,
+   * default OFF (undefined/`enabled:false` registers nothing; the rest of this
+   * function's output stays byte-identical). When on, registers 3 native meta-tools
+   * (`deckent_search_tools` / `deckent_describe_tool` / `deckent_call_tool`) over a
+   * catalog bridged from every tool already registered above (core TOOL-1/TOOL-2/
+   * TOOL-3 primitives — read-only, never modified here). See
+   * `registerToolSurfaceTools` for the plan->risk-gate->confirm->execImpl chain.
+   */
+  toolSurface?: ToolSurfaceOptions;
+}
+
+/**
+ * Injection seams for `deckent_call_tool`'s dispatch chain (tool-dispatch.ts).
+ * `execImpl` intentionally has NO live-exec default: TOOL-REPL-WIRE's nogo bars
+ * real execution (no `handlerRef` resolver exists yet — future cutover work).
+ * Omitting it falls back to `NOT_WIRED_EXEC`, which fails closed with a
+ * descriptive error rather than silently no-op-succeeding. `confirm` is likewise
+ * optional — tool-dispatch.ts already fail-closed-denies a risk-gated call when
+ * no confirm fn is supplied, so this seam only needs a real implementation once
+ * the approval-card UI (follow-up work) exists.
+ */
+export interface ToolSurfaceOptions {
+  enabled: boolean;
+  confirm?: ConfirmFn;
+  execImpl?: ExecImplFn;
+  riskThreshold?: CoreToolRiskLevel;
 }
 
 const LEGACY_TIER: Record<'read' | 'confirm' | 'always', ToolPermissionTier> = {
@@ -116,6 +158,164 @@ function createDefaultSkillDispatcher(cwd: () => string): McpToolDispatcher {
   };
 }
 
+// ─── TOOL-REPL-WIRE (354-002) — progressive-disclosure bridge ══════════════
+// Bridges the already-registered native tool surface (exec/CLI-bridge/skill/
+// MCP — built above) into the 353 core primitives: tool-registry.ts (TOOL-1,
+// catalog), tool-search.ts (TOOL-2, search/describe/planCall), tool-core.ts
+// (TOOL-CORE, deferred-index), tool-dispatch.ts (TOOL-3, risk-gated dispatch).
+// All four are core/, read-only here — this file only *consumes* them to
+// register 3 new native meta-tools. No production `handlerRef` resolver
+// exists yet, so `deckent_call_tool` never performs real execution unless a
+// caller injects `toolSurface.execImpl` (tests do; production wiring of the
+// real dispatch + approval-card UI is explicit follow-up work).
+
+/** Best-effort category bridge: agent tools carry an open, free-form category
+ * string; TOOL-1's `ToolCategory` is the fixed set tool-search.ts/tool-core.ts
+ * were designed around (deckent_* CLI-bridge command groups). Known CLI-bridge
+ * names map to their documented group; anything else (exec/skill/mcp tools)
+ * falls into the generic 'catalog' bucket rather than fabricating a group. */
+const CORE_CATEGORY_BY_NAME: Readonly<Record<string, CoreToolCategory>> = {
+  deckent_status: 'monitoring',
+  deckent_doctor: 'monitoring',
+  deckent_review: 'monitoring',
+  deckent_history: 'knowledge',
+  deckent_retro: 'knowledge',
+  deckent_models: 'catalog',
+};
+
+function bridgeCategory(name: string): CoreToolCategory {
+  return CORE_CATEGORY_BY_NAME[name] ?? 'catalog';
+}
+
+/** Tier -> risk: lines up with tool-dispatch.ts's DEFAULT_RISK_THRESHOLD
+ * ('moderate'), so the existing confirm/always-tier tools require a confirm
+ * decision through `deckent_call_tool` too, exactly like they already do
+ * through the AgentSession's own permission engine for a direct call. */
+const BRIDGE_RISK_BY_TIER: Record<ToolPermissionTier, CoreToolRiskLevel> = {
+  silent: 'safe',
+  confirm: 'moderate',
+  always: 'destructive',
+};
+
+/** Generic passthrough — agent ToolDefinition only carries a JSON-schema
+ * `inputSchema`, not a zod instance; a lossless JSON-schema->zod conversion is
+ * out of scope for this bridge (TOOL-1's `paramsSchema` needs *a* ZodTypeAny,
+ * not per-tool validation rules re-derived by hand). */
+const BRIDGE_PARAMS_SCHEMA = z.record(z.string(), z.unknown());
+
+/** Adapts every already-registered native ToolDefinition into a fresh TOOL-1
+ * catalog. Self-referential by construction (called with a snapshot of
+ * `registry.list()` taken BEFORE the 3 meta-tools below are registered), so
+ * `deckent_search_tools`/`describe_tool`/`call_tool` never see themselves. */
+function buildToolSurfaceCatalog(defs: readonly ToolDefinition[]): CoreToolRegistry {
+  const catalog = new CoreToolRegistry();
+  for (const def of defs) {
+    catalog.register({
+      name: def.name,
+      description: def.description,
+      paramsSchema: BRIDGE_PARAMS_SCHEMA,
+      risk: BRIDGE_RISK_BY_TIER[def.tier],
+      category: bridgeCategory(def.name),
+      handlerRef: `native:${def.name}`,
+    });
+  }
+  return catalog;
+}
+
+/** Fails closed with a descriptive error — the task's nogo bars real exec
+ * here (no `handlerRef` resolver exists yet); this is the default `execImpl`
+ * whenever a caller does not inject one via `toolSurface.execImpl`. */
+const NOT_WIRED_EXEC: ExecImplFn = ({ name }) => {
+  throw new Error(
+    `deckent_call_tool: execution seam not wired for "${name}" — inject toolSurface.execImpl ` +
+    '(TOOL-REPL-WIRE 354-002 exposes plan/risk-gate/confirm only; real dispatch is follow-up work).',
+  );
+};
+
+function registerToolSurfaceTools(registry: ToolRegistry, opts: ToolSurfaceOptions): void {
+  const catalog = buildToolSurfaceCatalog(registry.list());
+  const searchIndex = new ToolSearchIndex(catalog);
+  const deferred = deferredIndexLine(catalog.list());
+
+  registry.register({
+    name: 'deckent_search_tools',
+    description: [
+      'Search the deckent tool catalog by keyword (matches tool name/description); returns name, category, risk, and relevance score for each hit. Use this instead of scanning the full tool list.',
+      deferred,
+    ].filter((s) => s.length > 0).join(' '),
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Keyword(s) to search for.' },
+        limit: { type: 'number', description: 'Max results (default 10).' },
+      },
+      required: ['query'],
+    },
+    category: 'catalog',
+    tier: 'silent',
+    source: 'builtin',
+    handler: async (args) => {
+      const query = typeof args['query'] === 'string' ? args['query'] : '';
+      const limit = typeof args['limit'] === 'number' ? args['limit'] : undefined;
+      const hits = searchIndex.searchTools(query, limit !== undefined ? { limit } : {});
+      return { ok: true, output: JSON.stringify(hits) };
+    },
+  });
+
+  registry.register({
+    name: 'deckent_describe_tool',
+    description: 'Return the full description, category, risk, and parameter summary for one tool by exact name (see deckent_search_tools for discovery).',
+    inputSchema: {
+      type: 'object',
+      properties: { name: { type: 'string', description: 'Exact tool name.' } },
+      required: ['name'],
+    },
+    category: 'catalog',
+    tier: 'silent',
+    source: 'builtin',
+    handler: async (args) => {
+      const name = typeof args['name'] === 'string' ? args['name'] : '';
+      const def = searchIndex.describeTool(name);
+      if (!def) return { ok: false, output: `[mcp-error] deckent_describe_tool: unknown tool: ${name}` };
+      const params = summarizeEagerSchema(def.paramsSchema);
+      return {
+        ok: true,
+        output: JSON.stringify({ name: def.name, description: def.description, category: def.category, risk: def.risk, params }),
+      };
+    },
+  });
+
+  registry.register({
+    name: 'deckent_call_tool',
+    description: 'Plan and invoke a tool from the deckent catalog by name (validates args, derives risk, and risk-gates the call behind a confirm decision before executing).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Exact tool name (see deckent_search_tools/describe_tool).' },
+        args: { type: 'object', additionalProperties: true, description: 'Arguments for the target tool.' },
+      },
+      required: ['name'],
+    },
+    category: 'catalog',
+    tier: 'confirm',
+    source: 'builtin',
+    handler: async (toolArgs) => {
+      const name = typeof toolArgs['name'] === 'string' ? toolArgs['name'] : '';
+      const callArgs = (toolArgs['args'] && typeof toolArgs['args'] === 'object' && !Array.isArray(toolArgs['args']))
+        ? (toolArgs['args'] as Record<string, unknown>)
+        : {};
+      const plan: ToolDispatchPlan = { ...searchIndex.planCall(name, callArgs), args: callArgs };
+      const result = await dispatchToolCall(plan, {
+        execImpl: opts.execImpl ?? NOT_WIRED_EXEC,
+        ...(opts.confirm ? { confirm: opts.confirm } : {}),
+        riskThreshold: opts.riskThreshold ?? DEFAULT_RISK_THRESHOLD,
+      });
+      const tag = result.status === 'executed' ? '' : result.status === 'denied' ? '[deckent-denied] ' : '[mcp-error] ';
+      return { ok: result.status === 'executed', output: `${tag}${JSON.stringify(result)}` };
+    },
+  });
+}
+
 export function buildNativeToolRegistry(opts: NativeToolRegistryOptions): ToolRegistry {
   const registry = new ToolRegistry();
 
@@ -183,6 +383,13 @@ export function buildNativeToolRegistry(opts: NativeToolRegistryOptions): ToolRe
         },
       });
     }
+  }
+
+  // TOOL-REPL-WIRE (354-002) — `tool_surface.enabled`, default OFF. When absent
+  // or false the block below never runs, so every registration above this line
+  // stays byte-identical to the pre-354-002 tool list.
+  if (opts.toolSurface?.enabled) {
+    registerToolSurfaceTools(registry, opts.toolSurface);
   }
 
   return registry;

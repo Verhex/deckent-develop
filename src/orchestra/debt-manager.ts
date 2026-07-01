@@ -62,6 +62,68 @@ function getSprintNumber(sprintId: string): number {
   return match?.[1] ? parseInt(match[1], 10) : 0;
 }
 
+/**
+ * Origin of a debt-ledger entry: 'evaluator' when Brain's rubric verdict is
+ * itself GO_WITH_TECH_DEBT, 'self' when Brain promoted the task to DONE but
+ * the worker's own selfAssessment was GO_WITH_TECH_DEBT (354-011 —
+ * evaluateWithRubric's numeric score can outweigh a worker's honest debt
+ * declaration; that self-knowledge must still reach the ledger).
+ */
+type DebtSource = 'evaluator' | 'self';
+
+/**
+ * Insert a debt-ledger row for a task, keyed by `debt-${task.id}` (idempotent
+ * — a pre-existing row with the same id is never duplicated). Shared by both
+ * the evaluator-driven and worker-self-driven GO_WITH_TECH_DEBT paths in
+ * {@link handleEvaluation} so the two sources produce an identical record
+ * shape, differing only in `metadata.debtSource`.
+ */
+function recordDebtEntry(
+  projectRoot: string,
+  task: Task,
+  result: TaskResult,
+  source: DebtSource,
+): void {
+  const debtId = `debt-${task.id}`;
+
+  // B10: a debt entry must always be sprint-associated. `task.sprintId` is
+  // optional — when it is absent, derive the sprint from the NNN-MMM task
+  // id so sprint-range queries, escalation and decay never miss the entry
+  // (a NULL sprint_id column was the Memory V2 debt-row defect).
+  const debtSprint = task.sprintId
+    ? { sprint_id: task.sprintId, sprint_num: getSprintNumber(task.sprintId) }
+    : extractSprintFromDebtId(debtId) ?? { sprint_id: '', sprint_num: 0 };
+
+  const store = getMemoryStore(projectRoot);
+  if (!store) return; // No DB available — debt entry skipped (Memory V2 DB required)
+  try {
+    if (store.getById(debtId)) return;
+    const evalLabel = source === 'self'
+      ? 'Task evaluated as DONE, but worker self-assessed GO_WITH_TECH_DEBT'
+      : 'Task evaluated as GO_WITH_TECH_DEBT';
+    store.insert({
+      id: debtId,
+      type: 'debt',
+      title: `Tech debt from ${task.id}: ${result.notes}`.slice(0, 80),
+      content: `${evalLabel}. Notes: ${result.notes}`,
+      source: 'brain',
+      status: 'active',
+      priority: 'normal',
+      sprint_id: debtSprint.sprint_id,
+      sprint_num: debtSprint.sprint_num,
+      tags: ['debt', task.id],
+      metadata: {
+        originTaskId: task.id,
+        originSprintId: debtSprint.sprint_id,
+        sprintsOpen: 0,
+        debtSource: source,
+      },
+    });
+  } finally {
+    store.close();
+  }
+}
+
 // ═══ Fresh-Eyes Rotation (Sprint 156 Task 012) ═════════════════════
 // When a task fails (NO_GO), the fix worker should bring a "fresh
 // perspective" — different model tier and different agent specialty.
@@ -223,7 +285,9 @@ export function applyFreshEyesRotation(originalTask: Task): FreshEyesRotationStr
 /**
  * Handle a task evaluation result by updating task status, releasing locks,
  * and creating debt items or fix tasks as needed.
- * - DONE: marks task done, releases locks
+ * - DONE: marks task done, releases locks; if the worker itself
+ *   self-assessed GO_WITH_TECH_DEBT (rubric promoted it to DONE), still
+ *   records a debt-ledger entry (354-011) so that self-knowledge isn't lost
  * - GO_WITH_TECH_DEBT: marks done, releases locks, adds debt entry
  * - NO_GO: marks no-go, creates a priority fix task
  * @param projectRoot - Project root directory
@@ -242,46 +306,24 @@ export function handleEvaluation(
   if (evaluation === TaskEvaluation.DONE) {
     updateTaskStatus(projectRoot, task.id, TaskStatus.DONE);
     releaseAllLocks(projectRoot, workerId);
+
+    // 354-011: evaluateWithRubric's numeric score can promote a task to DONE
+    // even when the worker itself declared GO_WITH_TECH_DEBT (e.g. sprint-352
+    // 005/010/012 — rubric 89.33 → DONE while selfAssessment stayed
+    // GO_WITH_TECH_DEBT). That self-declared debt — scope conflicts, deferred
+    // follow-ups, named residual gaps — is invisible to the numeric rubric and
+    // must still reach the ledger, or it is silently lost. Brain's DONE
+    // verdict is not overridden here — only the ledger gap closes.
+    if (result.selfAssessment === 'GO_WITH_TECH_DEBT') {
+      recordDebtEntry(projectRoot, task, result, 'self');
+    }
     return;
   }
 
   if (evaluation === TaskEvaluation.GO_WITH_TECH_DEBT) {
     updateTaskStatus(projectRoot, task.id, TaskStatus.DONE);
     releaseAllLocks(projectRoot, workerId);
-
-    const debtId = `debt-${task.id}`;
-
-    // B10: a debt entry must always be sprint-associated. `task.sprintId` is
-    // optional — when it is absent, derive the sprint from the NNN-MMM task
-    // id so sprint-range queries, escalation and decay never miss the entry
-    // (a NULL sprint_id column was the Memory V2 debt-row defect).
-    const debtSprint = task.sprintId
-      ? { sprint_id: task.sprintId, sprint_num: getSprintNumber(task.sprintId) }
-      : extractSprintFromDebtId(debtId) ?? { sprint_id: '', sprint_num: 0 };
-
-    // ── Memory V2: DB-first ──────────────────────────────────────
-    const store = getMemoryStore(projectRoot);
-    if (store) {
-      try {
-        if (!store.getById(debtId)) {
-          store.insert({
-            id: debtId,
-            type: 'debt',
-            title: `Tech debt from ${task.id}: ${result.notes}`.slice(0, 80),
-            content: `Task ${task.id} evaluated as GO_WITH_TECH_DEBT. Notes: ${result.notes}`,
-            source: 'brain',
-            status: 'active',
-            priority: 'normal',
-            sprint_id: debtSprint.sprint_id,
-            sprint_num: debtSprint.sprint_num,
-            tags: ['debt', task.id],
-            metadata: { originTaskId: task.id, originSprintId: debtSprint.sprint_id, sprintsOpen: 0 },
-          });
-        }
-      } finally { store.close(); }
-      return;
-    }
-    // No DB available — debt entry skipped (Memory V2 DB required)
+    recordDebtEntry(projectRoot, task, result, 'evaluator');
     return;
   }
 

@@ -88,6 +88,7 @@ _Total: 33 MCP tools_
 | `cleanup` | deckent cleanup |
 | `config` | deckent config |
 | `config-nervous` | deckent config-nervous |
+| `connect` | deckent connect |
 | `cost` | deckent cost |
 | `dashboard` | deckent dashboard |
 | `docs` | deckent docs |
@@ -117,6 +118,7 @@ _Total: 33 MCP tools_
 | `onboard` | deckent onboard |
 | `output` | deckent output |
 | `plan` | deckent plan |
+| `plan-nl` | deckent plan-nl |
 | `plugin` | deckent plugin |
 | `process` | deckent process |
 | `quick-start` | deckent quick-start |
@@ -146,4 +148,4 @@ _Total: 33 MCP tools_
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 94 CLI command modules_
+_Total: 96 CLI command modules_

@@ -8,6 +8,7 @@ import { loadDeckSecrets } from './deck-file.js';
 import { detectAndRegisterModels, type DetectResult, type DetectAndRegisterOptions } from './model-auto-detect.js';
 import { modelRegistry as globalModelRegistry, type ModelRegistry } from './model-registry.js';
 import type { TokenUsage } from './token-usage.js';
+import { DeckBroker } from './deck-broker.js';
 
 // ─── Provider Spawn Options ──────────────────────────────────────────
 export interface ProviderSpawnOptions {
@@ -32,6 +33,20 @@ export interface ProviderSpawnOptions {
    * de-facto cap. Host-CLI adapters that lack a timeout wrapper may ignore it.
    */
   taskTimeoutSeconds?: number;
+  /**
+   * DECKBROKER-WIRE (354-006, flag-gated, ADR-G-005/G-017 row 422): host-side
+   * credential broker for THIS spawn batch — `BootstrapResult.deckBroker`,
+   * minted only when `config.deck_broker.enabled` is true. When present, a
+   * backend that supports it (`SubprocessSpawnBackend`) resolves ITS OWN
+   * task-scoped credential via `deckBroker.resolveForTask(taskId, provider)`
+   * instead of the ambient `.deck`→`process.env` inheritance — audited,
+   * TTL'd, and the `.deck` file path never reaches the worker. A denied or
+   * absent resolution falls through to `env` below unchanged, so passing a
+   * broker never breaks a caller that also sets `env` as a fallback.
+   * Omitted (the default — nothing upstream wires this yet) keeps today's
+   * env-scrub + `env` reinject flow byte-for-byte unchanged.
+   */
+  deckBroker?: DeckBroker;
 }
 
 // ─── Provider Worker Info ────────────────────────────────────────────
@@ -951,6 +966,24 @@ export interface BootstrapResult {
    * detected models available synchronously should await this promise.
    */
   modelAutoDetectPromise: Promise<DetectResult[]>;
+  /**
+   * DECKBROKER-WIRE (354-006, flag-gated DEFAULT-OFF): host-side credential
+   * broker minted over the SAME `.deck` secrets this bootstrap call already
+   * loaded, when `config.deck_broker.enabled` is true (and not
+   * `auth_mode: 'subscription'`). `null` when the flag is off/unset — the
+   * default, and the only behavior before this field existed. Optional so
+   * pre-existing `BootstrapResult` object literals (tests/mocks) keep
+   * compiling without it.
+   *
+   * Callers that want per-task, audited, TTL'd credential resolution instead
+   * of the ambient `process.env` mutation `providerEnvOverrides` already
+   * performs pass this through `ProviderSpawnOptions.deckBroker` at spawn
+   * time (see `SubprocessSpawnBackend.spawn`). Forwarding this into the real
+   * sprint spawn call sites (`orchestra/sprint-spawner.ts`,
+   * `cli/commands/spawn.ts`) is a tracked follow-up — this bootstrap surface
+   * plus the subprocess consumption side are the two halves this task closes.
+   */
+  deckBroker?: DeckBroker | null;
 }
 
 /**
@@ -966,7 +999,24 @@ export interface BootstrapResult {
  * @param registry    Provider registry (defaults to global singleton)
  */
 export async function bootstrapProviders(
-  config: Pick<ResolvedConfig, 'brain_provider' | 'worker_provider' | 'fallback_provider' | 'projectRoot' | 'providers'> & { auth_mode?: 'subscription' | 'api' | 'hybrid' },
+  config: Pick<ResolvedConfig, 'brain_provider' | 'worker_provider' | 'fallback_provider' | 'projectRoot' | 'providers'> & {
+    auth_mode?: 'subscription' | 'api' | 'hybrid';
+    /**
+     * DECKBROKER-WIRE (354-006, flag-gated DEFAULT-OFF, ADR-G-005/G-017 row
+     * 422): when `enabled`, bootstrap mints a host-side `DeckBroker`
+     * (`core/deck-broker.ts`) over the same `.deck` secrets this function
+     * already loads below, returned as `BootstrapResult.deckBroker` for a
+     * spawn backend to resolve task-scoped credentials via
+     * `resolveForTask` instead of inheriting the ambient `process.env`
+     * mutation `applyDeckSecretsToEnv` performs. Unset/false (default) →
+     * `deckBroker: null`; the `providerEnvOverrides`/`process.env` path
+     * below is entirely unaffected either way (both run side by side).
+     * Not yet on `ResolvedConfig` — a caller must pass this explicitly
+     * (see this task's plan notes); real `.deckent/config.json` wiring is
+     * a tracked follow-up.
+     */
+    deck_broker?: { enabled?: boolean };
+  },
   projectRoot?: string,
   registry: ProviderRegistry = providerRegistry,
   _hooks?: { mr?: ModelRegistry; detectOpts?: DetectAndRegisterOptions },
@@ -983,6 +1033,17 @@ export async function bootstrapProviders(
     // provider's deck secret (`DECKENT_<apiKeyEnv>`) is applied to its env var.
     providerEnvOverrides = applyDeckSecretsToEnv(secrets, config.providers?.registry);
   }
+
+  // ─── DECKBROKER-WIRE (354-006) — flag-gated, DEFAULT-OFF ──────────
+  // Mint a host-side broker over the SAME .deck secrets, gated the same way
+  // as providerEnvOverrides above (skip in subscription mode — no .deck read
+  // at all). DeckBroker's constructor never throws (loadDeckSecrets never
+  // throws), so no try/catch is needed. This is purely additive: it runs
+  // alongside the process.env mutation above, never replaces it.
+  const deckBroker: DeckBroker | null =
+    config.deck_broker?.enabled && config.auth_mode !== 'subscription'
+      ? new DeckBroker(root, { providerRegistry: config.providers?.registry })
+      : null;
 
   const detected = await detectAvailableProviders();
 
@@ -1242,5 +1303,5 @@ export async function bootstrapProviders(
     { timeoutMs: 5_000, ...(_hooks?.detectOpts ?? {}) },
   ).catch(() => [] as DetectResult[]);
 
-  return { connector, registered, skipped, defaultProvider, providerEnvOverrides, modelAutoDetectPromise };
+  return { connector, registered, skipped, defaultProvider, providerEnvOverrides, modelAutoDetectPromise, deckBroker };
 }

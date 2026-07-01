@@ -2,6 +2,31 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint354] - 2026-07-01
+
+### Added
+
+- TOOL-REPL-WIRE — deckent tool-yüzeyini native-tool-registry'ye köprüle
+- APR-SHELLCLIENT — Ink onay-kartı (row 33)
+- APR-DUALSTREAM — çift-bölge kompozitörü (row 36)
+- WORKERGATE-WIRE — riskli worker-tool'ları gate'le (flag-gated)
+- DECKBROKER-WIRE — subprocess secret'ları broker'dan (flag-gated)
+- TERM-FLOW — altın-akış orkestratörü (row 40)
+- DIR1-CMD — `deckent plan-nl` + komut-kayıtları (index.ts TEK-yetkili)
+- CONNECT-CMD — `deckent connect` komutu (kayıtsız — kayıt Task 8'de)
+- APR-EXPIRY-DRIVER — TTL süpürücü (G-013-güvenli)
+- STATE-FEED — live-footer gerçek besleme
+
+### Changed
+
+- REPL-SURFACE-WIRE — footer+mode+queue'yu Ink-app'e bağla (completed with tech debt)
+- MOAT3-FIXPHASE — NOT_DISPATCHED → FIX re-dispatch (completed with tech debt)
+- DEBT-LEDGER-COVERAGE — self-DEBT'ler neden ledger'a düşmüyor (completed with tech debt)
+- APR-RULES-LOAD — policy-kuralları config'ten (saf yükleyici) (completed with tech debt)
+
+
+_Tasks: 15 total, 15 done, 4 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint353] - 2026-07-01
 
 ### Added

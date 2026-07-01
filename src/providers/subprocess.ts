@@ -246,7 +246,21 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     for (const key of this.crossProviderCredentialKeys) {
       delete childEnv[key];
     }
-    if (opts?.env) {
+    // DECKBROKER-WIRE (354-006, flag-gated, ADR-G-005/G-017 row 422): when the
+    // caller hands a DeckBroker (opts.deckBroker — minted by bootstrapProviders
+    // only when config.deck_broker.enabled), resolve THIS task's own credential
+    // through it instead of the opts.env passthrough below — task-scoped,
+    // audited, TTL'd, and the .deck file path itself never reaches this worker.
+    // A denied/absent resolution (no secret configured, TTL expired, taskId
+    // already consumed) is NOT an error — it falls through to opts.env exactly
+    // as if no broker had been passed, so a broker-on-but-keyless spawn still
+    // authenticates via the CLI's own session. opts.deckBroker is undefined by
+    // default (nothing upstream wires it yet), which keeps this whole block
+    // byte-for-byte the pre-existing scrub+reinject flow.
+    const brokered = opts?.deckBroker?.resolveForTask(taskId, this.providerConfig.cliCommand);
+    if (brokered) {
+      Object.assign(childEnv, brokered);
+    } else if (opts?.env) {
       Object.assign(childEnv, opts.env);
     }
     // BUG-19: Set UTF-8 encoding environment for Windows (forced last, unchanged).

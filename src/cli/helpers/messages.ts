@@ -2106,6 +2106,29 @@ const MESSAGES: MessageMap = {
     en: 'WSL is recommended over {shell} for the best experience.',
     tr: 'En iyi deneyim için {shell} yerine WSL önerilir.',
   },
+
+  // ─── REPL mode indicator (Task 354-001 REPL-SURFACE-WIRE — sole-authority
+  // addition; cited by 354-001's ReplLabels.modeAsk/modeRun/modeControl
+  // fallback text ('Ask'/'Run'/'Control', resolveModeLabel in app.tsx).
+  // Naming mirrors every other ReplLabels field's existing tui.* key) ───────
+  'tui.mode_ask': { en: 'Ask', tr: 'Sor' },
+  'tui.mode_run': { en: 'Run', tr: 'Çalıştır' },
+  'tui.mode_control': { en: 'Control', tr: 'Kontrol' },
+
+  // ─── `deckent plan-nl` preview/backup lines (Task 354-008 DIR-1-CMD —
+  // sole-authority addition; cited by 354-008's own directive "yenisi
+  // gerekirse notes→Task 15" for the two plain-English strings in
+  // src/cli/commands/plan-nl.ts's formatPlanNlPreview()/backup print line —
+  // the post-write confirmation itself already reuses the existing
+  // set_directives.updated key, so it needs no new entry here) ─────────────
+  'plan_nl.preview_banner': {
+    en: 'Deckent Plan (NL) — preview only, DIRECTIVES.md was NOT modified. Re-run with --write to save.',
+    tr: 'Deckent Plan (NL) — yalnızca önizleme, DIRECTIVES.md değiştirilmedi. Kaydetmek için --write ile tekrar çalıştırın.',
+  },
+  'plan_nl.backup_created': {
+    en: 'Backed up existing DIRECTIVES.md → {path}',
+    tr: 'Mevcut DIRECTIVES.md yedeklendi → {path}',
+  },
 };
 
 /**
