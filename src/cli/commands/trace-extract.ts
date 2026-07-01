@@ -28,6 +28,7 @@ import { extractFromSession } from '../../training/cc-trace-extractor.js';
 import type { OpenAiMessage } from '../../agent/trace-recorder.js';
 import { DECKENT_AGENTIC_SYSTEM_PROMPT } from './chat-session.js';
 import { print, printError, redactSensitive } from '../helpers/output.js';
+import { getMessage } from '../helpers/messages.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────
@@ -135,20 +136,20 @@ export function runExtract(opts: RunExtractOptions): ExtractSummary {
 export function registerTraceExtract(program: Command): void {
   const trace = program
     .command('trace')
-    .description('Claude Code trace tooling for training corpora');
+    .description(getMessage('trace.desc', 'en'));
 
   trace
     .command('extract')
-    .description('Extract aligned + general training examples from Claude Code session transcript(s)')
-    .argument('<input>', 'Path to a transcript JSONL file, or a directory containing multiple transcripts')
-    .option('--out <dir>', 'Output directory for aligned.jsonl/general.jsonl', join('.deckent', 'training'))
-    .option('--system <text>', "System prompt to prepend to each example (default: deckent's agentic system prompt)")
+    .description(getMessage('trace.extract.desc', 'en'))
+    .argument('<input>', getMessage('trace.extract.arg.input', 'en'))
+    .option('--out <dir>', getMessage('trace.extract.opt.out', 'en'), join('.deckent', 'training'))
+    .option('--system <text>', getMessage('trace.extract.opt.system', 'en'))
     .action((input: string, opts: { out: string; system?: string }) => {
       const root = resolveProjectRoot();
       const inputPath = resolve(root, input);
 
       if (!existsSync(inputPath)) {
-        printError(`Input path not found: ${inputPath}`);
+        printError(getMessage('trace.extract.error.not_found', 'en', { path: inputPath }));
         process.exitCode = 1;
         return;
       }
@@ -158,10 +159,12 @@ export function registerTraceExtract(program: Command): void {
 
       const summary = runExtract({ inputPath, outDir, system });
 
-      print(
-        `Extracted ${summary.alignedWritten} aligned + ${summary.generalWritten} general ` +
-        `example(s) from ${summary.filesProcessed} transcript file(s) -> ${outDir} ` +
-        `(${summary.redactedCount} redacted).`,
-      );
+      print(getMessage('trace.extract.summary', 'en', {
+        aligned: String(summary.alignedWritten),
+        general: String(summary.generalWritten),
+        files: String(summary.filesProcessed),
+        outDir,
+        redacted: String(summary.redactedCount),
+      }));
     });
 }

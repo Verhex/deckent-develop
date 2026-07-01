@@ -181,7 +181,7 @@ describe('evaluateResult (result-evaluator)', () => {
 
   // ── KEY CHANGE: Brain overrides worker self-assessment ─────────
 
-  it('returns DONE when worker says GO_WITH_TECH_DEBT but has new tests (Brain override)', async () => {
+  it('EVAL-DEBT-CEILING (born-450): honest GO_WITH_TECH_DEBT is a ceiling — new tests do NOT upgrade to DONE', async () => {
     const task = makeTask(['src/orchestra']);
     const result = makeResult({
       selfAssessment: 'GO_WITH_TECH_DEBT',
@@ -189,10 +189,10 @@ describe('evaluateResult (result-evaluator)', () => {
       coverage: 95,
       filesChanged: ['src/orchestra/foo.ts', 'tests/orchestra/foo.test.ts'],
     });
-    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
-  it('returns DONE when worker says GO_WITH_TECH_DEBT but coverage >= 90 and has new tests', async () => {
+  it('EVAL-DEBT-CEILING: coverage>=90 + new tests still cannot upgrade past a declared debt', async () => {
     const task = makeTask(['src/core']);
     const result = makeResult({
       selfAssessment: 'GO_WITH_TECH_DEBT',
@@ -200,10 +200,10 @@ describe('evaluateResult (result-evaluator)', () => {
       coverage: 92,
       filesChanged: ['src/core/utils.ts', 'tests/core/utils.spec.ts'],
     });
-    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
-  it('returns DONE when worker says GO_WITH_TECH_DEBT but coverage >= 90 and no new tests', async () => {
+  it('EVAL-DEBT-CEILING: coverage>=90 alone cannot upgrade past a declared debt', async () => {
     const task = makeTask(['src/core']);
     const result = makeResult({
       selfAssessment: 'GO_WITH_TECH_DEBT',
@@ -211,7 +211,7 @@ describe('evaluateResult (result-evaluator)', () => {
       coverage: 95,
       filesChanged: ['src/core/utils.ts'],
     });
-    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.DONE);
+    expect(await evaluateResult(result, task)).toBe(TaskEvaluation.GO_WITH_TECH_DEBT);
   });
 
   // ── hasNewTests detection ──────────────────────────────────────

@@ -41,6 +41,7 @@ import { registerCostCommand } from './commands/cost.js';
 import { registerRecall } from './commands/recall.js';
 import { registerRemember } from './commands/remember.js';
 import { registerMemory } from './commands/memory.js';
+import { registerTraceExtract } from './commands/trace-extract.js';
 import { registerResume } from './commands/resume.js';
 import { registerHelp } from './commands/help.js';
 import { registerNervous } from './commands/nervous.js';
@@ -133,6 +134,7 @@ export function buildProgram(): Command {
   registerRecall(program);
   registerRemember(program);
   registerMemory(program);
+  registerTraceExtract(program);
   registerResume(program);
   registerNervous(program);
   registerConfigNervous(program);

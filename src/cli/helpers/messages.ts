@@ -1167,6 +1167,34 @@ const MESSAGES: MessageMap = {
   },
 
   // ─── memory backup subcommand ──────────────────────────────────
+  'trace.desc': {
+    en: 'Claude Code trace tooling for training corpora',
+    tr: 'Eğitim korpusları için Claude Code trace araçları',
+  },
+  'trace.extract.desc': {
+    en: 'Extract aligned + general training examples from Claude Code session transcript(s)',
+    tr: 'Claude Code oturum transkript(ler)inden aligned + general eğitim örnekleri çıkar',
+  },
+  'trace.extract.arg.input': {
+    en: 'Path to a transcript JSONL file, or a directory containing multiple transcripts',
+    tr: 'Transkript JSONL dosyası ya da birden çok transkript içeren dizin yolu',
+  },
+  'trace.extract.opt.out': {
+    en: 'Output directory for aligned.jsonl/general.jsonl',
+    tr: 'aligned.jsonl/general.jsonl için çıktı dizini',
+  },
+  'trace.extract.opt.system': {
+    en: "System prompt to prepend to each example (default: deckent's agentic system prompt)",
+    tr: 'Her örneğin başına eklenecek system prompt (varsayılan: deckent agentic system prompt)',
+  },
+  'trace.extract.error.not_found': {
+    en: 'Input path not found: {path}',
+    tr: 'Girdi yolu bulunamadı: {path}',
+  },
+  'trace.extract.summary': {
+    en: 'Extracted {aligned} aligned + {general} general example(s) from {files} transcript file(s) -> {outDir} ({redacted} redacted).',
+    tr: '{files} transkript dosyasından {aligned} aligned + {general} general örnek çıkarıldı -> {outDir} ({redacted} redaksiyonlu).',
+  },
   'memory.backup.desc': {
     en: 'Create a WAL-safe backup of memory.db',
     tr: 'memory.db dosyasının WAL-güvenli yedeğini oluştur',

@@ -2118,17 +2118,55 @@ export function parseADRs(content: string): ParsedADR[] {
 }
 
 // Pilot enforcement rules for Sprint 138
+//
+// APDD (Sprint 351, row 423): both legacy flat-id keys below (`ADR-006`, `ADR-008`)
+// are DEAD against the real, taxonomy-renamed DB — disk-verified via `.brain/memory.db`
+// (no entry with literal id `adr-006`/`adr-008` exists; the live ids are `adr-g-002`
+// and `adr-d-004`), so with the OLD id-transform below neither key could ever match a
+// real scan. Each was evaluated independently for redundancy against
+// `src/orchestra/authority-enforcer.ts` before deciding remap vs. delete — see the
+// per-entry notes.
 const PILOT_ADR_RULES: Map<string, ADREnforcementRule> = new Map([
-  // ADR-006: spawnSync must use array args, not shell:true
+  // ADR-006 (now ADR-G-002, spawnSync Security Pattern): dead (DB never has literal
+  // id `ADR-006`/`adr-006` post-taxonomy-rename) AND redundant —
+  // `docs/adr/adr-g-002-spawnsync-security.md` ("Enforcement") states this exact
+  // check already runs, unconditionally (not DB-gated at all), as `checkAdr006` in
+  // `src/orchestra/authority-enforcer.ts`. The correct fix is deletion, matching the
+  // ADR-010/DEP-POLICY-WIRE precedent below. NOT deleted here: two tests in
+  // `tests/monitor/auditor.test.ts` (`detects ADR-006 violation...` ~L1665 and
+  // `emits ADR_VIOLATION event when sprintId provided...` ~L2896) seed a synthetic
+  // MemoryStore entry with the legacy id `adr-006` specifically to exercise this key,
+  // and that file is outside this task's write scope
+  // (scope.filesWrite = auditor.ts + apdd-pilot-rules.test.ts only) — removing the
+  // key without updating those tests in the same change would break them. Left
+  // in place, unchanged, as a deliberate deferral: it is provably inert against any
+  // real DB (the id never matches), so no duplicate enforcement actually fires in
+  // practice. Follow-up: a task with write access to BOTH files should delete this
+  // entry and the two coupled legacy-id tests together.
   ['ADR-006', {
     type: 'grep_forbid',
     pattern: 'spawnSync.*shell.*true',
     targetFiles: ['src/'],
   } as ADREnforcementRule],
-  // ADR-008: Brain is the ONLY module that imports tmux/auditor/worker
-  ['ADR-008', {
+  // ADR-008 → remapped to ADR-D-004 (Layer-1 Import Direction / Brain-Family
+  // Boundary; crosswalk: `.analysis/adr-review-crosswalk.md` row 008). NOT
+  // redundant — `docs/adr/adr-d-004-brain-central-import.md` ("What is actually
+  // scanned today") states `authority-enforcer.ts`'s `checkAdr008` covers ONLY the
+  // `core/ → orchestra/` edge; the Brain-family tmux/auditor/worker reverse-import
+  // check this rule performs is explicitly documented there as "not yet
+  // machine-scanned" anywhere else — so this is the sole mechanical check for that
+  // edge and must be kept, just remapped to the real id.
+  //
+  // Pattern hardened while remapping: the original `'from.*brain'` self-matches its
+  // OWN definition line (this file is one of the rule's targetFiles, and the raw
+  // source text `pattern: 'from.*brain'` literally contains "from" followed by
+  // "brain" on one line) — a permanent false-positive against this very file.
+  // Requiring a real `\s+` before the quote (an ESM import specifier, not just any
+  // characters) fixes this: the escaped `\\s+` in this rule's own source text is a
+  // backslash-s, not whitespace, so it can never satisfy its own pattern.
+  ['ADR-D-004', {
     type: 'grep_forbid',
-    pattern: 'from.*brain',
+    pattern: "from\\s+['\"][^'\"]*brain",
     targetFiles: ['src/orchestra/tmux.ts', 'src/monitor/auditor.ts', 'src/agents/worker.ts'],
   } as ADREnforcementRule],
   // DEP-POLICY-WIRE (ADR-D-005): the ADR-010 `count_check` (maxCount:3) rule was
@@ -2219,9 +2257,11 @@ export function checkADRCompliance(
   }
 
   // DEP-POLICY-WIRE (ADR-D-005): inventory-drift advisory runs FIRST and
-  // independently of the DB-gated PILOT rules below — those match on legacy ADR
-  // ids (ADR-006/008/010) that no longer exist in the DB after the taxonomy
-  // rename, so they are dormant; this advisory must not inherit that fate.
+  // independently of the DB-gated PILOT rules below. APDD (Sprint 351): ADR-010 was
+  // removed outright (see below) and ADR-008 was remapped to its real taxonomy id
+  // `ADR-D-004`; only the retained `ADR-006` key stays dormant against a real DB scan
+  // (evidenced deferral — see the PILOT_ADR_RULES comment above). This advisory must
+  // not inherit any of that dormancy.
   violations.push(...checkDependencyInventoryDrift(projectRoot, changedFiles));
 
   // DB-first: load ADRs from MemoryStore
@@ -2233,7 +2273,14 @@ export function checkADRCompliance(
       try {
         const adrEntries = store.getByType('adr');
         adrs = adrEntries.map(e => ({
-          id: e.id.replace(/^adr-/i, 'ADR-'),  // adr-006 → ADR-006 (match PILOT_ADR_RULES keys)
+          // APDD (Sprint 351): must uppercase the WHOLE id, not just the `adr-`
+          // prefix — post-taxonomy ids carry an embedded class letter
+          // (`adr-d-004`, `adr-g-002`) that the old `replace(/^adr-/i, 'ADR-')`
+          // left lower-case (`ADR-d-004`), silently breaking any PILOT_ADR_RULES
+          // key written in the canonical all-caps form used everywhere else
+          // (`ADR-D-004`). `.toUpperCase()` is backward-compatible with legacy
+          // numeric-only ids too: `'adr-006'.toUpperCase()` still yields `'ADR-006'`.
+          id: e.id.toUpperCase(),
           title: e.title,
           status: e.status,
         }));

@@ -38,6 +38,8 @@ import {
   OPENAI_COMPAT_PRESETS,
   type OpenAICompatPresetName,
 } from '../providers/openai-compatible.js';
+import { buildHealthSnapshot, renderHealthSnapshot } from './helpers/health-snapshot.js';
+import { getLangFromConfig } from './helpers/config-reader.js';
 
 // ─── Default REPL Routing (Sprint 219 T-219-001) ────────────────────────────
 //
@@ -489,6 +491,19 @@ export async function launchDefaultRepl(): Promise<void> {
     process.exit(1);
     return;
   }
+  // TERM-1 (Sprint 351) — "hazır mıyım?" health snapshot, printed before EITHER
+  // REPL mode mounts (Ink or legacy) so both paths get the same at-a-glance
+  // line. buildHealthSnapshot() is already field-level fail-soft and time-
+  // boxed internally; this try/catch is only a backstop so the snapshot can
+  // never block or crash REPL boot.
+  const healthRoot = process.cwd();
+  try {
+    const snapshot = await buildHealthSnapshot(healthRoot);
+    process.stdout.write(`${renderHealthSnapshot(snapshot, getLangFromConfig(healthRoot))}\n`);
+  } catch {
+    // best-effort UX chrome only
+  }
+
   // Welcome chrome. The banner shows `deckent  provider  dir` + the /help hint.
   // (Sprint 222's separate status-line print was dropped here: at boot
   // activeSprint is null, so it was byte-identical to the banner header and

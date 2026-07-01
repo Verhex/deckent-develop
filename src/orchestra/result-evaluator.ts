@@ -191,6 +191,19 @@ export async function evaluateResult(result: TaskResult, task: Task, vitestJsonO
     }
   }
 
+  // EVAL-DEBT-CEILING (born-450, sprint-350-003 live case): an HONEST worker
+  // GO_WITH_TECH_DEBT declaration is a CEILING, never overridden upward. The
+  // objective signals below (tests pass + new tests + coverage) only see
+  // test-shaped completeness — a worker declares debt for reasons those signals
+  // CANNOT see (scope-blocked follow-ups, structurally unsatisfiable criteria,
+  // named residual gaps). Upgrading to DONE silently discarded that knowledge:
+  // the debt-manager never engaged, the ledger recorded nothing, the named
+  // follow-ups were lost. Brain still decides downward (the NO_GO rules above
+  // run first); it just never *upgrades past* the worker's own declared debt.
+  if (result.selfAssessment === 'GO_WITH_TECH_DEBT') {
+    return TaskEvaluation.GO_WITH_TECH_DEBT;
+  }
+
   // If tests pass AND worker wrote tests → DONE
   if (result.testsPassed && hasNewTests) {
     return TaskEvaluation.DONE;
@@ -204,11 +217,8 @@ export async function evaluateResult(result: TaskResult, task: Task, vitestJsonO
   // Coverage >= coverageThreshold with passing tests → DONE
   if (result.coverage >= coverageThreshold) return TaskEvaluation.DONE;
 
-  // Default: respect worker hint for edge cases only
-  if (result.selfAssessment === 'GO_WITH_TECH_DEBT') {
-    return TaskEvaluation.GO_WITH_TECH_DEBT;
-  }
-
+  // (The old trailing "respect worker hint as fallback" block is gone — the
+  // EVAL-DEBT-CEILING check above handles the debt-hint before any DONE rule.)
   return TaskEvaluation.DONE;
 }
 
@@ -1963,7 +1973,16 @@ export function findBoundaryViolations(result: TaskResult, task: Task): string[]
   const allowed = new Set(filesWrite.map(f => f.replace(/\\/g, '/')));
   const violations: string[] = [];
 
-  for (const changed of result.filesChanged ?? []) {
+  for (const changedEntry of result.filesChanged ?? []) {
+    // FILESCHANGED-SHAPE (sprint-351 finalize TypeError, live-surfaced by the
+    // 350-002 error-surface fix): workers legitimately write filesChanged as
+    // strings OR as {path, linesAdded, linesRemoved} objects (350-002 did) — a
+    // bare .replace on the object threw "changed.replace is not a function" and
+    // aborted the whole finalize. Normalize both shapes; skip malformed entries.
+    const changed = typeof changedEntry === 'string'
+      ? changedEntry
+      : (changedEntry as { path?: unknown } | null)?.path;
+    if (typeof changed !== 'string' || !changed) continue;
     const norm = changed.replace(/\\/g, '/');
     // Allow direct match OR match under any allowed directory in scope
     if (allowed.has(norm)) continue;
@@ -2326,8 +2345,12 @@ export function classifyHonestyViolation(
  * result is NOT a crash when the sprint was already finalized — the result was
  * moved to the archive. Used to suppress a late honest-gate sentinel that would
  * otherwise clobber the real (archived) verdict.
+ *
+ * Exported (Sprint 351 351-008 — MOAT-3): the same guard applies before
+ * classifying a missing-result task as NOT_DISPATCHED in sprint-phases.ts —
+ * an already-archived task is a finalized verdict, never a dispatch gap.
  */
-function archivedResultExists(projectRoot: string, taskId: string): boolean {
+export function archivedResultExists(projectRoot: string, taskId: string): boolean {
   try {
     const archiveRoot = join(projectRoot, BRAIN_DIR, ARCHIVE_DIR);
     if (!existsSync(archiveRoot)) return false;
@@ -2400,6 +2423,124 @@ export function writeHonestSentinelResult(
   } catch (e) {
     debugLog('writeHonestSentinelResult:write', `Failed for task ${taskId}: ${e}`);
   }
+}
+
+// ─── NOT_DISPATCHED Classification (Sprint 351 Task 351-008 — MOAT-3) ──
+//
+// MOAT-3: the synthetic-NO_GO trust problem. Live incident (sprint-347/348):
+// when spawn/dispatch never reached a task at all (spawn-fail, container
+// never started), the task still ended up looking like a worker "NO_GO" —
+// a lie, since no worker ever ran to actually fail. This section provides
+// the pure, disk-evidence-based classifier that separates a genuine
+// dispatch gap from a real worker crash/timeout, plus the FIX-phase +
+// summary-reporting helpers that consume the distinction. Wired into
+// sprint-phases.ts at every spot that currently declares a missing-result
+// synthetic NO_GO (runEvaluatePhase's liveness fallthrough AND
+// runRetroPhase's pre-finalize honest-sentinel pass — the latter is the
+// actual production bug: it bypassed EVALUATE's liveness nuance entirely).
+
+/**
+ * On-disk evidence for a task with no collected `.result`. Existence only —
+ * freshness is irrelevant here (even a stale `.hb`/`.log` proves a worker
+ * once started; that is a real crash, not a dispatch gap).
+ */
+export interface DispatchTraceEvidence {
+  /** `.tasks/task-{id}.result` exists. */
+  hasResultFile: boolean;
+  /** `.tasks/task-{id}.hb` exists (worker wrote at least one heartbeat). */
+  hasHeartbeatFile: boolean;
+  /** `.tasks/task-{id}.log` exists (worker process produced output). */
+  hasLogFile: boolean;
+}
+
+/** Verdict for a task missing its `.result` file. */
+export type MissingResultClassification = 'NOT_DISPATCHED' | 'SYNTHETIC_NO_GO';
+
+/**
+ * Pure classifier — no I/O. `.result` + `.hb` + `.log` all absent means
+ * dispatch itself never happened (spawn-fail, container never started):
+ * NOT_DISPATCHED. Any trace of a started worker (`.hb` or `.log` present)
+ * means a worker DID run and the missing result is a genuine crash/timeout:
+ * SYNTHETIC_NO_GO (existing behavior, unchanged).
+ */
+export function classifyMissingResultDispatch(
+  evidence: DispatchTraceEvidence,
+): MissingResultClassification {
+  if (evidence.hasResultFile) return 'SYNTHETIC_NO_GO'; // guard — caller has a result, not this codepath
+  if (!evidence.hasHeartbeatFile && !evidence.hasLogFile) return 'NOT_DISPATCHED';
+  return 'SYNTHETIC_NO_GO';
+}
+
+/**
+ * Disk I/O wrapper for {@link classifyMissingResultDispatch}. Reads
+ * existence only (no parsing, no mtime checks) — any read failure is
+ * treated as "file absent" (fail toward the conservative SYNTHETIC_NO_GO
+ * classification, preserving legacy behavior when disk state is unclear).
+ */
+export function gatherDispatchTraceEvidence(
+  projectRoot: string,
+  taskId: string,
+): DispatchTraceEvidence {
+  const tasksDir = join(projectRoot, TASKS_DIR);
+  return {
+    hasResultFile: existsSync(join(tasksDir, `task-${taskId}.result`)),
+    hasHeartbeatFile: existsSync(join(tasksDir, `task-${taskId}.hb`)),
+    hasLogFile: existsSync(join(tasksDir, `task-${taskId}.log`)),
+  };
+}
+
+/** FIX-phase split of the evaluations map (Sprint 351 351-008 — MOAT-3). */
+export interface FixPhaseTaskClassification {
+  /** Real NO_GO — routed through the standard worker-blame fix pipeline. */
+  fixCandidateTaskIds: string[];
+  /**
+   * NOT_DISPATCHED — dispatch never happened, so there is no worker to
+   * blame. These are re-dispatch candidates, not fix candidates.
+   */
+  reDispatchCandidateTaskIds: string[];
+}
+
+/**
+ * Pure classifier over a completed EVALUATE pass. Used by the FIX phase to
+ * keep NOT_DISPATCHED tasks out of the NO_GO blame-fix pipeline (a
+ * `${taskId}-fix` task with "Task X evaluated as NO_GO" framing would be
+ * dishonest for a task whose worker never ran) while still surfacing them
+ * as an explicit, countable re-dispatch bucket.
+ */
+export function classifyFixPhaseTasks(
+  evaluations: ReadonlyMap<string, TaskEvaluation>,
+): FixPhaseTaskClassification {
+  const fixCandidateTaskIds: string[] = [];
+  const reDispatchCandidateTaskIds: string[] = [];
+  for (const [taskId, evaluation] of evaluations) {
+    if (evaluation === TaskEvaluation.NOT_DISPATCHED) {
+      reDispatchCandidateTaskIds.push(taskId);
+    } else if (evaluation === TaskEvaluation.NO_GO) {
+      fixCandidateTaskIds.push(taskId);
+    }
+  }
+  return { fixCandidateTaskIds, reDispatchCandidateTaskIds };
+}
+
+/** Aggregated NOT_DISPATCHED count derived from the per-task evaluation map. */
+export interface NotDispatchedStats {
+  /** Tasks evaluated as NOT_DISPATCHED (dispatch never happened — no worker to blame). */
+  notDispatched: number;
+}
+
+/**
+ * Count NOT_DISPATCHED evaluations from a per-task evaluation map. Pure
+ * function — mirrors sprint-reporter.ts's `collectDeferredStats` pattern so
+ * a retro/summary surface can report this separately from real NO_GO.
+ */
+export function collectNotDispatchedStats(
+  evaluations: ReadonlyMap<string, TaskEvaluation>,
+): NotDispatchedStats {
+  let notDispatched = 0;
+  for (const ev of evaluations.values()) {
+    if (ev === TaskEvaluation.NOT_DISPATCHED) notDispatched += 1;
+  }
+  return { notDispatched };
 }
 
 // ─── FIX Context Enrichment (D-3) ──────────────────────────────────

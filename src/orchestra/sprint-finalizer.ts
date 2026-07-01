@@ -1181,232 +1181,168 @@ export async function finalizeSprint(
     } catch (e) { debugLog('finalizeSprint:afterSprintHook', e); }
   }
 
-  // 8b. Update agent/skill stats
-  // ROUTE-V1-PURGE (ADR-G-006): default 'v2'. Previously an unset routing_engine
-  // read as undefined, making `routingVersion !== 'v2'` TRUE — so the finalizer ran
-  // the legacy V1 stats path (write to agent.json) by default. V2 is the engine, so
-  // the SSOT path (learnings.json) is now the default. The now-dead V1 branch below
-  // is a behavior-sensitive collapse → ROUTE-V1-DEADBRANCH-COLLAPSE (born follow-up).
-  const routingVersion = ((opts?.config as Record<string, unknown> | undefined)?.['routing_engine'] as string | undefined) ?? 'v2';
+  // 8b. Update agent/skill stats — V2/learnings.json is the SOLE path
+  // (ROUTE-V1-DEADBRANCH-COLLAPSE, ADR-G-006 follow-up). The V1 branch
+  // (`routing_engine !== 'v2'`, writing stats directly to agent.json) is
+  // removed: config validation has accepted only 'v2' since ROUTE-V1-PURGE,
+  // so the guard was permanently false-taken (V1 code could never run) and
+  // is collapsed rather than left dead. routeTaskV2's `'v3'`-vs-`'v2'`-stamp
+  // reconcile remains open separately as ROUTING-VERSION-LABEL.
 
   // F5 evolution wire (B11): record per-task use of each agent's CURRENT prompt
   // version so prompt-analytics / /api/evolution/prompt-metrics see real
   // uses/successRate (updateVersionStats was zero-caller → stats frozen at 0).
-  // No-op for agents without a versioned prompt. Routing-version agnostic, but
-  // recorded inside each branch's re-finalize guard so `finalize --force` does
-  // not double-count.
+  // No-op for agents without a versioned prompt.
   const promptVersionMgr = new PromptVersionManager(projectRoot);
 
-  if (routingVersion !== 'v2') {
-    // V1: Write stats directly to agent.json and skill manifest files (legacy behavior)
-    try {
-      const poolManager = new AgentPoolManager(projectRoot);
-      const skillPoolManager = new SkillPoolManager(projectRoot);
+  // V2: Record outcomes to learnings.json (single source of truth).
+  // Agent.json manifests are NOT touched here directly — stats live in
+  // learnings.json and are synced to agent.json/manifest.json below (8d2).
+  try {
+    const { OutcomeTracker } = await import('./outcome-tracker.js');
+    const { assessQuality } = await import('./quality-assessor.js');
+    const tracker = new OutcomeTracker(projectRoot);
 
-      // FINALIZE-RECOUNT guard (Sprint 268, 1b): updateAgentStats /
-      // updateSkillStats stamp stats.lastUsedInSprint = sprint.id on first
-      // record, so an entity already carrying this sprint's stamp was
-      // recorded by an EARLIER finalize of the SAME sprint (re-finalize via
-      // `finalize --force`) and must not be double-counted (sprint-267 live
-      // bug: uses+N, success+0). Snapshot the markers BEFORE the update loop:
-      // an agent/skill serving multiple tasks in THIS run stamps itself on
-      // its first task, and the pre-scan keeps its remaining tasks counting.
-      const agentsAlreadyRecorded = new Set<string>();
-      const skillsAlreadyRecorded = new Set<string>();
-      for (const task of sprint.tasks) {
-        const aId = task.assignedAgent;
-        if (aId && !agentsAlreadyRecorded.has(aId)
-            && poolManager.getAgent(aId)?.stats?.lastUsedInSprint === sprint.id) {
-          agentsAlreadyRecorded.add(aId);
-        }
-        for (const sId of task.assignedSkills ?? []) {
-          if (!skillsAlreadyRecorded.has(sId)
-              && skillPoolManager.getSkill(sId)?.stats?.lastUsedInSprint === sprint.id) {
-            skillsAlreadyRecorded.add(sId);
-          }
-        }
-      }
-      if (agentsAlreadyRecorded.size > 0 || skillsAlreadyRecorded.size > 0) {
-        debugLog('finalizeSprint:updateAgentSkillStats',
-          `Re-finalize of ${sprint.id} — skipping already-recorded stats for ` +
-          `${agentsAlreadyRecorded.size} agent(s), ${skillsAlreadyRecorded.size} skill(s)`);
-      }
-
+    // FINALIZE-RECOUNT guard (Sprint 268, 1b): recordOutcome appends
+    // sprint.id to learnings.recentSprints on the first record and that
+    // list is append-only — its presence is a durable "stats already
+    // recorded for this sprint" marker. A re-finalize (`finalize --force`
+    // on an already-finalized sprint) must NOT re-record: the sprint-267
+    // live bug re-counted every task (uses+N) while archived results read
+    // as missing/NO_GO (success+0). Corrections to a recorded sprint go
+    // through tracker.reclassifyTaskOutcome instead of double-recording.
+    // The downstream steps (rule evolution, manifest sync, promotions)
+    // still run — they derive from accumulated learnings and are
+    // idempotent on unchanged data.
+    const statsAlreadyRecorded = tracker.getLearnings().recentSprints.includes(sprint.id);
+    if (statsAlreadyRecorded) {
+      debugLog('finalizeSprint:routing-outcomes',
+        `Stats already recorded for ${sprint.id} — skipping re-record (idempotent re-finalize)`);
+    } else {
       for (const task of sprint.tasks) {
         const evaluation = evaluations.get(task.id);
         if (!evaluation) continue;
-        // Sprint 192 Task 192-010: DEFERRED tasks were never dispatched —
-        // agent stats must not be updated (worker did not execute).
-        if (evaluation === TaskEvaluation.DEFERRED) continue;
+        // F5: record use against the agent's current prompt version (V2 path).
+        if (task.assignedAgent && evaluation !== TaskEvaluation.DEFERRED) {
+          promptVersionMgr.recordCurrentVersionUse(task.assignedAgent, evaluation);
+        }
         const taskResult = resultsMap.get(task.id);
-        const coverage = taskResult?.coverage ?? 0;
 
-        // Update agent stats
-        const agentId = task.assignedAgent;
-        if (agentId && !agentsAlreadyRecorded.has(agentId)) {
-          poolManager.updateAgentStats(agentId, evaluation, coverage, sprint.id);
-          // F5: record the use against the agent's current prompt version too.
-          promptVersionMgr.recordCurrentVersionUse(agentId, evaluation);
-        }
-
-        // Update skill stats
-        if (task.assignedSkills) {
-          for (const skillId of task.assignedSkills) {
-            if (skillsAlreadyRecorded.has(skillId)) continue;
-            skillPoolManager.updateSkillStats(skillId, evaluation, coverage, sprint.id);
-          }
-        }
-      }
-    } catch (e) { debugLog('finalizeSprint:updateAgentSkillStats', e); }
-  } else {
-    // V2: Record outcomes to learnings.json (single source of truth)
-    // Agent.json manifests are NOT touched — stats live in learnings.json only
-    try {
-      const { OutcomeTracker } = await import('./outcome-tracker.js');
-      const { assessQuality } = await import('./quality-assessor.js');
-      const tracker = new OutcomeTracker(projectRoot);
-
-      // FINALIZE-RECOUNT guard (Sprint 268, 1b): recordOutcome appends
-      // sprint.id to learnings.recentSprints on the first record and that
-      // list is append-only — its presence is a durable "stats already
-      // recorded for this sprint" marker. A re-finalize (`finalize --force`
-      // on an already-finalized sprint) must NOT re-record: the sprint-267
-      // live bug re-counted every task (uses+N) while archived results read
-      // as missing/NO_GO (success+0). Corrections to a recorded sprint go
-      // through tracker.reclassifyTaskOutcome instead of double-recording.
-      // The downstream steps (rule evolution, manifest sync, promotions)
-      // still run — they derive from accumulated learnings and are
-      // idempotent on unchanged data.
-      const statsAlreadyRecorded = tracker.getLearnings().recentSprints.includes(sprint.id);
-      if (statsAlreadyRecorded) {
-        debugLog('finalizeSprint:routing-outcomes',
-          `Stats already recorded for ${sprint.id} — skipping re-record (idempotent re-finalize)`);
-      } else {
-        for (const task of sprint.tasks) {
-          const evaluation = evaluations.get(task.id);
-          if (!evaluation) continue;
-          // F5: record use against the agent's current prompt version (V2 path).
-          if (task.assignedAgent && evaluation !== TaskEvaluation.DEFERRED) {
-            promptVersionMgr.recordCurrentVersionUse(task.assignedAgent, evaluation);
-          }
-          const taskResult = resultsMap.get(task.id);
-
-          // Quality assessment — multi-dimensional scoring beyond GO/NO_GO
-          let qualityScore: number | undefined;
-          if (taskResult) {
-            try {
-              const quality = assessQuality(task, taskResult, evaluation as unknown as string);
-              qualityScore = quality.overall;
-            } catch (e) { debugLog('finalizeSprint:assessQuality', e); }
-          }
-
-          tracker.recordOutcome({
-            taskId: task.id,
-            sprintId: sprint.id,
-            taskDNA: (task.routingMeta?.taskDNA ?? { intent: { primary: 'unknown', secondary: [], confidence: 0 }, domains: [], operations: [], complexity: { fileCount: 0, moduleCount: 0, crossCutting: false, estimatedSize: 'small' }, scope: { writeRatio: {}, primaryWriteTarget: '', testWriteRatio: 0 } }) as TaskDNA,
-            agentId: task.assignedAgent ?? null,
-            skillIds: task.assignedSkills ?? [],
-            evaluation: evaluation as unknown as 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
-            coverage: taskResult?.coverage ?? 0,
-            qualityScore,
-            routingVersion: 'v2',
-          });
-        }
-        debugLog('finalizeSprint:routing-outcomes', `Recorded ${sprint.tasks.length} routing outcomes to learnings.json`);
-      }
-
-      // 8d. Evolve routing rules from accumulated data
-      try {
-        const { RuleEvolver } = await import('./rule-evolver.js');
-        const evolver = new RuleEvolver(tracker, projectRoot);
-        const evolution = evolver.evolveRules();
-        if (evolution.newRules.length > 0) {
-          debugLog('finalizeSprint:rule-evolution', `${evolution.newRules.length} new rules evolved`);
-          // Persist evolved rules in learnings AND standalone file
-          tracker.saveEvolvedRules(evolution.newRules);
-          evolver.saveRules(evolution.newRules);
-        }
-      } catch (e) { debugLog('finalizeSprint:ruleEvolution', e); }
-
-      // 8d2. Sync V2 learnings → agent.json / manifest.json (so Dashboard/CLI see real stats)
-      try {
-        const poolManager = new AgentPoolManager(projectRoot);
-        const skillPoolManager = new SkillPoolManager(projectRoot);
-        const learnings = tracker.getLearnings();
-
-        for (const [agentId, perf] of Object.entries(learnings.agentPerformance)) {
-          // Compute average coverage from task results for this agent
-          const agentTasks = sprint.tasks.filter(t => t.assignedAgent === agentId);
-          let avgCov = 0;
-          if (agentTasks.length > 0) {
-            const totalCov = agentTasks.reduce((sum, t) => {
-              const r = resultsMap.get(t.id);
-              return sum + (r?.coverage ?? 0);
-            }, 0);
-            avgCov = totalCov / agentTasks.length;
-          }
-
-          // Build cumulative stats from learnings performance data
-          const agent = poolManager.getAgent(agentId);
-          if (agent) {
-            const stats = agent.stats ?? { totalUses: 0, successRate: 0, avgCoverage: 0, lastUsedInSprint: '' };
-            stats.totalUses = perf.totalTasks;
-            stats.successRate = perf.successRate;
-            // Blend historical avg coverage with current sprint coverage
-            if (avgCov > 0 && agentTasks.length > 0) {
-              const prevTotal = stats.totalUses - agentTasks.length;
-              stats.avgCoverage = prevTotal > 0
-                ? ((stats.avgCoverage * prevTotal) + (avgCov * agentTasks.length)) / stats.totalUses
-                : avgCov;
-            }
-            stats.lastUsedInSprint = sprint.id;
-            agent.stats = stats;
-            poolManager.saveAgent(agent);
-          }
-        }
-
-        for (const [skillId, perf] of Object.entries(learnings.skillPerformance)) {
-          const skill = skillPoolManager.getSkill(skillId);
-          if (skill) {
-            const stats = skill.stats ?? { totalUses: 0, successRate: 0, avgCoverage: 0, lastUsedInSprint: '', successCount: 0 };
-            stats.totalUses = perf.totalTasks;
-            stats.successRate = perf.successRate;
-            stats.successCount = perf.successCount;
-            stats.lastUsedInSprint = sprint.id;
-            skill.stats = stats;
-            skillPoolManager.saveSkill(skill);
-          }
-        }
-
-        debugLog('finalizeSprint:syncStatsToManifests', `Synced ${Object.keys(learnings.agentPerformance).length} agents, ${Object.keys(learnings.skillPerformance).length} skills to manifest files`);
-      } catch (e) { debugLog('finalizeSprint:syncStatsToManifests', e); }
-
-      // 8e. Evaluate promotions/demotions
-      try {
-        const { PromotionPipeline } = await import('./promotion-pipeline.js');
-        const pipeline = new PromotionPipeline(projectRoot);
-        const promotions = pipeline.evaluatePromotions(tracker);
-        const demotions = pipeline.evaluateDemotions(tracker);
-        for (const p of promotions.filter(r => r.action === 'promote')) {
-          debugLog('finalizeSprint:promotion', `${p.entityType} '${p.entityId}': ${p.reason}`);
+        // Quality assessment — multi-dimensional scoring beyond GO/NO_GO
+        let qualityScore: number | undefined;
+        if (taskResult) {
           try {
-            pipeline.promote(p.entityId, p.entityType);
-          } catch (promoteErr) {
-            debugLog('finalizeSprint:promotion', `Failed to promote ${p.entityType} '${p.entityId}': ${promoteErr}`);
-          }
+            const quality = assessQuality(task, taskResult, evaluation as unknown as string);
+            qualityScore = quality.overall;
+          } catch (e) { debugLog('finalizeSprint:assessQuality', e); }
         }
-        for (const d of demotions.filter(r => r.action === 'demote')) {
-          debugLog('finalizeSprint:demotion', `${d.entityType} '${d.entityId}': ${d.reason}`);
-          try {
-            pipeline.demote(d.entityId, d.entityType);
-          } catch (demoteErr) {
-            debugLog('finalizeSprint:demotion', `Failed to demote ${d.entityType} '${d.entityId}': ${demoteErr}`);
-          }
-        }
-      } catch (e) { debugLog('finalizeSprint:promotionDemotion', e); }
-    } catch (err) {
-      debugLog('finalizeSprint:v2-learning', `V2 learning pipeline failed: ${err}`);
+
+        tracker.recordOutcome({
+          taskId: task.id,
+          sprintId: sprint.id,
+          taskDNA: (task.routingMeta?.taskDNA ?? { intent: { primary: 'unknown', secondary: [], confidence: 0 }, domains: [], operations: [], complexity: { fileCount: 0, moduleCount: 0, crossCutting: false, estimatedSize: 'small' }, scope: { writeRatio: {}, primaryWriteTarget: '', testWriteRatio: 0 } }) as TaskDNA,
+          agentId: task.assignedAgent ?? null,
+          skillIds: task.assignedSkills ?? [],
+          evaluation: evaluation as unknown as 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
+          coverage: taskResult?.coverage ?? 0,
+          qualityScore,
+          routingVersion: 'v2',
+        });
+      }
+      debugLog('finalizeSprint:routing-outcomes', `Recorded ${sprint.tasks.length} routing outcomes to learnings.json`);
     }
+
+    // 8d. Evolve routing rules from accumulated data
+    try {
+      const { RuleEvolver } = await import('./rule-evolver.js');
+      const evolver = new RuleEvolver(tracker, projectRoot);
+      const evolution = evolver.evolveRules();
+      if (evolution.newRules.length > 0) {
+        debugLog('finalizeSprint:rule-evolution', `${evolution.newRules.length} new rules evolved`);
+        // Persist evolved rules in learnings AND standalone file
+        tracker.saveEvolvedRules(evolution.newRules);
+        evolver.saveRules(evolution.newRules);
+      }
+    } catch (e) { debugLog('finalizeSprint:ruleEvolution', e); }
+
+    // 8d2. Sync V2 learnings → agent.json / manifest.json (so Dashboard/CLI see real stats)
+    try {
+      const poolManager = new AgentPoolManager(projectRoot);
+      const skillPoolManager = new SkillPoolManager(projectRoot);
+      const learnings = tracker.getLearnings();
+
+      for (const [agentId, perf] of Object.entries(learnings.agentPerformance)) {
+        // Compute average coverage from task results for this agent
+        const agentTasks = sprint.tasks.filter(t => t.assignedAgent === agentId);
+        let avgCov = 0;
+        if (agentTasks.length > 0) {
+          const totalCov = agentTasks.reduce((sum, t) => {
+            const r = resultsMap.get(t.id);
+            return sum + (r?.coverage ?? 0);
+          }, 0);
+          avgCov = totalCov / agentTasks.length;
+        }
+
+        // Build cumulative stats from learnings performance data
+        const agent = poolManager.getAgent(agentId);
+        if (agent) {
+          const stats = agent.stats ?? { totalUses: 0, successRate: 0, avgCoverage: 0, lastUsedInSprint: '' };
+          stats.totalUses = perf.totalTasks;
+          stats.successRate = perf.successRate;
+          // Blend historical avg coverage with current sprint coverage
+          if (avgCov > 0 && agentTasks.length > 0) {
+            const prevTotal = stats.totalUses - agentTasks.length;
+            stats.avgCoverage = prevTotal > 0
+              ? ((stats.avgCoverage * prevTotal) + (avgCov * agentTasks.length)) / stats.totalUses
+              : avgCov;
+          }
+          stats.lastUsedInSprint = sprint.id;
+          agent.stats = stats;
+          poolManager.saveAgent(agent);
+        }
+      }
+
+      for (const [skillId, perf] of Object.entries(learnings.skillPerformance)) {
+        const skill = skillPoolManager.getSkill(skillId);
+        if (skill) {
+          const stats = skill.stats ?? { totalUses: 0, successRate: 0, avgCoverage: 0, lastUsedInSprint: '', successCount: 0 };
+          stats.totalUses = perf.totalTasks;
+          stats.successRate = perf.successRate;
+          stats.successCount = perf.successCount;
+          stats.lastUsedInSprint = sprint.id;
+          skill.stats = stats;
+          skillPoolManager.saveSkill(skill);
+        }
+      }
+
+      debugLog('finalizeSprint:syncStatsToManifests', `Synced ${Object.keys(learnings.agentPerformance).length} agents, ${Object.keys(learnings.skillPerformance).length} skills to manifest files`);
+    } catch (e) { debugLog('finalizeSprint:syncStatsToManifests', e); }
+
+    // 8e. Evaluate promotions/demotions
+    try {
+      const { PromotionPipeline } = await import('./promotion-pipeline.js');
+      const pipeline = new PromotionPipeline(projectRoot);
+      const promotions = pipeline.evaluatePromotions(tracker);
+      const demotions = pipeline.evaluateDemotions(tracker);
+      for (const p of promotions.filter(r => r.action === 'promote')) {
+        debugLog('finalizeSprint:promotion', `${p.entityType} '${p.entityId}': ${p.reason}`);
+        try {
+          pipeline.promote(p.entityId, p.entityType);
+        } catch (promoteErr) {
+          debugLog('finalizeSprint:promotion', `Failed to promote ${p.entityType} '${p.entityId}': ${promoteErr}`);
+        }
+      }
+      for (const d of demotions.filter(r => r.action === 'demote')) {
+        debugLog('finalizeSprint:demotion', `${d.entityType} '${d.entityId}': ${d.reason}`);
+        try {
+          pipeline.demote(d.entityId, d.entityType);
+        } catch (demoteErr) {
+          debugLog('finalizeSprint:demotion', `Failed to demote ${d.entityType} '${d.entityId}': ${demoteErr}`);
+        }
+      }
+    } catch (e) { debugLog('finalizeSprint:promotionDemotion', e); }
+  } catch (err) {
+    debugLog('finalizeSprint:v2-learning', `V2 learning pipeline failed: ${err}`);
   }
 
   // 9. Update project docs

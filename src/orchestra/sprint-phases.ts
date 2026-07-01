@@ -110,6 +110,16 @@ import {
   isConfirmedStub,
 } from './result-evaluator.js';
 
+// ─── NOT_DISPATCHED Classification (Sprint 351 Task 351-008 — MOAT-3) ────
+// Disk-evidence-based split between "dispatch never happened" and a real
+// worker crash/timeout — see result-evaluator.ts for the full rationale.
+import {
+  classifyMissingResultDispatch,
+  gatherDispatchTraceEvidence,
+  classifyFixPhaseTasks,
+  archivedResultExists,
+} from './result-evaluator.js';
+
 // ─── Verify-and-Complete FIX Signal (Sprint 272 — Task 272-004) ──────
 // Consumes the Task-272-003 EXIT_WITHOUT_RESULT marker: when work is present
 // on disk, the FIX prompt is reframed to audit-and-finish the partial work
@@ -1744,7 +1754,12 @@ export async function runEvaluatePhase(
         // ─── Explicit DEFERRED skip (Sprint 192 — Task 192-009 — W-INTEGRITY I-3) ──
         // Caller has signalled this task was never dispatched and should
         // not be force-NO_GO'd here — let retro (192-010 enum surface)
-        // report it. No synthetic result, no evaluation entry.
+        // report it. No synthetic result, no evaluation entry (contract
+        // covered by evaluate-trigger-gate.test.ts, out of this task's
+        // write scope — left byte-for-byte unchanged; Sprint 351 351-008's
+        // NOT_DISPATCHED classification is wired at the liveness-check and
+        // retro pre-finalize sites below/downstream instead, which cover
+        // the same "dispatch never happened" scenario this task targets).
         if (deferredTaskIds?.has(task.id)) {
           debugLog(
             'runEvaluatePhase:deferred-skip',
@@ -1817,11 +1832,16 @@ export async function runEvaluatePhase(
         // Memory: [[feedback_no_synthetic_results]] — sentetik veri ile NO_GO yasak.
         // Consult 5-layer worker liveness BEFORE writing synthetic NO_GO:
         //   - never-spawned (max_workers saturation / wave-barrier hold)
-        //       → SKIP synthetic; task stays unassigned for retro/cleanup
-        //         to surface as DEFERRED. No fix-task generated.
+        //       → NOT_DISPATCHED (Sprint 351 351-008 — MOAT-3). No fix-task
+        //         generated; re-dispatch candidate, not a worker failure.
         //   - alive (docker/hb/log fresh) → 60s grace poll; if result lands
         //         evaluate normally, else fall through with honest label.
-        //   - dead (no signal) → genuine synthetic NO_GO with liveness tag.
+        //   - dead (no signal) → disk-evidence check (351-008): if NEITHER
+        //         .hb NOR .log ever touched disk, this is also a dispatch
+        //         gap (e.g. assignedWorker was stamped at plan time but the
+        //         container spawn itself failed) → NOT_DISPATCHED. Any
+        //         trace of a started worker → genuine synthetic NO_GO with
+        //         liveness tag (unchanged existing behavior).
         const liveness = checkWorkerLiveness(task, projectRoot);
         if (liveness.status === 'never-spawned') {
           debugLog(
@@ -1840,7 +1860,32 @@ export async function runEvaluatePhase(
               },
             );
           } catch (e) { debugLog('runEvaluatePhase:nd-event', e); }
+          evaluations.set(task.id, TaskEvaluation.NOT_DISPATCHED);
           continue;
+        }
+        if (liveness.status === 'dead') {
+          const dispatchEvidence = gatherDispatchTraceEvidence(projectRoot, task.id);
+          if (classifyMissingResultDispatch(dispatchEvidence) === 'NOT_DISPATCHED') {
+            debugLog(
+              'runEvaluatePhase:not-dispatched-disk-evidence',
+              `task=${task.id} liveness=dead but no .hb/.log trace on disk — classifying NOT_DISPATCHED`,
+            );
+            try {
+              const sidNd2 = getCurrentSprintId(projectRoot) ?? sprint.id;
+              writeEvent(
+                projectRoot, sidNd2, 'brain', 'worker',
+                'BRAIN→WORKER:NEVER_DISPATCHED',
+                {
+                  taskId: task.id,
+                  reason: 'no .result/.hb/.log trace on disk despite assignedWorker set — spawn-fail',
+                  signals: liveness.signals,
+                  source: 'disk-evidence',
+                },
+              );
+            } catch (e) { debugLog('runEvaluatePhase:nd2-event', e); }
+            evaluations.set(task.id, TaskEvaluation.NOT_DISPATCHED);
+            continue;
+          }
         }
         if (liveness.status === 'alive') {
           debugLog(
@@ -2215,6 +2260,39 @@ export async function runFixPhase(
       }
     } catch (e) { debugLog('runFixPhase:providerLimitGuard', e); }
 
+    // ─── NOT_DISPATCHED Re-Dispatch-Candidate Classification ────────────
+    // (Sprint 351 351-008 — MOAT-3) NOT_DISPATCHED tasks never had a worker
+    // attempt, so routing them through the standard NO_GO blame-fix pipeline
+    // (handleEvaluation → a "-fix" task framed as "Task X evaluated as
+    // NO_GO") would falsely accuse a worker that never ran. They already
+    // never reach handleEvaluation (the EVALUATE-phase branches above
+    // `continue` before that call) so no blame-fix task exists for them —
+    // this block only makes that exclusion observable: a distinct event +
+    // an explicit re-dispatch-candidate classification, instead of a silent
+    // gap in the FIX wave. handleCrossDependencies below is unaffected — it
+    // filters strictly on `=== TaskEvaluation.NO_GO`, so NOT_DISPATCHED
+    // tasks were already correctly excluded from cross-dependency fixes.
+    try {
+      const { reDispatchCandidateTaskIds } = classifyFixPhaseTasks(evaluations);
+      if (reDispatchCandidateTaskIds.length > 0) {
+        debugLog(
+          'runFixPhase:reDispatchCandidates',
+          `taskIds=[${reDispatchCandidateTaskIds.join(',')}] — NOT_DISPATCHED, not routed through blame-fix`,
+        );
+        const sidForRd = getCurrentSprintId(projectRoot) ?? sprint.id;
+        writeEvent(
+          projectRoot, sidForRd, 'brain', 'worker',
+          'BRAIN→WORKER:RE_DISPATCH_CANDIDATES',
+          {
+            taskIds: reDispatchCandidateTaskIds,
+            total: reDispatchCandidateTaskIds.length,
+            reason: 'NOT_DISPATCHED — dispatch never happened, not a worker failure',
+            timestamp: new Date().toISOString(),
+          },
+        );
+      }
+    } catch (e) { debugLog('runFixPhase:reDispatchCandidates', e); }
+
     handleCrossDependencies(projectRoot, sprint, evaluations);
 
     const fixTasks: Task[] = [];
@@ -2457,6 +2535,27 @@ export async function runRetroPhase(
             const resultPath = join(tasksDir, `task-${task.id}.result`);
             const exists = existsSync(resultPath);
             if (!exists) {
+              // Sprint 351 351-008 (MOAT-3) — THE production bug this task
+              // fixes: this pass previously clobbered EVERY missing-result
+              // task to a "worker-crashed-no-result" NO_GO sentinel,
+              // regardless of whether a worker was ever dispatched at all —
+              // bypassing the EVALUATE-phase liveness nuance entirely
+              // (sprint-347/348 live incident). Apply the same disk-evidence
+              // check here: no .result + no .hb + no .log → NOT_DISPATCHED,
+              // never a lying NO_GO. Archived tasks (already finalized once)
+              // are excluded from either path — absence there is archiving,
+              // not a crash or a dispatch gap.
+              if (!archivedResultExists(projectRoot, task.id)) {
+                const dispatchEvidence = gatherDispatchTraceEvidence(projectRoot, task.id);
+                if (classifyMissingResultDispatch(dispatchEvidence) === 'NOT_DISPATCHED') {
+                  debugLog(
+                    'runRetroPhase:preFinalize:not-dispatched',
+                    `task=${task.id} — no .result/.hb/.log trace on disk, classifying NOT_DISPATCHED (not a crash)`,
+                  );
+                  evaluations.set(task.id, TaskEvaluation.NOT_DISPATCHED);
+                  continue;
+                }
+              }
               if (haveSentinel) {
                 writeHonestSentinelResult(
                   projectRoot, task.id, [], 'worker-crashed-no-result',

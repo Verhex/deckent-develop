@@ -10,7 +10,7 @@
 // sprint-phases) is intentionally out of scope for Task 1 — it lives in
 // Sprint 157 T-004.
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { EVALUATIONS_DIR } from '../core/constants.js';
@@ -185,7 +185,18 @@ export function writeEvaluationAudit(
 
   const filePath = evaluationAuditPath(projectRoot, sprintId, taskId, attemptNum);
   mkdirSync(dirname(filePath), { recursive: true });
-  writeFileSync(filePath, JSON.stringify(record, null, 2) + '\n', 'utf-8');
+
+  // Atomic write: tmp → rename (same pattern as sprint-checkpoint.ts::writeCheckpoint).
+  // A crash mid-write never leaves a half-serialized audit record for a post-mortem
+  // reader to trip over — readers only ever see the prior file or the fully new one.
+  const tmpPath = `${filePath}.tmp`;
+  writeFileSync(tmpPath, JSON.stringify(record, null, 2) + '\n', 'utf-8');
+  try {
+    renameSync(tmpPath, filePath);
+  } catch (renameErr) {
+    try { if (existsSync(tmpPath)) unlinkSync(tmpPath); } catch { /* ignore */ }
+    throw renameErr;
+  }
 
   return record;
 }

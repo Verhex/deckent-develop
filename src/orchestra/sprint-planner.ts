@@ -474,248 +474,246 @@ export async function planSprint(
 
   // ─── Routing: V2 intent-based engine (routeTaskV2) ────────────────────────
   // V1 (keyword-based DecisionOrchestrator) was removed by ROUTE-V1-PURGE
-  // (ADR-G-006). The default fallback is now 'v2' (was the latent-bug 'v1'); only
-  // 'v2' is a valid config value. The single-value guard is left for the
-  // ROUTING-VERSION-LABEL (P2) reconcile, not a V1 trace.
-  const routingVersion = config.routing_engine ?? 'v2';
+  // (ADR-G-006); config validation accepts only 'v2', so the former
+  // `if (routingVersion === 'v2')` guard was permanently true and is
+  // collapsed here (ROUTE-V1-DEADBRANCH-COLLAPSE). The routing-meta
+  // `routingVersion: 'v3'`-vs-`'v2'`-stamp reconcile below remains open
+  // separately as ROUTING-VERSION-LABEL.
+  // V2: Unified intent-based routing via routeTaskV2
+  try {
+    const agentPool = new AgentPoolManager(projectRoot);
+    const pool = agentPool.loadAgents();
+    const projectStackV2 = detectProjectStack(projectRoot);
+    const skillPoolV2 = new SkillPoolManager(projectRoot);
+    const skillsV2 = skillPoolV2.loadSkills();
 
-  if (routingVersion === 'v2') {
-    // V2: Unified intent-based routing via routeTaskV2
+    // Load learning bonuses from previous sprints
+    let learningData: import('../core/routing-types.js').LearningBonus[] = [];
     try {
-      const agentPool = new AgentPoolManager(projectRoot);
-      const pool = agentPool.loadAgents();
-      const projectStackV2 = detectProjectStack(projectRoot);
-      const skillPoolV2 = new SkillPoolManager(projectRoot);
-      const skillsV2 = skillPoolV2.loadSkills();
-
-      // Load learning bonuses from previous sprints
-      let learningData: import('../core/routing-types.js').LearningBonus[] = [];
-      try {
-        const { OutcomeTracker } = await import('./outcome-tracker.js');
-        const tracker = new OutcomeTracker(projectRoot);
-        const { classifyIntent } = await import('../core/intent-classifier.js');
-        if (tasks.length > 0) {
-          const sampleDNA = classifyIntent(tasks[0]!);
-          learningData = tracker.calculateBonuses(sampleDNA);
-          debugLog('planSprint:learning-bonuses', `Loaded ${learningData.length} learning bonuses from previous sprints`);
-        }
-      } catch (e) {
-        debugLog('planSprint:learning-bonuses:No learning data available (first sprint or missing learnings.json)', e);
+      const { OutcomeTracker } = await import('./outcome-tracker.js');
+      const tracker = new OutcomeTracker(projectRoot);
+      const { classifyIntent } = await import('../core/intent-classifier.js');
+      if (tasks.length > 0) {
+        const sampleDNA = classifyIntent(tasks[0]!);
+        learningData = tracker.calculateBonuses(sampleDNA);
+        debugLog('planSprint:learning-bonuses', `Loaded ${learningData.length} learning bonuses from previous sprints`);
       }
-
-      // Generate project conventions temp skill
-      try {
-        const { generateProjectConventionsSkill } = await import('./temp-skill-generator.js');
-        if (projectStackV2) {
-          const conventionsSkill = generateProjectConventionsSkill(projectStackV2);
-          skillsV2.set(conventionsSkill.id, conventionsSkill);
-          debugLog('planSprint:temp-skill', `Generated project-conventions skill for ${projectStackV2.language}`);
-        }
-      } catch (e) { debugLog('planSprint:generateProjectConventionsSkill', e); }
-
-      // Generate and persist project-specific temp agents (V2 only)
-      try {
-        const { generateTempAgents } = await import('./temp-skill-generator.js');
-        if (projectStackV2) {
-          const tempAgents = generateTempAgents(projectStackV2);
-          for (const tempAgent of tempAgents) {
-            agentPool.saveTempAgentToPool(tempAgent);
-            pool.set(tempAgent.id.startsWith('temp-') ? tempAgent.id : `temp-${tempAgent.id}`, tempAgent);
-            debugLog('planSprint:temp-agent', `Generated temp agent: ${tempAgent.id} for ${projectStackV2.language}/${projectStackV2.framework}`);
-          }
-        }
-      } catch (e) { debugLog('planSprint:generateTempAgents', e); }
-
-      // Inject evolved rules into agent/skill activation configs (in-memory only)
-      try {
-        const { OutcomeTracker: OT } = await import('./outcome-tracker.js');
-        const ot = new OT(projectRoot);
-        const allLearnings = ot.getLearnings();
-        const evolvedRules = (allLearnings.evolvedRules ?? []) as import('./rule-evolver.js').EvolvedRule[];
-        const autoApplied = evolvedRules.filter(r => r.status === 'auto-applied');
-        let injectedCount = 0;
-
-        for (const evolved of autoApplied) {
-          // Lean-A: never inject a legacy/stale unconditional (`when: {}`) rule — it
-          // matches every task and reintroduces the synergy/conflict runaway.
-          if (isUnconditionalRule(evolved.rule as { when?: Record<string, unknown> })) {
-            debugLog(
-              'planSprint:evolved-rules',
-              `Skipped unconditional (empty-when) rule '${(evolved.rule as { name?: string }).name ?? evolved.entityId}'`,
-            );
-            continue;
-          }
-          if (evolved.entityType === 'agent') {
-            const agent = pool.get(evolved.entityId);
-            if (!agent) continue;
-            if (!agent.activation) {
-              agent.activation = { rules: [], exclude: [], minScore: 0 };
-            }
-            if (evolved.type === 'activation') {
-              const rule = evolved.rule as import('../core/routing-types.js').ActivationRule;
-              const hasDuplicate = agent.activation.rules.some(r => r.name && rule.name && r.name === rule.name);
-              if (!hasDuplicate) {
-                agent.activation.rules.push(rule);
-                injectedCount++;
-              }
-            } else if (evolved.type === 'exclusion') {
-              const rule = evolved.rule as import('../core/routing-types.js').ExclusionRule;
-              const hasDuplicate = agent.activation.exclude.some(r => r.name && rule.name && r.name === rule.name);
-              if (!hasDuplicate) {
-                agent.activation.exclude.push(rule);
-                injectedCount++;
-              }
-            }
-          } else if (evolved.entityType === 'skill') {
-            const skill = skillsV2.get(evolved.entityId);
-            if (!skill) continue;
-            if (!skill.activation) {
-              skill.activation = { rules: [], exclude: [], minScore: 0 };
-            }
-            if (evolved.type === 'activation') {
-              const rule = evolved.rule as import('../core/routing-types.js').ActivationRule;
-              const hasDuplicate = skill.activation.rules.some(r => r.name && rule.name && r.name === rule.name);
-              if (!hasDuplicate) {
-                skill.activation.rules.push(rule);
-                injectedCount++;
-              }
-            } else if (evolved.type === 'exclusion') {
-              const rule = evolved.rule as import('../core/routing-types.js').ExclusionRule;
-              const hasDuplicate = skill.activation.exclude.some(r => r.name && rule.name && r.name === rule.name);
-              if (!hasDuplicate) {
-                skill.activation.exclude.push(rule);
-                injectedCount++;
-              }
-            }
-          }
-        }
-
-        if (injectedCount > 0) {
-          debugLog('planSprint:evolved-rules', `Injected ${injectedCount} auto-applied evolved rules into activation configs`);
-        }
-      } catch (e) {
-        debugLog('planSprint:evolved-rules', e);
-      }
-
-      // ADR-075 routing-balance gate (343-007): accumulate per-task agent
-      // selections so the affinity distribution can be measured BEFORE the flag
-      // is defaulted on. In-memory, non-blocking, never throws.
-      const affinitySink = new InMemoryAgentSelectionSink();
-      const skillAgentAffinity = config.routing?.skill_agent_affinity ?? false;
-
-      for (const task of tasks) {
-        try {
-          const overrides: UserOverride[] = [];
-          if (task.forceAgent || task.forceSkills || task.excludeSkills || task.excludeAgent) {
-            overrides.push({
-              source: 'task-directive',
-              forceAgent: task.forceAgent,
-              forceSkills: task.forceSkills,
-              excludeSkills: task.excludeSkills,
-              excludeAgents: task.excludeAgent,
-              priority: 3,
-            });
-          }
-
-          const decision = routeTaskV2(task, pool, skillsV2, {
-            projectStack: projectStackV2,
-            overrides,
-            learningData,
-            config: { ...config.routing_config, agentMinScore: config.agent_min_score },
-            // ADR-075 (343-007): thread the skill→agent affinity flag. Default-off →
-            // option is false → byte-identical routing (engine already guards on it).
-            skillAgentAffinity,
-            sprintId,
-            taskId: task.id,
-            projectRoot,
-          });
-
-          task.assignedAgent = decision.agentId ?? 'generic';
-          task.assignedSkills = decision.skillIds;
-
-          // Routing-balance observability — the affinity reasoning line is emitted
-          // only for the WINNING agent that actually received the bonus, so its
-          // presence is a faithful per-task "affinity influenced this choice" signal.
-          recordAgentSelection(affinitySink, {
-            taskId: task.id,
-            agentId: task.assignedAgent,
-            affinityApplied: decision.reasoning.some((r) => r.includes('skill-affinity:')),
-          });
-          task.routingMeta = {
-            taskDNA: decision.taskDNA,
-            confidence: decision.agentConfidence,
-            routingVersion: 'v2',
-            ...(decision.overrideWarnings && decision.overrideWarnings.length > 0
-              ? { overrideWarnings: decision.overrideWarnings }
-              : {}),
-          };
-
-          if (decision.overrideWarnings && decision.overrideWarnings.length > 0) {
-            for (const w of decision.overrideWarnings) {
-              debugLog('planSprint:override-warning', `[${task.id}] ${w}`);
-            }
-          }
-
-          // Persist decision trail via DecisionLogger — only for v2 routing with meaningful steps
-          try {
-            const { DecisionLogger, filterMeaningfulSteps } = await import('./decision-logger.js');
-            const decisionLogger = new DecisionLogger(projectRoot);
-            const allEntries = decision.reasoning.map((r, i) => ({
-              step: i + 1,
-              name: `routing-step-${i + 1}`,
-              input: {
-                taskId: task.id,
-                title: task.title,
-                scope: task.scope.directories,
-                intent: decision.taskDNA.intent.primary,
-              } as Record<string, unknown>,
-              output: {
-                agent: decision.agentId ?? 'generic',
-                skills: decision.skillIds,
-                confidence: decision.agentConfidence,
-              } as Record<string, unknown>,
-              durationMs: 0,
-              reasoning: r,
-            }));
-            const meaningful = filterMeaningfulSteps(allEntries);
-            // Only write log if there are meaningful steps
-            if (meaningful.length > 0) {
-              decisionLogger.log(sprintId, task.id, meaningful);
-            }
-          } catch (logErr) {
-            debugLog('planSprint:decision-trail', logErr);
-          }
-
-          debugLog(
-            'planSprint:routing-v2',
-            `Task ${task.id} → agent=${task.assignedAgent}, skills=[${task.assignedSkills.join(', ')}], ` +
-            `confidence=${decision.agentConfidence}, intent=${decision.taskDNA.intent.primary}`,
-          );
-          // Observability: surface routeTaskV2's skill scoring rationale (why these
-          // skills won / whether the floor fired) so the live plan path is debuggable
-          // without re-deriving it in isolation. Dev-only (DECKENT_DEBUG).
-          debugLog(
-            'planSprint:routing-v2-skills',
-            `Task ${task.id} skill reasoning: ` +
-            decision.reasoning
-              .filter(r => /skill|floor|budget|bonus|threshold|mismatch|excluded/i.test(r))
-              .join(' | '),
-          );
-        } catch (taskErr) {
-          debugLog('planSprint:routing-v2', `V2 routing failed for task ${task.id}: ${taskErr}`);
-        }
-      }
-
-      // ADR-075 routing-balance gate (343-007): surface the agent-distribution
-      // snapshot (counts per agent + % affinity-influenced) for the dogfood
-      // measurement that must precede any default-on. Dev-only (DECKENT_DEBUG).
-      debugLog(
-        'planSprint:routing-affinity',
-        `affinity=${skillAgentAffinity} distribution: ${JSON.stringify(summarizeAgentDistribution(affinitySink.records))}`,
-      );
-    } catch (poolErr) {
-      debugLog('planSprint:routing-v2', `V2 routing pool loading failed: ${poolErr}`);
+    } catch (e) {
+      debugLog('planSprint:learning-bonuses:No learning data available (first sprint or missing learnings.json)', e);
     }
+
+    // Generate project conventions temp skill
+    try {
+      const { generateProjectConventionsSkill } = await import('./temp-skill-generator.js');
+      if (projectStackV2) {
+        const conventionsSkill = generateProjectConventionsSkill(projectStackV2);
+        skillsV2.set(conventionsSkill.id, conventionsSkill);
+        debugLog('planSprint:temp-skill', `Generated project-conventions skill for ${projectStackV2.language}`);
+      }
+    } catch (e) { debugLog('planSprint:generateProjectConventionsSkill', e); }
+
+    // Generate and persist project-specific temp agents (V2 only)
+    try {
+      const { generateTempAgents } = await import('./temp-skill-generator.js');
+      if (projectStackV2) {
+        const tempAgents = generateTempAgents(projectStackV2);
+        for (const tempAgent of tempAgents) {
+          agentPool.saveTempAgentToPool(tempAgent);
+          pool.set(tempAgent.id.startsWith('temp-') ? tempAgent.id : `temp-${tempAgent.id}`, tempAgent);
+          debugLog('planSprint:temp-agent', `Generated temp agent: ${tempAgent.id} for ${projectStackV2.language}/${projectStackV2.framework}`);
+        }
+      }
+    } catch (e) { debugLog('planSprint:generateTempAgents', e); }
+
+    // Inject evolved rules into agent/skill activation configs (in-memory only)
+    try {
+      const { OutcomeTracker: OT } = await import('./outcome-tracker.js');
+      const ot = new OT(projectRoot);
+      const allLearnings = ot.getLearnings();
+      const evolvedRules = (allLearnings.evolvedRules ?? []) as import('./rule-evolver.js').EvolvedRule[];
+      const autoApplied = evolvedRules.filter(r => r.status === 'auto-applied');
+      let injectedCount = 0;
+
+      for (const evolved of autoApplied) {
+        // Lean-A: never inject a legacy/stale unconditional (`when: {}`) rule — it
+        // matches every task and reintroduces the synergy/conflict runaway.
+        if (isUnconditionalRule(evolved.rule as { when?: Record<string, unknown> })) {
+          debugLog(
+            'planSprint:evolved-rules',
+            `Skipped unconditional (empty-when) rule '${(evolved.rule as { name?: string }).name ?? evolved.entityId}'`,
+          );
+          continue;
+        }
+        if (evolved.entityType === 'agent') {
+          const agent = pool.get(evolved.entityId);
+          if (!agent) continue;
+          if (!agent.activation) {
+            agent.activation = { rules: [], exclude: [], minScore: 0 };
+          }
+          if (evolved.type === 'activation') {
+            const rule = evolved.rule as import('../core/routing-types.js').ActivationRule;
+            const hasDuplicate = agent.activation.rules.some(r => r.name && rule.name && r.name === rule.name);
+            if (!hasDuplicate) {
+              agent.activation.rules.push(rule);
+              injectedCount++;
+            }
+          } else if (evolved.type === 'exclusion') {
+            const rule = evolved.rule as import('../core/routing-types.js').ExclusionRule;
+            const hasDuplicate = agent.activation.exclude.some(r => r.name && rule.name && r.name === rule.name);
+            if (!hasDuplicate) {
+              agent.activation.exclude.push(rule);
+              injectedCount++;
+            }
+          }
+        } else if (evolved.entityType === 'skill') {
+          const skill = skillsV2.get(evolved.entityId);
+          if (!skill) continue;
+          if (!skill.activation) {
+            skill.activation = { rules: [], exclude: [], minScore: 0 };
+          }
+          if (evolved.type === 'activation') {
+            const rule = evolved.rule as import('../core/routing-types.js').ActivationRule;
+            const hasDuplicate = skill.activation.rules.some(r => r.name && rule.name && r.name === rule.name);
+            if (!hasDuplicate) {
+              skill.activation.rules.push(rule);
+              injectedCount++;
+            }
+          } else if (evolved.type === 'exclusion') {
+            const rule = evolved.rule as import('../core/routing-types.js').ExclusionRule;
+            const hasDuplicate = skill.activation.exclude.some(r => r.name && rule.name && r.name === rule.name);
+            if (!hasDuplicate) {
+              skill.activation.exclude.push(rule);
+              injectedCount++;
+            }
+          }
+        }
+      }
+
+      if (injectedCount > 0) {
+        debugLog('planSprint:evolved-rules', `Injected ${injectedCount} auto-applied evolved rules into activation configs`);
+      }
+    } catch (e) {
+      debugLog('planSprint:evolved-rules', e);
+    }
+
+    // ADR-075 routing-balance gate (343-007): accumulate per-task agent
+    // selections so the affinity distribution can be measured BEFORE the flag
+    // is defaulted on. In-memory, non-blocking, never throws.
+    const affinitySink = new InMemoryAgentSelectionSink();
+    const skillAgentAffinity = config.routing?.skill_agent_affinity ?? false;
+
+    for (const task of tasks) {
+      try {
+        const overrides: UserOverride[] = [];
+        if (task.forceAgent || task.forceSkills || task.excludeSkills || task.excludeAgent) {
+          overrides.push({
+            source: 'task-directive',
+            forceAgent: task.forceAgent,
+            forceSkills: task.forceSkills,
+            excludeSkills: task.excludeSkills,
+            excludeAgents: task.excludeAgent,
+            priority: 3,
+          });
+        }
+
+        const decision = routeTaskV2(task, pool, skillsV2, {
+          projectStack: projectStackV2,
+          overrides,
+          learningData,
+          config: { ...config.routing_config, agentMinScore: config.agent_min_score },
+          // ADR-075 (343-007): thread the skill→agent affinity flag. Default-off →
+          // option is false → byte-identical routing (engine already guards on it).
+          skillAgentAffinity,
+          sprintId,
+          taskId: task.id,
+          projectRoot,
+        });
+
+        task.assignedAgent = decision.agentId ?? 'generic';
+        task.assignedSkills = decision.skillIds;
+
+        // Routing-balance observability — the affinity reasoning line is emitted
+        // only for the WINNING agent that actually received the bonus, so its
+        // presence is a faithful per-task "affinity influenced this choice" signal.
+        recordAgentSelection(affinitySink, {
+          taskId: task.id,
+          agentId: task.assignedAgent,
+          affinityApplied: decision.reasoning.some((r) => r.includes('skill-affinity:')),
+        });
+        task.routingMeta = {
+          taskDNA: decision.taskDNA,
+          confidence: decision.agentConfidence,
+          routingVersion: 'v2',
+          ...(decision.overrideWarnings && decision.overrideWarnings.length > 0
+            ? { overrideWarnings: decision.overrideWarnings }
+            : {}),
+        };
+
+        if (decision.overrideWarnings && decision.overrideWarnings.length > 0) {
+          for (const w of decision.overrideWarnings) {
+            debugLog('planSprint:override-warning', `[${task.id}] ${w}`);
+          }
+        }
+
+        // Persist decision trail via DecisionLogger — only for v2 routing with meaningful steps
+        try {
+          const { DecisionLogger, filterMeaningfulSteps } = await import('./decision-logger.js');
+          const decisionLogger = new DecisionLogger(projectRoot);
+          const allEntries = decision.reasoning.map((r, i) => ({
+            step: i + 1,
+            name: `routing-step-${i + 1}`,
+            input: {
+              taskId: task.id,
+              title: task.title,
+              scope: task.scope.directories,
+              intent: decision.taskDNA.intent.primary,
+            } as Record<string, unknown>,
+            output: {
+              agent: decision.agentId ?? 'generic',
+              skills: decision.skillIds,
+              confidence: decision.agentConfidence,
+            } as Record<string, unknown>,
+            durationMs: 0,
+            reasoning: r,
+          }));
+          const meaningful = filterMeaningfulSteps(allEntries);
+          // Only write log if there are meaningful steps
+          if (meaningful.length > 0) {
+            decisionLogger.log(sprintId, task.id, meaningful);
+          }
+        } catch (logErr) {
+          debugLog('planSprint:decision-trail', logErr);
+        }
+
+        debugLog(
+          'planSprint:routing-v2',
+          `Task ${task.id} → agent=${task.assignedAgent}, skills=[${task.assignedSkills.join(', ')}], ` +
+          `confidence=${decision.agentConfidence}, intent=${decision.taskDNA.intent.primary}`,
+        );
+        // Observability: surface routeTaskV2's skill scoring rationale (why these
+        // skills won / whether the floor fired) so the live plan path is debuggable
+        // without re-deriving it in isolation. Dev-only (DECKENT_DEBUG).
+        debugLog(
+          'planSprint:routing-v2-skills',
+          `Task ${task.id} skill reasoning: ` +
+          decision.reasoning
+            .filter(r => /skill|floor|budget|bonus|threshold|mismatch|excluded/i.test(r))
+            .join(' | '),
+        );
+      } catch (taskErr) {
+        debugLog('planSprint:routing-v2', `V2 routing failed for task ${task.id}: ${taskErr}`);
+      }
+    }
+
+    // ADR-075 routing-balance gate (343-007): surface the agent-distribution
+    // snapshot (counts per agent + % affinity-influenced) for the dogfood
+    // measurement that must precede any default-on. Dev-only (DECKENT_DEBUG).
+    debugLog(
+      'planSprint:routing-affinity',
+      `affinity=${skillAgentAffinity} distribution: ${JSON.stringify(summarizeAgentDistribution(affinitySink.records))}`,
+    );
+  } catch (poolErr) {
+    debugLog('planSprint:routing-v2', `V2 routing pool loading failed: ${poolErr}`);
   }
 
   // Write task files (skip in dry-run mode)

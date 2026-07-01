@@ -204,12 +204,29 @@ export enum TaskStatus {
  *                Cascade is NOT triggered (handleCrossDependencies filters
  *                only NO_GO; DEFERRED is intentionally excluded so saturation
  *                does not spawn xfix tasks downstream).
+ *   • NOT_DISPATCHED → Sprint 351 Task 351-008 (MOAT-3): dispatch itself
+ *                never happened for this task — no spawn reached it, no
+ *                container ever started, and NONE of `.result` / `.hb` /
+ *                `.log` ever touched disk (verified via disk evidence, not
+ *                just in-memory state). Distinct from NO_GO, which implies
+ *                a worker actually ran (even if it crashed or produced
+ *                nothing) — NOT_DISPATCHED is an orchestrator/dispatcher-
+ *                side gap, never the worker's fault. The FIX phase treats
+ *                NOT_DISPATCHED task ids as re-dispatch candidates and
+ *                never routes them through the NO_GO blame-fix pipeline
+ *                (see `classifyFixPhaseTasks` in result-evaluator.ts).
+ *                Sibling to DEFERRED (also dispatcher-side, also excluded
+ *                from cascade) but kept as a separate value: DEFERRED is a
+ *                pre-EVALUATE dispatch-deadline signal computed by the
+ *                caller, NOT_DISPATCHED is EVALUATE's own disk-evidence
+ *                verdict for a task it directly inspected.
  */
 export enum TaskEvaluation {
   DONE = 'DONE',
   GO_WITH_TECH_DEBT = 'GO_WITH_TECH_DEBT',
   NO_GO = 'NO_GO',
   DEFERRED = 'DEFERRED',
+  NOT_DISPATCHED = 'NOT_DISPATCHED',
 }
 
 export type SelfAssessment = 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
