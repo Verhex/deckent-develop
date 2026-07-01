@@ -1,7 +1,7 @@
 # ADR-G-025: Process Resilience, Recovery & Live Observability
 
-**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=runtime contract (crash-handlers at boot — ⚠️ redaction NOT yet wired into the fatal handler — + atomic checkpoint + phase persistence; eval-audit non-atomic; recovery mandatory) → tomorrow=provider-failover + auditor-approved takeover + WORKER-LIVE-TRACE stream
-**Status:** accepted (provisional — crash-log redaction NOT wired into the fatal handler [CRASH-REDACT]; failover/live-trace/brain-death-procedure roadmap) · **Date:** 2026-06-30 · **Absorbs:** ADR-043 (Brain Crash Recovery) + ADR-044 (State Observability Contract) + ADR-047 Brain-death-procedure aspect
+**Class:** ADR-G (Global / Constitution) · **Scope:** global+project · **Immutable:** yes · **Source:** publisher · **Enforcement:** today=runtime contract (crash-handlers at boot **with `redactSensitive()` wired into the fatal handler — ✅ CRASH-REDACT done 2026-07-01** + atomic checkpoint + phase persistence; eval-audit non-atomic; recovery mandatory) → tomorrow=provider-failover + auditor-approved takeover + WORKER-LIVE-TRACE stream
+**Status:** accepted (CRASH-REDACT ✅ done 2026-07-01 — fatal-handler redaction wired+tested [sprint-348-005]; remaining provisionality = failover/live-trace/brain-death-procedure roadmap + EVAL-AUDIT-ATOMIC) · **Date:** 2026-06-30 · **Absorbs:** ADR-043 (Brain Crash Recovery) + ADR-044 (State Observability Contract) + ADR-047 Brain-death-procedure aspect
 **Crosswalk:** ADR-043 + ADR-044 → ADR-G-025
 
 > **Naming:** "sprint" → "süreç/process" (universal mode naming, ADR-G-024). This contract governs the resilience + observability of any orchestration *process*, not just a sprint.
@@ -21,12 +21,12 @@ Brain crash-recovery (old ADR-043) and state-observability (old ADR-044) were tw
 ```xml
 <crash-recovery>
   <layer n="1">Entry-point exception handlers (uncaughtException/unhandledRejection).
-    ⚠️ redaction is NOT yet wired: formatFatalAndExit writes the raw message + stack to
-    stderr + the .deckent/crashes/<ts>.log crash-log WITHOUT calling redactSensitive()
-    (the helper exists in redact-sensitive.ts but is not applied here) — so a secret in
-    an error message/stack CAN currently leak to a crash log. "API keys/tokens never
-    leak" is the TARGET; wiring redactSensitive() into the fatal handler is CRASH-REDACT
-    (P1-security).</layer>
+    ✅ redaction IS wired (CRASH-REDACT, sprint-348-005, 2026-07-01): formatFatalAndExit
+    passes BOTH message and stack through redactSensitive() before the stderr FATAL
+    line and the .deckent/crashes/<ts>.log write — sk-/Bearer/API_KEY patterns are
+    masked in both sinks (proven by tests/cli/error-handler-redact.test.ts against the
+    REAL crash-log file). Residual ceiling: redactSensitive is a fixed allowlist — AWS
+    AKIA…/ghp_…/JWT/generic password= are NOT masked (REDACT-COVERAGE follow-up).</layer>
   <layer n="2">Atomic checkpoint write (.tmp + renameSync; sprint_checkpoint_interval)
     — half-written checkpoints never read.</layer>
   <layer n="3">State recovery on restart (restoreSprintFromCheckpoint: fresh|complete|
@@ -83,7 +83,7 @@ A formal procedure for Brain death: fallback/retry **steps at system AND user le
 
 **(+)** Process state is durable, observable, recoverable, and (tomorrow) provider-resilient — the orchestration survives crashes, sleeps, and provider failures. Per-worker live-trace closes the #1 observability gap ("x is doing what, right now?"). Battle-tested core (Sprint 267/270).
 
-**(−)** **Crash-log redaction is NOT wired** — the fatal handler writes raw message+stack to stderr + the crash-log, so a secret can leak (CRASH-REDACT, P1-security); the "never leak" guarantee is a target, not today's reality. `writeEvaluationAudit` is non-atomic (EVAL-AUDIT-ATOMIC). Provider-failover + escalation + worker-live-trace + brain-death-tool are roadmap; today `deckent recover` = cleanup, not the staged brain-death procedure. The proven core is the 3-layer recovery + checkpoint/phase persistence (Sprint 267/270 battle-tested). Dashboard-reconcile gap is known/open.
+**(−)** Crash-log redaction is ✅ wired (CRASH-REDACT done 2026-07-01) but the redactor's pattern-allowlist is a coverage ceiling (no AWS/ghp_/JWT/generic-password masking — REDACT-COVERAGE). `writeEvaluationAudit` is non-atomic (EVAL-AUDIT-ATOMIC). Provider-failover + escalation + worker-live-trace + brain-death-tool are roadmap; today `deckent recover` = cleanup, not the staged brain-death procedure. The proven core is the 3-layer recovery + checkpoint/phase persistence (Sprint 267/270 battle-tested). Dashboard-reconcile gap is known/open.
 
 ---
 
@@ -91,4 +91,4 @@ A formal procedure for Brain death: fallback/retry **steps at system AND user le
 
 - **Absorbs:** ADR-043 (Crash Recovery) + ADR-044 (State Observability) + ADR-047 (Brain-death procedure aspect).
 - **Cross-ref:** ADR-G-008 (provider failover/self-update) · ADR-G-022 (nervous trigger) · ADR-G-020 (auditor authority for takeover-approval) · ADR-G-033 (dashboard) · ADR-G-009/TRN (trace) · ADR-G-024 (process naming).
-- **Born:** **CRASH-REDACT** (wire `redactSensitive()` into `formatFatalAndExit` message+stack for stderr + crash-log + test sk-/Bearer/API_KEY absence; P1-security) · **EVAL-AUDIT-ATOMIC** (`writeEvaluationAudit` → `.tmp`+rename) · BRAIN-FAILOVER · WORKER-LIVE-TRACE · BRAIN-PROVIDER-SELFUPDATE · BRAIN-DEATH-PROCEDURE.
+- **Born:** **CRASH-REDACT** (✅ done 2026-07-01, sprint-348-005 — `redactSensitive()` wired into `formatFatalAndExit` message+stack for BOTH stderr + crash-log; sk-/Bearer/API_KEY absence proven on the real crash-log file) · **REDACT-COVERAGE** (born — extend the redactor allowlist: AWS `AKIA…`, GitHub `ghp_…`, JWT, generic `password=`/`token=`) · **EVAL-AUDIT-ATOMIC** (`writeEvaluationAudit` → `.tmp`+rename) · BRAIN-FAILOVER · WORKER-LIVE-TRACE · BRAIN-PROVIDER-SELFUPDATE · BRAIN-DEATH-PROCEDURE.

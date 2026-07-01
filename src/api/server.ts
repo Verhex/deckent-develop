@@ -1,23 +1,25 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
-import { readFileSync, existsSync, readdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { SessionBackend } from './terminal/session-backend.js';
 import { PtySessionManager } from './terminal/session-manager.js';
 import { LocalTokenAuthProvider, JwksAuthProvider } from './terminal/auth-provider.js';
 import type { AuthProvider } from './terminal/auth-provider.js';
-import { TerminalAudit, type AuditSink } from './terminal/audit.js';
+import { TerminalAudit, MemoryStoreAuditSink } from './terminal/audit.js';
+import { loadOrCreateAuditKey } from './terminal/audit-integrity.js';
 import { attachTerminalGateway } from './terminal/ws-gateway.js';
 import type { CreateSessionInput, SessionKind, TenantId } from './terminal/types.js';
 import { z } from 'zod';
 import {
   DASHBOARD_FILE, BRAIN_DIR, SPRINTS_DIR, TASKS_DIR, LOCKS_DIR,
-  PROJECT_CONFIG_PATH, DIRECTIVES_FILE,
+  PROJECT_CONFIG_PATH, DIRECTIVES_FILE, MEMORY_DB_FILE,
 } from '../core/constants.js';
 import { SprintStatus, SprintPhase, TaskStatus } from '../core/types.js';
 import type { Task, Sprint } from '../core/types.js';
 import { readJsonSafe } from '../core/utils.js';
 import { deepMerge } from '../core/config.js';
+import { MemoryStore } from '../core/memory-store.js';
 import { watchDashboard } from './watcher.js';
 import { bearerAuthMiddleware, isLocalhostRequest, resolveAuthToken } from './auth.js';
 import { injectApiTokenIntoHtml, isLoopbackRemote } from './middleware/token.js';
@@ -1405,6 +1407,7 @@ export function createHttpServer(
   let terminalToken: string | undefined;
   let terminalMgr: PtySessionManager | undefined;
   let terminalAudit: TerminalAudit | undefined;
+  let terminalAuditStore: MemoryStore | undefined;
   let terminalAuth: AuthProvider | undefined;
   let terminalReaper: NodeJS.Timeout | undefined;
 
@@ -1415,6 +1418,11 @@ export function createHttpServer(
     // the same raw project-config read as `terminal.enabled`; absent block =
     // EXACTLY today's local-token behavior (default-off).
     let terminalJwks: { issuer: string; audience?: string; jwksUrl: string } | undefined;
+    // AUDIT-WIRE (ADR-G-029 invariant #3 clause-2): gates the HMAC integrity
+    // chain on the persisted audit trail. Persistence itself (MemoryStoreAuditSink)
+    // is unconditional — this only decides whether TerminalAudit chain-links
+    // each row. New gate, so secure-by-default (absent block = enabled).
+    let terminalAuditIntegrityEnabled = true;
     const projCfgPath = join(projectRoot, PROJECT_CONFIG_PATH);
     if (existsSync(projCfgPath)) {
       try {
@@ -1422,9 +1430,13 @@ export function createHttpServer(
         const projCfg = JSON.parse(raw) as {
           terminal?: { enabled?: boolean };
           terminal_oidc_jwks?: { issuer?: unknown; audience?: unknown; jwksUrl?: unknown };
+          terminal_audit_integrity?: { enabled?: boolean };
         };
         if (projCfg?.terminal?.enabled === false) {
           terminalEnabled = false;
+        }
+        if (projCfg?.terminal_audit_integrity?.enabled === false) {
+          terminalAuditIntegrityEnabled = false;
         }
         const jwks = projCfg?.terminal_oidc_jwks;
         if (jwks !== undefined && jwks !== null && typeof jwks === 'object') {
@@ -1469,9 +1481,16 @@ export function createHttpServer(
         host,
       });
       // Structured audit recorder. Tests pass a no-op sink; production wires
-      // MemoryStore. Raw PTY output is NEVER routed here (security invariant).
-      const auditSink: AuditSink = { insert: () => { /* no-op default */ } };
-      terminalAudit = new TerminalAudit(auditSink);
+      // a real MemoryStore (.brain/memory.db) via MemoryStoreAuditSink so
+      // lifecycle events are actually persisted (AUDIT-WIRE, ADR-G-029
+      // invariant #3 clause-2). Raw PTY output is NEVER routed here (security
+      // invariant) — TerminalAudit only ever serializes structured fields.
+      mkdirSync(join(projectRoot, BRAIN_DIR), { recursive: true }); // ensure .brain/ exists
+      terminalAuditStore = new MemoryStore(join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE));
+      const auditSink = new MemoryStoreAuditSink(terminalAuditStore);
+      terminalAudit = terminalAuditIntegrityEnabled
+        ? new TerminalAudit(auditSink, { secret: loadOrCreateAuditKey(projectRoot) })
+        : new TerminalAudit(auditSink);
       // JWKS auth (opt-in): bearer = IdP-issued RS256 JWT verified via the
       // verifyAsync seam. The auto-generated local token above is still minted
       // and HTML-injected (return contract preserved) but is NOT honored by
@@ -1647,6 +1666,7 @@ export function createHttpServer(
         terminalReaper = undefined;
       }
       terminalMgr?.reapIdle();
+      terminalAuditStore?.close();
       for (const client of sseClients) {
         client.end();
       }

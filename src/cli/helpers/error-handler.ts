@@ -3,6 +3,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DeckentError, formatHumanError } from '../../core/errors.js';
+import { redactSensitive } from '../../core/redact-sensitive.js';
 
 export interface ErrorHandlerOpts {
   verbose?: boolean;
@@ -102,11 +103,13 @@ function describeFatal(error: unknown): { name: string; message: string; stack?:
  */
 export function formatFatalAndExit(error: unknown): never {
   const { name, message, stack } = describeFatal(error);
+  const redactedMessage = redactSensitive(message);
+  const redactedStack = stack ? redactSensitive(stack) : stack;
   const debug = process.env.DECKENT_DEBUG === '1';
 
-  process.stderr.write(`\x1b[31m✗ FATAL:\x1b[0m ${name}: ${message}\n`);
-  if (debug && stack) {
-    process.stderr.write(`${stack}\n`);
+  process.stderr.write(`\x1b[31m✗ FATAL:\x1b[0m ${name}: ${redactedMessage}\n`);
+  if (debug && redactedStack) {
+    process.stderr.write(`${redactedStack}\n`);
   }
 
   try {
@@ -116,8 +119,8 @@ export function formatFatalAndExit(error: unknown): never {
     const body = [
       `timestamp: ${new Date().toISOString()}`,
       `name: ${name}`,
-      `message: ${message}`,
-      stack ? `stack:\n${stack}` : 'stack: <unavailable>',
+      `message: ${redactedMessage}`,
+      redactedStack ? `stack:\n${redactedStack}` : 'stack: <unavailable>',
     ].join('\n') + '\n';
     writeFileSync(join(dir, `${stamp}.log`), body, 'utf8');
   } catch {
