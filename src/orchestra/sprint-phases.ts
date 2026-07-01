@@ -871,6 +871,12 @@ export async function runSpawnPhase(
             id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status,
           }, scanResult);
         });
+        // MOAT-2 (ADR-G-013): unref the SPRINT's dashboard scan loop so it cannot
+        // pin the coordinator's event loop past sprint completion (e.g. a throw
+        // during EXECUTE that skips runCleanupPhase's clearInterval). unref here at
+        // the sprint call-site ONLY — startScanLoop stays ref'd for the standalone
+        // `deckent audit` daemon, whose scan loop IS its reason to stay alive.
+        scanInterval?.unref?.();
       } catch (e) { debugLog('runSpawnPhase:startScanLoop', e); }
       break;
     } catch (err) {

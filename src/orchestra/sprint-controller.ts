@@ -1099,6 +1099,13 @@ export async function runSprint(
 
     void writePeriodicSnapshot();
     snapshotInterval = setInterval(() => void writePeriodicSnapshot(), 30_000);
+    // MOAT-2 (ADR-G-013): the 30s periodic-snapshot timer is coordinator
+    // maintenance, not legitimate work that should keep the process alive. unref
+    // it so it can never pin the event loop past sprint completion — including a
+    // throw path where the happy-path clearInterval (below) is skipped and the
+    // finally block cannot reach this try-scoped variable. The `beforeExit`
+    // handler still flushes a final snapshot before a clean exit.
+    snapshotInterval.unref?.();
 
     beforeExitHandler = (): void => {
       try { void writePeriodicSnapshot(); } catch { /* best effort */ }
@@ -1591,6 +1598,16 @@ export async function runSprint(
     alerts: [],
     updatedAt: now(),
   });
+
+  // MOAT-2 (ADR-G-013): audit what — if anything — still pins the coordinator's
+  // event loop after the sprint's own teardown. Debug-gated (zero cost when the
+  // debug channel is off). If a future handle regresses the orphan-start fix it
+  // surfaces here BY NAME (e.g. a ref'd 'Timeout' / 'ChildProcess') instead of
+  // manifesting as a silent multi-minute linger — this is the permanent
+  // observability that closes the "unref'd-handle audit" the ADR called for.
+  try {
+    debugLog('runSprint:activeResourcesAtExit', process.getActiveResourcesInfo());
+  } catch (e) { debugLog('runSprint:activeResourcesAtExit:err', e); }
 
   return sprint;
   } finally {

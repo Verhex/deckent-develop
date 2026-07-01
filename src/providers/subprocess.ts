@@ -21,6 +21,15 @@ import { resolveReasoningEffort } from '../core/reasoning-effort.js';
 import type { ProviderDefinition } from '../core/config-types.js';
 import { resolveCrossProviderCredentialKeys } from './cross-provider-keys.js';
 
+/**
+ * MOAT-2 (ADR-G-013): grace window between a graceful SIGTERM and the SIGKILL
+ * escalation in {@link SubprocessSpawnBackend.killWithSignal}. Long enough for a
+ * well-behaved worker to flush + exit on SIGTERM, short enough that a signal-
+ * ignoring worker cannot survive as an orphan once `child.unref()` lets the
+ * coordinator drain.
+ */
+const SIGKILL_ESCALATION_MS = 2_000;
+
 // ─── SubprocessProviderConfig ───────────────────────────────────────
 /**
  * Configuration for a CLI-based provider used by SubprocessSpawnBackend.
@@ -114,6 +123,13 @@ interface SubprocessWorkerEntry {
   logPath: string;
   spawnedAt: string;
   timeoutHandle?: ReturnType<typeof setTimeout>;
+  /**
+   * MOAT-2 (ADR-G-013): the 15s coordinator-side heartbeat interval. Stored on
+   * the entry so {@link SubprocessSpawnBackend.killWithSignal} can clear it
+   * deterministically at reap time instead of waiting for the child's (possibly
+   * slow) `exit` event to fire the closure-scoped clear.
+   */
+  hbInterval?: ReturnType<typeof setInterval>;
 }
 
 // ─── SubprocessSpawnBackend ───────────────────────────────────────────
@@ -246,6 +262,22 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     // BUG-26: DON'T close logFd here — keep open until child exits
     // On Windows the cmd.exe wrapper child inherits the FD; closing it before inherit causes empty logs
 
+    // MOAT-2 ROOT CAUSE (ADR-G-013, sprint-333 ~27min linger): a `child_process`
+    // spawned without `detached`/`unref` keeps the PARENT's event loop alive by
+    // default until the child exits (that is what `child.unref()` exists to undo —
+    // Node docs: "allow the parent to exit independently of the child"). The sprint
+    // keys task completion on the `.result` FILE, not the child's `exit` — so a
+    // worker that writes its result while its process lingers pins the COORDINATOR's
+    // loop for the child's whole lifetime. Empirically verified: same-stdio child
+    // ⇒ parent waits the child's full runtime; WITH `child.unref()` ⇒ parent drains
+    // immediately. The child handle — not the heartbeat timer — is the dominant
+    // anchor, so unref the child here. Safe during the sprint: the EXECUTE-phase
+    // result poll loop (waitForResults) keeps the loop alive with its own timer, so
+    // an unref'd child never causes a premature mid-sprint exit; it only lets the
+    // coordinator exit once the sprint is genuinely done. cleanup()/kill() below
+    // still SIGTERM→SIGKILL-reap the child so it cannot survive as an orphan worker.
+    child.unref?.();
+
     // Write initial heartbeat
     this.writeHeartbeat(taskId, dir, 'EXECUTING', 0);
 
@@ -255,12 +287,20 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
       hbSequence++;
       this.writeHeartbeat(taskId, dir, 'EXECUTING', hbSequence);
     }, 15_000);
+    // MOAT-2 defense-in-depth (ADR-G-013): the child handle (unref'd above) is the
+    // dominant loop-anchor, but this 15s heartbeat interval is a SECOND coordinator-
+    // side timer that would independently pin the loop, so unref it too — a
+    // maintenance timer must never hold the process open. It still fires whenever the
+    // loop is otherwise busy (the heartbeat FILE is the Auditor's liveness source, and
+    // is unaffected). `?.` guards fake timers in unit tests.
+    hbInterval.unref?.();
 
     const entry: SubprocessWorkerEntry = {
       taskId,
       process: child,
       logPath,
       spawnedAt: new Date().toISOString(),
+      hbInterval,
     };
 
     // Set up timeout if configured
@@ -269,6 +309,10 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
       entry.timeoutHandle = setTimeout(() => {
         this.killWithSignal(taskId, 'SIGKILL');
       }, timeout);
+      // MOAT-2 (ADR-G-013): same rationale as hbInterval — the kill-timeout is a
+      // background guard, not legitimate coordinator work, so it must not pin the
+      // event loop past normal completion. Cleared on exit/kill either way.
+      entry.timeoutHandle.unref?.();
     }
 
     this.workers.set(taskId, entry);
@@ -362,7 +406,27 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
       );
     }
     if (entry.timeoutHandle) clearTimeout(entry.timeoutHandle);
-    entry.process.kill(signal);
+    // MOAT-2 (ADR-G-013): clear the heartbeat interval at reap time so cleanup()
+    // releases the coordinator's event loop immediately, rather than waiting for
+    // the child's `exit` closure (which may lag SIGTERM). Idempotent with the
+    // exit-handler clearInterval.
+    if (entry.hbInterval) clearInterval(entry.hbInterval);
+    const proc = entry.process;
+    proc.kill(signal);
+    // MOAT-2 (ADR-G-013) — no orphan worker survives a clean run. `child.unref()`
+    // lets the coordinator exit without waiting on the child, so a worker that
+    // IGNORES a graceful SIGTERM would otherwise linger as an orphan (trading a
+    // lingering coordinator for a lingering worker — still a lifecycle violation).
+    // Escalate SIGTERM→SIGKILL after a short grace; the grace timer is unref'd (it
+    // never itself pins the loop) and is cleared the moment the child actually
+    // exits. Mirrors the docker backend's `docker stop --time` graceful→force stop.
+    if (signal === 'SIGTERM') {
+      const escalation = setTimeout(() => {
+        try { proc.kill('SIGKILL'); } catch { /* already exited */ }
+      }, SIGKILL_ESCALATION_MS);
+      escalation.unref?.();
+      proc.once('exit', () => clearTimeout(escalation));
+    }
     this.workers.delete(taskId);
   }
 
