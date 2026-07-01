@@ -17,6 +17,7 @@ import { createCodexAdapter } from '../providers/codex.js';
 import { createGeminiAdapter } from '../providers/gemini.js';
 import { buildSuggestedImageCmd } from '../core/worker-image-check.js';
 import { TASKS_DIR } from '../core/constants.js';
+import { DECK_FILE_NAME } from '../core/deck-file.js';
 import { debugLog } from '../core/utils.js';
 import { DeckentError } from '../core/errors.js';
 import {
@@ -505,6 +506,60 @@ export function parseInspectOutput(stdout: string): { running: boolean; exitCode
   return { running, exitCode };
 }
 
+/**
+ * DECK-WORKER-ISOLATION (ADR-G-005): build the read-only shadow mount that hides
+ * the project's `.deck` secret file from a worker container.
+ *
+ * The docker backend bind-mounts the WHOLE project root read-write at
+ * `/workspace`, and `.deck` lives in the project root — so without this a worker
+ * can `read('/workspace/.deck')` and see every deckent secret (verified live).
+ * Overlaying an empty regular file at that path read-only makes the worker see a
+ * 0-byte `.deck` while the host file is untouched; the provider credential the
+ * worker legitimately needs still arrives via the per-provider env allowlist
+ * (F1-014r), so nothing breaks.
+ *
+ * **CONDITIONAL by design — only shadow when the host `.deck` exists.** A nested
+ * bind mount materializes its target on the host underlying dir before mounting,
+ * and `/workspace` IS the project root (same inode). Shadowing a non-existent
+ * `.deck` therefore makes docker CREATE a phantom empty `${dir}/.deck` on the
+ * host that persists after the container exits (verified: regular empty file) —
+ * deckent silently writing a secret file into the user's repo and colliding with
+ * `createDeckTemplate` / DECK-OVERWRITE-GUARD. No file to hide ⇒ no mount.
+ *
+ * Pure — exported for unit tests. The caller creates the empty shadow source file
+ * (a regular 0-byte file, so docker cannot create a `.deck` *directory* instead).
+ *
+ * NOTE (honest scope): this closes the file-exposure half of zero-worker-exposure
+ * for the DOCKER backend only. The subprocess backend runs the worker as a host
+ * process inside the project root, so `.deck` stays disk-readable there (mitigated
+ * by env-scrubbing, not mount-isolation) until the host-side credential broker
+ * lands — see ADR-G-005.
+ */
+export function buildDeckShadowMountArgs(deckExists: boolean, shadowHostPath: string): string[] {
+  if (!deckExists) return [];
+  return ['-v', `${shadowHostPath}:${CONTAINER_WORKSPACE}/${DECK_FILE_NAME}:ro`];
+}
+
+/**
+ * DECK-WORKER-ISOLATION (ADR-G-005): create/refresh the empty host file that the
+ * `.deck` shadow mount overlays, returning its path.
+ *
+ * The shadow source lives at `${tasksDir}/.deck-shadow` — a single path shared by
+ * EVERY worker in a sprint, so the write MUST be idempotent. It is written
+ * owner-writable (`0o600`), never `0o400`: a read-only file would make the second
+ * worker's `writeFileSync` (which opens `O_WRONLY|O_TRUNC`) throw `EACCES` and
+ * crash the spawn, breaking every multi-worker docker sprint. Read-only INSIDE the
+ * container is enforced by the mount's `:ro` flag (buildDeckShadowMountArgs), not
+ * by the host file mode, so host write permission does not weaken the isolation.
+ *
+ * Exported for unit tests (idempotency regression).
+ */
+export function ensureDeckShadowFile(tasksDir: string): string {
+  const shadowHostPath = join(tasksDir, '.deck-shadow');
+  writeFileSync(shadowHostPath, '', { mode: 0o600 });
+  return shadowHostPath;
+}
+
 // ─── Docker Spawn Backend ─────────────────────────────────────────────────
 
 export class DockerSpawnBackend implements SpawnBackend {
@@ -800,6 +855,19 @@ export class DockerSpawnBackend implements SpawnBackend {
       );
     }
 
+    // DECK-WORKER-ISOLATION (ADR-G-005): hide the project's `.deck` secret file
+    // from the worker. The project root is bind-mounted read-write at /workspace,
+    // so `.deck` would otherwise be worker-readable. Overlay an empty read-only
+    // file at /workspace/.deck — ONLY when a real `.deck` exists (shadowing a
+    // missing file would materialize a phantom host `.deck` via the nested bind
+    // mount; see buildDeckShadowMountArgs). The shadow source is a regular 0-byte
+    // file so docker cannot create a `.deck` directory on the target.
+    const deckExists = existsSync(join(dir, DECK_FILE_NAME));
+    const deckShadowHostPath = deckExists
+      ? ensureDeckShadowFile(tasksDir)
+      : join(tasksDir, '.deck-shadow');
+    const deckShadowMountArgs = buildDeckShadowMountArgs(deckExists, deckShadowHostPath);
+
     const dockerArgs: string[] = [
       'run', '-d',
       '--name', containerName,
@@ -815,6 +883,9 @@ export class DockerSpawnBackend implements SpawnBackend {
       '--tmpfs', `${containerHome}:size=100m,uid=${uid},gid=${gid}`,
       // Project mounted read-write — workers need to create/edit files in scope
       '-v', `${dir}:${CONTAINER_WORKSPACE}`,
+      // DECK-WORKER-ISOLATION (ADR-G-005): read-only empty overlay hiding .deck
+      // (nested mount, applied after the project root so it shadows /workspace/.deck)
+      ...deckShadowMountArgs,
       // .tasks/ mounted read-write (results, heartbeats, prompts)
       '-v', `${tasksDir}:${CONTAINER_WORKSPACE}/${TASKS_DIR}`,
       // .locks/ mounted read-write (file locking)
