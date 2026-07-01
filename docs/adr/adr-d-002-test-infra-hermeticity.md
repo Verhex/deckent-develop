@@ -1,7 +1,7 @@
 # ADR-D-002: Test Infrastructure & Hermeticity
 
-**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=vitest (`tests/` + dual `vitest.config.ts` / `vitest.dashboard.config.ts`) + 3 hermeticity artifacts (`test:ci-sim` · `lint-test-hermeticity` · `sandbox-home`) + agent-injected async/hermetic rule (advisory) → tomorrow=mechanical hard-gates `lint-no-spawnsync` (W1) + ADR-087-W auditor residual migration (W2); then `test:ci-sim` sandbox-overlay (W3, gated on the STATE-RESOLVER precondition)
-**Status:** accepted (provisional — mechanical enforcement closes when W1+W2 land; W3 overlay is P1 hardening) · **Date:** 2026-06-30 · **Absorbs:** ADR-003 (vitest over Jest) + ADR-087 (Async I/O & Test Hermeticity Standard) + ADR-078 Part-A (CI-Hermeticity artifacts) · **Supersedes:** ADR-005 (Synchronous I/O — archived)
+**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=vitest (`tests/` + dual `vitest.config.ts` / `vitest.dashboard.config.ts`) + 3 hermeticity artifacts (`test:ci-sim` · `lint-test-hermeticity` · `sandbox-home`) + **✅ `lint-no-spawnsync` (W1, 2026-07-01): a no-NEW-spawnSync RATCHET (89 grandfathered call sites, un-audited baseline; catches namespace `cp.spawnSync` too) + a HOT-PATH hard-block (36 hot-path spawnSync across 6 files on an owned `hotPathDebt` list; a new hot-path spawnSync hard-fails)** → tomorrow=ADR-087-W auditor residual migration (W2, shrinks the hotPathDebt); then `test:ci-sim` sandbox-overlay (W3, gated on the STATE-RESOLVER precondition)
+**Status:** accepted (provisional — **W1 ✅ done 2026-07-01** (ratchet + hot-path block live; full ADR-G-002 M1–M6 audit of the 89 grandfathered sites is NOT claimed); **mechanical enforcement fully closes when W2 (ADR-087-W) migrates the hot-path residual**; W3 overlay is P1 hardening) · **Date:** 2026-06-30 (rev 2026-07-01) · **Absorbs:** ADR-003 (vitest over Jest) + ADR-087 (Async I/O & Test Hermeticity Standard) + ADR-078 Part-A (CI-Hermeticity artifacts) · **Supersedes:** ADR-005 (Synchronous I/O — archived)
 **Crosswalk:** ADR-003 (+ ADR-087 + ADR-078-A) → ADR-D-002
 
 > **Scope note:** Contributor-only test conventions (how deckent is built + verified) — ADR-D, dev install, agent-injected to dev/dogfood workers. The discipline's *outcome* (a hermetic, trustworthy suite) is what users rely on, but the *convention itself* is contributor-facing — hence ADR-D, not ADR-G.
@@ -112,10 +112,18 @@ Hot-path file/network I/O — loops, scan cycles, worker dispatch, large reads �
   <artifact path="tests/helpers/sandbox-home.ts">
     withSandboxHome(fn) / useSandboxHome() — redirect process.env.HOME to a unique
     os.tmpdir() dir per test, cleaned up after; nested calls independent.</artifact>
-  <artifact path="scripts/lint-no-spawnsync.mjs" status="W1 — to build">
-    Detects spawnSync import/call; fails unless in an allowlist entry carrying
-    file:line + rationale + ADR-G-002 ref; allowlist is REJECTED in hot-path folders
-    (auditor scan, dispatcher, runner, watcher, CI polling).</artifact>
+  <artifact path="scripts/lint-no-spawnsync.mjs" status="W1 — live (2026-07-01)">
+    Scans src/ for real spawnSync CALL sites (excludes imports, comments, string
+    literals, the ADR-G-002 detection-pattern). Two guarantees against
+    scripts/spawnsync-baseline.json: (1) RATCHET — a call site absent from
+    `sanctioned` fails (no new spawnSync; `--update` regenerates, diff-visible);
+    (2) HOT-PATH hard-block — a spawnSync in a hot-path file (auditor scan,
+    worker dispatch/retry, evaluate-loop probe) must be on the owner-tagged
+    `hotPathDebt` list, and `--update` never auto-adds one, so a new hot-path
+    spawnSync fails until consciously recorded. HONEST: the 89 `sanctioned` sites
+    are grandfathered UN-AUDITED (not verified against M1–M6) — this blocks
+    regressions, it does not retroactively prove the existing surface. `npm run
+    lint:spawnsync`.</artifact>
 </hermeticity-artifacts>
 ```
 
@@ -130,11 +138,11 @@ Agent injection is an **ergonomics / behavior-shaping** layer, not the source of
 |---|---|---|
 | `tsc --noEmit` (ADR-D-001) | type / module-graph errors, extensionless ESM imports | live |
 | `lint-test-hermeticity` | gitignored-state reads without skip-if-absent guard | live |
-| `lint-no-spawnsync` | new `spawnSync` outside the ADR-G-002 allowlist; hard fail; denied in hot-path folders | **W1 (pending)** |
+| `lint-no-spawnsync` | new `spawnSync` (ratchet vs baseline); new hot-path `spawnSync` hard-blocked | **live (W1, 2026-07-01)** |
 | `test:ci-sim` | clean-checkout / sandbox-state violations | live (rename); overlay = W3 |
 | pre-commit hook | runs the above before the diff leaves the worker | partial |
 
-Agents may read and still violate; merge trust rests on the gates, not the prompt. *Today the no-`spawnSync` rule is still advisory (the auditor flags only the ADR-G-002 `shell:true` security-variant, not a general new-`spawnSync`); W1 makes it a hard gate.*
+Agents may read and still violate; merge trust rests on the gates, not the prompt. *As of W1 (2026-07-01) the no-new-`spawnSync` rule is a hard gate (`lint-no-spawnsync`): a new call site fails the ratchet, a new hot-path call site is hard-blocked. The auditor's ADR-G-002 `shell:true` security-variant check is orthogonal and still live.*
 
 ### 7. Agent-injected & routing
 
@@ -146,7 +154,7 @@ The async + hermeticity rule is **agent-injected**: every worker model (Claude /
 
 The next step is not another framework migration; it is **test-governance hardening**. The mechanical-enforcement milestone (advisory → authoritative) is **W1 + W2**; W3+ are progressive hardening.
 
-- **W1 — `lint-no-spawnsync` hard gate (P0).** Mechanical lint that fails on any new `spawnSync` outside an explicit ADR-G-002 allowlist (file:line + rationale + ref); allowlist rejected in hot-path folders. Models on the existing `lint-test-hermeticity.mjs`. Closes the advisory→mechanical gap.
+- **W1 — `lint-no-spawnsync` hard gate (P0) — ✅ DONE (2026-07-01).** `scripts/lint-no-spawnsync.mjs` (modeled on `lint-test-hermeticity.mjs`) + `scripts/spawnsync-baseline.json` + `npm run lint:spawnsync` + `tests/scripts/lint-no-spawnsync.test.ts`. Delivered as a **no-new-spawnSync ratchet** (89 grandfathered; the scanner catches namespace `cp.spawnSync` calls, not just the bare form) + a **hot-path hard-block** (36 owner-tagged sites across 6 files: auditor.ts×6 → ADR-087-W; spawn-backend-docker.ts×13 + tmux.ts×13 + worker-liveness.ts×1 + monitor-adapter.ts×1 + output-collector.ts×2 → **HOTPATH-SPAWN-ASYNC** born-item). Closes the advisory→mechanical gap for *regressions*; it does not retro-audit the grandfathered surface (see Consequences). `HOT_PATH_FILES` is a curated set of the clear M4 contexts (spawn backends, worker-monitor/liveness probes, auditor scan), not an exhaustive sweep — HOTPATH-SPAWN-ASYNC owns extending it.
 - **W2 — Auditor residual migration (P0; ADR-087-W).** `auditor.ts` carries ~15 `spawnSync` *mentions*, of which **~6–7 are real subprocess calls** (the migration targets: worker-probe `docker`/`tmux`, `git diff`/`status`, `sh`, `npx vitest`, and `gatherCiBaseline`'s injectable default). The rest are the import, comments, the ADR-G-002 detection-pattern *string*, and the injectable `spawnFn` test-seam — *not* targets. Liveness probes are already async-batched (Sprint 279); migrate the real-call tail to async `spawn` with bounded concurrency + `Promise.allSettled`.
 - **STATE-RESOLVER (P1 — cross-cutting; W3 precondition).** A single env-aware state-path resolver (`DECKENT_HOME` / `BRAIN_HOME` / `HOME`); migrate the ~150 hardcoded `.deckent`/`.brain` joins through it (0 today). **Primarily justified by global-install (ADR-G-001) + multi-project isolation (ADR-G-017)** — the test-overlay (W3) is a secondary beneficiary, so the cost is amortized across those goals rather than charged to test-SIGKILL-safety alone.
 - **W3 — `test:ci-sim` sandbox-overlay (P1, gated on STATE-RESOLVER).** Once the resolver lands, redirect `HOME`/`DECKENT_HOME`/`BRAIN_HOME` to `os.tmpdir()`; SIGKILL-safe by construction, never mutates real state. **Trivial once the resolver exists** — and the current rename (SIGTERM-safe via signal-handlers) suffices until then, so W3 does **not** block the W1+W2 enforcement milestone.
@@ -163,7 +171,7 @@ The next step is not another framework migration; it is **test-governance harden
 
 **(+)** One dev-class law frames the suite (vitest), forbids event-loop-blocking `spawnSync` (ADR-G-002 carve-out as sole exception), and makes hermeticity structurally enforceable (`test:ci-sim` reproducer + `lint-test-hermeticity` + `sandbox-home`). The immutable Contract names what may never break; enforcement moves from advisory to mechanical hard-gates (W1+W2), so agents can read *and* still be blocked. ADR-005's archival removes a dead deprecated-Note. The overlay direction (W3) makes the reproducer SIGKILL-safe and removes the self-contradiction of a hermeticity tool mutating real state.
 
-**(−)** Until **W1+W2** land the ADR is **provisional**: enforcement is still advisory (the auditor flags only the ADR-G-002 `shell:true` security-variant, not a general new-`spawnSync`), and ~6–7 real `spawnSync` calls remain in `auditor.ts`. The SIGKILL-safe overlay (W3) carries a **real dependency cost**: it is gated on the STATE-RESOLVER, which today is greenfield (0 `DECKENT_HOME`/`BRAIN_HOME`; ~150 hardcoded paths) — until that resolver is provably env-aware (incl. SQLite WAL), an overlay would leak worse than the current rename, so W3 stays P1 and the rename (SIGTERM-safe) holds the line. Local full-suite runs require the ≤16 GB fork-bounded discipline until W6 codifies it.
+**(−)** W1 is a **regression ratchet, not a retro-audit**: the 89 `sanctioned` sites are grandfathered UN-AUDITED (never checked against ADR-G-002 M1–M6), so the gate proves "no new spawnSync," not "the existing surface is clean." The ADR stays **provisional** until **W2** (ADR-087-W) migrates the auditor's 6 hot-path `spawnSync` and **HOTPATH-SPAWN-ASYNC** clears the remaining 30 hot-path residual off `hotPathDebt` (spawn-backend-docker×13, tmux×13, worker-liveness×1, monitor-adapter×1, output-collector×2). Also honest: `HOT_PATH_FILES` is a curated subset of the M4 category, not an exhaustive sweep, so some grandfathered `sanctioned` calls may in truth be hot-path (HOTPATH-SPAWN-ASYNC owns that audit). `--update` is a genuine escape hatch (a determined dev can grandfather a non-hot-path call), so the ratchet's strength is review-visibility, not an unbypassable wall. One M4-vs-M5 judgment is recorded consciously: `docker images -q` at worker spawn is per-dispatch (M4 hot-path) yet one-shot <250ms (M5) — it sits in `hotPathDebt` as migration-candidate rather than sanctioned, pending the HOTPATH-SPAWN-ASYNC review. The SIGKILL-safe overlay (W3) carries a **real dependency cost**: it is gated on the STATE-RESOLVER, which today is greenfield (0 `DECKENT_HOME`/`BRAIN_HOME`; ~150 hardcoded paths) — until that resolver is provably env-aware (incl. SQLite WAL), an overlay would leak worse than the current rename, so W3 stays P1 and the rename (SIGTERM-safe) holds the line. Local full-suite runs require the ≤16 GB fork-bounded discipline until W6 codifies it.
 
 ---
 
@@ -172,5 +180,5 @@ The next step is not another framework migration; it is **test-governance harden
 - **Absorbs:** ADR-003 (vitest over Jest) · ADR-087 (Async I/O & Test Hermeticity Standard) · ADR-078 Part-A (CI-Hermeticity artifacts: `test-ci-sim` + `lint-test-hermeticity` + `sandbox-home`).
 - **Supersedes:** ADR-005 (Synchronous I/O — **archived**; the async successor is now this active, injected law).
 - **Cross-ref:** ADR-G-002 (spawnSync Security Pattern — the sanctioned array-args exception; sync-vs-async is the orthogonal axis this ADR owns) · ADR-D-001 (Build Baseline — the TS/ESM/Node toolchain + ESM baseline the suite runs on) · ADR-G-001 (Layered Config — the STATE-RESOLVER serves its global-install scope) · ADR-G-017 (Multi-Project Isolation — co-beneficiary of STATE-RESOLVER) · ADR-G-019 (ADR Governance — ADR-D class/scope-aware injection to dev/dogfood workers).
-- **Born work-items:** ADR-D-002-W1 (`lint-no-spawnsync` hard gate) · W2 = ADR-087-W (auditor residual migration) · **STATE-RESOLVER** (env-aware state-path resolver; W3 precondition, cross-cutting) · W3 (`test:ci-sim` sandbox-overlay) · W4 (network/docker default-deny) · W5 (env/cwd/time/port helpers) · W6 (`test:local-full` bounded script) · W7 (integration-test taxonomy).
+- **Born work-items:** ADR-D-002-W1 (`lint-no-spawnsync` hard gate) — ✅ **done 2026-07-01** · W2 = ADR-087-W (auditor residual migration; clears auditor.ts×6 off `hotPathDebt`) · **HOTPATH-SPAWN-ASYNC** (born from W1 — migrate the 30 non-auditor hot-path `spawnSync` to async: spawn-backend-docker×13, tmux×13, worker-liveness×1, monitor-adapter×1, output-collector×2; also owns extending the curated `HOT_PATH_FILES` set) · **STATE-RESOLVER** (env-aware state-path resolver; W3 precondition, cross-cutting) · W3 (`test:ci-sim` sandbox-overlay) · W4 (network/docker default-deny) · W5 (env/cwd/time/port helpers) · W6 (`test:local-full` bounded script) · W7 (integration-test taxonomy).
 - **Direction:** `.analysis/adr-review-crosswalk.md` (rows 003 + 087 + 078-A → ADR-D-002), `.claude/rules/karpathy-discipline.md`, memory `project_ci_green_root_causes` · `project_test_home_leak` · `feedback_vitest_16gb_local_cap`.
