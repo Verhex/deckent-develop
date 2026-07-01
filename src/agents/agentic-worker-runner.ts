@@ -25,6 +25,8 @@
 //   3. `maxIterations` reached → filesChanged>0 → GO_WITH_TECH_DEBT; else NO_GO.
 //   4. Ollama API error / unreachable → NO_GO + reason.
 
+import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   createToolExecDispatcher,
   type ToolExecOptions,
@@ -99,6 +101,16 @@ export interface AgenticRunnerOptions {
   dispatcher?: McpToolDispatcher;
   /** Optional log sink. Default: silent. */
   logger?: (line: string) => void;
+  /**
+   * WORKER-LIVE-TRACE (ADR-G-025 §4) progress-stream toggle. Default:
+   * disabled — flag-off performs ZERO fs I/O and is byte-identical to
+   * pre-WLT-EMIT behavior. When enabled, ordered step events are appended to
+   * `.tasks/task-{taskId}.progress.jsonl` under `projectRoot`. Distinct from
+   * the `.hb` heartbeat file (`agentic-worker-entry.ts`): `.hb` is a
+   * last-known-state snapshot, this is the ordered event stream — no
+   * duplication.
+   */
+  liveTrace?: { enabled?: boolean };
 }
 
 /**
@@ -323,6 +335,69 @@ function buildDefaultDispatcher(projectRoot: string): McpToolDispatcher {
   };
 }
 
+// ─── WORKER-LIVE-TRACE progress-stream (ADR-G-025 §4, WLT-EMIT) ────────────
+//
+// Per-worker live observability: ordered step events appended to
+// `.tasks/task-{taskId}.progress.jsonl` (fail-soft, append-only) while the
+// agentic loop runs. Flag-gated via `AgenticRunnerOptions.liveTrace.enabled`
+// (default false/undefined) — flag-off performs ZERO fs I/O.
+
+/** Ordered step vocabulary this runner emits (ADR-G-025 §4 subset: this loop
+ * has no plan-writing step of its own, so `plan-written` is not applicable
+ * here — that belongs to the CLI worker path). */
+export const WLT_STEP = {
+  START: 'start',
+  EDIT_FILE: 'edit-file',
+  VERIFY_RUNNING: 'verify-running',
+  RESULT: 'result-writing',
+} as const;
+
+export type WltStep = (typeof WLT_STEP)[keyof typeof WLT_STEP];
+
+/** One line of `.tasks/task-{taskId}.progress.jsonl` (JSON + trailing `\n`). */
+export interface WltProgressEvent {
+  ts: string;
+  step: WltStep;
+  detail: string;
+  seq: number;
+}
+
+function ensureTasksDir(projectRoot: string): string {
+  const dir = join(projectRoot, '.tasks');
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+/**
+ * Bind a fail-soft progress emitter to one task run. No-ops (zero fs I/O)
+ * when `enabled` is false. A write failure (e.g. read-only fs, disk full,
+ * `.tasks` blocked by a same-named file) must never interrupt the agentic
+ * loop — errors are swallowed.
+ */
+function createProgressEmitter(
+  taskId: string,
+  projectRoot: string,
+  enabled: boolean,
+): (step: WltStep, detail: string) => void {
+  let seq = 0;
+  return (step, detail) => {
+    if (!enabled) return;
+    seq += 1;
+    const event: WltProgressEvent = { ts: new Date().toISOString(), step, detail, seq };
+    try {
+      const tasksDir = ensureTasksDir(projectRoot);
+      appendFileSync(
+        join(tasksDir, `task-${taskId}.progress.jsonl`),
+        `${JSON.stringify(event)}\n`,
+        'utf-8',
+      );
+    } catch {
+      // fail-soft (ADR-G-025 §4) — a progress-stream write failure must
+      // never kill the worker loop.
+    }
+  };
+}
+
 // ─── Runner ─────────────────────────────────────────────────────────────────
 
 /**
@@ -359,9 +434,12 @@ export async function runAgenticWorker(
     fetchImpl = ((...args) => fetch(...args)) as typeof fetch,
     dispatcher: injectedDispatcher,
     logger = () => undefined,
+    liveTrace,
   } = opts;
 
   const dispatcher = injectedDispatcher ?? buildDefaultDispatcher(projectRoot);
+  const emitProgress = createProgressEmitter(taskId, projectRoot, liveTrace?.enabled === true);
+  emitProgress(WLT_STEP.START, `model=${model} host=${host} maxIterations=${maxIterations}`);
 
   const messages: OllamaMessage[] = [
     { role: 'system', content: buildSystemPrompt(scope, goNogo, operativeAdrs) },
@@ -397,6 +475,7 @@ export async function runAgenticWorker(
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       logger(`[agentic-runner] /api/chat fetch failed: ${msg}`);
+      emitProgress(WLT_STEP.RESULT, `NO_GO api_error: fetch failed (${msg})`);
       return {
         taskId,
         filesChanged: [...filesChanged],
@@ -412,6 +491,7 @@ export async function runAgenticWorker(
     if (!chatRes.ok) {
       const body = await chatRes.text().catch(() => '');
       logger(`[agentic-runner] /api/chat returned ${chatRes.status}: ${body}`);
+      emitProgress(WLT_STEP.RESULT, `NO_GO api_error: HTTP ${chatRes.status}`);
       return {
         taskId,
         filesChanged: [...filesChanged],
@@ -429,6 +509,7 @@ export async function runAgenticWorker(
       parsed = (await chatRes.json()) as OllamaChatResponse;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      emitProgress(WLT_STEP.RESULT, `NO_GO api_error: non-JSON body (${msg})`);
       return {
         taskId,
         filesChanged: [...filesChanged],
@@ -467,6 +548,7 @@ export async function runAgenticWorker(
       const note = filesChanged.size > 0
         ? `Model finished with content-only turn after ${filesChanged.size} file change(s). Assistant: ${assistantContent.slice(0, 300)}`
         : `Model returned no tool calls and no files were changed. Assistant: ${assistantContent.slice(0, 300)}`;
+      emitProgress(WLT_STEP.RESULT, `${sa} (no_tool_calls)`);
       return {
         taskId,
         filesChanged: [...filesChanged],
@@ -504,6 +586,7 @@ export async function runAgenticWorker(
             ? 'task_done called without notes'
             : `task_done called without a valid selfAssessment; defaulted to ${validSa} (${filesChanged.size} file change(s))`;
         logger(`[agentic-runner] task_done: ${validSa}`);
+        emitProgress(WLT_STEP.RESULT, `${validSa} (task_done)`);
         return {
           taskId,
           filesChanged: [...filesChanged],
@@ -543,6 +626,12 @@ export async function runAgenticWorker(
       }
 
       // Dispatch.
+      const bashCmd = name === 'run_bash' ? String(args['cmd'] ?? args['command'] ?? '') : '';
+      const isTestRun = name === 'run_bash' && looksLikeTestCommand(bashCmd);
+      if (isTestRun) {
+        emitProgress(WLT_STEP.VERIFY_RUNNING, bashCmd.slice(0, 200));
+      }
+
       let result: string;
       try {
         result = await dispatcher.dispatch(name, args);
@@ -552,15 +641,14 @@ export async function runAgenticWorker(
 
       // Track filesChanged on POST-DISPATCH success only (advisor #2).
       if ((name === 'write_file' || name === 'edit_file') && !result.startsWith('[mcp-error]')) {
-        filesChanged.add(String(args['path'] ?? ''));
+        const targetPath = String(args['path'] ?? '');
+        filesChanged.add(targetPath);
+        emitProgress(WLT_STEP.EDIT_FILE, `${name} ${targetPath}`);
       }
 
       // testsPassed sniffer for run_bash.
-      if (name === 'run_bash') {
-        const cmd = String(args['cmd'] ?? args['command'] ?? '');
-        if (looksLikeTestCommand(cmd)) {
-          testsPassed = !bashOutputSuggestsFailure(result);
-        }
+      if (isTestRun) {
+        testsPassed = !bashOutputSuggestsFailure(result);
       }
 
       messages.push({
@@ -577,6 +665,7 @@ export async function runAgenticWorker(
   const note = filesChanged.size > 0
     ? `Reached maxIterations=${maxIterations} after ${filesChanged.size} file change(s) without task_done — task incomplete.`
     : `Reached maxIterations=${maxIterations} with no file changes and no task_done — model did not converge.`;
+  emitProgress(WLT_STEP.RESULT, `${sa} (max_iterations)`);
   return {
     taskId,
     filesChanged: [...filesChanged],

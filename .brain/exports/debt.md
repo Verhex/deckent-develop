@@ -9,6 +9,10 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-354-001 | Tech debt from 354-001: Wired buildLiveFooter + term-mode.ts + chat-turn-queue.t | normal | sprint-354 | resolved |
+| debt-354-010 | Tech debt from 354-010: MOAT-3 FIX-half wired: runFixPhase now actually re-dispa | normal | sprint-354 | resolved |
+| debt-354-011 | Tech debt from 354-011: Root cause (disk-verified against sprint-352 archive, .b | normal | sprint-354 | resolved |
+| debt-354-012 | Tech debt from 354-012: APR-RULES-LOAD: pure zod-validated loader `loadApprovalR | normal | sprint-354 | resolved |
 | debt-352-008 | Tech debt from 352-008: PCOMP-W5C kind-affinity, config-gated via RoutingOptions | normal | sprint-352 | resolved |
 | debt-352-013 | Tech debt from 352-013: ADR-G-006 P2 ROUTING-VERSION-LABEL reconcile. (1) src/co | normal | sprint-352 | resolved |
 | debt-344-003 | Tech debt from 344-003: Added module-level `_missingKeyWarnedInProd = new Set<st | normal | sprint-344 | resolved |

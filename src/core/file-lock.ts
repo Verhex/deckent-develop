@@ -10,11 +10,11 @@
 //   - Observability via trace instrumentation
 
 import {
-  readFileSync, writeFileSync, existsSync, unlinkSync,
+  readFileSync, writeFileSync, existsSync, unlinkSync, linkSync,
   mkdirSync, readdirSync, openSync, closeSync, constants as fsConstants,
 } from 'node:fs';
 import { join } from 'node:path';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { LOCKS_DIR } from './constants.js';
 import { trace } from './observability.js';
 import { debugLog } from './utils.js';
@@ -329,7 +329,8 @@ function spawnLockPathFor(projectRoot: string, filePath: string): string {
 
 /**
  * Acquire a spawn-time lock for a single file.
- * Atomic via O_EXCL. Idempotent for the same taskId.
+ * Atomic via a tmp-write + hard-link publish (never a torn-read window).
+ * Idempotent for the same taskId.
  * Throws SpawnLockError when a different task already holds the lock.
  */
 export function acquireSpawnLock(
@@ -353,7 +354,10 @@ export function acquireSpawnLock(
       );
     } catch (err) {
       if (err instanceof SpawnLockError) throw err;
-      // Corrupted spawnlock file — let the O_EXCL path below overwrite it.
+      // Corrupted spawnlock file — let the atomic publish below recreate it.
+      // Safe to unlink here: the publish path never leaves lockPath visible
+      // mid-write (see below), so an unparseable file here can only be
+      // genuine corruption, not a concurrent in-flight write.
       try { unlinkSync(lockPath); } catch { /* best-effort */ }
     }
   }
@@ -365,30 +369,41 @@ export function acquireSpawnLock(
   };
   const data = JSON.stringify(info, null, 2);
 
+  // Publish atomically (born-428): write the full content to a private
+  // staging file first, then hard-link it into place. link(2) keeps the
+  // same exclusivity guarantee as O_EXCL (EEXIST if lockPath already
+  // exists) but — unlike open+write — lockPath is never visible in a
+  // partially-written state. A concurrent reader can only ever observe
+  // "absent" or "fully valid", closing the window where a mid-write read
+  // was mistaken for corruption and the real owner's lock got unlinked.
+  const stagingPath = `${lockPath}.tmp-${process.pid}-${randomBytes(6).toString('hex')}`;
   try {
-    const fd = openSync(lockPath, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL);
-    writeFileSync(fd, data, 'utf-8');
-    closeSync(fd);
-  } catch (err: unknown) {
-    if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'EEXIST') {
-      try {
-        const actual = JSON.parse(readFileSync(lockPath, 'utf-8')) as SpawnLockInfo;
-        if (actual.taskId === taskId) return actual;
-        throw new SpawnLockError(
-          `Spawn lock conflict on ${filePath}: held by task ${actual.taskId}`,
-          filePath,
-          actual.taskId,
-        );
-      } catch (innerErr) {
-        if (innerErr instanceof SpawnLockError) throw innerErr;
-        throw new SpawnLockError(
-          `Spawn lock conflict on ${filePath}: held by another task`,
-          filePath,
-          'unknown',
-        );
+    writeFileSync(stagingPath, data, { encoding: 'utf-8', flag: 'wx' });
+    try {
+      linkSync(stagingPath, lockPath);
+    } catch (err: unknown) {
+      if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'EEXIST') {
+        try {
+          const actual = JSON.parse(readFileSync(lockPath, 'utf-8')) as SpawnLockInfo;
+          if (actual.taskId === taskId) return actual;
+          throw new SpawnLockError(
+            `Spawn lock conflict on ${filePath}: held by task ${actual.taskId}`,
+            filePath,
+            actual.taskId,
+          );
+        } catch (innerErr) {
+          if (innerErr instanceof SpawnLockError) throw innerErr;
+          throw new SpawnLockError(
+            `Spawn lock conflict on ${filePath}: held by another task`,
+            filePath,
+            'unknown',
+          );
+        }
       }
+      throw err;
     }
-    throw err;
+  } finally {
+    try { unlinkSync(stagingPath); } catch { /* best-effort cleanup */ }
   }
 
   return info;

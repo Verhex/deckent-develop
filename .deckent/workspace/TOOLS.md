@@ -91,6 +91,7 @@ _Total: 33 MCP tools_
 | `connect` | deckent connect |
 | `cost` | deckent cost |
 | `dashboard` | deckent dashboard |
+| `do` | deckent do |
 | `docs` | deckent docs |
 | `doctor` | deckent doctor |
 | `doctor-checks` | deckent doctor-checks |
@@ -148,4 +149,4 @@ _Total: 33 MCP tools_
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 96 CLI command modules_
+_Total: 97 CLI command modules_

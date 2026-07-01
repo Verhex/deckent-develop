@@ -22,6 +22,11 @@ import { measuredOnTurnEnd } from './native-elapsed.js';
 import { buildLiveFooter, type LiveFooterState } from '../helpers/live-footer.js';
 import { initialTermModeState, applyModeCommand, type TermMode, type TermModeState } from './term-mode.js';
 import { createChatTurnQueue, type ChatTurnQueue, type ChatTurnBgEvent, type ChatTurnPayload } from './chat-turn-queue.js';
+import { ApprovalCard, createApprovalCardQueue, type ApprovalCardLabels, type ApprovalCardQueue } from './approval-card.js';
+import { composeDualStream } from './dual-stream.js';
+import type { ApprovalTerminalChannel } from './approval-terminal-channel.js';
+import type { ApprovalStreamEvent } from '../../core/approval-eventstream.js';
+import type { ApprovalRisk } from '../../core/approval-contract.js';
 
 export type ConfirmAnswer = 'y' | 'a' | 'n';
 // toolName is optional: the dispatcher passes it so an 'a' (always) decision can
@@ -130,6 +135,76 @@ export function bgPayloadsToTurnTexts(payloads: readonly ChatTurnPayload[]): str
   return payloads.map((p) => p.events.map((e) => e.summary).join('\n'));
 }
 
+/**
+ * APP-APPROVAL-WIRE (355-011) — pure, testable helpers for the ApprovalCard +
+ * dual-stream wiring (same "pull decision logic out of the Ink component"
+ * pattern as resolveModeLabel/bgPayloadsToTurnTexts above — ink-testing-library
+ * is not a project dependency, see repl-surface-wire.test.tsx / approval-card.test.tsx).
+ */
+
+/** English-default labels for ApprovalCard (string-free component; caller
+ * injects labels). Messages round-8 (Task 15, MESSAGES-KEYS-4) wires real
+ * en/tr keys through run.tsx and DEPENDS ON this task, so this is the same
+ * fallback-until-i18n-wired precedent as resolveModeLabel's English default. */
+export const DEFAULT_APPROVAL_CARD_LABELS: ApprovalCardLabels = {
+  hint: '(y = approve · n = deny · a = approve similar · d = details)',
+  progress: '[{index}/{total}]',
+  detailsHeading: 'Details',
+  noArgs: '(no arguments)',
+  riskLabels: {
+    none: 'NONE',
+    low: 'LOW',
+    medium: 'MEDIUM',
+    high: 'HIGH',
+    critical: 'CRITICAL',
+  } satisfies Record<ApprovalRisk, string>,
+};
+
+/** Sentinel used only to reserve dual-stream "approval wants space" priority
+ * below — never rendered (filtered out before the footer maps to <Text>). */
+const DUAL_STREAM_APPROVAL_PLACEHOLDER = ' dual-stream-approval-placeholder';
+
+/**
+ * Compress the live-footer (status) region to its dual-stream-tested min-1-line
+ * floor (composeDualStream, dual-stream.ts) while an approval is pending, so
+ * ApprovalCard — rendered above it — never has to compete with it for space,
+ * and the footer itself never fully disappears ("footer kaybolmaz"). No
+ * pending approval -> `footerLines` returned unchanged (byte-identical to the
+ * pre-355-011 footer render). `height=2` deliberately does not depend on the
+ * real terminal size: only composeDualStream's min-1 FLOOR behavior is used
+ * here (verified for any height >= 1 by dual-stream.test.ts), not its actual
+ * row budget — ApprovalCard renders its own real Ink box separately.
+ */
+export function resolveFooterLines(footerLines: string[], hasPendingApproval: boolean): string[] {
+  if (!hasPendingApproval) return footerLines;
+  const composed = composeDualStream({
+    statusLines: footerLines,
+    approvalLines: [DUAL_STREAM_APPROVAL_PLACEHOLDER],
+    width: 4096,
+    height: 2,
+  });
+  return composed.filter((line) => line !== DUAL_STREAM_APPROVAL_PLACEHOLDER);
+}
+
+/**
+ * Tap one ApprovalTerminalChannel event stream: forwards every event to its
+ * single downstream consumer (ApprovalCard's own `events` prop) UNCHANGED,
+ * while also feeding a second, app.tsx-local queue purely so the App can
+ * derive a `hasPendingApproval` boolean for dual-stream layout — WITHOUT a
+ * second independent subscription (the channel's AsyncIterable is backed by
+ * one single-consumer queue; two parallel `for await` readers would race and
+ * split delivery between ApprovalCard and the App).
+ */
+export async function* tapApprovalEvents(
+  source: AsyncIterable<ApprovalStreamEvent>,
+  tracker: ApprovalCardQueue,
+): AsyncGenerator<ApprovalStreamEvent> {
+  for await (const event of source) {
+    tracker.ingest(event);
+    yield event;
+  }
+}
+
 /** A completed tool action, rendered as a claude-code-style change block. The
  * caller (run.tsx) localizes `verb`/`note`; the App owns the colored layout. */
 export interface ToolInfo {
@@ -219,6 +294,21 @@ export interface ReplAppProps {
    * Buffered by ChatTurnQueue and drained as brand-new turn(s) at turn-end —
    * NEVER injected mid-turn (Hermes rule, chat-turn-queue.ts). */
   registerBgEventSink?: (enqueue: (event: ChatTurnBgEvent) => void) => void;
+  /** APP-APPROVAL-WIRE (355-011) — `repl_surface.approvals ?? false` seam,
+   * resolved by the caller (run.tsx) and INDEPENDENT of `replSurfaceEnabled`
+   * (a different feature landed the same sprint). Absent/false -> ApprovalCard
+   * never renders and the footer/layout stays byte-identical to the
+   * pre-355-011 render. */
+  approvalsEnabled?: boolean;
+  /** The runtime-wide-ApprovalBroker terminal bridge (createApprovalTerminalChannel,
+   * approval-terminal-channel.ts, Task 355-004) — its `events`/`decide` pass
+   * straight through to <ApprovalCard>. Absent -> no card, regardless of
+   * `approvalsEnabled` (nothing to subscribe to). */
+  approvalChannel?: ApprovalTerminalChannel;
+  /** Optional label override for the approval card; defaults to
+   * DEFAULT_APPROVAL_CARD_LABELS (English) until messages round-8 (Task 15,
+   * MESSAGES-KEYS-4 — depends on this task) wires localized keys through run.tsx. */
+  approvalLabels?: ApprovalCardLabels;
 }
 
 type ApprovalMode = 'suggest' | 'auto-edit' | 'full-auto';
@@ -305,7 +395,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, registerBgEventSink } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels } = props;
   const { exit } = useApp();
   const [selection, setSelection] = useState<ActiveSelection>(initialSelection);
   const [approval, setApproval] = useState<ApprovalMode>('suggest');
@@ -339,6 +429,22 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const [footerLines, setFooterLines] = useState<string[]>([]);
   const bgQueue = useRef<ChatTurnQueue | null>(null);
   if (bgQueue.current === null) bgQueue.current = createChatTurnQueue();
+
+  // APP-APPROVAL-WIRE (355-011) seam state — inert unless approvalsEnabled AND
+  // an approvalChannel is supplied; independent of replSurfaceEnabled (a
+  // different feature). approvalTracker is always created (a bare, never-fed
+  // queue is inert) but approvalEvents — the tapped subscription ApprovalCard
+  // actually reads from — is only ever created behind the flag, so a flag-off
+  // render never subscribes to anything and stays byte-identical.
+  const [approvalPending, setApprovalPending] = useState(false);
+  const approvalTracker = useRef<ApprovalCardQueue | null>(null);
+  if (approvalTracker.current === null) {
+    approvalTracker.current = createApprovalCardQueue(() => setApprovalPending(approvalTracker.current!.head() !== null));
+  }
+  const approvalEvents = useRef<AsyncIterable<ApprovalStreamEvent> | null>(null);
+  if (approvalsEnabled && approvalChannel && approvalEvents.current === null) {
+    approvalEvents.current = tapApprovalEvents(approvalChannel.events, approvalTracker.current);
+  }
 
   const pushTurn = (role: Turn['role'], text: string): void =>
     setTurns((t) => [...t, { id: idRef.current++, role, text }]);
@@ -596,13 +702,32 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         </Box>
       )}
 
+      {/* APP-APPROVAL-WIRE (355-011): the runtime-wide-ApprovalBroker card —
+          inert unless approvalsEnabled AND an approvalChannel is supplied
+          (flag-off render stays byte-identical). Rendered BEFORE the footer
+          block below so a pending approval sits "üst" (on top) of it — Ink's
+          natural top-to-bottom Box flow, no manual layout math needed. The
+          card itself renders null while nothing is pending. */}
+      {approvalsEnabled && approvalChannel && approvalEvents.current && (
+        <ApprovalCard
+          events={approvalEvents.current}
+          onDecide={approvalChannel.decide}
+          decidedBy="terminal"
+          channel="terminal"
+          labels={approvalLabels ?? DEFAULT_APPROVAL_CARD_LABELS}
+        />
+      )}
+
       {/* REPL-SURFACE-WIRE (354-001): mode indicator + live-footer — both
           inert unless replSurfaceEnabled (flag-off render stays byte-identical
-          to the pre-354-001 App). */}
+          to the pre-354-001 App). Footer lines pass through resolveFooterLines
+          (355-011 dual-stream seam) — a no-op unless a pending approval is
+          compressing it down to its tested min-1-line floor, so the footer
+          never fully disappears while the ApprovalCard above it is visible. */}
       {replSurfaceEnabled && (
         <Box flexDirection="column" marginTop={1}>
           <Text color={GOLD} bold>{`[${resolveModeLabel(termMode.mode, labels)}]`}</Text>
-          {footerLines.map((line, i) => <Text key={i} dimColor>{line}</Text>)}
+          {resolveFooterLines(footerLines, approvalPending).map((line, i) => <Text key={i} dimColor>{line}</Text>)}
         </Box>
       )}
 

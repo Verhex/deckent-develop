@@ -2129,6 +2129,86 @@ const MESSAGES: MessageMap = {
     en: 'Backed up existing DIRECTIVES.md → {path}',
     tr: 'Mevcut DIRECTIVES.md yedeklendi → {path}',
   },
+
+  // ─── ApprovalCard labels (Task 355-011 APP-APPROVAL-WIRE — sole-authority
+  // addition; cited by app.tsx's DEFAULT_APPROVAL_CARD_LABELS fallback comment
+  // "until messages round-8 (Task 15, MESSAGES-KEYS-4) wires localized keys".
+  // English values mirror DEFAULT_APPROVAL_CARD_LABELS byte-for-byte) ────────
+  'approval_card.hint': {
+    en: '(y = approve · n = deny · a = approve similar · d = details)',
+    tr: '(y = onayla · n = reddet · a = benzerlerini onayla · d = detay)',
+  },
+  // Numeric position notation — identical across locales by design, same
+  // precedent as the existing tui.confirm_progress key.
+  'approval_card.progress': {
+    en: '[{index}/{total}]',
+    tr: '[{index}/{total}]',
+  },
+  'approval_card.details_heading': {
+    en: 'Details',
+    tr: 'Detay',
+  },
+  'approval_card.no_args': {
+    en: '(no arguments)',
+    tr: '(argüman yok)',
+  },
+  'approval_card.risk_none': { en: 'NONE', tr: 'YOK' },
+  'approval_card.risk_low': { en: 'LOW', tr: 'DÜŞÜK' },
+  'approval_card.risk_medium': { en: 'MEDIUM', tr: 'ORTA' },
+  'approval_card.risk_high': { en: 'HIGH', tr: 'YÜKSEK' },
+  'approval_card.risk_critical': { en: 'CRITICAL', tr: 'KRİTİK' },
+
+  // ─── `deckent do "<goal>"` (Task 355-010 GOLDENFLOW-CMD — sole-authority
+  // addition; cited by 355-010's own docImpact: "all do.ts user-facing
+  // strings are plain English literals ... A follow-up task should add do.*
+  // keys to messages.ts". English values mirror do.ts's literal strings
+  // byte-for-byte (formatDoPlanPreview + registerDo)) ────────────────────────
+  'do.preview_banner_run': {
+    en: 'Deckent Do — plan preview ({count} task(s)). Confirm below to start the sprint now.',
+    tr: 'Deckent Do — plan önizleme ({count} görev). Sprint\'i şimdi başlatmak için aşağıdan onaylayın.',
+  },
+  'do.preview_banner_dry_run': {
+    en: 'Deckent Do — plan preview (dry-run; {count} task(s)). Nothing was started. Re-run with --run to execute.',
+    tr: 'Deckent Do — plan önizleme (dry-run; {count} görev). Hiçbir şey başlatılmadı. Çalıştırmak için --run ile tekrar çalıştırın.',
+  },
+  'do.what_will_happen': {
+    en: 'What will happen:',
+    tr: 'Ne olacak:',
+  },
+  'do.task_files': {
+    en: 'files: {files}',
+    tr: 'dosyalar: {files}',
+  },
+  'do.task_scope': {
+    en: 'scope: {scope}',
+    tr: 'kapsam: {scope}',
+  },
+  'do.task_go_criteria': {
+    en: 'goCriteria: {goCriteria}',
+    tr: 'goCriteria: {goCriteria}',
+  },
+  'do.empty_goal': {
+    en: 'do: goal must not be empty',
+    tr: 'do: hedef boş olamaz',
+  },
+  'do.confirm_start': {
+    en: 'Proceed and start this sprint now?',
+    tr: 'Devam edilsin ve sprint şimdi başlatılsın mı?',
+  },
+  'do.dry_run_complete': {
+    en: 'Dry-run complete — nothing was started. Re-run with --run to execute this plan.',
+    tr: 'Dry-run tamamlandı — hiçbir şey başlatılmadı. Bu planı çalıştırmak için --run ile tekrar çalıştırın.',
+  },
+  'do.cancelled': {
+    en: 'Cancelled at stage "{stage}" ({reason}). Nothing was started.',
+    tr: '"{stage}" aşamasında iptal edildi ({reason}). Hiçbir şey başlatılmadı.',
+  },
+  'do.finished': {
+    en: 'Sprint finished — exitCode {exitCode} ({outcome}).',
+    tr: 'Sprint tamamlandı — exitCode {exitCode} ({outcome}).',
+  },
+  'do.outcome_success': { en: 'success', tr: 'başarılı' },
+  'do.outcome_failure': { en: 'failure', tr: 'başarısız' },
 };
 
 /**

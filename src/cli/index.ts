@@ -34,6 +34,7 @@ import { registerExplain } from './commands/explain.js';
 import { registerSetDirectives } from './commands/set-directives.js';
 import { registerConnect } from './commands/connect.js';
 import { registerPlanNl } from './commands/plan-nl.js';
+import { registerDo } from './commands/do.js';
 import { registerHeartbeat } from './commands/heartbeat.js';
 import { registerChat } from './commands/chat.js';
 import { registerCheckpoint } from './commands/checkpoint.js';
@@ -129,6 +130,7 @@ export function buildProgram(): Command {
   registerSetDirectives(program);
   registerConnect(program);
   registerPlanNl(program);
+  registerDo(program);
   registerHeartbeat(program);
   registerChat(program);
   registerCheckpoint(program);

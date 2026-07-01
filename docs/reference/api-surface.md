@@ -482,3 +482,227 @@ recurring: done → pending (re-enqueue when next cron cadence after lastRun arr
 - Auditor reads task files from disk (no brain import)
 - Worker reads task files from disk (no brain import)
 - Circular dependencies are FORBIDDEN
+
+## Pillar Module Contracts (Sprint 352–354)
+
+The following contracts document internal module boundaries landed across sprint-352/353/354.
+Every claim below is disk-verified against the cited `file:line`; anything gated behind a
+config-flag seam is labeled **flag-gated (default-off)** — treat unlabeled entries as shipped
+and always active. None of the flags below appear in `.deckent/settings/features-manifest.json`
+(they are plain `config.<key>?.enabled` seams, not manifest-tracked features).
+
+### TOOL — Registry / Search / Dispatch (ADR-D-004 Layer-1)
+
+Four `src/core/` modules form a strict layering (each tier depends only on the tier below it;
+none import from `mcp/`, `cli/`, `orchestra/`, or `agents/`):
+
+1. **TOOL-1** `src/core/tool-registry.ts` — pure catalog (register/get/list/validate tools).
+2. **TOOL-2** `src/core/tool-search.ts` (160 lines) — progressive disclosure over TOOL-1.
+   - `ToolSearchIndex` class (`src/core/tool-search.ts:108`), constructed with a `ToolRegistry`.
+   - `searchTools(query, options?)` (`tool-search.ts:112`) — deterministic tiered scoring:
+     exact name match = 3000, name-substring = 2000 + overlap%, token-overlap = 1000 + hits;
+     ties broken alphabetically; `options.limit` defaults to 10.
+   - `describeTool(name)` (`tool-search.ts:133`) — exact match, returns the real `paramsSchema`
+     instance (never a re-derived copy).
+   - `planCall(name, args)` (`tool-search.ts:138`) — validates args and labels risk; **never
+     executes**.
+   - `coreTools()` (`tool-search.ts:152`) — returns the eager-7 set named in
+     `CORE_TOOL_NAMES` (`tool-search.ts:91`): `deckent_status`, `deckent_plan`, `deckent_run`,
+     `deckent_start`, `deckent_review`, `deckent_help`, `deckent_memory_query`.
+3. **TOOL-CORE** `src/core/tool-core.ts` (130 lines) — eager-disclosure surface builder on top
+   of TOOL-1 + TOOL-2.
+   - `summarizeEagerSchema(schema)` (`tool-core.ts:74`) — derives `{name,type,optional}[]` from
+     a tool's real Zod schema (no hand-maintained duplicate).
+   - `buildCoreToolSurface(index)` (`tool-core.ts:101`) — maps `index.coreTools()` to abbreviated
+     schemas.
+   - `deferredIndexLine(allTools, coreNames?)` (`tool-core.ts:118`) — alphabetically sorted
+     one-liner naming every non-core tool, for the "+N more tools" first-turn pointer.
+4. **TOOL-3** `src/core/tool-dispatch.ts` (221 lines) — first execution-capable layer.
+   - `dispatchToolCall(plan, options)` (`tool-dispatch.ts:157`, async) — **never throws**.
+     Flow: unknown/invalid plan short-circuits → risk gate via `meetsRiskThreshold` against
+     `options.riskThreshold` (default `'moderate'`, `tool-dispatch.ts:33`) → if risk-gated and
+     no `options.confirm` seam is supplied, **fail-closed deny** → if `confirm` resolves
+     `'allow'`, calls `options.execImpl` seam → every path settles a `DispatchResult` with
+     `telemetry` (`tool-dispatch.ts:98-112`) populated.
+   - `DISPATCH_STATUSES` (`tool-dispatch.ts:88`): `executed | denied | invalid | unknown_tool | error`.
+
+**Scope containment:** `src/core/tool-scope-gate.ts` (149 lines) — pure, realpath-based
+containment check (ADR-G-017/G-020, ADR-D-004 SCOPECHECK-CORE relocation). `createScopeGate(scope,
+options?)` (`tool-scope-gate.ts:117`) defaults to `mode: 'advisory'` (`allowed: true` even on a
+violation — never blocks); `mode: 'enforce'` blocks. Symlink escapes are resolved via realpath
+before containment check.
+
+**Native REPL bridge — flag-gated (default-off):** `src/cli/repl/native-tool-registry.ts` (396
+lines), `buildNativeToolRegistry(opts)` (`native-tool-registry.ts:319`). Registers 3 meta-tools
+(`deckent_search_tools`, `deckent_describe_tool`, `deckent_call_tool`) only when
+`opts.toolSurface.enabled` is true — checked at `native-tool-registry.ts:391`
+(`tool_surface.enabled` config seam). When off, tool registration is byte-identical to
+pre-sprint-354. Verified by `tests/cli/tool-repl-wire.test.ts:26-30` (structural equality).
+`deckent_call_tool`'s handler chains `planCall` → `dispatchToolCall`; with no `execImpl` wired,
+calls fail closed with `NOT_WIRED_EXEC` (`native-tool-registry.ts:228`) — real tool execution via
+this surface is explicit future work, not yet shipped.
+
+### APR — Approval Contract → EventStream Chain
+
+Twelve `src/core/approval-*.ts` modules (2,337 lines total) plus `pending-approvals.ts`. **No
+module in this chain is itself flag-gated** — the chain is core infrastructure; only its
+*call sites* (worker tool dispatch, REPL approval card) are flag-gated (see TERM/TOOL sections).
+
+- **Contract** `src/core/approval-contract.ts` (194 lines) — canonical Zod schemas, zero business
+  logic. `ApprovalRequest`/`ApprovalDecision` types (`approval-contract.ts:95,113`); 5 requester
+  roles, 7 action scopes (`file-read`,`file-write`,`shell-exec`,`git-mutation`,`network`,
+  `credential`,`lifecycle`), 5 risk tiers (`none`..`critical`), 4 policy verdicts
+  (`auto-approve`,`notify`,`require-approval`,`deny`).
+- **Broker** `src/core/approval-broker.ts:107` (class, 339 lines) — event-driven, file-backed
+  (`.deckent/approvals/`), atomic tmp+rename writes, multi-process safe via
+  `checkForExternalDecisions()` (`approval-broker.ts:301`). `submit()`/`decide()`/`expire()` at
+  lines 169/211/251.
+- **Relay** `src/core/approval-relay.ts` (193 lines) — fans `'pending'` events to attached
+  channels (`attachChannel`, `approval-relay.ts:144`); channels only ever see `maskedArgs`.
+- **Masking** `src/core/approval-masking.ts` (118 lines) — `maskArgs()` (line 36) redacts via the
+  existing `redactSensitive` regex library; `storeRawArgs()`/`resolveRawArgs()` (lines 77/102)
+  persist raw args under `.deckent/approvals/raw/` (mode 0600) behind an opaque
+  `rawArgsRef` pointer, with path-traversal validation on resolve.
+- **Store** `src/core/approval-store.ts` (class, 358 lines) — restart-survive peer index over the
+  same `.deckent/approvals/` directory the broker writes; `index()` (line 277) rebuilds full
+  state from disk on every call.
+- **Policy** `src/core/approval-policy.ts` — `decidePolicy()` (line 101), pure function,
+  first-match-wins over an ordered rule list. **Critical-clamp:** risk `'critical'` can never
+  resolve to `'auto-approve'` — clamped to `'deny'` (`approval-policy.ts:98`, `approval-policy.ts:122`).
+- **WorkerGate** `src/core/approval-worker-gate.ts` (class, 262 lines) — `guard(action)` (line
+  155) is the enforcement point called before risky tool execution; masks args, submits, then
+  awaits a decision or the injected fallback resolver (default: `DENY_FALLBACK_RESOLVER`, line 80).
+- **Fallback** `src/core/approval-fallback.ts` — `resolveFallback()` (line 106) is pure,
+  synchronous, and **total** ("finite-always": always returns one of
+  `deny|pause|timeout-default|escalate`, never hangs). Precedence: critical-with-no-escalation
+  → deny; expired → timeout-default; escalation channel reachable → escalate; else → bounded pause.
+- **EventStream** `src/core/approval-eventstream.ts` (class, 281 lines) — multi-client publish
+  stream over the relay. **Backfill:** new subscribers immediately receive all currently-pending
+  requests via a cached `pendingById` map. **Backpressure:** per-client bounded async queue,
+  drop-oldest on overrun with a coalesced `dropped` marker event.
+- **Rules-load** `src/core/approval-rules-load.ts` — `loadApprovalRules()` (line 94), fail-soft
+  (malformed rule entries skipped with a warning, never throws); `SAFE_DEFAULT_APPROVAL_RULES`
+  (line 54) is the 5-rule fallback set. **Not yet wired** to `src/core/config.ts` — a tracked follow-up.
+- **Expiry-driver** `src/core/approval-expiry-driver.ts` (class, 104 lines) — `tick()` (line 70)
+  runs `broker.expire()` → `store.index()` → `store.prune()`; its interval timer is `.unref()`'d
+  (ADR-G-013 — never keeps the process alive). **Not yet wired** into runtime bootstrap.
+- **pending-approvals.ts** (94 lines) — `readPendingApprovals()` (line 92), single-source reader
+  merging nervous + autonomous pending approvals for CLI/dashboard/MCP; fail-safe (missing/corrupt
+  files yield `[]`).
+
+**Worker-side consumption — flag-gated (default-off):** `src/agents/agentic-worker-tools.ts`'s
+`wrapDispatcherWithApprovalGate(baseDispatcher, options)` (`agentic-worker-tools.ts:303`) wraps an
+Ollama worker's tool dispatcher so risky calls (`shell-exec`/`git-mutation`/`network` — currently
+only `run_bash` is classified via `classifyRiskyToolCall()`, `agentic-worker-tools.ts:248`) pass
+through `WorkerApprovalGate.guard()` before dispatch. Gated by `options.enabled` — the
+`approval_gate.enabled` config flag (`agentic-worker-tools.ts:279`): `if (!options.enabled) return
+baseDispatcher;` (`agentic-worker-tools.ts:307`) returns the exact same dispatcher reference,
+zero-overhead, when off. A denied/errored guard call never calls `baseDispatcher` — it returns a
+structured `[approval-denied] ...` string so the model can self-correct, mirroring the existing
+`[scope-violation]` rejection pattern.
+
+**Data-flow order:** contract (types) → broker (submit/persist) → relay (fan-out) → masking
+(redact before submit) → store (restart-survive read index) → policy (decision, not yet wired to
+a live call site) → worker-gate (the actual enforcement point) → fallback (timeout/no-response) →
+eventstream (read-only delivery to observers, e.g. the REPL approval card) → rules-load / expiry-
+driver (config load and TTL housekeeping — both implemented but not yet wired into a runtime
+bootstrap path).
+
+### TERM — REPL Surface Cores
+
+- `src/cli/helpers/live-footer.ts` (163 lines) — `buildLiveFooter(state, options)` (line 132),
+  pure render, i18n-first via injected `LiveFooterLabels` (no hardcoded strings).
+- `src/cli/repl/term-mode.ts` (111 lines) — Ask/Run/Control mode machine.
+  `ALLOWED_RISKS_BY_MODE` (line 31) is a cumulative risk ladder: `ask` ⊂ `run` ⊂ `control`.
+  `applyModeCommand()` (line 63) resolves `/ask` `/run` `/control` slash commands;
+  `checkActionAllowed()` (line 101) returns an `ActionDecision` naming the `suggestedMode` when
+  denied.
+- `src/cli/repl/chat-turn-queue.ts` (78 lines) — Hermes "no mid-turn injection" rule.
+  `drainAsTurns()` (`chat-turn-queue.ts:66-67`): `if (queue.userTurnActive) return [];` — the
+  queue is left untouched and returns nothing while a user turn is in flight; buffered
+  background events only surface at turn-end.
+- `src/cli/helpers/connect-wizard.ts` (328 lines) — pure `/connect` detection wizard (provider
+  CLI auth + MCP attach + IDE detection + Windows shell guidance). `detectRuntime(probes)` (line
+  137) and `planConnectSteps()` (line 263) take an injected probe seam — no direct I/O.
+- `src/orchestra/directives-builder.ts` (232 lines) — canonical DIRECTIVES.md generator.
+  `buildDirectives(intent)` (line 156) has a round-trip contract with the existing
+  `parseStructuredDirectives` parser, proven by `tests/orchestra/directives-builder.test.ts:67`
+  (`build → parse → reconstructBuildTask` deep-equals the original intent). Fragility guards
+  (`directives-builder.ts:52-99`) reject reserved labels/heading text/delimiter collisions in
+  user-supplied fields — the "DIRECTIVES zero-fragility foundation".
+- `src/cli/repl/dual-stream.ts` (97 lines) — `composeDualStream(input, options)` (line 78) fits
+  a status footer + approval-card region into one non-overlapping line-list.
+- `src/cli/repl/approval-card.tsx` (286 lines) — Ink component rendering the oldest pending
+  `ApprovalRequest` with y/n/a/d decision keys; never renders `rawArgsRef` (line 14), only
+  `maskedArgs`.
+- `src/cli/helpers/run-state-feed.ts` (213 lines) — `computeLiveFooterState()` (line 93) derives
+  live-footer state from `.tasks/task-*.hb` + `.deckent/sprint-state.json`; missing/corrupt input
+  degrades to "absent", never throws.
+
+**REPL surface wiring — flag-gated (default-off):** `src/cli/repl/app.tsx`'s `replSurfaceEnabled`
+prop (`app.tsx:210-213`, `repl_surface.enabled` config seam). When absent/false, `ReplApp` renders
+byte-identical to the pre-sprint-354 component; term-mode/live-footer polling/chat-turn-queue
+wiring only activate when true. `dual-stream.ts` and `approval-card.tsx` are implemented and
+tested but have **no caller in `src/` yet** — App-level wiring is a tracked follow-up.
+
+### DeckBroker — Task-Scoped Credential Resolution (ADR-G-005)
+
+`src/core/deck-broker.ts` (150 lines) — host-side, mint-once broker over `.deck` secrets.
+Constructed once per spawn batch; the `.deck` file path is loaded once at construction
+(`deck-broker.ts` via `loadDeckSecrets`) and **never stored on the instance, returned by any
+public method, or logged**.
+
+- `resolveForTask(taskId, provider)` (`deck-broker.ts:109`) → `Record<string,string> | null`.
+  Three enforced constraints: **task-scoped** (a second call for the same `taskId` is denied,
+  reason `'already-consumed'`), **TTL-gated** (`DEFAULT_TTL_MS = 5 * 60_000`, `deck-broker.ts:73`,
+  configurable via `opts.ttlMs`), **single-use** (`taskId` is marked consumed after a grant). A
+  provider with no configured `.deck` secret returns `null` with reason `'no-secret'` and does
+  **not** consume the `taskId` — a later call for a different provider can still succeed.
+- `getAuditLog()` (`deck-broker.ts:133`) — returns a copy of an **in-memory only** audit trail
+  (never persisted to disk); entries record `taskId`/`provider`/`timestamp`/`outcome`/`reason`,
+  never secret values or the `.deck` path.
+
+**Flag-gated (default-off):** minted only when `config.deck_broker?.enabled &&
+config.auth_mode !== 'subscription'` (`src/core/provider.ts:1044`, inside `bootstrapProviders()`).
+Subscription-mode auth never reads `.deck` at all, so the broker is inapplicable there. When the
+flag is off, `bootstrapProviders()` returns `deckBroker: null`.
+
+**Consumption point:** `src/providers/subprocess.ts:249-265` — `SubprocessSpawnBackend.spawn()`
+resolves the *current task's own* credential through `opts.deckBroker?.resolveForTask(...)` when a
+broker is passed in, and falls through to the pre-existing `opts.env` passthrough when the broker
+is absent or denies the resolution (never throws). **Not yet wired end-to-end**: `bootstrapProviders()`
+mints the broker, `subprocess.ts` knows how to consume one, but no call site
+(`src/orchestra/sprint-spawner.ts`, `src/cli/commands/spawn.ts`) currently threads
+`BootstrapResult.deckBroker` into `ProviderSpawnOptions.deckBroker` — this wiring is a tracked
+follow-up (`src/core/provider.ts:982-984`).
+
+### trace-extract CLI — Training-Trace Extraction
+
+- `src/training/cc-trace-extractor.ts` (165 lines) — pure parser. `extractFromSession(lines,
+  system)` (line 51) reads Claude-Code JSONL transcript lines, segments at real-user-text turns
+  (drops thinking blocks), and remaps the core-4 tool names (`Read`/`Write`/`Edit`/`Bash`) to
+  `deckent_*` via `mapToolName()` (line 20) / `CORE4` (line 12). Returns two corpora: `aligned`
+  (core-4-tools-only segments) and `general` (all segments, non-mappable tool names preserved
+  as-is).
+- `src/cli/commands/trace-extract.ts` (170 lines) — CLI driver. `registerTraceExtract(program)`
+  (line 136) registers a nested `trace extract` subcommand (`trace-extract.ts:138,142`):
+  ```
+  deckent trace extract <input> [--out <dir>] [--system <text>]
+  ```
+  `<input>` may be a single `.jsonl` file or a directory (recursed via `collectTranscriptFiles()`,
+  line 56). `--out` defaults to `.deckent/training`. Each extracted example is redacted via
+  `redactExample()` (line 90, uses the shared `redactSensitive` library) before being appended to
+  `<out>/aligned.jsonl` and `<out>/general.jsonl`. Exits 1 if `<input>` does not exist.
+- `src/cli/repl/trace-wire.ts` (45 lines) — native-REPL turn recorder, wired into
+  `src/cli/repl/run.tsx`. `buildTurnRecorder(opts)` (line 34) returns `undefined` when disabled;
+  opt-out via the `DECKENT_TRACE=0` environment variable (not a `features-manifest.json` flag).
+  Writes redacted per-turn training examples to `.deckent/traces/<sessionId>.jsonl` (gitignored,
+  local-only); write failures are fail-soft (ADR-G-009) and never break the REPL turn.
+- `src/training/pipeline.ts` (319 lines) — downstream ShareGPT converter (unsloth/LLaMA-Factory
+  format). `traceToShareGpt(trace, policy?)` (line 223) runs convert → redact → truncate → redact
+  (double-pass redaction defense-in-depth); `runPipeline(opts)` (line 280) is a streaming
+  (readline + write-stream) driver that never materializes a whole file in memory. **Exported but
+  not yet wired into the CLI** — no `deckent` command currently invokes `runPipeline()`.
+
+No module in this pillar is behind a `config.*.enabled` flag; `trace-wire.ts`'s only gate is the
+`DECKENT_TRACE=0` env-var opt-out described above.

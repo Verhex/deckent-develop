@@ -8,6 +8,7 @@ import type { ModelStrategy } from './mode-presets.js';
 import type { ModelTier } from './model-equivalence.js';
 import type { ErpRuntimeConfig } from './erp/factory.js';
 import type { BotCapabilitiesConfig } from '../connectors/capabilities/types.js';
+import type { ApprovalPolicyRule } from './approval-policy.js';
 
 // ─── Timeout Configuration ──────────────────────────────────────────
 export interface TimeoutConfig {
@@ -122,6 +123,34 @@ export interface GateConfig {
    *  FIX path triggers. The enforcer fails OPEN (an internal error never blocks
    *  the task). Absent/false = disabled (default-off, byte-identical). */
   enforce_adr_compliance?: boolean;
+}
+
+// ─── Approval Config (runtime-wide ApprovalBroker, APR family) ───────
+/**
+ * `approval` config block — policy rules + gate/relay activation flags for the
+ * runtime-wide ApprovalBroker (strategic-pivot §11.2, ADR-G-020). Sprint 355
+ * CFG-APR-WIRE. `rules` describes the declarative JSON shape a user writes;
+ * `loadApprovalRules` (approval-rules-load.ts) is the SOLE owner of rule
+ * validation semantics — a malformed entry is skipped with a warning at
+ * config-load time and never breaks the sprint (fail-soft by design). Absent
+ * block, absent/null/empty `rules` -> `loadApprovalRules`'s own
+ * `SAFE_DEFAULT_APPROVAL_RULES`.
+ */
+export interface ApprovalConfig {
+  /** Policy rules evaluated by `decidePolicy` (approval-policy.ts) in list
+   *  order — first match wins. Validated fail-soft via `loadApprovalRules`
+   *  at config-load time; this field only describes the raw JSON shape. */
+  rules?: ApprovalPolicyRule[];
+  /** Activate the worker-side `WorkerApprovalGate` (approval-worker-gate.ts) —
+   *  gates a risky worker action on a broker decision before it executes.
+   *  Default: false. Wiring the gate into the live worker runtime is a
+   *  separate follow-up task; this flag only reserves the config surface. */
+  gate_enabled?: boolean;
+  /** Activate the runtime-wide `ApprovalRelay` (approval-relay.ts) — routes
+   *  pending approvals out to external decision channels (terminal/telegram/
+   *  ...). Default: false. Channel wiring is a separate follow-up task; this
+   *  flag only reserves the config surface. */
+  relay_enabled?: boolean;
 }
 
 // ─── Cost Guard Config ───────────────────────────────────────────────
@@ -682,6 +711,12 @@ export interface DeckentConfig {
    *  Absent block or max_tech_debt_ratio=0 → byte-identical behavior. */
   gate?: GateConfig;
 
+  // ─── Approval (Sprint 355 CFG-APR-WIRE — runtime-wide ApprovalBroker) ─
+  /** Approval policy rules + gate/relay activation flags (flag-gated,
+   *  default-off for gate/relay; rules default to the loader's own safe set).
+   *  @see ApprovalConfig */
+  approval?: ApprovalConfig;
+
   // ─── ERP (capability-broker erp.read) ───────────────────────────────
   /** ERP connector for the `erp.read` capability (process + autonomous). Opt-in
    *  (`enabled` default-off); secret-free — the credential is read from an env
@@ -1069,6 +1104,16 @@ export interface ResolvedConfig {
   cost_guard?: CostGuardConfig;
   /** Sprint outcome gate configuration (passed through from DeckentConfig). Default-disabled. */
   gate?: GateConfig;
+  /** Resolved approval config (Sprint 355 CFG-APR-WIRE). Unlike the other
+   *  passed-through opt-in blocks above, `rules` here is ALWAYS populated —
+   *  `loadConfig`/`mergeConfigs` resolve it via `resolveApprovalConfig`
+   *  (config.ts), which validates+defaults through `loadApprovalRules`
+   *  (approval-rules-load.ts) fail-soft. Never the raw/unvalidated JSON. */
+  approval?: {
+    rules: ApprovalPolicyRule[];
+    gate_enabled: boolean;
+    relay_enabled: boolean;
+  };
   /** Observability configuration (passed through from DeckentConfig) */
   observability?: DeckentConfig['observability'];
   /** Resolved runtime style — always 'sprint' or 'task' */

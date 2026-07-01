@@ -295,6 +295,16 @@ export interface RoutingOptions {
    */
   kindAffinity?: boolean;
   /**
+   * Enable task/agent-prompt language-mismatch penalty (WM-7, Sprint 355-008).
+   * Default-off. When true, `detectHeuristicLanguage` classifies the task text
+   * (title+description) and each agent's persona text (description+systemPrompt)
+   * via a simple TR-char/word-ratio heuristic; a confident TR/EN mismatch costs
+   * the agent AGENT_LANGUAGE_MISMATCH_PENALTY. Mirrors the kindAffinity /
+   * getRoleMismatchPenalty additive-tiebreaker pattern — never exclusionary.
+   * Flag-off is byte-identical to pre-355-008 routing.
+   */
+  languagePenalty?: boolean;
+  /**
    * Enable agent selection cache. Default-off.
    * When true, selectBestAgent results are memoized via agentSelectionCache.
    * Cache key includes selected skill IDs so affinity-on cache is correct.
@@ -342,6 +352,7 @@ export function routeTaskV2(
   const overrideWarnings: string[] = [];
   const skillAgentAffinityEnabled = options?.skillAgentAffinity ?? false;
   const kindAffinityEnabled = options?.kindAffinity ?? false;
+  const languagePenaltyEnabled = options?.languagePenalty ?? false;
   const agentCacheEnabled = options?.agentCache ?? false;
 
   // Step 1: Classify task intent
@@ -462,6 +473,7 @@ export function routeTaskV2(
       const agentResult = selectBestAgent(
         taskDNA, agentPool, cfg, learningData, allExcludeAgents, task.type,
         skillIds, skillAgentAffinityEnabled, kindAffinityEnabled,
+        `${task.title} ${task.description}`, languagePenaltyEnabled,
       );
       agentId = agentResult.agentId;
       agentScore = agentResult.score;
@@ -606,6 +618,65 @@ export function getKindAffinityBonus(agentId: string, taskKind?: TaskKind): numb
   return 0;
 }
 
+// ─── WM-7 Agent Language-Mismatch Penalty (Sprint 355-008, config-gated) ────
+
+/** Result of the simple TR/EN heuristic — 'unknown' means "no confident signal",
+ *  which callers must treat as "no opinion" (never penalize on an unknown side). */
+export type HeuristicLanguage = 'tr' | 'en' | 'unknown';
+
+/** TR-specific letters absent from standard English orthography. Deliberately
+ *  excludes plain ASCII 'I'/'i' (ambiguous with English) — only the dotted/dotless
+ *  and diacritic forms unique to Turkish are counted. */
+const TR_SPECIFIC_CHARS = /[çğıİöşüÇĞÖŞÜ]/;
+
+/** Below this word count, the ratio has no statistical meaning — 'unknown'. */
+const LANGUAGE_DETECT_MIN_WORDS = 3;
+
+/** Ratio of TR-charactered words to total words at/above which text is
+ *  confidently classified Turkish. Conservative — plain English text scores ~0
+ *  because none of its words carry a Turkish-specific letter. */
+const TR_WORD_RATIO_THRESHOLD = 0.08;
+
+/**
+ * WM-7 (Sprint 355-008, config-gated): a simple, dependency-free TR/EN language
+ * heuristic — the ratio of words containing at least one TR-specific character
+ * to total words. Turkish's suffix morphology (-ği, -ış, -ler, -şey, dil, için, …)
+ * means a real Turkish sentence of any reasonable length reliably contains several
+ * such words; plain English text scores ~0. Deliberately conservative: too few
+ * words or a below-threshold ratio returns 'unknown'/'en' rather than guessing —
+ * the goal is a confident TR/EN split for a routing tiebreaker, not language ID.
+ * Reused symmetrically for both task text (title+description) and agent persona
+ * text (description+systemPrompt) so no separate per-agent language field or
+ * hardcoded map is needed.
+ */
+export function detectHeuristicLanguage(text: string): HeuristicLanguage {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length < LANGUAGE_DETECT_MIN_WORDS) return 'unknown';
+  const trWordCount = words.filter(w => TR_SPECIFIC_CHARS.test(w)).length;
+  return trWordCount / words.length >= TR_WORD_RATIO_THRESHOLD ? 'tr' : 'en';
+}
+
+/** WM-7: soft penalty for a confident task/agent-prompt language mismatch. Sized
+ *  small (unlike the skill-side stack LANGUAGE_MISMATCH_PENALTY) — this is a
+ *  tiebreaker signal among otherwise-competitive agents, not a hard exclusion;
+ *  a genuinely better-fit agent in the "wrong" language must still be selectable. */
+export const AGENT_LANGUAGE_MISMATCH_PENALTY = -1;
+
+/**
+ * WM-7 (config-gated via RoutingOptions.languagePenalty, default-off): returns
+ * AGENT_LANGUAGE_MISMATCH_PENALTY when the task's language and the agent's prompt
+ * language are both confidently detected AND differ, else 0. Takes precomputed
+ * `HeuristicLanguage` values (not raw text) so the task-side detection can be
+ * hoisted once per selectBestAgent call instead of recomputed per candidate.
+ */
+export function getLanguageMismatchPenalty(
+  taskLanguage: HeuristicLanguage,
+  agentLanguage: HeuristicLanguage,
+): number {
+  if (taskLanguage === 'unknown' || agentLanguage === 'unknown') return 0;
+  return taskLanguage === agentLanguage ? 0 : AGENT_LANGUAGE_MISMATCH_PENALTY;
+}
+
 function selectBestAgent(
   taskDNA: TaskDNA,
   pool: AgentPool,
@@ -616,12 +687,17 @@ function selectBestAgent(
   assignedSkills?: string[],
   skillAgentAffinity?: boolean,
   kindAffinity?: boolean,
+  taskText?: string,
+  languagePenalty?: boolean,
 ): { agentId: string | null; score: number; confidence: ConfidenceLevel; reasoning: string[] } {
   const candidates: ScoredCandidate[] = [];
   const reasoning: string[] = [];
 
   // ROUTE-1 B2 — suppress path-proxy + user-surface bonus for touch-up / non-build tasks.
   const buildTask = isSurfaceBuildTask(taskDNA.intent.primary, taskKind);
+
+  // WM-7 — hoisted once: identical for every candidate this call (task-side only).
+  const taskLanguage: HeuristicLanguage = languagePenalty ? detectHeuristicLanguage(taskText ?? '') : 'unknown';
 
   for (const [id, agent] of pool) {
     if (!agent.enabled) continue;
@@ -689,12 +765,22 @@ function selectBestAgent(
       reasoning.push(`Agent '${id}' kind-affinity bonus: ${kindBonus > 0 ? '+' : ''}${kindBonus} (taskKind=${taskKind})`);
     }
 
-    const finalScore = result.score + bonus + domainBonus + surfaceBonus + rolePenalty + kindBonus;
+    // WM-7: task/agent-prompt language-mismatch signal — config-gated, default-off
+    // (see RoutingOptions.languagePenalty).
+    const agentLanguage: HeuristicLanguage = languagePenalty
+      ? detectHeuristicLanguage(`${agent.description} ${agent.systemPrompt}`)
+      : 'unknown';
+    const langPenalty = languagePenalty ? getLanguageMismatchPenalty(taskLanguage, agentLanguage) : 0;
+    if (langPenalty !== 0) {
+      reasoning.push(`Agent '${id}' language-mismatch penalty: ${langPenalty} (taskLanguage=${taskLanguage}, agentLanguage=${agentLanguage})`);
+    }
+
+    const finalScore = result.score + bonus + domainBonus + surfaceBonus + rolePenalty + kindBonus + langPenalty;
 
     if (finalScore >= cfg.agentMinScore) {
       candidates.push({
         id,
-        rawScore: result.score + domainBonus + surfaceBonus + rolePenalty + kindBonus,
+        rawScore: result.score + domainBonus + surfaceBonus + rolePenalty + kindBonus + langPenalty,
         learningBonus: bonus,
         finalScore,
         matchedRules: result.matchedRules,

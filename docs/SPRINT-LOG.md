@@ -8495,3 +8495,39 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 354-015: MESSAGES-KEYS-3 — round-7 i18n (tek-yetkili) (DONE)
 
 ---
+## Sprint 355 — sprint-355
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-01
+**Duration:** 1504s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 0 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1503520ms |
+
+### Tasks
+
+- 355-001: WLT-EMIT — worker progress-stream yazıcı (WORKER-LIVE-TRACE dilim-1) (DONE)
+- 355-002: WLT-READ — progress-stream okuyucu/agregatör (dilim-2) (DONE)
+- 355-003: APR-TG-CHANNEL — telegram onay-kanal adaptörü (DONE)
+- 355-004: APR-TERM-CHANNEL — terminal onay-kanal adaptörü (DONE)
+- 355-005: ROLLBACK-DECIDE — worker-rollback wire-or-kill (born-427) (DONE)
+- 355-006: SPAWNLOCK-HARDEN — TOCTOU pencere kapatma (born-428) (DONE)
+- 355-007: DOC-PILLARS — landed-pillar dokümantasyonu (DONE)
+- 355-008: WM-7 — dil-uyumsuzluk routing-penaltısı (config-gated) (DONE)
+- 355-009: TRN-LINT — eğitim-korpusu kalite-denetçisi (DONE)
+- 355-010: GOLDENFLOW-CMD — `deckent do "<goal>"` (index.ts TEK-yetkili) (DONE)
+- 355-011: APP-APPROVAL-WIRE — approval-card+dual-stream'i app'e tak (app.tsx TEK-yetkili) (DONE)
+- 355-012: NERVOUS-APR — nervous accept/reject ↔ broker köprüsü (DONE)
+- 355-013: CFG-APR-WIRE — approval.rules'u config'e bağla (config.ts TEK-yetkili) (DONE)
+- 355-014: SMOKE-AUDIT — post-sprint Tier-1 smoke zinciri disk-denetimi (DONE)
+- 355-015: MESSAGES-KEYS-4 — round-8 i18n (tek-yetkili) (DONE)
+
+---

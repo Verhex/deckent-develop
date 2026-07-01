@@ -27,10 +27,6 @@ import { ErrorRegistry } from '../core/errors.js';
 import { checkAuthority, emitAuthorityViolation } from '../orchestra/authority-enforcer.js';
 import { writeEvent, getCurrentSprintId, CHANNELS } from '../orchestra/event-stream.js';
 import { atomicWriteFileSync as _atomicWrite } from './worker-lifecycle.js';
-import {
-  snapshotWorkerScope as _snapshotWorkerScope,
-  writeStashRef as _writeStashRef,
-} from './worker-rollback.js';
 import { SharedMemory } from '../orchestra/shared-memory.js';
 export type { SharedMemoryEntry } from '../orchestra/shared-memory.js';
 export { SharedMemory };
@@ -47,16 +43,6 @@ export { SharedMemory };
 // reports nothing — never a worker-authored zero. The worker now contributes
 // only the subjective block (`selfAssessment`, `goCriteria`, `notes`); every
 // measurable field is derived by the orchestrator/adapter.
-
-// ─── Re-export: worker-rollback.ts (Sprint 177 Task 1) ─────────────
-export {
-  snapshotWorkerScope,
-  rollbackWorkerScope,
-  dropWorkerSnapshot,
-  writeStashRef,
-  readStashRef,
-  clearStashRef,
-} from './worker-rollback.js';
 
 // ─── Re-export: worker-verify.ts ───────────────────────────────────
 export {
@@ -241,35 +227,6 @@ export function calculateProgress(heartbeat: { status: AgentStatus | string; fil
 }
 
 // ─── Worker Snapshot Setup (Sprint 177 Task 1) ────────────────────
-
-/**
- * Captures a pre-spawn git-stash snapshot of the working tree and persists
- * the ref via the `.tasks/task-{id}.stash-ref` sidecar so the result-evaluator
- * can later rollback (NO_GO) or drop (DONE / GO_WITH_TECH_DEBT) the snapshot.
- *
- * Designed to be called by spawn-backend / tmux backends just before launching
- * a worker process. Returns the captured stash ref, or `null` if the project
- * root is not a git working tree (graceful degradation).
- *
- * @param projectRoot — absolute path to the project repository
- * @param taskId — task identifier (matches the worker's `task-{id}.json`)
- * @returns the captured stash ref (e.g. `stash@\{0\}`) or `null` on non-git roots
- */
-export function setupTaskSnapshot(projectRoot: string, taskId: string): string | null {
-  if (!existsSync(join(projectRoot, '.git'))) {
-    return null;
-  }
-  try {
-    const ref = _snapshotWorkerScope(projectRoot, taskId);
-    _writeStashRef(projectRoot, taskId, ref);
-    return ref;
-  } catch (err) {
-    console.warn(
-      `[deckent] setupTaskSnapshot failed for task ${taskId}: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    return null;
-  }
-}
 
 // ─── Core Task Operations ───────────────────────────────────────────
 

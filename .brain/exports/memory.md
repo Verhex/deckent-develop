@@ -1,5 +1,23 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-354 Learnings
+- Sprint sprint-354 Learnings: ## Sprint sprint-354 Learnings
+- REPL-SURFACE-WIRE — footer+mode+queue'yu Ink-app'e bağla: GO_WITH_TECH_DEBT — Wired buildLiveFooter + term-mode.ts + chat-turn-queue.ts into ReplApp (src/cli/repl/app.tsx), all behind a single `repl
+- MOAT3-FIXPHASE — NOT_DISPATCHED → FIX re-dispatch: GO_WITH_TECH_DEBT — MOAT-3 FIX-half wired: runFixPhase now actually re-dispatches NOT_DISPATCHED tasks (351-008 built only the classificatio
+- DEBT-LEDGER-COVERAGE — self-DEBT'ler neden ledger'a düşmüyor: GO_WITH_TECH_DEBT — Root cause (disk-verified against sprint-352 archive, .brain/archive/sprint-352-tasks/task-352-{005,008,010,012,013}.res
+- APR-RULES-LOAD — policy-kuralları config'ten (saf yükleyici): GO_WITH_TECH_DEBT — APR-RULES-LOAD: pure zod-validated loader `loadApprovalRules(rawConfig: unknown)` in src/core/approval-rules-load.ts. Re
+
+## Gains
+- 354-002 — TOOL-REPL-WIRE — deckent tool-yüzeyini native-tool-registry'ye köprüle — TOOL-REPL-WIRE: bridged the 353 core primitives (tool-registry.ts TOOL-1, tool-search.ts TOOL-2, ...
+- 354-003 — APR-SHELLCLIENT — Ink onay-kartı (row 33) — DONE (code + logic fully correct + verified) with ONE open item outside my write scope: tests/cli...
+- 354-004 — APR-DUALSTREAM — çift-bölge kompozitörü (row 36) — composeDualStream({statusLines, approvalLines, width, height}, options?) implemented as a pure, n...
+- 354-005 — WORKERGATE-WIRE — riskli worker-tool'ları gate'le (flag-gated) — WORKERGATE-WIRE implemented entirely in src/agents/agentic-worker-tools.ts (the only src/ file in...
+- 354-006 — DECKBROKER-WIRE — subprocess secret'ları broker'dan (flag-gated) — DECKBROKER-WIRE implemented, flag-gated DEFAULT-OFF, ADR-G-005/G-017.
+- 354-007 — TERM-FLOW — altın-akış orkestratörü (row 40) — runGoldenFlow(goal, seams) implemented as a single pure orchestrator in src/orchestra/golden-flow...
+- 354-008 — DIR1-CMD — `deckent plan-nl` + komut-kayıtları (index.ts TEK-yetkili) — Implemented `deckent plan-nl "<goal>"` (src/cli/commands/plan-nl.ts): buildPlanNlIntent() maps th...
+- 354-009 — CONNECT-CMD — `deckent connect` komutu (kayıtsız — kayıt Task 8'de) — Implemented registerConnect(program) wrapping the 353-era pure /connect wizard core (helpers/conn...
+- …and 3 more delivered
+
 ## Sprint sprint-353 Learnings
 - Sprint sprint-353 Learnings: ## Sprint sprint-353 Learnings
 

@@ -273,57 +273,6 @@ export function getAggregateVerdict(
   return best;
 }
 
-// ─── Worker Rollback Verdict Hook (Sprint 177 Task 1) ────────────────
-
-/**
- * Applies the rollback verdict for a worker by inspecting the persisted
- * git-stash ref written at spawn (`setupTaskSnapshot` in `worker.ts`).
- *
- * - NO_GO          → revert the working tree, drop the stash, clear the sidecar.
- * - DONE / GWT     → drop the stash (keep changes), clear the sidecar.
- * - no stash ref   → no-op (worker was spawned before Sprint 177 wire, or
- *                    the project root is not a git working tree).
- *
- * Callers (sprint-controller after EVALUATE) invoke this once per task so the
- * working tree never carries silent partial state from failed workers, closing
- * the Sprint 176 dogfood gap.
- *
- * Imports are lazy to avoid the circular import that would arise if
- * `src/orchestra/result-evaluator.ts` and `src/agents/worker-rollback.ts`
- * pulled each other at module-load time via the `worker.ts` re-export layer.
- */
-export async function applyRollbackVerdict(
-  projectRoot: string,
-  taskId: string,
-  decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
-): Promise<{ applied: 'rollback' | 'drop' | 'none'; stashRef: string | null }> {
-  const { readStashRef, rollbackWorkerScope, dropWorkerSnapshot, clearStashRef } =
-    await import('../agents/worker-rollback.js');
-
-  const stashRef = readStashRef(projectRoot, taskId);
-  if (!stashRef) {
-    return { applied: 'none', stashRef: null };
-  }
-
-  try {
-    if (decision === 'NO_GO') {
-      rollbackWorkerScope(projectRoot, stashRef, []);
-      clearStashRef(projectRoot, taskId);
-      return { applied: 'rollback', stashRef };
-    }
-    dropWorkerSnapshot(projectRoot, stashRef);
-    clearStashRef(projectRoot, taskId);
-    return { applied: 'drop', stashRef };
-  } catch (err) {
-    debugLog(
-      'applyRollbackVerdict',
-      `Task ${taskId}: rollback dispatch failed (${decision}) — ${err instanceof Error ? err.message : String(err)}`,
-    );
-    clearStashRef(projectRoot, taskId);
-    return { applied: 'none', stashRef };
-  }
-}
-
 // ─── Recent Sprint Stats (for adaptive thresholds) ──────────────────
 
 /** Aggregated stats from recent sprints for adaptive threshold decisions */

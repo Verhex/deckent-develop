@@ -10,8 +10,9 @@ import {
   DECKENT_VERSION,
   SUPPORTED_LANGUAGES,
 } from './constants.js';
-import { readJsonSafeAsync } from './utils.js';
+import { readJsonSafeAsync, debugLog } from './utils.js';
 import { needsMigration, migrateConfig, removeDuplicateKeys } from './config-migration.js';
+import { loadApprovalRules } from './approval-rules-load.js';
 import type {
   AutoDocsConfig,
   DeckentConfig,
@@ -926,6 +927,28 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  // ─── Approval config validation (Sprint 355 CFG-APR-WIRE) ───────────
+  // NOTE: `approval.rules` is intentionally NOT validated here — a malformed
+  // rule must never throw / break config load. Rule-level validation is
+  // fully owned by `loadApprovalRules` (approval-rules-load.ts), invoked
+  // fail-soft from `loadConfig`/`mergeConfigs` via `resolveApprovalConfig`
+  // (warnings only, routed through `debugLog`). Only the gate/relay
+  // activation flags get a shallow throwing type-check here, mirroring the
+  // other opt-in blocks above.
+  if (config.approval !== undefined) {
+    const apr = config.approval;
+    if (typeof apr !== 'object' || apr === null || Array.isArray(apr)) {
+      errors.push('approval must be an object');
+    } else {
+      if (apr.gate_enabled !== undefined && typeof apr.gate_enabled !== 'boolean') {
+        errors.push('approval.gate_enabled must be a boolean');
+      }
+      if (apr.relay_enabled !== undefined && typeof apr.relay_enabled !== 'boolean') {
+        errors.push('approval.relay_enabled must be a boolean');
+      }
+    }
+  }
+
   // ─── deckent_style validation ───────────────────────────────────────
   if (config.deckent_style !== undefined && !['sprint', 'task', 'process'].includes(config.deckent_style)) {
     errors.push(`Invalid value '${config.deckent_style}' for field 'deckent_style'. Valid options: sprint, task, process`);
@@ -1085,6 +1108,31 @@ export function resolveCoverageGates(
     coverage_hard_floor: hardFloor,
     coverage_aspirational: aspirational,
     coverage_threshold: aspirational, // back-compat mirror
+  };
+}
+
+/**
+ * Resolve the `approval` config block (Sprint 355 CFG-APR-WIRE) — the single
+ * authority turning raw `approval.rules` JSON into a validated
+ * `ApprovalPolicyRule[]` plus the gate/relay activation flags. Rule
+ * validation itself is fully owned by `loadApprovalRules`
+ * (approval-rules-load.ts, READ-ONLY here — never re-implemented); a
+ * malformed rule entry is skipped with a warning routed through `debugLog`,
+ * never thrown — a broken `approval.rules` block must not break config load
+ * or a sprint. Called from both `loadConfig` and `mergeConfigs`, mirroring
+ * `resolveCoverageGates`.
+ */
+export function resolveApprovalConfig(
+  config: Partial<DeckentConfig>,
+): NonNullable<ResolvedConfig['approval']> {
+  const { rules, warnings } = loadApprovalRules(config);
+  for (const warning of warnings) {
+    debugLog('cfg-apr-wire', warning);
+  }
+  return {
+    rules,
+    gate_enabled: config.approval?.gate_enabled ?? false,
+    relay_enabled: config.approval?.relay_enabled ?? false,
   };
 }
 
@@ -1591,6 +1639,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     cost_guard: config.cost_guard,
     // Gate — passed through (opt-in, default-off)
     gate: config.gate,
+    // Approval — validated + defaulted via resolveApprovalConfig (Sprint 355 CFG-APR-WIRE)
+    approval: resolveApprovalConfig(config),
     // ERP connector — passed through (opt-in, absent = disabled; secret-free)
     erp: config.erp,
     // Plan config (Sprint 276 PLAN-INT-1) — passed through (opt-in, absent = disabled)
@@ -2301,6 +2351,8 @@ export function mergeConfigs(
     cost_guard: config.cost_guard,
     // Gate — passed through (opt-in, default-off)
     gate: config.gate,
+    // Approval — validated + defaulted via resolveApprovalConfig (Sprint 355 CFG-APR-WIRE)
+    approval: resolveApprovalConfig(config),
     // ERP connector — passed through (opt-in, absent = disabled; secret-free)
     erp: config.erp,
     // Plan config (Sprint 276 PLAN-INT-1) — passed through (opt-in, absent = disabled)
