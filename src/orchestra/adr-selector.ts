@@ -55,39 +55,46 @@ export type TaskType = AdrTaskType;
  *
  * Sprint 146 — Task 146-006
  */
+// ADR-TAXONOMY (2026-06-30): remapped from the retired numeric IDs to the ADR-G/D
+// taxonomy via the crosswalk (docs/adr/*.md `**Crosswalk:**`). The old numeric IDs
+// (adr-001…) no longer exist in the DB — comparing them against `adr-g/d-NNN` was a
+// dead no-op (every intent-preference score = 0), so selection fell back to keyword
+// matching only. Mapping preserves each domain's original architectural intent.
 export const TASK_TYPE_ADR_PRESETS: Record<AdrTaskType, string[]> = {
-  'core-dev':      ['adr-001', 'adr-002', 'adr-008', 'adr-015'],
-  'docs':          ['adr-029', 'adr-030', 'adr-032'],
-  // WP-15: adr-087 (Async I/O & Test Hermeticity Standard) is THE test-hermeticity
-  // ADR — it is the heart of most test tasks (tmpdir, no spawnSync, CI-fresh) yet
-  // was previously absent, so a hermeticity task never had it force-ranked.
-  'test':          ['adr-003', 'adr-019', 'adr-087'],
-  'cli':           ['adr-010', 'adr-011', 'adr-012', 'adr-022-v2'],
-  'mcp':           ['adr-022-v2', 'adr-017'],
-  // WP-15: adr-038 is "Dead Code Disposition" — NOT a security ADR; it was being
-  // force-ranked into security tasks ahead of real ones. Replaced with adr-034
-  // (Multi-Project Isolation — per-project security boundaries / tenant isolation).
-  'security':      ['adr-006', 'adr-034', 'adr-037'],
-  'observability': ['adr-035'],
-  'orchestra':     ['adr-008', 'adr-015', 'adr-024', 'adr-026'],
-  'provider':      ['adr-017', 'adr-023', 'adr-027'],
-  'dashboard':     ['adr-001', 'adr-002'],
+  'core-dev':      ['adr-d-001', 'adr-d-004', 'adr-g-006'],
+  'docs':          ['adr-g-015'],
+  // adr-d-002 (State-Path & Test Hermeticity — absorbed old adr-003/087) is THE
+  // hermeticity ADR (tmpdir, no spawnSync, CI-fresh); adr-g-009 = eval/surface.
+  'test':          ['adr-d-002', 'adr-g-009'],
+  'cli':           ['adr-d-005', 'adr-d-006', 'adr-g-011'],
+  'mcp':           ['adr-g-011', 'adr-g-008'],
+  // security = adr-g-017 (Multi-Project Isolation / per-project boundary), adr-g-020
+  // (Authority/Roles/RBAC), adr-g-002 (absorbed old adr-006).
+  'security':      ['adr-g-017', 'adr-g-020', 'adr-g-002'],
+  'observability': ['adr-g-018'],
+  'orchestra':     ['adr-d-004', 'adr-g-006', 'adr-d-006'],
+  'provider':      ['adr-g-008', 'adr-g-012', 'adr-g-014'],
+  'dashboard':     ['adr-d-001'],
 };
 
 // ─── Intent → ADR Preference ────────────────────────────────────────
 
-/** Task type inferred from scope + description → preferred ADR IDs */
+/**
+ * Task intent → preferred ADR IDs. Remapped to the ADR-G/D taxonomy (2026-06-30)
+ * via the crosswalk — the retired numeric IDs never matched the DB's `adr-g/d-NNN`
+ * (dead scoring). Mapping preserves each intent's original architectural intent.
+ */
 const INTENT_ADR_PREFERENCES: Record<string, string[]> = {
-  'core-dev':      ['adr-001', 'adr-002', 'adr-004', 'adr-008', 'adr-015', 'adr-023'],
-  'orchestra':     ['adr-008', 'adr-015', 'adr-024', 'adr-026', 'adr-028'],
-  'cli':           ['adr-010', 'adr-011', 'adr-012', 'adr-022-v2'],
-  'mcp':           ['adr-017', 'adr-022-v2'],
-  'docs':          ['adr-029', 'adr-030', 'adr-031', 'adr-032'],
-  'test':          ['adr-003', 'adr-019', 'adr-087'],
-  'security':      ['adr-006', 'adr-014', 'adr-034', 'adr-037', 'adr-039'],
-  'observability': ['adr-035'],
-  'provider':      ['adr-017', 'adr-023', 'adr-027'],
-  'dashboard':     ['adr-001', 'adr-002'],
+  'core-dev':      ['adr-d-001', 'adr-g-001', 'adr-d-004', 'adr-g-006', 'adr-g-012'],
+  'orchestra':     ['adr-d-004', 'adr-g-006', 'adr-d-006'],
+  'cli':           ['adr-d-005', 'adr-d-006', 'adr-g-011'],
+  'mcp':           ['adr-g-008', 'adr-g-011'],
+  'docs':          ['adr-g-015'],
+  'test':          ['adr-d-002', 'adr-g-009'],
+  'security':      ['adr-g-017', 'adr-g-020', 'adr-g-002', 'adr-g-005', 'adr-g-021'],
+  'observability': ['adr-g-018'],
+  'provider':      ['adr-g-008', 'adr-g-012', 'adr-g-014'],
+  'dashboard':     ['adr-d-001'],
 };
 
 // ─── Intent Classification ──────────────────────────────────────────
@@ -269,9 +276,12 @@ function scoreAgePenalty(adr: MemoryEntryV2, currentSprintNum: number): { score:
  * Handles "ADR-12", "adr-012", "ADR012" → "adr-012".
  */
 function normalizeAdrId(raw: string): string {
-  const m = /adr-?0*(\d+)/i.exec(raw);
+  // ADR-TAXONOMY: canonical form is `adr-<class>-NNN` (class g|d) for the current
+  // taxonomy, or legacy `adr-NNN` when no class letter is present. 3-digit padded.
+  const m = /adr-?([gd])?-?0*(\d+)/i.exec(raw);
   if (!m) return raw.toLowerCase();
-  return `adr-${m[1]!.padStart(3, '0')}`;
+  const cls = m[1] ? `${m[1].toLowerCase()}-` : '';
+  return `adr-${cls}${m[2]!.padStart(3, '0')}`;
 }
 
 /**
@@ -280,11 +290,16 @@ function normalizeAdrId(raw: string): string {
  * Returns deduplicated canonical ids like ["adr-012", "adr-037"].
  */
 export function extractExplicitAdrRefs(text: string): string[] {
-  const pattern = /ADR-?(\d{1,3})/gi;
+  // ADR-TAXONOMY: match the current taxonomy `ADR-G-025` / `adr-d-2` (class letter)
+  // AND the legacy `ADR-025` (no class). This is what makes a task's explicit
+  // `Governing: ADR-G-025` pin actually force-include that ADR — previously the
+  // class letter broke the digit match, so every new-format pin silently no-op'd.
+  const pattern = /ADR-?([GD])?-?(\d{1,3})/gi;
   const seen = new Set<string>();
   let m: RegExpExecArray | null;
   while ((m = pattern.exec(text)) !== null) {
-    seen.add(normalizeAdrId(`adr-${m[1]!}`));
+    const cls = m[1] ? `${m[1].toLowerCase()}-` : '';
+    seen.add(normalizeAdrId(`adr-${cls}${m[2]!}`));
   }
   return [...seen];
 }
@@ -415,11 +430,24 @@ const OPERATIVE_END = '<!-- worker-operative-end -->';
  * Extract the operative section from ADR content when markers are present.
  * Returns null if no valid marker pair found (caller falls back to full content).
  */
-function extractOperativeSection(content: string): string | null {
+export function extractOperativeSection(content: string): string | null {
   const startIdx = content.indexOf(OPERATIVE_START);
   const endIdx = content.indexOf(OPERATIVE_END);
-  if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) return null;
-  return content.slice(startIdx + OPERATIVE_START.length, endIdx).trim();
+  if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+    return content.slice(startIdx + OPERATIVE_START.length, endIdx).trim();
+  }
+  // ADR-TAXONOMY fallback: the current ADR format carries no operative-marker
+  // comments — the `## Decision (Today)` section IS the operative rule set. Return
+  // it (through to the next `## ` header) so a worker sees the decision, not the
+  // full Context + Roadmap + Consequences + References body (the token bloat).
+  const decMatch = /^##\s+Decision\b.*$/im.exec(content);
+  if (decMatch) {
+    const after = content.slice(decMatch.index + decMatch[0].length);
+    const nextHdr = /^##\s+/m.exec(after);
+    const body = (nextHdr ? after.slice(0, nextHdr.index) : after).trim();
+    if (body) return body;
+  }
+  return null;
 }
 
 // ─── Prompt Section Builder ──────────────────────────────────────────
@@ -538,24 +566,34 @@ export function distillActiveConstraint(content: string, summary?: string | null
   if (summary && summary.trim()) return cap(summary);
 
   const lines = content.split('\n');
-  // 2. The Decision statement — text on the same line, else the next content line.
+  // ADR-TAXONOMY 1. The `**Enforcement:** today=<rule> → tomorrow=…` header line is
+  // the operative constraint in the current taxonomy. Take the `today=` clause.
+  for (const raw of lines) {
+    const m = /\*\*Enforcement:\*\*\s*(.+)$/i.exec(raw.trim());
+    if (!m || !m[1]) continue;
+    const t = m[1].replace(/^today\s*=\s*/i, '').split(/→\s*tomorrow/i)[0]!.trim();
+    if (t) return cap(t);
+  }
+  // 2. The Decision statement (`## Decision (Today)` or `**Decision:**`) — same-line
+  //    text, else the next prose/list line.
   for (let i = 0; i < lines.length; i++) {
-    const m = /^\**\s*Decision\**\s*:?\s*(.*)$/i.exec(lines[i]!.trim());
+    const m = /^#*\s*\**\s*Decision\b[^:*]*\**\s*:?\s*(.*)$/i.exec(lines[i]!.trim());
     if (!m) continue;
-    let text = m[1]!.replace(/^\**\s*/, '').trim();
+    let text = m[1]!.replace(/^\**\s*/, '').replace(/^\(today\)\s*/i, '').trim();
     if (!text) {
       for (let j = i + 1; j < lines.length; j++) {
         const nxt = lines[j]!.trim();
-        if (nxt && !nxt.startsWith('#') && !nxt.startsWith('---')) { text = nxt; break; }
+        if (nxt && !nxt.startsWith('#') && !nxt.startsWith('---') && !nxt.startsWith('```')) { text = nxt; break; }
       }
     }
     if (text) return cap(text);
   }
-  // 3. First meaningful content line (skip headers, rules, tables, quotes, metadata).
+  // 3. First meaningful content line (skip headers, rules, tables, quotes, code
+  //    fences, and ALL metadata header lines — new taxonomy + legacy).
   for (const raw of lines) {
     const l = raw.trim();
-    if (!l || l.startsWith('#') || l.startsWith('---') || l.startsWith('|') || l.startsWith('>')) continue;
-    if (/^\**\s*(status|date|accepted)\b/i.test(l)) continue;
+    if (!l || l.startsWith('#') || l.startsWith('---') || l.startsWith('|') || l.startsWith('>') || l.startsWith('```')) continue;
+    if (/^\**\s*(status|date|accepted|class|scope|immutable|source|enforcement|crosswalk|absorbs|supersedes)\b/i.test(l)) continue;
     const s = l.replace(/^\**\s*/, '').replace(/\s*\**$/, '');
     if (s) return cap(s);
   }

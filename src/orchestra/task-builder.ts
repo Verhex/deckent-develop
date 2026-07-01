@@ -1233,11 +1233,14 @@ export function queryRelevantADRs(taskDescription: string, taskScope: string[], 
         return '';
       }
 
-      // If a full Task-like object is provided, use the new scoring engine
+      // If a full Task-like object is provided, use the new scoring engine.
+      // WP-OPT: render 'operative' (Decision section, not the full amendment log) +
+      // scope-gated (non-scope-intersecting ADRs → distilled head + pointer only),
+      // so a worker sees the actionable constraint, not a 25 KB full-body dump.
       if (task) {
         const ranked = selectRelevantAdrs(task, allAdrs, 3);
         if (ranked.length === 0) return '';
-        return buildAdrPromptSection(ranked, 'full', allAdrs);
+        return buildAdrPromptSection(ranked, 'full', allAdrs, 'operative', true);
       }
 
       // Fallback: construct a minimal task-like object from description + scope
@@ -1263,7 +1266,7 @@ export function queryRelevantADRs(taskDescription: string, taskScope: string[], 
         if (results.length === 0) return '';
         return results.map(r => `## ${r.entry.id}: ${r.entry.title}\n\n${r.entry.content}`).join('\n\n---\n\n');
       }
-      return buildAdrPromptSection(ranked, 'full', allAdrs);
+      return buildAdrPromptSection(ranked, 'full', allAdrs, 'operative', true);
     } finally {
       store.close();
     }

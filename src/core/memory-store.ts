@@ -90,6 +90,16 @@ export class MemoryStore {
     this.strictTenantIsolation = opts?.strictTenantIsolation ?? false;
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
+    // DB-LOCK RESILIENCE (verified root cause, sprint-348): `.brain/memory.db` is a
+    // shared store — a live sprint's finalizeSprint() writes retro/memory/agent-stats
+    // WHILE the dashboard, `deckent review`, the auditor, and other CLI/MCP processes
+    // read it concurrently (normal under the multi-tenant / enterprise law). WAL alone
+    // does NOT retry on write contention: without a busy_timeout, a concurrent access
+    // throws `SQLITE_BUSY: database is locked` IMMEDIATELY. In sprint-348 that lock
+    // was swallowed by the finalize try/catch (sprint-phases.ts), silently dropping
+    // the entire retro/memory/export/archive step (no .brain/archive/sprint-348-tasks).
+    // A 5s busy_timeout makes every connection wait-and-retry instead of failing hard.
+    this.db.pragma('busy_timeout = 5000');
     this.initSchema();
   }
 

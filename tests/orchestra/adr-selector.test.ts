@@ -282,15 +282,16 @@ describe('adr-selector', () => {
     expect(ids).toContain('adr-087');
   });
 
-  it('WP-15: test preset includes the hermeticity ADR-087', () => {
-    expect(TASK_TYPE_ADR_PRESETS.test).toContain('adr-087');
+  it('ADR-TAXONOMY: test preset includes the hermeticity ADR (adr-d-002, absorbed old adr-087)', () => {
+    // Crosswalk: old adr-003/adr-087 (hermeticity) → adr-d-002 (State-Path & Test).
+    expect(TASK_TYPE_ADR_PRESETS.test).toContain('adr-d-002');
   });
 
-  it('WP-15: drops the miscategorized Dead-Code ADR-038 from the security preset, prefers isolation ADR-034', () => {
-    // ADR-038 is "Dead Code Disposition" — not a security ADR. It must not be
-    // force-ranked into a security task ahead of real security/isolation ADRs.
+  it('ADR-TAXONOMY: security preset prefers isolation adr-g-017 (old adr-034), never Dead-Code', () => {
+    // Crosswalk: old adr-034 (Multi-Project Isolation) → adr-g-017. The old
+    // Dead-Code adr-038 must not appear (nor its new home) in the security preset.
     expect(TASK_TYPE_ADR_PRESETS.security).not.toContain('adr-038');
-    expect(TASK_TYPE_ADR_PRESETS.security).toContain('adr-034');
+    expect(TASK_TYPE_ADR_PRESETS.security).toContain('adr-g-017');
 
     const pool = [
       makeAdr({ id: 'adr-006', title: 'spawnSync Security Pattern', content: 'security spawnSync safe argv', sprint_num: 6 }),
