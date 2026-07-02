@@ -1645,6 +1645,15 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     erp: config.erp,
     // Plan config (Sprint 276 PLAN-INT-1) — passed through (opt-in, absent = disabled)
     plan: config.plan,
+    // born-464 (Alperen live-test 2026-07-02): the five overnight opt-in flag
+    // blocks were declared on the type but never passed through in EITHER
+    // resolver (this one nor mergeConfigs) — on the live path every flag
+    // silently resolved to undefined (off) no matter what the user set.
+    repl_surface: config.repl_surface,
+    tool_surface: config.tool_surface,
+    deck_broker: config.deck_broker,
+    training_trace: config.training_trace,
+    live_trace: config.live_trace,
     // Messaging connectors (BOT-001) — passed through; tokens .deck-interpolated below.
     notify_connectors: (config as DeckentConfig).notify_connectors,
     notify_on_complete: (config as DeckentConfig).notify_on_complete,
@@ -2357,6 +2366,17 @@ export function mergeConfigs(
     erp: config.erp,
     // Plan config (Sprint 276 PLAN-INT-1) — passed through (opt-in, absent = disabled)
     plan: config.plan,
+    // born-464 (Alperen live-test 2026-07-02): the five overnight opt-in flag
+    // blocks below were declared on the type but never passed through here —
+    // hermetic tests injected configs directly, so on the LIVE loadConfig path
+    // every flag silently resolved to undefined (off) no matter what the user
+    // set. Each is a plain pass-through: absent = disabled, exactly like
+    // resource_monitor/worker_comms above.
+    repl_surface: config.repl_surface,
+    tool_surface: config.tool_surface,
+    deck_broker: config.deck_broker,
+    training_trace: config.training_trace,
+    live_trace: config.live_trace,
   };
   return merged;
 }
