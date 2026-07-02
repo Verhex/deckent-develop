@@ -13,6 +13,10 @@ import { scanHeartbeats } from 'deckent/monitor';
 
 ---
 
+```bash
+curl http://localhost:3100/api/status
+```
+
 ## Table of Contents
 
 1. [Core — Types](#1-core--types)

@@ -79,6 +79,7 @@
 | `docker_image` | `string` | `'deckent-worker:latest'` | — | Docker worker container imaji. |
 | `docker_timeout` | `number` | `1200` | — | Docker container timeout (saniye). |
 | `worker_memory_limit` | `string` | `undefined` (falls back to `'4g'`) | — | Docker-only: worker container bellek limiti (orn. `'2g'`, `'512m'`). Unset = spawn backend DEFAULT_WORKER_MEMORY_LIMIT `'4g'`. CT:314. Swap auto-derived as `limit × 1.5`. |
+| `worker_memory_swap` | `string` | `undefined` | — | Docker-only: container swap limiti (örn. `'4g'`). Unset = backend default. Overnight-2026-07-02 tuning ile eklendi. |
 | `worker_memory_limit_by_kind` | `object` | `undefined` | — | Per-task-kind Docker bellek limiti override. Anahtar: TaskKind (`'code'`, `'doc'`), deger: bellek string (`'1.5g'`). |
 | `multi_ide_mode` | `boolean` | `false` | — | Birden fazla IDE ortamini destekle. |
 | `chat_provider` | `'claude' \| 'codex' \| 'gemini' \| 'ollama'` | — | — | REPL/chat icin isteğe bagli provider override. Yok ise `brain_provider` -> `'claude'` zinciri izlenir. Sprint 220. |

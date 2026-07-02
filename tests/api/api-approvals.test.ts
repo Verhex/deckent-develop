@@ -34,7 +34,7 @@ function buildRequest(id: string, overrides: Partial<ApprovalRequestInput> = {})
     tenantId: 'local',
     userId: 'alperen',
     createdAt: '2026-07-02T00:00:00.000Z',
-    expiresAt: '2026-07-02T01:00:00.000Z',
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // time-bomb fix: relative future, never expires mid-suite
     maskedArgs: { command: '[REDACTED]' },
     rawArgsRef: null,
     ...overrides,

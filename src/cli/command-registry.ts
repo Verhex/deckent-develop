@@ -98,6 +98,11 @@ export const COMMAND_REGISTRY: readonly CommandRegistryEntry[] = [
   entry('upgrade', 'Core', 'Çalıştır', 'cli', ['cli']),
   entry('onboard', 'Core', 'Değiştir', 'cli', ['cli']),
   entry('analyze', 'Core', 'Oku', 'core', ['cli', 'mcp', 'repl'], ['deckent_analyze_project']),
+  // Overnight 2026-07-02 additions (rounds 5-9): registered commands must appear
+  // here — the registry⊇commands invariant test enforces it.
+  entry('plan-nl', 'Run', 'Oku', 'orchestra', ['cli']), // dry-run preview by default; --write mutates DIRECTIVES
+  entry('connect', 'Core', 'Oku', 'core', ['cli']),     // diagnostic wizard, no mutation
+  entry('do', 'Run', 'Çalıştır', 'orchestra', ['cli']), // golden-flow; default dry-run, --run executes
   entry('archive-debt', 'Core', 'Oku', 'orchestra', ['cli']),
   entry('dashboard', 'Core', 'Oku', 'monitor', ['cli']),
   entry('sync', 'Core', 'Değiştir', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_sync']),
