@@ -296,8 +296,11 @@ describe('cost-config-loader', () => {
       const config = loadCostConfig(tmpDir, { forceReload: true });
       expect(config.providers.anthropic?.models['claude-opus-4-8']?.input_cost_per_token).toBe(0.000005);
       expect(config.providers.anthropic?.models['claude-opus-4-8']?.output_cost_per_token).toBe(0.000025);
-      // Sonnet 4.6 should be 1M context
-      expect(config.providers.anthropic?.models['claude-sonnet-4-6']?.max_input_tokens).toBe(1000000);
+      // Sonnet 5 should be 1M context (key renamed from claude-sonnet-4-6; legacy IDs live in aliases)
+      expect(config.providers.anthropic?.models['claude-sonnet-5']?.max_input_tokens).toBe(1000000);
+      expect(config.providers.anthropic?.models['claude-sonnet-5']?.deckent_aliases).toContain('claude-sonnet-4-6');
+      // Fable 5 present in baseline
+      expect(config.providers.anthropic?.models['claude-fable-5']?.input_cost_per_token).toBe(0.00001);
       // Haiku 4.5
       expect(config.providers.anthropic?.models['claude-haiku-4-5']?.input_cost_per_token).toBe(0.000001);
     });

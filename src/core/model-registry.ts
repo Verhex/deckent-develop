@@ -54,7 +54,9 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
     provider: 'claude',
     tier: 'premium',
     contextWindow: 1_000_000,
-    costPerMillion: { input: 15, output: 75 },
+    // Opus 4.5+ repricing ($5/$25) — matches pricing-data-baseline.json (cost SSOT);
+    // the old $15/$75 was pre-4.5 Opus pricing left stale here.
+    costPerMillion: { input: 5, output: 25 },
     capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: false },
     status: 'ga',
   },

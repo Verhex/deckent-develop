@@ -25,7 +25,7 @@ export interface ProviderError {
 }
 
 const DEFAULT_MODEL: Record<'anthropic-api' | 'openai-compatible' | 'ollama', string> = {
-  'anthropic-api': 'claude-sonnet-4-6',
+  'anthropic-api': 'claude-sonnet-5',
   'openai-compatible': 'gpt-4.1',
   ollama: 'qwen3',
 };

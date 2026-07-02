@@ -418,9 +418,9 @@ describe('ModelRegistry', () => {
 
   describe('estimateCost()', () => {
     it('calculates cost for opus with 1M input + 500K output', () => {
-      // opus: $15/M input, $75/M output
+      // opus (4.5+ repricing): $5/M input, $25/M output — baseline-aligned
       const cost = registry.estimateCost('opus', 1_000_000, 500_000);
-      expect(cost).toBeCloseTo(15 + 37.5, 2);
+      expect(cost).toBeCloseTo(5 + 12.5, 2);
     });
 
     it('calculates cost for haiku with 100K input + 50K output', () => {
