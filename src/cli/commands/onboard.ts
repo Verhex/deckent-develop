@@ -9,6 +9,7 @@ import { DECKENT_DIR, DECKENT_VERSION } from '../../core/constants.js';
 import { runWizard } from '../helpers/wizard.js';
 import type { WizardStep } from '../helpers/wizard.js';
 import { detectProjectStack } from '../../core/stack-detector.js';
+import { PROVIDER_PACKAGES } from '../../core/provider-packages.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -143,7 +144,7 @@ export async function runOnboard(root: string, opts: { nonInteractive?: boolean;
   if (claude.available) {
     print(`Claude CLI: v${claude.version}`);
   } else {
-    print('Claude CLI: not found — install with: npm install -g @anthropic-ai/claude-code');
+    print(`Claude CLI: not found — install with: ${PROVIDER_PACKAGES.claude.installHint}`);
   }
 
   // 3. Provider detection

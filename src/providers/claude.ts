@@ -3,6 +3,7 @@ import { readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ModelType } from '../core/types.js';
 import { modelRegistry } from '../core/model-registry.js';
+import { PROVIDER_PACKAGES } from '../core/provider-packages.js';
 import type { ProviderAdapter, ProviderSpawnOptions, ProviderAvailabilityDetail } from '../core/provider.js';
 import { ProviderError, resolveBinaryPath, parseSemverFromOutput } from '../core/provider.js';
 import {
@@ -294,7 +295,7 @@ export class ClaudeAdapter implements ProviderAdapter {
     const hints: string[] = [];
     if (!binaryFound) {
       reason = 'Claude CLI not found in PATH';
-      hints.push('Install: npm i -g @anthropic-ai/claude-code');
+      hints.push(`Install: npm i -g ${PROVIDER_PACKAGES.claude.npmPkg}`);
     } else {
       reason = `Claude CLI ${version ?? 'installed'} — session auth managed by CLI`;
     }

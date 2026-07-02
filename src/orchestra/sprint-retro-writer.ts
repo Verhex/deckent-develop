@@ -278,6 +278,16 @@ export function formatHumanRetro(data: HumanRetroData): string {
     lines.push(`| Sprint time | ${durationStr.replace(' total', '')} |`);
   }
   if (metrics.totalTasks > 0) {
+    // born-460 fix: this row was missing entirely, so `deckent retro`'s
+    // markdown parser (retro-parser.ts debtMatch) never found a "Tech Debt"
+    // line and fell back to counting the literal string "GO_WITH_TECH_DEBT"
+    // in the content — which never appears (Learnings renders "completed
+    // with tech debt", not the enum name) — always yielding 0 regardless of
+    // the real count. metrics.techDebtTasks is already the Brain-final-verdict
+    // source (calculateMetrics counts the `evaluations` Map, which holds
+    // each task's `result.brainEvaluation ?? evaluation`, not the worker's
+    // own selfAssessment) — this just renders that existing correct value.
+    lines.push(`| Tech Debt | ${metrics.techDebtTasks} |`);
     const noGoPercent = Math.round(metrics.noGoRate * 100);
     lines.push(`| NO_GO rate | ${noGoPercent}% (${metrics.noGoTasks}/${metrics.totalTasks}) |`);
   }

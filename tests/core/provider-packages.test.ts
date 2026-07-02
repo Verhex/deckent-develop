@@ -11,11 +11,13 @@ import {
 } from '../../src/core/provider-packages.js';
 
 // ─── PROVIDER_PACKAGES — SSOT shape + regression guard ───────────────────
-// These values MUST match the literals currently hardcoded across
-// src/providers/{claude,codex,gemini}.ts, src/core/{errors,provisioner}.ts,
-// and src/cli/{helpers/messages,helpers/wizard,commands/doctor,commands/onboard,
-// commands/chat}.ts — a mismatch here means either this SSOT or a call-site
-// literal has drifted (this file is the one place that should ever change).
+// These values MUST match the remaining hardcoded literals in
+// src/cli/{helpers/messages,commands/doctor}.ts (DISTINCT-FILE protected,
+// see KNOWN_HARDCODE_CEILING below) — every other former call-site
+// (src/providers/{claude,codex,gemini}.ts, src/core/{errors,provisioner}.ts,
+// src/cli/{helpers/wizard,commands/onboard,commands/chat}.ts) now imports
+// PROVIDER_PACKAGES directly (task-358-013) — a mismatch here means either
+// this SSOT or a protected-file literal has drifted.
 
 describe('PROVIDER_PACKAGES', () => {
   it('covers exactly claude, codex, gemini', () => {
@@ -94,21 +96,16 @@ describe('getProviderPackage', () => {
 
 const PROVIDER_LITERAL_PATTERN = /@anthropic-ai\/claude-code|@openai\/codex|@google\/gemini-cli/g;
 
-// DISTINCT-FILE (write-protected by task-357-016 directive — never convert
-// from this task) and write-scope-blocked (outside this task's
-// scope.filesWrite) call sites, with their occurrence count observed at
-// authoring time as the ratchet ceiling.
+// task-358-013 converted chat.ts, onboard.ts, wizard.ts, provisioner.ts,
+// errors.ts, and providers/{claude,codex,gemini}.ts to the SSOT — they
+// dropped out of this list entirely (0 occurrences, covered by the
+// repo-wide guard below instead of an explicit ceiling row). Only the
+// DISTINCT-FILE protected sites remain: doctor.ts and messages.ts are
+// out of every PKG-SSOT task's write scope by directive and are never
+// converted from this file.
 const KNOWN_HARDCODE_CEILING: Readonly<Record<string, number>> = Object.freeze({
-  'src/cli/commands/chat.ts': 3,
-  'src/cli/commands/onboard.ts': 1,
   'src/cli/commands/doctor.ts': 2, // DISTINCT-FILE protected
-  'src/cli/helpers/wizard.ts': 1,
   'src/cli/helpers/messages.ts': 2, // DISTINCT-FILE protected
-  'src/core/provisioner.ts': 3,
-  'src/core/errors.ts': 2,
-  'src/providers/claude.ts': 1,
-  'src/providers/codex.ts': 1,
-  'src/providers/gemini.ts': 1,
 });
 
 function countProviderLiterals(absPath: string): number {

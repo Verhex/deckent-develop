@@ -21,6 +21,7 @@ import { CodexAdapter } from '../../providers/codex.js';
 import { GeminiAdapter } from '../../providers/gemini.js';
 import { OllamaAdapter } from '../../providers/ollama.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
+import { PROVIDER_PACKAGES } from '../../core/provider-packages.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import type { ChatTurn } from '../../core/memory-types.js';
 import { print, printError } from '../helpers/output.js';
@@ -57,9 +58,9 @@ interface ProviderProbe {
 const NO_PROVIDER_MESSAGE =
   'No AI CLI found. Searched: claude (Anthropic), codex (OpenAI), gemini (Google).\n' +
   'Install options:\n' +
-  '  • claude  — https://claude.ai/download  (npm: npm install -g @anthropic-ai/claude-code)\n' +
-  '  • codex   — npm install -g @openai/codex\n' +
-  '  • gemini  — npm install -g @google/gemini-cli\n' +
+  `  • claude  — https://claude.ai/download  (npm: ${PROVIDER_PACKAGES.claude.installHint})\n` +
+  `  • codex   — ${PROVIDER_PACKAGES.codex.installHint}\n` +
+  `  • gemini  — ${PROVIDER_PACKAGES.gemini.installHint}\n` +
   'Alternatives:\n' +
   '  • deckent chat --native  — built-in chat (no host CLI required)\n' +
   '  • deckent serve          — open dashboard chat in your browser';

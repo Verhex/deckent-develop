@@ -2,6 +2,31 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint358] - 2026-07-02
+
+### Added
+
+- APR-XPROC-CORE — approval-store dizin-izleyici çekirdeği (born-462 dilim-1)
+- APR-XPROC-WIRE — REPL'e cross-process onay beslemesi (born-462 dilim-2)
+- APP-SURFACE-WIRE — /resume picker + açılış-teaser + busy-kontrolleri (app.tsx)
+- CKPT-QUESTION-BRIDGE-WIRE — worker-soruları gerçek onaya (Sıra-73 kapanışı)
+- ALLOWSCOPE-COMPOSE — always-allow'u worker-gate önüne bağla (Sıra-69 kapanışı)
+- DEP-REF-LOUD — çözülemeyen dependency-ref sessiz düşmesin (born-458)
+- RETRO-DEBT-COUNT — retro sayaç-kaynağı düzelt (born-460)
+- REFDOCS-ADR-REGEX — docs:ref yeni ADR-taksonomisini tanısın (born-461)
+- PKG-SSOT-CLOSE — kalan 13 hardcode-hint SSOT'a (Sıra-207 kapanışı)
+- CONFIG-ROUNDTRIP-GUARD — flag-drop sınıfına kalıcı mekanik kapan (born-464 guard)
+
+### Changed
+
+- REPL-DETACHED-START — REPL'den kilitlemeyen sprint-start (completed with tech debt)
+- REPL-DISPATCH-PARITY — /nervous köprü-tüketimi + /autonomous /mcp parite (completed with tech debt)
+- HELP-SURFACE-WIRE — /help'e katalog + mode-filtre (Sıra-26+56 kapanışı) (completed with tech debt)
+- TRN-PIPE-WIRE — pipeline outcome-etiketi taksonomiden (Sıra-79 kapanışı) (completed with tech debt)
+
+
+_Tasks: 18 total, 18 done, 4 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint357] - 2026-07-02
 
 ### Added

@@ -6,6 +6,7 @@ import { execSync } from 'node:child_process';
 import { join } from 'node:path';
 import type { DetectedProvider } from '../../core/provider.js';
 import type { ProviderName } from '../../core/task-types.js';
+import { PROVIDER_PACKAGES } from '../../core/provider-packages.js';
 
 export interface WizardStep {
   id: string;
@@ -347,7 +348,7 @@ export function formatProviderAuthGuidance(detected: DetectedProvider[]): string
     if (envVar) {
       lines.push(`  ⚠ ${p.name}: Set ${envVar} environment variable to enable`);
     } else if (p.name === 'claude' && !p.available) {
-      lines.push(`  ⚠ claude: Install CLI (npm i -g @anthropic-ai/claude-code) and log in`);
+      lines.push(`  ⚠ claude: Install CLI (npm i -g ${PROVIDER_PACKAGES.claude.npmPkg}) and log in`);
     }
   }
   return lines;

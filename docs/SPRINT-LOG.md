@@ -8604,3 +8604,41 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 357-016: PKG-SSOT-REST — install-hint paket-adlarının kalan çağrı-noktaları (207 tamamlama) (DONE)
 
 ---
+## Sprint 358 — sprint-358
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-02
+**Duration:** 1998s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 18 |
+| Completed | 18 |
+| Tech Debt | 4 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1998237ms |
+
+### Tasks
+
+- 358-001: APR-XPROC-CORE — approval-store dizin-izleyici çekirdeği (born-462 dilim-1) (DONE)
+- 358-002: APR-XPROC-WIRE — REPL'e cross-process onay beslemesi (born-462 dilim-2) (DONE)
+- 358-003: REPL-DETACHED-START — REPL'den kilitlemeyen sprint-start (GO_WITH_TECH_DEBT)
+- 358-004: REPL-DISPATCH-PARITY — /nervous köprü-tüketimi + /autonomous /mcp parite (GO_WITH_TECH_DEBT)
+- 358-005: HELP-SURFACE-WIRE — /help'e katalog + mode-filtre (Sıra-26+56 kapanışı) (GO_WITH_TECH_DEBT)
+- 358-006: APP-SURFACE-WIRE — /resume picker + açılış-teaser + busy-kontrolleri (app.tsx) (DONE)
+- 358-007: CKPT-QUESTION-BRIDGE-WIRE — worker-soruları gerçek onaya (Sıra-73 kapanışı) (DONE)
+- 358-008: ALLOWSCOPE-COMPOSE — always-allow'u worker-gate önüne bağla (Sıra-69 kapanışı) (DONE)
+- 358-009: TRN-PIPE-WIRE — pipeline outcome-etiketi taksonomiden (Sıra-79 kapanışı) (GO_WITH_TECH_DEBT)
+- 358-010: DEP-REF-LOUD — çözülemeyen dependency-ref sessiz düşmesin (born-458) (DONE)
+- 358-011: RETRO-DEBT-COUNT — retro sayaç-kaynağı düzelt (born-460) (DONE)
+- 358-012: REFDOCS-ADR-REGEX — docs:ref yeni ADR-taksonomisini tanısın (born-461) (DONE)
+- 358-013: PKG-SSOT-CLOSE — kalan 13 hardcode-hint SSOT'a (Sıra-207 kapanışı) (DONE)
+- 358-014: CONFIG-ROUNDTRIP-GUARD — flag-drop sınıfına kalıcı mekanik kapan (born-464 guard) (DONE)
+- 358-015: NATIVE-M5-GATE — native-agent parite kanıt-kapısı (DONE)
+- 358-016: NATIVE-SUB-TRANSPORT-DESIGN — abonelik-transport tasarım dokümanı (DONE)
+- 358-017: CAT-TYPE-UNIFY — catalog-render tipini tool-catalog'a bağla (357-002 kalanı) (DONE)
+
+---

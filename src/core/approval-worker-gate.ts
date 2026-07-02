@@ -39,6 +39,18 @@ import type {
 import type { ApprovalRequestInput, ApprovalDecisionInput } from './approval-broker.js';
 import type { ApprovalRequest, ApprovalDecision } from './approval-contract.js';
 import { maskArgs } from './approval-masking.js';
+import type { ApprovalAllowScopeMatchInput, ApprovalAllowScopeRule } from './approval-allowscope.js';
+
+// ─── ApprovalAllowScope seam (357-005 store satisfies this — ALLOWSCOPE-COMPOSE) ──
+
+/**
+ * The narrow slice of {@link import('./approval-allowscope.js').ApprovalAllowScopeStore}
+ * this gate needs — structural, mirroring {@link ApprovalBrokerLike}, so a hermetic
+ * in-memory fake can stand in for the real, file-backed store in tests.
+ */
+export interface ApprovalAllowScopeLike {
+  matchesAllow(request: ApprovalAllowScopeMatchInput): ApprovalAllowScopeRule | null;
+}
 
 // ─── Broker seam (structural — real ApprovalBroker satisfies this) ──────────
 
@@ -116,6 +128,19 @@ export interface WorkerApprovalGateOptions {
   now?: () => Date;
   /** Id generator seam for deterministic tests. Defaults to `randomUUID`. */
   idFactory?: () => string;
+  /**
+   * Optional scoped always-allow lookup (APR-ALLOWSCOPE, 357-005) composed in
+   * FRONT of the decide-resume wait path (Sıra-69 follow-up — "policy-önü
+   * kompozisyon"). Absent => `guard()` is byte-identical to before this seam
+   * existed. When present and `matchesAllow()` finds a live grant for the
+   * action's (scopeId, scope, risk), the gate decides the ALREADY-submitted
+   * request as `'allow'` (channel `'allowscope'`) instead of waiting on
+   * `awaitDecision()` — the submit+decide audit trail is never skipped, only
+   * the wait is. Second defense alongside the never-global grant schema
+   * (357-005): `risk: 'critical'` can never pass through this seam, mirroring
+   * approval-policy.ts `decidePolicy`'s own critical clamp.
+   */
+  allowStore?: ApprovalAllowScopeLike;
 }
 
 const DEFAULT_TIMEOUT_MS = 5 * 60_000;
@@ -134,6 +159,7 @@ export class WorkerApprovalGate {
   private readonly fallbackResolver: FallbackResolver;
   private readonly now: () => Date;
   private readonly idFactory: () => string;
+  private readonly allowStore?: ApprovalAllowScopeLike;
 
   constructor(opts: WorkerApprovalGateOptions) {
     this.broker = opts.broker;
@@ -144,6 +170,7 @@ export class WorkerApprovalGate {
     this.fallbackResolver = opts.fallbackResolver ?? DENY_FALLBACK_RESOLVER;
     this.now = opts.now ?? (() => new Date());
     this.idFactory = opts.idFactory ?? randomUUID;
+    this.allowStore = opts.allowStore;
   }
 
   /**
@@ -188,8 +215,36 @@ export class WorkerApprovalGate {
       return toVerdict(decision.decision);
     }
 
+    const allowGrant = this.matchAllowScope(action);
+    if (allowGrant) {
+      const decision = this.broker.decide(request.id, {
+        decision: 'allow',
+        decidedBy: 'system',
+        channel: 'allowscope',
+        decidedAt: this.now().toISOString(),
+        reason: `allowscope: grant ${allowGrant.id} (scopeId=${allowGrant.scopeId}, scope=${allowGrant.scope})`,
+      });
+      return toVerdict(decision.decision);
+    }
+
     const decision = await this.awaitDecisionOrFallback(request.id, action);
     return toVerdict(decision);
+  }
+
+  /**
+   * Look up a live always-allow grant for `action`, if an {@link allowStore}
+   * seam was supplied. `risk: 'critical'` is clamped to "never matches" here
+   * — a second defense (alongside 357-005's never-global grant schema)
+   * mirroring approval-policy.ts `decidePolicy`'s own critical clamp.
+   */
+  private matchAllowScope(action: WorkerActionDescriptor): ApprovalAllowScopeRule | null {
+    if (!this.allowStore) return null;
+    if (action.risk === 'critical') return null;
+    return this.allowStore.matchesAllow({
+      scopeId: action.scopeId,
+      scope: action.scope,
+      risk: action.risk,
+    });
   }
 
   /** Race the broker's external decision against the timeout. On timeout,

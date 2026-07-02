@@ -13,6 +13,7 @@ import {
 import { join } from 'node:path';
 import type { ModelType, GeminiModel } from '../core/types.js';
 import type { ProviderAdapter, ProviderSpawnOptions, ProviderAvailabilityDetail } from '../core/provider.js';
+import { PROVIDER_PACKAGES } from '../core/provider-packages.js';
 import { ProviderError, resolveBinaryPath, parseSemverFromOutput } from '../core/provider.js';
 import type { ProviderDetectResult } from './claude.js';
 import { TASKS_DIR } from '../core/constants.js';
@@ -388,7 +389,7 @@ export class GeminiAdapter implements ProviderAdapter {
     const hints: string[] = [];
     if (!binaryFound) {
       reason = 'Gemini CLI not found in PATH';
-      hints.push('Install: npm i -g @google/gemini-cli');
+      hints.push(`Install: npm i -g ${PROVIDER_PACKAGES.gemini.npmPkg}`);
     } else if (!hasAuth) {
       reason = 'Gemini CLI installed but GOOGLE_API_KEY / DECKENT_GOOGLE_API_KEY not set';
       hints.push('Set GOOGLE_API_KEY environment variable');

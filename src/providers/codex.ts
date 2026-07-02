@@ -14,6 +14,7 @@ import {
 import { join } from 'node:path';
 import type { ModelType, OpenAIModel } from '../core/types.js';
 import { isOpenAIModel } from '../core/types.js';
+import { PROVIDER_PACKAGES } from '../core/provider-packages.js';
 import { modelRegistry } from '../core/model-registry.js';
 import type { ProviderAdapter, ProviderSpawnOptions, ProviderAvailabilityDetail } from '../core/provider.js';
 import { ProviderError, resolveBinaryPath, parseSemverFromOutput } from '../core/provider.js';
@@ -281,7 +282,7 @@ export class CodexAdapter implements ProviderAdapter {
     const hints: string[] = [];
     if (!binaryFound) {
       reason = 'Codex CLI not found in PATH';
-      hints.push('Install: npm i -g @openai/codex');
+      hints.push(`Install: npm i -g ${PROVIDER_PACKAGES.codex.npmPkg}`);
     } else if (authMode === 'none') {
       reason = 'Codex CLI installed but no authentication configured';
       hints.push('Set OPENAI_API_KEY environment variable');

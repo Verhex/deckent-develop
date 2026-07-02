@@ -1,0 +1,26 @@
+{
+  "id": "2f42afb7-ab6b-46dd-b4ab-1d8a5eb6eafe",
+  "version": "1.0",
+  "requester": {
+    "role": "worker",
+    "instanceId": "demo-worker"
+  },
+  "summary": "DEMO — rm -rf ./build çalıştırma izni (canlı-test kartı)",
+  "details": {
+    "reason": "repl_surface.approvals canlı-doğrulama",
+    "task": "demo-001"
+  },
+  "scopeId": "demo-001",
+  "scope": "shell-exec",
+  "risk": "high",
+  "policy": "require-approval",
+  "defaultAction": "deny",
+  "tenantId": "local",
+  "userId": "alperen",
+  "createdAt": "2026-07-02T13:08:46.140Z",
+  "expiresAt": "2026-07-02T13:18:46.140Z",
+  "maskedArgs": {
+    "cmd": "rm -rf ./build"
+  },
+  "rawArgsRef": null
+}

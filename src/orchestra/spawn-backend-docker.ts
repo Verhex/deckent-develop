@@ -195,7 +195,10 @@ export function buildExitWithoutResultMarker(input: ExitWithoutResultMarkerInput
 export function buildOnExitTrap(taskId: string, model: string): string {
   return [
     'on_exit() {',
-    '  local exit_code=$?',
+    // born-466: $? here is the LAST command's code (rm/echo masked it to 0 on
+    // every path) — prefer CLAUDE_EXIT captured right after the worker command,
+    // so TIMEOUT_WITH_WORK and signal_info see the REAL worker exit code.
+    '  local exit_code=${CLAUDE_EXIT:-$?}',
     // If .result already exists (worker wrote it normally), just fsync and exit
     '  if [ -f "$RFILE" ]; then',
     '    fsync_file "$RFILE"',
@@ -222,7 +225,10 @@ export function buildOnExitTrap(taskId: string, model: string): string {
     // Non-zero exit: check git diff for partial work
     `  cd "${CONTAINER_WORKSPACE}" 2>/dev/null || true`,
     '  local changed_files=""',
-    '  changed_files=$(git diff --name-only 2>/dev/null || true)',
+    // born-467: tracked diff alone misses NEW files (most deckent tasks create
+    // new test files) — include untracked-but-not-ignored so workPresent is
+    // honest when a worker produced only new files before dying.
+    '  changed_files=$({ git diff --name-only; git ls-files --others --exclude-standard; } 2>/dev/null | sort -u || true)',
     '  if [ -n "$changed_files" ] && [ "$exit_code" -ne 0 ]; then',
     // Build JSON array from changed files using pure POSIX sh (no jq dependency)
     '    local json_array="["',
@@ -842,8 +848,10 @@ export class DockerSpawnBackend implements SpawnBackend {
       'fsync_file "$PRFILE"',
       // EXIT trap: Sprint 145 — calls on_exit() which detects partial work via git diff
       'trap on_exit EXIT',
-      // SIGTERM trap: on graceful stop, fsync .result immediately (before grace period expires)
-      `trap 'fsync_file "$RFILE"; fsync_file "$HBFILE"; exit 0' TERM`,
+      // SIGTERM trap: on graceful stop, fsync .result immediately (before grace
+      // period expires). born-466: exit 143 (128+TERM), NOT 0 — exiting 0 made
+      // on_exit classify a docker-stop as a clean run (TIMEOUT_WITH_WORK dead).
+      `trap 'fsync_file "$RFILE"; fsync_file "$HBFILE"; exit 143' TERM`,
       // Heartbeat update loop (every 15s) — prevents false stale alerts
       `( SEQ=2; while true; do sleep 15; SEQ=$((SEQ+1)); echo "{\\"workerId\\":\\"docker-${taskId}\\",\\"taskId\\":\\"${taskId}\\",\\"status\\":\\"EXECUTING\\",\\"sequence\\":$SEQ,\\"timestamp\\":\\"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\\",\\"backend\\":\\"docker\\"}" > "$HBFILE"; done ) &`,
       'HB_PID=$!',
@@ -851,7 +859,14 @@ export class DockerSpawnBackend implements SpawnBackend {
       // PSL-1 (Sprint 252): feed the prompt per the spec's promptFeed — 'stdin'
       // providers (claude `-p -`, codex `exec`) read the prompt FILE via `< …`;
       // 'inline' providers (gemini `-p "$(cat …)"`) already embed it in workerCmd.
-      `timeout $TIMEOUT ${workerCmd}${spec.promptFeed === 'stdin' ? ` < "${containerPromptPath}"` : ''} || echo "WORKER_TIMEOUT" > "${timeoutPath}"`,
+      // born-466: -k 30 hard-KILLs a TERM-swallowing worker; the exit code is
+      // captured in CLAUDE_EXIT (read by on_exit) instead of being masked by
+      // `|| echo` + the trailing rm. The .timeout marker is timeout-PURE now:
+      // only 124 (TERM-timeout) / 137 (KILL) qualify — a crash/CLI-arg error is
+      // NOT a timeout — and never when a real .result already exists.
+      `timeout -k 30 $TIMEOUT ${workerCmd}${spec.promptFeed === 'stdin' ? ` < "${containerPromptPath}"` : ''}`,
+      'CLAUDE_EXIT=$?',
+      `if [ "$CLAUDE_EXIT" -eq 124 ] || [ "$CLAUDE_EXIT" -eq 137 ]; then [ ! -f "$RFILE" ] && echo "WORKER_TIMEOUT" > "${timeoutPath}"; fi`,
       // Sprint 151: Clean up .partial-result on normal exit — on_exit/EXIT trap handles abnormal exit
       'rm -f "$PRFILE" 2>/dev/null',
     ].join('\n');

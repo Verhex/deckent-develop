@@ -4,12 +4,16 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-357-015-fix | Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L | normal | sprint-357 | active |
+| debt-357-015-fix | Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L | high | sprint-357 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-358-003 | Tech debt from 358-003: New src/cli/helpers/detached-start.ts exports spawnDetac | normal | sprint-358 | resolved |
+| debt-358-004 | Tech debt from 358-004: REPL-DISPATCH-PARITY (MASTER-PLAN Sıra-66/REPL-001 + Sır | normal | sprint-358 | resolved |
+| debt-358-005 | Tech debt from 358-005: Wired both required consumers into chat-native.ts's /hel | normal | sprint-358 | resolved |
+| debt-358-009 | Tech debt from 358-009: buildLabels() in src/training/pipeline.ts now routes met | normal | sprint-358 | resolved |
 | debt-357-009 | Tech debt from 357-009: Wired all six schema-only terminal.* config fields into  | normal | sprint-357 | resolved |
 | debt-357-010 | Tech debt from 357-010: DISK-VERIFY: grepped filterRegistryByMode/resolveSlash/r | normal | sprint-357 | resolved |
 | debt-357-014 | Tech debt from 357-014: ONB-HONEST presentation layer implemented, check logic u | normal | sprint-357 | resolved |

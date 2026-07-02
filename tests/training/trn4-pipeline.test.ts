@@ -111,7 +111,8 @@ describe('convertToShareGpt', () => {
       selfAssessment: 'DONE',
     });
     const example = convertToShareGpt(trace);
-    expect(example.labels).toEqual({ outcome: 'DONE', agent: 'bug-fixer', model: 'claude-sonnet-5' });
+    // TRN-PIPE-WIRE (358-009): outcome maps through mapTaskEvaluationToLabel — DONE → 'success'.
+    expect(example.labels).toEqual({ outcome: 'success', agent: 'bug-fixer', model: 'claude-sonnet-5' });
   });
 
   it('omits labels entirely when meta is absent (TRN-3 aligned/general shape)', () => {
@@ -352,7 +353,8 @@ describe('runPipeline (hermetic — injected I/O)', () => {
     expect(written).toHaveLength(1);
     const parsed = JSON.parse(written[0]!);
     expect(isValidShareGptExample(parsed)).toBe(true);
-    expect(parsed.labels).toEqual({ outcome: 'DONE', model: 'claude-sonnet-5' });
+    // TRN-PIPE-WIRE (358-009): DONE → 'success' via the RunOutcomeLabel taxonomy.
+    expect(parsed.labels).toEqual({ outcome: 'success', model: 'claude-sonnet-5' });
   });
 
   it('counts truncated and redacted examples in the summary', async () => {

@@ -15,6 +15,14 @@ import { TASKS_DIR } from '../core/constants.js';
 import type { WorkerQuestion, BrainAnswer, QuestionAction } from '../core/task-types.js';
 import { debugLog } from '../core/utils.js';
 import { notifyAsync } from '../core/notify.js';
+import type { ApprovalBrokerLike } from '../core/approval-worker-gate.js';
+// Type-only — question-approval-bridge.ts imports NPM_ADVISORY_MARKER (a VALUE)
+// from THIS file, so a value-import back here would be a real runtime import
+// cycle. `import type` is erased at compile time (ADR-D-001 nodenext), so the
+// shapes below cost nothing at runtime; the actual `bridgeQuestionToApproval`
+// function is injected by the caller via HandleWorkerQuestionOptions.bridge —
+// see CKPT-QUESTION-BRIDGE-WIRE (358-007) below.
+import type { QuestionBridgeOptions, QuestionBridgeResult } from './question-approval-bridge.js';
 
 // ─── Channel Registry (Sprint 134) ─────────────────────────────────
 
@@ -235,7 +243,46 @@ export interface HandleWorkerQuestionOptions {
   /** Sprint id for human-facing notifications (NPM-ADVISORY surfacing). When
    *  absent the advisory is still answered + debug-logged, just not notified. */
   sprintId?: string;
+
+  // ─── CKPT-QUESTION-BRIDGE-WIRE (358-007) seam ──────────────────────────
+  // Sprint-357 built `bridgeQuestionToApproval` (question-approval-bridge.ts)
+  // as a pure, deliberately-unwired module. This seam threads it into the live
+  // question loop: when `questionBridgeEnabled` reads true AND both `bridge`
+  // and `broker` are supplied, a non-NPM-ADVISORY question is delegated to the
+  // runtime-wide ApprovalBroker instead of the hardcoded/suggestedAction
+  // auto-answer below. Omit any of the three and behavior is byte-for-byte the
+  // historical auto-answer — the seam is fully caller-opt-in.
+
+  /**
+   * Injected `bridgeQuestionToApproval`-shaped function. Typed structurally
+   * (not imported as a value — see the `import type` note above) so a real
+   * caller can pass the function straight through with no wrapper.
+   */
+  bridge?: (
+    question: WorkerQuestion,
+    broker: ApprovalBrokerLike,
+    opts?: QuestionBridgeOptions,
+  ) => Promise<QuestionBridgeResult>;
+  /** The ApprovalBrokerLike instance the bridged question submits to. Required
+   *  alongside `bridge` for the seam to activate. */
+  broker?: ApprovalBrokerLike;
+  /**
+   * Pre-computed `approval.question_bridge` config flag (caller derives this
+   * via `isQuestionBridgeEnabled(config)` from question-approval-bridge.ts —
+   * kept out of this module to avoid importing that reader as a value).
+   * Default-off: omitted/false means the bridge seam never activates even when
+   * `bridge` + `broker` are both supplied.
+   */
+  questionBridgeEnabled?: boolean;
 }
+
+// ─── CKPT-QUESTION-BRIDGE-WIRE in-flight guard ─────────────────────────────
+// A poll loop calls checkWorkerQuestions every tick against the SAME
+// still-unconsumed .question file (the worker only deletes it after reading
+// its .answer). Without this guard, every tick while a broker round-trip is
+// pending would submit a fresh duplicate ApprovalRequest. Keyed by taskId —
+// cleared once the in-flight bridge call settles (success or error).
+const inFlightBridgeTaskIds = new Set<string>();
 
 // ─── NPM-ADVISORY (born-454) ────────────────────────────────────────
 // Worker-side marker for dependency-mutation escalation. The god-prompt
@@ -303,6 +350,52 @@ export function handleWorkerQuestion(
       );
     }
     return answer;
+  }
+
+  // CKPT-QUESTION-BRIDGE-WIRE (358-007): flag-on + seam-supplied → delegate to
+  // the runtime-wide ApprovalBroker instead of the hardcoded/suggestedAction
+  // auto-answer below. NPM-ADVISORY questions never reach here (returned above,
+  // unconditionally, regardless of this flag). Flag-off, or bridge/broker
+  // omitted, falls straight through to the byte-identical historical path.
+  if (options?.questionBridgeEnabled === true && options.bridge !== undefined && options.broker !== undefined) {
+    // A prior tick's bridge call already settled this question — surface that
+    // answer directly. Never re-submit a question that already has an answer.
+    const settled = readAnswerFile(projectRoot, taskId);
+    if (settled) return settled;
+
+    if (!inFlightBridgeTaskIds.has(taskId)) {
+      inFlightBridgeTaskIds.add(taskId);
+      const bridge = options.bridge;
+      const broker = options.broker;
+      bridge(question, broker)
+        .then((result) => {
+          if (result.kind === 'bridged') {
+            writeAnswerFile(projectRoot, result.answer);
+            debugLog(
+              'handleWorkerQuestion',
+              `Bridged question for task ${taskId} → '${result.answer.action}' via ${result.decision.channel}`,
+            );
+          } else {
+            // Structurally unreachable: the NPM-ADVISORY branch above already
+            // returns before this seam is ever reached for such a question.
+            debugLog('handleWorkerQuestion', `Unexpected bridge rejection for task ${taskId}: ${result.note}`);
+          }
+        })
+        .catch((err: unknown) => {
+          debugLog(
+            'handleWorkerQuestion',
+            `Bridge error for task ${taskId}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        })
+        .finally(() => {
+          inFlightBridgeTaskIds.delete(taskId);
+        });
+    }
+
+    // Fire-and-forget: checkWorkerQuestions' poll loop must not block on the
+    // broker round-trip. The .answer file is written whenever the bridge
+    // settles (above); this call itself returns undefined until it does.
+    return undefined;
   }
 
   // Flag-gated (default-off): honor the worker's requested action only when the

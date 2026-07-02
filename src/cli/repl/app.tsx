@@ -22,6 +22,12 @@ import { measuredOnTurnEnd } from './native-elapsed.js';
 import { buildLiveFooter, type LiveFooterState } from '../helpers/live-footer.js';
 import { initialTermModeState, applyModeCommand, type TermMode, type TermModeState } from './term-mode.js';
 import { createChatTurnQueue, type ChatTurnQueue, type ChatTurnBgEvent, type ChatTurnPayload } from './chat-turn-queue.js';
+import { listRecentSessions, pickSession, type SessionRecord } from '../helpers/session-resume.js';
+import {
+  initialBusyControlsState, markBusy, markIdle, parseBusyCommand,
+  resolveQueueCommand, applyInterrupt, applySteer,
+  type BusyControlsState, type QueueStatusDecision, type InterruptDecision, type SteerDecision,
+} from './busy-controls.js';
 import { ApprovalCard, createApprovalCardQueue, type ApprovalCardLabels, type ApprovalCardQueue } from './approval-card.js';
 import { composeDualStream } from './dual-stream.js';
 import type { ApprovalTerminalChannel } from './approval-terminal-channel.js';
@@ -136,6 +142,152 @@ export function bgPayloadsToTurnTexts(payloads: readonly ChatTurnPayload[]): str
 }
 
 /**
+ * APP-SURFACE-WIRE (358-006) — pure, testable helpers for the startup
+ * resume-teaser, the /resume picker (session-resume.ts), and the busy-controls
+ * state machine (busy-controls.ts). Same "pull decision logic out of the Ink
+ * component" pattern as the 354-001/355-011 blocks above (ink-testing-library
+ * is not a project dependency — tests/cli/repl/app-surface-wire.test.tsx).
+ */
+
+/** Session entries the teaser/picker shows (both the startup teaser and the
+ * bare-`/resume` list). One shared limit keeps the teaser numbering and the
+ * picker numbering aligned, so "/resume 2" always picks the teaser's row 2. */
+export const RESUME_RECENT_LIMIT = 5;
+
+/** Minimal structural shape of ChatMemoryAdapter.listChatSessions results. */
+interface ChatSessionSummaryLike { sessionId: string; lastAt: string; preview: string }
+
+/** Map memory-backed chat sessions into the picker's SessionRecord shape so
+ * pickSession can resolve over ONE combined list (disk sprint sessions first,
+ * chat sessions after — the merge with the pre-existing loop-side /resume). */
+export function chatSessionsToRecords(summaries: readonly ChatSessionSummaryLike[]): SessionRecord[] {
+  return summaries.map((s) => ({
+    id: s.sessionId,
+    title: s.preview.length > 0 ? s.preview : s.sessionId,
+    date: s.lastAt,
+    status: 'chat',
+  }));
+}
+
+/** Compact an ISO timestamp to `YYYY-MM-DD HH:MM`; falls back to the raw value
+ * (same display rule as chat-resume.ts's private shortTime). */
+function shortSessionTime(iso: string): string {
+  const m = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/.exec(iso);
+  return m ? `${m[1]} ${m[2]}` : iso;
+}
+
+/**
+ * Render the teaser/picker lines for the combined session list. Returns []
+ * when BOTH lists are empty — the caller renders NOTHING then (degrade-safe:
+ * a fresh checkout with no `.deckent/runtime/jobs/` shows no teaser at all).
+ * Numbering is continuous across disk→chat so one number-space serves
+ * `/resume <n>` for every visible row.
+ */
+export function buildResumePickerLines(
+  disk: readonly SessionRecord[],
+  chat: readonly SessionRecord[],
+  labels: Pick<ReplLabels, 'resumeHeader' | 'resumeHint'>,
+): string[] {
+  const combined = [...disk, ...chat];
+  if (combined.length === 0) return [];
+  const lines: string[] = [labels.resumeHeader ?? 'Recent sessions'];
+  combined.forEach((s, i) => {
+    lines.push(`  ${i + 1}. ${s.title} · ${s.status} · ${shortSessionTime(s.date)}`);
+  });
+  lines.push(labels.resumeHint ?? 'Tip: /resume <number> to continue a session');
+  return lines;
+}
+
+/** What the App should do with a `/resume` input (decided pure, applied in JSX). */
+export type ResumeCommandDecision =
+  | { readonly kind: 'passthrough' }
+  | { readonly kind: 'list'; readonly lines: string[] }
+  | { readonly kind: 'switch'; readonly sessionId: string; readonly forwardToLoop: boolean; readonly line: string }
+  | { readonly kind: 'reject'; readonly line: string };
+
+/**
+ * Resolve a `/resume` input against the local picker lists, MERGING with the
+ * pre-existing loop-side /resume (chat-native.ts) instead of shadowing it:
+ * - no local sessions at all → 'passthrough' (loop behavior byte-identical);
+ * - bare `/resume` → 'list' (the numbered picker, teaser-aligned);
+ * - resolved pick → 'switch' — a chat-session pick sets forwardToLoop so the
+ *   caller re-queues `/resume <id>` and the loop's REAL transcript/session
+ *   switch machinery runs; a sprint-session pick switches locally;
+ * - unknown literal id → 'passthrough' (the loop may know it, e.g. an older
+ *   chat session beyond the picker window);
+ * - numeric out-of-range / ambiguous → 'reject' — forwarding a NUMBER would
+ *   let the loop resolve it against a DIFFERENT list and silently resume the
+ *   wrong session, so numbers never pass through.
+ */
+export function resolveResumeCommand(
+  arg: string,
+  disk: readonly SessionRecord[],
+  chat: readonly SessionRecord[],
+  labels: Pick<ReplLabels, 'resumeHeader' | 'resumeHint' | 'resumeSwitched' | 'resumeNotFound' | 'resumeAmbiguous'>,
+): ResumeCommandDecision {
+  const combined = [...disk, ...chat];
+  if (combined.length === 0) return { kind: 'passthrough' };
+  const trimmed = arg.trim();
+  if (trimmed.length === 0) return { kind: 'list', lines: buildResumePickerLines(disk, chat, labels) };
+  const picked = pickSession(trimmed, combined);
+  if (picked.kind === 'found') {
+    return {
+      kind: 'switch',
+      sessionId: picked.session.id,
+      // Same-object check is safe: `combined` holds the caller's own records.
+      forwardToLoop: chat.includes(picked.session),
+      line: (labels.resumeSwitched ?? 'resumed: {id}').replace('{id}', picked.session.id),
+    };
+  }
+  if (picked.kind === 'ambiguous') {
+    const ids = picked.matches.map((m) => m.id).join(' · ');
+    return { kind: 'reject', line: (labels.resumeAmbiguous ?? 'ambiguous — matches: {matches}').replace('{matches}', ids) };
+  }
+  if (/^\d+$/.test(trimmed)) {
+    return { kind: 'reject', line: (labels.resumeNotFound ?? 'session not found: {arg}').replace('{arg}', trimmed) };
+  }
+  return { kind: 'passthrough' };
+}
+
+/** Map a busy-controls decision to its display line (labels injected by the
+ * caller; English defaults — same fallback precedent as resolveModeLabel). */
+export function renderBusyDecision(
+  decision: QueueStatusDecision | InterruptDecision | SteerDecision,
+  labels: Pick<ReplLabels,
+    'busyQueueStatus' | 'busyStateBusy' | 'busyStateIdle' | 'busyInterrupted' |
+    'busyInterruptIdle' | 'busyInterruptDup' | 'busySteerQueued' | 'busySteerIdle' | 'busySteerEmpty'>,
+): string {
+  switch (decision.kind) {
+    case 'queue-status': {
+      const state = decision.busy ? (labels.busyStateBusy ?? 'busy') : (labels.busyStateIdle ?? 'idle');
+      return (labels.busyQueueStatus ?? 'queue: {count} background · {state}')
+        .replace('{count}', String(decision.pendingBackgroundBuckets))
+        .replace('{state}', state);
+    }
+    case 'interrupted':
+      return labels.busyInterrupted ?? 'interrupt requested — stopping after the current step';
+    case 'interrupt-noop':
+      return decision.reason === 'idle'
+        ? (labels.busyInterruptIdle ?? 'nothing running to interrupt')
+        : (labels.busyInterruptDup ?? 'interrupt already requested');
+    case 'steer-queued':
+      return (labels.busySteerQueued ?? 'steer note queued (#{position}) — applied at turn end')
+        .replace('{position}', String(decision.position));
+    case 'steer-noop':
+      return decision.reason === 'idle'
+        ? (labels.busySteerIdle ?? 'nothing running to steer')
+        : (labels.busySteerEmpty ?? 'usage: /steer <message>');
+  }
+}
+
+/** Turn-end steer drain → next-turn inputs: drained notes STEER the work, so
+ * they jump ahead of the already-queued messages (FIFO among themselves).
+ * Pure — the inputIter applies the result as its new pending queue. */
+export function steerNotesToInputs(drained: readonly string[], pendingQueue: readonly string[]): string[] {
+  return [...drained, ...pendingQueue];
+}
+
+/**
  * APP-APPROVAL-WIRE (355-011) — pure, testable helpers for the ApprovalCard +
  * dual-stream wiring (same "pull decision logic out of the Ink component"
  * pattern as resolveModeLabel/bgPayloadsToTurnTexts above — ink-testing-library
@@ -239,6 +391,23 @@ export interface ReplLabels {
   modeAsk?: string;
   modeRun?: string;
   modeControl?: string;
+  /** APP-SURFACE-WIRE (358-006) — resume-teaser/picker + busy-controls labels;
+   * optional, English fallback until a messages round wires en/tr keys through
+   * run.tsx (same seam precedent as the mode labels above). */
+  resumeHeader?: string;    // "Recent sessions"
+  resumeHint?: string;      // "Tip: /resume <number> to continue a session"
+  resumeSwitched?: string;  // "resumed: {id}"
+  resumeNotFound?: string;  // "session not found: {arg}"
+  resumeAmbiguous?: string; // "ambiguous — matches: {matches}"
+  busyQueueStatus?: string; // "queue: {count} background · {state}"
+  busyStateBusy?: string;   // "busy"
+  busyStateIdle?: string;   // "idle"
+  busyInterrupted?: string; // "interrupt requested — stopping after the current step"
+  busyInterruptIdle?: string; // "nothing running to interrupt"
+  busyInterruptDup?: string;  // "interrupt already requested"
+  busySteerQueued?: string;   // "steer note queued (#{position}) — applied at turn end"
+  busySteerIdle?: string;     // "nothing running to steer"
+  busySteerEmpty?: string;    // "usage: /steer <message>"
 }
 
 /**
@@ -430,6 +599,16 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const bgQueue = useRef<ChatTurnQueue | null>(null);
   if (bgQueue.current === null) bgQueue.current = createChatTurnQueue();
 
+  // APP-SURFACE-WIRE (358-006) seam state — inert unless replSurfaceEnabled.
+  // recentSessions: the disk sprint-session snapshot the teaser showed (picker
+  // numbering must match it). activeSessionId: /resume switches it; shown in
+  // the bottom bar when it differs from the launch session. busyCtl: the
+  // /queue-/interrupt-/steer state machine (ref only — no render reads it
+  // directly; decision lines re-render via pushTurn).
+  const recentSessions = useRef<SessionRecord[] | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string | undefined>(sessionId);
+  const busyCtl = useRef<BusyControlsState>(initialBusyControlsState());
+
   // APP-APPROVAL-WIRE (355-011) seam state — inert unless approvalsEnabled AND
   // an approvalChannel is supplied; independent of replSurfaceEnabled (a
   // different feature). approvalTracker is always created (a bare, never-fed
@@ -495,6 +674,20 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     registerBgEventSink((event) => bgQueue.current!.enqueueBg(event));
   }, [registerBgEventSink]);
 
+  // APP-SURFACE-WIRE (358-006): startup resume-teaser. One disk read per mount
+  // (listRecentSessions is degrade-safe: missing/unreadable jobs dir → []).
+  // Renders NOTHING when the source is empty — the teaser only ever appears
+  // when there are sessions to resume, and it flows into <Static> as a one-off
+  // turn so it scrolls away naturally (render order untouched).
+  useEffect(() => {
+    if (!replSurfaceEnabled || recentSessions.current !== null) return;
+    recentSessions.current = listRecentSessions(props.cwd, RESUME_RECENT_LIMIT);
+    const lines = buildResumePickerLines(recentSessions.current, [], labels);
+    if (lines.length > 0) pushTurn('bg', lines.join('\n'));
+    // labels/props.cwd are mount-stable (run.tsx passes literals); the ref
+    // guard makes this one-shot even if the deps ever re-fired.
+  }, [replSurfaceEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (started.current) return;
     started.current = true;
@@ -523,9 +716,24 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           setQueued([...queue.current]);
           pushTurn('user', line);
           setWorking(true);
+          // 358-006: busy-controls turn-start. Unconditional on purpose — with
+          // the surface flag off nothing can feed the machine (commands fall
+          // through to chat), so this stays invisible; gating would only add a
+          // second code path to keep in sync.
+          busyCtl.current = markBusy();
           if (replSurfaceEnabled) bgQueue.current!.userTurnActive = true;
           yield line;
           finalizeReply(); // turn finished streaming → close it out
+          // 358-006: turn-end steer drain (busy-controls markIdle) — the SAME
+          // "never mid-turn" contract as the ChatTurnQueue drain below: notes
+          // buffered while busy surface only now, re-queued ahead of pending
+          // input so they steer the immediately-following turn.
+          const turnEnd = markIdle(busyCtl.current);
+          busyCtl.current = turnEnd.state;
+          if (turnEnd.drainedSteerNotes.length > 0) {
+            queue.current = steerNotesToInputs(turnEnd.drainedSteerNotes, queue.current);
+            setQueued([...queue.current]);
+          }
           if (replSurfaceEnabled) {
             bgQueue.current!.userTurnActive = false;
             // Drain buffered bg-completed work as brand-new turn(s) — never
@@ -594,6 +802,12 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     }
   }, [provider, dispatcher, exit, nativeEngine]);
 
+  // 358-006 interrupt canceller (busy-controls Canceller seam): no mid-turn
+  // provider-abort seam exists in runChatNativeLoop/nativeEngine yet, so
+  // "interrupt" honestly cancels what it CAN — the not-yet-started queued
+  // inputs (true mid-turn abort is loop-side follow-up work).
+  const cancelPendingInputs = (): void => { queue.current = []; setQueued([]); };
+
   const handleSubmit = (line: string): void => {
     const trimmed = line.trim();
     if (trimmed.length === 0) return;
@@ -619,6 +833,58 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         const result = applyModeCommand(termMode, modeCmd);
         if (result.changed) setTermMode(result.state);
         return;
+      }
+      // 358-006: /queue · /interrupt · /steer — busy-controls.ts dispatch.
+      // Same inertness rule: flag off → these fall through to a chat message.
+      const busyAction = parseBusyCommand(trimmed);
+      if (busyAction.kind !== 'none') {
+        pushTurn('user', trimmed);
+        if (busyAction.kind === 'queue') {
+          pushTurn('seg', renderBusyDecision(resolveQueueCommand(busyCtl.current, bgQueue.current!), labels));
+        } else if (busyAction.kind === 'interrupt') {
+          const r = applyInterrupt(busyCtl.current, cancelPendingInputs);
+          busyCtl.current = r.state;
+          pushTurn('seg', renderBusyDecision(r.decision, labels));
+        } else {
+          const r = applySteer(busyCtl.current, busyAction.message);
+          busyCtl.current = r.state;
+          pushTurn('seg', renderBusyDecision(r.decision, labels));
+        }
+        return;
+      }
+      // 358-006: /resume picker (session-resume.ts pickSession) merged with the
+      // loop-side /resume — only a non-passthrough decision is handled here;
+      // 'passthrough' falls to the queue push below, i.e. the loop's existing
+      // memory-backed /resume, byte-identical (also the whole flag-off path).
+      const resume = trimmed.match(/^\/resume(?:\s+(.*))?$/i);
+      if (resume) {
+        const chatRecords = chatSessionsToRecords(
+          memory?.listChatSessions ? memory.listChatSessions(RESUME_RECENT_LIMIT) : [],
+        );
+        const decision = resolveResumeCommand(resume[1] ?? '', recentSessions.current ?? [], chatRecords, labels);
+        if (decision.kind !== 'passthrough') {
+          pushTurn('user', trimmed);
+          if (decision.kind === 'list') {
+            pushTurn('bg', decision.lines.join('\n'));
+          } else if (decision.kind === 'reject') {
+            pushTurn('seg', decision.line);
+          } else {
+            setActiveSessionId(decision.sessionId);
+            if (decision.forwardToLoop) {
+              // Chat-session pick: hand the RESOLVED id to the loop so its real
+              // transcript/session-switch machinery runs (behavior-merge — the
+              // loop treats a non-numeric arg as a literal session id).
+              queue.current.push(`/resume ${decision.sessionId}`);
+              setQueued([...queue.current]);
+              if (wake.current) { const w = wake.current; wake.current = null; w(); }
+            } else {
+              // Sprint-session pick: switch the active session pointer locally
+              // (deep context-load for sprint sessions is loop-side follow-up).
+              pushTurn('seg', decision.line);
+            }
+          }
+          return;
+        }
       }
     }
     // /cd <path> — change the working dir (file tools + status follow it live).
@@ -671,6 +937,18 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     const answer: ConfirmAnswer = input === 'y' ? 'y' : input === 'a' ? 'a' : 'n';
     confirmQueue.current!.answer(answer);
   }, { isActive: confirm !== null });
+
+  // 358-006: Esc→interrupt while a turn is in flight (BUSY_KEY_ACTIONS contract,
+  // busy-controls.ts). Double-Esc is idempotent by construction — the second
+  // press resolves to interrupt-noop, the canceller never re-fires, and no
+  // duplicate line is pushed. Inactive while the confirm modal owns input;
+  // inert unless the surface flag is on (flag-off key handling unchanged).
+  useInput((_input, key) => {
+    if (!key.escape) return;
+    const r = applyInterrupt(busyCtl.current, cancelPendingInputs);
+    busyCtl.current = r.state;
+    if (r.decision.kind === 'interrupted') pushTurn('seg', renderBusyDecision(r.decision, labels));
+  }, { isActive: replSurfaceEnabled && working && confirm === null });
 
   // Persistent phase anchor — the orientation signal ("am I working / done?").
   const phase: 'thinking' | 'generating' | 'idle' =
@@ -755,6 +1033,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         <Text dimColor>{`  ${cwd}`}</Text>
         {sessionTok > 0 ? <Text dimColor>{`  · Σ ${sessionTok} tok`}</Text> : null}
         {approval !== 'suggest' ? <Text color={GOLD}>{`  · ⚡${approval}`}</Text> : null}
+        {/* 358-006: visible only after a /resume picker switch (gated upstream). */}
+        {activeSessionId && activeSessionId !== sessionId ? <Text dimColor>{`  · ↺ ${activeSessionId}`}</Text> : null}
       </Box>
     </Box>
   );

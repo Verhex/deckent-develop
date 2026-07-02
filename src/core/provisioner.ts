@@ -14,6 +14,7 @@
 //     spawn — `sh`/`bash` are intentionally absent (no shell interpolation).
 
 import { spawnSync } from 'node:child_process';
+import { PROVIDER_PACKAGES } from './provider-packages.js';
 
 export type ToolId = 'claude' | 'codex' | 'gemini' | 'tmux' | 'node' | 'docker';
 export type LinuxPkgManager = 'apt' | 'dnf' | 'pacman';
@@ -57,12 +58,6 @@ export type InstallResult =
 /** Binaries the provisioner is permitted to spawn. Frozen; shell-free. */
 export const PROVISIONER_BIN_WHITELIST: readonly string[] = Object.freeze(['npm']);
 
-const NPM_PKG: Record<'claude' | 'codex' | 'gemini', string> = {
-  claude: '@anthropic-ai/claude-code',
-  codex: '@openai/codex',
-  gemini: '@google/gemini-cli',
-};
-
 function tmuxInstruction(opts: PlanOptions): string {
   const platform = opts.platform ?? process.platform;
   if (platform === 'darwin') return 'brew install tmux';
@@ -79,7 +74,7 @@ function tmuxInstruction(opts: PlanOptions): string {
 
 export function planInstall(tool: ToolId, opts: PlanOptions = {}): InstallPlan {
   if (tool === 'claude' || tool === 'codex' || tool === 'gemini') {
-    const pkg = NPM_PKG[tool];
+    const pkg = PROVIDER_PACKAGES[tool].npmPkg;
     return {
       tool,
       method: 'npm-global',

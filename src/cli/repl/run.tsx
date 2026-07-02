@@ -26,9 +26,11 @@ import { ApprovalBroker } from '../../core/approval-broker.js';
 import { ApprovalRelay } from '../../core/approval-relay.js';
 import { ApprovalEventStream } from '../../core/approval-eventstream.js';
 import { createApprovalTerminalChannel, type ApprovalTerminalChannel } from './approval-terminal-channel.js';
+import { createApprovalStoreWatch, type ApprovalStoreWatchHandle } from '../../core/approval-store-watch.js';
+import type { ApprovalRequest } from '../../core/approval-contract.js';
 import { randomUUID } from 'node:crypto';
 import { MemoryStore } from '../../core/memory-store.js';
-import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
+import { BRAIN_DIR, MEMORY_DB_FILE, DECKENT_DIR } from '../../core/constants.js';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 
@@ -36,6 +38,48 @@ const EXEC_TOOLS = new Set(['deckent_write_file', 'deckent_read_file', 'deckent_
 
 /** Rebuilds a provider adapter for a selection (entry.ts passes buildReplProvider). */
 export type ProviderRebuild = (sel: ActiveSelection) => ChatProviderAdapter;
+
+/**
+ * APR-XPROC-WIRE (358-002) — bridges Task 1's ApprovalStoreWatch
+ * (createApprovalStoreWatch, APR-XPROC-CORE) into the approval-wire block
+ * below via the broker's OWN public EventEmitter surface (`emit('pending'|
+ * 'decided', ...)`, part of ApprovalBroker's typed interface — see
+ * approval-broker.ts) rather than `broker.submit()`/`broker.decide()`.
+ * Disk-verify: both of those persist unconditionally via `atomicWriteJson`,
+ * and the broker exposes no separate ingest/recover path — replaying a
+ * record the watch found ALREADY on disk (written by a DIFFERENT process)
+ * through either would be a pointless rewrite of a file this process never
+ * owned. `.emit()` reaches the SAME relay/eventstream/terminal-channel
+ * pipeline `submit()`/`decide()` themselves trigger, with zero disk I/O of
+ * its own — the narrowest clean path. A local id->request cache (populated
+ * on every onPending) supplies the ApprovalRequest a `decided` emit needs to
+ * reconstruct the relay's cross-decided broadcast — the watch's onDecided
+ * callback only carries id+decision; when the cache has nothing (the
+ * request was already decided before this process attached), `request`
+ * stays undefined, which ApprovalRelay's own handleDecided already
+ * tolerates ("no locally-known request -> skip rather than notify with a
+ * gap"). `enabled=false` never invokes `watchFactory` at all.
+ */
+export function wireApprovalCrossProcess(
+  enabled: boolean,
+  broker: ApprovalBroker,
+  storeDir: string,
+  watchFactory: typeof createApprovalStoreWatch = createApprovalStoreWatch,
+): ApprovalStoreWatchHandle | undefined {
+  if (!enabled) return undefined;
+  const pendingById = new Map<string, ApprovalRequest>();
+  return watchFactory(storeDir, {
+    onPending: (request) => {
+      pendingById.set(request.id, request);
+      broker.emit('pending', request);
+    },
+    onDecided: (id, decision) => {
+      const request = pendingById.get(id);
+      pendingById.delete(id);
+      broker.emit('decided', decision, request);
+    },
+  });
+}
 
 /** Mount the Ink REPL for an interactive TTY and run until the user exits. */
 export async function runInkRepl(
@@ -63,17 +107,22 @@ export async function runInkRepl(
   }
   const approvalsEnabled = surf.approvals === true;
   let approvalChannel: ApprovalTerminalChannel | undefined;
+  let approvalWatch: ApprovalStoreWatchHandle | undefined;
   if (approvalsEnabled) {
     try {
       const broker = new ApprovalBroker(process.cwd());
       const relay = new ApprovalRelay(broker);
       const stream = new ApprovalEventStream(relay);
       approvalChannel = createApprovalTerminalChannel(relay, stream);
+      // Cross-process feed (APR-XPROC-WIRE, born-462 dilim-2) — same storeDir
+      // the broker above defaults to (it has no public getter, so replicated
+      // via the same DECKENT_DIR constant it's built from).
+      approvalWatch = wireApprovalCrossProcess(approvalsEnabled, broker, join(process.cwd(), DECKENT_DIR, 'approvals'));
 
       // DECKENT_APPROVAL_DEMO=1 — seed ONE in-process demo pending so the card
-      // path is testable end-to-end without a live worker. The relay/eventstream
-      // pair lives in THIS process (no cross-process store-watch yet — see
-      // MASTER-PLAN APR-CROSS-PROCESS-FEED), so the demo must submit here.
+      // path is testable end-to-end without a live worker. Submitted straight
+      // to `broker` (not via the cross-process watch above) since it's an
+      // in-process fixture, not a foreign-process record.
       if (process.env['DECKENT_APPROVAL_DEMO'] === '1') {
         const now = new Date();
         broker.submit({
@@ -94,7 +143,7 @@ export async function runInkRepl(
           rawArgsRef: null,
         });
       }
-    } catch { approvalChannel = undefined; }
+    } catch { approvalChannel = undefined; approvalWatch = undefined; }
   }
 
   const perms = createPermissionStore(process.cwd());
@@ -325,6 +374,7 @@ export async function runInkRepl(
   await waitUntilExit();
 
   if (altScreen) process.stdout.write('\x1b[?1049l'); // restore the main screen
+  try { approvalWatch?.dispose(); } catch { /* already disposed */ }
   try { approvalChannel?.dispose(); } catch { /* already disposed */ }
   try { memory?.close(); } catch { /* already closed */ }
   // Bounded teardown of the active session, then deterministic exit (Ink unmount

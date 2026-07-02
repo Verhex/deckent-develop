@@ -1,0 +1,126 @@
+// ═══ detached-start — fire-and-forget CLI spawn for long-running REPL commands ═══
+//
+// chat-tool-bridge.ts's default dispatch path spawns `dist/cli/entry.js <args>`
+// and `await`s its stdout until the child closes — fine for a fast read
+// (status/history) but a sprint (`start`), a one-shot worker (`run`), or a
+// process-mode submit (`process submit`) runs for minutes and would freeze the
+// whole REPL turn while it waits. spawnDetachedDeckent spawns the SAME entry
+// point as a fully detached child instead: own process group (separate PGID,
+// mirrors the detached-worker pattern in providers/subprocess.ts), unref'd so
+// the parent never waits on it, stdout+stderr redirected straight to a log
+// file under `.deckent/recently-works/`. Returns immediately with the child's
+// pid and the log path — never awaits completion.
+//
+// fd-based stdio (not 'pipe' + `.on('data')`) is deliberate: a piped stream
+// keeps the event loop alive even after `child.unref()` unless the stream
+// itself is separately unref'd. Passing an open file descriptor directly
+// avoids that dance entirely and is the standard detached-daemon-with-logging
+// pattern (gateway.ts / bot-daemon.ts use the simpler stdio:'ignore' case;
+// this extends it with log capture).
+//
+// Pure mechanism — zero user-facing strings. The caller (chat-tool-bridge.ts)
+// builds any display text from the returned { pid, logPath }.
+
+import { spawn } from 'node:child_process';
+import { openSync, closeSync, mkdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { RECENT_WORKS_DIR } from '../../core/constants.js';
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+/** Minimal shape spawnDetachedDeckent needs back from a spawn call. */
+export interface DetachedChildHandle {
+  pid?: number;
+  unref(): void;
+}
+
+/** The exact option shape passed to the (possibly injected) spawn primitive. */
+export interface DetachedSpawnOptions {
+  detached: true;
+  stdio: ['ignore', number, number];
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  windowsHide: true;
+}
+
+/** Injectable spawn primitive — tests supply a fake to stay hermetic (no real subprocess). */
+export type DetachedSpawnFn = (
+  command: string,
+  args: readonly string[],
+  options: DetachedSpawnOptions,
+) => DetachedChildHandle;
+
+export interface SpawnDetachedOptions {
+  /** Project root — resolves `.deckent/recently-works/` and the child's cwd. Defaults to process.cwd(). */
+  projectRoot?: string;
+  /** Inject a fake spawn for hermetic tests; omit for the real node:child_process spawn. */
+  spawnFn?: DetachedSpawnFn;
+}
+
+export interface DetachedSpawnResult {
+  /** PID of the spawned child, or null if the platform did not report one. */
+  pid: number | null;
+  /** Absolute path to the log file the child's stdout+stderr are redirected to. */
+  logPath: string;
+}
+
+// ─── Entry resolution ────────────────────────────────────────────────────────
+
+function resolveEntryPath(): string {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = dirname(__filename);
+  // dist/cli/helpers/ → ../entry.js → dist/cli/entry.js
+  return join(__dirname, '..', 'entry.js');
+}
+
+function defaultSpawnFn(
+  command: string,
+  args: readonly string[],
+  options: DetachedSpawnOptions,
+): DetachedChildHandle {
+  return spawn(command, [...args], options);
+}
+
+// ─── Public API ───────────────────────────────────────────────────────────────
+
+/**
+ * Spawn `dist/cli/entry.js <argv>` as a detached background process — own
+ * process group (`detached: true` → separate PGID on POSIX) + `windowsHide`
+ * (no visible console window on native Windows), unref'd so the parent can
+ * exit independently, stdout+stderr redirected to
+ * `.deckent/recently-works/<argv[0]>-<timestamp>.log`. Returns immediately
+ * with the child's pid and the log path; never awaits completion.
+ */
+export function spawnDetachedDeckent(
+  argv: readonly string[],
+  opts: SpawnDetachedOptions = {},
+): DetachedSpawnResult {
+  const projectRoot = opts.projectRoot ?? process.cwd();
+  const recentWorksDir = join(projectRoot, RECENT_WORKS_DIR);
+  mkdirSync(recentWorksDir, { recursive: true });
+
+  const cmdLabel = (argv[0] ?? 'cmd').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const logPath = join(recentWorksDir, `${cmdLabel}-${Date.now()}.log`);
+  const logFd = openSync(logPath, 'a');
+
+  const spawnFn = opts.spawnFn ?? defaultSpawnFn;
+  let child: DetachedChildHandle;
+  try {
+    child = spawnFn(process.execPath, [resolveEntryPath(), ...argv], {
+      detached: true,
+      stdio: ['ignore', logFd, logFd],
+      cwd: projectRoot,
+      env: { ...process.env },
+      windowsHide: true,
+    });
+  } finally {
+    // The child received its own reference to the file at spawn time (the OS
+    // dups the fd into the child's table) — the parent's copy must be closed
+    // here or it leaks for the lifetime of this process.
+    closeSync(logFd);
+  }
+  child.unref();
+
+  return { pid: child.pid ?? null, logPath };
+}

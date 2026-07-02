@@ -313,6 +313,10 @@ const DEPENDENCY_REF_RESERVED = new Set(['NONE', 'AUTO']);
 
 const PLAN_SLOT_ID_RE = /^\d{1,4}-\d{1,4}$/;
 
+// born-458: matches the human-natural "Task N" / "task N" dependency-ref form
+// (e.g. "Dependencies: Task 1"), as opposed to a plan-slot id or title-prefix.
+const TASK_N_RE = /^task\s+(\d+)$/i;
+
 /**
  * Format guard (323-031): true when `ref` is a canonical plan-slot task id
  * (`NNN-NNN`, e.g. "323-005") — the shape structured `- Dependencies: 323-005,
@@ -350,13 +354,22 @@ function titleHasRefToken(title: string, ref: string): boolean {
  * `task.id`, surviving the auto-debt prepend offset drift (Sprint 176/178).
  *
  * Resolution order:
- *   1. Plan-slot ID (`NNN-NNN`) → exact `task.id` lookup. Returns the id
+ *   1. Pure integer (`"0"`, `"1"`, …) → 0-based index into `tasks` (325-001).
+ *   2. Human-natural `"Task N"` / `"task N"` (born-458) → 1-based index into
+ *      `tasks`, matching the `## Task N:` heading numbering DIRECTIVES.md
+ *      authors actually write (`"Task 1"` is the first task). Distinct
+ *      literal shape from #1 so the two never collide.
+ *   3. Plan-slot ID (`NNN-NNN`) → exact `task.id` lookup. Returns the id
  *      when a task with that exact id exists, otherwise undefined. (Back-
  *      compat: legacy DIRECTIVES that hard-code slot IDs still work — but
  *      only when the slot is actually present after planning.)
- *   2. Title-prefix label (anything else) → case-insensitive token match
+ *   4. Title-prefix label (anything else) → case-insensitive token match
  *      against `task.title`. Returns the first matching task's id, or
  *      undefined when no title contains the ref as a standalone token.
+ *
+ * A ref that resolves to `undefined` here is NOT silently dropped by every
+ * caller — batch callers should prefer `resolveTaskDependenciesLoud`, which
+ * reports every unresolved ref instead of swallowing it.
  *
  * Why title-prefix is preferred: Brain prepends critical-debt fix tasks at
  * the head of the sprint, which shifts every subsequent plan-slot ID by N.
@@ -383,6 +396,17 @@ export function resolveDependencyRef(
   if (/^\d+$/.test(trimmed)) {
     const idx = Number.parseInt(trimmed, 10);
     return tasks[idx]?.id;
+  }
+
+  // born-458: human-natural "Task N" / "task N" form → 1-based index into the
+  // task list, matching DIRECTIVES.md's own "## Task N:" heading numbering
+  // (authors write "Dependencies: Task 1" meaning the FIRST task). Deliberately
+  // 1-based and a distinct literal shape from the 0-based pure-integer form
+  // above, so "0"/"1" and "Task 0"/"Task 1" never collide or alias each other.
+  const taskNMatch = TASK_N_RE.exec(trimmed);
+  if (taskNMatch) {
+    const n = Number.parseInt(taskNMatch[1]!, 10);
+    return tasks[n - 1]?.id;
   }
 
   if (PLAN_SLOT_ID_RE.test(trimmed)) {
@@ -417,6 +441,82 @@ export function resolveTaskDependencies(
     }
   }
   return resolved;
+}
+
+/** A dependency ref that `resolveTaskDependenciesLoud` could not resolve. */
+export interface DependencyRefWarning {
+  /** Id of the task whose `Dependencies:` line contained the ref. */
+  taskId: string;
+  /** The raw, unresolved ref string. */
+  ref: string;
+  /** The exact `[deckent] WARN: ...` message emitted to stderr. */
+  message: string;
+}
+
+export interface ResolveTaskDependenciesLoudOptions {
+  /**
+   * Mirrors the project-config `dependency_ref_strict` field (default off).
+   * When true, the FIRST unresolved ref throws instead of warning — blocking
+   * planning outright. Callers wire this from `config.dependency_ref_strict`;
+   * this function does not read config itself.
+   */
+  strict?: boolean;
+}
+
+export interface ResolveTaskDependenciesLoudResult {
+  /** Successfully resolved, order-preserved, de-duplicated task ids. */
+  resolved: string[];
+  /** Every ref that could not be resolved (empty when all refs resolve). */
+  warnings: DependencyRefWarning[];
+}
+
+/**
+ * born-458 — Loud variant of `resolveTaskDependencies`: an unresolved
+ * dependency ref is never silently dropped.
+ *
+ * For each ref in `refs`:
+ *   - resolves via `resolveDependencyRef` (all ref styles: pure-integer,
+ *     "Task N", plan-slot id, title-prefix — unchanged resolution rules)
+ *   - on success: de-duplicated + appended to `resolved`, order preserved
+ *   - on failure: builds `[deckent] WARN: dependency ref '<ref>' çözülemedi
+ *     (task <ownerTaskId>)`; when `options.strict` is set, THROWS that
+ *     message immediately (blocks plan construction); otherwise writes it to
+ *     stderr and records it in the returned `warnings` array so the caller
+ *     can stamp it onto the plan output — the ref is dropped from `resolved`
+ *     either way, it just never happens invisibly.
+ *
+ * `resolveTaskDependencies` (above) is left untouched for existing callers
+ * that want silent-drop batch resolution; this is an additive sibling.
+ */
+export function resolveTaskDependenciesLoud(
+  ownerTaskId: string,
+  refs: ReadonlyArray<string>,
+  tasks: ReadonlyArray<{ id: string; title: string }>,
+  options: ResolveTaskDependenciesLoudOptions = {},
+): ResolveTaskDependenciesLoudResult {
+  const seen = new Set<string>();
+  const resolved: string[] = [];
+  const warnings: DependencyRefWarning[] = [];
+
+  for (const ref of refs) {
+    const id = resolveDependencyRef(ref, tasks);
+    if (id) {
+      if (!seen.has(id)) {
+        seen.add(id);
+        resolved.push(id);
+      }
+      continue;
+    }
+
+    const message = `[deckent] WARN: dependency ref '${ref}' çözülemedi (task ${ownerTaskId})`;
+    if (options.strict) {
+      throw new Error(message);
+    }
+    process.stderr.write(message + '\n');
+    warnings.push({ taskId: ownerTaskId, ref, message });
+  }
+
+  return { resolved, warnings };
 }
 
 const VALID_PRIORITIES: readonly string[] = ['CRITICAL', 'HIGH', 'NORMAL', 'LOW'];

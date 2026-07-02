@@ -19,6 +19,7 @@ import { createReadStream, createWriteStream } from 'node:fs';
 import { createInterface } from 'node:readline';
 import type { OpenAiMessage, TraceMeta } from '../agent/trace-recorder.js';
 import { redactSensitive } from '../core/redact-sensitive.js';
+import { mapTaskEvaluationToLabel, type TaskEvaluationLike } from '../core/trace-labels.js';
 
 // ─── ShareGPT types ──────────────────────────────────────────────────────────
 
@@ -101,10 +102,34 @@ function toFunctionCallValue(call: NonNullable<OpenAiMessage['tool_calls']>[numb
   return JSON.stringify({ name: call.function.name, arguments: args });
 }
 
+const KNOWN_TASK_EVALUATIONS: ReadonlySet<TaskEvaluationLike> = new Set([
+  'DONE',
+  'GO_WITH_TECH_DEBT',
+  'NO_GO',
+  'DEFERRED',
+  'NOT_DISPATCHED',
+]);
+
+function isTaskEvaluationLike(value: string): value is TaskEvaluationLike {
+  return KNOWN_TASK_EVALUATIONS.has(value as TaskEvaluationLike);
+}
+
+/**
+ * Route a raw `meta.selfAssessment` string through the RunOutcomeLabel taxonomy
+ * (src/core/trace-labels.ts) when it is one of the 5 known TaskEvaluation values.
+ * `mapTaskEvaluationToLabel`'s param type is a closed union with no "unknown"
+ * slot, so it structurally cannot accept anything else — an unrecognized/legacy
+ * value passes through unchanged rather than being dishonestly folded into
+ * 'failed'.
+ */
+function normalizeOutcome(raw: string): string {
+  return isTaskEvaluationLike(raw) ? mapTaskEvaluationToLabel(raw) : raw;
+}
+
 function buildLabels(meta: Partial<TraceMeta> | undefined): ShareGptLabels | undefined {
   if (meta === undefined) return undefined;
   const labels: ShareGptLabels = {};
-  if (meta.selfAssessment !== undefined) labels.outcome = meta.selfAssessment;
+  if (meta.selfAssessment !== undefined) labels.outcome = normalizeOutcome(meta.selfAssessment);
   if (meta.agent !== undefined) labels.agent = meta.agent;
   if (meta.model !== undefined) labels.model = meta.model;
   return Object.keys(labels).length > 0 ? labels : undefined;

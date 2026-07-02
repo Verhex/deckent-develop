@@ -4,24 +4,34 @@
 // slash command resolves to an MCP tool (chat-slash-registry.ts maps
 // /status→deckent_status, /recall→deckent_memory_query, /sprint→deckent_history),
 // runChatNativeLoop calls `dispatcher.dispatch(tool, args)`. This dispatcher
-// translates that tool name into a `dist/cli/entry.js <subcommand>` spawn and
-// returns its stdout, replacing the prior NOOP "tool not yet wired" stub.
+// translates that tool name into a `dist/cli/entry.js <subcommand>` spawn.
+// Most tools spawn synchronously and return combined stdout, replacing the
+// prior NOOP "tool not yet wired" stub. The `start`/`run`/`process submit`
+// command-class is long-running (a sprint / one-shot worker / process-mode
+// submit runs for minutes) — awaiting it the same way would freeze the whole
+// REPL turn, so those route through `spawnDetachedDeckent` (detached-start.ts)
+// instead: fire-and-forget, own process group, output captured to a
+// `.deckent/recently-works/` log file. See `isDetachedCommandClass`.
 //
 // Spawn pattern mirrors chat-enterprise-bridge.ts (the sibling slash bridge).
-// Tests inject `opts.spawnFn` to stay hermetic (no real subprocess spawns).
+// Tests inject `opts.spawnFn` / `opts.spawnDetachedFn` to stay hermetic (no
+// real subprocess spawns).
 
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 import type { McpToolDispatcher } from './chat-native.js';
+import { spawnDetachedDeckent, type DetachedSpawnResult } from '../helpers/detached-start.js';
 
 // ─── Tool → CLI subcommand map ─────────────────────────────────────────────
 //
 // Allow-list of read-only MCP tools that are safe to spawn headlessly (each
-// finishes quickly and never blocks on a stdin confirmation prompt). Anything
-// outside this map (notably deckent_plan / start / run — interactive, long, or
-// disk-writing) is refused with a tagged error so the headless spawn never
-// hangs. Positional args (e.g. `/audit sprint-224`) flow through `args._rest`.
+// finishes quickly and never blocks on a stdin confirmation prompt). Tools
+// with structured args (deckent_start / run / process / audit / autonomous / …)
+// are NOT in this static map — they are arg-aware builders in cliArgsFor
+// below. Anything cliArgsFor still can't resolve is refused with a tagged
+// error so the headless spawn never hangs. Positional args (e.g.
+// `/audit sprint-224`) flow through `args._rest`.
 
 const TOOL_COMMANDS: Readonly<Record<string, readonly string[]>> = {
   deckent_status: ['status'],
@@ -57,10 +67,12 @@ const TOOL_COMMANDS: Readonly<Record<string, readonly string[]>> = {
   // recover prompts via readline unless --force; the REPL's always-confirm modal
   // IS the confirmation, so bake in --force to avoid a headless stdin hang.
   deckent_recover: ['recover', '--force'],
-  // NOTE: deckent_start / run / watch are intentionally NOT here — long-running
-  // (a sprint / worker / live stream) would block the REPL turn. deckent_audit
-  // (provider-backed self-audit gate, 30-60s+) and deckent_set_directives
-  // (stdin content) are also excluded. Run those standalone via the CLI.
+  // NOTE: deckent_watch is intentionally NOT here — a live event stream would
+  // block the REPL turn forever, not just for a few minutes. deckent_start /
+  // deckent_run / deckent_process are handled by the arg-aware builders below
+  // (cliArgsFor) and route through the detached spawn path (isDetachedCommandClass)
+  // instead of this static map. deckent_audit (provider-backed self-audit gate,
+  // 30-60s+) and deckent_set_directives (stdin content) stay excluded here too.
   // deckent_memory_query is special-cased below: it needs the `query` arg
   // appended as the `recall <query>` positional.
 };
@@ -76,6 +88,12 @@ export type CliToolSpawnFn = (args: string[]) => Promise<string>;
 export interface CliToolDispatcherOptions {
   /** Inject a fake spawn for hermetic tests; omit for the real child_process spawn. */
   spawnFn?: CliToolSpawnFn;
+  /** Inject a fake detached-spawn for hermetic tests; omit for the real spawnDetachedDeckent. */
+  spawnDetachedFn?: typeof spawnDetachedDeckent;
+  /** Project root passed to spawnDetachedDeckent (recently-works log dir + child cwd). Defaults to process.cwd(). */
+  projectRoot?: string;
+  /** Override the English-default detached-start message labels — see DEFAULT_DETACHED_START_LABELS. */
+  detachedLabels?: Partial<DetachedStartLabels>;
 }
 
 function resolveEntryPath(): string {
@@ -194,6 +212,68 @@ export function cliArgsFor(name: string, args: Record<string, unknown>): string[
     const content = typeof args['content'] === 'string' ? (args['content'] as string) : '';
     return content.length > 0 ? ['set-directives', '--content', content] : null;
   }
+  // REPL-DETACHED-START (358-003): start/run/process are long-running — the
+  // caller routes their resolved argv through spawnDetachedDeckent instead of
+  // the synchronous spawnFn (see isDetachedCommandClass + dispatch below).
+  // Building real CLI argv here still matters even for the detached path: it
+  // is also what the REPL confirm modal shows the user before running.
+  if (name === 'deckent_start') {
+    const argv: string[] = ['start'];
+    if (args['autoApprove'] === true) argv.push('--auto-approve');
+    if (args['sandbox'] === true) argv.push('--sandbox');
+    if (args['force'] === true) argv.push('--force');
+    if (args['dryRun'] === true) argv.push('--dry-run');
+    if (typeof args['timeout'] === 'number' && Number.isFinite(args['timeout'])) {
+      argv.push('--timeout', String(args['timeout']));
+    }
+    return argv;
+  }
+  if (name === 'deckent_run') {
+    const description = typeof args['description'] === 'string' ? (args['description'] as string).trim() : '';
+    if (!description) return null;
+    const argv: string[] = ['run', description];
+    if (typeof args['model'] === 'string' && (args['model'] as string).length > 0) {
+      argv.push('--model', args['model'] as string);
+    }
+    if (typeof args['modelEffort'] === 'string' && (args['modelEffort'] as string).length > 0) {
+      argv.push('--model-effort', args['modelEffort'] as string);
+    }
+    if (typeof args['scope'] === 'string' && (args['scope'] as string).length > 0) {
+      argv.push('--scope', args['scope'] as string);
+    }
+    if (typeof args['timeoutMs'] === 'number' && Number.isFinite(args['timeoutMs'])) {
+      argv.push('--timeout', String(args['timeoutMs']));
+    }
+    if (args['keep'] === true) argv.push('--keep');
+    if (args['autoApprove'] === true) argv.push('--auto-approve');
+    return argv;
+  }
+  if (name === 'deckent_process') {
+    const action = typeof args['action'] === 'string' ? (args['action'] as string) : '';
+    if (action === 'submit') {
+      const description = typeof args['description'] === 'string' ? (args['description'] as string).trim() : '';
+      if (!description) return null;
+      const argv: string[] = ['process', 'submit', description];
+      if (typeof args['kind'] === 'string' && (args['kind'] as string).length > 0) {
+        argv.push('--kind', args['kind'] as string);
+      }
+      if (typeof args['scopeDir'] === 'string' && (args['scopeDir'] as string).length > 0) {
+        argv.push('--scope-dir', args['scopeDir'] as string);
+      }
+      if (typeof args['provider'] === 'string' && (args['provider'] as string).length > 0) {
+        argv.push('--provider', args['provider'] as string);
+      }
+      if (typeof args['model'] === 'string' && (args['model'] as string).length > 0) {
+        argv.push('--model', args['model'] as string);
+      }
+      return argv;
+    }
+    if (action === 'status' || action === 'result') {
+      const executionId = typeof args['executionId'] === 'string' ? (args['executionId'] as string).trim() : '';
+      return executionId ? ['process', action, executionId] : null;
+    }
+    return null;
+  }
 
   const base = TOOL_COMMANDS[name];
   if (!base) return null;
@@ -207,6 +287,51 @@ export function cliArgsFor(name: string, args: Record<string, unknown>): string[
   return cliArgs;
 }
 
+// ─── Detached command-class routing ────────────────────────────────────────
+//
+// `start` (sprint), `run` (one-shot worker), and `process submit` (process-mode
+// submit) run for minutes — spawning them through the synchronous
+// spawn-and-await-close path (defaultSpawnFn) would freeze the whole REPL
+// turn. Decided from the RESOLVED cliArgs (not the tool name) so it stays
+// correct regardless of which MCP tool mapped to that argv. Everything else
+// (status, config, kill, process status/result, …) is untouched — sync path
+// unchanged.
+
+/** True for the `start` / `run` / `process submit` command-class. */
+export function isDetachedCommandClass(cliArgs: readonly string[]): boolean {
+  const [cmd, sub] = cliArgs;
+  return cmd === 'start' || cmd === 'run' || (cmd === 'process' && sub === 'submit');
+}
+
+/**
+ * String-free mechanism (CLAUDE.md i18n-first): the detached-start
+ * confirmation text uses English-default labels the caller may override via
+ * `CliToolDispatcherOptions.detachedLabels` — same "labels injected by
+ * caller, English default" seam already established in live-footer.ts, which
+ * itself defers full en/tr wiring through messages.ts to a follow-up task.
+ * messages.ts is outside this task's write scope (task 358-003).
+ */
+export interface DetachedStartLabels {
+  started: string;
+  log: string;
+  trackHint: string;
+}
+
+export const DEFAULT_DETACHED_START_LABELS: DetachedStartLabels = {
+  started: 'Started',
+  log: 'log',
+  trackHint: 'track via /status or the live footer',
+};
+
+function formatDetachedStartMessage(
+  cliArgs: readonly string[],
+  result: DetachedSpawnResult,
+  labels: DetachedStartLabels,
+): string {
+  const pidStr = result.pid !== null ? String(result.pid) : 'unknown';
+  return `${labels.started}: deckent ${cliArgs.join(' ')} (pid ${pidStr}). ${labels.log}: ${result.logPath} — ${labels.trackHint}.`;
+}
+
 /**
  * Build an McpToolDispatcher that runs deckent CLI subcommands headlessly.
  *
@@ -217,9 +342,16 @@ export function cliArgsFor(name: string, args: Record<string, unknown>): string[
  * returned as `[mcp-error] …` strings so the chat loop can surface them as
  * ordinary turn output. Write/destructive confirmation is enforced one layer
  * up (run.tsx, via tool-permissions.classifyTool) before dispatch is called.
+ *
+ * `start` / `run` / `process submit` are the exception to "spawn and await
+ * stdout": they route through spawnDetachedDeckent (fire-and-forget, own
+ * process group, logged to `.deckent/recently-works/`) so a multi-minute
+ * sprint/task never blocks the REPL turn — see isDetachedCommandClass.
  */
 export function createCliToolDispatcher(opts: CliToolDispatcherOptions = {}): McpToolDispatcher {
   const spawnFn = opts.spawnFn ?? defaultSpawnFn;
+  const spawnDetachedFn = opts.spawnDetachedFn ?? spawnDetachedDeckent;
+  const labels: DetachedStartLabels = { ...DEFAULT_DETACHED_START_LABELS, ...opts.detachedLabels };
   return {
     async dispatch(name, args) {
       let cliArgs: string[];
@@ -231,6 +363,15 @@ export function createCliToolDispatcher(opts: CliToolDispatcherOptions = {}): Mc
         const built = cliArgsFor(name, args);
         if (!built) return `[mcp-error] tool not allowed: ${name}`;
         cliArgs = built;
+      }
+      if (isDetachedCommandClass(cliArgs)) {
+        try {
+          const result = spawnDetachedFn(cliArgs, { projectRoot: opts.projectRoot });
+          return formatDetachedStartMessage(cliArgs, result, labels);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return `[mcp-error] ${name}: ${msg}`;
+        }
       }
       try {
         return await spawnFn(cliArgs);

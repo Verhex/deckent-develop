@@ -12,7 +12,26 @@ import { renderUserMessage, renderAssistantHeader, messageSeparator } from './ch
 import { renderToolActivity } from './chat-render-region.js';
 import { classifyAgenticIntent, dispatchAgenticIntent } from './chat-agentic-dispatch.js';
 import { requireConfirmIfRisky, type AgenticAction } from './agentic-confirm.js';
-import { buildSlashRegistry, renderHelp, resolveSlash } from './chat-slash-registry.js';
+import {
+  buildSlashRegistry,
+  renderHelp,
+  resolveSlash,
+  type SlashCommand,
+  type SlashRegistry,
+} from './chat-slash-registry.js';
+import { getVisibleCommands, isEnterpriseSlash, type ChatMode } from './chat-mode.js';
+import type { TermMode } from '../repl/term-mode.js';
+import { classifyTool, type ToolPermission } from '../repl/tool-permissions.js';
+import {
+  renderCatalog,
+  type CatalogRenderEntry,
+  type CatalogRenderLabels,
+} from '../helpers/catalog-render.js';
+import {
+  classifyToolTrust,
+  type ToolCatalogSource,
+  type ToolCatalogRiskLevel,
+} from '../../core/tool-catalog.js';
 import {
   dispatchEnterpriseSlash,
   type EnterpriseSpawnFn,
@@ -302,6 +321,19 @@ export interface ChatNativeOptions {
    */
   lang?: string;
   /**
+   * Sprint 358 T-358-005 — current terminal risk-ladder mode (term-mode.ts),
+   * consumed ONLY to decide `/help` catalog visibility: `'control'` maps to
+   * `ChatMode` `'enterprise'` (enterprise slashes like `/audit` listed),
+   * anything else maps to `'user'` (hidden from the list, still dispatchable
+   * directly per chat-mode.ts's "kullanılmasa da kullanılabilir" contract).
+   * Defaults to `'ask'` (the safe default from `initialTermModeState()`) when
+   * omitted. No `/ask`/`/run`/`/control` transition state machine is wired
+   * into this loop yet (term-mode.ts has no production caller as of this
+   * task) — a future caller that owns live `TermModeState` can pass its
+   * current `.mode` here with no shape change.
+   */
+  termMode?: TermMode;
+  /**
    * Sprint 269 T-269-003 — project root used by the `/directives` slash to
    * read DIRECTIVES.md. Tests inject a tmpdir fixture (hermetic file I/O);
    * production defaults to `process.cwd()` like the nervous bridge.
@@ -356,6 +388,93 @@ export interface ChatNativeOptions {
 const DEFAULT_MAX_TURNS = 50;
 const DEFAULT_MAX_TOOL_HOPS = 10;
 const EXIT_COMMANDS: readonly string[] = [':exit', ':quit'];
+
+// ─── /help "Tools/Actions" catalog (Sprint 358 T-358-005) ───────────
+//
+// Bridges the live slash registry into a trust-badged catalog for the
+// renderCatalog mechanism (357-002, src/cli/helpers/catalog-render.ts).
+// Source/risk classification reuses two already-established single sources
+// of truth instead of inventing new heuristics:
+//   - isEnterpriseSlash (chat-mode.ts)   -> ToolCatalogSource (enterprise/builtin)
+//   - classifyTool (tool-permissions.ts) -> confirm tier -> risk level
+// classifyToolTrust (tool-catalog.ts, 357-001) then derives the trust tier
+// from (source, risk) — 'always'-tier commands (/kill /cleanup /recover)
+// clamp to 'Danger' regardless of source, matching their existing ⚠️ desc
+// markers in chat-slash-registry.ts.
+//
+// messages.ts is outside this task's write scope, so no new i18n keys can be
+// added here. `category`/`labelKey` below are identity-passthrough of
+// already-technical vocabulary (trust-tier names, slash-command tokens) —
+// consistent with the project convention that code/command tokens stay
+// English-invariant regardless of UI language. The one real prose string
+// (the section header) reuses the existing generic `nervous.actions_label`
+// key via getMessage at the call site — see docImpact note in the task
+// result for a proposed dedicated key follow-up.
+
+const HELP_CATALOG_RISK_TO_CATALOG_RISK: Record<ToolPermission, ToolCatalogRiskLevel> = {
+  read: 'safe',
+  confirm: 'moderate',
+  always: 'critical',
+};
+
+const HELP_CATALOG_RISK_TO_RENDER_RISK: Record<ToolPermission, CatalogRenderEntry['riskLevel']> = {
+  read: 'low',
+  confirm: 'medium',
+  always: 'critical',
+};
+
+const HELP_CATALOG_TIER_BADGE: CatalogRenderLabels['tierBadge'] = {
+  Core: 'C',
+  Project: 'P',
+  MCP: 'M',
+  Enterprise: 'E',
+  Danger: '!',
+};
+
+const HELP_CATALOG_RISK_MARKER: CatalogRenderLabels['riskMarker'] = {
+  low: '',
+  medium: '',
+  high: '',
+  critical: '',
+};
+
+/** Meta-commands (no `agenticTool`, e.g. `/help` `/model` `/cd`) default to the safe 'read' tier. */
+function slashCommandRiskTier(cmd: SlashCommand): ToolPermission {
+  return cmd.agenticTool ? classifyTool(cmd.agenticTool, {}) : 'read';
+}
+
+function slashCommandCatalogSource(cmd: SlashCommand): ToolCatalogSource {
+  return isEnterpriseSlash(cmd.name) ? 'enterprise' : 'builtin';
+}
+
+/** Builds trust-badged catalog rows from a (mode-filtered) slash registry for /help. */
+export function buildHelpCatalogEntries(registry: SlashRegistry): CatalogRenderEntry[] {
+  return registry
+    .filter((cmd) => cmd.name !== '/quit') // alias — renderHelp already skips it too
+    .map((cmd) => {
+      const tier = slashCommandRiskTier(cmd);
+      const source = slashCommandCatalogSource(cmd);
+      const trustTier = classifyToolTrust({ source, riskLevel: HELP_CATALOG_RISK_TO_CATALOG_RISK[tier] });
+      return {
+        id: cmd.name,
+        category: trustTier,
+        labelKey: cmd.name,
+        trustTier,
+        riskLevel: HELP_CATALOG_RISK_TO_RENDER_RISK[tier],
+      } satisfies CatalogRenderEntry;
+    });
+}
+
+/** String-free labels for the /help catalog section — see module-header comment above. */
+export function buildHelpCatalogLabels(lang: string): CatalogRenderLabels {
+  return {
+    categoryName: (category) => category,
+    entryName: (labelKey) => labelKey,
+    tierBadge: HELP_CATALOG_TIER_BADGE,
+    riskMarker: HELP_CATALOG_RISK_MARKER,
+    emptyState: getMessage('nervous.no_pending', lang),
+  };
+}
 
 // ─── Per-turn stats footer (Sprint 224 T-224-021) ──────────────────
 //
@@ -463,6 +582,8 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     : `chat-${Date.now()}`;
   const resumeLimit = opts.resumeLimit ?? 0;
   const lang = opts.lang ?? 'en';
+  // Sprint 358 T-358-005 — see ChatNativeOptions.termMode doc comment.
+  const chatMode: ChatMode = (opts.termMode ?? 'ask') === 'control' ? 'enterprise' : 'user';
   // Most recently shown /resume list — lets `/resume <n>` pick by number.
   let lastResumeList: ReadonlyArray<{ sessionId: string; turnCount: number; lastAt: string; preview: string }> = [];
   // Sprint 280 T-280-004 — lazily-built external-MCP bridge for `/mcp`, cached
@@ -700,7 +821,24 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     // through to the enterprise CLI bridge below (behaviour preserved).
     const slashAction = resolveSlash(line, buildSlashRegistry());
     if (slashAction.action === 'help') {
-      output(renderHelp(slashAction.registry));
+      // Sprint 358 T-358-005 — mode-filtered render (357-010) + trust-badged
+      // "Tools/Actions" catalog section (357-002/357-001). `slashAction.registry`
+      // is intentionally NOT used here — it is the FULL unfiltered registry
+      // (needed by resolveSlash's dispatch path, see chat-mode.ts), while /help
+      // display must go through getVisibleCommands(chatMode) to hide enterprise
+      // slashes outside control mode. Concatenated into ONE output() call so
+      // existing single-emit assertions on `/help` stay intact.
+      const visible = getVisibleCommands(chatMode);
+      const sections = [renderHelp(visible)];
+      const catalogEntries = buildHelpCatalogEntries(visible);
+      if (catalogEntries.length > 0) {
+        sections.push(
+          '',
+          getMessage('nervous.actions_label', lang),
+          renderCatalog(catalogEntries, buildHelpCatalogLabels(lang)),
+        );
+      }
+      output(sections.join('\n'));
       continue;
     }
     // Sprint 269 T-269-003 — i18n informational/error reply from the registry

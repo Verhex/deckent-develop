@@ -1,33 +1,46 @@
-// ─── Catalog Render (TERM-CAT, Sprint 357, Task 357-002) ────────────────────
+// ─── Catalog Render (TERM-CAT, Sprint 357 Task 357-002 + Sprint 358 Task 358-017) ──
 //
 // Pure render mechanism for a category-grouped, trust-badged tool/action
 // catalog. String-free: every visible glyph/word comes from the injected
 // `labels` parameter — this module owns layout, grouping, and ANSI color
 // selection only (color codes are control sequences, not language content).
-// Decoupled from the catalog data-model task (357-001, src/core/tool-catalog.ts)
-// by design: CatalogRenderEntry is a structural type, not an import, so this
-// mechanism is independently fixture-testable. Wiring a real catalog + i18n
-// labels into a `/help` command is an explicit follow-up, not part of this
-// module (no command/app.tsx changes here).
+// CatalogRenderEntry's `id`/`labelKey`/`trustTier` are now derived from the
+// catalog data-model's canonical type (357-001, src/core/tool-catalog.ts) —
+// 357-002 shipped it as a hand-rolled structural type ahead of tool-catalog.ts
+// existing; 358-017 closed that gap. `category`/`riskLevel` remain this
+// module's own narrow subset (tool-catalog has no `category`, and its risk
+// scale is a different domain — see the RiskLevel doc comment below), so this
+// mechanism stays independently fixture-testable via plain object literals.
+// Wiring a real catalog + i18n labels into a `/help` command is handled by
+// chat-native.ts, not this module (no command/app.tsx changes here).
 
 import { isNoColor } from './output.js';
+import type { ToolTrustTier, ToolCatalogEntry } from '../../core/tool-catalog.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
-/** Trust classification tiers (mirrors the 357-001 tool-catalog data-model). */
-export type TrustTier = 'Core' | 'Project' | 'MCP' | 'Enterprise' | 'Danger';
+/** Trust classification tiers — single source of truth: {@link ToolTrustTier} (core/tool-catalog.ts, 357-001). */
+export type TrustTier = ToolTrustTier;
 
-/** Risk classification for a single catalog entry. */
+/**
+ * Risk classification for a single catalog entry. Render's own narrow UI scale —
+ * intentionally distinct from tool-catalog's {@link ToolCatalogEntry.riskLevel} governance
+ * scale (safe/moderate/destructive/critical); callers (e.g. chat-native.ts) already map
+ * between the two domains explicitly, so unifying further is YAGNI (358-017).
+ */
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 
-/** One row of the catalog. Structural shape only — not imported from core/tool-catalog.ts. */
-export interface CatalogRenderEntry {
-  id: string;
+/**
+ * One row of the catalog. `id`/`labelKey`/`trustTier` are Pick'd directly from
+ * tool-catalog's canonical {@link ToolCatalogEntry} — proves structural compatibility at
+ * the type level (358-017, closing out 357-002's dep-drop placeholder). `category` and
+ * `riskLevel` stay render's own narrow subset: tool-catalog has no `category` concept, and
+ * its risk domain differs from this UI-facing scale (see {@link RiskLevel}).
+ */
+export type CatalogRenderEntry = Pick<ToolCatalogEntry, 'id' | 'labelKey' | 'trustTier'> & {
   category: string;
-  labelKey: string;
-  trustTier: TrustTier;
   riskLevel: RiskLevel;
-}
+};
 
 /**
  * All display text for renderCatalog. String-free mechanism: the caller

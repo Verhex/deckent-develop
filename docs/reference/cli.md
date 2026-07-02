@@ -1214,7 +1214,7 @@ deckent autonomous-mission list --json
 > Hand-curated sections above are produced by `scripts/generate-cli-docs.ts`; this block is maintained by `scripts/gen-reference-docs.mjs`.
 
 <!-- AUTOGEN:START id="cli" -->
-> 170 commands. Generated from `src/cli/commands/*.ts`.
+> 173 commands. Generated from `src/cli/commands/*.ts`.
 
 | Command | Description |
 |---------|-------------|
@@ -1245,6 +1245,7 @@ deckent autonomous-mission list --json
 | `deckent cleanup` | Sweep stray autonomous run-artifacts (task-run-*, _*.pid) from .tasks/ |
 | `deckent cleanup` | Clean up after a sprint |
 | `deckent config` | Show or modify project configuration |
+| `deckent connect` | Diagnose provider/MCP/IDE/shell connection status (read-only — no changes are made) |
 | `deckent cost` | User Safety Shield — cost management & estimation |
 | `deckent create <name>` | Create a custom agent (use --prompt/--description for wizard-style setup) |
 | `deckent create <name>` | Create a new plugin scaffold |
@@ -1256,6 +1257,7 @@ deckent autonomous-mission list --json
 | `deckent delete <name>` | Delete a skill |
 | `deckent disable <name>` | Disable an agent |
 | `deckent disable <name>` | Disable a skill |
+| `deckent do <goal>` | Golden-flow: turn a goal into a sprint plan (dry-run preview by default; --run to actually start it) |
 | `deckent docs` | Manage user-defined documents |
 | `deckent doctor` | Check system dependencies and health |
 | `deckent edit <id>` | Modify and accept a pending suggestion |
@@ -1317,6 +1319,7 @@ deckent autonomous-mission list --json
 | `deckent pending` | List parked approvals awaiting human accept/reject |
 | `deckent plan` | Plan a sprint without executing it |
 | `deckent plan <goal>` | Decompose a high-level goal into a lightweight autonomous backlog (Phase 1) |
+| `deckent plan-nl` | Turn a free-form goal into a DIRECTIVES.md scaffold (single-task template; preview by default) |
 | `deckent plugin` | Manage plugins |
 | `deckent process` | Switch to process mode (continuous request-handling \u2014 ERP / automation via MCP + REST) |
 | `deckent process` | Process-mode execution surface — submit tasks/capabilities and poll their status (ADR-022 CLI/MCP parity) |

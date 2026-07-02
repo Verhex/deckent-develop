@@ -87,8 +87,13 @@ export function parseMcpResources(resDir) {
 
 // ─── ADR parser ──────────────────────────────────────────────────────────────
 
-const ADR_FILE_RE = /^(\d+)-.+\.md$/;
-const ADR_HEADING_RE = /^#\s+ADR-(\d+):\s*(.+)$/m;
+// Recognizes both the legacy `NNN-slug.md` naming and the post-2026-06-30 ADR-G/ADR-D
+// taxonomy `adr-(g|d)-NNN-slug.md` (ADR-G-019). README.md and any other non-numbered file
+// never match either alternative.
+const ADR_FILE_RE = /^(?:\d+-|adr-[gd]-\d+-).+\.md$/i;
+// Optional class-letter group before the number: undefined → legacy `# ADR-NNN:` heading,
+// 'G'/'D' → new-taxonomy `# ADR-G-NNN:` / `# ADR-D-NNN:` heading.
+const ADR_HEADING_RE = /^#\s+ADR-(?:([GD])-)?(\d+):\s*(.+)$/im;
 const ADR_STATUS_RE = /\*\*Status:\*\*\s*([a-zA-Z]+)/;
 
 export function parseAdrs(adrDir) {
@@ -101,10 +106,12 @@ export function parseAdrs(adrDir) {
     const content = readFileSync(file, 'utf-8');
     const head = ADR_HEADING_RE.exec(content);
     if (!head) continue;
-    const idNum = head[1];
-    const title = head[2].trim();
+    const cls = head[1] ? head[1].toUpperCase() : null;
+    const idNum = head[2];
+    const title = head[3].trim();
     const status = (ADR_STATUS_RE.exec(content)?.[1] ?? 'unknown').toLowerCase();
-    out.push({ id: `ADR-${idNum.padStart(3, '0')}`, num: parseInt(idNum, 10), title, status, file: entry.name });
+    const id = cls ? `ADR-${cls}-${idNum.padStart(3, '0')}` : `ADR-${idNum.padStart(3, '0')}`;
+    out.push({ id, num: parseInt(idNum, 10), cls, title, status, file: entry.name });
   }
   // Deduplicate by id (some ADRs may have duplicate files — keep highest precedence file)
   const byId = new Map();
@@ -114,7 +121,15 @@ export function parseAdrs(adrDir) {
     if (!existing) byId.set(a.id, a);
     else if (existing.status !== 'accepted' && a.status === 'accepted') byId.set(a.id, a);
   }
-  return Array.from(byId.values()).sort((a, b) => a.num - b.num);
+  // Legacy (no class) sorts before new-taxonomy; within new-taxonomy, ADR-D-* before
+  // ADR-G-* (alphabetical), numeric ascending within each class — matches the
+  // hand-authored docs/adr/README.md ordering this generator must reproduce.
+  return Array.from(byId.values()).sort((a, b) => {
+    const clsA = a.cls ?? '';
+    const clsB = b.cls ?? '';
+    if (clsA !== clsB) return clsA.localeCompare(clsB);
+    return a.num - b.num;
+  });
 }
 
 // ─── CLI command parser ──────────────────────────────────────────────────────
@@ -278,15 +293,27 @@ export function replaceAutogenBlock(content, blockId, newBody) {
 
 // ─── Build target file content (header + AUTOGEN block + body) ───────────────
 
-function buildTargetContent(blockId, header, body) {
-  return [
+// Preserves any hand-written content after the AUTOGEN:END marker (e.g. docs/adr/README.md's
+// "Archived" note) — without this, regen would silently delete it on every --write, tripping
+// the "don't corrupt hand-written README content" NO-GO.
+function extractTrailer(existingContent, blockId) {
+  if (!existingContent) return '';
+  const end = AUTOGEN_END(blockId);
+  const endIdx = existingContent.indexOf(end);
+  if (endIdx === -1) return '';
+  return existingContent.slice(endIdx + end.length);
+}
+
+function buildTargetContent(blockId, header, body, existingContent = '') {
+  const head = [
     header.trim(),
     '',
     AUTOGEN_START(blockId),
     body.trimEnd(),
     AUTOGEN_END(blockId),
-    '',
   ].join('\n');
+  const trailer = extractTrailer(existingContent, blockId);
+  return trailer ? head + trailer : head + '\n';
 }
 
 /**
@@ -398,7 +425,7 @@ export function collectGenerations({ root = DEFAULT_ROOT } = {}) {
     }
     const expected = gen.mode === 'embed'
       ? buildEmbedContent(actual, gen.id, gen.header, gen.body)
-      : buildTargetContent(gen.id, gen.header, gen.body);
+      : buildTargetContent(gen.id, gen.header, gen.body, actual);
     gen.content = expected;
     gen.actual = actual;
     gen.exists = exists;

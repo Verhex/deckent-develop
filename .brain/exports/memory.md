@@ -1,5 +1,23 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-358 Learnings
+- Sprint sprint-358 Learnings: ## Sprint sprint-358 Learnings
+- REPL-DETACHED-START — REPL'den kilitlemeyen sprint-start: GO_WITH_TECH_DEBT — New src/cli/helpers/detached-start.ts exports spawnDetachedDeckent(argv, opts): spawns dist/cli/entry.js as a fully deta
+- REPL-DISPATCH-PARITY — /nervous köprü-tüketimi + /autonomous /mcp parite: GO_WITH_TECH_DEBT — REPL-DISPATCH-PARITY (MASTER-PLAN Sıra-66/REPL-001 + Sıra-72 kalanı). chat-slash-registry.ts genuinely CONSUMES the 357-
+- HELP-SURFACE-WIRE — /help'e katalog + mode-filtre (Sıra-26+56 kapanışı): GO_WITH_TECH_DEBT — Wired both required consumers into chat-native.ts's /help handler (line ~823): (1) getVisibleCommands(mode) (chat-mode.t
+- TRN-PIPE-WIRE — pipeline outcome-etiketi taksonomiden (Sıra-79 kapanışı): GO_WITH_TECH_DEBT — buildLabels() in src/training/pipeline.ts now routes meta.selfAssessment through mapTaskEvaluationToLabel (src/core/trac
+
+## Gains
+- 358-001 — APR-XPROC-CORE — approval-store dizin-izleyici çekirdeği (born-462 dilim-1) — createApprovalStoreWatch(storeDir, handlers, opts) implemented in src/core/approval-store-watch.ts.
+- 358-002 — APR-XPROC-WIRE — REPL'e cross-process onay beslemesi (born-462 dilim-2) — APR-XPROC-WIRE: wired Task 1's createApprovalStoreWatch into runInkRepl's repl_surface.approvals=...
+- 358-006 — APP-SURFACE-WIRE — /resume picker + açılış-teaser + busy-kontrolleri (app.tsx) — APP-SURFACE-WIRE landed in app.tsx, all additive + gated behind the EXISTING replSurfaceEnabled c...
+- 358-007 — CKPT-QUESTION-BRIDGE-WIRE — worker-soruları gerçek onaya (Sıra-73 kapanışı) — Wired handleWorkerQuestion (ipc-registry.ts) to the existing (previously unwired) bridgeQuestionT...
+- 358-008 — ALLOWSCOPE-COMPOSE — always-allow'u worker-gate önüne bağla (Sıra-69 kapanışı) — Wired 357-005's ApprovalAllowScopeStore.matchesAllow() in FRONT of WorkerApprovalGate.guard()'s d...
+- 358-010 — DEP-REF-LOUD — çözülemeyen dependency-ref sessiz düşmesin (born-458) — born-458 fix, fully scoped to task-builder.ts: (1) resolveDependencyRef gained a 1-based 'Task N'...
+- 358-011 — RETRO-DEBT-COUNT — retro sayaç-kaynağı düzelt (born-460) — DISK-VERIFY (reproduced with the sprint-357 archive): .brain/sprints/sprint-357.md (writeSprintLo...
+- 358-012 — REFDOCS-ADR-REGEX — docs:ref yeni ADR-taksonomisini tanısın (born-461) — ADR_FILE_RE + ADR_HEADING_RE now recognize both the new adr-(g|d)-NNN-slug.md / # ADR-(G|D)-NNN: ...
+- …and 5 more delivered
+
 ## Sprint sprint-357 Learnings
 - Sprint sprint-357 Learnings: ## Sprint sprint-357 Learnings
 - TERM-CONFIG-WIRE — TerminalConfig'i runtime'a bağla: GO_WITH_TECH_DEBT — Wired all six schema-only terminal.* config fields into server.ts's createHttpServer: maxSessions/idleTimeoutMs/scrollba

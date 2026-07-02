@@ -1,3 +1,5 @@
+import { PROVIDER_PACKAGES } from './provider-packages.js';
+
 // ─── DeckentError ───────────────────────────────────────────────────
 
 export class DeckentError extends Error {
@@ -44,11 +46,11 @@ registry.set('DECKENT_E001', {
 
 registry.set('DECKENT_E002', {
   message: 'claude CLI not found',
-  suggestion: 'Install: npm install -g @anthropic-ai/claude-code',
+  suggestion: `Install: ${PROVIDER_PACKAGES.claude.installHint}`,
   whatHappened: 'Deckent could not find the Claude CLI tool.',
   why: 'The Claude CLI is required for AI-powered task execution.',
   howToFix: [
-    'Install the Claude CLI: npm install -g @anthropic-ai/claude-code',
+    `Install the Claude CLI: ${PROVIDER_PACKAGES.claude.installHint}`,
     'Verify installation: claude --version',
   ],
 });

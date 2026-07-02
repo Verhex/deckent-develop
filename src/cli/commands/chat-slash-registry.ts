@@ -11,6 +11,26 @@
 //   const action   = resolveSlash(line, registry);
 //
 // Karpathy D2: pure functions, no new runtime deps, no disk I/O.
+//
+// Sprint 358 T-358-004 (REPL-DISPATCH-PARITY) — `/nervous` list/accept/reject/edit
+// now CONSUME the 357-006 pure plan-object bridge (../repl/nervous-bridge.js):
+// resolveNervousSlash builds a `NervousBridgePlan` via the injected store's
+// listPendingNervous/planAccept/planReject/handleEdit — this module still never
+// executes anything (no applyNervousBridgePlan call here; that needs a live
+// executor, the caller's job — same "wiring is follow-up" split the bridge itself
+// documents). `/autonomous` and `/mcp` get category/risk tags cross-referenced
+// from the TERM-3 command-registry.ts (no literal duplication, no drift).
+
+import type { NervousNotification } from '../../core/nervous-types.js';
+import {
+  listPendingNervous,
+  planAccept,
+  planReject,
+  handleEdit,
+  type NervousPendingStore,
+  type NervousBridgePlan,
+} from '../repl/nervous-bridge.js';
+import { getCommand, type CommandCategory, type CommandRisk } from '../command-registry.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -24,6 +44,14 @@ export interface SlashCommand {
   agenticTool?: string;
   /** Default args for the MCP tool. May be extended by inline command args. */
   agenticArgs?: Record<string, unknown>;
+  /**
+   * TERM-3 category/risk tag (Sprint 358 T-358-004), cross-referenced from
+   * `command-registry.ts` via `tag()` below. Populated for /nervous, /autonomous,
+   * /mcp (this task's 3 command-families); other entries are untagged (undefined)
+   * until a follow-up extends `tag()` coverage to the rest of SLASH_CATALOG.
+   */
+  category?: CommandCategory;
+  risk?: CommandRisk;
 }
 
 /** Immutable list of slash commands. */
@@ -43,6 +71,19 @@ export type SlashAction =
   | { action: 'message'; messageKey: string; params?: Record<string, string> }
   /** Sprint 269 T-269-003 — `/directives` (bare): caller shows DIRECTIVES.md. */
   | { action: 'show-directives' }
+  /**
+   * Sprint 358 T-358-004 — `/nervous` (bare / list): the injected store's pending
+   * notifications, read-only pass-through (no plan involved).
+   */
+  | { action: 'nervous-list'; items: readonly NervousNotification[] }
+  /**
+   * Sprint 358 T-358-004 — `/nervous accept|reject|edit <id> ...`: an UNAPPLIED
+   * plan built from the injected store via the 357-006 bridge
+   * (../repl/nervous-bridge.js). The caller applies it with
+   * `applyNervousBridgePlan(plan, executor, pendingCleanup?)` — this module never
+   * executes anything itself.
+   */
+  | { action: 'nervous-plan'; sub: 'accept' | 'reject' | 'edit'; plan: NervousBridgePlan }
   | { action: 'none' };
 
 // ─── Live Catalog ────────────────────────────────────────────────────────────
@@ -53,6 +94,17 @@ export type SlashAction =
 //
 // This catalog IS the "deckent yetenek kataloğu" for the REPL surface.
 // To add a new slash command, add one entry here — nothing else changes.
+
+/**
+ * TERM-3 category/risk lookup (Sprint 358 T-358-004) — cross-references
+ * `command-registry.ts` by canonical command name so SLASH_CATALOG's tags can
+ * never literal-duplicate-and-drift from the TERM-3 SSOT. Returns `{}` (both
+ * fields undefined) for a name with no COMMAND_REGISTRY entry.
+ */
+function tag(commandRegistryName: string): Pick<SlashCommand, 'category' | 'risk'> {
+  const cmd = getCommand(commandRegistryName);
+  return cmd ? { category: cmd.category, risk: cmd.risk } : {};
+}
 
 const SLASH_CATALOG: readonly SlashCommand[] = [
   {
@@ -145,10 +197,15 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
   },
   {
     // Meta-command: handled directly by the chat loop (chat-native.ts) BEFORE
-    // the registry, via the nervous bridge — listed here only for /help + menu
-    // visibility (no agenticTool, like /model and /cd).
+    // the registry, via the legacy nervous bridge — listed here for /help + menu
+    // visibility (no agenticTool, like /model and /cd). Sprint 358 T-358-004 —
+    // resolveSlash's OWN /nervous branch (below, gated on an injected store) now
+    // consumes the 357-006 plan-object bridge; that is the fallback path (fires
+    // only when a caller passes a store — chat-native.ts's earlier interception
+    // is unchanged by this task).
     name: '/nervous',
     desc: 'Bekleyen nervous bildirimleri (örn: /nervous accept <id>)',
+    ...tag('nervous'),
   },
   {
     // Meta-command: handled directly in chat-native.ts BEFORE the registry
@@ -197,6 +254,7 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     desc: 'Otonom motor (örn: /autonomous status · backlog add <başlık> [--cron <expr>] · approve <id>)',
     agenticTool: 'deckent_autonomous',
     agenticArgs: {},
+    ...tag('autonomous'),
   },
   {
     name: '/audit',
@@ -228,10 +286,13 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     // (.mcp.json), `/mcp list` shows the namespaced tool catalogue and
     // `/mcp call <tool> [args]` dispatches through the broker confirm-gate.
     // With no server configured it falls through here to the honest notice
-    // (resolveSlash → chat.mcp_not_wired) so the line never round-trips to the
-    // provider (audit finding A3).
+    // (resolveSlash → resolveMcpSlash → chat.mcp_not_wired, Sprint 358 T-358-004
+    // per-subaction fallback) so the line never round-trips to the provider
+    // (audit finding A3). Tagged from 'mcp-bridge' (the REPL-surface entry, not
+    // the CLI-only 'mcp' entry) — matches the actual dispatch-capable risk here.
     name: '/mcp',
     desc: 'Harici MCP araçları — list · call <tool> [args] (proje .mcp.json)',
+    ...tag('mcp-bridge'),
   },
   {
     name: '/model',
@@ -468,14 +529,140 @@ function resolveDirectivesSlash(rest: readonly string[]): SlashAction {
 }
 
 /**
+ * Parse `/nervous edit <id> ...` payload words into a modifiedPayload object —
+ * one JSON object (`{...}`) or a sequence of `key=value` tokens. Mirrors
+ * chat-nervous-bridge.ts's `handleNervousSlash` 'edit' parsing (Sprint 223); kept
+ * as a small local duplicate rather than a cross-file refactor since that file is
+ * outside this task's write scope (Karpathy D3 — surgical, in-scope only).
+ */
+function parseNervousEditPayload(
+  payloadArgs: readonly string[],
+): { ok: true; payload: Record<string, unknown> } | { ok: false; action: SlashAction } {
+  const joined = payloadArgs.join(' ');
+  if (joined.trimStart().startsWith('{')) {
+    try {
+      return { ok: true, payload: JSON.parse(joined) as Record<string, unknown> };
+    } catch {
+      return {
+        ok: false,
+        action: {
+          action: 'message',
+          messageKey: 'nervous.slash_edit_invalid_json',
+          params: { detail: joined.slice(0, 40) },
+        },
+      };
+    }
+  }
+  const payload: Record<string, unknown> = {};
+  for (const arg of payloadArgs) {
+    const eqIdx = arg.indexOf('=');
+    if (eqIdx <= 0) {
+      return {
+        ok: false,
+        action: { action: 'message', messageKey: 'nervous.slash_edit_invalid_kv', params: { arg } },
+      };
+    }
+    payload[arg.slice(0, eqIdx)] = arg.slice(eqIdx + 1);
+  }
+  return { ok: true, payload };
+}
+
+/**
+ * `/nervous [list] | accept <id> [reason...] | reject <id> [reason...] | edit <id> <json|k=v...>`
+ * → CONSUMES the 357-006 plan-object bridge (../repl/nervous-bridge.js). Builds
+ * an UNAPPLIED plan (or, for bare/list, a read-only pending snapshot) — never
+ * executes anything (no `applyNervousBridgePlan` call here; that is the caller's
+ * job once it holds a live executor). `store` is the same `NervousPendingStore`
+ * seam the bridge itself defines — a fake in tests, a disk/IPC-backed reader in
+ * production wiring (explicit follow-up, unchanged by this task).
+ */
+export function resolveNervousSlash(rest: readonly string[], store: NervousPendingStore): SlashAction {
+  const sub = (rest[0] ?? 'list').toLowerCase();
+
+  if (sub === 'list') {
+    return { action: 'nervous-list', items: listPendingNervous(store) };
+  }
+
+  if (sub === 'accept' || sub === 'reject') {
+    const id = rest[1];
+    if (!id) {
+      return { action: 'message', messageKey: 'nervous.slash_id_required', params: { sub } };
+    }
+    const reason = rest.slice(2).join(' ').trim();
+    const result =
+      sub === 'accept' ? planAccept(store, id) : planReject(store, id, reason.length > 0 ? reason : undefined);
+    if (!result.found) {
+      return { action: 'message', messageKey: 'nervous.slash_not_found', params: { id: result.id } };
+    }
+    return { action: 'nervous-plan', sub, plan: result.plan };
+  }
+
+  if (sub === 'edit') {
+    const id = rest[1];
+    if (!id) {
+      return { action: 'message', messageKey: 'nervous.slash_id_required', params: { sub } };
+    }
+    const payloadArgs = rest.slice(2);
+    if (payloadArgs.length === 0) {
+      return { action: 'message', messageKey: 'nervous.slash_edit_payload_required' };
+    }
+    const parsed = parseNervousEditPayload(payloadArgs);
+    if (!parsed.ok) return parsed.action;
+    const result = handleEdit(store, id, parsed.payload);
+    if (!result.found) {
+      return { action: 'message', messageKey: 'nervous.slash_not_found', params: { id: result.id } };
+    }
+    return { action: 'nervous-plan', sub: 'edit', plan: result.plan };
+  }
+
+  return {
+    action: 'message',
+    messageKey: 'chat.slash_unknown_subaction',
+    params: { command: '/nervous', sub },
+  };
+}
+
+/**
+ * `/mcp [list|call ...|restart]` — registry-level FALLBACK notice only. The LIVE
+ * external-MCP dispatch (list/call) is chat-native.ts's own wire
+ * (dispatchMcpSlash, ../repl/mcp-bridge.js), which intercepts BEFORE resolveSlash
+ * whenever a bridge is configured — this function only runs with no bridge
+ * present (or a caller invoking resolveSlash directly). 'restart' has no dispatch
+ * surface in mcp-bridge.ts at all, so it gets the existing honest
+ * unknown-subaction hint instead of the misleading "not configured" notice;
+ * bare/list/call are unchanged from before this task (chat.mcp_not_wired).
+ */
+function resolveMcpSlash(rest: readonly string[]): SlashAction {
+  const sub = (rest[0] ?? 'list').toLowerCase();
+  if (sub === 'restart') {
+    return {
+      action: 'message',
+      messageKey: 'chat.slash_unknown_subaction',
+      params: { command: '/mcp', sub },
+    };
+  }
+  return { action: 'message', messageKey: 'chat.mcp_not_wired' };
+}
+
+/**
  * Resolve a raw REPL line against the slash registry.
  *
  * Lines that do NOT start with '/' always return `{ action: 'none' }` so the
  * caller can fall through to the provider-driven chat path.
  *
  * For `/recall <query>` the trailing words are extracted as the query arg.
+ *
+ * `nervousStore` (Sprint 358 T-358-004) is an OPTIONAL 3rd param — omitted, every
+ * existing 2-arg call site (chat-native.ts, all prior tests) is byte-for-byte
+ * unaffected: `/nervous` still resolves to `{ action: 'none' }` exactly as before
+ * (chat-native.ts's own legacy bridge intercepts it earlier). Pass a store to opt
+ * a caller into the 357-006 plan-object bridge for `/nervous`.
  */
-export function resolveSlash(line: string, registry: SlashRegistry): SlashAction {
+export function resolveSlash(
+  line: string,
+  registry: SlashRegistry,
+  nervousStore?: NervousPendingStore,
+): SlashAction {
   const trimmed = line.trim();
   if (!trimmed.startsWith('/')) return { action: 'none' };
 
@@ -490,7 +677,11 @@ export function resolveSlash(line: string, registry: SlashRegistry): SlashAction
   // Sprint 269 T-269-003 — structured subaction slashes. Parsed BEFORE the
   // generic entry lookup so their args map to the MCP tool schemas instead of
   // the positional `_rest` passthrough.
-  if (name === '/mcp') return { action: 'message', messageKey: 'chat.mcp_not_wired' };
+  if (name === '/mcp') return resolveMcpSlash(rest);
+  // Sprint 358 T-358-004 — `/nervous` structured dispatch, gated on an injected
+  // store (see doc-comment above); no store → 'none' (today's behavior, chat-native.ts
+  // already handles /nervous before reaching the registry).
+  if (name === '/nervous') return nervousStore ? resolveNervousSlash(rest, nervousStore) : { action: 'none' };
   if (name === '/autonomous') return resolveAutonomousSlash(rest);
   if (name === '/audit') return resolveAuditSlash(rest);
   if (name === '/directives') return resolveDirectivesSlash(rest);
