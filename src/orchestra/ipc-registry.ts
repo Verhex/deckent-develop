@@ -14,6 +14,7 @@ import type { WorkerSideChannel } from '../agents/worker-ipc.js';
 import { TASKS_DIR } from '../core/constants.js';
 import type { WorkerQuestion, BrainAnswer, QuestionAction } from '../core/task-types.js';
 import { debugLog } from '../core/utils.js';
+import { notifyAsync } from '../core/notify.js';
 
 // ─── Channel Registry (Sprint 134) ─────────────────────────────────
 
@@ -225,8 +226,36 @@ export interface HandleWorkerQuestionOptions {
    * writes that action into the answer instead of the hardcoded `'continue'`.
    * When omitted/false, or when no `suggestedAction` is present, behaviour is
    * byte-for-byte the historical `'continue'` auto-answer.
+   *
+   * NPM-ADVISORY questions are exempt: their answer is a deterministic policy
+   * (fail-closed `'continue'` + explicit not-approved message) regardless of
+   * this flag — a worker cannot self-approve a dependency mutation.
    */
   honorWorkerQuestionAction?: boolean;
+  /** Sprint id for human-facing notifications (NPM-ADVISORY surfacing). When
+   *  absent the advisory is still answered + debug-logged, just not notified. */
+  sprintId?: string;
+}
+
+// ─── NPM-ADVISORY (born-454) ────────────────────────────────────────
+// Worker-side marker for dependency-mutation escalation. The god-prompt
+// (prompt-god-template.ts NPM_ADVISORY_BLOCK) instructs workers to prefix
+// their question with this token instead of ever running npm/yarn/pnpm
+// install in the mounted workspace (sprint-356 live incident: native-binding
+// destruction via host-vs-container ABI + `.npmrc ignore-scripts=true`).
+
+/** Question-text marker for a dependency-mutation advisory. */
+export const NPM_ADVISORY_MARKER = '[NPM-ADVISORY]';
+
+/** Deterministic fail-closed answer body for NPM-ADVISORY questions. */
+export const NPM_ADVISORY_ANSWER_MESSAGE =
+  'NPM-ADVISORY acknowledged — dependency mutation is NOT approved inside the workspace. '
+  + 'Do NOT run npm/yarn/pnpm install|ci|rebuild|update. Continue the task without the '
+  + 'dependency change, record the need in your .result notes on an `npmAdvisory:` line, '
+  + 'and self-assess honestly. Dependency changes are performed host-side by the operator.';
+
+function isNpmAdvisoryQuestion(question: WorkerQuestion): boolean {
+  return question.question.trimStart().startsWith(NPM_ADVISORY_MARKER);
 }
 
 /**
@@ -247,6 +276,34 @@ export function handleWorkerQuestion(
 ): BrainAnswer | undefined {
   const question = readQuestionFile(projectRoot, taskId);
   if (!question) return undefined;
+
+  // NPM-ADVISORY (born-454): deterministic policy branch — fail-closed
+  // 'continue' + explicit not-approved message, suggestedAction NEVER honored
+  // (a worker cannot self-approve a dependency mutation). Notified to the
+  // human exactly once: re-answer cycles (the poll loop re-visits an
+  // unconsumed question file every tick) skip the notify when an answer for
+  // this task already exists on disk.
+  if (isNpmAdvisoryQuestion(question)) {
+    const firstAnswer = !existsSync(getAnswerPath(projectRoot, taskId));
+    const answer: BrainAnswer = {
+      taskId,
+      action: 'continue',
+      message: NPM_ADVISORY_ANSWER_MESSAGE,
+      timestamp: new Date().toISOString(),
+    };
+    writeAnswerFile(projectRoot, answer);
+    debugLog('handleWorkerQuestion', `NPM-ADVISORY from task ${taskId}: "${question.question}" → fail-closed continue`);
+    if (firstAnswer && options?.sprintId) {
+      notifyAsync(
+        'human-checkpoint-required',
+        options.sprintId,
+        `NPM advisory — task ${taskId}`,
+        question.question,
+        question.context,
+      );
+    }
+    return answer;
+  }
 
   // Flag-gated (default-off): honor the worker's requested action only when the
   // flag is ON and a suggestedAction was actually supplied. Otherwise fall back

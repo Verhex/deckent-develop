@@ -1371,7 +1371,8 @@ export async function waitForResults(
       }
       if (collected.size === taskIds.size) break;
       // Check for pending worker questions and auto-answer them
-      checkWorkerQuestions(projectRoot, taskIds, collected);
+      // (sprintId → NPM-ADVISORY questions surface a human notification)
+      checkWorkerQuestions(projectRoot, taskIds, collected, { sprintId: sprint.id });
       // Periodic progress log (every 5 minutes)
       const now = Date.now();
       if (now - lastProgressLog >= PROGRESS_LOG_INTERVAL_MS) {

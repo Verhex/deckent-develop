@@ -188,6 +188,28 @@ const KARPATHY_ESSENCE = `## Karpathy Discipline
 4. **Goal-driven** — map every change to the goCriteria above; assess yourself honestly.`;
 
 /**
+ * Dependency-mutation advisory (born-454, sprint-356 live incident). The worker
+ * NEVER mutates node_modules/lockfiles itself; a genuine dependency need is
+ * escalated through the file-based worker→Brain question channel
+ * (`.tasks/task-<id>.question`, `[NPM-ADVISORY]` marker — answered fail-closed
+ * by {@link import('./ipc-registry.js').handleWorkerQuestion}). Static content
+ * (no task.id interpolation) so it stays in the shared T0 cache prefix; the
+ * worker substitutes its own task id, already stated in its Task/Heartbeat
+ * sections. Backend-agnostic on purpose: the destroyed-binding failure mode is
+ * docker-mount specific, but unauthorized dependency mutation is out of scope
+ * in every backend.
+ */
+const NPM_ADVISORY_BLOCK = `## Dependency-Mutation Advisory (npm / yarn / pnpm)
+NEVER run a package-manager command that mutates node_modules or a lockfile in this workspace: \`npm install\`, \`npm ci\`, \`npm rebuild\`, \`npm update\`, \`npm prune\`, \`npm dedupe\`, \`npm link\`, or any yarn/pnpm equivalent. The workspace is mounted from the host — your environment's ABI differs from the host's, and repo .npmrc settings (e.g. \`ignore-scripts=true\`) silently destroy native bindings for every process that shares node_modules. This has caused a real production incident (a worker's \`npm install\` deleted the better-sqlite3 native binding and took down all database access host-wide).
+
+If your task genuinely requires a dependency change, escalate it instead of running it:
+1. Write \`.tasks/task-<your-task-id>.question\` with this JSON shape:
+   {"taskId": "<your-task-id>", "workerId": "w-<your-task-id>", "question": "[NPM-ADVISORY] <package + one-line why>", "context": "<what the task needs it for>", "suggestedAction": "continue", "timestamp": "<ISO-8601 now>"}
+2. Poll \`.tasks/task-<your-task-id>.answer\` for up to 60 seconds, then delete both files after reading (or on timeout).
+3. Whatever the answer says: do NOT run the install yourself. Continue the task without the dependency change, record the need in your .result \`notes\` on a line starting with \`npmAdvisory:\`, and self-assess honestly — GO_WITH_TECH_DEBT if the core criteria are still met without it, NO_GO if the task is impossible without it.
+The orchestrator (Brain) surfaces your advisory to the human operator, and any actual dependency mutation is performed host-side, never inside a worker.`;
+
+/**
  * Default minimum ADR relevance score (Sprint 182 PQ-5 / F7).
  *
  * Threshold below which ADRs are dropped from the worker prompt's mandatory
@@ -1228,6 +1250,14 @@ If Bash tool is unavailable → report in notes, selfAssessment = "GO_WITH_TECH_
 If targeted tests fail after 3 attempts → selfAssessment = "NO_GO" with error details
 ${buildVerifyPrecedenceNote(verificationMode)}`);
   }
+
+  // NPM-Advisory (born-454, sprint-356 live incident): dependency mutation is
+  // advisory-escalated via the worker→Brain question channel, never executed by
+  // the worker itself — a mounted-workspace `npm install` under `.npmrc
+  // ignore-scripts=true` + container-vs-host ABI destroyed the better-sqlite3
+  // binding for every host process. Static content (no task.id) → T0, so it
+  // rides the shared cache prefix.
+  push('T0', 'npm-advisory', NPM_ADVISORY_BLOCK);
 
   // Smoke note (WP-16) — Tier-1 Proof-of-Function context. Emitted next to the
   // VERIFY STEPS (its natural home) only when the task carries a Smoke: directive.

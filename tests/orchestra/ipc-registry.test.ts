@@ -18,6 +18,13 @@ vi.mock('../../src/agents/worker-ipc.js', async (importOriginal) => {
   return actual;
 });
 
+// NPM-ADVISORY (born-454): notifications must never hit real channels in tests.
+vi.mock('../../src/core/notify.js', () => ({
+  notifyAsync: vi.fn(),
+}));
+
+import { notifyAsync } from '../../src/core/notify.js';
+
 import {
   getChannelRegistry,
   registerWorkerChannel,
@@ -32,6 +39,7 @@ import {
   askBrain,
   handleWorkerQuestion,
   checkWorkerQuestions,
+  NPM_ADVISORY_ANSWER_MESSAGE,
 } from '../../src/orchestra/ipc-registry.js';
 
 // Backward compat: these should also be importable from worker-ipc.ts
@@ -250,6 +258,65 @@ describe('ipc-registry file-based IPC', () => {
       expect(answer!.taskId).toBe('hq-001');
       // Answer file should be written
       expect(existsSync(getAnswerPath(tmpDir, 'hq-001'))).toBe(true);
+    });
+  });
+
+  // ─── NPM-ADVISORY (born-454) — dependency-mutation escalation channel ────
+  describe('handleWorkerQuestion — NPM-ADVISORY', () => {
+    beforeEach(() => {
+      vi.mocked(notifyAsync).mockClear();
+    });
+
+    const npmQuestion = (taskId: string, suggestedAction?: 'continue' | 'skip' | 'abort' | 'retry') => ({
+      taskId,
+      workerId: `w-${taskId}`,
+      question: '[NPM-ADVISORY] needs left-pad@1.3.0 for string alignment',
+      context: 'goCriteria requires padded table output',
+      suggestedAction,
+      timestamp: new Date().toISOString(),
+    });
+
+    it('answers fail-closed continue with the explicit not-approved message', () => {
+      writeQuestionFile(tmpDir, npmQuestion('npm-001'));
+      const answer = handleWorkerQuestion(tmpDir, 'npm-001');
+      expect(answer!.action).toBe('continue');
+      expect(answer!.message).toBe(NPM_ADVISORY_ANSWER_MESSAGE);
+      expect(answer!.message).toContain('NOT approved');
+      expect(existsSync(getAnswerPath(tmpDir, 'npm-001'))).toBe(true);
+    });
+
+    it('never honors suggestedAction even when honorWorkerQuestionAction is on (no self-approval)', () => {
+      writeQuestionFile(tmpDir, npmQuestion('npm-002', 'abort'));
+      const answer = handleWorkerQuestion(tmpDir, 'npm-002', { honorWorkerQuestionAction: true });
+      expect(answer!.action).toBe('continue');
+      expect(answer!.message).toBe(NPM_ADVISORY_ANSWER_MESSAGE);
+    });
+
+    it('notifies the human exactly once — re-answer cycles with an existing answer file skip notify', () => {
+      writeQuestionFile(tmpDir, npmQuestion('npm-003'));
+      handleWorkerQuestion(tmpDir, 'npm-003', { sprintId: 'sprint-999' });
+      expect(notifyAsync).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(notifyAsync).mock.calls[0][0]).toBe('human-checkpoint-required');
+      expect(vi.mocked(notifyAsync).mock.calls[0][1]).toBe('sprint-999');
+      // Poll loop revisits the still-unconsumed question file → answered again, NOT re-notified.
+      handleWorkerQuestion(tmpDir, 'npm-003', { sprintId: 'sprint-999' });
+      expect(notifyAsync).toHaveBeenCalledTimes(1);
+    });
+
+    it('without a sprintId the advisory is still answered but never notified', () => {
+      writeQuestionFile(tmpDir, npmQuestion('npm-004'));
+      const answer = handleWorkerQuestion(tmpDir, 'npm-004');
+      expect(answer!.action).toBe('continue');
+      expect(notifyAsync).not.toHaveBeenCalled();
+    });
+
+    it('leading whitespace before the marker still classifies as NPM-ADVISORY', () => {
+      writeQuestionFile(tmpDir, {
+        ...npmQuestion('npm-005'),
+        question: '  [NPM-ADVISORY] needs esbuild bump',
+      });
+      const answer = handleWorkerQuestion(tmpDir, 'npm-005');
+      expect(answer!.message).toBe(NPM_ADVISORY_ANSWER_MESSAGE);
     });
   });
 

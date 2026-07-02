@@ -1,7 +1,7 @@
 {
   "_meta": {
     "version": "2.0",
-    "generatedAt": "2026-07-02T00:26:29.267Z",
+    "generatedAt": "2026-07-02T05:18:13.200Z",
     "generatedBy": "scripts/sync-manifest.mjs",
     "sprintId": "sprint-356",
     "description": "Feature usage manifest — curated feature catalog (FEATURE_DEFINITIONS in scripts/sync-manifest.mjs) bucketed by an import-count heuristic plus manual lifecycle annotations. NOT a full import-graph analysis. Categories: active, lightly_used, dormant, dead.",
@@ -205,6 +205,66 @@
       "description": "F3-009 backlog-driven autonomous engine (sub-projects 1+2, 2026-06-07). Durable backlog (recurring+one-off+reactive entries; per-entry policy/provider/kind; atomic writeback + crash recovery) → 3-gate governance (RBAC authority ADR-037 → per-task policy auto|approval-required → EffectClass risk ADR-055) → execute-dispatcher (task→runTaskMode | sprint→runSprint) → audit. Hybrid trigger (backlog∪scheduled-flow∪reactive), concurrency-ready ExecutionPool, composition root buildEngineRuntime, flag-gated config.autonomous (default enabled:false). Live `deckent autonomous start` drives the engine end-to-end (flag-gated config.autonomous.enabled, default-off; buildEngineRuntime + real runTaskMode/runSprint runners + crash recovery; smoke-proven) plus `backlog add/list/remove` + status. Sub-project 2: nervous-detector reactive bridge (detection→declarative reactive-map→durable backlog entry via an ingester; dedup; flag-gated config.autonomous.reactive default-off) — built + unit-tested + wired into start (attach-only). AS-6 / ADR-037 / ADR-040.",
       "importCount": "high",
       "parityGap": "CLI-only — no MCP tool for autonomous start/backlog/status yet. Reactive bridge is ATTACH-ONLY: the nervous observer is not driven in `start` (and built-in detectors are EXECUTE-phase-gated), so live detections do not yet flow — observer-driving + webhook/repo-watch sources remain (sub-project 2 continuation). Concurrent ExecutionPool also remains."
+    },
+    {
+      "id": "approval-runtime",
+      "label": "Approval Runtime — Runtime-Wide ApprovalBroker Chain (APR pillar)",
+      "files": [
+        "src/core/approval-contract.ts",
+        "src/core/approval-broker.ts",
+        "src/core/approval-policy.ts",
+        "src/core/approval-store.ts",
+        "src/core/approval-relay.ts",
+        "src/core/approval-eventstream.ts",
+        "src/core/approval-worker-gate.ts",
+        "src/core/approval-fallback.ts",
+        "src/core/approval-masking.ts",
+        "src/core/approval-rules-load.ts",
+        "src/core/approval-expiry-driver.ts"
+      ],
+      "description": "Runtime-wide live-approval chain (sprints 350-356, strategic-pivot P0 APR): contract (zod, 7 scopes × 5 risks × 4 policies) → broker (submit/decide/awaitDecision) → policy engine (rules from .deckent/approvals-rules.json) → file-backed store (.deckent/approvals/, restart-survivable) → relay (channel fan-out: telegram/terminal/nervous) → eventstream → WorkerApprovalGate (guard() before risky actions, fail-closed timeout fallback) → arg-masking + expiry driver. Surfaces: Ink approval-card (repl_surface.approvals), GET /api/approvals + dashboard ApprovalsPanel (watch-only), decide-API flag-gated (approval.api_decide). Worker-side enforcement gate flag: approval_gate (default-off). Docs: docs/features/approval-runtime.md.",
+      "importCount": "high"
+    },
+    {
+      "id": "tool-surface",
+      "label": "Tool Surface — Progressive-Disclosure Meta-Tools (TOOL pillar)",
+      "files": [
+        "src/core/tool-registry.ts",
+        "src/core/tool-search.ts",
+        "src/core/tool-core.ts",
+        "src/core/tool-dispatch.ts",
+        "src/core/tool-scope-gate.ts",
+        "src/cli/repl/native-tool-registry.ts"
+      ],
+      "description": "Hermes-model progressive tool disclosure (354-002 + tool family): registry (MCP-seeded catalog) → core-7 eager set + deferred index → deckent_search_tools / deckent_describe_tool / deckent_call_tool meta-tools in the native REPL → dispatch bridge with risk threshold + scope gate. Config: tool_surface.enabled (default-off; ON in dogfood 2026-07-02), tool_surface.riskThreshold. Docs: docs/features/tool-surface.md.",
+      "importCount": "high"
+    },
+    {
+      "id": "repl-surface",
+      "label": "REPL Surface — Mode-Indicator + Live-Footer + Approval-Card (TERM pillar)",
+      "files": [
+        "src/cli/repl/app.tsx",
+        "src/cli/helpers/live-footer.ts",
+        "src/cli/helpers/run-state-feed.ts",
+        "src/cli/helpers/health-snapshot.ts",
+        "src/cli/helpers/progress-reader.ts",
+        "src/cli/repl/approval-card.tsx",
+        "src/cli/repl/dual-stream.ts",
+        "src/cli/repl/approval-terminal-channel.ts",
+        "src/cli/repl/chat-turn-queue.ts"
+      ],
+      "description": "Native-REPL management surface (354-001 / 355-011, strategic-pivot \"terminal = ana yönetim yüzeyi\"): mode-indicator + live-footer (run-state feed + health snapshot + progress reader) and the approval-card + dual-stream + terminal approval channel. Config: repl_surface.enabled + repl_surface.approvals (independent flags, default-off; both ON in dogfood 2026-07-02), repl_surface.bg_turns reserved. Flag-off render byte-identical. Docs: docs/features/repl-surface.md.",
+      "importCount": "high"
+    },
+    {
+      "id": "npm-advisory",
+      "label": "NPM Advisory — Dependency-Mutation Escalation via Worker→Brain Channel (born-454)",
+      "files": [
+        "src/orchestra/prompt-god-template.ts",
+        "src/orchestra/ipc-registry.ts"
+      ],
+      "description": "Advisory-style (CC-advisory-like, non-blocking) guard against workers running npm/yarn/pnpm install in the mounted workspace (sprint-356 live incident: native-binding destruction). God-prompt NPM_ADVISORY_BLOCK (static T0) instructs escalation via the file-based question channel (.tasks/task-<id>.question, [NPM-ADVISORY] marker); Brain answers deterministically fail-closed (continue + explicit not-approved message, suggestedAction never honored) and notifies the operator once per advisory. Design decided by Alperen 2026-07-02: channel-advisory instead of a physical PATH-shim/RO-mount block. Docs: docs/features/npm-advisory.md.",
+      "importCount": "high"
     }
   ],
   "lightly_used": [

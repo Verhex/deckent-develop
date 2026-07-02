@@ -32,6 +32,7 @@ export type PromptSegmentKind =
   | 'worker-contract'
   | 'verify-steps'
   | 'verify-precedence'
+  | 'npm-advisory'
   | 'karpathy'
   // ── T1: tenant-project, stable per task-class ──
   | 'skills'
@@ -72,6 +73,7 @@ const TIER_BY_KIND: Readonly<Record<PromptSegmentKind, PromptTier>> = {
   'worker-contract': 'T0',
   'verify-steps': 'T0',
   'verify-precedence': 'T0',
+  'npm-advisory': 'T0',
   karpathy: 'T0',
   skills: 'T1',
   persona: 'T1',

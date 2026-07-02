@@ -312,6 +312,21 @@ Worker-to-worker iletisim (Sprint 278 COMM-1). Varsayilan devre disi — `opt-in
 
 ---
 
+## Native REPL Surface
+
+Native-REPL yonetim yuzeyi (sprint-354/355, TERM/TOOL pillar). Varsayilan devre disi — `opt-in`.
+Davranis-duzeyi anlatim: `docs/features/repl-surface.md` + `docs/features/tool-surface.md`.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `repl_surface.enabled` | `boolean` | `false` | Mode-indicator + live-footer yuzeyi (run-state feed, health snapshot, progress). Kapaliyken render byte-identical. |
+| `repl_surface.approvals` | `boolean` | `false` | Approval-card + dual-stream + terminal onay kanali (355-011). `enabled`'dan bagimsiz. |
+| `repl_surface.bg_turns` | `boolean` | `false` | Rezerve — background-turn-queue yuzey kapisi; henuz hicbir kod okumaz. |
+| `tool_surface.enabled` | `boolean` | `false` | Progressive-disclosure meta-tool'lari (`deckent_search_tools`/`describe`/`call`) native REPL'e kaydeder (354-002). |
+| `tool_surface.riskThreshold` | `ToolRiskLevel` | engine default | `deckent_call_tool` dispatch'inin kabul edecegi azami tool-risk seviyesi; asani reddeder. |
+
+---
+
 ## Cost Guard
 
 Sprint-ici token maliyet kesici (Sprint 279 WK-cost). Varsayilan devre disi — `opt-in`.

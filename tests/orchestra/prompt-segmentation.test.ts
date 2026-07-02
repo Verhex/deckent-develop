@@ -206,6 +206,31 @@ describe('prompt-protected-set — scope/goNogo/verify survive compilation diff-
   });
 });
 
+// ─── NPM-Advisory (born-454) — dependency-mutation escalation block ─────────
+
+describe('npm-advisory block — static T0, present in every compiled prompt', () => {
+  it('every compiled prompt carries the dependency-mutation advisory', () => {
+    const { prompt } = buildTaskPromptSegmented(makeTask(), makeCtx());
+    expect(prompt).toContain('## Dependency-Mutation Advisory');
+    expect(prompt).toContain('[NPM-ADVISORY]');
+    expect(prompt).toContain('.question');
+  });
+
+  it('is a T0 segment with static content (no task.id interpolation)', () => {
+    const a = buildTaskPromptSegmented(makeTask({ id: 'npm-A' }), makeCtx());
+    const b = buildTaskPromptSegmented(makeTask({ id: 'npm-B' }), makeCtx());
+    const segA = a.segments.find(s => s.kind === 'npm-advisory');
+    const segB = b.segments.find(s => s.kind === 'npm-advisory');
+    expect(segA?.tier).toBe('T0');
+    expect(segA?.content).toBe(segB?.content);
+    expect(segA?.content).not.toContain('npm-A');
+  });
+
+  it('classifyTier maps npm-advisory to T0', () => {
+    expect(classifyTier('npm-advisory')).toBe('T0');
+  });
+});
+
 // ─── (5) Leading-T0 reorder is flag-gated, default OFF ──────────────────────
 
 describe('leading-T0 reorder — flag-gated, default OFF (determinism preserved)', () => {
