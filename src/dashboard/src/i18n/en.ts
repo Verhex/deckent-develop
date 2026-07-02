@@ -637,6 +637,28 @@ export const en = {
   'kpi.sprint_label': 'Sprint',
   'kpi.period': 'Period',
   'kpi.series_value': 'Value',
+
+  // Approvals panel (sprint-356 task 356-001, row 213 — read-only monitor, no decide action)
+  'approvals.title': 'Approvals',
+  'approvals.error': 'Error',
+  'approvals.pending_title': 'Pending',
+  'approvals.approved_title': 'Approved',
+  'approvals.denied_title': 'Denied',
+  'approvals.empty_title': 'No approvals',
+  'approvals.pending_empty_desc': 'No approvals are currently pending.',
+  'approvals.approved_empty_desc': 'No approvals have been granted yet.',
+  'approvals.denied_empty_desc': 'No approvals have been denied.',
+  'approvals.channel_label': 'Channel',
+  'approvals.channel_pending': 'Awaiting decision',
+  'approvals.age_just_now': 'just now',
+  'approvals.age_minutes': '{{n}}m ago',
+  'approvals.age_hours': '{{n}}h ago',
+  'approvals.age_days': '{{n}}d ago',
+  'approvals.risk_none': 'none',
+  'approvals.risk_low': 'low',
+  'approvals.risk_medium': 'medium',
+  'approvals.risk_high': 'high',
+  'approvals.risk_critical': 'critical',
 } as const;
 
 export type TranslationKey = keyof typeof en;

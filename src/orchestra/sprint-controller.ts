@@ -983,6 +983,20 @@ export async function runSprint(
   // sprint scope (before the try) so the finally block can stop it on every
   // early-exit/throw path. Stays null unless config.resource_monitor.enabled.
   let resourceMonitor: ResourceMonitor | null = null;
+  // SPAWN-THROW-LIFECYCLE (born-435, sprint-356 Task 4): these three used to be
+  // declared INSIDE the try block below, which put them out of the finally
+  // block's reach — a SPAWN-phase throw (BrainError after 2 retries,
+  // sprint-phases.ts runSpawnPhase) skipped every happy-path
+  // clearInterval/removeListener call further down, and the finally block had
+  // no fail-safe for them (unlike nervous/heartbeatDaemon/resourceMonitor
+  // above). snapshotInterval's unref() was a workaround for exactly this gap,
+  // not a fix — it kept the leak from pinning the process, but the interval
+  // (and the beforeExit listener) still leaked across sprints in a long-lived
+  // coordinator. Declaring them here lets the finally block reach them on
+  // every exit path (success, BrainError, human-checkpoint abort, throw).
+  let scanInterval: ReturnType<typeof setInterval> | null = null;
+  let snapshotInterval: ReturnType<typeof setInterval> | null = null;
+  let beforeExitHandler: (() => void) | null = null;
 
   try {
   // ═══ State Recovery on Brain Restart (Sprint 162 — Task T-004) ════
@@ -1031,10 +1045,7 @@ export async function runSprint(
   // ─── Outer-scope variables (shared between fresh and resume paths) ──
   let sprint: Sprint;
   let safetyPoint: SafetyPoint | null = null;
-  let scanInterval: ReturnType<typeof setInterval> | null = null;
-  let snapshotInterval: ReturnType<typeof setInterval> | null = null;
   let results: TaskResult[] = [];
-  let beforeExitHandler: (() => void) | null = null;
 
   if (isResumeEvaluate && recoveredSprint) {
     // ─── Resume Path: skip PLAN/SPAWN/EXECUTE, jump to EVALUATE ─────
@@ -1101,10 +1112,9 @@ export async function runSprint(
     snapshotInterval = setInterval(() => void writePeriodicSnapshot(), 30_000);
     // MOAT-2 (ADR-G-013): the 30s periodic-snapshot timer is coordinator
     // maintenance, not legitimate work that should keep the process alive. unref
-    // it so it can never pin the event loop past sprint completion — including a
-    // throw path where the happy-path clearInterval (below) is skipped and the
-    // finally block cannot reach this try-scoped variable. The `beforeExit`
-    // handler still flushes a final snapshot before a clean exit.
+    // it so it can never pin the event loop past sprint completion even in the
+    // brief window before the finally block's fail-safe (below) runs. The
+    // `beforeExit` handler still flushes a final snapshot before a clean exit.
     snapshotInterval.unref?.();
 
     beforeExitHandler = (): void => {
@@ -1601,8 +1611,8 @@ export async function runSprint(
   clearSprintState(projectRoot);
 
   // PID Cleanup
-  if (snapshotInterval) clearInterval(snapshotInterval);
-  if (beforeExitHandler) process.removeListener('beforeExit', beforeExitHandler);
+  if (snapshotInterval) { clearInterval(snapshotInterval); snapshotInterval = null; }
+  if (beforeExitHandler) { process.removeListener('beforeExit', beforeExitHandler); beforeExitHandler = null; }
   try { clearPid(projectRoot, sprint.id); } catch { /* non-fatal */ }
 
   updateDashboard(projectRoot, {
@@ -1612,16 +1622,6 @@ export async function runSprint(
     alerts: [],
     updatedAt: now(),
   });
-
-  // MOAT-2 (ADR-G-013): audit what — if anything — still pins the coordinator's
-  // event loop after the sprint's own teardown. Debug-gated (zero cost when the
-  // debug channel is off). If a future handle regresses the orphan-start fix it
-  // surfaces here BY NAME (e.g. a ref'd 'Timeout' / 'ChildProcess') instead of
-  // manifesting as a silent multi-minute linger — this is the permanent
-  // observability that closes the "unref'd-handle audit" the ADR called for.
-  try {
-    debugLog('runSprint:activeResourcesAtExit', process.getActiveResourcesInfo());
-  } catch (e) { debugLog('runSprint:activeResourcesAtExit:err', e); }
 
   return sprint;
   } finally {
@@ -1637,5 +1637,32 @@ export async function runSprint(
     if (resourceMonitor) {
       await stopResourceMonitor(resourceMonitor);
     }
+    // SPAWN-THROW-LIFECYCLE (born-435, sprint-356 Task 4): fail-safe teardown
+    // for the timer/listener trio that used to be declared INSIDE the try
+    // block (out of this finally's reach) — a SPAWN-phase throw (BrainError
+    // after 2 retries) skipped every happy-path clearInterval/removeListener
+    // call above and left nothing to close them. No-op on the happy path
+    // (already cleared + nulled above); this is what actually closes the
+    // SPAWN-throw hang — previously NONE of these three ran on that path.
+    if (scanInterval) {
+      try { clearInterval(scanInterval); } catch { /* best effort */ }
+    }
+    if (snapshotInterval) {
+      try { clearInterval(snapshotInterval); } catch { /* best effort */ }
+    }
+    if (beforeExitHandler) {
+      try { process.removeListener('beforeExit', beforeExitHandler); } catch { /* best effort */ }
+    }
+    // MOAT-2 (ADR-G-013): audit what — if anything — still pins the
+    // coordinator's event loop after the sprint's own teardown. Debug-gated
+    // (zero cost when the debug channel is off). Runs here (finally) rather
+    // than only on the happy path so a future handle/listener regression
+    // surfaces here BY NAME (e.g. a ref'd 'Timeout' / 'ChildProcess') on
+    // EVERY exit — including a throw — instead of manifesting as a silent
+    // multi-minute linger. This is the permanent observability that closes
+    // the "unref'd-handle audit" the ADR called for, on BOTH exit paths.
+    try {
+      debugLog('runSprint:activeResourcesAtExit', process.getActiveResourcesInfo());
+    } catch (e) { debugLog('runSprint:activeResourcesAtExit:err', e); }
   }
 }

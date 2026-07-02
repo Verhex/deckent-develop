@@ -29,6 +29,20 @@
 //              `OPENAI_API_KEY`/`DECKENT_OPENAI_API_KEY` env.
 //   - gemini : `~/.gemini/oauth_creds.json` → access_token (documented gemini-cli
 //              OAuth layout) OR `GEMINI_API_KEY`/`GOOGLE_API_KEY` env.
+//
+// PSL-6-WIRE (Sprint 356, row 206): the original `{ state, detail }` shape only
+// answers "logged in or not". It cannot tell "CLI/creds missing entirely" apart
+// from "creds present but a session couldn't be confirmed" — both surface as
+// generic buckets. `AuthProbeResult` is enriched with three optional fields that
+// make that distinction explicit: `present` (was an auth artifact found at all),
+// `authenticated` (was a usable session actually confirmed), `method`
+// ('subscription' | 'api-key' | 'none' — HOW, when known). All three are honest
+// tri-state (`'unknown'` when the probe genuinely cannot tell, e.g. a timeout —
+// never guessed) and all three are OPTIONAL: `state`/`detail` are unchanged and
+// every pre-existing caller/fixture that builds a bare `{ state, detail? }`
+// literal (doctor.ts's failure fallback; tests/cli/health-snapshot.test.ts,
+// doctor-auth-probe.test.ts, connect-wizard.test.ts, connect-cmd.test.ts) keeps
+// compiling and behaving exactly as before.
 
 import { spawn as nodeSpawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -41,11 +55,29 @@ export type AuthProbeProvider = 'claude' | 'codex' | 'gemini';
 /** Tri-state login result. */
 export type AuthProbeState = 'logged-in' | 'logged-out' | 'unknown';
 
+/** How a provider is authenticated. 'none' when not authenticated OR the method can't be confirmed. */
+export type AuthProbeMethod = 'subscription' | 'api-key' | 'none';
+
 export interface AuthProbeResult {
   /** Real session state — distinct from "binary installed". */
   state: AuthProbeState;
   /** Static English diagnostic (NEVER a secret value). Used by doctor (Task 6). */
   detail?: string;
+  /**
+   * Was an auth artifact (env key, credentials/oauth file, or a definitive CLI
+   * answer) found at all — independent of whether it proves a valid session.
+   * 'unknown' ONLY when the probe itself could not tell (e.g. timeout). Optional
+   * for backward-compat with pre-existing `{ state, detail? }` call sites.
+   */
+  present?: boolean | 'unknown';
+  /**
+   * Was a USABLE session actually confirmed. 'unknown' whenever validity can't
+   * be honestly determined (malformed file, indeterminate CLI output, timeout)
+   * — never guessed. Optional for the same backward-compat reason as `present`.
+   */
+  authenticated?: boolean | 'unknown';
+  /** How authentication happened, when known/true; 'none' otherwise. Optional, same reason. */
+  method?: AuthProbeMethod;
 }
 
 /** Minimal, secret-free result of a probe subprocess. `stdout` is parsed, never logged. */
@@ -149,7 +181,13 @@ function probeClaude(
   home: string,
 ): AuthProbeResult {
   if (envValue(env, 'ANTHROPIC_API_KEY')) {
-    return { state: 'logged-in', detail: 'ANTHROPIC_API_KEY set (api auth)' };
+    return {
+      state: 'logged-in',
+      detail: 'ANTHROPIC_API_KEY set (api auth)',
+      present: true,
+      authenticated: true,
+      method: 'api-key',
+    };
   }
 
   const credPath = join(home, '.claude', '.credentials.json');
@@ -157,14 +195,26 @@ function probeClaude(
   try {
     raw = readFile(credPath);
   } catch {
-    return { state: 'logged-out', detail: 'no credentials file — run: claude (then /login)' };
+    return {
+      state: 'logged-out',
+      detail: 'no credentials file — run: claude (then /login)',
+      present: false,
+      authenticated: false,
+      method: 'none',
+    };
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return { state: 'unknown', detail: 'credentials file present but unparseable' };
+    return {
+      state: 'unknown',
+      detail: 'credentials file present but unparseable',
+      present: true,
+      authenticated: 'unknown',
+      method: 'none',
+    };
   }
 
   // Presence of a non-empty accessToken ⇒ a session exists (the CLI auto-refreshes
@@ -172,8 +222,20 @@ function probeClaude(
   const oauth = (parsed as { claudeAiOauth?: { accessToken?: unknown } } | null)?.claudeAiOauth;
   const hasToken = typeof oauth?.accessToken === 'string' && oauth.accessToken.length > 0;
   return hasToken
-    ? { state: 'logged-in', detail: 'session credentials present' }
-    : { state: 'logged-out', detail: 'credentials file present but no session token' };
+    ? {
+        state: 'logged-in',
+        detail: 'session credentials present',
+        present: true,
+        authenticated: true,
+        method: 'subscription',
+      }
+    : {
+        state: 'logged-out',
+        detail: 'credentials file present but no session token',
+        present: true,
+        authenticated: false,
+        method: 'none',
+      };
 }
 
 // ─── codex ───────────────────────────────────────────────────────────────────
@@ -193,25 +255,61 @@ async function probeCodex(
   timeoutMs: number,
 ): Promise<AuthProbeResult> {
   if (envValue(env, 'OPENAI_API_KEY') ?? envValue(env, 'DECKENT_OPENAI_API_KEY')) {
-    return { state: 'logged-in', detail: 'OPENAI_API_KEY set (api auth)' };
+    return {
+      state: 'logged-in',
+      detail: 'OPENAI_API_KEY set (api auth)',
+      present: true,
+      authenticated: true,
+      method: 'api-key',
+    };
   }
 
   const res = await spawnImpl('codex', ['login', 'status'], { timeoutMs });
   if (res.spawnError) {
-    return { state: 'unknown', detail: 'codex CLI not available' };
+    return {
+      state: 'unknown',
+      detail: 'codex CLI not available',
+      present: false,
+      authenticated: false,
+      method: 'none',
+    };
   }
   if (res.timedOut) {
-    return { state: 'unknown', detail: 'auth probe timed out' };
+    return {
+      state: 'unknown',
+      detail: 'auth probe timed out',
+      present: 'unknown',
+      authenticated: 'unknown',
+      method: 'none',
+    };
   }
 
   const out = res.stdout ?? '';
   if (CODEX_LOGGED_OUT.test(out)) {
-    return { state: 'logged-out', detail: 'codex login status: not logged in — run: codex login' };
+    return {
+      state: 'logged-out',
+      detail: 'codex login status: not logged in — run: codex login',
+      present: true,
+      authenticated: false,
+      method: 'none',
+    };
   }
   if (CODEX_LOGGED_IN.test(out)) {
-    return { state: 'logged-in', detail: 'codex login status: logged in' };
+    return {
+      state: 'logged-in',
+      detail: 'codex login status: logged in',
+      present: true,
+      authenticated: true,
+      method: 'subscription',
+    };
   }
-  return { state: 'unknown', detail: 'codex login status: indeterminate output' };
+  return {
+    state: 'unknown',
+    detail: 'codex login status: indeterminate output',
+    present: true,
+    authenticated: 'unknown',
+    method: 'none',
+  };
 }
 
 // ─── gemini ──────────────────────────────────────────────────────────────────
@@ -233,7 +331,13 @@ function probeGemini(
     envValue(env, 'GOOGLE_API_KEY') ??
     envValue(env, 'DECKENT_GOOGLE_API_KEY')
   ) {
-    return { state: 'logged-in', detail: 'GEMINI/GOOGLE API key set (api auth)' };
+    return {
+      state: 'logged-in',
+      detail: 'GEMINI/GOOGLE API key set (api auth)',
+      present: true,
+      authenticated: true,
+      method: 'api-key',
+    };
   }
 
   const credPath = join(home, '.gemini', 'oauth_creds.json');
@@ -241,21 +345,45 @@ function probeGemini(
   try {
     raw = readFile(credPath);
   } catch {
-    return { state: 'logged-out', detail: 'no oauth creds — run: gemini (then /auth)' };
+    return {
+      state: 'logged-out',
+      detail: 'no oauth creds — run: gemini (then /auth)',
+      present: false,
+      authenticated: false,
+      method: 'none',
+    };
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return { state: 'unknown', detail: 'oauth creds present but unparseable' };
+    return {
+      state: 'unknown',
+      detail: 'oauth creds present but unparseable',
+      present: true,
+      authenticated: 'unknown',
+      method: 'none',
+    };
   }
 
   const token = (parsed as { access_token?: unknown } | null)?.access_token;
   const hasToken = typeof token === 'string' && token.length > 0;
   return hasToken
-    ? { state: 'logged-in', detail: 'oauth session present' }
-    : { state: 'logged-out', detail: 'oauth creds present but no access token' };
+    ? {
+        state: 'logged-in',
+        detail: 'oauth session present',
+        present: true,
+        authenticated: true,
+        method: 'subscription',
+      }
+    : {
+        state: 'logged-out',
+        detail: 'oauth creds present but no access token',
+        present: true,
+        authenticated: false,
+        method: 'none',
+      };
 }
 
 // ─── public API ───────────────────────────────────────────────────────────────
@@ -290,6 +418,12 @@ export async function probeProviderAuth(
     case 'gemini':
       return probeGemini(readFile, env, home);
     default:
-      return { state: 'unknown', detail: `unsupported provider: ${String(provider)}` };
+      return {
+        state: 'unknown',
+        detail: `unsupported provider: ${String(provider)}`,
+        present: 'unknown',
+        authenticated: 'unknown',
+        method: 'none',
+      };
   }
 }

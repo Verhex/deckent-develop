@@ -2209,6 +2209,48 @@ const MESSAGES: MessageMap = {
   },
   'do.outcome_success': { en: 'success', tr: 'başarılı' },
   'do.outcome_failure': { en: 'failure', tr: 'başarısız' },
+
+  // ─── `deckent doctor --fix` (Task 356-006 DOCTOR-FIX — sole-authority
+  // addition; cited by doctor.ts's own docImpact + its
+  // "TODO(docImpact, Task 15)" comment above formatDoctorFixLines():
+  // "these strings are plain EN, not routed through getMessage() ...
+  // a follow-up task should add `doctor.fix_*` en/tr keys". English values
+  // mirror formatDoctorFixLines()'s literal strings byte-for-byte. The
+  // conditional "attempted (N FAILED)" header is split into two keys
+  // (_ok / _failed) since getMessage() only does flat {var} substitution,
+  // same precedent as do.preview_banner_run/do.preview_banner_dry_run) ──────
+  'doctor.fix_nothing_to_repair': {
+    en: 'doctor --fix: nothing to repair — all safe-fix checks passed.',
+    tr: 'doctor --fix: onarılacak bir şey yok — tüm güvenli-onarım kontrolleri geçti.',
+  },
+  'doctor.fix_dry_run_header': {
+    en: 'doctor --fix (dry-run) — {count} safe repair(s) available:',
+    tr: 'doctor --fix (dry-run) — {count} güvenli onarım mevcut:',
+  },
+  'doctor.fix_would_fix_line': {
+    en: '  [would fix] {description}',
+    tr: '  [onarılacak] {description}',
+  },
+  'doctor.fix_apply_hint': {
+    en: 'Run `deckent doctor --fix --yes` to apply.',
+    tr: 'Uygulamak için `deckent doctor --fix --yes` çalıştırın.',
+  },
+  'doctor.fix_apply_header_ok': {
+    en: 'doctor --fix --yes — {count} repair(s) attempted:',
+    tr: 'doctor --fix --yes — {count} onarım denendi:',
+  },
+  'doctor.fix_apply_header_failed': {
+    en: 'doctor --fix --yes — {count} repair(s) attempted ({failed} FAILED):',
+    tr: 'doctor --fix --yes — {count} onarım denendi ({failed} BAŞARISIZ):',
+  },
+  'doctor.fix_line_fixed': {
+    en: '  [fixed] {description}',
+    tr: '  [onarıldı] {description}',
+  },
+  'doctor.fix_line_failed': {
+    en: '  [FAILED] {description} — {error}',
+    tr: '  [BAŞARISIZ] {description} — {error}',
+  },
 };
 
 /**

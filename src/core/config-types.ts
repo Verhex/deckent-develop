@@ -9,6 +9,7 @@ import type { ModelTier } from './model-equivalence.js';
 import type { ErpRuntimeConfig } from './erp/factory.js';
 import type { BotCapabilitiesConfig } from '../connectors/capabilities/types.js';
 import type { ApprovalPolicyRule } from './approval-policy.js';
+import type { ToolRiskLevel } from './tool-registry.js';
 
 // ─── Timeout Configuration ──────────────────────────────────────────
 export interface TimeoutConfig {
@@ -144,13 +145,101 @@ export interface ApprovalConfig {
   /** Activate the worker-side `WorkerApprovalGate` (approval-worker-gate.ts) —
    *  gates a risky worker action on a broker decision before it executes.
    *  Default: false. Wiring the gate into the live worker runtime is a
-   *  separate follow-up task; this flag only reserves the config surface. */
+   *  separate follow-up task; this flag only reserves the config surface.
+   *  Same flag `agents/agentic-worker-tools.ts` (WORKERGATE-WIRE, 354-005)
+   *  refers to informally as `approval_gate.enabled` in its comments — there
+   *  is no separate `approval_gate` top-level block. */
   gate_enabled?: boolean;
   /** Activate the runtime-wide `ApprovalRelay` (approval-relay.ts) — routes
    *  pending approvals out to external decision channels (terminal/telegram/
    *  ...). Default: false. Channel wiring is a separate follow-up task; this
    *  flag only reserves the config surface. */
   relay_enabled?: boolean;
+  /** Activate `POST /api/approvals/:id/decision` (356-002, ADR-G-033/G-020).
+   *  Default: false — an absent block/key or a non-boolean value disables the
+   *  endpoint. NOTE: `api/server.ts`'s `isApprovalApiDecideEnabled` currently
+   *  reads this straight off raw `config.json` (config-types.ts was out of
+   *  that task's write scope) rather than through `ResolvedConfig` — this
+   *  field types the raw `DeckentConfig.approval` shape for `.deckent/
+   *  config.json` authors; it is intentionally NOT mirrored onto
+   *  `ResolvedConfig.approval` (see that type's doc comment). */
+  api_decide?: boolean;
+}
+
+// ─── Night-Landed Flag Configs (Sprint 356, Task 356-012 TRACE-CONFIG-TYPES) ──
+// Each block below already has a real consumer on disk that duck-types or
+// caller-resolves the shape described in its doc comment; this task's job is
+// only to give that shape a typed, discoverable home on DeckentConfig/
+// ResolvedConfig. None of these are threaded through `mergeConfigs`/
+// `loadConfig` yet (that remains each feature's own follow-up wiring task) —
+// registering the type here does not change `validateConfig`'s behavior
+// (unknown/untyped blocks were already tolerated, and stay so).
+
+/** Sprint-worker structured-log → training-trace recording (TRN-1). Opt-in — absent block = disabled.
+ *  @see recordSprintWorkerTrace (orchestra/output-collector.ts), which expects its
+ *  caller to resolve `enabled` from this block (no caller is wired yet). */
+export interface TrainingTraceConfig {
+  /** Enable sprint-worker training-trace recording (default: false). */
+  enabled?: boolean;
+}
+
+/** Worker-runner ordered progress-stream, `.tasks/task-<id>.progress.jsonl` (ADR-G-025 §4,
+ *  WORKER-LIVE-TRACE). Opt-in — absent block = disabled; flag-off performs ZERO fs I/O.
+ *  @see AgenticRunnerOptions.liveTrace (agents/agentic-worker-runner.ts). */
+export interface LiveTraceConfig {
+  /** Enable the worker progress-stream (default: false). */
+  enabled?: boolean;
+}
+
+/** Native-REPL progressive-disclosure meta-tools — `deckent_search_tools` /
+ *  `deckent_describe_tool` / `deckent_call_tool` (TOOL-REPL-WIRE, 354-002). Opt-in —
+ *  absent block = disabled (registers nothing; rest of the native tool list unchanged).
+ *  @see ToolSurfaceOptions (cli/repl/native-tool-registry.ts). */
+export interface ToolSurfaceConfig {
+  /** Enable the 3 progressive-disclosure meta-tools (default: false). */
+  enabled?: boolean;
+  /** Risk-gate threshold for `deckent_call_tool` dispatch (default: engine default). */
+  riskThreshold?: ToolRiskLevel;
+}
+
+/** Native-REPL mode-indicator + live-footer + approval-card surface
+ *  (REPL-SURFACE-WIRE 354-001 / APP-APPROVAL-WIRE 355-011). Opt-in — every field
+ *  independently default-off; flag-off render stays byte-identical to pre-354-001.
+ *  @see ReplAppProps.replSurfaceEnabled / .approvalsEnabled (cli/repl/app.tsx). */
+export interface ReplSurfaceConfig {
+  /** Enable the mode-indicator + live-footer surface (default: false). */
+  enabled?: boolean;
+  /** Enable the approval-card + dual-stream + terminal-channel bridge (355-011).
+   *  Independent of `enabled` — a pending approval can render even when the base
+   *  mode-indicator/live-footer surface is off. Default: false. */
+  approvals?: boolean;
+  /**
+   * Reserved for a future gate over the background-turn-queue surface
+   * (`cli/repl/chat-turn-queue.ts`, TERM-2). The queue itself already runs
+   * unconditionally in `app.tsx` today (buffers background-completed work and
+   * drains it between user turns) — no code reads `bg_turns` yet. This field
+   * only reserves the config surface for the follow-up task that gates it.
+   */
+  bg_turns?: boolean;
+}
+
+/** Host-side `DeckBroker` credential minting for spawned tasks (DECKBROKER-WIRE,
+ *  354-006, ADR-G-005/G-017 row 422). Opt-in — absent block/`enabled` = the pre-
+ *  existing `applyDeckSecretsToEnv`/`process.env` credential path is unaffected.
+ *  @see bootstrapProviders's inline `deck_broker` param (core/provider.ts). */
+export interface DeckBrokerConfig {
+  /** Mint a host-side `DeckBroker` in `bootstrapProviders` (default: false). */
+  enabled?: boolean;
+}
+
+/** Flag-gated NO_GO file-revert at EVALUATE time (ROLLBACK-DECIDE, born-427,
+ *  ADR-D-006). Opt-in — absent block/`enabled` = no revert (pre-existing
+ *  behavior). Distinct from `rollback_policy` (legacy sprint-level
+ *  always/on_failure/never policy) — this block governs the newer per-task,
+ *  files-changed-aware revert decision. */
+export interface RollbackConfig {
+  /** Enable evaluate-time NO_GO revert for files-changed tasks (default: false). */
+  enabled?: boolean;
 }
 
 // ─── Cost Guard Config ───────────────────────────────────────────────
@@ -377,6 +466,9 @@ export interface DeckentConfig {
      *  unchanged (backward-safe default). */
     registry?: ProviderDefinition[];
   };
+  /** Host-side `DeckBroker` credential minting (DECKBROKER-WIRE, 354-006).
+   *  @see DeckBrokerConfig */
+  deck_broker?: DeckBrokerConfig;
   /** Auto-select cheapest capable provider (default: false) */
   cost_optimization?: boolean;
   /** Claude execution backend: 'tmux' (default), 'subprocess' (headless), 'mcp' (future) */
@@ -613,6 +705,8 @@ export interface DeckentConfig {
   // ─── Rollback ───────────────────────────────────────────────────────
   /** Rollback policy: 'never' | 'on_failure' | 'always' (default: 'never') */
   rollback_policy?: 'never' | 'on_failure' | 'always';
+  /** Evaluate-time NO_GO file-revert (ROLLBACK-DECIDE, born-427). @see RollbackConfig */
+  rollback?: RollbackConfig;
 
   // ─── Rubric-Based Evaluation ──────────────────────────────────────
   /** Custom evaluation rubric overrides (merged with DEFAULT_RUBRIC) */
@@ -638,6 +732,22 @@ export interface DeckentConfig {
     skill_agent_affinity?: boolean;
     /** Cache agent selection across tasks in the same sprint to reduce routing overhead (default: false). */
     agent_cache?: boolean;
+    /**
+     * Enable kind-affinity bonus (PCOMP-W5C, Sprint 352-008). Default-off.
+     * When true, the 'refactorer' agent gets a bonus on a 'refactor'-kind task
+     * and a penalty on a 'code-development'-kind task (`RoutingOptions.kindAffinity`,
+     * core/routing-engine.ts). Flag-off is byte-identical to pre-352-008 routing.
+     */
+    kindAffinity?: boolean;
+    /**
+     * Enable task/agent-prompt language-mismatch penalty (WM-7, Sprint 355-008).
+     * Default-off. When true, a confident TR/EN mismatch between the task text
+     * and the agent's persona text costs a small routing penalty
+     * (`RoutingOptions.languagePenalty`, core/routing-engine.ts). Mirrors the
+     * kindAffinity additive-tiebreaker pattern — never exclusionary. Flag-off
+     * is byte-identical to pre-355-008 routing.
+     */
+    languagePenalty?: boolean;
   };
   /** Delay in ms before cleanup deletes .tasks/ files. Default: 180000 (180s). Set 0 for immediate. */
   cleanup_delay_ms?: number;
@@ -694,6 +804,12 @@ export interface DeckentConfig {
   // ─── Worker Comms ────────────────────────────────────────────────────
   /** Worker-to-worker communication configuration (Sprint 278 COMM-1). Default-disabled (opt-in). */
   worker_comms?: WorkerCommsConfig;
+
+  // ─── Trace (training + live progress-stream) ────────────────────────
+  /** Sprint-worker training-trace recording (TRN-1). @see TrainingTraceConfig */
+  training_trace?: TrainingTraceConfig;
+  /** Worker-runner ordered progress-stream (ADR-G-025 §4). @see LiveTraceConfig */
+  live_trace?: LiveTraceConfig;
 
   // ─── Doc-Tracking (ADR-090) ──────────────────────────────────────────
   /** Doc-tracking options. */
@@ -773,6 +889,12 @@ export interface DeckentConfig {
   // ─── Terminal ──────────────────────────────────────────────────────
   /** Embedded web terminal configuration (Sprint 175). */
   terminal?: TerminalConfig;
+
+  // ─── Native REPL Surface ─────────────────────────────────────────────
+  /** Native-REPL progressive-disclosure meta-tools (TOOL-REPL-WIRE, 354-002). @see ToolSurfaceConfig */
+  tool_surface?: ToolSurfaceConfig;
+  /** Native-REPL mode-indicator + live-footer + approval-card surface (354-001/355-011). @see ReplSurfaceConfig */
+  repl_surface?: ReplSurfaceConfig;
 
   // ─── Prompt Generation (Sprint 182 PQ-5 / F7) ──────────────────────
   /** Worker prompt generation tuning. */
@@ -1002,6 +1124,8 @@ export interface ResolvedConfig {
    *  flattened into brain_provider/worker_provider/fallback_provider above; this
    *  carries `registry` (config-driven provider definitions) to bootstrap. */
   providers?: DeckentConfig['providers'];
+  /** Host-side `DeckBroker` credential minting (passed through from DeckentConfig, 354-006). */
+  deck_broker?: DeckentConfig['deck_broker'];
   // Memory
   memory_budget?: number;
   decay_after_sprints?: number;
@@ -1060,6 +1184,8 @@ export interface ResolvedConfig {
   adaptive_config: AdaptiveConfig;
   // Rollback
   rollback_policy?: 'never' | 'on_failure' | 'always';
+  /** Evaluate-time NO_GO file-revert (passed through from DeckentConfig, born-427). */
+  rollback?: DeckentConfig['rollback'];
   // Rubric-Based Evaluation
   evaluation_rubric?: Partial<EvaluationRubric>;
   rubric_max_retries?: number;
@@ -1095,6 +1221,10 @@ export interface ResolvedConfig {
   cross_verify?: CrossVerifyConfig;
   /** Worker-to-worker communication configuration (passed through from DeckentConfig). Default-disabled. */
   worker_comms?: WorkerCommsConfig;
+  /** Sprint-worker training-trace recording (passed through from DeckentConfig, TRN-1). */
+  training_trace?: DeckentConfig['training_trace'];
+  /** Worker-runner ordered progress-stream (passed through from DeckentConfig, ADR-G-025 §4). */
+  live_trace?: DeckentConfig['live_trace'];
   /** Doc-tracking options (passed through from DeckentConfig, ADR-090). */
   doc_tracking?: {
     /** Run a DB-only doc-tracking sync at sprint finalize (default: false). */
@@ -1124,6 +1254,10 @@ export interface ResolvedConfig {
    * on it being present without forcing every ResolvedConfig literal to spell
    * it out. Sprint 175. */
   terminal?: TerminalConfig;
+  /** Native-REPL progressive-disclosure meta-tools (passed through from DeckentConfig, 354-002). */
+  tool_surface?: DeckentConfig['tool_surface'];
+  /** Native-REPL mode-indicator + live-footer + approval-card surface (passed through from DeckentConfig, 354-001/355-011). */
+  repl_surface?: DeckentConfig['repl_surface'];
   /** Resolved worker prompt generation tuning (Sprint 182 PQ-5 / F7).
    *  Same optional-on-both-sides pattern as `terminal`; `loadConfig`/`mergeConfigs`
    *  always populate it with DEFAULT_PROMPT_CONFIG. Consumers may rely on it. */

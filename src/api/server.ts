@@ -64,6 +64,8 @@ import { registerOidcCallbackRoute } from './oidc-callback-endpoint.js';
 import { handleOutputStream, isOutputStreamRequest } from './output-stream.js';
 import { createOutputCollector, type OutputCollector } from '../core/output-collector.js';
 import { reconcileStatusResponse } from './status-reconcile.js';
+import { ApprovalStore, type ApprovalStoreEntry, type ApprovalStoreCategory } from '../core/approval-store.js';
+import { ApprovalBroker, ApprovalBrokerError } from '../core/approval-broker.js';
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -163,6 +165,15 @@ const SetDirectivesSchema = z.object({ content: z.string().min(1) });
 const ChatSchema = z.object({ message: z.string() });
 const ConfigSchema = z.record(z.string(), z.unknown());
 const WORKER_ID_RE = /^[a-zA-Z0-9-]+$/;
+const ApprovalDecisionBodySchema = z.object({
+  decision: z.enum(['allow', 'deny', 'defer', 'escalate']),
+  reason: z.string().max(2000).optional(),
+}).strict();
+/** Approval id path segment guard. `ApprovalStore`/`ApprovalBroker` join `id`
+ *  straight into a store-dir filename with no sanitization of their own, so a
+ *  client-supplied id MUST be validated here before it ever reaches those
+ *  modules (path-traversal defense-in-depth, 356-002). */
+const APPROVAL_ID_RE = /^[a-zA-Z0-9_-]+$/;
 
 // ─── Chat-Stream Adapter Hook (Sprint 219 T-219-007) ────────────
 // Tests inject a deterministic ChatProviderAdapter via setChatStreamAdapter;
@@ -395,6 +406,49 @@ function detectRoutingImbalance(
   return entries
     .filter((e) => e.pct > threshold)
     .map((e) => `IMBALANCE: "${e.id}" dominates with ${e.pct}% (threshold: ${threshold}%)`);
+}
+
+// ─── Approvals (356-002, ADR-G-033/ADR-G-020) ─────────────────────
+// GET routes read `ApprovalStore` (read-only snapshot) and are ALWAYS
+// available — dashboard monitoring is not flag-gated. The mutation path
+// (POST .../decision) goes ONLY through `ApprovalBroker.decide()`, never
+// `ApprovalStore.transition()`, so the broker's own validation/event
+// semantics stay the single source of truth for a decision.
+
+/**
+ * `approval.api_decide` activation flag for POST /api/approvals/:id/decision.
+ * Not yet part of the typed `ApprovalConfig` surface (config-types.ts is out
+ * of this task's write scope) — read directly off the raw config.json, the
+ * same pattern `getNextSprintId` uses for `last_sprint_id` (core/utils.ts).
+ * Default-off: an absent block/key or a non-boolean value is disabled.
+ */
+function isApprovalApiDecideEnabled(projectRoot: string): boolean {
+  const raw = readJsonSafe<Record<string, unknown>>(join(projectRoot, PROJECT_CONFIG_PATH));
+  const approvalBlock = raw?.['approval'];
+  if (!approvalBlock || typeof approvalBlock !== 'object') return false;
+  return (approvalBlock as Record<string, unknown>)['api_decide'] === true;
+}
+
+/** Serialize a store entry for the API — strips `rawArgsRef` (an internal
+ *  pointer into the out-of-band raw-args store) so the response carries
+ *  `maskedArgs` only. The raw value itself is never a field on the contract
+ *  type and this endpoint never calls `resolveRawArgs`. */
+function serializeApprovalEntry(category: ApprovalStoreCategory, entry: ApprovalStoreEntry): Record<string, unknown> {
+  const { rawArgsRef: _rawArgsRef, ...safeRequest } = entry.request;
+  return { category, request: safeRequest, decision: entry.decision };
+}
+
+/** Find `id` across the store snapshot's 4 categories. */
+function findApprovalEntry(
+  store: ApprovalStore,
+  id: string,
+): { category: ApprovalStoreCategory; entry: ApprovalStoreEntry } | undefined {
+  const snapshot = store.load();
+  for (const category of ['pending', 'approved', 'denied', 'expired'] as const) {
+    const entry = snapshot[category].find((e) => e.request.id === id);
+    if (entry) return { category, entry };
+  }
+  return undefined;
 }
 
 // ─── Route Handler ───────────────────────────────────────────────
@@ -847,6 +901,38 @@ async function handleRequest(
       return;
     }
 
+    // GET /api/approvals — pending/approved/denied buckets, maskedArgs-only
+    // (356-002, ADR-G-033/ADR-G-020). Never flag-gated — dashboard monitoring
+    // stays always-on regardless of `approval.api_decide`.
+    if (url === '/api/approvals') {
+      const store = new ApprovalStore(projectRoot);
+      const snapshot = store.load();
+      sendJson(res, {
+        pending: snapshot.pending.map((e) => serializeApprovalEntry('pending', e)),
+        approved: snapshot.approved.map((e) => serializeApprovalEntry('approved', e)),
+        denied: snapshot.denied.map((e) => serializeApprovalEntry('denied', e)),
+      });
+      return;
+    }
+
+    // GET /api/approvals/:id — single entry detail. maskedArgs-only; raw
+    // args are NEVER resolved (resolveRawArgs is never called from here).
+    if (url.startsWith('/api/approvals/')) {
+      const id = url.slice('/api/approvals/'.length);
+      if (!id || !APPROVAL_ID_RE.test(id)) {
+        sendError(res, 400, 'Invalid approval id');
+        return;
+      }
+      const store = new ApprovalStore(projectRoot);
+      const found = findApprovalEntry(store, id);
+      if (!found) {
+        sendError(res, 404, 'Approval not found');
+        return;
+      }
+      sendJson(res, serializeApprovalEntry(found.category, found.entry));
+      return;
+    }
+
     // GET with no matching route
     sendError(res, 404, 'Not found');
     return;
@@ -1131,6 +1217,65 @@ async function handleRequest(
       });
 
       sendJson(res, { ok: true });
+      return;
+    }
+
+    // POST /api/approvals/:id/decision — ApprovalBroker.decide() (356-002,
+    // ADR-G-033/ADR-G-020). Flag-gated: `approval.api_decide` default-off →
+    // 403. GET /api/approvals[/…] above are NEVER gated by this flag — only
+    // the mutation is.
+    if (url.startsWith('/api/approvals/') && url.endsWith('/decision')) {
+      const id = url.slice('/api/approvals/'.length, -'/decision'.length);
+      if (!id || !APPROVAL_ID_RE.test(id)) {
+        sendError(res, 400, 'Invalid approval id');
+        return;
+      }
+
+      if (!isApprovalApiDecideEnabled(projectRoot)) {
+        sendError(
+          res,
+          403,
+          'Approval API decisions are disabled — set approval.api_decide: true in .deckent/config.json to enable POST /api/approvals/:id/decision',
+        );
+        return;
+      }
+
+      const parsed = ApprovalDecisionBodySchema.safeParse(body);
+      if (!parsed.success) {
+        sendError(res, 400, parsed.error.message);
+        return;
+      }
+
+      const store = new ApprovalStore(projectRoot);
+      const found = findApprovalEntry(store, id);
+      if (!found) {
+        sendError(res, 404, 'Approval not found');
+        return;
+      }
+      if (found.category !== 'pending') {
+        sendError(res, 409, `Approval already ${found.category}`);
+        return;
+      }
+
+      const principal = deriveRequestPrincipal(req);
+      const broker = new ApprovalBroker(projectRoot);
+      try {
+        const decision = broker.decide(id, {
+          decision: parsed.data.decision,
+          decidedBy: principal.id,
+          channel: 'api',
+          decidedAt: new Date().toISOString(),
+          reason: parsed.data.reason ?? '',
+        });
+        console.log(`[deckent] Approval decided via API: ${id} -> ${decision.decision} (by ${principal.id})`);
+        sendJson(res, { success: true, decision });
+      } catch (err: unknown) {
+        if (err instanceof ApprovalBrokerError) {
+          sendError(res, err.code === 'APR_ALREADY_DECIDED' ? 409 : 400, err.message);
+        } else {
+          sendError(res, 500, err instanceof Error ? err.message : 'Decision failed');
+        }
+      }
       return;
     }
 

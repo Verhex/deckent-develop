@@ -15,6 +15,7 @@ import type { ToolRegistry } from '../../agent/tools/registry.js';
 import type { AgentEvent } from '../../agent/events.js';
 import type { PermissionResponse } from '../../agent/loop.js';
 import type { ToolInfo } from './app.js';
+import type { ChatTurnQueue, ChatTurnPayload } from './chat-turn-queue.js';
 
 /** The view's engine contract (same shape the legacy runChatNativeLoop satisfies). */
 export type ReplEngine = (
@@ -41,6 +42,30 @@ export interface NativeEngineDeps {
   t?: (key: string) => string;
   /** Optional: called with the full transcript after each completed turn (trace recording). */
   recordTurn?: (messages: import('../../agent/provider-tooluse/types.js').ProviderMessage[]) => void;
+  /**
+   * TERM2-WIRE (356-011) — caller-owned ChatTurnQueue instance. This bridge only
+   * calls its public API (READ-ONLY: never edits chat-turn-queue.ts); the
+   * caller owns the "event-source seam" — a follow-up task feeds real
+   * sprint-done/task-done notify-events in via `bgQueue.enqueueBg(...)`.
+   * Absent → bg-turns wiring is fully inert (byte-identical to pre-356-011).
+   */
+  bgQueue?: ChatTurnQueue;
+  /**
+   * `repl_surface.bg_turns ?? false` config seam — the real config lookup is a
+   * follow-up (run.tsx wiring) task; default false. Even with `bgQueue`
+   * supplied, no synthetic turn is ever produced unless this is explicitly true.
+   */
+  bgTurnsEnabled?: boolean;
+}
+
+/** Format one drained ChatTurnPayload (ChatTurnQueue.drainAsTurns()) as the
+ *  synthetic user-turn input fed back into the session — one coalesced bucket
+ *  becomes one turn. Mirrors app.tsx's `bgPayloadsToTurnTexts` shape, but each
+ *  line carries a literal `[bg] ` marker since this text becomes real model
+ *  input here (not a UI-only render), so the model can tell a
+ *  background-notification turn apart from a genuine user message. */
+export function formatBgTurnInput(payload: ChatTurnPayload): string {
+  return payload.events.map((e) => `[bg] ${e.summary}`).join('\n');
 }
 
 /** Resolve an optional hard cost ceiling (USD) for the native session, so the
@@ -90,7 +115,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
     ...(deps.maxIterations !== undefined ? { maxIterations: deps.maxIterations } : {}),
   });
 
-  return async (input, cbs) => {
+  const runTurn: ReplEngine = async (input, cbs) => {
     let inputTokens = 0;
     let outputTokens = 0;
     for await (const ev of session.send(input) as AsyncIterable<AgentEvent>) {
@@ -120,5 +145,29 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
     }
     cbs.onTurnEnd({ inputTokens, outputTokens });
     if (deps.recordTurn) deps.recordTurn(session.transcript());
+  };
+
+  // TERM2-WIRE (356-011): bg-turns wiring is fully OFF by default — no queue
+  // supplied, or `bgTurnsEnabled` unset/false → return runTurn unwrapped, so
+  // the flag-off path stays byte-identical to pre-356-011 (no extra Promise
+  // hops, no queue reads at all).
+  const bgQueue = deps.bgQueue;
+  if (!bgQueue || !deps.bgTurnsEnabled) return runTurn;
+
+  return async (input, cbs) => {
+    bgQueue.userTurnActive = true;
+    try {
+      await runTurn(input, cbs);
+    } finally {
+      bgQueue.userTurnActive = false;
+    }
+    // Hermes rule (chat-turn-queue.ts): drainAsTurns() no-ops while
+    // userTurnActive is true, so anything enqueued during the turn above was
+    // buffered, never mid-turn-injected. Now that the turn is over, drain and
+    // run each coalesced bucket as its own synthetic user turn — through the
+    // SAME output/onTurnEnd/recordTurn pipeline as a real turn.
+    for (const payload of bgQueue.drainAsTurns()) {
+      await runTurn(formatBgTurnInput(payload), cbs);
+    }
   };
 }

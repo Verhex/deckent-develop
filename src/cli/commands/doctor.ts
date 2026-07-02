@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, statSync, mkdirSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
 import { platform, totalmem } from 'node:os';
 import { spawnSync, spawn as nodeSpawn } from 'node:child_process';
@@ -10,10 +10,11 @@ import type { HealthCheckResult } from '../../orchestra/connector.js';
 import {
   DECKENT_DIR, BRAIN_DIR, DECISIONS_FILE,
   DIRECTIVES_FILE, LOCKS_DIR, MEMORY_DB_FILE,
-  PROJECT_CONFIG_PATH,
+  PROJECT_CONFIG_PATH, TASKS_DIR,
 } from '../../core/constants.js';
 import { DebtPriority } from '../../core/types.js';
 import { getDebtItems } from '../../core/debt-store.js';
+import { migrateConfig } from '../../core/config-migration.js';
 
 // Memory V2 (Sprint 179 W3-6): exports/decisions.md is the auto-generated
 // source. doctor must accept EITHER this OR legacy .brain/DECISIONS.md.
@@ -1406,6 +1407,151 @@ export function formatRamExperiment(report: RamExperimentReport): string {
   return lines.join('\n');
 }
 
+// ─── DOCTOR-FIX (Sprint 356, Task 356-006, row 203 ONB-2) ─────────────────────
+//
+// `deckent doctor --fix` — a CLOSED whitelist of safe, non-destructive repairs.
+// Nothing risky (delete / docker / login) is ever eligible: planDoctorFixes()
+// only ever emits the three kinds below, and applyDoctorFixes() only ever
+// executes those same three kinds. Default is dry-run (list only); `--yes` is
+// required to actually apply. Every repair is additive or a permission reset —
+// never a deletion.
+
+/** Closed whitelist — the ONLY fix kinds `doctor --fix` may ever plan or apply. */
+export const DOCTOR_FIX_ACTION_KINDS = ['mkdir', 'chmod', 'config-migrate'] as const;
+export type DoctorFixActionKind = typeof DOCTOR_FIX_ACTION_KINDS[number];
+
+export interface DoctorFixAction {
+  kind: DoctorFixActionKind;
+  /** Absolute path the action operates on. */
+  target: string;
+  /** Human-readable "what this will do" line, shown in the dry-run list. */
+  description: string;
+}
+
+export interface DoctorFixApplyResult {
+  action: DoctorFixAction;
+  applied: boolean;
+  error?: string;
+}
+
+/** Owner-only read/write — matches ensureDeckShadowFile's mode in spawn-backend-docker.ts. */
+const DECK_SHADOW_SAFE_MODE = 0o600;
+
+/**
+ * Detect safe repairs WITHOUT mutating anything (read-only: existsSync/statSync/
+ * migrateConfig dry-run). Call applyDoctorFixes() on the returned list to apply.
+ */
+export function planDoctorFixes(root: string): DoctorFixAction[] {
+  const actions: DoctorFixAction[] = [];
+
+  const deckentPath = join(root, DECKENT_DIR);
+  if (!existsSync(deckentPath)) {
+    actions.push({
+      kind: 'mkdir',
+      target: deckentPath,
+      description: `Create missing directory: ${DECKENT_DIR}/`,
+    });
+  }
+
+  const tasksPath = join(root, TASKS_DIR);
+  if (!existsSync(tasksPath)) {
+    actions.push({
+      kind: 'mkdir',
+      target: tasksPath,
+      description: `Create missing directory: ${TASKS_DIR}/`,
+    });
+  }
+
+  // Stale .deck-shadow permission drift (e.g. a docker mount that changed the
+  // host file's mode). chmod-only — never unlinked, deletion is out of scope.
+  const shadowPath = join(tasksPath, '.deck-shadow');
+  if (existsSync(shadowPath)) {
+    try {
+      const mode = statSync(shadowPath).mode & 0o777;
+      if (mode !== DECK_SHADOW_SAFE_MODE) {
+        actions.push({
+          kind: 'chmod',
+          target: shadowPath,
+          description: `Reset permissions on stale ${TASKS_DIR}/.deck-shadow: `
+            + `${mode.toString(8)} → ${DECK_SHADOW_SAFE_MODE.toString(8)}`,
+        });
+      }
+    } catch { /* unreadable stat — not a safe-repair case, skip */ }
+  }
+
+  // Missing config defaults — delegates to the existing, already-vetted
+  // migrateConfig() utility (it writes its own timestamped backup before
+  // touching the file). Only proposed when there are ADDED fields to apply.
+  const configPath = join(root, PROJECT_CONFIG_PATH);
+  if (existsSync(configPath)) {
+    const probe = migrateConfig(configPath, { dryRun: true });
+    if (probe.addedFields.length > 0) {
+      actions.push({
+        kind: 'config-migrate',
+        target: configPath,
+        description: `Add ${probe.addedFields.length} missing config default(s): `
+          + probe.addedFields.join(', '),
+      });
+    }
+  }
+
+  return actions;
+}
+
+/**
+ * Apply a previously-planned action list. Each action runs independently and
+ * failures are captured per-action — one failing repair never aborts the rest.
+ */
+export function applyDoctorFixes(actions: DoctorFixAction[]): DoctorFixApplyResult[] {
+  const results: DoctorFixApplyResult[] = [];
+  for (const action of actions) {
+    try {
+      switch (action.kind) {
+        case 'mkdir':
+          mkdirSync(action.target, { recursive: true });
+          break;
+        case 'chmod':
+          chmodSync(action.target, DECK_SHADOW_SAFE_MODE);
+          break;
+        case 'config-migrate':
+          migrateConfig(action.target, { dryRun: false });
+          break;
+      }
+      results.push({ action, applied: true });
+    } catch (err) {
+      results.push({ action, applied: false, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  return results;
+}
+
+/**
+ * Render the dry-run / applied fix list for CLI output.
+ * TODO(docImpact, Task 15): these strings are plain EN, not routed through
+ * getMessage() — messages.ts is outside this task's write scope. Follow-up
+ * should add `doctor.fix_*` en/tr keys and switch this over.
+ */
+export function formatDoctorFixLines(actions: DoctorFixAction[], results?: DoctorFixApplyResult[]): string[] {
+  const lines: string[] = [];
+  if (actions.length === 0) {
+    lines.push('doctor --fix: nothing to repair — all safe-fix checks passed.');
+    return lines;
+  }
+  if (!results) {
+    lines.push(`doctor --fix (dry-run) — ${actions.length} safe repair(s) available:`);
+    for (const a of actions) lines.push(`  [would fix] ${a.description}`);
+    lines.push('Run `deckent doctor --fix --yes` to apply.');
+    return lines;
+  }
+  const failed = results.filter(r => !r.applied).length;
+  lines.push(`doctor --fix --yes — ${results.length} repair(s) attempted`
+    + `${failed > 0 ? ` (${failed} FAILED)` : ''}:`);
+  for (const r of results) {
+    lines.push(r.applied ? `  [fixed] ${r.action.description}` : `  [FAILED] ${r.action.description} — ${r.error}`);
+  }
+  return lines;
+}
+
 export function registerDoctor(program: Command): void {
   program
     .command('doctor')
@@ -1418,7 +1564,9 @@ export function registerDoctor(program: Command): void {
     .option('--memory', 'Show host RAM detection (/proc/meminfo first, os.totalmem fallback) and suggested max_workers')
     .option('--ram-experiment', 'Show 6-worker × 2g RAM scenario verdict (Safe/Risky) based on current config and host RAM')
     .option('--fix-image', 'Rebuild the worker docker image after an interactive confirmation (ADR-063 consent) when it is missing/stale')
-    .action(async (opts: { profile?: boolean; legacy?: boolean; json?: boolean; preFlight?: boolean; providers?: boolean; memory?: boolean; ramExperiment?: boolean; fixImage?: boolean }) => {
+    .option('--fix', 'Preview safe repairs (missing .deckent/.tasks dirs, stale .deck-shadow permissions, missing config defaults) — a closed whitelist, no delete/docker/login. Dry-run by default; combine with --yes to apply.')
+    .option('-y, --yes', 'Apply the repairs listed by --fix (no effect without --fix)')
+    .action(async (opts: { profile?: boolean; legacy?: boolean; json?: boolean; preFlight?: boolean; providers?: boolean; memory?: boolean; ramExperiment?: boolean; fixImage?: boolean; fix?: boolean; yes?: boolean }) => {
       let root: string;
       try {
         root = resolveProjectRoot();
@@ -1426,6 +1574,28 @@ export function registerDoctor(program: Command): void {
         root = process.cwd();
       }
       const lang = getLangFromConfig(root);
+
+      // --fix: closed-whitelist safe repairs. Dedicated early-return branch
+      // (mirrors --providers/--memory/--ram-experiment below) — never runs the
+      // full health check, never touches providers/network.
+      if (opts.fix) {
+        const actions = planDoctorFixes(root);
+        const results = opts.yes ? applyDoctorFixes(actions) : undefined;
+        if (opts.json) {
+          print(JSON.stringify({
+            dryRun: !opts.yes,
+            actions,
+            results: results ?? null,
+          }, null, 2));
+        } else {
+          print(formatDoctorFixLines(actions, results).join('\n'));
+        }
+        const failed = results?.some(r => !r.applied) ?? false;
+        if (failed || (!results && actions.length > 0)) {
+          process.exitCode = 1;
+        }
+        return;
+      }
       const providers = await detectAvailableProviders();
       const activeProviderNames = providers.filter(p => p.available).map(p => p.name);
       // Read spawn_backend from config for Docker/tmux check context

@@ -8531,3 +8531,39 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 355-015: MESSAGES-KEYS-4 — round-8 i18n (tek-yetkili) (DONE)
 
 ---
+## Sprint 356 — sprint-356
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-02
+**Duration:** 1403s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 0 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1403491ms |
+
+### Tasks
+
+- 356-001: DASH-APPROVALS — pending-onay görüntüleyici (row 213) (DONE)
+- 356-002: API-APPROVALS — /api/approvals endpoint'leri (server.ts TEK-yetkili) (DONE)
+- 356-003: TAXONOMY-READPATH — ADR taksonomi kolonları read-mapping (row 160) (DONE)
+- 356-004: SPAWN-THROW-LIFECYCLE — SPAWN-fail error-path hang fix (born-435) (DONE)
+- 356-005: WLT-FEED-WIRE — progress-reader'ı state-feed'e bağla (run-state-feed TEK-yetkili) (DONE)
+- 356-006: DOCTOR-FIX — `deckent doctor --fix` güvenli-onarımlar (row 203 dilimi; doctor.ts TEK-yetkili) (DONE)
+- 356-007: ONB-DISCOVERY — kurulu provider-CLI auto-detect (row 205) (DONE)
+- 356-008: PKG-NAME-SSOT — install-hint paket-adları tek-kaynak (row 207) (DONE)
+- 356-009: PSL-6-WIRE — doctor'a gerçek-auth probe durumları (row 206) (DONE)
+- 356-010: APR-E2E-INT — onay-zinciri entegrasyon-suite'i (salt-test) (DONE)
+- 356-011: TERM2-WIRE — bg-event'leri turn'e bağla (native-agent-bridge TEK-yetkili) (DONE)
+- 356-012: TRACE-CONFIG-TYPES — gece-flag'lerinin tip-kaydı (config-types TEK-yetkili) (DONE)
+- 356-013: DASH-1 — scope-freeze/observability reframe dokümanı (row 211) (DONE)
+- 356-014: NERVOUS-APR-WIRE — köprüyü nervous-handler'lara tak (DONE)
+- 356-015: MESSAGES-KEYS-5 — round-9 i18n (tek-yetkili) (DONE)
+
+---

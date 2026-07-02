@@ -47,6 +47,12 @@ interface EntryRow {
   decay_exempt: number;
   metadata: string;
   tenant_id: string | null;
+  /** ADR taxonomy (ADR-G-019): class `G`|`D`|`UG`|`UP`. NULL for non-ADR rows. */
+  adr_class: string | null;
+  scope: string | null;
+  immutable: number | null;
+  source_authority: string | null;
+  enforcement_level: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -73,6 +79,11 @@ function rowToEntry(row: EntryRow): MemoryEntryV2 {
     decay_exempt: row.decay_exempt === 1,
     metadata: row.metadata,
     tenant_id: row.tenant_id ?? null,
+    adr_class: row.adr_class ?? null,
+    scope: row.scope ?? null,
+    immutable: row.immutable ?? null,
+    source_authority: row.source_authority ?? null,
+    enforcement_level: row.enforcement_level ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
     deleted_at: row.deleted_at,
@@ -455,6 +466,18 @@ export class MemoryStore {
     const metadata = JSON.stringify(input.metadata ?? {});
     const tenantId = input.tenant_id ?? null;
 
+    // ADR-G-019 taxonomy columns — protect-by-omission: a caller that upserts
+    // without these fields (e.g. a generic title/content patch) must NOT erase
+    // existing classification. Only overwrite when the caller explicitly supplies
+    // a value; otherwise carry the existing row's value forward untouched.
+    const adrClass = input.adr_class !== undefined ? input.adr_class : existing.adr_class;
+    const adrScope = input.scope !== undefined ? input.scope : existing.scope;
+    const immutable = input.immutable !== undefined
+      ? (input.immutable ? 1 : 0)
+      : existing.immutable;
+    const sourceAuthority = input.source_authority !== undefined ? input.source_authority : existing.source_authority;
+    const enforcementLevel = input.enforcement_level !== undefined ? input.enforcement_level : existing.enforcement_level;
+
     const tagText = tags.join(' ');
     const titleNorm = turkishNormalize(input.title);
     const contentNorm = turkishNormalize(input.content);
@@ -479,6 +502,11 @@ export class MemoryStore {
       ['decay_exempt', existing.decay_exempt, decayExempt],
       ['metadata', existing.metadata, metadata],
       ['tenant_id', existing.tenant_id, tenantId],
+      ['adr_class', existing.adr_class, adrClass],
+      ['scope', existing.scope, adrScope],
+      ['immutable', existing.immutable, immutable],
+      ['source_authority', existing.source_authority, sourceAuthority],
+      ['enforcement_level', existing.enforcement_level, enforcementLevel],
     ];
 
     for (const [field, oldVal, newVal] of fieldMap) {
@@ -509,6 +537,11 @@ export class MemoryStore {
         decay_exempt = @decay_exempt,
         metadata = @metadata,
         tenant_id = @tenant_id,
+        adr_class = @adr_class,
+        scope = @scope,
+        immutable = @immutable,
+        source_authority = @source_authority,
+        enforcement_level = @enforcement_level,
         updated_at = datetime('now')
       WHERE id = @id
     `);
@@ -541,6 +574,11 @@ export class MemoryStore {
         decay_exempt: decayExempt,
         metadata,
         tenant_id: tenantId,
+        adr_class: adrClass,
+        scope: adrScope,
+        immutable,
+        source_authority: sourceAuthority,
+        enforcement_level: enforcementLevel,
       });
 
       // Replace tags
@@ -736,7 +774,29 @@ export class MemoryStore {
     return row ? rowToEntry(row) : null;
   }
 
-  getByType(type: string, tenantId?: string): MemoryEntryV2[] {
+  /**
+   * `filters` (ADR-G-019 taxonomy, class-aware recall): optional `adr_class`/`scope`
+   * equality filters, appended as additional AND clauses. Omitted (default) →
+   * SQL text is unchanged from pre-taxonomy behavior — byte-identical for all
+   * existing call sites.
+   */
+  getByType(
+    type: string,
+    tenantId?: string,
+    filters?: { adr_class?: string; scope?: string },
+  ): MemoryEntryV2[] {
+    const extraClauses: string[] = [];
+    const extraParams: unknown[] = [];
+    if (filters?.adr_class !== undefined) {
+      extraClauses.push('adr_class = ?');
+      extraParams.push(filters.adr_class);
+    }
+    if (filters?.scope !== undefined) {
+      extraClauses.push('scope = ?');
+      extraParams.push(filters.scope);
+    }
+    const extraSql = extraClauses.length > 0 ? ` AND ${extraClauses.join(' AND ')}` : '';
+
     let rows: EntryRow[];
     if (tenantId !== undefined) {
       // WARNING: When strictTenantIsolation is false (default), this query includes
@@ -749,12 +809,12 @@ export class MemoryStore {
         ? 'tenant_id = ?'
         : '(tenant_id = ? OR tenant_id IS NULL)';
       rows = this.db.prepare(
-        `SELECT * FROM entries WHERE type = ? AND deleted_at IS NULL AND ${tenantClause} ORDER BY sprint_num DESC`,
-      ).all(type, tenantId) as EntryRow[];
+        `SELECT * FROM entries WHERE type = ? AND deleted_at IS NULL AND ${tenantClause}${extraSql} ORDER BY sprint_num DESC`,
+      ).all(type, tenantId, ...extraParams) as EntryRow[];
     } else {
       rows = this.db.prepare(
-        `SELECT * FROM entries WHERE type = ? AND deleted_at IS NULL ORDER BY sprint_num DESC`,
-      ).all(type) as EntryRow[];
+        `SELECT * FROM entries WHERE type = ? AND deleted_at IS NULL${extraSql} ORDER BY sprint_num DESC`,
+      ).all(type, ...extraParams) as EntryRow[];
     }
     return rows.map(rowToEntry);
   }

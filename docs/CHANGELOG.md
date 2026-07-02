@@ -2,6 +2,15 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint356] - 2026-07-02
+
+### Added
+
+- No completed tasks
+
+
+_Tasks: 0 total, 0 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint355] - 2026-07-01
 
 ### Added
