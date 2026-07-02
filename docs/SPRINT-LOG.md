@@ -8679,3 +8679,41 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 359-016: AUTONOMOUS-MCP — autonomous start/backlog/status MCP yüzeyi (Sıra-74 dilim) (DONE)
 
 ---
+## Sprint 360 — sprint-360
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-02
+**Duration:** 19625s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 28 |
+| Completed | 26 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 19625105ms |
+
+### Tasks
+
+- 360-001: Fix debt: Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L (DONE)
+- 360-002: LIMIT-PREFLIGHT — abonelik-pencere probu (claude -p "/usage" parse) (DONE)
+- 360-003: LIMIT-GATE-WIRE — `deckent limits` komutu + start-gate (flag'li) (NOT_DISPATCHED)
+- 360-004: GPT55-CATALOG — gpt-5.5 model-kaydı (feed-fiyatlı, zero-hardcode) (DONE)
+- 360-005: CODEX-SPAWN-READINESS — codex worker-yolunun canlı-hazırlık denetimi (DONE)
+- 360-006: OPENROUTER-ADAPTER — OpenRouter worker/chat adaptör çekirdeği (DONE)
+- 360-007: OPENROUTER-FREE-PROBE — ücretsiz-model envanteri + settings + doc (DONE)
+- 360-008: OPENROUTER-DOC-ROUTE — doc-kind işleri free-modele yönlendirme (flag'li) (NOT_DISPATCHED)
+- 360-009: F11-016-STAB — Ink REPL stabilizasyon dilimi (app.tsx) (DONE)
+- 360-010: TERM-NAT-M5 — parite-kapısındaki bilinen-sapmaları kapat (DONE)
+- 360-011: F11-014-CODEX-PARITY — REPL codex send-yolu parite testleri (DONE)
+- 360-012: F2-008-SDK-1 — gömülebilir SDK round-trip dilim-1 (zero-CLI-prereq) (DONE)
+- 360-013: APR-HISTORY-WIRE — endpoint'i canlı server'a bağla (71 kapanışı) (GO_WITH_TECH_DEBT)
+- 360-014: CODEX-DOGFOOD-A — üç-sprint worker-kalite karşılaştırma analizi (GERÇEK codex-worker) (DONE)
+- 360-015: CODEX-DOGFOOD-B — wrapper-sh bağımsız POSIX-denetimi (GERÇEK codex-worker) (DONE)
+- 360-016: HOOK-DISPATCH-WIRE — ToolHookRegistry'yi dispatch'e bağla (84 kapanışı, flag'li) (DONE)
+- 360-017: HISTORY-INK-WIRE — input-history'yi input-bar'a bağla (65 kapanışı) (DONE)
+
+---

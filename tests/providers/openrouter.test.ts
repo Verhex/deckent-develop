@@ -1,0 +1,346 @@
+/**
+ * Contract tests for OpenRouterProvider (Sprint 360 Task 360-006).
+ *
+ * goCriteria: fake-fetch send() round-trip + usage-map + error-path + single-retry;
+ * secret NEVER plain-written to process.env (test: process.env stays clean);
+ * `tsc` clean.
+ *
+ * Fully hermetic: `fetchImpl` is injected (zero network), `loadSecretsImpl` is
+ * injected (zero disk I/O — `.deck` is never read from), and `process.env` is
+ * snapshotted/restored around every test so this suite leaves zero global state.
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { OpenRouterProvider, createOpenRouterAdapter } from '../../src/providers/openrouter.js';
+import { ProviderError } from '../../src/core/provider.js';
+
+const OPENROUTER_API_KEY_ENV = 'OPENROUTER_API_KEY';
+const DECKENT_OPENROUTER_API_KEY_ENV = 'DECKENT_OPENROUTER_API_KEY';
+
+// ─── Helpers ─────────────────────────────────────────────────────────
+
+function fakeSecrets(key: string | undefined): (projectRoot: string) => Record<string, string> {
+  return () => (key ? { [OPENROUTER_API_KEY_ENV]: key } : {});
+}
+
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function makeProvider(overrides: Parameters<typeof createOpenRouterAdapter>[1] = {}) {
+  return createOpenRouterAdapter('/fake/project', {
+    loadSecretsImpl: fakeSecrets('test-key-abc123'),
+    ...overrides,
+  });
+}
+
+// Every env var these tests could theoretically touch — snapshot + restore.
+const TOUCHED_ENV = [OPENROUTER_API_KEY_ENV, DECKENT_OPENROUTER_API_KEY_ENV];
+let envSnapshot: Record<string, string | undefined>;
+
+beforeEach(() => {
+  envSnapshot = {};
+  for (const key of TOUCHED_ENV) envSnapshot[key] = process.env[key];
+});
+
+afterEach(() => {
+  for (const key of TOUCHED_ENV) {
+    if (envSnapshot[key] === undefined) delete process.env[key];
+    else process.env[key] = envSnapshot[key];
+  }
+  vi.restoreAllMocks();
+});
+
+// ─── send() round-trip + usage-map (goNogo) ───────────────────────────
+
+describe('OpenRouterProvider.send()', () => {
+  it('POSTs /chat/completions and maps a real OpenRouter response (content + usage + model)', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      jsonResponse(200, {
+        id: 'gen-1718000000-abcdef',
+        model: 'openai/o3-mini',
+        choices: [{ message: { role: 'assistant', content: 'The answer is 42.' } }],
+        usage: {
+          prompt_tokens: 1024,
+          completion_tokens: 512,
+          total_tokens: 1536,
+          prompt_tokens_details: { cached_tokens: 256 },
+          completion_tokens_details: { reasoning_tokens: 128 },
+        },
+      }),
+    );
+    const provider = makeProvider({ fetchImpl });
+
+    const result = await provider.send(
+      [{ role: 'user', content: 'What is 6*7?' }],
+      'openai/o3-mini',
+    );
+
+    expect(result.content).toBe('The answer is 42.');
+    expect(result.model).toBe('openai/o3-mini');
+    expect(result.usage).toEqual({ inputTokens: 1024, outputTokens: 512 });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
+    expect(init.method).toBe('POST');
+    expect(init.headers['Authorization']).toBe('Bearer test-key-abc123');
+    const body = JSON.parse(init.body as string);
+    expect(body.model).toBe('openai/o3-mini');
+    expect(body.stream).toBe(false);
+  });
+
+  it('honors a config-overridden baseURL (trailing slash stripped)', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      jsonResponse(200, { choices: [{ message: { content: 'ok' } }] }),
+    );
+    const provider = makeProvider({ fetchImpl, baseURL: 'https://custom.gateway.example/v9/' });
+
+    await provider.send([{ role: 'user', content: 'hi' }], 'anthropic/claude-3.7-sonnet');
+
+    const [url] = fetchImpl.mock.calls[0]!;
+    expect(url).toBe('https://custom.gateway.example/v9/chat/completions');
+  });
+
+  it('surfaces tool_calls when the model requests tools', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      jsonResponse(200, {
+        choices: [
+          {
+            message: {
+              content: '',
+              tool_calls: [
+                { id: 'call_1', type: 'function', function: { name: 'read_file', arguments: '{"path":"a.ts"}' } },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+    const provider = makeProvider({ fetchImpl });
+
+    const result = await provider.send(
+      [{ role: 'user', content: 'read a.ts' }],
+      'openai/gpt-4o',
+      { tools: [{ type: 'function', function: { name: 'read_file' } }] },
+    );
+
+    expect(result.toolCalls).toEqual([
+      { id: 'call_1', type: 'function', function: { name: 'read_file', arguments: '{"path":"a.ts"}' } },
+    ]);
+  });
+
+  it('rejects a blank model id without ever calling fetch', async () => {
+    const fetchImpl = vi.fn();
+    const provider = makeProvider({ fetchImpl });
+
+    await expect(provider.send([{ role: 'user', content: 'hi' }], '')).rejects.toThrow(ProviderError);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Error path (hata-yolu, goNogo) ────────────────────────────────────
+
+describe('OpenRouterProvider error path', () => {
+  it('throws honestly (no silent-empty) when the deck secret is missing — never calls fetch', async () => {
+    const fetchImpl = vi.fn();
+    const provider = makeProvider({ fetchImpl, loadSecretsImpl: fakeSecrets(undefined) });
+
+    await expect(provider.send([{ role: 'user', content: 'hi' }], 'openai/gpt-4o')).rejects.toThrow(
+      /OPENROUTER_API_KEY/,
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('throws with the real status + body on a 4xx — no retry (client error)', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(401, { error: { message: 'invalid api key' } }));
+    const provider = makeProvider({ fetchImpl });
+
+    await expect(
+      provider.send([{ role: 'user', content: 'hi' }], 'openai/gpt-4o'),
+    ).rejects.toThrow(/401/);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('never resolves to an empty/undefined result on failure — always throws', async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new Error('boom'));
+    const provider = makeProvider({ fetchImpl });
+
+    await expect(provider.send([{ role: 'user', content: 'hi' }], 'openai/gpt-4o')).rejects.toBeInstanceOf(
+      ProviderError,
+    );
+  });
+});
+
+// ─── Single retry (retry-tek, goNogo) ─────────────────────────────────
+
+describe('OpenRouterProvider single-retry', () => {
+  it('retries exactly once on a network error, then succeeds', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('ECONNRESET'))
+      .mockResolvedValueOnce(jsonResponse(200, { choices: [{ message: { content: 'recovered' } }] }));
+    const provider = makeProvider({ fetchImpl });
+
+    const result = await provider.send([{ role: 'user', content: 'hi' }], 'openai/gpt-4o');
+
+    expect(result.content).toBe('recovered');
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries exactly once on a network error, then throws honestly if it fails again', async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new Error('ECONNRESET'));
+    const provider = makeProvider({ fetchImpl });
+
+    await expect(provider.send([{ role: 'user', content: 'hi' }], 'openai/gpt-4o')).rejects.toThrow(
+      /ECONNRESET/,
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(2); // 1 initial + 1 retry, never more
+  });
+
+  it('retries exactly once on a transient 5xx, then succeeds', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(503, { error: 'upstream overloaded' }))
+      .mockResolvedValueOnce(jsonResponse(200, { choices: [{ message: { content: 'ok now' } }] }));
+    const provider = makeProvider({ fetchImpl });
+
+    const result = await provider.send([{ role: 'user', content: 'hi' }], 'openai/gpt-4o');
+
+    expect(result.content).toBe('ok now');
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries exactly once on a transient 5xx, then throws with the real status if it fails again', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(500, { error: 'still down' }));
+    const provider = makeProvider({ fetchImpl });
+
+    await expect(provider.send([{ role: 'user', content: 'hi' }], 'openai/gpt-4o')).rejects.toThrow(/500/);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ─── extractUsage() — TaskResult tokenUsage shape ─────────────────────
+
+describe('OpenRouterProvider.extractUsage()', () => {
+  it('maps a real OpenRouter usage block into the normalized TokenUsage shape', () => {
+    const provider = makeProvider();
+    const raw = JSON.stringify({
+      model: 'openai/o3-mini',
+      choices: [{ message: { content: 'hi' } }],
+      usage: {
+        prompt_tokens: 1024,
+        completion_tokens: 512,
+        total_tokens: 1536,
+        prompt_tokens_details: { cached_tokens: 256 },
+        completion_tokens_details: { reasoning_tokens: 128 },
+      },
+    });
+
+    expect(provider.extractUsage(raw)).toEqual({
+      inputTokens: 1024,
+      outputTokens: 512,
+      cacheReadTokens: 256,
+      cacheCreationTokens: 0,
+      reasoningTokens: 128,
+      totalTokens: 1536,
+      source: 'provider-adapter',
+    });
+  });
+
+  it('falls back to inputTokens + outputTokens when total_tokens is absent', () => {
+    const provider = makeProvider();
+    const raw = JSON.stringify({ usage: { prompt_tokens: 30, completion_tokens: 12 } });
+    expect(provider.extractUsage(raw)?.totalTokens).toBe(42);
+  });
+
+  it('returns null for no usage, empty usage, or malformed input', () => {
+    const provider = makeProvider();
+    expect(provider.extractUsage(JSON.stringify({ choices: [] }))).toBeNull();
+    expect(provider.extractUsage(JSON.stringify({ usage: {} }))).toBeNull();
+    expect(provider.extractUsage('not json')).toBeNull();
+    expect(provider.extractUsage('')).toBeNull();
+  });
+});
+
+// ─── Secret never plain-written to env (goNogo) ────────────────────────
+
+describe('OpenRouterProvider — no plain-env secret write', () => {
+  it('never assigns the resolved key to process.env, across success, retry, and error paths', async () => {
+    delete process.env[OPENROUTER_API_KEY_ENV];
+    delete process.env[DECKENT_OPENROUTER_API_KEY_ENV];
+
+    const fetchImpl = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('transient'))
+      .mockResolvedValueOnce(jsonResponse(200, { choices: [{ message: { content: 'ok' } }] }))
+      .mockResolvedValueOnce(jsonResponse(401, { error: 'nope' }));
+    const provider = makeProvider({ fetchImpl, loadSecretsImpl: fakeSecrets('super-secret-value') });
+
+    await provider.send([{ role: 'user', content: 'hi' }], 'openai/gpt-4o'); // success w/ 1 retry
+    await provider.send([{ role: 'user', content: 'hi' }], 'openai/gpt-4o').catch(() => undefined); // 401
+
+    expect(process.env[OPENROUTER_API_KEY_ENV]).toBeUndefined();
+    expect(process.env[DECKENT_OPENROUTER_API_KEY_ENV]).toBeUndefined();
+  });
+
+  it('isAvailable()/diagnoseAvailability() resolve the key without ever touching process.env', async () => {
+    delete process.env[OPENROUTER_API_KEY_ENV];
+    const provider = makeProvider({ loadSecretsImpl: fakeSecrets('another-secret') });
+
+    await expect(provider.isAvailable()).resolves.toBe(true);
+    const detail = await provider.diagnoseAvailability();
+    expect(detail.available).toBe(true);
+
+    expect(process.env[OPENROUTER_API_KEY_ENV]).toBeUndefined();
+  });
+
+  it('isAvailable() is false (never throws) when the deck secret is absent', async () => {
+    const provider = makeProvider({ loadSecretsImpl: fakeSecrets(undefined) });
+    await expect(provider.isAvailable()).resolves.toBe(false);
+    const detail = await provider.diagnoseAvailability();
+    expect(detail.available).toBe(false);
+    expect(detail.authStatus).toBe('missing');
+  });
+
+  it('resolves DECKENT_OPENROUTER_API_KEY as a fallback when the bare key is absent ($DECK: dual-lookup parity)', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { choices: [{ message: { content: 'ok' } }] }));
+    const provider = makeProvider({
+      fetchImpl,
+      loadSecretsImpl: () => ({ DECKENT_OPENROUTER_API_KEY: 'prefixed-secret' }),
+    });
+
+    await provider.send([{ role: 'user', content: 'hi' }], 'openai/gpt-4o');
+
+    const [, init] = fetchImpl.mock.calls[0]!;
+    expect(init.headers['Authorization']).toBe('Bearer prefixed-secret');
+  });
+});
+
+// ─── Interface shape sanity (ProviderAdapter contract) ─────────────────
+
+describe('OpenRouterProvider — ProviderAdapter contract shape', () => {
+  it('exposes the required ProviderAdapter surface', () => {
+    const provider = makeProvider();
+    expect(provider.name).toBe('openrouter');
+    expect(Array.isArray(provider.supportedModels)).toBe(true);
+    expect(provider.supportedModels.length).toBeGreaterThan(0);
+    expect(typeof provider.spawn).toBe('function');
+    expect(typeof provider.kill).toBe('function');
+    expect(typeof provider.listWorkers).toBe('function');
+    expect(typeof provider.buildCommand).toBe('function');
+    expect(provider.listWorkers()).toEqual([]);
+    expect(provider.buildCommand('anthropic/claude-3.7-sonnet' as never, '/tmp/prompt.txt')).toMatch(
+      /openrouter/,
+    );
+  });
+
+  it('is constructible via the createOpenRouterAdapter factory', () => {
+    const provider = createOpenRouterAdapter('/fake/project');
+    expect(provider).toBeInstanceOf(OpenRouterProvider);
+  });
+});

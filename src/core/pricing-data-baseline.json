@@ -165,6 +165,28 @@
           "_verified_at": "2026-04-15",
           "_notes": "OpenAI auto-caches (no explicit cache_control needed). Reasoning tokens billed at output rate, folded into output_tokens."
         },
+        "gpt-5.5": {
+          "input_cost_per_token": 5e-06,
+          "output_cost_per_token": 3e-05,
+          "cache_creation_input_token_cost": null,
+          "cache_creation_input_token_cost_above_1hr": null,
+          "cache_read_input_token_cost": 5e-07,
+          "max_input_tokens": 1050000,
+          "max_output_tokens": 128000,
+          "supports_prompt_caching": true,
+          "supports_reasoning": true,
+          "supports_vision": true,
+          "supports_tool_choice": true,
+          "deckent_tier": "premium",
+          "deckent_aliases": [
+            "gpt-5.5",
+            "gpt55"
+          ],
+          "enabled": true,
+          "_source": "litellm",
+          "_verified_at": "2026-07-02",
+          "_notes": "Sprint 360 task 360-004 — live-fetched+disk-verified from the LiteLLM feed (raw.githubusercontent.com/BerriAI/litellm/main/litellm/model_prices_and_context_window_backup.json) key \"gpt-5.5\" (litellm_provider=openai, mode=chat) on 2026-07-02: input=$5.00/MTok, output=$30.00/MTok, cache_read=$0.50/MTok, max_input_tokens=1,050,000, max_output_tokens=128,000, supports_reasoning/vision/tool_choice/prompt_caching all true — not fabricated. Distinct from the registry's 'gpt-5' apiId-shim (Sprint 248); registry counterpart is CODEX_PARITY_MODELS in model-registry.ts (opt-in via registerCodexParityModels(), not yet auto-wired into a Codex provider bootstrap)."
+        },
         "gpt-5-mini": {
           "input_cost_per_token": 2.5e-07,
           "output_cost_per_token": 2e-06,

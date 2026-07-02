@@ -11,6 +11,7 @@ import { useState, useRef, type ReactElement } from 'react';
 import { appendFileSync } from 'node:fs';
 import type { Key } from 'node:readline';
 import { editInput, EMPTY_INPUT, InputHistory, type InputState } from './line-edit.js';
+import { appendHistory, HistoryNavigator, loadHistory } from './input-history.js';
 import { filterSlashCommands } from '../commands/chat-slash-menu.js';
 import type { SlashRegistry, SlashCommand } from '../commands/chat-slash-registry.js';
 
@@ -30,6 +31,40 @@ export interface InputBarProps {
   slashRegistry?: SlashRegistry;
   /** Localized hint shown under the menu (e.g. "↑↓ gez · Enter seç · Esc kapat"). */
   menuHint?: string;
+  /** Project root for persistent history (`.deckent/settings/repl-history`).
+   * Injectable for tests (tmpdir); defaults to `process.cwd()` — the real
+   * REPL's project root — when the caller (app.tsx) doesn't override it. */
+  historyProjectRoot?: string;
+}
+
+/** Persistent (disk-backed), prefix-filtered history for one InputBar instance. */
+export interface HistoryController {
+  /** Entries loaded from disk at construction, grown in place as lines submit —
+   * shared by reference with `navigator` so pushes stay visible without rebuilding it. */
+  entries: string[];
+  navigator: HistoryNavigator;
+}
+
+/** Load persisted history for `projectRoot` and wrap it in a fresh navigator. */
+export function createHistoryController(projectRoot: string): HistoryController {
+  const entries = loadHistory(projectRoot);
+  return { entries, navigator: new HistoryNavigator(entries) };
+}
+
+/** Resolve the next input state for a ↑/↓ history-navigation signal (the
+ * `-1|1` editInput emits for up/down). Prefix-filters against `buffer` when
+ * navigation is (re)entered — mirrors HistoryNavigator's own semantics. */
+export function resolveHistoryNav(navigator: HistoryNavigator, dir: -1 | 1, buffer: string): InputState {
+  const next = navigator.navigate(dir === -1 ? 'up' : 'down', buffer, buffer);
+  return { buffer: next, cursor: next.length };
+}
+
+/** Record a submitted line into the persistent (disk) + in-session history,
+ * then reset navigation back to the live line. Call on every Enter-submit. */
+export function recordHistoryEntry(projectRoot: string, controller: HistoryController, line: string): void {
+  controller.entries.push(line);
+  appendHistory(projectRoot, line);
+  controller.navigator.reset();
 }
 
 /** Interactive slash menu is open when the buffer is a bare `/command` prefix
@@ -73,13 +108,17 @@ function CaretText({ state }: { state: InputState }): ReactElement {
 
 export function InputBar(props: InputBarProps): ReactElement {
   const { active, onSubmit, onInterrupt, onClear, slashRegistry, menuHint } = props;
+  const projectRoot = props.historyProjectRoot ?? process.cwd();
   const [state, setState] = useState<InputState>(EMPTY_INPUT);
   const [menuSel, setMenuSel] = useState(0);
   const [search, setSearch] = useState<{ q: string; idx: number } | null>(null);
   const stateRef = useRef<InputState>(EMPTY_INPUT);
   const menuSelRef = useRef(0);
   const searchRef = useRef<{ q: string; idx: number } | null>(null);
-  const history = useRef(new InputHistory());
+  const history = useRef(new InputHistory()); // Ctrl-R search only — HistoryNavigator has no search()
+  const persistentHistoryRef = useRef<HistoryController | null>(null);
+  if (persistentHistoryRef.current === null) persistentHistoryRef.current = createHistoryController(projectRoot);
+  const persistentHistory = persistentHistoryRef.current;
   const set = (s: InputState): void => { stateRef.current = s; setState(s); };
   const setSel = (n: number): void => { menuSelRef.current = n; setMenuSel(n); };
   const setSearchBoth = (s: { q: string; idx: number } | null): void => { searchRef.current = s; setSearch(s); };
@@ -139,6 +178,7 @@ export function InputBar(props: InputBarProps): ReactElement {
       } else {
         const line = stateRef.current.buffer + withoutTrailing;
         history.current.push(line); // keep history (Ctrl-R) consistent with the lone-Enter path
+        recordHistoryEntry(projectRoot, persistentHistory, line);
         onSubmit(line);
         set(EMPTY_INPUT);
       }
@@ -149,12 +189,12 @@ export function InputBar(props: InputBarProps): ReactElement {
     if (res.signal === 'int') { onInterrupt(); set(EMPTY_INPUT); return; }
     if (res.signal === 'eof') { onInterrupt(); return; }
     if (res.history) {
-      const next = history.current.navigate(res.history, stateRef.current.buffer);
-      set({ buffer: next, cursor: next.length });
+      set(resolveHistoryNav(persistentHistory.navigator, res.history, stateRef.current.buffer));
       return;
     }
     if (res.submit !== undefined) {
       history.current.push(res.submit);
+      recordHistoryEntry(projectRoot, persistentHistory, res.submit);
       onSubmit(res.submit);
       set(EMPTY_INPUT);
       return;

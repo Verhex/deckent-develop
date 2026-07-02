@@ -2,6 +2,32 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint360] - 2026-07-02
+
+### Added
+
+- LIMIT-PREFLIGHT — abonelik-pencere probu (claude -p "/usage" parse)
+- GPT55-CATALOG — gpt-5.5 model-kaydı (feed-fiyatlı, zero-hardcode)
+- CODEX-SPAWN-READINESS — codex worker-yolunun canlı-hazırlık denetimi
+- OPENROUTER-ADAPTER — OpenRouter worker/chat adaptör çekirdeği
+- OPENROUTER-FREE-PROBE — ücretsiz-model envanteri + settings + doc
+- F11-016-STAB — Ink REPL stabilizasyon dilimi (app.tsx)
+- TERM-NAT-M5 — parite-kapısındaki bilinen-sapmaları kapat
+- F11-014-CODEX-PARITY — REPL codex send-yolu parite testleri
+- F2-008-SDK-1 — gömülebilir SDK round-trip dilim-1 (zero-CLI-prereq)
+- CODEX-DOGFOOD-A — üç-sprint worker-kalite karşılaştırma analizi (GERÇEK codex-worker)
+
+### Changed
+
+- APR-HISTORY-WIRE — endpoint'i canlı server'a bağla (71 kapanışı) (completed with tech debt)
+
+### Fixed
+
+- Fix debt: Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L
+
+
+_Tasks: 28 total, 26 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint359] - 2026-07-02
 
 ### Added

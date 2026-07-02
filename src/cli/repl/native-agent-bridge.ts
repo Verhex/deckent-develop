@@ -17,7 +17,17 @@ import type { PermissionResponse } from '../../agent/loop.js';
 import type { ToolInfo } from './app.js';
 import type { ChatTurnQueue, ChatTurnPayload } from './chat-turn-queue.js';
 
-/** The view's engine contract (same shape the legacy runChatNativeLoop satisfies). */
+/** The view's engine contract (same shape the legacy runChatNativeLoop satisfies).
+ *  `onTurnEnd` intentionally stays `{inputTokens, outputTokens}` — no `elapsedMs`, unlike
+ *  legacy's `{elapsedMs, usage?}` (chat-native.ts's `ChatNativeOptions.onTurnEnd`). This is
+ *  a KNOWN, tracked divergence (NATIVE-M5-GATE KNOWN_DIVERGENCES id
+ *  'onturnend-stats-shape', tests/cli/native-parity-gate.test.ts) — the practical gap is
+ *  already closed for the one real consumer via `native-elapsed.ts`'s `measuredOnTurnEnd`
+ *  (wired at app.tsx's nativeEngine call site), NOT here: widening this raw shape would
+ *  require `runTurn` below to always emit `elapsedMs`, which breaks
+ *  `tests/cli/native-agent-bridge.test.ts`'s exact `toEqual({inputTokens, outputTokens})`
+ *  assertion on the raw engine contract. Leave as-is; see the divergence entry for the
+ *  full disk-verified rationale. */
 export type ReplEngine = (
   input: string,
   cbs: { output: (text: string) => void; onTurnEnd: (stats: { inputTokens: number; outputTokens: number }) => void },

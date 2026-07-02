@@ -1,311 +1,311 @@
-# DIRECTIVES — SPRINT-359: BORN-TEMİZLİĞİ + PARITE + KATALOG-GENİŞLEME (16 task)
+# DIRECTIVES — SPRINT-360: LIMIT-PREFLIGHT + PROVIDER-GENİŞLEME + NATIVE-M5 + WIRE-KALANLARI (16 task)
 
 ## Goal
-358-analiz born'larını kapat (dep-normalize, wrapper-hb, ADR-pointer, route-domain, allowlist,
-tmux-parite), TOOL-REG dilim-2, terminal compat/simple/hardening, CLI-MCP parite + agent-skill
-katalog-genişleme dilimi, APR-history paneli, hook-seam ve autonomous-MCP yüzeyi.
+Abonelik-limit preflight'ı (claude -p "/usage" probe) + gate; gpt-5.5 katalog + 2 canlı codex-dogfood;
+OpenRouter provider-adapter + free-model probe + doc-route; native-üçlü ilerleme (F11-016/TERM-NAT/
+F11-014); F2-008 SDK dilim-1; 359 wire-kalanları (APR-history server, hook-dispatch, history-inputbar).
 DISK-VERIFY → hermetik-test. Yasa #1/#2/#3.
 
 ## 🔒 BAĞLAYICI — her task
-- **DISTINCT-FILE** (task-builder.ts YALNIZ Task 1 · spawn-backend-docker.ts YALNIZ Task 2 ·
-  tmux.ts YALNIZ Task 3 · adr-selector.ts YALNIZ Task 4 · routing-engine.ts YALNIZ Task 5 ·
-  chat-mode.ts YALNIZ Task 8 · **app.tsx/run.tsx/chat-native.ts BU SPRINT'TE KİMSEYE KAPALI**).
-- **DISK-VERIFY first**; ADR (D-004 yön: core→orchestra YASAK); surgical; YAGNI.
-- **Hermetik test** (tmpdir, async spawn, fake-clock); gerçek provider/exec/ağ YOK. **No build/install/login.**
-- **npm/yarn/pnpm install-ailesi ASLA** — ihtiyaçta Dependency-Mutation Advisory kanalı.
-- **goCriteria = makine-denetlenebilir**; flag-gated default-off + CANLI loadConfig round-trip
-  (yeni config-alanı eklersen tests/core/config-flag-roundtrip.test.ts kapanına da ekle!).
-- **Mekanizma string-free**; dashboard işinde EMOJI YASAK (lucide-react). **Honest result. No haiku.**
+- **DISTINCT-FILE** (app.tsx YALNIZ Task 8 · native-agent-bridge.ts YALNIZ Task 9 ·
+  chat-provider-parity.ts YALNIZ Task 10 · src/api/server.ts YALNIZ Task 12 · tool-dispatch.ts
+  YALNIZ Task 15 · input-bar.ts YALNIZ Task 16 · run.tsx/chat-native.ts KAPALI).
+- **DISK-VERIFY first**; ADR (D-004 yön); surgical; YAGNI. **Hermetik test**; gerçek ağ/provider-çağrısı
+  YOK (fetch/spawn injectable). **No build/install/login. npm-install ASLA** (advisory-kanal).
+- **Flag-gated default-off** + yeni config-alanı → config-types + resolver-passthrough +
+  tests/core/config-flag-roundtrip.test.ts kapanına EKLE (born-464 üçlüsü).
+- **Zero-hardcode:** model-fiyatı/listesi feed'den ya da dürüst-⏳; katalog canlı-veriden.
+- **Mekanizma string-free**; user-facing getMessage. **Honest result. No haiku.**
 
 ---
 
-## Task 1: DEP-NORMALIZE — dependency-ref'leri plan-yazımında slot-ID'ye çevir (born-465)
+## Task 1: LIMIT-PREFLIGHT — abonelik-pencere probu (claude -p "/usage" parse)
 - Model: sonnet
 - Effort: high
 - Skills: typescript-expert
-- Files: src/orchestra/task-builder.ts, tests/orchestra/dep-normalize.test.ts
-- Scope: src/orchestra/, tests/orchestra/, docs/adr/
-- Dependencies: none
-### Description
-born-465: title-prefix ref'ler task-JSON'a HAM yazılıyor; üç runtime-katmanı üç farklı davranıyor
-(wave-yolu çözer ✓, scheduler düşürür, planContinuous sonsuz-bekletir). Fix: structured-plan yolunda,
-task-listesi tamamlandıktan sonra HER task'ın dependencies'ini `resolveTaskDependencies` (MEVCUT
-yardımcı) ile slot-ID'ye normalize et ve task-JSON'a NORMALİZE halini yaz; 358-010'un WARN/strict
-davranışı korunur (çözülmeyen ref normalize'da da WARN + drop / strict'te blok). AI-planner yolundaki
-mevcut normalize (planner.ts:904) davranışı değişmez.
-### goNogo
-- goCriteria: title-prefix'li DIRECTIVES fixture → yazılan task-JSON'da deps=["NNN-NNN"] (test);
-  "Task N"+integer+slot-id yolları da normalize; çözülmeyen ref WARN+drop (strict'te throw); mevcut
-  dep-testleri (dep-ref-loud dahil) yeşil; `tsc` temiz.
-- nogo: parser giriş-formatlarını değiştirmek; planner.ts/scheduler değişikliği.
-
-## Task 2: WRAPPER-HB-GATE + ALLOWLIST-SSOT (born-468 + born-471)
-- Model: sonnet
-- Effort: high
-- Skills: typescript-expert, secure-coding
-- Files: src/orchestra/spawn-backend-docker.ts, tests/orchestra/wrapper-hb-allowlist.test.ts
-- Scope: src/orchestra/, tests/orchestra/, docs/adr/
-- Dependencies: none
-### Description
-İki aynı-dosya fix'i: (a) **born-468** — wrapper hb-döngüsü worker'ın zengin hb'sini eziyor →
-staleness-gate: yazmadan önce $HBFILE mtime'ına bak, ~40sn'den tazeyse DOKUNMA (worker yazıyor);
-yazarken tmp+mv atomic. (b) **born-471** — `--allowedTools` Write/Edit allowlist'ini scope.filesWrite'tan
-üret (read-dirs YALNIZ Read/Glob/Grep'e; redundant dizin+dosya karışımı bitsin; docs/adr yazımı ancak
-filesWrite'ta docs/ varsa açılır). Bash-kısıtsız gerçeği docs/adr'a değil `.result` docImpact-notuna —
-ADR-G-034 amendment'ı Alperen-karar-kapısı.
-### goNogo
-- goCriteria: üretilen wrapper-metni testleri — taze-hb'de wrapper yazmaz / bayat-hb'de yazar (metin-
-  seviyesi assert + sh-parçası unit); allowlist yalnız filesWrite-türevi (fixture-task ile string-assert);
-  mevcut docker-exit-marker/timeout-with-work testleri yeşil; `tsc` temiz.
-- nogo: 473'ün CLAUDE_EXIT bölgesini bozmak; on_exit sınıflandırma değişikliği.
-
-## Task 3: TMUX-TIMEOUT-PARITY — tmux wrapper'ına 466-ailesi paritesi
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/orchestra/tmux.ts, tests/orchestra/tmux-timeout-parity.test.ts
-- Scope: src/orchestra/, tests/orchestra/, docs/adr/
-- Dependencies: none
-### Description
-tmux.ts:150 aynı `|| echo WORKER_TIMEOUT` deseni — docker'daki born-466 fix'inin paritesi (Yasa #2):
-exit-kodunu yakala, `.timeout` yalnız 124/137'de ve result-yokken; timeout'a `-k 30`. tmux-wrapper'ın
-mevcut trap/format sözleşmesi korunur.
-### goNogo
-- goCriteria: üretilen tmux-cmd string'i 124/137-koşullu marker içerir + `\|\| echo` kalıbı kalktı
-  (string-assert); mevcut tmux testleri yeşil; `tsc` temiz.
-- nogo: tmux oturum-yönetimi değişikliği.
-
-## Task 4: ADR-POINTER-PATH — tiered-injection pointer'ı erişilebilir dosyaya (born-469)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/orchestra/adr-selector.ts, tests/orchestra/adr-pointer-path.test.ts
-- Scope: src/orchestra/, tests/orchestra/, docs/adr/
-- Dependencies: none
-### Description
-born-469: `[background constraint — full text: .brain/memory.db adr-g-006]` pointer'ı worker
-read-scope'unda olmayan SQLite'a işaret ediyor (G-027 "one pointer away" fiilen kopuk). Fix:
-pointer'ı `docs/adr/<gerçek-dosya-adı>.md`'ye çevir — dosya-adını docs/adr dizininden id-prefix'le
-çözümle (adr-g-006-*.md); dosya bulunamazsa mevcut db-pointer'a fail-soft düş. +docImpact: G-027
-"scope-intersecting=full-body" metni ile Contract-tier uygulama ayrışması amendment-notu (.result'a).
-### goNogo
-- goCriteria: fixture docs/adr ağacıyla pointer docs-yoluna döner; dosya-yok→eski-pointer (test);
-  injection-audit/tier davranışı değişmez (mevcut adr-selector testleri yeşil); `tsc` temiz.
-- nogo: tier-sınıflandırma/skorlama değişikliği; docs/adr içerik değişikliği.
-
-## Task 5: ROUTE-DOMAIN-SCOPE — domain-sinyalini scope-path'ten türet (born-470, flag'li)
-- Model: sonnet
-- Effort: high
-- Skills: typescript-expert
-- Files: src/core/routing-engine.ts, tests/core/route-domain-scope.test.ts
+- Files: src/core/limit-preflight.ts, tests/core/limit-preflight.test.ts
 - Scope: src/core/, tests/core/, docs/adr/
 - Dependencies: none
 ### Description
-born-470 (3-sprint kanıtlı): domain-enrichment keyword-kanalı scope-path'i ezebiliyor (358-002:
-api-builder → Ink/REPL işi). Fix (flag `routing.domainFromScope`, default-off + config-types alanı +
-roundtrip-kapanına ekle): scope.filesWrite/directories path-öneklerinden domain çıkar
-(src/cli/repl|src/cli→terminal-ui · src/api→api · src/dashboard→frontend · src/core→core ·
-src/orchestra→orchestration · docs→doc · src/connectors→messaging), flag-on'da scope-domain
-keyword-domain'le ÇATIŞIRSA scope kazanır (ağırlık değil, öncelik). Flag-off byte-identical.
+CANLI-DOĞRULANMIŞ veri-kaynağı: `claude -p "/usage"` düz-metin döndürüyor —
+"Current session: 81% used · resets Jul 2, 8:30pm (Europe/Istanbul)" + "Current week (all models):
+31% ..." + "Current week (Fable): 26% ...". Modül: `probeSubscriptionLimits(opts)` — injectable
+spawn ile komutu koşar (timeout'lu), 3 satırı parse eder → { sessionPct, sessionResetAt,
+weekAllPct, weekAllResetAt, weekFablePct?, raw }; parse-edilemeyen çıktı → { unavailable: true,
+reason } (fail-honest, throw yok — CLI-format değişebilir); `evaluateLimitGate(probe, thresholds)`
+→ 'ok' | 'warn' | 'block' + insan-okur gerekçe. Reset-zamanı parse'ı timezone-adlı ("Europe/Istanbul")
+biçimi tolere eder; parse başarısızsa yalnız pct ile karar.
 ### goNogo
-- goCriteria: 358-002-şekilli fixture flag-on'da api-builder SEÇMEZ (terminal-ui domain'e uygun
-  implementer seçer); flag-off mevcut routing testleri byte-aynı yeşil; roundtrip-kapanı yeni alanı
-  görüyor; `tsc` temiz.
-- nogo: default-on; mevcut skor-tablosunu flag-off'ta değiştirmek.
+- goCriteria: gerçek-çıktı fixture'ından 3-alan parse; bozuk/eksik-çıktı → unavailable (throw yok);
+  eşik-matrisi (ok/warn/block) testli; spawn-inject (gerçek claude çağrılmaz); `tsc` temiz.
+- nogo: gerçek claude-çağrısı testte; format-değişiminde throw.
 
-## Task 6: TOOL-REG-2 — dynamic-schema-override + generation-memo dilimi (Sıra-24 devam)
+## Task 2: LIMIT-GATE-WIRE — `deckent limits` komutu + start-gate (flag'li)
 - Model: sonnet
 - Effort: high
 - Skills: typescript-expert
-- Files: src/core/tool-schema-override.ts, tests/core/tool-schema-override.test.ts
+- Files: src/cli/commands/limits.ts, src/cli/index.ts, src/cli/helpers/messages.ts, tests/cli/limits-command.test.ts
+- Scope: src/cli/, src/core/, tests/cli/, docs/adr/
+- Dependencies: LIMIT-PREFLIGHT
+- Smoke: node dist/cli/entry.js limits --json → exit 0 + sessionPct alanı
+### Description
+Task 1 üstüne: (a) `deckent limits [--json]` komutu — probe sonuçlarını insan-okur tablo + --json
+yapısal basar (getMessage en/tr); (b) start-yolu gate'i: config `limit_gate.{enabled,session_max_pct,
+weekly_max_pct}` (default-off; config-types+passthrough+roundtrip-kapanı) — enabled iken sprint-start
+öncesi probe koşulur, 'block' → start reddedilir (açık mesaj + reset-zamanı; --force-limits bypass
+bayrağı), 'warn' → uyarıyla devam. Start-yolu wire noktasını DISK-VERIFY et (cli start komutu / runSprint
+girişi — hangisi tek-noktaysa); dokunulan giriş-dosyası yalnız index.ts+limits.ts kalsın (start.ts
+gerekirse SCOPE'ta ama minimal-diff).
+### goNogo
+- goCriteria: limits-komut çıktı+--json (fixture-probe inject); gate block/warn/off yolları testli;
+  flag-off byte-aynı start; roundtrip-kapanı yeni alanları görür; en+tr key'ler; `tsc` temiz.
+- nogo: default-on gate; gerçek probe testte.
+
+## Task 3: GPT55-CATALOG — gpt-5.5 model-kaydı (feed-fiyatlı, zero-hardcode)
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/core/model-registry.ts, src/core/pricing-data-baseline.json, tests/core/gpt55-catalog.test.ts
 - Scope: src/core/, tests/core/, docs/adr/
 - Dependencies: none
 ### Description
-Sıra-24 kalan-dilim: (a) dynamic-schema-override — tool-şemasına proje-config'ten alan-düzeyi override
-(`.deckent/settings/tool-overrides.json`: default-değer/enum-daraltma/açıklama; zod-parse fail-soft);
-(b) generation-memo — describe-çıktısının (şema+açıklama) içerik-hash'li memoizasyonu (kaynak
-değişince invalid). tool-registry/search/availability'ye DOKUNMADAN kompozisyon-modülü.
+Codex CLI GPT-5.5'e bağlı ama katalogda yok. model-registry'ye `gpt-5.5` (id 'gpt-5.5', apiId
+feed-doğrulamalı, provider codex, tier premium; contextWindow/maxOutput feed'den) + baseline'a
+fiyat-girişi. Fiyat/parametre kaynağı: pricing-updater'ın litellm/openrouter feed-şemasından
+DISK-VERIFY ile oku (scripts ya da mevcut updater-fonksiyonlarını test-ortamında fixture'la çağır);
+feed'de gpt-5.5 YOKSA: registry-girişini `status:'preview'` + baseline `_notes:'price-unverified'`
+ile dürüst-işaretle ve gerçek değerleri notes'a "CC host-side updater-koşusuyla doğrulanacak" yaz —
+UYDURMA fiyat YAZMA (zero-hardcode).
 ### goNogo
-- goCriteria: override round-trip (tmpdir-config → şemada görünür; bozuk-dosya fail-soft); memo
-  hash-invalidasyonu (fake-kaynak değişimi → yeni üretim); shadow-policy YOK (dilim-dışı, notes'a);
-  `tsc` temiz.
-- nogo: tool-registry.ts/tool-search.ts/tool-availability.ts değişikliği.
+- goCriteria: registry+baseline girişleri tutarlı (alias'lar: 'gpt-5.5','gpt55'); catalog-testleri
+  + cost-config-loader baseline-testi yeşil; fiyat-kaynağı kanıtı notes'ta (feed-alıntısı ya da
+  dürüst-unverified); `tsc` temiz.
+- nogo: uydurma fiyat; mevcut model-girişlerini değiştirmek.
 
-## Task 7: TERM-COMPAT — REPL compat test-matrisi + PTY smoke (Sıra-52)
-- Model: sonnet
-- Effort: high
-- Skills: typescript-expert, ci-testing
-- Files: tests/cli/repl/term-compat-matrix.test.ts, docs/reference/terminal-compat.md
-- Scope: tests/cli/, src/cli/, docs/reference/
-- Dependencies: none
-### Description
-Sıra-52: REPL compat-matrisi TEST olarak — resize/paste/arrow/raw-mode davranışları ink-testing-library
-ile deterministik senaryolar (gerçek-PTY değil, seam'li); platform-farkları (Linux/macOS/WinTerm/
-PowerShell/GitBash) için davranış-beklenti TABLOSU docs/reference/terminal-compat.md'ye (hangi
-kombinasyon test-edildi/hangisi manuel-checklist — dürüst işaretle). Gerçek-PTY smoke'u host-side
-CC/Alperen koşusu olarak dokümana komutuyla yaz.
-### goNogo
-- goCriteria: ≥8 deterministik compat-senaryosu yeşil; doc-tablo test-edilen/manuel ayrımı dürüst;
-  lint:link temiz; `tsc` temiz.
-- nogo: app.tsx/input-bar.ts değişikliği (yalnız test+doc); flaky-timing.
-
-## Task 8: TERM-SIMPLE — Simple-Mode edition (Sıra-53)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/cli/commands/chat-mode.ts, tests/cli/term-simple-mode.test.ts
-- Scope: src/cli/, tests/cli/, docs/adr/
-- Dependencies: none
-### Description
-Sıra-53: basic-user için Simple-Mode — chat-mode.ts'e `simple` mode-varyantı: getVisibleCommands
-5-7 core komuta iner (status/plan/run-golden-flow/help/resume/model + çıkış), advanced+enterprise
-gizli; mevcut Ask/Run/Control durum-makinesi BOZULMAZ (simple bir görünürlük-filtresi, mod-makinesi
-değil — disk-verify ile term-mode.ts ilişkisini netleştir, gerekirse notes'a mimari-notu). Config:
-`terminal.simple_mode` (boolean, default-off; config-types + roundtrip-kapanı).
-### goNogo
-- goCriteria: simple-on'da görünür-komut ≤7 ve core-set tam (test); off'ta mevcut davranış byte-aynı;
-  roundtrip-kapanı alanı görüyor; mevcut chat-mode testleri yeşil; `tsc` temiz.
-- nogo: term-mode.ts/app.tsx değişikliği; default-on.
-
-## Task 9: NL-DISPATCH-EVIDENCE — agenticDispatch default kararı için kanıt-paketi (Sıra-57)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: tests/cli/nl-dispatch-evidence.test.ts, docs/design/nl-dispatch-default-decision.md
-- Scope: tests/cli/, src/cli/, docs/design/
-- Dependencies: none
-### Description
-Sıra-57 bir Alperen-karar-kapısı — bu task KARAR VERMEZ, kanıt üretir: agenticDispatch'in mevcut
-davranışını (NL→status/recall/plan direkt-dispatch) testle sabitle (yanlış-pozitif riski: hangi NL
-girdileri yanlışlıkla komuta dönüşür — ≥10 sınır-vakası), iki seçeneğin (default-on vs slash+tool-only)
-artı/eksisini ölçülmüş örneklerle docs/design'a yaz, öneri + ADR-taslak "Önerilen Karar" bölümü.
-### goNogo
-- goCriteria: ≥10 sınır-vakası testi (dispatch-olur/olmaz sınıflandırması); design-doc karşılaştırma+
-  öneri + kod-satır-referanslı; lint:link temiz; `tsc` temiz.
-- nogo: default değiştirmek; dispatch-mantığı değişikliği.
-
-## Task 10: F7-HARDEN — terminal hardening dilimi: session-history + copy-paste (Sıra-65)
+## Task 4: CODEX-SPAWN-READINESS — codex worker-yolunun canlı-hazırlık denetimi
 - Model: sonnet
 - Effort: high
 - Skills: typescript-expert
-- Files: src/cli/repl/input-history.ts, tests/cli/repl/input-history.test.ts
-- Scope: src/cli/, tests/cli/, docs/adr/
+- Files: src/orchestra/codex-spawn-readiness.ts, tests/orchestra/codex-spawn-readiness.test.ts
+- Scope: src/orchestra/, src/providers/, tests/orchestra/, docs/adr/
 - Dependencies: none
 ### Description
-Sıra-65 dilimi: kalıcı input-history çekirdeği — `.deckent/settings/repl-history` (satır-tabanlı,
-cap'li örn. 1000, atomic-append, secret-redaksiyon: redactSensitive'den geçir), `loadHistory/append/
-navigate(up/down, prefix-filtreli)` API'si; çok-oturum güvenli (append-only + load-merge). Ink-wire
-(input-bar) follow-up — burada saf çekirdek. Bracketed-paste normalizasyonu için `normalizePasted(text)`
-yardımcısı (CRLF/kontrol-karakter temizliği).
+Codex-worker'ları gerçek sprint'te koşmadan önce hazırlık-denetimi modülü: (a) host'ta codex-CLI
+var/auth durumu (injectable probe; providers/codex.ts'in mevcut arg-tablosunu DISK-VERIFY et —
+prompt-feed biçimi, --model paramı, output-format); (b) docker-worker-imajında codex VAR MI tespiti
+(imaj-manifest/probe seam) → yoksa `Backend: subprocess` zorunluluğunu yapısal sonuçla döndür
+(`{ backendRequired: 'subprocess', reason }`); (c) spawn-yolunun gpt-5.5/gpt-5 model-paramını nasıl
+geçirdiğinin kanıtı (test). Bu modül route/plan tarafına ÖNERİ üretir — spawn-koduna dokunmaz.
 ### goNogo
-- goCriteria: append→load round-trip + cap + redaksiyon (AKIA-fixture maskelenir) + prefix-navigate
-  testleri; çok-oturum append çakışmasız (tmpdir-iki-writer testi); `tsc` temiz.
-- nogo: input-bar.ts/app.tsx değişikliği; secret'ın düz yazılması.
+- goCriteria: probe-inject'li 3 senaryo (cli-yok/auth-yok/hazır); docker-imaj tespiti seam'li;
+  codex arg-tablosu kanıtı testte (gerçek-spawn yok); `tsc` temiz.
+- nogo: spawn-backend/provider dosyalarını değiştirmek; gerçek codex-çağrısı.
 
-## Task 11: PARITY-CLI-MCP — agent/skill/memory_manage + cost tool paritesi (Sıra-86 dilim)
+## Task 5: OPENROUTER-ADAPTER — OpenRouter worker/chat adaptör çekirdeği
 - Model: sonnet
 - Effort: high
 - Skills: typescript-expert, api-design
-- Files: src/mcp/tools/catalog-parity.ts, tests/mcp/catalog-parity.test.ts
-- Scope: src/mcp/, src/core/, tests/mcp/, docs/adr/
+- Files: src/providers/openrouter.ts, tests/providers/openrouter.test.ts
+- Scope: src/providers/, src/core/, tests/providers/, docs/adr/
 - Dependencies: none
 ### Description
-Sıra-86 dilimi: MCP'de eksik CLI-yetenekleri — tek modülde 3 tool: `deckent_agent_manage`
-(add/remove/promote — mevcut agent-pool API'siyle), `deckent_skill_manage` (add/remove/marketplace-list),
-`deckent_memory_manage` (insert/update/decay-trigger — MemoryStore public API). MCP server'a kayıt
-mevcut tools/ desenini izler (server.ts'e tek-satır register kabul — DISK-VERIFY mevcut kayıt-yerini).
-Cost-tool zaten varsa (deckent_cost) parite-farklarını notes'a.
+OpenRouter (OpenAI-compatible /chat/completions) adaptör çekirdeği: mevcut provider-kontratını
+DISK-VERIFY et (providers/ altındaki en yakın HTTP-deseni — ollama) ve aynı sözleşmeyle
+`OpenRouterProvider` yaz: `$DECK:OPENROUTER_API_KEY` secret-deseni (deck-secrets çözümü; env'e düz
+yazma), base-url https://openrouter.ai/api/v1 (config-override'lı), fetch-injectable, timeout+retry
+(tek-retry), hata=dürüst-throw (sessiz-boş yok); usage-alanlarını (prompt/completion tokens) yanıttan
+TaskResult tokenUsage-şekline map'le. Kayıt: provider-registry/bootstrap'a EKLEME — dilim-2'nin işi
+(notes'a wire-noktası).
 ### goNogo
-- goCriteria: 3 tool zod-şemalı + hermetik testler (tmpdir agent/skill/db fixture); MCP-kayıt
-  smoke (tool-listesinde görünür — registry-unit); `tsc` temiz.
-- nogo: agent-pool/skill-pool/memory-store çekirdek değişikliği; CLI davranış değişikliği.
+- goCriteria: fake-fetch ile send round-trip + usage-map + hata-yolu + retry-tek; secret env-düz-yazım
+  YOK (test: process.env'e anahtar sızmaz); `tsc` temiz.
+- nogo: gerçek ağ; provider-bootstrap değişikliği; anahtar log'lanması.
 
-## Task 12: AGSK-EXPAND — katalog genişleme dilim-1: 3 yeni horizontal skill (Sıra-85)
+## Task 6: OPENROUTER-FREE-PROBE — ücretsiz-model envanteri + settings + doc
 - Model: sonnet
 - Effort: normal
-- Skills: doc-writing, typescript-expert
-- Files: .deckent/skills/ink-tui/, .deckent/skills/file-watch-hygiene/, .deckent/skills/sh-portability/, src/cli/builtins/skills/ink-tui/, src/cli/builtins/skills/file-watch-hygiene/, src/cli/builtins/skills/sh-portability/
-- Scope: .deckent/skills/, src/cli/builtins/, docs/adr/
+- Skills: typescript-expert, doc-writing
+- Files: src/core/openrouter-models.ts, tests/core/openrouter-models.test.ts, docs/reference/openrouter-free-models.md
+- Scope: src/core/, tests/core/, docs/reference/
 - Dependencies: none
 ### Description
-Sıra-85 dilim-1 — son 3 sprint'in ders-yoğun alanlarından 3 yeni skill (manifest+SKILL.md, mevcut
-format birebir; İKİ ağaca — builtins-SSOT + .deckent — sync-korunması): (1) **ink-tui**: Ink/React-CLI
-desenleri (Static/anchor/input-pinned düzeni, ink-testing-library, NO_COLOR, raw-mode tuzakları);
-(2) **file-watch-hygiene**: fs.watch+poll-fallback, unref'd timer, dedup, atomic-read toleransı
-(358-001 dersleri); (3) **sh-portability**: POSIX-sh tuzakları (`local`, `$?`-maskeleme, trap-exit-kodları,
-timeout -k, untracked-git — 466/467 dersleri). Her skill ≤4KB, Karpathy-hijyen (targeted-test dili).
+`fetchOpenRouterModels(fetchImpl)` — /api/v1/models'ı çek, `:free` sonekli + pricing.prompt==0
+modelleri filtrele → `{ id, context, modality }[]`; `writeFreeModelCache(root, list)` →
+`.deckent/settings/openrouter-models.json` (atomic, timestamp'li); doc: tablo-iskeleti + "CC host-side
+canlı-probe ile doldurulacak" dürüst-placeholder'lı kullanım-notları (hangi işler: YALNIZ-doc sınıfı —
+haiku-kuralının genişlemesi) + token/usage-izleme alanları açıklaması.
 ### goNogo
-- goCriteria: 3×2 ağaçta manifest+SKILL.md; skill-pool load-smoke (mevcut skill-pool testine fixture
-  eklemeden kendi load-testi); içerik ders-referanslı (sprint/born künyeleri); format mevcut skill'lerle
-  diff-tutarlı.
-- nogo: mevcut skill'leri değiştirmek; 4KB üstü şişkinlik.
+- goCriteria: fixture-yanıttan filtre+cache round-trip; bozuk-yanıt fail-honest; doc lint:link temiz;
+  `tsc` temiz.
+- nogo: gerçek ağ testte; canlı-liste UYDURMA (doc'ta placeholder+komut).
 
-## Task 13: APR-HISTORY — dashboard onay-geçmişi paneli (Sıra-71)
+## Task 7: OPENROUTER-DOC-ROUTE — doc-kind işleri free-modele yönlendirme (flag'li)
 - Model: sonnet
-- Effort: high
-- Skills: frontend-design, typescript-expert
-- Files: src/dashboard/src/components/ApprovalHistoryPanel.tsx, tests/dashboard/approval-history-panel.test.tsx, src/api/approval-history-endpoint.ts
-- Scope: src/dashboard/, src/api/, tests/dashboard/, docs/adr/
-- Dependencies: none
-- Smoke: node dist/cli/entry.js serve --port 3215 → GET /api/health = 200
-### Description
-Sıra-71: approval history + audit-view — GET /api/approvals/history endpoint'i (store'un decided/expired
-kayıtları + policy + kanal + karar-veren; sayfalı, read-only; server.ts'e DOKUNMADAN ayrı endpoint-modülü
-+ kayıt-yerini disk-verify edip notes'a tek-satır-wire önerisi yaz — server.ts bu sprint kapalı) +
-dashboard paneli (ApprovalsPanel deseni; EMOJI YASAK, lucide-react; approved/denied/expired filtreleri).
-### goNogo
-- goCriteria: endpoint-modülü hermetik test (tmpdir-store fixture → sayfalı JSON); panel render-testleri
-  (3 filtre + boş-durum); lucide-only (emoji-grep=0); `tsc` temiz + dashboard-test config'iyle geçer.
-- nogo: server.ts/ApprovalsPanel.tsx değişikliği; emoji.
-
-## Task 14: RUNTIME-GITIGNORE — çalışma-zamanı artefakt hijyeni
-- Model: sonnet
-- Effort: low
+- Effort: normal
 - Skills: typescript-expert
-- Files: .gitignore, tests/docs/runtime-gitignore.test.ts
-- Scope: ., tests/docs/, docs/adr/
-- Dependencies: none
+- Files: src/core/routing-openrouter.ts, tests/core/routing-openrouter.test.ts
+- Scope: src/core/, tests/core/, docs/adr/
+- Dependencies: OPENROUTER-FREE-PROBE
 ### Description
-358-commit'i runtime-artefakt süpürdü (.deckent/approvals/*.json — canlı karar kayıtları). CC
-`.deckent/approvals/` ekledi; bu task tamamlar: `.deckent/runtime/jobs/`, `.deckent/prompts/*.jsonl`
-(injection-audit), `.deckent/traces/`, `deneme.md`-sınıfı kök-scratch DEĞİL (kullanıcı dosyasına karışma)
-— yalnız runtime-üretimi yollar; git-durumunu bozmadan (`git rm --cached` ÖNERME — not yaz, CC yapar).
-Test: gitignore satırları mevcut + `git check-ignore` doğrulaması (spawn'lı, hermetik-repo fixture'ında).
+Config `openrouter.{enabled, doc_route, model}` (default-off; config-types+passthrough+roundtrip-kapanı):
+`resolveOpenRouterDocRoute(task, config, cache)` — yalnız doc-kind task + flag-on + cache'te uygun
+free-model varsa `{ provider:'openrouter', model }` önerisi döndürür; kod/tsx task'ına ASLA (haiku-kuralı
+emsali — testle kilitle). routeTaskV2'ye bağlama dilim-2 (notes'a wire-noktası) — çekirdek saf-fonksiyon.
 ### goNogo
-- goCriteria: check-ignore testleri yeşil; tracked-dosya silinmedi (yalnız .gitignore değişti);
-  mevcut gitignore-satırları korunur.
-- nogo: git rm çalıştırmak; kullanıcı-dosyası ignore'lamak.
+- goCriteria: doc-task+flag-on→öneri; kod-task→ASLA (negatif-test); flag-off→null; roundtrip-kapanı
+  alanları görür; `tsc` temiz.
+- nogo: routing-engine.ts değişikliği; default-on.
 
-## Task 15: TOOL-HOOK-SEAM — plugin/hook seam çekirdeği (Sıra-84)
+## Task 8: F11-016-STAB — Ink REPL stabilizasyon dilimi (app.tsx)
+- Model: fable
+- Effort: high
+- Skills: typescript-expert, ink-tui
+- Files: src/cli/repl/app.tsx, tests/cli/repl/f11-016-stab.test.tsx
+- Scope: src/cli/, tests/cli/, docs/adr/
+- Dependencies: none
+- Smoke: node dist/cli/entry.js --help → exit 0
+### Description
+Sıra-62 dilimi. DISK-VERIFY: app.tsx'te bilinen stabilizasyon-pürüzlerini envanterle (cursor-drift
+yorumları, queue kenarları, stream-segmenter kesişimleri, resize-davranışı) — mevcut TODO/known-issue
+yorumları + F11-016 satırının "cursor/queue/streaming" üçlüsü rehber. En değerli 2-3 pürüzü kapat
+(minimum-diff; Static/anchor/input-pinned düzeni KORUNUR); her fix'e render-testi. Kapsam-dürüstlüğü:
+kapatamadıklarını notes'ta KNOWN-listesiyle bırak.
+### goNogo
+- goCriteria: ≥2 somut pürüz fix'i + render-testleri; mevcut app/repl testleri (app-surface-wire dahil)
+  yeşil; `tsc` temiz.
+- nogo: approval/dual-stream bölgesi; büyük-refactor.
+
+## Task 9: TERM-NAT-M5 — parite-kapısındaki bilinen-sapmaları kapat
 - Model: sonnet
 - Effort: high
 - Skills: typescript-expert
-- Files: src/core/tool-hooks.ts, tests/core/tool-hooks.test.ts
+- Files: src/cli/repl/native-agent-bridge.ts, tests/cli/native-parity-gate.test.ts
+- Scope: src/cli/, tests/cli/, docs/adr/
+- Dependencies: none
+### Description
+Sıra-63: 358-015'in KNOWN_DIVERGENCES listesini DISK-VERIFY et; native-engine tarafında kapatılabilir
+sapmaları kapat (davranışı legacy-loop'a eşitle — ya da sapma BİLİNÇLİ ise test-listesinde gerekçesini
+güçlendir ve M5-karar-notuna yaz). Hedef: liste yalnız bilinçli-sapmalar kalacak şekilde küçülsün;
+M5 default-flip karar-paketi (Alperen) netleşsin.
+### goNogo
+- goCriteria: KNOWN_DIVERGENCES sayısı azaldı ya da tamamı gerekçeli-bilinçli (diff-kanıt); parite-testleri
+  yeşil; M5-karar-özeti notes'ta; `tsc` temiz.
+- nogo: legacy-loop davranışını değiştirmek; flag default-flip.
+
+## Task 10: F11-014-CODEX-PARITY — REPL codex send-yolu parite testleri
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/cli/commands/chat-provider-parity.ts, tests/cli/f11-014-codex-parity.test.ts
+- Scope: src/cli/, tests/cli/, docs/adr/
+- Dependencies: none
+### Description
+Sıra-61 dilimi: resolveChatAdapter'ın codex-dalını parite-testleriyle sabitle (arg-tablosu, model-param
+geçişi — gpt-5/gpt-5.5, prompt-feed, hata-yolu); eksik/yanlış codex-davranışı bulursan minimal-fix
+(chat-provider-parity.ts yazı-yetkinde). gemini key-gated durumu notes'ta kalır (bu dilimin dışı).
+### goNogo
+- goCriteria: codex-dal ≥6 parite-testi (fake-spawn); model-param kanıtı; mevcut parity-testleri yeşil;
+  `tsc` temiz.
+- nogo: claude/gemini dallarını değiştirmek; gerçek codex.
+
+## Task 11: F2-008-SDK-1 — gömülebilir SDK round-trip dilim-1 (zero-CLI-prereq)
+- Model: sonnet
+- Effort: high
+- Skills: typescript-expert, api-design
+- Files: src/sdk/index.ts, src/sdk/deckent-client.ts, tests/sdk/deckent-client.test.ts
+- Scope: src/sdk/, src/core/, src/orchestra/, tests/sdk/, docs/adr/
+- Dependencies: none
+### Description
+Sıra-60 dilim-1 ([[project_deckent_sdk_spec]] taslağı docs'ta olabilir — DISK-VERIFY): `src/sdk/`
+giriş-modülü — `createDeckentClient({ projectRoot })` → CLI'sız programatik çekirdek-yüzey:
+`status()`, `memoryQuery(q)`, `planStructured(directivesText)` (yazmadan dry-plan), `limits()`
+(Task 1 modülünü tüket). Mevcut çekirdek-fonksiyonları import-eder (yeniden-yazma YOK); ESM+tip-dışa-aktarım
+temiz; package.json exports-alanına DOKUNMA (publish-yüzeyi Alperen-kapısı — notes'a öneri).
+### goNogo
+- goCriteria: 4 metot hermetik round-trip (tmpdir-proje fixture); CLI-binary'siz çalışır (spawn yok);
+  `tsc` temiz + tip-dışa-aktarımlar derli.
+- nogo: package.json/publish değişikliği; CLI-davranış değişikliği.
+
+## Task 12: APR-HISTORY-WIRE — endpoint'i canlı server'a bağla (71 kapanışı)
+- Model: sonnet
+- Effort: normal
+- Skills: api-design, typescript-expert
+- Files: src/api/server.ts, tests/api/approval-history-wire.test.ts
+- Scope: src/api/, tests/api/, docs/adr/
+- Dependencies: none
+- Smoke: node dist/cli/entry.js serve --port 3216 → GET /api/health = 200
+### Description
+359-013'ün notes'undaki wire-önerisini uygula: approval-history-endpoint modülünü server.ts route-kaydına
+bağla (tek-satır-sınıfı, mevcut /api/approvals kayıt-deseni); auth-gate mevcut middleware-zincirinden
+aynen geçer (public YAPMA).
+### goNogo
+- goCriteria: route kayıtlı (injected-server unit); auth'suz istek 401 (mevcut fail-closed korunur);
+  mevcut api-testleri yeşil; `tsc` temiz.
+- nogo: endpoint-modülü değişikliği; auth-bypass.
+
+## Task 13: CODEX-DOGFOOD-A — üç-sprint worker-kalite karşılaştırma analizi (GERÇEK codex-worker)
+- Model: gpt-5
+- Backend: subprocess
+- Effort: high
+- Skills: doc-writing
+- Files: docs/analysis/worker-quality-357-359.md
+- Scope: docs/analysis/, .brain/archive/
+- Dependencies: none
+### Description
+BU TASK CODEX-CLI DOGFOOD'UDUR (analiz-gücü testi). `.brain/archive/sprint-357/358/359-tasks/`
+result-dosyalarını oku; worker-kalitesini karşılaştır: self-assessment dürüstlüğü, notes-derinliği,
+scope-disiplini, debt-gerekçe kalitesi; sprint-başına 3 örnek alıntıyla. Çıktı: yapılandırılmış
+karşılaştırma dokümanı (tablo+bulgular+öneri). YALNIZ oku+yaz — kod/test koşma.
+### goNogo
+- goCriteria: doküman 3-sprint × ≥4 boyut karşılaştırma + alıntı-kanıtlı; lint:link temiz.
+- nogo: kod değişikliği; arşiv-dosyası değişikliği.
+
+## Task 14: CODEX-DOGFOOD-B — wrapper-sh bağımsız POSIX-denetimi (GERÇEK codex-worker)
+- Model: gpt-5
+- Backend: subprocess
+- Effort: high
+- Skills: sh-portability, doc-writing
+- Files: docs/analysis/wrapper-posix-audit-360.md
+- Scope: docs/analysis/, src/orchestra/
+- Dependencies: none
+### Description
+İKİNCİ-GÖZ DENETİMİ (Fable-analizinin çapraz-doğrulaması): src/orchestra/spawn-backend-docker.ts +
+tmux.ts wrapper-üretimini OKU; born-466/467/473 fix'leri sonrası kalan POSIX/portability risklerini
+denetle (sh-portability skill'i rehber): local-kullanımı, fsync-dizin, JSON-escaping kenarları,
+sinyal-yarışları. Rapor: bulgu+satır-ref+önem; fix ÖNERİSİ yaz ama kod DEĞİŞTİRME.
+### goNogo
+- goCriteria: ≥6 madde denetim (her biri satır-ref'li, önem-dereceli); 466-473 fix'lerinin doğrulaması
+  dahil; lint:link temiz.
+- nogo: src değişikliği.
+
+## Task 15: HOOK-DISPATCH-WIRE — ToolHookRegistry'yi dispatch'e bağla (84 kapanışı, flag'li)
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/core/tool-dispatch.ts, tests/core/hook-dispatch-wire.test.ts
 - Scope: src/core/, tests/core/, docs/adr/
 - Dependencies: none
 ### Description
-Sıra-84: pre/post_tool + transform hook-seam'i (Hermes 24-hook rol-model, dilim-1): `ToolHookRegistry` —
-`register(hook: {name, phase: 'pre'|'post', match(toolId), run(ctx)})`; pre-hook arg-transform/veto
-(veto→dispatch reddi, gerekçeli), post-hook sonuç-transform/observe; hata-izolasyonu (hook-throw
-dispatch'i öldürmez, telemetriye düşer); deterministik sıra (kayıt-sırası). tool-dispatch'e bağlama
-follow-up — burada saf çekirdek + dispatch'in tüketeceği dar arayüz.
+359-015'in ToolHookRegistry'sini tool-dispatch'e opsiyonel seam olarak bağla: dispatch opts'una
+`hooks?: ToolHookRegistry` — pre-hook veto→dispatch reddi (gerekçeli sonuç), transform→arg/result
+akışı; hook-throw izolasyonu korunur; seam yokken byte-aynı.
 ### goNogo
-- goCriteria: pre-veto/pre-transform/post-transform/hata-izolasyon/sıra testleri (≥12); `tsc` temiz.
-- nogo: tool-dispatch.ts değişikliği; global-mutable-state (registry instance-bazlı).
+- goCriteria: veto/transform/izolasyon dispatch-üstünden testli; seam'siz mevcut dispatch-testleri
+  byte-aynı yeşil; `tsc` temiz.
+- nogo: tool-hooks.ts değişikliği; default-hook kaydı.
 
-## Task 16: AUTONOMOUS-MCP — autonomous start/backlog/status MCP yüzeyi (Sıra-74 dilim)
+## Task 16: HISTORY-INK-WIRE — input-history'yi input-bar'a bağla (65 kapanışı)
 - Model: sonnet
 - Effort: normal
-- Skills: typescript-expert, api-design
-- Files: src/mcp/tools/autonomous-surface.ts, tests/mcp/autonomous-surface.test.ts
-- Scope: src/mcp/, src/orchestra/, tests/mcp/, docs/adr/
+- Skills: typescript-expert, ink-tui
+- Files: src/cli/repl/input-bar.ts, tests/cli/repl/history-ink-wire.test.tsx
+- Scope: src/cli/, tests/cli/, docs/adr/
 - Dependencies: none
 ### Description
-Sıra-74 dilimi (autonomous parityGap'i): MCP'ye `deckent_autonomous_backlog` (list/add/remove —
-backlog.ts public API) + `deckent_autonomous_status` (engine-durumu read-only). START MCP'den YOK
-(fire-and-forget riski — deckent_start gotcha'sı; notes'a gerekçe). Kayıt-deseni Task 11 ile aynı
-(çakışma yok: ayrı dosyalar).
+359-010'un input-history çekirdeğini input-bar'a bağla: yukarı/aşağı ok geçmiş-gezinme (prefix-filtreli),
+Enter'da append; mevcut ok-tuşu davranışıyla çakışmayı DISK-VERIFY et (imleç-hareketi vs geçmiş —
+boş-input'ta geçmiş, dolu-input'ta imleç deseni); dosya-I/O injectable (testler tmpdir).
 ### goNogo
-- goCriteria: 2 tool zod+hermetik (tmpdir-backlog fixture round-trip); start-yok gerekçesi notes'ta;
-  `tsc` temiz.
-- nogo: autonomous çekirdek değişikliği; MCP'den start.
+- goCriteria: boş-input up→son-giriş; prefix-yazıp-up→filtreli; Enter→append; mevcut input-bar testleri
+  yeşil; `tsc` temiz.
+- nogo: app.tsx değişikliği; imleç-davranış regresyonu.

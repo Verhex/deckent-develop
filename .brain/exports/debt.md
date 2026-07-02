@@ -10,6 +10,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-360-013 | Tech debt from 360-013: Wired registerApprovalHistoryRoute (built in 359-013) in | normal | sprint-360 | resolved |
 | debt-359-001 | Tech debt from 359-001: Added normalizeStructuredTaskDependencies(tasks, options | normal | sprint-359 | resolved |
 | debt-359-003 | Tech debt from 359-003: born-466 parity implemented in buildWorkerCommand() (src | normal | sprint-359 | resolved |
 | debt-359-008 | Tech debt from 359-008: Implemented Simple-Mode as a SECOND, orthogonal visibili | normal | sprint-359 | resolved |

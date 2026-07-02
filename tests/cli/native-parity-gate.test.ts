@@ -22,6 +22,24 @@
 // KNOWN_DIVERGENCES below is the honest record the M5 default-flip decision
 // needs: where the two engines behave differently ON PURPOSE or by omission,
 // with the reasoning spelled out. Emptiness is not the goal — honesty is.
+//
+// ─── M5-decision-özeti (360-010, disk-verify pass) ─────────────────────────
+// All 4 entries below were re-verified line-by-line against current disk state
+// (not memory/Brain-synthetic). Result: 0 of 4 were closable by changing native
+// behavior inside this task's write scope (src/cli/repl/native-agent-bridge.ts
+// + this file) — every closure path either required editing an out-of-scope
+// production file (loop.ts / chat-tool-exec.ts / run.tsx / native-tool-registry.ts)
+// or would have broken an out-of-scope existing test
+// (tests/cli/native-agent-bridge.test.ts's exact-shape `toEqual`, see id
+// 'onturnend-stats-shape' below). All 4 are therefore kept as CONSCIOUS,
+// disk-evidenced divergences with strengthened file:line citations (this pass
+// added several previously-undocumented marker variants — see id
+// 'tool-denial-marker-text'). Net M5 read: none of the 4 block a default-flip
+// by themselves — #2 is a point IN FAVOR of native, #3 is a real legacy
+// robustness gap (native has no equivalent gap), #1 and #4 are cosmetic/shape
+// differences with no silent-data-loss risk once the caller-side mitigations
+// already in place (app.tsx's confirm-gate, native-elapsed.ts's
+// measuredOnTurnEnd) are accounted for.
 
 import { describe, it, expect } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -54,32 +72,59 @@ export const KNOWN_DIVERGENCES: Divergence[] = [
   {
     id: 'tool-denial-marker-text',
     area: 'tool-call → confirm(deny) → result',
-    legacy: 'Denial is a caller-composed dispatcher wrapper; this suite\'s wrapper (mirroring ' +
-      'src/cli/repl/run.tsx\'s real production dispatcher) returns the literal ' +
-      '"[deckent-denied] <tool>" marker string as the tool-result content fed back to the model.',
-    native: 'Denial is decided centrally by runAgentTurn (src/agent/loop.ts) on a permission ' +
-      '\'deny\' response and always yields tool-result output "[rejected by user]".',
-    rationale: 'The two engines were built independently (legacy = Sprint 203/211, native = ' +
-      'SP-1 M2/M3) and never unified their denial vocabulary. Both are honest, human-readable ' +
-      'markers, but a consumer that pattern-matches the exact string (e.g. a trace analyzer, or ' +
-      'a training-data label) will see different tokens for the same semantic event across the ' +
-      'two engines. Not a blocker for M5, but should be normalized before default-flip if any ' +
-      'downstream tooling depends on the literal text.',
+    legacy: 'NOT a single marker — a real 2-way split by tool category. EXEC_TOOLS ' +
+      '(write/edit/bash) deny inside the exec dispatcher itself and return the literal ' +
+      '"[deckent-denied] <tool>" (src/cli/commands/chat-tool-exec.ts:103, real production ' +
+      'code — this suite\'s confirmingDispatcher mirrors exactly this subset, per the test ' +
+      'file header). CLI-bridge tools (config/sync/kill/…) deny in run.tsx\'s OUTER dispatcher ' +
+      'wrapper instead and return an i18n\'d "[<cancelled-label>] deckent <args>" ' +
+      '(src/cli/repl/run.tsx:236, `t(\'tui.cmd_cancelled\')`) — a DIFFERENT marker family, ' +
+      'not "[deckent-denied]".',
+    native: 'ALSO not a single marker. The direct tool-call path (every tool this parity suite ' +
+      'exercises) denies via the session\'s central permission engine and always yields ' +
+      '"[rejected by user]" (src/agent/loop.ts:137). A SEPARATE, newer path — the ' +
+      '`deckent_call_tool` progressive-disclosure meta-tool (TOOL-REPL-WIRE 354-002, ' +
+      'src/cli/repl/native-tool-registry.ts:313) — denies through its own risk-gated dispatch ' +
+      '(tool-dispatch.ts) and tags its JSON result with "[deckent-denied] " instead — the SAME ' +
+      'literal prefix legacy\'s EXEC_TOOLS use, but via an entirely different mechanism and only ' +
+      'reachable when `tool_surface.enabled` is on.',
+    rationale: 'Disk-verified 360-010: this is a genuine 3-to-4-way marker split (legacy-exec, ' +
+      'legacy-cli-bridge, native-session, native-tool-surface), not a clean 2-way legacy-vs-' +
+      'native divergence as previously written — the earlier text undercounted it by only ' +
+      'checking the one code path this suite\'s mocks exercise. NOT closable inside 360-010\'s ' +
+      'write scope: all four generation sites (chat-tool-exec.ts, run.tsx, loop.ts, ' +
+      'native-tool-registry.ts) sit outside scope.filesWrite (native-agent-bridge.ts + this test ' +
+      'file only), and loop.ts/chat-tool-exec.ts are shared-authority modules a single task ' +
+      'should not silently rewrite. Both engines are honest, human-readable markers; a consumer ' +
+      'that pattern-matches the exact string (a trace analyzer, or a training-data label) sees ' +
+      'different tokens for the same semantic event, and native itself is not internally ' +
+      'consistent between its two tool-invocation paths. Not a blocker for M5 (no data loss, no ' +
+      'silent failure — every marker is a distinct, greppable "denied" signal), but a real ' +
+      'follow-up: unify to ONE marker convention across all four sites before any tooling starts ' +
+      'depending on the literal text.',
   },
   {
     id: 'confirm-gate-ownership',
     area: 'tool-call → confirm → result (architecture)',
-    legacy: 'runChatNativeLoop has NO built-in permission tiering. Any confirm-gating (as in ' +
+    legacy: 'runChatNativeLoop has NO built-in permission tiering — confirmed at ' +
+      'src/cli/commands/chat-native.ts:1023, where `dispatcher.dispatch(call.name, call.args)` ' +
+      'is invoked with zero policy/tier lookup inside the loop. Any confirm-gating (as in ' +
       'run.tsx\'s dispatcher wrapper, or this suite\'s confirmingDispatcher) is bolted on by the ' +
       'CALLER around McpToolDispatcher — there is no compile-time or runtime guarantee that a ' +
       'given caller gates every risky tool.',
-    native: 'createAgentSession/runAgentTurn enforce PermissionPolicy centrally, per registered ' +
-      'ToolRegistry tier (silent/confirm/always), for EVERY tool and EVERY caller — a caller ' +
-      'cannot forget to gate a tool because the gate lives inside the loop, not around it.',
-    rationale: 'This is the single most decision-relevant divergence for M5: native is safe-by-' +
-      'construction (governance-by-construction, per this project\'s pivot notes), legacy is ' +
-      'safe-by-convention. Any M5 default-flip argument should weigh this centralization as a ' +
-      'point IN FAVOR of native, independent of feature parity.',
+    native: 'createAgentSession/runAgentTurn enforce PermissionPolicy centrally — confirmed at ' +
+      'src/agent/loop.ts:122-146 (`resolveTier(def, deps.policy)` then `decide(...)` gates ' +
+      'EVERY call before `def.handler(...)` runs, per registered ToolRegistry tier ' +
+      '(silent/confirm/always)) — for EVERY tool and EVERY caller; a caller cannot forget to ' +
+      'gate a tool because the gate lives inside the loop, not around it.',
+    rationale: 'Disk-verified 360-010 (file:line citations above added/confirmed against current ' +
+      'source — text otherwise unchanged, still accurate). This is the single most decision-' +
+      'relevant divergence for M5: native is safe-by-construction (governance-by-construction, ' +
+      'per this project\'s pivot notes), legacy is safe-by-convention. This is intentional ' +
+      'architecture, not a gap to close — closing it would mean either stripping native\'s ' +
+      'central gate (a regression) or retrofitting legacy with one (explicitly barred by this ' +
+      'task\'s nogo: "legacy-loop davranışını değiştirmek"). Any M5 default-flip argument should ' +
+      'weigh this centralization as a point IN FAVOR of native, independent of feature parity.',
   },
   {
     id: 'error-handling-opt-in',
@@ -88,32 +133,62 @@ export const KNOWN_DIVERGENCES: Divergence[] = [
       'explicitly sets `gracefulErrors: true` (default false → the failure is rethrown out of ' +
       'runChatNativeLoop). Even with gracefulErrors on, ONLY a failure before any output has ' +
       'been streamed for that turn is caught — once ANY text chunk has already reached the ' +
-      'output sink, a later stream failure still rethrows (chat-native.ts: `if (!opts.' +
-      'gracefulErrors || outputCount > 0) throw err;`).',
-    native: 'runAgentTurn wraps the entire adapter.send() drain in a single try/catch and ALWAYS ' +
-      'converts a failure (pre- or mid-stream, no opt-out) into an inline `error` AgentEvent + ' +
-      '`turn-end`, never rethrowing out of session.send()/createNativeEngine.',
+      'output sink, a later stream failure still rethrows — confirmed byte-identical against ' +
+      'current disk state at src/cli/commands/chat-native.ts:1038: `if (!opts.gracefulErrors || ' +
+      'outputCount > 0) throw err;`.',
+    native: 'runAgentTurn wraps the entire adapter.send() drain in a single try/catch ' +
+      '(src/agent/loop.ts, the outer try/catch around the drain loop) and ALWAYS converts a ' +
+      'failure (pre- or mid-stream, no opt-out) into an inline `error` AgentEvent + `turn-end`, ' +
+      'never rethrowing out of session.send()/createNativeEngine.',
     rationale: 'Verified with concrete test evidence in this file (see the "cancel/error path" ' +
-      'group): the legacy default (no flag) still crashes the loop on a plain provider throw, ' +
+      'group) AND re-confirmed against current disk state for 360-010 (chat-native.ts:1038 ' +
+      'unchanged): the legacy default (no flag) still crashes the loop on a plain provider throw, ' +
       'and even the opt-in does not cover a mid-stream failure. A legacy caller that forgets the ' +
       'flag, or hits a failure after the first token streamed, gets an uncaught exception; the ' +
-      'native engine never does. This is a real robustness gap the M5 decision should weigh, not ' +
-      'just a naming difference.',
+      'native engine never does. Nothing to close on native\'s side — it already has the safer ' +
+      'behavior; the gap is entirely on legacy\'s side, and this task\'s nogo explicitly bars ' +
+      'changing legacy-loop behavior. This is a real robustness gap the M5 decision should weigh ' +
+      'IN FAVOR of native, not just a naming difference.',
   },
   {
     id: 'onturnend-stats-shape',
     area: 'token-istatistiği (per-turn stats callback)',
     legacy: 'onTurnEnd receives `{ elapsedMs: number; usage?: { inputTokens: number; ' +
       'outputTokens: number } }` — wall-clock timing is always present, token usage is an ' +
-      'OPTIONAL nested object (absent when the provider never surfaced usage).',
+      'OPTIONAL nested object (absent when the provider never surfaced usage). The elapsedMs is ' +
+      'measured INSIDE the loop itself (chat-native.ts:998 `turnStart = Date.now()` → ' +
+      'chat-native.ts:1068 `Date.now() - turnStart` at the onTurnEnd call) — the engine owns ' +
+      'timing, callers never measure it themselves.',
     native: 'ReplEngine.onTurnEnd receives `{ inputTokens: number; outputTokens: number }` — no ' +
       'timing field at all, and both token counts are ALWAYS present (defaulting to 0 when no ' +
-      '`usage` ProviderEvent ever arrived), never nested/optional.',
-    rationale: 'These are literally different TypeScript shapes, not just different values for ' +
-      'the same shape. Any M5 cutover consumer that currently reads `stats.elapsedMs` or `stats.' +
-      'usage?.outputTokens` (e.g. a REPL footer, or a trace/telemetry sink) will silently break ' +
-      'or read `undefined` if the engine is swapped without an explicit adapter — this needs a ' +
-      'shim or a consumer-side migration BEFORE default-flip, not after.',
+      '`usage` ProviderEvent ever arrived), never nested/optional. The engine itself never ' +
+      'measures wall-clock time (src/cli/repl/native-agent-bridge.ts, `runTurn`).',
+    rationale: 'Disk-verify 360-010 UPDATE — the practical risk this entry originally warned ' +
+      'about ("needs a shim... BEFORE default-flip") is ALREADY MITIGATED for the one real ' +
+      'production consumer: src/cli/repl/native-elapsed.ts (`measuredOnTurnEnd`, shipped SP-1 ' +
+      'M4 — its own header literally says "Builds the native branch\'s onTurnEnd so the footer ' +
+      'shows a real duration (M3 left it 0)") is wired at src/cli/repl/app.tsx:848 (inside the ' +
+      'nativeEngine branch\'s per-line loop, `onTurnEnd: measuredOnTurnEnd(startMs, ...)`), wrapping the ' +
+      'native engine\'s onTurnEnd with an externally-measured elapsedMs before it ever reaches ' +
+      'the REPL footer. So the ONE real consumer of this callback already gets a real duration, ' +
+      'today, in production. What remains open is the RAW engine-level contract shape (flat ' +
+      '`{inputTokens,outputTokens}`, no elapsedMs, vs legacy\'s engine-owned `{elapsedMs, ' +
+      'usage?}`) — investigated for 360-010 whether this raw shape is closable by moving the ' +
+      'timing measurement INTO `runTurn` (matching legacy\'s "engine owns timing" design): ' +
+      'type-safety-checked (a real `tsc --strict` probe) and confirmed adding a required ' +
+      '`elapsedMs` field to ReplEngine\'s onTurnEnd stats IS structurally assignable everywhere ' +
+      'it is currently consumed (run.tsx\'s local NativeEngineType, app.tsx\'s ' +
+      'measuredOnTurnEnd-wrapped call) — but doing so would make `runTurn` ALWAYS emit ' +
+      '`elapsedMs` at runtime, which breaks the existing, out-of-scope ' +
+      'tests/cli/native-agent-bridge.test.ts:26 `expect(stats).toEqual({ inputTokens: 3, ' +
+      'outputTokens: 1 })` (Vitest `toEqual` fails on any extra key). That test file is not in ' +
+      'this task\'s scope.filesWrite, so this closure path is genuinely blocked, not skipped for ' +
+      'convenience. A flag-gated opt-in variant was considered and rejected: no production caller ' +
+      '(app.tsx/run.tsx, both out of scope) would ever set it, so it would ship as dead,  ' +
+      'untested-in-production code — tech debt by this project\'s own definition. Net: the ' +
+      'consumer-facing risk is closed (already, via the M4 shim); the raw contract shape stays a ' +
+      'documented, low-severity, disk-evidenced divergence — see src/cli/repl/native-agent-' +
+      'bridge.ts\'s ReplEngine doc-comment for the pointer back to this entry.',
   },
 ];
 

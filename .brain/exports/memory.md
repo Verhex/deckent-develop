@@ -1,5 +1,20 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-360 Learnings
+- Sprint sprint-360 Learnings: ## Sprint sprint-360 Learnings
+- APR-HISTORY-WIRE — endpoint'i canlı server'a bağla (71 kapanışı): GO_WITH_TECH_DEBT — Wired registerApprovalHistoryRoute (built in 359-013) into server.ts's live GET dispatch, following the wiring note left
+
+## Gains
+- 360-001 — Fix debt: Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L — Worker timeout/killed (exitCode=1) but git diff shows 40 files modified.
+- 360-002 — LIMIT-PREFLIGHT — abonelik-pencere probu (claude -p "/usage" parse) — probeSubscriptionLimits(opts) spawns `claude -p "/usage"` via an injectable async SpawnImpl (work...
+- 360-004 — GPT55-CATALOG — gpt-5.5 model-kaydı (feed-fiyatlı, zero-hardcode) — Worker timeout/killed (exitCode=1) but git diff shows 40 files modified.
+- 360-005 — CODEX-SPAWN-READINESS — codex worker-yolunun canlı-hazırlık denetimi — Advisory-only codex spawn-readiness module, does not touch spawn/provider code, never performs a ...
+- 360-006 — OPENROUTER-ADAPTER — OpenRouter worker/chat adaptör çekirdeği — Worker timeout/killed (exitCode=1) but git diff shows 40 files modified.
+- 360-007 — OPENROUTER-FREE-PROBE — ücretsiz-model envanteri + settings + doc — fetchOpenRouterModels(fetchImpl) + writeFreeModelCache(root, list) implemented in src/core/openro...
+- 360-009 — F11-016-STAB — Ink REPL stabilizasyon dilimi (app.tsx) — Worker timeout/killed (exitCode=1) but git diff shows 40 files modified.
+- 360-010 — TERM-NAT-M5 — parite-kapısındaki bilinen-sapmaları kapat — Worker timeout/killed (exitCode=1) but git diff shows 40 files modified.
+- …and 6 more delivered
+
 ## Sprint sprint-359 Learnings
 - Sprint sprint-359 Learnings: ## Sprint sprint-359 Learnings
 - DEP-NORMALIZE — dependency-ref'leri plan-yazımında slot-ID'ye çevir (born-465): GO_WITH_TECH_DEBT — Added normalizeStructuredTaskDependencies(tasks, options) to task-builder.ts: given the FULL completed structured-plan t

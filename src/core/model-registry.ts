@@ -81,7 +81,9 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
     capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: false },
     status: 'ga',
   },
-  // OpenAI (6)
+  // OpenAI (6) — see also CODEX_PARITY_MODELS below (gpt-5.5, opt-in, kept
+  // out of this array on purpose so the hardcoded builtin-count invariant
+  // asserted by tests/core/model-registry*.test.ts is not disturbed)
   {
     id: 'o3',
     apiId: 'o3',
@@ -198,6 +200,36 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
 // tier)` without depending on the OllamaAdapter side-effect path. Kept out of
 // `BUILTIN_MODELS` on purpose so the 13-model / 3-provider invariant holds.
 export { OLLAMA_BUILTIN_MODELS } from './ollama-models.js';
+
+// ─── Codex Parity Models (opt-in, Sprint 360 task 360-004) ────────────────
+// `gpt-5.5` is the real OpenAI/Codex model id that Codex CLI already speaks on
+// the wire (the existing `id: 'gpt-5'` entry above sends `apiId: 'gpt-5.5'` as
+// a ChatGPT-subscription auth shim, Sprint 248 — that entry is untouched).
+// This is the first-class, feed-verified catalog record for `gpt-5.5` itself.
+// Kept OUT of BUILTIN_MODELS on purpose, mirroring OLLAMA_BUILTIN_MODELS
+// above: several tests hardcode the BUILTIN_MODELS / modelRegistry builtin
+// count, so growing that array is a breaking change outside this mechanism's
+// control. Call `registerCodexParityModels()` (defined near
+// `registerOllamaModels()` below, same opt-in pattern) to make `gpt-5.5`
+// first-class on a registry.
+// Values verified 2026-07-02 against the live LiteLLM feed
+// (raw.githubusercontent.com/BerriAI/litellm/main/litellm/model_prices_and_context_window_backup.json),
+// key "gpt-5.5" (litellm_provider: openai, mode: chat) — see
+// pricing-data-baseline.json providers.openai.models["gpt-5.5"] for the full
+// per-token pricing record and cited evidence.
+export const CODEX_PARITY_MODELS: readonly ModelDefinition[] = [
+  {
+    id: 'gpt-5.5',
+    apiId: 'gpt-5.5',
+    provider: 'codex',
+    tier: 'premium',
+    contextWindow: 1_050_000,
+    costPerMillion: { input: 5, output: 30 },
+    capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: true },
+    status: 'ga',
+    maxOutputTokens: 128_000,
+  },
+] as const;
 
 // ─── Tier ordering for comparison ──────────────────────────────────────────
 
@@ -467,6 +499,17 @@ export const modelRegistry = new ModelRegistry();
 // re-registering a model is a no-op since `register()` simply re-Map.sets it.
 export function registerOllamaModels(registry: ModelRegistry = modelRegistry): void {
   for (const def of OLLAMA_BUILTIN_MODELS) {
+    registry.register(def);
+  }
+}
+
+// ─── Opt-in: register Codex parity models on a target registry ────────────
+// Mirrors registerOllamaModels() immediately above. Not called automatically
+// at module load (see CODEX_PARITY_MODELS comment) — a Codex provider
+// bootstrap can call this to make `gpt-5.5` first-class. Idempotent:
+// re-registering a model is a no-op since `register()` simply re-Map.sets it.
+export function registerCodexParityModels(registry: ModelRegistry = modelRegistry): void {
+  for (const def of CODEX_PARITY_MODELS) {
     registry.register(def);
   }
 }

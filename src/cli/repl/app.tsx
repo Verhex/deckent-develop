@@ -288,6 +288,68 @@ export function steerNotesToInputs(drained: readonly string[], pendingQueue: rea
 }
 
 /**
+ * F11-016-STAB (360-009) — pure, testable stabilization helpers (same
+ * "pull decision logic out of the Ink component" pattern as the 354-001 /
+ * 355-011 / 358-006 blocks above — ink-testing-library is not a project
+ * dependency, see tests/cli/repl/f11-016-stab.test.tsx).
+ */
+
+/**
+ * Map a confirm-modal keypress to its ConfirmAnswer — or null when the key
+ * must be IGNORED. The previous inline mapping treated EVERY key as deny
+ * except lowercase y/a: an uppercase 'Y' (an emphatic approve) DENIED the
+ * tool call, and stray navigation keys (arrows, Tab, mouse-wheel escape
+ * sequences) or text typed for the input bar (inactive while the modal is
+ * open) mowed down the whole confirm burst one card per keystroke. Only the
+ * documented keys decide now: y/Y approve, a/A always-approve, n/N deny,
+ * Enter/Esc deny (the hint's capital-N default — both already denied before,
+ * behavior preserved); anything else keeps the card waiting.
+ */
+export function confirmKeyToAnswer(
+  input: string,
+  key: { return?: boolean; escape?: boolean; ctrl?: boolean; meta?: boolean },
+): ConfirmAnswer | null {
+  if (key.return || key.escape) return 'n'; // default = deny (hint shows capital N)
+  if (key.ctrl || key.meta) return null;    // shortcuts/sequences never decide a card
+  const ch = input.toLowerCase();
+  if (ch === 'y') return 'y';
+  if (ch === 'a') return 'a';
+  if (ch === 'n') return 'n';
+  return null; // arrows, Tab, stray/pasted text → card stays pending
+}
+
+/**
+ * Build the turn(s) one completed reply segment appends: the '● deckent'
+ * head exactly once per reply, then the segment. Pure — id/head bookkeeping
+ * happens at the CALL site, never inside a React setState updater. The
+ * previous pushSegment mutated the `headPushed`/`idRef` refs INSIDE the
+ * updater; React may re-invoke an updater (batched renders), and an impure
+ * one can duplicate or drop the head row. Same hazard removed from
+ * pushTurn / the tool sink / the foot push (objects built before setTurns).
+ */
+export function buildSegmentTurns(
+  headAlreadyPushed: boolean,
+  nextId: number,
+  markdown: string,
+): { turns: Turn[]; nextId: number } {
+  const turns: Turn[] = [];
+  let id = nextId;
+  if (!headAlreadyPushed) turns.push({ id: id++, role: 'head', text: '' });
+  turns.push({ id: id++, role: 'seg', text: markdown });
+  return { turns, nextId: id };
+}
+
+/** Code-point-safe queue-preview truncation. The old inline `q.slice(0, 60)`
+ * counted UTF-16 code units and could bisect a surrogate pair (an emoji in a
+ * queued message), leaving a lone surrogate that garbles the row. Slices
+ * whole code points instead. (Fixed 60-col width is a KNOWN resize gap —
+ * width-aware layout is a separate slice, see task notes.) */
+export function truncateQueuePreview(text: string, max = 60): string {
+  const points = [...text];
+  return points.length > max ? points.slice(0, max).join('') + '…' : text;
+}
+
+/**
  * APP-APPROVAL-WIRE (355-011) — pure, testable helpers for the ApprovalCard +
  * dual-stream wiring (same "pull decision logic out of the Ink component"
  * pattern as resolveModeLabel/bgPayloadsToTurnTexts above — ink-testing-library
@@ -487,7 +549,8 @@ interface TurnStats { elapsedMs: number; tokens?: number; }
 // (prose lines / finished code+table blocks) that flow into <Static> as they
 // complete, then a 'foot' (⏱ stats). Each lands in scrollback immediately, so
 // the user reads in real time and the dynamic region stays tiny (no drift).
-interface Turn { id: number; role: 'user' | 'head' | 'seg' | 'foot' | 'tool' | 'bg'; text: string; tool?: ToolInfo; stats?: TurnStats; }
+// Exported for buildSegmentTurns' tests (360-009) — shape-only, no behavior.
+export interface Turn { id: number; role: 'user' | 'head' | 'seg' | 'foot' | 'tool' | 'bg'; text: string; tool?: ToolInfo; stats?: TurnStats; }
 
 const TEAL = '#4DB8A4';
 const GOLD = '#C4A855';
@@ -625,18 +688,33 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     approvalEvents.current = tapApprovalEvents(approvalChannel.events, approvalTracker.current);
   }
 
-  const pushTurn = (role: Turn['role'], text: string): void =>
-    setTurns((t) => [...t, { id: idRef.current++, role, text }]);
+  // 360-009: turn objects are built BEFORE setTurns so every updater stays
+  // pure (append-only) — React may re-invoke an updater, and the previous
+  // inline `idRef.current++` / `headPushed.current` mutations inside it could
+  // duplicate or drop rows (the '● deckent' head in particular).
+  const pushTurn = (role: Turn['role'], text: string): void => {
+    const turn: Turn = { id: idRef.current++, role, text };
+    setTurns((t) => [...t, turn]);
+  };
 
   // Push one completed reply segment (a line or a finished code/table block);
   // emit the '● deckent' head once per reply, before the first segment.
   const pushSegment = (markdown: string): void => {
-    setTurns((t) => {
-      const next = [...t];
-      if (!headPushed.current) { headPushed.current = true; next.push({ id: idRef.current++, role: 'head', text: '' }); }
-      next.push({ id: idRef.current++, role: 'seg', text: markdown });
-      return next;
-    });
+    const built = buildSegmentTurns(headPushed.current, idRef.current, markdown);
+    headPushed.current = true;
+    idRef.current = built.nextId;
+    setTurns((t) => [...t, ...built.turns]);
+  };
+
+  // F11-016-STAB (360-009): ONE clear routine for both clear surfaces (the
+  // /clear command below + InputBar's Ctrl-L onClear — previously two drifting
+  // inline copies). Also RECREATES the segmenter: the old instance still
+  // buffered the pre-clear in-flight partial line / open block, so the very
+  // next streamed token resurfaced pre-clear text onto the just-cleared screen
+  // (output() renders `segmenter.partial()` verbatim).
+  const clearScreen = (): void => {
+    setTurns([]); setPartial(''); headPushed.current = false;
+    segmenter.current = createStreamSegmenter((seg) => pushSegment(seg.markdown));
   };
 
   useEffect(() => {
@@ -653,7 +731,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   useEffect(() => {
     registerToolSink((info: ToolInfo) => {
       segmenter.current?.flush(); setPartial(''); // commit any in-flight reply first
-      setTurns((t) => [...t, { id: idRef.current++, role: 'tool', text: '', tool: info }]);
+      const turn: Turn = { id: idRef.current++, role: 'tool', text: '', tool: info };
+      setTurns((t) => [...t, turn]); // pure updater — id consumed above (360-009)
     });
   }, [registerToolSink]);
 
@@ -705,7 +784,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         const stats = lastStats.current ?? undefined;
         lastStats.current = null;
         headPushed.current = false;
-        setTurns((t) => [...t, { id: idRef.current++, role: 'foot', text: '', ...(stats ? { stats } : {}) }]);
+        const foot: Turn = { id: idRef.current++, role: 'foot', text: '', ...(stats ? { stats } : {}) };
+        setTurns((t) => [...t, foot]); // pure updater — id consumed above (360-009)
       }
     };
 
@@ -820,7 +900,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     }
     // /clear must clear the Ink screen (history), not just the loop transcript.
     if (trimmed.toLowerCase() === '/clear') {
-      setTurns([]); setPartial(''); headPushed.current = false;
+      clearScreen();
       return;
     }
     // /ask · /run · /control — term-mode.ts transition commands (354-001 seam).
@@ -933,9 +1013,12 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // Confirm modal owns input only while it is open (single-key y / a / N). The
   // queue resolves the current head and advances to the next card (deny does not
   // cancel the rest); onChange updates `confirm` (null when the queue drains).
-  useInput((input) => {
-    const answer: ConfirmAnswer = input === 'y' ? 'y' : input === 'a' ? 'a' : 'n';
-    confirmQueue.current!.answer(answer);
+  // 360-009: keys route through confirmKeyToAnswer — only documented keys
+  // decide a card (case-insensitive y/a/n + Enter/Esc = deny default); stray
+  // navigation/typed keys no longer mow the burst down one card per keystroke.
+  useInput((input, key) => {
+    const answer = confirmKeyToAnswer(input, key);
+    if (answer !== null) confirmQueue.current!.answer(answer);
   }, { isActive: confirm !== null });
 
   // 358-006: Esc→interrupt while a turn is in flight (BUSY_KEY_ACTIONS contract,
@@ -975,7 +1058,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       {queued.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
           {queued.map((q, i) => (
-            <Text key={i} dimColor>{`  ⋯ ${labels.queued} ${i + 1}: ${q.length > 60 ? q.slice(0, 60) + '…' : q}`}</Text>
+            <Text key={i} dimColor>{`  ⋯ ${labels.queued} ${i + 1}: ${truncateQueuePreview(q)}`}</Text>
           ))}
         </Box>
       )}
@@ -1021,7 +1104,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         active={confirm === null}
         onSubmit={handleSubmit}
         onInterrupt={() => exit()}
-        onClear={() => { setTurns([]); setPartial(''); headPushed.current = false; }}
+        onClear={clearScreen}
         slashRegistry={slashRegistry}
         menuHint={labels.menuHint}
       />

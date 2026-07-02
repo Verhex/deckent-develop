@@ -46,6 +46,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-360 Learnings** (sprint-360): ## Sprint sprint-360 Learnings
+- APR-HISTORY-WIRE — endpoint'i canlı server'a bağla (71 kapanışı): GO_WITH_TECH_DEBT ...
 - **Sprint sprint-359 Learnings** (sprint-359): ## Sprint sprint-359 Learnings
 - DEP-NORMALIZE — dependency-ref'leri plan-yazımında slot-ID'ye çevir (born-465): GO_W...
 - **Sprint sprint-358 Learnings** (sprint-358): ## Sprint sprint-358 Learnings
@@ -71,8 +73,6 @@
 - **Sprint sprint-347 Learnings** (sprint-347): ## Sprint sprint-347 Learnings
 - W0-8 STATE-RESOLVER — env-aware state-path resolver primitive: NO_GO
 - W0-9 CRED-PER...
-- **Sprint sprint-346 Learnings** (sprint-346): ## Sprint sprint-346 Learnings
-- F07 — fix reference CLI (hand-curated only): NO_GO — Worker exited without writing r...
 
 ## Active Technical Debt
 - [CRITICAL] Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L
@@ -121,5 +121,6 @@
 - Violation pattern: file_outside_scope
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: stale_heartbeat
+- Violation pattern: file_outside_scope
 
-_Total entries: 881 | Generated: 2026-07-02_
+_Total entries: 886 | Generated: 2026-07-02_

@@ -62,6 +62,7 @@ import { registerKpiTrendEndpoint } from './kpi-trend-endpoint.js';
 import { registerDocsHealthRoute } from './docs-health-endpoint.js';
 import { registerAuthMeRoute, deriveRequestPrincipal } from './auth-me-endpoint.js';
 import { registerOidcCallbackRoute } from './oidc-callback-endpoint.js';
+import { registerApprovalHistoryRoute } from './approval-history-endpoint.js';
 import { handleOutputStream, isOutputStreamRequest } from './output-stream.js';
 import { createOutputCollector, type OutputCollector } from '../core/output-collector.js';
 import { reconcileStatusResponse } from './status-reconcile.js';
@@ -929,6 +930,12 @@ async function handleRequest(
       });
       return;
     }
+
+    // GET /api/approvals/history[?status=&limit=&offset=] — paginated settled-
+    // approval audit trail (359-013/360-013, ADR-G-033/ADR-G-020). Must be
+    // dispatched BEFORE the /api/approvals/:id block below — that block's
+    // prefix match would otherwise swallow "history" as an id and 404.
+    if (registerApprovalHistoryRoute(url, res, projectRoot)) return;
 
     // GET /api/approvals/:id — single entry detail. maskedArgs-only; raw
     // args are NEVER resolved (resolveRawArgs is never called from here).
