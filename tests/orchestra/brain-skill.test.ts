@@ -83,7 +83,7 @@ describe('planSprint — skill selection integration', () => {
     expect(sprint.tasks.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('tasks have assignedSkills as empty array when no skill pool exists', async () => {
+  it('WM-7 E1: no skill pool → planner still injects the generated project-conventions temp-skill', async () => {
     const { planSprint } = await import('../../src/orchestra/brain.js');
     const config = makeConfig(tempDir);
     const context = makeContext('## Task 1: Test task\n- Scope: src/core/\n');
@@ -92,7 +92,7 @@ describe('planSprint — skill selection integration', () => {
     const sprint = await planSprint(tempDir, config, context, recommendation, { mode: 'structured' });
     // Without skill pool directory, skills default to empty array (initialized in createTask)
     for (const task of sprint.tasks) {
-      expect(task.assignedSkills).toEqual([]);
+      expect(task.assignedSkills).toEqual(['project-conventions']);
     }
   });
 

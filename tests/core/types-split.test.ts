@@ -118,9 +118,9 @@ describe('types.ts barrel re-export — enums', () => {
     expect(TaskStatus.DONE).toBe('DONE');
   });
 
-  it('re-exports TaskEvaluation with all 4 members', () => {
+  it('re-exports TaskEvaluation with all 5 members', () => {
     // Sprint 192 192-010: DEFERRED added for dispatcher saturation reporting.
-    expect(Object.values(TaskEvaluation)).toHaveLength(4);
+    expect(Object.values(TaskEvaluation)).toHaveLength(5);
     expect(TaskEvaluation.GO_WITH_TECH_DEBT).toBe('GO_WITH_TECH_DEBT');
   });
 

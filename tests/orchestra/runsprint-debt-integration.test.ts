@@ -195,7 +195,11 @@ vi.mock('../../src/core/config.js', () => ({
   resolveEffectiveWorkers: vi.fn().mockReturnValue(4),
 }));
 
-vi.mock('../../src/core/agent-pool.js', () => ({
+vi.mock('../../src/core/agent-pool.js', async (importOriginal) => ({
+  // Partial mock over the REAL module: new exports (getAgentRole, getAgentPrompt,
+  // BUILTIN_AGENT_ROLES, ...) keep working as the surface grows — only the pool
+  // manager is stubbed for this integration test.
+  ...(await importOriginal<typeof import('../../src/core/agent-pool.js')>()),
   AgentPoolManager: vi.fn().mockImplementation(() => ({
     loadAgents: vi.fn().mockReturnValue(new Map()),
     selectOrCreateAgent: vi.fn().mockReturnValue(null),

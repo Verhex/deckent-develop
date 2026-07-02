@@ -30,9 +30,9 @@ describe('TaskStatus enum', () => {
 });
 
 describe('TaskEvaluation enum', () => {
-  it('has 4 members', () => {
+  it('has 5 members (incl. NOT_DISPATCHED)', () => {
     // Sprint 192 192-010: DEFERRED added for dispatcher saturation reporting.
-    expect(Object.values(TaskEvaluation)).toHaveLength(4);
+    expect(Object.values(TaskEvaluation)).toHaveLength(5);
   });
 });
 

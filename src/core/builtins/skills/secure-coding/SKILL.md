@@ -40,6 +40,13 @@
 - Minimize dependency surface area
 - Monitor for CVE advisories on critical dependencies
 
+## Anti-Patterns to Avoid
+- Hardcoding a secret "just for the test" — use env-injection or a fixture generator.
+- Logging a credential value (even truncated) — log the KEY NAME and a redaction marker.
+- Building SQL/shell strings by concatenation — parameterize or use argv arrays.
+- Writing a credential file without restrictive permissions (0600) or atomic replace.
+- Catching a crypto/auth error and returning a default value — fail closed, loudly.
+
 ## Karpathy Notes
 - **Surgical:** apply these practices to the code you are writing IN scope — do not launch
   a repo-wide security sweep from an implementation task; note out-of-scope findings in

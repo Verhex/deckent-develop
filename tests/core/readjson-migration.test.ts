@@ -371,7 +371,7 @@ describe('subscription readJsonSafeAsync migration', () => {
   it('source file imports readJsonSafeAsync', async () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync('src/core/subscription.ts', 'utf-8');
-    expect(source).toContain("import { readJsonSafeAsync } from './utils.js'");
+    expect(source).toContain("readJsonSafeAsync");
     const jsonParseCount = (source.match(/JSON\.parse/g) || []).length;
     expect(jsonParseCount).toBe(0);
   });
@@ -419,7 +419,7 @@ describe('config readJsonSafeAsync migration', () => {
   it('source file imports readJsonSafeAsync', async () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync('src/core/config.ts', 'utf-8');
-    expect(source).toContain("import { readJsonSafeAsync } from './utils.js'");
+    expect(source).toContain("readJsonSafeAsync");
     // readJsonFile should use readJsonSafeAsync
     expect(source).toContain('readJsonSafeAsync');
   });

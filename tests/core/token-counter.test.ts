@@ -227,7 +227,7 @@ describe('TokenCounter', () => {
       // opus has 1M context window, sonnet has 200K
       const opusResult = counter.estimateTaskContextBudget(100, '', [], 'opus');
       const sonnetResult = counter.estimateTaskContextBudget(100, '', [], 'sonnet');
-      expect(opusResult.modelBudget).toBeGreaterThan(sonnetResult.modelBudget);
+      expect(opusResult.modelBudget).toBeGreaterThanOrEqual(sonnetResult.modelBudget) // Sonnet 5 = 1M context, opus-parite (stale opus>sonnet varsayımı kalktı);
     });
   });
 });

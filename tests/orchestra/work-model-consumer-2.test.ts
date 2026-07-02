@@ -71,37 +71,37 @@ const SKILL_ROUTING_CONFIG: TaskRouterConfig = {
 
 const MOCK_ADRS: MemoryEntryV2[] = [
   makeAdr({
-    id: 'adr-029',
+    id: 'adr-g-015',
     title: 'Managed-Docs Universalization',
     content: 'Sprint lifecycle template-based document generation. Managed docs system under docs/. Template engine for documentation updates.',
     sprint_num: 131,
   }),
   makeAdr({
-    id: 'adr-030',
+    id: 'adr-g-015',
     title: 'Template Engine Plugin Loader',
     content: 'Managed-Docs render pipeline. Template rendering for managed docs documentation.',
     sprint_num: 131,
   }),
   makeAdr({
-    id: 'adr-008',
+    id: 'adr-d-004',
     title: 'Brain Merkezi Import — Tek Yönlü Bağımlılık',
     content: 'Brain is the central orchestrator. All imports in src/orchestra/ and src/core/ follow one-way dependency.',
     sprint_num: 8,
   }),
   makeAdr({
-    id: 'adr-015',
+    id: 'adr-g-006',
     title: 'TaskRouter Module — 6-level routing',
     content: 'TaskRouter implements 6-level routing priority in sprint task assignment for src/orchestra/.',
     sprint_num: 44,
   }),
   makeAdr({
-    id: 'adr-006',
+    id: 'adr-g-002',
     title: 'spawnSync Security Pattern',
     content: 'Security pattern for spawnSync. OWASP vulnerability protection and auth boundary enforcement.',
     sprint_num: 6,
   }),
   makeAdr({
-    id: 'adr-037',
+    id: 'adr-g-020',
     title: 'Brain-Auditor-Worker Authority Matrix RBAC',
     content: 'RBAC protocol for brain, auditor, worker roles. Security permission enforcement and authority matrix.',
     sprint_num: 139,
@@ -218,7 +218,7 @@ describe('adr-selector WM-2c canonical bridge', () => {
     const results = selectRelevantAdrs(task, MOCK_ADRS, 3, 240);
     const ids = results.map(r => r.adrId);
     // Docs presets: adr-029, adr-030, adr-032 — at least adr-029/030 should appear
-    expect(ids.some(id => id === 'adr-029' || id === 'adr-030')).toBe(true);
+    expect(ids.some(id => id === 'adr-g-015' || id === 'adr-g-015')).toBe(true);
   });
 
   // (a) canonical: task.type=code-development → 'core-dev' domain → core ADRs preferred
@@ -232,7 +232,7 @@ describe('adr-selector WM-2c canonical bridge', () => {
     const results = selectRelevantAdrs(task, MOCK_ADRS, 3, 240);
     const ids = results.map(r => r.adrId);
     // core-dev presets: adr-001, adr-002, adr-008, adr-015 — adr-008/015 are in MOCK_ADRS
-    expect(ids.some(id => id === 'adr-008' || id === 'adr-015')).toBe(true);
+    expect(ids.some(id => id === 'adr-d-004' || id === 'adr-g-006')).toBe(true);
   });
 
   // (a) canonical: task.type=security → 'security' domain → security ADRs preferred
@@ -246,7 +246,7 @@ describe('adr-selector WM-2c canonical bridge', () => {
     const results = selectRelevantAdrs(task, MOCK_ADRS, 3, 240);
     const ids = results.map(r => r.adrId);
     // security presets: adr-006, adr-037, adr-038 — adr-006/037 are in MOCK_ADRS
-    expect(ids.some(id => id === 'adr-006' || id === 'adr-037')).toBe(true);
+    expect(ids.some(id => id === 'adr-g-002' || id === 'adr-g-020')).toBe(true);
   });
 
   // (b) legacy fallback: no task.type, docs/ scope → classifyTaskIntent used
@@ -259,7 +259,7 @@ describe('adr-selector WM-2c canonical bridge', () => {
     const results = selectRelevantAdrs(task, MOCK_ADRS, 3, 240);
     const ids = results.map(r => r.adrId);
     // docs domain → adr-029/030 should appear
-    expect(ids.some(id => id === 'adr-029' || id === 'adr-030')).toBe(true);
+    expect(ids.some(id => id === 'adr-g-015' || id === 'adr-g-015')).toBe(true);
   });
 
   // (c) regression eq: canonical task.type=documentation should prefer same ADRs as legacy docs task
@@ -280,8 +280,8 @@ describe('adr-selector WM-2c canonical bridge', () => {
     // Both should select docs-domain ADRs
     const canonicalIds = canonicalResults.map(r => r.adrId);
     const legacyIds = legacyResults.map(r => r.adrId);
-    expect(canonicalIds.some(id => id === 'adr-029' || id === 'adr-030')).toBe(true);
-    expect(legacyIds.some(id => id === 'adr-029' || id === 'adr-030')).toBe(true);
+    expect(canonicalIds.some(id => id === 'adr-g-015' || id === 'adr-g-015')).toBe(true);
+    expect(legacyIds.some(id => id === 'adr-g-015' || id === 'adr-g-015')).toBe(true);
   });
 
   // empty ADRs still returns empty

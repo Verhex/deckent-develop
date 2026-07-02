@@ -1,3 +1,4 @@
+import { modelRegistry } from '../../src/core/model-registry.js';
 import { describe, it, expect } from 'vitest';
 import {
   routeTaskV2,
@@ -928,8 +929,8 @@ describe('assessContextFit', () => {
 
   it('returns "tight" when utilization is between 75% and 90%', () => {
     const reasoning: string[] = [];
-    // sonnet has 200_000 context window; 160_000 = 80% utilization
-    const result = assessContextFit(160_000, 'sonnet', reasoning);
+    // zero-hardcode: derive from the LIVE registry window (Sonnet 5 = 1M)
+    const result = assessContextFit(Math.round((modelRegistry.get('sonnet')?.contextWindow ?? 200000) * 0.80), 'sonnet', reasoning);
     expect(result).toBe('tight');
     expect(reasoning.some(r => r.includes('Context fit: TIGHT'))).toBe(true);
     expect(reasoning.some(r => r.includes('upgrading'))).toBe(true);
@@ -938,7 +939,7 @@ describe('assessContextFit', () => {
   it('returns "overflow" when utilization exceeds 90%', () => {
     const reasoning: string[] = [];
     // sonnet has 200_000 context window; 190_000 = 95% utilization
-    const result = assessContextFit(190_000, 'sonnet', reasoning);
+    const result = assessContextFit(Math.round((modelRegistry.get('sonnet')?.contextWindow ?? 200000) * 0.95), 'sonnet', reasoning);
     expect(result).toBe('overflow');
     expect(reasoning.some(r => r.includes('Context fit: OVERFLOW'))).toBe(true);
     expect(reasoning.some(r => r.includes('splitting'))).toBe(true);
@@ -953,9 +954,8 @@ describe('assessContextFit', () => {
 
   it('boundary: exactly 75% returns "tight" (not "ok")', () => {
     const reasoning: string[] = [];
-    // sonnet context = 200_000; 75% = 150_000 → exactly at threshold
-    // 150_001 / 200_000 = 0.7500... > 0.75 → tight
-    const result = assessContextFit(150_001, 'sonnet', reasoning);
+    // zero-hardcode: registry-derived window; just past the 75% boundary → tight
+    const result = assessContextFit(Math.floor((modelRegistry.get('sonnet')?.contextWindow ?? 200000) * 0.75) + 1, 'sonnet', reasoning);
     expect(result).toBe('tight');
   });
 
@@ -963,7 +963,7 @@ describe('assessContextFit', () => {
     const reasoning: string[] = [];
     // sonnet context = 200_000; 90% = 180_000 → exactly at threshold
     // 180_001 / 200_000 = 0.9000... > 0.90 → overflow
-    const result = assessContextFit(180_001, 'sonnet', reasoning);
+    const result = assessContextFit(Math.floor((modelRegistry.get('sonnet')?.contextWindow ?? 200000) * 0.90) + 1, 'sonnet', reasoning);
     expect(result).toBe('overflow');
   });
 });
@@ -1012,8 +1012,8 @@ describe('routeTaskV2 — context budget integration', () => {
       makePool(),
       makeSkillPool(),
       {
-        estimatedTokens: 170_000,
-        modelId: 'sonnet', // 200k context → 85% utilization
+        estimatedTokens: Math.round((modelRegistry.get('sonnet')?.contextWindow ?? 200000) * 0.85),
+        modelId: 'sonnet', // registry-window × 0.85 → tight
       },
     );
 
@@ -1030,7 +1030,7 @@ describe('routeTaskV2 — context budget integration', () => {
       makePool(),
       makeSkillPool(),
       {
-        estimatedTokens: 195_000,
+        estimatedTokens: Math.round((modelRegistry.get('sonnet')?.contextWindow ?? 200000) * 0.95),
         modelId: 'sonnet', // 200k context → 97.5% utilization
       },
     );

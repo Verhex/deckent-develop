@@ -16,6 +16,7 @@
 // understanding. The NL→structured-intent step is an explicit follow-up.
 
 import type { ModelType, TaskEffort } from '../core/types.js';
+import { DeckentError } from '../core/errors.js';
 import type { ParsedDirectiveTask } from './task-builder.js';
 
 // ═══ Types ═══════════════════════════════════════════════════════════════
@@ -66,12 +67,12 @@ const SECTION_HEADING_RE = /^\s*###\s+(?:Description|goNogo)\b/im;
 
 function assertNoHeadingCollision(field: string, value: string): void {
   if (TASK_HEADING_RE.test(value)) {
-    throw new Error(
+    throw new DeckentError('DECKENT_E074', 
       `directives-builder: "${field}" contains a "## Task N:" heading pattern — would fracture parseStructuredDirectives' block split`,
     );
   }
   if (SECTION_HEADING_RE.test(value)) {
-    throw new Error(
+    throw new DeckentError('DECKENT_E074', 
       `directives-builder: "${field}" contains a reserved "### Description"/"### goNogo" heading`,
     );
   }
@@ -81,7 +82,7 @@ function assertSafeField(field: string, value: string): void {
   assertNoHeadingCollision(field, value);
   for (const rawLine of value.split('\n')) {
     if (RESERVED_LABEL_RE.test(rawLine)) {
-      throw new Error(
+      throw new DeckentError('DECKENT_E074', 
         `directives-builder: "${field}" contains a reserved directive-label line ("${rawLine.trim()}") — would be mis-parsed as a task directive`,
       );
     }
@@ -91,7 +92,7 @@ function assertSafeField(field: string, value: string): void {
 function assertNoDelimiterCollision(field: string, items: readonly string[], delimiter: string): void {
   for (const item of items) {
     if (item.includes(delimiter)) {
-      throw new Error(
+      throw new DeckentError('DECKENT_E074', 
         `directives-builder: "${field}" item "${item}" contains the "${delimiter}" join delimiter — would not round-trip`,
       );
     }
@@ -99,7 +100,7 @@ function assertNoDelimiterCollision(field: string, items: readonly string[], del
 }
 
 function assertNonEmpty(field: string, value: string): void {
-  if (!value.trim()) throw new Error(`directives-builder: "${field}" must not be empty`);
+  if (!value.trim()) throw new DeckentError('DECKENT_E074', `directives-builder: "${field}" must not be empty`);
 }
 
 // ═══ Writer ══════════════════════════════════════════════════════════════
@@ -111,9 +112,9 @@ function normalizeScopeDir(dir: string): string {
 function validateTask(task: DirectiveBuildTask): void {
   assertNonEmpty('title', task.title);
   assertNonEmpty('desc', task.desc);
-  if (task.files.length === 0) throw new Error('directives-builder: "files" must contain at least one entry (DISTINCT-FILE)');
-  if (task.goCriteria.length === 0) throw new Error('directives-builder: "goCriteria" must contain at least one entry');
-  if (task.nogo.length === 0) throw new Error('directives-builder: "nogo" must contain at least one entry');
+  if (task.files.length === 0) throw new DeckentError('DECKENT_E074', 'directives-builder: "files" must contain at least one entry (DISTINCT-FILE)');
+  if (task.goCriteria.length === 0) throw new DeckentError('DECKENT_E074', 'directives-builder: "goCriteria" must contain at least one entry');
+  if (task.nogo.length === 0) throw new DeckentError('DECKENT_E074', 'directives-builder: "nogo" must contain at least one entry');
 
   assertSafeField('title', task.title);
   assertSafeField('desc', task.desc);
@@ -155,7 +156,7 @@ function buildTaskBlock(task: DirectiveBuildTask, seq: number): string[] {
  */
 export function buildDirectives(intent: DirectiveBuildIntent): string {
   if (!intent.tasks || intent.tasks.length === 0) {
-    throw new Error('directives-builder: intent.tasks must contain at least one task');
+    throw new DeckentError('DECKENT_E074', 'directives-builder: intent.tasks must contain at least one task');
   }
   if (intent.title) assertNoHeadingCollision('title', intent.title);
   if (intent.goal) assertNoHeadingCollision('goal', intent.goal);

@@ -133,15 +133,15 @@ describe('features-manifest.json — category membership', () => {
     expect(manifest.active.length).toBeGreaterThanOrEqual(10);
   });
 
-  it('dead category contains decision-orchestrator-v1', () => {
+  it('ROUTE-V1-PURGE: decision-orchestrator-v1 is fully purged from the manifest', () => {
     const deadIds = manifest.dead.map(e => e.id);
-    expect(deadIds).toContain('decision-orchestrator-v1');
+    expect(deadIds).not.toContain('decision-orchestrator-v1');
   });
 
-  it('dead decision-orchestrator-v1 has adrRef pointing to ADR-028', () => {
+  it('purged decision-orchestrator-v1 leaves no adrRef residue', () => {
+    // ROUTE-V1-PURGE (ADR-G-006): the entry is deleted from the manifest entirely.
     const v1 = manifest.dead.find(e => e.id === 'decision-orchestrator-v1');
-    expect(v1).toBeDefined();
-    expect(v1?.adrRef).toBe('ADR-028');
+    expect(v1).toBeUndefined();
   });
 
   it('active category contains sprint-controller', () => {

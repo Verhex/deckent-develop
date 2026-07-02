@@ -49,20 +49,20 @@ function makeAdr(overrides: Partial<MemoryEntryV2> & { id: string; title: string
 
 // Minimal ADR set covering core-dev + docs presets
 const CORE_DEV_ADRS: MemoryEntryV2[] = [
-  makeAdr({ id: 'adr-001', title: 'TypeScript + ESM', content: 'TypeScript as the core language for src/core/ modules.', sprint_num: 1 }),
-  makeAdr({ id: 'adr-002', title: 'Node16 Module Resolution', content: 'Node16 module resolution for TypeScript ESM.', sprint_num: 2 }),
-  makeAdr({ id: 'adr-008', title: 'Brain Merkezi Import', content: 'Brain is the central orchestrator. One-way dependency in src/orchestra/.', sprint_num: 8 }),
-  makeAdr({ id: 'adr-015', title: 'TaskRouter Module', content: 'TaskRouter 6-level routing for src/orchestra/ task assignment.', sprint_num: 44 }),
+  makeAdr({ id: 'adr-d-001', title: 'TypeScript + ESM', content: 'TypeScript as the core language for src/core/ modules.', sprint_num: 1 }),
+  makeAdr({ id: 'adr-d-001', title: 'Node16 Module Resolution', content: 'Node16 module resolution for TypeScript ESM.', sprint_num: 2 }),
+  makeAdr({ id: 'adr-d-004', title: 'Brain Merkezi Import', content: 'Brain is the central orchestrator. One-way dependency in src/orchestra/.', sprint_num: 8 }),
+  makeAdr({ id: 'adr-g-006', title: 'TaskRouter Module', content: 'TaskRouter 6-level routing for src/orchestra/ task assignment.', sprint_num: 44 }),
   makeAdr({ id: 'adr-033', title: 'Product Vision', content: 'Product not service. CLI distribution.', sprint_num: 132 }),
-  makeAdr({ id: 'adr-037', title: 'RBAC Protocol', content: 'Security boundaries for brain, auditor, worker roles.', sprint_num: 139 }),
+  makeAdr({ id: 'adr-g-020', title: 'RBAC Protocol', content: 'Security boundaries for brain, auditor, worker roles.', sprint_num: 139 }),
 ];
 
 const DOCS_ADRS: MemoryEntryV2[] = [
-  makeAdr({ id: 'adr-029', title: 'Managed-Docs Universalization', content: 'Sprint lifecycle template-based document generation for docs/.', sprint_num: 131 }),
-  makeAdr({ id: 'adr-030', title: 'Template Engine + Plugin Loader', content: 'Managed-Docs render pipeline for documentation templates.', sprint_num: 131 }),
+  makeAdr({ id: 'adr-g-015', title: 'Managed-Docs Universalization', content: 'Sprint lifecycle template-based document generation for docs/.', sprint_num: 131 }),
+  makeAdr({ id: 'adr-g-015', title: 'Template Engine + Plugin Loader', content: 'Managed-Docs render pipeline for documentation templates.', sprint_num: 131 }),
   makeAdr({ id: 'adr-032', title: 'i18n Pattern System', content: 'TR/EN content diversity support for documentation templates.', sprint_num: 131 }),
-  makeAdr({ id: 'adr-001', title: 'TypeScript + ESM', content: 'TypeScript for src/core/.', sprint_num: 1 }),
-  makeAdr({ id: 'adr-008', title: 'Brain Merkezi Import', content: 'Brain orchestrator in src/orchestra/.', sprint_num: 8 }),
+  makeAdr({ id: 'adr-d-001', title: 'TypeScript + ESM', content: 'TypeScript for src/core/.', sprint_num: 1 }),
+  makeAdr({ id: 'adr-d-004', title: 'Brain Merkezi Import', content: 'Brain orchestrator in src/orchestra/.', sprint_num: 8 }),
 ];
 
 function makeTask(
@@ -105,12 +105,12 @@ function makeFullTask(overrides: Partial<Task> = {}): Task {
 describe('TASK_TYPE_ADR_PRESETS', () => {
   it('exports preset matrix with expected task types', () => {
     expect(TASK_TYPE_ADR_PRESETS).toBeDefined();
-    expect(TASK_TYPE_ADR_PRESETS['core-dev']).toContain('adr-001');
-    expect(TASK_TYPE_ADR_PRESETS['core-dev']).toContain('adr-008');
-    expect(TASK_TYPE_ADR_PRESETS['docs']).toContain('adr-029');
-    expect(TASK_TYPE_ADR_PRESETS['test']).toContain('adr-003');
-    expect(TASK_TYPE_ADR_PRESETS['security']).toContain('adr-037');
-    expect(TASK_TYPE_ADR_PRESETS['observability']).toContain('adr-035');
+    expect(TASK_TYPE_ADR_PRESETS['core-dev']).toContain('adr-d-001');
+    expect(TASK_TYPE_ADR_PRESETS['core-dev']).toContain('adr-d-004');
+    expect(TASK_TYPE_ADR_PRESETS['docs']).toContain('adr-g-015');
+    expect(TASK_TYPE_ADR_PRESETS['test']).toContain('adr-d-002');
+    expect(TASK_TYPE_ADR_PRESETS['security']).toContain('adr-g-020');
+    expect(TASK_TYPE_ADR_PRESETS['observability']).toContain('adr-g-018');
   });
 });
 
@@ -151,7 +151,7 @@ describe('adr-preset: selectRelevantAdrs with preset bonus', () => {
     const found = ids.filter(id => docsPresets.includes(id));
     expect(found.length).toBeGreaterThanOrEqual(2);
     // adr-029 and adr-030 should definitely be in results
-    expect(ids).toContain('adr-029');
+    expect(ids).toContain('adr-g-015');
   });
 
   // Test 3: Preset + relevance combined score
@@ -164,7 +164,7 @@ describe('adr-preset: selectRelevantAdrs with preset bonus', () => {
     );
 
     const results = selectRelevantAdrs(task, CORE_DEV_ADRS, 10, 146);
-    const adr008 = results.find(r => r.adrId === 'adr-008');
+    const adr008 = results.find(r => r.adrId === 'adr-d-004');
 
     expect(adr008).toBeDefined();
     // Should have preset-match in reasons (preset bonus applied)

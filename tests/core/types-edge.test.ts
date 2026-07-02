@@ -90,9 +90,9 @@ describe('TaskEvaluation enum', () => {
     expect(TaskEvaluation.NO_GO).toBe('NO_GO');
   });
 
-  it('should have exactly 4 members', () => {
+  it('should have exactly 5 members (MOAT-3 added NOT_DISPATCHED)', () => {
     // Sprint 192 192-010: DEFERRED added for dispatcher saturation reporting.
-    expect(Object.values(TaskEvaluation)).toHaveLength(4);
+    expect(Object.values(TaskEvaluation)).toHaveLength(5);
   });
 
   it('should be usable as switch cases', () => {

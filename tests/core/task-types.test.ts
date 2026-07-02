@@ -15,7 +15,7 @@ describe('Sprint 192 Task 192-010 — TaskEvaluation.DEFERRED + retro reporting'
 
     const values = Object.values(TaskEvaluation);
     expect(values).toContain('DEFERRED');
-    expect(values.length).toBe(4);
+    expect(values.length).toBe(5); // +NOT_DISPATCHED (MOAT-3)
   });
 
   // ─── Test 2: retro inclusion — markdown section renders Deferred count ──
@@ -50,8 +50,8 @@ describe('Sprint 192 Task 192-010 — TaskEvaluation.DEFERRED + retro reporting'
       ['t1', TaskEvaluation.DONE],
       ['t2', TaskEvaluation.NO_GO],
       ['t3', TaskEvaluation.GO_WITH_TECH_DEBT],
-      ['t4', TaskEvaluation.DEFERRED],
-      ['t5', TaskEvaluation.DEFERRED],
+      ['t4', TaskEvaluation.DEFERRED, TaskEvaluation.NOT_DISPATCHED],
+      ['t5', TaskEvaluation.DEFERRED, TaskEvaluation.NOT_DISPATCHED],
     ]);
 
     const stats = collectDeferredStats(evaluations);

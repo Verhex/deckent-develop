@@ -592,6 +592,11 @@ registry.set('DECKENT_E072', {
   ],
 });
 
+registry.set('DECKENT_E074', {
+  message: 'Directives-builder input invalid',
+  suggestion: 'Fix the structured intent (title/files/goCriteria/nogo required) and rebuild — the builder guarantees round-trip parseability only for complete tasks.',
+});
+
 registry.set('DECKENT_E073', {
   message: 'KPI definition formula error',
   suggestion: 'Use only catalog measure IDs in the formula — see BASE_MEASURES in src/core/kpi/measure-catalog.ts',

@@ -68,7 +68,7 @@ describe('Intent Classifier V3 — Sub-Intents', () => {
     expect(result.subIntent).toBe('observer');
   });
 
-  it('routingMeta.routingVersion === "v3"', () => {
+  it('routingMeta.routingVersion === "v2" (ROUTING-VERSION-LABEL reconcile)', () => {
     // Create minimal agent pool and skill pool
     const agentPool = new Map();
     agentPool.set('architect', {
@@ -98,7 +98,7 @@ describe('Intent Classifier V3 — Sub-Intents', () => {
       skillPool,
     );
 
-    expect(result.routingVersion).toBe('v3');
+    expect(result.routingVersion).toBe('v2');
   });
 
   it('Backward compat — v2 tasks still parseable (subIntent is optional)', () => {
