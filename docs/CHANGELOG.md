@@ -2,6 +2,35 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint361] - 2026-07-02
+
+### Added
+
+- OPENROUTER-DOC-ROUTE — doc-kind→free-model önerisi (CARRYOVER 360-008, aynı-spec)
+- CODEX-RETRY-RCA — codex-timeout kök-analizi + yeniden-deneme (GERÇEK codex-worker)
+- OPENROUTER-BOOTSTRAP — adapter'ı provider-bootstrap'a flag'li kaydet
+- ONB-GLOBAL-DESIGN — global-install + proje-scope mimari tasarımı (Sıra-200 dilim-1)
+- ONB-WIZARD-CORE — install→init sihirbaz çekirdeği (Sıra-201 dilim-1)
+- APR-CLIENTS-CORE — Slack/Teams onay-kanal adaptörleri (Sıra-70 dilim-1)
+- TERM-RPC-CORE — ortak session/action RPC protokol çekirdeği (Sıra-54 dilim-1)
+- AGSK-2 — katalog dilim-2: integration-engineer + terminal-ux-engineer agent'ları (Sıra-85)
+- TOOL-REG-SHADOW — shadow/override-policy dilimi (Sıra-24 kapanışı)
+- F7-MULTISESSION — terminal çok-oturum hardening dilimi (Sıra-65 devam)
+
+### Changed
+
+- Fix debt: Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L (completed with tech debt)
+- LIMIT-GATE-WIRE — `deckent limits` + start-gate (CARRYOVER 360-003, aynı-spec) (completed with tech debt)
+- DEFER-002-NERVOUS — nervous MCP undo/edit + askBrain-escalation dilimi (Sıra-75) (completed with tech debt)
+
+### Fixed
+
+- POSTFIX-PENDING-SCAN — FIX-sonrası hiç-başlamamış eligible'ları koştur (born-475)
+- FIX-MODEL-PRESERVE — fix-task orijinalin model/provider/backend mirası (born-476)
+
+
+_Tasks: 17 total, 17 done, 4 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint360] - 2026-07-02
 
 ### Added

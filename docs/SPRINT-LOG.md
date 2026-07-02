@@ -8717,3 +8717,40 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 360-017: HISTORY-INK-WIRE — input-history'yi input-bar'a bağla (65 kapanışı) (DONE)
 
 ---
+## Sprint 361 — sprint-361
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-02
+**Duration:** 2473s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 17 |
+| Completed | 17 |
+| Tech Debt | 4 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 2473406ms |
+
+### Tasks
+
+- 361-001: Fix debt: Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L (GO_WITH_TECH_DEBT)
+- 361-002: LIMIT-GATE-WIRE — `deckent limits` + start-gate (CARRYOVER 360-003, aynı-spec) (GO_WITH_TECH_DEBT)
+- 361-003: OPENROUTER-DOC-ROUTE — doc-kind→free-model önerisi (CARRYOVER 360-008, aynı-spec) (DONE)
+- 361-004: POSTFIX-PENDING-SCAN — FIX-sonrası hiç-başlamamış eligible'ları koştur (born-475) (DONE)
+- 361-005: FIX-MODEL-PRESERVE — fix-task orijinalin model/provider/backend mirası (born-476) (DONE)
+- 361-006: CODEX-RETRY-RCA — codex-timeout kök-analizi + yeniden-deneme (GERÇEK codex-worker) (DONE)
+- 361-007: OPENROUTER-BOOTSTRAP — adapter'ı provider-bootstrap'a flag'li kaydet (DONE)
+- 361-008: ONB-GLOBAL-DESIGN — global-install + proje-scope mimari tasarımı (Sıra-200 dilim-1) (DONE)
+- 361-009: ONB-WIZARD-CORE — install→init sihirbaz çekirdeği (Sıra-201 dilim-1) (DONE)
+- 361-010: APR-CLIENTS-CORE — Slack/Teams onay-kanal adaptörleri (Sıra-70 dilim-1) (DONE)
+- 361-011: TERM-RPC-CORE — ortak session/action RPC protokol çekirdeği (Sıra-54 dilim-1) (DONE)
+- 361-012: AGSK-2 — katalog dilim-2: integration-engineer + terminal-ux-engineer agent'ları (Sıra-85) (DONE)
+- 361-013: TOOL-REG-SHADOW — shadow/override-policy dilimi (Sıra-24 kapanışı) (DONE)
+- 361-014: DEFER-002-NERVOUS — nervous MCP undo/edit + askBrain-escalation dilimi (Sıra-75) (GO_WITH_TECH_DEBT)
+- 361-015: F7-MULTISESSION — terminal çok-oturum hardening dilimi (Sıra-65 devam) (DONE)
+- 361-016: ONB-CHAT-CORE — sohbetle-setup akış çekirdeği (Sıra-202 dilim-1) (DONE)
+
+---

@@ -1016,6 +1016,22 @@ export async function bootstrapProviders(
      * a tracked follow-up.
      */
     deck_broker?: { enabled?: boolean };
+    /**
+     * OPENROUTER-BOOTSTRAP (361-007, flag-gated DEFAULT-OFF): when `enabled`,
+     * bootstrap registers an `OpenRouterProvider` (`providers/openrouter.ts`,
+     * Sprint 360 Task 360-006) gated on `$DECK:OPENROUTER_API_KEY` resolving
+     * — checked via the adapter's OWN `isAvailable()`, which reads `.deck`
+     * only and never touches `process.env` (openrouter.ts's secret-resolution
+     * contract, see its `resolveApiKey()`). Mirrors the AWS-creds-gated
+     * Bedrock block below: flag-on + key present → registered; flag-on + key
+     * absent → skipped with an honest reason (fail-honest log), never
+     * silently registered broken. Unset/false (default) → this block never
+     * runs; bootstrap behavior is byte-for-byte unchanged. Not yet on
+     * `ResolvedConfig` — a caller must pass this explicitly (see
+     * `deck_broker` precedent above); real `.deckent/config.json` wiring is
+     * a tracked follow-up.
+     */
+    openrouter?: { enabled?: boolean };
   },
   projectRoot?: string,
   registry: ProviderRegistry = providerRegistry,
@@ -1170,6 +1186,33 @@ export async function bootstrapProviders(
       registered.push('bedrock' as ProviderName);
     } catch {
       skipped.push({ name: 'bedrock' as ProviderName, reason: 'Failed to create BedrockAdapter' });
+    }
+  }
+
+  // ─── Bootstrap OpenRouter (361-007) — flag-gated, DEFAULT-OFF ──────────
+  // Opt-in via `config.openrouter.enabled` (mirrors `deck_broker`'s inline
+  // flag param above — not yet on `ResolvedConfig`). Further gated on
+  // `$DECK:OPENROUTER_API_KEY` resolving, checked through the adapter's own
+  // `isAvailable()` (`.deck` file only, never `process.env` — see
+  // `providers/openrouter.ts`). flag-on + key present → registered; flag-on
+  // + key absent → skipped with an honest reason, never registered broken.
+  // flag-off (default, unset) → this block never runs at all — bootstrap
+  // output is byte-for-byte identical to pre-361-007 behavior.
+  if (config.openrouter?.enabled && !registry.hasProvider('openrouter')) {
+    try {
+      const { createOpenRouterAdapter } = await import('../providers/openrouter.js');
+      const openrouterAdapter = createOpenRouterAdapter(root);
+      if (await openrouterAdapter.isAvailable()) {
+        registry.registerProvider(openrouterAdapter);
+        registered.push('openrouter' as ProviderName);
+      } else {
+        skipped.push({
+          name: 'openrouter' as ProviderName,
+          reason: 'openrouter.enabled is true but $DECK:OPENROUTER_API_KEY is not set',
+        });
+      }
+    } catch {
+      skipped.push({ name: 'openrouter' as ProviderName, reason: 'Failed to create OpenRouterProvider' });
     }
   }
 

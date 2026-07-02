@@ -157,7 +157,7 @@ import {
 // applyCascadeToSprint + applyUnblockToSprint were exported from
 // sprint-spawner but had no runtime caller. Wired here so NO_GO →
 // dependents PAUSED and DONE → dependents PENDING actually fire.
-import { applyCascadeToSprint, applyUnblockToSprint } from './sprint-spawner.js';
+import { applyCascadeToSprint, applyUnblockToSprint, respawnEligibleTasks } from './sprint-spawner.js';
 import { writeEvent, getCurrentSprintId, readEvents, SCOPE_INSUFFICIENT_CHANNEL } from './event-stream.js';
 import { verifyProofOfFunction } from './proof-of-function.js';
 import { checkWorkerLiveness } from './worker-liveness.js';
@@ -2614,6 +2614,75 @@ export async function runFixPhase(
         } catch (e) { debugLog('runFixPhase:reDispatchResult:event', e); }
       }
     } catch (e) { debugLog('runFixPhase:reDispatchExecution', e); }
+
+    // ─── POSTFIX-PENDING-SCAN (Sprint 361 361-004 — born-475) ────────────
+    // 360 live lesson: tasks 003/008 whose parent tasks were already DONE
+    // were never spawned — a stall window swallowed the per-completion
+    // respawnEligibleTasks call (result-collector.ts normally invokes it
+    // after every finalizeTaskResult), leaving a PENDING+dependency-
+    // eligible task with no dispatch attempt ever made. This is a single
+    // safety-net pass at the very end of FIX: reuse respawnEligibleTasks
+    // (the SAME wave mechanism spawnWorkers/EVALUATE use elsewhere — no new
+    // scheduler), spawn whatever it finds still-eligible, and wait for those
+    // results. If nothing is eligible this is a no-op — behavior stays
+    // byte-identical to before this block existed. Single-pass by
+    // construction: it does not loop back to re-scan after spawning. Any
+    // NEW NO_GO produced by this pass goes through the standard
+    // handleEvaluation NO_GO path (creates a normal "-fix" task on disk),
+    // picked up by a LATER sprint's FIX phase like any other NO_GO — never
+    // a second immediate respawn attempt within this call.
+    try {
+      const postFixSpawnedIds = await respawnEligibleTasks(
+        projectRoot, sprint, config, { autoApprove: opts?.autoApprove, spawnBackend },
+      );
+      if (postFixSpawnedIds.length > 0) {
+        debugLog(
+          'runFixPhase:postFixPendingScan',
+          `spawned ${postFixSpawnedIds.length} previously-stalled eligible task(s): ${postFixSpawnedIds.join(', ')}`,
+        );
+        const postFixTasks = sprint.tasks.filter(t => postFixSpawnedIds.includes(t.id));
+        const postFixSprint: Sprint = {
+          ...sprint,
+          tasks: postFixTasks,
+          workers: postFixTasks.map(t => `w-${t.id}`),
+        };
+        const postFixTimeout = (config as unknown as Record<string, unknown>).fix_phase_timeout as number | undefined
+          ?? opts?.fixPhaseTimeoutMs
+          ?? 1_800_000;
+        const postFixResults = await waitForResults(
+          projectRoot, postFixSprint, postFixTimeout, undefined, { spawnBackend }, config,
+        );
+
+        let succeeded = 0;
+        let failed = 0;
+        for (const pTask of postFixTasks) {
+          const pResult = postFixResults.find(r => r.taskId === pTask.id);
+          if (!pResult) continue;
+          const pRubricResult = await reconcileEvaluationSpuriousNoGo(
+            evaluateWithRubric(pResult, pTask, undefined, projectRoot), pResult, pTask, projectRoot);
+          const pEval = toTaskEvaluation(pRubricResult);
+          handleEvaluation(projectRoot, pTask, pEval, pResult);
+          evaluations.set(pTask.id, pEval);
+          persistBrainVerdict(
+            projectRoot, pTask.id, pEval, pRubricResult.totalScore, { honest: true }, pResult,
+          );
+          if (pEval === TaskEvaluation.NO_GO) failed += 1; else succeeded += 1;
+        }
+
+        const sidForPostFix = getCurrentSprintId(projectRoot) ?? sprint.id;
+        writeEvent(
+          projectRoot, sidForPostFix, 'brain', 'worker',
+          'BRAIN→WORKER:POSTFIX_PENDING_SCAN',
+          {
+            spawned: postFixSpawnedIds.length,
+            taskIds: postFixSpawnedIds,
+            succeeded,
+            failed,
+            timestamp: new Date().toISOString(),
+          },
+        );
+      }
+    } catch (e) { debugLog('runFixPhase:postFixPendingScan', e); }
   } catch (err) {
     safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
   }

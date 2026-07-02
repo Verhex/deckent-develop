@@ -2341,6 +2341,76 @@ const MESSAGES: MessageMap = {
     en: '  [FAILED] {description} — {error}',
     tr: '  [BAŞARISIZ] {description} — {error}',
   },
+
+  // ─── limits command (Sprint 361 Task 361-002, LIMIT-GATE-WIRE) ─────────
+  'limits.header': {
+    en: 'Subscription Limits',
+    tr: 'Abonelik Limitleri',
+  },
+  'limits.unavailable': {
+    en: 'Limit probe unavailable: {reason}',
+    tr: 'Limit probu kullanılamıyor: {reason}',
+  },
+  'limits.col_window': {
+    en: 'Window',
+    tr: 'Pencere',
+  },
+  'limits.col_usage': {
+    en: 'Usage',
+    tr: 'Kullanım',
+  },
+  'limits.col_resets': {
+    en: 'Resets',
+    tr: 'Sıfırlanma',
+  },
+  'limits.window_session': {
+    en: 'Session',
+    tr: 'Oturum',
+  },
+  'limits.window_week_all': {
+    en: 'Week (all models)',
+    tr: 'Hafta (tüm modeller)',
+  },
+  'limits.window_week_fable': {
+    en: 'Week (Fable)',
+    tr: 'Hafta (Fable)',
+  },
+  'limits.no_reset': {
+    en: '—',
+    tr: '—',
+  },
+  'limits.verdict_ok': {
+    en: 'OK — usage is within safe limits.',
+    tr: 'OK — kullanım güvenli sınırlar içinde.',
+  },
+  'limits.verdict_warn': {
+    en: 'WARNING — {window} usage at {pct}% is approaching the limit.',
+    tr: 'UYARI — {window} kullanımı %{pct} ile limite yaklaşıyor.',
+  },
+  'limits.verdict_block': {
+    en: 'BLOCKED — {window} usage at {pct}% has reached the limit (resets {reset}).',
+    tr: 'ENGELLENDİ — {window} kullanımı %{pct} ile limite ulaştı (sıfırlanma: {reset}).',
+  },
+  'limits.gate_enabled': {
+    en: 'Start-gate: enabled (limit_gate.enabled = true)',
+    tr: 'Başlangıç-kapısı: açık (limit_gate.enabled = true)',
+  },
+  'limits.gate_disabled': {
+    en: 'Start-gate: disabled (limit_gate.enabled = false)',
+    tr: 'Başlangıç-kapısı: kapalı (limit_gate.enabled = false)',
+  },
+  'limits.force_bypass': {
+    en: '[limit-gate] Blocked verdict bypassed via --force-limits.',
+    tr: '[limit-gate] Engelleme --force-limits ile aşıldı.',
+  },
+  'limits.start_gate_blocked': {
+    en: '[limit-gate] Sprint start blocked — {window} usage at {pct}% (resets {reset}). Use --force-limits to override.',
+    tr: '[limit-gate] Sprint başlatma engellendi — {window} kullanımı %{pct} (sıfırlanma: {reset}). Aşmak için --force-limits kullanın.',
+  },
+  'limits.start_gate_warn': {
+    en: '[limit-gate] Warning: {window} usage at {pct}% — proceeding.',
+    tr: '[limit-gate] Uyarı: {window} kullanımı %{pct} — devam ediliyor.',
+  },
 };
 
 /**

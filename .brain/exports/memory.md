@@ -1,5 +1,22 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-361 Learnings
+- Sprint sprint-361 Learnings: ## Sprint sprint-361 Learnings
+- Fix debt: Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L: GO_WITH_TECH_DEBT — VERIFY-AND-DOCUMENT RESOLUTION (zero src/ diff is correct — see below; this is NOT a crashed-worker stub like original 3
+- LIMIT-GATE-WIRE — `deckent limits` + start-gate (CARRYOVER 360-003, aynı-spec): GO_WITH_TECH_DEBT — Part (a) `deckent limits [--json]` is fully implemented and DONE: runs the real Sprint-360 probeSubscriptionLimits() (co
+- DEFER-002-NERVOUS — nervous MCP undo/edit + askBrain-escalation dilimi (Sıra-75): GO_WITH_TECH_DEBT — DONE for the write-scope deliverable: 2 new MCP tools (deckent_nervous_edit, deckent_nervous_undo) in src/mcp/tools/nerv
+
+## Gains
+- 361-003 — OPENROUTER-DOC-ROUTE — doc-kind→free-model önerisi (CARRYOVER 360-008, aynı-spec) — CARRYOVER of 360-008 (that task never executed — archived as PENDING, no .result found).
+- 361-004 — POSTFIX-PENDING-SCAN — FIX-sonrası hiç-başlamamış eligible'ları koştur (born-475) — born-475: added a single-pass POSTFIX-PENDING-SCAN block at the very end of runFixPhase (src/orch...
+- 361-005 — FIX-MODEL-PRESERVE — fix-task orijinalin model/provider/backend mirası (born-476) — DISK-VERIFIED all isPriorityFix producers (debt-manager.ts handleEvaluation ~L399, handleCrossDep...
+- 361-006 — CODEX-RETRY-RCA — codex-timeout kök-analizi + yeniden-deneme (GERÇEK codex-worker) — CODEX-RETRY-RCA delivered at docs/analysis/codex-dogfood-rca-361.md.
+- 361-007 — OPENROUTER-BOOTSTRAP — adapter'ı provider-bootstrap'a flag'li kaydet — Wired OpenRouterProvider (providers/openrouter.ts, 360-006) into bootstrapProviders following the...
+- 361-008 — ONB-GLOBAL-DESIGN — global-install + proje-scope mimari tasarımı (Sıra-200 dilim-1) — ONB-GLOBAL-DESIGN (Sıra-200 dilim-1) complete.
+- 361-009 — ONB-WIZARD-CORE — install→init sihirbaz çekirdeği (Sıra-201 dilim-1) — 5-step onboarding-wizard core (install->init, Sira-201 dilim-1): provider-detect -> auth-status -...
+- 361-010 — APR-CLIENTS-CORE — Slack/Teams onay-kanal adaptörleri (Sıra-70 dilim-1) — APR-CLIENTS-CORE: ApprovalSlackChannel + ApprovalTeamsChannel, both RelayChannel adapters (src/co...
+- …and 5 more delivered
+
 ## Sprint sprint-360 Learnings
 - Sprint sprint-360 Learnings: ## Sprint sprint-360 Learnings
 - APR-HISTORY-WIRE — endpoint'i canlı server'a bağla (71 kapanışı): GO_WITH_TECH_DEBT — Wired registerApprovalHistoryRoute (built in 359-013) into server.ts's live GET dispatch, following the wiring note left

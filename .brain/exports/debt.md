@@ -4,12 +4,15 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-361-001-fix | Tech debt from 361-001-fix: Worker timeout/killed (exitCode=1) but git diff show | normal | sprint-361 | active |
 | debt-357-015-fix | Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L | critical | sprint-357 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-361-002 | Tech debt from 361-002: Part (a) `deckent limits [--json]` is fully implemented  | normal | sprint-361 | resolved |
+| debt-361-014 | Tech debt from 361-014: DONE for the write-scope deliverable: 2 new MCP tools (d | normal | sprint-361 | resolved |
 | debt-360-013 | Tech debt from 360-013: Wired registerApprovalHistoryRoute (built in 359-013) in | normal | sprint-360 | resolved |
 | debt-359-001 | Tech debt from 359-001: Added normalizeStructuredTaskDependencies(tasks, options | normal | sprint-359 | resolved |
 | debt-359-003 | Tech debt from 359-003: born-466 parity implemented in buildWorkerCommand() (src | normal | sprint-359 | resolved |

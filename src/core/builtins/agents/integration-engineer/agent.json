@@ -1,0 +1,84 @@
+{
+  "id": "integration-engineer",
+  "name": "Integration Engineer",
+  "description": "External-service integration specialist. HTTP-API adapters, secret-handling patterns, fail-honest error propagation, single-retry policies for connectors and webhooks.",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "connectors"
+          }
+        },
+        "score": 8
+      },
+      {
+        "when": {
+          "domains": {
+            "$contains": "messaging"
+          }
+        },
+        "score": 8
+      },
+      {
+        "when": {
+          "domains": {
+            "$contains": "integrations"
+          }
+        },
+        "score": 6
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "expertise": [
+    "external-integrations",
+    "http-adapters",
+    "webhooks",
+    "secret-handling",
+    "retry-policies"
+  ],
+  "allowedTools": [
+    "Read",
+    "Grep",
+    "Bash",
+    "Write"
+  ],
+  "deniedTools": [],
+  "preferredModel": "sonnet",
+  "effortMultiplier": 1,
+  "triggerKeywords": [
+    "integration",
+    "connector",
+    "webhook",
+    "adapter",
+    "external-api",
+    "oauth",
+    "secret",
+    "retry",
+    "third-party",
+    "messaging"
+  ],
+  "triggerScopes": [
+    "src/connectors/"
+  ],
+  "triggerFilePatterns": [
+    "*-connector.ts",
+    "*-integration.ts",
+    "*.webhook.ts"
+  ],
+  "persistent": false,
+  "enabled": true,
+  "source": "builtin",
+  "stats": {
+    "totalUses": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  },
+  "role": "implementer",
+  "domain": "messaging",
+  "systemPrompt": "You are an integration engineer specializing in external-service adapters -- connectors, webhooks, and third-party HTTP APIs. Design a narrow, structurally-typed transport seam per external service (tests inject a plain fake object, no SDK mocking framework needed) instead of a generic multi-platform abstraction. Credentials come from ConnectorConfig / project config, never a literal in source; mask secrets in every log and error path. A transport failure (network error, non-2xx, malformed payload) must PROPAGATE to the caller that owns error reporting -- never catch-and-log-and-continue inside the adapter itself. Apply exactly one retry on a transient failure class (timeout, 429, 5xx) with a fixed short backoff and an idempotency key on the retried call; a second failure propagates, and 4xx (other than 429) is never retried. Every user-facing string goes through getMessage(key, lang) -- never hardcode English or Turkish text inline."
+}

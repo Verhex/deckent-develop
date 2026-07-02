@@ -46,6 +46,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-361 Learnings** (sprint-361): ## Sprint sprint-361 Learnings
+- Fix debt: Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC...
 - **Sprint sprint-360 Learnings** (sprint-360): ## Sprint sprint-360 Learnings
 - APR-HISTORY-WIRE — endpoint'i canlı server'a bağla (71 kapanışı): GO_WITH_TECH_DEBT ...
 - **Sprint sprint-359 Learnings** (sprint-359): ## Sprint sprint-359 Learnings
@@ -70,11 +72,9 @@
 
 ## Gains
 - 349-001 — DOCKER-FIXPACK — stale-shadow EACCES + inert kind-memlimit (rows...
-- **Sprint sprint-347 Learnings** (sprint-347): ## Sprint sprint-347 Learnings
-- W0-8 STATE-RESOLVER — env-aware state-path resolver primitive: NO_GO
-- W0-9 CRED-PER...
 
 ## Active Technical Debt
+- [NORMAL] Tech debt from 361-001-fix: Worker timeout/killed (exitCode=1) but git diff show
 - [CRITICAL] Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L
 
 ## Active Patterns
@@ -123,4 +123,4 @@
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
 
-_Total entries: 886 | Generated: 2026-07-02_
+_Total entries: 892 | Generated: 2026-07-02_

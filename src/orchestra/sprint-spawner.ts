@@ -579,6 +579,14 @@ export async function spawnWorkers(
       debugLog('spawnWorkers:freshTaskRead', e);
     }
 
+    // Sprint 361 Task 361-005 (FIX-MODEL-PRESERVE, born-476): a fix-task must
+    // inherit the original task's provider/backend/modelEffort/forceModel pins
+    // before those fields are resolved below (resolveTaskProvider inference on
+    // a missing pin is exactly how born-476 silently respawned a codex/gpt-5
+    // task's fix on claude/opus). Runs BEFORE the overflow gate below so a
+    // genuinely conscious overflow decision still applies on top afterward.
+    preserveFixTaskRoutingFields(projectRoot, sprint.id, task);
+
     // ─── F1-010 — Dynamic pre-spawn subs→API overflow gate (flag-gated) ──
     // When `config.provider_overflow.dynamic === true` AND this worker's
     // subscription provider is currently rate-limited AND an API overflow target
@@ -907,6 +915,12 @@ export async function respawnEligibleTasks(
     const allowedTools = writeTargets.length > 0
       ? `Read,Write(${writeTargets.join(',')}),Edit(${writeTargets.join(',')}),Bash,Glob,Grep`
       : 'Read,Write,Edit,Bash,Glob,Grep';
+
+    // Sprint 361 Task 361-005 (FIX-MODEL-PRESERVE, born-476): same inheritance
+    // guarantee as spawnWorkers() — a fix-task respawned through the wave/
+    // dependency-unblock path must not lose its provider/backend/modelEffort
+    // pin either. Must run before resolveTaskProvider() below.
+    preserveFixTaskRoutingFields(projectRoot, sprint.id, task);
 
     const taskProvider = resolveTaskProvider(task);
 
@@ -1548,6 +1562,117 @@ export function applyUnblockToSprint(
   );
 
   return unblockResult.unblockedTaskIds;
+}
+
+// ─── Fix-Task Routing-Field Inheritance (Sprint 361 Task 361-005, born-476) ──
+
+/** Task fields a fix-task must inherit from its original when left unset. */
+type FixRoutingField = 'forceModel' | 'provider' | 'backend' | 'modelEffort';
+const FIX_ROUTING_FIELDS: readonly FixRoutingField[] = ['forceModel', 'provider', 'backend', 'modelEffort'];
+
+/**
+ * Ensure a fix-task inherits its original task's `forceModel` / `provider` /
+ * `backend` / `modelEffort` pins whenever the fix-task producer left them
+ * unset (born-476: a NO_GO fix-task object built by debt-manager.ts /
+ * sprint-planner.ts carries `model`/`forceModel` forward but never copies
+ * `provider`/`backend`/`modelEffort` — so a gpt-5/codex/subprocess original's
+ * fix silently fell back to registry model-inference and respawned on
+ * claude/opus). This runs at the SPAWN boundary — the one place every
+ * fix-task, regardless of which producer created it, must pass through —
+ * so the inheritance guarantee holds independent of the producer.
+ *
+ * Only fields the fix-task left `undefined` are inherited; a field the
+ * fix-task already set to something DIFFERENT from the original (a conscious
+ * override — e.g. fresh-eyes model rotation already applied, or a
+ * provider-fallback decision) is left untouched but still reported, so no
+ * change here is ever silent.
+ *
+ * No-op for non-fix tasks or when the original task file cannot be read.
+ * Mutates `task` in place (the caller resolves provider/backend/reasoning
+ * effort from this same object afterward) and best-effort persists the
+ * reconciled task back to disk. All I/O is try/catch wrapped — a failure
+ * here must never block worker spawn.
+ *
+ * @param projectRoot - Project root for task file + event stream reads/writes
+ * @param sprintFallbackId - Sprint ID fallback when getCurrentSprintId returns null
+ * @param task - Task about to be spawned (only isPriorityFix tasks are touched)
+ */
+export function preserveFixTaskRoutingFields(
+  projectRoot: string,
+  sprintFallbackId: string,
+  task: Task,
+): void {
+  if (!task.isPriorityFix || !task.fixForTaskId) return;
+  try {
+    const originalPath = join(projectRoot, TASKS_DIR, `task-${task.fixForTaskId}.json`);
+    const raw = readFileSafely(originalPath);
+    if (!raw) return;
+    const original = JSON.parse(raw) as Task;
+    const taskRecord = task as unknown as Record<FixRoutingField, unknown>;
+    const originalRecord = original as unknown as Record<FixRoutingField, unknown>;
+
+    const inherited: Partial<Record<FixRoutingField, unknown>> = {};
+    const overridden: Partial<Record<FixRoutingField, { from: unknown; to: unknown }>> = {};
+
+    for (const field of FIX_ROUTING_FIELDS) {
+      const originalValue = originalRecord[field];
+      if (originalValue === undefined) continue; // nothing pinned on the original to inherit
+      const fixValue = taskRecord[field];
+      if (fixValue === undefined) {
+        // Silent-drop protection: the producer never carried this field
+        // forward — inherit it now so spawn resolution below sees the pin.
+        taskRecord[field] = originalValue;
+        inherited[field] = originalValue;
+      } else if (fixValue !== originalValue) {
+        // Already a conscious, explicit value on the fix-task — never
+        // silently overwritten, but always surfaced below.
+        overridden[field] = { from: originalValue, to: fixValue };
+      }
+    }
+
+    const inheritedKeys = Object.keys(inherited);
+    const overriddenKeys = Object.keys(overridden);
+    if (inheritedKeys.length === 0 && overriddenKeys.length === 0) return;
+
+    debugLog(
+      'preserveFixTaskRoutingFields',
+      `task ${task.id} (fixFor=${task.fixForTaskId}): inherited=${JSON.stringify(inherited)} ` +
+      `overridden=${JSON.stringify(overridden)}`,
+    );
+
+    const sprintId = getCurrentSprintId(projectRoot) ?? sprintFallbackId;
+    writeEvent(
+      projectRoot, sprintId, 'brain', '*',
+      CHANNELS.METRIC_EMITTED,
+      {
+        name: 'fix.routing.preserved',
+        value: 1,
+        taskId: task.id,
+        fixForTaskId: task.fixForTaskId,
+        inherited,
+        overridden,
+      },
+    );
+    metric('fix.routing.preserved', 1, {
+      task_id: task.id,
+      fields_inherited: String(inheritedKeys.length),
+      fields_overridden: String(overriddenKeys.length),
+    });
+
+    if (inheritedKeys.length > 0) {
+      try {
+        writeFileSync(
+          join(projectRoot, TASKS_DIR, `task-${task.id}.json`),
+          JSON.stringify(task, null, 2),
+          'utf-8',
+        );
+      } catch (e) {
+        debugLog('preserveFixTaskRoutingFields:persist', e);
+      }
+    }
+  } catch (e) {
+    debugLog('preserveFixTaskRoutingFields', e);
+  }
 }
 
 // ─── Fresh-Eyes Rotation Emit (Sprint 156 Task 012) ─────────────────────────

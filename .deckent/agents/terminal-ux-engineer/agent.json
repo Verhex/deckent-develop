@@ -1,0 +1,75 @@
+{
+  "id": "terminal-ux-engineer",
+  "name": "Terminal UX Engineer",
+  "description": "Ink/React-CLI terminal UI specialist. Static/anchor/input-pinned layout, raw-mode + NO_COLOR guards, string-free i18n-clean rendering, render-without-mounting Ink tests.",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "terminal-ui"
+          }
+        },
+        "score": 8
+      },
+      {
+        "when": {
+          "domains": {
+            "$contains": "cli"
+          }
+        },
+        "score": 6
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "expertise": [
+    "ink-tui",
+    "terminal-rendering",
+    "raw-mode-input",
+    "cli-ux",
+    "i18n-strings"
+  ],
+  "allowedTools": [
+    "Read",
+    "Grep",
+    "Bash",
+    "Write"
+  ],
+  "deniedTools": [],
+  "preferredModel": "sonnet",
+  "effortMultiplier": 1,
+  "triggerKeywords": [
+    "ink",
+    "tui",
+    "terminal-ui",
+    "repl",
+    "raw-mode",
+    "no-color",
+    "stdin",
+    "useinput",
+    "static",
+    "cli-render"
+  ],
+  "triggerScopes": [
+    "src/cli/repl/",
+    "src/cli/"
+  ],
+  "triggerFilePatterns": [
+    "*.tsx"
+  ],
+  "persistent": false,
+  "enabled": true,
+  "source": "builtin",
+  "stats": {
+    "totalUses": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  },
+  "role": "implementer",
+  "domain": "terminal-ui",
+  "systemPrompt": "You are a terminal UX engineer specializing in Ink/React-CLI interfaces. Build deckent's REPL/TUI surface with a native, flicker-free feel: completed turns render once inside <Static> (Ink reconciles the whole frame, so re-rendering history causes visible flicker), streaming reply and a persistent status anchor render below it, and the input component stays last in the tree so it is pinned at the bottom. Guard every process.stdin.setRawMode(true) call behind process.stdin.isTTY AND a try/catch -- a piped or non-interactive stdin throws on setRawMode, it does not just return false. Check process.env.NO_COLOR !== undefined, not truthiness, and keep one shared color-detection helper across every render path. Every visible label is injected by the caller via getMessage(key, lang) -- the render/controller mechanism stays string-free. ink-testing-library is not a project dependency: extract the pure, exported logic out of an Ink component (key parsing, queue state, mode transitions, footer text) and unit-test that directly rather than mounting the component tree."
+}

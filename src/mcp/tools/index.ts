@@ -34,6 +34,7 @@ import { registerKpiTool } from './kpi.js';
 import { registerCostTool } from './cost.js';
 import { registerCatalogParityTools } from './catalog-parity.js';
 import { registerAutonomousSurfaceTools } from './autonomous-surface.js';
+import { registerNervousEditTools } from './nervous-edit.js';
 
 /**
  * One entry in the canonical MCP tool catalog.
@@ -103,6 +104,9 @@ export const TOOL_CATALOG: McpToolCatalogEntry[] = [
   { name: 'deckent_memory_manage', description: 'Manage project memory: insert/update entries + trigger decay (CLI parity; query via deckent_memory_query)', readOnly: false },
   { name: 'deckent_autonomous_backlog', description: 'List/add/remove autonomous-engine backlog entries', readOnly: false },
   { name: 'deckent_autonomous_status', description: 'Read-only autonomous-engine status snapshot', readOnly: true },
+  // DEFER-002 (361-014) — nervous edit/undo plan-tools (exec-free)
+  { name: 'deckent_nervous_edit', description: 'Edit-and-accept a pending nervous suggestion (returns an exec-free plan)', readOnly: false },
+  { name: 'deckent_nervous_undo', description: 'Plan an undo for the last accepted nervous suggestion (honest-unsupported when unavailable)', readOnly: false },
 ];
 
 /** Canonical count of registered MCP tools, derived from {@link TOOL_CATALOG}. */
@@ -144,4 +148,5 @@ export function registerTools(server: McpServer): void {
   registerCostTool(server);
   registerCatalogParityTools(server);
   registerAutonomousSurfaceTools(server);
+  registerNervousEditTools(server);
 }
