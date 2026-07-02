@@ -8567,3 +8567,40 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 356-015: MESSAGES-KEYS-5 — round-9 i18n (tek-yetkili) (DONE)
 
 ---
+## Sprint 357 — sprint-357
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-02
+**Duration:** 1548s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 17 |
+| Completed | 17 |
+| Tech Debt | 5 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1548136ms |
+
+### Tasks
+
+- 357-001: TOOL-CAT — tool/action katalog veri-modeli + trust-tier (DONE)
+- 357-002: TERM-CAT — katalog render + trust badge (string-free) (DONE)
+- 357-003: TOOL-REG — availability-cache (TTL) + toolset enable/disable dilimi (DONE)
+- 357-004: CKPT-1 — WorkerQuestion → ApprovalBroker köprüsü (gerçek human-checkpoint) (DONE)
+- 357-005: APR-ALLOWSCOPE — scoped always-allow (asla global) (DONE)
+- 357-006: APPROVE-007b — REPL /nervous köprüsü + handleEdit (DONE)
+- 357-007: TERM-RESUME — recent-session teaser + /resume picker çekirdeği (DONE)
+- 357-008: TERM-BUSY — /queue /interrupt /steer durum-makinesi (DONE)
+- 357-009: TERM-CONFIG-WIRE — TerminalConfig'i runtime'a bağla (GO_WITH_TECH_DEBT)
+- 357-010: SLASH-MODE-WIRE — filterRegistryByMode'u /help yoluna bağla (GO_WITH_TECH_DEBT)
+- 357-011: PROVIDER-SSOT — buildReplProvider → resolveChatAdapter tekleştirme (DONE)
+- 357-012: TRN-LABEL — run-outcome etiket taksonomisi (DONE)
+- 357-013: TOK-AUT — autonomous task-mode tokenUsage 0/0/0 fix (DONE)
+- 357-014: ONB-HONEST — doctor "hazır/eksik/tek-tık-fix" dürüst mesaj katmanı (GO_WITH_TECH_DEBT)
+- 357-015: LINK-SWEEP — eski-ADR linklerinin crosswalk taraması (born-455) (GO_WITH_TECH_DEBT)
+- 357-016: PKG-SSOT-REST — install-hint paket-adlarının kalan çağrı-noktaları (207 tamamlama) (DONE)
+
+---

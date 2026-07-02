@@ -851,6 +851,127 @@ export function formatConnectorHealthLines(
   return lines;
 }
 
+// ─── ONB-HONEST: doctor honest ready/missing/one-command-fix summary
+// (Sprint 357, Task 357-014, MASTER-PLAN row 204) ──────────────────────────
+//
+// Presentation-only layer: maps the EXISTING DoctorCheck results (unchanged
+// check logic) into a non-technical three-state summary — ready | missing |
+// one-command-fix — plus a closing count line and a plain-language one-liner
+// per not-ready check. All user-facing text is i18n'd via getMessage (en+tr).
+
+export type DoctorHonestState = 'ready' | 'missing' | 'one-command-fix';
+
+export interface DoctorHonestCheckSummary {
+  name: string;
+  state: DoctorHonestState;
+  /** Plain-language one-line explanation. Empty for 'ready' checks. */
+  explanation: string;
+}
+
+export interface DoctorHonestSummary {
+  readyCount: number;
+  /** Total NOT-ready checks (missing + one-command-fix combined). */
+  missingCount: number;
+  /** Subset of missingCount resolvable by `deckent doctor --fix`. */
+  fixableCount: number;
+  checks: DoctorHonestCheckSummary[];
+  summaryLine: string;
+}
+
+/**
+ * DoctorCheck names that `deckent doctor --fix` (planDoctorFixes' closed
+ * mkdir/chmod/config-migrate whitelist, DOCTOR_FIX_ACTION_KINDS) can actually
+ * resolve today. Only 'Workspace' (missing .deckent/ dir -> mkdir action)
+ * maps 1:1 onto an existing check — no other check corresponds to a --fix
+ * action, so this stays a narrow, explicit allowlist rather than a guess
+ * from message text. Keeping it honest is the entire point of this feature.
+ */
+const DOCTOR_FIX_CHECK_NAMES: ReadonlySet<string> = new Set(['Workspace']);
+
+function classifyDoctorCheckState(check: DoctorCheck): DoctorHonestState {
+  if (check.passed) return 'ready';
+  return DOCTOR_FIX_CHECK_NAMES.has(check.name) ? 'one-command-fix' : 'missing';
+}
+
+/** Check name -> i18n key for a plain-language one-line explanation. */
+const DOCTOR_HONEST_EXPLANATION_KEYS: Readonly<Record<string, string>> = {
+  'Platform': 'doctor.honest_explain_platform',
+  'Node.js': 'doctor.honest_explain_node',
+  'git': 'doctor.honest_explain_git',
+  'tmux': 'doctor.honest_explain_tmux',
+  'Docker': 'doctor.honest_explain_docker',
+  'Claude CLI': 'doctor.honest_explain_claude_cli',
+  'Workspace': 'doctor.honest_explain_workspace',
+  'Brain Dir': 'doctor.honest_explain_brain_dir',
+  'Directives': 'doctor.honest_explain_directives',
+  'Brain Budget': 'doctor.honest_explain_brain_budget',
+  'Debt': 'doctor.honest_explain_debt',
+  'Locks': 'doctor.honest_explain_locks',
+  '.deck Security': 'doctor.honest_explain_deck_security',
+  'Write Permissions': 'doctor.honest_explain_write_permissions',
+  'Gitignore': 'doctor.honest_explain_gitignore',
+};
+
+/**
+ * Plain-language one-liner for a not-ready check. Falls back to a generic,
+ * still-i18n'd template for any check name not in the map above — new checks
+ * added later never silently break this feature (EVERY ENVIRONMENT law).
+ */
+function getHonestExplanation(check: DoctorCheck, state: DoctorHonestState, lang: string): string {
+  const key = DOCTOR_HONEST_EXPLANATION_KEYS[check.name];
+  const base = key
+    ? getMessage(key, lang)
+    : getMessage('doctor.honest_explain_generic', lang, { name: check.name, message: check.message });
+  return state === 'one-command-fix' ? base + getMessage('doctor.honest_fixable_suffix', lang) : base;
+}
+
+/**
+ * Build the honest ready/missing/one-command-fix summary from doctor check
+ * results. Pure function — does not read the filesystem or run checks.
+ */
+export function buildDoctorHonestSummary(checks: DoctorCheck[], lang: string = 'en'): DoctorHonestSummary {
+  const perCheck: DoctorHonestCheckSummary[] = checks.map((check) => {
+    const state = classifyDoctorCheckState(check);
+    return {
+      name: check.name,
+      state,
+      explanation: state === 'ready' ? '' : getHonestExplanation(check, state, lang),
+    };
+  });
+
+  const readyCount = perCheck.filter(c => c.state === 'ready').length;
+  const fixableCount = perCheck.filter(c => c.state === 'one-command-fix').length;
+  const missingCount = perCheck.length - readyCount;
+
+  let summaryLine: string;
+  if (missingCount === 0) {
+    summaryLine = getMessage('doctor.honest_all_ready', lang, { ready: String(readyCount) });
+  } else if (fixableCount > 0) {
+    summaryLine = getMessage('doctor.honest_summary_with_fix', lang, {
+      ready: String(readyCount),
+      missing: String(missingCount),
+      fixable: String(fixableCount),
+    });
+  } else {
+    summaryLine = getMessage('doctor.honest_summary_no_fix', lang, {
+      ready: String(readyCount),
+      missing: String(missingCount),
+    });
+  }
+
+  return { readyCount, missingCount, fixableCount, checks: perCheck, summaryLine };
+}
+
+/** Render the honest summary block: header + closing count line + one line per not-ready check. */
+export function formatDoctorHonestSummary(summary: DoctorHonestSummary, lang: string = 'en'): string[] {
+  const lines: string[] = [getMessage('doctor.honest_header', lang), summary.summaryLine];
+  for (const c of summary.checks) {
+    if (c.state === 'ready') continue;
+    lines.push(getMessage('doctor.honest_missing_line', lang, { name: c.name, explanation: c.explanation }));
+  }
+  return lines;
+}
+
 /**
  * Format a human-friendly doctor output.
  * Groups checks into System and Project sections, adds recommendations.
@@ -1029,6 +1150,11 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
   if (brainLines > brainBudget) {
     lines.push('  Tip: Run `deckent cleanup --decay` to reduce memory usage.');
   }
+
+  // --- Honest Summary (ONB-HONEST, Task 357-014) ---
+  lines.push('');
+  const honestSummary = buildDoctorHonestSummary(result.checks, input.lang ?? 'en');
+  lines.push(...formatDoctorHonestSummary(honestSummary, input.lang ?? 'en'));
 
   return lines.join('\n');
 }
@@ -1700,6 +1826,7 @@ export function registerDoctor(program: Command): void {
           ok: result.ok,
           checks: result.checks,
           providers,
+          honestSummary: buildDoctorHonestSummary(result.checks, lang),
         };
         if (opts.profile) {
           const profile = getSystemProfile();

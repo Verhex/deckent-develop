@@ -4,11 +4,16 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-357-015-fix | Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L | normal | sprint-357 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-357-009 | Tech debt from 357-009: Wired all six schema-only terminal.* config fields into  | normal | sprint-357 | resolved |
+| debt-357-010 | Tech debt from 357-010: DISK-VERIFY: grepped filterRegistryByMode/resolveSlash/r | normal | sprint-357 | resolved |
+| debt-357-014 | Tech debt from 357-014: ONB-HONEST presentation layer implemented, check logic u | normal | sprint-357 | resolved |
+| debt-357-016 | Tech debt from 357-016: SCOPE FINDING (read first): scope.filesWrite for 357-016 | normal | sprint-357 | resolved |
 | debt-354-001 | Tech debt from 354-001: Wired buildLiveFooter + term-mode.ts + chat-turn-queue.t | normal | sprint-354 | resolved |
 | debt-354-010 | Tech debt from 354-010: MOAT-3 FIX-half wired: runFixPhase now actually re-dispa | normal | sprint-354 | resolved |
 | debt-354-011 | Tech debt from 354-011: Root cause (disk-verified against sprint-352 archive, .b | normal | sprint-354 | resolved |

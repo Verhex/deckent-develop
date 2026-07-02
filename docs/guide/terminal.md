@@ -204,4 +204,4 @@ The `AuthProvider` and `SessionBackend` are interfaces from day one:
 
 - [Config Reference](/reference/config) — full configuration documentation
 - [Security Model](/reference/security) — deckent overall security architecture
-- [ADR-062](/adr/062-embedded-web-terminal) — embedded terminal architecture decisions
+- [ADR-G-029](/adr/adr-g-029-embedded-web-terminal) — embedded terminal architecture decisions

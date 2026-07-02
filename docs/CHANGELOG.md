@@ -2,6 +2,35 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint357] - 2026-07-02
+
+### Added
+
+- TOOL-CAT — tool/action katalog veri-modeli + trust-tier
+- TERM-CAT — katalog render + trust badge (string-free)
+- TOOL-REG — availability-cache (TTL) + toolset enable/disable dilimi
+- CKPT-1 — WorkerQuestion → ApprovalBroker köprüsü (gerçek human-checkpoint)
+- APR-ALLOWSCOPE — scoped always-allow (asla global)
+- APPROVE-007b — REPL /nervous köprüsü + handleEdit
+- TERM-RESUME — recent-session teaser + /resume picker çekirdeği
+- TERM-BUSY — /queue /interrupt /steer durum-makinesi
+- PROVIDER-SSOT — buildReplProvider → resolveChatAdapter tekleştirme
+- TRN-LABEL — run-outcome etiket taksonomisi
+
+### Changed
+
+- TERM-CONFIG-WIRE — TerminalConfig'i runtime'a bağla (completed with tech debt)
+- SLASH-MODE-WIRE — filterRegistryByMode'u /help yoluna bağla (completed with tech debt)
+- ONB-HONEST — doctor "hazır/eksik/tek-tık-fix" dürüst mesaj katmanı (completed with tech debt)
+- LINK-SWEEP — eski-ADR linklerinin crosswalk taraması (born-455) (completed with tech debt)
+
+### Fixed
+
+- TOK-AUT — autonomous task-mode tokenUsage 0/0/0 fix
+
+
+_Tasks: 17 total, 17 done, 5 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint356] - 2026-07-02
 
 ### Added

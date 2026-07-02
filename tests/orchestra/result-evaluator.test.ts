@@ -518,6 +518,21 @@ describe('evaluateWithRubric', () => {
     expect(evaluation.rubricScores).toHaveLength(4);
   });
 
+  it('EVAL-DEBT-CEILING (born-459, 357-016 live case): honest worker GO_WITH_TECH_DEBT is never raised to DONE by a passing rubric score', () => {
+    const task = makeTask(['src/core/']);
+    const result = makeResult({
+      testsPassed: true,
+      selfAssessment: 'GO_WITH_TECH_DEBT',
+      coverage: 95,
+      filesChanged: ['src/core/foo.ts', 'tests/core/foo.test.ts'],
+      notes: 'Core criteria met, but 7 call-site files remain outside my write scope — follow-up task needed.',
+    });
+    const evaluation = evaluateWithRubric(result, task);
+    // A passing score must NOT discard the worker's own debt declaration.
+    expect(evaluation.totalScore).toBeGreaterThanOrEqual(70);
+    expect(evaluation.decision).toBe('GO_WITH_TECH_DEBT');
+  });
+
   it('returns DONE with custom rubric', () => {
     const task = makeTask(['src/core/']);
     const result = makeResult({

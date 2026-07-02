@@ -9,6 +9,7 @@ import type { AuthProvider } from './terminal/auth-provider.js';
 import { TerminalAudit, MemoryStoreAuditSink } from './terminal/audit.js';
 import { loadOrCreateAuditKey } from './terminal/audit-integrity.js';
 import { attachTerminalGateway } from './terminal/ws-gateway.js';
+import { OutboundLimiter } from './terminal/outbound-limiter.js';
 import type { CreateSessionInput, SessionKind, TenantId } from './terminal/types.js';
 import { z } from 'zod';
 import {
@@ -78,6 +79,20 @@ const MIME_TYPES: Record<string, string> = {
 const DEFAULT_PORT = 3100;
 const LOCALHOST_ONLY = '127.0.0.1';
 const MAX_BODY_SIZE = 1024 * 1024; // 1MB
+
+// TERM-CONFIG-WIRE (357-009): mirrors DEFAULT_TERMINAL_CONFIG /
+// DEFAULT_OUTBOUND_DAILY_QUOTA_BYTES in ../core/config.ts byte-for-byte —
+// the exact pre-wire hardcoded literals this function used to inline
+// directly at the PtySessionManager/OutboundLimiter construction sites.
+// Duplicated (not imported) deliberately: several existing test files
+// (tests/api/server.test.ts and siblings) replace ../core/config.js with a
+// hand-written `vi.mock` that only lists a handful of named exports —
+// importing a new one here would break every one of those unrelated suites.
+const TERMINAL_DEFAULT_MAX_SESSIONS = 10;
+const TERMINAL_DEFAULT_IDLE_TIMEOUT_MS = 1_800_000;
+const TERMINAL_DEFAULT_SCROLLBACK_BYTES = 262_144;
+const TERMINAL_DEFAULT_ALLOW_SHELL_KIND = true;
+const TERMINAL_DEFAULT_OUTBOUND_QUOTA_BYTES = 1_073_741_824; // 1 GiB
 
 // ─── Rate Limiter ────────────────────────────────────────────────
 
@@ -1350,11 +1365,28 @@ export function createHttpServer(
   let terminalBackend: SessionBackend | undefined;
   let resolvedOidc: HttpServerOptions['oidc'];
 
+  // TERM-CONFIG-WIRE (357-009): `terminal.bind` fallback for the server's
+  // listen host. Same raw sync-read pattern as the token/OIDC blocks below
+  // (createHttpServer is synchronous, loadConfig is async). An explicit
+  // `host`/`portOrOpts.host` caller value ALWAYS wins — config only fills the
+  // previously-fixed LOCALHOST_ONLY default, so config-absent behavior is
+  // unchanged. This is safe against the command-guard's I3 loopback-bypass
+  // invariant precisely because this same resolved `host` is what actually
+  // gets passed to `server.listen()` below — declared and actual bind can
+  // never diverge.
+  const rawCfgForBind = readJsonSafe<{ terminal?: { bind?: unknown } }>(
+    join(projectRoot, PROJECT_CONFIG_PATH),
+  );
+  const terminalConfigBind =
+    typeof rawCfgForBind?.terminal?.bind === 'string' && rawCfgForBind.terminal.bind.length > 0
+      ? rawCfgForBind.terminal.bind
+      : undefined;
+
   if (typeof portOrOpts === 'object' && portOrOpts !== null) {
     listenPort = portOrOpts.port ?? DEFAULT_PORT;
     resolvedStaticDir = portOrOpts.staticDir;
     resolvedToken = portOrOpts.apiToken;
-    host = portOrOpts.host ?? LOCALHOST_ONLY;
+    host = portOrOpts.host ?? terminalConfigBind ?? LOCALHOST_ONLY;
     autoGenerateToken = portOrOpts.autoGenerateToken ?? false;
     rateLimitMax = portOrOpts.rateLimit ?? 100;
     rateLimitExemptLoopback = portOrOpts.rateLimitExemptLoopback ?? true;
@@ -1364,7 +1396,7 @@ export function createHttpServer(
     listenPort = portOrOpts ?? DEFAULT_PORT;
     resolvedStaticDir = staticDir;
     resolvedToken = apiToken;
-    host = LOCALHOST_ONLY;
+    host = terminalConfigBind ?? LOCALHOST_ONLY;
   }
 
   // Auto-generate token if requested and none provided
@@ -1555,6 +1587,15 @@ export function createHttpServer(
   let terminalAuditStore: MemoryStore | undefined;
   let terminalAuth: AuthProvider | undefined;
   let terminalReaper: NodeJS.Timeout | undefined;
+  let terminalLimiter: OutboundLimiter | undefined;
+  // TERM-CONFIG-WIRE (357-009): session-manager defaults, overridden below
+  // from `config.terminal.*` when present + valid — absent/invalid config
+  // preserves these exact literals (byte-identical to the pre-wire hardcode).
+  let terminalMaxSessions: number = TERMINAL_DEFAULT_MAX_SESSIONS;
+  let terminalIdleTimeoutMs: number = TERMINAL_DEFAULT_IDLE_TIMEOUT_MS;
+  let terminalScrollbackBytes: number = TERMINAL_DEFAULT_SCROLLBACK_BYTES;
+  let terminalAllowShellKind: boolean = TERMINAL_DEFAULT_ALLOW_SHELL_KIND;
+  let terminalOutboundQuotaBytes: number = TERMINAL_DEFAULT_OUTBOUND_QUOTA_BYTES;
 
   if (terminalBackend) {
     // Check if terminal is enabled via project config (sync read — createHttpServer is synchronous)
@@ -1573,7 +1614,14 @@ export function createHttpServer(
       try {
         const raw = readFileSync(projCfgPath, 'utf-8');
         const projCfg = JSON.parse(raw) as {
-          terminal?: { enabled?: boolean };
+          terminal?: {
+            enabled?: boolean;
+            maxSessions?: unknown;
+            idleTimeoutMs?: unknown;
+            scrollbackBytes?: unknown;
+            allowShellKind?: unknown;
+            outboundDailyQuotaBytes?: unknown;
+          };
           terminal_oidc_jwks?: { issuer?: unknown; audience?: unknown; jwksUrl?: unknown };
           terminal_audit_integrity?: { enabled?: boolean };
         };
@@ -1582,6 +1630,29 @@ export function createHttpServer(
         }
         if (projCfg?.terminal_audit_integrity?.enabled === false) {
           terminalAuditIntegrityEnabled = false;
+        }
+        // TERM-CONFIG-WIRE (357-009): validate before use — a malformed value
+        // (wrong type / out-of-range) silently keeps the DEFAULT_TERMINAL_CONFIG
+        // literal rather than propagating garbage into PtySessionManager.
+        const cfgMaxSessions = projCfg?.terminal?.maxSessions;
+        if (typeof cfgMaxSessions === 'number' && Number.isFinite(cfgMaxSessions) && cfgMaxSessions > 0) {
+          terminalMaxSessions = cfgMaxSessions;
+        }
+        const cfgIdleTimeoutMs = projCfg?.terminal?.idleTimeoutMs;
+        if (typeof cfgIdleTimeoutMs === 'number' && Number.isFinite(cfgIdleTimeoutMs) && cfgIdleTimeoutMs >= 0) {
+          terminalIdleTimeoutMs = cfgIdleTimeoutMs;
+        }
+        const cfgScrollbackBytes = projCfg?.terminal?.scrollbackBytes;
+        if (typeof cfgScrollbackBytes === 'number' && Number.isFinite(cfgScrollbackBytes) && cfgScrollbackBytes > 0) {
+          terminalScrollbackBytes = cfgScrollbackBytes;
+        }
+        const cfgAllowShellKind = projCfg?.terminal?.allowShellKind;
+        if (typeof cfgAllowShellKind === 'boolean') {
+          terminalAllowShellKind = cfgAllowShellKind;
+        }
+        const cfgOutboundQuota = projCfg?.terminal?.outboundDailyQuotaBytes;
+        if (typeof cfgOutboundQuota === 'number' && Number.isFinite(cfgOutboundQuota) && cfgOutboundQuota > 0) {
+          terminalOutboundQuotaBytes = cfgOutboundQuota;
         }
         const jwks = projCfg?.terminal_oidc_jwks;
         if (jwks !== undefined && jwks !== null && typeof jwks === 'object') {
@@ -1616,15 +1687,20 @@ export function createHttpServer(
       // previously logged as "API token", sending users to /api/* 403s.
       process.stderr.write(`[deckent:info] Terminal session token (embedded web terminal only — NOT the /api/* API token): ${terminalToken}\n`);
       terminalMgr = new PtySessionManager(terminalBackend, {
-        scrollbackBytes: 262_144,
-        idleTimeoutMs: 1_800_000,
-        maxSessions: 10,
+        scrollbackBytes: terminalScrollbackBytes,
+        idleTimeoutMs: terminalIdleTimeoutMs,
+        maxSessions: terminalMaxSessions,
         // Thread the server's bind host so the command guard (deny-list for
         // remote shell sessions, invariant I3) actually enforces when the server
         // is exposed beyond loopback. Omitting it defaulted host to 'localhost',
         // which exempted EVERY session — the guard never fired even on a remote bind.
         host,
       });
+      // TERM-CONFIG-WIRE (357-009): per-tenant outbound byte quota (W4-10,
+      // invariant I5) — previously always omitted from attachTerminalGateway,
+      // so quota enforcement never ran in production. Unconditional per the
+      // DEFAULT_OUTBOUND_DAILY_QUOTA_BYTES doc-comment SSOT in core/config.ts.
+      terminalLimiter = new OutboundLimiter({ quotaBytes: terminalOutboundQuotaBytes });
       // Structured audit recorder. Tests pass a no-op sink; production wires
       // a real MemoryStore (.brain/memory.db) via MemoryStoreAuditSink so
       // lifecycle events are actually persisted (AUDIT-WIRE, ADR-G-029
@@ -1717,6 +1793,14 @@ export function createHttpServer(
           try { body = await parseBody(req); } catch { body = {}; }
           const input = body as { kind?: string; tool?: string; args?: string[] };
           const kind = input.kind ?? 'shell';
+          // TERM-CONFIG-WIRE (357-009): config.terminal.allowShellKind gate —
+          // previously schema-only (never consulted), so a plain `shell`
+          // session could always be created regardless of config.
+          if (kind === 'shell' && !terminalAllowShellKind) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'shell session kind disabled by config' }));
+            return;
+          }
           try {
             const sess = terminalMgr.create({
               kind: kind as SessionKind,
@@ -1788,6 +1872,7 @@ export function createHttpServer(
       manager: terminalMgr,
       auth: terminalAuth,
       audit: terminalAudit,
+      limiter: terminalLimiter,
     });
     // Idle reaper — sweeps stale non-deckent sessions every 30s.
     // unref() so the timer does not keep the event loop alive in tests.

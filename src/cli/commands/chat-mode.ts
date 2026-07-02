@@ -8,7 +8,7 @@
 //
 // Karpathy D2: pure functions, no runtime deps, no disk I/O.
 
-import type { SlashCommand } from './chat-slash-registry.js';
+import { buildSlashRegistry, type SlashCommand } from './chat-slash-registry.js';
 
 /** REPL operating mode. Defaults to 'user'. */
 export type ChatMode = 'user' | 'enterprise';
@@ -66,4 +66,20 @@ export function filterRegistryByMode(
  */
 export function isEnterpriseSlash(name: string): boolean {
   return ENTERPRISE_SLASH_NAMES.has(name.toLowerCase());
+}
+
+/**
+ * Mode-aware /help command list — the canonical entrypoint for `/help` rendering.
+ *
+ * Builds the live slash catalog and filters it for the given mode in one call, so
+ * a `/help` consumer needs only `renderHelp(getVisibleCommands(mode))` instead of
+ * separately calling `buildSlashRegistry()` + `filterRegistryByMode()`.
+ *
+ * NOTE: this does NOT change what `resolveSlash()` accepts — dispatch must still
+ * use the FULL (unfiltered) registry from `buildSlashRegistry()` so enterprise
+ * commands keep working when typed directly in user mode (see filterRegistryByMode
+ * doc comment above).
+ */
+export function getVisibleCommands(mode: ChatMode): readonly SlashCommand[] {
+  return filterRegistryByMode(buildSlashRegistry(), mode);
 }

@@ -11,14 +11,14 @@
 //   - Any future task-mode entrypoint
 
 import { join } from 'node:path';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import type { ModelType, ProviderName } from '../core/types.js';
+import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import type { ModelType, ProviderName, Task, TaskResult } from '../core/types.js';
 import type { ResolvedConfig } from '../core/config-types.js';
 import { buildExecutionRequest, resolveToTask } from './execution-request-builder.js';
 import { createRunTaskId } from '../cli/commands/run.js';
 import { spawnWorkerMultiProvider } from '../cli/commands/spawn.js';
 import { buildWorkerPrompt } from './task-builder.js';
-import { resolveAgentPrompt, resolveSkillPrompts } from './result-collector.js';
+import { enrichResultCost, enrichResultTokenUsage, resolveAgentPrompt, resolveSkillPrompts } from './result-collector.js';
 import { eventBus } from './event-bus.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { AgentPoolManager } from '../core/agent-pool.js';
@@ -26,7 +26,7 @@ import { SkillPoolManager } from '../core/skill-pool.js';
 import { detectProjectStack } from '../core/stack-detector.js';
 import { routeTaskV2 } from '../core/routing-engine.js';
 import type { UserOverride } from '../core/routing-types.js';
-import { debugLog } from '../core/utils.js';
+import { debugLog, readJsonSafe } from '../core/utils.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -75,6 +75,86 @@ function assertTaskMode(config: ResolvedConfig): void {
       'runTaskMode called but config.deckent_style !== "task". ' +
       'Set deckent_style=task in config or run `deckent mode task`.',
     );
+  }
+}
+
+// ─── Token-usage enrichment (357-013 / TOK-AUT) ────────────────────────
+
+/**
+ * Persist an enriched TaskResult back to disk (atomic temp+rename). Mirrors
+ * result-collector.ts's private `persistEnrichedResult` — that helper is not
+ * exported, so this is a minimal local equivalent (same on-disk contract:
+ * `.tasks/task-{id}.result`). Best-effort: a write failure is logged, never thrown.
+ */
+function persistTaskModeResult(projectRoot: string, result: TaskResult): void {
+  try {
+    const path = join(projectRoot, TASKS_DIR, `task-${result.taskId}.result`);
+    const tmp = `${path}.enrich-tmp`;
+    writeFileSync(tmp, JSON.stringify(result, null, 2), 'utf-8');
+    renameSync(tmp, path);
+  } catch (err) {
+    debugLog('task-mode-runner:persistTaskModeResult', err);
+  }
+}
+
+/**
+ * Enrich a task-mode `.result` file with real tokenUsage + cost data.
+ *
+ * The sprint lifecycle (result-collector.ts `waitForResults`) fills tokenUsage/cost
+ * inline as part of its own result-collection loop. Task-mode has no equivalent
+ * loop of its own — `spawnWorkerMultiProvider` is fire-and-forget (the backend
+ * launches a detached docker/tmux/subprocess and returns immediately) and
+ * `runTaskMode` returns right after spawn — so the worker's honest tokenUsage
+ * 0/0/0 stub (Worker Output Contract) was never enriched and stayed 0/0/0 on
+ * disk forever. Read-only reuse of result-collector.ts's exported enrichment
+ * functions — same resolution order as the sprint path, no behavior change there.
+ *
+ * No-op (returns `undefined`) when the `.result` file does not exist yet.
+ */
+export function enrichTaskModeResult(
+  projectRoot: string,
+  task: Task,
+): TaskResult | undefined {
+  const resultPath = join(projectRoot, TASKS_DIR, `task-${task.id}.result`);
+  const result = readJsonSafe<TaskResult>(resultPath);
+  if (!result) return undefined;
+  enrichResultTokenUsage(result, task, projectRoot);
+  enrichResultCost(result, task, projectRoot);
+  persistTaskModeResult(projectRoot, result);
+  return result;
+}
+
+/**
+ * Poll for the task-mode worker's `.result` file and enrich it the moment it
+ * appears. Runs detached from `runTaskMode`'s returned promise (spawn is
+ * fire-and-forget, so the `.result` is written well after `runTaskMode` already
+ * resolved) — callers must NOT await this from `runTaskMode` itself. Bounded by
+ * `timeoutMs` and `.unref()`'d so a task that never finishes (or a test that
+ * never produces a `.result`) cannot leak a polling loop past process exit.
+ */
+async function watchAndEnrichTaskModeResult(
+  projectRoot: string,
+  task: Task,
+  timeoutMs: number,
+): Promise<void> {
+  // Never let this best-effort background watcher surface an unhandled
+  // rejection — callers invoke it fire-and-forget (`void watch...(...)`), so
+  // any throw here (e.g. a test harness mocking 'node:fs' without
+  // existsSync) would otherwise escape as an unhandled promise rejection.
+  try {
+    const resultPath = join(projectRoot, TASKS_DIR, `task-${task.id}.result`);
+    const POLL_MS = 500;
+    const deadline = Date.now() + timeoutMs;
+    while (!existsSync(resultPath)) {
+      if (Date.now() >= deadline) return;
+      await new Promise<void>((resolve) => {
+        const t = setTimeout(resolve, POLL_MS);
+        t.unref?.();
+      });
+    }
+    enrichTaskModeResult(projectRoot, task);
+  } catch (err) {
+    debugLog('task-mode-runner:watchAndEnrichTaskModeResult', err);
   }
 }
 
@@ -196,6 +276,13 @@ export async function runTaskMode(
       provider: execReq.provider,
     },
   );
+
+  // TOK-AUT (357-013): spawn above is fire-and-forget — the worker writes its
+  // .result well after this function has already returned. Enrich it in the
+  // background (real tokenUsage/cost via result-collector.ts, mirroring the
+  // sprint path) so the on-disk .result isn't left at the worker's honest
+  // 0/0/0 stub forever. Not awaited — must not delay runTaskMode's return.
+  void watchAndEnrichTaskModeResult(projectRoot, task, ctx.timeoutMs ?? 300_000);
 
   return { taskId, backend, provider };
 }

@@ -1041,6 +1041,15 @@ export function evaluateWithRubric(
     decision = 'NO_GO';
   }
 
+  // EVAL-DEBT-CEILING (born-450; rubric-path bypass = born-459, 357-016 live case):
+  // an honest worker GO_WITH_TECH_DEBT is a CEILING — the rubric may lower the
+  // verdict (NO_GO) but never raise it to DONE. Same rule as the non-rubric
+  // ladder in evaluateTaskResult; without it a passing score silently discarded
+  // the worker's own debt declaration.
+  if (decision === 'DONE' && result.selfAssessment === 'GO_WITH_TECH_DEBT') {
+    decision = 'GO_WITH_TECH_DEBT';
+  }
+
   const evaluation: EvaluationResult = {
     decision,
     totalScore,

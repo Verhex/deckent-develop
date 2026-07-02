@@ -287,6 +287,96 @@ const MESSAGES: MessageMap = {
     tr: 'Kaynak izleme: devre dışı (etkinleştirmek için resource_monitor.enabled=true ayarlayın)',
   },
 
+  // ─── doctor: honest ready/missing/one-command-fix summary (ONB-HONEST, Sprint 357 — 357-014) ──
+  'doctor.honest_header': {
+    en: 'Honest Summary:',
+    tr: 'Dürüst Özet:',
+  },
+  'doctor.honest_all_ready': {
+    en: '{ready} ready — you are all set!',
+    tr: '{ready} hazır — her şey tamam!',
+  },
+  'doctor.honest_summary_with_fix': {
+    en: '{ready} ready · {missing} missing ({fixable} fixed by `deckent doctor --fix`)',
+    tr: '{ready} hazır · {missing} eksik ({fixable}\'i `deckent doctor --fix` ile düzelir)',
+  },
+  'doctor.honest_summary_no_fix': {
+    en: '{ready} ready · {missing} missing',
+    tr: '{ready} hazır · {missing} eksik',
+  },
+  'doctor.honest_missing_line': {
+    en: '  - {name}: {explanation}',
+    tr: '  - {name}: {explanation}',
+  },
+  'doctor.honest_fixable_suffix': {
+    en: ' (fixed automatically by `deckent doctor --fix`)',
+    tr: ' (`deckent doctor --fix` ile otomatik düzelir)',
+  },
+  'doctor.honest_explain_generic': {
+    en: '{name} needs attention: {message}',
+    tr: '{name} dikkat gerektiriyor: {message}',
+  },
+  'doctor.honest_explain_platform': {
+    en: 'Your operating system is not fully supported yet.',
+    tr: 'İşletim sisteminiz henüz tam olarak desteklenmiyor.',
+  },
+  'doctor.honest_explain_node': {
+    en: 'Node.js is missing or too old — deckent needs it to run.',
+    tr: 'Node.js kurulu değil veya çok eski — deckent\'in çalışması için gerekli.',
+  },
+  'doctor.honest_explain_git': {
+    en: 'git is not installed — deckent uses it for safe rollbacks and history.',
+    tr: 'git kurulu değil — deckent güvenli geri-alma ve geçmiş için kullanır.',
+  },
+  'doctor.honest_explain_tmux': {
+    en: 'tmux is not installed — needed to run Claude-based sprints.',
+    tr: 'tmux kurulu değil — Claude tabanlı sprintleri çalıştırmak için gerekli.',
+  },
+  'doctor.honest_explain_docker': {
+    en: 'Docker is not ready — needed for isolated worker containers.',
+    tr: 'Docker hazır değil — izole worker konteynerleri için gerekli.',
+  },
+  'doctor.honest_explain_claude_cli': {
+    en: 'The Claude CLI is missing or you are not logged in.',
+    tr: 'Claude CLI kurulu değil veya oturum açılmamış.',
+  },
+  'doctor.honest_explain_workspace': {
+    en: 'This project has not been initialized yet.',
+    tr: 'Bu proje henüz başlatılmamış.',
+  },
+  'doctor.honest_explain_brain_dir': {
+    en: 'deckent\'s memory folder is missing or incomplete.',
+    tr: 'deckent\'in hafıza klasörü eksik veya tamamlanmamış.',
+  },
+  'doctor.honest_explain_directives': {
+    en: 'No sprint goals have been defined yet.',
+    tr: 'Henüz sprint hedefleri tanımlanmamış.',
+  },
+  'doctor.honest_explain_brain_budget': {
+    en: 'deckent\'s memory has grown past its healthy size.',
+    tr: 'deckent\'in hafızası sağlıklı boyutunu aştı.',
+  },
+  'doctor.honest_explain_debt': {
+    en: 'There are unresolved critical issues from past sprints.',
+    tr: 'Geçmiş sprintlerden çözülmemiş kritik sorunlar var.',
+  },
+  'doctor.honest_explain_locks': {
+    en: 'Some old task locks were left behind and need cleanup.',
+    tr: 'Bazı eski görev kilitleri temizlenmeyi bekliyor.',
+  },
+  'doctor.honest_explain_deck_security': {
+    en: 'Your secrets file may be exposed in git history.',
+    tr: 'Gizli bilgiler dosyanız git geçmişinde açığa çıkmış olabilir.',
+  },
+  'doctor.honest_explain_write_permissions': {
+    en: 'deckent cannot write to its own working folders.',
+    tr: 'deckent kendi çalışma klasörlerine yazamıyor.',
+  },
+  'doctor.honest_explain_gitignore': {
+    en: 'Sensitive database files are not properly ignored by git.',
+    tr: 'Hassas veritabanı dosyaları git tarafından düzgün yok sayılmıyor.',
+  },
+
   // ─── attach command ─────────────────────────────────────────────────
   'attach.no_active_session': {
     en: 'No active session. Run `deckent start` first.',

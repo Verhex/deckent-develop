@@ -204,4 +204,4 @@ ws-gateway.ts ──► PtySessionManager ──► node-pty
 
 - [Yapılandırma Referansı](/reference/config) — tam yapılandırma belgeleri
 - [Güvenlik Modeli](/reference/security) — deckent genel güvenlik mimarisi
-- [ADR-062](/adr/062-embedded-web-terminal) — gömülü terminal mimari kararları
+- [ADR-G-029](/adr/adr-g-029-embedded-web-terminal) — gömülü terminal mimari kararları

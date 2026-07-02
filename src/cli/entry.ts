@@ -9,6 +9,7 @@ import { interruptActiveSprint } from '../orchestra/sprint-controller.js';
 import { killAllSessions } from '../orchestra/tmux.js';
 import { bootstrapFromCatalog } from '../core/model-catalog.js';
 import { loadConfig, resolveChatProvider, type ChatProviderName } from '../core/config.js';
+import { resolveChatAdapter } from './commands/chat-provider-parity.js';
 import {
   runChatNativeLoop,
   buildSubscriptionPrompt,
@@ -203,40 +204,32 @@ function subscriptionReplEnv(): NodeJS.ProcessEnv {
  * http://localhost:11434). Zero-API: no external network dependency, no
  * subscription. Honours DECKENT_OLLAMA_HOST / DECKENT_OLLAMA_MODEL env vars.
  *
- * Uses the global `fetch` (Node >= 24 built-in fetch) so no new
- * runtime dependency is introduced (ADR-010 compliance).
- *
- * Sprint 221 Task 221-005: connection-refused / DNS failures are wrapped
- * with a NET error (`Ollama (<host>) erişilemedi…`) so the smoke command
- * (`DECKENT_CHAT_PROVIDER=ollama … node dist/cli/entry.js`) surfaces a
- * clear "ollama serve" hint instead of an opaque `TypeError: fetch failed`.
+ * Sprint 357 T-357-011 (PROVIDER-SSOT) — the HTTP mechanics (host/model
+ * resolution, request body, `/api/generate` call, HTTP-status error message)
+ * are single-sourced in {@link resolveChatAdapter} (chat-provider-parity.ts,
+ * ADR-083 SSOT). The only REPL-only behavior kept here is Sprint 221 Task
+ * 221-005's connection-refused / DNS-failure wrap: the SSOT lets a raw fetch
+ * rejection propagate unwrapped (it has no REPL-specific UX concerns), so
+ * this wrapper catches ONLY that case and rewraps it with the Turkish
+ * `Ollama (<host>) erişilemedi… 'ollama serve' …` hint. An HTTP-status error
+ * (`res.ok === false`) already carries a clear `Ollama request failed: …`
+ * message from the SSOT and passes through unchanged.
  */
 function buildOllamaReplAdapter(opts?: { fetchFn?: typeof fetch }): ChatProviderAdapter {
   const host = (process.env['DECKENT_OLLAMA_HOST'] ?? 'http://localhost:11434').replace(/\/$/, '');
-  const model = process.env['DECKENT_OLLAMA_MODEL'] ?? 'llama3';
-  const fetchImpl = opts?.fetchFn ?? fetch;
+  const inner = resolveChatAdapter('ollama', opts?.fetchFn ? { fetchFn: opts.fetchFn } : {});
   return {
     async send(messages: ChatMessage[]): Promise<ProviderResponse> {
-      const prompt = buildSubscriptionPrompt(messages);
-      let res: Response;
       try {
-        res = await fetchImpl(`${host}/api/generate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model, prompt, stream: false }),
-        });
+        return await inner.send(messages);
       } catch (err) {
+        if (err instanceof Error && err.message.startsWith('Ollama request failed')) throw err;
         const reason = err instanceof Error ? err.message : String(err);
         throw new Error(
           `Ollama (${host}) erişilemedi: ${reason}. ` +
           `'ollama serve' ile başlatın veya DECKENT_OLLAMA_HOST ile farklı host belirtin.`,
         );
       }
-      if (!res.ok) {
-        throw new Error(`Ollama request failed: ${res.status} ${res.statusText}`);
-      }
-      const data = (await res.json()) as { response?: string };
-      return { text: data.response ?? '', stopReason: 'end_turn' };
     },
   };
 }
@@ -304,6 +297,101 @@ function isOpenAICompatName(name: string): name is OpenAICompatPresetName {
 }
 
 /**
+ * Sprint 222 Task 222-002 streaming logic, kept local to the REPL (see the
+ * behavior-diff matrix on {@link buildReplProvider}): `resolveChatAdapter`'s
+ * (SSOT) `.stream()` is raw-chunk passthrough using ONE fixed arg table
+ * shared with `.send()` — it cannot request claude's `--output-format
+ * stream-json --verbose` mode, so it cannot parse per-token NDJSON deltas.
+ * Shared by both the SSOT-delegated and the `--model`-override send paths in
+ * {@link buildReplProvider} since neither the args nor the parsing here
+ * depend on `opts.model` — a pre-existing gap (model overrides apply to
+ * `.send()` only, never `.stream()`) preserved as-is by this extraction.
+ */
+function buildCliStream(
+  name: 'claude' | 'codex' | 'gemini',
+  spawnFn: SubscriptionSpawnFn,
+): (messages: ChatMessage[]) => AsyncGenerator<{ text?: string; done?: ProviderResponse }> {
+  return async function* stream(messages: ChatMessage[]) {
+    const prompt = buildSubscriptionPrompt(messages);
+    // Request per-token stream-json (claude) so the CLI flushes deltas as
+    // they arrive instead of dumping the full response as one batched chunk.
+    // Legacy non-JSON stdout (codex/gemini, or any future fallback) is
+    // detected on the first chunk and passes through unchanged so existing
+    // callers / tests stay green.
+    const args = streamingArgsForProvider(name);
+    const { chunks, wait } = spawnFn(name, [...args, prompt], subscriptionReplEnv());
+    let collected = '';
+    let buffer = '';
+    let mode: 'unknown' | 'raw' | 'ndjson' = 'unknown';
+    for await (const chunk of chunks) {
+      if (chunk.length === 0) continue;
+      if (mode === 'unknown') {
+        mode = chunk.charCodeAt(0) === 0x7B /* '{' */ ? 'ndjson' : 'raw';
+      }
+      if (mode === 'raw') {
+        collected += chunk;
+        yield { text: chunk };
+        continue;
+      }
+      // ndjson: buffer across chunk boundaries, drain complete lines.
+      buffer += chunk;
+      let nlIdx: number;
+      while ((nlIdx = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, nlIdx);
+        buffer = buffer.slice(nlIdx + 1);
+        if (line.length === 0) continue;
+        const delta = extractClaudeStreamDelta(line);
+        if (delta === undefined) {
+          // Looked like NDJSON but didn't parse — never swallow data.
+          collected += line + '\n';
+          yield { text: line + '\n' };
+        } else if (delta !== null && delta.length > 0) {
+          collected += delta;
+          yield { text: delta };
+        }
+      }
+    }
+    // Flush trailing partial line (no terminating newline) — only relevant
+    // in ndjson mode; raw mode already emitted everything inline above.
+    if (mode === 'ndjson' && buffer.length > 0) {
+      const delta = extractClaudeStreamDelta(buffer);
+      if (delta === undefined) {
+        collected += buffer;
+        yield { text: buffer };
+      } else if (delta !== null && delta.length > 0) {
+        collected += delta;
+        yield { text: delta };
+      }
+      buffer = '';
+    }
+    await wait;
+    yield { done: { text: collected, stopReason: 'end_turn' } };
+  };
+}
+
+/**
+ * `--model`-override `.send()` — kept local (see the behavior-diff matrix on
+ * {@link buildReplProvider}): `resolveChatAdapter`'s (SSOT) arg table has no
+ * `--model` parameter, so a caller-selected model (Ink REPL's provider
+ * switcher) cannot be expressed through the SSOT.
+ */
+function buildModelOverrideSend(
+  name: 'claude' | 'codex' | 'gemini',
+  spawnFn: SubscriptionSpawnFn,
+  model: string,
+): (messages: ChatMessage[]) => Promise<ProviderResponse> {
+  const extraArgs = [...extraArgsForProvider(name), '--model', model];
+  return async (messages: ChatMessage[]) => {
+    const prompt = buildSubscriptionPrompt(messages);
+    const { chunks, wait } = spawnFn(name, [...extraArgs, prompt], subscriptionReplEnv());
+    let text = '';
+    for await (const chunk of chunks) text += chunk;
+    await wait;
+    return { text, stopReason: 'end_turn' };
+  };
+}
+
+/**
  * Build a real {@link ChatProviderAdapter} for the native REPL.
  *
  * - `'ollama'`               → HTTP fetch adapter (zero external API).
@@ -314,6 +402,22 @@ function isOpenAICompatName(name: string): name is OpenAICompatPresetName {
  *   without the global registry lookup so the REPL boot does not require a
  *   full provider bootstrap.
  * - anything else            → throws a clear `Unknown REPL provider …` error.
+ *
+ * Sprint 357 T-357-011 (PROVIDER-SSOT, ADR-083, G-034 #1) — behavior-diff
+ * matrix vs. {@link resolveChatAdapter} (chat-provider-parity.ts), the
+ * project's SSOT chat-adapter resolver. Modifying chat-provider-parity.ts is
+ * out of this task's write scope, so any row whose "SSOT gap" column is
+ * non-empty keeps a local implementation — these are INTENTIONAL, tracked
+ * differences, not drift:
+ *
+ *   | branch                                        | SSOT gap                                                                                   | resolution |
+ *   |------------------------------------------------|---------------------------------------------------------------------------------------------|------------|
+ *   | claude, no spawnFn/persistentSpawnFn (REPL boot) | no persistent-session concept                                                              | local (Sprint 223 T-223-001, unchanged) |
+ *   | claude/codex/gemini, `opts.model` set (Ink model-switcher) | arg table has no `--model` param                                                  | local ({@link buildModelOverrideSend}) |
+ *   | claude/codex/gemini `.stream()`                | `.stream()` is raw passthrough w/ ONE fixed arg table — no `--output-format stream-json`, no NDJSON parsing | local ({@link buildCliStream}, shared by every branch below) |
+ *   | claude/codex/gemini `.send()`, no `opts.model` | none — arg table (`extraArgsForProvider` ≡ SSOT's internal `cliExtraArgs`), env-stripping, and prompt-building are identical | **delegates to `resolveChatAdapter()`** |
+ *   | ollama `.send()`                               | none for the HTTP mechanics; only the Turkish "erişilemedi / ollama serve" hint on network failure is REPL-only UX | **delegates to `resolveChatAdapter()`** (see {@link buildOllamaReplAdapter}) |
+ *   | deepseek / qwen / glm                          | SSOT only knows the single generic `'openai-compatible'` provider (one configurable HTTP target via env), not named vendor presets (that logic lives in `providers/openai-compatible.ts`, a separate module) | local |
  */
 export function buildReplProvider(
   name: ReplProviderName,
@@ -351,77 +455,22 @@ export function buildReplProvider(
     });
   }
 
-  const binary = name;
-  const extraArgs = opts.model
-    ? [...extraArgsForProvider(name), '--model', opts.model]
-    : extraArgsForProvider(name);
   const spawnFn: SubscriptionSpawnFn = opts.spawnFn ?? defaultSubscriptionSpawn;
 
+  // Per-turn CLI-spawn path (claude non-persistent / codex / gemini). See
+  // the behavior-diff matrix above: send() delegates to the SSOT whenever
+  // there's no `--model` override; stream() always stays local.
+  if (!opts.model) {
+    const ssot = resolveChatAdapter(name, { spawnFn });
+    return {
+      send: (messages) => ssot.send(messages),
+      stream: buildCliStream(name, spawnFn),
+    };
+  }
+
   return {
-    async send(messages) {
-      const prompt = buildSubscriptionPrompt(messages);
-      const { chunks, wait } = spawnFn(binary, [...extraArgs, prompt], subscriptionReplEnv());
-      let text = '';
-      for await (const chunk of chunks) text += chunk;
-      await wait;
-      return { text, stopReason: 'end_turn' };
-    },
-    async *stream(messages) {
-      const prompt = buildSubscriptionPrompt(messages);
-      // Sprint 222 Task 222-002 — request per-token stream-json (claude) so the
-      // CLI flushes deltas as they arrive instead of dumping the full response
-      // as one batched chunk. Legacy non-JSON stdout (codex/gemini, or any
-      // future fallback) is detected on the first chunk and passes through
-      // unchanged so existing callers / tests stay green.
-      const args = streamingArgsForProvider(name);
-      const { chunks, wait } = spawnFn(binary, [...args, prompt], subscriptionReplEnv());
-      let collected = '';
-      let buffer = '';
-      let mode: 'unknown' | 'raw' | 'ndjson' = 'unknown';
-      for await (const chunk of chunks) {
-        if (chunk.length === 0) continue;
-        if (mode === 'unknown') {
-          mode = chunk.charCodeAt(0) === 0x7B /* '{' */ ? 'ndjson' : 'raw';
-        }
-        if (mode === 'raw') {
-          collected += chunk;
-          yield { text: chunk };
-          continue;
-        }
-        // ndjson: buffer across chunk boundaries, drain complete lines.
-        buffer += chunk;
-        let nlIdx: number;
-        while ((nlIdx = buffer.indexOf('\n')) >= 0) {
-          const line = buffer.slice(0, nlIdx);
-          buffer = buffer.slice(nlIdx + 1);
-          if (line.length === 0) continue;
-          const delta = extractClaudeStreamDelta(line);
-          if (delta === undefined) {
-            // Looked like NDJSON but didn't parse — never swallow data.
-            collected += line + '\n';
-            yield { text: line + '\n' };
-          } else if (delta !== null && delta.length > 0) {
-            collected += delta;
-            yield { text: delta };
-          }
-        }
-      }
-      // Flush trailing partial line (no terminating newline) — only relevant
-      // in ndjson mode; raw mode already emitted everything inline above.
-      if (mode === 'ndjson' && buffer.length > 0) {
-        const delta = extractClaudeStreamDelta(buffer);
-        if (delta === undefined) {
-          collected += buffer;
-          yield { text: buffer };
-        } else if (delta !== null && delta.length > 0) {
-          collected += delta;
-          yield { text: delta };
-        }
-        buffer = '';
-      }
-      await wait;
-      yield { done: { text: collected, stopReason: 'end_turn' } };
-    },
+    send: buildModelOverrideSend(name, spawnFn, opts.model),
+    stream: buildCliStream(name, spawnFn),
   };
 }
 

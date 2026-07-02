@@ -2,7 +2,7 @@
   "_version": "1.0",
   "_last_updated": "2026-04-15T15:23:48.373Z",
   "_update_source": "bundled",
-  "_user_notes": "Bundled baseline — ADR-033 offline-first, npx deckent zero-setup works. Run `deckent config update-pricing` for latest. All values verified from LiteLLM JSON + Anthropic docs + OpenAI pricing + Gemini docs 2026-04-15.",
+  "_user_notes": "Bundled baseline \u2014 ADR-033 offline-first, npx deckent zero-setup works. Run `deckent config update-pricing` for latest. All values verified from LiteLLM JSON + Anthropic docs + OpenAI pricing + Gemini docs 2026-04-15.",
   "providers": {
     "anthropic": {
       "enabled": true,
@@ -34,51 +34,6 @@
           "_source": "model-registry (Fable-5 integration 2026-06-09; $10/$50 per MTok, free on subscription until 2026-06-22)",
           "_verified_at": "2026-06-10"
         },
-        "claude-opus-4-6": {
-          "input_cost_per_token": 5e-06,
-          "output_cost_per_token": 2.5e-05,
-          "cache_creation_input_token_cost": 6.25e-06,
-          "cache_creation_input_token_cost_above_1hr": 1e-05,
-          "cache_read_input_token_cost": 5e-07,
-          "max_input_tokens": 1000000,
-          "max_output_tokens": 128000,
-          "supports_prompt_caching": true,
-          "supports_reasoning": true,
-          "supports_vision": true,
-          "supports_tool_choice": true,
-          "deckent_tier": "premium",
-          "deckent_aliases": [
-            "opus",
-            "opus-4-6",
-            "opus-4-8",
-            "claude-opus-4-8"
-          ],
-          "enabled": true,
-          "_source": "litellm",
-          "_verified_at": "2026-04-15"
-        },
-        "claude-sonnet-4-6": {
-          "input_cost_per_token": 3e-06,
-          "output_cost_per_token": 1.5e-05,
-          "cache_creation_input_token_cost": 3.75e-06,
-          "cache_creation_input_token_cost_above_1hr": null,
-          "cache_read_input_token_cost": 3e-07,
-          "max_input_tokens": 1000000,
-          "max_output_tokens": 64000,
-          "supports_prompt_caching": true,
-          "supports_reasoning": false,
-          "supports_vision": true,
-          "supports_tool_choice": true,
-          "deckent_tier": "standard",
-          "deckent_aliases": [
-            "sonnet",
-            "sonnet-4-6"
-          ],
-          "enabled": true,
-          "_source": "anthropic-docs",
-          "_verified_at": "2026-04-15",
-          "_notes": "Sonnet 4.6 upgraded to 1M context in 2026 (was 200K in Sonnet 4.5). Does not support 1h extended cache."
-        },
         "claude-haiku-4-5": {
           "input_cost_per_token": 1e-06,
           "output_cost_per_token": 5e-06,
@@ -100,6 +55,53 @@
           "enabled": true,
           "_source": "litellm",
           "_verified_at": "2026-04-15"
+        },
+        "claude-sonnet-5": {
+          "input_cost_per_token": 3e-06,
+          "output_cost_per_token": 1.5e-05,
+          "cache_creation_input_token_cost": 3.75e-06,
+          "cache_creation_input_token_cost_above_1hr": null,
+          "cache_read_input_token_cost": 3e-07,
+          "max_input_tokens": 1000000,
+          "max_output_tokens": 64000,
+          "supports_prompt_caching": true,
+          "supports_reasoning": false,
+          "supports_vision": true,
+          "supports_tool_choice": true,
+          "deckent_tier": "standard",
+          "deckent_aliases": [
+            "sonnet",
+            "sonnet-5",
+            "sonnet-4-6",
+            "claude-sonnet-4-6"
+          ],
+          "enabled": true,
+          "_source": "anthropic-docs",
+          "_verified_at": "2026-07-02",
+          "_notes": "Claude Sonnet 5 (claude-sonnet-5). Same $3/$15 pricing as Sonnet 4.6; 1M context. Legacy 4-6 IDs kept as aliases for historical usage records."
+        },
+        "claude-opus-4-8": {
+          "input_cost_per_token": 5e-06,
+          "output_cost_per_token": 2.5e-05,
+          "cache_creation_input_token_cost": 6.25e-06,
+          "cache_creation_input_token_cost_above_1hr": 1e-05,
+          "cache_read_input_token_cost": 5e-07,
+          "max_input_tokens": 1000000,
+          "max_output_tokens": 128000,
+          "supports_prompt_caching": true,
+          "supports_reasoning": true,
+          "supports_vision": true,
+          "supports_tool_choice": true,
+          "deckent_tier": "premium",
+          "deckent_aliases": [
+            "opus",
+            "opus-4-8",
+            "opus-4-6",
+            "claude-opus-4-6"
+          ],
+          "enabled": true,
+          "_source": "litellm",
+          "_verified_at": "2026-07-02"
         }
       },
       "rate_limits": {
@@ -237,7 +239,7 @@
       "subscription_tracking": {
         "method": "none",
         "supported": false,
-        "reason": "ChatGPT Plus/Pro/Enterprise is web UI access. API billing is separate. Architectural impossibility — use API key for cost tracking."
+        "reason": "ChatGPT Plus/Pro/Enterprise is web UI access. API billing is separate. Architectural impossibility \u2014 use API key for cost tracking."
       }
     },
     "google": {
@@ -321,7 +323,7 @@
       "subscription_tracking": {
         "method": "none",
         "supported": false,
-        "reason": "Gemini Advanced is web/mobile subscription. API billing through Google Cloud is separate. Architectural impossibility — use API key for cost tracking."
+        "reason": "Gemini Advanced is web/mobile subscription. API billing through Google Cloud is separate. Architectural impossibility \u2014 use API key for cost tracking."
       }
     },
     "ollama": {
@@ -331,7 +333,7 @@
       ],
       "default_billing_mode": "local",
       "api_endpoint": "http://localhost:11434",
-      "_note": "Local Ollama models — zero cost (on-device inference, no third-party billing). Dynamically-pulled tags not listed here also cost 0; add as needed or rely on provider=ollama → 0 fallback.",
+      "_note": "Local Ollama models \u2014 zero cost (on-device inference, no third-party billing). Dynamically-pulled tags not listed here also cost 0; add as needed or rely on provider=ollama \u2192 0 fallback.",
       "models": {
         "qwen3.6:27b": {
           "input_cost_per_token": 0,

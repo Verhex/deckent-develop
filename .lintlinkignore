@@ -70,3 +70,9 @@ dist/**
 coverage/**
 node_modules/**
 .git/**
+
+# ─── Agent worktrees (transient repo checkouts; their docs are snapshots, not our live tree) ──
+.claude/worktrees/**
+
+# ─── GitHub issue templates (relative GitHub-WEB URLs the linter false-positives as file links) ──
+.github/ISSUE_TEMPLATE/**

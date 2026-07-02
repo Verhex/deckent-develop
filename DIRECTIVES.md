@@ -1,259 +1,329 @@
-# DIRECTIVES — OVERNIGHT ROUND 8: canlı-gözlem + onay-kanalları + kalan borçlar (15 task)
+# DIRECTIVES — SPRINT-357: TOOL-katalog + onay-derinliği + terminal-P1 + borçlar (16 task)
 
 ## Goal
-WORKER-LIVE-TRACE dilimlerini indir (progress-stream yaz+oku), onay-kanallarını bağla
-(telegram/terminal/nervous), golden-flow'u komuta giydir, kalan born-borçları (427/428) kapat,
-landed-pillar'ların dokümantasyonunu güncelle. DISK-VERIFY → hermetik-test. Yasa #1/#2/#3.
+TOOL pillar'ının katalog/registry kalanlarını indir (TOOL-CAT→TERM-CAT→TOOL-REG), onay-omurgasını
+derinleştir (CKPT-1 köprüsü + ALLOWSCOPE + nervous-bridge), terminal-P1'leri kapat
+(resume/busy/config-wire/slash-mode/provider-SSOT), TRN-etiket + TOK-AUT + doctor-dürüstlük +
+link-sweep + PKG-SSOT kalanı. DISK-VERIFY → hermetik-test. Yasa #1/#2/#3.
+**Not:** Bu sprint fable-Brain deneyidir (brain_model=fable) — retro'da opus-Brain'le fark ölçülecek.
 
 ## 🔒 BAĞLAYICI — her task
-- **DISTINCT-FILE** (index.ts YALNIZ Task 10 · app.tsx YALNIZ Task 11 · config.ts YALNIZ Task 13 ·
-  messages.ts YALNIZ Task 15). **DISK-VERIFY first**; ADR (D-004 yön!); surgical; YAGNI.
-- **Hermetik test**; gerçek provider/exec/telegram YOK. **No build/install/login.**
+- **DISTINCT-FILE** (server.ts YALNIZ Task 9 · chat-mode.ts YALNIZ Task 10 · entry.ts YALNIZ Task 11 ·
+  doctor.ts+messages.ts YALNIZ Task 14 · task-mode-runner.ts YALNIZ Task 13 · provider-packages.ts
+  YALNIZ Task 16 · **app.tsx HİÇBİR task'ın yazı-listesinde DEĞİL — dokunma**).
+- **DISK-VERIFY first**; ADR (D-004 yön: core→orchestra import YASAK!); surgical; YAGNI.
+- **Hermetik test** (tmpdir, async spawn); gerçek provider/exec/telegram YOK. **No build/install/login.**
+- **npm/yarn/pnpm install-ailesi ASLA** — bağımlılık ihtiyacı doğarsa prompt'undaki
+  Dependency-Mutation Advisory kanalını kullan (`.question` + `[NPM-ADVISORY]`).
 - **Flag-gated wiring** default-off; flag-off byte-identical (test).
-- **Honest result. No haiku.**
+- **Mekanizma modülleri string-free** (label caller-injected, EN default); user-facing metin yalnız
+  Task 14'te (getMessage). **Honest result. No haiku.**
 
 ---
 
-## Task 1: WLT-EMIT — worker progress-stream yazıcı (WORKER-LIVE-TRACE dilim-1)
+## Task 1: TOOL-CAT — tool/action katalog veri-modeli + trust-tier
 - Model: sonnet
 - Effort: high
 - Skills: typescript-expert
-- Files: src/agents/agentic-worker-runner.ts, tests/agents/wlt-emit.test.ts
-- Scope: src/agents/, src/core/, tests/agents/, docs/adr/
+- Files: src/core/tool-catalog.ts, tests/core/tool-catalog.test.ts
+- Scope: src/core/, tests/core/, docs/adr/
 - Dependencies: none
 ### Description
-Governing: ADR-G-025 §4 (WORKER-LIVE-TRACE — ".log yetmez, structured progress-stream").
-Worker-runner'ın anlamlı adımlarında (start/plan-yazıldı/edit-file/verify-koşuyor/result-yazılıyor)
-`.tasks/task-<id>.progress.jsonl`'e satır-event (ts/step/detail/seq) — append-only, fail-soft,
-`live_trace.enabled` flag default-off (flag-off byte-identical). Heartbeat currentAction ile uyumlu
-(çiftleme değil: hb=son-durum, progress=akış).
+MASTER-PLAN Sıra-25 (TOOL-CAT). Tool/action catalog veri-modeli: tool-registry entry'lerinin üstüne
+trust-tier katmanı — `Core | Project | MCP | Enterprise | Danger` (zod-enum) + katalog-kaydı
+(id/label-key/trustTier/riskLevel/source/scopes) + `classifyToolTrust(entry)` (kaynak+risk'ten
+deterministik tier: builtin core-7→Core, proje-tanımlı→Project, MCP-seed→MCP, riskLevel critical→
+Danger clamp). tool-registry.ts'i DEĞİŞTİRME — read-only tüket (D-004 yönüne dikkat: core→core ✓).
 ### goNogo
-- goCriteria: flag-on adım-event'leri sıralı yazılır (fake-runner testi); flag-off hiç-yazmaz;
-  fail-soft (yazım-hatası runner'ı öldürmez); `tsc` temiz.
-- nogo: default-on; hb-formatını değiştirmek.
+- goCriteria: 5-tier zod-enum + classifyToolTrust deterministik (fixture-registry testleri: builtin→
+  Core, MCP→MCP, critical→Danger clamp); katalog-kaydı serileşir (JSON round-trip); `tsc` temiz.
+- nogo: tool-registry.ts/tool-search.ts değişikliği; UI/render kodu (Task 2'nin işi).
 
-## Task 2: WLT-READ — progress-stream okuyucu/agregatör (dilim-2)
+## Task 2: TERM-CAT — katalog render + trust badge (string-free)
 - Model: sonnet
 - Effort: normal
 - Skills: typescript-expert
-- Files: src/cli/helpers/progress-reader.ts, tests/cli/progress-reader.test.ts
+- Files: src/cli/helpers/catalog-render.ts, tests/cli/catalog-render.test.ts
 - Scope: src/cli/, src/core/, tests/cli/, docs/adr/
-- Dependencies: none
+- Dependencies: Task 1
 ### Description
-`.tasks/*.progress.jsonl` okuyucusu: `readWorkerProgress(dir)` → worker-başına son-N adım +
-"şu an ne yapıyor" özeti; bozuk-satır atlanır (sayaçla); run-state-feed'in worker-detay alanını
-beslemeye uygun şekil (feed'e YAZMADAN — tüketici sonra bağlar).
+MASTER-PLAN Sıra-26 (TERM-CAT). Task 1'in katalog-modelini terminal'e render eden mekanizma-modülü:
+`renderCatalog(entries, labels)` — kategori-gruplu liste + trust-badge (tier→badge-char/renk-kodu,
+NO_COLOR-duyarlı) + risk-işareti. TÜM görünen metin `labels` parametresinden (string-free mekanizma,
+EN default caller'da); emoji YOK (lucide-benzeri char/ANSI). /help-katalog tüketimi follow-up —
+burada yalnız saf render.
 ### goNogo
-- goCriteria: fixture-stream'lerden doğru özet; bozuk-satır toleransı; büyük-dosyada son-N (tail)
-  verimli; `tsc` temiz.
-- nogo: run-state-feed.ts'e yazmak.
+- goCriteria: fixture-katalogdan deterministik çıktı (snapshot-test); NO_COLOR'da ANSI'siz;
+  label-injection çalışır (TR-label fixture'ı ile aynı yapı); `tsc` temiz.
+- nogo: hardcoded user-facing string; app.tsx/command dosyası değişikliği.
 
-## Task 3: APR-TG-CHANNEL — telegram onay-kanal adaptörü
+## Task 3: TOOL-REG — availability-cache (TTL) + toolset enable/disable dilimi
 - Model: sonnet
 - Effort: high
 - Skills: typescript-expert
-- Files: src/connectors/approval-telegram.ts, tests/connectors/approval-telegram.test.ts
-- Scope: src/connectors/, src/core/, tests/connectors/, docs/adr/
+- Files: src/core/tool-availability.ts, tests/core/tool-availability.test.ts
+- Scope: src/core/, tests/core/, docs/adr/
 - Dependencies: none
 ### Description
-ApprovalRelay'in attachChannel kontratına telegram adaptörü: pending → maskedArgs-özet + risk +
-inline-butonlar (approve/deny — mevcut telegram-connector'ın buton/callback altyapısını disk-verify
-edip YENİDEN-KULLAN; feedback_telegram_rich_approval_bot emsali); callback → onDecision. Transport
-inject (fake-bot testleri); gerçek-bot bağlama follow-up.
+MASTER-PLAN Sıra-24'ün (TOOL-REG) ilk dilimi: (a) availability-cache — tool-kaynağı probe sonucu
+(mcp-server ayakta mı vb.) TTL'li memoize (`checkAvailability(id, probe, {ttlMs})`, injected-clock
+testable); (b) toolset enable/disable — `.deckent/settings/toolsets.json`'a persist eden
+enable/disable seti (atomic-write tmp+rename, bozuk-dosya fail-soft→hepsi-enabled). Schema-override/
+generation-memo/shadow-policy bu dilimde YOK (follow-up).
 ### goNogo
-- goCriteria: fake-transport ile pending→mesaj-payload (masked+butonlar); callback→decision; kanal-
-  hatası relay'i etkilemez; `tsc` temiz.
-- nogo: gerçek telegram; connector-çekirdeğini değiştirmek; raw-args.
+- goCriteria: TTL içinde probe 1×, TTL sonrası re-probe (fake-clock); disable edilen tool
+  isDisabled=true + restart-survive (tmpdir round-trip); bozuk toolsets.json fail-soft; `tsc` temiz.
+- nogo: schema-override/memo (dilim-dışı); tool-registry.ts değişikliği.
 
-## Task 4: APR-TERM-CHANNEL — terminal onay-kanal adaptörü
-- Model: sonnet
-- Effort: normal
+## Task 4: CKPT-1 — WorkerQuestion → ApprovalBroker köprüsü (gerçek human-checkpoint)
+- Model: fable
+- Effort: high
 - Skills: typescript-expert
-- Files: src/cli/repl/approval-terminal-channel.ts, tests/cli/approval-terminal-channel.test.ts
-- Scope: src/cli/, src/core/, tests/cli/, docs/adr/
-- Dependencies: none
-### Description
-Relay↔EventStream↔approval-card kuyruğu köprüsü: relay-pending → eventstream-publish → card-queue
-enqueue seam; card-decision → relay.onDecision. app.tsx'e DOKUNMADAN (Task 11 bağlar) saf köprü.
-### goNogo
-- goCriteria: uçtan-uca fake zincir (pending→card-payload→decision→relay); cross-broadcast alımı;
-  `tsc` temiz.
-- nogo: app.tsx/approval-card.tsx'e yazmak.
-
-## Task 5: ROLLBACK-DECIDE — worker-rollback wire-or-kill (born-427)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/orchestra/worker-rollback.ts, src/orchestra/result-evaluator.ts, tests/orchestra/rollback-decide.test.ts
+- Files: src/orchestra/question-approval-bridge.ts, tests/orchestra/question-approval-bridge.test.ts
 - Scope: src/orchestra/, src/core/, tests/orchestra/, docs/adr/
 - Dependencies: none
 ### Description
-Governing: ADR-D-006 (dead-code disposition) + born-427. `setupTaskSnapshot`/`applyRollbackVerdict`
-0-caller (disk-verify güncel durum). KARAR + uygulama: NOT_DISPATCHED/re-dispatch çağı geldi —
-NO_GO-task dosya-revert'i hâlâ isteniyor mu? (a) KILL: ölü kodu sil + ADR-notu; ya da (b) WIRE:
-evaluate-NO_GO + files-changed'li task için flag-gated revert (`rollback.enabled` default-off).
-Seçimini kanıt+gerekçeyle yaz; hangisiyse TAM yap (yarım-wire bırakma).
+MASTER-PLAN Sıra-73 (CKPT-1). Bugün worker soruları Brain'de auto-continue'ya düşüyor (ipc-registry
+handleWorkerQuestion) — gerçek insan-checkpoint yok. Köprü-modülü: `bridgeQuestionToApproval(question,
+broker, opts)` — WorkerQuestion'ı ApprovalRequestInput'a çevir (scope: 'lifecycle', risk: soru-içeriğinden
+heuristik, policy: 'require-approval', maskArgs ile context maskele), broker'a submit et, decision'ı
+BrainAnswer'a geri-çevir (allow→suggestedAction-veya-continue, deny→abort, timeout→fallback continue).
+Flag `approval.question_bridge` (default-off, config-types'a alan ekle). ipc-registry.ts'e DOKUNMA —
+wire follow-up task'ı yapacak; NPM-ADVISORY dalı deterministik kalır (köprüden ASLA geçmez, tasarım-notu yaz).
 ### goNogo
-- goCriteria: 0-caller güncel-kanıt; seçim gerekçeli; KILL→grep-temiz+testler yeşil YA DA WIRE→
-  flag-gated revert testli (tmpdir git-fixture); `tsc` temiz.
-- nogo: yarım-wire; kanıtsız silme.
+- goCriteria: fake-broker ile question→submit→decide→answer round-trip (allow/deny/timeout 3 yolu);
+  NPM-ADVISORY-işaretli soru köprüye girse bile reddedilip deterministik-yol notu döner; flag-off'ta
+  modül import-edilebilir ama hiçbir yerde çağrılmaz (0-caller kanıtı test-notunda); `tsc` temiz.
+- nogo: ipc-registry.ts değişikliği; default-on; raw context'in maskesiz taşınması.
 
-## Task 6: SPAWNLOCK-HARDEN — TOCTOU pencere kapatma (born-428)
+## Task 5: APR-ALLOWSCOPE — scoped always-allow (asla global)
 - Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/core/file-lock.ts, tests/core/spawnlock-toctou.test.ts
+- Effort: high
+- Skills: typescript-expert, secure-coding
+- Files: src/core/approval-allowscope.ts, tests/core/approval-allowscope.test.ts
 - Scope: src/core/, tests/core/, docs/adr/
 - Dependencies: none
 ### Description
-born-428: O_EXCL-create ile content-write arası "corrupted sanıp unlink" dar-penceresi. Fix:
-lock-içeriğini tmp+rename atomik yaz YA DA pre-check'in unlink-dalını kaldır (O_EXCL yeter) —
-disk-verify edip dar-değişikliği uygula; mevcut moat-1 suite (conflict/batch/release) yeşil kalmalı.
+MASTER-PLAN Sıra-69 (APR-ALLOWSCOPE). "Always allow" kaydı: (tool/scopeId + ApprovalScope + azami-risk
++ expiry) dörtlüsüne bağlı — ASLA global. `.deckent/settings/approval-allows.json` persist (atomic,
+fail-soft→boş-set). API: `grantAllow(rule)`, `revokeAllow(id)`, `matchesAllow(request)` — eşleşme
+TAM-scope + risk<=azami + expiry-geçmemiş; süresi-geçen kayıt match-anında temizlenir. approval-policy.ts'i
+DEĞİŞTİRME — policy-engine'in ÖNÜNE takılacak lookup olarak tasarla (kompozisyon follow-up).
 ### goNogo
-- goCriteria: mid-write okuma artık unlink tetiklemez (test-simülasyon); moat-1-source-merge-race
-  suite yeşil; `tsc` temiz.
-- nogo: lock-semantiğini değiştirmek.
-
-## Task 7: DOC-PILLARS — landed-pillar dokümantasyonu
-- Model: sonnet
-- Effort: normal
-- Skills: documentation-writer
-- Files: DECKENT.md, docs/reference/api-surface.md, tests/docs/doc-pillars-links.test.ts
-- Scope: docs/, DECKENT.md, tests/docs/, src/
-- Dependencies: none
-### Description
-Bu gece inen pillar-çekirdeklerini (TOOL registry/search/dispatch · APR contract→eventstream zinciri ·
-TERM çekirdekleri · DeckBroker · trace-extract CLI) DECKENT.md katalog-bölümlerine + api-surface.md
-kontratlarına DİSK-DOĞRULAYARAK ekle (her iddia file:line'lı gerçek; vizyonu shipped gibi yazma —
-flag-gated olanları 'flag-gated (default-off)' etiketiyle). Ölü-link testi.
-### goNogo
-- goCriteria: her yeni-iddia disk-verify (modül+export gerçek); flag-etiketleri doğru; link-testi
-  yeşil; AUTO-section'lara dokunulmadı.
-- nogo: vizyon=shipped yazmak; autogen-blok düzenlemek.
-
-## Task 8: WM-7 — dil-uyumsuzluk routing-penaltısı (config-gated)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/core/routing-engine.ts, tests/core/wm7-language-penalty.test.ts
-- Scope: src/core/, tests/core/, docs/adr/
-- Dependencies: none
-### Description
-Governing: ADR-G-006/G-023 (WM-7). Task-dili (TR/EN — basit heuristik: TR-karakter/kelime oranı) ile
-agent-prompt dili uyuşmazsa küçük-penaltı (−1), `routing.languagePenalty ?? false` gate default-off;
-flag-off byte-identical. Kind-affinity/role-signal desenlerini aynala.
-### goNogo
-- goCriteria: flag-off identical; flag-on TR-task'ta EN-only-agent −1 (fixture); diversity testleri
-  yeşil; `tsc` temiz.
-- nogo: default-on; dil-tespitine bağımlılık eklemek.
-
-## Task 9: TRN-LINT — eğitim-korpusu kalite-denetçisi
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/training/corpus-lint.ts, tests/training/corpus-lint.test.ts
-- Scope: src/training/, src/core/, tests/training/, docs/adr/
-- Dependencies: none
-### Description
-ShareGPT JSONL denetçisi: şema-uygunluk + redaction-taraması (sk-/AKIA/ghp_/JWT kalıntısı → ihlal) +
-dedupe-istatistiği + boş/çok-kısa örnek tespiti → rapor-objesi {ok, violations[], stats}. CLI-wiring
-follow-up. Satır-akışlı.
-### goNogo
-- goCriteria: temiz/kirli fixture'larda doğru rapor; secret-kalıntısı yakalanır; satır-akışlı;
+- goCriteria: scope-dışı/risk-üstü/expired istek match ETMEZ (negatif-testler zengin); grant→match→
+  revoke→no-match round-trip; expiry-temizliği; global-wildcard kaydı schema-düzeyinde REDDEDİLİR;
   `tsc` temiz.
-- nogo: dosya-düzeltme (salt-denetim); yeni bağımlılık.
+- nogo: approval-policy.ts/broker değişikliği; wildcard/global allow; default-on wire.
 
-## Task 10: GOLDENFLOW-CMD — `deckent do "<goal>"` (index.ts TEK-yetkili)
+## Task 6: APPROVE-007b — REPL /nervous köprüsü + handleEdit
 - Model: sonnet
 - Effort: high
 - Skills: typescript-expert
-- Files: src/cli/commands/do.ts, src/cli/index.ts, tests/cli/do-cmd.test.ts
-- Scope: src/cli/, src/orchestra/, tests/cli/, docs/adr/
+- Files: src/cli/repl/nervous-bridge.ts, tests/cli/repl/nervous-bridge.test.ts
+- Scope: src/cli/, src/nervous/, tests/cli/, docs/adr/
 - Dependencies: none
 ### Description
-golden-flow'u (READ-ONLY) komuta giydir: `deckent do "<goal>"` — default DRY-RUN (plan-önizleme +
-ne-yapılacak listesi; start ETMEZ); `--run` ile approve-seam üzerinden gerçek akış (start-seam mevcut
-runSprint-yoluna bağlanır ama --run'suz test edilir). index.ts kaydı bu görevde.
+MASTER-PLAN Sıra-72 (APPROVE-007b). REPL'den nervous kararlarına köprü: pending nervous-önerilerini
+listele (accept/reject/edit aksiyon-planı döndür — exec-siz plan-objesi, injected-executor deseni) +
+`handleEdit(id, modifiedPayload)` — öneriyi değiştirilmiş-payload ile kabul yolu (nervous accept'in
+pending'i silmeme gotcha'sını disk-verify et — edit-accept sonrası pending temizliğini plana dahil et).
+Nervous çekirdeğini DEĞİŞTİRME; mevcut nervous API'sini read-only tüket, aksiyonu injected-executor'a delege et.
 ### goNogo
-- goCriteria: dry-run önizleme deterministik (fake-seam); --run seam-zinciri unit-fake ile; kayıt-
-  testi; `tsc` temiz.
-- nogo: default'ta sprint başlatmak; golden-flow'u değiştirmek.
+- goCriteria: fake-nervous-store ile list/accept/reject/edit plan-üretimi; edit-accept planı pending-
+  temizlik adımı içerir; executor-inject testli (gerçek-exec yok); `tsc` temiz.
+- nogo: src/nervous/ çekirdek değişikliği; gerçek nervous-exec.
 
-## Task 11: APP-APPROVAL-WIRE — approval-card+dual-stream'i app'e tak (app.tsx TEK-yetkili)
+## Task 7: TERM-RESUME — recent-session teaser + /resume picker çekirdeği
 - Model: sonnet
-- Effort: high
-- Skills: typescript-expert, react-specialist
-- Files: src/cli/repl/app.tsx, tests/cli/app-approval-wire.test.tsx
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/cli/helpers/session-resume.ts, tests/cli/session-resume.test.ts
 - Scope: src/cli/, tests/cli/, docs/adr/
-- Dependencies: APR-TERM-CHANNEL
-### Description
-354'te inen repl_surface bölgesine (disk-verify app.tsx flag-yapısı) approval-card + dual-stream +
-terminal-kanal köprüsünü tak: pending-varken dual-stream düzeni (approval üst, status min-1);
-`repl_surface.approvals ?? false` alt-flag; flag-off 354-davranışı byte-identical.
-### goNogo
-- goCriteria: alt-flag-off identical; flag-on pending→kart görünür + y/n decide zinciri (fake-relay);
-  footer kaybolmaz; `tsc` temiz.
-- nogo: kart/kanal core dosyalarına yazmak; default-on.
-
-## Task 12: NERVOUS-APR — nervous accept/reject ↔ broker köprüsü
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/nervous/approval-bridge.ts, tests/nervous/approval-bridge.test.ts
-- Scope: src/nervous/, src/core/, tests/nervous/, docs/adr/
 - Dependencies: none
 ### Description
-Governing: ADR-G-022 + G-020. Nervous'un mevcut accept/reject akışını (disk-verify nervous-accept
-tool/handler) ApprovalBroker'a köprüle: nervous-onayı → broker.decide(map'lenmiş request); broker-
-pending (nervous-kaynaklı aksiyonlar) → nervous-bildirim payload'u. Saf köprü + fake'lerle test;
-gerçek-wiring follow-up. Bilinen gotcha: accept pending'i silmiyor ([[project_nervous_accept_pending_not_cleared]]) — köprü decide-sonrası temizliği üstlenir.
+MASTER-PLAN Sıra-50 (TERM-RESUME). Açılışta "son N oturum" teaser'ı + `/resume` picker'ının veri+seçim
+çekirdeği: session-kaynağını disk-verify et (sprint-arşivi/`.deckent` oturum-izleri — ne varsa onu oku),
+`listRecentSessions(root, n)` (id/title/tarih/durum; bozuk-kayıt atla) + `pickSession(input, sessions)`
+(number/id/title-prefix eşleşme). Degrade-safe: kaynak yoksa boş-liste (teaser hiç görünmez). Render/
+Ink-wire follow-up — burada saf veri+seçim mantığı, string-free.
 ### goNogo
-- goCriteria: nervous-accept→decide + pending-temizliği; reject→deny; çift-karar idempotent;
-  `tsc` temiz.
-- nogo: nervous-çekirdeğini yeniden-yazmak.
+- goCriteria: fixture-oturumlarla listeleme (en-yeni-önce, N-cap); number/id/title-prefix seçimi +
+  çakışmada belirsizlik-hatası; kaynak-yok→boş-liste (throw yok); `tsc` temiz.
+- nogo: app.tsx/entry.ts wire; hardcoded string.
 
-## Task 13: CFG-APR-WIRE — approval.rules'u config'e bağla (config.ts TEK-yetkili)
+## Task 8: TERM-BUSY — /queue /interrupt /steer durum-makinesi
+- Model: sonnet
+- Effort: high
+- Skills: typescript-expert
+- Files: src/cli/repl/busy-controls.ts, tests/cli/repl/busy-controls.test.ts
+- Scope: src/cli/, tests/cli/, docs/adr/
+- Dependencies: none
+### Description
+MASTER-PLAN Sıra-51 (TERM-BUSY). Busy-davranış standardının çekirdeği: koşan-iş varken gelen komutlar
+için durum-makinesi — `/queue` (ChatTurnQueue'ya devret — chat-turn-queue.ts'i read-only tüket),
+`/interrupt` (kibarca durdur: injected-canceller), `/steer <msg>` (koşan turn'e yönlendirme-notu kuyruğu).
+Esc/Ctrl-C eşlemesi için key→aksiyon çözümleme tablosu (Ink-wire follow-up). Yarış-durumları: busy-değilken
+interrupt no-op + bilgi-sonucu; çifte-interrupt idempotent.
+### goNogo
+- goCriteria: busy/idle × queue/interrupt/steer matris-testleri; çifte-interrupt idempotent;
+  steer-notları FIFO + turn-bitiminde drain-plan; canceller-inject testli; `tsc` temiz.
+- nogo: chat-turn-queue.ts/app.tsx değişikliği; gerçek süreç-öldürme.
+
+## Task 9: TERM-CONFIG-WIRE — TerminalConfig'i runtime'a bağla
+- Model: sonnet
+- Effort: high
+- Skills: api-design, typescript-expert
+- Files: src/api/server.ts, tests/api/terminal-config-wire.test.ts
+- Scope: src/api/, src/core/, tests/api/, docs/adr/
+- Dependencies: none
+- Smoke: node dist/cli/entry.js serve --port 3213 → GET /api/status = 200 (terminal-config değerleri effective)
+### Description
+MASTER-PLAN Sıra-58 (TERM-CONFIG-WIRE, G-029). `terminal.*` config'i (maxSessions/idleTimeoutMs/
+scrollbackBytes/allowShellKind/bind) şu an schema-only — server hardcoded-default kullanıyor. server.ts'te
+terminal-session yönetiminin default'larını ResolvedConfig.terminal'den okut (yoksa mevcut default'lar —
+davranış-koruma); bind adresi + outboundDailyQuota varsa onları da bağla. DİKKAT: server.ts büyük —
+surgical diff, yalnız config-okuma noktaları; mevcut testler yeşil kalmalı.
+### goNogo
+- goCriteria: config'te maxSessions=2 verilince 3. session reddi (hermetik test, injected/ephemeral —
+  gerçek sabit-port değil); config-yok→eski default'lar byte-aynı; idleTimeout config'ten okunur; `tsc` temiz.
+- nogo: terminal davranışının config-yokken değişmesi; API-kontrat kırılması.
+
+## Task 10: SLASH-MODE-WIRE — filterRegistryByMode'u /help yoluna bağla
 - Model: sonnet
 - Effort: normal
 - Skills: typescript-expert
-- Files: src/core/config.ts, src/core/config-types.ts, tests/core/cfg-apr-wire.test.ts
+- Files: src/cli/commands/chat-mode.ts, tests/cli/slash-mode-wire.test.ts
+- Scope: src/cli/, tests/cli/, docs/adr/
+- Dependencies: none
+- Smoke: node dist/cli/entry.js --help → exit 0 (regresyon)
+### Description
+MASTER-PLAN Sıra-56 (SLASH-MODE-WIRE, G-034 #3). `filterRegistryByMode` (chat-mode.ts:55) delivered ama
+UNWIRED — /help tüm registry'yi basıyor, enterprise-slash user-mode'da gizlenmiyor. DISK-VERIFY: /help
+render'ının komut-listesini nereden aldığını bul (grep command-registry tüketicileri). Wire stratejisi:
+chat-mode.ts'e mode-aware help-list export'u ekle (`getVisibleCommands(mode)`), /help-tüketicisinin
+çağrısını buna çevir — tüketici dosya app.tsx İSE dokunma, bunun yerine export'u hazırla + `.result`
+notes'a `docImpact:` + wire-noktasını yaz (follow-up); tüketici chat-mode.ts-içi ya da yazı-listendeki
+başka dosyaysa bağla.
+### goNogo
+- goCriteria: getVisibleCommands(mode) user-mode'da enterprise-komutları filtreler (test); mevcut
+  chat-mode testleri yeşil; wire tamamlandıysa /help-path testi, tamamlanamadıysa dürüst notes+plan;
+  `tsc` temiz.
+- nogo: app.tsx/entry.ts değişikliği; registry çekirdeğine dokunmak.
+
+## Task 11: PROVIDER-SSOT — buildReplProvider → resolveChatAdapter tekleştirme
+- Model: sonnet
+- Effort: high
+- Skills: typescript-expert
+- Files: src/cli/entry.ts, tests/cli/entry-provider-ssot.test.ts
+- Scope: src/cli/, tests/cli/, docs/adr/
+- Dependencies: none
+- Smoke: node dist/cli/entry.js --help → exit 0 (regresyon)
+### Description
+MASTER-PLAN Sıra-55 (PROVIDER-SSOT, G-034 #1). entry.ts:318 `buildReplProvider` bare-REPL için inline
+provider kuruyor; SSOT `resolveChatAdapter` (chat-provider-parity.ts, ADR-083) ile İKİ ayrı yol var —
+minor-drift. buildReplProvider'ı resolveChatAdapter'a delege eden ince-adapter'a indir (injected
+spawnFn/fetchFn seam'leri KORUNUR — hermetik testler kırılmasın); davranış-fark matrisi çıkar (hangi
+env/config kombinasyonunda farklı provider seçiliyor) ve farkları SSOT-lehine kapat; kalan bilinçli-fark
+varsa notes'a yaz.
+### goNogo
+- goCriteria: mevcut entry/bare-REPL testleri yeşil; buildReplProvider artık resolveChatAdapter'ı
+  çağırıyor (grep-kanıt + test); seam-injection korunmuş; davranış-fark matrisi notes'ta; `tsc` temiz.
+- nogo: chat-provider-parity.ts değişikliği; REPL davranış-regresyonu.
+
+## Task 12: TRN-LABEL — run-outcome etiket taksonomisi
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/core/trace-labels.ts, tests/core/trace-labels.test.ts
 - Scope: src/core/, tests/core/, docs/adr/
 - Dependencies: none
 ### Description
-`approval` config-bloğunu (rules[] + gate/relay flag'leri) config-types'a ekle + loadConfig merge'inde
-approval-rules-load (READ-ONLY) ile doğrula — bozuk-kural sprint'i KIRMAZ (uyarı-listesi debugLog);
-default'lar approval-rules-load'un güvenli-set'i. validatePartialConfig uyumu.
+MASTER-PLAN Sıra-79 (TRN-LABEL, §3.5). Training+memory için run-outcome etiket taksonomisi:
+`RunOutcomeLabel = success | partial | cancelled | failed | not_dispatched` (zod) + mapper'lar:
+task-evaluation→label (DONE→success, GO_WITH_TECH_DEBT→partial, NO_GO→failed, NOT_DISPATCHED→
+not_dispatched), sprint-özeti→label (oran-eşikli). D-004 yönünü disk-verify et: TaskEvaluation enum'u
+orchestra'daysa core→orchestra import YASAK — mapper'ı tip-yapısal kur (string-union parametre kabul et).
+trace-recorder/pipeline'a wire follow-up — burada saf taksonomi+mapper.
 ### goNogo
-- goCriteria: geçerli/bozuk config fixture'ları (tmpdir loadConfig); default-güvenli; mevcut config
-  suite yeşil; `tsc` temiz.
-- nogo: rules-load'u çiftlemek; validation'ı gevşetmek.
+- goCriteria: 5-label zod + iki mapper tam-eşleme testleri (her evaluation değeri kapsanır — exhaustive-
+  switch compile-güvencesi); D-004 ihlali yok (import-yön grep-kanıt notes'ta); `tsc` temiz.
+- nogo: trace-recorder/pipeline değişikliği; core→orchestra import.
 
-## Task 14: SMOKE-AUDIT — post-sprint Tier-1 smoke zinciri disk-denetimi
+## Task 13: TOK-AUT — autonomous task-mode tokenUsage 0/0/0 fix
 - Model: sonnet
-- Effort: normal
+- Effort: high
 - Skills: typescript-expert
-- Files: src/orchestra/post-sprint-smoke.ts, tests/orchestra/smoke-audit.test.ts
+- Files: src/orchestra/task-mode-runner.ts, tests/orchestra/task-mode-tokenusage.test.ts
 - Scope: src/orchestra/, src/core/, tests/orchestra/, docs/adr/
 - Dependencies: none
 ### Description
-Governing: ADR-G-009 (proof-of-function). worker-default docs "deckent Smoke'u host-side koşar +
-DONE→DEBT düşürür" diyor — disk-verify: post-sprint-smoke gerçekte var mı/çağrılıyor mu/Smoke-satırını
-nereden okuyor? Eksik/kopuksa dürüst tespit + minimal-onarım (koşucu seam'li: exec inject); çalışıyorsa
-kapsam-testi ekle (Smoke-fail→DONE-düşürme yolu).
+MASTER-PLAN Sıra-81 (TOK-AUT, WP-4 ailesi). Sprint-yolu result'ları `enrichResultCost`/
+`enrichResultTokenUsage` (result-collector.ts:563+) ile dolduruyor; autonomous task-mode yolu
+(task-mode-runner.ts) bu enrichment'ı ÇAĞIRMIYOR → tokenUsage 0/0/0 kalıyor. DISK-VERIFY: task-mode-runner'ın
+result-üretim noktasını bul, enrichment'ı oraya bağla (result-collector'dan import — orchestra→orchestra ✓);
+transcript/log kaynağı task-mode'da farklıysa kaynak-çözümlemeyi task-mode'a uyarla. result-collector.ts'e
+DOKUNMA (read-only import).
 ### goNogo
-- goCriteria: zincirin gerçek-durumu kanıtlı (file:line); kopuksa onarıldı + smoke-fail→downgrade
-  testli (fake-exec); çalışıyorsa regression-testi; `tsc` temiz.
-- nogo: gerçek-binary exec testte; DONE-düşürme semantiğini genişletmek.
+- goCriteria: fake-transcript'li task-mode koşusunda result.tokenUsage ≠ 0/0/0 (hermetik fixture);
+  transcript-yok→0/0/0 + dürüst-fallback korunur; mevcut task-mode testleri yeşil; `tsc` temiz.
+- nogo: result-collector.ts değişikliği; sprint-yolu davranış değişikliği.
 
-## Task 15: MESSAGES-KEYS-4 — round-8 i18n (tek-yetkili)
+## Task 14: ONB-HONEST — doctor "hazır/eksik/tek-tık-fix" dürüst mesaj katmanı
 - Model: sonnet
-- Effort: low
+- Effort: normal
 - Skills: typescript-expert
-- Files: src/cli/helpers/messages.ts, tests/cli/messages-round8-keys.test.ts
+- Files: src/cli/commands/doctor.ts, src/cli/helpers/messages.ts, tests/cli/doctor-honest.test.ts
 - Scope: src/cli/, tests/cli/, docs/adr/
-- Dependencies: GOLDENFLOW-CMD, APP-APPROVAL-WIRE, APR-TG-CHANNEL
+- Dependencies: none
+- Smoke: node dist/cli/entry.js doctor → exit 0 + özet-satırında hazır/eksik sayımı
 ### Description
-Round-8 notes'larındaki key-ihtiyaçları (en+tr) — yalnız anahtar-ekleme, çakışma/fallback testli.
+MASTER-PLAN Sıra-204 (ONB-HONEST, §3.1). Doctor çıktısının sonuna non-teknik dürüst özet: her check
+`hazır | eksik | tek-komutla-düzelir` üç-durumuna map'lenir; kapanışta "N hazır · M eksik (K'sı
+`deckent doctor --fix` ile düzelir)" + eksikler için tek-satır insan-dili açıklama. TÜM metin
+getMessage üzerinden (en+tr çifti, i18n-FIRST); mevcut check-mantığına DOKUNMA — yalnız sunum-katmanı.
+--json çıktısına `honestSummary` alanı (yapısal).
 ### goNogo
-- goCriteria: ihtiyaçlar karşılandı (cite); en+tr; suite yeşil.
-- nogo: tek-dilli; yapısal değişiklik.
+- goCriteria: fixture-check-sonuçlarından doğru üç-durum sınıflaması + özet-sayımı; en+tr key-çiftleri
+  eksiksiz (test); --json'da honestSummary; mevcut doctor testleri yeşil; `tsc` temiz.
+- nogo: check-mantığı değişikliği; hardcoded string (i18n-ihlal).
+
+## Task 15: LINK-SWEEP — eski-ADR linklerinin crosswalk taraması (born-455)
+- Model: sonnet
+- Effort: normal
+- Skills: doc-writing
+- Files: docs/
+- Scope: docs/
+- Dependencies: none
+### Description
+MASTER-PLAN Sıra-455 (DOC-ADR-LINK-CROSSWALK-SWEEP). 2026-06-30 taksonomi-redesign'ı eski-numaralı ADR
+dosyalarını silince docs-genelinde ~20+ link öldü. `npm run lint:link` koş → her kırık eski-ADR linkini
+docs/adr dosyalarındaki **Crosswalk:** satırlarından yeni adr-g/d-NNN karşılığına çevir (link-metni
+bağlamını koru); crosswalk'ta karşılığı OLMAYAN (gerçekten silinmiş, halefsiz) linkler için çevre-cümleyi
+"arşivlendi" diline çevir ya da linki metin-yap. docs/archive/ altındaki tarihî dokümanların İÇERİĞİNE
+dokunma (frozen, Tier-4).
+### goNogo
+- goCriteria: `npm run lint:link` exit 0 (ya da kalan hataların TAMAMI archive-frozen sınıfı — notes'ta
+  listele); değişen her link crosswalk-doğru (spot-check listesi notes'ta); ADR gövde-metni değişmedi
+  (yalnız link/çevre-cümle).
+- nogo: ADR karar-metni değişikliği; docs/MASTER-PLAN.md'ye dokunmak.
+
+## Task 16: PKG-SSOT-REST — install-hint paket-adlarının kalan çağrı-noktaları (207 tamamlama)
+- Model: sonnet
+- Effort: high
+- Skills: typescript-expert
+- Files: src/core/provider-packages.ts
+- Scope: src/core/, src/cli/, src/orchestra/, tests/, docs/adr/
+- Dependencies: none
+### Description
+MASTER-PLAN Sıra-207 (PKG-NAME-SSOT) tamamlama. 356-008 SSOT-modülü (`provider-packages.ts`) + kritik-3
+çevrimi yaptı, kalan hardcoded install-hint'ler duruyor. DISK-VERIFY: repo'da hardcoded provider-paket-adı
+hint'lerini grep'le envanterle (`@anthropic-ai/claude-code`, `@openai/codex`, `@google/gemini-cli`,
+`npm install -g` kalıpları; test/fixture hariç); HER kalan çağrı-noktasını SSOT'tan okur hale getir —
+dokunduğun her dosyayı `.result` filesChanged'e yaz. DISTINCT-FILE listesindeki dosyalara (server.ts/
+chat-mode.ts/entry.ts/doctor.ts/messages.ts/task-mode-runner.ts) DOKUNMA — onlardaki hint varsa notes'a
+bırak. **npm install ASLA çalıştırma** — bu task paket-ADLARI metni işidir; bağımlılık ihtiyacı sanrısı
+doğarsa Dependency-Mutation Advisory kanalını kullan.
+### goNogo
+- goCriteria: grep-envanter notes'ta (önce/sonra sayım); kalan hardcode=0 ya da DISTINCT-FILE-korumalı
+  istisnalar listeli; SSOT-testleri + dokunulan modül testleri yeşil; `tsc` temiz.
+- nogo: DISTINCT-FILE dosyalarına yazmak; npm install/rebuild; paket-adı değiştirmek (yalnız kaynağı SSOT'a çevir).
