@@ -45,7 +45,17 @@ davranış değişikliği. Bu, riskli-yüzey kör-default-on yasağının (quali
 - `approvals` yalnız görünür yüzeydir — onayın **enforcement** tarafı `approval_gate` flag'ine bağlıdır
   (bkz. [approval-runtime.md](approval-runtime.md)); kartı açmak tek başına worker'ları durdurmaz.
 
+## Canlı test
+
+- `DECKENT_APPROVAL_DEMO=1 deckent` — REPL açılışında bir demo-pending onay isteği seed edilir;
+  approval-card render'ı + y/n/a/d akışı gerçek zincir (broker→relay→eventstream→terminal-channel)
+  üzerinden uçtan-uca test edilir. Yalnız demo amaçlı; default kapalı.
+- ⚠️ Sınır: relay/eventstream bugün **in-process** — başka process'in (ör. sprint worker'ının) diske
+  yazdığı pending taze REPL'e akmaz; store-watch köprüsü MASTER-PLAN `APR-CROSS-PROCESS-FEED`'te.
+
 ## Kanıt
 
 - Testler: `tests/` altında 354-001/355-011 aileleri (flag-off byte-identity + kart render + kanal köprüsü).
+- Config→prop wire: `runInkRepl` (`src/cli/repl/run.tsx`) — 2026-07-02 CC el-fix (born-463; flag'ler
+  önceden şema+seam olarak inmişti, tüketici wire eksikti).
 - Dogfood: **2026-07-02'den beri `enabled: true` + `approvals: true`** (deckent-dev `.deckent/config.json`).

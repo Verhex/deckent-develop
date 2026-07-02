@@ -162,7 +162,7 @@ export const DEFAULT_APPROVAL_CARD_LABELS: ApprovalCardLabels = {
 
 /** Sentinel used only to reserve dual-stream "approval wants space" priority
  * below — never rendered (filtered out before the footer maps to <Text>). */
-const DUAL_STREAM_APPROVAL_PLACEHOLDER = ' dual-stream-approval-placeholder';
+const DUAL_STREAM_APPROVAL_PLACEHOLDER = '\u0000dual-stream-approval-placeholder';
 
 /**
  * Compress the live-footer (status) region to its dual-stream-tested min-1-line

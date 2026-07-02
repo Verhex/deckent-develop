@@ -21,6 +21,12 @@ import { buildSlashRegistry } from '../commands/chat-slash-registry.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { loadConfig } from '../../core/config.js';
 import { createSwitchableProvider, type ActiveSelection } from './provider-switch.js';
+import { createRunStateFeed } from '../helpers/run-state-feed.js';
+import { ApprovalBroker } from '../../core/approval-broker.js';
+import { ApprovalRelay } from '../../core/approval-relay.js';
+import { ApprovalEventStream } from '../../core/approval-eventstream.js';
+import { createApprovalTerminalChannel, type ApprovalTerminalChannel } from './approval-terminal-channel.js';
+import { randomUUID } from 'node:crypto';
 import { MemoryStore } from '../../core/memory-store.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { join } from 'node:path';
@@ -37,9 +43,59 @@ export async function runInkRepl(
   providerName: string,
   rebuild: ProviderRebuild,
 ): Promise<void> {
+  // Project config is loaded once here and reused by the surface wire below —
+  // a load failure degrades to defaults (lang=en, every surface flag off).
+  let projectCfg: { language?: string; repl_surface?: { enabled?: boolean; approvals?: boolean } } = {};
+  try { projectCfg = await loadConfig() as typeof projectCfg; } catch { /* defaults */ }
   let lang = 'en';
-  try { lang = getLanguage((await loadConfig()).language); } catch { /* default en */ }
+  try { lang = getLanguage(projectCfg.language); } catch { /* default en */ }
   const t = (key: string): string => getMessage(key, lang);
+
+  // ─── REPL-SURFACE config→prop wire (repl_surface.*, born: flags landed 354-001/
+  // 355-011 as App-prop seams but no caller ever resolved the config — the flag
+  // was unreachable). Fail-soft: any wiring error leaves the surface off and the
+  // REPL fully usable.
+  const surf = projectCfg.repl_surface ?? {};
+  const replSurfaceEnabled = surf.enabled === true;
+  let stateFeed: (() => import('../helpers/live-footer.js').LiveFooterState) | undefined;
+  if (replSurfaceEnabled) {
+    try { stateFeed = createRunStateFeed({ projectRoot: process.cwd() }); } catch { stateFeed = undefined; }
+  }
+  const approvalsEnabled = surf.approvals === true;
+  let approvalChannel: ApprovalTerminalChannel | undefined;
+  if (approvalsEnabled) {
+    try {
+      const broker = new ApprovalBroker(process.cwd());
+      const relay = new ApprovalRelay(broker);
+      const stream = new ApprovalEventStream(relay);
+      approvalChannel = createApprovalTerminalChannel(relay, stream);
+
+      // DECKENT_APPROVAL_DEMO=1 — seed ONE in-process demo pending so the card
+      // path is testable end-to-end without a live worker. The relay/eventstream
+      // pair lives in THIS process (no cross-process store-watch yet — see
+      // MASTER-PLAN APR-CROSS-PROCESS-FEED), so the demo must submit here.
+      if (process.env['DECKENT_APPROVAL_DEMO'] === '1') {
+        const now = new Date();
+        broker.submit({
+          id: randomUUID(),
+          requester: { role: 'worker', instanceId: 'demo-worker' },
+          summary: 'DEMO — rm -rf ./build çalıştırma izni (canlı-test kartı)',
+          details: { reason: 'repl_surface.approvals canlı-doğrulama', task: 'demo-001' },
+          scopeId: 'demo-001',
+          scope: 'shell-exec',
+          risk: 'high',
+          policy: 'require-approval',
+          defaultAction: 'deny',
+          tenantId: 'local',
+          userId: 'alperen',
+          createdAt: now.toISOString(),
+          expiresAt: new Date(now.getTime() + 10 * 60_000).toISOString(),
+          maskedArgs: { cmd: 'rm -rf ./build' },
+          rawArgsRef: null,
+        });
+      }
+    } catch { approvalChannel = undefined; }
+  }
 
   const perms = createPermissionStore(process.cwd());
 
@@ -258,6 +314,10 @@ export async function runInkRepl(
       registerConfirm={(trigger) => { confirmTrigger = trigger; }}
       registerToolSink={(sink) => { toolSink = sink; }}
       {...(nativeEngine ? { nativeEngine } : {})}
+      replSurfaceEnabled={replSurfaceEnabled}
+      {...(stateFeed ? { stateFeed } : {})}
+      approvalsEnabled={approvalsEnabled}
+      {...(approvalChannel ? { approvalChannel } : {})}
     />
     </ReplErrorBoundary>,
   );
@@ -265,6 +325,7 @@ export async function runInkRepl(
   await waitUntilExit();
 
   if (altScreen) process.stdout.write('\x1b[?1049l'); // restore the main screen
+  try { approvalChannel?.dispose(); } catch { /* already disposed */ }
   try { memory?.close(); } catch { /* already closed */ }
   // Bounded teardown of the active session, then deterministic exit (Ink unmount
   // + restored stdin can otherwise keep the event loop alive).
