@@ -161,7 +161,7 @@ describe('getUsageData — sprint mode', () => {
 });
 
 describe('lint-mcp-instructions.mjs', () => {
-  it('(8) script exits 0 after adding deckent_usage (37 tools)', () => {
+  it('(8) script exits 0 after adding deckent_usage (count-synced: 42 tools)', () => {
     const scriptPath = join(process.cwd(), 'scripts', 'lint-mcp-instructions.mjs');
     const result = spawnSync('node', [scriptPath], {
       encoding: 'utf-8',
@@ -169,6 +169,6 @@ describe('lint-mcp-instructions.mjs', () => {
     });
     expect(result.status).toBe(0);
     expect(result.stdout).toMatch(/^OK:/);
-    expect(result.stdout).toContain('37 tools');
+    expect(result.stdout).toContain('42 tools');
   });
 });

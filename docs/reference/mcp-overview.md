@@ -1,6 +1,6 @@
 # MCP Module Overview
 
-The Deckent MCP server (`src/mcp/`) exposes the full Deckent orchestration surface as a Model Context Protocol server using the stdio transport. It is registered with Claude Code via `claude mcp add deckent -- npx deckent-mcp`, which launches it as a long-lived child process that communicates over stdin/stdout. The server publishes **37 tools** and **8 resources** organized across sprint lifecycle management, memory, autonomous execution, Nervous System integration, and enterprise process mode. A singleton lock (`mcp-server.pid`) prevents multiple concurrent server instances in the same project root.
+The Deckent MCP server (`src/mcp/`) exposes the full Deckent orchestration surface as a Model Context Protocol server using the stdio transport. It is registered with Claude Code via `claude mcp add deckent -- npx deckent-mcp`, which launches it as a long-lived child process that communicates over stdin/stdout. The server publishes **42 tools** and **8 resources** organized across sprint lifecycle management, memory, autonomous execution, Nervous System integration, and enterprise process mode. A singleton lock (`mcp-server.pid`) prevents multiple concurrent server instances in the same project root.
 
 ---
 
@@ -50,7 +50,7 @@ Resources follow the same pattern in `src/mcp/resources/index.ts`, calling `regi
 
 ---
 
-## Tools (37)
+## Tools (42)
 
 ### Init / Config
 

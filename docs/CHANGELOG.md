@@ -2,6 +2,33 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint359] - 2026-07-02
+
+### Added
+
+- WRAPPER-HB-GATE + ALLOWLIST-SSOT (born-468 + born-471)
+- ADR-POINTER-PATH — tiered-injection pointer'ı erişilebilir dosyaya (born-469)
+- ROUTE-DOMAIN-SCOPE — domain-sinyalini scope-path'ten türet (born-470, flag'li)
+- TOOL-REG-2 — dynamic-schema-override + generation-memo dilimi (Sıra-24 devam)
+- TERM-COMPAT — REPL compat test-matrisi + PTY smoke (Sıra-52)
+- NL-DISPATCH-EVIDENCE — agenticDispatch default kararı için kanıt-paketi (Sıra-57)
+- F7-HARDEN — terminal hardening dilimi: session-history + copy-paste (Sıra-65)
+- RUNTIME-GITIGNORE — çalışma-zamanı artefakt hijyeni
+- TOOL-HOOK-SEAM — plugin/hook seam çekirdeği (Sıra-84)
+- AUTONOMOUS-MCP — autonomous start/backlog/status MCP yüzeyi (Sıra-74 dilim)
+
+### Changed
+
+- DEP-NORMALIZE — dependency-ref'leri plan-yazımında slot-ID'ye çevir (born-465) (completed with tech debt)
+- TMUX-TIMEOUT-PARITY — tmux wrapper'ına 466-ailesi paritesi (completed with tech debt)
+- TERM-SIMPLE — Simple-Mode edition (Sıra-53) (completed with tech debt)
+- PARITY-CLI-MCP — agent/skill/memory_manage + cost tool paritesi (Sıra-86 dilim) (completed with tech debt)
+- AGSK-EXPAND — katalog genişleme dilim-1: 3 yeni horizontal skill (Sıra-85) (completed with tech debt)
+- APR-HISTORY — dashboard onay-geçmişi paneli (Sıra-71) (completed with tech debt)
+
+
+_Tasks: 16 total, 16 done, 6 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint358] - 2026-07-02
 
 ### Added

@@ -178,6 +178,12 @@ export function isSurfaceBuildTask(intent: IntentType, taskKind?: TaskKind): boo
  * @param allowPathProxy When false, path 2 (domain-name proxy) is suppressed;
  *                       path 1 (intent-driven) always runs. Defaults to true so
  *                       existing 3-arg callers are byte-for-byte unchanged.
+ * @param scopeDomain    ROUTE-DOMAIN-SCOPE (born-470, Sprint 359 Task 359-005):
+ *                       when truthy, REPLACES the path-2 taskDNA.domains lookup
+ *                       (priority, not additive — see SCOPE_DOMAIN_TO_AGENT_ID
+ *                       below). `undefined` (every pre-359-005 call site) or
+ *                       `null` (scope-domain flag on but no curated match) both
+ *                       fall through to the generic path-2 lookup unchanged.
  * @returns DOMAIN_MATCH_BONUS on match, 0 otherwise.
  */
 export function getDomainMatchBonus(
@@ -185,6 +191,7 @@ export function getDomainMatchBonus(
   agentDomain: AgentDomain | 'generic',
   taskDNA: TaskDNA,
   allowPathProxy: boolean = true,
+  scopeDomain?: string | null,
 ): number {
   // Path 1: intent → agent domain (intent-driven, always honoured).
   const targetDomain = INTENT_TO_AGENT_DOMAIN[taskDNA.intent.primary];
@@ -194,6 +201,11 @@ export function getDomainMatchBonus(
 
   // Path 2: extracted task domain name → specific agent id (path proxy, gated).
   if (allowPathProxy) {
+    if (scopeDomain) {
+      // born-470: curated scope-domain replaces the generic lookup below.
+      const expectedAgent = SCOPE_DOMAIN_TO_AGENT_ID[scopeDomain];
+      return expectedAgent === agentId ? DOMAIN_MATCH_BONUS : 0;
+    }
     for (const domain of taskDNA.domains) {
       const expectedAgent = TASK_DOMAIN_TO_AGENT_ID[domain.name.toLowerCase()];
       if (expectedAgent && expectedAgent === agentId) {
@@ -239,8 +251,15 @@ export const USER_SURFACE_AGENTS: ReadonlySet<string> = new Set([
  * Returns USER_SURFACE_BONUS when `agentId` is the surface owner of one of the
  * task's surface domains/tags, else 0. Non-surface agents (refactorer, …) never
  * receive it — that is the anti-collapse guarantee.
+ *
+ * @param scopeDomain ROUTE-DOMAIN-SCOPE (born-470, Sprint 359 Task 359-005):
+ *   when truthy, REPLACES the generic `taskDNA.domains`/tags signals lookup below
+ *   (priority, not additive — see {@link SCOPE_DOMAIN_TO_AGENT_ID}). `undefined`
+ *   (the default — every pre-359-005 call site) or `null` (scope-domain flag on but
+ *   no curated match for this scope) both fall through to the generic lookup, so
+ *   this param is 100% opt-in and byte-identical when omitted.
  */
-export function getUserSurfaceBonus(agentId: string, taskDNA: TaskDNA): number {
+export function getUserSurfaceBonus(agentId: string, taskDNA: TaskDNA, scopeDomain?: string | null): number {
   if (!USER_SURFACE_AGENTS.has(agentId)) return 0;
   const signals = [
     ...taskDNA.domains.map((d) => d.name.toLowerCase()),
@@ -252,11 +271,85 @@ export function getUserSurfaceBonus(agentId: string, taskDNA: TaskDNA): number {
     taskDNA.intent.primary === 'security' ||
     signals.some((s) => s === 'auth' || s === 'security' || s === 'rbac');
   if (hasSecuritySignal && agentId === 'api-builder') return 0;
+
+  if (scopeDomain) {
+    // born-470: curated scope-domain replaces the generic signals lookup below.
+    const expectedAgent = SCOPE_DOMAIN_TO_AGENT_ID[scopeDomain];
+    return expectedAgent === agentId ? USER_SURFACE_BONUS : 0;
+  }
+
   for (const s of signals) {
     if (SURFACE_DOMAIN_TO_AGENT_ID[s] === agentId) return USER_SURFACE_BONUS;
   }
   return 0;
 }
+
+// ─── ROUTE-DOMAIN-SCOPE — scope-path domain extraction (born-470) ──────────
+//
+// born-470 (3-sprint-proven, 358-002: APR-XPROC-WIRE): the generic path-proxy
+// domain signal (TaskDNA.domains, populated by intent-classifier's first-path-
+// segment extraction) is too coarse for agent routing. A REPL/Ink task scoped
+// under `src/cli/repl/` extracts the bare domain name `'cli'`, which
+// SURFACE_DOMAIN_TO_AGENT_ID maps to `'api-builder'` — so terminal-UI work was
+// routed to the REST/HTTP specialist purely because `cli` and the api surface
+// happen to share a path segment ('src/cli/...' vs 'src/api/...'), not because
+// the task has anything to do with APIs.
+//
+// This section adds a curated, more specific scope-domain extraction —
+// flag-gated via `RoutingOptions.domainFromScope` (default-off). When enabled
+// and a task's scope matches one of the curated prefixes below, the resulting
+// domain name REPLACES (priority, not additive weight) the generic path-proxy
+// domain for the two domain-driven agent bonuses (`getDomainMatchBonus` path 2,
+// `getUserSurfaceBonus`). Flag-off is byte-identical to pre-359-005 routing.
+
+/** Curated scope-path-prefix → canonical domain name. Order matters: a more
+ *  specific prefix (`src/cli/repl`) must be listed before its broader parent
+ *  (`src/cli`) — `extractScopeDomain` returns the FIRST match. Both entries
+ *  resolve to the same 'terminal-ui' domain today, so the ordering has no
+ *  observable effect yet, but is kept correct for when the two diverge. */
+const SCOPE_DOMAIN_PATTERNS: ReadonlyArray<{ prefix: RegExp; domain: string }> = [
+  { prefix: /^src\/cli\/repl(\/|$)/, domain: 'terminal-ui' },
+  { prefix: /^src\/cli(\/|$)/, domain: 'terminal-ui' },
+  { prefix: /^src\/api(\/|$)/, domain: 'api' },
+  { prefix: /^src\/dashboard(\/|$)/, domain: 'frontend' },
+  { prefix: /^src\/core(\/|$)/, domain: 'core' },
+  { prefix: /^src\/orchestra(\/|$)/, domain: 'orchestration' },
+  { prefix: /^docs(\/|$)/, domain: 'doc' },
+  { prefix: /^src\/connectors(\/|$)/, domain: 'messaging' },
+];
+
+/**
+ * Extract the curated scope-domain for a task from its write scope
+ * (`scope.filesWrite`, then `scope.directories` — the born-470 "path-önekleri"
+ * signal). Returns the first curated-table match across all scope paths, or
+ * `null` when nothing matches (no curated opinion — callers fall through to
+ * the generic taskDNA.domains-driven lookup for that scope).
+ */
+export function extractScopeDomain(scope: TaskScope): string | null {
+  const paths = [...scope.filesWrite, ...scope.directories];
+  for (const path of paths) {
+    for (const { prefix, domain } of SCOPE_DOMAIN_PATTERNS) {
+      if (prefix.test(path)) return domain;
+    }
+  }
+  return null;
+}
+
+/**
+ * Curated scope-domain → owning agent id. Deliberately sparse: only domains
+ * with a genuine built-in specialist agent are listed (verified against
+ * `BUILTIN_AGENT_DOMAINS` in agent-pool.ts). `'terminal-ui'`, `'core'`,
+ * `'orchestration'`, and `'messaging'` have no dedicated built-in agent —
+ * they intentionally map to nothing, which SUPPRESSES the domain/surface
+ * bonus entirely for those scopes (the born-470 fix: a REPL/Ink task no
+ * longer accidentally routes to api-builder) and lets generic activation-rule
+ * scoring (architect/refactorer) decide instead.
+ */
+export const SCOPE_DOMAIN_TO_AGENT_ID: Readonly<Record<string, string>> = {
+  api: 'api-builder',
+  frontend: 'frontend-designer',
+  doc: 'doc-writer',
+};
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -311,6 +404,23 @@ export interface RoutingOptions {
    * Call agentSelectionCache.clear() when pool or config changes.
    */
   agentCache?: boolean;
+  /**
+   * Enable scope-path domain extraction (ROUTE-DOMAIN-SCOPE, born-470,
+   * Sprint 359 Task 359-005). Default-off. When true, `extractScopeDomain`
+   * derives a curated domain name from the task's scope path prefixes
+   * (src/cli/repl|src/cli→terminal-ui, src/api→api, src/dashboard→frontend,
+   * src/core→core, src/orchestra→orchestration, docs→doc,
+   * src/connectors→messaging) and, when a curated match is found, that domain
+   * REPLACES (priority, not additive weight) the generic path-proxy domain
+   * signal for `getDomainMatchBonus`/`getUserSurfaceBonus` — fixing the
+   * born-470 class of bug where a REPL/Ink task under `src/cli/` was routed to
+   * api-builder purely because 'cli' and 'api' share the `SURFACE_DOMAIN_TO_AGENT_ID`
+   * lookup table. Mirrors the kindAffinity/languagePenalty additive-tiebreaker
+   * pattern in spirit (config-gated, non-exclusionary at the option level) but
+   * is a REPLACE at the bonus-lookup level, not an add. Flag-off is
+   * byte-identical to pre-359-005 routing.
+   */
+  domainFromScope?: boolean;
 }
 
 // ─── Agent Selection Cache (module-level singleton) ─────────────────────────
@@ -354,10 +464,16 @@ export function routeTaskV2(
   const kindAffinityEnabled = options?.kindAffinity ?? false;
   const languagePenaltyEnabled = options?.languagePenalty ?? false;
   const agentCacheEnabled = options?.agentCache ?? false;
+  const domainFromScopeEnabled = options?.domainFromScope ?? false;
+  // born-470: hoisted once — identical for every candidate this call.
+  const scopeDomain = domainFromScopeEnabled ? extractScopeDomain(task.scope) : undefined;
 
   // Step 1: Classify task intent
   const taskDNA = classifyIntent(task);
   reasoning.push(`Intent: ${taskDNA.intent.primary} (confidence: ${taskDNA.intent.confidence})`);
+  if (domainFromScopeEnabled) {
+    reasoning.push(`Scope-domain (born-470): ${scopeDomain ? `'${scopeDomain}'` : 'none (no curated match)'}`);
+  }
 
   // ROUTE-1 B3 — when the keyword classifier cannot resolve an intent, fall back to the
   // canonical TaskKind SSOT (scope-shape) instead of 'unknown'. Confident classifications
@@ -473,7 +589,7 @@ export function routeTaskV2(
       const agentResult = selectBestAgent(
         taskDNA, agentPool, cfg, learningData, allExcludeAgents, task.type,
         skillIds, skillAgentAffinityEnabled, kindAffinityEnabled,
-        `${task.title} ${task.description}`, languagePenaltyEnabled,
+        `${task.title} ${task.description}`, languagePenaltyEnabled, scopeDomain,
       );
       agentId = agentResult.agentId;
       agentScore = agentResult.score;
@@ -689,6 +805,7 @@ function selectBestAgent(
   kindAffinity?: boolean,
   taskText?: string,
   languagePenalty?: boolean,
+  scopeDomain?: string | null,
 ): { agentId: string | null; score: number; confidence: ConfidenceLevel; reasoning: string[] } {
   const candidates: ScoredCandidate[] = [];
   const reasoning: string[] = [];
@@ -707,7 +824,7 @@ function selectBestAgent(
     // gets +USER_SURFACE_BONUS and BYPASSES excludes (override + activation), so
     // a user-facing task cannot collapse to refactorer's generic impl@7.
     // ROUTE-1 B2: suppressed for non-build tasks (touch-ups, refactor, doc, audit).
-    const surfaceBonus = buildTask ? getUserSurfaceBonus(id, taskDNA) : 0;
+    const surfaceBonus = buildTask ? getUserSurfaceBonus(id, taskDNA, scopeDomain) : 0;
 
     if (excludeAgents.includes(id)) {
       if (surfaceBonus > 0) {
@@ -744,12 +861,12 @@ function selectBestAgent(
     // agent (api-builder / security-auditor / devops-engineer / …) beats
     // the generic refactorer impl@7 candidate. Refactorer/architect still
     // get impl@7; this is purely an additive tiebreaker.
-    const domainBonus = getDomainMatchBonus(id, getAgentDomain(agent), taskDNA, buildTask);
+    const domainBonus = getDomainMatchBonus(id, getAgentDomain(agent), taskDNA, buildTask, scopeDomain);
     if (domainBonus > 0) {
-      reasoning.push(`Agent '${id}' domain-match bonus: +${domainBonus} (intent=${taskDNA.intent.primary}, domains=[${taskDNA.domains.map(d => d.name).join(', ')}])`);
+      reasoning.push(`Agent '${id}' domain-match bonus: +${domainBonus} (intent=${taskDNA.intent.primary}, domains=[${taskDNA.domains.map(d => d.name).join(', ')}]${scopeDomain ? `, scopeDomain='${scopeDomain}'` : ''})`);
     }
     if (surfaceBonus > 0) {
-      reasoning.push(`Agent '${id}' user-surface bonus: +${surfaceBonus} (domains=[${taskDNA.domains.map(d => d.name).join(', ')}])`);
+      reasoning.push(`Agent '${id}' user-surface bonus: +${surfaceBonus} (domains=[${taskDNA.domains.map(d => d.name).join(', ')}]${scopeDomain ? `, scopeDomain='${scopeDomain}'` : ''})`);
     }
 
     // PCOMP-W5: role-mismatch signal — a review/analyst persona on an implement

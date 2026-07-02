@@ -43,6 +43,19 @@ const DEFAULT_GRACEFUL_TIMEOUT_SECONDS = 15;
 const CONTAINER_PREFIX = 'deckent-w-';
 
 /**
+ * born-468 (WRAPPER-HB-GATE): the in-container wrapper's own heartbeat tick
+ * writes a skeletal fallback heartbeat every 15s so the auditor's stale-worker
+ * detector stays quiet even between the worker's own updates. Left unguarded,
+ * that tick unconditionally overwrites $HBFILE and clobbers any richer
+ * heartbeat the worker itself just wrote (currentAction etc., per
+ * WORKER-GUIDE.md). 40s = ~2.5 wrapper ticks of slack — long enough that a
+ * normal worker write cadence always wins, short enough that a genuinely
+ * stalled worker's heartbeat still refreshes well before the auditor's >2min
+ * stale threshold (auditor.md).
+ */
+export const WRAPPER_HB_STALE_THRESHOLD_SECONDS = 40;
+
+/**
  * Sprint 191 T-001: WSL2-safe memory defaults. Pre-191 hardcoded `8g/12g` proved
  * OOM-hostile on WSL2 hosts (~12-14GB total); cut to 4g/6g to break the exit-137
  * cycle. Cross-checked with `.deckent/config.json` worker_memory_limit/swap.
@@ -591,6 +604,114 @@ export function ensureDeckShadowFile(tasksDir: string): string {
   return shadowHostPath;
 }
 
+// ─── born-468: WRAPPER-HB-GATE (heartbeat staleness gate) ──────────────────
+// The wrapper's background heartbeat tick used to unconditionally overwrite
+// $HBFILE every 15s with a skeletal {workerId,taskId,status,sequence,
+// timestamp,backend} payload — clobbering any richer heartbeat the worker
+// itself just wrote. Gate the write on staleness: only refresh $HBFILE when
+// it is missing or older than WRAPPER_HB_STALE_THRESHOLD_SECONDS, and write
+// it atomically (tmp+mv — same directory ⇒ a single rename syscall) so a
+// concurrent reader (auditor stale-worker scan) never observes a torn write.
+
+/**
+ * Build the POSIX `sh` `write_hb_if_stale()` function definition. Extracted
+ * from {@link buildHeartbeatWrapperLoop} so it is independently invokable in
+ * tests (write it to a script, call `write_hb_if_stale <seq>`) without
+ * running the real 15s-interval background loop.
+ */
+export function buildHeartbeatGateFn(taskId: string): string {
+  return [
+    'write_hb_if_stale() {',
+    '  hb_seq="$1"',
+    '  if [ -f "$HBFILE" ]; then',
+    '    hb_mtime=$(stat -c %Y "$HBFILE" 2>/dev/null || echo 0)',
+    '    hb_now=$(date -u +%s)',
+    '    hb_age=$((hb_now - hb_mtime))',
+    `    if [ "$hb_age" -lt ${WRAPPER_HB_STALE_THRESHOLD_SECONDS} ]; then`,
+    // Fresh heartbeat already on disk — the worker itself is writing it.
+    // Do NOT touch it (born-468: this is the fix — the old loop always wrote).
+    '      return 0',
+    '    fi',
+    '  fi',
+    '  hb_tmp="$HBFILE.hbwrap.$$"',
+    `  echo "{\\"workerId\\":\\"docker-${taskId}\\",\\"taskId\\":\\"${taskId}\\",\\"status\\":\\"EXECUTING\\",\\"sequence\\":$hb_seq,\\"timestamp\\":\\"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\\",\\"backend\\":\\"docker\\"}" > "$hb_tmp"`,
+    '  mv "$hb_tmp" "$HBFILE"',
+    '}',
+  ].join('\n');
+}
+
+/**
+ * Build the full wrapper heartbeat loop: the gate function above plus its
+ * background 15s-interval driver. This is what actually goes into the
+ * generated worker script.
+ */
+export function buildHeartbeatWrapperLoop(taskId: string): string {
+  return [
+    buildHeartbeatGateFn(taskId),
+    '( SEQ=2; while true; do sleep 15; SEQ=$((SEQ+1)); write_hb_if_stale "$SEQ"; done ) &',
+  ].join('\n');
+}
+
+// ─── born-471: ALLOWLIST-SSOT ───────────────────────────────────────────────
+// sprint-spawner.ts's buildAllowedWriteTargets merges scope.directories into
+// the SAME Write()/Edit() target list as scope.filesWrite unconditionally.
+// The worker PROMPT disagrees (prompt-god-template.ts PCOMP-W1, "single write
+// authority"): once an explicit filesWrite list exists it is the SOLE write
+// authority and the directory list is READ/context scope only — a worker told
+// "you may only write these N files" must not simultaneously hold a
+// --allowedTools grant of Write()/Edit() over an entire read-context
+// directory (e.g. docs/adr/ listed for read-context, with no matching docs/
+// entry in filesWrite, would otherwise still be writable). The docker backend
+// is the last hop before the flag reaches the CLI, so it re-derives the
+// allowlist HERE from the task's own on-disk scope, applying the same
+// canonical rule as the prompt — independent of whatever opts.allowedTools
+// the caller computed. (sprint-spawner.ts itself is out of this task's write
+// scope; importing its helpers here would also create an import cycle —
+// sprint-spawner → spawn-backend → spawn-backend-docker → sprint-spawner.)
+
+/** Pure scope shape this module needs — subset of `TaskScope` (core/task-types.ts). */
+export interface DockerAllowedToolsScope {
+  directories?: readonly string[];
+  filesWrite?: readonly string[];
+}
+
+/**
+ * Derive the docker backend's `--allowedTools` string from a task's scope.
+ * `filesWrite` present → SOLE write authority (directories excluded — they
+ * stay read-only context, reachable only via the unscoped Read/Glob/Grep).
+ * `filesWrite` absent → directories become the write-fallback target
+ * (mirrors the prompt's own "no explicit Files list — you may write to any
+ * file within the directories above" wording). `.tasks/` is always included
+ * so the worker can write its own heartbeat/result files — this also means
+ * a task with neither directories nor filesWrite still narrows Write/Edit to
+ * `.tasks/` only, never falls open to unrestricted Write/Edit (a scope-less
+ * task must not silently get the widest possible grant). Pure — exported for
+ * unit tests.
+ */
+export function buildDockerAllowedTools(scope: DockerAllowedToolsScope): string {
+  const directories = normalizeNonEmptyStrings(scope.directories);
+  const filesWrite = normalizeNonEmptyStrings(scope.filesWrite);
+  const writeSource = filesWrite.length > 0 ? filesWrite : directories;
+  const writeTargets = dedupeTrimmed(['.tasks/', ...writeSource]);
+  return `Read,Write(${writeTargets.join(',')}),Edit(${writeTargets.join(',')}),Bash,Glob,Grep`;
+}
+
+function normalizeNonEmptyStrings(values: readonly string[] | undefined): string[] {
+  return (values ?? []).filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+}
+
+function dedupeTrimmed(paths: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of paths) {
+    const trimmed = raw.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    result.push(trimmed);
+  }
+  return result;
+}
+
 // ─── Docker Spawn Backend ─────────────────────────────────────────────────
 
 export class DockerSpawnBackend implements SpawnBackend {
@@ -790,7 +911,10 @@ export class DockerSpawnBackend implements SpawnBackend {
     // maps that to the correct per-provider flag (claude --dangerously-skip-
     // permissions, codex --dangerously-bypass-approvals-and-sandbox, gemini yolo).
     const workerCmd = buildProviderCommand(spec, apiId, containerPromptPath, {
-      allowedTools: opts?.allowedTools,
+      // born-471 (ALLOWLIST-SSOT): re-derived from the task's own on-disk
+      // scope, not trusted verbatim from opts.allowedTools — see the
+      // ALLOWLIST-SSOT block comment above resolveAllowedTools.
+      allowedTools: this.resolveAllowedTools(dir, taskId, opts?.allowedTools),
       autoApprove: true,
       // F1-RE (Sprint 252): resolved model reasoning-effort (claude --effort,
       // codex -c model_reasoning_effort); undefined → no flag (CLI default).
@@ -852,8 +976,10 @@ export class DockerSpawnBackend implements SpawnBackend {
       // period expires). born-466: exit 143 (128+TERM), NOT 0 — exiting 0 made
       // on_exit classify a docker-stop as a clean run (TIMEOUT_WITH_WORK dead).
       `trap 'fsync_file "$RFILE"; fsync_file "$HBFILE"; exit 143' TERM`,
-      // Heartbeat update loop (every 15s) — prevents false stale alerts
-      `( SEQ=2; while true; do sleep 15; SEQ=$((SEQ+1)); echo "{\\"workerId\\":\\"docker-${taskId}\\",\\"taskId\\":\\"${taskId}\\",\\"status\\":\\"EXECUTING\\",\\"sequence\\":$SEQ,\\"timestamp\\":\\"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\\",\\"backend\\":\\"docker\\"}" > "$HBFILE"; done ) &`,
+      // born-468: heartbeat update loop (every 15s) — staleness-gated so it
+      // never clobbers a richer heartbeat the worker itself just wrote; the
+      // fallback write itself is atomic (tmp+mv). See buildHeartbeatWrapperLoop.
+      buildHeartbeatWrapperLoop(taskId),
       'HB_PID=$!',
       `TIMEOUT=\${TASK_TIMEOUT:-${effectiveTimeout}}`,
       // PSL-1 (Sprint 252): feed the prompt per the spec's promptFeed — 'stdin'
@@ -1403,6 +1529,30 @@ export class DockerSpawnBackend implements SpawnBackend {
       debugLog('docker-backend:auth-mode', `taskId=${taskId} failed to read authMode: ${(err as Error).message}`);
     }
     return undefined;
+  }
+
+  /**
+   * born-471 (ALLOWLIST-SSOT): read `scope.directories` + `scope.filesWrite`
+   * from `task-<taskId>.json` and derive the `--allowedTools` string via
+   * {@link buildDockerAllowedTools}. Falls back to the caller-supplied value
+   * when the task JSON is missing/malformed — never blocks a spawn over a
+   * parse failure, mirroring {@link readTaskAuthMode}/{@link readTaskKind}.
+   */
+  private resolveAllowedTools(projectDir: string, taskId: string, fallback: string | undefined): string | undefined {
+    const taskJsonPath = join(projectDir, TASKS_DIR, `task-${taskId}.json`);
+    if (!existsSync(taskJsonPath)) return fallback;
+    try {
+      const raw = readFileSync(taskJsonPath, 'utf-8');
+      const parsed = JSON.parse(raw) as { scope?: { directories?: unknown; filesWrite?: unknown } };
+      const rawDirs = parsed.scope?.directories;
+      const rawFiles = parsed.scope?.filesWrite;
+      const directories = Array.isArray(rawDirs) ? rawDirs.filter((d): d is string => typeof d === 'string') : [];
+      const filesWrite = Array.isArray(rawFiles) ? rawFiles.filter((f): f is string => typeof f === 'string') : [];
+      return buildDockerAllowedTools({ directories, filesWrite });
+    } catch (err) {
+      debugLog('docker-backend:allowed-tools', `taskId=${taskId} failed to parse task JSON: ${(err as Error).message}`);
+      return fallback;
+    }
   }
 
   private acquireSpawnTimeLocks(projectDir: string, taskId: string): void {

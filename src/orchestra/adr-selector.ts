@@ -7,6 +7,7 @@
  * Sprint 146 — Task 146-003
  */
 
+import { existsSync, readdirSync } from 'node:fs';
 import type { Task } from '../core/task-types.js';
 import type { MemoryEntryV2 } from '../core/memory-types.js';
 import { taskKindToAdrDomain, type AdrTaskType } from '../core/work-model.js';
@@ -495,6 +496,54 @@ export function extractOperativeSection(content: string): string | null {
   return null;
 }
 
+// ─── Pointer Resolution (born-469 / ADR-POINTER-PATH) ────────────────
+
+/**
+ * Resolve an ADR id to its real `docs/adr/*.md` file by id-prefix, matching
+ * the filename convention `adr-{class}-{num}-slug.md` (legacy `{num}-slug.md`
+ * also matches, since `adrId` for those is `adr-{num}`) owned by
+ * `core/adr-file-sync.ts` — no re-parsing of file content needed, a directory
+ * listing + prefix match is sufficient.
+ *
+ * born-469: a Tier-2 (constraint) pointer previously always read
+ * `.brain/memory.db <id>` — a path outside worker read-scope (SQLite,
+ * `.brain/` is never in `scope.directories`/`scope.filesRead`), breaking the
+ * G-027 "one pointer away" guarantee. Resolving to the actual docs/adr file
+ * keeps the pointer inside the worker's read scope (`docs/adr/` is always a
+ * read-scope directory injected alongside ADR context).
+ *
+ * Fail-soft by design: a missing directory, an unreadable directory, or no
+ * matching file all return `null` — the caller falls back to the legacy
+ * `.brain/memory.db <id>` pointer rather than emitting a broken path.
+ */
+export function resolveAdrDocPointer(adrId: string, adrDocsDir: string): string | null {
+  try {
+    if (!existsSync(adrDocsDir)) return null;
+    const prefix = `${adrId.toLowerCase()}-`;
+    const match = readdirSync(adrDocsDir)
+      .filter(f => f.toLowerCase().endsWith('.md'))
+      .find(f => f.toLowerCase().startsWith(prefix));
+    return match ? `docs/adr/${match}` : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build the footnote pointer text for a Tier-2 ADR reference.
+ * `adrDocsDir` is opt-in (default: legacy behavior, zero fs access) so
+ * existing callers of {@link buildAdrPromptSection} that do not pass it keep
+ * byte-identical output — resolving against the real `docs/adr/` tree is a
+ * caller decision, not a default.
+ */
+function resolveAdrPointerText(adrId: string, adrDocsDir: string | undefined): string {
+  if (adrDocsDir) {
+    const resolved = resolveAdrDocPointer(adrId, adrDocsDir);
+    if (resolved) return resolved;
+  }
+  return `.brain/memory.db ${adrId}`;
+}
+
 // ─── Prompt Section Builder ──────────────────────────────────────────
 
 /**
@@ -511,6 +560,14 @@ export function extractOperativeSection(content: string): string | null {
  *   rendered condensed — `Active constraint` head + summary + `[full: …]` pointer
  *   — instead of its full amendment-log body. Scope-intersecting ADRs still print
  *   the full body. Defaults to false → byte-for-byte legacy rendering.
+ * @param adrDocsDir - born-469 (ADR-POINTER-PATH), opt-in. Absolute path to the
+ *   `docs/adr/` directory. When provided, condensed-render pointers resolve to
+ *   the real `docs/adr/<file>.md` (inside worker read-scope) via
+ *   {@link resolveAdrDocPointer} instead of the legacy `.brain/memory.db <id>`
+ *   pointer (a path outside worker read-scope — G-027 "one pointer away" was
+ *   broken). Omitted (default): byte-for-byte legacy pointer text, zero fs
+ *   access — existing callers are unaffected. A lookup miss (file not found)
+ *   fails soft to the legacy pointer.
  * @returns Formatted markdown string for prompt injection
  */
 export function buildAdrPromptSection(
@@ -519,6 +576,7 @@ export function buildAdrPromptSection(
   allAdrs?: MemoryEntryV2[],
   adrRender: 'full' | 'operative' = 'full',
   scopeGated: boolean = false,
+  adrDocsDir?: string,
 ): string {
   if (adrs.length === 0) return '';
 
@@ -549,14 +607,14 @@ export function buildAdrPromptSection(
         const marked = extractMarkedSlice(rawContent);
         if (marked) {
           sections.push(
-            `## ${adr.adrId}: ${adr.title}\n\n${constraintHead}${marked}\n\n[full text: .brain/memory.db ${adr.adrId}]`,
+            `## ${adr.adrId}: ${adr.title}\n\n${constraintHead}${marked}\n\n[full text: ${resolveAdrPointerText(adr.adrId, adrDocsDir)}]`,
           );
           continue;
         }
         const contract = extractContractSection(rawContent);
         const contractBlock = contract ? `### Contract (binding)\n\n${contract}\n\n` : '';
         sections.push(
-          `## ${adr.adrId}: ${adr.title}\n\n${constraintHead}${contractBlock}[background constraint — full text: .brain/memory.db ${adr.adrId}]`,
+          `## ${adr.adrId}: ${adr.title}\n\n${constraintHead}${contractBlock}[background constraint — full text: ${resolveAdrPointerText(adr.adrId, adrDocsDir)}]`,
         );
         continue;
       }
@@ -577,7 +635,7 @@ export function buildAdrPromptSection(
             : '';
         const summaryBlock = summaryText ? `${summaryText}\n\n` : '';
         sections.push(
-          `## ${adr.adrId}: ${adr.title}\n\n${constraintHead}${summaryBlock}[full: .brain/memory.db ${adr.adrId}]`,
+          `## ${adr.adrId}: ${adr.title}\n\n${constraintHead}${summaryBlock}[full: ${resolveAdrPointerText(adr.adrId, adrDocsDir)}]`,
         );
         continue;
       }

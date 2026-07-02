@@ -1,0 +1,67 @@
+{
+  "id": "file-watch-hygiene",
+  "source": "builtin",
+  "name": "File Watch Hygiene",
+  "version": "0.1.0",
+  "description": "fs.watch + always-on poll fallback, unref'd handles, store-replay on attach, dedup and torn-write tolerance",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "core"
+          }
+        },
+        "score": 8
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "autoActivate": {
+    "keywords": [
+      "fs.watch",
+      "file-watch",
+      "poll-fallback",
+      "chokidar",
+      "watcher"
+    ]
+  },
+  "entrypoint": "SKILL.md",
+  "category": "tool",
+  "triggers": [
+    "fs.watch",
+    "file-watch",
+    "poll-fallback",
+    "unref",
+    "debounce",
+    "dedup",
+    "atomic-read",
+    "chokidar",
+    "watcher",
+    "store-replay"
+  ],
+  "stackDetection": {
+    "files": [],
+    "dependencies": [],
+    "commands": []
+  },
+  "composableWith": [
+    "typescript-expert",
+    "performance-optimizer"
+  ],
+  "priority": 6,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  }
+}

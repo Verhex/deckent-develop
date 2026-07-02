@@ -4,12 +4,18 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-357-015-fix | Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L | high | sprint-357 | active |
+| debt-357-015-fix | Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L | critical | sprint-357 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-359-001 | Tech debt from 359-001: Added normalizeStructuredTaskDependencies(tasks, options | normal | sprint-359 | resolved |
+| debt-359-003 | Tech debt from 359-003: born-466 parity implemented in buildWorkerCommand() (src | normal | sprint-359 | resolved |
+| debt-359-008 | Tech debt from 359-008: Implemented Simple-Mode as a SECOND, orthogonal visibili | normal | sprint-359 | resolved |
+| debt-359-011 | Tech debt from 359-011: 3 tools implemented in a single module (src/mcp/tools/ca | normal | sprint-359 | resolved |
+| debt-359-012 | Tech debt from 359-012: SCOPE-DEFECT self-flag (found before coding, documented  | normal | sprint-359 | resolved |
+| debt-359-013 | Tech debt from 359-013: APR-HISTORY: standalone GET /api/approvals/history endpo | normal | sprint-359 | resolved |
 | debt-358-003 | Tech debt from 358-003: New src/cli/helpers/detached-start.ts exports spawnDetac | normal | sprint-358 | resolved |
 | debt-358-004 | Tech debt from 358-004: REPL-DISPATCH-PARITY (MASTER-PLAN Sıra-66/REPL-001 + Sır | normal | sprint-358 | resolved |
 | debt-358-005 | Tech debt from 358-005: Wired both required consumers into chat-native.ts's /hel | normal | sprint-358 | resolved |

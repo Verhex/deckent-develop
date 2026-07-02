@@ -1,0 +1,61 @@
+{
+  "id": "ink-tui",
+  "source": "builtin",
+  "name": "Ink TUI",
+  "version": "0.1.0",
+  "description": "Ink/React-CLI patterns: Static/anchor/input-pinned layout, raw-mode + NO_COLOR guards, testing without mounting Ink",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "terminal-ui"
+          }
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "framework",
+  "triggers": [
+    "ink",
+    "tui",
+    "react-cli",
+    "static",
+    "raw-mode",
+    "useinput",
+    "stdin",
+    "no-color",
+    "terminal-ui",
+    "cli-render"
+  ],
+  "stackDetection": {
+    "files": [],
+    "dependencies": [
+      "ink"
+    ],
+    "commands": []
+  },
+  "composableWith": [
+    "typescript-expert",
+    "react-specialist",
+    "testing-expert"
+  ],
+  "priority": 6,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  }
+}

@@ -14,6 +14,8 @@ Dashboard: deckent web
 | analyze | `deckent_analyze` |
 | audit | `deckent_audit` |
 | autonomous | `deckent_autonomous` |
+| autonomous-surface | `deckent_autonomous_surface` |
+| catalog-parity | `deckent_catalog_parity` |
 | checkpoint | `deckent_checkpoint` |
 | cleanup | `deckent_cleanup` |
 | config | `deckent_config` |
@@ -44,7 +46,7 @@ Dashboard: deckent web
 | usage | `deckent_usage` |
 | watch | `deckent_watch` |
 
-_Total: 33 MCP tools_
+_Total: 35 MCP tools_
 
 **Key operational tools:** `deckent_audit`, `deckent_nervous`, `deckent_watch`, `deckent_recover`, `deckent_status`, `deckent_memory_query`
 

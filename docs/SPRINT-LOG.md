@@ -8642,3 +8642,40 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 358-017: CAT-TYPE-UNIFY — catalog-render tipini tool-catalog'a bağla (357-002 kalanı) (DONE)
 
 ---
+## Sprint 359 — sprint-359
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-02
+**Duration:** 1326s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 16 |
+| Completed | 16 |
+| Tech Debt | 6 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1325825ms |
+
+### Tasks
+
+- 359-001: DEP-NORMALIZE — dependency-ref'leri plan-yazımında slot-ID'ye çevir (born-465) (GO_WITH_TECH_DEBT)
+- 359-002: WRAPPER-HB-GATE + ALLOWLIST-SSOT (born-468 + born-471) (DONE)
+- 359-003: TMUX-TIMEOUT-PARITY — tmux wrapper'ına 466-ailesi paritesi (GO_WITH_TECH_DEBT)
+- 359-004: ADR-POINTER-PATH — tiered-injection pointer'ı erişilebilir dosyaya (born-469) (DONE)
+- 359-005: ROUTE-DOMAIN-SCOPE — domain-sinyalini scope-path'ten türet (born-470, flag'li) (DONE)
+- 359-006: TOOL-REG-2 — dynamic-schema-override + generation-memo dilimi (Sıra-24 devam) (DONE)
+- 359-007: TERM-COMPAT — REPL compat test-matrisi + PTY smoke (Sıra-52) (DONE)
+- 359-008: TERM-SIMPLE — Simple-Mode edition (Sıra-53) (GO_WITH_TECH_DEBT)
+- 359-009: NL-DISPATCH-EVIDENCE — agenticDispatch default kararı için kanıt-paketi (Sıra-57) (DONE)
+- 359-010: F7-HARDEN — terminal hardening dilimi: session-history + copy-paste (Sıra-65) (DONE)
+- 359-011: PARITY-CLI-MCP — agent/skill/memory_manage + cost tool paritesi (Sıra-86 dilim) (GO_WITH_TECH_DEBT)
+- 359-012: AGSK-EXPAND — katalog genişleme dilim-1: 3 yeni horizontal skill (Sıra-85) (GO_WITH_TECH_DEBT)
+- 359-013: APR-HISTORY — dashboard onay-geçmişi paneli (Sıra-71) (GO_WITH_TECH_DEBT)
+- 359-014: RUNTIME-GITIGNORE — çalışma-zamanı artefakt hijyeni (DONE)
+- 359-015: TOOL-HOOK-SEAM — plugin/hook seam çekirdeği (Sıra-84) (DONE)
+- 359-016: AUTONOMOUS-MCP — autonomous start/backlog/status MCP yüzeyi (Sıra-74 dilim) (DONE)
+
+---

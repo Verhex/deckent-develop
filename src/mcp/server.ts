@@ -24,7 +24,7 @@ init → set_directives → plan → start → status → review → retro → c
 ## Sprint Lifecycle
 PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 
-## Tools (37)
+## Tools (42)
 - deckent_init: Initialize Deckent in the current project directory
 - deckent_set_directives: Write sprint goals and task definitions to DIRECTIVES.md
 - deckent_plan: Generate task plan from DIRECTIVES (mode: ai/structured/auto)
@@ -61,6 +61,11 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 - deckent_process: Process-mode execution surface (submit an ExecutionRequest → policy-gated auto-run or park; status/result by executionId — ERP / business automation)
 - deckent_usage: Show token/limit consumption from Claude Code transcripts (model table or sprint task breakdown + cache-gate)
 - deckent_cost: Show cost config: budget limits, per-model pricing (input/output per MTok), and today's spend from the resource log
+- deckent_agent_manage: Manage the agent pool: add/remove/promote agents (CLI parity)
+- deckent_skill_manage: Manage the skill pool: add/remove + marketplace list (CLI parity)
+- deckent_memory_manage: Manage project memory: insert/update entries + trigger decay (CLI parity)
+- deckent_autonomous_backlog: List/add/remove autonomous-engine backlog entries
+- deckent_autonomous_status: Read-only autonomous-engine status snapshot
 - deckent_kpi: Show the KPI scorecard for a sprint — returns { sprintId, kpis } with cost, token, cache, retry, completion, and quality metrics
 
 ## Resources (8)

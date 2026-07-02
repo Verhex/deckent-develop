@@ -114,7 +114,7 @@ import {
 
 // ─── Sub-module imports ──────────────────────────────────────────
 import { resolveTaskModel, parsePatterns, deduplicatePatterns } from './model-selector.js';
-import { createTask, extractScopeFromDirective, parseStructuredDirectives, plannerTaskToParams } from './task-builder.js';
+import { createTask, extractScopeFromDirective, parseStructuredDirectives, plannerTaskToParams, normalizeStructuredTaskDependencies } from './task-builder.js';
 
 // ─── BrainError ──────────────────────────────────────────────────
 import { BrainError } from './sprint-lifecycle.js';
@@ -452,6 +452,13 @@ export async function planSprint(
       }, seq++));
     }
   }
+
+  // born-465 wire (359-001's honest debt, CC-paid): resolve every dependency
+  // ref (title-prefix / "Task N" / index) to a concrete slot-id IN the written
+  // task JSON, so all three runtime layers (wave-enforcement, scheduler graph,
+  // continuous-dispatch gate) see the same ids. Unresolvable refs WARN+drop
+  // (or throw under dependency_ref_strict) per the 358-010 loud contract.
+  normalizeStructuredTaskDependencies(tasks);
 
   // Deadlock check
   const deadlocks = detectDeadlocks(tasks);

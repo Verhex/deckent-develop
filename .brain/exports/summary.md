@@ -46,6 +46,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-359 Learnings** (sprint-359): ## Sprint sprint-359 Learnings
+- DEP-NORMALIZE — dependency-ref'leri plan-yazımında slot-ID'ye çevir (born-465): GO_W...
 - **Sprint sprint-358 Learnings** (sprint-358): ## Sprint sprint-358 Learnings
 - REPL-DETACHED-START — REPL'den kilitlemeyen sprint-start: GO_WITH_TECH_DEBT — New sr...
 - **Sprint sprint-357 Learnings** (sprint-357): ## Sprint sprint-357 Learnings
@@ -71,14 +73,9 @@
 - W0-9 CRED-PER...
 - **Sprint sprint-346 Learnings** (sprint-346): ## Sprint sprint-346 Learnings
 - F07 — fix reference CLI (hand-curated only): NO_GO — Worker exited without writing r...
-- **Sprint sprint-345 Learnings** (sprint-345): ## Sprint sprint-345 Learnings
-
-## Gains
-- 345-001 — A01 — guide onboarding-core — A01 audit file created.
-- 345-002 ...
 
 ## Active Technical Debt
-- [HIGH] Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L
+- [CRITICAL] Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -125,4 +122,4 @@
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: stale_heartbeat
 
-_Total entries: 872 | Generated: 2026-07-02_
+_Total entries: 881 | Generated: 2026-07-02_

@@ -1,5 +1,25 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-359 Learnings
+- Sprint sprint-359 Learnings: ## Sprint sprint-359 Learnings
+- DEP-NORMALIZE — dependency-ref'leri plan-yazımında slot-ID'ye çevir (born-465): GO_WITH_TECH_DEBT — Added normalizeStructuredTaskDependencies(tasks, options) to task-builder.ts: given the FULL completed structured-plan t
+- TMUX-TIMEOUT-PARITY — tmux wrapper'ına 466-ailesi paritesi: GO_WITH_TECH_DEBT — born-466 parity implemented in buildWorkerCommand() (src/orchestra/tmux.ts:150): timeout now uses `timeout -k 30 $TSEC .
+- TERM-SIMPLE — Simple-Mode edition (Sıra-53): GO_WITH_TECH_DEBT — Implemented Simple-Mode as a SECOND, orthogonal visibility filter in chat-mode.ts (not a 3rd ChatMode union state, per t
+- PARITY-CLI-MCP — agent/skill/memory_manage + cost tool paritesi (Sıra-86 dilim): GO_WITH_TECH_DEBT — 3 tools implemented in a single module (src/mcp/tools/catalog-parity.ts) as specified: deckent_agent_manage (add/remove/
+- AGSK-EXPAND — katalog genişleme dilim-1: 3 yeni horizontal skill (Sıra-85): GO_WITH_TECH_DEBT — SCOPE-DEFECT self-flag (found before coding, documented in .plan): declared scope.directories name `src/cli/builtins/ski
+- APR-HISTORY — dashboard onay-geçmişi paneli (Sıra-71): GO_WITH_TECH_DEBT — APR-HISTORY: standalone GET /api/approvals/history endpoint module (src/api/approval-history-endpoint.ts) over ApprovalS
+
+## Gains
+- 359-002 — WRAPPER-HB-GATE + ALLOWLIST-SSOT (born-468 + born-471) — born-468 WRAPPER-HB-GATE: extracted buildHeartbeatGateFn()/buildHeartbeatWrapperLoop() — the wrap...
+- 359-004 — ADR-POINTER-PATH — tiered-injection pointer'ı erişilebilir dosyaya (born-469) — born-469 fix: added exported resolveAdrDocPointer(adrId, adrDocsDir) which readdirSync()s the giv...
+- 359-005 — ROUTE-DOMAIN-SCOPE — domain-sinyalini scope-path'ten türet (born-470, flag'li) — born-470 fix: introduced RoutingOptions.domainFromScope (default-off) in src/core/routing-engine.ts.
+- 359-006 — TOOL-REG-2 — dynamic-schema-override + generation-memo dilimi (Sıra-24 devam) — TOOL-REG-2 (Sıra-24 devam) — iki bağımsız-ama-kompoze parça, tool-availability.ts'nin 'two indepe...
+- 359-007 — TERM-COMPAT — REPL compat test-matrisi + PTY smoke (Sıra-52) — Key finding: ink-testing-library is NOT a project dependency (package.json has only `ink`; confir...
+- 359-009 — NL-DISPATCH-EVIDENCE — agenticDispatch default kararı için kanıt-paketi (Sıra-57) — Sira-57 karar-kapisi kanit paketi -- KARAR VERILMEDI, yalniz kanit uretildi (nogo: default degist...
+- 359-010 — F7-HARDEN — terminal hardening dilimi: session-history + copy-paste (Sıra-65) — Sıra-65 F7-HARDEN input-history çekirdeği: .deckent/settings/repl-history (satır-tabanlı, append-...
+- 359-014 — RUNTIME-GITIGNORE — çalışma-zamanı artefakt hijyeni — Investigated .gitignore before touching anything: it already contains all three entries this task...
+- …and 2 more delivered
+
 ## Sprint sprint-358 Learnings
 - Sprint sprint-358 Learnings: ## Sprint sprint-358 Learnings
 - REPL-DETACHED-START — REPL'den kilitlemeyen sprint-start: GO_WITH_TECH_DEBT — New src/cli/helpers/detached-start.ts exports spawnDetachedDeckent(argv, opts): spawns dist/cli/entry.js as a fully deta

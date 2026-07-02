@@ -147,7 +147,11 @@ export function buildWorkerCommand(
     // RFILE env var avoids nested quoting issues; trap fires on ANY exit (normal, crash, timeout)
     // Use single-quoted JSON to prevent bash brace expansion on { }
     const trap = `RFILE=${resultFile}; trap '[ -f $RFILE ] || echo '"'"'${fallbackJson}'"'"' > $RFILE' EXIT`;
-    cmd = `${trap}; timeout ${tSec} sh -c '${cmd.replace(/'/g, "'\\''")}' || echo "WORKER_TIMEOUT" > ${timeoutMarker}`;
+    // born-466 parity (spawn-backend-docker.ts): -k 30 hard-KILLs a TERM-swallowing
+    // worker; the exit code is captured explicitly instead of being masked by a
+    // blind `|| echo`. The .timeout marker is timeout-PURE — only 124 (TERM-timeout)
+    // / 137 (KILL) qualify, and never when a real .result already exists.
+    cmd = `${trap}; timeout -k 30 ${tSec} sh -c '${cmd.replace(/'/g, "'\\''")}'; CLAUDE_EXIT=$?; if [ "$CLAUDE_EXIT" -eq 124 ] || [ "$CLAUDE_EXIT" -eq 137 ]; then [ ! -f "${resultFile}" ] && echo "WORKER_TIMEOUT" > "${timeoutMarker}"; fi`;
   }
   return cmd;
 }

@@ -32,6 +32,8 @@ import { registerProcessTool } from './process.js';
 import { registerUsageTool } from './usage.js';
 import { registerKpiTool } from './kpi.js';
 import { registerCostTool } from './cost.js';
+import { registerCatalogParityTools } from './catalog-parity.js';
+import { registerAutonomousSurfaceTools } from './autonomous-surface.js';
 
 /**
  * One entry in the canonical MCP tool catalog.
@@ -94,6 +96,13 @@ export const TOOL_CATALOG: McpToolCatalogEntry[] = [
   { name: 'deckent_usage', description: 'Show token/limit consumption from Claude Code transcripts (model table or sprint task breakdown + cache-gate)', readOnly: true },
   { name: 'deckent_kpi', description: 'Show the KPI scorecard for a sprint — returns { sprintId, kpis } with cost, token, cache, retry, completion, and quality metrics', readOnly: true },
   { name: 'deckent_cost', description: 'Show cost config: budget limits, per-model pricing (input/output per MTok), and today\'s spend from the resource log', readOnly: true },
+  // PARITY-CLI-MCP (359-011) + AUTONOMOUS-MCP (359-016) — registered by CC debt-payment
+  // (both modules landed with honest "not wired into live server" GO_WITH_TECH_DEBT notes).
+  { name: 'deckent_agent_manage', description: 'Manage the agent pool: add/remove/promote agents (CLI parity)', readOnly: false },
+  { name: 'deckent_skill_manage', description: 'Manage the skill pool: add/remove + marketplace list (CLI parity)', readOnly: false },
+  { name: 'deckent_memory_manage', description: 'Manage project memory: insert/update entries + trigger decay (CLI parity; query via deckent_memory_query)', readOnly: false },
+  { name: 'deckent_autonomous_backlog', description: 'List/add/remove autonomous-engine backlog entries', readOnly: false },
+  { name: 'deckent_autonomous_status', description: 'Read-only autonomous-engine status snapshot', readOnly: true },
 ];
 
 /** Canonical count of registered MCP tools, derived from {@link TOOL_CATALOG}. */
@@ -133,4 +142,6 @@ export function registerTools(server: McpServer): void {
   registerUsageTool(server);
   registerKpiTool(server);
   registerCostTool(server);
+  registerCatalogParityTools(server);
+  registerAutonomousSurfaceTools(server);
 }

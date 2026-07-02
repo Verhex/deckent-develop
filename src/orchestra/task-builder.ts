@@ -519,6 +519,54 @@ export function resolveTaskDependenciesLoud(
   return { resolved, warnings };
 }
 
+/**
+ * born-465 — Normalize EVERY task's `dependencies` from raw DIRECTIVES refs
+ * (title-prefix / "Task N" / integer-index / plan-slot id) into concrete
+ * slot-ids, once the full structured-plan task list has been built.
+ *
+ * The structured-plan path (sprint-planner.ts `planSprint`) writes
+ * `src.dependencies` straight through to `createTask({ dependencies })` and
+ * never resolves title-prefix/"Task N" refs before the task list is
+ * serialized to `.tasks/task-*.json` — unlike the AI-planner path
+ * (`normalizePlannerDependencies`, planner.ts:904), which already normalizes
+ * at construction time. Three runtime layers then disagree on how to read a
+ * raw (unresolved) ref: wave-dispatch resolves it inline, the FIFO scheduler
+ * drops it, and planContinuous stalls forever waiting on a dependency id that
+ * never appears. Calling this once the full task list (debt + directive
+ * tasks) is built — and before the tasks are written to disk — makes every
+ * runtime layer see the same resolved slot-id shape.
+ *
+ * Mutates `dependencies` on each task IN PLACE, mirroring
+ * `normalizePlannerDependencies`'s contract. Reuses `resolveTaskDependenciesLoud`
+ * (born-458 / 358-010) per task, so an unresolved ref keeps the exact same
+ * WARN+drop / strict-throw contract already proven for that path — this adds
+ * no new resolution policy, it only runs the existing one earlier, for the
+ * structured-plan path.
+ *
+ * @param tasks Full completed task list (debt + directive tasks). Only `id`,
+ *   `title`, `dependencies` are read; `dependencies` is rewritten on each entry.
+ * @param options.strict Mirrors `config.dependency_ref_strict` (default off) —
+ *   throws on the first unresolved ref instead of warning. Caller wires this
+ *   from config; this function does not read config itself.
+ * @returns every unresolved ref across the whole list (already WARN'd to
+ *   stderr per-task by `resolveTaskDependenciesLoud`, unless strict threw first).
+ */
+export function normalizeStructuredTaskDependencies(
+  tasks: Array<{ id: string; title: string; dependencies: string[] }>,
+  options: ResolveTaskDependenciesLoudOptions = {},
+): { warnings: DependencyRefWarning[] } {
+  const warnings: DependencyRefWarning[] = [];
+  for (const task of tasks) {
+    if (!task.dependencies || task.dependencies.length === 0) continue;
+    const { resolved, warnings: taskWarnings } = resolveTaskDependenciesLoud(
+      task.id, task.dependencies, tasks, options,
+    );
+    warnings.push(...taskWarnings);
+    task.dependencies = resolved;
+  }
+  return { warnings };
+}
+
 const VALID_PRIORITIES: readonly string[] = ['CRITICAL', 'HIGH', 'NORMAL', 'LOW'];
 
 /**

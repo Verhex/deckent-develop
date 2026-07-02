@@ -1,0 +1,68 @@
+{
+  "id": "sh-portability",
+  "source": "builtin",
+  "name": "POSIX-sh Portability",
+  "version": "0.1.0",
+  "description": "Container/wrapper shell scripting traps: $? masking, local, trap exit codes, timeout -k, untracked-git in diff detection",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "orchestration"
+          }
+        },
+        "score": 8
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "autoActivate": {
+    "keywords": [
+      "trap",
+      "posix",
+      "sh -c",
+      "exit code",
+      "timeout -k",
+      "dash"
+    ]
+  },
+  "entrypoint": "SKILL.md",
+  "category": "tool",
+  "triggers": [
+    "posix-sh",
+    "shell",
+    "trap",
+    "exit-code",
+    "timeout",
+    "sh-compat",
+    "dash",
+    "local",
+    "untracked-git",
+    "wrapper-script"
+  ],
+  "stackDetection": {
+    "files": [],
+    "dependencies": [],
+    "commands": []
+  },
+  "composableWith": [
+    "devops-engineer",
+    "typescript-expert"
+  ],
+  "priority": 6,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  }
+}
