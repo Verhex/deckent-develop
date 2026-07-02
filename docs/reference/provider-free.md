@@ -163,7 +163,7 @@ Provider-free is complete across all backends with the following known constrain
 
 ## Related Documentation
 
-- [ADR-066: Provider Independence](../adr/066-provider-independence.md) — architectural decision record
+- [ADR-066: Provider Independence](../adr/adr-g-008-provider-abstraction-fleet-usage.md) — architectural decision record
 - [Multi-Provider Guide](./multi-provider.md) — per-provider setup and configuration
 - [Config Reference](./config-reference.md) — full configuration options
 - [Model Registry](../../src/core/model-registry.ts) — canonical model→provider resolver

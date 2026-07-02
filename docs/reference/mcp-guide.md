@@ -32,7 +32,7 @@ Deckent, [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) üzeri
    - [deckent://config](#5-deckentconfig)
    - [deckent://retro](#6-deckentretro)
    - [deckent://tasks](#7-deckenttasks)
-   - [deckent://agents](#8-decktentagents)
+   - [deckent://agents](#8-deckentagents)
 5. [Tipik Kullanım Akışları](#tipik-kullanım-akışları)
 
 ---

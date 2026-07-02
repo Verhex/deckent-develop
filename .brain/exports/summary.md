@@ -129,4 +129,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: stale_heartbeat
 
-_Total entries: 839 | Generated: 2026-07-01_
+_Total entries: 839 | Generated: 2026-07-02_
