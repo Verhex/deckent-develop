@@ -107,6 +107,9 @@ export const TOOL_CATALOG: McpToolCatalogEntry[] = [
   // DEFER-002 (361-014) — nervous edit/undo plan-tools (exec-free)
   { name: 'deckent_nervous_edit', description: 'Edit-and-accept a pending nervous suggestion (returns an exec-free plan)', readOnly: true },
   { name: 'deckent_nervous_undo', description: 'Plan an undo for the last accepted nervous suggestion (honest-unsupported when unavailable)', readOnly: true },
+  // DEFER-001 (363-011) — autonomous approval decisions
+  { name: 'deckent_autonomous_approve', description: 'Approve an approval-required autonomous backlog entry', readOnly: false },
+  { name: 'deckent_autonomous_reject', description: 'Reject an approval-required autonomous backlog entry', readOnly: false },
 ];
 
 /** Canonical count of registered MCP tools, derived from {@link TOOL_CATALOG}. */
