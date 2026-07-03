@@ -8,8 +8,8 @@ import { DECKENT_MCP_INSTRUCTIONS } from '../../src/mcp/server.js';
  */
 
 describe('MCP Server Instructions', () => {
-  it('should declare 44 tools in the instructions header', () => {
-    expect(DECKENT_MCP_INSTRUCTIONS).toContain('## Tools (44)');
+  it('should declare 46 tools in the instructions header', () => {
+    expect(DECKENT_MCP_INSTRUCTIONS).toContain('## Tools (46)');
   });
 
   it('should list deckent_memory_query in instructions', () => {
