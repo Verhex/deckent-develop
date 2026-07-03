@@ -414,8 +414,41 @@ export async function planSprint(
       if (src.provider && isAdapterProvider(src.provider) && src.forceModel && !modelRegistry.has(src.forceModel)) {
         ensureOllamaModelRegistered(src.forceModel);
       }
-      const resolvedModel = recommendation.modelConstraint ??
-        resolveTaskModel(src.title, src.description, src.scope, config, parsedPatterns, src.forceModel, undefined, src.provider);
+
+      // born-479 (362-002 MODEL-DROP-FIX): a `- Model:` directive is a
+      // deterministic user override and MUST win outright. Previously
+      // `resolvedModel` ran forceModel through
+      // `recommendation.modelConstraint ?? resolveTaskModel(...)` — when the
+      // directive had no explicit `- Provider:` line (e.g. sprint-361's
+      // `- Model: gpt-5` + `- Backend: subprocess`, no Provider line),
+      // resolveTaskModel defaulted the target provider to the registry
+      // default ('claude'), found gpt-5 unavailable there, and silently
+      // rewrote it to the claude tier-equivalent ('opus') — while
+      // task-router later (correctly) re-inferred provider='codex' from the
+      // still-intact forceModel, leaving a written task JSON with a
+      // mismatched model/provider pair (task.model='opus', task.provider=
+      // 'codex'). forceModel now always resolves verbatim, independent of
+      // provider presence/mismatch and of recommendation.modelConstraint
+      // (which only ever constrains auto-selected, non-forced models). An
+      // honest WARN fires when the model is not registered anywhere in the
+      // catalog at all (adapter-provider tags are always accepted — Sprint
+      // 236 pass-through contract); the override is preserved either way —
+      // silent substitution is never acceptable.
+      let resolvedModel: ModelType;
+      if (src.forceModel) {
+        resolvedModel = src.forceModel;
+        const isAdapterPassthrough = !!(src.provider && isAdapterProvider(src.provider));
+        if (!isAdapterPassthrough && !modelRegistry.has(src.forceModel)) {
+          void notify(
+            'progress', sprintId,
+            '[Brain] plan:model-override-unknown',
+            `Directive "- Model: ${src.forceModel}" for task "${src.title}" is not in the model catalog — preserving the override as-is (no silent fallback). Verify the model id.`,
+          );
+        }
+      } else {
+        resolvedModel = recommendation.modelConstraint ??
+          resolveTaskModel(src.title, src.description, src.scope, config, parsedPatterns, undefined, undefined, src.provider);
+      }
       const resolvedEffort = src.forceEffort ?? 'normal';
       tasks.push(createTask({
         title: src.title,

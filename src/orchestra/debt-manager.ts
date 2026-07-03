@@ -117,6 +117,22 @@ function recordDebtEntry(
         originSprintId: debtSprint.sprint_id,
         sprintsOpen: 0,
         debtSource: source,
+        // 362-001: producer-side wiring for the Sprint 179 W1-1 scope-inheritance
+        // feature. `injectCriticalDebtTasks` (and the sprint-planner debt mapper)
+        // READ `meta.originScope`/`meta.class`, but this — the runtime debt
+        // producer — never WROTE them, so every persisted debt fell back to the
+        // broad `src/` fallback scope ("No origin scope on debt …"). Persist the
+        // origin task's writable surface so the auto-injected fix task targets the
+        // correct area instead of all of `src/`. `class` defaults to 'standard';
+        // the honest-closure `verified-no-result` classification is a separate
+        // Brain-level lifecycle concern (see 362-001 result notes) and is not set
+        // here. NOTE: additive only — retroactively unaffects rows already written
+        // without originScope.
+        class: 'standard',
+        originScope: {
+          directories: [...(task.scope?.directories ?? [])],
+          filesWrite: [...(task.scope?.filesWrite ?? [])],
+        },
       },
     });
   } finally {

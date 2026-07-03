@@ -2436,7 +2436,27 @@ export async function runFixPhase(
             { honest: true }, fixResult,
           );
           if (fixEval === TaskEvaluation.DONE && fixTask.fixForTaskId) {
-            resolveDebt(projectRoot, `debt-${fixTask.fixForTaskId}`, sprint.id);
+            // 362-001-fix: resolve the debt this fix chain was spawned to clear,
+            // walking the fixForTaskId chain to its ROOT — not just the immediate
+            // parent. A DIRECT fix (fixForTaskId → origin task) is the original
+            // single call. But a FIX-OF-A-FIX (this task's fixForTaskId points at
+            // another fix task that went NO_GO) breaks the link: NO_GO never mints
+            // a debt row via recordDebtEntry, so `debt-<parentFixId>` does not
+            // exist and resolving only it is a silent no-op — the origin debt the
+            // chain exists to clear (e.g. debt-357-015-fix) stays `active` forever
+            // and re-injects every sprint. Walk up to the root; resolveDebt is
+            // idempotent (no-op on a missing / already-resolved row) so resolving
+            // the whole chain is safe, and a `seen` set bounds the walk against a
+            // malformed self / cyclic fixForTaskId. Degrades to the prior single-
+            // resolve when the ancestor task file is absent (ancestorId → undefined).
+            const seenFixChain = new Set<string>([fixTask.id]);
+            let ancestorId: string | undefined = fixTask.fixForTaskId;
+            while (ancestorId && !seenFixChain.has(ancestorId)) {
+              seenFixChain.add(ancestorId);
+              resolveDebt(projectRoot, `debt-${ancestorId}`, sprint.id);
+              const ancestorTask: Task | null = readJsonSafe<Task>(join(tasksPath, `task-${ancestorId}.json`));
+              ancestorId = ancestorTask?.fixForTaskId;
+            }
           }
           // Update original task evaluation if fix succeeded
           const originalReconciled =

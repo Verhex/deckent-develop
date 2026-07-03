@@ -340,3 +340,136 @@ export function evaluateLimitGate(
     reason: `all usage windows below warn threshold ${thresholds.warnPct}% (highest: ${worst.name} at ${worst.pct}%)`,
   };
 }
+
+// ─── Per-window threshold resolution (LIMITS-WARN-FIELDS, 361-002 debt) ─────
+//
+// 361-002 shipped a per-window (session vs weekly) verdict evaluator, but it
+// lives in cli/commands/limits.ts and its warn floor is hardcoded to
+// `min(DEFAULT_LIMIT_GATE_THRESHOLDS.warnPct, block)` — there is no way to
+// configure an independent warn threshold per window. That gap is the debt
+// this closes. Per ADR-D-004 C3 ("surfaces MUST NOT host reusable business
+// logic"), the resolution + evaluation primitives belong here in core/, not
+// in cli/ — a follow-up task wires cli/commands/limits.ts's `limit_gate`
+// config (session_warn_pct / weekly_warn_pct fields) to the functions below.
+
+/**
+ * Per-window thresholds: one pair for the session window, one shared pair
+ * for both weekly windows (week (all models) + week (Fable)) — mirrors the
+ * session/weekly grouping already used by cli/commands/limits.ts.
+ */
+export interface WindowedLimitGateThresholds {
+  readonly session: LimitGateThresholds;
+  readonly weekly: LimitGateThresholds;
+}
+
+/**
+ * Optional block/warn overrides for resolving per-window thresholds.
+ * Config-format-agnostic by design: this core module does not know about any
+ * particular config file's key names (e.g. `session_max_pct`) — the caller
+ * reads its own config and passes the parsed numbers in.
+ */
+export interface WindowedLimitGateOverrides {
+  readonly sessionBlockPct?: number;
+  readonly sessionWarnPct?: number;
+  readonly weeklyBlockPct?: number;
+  readonly weeklyWarnPct?: number;
+}
+
+/**
+ * Resolve independent session/weekly threshold pairs from optional
+ * overrides. Byte-identical default when no `*WarnPct` override is supplied:
+ * block defaults to `DEFAULT_LIMIT_GATE_THRESHOLDS.blockPct`, warn defaults
+ * to `min(DEFAULT_LIMIT_GATE_THRESHOLDS.warnPct, block)` — the exact
+ * pre-362-004 `min(70, block)` formula (the 361-002 debt). An explicit warn
+ * override is still clamped to never exceed its window's block ceiling, so a
+ * configured warn threshold can never fire after block already would.
+ */
+export function resolveWindowedLimitGateThresholds(
+  overrides: WindowedLimitGateOverrides = {},
+): WindowedLimitGateThresholds {
+  const sessionBlock = overrides.sessionBlockPct ?? DEFAULT_LIMIT_GATE_THRESHOLDS.blockPct;
+  const weeklyBlock = overrides.weeklyBlockPct ?? DEFAULT_LIMIT_GATE_THRESHOLDS.blockPct;
+  const sessionWarn =
+    overrides.sessionWarnPct ?? Math.min(DEFAULT_LIMIT_GATE_THRESHOLDS.warnPct, sessionBlock);
+  const weeklyWarn =
+    overrides.weeklyWarnPct ?? Math.min(DEFAULT_LIMIT_GATE_THRESHOLDS.warnPct, weeklyBlock);
+  return {
+    session: { warnPct: Math.min(sessionWarn, sessionBlock), blockPct: sessionBlock },
+    weekly: { warnPct: Math.min(weeklyWarn, weeklyBlock), blockPct: weeklyBlock },
+  };
+}
+
+const WINDOWED_VERDICT_RANK: Readonly<Record<LimitGateVerdict, number>> = { ok: 0, warn: 1, block: 2 };
+
+function verdictForWindow(pct: number, thresholds: LimitGateThresholds): LimitGateVerdict {
+  if (pct >= thresholds.blockPct) return 'block';
+  if (pct >= thresholds.warnPct) return 'warn';
+  return 'ok';
+}
+
+/**
+ * Evaluate a probe against independent per-window thresholds. Unlike
+ * {@link evaluateLimitGate} (one shared warn/block pair checked only against
+ * whichever window has the highest raw percentage), each window here is
+ * checked against its OWN thresholds first; the worst VERDICT — not the
+ * worst raw percentage — wins. That distinction matters: a session at 75%
+ * with a lenient session warn floor can stay 'ok' while a weekly window at
+ * 72% trips its own tighter warn floor, a case the single-shared-threshold
+ * evaluator cannot express.
+ *
+ * Fails open ('ok') when the probe is unavailable, mirroring
+ * `evaluateLimitGate`. Defaults to `resolveWindowedLimitGateThresholds()`
+ * (no overrides) — i.e. the pre-362-004 `min(70, block)` behavior — when no
+ * thresholds are passed.
+ */
+export function evaluateLimitGateByWindow(
+  probe: SubscriptionLimitResult,
+  thresholds: WindowedLimitGateThresholds = resolveWindowedLimitGateThresholds(),
+): LimitGateResult {
+  if (probe.unavailable) {
+    return {
+      verdict: 'ok',
+      reason: `limit probe unavailable (${probe.reason}) — proceeding without a limit signal`,
+    };
+  }
+
+  const windows: Array<{ name: string; pct: number; thresholds: LimitGateThresholds }> = [
+    { name: 'session', pct: probe.sessionPct, thresholds: thresholds.session },
+    { name: 'week (all models)', pct: probe.weekAllPct, thresholds: thresholds.weekly },
+  ];
+  if (probe.weekFablePct !== undefined) {
+    windows.push({ name: 'week (Fable)', pct: probe.weekFablePct, thresholds: thresholds.weekly });
+  }
+
+  let worstName = windows[0]!.name;
+  let worstPct = windows[0]!.pct;
+  let worstThresholds = windows[0]!.thresholds;
+  let worstVerdict = verdictForWindow(worstPct, worstThresholds);
+
+  for (const w of windows) {
+    const verdict = verdictForWindow(w.pct, w.thresholds);
+    if (WINDOWED_VERDICT_RANK[verdict] > WINDOWED_VERDICT_RANK[worstVerdict]) {
+      worstName = w.name;
+      worstPct = w.pct;
+      worstThresholds = w.thresholds;
+      worstVerdict = verdict;
+    }
+  }
+
+  if (worstVerdict === 'block') {
+    return {
+      verdict: 'block',
+      reason: `${worstName} usage at ${worstPct}% >= block threshold ${worstThresholds.blockPct}%`,
+    };
+  }
+  if (worstVerdict === 'warn') {
+    return {
+      verdict: 'warn',
+      reason: `${worstName} usage at ${worstPct}% >= warn threshold ${worstThresholds.warnPct}%`,
+    };
+  }
+  return {
+    verdict: 'ok',
+    reason: `all usage windows below their warn threshold (highest: ${worstName} at ${worstPct}%)`,
+  };
+}

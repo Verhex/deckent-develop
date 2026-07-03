@@ -6,6 +6,8 @@ import {
   probeSubscriptionLimits,
   evaluateLimitGate,
   DEFAULT_LIMIT_GATE_THRESHOLDS,
+  resolveWindowedLimitGateThresholds,
+  evaluateLimitGateByWindow,
   type SpawnImpl,
   type SpawnedProcessLike,
   type SubscriptionLimitProbe,
@@ -292,5 +294,101 @@ describe('evaluateLimitGate', () => {
 
     const blockProbe = makeProbe({ sessionPct: DEFAULT_LIMIT_GATE_THRESHOLDS.blockPct, weekAllPct: 0 });
     expect(evaluateLimitGate(blockProbe).verdict).toBe('block');
+  });
+});
+
+// ─── resolveWindowedLimitGateThresholds (LIMITS-WARN-FIELDS) ───────────────
+
+describe('resolveWindowedLimitGateThresholds', () => {
+  it('defaults to {warnPct:70,blockPct:90} for both windows when no override is given — byte-identical to the pre-362-004 min(70,block) formula', () => {
+    const result = resolveWindowedLimitGateThresholds();
+    expect(result.session).toEqual({ warnPct: 70, blockPct: 90 });
+    expect(result.weekly).toEqual({ warnPct: 70, blockPct: 90 });
+  });
+
+  it('recomputes the min(70,block) warn floor from a custom block override when no warn override is given', () => {
+    const result = resolveWindowedLimitGateThresholds({ sessionBlockPct: 50 });
+    expect(result.session).toEqual({ warnPct: 50, blockPct: 50 });
+    expect(result.weekly).toEqual({ warnPct: 70, blockPct: 90 });
+  });
+
+  it('honors an explicit sessionWarnPct override independently of weekly', () => {
+    const result = resolveWindowedLimitGateThresholds({ sessionWarnPct: 40 });
+    expect(result.session).toEqual({ warnPct: 40, blockPct: 90 });
+    expect(result.weekly).toEqual({ warnPct: 70, blockPct: 90 });
+  });
+
+  it('honors an explicit weeklyWarnPct override independently of session', () => {
+    const result = resolveWindowedLimitGateThresholds({ weeklyWarnPct: 55 });
+    expect(result.session).toEqual({ warnPct: 70, blockPct: 90 });
+    expect(result.weekly).toEqual({ warnPct: 55, blockPct: 90 });
+  });
+
+  it('clamps a warn override down to the block ceiling when the override exceeds it', () => {
+    const result = resolveWindowedLimitGateThresholds({ sessionBlockPct: 90, sessionWarnPct: 95 });
+    expect(result.session).toEqual({ warnPct: 90, blockPct: 90 });
+  });
+});
+
+// ─── evaluateLimitGateByWindow (LIMITS-WARN-FIELDS) ────────────────────────
+
+describe('evaluateLimitGateByWindow', () => {
+  it('matches evaluateLimitGate/min(70,block) semantics when no thresholds are passed', () => {
+    const okProbe = makeProbe({ sessionPct: 69, weekAllPct: 10 });
+    expect(evaluateLimitGateByWindow(okProbe).verdict).toBe('ok');
+
+    const warnProbe = makeProbe({ sessionPct: 70, weekAllPct: 10 });
+    expect(evaluateLimitGateByWindow(warnProbe).verdict).toBe('warn');
+
+    const blockProbe = makeProbe({ sessionPct: 90, weekAllPct: 10 });
+    expect(evaluateLimitGateByWindow(blockProbe).verdict).toBe('block');
+  });
+
+  it('evaluates session and weekly independently — a lenient session warn floor stays ok while a tighter weekly floor trips warn', () => {
+    const probe = makeProbe({ sessionPct: 75, weekAllPct: 72 });
+    const thresholds = resolveWindowedLimitGateThresholds({ sessionWarnPct: 80, weeklyWarnPct: 70 });
+    const result = evaluateLimitGateByWindow(probe, thresholds);
+    expect(result.verdict).toBe('warn');
+    expect(result.reason).toContain('week (all models)');
+  });
+
+  it('evaluates the reverse independently — a tight session warn floor trips warn while a lenient weekly floor stays ok', () => {
+    const probe = makeProbe({ sessionPct: 72, weekAllPct: 75 });
+    const thresholds = resolveWindowedLimitGateThresholds({ sessionWarnPct: 70, weeklyWarnPct: 80 });
+    const result = evaluateLimitGateByWindow(probe, thresholds);
+    expect(result.verdict).toBe('warn');
+    expect(result.reason).toContain('session');
+  });
+
+  it('applies the weekly thresholds to the week (Fable) window', () => {
+    const probe = makeProbe({ sessionPct: 10, weekAllPct: 10, weekFablePct: 96 });
+    const result = evaluateLimitGateByWindow(probe);
+    expect(result.verdict).toBe('block');
+    expect(result.reason).toContain('week (Fable)');
+  });
+
+  it('fails open (ok) when the probe is unavailable', () => {
+    const result = evaluateLimitGateByWindow({ unavailable: true, reason: 'CLI output changed', raw: '' });
+    expect(result.verdict).toBe('ok');
+    expect(result.reason).toContain('unavailable');
+  });
+
+  it('block always wins over warn even when a warn-triggering window has a higher raw percentage', () => {
+    const probe = makeProbe({ sessionPct: 85, weekAllPct: 92 });
+    const result = evaluateLimitGateByWindow(probe);
+    expect(result.verdict).toBe('block');
+    expect(result.reason).toContain('week (all models)');
+  });
+
+  it('roundtrip: an explicit warn override actually moves the verdict boundary end-to-end', () => {
+    const probe = makeProbe({ sessionPct: 65, weekAllPct: 10 });
+
+    const defaultThresholds = resolveWindowedLimitGateThresholds();
+    expect(evaluateLimitGateByWindow(probe, defaultThresholds).verdict).toBe('ok');
+
+    const tightened = resolveWindowedLimitGateThresholds({ sessionWarnPct: 60 });
+    const result = evaluateLimitGateByWindow(probe, tightened);
+    expect(result.verdict).toBe('warn');
+    expect(result.reason).toContain('session');
   });
 });

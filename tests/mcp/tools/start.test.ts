@@ -1,4 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync } from 'node:fs';
+import { mkdir, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { SprintStatus, SprintPhase } from '../../../src/core/types.js';
 import type { Sprint, ResolvedConfig } from '../../../src/core/types.js';
 
@@ -136,10 +140,35 @@ async function getStartTool() {
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('registerStartTool', () => {
+  // born-480 HERMETIC-RUNSTATE: registerStartTool's handler reads
+  // `process.cwd()` and passes it straight into `isSprintLocked()` /
+  // `cleanOrphanIpcDirs()` (src/core/multi-ide.ts, src/core/orphan-cleaner.ts)
+  // — real, unmocked `existsSync`/`readFileSync` calls (only mkdirSync /
+  // writeFileSync / rmSync are stubbed above). Without a cwd redirect, every
+  // test here reads the REAL repo's `.deckent/sprint.lock`; a genuinely-live
+  // sprint on the host (same PID namespace as the test runner) makes
+  // `isSprintLocked` report locked=true and breaks every non-force test with
+  // an unexpected "Sprint already running" error. Redirect process.cwd() to
+  // a fresh, empty tmpdir per test (mkdtempSync — NOT among the stubbed fs
+  // fns above, so this is a real directory) so the lock check naturally sees
+  // no lock file, independent of whatever the real repo/host is doing.
+  let sandboxRoot = '';
+  let cwdSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(loadConfig).mockResolvedValue(MOCK_CONFIG);
     vi.mocked(runSprint).mockReturnValue(new Promise(() => {})); // never resolves by default
+    sandboxRoot = mkdtempSync(join(tmpdir(), 'deckent-start-test-'));
+    cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(sandboxRoot);
+  });
+
+  afterEach(async () => {
+    cwdSpy.mockRestore();
+    // node:fs/promises is NOT vi.mock'd in this file (only sync node:fs is),
+    // so this actually removes the tmpdir — the stubbed sync rmSync above
+    // would silently no-op and leak it.
+    await rm(sandboxRoot, { recursive: true, force: true });
   });
 
   // ── Tool Registration ────────────────────────────────────────────────────
@@ -272,6 +301,54 @@ describe('registerStartTool', () => {
       expect(parsed._enriched).toBeDefined();
       expect(parsed._enriched.summary).toBeDefined();
       expect(parsed._enriched.hints).toBeDefined();
+    });
+  });
+
+  // ── Hermetic Run-State (born-480) ────────────────────────────────────────
+  // Proof case: the sprint-lock check must be correct AND fully sandbox-scoped.
+  // Each test gets its own fresh mkdtemp root (see beforeEach above), so
+  // deliberately writing a fake "live" lock into THIS test's sandbox cannot
+  // leak into any other test — this is the direct rebuttal to the born-480
+  // symptom (a real host-level lock breaking unrelated test outcomes).
+
+  describe('hermetic run-state (born-480) — sandbox-scoped lock detection', () => {
+    async function writeFakeLiveLock(): Promise<void> {
+      // process.pid is guaranteed alive for the lifetime of this test process
+      // (isPidAlive checks /proc/<pid> on linux, process.kill(pid, 0) elsewhere
+      // — both succeed on self), so this simulates a genuinely-live sprint lock
+      // without depending on any real host/repo state.
+      await mkdir(join(sandboxRoot, '.deckent'), { recursive: true });
+      await writeFile(
+        join(sandboxRoot, '.deckent', 'sprint.lock'),
+        JSON.stringify({
+          pid: process.pid,
+          env: 'vscode',
+          sprintId: 'sprint-fake-live',
+          acquiredAt: new Date().toISOString(),
+        }),
+        'utf-8',
+      );
+    }
+
+    it('detects a fake live-PID lock inside its own isolated sandbox and blocks the sprint', async () => {
+      await writeFakeLiveLock();
+
+      const tool = await getStartTool();
+      const result = await tool.handler({ autoApprove: false });
+      const parsed = JSON.parse(result.content[0]!.text);
+
+      expect(result.isError).toBe(true);
+      expect(parsed.success).toBe(false);
+      expect(parsed.message).toContain('Sprint already running');
+    });
+
+    it('force=true bypasses the fake live lock — sandbox-scoped, not real-repo-dependent', async () => {
+      await writeFakeLiveLock();
+
+      const tool = await getStartTool();
+      const result = await tool.handler({ autoApprove: false, force: true });
+
+      expect(result.isError).toBeUndefined();
     });
   });
 });

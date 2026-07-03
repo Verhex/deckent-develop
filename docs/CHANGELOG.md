@@ -2,6 +2,33 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint362] - 2026-07-02
+
+### Added
+
+- HERMETIC-RUNSTATE — start-testleri gerçek-repo'dan kopar (born-480)
+- APRHIST-DEBT-CLOSE — 360-013 debt-notunu kapat
+- DOMAIN-ROUTE-WIRE — routeTaskV2'ye domainFromScope + openrouter-doc-route bağla
+- CLIENTS-RELAY-WIRE — Slack/Teams adaptörlerini relay-config'e bağla
+- ONB-GLOBAL-STORE — global-katman deposu dilim-2
+- WIZARD-INK — onboarding-wizard Ink yüzeyi (dilim-2)
+- D004-SHIM-REGISTRY — bilinçli katman-geçişleri için istisna-kaydı (361-014 debt)
+
+### Changed
+
+- Fix debt: Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L (completed with tech debt)
+- LIMITS-WARN-FIELDS — pencere-başına warn eşiği (361-002 debt) (completed with tech debt)
+- RPC-API-WIRE — TERM-RPC'yi HTTP yüzeyine bağla (dilim-2a) (completed with tech debt)
+
+### Fixed
+
+- MODEL-DROP-FIX — forceModel zinciri kök+fix (born-479, P0)
+- RPC-REPL-WIRE — REPL'e rpc-client + /rpc debug-komutu (dilim-2b-read)
+- CODEX-DOGFOOD-V3 — gerçek codex analiz-işi (479-fix sonrası)
+
+
+_Tasks: 14 total, 14 done, 4 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint361] - 2026-07-02
 
 ### Added

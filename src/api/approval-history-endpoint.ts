@@ -6,22 +6,15 @@
 // companion. Same read-only stance as that endpoint (ADR-G-033/ADR-G-020):
 // the dashboard observes, it never decides — there is no mutation route here.
 //
-// NOT wired into server.ts — server.ts is closed for this sprint (task
-// scope). Disk-verified call site for whoever wires it next:
-//
-//   1. import { registerApprovalHistoryRoute } from './approval-history-endpoint.js';
-//      — add alongside the other `import { registerXRoute } from './x-endpoint.js'`
-//      lines (server.ts ~line 49-64).
-//   2. In the GET section, add:
-//        if (registerApprovalHistoryRoute(url, res, projectRoot)) return;
-//      immediately AFTER the `if (url === '/api/approvals') { ... }` block
-//      (server.ts ~line 922-931) and BEFORE the `GET /api/approvals/:id`
-//      block (`if (url.startsWith('/api/approvals/')) { ... }`, ~line 935).
-//      Ordering matters: the :id block's prefix match
-//      (`url.startsWith('/api/approvals/')`) would otherwise swallow
-//      `/api/approvals/history` as id="history" (the id regex
-//      `/^[a-zA-Z0-9_-]+$/` matches the literal string "history") and 404,
-//      never reaching this route.
+// Wired into server.ts's live GET dispatch (360-013 APR-HISTORY-WIRE):
+// `registerApprovalHistoryRoute` is called immediately AFTER the
+// `if (url === '/api/approvals') { ... }` block and BEFORE the
+// `GET /api/approvals/:id` block (`if (url.startsWith('/api/approvals/'))`).
+// That ordering is load-bearing, not stylistic — the :id block's prefix
+// match would otherwise swallow `/api/approvals/history` as id="history"
+// (the id regex `/^[a-zA-Z0-9_-]+$/` matches the literal string "history")
+// and 404 before ever reaching this route. Regression-covered by
+// tests/api/approval-history-wire.test.ts's routing-order test.
 
 import type { ServerResponse } from 'node:http';
 import { ApprovalStore, type ApprovalStoreEntry } from '../core/approval-store.js';
@@ -194,9 +187,9 @@ export function buildApprovalHistoryPage(
 /**
  * Handle GET /api/approvals/history[?status=&limit=&offset=]. Returns `true`
  * when the route matched (and a response was sent), `false` otherwise so the
- * caller can fall through to its other routes. See the wiring note at the
- * top of this file for the exact server.ts call site + why its position
- * (BEFORE the `/api/approvals/:id` block) matters.
+ * caller can fall through to its other routes. See the module header comment
+ * for the server.ts call site + why its position (BEFORE the
+ * `/api/approvals/:id` block) matters.
  */
 export function registerApprovalHistoryRoute(url: string, res: ServerResponse, projectRoot: string): boolean {
   const parsed = new URL(url, 'http://localhost');

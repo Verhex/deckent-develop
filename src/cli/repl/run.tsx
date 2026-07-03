@@ -33,6 +33,8 @@ import { MemoryStore } from '../../core/memory-store.js';
 import { BRAIN_DIR, MEMORY_DB_FILE, DECKENT_DIR } from '../../core/constants.js';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
+import { createLocalRpcTransport, buildReplRpcHandlers, runRpcDebugCommand } from './rpc-client.js';
+import { probeSubscriptionLimits } from '../../core/limit-preflight.js';
 
 const EXEC_TOOLS = new Set(['deckent_write_file', 'deckent_read_file', 'deckent_edit_file', 'deckent_bash']);
 
@@ -89,7 +91,11 @@ export async function runInkRepl(
 ): Promise<void> {
   // Project config is loaded once here and reused by the surface wire below —
   // a load failure degrades to defaults (lang=en, every surface flag off).
-  let projectCfg: { language?: string; repl_surface?: { enabled?: boolean; approvals?: boolean } } = {};
+  let projectCfg: {
+    language?: string;
+    repl_surface?: { enabled?: boolean; approvals?: boolean };
+    terminal?: { rpc_debug?: boolean };
+  } = {};
   try { projectCfg = await loadConfig() as typeof projectCfg; } catch { /* defaults */ }
   let lang = 'en';
   try { lang = getLanguage(projectCfg.language); } catch { /* default en */ }
@@ -108,9 +114,13 @@ export async function runInkRepl(
   const approvalsEnabled = surf.approvals === true;
   let approvalChannel: ApprovalTerminalChannel | undefined;
   let approvalWatch: ApprovalStoreWatchHandle | undefined;
+  // Hoisted (not block-local) so the TERM-RPC local-transport wire further
+  // below (terminal.rpc_debug) can read approval.list off the SAME broker
+  // instance instead of constructing a second one.
+  let broker: ApprovalBroker | undefined;
   if (approvalsEnabled) {
     try {
-      const broker = new ApprovalBroker(process.cwd());
+      broker = new ApprovalBroker(process.cwd());
       const relay = new ApprovalRelay(broker);
       const stream = new ApprovalEventStream(relay);
       approvalChannel = createApprovalTerminalChannel(relay, stream);
@@ -143,7 +153,7 @@ export async function runInkRepl(
           rawArgsRef: null,
         });
       }
-    } catch { approvalChannel = undefined; approvalWatch = undefined; }
+    } catch { approvalChannel = undefined; approvalWatch = undefined; broker = undefined; }
   }
 
   const perms = createPermissionStore(process.cwd());
@@ -161,6 +171,53 @@ export async function runInkRepl(
       sessionId = memory.createChatSession();
     }
   } catch { memory = undefined; sessionId = undefined; }
+
+  // ─── TERM-RPC local-transport debug command (terminal.rpc_debug, default-
+  // off; 362-009 RPC-REPL-WIRE dilim-2b-read) — the SECOND consumer of the
+  // TERM-RPC contract (core/term-rpc.ts): dispatches in-process via
+  // rpc-client.ts's createLocalRpcTransport, no HTTP (362-008's /api/rpc is
+  // the first consumer). Only the v1 READ methods this slice can honestly
+  // wire from local REPL data get a handler (session.list via MemoryStore,
+  // approval.list via the SAME broker instance above); run.status has no
+  // REPL-side run-tracking equivalent and is deliberately left unregistered
+  // (dispatchRpcRequest's own METHOD_NOT_IMPLEMENTED is the honest answer).
+  // Invocation is env-var-gated (DECKENT_RPC_DEBUG_METHOD[/_PARAMS]) rather
+  // than a live `/rpc` slash command: app.tsx/chat-slash-registry.ts are out
+  // of this task's write scope (nogo: no app.tsx wiring), so this runs once,
+  // prints the result, and returns BEFORE `render(...)` mounts Ink — Ink is
+  // never touched. Both the config flag and the env var must be present, so
+  // this entire block is a no-op (byte-identical run.tsx behavior) whenever
+  // either is absent — in particular, always a no-op when the flag is off.
+  const rpcDebugEnabled = projectCfg.terminal?.rpc_debug === true;
+  const rpcDebugMethod = process.env['DECKENT_RPC_DEBUG_METHOD'];
+  if (rpcDebugEnabled && rpcDebugMethod) {
+    try {
+      const currentMemory = memory;
+      const currentBroker = broker;
+      const handlers = buildReplRpcHandlers({
+        ...(currentMemory
+          ? {
+              listChatSessions: (limit?: number) => currentMemory.listChatSessions(limit),
+              ...(sessionId ? { currentSessionId: sessionId } : {}),
+            }
+          : {}),
+        ...(currentBroker ? { listApprovals: (status: 'pending' | 'decided' | 'all') => currentBroker.list(status) } : {}),
+        probeLimits: () => probeSubscriptionLimits(),
+      });
+      const transport = createLocalRpcTransport(handlers);
+      const rpcDebugParams = process.env['DECKENT_RPC_DEBUG_PARAMS'];
+      const output = await runRpcDebugCommand(
+        transport,
+        `/rpc ${rpcDebugMethod}${rpcDebugParams ? ` ${rpcDebugParams}` : ''}`,
+      );
+      process.stdout.write(`${output ?? ''}\n`);
+    } catch (err: unknown) {
+      process.stdout.write(`[rpc-debug] ${err instanceof Error ? err.message : String(err)}\n`);
+    }
+    try { approvalWatch?.dispose(); } catch { /* already disposed */ }
+    try { memory?.close(); } catch { /* already closed */ }
+    return;
+  }
 
   // Runtime model/provider switching: the loop holds a stable proxy; /model and
   // /provider rebuild the underlying adapter (the warm boot session is reused

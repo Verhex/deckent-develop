@@ -1,0 +1,29 @@
+{
+  "note": "ADR-D-004 (C3) mcp/ <-> cli/ Layer-1 sanctioned-exception registry (D004-W5 data-file; task 362-012, 361-014 debt). WHAT THIS IS (honest framing): a REGISTRY-SCOPED ratchet, not a full mcp/-wide C3-edge scan. scripts/lint-layer-shims.mjs derives the set of governed files from this file's `shims[].from` values and verifies each governed file's cli/-crossing imports are all covered by a registered entry (same `to` module + symbols subset-of-allowed) -- 'no registry entry, no import' per ADR-D-004 C5. A brand-new mcp/ file that starts importing cli/ is NOT auto-discovered by this mechanism; extending to a full-edge, all-files scan is ADR-D-004's own documented D004-W6 (hard graph gate + full-edge scan), separate future work. `enforced: false` entries are recorded for context/precedent only (the pre-existing ADR-G-011 Surface-Parity/CLI-MCP-parity convention, broadly used elsewhere in mcp/tools/*.ts) and are not the crossing this ratchet actively protects; `enforced: true` entries are the crossing type this task's gate exists for. `expiry` is mandatory on every entry.",
+  "shims": [
+    {
+      "id": "D004-SHIM-001",
+      "from": "src/mcp/tools/nervous.ts",
+      "to": "src/cli/commands/nervous.js",
+      "symbols": ["acceptPanicGuard", "listPendingPanicEvents"],
+      "reason": "MCP surface for Nervous panic-guard accept/list, reusing the CLI's read/plan logic instead of duplicating it -- the shipped ADR-G-011 (Surface Parity & Thin-Wrapper, formerly ADR-022 CLI/MCP Feature Parity, Sprint 147 Task 16) precedent that nervous-edit.ts's own header cites when justifying D004-SHIM-002.",
+      "adrRef": "ADR-D-004 (C3) / ADR-G-011",
+      "enforced": false,
+      "owner": "nervous-system",
+      "dateAdded": "2026-07-02",
+      "expiry": "2027-01-02 (review at ADR-D-004 W6 full-edge audit; renew, fold into ADR-G-011's parity allowlist, or relocate)"
+    },
+    {
+      "id": "D004-SHIM-002",
+      "from": "src/mcp/tools/nervous-edit.ts",
+      "to": "src/cli/repl/nervous-bridge.js",
+      "symbols": ["handleEdit", "NervousPendingStore", "NervousBridgePlanResult"],
+      "reason": "deckent_nervous_edit wraps 357-006/APPROVE-007b's accept-with-edited-payload plan builder (`handleEdit`) for MCP callers, following the D004-SHIM-001 precedent rather than duplicating the plan-building logic a second time. Sprint 361 Task 361-014 (DEFER-002-NERVOUS); this registry entry is that task's exception-registry follow-up.",
+      "adrRef": "ADR-D-004 (C3)",
+      "enforced": true,
+      "owner": "nervous-system",
+      "dateAdded": "2026-07-02",
+      "expiry": "2027-01-02 (review at ADR-D-004 W6 full-edge audit; renew or dissolve into a core/orchestra relocation)"
+    }
+  ]
+}

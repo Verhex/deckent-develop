@@ -8754,3 +8754,37 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 361-016: ONB-CHAT-CORE — sohbetle-setup akış çekirdeği (Sıra-202 dilim-1) (DONE)
 
 ---
+## Sprint 362 — sprint-362
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-02
+**Duration:** 2514s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 14 |
+| Completed | 14 |
+| Tech Debt | 4 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 2513753ms |
+
+### Tasks
+
+- 362-001: Fix debt: Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L (GO_WITH_TECH_DEBT)
+- 362-002: MODEL-DROP-FIX — forceModel zinciri kök+fix (born-479, P0) (DONE)
+- 362-003: HERMETIC-RUNSTATE — start-testleri gerçek-repo'dan kopar (born-480) (DONE)
+- 362-004: LIMITS-WARN-FIELDS — pencere-başına warn eşiği (361-002 debt) (GO_WITH_TECH_DEBT)
+- 362-005: APRHIST-DEBT-CLOSE — 360-013 debt-notunu kapat (DONE)
+- 362-006: DOMAIN-ROUTE-WIRE — routeTaskV2'ye domainFromScope + openrouter-doc-route bağla (DONE)
+- 362-007: CLIENTS-RELAY-WIRE — Slack/Teams adaptörlerini relay-config'e bağla (DONE)
+- 362-008: RPC-API-WIRE — TERM-RPC'yi HTTP yüzeyine bağla (dilim-2a) (GO_WITH_TECH_DEBT)
+- 362-009: RPC-REPL-WIRE — REPL'e rpc-client + /rpc debug-komutu (dilim-2b-read) (DONE)
+- 362-010: ONB-GLOBAL-STORE — global-katman deposu dilim-2 (DONE)
+- 362-011: WIZARD-INK — onboarding-wizard Ink yüzeyi (dilim-2) (DONE)
+- 362-012: D004-SHIM-REGISTRY — bilinçli katman-geçişleri için istisna-kaydı (361-014 debt) (DONE)
+- 362-013: CODEX-DOGFOOD-V3 — gerçek codex analiz-işi (479-fix sonrası) (DONE)
+
+---

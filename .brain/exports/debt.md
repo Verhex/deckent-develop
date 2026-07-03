@@ -4,13 +4,16 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-361-001-fix | Tech debt from 361-001-fix: Worker timeout/killed (exitCode=1) but git diff show | normal | sprint-361 | active |
+| debt-362-001-fix | Tech debt from 362-001-fix: VERIFY-AND-COMPLETE of the OOM-killed prior 362-001- | normal | sprint-362 | active |
+| debt-361-001-fix | Tech debt from 361-001-fix: Worker timeout/killed (exitCode=1) but git diff show | high | sprint-361 | active |
 | debt-357-015-fix | Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L | critical | sprint-357 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-362-004 | Tech debt from 362-004: Scope reality check first: the 361-002 debt note ('warn  | normal | sprint-362 | resolved |
+| debt-362-008 | Tech debt from 362-008: POST /api/rpc wired as the first HTTP consumer of TERM-R | normal | sprint-362 | resolved |
 | debt-361-002 | Tech debt from 361-002: Part (a) `deckent limits [--json]` is fully implemented  | normal | sprint-361 | resolved |
 | debt-361-014 | Tech debt from 361-014: DONE for the write-scope deliverable: 2 new MCP tools (d | normal | sprint-361 | resolved |
 | debt-360-013 | Tech debt from 360-013: Wired registerApprovalHistoryRoute (built in 359-013) in | normal | sprint-360 | resolved |

@@ -13,7 +13,11 @@
  *     acknowledgeCost regardless of autoApprove).
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { SprintStatus, SprintPhase } from '../../src/core/types.js';
 import type { Sprint, ResolvedConfig } from '../../src/core/types.js';
 
@@ -217,6 +221,14 @@ function readRunnerConfigFromMock(): { autoApprove?: boolean; jobId?: string } |
 // ─── Tests ──────────────────────────────────────────────────────────
 
 describe('deckent_start — autoApprove parity (Sprint 189 T-009)', () => {
+  // born-480 HERMETIC-RUNSTATE: the handler reads process.cwd() and passes it
+  // into isSprintLocked()/cleanOrphanIpcDirs() — real, unmocked fs reads.
+  // Redirect to a fresh tmpdir per test so a genuinely-live sprint lock on
+  // the real host (same PID namespace as the test runner) can never leak in
+  // and flip these success-path assertions into "Sprint already running".
+  let sandboxRoot = '';
+  let cwdSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(loadConfig).mockResolvedValue(MOCK_CONFIG);
@@ -228,6 +240,15 @@ describe('deckent_start — autoApprove parity (Sprint 189 T-009)', () => {
       autoConfirmThresholdUsd: 2,
       overrideApplied: false,
     });
+    sandboxRoot = mkdtempSync(join(tmpdir(), 'deckent-start-autoapprove-test-'));
+    cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(sandboxRoot);
+  });
+
+  afterEach(async () => {
+    cwdSpy.mockRestore();
+    // node:fs/promises is NOT vi.mock'd here (only sync node:fs is) — this
+    // really cleans up; the stubbed sync rmSync would silently no-op.
+    await rm(sandboxRoot, { recursive: true, force: true });
   });
 
   describe('schema parity', () => {

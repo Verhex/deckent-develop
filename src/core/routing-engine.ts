@@ -2,7 +2,8 @@
 // Layer 3: The main routing orchestrator.
 // Replaces selectAgent() + selectSkills() with a unified, intent-based decision.
 
-import type { TaskScope } from './task-types.js';
+import type { TaskScope, ModelType, ProviderName, Task } from './task-types.js';
+import { TaskStatus } from './task-types.js';
 import type { AgentDefinition, AgentPool } from './agent-types.js';
 import type { SkillDefinition } from './skill-types.js';
 import type {
@@ -36,6 +37,8 @@ import { normalizeTechStack, taskKindToIntent } from './work-model.js';
 import type { TaskKind, TechStackKind } from './work-model.js';
 import { getAgentDomain, getAgentRole, type AgentDomain, type AgentRole } from './agent-pool.js';
 import { debugLog } from './utils.js';
+import { resolveOpenRouterDocRoute, type OpenRouterRouteConfig } from './routing-openrouter.js';
+import type { FreeModelCache } from './openrouter-models.js';
 
 // ─── Agent Fallback Chain ──────────────────────────────────────────────────
 
@@ -421,6 +424,25 @@ export interface RoutingOptions {
    * byte-identical to pre-359-005 routing.
    */
   domainFromScope?: boolean;
+  /**
+   * Enable the OpenRouter doc-route provider-suggestion wire (OPENROUTER-DOC-ROUTE,
+   * Sprint 362 Task 362-006). Default-off. When true AND `openRouterConfig` +
+   * `openRouterCache` are BOTH supplied, `resolveOpenRouterDocRoute` (361-003,
+   * previously a standalone pure function — see routing-openrouter.ts's own
+   * "slice 2" follow-up note) is consulted for the task. The result is
+   * appended to `RoutingDecision.reasoning` as text — `RoutingDecision` has no
+   * dedicated field for it (routing-types.ts is outside this task's write
+   * scope), mirroring how `domainFromScope`'s scopeDomain is surfaced above.
+   * NEVER overrides an existing `task.forceModel`/`task.provider` — those are
+   * checked BEFORE the resolver is even consulted, regardless of this flag
+   * (ASLA-override guarantee). Flag-off is byte-identical to pre-362-006
+   * routing: the whole block is skipped, zero reasoning lines added.
+   */
+  openRouterDocRoute?: boolean;
+  /** Config consulted by the OpenRouter doc-route wire — see `openRouterDocRoute`. */
+  openRouterConfig?: OpenRouterRouteConfig;
+  /** Free-model cache consulted by the OpenRouter doc-route wire — see `openRouterDocRoute`. */
+  openRouterCache?: FreeModelCache;
 }
 
 // ─── Agent Selection Cache (module-level singleton) ─────────────────────────
@@ -450,7 +472,13 @@ interface ScoredCandidate {
  * output is byte-identical to the pre-reorder behavior.
  */
 export function routeTaskV2(
-  task: { title: string; description: string; scope: TaskScope; type?: TaskKind },
+  task: {
+    title: string; description: string; scope: TaskScope; type?: TaskKind;
+    /** ASLA-override guard for the OpenRouter doc-route wire — see `RoutingOptions.openRouterDocRoute`. */
+    forceModel?: ModelType;
+    /** ASLA-override guard for the OpenRouter doc-route wire — see `RoutingOptions.openRouterDocRoute`. */
+    provider?: ProviderName;
+  },
   agentPool: AgentPool,
   skillPool: Map<string, SkillDefinition>,
   options?: RoutingOptions,
@@ -473,6 +501,45 @@ export function routeTaskV2(
   reasoning.push(`Intent: ${taskDNA.intent.primary} (confidence: ${taskDNA.intent.confidence})`);
   if (domainFromScopeEnabled) {
     reasoning.push(`Scope-domain (born-470): ${scopeDomain ? `'${scopeDomain}'` : 'none (no curated match)'}`);
+  }
+
+  // OPENROUTER-DOC-ROUTE wire (Sprint 362 Task 362-006) — see RoutingOptions.openRouterDocRoute.
+  const openRouterDocRouteEnabled = options?.openRouterDocRoute ?? false;
+  if (openRouterDocRouteEnabled) {
+    if (task.forceModel || task.provider) {
+      // ASLA-override guarantee: an existing forceModel/provider short-circuits
+      // BEFORE the resolver is even consulted — never overridden.
+      const setField = task.forceModel ? `forceModel='${task.forceModel}'` : `provider='${task.provider}'`;
+      reasoning.push(`OpenRouter doc-route: skipped — task already has ${setField} (never overridden)`);
+    } else if (!options?.openRouterConfig || !options?.openRouterCache) {
+      reasoning.push('OpenRouter doc-route: flag on but openRouterConfig/openRouterCache not supplied — skipped');
+    } else {
+      // resolveOpenRouterDocRoute requires the full Task shape, but only ever
+      // reads `.type`/`.scope` internally (isDocKindTask/isDocKindScope, private
+      // helpers mirrored-not-exported by that module's own precedent). The
+      // fields below beyond title/description/scope/type are structurally
+      // required placeholders, never read by the resolver.
+      const docRouteTask: Task = {
+        id: options?.taskId ?? '',
+        title: task.title,
+        description: task.description,
+        model: 'sonnet',
+        effort: 'normal',
+        priority: 'NORMAL',
+        reason: '',
+        scope: task.scope,
+        dependencies: [],
+        goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
+        status: TaskStatus.DRAFT,
+        type: task.type,
+      };
+      const suggestion = resolveOpenRouterDocRoute(docRouteTask, options.openRouterConfig, options.openRouterCache);
+      reasoning.push(
+        suggestion
+          ? `OpenRouter doc-route suggestion: provider='${suggestion.provider}', model='${suggestion.model}'`
+          : 'OpenRouter doc-route: no suggestion (not doc-kind, or model not cache-validated)',
+      );
+    }
   }
 
   // ROUTE-1 B3 — when the keyword classifier cannot resolve an intent, fall back to the

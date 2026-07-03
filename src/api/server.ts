@@ -10,7 +10,7 @@ import { TerminalAudit, MemoryStoreAuditSink } from './terminal/audit.js';
 import { loadOrCreateAuditKey } from './terminal/audit-integrity.js';
 import { attachTerminalGateway } from './terminal/ws-gateway.js';
 import { OutboundLimiter } from './terminal/outbound-limiter.js';
-import type { CreateSessionInput, SessionKind, TenantId } from './terminal/types.js';
+import type { CreateSessionInput, SessionKind, TenantId, SessionMeta } from './terminal/types.js';
 import { z } from 'zod';
 import {
   DASHBOARD_FILE, BRAIN_DIR, SPRINTS_DIR, TASKS_DIR, LOCKS_DIR,
@@ -68,6 +68,8 @@ import { createOutputCollector, type OutputCollector } from '../core/output-coll
 import { reconcileStatusResponse } from './status-reconcile.js';
 import { ApprovalStore, type ApprovalStoreEntry, type ApprovalStoreCategory } from '../core/approval-store.js';
 import { ApprovalBroker, ApprovalBrokerError } from '../core/approval-broker.js';
+import { rpcRequestSchema, dispatchRpcRequest, type RpcHandler, type RpcHandlerMap } from '../core/term-rpc.js';
+import { probeSubscriptionLimits, type SpawnImpl } from '../core/limit-preflight.js';
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -202,6 +204,20 @@ let chatStreamAdapter: ChatProviderAdapter | null = null;
  *  the `/api/chat/stream` SSE endpoint. Pass null to reset. */
 export function setChatStreamAdapter(adapter: ChatProviderAdapter | null): void {
   chatStreamAdapter = adapter;
+}
+
+// ─── RPC limits.get spawn seam (362-008) ────────────────────────────────
+// `limits.get`'s handler calls probeSubscriptionLimits(), which shells out to
+// the real `claude` binary by default. Same test-seam shape as
+// setChatStreamAdapter above — tests inject a fake spawn so `/api/rpc`
+// round-trip coverage never depends on a real `claude` binary being on PATH.
+let rpcLimitProbeSpawnImpl: SpawnImpl | undefined;
+
+/** Test/wiring hook — install (or clear) the spawn implementation used by
+ *  the `limits.get` RPC handler's probeSubscriptionLimits() call. Pass
+ *  undefined to reset to the real `claude` binary spawn. */
+export function setRpcLimitProbeSpawnImpl(impl: SpawnImpl | undefined): void {
+  rpcLimitProbeSpawnImpl = impl;
 }
 
 // ─── Active Job Tracking ─────────────────────────────────────────
@@ -467,6 +483,119 @@ function findApprovalEntry(
   return undefined;
 }
 
+// ─── TERM-RPC HTTP wire (362-008, RPC-API-WIRE slice-2a) ─────────────────
+// POST /api/rpc — the first HTTP consumer of TERM-RPC's dispatcher
+// (core/term-rpc.ts, task 361-011). Behind the SAME bearer-auth gate as every
+// other /api/* route (no exemption added — see the generic auth check ahead
+// of GET/POST dispatch). Only 4 read methods get a real handler this slice:
+//   session.list / run.status -> PtySessionManager (api/terminal/session-
+//     manager.ts). The task names "session-registry"/"run-state-feed" as
+//     adapter sources, but both concrete modules with those names live under
+//     src/cli/helpers/ — importing either here would violate ADR-D-004 C3
+//     (api/ MUST NOT import cli/). PtySessionManager is the same-layer,
+//     already-wired existing surface whose SessionMeta shape (id, kind,
+//     tenantId, createdAt, status: running|exited, exitCode?) covers both
+//     methods' fields; see docImpact in the task .result notes.
+//   approval.list -> ApprovalStore (core/approval-store.ts, already used by
+//     GET /api/approvals above).
+//   limits.get -> probeSubscriptionLimits (core/limit-preflight.ts).
+// session.resume / run.start-detached / approval.decide are deliberately left
+// OUT of the handler map — dispatchRpcRequest's own METHOD_NOT_IMPLEMENTED
+// path is already the honest "unsupported" answer (write methods wire in the
+// dilim-2b follow-up task).
+
+/** SessionMeta -> TERM-RPC SessionSummary. PtySessionManager only tracks
+ *  running/exited, narrowed onto the contract's 4-state enum (idle/detached
+ *  are never produced by this adapter). SessionMeta has no separate
+ *  last-activity timestamp, so `lastActivityAt` honestly mirrors `createdAt`
+ *  rather than fabricating a distinct value. */
+function sessionMetaToRpcSummary(meta: SessionMeta): {
+  sessionId: string;
+  label: string;
+  status: 'active' | 'idle' | 'detached' | 'closed';
+  createdAt: string;
+  lastActivityAt: string;
+} {
+  return {
+    sessionId: meta.id,
+    label: `${meta.kind}:${meta.tenantId}`,
+    status: meta.status === 'running' ? 'active' : 'closed',
+    createdAt: meta.createdAt,
+    lastActivityAt: meta.createdAt,
+  };
+}
+
+function buildRpcSessionListHandler(terminalManager: PtySessionManager | undefined): RpcHandler<'session.list'> {
+  return () => ({
+    sessions: terminalManager ? terminalManager.list().map(sessionMetaToRpcSummary) : [],
+  });
+}
+
+function buildRpcRunStatusHandler(terminalManager: PtySessionManager | undefined): RpcHandler<'run.status'> {
+  return (params) => {
+    const meta = terminalManager?.get(params.runId);
+    if (!meta) {
+      // No on-disk/in-memory evidence of this runId — honestly report
+      // "pending" rather than fabricating a completed/failed verdict.
+      return { runId: params.runId, state: 'pending', startedAt: null, finishedAt: null, exitCode: null };
+    }
+    const state: 'running' | 'completed' | 'failed' =
+      meta.status === 'running' ? 'running' : meta.exitCode === 0 ? 'completed' : 'failed';
+    return {
+      runId: meta.id,
+      state,
+      startedAt: meta.createdAt,
+      // SessionMeta tracks no separate finish timestamp.
+      finishedAt: null,
+      exitCode: meta.exitCode ?? null,
+    };
+  };
+}
+
+function buildRpcApprovalListHandler(projectRoot: string): RpcHandler<'approval.list'> {
+  return (params) => {
+    const store = new ApprovalStore(projectRoot);
+    const snapshot = store.load();
+    const categories = ['pending', 'approved', 'denied', 'expired'] as const;
+    const approvals = categories.flatMap((category) =>
+      snapshot[category]
+        .filter((e) => !params.scopeId || e.request.scopeId === params.scopeId)
+        .map((e) => serializeApprovalEntry(category, e)),
+    );
+    return { approvals };
+  };
+}
+
+function buildRpcLimitsGetHandler(): RpcHandler<'limits.get'> {
+  return async () => {
+    const probe = await probeSubscriptionLimits(
+      rpcLimitProbeSpawnImpl ? { spawnImpl: rpcLimitProbeSpawnImpl } : {},
+    );
+    if (probe.unavailable) {
+      return { limits: { unavailable: true, reason: probe.reason } };
+    }
+    return {
+      limits: {
+        unavailable: false,
+        sessionPct: probe.sessionPct,
+        sessionResetAt: probe.sessionResetAt,
+        weekAllPct: probe.weekAllPct,
+        weekAllResetAt: probe.weekAllResetAt,
+        ...(probe.weekFablePct !== undefined ? { weekFablePct: probe.weekFablePct } : {}),
+      },
+    };
+  };
+}
+
+function buildRpcHandlerMap(projectRoot: string, terminalManager: PtySessionManager | undefined): RpcHandlerMap {
+  return {
+    'session.list': buildRpcSessionListHandler(terminalManager),
+    'run.status': buildRpcRunStatusHandler(terminalManager),
+    'approval.list': buildRpcApprovalListHandler(projectRoot),
+    'limits.get': buildRpcLimitsGetHandler(),
+  };
+}
+
 // ─── Route Handler ───────────────────────────────────────────────
 
 async function handleRequest(
@@ -483,6 +612,7 @@ async function handleRequest(
   outputCollector?: OutputCollector,
   serveIndexHtml?: (req: IncomingMessage, res: ServerResponse) => boolean,
   chatAdapter?: ChatProviderAdapter | null,
+  terminalManager?: PtySessionManager,
 ): Promise<void> {
   // Normalize /api/v1/... → /api/... for backward compat
   const rawUrl = req.url ?? '/';
@@ -983,6 +1113,25 @@ async function handleRequest(
     // OIDC SSO token exchange: POST /api/auth/oidc/exchange (277-007). Auth-exempt
     // (login flow has no bearer yet); config-gated (404 when dashboard_oidc off).
     if (await registerOidcCallbackRoute(url, method, res, body, projectRoot)) return;
+
+    // POST /api/rpc — TERM-RPC HTTP wire (362-008, RPC-API-WIRE slice-2a).
+    // Auth is already enforced generically above for every /api/* path — no
+    // exemption is added for this route. A malformed envelope (fails
+    // rpcRequestSchema) is a 400, same convention as every other POST body
+    // schema in this file; a well-formed envelope always answers 200 with the
+    // RpcResponse body (result OR error) — the dispatcher's own error taxonomy
+    // (UNKNOWN_METHOD, METHOD_NOT_IMPLEMENTED, INVALID_PARAMS, ...) carries
+    // the honest outcome, matching term-rpc.ts's transport-agnostic envelope.
+    if (url === '/api/rpc') {
+      const parsedRpc = rpcRequestSchema.safeParse(body);
+      if (!parsedRpc.success) {
+        sendError(res, 400, `Invalid RPC request: ${parsedRpc.error.message}`);
+        return;
+      }
+      const rpcResponse = await dispatchRpcRequest(parsedRpc.data, buildRpcHandlerMap(projectRoot, terminalManager));
+      sendJson(res, rpcResponse);
+      return;
+    }
 
     if (url === '/api/start') {
       const parsed = StartSchema.safeParse(body);
@@ -1866,7 +2015,7 @@ export function createHttpServer(
         if (serveIndexWithTokenInject(req, res)) return;
       }
 
-      await handleRequest(req, res, projectRoot, dashPath, sseClients, resolvedStaticDir, initWatcher, finalToken, rateLimiter, authMiddleware, outputCollector ?? undefined, serveIndexWithTokenInject, serveChatAdapter);
+      await handleRequest(req, res, projectRoot, dashPath, sseClients, resolvedStaticDir, initWatcher, finalToken, rateLimiter, authMiddleware, outputCollector ?? undefined, serveIndexWithTokenInject, serveChatAdapter, terminalMgr);
     })().catch((err: unknown) => {
       sendError(res, 500, err instanceof Error ? err.message : 'Internal server error');
     });
