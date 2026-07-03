@@ -46,6 +46,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-363 Learnings** (sprint-363): ## Sprint sprint-363 Learnings
+- CODEX-V4 — model-pin gerçek sınavı (479-fix'li plan): NO_GO — Subprocess worker exit...
 - **Sprint sprint-362 Learnings** (sprint-362): ## Sprint sprint-362 Learnings
 - Fix debt: Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC...
 - **Sprint sprint-361 Learnings** (sprint-361): ## Sprint sprint-361 Learnings
@@ -66,15 +68,10 @@
 - 353-001 — SCOPECHECK-CORE — realpath scope-check primitive'ini core'a taşı...
 - **Sprint sprint-352 Learnings** (sprint-352): ## Sprint sprint-352 Learnings
 - W5C — kind-affinity, config-gated (row 447, YENİDEN-KOŞUM): GO_WITH_TECH_DEBT — PCOM...
-- **Sprint sprint-350 Learnings** (sprint-350): ## Sprint sprint-350 Learnings
-
-## Gains
-- 350-001 — TRN-1 — trace-recorder'ı sprint-worker turn'lerine WIRE (row 76)...
 
 ## Active Technical Debt
-- [NORMAL] Tech debt from 362-001-fix: VERIFY-AND-COMPLETE of the OOM-killed prior 362-001-
-- [HIGH] Tech debt from 361-001-fix: Worker timeout/killed (exitCode=1) but git diff show
-- [CRITICAL] Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L
+- [HIGH] Tech debt from 362-001-fix: VERIFY-AND-COMPLETE of the OOM-killed prior 362-001-
+- [CRITICAL] Tech debt from 361-001-fix: Worker timeout/killed (exitCode=1) but git diff show
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -121,5 +118,7 @@
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
+- Violation pattern: stale_heartbeat
+- Violation pattern: file_outside_scope
 
-_Total entries: 898 | Generated: 2026-07-02_
+_Total entries: 906 | Generated: 2026-07-03_

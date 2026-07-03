@@ -4,14 +4,16 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-362-001-fix | Tech debt from 362-001-fix: VERIFY-AND-COMPLETE of the OOM-killed prior 362-001- | normal | sprint-362 | active |
-| debt-361-001-fix | Tech debt from 361-001-fix: Worker timeout/killed (exitCode=1) but git diff show | high | sprint-361 | active |
-| debt-357-015-fix | Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L | critical | sprint-357 | active |
+| debt-362-001-fix | Tech debt from 362-001-fix: VERIFY-AND-COMPLETE of the OOM-killed prior 362-001- | high | sprint-362 | active |
+| debt-361-001-fix | Tech debt from 361-001-fix: Worker timeout/killed (exitCode=1) but git diff show | critical | sprint-361 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-363-005 | Tech debt from 363-005: Wired the 361-009 onboarding machine (helpers/onboarding | normal | sprint-363 | resolved |
+| debt-363-009 | Tech debt from 363-009: Implemented deckent_autonomous_approve + deckent_autonom | normal | sprint-363 | resolved |
+| debt-363-011 | Tech debt from 363-011: Wired 361-015 session-registry into health-snapshot.ts p | normal | sprint-363 | resolved |
 | debt-362-004 | Tech debt from 362-004: Scope reality check first: the 361-002 debt note ('warn  | normal | sprint-362 | resolved |
 | debt-362-008 | Tech debt from 362-008: POST /api/rpc wired as the first HTTP consumer of TERM-R | normal | sprint-362 | resolved |
 | debt-361-002 | Tech debt from 361-002: Part (a) `deckent limits [--json]` is fully implemented  | normal | sprint-361 | resolved |
@@ -31,6 +33,7 @@
 | debt-357-010 | Tech debt from 357-010: DISK-VERIFY: grepped filterRegistryByMode/resolveSlash/r | normal | sprint-357 | resolved |
 | debt-357-014 | Tech debt from 357-014: ONB-HONEST presentation layer implemented, check logic u | normal | sprint-357 | resolved |
 | debt-357-016 | Tech debt from 357-016: SCOPE FINDING (read first): scope.filesWrite for 357-016 | normal | sprint-357 | resolved |
+| debt-357-015-fix | Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L | critical | sprint-357 | resolved |
 | debt-354-001 | Tech debt from 354-001: Wired buildLiveFooter + term-mode.ts + chat-turn-queue.t | normal | sprint-354 | resolved |
 | debt-354-010 | Tech debt from 354-010: MOAT-3 FIX-half wired: runFixPhase now actually re-dispa | normal | sprint-354 | resolved |
 | debt-354-011 | Tech debt from 354-011: Root cause (disk-verified against sprint-352 archive, .b | normal | sprint-354 | resolved |

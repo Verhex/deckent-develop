@@ -19,6 +19,7 @@ import { probeProviderAuth } from '../../core/provider-auth-probe.js';
 import { loadMcpServers, type McpServersMap } from '../../mcp-client/config.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
+import { listActive, type ReplSession } from './session-registry.js';
 import { theme } from './theme.js';
 import { getMessage } from './messages.js';
 
@@ -41,6 +42,12 @@ export interface HealthSnapshot {
   mcp: HealthField;
   memory: HealthField;
   mode: HealthField;
+  /**
+   * Optional (not one of the always-on fields above): 361-015 session-registry
+   * wiring (363-011). Omitted by pre-existing snapshot fixtures/consumers built
+   * before this field existed — buildHealthSnapshot() always populates it.
+   */
+  sessions?: HealthField;
   cwd: string;
   elapsedMs: number;
 }
@@ -51,6 +58,8 @@ export interface HealthSnapshotDeps {
   probeAuthFn?: typeof probeProviderAuth;
   loadMcpServersFn?: (root: string) => McpServersMap;
   readMemoryCountFn?: (root: string) => number | undefined;
+  /** 363-011 — active REPL session count (361-015 session-registry). Default: listActive(root). */
+  listActiveSessionsFn?: (root: string) => ReplSession[];
 }
 
 // ─── Timing budget ───────────────────────────────────────────────────────
@@ -63,6 +72,9 @@ const CONFIG_TIMEOUT_MS = 200;
 const AUTH_PROBE_TIMEOUT_MS = 250;
 
 const UNKNOWN_LABEL = 'unknown';
+
+/** 4+ concurrent REPL sessions on this project share one usage limit (/usage). */
+const SESSION_WARN_THRESHOLD = 4;
 
 /** Resolves to `value`, or `undefined` if `ms` elapses first. Never rejects on timeout. */
 async function raceWithTimeout<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
@@ -197,6 +209,22 @@ function resolveModeField(config: ResolvedConfig | undefined): HealthField {
   return { status: 'ok', label: config.mode };
 }
 
+/**
+ * 363-011 — active-session count (361-015 session-registry). >= SESSION_WARN_THRESHOLD
+ * is an honest 'warn' (all N sessions share one usage limit), not an error.
+ */
+function resolveSessionsField(
+  root: string,
+  listActiveSessionsFn: (root: string) => ReplSession[],
+): HealthField {
+  try {
+    const count = listActiveSessionsFn(root).length;
+    return { status: count >= SESSION_WARN_THRESHOLD ? 'warn' : 'ok', label: String(count) };
+  } catch (err) {
+    return { status: 'unknown', label: UNKNOWN_LABEL, detail: errorDetail(err) };
+  }
+}
+
 // ─── Public: buildHealthSnapshot ────────────────────────────────────────
 
 export async function buildHealthSnapshot(
@@ -208,6 +236,7 @@ export async function buildHealthSnapshot(
   const probeAuthFn = deps.probeAuthFn ?? probeProviderAuth;
   const loadMcpServersFn = deps.loadMcpServersFn ?? loadMcpServers;
   const readMemoryCountFn = deps.readMemoryCountFn ?? defaultReadMemoryCount;
+  const listActiveSessionsFn = deps.listActiveSessionsFn ?? ((r: string) => listActive(r));
 
   let config: ResolvedConfig | undefined;
   try {
@@ -221,9 +250,10 @@ export async function buildHealthSnapshot(
   const mcp = resolveMcpField(loadMcpServersFn, root);
   const memory = resolveMemoryField(root, config, readMemoryCountFn);
   const mode = resolveModeField(config);
+  const sessions = resolveSessionsField(root, listActiveSessionsFn);
   const auth = await resolveAuthField(probeAuthFn, provider);
 
-  return { provider, model, auth, mcp, memory, mode, cwd: root, elapsedMs: Date.now() - start };
+  return { provider, model, auth, mcp, memory, mode, sessions, cwd: root, elapsedMs: Date.now() - start };
 }
 
 // ─── Render (i18n-first, NO_COLOR via `theme`) ──────────────────────────
@@ -248,8 +278,27 @@ function authLabelText(field: HealthField, lang: string): string {
   return getMessage('health.unknown', lang);
 }
 
-/** Compact single-line render — "tek-bakış" (ADR-G-010: terminal stays concise). */
-export function renderHealthSnapshot(snapshot: HealthSnapshot, lang: string): string {
+/**
+ * Injectable seam for the 363-011 session-warn line only — every other message
+ * lookup in this render stays a direct getMessage() call (existing pattern).
+ * Needed because the 'health.session_warn' key's messages.ts entry is a
+ * companion edit outside this task's write scope (see .result docImpact); this
+ * DI lets the wiring + en/tr/interpolation behavior be proven hermetically
+ * now, and picks up the real localized text with zero further code changes
+ * once messages.ts adds the key.
+ */
+export interface RenderHealthSnapshotDeps {
+  getMessageFn?: typeof getMessage;
+}
+
+/** Compact single-line render — "tek-bakış" (ADR-G-010: terminal stays concise).
+ *  Gains a second, warning-only line when 4+ parallel sessions are active. */
+export function renderHealthSnapshot(
+  snapshot: HealthSnapshot,
+  lang: string,
+  deps: RenderHealthSnapshotDeps = {},
+): string {
+  const getMessageFn = deps.getMessageFn ?? getMessage;
   const providerText = genericLabel(snapshot.provider, lang);
   const modelText = genericLabel(snapshot.model, lang);
   // Model rides on top of provider: show `provider/unknown` when only the model
@@ -265,5 +314,9 @@ export function renderHealthSnapshot(snapshot: HealthSnapshot, lang: string): st
     `${getMessage('health.mode', lang)}: ${statusColor(snapshot.mode.status, genericLabel(snapshot.mode, lang))}`,
   ];
 
-  return `${segments.join(' · ')}  ${theme.muted(snapshot.cwd)}`;
+  const line = `${segments.join(' · ')}  ${theme.muted(snapshot.cwd)}`;
+  if (snapshot.sessions?.status !== 'warn') return line;
+
+  const warning = getMessageFn('health.session_warn', lang, { count: snapshot.sessions.label });
+  return `${line}\n${statusColor('warn', warning)}`;
 }

@@ -1,5 +1,23 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-363 Learnings
+- Sprint sprint-363 Learnings: ## Sprint sprint-363 Learnings
+- CODEX-V4 — model-pin gerçek sınavı (479-fix'li plan): NO_GO — Subprocess worker exited with code 1. No explicit result file written by worker.
+- ONB-ENTRY-WIRE — wizard'ı `deckent onboard` komutuna bağla: GO_WITH_TECH_DEBT — Wired the 361-009 onboarding machine (helpers/onboarding-wizard.ts, runOnboardingWizard) and the 362-011 Ink UI (repl/on
+- AUTONOMOUS-APPROVAL-MCP — DEFER-001 kalan yüzey: GO_WITH_TECH_DEBT — Implemented deckent_autonomous_approve + deckent_autonomous_reject in src/mcp/tools/autonomous-approval.ts, mirroring th
+- WATCH-SESSION-WARN — 4+ paralel-oturum uyarısı (session-registry wire): GO_WITH_TECH_DEBT — Wired 361-015 session-registry into health-snapshot.ts per goCriteria: buildHealthSnapshot() gained an optional `session
+
+## Gains
+- 363-001 — Fix debt: Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L — Worker timeout/killed (exitCode=1) but git diff shows 43 files modified.
+- 363-003 — RPC-WRITE-METHODS — run.start-detached + approval.decide (dilim-2c) — run.start-detached + approval.decide implemented as a standalone, injectable handler-map builder ...
+- 363-004 — ONB-GLOBAL-PRECEDENCE — global-katmanı config-zincirine bağla (dilim-3) — ONB-GLOBAL-PRECEDENCE (dilim-3, M1 dual-read/legacy-write per docs/design/onb-global-install.md §...
+- 363-006 — SDK-2 — sprint-yüzeyi: startDetached + results + retro (F2-008 dilim-2) — Added 3 methods to DeckentClient (360-012's client): startSprintDetached(options?) reuses spawnDe...
+- 363-007 — 362-DEBT-CLOSE — 362'nin 4 debt-notunu oku-kapat — Read all 4 debt-notes named by the task from .brain/archive/sprint-362-tasks/ result+json files: ...
+- 363-008 — TERM5-EVIDENCE — sade risk-dili karar-paketi (Sıra-45 🔬→karar) — TERM5-EVIDENCE karar-paketi yazıldı: docs/design/term5-risk-language.md.
+- 363-010 — AGSK-3 — rpc-protocol + onboarding-ux skill'leri (dilim-3) — 2x2-tree (2 skills x .deckent/skills + src/core/builtins/skills) created, byte-identical across t...
+- 363-012 — VSCODE-EXT-1 — CHAT-IDE gerçek-impl dilim-1 (Sıra-64) — DISK-VERIFY finding (see .tasks/task-363-012.plan for full detail): the task's scope assumed the ...
+- …and 1 more delivered
+
 ## Sprint sprint-362 Learnings
 - Sprint sprint-362 Learnings: ## Sprint sprint-362 Learnings
 - Fix debt: Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L: GO_WITH_TECH_DEBT — RESOLUTION BASIS (honest): born-455 DOC-ADR-LINK-CROSSWALK-SWEEP — the actual deliverable behind debt-357-015-fix — is V

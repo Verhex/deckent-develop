@@ -1,214 +1,208 @@
-# DIRECTIVES — SPRINT-362: MODEL-OVERRIDE-P0 + HERMETİK + DİLİM-2'LER + CODEX-V3 (12 task)
+# DIRECTIVES — SPRINT-363: CODEX-GERÇEK-SINAV + RPC-YAZMA + ONB-ENTEGRASYON + SDK-2 (12 task)
 
 ## Goal
-born-479 (Model-override-drop) kök+fix — 362'nin bir-numaralı işi; born-480 hermetik-fix;
-361-debt kapanışları; ONB/RPC/CLIENTS dilim-2 wire'ları; codex-dogfood v3 (479-fix'ine bağımlı).
+479-fix'li dist'le codex-v4 (model-pin gerçek sınavı); RPC yazma-metotları; ONB global-precedence +
+entry-wire; SDK dilim-2; 362-debt kapanışları; TERM-5 karar-paketi; katalog dilim-3.
 DISK-VERIFY → hermetik-test. Yasa #1/#2/#3.
 
 ## 🔒 BAĞLAYICI — her task
-- **DISTINCT-FILE** (sprint-planner.ts YALNIZ Task 1 · routing-engine.ts YALNIZ Task 5 ·
-  api/server.ts YALNIZ Task 7 · run.tsx YALNIZ Task 8 · app.tsx/chat-native.ts KAPALI).
-- DISK-VERIFY first; D-004 yön; surgical; YAGNI. Hermetik test; gerçek ağ/provider YOK
-  (Task 12 hariç — o GERÇEK codex-koşusudur). No build/install/login. npm-install ASLA.
-- Flag default-off + config-alanı→types+passthrough+roundtrip-kapanı. Zero-hardcode.
+- **DISTINCT-FILE** (config.ts YALNIZ Task 3 · api/server.ts KAPALI (RPC-yazma endpoint-modülü ayrı
+  dosyada) · app.tsx/run.tsx/chat-native.ts/sprint-planner.ts KAPALI).
+- DISK-VERIFY; D-004; surgical; YAGNI. Hermetik test; gerçek ağ YOK (Task 1 hariç — gerçek codex).
+  No build/install/login. npm-install ASLA. Flag default-off + roundtrip-kapanı. Zero-hardcode.
   String-free. Honest result. No haiku.
 
 ---
 
-## Task 1: MODEL-DROP-FIX — forceModel zinciri kök+fix (born-479, P0)
-- Model: sonnet
-- Effort: high
-- Skills: typescript-expert
-- Files: src/orchestra/sprint-planner.ts, tests/orchestra/model-override-drop.test.ts
-- Scope: src/orchestra/, src/core/, tests/orchestra/, docs/adr/
-- Dependencies: none
-### Description
-born-479: 361-006 `Model: gpt-5` → task-JSON `model: opus` (provider: codex korundu). REPRO-önce:
-361-DIRECTIVES-fixture'ıyla planner-testi yaz, düşüşü İSPATLA; sonra kök (şüpheli: 360-004
-gpt-5→wire-5.5 remap'i sonrası resolvedModel/validasyon dalı forceModel'i default'a düşürüyor —
-sprint-planner.ts:386-431 çevresi + resolveModel çağrıları) ve fix: forceModel HER ZAMAN kazanır
-(katalogda-yoksa dürüst-WARN + forceModel korunur ya da plan-blok — sessiz-düşüş ASLA). Haiku/fable
-override'ları için de regresyon-testleri.
-### goNogo
-- goCriteria: repro-testi önce-KIRMIZI sonra-YEŞİL (commit-notes'ta kanıt); gpt-5/haiku/fable
-  force-matrisi task-JSON'a aynen iner; sessiz-düşüş kalmadı (WARN-yolu testli); mevcut planner-testleri
-  yeşil; `tsc` temiz.
-- nogo: model-registry değişikliği; provider-resolution değişikliği.
-
-## Task 2: HERMETIC-RUNSTATE — start-testleri gerçek-repo'dan kopar (born-480)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert, ci-testing
-- Files: tests/mcp/tools/start.test.ts, tests/mcp/start-autoapprove.test.ts, tests/mcp/start-cost-gate.test.ts, tests/mcp/start-estimate.test.ts
-- Scope: tests/mcp/, src/mcp/, docs/adr/
-- Dependencies: none
-### Description
-born-480: start-test ailesi gerçek `process.cwd()` run-state'ini okuyor (canlı-sprint lock'unda 19
-test kırılıyor). Fix test-tarafında: tmpdir-proje fixture + cwd/lock-inject (mevcut hermetik-desen:
-withSandboxHome emsali); src'de yalnız gerekli seam varsa dar-ekle (dokunursan gerekçele). Kanıt:
-sahte "sprint-running lock" fixture'ıyla testler YİNE yeşil (lock'a duyarsız).
-### goNogo
-- goCriteria: 4 dosya tmpdir-hermetik; sahte-canlı-lock altında yeşil (test-içi kanıt-vakası);
-  `tsc` temiz.
-- nogo: start-tool davranış değişikliği.
-
-## Task 3: LIMITS-WARN-FIELDS — pencere-başına warn eşiği (361-002 debt)
-- Model: sonnet
-- Effort: low
-- Skills: typescript-expert
-- Files: src/core/limit-preflight.ts, tests/core/limit-preflight.test.ts
-- Scope: src/core/, tests/core/, docs/adr/
-- Dependencies: none
-### Description
-361-002 debt-notu: warn-eşiği tek-global (min(70, block)). `limit_gate` config'ine opsiyonel
-`session_warn_pct/weekly_warn_pct` (default mevcut davranış — geriye-uyum byte-aynı; roundtrip-kapanı).
-### goNogo
-- goCriteria: per-pencere warn testli; alan-yokken eski davranış byte-aynı; roundtrip; `tsc` temiz.
-- nogo: block-semantiği değişikliği.
-
-## Task 4: APRHIST-DEBT-CLOSE — 360-013 debt-notunu kapat
-- Model: sonnet
-- Effort: low
-- Skills: typescript-expert, api-design
-- Files: src/api/approval-history-endpoint.ts, tests/api/approval-history-endpoint.test.ts
-- Scope: src/api/, tests/api/, docs/adr/
-- Dependencies: none
-### Description
-`.brain/archive/sprint-360-tasks/task-360-013.result` notes'unu OKU (debt-gerekçesi orada) ve tam
-kapat; endpoint davranış-kontratı (sayfalama/auth) değişmez.
-### goNogo
-- goCriteria: debt-notundaki eksik(ler) kapandı (notes'ta önce/sonra); endpoint testleri yeşil; `tsc` temiz.
-- nogo: server.ts (Task 7'nin) değişikliği.
-
-## Task 5: DOMAIN-ROUTE-WIRE — routeTaskV2'ye domainFromScope + openrouter-doc-route bağla
-- Model: sonnet
-- Effort: high
-- Skills: typescript-expert
-- Files: src/core/routing-engine.ts, tests/core/domain-route-wire.test.ts
-- Scope: src/core/, tests/core/, docs/adr/
-- Dependencies: none
-### Description
-İki flag'li çekirdek routeTaskV2'ye bağlanır (ikisi de default-off, flag-off byte-aynı):
-(a) 359-005 route-domain-scope (flag-on'da scope-domain önceliği); (b) 361-003
-resolveOpenRouterDocRoute (flag-on'da doc-task provider-önerisi — forceModel/provider varsa ASLA ezme).
-### goNogo
-- goCriteria: iki flag'in on/off matris-testleri; force-override ezilmez (negatif-test); flag-off
-  mevcut routing-testleri byte-aynı; `tsc` temiz.
-- nogo: default-on; skor-tablosu değişikliği flag-off'ta.
-
-## Task 6: CLIENTS-RELAY-WIRE — Slack/Teams adaptörlerini relay-config'e bağla
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/connectors/approval-clients-wire.ts, tests/connectors/approval-clients-wire.test.ts
-- Scope: src/connectors/, src/core/, tests/connectors/, docs/adr/
-- Dependencies: none
-### Description
-361-010 adaptörlerini kayıt-katmanıyla bitir: config `approval_channels.{slack,teams}` blokları
-($DECK-secret webhook/token; default-off + roundtrip) → `attachConfiguredApprovalChannels(relay,
-config, transports)` — telegram-emsal deseni; kanal-hatası izole.
-### goNogo
-- goCriteria: config-on+fake-transport→attach; off→hiç; secret sızmaz; roundtrip; `tsc` temiz.
-- nogo: adaptörleri/relay'i değiştirmek; gerçek ağ.
-
-## Task 7: RPC-API-WIRE — TERM-RPC'yi HTTP yüzeyine bağla (dilim-2a)
-- Model: sonnet
-- Effort: high
-- Skills: api-design, typescript-expert
-- Files: src/api/server.ts, tests/api/rpc-endpoint.test.ts
-- Scope: src/api/, src/core/, tests/api/, docs/adr/
-- Dependencies: none
-- Smoke: node dist/cli/entry.js serve --port 3217 → GET /api/health = 200
-### Description
-361-011 RPC-çekirdeğine ilk tüketici: POST /api/rpc — auth-zincirin ARKASINDA (fail-closed korunur),
-handler-map'i mevcut yüzeylerden dar-adaptörlerle doldur (session.list→session-registry ·
-run.status→run-state-feed · approval.list→store · limits.get→limit-preflight); yazma-metotları
-(run.start-detached, approval.decide) bu dilimde `unsupported` dürüst-yanıt (dilim-2b).
-### goNogo
-- goCriteria: 4 read-metot round-trip (hermetik fixture); unknown/unsupported dürüst; auth'suz 401;
-  mevcut api-testleri yeşil; `tsc` temiz.
-- nogo: auth-zayıflatma; yazma-metotlarını açmak.
-
-## Task 8: RPC-REPL-WIRE — REPL'e rpc-client + /rpc debug-komutu (dilim-2b-read)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/cli/repl/run.tsx, src/cli/repl/rpc-client.ts, tests/cli/repl/rpc-client.test.ts
-- Scope: src/cli/, src/core/, tests/cli/, docs/adr/
-- Dependencies: none
-### Description
-İkinci tüketici: in-process rpc-client (HTTP'siz — dispatcher'ı doğrudan çağıran local-transport;
-term-rpc kontratı üzerinden) + run.tsx'te flag'li kayıt (`terminal.rpc_debug` default-off; mevcut
-surface-wire fail-soft desenine ekle). Amaç: protokolün çift-tüketici kanıtı (RPC gerçekten ortak).
-### goNogo
-- goCriteria: local-transport 4 read-metot testli; flag-off run.tsx byte-aynı (mevcut repl-testleri
-  yeşil); roundtrip-kapanı; `tsc` temiz.
-- nogo: app.tsx; HTTP-çağrısı.
-
-## Task 9: ONB-GLOBAL-STORE — global-katman deposu dilim-2
-- Model: sonnet
-- Effort: high
-- Skills: typescript-expert
-- Files: src/core/global-store.ts, tests/core/global-store.test.ts
-- Scope: src/core/, tests/core/, docs/adr/
-- Dependencies: none
-### Description
-361-008 resolver'ının üstüne depo-katmanı: `GlobalStore` — resolveGlobalScopePaths'la çözülen dizinde
-versiyonlu JSON-depolar (auth-durum-cache, model-catalog-cache, limits-cache); atomic-yazım, bozuk-dosya
-fail-soft, migration-iskeleti (v1). Proje-scope'a DOKUNMA (memory.db vs. proje işi — tasarım-doc'daki
-katman-tablosuna sadık).
-### goNogo
-- goCriteria: 3-depo round-trip (tmpdir+env-inject, 4-platform yol-testleri resolver-reuse);
-  bozuk-dosya fail-soft; `tsc` temiz.
-- nogo: config.ts precedence değişikliği; gerçek ~/.deckent yazımı testte.
-
-## Task 10: WIZARD-INK — onboarding-wizard Ink yüzeyi (dilim-2)
-- Model: fable
-- Effort: high
-- Skills: typescript-expert, ink-tui
-- Files: src/cli/repl/onboarding-ui.tsx, tests/cli/repl/onboarding-ui.test.tsx
-- Scope: src/cli/, tests/cli/, docs/adr/
-- Dependencies: none
-### Description
-361-009 adım-makinesine Ink-UI: soru-kartı (seçenekler/onay/atla), ilerleme-göstergesi, özet+uygula-onayı
-ekranı — string-free (labels-inject), ink-testing-library testleri; entry-wire follow-up (bu dilimde
-mount-edilebilir bileşen + adım-makinesi entegrasyonu).
-### goNogo
-- goCriteria: 5-adım akışı render-testleriyle (seçim→ilerleme→özet); NO_COLOR temiz; makine-reuse
-  kanıtı; `tsc` temiz.
-- nogo: entry.ts/app.tsx wire; init davranışı.
-
-## Task 11: D004-SHIM-REGISTRY — bilinçli katman-geçişleri için istisna-kaydı (361-014 debt)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: scripts/lint-layer-shims.mjs, .deckent/settings/layer-shims.json, tests/docs/layer-shims.test.ts
-- Scope: scripts/, .deckent/settings/, tests/docs/, docs/adr/
-- Dependencies: none
-### Description
-361-014 debt'i: mcp→cli/repl crossing'leri (nervous.ts pre-existing + nervous-edit.ts yeni) için
-İSTİSNA-KAYDI mekanizması — layer-shims.json (crossing + gerekçe + ADR-ref + expiry-tarihi) +
-lint-script: kayıtlı-crossing OK, kayıtsız-yeni-crossing FAIL (ratchet-deseni; 466-emsali).
-Mevcut 2 crossing kayıtla; ADR-D-004 amendment karar-metni Alperen-kapısına (doc'a taslak-not).
-### goNogo
-- goCriteria: lint kayıtlı-2'yle yeşil, kayıtsız-fixture'la kırmızı (test spawn'lı); expiry-alanı
-  zorunlu; `tsc`/lint-node temiz.
-- nogo: crossing'leri kod-tarafında taşımak (o ayrı karar).
-
-## Task 12: CODEX-DOGFOOD-V3 — gerçek codex analiz-işi (479-fix sonrası)
+## Task 1: CODEX-V4 — model-pin gerçek sınavı (479-fix'li plan)
 - Model: gpt-5
 - Backend: subprocess
 - Effort: normal
 - Skills: doc-writing
-- Files: docs/analysis/codex-v3-eval-audit-361.md
-- Scope: docs/analysis/, .brain/archive/
-- Dependencies: MODEL-DROP-FIX
+- Files: docs/analysis/codex-v4-selfreport-363.md
+- Scope: docs/analysis/
+- Dependencies: none
 ### Description
-ÜÇÜNCÜ deneme — bu kez Task 1'in fix'ine bağımlı (dependency-gate normalize-zinciri onu 479-fix'li
-planla koşturur… planlama bu sprint'in BAŞINDA olduğundan fix bu sprint'e yetişmez: o yüzden KANIT-ODAKLI
-küçük iş): (1) runtime self-report (hangi model/CLI — bu görev yine claude'la koşarsa BU DA VERİDİR,
-dürüst yaz); (2) sprint-361 arşivinden evaluation-audit kalitesi mini-denetimi (5 task'ın
-brainEvaluationReason'ları tutarlı mı). ≤5KB, erken-yaz.
+DÖRDÜNCÜ ve belirleyici deneme — bu plan 479-fix'li dist'le yazıldı; task-JSON'da model:gpt-5
+bekleniyor. (1) runtime self-report (model/CLI/başlangıç); (2) kendi task-JSON'ını oku
+(.tasks/task-<id>.json) ve model/provider alanlarını rapora yaz — zincirin uçtan-uca kanıtı.
+≤3KB, erken-yaz-erken-bitir.
 ### goNogo
-- goCriteria: doküman + self-report + ≥3 bulgu; lint:link temiz.
-- nogo: kod değişikliği; 5KB üstü.
+- goCriteria: doküman + self-report + kendi-JSON alıntısı; lint:link temiz.
+- nogo: kod; 3KB üstü.
+
+## Task 2: RPC-WRITE-METHODS — run.start-detached + approval.decide (dilim-2c)
+- Model: sonnet
+- Effort: high
+- Skills: api-design, typescript-expert
+- Files: src/api/rpc-write-handlers.ts, tests/api/rpc-write-handlers.test.ts
+- Scope: src/api/, src/core/, src/cli/, tests/api/, docs/adr/
+- Dependencies: none
+### Description
+362-008'in `unsupported` bıraktığı iki yazma-metodu, AYRI handler-modülünde:
+run.start-detached → detached-start.ts reuse (358-003); approval.decide → broker.decide (karar-kanalı
+'rpc'). Handler-map'e kayıt: 362-008'in injectable-map desenine EK (server.ts'e DOKUNMADAN — map'i
+dolduran modül-fonksiyonu export et, wire tek-satırsa notes'a). Auth zaten üst-zincirde; yine de
+handler-içi requester-alanı zorunlu (audit).
+### goNogo
+- goCriteria: iki metot hermetik (fake-spawn/fake-broker); requester'sız istek reddi; unsupported-listesi
+  güncel; `tsc` temiz.
+- nogo: server.ts; auth-zayıflatma; gerçek-spawn.
+
+## Task 3: ONB-GLOBAL-PRECEDENCE — global-katmanı config-zincirine bağla (dilim-3)
+- Model: sonnet
+- Effort: high
+- Skills: typescript-expert
+- Files: src/core/config.ts, tests/core/global-precedence.test.ts
+- Scope: src/core/, tests/core/, docs/adr/
+- Dependencies: none
+### Description
+DİKKATLİ görev (config.ts kritik): 3-katman merge zaten global(~/.deckent/config.json) okuyor —
+DISK-VERIFY: GLOBAL_CONFIG_PATH mevcut zincir. Bu dilim: global-yolu resolveGlobalScopePaths'tan
+(361-008) türet (platform-doğru; mevcut sabit-yol davranışı DEĞİŞMEZSE no-op refactor + testler;
+farklıysa geriye-uyum: eski-yol fallback okunur, yeni-yol tercih). born-464 dersi: değişen her alan
+roundtrip-kapanıyla.
+### goNogo
+- goCriteria: 4-platform yol-testi (env-inject); eski-yol geriye-uyum testi; mevcut config-testleri
+  (config-flag-roundtrip dahil) BYTE-yeşil; `tsc` temiz.
+- nogo: precedence-sırası değişikliği; cache-semantiği bozma.
+
+## Task 4: ONB-ENTRY-WIRE — wizard'ı `deckent onboard` komutuna bağla
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/cli/commands/onboard.ts, src/cli/index.ts, src/cli/helpers/messages.ts, tests/cli/onboard-command.test.ts
+- Scope: src/cli/, tests/cli/, docs/adr/
+- Dependencies: none
+- Smoke: node dist/cli/entry.js onboard --plan-only → exit 0
+### Description
+361-009 makinesi + 362-011 Ink-UI'yi komuta bağla: `deckent onboard` — TTY'de Ink-akışı, `--plan-only`
+non-interaktif plan-çıktısı (CI/test yolu); init'e DOKUNMA (onboard ayrı-komut; init-entegrasyonu
+Alperen-kararı sonrası). getMessage en/tr.
+### goNogo
+- goCriteria: --plan-only hermetik (fixture-probe) plan basar; komut kayıtlı (command-registry
+  envanter-testi güncel); en+tr; `tsc` temiz.
+- nogo: init.ts davranışı; gerçek-yazım default'ta.
+
+## Task 5: SDK-2 — sprint-yüzeyi: startDetached + results + retro (F2-008 dilim-2)
+- Model: sonnet
+- Effort: high
+- Skills: typescript-expert, api-design
+- Files: src/sdk/deckent-client.ts, tests/sdk/deckent-client-sprint.test.ts
+- Scope: src/sdk/, src/core/, src/orchestra/, src/cli/, tests/sdk/, docs/adr/
+- Dependencies: none
+### Description
+360-012 client'ına sprint-yüzeyi: `startSprintDetached()` (detached-start reuse; pid+log döner),
+`getSprintResults(sprintId)` (arşiv/tasks okuyucu), `getRetro(sprintId)`. Zero-CLI-prereq korunur
+(spawn yalnız startDetached'te ve injectable).
+### goNogo
+- goCriteria: 3 metot hermetik round-trip (fixture-arşiv; fake-spawn); mevcut sdk-testleri yeşil;
+  `tsc` temiz.
+- nogo: package.json; runSprint çekirdeğine dokunmak.
+
+## Task 6: 362-DEBT-CLOSE — 362'nin 4 debt-notunu oku-kapat
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/api/approval-history-endpoint.ts, tests/api/approval-history-endpoint.test.ts, docs/analysis/debt-close-362.md
+- Scope: src/api/, src/core/, tests/, docs/analysis/, docs/adr/
+- Dependencies: none
+### Description
+`.brain/archive/sprint-362-tasks/` debt-notlarını (001-zinciri, 004, 008-brain-debt, +1) OKU;
+yazı-yetkin dahilinde kapat (approval-history ailesi yetkinde); yetki-dışı kalanları
+docs/analysis/debt-close-362.md'ye net-followup listesi olarak yaz (dosya+satır+öneri).
+### goNogo
+- goCriteria: yetki-içi debt'ler kapalı (önce/sonra notes); yetki-dışılar dokümante; testler yeşil;
+  `tsc` temiz.
+- nogo: DISTINCT-KAPALI dosyalar.
+
+## Task 7: TERM5-EVIDENCE — sade risk-dili karar-paketi (Sıra-45 🔬→karar)
+- Model: sonnet
+- Effort: normal
+- Skills: doc-writing
+- Files: docs/design/term5-risk-language.md
+- Scope: docs/design/, src/cli/
+- Dependencies: none
+### Description
+Sıra-45 (P0 🔬): Oku/Değiştir/Çalıştır/Otonom 4-seviyeli sade risk-dili önerisi — mevcut yüzeylerin
+(command-registry risk-etiketleri, tool trust-tier, approval risk-5'lisi) envanteri (DISK-VERIFY,
+satır-ref'li) + tek-eşleme tablosu önerisi + 10 örnek-komutun önce/sonra diliyle + getMessage-key
+taslağı. Karar Alperen'in — ADR-taslak bölümü.
+### goNogo
+- goCriteria: envanter satır-ref'li + eşleme-tablosu + 10 örnek + ADR-taslak; lint:link temiz.
+- nogo: kod.
+
+## Task 8: AUTONOMOUS-APPROVAL-MCP — DEFER-001 kalan yüzey
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/mcp/tools/autonomous-approval.ts, tests/mcp/autonomous-approval.test.ts
+- Scope: src/mcp/, src/orchestra/, tests/mcp/, docs/adr/
+- Dependencies: none
+### Description
+Sıra-74 kalanı: `deckent_autonomous_approve` / `deckent_autonomous_reject` — autonomous policy-gate'in
+approval-required backlog-girişlerine MCP'den karar (mevcut approval-adapter public-API'siyle;
+exec-siz karar-yazımı). Katalog+register+sayaç-senkron (44→46; 359/361 CC-desenini AYNEN uygula:
+index.ts TOOL_CATALOG + registerTools + server.ts instructions + tests sayaçları — HEPSİ bu task'ın işi).
+### goNogo
+- goCriteria: 2 tool hermetik; lint-mcp 46/46 yeşil; sayaç-testleri güncel-yeşil; `tsc` temiz.
+- nogo: autonomous çekirdek; eksik sayaç-senkron.
+
+## Task 9: AGSK-3 — rpc-protocol + onboarding-ux skill'leri (dilim-3)
+- Model: sonnet
+- Effort: low
+- Skills: doc-writing
+- Files: .deckent/skills/rpc-protocol/, .deckent/skills/onboarding-ux/, src/core/builtins/skills/rpc-protocol/, src/core/builtins/skills/onboarding-ux/
+- Scope: .deckent/skills/, src/core/builtins/, docs/adr/
+- Dependencies: none
+### Description
+2 yeni skill (iki-ağaç, ≤4KB): rpc-protocol (term-rpc kontrat-desenleri: zod-first, unknown-method
+dürüstlüğü, çift-tüketici testi) + onboarding-ux (wizard-adım-makinesi + plan-önce-uygula + degrade-safe
+teaser desenleri). Sprint-361/362 derslerinden künyeli.
+### goNogo
+- goCriteria: 2×2 ağaç; load-smoke; format-tutarlı; ≤4KB.
+- nogo: mevcut skill değişikliği.
+
+## Task 10: WATCH-SESSION-WARN — 4+ paralel-oturum uyarısı (session-registry wire)
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/cli/helpers/health-snapshot.ts, tests/cli/session-warn.test.ts
+- Scope: src/cli/, tests/cli/, docs/adr/
+- Dependencies: none
+### Description
+361-015 session-registry'sini health-snapshot'a bağla: açılışta aktif-oturum sayısı; ≥4 ise usage-katkı
+uyarısı satırı ("paralel oturumlar tek limiti paylaşır" — getMessage; /usage dersinden). Fail-soft.
+### goNogo
+- goCriteria: fixture-registry ile 1/4/stale senaryoları; snapshot mevcut testleri yeşil; en+tr; `tsc` temiz.
+- nogo: registry değişikliği.
+
+## Task 11: VSCODE-EXT-1 — CHAT-IDE gerçek-impl dilim-1 (Sıra-64)
+- Model: sonnet
+- Effort: high
+- Skills: typescript-expert
+- Files: src/extensions/vscode/src/deckent-panel.ts, src/extensions/vscode/src/rpc-bridge.ts, tests/extensions/vscode-panel.test.ts
+- Scope: src/extensions/, src/core/, tests/extensions/, docs/adr/
+- Dependencies: none
+### Description
+Sıra-64 stub→gerçek dilim-1: mevcut ext-iskeletini DISK-VERIFY; webview-panel (status+limits+approvals
+read-only — TERM-RPC http-client'ıyla; RPC'nin ÜÇÜNCÜ tüketicisi) + rpc-bridge (fetch-injectable).
+Paket/publish YOK; unit-test'ler node-tarafı (webview-mock).
+### goNogo
+- goCriteria: rpc-bridge 4 read-metot testli; panel veri-bağlama unit'li (mock-webview); ext derlenir
+  (`tsc` ext-config'iyle de temiz — DISK-VERIFY nasıl derleniyor).
+- nogo: publish/paketleme; ana-tsconfig bozulması.
+
+## Task 12: TOOLCU-DESIGN — computer-use/browser pack tasarım-notu (Sıra-83, P2)
+- Model: sonnet
+- Effort: low
+- Skills: doc-writing
+- Files: docs/design/tool-cu-pack.md
+- Scope: docs/design/
+- Dependencies: none
+### Description
+Sıra-83 (P2) tasarım-dilimi: opsiyonel automation-pack sınırları — playwright-MCP mevcut-emsali,
+risk-sınıfı (Danger-tier), approval-zorunluluğu, sandbox-gereksinimi; uygulama post-7-Tem önerisi.
+### goNogo
+- goCriteria: kapsam+risk+entegrasyon-önerisi (satır-ref'li); lint:link temiz.
+- nogo: kod.

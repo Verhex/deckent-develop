@@ -2411,6 +2411,212 @@ const MESSAGES: MessageMap = {
     en: '[limit-gate] Warning: {window} usage at {pct}% — proceeding.',
     tr: '[limit-gate] Uyarı: {window} kullanımı %{pct} — devam ediliyor.',
   },
+
+  // ─── onboarding wizard core (ONB-WIZARD-CORE, Sprint 361 Task 361-009) ─
+  'onboarding.mcp.host_not_installed': {
+    en: '{host}: CLI not installed — MCP attach skipped',
+    tr: '{host}: CLI kurulu değil — MCP bağlama atlandı',
+  },
+  'onboarding.mcp.unsupported': {
+    en: '{host}: this CLI does not support MCP attach',
+    tr: '{host}: bu CLI MCP bağlamayı desteklemiyor',
+  },
+  'onboarding.mcp.already_attached': {
+    en: '{host}: MCP already attached',
+    tr: '{host}: MCP zaten bağlı',
+  },
+  'onboarding.mcp.attach_suggested': {
+    en: '{host}: MCP attach suggested',
+    tr: '{host}: MCP bağlama önerildi',
+  },
+  'onboarding.question.workspace_scope': {
+    en: 'Where should this configuration live?',
+    tr: 'Bu yapılandırma nerede saklansın?',
+  },
+  'onboarding.choice.workspace_scope.project': {
+    en: 'This project only',
+    tr: 'Yalnızca bu proje',
+  },
+  'onboarding.choice.workspace_scope.global': {
+    en: 'Global (all projects on this machine)',
+    tr: 'Global (bu makinedeki tüm projeler)',
+  },
+  'onboarding.question.plan_mode': {
+    en: 'Select a working mode',
+    tr: 'Bir çalışma modu seçin',
+  },
+  'onboarding.choice.plan_mode.performance': {
+    en: 'performance (premium tier, max power)',
+    tr: 'performans (premium katman, maksimum güç)',
+  },
+  'onboarding.choice.plan_mode.balanced': {
+    en: 'balanced (standard brain + premium workers)',
+    tr: 'dengeli (standart brain + premium worker)',
+  },
+  'onboarding.choice.plan_mode.economic': {
+    en: 'economic (standard tier, cost-efficient)',
+    tr: 'ekonomik (standart katman, maliyet-etkin)',
+  },
+  'onboarding.choice.plan_mode.api': {
+    en: 'api (pay-per-use, premium brain + standard workers)',
+    tr: 'api (kullandıkça öde, premium brain + standart worker)',
+  },
+  'onboarding.choice.plan_mode.max_plan': {
+    en: 'max_plan (Claude Max subscription, performance preset)',
+    tr: 'max_plan (Claude Max aboneliği, performans ön ayarı)',
+  },
+  'onboarding.choice.plan_mode.max5x_plan': {
+    en: 'max5x_plan (Claude Max 5x subscription, higher usage ceiling)',
+    tr: 'max5x_plan (Claude Max 5x aboneliği, daha yüksek kullanım tavanı)',
+  },
+  'onboarding.choice.plan_mode.pro_plan': {
+    en: 'pro_plan (Claude Pro subscription, economic preset)',
+    tr: 'pro_plan (Claude Pro aboneliği, ekonomik ön ayar)',
+  },
+  'onboarding.provider.none_authenticated': {
+    en: 'No authenticated provider found — sign in to a provider CLI (claude / codex / gemini) and re-run onboarding.',
+    tr: 'Kimliği doğrulanmış bir sağlayıcı bulunamadı — bir sağlayıcı CLI\'sine (claude / codex / gemini) giriş yapıp onboarding\'i yeniden çalıştırın.',
+  },
+
+  // ─── onboarding Ink UI (WIZARD-INK, Sprint 362 Task 362-011) ───────────
+  'onboarding.ui.step.provider_detect': {
+    en: 'Provider Detection',
+    tr: 'Sağlayıcı Tespiti',
+  },
+  'onboarding.ui.step.auth_status': {
+    en: 'Authentication Status',
+    tr: 'Kimlik Doğrulama Durumu',
+  },
+  'onboarding.ui.step.mcp_suggestion': {
+    en: 'MCP Attach',
+    tr: 'MCP Bağlama',
+  },
+  'onboarding.ui.step.workspace_mode': {
+    en: 'Workspace & Mode',
+    tr: 'Çalışma Alanı ve Mod',
+  },
+  'onboarding.ui.step.summary': {
+    en: 'Summary',
+    tr: 'Özet',
+  },
+  'onboarding.ui.provider.present': {
+    en: '{provider}: found (v{version})',
+    tr: '{provider}: bulundu (v{version})',
+  },
+  'onboarding.ui.provider.missing': {
+    en: '{provider}: not found',
+    tr: '{provider}: bulunamadı',
+  },
+  'onboarding.ui.auth.logged-in': {
+    en: '{provider}: logged in ({method})',
+    tr: '{provider}: giriş yapıldı ({method})',
+  },
+  'onboarding.ui.auth.logged-out': {
+    en: '{provider}: not logged in',
+    tr: '{provider}: giriş yapılmamış',
+  },
+  'onboarding.ui.auth.unknown': {
+    en: '{provider}: login status unknown',
+    tr: '{provider}: giriş durumu bilinmiyor',
+  },
+  'onboarding.ui.question.mcp_attach': {
+    en: 'Attach the recommended MCP servers?',
+    tr: 'Önerilen MCP sunucuları bağlansın mı?',
+  },
+  'onboarding.ui.choice.mcp_attach.accept': {
+    en: 'Yes, attach ({hosts})',
+    tr: 'Evet, bağla ({hosts})',
+  },
+  'onboarding.ui.choice.mcp_attach.skip': {
+    en: 'No, skip',
+    tr: 'Hayır, atla',
+  },
+  'onboarding.ui.question.apply': {
+    en: 'Apply this configuration?',
+    tr: 'Bu yapılandırma uygulansın mı?',
+  },
+  'onboarding.ui.choice.apply.apply': {
+    en: 'Apply',
+    tr: 'Uygula',
+  },
+  'onboarding.ui.choice.apply.cancel': {
+    en: 'Cancel',
+    tr: 'İptal',
+  },
+  'onboarding.ui.progress': {
+    en: 'Step {index}/{total}',
+    tr: 'Adım {index}/{total}',
+  },
+  'onboarding.ui.hint.question': {
+    en: '↑/↓ move · Enter select · s skip (default) · Esc cancel',
+    tr: '↑/↓ hareket · Enter seç · s atla (varsayılan) · Esc iptal',
+  },
+  'onboarding.ui.hint.info': {
+    en: 'Enter continue · Esc cancel',
+    tr: 'Enter devam · Esc iptal',
+  },
+  'onboarding.ui.summary.config_path': {
+    en: 'Config path: {path}',
+    tr: 'Yapılandırma yolu: {path}',
+  },
+  'onboarding.ui.summary.mode': {
+    en: 'Mode: {mode} (brain/worker tier: {strategy})',
+    tr: 'Mod: {mode} (brain/worker katmanı: {strategy})',
+  },
+  'onboarding.ui.summary.scope': {
+    en: 'Scope: {scope} (root: {root})',
+    tr: 'Kapsam: {scope} (kök: {root})',
+  },
+  'onboarding.ui.summary.providers': {
+    en: 'Providers — brain: {brain}, worker: {worker}, fallback: {fallback}',
+    tr: 'Sağlayıcılar — brain: {brain}, worker: {worker}, fallback: {fallback}',
+  },
+  'onboarding.ui.summary.mcp_actions': {
+    en: 'MCP attach actions: {count} ({hosts})',
+    tr: 'MCP bağlama eylemleri: {count} ({hosts})',
+  },
+  'onboarding.ui.summary.mcp_none': {
+    en: 'MCP attach actions: none',
+    tr: 'MCP bağlama eylemleri: yok',
+  },
+  'onboarding.ui.summary.global_scope_error': {
+    en: 'Global scope resolution failed: {error}',
+    tr: 'Global kapsam çözümlemesi başarısız: {error}',
+  },
+  'onboarding.ui.done.applied': {
+    en: 'Configuration plan confirmed.',
+    tr: 'Yapılandırma planı onaylandı.',
+  },
+  'onboarding.ui.done.cancelled': {
+    en: 'Onboarding cancelled — nothing changed.',
+    tr: 'Onboarding iptal edildi — hiçbir şey değişmedi.',
+  },
+
+  // ─── onboard entry-wire (ONB-ENTRY-WIRE, Sprint 363 Task 363-005) ──────
+  'onboarding.plan.title': {
+    en: '=== Deckent Onboarding Plan ===',
+    tr: '=== Deckent Onboarding Planı ===',
+  },
+  'onboarding.plan.section.providers': {
+    en: 'Providers:',
+    tr: 'Sağlayıcılar:',
+  },
+  'onboarding.plan.section.auth': {
+    en: 'Authentication:',
+    tr: 'Kimlik Doğrulama:',
+  },
+  'onboarding.plan.section.mcp': {
+    en: 'MCP Attach:',
+    tr: 'MCP Bağlama:',
+  },
+  'onboarding.plan.section.summary': {
+    en: 'Summary:',
+    tr: 'Özet:',
+  },
+  'onboarding.plan.not_applied': {
+    en: 'No files were written — this was a plan preview only.',
+    tr: 'Hiçbir dosya yazılmadı — bu yalnızca bir plan önizlemesiydi.',
+  },
 };
 
 /**

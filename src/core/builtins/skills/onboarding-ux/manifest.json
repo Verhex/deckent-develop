@@ -1,0 +1,57 @@
+{
+  "id": "onboarding-ux",
+  "source": "builtin",
+  "name": "Onboarding UX",
+  "version": "0.1.0",
+  "description": "Wizard step-machines, plan-before-apply config writes, injectable probes, degrade-safe startup teasers",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "onboarding"
+          }
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "workflow",
+  "triggers": [
+    "onboarding",
+    "wizard",
+    "step-machine",
+    "teaser",
+    "plan-before-apply",
+    "first-run",
+    "setup-flow",
+    "degrade-safe"
+  ],
+  "stackDetection": {
+    "files": [],
+    "dependencies": [],
+    "commands": []
+  },
+  "composableWith": [
+    "ink-tui",
+    "typescript-expert",
+    "testing-expert"
+  ],
+  "priority": 6,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  }
+}

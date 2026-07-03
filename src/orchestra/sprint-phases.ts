@@ -2435,7 +2435,10 @@ export async function runFixPhase(
             projectRoot, fixTask.id, fixEval, fixRubricResult.totalScore,
             { honest: true }, fixResult,
           );
-          if (fixEval === TaskEvaluation.DONE && fixTask.fixForTaskId) {
+          if (
+            (fixEval === TaskEvaluation.DONE || fixEval === TaskEvaluation.GO_WITH_TECH_DEBT) &&
+            fixTask.fixForTaskId
+          ) {
             // 362-001-fix: resolve the debt this fix chain was spawned to clear,
             // walking the fixForTaskId chain to its ROOT — not just the immediate
             // parent. A DIRECT fix (fixForTaskId → origin task) is the original
@@ -2449,6 +2452,19 @@ export async function runFixPhase(
             // the whole chain is safe, and a `seen` set bounds the walk against a
             // malformed self / cyclic fixForTaskId. Degrades to the prior single-
             // resolve when the ancestor task file is absent (ancestorId → undefined).
+            //
+            // 363-001-fix: the gate now mirrors the main-loop EVALUATE-phase gate
+            // (line ~1787: `DONE || GO_WITH_TECH_DEBT`). The prior DONE-only gate
+            // was the true root-cause of the multi-sprint debt pile-up: a fix task
+            // that lands GWTD (the common outcome — core delivered, minor residual)
+            // skipped the chain-walk entirely, yet handleEvaluation still mints a
+            // fresh `debt-<fixTaskId>` row for the residual. The ancestor chain
+            // (incl. the root debt) therefore never resolved and re-injected every
+            // sprint — an ever-growing pile. Widening to GWTD collapses the lineage
+            // to a SINGLE rolling debt: a GWTD fix DID deliver the core, its residual
+            // is tracked by the freshly-minted debt-<fixTaskId>, so the stale
+            // ancestor rows are safe to resolve. NO_GO is still excluded (a NO_GO
+            // fix delivered nothing, so its ancestors must stay open).
             const seenFixChain = new Set<string>([fixTask.id]);
             let ancestorId: string | undefined = fixTask.fixForTaskId;
             while (ancestorId && !seenFixChain.has(ancestorId)) {

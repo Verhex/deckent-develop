@@ -8788,3 +8788,37 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 362-013: CODEX-DOGFOOD-V3 — gerçek codex analiz-işi (479-fix sonrası) (DONE)
 
 ---
+## Sprint 363 — sprint-363
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-03
+**Duration:** 1818s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 15 |
+| Completed | 13 |
+| Tech Debt | 3 |
+| No-Go | 2 |
+| Coverage | NaN% |
+| Duration | 1818153ms |
+
+### Tasks
+
+- 363-001: Fix debt: Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L (DONE)
+- 363-002: CODEX-V4 — model-pin gerçek sınavı (479-fix'li plan) (NO_GO)
+- 363-003: RPC-WRITE-METHODS — run.start-detached + approval.decide (dilim-2c) (DONE)
+- 363-004: ONB-GLOBAL-PRECEDENCE — global-katmanı config-zincirine bağla (dilim-3) (DONE)
+- 363-005: ONB-ENTRY-WIRE — wizard'ı `deckent onboard` komutuna bağla (GO_WITH_TECH_DEBT)
+- 363-006: SDK-2 — sprint-yüzeyi: startDetached + results + retro (F2-008 dilim-2) (DONE)
+- 363-007: 362-DEBT-CLOSE — 362'nin 4 debt-notunu oku-kapat (DONE)
+- 363-008: TERM5-EVIDENCE — sade risk-dili karar-paketi (Sıra-45 🔬→karar) (DONE)
+- 363-009: AUTONOMOUS-APPROVAL-MCP — DEFER-001 kalan yüzey (GO_WITH_TECH_DEBT)
+- 363-010: AGSK-3 — rpc-protocol + onboarding-ux skill'leri (dilim-3) (DONE)
+- 363-011: WATCH-SESSION-WARN — 4+ paralel-oturum uyarısı (session-registry wire) (GO_WITH_TECH_DEBT)
+- 363-012: VSCODE-EXT-1 — CHAT-IDE gerçek-impl dilim-1 (Sıra-64) (DONE)
+- 363-013: TOOLCU-DESIGN — computer-use/browser pack tasarım-notu (Sıra-83, P2) (DONE)
+
+---

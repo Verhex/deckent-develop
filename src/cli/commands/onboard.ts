@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { createElement } from 'react';
+import { render } from 'ink';
 import type { Command } from 'commander';
 import { print } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -10,6 +12,24 @@ import { runWizard } from '../helpers/wizard.js';
 import type { WizardStep } from '../helpers/wizard.js';
 import { detectProjectStack } from '../../core/stack-detector.js';
 import { PROVIDER_PACKAGES } from '../../core/provider-packages.js';
+import { getMessage } from '../helpers/messages.js';
+import { getLangFromConfig } from '../helpers/config-reader.js';
+import {
+  runOnboardingWizard,
+  type OnboardingWizardResult,
+  type OnboardingConfigWritePlan,
+} from '../helpers/onboarding-wizard.js';
+import {
+  OnboardingWizardView,
+  buildProviderDetectRows,
+  buildAuthStatusRows,
+  buildMcpInfoRows,
+  buildSummaryRows,
+  type OnboardingUiContext,
+  type OnboardingLabelResolver,
+  type OnboardingInfoRow,
+  type OnboardingRowTone,
+} from '../repl/onboarding-ui.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -218,21 +238,149 @@ export async function runOnboard(root: string, opts: { nonInteractive?: boolean;
   print('');
 }
 
+// ─── ONB-ENTRY-WIRE (Sprint 363 Task 363-005) ──────────────────────────────
+//
+// Wires the 361-009 onboarding machine (helpers/onboarding-wizard.ts,
+// `runOnboardingWizard`) and the 362-011 Ink UI (repl/onboarding-ui.tsx,
+// `OnboardingWizardView`) into `deckent onboard`, alongside the pre-existing
+// stub flow above (`runOnboard`/`buildOnboardSteps`), which stays untouched
+// as the fallback for `--non-interactive` / non-TTY invocations — preserving
+// prior behavior for its two existing test files (out of this task's write
+// scope). Two new paths:
+//   - `--plan-only` (+ `--json`): the non-interactive, hermetic CI/test path
+//     — runs the machine once and prints the resulting plan. Read-only: no
+//     config.json write, no `deckent init` spawn.
+//   - TTY (no `--plan-only`, no `--non-interactive`, stdin is a TTY): mounts
+//     the Ink `OnboardingWizardView` card flow via `react`'s `createElement`
+//     (no JSX — this file is `.ts`, not `.tsx`).
+// Actually persisting the confirmed plan to disk is explicitly out of this
+// task's scope (NO-GO guard: real write must never be the default) — the
+// `OnboardingConfigWritePlan` stays `applied: false` by contract; the Ink
+// flow's apply-confirm reports that nothing was written and stops.
+
+/** `[OK]` / `[WARN]` / `[--]` prefix per row tone — mirrors `connect.ts`'s bracket-marker convention. */
+function onboardingToneMarker(tone: OnboardingRowTone): string {
+  return tone === 'ok' ? '[OK]' : tone === 'warn' ? '[WARN]' : '[--]';
+}
+
+/**
+ * Text report for `--plan-only` (non-JSON). Reuses the 362-011 Ink UI's own
+ * pure row-builders (`buildProviderDetectRows`/`buildAuthStatusRows`/
+ * `buildMcpInfoRows`/`buildSummaryRows`) — no formatting logic is reinvented
+ * here, only getMessage-resolved text + tone markers laid out as sections.
+ */
+export function formatOnboardingPlanReport(result: OnboardingWizardResult, lang: string): string {
+  const lines: string[] = [getMessage('onboarding.plan.title', lang), ''];
+
+  const section = (titleKey: string, rows: readonly OnboardingInfoRow[]): void => {
+    lines.push(getMessage(titleKey, lang));
+    for (const row of rows) {
+      lines.push(`  ${onboardingToneMarker(row.tone)} ${getMessage(row.labelKey, lang, row.labelParams)}`);
+    }
+    lines.push('');
+  };
+
+  section('onboarding.plan.section.providers', buildProviderDetectRows(result.providers));
+  section('onboarding.plan.section.auth', buildAuthStatusRows(result.providers));
+  section('onboarding.plan.section.mcp', buildMcpInfoRows(result.mcp));
+  section(
+    'onboarding.plan.section.summary',
+    buildSummaryRows({ workspace: result.workspace, providerSelection: result.providerSelection, plan: result.configPlan }),
+  );
+
+  return lines.join('\n').trimEnd();
+}
+
+/**
+ * `--plan-only` — the non-interactive CI/test path. Runs the 361-009 machine
+ * once with real (read-only) probes and prints the resulting plan. Never
+ * prompts, never writes config.json, never spawns `deckent init`.
+ */
+export async function runOnboardPlanOnly(root: string, opts: { json?: boolean } = {}): Promise<void> {
+  const lang = getLangFromConfig(root);
+  const project = detectProjectInfo(root);
+  const result = await runOnboardingWizard({ projectRoot: root, language: lang, projectName: project.name });
+
+  if (opts.json) {
+    print(JSON.stringify(result, null, 2));
+  } else {
+    print(formatOnboardingPlanReport(result, lang));
+  }
+}
+
+/**
+ * TTY interactive path — mounts the 362-011 Ink UI over one upfront machine
+ * run. `onApply` never performs a real write (out of scope, see module doc
+ * above): it just lets the component's own "applied" screen render, then
+ * prints an explicit "nothing was written" notice once unmounted so the
+ * plan-preview nature of this flow is never ambiguous to the user.
+ */
+export async function runOnboardInkFlow(root: string): Promise<void> {
+  const lang = getLangFromConfig(root);
+  const project = detectProjectInfo(root);
+  const wizard = await runOnboardingWizard({ projectRoot: root, language: lang, projectName: project.name });
+
+  const context: OnboardingUiContext = {
+    projectRoot: root,
+    platform: process.platform,
+    env: process.env,
+    language: lang,
+    projectName: project.name,
+  };
+  const resolveLabel: OnboardingLabelResolver = (key, params) => getMessage(key, lang, params);
+
+  let unmountApp: (() => void) | null = null;
+  let applied = false;
+
+  const element = createElement(OnboardingWizardView, {
+    wizard,
+    context,
+    resolveLabel,
+    onApply: (_plan: OnboardingConfigWritePlan) => {
+      applied = true;
+      setTimeout(() => unmountApp?.(), 150);
+    },
+    onCancel: () => {
+      setTimeout(() => unmountApp?.(), 150);
+    },
+  });
+
+  const { unmount, waitUntilExit } = render(element);
+  unmountApp = unmount;
+  await waitUntilExit();
+
+  if (applied) {
+    print(getMessage('onboarding.plan.not_applied', lang));
+  }
+}
+
 export function registerOnboard(program: Command): void {
   program
     .command('onboard')
     .description('Run the onboarding wizard')
     .option('--non-interactive', 'Skip interactive prompts, use defaults')
     .option('--force', 'Re-run onboarding even if already initialized')
-    .action(async (opts: { nonInteractive?: boolean; force?: boolean }) => {
+    .option('--plan-only', 'Print the onboarding plan without prompting (non-interactive, CI/test path)')
+    .option('--json', 'Output the --plan-only report as JSON')
+    .action(async (opts: { nonInteractive?: boolean; force?: boolean; planOnly?: boolean; json?: boolean }) => {
       let root: string;
       try {
         root = resolveProjectRoot();
       } catch {
         root = process.cwd();
       }
+
+      if (opts.planOnly) {
+        await runOnboardPlanOnly(root, { json: opts.json });
+        return;
+      }
+
       // Auto-detect non-interactive if stdin is not a TTY
       const isNonInteractive = opts.nonInteractive || !process.stdin.isTTY;
+      if (!isNonInteractive) {
+        await runOnboardInkFlow(root);
+        return;
+      }
       await runOnboard(root, { nonInteractive: isNonInteractive, force: opts.force });
     });
 }

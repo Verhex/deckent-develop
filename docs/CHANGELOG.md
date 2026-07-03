@@ -2,6 +2,32 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint363] - 2026-07-03
+
+### Added
+
+- RPC-WRITE-METHODS — run.start-detached + approval.decide (dilim-2c)
+- ONB-GLOBAL-PRECEDENCE — global-katmanı config-zincirine bağla (dilim-3)
+- SDK-2 — sprint-yüzeyi: startDetached + results + retro (F2-008 dilim-2)
+- 362-DEBT-CLOSE — 362'nin 4 debt-notunu oku-kapat
+- TERM5-EVIDENCE — sade risk-dili karar-paketi (Sıra-45 🔬→karar)
+- AGSK-3 — rpc-protocol + onboarding-ux skill'leri (dilim-3)
+- VSCODE-EXT-1 — CHAT-IDE gerçek-impl dilim-1 (Sıra-64)
+- TOOLCU-DESIGN — computer-use/browser pack tasarım-notu (Sıra-83, P2)
+
+### Changed
+
+- ONB-ENTRY-WIRE — wizard'ı `deckent onboard` komutuna bağla (completed with tech debt)
+- AUTONOMOUS-APPROVAL-MCP — DEFER-001 kalan yüzey (completed with tech debt)
+- WATCH-SESSION-WARN — 4+ paralel-oturum uyarısı (session-registry wire) (completed with tech debt)
+
+### Fixed
+
+- Fix debt: Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC-ADR-L
+
+
+_Tasks: 15 total, 13 done, 3 tech debt, 2 no-go_
+
 ## [1.0.0-beta.1-sprint362] - 2026-07-02
 
 ### Added

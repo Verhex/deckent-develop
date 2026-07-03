@@ -1,0 +1,60 @@
+{
+  "id": "rpc-protocol",
+  "source": "builtin",
+  "name": "RPC Protocol",
+  "version": "0.1.0",
+  "description": "Zod-first RPC contracts: versioned envelope, method-catalog exhaustiveness, unknown-method honesty, never-throw dispatch, dual-consumer testing",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "rpc"
+          }
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "domain",
+  "triggers": [
+    "rpc",
+    "zod",
+    "schema",
+    "dispatch",
+    "protocol",
+    "envelope",
+    "handler-map",
+    "dual-consumer",
+    "unknown-method"
+  ],
+  "stackDetection": {
+    "files": [],
+    "dependencies": [
+      "zod"
+    ],
+    "commands": []
+  },
+  "composableWith": [
+    "typescript-expert",
+    "api-builder",
+    "testing-expert"
+  ],
+  "priority": 7,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  }
+}
