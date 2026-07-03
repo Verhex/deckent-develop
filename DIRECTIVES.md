@@ -1,171 +1,139 @@
-# DIRECTIVES — SPRINT-364: CODEX-SON-HALKA + DEBT-KAPANIŞLARI + CİLA (10 task)
+# DIRECTIVES — SPRINT-365: CODEX-V6 KESİN-SINAV + DEBT-SÜPÜRME + SERİ-RAPOR (8 task)
 
 ## Goal
-born-481 (subprocess CLI-binary seçimi) fix + CODEX-V5 kesin-sınav; 363-debt kapanışları;
-gemini-parite dilimi; katalog/doc cilası. DISK-VERIFY → hermetik-test. Yasa #1/#2/#3.
+481-fix'li dist'le CODEX-V6 (zincirin kesin kanıtı); 364-debt kapanışları; OpenRouter canlı-probe
+hazırlığı; seri-raporun ilk üretimi; küçük cilalar. DISK-VERIFY → hermetik-test. Yasa #1/#2/#3.
 
 ## 🔒 BAĞLAYICI
-- **DISTINCT-FILE** (spawn-backend.ts YALNIZ Task 1 · tmux.ts YALNIZ Task 2 · chat-provider-parity.ts
-  YALNIZ Task 6 · app.tsx/run.tsx/server.ts/sprint-planner.ts KAPALI).
-- DISK-VERIFY; D-004; surgical; hermetik (Task 4 hariç — gerçek codex). No build/install/login.
-  npm-install ASLA. Flag default-off+roundtrip. Zero-hardcode. String-free. Honest. No haiku.
-- **MCP-tool ekleyen task = TAM sayaç-senkron sahibi** (TOOL_CATALOG + registerTools-çağrısı +
-  server.ts instructions + tests sayaçları — 361/363'te üç kez CC tamamladı, artık görev-tanımı).
+- **DISTINCT-FILE**; app.tsx/run.tsx/server.ts/sprint-planner.ts/result-evaluator.ts KAPALI.
+- DISK-VERIFY; D-004; surgical; hermetik (Task 1 hariç). No build/install/login. npm-install ASLA.
+  Flag default-off+roundtrip. Zero-hardcode. String-free. Honest. No haiku.
+- MCP-tool ekleyen task = TAM sayaç-senkron sahibi.
 
 ---
 
-## Task 1: SUBPROC-PROVIDER-CLI — worker-komutu CLI-binary'yi provider'dan seçsin (born-481)
+## Task 1: CODEX-V6 — kesin-sınav (fix'li dist: model-pin + CLI-binary zinciri)
+- Model: gpt-5
+- Backend: subprocess
+- Effort: normal
+- Skills: doc-writing
+- Files: docs/analysis/codex-v6-final-363chain.md
+- Scope: docs/analysis/, .brain/archive/
+- Dependencies: none
+### Description
+ALTINCI ve kesin koşu — bu plan 481-fix'li (üç-backend provider→CLI) dist'le spawn ediliyor:
+`codex exec` ile gpt-5.5 olarak koşmalısın. (1) runtime self-report (model/CLI — codex isen bunun
+İLK resmi kanıtı); (2) kendi task-JSON'unu alıntıla; (3) V1→V6 zinciri tablo-özeti (479/481
+born-ref'leriyle). ≤4KB.
+### goNogo
+- goCriteria: doküman + self-report + JSON-alıntı + zincir-tablosu; lint:link temiz.
+- nogo: kod.
+
+## Task 2: 364-DEBT-CLOSE — 4 debt-notunu oku-kapat
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: docs/analysis/debt-close-364.md, tests/orchestra/debt364-followups.test.ts
+- Scope: src/, tests/, docs/analysis/, docs/adr/
+- Dependencies: none
+### Description
+`.brain/archive/sprint-364-tasks/` debt-notlarını (001, 003-brain-debt, 011 +varsa) OKU; yetki-genişliğin
+src/ geneli AMA DISTINCT-KAPALI dosyalara dokunmadan kapat; kapatamadıklarını dokümante et.
+Her kapama için test.
+### goNogo
+- goCriteria: notlar okundu-listelendi; yetki-içi kapalı+testli; kalan dokümante; `tsc` temiz.
+- nogo: KAPALI dosyalar.
+
+## Task 3: OPENROUTER-LIVE-PREP — canlı-probe komutu (key'siz dürüst)
+- Model: sonnet
+- Effort: normal
+- Skills: typescript-expert
+- Files: src/cli/commands/openrouter-probe.ts, src/cli/index.ts, src/cli/helpers/messages.ts, tests/cli/openrouter-probe.test.ts
+- Scope: src/cli/, src/core/, tests/cli/, docs/adr/
+- Dependencies: none
+- Smoke: node dist/cli/entry.js openrouter-probe --json → exit 0 (key-yoksa unavailable-dürüst)
+### Description
+`deckent openrouter-probe [--json]`: $DECK:OPENROUTER_API_KEY çözülüyorsa fetchOpenRouterModels
+(360-007) canlı-çağrı + cache-yazım + özet; key yoksa dürüst-unavailable (exit 0 + neden). Alperen
+key'i bağlayınca tek-komut aktivasyon. getMessage en/tr.
+### goNogo
+- goCriteria: key'li yol fake-fetch testli; key'siz dürüst-unavailable; komut kayıtlı (envanter-testi);
+  en+tr; `tsc` temiz.
+- nogo: gerçek-ağ testte.
+
+## Task 4: SERIES-REPORT-RUN — 357-364 seri-raporunu üret + yorumla
+- Model: sonnet
+- Effort: normal
+- Skills: doc-writing
+- Files: docs/analysis/series-357-364.md
+- Scope: docs/analysis/, scripts/, .brain/archive/
+- Dependencies: none
+### Description
+364-011 agregatörünü (scripts/series-metrics.mjs) 357-364 için KOŞ (script'i değiştirme; eksiği
+notes'a), çıktıyı yorumla: trend (DONE-oranı, fix-heal, self-vs-brain uyumu, süreler), 3 en-önemli
+governance-kazanımı (466-zinciri, ceiling-ailesi, dep-normalize) kanıt-ref'li. 7-Tem kapanışının taslağı.
+### goNogo
+- goCriteria: tablo gerçek-arşivden + ≥5 trend-bulgusu ref'li; lint:link temiz.
+- nogo: script/arşiv değişikliği.
+
+## Task 5: DASH-LIMITS-CARD — dashboard'a limit-durum kartı
+- Model: sonnet
+- Effort: normal
+- Skills: frontend-design, typescript-expert
+- Files: src/dashboard/src/components/LimitsCard.tsx, tests/dashboard/limits-card.test.tsx, src/api/limits-endpoint.ts, tests/api/limits-endpoint.test.ts
+- Scope: src/dashboard/, src/api/, tests/, docs/adr/
+- Dependencies: none
+### Description
+İzleme-yüzeyi: GET /api/limits (limit-preflight probe'unu injectable-spawn'la; server.ts'e DOKUNMADAN
+endpoint-modülü + notes'a tek-satır-wire) + dashboard kartı (3 pencere-barı + reset-zamanları;
+lucide, EMOJI YASAK; unavailable-durumu dürüst).
+### goNogo
+- goCriteria: endpoint fake-probe testli; kart 3-bar+unavailable render-testleri; emoji-grep=0;
+  `tsc`+dashboard-test yeşil.
+- nogo: server.ts; gerçek-probe testte.
+
+## Task 6: WIZARD-APPLY — onboarding plan→uygula adımı (güvenli-yazım)
 - Model: sonnet
 - Effort: high
 - Skills: typescript-expert
-- Files: src/orchestra/spawn-backend.ts, tests/orchestra/subproc-provider-cli.test.ts
-- Scope: src/orchestra/, src/providers/, tests/orchestra/, docs/adr/
+- Files: src/cli/helpers/onboarding-apply.ts, tests/cli/onboarding-apply.test.ts
+- Scope: src/cli/, src/core/, tests/cli/, docs/adr/
 - Dependencies: none
 ### Description
-born-481 (log-kanıtlı): subprocess-backend provider:codex task'ında CLAUDE-CLI spawn etti
-(gpt-5.5→claude 404→exit-1). DISK-VERIFY: subprocess workerCmd-üretimi nerede + providers/codex.ts
-arg-tablosu (prompt-feed/`exec`/--model) + 360-005 codex-spawn-readiness referansı. Fix: provider→
-CLI-binary+arg-tablosu seçimi (claude|codex|gemini); bilinmeyen-provider dürüst-hata (sessiz-claude-fallback
-YASAK). Repro-önce-kırmızı: 363-002-şekilli fixture'la claude-komutu üretildiğini İSPATLA, sonra fix.
+361-009 plan-objesini UYGULAYAN katman: config-yazımı (mevcut config-write yardımcıyla; atomic),
+her adım geri-alınabilir-rapor (öncesi-değer kaydı), dry-run paritesi (plan==apply-preview);
+onboard-komutuna bağlama follow-up (onboard.ts'e dokunma).
 ### goNogo
-- goCriteria: repro önce-kırmızı sonra-yeşil; codex-task→`codex exec` komutu (string-assert);
-  claude-task byte-aynı; bilinmeyen→hata; `tsc` temiz.
-- nogo: docker-backend'e dokunmak (ayrı dilim); gerçek-spawn.
+- goCriteria: tmpdir-projede plan→apply→config-doğrulama + öncesi-değer raporu; dry-run==apply-preview
+  (test); `tsc` temiz.
+- nogo: onboard.ts/init.ts; global-yazım.
 
-## Task 2: TMUX-PROVIDER-CLI — aynı fix tmux-backend'e (Yasa #2 paritesi)
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/orchestra/tmux.ts, tests/orchestra/tmux-provider-cli.test.ts
-- Scope: src/orchestra/, tests/orchestra/, docs/adr/
-- Dependencies: SUBPROC-PROVIDER-CLI
-### Description
-Task 1'in desenini tmux workerCmd'ine uygula (aynı seçim-tablosunu PAYLAŞ — Task 1'in export'unu
-tüket, kopyalama).
-### goNogo
-- goCriteria: codex-task tmux-cmd'i codex-binary'li (string-assert); claude byte-aynı; ortak-tablo
-  reuse (import-kanıt); `tsc` temiz.
-- nogo: tmux oturum-mantığı.
-
-## Task 3: DOCKER-PROVIDER-CLI — docker-backend paritesi + imaj-gerçeği
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/orchestra/spawn-backend-docker.ts, tests/orchestra/docker-provider-cli.test.ts
-- Scope: src/orchestra/, tests/orchestra/, docs/adr/
-- Dependencies: SUBPROC-PROVIDER-CLI
-### Description
-Docker workerCmd'inde aynı ortak-tablo; ARTI imaj-gerçeği: imajda codex/gemini yoksa spawn-öncesi
-dürüst-hata + `Backend: subprocess` öneri-mesajı (360-005 readiness çıktısını kullan; sessiz-claude
-YASAK). Wrapper'ın 466/473 bölgelerine DOKUNMA.
-### goNogo
-- goCriteria: provider→cmd tablosu docker'da (string-assert); imaj-yok→honest-error+öneri (fixture);
-  wrapper-testleri yeşil; `tsc` temiz.
-- nogo: 466/473 exit-code bölgesi.
-
-## Task 4: CODEX-V5 — kesin-sınav (481-fix'li dist gerekmez: subprocess kendi sprint'inde fix'lenmiş
-  olmayacak — o yüzden bu görev SINAV-RAPORU değil HAZIRLIK-KANITI üretir)
-- Model: gpt-5
-- Backend: subprocess
-- Effort: low
-- Skills: doc-writing
-- Files: docs/analysis/codex-v5-363chain.md
-- Scope: docs/analysis/
-- Dependencies: none
-### Description
-Beşinci koşu: yine plan-anı dist'iyle spawn edileceksin — muhtemelen YİNE claude'la (481-fix bu
-sprint içinde iniyor, dist'e yetişmez). GÖREVİN: (1) self-report (model/CLI); (2) born-479→481
-zincirinin task-JSON+log kanıt-özetini yaz (363-002 log'undan 404-satırı alıntıla). ≤2KB. Bu rapor,
-V6'nın (365, fix'li-dist) karşılaştırma-tabanı.
-### goNogo
-- goCriteria: doküman + self-report + 404-alıntı; ≤2KB; lint:link temiz.
-- nogo: kod.
-
-## Task 5: 363-DEBT-CLOSE — 3 debt-notunu oku-kapat
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/api/rpc-write-handlers.ts, tests/api/rpc-write-handlers.test.ts, docs/analysis/debt-close-363.md
-- Scope: src/api/, src/mcp/, tests/, docs/analysis/, docs/adr/
-- Dependencies: none
-### Description
-`.brain/archive/sprint-363-tasks/` debt-notlarını (005-brain-debt, 009, 011) OKU; yetki-içi kapat,
-yetki-dışını dokümante et (dosya+satır+öneri).
-### goNogo
-- goCriteria: yetki-içi kapalı (önce/sonra); kalan-liste dokümante; testler yeşil; `tsc` temiz.
-- nogo: DISTINCT-KAPALI dosyalar.
-
-## Task 6: GEMINI-PARITY-GATED — F11-014 gemini-dalı key-gated testler
-- Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: src/cli/commands/chat-provider-parity.ts, tests/cli/gemini-parity-gated.test.ts
-- Scope: src/cli/, tests/cli/, docs/adr/
-- Dependencies: none
-### Description
-Sıra-61 kalanı: gemini send-yolu parite-testleri (fake-spawn; arg-tablosu/model-param/hata-yolu);
-canlı-key gerektiren senaryolar `describe.skipIf(!env.GEMINI_API_KEY)` dürüst-gate'li. Bulunan
-minimal-fix yazı-yetkinde.
-### goNogo
-- goCriteria: ≥5 fake-spawn parite-testi + gated-canlı blok; mevcut parity yeşil; `tsc` temiz.
-- nogo: claude/codex dalları.
-
-## Task 7: ONB-DOC — onboarding kullanıcı-dokümanı (deckent onboard + wizard + global)
-- Model: sonnet
-- Effort: normal
-- Skills: doc-writing
-- Files: docs/guide/onboarding.md, docs/features/onboarding.md
-- Scope: docs/guide/, docs/features/
-- Dependencies: none
-### Description
-361-363 ONB teslimlerinin kullanıcı-dokümanı: `deckent onboard` akışı (--plan-only dahil),
-global↔proje katman-özeti (tasarım-doc'a link), Simple-Mode; docs/features iskeleti (Ne yapar→
-Parametreler→Riskler→Kanıt) — README-index'e satır.
-### goNogo
-- goCriteria: 2 doc + features-README satırı; komut-örnekleri gerçek-flag'lerle; lint:link temiz.
-- nogo: kod.
-
-## Task 8: AGSK-4 — provider-cli-matrix skill'i
+## Task 7: FEATURES-DOC-3 — sdk + onboarding-apply + provider-cli doc'ları
 - Model: sonnet
 - Effort: low
 - Skills: doc-writing
-- Files: .deckent/skills/provider-cli-matrix/, src/core/builtins/skills/provider-cli-matrix/
-- Scope: .deckent/skills/, src/core/builtins/, docs/adr/
-- Dependencies: none
-### Description
-479/481 derslerinden skill: provider→CLI arg-tabloları (claude/codex/gemini: model-param, prompt-feed,
-output-format, exit-kodları), sessiz-fallback yasağı, repro-önce-kırmızı deseni. İki-ağaç, ≤4KB.
-### goNogo
-- goCriteria: 2-ağaç manifest+SKILL.md; load-smoke; ≤4KB.
-- nogo: mevcut skill.
-
-## Task 9: FEATURES-DOC-2 — limit/rpc/openrouter feature-doc'ları
-- Model: sonnet
-- Effort: normal
-- Skills: doc-writing
-- Files: docs/features/limit-gate.md, docs/features/term-rpc.md, docs/features/openrouter.md
+- Files: docs/features/sdk.md, docs/features/provider-cli-routing.md
 - Scope: docs/features/
 - Dependencies: none
 ### Description
-Feature-doc iskeletiyle (repl-surface.md emsal) 3 doc: limit-gate (3-kural + fail-closed + probe),
-term-rpc (4-tüketici tablosu), openrouter (adapter+free-probe+doc-route; canlı-probe placeholder'ı
-dürüst). README-index güncelle.
+2 feature-doc (iskele-standart): sdk (createDeckentClient yüzeyi + zero-CLI garantisi),
+provider-cli-routing (479/481 zinciri: Model:-pin → plan → spawn-CLI tablosu; sessiz-fallback yasağı).
+README-index güncelle.
 ### goNogo
-- goCriteria: 3 doc + index; parametre-tabloları config-types'la tutarlı; lint:link temiz.
+- goCriteria: 2 doc + index; kod-satır-ref'li; lint:link temiz.
 - nogo: kod.
 
-## Task 10: RETRO-SERIES-METRICS — 357-363 seri-metrik agregatörü (7-Tem raporu altyapısı)
+## Task 8: HB-WRAPPER-DOC — wrapper davranış-sözleşmesi dokümanı (466-473-468 ailesi)
 - Model: sonnet
-- Effort: normal
-- Skills: typescript-expert
-- Files: scripts/series-metrics.mjs, tests/docs/series-metrics.test.ts
-- Scope: scripts/, tests/docs/, docs/analysis/
+- Effort: low
+- Skills: doc-writing
+- Files: docs/reference/worker-wrapper-contract.md
+- Scope: docs/reference/, src/orchestra/
 - Dependencies: none
 ### Description
-Kapanış-analizi altyapısı: arşivlerden seri-metrik JSON+MD üretici — sprint-başına task/DONE/DEBT/NO_GO/
-süre/self-vs-brain-uyum/fix-heal-oranı + kümülatif tablo (`node scripts/series-metrics.mjs 357 363`).
-Hermetik test fixture-arşivle.
+Wrapper-ailesinin (exit-code yakalama, timeout-purity 124/137, TERM-143, hb-staleness-gate,
+untracked-diff, allowlist-SSOT) davranış-sözleşmesi — satır-ref'li, POSIX-audit (360) bulgularına
+çapraz-ref; gelecek wrapper-değişikliklerinin kontrat-tabanı.
 ### goNogo
-- goCriteria: 357-363 gerçek-koşusu tablo üretir (çıktı docs/analysis/series-357-363.md); fixture-test;
-  lint-node temiz.
-- nogo: arşiv-değişikliği.
+- goCriteria: 6-davranış sözleşme-tablosu satır-ref'li; lint:link temiz.
+- nogo: kod.

@@ -2,6 +2,25 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint366] - 2026-07-03
+
+### Added
+
+- No completed tasks
+
+
+_Tasks: 0 total, 0 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint365] - 2026-07-03
+
+
+### Fixed
+
+- Fix debt: Tech debt from 362-001-fix: VERIFY-AND-COMPLETE of the OOM-killed prior 362-001-
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint364] - 2026-07-03
 
 ### Added

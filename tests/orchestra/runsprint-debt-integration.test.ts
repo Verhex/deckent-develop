@@ -330,7 +330,7 @@ function seedDebtStore(items: Array<Partial<DebtItem>>): void {
     sprint_id: d.originSprintId ?? 'sprint-000',
     sprint_num: 0,
     tag_text: '',
-    metadata: JSON.stringify({ originTaskId: d.originTaskId ?? '', originSprintId: d.originSprintId ?? 'sprint-000', sprintsOpen: d.sprintsOpen ?? 0, resolvedInSprintId: d.resolvedInSprintId }),
+    metadata: JSON.stringify({ originTaskId: d.originTaskId ?? '', originSprintId: d.originSprintId ?? 'sprint-000', sprintsOpen: d.sprintsOpen ?? 0, resolvedInSprintId: d.resolvedInSprintId, class: d.class }),
     created_at: d.createdAt ?? '2026-03-17T00:00:00.000Z',
     updated_at: new Date().toISOString(),
     deleted_at: null,
@@ -518,6 +518,34 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
       return input.id === fixDebtId && input.status === 'resolved';
     });
     expect(fixDebtResolved).toBeDefined();
+  });
+
+  // ── PLAN: verified-no-result debt is resolved, not re-injected (365-001) ──
+
+  it('PLAN resolves a verified-no-result CRITICAL debt instead of leaving it active', async () => {
+    // A skip-class debt has NO follow-up code work: injectCriticalDebtTasks skips
+    // it (no fix task), and the planner now resolves it so it stops re-injecting
+    // every sprint. A normal CRITICAL debt rides alongside to produce the one
+    // dispatched fix task (001-001) the harness expects.
+    const vnrDebtId = 'debt-vnr-001';
+    const debtItems = [
+      { id: `debt-${EXPECTED_TASK_ID}`, originTaskId: EXPECTED_TASK_ID, priority: DebtPriority.CRITICAL, resolved: false },
+      { id: vnrDebtId, originTaskId: 'vnr-001', priority: DebtPriority.CRITICAL, resolved: false, class: 'verified-no-result' as const },
+    ];
+    const results = new Map([[
+      EXPECTED_TASK_ID,
+      makeTaskResult({ selfAssessment: 'DONE', testsPassed: true, coverage: 95 }),
+    ]]);
+
+    setupMocks(makeDebtTable(debtItems), results, '', debtItems);
+
+    await runSprint(ROOT, makeConfig());
+
+    const vnrResolved = mockMemStore.upsert.mock.calls.some((args: unknown[]) => {
+      const input = args[0] as Record<string, unknown>;
+      return input.id === vnrDebtId && input.status === 'resolved';
+    });
+    expect(vnrResolved).toBe(true);
   });
 
   // ── NO_GO evaluation — debt must NOT be resolved ─────────────────

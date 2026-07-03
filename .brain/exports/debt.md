@@ -4,7 +4,6 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-362-001-fix | Tech debt from 362-001-fix: VERIFY-AND-COMPLETE of the OOM-killed prior 362-001- | critical | sprint-362 | active |
 
 ## Resolved Technical Debt
 
@@ -19,6 +18,7 @@
 | debt-363-011 | Tech debt from 363-011: Wired 361-015 session-registry into health-snapshot.ts p | normal | sprint-363 | resolved |
 | debt-362-004 | Tech debt from 362-004: Scope reality check first: the 361-002 debt note ('warn  | normal | sprint-362 | resolved |
 | debt-362-008 | Tech debt from 362-008: POST /api/rpc wired as the first HTTP consumer of TERM-R | normal | sprint-362 | resolved |
+| debt-362-001-fix | Tech debt from 362-001-fix: VERIFY-AND-COMPLETE of the OOM-killed prior 362-001- | critical | sprint-362 | resolved |
 | debt-361-002 | Tech debt from 361-002: Part (a) `deckent limits [--json]` is fully implemented  | normal | sprint-361 | resolved |
 | debt-361-014 | Tech debt from 361-014: DONE for the write-scope deliverable: 2 new MCP tools (d | normal | sprint-361 | resolved |
 | debt-361-001-fix | Tech debt from 361-001-fix: Worker timeout/killed (exitCode=1) but git diff show | critical | sprint-361 | resolved |

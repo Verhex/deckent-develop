@@ -46,6 +46,11 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-366 Learnings** (sprint-366): ## Sprint sprint-366 Learnings
+- **Sprint sprint-365 Learnings** (sprint-365): ## Sprint sprint-365 Learnings
+
+## Gains
+- 365-001 — Fix debt: Tech debt from 362-001-fix: VERIFY-AND-COMPLETE of the...
 - **Sprint sprint-364 Learnings** (sprint-364): ## Sprint sprint-364 Learnings
 - Fix debt: Tech debt from 361-001-fix: Worker timeout/killed (exitCode=1) but git dif...
 - **Sprint sprint-363 Learnings** (sprint-363): ## Sprint sprint-363 Learnings
@@ -62,15 +67,9 @@
 - REPL-DETACHED-START — REPL'den kilitlemeyen sprint-start: GO_WITH_TECH_DEBT — New sr...
 - **Sprint sprint-357 Learnings** (sprint-357): ## Sprint sprint-357 Learnings
 - TERM-CONFIG-WIRE — TerminalConfig'i runtime'a bağla: GO_WITH_TECH_DEBT — Wired all s...
-- **Sprint sprint-354 Learnings** (sprint-354): ## Sprint sprint-354 Learnings
-- REPL-SURFACE-WIRE — footer+mode+queue'yu Ink-app'e bağla: GO_WITH_TECH_DEBT — Wired ...
-- **Sprint sprint-353 Learnings** (sprint-353): ## Sprint sprint-353 Learnings
-
-## Gains
-- 353-001 — SCOPECHECK-CORE — realpath scope-check primitive'ini core'a taşı...
 
 ## Active Technical Debt
-- [CRITICAL] Tech debt from 362-001-fix: VERIFY-AND-COMPLETE of the OOM-killed prior 362-001-
+_No active technical debt._
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -120,5 +119,6 @@
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
+- Violation pattern: stale_heartbeat
 
-_Total entries: 914 | Generated: 2026-07-03_
+_Total entries: 921 | Generated: 2026-07-03_

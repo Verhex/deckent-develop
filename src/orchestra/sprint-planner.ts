@@ -37,6 +37,7 @@ import { MemoryStore } from '../core/memory-store.js';
 // ─── Core — utils ─────────────────────────────────────────────────
 import { getNextSprintId, readJsonSafe, debugLog } from '../core/utils.js';
 import { isUnconditionalRule } from './rule-evolver.js';
+import { resolveDebt } from './debt-manager.js';
 
 // ─── Sprint Utilities ─────────────────────────────────────────────
 import { readFileSafe, extractGoNogoCriteria, isAdapterProvider } from './sprint-utils.js';
@@ -274,6 +275,16 @@ export async function planSprint(
   const injected = injectCriticalDebtTasks(context.debt, sprintId, defaultModel, seq, initialStatus);
   tasks.push(...injected.tasks);
   seq = injected.nextSeq;
+
+  // 365-001: honest-closure debts (verified-no-result / timeout-partial) are
+  // intentionally NOT re-injected as fix tasks — but the skip signal was
+  // previously discarded, leaving those rows `active` to re-inject/re-evaluate
+  // every sprint forever (a permanent no-op pile-up). Resolving them here makes
+  // a skip a genuine closure. resolveDebt is idempotent + fail-soft (no-op when
+  // there is no DB / the row is already resolved), so this is safe to run every plan.
+  for (const skippedDebtId of injected.skipped) {
+    resolveDebt(projectRoot, skippedDebtId, sprintId);
+  }
 
   // AI planner attempt
   if (planMode === 'ai' || planMode === 'auto') {

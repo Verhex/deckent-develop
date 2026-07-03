@@ -83,6 +83,7 @@ import {
   handleEvaluation, handleCrossDependencies, escalateDebt,
   resolveDebt, runDecay,
 } from './debt-manager.js';
+import { resolveDebtChain } from './debt-chain.js';
 
 // ─── Agent/Skill Pools ───────────────────────────────────────────
 import { AgentPoolManager } from '../core/agent-pool.js';
@@ -1786,7 +1787,13 @@ export async function runEvaluatePhase(
         } catch (e) { debugLog('runEvaluatePhase:afterTaskHook', e); }
         if (evaluation === TaskEvaluation.DONE || evaluation === TaskEvaluation.GO_WITH_TECH_DEBT) {
           if (task.isPriorityFix && task.fixForTaskId) {
-            resolveDebt(projectRoot, `debt-${task.fixForTaskId}`, sprint.id);
+            // 365-001: resolve the WHOLE fix lineage, not just the immediate parent.
+            // A fix-of-a-fix completing via EVALUATE (not FIX) previously resolved only
+            // `debt-<fixForTaskId>`, leaving the origin/ancestor debts `active` to
+            // re-inject every sprint — the same bug the FIX phase already fixed
+            // (runFixPhase). Both phases now share resolveDebtChain (single source of
+            // truth; idempotent + cycle-guarded) so they can never drift again.
+            resolveDebtChain(projectRoot, task.id, task.fixForTaskId, sprint.id);
           }
           resolveDebt(projectRoot, `debt-${task.id}`, sprint.id);
         }
@@ -2465,14 +2472,10 @@ export async function runFixPhase(
             // is tracked by the freshly-minted debt-<fixTaskId>, so the stale
             // ancestor rows are safe to resolve. NO_GO is still excluded (a NO_GO
             // fix delivered nothing, so its ancestors must stay open).
-            const seenFixChain = new Set<string>([fixTask.id]);
-            let ancestorId: string | undefined = fixTask.fixForTaskId;
-            while (ancestorId && !seenFixChain.has(ancestorId)) {
-              seenFixChain.add(ancestorId);
-              resolveDebt(projectRoot, `debt-${ancestorId}`, sprint.id);
-              const ancestorTask: Task | null = readJsonSafe<Task>(join(tasksPath, `task-${ancestorId}.json`));
-              ancestorId = ancestorTask?.fixForTaskId;
-            }
+            // 365-001: walk delegated to resolveDebtChain (src/orchestra/debt-chain.ts)
+            // — the single definition now shared with the EVALUATE-phase gate above,
+            // so the two paths can never diverge again (they were hand-re-synced twice).
+            resolveDebtChain(projectRoot, fixTask.id, fixTask.fixForTaskId, sprint.id);
           }
           // Update original task evaluation if fix succeeded
           const originalReconciled =

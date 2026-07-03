@@ -2412,6 +2412,32 @@ const MESSAGES: MessageMap = {
     tr: '[limit-gate] Uyarı: {window} kullanımı %{pct} — devam ediliyor.',
   },
 
+  // ─── openrouter-probe command (OPENROUTER-LIVE-PREP, Sprint 365 Task 365-004) ─
+  'openrouter_probe.header': {
+    en: 'OpenRouter Live Probe',
+    tr: 'OpenRouter Canlı Probu',
+  },
+  'openrouter_probe.unavailable': {
+    en: 'OpenRouter probe unavailable: {reason}',
+    tr: 'OpenRouter probu kullanılamıyor: {reason}',
+  },
+  'openrouter_probe.fetch_failed': {
+    en: 'OpenRouter live fetch failed: {reason}',
+    tr: 'OpenRouter canlı-çağrısı başarısız: {reason}',
+  },
+  'openrouter_probe.summary': {
+    en: '{count} free model(s) found — cache written to {cacheFile}',
+    tr: '{count} ücretsiz model bulundu — önbellek {cacheFile} konumuna yazıldı',
+  },
+  'openrouter_probe.model_line': {
+    en: '  - {id} ({context} ctx, {modality})',
+    tr: '  - {id} ({context} bağlam, {modality})',
+  },
+  'openrouter_probe.more': {
+    en: '  … and {count} more',
+    tr: '  … ve {count} tane daha',
+  },
+
   // ─── onboarding wizard core (ONB-WIZARD-CORE, Sprint 361 Task 361-009) ─
   'onboarding.mcp.host_not_installed': {
     en: '{host}: CLI not installed — MCP attach skipped',

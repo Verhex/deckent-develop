@@ -1,5 +1,14 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-366 Learnings
+- Sprint sprint-366 Learnings: ## Sprint sprint-366 Learnings
+
+## Sprint sprint-365 Learnings
+- Sprint sprint-365 Learnings: ## Sprint sprint-365 Learnings
+
+## Gains
+- 365-001 — Fix debt: Tech debt from 362-001-fix: VERIFY-AND-COMPLETE of the OOM-killed prior 362-001- — DEBT debt-362-001-fix (CRITICAL, active 3 sprints) — RESOLVED.
+
 ## Sprint sprint-364 Learnings
 - Sprint sprint-364 Learnings: ## Sprint sprint-364 Learnings
 - Fix debt: Tech debt from 361-001-fix: Worker timeout/killed (exitCode=1) but git diff show: GO_WITH_TECH_DEBT — ROOT CAUSE of debt-361-001-fix: a TIMEOUT_WITH_WORK result (worker 361-001-fix killed exitCode=1, but git diff showed 67

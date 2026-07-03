@@ -8854,3 +8854,62 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 364-011: RETRO-SERIES-METRICS — 357-363 seri-metrik agregatörü (7-Tem raporu altyapısı) (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 365 — sprint-365
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-03
+**Duration:** 1629s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1628752ms |
+
+### Tasks
+
+- 365-001: Fix debt: Tech debt from 362-001-fix: VERIFY-AND-COMPLETE of the OOM-killed prior 362-001- (DONE)
+- 365-002: CODEX-V6 — kesin-sınav (fix'li dist: model-pin + CLI-binary zinciri) (DONE)
+- 365-003: 364-DEBT-CLOSE — 4 debt-notunu oku-kapat (DONE)
+- 365-004: OPENROUTER-LIVE-PREP — canlı-probe komutu (key'siz dürüst) (DONE)
+- 365-005: SERIES-REPORT-RUN — 357-364 seri-raporunu üret + yorumla (DONE)
+- 365-006: DASH-LIMITS-CARD — dashboard'a limit-durum kartı (DONE)
+- 365-007: WIZARD-APPLY — onboarding plan→uygula adımı (güvenli-yazım) (DONE)
+- 365-008: FEATURES-DOC-3 — sdk + onboarding-apply + provider-cli doc'ları (DONE)
+- 365-009: HB-WRAPPER-DOC — wrapper davranış-sözleşmesi dokümanı (466-473-468 ailesi) (DONE)
+
+---
+## Sprint 366 — sprint-366
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-03
+**Duration:** 264s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 0 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 263841ms |
+
+### Tasks
+
+- 366-001: CODEX-V6 — kesin-sınav (fix'li dist: model-pin + CLI-binary zinciri) (DONE)
+- 366-002: 364-DEBT-CLOSE — 4 debt-notunu oku-kapat (DONE)
+- 366-003: OPENROUTER-LIVE-PREP — canlı-probe komutu (key'siz dürüst) (DONE)
+- 366-004: SERIES-REPORT-RUN — 357-364 seri-raporunu üret + yorumla (DONE)
+- 366-005: DASH-LIMITS-CARD — dashboard'a limit-durum kartı (DONE)
+- 366-006: WIZARD-APPLY — onboarding plan→uygula adımı (güvenli-yazım) (DONE)
+- 366-007: FEATURES-DOC-3 — sdk + onboarding-apply + provider-cli doc'ları (DONE)
+- 366-008: HB-WRAPPER-DOC — wrapper davranış-sözleşmesi dokümanı (466-473-468 ailesi) (DONE)
+
+---

@@ -122,6 +122,7 @@ _Total: 37 MCP tools_
 | `models` | deckent models |
 | `nervous` | deckent nervous |
 | `onboard` | deckent onboard |
+| `openrouter-probe` | deckent openrouter-probe |
 | `output` | deckent output |
 | `plan` | deckent plan |
 | `plan-nl` | deckent plan-nl |
@@ -154,4 +155,4 @@ _Total: 37 MCP tools_
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 98 CLI command modules_
+_Total: 99 CLI command modules_
