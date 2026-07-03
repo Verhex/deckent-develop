@@ -35,6 +35,7 @@ import { registerCostTool } from './cost.js';
 import { registerCatalogParityTools } from './catalog-parity.js';
 import { registerAutonomousSurfaceTools } from './autonomous-surface.js';
 import { registerNervousEditTools } from './nervous-edit.js';
+import { registerAutonomousApprovalTools } from './autonomous-approval.js';
 
 /**
  * One entry in the canonical MCP tool catalog.
@@ -152,4 +153,5 @@ export function registerTools(server: McpServer): void {
   registerCatalogParityTools(server);
   registerAutonomousSurfaceTools(server);
   registerNervousEditTools(server);
+  registerAutonomousApprovalTools(server);
 }
