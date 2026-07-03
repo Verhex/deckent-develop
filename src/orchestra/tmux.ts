@@ -8,6 +8,8 @@ import { debugLog } from '../core/utils.js';
 import { validateTaskId } from '../core/validators.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { resolveReasoningEffort } from '../core/reasoning-effort.js';
+import { getProviderCommandSpec, buildProviderCommand } from '../core/provider-command-spec.js';
+import { getDefaultProviderName } from './sprint-utils.js';
 import {
   TMUX_SESSION_NAME,
   TMUX_AUDITOR_WINDOW,
@@ -85,6 +87,84 @@ export function cleanupPromptFile(promptPath: string): void {
 /** @deprecated Use adaptive timeout via brainEstimateTimeout() + SpawnBackendOptions.taskTimeoutSeconds instead. Kept for backward compat fallback. */
 export const WORKER_TIMEOUT_SECONDS = 1200;
 
+// ─── Provider→CLI Resolution (TMUX-PROVIDER-CLI, 364-003) ─────────────
+//
+// born-481 parity (Yasa #2 / 364-002): TmuxBackend.spawn() (spawn-backend.ts)
+// calls spawnWorker()/buildWorkerCommand() with NO ProviderAdapter, so every
+// task routed onto `spawn_backend: 'tmux'` (still supported — see
+// resolveBackend()) used to hit a hardcoded `claude -p - --model <apiId>`
+// build regardless of the model's actual provider — a codex-provider task's
+// apiId (e.g. gpt-5.5) would be fed to the `claude` CLI's `--model` flag,
+// exactly the bug 364-002 fixed for SubprocessBackend.
+//
+// Fix: resolve the CLI-binary + flag table FROM THE PROVIDER, reusing
+// PROVIDER_COMMAND_SPECS (core/provider-command-spec.ts) — the SAME shared
+// selection-table spawn-backend.ts (364-002) and spawn-backend-docker.ts
+// already consume, imported here rather than re-implemented — so tmux,
+// docker, and subprocess can never drift apart on provider→CLI mapping.
+// Unlike SubprocessSpawnBackend, buildWorkerCommand() already receives
+// promptFilePath directly, so buildProviderCommand() can be used generically
+// for ANY registered provider (stdin or inline promptFeed), not just codex.
+
+/**
+ * Build the worker-CLI invocation for a model when no ProviderAdapter is
+ * supplied. 'claude' keeps the exact pre-364-003 hardcoded shape
+ * (byte-identical — PROVIDER_COMMAND_SPECS.claude's baseArgs additionally
+ * carry `--output-format json`, which would change the historical claude
+ * tmux command). Every other registered provider is built from the shared
+ * PROVIDER_COMMAND_SPECS table. An unregistered provider (e.g. ollama,
+ * host-only) is an honest TmuxError — never a silent claude-CLI fallback.
+ */
+function buildProviderWorkerCommand(
+  model: ModelType,
+  promptFilePath: string,
+  opts?: SpawnOptions,
+): string {
+  const provider = modelRegistry.get(model)?.provider ?? getDefaultProviderName();
+
+  if (provider === 'claude') {
+    // Default: Claude CLI syntax (backward compat)
+    // Use stdin redirection from file — no shell metacharacter risk
+    let cmd = `claude -p - --model ${modelRegistry.get(model)?.apiId ?? model}`;
+    if (opts?.allowedTools) {
+      // allowedTools is a controlled string (never user input)
+      cmd += ` --allowedTools '${opts.allowedTools}'`;
+    }
+    if (opts?.autoApprove) {
+      cmd += ' --dangerously-skip-permissions';
+    }
+    // F1-RE: native reasoning-effort, opt-in + validated against claude's vocabulary.
+    const effort = resolveReasoningEffort('claude', opts?.reasoningEffort);
+    if (effort) {
+      cmd += ` --effort ${effort}`;
+    }
+    cmd += ` < ${promptFilePath}`;
+    return cmd;
+  }
+
+  const spec = getProviderCommandSpec(provider);
+  if (!spec) {
+    throw new TmuxError(
+      `No worker-CLI mapping for provider "${provider}" (no ProviderCommandSpec registered) `
+      + `— refusing to silently spawn the claude CLI for a mismatched provider (Yasa #2 / born-481 parity).`,
+    );
+  }
+
+  const apiId = modelRegistry.get(model)?.apiId ?? model;
+  let cmd = buildProviderCommand(spec, apiId, promptFilePath, {
+    allowedTools: opts?.allowedTools,
+    autoApprove: opts?.autoApprove,
+    reasoningEffort: resolveReasoningEffort(provider, opts?.reasoningEffort),
+  });
+  // PSL-1 convention (spawn-backend-docker.ts): 'stdin' providers pipe the
+  // prompt file in; 'inline' providers (gemini) already embed it via
+  // buildProviderCommand()'s PROMPT_CAT_TOKEN substitution.
+  if (spec.promptFeed === 'stdin') {
+    cmd += ` < ${promptFilePath}`;
+  }
+  return cmd;
+}
+
 /**
  * Build the shell command to invoke a worker.
  * If a ProviderAdapter is supplied, delegates to adapter.buildCommand().
@@ -114,22 +194,7 @@ export function buildWorkerCommand(
     validateTaskId(taskId);
   }
 
-  // Default: Claude CLI syntax (backward compat)
-  // Use stdin redirection from file — no shell metacharacter risk
-  let cmd = `claude -p - --model ${modelRegistry.get(model)?.apiId ?? model}`;
-  if (opts?.allowedTools) {
-    // allowedTools is a controlled string (never user input)
-    cmd += ` --allowedTools '${opts.allowedTools}'`;
-  }
-  if (opts?.autoApprove) {
-    cmd += ' --dangerously-skip-permissions';
-  }
-  // F1-RE: native reasoning-effort, opt-in + validated against claude's vocabulary.
-  const effort = resolveReasoningEffort('claude', opts?.reasoningEffort);
-  if (effort) {
-    cmd += ` --effort ${effort}`;
-  }
-  cmd += ` < ${promptFilePath}`;
+  let cmd = buildProviderWorkerCommand(model, promptFilePath, opts);
 
   // Wrap with timeout + EXIT trap — guarantees .result file is ALWAYS written.
   // Without this, workers can exit without writing .result (crash, permission error, etc.)

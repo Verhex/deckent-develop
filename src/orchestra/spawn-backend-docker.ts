@@ -444,6 +444,42 @@ export function workerImageBuildCmdForProvider(image: string, provider: string):
   return buildSuggestedImageCmd(image, [provider]);
 }
 
+/**
+ * F1-IMG-SPAWN (364-004 DOCKER-PROVIDER-CLI): synchronous "image-reality" probe —
+ * is `binary` actually on PATH inside `image` (not merely: does an image with
+ * this tag exist)? `docker images -q` (the existing runSpawn() guard) only proves
+ * the latter — a stale image (built before a codex/gemini opt-in, or without the
+ * INSTALL_CODEX/INSTALL_GEMINI build-arg, F1-005/Sprint 332) passes it and only
+ * fails deep inside the container ("command not found") instead of an actionable
+ * pre-flight error.
+ *
+ * core/worker-image-check.ts's `checkWorkerImage()` already answers this exact
+ * question for doctor/init/upgrade, but it is Promise-based (its injectable
+ * `spawnImpl` is async `node:child_process.spawn`) while this backend's `spawn()`
+ * is synchronous end-to-end (`SpawnBackend.spawn(...): void`, and every other
+ * pre-container-start guard in this file uses `spawnSync`). This mirrors its
+ * `command -v <bin>` probe technique via `spawnSync` instead of importing the
+ * async function, to stay inside that sync contract.
+ *
+ * Fail-open (returns true) when the probe itself could not run at all (docker
+ * daemon hiccup, timeout) — mirrors `healthCheckContainer`'s existing fail-open
+ * convention in this file. The real `docker run -d` right after this still has
+ * its own retry + health-check path (runDockerWithRetry) for genuine docker
+ * failures; this probe's only job is to catch "image built without the CLI".
+ *
+ * Exported for unit tests (spawnSync mock seam, same pattern as the rest of
+ * this file's docker-arg helpers).
+ */
+export function probeProviderCliPresentInImage(image: string, binary: string): boolean {
+  const probe = spawnSync(
+    'docker',
+    ['run', '--rm', image, 'sh', '-c', `command -v ${binary}`],
+    { encoding: 'utf-8', timeout: 15_000, stdio: ['pipe', 'pipe', 'pipe'] },
+  );
+  if (probe.error || probe.status === null || probe.status === undefined) return true;
+  return probe.status === 0;
+}
+
 /** Result of a single health-check inspect call. */
 export interface HealthCheckResult {
   /** Container is running normally — proceed with monitor. */
@@ -724,9 +760,10 @@ export class DockerSpawnBackend implements SpawnBackend {
   private readonly memoryLimit: string;
   private readonly memorySwap: string;
   private readonly kindMemoryLimits: Record<string, string>;
+  private readonly verifyProviderCliInImage: boolean;
   private readonly containers = new Map<string, { containerId: string; model: string }>(); // taskId → container info
 
-  constructor(projectDir: string, opts?: { image?: string; timeoutSeconds?: number; gracefulTimeoutSeconds?: number; memoryLimit?: string; memorySwap?: string; kindMemoryLimits?: Record<string, string> }) {
+  constructor(projectDir: string, opts?: { image?: string; timeoutSeconds?: number; gracefulTimeoutSeconds?: number; memoryLimit?: string; memorySwap?: string; kindMemoryLimits?: Record<string, string>; verifyProviderCliInImage?: boolean }) {
     this.projectDir = resolve(projectDir);
     this.image = opts?.image ?? DEFAULT_IMAGE;
     this.timeoutSeconds = opts?.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS;
@@ -741,6 +778,11 @@ export class DockerSpawnBackend implements SpawnBackend {
       }
     }
     this.kindMemoryLimits = rawKindLimits;
+    // F1-IMG-SPAWN (364-004): opt-in, default false — see probeProviderCliPresentInImage
+    // doc comment for why this cannot be default-on yet (SpawnBackendFactory wiring
+    // is out of this task's DISTINCT-FILE scope, and several existing docker-backend
+    // test suites assert exactly one `docker run` call per spawn).
+    this.verifyProviderCliInImage = opts?.verifyProviderCliInImage ?? false;
   }
 
   /**
@@ -882,6 +924,30 @@ export class DockerSpawnBackend implements SpawnBackend {
       return;
     }
     const providerBinary = spec.binary;
+
+    // F1-IMG-SPAWN (364-004 DOCKER-PROVIDER-CLI): image-reality gate — opt-in
+    // (see probeProviderCliPresentInImage doc comment for why this cannot be
+    // default-on yet). claude is always baked in (no build-arg) so it is never
+    // probed. codex/gemini absent from the image → honest-fail BEFORE any
+    // `docker run -d` for the actual worker, never a silent claude fallback
+    // (Yasa #2). Suggests both the exact rebuild command (workerImageBuildCmdForProvider)
+    // and the subprocess backend as an alternative — 364-002 (SUBPROC-PROVIDER-CLI)
+    // fixed that backend to resolve the correct CLI per provider, so it is now a
+    // genuinely correct fallback route for codex/gemini, not a degraded one.
+    if (
+      this.verifyProviderCliInImage
+      && providerBinary !== 'claude'
+      && !probeProviderCliPresentInImage(this.image, providerBinary)
+    ) {
+      throw new SpawnBackendError(
+        `Docker image '${this.image}' does not have the '${providerBinary}' CLI installed for provider `
+        + `'${provider}' (task ${taskId}) — the image exists but was built without it. `
+        + `Rebuild with: ${workerImageBuildCmdForProvider(this.image, provider)} `
+        + `— or route this task to the subprocess backend instead by adding `
+        + `\`- Backend: subprocess\` to its directive.`,
+        'docker',
+      );
+    }
 
     // Sprint 194 W-AUTH A-1 (host-side wire — A23): before spawning a claude
     // container we run the auth health-check on the HOST. The container executes

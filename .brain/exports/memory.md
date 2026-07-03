@@ -1,5 +1,21 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-364 Learnings
+- Sprint sprint-364 Learnings: ## Sprint sprint-364 Learnings
+- Fix debt: Tech debt from 361-001-fix: Worker timeout/killed (exitCode=1) but git diff show: GO_WITH_TECH_DEBT — ROOT CAUSE of debt-361-001-fix: a TIMEOUT_WITH_WORK result (worker 361-001-fix killed exitCode=1, but git diff showed 67
+- TMUX-PROVIDER-CLI — aynı fix tmux-backend'e (Yasa #2 paritesi): GO_WITH_TECH_DEBT — TMUX-PROVIDER-CLI (364-002/born-481 Yasa#2 parity). Root cause confirmed: TmuxBackend.spawn() (spawn-backend.ts) calls t
+- CODEX-V5 — kesin-sınav (481-fix'li dist gerekmez: subprocess kendi sprint'inde fix'lenmiş: NO_GO — Subprocess worker exited with code 1. No explicit result file written by worker.
+- RETRO-SERIES-METRICS — 357-363 seri-metrik agregatörü (7-Tem raporu altyapısı): GO_WITH_TECH_DEBT — Built `node scripts/series-metrics.mjs <startSprint> <endSprint>` (no new deps — plain ESM + node:fs/path, follows the p
+
+## Gains
+- 364-002 — SUBPROC-PROVIDER-CLI — worker-komutu CLI-binary'yi provider'dan seçsin (born-481) — born-481 root cause (disk-verified): SubprocessBackend (src/orchestra/spawn-backend.ts) always co...
+- 364-004 — DOCKER-PROVIDER-CLI — docker-backend paritesi + imaj-gerçeği — DISK-VERIFY: docker backend ALREADY builds workerCmd from the shared provider→cmd table (getProvi...
+- 364-006 — 363-DEBT-CLOSE — 3 debt-notunu oku-kapat — Resolved '005-brain-debt, 009, 011' to debt-363-005/009/011 in .brain/memory.db (matched via orig...
+- 364-007 — GEMINI-PARITY-GATED — F11-014 gemini-dalı key-gated testler — Plan written to .tasks/task-364-007.plan before coding.
+- 364-008 — ONB-DOC — onboarding kullanıcı-dokümanı (deckent onboard + wizard + global) — Both target docs written and disk-verified against the actual 361-363 ONB source (onboard.ts, onb...
+- 364-009 — AGSK-4 — provider-cli-matrix skill'i — AGSK-4: new two-tree built-in skill 'provider-cli-matrix' (.deckent/skills/ + src/core/builtins/s...
+- 364-010 — FEATURES-DOC-2 — limit/rpc/openrouter feature-doc'ları — 3 feature docs written to docs/features/ following the repl-surface.md skeleton (Ne yapar -> Para...
+
 ## Sprint sprint-363 Learnings
 - Sprint sprint-363 Learnings: ## Sprint sprint-363 Learnings
 - CODEX-V4 — model-pin gerçek sınavı (479-fix'li plan): NO_GO — Subprocess worker exited with code 1. No explicit result file written by worker.

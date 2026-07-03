@@ -8822,3 +8822,35 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 363-013: TOOLCU-DESIGN — computer-use/browser pack tasarım-notu (Sıra-83, P2) (DONE)
 
 ---
+## Sprint 364 — sprint-364
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-03
+**Duration:** 1739s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 12 |
+| Completed | 10 |
+| Tech Debt | 3 |
+| No-Go | 2 |
+| Coverage | NaN% |
+| Duration | 1738585ms |
+
+### Tasks
+
+- 364-001: Fix debt: Tech debt from 361-001-fix: Worker timeout/killed (exitCode=1) but git diff show (GO_WITH_TECH_DEBT)
+- 364-002: SUBPROC-PROVIDER-CLI — worker-komutu CLI-binary'yi provider'dan seçsin (born-481) (DONE)
+- 364-003: TMUX-PROVIDER-CLI — aynı fix tmux-backend'e (Yasa #2 paritesi) (GO_WITH_TECH_DEBT)
+- 364-004: DOCKER-PROVIDER-CLI — docker-backend paritesi + imaj-gerçeği (DONE)
+- 364-005: CODEX-V5 — kesin-sınav (481-fix'li dist gerekmez: subprocess kendi sprint'inde fix'lenmiş (NO_GO)
+- 364-006: 363-DEBT-CLOSE — 3 debt-notunu oku-kapat (DONE)
+- 364-007: GEMINI-PARITY-GATED — F11-014 gemini-dalı key-gated testler (DONE)
+- 364-008: ONB-DOC — onboarding kullanıcı-dokümanı (deckent onboard + wizard + global) (DONE)
+- 364-009: AGSK-4 — provider-cli-matrix skill'i (DONE)
+- 364-010: FEATURES-DOC-2 — limit/rpc/openrouter feature-doc'ları (DONE)
+- 364-011: RETRO-SERIES-METRICS — 357-363 seri-metrik agregatörü (7-Tem raporu altyapısı) (GO_WITH_TECH_DEBT)
+
+---

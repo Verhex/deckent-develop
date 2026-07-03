@@ -533,6 +533,18 @@ describe('evaluateWithRubric', () => {
     expect(evaluation.decision).toBe('GO_WITH_TECH_DEBT');
   });
 
+  it('EVAL-DEBT-CEILING (born-482): verification-task fast-path also respects honest DEBT', () => {
+    const task = makeTask(['src/core/'], { description: 'Verify the existing implementation works' });
+    const result = makeResult({
+      testsPassed: true,
+      selfAssessment: 'GO_WITH_TECH_DEBT',
+      filesChanged: [],
+      notes: 'verified existing work; one gap remains outside scope',
+    });
+    const evaluation = evaluateWithRubric(result, task);
+    expect(evaluation.decision).not.toBe('DONE');
+  });
+
   it('returns DONE with custom rubric', () => {
     const task = makeTask(['src/core/']);
     const result = makeResult({

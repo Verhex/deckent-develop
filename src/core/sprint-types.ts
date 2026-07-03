@@ -87,9 +87,16 @@ export enum DebtPriority {
  * - `verified-no-result`: closure-only debt that requires no follow-up code change
  *   (e.g. earlier sprint already verified the underlying issue). Injection step
  *   skips such debts to avoid spawning no-op CRITICAL fix tasks (Sprint 179 W1-1).
+ * - `timeout-partial`: a worker was killed mid-execution (TIMEOUT_WITH_WORK) and
+ *   result-evaluator reconciled its partial diff to GO_WITH_TECH_DEBT — the work
+ *   was ACCEPTED into the tree, so there is no described code defect to fix. Like
+ *   `verified-no-result`, injection skips it: a timeout is incomplete execution,
+ *   not a deliberate shortcut, so a forced fix task only spawns a no-op worker
+ *   that re-injects every sprint (the debt-361-001-fix phantom loop). Genuine
+ *   incompleteness resurfaces later as a concrete, actionable failure. (Sprint 364.)
  * - `standard`: regular debt that needs a fix task (default when class is absent).
  */
-export type DebtClass = 'verified-no-result' | 'standard';
+export type DebtClass = 'verified-no-result' | 'timeout-partial' | 'standard';
 
 /**
  * Origin scope captured when the debt was created. Used by the auto-debt

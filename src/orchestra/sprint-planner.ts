@@ -927,6 +927,9 @@ function legacyFallbackScope(): TaskScope {
  *
  * Sprint 179 W1-1 behaviour:
  *  - `class === 'verified-no-result'` → skip (honest closure, no work needed).
+ *  - `class === 'timeout-partial'` → skip (Sprint 364): a killed-worker partial
+ *    diff already accepted into the tree — no described defect, so a forced fix
+ *    task only spawns a no-op worker that re-injects every sprint.
  *  - `originScope` present → inherit `directories` + `filesWrite`; `filesRead`
  *    mirrors `directories` so the worker can read the area it must write to.
  *  - `originScope` absent → broad legacy fallback `src/` (matches behaviour
@@ -946,8 +949,12 @@ export function injectCriticalDebtTasks(
   for (const item of debt) {
     if (item.priority !== DebtPriority.CRITICAL || item.resolved) continue;
 
-    // Honest closure: verified-no-result debts have no follow-up work.
-    if (item.class === 'verified-no-result') {
+    // Honest closure: verified-no-result debts have no follow-up work, and
+    // timeout-partial debts (Sprint 364) record a killed-worker event whose
+    // partial diff reconciliation already accepted into the tree — neither has a
+    // described code defect, so injecting a CRITICAL fix task only spawns a
+    // no-op worker that flails and re-injects every sprint.
+    if (item.class === 'verified-no-result' || item.class === 'timeout-partial') {
       skipped.push(item.id);
       continue;
     }

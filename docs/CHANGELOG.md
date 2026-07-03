@@ -2,6 +2,27 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint364] - 2026-07-03
+
+### Added
+
+- SUBPROC-PROVIDER-CLI — worker-komutu CLI-binary'yi provider'dan seçsin (born-481)
+- DOCKER-PROVIDER-CLI — docker-backend paritesi + imaj-gerçeği
+- 363-DEBT-CLOSE — 3 debt-notunu oku-kapat
+- GEMINI-PARITY-GATED — F11-014 gemini-dalı key-gated testler
+- ONB-DOC — onboarding kullanıcı-dokümanı (deckent onboard + wizard + global)
+- AGSK-4 — provider-cli-matrix skill'i
+- FEATURES-DOC-2 — limit/rpc/openrouter feature-doc'ları
+
+### Changed
+
+- Fix debt: Tech debt from 361-001-fix: Worker timeout/killed (exitCode=1) but git diff show (completed with tech debt)
+- TMUX-PROVIDER-CLI — aynı fix tmux-backend'e (Yasa #2 paritesi) (completed with tech debt)
+- RETRO-SERIES-METRICS — 357-363 seri-metrik agregatörü (7-Tem raporu altyapısı) (completed with tech debt)
+
+
+_Tasks: 12 total, 10 done, 3 tech debt, 2 no-go_
+
 ## [1.0.0-beta.1-sprint363] - 2026-07-03
 
 ### Added

@@ -1,0 +1,60 @@
+{
+  "id": "provider-cli-matrix",
+  "source": "builtin",
+  "name": "Provider CLI Matrix",
+  "version": "0.1.0",
+  "description": "Provider-to-CLI arg contracts (claude/codex/gemini): model-param, prompt-feed, output-format, exit-code honesty, silent-fallback ban, repro-before-red pattern",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "provider-cli"
+          }
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "domain",
+  "triggers": [
+    "provider-cli",
+    "buildArgs",
+    "buildCommand",
+    "output-format",
+    "exit-code",
+    "silent-fallback",
+    "usage-emit",
+    "codex",
+    "gemini",
+    "claude-cli",
+    "repro-before-red"
+  ],
+  "stackDetection": {
+    "files": [],
+    "dependencies": [],
+    "commands": []
+  },
+  "composableWith": [
+    "typescript-expert",
+    "testing-expert",
+    "anthropic-sdk"
+  ],
+  "priority": 7,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  }
+}

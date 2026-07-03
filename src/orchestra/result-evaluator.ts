@@ -157,7 +157,12 @@ export async function evaluateResult(result: TaskResult, task: Task, vitestJsonO
   if (!result.testsPassed) return TaskEvaluation.NO_GO;
 
   // Step 2: Doc tasks — DONE if tests pass (skip coverage)
-  if (isDocTask(task)) return TaskEvaluation.DONE;
+  // born-482: doc fast-path respects the honest-DEBT ceiling too.
+  if (isDocTask(task)) {
+    return result.selfAssessment === 'GO_WITH_TECH_DEBT'
+      ? TaskEvaluation.GO_WITH_TECH_DEBT
+      : TaskEvaluation.DONE;
+  }
 
   // Step 3: Brain makes the final call based on objective criteria
   // Worker self-assessment is just a HINT, not the final decision
@@ -974,7 +979,9 @@ export function evaluateWithRubric(
   // should get DONE when filesChanged=[] + testsPassed=true + description matches
   if (isVerificationTask(task, result)) {
     return {
-      decision: 'DONE',
+      // born-482: fast-path may not raise an honest worker DEBT to DONE
+      // (third bypass variant of EVAL-DEBT-CEILING after ladder+rubric).
+      decision: result.selfAssessment === 'GO_WITH_TECH_DEBT' ? 'GO_WITH_TECH_DEBT' : 'DONE',
       totalScore: 100,
       rubricScores: [
         { criterion: 'correctness', score: 100, passed: true, reason: 'verification task — tests passed, existing work confirmed' },

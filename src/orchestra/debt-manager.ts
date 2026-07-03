@@ -98,20 +98,42 @@ function recordDebtEntry(
   if (!store) return; // No DB available — debt entry skipped (Memory V2 DB required)
   try {
     if (store.getById(debtId)) return;
+
+    // Sprint 364 (364-001): a TIMEOUT_WITH_WORK result is NOT tech debt. The
+    // worker was killed mid-execution; result-evaluator reconciled the partial
+    // diff to GO_WITH_TECH_DEBT (the files were ACCEPTED into the tree) and
+    // `result.notes` is the generic orchestration string ("Worker timeout/killed
+    // … git diff shows N files … reconcile via Spurious NO_GO helper"), not a
+    // described code defect. Recording it with the default 'standard' class +
+    // verbatim note produced a phantom debt (debt-361-001-fix) — unactionable,
+    // escalated to CRITICAL, and respawning a no-op fix task every sprint. Class
+    // it 'timeout-partial' (injectCriticalDebtTasks skips it, like
+    // 'verified-no-result') and give it an honest ledger title/content instead of
+    // the raw timeout string.
+    const isTimeoutPartial = (result.selfAssessment as string) === 'TIMEOUT_WITH_WORK';
     const evalLabel = source === 'self'
       ? 'Task evaluated as DONE, but worker self-assessed GO_WITH_TECH_DEBT'
       : 'Task evaluated as GO_WITH_TECH_DEBT';
+    const title = isTimeoutPartial
+      ? `Timeout-partial from ${task.id}: worker killed mid-execution, work accepted`
+      : `Tech debt from ${task.id}: ${result.notes}`;
+    const content = isTimeoutPartial
+      ? `Worker for ${task.id} was killed mid-execution (TIMEOUT_WITH_WORK); reconciliation `
+        + `accepted the partial diff into the tree (GO_WITH_TECH_DEBT). There is no described `
+        + `code defect to fix, so no forced follow-up is injected — any genuine incompleteness `
+        + `resurfaces later as a concrete, actionable failure. Original worker note: ${result.notes}`
+      : `${evalLabel}. Notes: ${result.notes}`;
     store.insert({
       id: debtId,
       type: 'debt',
-      title: `Tech debt from ${task.id}: ${result.notes}`.slice(0, 80),
-      content: `${evalLabel}. Notes: ${result.notes}`,
+      title: title.slice(0, 80),
+      content,
       source: 'brain',
       status: 'active',
       priority: 'normal',
       sprint_id: debtSprint.sprint_id,
       sprint_num: debtSprint.sprint_num,
-      tags: ['debt', task.id],
+      tags: isTimeoutPartial ? ['debt', task.id, 'timeout-partial'] : ['debt', task.id],
       metadata: {
         originTaskId: task.id,
         originSprintId: debtSprint.sprint_id,
@@ -128,7 +150,7 @@ function recordDebtEntry(
         // Brain-level lifecycle concern (see 362-001 result notes) and is not set
         // here. NOTE: additive only — retroactively unaffects rows already written
         // without originScope.
-        class: 'standard',
+        class: isTimeoutPartial ? 'timeout-partial' : 'standard',
         originScope: {
           directories: [...(task.scope?.directories ?? [])],
           filesWrite: [...(task.scope?.filesWrite ?? [])],

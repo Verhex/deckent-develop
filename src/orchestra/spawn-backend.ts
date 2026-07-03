@@ -2,11 +2,17 @@ import { spawnSync } from 'node:child_process';
 import type { ModelType } from '../core/types.js';
 import type { ProviderSpawnOptions } from '../core/provider.js';
 import { ensureSession, spawnWorker as tmuxSpawnWorker, killWorker as tmuxKillWorker, listWorkers as tmuxListWorkers } from './tmux.js';
-import { SubprocessSpawnBackend } from '../providers/subprocess.js';
+import { SubprocessSpawnBackend, CLAUDE_SUBPROCESS_CONFIG } from '../providers/subprocess.js';
+import type { SubprocessProviderConfig } from '../providers/subprocess.js';
+import { CODEX_USAGE_EMIT_ARGS } from '../providers/codex.js';
 import { DockerSpawnBackend } from './spawn-backend-docker.js';
 import { assertNotLethalWithoutApproval } from '../nervous/panic-gate.js';
 import { SandboxSpawnBackend } from '../providers/sandbox.js';
 import type { SandboxOptions } from '../providers/sandbox.js';
+import { modelRegistry } from '../core/model-registry.js';
+import { getProviderCommandSpec } from '../core/provider-command-spec.js';
+import { resolveReasoningEffort } from '../core/reasoning-effort.js';
+import { getDefaultProviderName } from './sprint-utils.js';
 
 export type { SandboxOptions };
 export { SandboxSpawnBackend };
@@ -170,6 +176,110 @@ export class TmuxBackend implements SpawnBackend {
   }
 }
 
+// ─── Subprocess Provider→CLI Resolution (SUBPROC-PROVIDER-CLI, 364-002) ───────
+//
+// born-481 (log-evidenced): SubprocessBackend always defaulted to
+// CLAUDE_SUBPROCESS_CONFIG regardless of the spawned task's actual provider —
+// a provider:codex task (model apiId gpt-5.5) was fed to the claude CLI's
+// `--model` flag, which the Claude API rejects (404 -> worker exit 1). The
+// CLI-binary + arg-table must be selected FROM THE PROVIDER, reusing
+// PROVIDER_COMMAND_SPECS (core/provider-command-spec.ts) — the same SSOT
+// spawn-backend-docker.ts's runSpawn() already keys off — so the docker and
+// subprocess backends' provider→CLI mapping can never drift apart.
+//
+// Only STDIN-fed CLIs can be represented here: SubprocessProviderConfig.
+// buildArgs(model, opts) has no prompt parameter — SubprocessSpawnBackend
+// writes the prompt to the child's stdin separately (providers/subprocess.ts
+// spawn(), after buildArgs() runs) — so an 'inline' promptFeed provider
+// (gemini's `-p <text>`) cannot be expressed without changing that interface
+// (out of this task's write scope). Any such provider, or one with no
+// ProviderCommandSpec at all (ollama — host-only, ADR: use its host adapter),
+// is an honest SpawnBackendError — never a silent claude-CLI fallback (Yasa #2).
+
+let codexSubprocessConfig: SubprocessProviderConfig | undefined;
+
+/**
+ * Build (once, memoized) the codex SubprocessProviderConfig from
+ * PROVIDER_COMMAND_SPECS.codex — the CLI binary + flag table are read from
+ * that single source of truth, not re-hardcoded here.
+ */
+function getCodexSubprocessConfig(): SubprocessProviderConfig {
+  if (codexSubprocessConfig) return codexSubprocessConfig;
+
+  const spec = getProviderCommandSpec('codex');
+  if (!spec) {
+    // Unreachable in practice — codex is a built-in PROVIDER_COMMAND_SPECS
+    // entry — kept as an honest failure instead of a non-null assertion.
+    throw new SpawnBackendError(
+      'No ProviderCommandSpec registered for "codex" — cannot build its subprocess CLI config.',
+      'subprocess',
+    );
+  }
+
+  // spec.baseArgs carries '--json' inline (the docker convention); the
+  // subprocess backend applies a usage-emit flag ONLY at live-spawn time via
+  // SubprocessProviderConfig.usageEmitArgs (mirrors CLAUDE_SUBPROCESS_CONFIG),
+  // which keeps buildArgs()/buildCommandString() dry-run-stable — no
+  // usage-telemetry flag leaking into the unit-tested arg shape or display string.
+  const baseArgs = spec.baseArgs.filter(arg => !CODEX_USAGE_EMIT_ARGS.includes(arg));
+
+  const config: SubprocessProviderConfig = {
+    cliCommand: spec.binary,
+    name: 'codex-subprocess',
+    supportedModels: modelRegistry.getByProvider('codex').map(m => m.id) as ModelType[],
+    buildArgs(model, opts) {
+      const wireModel = modelRegistry.get(model)?.apiId ?? model;
+      const args = [...baseArgs, spec.modelFlag, wireModel];
+      if (opts?.autoApprove) {
+        args.push(...spec.approvalArgs);
+      }
+      const effort = resolveReasoningEffort('codex', opts?.reasoningEffort);
+      if (effort && spec.reasoningEffortArgs) {
+        args.push(...spec.reasoningEffortArgs(effort));
+      }
+      return args;
+    },
+    buildCommandString(model, promptPath, opts) {
+      const args = config.buildArgs(model, opts);
+      return `${spec.binary} ${args.join(' ')} < ${promptPath}`;
+    },
+    usageEmitArgs: CODEX_USAGE_EMIT_ARGS,
+  };
+
+  codexSubprocessConfig = config;
+  return config;
+}
+
+/**
+ * Resolve the SubprocessProviderConfig for a non-claude provider. 'claude' is
+ * handled by the caller as a direct CLAUDE_SUBPROCESS_CONFIG passthrough
+ * (byte-identical to pre-364-002 behavior — see SubprocessBackend below).
+ * 'codex' builds a matching config from PROVIDER_COMMAND_SPECS; any other
+ * provider is an honest SpawnBackendError (born-481 — no silent claude
+ * fallback), with a specific reason when the provider IS known but its CLI
+ * cannot be expressed over this backend's stdin-only prompt delivery.
+ */
+function resolveSubprocessProviderConfig(provider: string): SubprocessProviderConfig {
+  if (provider === 'codex') return getCodexSubprocessConfig();
+
+  const spec = getProviderCommandSpec(provider);
+  if (spec && spec.promptFeed !== 'stdin') {
+    throw new SpawnBackendError(
+      `Subprocess backend cannot spawn provider "${provider}": its CLI ("${spec.binary}") `
+      + `expects the prompt as an inline argument, but SubprocessProviderConfig.buildArgs() has `
+      + `no prompt access (the subprocess backend only supports stdin-fed CLIs). Use the docker `
+      + `backend for this provider instead.`,
+      'subprocess',
+    );
+  }
+  throw new SpawnBackendError(
+    `Subprocess backend has no CLI command mapping for provider "${provider}" `
+    + `(supported: claude, codex). Refusing to silently spawn the claude CLI for a `
+    + `mismatched provider — born-481.`,
+    'subprocess',
+  );
+}
+
 // ─── SubprocessBackend ────────────────────────────────────────────────────────
 
 /**
@@ -183,27 +293,42 @@ export class SubprocessBackend implements SpawnBackend {
 
   private readonly projectDir: string;
   private readonly timeoutMs: number;
-  private _backend: SubprocessSpawnBackend | null = null;
+  /**
+   * One SubprocessSpawnBackend PER PROVIDER (364-002) — each instance owns
+   * exactly one CLI binary, fixed at construction via providerConfig. Keyed
+   * by provider so a mixed-provider sprint on spawn_backend=subprocess (e.g.
+   * claude + codex tasks) gives each task its own CLI instead of every task
+   * silently defaulting to claude's (born-481).
+   */
+  private readonly backendsByProvider = new Map<string, SubprocessSpawnBackend>();
 
   constructor(projectDir: string, opts?: { timeoutMs?: number }) {
     this.projectDir = projectDir;
     this.timeoutMs = opts?.timeoutMs ?? 0;
   }
 
-  private getBackend(timeoutOverrideMs?: number): SubprocessSpawnBackend {
+  private getBackendForProvider(provider: string, timeoutOverrideMs?: number): SubprocessSpawnBackend {
+    // 'claude' resolves the SAME CLAUDE_SUBPROCESS_CONFIG singleton
+    // SubprocessSpawnBackend defaults to internally — byte-identical spawn
+    // args to pre-364-002 behavior.
+    const providerConfig = provider === 'claude' ? CLAUDE_SUBPROCESS_CONFIG : resolveSubprocessProviderConfig(provider);
     // When a per-task timeout is provided, create a fresh backend with that timeout
     // (SubprocessSpawnBackend.defaultTimeoutMs is protected, so we can't mutate it)
     if (timeoutOverrideMs != null) {
       return new SubprocessSpawnBackend(this.projectDir, {
         defaultTimeoutMs: timeoutOverrideMs,
+        providerConfig,
       });
     }
-    if (!this._backend) {
-      this._backend = new SubprocessSpawnBackend(this.projectDir, {
+    let backend = this.backendsByProvider.get(provider);
+    if (!backend) {
+      backend = new SubprocessSpawnBackend(this.projectDir, {
         defaultTimeoutMs: this.timeoutMs,
+        providerConfig,
       });
+      this.backendsByProvider.set(provider, backend);
     }
-    return this._backend;
+    return backend;
   }
 
   spawn(taskId: string, model: ModelType, prompt: string, opts?: SpawnBackendOptions): void {
@@ -214,18 +339,32 @@ export class SubprocessBackend implements SpawnBackend {
     // Subprocess backend does NOT currently write `.prompt-*.txt` files (prompts
     // are passed via child_process argv / stdin), so the cross-backend contract
     // here is a marker that future prompt persistence MUST follow this lifecycle.
+    // 364-002 (born-481): resolve the CLI-binary from the TASK'S ACTUAL PROVIDER,
+    // not a fixed claude default — mirrors spawn-backend-docker.ts's runSpawn().
+    const provider = modelRegistry.get(model)?.provider ?? getDefaultProviderName();
     const timeoutOverrideMs = opts?.taskTimeoutSeconds != null
       ? opts.taskTimeoutSeconds * 1000
       : undefined;
-    this.getBackend(timeoutOverrideMs).spawn(taskId, model, prompt, opts);
+    this.getBackendForProvider(provider, timeoutOverrideMs).spawn(taskId, model, prompt, opts);
   }
 
   kill(taskId: string): void {
-    this.getBackend().kill(taskId);
+    // Scan every provider backend this instance has spawned through — a
+    // mixed-provider sprint may hold the taskId on any one of them.
+    for (const backend of this.backendsByProvider.values()) {
+      if (backend.listWorkers().includes(taskId)) {
+        backend.kill(taskId);
+        return;
+      }
+    }
+    // No cached backend currently tracks this taskId — surface the SAME
+    // "No running worker" error SubprocessSpawnBackend itself throws (matches
+    // pre-364-002 behavior for an unknown/already-exited task).
+    this.getBackendForProvider('claude').kill(taskId);
   }
 
   list(): string[] {
-    return this.getBackend().listWorkers() as string[];
+    return Array.from(this.backendsByProvider.values()).flatMap(b => b.listWorkers() as string[]);
   }
 
   async isAvailable(): Promise<boolean> {

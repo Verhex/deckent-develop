@@ -4,13 +4,16 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-362-001-fix | Tech debt from 362-001-fix: VERIFY-AND-COMPLETE of the OOM-killed prior 362-001- | high | sprint-362 | active |
-| debt-361-001-fix | Tech debt from 361-001-fix: Worker timeout/killed (exitCode=1) but git diff show | critical | sprint-361 | active |
+| debt-362-001-fix | Tech debt from 362-001-fix: VERIFY-AND-COMPLETE of the OOM-killed prior 362-001- | critical | sprint-362 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-364-001 | Tech debt from 364-001: ROOT CAUSE of debt-361-001-fix: a TIMEOUT_WITH_WORK resu | normal | sprint-364 | resolved |
+| debt-364-003 | Tech debt from 364-003: TMUX-PROVIDER-CLI (364-002/born-481 Yasa#2 parity). Root | normal | sprint-364 | resolved |
+| debt-364-008 | Tech debt from 364-008: Both target docs written and disk-verified against the a | normal | sprint-364 | resolved |
+| debt-364-011 | Tech debt from 364-011: Built `node scripts/series-metrics.mjs <startSprint> <en | normal | sprint-364 | resolved |
 | debt-363-005 | Tech debt from 363-005: Wired the 361-009 onboarding machine (helpers/onboarding | normal | sprint-363 | resolved |
 | debt-363-009 | Tech debt from 363-009: Implemented deckent_autonomous_approve + deckent_autonom | normal | sprint-363 | resolved |
 | debt-363-011 | Tech debt from 363-011: Wired 361-015 session-registry into health-snapshot.ts p | normal | sprint-363 | resolved |
@@ -18,6 +21,7 @@
 | debt-362-008 | Tech debt from 362-008: POST /api/rpc wired as the first HTTP consumer of TERM-R | normal | sprint-362 | resolved |
 | debt-361-002 | Tech debt from 361-002: Part (a) `deckent limits [--json]` is fully implemented  | normal | sprint-361 | resolved |
 | debt-361-014 | Tech debt from 361-014: DONE for the write-scope deliverable: 2 new MCP tools (d | normal | sprint-361 | resolved |
+| debt-361-001-fix | Tech debt from 361-001-fix: Worker timeout/killed (exitCode=1) but git diff show | critical | sprint-361 | resolved |
 | debt-360-013 | Tech debt from 360-013: Wired registerApprovalHistoryRoute (built in 359-013) in | normal | sprint-360 | resolved |
 | debt-359-001 | Tech debt from 359-001: Added normalizeStructuredTaskDependencies(tasks, options | normal | sprint-359 | resolved |
 | debt-359-003 | Tech debt from 359-003: born-466 parity implemented in buildWorkerCommand() (src | normal | sprint-359 | resolved |

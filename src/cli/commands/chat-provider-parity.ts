@@ -52,6 +52,13 @@ function subscriptionEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
   delete env['ANTHROPIC_API_KEY'];
   delete env['DECKENT_CLAUDE_API_KEY'];
+  // Gemini CLI treats any of these as API-key auth, outranking its own OAuth
+  // session file (~/.gemini/oauth_creds.json — see provider-auth-probe.ts's
+  // probeGemini). Stripping them keeps the gemini branch on subscription/OAuth
+  // auth, matching the claude branch's ANTHROPIC_API_KEY stripping above.
+  delete env['GEMINI_API_KEY'];
+  delete env['GOOGLE_API_KEY'];
+  delete env['DECKENT_GOOGLE_API_KEY'];
   return env;
 }
 
