@@ -2,6 +2,28 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint368] - 2026-07-05
+
+### Added
+
+- AGSK-1-DILIM-2-CARRY — 3 yeni builtin-skill (DOĞRU ağaç-yolu)
+- F11-016-STAB — REPL cursor/queue stabilizasyon dilimi
+- ONB-CHAT-DILIM-2 — sohbet-setup intent genişlemesi
+- DEFER-002 — nervous askBrain escalation kapanışı
+- SERIES-357-367 — seri-raporu güncelle + 484-saga bölümü
+- CHAT-IDE-DILIM-2 — VS Code panel veri-bağlama
+
+### Changed
+
+- ONB-2-DILIM-3 — doctor windows-native profil + auth-state probe (completed with tech debt)
+
+### Fixed
+
+- DOCS-FEATURES-4 — doctor-fix + onboard-apply + approval-history feature-doc'ları
+
+
+_Tasks: 8 total, 8 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint367] - 2026-07-05
 
 ### Added

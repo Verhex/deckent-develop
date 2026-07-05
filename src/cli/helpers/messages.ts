@@ -377,6 +377,70 @@ const MESSAGES: MessageMap = {
     tr: 'Hassas veritabanı dosyaları git tarafından düzgün yok sayılmıyor.',
   },
 
+  // ─── doctor: platform profile (ONB-2-DILIM-3, Sprint 368 — 368-002) ──
+  'doctor.platform_profile_header': {
+    en: 'Platform Profile:',
+    tr: 'Platform Profili:',
+  },
+  'doctor.platform_profile_line': {
+    en: '{platform} — {label}',
+    tr: '{platform} — {label}',
+  },
+  'doctor.platform_profile_adapted_header': {
+    en: 'Platform-specific check adaptations (no silent skips):',
+    tr: 'Platforma özgü check uyarlamaları (sessiz-geçiş yok):',
+  },
+  'doctor.platform_adapt_tmux': {
+    en: 'tmux is not natively available on Windows — the tmux requirement is skipped on this platform (use WSL2, or set spawn_backend to docker/subprocess for full support).',
+    tr: 'tmux Windows\'ta yerel olarak mevcut değil — tmux gereksinimi bu platformda atlanıyor (WSL2 kullanın veya tam destek için spawn_backend\'i docker/subprocess yapın).',
+  },
+  'doctor.platform_adapt_permissions': {
+    en: 'Windows uses NTFS ACLs, not POSIX permission bits — a chmod-based restriction (e.g. owner-only 0600) is not enforced the same way; write-access checks still work but cannot guarantee equivalent protection.',
+    tr: 'Windows POSIX izin bitleri yerine NTFS ACL\'leri kullanır — chmod-tabanlı bir kısıtlama (örn. yalnız-sahip 0600) aynı şekilde uygulanmaz; yazma-erişim kontrolleri çalışır ama eşdeğer koruma garanti edilmez.',
+  },
+  'doctor.platform_adapt_paths': {
+    en: 'Windows uses backslash path separators — checks that compare literal path strings (e.g. .gitignore entries) may behave differently even though internal path handling is normalized.',
+    tr: 'Windows ters-eğik-çizgi yol ayırıcıları kullanır — dahili yol işleme normalize edilmiş olsa da, literal yol dizesi karşılaştıran kontroller (örn. .gitignore girdileri) farklı davranabilir.',
+  },
+  'doctor.platform_label_win32_native': {
+    en: 'Windows (native)',
+    tr: 'Windows (native)',
+  },
+  'doctor.platform_label_wsl': {
+    en: 'WSL2/Linux (fully supported)',
+    tr: 'WSL2/Linux (tam destekli)',
+  },
+  'doctor.platform_label_linux': {
+    en: 'Linux (fully supported)',
+    tr: 'Linux (tam destekli)',
+  },
+  'doctor.platform_label_darwin': {
+    en: 'macOS (fully supported)',
+    tr: 'macOS (tam destekli)',
+  },
+  'doctor.platform_label_untested': {
+    en: '{platform} (untested — may work)',
+    tr: '{platform} (test edilmedi — çalışabilir)',
+  },
+
+  // ─── doctor: config-based auth state (ONB-2-DILIM-3, Sprint 368 — 368-002) ──
+  'doctor.auth_state_header': {
+    en: 'Auth State (config-based, no network):',
+    tr: 'Auth Durumu (config-tabanlı, ağ-çağrısı yok):',
+  },
+  'doctor.auth_state_connected': {
+    en: '{provider}: connected',
+    tr: '{provider}: bağlı',
+  },
+  'doctor.auth_state_missing': {
+    en: '{provider}: missing',
+    tr: '{provider}: eksik',
+  },
+  'doctor.auth_state_unknown': {
+    en: '{provider}: unknown',
+    tr: '{provider}: bilinmiyor',
+  },
+
   // ─── attach command ─────────────────────────────────────────────────
   'attach.no_active_session': {
     en: 'No active session. Run `deckent start` first.',
@@ -2707,6 +2771,24 @@ const MESSAGES: MessageMap = {
   'onboarding.apply.dry_run_notice': {
     en: 'Dry-run — no changes were written.',
     tr: 'Dry-run — hiçbir değişiklik yazılmadı.',
+  },
+
+  // ─── onboarding chat meta-intents (ONB-CHAT-DILIM-2, Sprint 368 Task 368-004) ──
+  'onboarding.suggestion.connect_provider': {
+    en: 'Run `deckent connect` to sign in to a provider CLI (claude / codex / gemini).',
+    tr: 'Bir sağlayıcı CLI\'sine (claude / codex / gemini) giriş yapmak için `deckent connect` çalıştırın.',
+  },
+  'onboarding.chat.suggestion.show_limits': {
+    en: 'Run `deckent limits` to see your current subscription-window usage.',
+    tr: 'Mevcut abonelik-penceresi kullanımınızı görmek için `deckent limits` çalıştırın.',
+  },
+  'onboarding.chat.suggestion.start_sprint': {
+    en: 'Once setup is done, run `deckent plan` then `deckent start` to plan and launch a sprint.',
+    tr: 'Kurulum bittiğinde bir sprint planlayıp başlatmak için `deckent plan`, ardından `deckent start` çalıştırın.',
+  },
+  'onboarding.chat.suggestion.run_doctor': {
+    en: 'Run `deckent doctor` to diagnose and fix common setup problems.',
+    tr: 'Yaygın kurulum sorunlarını teşhis edip düzeltmek için `deckent doctor` çalıştırın.',
   },
 };
 

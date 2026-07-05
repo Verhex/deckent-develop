@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-368-002 | Tech debt from 368-002: Both parts delivered. (1) Platform profile: buildPlatfor | normal | sprint-368 | resolved |
 | debt-367-004 | Tech debt from 367-004: Read task-366-003.result (the sole sprint-366 GO_WITH_TE | normal | sprint-367 | resolved |
 | debt-367-005 | Tech debt from 367-005: Wired 366-006's onboarding-apply.ts (applyOnboardingPlan | normal | sprint-367 | resolved |
 | debt-367-006 | Tech debt from 367-006: Enriched `deckent doctor --fix` (Sprint 356 Task 356-006 | normal | sprint-367 | resolved |

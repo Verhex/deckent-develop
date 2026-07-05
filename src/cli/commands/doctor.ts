@@ -126,6 +126,92 @@ export function checkPlatform(spawnBackend?: string): DoctorCheck {
   };
 }
 
+// ─── Platform Profile Report (ONB-2-DILIM-3, Sprint 368 — 368-002) ───────────
+//
+// `checkPlatform` above answers a single pass/fail question. This section adds
+// a richer, HONEST profile: process.platform + WSL detection, plus — for
+// win32 — an explicit list of checks whose behavior is ADAPTED on this
+// platform (Law #2: never silently skip a check without saying so). Grounded
+// in real code, not speculative: `checkTmux` already treats win32 as
+// "not required" unconditionally; Windows ACLs are not POSIX mode bits (a
+// chmod-based restriction elsewhere in this file is not enforced equivalently);
+// and backslash path separators can make literal path-string comparisons
+// (e.g. .gitignore matching) behave differently even though node:path
+// normalizes most internal usage.
+
+export interface PlatformAdaptedCheck {
+  name: string;
+  note: string;
+}
+
+export interface PlatformProfileReport {
+  platform: NodeJS.Platform;
+  isWSL: boolean;
+  label: string;
+  adaptedChecks: PlatformAdaptedCheck[];
+}
+
+function buildWin32AdaptedChecks(lang: string): PlatformAdaptedCheck[] {
+  return [
+    { name: 'tmux', note: getMessage('doctor.platform_adapt_tmux', lang) },
+    { name: 'Write Permissions', note: getMessage('doctor.platform_adapt_permissions', lang) },
+    { name: 'Path Separators', note: getMessage('doctor.platform_adapt_paths', lang) },
+  ];
+}
+
+/**
+ * Build an honest platform profile: WSL/linux/win32 detection, localized label,
+ * and — for win32 — the explicit adapted-check disclosure above. Pure aside
+ * from `platform()`/`isRunningInWSL()` (both already used by `checkPlatform`).
+ */
+export function buildPlatformProfileReport(lang: string = 'en'): PlatformProfileReport {
+  const currentPlatform = platform();
+  if (currentPlatform === 'win32') {
+    return {
+      platform: currentPlatform,
+      isWSL: false,
+      label: getMessage('doctor.platform_label_win32_native', lang),
+      adaptedChecks: buildWin32AdaptedChecks(lang),
+    };
+  }
+  if (currentPlatform === 'linux') {
+    const inWSL = isRunningInWSL();
+    return {
+      platform: currentPlatform,
+      isWSL: inWSL,
+      label: inWSL ? getMessage('doctor.platform_label_wsl', lang) : getMessage('doctor.platform_label_linux', lang),
+      adaptedChecks: [],
+    };
+  }
+  if (currentPlatform === 'darwin') {
+    return {
+      platform: currentPlatform,
+      isWSL: false,
+      label: getMessage('doctor.platform_label_darwin', lang),
+      adaptedChecks: [],
+    };
+  }
+  return {
+    platform: currentPlatform,
+    isWSL: false,
+    label: getMessage('doctor.platform_label_untested', lang, { platform: currentPlatform }),
+    adaptedChecks: [],
+  };
+}
+
+/** Render the platform profile: header + platform/label line + (win32-only) adapted-check disclosure. */
+export function formatPlatformProfileLines(report: PlatformProfileReport, lang: string = 'en'): string[] {
+  const lines: string[] = [getMessage('doctor.platform_profile_header', lang)];
+  lines.push(`  ${getMessage('doctor.platform_profile_line', lang, { platform: report.platform, label: report.label })}`);
+  if (report.adaptedChecks.length > 0) {
+    lines.push(`  ${getMessage('doctor.platform_profile_adapted_header', lang)}`);
+    for (const c of report.adaptedChecks) {
+      lines.push(`    - ${c.name}: ${c.note}`);
+    }
+  }
+  return lines;
+}
+
 function checkNode(): DoctorCheck {
   const result = spawnSync('node', ['--version'], { encoding: 'utf-8' });
   if (result.status !== 0) {
@@ -434,6 +520,10 @@ export interface HumanDoctorInput {
    * (no regression for existing callers).
    */
   daemonHygieneLines?: string[];
+  /** Optional (ONB-2-DILIM-3, Task 368-002): honest WSL/win32-native platform profile. */
+  platformProfile?: PlatformProfileReport;
+  /** Optional (ONB-2-DILIM-3, Task 368-002): config-based (env + .deck) auth state, no network. */
+  authStateReport?: AuthStateResult[];
 }
 
 /**
@@ -631,6 +721,85 @@ function authProbeLoggedOutLine(name: string, lang: string): string {
   return lang === 'tr'
     ? `CLI mevcut ama oturum AÇILMAMIŞ — çalıştırın: ${cmd}`
     : `CLI present but NOT logged in — run: ${cmd}`;
+}
+
+// ─── Config-Based Auth State Probe (ONB-2-DILIM-3, Sprint 368 — 368-002) ─────
+//
+// Distinct from `probeProviderAuth`/PSL-6 above (a REAL session probe: reads
+// provider credential files and, for codex, spawns a local CLI subprocess).
+// This probe answers a narrower, cheaper question — "did the user configure a
+// credential via deckent's OWN config channels (env var or the local `.deck`
+// file, via the existing `loadDeckSecrets`)" — no provider credentials file,
+// no CLI subprocess, no network, no /login flow.
+
+export type AuthStateVerdict = 'connected' | 'missing' | 'unknown';
+
+export interface AuthStateResult {
+  provider: string;
+  state: AuthStateVerdict;
+}
+
+/** Providers this probe understands — matches AUTH_PROBE_PROVIDERS above. */
+const AUTH_STATE_PROVIDERS: readonly string[] = ['claude', 'codex', 'gemini'];
+
+/** Env var names checked per provider, in priority order (native SDK key first, deckent alias second). */
+const AUTH_STATE_ENV_KEYS: Readonly<Record<string, readonly string[]>> = {
+  claude: ['ANTHROPIC_API_KEY', 'DECKENT_CLAUDE_API_KEY'],
+  codex: ['OPENAI_API_KEY', 'DECKENT_OPENAI_API_KEY'],
+  gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'DECKENT_GOOGLE_API_KEY'],
+};
+
+/** The .deck key (one of KNOWN_DECK_KEYS) that maps to each provider. */
+const AUTH_STATE_DECK_KEYS: Readonly<Record<string, string>> = {
+  claude: 'DECKENT_CLAUDE_API_KEY',
+  codex: 'DECKENT_OPENAI_API_KEY',
+  gemini: 'DECKENT_GOOGLE_API_KEY',
+};
+
+/**
+ * Honest, network-free, subprocess-free auth-STATE probe (config + env only).
+ * `providerNames` defaults to the 3 providers this probe understands;
+ * 'unknown' for any name outside that set — never guessed (same convention as
+ * `probeProviderAuth`'s unsupported-provider default above).
+ */
+export function buildAuthStateReport(
+  root: string,
+  env: NodeJS.ProcessEnv = process.env,
+  providerNames: readonly string[] = AUTH_STATE_PROVIDERS,
+): AuthStateResult[] {
+  const deckSecrets = loadDeckSecrets(root);
+
+  return providerNames.map((name): AuthStateResult => {
+    const envKeys = AUTH_STATE_ENV_KEYS[name];
+    const envConnected = (envKeys ?? []).some((key) => {
+      const value = env[key];
+      return typeof value === 'string' && value.trim().length > 0;
+    });
+    if (envConnected) return { provider: name, state: 'connected' };
+
+    const deckKey = AUTH_STATE_DECK_KEYS[name];
+    if (!deckKey) return { provider: name, state: 'unknown' };
+
+    const deckValue = deckSecrets[deckKey];
+    if (typeof deckValue === 'string' && deckValue.trim().length > 0) {
+      return { provider: name, state: 'connected' };
+    }
+    return { provider: name, state: 'missing' };
+  });
+}
+
+/** Render the config-based auth-state report as one localized line per provider. */
+export function formatAuthStateLines(results: AuthStateResult[], lang: string = 'en'): string[] {
+  const lines: string[] = [getMessage('doctor.auth_state_header', lang)];
+  for (const r of results) {
+    const key = r.state === 'connected'
+      ? 'doctor.auth_state_connected'
+      : r.state === 'missing'
+        ? 'doctor.auth_state_missing'
+        : 'doctor.auth_state_unknown';
+    lines.push(`  ${getMessage(key, lang, { provider: capitalize(r.provider) })}`);
+  }
+  return lines;
 }
 
 // ─── F1-IMG Worker Image Readiness Wiring (Sprint 270, Task 270-008) ──────────
@@ -1017,6 +1186,12 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
 
   lines.push('');
 
+  // --- Platform Profile (ONB-2-DILIM-3, Task 368-002) ---
+  if (input.platformProfile) {
+    lines.push(...formatPlatformProfileLines(input.platformProfile, input.lang ?? 'en'));
+    lines.push('');
+  }
+
   // --- Your Project ---
   lines.push('Your Project:');
 
@@ -1102,6 +1277,14 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
       const providerHealthLines = formatProviderHealthSection(providers, input.projectRoot);
       lines.push(...providerHealthLines);
     }
+    lines.push('');
+  }
+
+  // --- Auth State (ONB-2-DILIM-3, Task 368-002) ---
+  // Config-based (env + .deck), network-free — complements the Provider Health
+  // section above (which surfaces the real-session PSL-6 probe).
+  if (input.authStateReport) {
+    lines.push(...formatAuthStateLines(input.authStateReport, input.lang ?? 'en'));
     lines.push('');
   }
 
@@ -2014,6 +2197,11 @@ export function registerDoctor(program: Command): void {
         // so "CLI present but NOT logged in" is surfaced, not assumed-OK.
         const authProbes = await runAuthProbes(providers);
 
+        // ONB-2-DILIM-3 (Task 368-002): honest platform profile (WSL/win32-native
+        // adaptations) + config-based auth state (env + .deck, no network/subprocess).
+        const platformProfile = buildPlatformProfileReport(lang);
+        const authStateReport = buildAuthStateReport(root);
+
         // F1-IMG (Task 270-008): for the docker backend, report worker-image
         // readiness. Detection-only; wrapped so a docker hiccup never breaks doctor.
         let workerImage: WorkerImageReport | undefined;
@@ -2090,6 +2278,8 @@ export function registerDoctor(program: Command): void {
           workerResources,
           lang,
           daemonHygieneLines: daemonHygiene.lines,
+          platformProfile,
+          authStateReport,
         }));
 
         // F1-IMG consent (ADR-063): only the explicit --fix-image flag, plus an

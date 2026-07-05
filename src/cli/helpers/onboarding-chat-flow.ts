@@ -12,10 +12,15 @@
 //
 // Intent interpretation is a deterministic, rule-based core: yes/no/skip
 // word-lists (tr+en) checked first, then choice-value / 1-based-index
-// matching against the current question's choices. An `OnboardingIntentFallback`
-// seam exists for a real NL/LLM interpreter to plug in later, but is never
-// wired to one here — by default an unrecognized reply simply re-asks the
-// same question (`unknown` stays `unknown`).
+// matching against the current question's choices, then (ONB-CHAT-DILIM-2,
+// Sprint 368 Task 368-004) a TR+EN meta-intent phrase list — "connect
+// provider" / "show limits" / "how do I start a sprint" / "doctor" — for
+// requests that are a detour, not an answer. A meta-intent reply does NOT
+// advance the flow (interrupt-resume: `pending` is untouched, `lastMetaResponse`
+// carries the helpful-feature suggestion back to the caller instead). An
+// `OnboardingIntentFallback` seam exists for a real NL/LLM interpreter to plug
+// in later, but is never wired to one here — by default an unrecognized reply
+// simply re-asks the same question (`unknown` stays `unknown`).
 //
 // State (`OnboardingChatState`) is plain JSON data only — no functions, no
 // probes. `startOnboardingChat`/`replyToOnboardingChat` take `input` (with
@@ -24,9 +29,12 @@
 // round-trip: persist the state, drop it, reload it later, keep answering.
 //
 // String-free: every user-facing label is a `*Key` identifier the caller
-// resolves via `getMessage()` (cli/helpers/messages.ts). New keys this module
-// introduces (`onboarding.chat.*`) are NOT added to messages.ts here (out of
-// this task's write scope) — see the worker's `.result` `docImpact` note.
+// resolves via `getMessage()` (cli/helpers/messages.ts). `ONBOARDING_CHAT_MCP_QUESTION_KEY`
+// and the `onboarding.suggestion.*` keys `generateOnboardingFeatureSuggestions`
+// emits predate messages.ts registration (361-016 docImpact, still open —
+// out of THIS task's scope). The 3 new `onboarding.chat.suggestion.*` keys this
+// task's meta-intents introduce ARE registered in messages.ts, since messages.ts
+// is in this task's write scope and the code introducing them is new.
 // The `workspace_mode` step's question keys are NOT re-declared here at all —
 // they come straight from the wizard's own `buildWorkspaceModeQuestions()`,
 // so there is a single source of truth and zero drift risk.
@@ -57,7 +65,18 @@ export type OnboardingChatIntent =
   | { kind: 'no' }
   | { kind: 'skip' }
   | { kind: 'choice'; value: string }
+  | { kind: 'meta'; action: OnboardingChatMetaAction }
   | { kind: 'unknown'; raw: string };
+
+/**
+ * A "meta"-intent (ONB-CHAT-DILIM-2, Sprint 368 Task 368-004): a request that
+ * is NOT an answer to the currently-pending wizard question, but a detour the
+ * user wants mid-flow — connect a provider, check usage limits, get pointed
+ * at how to start a sprint, or bridge to `deckent doctor`. Recognizing one of
+ * these does NOT advance the flow (see `replyToOnboardingChat`'s interrupt-resume
+ * handling): the pending question stays exactly as it was.
+ */
+export type OnboardingChatMetaAction = 'connect_provider' | 'show_limits' | 'start_sprint' | 'doctor';
 
 /** Context the matcher needs to resolve a "seçenek-adı" (choice-name) reply. */
 export interface OnboardingIntentContext {
@@ -79,10 +98,49 @@ const NO_WORDS = new Set(['n', 'no', 'nope', 'hayır', 'hayir', 'h', 'istemiyoru
 const SKIP_WORDS = new Set(['skip', 'atla', 'geç', 'gec', 'pas', 'sonra', 'next']);
 
 /**
+ * TR+EN phrase list per meta-action, matched by plain substring — same
+ * deterministic, no-LLM philosophy as the yes/no/skip word-lists above, just
+ * phrase-length instead of single-token. Not exhaustive NLP coverage by
+ * design (YAGNI); covers the phrasings named in the ONB-CHAT-DILIM-2 spec
+ * plus their direct TR/EN counterparts.
+ */
+const META_INTENT_PATTERNS: Record<OnboardingChatMetaAction, readonly string[]> = {
+  connect_provider: [
+    'provider bağla', 'provider bagla', 'sağlayıcı bağla', 'saglayici bagla', 'provider ekle',
+    'connect provider', 'connect a provider', 'add provider', 'link provider',
+  ],
+  show_limits: [
+    'limit göster', 'limit goster', 'kota göster', 'kota goster', 'limitlerim', 'kotam',
+    'show limits', 'show my limits', 'show quota', 'show my quota', 'usage limits',
+  ],
+  start_sprint: [
+    'sprint nasıl başlatırım', 'sprint nasil baslatirim', 'sprint başlat', 'sprint baslat',
+    'how do i start a sprint', 'how to start a sprint', 'start a sprint',
+  ],
+  doctor: [
+    'sorun var', 'bir sorun var', 'hata var', 'doctor çalıştır', 'doctor calistir', 'doctor',
+    'something is wrong', "something's wrong", 'there is a problem', "there's a problem", 'run doctor',
+  ],
+};
+
+/** Returns the first meta-action whose pattern list matches `lower` as a substring, else `undefined`. */
+function matchMetaIntent(lower: string): OnboardingChatMetaAction | undefined {
+  for (const action of Object.keys(META_INTENT_PATTERNS) as OnboardingChatMetaAction[]) {
+    if (META_INTENT_PATTERNS[action].some((pattern) => lower.includes(pattern))) {
+      return action;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Deterministic rule-based core: yes/no/skip word-lists first, then
- * choice-by-value or choice-by-1-based-index against `context.choices`, else
- * `unknown`. An empty/whitespace-only reply is treated as `skip` (accepting
- * the question's default is the safe, non-blocking behavior for "just enter").
+ * choice-by-value or choice-by-1-based-index against `context.choices` (an
+ * exact answer to the currently-pending question always wins over a
+ * coincidental meta-phrase collision), then the meta-intent phrase list,
+ * else `unknown`. An empty/whitespace-only reply is treated as `skip`
+ * (accepting the question's default is the safe, non-blocking behavior for
+ * "just enter").
  */
 export function interpretChatAnswer(raw: string, context: OnboardingIntentContext = {}): OnboardingChatIntent {
   const trimmed = raw.trim();
@@ -101,6 +159,9 @@ export function interpretChatAnswer(raw: string, context: OnboardingIntentContex
   if (Number.isInteger(index) && index >= 1 && index <= choices.length) {
     return { kind: 'choice', value: choices[index - 1]!.value };
   }
+
+  const metaAction = matchMetaIntent(lower);
+  if (metaAction) return { kind: 'meta', action: metaAction };
 
   return { kind: 'unknown', raw: trimmed };
 }
@@ -143,6 +204,20 @@ export interface OnboardingChatState {
   result?: OnboardingWizardResult;
   /** Last reply that neither matched deterministically nor via the fallback seam — cleared on the next successful match. */
   lastUnrecognizedReply?: string;
+  /**
+   * Set when the most recent reply was a meta-intent (ONB-CHAT-DILIM-2) —
+   * "connect provider" / "show limits" / "how do I start a sprint" /
+   * "doctor" — recognized WHILE `pending` was set. `pending` is left
+   * untouched (interrupt-resume: the original question is still there to
+   * answer next). Cleared on the very next reply, whatever kind it is.
+   */
+  lastMetaResponse?: OnboardingChatMetaResponse;
+}
+
+/** A meta-intent's helpful-feature response — the Deckent-suggestion principle applied mid-flow. */
+export interface OnboardingChatMetaResponse {
+  action: OnboardingChatMetaAction;
+  suggestion: OnboardingFeatureSuggestion;
 }
 
 export interface OnboardingChatInput {
@@ -323,13 +398,31 @@ export async function startOnboardingChat(input: OnboardingChatInput): Promise<O
   return advanceUntilBlocked(draft, input);
 }
 
+/** Maps a recognized meta-action to its helpful-feature suggestion key (Deckent-suggestion principle). */
+function buildMetaSuggestion(action: OnboardingChatMetaAction): OnboardingFeatureSuggestion {
+  switch (action) {
+    case 'connect_provider':
+      // Reuses the same key `generateOnboardingFeatureSuggestions` emits for a blocked config-plan.
+      return { key: 'onboarding.suggestion.connect_provider' };
+    case 'show_limits':
+      return { key: 'onboarding.chat.suggestion.show_limits' };
+    case 'start_sprint':
+      return { key: 'onboarding.chat.suggestion.start_sprint' };
+    case 'doctor':
+      return { key: 'onboarding.chat.suggestion.run_doctor' };
+  }
+}
+
 /**
  * Interprets `reply` against the state's current `pending` question and
  * advances the flow. Throws if there is no pending question (flow already
  * `done`, or between two auto-advanced steps — callers should only call this
  * when a previous result's `pending` was set). An unresolvable reply (neither
  * the deterministic core nor `fallback` could interpret it) leaves `pending`
- * unchanged — the caller re-prompts.
+ * unchanged — the caller re-prompts. A meta-intent reply (ONB-CHAT-DILIM-2)
+ * also leaves `pending` unchanged — interrupt-resume: it is a detour, not an
+ * answer, so `lastMetaResponse` carries the bridge suggestion back to the
+ * caller while the original question stays there to answer next.
  */
 export async function replyToOnboardingChat(
   state: OnboardingChatState,
@@ -349,11 +442,19 @@ export async function replyToOnboardingChat(
     if (resolved) intent = resolved;
   }
 
+  if (intent.kind === 'meta') {
+    draft.lastUnrecognizedReply = undefined;
+    draft.lastMetaResponse = { action: intent.action, suggestion: buildMetaSuggestion(intent.action) };
+    return draft;
+  }
+
   if (!applyIntent(draft, intent)) {
     draft.lastUnrecognizedReply = reply;
+    draft.lastMetaResponse = undefined;
     return draft;
   }
   draft.lastUnrecognizedReply = undefined;
+  draft.lastMetaResponse = undefined;
 
   return advanceUntilBlocked(draft, input);
 }

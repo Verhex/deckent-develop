@@ -8942,3 +8942,32 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 367-008: AGSK-1-DILIM-2 — agent/skill katalog genişlemesi (NO_GO)
 
 ---
+## Sprint 368 — sprint-368
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-05
+**Duration:** 1054s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 8 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1053813ms |
+
+### Tasks
+
+- 368-001: AGSK-1-DILIM-2-CARRY — 3 yeni builtin-skill (DOĞRU ağaç-yolu) (DONE)
+- 368-002: ONB-2-DILIM-3 — doctor windows-native profil + auth-state probe (GO_WITH_TECH_DEBT)
+- 368-003: F11-016-STAB — REPL cursor/queue stabilizasyon dilimi (DONE)
+- 368-004: ONB-CHAT-DILIM-2 — sohbet-setup intent genişlemesi (DONE)
+- 368-005: DEFER-002 — nervous askBrain escalation kapanışı (DONE)
+- 368-006: SERIES-357-367 — seri-raporu güncelle + 484-saga bölümü (DONE)
+- 368-007: CHAT-IDE-DILIM-2 — VS Code panel veri-bağlama (DONE)
+- 368-008: DOCS-FEATURES-4 — doctor-fix + onboard-apply + approval-history feature-doc'ları (DONE)
+
+---
