@@ -20,7 +20,7 @@ import {
 
 // ─── Core (type imports) ───────────────────────────────────────────
 import type {
-  Sprint,
+  Sprint, Task,
 } from '../core/types.js';
 
 import {
@@ -244,6 +244,58 @@ export function cleanupPreviousSprintOrphans(
   } catch (e) {
     debugLog('cleanupPreviousSprintOrphans:archivePromptFiles', e);
   }
+  sweepOrphanHeartbeats(tasksDir, previousSprintId);
+}
+
+/** Marker/heartbeat file suffixes a crashed worker can leave behind (BORN-486). */
+const ORPHAN_HEARTBEAT_SUFFIXES = ['.hb', '.timeout', '.partial-result'] as const;
+
+/**
+ * BORN-486 — Sweep `task-*.hb` / `.timeout` / `.partial-result` files left
+ * behind by `previousSprintId`.
+ *
+ * These markers survive when a sprint dies during spawn: `cleanup()` runs
+ * with `cleanupPhase='spawn-fail'`, which deliberately PRESERVES
+ * `task-*.json`/`.plan`/`.hb`/`.result` for post-mortem forensics (see
+ * `CleanupPhaseKind` doc above). If the next sprint never revisits them, each
+ * leftover `.hb` is picked up by `scanHeartbeats()` (monitor/auditor.ts) as a
+ * "foreign task" on every 30s scan for that sprint's entire lifetime — a real
+ * incident: sprint 365's preserved `task-365-001.hb` fired repeated CRITICAL
+ * `hb.stale` alerts throughout sprint 366.
+ *
+ * Safety ("canlı-sprint'e ait olanlara dokunmadan" — never touch a live
+ * sprint's files): a file is deleted only when it can be positively
+ * attributed to `previousSprintId` —
+ *   - its sidecar `task-<id>.json` is missing/unparseable (a live task always
+ *     still has its json; absence means it is already orphaned), OR
+ *   - the sidecar's `sprintId` matches `previousSprintId` exactly.
+ * Any other (or missing) `sprintId` — including the sprint currently
+ * starting — leaves the file untouched. Mirrors the
+ * `archivePromptFiles(tasksDir, previousSprintId)` call above: same input,
+ * same previous-sprint-id attribution, no new abstraction.
+ */
+function sweepOrphanHeartbeats(tasksDir: string, previousSprintId: string): void {
+  let files: string[];
+  try {
+    files = readdirSync(tasksDir);
+  } catch (e) {
+    debugLog('sweepOrphanHeartbeats:readdir', e);
+    return;
+  }
+
+  for (const file of files) {
+    if (!file.startsWith('task-')) continue;
+    const suffix = ORPHAN_HEARTBEAT_SUFFIXES.find((s) => file.endsWith(s));
+    if (!suffix) continue;
+    const taskId = file.slice('task-'.length, file.length - suffix.length);
+    if (!taskId) continue;
+
+    const sidecar = readJsonSafe<Task>(join(tasksDir, `task-${taskId}.json`));
+    const isOrphanOfPreviousSprint = sidecar === null || sidecar.sprintId === previousSprintId;
+    if (!isOrphanOfPreviousSprint) continue;
+
+    try { unlinkSync(join(tasksDir, file)); } catch (e) { debugLog('sweepOrphanHeartbeats:unlink', e); }
+  }
 }
 
 // ═══ Cleanup ══════════════════════════════════════════════════════
@@ -321,9 +373,15 @@ export function cleanup(
     }
   }
 
+  // BORN-486: TASK_FILE_EXTENSIONS (core/constants.ts) predates the '.timeout'/
+  // '.partial-result' worker-crash markers, so this always-on (phase-agnostic)
+  // stale sweep never considered them — they could linger past their mtime
+  // indefinitely. Extended locally (not in shared TASK_FILE_EXTENSIONS, which
+  // other call sites depend on unchanged) to include them here too.
+  const STALE_SWEEP_EXTENSIONS: readonly string[] = [...TASK_FILE_EXTENSIONS, '.timeout', '.partial-result'];
   if (existsSync(tasksDir)) {
     for (const file of readdirSync(tasksDir)) {
-      if (TASK_FILE_EXTENSIONS.some(ext => file.endsWith(ext))) {
+      if (STALE_SWEEP_EXTENSIONS.some(ext => file.endsWith(ext))) {
         const fullPath = join(tasksDir, file);
         if (isStaleTaskFile(fullPath)) {
           try { unlinkSync(fullPath); } catch (e) { debugLog('cleanup:unlinkStaleTaskFile', e); }

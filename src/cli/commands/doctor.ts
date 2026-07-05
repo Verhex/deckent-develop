@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, readdirSync, statSync, mkdirSync, chmodSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, statSync, mkdirSync, chmodSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { platform, totalmem } from 'node:os';
 import { spawnSync, spawn as nodeSpawn } from 'node:child_process';
@@ -15,6 +15,7 @@ import {
 import { DebtPriority } from '../../core/types.js';
 import { getDebtItems } from '../../core/debt-store.js';
 import { migrateConfig } from '../../core/config-migration.js';
+import { createDefaultConfig } from '../../core/config.js';
 
 // Memory V2 (Sprint 179 W3-6): exports/decisions.md is the auto-generated
 // source. doctor must accept EITHER this OR legacy .brain/DECISIONS.md.
@@ -880,13 +881,16 @@ export interface DoctorHonestSummary {
 
 /**
  * DoctorCheck names that `deckent doctor --fix` (planDoctorFixes' closed
- * mkdir/chmod/config-migrate whitelist, DOCTOR_FIX_ACTION_KINDS) can actually
- * resolve today. Only 'Workspace' (missing .deckent/ dir -> mkdir action)
- * maps 1:1 onto an existing check — no other check corresponds to a --fix
- * action, so this stays a narrow, explicit allowlist rather than a guess
- * from message text. Keeping it honest is the entire point of this feature.
+ * mkdir/chmod/config-migrate/config-recreate/unlock whitelist,
+ * DOCTOR_FIX_ACTION_KINDS) can actually resolve today. 'Workspace' (missing
+ * .deckent/ dir -> mkdir action) and 'Locks' (stale lock files -> unlock
+ * action, Task 367-006) map 1:1 onto an existing check — no other check
+ * corresponds to a --fix action (chmod/config-migrate/config-recreate targets
+ * have no dedicated named DoctorCheck), so this stays a narrow, explicit
+ * allowlist rather than a guess from message text. Keeping it honest is the
+ * entire point of this feature.
  */
-const DOCTOR_FIX_CHECK_NAMES: ReadonlySet<string> = new Set(['Workspace']);
+const DOCTOR_FIX_CHECK_NAMES: ReadonlySet<string> = new Set(['Workspace', 'Locks']);
 
 function classifyDoctorCheckState(check: DoctorCheck): DoctorHonestState {
   if (check.passed) return 'ready';
@@ -1533,17 +1537,28 @@ export function formatRamExperiment(report: RamExperimentReport): string {
   return lines.join('\n');
 }
 
-// ─── DOCTOR-FIX (Sprint 356, Task 356-006, row 203 ONB-2) ─────────────────────
+// ─── DOCTOR-FIX (Sprint 356 Task 356-006; enriched Sprint 367 Task 367-006) ──
 //
 // `deckent doctor --fix` — a CLOSED whitelist of safe, non-destructive repairs.
-// Nothing risky (delete / docker / login) is ever eligible: planDoctorFixes()
-// only ever emits the three kinds below, and applyDoctorFixes() only ever
-// executes those same three kinds. Default is dry-run (list only); `--yes` is
-// required to actually apply. Every repair is additive or a permission reset —
-// never a deletion.
+// Nothing risky (delete-of-live-data / docker / login) is ever eligible:
+// planDoctorFixes() only ever emits the kinds below, and applyDoctorFixes()
+// only ever executes those same kinds. Default is dry-run (list only);
+// `--yes` (or the absence of `--dry-run`... `--dry-run` forces preview even
+// if `--yes` is also passed) is required to actually apply. `unlock` is the
+// one kind that deletes a file outright — but only a file already proven
+// stale (idle past the same threshold `deckent doctor`'s own "Locks" check
+// warns about), never a live/active lock.
+//
+// Every fix action carries an OPTIONAL `previousValue` — a concise summary of
+// the pre-fix state, so the plan/apply report stays "reversible" (a human can
+// see what existed before and restore it by hand). Optional (not required) so
+// hand-built DoctorFixAction fixtures that predate this field keep compiling —
+// see tests/cli/messages-round9-keys.test.ts, which pins formatDoctorFixLines'
+// EN output byte-for-byte against bare fixtures with no previousValue and no
+// extra call args.
 
 /** Closed whitelist — the ONLY fix kinds `doctor --fix` may ever plan or apply. */
-export const DOCTOR_FIX_ACTION_KINDS = ['mkdir', 'chmod', 'config-migrate'] as const;
+export const DOCTOR_FIX_ACTION_KINDS = ['mkdir', 'chmod', 'config-migrate', 'config-recreate', 'unlock'] as const;
 export type DoctorFixActionKind = typeof DOCTOR_FIX_ACTION_KINDS[number];
 
 export interface DoctorFixAction {
@@ -1552,6 +1567,8 @@ export interface DoctorFixAction {
   target: string;
   /** Human-readable "what this will do" line, shown in the dry-run list. */
   description: string;
+  /** Concise summary of the pre-fix state (reversible-report "before" value). */
+  previousValue?: string;
 }
 
 export interface DoctorFixApplyResult {
@@ -1560,8 +1577,21 @@ export interface DoctorFixApplyResult {
   error?: string;
 }
 
+/** A failing doctor check that is NOT covered by any --fix action — honestly labeled "manual". */
+export interface DoctorFixManualItem {
+  name: string;
+  message: string;
+}
+
 /** Owner-only read/write — matches ensureDeckShadowFile's mode in spawn-backend-docker.ts. */
 const DECK_SHADOW_SAFE_MODE = 0o600;
+
+/**
+ * Same staleness window `checkStaleLocks()` already warns about (its own
+ * default parameter). Kept in sync explicitly so the fix-plan and the
+ * "Locks" doctor check agree on what counts as stale.
+ */
+const STALE_LOCK_THRESHOLD_MS = 300_000;
 
 /**
  * Detect safe repairs WITHOUT mutating anything (read-only: existsSync/statSync/
@@ -1576,6 +1606,7 @@ export function planDoctorFixes(root: string): DoctorFixAction[] {
       kind: 'mkdir',
       target: deckentPath,
       description: `Create missing directory: ${DECKENT_DIR}/`,
+      previousValue: 'not present',
     });
   }
 
@@ -1585,6 +1616,7 @@ export function planDoctorFixes(root: string): DoctorFixAction[] {
       kind: 'mkdir',
       target: tasksPath,
       description: `Create missing directory: ${TASKS_DIR}/`,
+      previousValue: 'not present',
     });
   }
 
@@ -1600,25 +1632,80 @@ export function planDoctorFixes(root: string): DoctorFixAction[] {
           target: shadowPath,
           description: `Reset permissions on stale ${TASKS_DIR}/.deck-shadow: `
             + `${mode.toString(8)} → ${DECK_SHADOW_SAFE_MODE.toString(8)}`,
+          previousValue: `mode ${mode.toString(8)}`,
         });
       }
     } catch { /* unreadable stat — not a safe-repair case, skip */ }
   }
 
-  // Missing config defaults — delegates to the existing, already-vetted
-  // migrateConfig() utility (it writes its own timestamped backup before
-  // touching the file). Only proposed when there are ADDED fields to apply.
+  // Config defaults / corruption — a single parse decides which of the two
+  // mutually-exclusive repairs applies. Missing defaults delegate to the
+  // existing, already-vetted migrateConfig() utility (it writes its own
+  // timestamped backup before touching the file). Unparseable JSON is a
+  // DIFFERENT failure mode migrateConfig() silently declines to touch today
+  // (it returns addedFields:[] + an error) — config-recreate closes that gap
+  // by backing up the broken file and rewriting full, valid defaults.
   const configPath = join(root, PROJECT_CONFIG_PATH);
   if (existsSync(configPath)) {
-    const probe = migrateConfig(configPath, { dryRun: true });
-    if (probe.addedFields.length > 0) {
+    const raw = readFileSync(configPath, 'utf-8');
+    let parsed: Record<string, unknown> | null = null;
+    try {
+      parsed = JSON.parse(raw) as Record<string, unknown>;
+    } catch { /* corrupt — handled below */ }
+
+    if (parsed === null) {
       actions.push({
-        kind: 'config-migrate',
+        kind: 'config-recreate',
         target: configPath,
-        description: `Add ${probe.addedFields.length} missing config default(s): `
-          + probe.addedFields.join(', '),
+        description: `Config JSON is corrupted — back up the broken file and recreate `
+          + `${PROJECT_CONFIG_PATH} with defaults`,
+        previousValue: raw.length > 500 ? `${raw.slice(0, 500)}… (${raw.length} bytes total)` : raw,
       });
+    } else {
+      const probe = migrateConfig(configPath, { dryRun: true });
+      if (probe.addedFields.length > 0) {
+        actions.push({
+          kind: 'config-migrate',
+          target: configPath,
+          description: `Add ${probe.addedFields.length} missing config default(s): `
+            + probe.addedFields.join(', '),
+          previousValue: `${Object.keys(parsed).length} top-level key(s) before migration`,
+        });
+      }
     }
+  }
+
+  // Stale worker locks — same 300s threshold checkStaleLocks() already warns
+  // about, but here every stale `.lock` becomes an individually-removable fix
+  // action (independent per-action apply, matching mkdir/chmod/config-*
+  // above) instead of just a warning count. A lock idle past this threshold
+  // belongs to a dead/crashed worker; a genuinely active lock is refreshed
+  // well inside the window. `.spawnlock` files are a distinct namespace
+  // (see core/file-lock.ts) and are intentionally excluded by the `.lock`
+  // suffix filter below.
+  const locksPath = join(root, LOCKS_DIR);
+  if (existsSync(locksPath)) {
+    try {
+      const lockFiles = readdirSync(locksPath).filter(f => f.endsWith('.lock'));
+      for (const file of lockFiles) {
+        const lockPath = join(locksPath, file);
+        try {
+          const lockRaw = readFileSync(lockPath, 'utf-8');
+          const lock = JSON.parse(lockRaw) as { filePath?: string; ownerWorkerId?: string; acquiredAt?: string };
+          if (!lock.acquiredAt) continue;
+          const ageMs = Date.now() - new Date(lock.acquiredAt).getTime();
+          if (Number.isNaN(ageMs) || ageMs <= STALE_LOCK_THRESHOLD_MS) continue;
+          const ageMin = Math.round(ageMs / 60_000);
+          actions.push({
+            kind: 'unlock',
+            target: lockPath,
+            description: `Remove stale lock (${ageMin}m old, worker ${lock.ownerWorkerId ?? 'unknown'}): `
+              + `${lock.filePath ?? file}`,
+            previousValue: lockRaw,
+          });
+        } catch { /* malformed lock file — not a safe-repair case, skip */ }
+      }
+    } catch { /* unreadable .locks dir — skip */ }
   }
 
   return actions;
@@ -1642,6 +1729,16 @@ export function applyDoctorFixes(actions: DoctorFixAction[]): DoctorFixApplyResu
         case 'config-migrate':
           migrateConfig(action.target, { dryRun: false });
           break;
+        case 'config-recreate': {
+          const corruptRaw = readFileSync(action.target, 'utf-8');
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          writeFileSync(`${action.target}.corrupt.${timestamp}`, corruptRaw);
+          writeFileSync(action.target, JSON.stringify(createDefaultConfig(), null, 2) + '\n');
+          break;
+        }
+        case 'unlock':
+          unlinkSync(action.target);
+          break;
       }
       results.push({ action, applied: true });
     } catch (err) {
@@ -1652,30 +1749,78 @@ export function applyDoctorFixes(actions: DoctorFixAction[]): DoctorFixApplyResu
 }
 
 /**
- * Render the dry-run / applied fix list for CLI output.
- * TODO(docImpact, Task 15): these strings are plain EN, not routed through
- * getMessage() — messages.ts is outside this task's write scope. Follow-up
- * should add `doctor.fix_*` en/tr keys and switch this over.
+ * Render the dry-run / applied fix list for CLI output. i18n via getMessage
+ * (en+tr) — closes the standing TODO(docImpact, Task 15) from Task 356-006.
+ *
+ * `manual` and `lang` are additive, optional params (Task 367-006): every
+ * call site that predates them (bare actions/results, no previousValue on the
+ * action fixtures) renders IDENTICALLY to before — see
+ * tests/cli/messages-round9-keys.test.ts, which pins the EN output
+ * byte-for-byte against exactly that call shape.
  */
-export function formatDoctorFixLines(actions: DoctorFixAction[], results?: DoctorFixApplyResult[]): string[] {
+export function formatDoctorFixLines(
+  actions: DoctorFixAction[],
+  results?: DoctorFixApplyResult[],
+  manual: DoctorFixManualItem[] = [],
+  lang: string = 'en',
+): string[] {
   const lines: string[] = [];
+  const previousValueLine = (a: DoctorFixAction): string | null =>
+    a.previousValue ? getMessage('doctor.fix_previous_value_line', lang, { previousValue: a.previousValue }) : null;
+
   if (actions.length === 0) {
-    lines.push('doctor --fix: nothing to repair — all safe-fix checks passed.');
-    return lines;
+    lines.push(manual.length > 0
+      ? getMessage('doctor.fix_no_auto_fixable_but_manual', lang, { count: String(manual.length) })
+      : getMessage('doctor.fix_nothing_to_repair', lang));
+  } else if (!results) {
+    lines.push(getMessage('doctor.fix_dry_run_header', lang, { count: String(actions.length) }));
+    for (const a of actions) {
+      lines.push(getMessage('doctor.fix_would_fix_line', lang, { description: a.description }));
+      const prev = previousValueLine(a);
+      if (prev) lines.push(prev);
+    }
+    lines.push(getMessage('doctor.fix_apply_hint', lang));
+  } else {
+    const failed = results.filter(r => !r.applied).length;
+    lines.push(failed > 0
+      ? getMessage('doctor.fix_apply_header_failed', lang, { count: String(results.length), failed: String(failed) })
+      : getMessage('doctor.fix_apply_header_ok', lang, { count: String(results.length) }));
+    for (const r of results) {
+      if (r.applied) {
+        lines.push(getMessage('doctor.fix_line_fixed', lang, { description: r.action.description }));
+        const prev = previousValueLine(r.action);
+        if (prev) lines.push(prev);
+      } else {
+        lines.push(getMessage('doctor.fix_line_failed', lang, { description: r.action.description, error: r.error ?? '' }));
+      }
+    }
   }
-  if (!results) {
-    lines.push(`doctor --fix (dry-run) — ${actions.length} safe repair(s) available:`);
-    for (const a of actions) lines.push(`  [would fix] ${a.description}`);
-    lines.push('Run `deckent doctor --fix --yes` to apply.');
-    return lines;
+
+  if (manual.length > 0) {
+    lines.push(getMessage('doctor.fix_manual_header', lang, { count: String(manual.length) }));
+    for (const m of manual) {
+      lines.push(getMessage('doctor.fix_manual_line', lang, { name: m.name, message: m.message }));
+    }
   }
-  const failed = results.filter(r => !r.applied).length;
-  lines.push(`doctor --fix --yes — ${results.length} repair(s) attempted`
-    + `${failed > 0 ? ` (${failed} FAILED)` : ''}:`);
-  for (const r of results) {
-    lines.push(r.applied ? `  [fixed] ${r.action.description}` : `  [FAILED] ${r.action.description} — ${r.error}`);
-  }
+
   return lines;
+}
+
+/**
+ * Read `spawn_backend` (falling back to the legacy `claude_backend` key) from
+ * `.deckent/config.json`, if present. Pure config-file read — no provider
+ * detection, no network. Shared by the `--fix` branch's manual-check pass and
+ * the main human/JSON doctor path so the logic lives in exactly one place.
+ */
+function resolveSpawnBackendForDoctor(root: string): string | undefined {
+  try {
+    const cfgPath = join(root, PROJECT_CONFIG_PATH);
+    if (existsSync(cfgPath)) {
+      const raw = JSON.parse(readFileSync(cfgPath, 'utf-8')) as Record<string, unknown>;
+      return (raw.spawn_backend ?? raw.claude_backend) as string | undefined;
+    }
+  } catch { /* use default */ }
+  return undefined;
 }
 
 export function registerDoctor(program: Command): void {
@@ -1690,9 +1835,10 @@ export function registerDoctor(program: Command): void {
     .option('--memory', 'Show host RAM detection (/proc/meminfo first, os.totalmem fallback) and suggested max_workers')
     .option('--ram-experiment', 'Show 6-worker × 2g RAM scenario verdict (Safe/Risky) based on current config and host RAM')
     .option('--fix-image', 'Rebuild the worker docker image after an interactive confirmation (ADR-063 consent) when it is missing/stale')
-    .option('--fix', 'Preview safe repairs (missing .deckent/.tasks dirs, stale .deck-shadow permissions, missing config defaults) — a closed whitelist, no delete/docker/login. Dry-run by default; combine with --yes to apply.')
+    .option('--fix', 'Preview safe repairs (missing .deckent/.tasks dirs, stale .deck-shadow permissions, missing/corrupt config, stale worker locks) — a closed whitelist, no delete-of-live-data/docker/login. Dry-run by default; combine with --yes to apply.')
     .option('-y, --yes', 'Apply the repairs listed by --fix (no effect without --fix)')
-    .action(async (opts: { profile?: boolean; legacy?: boolean; json?: boolean; preFlight?: boolean; providers?: boolean; memory?: boolean; ramExperiment?: boolean; fixImage?: boolean; fix?: boolean; yes?: boolean }) => {
+    .option('--dry-run', 'Explicit alias for the default --fix preview (no writes) — wins over --yes if both are passed')
+    .action(async (opts: { profile?: boolean; legacy?: boolean; json?: boolean; preFlight?: boolean; providers?: boolean; memory?: boolean; ramExperiment?: boolean; fixImage?: boolean; fix?: boolean; yes?: boolean; dryRun?: boolean }) => {
       let root: string;
       try {
         root = resolveProjectRoot();
@@ -1702,19 +1848,33 @@ export function registerDoctor(program: Command): void {
       const lang = getLangFromConfig(root);
 
       // --fix: closed-whitelist safe repairs. Dedicated early-return branch
-      // (mirrors --providers/--memory/--ram-experiment below) — never runs the
-      // full health check, never touches providers/network.
+      // (mirrors --providers/--memory/--ram-experiment below) — never awaits
+      // provider detection, never touches the network. `--dry-run` forces a
+      // preview even if `--yes` was also passed (defensive: an explicit
+      // dry-run request always wins).
       if (opts.fix) {
+        const applying = opts.yes === true && opts.dryRun !== true;
         const actions = planDoctorFixes(root);
-        const results = opts.yes ? applyDoctorFixes(actions) : undefined;
+        const results = applying ? applyDoctorFixes(actions) : undefined;
+
+        // Manual/unfixable — reuse the same LOCAL system checks `deckent doctor`
+        // runs (no provider detection, so still no network) purely to surface an
+        // honest "these need you, not --fix" list. Never affects action planning.
+        const fixSpawnBackend = resolveSpawnBackendForDoctor(root);
+        const fixDoctorResult = runDoctorChecks(root, undefined, fixSpawnBackend);
+        const manual: DoctorFixManualItem[] = fixDoctorResult.checks
+          .filter(c => !c.passed && !DOCTOR_FIX_CHECK_NAMES.has(c.name))
+          .map(c => ({ name: c.name, message: c.message }));
+
         if (opts.json) {
           print(JSON.stringify({
-            dryRun: !opts.yes,
+            dryRun: !applying,
             actions,
             results: results ?? null,
+            manual,
           }, null, 2));
         } else {
-          print(formatDoctorFixLines(actions, results).join('\n'));
+          print(formatDoctorFixLines(actions, results, manual, lang).join('\n'));
         }
         const failed = results?.some(r => !r.applied) ?? false;
         if (failed || (!results && actions.length > 0)) {
@@ -1724,15 +1884,7 @@ export function registerDoctor(program: Command): void {
       }
       const providers = await detectAvailableProviders();
       const activeProviderNames = providers.filter(p => p.available).map(p => p.name);
-      // Read spawn_backend from config for Docker/tmux check context
-      let spawnBackend: string | undefined;
-      try {
-        const cfgPath = join(root, PROJECT_CONFIG_PATH);
-        if (existsSync(cfgPath)) {
-          const raw = JSON.parse(readFileSync(cfgPath, 'utf-8')) as Record<string, unknown>;
-          spawnBackend = (raw.spawn_backend ?? raw.claude_backend) as string | undefined;
-        }
-      } catch { /* use default */ }
+      const spawnBackend = resolveSpawnBackendForDoctor(root);
       const result = runDoctorChecks(root, activeProviderNames, spawnBackend);
 
       // --providers: detailed binary/version/auth diagnostics for Claude/Codex/Gemini + Ollama

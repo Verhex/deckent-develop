@@ -9,6 +9,9 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-367-004 | Tech debt from 367-004: Read task-366-003.result (the sole sprint-366 GO_WITH_TE | normal | sprint-367 | resolved |
+| debt-367-005 | Tech debt from 367-005: Wired 366-006's onboarding-apply.ts (applyOnboardingPlan | normal | sprint-367 | resolved |
+| debt-367-006 | Tech debt from 367-006: Enriched `deckent doctor --fix` (Sprint 356 Task 356-006 | normal | sprint-367 | resolved |
 | debt-364-001 | Tech debt from 364-001: ROOT CAUSE of debt-361-001-fix: a TIMEOUT_WITH_WORK resu | normal | sprint-364 | resolved |
 | debt-364-003 | Tech debt from 364-003: TMUX-PROVIDER-CLI (364-002/born-481 Yasa#2 parity). Root | normal | sprint-364 | resolved |
 | debt-364-008 | Tech debt from 364-008: Both target docs written and disk-verified against the a | normal | sprint-364 | resolved |

@@ -30,6 +30,13 @@ import {
   type OnboardingInfoRow,
   type OnboardingRowTone,
 } from '../repl/onboarding-ui.js';
+import {
+  dryRunOnboardingApply,
+  applyOnboardingPlan,
+  type OnboardingApplyReport,
+  type OnboardingApplyResult,
+  type OnboardingApplyFieldChange,
+} from '../helpers/onboarding-apply.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -354,6 +361,144 @@ export async function runOnboardInkFlow(root: string): Promise<void> {
   }
 }
 
+// ─── ONB-APPLY-WIRE (Sprint 367 Task 367-005) ──────────────────────────────
+//
+// Wires 366-006's onboarding-apply.ts (plan→apply, atomic, reversible report,
+// dry-run parity) into `deckent onboard` — the piece 363-005 explicitly left
+// out ("Actually persisting the confirmed plan to disk is explicitly out of
+// this task's scope", see `runOnboardInkFlow` above). This is an ADDITIVE
+// path behind new `--apply` / `--dry-run` / `--yes` flags: it never changes
+// the pre-existing TTY-Ink flow's `onApply` (still a no-write preview-confirm,
+// per its own tests) nor the pre-existing non-interactive stub flow
+// (`runOnboard`, which still spawns `deckent init` — untouched, out of this
+// task's scope per its own NO-GO guard on init.ts). Project-scope only: the
+// wizard's workspace-scope question is never overridden to 'global' here.
+
+/** Renders a `previous → new` value for the apply report; `undefined` gets an honest i18n label rather than the literal string "undefined". */
+function formatOnboardingApplyValue(value: unknown, lang: string): string {
+  if (value === undefined) return getMessage('onboarding.apply.value_none', lang);
+  return typeof value === 'string' ? value : JSON.stringify(value);
+}
+
+/** Shared "before/after" field-change section for both the dry-run preview and the post-apply report — one implementation, so the two texts can never drift apart (mirrors dry-run/apply parity itself). */
+function formatOnboardingApplyFieldChanges(
+  fieldChanges: readonly OnboardingApplyFieldChange[],
+  lang: string,
+): string[] {
+  const changed = fieldChanges.filter((c) => c.changed);
+  if (changed.length === 0) {
+    return [getMessage('onboarding.apply.no_changes', lang)];
+  }
+  return [
+    getMessage('onboarding.apply.section.changes', lang),
+    ...changed.map(
+      (c) =>
+        `  ${getMessage('onboarding.apply.field_change', lang, {
+          key: c.key,
+          previous: formatOnboardingApplyValue(c.previousValue, lang),
+          next: formatOnboardingApplyValue(c.newValue, lang),
+        })}`,
+    ),
+  ];
+}
+
+/** Read-only preview report (`--dry-run`): what applying the plan WOULD change, never written. */
+export function formatOnboardingApplyPreview(report: OnboardingApplyReport, lang: string): string {
+  const lines: string[] = [
+    getMessage('onboarding.apply.preview.title', lang),
+    '',
+    getMessage('onboarding.ui.summary.config_path', lang, { path: report.configPath }),
+    '',
+    ...formatOnboardingApplyFieldChanges(report.fieldChanges, lang),
+  ];
+  return lines.join('\n').trimEnd();
+}
+
+/** Post-apply report: the same before/after field list, now confirmed written + verified. */
+export function formatOnboardingApplyResult(result: OnboardingApplyResult, lang: string): string {
+  const lines: string[] = [
+    getMessage('onboarding.apply.result.title', lang),
+    '',
+    getMessage('onboarding.ui.summary.config_path', lang, { path: result.configPath }),
+    '',
+    ...formatOnboardingApplyFieldChanges(result.fieldChanges, lang),
+    '',
+    getMessage('onboarding.apply.applied', lang, { path: result.configPath }),
+  ];
+  if (!result.verified) {
+    lines.push(
+      getMessage('onboarding.apply.verification_failed', lang, {
+        errors: result.verificationErrors.join('; '),
+      }),
+    );
+  }
+  return lines.join('\n').trimEnd();
+}
+
+/** Injectable stdin/stdout seam so the confirmation prompt is hermetically testable with a fake input stream (mirrors `WizardOpts`). */
+export interface OnboardingApplyFlowOptions {
+  dryRun?: boolean;
+  autoYes?: boolean;
+  input?: NodeJS.ReadableStream;
+  output?: NodeJS.WritableStream;
+}
+
+/** The "onay" (confirm) step — a single reused `runWizard` confirm question, same readline machinery `runOnboard`'s own steps already use. */
+async function confirmOnboardingApply(
+  configPath: string,
+  lang: string,
+  io: { input?: NodeJS.ReadableStream; output?: NodeJS.WritableStream },
+): Promise<boolean> {
+  const answers = await runWizard(
+    [
+      {
+        id: 'confirmApply',
+        prompt: getMessage('onboarding.apply.confirm_prompt', lang, { path: configPath }),
+        type: 'confirm',
+        default: false,
+      },
+    ],
+    { input: io.input, output: io.output },
+  );
+  return answers['confirmApply'] === true;
+}
+
+/**
+ * plan-göster → onay → apply → öncesi-değer raporu. Runs the wizard once
+ * (project-scope), shows the resulting plan, then either previews (`dryRun`),
+ * or confirms (unless `autoYes`) and applies via `applyOnboardingPlan`,
+ * printing the before/after report either way.
+ */
+export async function runOnboardApply(root: string, opts: OnboardingApplyFlowOptions = {}): Promise<void> {
+  const lang = getLangFromConfig(root);
+  const project = detectProjectInfo(root);
+  const wizard = await runOnboardingWizard({ projectRoot: root, language: lang, projectName: project.name });
+  const plan = wizard.configPlan;
+
+  print(formatOnboardingPlanReport(wizard, lang));
+
+  const preview = dryRunOnboardingApply(plan);
+
+  if (opts.dryRun) {
+    print(formatOnboardingApplyPreview(preview, lang));
+    print(getMessage('onboarding.apply.dry_run_notice', lang));
+    return;
+  }
+
+  const confirmed =
+    opts.autoYes === true
+      ? true
+      : await confirmOnboardingApply(plan.configPath, lang, { input: opts.input, output: opts.output });
+
+  if (!confirmed) {
+    print(getMessage('onboarding.apply.cancelled', lang));
+    return;
+  }
+
+  const result = applyOnboardingPlan(plan);
+  print(formatOnboardingApplyResult(result, lang));
+}
+
 export function registerOnboard(program: Command): void {
   program
     .command('onboard')
@@ -362,7 +507,18 @@ export function registerOnboard(program: Command): void {
     .option('--force', 'Re-run onboarding even if already initialized')
     .option('--plan-only', 'Print the onboarding plan without prompting (non-interactive, CI/test path)')
     .option('--json', 'Output the --plan-only report as JSON')
-    .action(async (opts: { nonInteractive?: boolean; force?: boolean; planOnly?: boolean; json?: boolean }) => {
+    .option('--apply', 'Apply the onboarding config plan: plan preview -> confirm -> write (project-scope)')
+    .option('--dry-run', 'Preview the onboarding apply without writing anything (implies --apply)')
+    .option('-y, --yes', 'Skip the apply confirmation prompt (implies --apply)')
+    .action(async (opts: {
+      nonInteractive?: boolean;
+      force?: boolean;
+      planOnly?: boolean;
+      json?: boolean;
+      apply?: boolean;
+      dryRun?: boolean;
+      yes?: boolean;
+    }) => {
       let root: string;
       try {
         root = resolveProjectRoot();
@@ -372,6 +528,11 @@ export function registerOnboard(program: Command): void {
 
       if (opts.planOnly) {
         await runOnboardPlanOnly(root, { json: opts.json });
+        return;
+      }
+
+      if (opts.apply || opts.dryRun || opts.yes) {
+        await runOnboardApply(root, { dryRun: !!opts.dryRun, autoYes: !!opts.yes });
         return;
       }
 

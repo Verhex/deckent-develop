@@ -1,5 +1,18 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-367 Learnings
+- Sprint sprint-367 Learnings: ## Sprint sprint-367 Learnings
+- 366-003-DEBT-CLOSE — openrouter-probe debt-notunu oku-kapat: GO_WITH_TECH_DEBT — Read task-366-003.result (the sole sprint-366 GO_WITH_TECH_DEBT note, confirmed by grepping selfAssessment across all 8 
+- ONB-APPLY-WIRE — onboarding-apply'ı onboard-komutuna bağla: GO_WITH_TECH_DEBT — Wired 366-006's onboarding-apply.ts (applyOnboardingPlan/dryRunOnboardingApply) into `deckent onboard` as an ADDITIVE pa
+- ONB-2-DOCTOR-FIX — zengin doctor dilimi (--fix): GO_WITH_TECH_DEBT — Enriched `deckent doctor --fix` (Sprint 356 Task 356-006 baseline: mkdir/chmod/config-migrate) with 2 new closed-whiteli
+- AGSK-1-DILIM-2 — agent/skill katalog genişlemesi: NO_GO — SCOPE-DEFECT self-flag (found before coding, documented in full in .tasks/task-367-008.plan): declared scope.filesWrite 
+
+## Gains
+- 367-001 — BORN-485 — spawn-timeout/tmux kırmızı-test onarımı (9 test) — Kontrat-kararı: kod kontrata UYUYOR, testler bayattı.
+- 367-002 — BORN-486 — cleanup stale-hb süpürme — BORN-486 fix, two surgical additions in sprint-lifecycle.ts (no other files touched): (1) cleanup...
+- 367-003 — RESULT-SHAPE-SOURCE-GUARD — worker-prompt'a result-şema sözleşmesi (born-484 kaynak-önleme) — born-484 source-side guard.
+- 367-007 — APR-HISTORY-DILIM — dashboard approval-history görünümü — DUPLICATE-WORK FOUND (disk-verified, not Brain-synthetic) — this task's exact deliverable already...
+
 ## Sprint sprint-366 Learnings
 - Sprint sprint-366 Learnings: ## Sprint sprint-366 Learnings
 

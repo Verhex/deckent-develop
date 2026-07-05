@@ -32,8 +32,10 @@ afterEach(() => {
 });
 
 describe('DOCTOR_FIX_ACTION_KINDS — closed whitelist', () => {
-  it('is exactly mkdir/chmod/config-migrate — no delete/docker/login', () => {
-    expect([...DOCTOR_FIX_ACTION_KINDS].sort()).toEqual(['chmod', 'config-migrate', 'mkdir']);
+  it('is exactly mkdir/chmod/config-migrate/config-recreate/unlock — no docker/login, no delete of live data', () => {
+    expect([...DOCTOR_FIX_ACTION_KINDS].sort()).toEqual(
+      ['chmod', 'config-migrate', 'config-recreate', 'mkdir', 'unlock'],
+    );
   });
 });
 
@@ -51,6 +53,8 @@ describe('planDoctorFixes — dry-run detection (no mutation)', () => {
     expect(actions).toHaveLength(1);
     expect(actions[0]).toMatchObject({ kind: 'mkdir', target: join(root, '.deckent') });
     expect(existsSync(join(root, '.deckent'))).toBe(false);
+    // reversible-report: every action carries a "before" value (Task 367-006)
+    expect(actions[0]?.previousValue).toBeTruthy();
   });
 
   it('proposes mkdir for a missing .tasks/ directory, without creating it', () => {
@@ -81,6 +85,8 @@ describe('planDoctorFixes — dry-run detection (no mutation)', () => {
     expect(actions[0]).toMatchObject({ kind: 'chmod', target: shadowPath });
     // dry-run — mode must be unchanged
     expect(statSync(shadowPath).mode & 0o777).toBe(0o644);
+    // reversible-report: the prior octal mode is captured
+    expect(actions[0]?.previousValue).toContain('644');
   });
 
   it('does NOT propose a chmod when .deck-shadow is already 0o600', () => {
@@ -105,6 +111,8 @@ describe('planDoctorFixes — dry-run detection (no mutation)', () => {
     expect(configAction).toBeDefined();
     expect(configAction?.target).toBe(configPath);
     expect(configAction?.description).toContain('missing config default');
+    // reversible-report: prior key count captured (Task 367-006)
+    expect(configAction?.previousValue).toContain('1 top-level key');
     // dry-run — file must be untouched (no backup written, no mtime change)
     expect(statSync(configPath).mtimeMs).toBe(before);
     expect(existsSync(`${configPath}.bak`)).toBe(false);
@@ -115,6 +123,83 @@ describe('planDoctorFixes — dry-run detection (no mutation)', () => {
     mkdirSync(join(root, '.tasks'), { recursive: true });
     const actions = planDoctorFixes(root);
     expect(actions.find(a => a.kind === 'config-migrate')).toBeUndefined();
+  });
+
+  it('proposes config-recreate (backup + rewrite) when config.json is corrupt JSON, without touching it', () => {
+    mkdirSync(join(root, '.deckent'), { recursive: true });
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    const configPath = join(root, '.deckent', 'config.json');
+    const corrupt = '{ "mode": "balanced", oops this is not valid json';
+    writeFileSync(configPath, corrupt);
+    const before = statSync(configPath).mtimeMs;
+
+    const actions = planDoctorFixes(root);
+    // Corrupt JSON is mutually exclusive with config-migrate (which requires a parse to succeed).
+    expect(actions.find(a => a.kind === 'config-migrate')).toBeUndefined();
+    const recreateAction = actions.find(a => a.kind === 'config-recreate');
+    expect(recreateAction).toBeDefined();
+    expect(recreateAction?.target).toBe(configPath);
+    expect(recreateAction?.description).toContain('corrupted');
+    expect(recreateAction?.previousValue).toContain(corrupt);
+    // dry-run — file must be untouched (no backup written, no mtime change)
+    expect(statSync(configPath).mtimeMs).toBe(before);
+    expect(readFileSync(configPath, 'utf-8')).toBe(corrupt);
+  });
+
+  it('does NOT propose config-recreate when config.json is valid JSON', () => {
+    mkdirSync(join(root, '.deckent'), { recursive: true });
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    writeFileSync(join(root, '.deckent', 'config.json'), JSON.stringify({ mode: 'balanced' }));
+    const actions = planDoctorFixes(root);
+    expect(actions.find(a => a.kind === 'config-recreate')).toBeUndefined();
+  });
+
+  it('proposes unlock for a stale lock file, without deleting it', () => {
+    mkdirSync(join(root, '.deckent'), { recursive: true });
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    const locksPath = join(root, '.locks');
+    mkdirSync(locksPath, { recursive: true });
+    const lockPath = join(locksPath, 'src__foo.ts.lock');
+    const staleAcquiredAt = new Date(Date.now() - 400_000).toISOString(); // 400s > 300s threshold
+    const lockContent = JSON.stringify({ filePath: 'src/foo.ts', ownerWorkerId: 'w-dead', acquiredAt: staleAcquiredAt, taskId: 'task-001' });
+    writeFileSync(lockPath, lockContent);
+
+    const actions = planDoctorFixes(root);
+    const unlockAction = actions.find(a => a.kind === 'unlock');
+    expect(unlockAction).toBeDefined();
+    expect(unlockAction?.target).toBe(lockPath);
+    expect(unlockAction?.description).toContain('w-dead');
+    expect(unlockAction?.description).toContain('src/foo.ts');
+    expect(unlockAction?.previousValue).toBe(lockContent);
+    // dry-run — lock file must still exist
+    expect(existsSync(lockPath)).toBe(true);
+  });
+
+  it('does NOT propose unlock for a fresh (non-stale) lock file', () => {
+    mkdirSync(join(root, '.deckent'), { recursive: true });
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    const locksPath = join(root, '.locks');
+    mkdirSync(locksPath, { recursive: true });
+    const lockPath = join(locksPath, 'src__foo.ts.lock');
+    writeFileSync(lockPath, JSON.stringify({
+      filePath: 'src/foo.ts', ownerWorkerId: 'w-alive', acquiredAt: new Date().toISOString(), taskId: 'task-001',
+    }));
+
+    const actions = planDoctorFixes(root);
+    expect(actions.find(a => a.kind === 'unlock')).toBeUndefined();
+  });
+
+  it('ignores .spawnlock files entirely (distinct namespace, never proposed for unlock)', () => {
+    mkdirSync(join(root, '.deckent'), { recursive: true });
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    const locksPath = join(root, '.locks');
+    mkdirSync(locksPath, { recursive: true });
+    writeFileSync(join(locksPath, 'abc123.spawnlock'), JSON.stringify({
+      filePath: 'src/foo.ts', taskId: 'task-001', acquiredAt: new Date(Date.now() - 400_000).toISOString(),
+    }));
+
+    const actions = planDoctorFixes(root);
+    expect(actions.find(a => a.kind === 'unlock')).toBeUndefined();
   });
 
   it('every planned action kind is a member of the closed whitelist', () => {
@@ -171,6 +256,44 @@ describe('applyDoctorFixes — --yes real application', () => {
     // migrateConfig's own timestamped backup exists somewhere in .deckent/
     const deckentFiles = readdirSync(join(root, '.deckent'));
     expect(deckentFiles.some((f: string) => f.startsWith('config.json.bak.'))).toBe(true);
+  });
+
+  it('applies config-recreate for real: backs up the corrupt file and rewrites valid defaults', () => {
+    mkdirSync(join(root, '.deckent'), { recursive: true });
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    const configPath = join(root, '.deckent', 'config.json');
+    const corrupt = '{ not: valid json at all';
+    writeFileSync(configPath, corrupt);
+
+    const actions = planDoctorFixes(root);
+    const results = applyDoctorFixes(actions);
+
+    expect(results.every(r => r.applied)).toBe(true);
+    // config.json is now valid, parseable, and has real default content
+    const recreated = JSON.parse(readFileSync(configPath, 'utf-8'));
+    expect(Object.keys(recreated).length).toBeGreaterThan(1);
+    // The corrupt original is preserved verbatim in a backup file
+    const deckentFiles = readdirSync(join(root, '.deckent'));
+    const backupFile = deckentFiles.find((f: string) => f.startsWith('config.json.corrupt.'));
+    expect(backupFile).toBeDefined();
+    expect(readFileSync(join(root, '.deckent', backupFile!), 'utf-8')).toBe(corrupt);
+  });
+
+  it('applies unlock for real: removes the stale lock file', () => {
+    mkdirSync(join(root, '.deckent'), { recursive: true });
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    const locksPath = join(root, '.locks');
+    mkdirSync(locksPath, { recursive: true });
+    const lockPath = join(locksPath, 'src__foo.ts.lock');
+    writeFileSync(lockPath, JSON.stringify({
+      filePath: 'src/foo.ts', ownerWorkerId: 'w-dead', acquiredAt: new Date(Date.now() - 400_000).toISOString(), taskId: 'task-001',
+    }));
+
+    const actions = planDoctorFixes(root);
+    const results = applyDoctorFixes(actions);
+
+    expect(results.every(r => r.applied)).toBe(true);
+    expect(existsSync(lockPath)).toBe(false);
   });
 
   it('captures a per-action failure without aborting the remaining actions', () => {
@@ -239,6 +362,55 @@ describe('formatDoctorFixLines', () => {
     const joined = lines.join('\n');
     expect(joined).toContain('[FAILED]');
     expect(joined).toContain('boom');
+  });
+
+  it('renders a "before:" line for an action that carries a previousValue (dry-run)', () => {
+    const actions = [{ kind: 'chmod' as const, target: '/tmp/x/.deck-shadow', description: 'Reset permissions', previousValue: 'mode 644' }];
+    const lines = formatDoctorFixLines(actions);
+    expect(lines.some(l => l.includes('mode 644'))).toBe(true);
+  });
+
+  it('renders a "before:" line for an applied action that carries a previousValue', () => {
+    const actions = [{ kind: 'unlock' as const, target: '/tmp/x/.locks/foo.lock', description: 'Remove stale lock', previousValue: '{"ownerWorkerId":"w-dead"}' }];
+    const results = [{ action: actions[0]!, applied: true }];
+    const lines = formatDoctorFixLines(actions, results);
+    expect(lines.some(l => l.includes('w-dead'))).toBe(true);
+  });
+
+  it('does NOT render a "before:" line when previousValue is absent (backward-compat fixture shape)', () => {
+    const actions = planDoctorFixesFixture();
+    const lines = formatDoctorFixLines(actions);
+    expect(lines.some(l => l.includes('before:'))).toBe(false);
+  });
+
+  it('appends a "Manual" section listing non-auto-fixable checks, honestly labeled', () => {
+    const actions = planDoctorFixesFixture();
+    const manual = [{ name: 'git', message: 'not found — Install git' }];
+    const lines = formatDoctorFixLines(actions, undefined, manual);
+    const joined = lines.join('\n');
+    expect(joined).toContain('[manual]');
+    expect(joined).toContain('git');
+    expect(joined).toContain('not found — Install git');
+  });
+
+  it('replaces "nothing to repair" with an honest "manual attention needed" line when actions is empty but manual is not', () => {
+    const manual = [{ name: 'tmux', message: 'not found' }];
+    const lines = formatDoctorFixLines([], undefined, manual);
+    const joined = lines.join('\n');
+    expect(joined).not.toContain('nothing to repair');
+    expect(joined).toContain('manual attention');
+    expect(joined).toContain('[manual]');
+    expect(joined).toContain('tmux');
+  });
+
+  it('still reports "nothing to repair" when BOTH actions and manual are empty', () => {
+    const lines = formatDoctorFixLines([], undefined, []);
+    expect(lines.join('\n')).toContain('nothing to repair');
+  });
+
+  it('renders the Turkish variant when lang="tr" is passed', () => {
+    const lines = formatDoctorFixLines([], undefined, [], 'tr');
+    expect(lines.join('\n')).toContain('onarılacak bir şey yok');
   });
 });
 

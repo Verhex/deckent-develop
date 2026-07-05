@@ -188,6 +188,47 @@ describe('runOpenRouterProbeCommand — key present (fake-fetch live path)', () 
     expect(typeof parsed.generatedAt).toBe('string');
   });
 
+  it('truncates the human-readable listing to MAX_LISTED_MODELS (10) and prints an "N more" line', async () => {
+    const manyModels = {
+      data: Array.from({ length: 13 }, (_, i) => ({
+        id: `vendor/free-model-${i}:free`,
+        pricing: { prompt: '0', completion: '0' },
+        context_length: 4096,
+        architecture: { modality: 'text->text' },
+      })),
+    };
+    const fetchImpl = vi.fn(async () => jsonResponse(manyModels)) as unknown as FetchFn;
+    const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    await runOpenRouterProbeCommand({}, baseDeps({ loadSecretsFn: withKey, fetchImpl }));
+    const printed = writeSpy.mock.calls.map((c) => String(c[0])).join('');
+    writeSpy.mockRestore();
+
+    expect(printed).toContain('13 free model(s) found');
+    expect(printed).toContain('vendor/free-model-9:free');
+    expect(printed).not.toContain('vendor/free-model-10:free');
+    expect(printed).toContain('… and 3 more');
+  });
+
+  it('does NOT truncate the --json model array even past MAX_LISTED_MODELS', async () => {
+    const manyModels = {
+      data: Array.from({ length: 13 }, (_, i) => ({
+        id: `vendor/free-model-${i}:free`,
+        pricing: { prompt: '0', completion: '0' },
+        context_length: 4096,
+        architecture: { modality: 'text->text' },
+      })),
+    };
+    const fetchImpl = vi.fn(async () => jsonResponse(manyModels)) as unknown as FetchFn;
+    const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    await runOpenRouterProbeCommand({ json: true }, baseDeps({ loadSecretsFn: withKey, fetchImpl }));
+    const printed = writeSpy.mock.calls.map((c) => String(c[0])).join('');
+    writeSpy.mockRestore();
+
+    const parsed = JSON.parse(printed);
+    expect(parsed.count).toBe(13);
+    expect(parsed.models).toHaveLength(13);
+  });
+
   it('resolves the key via the DECKENT_-prefixed convention too', async () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ data: [] })) as unknown as FetchFn;
     await runOpenRouterProbeCommand(

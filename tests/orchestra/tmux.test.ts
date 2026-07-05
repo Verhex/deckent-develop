@@ -588,7 +588,9 @@ describe.skipIf(isWindows)('buildWorkerCommand', () => {
 
   it('wraps with timeout when taskId is provided (no adapter)', () => {
     const cmd = buildWorkerCommand('opus', '/proj/.tasks/.prompt-abc.txt', undefined, undefined, '001-001');
-    expect(cmd).toContain(`timeout ${WORKER_TIMEOUT_SECONDS}`);
+    // born-466 parity (docs/reference/worker-wrapper-contract.md §1-2): tmux.ts:219 wraps as
+    // `timeout -k 30 <N>` (docker-parity hard-KILL grace) — see tmux-timeout-parity.test.ts.
+    expect(cmd).toContain(`timeout -k 30 ${WORKER_TIMEOUT_SECONDS}`);
     expect(cmd).toContain('WORKER_TIMEOUT');
     expect(cmd).toContain('task-001-001.timeout');
     expect(cmd).toContain('claude -p - --model claude-opus-4-8');
@@ -603,7 +605,8 @@ describe.skipIf(isWindows)('buildWorkerCommand', () => {
 
   it('uses custom timeout seconds when provided', () => {
     const cmd = buildWorkerCommand('haiku', '/proj/.tasks/.prompt-x.txt', undefined, undefined, '002-001', 600);
-    expect(cmd).toContain('timeout 600');
+    // born-466 parity shape — `timeout -k 30 <N>` (see comment above)
+    expect(cmd).toContain('timeout -k 30 600');
     expect(cmd).toContain('task-002-001.timeout');
   });
 

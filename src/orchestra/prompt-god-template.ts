@@ -1286,6 +1286,10 @@ At EVERY significant step, also update the \`currentAction\` field to a short hu
   const provider = task.provider ?? getDefaultProviderName();
   push('T2', 'result-contract', `## Result & Self-Assessment
 Write .tasks/task-${task.id}.result with: taskId, filesChanged, testsPassed, selfAssessment ("DONE"|"GO_WITH_TECH_DEBT"|"NO_GO"), notes, and tokenUsage { "inputTokens": 0, "outputTokens": 0, "cacheReadTokens": 0, "provider": "${provider}", "model": "${task.model}" }. Set provider/model as shown (you know these); leave inputTokens, outputTokens and cacheReadTokens at 0 — do NOT estimate them. An LLM cannot count its own token usage, so any guess only adds noise: the orchestrator fills the real token counts server-side after you finish. tokenUsage is optional — if you omit it the orchestrator still fills it.
+Field shapes (strict — a wrong shape here breaks the orchestrator's result parser for the whole sprint):
+- \`notes\`: a SINGLE string, never an array or object. For multiple points, join them into ONE string using \`\\n\` newlines — do NOT write \`["point one", "point two"]\` or \`{"a": "..."}\`.
+- \`selfAssessment\`: exactly one of the three string literals \`"DONE"\`, \`"GO_WITH_TECH_DEBT"\`, \`"NO_GO"\` — never an array, never any other value.
+- \`filesChanged\`: an array of file-path strings, e.g. \`["src/foo.ts", "tests/foo.test.ts"]\`.
 ${buildDodChecklist(task.goNogo?.goCriteria)}
 CRITICAL: never exit without writing the .result file — even on failure, write selfAssessment "NO_GO" with error details. A missing result file stalls the entire sprint.`);
 

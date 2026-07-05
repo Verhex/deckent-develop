@@ -46,6 +46,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-367 Learnings** (sprint-367): ## Sprint sprint-367 Learnings
+- 366-003-DEBT-CLOSE — openrouter-probe debt-notunu oku-kapat: GO_WITH_TECH_DEBT — Rea...
 - **Sprint sprint-366 Learnings** (sprint-366): ## Sprint sprint-366 Learnings
 - **Sprint sprint-365 Learnings** (sprint-365): ## Sprint sprint-365 Learnings
 
@@ -65,8 +67,6 @@
 - DEP-NORMALIZE — dependency-ref'leri plan-yazımında slot-ID'ye çevir (born-465): GO_W...
 - **Sprint sprint-358 Learnings** (sprint-358): ## Sprint sprint-358 Learnings
 - REPL-DETACHED-START — REPL'den kilitlemeyen sprint-start: GO_WITH_TECH_DEBT — New sr...
-- **Sprint sprint-357 Learnings** (sprint-357): ## Sprint sprint-357 Learnings
-- TERM-CONFIG-WIRE — TerminalConfig'i runtime'a bağla: GO_WITH_TECH_DEBT — Wired all s...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -121,4 +121,4 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 
-_Total entries: 921 | Generated: 2026-07-03_
+_Total entries: 927 | Generated: 2026-07-05_

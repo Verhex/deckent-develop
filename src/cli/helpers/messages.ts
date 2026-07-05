@@ -2300,15 +2300,14 @@ const MESSAGES: MessageMap = {
   'do.outcome_success': { en: 'success', tr: 'başarılı' },
   'do.outcome_failure': { en: 'failure', tr: 'başarısız' },
 
-  // ─── `deckent doctor --fix` (Task 356-006 DOCTOR-FIX — sole-authority
-  // addition; cited by doctor.ts's own docImpact + its
-  // "TODO(docImpact, Task 15)" comment above formatDoctorFixLines():
-  // "these strings are plain EN, not routed through getMessage() ...
-  // a follow-up task should add `doctor.fix_*` en/tr keys". English values
-  // mirror formatDoctorFixLines()'s literal strings byte-for-byte. The
-  // conditional "attempted (N FAILED)" header is split into two keys
-  // (_ok / _failed) since getMessage() only does flat {var} substitution,
-  // same precedent as do.preview_banner_run/do.preview_banner_dry_run) ──────
+  // ─── `deckent doctor --fix` (keys added by Task 356-015; wired into
+  // formatDoctorFixLines() by Task 367-006, closing the standing
+  // "TODO(docImpact, Task 15)" — English values mirror
+  // formatDoctorFixLines()'s literal strings byte-for-byte, pinned by
+  // tests/cli/messages-round9-keys.test.ts. The conditional "attempted
+  // (N FAILED)" header is split into two keys (_ok / _failed) since
+  // getMessage() only does flat {var} substitution, same precedent as
+  // do.preview_banner_run/do.preview_banner_dry_run) ─────────────────────
   'doctor.fix_nothing_to_repair': {
     en: 'doctor --fix: nothing to repair — all safe-fix checks passed.',
     tr: 'doctor --fix: onarılacak bir şey yok — tüm güvenli-onarım kontrolleri geçti.',
@@ -2340,6 +2339,26 @@ const MESSAGES: MessageMap = {
   'doctor.fix_line_failed': {
     en: '  [FAILED] {description} — {error}',
     tr: '  [BAŞARISIZ] {description} — {error}',
+  },
+
+  // ─── `deckent doctor --fix` enrichment (Task 367-006 ONB-2-DOCTOR-FIX):
+  // reversible-report "before value" line + the honest "manual" (not
+  // auto-fixable) section ───────────────────────────────────────────────
+  'doctor.fix_previous_value_line': {
+    en: '        before: {previousValue}',
+    tr: '        önce: {previousValue}',
+  },
+  'doctor.fix_no_auto_fixable_but_manual': {
+    en: 'doctor --fix: no auto-fixable issues found — {count} check(s) need manual attention (see below).',
+    tr: 'doctor --fix: otomatik onarılabilir bir sorun yok — {count} kontrol elle ilgi bekliyor (aşağıya bakın).',
+  },
+  'doctor.fix_manual_header': {
+    en: 'Manual (not auto-fixable — {count} check(s) need your attention):',
+    tr: 'Manuel (otomatik onarılamaz — {count} kontrol dikkatinizi bekliyor):',
+  },
+  'doctor.fix_manual_line': {
+    en: '  [manual] {name} — {message}',
+    tr: '  [manuel] {name} — {message}',
   },
 
   // ─── limits command (Sprint 361 Task 361-002, LIMIT-GATE-WIRE) ─────────
@@ -2642,6 +2661,52 @@ const MESSAGES: MessageMap = {
   'onboarding.plan.not_applied': {
     en: 'No files were written — this was a plan preview only.',
     tr: 'Hiçbir dosya yazılmadı — bu yalnızca bir plan önizlemesiydi.',
+  },
+
+  // ─── onboard apply-wire (ONB-APPLY-WIRE, Sprint 367 Task 367-005) ──────
+  'onboarding.apply.preview.title': {
+    en: '=== Deckent Onboarding Apply Preview (dry-run) ===',
+    tr: '=== Deckent Onboarding Uygulama Önizlemesi (dry-run) ===',
+  },
+  'onboarding.apply.result.title': {
+    en: '=== Deckent Onboarding Apply ===',
+    tr: '=== Deckent Onboarding Uygulama ===',
+  },
+  'onboarding.apply.section.changes': {
+    en: 'Field changes:',
+    tr: 'Alan değişiklikleri:',
+  },
+  'onboarding.apply.field_change': {
+    en: '{key}: {previous} -> {next}',
+    tr: '{key}: {previous} -> {next}',
+  },
+  'onboarding.apply.value_none': {
+    en: '(none)',
+    tr: '(yok)',
+  },
+  'onboarding.apply.no_changes': {
+    en: 'No changes — the target config already matches this plan.',
+    tr: 'Değişiklik yok — hedef yapılandırma zaten bu planla eşleşiyor.',
+  },
+  'onboarding.apply.confirm_prompt': {
+    en: 'Apply this configuration to {path}?',
+    tr: 'Bu yapılandırma {path} konumuna uygulansın mı?',
+  },
+  'onboarding.apply.cancelled': {
+    en: 'Apply cancelled — no changes were written.',
+    tr: 'Uygulama iptal edildi — hiçbir değişiklik yazılmadı.',
+  },
+  'onboarding.apply.applied': {
+    en: 'Applied — configuration written to {path}.',
+    tr: 'Uygulandı — yapılandırma {path} konumuna yazıldı.',
+  },
+  'onboarding.apply.verification_failed': {
+    en: 'Warning: post-write verification failed: {errors}',
+    tr: 'Uyarı: yazım sonrası doğrulama başarısız oldu: {errors}',
+  },
+  'onboarding.apply.dry_run_notice': {
+    en: 'Dry-run — no changes were written.',
+    tr: 'Dry-run — hiçbir değişiklik yazılmadı.',
   },
 };
 

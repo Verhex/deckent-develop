@@ -2,6 +2,24 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint367] - 2026-07-05
+
+### Added
+
+- BORN-485 — spawn-timeout/tmux kırmızı-test onarımı (9 test)
+- BORN-486 — cleanup stale-hb süpürme
+- RESULT-SHAPE-SOURCE-GUARD — worker-prompt'a result-şema sözleşmesi (born-484 kaynak-önleme)
+- APR-HISTORY-DILIM — dashboard approval-history görünümü
+
+### Changed
+
+- 366-003-DEBT-CLOSE — openrouter-probe debt-notunu oku-kapat (completed with tech debt)
+- ONB-APPLY-WIRE — onboarding-apply'ı onboard-komutuna bağla (completed with tech debt)
+- ONB-2-DOCTOR-FIX — zengin doctor dilimi (--fix) (completed with tech debt)
+
+
+_Tasks: 10 total, 8 done, 3 tech debt, 2 no-go_
+
 ## [1.0.0-beta.1-sprint366] - 2026-07-03
 
 ### Added

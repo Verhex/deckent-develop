@@ -8913,3 +8913,32 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 366-008: HB-WRAPPER-DOC — wrapper davranış-sözleşmesi dokümanı (466-473-468 ailesi) (DONE)
 
 ---
+## Sprint 367 — sprint-367
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-05
+**Duration:** 2065s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 10 |
+| Completed | 8 |
+| Tech Debt | 3 |
+| No-Go | 2 |
+| Coverage | NaN% |
+| Duration | 2065369ms |
+
+### Tasks
+
+- 367-001: BORN-485 — spawn-timeout/tmux kırmızı-test onarımı (9 test) (DONE)
+- 367-002: BORN-486 — cleanup stale-hb süpürme (DONE)
+- 367-003: RESULT-SHAPE-SOURCE-GUARD — worker-prompt'a result-şema sözleşmesi (born-484 kaynak-önleme) (DONE)
+- 367-004: 366-003-DEBT-CLOSE — openrouter-probe debt-notunu oku-kapat (GO_WITH_TECH_DEBT)
+- 367-005: ONB-APPLY-WIRE — onboarding-apply'ı onboard-komutuna bağla (GO_WITH_TECH_DEBT)
+- 367-006: ONB-2-DOCTOR-FIX — zengin doctor dilimi (--fix) (GO_WITH_TECH_DEBT)
+- 367-007: APR-HISTORY-DILIM — dashboard approval-history görünümü (DONE)
+- 367-008: AGSK-1-DILIM-2 — agent/skill katalog genişlemesi (NO_GO)
+
+---
