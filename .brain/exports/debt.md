@@ -9,6 +9,8 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-371-001 | Tech debt from 371-001: Decision (Option A over Option B, per task instruction t | normal | sprint-371 | resolved |
+| debt-371-002 | Tech debt from 371-002: Wired the two dead endpoints exactly mirroring the regis | normal | sprint-371 | resolved |
 | debt-370-006 | Tech debt from 370-006: 3 feature-doc written to disk, all iskele-standart (Ne y | normal | sprint-370 | resolved |
 | debt-369-002 | Tech debt from 369-002: (1) checkTmux win32 honest-label fix: the win32 short-ci | normal | sprint-369 | resolved |
 | debt-369-005 | Tech debt from 369-005: Delivered the dilim-1 sözleşme-katmanı: src/core/compute | normal | sprint-369 | resolved |

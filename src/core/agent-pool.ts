@@ -1,11 +1,119 @@
 // ─── Agent Pool Manager ──────────────────────────────────────────────────────
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { AgentDefinition, AgentPool } from './agent-types.js';
 import { createDefaultStats } from './agent-types.js';
 import type { ActivationRule } from './routing-types.js';
 import { createDefaultActivationConfig } from './routing-types.js';
 import { readJsonSafe } from './utils.js';
+
+// ─── Builtin Fallback (371-001 CATALOG-MATERIALIZE) ─────────────────────────
+//
+// D-004 layer pattern: .deckent override > builtin default. Mirrors
+// skill-pool.ts's _loadBuiltinFallback — see that file for the full
+// rationale (why this reads the builtin tree in-memory at load time rather
+// than having the sync step / seedBuiltins materialize agent.json files).
+
+/**
+ * Resolve the builtin agents directory relative to THIS module's own file
+ * location (src/core/agent-pool.ts or dist/core/agent-pool.js — builtins/ is
+ * a direct sibling either way, copied to dist/ by scripts/copy-assets.mjs).
+ */
+function resolveBuiltinAgentsDir(): string {
+  const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+  return path.join(moduleDir, 'builtins', 'agents');
+}
+
+/** Title-case a kebab/snake-case id as a last-resort name. */
+function titleCaseFromId(id: string): string {
+  return id
+    .split(/[-_]/)
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(' ');
+}
+
+/**
+ * Parse a builtin PROMPT.md body for its H1 title and lead paragraph.
+ * Tolerates an optional YAML frontmatter block. Mirrors
+ * skill-pool.ts:parseMarkdownTitleAndLead (kept file-local — the two
+ * pool managers are outside each other's write/read scope for this task).
+ */
+function parseMarkdownTitleAndLead(markdown: string): { title: string; lead: string } {
+  const withoutFrontmatter = markdown.replace(/^---\n[\s\S]*?\n---\n/, '');
+  const lines = withoutFrontmatter.split('\n');
+
+  let title = '';
+  let titleIndex = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const match = /^#\s+(.+)$/.exec(lines[i]!.trim());
+    if (match) {
+      title = match[1]!.trim();
+      titleIndex = i;
+      break;
+    }
+  }
+
+  const leadLines: string[] = [];
+  if (titleIndex >= 0) {
+    for (let i = titleIndex + 1; i < lines.length; i++) {
+      const line = lines[i]!.trim();
+      if (line === '') {
+        if (leadLines.length > 0) break;
+        continue;
+      }
+      if (/^#{1,6}\s/.test(line)) break;
+      leadLines.push(line);
+    }
+  }
+
+  return { title, lead: leadLines.join(' ').trim() };
+}
+
+/**
+ * Synthesize a minimal, valid AgentDefinition (raw JSON-shaped record) from a
+ * builtin PROMPT.md that has no accompanying agent.json. `systemPrompt` is
+ * left empty — the real content is served through getAgentPrompt()'s own
+ * builtin-tree fallback (PROMPT.md stays the single canonical source, per
+ * ADR-048); duplicating it into systemPrompt here would violate that
+ * single-source contract. Returns null if the file cannot be read.
+ */
+function synthesizeAgentDefinition(id: string, promptMdPath: string): Record<string, unknown> | null {
+  let content: string;
+  try {
+    content = fs.readFileSync(promptMdPath, 'utf8');
+  } catch {
+    return null;
+  }
+
+  const { title, lead } = parseMarkdownTitleAndLead(content);
+  const name = (title ? title.replace(/\s+Agent$/i, '').trim() : '') || titleCaseFromId(id);
+
+  return {
+    id,
+    name,
+    description: lead,
+    systemPrompt: '',
+    manifestVersion: 2,
+    expertise: [],
+    allowedTools: ['Read', 'Grep', 'Bash', 'Write'],
+    deniedTools: [],
+    preferredModel: 'sonnet',
+    effortMultiplier: 1,
+    triggerKeywords: [],
+    triggerScopes: [],
+    triggerFilePatterns: [],
+    persistent: false,
+    enabled: true,
+    source: 'builtin',
+    stats: createDefaultStats(),
+    // Well-formed but inert (no rules -> never scores above minScore): the V2
+    // routing engine indexes activation.rules unconditionally for every pool
+    // member, so leaving this field undefined (rather than an empty, valid
+    // ActivationConfig) breaks scoring for the WHOLE pool, not just this entry.
+    activation: createDefaultActivationConfig(),
+  };
+}
 
 // ─── Built-in Implementation Intent Candidacy (Sprint 204 Task 204-003) ──────
 //
@@ -167,6 +275,7 @@ export function getAgentRole(agent: AgentDefinition): AgentRole {
 const AGENTS_DIR = '.deckent/agents';
 const TEMP_AGENTS_DIR = '.tasks/agents';
 const AGENT_FILENAME = 'agent.json';
+const CONFIG_FILENAME = path.join('.deckent', 'config.json');
 
 /** Default maximum number of temp agents to keep in pool. */
 export const DEFAULT_MAX_TEMP_AGENTS = 50;
@@ -260,7 +369,66 @@ export class AgentPoolManager {
       }
     }
 
+    this._loadBuiltinFallback(pool);
+
     return pool;
+  }
+
+  /**
+   * Fallback layer (371-001): make builtin agents pool-visible even when
+   * .deckent/agents/<id>/agent.json has never been materialized. D-004
+   * precedence — any id already present (a .deckent/.tasks override) is left
+   * untouched; only ids absent from `pool` are considered here.
+   *
+   * Gated on .deckent/config.json existing — see skill-pool.ts's
+   * _loadBuiltinFallback for the full rationale (this projectRoot must
+   * actually be an initialized deckent project, not merely a directory that
+   * happens to contain a `.deckent/agents/<id>/` subdirectory).
+   */
+  private _loadBuiltinFallback(pool: AgentPool): void {
+    if (!fs.existsSync(path.join(this.projectRoot, CONFIG_FILENAME))) return;
+
+    const builtinDir = resolveBuiltinAgentsDir();
+    if (!fs.existsSync(builtinDir)) return;
+
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(builtinDir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    if (!Array.isArray(entries)) return;
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      if (pool.has(entry.name)) continue;
+
+      const entryDir = path.join(builtinDir, entry.name);
+      let files: fs.Dirent[];
+      try {
+        files = fs.readdirSync(entryDir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      if (!Array.isArray(files)) continue;
+
+      // Only the "PROMPT.md with no agent.json anywhere" gap is this task's
+      // actual scope (369-003's 3 new agents) — see skill-pool.ts's identical
+      // fallback for the full rationale (a builtin shipping its own
+      // agent.json belongs in .deckent/agents/<id>/ via the normal override
+      // path; trusting arbitrary builtin agent.json content verbatim is
+      // unneeded generality this task's goCriteria never requires).
+      if (files.some((f) => f.name === AGENT_FILENAME)) continue;
+      if (!files.some((f) => f.name === PROMPT_MD_FILENAME)) continue;
+
+      const raw = synthesizeAgentDefinition(entry.name, path.join(entryDir, PROMPT_MD_FILENAME));
+      if (!raw) continue;
+      const validation = AgentPoolManager.validateAgentDefinition(raw);
+      if (!validation.valid) continue;
+      const agent = raw as unknown as AgentDefinition;
+      applyBuiltinImplementationRules(agent);
+      pool.set(agent.id, agent);
+    }
   }
 
   /**
@@ -651,7 +819,7 @@ export class AgentPoolManager {
 // ─── Agent Prompt Resolution (single source — PROMPT.md canonical) ─────
 
 /** Source of the resolved agent prompt content. */
-export type AgentPromptSource = 'prompt-md' | 'system-prompt' | 'none';
+export type AgentPromptSource = 'prompt-md' | 'prompt-md-builtin' | 'system-prompt' | 'none';
 
 /**
  * Result of {@link getAgentPrompt}. Single-source contract:
@@ -684,6 +852,13 @@ function readFileIfExists(filePath: string): string | undefined {
  * Lookup order:
  *   1. `<root>/.deckent/agents/<id>/PROMPT.md` (canonical)
  *   2. `<root>/.tasks/agents/<id>/PROMPT.md`  (temp scope)
+ *   2.5. `src/core/builtins/agents/<id>/PROMPT.md` (builtin fallback, 371-001) —
+ *        ONLY when neither .deckent/agents/<id>/ nor .tasks/agents/<id>/ has
+ *        ANY record for this id (not even an agent.json). If a persistent or
+ *        temp agent.json exists, that id already went through the sync/
+ *        override path deliberately and step 3's degraded contract applies —
+ *        reaching past it into the builtin tree would break ADR-048 for
+ *        every already-known agent that happens to omit its own PROMPT.md.
  *   3. `agent.json::systemPrompt` (degraded fallback — emits warning)
  *
  * No concatenation. `agent.json::systemPrompt` is preserved in the schema for
@@ -716,6 +891,29 @@ export function getAgentPrompt(
       degraded: false,
       resolvedFrom: tempPromptPath,
     };
+  }
+
+  // 2.5. PROMPT.md (builtin fallback) — only when this id has no .deckent/
+  // .tasks record at all (neither PROMPT.md nor agent.json anywhere for it),
+  // AND projectRoot is an actual initialized deckent project (has
+  // .deckent/config.json — see _loadBuiltinFallback for why this gate
+  // matters: resolveBuiltinAgentsDir() intentionally reaches outside
+  // projectRoot, into the running installation's own location).
+  const hasPersistentRecord =
+    fs.existsSync(path.join(projectRoot, AGENTS_DIR, agentId, AGENT_FILENAME)) ||
+    fs.existsSync(path.join(projectRoot, TEMP_AGENTS_DIR, agentId, AGENT_FILENAME));
+  const isInitializedProject = fs.existsSync(path.join(projectRoot, CONFIG_FILENAME));
+  if (!hasPersistentRecord && isInitializedProject) {
+    const builtinPromptPath = path.join(resolveBuiltinAgentsDir(), agentId, PROMPT_MD_FILENAME);
+    const builtinPrompt = readFileIfExists(builtinPromptPath);
+    if (builtinPrompt !== undefined && builtinPrompt.trim().length > 0) {
+      return {
+        content: builtinPrompt,
+        source: 'prompt-md-builtin',
+        degraded: false,
+        resolvedFrom: builtinPromptPath,
+      };
+    }
   }
 
   // 3. Degraded fallback: agent.json::systemPrompt

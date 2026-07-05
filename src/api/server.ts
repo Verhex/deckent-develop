@@ -63,6 +63,8 @@ import { registerDocsHealthRoute } from './docs-health-endpoint.js';
 import { registerAuthMeRoute, deriveRequestPrincipal } from './auth-me-endpoint.js';
 import { registerOidcCallbackRoute } from './oidc-callback-endpoint.js';
 import { registerApprovalHistoryRoute } from './approval-history-endpoint.js';
+import { registerLimitsRoute } from './limits-endpoint.js';
+import { registerEvaluateHealthRoute } from './evaluate-health-endpoint.js';
 import { handleOutputStream, isOutputStreamRequest } from './output-stream.js';
 import { createOutputCollector, type OutputCollector } from '../core/output-collector.js';
 import { reconcileStatusResponse } from './status-reconcile.js';
@@ -1038,6 +1040,10 @@ async function handleRequest(
     if (registerDocsHealthRoute(url, res, projectRoot)) return;
     // Auth identity: /api/auth/me (277-001)
     if (registerAuthMeRoute(url, method, res, req)) return;
+    // Subscription-limits probe (DASH-LIMITS-CARD, 365-006): /api/limits
+    if (await registerLimitsRoute(url, res)) return;
+    // Evaluate-health observability (born-484, 370-007): /api/evaluate-health[?n=]
+    if (registerEvaluateHealthRoute(url, res, projectRoot)) return;
 
     // GET /api/directives — DIRECTIVES.md content (symmetric with POST, DASH-FIX-1)
     if (url === '/api/directives') {

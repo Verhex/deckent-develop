@@ -14,6 +14,9 @@
 | Tool Surface — progressive-disclosure meta-tool'ları | `tool_surface.*` | off | [tool-surface.md](tool-surface.md) |
 | Approval Runtime — runtime-geneli canlı onay zinciri | `approval_gate` + `approval.*` | off | [approval-runtime.md](approval-runtime.md) |
 | NPM Advisory — bağımlılık-mutasyonu eskalasyon kanalı | (her zaman açık — prompt-seviyesi) | on | [npm-advisory.md](npm-advisory.md) |
+| Computer-Use Contract — TOOL-CU dilim-1 sözleşme katmanı (aksiyon şeması + taksonomi, adapter'sız) | `computer_use.*` | off | [computer-use-contract.md](computer-use-contract.md) |
+| Connect Auth-State — config-tabanlı, ağsız kimlik-doğrulama raporu (`doctor`/`connect`) | (yok — her zaman çalışır, read-only) | on | [connect-auth-state.md](connect-auth-state.md) |
+| VS Code Panel — TERM-RPC bridge/data/refresh soy-zinciri (extension'ın salt-okunur durum paneli) | (yok — extension-seviyesi kod) | n/a | [vscode-panel.md](vscode-panel.md) |
 
 ## Yazım kuralları
 

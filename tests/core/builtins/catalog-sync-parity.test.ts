@@ -81,13 +81,13 @@ describe('370-003 CATALOG-SYNC-PARITY: 368-001 skills + 369-003 agents pool-load
           },
         );
 
-        it('pool membership is fully explained by manifest.json presence on disk (sync-parity contract — dynamic, not a hardcoded gap)', () => {
-          const hasManifest = hasSkillManifest(DECKENT_SKILLS_DIR, id);
-          if (inPool) {
-            expect(hasManifest, `'${id}' is in the pool, so its manifest.json must exist`).toBe(true);
-          } else {
-            expect(hasManifest, `'${id}' has no manifest.json, so the pool correctly excludes it`).toBe(false);
-          }
+        it('pool membership follows the two-layer contract: .deckent manifest OR builtin-tree presence (371-001 D-004 fallback — supersedes the manifest-only invariant)', () => {
+          // 371-001 (CATALOG-MATERIALIZE, Option A) taught the pool to read the
+          // builtin tree directly as a fallback layer (.deckent override >
+          // builtin default). These ids exist in src/core/builtins (asserted
+          // above), so pool membership is now GUARANTEED even without a
+          // .deckent manifest — the old "manifest-only" invariant is obsolete.
+          expect(inPool, `'${id}' exists in the builtin tree, so the two-layer pool must include it`).toBe(true);
         });
       });
     }
@@ -110,13 +110,9 @@ describe('370-003 CATALOG-SYNC-PARITY: 368-001 skills + 369-003 agents pool-load
           },
         );
 
-        it('pool membership is fully explained by agent.json presence on disk (sync-parity contract — dynamic, not a hardcoded gap)', () => {
-          const hasJson = hasAgentJson(DECKENT_AGENTS_DIR, id);
-          if (inPool) {
-            expect(hasJson, `'${id}' is in the pool, so its agent.json must exist`).toBe(true);
-          } else {
-            expect(hasJson, `'${id}' has no agent.json, so the pool correctly excludes it`).toBe(false);
-          }
+        it('pool membership follows the two-layer contract: .deckent agent.json OR builtin-tree presence (371-001 D-004 fallback — supersedes the json-only invariant)', () => {
+          // Same 371-001 two-layer contract as the skills block above.
+          expect(inPool, `'${id}' exists in the builtin tree, so the two-layer pool must include it`).toBe(true);
         });
       });
     }

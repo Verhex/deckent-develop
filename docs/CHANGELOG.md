@@ -2,6 +2,24 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint371] - 2026-07-05
+
+### Added
+
+- TOOL-CU-DILIM-3 — exec-adapter (injectable-spawn, flag-zincirli)
+- CHAT-EXEC-ENGINE — dispatch-descriptor executor motoru
+- F11-016-ADR — REPL-stabilizasyon ADR-taslağı + kalan-envanter
+- DEBT-370-CLOSE — 370-006 kalanını kapat
+- CLOSING-DATA-PACK — 357-370 kapanış-veri-paketi (7-Tem hazırlığı)
+
+### Changed
+
+- CATALOG-MATERIALIZE — builtin 3+3'ü pool-görünür yap (370-003 kapanışı) (completed with tech debt)
+- SERVER-WIRE-ENDPOINTS — limits + evaluate-health kayıtları (completed with tech debt)
+
+
+_Tasks: 7 total, 7 done, 2 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint370] - 2026-07-05
 
 ### Added

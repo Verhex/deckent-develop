@@ -12,10 +12,12 @@ import type { CostConfig } from '../../src/core/cost-config-loader.js';
 // ─── Fixtures ───────────────────────────────────────────────────────────────
 // A fresh ModelRegistry (BUILTIN_MODELS copy) is injected so pricing is
 // deterministic regardless of global-singleton mutation by other suites.
-// Built-in opus = $15/$75 per MTok → $0.000015 / $0.000075 per token.
+// Built-in opus = $5/$25 per MTok (4.5+ repricing, registry SSOT).
 const REGISTRY = new ModelRegistry();
-const OPUS_IN = 15 / 1_000_000; // $0.000015 / token
-const OPUS_OUT = 75 / 1_000_000; // $0.000075 / token
+// Opus 4.5+ repricing ($5/$25 — pricing-data-baseline.json SSOT; registry synced,
+// these constants follow). Old $15/$75 was pre-4.5 Opus pricing.
+const OPUS_IN = 5 / 1_000_000; // $0.000005 / token
+const OPUS_OUT = 25 / 1_000_000; // $0.000025 / token
 
 /** Config whose `opus` alias carries REAL per-model cache prices (api regime reads these). */
 const CONFIG_WITH_OPUS_CACHE: CostConfig = {
@@ -27,10 +29,10 @@ const CONFIG_WITH_OPUS_CACHE: CostConfig = {
       default_billing_mode: 'api',
       models: {
         'claude-opus-4-8': {
-          // Deliberately DIFFERENT from the registry ($5 vs $15) to prove the
+          // Deliberately DIFFERENT from the registry ($50 vs $5) to prove the
           // registry — not the cost-config — is the in/out price source.
-          input_cost_per_token: 0.000005,
-          output_cost_per_token: 0.000025,
+          input_cost_per_token: 0.00005,
+          output_cost_per_token: 0.00025,
           cache_read_input_token_cost: 0.0000005, // $0.50/MTok
           cache_creation_input_token_cost: 0.00000625, // $6.25/MTok
           max_input_tokens: 1_000_000,
@@ -86,7 +88,7 @@ describe('calculateRegimeCost — subscription (limit-burn)', () => {
     const hugeRead = calculateRegimeCost({ ...base, cacheReadTokens: 5_000_000 }, 'opus', 'subscription', CONFIG_WITH_OPUS_CACHE, REGISTRY);
 
     expect(noRead.value).toBeCloseTo(hugeRead.value, 10); // identical → cacheRead is free
-    expect(noRead.value).toBeCloseTo(1_000_000 * OPUS_IN, 6); // = $15 input only
+    expect(noRead.value).toBeCloseTo(1_000_000 * OPUS_IN, 6); // input-only burn
     expect(noRead.isLimitBurn).toBe(true);
     expect(noRead.regime).toBe('subscription');
   });
@@ -99,9 +101,9 @@ describe('calculateRegimeCost — subscription (limit-burn)', () => {
       CONFIG_WITH_OPUS_CACHE,
       REGISTRY,
     );
-    // 1M cacheWrite × (1.25 × $0.000015) = $18.75
+    // 1M cacheWrite × (1.25 × $0.000005) = $6.25
     expect(r.value).toBeCloseTo(1_000_000 * 1.25 * OPUS_IN, 6);
-    expect(r.value).toBeCloseTo(18.75, 4);
+    expect(r.value).toBeCloseTo(6.25, 4);
   });
 
   it('full formula = in·$in + out·$out + cacheWrite·1.25·$in', () => {
@@ -113,8 +115,8 @@ describe('calculateRegimeCost — subscription (limit-burn)', () => {
       REGISTRY,
     );
     const expected = 1_000_000 * OPUS_IN + 1_000_000 * OPUS_OUT + 1_000_000 * 1.25 * OPUS_IN;
-    expect(r.value).toBeCloseTo(expected, 6); // 15 + 75 + 18.75 = 108.75 (cacheRead excluded)
-    expect(r.value).toBeCloseTo(108.75, 4);
+    expect(r.value).toBeCloseTo(expected, 6); // 5 + 25 + 6.25 = 36.25 (cacheRead excluded)
+    expect(r.value).toBeCloseTo(36.25, 4);
   });
 });
 
@@ -125,10 +127,10 @@ describe('calculateRegimeCost — api ($-per-token)', () => {
       { inputTokens: 1_000_000, outputTokens: 0 },
       'opus',
       'api',
-      CONFIG_WITH_OPUS_CACHE, // config says $5/MTok; registry says $15/MTok
+      CONFIG_WITH_OPUS_CACHE, // config says $50/MTok; registry says $5/MTok
       REGISTRY,
     );
-    expect(r.value).toBeCloseTo(15, 4); // registry $15, NOT config $5
+    expect(r.value).toBeCloseTo(5, 4); // registry $5, NOT config $50
     expect(r.pricingSource).toBe('registry:opus');
   });
 
@@ -137,10 +139,10 @@ describe('calculateRegimeCost — api ($-per-token)', () => {
     const api = calculateRegimeCost(usage, 'opus', 'api', CONFIG_WITH_OPUS_CACHE, REGISTRY);
     const sub = calculateRegimeCost(usage, 'opus', 'subscription', CONFIG_WITH_OPUS_CACHE, REGISTRY);
 
-    // api uses config cacheRead price $0.50/MTok → 15 + 0.5 = 15.5
-    expect(api.value).toBeCloseTo(15 + 0.5, 4);
-    // subscription ignores cacheRead → 15 only
-    expect(sub.value).toBeCloseTo(15, 4);
+    // api uses config cacheRead price $0.50/MTok → 5 + 0.5 = 5.5
+    expect(api.value).toBeCloseTo(5 + 0.5, 4);
+    // subscription ignores cacheRead → 5 only
+    expect(sub.value).toBeCloseTo(5, 4);
     expect(api.value).toBeGreaterThan(sub.value);
   });
 
@@ -165,10 +167,10 @@ describe('calculateRegimeCost — api ($-per-token)', () => {
       CONFIG_NO_OPUS, // opus absent from config → derive cache prices from input
       REGISTRY,
     );
-    // cacheRead = 1M × (0.10 × $0.000015) = 1.5 ; cacheWrite = 1M × (1.25 × $0.000015) = 18.75
+    // cacheRead = 1M × (0.10 × $0.000005) = 0.5 ; cacheWrite = 1M × (1.25 × $0.000005) = 6.25
     const expected = 1_000_000 * 0.1 * OPUS_IN + 1_000_000 * 1.25 * OPUS_IN;
-    expect(r.value).toBeCloseTo(expected, 6); // 1.5 + 18.75 = 20.25
-    expect(r.value).toBeCloseTo(20.25, 4);
+    expect(r.value).toBeCloseTo(expected, 6); // 0.5 + 6.25 = 6.75
+    expect(r.value).toBeCloseTo(6.75, 4);
     expect(r.pricingSource).toBe('registry:opus');
   });
 });

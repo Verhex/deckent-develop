@@ -1,5 +1,17 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-371 Learnings
+- Sprint sprint-371 Learnings: ## Sprint sprint-371 Learnings
+- CATALOG-MATERIALIZE — builtin 3+3'ü pool-görünür yap (370-003 kapanışı): GO_WITH_TECH_DEBT — Decision (Option A over Option B, per task instruction to justify): pool-loading now reads the builtin tree directly (D-
+- SERVER-WIRE-ENDPOINTS — limits + evaluate-health kayıtları: GO_WITH_TECH_DEBT — Wired the two dead endpoints exactly mirroring the registerApprovalHistoryRoute pattern (server.ts:65/:1068 precedent): 
+
+## Gains
+- 371-003 — TOOL-CU-DILIM-3 — exec-adapter (injectable-spawn, flag-zincirli) — Implemented executeComputerUseAction(action, {config, platform, spawn}) in src/core/computer-use-...
+- 371-004 — CHAT-EXEC-ENGINE — dispatch-descriptor executor motoru — Implemented executeIntentDescriptor(descriptor, { runner, confirm }) as a pure, string-free engin...
+- 371-005 — F11-016-ADR — REPL-stabilizasyon ADR-taslağı + kalan-envanter — Wrote docs/adr/adr-d-010-repl-input-stabilization.md (Class ADR-D, Status: proposed) as Row-62's ...
+- 371-006 — DEBT-370-CLOSE — 370-006 kalanını kapat — 370-006's GO_WITH_TECH_DEBT rationale (read from .brain/archive/sprint-370-tasks/task-370-006.res...
+- 371-007 — CLOSING-DATA-PACK — 357-370 kapanış-veri-paketi (7-Tem hazırlığı) — CLOSING-DATA-PACK written to docs/analysis/closing-data-357-370.md, the only file in write scope.
+
 ## Sprint sprint-370 Learnings
 - Sprint sprint-370 Learnings: ## Sprint sprint-370 Learnings
 - DOCS-FEATURES-5 — computer-use + connect-auth + panel feature-doc'ları: GO_WITH_TECH_DEBT — 3 feature-doc written to disk, all iskele-standart (Ne yapar/Parametreler/Açınca ne değişir/Kapalıyken garanti/Riskler/K

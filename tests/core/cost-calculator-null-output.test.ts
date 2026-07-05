@@ -10,8 +10,10 @@ import type { CostConfig } from '../../src/core/cost-config-loader.js';
 // Fresh ModelRegistry (BUILTIN_MODELS copy) → deterministic pricing regardless of
 // global-singleton mutation by other suites. Built-in opus = $15/$75 per MTok.
 const REGISTRY = new ModelRegistry();
-const OPUS_IN = 15 / 1_000_000; // $0.000015 / token
-const OPUS_OUT = 75 / 1_000_000; // $0.000075 / token
+// Opus 4.5+ repricing ($5/$25 — pricing-data-baseline.json SSOT; registry synced,
+// these constants follow). Old $15/$75 was pre-4.5 Opus pricing.
+const OPUS_IN = 5 / 1_000_000; // $0.000005 / token
+const OPUS_OUT = 25 / 1_000_000; // $0.000025 / token
 
 /** opus alias carries REAL per-model cache prices (api regime reads these). */
 const CONFIG_WITH_OPUS_CACHE: CostConfig = {
@@ -49,8 +51,8 @@ describe('calculateRegimeCost — unmeasured output honest signal (Task 331-012)
       CONFIG_WITH_OPUS_CACHE,
       REGISTRY,
     );
-    // value computed purely from input + cacheRead (output omitted): 15 + 0.5 = 15.5
-    expect(unmeasured.value).toBeCloseTo(15 + 0.5, 4);
+    // value computed purely from input + cacheRead (output omitted) — constants-based
+    expect(unmeasured.value).toBeCloseTo(5 + 0.5, 4);
     // the honest marker fires — a downstream KPI/ledger can see the under-count
     expect(unmeasured.outputUnmeasured).toBe(true);
 
@@ -76,7 +78,7 @@ describe('calculateRegimeCost — unmeasured output honest signal (Task 331-012)
       CONFIG_WITH_OPUS_CACHE,
       REGISTRY,
     );
-    expect(r.value).toBeCloseTo(15, 4); // input only
+    expect(r.value).toBeCloseTo(5, 4); // input only
     expect(r.outputUnmeasured).toBe(true);
   });
 
@@ -88,7 +90,7 @@ describe('calculateRegimeCost — unmeasured output honest signal (Task 331-012)
       CONFIG_WITH_OPUS_CACHE,
       REGISTRY,
     );
-    // limit-burn = in·$in + cacheWrite·1.25·$in (output omitted): 15 + 18.75 = 33.75
+    // limit-burn = in·$in + cacheWrite·1.25·$in (output omitted): 5 + 6.25 = 11.25
     expect(unmeasured.value).toBeCloseTo(1_000_000 * OPUS_IN + 1_000_000 * 1.25 * OPUS_IN, 6);
     expect(unmeasured.isLimitBurn).toBe(true);
     expect(unmeasured.outputUnmeasured).toBe(true);
@@ -102,9 +104,9 @@ describe('calculateRegimeCost — unmeasured output honest signal (Task 331-012)
       CONFIG_WITH_OPUS_CACHE,
       REGISTRY,
     );
-    // in·$in + out·$out = 15 + 75 = 90 (real-numbers path unchanged)
+    // in·$in + out·$out (real-numbers path unchanged; constants-based)
     expect(r.value).toBeCloseTo(1_000_000 * OPUS_IN + 1_000_000 * OPUS_OUT, 6);
-    expect(r.value).toBeCloseTo(90, 4);
+    expect(r.value).toBeCloseTo(30, 4);
     expect(r.outputUnmeasured).toBe(false);
   });
 

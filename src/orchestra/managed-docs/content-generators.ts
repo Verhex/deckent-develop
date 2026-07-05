@@ -115,10 +115,19 @@ export function countModules(dir: string): number {
 }
 
 /**
- * Count MCP tools registered in src/mcp/server.ts by scanning unique deckent_ names.
- * More accurate than file counting since server.ts is the registration source of truth.
+ * Count MCP tools from the TOOL_CATALOG SSOT (src/mcp/tools/index.ts) —
+ * CLAUDE.md: MCP tool counter SSOT is TOOL_CATALOG; server.ts only mirrors it
+ * in prose (and drifted to 37 vs the registered 46, which is exactly why this
+ * counter no longer scans server.ts). Falls back to the legacy server.ts scan
+ * only when the catalog file is absent (older target projects).
  */
 export function mcpToolCount(projectRoot: string): number {
+  const catalogPath = join(projectRoot, 'src', 'mcp', 'tools', 'index.ts');
+  if (existsSync(catalogPath)) {
+    const src = readFileSync(catalogPath, 'utf-8');
+    const entries = src.match(/name:\s*'deckent_[a-z_]+'/g) ?? [];
+    if (entries.length > 0) return new Set(entries).size;
+  }
   const serverPath = join(projectRoot, 'src', 'mcp', 'server.ts');
   if (!existsSync(serverPath)) return 0;
   const src = readFileSync(serverPath, 'utf-8');

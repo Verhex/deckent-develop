@@ -9028,3 +9028,31 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 370-007: EVAL-OBS-DASH — evaluate-sağlık işaretlerinin dashboard'a taşınması (DONE)
 
 ---
+## Sprint 371 — sprint-371
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-05
+**Duration:** 2847s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 7 |
+| Completed | 7 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 2847343ms |
+
+### Tasks
+
+- 371-001: CATALOG-MATERIALIZE — builtin 3+3'ü pool-görünür yap (370-003 kapanışı) (GO_WITH_TECH_DEBT)
+- 371-002: SERVER-WIRE-ENDPOINTS — limits + evaluate-health kayıtları (GO_WITH_TECH_DEBT)
+- 371-003: TOOL-CU-DILIM-3 — exec-adapter (injectable-spawn, flag-zincirli) (DONE)
+- 371-004: CHAT-EXEC-ENGINE — dispatch-descriptor executor motoru (DONE)
+- 371-005: F11-016-ADR — REPL-stabilizasyon ADR-taslağı + kalan-envanter (DONE)
+- 371-006: DEBT-370-CLOSE — 370-006 kalanını kapat (DONE)
+- 371-007: CLOSING-DATA-PACK — 357-370 kapanış-veri-paketi (7-Tem hazırlığı) (DONE)
+
+---

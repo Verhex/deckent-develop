@@ -1,6 +1,7 @@
 // ─── Task Creation & Directive Parsing ─────────────────────────────
 // Extracted from brain.ts — task construction, scope extraction, directive parsing
 import { z } from 'zod';
+import { DeckentError } from '../core/errors.js';
 import { existsSync, readdirSync, readFileSync, appendFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
@@ -510,7 +511,7 @@ export function resolveTaskDependenciesLoud(
 
     const message = `[deckent] WARN: dependency ref '${ref}' çözülemedi (task ${ownerTaskId})`;
     if (options.strict) {
-      throw new Error(message);
+      throw new DeckentError('E_DEP_REF_UNRESOLVED', message);
     }
     process.stderr.write(message + '\n');
     warnings.push({ taskId: ownerTaskId, ref, message });

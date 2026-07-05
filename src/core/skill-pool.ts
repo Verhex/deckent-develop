@@ -1,14 +1,132 @@
 // ─── Skill Pool Manager ─────────────────────────────────────────────────────
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { SkillDefinition, SkillCategory } from './skill-types.js';
 import { createDefaultSkillStats } from './skill-types.js';
+import { createDefaultActivationConfig } from './routing-types.js';
 import { readJsonSafe } from './utils.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const SKILLS_DIR = '.deckent/skills';
 const MANIFEST_FILENAME = 'manifest.json';
+const SKILL_MD_FILENAME = 'SKILL.md';
+const CONFIG_FILENAME = path.join('.deckent', 'config.json');
+
+// ─── Builtin Fallback (371-001 CATALOG-MATERIALIZE) ─────────────────────────
+//
+// D-004 layer pattern: .deckent override > builtin default. A builtin skill
+// that has never been materialized into .deckent/skills/<id>/manifest.json
+// (e.g. shipped in src/core/builtins/skills/<id>/ with only a SKILL.md, no
+// manifest.json anywhere yet) must still be pool-visible — otherwise it is
+// invisible to routing/selection until some future `deckent init` re-seed
+// AND a manifest is hand-authored, which never happens automatically.
+//
+// This reads the builtin tree directly at load time (in-memory synthesis
+// only, never writes to disk) rather than having the sync step
+// (seedBuiltins/init-steps.ts) materialize manifests — that function lives
+// outside this module's write authority, and writing a manifest as a
+// side-effect of a *read* method would make loadSkills() non-hermetic.
+
+/**
+ * Resolve the builtin skills directory relative to THIS module's own file
+ * location (src/core/skill-pool.ts or dist/core/skill-pool.js — either way
+ * builtins/ is a direct sibling, copied to dist/ by scripts/copy-assets.mjs).
+ */
+function resolveBuiltinSkillsDir(): string {
+  const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+  return path.join(moduleDir, 'builtins', 'skills');
+}
+
+/** Title-case a kebab/snake-case id as a last-resort name (e.g. "api-design" -> "Api Design"). */
+function titleCaseFromId(id: string): string {
+  return id
+    .split(/[-_]/)
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(' ');
+}
+
+/**
+ * Parse a builtin SKILL.md/PROMPT.md body for its H1 title and lead paragraph
+ * (the free-text block directly under the title, before the next heading or
+ * blank-line gap). Tolerates an optional YAML frontmatter block. Returns
+ * empty strings when no title/lead paragraph is present — both are optional
+ * on SkillDefinition/AgentDefinition, so callers fall back to id-derived
+ * defaults rather than failing.
+ */
+function parseMarkdownTitleAndLead(markdown: string): { title: string; lead: string } {
+  const withoutFrontmatter = markdown.replace(/^---\n[\s\S]*?\n---\n/, '');
+  const lines = withoutFrontmatter.split('\n');
+
+  let title = '';
+  let titleIndex = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const match = /^#\s+(.+)$/.exec(lines[i]!.trim());
+    if (match) {
+      title = match[1]!.trim();
+      titleIndex = i;
+      break;
+    }
+  }
+
+  const leadLines: string[] = [];
+  if (titleIndex >= 0) {
+    for (let i = titleIndex + 1; i < lines.length; i++) {
+      const line = lines[i]!.trim();
+      if (line === '') {
+        if (leadLines.length > 0) break;
+        continue;
+      }
+      if (/^#{1,6}\s/.test(line)) break;
+      leadLines.push(line);
+    }
+  }
+
+  return { title, lead: leadLines.join(' ').trim() };
+}
+
+/**
+ * Synthesize a minimal, valid SkillDefinition (as a raw JSON-shaped record,
+ * matching the readJsonSafe<Record<string,unknown>> shape used for on-disk
+ * manifests) from a builtin SKILL.md that has no accompanying manifest.json.
+ * Returns null if the file cannot be read.
+ */
+function synthesizeSkillManifest(id: string, skillMdPath: string): Record<string, unknown> | null {
+  let content: string;
+  try {
+    content = fs.readFileSync(skillMdPath, 'utf8');
+  } catch {
+    return null;
+  }
+
+  const { title, lead } = parseMarkdownTitleAndLead(content);
+  const name = title || titleCaseFromId(id);
+
+  return {
+    id,
+    name,
+    version: '0.1.0',
+    description: lead,
+    entrypoint: SKILL_MD_FILENAME,
+    category: 'domain',
+    manifestVersion: 2,
+    triggers: [],
+    stackDetection: { files: [], dependencies: [], commands: [] },
+    composableWith: [],
+    priority: 5,
+    promptInjection: { position: 'append', maxTokens: 1500 },
+    enabled: true,
+    source: 'builtin',
+    stats: createDefaultSkillStats(),
+    // Well-formed but inert (no rules -> never scores above minScore): the V2
+    // routing engine indexes activation.rules unconditionally for every
+    // pool member, so leaving this field undefined (rather than an empty,
+    // valid ActivationConfig) breaks scoring for the WHOLE pool, not just
+    // this entry.
+    activation: createDefaultActivationConfig(),
+  };
+}
 
 // ─── Validation Constants ───────────────────────────────────────────────────
 
@@ -33,30 +151,96 @@ export class SkillPoolManager {
     const pool = new Map<string, SkillDefinition>();
     const skillsDir = path.join(this.projectRoot, SKILLS_DIR);
 
-    if (!fs.existsSync(skillsDir)) return pool;
+    if (fs.existsSync(skillsDir)) {
+      let entries: fs.Dirent[] = [];
+      try {
+        entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+      } catch {
+        entries = [];
+      }
 
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(skillsDir, { withFileTypes: true });
-    } catch {
-      return pool;
-    }
-
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const manifestPath = path.join(skillsDir, entry.name, MANIFEST_FILENAME);
-      if (!fs.existsSync(manifestPath)) continue;
-      const raw = readJsonSafe<Record<string, unknown>>(manifestPath);
-      if (raw) {
-        const validation = SkillPoolManager.validateSkillDefinition(raw);
-        if (validation.valid) {
-          const skill = raw as unknown as SkillDefinition;
-          pool.set(skill.id, skill);
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const manifestPath = path.join(skillsDir, entry.name, MANIFEST_FILENAME);
+        if (!fs.existsSync(manifestPath)) continue;
+        const raw = readJsonSafe<Record<string, unknown>>(manifestPath);
+        if (raw) {
+          const validation = SkillPoolManager.validateSkillDefinition(raw);
+          if (validation.valid) {
+            const skill = raw as unknown as SkillDefinition;
+            pool.set(skill.id, skill);
+          }
         }
       }
     }
 
+    this._loadBuiltinFallback(pool);
+
     return pool;
+  }
+
+  /**
+   * Fallback layer (371-001): make builtin skills pool-visible even when
+   * .deckent/skills/<id>/manifest.json has never been materialized. D-004
+   * precedence — any id already present (a .deckent override) is left
+   * untouched; only ids absent from `pool` are considered here.
+   *
+   * Gated on .deckent/config.json existing — i.e. this projectRoot has
+   * actually been through `deckent init`, not merely a directory that
+   * happens to contain a `.deckent/skills/<id>/` subdirectory (e.g. a
+   * narrow test fixture). Without this gate, any project/fixture lacking
+   * .deckent/skills entirely would inherit this INSTALLATION's full builtin
+   * catalog, since resolveBuiltinSkillsDir() intentionally resolves relative
+   * to the running module's own location (not `this.projectRoot`) — that
+   * part is required for real npm-installed usage, where builtins live
+   * under node_modules/deckent/, never under the user's own project root.
+   */
+  private _loadBuiltinFallback(pool: Map<string, SkillDefinition>): void {
+    if (!fs.existsSync(path.join(this.projectRoot, CONFIG_FILENAME))) return;
+
+    const builtinDir = resolveBuiltinSkillsDir();
+    if (!fs.existsSync(builtinDir)) return;
+
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(builtinDir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    if (!Array.isArray(entries)) return;
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      if (pool.has(entry.name)) continue;
+
+      const entryDir = path.join(builtinDir, entry.name);
+      let files: fs.Dirent[];
+      try {
+        files = fs.readdirSync(entryDir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      if (!Array.isArray(files)) continue;
+
+      // Only the "SKILL.md with no manifest anywhere" gap is this task's actual
+      // scope (368-001's 3 new skills). A builtin that already ships its OWN
+      // manifest.json is deliberately NOT read here — trusting arbitrary builtin
+      // manifest content as complete is unnecessary generality this task's
+      // goCriteria never requires, and at least one shipped manifest
+      // (secure-coding) omits the required `stackDetection` field, which crashes
+      // routing-engine.ts's stack-bonus scoring when read verbatim. If `id`
+      // already has a manifest.json in the builtin tree, it belongs in
+      // .deckent/skills/<id>/ via the normal override path, not this fallback.
+      if (files.some((f) => f.name === MANIFEST_FILENAME)) continue;
+      if (!files.some((f) => f.name === SKILL_MD_FILENAME)) continue;
+
+      const raw = synthesizeSkillManifest(entry.name, path.join(entryDir, SKILL_MD_FILENAME));
+      if (!raw) continue;
+      const validation = SkillPoolManager.validateSkillDefinition(raw);
+      if (!validation.valid) continue;
+      const skill = raw as unknown as SkillDefinition;
+      pool.set(skill.id, skill);
+    }
   }
 
   // ─── Get / List ─────────────────────────────────────────────────────────────

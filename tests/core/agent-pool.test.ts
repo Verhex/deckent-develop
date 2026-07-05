@@ -918,8 +918,10 @@ describe('AgentPoolManager batch read (loadAgents — O(N+1) syscalls)', () => {
 
     manager.loadAgents();
 
-    // readdirSync called once per dir (persistent + temp = 2 calls total)
-    expect(fs.readdirSync).toHaveBeenCalledTimes(2);
+    // readdirSync called once per dir. 371-001 (CATALOG-MATERIALIZE) added the
+    // builtin-tree fallback layer as a third directory read: persistent + temp
+    // + builtin = 3 calls total — still O(N+1), one readdir per layer.
+    expect(fs.readdirSync).toHaveBeenCalledTimes(3);
   });
 
   it('does NOT call existsSync for individual agent.json files', () => {

@@ -11,6 +11,7 @@
 | adr-d-007 | Manual Subagent Dispatch (Dogfood Survival-Fallback) | accepted |
 | adr-d-008 | Develop / Product Repo Strategy | accepted |
 | adr-d-009 | Worker-Result Boundary Normalization Policy | proposed |
+| adr-d-010 | REPL Input Stabilization (Cursor / Queue / Streaming Contract) | proposed |
 | adr-g-001 | Layered Config & Scope Precedence | accepted |
 | adr-g-002 | spawnSync Security Pattern | accepted |
 | adr-g-004 | Instruction-File Adapter & Multi-Env Generation | accepted |
@@ -47,6 +48,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-371 Learnings** (sprint-371): ## Sprint sprint-371 Learnings
+- CATALOG-MATERIALIZE — builtin 3+3'ü pool-görünür yap (370-003 kapanışı): GO_WITH_TEC...
 - **Sprint sprint-370 Learnings** (sprint-370): ## Sprint sprint-370 Learnings
 - DOCS-FEATURES-5 — computer-use + connect-auth + panel feature-doc'ları: GO_WITH_TECH...
 - **Sprint sprint-369 Learnings** (sprint-369): ## Sprint sprint-369 Learnings
@@ -65,8 +68,6 @@
 - **Sprint sprint-363 Learnings** (sprint-363): ## Sprint sprint-363 Learnings
 - CODEX-V4 — model-pin gerçek sınavı (479-fix'li plan): NO_GO — Subprocess worker exit...
 - **Sprint sprint-362 Learnings** (sprint-362): ## Sprint sprint-362 Learnings
-- Fix debt: Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC...
-- **Sprint sprint-361 Learnings** (sprint-361): ## Sprint sprint-361 Learnings
 - Fix debt: Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC...
 
 ## Active Technical Debt
@@ -123,5 +124,6 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: doc_sync_ground_truth_mismatch
+- Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 944 | Generated: 2026-07-05_
+_Total entries: 951 | Generated: 2026-07-05_
