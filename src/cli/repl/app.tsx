@@ -22,6 +22,7 @@ import { measuredOnTurnEnd } from './native-elapsed.js';
 import { buildLiveFooter, type LiveFooterState } from '../helpers/live-footer.js';
 import { initialTermModeState, applyModeCommand, type TermMode, type TermModeState } from './term-mode.js';
 import { createChatTurnQueue, type ChatTurnQueue, type ChatTurnBgEvent, type ChatTurnPayload } from './chat-turn-queue.js';
+import { createInputQueue, type InputQueue } from './input-queue.js';
 import { listRecentSessions, pickSession, type SessionRecord } from '../helpers/session-resume.js';
 import {
   initialBusyControlsState, markBusy, markIdle, parseBusyCommand,
@@ -645,7 +646,12 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const lastStats = useRef<TurnStats | null>(null);
   const headPushed = useRef(false);       // ● deckent header emitted for this turn?
   const segmenter = useRef<StreamSegmenter | null>(null);
-  const queue = useRef<string[]>([]);
+  // F11-016 (368-003 wire): the raw useRef<string[]> FIFO is replaced by the
+  // pure input-queue core — same FIFO, plus the hardened contract (blank +
+  // double-fire-Enter swallow, ESC clear resets the dup-guard). Lazy-init once,
+  // mirroring the confirmQueue pattern below.
+  const queue = useRef<InputQueue | null>(null);
+  if (queue.current === null) queue.current = createInputQueue();
   const wake = useRef<(() => void) | null>(null);
   // FIFO confirm queue (replaces the single-slot resolver — H1 fix). Lazy-init
   // once; onChange mirrors the head into `confirm` state so React re-renders it.
@@ -791,9 +797,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
 
     async function* inputIter(): AsyncGenerator<string> {
       for (;;) {
-        while (queue.current.length > 0) {
-          const line = queue.current.shift() as string;
-          setQueued([...queue.current]);
+        while (queue.current!.size() > 0) {
+          const line = queue.current!.dequeue() as string;
+          setQueued([...queue.current!.snapshot()]);
           pushTurn('user', line);
           setWorking(true);
           // 358-006: busy-controls turn-start. Unconditional on purpose — with
@@ -811,8 +817,10 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           const turnEnd = markIdle(busyCtl.current);
           busyCtl.current = turnEnd.state;
           if (turnEnd.drainedSteerNotes.length > 0) {
-            queue.current = steerNotesToInputs(turnEnd.drainedSteerNotes, queue.current);
-            setQueued([...queue.current]);
+            const merged = steerNotesToInputs(turnEnd.drainedSteerNotes, queue.current!.snapshot());
+            queue.current!.clear();
+            for (const steered of merged) queue.current!.enqueue(steered);
+            setQueued([...queue.current!.snapshot()]);
           }
           if (replSurfaceEnabled) {
             bgQueue.current!.userTurnActive = false;
@@ -886,7 +894,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // provider-abort seam exists in runChatNativeLoop/nativeEngine yet, so
   // "interrupt" honestly cancels what it CAN — the not-yet-started queued
   // inputs (true mid-turn abort is loop-side follow-up work).
-  const cancelPendingInputs = (): void => { queue.current = []; setQueued([]); };
+  const cancelPendingInputs = (): void => { queue.current!.clear(); setQueued([]); };
 
   const handleSubmit = (line: string): void => {
     const trimmed = line.trim();
@@ -894,7 +902,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (['/exit', '/quit', ':exit', ':quit'].includes(trimmed.toLowerCase())) { exit(); return; }
     if (trimmed.toLowerCase() === '/cancel') {
       pushTurn('user', trimmed);
-      queue.current = []; setQueued([]);
+      queue.current!.clear(); setQueued([]);
       pushTurn('seg', labels.queueCleared);
       return;
     }
@@ -954,8 +962,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
               // Chat-session pick: hand the RESOLVED id to the loop so its real
               // transcript/session-switch machinery runs (behavior-merge — the
               // loop treats a non-numeric arg as a literal session id).
-              queue.current.push(`/resume ${decision.sessionId}`);
-              setQueued([...queue.current]);
+              queue.current!.enqueue(`/resume ${decision.sessionId}`);
+              setQueued([...queue.current!.snapshot()]);
               if (wake.current) { const w = wake.current; wake.current = null; w(); }
             } else {
               // Sprint-session pick: switch the active session pointer locally
@@ -1005,8 +1013,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       else { pushTurn('seg', `${labels.approvalUsage} (${approval})`); }
       return;
     }
-    queue.current.push(trimmed);
-    setQueued([...queue.current]);
+    const enq = queue.current!.enqueue(trimmed);
+    if (enq.kind === 'swallowed') return; // double-fire Enter quirk — nothing new to queue or wake
+    setQueued([...queue.current!.snapshot()]);
     if (wake.current) { const w = wake.current; wake.current = null; w(); }
   };
 
