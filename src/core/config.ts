@@ -1717,6 +1717,10 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     deck_broker: config.deck_broker,
     training_trace: config.training_trace,
     live_trace: config.live_trace,
+    // Sprint 369-005/008 follow-up (born-464 pattern): TOOL-CU + V1-strict-report
+    // flag blocks — declared on the type in 369, wired here by CC hand-fix.
+    computer_use: config.computer_use,
+    worker_output_contract: config.worker_output_contract,
     // Messaging connectors (BOT-001) — passed through; tokens .deck-interpolated below.
     notify_connectors: (config as DeckentConfig).notify_connectors,
     notify_on_complete: (config as DeckentConfig).notify_on_complete,
@@ -2443,6 +2447,9 @@ export function mergeConfigs(
     deck_broker: config.deck_broker,
     training_trace: config.training_trace,
     live_trace: config.live_trace,
+    // Sprint 369-005/008 follow-up (born-464 pattern) — see loadConfig twin above.
+    computer_use: config.computer_use,
+    worker_output_contract: config.worker_output_contract,
   };
   return merged;
 }

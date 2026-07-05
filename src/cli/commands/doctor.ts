@@ -252,11 +252,21 @@ function checkGit(): DoctorCheck {
   };
 }
 
-export function checkTmux(providerNames?: string[], spawnBackend?: string): DoctorCheck {
+export function checkTmux(providerNames?: string[], spawnBackend?: string, lang: string = 'en'): DoctorCheck {
   // tmux is NOT required on Windows, subprocess, or Docker backend
   if (platform() === 'win32' || spawnBackend === 'subprocess' || spawnBackend === 'docker') {
-    const reason = spawnBackend === 'docker' ? 'docker backend' : 'subprocess backend';
-    return { name: 'tmux', passed: true, message: `not required (${reason})`, required: false };
+    // Honest-label the reason (369-002, follow-up to 368-002's out-of-scope note): an
+    // explicit spawn_backend override is a CONFIG-PREFERENCE reason; win32 with no
+    // override (or one that is neither 'docker' nor 'subprocess') is a
+    // PLATFORM-INCOMPATIBILITY reason — tmux genuinely does not run natively on Windows.
+    // Falling through to "subprocess backend" regardless used to imply a config choice
+    // the user never made.
+    const reasonKey = spawnBackend === 'docker'
+      ? 'doctor.tmux_not_required_docker'
+      : spawnBackend === 'subprocess'
+        ? 'doctor.tmux_not_required_subprocess'
+        : 'doctor.tmux_not_required_win32';
+    return { name: 'tmux', passed: true, message: getMessage(reasonKey, lang), required: false };
   }
   const needsTmux = !providerNames || providerNames.includes('claude') || providerNames.length === 0;
   const required = needsTmux;
@@ -1594,10 +1604,10 @@ export function checkDocker(spawnBackend?: string): DoctorCheck {
   };
 }
 
-export function runDoctorChecks(root: string, providerNames?: string[], spawnBackend?: string): DoctorResult {
+export function runDoctorChecks(root: string, providerNames?: string[], spawnBackend?: string, lang: string = 'en'): DoctorResult {
   const checks: DoctorCheck[] = [
     checkPlatform(spawnBackend),
-    checkNode(), checkGit(), checkTmux(providerNames, spawnBackend), checkDocker(spawnBackend), checkClaude(),
+    checkNode(), checkGit(), checkTmux(providerNames, spawnBackend, lang), checkDocker(spawnBackend), checkClaude(),
     checkWorkspace(root), checkBrainDir(root), checkDirectives(root),
     checkBrainBudget(root), checkDebt(root), checkStaleLocks(root),
     checkDeckSecurity(root), checkWritePermissions(root), checkGitignore(root),
@@ -2044,7 +2054,7 @@ export function registerDoctor(program: Command): void {
         // runs (no provider detection, so still no network) purely to surface an
         // honest "these need you, not --fix" list. Never affects action planning.
         const fixSpawnBackend = resolveSpawnBackendForDoctor(root);
-        const fixDoctorResult = runDoctorChecks(root, undefined, fixSpawnBackend);
+        const fixDoctorResult = runDoctorChecks(root, undefined, fixSpawnBackend, lang);
         const manual: DoctorFixManualItem[] = fixDoctorResult.checks
           .filter(c => !c.passed && !DOCTOR_FIX_CHECK_NAMES.has(c.name))
           .map(c => ({ name: c.name, message: c.message }));
@@ -2068,7 +2078,7 @@ export function registerDoctor(program: Command): void {
       const providers = await detectAvailableProviders();
       const activeProviderNames = providers.filter(p => p.available).map(p => p.name);
       const spawnBackend = resolveSpawnBackendForDoctor(root);
-      const result = runDoctorChecks(root, activeProviderNames, spawnBackend);
+      const result = runDoctorChecks(root, activeProviderNames, spawnBackend, lang);
 
       // --providers: detailed binary/version/auth diagnostics for Claude/Codex/Gemini + Ollama
       if (opts.providers) {

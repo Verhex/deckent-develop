@@ -8971,3 +8971,32 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 368-008: DOCS-FEATURES-4 — doctor-fix + onboard-apply + approval-history feature-doc'ları (DONE)
 
 ---
+## Sprint 369 — sprint-369
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-05
+**Duration:** 1022s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 8 |
+| Tech Debt | 3 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1022413ms |
+
+### Tasks
+
+- 369-001: RUBRIC-ARMOR-COMPLETE — kalan 4 rubric-sitesine born-484 zırhı (DONE)
+- 369-002: DOCTOR-FOLLOWUPS — checkTmux win32 etiketi + 368-002 debt-süpürme (GO_WITH_TECH_DEBT)
+- 369-003: AGSK-1-DILIM-3 — 3 yeni builtin-AGENT (DONE)
+- 369-004: CHAT-IDE-DILIM-3 — panel canlı-yenileme + task-detay (read-only) (DONE)
+- 369-005: TOOL-CU-DILIM-1 — computer-use pack sözleşme-katmanı (flag-gated) (GO_WITH_TECH_DEBT)
+- 369-006: PSL-6-DILIM — connect-wizard'a auth-state entegrasyonu (GO_WITH_TECH_DEBT)
+- 369-007: ADR-RESULT-NORMALIZE — sınır-normalizasyon politikası ADR-D taslağı (DONE)
+- 369-008: V1-STRICT-REPORT — TaskResultV1 doğrulamasının report-only ön-kablosu (DONE)
+
+---

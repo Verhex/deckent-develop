@@ -1,5 +1,18 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-369 Learnings
+- Sprint sprint-369 Learnings: ## Sprint sprint-369 Learnings
+- DOCTOR-FOLLOWUPS — checkTmux win32 etiketi + 368-002 debt-süpürme: GO_WITH_TECH_DEBT — (1) checkTmux win32 honest-label fix: the win32 short-circuit branch used to compute `reason = spawnBackend === 'docker'
+- TOOL-CU-DILIM-1 — computer-use pack sözleşme-katmanı (flag-gated): GO_WITH_TECH_DEBT — Delivered the dilim-1 sözleşme-katmanı: src/core/computer-use-contract.ts with zod discriminated-union schemas for the 4
+- PSL-6-DILIM — connect-wizard'a auth-state entegrasyonu: GO_WITH_TECH_DEBT — Wired 368-002's buildAuthStateReport (doctor.ts, env+.deck only, no network) into `deckent connect`'s own report. connec
+
+## Gains
+- 369-001 — RUBRIC-ARMOR-COMPLETE — kalan 4 rubric-sitesine born-484 zırhı — Extracted the born-484 fault-armor pattern (previously inline only at the main-EVALUATE site ~142...
+- 369-003 — AGSK-1-DILIM-3 — 3 yeni builtin-AGENT — Created 3 new builtin-agent PROMPT.md files (api-designer, observability-engineer, i18n-specialis...
+- 369-004 — CHAT-IDE-DILIM-3 — panel canlı-yenileme + task-detay (read-only) — New panel-refresh.ts on top of 368-007's panel-data.ts, additive only — no edits to panel-data.ts...
+- 369-007 — ADR-RESULT-NORMALIZE — sınır-normalizasyon politikası ADR-D taslağı — Wrote docs/adr/adr-d-009-worker-result-boundary-normalization.md as a proposed ADR-D (status: pro...
+- 369-008 — V1-STRICT-REPORT — TaskResultV1 doğrulamasının report-only ön-kablosu — V1-STRICT-REPORT flag-gated report-only wire delivered.
+
 ## Sprint sprint-368 Learnings
 - Sprint sprint-368 Learnings: ## Sprint sprint-368 Learnings
 - ONB-2-DILIM-3 — doctor windows-native profil + auth-state probe: GO_WITH_TECH_DEBT — Both parts delivered. (1) Platform profile: buildPlatformProfileReport(lang) + formatPlatformProfileLines(report, lang) 

@@ -10,6 +10,7 @@
 | adr-d-006 | Code Architecture Conventions | accepted |
 | adr-d-007 | Manual Subagent Dispatch (Dogfood Survival-Fallback) | accepted |
 | adr-d-008 | Develop / Product Repo Strategy | accepted |
+| adr-d-009 | Worker-Result Boundary Normalization Policy | proposed |
 | adr-g-001 | Layered Config & Scope Precedence | accepted |
 | adr-g-002 | spawnSync Security Pattern | accepted |
 | adr-g-004 | Instruction-File Adapter & Multi-Env Generation | accepted |
@@ -46,6 +47,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-369 Learnings** (sprint-369): ## Sprint sprint-369 Learnings
+- DOCTOR-FOLLOWUPS — checkTmux win32 etiketi + 368-002 debt-süpürme: GO_WITH_TECH_DEBT...
 - **Sprint sprint-368 Learnings** (sprint-368): ## Sprint sprint-368 Learnings
 - ONB-2-DILIM-3 — doctor windows-native profil + auth-state probe: GO_WITH_TECH_DEBT —...
 - **Sprint sprint-367 Learnings** (sprint-367): ## Sprint sprint-367 Learnings
@@ -65,8 +68,6 @@
 - Fix debt: Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC...
 - **Sprint sprint-360 Learnings** (sprint-360): ## Sprint sprint-360 Learnings
 - APR-HISTORY-WIRE — endpoint'i canlı server'a bağla (71 kapanışı): GO_WITH_TECH_DEBT ...
-- **Sprint sprint-359 Learnings** (sprint-359): ## Sprint sprint-359 Learnings
-- DEP-NORMALIZE — dependency-ref'leri plan-yazımında slot-ID'ye çevir (born-465): GO_W...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -120,5 +121,6 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
+- Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 931 | Generated: 2026-07-05_
+_Total entries: 939 | Generated: 2026-07-05_

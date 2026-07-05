@@ -9,6 +9,9 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-369-002 | Tech debt from 369-002: (1) checkTmux win32 honest-label fix: the win32 short-ci | normal | sprint-369 | resolved |
+| debt-369-005 | Tech debt from 369-005: Delivered the dilim-1 sözleşme-katmanı: src/core/compute | normal | sprint-369 | resolved |
+| debt-369-006 | Tech debt from 369-006: Wired 368-002's buildAuthStateReport (doctor.ts, env+.de | normal | sprint-369 | resolved |
 | debt-368-002 | Tech debt from 368-002: Both parts delivered. (1) Platform profile: buildPlatfor | normal | sprint-368 | resolved |
 | debt-367-004 | Tech debt from 367-004: Read task-366-003.result (the sole sprint-366 GO_WITH_TE | normal | sprint-367 | resolved |
 | debt-367-005 | Tech debt from 367-005: Wired 366-006's onboarding-apply.ts (applyOnboardingPlan | normal | sprint-367 | resolved |

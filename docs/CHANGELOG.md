@@ -2,6 +2,25 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint369] - 2026-07-05
+
+### Added
+
+- RUBRIC-ARMOR-COMPLETE — kalan 4 rubric-sitesine born-484 zırhı
+- AGSK-1-DILIM-3 — 3 yeni builtin-AGENT
+- CHAT-IDE-DILIM-3 — panel canlı-yenileme + task-detay (read-only)
+- ADR-RESULT-NORMALIZE — sınır-normalizasyon politikası ADR-D taslağı
+- V1-STRICT-REPORT — TaskResultV1 doğrulamasının report-only ön-kablosu
+
+### Changed
+
+- DOCTOR-FOLLOWUPS — checkTmux win32 etiketi + 368-002 debt-süpürme (completed with tech debt)
+- TOOL-CU-DILIM-1 — computer-use pack sözleşme-katmanı (flag-gated) (completed with tech debt)
+- PSL-6-DILIM — connect-wizard'a auth-state entegrasyonu (completed with tech debt)
+
+
+_Tasks: 8 total, 8 done, 3 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint368] - 2026-07-05
 
 ### Added

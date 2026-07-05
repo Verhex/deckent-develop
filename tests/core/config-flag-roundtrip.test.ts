@@ -260,7 +260,12 @@ describe('type-vs-live field parity — mechanical guard against future flag-dro
     // This assertion pins the set EXACTLY: it fails loudly both when a NEW
     // field regresses (the set grows) and when one of these four is fixed
     // (the set shrinks — update this list, don't just relax the assertion).
-    const KNOWN_PRE_EXISTING_GAPS = ['cross_verify', 'doc_tracking', 'observability', 'rollback'].sort();
+    const KNOWN_PRE_EXISTING_GAPS = [
+      'cross_verify',
+      'doc_tracking',
+      'observability',
+      'rollback',
+    ].sort();
 
     expect(missing).toEqual(KNOWN_PRE_EXISTING_GAPS);
 

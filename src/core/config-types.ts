@@ -10,6 +10,7 @@ import type { ErpRuntimeConfig } from './erp/factory.js';
 import type { BotCapabilitiesConfig } from '../connectors/capabilities/types.js';
 import type { ApprovalPolicyRule } from './approval-policy.js';
 import type { ToolRiskLevel } from './tool-registry.js';
+import type { ComputerUseConfig } from './computer-use-contract.js';
 
 // ─── Timeout Configuration ──────────────────────────────────────────
 export interface TimeoutConfig {
@@ -240,6 +241,22 @@ export interface DeckBrokerConfig {
 export interface RollbackConfig {
   /** Enable evaluate-time NO_GO revert for files-changed tasks (default: false). */
   enabled?: boolean;
+}
+
+/**
+ * Worker structured-result strictness (TOOL-CU-DILIM-1, Sprint 369-005) —
+ * consumed by a future Task-8 (not yet implemented). Opt-in — absent block/
+ * `strict_report` = today's lenient `.result` parsing is unaffected.
+ * @see WORKER-GUIDE.md's .result field-shape rules for the lenient baseline
+ * this flag would eventually tighten (e.g. reject an array `notes`, a
+ * non-literal `selfAssessment`) once its consumer lands.
+ */
+export interface WorkerOutputContractConfig {
+  /** Master switch — the block is inert unless true (default: false). */
+  enabled?: boolean;
+  /** Reject a malformed `.result` file instead of best-effort-parsing it
+   *  (default: false — lenient parsing preserved until Task-8 wires this). */
+  strict_report?: boolean;
 }
 
 // ─── Cost Guard Config ───────────────────────────────────────────────
@@ -839,6 +856,19 @@ export interface DeckentConfig {
    *  var, never stored here. CORE-W5: IFS is the first live driver. */
   erp?: ErpRuntimeConfig;
 
+  // ─── Computer-Use (TOOL-CU dilim-1, Sprint 369-005) ─────────────────
+  /** Computer-use capability pack — contract layer only (no adapter yet, see
+   *  computer-use-contract.ts). Opt-in (`enabled` default-off); even when
+   *  enabled, only capabilities named in `allowed_capabilities` are granted
+   *  (fail-closed allowlist). @see ComputerUseConfig */
+  computer_use?: ComputerUseConfig;
+
+  // ─── Worker Output Contract (Task-8, consumed by a future task) ─────
+  /** Worker `.result` strictness — reserved for a future consumer (Task-8).
+   *  Opt-in (`enabled`/`strict_report` default-off); no code reads this block
+   *  yet. @see WorkerOutputContractConfig */
+  worker_output_contract?: WorkerOutputContractConfig;
+
   // ─── Autonomous Engine ──────────────────────────────────────────────
   /** Autonomous execution engine configuration (Sprint 226 — Task 7). Default-disabled. */
   autonomous?: {
@@ -1215,6 +1245,18 @@ export interface ResolvedConfig {
   autonomous?: DeckentConfig['autonomous'];
   /** ERP connector configuration (passed through from DeckentConfig). Opt-in, secret-free. */
   erp?: ErpRuntimeConfig;
+  /** Computer-use capability pack config (passed through from DeckentConfig,
+   *  TOOL-CU dilim-1). NOTE: type-only pass-through today — `loadConfig`/
+   *  `mergeConfigs` (config.ts) do not yet assign this field in their resolved-
+   *  object literal (that wiring is out of 369-005's write scope; tracked as a
+   *  named, pinned gap in tests/core/config-flag-roundtrip.test.ts pending a
+   *  dedicated follow-up task). @see ComputerUseConfig */
+  computer_use?: DeckentConfig['computer_use'];
+  /** Worker output-contract strictness config (passed through from DeckentConfig,
+   *  reserved for a future Task-8 consumer). Same type-only-pass-through caveat
+   *  as `computer_use` above — not yet wired into config.ts's resolvers.
+   *  @see WorkerOutputContractConfig */
+  worker_output_contract?: DeckentConfig['worker_output_contract'];
   /** Resource monitor configuration (passed through from DeckentConfig). Default-disabled. */
   resource_monitor?: ResourceMonitorConfig;
   /** Cross-provider adversarial verification configuration (passed through from DeckentConfig). Default-disabled. */

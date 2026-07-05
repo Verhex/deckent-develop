@@ -216,6 +216,64 @@ function toTaskEvaluation(evalResult: EvaluationResult): TaskEvaluation {
 }
 
 /**
+ * born-484 armor: a rubric fault on ONE result (live case: codex worker's
+ * array-shaped `notes` → TypeError in isVerificationTask) used to escape
+ * whichever per-task loop called it — the EVALUATE loop closed a sprint
+ * "0/0" while every worker had delivered. A single malformed result must
+ * never truncate the loop it's evaluated in: fall back to an HONEST verdict
+ * (worker NO_GO stays NO_GO, anything else caps at GO_WITH_TECH_DEBT — never
+ * a fabricated DONE) and surface the fault as an auditor event.
+ *
+ * 369-001 RUBRIC-ARMOR-COMPLETE: single source for every `evaluateWithRubric`
+ * call site in this module (main EVALUATE, extension-hit late-result,
+ * alive-grace-result, FIX-phase re-eval, NOT_DISPATCHED re-dispatch re-eval,
+ * POSTFIX-PENDING-SCAN re-eval) — previously only the main EVALUATE site had
+ * this armor; the other five had bare calls that could still truncate their
+ * loop on the same class of fault.
+ */
+async function safeRubricReconcile(
+  projectRoot: string,
+  sprintIdFallback: string,
+  task: Task,
+  result: TaskResult,
+): Promise<EvaluationResult> {
+  try {
+    return await reconcileEvaluationSpuriousNoGo(
+      evaluateWithRubric(result, task, undefined, projectRoot), result, task, projectRoot);
+  } catch (rubricErr) {
+    const msg = rubricErr instanceof Error ? rubricErr.message : String(rubricErr);
+    debugLog('safeRubricReconcile:fault', `task=${task.id} — ${msg}`);
+    try {
+      const sidFault = getCurrentSprintId(projectRoot) ?? sprintIdFallback;
+      writeEvent(
+        projectRoot, sidFault, 'brain', 'auditor',
+        'BRAIN→AUDITOR:EVALUATION_FAULT',
+        {
+          taskId: task.id,
+          error: msg,
+          selfAssessment: result.selfAssessment,
+          fallbackDecision: result.selfAssessment === 'NO_GO' ? 'NO_GO' : 'GO_WITH_TECH_DEBT',
+          timestamp: new Date().toISOString(),
+        },
+      );
+    } catch (e) { debugLog('safeRubricReconcile:fault-event', e); }
+    const faultNote = `[evaluation-fault fallback] rubric threw: ${msg}`;
+    result.notes = result.notes ? `${result.notes}\n${faultNote}` : faultNote;
+    return {
+      decision: result.selfAssessment === 'NO_GO' ? 'NO_GO' : 'GO_WITH_TECH_DEBT',
+      totalScore: 0,
+      rubricScores: [{
+        criterion: 'evaluation-fault',
+        score: 0,
+        passed: false,
+        reason: `rubric evaluation threw (${msg}) — honest fallback from worker selfAssessment`,
+      }],
+      retryCount: 0,
+    };
+  }
+}
+
+/**
  * Persist a single task's mutated status (PAUSED/PENDING) back to disk.
  * Sprint 156 Task 003: cascade/unblock writes flow through here so spawn-spawner
  * disk reads + Auditor dashboards reflect the new state.
@@ -1412,49 +1470,11 @@ export async function runEvaluatePhase(
 
         // Sprint 191 P191-1: pass projectRoot so OOM-killed / partial-result
         // workers can be reconciled via reconcileSpuriousNoGo (git diff fallback).
-        //
-        // born-484 armor: a rubric fault on ONE result (live case: codex worker's
-        // array-shaped `notes` → TypeError in isVerificationTask) used to escape
-        // the loop into the outer catch — the sprint closed "0/0" while every
-        // worker had delivered. A single malformed result must never truncate the
-        // whole EVALUATE loop: fall back to an HONEST verdict (worker NO_GO stays
-        // NO_GO, anything else caps at GO_WITH_TECH_DEBT — never a fabricated
-        // DONE) and surface the fault as an auditor event.
-        let rubricResult: EvaluationResult;
-        try {
-          rubricResult = await reconcileEvaluationSpuriousNoGo(
-            evaluateWithRubric(result, task, undefined, projectRoot), result, task, projectRoot);
-        } catch (rubricErr) {
-          const msg = rubricErr instanceof Error ? rubricErr.message : String(rubricErr);
-          debugLog('runEvaluatePhase:rubricFault', `task=${task.id} — ${msg}`);
-          try {
-            const sidFault = getCurrentSprintId(projectRoot) ?? sprint.id;
-            writeEvent(
-              projectRoot, sidFault, 'brain', 'auditor',
-              'BRAIN→AUDITOR:EVALUATION_FAULT',
-              {
-                taskId: task.id,
-                error: msg,
-                selfAssessment: result.selfAssessment,
-                fallbackDecision: result.selfAssessment === 'NO_GO' ? 'NO_GO' : 'GO_WITH_TECH_DEBT',
-                timestamp: new Date().toISOString(),
-              },
-            );
-          } catch (e) { debugLog('runEvaluatePhase:rubricFault-event', e); }
-          rubricResult = {
-            decision: result.selfAssessment === 'NO_GO' ? 'NO_GO' : 'GO_WITH_TECH_DEBT',
-            totalScore: 0,
-            rubricScores: [{
-              criterion: 'evaluation-fault',
-              score: 0,
-              passed: false,
-              reason: `rubric evaluation threw (${msg}) — honest fallback from worker selfAssessment`,
-            }],
-            retryCount: 0,
-          };
-          const faultNote = `[evaluation-fault fallback] rubric threw: ${msg}`;
-          result.notes = result.notes ? `${result.notes}\n${faultNote}` : faultNote;
-        }
+        // 369-001: fault-armor (born-484) extracted to safeRubricReconcile —
+        // single source shared by every evaluateWithRubric call site in this
+        // module (see helper doc comment).
+        const rubricResult: EvaluationResult = await safeRubricReconcile(
+          projectRoot, sprint.id, task, result);
         let evaluation = toTaskEvaluation(rubricResult);
 
         // PROMOTE-W1b: flag-gated partial promotion (default-off).
@@ -1899,8 +1919,7 @@ export async function runEvaluatePhase(
               'runEvaluatePhase:extension-hit',
               `task=${task.id} produced .result during extension window`,
             );
-            const rubricResult = await reconcileEvaluationSpuriousNoGo(
-              evaluateWithRubric(lateResult, task, undefined, projectRoot), lateResult, task, projectRoot);
+            const rubricResult = await safeRubricReconcile(projectRoot, sprint.id, task, lateResult);
             const evaluation = toTaskEvaluation(rubricResult);
             handleEvaluation(projectRoot, task, evaluation, lateResult);
             evaluations.set(task.id, evaluation);
@@ -1991,8 +2010,7 @@ export async function runEvaluatePhase(
               'runEvaluatePhase:alive-grace-hit',
               `task=${task.id} produced .result during grace window`,
             );
-            const graceRubric = await reconcileEvaluationSpuriousNoGo(
-              evaluateWithRubric(graceResult, task, undefined, projectRoot), graceResult, task, projectRoot);
+            const graceRubric = await safeRubricReconcile(projectRoot, sprint.id, task, graceResult);
             const graceEval = toTaskEvaluation(graceRubric);
             handleEvaluation(projectRoot, task, graceEval, graceResult);
             evaluations.set(task.id, graceEval);
@@ -2496,8 +2514,7 @@ export async function runFixPhase(
         const fixResult = fixResults.find(r => r.taskId === fixTask.id);
         if (fixResult) {
           // Sprint 191 P191-1: projectRoot for spurious NO_GO reconcile (fix-task too)
-          const fixRubricResult = await reconcileEvaluationSpuriousNoGo(
-            evaluateWithRubric(fixResult, fixTask, undefined, projectRoot), fixResult, fixTask, projectRoot);
+          const fixRubricResult = await safeRubricReconcile(projectRoot, sprint.id, fixTask, fixResult);
           const fixEval = toTaskEvaluation(fixRubricResult);
           handleEvaluation(projectRoot, fixTask, fixEval, fixResult);
           evaluations.set(fixTask.id, fixEval);
@@ -2691,8 +2708,7 @@ export async function runFixPhase(
               }
               continue;
             }
-            const rRubricResult = await reconcileEvaluationSpuriousNoGo(
-              evaluateWithRubric(rResult, rTask, undefined, projectRoot), rResult, rTask, projectRoot);
+            const rRubricResult = await safeRubricReconcile(projectRoot, sprint.id, rTask, rResult);
             const rEval = toTaskEvaluation(rRubricResult);
             handleEvaluation(projectRoot, rTask, rEval, rResult);
             evaluations.set(rTask.id, rEval);
@@ -2768,8 +2784,7 @@ export async function runFixPhase(
         for (const pTask of postFixTasks) {
           const pResult = postFixResults.find(r => r.taskId === pTask.id);
           if (!pResult) continue;
-          const pRubricResult = await reconcileEvaluationSpuriousNoGo(
-            evaluateWithRubric(pResult, pTask, undefined, projectRoot), pResult, pTask, projectRoot);
+          const pRubricResult = await safeRubricReconcile(projectRoot, sprint.id, pTask, pResult);
           const pEval = toTaskEvaluation(pRubricResult);
           handleEvaluation(projectRoot, pTask, pEval, pResult);
           evaluations.set(pTask.id, pEval);

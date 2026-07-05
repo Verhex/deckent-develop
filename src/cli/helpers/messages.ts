@@ -402,6 +402,21 @@ const MESSAGES: MessageMap = {
     en: 'Windows uses backslash path separators — checks that compare literal path strings (e.g. .gitignore entries) may behave differently even though internal path handling is normalized.',
     tr: 'Windows ters-eğik-çizgi yol ayırıcıları kullanır — dahili yol işleme normalize edilmiş olsa da, literal yol dizesi karşılaştıran kontroller (örn. .gitignore girdileri) farklı davranabilir.',
   },
+  // checkTmux "not required" reason labels (369-002, DOCTOR-FOLLOWUPS — honest-label fix
+  // for the win32 branch, which used to fall through to "subprocess backend" even with
+  // no spawn_backend override configured).
+  'doctor.tmux_not_required_docker': {
+    en: 'not required (docker backend)',
+    tr: 'gerekli değil (docker backend)',
+  },
+  'doctor.tmux_not_required_subprocess': {
+    en: 'not required (subprocess backend)',
+    tr: 'gerekli değil (subprocess backend)',
+  },
+  'doctor.tmux_not_required_win32': {
+    en: 'not required (Windows — tmux not supported natively)',
+    tr: 'gerekli değil (Windows — tmux yerel olarak desteklenmiyor)',
+  },
   'doctor.platform_label_win32_native': {
     en: 'Windows (native)',
     tr: 'Windows (native)',
@@ -2259,6 +2274,15 @@ const MESSAGES: MessageMap = {
   'connect.step.wsl_recommended': {
     en: 'WSL is recommended over {shell} for the best experience.',
     tr: 'En iyi deneyim için {shell} yerine WSL önerilir.',
+  },
+
+  // ─── `deckent connect` auth-state guidance (PSL-6-DILIM, Sprint 369 —
+  // 369-006). Shown only when buildAuthStateReport (doctor.ts, 368-002) finds
+  // a provider "missing" — names the env var / .deck key to set, NEVER a
+  // secret value (the {cmd} placeholder is always a literal `<value>`).
+  'connect.auth_state.hint': {
+    en: 'Set {envKey} (e.g. `{cmd}`), or add {deckKey} to your .deck file and reference it as $DECK:{deckKey} in config.',
+    tr: '{envKey} ortam değişkenini ayarlayın (örn. `{cmd}`), ya da .deck dosyanıza {deckKey} ekleyip config içinde $DECK:{deckKey} olarak referans verin.',
   },
 
   // ─── REPL mode indicator (Task 354-001 REPL-SURFACE-WIRE — sole-authority

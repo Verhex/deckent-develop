@@ -136,7 +136,7 @@ import { clearDependencyBlockedState, writeEvent, emitProgress } from './event-s
 
 // Sprint 195 195-001 (W-INTEGRITY) — disk-verify gate before synthetic NO_GO.
 import { verifyDiskAgainstClaim, DISK_VS_CLAIM_MISMATCH_CHANNEL } from './disk-verify.js';
-import { normalizeTaskResultShape } from '../core/task-result-schema.js';
+import { normalizeTaskResultShape, validateTaskResult } from '../core/task-result-schema.js';
 import {
   sanitizeHostFacingFiles,
   CONTAINER_PATH_SANITIZED_CHANNEL,
@@ -163,6 +163,45 @@ function sanitizeResultHostFacingFiles(
       files: swept.rewritten.map(r => r.file),
       totalRewrites: swept.totalRewrites,
     });
+  }
+}
+
+// ═══ Result-Contract Drift Report (Sprint 369, Task 369-008 V1-STRICT-REPORT) ══
+//
+// Step-3 prep for the future hard-gate consumer reserved in
+// WorkerOutputContractConfig's doc comment (config-types.ts). REPORT-ONLY:
+// gated on `worker_output_contract.{enabled,strict_report}` — both must be
+// true, the block is inert otherwise (config-types.ts's own contract). When
+// on, a genuinely worker-produced `.result` (never a synthetic timeout/exit-
+// no-result fabrication — those are already known-incomplete by construction
+// and are not checked here) is validated against the strict TaskResultV1
+// contract (task-result-schema.ts). A mismatch never blocks, never reshapes
+// the result, and never changes selfAssessment/task status — it only emits a
+// BRAIN→AUDITOR:RESULT_CONTRACT_DRIFT audit event + a debugLog line, mirroring
+// the DISK_VS_CLAIM_MISMATCH_CHANNEL / CONTAINER_PATH_SANITIZED_CHANNEL
+// pattern already used above.
+export const RESULT_CONTRACT_DRIFT_CHANNEL = 'BRAIN→AUDITOR:RESULT_CONTRACT_DRIFT';
+
+function reportResultContractDrift(
+  projectRoot: string,
+  sprintId: string,
+  taskId: string,
+  result: TaskResult,
+  config: ResolvedConfig | undefined,
+): void {
+  if (!config?.worker_output_contract?.enabled || !config.worker_output_contract.strict_report) return;
+  try {
+    const verdict = validateTaskResult(result);
+    if (verdict.ok) return;
+    writeEvent(projectRoot, sprintId, 'brain', 'auditor', RESULT_CONTRACT_DRIFT_CHANNEL, {
+      taskId,
+      missingFields: verdict.missingFields,
+      errors: verdict.errors,
+      emittedAt: new Date().toISOString(),
+    });
+    debugLog('reportResultContractDrift', `taskId=${taskId} RESULT_CONTRACT_DRIFT: ${verdict.errors.join('; ')}`);
+  } catch (e) {
+    debugLog('reportResultContractDrift', e);
   }
 }
 
@@ -816,6 +855,7 @@ export async function waitForResults(
           // enrichResultTokenUsage/enrichResultCost mutate the in-memory result only;
           // without this write the on-disk .result keeps the worker's 0/0 placeholder.
           persistEnrichedResult(projectRoot, result);
+          reportResultContractDrift(projectRoot, sprint.id, taskId, result, config);
           results.push(result);
           collected.add(taskId);
           newlyCollected.push(taskId);
@@ -860,6 +900,7 @@ export async function waitForResults(
           sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, lateResult.filesChanged);
           // Persist enriched tokenUsage + cost to the .result FILE (see above).
           persistEnrichedResult(projectRoot, lateResult);
+          reportResultContractDrift(projectRoot, sprint.id, taskId, lateResult, config);
           results.push(lateResult);
           collected.add(taskId);
           newlyCollected.push(taskId);
