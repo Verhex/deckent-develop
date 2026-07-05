@@ -353,6 +353,7 @@ export function applyAdaptiveTimeout(
 import { handleScopeCollision } from './scope-collision.js';
 import type { ScopeCollisionPayload, SpawnDecision } from './scope-collision.js';
 import { writeEvent, CHANNELS, getCurrentSprintId } from './event-stream.js';
+import { normalizeTaskResultShape } from '../core/task-result-schema.js';
 
 // ─── Disk-Verify Gate (Sprint 199 199-001 — Synthetic NO_GO Kaynak 7) ──
 // Mirrors the pattern at result-collector.ts:513-583 (Sprint 195 195-001).
@@ -1033,7 +1034,7 @@ export async function runSprint(
           if (recoveredSprint) {
             for (const t of recoveredSprint.tasks) {
               const resPath = join(projectRoot, TASKS_DIR, `task-${t.id}.result`);
-              const r = readJsonSafe<TaskResult>(resPath);
+              const r = normalizeTaskResultShape(readJsonSafe<TaskResult>(resPath));
               if (r) resumeResults.push(r);
             }
           }
@@ -1246,7 +1247,7 @@ export async function runSprint(
         const latePath = join(projectRoot, TASKS_DIR, `task-${task.id}.result`);
         const lateExists = await stat(latePath).then(() => true, () => false);
         if (lateExists) {
-          const lateResult = readJsonSafe<TaskResult>(latePath);
+          const lateResult = normalizeTaskResultShape(readJsonSafe<TaskResult>(latePath));
           if (lateResult) results.push(lateResult);
         }
       }
@@ -1275,7 +1276,7 @@ export async function runSprint(
           const resultPath = join(projectRoot, TASKS_DIR, `task-${task.id}.result`);
           const resultExists = await stat(resultPath).then(() => true, () => false);
           if (resultExists) {
-            const lateResult = readJsonSafe<TaskResult>(resultPath);
+            const lateResult = normalizeTaskResultShape(readJsonSafe<TaskResult>(resultPath));
             if (lateResult) results.push(lateResult);
           } else {
             // ─── Sprint 192 Task 192-001 — W-INTEGRITY I-2 ────────────

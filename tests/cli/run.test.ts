@@ -186,7 +186,9 @@ describe('waitForRunResult', () => {
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(fakeResult));
 
     const result = await waitForRunResult('/project', 'run-1', 5000);
-    expect(result).toEqual(fakeResult);
+    // born-484: the disk-read boundary normalizer fills the contractual
+    // `notes: string` field ('' when the worker omitted it).
+    expect(result).toEqual({ ...fakeResult, notes: '' });
   });
 
   it('returns null if timeout expires without result', async () => {

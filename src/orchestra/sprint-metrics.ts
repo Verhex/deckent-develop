@@ -102,7 +102,13 @@ export function calculateMetrics(
     else if (ev === TaskEvaluation.NO_GO) noGoTasks++;
   }
 
-  const totalTasks = evaluations.size;
+  // born-484 honest denominator: an unevaluated task is still a task. When
+  // EVALUATE faults mid-loop the evaluations map is TRUNCATED — reporting
+  // `evaluations.size` as the total hid a whole sprint's delivered work behind
+  // "0/0" (sprint-366 live case; the honest close is "0/8"). Take the larger
+  // of the sprint's own task list and the evaluations map (which can exceed
+  // sprint.tasks when injected fix tasks are evaluated).
+  const totalTasks = Math.max(sprint.tasks.length, evaluations.size);
   const coveragePercent = results.length > 0
     ? results.reduce((sum, r) => sum + r.coverage, 0) / results.length
     : 0;

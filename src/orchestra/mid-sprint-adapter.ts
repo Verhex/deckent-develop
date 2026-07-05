@@ -11,6 +11,7 @@ import { routeTaskV2, type RoutingOptions } from '../core/routing-engine.js';
 import { enforceModelTierGuard } from '../core/model-tier-guard.js';
 import { getModelProvider } from '../core/model-equivalence.js';
 import { modelRegistry } from '../core/model-registry.js';
+import { coerceNotesToString } from '../core/task-result-schema.js';
 import { resolveWithOverflow, type OverflowOptions, type OverflowResolution } from '../core/provider-overflow.js';
 import type { RateLimitState } from '../core/token-quota.js';
 import type { OutcomeTracker } from './outcome-tracker.js';
@@ -51,7 +52,8 @@ const RATE_LIMIT_EXHAUSTED_STATE: RateLimitState = {
  * Inspects the free-text notes field written by workers.
  */
 export function is429Error(result: TaskResult): boolean {
-  const msg = result.notes.toLowerCase();
+  // born-484: notes can arrive as an array from provider-CLI workers.
+  const msg = coerceNotesToString(result.notes).toLowerCase();
   return (
     msg.includes('429') ||
     msg.includes('rate limit') ||

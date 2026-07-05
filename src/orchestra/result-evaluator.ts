@@ -11,6 +11,7 @@ import type { Task, TaskResult, EvaluationRubric, RubricScore, EvaluationResult,
 import { TaskEvaluation } from '../core/types.js';
 import { BRAIN_DIR, SPRINTS_DIR, TASKS_DIR, ARCHIVE_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
+import { coerceNotesToString } from '../core/task-result-schema.js';
 import { validateWorkerCoverage } from './coverage-validator.js';
 import { reconcileSpuriousNoGo, reconcileRubricNoGo } from './mid-sprint-adapter.js';
 import { getRubric, coverageOptional } from './rubric-registry.js';
@@ -406,7 +407,10 @@ export function isVerificationTask(task: Task, result: TaskResult): boolean {
   // Check task description for verification patterns
   const description = (task.description ?? '').toLowerCase();
   const title = (task.title ?? '').toLowerCase();
-  const notes = (result.notes ?? '').toLowerCase();
+  // born-484: provider-CLI workers (first live case: codex) can emit `notes`
+  // as an array — coerce instead of throwing so one drifted result cannot
+  // kill the whole EVALUATE loop.
+  const notes = coerceNotesToString(result.notes).toLowerCase();
   const textToCheck = `${description} ${title} ${notes}`;
 
   return VERIFICATION_TASK_PATTERNS.some(pattern => pattern.test(textToCheck));
@@ -1116,11 +1120,11 @@ export async function reconcileEvaluationSpuriousNoGo(
 ): Promise<EvaluationResult> {
   if (evaluation.decision !== 'NO_GO' || !projectRoot) return evaluation;
 
+  const oomNotes = coerceNotesToString(result.notes);
   const isOomKilled =
-    typeof result.notes === 'string' &&
-    (result.notes.includes('OOM-killed') ||
-      result.notes.includes('SIGKILL') ||
-      result.notes.includes('partial-result promoted'));
+    oomNotes.includes('OOM-killed') ||
+    oomNotes.includes('SIGKILL') ||
+    oomNotes.includes('partial-result promoted');
 
   const spurious = await reconcileSpuriousNoGo(
     result,
@@ -1191,7 +1195,7 @@ export function enrichEvaluationWithCategory(
 
   const isPartialPromotable = filesInScope.length > 0;
 
-  const notesText = (result.notes ?? '').toLowerCase();
+  const notesText = coerceNotesToString(result.notes).toLowerCase();
   const scopeScore = evaluation.rubricScores.find(s => s.criterion === 'scope_compliance')?.score ?? 100;
   const correctnessScore = evaluation.rubricScores.find(s => s.criterion === 'correctness')?.score ?? 100;
 
@@ -2524,7 +2528,7 @@ const NO_RESULT_CRASH_PATTERN = 'exited without writing result';
  * - result is a genuine worker self-NO_GO → "worker self-NO_GO, N files, X lines added"
  */
 export function buildAccurateNoGoNote(result: TaskResult): string {
-  const notes = result.notes ?? '';
+  const notes = coerceNotesToString(result.notes);
   const isNoResult = notes.includes(NO_RESULT_CRASH_PATTERN);
   if (isNoResult) {
     return 'no result file (worker exited without writing result)';

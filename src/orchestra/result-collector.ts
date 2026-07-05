@@ -136,6 +136,7 @@ import { clearDependencyBlockedState, writeEvent, emitProgress } from './event-s
 
 // Sprint 195 195-001 (W-INTEGRITY) — disk-verify gate before synthetic NO_GO.
 import { verifyDiskAgainstClaim, DISK_VS_CLAIM_MISMATCH_CHANNEL } from './disk-verify.js';
+import { normalizeTaskResultShape } from '../core/task-result-schema.js';
 import {
   sanitizeHostFacingFiles,
   CONTAINER_PATH_SANITIZED_CHANNEL,
@@ -744,7 +745,7 @@ export async function waitForResults(
       const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
       const resultExists = await stat(resultPath).then(() => true, () => false);
       if (resultExists) {
-        const result = readJsonSafe<TaskResult>(resultPath);
+        const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(resultPath));
         if (result) {
           // Sprint 231 T1 — synthetic exit-0-no-result uniform disk-verify gate.
           // Docker EXIT trap (spawn-backend-docker.ts) writes a NO_GO `.result`
@@ -852,7 +853,7 @@ export async function waitForResults(
         // before overwriting with synthetic NO_GO. The EXIT trap runs between timeout kill
         // and result collection, so .result may appear after the first resultExists check.
         const lateResultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
-        const lateResult = readJsonSafe<TaskResult>(lateResultPath);
+        const lateResult = normalizeTaskResultShape(readJsonSafe<TaskResult>(lateResultPath));
         if (lateResult) {
           enrichResultTokenUsage(lateResult, taskMap.get(taskId), projectRoot);
           enrichResultCost(lateResult, taskMap.get(taskId), projectRoot);
@@ -1397,7 +1398,7 @@ export async function waitForResults(
     const resultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
     const finalExists = await stat(resultPath).then(() => true, () => false);
     if (finalExists) {
-      const result = readJsonSafe<TaskResult>(resultPath);
+      const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(resultPath));
       if (result) {
         enrichResultTokenUsage(result, taskMap.get(taskId), projectRoot);
         enrichResultCost(result, taskMap.get(taskId), projectRoot);

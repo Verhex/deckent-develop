@@ -240,3 +240,37 @@ describe('calculateMetrics — boundaryViolations counted from results, not hard
     expect(metrics.boundaryViolations).toBe(0);
   });
 });
+
+// ─── born-484: honest denominator ──────────────────────────────────────────
+//
+// Live case (sprint-366, 2026-07-03): runEvaluatePhase faulted after collecting
+// 8/8 results, evaluations stayed empty, and calculateMetrics reported the
+// sprint as "0/0" because totalTasks was `evaluations.size`. The honest
+// denominator is the sprint's OWN task list — an unevaluated task is still a
+// task. "0/8" tells the operator work went missing; "0/0" hides it.
+describe('totalTasks honest denominator (born-484)', () => {
+  it('reports totalTasks from sprint.tasks even when evaluations is empty', () => {
+    const sprint = makeSprintFixture(['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8']);
+    const metrics = calculateMetrics(sprint, new Map(), []);
+    expect(metrics.totalTasks).toBe(8);
+    expect(metrics.completedTasks).toBe(0);
+  });
+
+  it('partial evaluations still count the full task list', () => {
+    const sprint = makeSprintFixture(['t1', 't2', 't3']);
+    const evaluations = new Map([['t1', TaskEvaluation.DONE]]);
+    const metrics = calculateMetrics(sprint, evaluations, []);
+    expect(metrics.totalTasks).toBe(3);
+    expect(metrics.completedTasks).toBe(1);
+  });
+
+  it('covers evaluations that exceed sprint.tasks (injected fix tasks)', () => {
+    const sprint = makeSprintFixture(['t1']);
+    const evaluations = new Map([
+      ['t1', TaskEvaluation.DONE],
+      ['t1-fix', TaskEvaluation.DONE],
+    ]);
+    const metrics = calculateMetrics(sprint, evaluations, []);
+    expect(metrics.totalTasks).toBe(2);
+  });
+});

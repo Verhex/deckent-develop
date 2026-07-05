@@ -200,6 +200,7 @@ import {
   cleanup,
 } from './sprint-controller.js';
 import type { RunSprintOptions } from './sprint-controller.js';
+import { normalizeTaskResultShape } from '../core/task-result-schema.js';
 
 
 // ═══ Local Helpers (duplicated from sprint-controller to avoid circular init-time deps) ══
@@ -1210,7 +1211,7 @@ export async function pollForResultFile(
   while (Date.now() < deadline) {
     try {
       if (existsSync(resultPath)) {
-        const parsed = readJsonSafe<TaskResult>(resultPath);
+        const parsed = normalizeTaskResultShape(readJsonSafe<TaskResult>(resultPath));
         if (parsed) return parsed;
       }
     } catch (e) { debugLog('pollForResultFile:read', e); }
@@ -1220,7 +1221,7 @@ export async function pollForResultFile(
   // result lands exactly on the deadline boundary.
   try {
     if (existsSync(resultPath)) {
-      const parsed = readJsonSafe<TaskResult>(resultPath);
+      const parsed = normalizeTaskResultShape(readJsonSafe<TaskResult>(resultPath));
       if (parsed) return parsed;
     }
   } catch (e) { debugLog('pollForResultFile:finalRead', e); }
@@ -1411,8 +1412,49 @@ export async function runEvaluatePhase(
 
         // Sprint 191 P191-1: pass projectRoot so OOM-killed / partial-result
         // workers can be reconciled via reconcileSpuriousNoGo (git diff fallback).
-        const rubricResult = await reconcileEvaluationSpuriousNoGo(
-          evaluateWithRubric(result, task, undefined, projectRoot), result, task, projectRoot);
+        //
+        // born-484 armor: a rubric fault on ONE result (live case: codex worker's
+        // array-shaped `notes` → TypeError in isVerificationTask) used to escape
+        // the loop into the outer catch — the sprint closed "0/0" while every
+        // worker had delivered. A single malformed result must never truncate the
+        // whole EVALUATE loop: fall back to an HONEST verdict (worker NO_GO stays
+        // NO_GO, anything else caps at GO_WITH_TECH_DEBT — never a fabricated
+        // DONE) and surface the fault as an auditor event.
+        let rubricResult: EvaluationResult;
+        try {
+          rubricResult = await reconcileEvaluationSpuriousNoGo(
+            evaluateWithRubric(result, task, undefined, projectRoot), result, task, projectRoot);
+        } catch (rubricErr) {
+          const msg = rubricErr instanceof Error ? rubricErr.message : String(rubricErr);
+          debugLog('runEvaluatePhase:rubricFault', `task=${task.id} — ${msg}`);
+          try {
+            const sidFault = getCurrentSprintId(projectRoot) ?? sprint.id;
+            writeEvent(
+              projectRoot, sidFault, 'brain', 'auditor',
+              'BRAIN→AUDITOR:EVALUATION_FAULT',
+              {
+                taskId: task.id,
+                error: msg,
+                selfAssessment: result.selfAssessment,
+                fallbackDecision: result.selfAssessment === 'NO_GO' ? 'NO_GO' : 'GO_WITH_TECH_DEBT',
+                timestamp: new Date().toISOString(),
+              },
+            );
+          } catch (e) { debugLog('runEvaluatePhase:rubricFault-event', e); }
+          rubricResult = {
+            decision: result.selfAssessment === 'NO_GO' ? 'NO_GO' : 'GO_WITH_TECH_DEBT',
+            totalScore: 0,
+            rubricScores: [{
+              criterion: 'evaluation-fault',
+              score: 0,
+              passed: false,
+              reason: `rubric evaluation threw (${msg}) — honest fallback from worker selfAssessment`,
+            }],
+            retryCount: 0,
+          };
+          const faultNote = `[evaluation-fault fallback] rubric threw: ${msg}`;
+          result.notes = result.notes ? `${result.notes}\n${faultNote}` : faultNote;
+        }
         let evaluation = toTaskEvaluation(rubricResult);
 
         // PROMOTE-W1b: flag-gated partial promotion (default-off).
@@ -2106,7 +2148,36 @@ export async function runEvaluatePhase(
       }
     } catch (e) { debugLog('runEvaluatePhase:cascadeWire', e); }
   } catch (err) {
-    safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
+    // EVALUATE-ERROR-SURFACE (born-484, sprints 365/366 live case — sibling of
+    // the born-453 EXECUTE surface in sprint-controller): this catch used to
+    // swallow a mid-EVALUATE throw into a dashboard line only. The sprint then
+    // closed with a TRUNCATED evaluations map ("0/0" while all workers had
+    // delivered) and nothing told the operator. Keep the fail-soft (do not
+    // crash the sprint), but SURFACE: stderr + notify + event + debugLog, and
+    // record the abort on the sprint object so downstream phases/summary can
+    // qualify their counts.
+    const msg = err instanceof Error ? err.message : String(err);
+    debugLog('runEvaluatePhase:aborted', `${msg}${err instanceof Error && err.stack ? `\n${err.stack}` : ''}`);
+    process.stderr.write(`[evaluate] runEvaluatePhase threw — EVALUATE aborted early with ${evaluations.size}/${sprint.tasks.length} evaluations: ${msg}\n`);
+    try {
+      void notify('progress', sprint.id, 'EVALUATE aborted early', `${msg} (${evaluations.size}/${sprint.tasks.length} evaluated)`);
+    } catch { /* fail-safe */ }
+    try {
+      const sidAbort = getCurrentSprintId(projectRoot) ?? sprint.id;
+      writeEvent(
+        projectRoot, sidAbort, 'brain', 'auditor',
+        'BRAIN→AUDITOR:EVALUATE_ABORTED',
+        {
+          sprintId: sprint.id,
+          error: msg,
+          evaluated: evaluations.size,
+          totalTasks: sprint.tasks.length,
+          timestamp: new Date().toISOString(),
+        },
+      );
+    } catch (e) { debugLog('runEvaluatePhase:aborted-event', e); }
+    (sprint as Sprint & { evaluateAborted?: string }).evaluateAborted = msg;
+    safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${msg}`);
   } finally {
     // Release idempotency lock so a future legitimate runEvaluatePhase
     // call (e.g., post-FIX re-evaluation in a separate orchestration

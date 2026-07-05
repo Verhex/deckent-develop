@@ -15,6 +15,7 @@ import { getMessage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 import { readJsonSafe } from '../../core/utils.js';
 import { loadReviewState } from './review.js';
+import { normalizeTaskResultShape } from '../../core/task-result-schema.js';
 
 /**
  * Build a Sprint object and evaluations from .tasks/ directory contents.
@@ -88,7 +89,7 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string): {
   if (tasksDirExists) {
     const resultFiles = readdirSync(tasksDir).filter(f => f.startsWith('task-') && f.endsWith('.result'));
     for (const file of resultFiles) {
-      const result = readJsonSafe<TaskResult>(join(tasksDir, file));
+      const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(join(tasksDir, file)));
       if (result) {
         results.push(result);
         seenResultIds.add(result.taskId);
@@ -98,7 +99,7 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string): {
   if (archiveDirExists) {
     const archivedResultFiles = readdirSync(archiveTasksDir).filter(f => f.startsWith('task-') && f.endsWith('.result'));
     for (const file of archivedResultFiles) {
-      const result = readJsonSafe<TaskResult>(join(archiveTasksDir, file));
+      const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(join(archiveTasksDir, file)));
       if (result && !seenResultIds.has(result.taskId)) {
         results.push(result);
         seenResultIds.add(result.taskId);

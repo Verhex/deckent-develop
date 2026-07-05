@@ -49,6 +49,7 @@ import { SkillPoolManager } from '../../core/skill-pool.js';
 import { detectProjectStack } from '../../core/stack-detector.js';
 import { routeTaskV2 } from '../../core/routing-engine.js';
 import type { UserOverride } from '../../core/routing-types.js';
+import { normalizeTaskResultShape } from '../../core/task-result-schema.js';
 
 let _runTaskCounter = 0;
 export function createRunTaskId(): string {
@@ -135,7 +136,7 @@ export async function waitForRunResult(
 
   // Check immediately first
   if (existsSync(resultPath)) {
-    return readJsonSafe<TaskResult>(resultPath);
+    return normalizeTaskResultShape(readJsonSafe<TaskResult>(resultPath));
   }
 
   return new Promise<TaskResult | null>((resolve) => {
@@ -157,7 +158,7 @@ export async function waitForRunResult(
     const checkResult = (): void => {
       if (existsSync(resultPath)) {
         cleanup();
-        resolve(readJsonSafe<TaskResult>(resultPath));
+        resolve(normalizeTaskResultShape(readJsonSafe<TaskResult>(resultPath)));
       }
     };
 

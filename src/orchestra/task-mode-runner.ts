@@ -27,6 +27,7 @@ import { detectProjectStack } from '../core/stack-detector.js';
 import { routeTaskV2 } from '../core/routing-engine.js';
 import type { UserOverride } from '../core/routing-types.js';
 import { debugLog, readJsonSafe } from '../core/utils.js';
+import { normalizeTaskResultShape } from '../core/task-result-schema.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -116,7 +117,7 @@ export function enrichTaskModeResult(
   task: Task,
 ): TaskResult | undefined {
   const resultPath = join(projectRoot, TASKS_DIR, `task-${task.id}.result`);
-  const result = readJsonSafe<TaskResult>(resultPath);
+  const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(resultPath));
   if (!result) return undefined;
   enrichResultTokenUsage(result, task, projectRoot);
   enrichResultCost(result, task, projectRoot);

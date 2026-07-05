@@ -1323,7 +1323,10 @@ describe('calculateMetrics', () => {
   });
 
   it('handles empty sprint', () => {
-    const m = calculateMetrics(makeSprint(), new Map(), []);
+    // born-484: totalTasks is now the honest denominator (sprint.tasks.length),
+    // so a genuinely empty sprint needs an empty task list — the default
+    // makeSprint() fixture carries 1 task and would (correctly) report 1.
+    const m = calculateMetrics(makeSprint({ tasks: [], workers: [] }), new Map(), []);
     expect(m.totalTasks).toBe(0);
     expect(m.coveragePercent).toBe(0);
     expect(m.noGoRate).toBe(0);

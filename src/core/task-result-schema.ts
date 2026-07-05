@@ -210,3 +210,55 @@ export function validateTaskResult(obj: unknown): ValidateTaskResult {
   }
   return { ok: false, missingFields, errors };
 }
+
+// ─── Legacy-shape boundary normalizer (born-484) ─────────────────────────────
+//
+// Live case (sprints 365/366, 2026-07-03): the first real codex-CLI worker
+// results carried `notes` as a STRING ARRAY while the legacy `TaskResult`
+// contract says `notes: string`. Downstream string ops
+// (`(result.notes ?? '').toLowerCase()`) threw TypeError and truncated the
+// EVALUATE loop. Different provider CLIs will keep producing slightly drifted
+// shapes — the honest response is to NORMALIZE at the disk-read boundary
+// (the work is real; only the field shape drifted), not to reject the result.
+// Strict rejection is the future `TaskResultV1` gate's job, applied at
+// assembly time where the worker can still be asked to fix its output.
+
+/**
+ * Collapse any worker-produced `notes` value to the contractual string shape.
+ * Arrays join with newlines (the live codex shape); objects JSON-stringify;
+ * null/undefined collapse to ''. Never throws.
+ */
+export function coerceNotesToString(notes: unknown): string {
+  if (typeof notes === 'string') return notes;
+  if (notes == null) return '';
+  if (Array.isArray(notes)) {
+    return notes
+      .map(n => (typeof n === 'string' ? n : safeJsonStringify(n)))
+      .join('\n');
+  }
+  return safeJsonStringify(notes);
+}
+
+function safeJsonStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
+/**
+ * Normalize a legacy `TaskResult` freshly read from disk to the shapes its
+ * consumers assume. Applied at every `readJsonSafe<TaskResult>` call site so a
+ * provider-CLI shape drift can never reach the evaluator/collector string ops.
+ * Mutates in place (results are plain parsed JSON) and passes `null` through
+ * so it composes with `readJsonSafe`'s miss contract.
+ */
+export function normalizeTaskResultShape<T extends { notes?: unknown }>(result: T | null): T | null {
+  if (result === null || typeof result !== 'object') return result;
+  const coerced = coerceNotesToString((result as { notes?: unknown }).notes);
+  if (coerced !== (result as { notes?: unknown }).notes) {
+    (result as { notes: string }).notes = coerced;
+  }
+  return result;
+}

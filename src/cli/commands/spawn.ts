@@ -17,6 +17,7 @@ import { SpawnBackendFactory } from '../../orchestra/spawn-backend.js';
 import { isAdapterProvider, getProviderAdapterForTask } from '../../orchestra/sprint-utils.js';
 import { ensureOllamaModelRegistered } from '../../core/model-registry.js';
 import { resolveReasoningEffort } from '../../core/reasoning-effort.js';
+import { normalizeTaskResultShape } from '../../core/task-result-schema.js';
 
 /**
  * Build a comma-separated allowedTools string from a task's scope.
@@ -157,7 +158,7 @@ export async function spawnWorkerMultiProvider(
 export function finalizeTaskStatusFromResult(root: string, taskId: string): TaskStatus | null {
   const resultPath = join(root, TASKS_DIR, `task-${taskId}.result`);
   if (!existsSync(resultPath)) return null;
-  const result = readJsonSafe<TaskResult>(resultPath);
+  const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(resultPath));
   if (!result) return null;
 
   const assessment = result.selfAssessment;
