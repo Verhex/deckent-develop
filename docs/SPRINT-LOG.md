@@ -9000,3 +9000,31 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 369-008: V1-STRICT-REPORT — TaskResultV1 doğrulamasının report-only ön-kablosu (DONE)
 
 ---
+## Sprint 370 — sprint-370
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-05
+**Duration:** 626s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 7 |
+| Completed | 7 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 626161ms |
+
+### Tasks
+
+- 370-001: EVAL-PREMATURE-RETRY — gate-dönüşü sessiz-boş bırakmasın (DONE)
+- 370-002: DEBT-369-CLOSE — 002/006 kalanlarını kapat (DONE)
+- 370-003: CATALOG-SYNC-PARITY — yeni 3+3 katalog-öğesinin sync-görünürlüğü (DONE)
+- 370-004: TOOL-CU-DILIM-2 — platform-capability negotiation (impl'siz, dürüst-tespit) (DONE)
+- 370-005: CHAT-INTENT-DISPATCH — intent-köprülerinin gerçek-dispatch seam'i (DONE)
+- 370-006: DOCS-FEATURES-5 — computer-use + connect-auth + panel feature-doc'ları (GO_WITH_TECH_DEBT)
+- 370-007: EVAL-OBS-DASH — evaluate-sağlık işaretlerinin dashboard'a taşınması (DONE)
+
+---

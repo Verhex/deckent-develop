@@ -237,3 +237,64 @@ describe('deckent connect — buildAuthStateReport integration (config-based, no
     expect(report.authState.every((r) => r.state === 'connected' || r.state === 'missing' || r.state === 'unknown')).toBe(true);
   });
 });
+
+// ─── Guidance/doctor drift guard (370-002, DEBT-369-CLOSE) ──────────────────
+//
+// connect.ts's AUTH_STATE_GUIDANCE is an unexported, hand-maintained mirror of
+// doctor.ts's own unexported AUTH_STATE_ENV_KEYS/AUTH_STATE_DECK_KEYS (see the
+// design note left in 369-006's result — doctor.ts is outside this task's
+// write scope, so exporting the maps to remove the duplication outright stays
+// a follow-up). Until then, this suite ties connect.ts's STATIC guidance text
+// to doctor.ts's ACTUAL runtime behavior end-to-end: for each provider, it
+// sets exactly the env var named in that provider's rendered hint and asserts
+// the REAL (unmocked) buildAuthStateReport flips that provider — and only
+// that provider — to 'connected'. If the two source files ever drift (a
+// renamed/reordered key in one but not the other), this test fails instead of
+// deckent silently telling a user to set an env var that doctor.ts does not
+// actually recognize.
+describe('AUTH_STATE_GUIDANCE / doctor.ts env-key sync guard (370-002)', () => {
+  const savedEnv: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getLangFromConfig).mockReturnValue('en');
+    vi.mocked(createDefaultConnectProbes).mockReturnValue(healthyProbes());
+    process.exitCode = undefined;
+    for (const key of SECRET_ENV_KEYS) {
+      savedEnv[key] = process.env[key];
+      delete process.env[key];
+    }
+  });
+
+  afterEach(() => {
+    process.exitCode = undefined;
+    for (const key of SECRET_ENV_KEYS) {
+      if (savedEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = savedEnv[key];
+    }
+  });
+
+  it.each([
+    ['claude', 'ANTHROPIC_API_KEY'],
+    ['codex', 'OPENAI_API_KEY'],
+    ['gemini', 'GEMINI_API_KEY'],
+  ] as const)('the %s guidance hint names an env var (%s) that doctor.ts actually honors', async (provider, envKey) => {
+    // First confirm the hint text names this exact env var (pins the mirror's
+    // CURRENT value so a silent connect.ts-side rename is also caught).
+    await runCommand(['connect']);
+    const hintText = vi.mocked(print).mock.calls.map((c) => c[0] as string).join('\n');
+    expect(hintText).toContain(`Set ${envKey}`);
+
+    // Then prove the SAME key flips the REAL, unmocked doctor.ts probe.
+    vi.clearAllMocks();
+    vi.mocked(createDefaultConnectProbes).mockReturnValue(healthyProbes());
+    process.env[envKey] = 'drift-guard-test-value-not-a-real-secret';
+    await runCommand(['connect', '--json']);
+    const report = lastJsonPrint();
+
+    expect(report.authState.find((r) => r.provider === provider)?.state).toBe('connected');
+    for (const other of report.authState.filter((r) => r.provider !== provider)) {
+      expect(other.state).not.toBe('connected');
+    }
+  });
+});

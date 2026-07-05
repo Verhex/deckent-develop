@@ -2,6 +2,24 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint370] - 2026-07-05
+
+### Added
+
+- EVAL-PREMATURE-RETRY — gate-dönüşü sessiz-boş bırakmasın
+- DEBT-369-CLOSE — 002/006 kalanlarını kapat
+- CATALOG-SYNC-PARITY — yeni 3+3 katalog-öğesinin sync-görünürlüğü
+- TOOL-CU-DILIM-2 — platform-capability negotiation (impl'siz, dürüst-tespit)
+- CHAT-INTENT-DISPATCH — intent-köprülerinin gerçek-dispatch seam'i
+- EVAL-OBS-DASH — evaluate-sağlık işaretlerinin dashboard'a taşınması
+
+### Changed
+
+- DOCS-FEATURES-5 — computer-use + connect-auth + panel feature-doc'ları (completed with tech debt)
+
+
+_Tasks: 7 total, 7 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint369] - 2026-07-05
 
 ### Added

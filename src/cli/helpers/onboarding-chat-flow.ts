@@ -38,6 +38,19 @@
 // The `workspace_mode` step's question keys are NOT re-declared here at all —
 // they come straight from the wizard's own `buildWorkspaceModeQuestions()`,
 // so there is a single source of truth and zero drift risk.
+//
+// ONB-CHAT-DILIM-3 (Sprint 370, Task 370-005): each meta-intent (DILIM-2)
+// also resolves to a not-yet-run `OnboardingChatDispatchDescriptor` —
+// `{ command, args, requiresConfirm }` — read-only-resolved against
+// `command-registry.ts` (the cross-surface command SSOT, ADR-D-004). This
+// module never executes the command; that is a later slice wired to the
+// terminal's approval flow. The descriptor lives on a NEW sibling state
+// field (`lastMetaDispatch`), not nested inside `OnboardingChatMetaResponse`,
+// because DILIM-2's own tests (`tests/cli/chat-setup-intents.test.ts`, out of
+// this task's write scope) assert `lastMetaResponse`'s exact shape with
+// `toEqual` — adding a key there would break them. `requiresConfirm` is
+// derived from the resolved command's own `CommandRisk` (`risk !== 'Oku'`)
+// rather than hardcoded per intent, so it never drifts from the registry SSOT.
 
 import { basename } from 'node:path';
 import {
@@ -56,6 +69,7 @@ import {
   type WorkspaceScope,
 } from './onboarding-wizard.js';
 import type { PlanMode } from '../../core/types.js';
+import { getCommand } from '../command-registry.js';
 
 // ─── Intent Matching ─────────────────────────────────────────────────────
 
@@ -166,6 +180,43 @@ export function interpretChatAnswer(raw: string, context: OnboardingIntentContex
   return { kind: 'unknown', raw: trimmed };
 }
 
+// ─── Meta-Intent Dispatch (ONB-CHAT-DILIM-3, Sprint 370 Task 370-005) ───
+
+/**
+ * A not-yet-run eylem-tarifi (action-description) for a recognized
+ * meta-intent. Describes WHAT bridge command the intent maps to — never runs
+ * it; the executor seam that actually invokes `command` is a later slice,
+ * wired to the terminal's approval flow.
+ */
+export interface OnboardingChatDispatchDescriptor {
+  command: string;
+  args: readonly string[];
+  requiresConfirm: boolean;
+}
+
+/** Fixed bridge-command mapping per meta-action, resolved read-only against `command-registry.ts` (the cross-surface command SSOT). */
+const META_ACTION_COMMAND_NAME: Record<OnboardingChatMetaAction, string> = {
+  connect_provider: 'connect',
+  show_limits: 'limits',
+  start_sprint: 'start',
+  doctor: 'doctor',
+};
+
+/**
+ * Resolves `action`'s bridge command against the registry SSOT into a
+ * dispatch descriptor. `requiresConfirm` is derived from the resolved
+ * command's own `CommandRisk` (`risk !== 'Oku'`) rather than hardcoded per
+ * action, so it can never drift from the registry's own risk tier.
+ */
+function buildMetaDispatch(action: OnboardingChatMetaAction): OnboardingChatDispatchDescriptor {
+  const name = META_ACTION_COMMAND_NAME[action];
+  const command = getCommand(name);
+  if (!command) {
+    throw new Error(`onboarding-chat-flow: meta-action '${action}' maps to unknown command '${name}'`);
+  }
+  return { command: command.name, args: [], requiresConfirm: command.risk !== 'Oku' };
+}
+
 // ─── Step Machine ────────────────────────────────────────────────────────
 
 /** The wizard's own 5 step kinds, walked in the wizard's own order. */
@@ -212,6 +263,14 @@ export interface OnboardingChatState {
    * answer next). Cleared on the very next reply, whatever kind it is.
    */
   lastMetaResponse?: OnboardingChatMetaResponse;
+  /**
+   * Not-yet-run dispatch descriptor for that same meta-intent reply
+   * (ONB-CHAT-DILIM-3). A sibling of `lastMetaResponse`, not nested inside
+   * it — DILIM-2's own tests assert `lastMetaResponse`'s exact shape, so the
+   * new field lives alongside it instead. Set/cleared in lockstep with
+   * `lastMetaResponse` at every call site.
+   */
+  lastMetaDispatch?: OnboardingChatDispatchDescriptor;
 }
 
 /** A meta-intent's helpful-feature response — the Deckent-suggestion principle applied mid-flow. */
@@ -421,8 +480,9 @@ function buildMetaSuggestion(action: OnboardingChatMetaAction): OnboardingFeatur
  * the deterministic core nor `fallback` could interpret it) leaves `pending`
  * unchanged — the caller re-prompts. A meta-intent reply (ONB-CHAT-DILIM-2)
  * also leaves `pending` unchanged — interrupt-resume: it is a detour, not an
- * answer, so `lastMetaResponse` carries the bridge suggestion back to the
- * caller while the original question stays there to answer next.
+ * answer, so `lastMetaResponse` carries the bridge suggestion (and
+ * `lastMetaDispatch` the not-yet-run action descriptor, ONB-CHAT-DILIM-3)
+ * back to the caller while the original question stays there to answer next.
  */
 export async function replyToOnboardingChat(
   state: OnboardingChatState,
@@ -445,16 +505,19 @@ export async function replyToOnboardingChat(
   if (intent.kind === 'meta') {
     draft.lastUnrecognizedReply = undefined;
     draft.lastMetaResponse = { action: intent.action, suggestion: buildMetaSuggestion(intent.action) };
+    draft.lastMetaDispatch = buildMetaDispatch(intent.action);
     return draft;
   }
 
   if (!applyIntent(draft, intent)) {
     draft.lastUnrecognizedReply = reply;
     draft.lastMetaResponse = undefined;
+    draft.lastMetaDispatch = undefined;
     return draft;
   }
   draft.lastUnrecognizedReply = undefined;
   draft.lastMetaResponse = undefined;
+  draft.lastMetaDispatch = undefined;
 
   return advanceUntilBlocked(draft, input);
 }

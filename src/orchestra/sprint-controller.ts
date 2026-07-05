@@ -886,6 +886,63 @@ export function evaluateResultSync(result: TaskResult, task: Task, vitestJsonOut
 }
 
 /**
+ * Sprint 370 Task 370-001 — EVAL-PREMATURE-RETRY (born-484 family closure).
+ *
+ * `runEvaluatePhase`'s dispatch-gate (`BRAIN→AUDITOR:EVALUATE_PREMATURE`,
+ * sprint-phases.ts) early-`return`s when it still sees undispatched tasks —
+ * `evaluations` stays empty even though `results` may already hold every
+ * collected worker output. Left unhandled, `runSprint` would march straight
+ * to FIX/RETRO with a truncated evaluations Map — externally indistinguishable
+ * from the born-484 `EVALUATE_ABORTED` surface, but silent. This runs
+ * immediately after the primary `runEvaluatePhase` call: if evaluations came
+ * back empty while results did not, it retries once (the dispatch-gate's own
+ * idempotency lock is released in `finally` before this runs, so re-entry is
+ * safe), and if STILL empty, surfaces a loud, honest abort instead of letting
+ * the sprint continue silently.
+ */
+export async function retryEvaluateIfEmpty(
+  projectRoot: string,
+  sprint: Sprint,
+  results: TaskResult[],
+  evaluations: Map<string, TaskEvaluation>,
+  coverageHardFloor: number | undefined,
+  deferredTaskIds: ReadonlySet<string>,
+): Promise<void> {
+  if (evaluations.size !== 0 || results.length === 0) return;
+
+  debugLog(
+    'runSprint:evaluateEmptyRetry',
+    `evaluations empty after EVALUATE with ${results.length} results collected — retrying runEvaluatePhase once`,
+  );
+  await runEvaluatePhase(
+    projectRoot, sprint, results, evaluations, coverageHardFloor,
+    undefined, undefined, deferredTaskIds, { enforceDispatchGate: true },
+  );
+  if (evaluations.size > 0) return;
+
+  const msg = `EVALUATE produced 0 evaluations for ${results.length} collected results after 1 retry`;
+  debugLog('runSprint:evaluateEmptyAfterRetry', msg);
+  process.stderr.write(`[evaluate] ${msg}\n`);
+  try {
+    notifyAsync('progress', sprint.id, 'EVALUATE empty after retry', msg);
+  } catch { /* fail-safe */ }
+  try {
+    const sid = getCurrentSprintId(projectRoot) ?? sprint.id;
+    writeEvent(
+      projectRoot, sid, 'brain', 'auditor',
+      'BRAIN→AUDITOR:EVALUATE_EMPTY_AFTER_RETRY',
+      {
+        sprintId: sprint.id,
+        collectedResults: results.length,
+        totalTasks: sprint.tasks.length,
+        timestamp: new Date().toISOString(),
+      },
+    );
+  } catch (e) { debugLog('runSprint:evaluateEmptyAfterRetry:event', e); }
+  (sprint as Sprint & { evaluateAborted?: string }).evaluateAborted = msg;
+}
+
+/**
  * Sprint 140 cost-cascade circuit-breaker (B11 wire) — disaster prevention.
  *
  * Feeds the EVALUATE-phase outcomes to the {@link CascadeDetector} in task order.
@@ -1496,6 +1553,12 @@ export async function runSprint(
   await runEvaluatePhase(
     projectRoot, sprint, results, evaluations, config.coverage_hard_floor,
     undefined, undefined, deferredTaskIds, { enforceDispatchGate: true },
+  );
+
+  // Sprint 370 Task 370-001: EVALUATE_PREMATURE gate can return with `evaluations`
+  // still empty while `results` is populated — retry once, then abort loudly.
+  await retryEvaluateIfEmpty(
+    projectRoot, sprint, results, evaluations, config.coverage_hard_floor, deferredTaskIds,
   );
 
   // Sprint 140 cost-cascade circuit-breaker (B11 wire): N consecutive NO_GO →
