@@ -353,6 +353,23 @@ describe('findOrphanFiles — fixture determinism', () => {
 // a fresh "delivered but not integrated" deliverable landed) — loud failure.
 // An allowlist entry that STOPS appearing means it was connected or deleted —
 // update this list (shrink it) as the corresponding follow-up work lands.
+//
+// Wave-1 selection + ready-to-execute wiring specs for the 5 highest-value
+// entries below (approval-expiry-driver.ts, ask-brain-escalation.ts,
+// global-store.ts, tool-scope-gate.ts, retro-formatter.ts): Sprint 375 Task
+// 375-007, docs/analysis/orphan-wire-wave1.md. None of those 5 were wired in
+// that task (its scope.filesWrite covered only this file + that doc, no
+// src/** write authority) — they stay pinned until a follow-up wiring task
+// lands.
+//
+// `src/cli/helpers/risk-language.ts` was added to this pin by the same task,
+// NOT as one of the wave-1 5 — it is a brand-new deliverable landed by a
+// sibling same-sprint task (375-004, TERM5-I18N-DILIM-1), whose own result
+// notes explicitly leave it with zero consumer wiring ("slice-2 will wire
+// help/catalog-render"). Ground-truth verified live (git status showed it
+// untracked, 375-004 was already DONE) before adding — this keeps the
+// roundtrip-gap-pin accurate rather than leaving it permanently red for
+// everyone after this sprint closes.
 // ═══════════════════════════════════════════════════════════════════════════
 
 const KNOWN_ORPHANS = [
@@ -372,6 +389,7 @@ const KNOWN_ORPHANS = [
   'src/cli/helpers/chat-intent-executor.ts',
   'src/cli/helpers/hints.ts',
   'src/cli/helpers/output-mode.ts',
+  'src/cli/helpers/risk-language.ts',
   'src/cli/helpers/sprint-summary.ts',
   'src/cli/repl/cursor-model.ts',
   'src/cli/repl/ink-probe.tsx',
@@ -445,7 +463,7 @@ const KNOWN_ORPHANS = [
 
 describe('KNOWN_ORPHANS allowlist sanity', () => {
   it('has the expected count and only well-formed src/**/*.ts(x) entries', () => {
-    expect(KNOWN_ORPHANS.length).toBe(85);
+    expect(KNOWN_ORPHANS.length).toBe(86);
     for (const entry of KNOWN_ORPHANS) {
       expect(entry.startsWith('src/')).toBe(true);
       expect(entry.endsWith('.ts') || entry.endsWith('.tsx')).toBe(true);

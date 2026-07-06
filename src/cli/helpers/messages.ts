@@ -2864,6 +2864,31 @@ const MESSAGES: MessageMap = {
     en: 'could not resolve project configuration ({error}) — treating computer_use as unavailable',
     tr: 'proje yapılandırması çözülemedi ({error}) — computer_use kullanılamaz kabul ediliyor',
   },
+
+  // ─── ADR-D-012 TERM-5 CommandRisk ladder (cmdCatalog.risk.*) ─────────────
+  // Canonical 4-class plain-risk-language (src/cli/command-registry.ts
+  // CommandRisk), consumed via src/cli/helpers/risk-language.ts. Key names
+  // match the ADR's own draft spec (ADR-D-012 § Decision item 2).
+  'cmdCatalog.risk.oku': { en: 'Read', tr: 'Oku' },
+  'cmdCatalog.risk.oku.desc': {
+    en: 'Read-only — displays information, changes nothing.',
+    tr: 'Salt-okunur — bilgi gösterir, hiçbir şeyi değiştirmez.',
+  },
+  'cmdCatalog.risk.degistir': { en: 'Modify', tr: 'Değiştir' },
+  'cmdCatalog.risk.degistir.desc': {
+    en: 'Local-state modification — writes local project/session state, generally reversible.',
+    tr: 'Yerel-durum değişikliği — yerel proje/oturum durumuna yazar, genelde geri alınabilir.',
+  },
+  'cmdCatalog.risk.calistir': { en: 'Execute', tr: 'Çalıştır' },
+  'cmdCatalog.risk.calistir.desc': {
+    en: 'Executes or spawns a process/action — starts something, often not reversible by re-running it.',
+    tr: 'Bir süreç/eylem çalıştırır veya başlatır — bir şey başlatır, yeniden çalıştırarak geri alınamayabilir.',
+  },
+  'cmdCatalog.risk.otonom': { en: 'Autonomous', tr: 'Otonom' },
+  'cmdCatalog.risk.otonom.desc': {
+    en: 'Opens a continuous, human-out-of-the-loop decision/work loop.',
+    tr: 'Sürekli, insan-döngü-dışı bir karar/iş döngüsü açar.',
+  },
 };
 
 /**

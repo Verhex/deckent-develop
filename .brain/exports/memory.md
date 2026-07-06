@@ -1,5 +1,18 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-375 Learnings
+- Sprint sprint-375 Learnings: ## Sprint sprint-375 Learnings
+- DOCS-P0-DELTA — analiz-delta-kutuları + features-index: GO_WITH_TECH_DEBT — Scope conflict discovered before writing, resolved by following the canonical write-authority list (task description exp
+- ORPHAN-WIRE-DALGA-1 — en-değerli 5 bağlanmamış-teslimin wire'ı: GO_WITH_TECH_DEBT — SCOPE CONFLICT (flagging for Brain, not worked around): task-375-007.json scope.filesWrite contains ONLY docs/analysis/o
+
+## Gains
+- 375-001 — XPLAT-TEST-DOC — Win-native + macOS kapsamlı test-dokümanı (PROJE KÖKÜNE) — Created CROSS-PLATFORM-TESTING.md at project root with all 5 required sections: (1) Setup — Windo...
+- 375-002 — ADR-DB-SYNC — 5 accepted-ADR'nin memory.db kaydı — Read the existing adr-type row schema from .brain/memory.db first (adr-d-008) to confirm field sh...
+- 375-003 — D013C-WIRING — sınıf-bazlı NL-dispatch canlıya — ADR-D-013 Option C wired.
+- 375-004 — TERM5-I18N-DILIM-1 — CommandRisk display-çeviri katmanı — Implemented ADR-D-012 slice-1 display-translation layer in new src/cli/helpers/risk-language.ts: ...
+- 375-005 — D004-AMEND + DOCS-P0-ADR — ADR-amend paketi — 3 dated amendment sections eklendi (2026-07-06), her biri mevcut metni silmeden, sadece Reference...
+- 375-008 — M5-PROOF-HARNESS — native-flip stabilizasyon-kanıt koşumu — Built createNativeModeHarness() in tests/cli/native-stabilization-proof.test.ts — a module-level ...
+
 ## Sprint sprint-374 Learnings
 - Sprint sprint-374 Learnings: ## Sprint sprint-374 Learnings
 - CU-STATUS-CLI — `deckent cu-status` (computer-use ilk kullanıcı-yüzeyi): GO_WITH_TECH_DEBT — Implemented `deckent cu-status [--json]` — TOOL-CU's first Tier-1 CLI surface. Flag-off path is honest-disabled with a g

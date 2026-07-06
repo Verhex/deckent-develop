@@ -9135,3 +9135,32 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 374-004: ORPHAN-DELIVERABLE-SWEEP — bağlanmamış-teslim sistematik keşfi (DONE)
 
 ---
+## Sprint 375 — sprint-375
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-06
+**Duration:** 677s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 8 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 676750ms |
+
+### Tasks
+
+- 375-001: XPLAT-TEST-DOC — Win-native + macOS kapsamlı test-dokümanı (PROJE KÖKÜNE) (DONE)
+- 375-002: ADR-DB-SYNC — 5 accepted-ADR'nin memory.db kaydı (DONE)
+- 375-003: D013C-WIRING — sınıf-bazlı NL-dispatch canlıya (DONE)
+- 375-004: TERM5-I18N-DILIM-1 — CommandRisk display-çeviri katmanı (DONE)
+- 375-005: D004-AMEND + DOCS-P0-ADR — ADR-amend paketi (DONE)
+- 375-006: DOCS-P0-DELTA — analiz-delta-kutuları + features-index (GO_WITH_TECH_DEBT)
+- 375-007: ORPHAN-WIRE-DALGA-1 — en-değerli 5 bağlanmamış-teslimin wire'ı (GO_WITH_TECH_DEBT)
+- 375-008: M5-PROOF-HARNESS — native-flip stabilizasyon-kanıt koşumu (DONE)
+
+---

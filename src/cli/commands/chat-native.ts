@@ -12,6 +12,7 @@ import { renderUserMessage, renderAssistantHeader, messageSeparator } from './ch
 import { renderToolActivity } from './chat-render-region.js';
 import { classifyAgenticIntent, dispatchAgenticIntent } from './chat-agentic-dispatch.js';
 import { requireConfirmIfRisky, type AgenticAction } from './agentic-confirm.js';
+import { COMMAND_REGISTRY } from '../command-registry.js';
 import {
   buildSlashRegistry,
   renderHelp,
@@ -239,19 +240,24 @@ export interface ChatNativeOptions {
   /**
    * Sprint 221 T-221-002 — natural-language → MCP tool routing. When true,
    * each REPL line is first classified via {@link classifyAgenticIntent}; if
-   * it matches a deckent_* tool (status/history/recall/plan) the call is
-   * gated through {@link requireConfirmIfRisky} and then dispatched through
-   * the supplied `dispatcher`, skipping the provider turn entirely. Default
-   * false preserves the pre-T-221-002 behaviour for existing callers
-   * (test suite) whose canned inputs include phrases like "check status" or
-   * "how are we doing?" that would otherwise be intercepted by the STATUS_RE.
+   * it matches a deckent_* tool (status/history/recall/plan), ADR-D-013
+   * Option C (sprint-375 task 375-003) resolves the matched tool's
+   * command-registry risk tier: `'Oku'` (read-only) dispatches DIRECTLY —
+   * no confirm call at all; any other tier (or an unresolvable tool,
+   * fail-safe) is gated through {@link requireConfirmIfRisky} (or the
+   * injected `agenticConfirm`) exactly as T-221-002 did unconditionally.
+   * Default false preserves the pre-T-221-002 behaviour for existing
+   * callers (test suite) whose canned inputs include phrases like "check
+   * status" or "how are we doing?" that would otherwise be intercepted by
+   * the STATUS_RE.
    */
   agenticDispatch?: boolean;
   /**
-   * Injection point for the risky-confirm gate used when `agenticDispatch`
-   * matches a tool. Defaults to {@link requireConfirmIfRisky} (auto-approves
-   * safe read-only tools, prompts on stdin/stdout for risky ones). Tests
-   * inject a stub to drive both branches deterministically.
+   * Injection point for the confirm gate used when `agenticDispatch`
+   * matches a non-`'Oku'` tool (ADR-D-013 Option C — `'Oku'`-tier matches
+   * skip this call entirely). Defaults to {@link requireConfirmIfRisky}
+   * (auto-approves safe read-only tools, prompts on stdin/stdout for risky
+   * ones). Tests inject a stub to drive both branches deterministically.
    */
   agenticConfirm?: (action: AgenticAction) => Promise<boolean>;
   /**
@@ -556,6 +562,21 @@ export async function runProviderTurn(
 export function getRecentTurns(transcript: ChatMessage[], n: number | undefined): ChatMessage[] {
   if (n === undefined || n <= 0 || transcript.length <= n) return transcript;
   return transcript.slice(-n);
+}
+
+// ─── Agentic Dispatch Risk Class (ADR-D-013 Option C, task 375-003) ──
+//
+// Resolves an agenticDispatch-classified tool name (e.g. 'deckent_status')
+// to its command-registry CommandRisk tier by matching against each
+// entry's `mcpNames`. `'Oku'` (read-only) tools skip the confirm gate
+// entirely below; everything else — including a tool this registry lookup
+// can't resolve — requires confirm (fail-safe), mirroring the
+// `requiresConfirm: command.risk !== 'Oku'` precedent already shipped in
+// onboarding-chat-flow.ts's `buildMetaDispatch` (sprint-370 task 370-005).
+
+function agenticToolRequiresConfirm(tool: string): boolean {
+  const entry = COMMAND_REGISTRY.find((e) => e.mcpNames?.includes(tool));
+  return entry ? entry.risk !== 'Oku' : true;
 }
 
 // ─── The Loop ───────────────────────────────────────────────────────
@@ -908,23 +929,30 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     }
     // Sprint 221 T-221-002 — agentic dispatch wire. After the slash check,
     // classify the line as a deckent_* MCP tool intent (status/history/
-    // recall/plan). On match: gate risky tools through the confirm function,
-    // then dispatch through the same `dispatcher` used for provider-driven
-    // tool_use. The result is echoed to output and recorded in the
-    // transcript+memory so context survives across turns. Opt-in via
-    // `agenticDispatch` to preserve backward compatibility with tests whose
-    // canned inputs may collide with the natural-language regexes in
-    // chat-agentic-dispatch.ts.
+    // recall/plan). ADR-D-013 Option C (sprint-375 task 375-003): the
+    // resolved tool's command-registry risk tier decides whether the
+    // confirm gate runs at all — `agenticToolRequiresConfirm` returns false
+    // for `'Oku'` (read-only) tools, which dispatch DIRECTLY; any other tier
+    // (or an unresolvable tool, fail-safe) still goes through the confirm
+    // function exactly as T-221-002 did unconditionally. Then dispatch
+    // through the same `dispatcher` used for provider-driven tool_use. The
+    // result is echoed to output and recorded in the transcript+memory so
+    // context survives across turns. Opt-in via `agenticDispatch` to
+    // preserve backward compatibility with tests whose canned inputs may
+    // collide with the natural-language regexes in chat-agentic-dispatch.ts.
     if (opts.agenticDispatch) {
       const intent = classifyAgenticIntent(line);
       if (intent.tool !== null) {
-        const action: AgenticAction = {
-          name: intent.tool,
-          description: `agentic intent → ${intent.tool}`,
-          args: intent.args,
-        };
-        const confirmFn = opts.agenticConfirm ?? requireConfirmIfRisky;
-        const approved = await confirmFn(action);
+        let approved = true;
+        if (agenticToolRequiresConfirm(intent.tool)) {
+          const action: AgenticAction = {
+            name: intent.tool,
+            description: `agentic intent → ${intent.tool}`,
+            args: intent.args,
+          };
+          const confirmFn = opts.agenticConfirm ?? requireConfirmIfRisky;
+          approved = await confirmFn(action);
+        }
         if (!approved) {
           output(`[agentic] cancelled: ${intent.tool}`);
           continue;

@@ -51,6 +51,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-375 Learnings** (sprint-375): ## Sprint sprint-375 Learnings
+- DOCS-P0-DELTA — analiz-delta-kutuları + features-index: GO_WITH_TECH_DEBT — Scope co...
 - **Sprint sprint-374 Learnings** (sprint-374): ## Sprint sprint-374 Learnings
 - CU-STATUS-CLI — `deckent cu-status` (computer-use ilk kullanıcı-yüzeyi): GO_WITH_TEC...
 - **Sprint sprint-373 Learnings** (sprint-373): ## Sprint sprint-373 Learnings
@@ -70,10 +72,6 @@
 - **Sprint sprint-367 Learnings** (sprint-367): ## Sprint sprint-367 Learnings
 - 366-003-DEBT-CLOSE — openrouter-probe debt-notunu oku-kapat: GO_WITH_TECH_DEBT — Rea...
 - **Sprint sprint-366 Learnings** (sprint-366): ## Sprint sprint-366 Learnings
-- **Sprint sprint-365 Learnings** (sprint-365): ## Sprint sprint-365 Learnings
-
-## Gains
-- 365-001 — Fix debt: Tech debt from 362-001-fix: VERIFY-AND-COMPLETE of the...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -131,4 +129,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 970 | Generated: 2026-07-06_
+_Total entries: 975 | Generated: 2026-07-06_

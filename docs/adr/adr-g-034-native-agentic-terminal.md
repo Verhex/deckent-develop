@@ -70,6 +70,47 @@
 
 ---
 
+## Amendment (2026-07-06) — Delivered/Future matrix (P0 ground-truth pass)
+
+Alperen-kararı 2026-07-06 (ground-truth-snapshot P0,
+`docs/analysis/ground-truth-snapshot-2026-07-06.md` §Terminal/§Approval/§Tool Surface, plus
+the same-day orphan-deliverables sweep `docs/analysis/orphan-deliverables-2026-07.md`,
+Sprint 374 Task 374-004): the §Intent/Roadmap block above lists "TOOL progressive-disclosure",
+"WORKER-LIVE-TRACE", "Runtime-wide ApprovalBroker integration" and "Scope-enforcement via
+TOOL" as undifferentiated future work. Code-verified today, several of these have shipped
+(behind flags, default-off) while others remain genuinely unbuilt or built-but-unwired. This
+amendment replaces the flat roadmap read with a delivered/flag-gated/future matrix; it does
+not change §Decision (Today) or the surviving roadmap items themselves.
+
+| Item | Real status (2026-07-06) | Evidence |
+|---|---|---|
+| Tool progressive-disclosure (search/describe/plan) | **Delivered, wired** | `src/core/tool-search.ts`, `src/core/tool-core.ts`; consumed by `src/cli/repl/native-tool-registry.ts:24-25` (`ToolSearchIndex`, `summarizeEagerSchema`/`deferredIndexLine`), which `src/cli/repl/run.tsx:11` imports (`buildNativeToolRegistry`) |
+| REPL meta-tools surface | **Delivered, flag-gated default-off** | `src/cli/repl/native-tool-registry.ts`; gate `tool_surface.enabled` (`src/core/config-types.ts:199-204`, default `false`) |
+| Tool-call execution (`deckent_call_tool`) | **Fail-closed by design, not yet live-execution** | `native-tool-registry.ts:65-69,226-230,309` — `NOT_WIRED_EXEC` is the default `execImpl`; a caller must inject a real one or the call is denied. Still an accurate "plan/risk-gate ready, execution seam is separate work" split |
+| TOOL-REG availability/schema-override/shadow-policy slices | **Implemented + tested, NOT wired into the live registry chain** | `src/core/tool-availability.ts`, `tool-schema-override.ts`, `tool-shadow-policy.ts` — confirmed zero production callers by the 374-004 orphan sweep (§4.5); each has its own test file but is not yet consumed by `native-tool-registry.ts` or any dispatcher |
+| Scope-enforcement via TOOL (TOOL-SCOPE) | **Implemented + tested, NOT wired** — same orphan status, not merely "not started" | `src/core/tool-scope-gate.ts`; 374-004 §4.5 confirms zero production callers. Downgrade from "roadmap" (implies unbuilt) to "built, unwired" is the accurate framing |
+| WORKER-LIVE-TRACE (in-terminal live per-worker run-status) | **Distinct, not yet built** — do not conflate with the live-footer below | No file implements a per-worker run-status footer; remains genuine roadmap |
+| Runtime-wide ApprovalBroker (core) | **Delivered, wired** | `src/core/approval-broker.ts`, `-contract.ts`, `-store.ts`, `-policy.ts`, `-worker-gate.ts`, `-relay.ts`, `-eventstream.ts`; `tests/integration/approval-chain.test.ts` |
+| Approval terminal card + live footer | **Delivered, flag-gated default-off** | `src/cli/repl/approval-card.tsx`, `src/cli/helpers/live-footer.ts`, wired into `src/cli/repl/app.tsx`; gates `repl_surface.enabled` and `repl_surface.approvals` (`config-types.ts:210-216`, both default `false`) |
+| Approval cross-process feed | **Delivered, wired** | `src/core/approval-store-watch.ts` + `src/cli/repl/run.tsx`; `tests/cli/repl/approval-xproc-wire.test.ts` |
+| Approval dashboard/API history | **Delivered, wired** | `src/api/approval-history-endpoint.ts` + `src/api/server.ts`; `tests/api/approval-history-wire.test.ts` |
+| Approval fallback path | **Implemented + tested, NOT wired** | `src/core/approval-fallback.ts` — zero production callers confirmed by 374-004 §4.6 |
+| Desktop app | **Not started** | No `src/extensions/vscode/` `package.json`/`activate()` exists yet either (a separate, also-unpackaged prototype per 374-004 §4.8); Desktop app itself remains unstarted roadmap |
+
+**Reading:** "flag-gated default-off" and "implemented + tested but unwired" are different
+statuses that this ADR's original roadmap language collapsed into one bucket. A flag-gated
+feature is one config change away from being live; an unwired module needs an integration
+task (a caller/seed-point) before a flag can even matter. TOOL-SCOPE and the TOOL-REG
+availability/schema-override/shadow-policy slices are the latter — real, tested code with
+no follow-up task yet opened to connect them.
+
+**Status impact:** this amendment does not change the ADR's own `Status:` provisional
+qualifier (SLASH-MODE-WIRE / NL-DISPATCH-DECISION remain open per the existing header). It
+narrows the roadmap bullet list in §Intent/Roadmap and the "(−)" paragraph in §Consequences
+from a single undifferentiated "roadmap" bucket into the matrix above.
+
+---
+
 ## References / Absorbed
 
 - **Absorbs:** ADR-081 + ADR-074A + ADR-082A + ADR-083 + ADR-086.

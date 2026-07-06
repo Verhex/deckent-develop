@@ -871,6 +871,14 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         // Ink confirm modal), so auto-approve here and let that single authority
         // ask. Read-only tools pass through; write/destructive ones still prompt.
         agenticConfirm: async () => true,
+        // ADR-D-013 Option C (task 375-003): activates chat-native.ts's
+        // natural-language → deckent_* tool classifier for this REPL too.
+        // Its command-registry class-gate skips the `agenticConfirm` stub
+        // above entirely for 'Oku' (read-only) matches; any other tier
+        // still passes through the always-true stub here, same as the
+        // slash-dispatch path a few lines up — its real gate is the SAME
+        // dispatcher-level classifyTool check (run.tsx) already relied on.
+        agenticDispatch: true,
         // Chat persistence + /resume: when a memory adapter is wired, every turn
         // is saved under sessionId and /resume can list/load prior sessions.
         ...(memory ? { memory } : {}),

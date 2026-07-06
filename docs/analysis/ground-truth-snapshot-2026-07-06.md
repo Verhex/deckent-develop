@@ -270,3 +270,16 @@ P2:
 - TOOL-CALL: progressive disclosure var; production execution seam için ayrı karar/iş gerekiyor.
 - ENTERPRISE-SECRETS: per-project encrypted credential var; binding-scoped audited vault ayrı iş.
 - ENTERPRISE-TENANT: strict tenant isolation var; default ve full management plane ayrı karar.
+
+## İşlendi (2026-07-06 P0 turu — Task 375-006)
+
+Bu snapshot'ın "Önerilen Docs Sprinti" P0 kuyruğundan hangi maddelerin bu turda
+kapandığını, hangilerinin açık kaldığını işaretler.
+
+| Madde | Kapsam | Durum | Not |
+|---|---|---|---|
+| P0.1 — `docs/features/README.md` | 16 feature dosyasının tamamını status-etiketiyle (stable/default-off/partial/design-only) listeleyen index | ✅ Kapandı | Bu task'ın write-authority'si içinde; index artık 16/16 dosyayı listeliyor (önceki 7/16 drift kapandı) |
+| P0.4 — `.analysis/hermes-vs-deckent-*.md` + `.analysis/paperclip-vs-deckent-comparison.md` başına 2026-07-06 delta kutusu | Stale Signal Register'daki düzeltmeler (trace-wired, encrypted-credentials-kısmi vb.) | ⛔ Açık kaldı | Bu task'ın canonical write-authority listesi yalnız `docs/features/README.md` + bu snapshot dosyasını içeriyor — `.analysis/` dosyaları scope dışı kaldığı için düzenlenmedi. Takip: scope.filesWrite'ına `.analysis/hermes-vs-deckent-analysis.md`, `.analysis/hermes-vs-deckent-claude-analysis.md`, `.analysis/hermes-vs-deckent-direction-decisions.md`, `.analysis/paperclip-vs-deckent-comparison.md` eklenmiş yeni bir task gerekir |
+
+Diğer P0 maddeleri (ADR-G-034/ADR-G-022 amend, `docs/reference` generated check)
+bu task'ın kapsamı dışında — ayrı task'larda izlenmeli.

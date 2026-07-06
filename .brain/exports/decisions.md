@@ -364,6 +364,55 @@ When ADR-G-020's enforcement-engine graduates, the advisory import check **hard-
 
 ---
 
+## Amendment (2026-07-06) — D004-W5 exception registry: roadmap → delivered
+
+Alperen-kararı 2026-07-06 (ground-truth-snapshot P0, `docs/analysis/ground-truth-snapshot-2026-07-06.md`):
+the §Intent/Roadmap and §Consequences framing above still describes **D004-W5 ("Exception
+registry as data-file")** as future work ("registry file exists" was the acceptance
+criterion). It has since shipped and is code-verified today:
+
+- **Registry (data-file):** `.deckent/settings/layer-shims.json` — 2 sanctioned entries
+  (`D004-SHIM-001` advisory/`enforced: false`, `D004-SHIM-002` enforced/`enforced: true`),
+  each carrying the mandatory `id/from/to/symbols/reason/adrRef/owner/expiry` fields this
+  ADR's C5 requires.
+- **Enforcer:** `scripts/lint-layer-shims.mjs` — derives the governed-file set from the
+  registry's `shims[].from`, and for each governed file fails any `cli/`-crossing import
+  whose target module + symbols are not a registered subset ("no registry entry, no
+  import" — C5, verbatim in the script's own header comment).
+- **Test coverage:** `tests/docs/layer-shims.test.ts` — unit tests for the
+  extraction/resolution/validation helpers, a green check against the real, checked-in
+  registry (`describe('the real, checked-in layer-shims.json registry')`), and a
+  spawned-subprocess fixture proving the ratchet fails on an unregistered symbol/crossing.
+
+**Honest caveat (do not overstate):** the enforcer is not wired into any `package.json`
+script (`lint:adr` validates the DB-generated `.brain/exports/decisions.md`, unrelated;
+`lint:link` checks markdown links only) — `lint-layer-shims.mjs` runs today only via
+`tests/docs/layer-shims.test.ts`'s subprocess-spawn assertions, not as a standalone CI gate
+a human or pre-commit hook would invoke directly. D004-W6 (hard graph gate + full-edge
+scan) is the tracked follow-up that would also fold in a direct script-invocation gate —
+this amendment closes D004-W5's "does the data-file exist and is it enforced" question,
+not D004-W6's broader all-edge hard-flip.
+
+**Adjacent, not the same thing — "pool iki-katman" (two-tier pool loading):** Sprint 371's
+`agent-pool.ts`/`skill-pool.ts` builtin-fallback work (371-001, `CATALOG-MATERIALIZE`)
+borrows this ADR's naming for a *config-layer precedence* pattern — ".deckent override >
+builtin default" — see `src/core/agent-pool.ts:13` ("D-004 layer pattern: .deckent
+override > builtin default") and `:379-382`, and `src/core/skill-pool.ts:19,184` with the
+same phrasing. This is **not** a Layer-1 import-direction exception and has no entry in
+`layer-shims.json` — it is an independent module (pool builtin-fallback precedence) that
+cites this ADR's precedent language for its own, unrelated precedence rule. Recorded here
+only because Alperen's 2026-07-06 decision named it alongside the registry; it does not
+change C1–C7 or the sanctioned-exceptions table.
+
+**Status impact:** D004-W5 moves from *Intent/Roadmap* to *delivered* in this ADR's own
+bookkeeping. The ADR's overall `Status:` line stays "accepted (provisional — closes when
+LAYER-1 cleanup + exception registry + hard-gate land)" — the exception-registry leg has
+now landed; LAYER-1 inversion cleanup (ADR-008-W, CORE-W1, ORCH-W1, API-W1, D004-W9) and
+the D004-W6 hard-gate/full-edge scan remain open, so the provisional status is unchanged
+pending those.
+
+---
+
 ## References / Absorbed
 
 - **Absorbs:** ADR-008 (one-way import direction; Brain-family definition; sanctioned provider-adapter exception; Sprint-279 event-stream cycle-fix).
@@ -3482,6 +3531,68 @@ Executor approve-mode: non-safety-floor actions auto-proceed on a **presence-awa
 
 ---
 
+## Amendment (2026-07-06) — Nervous approval-bridge: real status + which path is flag/default
+
+Alperen-kararı 2026-07-06 (ground-truth-snapshot P0,
+`docs/analysis/ground-truth-snapshot-2026-07-06.md` §Approval, and the same-day orphan sweep
+`docs/analysis/orphan-deliverables-2026-07.md` §4.6, Sprint 374 Task 374-004): the §Intent
+Roadmap's "APR unification" bullet above describes the nervous↔ApprovalBroker bridge purely
+as future work ("nervous becomes one approval-source on the runtime-wide ApprovalBroker").
+Two code modules implementing this now exist; this amendment records their exact wiring
+status so "unification" is not read as either fully shipped or fully unstarted.
+
+**Two layers, two different real statuses:**
+
+1. **`src/nervous/approval-bridge.ts`** (Sprint 355, Task 355-012) — a pure, read-only
+   bridge: `applyNervousDecision()` maps a resolved nervous accept/reject onto
+   `ApprovalBroker.decide()`; `toNervousNotification()` projects a broker-pending
+   `ApprovalRequest` back into nervous's own notification shape (guarded to
+   `requester.role === 'nervous'` only). The module's own header states it **deliberately
+   does not** subscribe to a live broker's `'pending'` event and does **not** touch
+   `src/nervous/executor.ts`, `src/mcp/tools/nervous.ts`, or `src/nervous/bootstrap.ts` —
+   wiring into the real Executor/IPC-queue/MCP-tool flow is explicitly named as follow-up
+   work in its own comments. Test coverage: `tests/nervous/approval-bridge.test.ts`
+   (fake-broker + real-`ApprovalBroker` idempotency cases).
+
+2. **`src/nervous/approval-actions.ts`** — a routing function,
+   `resolveNervousApprovalAction()`, gated on flag **`nervous_system.approval_bridge`**
+   (default `false`; its own header notes this flag is "not yet part of the V2 config
+   schema" — `core/config-types.ts` was outside that task's write scope). When the flag is
+   off (default), `legacyResolve` runs byte-identical to pre-existing behavior; when on, the
+   call is forwarded to `approval-bridge.ts`'s `applyNervousDecision`. Test coverage:
+   `tests/nervous/nervous-apr-wire.test.ts` (both flag-off and flag-on paths, plus
+   `isNervousApprovalBridgeEnabled` default/override cases).
+
+**Which path is flag/default, precisely:** `nervous_system.approval_bridge` is the flag that
+would route nervous accept/reject through the runtime-wide ApprovalBroker — but as of
+2026-07-06, **nothing in `src/mcp/tools/nervous.ts` (the real `deckent_nervous_accept`/
+`deckent_nervous_reject` handlers), `src/nervous/executor.ts`, or any other production module
+calls `resolveNervousApprovalAction` or `isNervousApprovalBridgeEnabled`.** Confirmed by
+direct grep (`grep -rn "resolveNervousApprovalAction\|isNervousApprovalBridgeEnabled" src/`
+returns only the definition site) and by the 374-004 orphan sweep, which lists both
+`approval-actions.ts` and (transitively, since its only caller is itself unwired)
+`approval-bridge.ts`'s consumption path under "follow-up-öneri" (delivered + tested, never
+called from the real dispatch chain). Flipping the flag today would have **no runtime
+effect** — there is no call site for it to change the behavior of yet. The follow-up task is
+wiring `resolveNervousApprovalAction` directly into `handleNervousAccept`/
+`handleNervousReject` (`src/mcp/tools/nervous.ts`) and/or `Executor.resolveApproval`.
+
+**`nervous_system.enabled` itself:** the shipped code default remains `false`
+(`src/core/config.ts:1303-1305`, comment: "disabled by default — Sprint 148 will
+activate"). This is unchanged by the above — the approval_bridge flag is a sub-flag nested
+inside an already-default-off subsystem. (Note: this dogfood workspace's own gitignored
+`.deckent/config.json` currently has `nervous_system.enabled: true` locally — that is this
+instance's runtime state, not a change to the shipped/documented default, and is mentioned
+here only for completeness, not as a status claim about the ADR's default.)
+
+**Status impact:** "APR unification" in §Intent/Roadmap is now more precisely: the
+decision-mapping and routing code exist and are tested, but the wiring into the actual
+accept/reject handlers is the remaining, still-open work — the ADR's `Status:` line and
+§Consequences "(−)" framing ("approval today is a shared reader-hub, not one
+ApprovalBroker") stay accurate and unchanged by this amendment.
+
+---
+
 ## References / Absorbed
 
 - **Absorbs:** ADR-040.
@@ -4612,6 +4723,47 @@ The dashboard is a **god-level observability surface**: a freeze-free React SPA 
 **(+)** The product's primary individual surface is a real, agentic, multi-provider, polished terminal at parity with the best CLIs — the pivot's "terminal runs" thesis is shipped. Local-model foundation enables offline/air-gapped + cost-free dogfooding. Enterprise capability is reachable but unobtrusive.
 
 **(−)** TOOL progressive-disclosure, WORKER-LIVE-TRACE, ApprovalBroker integration, and TOOL-SCOPE are roadmap (the "must be BETTER than Hermes at tool+terminal" bar is forward work). Several pieces are delivered-but-not-default: the `src/agent/*` native-agent engine is flag-gated (`DECKENT_NATIVE_AGENT=1` / `--native`, default OFF — M4 cutover pending); `entry.ts` keeps an inline `buildReplProvider` vs the `resolveChatAdapter` SSOT (born PROVIDER-SSOT); the mode-filter + NL-dispatch are not wired to the default Ink path (born SLASH-MODE-WIRE / NL-DISPATCH-DECISION). Dashboard-chat is being de-emphasized in favor of this surface + the desktop app.
+
+---
+
+## Amendment (2026-07-06) — Delivered/Future matrix (P0 ground-truth pass)
+
+Alperen-kararı 2026-07-06 (ground-truth-snapshot P0,
+`docs/analysis/ground-truth-snapshot-2026-07-06.md` §Terminal/§Approval/§Tool Surface, plus
+the same-day orphan-deliverables sweep `docs/analysis/orphan-deliverables-2026-07.md`,
+Sprint 374 Task 374-004): the §Intent/Roadmap block above lists "TOOL progressive-disclosure",
+"WORKER-LIVE-TRACE", "Runtime-wide ApprovalBroker integration" and "Scope-enforcement via
+TOOL" as undifferentiated future work. Code-verified today, several of these have shipped
+(behind flags, default-off) while others remain genuinely unbuilt or built-but-unwired. This
+amendment replaces the flat roadmap read with a delivered/flag-gated/future matrix; it does
+not change §Decision (Today) or the surviving roadmap items themselves.
+
+| Item | Real status (2026-07-06) | Evidence |
+|---|---|---|
+| Tool progressive-disclosure (search/describe/plan) | **Delivered, wired** | `src/core/tool-search.ts`, `src/core/tool-core.ts`; consumed by `src/cli/repl/native-tool-registry.ts:24-25` (`ToolSearchIndex`, `summarizeEagerSchema`/`deferredIndexLine`), which `src/cli/repl/run.tsx:11` imports (`buildNativeToolRegistry`) |
+| REPL meta-tools surface | **Delivered, flag-gated default-off** | `src/cli/repl/native-tool-registry.ts`; gate `tool_surface.enabled` (`src/core/config-types.ts:199-204`, default `false`) |
+| Tool-call execution (`deckent_call_tool`) | **Fail-closed by design, not yet live-execution** | `native-tool-registry.ts:65-69,226-230,309` — `NOT_WIRED_EXEC` is the default `execImpl`; a caller must inject a real one or the call is denied. Still an accurate "plan/risk-gate ready, execution seam is separate work" split |
+| TOOL-REG availability/schema-override/shadow-policy slices | **Implemented + tested, NOT wired into the live registry chain** | `src/core/tool-availability.ts`, `tool-schema-override.ts`, `tool-shadow-policy.ts` — confirmed zero production callers by the 374-004 orphan sweep (§4.5); each has its own test file but is not yet consumed by `native-tool-registry.ts` or any dispatcher |
+| Scope-enforcement via TOOL (TOOL-SCOPE) | **Implemented + tested, NOT wired** — same orphan status, not merely "not started" | `src/core/tool-scope-gate.ts`; 374-004 §4.5 confirms zero production callers. Downgrade from "roadmap" (implies unbuilt) to "built, unwired" is the accurate framing |
+| WORKER-LIVE-TRACE (in-terminal live per-worker run-status) | **Distinct, not yet built** — do not conflate with the live-footer below | No file implements a per-worker run-status footer; remains genuine roadmap |
+| Runtime-wide ApprovalBroker (core) | **Delivered, wired** | `src/core/approval-broker.ts`, `-contract.ts`, `-store.ts`, `-policy.ts`, `-worker-gate.ts`, `-relay.ts`, `-eventstream.ts`; `tests/integration/approval-chain.test.ts` |
+| Approval terminal card + live footer | **Delivered, flag-gated default-off** | `src/cli/repl/approval-card.tsx`, `src/cli/helpers/live-footer.ts`, wired into `src/cli/repl/app.tsx`; gates `repl_surface.enabled` and `repl_surface.approvals` (`config-types.ts:210-216`, both default `false`) |
+| Approval cross-process feed | **Delivered, wired** | `src/core/approval-store-watch.ts` + `src/cli/repl/run.tsx`; `tests/cli/repl/approval-xproc-wire.test.ts` |
+| Approval dashboard/API history | **Delivered, wired** | `src/api/approval-history-endpoint.ts` + `src/api/server.ts`; `tests/api/approval-history-wire.test.ts` |
+| Approval fallback path | **Implemented + tested, NOT wired** | `src/core/approval-fallback.ts` — zero production callers confirmed by 374-004 §4.6 |
+| Desktop app | **Not started** | No `src/extensions/vscode/` `package.json`/`activate()` exists yet either (a separate, also-unpackaged prototype per 374-004 §4.8); Desktop app itself remains unstarted roadmap |
+
+**Reading:** "flag-gated default-off" and "implemented + tested but unwired" are different
+statuses that this ADR's original roadmap language collapsed into one bucket. A flag-gated
+feature is one config change away from being live; an unwired module needs an integration
+task (a caller/seed-point) before a flag can even matter. TOOL-SCOPE and the TOOL-REG
+availability/schema-override/shadow-policy slices are the latter — real, tested code with
+no follow-up task yet opened to connect them.
+
+**Status impact:** this amendment does not change the ADR's own `Status:` provisional
+qualifier (SLASH-MODE-WIRE / NL-DISPATCH-DECISION remain open per the existing header). It
+narrows the roadmap bullet list in §Intent/Roadmap and the "(−)" paragraph in §Consequences
+from a single undifferentiated "roadmap" bucket into the matrix above.
 
 ---
 

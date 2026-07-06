@@ -9,6 +9,8 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-375-006 | Tech debt from 375-006: Scope conflict discovered before writing, resolved by fo | normal | sprint-375 | resolved |
+| debt-375-007 | Tech debt from 375-007: SCOPE CONFLICT (flagging for Brain, not worked around):  | normal | sprint-375 | resolved |
 | debt-374-002 | Tech debt from 374-002: Implemented `deckent cu-status [--json]` — TOOL-CU's fir | normal | sprint-374 | resolved |
 | debt-371-001 | Tech debt from 371-001: Decision (Option A over Option B, per task instruction t | normal | sprint-371 | resolved |
 | debt-371-002 | Tech debt from 371-002: Wired the two dead endpoints exactly mirroring the regis | normal | sprint-371 | resolved |

@@ -107,6 +107,55 @@ When ADR-G-020's enforcement-engine graduates, the advisory import check **hard-
 
 ---
 
+## Amendment (2026-07-06) — D004-W5 exception registry: roadmap → delivered
+
+Alperen-kararı 2026-07-06 (ground-truth-snapshot P0, `docs/analysis/ground-truth-snapshot-2026-07-06.md`):
+the §Intent/Roadmap and §Consequences framing above still describes **D004-W5 ("Exception
+registry as data-file")** as future work ("registry file exists" was the acceptance
+criterion). It has since shipped and is code-verified today:
+
+- **Registry (data-file):** `.deckent/settings/layer-shims.json` — 2 sanctioned entries
+  (`D004-SHIM-001` advisory/`enforced: false`, `D004-SHIM-002` enforced/`enforced: true`),
+  each carrying the mandatory `id/from/to/symbols/reason/adrRef/owner/expiry` fields this
+  ADR's C5 requires.
+- **Enforcer:** `scripts/lint-layer-shims.mjs` — derives the governed-file set from the
+  registry's `shims[].from`, and for each governed file fails any `cli/`-crossing import
+  whose target module + symbols are not a registered subset ("no registry entry, no
+  import" — C5, verbatim in the script's own header comment).
+- **Test coverage:** `tests/docs/layer-shims.test.ts` — unit tests for the
+  extraction/resolution/validation helpers, a green check against the real, checked-in
+  registry (`describe('the real, checked-in layer-shims.json registry')`), and a
+  spawned-subprocess fixture proving the ratchet fails on an unregistered symbol/crossing.
+
+**Honest caveat (do not overstate):** the enforcer is not wired into any `package.json`
+script (`lint:adr` validates the DB-generated `.brain/exports/decisions.md`, unrelated;
+`lint:link` checks markdown links only) — `lint-layer-shims.mjs` runs today only via
+`tests/docs/layer-shims.test.ts`'s subprocess-spawn assertions, not as a standalone CI gate
+a human or pre-commit hook would invoke directly. D004-W6 (hard graph gate + full-edge
+scan) is the tracked follow-up that would also fold in a direct script-invocation gate —
+this amendment closes D004-W5's "does the data-file exist and is it enforced" question,
+not D004-W6's broader all-edge hard-flip.
+
+**Adjacent, not the same thing — "pool iki-katman" (two-tier pool loading):** Sprint 371's
+`agent-pool.ts`/`skill-pool.ts` builtin-fallback work (371-001, `CATALOG-MATERIALIZE`)
+borrows this ADR's naming for a *config-layer precedence* pattern — ".deckent override >
+builtin default" — see `src/core/agent-pool.ts:13` ("D-004 layer pattern: .deckent
+override > builtin default") and `:379-382`, and `src/core/skill-pool.ts:19,184` with the
+same phrasing. This is **not** a Layer-1 import-direction exception and has no entry in
+`layer-shims.json` — it is an independent module (pool builtin-fallback precedence) that
+cites this ADR's precedent language for its own, unrelated precedence rule. Recorded here
+only because Alperen's 2026-07-06 decision named it alongside the registry; it does not
+change C1–C7 or the sanctioned-exceptions table.
+
+**Status impact:** D004-W5 moves from *Intent/Roadmap* to *delivered* in this ADR's own
+bookkeeping. The ADR's overall `Status:` line stays "accepted (provisional — closes when
+LAYER-1 cleanup + exception registry + hard-gate land)" — the exception-registry leg has
+now landed; LAYER-1 inversion cleanup (ADR-008-W, CORE-W1, ORCH-W1, API-W1, D004-W9) and
+the D004-W6 hard-gate/full-edge scan remain open, so the provisional status is unchanged
+pending those.
+
+---
+
 ## References / Absorbed
 
 - **Absorbs:** ADR-008 (one-way import direction; Brain-family definition; sanctioned provider-adapter exception; Sprint-279 event-stream cycle-fix).

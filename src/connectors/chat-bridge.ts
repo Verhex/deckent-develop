@@ -399,6 +399,14 @@ export function makeChatResponder(deps: ChatResponderDeps = {}): ChatResponder {
           deps.onPartial?.(sessionId, collected.join(''));
         }
       },
+      // ADR-D-013 Option C (task 375-003): chat-native.ts now gates this
+      // flag's dispatch through the command-registry risk class — 'Oku'
+      // (status/history/recall) matches dispatch directly, no `confirm`
+      // call. `deckent_plan` (the only Değiştir-tier NL tool) still calls
+      // `confirm` exactly as before, so `denyRiskyConfirm` / the
+      // gated-dispatcher wrapper's approve/deny behavior below is
+      // unaffected — this connector's behavior is unchanged, it now simply
+      // passes through the same shared gate as the CLI/TUI call-sites.
       agenticDispatch: true,
       agenticConfirm: confirm,
       gracefulErrors: true, // a provider failure becomes a tagged turn, not a throw

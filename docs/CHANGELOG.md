@@ -2,6 +2,25 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint375] - 2026-07-06
+
+### Added
+
+- XPLAT-TEST-DOC — Win-native + macOS kapsamlı test-dokümanı (PROJE KÖKÜNE)
+- ADR-DB-SYNC — 5 accepted-ADR'nin memory.db kaydı
+- D013C-WIRING — sınıf-bazlı NL-dispatch canlıya
+- TERM5-I18N-DILIM-1 — CommandRisk display-çeviri katmanı
+- D004-AMEND + DOCS-P0-ADR — ADR-amend paketi
+- M5-PROOF-HARNESS — native-flip stabilizasyon-kanıt koşumu
+
+### Changed
+
+- DOCS-P0-DELTA — analiz-delta-kutuları + features-index (completed with tech debt)
+- ORPHAN-WIRE-DALGA-1 — en-değerli 5 bağlanmamış-teslimin wire'ı (completed with tech debt)
+
+
+_Tasks: 8 total, 8 done, 2 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint374] - 2026-07-06
 
 ### Added
