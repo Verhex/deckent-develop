@@ -32,7 +32,18 @@
   `.deckent/` (runtime — yeni repoda `deckent init/sync` üretir), `.tasks/`
 - `docs/MASTER-PLAN.md` (develop'un canlı-defteri; kapanış-analiziyle mühürlenir)
 
-## 🔑 Alperen karar-noktaları
+## 🔑 Alperen karar-noktaları — ✅ KARARLAR ALINDI (2026-07-06)
+| # | Karar | Sonuç |
+|---|---|---|
+| 1 | ADR/brain-bilgisi | **(a) DB-kopyası** — `.brain/memory.db` DOSYA-olarak yeni klona kopyalanır (gitignore'da kalır, commit'e GİRMEZ; öğrenme-sürekliliği korunur) + `docs/adr` 41 md F5'te doğrulanarak yeniden yazılır |
+| 2 | Git-tarihi | **Tek-snapshot** commit ("v1.0.0-beta.2 code-migration"); develop read-only tarihsel-başvuru |
+| 3 | deckent-hub | **Taşınır** (ürün-parçası) |
+| 4 | 11 gerçek-ölü orphan | **Göç-öncesi silinir** (375-sonrası CC tek-commit'i, develop'ta geri-alınabilir) |
+| 5 | Read-only zamanlama | F4'te, push-doğrulama sonrası (Alperen) |
+
+Ek not (F1): `.test/` fixture-dizini (3 dosya) manifest'e eklenir (test-bağımlılığı ihtimaline karşı — küçük).
+
+### (Orijinal karar-metinleri — arşiv)
 1. **ADR-bilgisi (`.brain/memory.db`):** yeni repoya (a) DB-kopyası mı, (b) curated ADR-export mu
    (41 ADR md zaten `docs/adr`'de — F5'te yeniden yazım sırasında DB'ye re-import), (c) develop'ta mı kalır?
    **Öneri: (b)** — temiz-repo ilkesiyle uyumlu; ADR-md'leri kod-doğrulamalı taşınır, DB yeni repoda sıfırdan dolar.
