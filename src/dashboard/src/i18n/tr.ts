@@ -27,7 +27,7 @@ export const tr: Record<TranslationKey, string> = {
   'layout.language': 'Dil',
 
   // Dashboard Page
-  'dashboard.title': 'Sprint Paneli',
+  'dashboard.title': 'Run Paneli (sprint)',
   'dashboard.no_sprint': 'Aktif sprint yok',
   'dashboard.no_sprint_hint': 'Sprint başlatmak için `deckent start` çalıştırın.',
   'dashboard.phase': 'Faz',
@@ -168,8 +168,8 @@ export const tr: Record<TranslationKey, string> = {
   'welcome.last_sprint': 'Son sprint',
 
   // Dashboard additional
-  'dashboard.sprint_status': 'Sprint Durumu',
-  'dashboard.sprint_id': 'Sprint ID',
+  'dashboard.sprint_status': 'Run Durumu (sprint)',
+  'dashboard.sprint_id': 'Run ID (sprint)',
   'dashboard.updated': 'Güncellendi',
   'dashboard.active': 'Aktif',
   'dashboard.pending': 'Bekliyor',
@@ -207,7 +207,7 @@ export const tr: Record<TranslationKey, string> = {
 
   // New Sprint Modal
   'modal.directives_hint': 'Sprint direktiflerini aşağıya girin. Her "## Task" bloğu bir görevi tanımlar.',
-  'modal.plan_sprint': 'Sprint Planla',
+  'modal.plan_sprint': 'Run Planla (sprint)',
   'modal.planning': 'Sprint planlanıyor...',
   'modal.review_tasks_parsed': 'görev ayrıştırıldı. Sprint',
   'modal.review_planned_with': 'planlandı,',
@@ -362,7 +362,7 @@ export const tr: Record<TranslationKey, string> = {
   'status.no_sprint': 'Aktif sprint yok.',
   'status.run_start': 'Başlamak için deckent start çalıştırın.',
   'status.loading': 'Sprint verileri yükleniyor...',
-  'status.title': 'Sprint Durumu',
+  'status.title': 'Run Durumu (sprint)',
 
   // Sprint Summary
   'sprint_summary.tasks_done': '{{done}}/{{total}} görev tamamlandı',

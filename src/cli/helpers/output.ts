@@ -471,11 +471,11 @@ export function formatHumanStatus(input: HumanStatusInput): string {
   // existing idiom; callers inject localized labels where needed.)
   const sp = dashboard.sprint as { status?: string; phase?: string; number: number; id: string };
   if (sp.status === 'COMPLETE' || sp.phase === 'COMPLETE') {
-    const doneLabel = `Sprint ${String(sp.number).padStart(3, '0')} — completed`;
+    const doneLabel = `Run ${String(sp.number).padStart(3, '0')} (sprint) — completed`;
     return [
       doneLabel,
-      'No active sprint. This is the last finished sprint\u2019s record.',
-      'Next: run `deckent retro` for the retrospective, or `deckent plan` to start the next sprint.',
+      'No active run (sprint). This is the last finished run\u2019s record.',
+      'Next: run `deckent retro` for the retrospective, or `deckent plan` to start the next run (sprint).',
     ].join('\n');
   }
 

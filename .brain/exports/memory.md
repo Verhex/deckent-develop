@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-378 Learnings
+- Sprint sprint-378 Learnings: ## Sprint sprint-378 Learnings
+- RUN-CLI-ALIAS — `deckent run` çatı-komutu + sprint-alias: GO_WITH_TECH_DEBT — Converted `run <description>` to `.command('run').argument('<description>')` and added 4 nested subcommands (start/statu
+- RUN-MODE-BRIDGE — `deckent mode run` + config-alias: GO_WITH_TECH_DEBT — Implemented RUN-MODE-BRIDGE without touching the deckent_style enum. src/cli/commands/mode.ts: added `mode run` subcomma
+
+## Gains
+- 378-002 — RUN-SURFACE-TEXT — görünür-metinlerde run-dili — Curated (not mechanical) bridge-language pass, scoped to status/plan/retro human output per goCri...
+
 ## Sprint sprint-377 Learnings
 - Sprint sprint-377 Learnings: ## Sprint sprint-377 Learnings
 - MISSION-VERDICT-FIX — dürüst-DEBT fail sayılmaz: GO_WITH_TECH_DEBT — Investigation first (per task instructions): src/cli/commands/autonomous.ts:535 (the runV2Engine runTask adapter) alread

@@ -36,6 +36,17 @@ function setProjectConfigValue(configPath: string, key: string, value: unknown):
   writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
 }
 
+
+/**
+ * RUN-RENAME dilim-1 (Alperen 2026-07-06, ADR-G-024 MODE-RENAME): display-only
+ * bridge — the stored style value stays 'sprint' (enum untouched, backward-
+ * compatible); every human surface presents it as "run (sprint)" during the
+ * transition. Pure + exported for tests and other surfaces.
+ */
+export function bridgeStyleLabel(style: string): string {
+  return style === 'sprint' ? 'run (sprint)' : style;
+}
+
 export function registerMode(program: Command): void {
   const lang = getLanguage(undefined);
 
@@ -53,6 +64,9 @@ export function registerMode(program: Command): void {
         const config = await loadConfig(root);
         const style = (config as unknown as Record<string, unknown>).deckent_style ?? 'sprint';
         print(`Current: ${style}`);
+        // RUN-RENAME bridge line (display-only; the pinned line above is unchanged).
+        const bridged = bridgeStyleLabel(String(style));
+        if (bridged !== String(style)) print(`Bridge: ${bridged}`);
       } catch (error) {
         printError(error);
         process.exitCode = 1;
@@ -68,6 +82,22 @@ export function registerMode(program: Command): void {
         const configPath = join(root, PROJECT_CONFIG_PATH);
         setProjectConfigValue(configPath, 'deckent_style', 'sprint');
         print('\u2713 Switched to sprint mode (project override)');
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+
+  mode
+    .command('run')
+    .description(getMessage('mode.run_desc', lang))
+    .action(async () => {
+      try {
+        const root = resolveProjectRoot();
+        const configPath = join(root, PROJECT_CONFIG_PATH);
+        // Write-time alias: 'run' maps to the stored 'sprint' value (enum untouched).
+        setProjectConfigValue(configPath, 'deckent_style', 'sprint');
+        print(getMessage('mode.run_switched', lang));
       } catch (error) {
         printError(error);
         process.exitCode = 1;

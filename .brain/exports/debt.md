@@ -9,6 +9,8 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-378-001 | Tech debt from 378-001: Converted `run <description>` to `.command('run').argume | normal | sprint-378 | resolved |
+| debt-378-003 | Tech debt from 378-003: Implemented RUN-MODE-BRIDGE without touching the deckent | normal | sprint-378 | resolved |
 | debt-377-001 | Tech debt from 377-001: Investigation first (per task instructions): src/cli/com | normal | sprint-377 | resolved |
 | debt-377-002 | Tech debt from 377-002: React.lazy()+Suspense route-based code splitting shipped | normal | sprint-377 | resolved |
 | debt-376-001 | Tech debt from 376-001: DONE (tool_surface half): flipped tool_surface to defaul | normal | sprint-376 | resolved |

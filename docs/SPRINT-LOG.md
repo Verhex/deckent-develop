@@ -9212,3 +9212,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 377-003: DASH-POLLING-DEDUP — istek-tekilleştirme katmanı (DONE)
 
 ---
+## Sprint 378 — sprint-378
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-06
+**Duration:** 1481s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1481369ms |
+
+### Tasks
+
+- 378-001: RUN-CLI-ALIAS — `deckent run` çatı-komutu + sprint-alias (GO_WITH_TECH_DEBT)
+- 378-002: RUN-SURFACE-TEXT — görünür-metinlerde run-dili (DONE)
+- 378-003: RUN-MODE-BRIDGE — `deckent mode run` + config-alias (GO_WITH_TECH_DEBT)
+
+---

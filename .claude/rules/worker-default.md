@@ -8,6 +8,7 @@ paths: ["src/**","tests/**"]
 - If you need to query project memory: relevant ADRs and past learnings are provided by Brain via MemoryStore
 - If your implementation would violate an accepted ADR → stop, write NO_GO, propose ADR amendment
 - Write execution plan to `.tasks/task-XXX.plan` before coding
+- **NEVER run `git stash`/`git checkout --`/`git reset` on the shared project tree** — other workers edit it concurrently; a stash/pop wiped two workers' deliveries live (sprint-378, 2026-07-06). To compare against unmodified HEAD, use `git show HEAD:<path>` or a throwaway `git worktree` — never mutate the shared tree.
 - Check `.locks/` before writing any file
 - Update heartbeat (`.tasks/task-XXX.hb`) on every file change
 - Stay within your assigned scope — do not touch files outside it

@@ -25,7 +25,7 @@ export const en = {
   'layout.language': 'Language',
 
   // Dashboard Page
-  'dashboard.title': 'Sprint Dashboard',
+  'dashboard.title': 'Run Dashboard (sprint)',
   'dashboard.no_sprint': 'No active sprint',
   'dashboard.no_sprint_hint': 'Run `deckent start` to begin a sprint.',
   'dashboard.phase': 'Phase',
@@ -166,8 +166,8 @@ export const en = {
   'welcome.last_sprint': 'Last sprint',
 
   // Dashboard additional
-  'dashboard.sprint_status': 'Sprint Status',
-  'dashboard.sprint_id': 'Sprint ID',
+  'dashboard.sprint_status': 'Run Status (sprint)',
+  'dashboard.sprint_id': 'Run ID (sprint)',
   'dashboard.updated': 'Updated',
   'dashboard.active': 'Active',
   'dashboard.pending': 'Pending',
@@ -205,7 +205,7 @@ export const en = {
 
   // New Sprint Modal
   'modal.directives_hint': 'Enter sprint directives below. Each "## Task" block defines a task.',
-  'modal.plan_sprint': 'Plan Sprint',
+  'modal.plan_sprint': 'Plan Run (sprint)',
   'modal.planning': 'Planning sprint...',
   'modal.review_tasks_parsed': 'task(s) parsed. Sprint',
   'modal.review_planned_with': 'planned with',
@@ -360,7 +360,7 @@ export const en = {
   'status.no_sprint': 'No active sprint.',
   'status.run_start': 'Run deckent start to begin.',
   'status.loading': 'Loading sprint data...',
-  'status.title': 'Sprint Status',
+  'status.title': 'Run Status (sprint)',
 
   // Sprint Summary
   'sprint_summary.tasks_done': '{{done}}/{{total}} tasks done',

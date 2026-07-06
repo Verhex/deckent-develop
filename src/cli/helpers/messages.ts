@@ -51,8 +51,8 @@ const MESSAGES: MessageMap = {
     tr: 'Not: Dry-run modunda --watch görmezden gelindi (worker başlatılmadı).',
   },
   'start.sprint_planned': {
-    en: 'Sprint {number} ({id}) planned — {count} tasks:',
-    tr: 'Sprint {number} ({id}) planlandı — {count} görev:',
+    en: 'Run {number} (sprint) ({id}) planned — {count} tasks:',
+    tr: 'Run {number} (sprint) ({id}) planlandı — {count} görev:',
   },
   'start.reasoning': {
     en: 'Reasoning: {reasoning}',
@@ -91,10 +91,20 @@ const MESSAGES: MessageMap = {
     tr: 'Sıfır-yapılandırma modu: geçici DIRECTIVES.md temizlendi',
   },
 
+  // ─── run command (RUN-CLI-ALIAS, Sprint 378 — 378-001) ───────────────
+  'run.alias_note': {
+    en: "Note: 'run start|status|retro|history' are aliases for the top-level "
+      + "'deckent start|status|retro|history' commands — identical behavior, same handler. "
+      + "'sprint' terminology is being renamed to 'run'.",
+    tr: "Not: 'run start|status|retro|history', üst-düzey 'deckent start|status|retro|history' "
+      + "komutlarının takma adıdır — davranış ve işleyici birebir aynıdır. "
+      + "'sprint' terimi 'run' olarak yeniden adlandırılıyor.",
+  },
+
   // ─── plan command ───────────────────────────────────────────────────
   'plan.sprint_planned': {
-    en: 'Sprint {number} ({id}) planned with {count} tasks:',
-    tr: 'Sprint {number} ({id}) {count} görevle planlandı:',
+    en: 'Run {number} (sprint) ({id}) planned with {count} tasks:',
+    tr: 'Run {number} (sprint) ({id}) {count} görevle planlandı:',
   },
   'plan.reasoning': {
     en: 'Reasoning: {reasoning}',
@@ -105,8 +115,8 @@ const MESSAGES: MessageMap = {
     tr: 'Planlama modu: {mode}',
   },
   'plan.note_sprint_size': {
-    en: 'Note: Sprint size {size} — {reason}',
-    tr: 'Not: Sprint boyutu {size} — {reason}',
+    en: 'Note: Run (sprint) size {size} — {reason}',
+    tr: 'Not: Run (sprint) boyutu {size} — {reason}',
   },
   'plan.approved': {
     en: 'Plan approved.',
@@ -179,8 +189,8 @@ const MESSAGES: MessageMap = {
     tr: '.tasks/ dizininde görev bulunamadı. Sonlandırılacak bir şey yok.',
   },
   'finalize.complete': {
-    en: 'Sprint {sprintId} finalized: {total} tasks ({done} done, {debt} debt, {noGo} no-go). MEMORY.md, RETRO.md, and config updated.',
-    tr: 'Sprint {sprintId} sonlandırıldı: {total} görev ({done} tamam, {debt} borç, {noGo} no-go). MEMORY.md, RETRO.md ve config güncellendi.',
+    en: 'Run {sprintId} (sprint) finalized: {total} tasks ({done} done, {debt} debt, {noGo} no-go). MEMORY.md, RETRO.md, and config updated.',
+    tr: 'Run {sprintId} (sprint) sonlandırıldı: {total} görev ({done} tamam, {debt} borç, {noGo} no-go). MEMORY.md, RETRO.md ve config güncellendi.',
   },
 
   // ─── doctor command ──────────────────────────────────────────────────
@@ -462,8 +472,16 @@ const MESSAGES: MessageMap = {
 
   // ─── mode command (MODE-HELP-FIX, Sprint 376 — 376-002) ──────────────
   'mode.group_desc': {
-    en: 'Get/set deckent_style (sprint|task|process|auto)',
-    tr: 'deckent_style al/ayarla (sprint|task|process|auto)',
+    en: 'Get/set deckent_style (run (sprint) | task | process)',
+    tr: 'deckent_style al/ayarla (run (sprint) | task | process)',
+  },
+  'mode.run_desc': {
+    en: 'Switch to run mode (bridge alias — stores deckent_style: "sprint")',
+    tr: 'Run moduna geç (köprü-alias — deckent_style: "sprint" olarak saklanır)',
+  },
+  'mode.run_switched': {
+    en: '\u2713 Switched to run mode (stored as "sprint" — bridge alias)',
+    tr: '\u2713 Run moduna geçildi ("sprint" olarak saklandı — köprü-alias)',
   },
   'mode.rename_note': {
     en: "Note: 'sprint' will soon be renamed to 'run' (naming decision pending rollout).",

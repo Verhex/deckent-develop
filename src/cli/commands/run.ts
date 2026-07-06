@@ -50,6 +50,7 @@ import { detectProjectStack } from '../../core/stack-detector.js';
 import { routeTaskV2 } from '../../core/routing-engine.js';
 import type { UserOverride } from '../../core/routing-types.js';
 import { normalizeTaskResultShape } from '../../core/task-result-schema.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 
 let _runTaskCounter = 0;
 export function createRunTaskId(): string {
@@ -239,8 +240,9 @@ export async function streamWorkerLog(
 // ─── Command Registration ────────────────────────────────────────────
 
 export function registerRun(program: Command): void {
-  program
-    .command('run <description>')
+  const runCmd = program
+    .command('run')
+    .argument('<description>')
     .description('Run a single one-shot task without a sprint cycle')
     .option('--model <model>', `Model to use (default: sonnet). Options: ${ALL_MODELS.join(', ')}`, 'sonnet')
     .option('--model-effort <level>', 'Native model reasoning-effort (claude: low|medium|high|xhigh|max, codex: minimal|low|medium|high). Opt-in; unsupported/invalid levels are ignored')
@@ -405,5 +407,27 @@ export function registerRun(program: Command): void {
         process.exitCode = 1;
       }
     });
+
+  // ── RUN-RENAME dilim-1 (Alperen 2026-07-06, ADR-G-024): `run start|status|retro|history`
+  // aliases delegate to the EXACT top-level lifecycle commands (same handlers, no copies).
+  // The legacy one-shot `run "<description>"` signature above is untouched — a first
+  // positional that is not one of these four reserved names still runs a single task.
+  const RUN_ALIAS_TARGETS = ['start', 'status', 'retro', 'history'] as const;
+  for (const target of RUN_ALIAS_TARGETS) {
+    runCmd
+      .command(target)
+      .description(getMessage('run.alias_note', getLanguage(undefined)))
+      .argument('[args...]')
+      // passThroughOptions would demand enablePositionalOptions on the SHARED
+      // root program (global parse-semantics change — too risky). Empirically
+      // verified: allowUnknownOption + variadic capture keeps raw tokens in
+      // order inside this.args, so the delegated parse reproduces the exact
+      // handler+options of the top-level command.
+      .allowUnknownOption()
+      .allowExcessArguments()
+      .action(async function (this: Command) {
+        await program.parseAsync([target, ...this.args], { from: 'user' });
+      });
+  }
 }
 
