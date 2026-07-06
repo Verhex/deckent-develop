@@ -1,7 +1,7 @@
 # ADR-D-010: REPL Input Stabilization (Cursor / Queue / Streaming Contract)
 
 **Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=test-suite-only (`tests/cli/line-edit.test.ts`, `tests/cli/repl-input-queue.test.ts`, `tests/cli/repl/f11-016-stab.test.tsx`, `tests/cli/repl/term-compat-matrix.test.ts` — no runtime gate, no `lint:*` hook) → tomorrow=named follow-up tasks per KALAN-envanter item (§ below), each closing with its own targeted test before this ADR's Status graduates past `proposed`
-**Status:** proposed (acceptance: Alperen) · **Date:** 2026-07-05 · **Absorbs:** — (new; consolidates the F11-016 line of work — Sprint 224 Ink migration, 360-009, 368-003, commit `2ddda01b` — under one governance record; no legacy ADR-NNN predecessor)
+**Status:** accepted (Alperen, 2026-07-06) · **Date:** 2026-07-05 · **Absorbs:** — (new; consolidates the F11-016 line of work — Sprint 224 Ink migration, 360-009, 368-003, commit `2ddda01b` — under one governance record; no legacy ADR-NNN predecessor)
 **Crosswalk:** — (new decision, no legacy ADR-NNN mapping)
 
 > **Origin note:** MASTER-PLAN Row-62 (F11-016, "Ink REPL stabilizasyon (cursor/queue/streaming) + ADR") has carried an open ADR-ayağı since the row was created. This document is that ADR-ayağı: it records what F11-016 already shipped (Sprint 224 Ink migration, 360-009 render fixes, 368-003 input-queue core, and its `2ddda01b` app.tsx wire), states the behavior guarantees that stack of work actually provides today, and — per the ADR-G-019 authoring standard's demand for honesty — inventories what is explicitly **not yet** guaranteed rather than implying the row is closed.
