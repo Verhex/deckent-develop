@@ -1712,7 +1712,11 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // blocks were declared on the type but never passed through in EITHER
     // resolver (this one nor mergeConfigs) — on the live path every flag
     // silently resolved to undefined (off) no matter what the user set.
-    repl_surface: config.repl_surface,
+    // W1-EXPERIENCE-ON (#492, Alperen 2026-07-06): the terminal experience layer
+    // (live footer, mode indicator, approval card) ships ON by default — months
+    // of UX stayed invisible behind absent config blocks (user-truth-audit §2).
+    // An explicit { enabled: false } still turns it off (opt-out, not opt-in).
+    repl_surface: config.repl_surface ?? { enabled: true, approvals: true },
     tool_surface: config.tool_surface,
     deck_broker: config.deck_broker,
     training_trace: config.training_trace,
@@ -2442,7 +2446,11 @@ export function mergeConfigs(
     // every flag silently resolved to undefined (off) no matter what the user
     // set. Each is a plain pass-through: absent = disabled, exactly like
     // resource_monitor/worker_comms above.
-    repl_surface: config.repl_surface,
+    // W1-EXPERIENCE-ON (#492, Alperen 2026-07-06): the terminal experience layer
+    // (live footer, mode indicator, approval card) ships ON by default — months
+    // of UX stayed invisible behind absent config blocks (user-truth-audit §2).
+    // An explicit { enabled: false } still turns it off (opt-out, not opt-in).
+    repl_surface: config.repl_surface ?? { enabled: true, approvals: true },
     tool_surface: config.tool_surface,
     deck_broker: config.deck_broker,
     training_trace: config.training_trace,

@@ -130,12 +130,28 @@ describe('config flag round-trip — 9 opt-in blocks through the REAL loadConfig
     }
   });
 
-  it('absent blocks resolve to undefined — opt-in, zero behavior change', async () => {
+  it('absent blocks resolve per-contract — opt-in blocks undefined, experience-layer default-ON', async () => {
     writeProjectConfig(projectRoot, {});
     const resolved = (await loadConfig(projectRoot)) as unknown as Record<string, unknown>;
+    // W1-EXPERIENCE-ON (#492, Alperen 2026-07-06): repl_surface is the terminal
+    // EXPERIENCE layer and ships ON when the block is absent (opt-out). The
+    // remaining blocks stay opt-in/undefined.
+    const DEFAULT_ON: Record<string, unknown> = {
+      repl_surface: { enabled: true, approvals: true },
+    };
     for (const { name } of ROUND_TRIP_BLOCKS) {
-      expect(resolved[name]).toBeUndefined();
+      if (name in DEFAULT_ON) {
+        expect(resolved[name]).toEqual(DEFAULT_ON[name]);
+      } else {
+        expect(resolved[name]).toBeUndefined();
+      }
     }
+  });
+
+  it('explicit { enabled: false } still turns the experience layer OFF (opt-out honored)', async () => {
+    writeProjectConfig(projectRoot, { repl_surface: { enabled: false } });
+    const resolved = (await loadConfig(projectRoot)) as unknown as Record<string, unknown>;
+    expect(resolved['repl_surface']).toEqual({ enabled: false });
   });
 });
 
