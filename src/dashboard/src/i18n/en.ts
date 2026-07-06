@@ -659,6 +659,12 @@ export const en = {
   'approvals.risk_medium': 'medium',
   'approvals.risk_high': 'high',
   'approvals.risk_critical': 'critical',
+
+  // Missions page — work-item three-way settle status (sprint-377 task 377-001,
+  // mission-w1 honesty fix: GO_WITH_TECH_DEBT is a success, not a failure)
+  'mission.item.status.done': 'Done',
+  'mission.item.status.debt': 'Tech debt',
+  'mission.item.status.failed': 'Failed',
 } as const;
 
 export type TranslationKey = keyof typeof en;

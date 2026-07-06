@@ -661,4 +661,10 @@ export const tr: Record<TranslationKey, string> = {
   'approvals.risk_medium': 'orta',
   'approvals.risk_high': 'yüksek',
   'approvals.risk_critical': 'kritik',
+
+  // Missions sayfası — iş-maddesi üçlü sonuç durumu (sprint-377 görev 377-001,
+  // mission-w1 dürüstlük düzeltmesi: GO_WITH_TECH_DEBT başarıdır, hata değil)
+  'mission.item.status.done': 'Tamamlandı',
+  'mission.item.status.debt': 'Teknik borç',
+  'mission.item.status.failed': 'Başarısız',
 };

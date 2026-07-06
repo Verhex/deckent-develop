@@ -9,6 +9,8 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-377-001 | Tech debt from 377-001: Investigation first (per task instructions): src/cli/com | normal | sprint-377 | resolved |
+| debt-377-002 | Tech debt from 377-002: React.lazy()+Suspense route-based code splitting shipped | normal | sprint-377 | resolved |
 | debt-376-001 | Tech debt from 376-001: DONE (tool_surface half): flipped tool_surface to defaul | normal | sprint-376 | resolved |
 | debt-376-002 | Tech debt from 376-002: MODE-HELP-FIX: fixed the stale `mode global <style>` des | normal | sprint-376 | resolved |
 | debt-375-006 | Tech debt from 375-006: Scope conflict discovered before writing, resolved by fo | normal | sprint-375 | resolved |

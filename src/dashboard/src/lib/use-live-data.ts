@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getBootstrapApiToken } from "./api";
+import { dedupedFetch } from "./request-cache";
 
 // ─── Live Activity (DASH-RT-1) ──────────────────────────────────────────────
 
@@ -61,7 +62,7 @@ export function useLiveData<T>(
   const [error, setError] = useState<Error | null>(null);
   const [status, setStatus] = useState<LiveDataStatus>("connecting");
 
-  const abortRef = useRef<AbortController | null>(null);
+  const releaseRef = useRef<(() => void) | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
   // Latest tick function — written by the effect below so the stable
@@ -73,16 +74,21 @@ export function useLiveData<T>(
     mountedRef.current = true;
 
     async function tick(): Promise<void> {
-      const controller = new AbortController();
-      abortRef.current = controller;
       setIsLoading(true);
 
       const headers: Record<string, string> = {};
       const token = getBootstrapApiToken();
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
+      // De-duplicated fetch (DASH-POLLING-DEDUP): if another caller already
+      // has an in-flight request to this same URL, share its promise instead
+      // of firing a duplicate GET. `release` is reference-counted — it only
+      // aborts the underlying request once every subscriber has released it.
+      const handle = dedupedFetch(url, { headers });
+      releaseRef.current = handle.release;
+
       try {
-        const res = await fetch(url, { headers, signal: controller.signal });
+        const res = await handle.promise;
         if (!mountedRef.current) return;
         if (!res.ok) throw new Error(`GET ${url} → ${res.status}`);
         const body = (await res.json()) as T;
@@ -96,7 +102,6 @@ export function useLiveData<T>(
         }, pollIntervalMs);
       } catch (err) {
         // Aborted on unmount → no state updates, no retry.
-        if (controller.signal.aborted) return;
         if (!mountedRef.current) return;
         setError(err instanceof Error ? err : new Error(String(err)));
         // Stale-while-revalidate: KEEP the previous `data`. Mark it stale so the
@@ -127,7 +132,7 @@ export function useLiveData<T>(
     return () => {
       mountedRef.current = false;
       tickRef.current = () => {};
-      abortRef.current?.abort();
+      releaseRef.current?.();
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;

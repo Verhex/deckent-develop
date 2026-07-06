@@ -2,6 +2,20 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint377] - 2026-07-06
+
+### Added
+
+- DASH-POLLING-DEDUP — istek-tekilleştirme katmanı
+
+### Changed
+
+- MISSION-VERDICT-FIX — dürüst-DEBT fail sayılmaz (completed with tech debt)
+- DASH-LAZY-LOAD — route-bazlı code-splitting (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 2 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint376] - 2026-07-06
 
 ### Added

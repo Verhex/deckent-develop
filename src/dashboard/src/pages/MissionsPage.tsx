@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Badge } from "../components/ui/badge";
 import { SkeletonCard } from "../components/Skeleton";
 import EmptyState from "../components/EmptyState";
+import { useTranslation } from "../i18n/LanguageProvider";
 import {
   Target,
   CheckSquare2,
@@ -13,17 +14,23 @@ import {
   XCircle,
   Clock,
   Activity,
+  AlertTriangle,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 // Local types matching the MissionView shape from src/orchestra/autonomous/mission-store/mission-view.ts
 interface Progress { done: number; total: number; phase?: string; step?: string; }
+interface ItemResultLike { ok: boolean; reason?: string; settleDetail?: "done" | "debt" | "failed"; }
 interface MissionItem {
   id: string;
   kind: string;
   status: string;
   renderAs: string;
   progress: Progress | null;
+  // NOTE (docImpact): mission-view.ts#projectMission does not forward item.lastResult
+  // to the API yet (out of this task's write scope) — until it does, this stays
+  // undefined in production and item badges fall back to `status` alone.
+  lastResult?: ItemResultLike | null;
 }
 interface MissionView {
   id: string;
@@ -71,6 +78,68 @@ const STATUS_ICON: Record<string, LucideIcon> = {
   failed: XCircle,
   cancelled: XCircle,
 };
+
+// Work-item three-way settle presentation key: 'debt' is not a WorkItemStatus value —
+// it is derived here from `lastResult.settleDetail` on top of a terminal 'done' status,
+// so an honest GO_WITH_TECH_DEBT item is never confused with a failure (mission-w1 fix).
+type ItemPresentationKey = "pending" | "running" | "done" | "debt" | "failed" | "parked";
+
+function itemPresentationKey(item: MissionItem): ItemPresentationKey {
+  if (item.status === "done" && item.lastResult?.settleDetail === "debt") return "debt";
+  if (
+    item.status === "pending" || item.status === "running" || item.status === "done" ||
+    item.status === "failed" || item.status === "parked"
+  ) {
+    return item.status;
+  }
+  return "pending";
+}
+
+// presentation-key → badge color classes (self-contained: includes the border color,
+// matching the RenderAsBadge pattern below — does not rely on the <Badge> component).
+const ITEM_STATUS_COLOR: Record<ItemPresentationKey, string> = {
+  pending: "bg-zinc-800 text-zinc-400 border-zinc-700",
+  running: "bg-blue-900/50 text-blue-300 border-blue-800",
+  done: "bg-green-900/50 text-green-300 border-green-800",
+  debt: "bg-amber-900/50 text-amber-300 border-amber-800",
+  failed: "bg-red-900/50 text-red-300 border-red-800",
+  parked: "bg-zinc-900/50 text-zinc-500 border-zinc-800",
+};
+
+// presentation-key → lucide icon (no emoji — DIRECTIVES.md sprint-377 binding rule)
+const ITEM_STATUS_ICON: Record<ItemPresentationKey, LucideIcon> = {
+  pending: Clock,
+  running: Activity,
+  done: CheckCircle,
+  debt: AlertTriangle,
+  failed: XCircle,
+  parked: Clock,
+};
+
+function itemStatusLabel(
+  key: ItemPresentationKey,
+  t: (k: "mission.item.status.done" | "mission.item.status.debt" | "mission.item.status.failed") => string,
+): string {
+  if (key === "done") return t("mission.item.status.done");
+  if (key === "debt") return t("mission.item.status.debt");
+  if (key === "failed") return t("mission.item.status.failed");
+  return key; // pending/running/parked — same unlocalized-raw-enum convention as the mission status badge below
+}
+
+function WorkItemBadge({ item }: { item: MissionItem }) {
+  const { t } = useTranslation();
+  const key = itemPresentationKey(item);
+  const Icon = ITEM_STATUS_ICON[key];
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${ITEM_STATUS_COLOR[key]}`}
+      data-testid={`mission-item-status-${item.id}`}
+    >
+      <Icon className="w-3 h-3" aria-hidden="true" />
+      {itemStatusLabel(key, t)}
+    </span>
+  );
+}
 
 function RenderAsBadge({ renderAs }: { renderAs: string }) {
   const Icon = RENDER_AS_ICON[renderAs] ?? ListTodo;
@@ -189,6 +258,13 @@ export default function MissionsPage() {
                     <p className="text-xs text-red-400" data-testid={`mission-error-${mission.id}`}>
                       {mission.lastResult.reason}
                     </p>
+                  )}
+                  {mission.items.length > 0 && (
+                    <div className="flex flex-wrap gap-2" data-testid={`mission-items-${mission.id}`}>
+                      {mission.items.map((item) => (
+                        <WorkItemBadge key={item.id} item={item} />
+                      ))}
+                    </div>
                   )}
                 </CardContent>
               </Card>

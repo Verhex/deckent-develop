@@ -253,14 +253,19 @@ describe("dashboard layout + router + navigation", () => {
       expect(app()).toContain("<Route element={<Layout />}>");
     });
 
-    it("uses direct imports instead of lazy", () => {
+    it("uses route-based code-splitting: critical routes eager, the rest lazy (PUBLISH-P2, 2026-07-06)", () => {
+      // Contract FLIP: the old pin ("direct imports, no lazy") predates the
+      // W3-DASH-PERF decision — 17 eager pages put Recharts+xterm into the
+      // first-paint bundle (user-truth-audit §4). Now: Dashboard + Chat stay
+      // eager (first-paint critical), everything else must be lazy().
       const content = app();
-      expect(content).not.toContain("lazy(");
-      expect(content).not.toContain("Suspense");
+      expect(content).toContain("lazy(");
+      expect(content).toContain("Suspense");
       expect(content).toContain('import DashboardPage from');
-      expect(content).toContain('import SettingsPage from');
-      expect(content).toContain('import HistoryPage from');
-      expect(content).toContain('import MemoryPage from');
+      // Heavy chart-carrying pages must be lazy; small pages may stay eager
+      // (the shipped split keeps light pages eager by design — App.tsx:10-30).
+      expect(content).not.toMatch(/^import HistoryPage from/m);
+      expect(content).toMatch(/HistoryPage = lazy\(/);
     });
 
     it("still has BrowserRouter", () => {

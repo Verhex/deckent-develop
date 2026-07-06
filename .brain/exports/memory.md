@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-377 Learnings
+- Sprint sprint-377 Learnings: ## Sprint sprint-377 Learnings
+- MISSION-VERDICT-FIX — dürüst-DEBT fail sayılmaz: GO_WITH_TECH_DEBT — Investigation first (per task instructions): src/cli/commands/autonomous.ts:535 (the runV2Engine runTask adapter) alread
+- DASH-LAZY-LOAD — route-bazlı code-splitting: GO_WITH_TECH_DEBT — React.lazy()+Suspense route-based code splitting shipped in App.tsx. Eager (critical first paint, per task): "/" (Dashbo
+
+## Gains
+- 377-003 — DASH-POLLING-DEDUP — istek-tekilleştirme katmanı — Added src/dashboard/src/lib/request-cache.ts: a module-level in-flight request dedup cache (dedup...
+
 ## Sprint sprint-376 Learnings
 - Sprint sprint-376 Learnings: ## Sprint sprint-376 Learnings
 - TOOL-QB-FLIP — tool_surface + approval.question_bridge default-ON: GO_WITH_TECH_DEBT — DONE (tool_surface half): flipped tool_surface to default-ON (opt-out) in BOTH resolvers (config.ts loadConfig ~1719-172

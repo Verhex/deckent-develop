@@ -15,7 +15,7 @@ import { migrateBacklogJson } from './mission-migrate.js';
 import { runMissionScheduler, type DispatchFn, type MissionSchedulerSummary } from './mission-scheduler.js';
 import { advanceGoalMission, type GoalAdvanceDeps } from './goal-mission.js';
 import { auditMissionLifecycle } from './mission-audit-bridge.js';
-import type { Mission, MissionStore, ResultLike } from './mission-types.js';
+import type { Mission, MissionStore, ResultLike, SettleDetail } from './mission-types.js';
 
 /**
  * Pure flag predicate — true only when the project config opts into the v2
@@ -64,6 +64,35 @@ export interface RunV2EngineDeps {
    * its own SqliteMissionStore(projectRoot) and closes it on completion.
    */
   store?: MissionStore;
+}
+
+/**
+ * Canonical DONE/DEBT/NO_GO → settle-outcome mapping (mission-w1 honesty fix). Trusts
+ * an explicit `settleDetail` if the caller already set one (e.g. a composition root
+ * that forwards the worker's raw selfAssessment — `NO_GO` → 'failed', `GO_WITH_TECH_DEBT`
+ * → 'debt', `DONE` → 'done'); otherwise falls back to the safe `ok`-derived binary, so
+ * older/fake callers that only return `{ ok }` keep working unchanged.
+ */
+export function deriveSettleDetail(result: Pick<ResultLike, 'ok' | 'settleDetail'>): SettleDetail {
+  if (result.settleDetail) return result.settleDetail;
+  return result.ok ? 'done' : 'failed';
+}
+
+/**
+ * Wrap an injected `runTask` so every task-kind ResultLike dispatched through this
+ * engine run always carries a normalized `settleDetail`. This is the single point
+ * (shared by both the scheduler-only and the goal-driven path, since both consume the
+ * same `dispatch`) where the DEBT-vs-clean-DONE nuance survives into the persisted
+ * WorkItem.lastResult — `ok` alone (as already correctly derived at the CLI composition
+ * root, `ok: selfAssessment !== 'NO_GO'`) cannot distinguish a clean DONE from an honest
+ * GO_WITH_TECH_DEBT, so a mission built entirely of DEBT items must still settle
+ * 'completed', never 'failed'.
+ */
+function withSettleDetail(runTask: RunV2EngineDeps['runTask']): RunV2EngineDeps['runTask'] {
+  return async (ctx) => {
+    const res = await runTask(ctx);
+    return { ...res, settleDetail: deriveSettleDetail(res) };
+  };
 }
 
 /** Resolve a concrete scheduler pool size from config (never < 1). */
@@ -118,7 +147,7 @@ export async function runV2Engine(
     const dispatch = buildMissionDispatch({
       projectRoot,
       config,
-      runTask: deps.runTask,
+      runTask: withSettleDetail(deps.runTask),
       runSprint: deps.runSprint,
       ...(deps.runCapability ? { runCapability: deps.runCapability } : {}),
     });

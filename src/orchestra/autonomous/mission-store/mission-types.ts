@@ -9,7 +9,16 @@ export type WorkItemRenderAs = 'task' | 'sprint' | 'workflow' | 'action';
 export type WorkItemPolicy = 'auto' | 'approval-required' | 'risk-tagged';
 
 export interface Progress { done: number; total: number; phase?: string; step?: string; }
-export interface ResultLike { ok: boolean; reason?: string; [k: string]: unknown; }
+/**
+ * Three-way settle outcome for a dispatched work item, layered on top of the binary
+ * `ok` used for scheduling: 'done' = clean success, 'debt' = succeeded but the worker
+ * honestly self-assessed GO_WITH_TECH_DEBT (still `ok: true` — DEBT is not a failure),
+ * 'failed' = NO_GO / thrown / timed-out. Optional: absent on any ResultLike falls back
+ * to `ok ? 'done' : 'failed'` (see mission-engine-wire.ts#deriveSettleDetail) — no store
+ * migration needed, it round-trips through the existing JSON `last_result` column.
+ */
+export type SettleDetail = 'done' | 'debt' | 'failed';
+export interface ResultLike { ok: boolean; reason?: string; settleDetail?: SettleDetail; [k: string]: unknown; }
 
 export interface Mission {
   id: string; kind: MissionKind; status: MissionStatus; tenant: string;
