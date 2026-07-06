@@ -669,12 +669,12 @@ Old ADR-065 proposed two continuously-synced repos: a private `deckent-develop` 
 
 ## adr-d-009: Worker-Result Boundary Normalization Policy
 
-**Status:** proposed
+**Status:** accepted
 
 # ADR-D-009: Worker-Result Boundary Normalization Policy
 
 **Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=disk-read-boundary normalize (`task-result-schema.ts` `coerceNotesToString`+`normalizeTaskResultShape`, applied at every `readJsonSafe<TaskResult>` call site) + honest-fallback rubric-fault handling (`sprint-phases.ts`, main eval site armored; 4 remaining sites in-flight, sprint-369 Task 1 / RUBRIC-ARMOR-COMPLETE) + mandatory loud-abort on the outer EVALUATE catch (`BRAIN→AUDITOR:EVALUATE_ABORTED`) + honest metrics denominator → tomorrow=assembly-time strict-reject gate (`TaskResultV1`/`validateTaskResult`, `result-assembler.ts`) rolling out flag-gated report-only (`worker_output_contract.strict_report`, sprint-369 Task 8 / V1-STRICT-REPORT) toward default-on enforcement
-**Status:** proposed (acceptance: Alperen) · **Date:** 2026-07-05 · **Absorbs:** — (new; born directly from the born-484 live incident, no legacy predecessor)
+**Status:** accepted (Alperen, 2026-07-06) · **Date:** 2026-07-05 · **Absorbs:** — (new; born directly from the born-484 live incident, no legacy predecessor)
 **Crosswalk:** — (new decision, no legacy ADR-NNN mapping)
 
 > **Origin note:** This ADR codifies the policy already shipped in commit `14f0a244` (2026-07-05) — the root-cause fix for **born-484** (sprints 365/366 lived a real Codex-CLI worker writing `notes` as a string array; the un-guarded `(result.notes ?? '').toLowerCase()` inside `isVerificationTask` threw a `TypeError`, `evaluateWithRubric` had no per-task `try`, and the phase's outer `catch` swallowed the fault to the dashboard only — the EVALUATE loop silently died and the sprint closed reporting "0/0" even though the underlying work was real and the collector had already gathered every result). This document exists so the *policy* — not just the one-off patch — survives every future provider-CLI integration.
@@ -775,12 +775,12 @@ This is not a one-off Codex quirk. Every provider-CLI integration deckent adds i
 
 ## adr-d-010: REPL Input Stabilization (Cursor / Queue / Streaming Contract)
 
-**Status:** proposed
+**Status:** accepted
 
 # ADR-D-010: REPL Input Stabilization (Cursor / Queue / Streaming Contract)
 
 **Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=test-suite-only (`tests/cli/line-edit.test.ts`, `tests/cli/repl-input-queue.test.ts`, `tests/cli/repl/f11-016-stab.test.tsx`, `tests/cli/repl/term-compat-matrix.test.ts` — no runtime gate, no `lint:*` hook) → tomorrow=named follow-up tasks per KALAN-envanter item (§ below), each closing with its own targeted test before this ADR's Status graduates past `proposed`
-**Status:** proposed (acceptance: Alperen) · **Date:** 2026-07-05 · **Absorbs:** — (new; consolidates the F11-016 line of work — Sprint 224 Ink migration, 360-009, 368-003, commit `2ddda01b` — under one governance record; no legacy ADR-NNN predecessor)
+**Status:** accepted (Alperen, 2026-07-06) · **Date:** 2026-07-05 · **Absorbs:** — (new; consolidates the F11-016 line of work — Sprint 224 Ink migration, 360-009, 368-003, commit `2ddda01b` — under one governance record; no legacy ADR-NNN predecessor)
 **Crosswalk:** — (new decision, no legacy ADR-NNN mapping)
 
 > **Origin note:** MASTER-PLAN Row-62 (F11-016, "Ink REPL stabilizasyon (cursor/queue/streaming) + ADR") has carried an open ADR-ayağı since the row was created. This document is that ADR-ayağı: it records what F11-016 already shipped (Sprint 224 Ink migration, 360-009 render fixes, 368-003 input-queue core, and its `2ddda01b` app.tsx wire), states the behavior guarantees that stack of work actually provides today, and — per the ADR-G-019 authoring standard's demand for honesty — inventories what is explicitly **not yet** guaranteed rather than implying the row is closed.
@@ -905,12 +905,15 @@ Per ADR-G-019 §4 ("every ADR documents both today and tomorrow, transparently")
 
 ## adr-d-011: Global Install Topology — Daemon vs CLI-Invoked, Project-Scope Config Layer
 
-**Status:** proposed
+**Status:** accepted
 
 # ADR-D-011: Global Install Topology — Daemon vs CLI-Invoked, Project-Scope Config Layer
 
+> **ACCEPTED DECISION (2026-07-06, Alperen):** Option C (Hybrid — per-project coordination daemon, CLI stays primary)
+
+
 **Class:** ADR-D (Dogfooding / Dev) — **see Meta-note below; classification is itself an open question** · **Scope:** global+project · **Immutable:** no (proposed) · **Source:** publisher · **Enforcement:** today=none, design-only — no code ships with this ADR → tomorrow=phased build (§ Intent/Roadmap) gated on Alperen's decision below
-**Status:** proposed (acceptance: Alperen) · **Date:** 2026-07-05 · **Absorbs:** — (new; this is the daemon-vs-CLI install-architecture axis of MASTER-PLAN row-200 ONB-GLOBAL — a *sibling*, not a duplicate, of the file-location axis already drafted in `docs/design/onb-global-install.md` §8) · **Supersedes:** —
+**Status:** accepted (Alperen, 2026-07-06) · **Date:** 2026-07-05 · **Absorbs:** — (new; this is the daemon-vs-CLI install-architecture axis of MASTER-PLAN row-200 ONB-GLOBAL — a *sibling*, not a duplicate, of the file-location axis already drafted in `docs/design/onb-global-install.md` §8) · **Supersedes:** —
 **Crosswalk:** — (new decision, no legacy ADR-NNN predecessor)
 
 > **Meta-note (classification — flagged, not resolved by this document):** Per ADR-G-019 §1's own class definitions, ADR-G covers "runtime behavior, orchestration... ships in BOTH global install AND every project install... applies to dogfood AND user (solo → largest enterprise, million-scale)"; ADR-D covers only "how deckent is BUILT — contributor conventions... ships ONLY with the dev install." This document's subject — how the *installed product* runs for every end user — reads as ADR-G by that definition, not ADR-D. The write-scope assigned to this task, however, is the file `docs/adr/adr-d-011-global-install-project-scope.md` (a D-slot). Rather than write outside my assigned scope, I am flagging the mismatch explicitly as **Open Question 1** below and keeping the file at its assigned path/number; the Class header above is left as assigned pending Alperen's call — if reclassified, the correct move is a follow-up rename to an `ADR-G-0XX` slot (mirroring the placeholder the sibling document already reserved, `docs/design/onb-global-install.md` §8) plus this file's retirement/redirect, not a silent edit of the number here.
@@ -1129,12 +1132,12 @@ Phased build, gated on Alperen's acceptance of this ADR (nothing below ships wit
 
 ## adr-d-012: Terminal Risk Language (Oku / Değiştir / Çalıştır / Otonom)
 
-**Status:** proposed
+**Status:** accepted
 
 # ADR-D-012: Terminal Risk Language (Oku / Değiştir / Çalıştır / Otonom)
 
 **Class:** ADR-D (Dogfooding / Dev) · **Scope:** `src/cli/command-registry.ts`, `src/cli/repl/tool-permissions.ts`, `src/cli/commands/chat-native.ts`, `src/cli/commands/chat-mcp-bridge.ts`, `src/cli/repl/native-tool-registry.ts`, `src/cli/helpers/catalog-render.ts`, `src/cli/helpers/messages.ts` (future i18n keys), `src/dashboard/` (forward constraint, no current consumer) · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=none (no lint/test enforces `CommandRisk` as the user-facing word; `tests/cli/command-registry.test.ts:29-31,48-51` only validates ladder-membership, not display or approval-tier consistency) → tomorrow=RISK-DRIFT-GUARD invariant test (§ Open Questions) + `cmdCatalog.*` i18n wiring + named registry-fix task(s), each closing before this ADR's Status graduates past `proposed`
-**Status:** proposed (acceptance: Alperen) · **Date:** 2026-07-05 (re-verified against disk 2026-07-06, task 373-002 — two stale citation line-ranges corrected, no substantive claim changed) · **Absorbs:** the evidence package in `docs/design/term5-risk-language.md` (sprint-363, task 363-008) — this ADR is that document's §9 "Önerilen Karar" carried into ADR form, re-verified against disk on 2026-07-05, plus a new registry/approval-tier consistency check (§ Decision, item 4) beyond what that document itself measured
+**Status:** accepted (Alperen, 2026-07-06) · **Date:** 2026-07-05 (re-verified against disk 2026-07-06, task 373-002 — two stale citation line-ranges corrected, no substantive claim changed) · **Absorbs:** the evidence package in `docs/design/term5-risk-language.md` (sprint-363, task 363-008) — this ADR is that document's §9 "Önerilen Karar" carried into ADR form, re-verified against disk on 2026-07-05, plus a new registry/approval-tier consistency check (§ Decision, item 4) beyond what that document itself measured
 **Crosswalk:** MASTER-PLAN #45 (TERM-5, "Görsel+işlevsel tutarlı/yormayan dil + sade risk-dili", row status 🔬 at authoring time)
 
 > **Origin note:** `docs/design/term5-risk-language.md` found that TERM-5's target 4-level ladder (`CommandRisk`) already exists in code (`command-registry.ts:34-38`) and is applied to all 75 registry entries, but has no i18n, no UI consumer, and coexists with 7 other risk/trust dictionaries with no central translation table. That document's §9 sketched a decision but explicitly stated it was not an ADR file and not recorded in `.brain/memory.db`. This document is that conversion, re-checked against the current source tree rather than copied verbatim.
@@ -1249,11 +1252,14 @@ This ADR does not change `command-registry.ts` or `tool-permissions.ts` (task co
 
 ## adr-d-013: NL-Dispatch Default Policy (`agenticDispatch` — Natural-Language → MCP-Tool Direct Dispatch)
 
-**Status:** proposed
+**Status:** accepted
 
 # ADR-D-013: NL-Dispatch Default Policy (`agenticDispatch` — Natural-Language → MCP-Tool Direct Dispatch)
 
-**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=none (the mechanism is live in code and test-covered, but no runtime gate or lint rule ties a specific default to this record — the flag's value at each call-site is simply whatever the last commit left it at) → tomorrow=once Alperen selects an option below, the chosen default is wired at the named call-sites plus a regression test asserting it, and this ADR's `Status` graduates from `proposed` to `accepted` · **Status:** proposed (acceptance: Alperen) · **Date:** 2026-07-05 · **Absorbs:** `docs/design/nl-dispatch-default-decision.md` (sprint-359 task 359-009 evidence package — this ADR is that document's §6 "Önerilen Karar" promoted to a standalone, numbered governance record; the design doc remains on disk as the underlying evidence citation, not superseded/deleted) · **Crosswalk:** MASTER-PLAN #57 (NL-DISPATCH-DECISION, TERM, P2)
+> **ACCEPTED DECISION (2026-07-06, Alperen):** Option C (risk-class-based: Oku=direct dispatch; Değiştir/Çalıştır/Otonom=confirm-gated — TERM-5/ADR-D-012 ladder)
+
+
+**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=none (the mechanism is live in code and test-covered, but no runtime gate or lint rule ties a specific default to this record — the flag's value at each call-site is simply whatever the last commit left it at) → tomorrow=once Alperen selects an option below, the chosen default is wired at the named call-sites plus a regression test asserting it, and this ADR's `Status` graduates from `proposed` to `accepted` · **Status:** accepted (Alperen, 2026-07-06) · **Date:** 2026-07-05 · **Absorbs:** `docs/design/nl-dispatch-default-decision.md` (sprint-359 task 359-009 evidence package — this ADR is that document's §6 "Önerilen Karar" promoted to a standalone, numbered governance record; the design doc remains on disk as the underlying evidence citation, not superseded/deleted) · **Crosswalk:** MASTER-PLAN #57 (NL-DISPATCH-DECISION, TERM, P2)
 
 > **Origin note:** This document does not ship a new mechanism — `agenticDispatch` and its
 > classifier have existed since Sprint 219 (tasks 219-002/219-004/219-005). It formalizes a

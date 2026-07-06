@@ -94,6 +94,7 @@ _Total: 37 MCP tools_
 | `config-nervous` | deckent config-nervous |
 | `connect` | deckent connect |
 | `cost` | deckent cost |
+| `cu-status` | deckent cu-status |
 | `dashboard` | deckent dashboard |
 | `do` | deckent do |
 | `docs` | deckent docs |
@@ -155,4 +156,4 @@ _Total: 37 MCP tools_
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 99 CLI command modules_
+_Total: 100 CLI command modules_

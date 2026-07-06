@@ -9110,3 +9110,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 373-006: CURSOR-HARNESS — F11-016 kalan-envanterinden cursor-drift test-harness'i (DONE)
 
 ---
+## Sprint 374 — sprint-374
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-06
+**Duration:** 1916s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1916417ms |
+
+### Tasks
+
+- 374-001: CLOSING-DATA-EXTEND — kapanış-verisini 357-373'e genişlet (DONE)
+- 374-002: CU-STATUS-CLI — `deckent cu-status` (computer-use ilk kullanıcı-yüzeyi) (GO_WITH_TECH_DEBT)
+- 374-003: DASH-MOUNT-CARDS — orphan kartları dashboard'a bağla (DONE)
+- 374-004: ORPHAN-DELIVERABLE-SWEEP — bağlanmamış-teslim sistematik keşfi (DONE)
+
+---

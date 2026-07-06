@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-374-002 | Tech debt from 374-002: Implemented `deckent cu-status [--json]` — TOOL-CU's fir | normal | sprint-374 | resolved |
 | debt-371-001 | Tech debt from 371-001: Decision (Option A over Option B, per task instruction t | normal | sprint-371 | resolved |
 | debt-371-002 | Tech debt from 371-002: Wired the two dead endpoints exactly mirroring the regis | normal | sprint-371 | resolved |
 | debt-370-006 | Tech debt from 370-006: 3 feature-doc written to disk, all iskele-standart (Ne y | normal | sprint-370 | resolved |

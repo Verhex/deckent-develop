@@ -69,6 +69,7 @@ import { registerKpi } from './commands/kpi.js';
 import { registerImage } from './commands/image.js';
 import { registerLimits } from './commands/limits.js';
 import { registerOpenRouterProbe } from './commands/openrouter-probe.js';
+import { registerCuStatus } from './commands/cu-status.js';
 import { showSplash } from './helpers/splash.js';
 import { installFatalHandlers } from './helpers/error-handler.js';
 
@@ -166,6 +167,7 @@ export function buildProgram(): Command {
   registerImage(program);
   registerLimits(program);
   registerOpenRouterProbe(program);
+  registerCuStatus(program);
   registerHelp(program);
 
   return program;

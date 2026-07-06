@@ -2,6 +2,21 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint374] - 2026-07-06
+
+### Added
+
+- CLOSING-DATA-EXTEND — kapanış-verisini 357-373'e genişlet
+- DASH-MOUNT-CARDS — orphan kartları dashboard'a bağla
+- ORPHAN-DELIVERABLE-SWEEP — bağlanmamış-teslim sistematik keşfi
+
+### Changed
+
+- CU-STATUS-CLI — `deckent cu-status` (computer-use ilk kullanıcı-yüzeyi) (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint373] - 2026-07-06
 
 ### Added

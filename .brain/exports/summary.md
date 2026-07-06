@@ -10,11 +10,11 @@
 | adr-d-006 | Code Architecture Conventions | accepted |
 | adr-d-007 | Manual Subagent Dispatch (Dogfood Survival-Fallback) | accepted |
 | adr-d-008 | Develop / Product Repo Strategy | accepted |
-| adr-d-009 | Worker-Result Boundary Normalization Policy | proposed |
-| adr-d-010 | REPL Input Stabilization (Cursor / Queue / Streaming Contract) | proposed |
-| adr-d-011 | Global Install Topology — Daemon vs CLI-Invoked, Project-Scope Config Layer | proposed |
-| adr-d-012 | Terminal Risk Language (Oku / Değiştir / Çalıştır / Otonom) | proposed |
-| adr-d-013 | NL-Dispatch Default Policy (`agenticDispatch` — Natural-Language → MCP-Tool Direct Dispatch) | proposed |
+| adr-d-009 | Worker-Result Boundary Normalization Policy | accepted |
+| adr-d-010 | REPL Input Stabilization (Cursor / Queue / Streaming Contract) | accepted |
+| adr-d-011 | Global Install Topology — Daemon vs CLI-Invoked, Project-Scope Config Layer | accepted |
+| adr-d-012 | Terminal Risk Language (Oku / Değiştir / Çalıştır / Otonom) | accepted |
+| adr-d-013 | NL-Dispatch Default Policy (`agenticDispatch` — Natural-Language → MCP-Tool Direct Dispatch) | accepted |
 | adr-g-001 | Layered Config & Scope Precedence | accepted |
 | adr-g-002 | spawnSync Security Pattern | accepted |
 | adr-g-004 | Instruction-File Adapter & Multi-Env Generation | accepted |
@@ -51,6 +51,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-374 Learnings** (sprint-374): ## Sprint sprint-374 Learnings
+- CU-STATUS-CLI — `deckent cu-status` (computer-use ilk kullanıcı-yüzeyi): GO_WITH_TEC...
 - **Sprint sprint-373 Learnings** (sprint-373): ## Sprint sprint-373 Learnings
 
 ## Gains
@@ -72,8 +74,6 @@
 
 ## Gains
 - 365-001 — Fix debt: Tech debt from 362-001-fix: VERIFY-AND-COMPLETE of the...
-- **Sprint sprint-364 Learnings** (sprint-364): ## Sprint sprint-364 Learnings
-- Fix debt: Tech debt from 361-001-fix: Worker timeout/killed (exitCode=1) but git dif...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -131,4 +131,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 966 | Generated: 2026-07-06_
+_Total entries: 970 | Generated: 2026-07-06_

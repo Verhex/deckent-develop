@@ -93,6 +93,7 @@ export const COMMAND_REGISTRY: readonly CommandRegistryEntry[] = [
   entry('init', 'Core', 'Değiştir', 'core', ['cli', 'mcp'], ['deckent_init']),
   entry('status', 'Core', 'Oku', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_status']),
   entry('doctor', 'Core', 'Oku', 'core', ['cli', 'mcp', 'repl'], ['deckent_doctor']),
+  entry('cu-status', 'Core', 'Oku', 'core', ['cli']),
   entry('config', 'Core', 'Değiştir', 'core', ['cli', 'mcp', 'repl'], ['deckent_config']),
   entry('plugin', 'Core', 'Değiştir', 'core', ['cli']),
   entry('upgrade', 'Core', 'Çalıştır', 'cli', ['cli']),

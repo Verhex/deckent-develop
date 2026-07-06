@@ -24,6 +24,30 @@ import MissionsPage from "./pages/MissionsPage";
 import LoginPage from "./pages/LoginPage";
 import CallbackPage from "./pages/CallbackPage";
 import KpiTrendPage from "./pages/KpiTrendPage";
+import { LimitsCard } from "./components/LimitsCard";
+import { EvaluateHealthCard } from "./components/EvaluateHealthCard";
+
+// DASH-MOUNT-CARDS (374-003): LimitsCard (366-005) and EvaluateHealthCard
+// (370-007) were written but never mounted anywhere. DashboardPage.tsx itself
+// is out of this task's write scope, so the mount happens here — wrapping the
+// existing "/" route (already the primary, always-reachable nav destination)
+// instead of adding a new nav entry. Additive, below the dashboard's own
+// content; Layout.tsx's <main className="grid ... gap-6"> already spaces
+// Outlet's direct children, so no extra layout CSS is needed here.
+function DashboardWithObservability() {
+  return (
+    <>
+      <DashboardPage />
+      <div
+        data-testid="observability-cards-row"
+        className="grid grid-cols-1 lg:grid-cols-2 gap-4"
+      >
+        <LimitsCard />
+        <EvaluateHealthCard />
+      </div>
+    </>
+  );
+}
 
 function App() {
   return (
@@ -34,7 +58,7 @@ function App() {
           <BrowserRouter>
             <Routes>
               <Route element={<Layout />}>
-                <Route path="/" element={<DashboardPage />} />
+                <Route path="/" element={<DashboardWithObservability />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/debt" element={<DebtPage />} />
                 <Route path="/history" element={<HistoryPage />} />

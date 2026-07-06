@@ -2814,6 +2814,56 @@ const MESSAGES: MessageMap = {
     en: 'Run `deckent doctor` to diagnose and fix common setup problems.',
     tr: 'Yaygın kurulum sorunlarını teşhis edip düzeltmek için `deckent doctor` çalıştırın.',
   },
+
+  // ─── cu-status (TOOL-CU CLI surface, Sprint 374 Task 374-002) ───────────────
+  'cuStatus.title': {
+    en: 'Computer-Use Status (TOOL-CU)',
+    tr: 'Bilgisayar-Kullanımı Durumu (TOOL-CU)',
+  },
+  'cuStatus.flag_disabled': {
+    en: 'Flag: disabled — {reason}',
+    tr: 'Bayrak: kapalı — {reason}',
+  },
+  'cuStatus.how_to_enable': {
+    en: 'To enable: set "computer_use": { "enabled": true, "allowed_capabilities": [...] } in .deckent/config.json (project or global), then rerun `deckent cu-status`.',
+    tr: 'Açmak için: .deckent/config.json (proje veya global) dosyasına "computer_use": { "enabled": true, "allowed_capabilities": [...] } ekleyin, ardından `deckent cu-status` komutunu tekrar çalıştırın.',
+  },
+  'cuStatus.flag_enabled': {
+    en: 'Flag: enabled',
+    tr: 'Bayrak: açık',
+  },
+  'cuStatus.platform_known': {
+    en: 'Platform: {platform} (known)',
+    tr: 'Platform: {platform} (bilinen)',
+  },
+  'cuStatus.platform_unsupported': {
+    en: 'Platform: {platform} (unsupported — no capability mapping for this platform)',
+    tr: 'Platform: {platform} (desteklenmiyor — bu platform için yetenek eşlemesi yok)',
+  },
+  'cuStatus.allowed_capabilities_line': {
+    en: 'Allowed capabilities: {list}',
+    tr: 'İzinli yetenekler: {list}',
+  },
+  'cuStatus.allowed_capabilities_empty': {
+    en: '(none)',
+    tr: '(yok)',
+  },
+  'cuStatus.capabilities_header': {
+    en: 'Capabilities:',
+    tr: 'Yetenekler:',
+  },
+  'cuStatus.capability_available': {
+    en: '  {kind}: available',
+    tr: '  {kind}: mevcut',
+  },
+  'cuStatus.capability_unavailable': {
+    en: '  {kind}: unavailable — {reason}',
+    tr: '  {kind}: kullanılamıyor — {reason}',
+  },
+  'cuStatus.config_load_error': {
+    en: 'could not resolve project configuration ({error}) — treating computer_use as unavailable',
+    tr: 'proje yapılandırması çözülemedi ({error}) — computer_use kullanılamaz kabul ediliyor',
+  },
 };
 
 /**

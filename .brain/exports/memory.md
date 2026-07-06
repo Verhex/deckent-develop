@@ -1,5 +1,14 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-374 Learnings
+- Sprint sprint-374 Learnings: ## Sprint sprint-374 Learnings
+- CU-STATUS-CLI — `deckent cu-status` (computer-use ilk kullanıcı-yüzeyi): GO_WITH_TECH_DEBT — Implemented `deckent cu-status [--json]` — TOOL-CU's first Tier-1 CLI surface. Flag-off path is honest-disabled with a g
+
+## Gains
+- 374-001 — CLOSING-DATA-EXTEND — kapanış-verisini 357-373'e genişlet — Wrote docs/analysis/closing-data-357-373.md (only file in scope.filesWrite) as the successor to c...
+- 374-003 — DASH-MOUNT-CARDS — orphan kartları dashboard'a bağla — Mounted the two orphan cards (LimitsCard 366-005, EvaluateHealthCard 370-007) into the dashboard ...
+- 374-004 — ORPHAN-DELIVERABLE-SWEEP — bağlanmamış-teslim sistematik keşfi — Systematic orphan-deliverable sweep of src/**/*.{ts,tsx} (src/dashboard excluded — separate bundl...
+
 ## Sprint sprint-373 Learnings
 - Sprint sprint-373 Learnings: ## Sprint sprint-373 Learnings
 
