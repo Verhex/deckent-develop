@@ -136,8 +136,10 @@ describe('config flag round-trip — 9 opt-in blocks through the REAL loadConfig
     // W1-EXPERIENCE-ON (#492, Alperen 2026-07-06): repl_surface is the terminal
     // EXPERIENCE layer and ships ON when the block is absent (opt-out). The
     // remaining blocks stay opt-in/undefined.
+    // TOOL-QB-FLIP (376-001): tool_surface joins the default-ON package too.
     const DEFAULT_ON: Record<string, unknown> = {
       repl_surface: { enabled: true, approvals: true },
+      tool_surface: { enabled: true },
     };
     for (const { name } of ROUND_TRIP_BLOCKS) {
       if (name in DEFAULT_ON) {
@@ -152,6 +154,12 @@ describe('config flag round-trip — 9 opt-in blocks through the REAL loadConfig
     writeProjectConfig(projectRoot, { repl_surface: { enabled: false } });
     const resolved = (await loadConfig(projectRoot)) as unknown as Record<string, unknown>;
     expect(resolved['repl_surface']).toEqual({ enabled: false });
+  });
+
+  it('explicit tool_surface { enabled: false } still turns the meta-tool surface OFF (opt-out honored)', async () => {
+    writeProjectConfig(projectRoot, { tool_surface: { enabled: false } });
+    const resolved = (await loadConfig(projectRoot)) as unknown as Record<string, unknown>;
+    expect(resolved['tool_surface']).toEqual({ enabled: false });
   });
 });
 

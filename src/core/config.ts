@@ -222,6 +222,19 @@ export const DEFAULT_AUTO_DOCS: AutoDocsConfig = {
 // Single source of truth for embedded web terminal defaults (Sprint 175).
 // Mirrors the DEFAULT_TIMEOUT_CONFIG / DEFAULT_AUTO_DOCS pattern: one named
 // const, structuredClone()'d at each use-site to keep instances independent.
+// M5-NATIVE-FLIP (376-003): `native_agent` is intentionally NOT listed here —
+// `TerminalConfig.native_agent` (config-types.ts) stays absent-by-default
+// (undefined), and `isNativeAgentSelected` (src/cli/repl/run.tsx) treats
+// "undefined" as the native-ON default, only `false` as the rollback signal.
+// Baking `native_agent: true` into this const would change its key-shape,
+// which tests/core/config-terminal.test.ts locks with an exact `toEqual`
+// snapshot — the default lives in the call-site check instead. Both
+// loadConfig and mergeConfigs already deepMerge `config.terminal` over this
+// const in one shared line each, so a project's
+// `{ terminal: { native_agent: false } }` override still reaches both
+// resolvers with zero further wiring (unlike the flat born-464 fields, which
+// needed per-resolver pass-through because they weren't part of an existing
+// deepMerge'd block).
 export const DEFAULT_TERMINAL_CONFIG: TerminalConfig = {
   enabled: true,
   bind: '127.0.0.1',
@@ -1717,7 +1730,11 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // of UX stayed invisible behind absent config blocks (user-truth-audit §2).
     // An explicit { enabled: false } still turns it off (opt-out, not opt-in).
     repl_surface: config.repl_surface ?? { enabled: true, approvals: true },
-    tool_surface: config.tool_surface,
+    // TOOL-QB-FLIP (376-001, continuing #492's default-flip package): the
+    // progressive-disclosure meta-tool surface ships ON by default too — same
+    // opt-out rationale as repl_surface above (explicit { enabled: false } still
+    // disables it).
+    tool_surface: config.tool_surface ?? { enabled: true },
     deck_broker: config.deck_broker,
     training_trace: config.training_trace,
     live_trace: config.live_trace,
@@ -2451,7 +2468,11 @@ export function mergeConfigs(
     // of UX stayed invisible behind absent config blocks (user-truth-audit §2).
     // An explicit { enabled: false } still turns it off (opt-out, not opt-in).
     repl_surface: config.repl_surface ?? { enabled: true, approvals: true },
-    tool_surface: config.tool_surface,
+    // TOOL-QB-FLIP (376-001, continuing #492's default-flip package): the
+    // progressive-disclosure meta-tool surface ships ON by default too — same
+    // opt-out rationale as repl_surface above (explicit { enabled: false } still
+    // disables it).
+    tool_surface: config.tool_surface ?? { enabled: true },
     deck_broker: config.deck_broker,
     training_trace: config.training_trace,
     live_trace: config.live_trace,

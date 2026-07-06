@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildNativeToolRegistry } from '../../src/cli/repl/native-tool-registry.js';
+import { mergeConfigs } from '../../src/core/config.js';
 
 describe('buildNativeToolRegistry', () => {
   it('registers the exec tools with native tiers (read→silent, write→confirm, bash floor stays confirm)', () => {
@@ -62,5 +63,44 @@ describe('buildNativeToolRegistry', () => {
     const r = await def!.handler({ v: 'hi' });
     expect(r).toEqual({ ok: true, output: 'mcp:hi' });
     expect(calls).toHaveLength(1);           // dispatched through the bridge (no-op confirm)
+  });
+
+  // TOOL-QB-FLIP (376-001): config.ts now resolves `tool_surface` to
+  // `{ enabled: true }` by default (opt-out, not opt-in — see config.ts loadConfig/
+  // mergeConfigs). This registry itself keeps its own local default OFF
+  // (`opts.toolSurface?.enabled`, byte-identical when the caller omits the option) —
+  // these tests prove that threading the new resolved config default through into
+  // `buildNativeToolRegistry` registers the 3 progressive-disclosure meta-tools,
+  // and that an absent `toolSurface` option still yields the pre-existing opt-out shape.
+  it('registers the 3 progressive-disclosure meta-tools when fed the config-resolved default (tool_surface default-ON)', () => {
+    const resolved = mergeConfigs(null, null);
+    expect(resolved.tool_surface).toEqual({ enabled: true });
+    const reg = buildNativeToolRegistry({
+      cwd: () => tmpdir(),
+      toolSurface: { enabled: resolved.tool_surface!.enabled! },
+    });
+    const names = reg.list().map((t) => t.name);
+    expect(names).toContain('deckent_search_tools');
+    expect(names).toContain('deckent_describe_tool');
+    expect(names).toContain('deckent_call_tool');
+  });
+
+  it('omitting toolSurface entirely still registers none of the meta-tools (local opt-out default unchanged)', () => {
+    const reg = buildNativeToolRegistry({ cwd: () => tmpdir() });
+    const names = reg.list().map((t) => t.name);
+    expect(names).not.toContain('deckent_search_tools');
+    expect(names).not.toContain('deckent_describe_tool');
+    expect(names).not.toContain('deckent_call_tool');
+  });
+
+  it('an explicit config-resolved tool_surface { enabled: false } (opt-out) registers none of the meta-tools', () => {
+    const resolved = mergeConfigs(null, { tool_surface: { enabled: false } });
+    expect(resolved.tool_surface).toEqual({ enabled: false });
+    const reg = buildNativeToolRegistry({
+      cwd: () => tmpdir(),
+      toolSurface: { enabled: resolved.tool_surface!.enabled! },
+    });
+    const names = reg.list().map((t) => t.name);
+    expect(names).not.toContain('deckent_search_tools');
   });
 });

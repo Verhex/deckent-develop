@@ -2,6 +2,20 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint376] - 2026-07-06
+
+### Added
+
+- M5-NATIVE-FLIP — native-agent default-ON (kanıt-paketi yeşil; rollback-flag'li)
+
+### Changed
+
+- TOOL-QB-FLIP — tool_surface + approval.question_bridge default-ON (completed with tech debt)
+- MODE-HELP-FIX — `deckent mode` yardımı gerçeğe eşitlenir (RUN-RENAME ön-adımı) (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 2 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint375] - 2026-07-06
 
 ### Added

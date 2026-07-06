@@ -460,6 +460,40 @@ const MESSAGES: MessageMap = {
     tr: '{provider}: bilinmiyor',
   },
 
+  // ─── mode command (MODE-HELP-FIX, Sprint 376 — 376-002) ──────────────
+  'mode.group_desc': {
+    en: 'Get/set deckent_style (sprint|task|process|auto)',
+    tr: 'deckent_style al/ayarla (sprint|task|process|auto)',
+  },
+  'mode.rename_note': {
+    en: "Note: 'sprint' will soon be renamed to 'run' (naming decision pending rollout).",
+    tr: "Not: 'sprint' yakında 'run' olarak anılacak (isimlendirme kararı, uygulanması bekleniyor).",
+  },
+  'mode.show_desc': {
+    en: 'Show current mode',
+    tr: 'Mevcut modu göster',
+  },
+  'mode.sprint_desc': {
+    en: 'Switch to sprint mode',
+    tr: 'Sprint moduna geç',
+  },
+  'mode.task_desc': {
+    en: 'Switch to task mode',
+    tr: 'Task moduna geç',
+  },
+  'mode.process_desc': {
+    en: 'Switch to process mode (continuous request-handling — ERP / automation via MCP + REST)',
+    tr: 'Process moduna geç (sürekli istek-işleme — ERP / otomasyon, MCP + REST üzerinden)',
+  },
+  'mode.auto_desc': {
+    en: 'Auto-detect mode from context',
+    tr: 'Bağlamdan modu otomatik algıla',
+  },
+  'mode.global_desc': {
+    en: 'Set global default (sprint|task|process)',
+    tr: 'Genel varsayılanı ayarla (sprint|task|process)',
+  },
+
   // ─── attach command ─────────────────────────────────────────────────
   'attach.no_active_session': {
     en: 'No active session. Run `deckent start` first.',

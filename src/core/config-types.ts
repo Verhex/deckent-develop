@@ -55,6 +55,14 @@ export interface TerminalConfig {
    * session and closes the WS with code 4429.
    */
   outboundDailyQuotaBytes?: number;
+  /**
+   * M5-NATIVE-FLIP (376-003): whether the Ink REPL's native-agent tool-use
+   * loop is the active engine. Default true (native ON). Set `false` to roll
+   * back to the legacy `runChatNativeLoop` engine — the other rollback path
+   * is the `--legacy-loop` CLI flag (src/cli/entry.ts), which wins over this
+   * config value when both are present.
+   */
+  native_agent?: boolean;
 }
 
 // ─── Resource Monitor Config ────────────────────────────────────────

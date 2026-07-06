@@ -1214,7 +1214,7 @@ deckent autonomous-mission list --json
 > Hand-curated sections above are produced by `scripts/generate-cli-docs.ts`; this block is maintained by `scripts/gen-reference-docs.mjs`.
 
 <!-- AUTOGEN:START id="cli" -->
-> 173 commands. Generated from `src/cli/commands/*.ts`.
+> 176 commands. Generated from `src/cli/commands/*.ts`.
 
 | Command | Description |
 |---------|-------------|
@@ -1252,6 +1252,7 @@ deckent autonomous-mission list --json
 | `deckent create <name>` | Create a custom skill |
 | `deckent create-goal <goal>` | Create a Type-2 goal mission (runs until the goal is reached) |
 | `deckent create-list <title>` | Create a Type-1 list mission from N work-items |
+| `deckent cu-status` | Show computer-use (TOOL-CU) status: flag state + per-capability availability |
 | `deckent dashboard` | Show terminal dashboard with auto-refresh (see also: deckent status --watch) |
 | `deckent delete <name>` | Delete an agent from the pool |
 | `deckent delete <name>` | Delete a skill |
@@ -1292,6 +1293,7 @@ deckent autonomous-mission list --json
 | `deckent keys` | List all config parameter keys |
 | `deckent kill [taskId]` | Kill a running worker |
 | `deckent kpi` | Show the KPI scorecard for the current (or a specific) sprint |
+| `deckent limits` | Check live subscription-window usage (session/week) and the configured start-gate thresholds |
 | `deckent list` | List all agents in the pool |
 | `deckent list` | List all missions (summary table) |
 | `deckent list` | List autonomous backlog entries |
@@ -1314,6 +1316,7 @@ deckent autonomous-mission list --json
 | `deckent nervous` | Configure Nervous System authority mode and action overrides', ) .option('--lang &lt;code&gt;', 'Language override (en\|tr) |
 | `deckent nervous` | Nervous System dashboard — monitor, accept, reject proactive suggestions |
 | `deckent onboard` | Run the onboarding wizard |
+| `deckent openrouter-probe` | Live-probe OpenRouter free models via $DECK:OPENROUTER_API_KEY and refresh the local cache |
 | `deckent output <taskId>` | Show captured output for a specific worker task |
 | `deckent override <actionId> <policy>` | Set a per-action policy override |
 | `deckent pending` | List parked approvals awaiting human accept/reject |

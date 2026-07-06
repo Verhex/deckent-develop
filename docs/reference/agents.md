@@ -5,7 +5,7 @@
 Agents are domain specialists that Brain assigns per task. Built-in agents live under `.deckent/agents/`; `temp-*` agents are runtime-generated and auto-promoted/demoted by the Evolution Pipeline.
 
 <!-- AUTOGEN:START id="agents" -->
-> 17 agents (15 built-in, 2 custom). Generated from `.deckent/agents/*/agent.json`.
+> 19 agents (17 built-in, 2 custom). Generated from `.deckent/agents/*/agent.json`.
 
 | Agent | Name | Expertise | Description |
 |-------|------|-----------|-------------|
@@ -20,10 +20,12 @@ Agents are domain specialists that Brain assigns per task. Built-in agents live 
 | `devops-engineer` | DevOps Engineer | ci-cd, docker, deployment, infrastructure, monitoring, github-actions | CI/CD pipelines, Docker containerization, deployment automation, infrastructure as code, monitoring setup. GitHub Actions expert. |
 | `doc-writer` | Doc Writer | documentation, technical-writing, jsdoc, readme, changelog | Documentation specialist. README structure, changelogs, JSDoc/TSDoc, guides, and API documentation. |
 | `frontend-designer` | Frontend Designer | ui-design, component-architecture, responsive-design, css, accessibility, design-systems | Production-grade UI/UX design agent. Component architecture, responsive layout, Tailwind CSS, design systems, micro-animations, visual hierarchy. |
+| `integration-engineer` | Integration Engineer | external-integrations, http-adapters, webhooks, secret-handling, retry-policies | External-service integration specialist. HTTP-API adapters, secret-handling patterns, fail-honest error propagation, single-retry policies for connectors and webhooks. |
 | `migration-specialist` | Migration Specialist | framework-migration, version-upgrade, breaking-changes, backward-compatibility, codemods | Framework migration, version upgrades, breaking change management, codemod generation, backward compatibility shims. |
 | `performance-analyzer` | Performance Analyzer | performance, profiling, optimization, memory-management, caching | Performance profiling and optimization specialist. Big-O analysis, memory leaks, caching strategies, benchmarking. |
 | `refactorer` | Refactorer | refactoring, design-patterns, modularization, code-organization | Code refactoring specialist. Extract, rename, split, merge, and reorganize code while preserving behavior. |
 | `security-auditor` | Security Auditor | security, authentication, encryption, vulnerability-assessment | Security-focused code analysis. OWASP compliance, vulnerability detection, threat modeling. |
 | `temp-react-specialist` | React Specialist | react, hooks, vite, component-architecture, css-modules | Expert in React component architecture, hooks, and state management. |
 | `temp-react-ts-specialist` | React TypeScript Specialist | react, typescript, hooks, vite, component-architecture | Expert in React + TypeScript component architecture, hooks, and testing with Vitest/RTL. |
+| `terminal-ux-engineer` | Terminal UX Engineer | ink-tui, terminal-rendering, raw-mode-input, cli-ux, i18n-strings | Ink/React-CLI terminal UI specialist. Static/anchor/input-pinned layout, raw-mode + NO_COLOR guards, string-free i18n-clean rendering, render-without-mounting Ink tests. |
 <!-- AUTOGEN:END id="agents" -->

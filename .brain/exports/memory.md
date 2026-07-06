@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-376 Learnings
+- Sprint sprint-376 Learnings: ## Sprint sprint-376 Learnings
+- TOOL-QB-FLIP — tool_surface + approval.question_bridge default-ON: GO_WITH_TECH_DEBT — DONE (tool_surface half): flipped tool_surface to default-ON (opt-out) in BOTH resolvers (config.ts loadConfig ~1719-172
+- MODE-HELP-FIX — `deckent mode` yardımı gerçeğe eşitlenir (RUN-RENAME ön-adımı): GO_WITH_TECH_DEBT — MODE-HELP-FIX: fixed the stale `mode global <style>` description (was 'sprint|task', now 'sprint|task|process' via new i
+
+## Gains
+- 376-003 — M5-NATIVE-FLIP — native-agent default-ON (kanıt-paketi yeşil; rollback-flag'li) — M5-NATIVE-FLIP implemented: the Ink REPL's native-agent tool-use loop is now the default engine.
+
 ## Sprint sprint-375 Learnings
 - Sprint sprint-375 Learnings: ## Sprint sprint-375 Learnings
 - DOCS-P0-DELTA — analiz-delta-kutuları + features-index: GO_WITH_TECH_DEBT — Scope conflict discovered before writing, resolved by following the canonical write-authority list (task description exp

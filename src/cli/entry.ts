@@ -55,8 +55,13 @@ const HELP_AND_VERSION_FLAGS: ReadonlySet<string> = new Set([
   '--version', '-V', '--version-json',
 ]);
 
-/** Top-level flags that are REPL-only and must NOT be passed to Commander. */
-const REPL_ONLY_FLAGS: ReadonlySet<string> = new Set(['--native']);
+/**
+ * Top-level flags that are REPL-only and must NOT be passed to Commander.
+ * `--legacy-loop` (M5-NATIVE-FLIP, 376-003) is the CLI rollback path back to
+ * the legacy runChatNativeLoop engine now that the native-agent tool-use loop
+ * is the REPL default — see `isNativeAgentSelected` (src/cli/repl/run.tsx).
+ */
+const REPL_ONLY_FLAGS: ReadonlySet<string> = new Set(['--native', '--legacy-loop']);
 
 /**
  * Decide whether the given argv should be redirected to `chat --native`.

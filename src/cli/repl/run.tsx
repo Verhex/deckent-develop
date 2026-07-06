@@ -6,7 +6,6 @@
 
 import { render } from 'ink';
 import { ReplApp, ReplErrorBoundary, type ConfirmTrigger, type ToolSink, type ToolInfo } from './app.js';
-import { isNativeAgentEnabled } from './native-flag.js';
 import { resolveNativeProvider } from './native-transport.js';
 import { buildNativeToolRegistry } from './native-tool-registry.js';
 import { createNativeEngine, resolveCostCeilingUsd } from './native-agent-bridge.js';
@@ -40,6 +39,27 @@ const EXEC_TOOLS = new Set(['deckent_write_file', 'deckent_read_file', 'deckent_
 
 /** Rebuilds a provider adapter for a selection (entry.ts passes buildReplProvider). */
 export type ProviderRebuild = (sel: ActiveSelection) => ChatProviderAdapter;
+
+/**
+ * M5-NATIVE-FLIP (376-003) — decide whether the native-agent tool-use loop is
+ * the active REPL engine. Native is the DEFAULT; either rollback path falls
+ * back to the legacy `runChatNativeLoop` engine:
+ *   1. the `--legacy-loop` CLI flag (checked first — wins over config)
+ *   2. project config `terminal.native_agent: false`
+ * Exported as a pure function (argv + config in, boolean out) so the decision
+ * is unit-testable without mounting Ink — same pattern as
+ * {@link wireApprovalCrossProcess}. Supersedes the old opt-in gate
+ * (`isNativeAgentEnabled`: `DECKENT_NATIVE_AGENT=1` env / `--native` argv),
+ * which is no longer called from this module.
+ */
+export function isNativeAgentSelected(
+  argv: readonly string[],
+  cfg: { terminal?: { native_agent?: boolean } },
+): boolean {
+  if (argv.includes('--legacy-loop')) return false;
+  if (cfg.terminal?.native_agent === false) return false;
+  return true;
+}
 
 /**
  * APR-XPROC-WIRE (358-002) — bridges Task 1's ApprovalStoreWatch
@@ -94,7 +114,7 @@ export async function runInkRepl(
   let projectCfg: {
     language?: string;
     repl_surface?: { enabled?: boolean; approvals?: boolean };
-    terminal?: { rpc_debug?: boolean };
+    terminal?: { rpc_debug?: boolean; native_agent?: boolean };
   } = {};
   try { projectCfg = await loadConfig() as typeof projectCfg; } catch { /* defaults */ }
   let lang = 'en';
@@ -329,11 +349,12 @@ export async function runInkRepl(
     },
   };
 
-  // Native-agent engine (SP-1 M3, flag-gated: DECKENT_NATIVE_AGENT=1 or --native).
-  // Default OFF — the legacy runChatNativeLoop path is unchanged when the flag is unset.
+  // Native-agent engine (M5-NATIVE-FLIP, 376-003) — DEFAULT ON. Rolls back to
+  // the legacy runChatNativeLoop path only via `--legacy-loop` or project
+  // config `terminal.native_agent: false` (see isNativeAgentSelected above).
   type NativeEngineType = ((input: string, cbs: { output: (t: string) => void; onTurnEnd: (s: { inputTokens: number; outputTokens: number }) => void }) => Promise<void>) | undefined;
   let nativeEngine: NativeEngineType;
-  if (isNativeAgentEnabled(process.env, process.argv.slice(2))) {
+  if (isNativeAgentSelected(process.argv.slice(2), projectCfg)) {
     const cfg = await loadConfig().catch(() => ({} as Record<string, unknown>));
     const resolved = resolveNativeProvider(process.env, {
       openai_base_url: (cfg as { openai_base_url?: string }).openai_base_url,

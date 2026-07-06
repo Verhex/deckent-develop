@@ -9164,3 +9164,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 375-008: M5-PROOF-HARNESS — native-flip stabilizasyon-kanıt koşumu (DONE)
 
 ---
+## Sprint 376 — sprint-376
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-06
+**Duration:** 1000s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 999949ms |
+
+### Tasks
+
+- 376-001: TOOL-QB-FLIP — tool_surface + approval.question_bridge default-ON (GO_WITH_TECH_DEBT)
+- 376-002: MODE-HELP-FIX — `deckent mode` yardımı gerçeğe eşitlenir (RUN-RENAME ön-adımı) (GO_WITH_TECH_DEBT)
+- 376-003: M5-NATIVE-FLIP — native-agent default-ON (kanıt-paketi yeşil; rollback-flag'li) (DONE)
+
+---

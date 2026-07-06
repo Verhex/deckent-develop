@@ -5,7 +5,7 @@
 Deckent ships an MCP server that exposes orchestration to MCP-compatible IDEs (Claude Code, Cursor, etc.). The tools below are registered in `src/mcp/tools/*.ts` and surfaced via `deckent-mcp` stdio transport.
 
 <!-- AUTOGEN:START id="mcp-tools" -->
-> 42 tools registered. Generated from `src/mcp/tools/*.ts`.
+> 46 tools registered. Generated from `src/mcp/tools/*.ts`.
 
 | Tool | Title | Description |
 |------|-------|-------------|
@@ -14,7 +14,9 @@ Deckent ships an MCP server that exposes orchestration to MCP-compatible IDEs (C
 | `deckent_analyze_project` | Analyze Project | Analyze the current project to detect: language (TypeScript/JavaScript/Python/Go/Rust/etc.), framework (React/Express/FastAPI/etc.), test framework (vitest/jest/pytest/etc.), build tool (tsc/webpack/vite/etc.), CI system (GitHub Actions/GitLab CI/etc.), project size (small/medium/large based on file count), and methodology recommendation. Returns config suggestions (e.g. recommended plan mode, worker count). Useful before init to pick the right configuration, or to verify stack detection. Does not modify any files. |
 | `deckent_audit` | Sprint Audit | Sprint audit multitool, mirrors the |
 | `deckent_autonomous` | Autonomous Engine | Control the deckent autonomous execution engine: query status, start/stop |
+| `deckent_autonomous_approve` | Autonomous Approve | Approve a pending autonomous-engine trigger — a backlog entry parked by the |
 | `deckent_autonomous_backlog` | Autonomous Backlog | Manage the autonomous engine backlog (.deckent/autonomous/backlog.json): list |
+| `deckent_autonomous_reject` | Autonomous Reject | Reject a pending autonomous-engine trigger — a backlog entry parked by the |
 | `deckent_autonomous_status` | Autonomous Status | Read-only autonomous engine status: backlog totals by status, stop-marker presence, |
 | `deckent_checkpoint` | Checkpoint Management | List, approve, or reject human checkpoints in sprint lifecycle. Checkpoints pause sprint execution at configured phases (plan/evaluate/fix) until a human approves or rejects. Use action=list to see pending checkpoints, action=approve/reject with sprintId and phase to respond. |
 | `deckent_cleanup` | Sprint Cleanup | Remove sprint artifacts and optionally trim memory budget. Deletes all task files (.json, .plan, .hb, .result, .paused, .log) from .tasks/ and all lock files from .locks/. With decay=true, also runs memory decay on .brain/ files if they exceed the line budget (trims MEMORY.md, RETRO.md, sprint logs). Use dryRun=true first to preview what would be deleted. Typically run after a sprint completes (deckent_review) or before starting a fresh sprint after kill. |
@@ -34,9 +36,11 @@ Deckent ships an MCP server that exposes orchestration to MCP-compatible IDEs (C
 | `deckent_models` | Model Catalog | Browse and manage the Deckent model catalog. |
 | `deckent_nervous_accept` | Nervous Accept | Accept a pending Nervous System notification/action. |
 | `deckent_nervous_config` | Nervous Config | Read or modify Nervous System configuration: authority mode preset, action overrides, and list available actions. |
+| `deckent_nervous_edit` | Nervous Edit | Build an accept-with-edited-payload PLAN for a pending Nervous System |
 | `deckent_nervous_reject` | Nervous Reject | Reject a pending Nervous System notification/action. |
 | `deckent_nervous_status` | Nervous Status | Show Nervous System dashboard: pending notifications, recent history, and current config. |
 | `deckent_nervous_subscribe` | Nervous Subscribe | Subscribe to Nervous System notifications for the current sprint. |
+| `deckent_nervous_undo` | Nervous Undo | Build an undo PLAN for the most recent reversible accepted Nervous |
 | `deckent_plan` | Plan Sprint | Preview a sprint plan based on current DIRECTIVES.md. Reads DIRECTIVES.md, analyzes task blocks, and returns a proposed task list with model assignments, wave breakdown, and risk assessment — without executing anything. Use this to validate your directives before running deckent_start. Prerequisite: deckent_init + deckent_set_directives must have been run. |
 | `deckent_process` | Process Mode | Process-mode execution surface (continuous request-handling for ERP / business |
 | `deckent_recover` | Sprint Recovery | Recover from a crashed or stuck sprint. Runs audit, cleans orphan IPC directories (dead PIDs only), clears stale locks (>5min), and archives terminal task files. Active tasks are preserved. Use dryRun=true to preview before executing. DESTRUCTIVE: modifies .tasks/, .locks/, and .deckent/ directories. |

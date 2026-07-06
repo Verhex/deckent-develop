@@ -6,6 +6,7 @@ import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
 import { loadConfig, saveGlobalConfig, loadGlobalConfig } from '../../core/config.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 
 const VALID_STYLES = ['sprint', 'task', 'process'] as const;
 type DeckentStyle = (typeof VALID_STYLES)[number];
@@ -36,13 +37,16 @@ function setProjectConfigValue(configPath: string, key: string, value: unknown):
 }
 
 export function registerMode(program: Command): void {
+  const lang = getLanguage(undefined);
+
   const mode = program
     .command('mode')
-    .description('Get/set deckent_style (sprint|task|process|auto)');
+    .description(getMessage('mode.group_desc', lang))
+    .addHelpText('after', `\n${getMessage('mode.rename_note', lang)}\n`);
 
   mode
     .command('show')
-    .description('Show current mode')
+    .description(getMessage('mode.show_desc', lang))
     .action(async () => {
       try {
         const root = resolveProjectRoot();
@@ -57,7 +61,7 @@ export function registerMode(program: Command): void {
 
   mode
     .command('sprint')
-    .description('Switch to sprint mode')
+    .description(getMessage('mode.sprint_desc', lang))
     .action(async () => {
       try {
         const root = resolveProjectRoot();
@@ -72,7 +76,7 @@ export function registerMode(program: Command): void {
 
   mode
     .command('task')
-    .description('Switch to task mode')
+    .description(getMessage('mode.task_desc', lang))
     .action(async () => {
       try {
         const root = resolveProjectRoot();
@@ -87,7 +91,7 @@ export function registerMode(program: Command): void {
 
   mode
     .command('process')
-    .description('Switch to process mode (continuous request-handling \u2014 ERP / automation via MCP + REST)')
+    .description(getMessage('mode.process_desc', lang))
     .action(async () => {
       try {
         const root = resolveProjectRoot();
@@ -102,7 +106,7 @@ export function registerMode(program: Command): void {
 
   mode
     .command('auto')
-    .description('Auto-detect mode from context')
+    .description(getMessage('mode.auto_desc', lang))
     .action(async () => {
       try {
         const root = resolveProjectRoot();
@@ -120,7 +124,7 @@ export function registerMode(program: Command): void {
 
   mode
     .command('global <style>')
-    .description('Set global default (sprint|task)')
+    .description(getMessage('mode.global_desc', lang))
     .action(async (style: string) => {
       try {
         if (!isValidStyle(style)) {
