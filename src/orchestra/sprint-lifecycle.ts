@@ -30,6 +30,7 @@ import {
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { readJsonSafe, debugLog } from '../core/utils.js';
+import { DECKENT_DIR, DASHBOARD_FILE } from '../core/constants.js';
 
 // ─── Notify (DECKENT→USER:NOTIFY — Hot Fix H6) ────────────────────
 import { notify } from '../core/notify.js';
@@ -43,6 +44,7 @@ import {
 
 // ─── Core — sprint lock ───────────────────────────────────────────
 import { releaseSprintLock } from '../core/multi-ide.js';
+import { pruneExpiredNervousPending } from '../core/pending-approvals.js';
 
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
@@ -371,6 +373,23 @@ export function cleanup(
     for (const file of readdirSync(tasksDir).filter(f => TASK_FILE_EXTENSIONS.some(ext => f.endsWith(ext)))) {
       try { unlinkSync(join(tasksDir, file)); } catch (e) { debugLog('cleanup:unlinkTaskFile', e); }
     }
+  }
+
+  // ─── W0-TRUTH (#491, 2026-07-06 live lie) ──────────────────────────────
+  // Per-sprint DISPLAY artifacts must die with the sprint, or `deckent status`
+  // keeps rendering a ghost: `.dashboard` (auditor's final scan — its progress
+  // numbers are a mid-close snapshot, not the sprint's true result) and
+  // `.deckent/ci-baseline.json` (stale "0 tests" line). Also prune parked
+  // nervous approvals whose own timeoutMs deadline passed — they can never be
+  // meaningfully accepted and only make the pending-section lie. All fail-soft;
+  // 'spawn-fail' preserves everything for post-mortem.
+  if (cleanupPhase === 'sprint-end') {
+    try { unlinkSync(join(projectRoot, DASHBOARD_FILE)); } catch (e) { debugLog('cleanup:unlinkDashboard', e); }
+    try { unlinkSync(join(projectRoot, DECKENT_DIR, 'ci-baseline.json')); } catch (e) { debugLog('cleanup:unlinkCiBaseline', e); }
+    try {
+      const pruned = pruneExpiredNervousPending(projectRoot, Date.now());
+      if (pruned.length > 0) debugLog('cleanup:pruneExpiredPending', `${pruned.length} expired approval(s) pruned: ${pruned.join(', ')}`);
+    } catch (e) { debugLog('cleanup:pruneExpiredPending', e); }
   }
 
   // BORN-486: TASK_FILE_EXTENSIONS (core/constants.ts) predates the '.timeout'/

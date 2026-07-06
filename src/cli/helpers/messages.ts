@@ -164,6 +164,10 @@ const MESSAGES: MessageMap = {
     en: 'Removed: {debt} debt, {patterns} patterns',
     tr: 'Silindi: {debt} borç, {patterns} desen',
   },
+  'cleanup.pruned_expired_approvals': {
+    en: '{count} expired pending approval(s) pruned (their timeout passed — no longer actionable).',
+    tr: '{count} süresi geçmiş bekleyen onay temizlendi (zaman aşımı doldu — artık işlem yapılamaz).',
+  },
   'cleanup.complete': {
     en: 'Cleanup complete. Removed artifacts for {count} tasks.',
     tr: 'Temizlik tamamlandı. {count} görevin artifaktları silindi.',

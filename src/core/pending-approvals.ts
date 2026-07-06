@@ -6,7 +6,7 @@
 // CLI helpers and the api/ endpoints can consume it without an ADR-008 inversion.
 // Fail-safe: a missing/corrupt file yields [] (never throws).
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { NERVOUS_PENDING_FILE } from './constants.js';
 
@@ -91,4 +91,57 @@ function readAutonomous(projectRoot: string): PendingApproval[] {
  */
 export function readPendingApprovals(projectRoot: string): PendingApproval[] {
   return [...readNervous(projectRoot), ...readAutonomous(projectRoot)];
+}
+
+// ─── Write-side lifecycle (W0-TRUTH, #491) ───────────────────────────────────
+// Live lie (2026-07-06): `nervous accept` only enqueued to the executor IPC
+// queue and never touched this durable hub, so entries survived for days and
+// `deckent status` kept shouting "⏳ Bekleyen onaylar: N". These two helpers are
+// the hub's write-side: same shape-tolerance as readNervous, never throw.
+
+/**
+ * Remove one parked nervous approval from the durable hub by id.
+ * Returns true only when an entry was actually removed (honest result).
+ */
+export function removeNervousPending(projectRoot: string, id: string): boolean {
+  const path = join(projectRoot, NERVOUS_PENDING_FILE);
+  if (!existsSync(path)) return false;
+  try {
+    const data: unknown = JSON.parse(readFileSync(path, 'utf-8'));
+    if (!Array.isArray(data)) return false;
+    const next = data.filter(n => !(n && typeof n === 'object' && (n as { id?: unknown }).id === id));
+    if (next.length === data.length) return false;
+    writeFileSync(path, JSON.stringify(next, null, 2), 'utf-8');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Prune entries whose own deadline (createdAt + timeoutMs) is in the past —
+ * they can never be meaningfully accepted anymore, and leaving them makes every
+ * status surface lie about actionable work. Returns the removed ids.
+ */
+export function pruneExpiredNervousPending(projectRoot: string, nowMs: number): string[] {
+  const path = join(projectRoot, NERVOUS_PENDING_FILE);
+  if (!existsSync(path)) return [];
+  try {
+    const data: unknown = JSON.parse(readFileSync(path, 'utf-8'));
+    if (!Array.isArray(data)) return [];
+    const removed: string[] = [];
+    const kept = data.filter(n => {
+      if (!n || typeof n !== 'object') return true;
+      const e = n as { id?: unknown; createdAt?: unknown; timeoutMs?: unknown };
+      if (typeof e.id !== 'string' || typeof e.createdAt !== 'string' || typeof e.timeoutMs !== 'number') return true;
+      const created = Date.parse(e.createdAt);
+      if (!Number.isFinite(created)) return true;
+      if (created + e.timeoutMs < nowMs) { removed.push(e.id); return false; }
+      return true;
+    });
+    if (removed.length > 0) writeFileSync(path, JSON.stringify(kept, null, 2), 'utf-8');
+    return removed;
+  } catch {
+    return [];
+  }
 }

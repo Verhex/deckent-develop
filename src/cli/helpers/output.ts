@@ -463,6 +463,22 @@ export function formatHumanStatus(input: HumanStatusInput): string {
   const now = input.nowMs ?? Date.now();
   const lines: string[] = [];
 
+  // ─── W0-TRUTH (#491) COMPLETE-gate ───────────────
+  // 2026-07-06 live lie: a COMPLETE dashboard (auditor's final scan, garbage
+  // progress like active:2/done:0) rendered as a LIVE sprint for hours. A
+  // completed sprint must never present live Progress/Active lines — render an
+  // honest closed-sprint block instead. (English default — this module's
+  // existing idiom; callers inject localized labels where needed.)
+  const sp = dashboard.sprint as { status?: string; phase?: string; number: number; id: string };
+  if (sp.status === 'COMPLETE' || sp.phase === 'COMPLETE') {
+    const doneLabel = `Sprint ${String(sp.number).padStart(3, '0')} — completed`;
+    return [
+      doneLabel,
+      'No active sprint. This is the last finished sprint\u2019s record.',
+      'Next: run `deckent retro` for the retrospective, or `deckent plan` to start the next sprint.',
+    ].join('\n');
+  }
+
   // ─── Header ──────────────────────────────────────
   const sprintLabel = sprintTitle
     ? `Sprint ${String(dashboard.sprint.number).padStart(3, '0')} \u2014 ${sprintTitle}`
@@ -630,4 +646,22 @@ export function formatHumanStatus(input: HumanStatusInput): string {
   }
 
   return lines.join('\n');
+}
+
+
+/**
+ * W0-TRUTH (#491) crash-case oracle: a dashboard that is still ACTIVE-shaped
+ * but whose writer died (stale updatedAt, no live sprint id, no task files) is
+ * ORPHANED — status must fall back to the honest no-sprint view instead of
+ * presenting a dead snapshot as live. Pure + injectable clock for tests.
+ */
+export function isDashboardOrphaned(
+  dashboard: { updatedAt?: string },
+  ctx: { hasLiveSprint: boolean; hasTasks: boolean; nowMs: number; staleThresholdMs?: number },
+): boolean {
+  if (ctx.hasLiveSprint || ctx.hasTasks) return false;
+  const updated = typeof dashboard.updatedAt === 'string' ? Date.parse(dashboard.updatedAt) : NaN;
+  if (!Number.isFinite(updated)) return true; // unreadable timestamp + no live signals = do not trust
+  const threshold = ctx.staleThresholdMs ?? 30 * 60_000;
+  return ctx.nowMs - updated > threshold;
 }

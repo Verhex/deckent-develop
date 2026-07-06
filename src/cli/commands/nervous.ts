@@ -25,6 +25,7 @@ import {
   dismissRecommendation,
 } from '../../nervous/recommendation-log.js';
 import { NERVOUS_HISTORY_FILE, NERVOUS_PENDING_FILE, PANIC_IPC_DIR } from '../../core/constants.js';
+import { removeNervousPending } from '../../core/pending-approvals.js';
 
 // ─── ANSI Color Helpers ─────────────────────────────────────────────────────
 
@@ -322,6 +323,11 @@ async function handleAccept(root: string, id: string, lang: string): Promise<voi
   // NOT mutate pending/history here.
   if (isNervousPollerAlive(root)) {
     await new NervousIpcQueue(root).writeApproval({ notificationId: notification.id, decision: 'accepted' });
+    // W0-TRUTH (#491): the operator has DECIDED — the durable display-hub entry
+    // must clear now, regardless of which executor ultimately runs the action
+    // (an approval owned by a long-dead executor is otherwise never consumed and
+    // haunts `deckent status` forever — 2026-07-06 live lie: 4 entries, 5 days).
+    removeNervousPending(root, notification.id);
     print(colorize('  ' + getMessage('nervous.sent_to_executor', lang, { action }), GREEN));
     return;
   }
@@ -353,6 +359,7 @@ async function handleReject(root: string, id: string, lang: string, reason?: str
   // actually resolves (else it hangs). The executor records the rejection.
   if (isNervousPollerAlive(root)) {
     await new NervousIpcQueue(root).writeApproval({ notificationId: notification.id, decision: 'rejected', reason });
+    removeNervousPending(root, notification.id); // W0-TRUTH: decided → display-hub clears (see accept path)
     print(colorize('  ' + getMessage('nervous.sent_to_executor', lang, { action }), GREEN));
     return;
   }

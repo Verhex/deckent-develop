@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { DashboardState, Task } from '../../core/types.js';
 import { DASHBOARD_FILE, TASKS_DIR, DECKENT_DIR } from '../../core/constants.js';
-import { print, printError, formatDashboard, formatTable, formatHumanStatus, formatStandaloneStatus, isNoColor, stripAnsi } from '../helpers/output.js';
+import { print, printError, formatDashboard, formatTable, formatHumanStatus, formatStandaloneStatus, isNoColor, stripAnsi , isDashboardOrphaned } from '../helpers/output.js';
 import type { CIBaseline, CIReport } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
@@ -492,6 +492,20 @@ export function registerStatus(program: Command): void {
       try {
         const rawData = readFileSync(dashPath, 'utf-8');
         const state = JSON.parse(rawData) as DashboardState;
+        // ─── W0-TRUTH (#491) orphan-gate ─────────────────────────────
+        // Crash-case: an ACTIVE-shaped .dashboard whose writer died must not be
+        // presented as live. Stale + no live sprint + no task files → honest
+        // no-sprint view (the COMPLETE case is handled inside formatHumanStatus).
+        if (!opts.json && !opts.raw && isDashboardOrphaned(state, {
+          hasLiveSprint: getCurrentSprintId(root) !== null,
+          hasTasks: loadTaskFiles(root).length > 0,
+          nowMs: Date.now(),
+        })) {
+          print(getMessage('status.no_active_sprint', lang));
+          const pendingOrphan = buildPendingApprovalsSection(root, lang);
+          if (pendingOrphan) print(pendingOrphan);
+          return;
+        }
         if (opts.json) {
           // (E) --json + --verbose: include agent/skill info
           const tasks = loadTaskFiles(root);

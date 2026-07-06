@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, readdirSync, existsSync, statSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, existsSync, statSync, mkdirSync, unlinkSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { archivePromptFiles } from '../../orchestra/spawn-backend-docker.js';
 import { cleanTasksArchive } from '../../orchestra/sprint-docs-updater.js';
@@ -17,6 +17,7 @@ import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
+import { pruneExpiredNervousPending } from '../../core/pending-approvals.js';
 
 /** DB-first memory entry count — replaces legacy countBrainLines. */
 function getMemoryEntryCount(projectRoot: string): number {
@@ -269,6 +270,19 @@ export function registerCleanup(program: Command): void {
 
         // D) Ensure .brain/archive/ is git-tracked (not excluded by .gitignore)
         ensureArchiveGitignore(root);
+
+        // ─── W0-TRUTH (#491): stale display-state dies with the cleanup ─────
+        // `deckent status` must never render a ghost sprint after a cleanup:
+        // remove the auditor's last `.dashboard` snapshot + the per-sprint
+        // ci-baseline, clear sprint-state/active pointers, and prune parked
+        // nervous approvals whose own timeout deadline has passed. Fail-soft.
+        for (const stale of ['.dashboard', join('.deckent', 'ci-baseline.json'), join('.deckent', 'sprint-state.json'), join('.deckent', 'sprint-active.json')]) {
+          try { unlinkSync(join(root, stale)); } catch { /* absent is fine */ }
+        }
+        try {
+          const prunedIds = pruneExpiredNervousPending(root, Date.now());
+          if (prunedIds.length > 0) print(getMessage('cleanup.pruned_expired_approvals', lang, { count: String(prunedIds.length) }));
+        } catch { /* fail-soft */ }
 
         // Only print cleanup.complete when not in decay mode (decay already showed its own summary)
         if (!opts.decay) {

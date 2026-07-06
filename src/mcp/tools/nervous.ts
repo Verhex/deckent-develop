@@ -11,6 +11,7 @@ import { NervousIpcQueue } from '../../nervous/ipc-queue.js';
 import type { AuthorityMode, NervousSystemConfigV1 } from '../../core/nervous-types.js';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { removeNervousPending } from '../../core/pending-approvals.js';
 import {
   acceptPanicGuard,
   listPendingPanicEvents,
@@ -123,6 +124,9 @@ export async function handleNervousAccept(
   const existsInHistory = all.some(r => r.notificationId === id);
 
   if (!config.enabled) {
+    // W0-TRUTH (#491): accepting must also clear the durable hub, or the entry
+    // haunts every status surface forever (2026-07-06 live lie: 4 entries, 5 days).
+    removeNervousPending(root, id);
     return {
       accepted: true,
       notificationId: id,
@@ -138,6 +142,9 @@ export async function handleNervousAccept(
     notificationId: id,
     decision: 'accepted',
   });
+  // W0-TRUTH (#491): clear the durable hub NOW — the executor's own bridge
+  // cleanup is an optional dependency and never fires on this MCP/CLI path.
+  removeNervousPending(root, id);
 
   return {
     accepted: true,
