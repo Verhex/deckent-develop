@@ -1,5 +1,27 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-373 Learnings
+- Sprint sprint-373 Learnings: ## Sprint sprint-373 Learnings
+
+## Gains
+- 373-001 — ADR-ONB-GLOBAL — global-kurulum + proje-scope katman ADR-taslağı — Ground-truth check first (per CLAUDE.md disk-verify rule): docs/adr/adr-d-011-global-install-proj...
+- 373-002 — ADR-TERM-5 — sade risk-dili ADR-taslağı (Oku/Değiştir/Çalıştır/Otonom) — Discovery: docs/adr/adr-d-012-terminal-risk-language.md (the exact target write-scope file) alrea...
+- 373-003 — ADR-NL-DISPATCH — agenticDispatch default kararı ADR-taslağı — docs/adr/adr-d-013-nl-dispatch-default.md already contained a complete draft on disk when this ta...
+- 373-004 — SERVE-E2E-SMOKE — auth'lu gerçek-200 smoke harness'ı — Write-scope file tests/e2e/serve-endpoints-smoke.test.ts already existed on disk (untracked, unco...
+- 373-005 — DEBT-371-CLOSE — 002 artığı + süpürme-doğrulaması — Read .brain/archive/sprint-371-tasks/task-371-001.result + task-371-002.result and git show 669b2...
+- 373-006 — CURSOR-HARNESS — F11-016 kalan-envanterinden cursor-drift test-harness'i — Found src/cli/repl/cursor-model.ts + tests/cli/repl-cursor-model.test.ts already present on disk,...
+
+## Sprint sprint-372 Learnings
+- Sprint sprint-372 Learnings: ## Sprint sprint-372 Learnings
+- ADR-ONB-GLOBAL — global-kurulum + proje-scope katman ADR-taslağı: NO_GO — Worker timeout/killed (exitCode=1) but git diff shows 40 files modified. Brain should reconcile via Spurious NO_GO helpe
+- ADR-NL-DISPATCH — agenticDispatch default kararı ADR-taslağı: NO_GO — Worker timeout/killed (exitCode=1) but git diff shows 40 files modified. Brain should reconcile via Spurious NO_GO helpe
+- SERVE-E2E-SMOKE — auth'lu gerçek-200 smoke harness'ı: NO_GO — Worker timeout/killed (exitCode=1) but git diff shows 37 files modified. Brain should reconcile via Spurious NO_GO helpe
+- CURSOR-HARNESS — F11-016 kalan-envanterinden cursor-drift test-harness'i: NO_GO — Worker timeout/killed (exitCode=1) but git diff shows 39 files modified. Brain should reconcile via Spurious NO_GO helpe
+
+## Gains
+- 372-002 — ADR-TERM-5 — sade risk-dili ADR-taslağı (Oku/Değiştir/Çalıştır/Otonom) — Wrote docs/adr/adr-d-012-terminal-risk-language.md (only file in scope.filesWrite), porting docs/...
+- 372-005 — DEBT-371-CLOSE — 002 artığı + süpürme-doğrulaması — 371-001 (CATALOG-MATERIALIZE) debt-gerekcesi (2 kalem: catalog-sync-parity.test.ts 6 stale assert...
+
 ## Sprint sprint-371 Learnings
 - Sprint sprint-371 Learnings: ## Sprint sprint-371 Learnings
 - CATALOG-MATERIALIZE — builtin 3+3'ü pool-görünür yap (370-003 kapanışı): GO_WITH_TECH_DEBT — Decision (Option A over Option B, per task instruction to justify): pool-loading now reads the builtin tree directly (D-

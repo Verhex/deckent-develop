@@ -118,16 +118,16 @@ Deckent'in tam otonom çok-ajanlı geliştirme platformu haline geldiği nokta �
 ---
 
 ## Sayılarla Deckent
-| Metric | Value |
+| Metrik | Değer |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-371 |
+| Sprint | sprint-373 |
 | MCP Tools | 46 |
 | MCP Resources | 8 |
 | CLI Commands | 68+ |
 | Dashboard Pages | 21 |
-| Agents | 17 built-in + 2 custom |
-| Skills | 28 built-in |
+| Agents | 20 built-in + 2 custom |
+| Skills | 31 built-in |
 | Providers | 4 (Claude, Codex, Gemini, Ollama) |
 
 ## Sprint Metrikleri
@@ -142,15 +142,15 @@ Deckent'in tam otonom çok-ajanlı geliştirme platformu haline geldiği nokta �
 | Coverage | 0.0% |
 
 ## Sprint History
-_No sprint history._
+_Sprint geçmişi yok._
 
 ## Sprint Metrics
-| Metric | Value |
+| Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-371 |
-| Total Tasks | 7 |
-| Completed | 7 |
-| Tech Debt | 2 |
+| Sprint | sprint-373 |
+| Toplam Task | 6 |
+| Tamamlanan | 6 |
+| Tech Debt | 0 |
 | No-Go | 0 |
-| Duration | 47dk 27sn |
+| Süre | 9dk 20sn |
 | Coverage | N/A |

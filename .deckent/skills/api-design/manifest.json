@@ -1,0 +1,35 @@
+{
+  "id": "api-design",
+  "name": "API Design",
+  "version": "0.1.0",
+  "description": "",
+  "entrypoint": "SKILL.md",
+  "category": "domain",
+  "manifestVersion": 2,
+  "triggers": [],
+  "stackDetection": {
+    "files": [],
+    "dependencies": [],
+    "commands": []
+  },
+  "composableWith": [],
+  "priority": 5,
+  "promptInjection": {
+    "position": "append",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "source": "builtin",
+  "stats": {
+    "totalUses": 12,
+    "successCount": 12,
+    "successRate": 1,
+    "avgCoverage": 0,
+    "lastUsedInSprint": "sprint-373"
+  },
+  "activation": {
+    "rules": [],
+    "exclude": [],
+    "minScore": 5
+  }
+}

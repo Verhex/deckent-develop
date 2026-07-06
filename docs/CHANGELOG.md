@@ -2,6 +2,30 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint373] - 2026-07-06
+
+### Added
+
+- ADR-ONB-GLOBAL — global-kurulum + proje-scope katman ADR-taslağı
+- ADR-TERM-5 — sade risk-dili ADR-taslağı (Oku/Değiştir/Çalıştır/Otonom)
+- ADR-NL-DISPATCH — agenticDispatch default kararı ADR-taslağı
+- SERVE-E2E-SMOKE — auth'lu gerçek-200 smoke harness'ı
+- DEBT-371-CLOSE — 002 artığı + süpürme-doğrulaması
+- CURSOR-HARNESS — F11-016 kalan-envanterinden cursor-drift test-harness'i
+
+
+_Tasks: 6 total, 6 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint372] - 2026-07-05
+
+### Added
+
+- ADR-TERM-5 — sade risk-dili ADR-taslağı (Oku/Değiştir/Çalıştır/Otonom)
+- DEBT-371-CLOSE — 002 artığı + süpürme-doğrulaması
+
+
+_Tasks: 10 total, 2 done, 0 tech debt, 8 no-go_
+
 ## [1.0.0-beta.1-sprint371] - 2026-07-05
 
 ### Added

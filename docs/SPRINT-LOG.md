@@ -9056,3 +9056,57 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 371-007: CLOSING-DATA-PACK — 357-370 kapanış-veri-paketi (7-Tem hazırlığı) (DONE)
 
 ---
+## Sprint 372 — sprint-372
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-05
+**Duration:** 435s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 10 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 8 |
+| Coverage | NaN% |
+| Duration | 434564ms |
+
+### Tasks
+
+- 372-001: ADR-ONB-GLOBAL — global-kurulum + proje-scope katman ADR-taslağı (NO_GO)
+- 372-002: ADR-TERM-5 — sade risk-dili ADR-taslağı (Oku/Değiştir/Çalıştır/Otonom) (DONE)
+- 372-003: ADR-NL-DISPATCH — agenticDispatch default kararı ADR-taslağı (NO_GO)
+- 372-004: SERVE-E2E-SMOKE — auth'lu gerçek-200 smoke harness'ı (NO_GO)
+- 372-005: DEBT-371-CLOSE — 002 artığı + süpürme-doğrulaması (DONE)
+- 372-006: CURSOR-HARNESS — F11-016 kalan-envanterinden cursor-drift test-harness'i (NO_GO)
+
+---
+## Sprint 373 — sprint-373
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-06
+**Duration:** 561s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 560993ms |
+
+### Tasks
+
+- 373-001: ADR-ONB-GLOBAL — global-kurulum + proje-scope katman ADR-taslağı (DONE)
+- 373-002: ADR-TERM-5 — sade risk-dili ADR-taslağı (Oku/Değiştir/Çalıştır/Otonom) (DONE)
+- 373-003: ADR-NL-DISPATCH — agenticDispatch default kararı ADR-taslağı (DONE)
+- 373-004: SERVE-E2E-SMOKE — auth'lu gerçek-200 smoke harness'ı (DONE)
+- 373-005: DEBT-371-CLOSE — 002 artığı + süpürme-doğrulaması (DONE)
+- 373-006: CURSOR-HARNESS — F11-016 kalan-envanterinden cursor-drift test-harness'i (DONE)
+
+---

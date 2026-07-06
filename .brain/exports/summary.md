@@ -12,6 +12,9 @@
 | adr-d-008 | Develop / Product Repo Strategy | accepted |
 | adr-d-009 | Worker-Result Boundary Normalization Policy | proposed |
 | adr-d-010 | REPL Input Stabilization (Cursor / Queue / Streaming Contract) | proposed |
+| adr-d-011 | Global Install Topology — Daemon vs CLI-Invoked, Project-Scope Config Layer | proposed |
+| adr-d-012 | Terminal Risk Language (Oku / Değiştir / Çalıştır / Otonom) | proposed |
+| adr-d-013 | NL-Dispatch Default Policy (`agenticDispatch` — Natural-Language → MCP-Tool Direct Dispatch) | proposed |
 | adr-g-001 | Layered Config & Scope Precedence | accepted |
 | adr-g-002 | spawnSync Security Pattern | accepted |
 | adr-g-004 | Instruction-File Adapter & Multi-Env Generation | accepted |
@@ -48,6 +51,12 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-373 Learnings** (sprint-373): ## Sprint sprint-373 Learnings
+
+## Gains
+- 373-001 — ADR-ONB-GLOBAL — global-kurulum + proje-scope katman ADR-taslağı...
+- **Sprint sprint-372 Learnings** (sprint-372): ## Sprint sprint-372 Learnings
+- ADR-ONB-GLOBAL — global-kurulum + proje-scope katman ADR-taslağı: NO_GO — Worker tim...
 - **Sprint sprint-371 Learnings** (sprint-371): ## Sprint sprint-371 Learnings
 - CATALOG-MATERIALIZE — builtin 3+3'ü pool-görünür yap (370-003 kapanışı): GO_WITH_TEC...
 - **Sprint sprint-370 Learnings** (sprint-370): ## Sprint sprint-370 Learnings
@@ -65,10 +74,6 @@
 - 365-001 — Fix debt: Tech debt from 362-001-fix: VERIFY-AND-COMPLETE of the...
 - **Sprint sprint-364 Learnings** (sprint-364): ## Sprint sprint-364 Learnings
 - Fix debt: Tech debt from 361-001-fix: Worker timeout/killed (exitCode=1) but git dif...
-- **Sprint sprint-363 Learnings** (sprint-363): ## Sprint sprint-363 Learnings
-- CODEX-V4 — model-pin gerçek sınavı (479-fix'li plan): NO_GO — Subprocess worker exit...
-- **Sprint sprint-362 Learnings** (sprint-362): ## Sprint sprint-362 Learnings
-- Fix debt: Tech debt from 357-015-fix: Verified the crosswalk sweep for born-455 (DOC...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -126,4 +131,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 951 | Generated: 2026-07-05_
+_Total entries: 966 | Generated: 2026-07-06_

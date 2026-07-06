@@ -903,6 +903,641 @@ Per ADR-G-019 §4 ("every ADR documents both today and tomorrow, transparently")
 
 ---
 
+## adr-d-011: Global Install Topology — Daemon vs CLI-Invoked, Project-Scope Config Layer
+
+**Status:** proposed
+
+# ADR-D-011: Global Install Topology — Daemon vs CLI-Invoked, Project-Scope Config Layer
+
+**Class:** ADR-D (Dogfooding / Dev) — **see Meta-note below; classification is itself an open question** · **Scope:** global+project · **Immutable:** no (proposed) · **Source:** publisher · **Enforcement:** today=none, design-only — no code ships with this ADR → tomorrow=phased build (§ Intent/Roadmap) gated on Alperen's decision below
+**Status:** proposed (acceptance: Alperen) · **Date:** 2026-07-05 · **Absorbs:** — (new; this is the daemon-vs-CLI install-architecture axis of MASTER-PLAN row-200 ONB-GLOBAL — a *sibling*, not a duplicate, of the file-location axis already drafted in `docs/design/onb-global-install.md` §8) · **Supersedes:** —
+**Crosswalk:** — (new decision, no legacy ADR-NNN predecessor)
+
+> **Meta-note (classification — flagged, not resolved by this document):** Per ADR-G-019 §1's own class definitions, ADR-G covers "runtime behavior, orchestration... ships in BOTH global install AND every project install... applies to dogfood AND user (solo → largest enterprise, million-scale)"; ADR-D covers only "how deckent is BUILT — contributor conventions... ships ONLY with the dev install." This document's subject — how the *installed product* runs for every end user — reads as ADR-G by that definition, not ADR-D. The write-scope assigned to this task, however, is the file `docs/adr/adr-d-011-global-install-project-scope.md` (a D-slot). Rather than write outside my assigned scope, I am flagging the mismatch explicitly as **Open Question 1** below and keeping the file at its assigned path/number; the Class header above is left as assigned pending Alperen's call — if reclassified, the correct move is a follow-up rename to an `ADR-G-0XX` slot (mirroring the placeholder the sibling document already reserved, `docs/design/onb-global-install.md` §8) plus this file's retirement/redirect, not a silent edit of the number here.
+
+---
+
+## Context
+
+### 1. What is already decided (do not re-litigate here)
+
+Two adjacent questions on MASTER-PLAN row-200 (ONB-GLOBAL, P0, "kesinlikle revize edilecek") are **already designed and partially shipped** and this document treats them as a settled floor:
+
+- **Config precedence (ADR-G-001).** `loadConfig()` (`src/core/config.ts:1446-`) merges four effective layers, last wins: hardcoded defaults (`createDefaultConfig()`, `config.ts:1459`) → `~/.deckent/config.json` (global merge, `config.ts:1461-1464`) → `.deckent/config.json` (project merge, `config.ts:1466-1503`) → curated `DECKENT_*` env overrides (`config.ts:1529-1550`). `deepMerge` semantics (nested-merge, array-replace, undefined-skip) are unchanged by anything in this document.
+- **Pivot rule — learnings stay project-scope (ADR-G-017).** `.brain/memory.db` (ADRs, sprint learnings, retros, routing stats) is the project's own accumulated judgment; it never migrates to global scope and never leaks across sibling projects. `docs/design/onb-global-install.md` §3.2 already states this as a design principle; this document reaffirms it as an unconditional constraint on every option below.
+- **Where global files physically live on disk.** `docs/design/onb-global-install.md` (Sprint 361-008, 2026-07-02) designed the full 4-platform matrix (XDG on Linux/WSL, `Library/Application Support`+`Library/Caches` on macOS, `%APPDATA%`/`%LOCALAPPDATA%` on Windows) via `resolveGlobalScopePaths` (`src/core/global-scope-resolver.ts`) and a versioned `GlobalStore` layer (`src/core/global-store.ts`, Sprint 362-010). That document's own §8 already contains a **separate, still-`proposed` ADR draft** ("ADR-G-0XX: Global Scope Topology & Platform-Correct Global Paths") for exactly this narrower axis — options A (flat forever) / B (platform-correct, staged migration) / C (hybrid opt-in). **This document does not re-decide that axis**; it is a sibling, cross-referenced, not absorbed.
+
+What those two settled items do **not** answer, and what MASTER-PLAN row-200 still marks 🟡 for, is the question this document takes on:
+
+### 2. The open question — how does the installed product *run*?
+
+Today, per `package.json:6-9` and `docs/guide/installation.md:24-44`, deckent ships two bins — `deckent` (`dist/cli/entry.js`) and `deckent-mcp` (`dist/mcp/server.js`) — and both install paths documented (`npx deckent@latest init` zero-install, or `npm install -g deckent`) are **CLI-invocation models**: every `deckent <command>` is a fresh process that reads config, does its work, and exits (or, for a sprint, spawns worker processes via tmux/subprocess and exits when the sprint completes). There is **no persistent background process for the core orchestration engine**.
+
+deckent already has exactly **one** daemon-shaped subsystem, and it is scoped narrowly: `src/connectors/gateway/gateway-daemon.ts` (152 lines) + `src/connectors/bot-daemon.ts` (112 lines) run the messaging-connector inbound listener (Telegram/Discord) as a long-lived, detached child process, because polling cannot receive inbound bot messages. Its own header comment is disarmingly honest about the model's limits: *"a detached process does NOT survive a reboot or a crash — that needs an OS supervisor (systemd/pm2). This is 'always-on while the machine is up', not 'survives reboot'"* (`bot-daemon.ts:1-7`). It is tracked by pid file **per project root** (`botPidPath(root)` → `.deckent/bot.pid`, `bot-daemon.ts:16-18`), liveness-checked by a portable, no-throw cross-platform helper (`src/core/pid-liveness.ts`, `isPidAlive`), and stale instances are detected — never auto-killed — by `src/core/daemon-hygiene.ts` (`detectStaleDaemons`, pure detector over an injected process snapshot; `listDeckentProcesses`, an injectable spawn-based cross-platform adapter that returns an honest empty list with `supported:false` on an unrecognized platform rather than guessing).
+
+The reason this axis can no longer stay implicit: **`.analysis/hermes-vs-deckent-direction-decisions.md` §3 (APPROVAL-CONTROL, P0)** commits deckent to a **runtime-wide ApprovalBroker** — an approval-request emitted by any surface (worker/tool/MCP elicitation) must broadcast live to *every* connected channel (terminal, Telegram, WhatsApp, dashboard), and a decision made in any one of them must cross-broadcast "approved in X" to all the others, in real time. §0 (strategic pivot) additionally makes the **terminal** the primary, conversational, tool-driven surface — a UX shape that assumes a live, addressable session, not a one-shot CLI invocation. Both of these push toward *some* durable, addressable process; neither the existing config-precedence work nor the existing file-location work answers what that process's scope and lifecycle should be. That is this document's decision.
+
+---
+
+## Decision (Today)
+
+**Nothing changes today.** This document is a proposal; no code ships with it (nogo per this task's own goNogo criteria: no code, no DB write, no "kabul edildi" status). It exists to put the three candidate architectures on record, scored against Yasa #2 (design the full million-environment / multi-tenant matrix up front), so Alperen can decide before ONB-GLOBAL-WIRE-class implementation work starts.
+
+### Options
+
+```xml
+<install-topology-options>
+  <option id="A" name="Global daemon + project-attach">
+    <shape>
+      One long-lived background process PER MACHINE (started once — manually via a
+      `deckent daemon start`, or registered as an OS service: systemd unit / launchd
+      plist / Windows Service / schtasks). Every project "attaches" via a local IPC
+      channel (unix domain socket / named pipe / loopback HTTP). The daemon owns:
+      cross-project ApprovalBroker fan-out, ALL messaging-connector listeners
+      (gateway-daemon absorbed into it), global-scope state (GlobalStore), and
+      cost/limit-ledger aggregation across every attached project.
+    </shape>
+    <pros>
+      Real-time cross-channel approval relay is trivial — one process already owns
+      every channel connection, so fan-out is an in-process pub/sub, not
+      cross-process coordination. One set of provider auth sessions machine-wide
+      (no re-login per project). Efficient at scale for a single power user running
+      many concurrent project sprints (shared connection pools/caches).
+    </pros>
+    <cons-yasa2 name="million-environment / multi-tenant impact">
+      Takes on FULL OS-service-lifecycle burden across all four platforms on day
+      one — systemd unit *and* launchd plist *and* Windows Service/schtasks *and*
+      WSL nuances (a WSL daemon's socket is not reachable from Windows-side
+      processes without an explicit bridge — `docs/design/onb-global-install.md`
+      §5.2 already treats Windows↔WSL as "two machines by design", which directly
+      complicates a would-be single cross-boundary daemon). Introduces a NEW
+      failure class deckent must actively defend against — `daemon-hygiene.ts`
+      already exists precisely because stale/orphaned always-on processes are a
+      real, previously-fought problem (Sprint 331, B-ZOMBIE), not hypothetical.
+      At enterprise/shared-machine scale, ONE per-machine daemon serving MULTIPLE
+      tenants' projects is exactly the isolation boundary ADR-G-017 explicitly
+      calls out of scope for today's per-project model ("multi-project ≠
+      multi-tenant... enterprise multi-tenancy arrives later as a *modular* layer,
+      **ADR-G-031**, never by weakening this per-project model" —
+      `adr-g-017-multi-project-isolation.md:15`) — Option A would force that
+      modular-layer work to exist BEFORE a shared-machine deployment is safe, not
+      after. A locked-down environment (CI runner, ephemeral container, managed
+      corporate desktop without background-service rights) may not permit
+      installing/registering a service at all; must honestly fail (Yasa#2), not
+      silently degrade.
+    </cons-yasa2>
+  </option>
+
+  <option id="B" name="Global-CLI + project-config-layer (today, extended)">
+    <shape>
+      No persistent daemon for core orchestration, ever. `deckent` stays installed
+      once (npm -g or npx), invoked per-command; state layering is exactly today's
+      ADR-G-001 spine, now carried onto the already-shipped platform-correct
+      GlobalStore (361-008/362-010/363-006). The ApprovalBroker (direction-doc §3)
+      is built WITHOUT a central daemon: channels poll/tail a shared local
+      event log (the same append-only pattern `.tasks/*.result` / `.dashboard`
+      already use), or the EXISTING gateway-daemon is extended to also carry
+      approval fan-out for the channels it already owns (Telegram/Discord),
+      without becoming the product's backbone.
+    </shape>
+    <pros>
+      Zero NEW OS-service-lifecycle surface — nothing to write/support/debug across
+      four platforms beyond what already exists (gateway/bot-daemon). Simplest
+      mental model: every command is a fresh, disposable process, matching
+      `docs/guide/installation.md`'s two documented install paths exactly as they
+      exist today. Naturally multi-tenant-safe by construction — no shared
+      long-lived process means no cross-tenant blast radius to defend against.
+      Matches sandboxed/CI/ephemeral-container environments, where installing a
+      background service is often disallowed or simply pointless (a CI job that
+      runs one sprint and exits has nothing to attach a daemon to anyway).
+    </pros>
+    <cons-yasa2 name="million-environment / multi-tenant impact">
+      Real-time cross-channel relay is harder to make feel "live" — re-derived
+      from polling/file-watch primitives instead of an in-process bus, likely
+      higher latency for the "xx ortamda onaylandı" cross-broadcast the direction
+      doc asks for. Does not actually eliminate daemons: messaging connectors
+      ALREADY require one (`gateway-daemon.ts` exists because polling cannot
+      receive inbound bot messages) — Option B just keeps that daemon narrowly
+      scoped to messaging rather than making it also serve as the coordination
+      backbone; the ApprovalBroker's live-relay ambition would sit awkwardly
+      outside it.
+    </cons-yasa2>
+  </option>
+
+  <option id="C" name="Hybrid — per-project coordination daemon, CLI stays primary">
+    <shape>
+      Core orchestration (sprints) stays CLI-invoked as today — Option A's
+      per-machine service is NOT introduced. Generalize the ALREADY-EXISTING
+      `gateway-daemon.ts`/`bot-daemon.ts` shape (detached child process,
+      `.deckent/bot.pid`-style liveness file, `isPidAlive` cross-platform check,
+      `daemon-hygiene.ts` stale-detection) into ONE narrow, optional,
+      lazily-started **per-project** coordination daemon. Its only job: own the
+      ApprovalBroker pub/sub bus for that project AND host the messaging listener
+      under the same process (not two coordination shapes side by side). Scope is
+      PER-PROJECT-ROOT — the exact isolation boundary ADR-G-017 already
+      guarantees — not per-machine, so it inherits that ADR's isolation model
+      instead of needing a new one. Auto-started on first need (first `deckent
+      start` in a project, or first action requiring live approval-relay) if not
+      already running; consent-gated per ADR-G-030 if it is ever registered
+      persistent-on-boot (out of scope for the initial slice — see Open Question 4).
+    </shape>
+    <pros>
+      Satisfies the actual P0 driver (live cross-channel approval relay) WITHOUT
+      taking on Option A's full per-machine OS-service burden on day one. Reuses
+      TWO things already built and already proven (`gateway-daemon.ts`'s detached-
+      process shape + `daemon-hygiene.ts`'s stale-detection + `pid-liveness.ts`'s
+      portable check) instead of inventing new OS-service machinery from scratch.
+      Per-project scope keeps multi-tenant isolation trivial — it is the SAME
+      boundary `.deckent/`/`.brain/` already use (ADR-G-017 Layer-1), so a shared
+      enterprise machine running many projects gets N independent coordination
+      daemons, never one shared surface to isolate. Environments that cannot/will
+      not run background processes (locked-down CI) simply do not get live relay
+      and fall back to polling — an honest, Yasa#2-compliant degrade, not a hard
+      requirement to work at all.
+    </pros>
+    <cons-yasa2 name="million-environment / multi-tenant impact">
+      Two coordination shapes (a generalized per-project daemon + whatever remains
+      of `gateway-daemon.ts`) must be explicitly unified, not left to drift —
+      this ADR's proposed decision below states they should be ONE process, but
+      the actual ownership/merge design is deferred to Open Question 2. A
+      per-project daemon still needs lifecycle hygiene (start/detect-stale/stop)
+      — smaller surface than Option A's per-machine service (N independent,
+      already-isolated processes vs. one shared one to defend), but not zero; N
+      concurrently open projects means N coordination daemons running, which a
+      resource-constrained environment (a small CI runner, a low-memory VM) must
+      be able to see and reason about (`deckent doctor` / `daemon-hygiene.ts`
+      already gives an inventory seam for this — extending it, not inventing a
+      new one).
+    </cons-yasa2>
+  </option>
+</install-topology-options>
+```
+
+### Proposed decision: **Option C**
+
+Reasoning, laid out against the project's own laws:
+
+1. **Yasa #3 (never MVP) does not mean "biggest option wins."** The god-level, enterprise-grade answer here is the *right-sized* one: reusing a proven, already-shipped daemon shape (`gateway-daemon.ts` + `daemon-hygiene.ts` + `pid-liveness.ts`) to close a real, named P0 gap (live cross-channel approval relay) is more rigorous than committing the whole product to a per-machine OS-service architecture (Option A) before any usage signal demonstrates that scale is needed. Building Option A's full systemd/launchd/Windows-Service/WSL-bridge matrix speculatively, with no proven driver beyond "it would also work," is itself a form of premature, unjustified complexity — the same anti-pattern Discipline 2 (Simplicity First) warns against, just at architecture scale instead of function scale.
+2. **Yasa #2 (every environment, honestly) favors Option C's degrade story.** A per-project daemon that simply doesn't start in a locked-down CI runner (and the CLI still works, just without live relay) is an honest partial-capability story. Option A either has to solve OS-service registration on every platform *including* environments that forbid it, or itself falls back to something Option-C-shaped anyway for those environments — meaning Option A doesn't avoid building Option C, it just adds a second, heavier mode on top.
+3. **ADR-G-017's existing "multi-project ≠ multi-tenant" line is exactly the isolation boundary Option C needs, already granted.** A per-project coordination daemon is no new isolation surface to design — it is the SAME directory-scoped boundary `.deckent/`/`.brain/` already use. Option A would need genuinely new multi-tenant engineering (a single shared daemon serving several tenants' projects safely) *before* it could be considered enterprise-safe, i.e. it would have to build ADR-G-031's modular multi-tenancy layer as a prerequisite rather than an addition.
+4. **It does not foreclose Option A later.** If real usage data later shows most users run many concurrent projects and would benefit from one supervising per-machine process, that becomes ITS OWN follow-up ADR amendment (a "coordination-daemon supervisor" sitting above N per-project daemons) — not a decision this document has to make today, and not a rewrite of Option C's per-project foundation when it happens.
+
+---
+
+## Intent / Roadmap (Tomorrow)
+
+Phased build, gated on Alperen's acceptance of this ADR (nothing below ships with this document):
+
+- **Phase 0 (today, no-op).** Core orchestration remains CLI-invoked. `gateway-daemon.ts`/`bot-daemon.ts` remain the only daemon-shaped code, scoped to messaging.
+- **Phase 1 — extract the coordination-daemon core.** Generalize `gateway-daemon.ts`'s detached-process/pid-file/liveness pattern into a project-scoped `coordination-daemon.ts` (name TBD) that can host BOTH the existing messaging listener AND a new ApprovalBroker pub/sub bus, reusing `pid-liveness.ts` and extending `daemon-hygiene.ts`'s stale-detection to the new process kind. No behavior change for existing bot users.
+- **Phase 2 — wire approval emitters.** Worker/tool/MCP-elicitation approval-request call-sites publish through the coordination daemon (when running) instead of file-only state; channels (terminal/Telegram/WhatsApp/dashboard) subscribe for live cross-broadcast. Consent-gated auto-start per ADR-G-030 (no silent background-process spawn without the user having opted into the feature that needs it).
+- **Phase 3 — evaluate a per-machine supervisor.** Only if real multi-project concurrent-usage telemetry shows a need: design a follow-up ADR for an OPTIONAL per-machine process supervising N per-project coordination daemons (Option A's benefits, added on top of Option C's foundation rather than replacing it). Not committed to by this document.
+
+---
+
+## Consequences
+
+**(+)** Puts the daemon-vs-CLI axis of ONB-GLOBAL on record for the first time, distinct from the already-settled file-location axis (`docs/design/onb-global-install.md`) — MASTER-PLAN row-200 gets a real second decision to close, not a rehash. The recommended option reuses three already-shipped, already-tested primitives (`gateway-daemon.ts`, `daemon-hygiene.ts`, `pid-liveness.ts`) rather than inventing new OS-service machinery, keeping the eventual implementation surgical. Explicitly preserves the two settled floors (ADR-G-001 precedence, ADR-G-017 pivot rule) so no future implementation work can silently erode them while chasing this document's decision.
+
+**(−)** This document itself carries an unresolved classification question (Meta-note) rather than resolving it — a follow-up rename/renumber may be needed once Alperen decides. Option C's "unify gateway-daemon into one coordination process" design is stated as a direction, not a finished interface — Open Question 2 below is real engineering ambiguity, not yet closed. No code ships with this ADR; MASTER-PLAN row-200 stays 🟡 until Alperen accepts (or amends) a decision here and Phase 1 work is scheduled.
+
+---
+
+## Open Questions (Alperen decides — each marked separately)
+
+1. **[ALPEREN] Classification/numbering.** Per the Meta-note: should this document be reclassified `ADR-G-0XX` (Global/Constitution — install topology reaches every user/environment) instead of `ADR-D-011` (Dev/contributor-only, which this content does not actually match)? If yes, the follow-up move is a rename to a proper `ADR-G` slot (there is already a reserved placeholder pattern in `docs/design/onb-global-install.md` §8 for a *different* ADR-G-0XX — these would need distinct numbers) plus retiring/redirecting this file — not a silent in-place renumber.
+2. **[ALPEREN] `gateway-daemon.ts` generalize-vs-new-module.** Should the coordination daemon be `gateway-daemon.ts` itself, extended to also carry ApprovalBroker fan-out, or a new sibling module that both messaging and approval-relay sit under? This is an implementation-shape fork with real blast-radius on the messaging-connector code path.
+3. **[ALPEREN] Auto-start posture.** Should the per-project coordination daemon auto-start on first need (e.g. first `deckent start`, or first approval-needing action) by default, or stay strictly opt-in behind an explicit `deckent daemon start` / config flag? This interacts directly with ADR-G-030's consent-gating discipline — auto-starting a background process without an explicit user action is a meaningfully different trust posture than today's `bot start`, which the user invokes by name.
+4. **[ALPEREN] OS-service registration — ever in scope?** Does deckent deliberately stay "detached user-space process only, no OS service" forever (matching `bot-daemon.ts`'s current honest limitation — no reboot survival), or is systemd/launchd/Windows-Service registration a real future goal for SOME tier of user (e.g. an enterprise "always-on" deployment)? If the latter, that is closer to Option A and should be scoped as its own follow-up ADR per Phase 3, not folded into this decision now.
+5. **[ALPEREN] Future per-machine-supervisor trigger.** What signal (usage telemetry threshold? explicit enterprise-tier request? a specific number of concurrently open projects?) should trigger evaluating Phase 3 (a per-machine supervisor atop Option C)? Left undefined here deliberately — Alperen may prefer "revisit only when asked" over a pre-committed metric.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** — (new document; no legacy ADR-NNN predecessor).
+- **Settled floors reaffirmed, not re-decided here:** ADR-G-001 (Layered Config & Scope Precedence — `src/core/config.ts:1446-1487`); ADR-G-017 (Multi-Project Isolation — `docs/adr/adr-g-017-multi-project-isolation.md:15,98` "multi-project ≠ multi-tenant"); ADR-D-002 (STATE-RESOLVER work-item, `src/core/state-paths.ts`); ADR-G-030 (Consent-Based Provisioning & Install — `docs/adr/adr-g-030-consent-based-provisioning.md:30,39,61` no-silent-sudo, consent-gated); ADR-G-031 (Enterprise Foundation — future modular multi-tenancy layer, cross-ref only, not read in depth for this document).
+- **Sibling document (file-location axis, not duplicated here):** `docs/design/onb-global-install.md` (Sprint 361-008) — its own §8 ADR draft covers "where do global files live on disk" (flat vs platform-correct XDG/AppData/Library); `src/core/global-scope-resolver.ts`, `src/core/global-store.ts` (Sprint 362-010), `src/core/global-config.ts`, `src/core/state-paths.ts`.
+- **Existing daemon precedent (this document's Option C foundation):** `src/connectors/gateway/gateway-daemon.ts` (152 lines), `src/connectors/bot-daemon.ts` (112 lines, header comment on reboot-survival honesty, `botPidPath` per-project pid file), `src/core/daemon-hygiene.ts` (354 lines, `detectStaleDaemons` pure detector + `listDeckentProcesses` injectable cross-platform adapter, Sprint 331 B-ZOMBIE), `src/core/pid-liveness.ts` (portable no-throw liveness check, Sprint 178).
+- **Install-model evidence:** `package.json:6-9` (`bin.deckent`, `bin.deckent-mcp`); `docs/guide/installation.md:24-44` (npx zero-install / `npm install -g` — both CLI-invocation models).
+- **Direction driver:** `.analysis/hermes-vs-deckent-direction-decisions.md` §0 (strategic pivot — terminal as primary, conversational, tool-driven surface) and §3 (APPROVAL-CONTROL, P0 — runtime-wide multi-channel live-approval broker; this is the concrete requirement that makes the daemon-vs-CLI axis undecidable-by-silence any longer).
+- **MASTER-PLAN:** Row-200 (ONB-GLOBAL, P0, "kesinlikle revize edilecek") — this document is the daemon-vs-CLI sub-decision of that row; the file-location sub-decision (361-008/362-010/363-006) is separate and already in-flight toward its own ADR acceptance.
+- **Born work-items (not yet filed in MASTER-PLAN, pending Alperen's acceptance of this ADR):** ONB-GLOBAL-DAEMON-CORE (Phase 1 — extract/generalize the coordination-daemon module), ONB-GLOBAL-APPROVAL-WIRE (Phase 2 — wire approval emitters + channel subscribers through it), ONB-GLOBAL-DAEMON-SUPERVISOR-EVAL (Phase 3 — future per-machine supervisor evaluation, gated on usage signal per Open Question 5).
+
+
+---
+
+## adr-d-012: Terminal Risk Language (Oku / Değiştir / Çalıştır / Otonom)
+
+**Status:** proposed
+
+# ADR-D-012: Terminal Risk Language (Oku / Değiştir / Çalıştır / Otonom)
+
+**Class:** ADR-D (Dogfooding / Dev) · **Scope:** `src/cli/command-registry.ts`, `src/cli/repl/tool-permissions.ts`, `src/cli/commands/chat-native.ts`, `src/cli/commands/chat-mcp-bridge.ts`, `src/cli/repl/native-tool-registry.ts`, `src/cli/helpers/catalog-render.ts`, `src/cli/helpers/messages.ts` (future i18n keys), `src/dashboard/` (forward constraint, no current consumer) · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=none (no lint/test enforces `CommandRisk` as the user-facing word; `tests/cli/command-registry.test.ts:29-31,48-51` only validates ladder-membership, not display or approval-tier consistency) → tomorrow=RISK-DRIFT-GUARD invariant test (§ Open Questions) + `cmdCatalog.*` i18n wiring + named registry-fix task(s), each closing before this ADR's Status graduates past `proposed`
+**Status:** proposed (acceptance: Alperen) · **Date:** 2026-07-05 (re-verified against disk 2026-07-06, task 373-002 — two stale citation line-ranges corrected, no substantive claim changed) · **Absorbs:** the evidence package in `docs/design/term5-risk-language.md` (sprint-363, task 363-008) — this ADR is that document's §9 "Önerilen Karar" carried into ADR form, re-verified against disk on 2026-07-05, plus a new registry/approval-tier consistency check (§ Decision, item 4) beyond what that document itself measured
+**Crosswalk:** MASTER-PLAN #45 (TERM-5, "Görsel+işlevsel tutarlı/yormayan dil + sade risk-dili", row status 🔬 at authoring time)
+
+> **Origin note:** `docs/design/term5-risk-language.md` found that TERM-5's target 4-level ladder (`CommandRisk`) already exists in code (`command-registry.ts:34-38`) and is applied to all 75 registry entries, but has no i18n, no UI consumer, and coexists with 7 other risk/trust dictionaries with no central translation table. That document's §9 sketched a decision but explicitly stated it was not an ADR file and not recorded in `.brain/memory.db`. This document is that conversion, re-checked against the current source tree rather than copied verbatim.
+
+---
+
+## Context
+
+`CommandRisk` (`'Oku' | 'Değiştir' | 'Çalıştır' | 'Otonom'`, `command-registry.ts:38`) is a plain-language, four-step risk ladder already assigned to every one of the 75 entries in `COMMAND_REGISTRY` (`command-registry.ts:91-188`). Its doc-comment already states the ladder semantics: read-only < local-state modification < execute/spawn a process < autonomous continuous-loop control (`command-registry.ts:34-37`).
+
+Three gaps keep it from being a real user-facing risk language:
+
+1. **No i18n.** Zero `cmdCatalog.*` keys exist in `messages.ts` (grep-verified 2026-07-05) — the `entry()` factory already emits `summaryKey: cmdCatalog.${name}.summary` (`command-registry.ts:82`), but nothing resolves it, and the ladder's four words themselves have no `getMessage` entry.
+2. **No UI wiring.** The file's own header says so directly: "UI wiring (REPL slash-menu grouping, i18n message-key population...) is an explicit follow-up" (`command-registry.ts:28-29`). The one surface that renders a risk badge today, the REPL `/help` catalog (`chat-native.ts:414-477`), does not read `CommandRisk` at all — it derives its own badge from `ToolPermission` (`tool-permissions.ts`) through a private mapping table (`HELP_CATALOG_RISK_TO_RENDER_RISK`, `chat-native.ts:420-424`).
+3. **No single mapping.** At least eight independent risk/trust vocabularies exist in the codebase (`CommandRisk`; `ToolTrustTier`; `ToolCatalogRiskLevel`; `ApprovalRisk`; `ToolPermission`; `CatalogRenderEntry.riskLevel`; nervous `RiskLevel`; base `ToolRiskLevel`) with no central translation table between them — `docs/design/term5-risk-language.md` §2-3 inventories all eight with source citations.
+
+A concrete, disk-verified consequence of gap 3 is that the REPL/MCP-bridge confirm-gating tier (`ToolPermission`, the actual enforcement mechanism for what silently runs vs. what prompts) disagrees with the registry's `CommandRisk` tag for several commands — see Decision item 4 below, which re-verifies and extends the design document's own finding.
+
+---
+
+## Decision
+
+### 1. The four-class risk language (canonical, user-facing)
+
+`CommandRisk` is adopted as the **single canonical, user-facing** risk vocabulary for every surface that shows a command/tool to a human. The other seven internal dictionaries are **not** deleted, merged, or changed in behavior by this ADR — they continue to serve their own engineering purposes (approval-workflow timing, REPL confirm-gating, MCP trust badges). Each keeps a pure, display-only translation *into* `CommandRisk`, never the reverse.
+
+| Class | Ladder position | Meaning | Registry doc-comment source |
+|---|---|---|---|
+| **Oku** ("Read") | 1 (lowest) | Read-only — displays information, changes nothing. | `command-registry.ts:35` |
+| **Değiştir** ("Modify") | 2 | Local-state modification — writes local project/session state, generally reversible. | `command-registry.ts:36` |
+| **Çalıştır** ("Execute") | 3 | Executes or spawns a process/action — starts something, often not reversible by re-running it. | `command-registry.ts:36` |
+| **Otonom** ("Autonomous") | 4 (orthogonal, not "worse") | Opens a continuous, human-out-of-the-loop decision/work loop. Every action taken *inside* the loop still carries its own independent risk tag from another dictionary (§3 below) — `Otonom` is a mode-entry marker, not a severity ceiling. | `command-registry.ts:36-37` |
+
+`Otonom` is deliberately not derivable from any of the other seven dictionaries (none of them encode "opens a continuous loop") — it stays a manually-assigned fourth badge on exactly the registry entries tagged for it today (`autonomous`, `autonomous-mission`, `gateway-runtime` — 3 of 75 entries).
+
+### 2. Per-surface display rule
+
+| Surface | State today (disk-verified 2026-07-05) | Decision |
+|---|---|---|
+| **REPL** (`/help` catalog) | Renders `ToolPermission` → `CatalogRenderEntry.riskLevel` (`low`/`medium`/`high`/`critical`) via a private mapping (`chat-native.ts:414-424`), never reads `CommandRisk`. | Adopt `CommandRisk` as the word shown to the user, sourced via `getMessage('cmdCatalog.risk.<class>', lang)` (draft keys below). The existing `CatalogRenderEntry.riskLevel` internal render-scale is a documented, prior, intentional decision (`catalog-render.ts:26-30`: "unifying further is YAGNI, 358-017") and is **not** replaced — `CommandRisk` is the label text laid over it, not a schema change. |
+| **CLI** (`--help` / command listing) | No consumer exists — verified no `CommandRisk`/registry-driven `--help` renderer in `src/cli/`. | When a CLI-native catalog view is built, it must show the same four words as plain text (no ANSI-only glyph substitute) so the label survives a non-tty pipe/redirect. |
+| **MCP** | Tool metadata exposes `readOnlyHint`/`destructiveHint` annotations (`tool-registry.ts:47-52`) — protocol-level booleans, consumed by `deriveRiskFromAnnotations`. Not `CommandRisk`-shaped and not meant to be — MCP clients rely on the protocol's own hint vocabulary. | Do not change the MCP annotation schema. Where a tool's human-readable *description* text is authored, it may additionally name the `CommandRisk` class in English (project convention: command/tool tokens stay English-invariant regardless of UI language — `chat-native.ts:406-409`), so an integrator reading tool descriptions sees the same word REPL users see. This is prose-level, not protocol-level. |
+| **Dashboard** | No command-catalog / command-palette consumer exists in `src/dashboard` (verified: no match for `CommandRisk`/`command-registry` under `src/dashboard`). | Forward constraint only, since nothing renders today: any future dashboard command-catalog panel MUST consume `cmdCatalog.risk.*` + `CommandRisk` directly — inventing a ninth dictionary for the same concept is out of bounds under this ADR. |
+
+Draft i18n keys (not written to `messages.ts` — outside this task's write scope, recorded here as the specification for that follow-up):
+
+```
+cmdCatalog.risk.oku:      { en: 'Read',       tr: 'Oku' }
+cmdCatalog.risk.degistir: { en: 'Modify',     tr: 'Değiştir' }
+cmdCatalog.risk.calistir: { en: 'Execute',    tr: 'Çalıştır' }
+cmdCatalog.risk.otonom:   { en: 'Autonomous', tr: 'Otonom' }
+```
+
+### 3. Approval-threshold mapping (which class is automatic, which requires confirmation)
+
+This is the *target* policy — i.e., what each `CommandRisk` class should mean for confirm-gating once surfaces are wired to it. It is derived from the REPL's existing, already-accepted three-tier hierarchy (`tool-permissions.ts:8-13`: `read` → silent, `confirm` → ask-once/remembered, `always` → ask-every-time/never-remembered), extended with the fourth class:
+
+| `CommandRisk` | Target approval behavior | Rationale |
+|---|---|---|
+| **Oku** | Always auto — never prompts, on any surface. | Read-only, nothing to confirm (`tool-permissions.ts:9`). |
+| **Değiştir** | Confirm-once per session; an "always allow" (`a`) answer is remembered. | Local-state mutation, generally reversible — matches existing `CONFIRM_TOOLS` tier (`tool-permissions.ts:24-31`). |
+| **Çalıştır** | Confirm-once per session as the **baseline** — EXCEPT the safety-floor subset (commands that irreversibly end/mutate live sprint state — today: `kill`, `cleanup`, `recover`), which escalate to confirm-**every**-time, never auto-approvable even under a remembered "a" or full-auto mode. | Matches the existing, explicitly-documented `ALWAYS_CONFIRM` rule (`tool-permissions.ts:11-13,17-22`: "never run kill/cleanup without asking... these mutate live sprint state irreversibly") — this is not a new policy, it is `CommandRisk`'s job to correctly reflect it (see item 4, mismatches). |
+| **Otonom** | Confirm-once to *enter* the loop (a single `Çalıştır`-shaped action). Every action taken *inside* the loop keeps its own, independent `ApprovalRisk`/nervous-`RiskLevel` gate — `Otonom` does not itself make every in-loop action stricter. | `autonomous`'s own entry has no dedicated `ToolPermission` case today and falls through to `confirm` for non-status actions (`tool-permissions.ts:51-56`) — consistent with "confirm-once to enter." |
+
+### 4. Registry consistency check — mismatches against the target policy (disk-verified 2026-07-05)
+
+Re-reading `command-registry.ts`, `tool-permissions.ts`, `chat-mcp-bridge.ts:270`, and `native-tool-registry.ts:332` together (beyond what `docs/design/term5-risk-language.md` §4 itself checked) surfaces five mismatched registry entries, in two distinct failure shapes:
+
+| Command | Registry `CommandRisk` | Actual REPL/MCP-bridge tier (`classifyTool`) | Mismatch | Severity |
+|---|---|---|---|---|
+| `kill` | `Çalıştır` | `always` (`tool-permissions.ts:19`) | None — correctly matched. | — |
+| `cleanup` | `Değiştir` | `always` (`tool-permissions.ts:20`) | **Yes** — tagged one rung below its real, safety-floor confirm-every-time behavior. | Wrong label, but the command still prompts every time — the confirm-gate itself is not weakened. |
+| `recover` | `Değiştir` | `always` (`tool-permissions.ts:21`) | **Yes** — same as `cleanup`. | Same as above. |
+| `start` | `Çalıştır` (has `mcpNames: ['deckent_start']`, routed through `classifyTool` at `chat-mcp-bridge.ts:270`) | `read` (no explicit case in `tool-permissions.ts:43-64` — falls through to the final `return 'read'` at line 64) | **Yes** — spawns a live sprint process with **zero** confirmation on the REPL/MCP-bridge surface, despite being tagged `Çalıştır`. | More material than the `cleanup`/`recover` case: the label is wrong AND the gate itself is silently absent, not merely mistiered. |
+| `run` | `Çalıştır` (`mcpNames: ['deckent_run']`) | `read` (same fallthrough) | **Yes** — same shape as `start`. | Same as `start`. |
+| `process` | `Çalıştır` (`mcpNames: ['deckent_process']`) | `read` (same fallthrough) | **Yes** — same shape as `start`. | Same as `start`. |
+
+Two additional registry entries with a single static `CommandRisk` tag branch by sub-action/subcommand in `classifyTool` (`audit`: `gate`→`confirm`, else→`read`; `config`: `set`/`import`/`migrate`→`confirm`, else→`read`). This is **not** counted as a mismatch — it is a legitimate coarsening where one ladder-word summarizes finer runtime granularity, not a contradiction of it.
+
+This ADR does not change `command-registry.ts` or `tool-permissions.ts` (task constraint: `nogo: kod`) — the six-row table above is the specification for a follow-up code task, not an in-place fix.
+
+---
+
+## Open Questions (explicitly separated from the Decision above — not yet resolved by this ADR)
+
+1. **`Değiştir`/`Çalıştır` boundary at `medium`-equivalent risk.** When translating `ApprovalRisk.medium` or nervous `RiskLevel.medium` into `CommandRisk` (a mapping needed for the seven-dictionary crosswalk this ADR's §1 promises but does not itself write), both `Değiştir` and `Çalıştır` are defensible — `docs/design/term5-risk-language.md` §5 proposes `Değiştir` (closer to "notify-tier, not auto-approve but not require-approval either") but flags it as Alperen's call, not a measured fact.
+2. **RISK-DRIFT-GUARD.** No test today prevents a future `command-registry.ts` entry from drifting out of sync with `tool-permissions.ts` the way `cleanup`/`recover`/`start`/`run`/`process` have (Decision item 4). A candidate shape: an invariant test asserting every registry entry with an `mcpNames` entry that is `always` in `tool-permissions.ts` is tagged `Çalıştır` or stricter, and every entry NOT explicitly classified in `tool-permissions.ts` is flagged rather than silently defaulting to `read`. Not built by this ADR.
+3. **Whether/when to fix the five mismatched entries.** Decision item 4's table is a specification, not a patch. Whether `cleanup`/`recover` get retagged to `Çalıştır`, and whether `start`/`run`/`process` get an explicit `tool-permissions.ts` case (at minimum `confirm`), is a separate, smaller follow-up task this ADR recommends but does not authorize itself.
+4. **i18n + UI wiring rollout order.** `cmdCatalog.risk.*` keys (§ Decision item 2) need to land in `messages.ts`, then `chat-native.ts:414-477`'s `buildHelpCatalogEntries`/`buildHelpCatalogLabels` need to consume `CommandRisk` directly instead of deriving through `ToolPermission`. Sequencing (i18n-keys-first vs. wiring-first) is not decided here.
+5. **`approval_card.risk_*` orphan keys.** `messages.ts:2245-2249` already defines `approval_card.risk_none/low/medium/high/critical` (en+tr) but `app.tsx:363-375`'s `DEFAULT_APPROVAL_CARD_LABELS` does not use them yet (tracked in-code as a future "Messages round-8" item). Independent of `CommandRisk` but adjacent — not resolved here.
+
+---
+
+## Consequences
+
+**(+)** `CommandRisk` requires no new architecture — the ladder, its semantics, and full 75-entry coverage already exist in `command-registry.ts`. Accepting this ADR mostly authorizes i18n + UI-wiring + the small registry-tag follow-ups in Decision item 4, not a new system. The other seven internal dictionaries stay untouched, keeping regression risk low for approval-workflow timing, REPL confirm-gating, and MCP trust badges.
+
+**(−)** The eight-dictionary sprawl itself is not eliminated by this ADR, only masked at the user-facing layer — a ninth ad hoc risk vocabulary could still appear in future code without this ADR preventing it (Open Question 2, RISK-DRIFT-GUARD, is the not-yet-built safeguard for that). Decision item 4 also means this ADR ships with five *known*, *named*, *unfixed* label/gate mismatches in the current codebase rather than resolving them — accepting this ADR accepts that gap as tracked debt, not closed debt.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** `docs/design/term5-risk-language.md` (sprint-363, task 363-008) — its §1-§6 evidence and §9 draft decision, re-verified against the source tree on 2026-07-05 rather than copied verbatim; its own §9 note that it is "not an ADR file, not recorded in `.brain/memory.db`" is resolved by this document's existence.
+- **Evidence:** `src/cli/command-registry.ts` (lines 28-38, 82, 91-188, 96, 98, 105, 125, 128, 130-136, 140-143, 157, 160, 171, 182-183, 187-189) · `src/cli/repl/tool-permissions.ts` (full file, esp. lines 8-31, 43-65) · `src/cli/commands/chat-native.ts` (lines 395-477) · `src/cli/commands/chat-mcp-bridge.ts:270` · `src/cli/repl/native-tool-registry.ts:332` · `src/cli/helpers/catalog-render.ts` (lines 26-30, 70-76) · `src/core/tool-catalog.ts` (lines 31-41, 73-76) · `src/core/tool-registry.ts` (lines 24-26, 47-52) · `src/core/approval-contract.ts:42,71,120,126` · `src/core/approval-allowscope.ts:105` · `src/core/approval-rules-load.ts:54-60` · `src/core/nervous-types.ts:32,308` · `messages.ts:2245-2249,590-592` · `tests/cli/command-registry.test.ts:31-33,48-51` (re-verified 2026-07-06).
+- **Cross-ref:** ADR-G-019 (ADR Governance & 4-Layer Taxonomy — the authoring standard this document follows, incl. the today/tomorrow honesty discipline applied throughout) · ADR-G-020 (Authority/Roles/Flow Enforcement — governs whether/when a future RISK-DRIFT-GUARD becomes a hard gate vs. advisory) · ADR-D-010 (REPL Input Stabilization — most recent sibling ADR-D, same header-block + Context/Decision/Open-Questions/Consequences shape this document follows) · ADR-G-011 (Surface Parity / Thin Wrapper — relevant to the CLI/MCP/dashboard "do not duplicate business logic per surface" framing in Decision item 2).
+- **MASTER-PLAN:** #45 (TERM-5, "Görsel+işlevsel tutarlı/yormayan dil + sade risk-dili (Oku/Değiştir/Çalıştır/Otonom)") — this document is that row's ADR-draft deliverable; row status update to 🟡 is out of this task's write scope (recorded as `docImpact` in the `.result` file instead).
+- **Born work-items (not yet filed in MASTER-PLAN):** RISK-DRIFT-GUARD invariant test (Open Question 2) · `cmdCatalog.*` i18n key population + REPL `/help` wiring (Open Question 4) · registry-tag fix for `cleanup`/`recover`/`start`/`run`/`process` (Decision item 4 / Open Question 3) · `approval_card.risk_*` orphan-key wiring (Open Question 5, independent of `CommandRisk` but adjacent).
+
+
+---
+
+## adr-d-013: NL-Dispatch Default Policy (`agenticDispatch` — Natural-Language → MCP-Tool Direct Dispatch)
+
+**Status:** proposed
+
+# ADR-D-013: NL-Dispatch Default Policy (`agenticDispatch` — Natural-Language → MCP-Tool Direct Dispatch)
+
+**Class:** ADR-D (Dogfooding / Dev) · **Scope:** dev · **Immutable:** no · **Source:** publisher+contributor · **Enforcement:** today=none (the mechanism is live in code and test-covered, but no runtime gate or lint rule ties a specific default to this record — the flag's value at each call-site is simply whatever the last commit left it at) → tomorrow=once Alperen selects an option below, the chosen default is wired at the named call-sites plus a regression test asserting it, and this ADR's `Status` graduates from `proposed` to `accepted` · **Status:** proposed (acceptance: Alperen) · **Date:** 2026-07-05 · **Absorbs:** `docs/design/nl-dispatch-default-decision.md` (sprint-359 task 359-009 evidence package — this ADR is that document's §6 "Önerilen Karar" promoted to a standalone, numbered governance record; the design doc remains on disk as the underlying evidence citation, not superseded/deleted) · **Crosswalk:** MASTER-PLAN #57 (NL-DISPATCH-DECISION, TERM, P2)
+
+> **Origin note:** This document does not ship a new mechanism — `agenticDispatch` and its
+> classifier have existed since Sprint 219 (tasks 219-002/219-004/219-005). It formalizes a
+> decision MASTER-PLAN row 57 has carried as "🟡 evidence-ready, awaiting Alperen" since
+> 2026-07-02, folds in two bodies of evidence produced since (the 359-009 false-positive audit and
+> the 363-008 TERM-5 risk-language inventory), and adds a third analysis this task was
+> specifically scoped to produce: what sprint-370/371's TOOL-CU descriptor/executor work
+> (370-005, 371-004) actually changes — and does not change — about the NL-dispatch default
+> question. Per this task's `nogo: kod`, nothing here flips a code default; it presents the
+> options and a non-binding recommendation for Alperen to accept, reject, or amend.
+
+---
+
+## Context
+
+`agenticDispatch` (`src/cli/commands/chat-native.ts:249`) is an opt-in boolean on
+`runChatNativeLoop`. When `true`, every REPL line is first run through
+`classifyAgenticIntent` (`src/cli/commands/chat-agentic-dispatch.ts:106-113`) — a pure,
+bare-`\b`-keyword regex classifier with **no semantic disambiguation** — and, on a match,
+short-circuits straight to a `deckent_status` / `deckent_history` / `deckent_memory_query` /
+`deckent_plan` MCP-tool call (`chat-native.ts:918-940`), skipping the LLM turn entirely. A match
+is gated through `requireConfirmIfRisky` (`src/cli/commands/agentic-confirm.ts:64-67`), whose
+`classifyActionRisk` (`agentic-confirm.ts:23-37`) auto-approves anything whose tool name contains
+a `SAFE_KEYWORDS` substring (`status`/`recall`/`history`/`query`/…) and only prompts y/N for the
+rest (fail-safe default: unknown names are risky).
+
+**The default is bifurcated today, and always has been — no single line ever set it uniformly:**
+
+| Call-site | `agenticDispatch` passed? | Verified at |
+|---|---|---|
+| `deckent chat --native` (bare CLI, both once-shot and interactive) | **No** | `src/cli/commands/chat.ts:501-530` — the opts object literal has no `agenticDispatch` key |
+| Ink REPL, legacy `runChatNativeLoop` branch | **No** | `src/cli/repl/app.tsx:865-889` — same, no key; the surrounding comment (`app.tsx:868-872`) explains agentic confirmation is deliberately owned by the Ink dispatcher's own gate instead (`tool-permissions.ts`, see below) |
+| Ink REPL, `nativeEngine` branch (today's default when a native engine is wired) | N/A | `app.tsx:850-863` — this branch never calls `runChatNativeLoop`; the mechanism does not run here at all |
+| Messaging connectors (Telegram/Discord/WhatsApp bridge) | **Yes** | per `docs/design/nl-dispatch-default-decision.md` §1, citing `src/connectors/chat-bridge.ts:402` (outside this task's read-scope; cited, not re-verified here) |
+
+Two independent confirm-gates exist for two independent call paths, which is itself a small,
+disk-verified instance of the sprawl §"TERM-5 Synergy" describes below: the Ink-REPL slash/tool
+dispatcher uses `classifyTool` (`src/cli/repl/tool-permissions.ts:43-64` — `deckent_plan` →
+`CONFIRM_TOOLS` → `'confirm'` tier), while the `agenticDispatch` branch specifically uses the
+separate `classifyActionRisk` (`agentic-confirm.ts:23-37`) described above. Both happen to agree
+on `deckent_plan` needing confirmation today, but they are two hand-maintained lists, not one.
+
+### Evidence: the classifier's structural false-positive rate
+
+`tests/cli/nl-dispatch-evidence.test.ts` (20 cases, sprint-359 task 359-009, all passing today —
+i.e. this is *measured shipped behavior*, not a hypothetical) exercises ordinary sentences against
+`classifyAgenticIntent`:
+
+| Result | Count | Cause |
+|---|---|---|
+| False-positive → wrong `deckent_*` tool call | **16 / 20** | Every one of the 4 rules (`STATUS_RE`/`HISTORY_RE`/`RECALL_RE`/`PLAN_RE`, `chat-agentic-dispatch.ts:63-67`) fires on a bare, `\b`-bounded keyword ("ara", "memory", "find", "search", "plan", "durum…", "status", "how is/are") with zero context awareness |
+| Correct no-match (true negative) | 4 / 20 | Sentences containing none of the trigger words |
+
+Of the 16 false positives, **14 map to `deckent_status` / `deckent_history` /
+`deckent_memory_query`** — all auto-approved silently by `classifyActionRisk`'s `SAFE_KEYWORDS`
+match, with no confirmation and no user-visible indication that a tool ran at all. The remaining
+2 map to `deckent_plan`, which the *existing* fail-safe-unknown rule in `classifyActionRisk`
+already routes to a y/N confirm. This 16/16-structural / 14-silent split is the load-bearing
+number for everything below — it is not a tail-case count, it is the *majority* outcome for
+ordinary conversational input once the flag is on.
+
+---
+
+## Options Considered
+
+This task was scoped to exactly three options (task 372-003 description); each is stated with its
+mechanism and measured trade-offs, not just a label.
+
+### Option A — Default-ON everywhere
+
+**Mechanism:** add `agenticDispatch: true` at `chat.ts:501-530` and `app.tsx:865-889`, matching
+`chat-bridge.ts:402`'s existing connector behavior. The classifier and confirm-gate are unchanged.
+
+| + | − |
+|---|---|
+| Closes the connector/CLI parity gap (§ table above) — one behavior everywhere | The measured 16/20 false-positive rate (evidence table above) now applies to free-flowing human↔LLM conversation in the CLI/TUI, a much larger collision surface than a connector's typically shorter, more command-like messages |
+| "sprint durumu ne" and equivalents skip an LLM round-trip (token + latency win) for the CLI/TUI too, matching what connector users already get | 14/16 of the false-positives are silent (`read`-tier auto-approve) — a user asking "how are we doing today, feeling ok?" gets `deckent_status`'s output silently spliced into context, corrupting the LLM's next answer with no visible sign anything unusual happened |
+| Zero new mechanism — minimal-diff (two call-sites) | The false-positive surface grows **linearly with every new NL-dispatch rule** added later — `RECALL_RE`'s bare `find`/`search`/`memory`/`ara` is the structural cause, not an isolated bug, so this doesn't self-heal |
+
+### Option B — Default-OFF + explicit opt-in flag (status quo, formalized)
+
+**Mechanism:** no call-site changes. `agenticDispatch` stays absent (effectively `false`) at both
+CLI/TUI call-sites; the connector bridge's existing `true` is *not* touched by this ADR (see Open
+Questions — changing an already-accepted connector default is a separate approval gate). The
+classifier code (`chat-agentic-dispatch.ts`) is not deleted — it remains available for any future
+opt-in surface. User intent is served by an explicit `/status`, `/recall <q>`, `/plan` slash
+(`chat-native.ts:823-843`'s existing `/help` catalog) or by the provider's own `tool_use` turn.
+
+| + | − |
+|---|---|
+| All 20/20 evidence cases are moot — the classifier never runs on this path, so it cannot mis-fire | Connector/CLI parity gap (§ table) remains open — this ADR only states it, it does not resolve it |
+| Zero regression risk — no existing behavior changes; a future "turn it on" decision would rest on this ADR's measured numbers instead of assumption | Users who don't know slash syntax pay a discoverability cost (`/help` exists but must be invoked first) |
+| The model-driven `tool_use` path (`chat-native.ts:1003-1028`, existing) already gives semantically-correct, regex-free NL routing at the cost of one LLM turn — this option leans on that instead of a second, cruder classifier | Does not, by itself, touch the pre-existing connector/CLI inconsistency (§ table) — an explicit non-goal, not an oversight |
+
+### Option C — Class-based dispatch (Oku = direct, others = confirm — TERM-5 synergy)
+
+**Mechanism:** turn `agenticDispatch` on everywhere (as Option A), but replace
+`classifyActionRisk`'s bespoke `SAFE_KEYWORDS`/`RISKY_KEYWORDS` substring lists with a derivation
+from the canonical `CommandRisk` ladder (`src/cli/command-registry.ts:38`,
+`'Oku' | 'Değiştir' | 'Çalıştır' | 'Otonom'`): resolve each dispatched intent's underlying command
+via `getCommand()` and gate on `command.risk !== 'Oku'`, exactly as `buildMetaDispatch()` already
+does for the unrelated onboarding-chat-flow intent set (`src/cli/helpers/onboarding-chat-flow.ts:211-217`,
+`requiresConfirm: command.risk !== 'Oku'`). See the dedicated section below for why this is scoped
+as its own option rather than a variant of A.
+
+| + | − |
+|---|---|
+| Replaces a second, hand-maintained risk dictionary with a read from the single `CommandRisk` SSOT — directly closes one instance of the 8-dictionary sprawl `docs/design/term5-risk-language.md` §3 catalogs | **Does not reduce the false-positive rate at all** — see the dedicated section below: 14/16 of the measured false positives are already `Oku`-tier and would still auto-dispatch silently under this scheme |
+| A working, tested precedent already exists one layer over (370-005's `buildMetaDispatch` + 371-004's `executeIntentDescriptor`) — this is not unproven design, it is "apply an existing pattern to a second call-site" | The precedent's classifier is a small, closed, structured intent set (4 onboarding meta-intents); porting only the *confirm-derivation* half without also replacing the free-text `RULES` table (out of this task's `nogo: kod` scope) leaves the actual wrong-tool-selection bug untouched |
+| Strictly better governance than Option A's "keep the two independent keyword lists and just flip the flag" — if A or a variant of A is chosen, C's confirm-derivation should be adopted regardless | Still inherits every other Option-A downside (parity-closing means the false-positive surface reaches CLI/TUI) — C is a governance refinement *of* A, not a fix *for* A's core problem |
+
+---
+
+## TERM-5 Synergy — detailed analysis (task-required section)
+
+`docs/design/term5-risk-language.md` (sprint-363 task 363-008) independently found that
+`CommandRisk` (Oku/Değiştir/Çalıştır/Otonom) is the intended single canonical, user-facing risk
+vocabulary, already applied to all 75 `COMMAND_REGISTRY` entries, but surrounded by **7 other**
+risk/trust dictionaries in the codebase with no central translation table (its §3). That evidence
+document has since been carried into its own governance record, **ADR-D-012** (`docs/adr/adr-d-012-terminal-risk-language.md`,
+dated 2026-07-05, `Status: proposed`, same pending-Alperen acceptance gate as this document) —
+ADR-D-012's Decision §3 "Approval-threshold mapping" independently derives a target confirm-gating
+policy per `CommandRisk` class (`Oku` → always auto, `Değiştir`/`Çalıştır` → confirm-once baseline,
+`Otonom` → confirm-to-enter), which is consistent with, and lends independent support to, Option
+C's `requiresConfirm: command.risk !== 'Oku'` derivation below — two separate tasks reached the same
+binary split from different angles. This task adds one more disk-verified data point to that
+inventory: **sprint-370/371 already built and shipped a working `CommandRisk`-derived confirm-gate**,
+independently of the TERM-5 document, ADR-D-012, and the NL-dispatch evidence document, for a
+different feature:
+
+- **370-005** (`src/cli/helpers/onboarding-chat-flow.ts:191-217`) added
+  `OnboardingChatDispatchDescriptor { command, args, requiresConfirm }` for the 4 onboarding
+  meta-intents (`connect_provider`/`show_limits`/`start_sprint`/`doctor`), with
+  `requiresConfirm: command.risk !== 'Oku'` (line 217) resolved against `COMMAND_REGISTRY` via
+  `getCommand()` — explicitly "so it can never drift from the registry SSOT" (per that task's own
+  `.result` notes).
+- **371-004** (`src/cli/helpers/chat-intent-executor.ts`) added the executor that actually honors
+  `requiresConfirm` before invoking a runner — confirm-before-run, and an absent confirm function
+  is treated as "cannot approve," never as implicit approval.
+
+This is real, tested, shipped prior art for Option C's mechanism — the risk here is not "would
+this work," it demonstrably already does, one layer over. **The limitation is scope, not
+soundness:** that pipeline classifies from a small, closed, structurally-unambiguous set of 4
+onboarding actions. `chat-agentic-dispatch.ts`'s `RULES` table classifies free natural-language
+text via bare-keyword regex, and — critically — the two intents responsible for **all 16 measured
+false-positive cases in `nl-dispatch-evidence.test.ts`** already resolve to commands whose
+`CommandRisk` is `Oku` (`status`, `history`, `recall` are read-only entries in
+`COMMAND_REGISTRY`). Deriving `requiresConfirm` from `CommandRisk` therefore reclassifies exactly
+zero of the 14 silent false-positives — they were already the auto-approved tier, and remain so,
+because the *problem* is that the classifier picked the wrong tool, not that the right
+confirm-tier wasn't applied to it. Only the 2 `deckent_plan` false positives would gain a step
+they don't already have via `classifyActionRisk`'s independent fail-safe-unknown rule (which
+already treats `plan` as risky today, coincidentally reaching the same outcome).
+
+**Conclusion for this ADR:** TERM-5 synergy is real and worth pursuing on its own governance
+merits (one canonical risk vocabulary instead of two independent keyword lists feeding the same
+kind of decision) — but it must not be mistaken for a fix to the false-positive classification
+problem documented in `docs/design/nl-dispatch-default-decision.md`. The two are orthogonal:
+"which tool fires" (classifier accuracy) vs. "how much friction that tool's execution has"
+(confirm-tier derivation). Option C only improves the second axis.
+
+---
+
+## Risk Analysis
+
+- **Severity is not uniform across the false-positive set.** 14/16 are silent (read-tier
+  auto-approve, no user-visible signal); 2/16 are confirm-gated today (`deckent_plan`, fail-safe
+  default). A "16/20 pass" framing understates risk; a "14/16 silent" framing is the honest one —
+  this is why the option comparisons above lead with it rather than the aggregate count.
+- **The false-positive rate is structural, not a fixable edge-case list.** All 4 `RULES` entries
+  share the same `\b`-bounded, bare-keyword design (`chat-agentic-dispatch.ts:63-67`); adding more
+  exceptions to any one regex only trades one false-positive shape for another, it does not change
+  the class of bug. Any option that keeps this classifier live in the CLI/TUI (A, C) inherits this
+  permanently unless the classifier itself changes — which is explicitly out of this task's
+  `nogo: kod` and is instead named as the CONFIDENCE-THRESHOLD follow-up below.
+  Deleting/replacing the classifier is not evaluated here; the closed set of 3 options in the task
+  description does not include it.
+- **Connector vs. CLI/TUI is not a symmetric risk surface even under one shared default.** A
+  messaging-bot user's typical input skews toward short, command-like phrases; a CLI/TUI user's
+  input skews toward free-flowing conversation with an LLM (code discussion, brainstorming,
+  small talk) — the same classifier meets a much higher-volume, higher-diversity collision surface
+  in the CLI/TUI. This asymmetry is why Option A's connector precedent does not straightforwardly
+  justify extending the same default to CLI/TUI.
+- **This ADR does not, by itself, change the connector's already-accepted `agenticDispatch: true`
+  default** under any option — see Open Questions.
+
+---
+
+## Recommendation (non-binding — worker opinion; Alperen decides)
+
+**Option B** (default-OFF + explicit flag, i.e. formalize today's CLI/TUI behavior) is
+recommended as this ADR's accepted decision, for a reason that follows directly from the TERM-5
+analysis above: **Option C cannot be adopted as a standalone fix**, because it leaves the dominant
+failure mode (14/16 silent false-positives, all already `Oku`-tier) completely unaddressed — it
+only improves the internal governance of a mechanism whose core classification is still broken by
+Option A's own measured evidence. Recommending C without also fixing the classifier would let a
+governance improvement masquerade as a safety fix. Since the classifier fix itself is out of this
+task's scope (`nogo: kod` — see CONFIDENCE-THRESHOLD below), the only choice consistent with "the
+evidence, not a hopeful reframing of it" is B.
+
+**Independent of A/B/C:** if any future task turns `agenticDispatch` on anywhere (Option A now, or
+after the classifier is fixed later), Option C's `CommandRisk`-derivation should be adopted
+regardless of which base option wins — it is a strict governance improvement over
+`classifyActionRisk`'s bespoke keyword lists with no downside identified in this analysis, it is
+already a proven pattern (370-005/371-004), and adopting it costs nothing extra once A is already
+being implemented.
+
+---
+
+## Open Questions
+
+- **CONFIDENCE-THRESHOLD (classifier fix, separate task):** `docs/design/nl-dispatch-default-decision.md`
+  §5 proposes a confidence heuristic (dispatch only on short/whole-line matches, e.g. "durum ne"
+  but not "bu duruma göre karar verelim") that could close most of the 16/20 false-positive surface
+  without deleting the mechanism. This changes `RULES` matching logic — explicitly a
+  "dispatch-mantığı değişikliği," out of both that task's and this ADR's `nogo: kod`. If accepted
+  in principle, it should be filed as its own task/ADR-amendment, and — per the analysis above —
+  is the *only* change that would make Option A or C actually reduce the measured false-positive
+  rate rather than just relabel its confirm-tier.
+- **CONNECTOR-DEFAULT-REVIEW:** whether `chat-bridge.ts:402`'s existing `agenticDispatch: true`
+  itself already passed an Alperen approval gate, and whether it should be revisited now that its
+  false-positive exposure is quantified, is explicitly **not** decided by this ADR — this document
+  only records the CLI/TUI default. Changing an already-shipped, accepted connector default is a
+  separate approval gate per `docs/design/nl-dispatch-default-decision.md` §4/§5.
+- **SLASH-DISCOVERABILITY:** if Option B is accepted, a first-turn "type /help to see commands"
+  hint (CLI/TUI first turn only) would reduce Option B's stated discoverability cost — a small,
+  separate UX task, not evaluated here.
+- **TERM-5 canonical-mapping adoption:** accepting Option C's `CommandRisk`-derivation as the
+  standing pattern for *any* future confirm-gate (not just this one) is the kind of cross-cutting
+  call `docs/design/term5-risk-language.md` §8 already raises for Alperen independently of NL-
+  dispatch, and which **ADR-D-012** now carries as its own pending, numbered decision (§ TERM-5
+  Synergy above) — this ADR does not duplicate that decision, it only notes the 370-005/371-004
+  precedent as fresh supporting evidence for it. Alperen accepting ADR-D-012 and this ADR are
+  independent gates; neither is contingent on the other, but a reviewer weighing Option C here
+  should read ADR-D-012's Decision §3 alongside it.
+- **MASTER-PLAN #57 status update:** recording that this ADR now exists (moving row 57 from its
+  current 🟡 "kanıt-hazır" note to point at `adr-d-013-nl-dispatch-default.md`) is out of this
+  task's write-scope (`docs/MASTER-PLAN.md` is not in `scope.filesWrite`) — flagged as `docImpact`
+  in this task's `.result` notes for the orchestrator to file as a follow-up.
+
+---
+
+## Consequences
+
+**(+)** A single, numbered governance record now exists for a decision MASTER-PLAN has carried as
+open since 2026-07-02, incorporating three independently-produced evidence bodies (359-009,
+363-008, and this task's fresh 370-005/371-004 cross-analysis) instead of leaving them as three
+separate design docs an implementer would have to discover and reconcile by hand. **(+)** The
+TERM-5/NL-dispatch orthogonality finding (governance-fix ≠ classifier-fix) is now explicit and
+citable, preventing a future task from adopting Option C under the mistaken belief that it closes
+the false-positive gap. **(−)** Per `nogo: kod`, this ADR resolves nothing in code — the
+connector/CLI parity gap and the classifier's structural false-positive rate both remain exactly
+as measured until a follow-up task acts on the Open Questions above. **(−)** `Status: proposed`
+means none of this is binding until Alperen accepts an option; until then, `agenticDispatch`'s
+actual runtime default remains whatever the current call-sites already do (§ Context table),
+unaffected by this document's existence.
+
+---
+
+## References / Absorbed
+
+- **Absorbs:** `docs/design/nl-dispatch-default-decision.md` (359-009, full evidence + Option A/B
+  analysis this ADR's §"Options Considered" A/B and §"Risk Analysis" build on directly).
+- **Evidence:** `src/cli/commands/chat-native.ts:249,909-940` · `src/cli/commands/chat-agentic-dispatch.ts`
+  (full file) · `src/cli/commands/agentic-confirm.ts` (full file) · `src/cli/repl/tool-permissions.ts`
+  (full file) · `src/cli/repl/app.tsx:850-891` · `src/cli/commands/chat.ts:470-530` ·
+  `src/cli/command-registry.ts:38` · `src/cli/helpers/onboarding-chat-flow.ts:191-217,508` ·
+  `src/cli/helpers/chat-intent-executor.ts` (full file) · `tests/cli/nl-dispatch-evidence.test.ts`
+  (full file, 20 cases).
+- **Cross-ref:** `docs/design/term5-risk-language.md` (363-008, `CommandRisk` ladder + 8-dictionary
+  sprawl inventory — this ADR's §"TERM-5 Synergy" section) · **ADR-D-012** (Terminal Risk Language —
+  the formal ADR-ification of that same term5-risk-language.md evidence, also `proposed`/pending
+  Alperen, dated 2026-07-05; its Decision §3 approval-threshold mapping directly informs this ADR's
+  Option C and Open Questions above) · ADR-G-019 (ADR Governance & 4-Layer
+  Taxonomy — the authoring standard this document follows) · ADR-D-009 (Worker-Result Boundary
+  Normalization) and ADR-D-010 (REPL Input Stabilization) — the two most recent sibling ADR-D
+  documents, same "proposed, acceptance: Alperen, today+tomorrow" shape this document follows.
+- **MASTER-PLAN:** Row 57 (NL-DISPATCH-DECISION, TERM, P2) — this document is that row's ADR
+  deliverable; the row itself is not updated by this task (write-scope; see Open Questions
+  `docImpact`).
+
+
+---
+
 ## adr-g-001: Layered Config & Scope Precedence
 
 **Status:** accepted
