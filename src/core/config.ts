@@ -1635,7 +1635,9 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // Native transport + BOT-1 bot-agent — pass through so loadConfig does not
     // strip them (the REPL native agent + bot-agent read these from config).
     ollama_host: config.ollama_host,
+    native_provider: config.native_provider,
     native_model: config.native_model,
+    native_context_tokens: config.native_context_tokens,
     openai_base_url: config.openai_base_url,
     bot_agent: config.bot_agent,
     // Memory

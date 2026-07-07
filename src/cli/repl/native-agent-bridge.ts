@@ -39,6 +39,12 @@ export interface NativeEngineDeps {
   cwd: string;
   model: string;
   lang: 'en' | 'tr';
+  /** Live adapter/model/context-budget overrides (read per provider call) — the
+   *  seam the /model — /provider runtime switch drives. The session (and its
+   *  cross-turn transcript) survives the switch; only the backend swaps. */
+  getAdapter?: () => ProviderAdapter;
+  getModel?: () => string;
+  getContextBudgetTokens?: () => number | undefined;
   /** The existing confirm-queue trigger (run.tsx confirmTrigger). 'y'|'a'|'n'. */
   confirm: (summary: string, toolName: string) => Promise<'y' | 'a' | 'n'>;
   /** The existing tool/change-block sink (run.tsx toolSink). */
@@ -123,7 +129,19 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
     lang: deps.lang,
     costGuard: cost,
     ...(deps.maxIterations !== undefined ? { maxIterations: deps.maxIterations } : {}),
+    ...(deps.getAdapter ? { getAdapter: deps.getAdapter } : {}),
+    ...(deps.getModel ? { getModel: deps.getModel } : {}),
+    ...(deps.getContextBudgetTokens ? { getContextBudgetTokens: deps.getContextBudgetTokens } : {}),
   });
+
+  // Localize a loop signal by its stable code ('native.<code>' message key);
+  // an unmapped/unlocalized code falls back to the loop's English default.
+  const localizeSignal = (code: string | undefined, fallback: string): string => {
+    if (!code) return fallback;
+    const key = `native.${code}`;
+    const label = t(key);
+    return label === key ? fallback : label;
+  };
 
   const runTurn: ReplEngine = async (input, cbs) => {
     let inputTokens = 0;
@@ -148,7 +166,13 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           // a crossed hard ceiling arrives here as an 'error' event, printed below.
           break;
         case 'error':
-          cbs.output(`\n[${ev.message}]`);
+          cbs.output(`\n[${localizeSignal(ev.code, ev.message)}]`);
+          break;
+        case 'notice':
+          // Honest degradation signal (truncated / context-compacted): visible
+          // but non-fatal — silence here is what made a full context window
+          // read as "the REPL died" (2026-07-07 incident).
+          cbs.output(`\n[${localizeSignal(ev.code, ev.message)}]\n`);
           break;
         // 'tool-proposed' / 'tool-executing' are progress-only; 'turn-end' falls through.
       }

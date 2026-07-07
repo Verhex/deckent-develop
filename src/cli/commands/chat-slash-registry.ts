@@ -307,6 +307,14 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     desc: 'Onay modu: suggest | auto-edit | full-auto',
   },
   {
+    // Meta-command: handled in app.tsx handleSubmit BEFORE resolveSlash
+    // (parseTermCommand, term-mode.ts). Listed for /help + menu visibility +
+    // Tab-complete only — no agenticTool, so resolveSlash falls through to
+    // { action: 'none' } exactly like /model and /cd.
+    name: '/term',
+    desc: 'Terminal modu göster/değiştir: /term ask|run|control',
+  },
+  {
     name: '/cd',
     desc: 'Çalışma dizinini değiştir (örn: /cd ~/deckent-dev)',
   },

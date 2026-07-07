@@ -550,44 +550,60 @@ function stripSseDataPrefix(line: string): string {
 
 // ─── Presets ─────────────────────────────────────────────────────────
 
+/** One vendor preset's wire facts — the SSOT both the legacy chat adapter
+ *  factories below AND the native tool-use transport (cli/repl/native-transport)
+ *  resolve from, so endpoint/key-env/model data can never drift between them. */
+export interface OpenAICompatPresetMeta {
+  name: string;
+  baseURL: string;
+  apiKeyEnv: string;
+  models: readonly string[];
+}
+
 /**
- * Factory presets for known OpenAI-compatible providers. Each preset
- * returns a fully configured adapter — caller passes the env var holding
- * the apiKey via standard process env (no extra config plumbing).
- *
- * Endpoints (verified against vendor docs as of Sprint 214):
+ * Endpoint metadata for known OpenAI-compatible providers
+ * (verified against vendor docs as of Sprint 214):
  *   - DeepSeek:  https://api.deepseek.com/v1            (DEEPSEEK_API_KEY)
  *   - Qwen:      https://dashscope.aliyuncs.com/compatible-mode/v1
  *                                                       (DASHSCOPE_API_KEY)
  *   - GLM/Zhipu: https://open.bigmodel.cn/api/paas/v4   (ZHIPU_API_KEY)
  */
+export const OPENAI_COMPAT_PRESET_META = {
+  deepseek: {
+    name: 'deepseek',
+    baseURL: 'https://api.deepseek.com/v1',
+    apiKeyEnv: 'DEEPSEEK_API_KEY',
+    models: ['deepseek-chat', 'deepseek-reasoner'],
+  },
+  qwen: {
+    name: 'qwen',
+    baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    apiKeyEnv: 'DASHSCOPE_API_KEY',
+    models: ['qwen-plus', 'qwen-turbo', 'qwen-max'],
+  },
+  glm: {
+    name: 'zhipu',
+    baseURL: 'https://open.bigmodel.cn/api/paas/v4',
+    apiKeyEnv: 'ZHIPU_API_KEY',
+    models: ['glm-4-plus', 'glm-4-flash', 'glm-4-air'],
+  },
+} as const satisfies Record<string, OpenAICompatPresetMeta>;
+
+/**
+ * Factory presets for known OpenAI-compatible providers. Each preset
+ * returns a fully configured adapter — caller passes the env var holding
+ * the apiKey via standard process env (no extra config plumbing).
+ * Wire facts come from {@link OPENAI_COMPAT_PRESET_META}.
+ */
 export const OPENAI_COMPAT_PRESETS = {
   deepseek: (fetchImpl?: typeof fetch): OpenAICompatibleAdapter =>
-    new OpenAICompatibleAdapter({
-      name: 'deepseek',
-      baseURL: 'https://api.deepseek.com/v1',
-      apiKeyEnv: 'DEEPSEEK_API_KEY',
-      models: ['deepseek-chat', 'deepseek-reasoner'],
-      fetchImpl,
-    }),
+    new OpenAICompatibleAdapter({ ...OPENAI_COMPAT_PRESET_META.deepseek, models: [...OPENAI_COMPAT_PRESET_META.deepseek.models], fetchImpl }),
 
   qwen: (fetchImpl?: typeof fetch): OpenAICompatibleAdapter =>
-    new OpenAICompatibleAdapter({
-      name: 'qwen',
-      baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-      apiKeyEnv: 'DASHSCOPE_API_KEY',
-      models: ['qwen-plus', 'qwen-turbo', 'qwen-max'],
-      fetchImpl,
-    }),
+    new OpenAICompatibleAdapter({ ...OPENAI_COMPAT_PRESET_META.qwen, models: [...OPENAI_COMPAT_PRESET_META.qwen.models], fetchImpl }),
 
   glm: (fetchImpl?: typeof fetch): OpenAICompatibleAdapter =>
-    new OpenAICompatibleAdapter({
-      name: 'zhipu',
-      baseURL: 'https://open.bigmodel.cn/api/paas/v4',
-      apiKeyEnv: 'ZHIPU_API_KEY',
-      models: ['glm-4-plus', 'glm-4-flash', 'glm-4-air'],
-      fetchImpl,
-    }),
+    new OpenAICompatibleAdapter({ ...OPENAI_COMPAT_PRESET_META.glm, models: [...OPENAI_COMPAT_PRESET_META.glm.models], fetchImpl }),
 } as const;
 
 export type OpenAICompatPresetName = keyof typeof OPENAI_COMPAT_PRESETS;

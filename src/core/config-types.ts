@@ -579,8 +579,15 @@ export interface DeckentConfig {
   // ─── Native transport + bot-agent (REPL native agent + BOT-1) ──────
   /** Local Ollama endpoint (e.g. "http://127.0.0.1:11434") — native agent + bot-agent. */
   ollama_host?: string;
-  /** Wire model id for the native transport (e.g. "qwen3.6:27b"). */
+  /** Pin the native-agent provider from settings ('claude' | 'openai' | 'ollama'
+   *  | 'deepseek' | 'qwen' | 'glm'). Unset → env/config transport detection.
+   *  An unresolvable pin fails honestly at boot (no silent fallback). */
+  native_provider?: string;
+  /** Wire/alias model id for the native transport (e.g. "fable", "qwen3.6:27b"). */
   native_model?: string;
+  /** Prompt-side context budget for the native agent (estimated tokens).
+   *  Unset → per-provider default (ollama 24k · claude 160k · else 100k). */
+  native_context_tokens?: number;
   /** OpenAI-compatible base URL (OpenAI/OpenRouter/vLLM). */
   openai_base_url?: string;
   /** BOT-1 bot-agent — humanizes/summarizes connector (Telegram/Discord) messages. */
@@ -1179,7 +1186,9 @@ export interface ResolvedConfig {
   identity?: DeckentConfig['identity'];
   /** Native transport + BOT-1 bot-agent (passed through from project config). */
   ollama_host?: string;
+  native_provider?: string;
   native_model?: string;
+  native_context_tokens?: number;
   openai_base_url?: string;
   bot_agent?: BotAgentConfig;
   /** Notify on sprint completion (passed through). */

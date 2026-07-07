@@ -34,6 +34,13 @@ export interface AgentSessionDeps {
   maxIterations?: number;
   /** Optional per-session cost accumulator; a configured hard ceiling aborts the turn. */
   costGuard?: CostGuardState;
+  /** Live adapter/model/context-budget overrides (read per provider call) — the
+   *  seam a runtime /model — /provider switch uses WITHOUT rebuilding the
+   *  session, so the cross-turn transcript survives the switch. Absent → the
+   *  fixed `adapter`/`model` above (back-compat). */
+  getAdapter?: () => ProviderAdapter;
+  getModel?: () => string;
+  getContextBudgetTokens?: () => number | undefined;
 }
 
 export interface AgentSession {
@@ -64,6 +71,9 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     lang: deps.lang,
     maxIterations: deps.maxIterations,
     costGuard: deps.costGuard,
+    ...(deps.getAdapter ? { getAdapter: deps.getAdapter } : {}),
+    ...(deps.getModel ? { getModel: deps.getModel } : {}),
+    ...(deps.getContextBudgetTokens ? { getContextBudgetTokens: deps.getContextBudgetTokens } : {}),
     getMode: () => mode,
     isCancelled: () => cancelled,
     requestPermission: (req) =>

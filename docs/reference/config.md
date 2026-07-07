@@ -215,7 +215,9 @@ Yerel/uyumlu LLM'ler ve giden mesaj humanizer'i (BOT-1).
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `ollama_host` | `string` | `undefined` | Yerel Ollama endpoint (orn. `"http://127.0.0.1:11434"`). Native agent + bot-agent tarafindan kullanilir. CT:435. |
-| `native_model` | `string` | `undefined` | Native transport icin wire model ID'si (orn. `"qwen3.6:27b"`). CT:437. |
+| `native_provider` | `string` | `undefined` | Native agent provider pini (`claude` \| `openai` \| `ollama` \| `deepseek` \| `qwen` \| `glm`). Ayarlanmissa transport-detection atlanir; cozulemeyen pin boot'ta durust hata verir (sessiz fallback yok). claude icin anahtar kaynagi: `.deck` `DECKENT_CLAUDE_API_KEY` > env `ANTHROPIC_API_KEY`. |
+| `native_model` | `string` | `undefined` | Native transport icin model ID'si veya alias'i (orn. `"fable"`, `"qwen3.6:27b"`). Alias'lar model-registry uzerinden API-pinned wire ID'ye cozulur (`fable` → `claude-fable-5`). CT:437. |
+| `native_context_tokens` | `number` | provider-bazli (ollama 24k · claude 160k · diger 100k) | Native agent'in prompt-tarafi context butcesi (tahmini token). Transcript butceyi asarsa en eski mesajlar istemci-tarafi sikistirilir ve `context-compacted` bildirimi gosterilir. |
 | `openai_base_url` | `string` | `undefined` | OpenAI-uyumlu base URL (OpenAI/OpenRouter/vLLM). CT:439. |
 | `bot_agent.enabled` | `boolean` | `false` | BOT-1 bot-agent — giden connector mesajlarini (Telegram/Discord) natural language'a cevirir. CT:441. |
 | `bot_agent.persona` | `string` | `undefined` | Rephrase prompt'una eklenen ton/kisilik. |

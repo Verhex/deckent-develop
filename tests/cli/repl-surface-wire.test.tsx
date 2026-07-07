@@ -8,20 +8,17 @@
 // Why this file has no JSX despite the `.tsx` extension the task's write
 // scope names: `ink-testing-library` is NOT a project dependency (confirmed
 // via package.json — same finding as sprint 285, recorded in
-// tests/cli/repl-tool-multi-tag-repro.test.ts), and vitest.config.ts's
-// `test.include` is `['tests/**/*.test.ts']`, which does not match `.tsx`
-// (empirically verified: `npx vitest run tests/cli/repl-surface-wire.test.tsx`
-// → "No test files found", exit 1 — vitest.config.ts is outside this task's
-// write scope, so that gap cannot be closed here). Given that, this suite
-// exercises the real, JSX-free decision logic app.tsx exports for exactly
-// this reason — `resolveModeLabel` and `bgPayloadsToTurnTexts` — the same
+// tests/cli/repl-tool-multi-tag-repro.test.ts). (vitest.config.ts's
+// `test.include` has since been widened to `tests/**/*.test.tsx`, so this
+// suite DOES run now.) It exercises the real, JSX-free decision logic
+// app.tsx exports — `resolveModeLabel` and `bgPayloadsToTurnTexts` — the same
 // "pull pure logic out of the component so it's testable without mounting
 // Ink" pattern already established by `createConfirmQueue` (see
 // tests/cli/repl-confirm-queue.test.ts).
 
 import { describe, it, expect } from 'vitest';
 import { resolveModeLabel, bgPayloadsToTurnTexts, type ReplLabels } from '../../src/cli/repl/app.js';
-import { initialTermModeState, applyModeCommand } from '../../src/cli/repl/term-mode.js';
+import { initialTermModeState, parseTermCommand, applyModeTarget } from '../../src/cli/repl/term-mode.js';
 import { createChatTurnQueue } from '../../src/cli/repl/chat-turn-queue.js';
 
 const NO_LABELS: Pick<ReplLabels, 'modeAsk' | 'modeRun' | 'modeControl'> = {};
@@ -45,19 +42,30 @@ describe('resolveModeLabel — mode-indicator label resolution (Ask/Run/Control)
     expect(resolveModeLabel('ask', { modeRun: 'Çalıştır' })).toBe('Ask');
   });
 
-  it('composes with term-mode.ts applyModeCommand — end-to-end mode-switch flow', () => {
-    // Mirrors app.tsx's handleSubmit: '/run' transitions state, then the new
-    // mode's label is what the indicator would render.
+  it('composes with term-mode.ts parseTermCommand + applyModeTarget — end-to-end mode-switch flow', () => {
+    // Mirrors app.tsx's handleSubmit: '/term run' parses to a switch target,
+    // the target transitions state, then the new mode's label is what the
+    // indicator would render.
     const start = initialTermModeState();
     expect(resolveModeLabel(start.mode, NO_LABELS)).toBe('Ask');
 
-    const afterRun = applyModeCommand(start, '/run');
+    const runParse = parseTermCommand('/term run');
+    expect(runParse).toEqual({ kind: 'switch', target: 'run' });
+    const afterRun = applyModeTarget(start, runParse.kind === 'switch' ? runParse.target : 'ask');
     expect(afterRun.changed).toBe(true);
     expect(resolveModeLabel(afterRun.state.mode, NO_LABELS)).toBe('Run');
 
-    const afterControl = applyModeCommand(afterRun.state, '/control');
+    const controlParse = parseTermCommand('/term control');
+    expect(controlParse).toEqual({ kind: 'switch', target: 'control' });
+    const afterControl = applyModeTarget(afterRun.state, controlParse.kind === 'switch' ? controlParse.target : 'ask');
     expect(afterControl.changed).toBe(true);
     expect(resolveModeLabel(afterControl.state.mode, NO_LABELS)).toBe('Control');
+
+    // Retired transition names no longer parse as /term commands — they stay
+    // free for future first-class commands (/run = task execution).
+    expect(parseTermCommand('/run')).toEqual({ kind: 'none' });
+    expect(parseTermCommand('/ask')).toEqual({ kind: 'none' });
+    expect(parseTermCommand('/control')).toEqual({ kind: 'none' });
   });
 });
 

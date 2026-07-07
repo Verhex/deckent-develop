@@ -19,6 +19,6 @@ describe('createOllamaAdapter', () => {
     for await (const e of a.send(req)) out.push(e);
     expect(calledUrl).toBe('http://127.0.0.1:11434/v1/chat/completions');
     expect(out).toContainEqual({ type: 'text-delta', text: 'hey' });
-    expect(out[out.length - 1]).toEqual({ type: 'done' });
+    expect(out[out.length - 1]).toEqual({ type: 'done', stopReason: 'stop' });
   });
 });

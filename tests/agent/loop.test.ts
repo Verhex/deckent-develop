@@ -152,7 +152,7 @@ describe('runAgentTurn', () => {
 
   it('does not abort on usage when the cost guard is advisory-only (no ceiling configured)', async () => {
     const costGuard = createCostGuard({ usdPerMillionTokens: 3 });
-    const { adapter } = scriptedAdapter([[{ type: 'usage', inputTokens: 10_000_000, outputTokens: 0 }, { type: 'done' }]]);
+    const { adapter } = scriptedAdapter([[{ type: 'text-delta', text: 'ok' }, { type: 'usage', inputTokens: 10_000_000, outputTokens: 0 }, { type: 'done' }]]);
     const evs = await drain(runAgentTurn(baseDeps({ adapter, costGuard }), new Transcript(), 'go'));
     expect(evs.some((e) => e.type === 'error')).toBe(false);
     expect(evs[evs.length - 1]).toEqual({ type: 'turn-end' });

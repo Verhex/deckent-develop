@@ -14,14 +14,27 @@ import { createAnthropicAdapter } from '../../agent/provider-tooluse/anthropic.j
 import { createOpenAIAdapter } from '../../agent/provider-tooluse/openai.js';
 import { createOllamaAdapter } from '../../agent/provider-tooluse/ollama.js';
 import type { ProviderAdapter } from '../../agent/provider-tooluse/types.js';
+import { inferProviderFromId, modelRegistry } from '../../core/model-registry.js';
+import { OPENAI_COMPAT_PRESET_META } from '../../providers/openai-compatible.js';
 import { createStreamSegmenter, type Segment } from './stream-segmenter.js';
 
 export interface ResolvedProvider {
   adapter: ProviderAdapter;
   model: string;
+  /** Selection-level provider name ('claude' | 'openai' | 'ollama' | 'deepseek'
+   *  | 'qwen' | 'glm' | 'mock') — what the status bar shows and what a runtime
+   *  /provider switch round-trips through. */
+  providerName: string;
 }
 export interface ProviderError {
   error: string;
+  /** Stable id for the failure class so the view can localize:
+   *  'missing-api-key' | 'missing-ollama-host' | 'unsupported-native-provider' | 'no-transport'. */
+  errorCode?: string;
+  /** Machine detail for the message (e.g. the key/env var name(s) to set). */
+  detail?: string;
+  /** The provider the failed selection asked for (message interpolation). */
+  provider?: string;
 }
 
 const DEFAULT_MODEL: Record<'anthropic-api' | 'openai-compatible' | 'ollama', string> = {
@@ -30,9 +43,181 @@ const DEFAULT_MODEL: Record<'anthropic-api' | 'openai-compatible' | 'ollama', st
   ollama: 'qwen3',
 };
 
+/** Config surface the native transport reads (all optional). */
+export type NativeTransportConfig = TransportConfig & {
+  /** Pin the native provider from settings ('claude' | 'openai' | 'ollama' | 'deepseek' | 'qwen' | 'glm'). */
+  native_provider?: string;
+  /** Wire/alias model id for the native transport (e.g. 'fable', 'qwen3.6:27b'). */
+  native_model?: string;
+  /** Prompt-side context budget override (estimated tokens). */
+  native_context_tokens?: number;
+};
+
+/** What a /model — /provider switch (or the settings pin) asks for. */
+export interface NativeSelectionInput {
+  provider: string;
+  /** null → provider default (config.native_model when compatible, else built-in). */
+  model: string | null;
+}
+
+export interface NativeResolveContext {
+  env: Record<string, string | undefined>;
+  config: NativeTransportConfig;
+  /** .deck secrets (ADR-G-005) — its documented contract is precedence OVER env. */
+  secrets?: Record<string, string>;
+}
+
+/** Providers whose native tool_use transport exists. codex/gemini are
+ *  subscription-CLI providers (orchestrator-side) — honestly unsupported here. */
+export const NATIVE_PROVIDER_NAMES = ['claude', 'openai', 'ollama', 'deepseek', 'qwen', 'glm'] as const;
+
+/** Confidently infer the native provider a bare `/model <id>` implies, or null.
+ *  Only unambiguous shapes count — `fable`/`opus` → claude, `name:tag` → ollama,
+ *  `gpt-*`/o-series → openai. Anything else returns null and the switch stays on
+ *  the current provider (no inferProviderFromId here: its unknown-id fallback is
+ *  'claude', which would silently re-route vendor models like `deepseek-chat`). */
+export function inferNativeProviderForModel(model: string): string | null {
+  const lid = model.toLowerCase().trim();
+  if (/^(claude|opus|sonnet|haiku|fable)/.test(lid)) return 'claude';
+  if (lid.includes(':')) return 'ollama';
+  if (/^(gpt|o\d)/.test(lid)) return 'openai';
+  return null;
+}
+
+/** Map a claude model id/alias ('fable', 'opus', …) onto its API-pinned wire id
+ *  ('claude-fable-5'). Unknown ids resolve parametrically; a non-claude-shaped
+ *  id falls back to the anthropic default (the 2026-07-07 incident shipped
+ *  `qwen3.6:27b` straight at the anthropic transport). */
+function resolveClaudeWireModel(model: string | null): string {
+  const candidate = model ?? DEFAULT_MODEL['anthropic-api'];
+  if (inferProviderFromId(candidate) !== 'claude') return DEFAULT_MODEL['anthropic-api'];
+  try {
+    return modelRegistry.resolve(candidate, { register: false }).apiId;
+  } catch {
+    return candidate;
+  }
+}
+
+/**
+ * Resolve a provider+model selection into a live native adapter.
+ *
+ * The single seam BOTH boot (settings pin / transport detection) and the
+ * runtime /model — /provider switch resolve through, so their behavior can
+ * never diverge. Credential sourcing for claude follows ADR-G-005:
+ * `.deck` DECKENT_CLAUDE_API_KEY > env DECKENT_CLAUDE_API_KEY > env
+ * ANTHROPIC_API_KEY. Failures return an errorCode (never a silent fallback).
+ */
+export function resolveNativeSelection(
+  sel: NativeSelectionInput,
+  ctx: NativeResolveContext,
+): ResolvedProvider | ProviderError {
+  const provider = sel.provider.toLowerCase().trim();
+  const { env, config } = ctx;
+  const secrets = ctx.secrets ?? {};
+
+  if (provider === 'claude') {
+    const apiKey = secrets['DECKENT_CLAUDE_API_KEY'] || env['DECKENT_CLAUDE_API_KEY'] || env['ANTHROPIC_API_KEY'];
+    if (!apiKey) {
+      return {
+        error: 'claude native transport needs an API key — set DECKENT_CLAUDE_API_KEY in .deck (or ANTHROPIC_API_KEY in the environment)',
+        errorCode: 'missing-api-key',
+        detail: 'DECKENT_CLAUDE_API_KEY (.deck) / ANTHROPIC_API_KEY',
+        provider: 'claude',
+      };
+    }
+    const configModel = config.native_model && inferProviderFromId(config.native_model) === 'claude' ? config.native_model : null;
+    return {
+      adapter: createAnthropicAdapter({ apiKey }),
+      model: resolveClaudeWireModel(sel.model ?? configModel),
+      providerName: 'claude',
+    };
+  }
+
+  if (provider === 'openai') {
+    const baseUrl = config.openai_base_url ?? 'https://api.openai.com/v1';
+    const apiKey = secrets['DECKENT_OPENAI_API_KEY'] || env['DECKENT_OPENAI_API_KEY'] || env['OPENAI_API_KEY'];
+    // A custom base URL (vLLM/OpenRouter/self-hosted) may be keyless; the
+    // hosted openai.com endpoint never is.
+    if (!apiKey && !config.openai_base_url) {
+      return {
+        error: 'openai native transport needs an API key — set DECKENT_OPENAI_API_KEY in .deck (or OPENAI_API_KEY), or point openai_base_url at a self-hosted endpoint',
+        errorCode: 'missing-api-key',
+        detail: 'DECKENT_OPENAI_API_KEY (.deck) / OPENAI_API_KEY',
+        provider: 'openai',
+      };
+    }
+    const configModel = config.native_model && inferProviderFromId(config.native_model) !== 'claude' ? config.native_model : null;
+    const opts: Parameters<typeof createOpenAIAdapter>[0] = { baseUrl };
+    if (apiKey) opts.apiKey = apiKey;
+    return {
+      adapter: createOpenAIAdapter(opts),
+      model: sel.model ?? configModel ?? DEFAULT_MODEL['openai-compatible'],
+      providerName: 'openai',
+    };
+  }
+
+  if (provider === 'deepseek' || provider === 'qwen' || provider === 'glm') {
+    const meta = OPENAI_COMPAT_PRESET_META[provider];
+    const apiKey = env[meta.apiKeyEnv];
+    if (!apiKey) {
+      return {
+        error: `${provider} native transport needs an API key — set ${meta.apiKeyEnv} in the environment`,
+        errorCode: 'missing-api-key',
+        detail: meta.apiKeyEnv,
+        provider,
+      };
+    }
+    return {
+      adapter: createOpenAIAdapter({ baseUrl: meta.baseURL, apiKey, name: meta.name }),
+      model: sel.model ?? meta.models[0]!,
+      providerName: provider,
+    };
+  }
+
+  if (provider === 'ollama') {
+    if (!config.ollama_host) {
+      return {
+        error: 'ollama native transport needs a host — set ollama_host in .deckent/config.json (e.g. http://127.0.0.1:11434)',
+        errorCode: 'missing-ollama-host',
+        detail: 'ollama_host',
+        provider: 'ollama',
+      };
+    }
+    const configModel = config.native_model && inferProviderFromId(config.native_model) === 'ollama' ? config.native_model : null;
+    return {
+      adapter: createOllamaAdapter({ host: config.ollama_host }),
+      model: sel.model ?? configModel ?? DEFAULT_MODEL.ollama,
+      providerName: 'ollama',
+    };
+  }
+
+  return {
+    error: `provider "${provider}" has no native tool-use transport (subscription CLIs stay orchestrator-side) — valid: ${NATIVE_PROVIDER_NAMES.join(', ')}`,
+    errorCode: 'unsupported-native-provider',
+    detail: provider,
+    provider,
+  };
+}
+
+/** Prompt-side context budget (estimated tokens) for a provider selection.
+ *  Explicit `native_context_tokens` config wins; defaults keep generation
+ *  headroom BELOW each transport family's typical window — local Ollama slots
+ *  default to 32k (the 2026-07-07 empty-turn incident), hosted APIs are 128k+. */
+export function resolveContextBudgetTokens(
+  providerName: string,
+  config: { native_context_tokens?: unknown },
+): number {
+  const c = config.native_context_tokens;
+  if (typeof c === 'number' && Number.isFinite(c) && c > 0) return Math.floor(c);
+  if (providerName === 'ollama') return 24_000;
+  if (providerName === 'claude') return 160_000;
+  return 100_000;
+}
+
 export function resolveNativeProvider(
   env: Record<string, string | undefined>,
-  config: TransportConfig & { native_model?: string },
+  config: NativeTransportConfig,
+  secrets?: Record<string, string>,
 ): ResolvedProvider | ProviderError {
   const mock = env['DECKENT_NATIVE_MOCK'];
   if (mock) {
@@ -42,24 +227,34 @@ export function resolveNativeProvider(
     return {
       adapter: { name: 'mock', async *send() { for (const e of (scripts[turn++] ?? [{ type: 'done' }])) yield e; } },
       model: env['DECKENT_NATIVE_MODEL'] ?? 'mock-model',
+      providerName: 'mock',
     };
   }
 
+  const explicitModel = env['DECKENT_NATIVE_MODEL'] ?? null;
+
+  // Settings pin (native_provider) — the "bind from settings" path. An explicit
+  // pin that cannot resolve is an honest error, NOT a silent fall-through to
+  // whatever transport detection would have picked.
+  if (config.native_provider) {
+    return resolveNativeSelection(
+      { provider: config.native_provider, model: explicitModel },
+      { env, config, ...(secrets ? { secrets } : {}) },
+    );
+  }
+
   const detected = detectTransport(env, config);
-  if (detected.kind === 'none') return { error: detected.reason };
+  if (detected.kind === 'none') return { error: detected.reason, errorCode: 'no-transport' };
 
-  const model = env['DECKENT_NATIVE_MODEL'] ?? config.native_model ?? DEFAULT_MODEL[detected.kind];
-
-  if (detected.kind === 'anthropic-api') {
-    return { adapter: createAnthropicAdapter({ apiKey: env['ANTHROPIC_API_KEY']! }), model };
-  }
-  if (detected.kind === 'openai-compatible') {
-    const baseUrl = config.openai_base_url ?? 'https://api.openai.com/v1';
-    const opts: Parameters<typeof createOpenAIAdapter>[0] = { baseUrl };
-    if (env['OPENAI_API_KEY']) opts.apiKey = env['OPENAI_API_KEY'];
-    return { adapter: createOpenAIAdapter(opts), model };
-  }
-  return { adapter: createOllamaAdapter({ host: config.ollama_host! }), model };
+  const kindToProvider: Record<Exclude<typeof detected.kind, 'none'>, string> = {
+    'anthropic-api': 'claude',
+    'openai-compatible': 'openai',
+    ollama: 'ollama',
+  };
+  return resolveNativeSelection(
+    { provider: kindToProvider[detected.kind], model: explicitModel },
+    { env, config, ...(secrets ? { secrets } : {}) },
+  );
 }
 
 // ═══ Stream output handler — fence-safe, flush-race-guarded ══════════════════

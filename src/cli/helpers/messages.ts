@@ -1052,6 +1052,30 @@ const MESSAGES: MessageMap = {
     en: 'tool ran',
     tr: 'araç çalıştı',
   },
+  'native.empty-response': {
+    en: 'model returned an empty response — its context window may be full; try again or switch model (/model)',
+    tr: 'model boş yanıt döndü — context penceresi dolmuş olabilir; tekrar deneyin veya model değiştirin (/model)',
+  },
+  'native.truncated': {
+    en: 'response truncated — the model hit its output/context token limit',
+    tr: 'yanıt kesildi — model çıktı/context token limitine takıldı',
+  },
+  'native.context-compacted': {
+    en: 'context window near its limit — oldest messages were compacted to keep the session responsive',
+    tr: 'context penceresi limite yaklaştı — oturum yanıt verebilsin diye en eski mesajlar sıkıştırıldı',
+  },
+  'native.switch.missing-api-key': {
+    en: 'switch failed — {provider} needs an API key: set {detail}',
+    tr: 'geçiş başarısız — {provider} için API anahtarı gerekli: {detail} tanımlayın',
+  },
+  'native.switch.missing-ollama-host': {
+    en: 'switch failed — ollama needs a host: set {detail} in .deckent/config.json',
+    tr: 'geçiş başarısız — ollama için host gerekli: .deckent/config.json içinde {detail} tanımlayın',
+  },
+  'native.switch.unsupported-native-provider': {
+    en: 'switch failed — "{detail}" has no native tool-use transport; valid: claude, openai, ollama, deepseek, qwen, glm',
+    tr: 'geçiş başarısız — "{detail}" için native tool-use transport yok; geçerli: claude, openai, ollama, deepseek, qwen, glm',
+  },
   'tui.render_error': {
     en: 'REPL render error',
     tr: 'REPL render hatası',
@@ -2352,6 +2376,23 @@ const MESSAGES: MessageMap = {
   'tui.mode_ask': { en: 'Ask', tr: 'Sor' },
   'tui.mode_run': { en: 'Run', tr: 'Çalıştır' },
   'tui.mode_control': { en: 'Control', tr: 'Kontrol' },
+
+  // ─── `/term` mode dispatch (term-mode.ts /term refactor — /ask·/run·/control
+  // retired as transition commands; app.tsx handleSubmit renders these via
+  // ReplLabels.termSwitched/termStatus/termUsage, run.tsx wires them).
+  // {mode}/{approval} are substituted by app.tsx (confirmProgress precedent) ──
+  'tui.term_switched': {
+    en: 'terminal mode switched: {mode}',
+    tr: 'terminal modu değişti: {mode}',
+  },
+  'tui.term_status': {
+    en: 'terminal mode: {mode} · write approval: {approval}',
+    tr: 'terminal modu: {mode} · yazma onayı: {approval}',
+  },
+  'tui.term_usage': {
+    en: 'usage: /term ask|run|control — file-write approval is separate: /approve suggest|auto-edit|full-auto',
+    tr: 'kullanım: /term ask|run|control — dosya-yazma onayı ayrıdır: /approve suggest|auto-edit|full-auto',
+  },
 
   // ─── `deckent plan-nl` preview/backup lines (Task 354-008 DIR-1-CMD —
   // sole-authority addition; cited by 354-008's own directive "yenisi

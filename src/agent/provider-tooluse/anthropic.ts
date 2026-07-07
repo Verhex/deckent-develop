@@ -62,6 +62,9 @@ export function createAnthropicAdapter(opts: AnthropicAdapterOptions): ProviderA
 
       let inputTokens = 0;
       let outputTokens = 0;
+      // Anthropic reports the stop cause on message_delta ('max_tokens' = cut
+      // at the token ceiling); normalized onto the final 'done' event.
+      let stopReason: string | undefined;
       // per-index in-flight tool_use accumulator
       const toolAcc = new Map<number, { id: string; name: string; json: string }>();
 
@@ -95,6 +98,7 @@ export function createAnthropicAdapter(opts: AnthropicAdapterOptions): ProviderA
           }
         } else if (ev.event === 'message_delta') {
           if (d.usage?.output_tokens) outputTokens = d.usage.output_tokens;
+          if (d.delta?.stop_reason) stopReason = d.delta.stop_reason;
         } else if (ev.event === 'message_stop') {
           yield { type: 'usage', inputTokens, outputTokens };
           break;
@@ -105,7 +109,10 @@ export function createAnthropicAdapter(opts: AnthropicAdapterOptions): ProviderA
           throw new Error(`anthropic stream error: ${d.error?.type ?? 'unknown'}`);
         }
       }
-      yield { type: 'done' };
+      yield {
+        type: 'done',
+        stopReason: stopReason === 'max_tokens' ? 'length' : stopReason === 'tool_use' ? 'tool_calls' : 'stop',
+      };
     },
   };
 }
@@ -114,7 +121,7 @@ interface AnthropicEvent {
   index?: number;
   message?: { usage?: { input_tokens?: number } };
   content_block?: { type?: string; id?: string; name?: string };
-  delta?: { type?: string; text?: string; partial_json?: string };
+  delta?: { type?: string; text?: string; partial_json?: string; stop_reason?: string };
   usage?: { output_tokens?: number };
   error?: { type?: string; message?: string };
 }

@@ -19,6 +19,7 @@ import type { ProviderAdapter, ProviderRequest, ProviderToolCall } from './provi
 import { recursionExceeded } from './guards/recursion.js';
 import { checkSelfModifying } from './guards/self-modifying.js';
 import { accrue, costExceeded, type CostGuardState } from './guards/cost.js';
+import { fitMessagesToBudget } from './context-budget.js';
 
 export type PermissionResponse = { decision: 'once' | 'session' | 'always' | 'deny' };
 
@@ -31,6 +32,19 @@ export interface LoopDeps {
   model: string;
   lang?: 'en' | 'tr';
   maxIterations?: number;
+  /** Live adapter override — read per provider call so a runtime /provider
+   *  switch takes effect mid-session without rebuilding the loop/transcript.
+   *  Absent → the fixed `adapter` above (back-compat). */
+  getAdapter?: () => ProviderAdapter;
+  /** Live model override — read per provider call so a runtime /model switch
+   *  takes effect mid-session. Absent → the fixed `model` above. */
+  getModel?: () => string;
+  /** Prompt-side token budget (estimated) for the transcript window. Read per
+   *  provider call; when the transcript overflows it, the oldest messages are
+   *  compacted away (pairing-safe) and a 'notice' event reports it — instead
+   *  of the backend silently truncating and returning an empty turn. Absent /
+   *  <=0 → no client-side fitting. */
+  getContextBudgetTokens?: () => number | undefined;
   /** current approval mode (read per-decision so setApprovalMode takes effect). */
   getMode: () => ApprovalMode;
   /** view→core suspension: resolve with the user's choice on an 'ask' decision. */
@@ -71,11 +85,33 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       return;
     }
 
-    const req: ProviderRequest = { system, messages: transcript.toProviderMessages(), tools: deps.registry.toNativeSchemas(), model: deps.model };
+    // Live-switchable adapter/model (read per call: /model — /provider mid-session).
+    const adapter = deps.getAdapter?.() ?? deps.adapter;
+    const model = deps.getModel?.() ?? deps.model;
+
+    // Client-side context fitting: drop the oldest messages (pairing-safe)
+    // BEFORE the backend hits its window — a server-side truncation returns an
+    // empty turn with HTTP 200 and looks like a dead REPL.
+    let messages = transcript.toProviderMessages();
+    const budget = deps.getContextBudgetTokens?.();
+    if (budget !== undefined && budget > 0) {
+      const fit = fitMessagesToBudget(messages, budget);
+      if (fit.droppedCount > 0) {
+        messages = fit.messages;
+        yield {
+          type: 'notice',
+          code: 'context-compacted',
+          message: `context window near its limit — compacted ${fit.droppedCount} oldest message(s) (~${fit.estimatedTokens} tokens kept)`,
+        };
+      }
+    }
+
+    const req: ProviderRequest = { system, messages, tools: deps.registry.toNativeSchemas(), model };
     let assistantText = '';
+    let stopReason: string | undefined;
     const calls: ProviderToolCall[] = [];
     try {
-      for await (const ev of deps.adapter.send(req)) {
+      for await (const ev of adapter.send(req)) {
         if (ev.type === 'text-delta') { assistantText += ev.text; yield { type: 'text-delta', text: ev.text }; }
         else if (ev.type === 'tool-call') { calls.push(ev); yield { type: 'tool-proposed', id: ev.id, tool: ev.name, args: ev.args }; }
         else if (ev.type === 'usage') {
@@ -90,12 +126,19 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
             }
           }
         }
-        // 'done' ends the inner provider stream.
+        else if (ev.type === 'done') { stopReason = ev.stopReason; }
       }
     } catch (e) {
       yield { type: 'error', message: e instanceof Error ? e.message : String(e) };
       yield { type: 'turn-end' };
       return;
+    }
+
+    // Honest truncation signal: the backend cut generation at its token/context
+    // ceiling. The turn still carries whatever arrived, but the user must know
+    // the reply is incomplete rather than mistaking it for a finished answer.
+    if (stopReason === 'length') {
+      yield { type: 'notice', code: 'truncated', message: 'response truncated — the model hit its output/context token limit' };
     }
 
     // Skip a truly-empty assistant turn (no text, no tool calls) — appending
@@ -104,7 +147,20 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
     if (assistantText !== '' || calls.length > 0) {
       transcript.appendAssistant(assistantText, calls.map((c) => ({ id: c.id, name: c.name, args: c.args })));
     }
-    if (calls.length === 0) { yield { type: 'turn-end' }; return; }
+    if (calls.length === 0) {
+      // Empty turn (no text, no tool calls): a healthy model never does this —
+      // it is the signature of a full context window (or a broken backend).
+      // Fail honestly instead of closing the turn as if it succeeded.
+      if (assistantText === '') {
+        yield {
+          type: 'error',
+          code: 'empty-response',
+          message: 'model returned an empty response — its context window may be full',
+        };
+      }
+      yield { type: 'turn-end' };
+      return;
+    }
 
     for (const call of calls) {
       // cancel() stops the rest of the in-flight batch (incl. auto-tier calls),

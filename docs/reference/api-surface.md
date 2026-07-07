@@ -612,11 +612,13 @@ bootstrap path).
 
 - `src/cli/helpers/live-footer.ts` (163 lines) — `buildLiveFooter(state, options)` (line 132),
   pure render, i18n-first via injected `LiveFooterLabels` (no hardcoded strings).
-- `src/cli/repl/term-mode.ts` (111 lines) — Ask/Run/Control mode machine.
+- `src/cli/repl/term-mode.ts` (133 lines) — Ask/Run/Control mode machine.
   `ALLOWED_RISKS_BY_MODE` (line 31) is a cumulative risk ladder: `ask` ⊂ `run` ⊂ `control`.
-  `applyModeCommand()` (line 63) resolves `/ask` `/run` `/control` slash commands;
-  `checkActionAllowed()` (line 101) returns an `ActionDecision` naming the `suggestedMode` when
-  denied.
+  `parseTermCommand()` (line 65) parses the single `/term` dispatch line (bare `/term` = status,
+  `/term ask|run|control` = switch, anything else = usage) and `applyModeTarget()` (line 86)
+  applies the switch — the former `/ask` `/run` `/control` transition commands are retired so
+  those names stay free for future first-class commands; `checkActionAllowed()` (line 123)
+  returns an `ActionDecision` naming the `suggestedMode` when denied.
 - `src/cli/repl/chat-turn-queue.ts` (78 lines) — Hermes "no mid-turn injection" rule.
   `drainAsTurns()` (`chat-turn-queue.ts:66-67`): `if (queue.userTurnActive) return [];` — the
   queue is left untouched and returns nothing while a user turn is in flight; buffered

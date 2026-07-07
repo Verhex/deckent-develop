@@ -74,6 +74,20 @@ function slashMenuMatches(registry: SlashRegistry | undefined, buffer: string): 
   return filterSlashCommands(registry, buffer);
 }
 
+/** Enter-decision while the slash menu is open. filterSlashCommands keeps the
+ * menu open with the FULL catalog when nothing prefix-matches (fallback list);
+ * in that state Enter must submit the TYPED buffer, not the menu selection —
+ * otherwise any command missing from the registry (a handleSubmit-only command
+ * like /term before it was catalogued) is silently replaced by the first menu
+ * item and can never be submitted at all. Only a real prefix-match may
+ * substitute the selection. Pure — regression-tested without mounting Ink. */
+export function resolveMenuSubmit(buffer: string, matches: readonly SlashCommand[], sel: number): string {
+  const q = buffer.toLowerCase();
+  const realMatch = matches.some((c) => c.name.toLowerCase().startsWith(q));
+  if (!realMatch) return buffer;
+  return matches[sel]?.name ?? buffer;
+}
+
 /** Map an Ink keypress to the node:readline Key shape editInput expects.
  * Ink exposes arrows but NOT Home/End — those arrive as raw escape sequences
  * (xterm: ESC[H / ESC[F, or ESC[1~ / ESC[4~), so detect them from `input`. */
@@ -160,7 +174,7 @@ export function InputBar(props: InputBarProps): ReactElement {
       if (key.downArrow) { setSel((sel + 1) % n); return; }
       if (key.escape) { set(EMPTY_INPUT); setSel(0); return; }
       if (key.tab) { const name = matches[sel]?.name ?? ''; set({ buffer: name + ' ', cursor: name.length + 1 }); setSel(0); return; }
-      if (key.return) { const name = matches[sel]?.name ?? stateRef.current.buffer; onSubmit(name); set(EMPTY_INPUT); setSel(0); return; }
+      if (key.return) { onSubmit(resolveMenuSubmit(stateRef.current.buffer, matches, sel)); set(EMPTY_INPUT); setSel(0); return; }
       // any other key falls through to editInput → re-filters; reset selection
     }
 

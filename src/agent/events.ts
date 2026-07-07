@@ -11,7 +11,14 @@ export interface ToolExecutingEvent { type: 'tool-executing'; id: string; tool: 
 export interface ToolResultEvent { type: 'tool-result'; id: string; tool: string; ok: boolean; output: string; }
 export interface TurnEndEvent { type: 'turn-end'; }
 export interface UsageEvent { type: 'usage'; inputTokens: number; outputTokens: number; }
-export interface ErrorEvent { type: 'error'; message: string; }
+/** `code` is a stable machine-readable id ('empty-response' | …) so views can
+ *  localize known failure classes; `message` stays the English default for
+ *  views without a localizer. */
+export interface ErrorEvent { type: 'error'; message: string; code?: string; }
+/** Non-terminal honest signal ('truncated' | 'context-compacted' | …): the turn
+ *  continues, but the view must tell the user something degraded — silence here
+ *  is what turned a full context window into a "model stopped replying" mystery. */
+export interface NoticeEvent { type: 'notice'; code: string; message: string; }
 
 export type AgentEvent =
   | TextDeltaEvent
@@ -21,7 +28,8 @@ export type AgentEvent =
   | ToolResultEvent
   | TurnEndEvent
   | UsageEvent
-  | ErrorEvent;
+  | ErrorEvent
+  | NoticeEvent;
 
 /** A turn is over once a terminal event is emitted. */
 export function isTerminalEvent(e: AgentEvent): boolean {

@@ -34,12 +34,11 @@ export const ALLOWED_RISKS_BY_MODE: Readonly<Record<TermMode, ReadonlySet<Comman
   control: new Set(RISK_LADDER),
 };
 
-/** Slash-style transition commands (chat-slash-registry.ts naming convention). */
-export const MODE_TRANSITION_COMMANDS: Readonly<Record<string, TermMode>> = {
-  '/ask': 'ask',
-  '/run': 'run',
-  '/control': 'control',
-};
+/** The single mode-transition slash command. `/ask` `/run` `/control` were
+ * retired as transition commands so those names stay free for future
+ * first-class commands (notably `/run` = task execution); every mode
+ * interaction now goes through `/term` (bare = status, `/term <mode>` = switch). */
+export const TERM_MODE_COMMAND = '/term';
 
 export interface TermModeState {
   readonly mode: TermMode;
@@ -50,19 +49,42 @@ export function initialTermModeState(): TermModeState {
   return { mode: 'ask' };
 }
 
+/** Parsed `/term` line — the caller (app.tsx handleSubmit) renders each kind
+ * with localized labels; `none` means "not a /term line, fall through". */
+export type TermCommandParse =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'status' }
+  | { readonly kind: 'switch'; readonly target: TermMode }
+  | { readonly kind: 'usage' };
+
+/**
+ * Parse a raw input line as a `/term` command. Case-insensitive and
+ * whitespace-tolerant. Bare `/term` → status; `/term ask|run|control` →
+ * switch; any other argument shape (unknown mode, extra words) → usage.
+ */
+export function parseTermCommand(line: string): TermCommandParse {
+  const parts = line.trim().split(/\s+/);
+  if ((parts[0] ?? '').toLowerCase() !== TERM_MODE_COMMAND) return { kind: 'none' };
+  if (parts.length === 1) return { kind: 'status' };
+  const arg = (parts[1] ?? '').toLowerCase();
+  if (parts.length === 2 && (TERM_MODES as readonly string[]).includes(arg)) {
+    return { kind: 'switch', target: arg as TermMode };
+  }
+  return { kind: 'usage' };
+}
+
 export interface ModeTransitionResult {
   readonly state: TermModeState;
   readonly changed: boolean;
 }
 
 /**
- * Resolve a transition command against the current state. An unrecognized
- * command or a self-transition returns the SAME state object with
- * `changed:false` — a cheap no-render signal for a future caller.
+ * Apply a parsed switch target to the current state. A self-transition
+ * returns the SAME state object with `changed:false` — a cheap no-render
+ * signal for the caller.
  */
-export function applyModeCommand(state: TermModeState, command: string): ModeTransitionResult {
-  const target = MODE_TRANSITION_COMMANDS[command];
-  if (target === undefined || target === state.mode) {
+export function applyModeTarget(state: TermModeState, target: TermMode): ModeTransitionResult {
+  if (target === state.mode) {
     return { state, changed: false };
   }
   return { state: { mode: target }, changed: true };

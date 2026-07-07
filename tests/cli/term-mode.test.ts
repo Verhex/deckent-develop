@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   initialTermModeState,
-  applyModeCommand,
+  parseTermCommand,
+  applyModeTarget,
   checkActionAllowed,
   ALLOWED_RISKS_BY_MODE,
-  MODE_TRANSITION_COMMANDS,
+  TERM_MODE_COMMAND,
   TERM_MODES,
   type TermMode,
 } from '../../src/cli/repl/term-mode.js';
@@ -16,26 +17,47 @@ describe('term-mode — initial state', () => {
   });
 });
 
-describe('term-mode — transition matrix (geçiş-matrisi)', () => {
-  const commands = Object.keys(MODE_TRANSITION_COMMANDS);
+describe('term-mode — parseTermCommand (/term dispatch parser)', () => {
+  it('exports /term as the single transition command', () => {
+    expect(TERM_MODE_COMMAND).toBe('/term');
+  });
 
+  it('non-/term lines → none (fall through to chat / other dispatch)', () => {
+    for (const line of ['hello', '/nope', '/ask', '/run', '/control', '/terminal', '', '   ']) {
+      expect(parseTermCommand(line)).toEqual({ kind: 'none' });
+    }
+  });
+
+  it('bare /term → status (case-insensitive, whitespace-tolerant)', () => {
+    expect(parseTermCommand('/term')).toEqual({ kind: 'status' });
+    expect(parseTermCommand('  /TERM  ')).toEqual({ kind: 'status' });
+  });
+
+  for (const mode of TERM_MODES) {
+    it(`/term ${mode} → switch:${mode} (case-insensitive)`, () => {
+      expect(parseTermCommand(`/term ${mode}`)).toEqual({ kind: 'switch', target: mode });
+      expect(parseTermCommand(`/term   ${mode.toUpperCase()} `)).toEqual({ kind: 'switch', target: mode });
+    });
+  }
+
+  it('unrecognized or extra arguments → usage (never a silent no-op)', () => {
+    expect(parseTermCommand('/term yolo')).toEqual({ kind: 'usage' });
+    expect(parseTermCommand('/term run extra')).toEqual({ kind: 'usage' });
+  });
+});
+
+describe('term-mode — applyModeTarget transition matrix (geçiş-matrisi)', () => {
   for (const from of TERM_MODES) {
-    for (const command of commands) {
-      const target = MODE_TRANSITION_COMMANDS[command] as TermMode;
+    for (const target of TERM_MODES) {
       const expectChanged = target !== from;
-      it(`${from} + ${command} → ${target} (changed:${expectChanged})`, () => {
-        const result = applyModeCommand({ mode: from }, command);
+      it(`${from} + /term ${target} → ${target} (changed:${expectChanged})`, () => {
+        const state = { mode: from };
+        const result = applyModeTarget(state, target);
         expect(result.state.mode).toBe(target);
         expect(result.changed).toBe(expectChanged);
+        if (!expectChanged) expect(result.state).toBe(state); // self-transition: same object
       });
     }
-
-    it(`${from} + unrecognized command → unchanged`, () => {
-      const state = { mode: from };
-      const result = applyModeCommand(state, '/nope');
-      expect(result.state).toBe(state);
-      expect(result.changed).toBe(false);
-    });
   }
 });
 

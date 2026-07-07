@@ -76,6 +76,9 @@ export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter
       if (!resp.ok || !resp.body) throw new Error(`openai-compatible http ${resp.status}`);
 
       const toolAcc = new Map<number, { id: string; name: string; args: string }>();
+      // Last finish_reason seen — 'length' means the backend cut generation at
+      // its token/context ceiling; normalized onto the final 'done' event.
+      let finishReason: string | undefined;
       for await (const ev of parseSSE(resp.body as AsyncIterable<Uint8Array>)) {
         if (ev.data === '[DONE]') break;
         let chunk: OpenAIChunk;
@@ -94,6 +97,7 @@ export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter
             toolAcc.set(idx, cur);
           }
         }
+        if (choice?.finish_reason) finishReason = choice.finish_reason;
         if (choice?.finish_reason === 'tool_calls') {
           for (const e of drainToolCalls(toolAcc)) yield e;
         }
@@ -102,7 +106,10 @@ export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter
       // Stream ended (via [DONE] or close) without a `finish_reason:'tool_calls'`
       // chunk — flush any tool calls still accumulated so they are never dropped.
       for (const e of drainToolCalls(toolAcc)) yield e;
-      yield { type: 'done' };
+      yield {
+        type: 'done',
+        stopReason: finishReason === 'length' ? 'length' : finishReason === 'tool_calls' ? 'tool_calls' : 'stop',
+      };
     },
   };
 }

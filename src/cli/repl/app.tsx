@@ -20,7 +20,7 @@ import type { ActiveSelection } from './provider-switch.js';
 import { createStreamSegmenter, type StreamSegmenter } from './stream-segmenter.js';
 import { measuredOnTurnEnd } from './native-elapsed.js';
 import { buildLiveFooter, type LiveFooterState } from '../helpers/live-footer.js';
-import { initialTermModeState, applyModeCommand, type TermMode, type TermModeState } from './term-mode.js';
+import { initialTermModeState, parseTermCommand, applyModeTarget, type TermMode, type TermModeState } from './term-mode.js';
 import { createChatTurnQueue, type ChatTurnQueue, type ChatTurnBgEvent, type ChatTurnPayload } from './chat-turn-queue.js';
 import { createInputQueue, type InputQueue } from './input-queue.js';
 import { listRecentSessions, pickSession, type SessionRecord } from '../helpers/session-resume.js';
@@ -454,6 +454,12 @@ export interface ReplLabels {
   modeAsk?: string;
   modeRun?: string;
   modeControl?: string;
+  /** `/term` dispatch lines (term-mode.ts refactor — /ask·/run·/control retired).
+   * `{mode}`/`{approval}` are i18n templates (same precedent as confirmProgress);
+   * optional with English fallbacks, wired to tui.term_* keys by run.tsx. */
+  termSwitched?: string; // "terminal mode switched: {mode}"
+  termStatus?: string;   // "terminal mode: {mode} · write approval: {approval}"
+  termUsage?: string;    // "usage: /term ask|run|control — ..."
   /** APP-SURFACE-WIRE (358-006) — resume-teaser/picker + busy-controls labels;
    * optional, English fallback until a messages round wires en/tr keys through
    * run.tsx (same seam precedent as the mode labels above). */
@@ -502,8 +508,11 @@ export interface ReplAppProps {
   slashRegistry: SlashRegistry;
   /** Initial model/provider selection (shown in the status bar). */
   initialSelection: ActiveSelection;
-  /** Switch model/provider; returns the resulting active selection. */
-  onSwitch: (sel: Partial<ActiveSelection>) => ActiveSelection;
+  /** Switch model/provider; returns the resulting active selection. A present
+   *  `switchError` means the switch was REFUSED (e.g. missing API key) — the
+   *  previous selection stays live and the message is shown to the user
+   *  instead of a false "switched" confirmation. */
+  onSwitch: (sel: Partial<ActiveSelection>) => ActiveSelection & { switchError?: string };
   /** Set the agentic approval mode (suggest / auto-edit / full-auto). */
   onApprovalMode: (mode: 'suggest' | 'auto-edit' | 'full-auto') => void;
   /** Optional chat-memory adapter — persists turns and powers /resume. */
@@ -919,15 +928,33 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       clearScreen();
       return;
     }
-    // /ask · /run · /control — term-mode.ts transition commands (354-001 seam).
+    // /term [ask|run|control] — term-mode.ts mode dispatch. Replaces the
+    // retired /ask·/run·/control transition commands (those names stay free
+    // for future first-class commands). Every branch prints a VISIBLE line —
+    // a silent badge-only switch reads as "nothing happened".
     // Inert unless replSurfaceEnabled: keeps flag-off behavior byte-identical
-    // (these strings fall through to a normal chat message, exactly as before).
+    // (the string falls through to a normal chat message, exactly as before).
     if (replSurfaceEnabled) {
-      const modeCmd = trimmed.toLowerCase();
-      if (modeCmd === '/ask' || modeCmd === '/run' || modeCmd === '/control') {
+      const termCmd = parseTermCommand(trimmed);
+      if (termCmd.kind !== 'none') {
         pushTurn('user', trimmed);
-        const result = applyModeCommand(termMode, modeCmd);
-        if (result.changed) setTermMode(result.state);
+        const usage = labels.termUsage
+          ?? 'usage: /term ask|run|control — file-write approval is separate: /approve suggest|auto-edit|full-auto';
+        if (termCmd.kind === 'switch') {
+          const result = applyModeTarget(termMode, termCmd.target);
+          if (result.changed) setTermMode(result.state);
+          pushTurn('seg', (labels.termSwitched ?? 'terminal mode switched: {mode}')
+            .replace('{mode}', resolveModeLabel(result.state.mode, labels)));
+        } else if (termCmd.kind === 'status') {
+          // Status names BOTH gates: term-mode (command risk) AND the agentic
+          // approval mode — file writes are gated by /approve, not /term.
+          const status = (labels.termStatus ?? 'terminal mode: {mode} · write approval: {approval}')
+            .replace('{mode}', resolveModeLabel(termMode.mode, labels))
+            .replace('{approval}', approval);
+          pushTurn('seg', `${status}\n${usage}`);
+        } else {
+          pushTurn('seg', usage);
+        }
         return;
       }
       // 358-006: /queue · /interrupt · /steer — busy-controls.ts dispatch.
@@ -1005,8 +1032,14 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       pushTurn('user', trimmed);
       if (arg) {
         const next = onSwitch(kind === 'model' ? { model: arg } : { provider: arg });
-        setSelection(next);
-        pushTurn('seg', `${labels.switched}: ${next.provider}${next.model ? ` · ${next.model}` : ''}`);
+        if (next.switchError) {
+          // Honest failure: selection (and status bar) stay on what actually
+          // serves the turns — no false "switched" confirmation.
+          pushTurn('seg', next.switchError);
+        } else {
+          setSelection({ provider: next.provider, model: next.model });
+          pushTurn('seg', `${labels.switched}: ${next.provider}${next.model ? ` · ${next.model}` : ''}`);
+        }
       } else {
         pushTurn('seg', `${labels.switchUsage}\n${selection.provider}${selection.model ? ` · ${selection.model}` : ''}`);
       }

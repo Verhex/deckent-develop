@@ -14,7 +14,11 @@ export interface TurnRecorderOptions {
   dir: string;
   sessionId: string;
   system: string;
-  model: string;
+  /** Model id stamped on each trace line. Pass a getter when the session can
+   *  switch models at runtime (/model) so the trace records the model that
+   *  actually served the turn — a fixed boot-time stamp misled the 2026-07-07
+   *  incident diagnosis. */
+  model: string | (() => string);
   now: () => string;
 }
 
@@ -36,7 +40,8 @@ export function buildTurnRecorder(opts: TurnRecorderOptions): ((messages: Provid
   const file = join(opts.dir, `${opts.sessionId}.jsonl`);
   return (messages) => {
     try {
-      const example = toTrainingExample(opts.system, messages, { source: 'native-repl', model: opts.model, ts: opts.now() });
+      const model = typeof opts.model === 'function' ? opts.model() : opts.model;
+      const example = toTrainingExample(opts.system, messages, { source: 'native-repl', model, ts: opts.now() });
       appendTrace(file, redactExample(example));
     } catch {
       // Fail-soft (ADR-G-009 / TRN-2, same rule as TRN-1): a trace-write error must never break the REPL turn.

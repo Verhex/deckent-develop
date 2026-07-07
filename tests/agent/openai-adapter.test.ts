@@ -35,7 +35,7 @@ describe('createOpenAIAdapter', () => {
       { type: 'text-delta', text: 'Hel' },
       { type: 'text-delta', text: 'lo' },
       { type: 'usage', inputTokens: 5, outputTokens: 2 },
-      { type: 'done' },
+      { type: 'done', stopReason: 'stop' },
     ]);
   });
   it('accumulates a streamed tool-call across delta fragments', async () => {
@@ -47,7 +47,7 @@ describe('createOpenAIAdapter', () => {
     const a = createOpenAIAdapter({ baseUrl: 'http://x/v1', fetchImpl: fakeFetch(sse) });
     const evs = await drain(a, req);
     expect(evs).toContainEqual({ type: 'tool-call', id: 'call_1', name: 'read_file', args: { path: 'x' } });
-    expect(evs[evs.length - 1]).toEqual({ type: 'done' });
+    expect(evs[evs.length - 1]).toEqual({ type: 'done', stopReason: 'tool_calls' });
   });
   it('throws on a non-ok HTTP status', async () => {
     const a = createOpenAIAdapter({ baseUrl: 'http://x/v1', fetchImpl: fakeFetch('', false, 500) });
@@ -65,7 +65,7 @@ describe('createOpenAIAdapter', () => {
     const a = createOpenAIAdapter({ baseUrl: 'http://x/v1', fetchImpl: fakeFetch(sse) });
     const evs = await drain(a, req);
     expect(evs).toContainEqual({ type: 'tool-call', id: 'call_9', name: 'read_file', args: { path: 'y' } });
-    expect(evs[evs.length - 1]).toEqual({ type: 'done' });
+    expect(evs[evs.length - 1]).toEqual({ type: 'done', stopReason: 'stop' });
   });
   it('flushes accumulated tool-calls when the stream ends with no finish_reason at all', async () => {
     const sse =

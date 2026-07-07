@@ -6,7 +6,15 @@
 
 import { render } from 'ink';
 import { ReplApp, ReplErrorBoundary, type ConfirmTrigger, type ToolSink, type ToolInfo } from './app.js';
-import { resolveNativeProvider } from './native-transport.js';
+import {
+  resolveNativeProvider,
+  resolveNativeSelection,
+  resolveContextBudgetTokens,
+  inferNativeProviderForModel,
+  type NativeTransportConfig,
+  type ProviderError,
+} from './native-transport.js';
+import { loadDeckSecrets } from '../../core/deck-file.js';
 import { buildNativeToolRegistry } from './native-tool-registry.js';
 import { createNativeEngine, resolveCostCeilingUsd } from './native-agent-bridge.js';
 import { buildTurnRecorder } from './trace-wire.js';
@@ -36,6 +44,16 @@ import { createLocalRpcTransport, buildReplRpcHandlers, runRpcDebugCommand } fro
 import { probeSubscriptionLimits } from '../../core/limit-preflight.js';
 
 const EXEC_TOOLS = new Set(['deckent_write_file', 'deckent_read_file', 'deckent_edit_file', 'deckent_bash']);
+
+/** Localize a native-transport resolution failure by its errorCode
+ *  ('native.switch.<code>' message keys); unknown codes fall back to the
+ *  mechanism's English default sentence. */
+function localizeNativeError(err: ProviderError, lang: string): string {
+  if (!err.errorCode) return err.error;
+  const key = `native.switch.${err.errorCode}`;
+  const localized = getMessage(key, lang, { provider: err.provider ?? '', detail: err.detail ?? '' });
+  return localized === key ? err.error : localized;
+}
 
 /** Rebuilds a provider adapter for a selection (entry.ts passes buildReplProvider). */
 export type ProviderRebuild = (sel: ActiveSelection) => ChatProviderAdapter;
@@ -354,15 +372,28 @@ export async function runInkRepl(
   // config `terminal.native_agent: false` (see isNativeAgentSelected above).
   type NativeEngineType = ((input: string, cbs: { output: (t: string) => void; onTurnEnd: (s: { inputTokens: number; outputTokens: number }) => void }) => Promise<void>) | undefined;
   let nativeEngine: NativeEngineType;
+  // Live native selection + the runtime switch (2026-07-07 incident fix): the
+  // engine reads adapter/model/budget through getters, so /model — /provider
+  // swap the REAL backend mid-session (transcript preserved). Before this, the
+  // switch only rebuilt the unused legacy proxy while the engine stayed pinned
+  // to its boot adapter — "geçildi: claude · fable" was a false positive.
+  let nativeSwitch: ((sel: Partial<ActiveSelection>) => ActiveSelection & { switchError?: string }) | undefined;
+  let nativeSelection: ActiveSelection | undefined;
   if (isNativeAgentSelected(process.argv.slice(2), projectCfg)) {
     const cfg = await loadConfig().catch(() => ({} as Record<string, unknown>));
-    const resolved = resolveNativeProvider(process.env, {
+    const nativeCfg: NativeTransportConfig = {
       openai_base_url: (cfg as { openai_base_url?: string }).openai_base_url,
       ollama_host: (cfg as { ollama_host?: string }).ollama_host,
+      native_provider: (cfg as { native_provider?: string }).native_provider,
       native_model: (cfg as { native_model?: string }).native_model,
-    });
+      native_context_tokens: (cfg as { native_context_tokens?: number }).native_context_tokens,
+    };
+    // .deck secrets (ADR-G-005) — credential source for API-backed transports;
+    // documented precedence: .deck over env.
+    const deckSecrets = loadDeckSecrets(process.cwd());
+    const resolved = resolveNativeProvider(process.env, nativeCfg, deckSecrets);
     if ('error' in resolved) {
-      process.stdout.write(`\n${resolved.error}\n`);
+      process.stdout.write(`\n${localizeNativeError(resolved, lang)}\n`);
     } else {
       let mcpBridge: import('./native-tool-registry.js').NativeMcpBridge | undefined;
       try {
@@ -375,13 +406,41 @@ export async function runInkRepl(
         if (connected.length > 0) mcpBridge = bridge as unknown as import('./native-tool-registry.js').NativeMcpBridge;
       } catch { /* MCP optional — REPL stays usable */ }
 
+      // Mutable backend the engine reads per turn (via the getters below).
+      const live = { adapter: resolved.adapter, model: resolved.model, provider: resolved.providerName };
+      nativeSelection = { provider: live.provider, model: live.model };
+      nativeSwitch = (sel) => {
+        // A bare `/model <id>` may imply a provider change (`/model fable` on
+        // ollama → a claude attempt) — infer it only from unambiguous ids, so
+        // the switch is refused honestly (e.g. missing claude key) instead of
+        // shipping a foreign model id at the current provider.
+        const impliedProvider = sel.provider === undefined && sel.model
+          ? inferNativeProviderForModel(sel.model)
+          : null;
+        const target = {
+          provider: sel.provider ?? impliedProvider ?? live.provider,
+          model: sel.model !== undefined ? sel.model : live.model,
+        };
+        const next = resolveNativeSelection(target, { env: process.env, config: nativeCfg, secrets: deckSecrets });
+        if ('error' in next) {
+          return { provider: live.provider, model: live.model, switchError: localizeNativeError(next, lang) };
+        }
+        live.adapter = next.adapter;
+        live.model = next.model;
+        live.provider = next.providerName;
+        nativeSelection = { provider: live.provider, model: live.model };
+        return { provider: live.provider, model: live.model };
+      };
+
       // Local-only training-trace recorder (SP-2) — opt-out via DECKENT_TRACE=0.
+      // Model is a getter: the trace stamps the model that ACTUALLY served the
+      // turn, not the boot-time one.
       const recordTurn = buildTurnRecorder({
         enabled: process.env['DECKENT_TRACE'] !== '0',
         dir: join(process.cwd(), '.deckent', 'traces'),
         sessionId: sessionId ?? `native-${Date.now()}`,
         system: composeSystemPrompt({ cwd: process.cwd(), lang: lang as 'en' | 'tr' }),
-        model: resolved.model,
+        model: () => live.model,
         now: () => new Date().toISOString(),
       });
       const costCeilingUsd = resolveCostCeilingUsd(process.env, cfg as { native_cost_ceiling_usd?: unknown });
@@ -390,6 +449,9 @@ export async function runInkRepl(
         registry: buildNativeToolRegistry({ cwd: () => process.cwd(), ...(mcpBridge ? { mcpBridge } : {}) }),
         cwd: process.cwd(),
         model: resolved.model,
+        getAdapter: () => live.adapter,
+        getModel: () => live.model,
+        getContextBudgetTokens: () => resolveContextBudgetTokens(live.provider, nativeCfg),
         lang: lang as 'en' | 'tr',
         confirm: (summary, toolName) => (confirmTrigger ? confirmTrigger(summary, toolName) : Promise.resolve('n')),
         toolSink: (info) => { if (toolSink) toolSink(info); },
@@ -413,11 +475,17 @@ export async function runInkRepl(
     <ReplApp
       provider={switcher.proxy}
       dispatcher={dispatcher}
-      providerName={providerName}
+      providerName={nativeSelection?.provider ?? providerName}
       cwd={process.cwd()}
       slashRegistry={buildSlashRegistry()}
-      initialSelection={switcher.current()}
-      onSwitch={(sel) => { switcher.switchTo(sel); return switcher.current(); }}
+      initialSelection={nativeSelection ?? switcher.current()}
+      onSwitch={(sel) => {
+        // Native engine active → the switch must retarget the REAL backend the
+        // turns run on (the legacy proxy is unused there). Legacy path unchanged.
+        if (nativeSwitch) return nativeSwitch(sel);
+        switcher.switchTo(sel);
+        return switcher.current();
+      }}
       onApprovalMode={(m) => { approvalMode = m; }}
       {...(memory ? { memory } : {})}
       {...(sessionId ? { sessionId } : {})}
@@ -437,6 +505,15 @@ export async function runInkRepl(
         queueCleared: t('tui.queue_cleared'),
         cdTo: t('tui.cd_to'),
         cdFail: t('tui.cd_fail'),
+        // Mode badge (Ask/Run/Control) — previously unwired, so the badge
+        // stayed English even in a TR session; localized here (i18n-first).
+        modeAsk: t('tui.mode_ask'),
+        modeRun: t('tui.mode_run'),
+        modeControl: t('tui.mode_control'),
+        // `/term` dispatch lines (app.tsx substitutes {mode}/{approval}).
+        termSwitched: t('tui.term_switched'),
+        termStatus: t('tui.term_status'),
+        termUsage: t('tui.term_usage'),
       }}
       registerConfirm={(trigger) => { confirmTrigger = trigger; }}
       registerToolSink={(sink) => { toolSink = sink; }}

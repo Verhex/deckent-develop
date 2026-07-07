@@ -28,7 +28,7 @@ describe('createAnthropicAdapter', () => {
     const evs = await drain(a, req);
     expect(evs).toContainEqual({ type: 'text-delta', text: 'Hi' });
     expect(evs).toContainEqual({ type: 'usage', inputTokens: 5, outputTokens: 3 });
-    expect(evs[evs.length - 1]).toEqual({ type: 'done' });
+    expect(evs[evs.length - 1]).toEqual({ type: 'done', stopReason: 'stop' });
   });
   it('accumulates a tool_use block from input_json_delta fragments', async () => {
     const sse =

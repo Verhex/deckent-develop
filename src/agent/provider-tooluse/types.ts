@@ -34,7 +34,13 @@ export interface ProviderRequest {
 export interface ProviderTextDelta { type: 'text-delta'; text: string; }
 export interface ProviderToolCall { type: 'tool-call'; id: string; name: string; args: Record<string, unknown>; }
 export interface ProviderUsage { type: 'usage'; inputTokens: number; outputTokens: number; }
-export interface ProviderDone { type: 'done'; }
+/** Normalized end-of-stream stop cause. 'length' = the backend cut generation at
+ *  its token/context ceiling (OpenAI `finish_reason:'length'`, Anthropic
+ *  `stop_reason:'max_tokens'`) — the loop surfaces this as an honest truncation
+ *  signal instead of letting the turn complete silently. Adapters that cannot
+ *  know the cause omit it; the loop then treats the stream as a plain stop. */
+export type ProviderStopReason = 'stop' | 'length' | 'tool_calls';
+export interface ProviderDone { type: 'done'; stopReason?: ProviderStopReason; }
 export type ProviderEvent = ProviderTextDelta | ProviderToolCall | ProviderUsage | ProviderDone;
 
 /** Every LLM backend (Anthropic/OpenAI-compat/Ollama) implements this. */
