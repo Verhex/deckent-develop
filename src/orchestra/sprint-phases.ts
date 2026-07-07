@@ -559,7 +559,7 @@ export function buildBrainEvaluationReason(
 /**
  * Sprint 207 P1-2 (forensic Sprint 206): persist Brain's verdict back to a
  * task's `.result` file. Until this existed the Brain decision lived only in
- * the audit ledger (`.deckent/evaluations/*.json`); inspecting a `.result`
+ * the audit ledger (`.deckent/runtime/evaluations/*.json`); inspecting a `.result`
  * showed the worker's self-claim ("DONE") with no trace of WHY a FIX was
  * spawned — the exact observability gap that made the Sprint 206 false-FIX
  * cascade hard to see. `brainEvaluation` + `brainEvaluationReason` are
@@ -571,7 +571,7 @@ export function buildBrainEvaluationReason(
  * closing the `-fix.result` format-inconsistency (a fix-result previously
  * carried no Brain verdict). The shared function guarantees the two phases
  * produce an identical block rather than copy-paste drifting. `rubricScores`
- * stay intentionally audit-only (written separately to `.deckent/evaluations/`
+ * stay intentionally audit-only (written separately to `.deckent/runtime/evaluations/`
  * via {@link writeEvaluationAudit}) and are deliberately NOT mirrored here.
  *
  * Fail-soft & non-blocking: a missing `.result` is a silent no-op; any
@@ -1814,7 +1814,7 @@ export async function runEvaluatePhase(
         // Sprint 161 Task 2 (T-003): per-task forensic audit record.
         // Joins the rubric outcome with the task's rubric definition
         // (for threshold + weight) and writes a JSON file under
-        // .deckent/evaluations/<sprintId>/<taskId>-attempt-1.json.
+        // .deckent/runtime/evaluations/<sprintId>/<taskId>-attempt-1.json.
         // 352-003: shared writer — see writeTaskEvaluationAudit doc comment
         // for why this can no longer be an inline block local to this branch.
         writeTaskEvaluationAudit(projectRoot, sprint.id, task, evaluation, rubricResult);

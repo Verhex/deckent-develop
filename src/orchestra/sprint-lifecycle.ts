@@ -421,7 +421,7 @@ export function cleanup(
     } catch (e) { debugLog('cleanup:archivePromptFiles', e); }
   }
 
-  // Clean up decision trail files from .deckent/decisions/
+  // Clean up decision trail files from .deckent/runtime/decisions/
   const decisionsDir = join(projectRoot, DECISIONS_LOG_DIR);
   if (existsSync(decisionsDir)) {
     for (const file of readdirSync(decisionsDir)) {
