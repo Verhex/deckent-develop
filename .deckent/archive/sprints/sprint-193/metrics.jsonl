@@ -1,5 +1,0 @@
-{"type":"metric","name":"wave.start","value":0,"tags":{"wave":"dep-pipeline","count":"1","sprintId":"sprint-193"},"timestamp":"2026-05-24T14:05:32.370Z"}
-{"type":"metric","name":"collect.batch","value":1,"tags":{"duration_ms":"2","sprintId":"sprint-193"},"timestamp":"2026-05-24T14:05:41.021Z"}
-{"type":"trace","operation":"wait_results","durationMs":4999.55,"success":true,"timestamp":"2026-05-24T14:05:41.021Z"}
-{"type":"metric","name":"config.cache","value":1,"tags":{"result":"miss","sprintId":"sprint-193"},"timestamp":"2026-05-24T14:05:41.026Z"}
-{"type":"metric","name":"wave.start","value":0,"tags":{"wave":"dep-pipeline","count":"1","sprintId":"sprint-193"},"timestamp":"2026-05-24T14:05:41.128Z"}

@@ -1,9 +1,0 @@
-{
-  "taskId": "179-011",
-  "workerId": "w-179-011",
-  "sprintId": "sprint-179",
-  "reason": "grace_period_timeout",
-  "timestamp": "2026-05-20T13:18:00.597Z",
-  "blocked": true,
-  "details": "Worker had heartbeat but failed to write result within grace period"
-}

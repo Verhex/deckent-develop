@@ -1,4 +1,0 @@
-{"type":"metric","name":"wave.start","value":0,"tags":{"wave":"dep-pipeline","count":"1","sprintId":"sprint-187"},"timestamp":"2026-05-22T13:07:55.484Z"}
-{"type":"metric","name":"result.collected","value":1,"tags":{"taskId":"187-001","sprintId":"sprint-187"},"timestamp":"2026-05-22T13:09:38.494Z"}
-{"type":"metric","name":"collect.batch","value":1,"tags":{"duration_ms":"1","sprintId":"sprint-187"},"timestamp":"2026-05-22T13:09:38.495Z"}
-{"type":"trace","operation":"wait_results","durationMs":101472.85,"success":true,"timestamp":"2026-05-22T13:09:38.495Z"}
