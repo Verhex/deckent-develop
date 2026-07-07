@@ -39,7 +39,10 @@ function readJsonSafe(path) {
 
 /** Load one sprint's archived task JSON + `.result` files. Returns null if the archive dir is missing. */
 export function loadSprintArchive(archiveDir, sprintNum) {
-  const dir = join(archiveDir, `sprint-${sprintNum}-tasks`);
+  // W7: yeni-düzen archive/sprints/ önce, eski düz-yerleşim fallback.
+  const dir = join(existsSync(join(archiveDir, 'sprints', `sprint-${sprintNum}-tasks`))
+    ? join(archiveDir, 'sprints')
+    : archiveDir, `sprint-${sprintNum}-tasks`);
   if (!existsSync(dir)) return null;
 
   const files = readdirSync(dir);

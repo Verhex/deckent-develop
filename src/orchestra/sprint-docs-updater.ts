@@ -8,7 +8,7 @@ import type {
   TaskResult, Sprint, SprintMetrics, ResolvedConfig, SprintResult,
 } from '../core/types.js';
 import {
-  BRAIN_DIR, SPRINTS_DIR, ARCHIVE_DIR, SPRINT_LOG_MAX_LINES,
+  BRAIN_DIR, SPRINTS_DIR, ARCHIVE_DIR, ARCHIVE_SPRINTS_SUBDIR, ARCHIVE_DIRECTIVES_SUBDIR, SPRINT_LOG_MAX_LINES,
   DECISIONS_FILE, DIRECTIVES_FILE,
 } from '../core/constants.js';
 import { runAllUpdaters } from './doc-updaters/registry.js';
@@ -385,7 +385,7 @@ export function archiveDirectives(
     return;
   }
   const directivesPath = join(projectRoot, DIRECTIVES_FILE);
-  const archiveDir = join(projectRoot, BRAIN_DIR, ARCHIVE_DIR);
+  const archiveDir = join(projectRoot, BRAIN_DIR, ARCHIVE_DIR, ARCHIVE_DIRECTIVES_SUBDIR);
 
   if (!existsSync(directivesPath)) {
     debugLog('archiveDirectives', `${DIRECTIVES_FILE} not found — skipping`);
@@ -557,7 +557,7 @@ export function archiveOrphanTasks(projectRoot: string, sprintId: string): numbe
     return 0;
   }
 
-  const archiveDir = join(projectRoot, BRAIN_DIR, ARCHIVE_DIR, `${sprintId}-tasks`);
+  const archiveDir = join(projectRoot, BRAIN_DIR, ARCHIVE_DIR, ARCHIVE_SPRINTS_SUBDIR, `${sprintId}-tasks`);
   mkdirSync(archiveDir, { recursive: true });
 
   let count = 0;

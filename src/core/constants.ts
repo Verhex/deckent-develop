@@ -76,6 +76,11 @@ export const RETRO_FILE = 'RETRO.md' as const;
 export const PROJECT_IDENTITY_FILE = 'PROJECT-IDENTITY.md' as const;
 export const SPRINTS_DIR = 'sprints' as const;
 export const ARCHIVE_DIR = 'archive' as const;
+// W7-temizlik (Alperen, 2026-07-07): .brain/archive iki alt-klasöre ayrıldı —
+// sprint-task arşivleri `archive/sprints/`, DIRECTIVES kopyaları `archive/directives/`.
+// Okuyucular geriye-uyum için eski düz-yerleşimi de tarar (mevcut kullanıcı-projeleri).
+export const ARCHIVE_SPRINTS_SUBDIR = 'sprints' as const;
+export const ARCHIVE_DIRECTIVES_SUBDIR = 'directives' as const;
 
 // ─── Agent Files ─────────────────────────────────────────────────────
 export const AGENTS_FILE = 'AGENTS.md' as const;

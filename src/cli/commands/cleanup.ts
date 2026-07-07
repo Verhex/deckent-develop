@@ -203,7 +203,7 @@ export function registerCleanup(program: Command): void {
         const archiveSprintId = sprintId ?? `sprint-${sprintNumber || Date.now()}`;
 
         // §2.4 — Archive .log files with byte-verify before live delete; archive-fail → live-RETAIN
-        const logArchiveDir = join(root, BRAIN_DIR, ARCHIVE_DIR, `${archiveSprintId}-tasks`);
+        const logArchiveDir = join(root, BRAIN_DIR, ARCHIVE_DIR, 'sprints', `${archiveSprintId}-tasks`);
         const logFilesToRestore: Array<[string, Buffer]> = [];
         if (existsSync(tasksDir)) {
           for (const lf of (readdirSync(tasksDir) as string[]).filter(n => n.endsWith('.log'))) {

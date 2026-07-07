@@ -2502,7 +2502,7 @@ export function cleanupOrphanHBs(
   }
 
   // Prepare archive directory: .brain/archive/{sprintId}-orphan-hb/
-  const archiveDir = join(projectRoot, BRAIN_DIR, ARCHIVE_DIR, `${sprintId}-orphan-hb`);
+  const archiveDir = join(projectRoot, BRAIN_DIR, ARCHIVE_DIR, 'sprints', `${sprintId}-orphan-hb`);
   try {
     mkdirSync(archiveDir, { recursive: true });
   } catch {

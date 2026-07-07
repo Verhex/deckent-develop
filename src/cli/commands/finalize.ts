@@ -71,7 +71,9 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string): {
   const sprintId = sprintFilter ?? tasks[0]?.sprintId ?? 'sprint-unknown';
 
   // Merge archived task JSONs (.tasks/ wins on id collision)
-  const archiveTasksDir = join(root, BRAIN_DIR, 'archive', `${sprintId}-tasks`);
+  // W7: yeni-düzen önce, eski düz-yerleşim fallback.
+  const archiveNewDir = join(root, BRAIN_DIR, 'archive', 'sprints', `${sprintId}-tasks`);
+  const archiveTasksDir = existsSync(archiveNewDir) ? archiveNewDir : join(root, BRAIN_DIR, 'archive', `${sprintId}-tasks`);
   const archiveDirExists = sprintId !== 'sprint-unknown' && existsSync(archiveTasksDir);
   if (archiveDirExists) {
     const archivedTaskFiles = readdirSync(archiveTasksDir).filter(f => f.startsWith('task-') && f.endsWith('.json'));

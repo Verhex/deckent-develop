@@ -274,7 +274,7 @@ export function detectOrphan(root: string, sprintId: string): OrphanInfo | null 
  * Moves PID file, snapshot, and sprint state to the archive directory.
  */
 export function archiveOrphan(root: string, orphan: OrphanInfo): void {
-  const archiveDir = join(root, BRAIN_DIR, 'archive');
+  const archiveDir = join(root, BRAIN_DIR, 'archive', 'sprints');
   mkdirSync(archiveDir, { recursive: true });
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');

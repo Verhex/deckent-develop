@@ -2321,11 +2321,13 @@ export function classifyHonestyViolation(
  */
 export function archivedResultExists(projectRoot: string, taskId: string): boolean {
   try {
-    const archiveRoot = join(projectRoot, BRAIN_DIR, ARCHIVE_DIR);
-    if (!existsSync(archiveRoot)) return false;
-    for (const dir of readdirSync(archiveRoot)) {
-      if (!dir.endsWith('-tasks')) continue;
-      if (existsSync(join(archiveRoot, dir, `task-${taskId}.result`))) return true;
+    // W7: yeni-düzen archive/sprints/ önce, eski düz-yerleşim fallback (geriye-uyum).
+    for (const base of [join(projectRoot, BRAIN_DIR, ARCHIVE_DIR, 'sprints'), join(projectRoot, BRAIN_DIR, ARCHIVE_DIR)]) {
+      if (!existsSync(base)) continue;
+      for (const dir of readdirSync(base)) {
+        if (!dir.endsWith('-tasks')) continue;
+        if (existsSync(join(base, dir, `task-${taskId}.result`))) return true;
+      }
     }
     return false;
   } catch {

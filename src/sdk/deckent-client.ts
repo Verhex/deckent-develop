@@ -280,7 +280,9 @@ class DeckentClientImpl implements DeckentClient {
       return { sprintId, tasks: live.tasks, results: live.results, source: 'live' };
     }
 
-    const archiveDir = join(this.projectRoot, BRAIN_DIR, ARCHIVE_DIR, `${sprintId}-tasks`);
+    // W7: yeni-düzen önce, eski düz-yerleşim fallback (geriye-uyum).
+    const archiveNew = join(this.projectRoot, BRAIN_DIR, ARCHIVE_DIR, 'sprints', `${sprintId}-tasks`);
+    const archiveDir = existsSync(archiveNew) ? archiveNew : join(this.projectRoot, BRAIN_DIR, ARCHIVE_DIR, `${sprintId}-tasks`);
     const archived = readTaskAndResultFiles(archiveDir, prefix);
     if (archived.tasks.length > 0 || archived.results.length > 0) {
       return { sprintId, tasks: archived.tasks, results: archived.results, source: 'archive' };
