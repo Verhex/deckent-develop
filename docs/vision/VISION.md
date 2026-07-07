@@ -121,7 +121,7 @@ This is where Deckent becomes a fully autonomous multi-agent development platfor
 | Metrik | Değer |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-378 |
+| Sprint | sprint-379 |
 | MCP Tools | 46 |
 | MCP Resources | 8 |
 | CLI Commands | 69+ |
@@ -133,12 +133,12 @@ This is where Deckent becomes a fully autonomous multi-agent development platfor
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-378 |
+| Sprint | sprint-379 |
 | Toplam Task | 3 |
 | Tamamlanan | 3 |
-| Tech Debt | 2 |
+| Tech Debt | 3 |
 | No-Go | 0 |
-| Süre | 24dk 41sn |
+| Süre | 18dk 42sn |
 | Coverage | N/A |
 
 ## Sprint History

@@ -51,6 +51,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-379 Learnings** (sprint-379): ## Sprint sprint-379 Learnings
+- DOCS-NUM-TRUTH — README/DECKENT sayı-ve-dil doğruluğu: GO_WITH_TECH_DEBT — Ground-tr...
 - **Sprint sprint-378 Learnings** (sprint-378): ## Sprint sprint-378 Learnings
 - RUN-CLI-ALIAS — `deckent run` çatı-komutu + sprint-alias: GO_WITH_TECH_DEBT — Conver...
 - **Sprint sprint-377 Learnings** (sprint-377): ## Sprint sprint-377 Learnings
@@ -71,8 +73,6 @@
 - CATALOG-MATERIALIZE — builtin 3+3'ü pool-görünür yap (370-003 kapanışı): GO_WITH_TEC...
 - **Sprint sprint-370 Learnings** (sprint-370): ## Sprint sprint-370 Learnings
 - DOCS-FEATURES-5 — computer-use + connect-auth + panel feature-doc'ları: GO_WITH_TECH...
-- **Sprint sprint-369 Learnings** (sprint-369): ## Sprint sprint-369 Learnings
-- DOCTOR-FOLLOWUPS — checkTmux win32 etiketi + 368-002 debt-süpürme: GO_WITH_TECH_DEBT...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -129,5 +129,6 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: doc_sync_ground_truth_mismatch
+- Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 1006 | Generated: 2026-07-06_
+_Total entries: 1013 | Generated: 2026-07-07_

@@ -3,11 +3,9 @@
 ## Identity
 @.deckent/workspace/IDENTITY.md
 
-## 🧭 Aktif Yön (2026-06-29 pivot — Hermes-vs-Deckent analiz turu)
-İş-planı SSOT: `docs/MASTER-PLAN.md` (tek pillar-tablo; eski hali `docs/archive/MASTER-PLAN-archived-2026-06-29.md`). Yön detayı: `.analysis/hermes-vs-deckent-direction-decisions.md`.
-- **Terminal** = ana yönetim+kullanım yüzeyi (tool-driven, derin, full-control+yormayan); iş CLI değil terminalden (CLI/MCP opsiyonel). **Dashboard** = yalnız izleme.
-- **P0:** training-trace WIRE · runtime-wide ApprovalBroker (çok-ortam canlı onay) · Hermes-rol-model tool + progressive disclosure · global-install+proje-scope · DIRECTIVES 0-kırılganlık.
-- **Koru (yeniden-yazma YOK):** deterministik 8-faz eval-backed orchestration · kapalı outcome→routing→promotion öğrenme · governance-by-construction.
+> **Aktif yön kararları taşındı** — bu iç-pivot notu artık `.analysis/hermes-vs-deckent-direction-decisions.md`
+> içinde tutuluyor (CLAUDE.md operating_rules'ta da özetlenir); DECKENT.md yalnız mekanik/işlevsel
+> referans kalır, tekrar-eden iç-strateji notu barındırmaz.
 
 ## Rules
 - Brain is the ONLY orchestrator — workers never plan
@@ -20,19 +18,19 @@
 - Default: Claude (docker backend, session auth)
 - Optional: Codex (set OPENAI_API_KEY), Gemini (set GOOGLE_API_KEY)
 - Config: brain_provider, worker_provider, fallback_provider in .deckent/config.json
-- Model Registry: 13 models, 3 providers, 4 tiers — single source of truth (model-registry.ts)
+- Model Registry: 14 models, 3 providers, 4 tiers — single source of truth (model-registry.ts)
 - Tier equivalence: premium_plus (o3, gemini-3.1-pro-preview), premium (opus↔gpt-5↔gemini-2.5-pro), standard (sonnet↔gpt-4.1↔o4-mini↔gemini-2.5-flash), economy (haiku↔gpt-5-mini↔gpt-4.1-mini↔gemini-2.0-flash)
 - Provider-agnostic config: brain_tier/worker_tier instead of model names
 - Planning mode: brain_planning = 'ai' | 'structured' | 'auto'
 
 ## Agents & Skills
-- 15 built-in agents + 21 built-in skills — tam listeler (aktivasyon anahtar kelimeleriyle) aşağıdaki **Built-in Agents (15)** / **Built-in Skills (21)** bölümlerinde (tek-kaynak; burada tekrarlanmaz).
+- 20 built-in agents + 31 built-in skills (src/core/builtins/{agents,skills} — canlı-sayım kaynağı) — aşağıdaki **Built-in Agents** / **Built-in Skills** bölümleri örnek/temsili bir alt-küme gösterir; tam liste `docs/reference/agents.md` + `src/core/builtins/skills/`.
 - Agent pool: .deckent/agents/*/agent.json — LRU eviction (max 50 temp, 5 sprint age)
 - Skill registry: .deckent/skills/*/skill.json — AST sandbox validation
 - Task routing: task-router.ts assigns agent + skills + provider per task
 
 ## MCP Integration
-- 35 tools: init, set_directives, plan, start, status, doctor, retro, history, analyze_project, sync, config, review, run, kill, cleanup, help, agent_list, skill_list, checkpoint, docs, explain, **memory_query**, watch, feature_query, audit, recover, **autonomous**, **models**, nervous_subscribe, nervous_accept, nervous_reject, nervous_status, nervous_config, usage, **process**
+- 46 tools — canlı/tam liste `docs/reference/mcp-tools.md` (AUTOGEN, `npm run docs:ref`); örnekler: init, set_directives, plan, start, status, doctor, retro, history, sync, config, review, run, kill, cleanup, help, **memory_query**, **autonomous**, **models**, nervous_subscribe, nervous_accept, nervous_reject, nervous_status, nervous_config, **process**, vb.
 - 8 resources: dashboard, directives, memory, debt, config, retro, tasks, agents
 - Canonical tool list is auto-generated — see `docs/reference/mcp-tools.md` (`npm run docs:ref`)
 - Registration: `claude mcp add deckent -- npx deckent-mcp`
@@ -150,7 +148,7 @@ hangi fonksiyonlar eklenecek/degistirilecek, neden gerekli oldugunu belirt.
 
 ---
 
-## Sprint Lifecycle — Sprint Yasam Dongusu
+## Sprint Lifecycle — Sprint Yasam Dongusu (run, eskiden "sprint")
 
 Bir sprint 8 fazdan olusur:
 
@@ -173,8 +171,8 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 
 ## MCP Tool Reference — MCP Arac Referansi
 
-> **Tam araç listesi (35 araç) koddan otomatik türetilir — bkz. `docs/reference/mcp-tools.md`** (`npm run docs:ref`).
-> Eskiden burada duran el-yazımı tablo **drift etmişti** (33 vs 35); canonical generated referans tek-kaynaktır.
+> **Tam araç listesi (46 araç) koddan otomatik türetilir — bkz. `docs/reference/mcp-tools.md`** (`npm run docs:ref`).
+> Eskiden burada duran el-yazımı tablo **drift etmişti** (33 vs 35 vs 46); canonical generated referans tek-kaynaktır.
 > Araç adları yukarıdaki `## MCP Integration` bölümünde listelenir; somut parametre örnekleri aşağıdadır.
 
 ### Parametre Ornekleri
@@ -349,7 +347,7 @@ tsc
 
 ---
 
-## Built-in Agents (15)
+## Built-in Agents (örnek — toplam 20, tam liste: `docs/reference/agents.md`)
 
 > ADR-041 (Sprint 166 reconfirmed): Tüm testing agent'ları kaldırıldı — test görevi task-bazlı yönetiliyor.
 
@@ -371,7 +369,7 @@ tsc
 | `frontend-designer` | UI/UX, component tasarimi, responsive | frontend/ui/design anahtar kelimeleri |
 | `migration-specialist` | Versiyon gecisi, framework migration | migration/upgrade/deprecation anahtar kelimeleri |
 
-## Built-in Skills (21)
+## Built-in Skills (örnek — toplam 31, tam liste: `src/core/builtins/skills/`)
 
 | Skill | Aciklama |
 |-------|----------|

@@ -9,6 +9,9 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-379-001 | Tech debt from 379-001: Ground-truth note: the rendered 'Scope Rules' section of | normal | sprint-379 | resolved |
+| debt-379-002 | Tech debt from 379-002: Measured (real, not assumed): npm pack --dry-run --json  | normal | sprint-379 | resolved |
+| debt-379-003 | Tech debt from 379-003: Root cause CONFIRMED with disk evidence + a real (non-mo | normal | sprint-379 | resolved |
 | debt-378-001 | Tech debt from 378-001: Converted `run <description>` to `.command('run').argume | normal | sprint-378 | resolved |
 | debt-378-003 | Tech debt from 378-003: Implemented RUN-MODE-BRIDGE without touching the deckent | normal | sprint-378 | resolved |
 | debt-377-001 | Tech debt from 377-001: Investigation first (per task instructions): src/cli/com | normal | sprint-377 | resolved |

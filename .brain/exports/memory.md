@@ -1,5 +1,11 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-379 Learnings
+- Sprint sprint-379 Learnings: ## Sprint sprint-379 Learnings
+- DOCS-NUM-TRUTH — README/DECKENT sayı-ve-dil doğruluğu: GO_WITH_TECH_DEBT — Ground-truth note: the rendered 'Scope Rules' section of my prompt only listed the two test-file paths, but .tasks/task-
+- PACK-SIZE — npm-paketi <5MB: GO_WITH_TECH_DEBT — Measured (real, not assumed): npm pack --dry-run --json => tarball 6,033,117 bytes (npm displays '6.0 MB', matches Gate 
+- DIRECTIVES-RESTORE-QUIRK — kapanışta eski-içeriğe dönme fix'i: GO_WITH_TECH_DEBT — Root cause CONFIRMED with disk evidence + a real (non-mocked) hermetic repro test (tests/orchestra/directives-restore-qu
+
 ## Sprint sprint-378 Learnings
 - Sprint sprint-378 Learnings: ## Sprint sprint-378 Learnings
 - RUN-CLI-ALIAS — `deckent run` çatı-komutu + sprint-alias: GO_WITH_TECH_DEBT — Converted `run <description>` to `.command('run').argument('<description>')` and added 4 nested subcommands (start/statu

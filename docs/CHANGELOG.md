@@ -2,6 +2,18 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint379] - 2026-07-07
+
+
+### Changed
+
+- DOCS-NUM-TRUTH — README/DECKENT sayı-ve-dil doğruluğu (completed with tech debt)
+- PACK-SIZE — npm-paketi <5MB (completed with tech debt)
+- DIRECTIVES-RESTORE-QUIRK — kapanışta eski-içeriğe dönme fix'i (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 3 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint378] - 2026-07-06
 
 ### Added

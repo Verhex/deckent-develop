@@ -7,7 +7,7 @@
 <p align="center"><strong>Describe what you want. Watch a team of AI agents build it — in parallel, with quality gates, on a budget you approve, remembering everything for next time.</strong></p>
 
 <!-- AUTOGEN:START id="badges" -->
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-28488%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![coverage](https://img.shields.io/badge/coverage-88.58%25-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-376%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-28587%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![coverage](https://img.shields.io/badge/coverage-88.58%25-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-380%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
 <!-- AUTOGEN:END id="badges" -->
 
 ---
@@ -125,7 +125,7 @@ deckent   claude   ~/my-project
 
 Side-effecting actions (write a file, run a command) ask before they run — once, or "always for this tool", your choice.
 
-### 2 — Structured sprints
+### 2 — Structured sprints (run, formerly "sprint")
 
 For real work, you write goals in `DIRECTIVES.md` and let a full sprint run. The simplest possible directive is just a goal and a task or two — deckent's router fills in the model, agent, and skills for you:
 
@@ -225,8 +225,8 @@ deckent is built to be watched, not to be a black box.
 - **Nervous System** — a proactive meta-orchestrator that watches for idle workers, routing anomalies, scope collisions, agent-health drops, and debt trends, and proposes action
 
 ### Agents & skills
-- **15 built-in agents** — security-auditor, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist
-- **21 built-in skills** — typescript-expert, testing-expert, react-specialist, security-specialist, docker-expert, python-expert, anthropic-sdk, and more
+- **20 built-in agents** — e.g. security-auditor, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner (full list: `docs/reference/agents.md`)
+- **31 built-in skills** — typescript-expert, testing-expert, react-specialist, security-specialist, docker-expert, python-expert, anthropic-sdk, and more
 - **Plugins** — drop a `manifest.json` + `SKILL.md` into `.deckent/plugins/` to add your own reusable capabilities
 
 ### Safety & quality
@@ -238,8 +238,8 @@ deckent is built to be watched, not to be a black box.
 
 ### Surfaces
 - **Interactive REPL** — `deckent` with markdown streaming, slash commands, and mid-session model/provider switching
-- **Web dashboard** — 16 pages (React + Vite + Tailwind): live status, workers, directives, memory explorer, debt, history, config, chat, nervous system, evolution, enterprise — plus an embedded web terminal (PTY over WebSocket, token-auth + audited)
-- **MCP server** — 35 tools + 8 resources over stdio, so any MCP client (Claude Code, Claude Desktop, …) can drive deckent
+- **Web dashboard** — 20 pages (React + Vite + Tailwind): live status, workers, directives, memory explorer, debt, history, config, chat, nervous system, evolution, enterprise — plus an embedded web terminal (PTY over WebSocket, token-auth + audited)
+- **MCP server** — 46 tools + 8 resources over stdio, so any MCP client (Claude Code, Claude Desktop, …) can drive deckent
 - **Autonomous engine** — a durable backlog with recurring (cron), one-off, and reactive triggers; deckent works a queue on its own
 - **Connectors** — Discord, Telegram, and WhatsApp for notifications and remote triggering
 - **Enterprise foundation** — multi-tenant isolation, audit query, OIDC/SSO dashboard login (RS256-pinned JWT, PKCE), role-based access, scheduled flows, and webhooks — all in the same MIT codebase, no gated edition
@@ -324,7 +324,7 @@ deckent ships an MCP server, so any MCP-compatible tool can drive it:
 claude mcp add deckent -- npx deckent-mcp     # any MCP client works the same way
 ```
 
-**35 tools + 8 resources** over stdio. → [docs/reference/mcp-guide.md](https://github.com/VerhexIO/deckent/blob/main/docs/reference/mcp-guide.md)
+**46 tools + 8 resources** over stdio. → [docs/reference/mcp-guide.md](https://github.com/VerhexIO/deckent/blob/main/docs/reference/mcp-guide.md)
 
 ---
 

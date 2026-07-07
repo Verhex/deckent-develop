@@ -9,7 +9,7 @@
 <p align="center"><strong>Ne istediğinizi anlatın. Bir AI agent ekibinin onu inşa edişini izleyin — paralel, kalite kapılarıyla, onayladığınız bir bütçeyle ve bir sonraki sefer için her şeyi hatırlayarak.</strong></p>
 
 <!-- AUTOGEN:START id="badges" -->
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-28488%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![coverage](https://img.shields.io/badge/coverage-88.58%25-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-376%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-28587%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![coverage](https://img.shields.io/badge/coverage-88.58%25-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-380%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
 <!-- AUTOGEN:END id="badges" -->
 
 ---
@@ -127,7 +127,7 @@ komutlar için /help · ya da yazmaya başlayın
 
 Yan-etkili eylemler (dosya yazma, komut çalıştırma) çalışmadan önce sorar — bir kez ya da "bu araç için her zaman", sizin seçiminiz.
 
-### 2 — Yapılandırılmış sprint'ler
+### 2 — Yapılandırılmış sprint'ler (run, eskiden "sprint")
 
 Gerçek iş için hedefleri `DIRECTIVES.md`'ye yazarsınız ve tam bir sprint koşmasına izin verirsiniz. Mümkün olan en basit directive yalnızca bir hedef ve bir-iki görevdir — deckent'in router'ı model, agent ve skill'leri sizin için doldurur:
 
@@ -240,8 +240,8 @@ deckent izlenmek için kuruldu, bir kara kutu olmak için değil.
 
 ### Yüzeyler
 - **Etkileşimli REPL** — markdown streaming, slash komutları ve oturum-ortası model/provider değiştirmeyle `deckent`
-- **Web paneli** — 16 sayfa (React + Vite + Tailwind): canlı durum, worker'lar, directives, memory explorer, borç, geçmiş, config, chat, nervous system, evolution, enterprise — artı gömülü bir web terminali (WebSocket üzeri PTY, token-auth + audit)
-- **MCP sunucusu** — stdio üzerinde 34 tool + 8 resource, böylece herhangi bir MCP istemcisi (Claude Code, Claude Desktop, …) deckent'i sürebilir
+- **Web paneli** — 20 sayfa (React + Vite + Tailwind): canlı durum, worker'lar, directives, memory explorer, borç, geçmiş, config, chat, nervous system, evolution, enterprise — artı gömülü bir web terminali (WebSocket üzeri PTY, token-auth + audit)
+- **MCP sunucusu** — stdio üzerinde 46 tool + 8 resource, böylece herhangi bir MCP istemcisi (Claude Code, Claude Desktop, …) deckent'i sürebilir
 - **Otonom motor** — recurring (cron), one-off ve reactive tetikleyicili kalıcı bir backlog; deckent bir kuyruğu kendi başına işler
 - **Connector'lar** — bildirim ve uzaktan-tetikleme için Discord, Telegram ve WhatsApp
 - **Enterprise temeli** — çok-tenant izolasyon, audit query, OIDC/SSO panel girişi (RS256-pinned JWT, PKCE), rol-tabanlı erişim, zamanlanmış akışlar ve webhook'lar — hepsi aynı MIT kod tabanında, gated edition yok
@@ -326,7 +326,7 @@ deckent bir MCP sunucusu sunar, böylece herhangi bir MCP-uyumlu araç onu süre
 claude mcp add deckent -- npx deckent-mcp     # herhangi bir MCP istemcisi aynı şekilde çalışır
 ```
 
-stdio üzerinde **34 tool + 8 resource**. → [docs/reference/mcp-guide.md](docs/reference/mcp-guide.md)
+stdio üzerinde **46 tool + 8 resource**. → [docs/reference/mcp-guide.md](docs/reference/mcp-guide.md)
 
 ---
 

@@ -78,11 +78,13 @@ const INTERNAL_STATE_PATTERNS = ['.deckent/', '.brain/', '.tasks/', '.locks/', '
 /**
  * Parse `npm pack --dry-run` output.
  * @param {string} output
- * @returns {{ files: string[], packageSize: string, packageSizeBytes: number, fileCount: number }}
+ * @returns {{ files: string[], fileSizes: Array<{ path: string, bytes: number }>, packageSize: string, packageSizeBytes: number, fileCount: number }}
  */
 export function parsePackOutput(output) {
   /** @type {string[]} */
   const files = [];
+  /** @type {Array<{ path: string, bytes: number }>} */
+  const fileSizes = [];
   let packageSize = '';
   let fileCount = 0;
   let inTarballContents = false;
@@ -91,20 +93,25 @@ export function parsePackOutput(output) {
     const line = rawLine.trim();
     if (!line) continue;
 
-    if (/=+\s*Tarball Contents\s*=+/i.test(line)) {
+    // Section header format varies by npm version: older npm wraps with "===",
+    // npm 11.x (currently installed: 11.12.1) prints the bare title with no
+    // decoration. Match both so the gate stays correct across the npm-version matrix.
+    if (/^npm notice\s*=*\s*Tarball Contents\s*=*\s*$/i.test(line)) {
       inTarballContents = true;
       continue;
     }
-    if (/=+\s*Tarball Details\s*=+/i.test(line)) {
+    if (/^npm notice\s*=*\s*Tarball Details\s*=*\s*$/i.test(line)) {
       inTarballContents = false;
       continue;
     }
 
     if (inTarballContents) {
-      // npm notice <size> <path>
-      const m = line.match(/npm notice\s+[\d.]+\s*[kKmMgG]?B?\s+(.+)/);
-      if (m && m[1] && !m[1].includes(':')) {
-        files.push(m[1].trim());
+      // npm notice <size><unit> <path> (e.g. "1.2kB dist/file.js", "787B dist/x.js")
+      const m = line.match(/npm notice\s+([\d.]+)\s*([kKmMgG]?B)\s+(.+)/);
+      if (m && m[3] && !m[3].includes(':')) {
+        const path = m[3].trim();
+        files.push(path);
+        fileSizes.push({ path, bytes: parseSizeToBytes(`${m[1]}${m[2]}`) });
       }
     }
 
@@ -121,10 +128,23 @@ export function parsePackOutput(output) {
 
   return {
     files,
+    fileSizes,
     packageSize,
     packageSizeBytes: parseSizeToBytes(packageSize),
     fileCount: fileCount || files.length,
   };
+}
+
+/**
+ * Rank parsed tarball entries by size, descending. Pure sort/slice utility used to
+ * surface the offenders behind a `pack_size_and_count` failure without re-running
+ * `npm pack` by hand.
+ * @param {Array<{ path: string, bytes: number }>} fileSizes
+ * @param {number} [limit]
+ * @returns {Array<{ path: string, bytes: number }>}
+ */
+export function rankLargestFiles(fileSizes, limit = 20) {
+  return [...fileSizes].sort((a, b) => b.bytes - a.bytes).slice(0, limit);
 }
 
 /**
@@ -173,7 +193,8 @@ export function extractMinNodeMajor(range) {
  * @returns {{ gate: string, ok: boolean, severity: 'info'|'warning'|'error', message: string }}
  */
 export function checkPackSizeAndCount(packOutput) {
-  const { packageSize, packageSizeBytes, fileCount } = parsePackOutput(packOutput);
+  const { packageSize, packageSizeBytes, fileCount, fileSizes } = parsePackOutput(packOutput);
+  const topOffenders = rankLargestFiles(fileSizes, 20);
 
   if (packageSizeBytes <= 0) {
     return {
@@ -181,6 +202,7 @@ export function checkPackSizeAndCount(packOutput) {
       ok: false,
       severity: 'error',
       message: 'Could not determine package size from npm pack output',
+      topOffenders,
     };
   }
 
@@ -195,6 +217,7 @@ export function checkPackSizeAndCount(packOutput) {
       ok: false,
       severity: 'error',
       message: `Package size ${packageSize} exceeds 5 MB limit (${packageSizeBytes} > ${MAX_PACK_BYTES} bytes)`,
+      topOffenders,
     };
   }
 
@@ -204,6 +227,7 @@ export function checkPackSizeAndCount(packOutput) {
       ok: false,
       severity: 'warning',
       message: `File count ${fileCount} far from target ${TARGET_FILE_COUNT} (tolerance ±${FILE_COUNT_TOLERANCE})`,
+      topOffenders,
     };
   }
 
@@ -212,6 +236,7 @@ export function checkPackSizeAndCount(packOutput) {
     ok: true,
     severity: 'info',
     message: `Pack ${packageSize} (${packageSizeBytes} bytes), ${fileCount} files (target ~${TARGET_FILE_COUNT})`,
+    topOffenders,
   };
 }
 
@@ -456,6 +481,60 @@ export function checkDashboardBundle(projectRoot) {
   };
 }
 
+// ─── Standalone diagnostic: critical files actually present in packed tarball ─────
+//
+// Distinct from checkEntryPoints (checks package.json *declares* main/types),
+// checkBinExecBits (checks the local disk build has bin files), and
+// checkDashboardBundle (checks the local disk build has a dashboard bundle): this
+// checks the PACKED tarball file list itself. A `.npmignore` / package.json "files"
+// edit aimed at shrinking pack size can silently exclude a file that is still
+// declared in package.json and still present on disk — this is the failure mode a
+// "surgical .npmignore narrowing" pass (like this task's own remit) must not
+// introduce. Exported standalone rather than added to GATES/runReadinessGates: those
+// are asserted at exactly 8 entries by tests outside this task's write scope.
+
+/**
+ * @param {string} packOutput
+ * @param {{ main?: string, types?: string }} pkg
+ * @returns {{ gate: string, ok: boolean, severity: 'info'|'warning'|'error', message: string, missing: string[] }}
+ */
+export function checkCriticalFilesInTarball(packOutput, pkg) {
+  const { files } = parsePackOutput(packOutput);
+  const normalize = (/** @type {string} */ p) => p.replace(/^\.\//, '');
+  const present = new Set(files.map(normalize));
+
+  /** @type {string[]} */
+  const required = [];
+  if (pkg?.main) required.push(normalize(pkg.main));
+  if (pkg?.types) required.push(normalize(pkg.types));
+  for (const bin of BIN_FILES) required.push(bin);
+
+  const missing = required.filter((p) => !present.has(p));
+
+  const hasDashboardHtml = present.has('dist/dashboard/index.html');
+  const hasDashboardJs = files.some((f) => /^dist\/dashboard\/assets\/index-.*\.js$/.test(normalize(f)));
+  if (!hasDashboardHtml) missing.push('dist/dashboard/index.html');
+  if (!hasDashboardJs) missing.push('dist/dashboard/assets/index-*.js');
+
+  if (missing.length > 0) {
+    return {
+      gate: 'critical_files_in_tarball',
+      ok: false,
+      severity: 'error',
+      message: `Critical file(s) absent from packed tarball (declared/expected but not packed): ${missing.join(', ')}`,
+      missing,
+    };
+  }
+
+  return {
+    gate: 'critical_files_in_tarball',
+    ok: true,
+    severity: 'info',
+    message: `All ${required.length + 2} critical files (entry/types/bin/dashboard) present in packed tarball`,
+    missing: [],
+  };
+}
+
 // ─── Aggregator ───────────────────────────────────────────────────────────
 
 /**
@@ -541,7 +620,7 @@ export function runCli(projectRoot) {
     projectRoot: root,
   });
 
-  return result;
+  return { ...result, packOutput: packResult.stdout, pkg };
 }
 
 const entryArg = process.argv[1] ?? '';
@@ -559,6 +638,18 @@ if (entryArg.endsWith('validate-publish.mjs')) {
           ? '\x1b[33mWARN\x1b[0m'
           : '\x1b[31mFAIL\x1b[0m';
     console.log(`  [${tag}] ${check.gate}: ${check.message}`);
+
+    if (check.gate === 'pack_size_and_count' && !check.ok && check.topOffenders?.length) {
+      console.log('    Top offenders (largest packed files):');
+      for (const f of check.topOffenders) {
+        console.log(`      ${(f.bytes / 1024).toFixed(1).padStart(9)} KB  ${f.path}`);
+      }
+    }
+  }
+
+  const criticalFiles = checkCriticalFilesInTarball(result.packOutput, result.pkg);
+  if (!criticalFiles.ok) {
+    console.log(`  [\x1b[31mFAIL\x1b[0m] ${criticalFiles.gate}: ${criticalFiles.message}`);
   }
 
   console.log(
@@ -566,5 +657,5 @@ if (entryArg.endsWith('validate-publish.mjs')) {
   );
   console.log(result.ok ? '\n  Beta launch READY.\n' : '\n  Beta launch BLOCKED — fix gates above.\n');
 
-  process.exit(result.ok ? 0 : 1);
+  process.exit(result.ok && criticalFiles.ok ? 0 : 1);
 }

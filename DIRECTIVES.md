@@ -1,67 +1,74 @@
-# DIRECTIVES — PUBLISH-P1P2: MISSION-VERDICT DÜRÜSTLÜĞÜ + DASHBOARD HIZLI-KAZANÇ (3 task)
+# DIRECTIVES — PUBLISH-P4: DOCS-DOĞRULUK + PACK-SIZE + RESTORE-QUIRK (3 task)
 
 ## Goal
-Publish-convergence ilk-dalga: mission-verdict eşlemesi dürüstleşir (DEBT≠fail), dashboard
-etkileşim-hissini bozan iki yapısal sorun (eager-bundle + polling-fırtınası) kapanır.
-HER task canlı-smoke kanıtlı. Yasa #1/#2/#3.
+Publish-gate'in kalan iki kırmızısının (pack-size, docs-sayı-kaosu) kapanması + DIRECTIVES-restore
+yan-etkisinin fix'i. HER task canlı-smoke kanıtlı. Yasa #1/#2/#3.
 
 ## 🔒 BAĞLAYICI
 - DISTINCT-FILE: sprint-planner/result-evaluator/sprint-phases/result-collector/sprint-controller/
   server.ts/config.ts KAPALI.
-- Hermetik test; i18n getMessage (dashboard: i18n/en+tr.ts); dashboard EMOJI YASAK (lucide).
-- Worker `notes` TEK STRING. Honest self-assessment.
+- **git stash/checkout/reset YASAK** (born-499 — worker-default kuralı; karşılaştırma `git show HEAD:`).
+- Hermetik test; i18n getMessage. Worker `notes` TEK STRING. Honest.
 
-## Task 1: MISSION-VERDICT-FIX — dürüst-DEBT fail sayılmaz
+## Task 1: DOCS-NUM-TRUTH — README/DECKENT sayı-ve-dil doğruluğu
 - Model: sonnet
 - Effort: high
+- Skills: doc-writing, typescript-expert
+- Files: README.md, README-TR.md, DECKENT.md, tests/docs/readme-number-truth.test.ts
+- Scope: ./, docs/, scripts/, src/
+- Dependencies: none
+- Smoke: node scripts/update-readme-stats.mjs --check → 0-drift && npm run lint:link → temiz
+### Description
+user-truth-audit §4 sayı-kaosu: README'de 35/37 tool + 15 agent + 21 skill + 16-vs-20 sayfa
+çelişkisi; DECKENT.md'de 35/15/21/13. GERÇEK (koddan): 46 tool (TOOL_CATALOG) · 20 agent · 31 skill ·
+14 model · 20 dashboard-sayfası · 79 registry-komutu. (1) Generator'ları koş (update-readme-stats +
+gen-reference-docs, --write) ve AUTOGEN-blok-dışı ELLE-yazılmış her bayat-sayıyı üç dosyada düzelt;
+(2) elle-satırları mümkünse AUTOGEN-bloklara bağla (drift bir daha olmasın); (3) başlık/özet
+cümlelerine RUN-köprü-dili ("run (formerly sprint)"); (4) DECKENT.md'nin iç-pivot-notu bölümünü
+(satır ~6-10) İÇ-doc'a taşı-notu ile kaldır (docs/analysis'e taşı). Test: üç dosyada bayat-sayı
+kalmadığını pin'leyen sayı-tutarlılık testi (kaynak=TOOL_CATALOG/builtins-sayımı — canlı-türetilmiş,
+hardcode-pin değil).
+### goNogo
+- goCriteria: --check 0-drift; sayı-tutarlılık testi yeşil; lint:link temiz; elle-bayat-sayı grep'i
+  boş (46/20/31/14 dışı eski-değerler yok).
+- nogo: docs/ gövde-yeniden-yazımı (yalnız sayı/dil-düzeltme + blok-bağlama).
+
+## Task 2: PACK-SIZE — npm-paketi <5MB
+- Model: sonnet
+- Effort: high
+- Skills: typescript-expert, devops
+- Files: package.json, .npmignore, scripts/validate-publish.mjs, tests/cli/pack-size-budget.test.ts
+- Scope: ./, scripts/, tests/, src/dashboard/
+- Dependencies: none
+- Smoke: npm run validate:publish → pack_size_and_count PASS
+### Description
+Gate: 6.0MB > 5MB. ÖNCE ölç: `npm pack --dry-run --json` içerik-dökümü — en büyük 20 dosyayı
+notes'a yaz. Beklenen-şişkinler: dist/**/*.map (source-map'ler pakete girmemeli), dist/dashboard
+(assets/'e zaten kopyalanıyorsa çift), .d.ts.map, test-artıkları. Budama: .npmignore/files-listesi
+cerrahi-daraltma (dist çalışır-bütünlüğü BOZULMADAN — bin'ler + assets + d.ts'ler kalır). Sınır
+yaklaşıksa tsconfig sourceMap-üretimini publish-build'de kapatma seçeneğini DEĞERLENDİR (notes'ta
+gerekçele; build:all davranışı değişmeden). Test: pack-dry-run boyut-bütçesi (<5MB) + kritik-dosya
+varlık-listesi (entry/bin/assets) — regresyon-bekçisi.
+### goNogo
+- goCriteria: validate:publish 8-gate İÇİNDE pack_size PASS; kritik-dosya testi yeşil; `deckent
+  --help` + `deckent-mcp` smoke pack-sonrası çalışır (dist bozulmadı).
+- nogo: dist içerik-silme (yalnız paket-dışlama); gate-limitini gevşetme.
+
+## Task 3: DIRECTIVES-RESTORE-QUIRK — kapanışta eski-içeriğe dönme fix'i
+- Model: sonnet
+- Effort: normal
 - Skills: typescript-expert
-- Files: src/orchestra/autonomous/mission-store/mission-engine-wire.ts, src/orchestra/autonomous/mission-store/mission-types.ts, src/dashboard/src/pages/MissionsPage.tsx, src/dashboard/src/i18n/en.ts, src/dashboard/src/i18n/tr.ts, tests/orchestra/mission-verdict-honesty.test.ts
-- Scope: src/orchestra/autonomous/, src/dashboard/, src/api/, tests/
+- Files: tests/orchestra/directives-restore-quirk.test.ts
+- Scope: src/orchestra/, src/cli/, tests/orchestra/, .brain/
 - Dependencies: none
 ### Description
-Canlı-bug (mission-w1): madde-2 worker'ı DÜRÜST `GO_WITH_TECH_DEBT` döndürdü ama mission "failed
-1/2" göründü. ÖNCE eşlemeyi koddan bul: runV2Engine deps.runTask adapter'ının ResultLike.ok'u
-selfAssessment'tan nasıl türettiğini izle (autonomous.ts runV2Engine çağrı-bloğu ~:506-540 +
-mission-engine-wire). FIX: ok = (selfAssessment !== 'NO_GO') — DEBT başarı sayılır, reason'a
-debt-notu taşınır; WorkItem'a settle-detayı (done|debt|failed üçlü) eklenir (tip + store-migrasyonu
-GEREKMEZse alan opsiyonel). MissionsPage: üçlü-durumu doğru renk/etiketle gösterir (debt=amber,
-i18n en/tr). mission-w1'in mevcut kaydı yeniden-yazılmaz (tarihsel).
+Canlı-gözlem (378-kapanışı): sprint bitince DIRECTIVES.md içeriği bir ÖNCEKİ sürüme döndü (mtime
+kapanış-anı). ÖNCE kök-bul: DIRECTIVES'e kapanışta kim yazıyor (grep: DIRECTIVES yaz/restore/backup —
+archive-directives akışı, .brain/directives-backup/, managed-docs?). Kökü kanıtla (repro-test:
+tmpdir-projede sprint-kapanış-yolunu çağır → DIRECTIVES değişmemeli). FIX kökün olduğu modülde
+(scope src/orchestra+src/cli içinde kalmalı; DISTINCT-kapalı dosyadaysa BLOCKED-raporla, fix'i
+tarif et). born-499'un stash'i de şüpheli-listede — ayırt et (378'de İKİ mekanizma da oynadı mı).
 ### goNogo
-- goCriteria: DONE/DEBT/NO_GO üç-yol eşleme-testli (fake-runTask); MissionsPage render-testi
-  (üç-durum + emoji-grep=0); mevcut mission-testleri kırılmadı; `tsc`+dashboard-test yeşil.
-- nogo: mission-store şema-kırılması; tarihsel-kayıt değiştirme.
-
-## Task 2: DASH-LAZY-LOAD — route-bazlı code-splitting
-- Model: sonnet
-- Effort: high
-- Skills: frontend-design, typescript-expert
-- Files: src/dashboard/src/App.tsx, tests/dashboard/lazy-routes.test.tsx
-- Scope: src/dashboard/, tests/dashboard/
-- Dependencies: none
-### Description
-App.tsx:6-26 17 sayfayı eager-import ediyor (Recharts+xterm dahil tek başlangıç-bundle).
-React.lazy()+Suspense'e çevir: "/" (Dashboard) + ChatPage eager KALIR (ilk-boya kritik),
-kalan sayfalar lazy; Suspense-fallback mevcut SkeletonCard desenini kullanır (yeni spinner icat
-etme). cards-mounted/nav-render/route-sidebar testleri KIRILMAMALI (App'in route-ağacı aynı).
-Kanıt: vite-build chunk-listesi notes'a (ana-chunk küçülmesi sayıyla).
-### goNogo
-- goCriteria: lazy-route render-testi (Suspense-fallback + sayfa-yüklenmesi); mevcut dashboard-suite
-  TAM yeşil (97 dosya); build-chunk kanıtı notes'ta; `tsc` temiz.
-- nogo: sayfa-davranış değişikliği; nav-items.ts.
-
-## Task 3: DASH-POLLING-DEDUP — istek-tekilleştirme katmanı
-- Model: sonnet
-- Effort: high
-- Skills: typescript-expert, frontend-design
-- Files: src/dashboard/src/lib/use-live-data.ts, src/dashboard/src/lib/request-cache.ts, tests/dashboard/request-dedup.test.ts
-- Scope: src/dashboard/, tests/dashboard/
-- Dependencies: none
-### Description
-Sayfa-başına bağımsız polling (2-5sn) aynı-URL'e eşzamanlı-mükerrer GET fırtınası yaratıyor.
-Paylaşılan in-flight istek-önbelleği: aynı-URL'e uçuşta-istek varken yeni çağrı AYNI promise'i
-paylaşır (SWR-tarzı dedup; kısa TTL yok — yalnız in-flight paylaşımı + son-değer cache'i
-mevcut stale-while-revalidate davranışını korur). use-live-data + useApi tek-chokepoint'ten geçer.
-### goNogo
-- goCriteria: eşzamanlı-çift-çağrı tek-fetch testli (fake-fetch sayaç); SWR-davranışı korunur
-  (mevcut use-live-data testleri yeşil); `tsc`+dashboard-suite yeşil.
-- nogo: SSE-yoluna dokunma; API-şekli değişikliği.
+- goCriteria: kök-neden kanıt-testli (önce-kırmızı); fix sonrası kapanış DIRECTIVES'i korur (test);
+  mevcut archive-directives testleri yeşil.
+- nogo: DISTINCT-kapalı dosyaya yazım (bulgu-raporla); arşivleme-davranışını silme.

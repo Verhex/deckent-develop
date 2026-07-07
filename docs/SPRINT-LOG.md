@@ -9236,3 +9236,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 378-003: RUN-MODE-BRIDGE — `deckent mode run` + config-alias (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 379 — sprint-379
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-07
+**Duration:** 1122s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 3 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1122144ms |
+
+### Tasks
+
+- 379-001: DOCS-NUM-TRUTH — README/DECKENT sayı-ve-dil doğruluğu (GO_WITH_TECH_DEBT)
+- 379-002: PACK-SIZE — npm-paketi <5MB (GO_WITH_TECH_DEBT)
+- 379-003: DIRECTIVES-RESTORE-QUIRK — kapanışta eski-içeriğe dönme fix'i (GO_WITH_TECH_DEBT)
+
+---

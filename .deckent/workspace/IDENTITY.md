@@ -9,12 +9,12 @@ Runtime: Node.js >=24.0.0
 Platform: macOS, Linux, Windows (native), WSL2
 Direction (2026-06-29 pivot): terminal-first ürün (tool-driven, derin, full-control+yormayan); dashboard=yalnız izleme. P0: training-trace WIRE · runtime-wide ApprovalBroker · Hermes-rolemodel tool+progressive-disclosure · global-install+proje-scope · DIRECTIVES 0-kırılganlık. Moat KORU (deterministik orchestration + kapalı-öğrenme + governance). SSOT: docs/MASTER-PLAN.md · detay: .analysis/hermes-vs-deckent-direction-decisions.md
 <!-- AUTOGEN:START id="identity-tests" -->
-Tests: 28,488 descriptors (parsed from tests/**/*.test.ts(x))
+Tests: 28,587 descriptors (parsed from tests/**/*.test.ts(x))
 Coverage: 88.58%
 <!-- AUTOGEN:END id="identity-tests" -->
 Dashboard Tests: 413
 <!-- AUTOGEN:START id="identity-summary" -->
-Sprints: 376+ (active)
+Sprints: 380+ (active)
 CLI Commands: 69+
 MCP: 46 tools, 8 resources
 Agents: 17 built-in + 2 custom
@@ -28,7 +28,7 @@ Features: **Memory V2 DB-First (SQLite FTS5, dual-layer i18n normalize, 96% cont
 | Metric | Value |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-376 |
+| Sprint | sprint-380 |
 | MCP Tools | 46 |
 | MCP Resources | 8 |
 | CLI Commands | 69+ |
