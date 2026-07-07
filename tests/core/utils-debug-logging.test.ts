@@ -133,13 +133,23 @@ describe('readJsonSafe — debug logging', () => {
     expect(stderrSpy).not.toHaveBeenCalled();
   });
 
-  it('logs to stderr on missing file when DECKENT_DEBUG is set', () => {
+  it('stays SILENT on missing file even when DECKENT_DEBUG is set (W7: expected soft-miss)', () => {
+    // Contract flip (2026-07-07): callers probe optional state with readJsonSafe
+    // constantly; logging ENOENT flooded ERRORS.md's rolling window and rotated
+    // real forensic entries out (born-484 lesson). Missing file = silent null.
     process.env['DECKENT_DEBUG'] = '1';
     const result = readJsonSafe(join(TMP, 'missing.json'));
     expect(result).toBeNull();
+    expect(stderrSpy).not.toHaveBeenCalled();
+  });
+
+  it('still logs UNEXPECTED failures (malformed JSON) when DECKENT_DEBUG is set', () => {
+    process.env['DECKENT_DEBUG'] = '1';
+    const file = join(TMP, 'bad-logged.json');
+    writeFileSync(file, '{ not valid }');
+    expect(readJsonSafe(file)).toBeNull();
     expect(stderrSpy).toHaveBeenCalled();
-    const output = stderrSpy.mock.calls[0]?.[0] as string;
-    expect(output).toContain('readJsonSafe');
+    expect(stderrSpy.mock.calls[0]?.[0] as string).toContain('readJsonSafe');
   });
 
   it('returns null on malformed JSON without stderr when debug off', () => {
@@ -184,13 +194,11 @@ describe('readJsonSafeAsync — debug logging', () => {
     expect(stderrSpy).not.toHaveBeenCalled();
   });
 
-  it('logs to stderr on missing file when DECKENT_DEBUG is set', async () => {
+  it('stays SILENT on missing file even when DECKENT_DEBUG is set (W7: expected soft-miss)', async () => {
     process.env['DECKENT_DEBUG'] = '1';
     const result = await readJsonSafeAsync(join(TMP, 'async-missing.json'));
     expect(result).toBeNull();
-    expect(stderrSpy).toHaveBeenCalled();
-    const output = stderrSpy.mock.calls[0]?.[0] as string;
-    expect(output).toContain('readJsonSafeAsync');
+    expect(stderrSpy).not.toHaveBeenCalled();
   });
 
   it('returns null on malformed JSON', async () => {

@@ -200,3 +200,4 @@ docs/audits/sprint-139/dead-code-report.md
 claude-fable-x.md
 .deckent/prompts/
 .deckent/approvals/
+.brain/heartbeat-log.md

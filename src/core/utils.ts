@@ -23,7 +23,7 @@ export function debugLog(context: string, error: unknown): void {
 
 /**
  * Append an error entry to .brain/ERRORS.md in pipe-delimited format.
- * Trims file to ERRORS_MAX_LINES (200) to prevent unbounded growth.
+ * Trims file to ERRORS_MAX_LINES (constants.ts — 600 since Sprint 140) to prevent unbounded growth.
  * Non-fatal: any write failure is silently ignored.
  */
 function appendToErrorsFile(context: string, message: string): void {
@@ -80,7 +80,14 @@ export function readJsonSafe<T>(filePath: string): T | null {
     // safe: generic T is caller-supplied; validation is deferred to caller; null returned on parse failure
     return JSON.parse(readFileSync(filePath, 'utf-8')) as T;
   } catch (e) {
-    debugLog('readJsonSafe', e);
+    // W7 (2026-07-07): a MISSING file is this function's expected soft-miss —
+    // callers probe optional state with it constantly (status pollers hit
+    // sprint-state.json every 15s). Logging ENOENT flooded ERRORS.md's rolling
+    // window (599/600 lines) and rotated real forensic entries out (born-484
+    // lesson). Only UNEXPECTED failures (parse errors, EACCES...) are logged.
+    if ((e as NodeJS.ErrnoException)?.code !== 'ENOENT' && (e as NodeJS.ErrnoException)?.code !== 'ENOTDIR') {
+      debugLog('readJsonSafe', e);
+    }
     return null;
   }
 }
@@ -96,7 +103,7 @@ export async function readJsonSafeAsync<T>(filePath: string): Promise<T | null> 
     // safe: generic T is caller-supplied; validation is deferred to caller; null returned on parse failure
     return JSON.parse(content) as T;
   } catch (e) {
-    debugLog('readJsonSafeAsync', e);
+    if ((e as NodeJS.ErrnoException)?.code !== 'ENOENT' && (e as NodeJS.ErrnoException)?.code !== 'ENOTDIR') debugLog('readJsonSafeAsync', e);
     return null;
   }
 }
