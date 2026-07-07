@@ -1,5 +1,5 @@
 #!/bin/bash
-# Fresh Install Matrix — Node 18/20/22 × Clean Env
+# Fresh Install Matrix — Node 24/26 × Clean Env
 # Runs deckent install + build + test in isolated Docker containers
 # Usage: bash scripts/fresh-env-test.sh
 set -euo pipefail
@@ -7,13 +7,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-echo "🧪 Fresh Install Matrix — Node 18/20/22"
+echo "🧪 Fresh Install Matrix — Node 24/26"
 echo "════════════════════════════════════════"
 
 PASS=0
 FAIL=0
 
-for node_version in 18 20 22; do
+for node_version in 24 26; do
   echo ""
   echo "▶ Testing Node ${node_version}..."
   echo "────────────────────────────────"
@@ -49,5 +49,5 @@ if [ "$FAIL" -gt 0 ]; then
   exit 1
 fi
 
-echo "✅ Fresh install matrix PASS on Node 18/20/22"
+echo "✅ Fresh install matrix PASS on Node 24/26"
 exit 0

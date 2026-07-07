@@ -1,15 +1,14 @@
 #!/usr/bin/env node
 // scripts/lint-i18n-hardcode.mjs
 //
-// Report-only: scans src/cli/commands/*.ts for likely hardcoded user-facing
+// Gate: scans src/cli/commands/*.ts for likely hardcoded user-facing
 // strings — console.log / console.error / console.warn / process.stdout.write
 // calls that contain natural-language literals instead of routing through
 // getMessage(key, lang) from src/cli/helpers/messages.ts.
 //
-// Always exits with code 0 — never blocks CI.
-//
-// TODO: Wire into `npm run lint` and CI once the allowlist is tuned and
-//       getMessage coverage is improved (follow-up sprint item).
+// Exits 1 when a hit is found. Wired into `npm run lint` via lint:gates
+// (W7 terfi, 2026-07-07 — enforces the i18n-FIRST quality bar in CLAUDE.md).
+// Heuristic false positives go into ALLOWLIST below with a reason.
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -161,6 +160,19 @@ for (const file of files) {
   scanRe(TEMPLATE_RE, 'template');
 }
 
+// ── Allowlist ─────────────────────────────────────────────────────────────────
+// Heuristic false positives: { file, contains, reason }. A hit is suppressed
+// when hit.file === file AND hit.text includes `contains`. Keep entries rare
+// and justified — real user-facing strings belong in messages.ts, not here.
+const ALLOWLIST = [];
+
+const allowed = (hit) =>
+  ALLOWLIST.some((a) => a.file === hit.file && hit.text.includes(a.contains));
+const suppressed = hits.filter(allowed).length;
+const gated = hits.filter((h) => !allowed(h));
+hits.length = 0;
+hits.push(...gated);
+
 // Sort by file then line
 hits.sort((a, b) => {
   if (a.file !== b.file) return a.file.localeCompare(b.file);
@@ -174,11 +186,11 @@ const line = '─'.repeat(W);
 
 console.log('');
 console.log('┌' + '─'.repeat(W) + '┐');
-console.log('│' + ' i18n Hardcode Lint Report (report-only)'.padEnd(W) + '│');
+console.log('│' + ' i18n Hardcode Lint (gate)'.padEnd(W) + '│');
 console.log('└' + '─'.repeat(W) + '┘');
 console.log('');
 console.log(`  Files scanned  : ${files.length}`);
-console.log(`  Potential hits : ${hits.length}`);
+console.log(`  Hits (gated)   : ${hits.length}${suppressed ? `  (+${suppressed} allowlisted)` : ''}`);
 console.log('');
 console.log(line);
 
@@ -201,10 +213,14 @@ if (hits.length === 0) {
 
 console.log('');
 console.log(line);
-console.log('  Note: This is a heuristic scan — false positives exist.');
-console.log('  Before enforcing as a CI gate, tune an allowlist and confirm');
-console.log('  each hit genuinely requires getMessage() routing.');
+if (hits.length > 0) {
+  console.log('  ✗ GATE FAIL — route the string(s) through getMessage(key, lang)');
+  console.log('    (src/cli/helpers/messages.ts, en+tr). Heuristic false positive?');
+  console.log('    Add an ALLOWLIST entry in this script with a reason.');
+} else {
+  console.log('  ✓ i18n gate clean.');
+}
 console.log(line);
 console.log('');
 
-process.exit(0);
+process.exit(hits.length > 0 ? 1 : 0);

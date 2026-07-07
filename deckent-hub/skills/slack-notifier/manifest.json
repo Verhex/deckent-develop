@@ -11,7 +11,7 @@
     "minScore": 5
   },
   "entrypoint": "SKILL.md",
-  "category": "messaging",
+  "category": "communication",
   "triggers": ["slack", "webhook", "notify", "channel", "message", "block-kit"],
   "stackDetection": { "files": [], "dependencies": ["@slack/web-api"], "commands": [] },
   "composableWith": ["typescript-expert", "api-builder"],

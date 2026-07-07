@@ -17,7 +17,9 @@ Thank you for contributing to the Deckent Skill Registry! This guide explains th
 
 ## Prerequisites
 
-- Deckent v1.0.0-beta.1 or later installed: `npm install -g deckent@beta`
+- Deckent v1.0.0-beta.1 or later. Until the first npm release ships, install from
+  source: clone `VerhexIO/deckent`, `npm ci && npm run build`, then `npm link`
+  (post-release: `npm install -g deckent`)
 - A GitHub account
 - Basic knowledge of TypeScript (for skill implementation examples)
 
@@ -86,10 +88,12 @@ cd deckent-hub
 
 ### 2. Create Your Skill Directory
 
+`SKILL_TEMPLATE.md` is a single reference document (not a directory) — scaffold by hand:
+
 ```bash
-# Use the template
-cp -r SKILL_TEMPLATE skills/my-skill-name
+mkdir -p skills/my-skill-name
 cd skills/my-skill-name
+# author SKILL.md + manifest.json following the structure in ../../SKILL_TEMPLATE.md
 ```
 
 ### 3. Fill in SKILL.md
@@ -102,41 +106,35 @@ Follow the template in `SKILL_TEMPLATE.md`. The minimum required sections are:
 
 ### 4. Fill in manifest.json
 
-Replace all `<placeholder>` values. Run validation:
+Replace all `<placeholder>` values. Note: `entrypoint` (string) is a **required** field —
+the validator rejects manifests without it. Run the hub validator (schema + sandbox +
+signature stages in one pass — there is no separate `deckent skill validate` subcommand):
 
 ```bash
-deckent skill validate ./skills/my-skill-name
+node scripts/hub-validate.mjs ./skills/my-skill-name
 ```
 
 Fix any reported issues before proceeding.
 
-### 5. Run AST Sandbox Scan
+### 5. Sandbox, Sign and Stage — one command
 
-```bash
-deckent skill sandbox ./skills/my-skill-name
-```
-
-This checks your skill for dangerous patterns. If violations are found, the output will list:
-- Which file
-- Which line number
-- What rule was violated
-- How to fix it
-
-### 6. Generate Ed25519 Signature
+Sandbox scanning and signing are **not** separate subcommands; `deckent skill publish`
+bundles them:
 
 ```bash
 deckent skill publish ./skills/my-skill-name
 ```
 
 This command:
-1. Runs the AST sandbox scan (again, as a final gate)
+1. Runs the AST sandbox scan as a gate — on violation it lists the file, line,
+   violated rule, and how to fix it
 2. Loads (or generates) your Ed25519 keypair at `~/.deckent/keys/`
 3. Signs the skill (SKILL.md + manifest.json)
 4. Writes `signature.ed25519` to your skill directory
 
 **Important:** Copy your public key hex from the output and add it to `manifest.json` under `author.publicKey`.
 
-### 7. Commit and Open PR
+### 6. Commit and Open PR
 
 ```bash
 git add skills/my-skill-name/
@@ -147,7 +145,7 @@ git push origin main
 
 PR title format: `feat: add <skill-name>` or `fix: update <skill-name> to v1.0.1`
 
-### 8. CI Will Run Automatically
+### 7. CI Will Run Automatically
 
 The `validate-skill.yml` CI workflow runs on every PR targeting files in `skills/`. It runs the same 3-stage pipeline (sandbox + signature + manifest). All 3 checks must pass before a maintainer can merge.
 

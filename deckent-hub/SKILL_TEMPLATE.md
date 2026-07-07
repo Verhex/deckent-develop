@@ -1,6 +1,14 @@
 # Skill Template — Deckent Hub
 
-Use this template when creating a new skill for Deckent Hub. Copy this directory to `skills/<your-skill-name>/` and fill in the placeholders.
+Use this template when creating a new skill for Deckent Hub. This is a single reference
+document — create `skills/<your-skill-name>/` yourself (`mkdir -p`), author the files
+below following these templates, and fill in the placeholders.
+
+> **Schema status (HUB-P0):** this template defines the TARGET public-marketplace
+> manifest schema (`author`, `tags`, `secrets`, `scope`, `deckentVersionMin`, `license`).
+> The 20 existing catalog manifests still use deckent's internal `SkillDefinition`
+> shape and will be migrated to this schema as part of HUB-P0 — new submissions
+> should follow THIS template, plus the required `entrypoint` field.
 
 ## Directory Structure
 
@@ -109,7 +117,7 @@ Create `skills/<your-skill>/manifest.json`:
     "github": "your-github-username",
     "publicKey": "ed25519:<your-public-key-hex>"
   },
-  "category": "communication | productivity | media | dev-tools | automation | utilities | social",
+  "category": "integration | analysis | generation | automation | devops | data | communication | utility",
   "tags": ["tag1", "tag2"],
   "triggers": [
     "keyword1",

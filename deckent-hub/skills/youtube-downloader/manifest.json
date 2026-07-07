@@ -11,7 +11,7 @@
     "minScore": 5
   },
   "entrypoint": "SKILL.md",
-  "category": "media",
+  "category": "utility",
   "triggers": ["youtube", "download", "video", "audio", "yt-dlp", "convert"],
   "stackDetection": { "files": [], "dependencies": [], "commands": ["yt-dlp"] },
   "composableWith": ["typescript-expert"],

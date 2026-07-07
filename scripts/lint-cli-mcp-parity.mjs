@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 // scripts/lint-cli-mcp-parity.mjs
 //
-// Report-only: scans src/cli/commands/*.ts for CLI command names and
-// src/mcp/tools/*.ts for MCP tool registrations, then prints a parity report
-// showing commands without a matching MCP tool and vice versa.
+// Gate (baseline-ratchet): scans src/cli/commands/*.ts for CLI command names
+// and src/mcp/tools/*.ts for MCP tool registrations, then compares the parity
+// gaps against scripts/cli-mcp-parity-baseline.json.
 //
-// Always exits with code 0 — never blocks CI.
-//
-// TODO: Wire into `npm run lint` and CI after review + allowlist tuning
-//       (define an explicit allowlist of known CLI-only / MCP-only items).
+// Exit 1 only on NEW gaps (a CLI command or MCP tool added without its
+// counterpart and without a baseline entry). Known-intentional gaps (chat,
+// dashboard, serve, ...) live in the baseline. Stale baseline entries warn.
+// Regenerate the baseline after an intentional change:
+//   node scripts/lint-cli-mcp-parity.mjs --update-baseline
+// Wired into `npm run lint` via lint:gates (W7 terfi, 2026-07-07).
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -165,14 +167,45 @@ for (const [tool, file] of mcpTools) {
 }
 mcpOnly.sort((a, b) => a.tool.localeCompare(b.tool));
 
-// ── 4. Report ─────────────────────────────────────────────────────────────────
+// ── 4. Baseline (accepted, known-intentional gaps) ────────────────────────────
+
+const BASELINE_PATH = join(__dirname, 'cli-mcp-parity-baseline.json');
+
+if (process.argv.includes('--update-baseline')) {
+  const baseline = {
+    _comment:
+      'Accepted CLI↔MCP parity gaps. lint-cli-mcp-parity.mjs fails only on gaps NOT listed here. Regenerate: node scripts/lint-cli-mcp-parity.mjs --update-baseline',
+    cliOnly: cliOnly.map((x) => x.cmd),
+    mcpOnly: mcpOnly.map((x) => x.tool),
+  };
+  writeFileSync(BASELINE_PATH, JSON.stringify(baseline, null, 2) + '\n');
+  console.log(
+    `✓ baseline updated: ${baseline.cliOnly.length} CLI-only + ${baseline.mcpOnly.length} MCP-only accepted (${BASELINE_PATH})`,
+  );
+  process.exit(0);
+}
+
+let baseline = { cliOnly: [], mcpOnly: [] };
+if (existsSync(BASELINE_PATH)) {
+  baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
+} else {
+  console.error(`✗ baseline missing: ${BASELINE_PATH} — run with --update-baseline first`);
+  process.exit(1);
+}
+
+const newCliOnly = cliOnly.filter((x) => !baseline.cliOnly.includes(x.cmd));
+const newMcpOnly = mcpOnly.filter((x) => !baseline.mcpOnly.includes(x.tool));
+const staleCli = baseline.cliOnly.filter((name) => !cliOnly.some((x) => x.cmd === name));
+const staleMcp = baseline.mcpOnly.filter((name) => !mcpOnly.some((x) => x.tool === name));
+
+// ── 5. Report ─────────────────────────────────────────────────────────────────
 
 const W = 64;
 const line = '─'.repeat(W);
 
 console.log('');
 console.log('┌' + '─'.repeat(W) + '┐');
-console.log('│' + ' CLI ↔ MCP Parity Report (report-only)'.padEnd(W) + '│');
+console.log('│' + ' CLI ↔ MCP Parity Gate (baseline-ratchet)'.padEnd(W) + '│');
 console.log('└' + '─'.repeat(W) + '┘');
 console.log('');
 console.log(`  CLI commands scanned : ${cliCommands.size}`);
@@ -180,35 +213,45 @@ console.log(`  MCP tools scanned    : ${mcpTools.size}`);
 console.log('');
 console.log(line);
 
-if (cliOnly.length === 0) {
-  console.log('  ✓ All CLI commands have a matching MCP tool.');
+console.log(
+  `  Known-intentional gaps (baseline): ${baseline.cliOnly.length} CLI-only + ${baseline.mcpOnly.length} MCP-only`,
+);
+console.log('');
+console.log(line);
+
+if (newCliOnly.length === 0 && newMcpOnly.length === 0) {
+  console.log('  ✓ No NEW parity gaps beyond the accepted baseline.');
 } else {
-  console.log(`  CLI-only (no matching MCP tool) — ${cliOnly.length} item(s):`);
-  console.log('');
-  for (const { cmd, file } of cliOnly) {
-    console.log(`    cli:${cmd.padEnd(26)}  ← ${file}`);
+  if (newCliOnly.length > 0) {
+    console.log(`  ✗ NEW CLI-only (no matching MCP tool) — ${newCliOnly.length} item(s):`);
+    console.log('');
+    for (const { cmd, file } of newCliOnly) {
+      console.log(`    cli:${cmd.padEnd(26)}  ← ${file}`);
+    }
+    console.log('');
   }
+  if (newMcpOnly.length > 0) {
+    console.log(`  ✗ NEW MCP-only (no matching CLI command) — ${newMcpOnly.length} item(s):`);
+    console.log('');
+    for (const { tool, file } of newMcpOnly) {
+      console.log(`    mcp:${tool.padEnd(32)}  ← ${file}`);
+    }
+    console.log('');
+  }
+  console.log('  Add the missing counterpart, or if the gap is intentional,');
+  console.log('  accept it: node scripts/lint-cli-mcp-parity.mjs --update-baseline');
+}
+
+if (staleCli.length > 0 || staleMcp.length > 0) {
+  console.log('');
+  console.log(
+    `  ⚠ Stale baseline entries (gap no longer exists): ${[...staleCli, ...staleMcp].join(', ')}`,
+  );
+  console.log('    Prune with: node scripts/lint-cli-mcp-parity.mjs --update-baseline');
 }
 
 console.log('');
 console.log(line);
-
-if (mcpOnly.length === 0) {
-  console.log('  ✓ All MCP tools have a matching CLI command.');
-} else {
-  console.log(`  MCP-only (no matching CLI command) — ${mcpOnly.length} item(s):`);
-  console.log('');
-  for (const { tool, file } of mcpOnly) {
-    console.log(`    mcp:${tool.padEnd(32)}  ← ${file}`);
-  }
-}
-
-console.log('');
-console.log(line);
-console.log('  Note: Some gaps are expected — CLI-only commands (e.g. chat,');
-console.log('  dashboard, serve) have no MCP equivalent by design. MCP-only');
-console.log('  tools may be intentional. Review before enforcing as a gate.');
-console.log(line);
 console.log('');
 
-process.exit(0);
+process.exit(newCliOnly.length > 0 || newMcpOnly.length > 0 ? 1 : 0);

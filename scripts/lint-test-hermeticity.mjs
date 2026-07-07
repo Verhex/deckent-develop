@@ -21,6 +21,10 @@ export const ALLOWLIST = [
   'tests/core/nervous-enabled-integration.test.ts',   // it.skipIf(!hasProjectConfig) guard
   'tests/orchestra/spawn-backend-docker.test.ts',     // ctx.skip() after null config check
   'tests/scripts/lint-test-hermeticity.test.ts',      // meta-test: patterns appear as fixture data
+  'tests/docs/api-md-no-stale-refs.test.ts',          // reads .brain/exports/*.md — git-TRACKED files, present on fresh checkout
+  'tests/cli/helpers/i18n-coverage.test.ts',          // reads .deckent/i18n/ — git-TRACKED files, present on fresh checkout
+  'tests/core/debt-002.test.ts',                      // reads .brain/exports/debt.md — git-TRACKED, present on fresh checkout
+  'tests/core/features-manifest.test.ts',             // reads .deckent/settings/features-manifest.json — git-TRACKED, present on fresh checkout
 ];
 
 // Per-line patterns that indicate non-hermetic access to live gitignored state.

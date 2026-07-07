@@ -11,7 +11,7 @@
     "minScore": 5
   },
   "entrypoint": "SKILL.md",
-  "category": "api",
+  "category": "integration",
   "triggers": ["weather", "forecast", "temperature", "humidity", "wind", "climate"],
   "stackDetection": { "files": [], "dependencies": [], "commands": [] },
   "composableWith": ["typescript-expert", "api-builder"],

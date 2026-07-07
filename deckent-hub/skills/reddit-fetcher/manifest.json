@@ -11,7 +11,7 @@
     "minScore": 5
   },
   "entrypoint": "SKILL.md",
-  "category": "social",
+  "category": "integration",
   "triggers": ["reddit", "subreddit", "post", "comment", "upvote", "flair"],
   "stackDetection": { "files": [], "dependencies": ["snoowrap"], "commands": [] },
   "composableWith": ["typescript-expert", "api-builder"],

@@ -79,7 +79,7 @@ export function registerServe(program: Command): void {
       const isLocalhost = host === '127.0.0.1' || host === '::1' || host === 'localhost';
       const terminalEnabled = opts.terminal !== false && isLocalhost;
       if (!isLocalhost && opts.terminal !== false) {
-        process.stderr.write('Warning: terminal disabled — non-localhost host requires explicit --no-terminal\n');
+        process.stderr.write(getMessage('serve.terminal_non_localhost_warning', getLanguage()) + '\n');
       }
 
       // Instantiate the local PTY backend when the terminal is enabled. This

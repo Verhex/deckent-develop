@@ -1600,6 +1600,10 @@ const MESSAGES: MessageMap = {
     en: '  Terminal  disabled — pass --terminal on localhost to enable',
     tr: '  Terminal  kapalı — etkinleştirmek için localhost\'ta --terminal geçin',
   },
+  'serve.terminal_non_localhost_warning': {
+    en: 'Warning: terminal disabled — non-localhost host requires explicit --no-terminal',
+    tr: 'Uyarı: terminal kapatıldı — localhost-dışı host açıkça --no-terminal gerektirir',
+  },
   'serve.stop_hint': {
     en: '  Stop      Ctrl+C',
     tr: '  Durdurmak Ctrl+C',

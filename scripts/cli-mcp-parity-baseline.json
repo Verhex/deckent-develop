@@ -1,0 +1,42 @@
+{
+  "_comment": "Accepted CLI↔MCP parity gaps. lint-cli-mcp-parity.mjs fails only on gaps NOT listed here. Regenerate: node scripts/lint-cli-mcp-parity.mjs --update-baseline",
+  "cliOnly": [
+    "archive-debt",
+    "attach",
+    "bot",
+    "chat",
+    "connect",
+    "cu-status",
+    "dashboard",
+    "do",
+    "evolve",
+    "features",
+    "finalize",
+    "flow",
+    "gateway",
+    "gateway-runtime",
+    "heartbeat",
+    "image",
+    "limits",
+    "mcp",
+    "mode",
+    "onboard",
+    "openrouter-probe",
+    "output",
+    "plugin",
+    "rbac",
+    "recall",
+    "remember",
+    "resources",
+    "resume",
+    "serve",
+    "spawn",
+    "test",
+    "trace",
+    "upgrade",
+    "web"
+  ],
+  "mcpOnly": [
+    "deckent_feature_query"
+  ]
+}

@@ -15,7 +15,7 @@
     "minScore": 5
   },
   "entrypoint": "SKILL.md",
-  "category": "tooling",
+  "category": "analysis",
   "triggers": ["screenshot", "vision", "capture", "analyze", "visual", "ocr"],
   "stackDetection": { "files": [], "dependencies": ["playwright"], "commands": [] },
   "composableWith": ["typescript-expert", "anthropic-sdk"],

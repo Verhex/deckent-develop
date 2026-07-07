@@ -1,6 +1,11 @@
 # Repo Sync — develop → product
 
-> Status: accepted (Sprint 201, amended Sprint 281). See also: `docs/adr/065-develop-product-repo-split.md`.
+> **Status: SUPERSEDED by ADR-D-008 (accepted 2026-06-30).** ADR-065's continuous
+> develop→product sync model will NOT be applied — today is single-repo development.
+> `scripts/sync-to-product.mjs` is retained only as the building block for the one-time
+> GA-2 public migration (deckent-develop → deckent + sensitive-scrub) in ADR-D-008's
+> roadmap. The guide below is reference for that migration, not a live process.
+> (Original status: accepted Sprint 201, amended Sprint 281.)
 >
 > **Note:** `docs/development/` is itself in the EXCLUDE list — this guide and all files in it are internal and do not appear in the public product repo.
 

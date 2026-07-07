@@ -10,6 +10,14 @@
  * Usage: node scripts/bundle-builtins.mjs [--dry-run] [--clean-stats]
  *
  * Sprint 150 Task 031 — P0 Beta GA Blocker.
+ *
+ * ⚠️ DO NOT RUN BLINDLY (W7 audit, 2026-07-07): the ".deckent is canonical"
+ * premise no longer holds — sprints have edited src/core/builtins/ DIRECTLY
+ * (sprint-369 added 3 agents + frontmatter there; 11 files have real content
+ * drift in BOTH directions; .deckent has a `docs` skill absent from builtins).
+ * A blind run would strip builtins-side frontmatter, clobber direct edits and
+ * change the shipped skill count. Resolve via MASTER-PLAN item
+ * BUILTINS-RECONCILE (per-file merge + canonicality decision) first.
  */
 
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, readFileSync, writeFileSync } from 'node:fs';

@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 // sync-to-product.mjs — Prepare deckent-develop → deckent (product) staging snapshot.
 //
-// Two-repo model (ADR pending — docs/adr/065-develop-product-repo-split.md):
+// Status (ADR-D-008, accepted 2026-06-30 — supersedes the retired ADR-065 two-repo
+// continuous-sync model): today is SINGLE-repo development; there is NO ongoing
+// develop→product sync. This script is retained as the building block for the
+// one-time GA-2 public migration (deckent-develop → deckent, sensitive-scrub) that
+// ADR-D-008's roadmap defines. Do not run it as a recurring sync.
 //   • deckent-develop = full history, internal sprint state (.brain, .deckent/archive)
-//   • deckent         = public product repo, clean snapshot (no sprint internals)
+//   • deckent         = future public product repo, clean snapshot (no sprint internals)
 //
 // Usage:
 //   node scripts/sync-to-product.mjs              # dry-run: report keep/drop + security PASS

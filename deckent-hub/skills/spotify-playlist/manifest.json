@@ -11,7 +11,7 @@
     "minScore": 5
   },
   "entrypoint": "SKILL.md",
-  "category": "media",
+  "category": "integration",
   "triggers": ["playlist", "spotify", "track", "album", "curate", "mix"],
   "stackDetection": { "files": [], "dependencies": ["spotify-web-api-node"], "commands": [] },
   "composableWith": ["typescript-expert", "api-builder"],

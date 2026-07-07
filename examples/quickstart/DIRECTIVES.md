@@ -30,7 +30,7 @@ Verify that the quickstart project directory structure is correct:
 - Skills: documentation-writer
 - Files: SUMMARY.md
 - Scope: .
-- Dependencies: quickstart-001
+- Dependencies: Task 1
 
 ### Description
 Generate a summary report of the quickstart example:

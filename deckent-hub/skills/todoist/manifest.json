@@ -11,7 +11,7 @@
     "minScore": 5
   },
   "entrypoint": "SKILL.md",
-  "category": "productivity",
+  "category": "integration",
   "triggers": ["todoist", "task", "todo", "project", "label", "priority"],
   "stackDetection": { "files": [], "dependencies": ["@doist/todoist-api-typescript"], "commands": [] },
   "composableWith": ["typescript-expert", "api-builder"],
