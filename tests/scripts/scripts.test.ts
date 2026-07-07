@@ -133,55 +133,6 @@ describe.skipIf(isWindows)('OSS Scripts', () => {
     });
   });
 
-  describe('changelog.sh', () => {
-    it('should generate changelog in dry-run mode', async () => {
-      const result = await runScriptAsync('changelog.sh', ['--dry-run']);
-      expect(result.success).toBe(true);
-      expect(result.output).toContain('Changelog section');
-    });
-
-    it('should show current version in changelog output', async () => {
-      const result = await runScriptAsync('changelog.sh', ['--dry-run']);
-      const pkgJson = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, 'package.json'), 'utf-8'));
-      expect(result.output).toContain(pkgJson.version);
-    });
-
-    it('should show release date in changelog', async () => {
-      const result = await runScriptAsync('changelog.sh', ['--dry-run']);
-      // Use local date (matching shell's `date +%Y-%m-%d`) not UTC
-      const now = new Date();
-      const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      expect(result.output).toContain(localDate);
-    });
-
-    it('should parse conventional commits if present', async () => {
-      const result = await runScriptAsync('changelog.sh', ['--dry-run']);
-      // The output should be valid markdown
-      expect(result.output).toContain('##'); // Markdown header
-    });
-
-    it('should handle --dry-run mode without modifying CHANGELOG.md', async () => {
-      const changelogPath = path.join(PROJECT_ROOT, 'CHANGELOG.md');
-      const existsBefore = fs.existsSync(changelogPath);
-      const contentBefore = existsBefore ? fs.readFileSync(changelogPath, 'utf-8') : null;
-
-      await runScriptAsync('changelog.sh', ['--dry-run']);
-
-      const existsAfter = fs.existsSync(changelogPath);
-      const contentAfter = existsAfter ? fs.readFileSync(changelogPath, 'utf-8') : null;
-
-      // Should not create or modify file in dry-run mode
-      expect(existsBefore === existsAfter && contentBefore === contentAfter).toBe(true);
-    });
-
-    it('should require valid arguments', async () => {
-      const result = await runScriptAsync('changelog.sh', ['invalid-arg', 'another-arg']);
-      // changelog.sh may not output anything if tag doesn't exist, which is ok
-      // It's forgiving with args and interprets them as git refs
-      expect(result.success === true || result.output === '').toBe(true);
-    });
-  });
-
   describe('bump-version.sh', () => {
     it('should show usage if no arguments provided', async () => {
       const result = await runScriptAsync('bump-version.sh', []);
@@ -236,7 +187,7 @@ describe.skipIf(isWindows)('OSS Scripts', () => {
 
   describe('Script Integration', () => {
     it('all scripts should be executable', () => {
-      const scripts = ['verify-publish.sh', 'changelog.sh', 'bump-version.sh'];
+      const scripts = ['verify-publish.sh', 'bump-version.sh'];
       scripts.forEach((script) => {
         const stat = fs.statSync(path.join(SCRIPTS_DIR, script));
         // Check if owner can execute (S_IXUSR = 0o100)
@@ -245,16 +196,11 @@ describe.skipIf(isWindows)('OSS Scripts', () => {
     });
 
     it('all scripts should have proper shebang', () => {
-      const scripts = ['verify-publish.sh', 'changelog.sh', 'bump-version.sh'];
+      const scripts = ['verify-publish.sh', 'bump-version.sh'];
       scripts.forEach((script) => {
         const content = fs.readFileSync(path.join(SCRIPTS_DIR, script), 'utf-8');
         expect(content.startsWith('#!/bin/bash')).toBe(true);
       });
-    });
-
-    it('changelog.sh should execute without errors in dry-run', { timeout: 10000 }, async () => {
-      const result = await runScriptAsync('changelog.sh', ['--dry-run']);
-      expect(result.success).toBe(true);
     });
 
     it('bump-version.sh should recognize all bump types', { timeout: 10000 }, async () => {

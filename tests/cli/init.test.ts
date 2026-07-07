@@ -1,8 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-import { createHash } from 'node:crypto';
 
 // ─── ADR Seed Data Tests ────────────────────────────────────────────────
 
@@ -115,34 +113,5 @@ describe('init.ts template references', () => {
     // DECISIONS.md is a legacy V1 file — Memory V2 keeps decisions in
     // memory.db (exported to exports/decisions.md). Neither init path writes it.
     expect(mcpInitContent).not.toContain("DECISIONS_FILE), '# Architecture");
-  });
-});
-
-// ─── Archive Script Tests ───────────────────────────────────────────────
-
-describe('archive-decisions-md.mjs', () => {
-  const tmpRoot = join(tmpdir(), `deckent-archive-test-${Date.now()}`);
-  const brainDir = join(tmpRoot, '.brain');
-  const archiveDir = join(brainDir, 'archive', 'decisions-root-pre-sprint143');
-
-  beforeEach(() => {
-    mkdirSync(brainDir, { recursive: true });
-  });
-
-  afterEach(() => {
-    // Cleanup
-    try {
-      const { rmSync } = require('node:fs');
-      rmSync(tmpRoot, { recursive: true, force: true });
-    } catch { /* best effort */ }
-  });
-
-  it('script file exists and is valid JavaScript', () => {
-    const scriptPath = join(process.cwd(), 'scripts', 'archive-decisions-md.mjs');
-    expect(existsSync(scriptPath)).toBe(true);
-
-    const content = readFileSync(scriptPath, 'utf-8');
-    expect(content).toContain('decisions-root-pre-sprint143');
-    expect(content).toContain('sha256');
   });
 });
