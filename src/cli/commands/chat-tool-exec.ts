@@ -37,6 +37,12 @@ export interface ToolExecOptions {
   confirm?: (summary: string, toolName: string) => Promise<boolean>;
   /** bash için spawn enjeksiyonu (test hermetik). Default node:child_process.spawn. */
   bashRun?: (cmd: string, cwd: string) => Promise<string>;
+  /**
+   * deckent_bash kill-budget (ms) — yalnız `bashRun` enjekte EDİLMEDİĞİNDE
+   * `defaultBashRun`'a geçirilir (enjekte edilen bir bashRun kendi timeout
+   * politikasının sahibidir). Default DEFAULT_BASH_TIMEOUT_MS (5dk).
+   */
+  bashTimeoutMs?: number;
 }
 
 /** İnsan-okur özet — onay prompt'unda gösterilir. */
@@ -53,16 +59,101 @@ function summarize(name: string, args: Record<string, unknown>): string {
   }
 }
 
-function defaultBashRun(cmd: string, cwd: string): Promise<string> {
+/**
+ * Safety-net budget: without this, a shell command that hangs (waits on
+ * stdin, an infinite loop, a stuck network call — born-535) never fires
+ * `close`/`error`, so the returned Promise never settles and the whole chat
+ * turn freezes forever. 5min — long enough for a real build/test command,
+ * still bounded. Overridable via ToolExecOptions.bashTimeoutMs /
+ * DefaultBashRunOptions.timeoutMs.
+ */
+const DEFAULT_BASH_TIMEOUT_MS = 300_000;
+
+/**
+ * Resolve the shell binary + argv for running an arbitrary command string.
+ * POSIX has `bash` on PATH by convention. Native Windows (no WSL, no
+ * Git-Bash) does not — the previous hardcoded `spawn('bash', …)` failed
+ * ENOENT there (born-579 cluster). PowerShell ships on every supported
+ * Windows version and, via its Unix-alias cmdlets (ls/cat/pwd/rm/cp/mv/…),
+ * tolerates POSIX-shaped commands far better than cmd.exe — it is already
+ * deckent's Windows shell of record (same `powershell.exe -NoProfile
+ * -Command` invocation as daemon-hygiene.ts / screenshot.ts).
+ */
+export function resolveBashInvocation(
+  cmd: string,
+  platform: NodeJS.Platform = process.platform,
+): { command: string; args: string[] } {
+  if (platform === 'win32') {
+    return { command: 'powershell.exe', args: ['-NoProfile', '-Command', cmd] };
+  }
+  return { command: 'bash', args: ['-lc', cmd] };
+}
+
+export interface DefaultBashRunOptions {
+  /** Kill budget in ms before a hanging spawn is force-killed. Default DEFAULT_BASH_TIMEOUT_MS. */
+  timeoutMs?: number;
+  /** Host platform override (test seam). Defaults to process.platform. */
+  platform?: NodeJS.Platform;
+}
+
+/**
+ * POSIX: signal the WHOLE process group, not just the immediate `bash` pid —
+ * a hanging pipeline (`sleep 999 | cat`) forks children under that group that
+ * a single-pid kill would orphan (mirrors subprocess.ts's PGID-TEARDOWN,
+ * ADR-G-013). win32 has no group-signal semantics for process.kill, so it
+ * always falls through to the plain child kill.
+ */
+function killBashGroup(child: ReturnType<typeof spawn>, platform: NodeJS.Platform): void {
+  const pid = child.pid;
+  if (platform !== 'win32' && typeof pid === 'number') {
+    try {
+      process.kill(-pid, 'SIGKILL');
+      return;
+    } catch {
+      // Group already gone / pid not a group leader — fall back below.
+    }
+  }
+  try { child.kill('SIGKILL'); } catch { /* already exited */ }
+}
+
+export function defaultBashRun(cmd: string, cwd: string, runOpts: DefaultBashRunOptions = {}): Promise<string> {
+  const platform = runOpts.platform ?? process.platform;
+  const timeoutMs = runOpts.timeoutMs ?? DEFAULT_BASH_TIMEOUT_MS;
+  const { command, args } = resolveBashInvocation(cmd, platform);
   return new Promise<string>((resolveOut) => {
-    const child = spawn('bash', ['-lc', cmd], { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+    // detached:true on POSIX makes this process the leader of a brand-new
+    // process group so killBashGroup can reach every child it forks; win32
+    // never sets detached (see killBashGroup / subprocess.ts precedent).
+    const child = spawn(command, args, {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: platform !== 'win32',
+    });
     let out = '';
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      killBashGroup(child, platform);
+      resolveOut(out.trim() + `\n[mcp-error] deckent_bash: timed out after ${Math.round(timeoutMs / 1000)}s`);
+    }, timeoutMs);
+    timer.unref?.();
     child.stdout?.setEncoding('utf-8');
     child.stderr?.setEncoding('utf-8');
     child.stdout?.on('data', (c: string) => { out += c; });
     child.stderr?.on('data', (c: string) => { out += c; });
-    child.once('close', (code) => resolveOut(out.trim() + (code === 0 ? '' : `\n[exit ${code}]`)));
-    child.once('error', (e) => resolveOut(`[mcp-error] deckent_bash: ${e.message}`));
+    child.once('close', (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolveOut(out.trim() + (code === 0 ? '' : `\n[exit ${code}]`));
+    });
+    child.once('error', (e) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolveOut(`[mcp-error] deckent_bash: ${e.message}`);
+    });
   });
 }
 
@@ -76,7 +167,7 @@ function defaultBashRun(cmd: string, cwd: string): Promise<string> {
 export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDispatcher {
   const resolveCwd = (): string => (typeof opts.cwd === 'function' ? opts.cwd() : (opts.cwd ?? process.cwd()));
   const confirm = opts.confirm ?? (async () => true);
-  const bashRun = opts.bashRun ?? defaultBashRun;
+  const bashRun = opts.bashRun ?? ((cmd: string, cwd: string) => defaultBashRun(cmd, cwd, { timeoutMs: opts.bashTimeoutMs }));
 
   // cwd dışına çıkışı engelle (path traversal). Geçerli mutlak yolu döner ya da null.
   const inScope = (p: string): string | null => {

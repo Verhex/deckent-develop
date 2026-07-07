@@ -17,6 +17,7 @@ import { join, dirname } from 'node:path';
 import { getLanguage, getMessage } from '../helpers/messages.js';
 import type { NervousNotification } from '../../core/nervous-types.js';
 import { NERVOUS_PENDING_FILE, NERVOUS_HISTORY_FILE, NERVOUS_IPC_DIR } from '../../core/constants.js';
+import { isNervousPollerAlive } from '../../nervous/ipc-queue.js';
 
 // ─── ANSI (Node built-in, ADR-010) ──────────────────────────────────────────
 
@@ -68,7 +69,12 @@ function appendNervousHistory(
     decision,
     decidedBy: 'user',
     executedAt: new Date().toISOString(),
-    outcome: decision === 'accepted' ? 'success' : 'pending',
+    // born-515: a short-lived REPL call can never synchronously confirm whether
+    // an accepted action was actually executed by the (possibly absent) nervous
+    // executor — claiming 'success' here regardless of what really happened was
+    // the false-success bug. 'pending' honestly reflects "decision recorded,
+    // real outcome not confirmed by this process" for BOTH decisions.
+    outcome: 'pending' as const,
     reversible: false,
   };
   appendFileSync(historyPath(root), JSON.stringify(record) + '\n', 'utf-8');
@@ -77,16 +83,20 @@ function appendNervousHistory(
 // ─── IPC Write Helper (sync — handleNervousSlash must stay synchronous) ─────
 
 /**
- * Write an approved-with-edits request to the nervous IPC pending queue.
- * Replicates NervousIpcQueue.writeApproval logic with sync fs calls so that
- * handleNervousSlash can stay synchronous (chat-native.ts calls it without await).
- * Errors are swallowed — the REPL must never crash on IPC write failure.
+ * Write a decision (accept/reject, optionally with payload edits) to the
+ * nervous IPC pending queue so a live nervous executor (its polling loop, see
+ * nervous/ipc-queue.ts NervousIpcQueue.startPolling) actually consumes and
+ * executes it. Replicates NervousIpcQueue.writeApproval logic with sync fs
+ * calls so that handleNervousSlash can stay synchronous (chat-native.ts calls
+ * it without await). Returns whether the write succeeded — callers must not
+ * report a decision as having reached the executor when it did not.
  */
 function writeIpcApprovalSync(
   root: string,
   notificationId: string,
-  modifiedPayload: Record<string, unknown>,
-): void {
+  decision: 'accepted' | 'rejected',
+  modifiedPayload?: Record<string, unknown>,
+): boolean {
   try {
     const pendingDir = join(root, NERVOUS_IPC_DIR, 'pending');
     const resolvedDir = join(root, NERVOUS_IPC_DIR, 'resolved');
@@ -96,7 +106,7 @@ function writeIpcApprovalSync(
     const suffix = `${Date.now().toString(36)}-${randomBytes(4).toString('hex')}`;
     const record = {
       notificationId,
-      decision: 'accepted' as const,
+      decision,
       requestedAt: new Date().toISOString(),
       modifiedPayload,
     };
@@ -105,8 +115,10 @@ function writeIpcApprovalSync(
       JSON.stringify(record, null, 2) + '\n',
       'utf-8',
     );
+    return true;
   } catch {
     // fail-safe: IPC write failure must not crash the REPL
+    return false;
   }
 }
 
@@ -184,16 +196,29 @@ export function handleNervousSlash(
       return getMessage('nervous.slash_not_found', lng, { id });
     }
     const notification = pending[idx]!;
-    const decision = sub === 'accept' ? 'accepted' : 'rejected';
+    const decision: 'accepted' | 'rejected' = sub === 'accept' ? 'accepted' : 'rejected';
     pending.splice(idx, 1);
     writePendingNervous(root, pending);
+
+    // born-515: actually reach the nervous executor via the same IPC channel
+    // `deckent nervous accept/reject` uses (nervous/ipc-queue.ts) whenever one
+    // is live, instead of only mutating local bridge state and never telling
+    // anything downstream. `handleNervousSlash` must stay synchronous (see
+    // writeIpcApprovalSync doc), so the history outcome is always 'pending' —
+    // this process can never synchronously confirm the executor's real result.
+    const routedToExecutor = isNervousPollerAlive(root) && writeIpcApprovalSync(root, notification.id, decision);
     appendNervousHistory(root, notification, decision);
+
     const label = notification.actions[0]?.id ?? notification.id.slice(0, 12);
+    const statusMsg = routedToExecutor
+      ? getMessage('nervous.sent_to_executor', lng, { action: label })
+      : getMessage('nervous.dismissed_no_executor', lng, { action: label });
     if (isTTY) {
       const color = decision === 'accepted' ? GREEN : RED;
-      return `${color}${decision === 'accepted' ? '✓' : '✗'} ${decision}: ${label}${RESET}`;
+      const icon = decision === 'accepted' ? '✓' : '✗';
+      return `${color}${icon} ${decision}: ${label}${RESET}\n${DIM}${statusMsg}${RESET}`;
     }
-    return `${decision}: ${label}`;
+    return `${decision}: ${label}\n${statusMsg}`;
   }
 
   if (sub === 'edit') {
@@ -237,7 +262,7 @@ export function handleNervousSlash(
     }
 
     // Route through IPC transport (Task 3 writeApproval — modifiedPayload merge)
-    writeIpcApprovalSync(root, notification.id, modifiedPayload);
+    writeIpcApprovalSync(root, notification.id, 'accepted', modifiedPayload);
 
     // Remove from pending + record in history
     pending.splice(idx, 1);

@@ -42,8 +42,8 @@ export interface AgenticDispatchResult {
 // cover Turkish-with-and-without-diacritics and English keywords.
 
 interface IntentRule {
-  /** Pattern the raw input must match for this rule to fire. */
-  match: RegExp;
+  /** Returns true when the normalized input should fire this rule. */
+  test(normalized: string): boolean;
   /** Build the MCP tool action descriptor from the matched input. */
   build(text: string): Extract<AgenticIntent, { tool: string }>;
 }
@@ -60,23 +60,38 @@ function normalize(text: string): string {
   return out.toLowerCase().trim();
 }
 
-const STATUS_RE = /\b(?:sprint\s+durum\w*|durum\w*(?:\s+ne(?:dir)?)?|durumu\s+nasil|status|how\s+is\s+sprint|how\s+are\s+we|nasil\s+gidiyor)\b/;
-const HISTORY_RE = /\b(?:son\s+sprint\w*|gecmis|history|sprint\s+history|past\s+sprints?)\b/;
-const RECALL_RE = /\b(?:hafiza\w*|recall|memory|ara|search|find)\b/;
+// task 380-007 (born-514, AGENTIC-DISPATCH-OVERMATCH): the original rules below matched on a
+// single bare, unqualified keyword ("ara", "memory", "find", "search", "plan", "status", bare
+// "durum\w*"/"gecmis", "how is/are") anywhere in the sentence — measured (359-009,
+// tests/cli/nl-dispatch-evidence.test.ts) to silently misroute 16/20 ordinary conversational
+// sentences into a tool call. Every trigger below now requires either a distinctive/rare word
+// (recall, planla) or an explicit command-shape context (sprint-scoped, or a memory-noun +
+// search-verb pairing) — a bare generic word alone no longer fires.
+
+const STATUS_RE = /\b(?:sprint\s+durum\w*|durum(?:u|un)?\s+ne(?:dir)?|durumu\s+nasil|what(?:'s|\s+is)\s+the\s+status|nasil\s+gidiyor)\b/;
+const HISTORY_RE = /\b(?:son\s+sprint\w*|sprint\s+gecmis\w*|gecmis\w*\s+sprint\w*|history|sprint\s+history|past\s+sprints?)\b/;
+const RECALL_RE = /\brecall\b/;
+const MEMORY_WORD_RE = /\b(?:hafiza\w*|memory)\b/;
+const SEARCH_VERB_RE = /\b(?:ara|search|find)\b/;
 const RECALL_STRIP_RE = /\b(?:hafiza\w*|recall|memory|ara|search|find|for)\b/g;
-const PLAN_RE = /\b(?:plan(?:la)?|sprint\s+planla|generate\s+plan)\b/;
+const PLAN_RE = /\b(?:planla|sprint\s+plan\w*|generate\s+plan)\b/;
 
 const RULES: readonly IntentRule[] = [
   {
-    match: STATUS_RE,
+    test: (normalized) => STATUS_RE.test(normalized),
     build: () => ({ tool: 'deckent_status', args: { root: '.' } }),
   },
   {
-    match: HISTORY_RE,
+    test: (normalized) => HISTORY_RE.test(normalized),
     build: () => ({ tool: 'deckent_history', args: { root: '.' } }),
   },
   {
-    match: RECALL_RE,
+    // "recall" is a distinctive/rare word — safe as a standalone trigger. The generic
+    // ara/search/find verbs are extremely common in ordinary conversation on their own
+    // (call me later / find my keys / search for an apartment), so they only fire when
+    // paired with an explicit memory-noun word in the SAME utterance.
+    test: (normalized) => RECALL_RE.test(normalized)
+      || (MEMORY_WORD_RE.test(normalized) && SEARCH_VERB_RE.test(normalized)),
     build: (text) => {
       // Strip the intent keywords + connector "for" so the remainder is the query.
       const query = normalize(text)
@@ -91,7 +106,7 @@ const RULES: readonly IntentRule[] = [
     },
   },
   {
-    match: PLAN_RE,
+    test: (normalized) => PLAN_RE.test(normalized),
     build: () => ({ tool: 'deckent_plan', args: { mode: 'auto' } }),
   },
 ];
@@ -107,7 +122,7 @@ export function classifyAgenticIntent(text: string): AgenticIntent {
   const normalized = normalize(text);
   if (normalized.length === 0) return { tool: null, reason: 'no_match' };
   for (const rule of RULES) {
-    if (rule.match.test(normalized)) return rule.build(text);
+    if (rule.test(normalized)) return rule.build(text);
   }
   return { tool: null, reason: 'no_match' };
 }

@@ -525,6 +525,7 @@ export function registerChat(program: Command): void {
           dispatcher,
           input: readStdin(),
           output: print,
+          gracefulErrors: true,
           lang,
         });
         return;

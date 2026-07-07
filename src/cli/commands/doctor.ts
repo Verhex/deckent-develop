@@ -43,7 +43,13 @@ import {
   parseMemoryString,
 } from '../../orchestra/spawn-backend-docker.js';
 import { promptConfirm } from '../helpers/prompt.js';
-import { runProviderDiagnostics, checkDaemonHygiene } from './doctor-checks.js';
+import {
+  runProviderDiagnostics,
+  checkDaemonHygiene,
+  runPreFlightHealthCheck,
+  type PreFlightResult,
+  type PreFlightCheckResult,
+} from './doctor-checks.js';
 import { detectEnvironment } from '../../core/environment.js';
 import { loadDeckSecrets, validateDeckFile, KNOWN_DECK_KEYS, isDeckFileCommitted } from '../../core/deck-file.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
@@ -1618,48 +1624,12 @@ export function runDoctorChecks(root: string, providerNames?: string[], spawnBac
   };
 }
 
-export interface PreFlightCheckResult {
-  name: string;
-  passed: boolean;
-  required: boolean;
-  message: string;
-  durationMs?: number;
-}
-
-export interface PreFlightResult {
-  passed: boolean;
-  abortSprint: boolean;
-  checks: PreFlightCheckResult[];
-}
-
-/**
- * Run pre-flight health check by invoking the pre-flight script as a child process.
- * Returns structured result suitable for --json output or spawn-gate decisions.
- */
-export function runPreFlightHealthCheck(root: string): PreFlightResult {
-  // Resolve script path relative to project root (works at both dev and dist time)
-  const scriptPath = join(root, 'scripts', 'pre-flight-health-check.mjs');
-
-  const result = spawnSync('node', [scriptPath, '--json', '--root', root, '--skip-tests'], {
-    encoding: 'utf-8',
-    cwd: root,
-    timeout: 120_000,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-  const output = result.stdout?.trim() ?? '';
-  if (output) {
-    try {
-      return JSON.parse(output) as PreFlightResult;
-    } catch { /* fall through to fallback */ }
-  }
-  // Fallback: parse basic doctor checks
-  const doctorResult = runDoctorChecks(root);
-  return {
-    passed: doctorResult.ok,
-    abortSprint: !doctorResult.ok,
-    checks: doctorResult.checks.map(c => ({ name: c.name, passed: c.passed, required: c.required, message: c.message })),
-  };
-}
+// PreFlightCheckResult / PreFlightResult / runPreFlightHealthCheck: canonical
+// definition lives in doctor-checks.ts (born-505, task 380-013 — was
+// duplicated verbatim in both modules). Re-exported here to preserve this
+// module's existing public surface for any external importer.
+export type { PreFlightResult, PreFlightCheckResult };
+export { runPreFlightHealthCheck };
 
 export interface RamExperimentReport {
   hostGB: number;

@@ -443,8 +443,10 @@ export function emitAuthorityViolation(
 
 // ─── Layer 4: ADR Compliance Enforcement ────────────────────────────
 // Runtime checks for ADR-006 (spawnSync shell:true) and ADR-008 (core→orchestra
-// import). Violations produce NO_GO + amendment proposals. Fail-safe: enforcer
-// errors → task continues.
+// import). Violations produce NO_GO + amendment proposals. A missing/unreadable
+// per-file read is skipped (not a violation) — but an internal enforcer crash
+// (LIFECYCLE-CRITICAL-2, sprint-380 task 380-002) fails CLOSED: the task is
+// blocked (NO_GO) rather than silently passing the compliance gate.
 //
 // DEP-POLICY-WIRE (ADR-D-005): the former ADR-010 package.json deps WHITELIST
 // (NO_GO for any dep outside a 4-package set) was REMOVED here — the minimal-dep
@@ -534,8 +536,14 @@ function checkAdr008(taskId: string, filePath: string, content: string): AdrViol
  * Scans the listed files for violations of ADR-006, ADR-008, and ADR-010.
  * Returns a result with pass/fail status and any violations found.
  *
- * **Fail-safe**: If the enforcer itself throws (e.g., file read error),
- * the task is NOT blocked — the error is captured in `enforcerError`.
+ * **Fail-CLOSED** (LIFECYCLE-CRITICAL-2, sprint-380 task 380-002): a missing
+ * or unreadable individual file is skipped (not a violation — see the
+ * per-file try/catch below). But if the enforcer itself crashes — a bug, a
+ * malformed `changedFiles` input, anything outside the expected per-file
+ * failure modes — compliance is NOT silently assumed. The task is blocked
+ * (`pass:false`, with a synthetic violation describing the crash) and the
+ * error is also captured in `enforcerError` for diagnosis. An enforcer bug
+ * must never be indistinguishable from "no ADR violations found".
  *
  * @param projectRoot - Absolute path to project root
  * @param sprintId - Current sprint identifier
@@ -602,7 +610,15 @@ export function enforceAdrCompliance(
       violations,
     };
   } catch (err) {
-    // Fail-safe: enforcer crash → task continues, error is logged
+    // Fail-CLOSED (LIFECYCLE-CRITICAL-2, sprint-380 task 380-002): an enforcer
+    // internal crash (as opposed to a per-file read miss, which is handled
+    // above and never reaches here) used to report pass:true, silently
+    // disabling the ADR compliance gate for this task's changed files exactly
+    // when something was already broken. Fail-closed instead: the crash
+    // becomes a synthetic violation so the standard NO_GO/FIX path (already
+    // wired in sprint-phases.ts:runEvaluatePhase off `adrVerdict.pass` /
+    // `.violations`) surfaces it with a real reason, with zero changes needed
+    // to that call site.
     const errorMsg = err instanceof Error ? err.message : String(err);
     try {
       writeEvent(
@@ -614,16 +630,23 @@ export function enforceAdrCompliance(
         {
           taskId,
           enforcerError: errorMsg,
-          description: 'ADR compliance enforcer failed — task proceeds (fail-safe)',
+          description: 'ADR compliance enforcer crashed — failing CLOSED (task blocked, compliance gate never silently disabled)',
         },
       );
     } catch {
-      // Double fail-safe
+      // Double fail-safe: event write failure must not hide the fail-closed verdict below
     }
 
     return {
-      pass: true, // Fail-safe: do not block the task
-      violations: [],
+      pass: false, // Fail-CLOSED: an enforcer crash must never silently pass compliance
+      violations: [{
+        taskId,
+        adrId: 'enforcer-internal-error',
+        file: '<authority-enforcer>',
+        line: 0,
+        description: `ADR compliance enforcer crashed before it could evaluate changed files for task ${taskId}: ${errorMsg}. Failing closed — task blocked until the enforcer error is investigated and resolved.`,
+        amendmentProposal: 'Investigate and fix the authority-enforcer crash (see enforcerError), then re-run ADR compliance for this task.',
+      }],
       enforcerError: errorMsg,
     };
   }

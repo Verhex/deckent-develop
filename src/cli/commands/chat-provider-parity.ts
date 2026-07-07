@@ -36,6 +36,14 @@ export interface ResolveChatAdapterOptions {
   openaiCompatBaseUrl?: string;
   /** Model name for openai-compatible endpoint. Env var DECKENT_OPENAI_COMPAT_MODEL takes precedence. */
   openaiCompatModel?: string;
+  /**
+   * HTTP request timeout (ms) for the Ollama / openai-compatible adapters —
+   * guards against an unresponsive local server hanging the REPL turn
+   * indefinitely. Env var DECKENT_CHAT_HTTP_TIMEOUT_MS takes precedence.
+   * Default 60_000 (60s) — a chat-completion budget, not a liveness-probe
+   * budget (cf. the 3s PROBE_TIMEOUT_MS in src/providers/ollama.ts).
+   */
+  httpTimeoutMs?: number;
 }
 
 // ─── CLI-spawn adapter (claude / codex / gemini) ─────────────────────────
@@ -59,7 +67,26 @@ function subscriptionEnv(): NodeJS.ProcessEnv {
   delete env['GEMINI_API_KEY'];
   delete env['GOOGLE_API_KEY'];
   delete env['DECKENT_GOOGLE_API_KEY'];
+  // Codex CLI treats either of these as API-key auth, outranking its own
+  // subscription/OAuth session (see provider-auth-probe.ts's probeCodex,
+  // which honors OPENAI_API_KEY / DECKENT_OPENAI_API_KEY in that exact
+  // order). Stripped unconditionally alongside the gemini keys above —
+  // harmless for the claude/gemini branches, required for codex.
+  delete env['OPENAI_API_KEY'];
+  delete env['DECKENT_OPENAI_API_KEY'];
   return env;
+}
+
+/**
+ * A non-zero subprocess exit (expired auth, rate limit, crash) previously
+ * surfaced as a silent empty-success turn — `wait`'s `{ exitCode }` was
+ * resolved but never inspected. `SubscriptionSpawnFn` exposes no stderr
+ * channel, so any already-collected stdout text is the best available
+ * failure signal here.
+ */
+function subscriptionExitError(binary: string, exitCode: number, collectedText: string): string {
+  const suffix = collectedText.length > 0 ? `: ${collectedText}` : ' (no output)';
+  return `${binary} subscription call exited with code ${exitCode}${suffix}`;
 }
 
 function buildCliSpawnAdapter(
@@ -74,7 +101,10 @@ function buildCliSpawnAdapter(
       const { chunks, wait } = spawnFn(binary, [...extraArgs, prompt], subscriptionEnv());
       let text = '';
       for await (const chunk of chunks) text += chunk;
-      await wait;
+      const { exitCode } = await wait;
+      if (exitCode !== null && exitCode !== 0) {
+        throw new Error(subscriptionExitError(binary, exitCode, text));
+      }
       return { text, stopReason: 'end_turn' };
     },
     async *stream(messages: ChatMessage[]) {
@@ -86,10 +116,57 @@ function buildCliSpawnAdapter(
         collected += chunk;
         yield { text: chunk };
       }
-      await wait;
+      const { exitCode } = await wait;
+      if (exitCode !== null && exitCode !== 0) {
+        throw new Error(subscriptionExitError(binary, exitCode, collected));
+      }
       yield { done: { text: collected, stopReason: 'end_turn' } };
     },
   };
+}
+
+// ─── HTTP timeout helper (Ollama / openai-compatible) ────────────────
+
+const DEFAULT_HTTP_TIMEOUT_MS = 60_000;
+
+function resolveHttpTimeoutMs(opts: ResolveChatAdapterOptions): number {
+  const envVal = process.env['DECKENT_CHAT_HTTP_TIMEOUT_MS'];
+  if (envVal !== undefined) {
+    const parsed = Number(envVal);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return opts.httpTimeoutMs ?? DEFAULT_HTTP_TIMEOUT_MS;
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === 'AbortError';
+}
+
+/**
+ * fetch wrapper with a bounded timeout — mirrors the established
+ * AbortController + setTimeout pattern used elsewhere in the codebase
+ * (src/providers/ollama.ts's fetchWithTimeout, src/core/notify-adapters/
+ * webhook-adapter.ts's fetchHttpClient). Without this, an unresponsive
+ * local Ollama/openai-compat server hangs the REPL turn forever.
+ */
+async function fetchWithTimeout(
+  fetchImpl: typeof fetch,
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetchImpl(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (isAbortError(err)) {
+      throw new Error(`Request timed out after ${timeoutMs}ms: ${url}`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // ─── Ollama HTTP adapter ──────────────────────────────────────────────
@@ -102,15 +179,16 @@ function buildOllamaAdapter(opts: ResolveChatAdapterOptions): ChatProviderAdapte
   ).replace(/\/$/, '');
   const model = process.env['DECKENT_OLLAMA_MODEL'] ?? opts.ollamaModel ?? 'llama3';
   const fetchImpl = opts.fetchFn ?? fetch;
+  const timeoutMs = resolveHttpTimeoutMs(opts);
 
   return {
     async send(messages: ChatMessage[]): Promise<ProviderResponse> {
       const prompt = buildSubscriptionPrompt(messages);
-      const res = await fetchImpl(`${host}/api/generate`, {
+      const res = await fetchWithTimeout(fetchImpl, `${host}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, prompt, stream: false }),
-      });
+      }, timeoutMs);
       if (!res.ok) {
         throw new Error(`Ollama request failed: ${res.status} ${res.statusText} (${host})`);
       }
@@ -130,6 +208,7 @@ function buildOpenAiCompatAdapter(opts: ResolveChatAdapterOptions): ChatProvider
   ).replace(/\/$/, '');
   const model = process.env['DECKENT_OPENAI_COMPAT_MODEL'] ?? opts.openaiCompatModel ?? 'default';
   const fetchImpl = opts.fetchFn ?? fetch;
+  const timeoutMs = resolveHttpTimeoutMs(opts);
 
   return {
     async send(messages: ChatMessage[]): Promise<ProviderResponse> {
@@ -138,11 +217,11 @@ function buildOpenAiCompatAdapter(opts: ResolveChatAdapterOptions): ChatProvider
         model,
         messages: [{ role: 'user', content: prompt }],
       };
-      const res = await fetchImpl(`${baseUrl}/v1/chat/completions`, {
+      const res = await fetchWithTimeout(fetchImpl, `${baseUrl}/v1/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      });
+      }, timeoutMs);
       if (!res.ok) {
         throw new Error(`OpenAI-compat request failed: ${res.status} ${res.statusText} (${baseUrl})`);
       }

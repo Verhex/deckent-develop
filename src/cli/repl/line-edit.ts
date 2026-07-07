@@ -6,6 +6,7 @@
 // (scroll-region TUI) so the Ink path owns its line-editing core cleanly.
 
 import type { Key } from 'node:readline';
+import { applyCursorEdit, moveCursor, toBuffer, type CursorState } from './cursor-model.js';
 
 /** Editable input-line state (pure). */
 export interface InputState {
@@ -15,6 +16,19 @@ export interface InputState {
 }
 
 export const EMPTY_INPUT: InputState = Object.freeze({ buffer: '', cursor: 0 });
+
+// `InputState.cursor` is a raw UTF-16 offset (input-bar.tsx slices `buffer`
+// with it directly), but stepping/editing by 1 UTF-16 unit can bisect a
+// surrogate pair (ADR-D-010 KALAN (a)). These two helpers convert at the
+// boundary so the arithmetic itself runs on cursor-model's code-point-safe
+// `CursorState`, without changing InputState's external UTF-16-offset contract.
+function toCursorState(buffer: string, utf16Cursor: number): CursorState {
+  return { codePoints: [...buffer], cursor: [...buffer.slice(0, utf16Cursor)].length };
+}
+
+function toUtf16Cursor(state: CursorState): number {
+  return state.codePoints.slice(0, state.cursor).join('').length;
+}
 
 /** Result of feeding one key to the input editor. */
 export interface EditResult {
@@ -54,16 +68,26 @@ export function editInput(state: InputState, key: Key): EditResult {
       const line = buffer;
       return { state: EMPTY_INPUT, submit: line.length > 0 ? line : undefined };
     }
-    case 'backspace':
-      if (cursor === 0) return { state };
-      return { state: { buffer: buffer.slice(0, cursor - 1) + buffer.slice(cursor), cursor: cursor - 1 } };
-    case 'delete':
-      if (cursor >= buffer.length) return { state };
-      return { state: { buffer: buffer.slice(0, cursor) + buffer.slice(cursor + 1), cursor } };
-    case 'left':
-      return { state: { buffer, cursor: Math.max(0, cursor - 1) } };
-    case 'right':
-      return { state: { buffer, cursor: Math.min(buffer.length, cursor + 1) } };
+    case 'backspace': {
+      const edited = applyCursorEdit(toCursorState(buffer, cursor), 'backspace');
+      if (edited.kind === 'unchanged') return { state };
+      return { state: { buffer: toBuffer(edited.state), cursor: toUtf16Cursor(edited.state) } };
+    }
+    case 'delete': {
+      const edited = applyCursorEdit(toCursorState(buffer, cursor), 'delete');
+      if (edited.kind === 'unchanged') return { state };
+      return { state: { buffer: toBuffer(edited.state), cursor: toUtf16Cursor(edited.state) } };
+    }
+    case 'left': {
+      const moved = moveCursor(toCursorState(buffer, cursor), 'left');
+      if (moved.kind === 'unchanged') return { state };
+      return { state: { buffer, cursor: toUtf16Cursor(moved.state) } };
+    }
+    case 'right': {
+      const moved = moveCursor(toCursorState(buffer, cursor), 'right');
+      if (moved.kind === 'unchanged') return { state };
+      return { state: { buffer, cursor: toUtf16Cursor(moved.state) } };
+    }
     case 'home':
       return { state: { buffer, cursor: 0 } };
     case 'end':

@@ -77,8 +77,28 @@ const TOOL_COMMANDS: Readonly<Record<string, readonly string[]>> = {
   // appended as the `recall <query>` positional.
 };
 
-/** Safety net: kill a headless CLI spawn that runs longer than this (ms). */
-const SPAWN_TIMEOUT_MS = 30_000;
+/**
+ * Safety net: kill a headless CLI spawn that runs longer than its budget (ms).
+ *
+ * Per-command-class budget (born-516): most bridged tools are read-only and
+ * finish in seconds, so they use the conservative default. `audit`
+ * (provider-backed self-audit gate, documented 30-60s+) and `plan` (AI plan
+ * generation) are documented to legitimately run past 30s — a flat timeout
+ * killed them mid-run. Add an entry to SPAWN_TIMEOUT_MS_BY_COMMAND for any
+ * future tool documented to run long; everything else falls back to
+ * DEFAULT_SPAWN_TIMEOUT_MS. The budget stays finite either way — never removed.
+ */
+const DEFAULT_SPAWN_TIMEOUT_MS = 30_000;
+const SPAWN_TIMEOUT_MS_BY_COMMAND: Readonly<Record<string, number>> = {
+  audit: 180_000,
+  plan: 180_000,
+};
+
+/** Resolve the spawn-kill budget (ms) for a resolved CLI argv, keyed off its first token. */
+export function resolveSpawnTimeoutMs(cliArgs: readonly string[]): number {
+  const cmd = cliArgs[0];
+  return (cmd !== undefined ? SPAWN_TIMEOUT_MS_BY_COMMAND[cmd] : undefined) ?? DEFAULT_SPAWN_TIMEOUT_MS;
+}
 
 // ─── Spawn injection ────────────────────────────────────────────────────────
 
@@ -103,7 +123,8 @@ function resolveEntryPath(): string {
   return join(__dirname, '..', 'entry.js');
 }
 
-function defaultSpawnFn(args: string[]): Promise<string> {
+/** Exported for direct hermetic testing (tool-bridge-timeout.test.ts) — mocks node:child_process.spawn + fake timers. */
+export function defaultSpawnFn(args: string[]): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const entryPath = resolveEntryPath();
     const child = spawn(process.execPath, [entryPath, ...args], {
@@ -112,19 +133,30 @@ function defaultSpawnFn(args: string[]): Promise<string> {
     });
     let out = '';
     let settled = false;
-    // Safety net: if a command runs past the budget (an unexpectedly slow or
+    // Safety net: if a command runs past its budget (an unexpectedly slow or
     // auth-blocked subcommand), kill it and surface a tagged error rather than
-    // freezing the REPL turn forever.
+    // freezing the REPL turn forever. Budget is per-command-class — see
+    // resolveSpawnTimeoutMs.
+    const timeoutMs = resolveSpawnTimeoutMs(args);
     const timer = setTimeout(() => {
       if (settled) return;
       settled = true;
       try { child.kill('SIGKILL'); } catch { /* already gone */ }
-      reject(new Error(`timed out after ${SPAWN_TIMEOUT_MS / 1000}s`));
-    }, SPAWN_TIMEOUT_MS);
+      reject(new Error(`timed out after ${timeoutMs / 1000}s`));
+    }, timeoutMs);
     child.stdout?.setEncoding('utf-8');
     child.stderr?.setEncoding('utf-8');
     child.stdout?.on('data', (chunk: string) => { out += chunk; });
     child.stderr?.on('data', (chunk: string) => { out += chunk; });
+    // born-509 spawn-hardening: without this, a spawn-level failure (e.g. ENOENT)
+    // is silently dropped and the promise hangs until the timeout fires instead
+    // of surfacing the real error immediately.
+    child.once('error', (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(err);
+    });
     child.once('close', () => {
       if (settled) return;
       settled = true;

@@ -20,8 +20,15 @@ export interface SwitchableProvider {
   readonly proxy: ChatProviderAdapter;
   /** Current selection (provider + model). */
   current(): ActiveSelection;
-  /** Switch provider and/or model; tears down the previous adapter. */
-  switchTo(sel: Partial<ActiveSelection>): void;
+  /**
+   * Switch provider and/or model; tears down the previous adapter.
+   *
+   * Returns the now-active selection. If `rebuild` throws for the requested
+   * target (e.g. an unknown provider name), the previous adapter/selection
+   * stays live — the switch is refused honestly via `switchError` rather
+   * than crashing or silently falling back to a different provider.
+   */
+  switchTo(sel: Partial<ActiveSelection>): ActiveSelection & { switchError?: string };
   /** Tear down the active adapter (REPL exit). */
   exit(): Promise<void>;
 }
@@ -73,10 +80,20 @@ export function createSwitchableProvider(
         provider: sel.provider ?? selection.provider,
         model: sel.model !== undefined ? sel.model : selection.model,
       };
+      let built: MaybeSession;
+      try {
+        built = rebuild(next) as MaybeSession;
+      } catch (error) {
+        // Unresolvable target (e.g. an unrecognized provider name) — stay on
+        // the current adapter and report the failure honestly instead of
+        // crashing the REPL (born-512) or silently falling back (Yasa #2).
+        return { ...selection, switchError: error instanceof Error ? error.message : String(error) };
+      }
       const prev = active;
-      active = rebuild(next) as MaybeSession;
+      active = built;
       selection = next;
       void teardown(prev); // fire-and-forget; the new adapter is already live
+      return { ...next };
     },
     exit: () => teardown(active),
   };

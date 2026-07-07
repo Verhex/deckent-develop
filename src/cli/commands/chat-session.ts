@@ -280,13 +280,66 @@ export function defaultPersistentSpawn(
   }
   stdout.setEncoding('utf-8');
   const rl = createInterface({ input: stdout, crlfDelay: Infinity });
+
+  // Sprint 380 T-380-005 — a spawn failure (e.g. ENOENT for a missing or
+  // misconfigured provider binary) fires Node's 'error' event on the
+  // ChildProcess AND independently on its stdio streams. An EventEmitter
+  // 'error' event with NO listener is thrown as an uncaught exception (Node
+  // contract) — with none of the four listeners below wired, a bad provider
+  // binary crashed the whole REPL process instead of producing a handled
+  // turn. `stdoutLines` re-throws the captured error once the readline loop
+  // ends — that turns into a real rejection out of `runTurn`'s
+  // `await it.next()`, which `send()`/`stream()` propagate as a thrown
+  // error. That is exactly the pre-call-throw shape chat-native.ts's
+  // existing `gracefulErrors` option already converts into a handled
+  // `chat.provider_error` turn (chat-native.ts is out of this task's write
+  // scope — reuse its contract rather than duplicate it here).
+  //
+  // `settled`/`settledPromise` below exist because whether 'error' or the
+  // stdout pipe's own natural close is delivered FIRST is not guaranteed:
+  // Node can detect a failed spawn either synchronously (fast path,
+  // 'error' fires immediately via process.nextTick — always before any
+  // stdio stream event) OR by forking and discovering the exec() failure
+  // asynchronously through an internal error pipe (slow path — that read
+  // is itself a poll-phase I/O callback racing the stdout pipe's own
+  // close callback at the libuv/kernel level, so either can win). If the
+  // readline loop below finished simply because `rl` closed naturally, that
+  // is NOT proof the spawn succeeded — a pending 'error' may just not have
+  // been delivered yet. `settledPromise` resolves on whichever of 'error' /
+  // 'close' the child reports first, so we always know the true outcome
+  // before deciding to throw — `close` is guaranteed to eventually fire
+  // once the process has ended and stdio has closed (Node contract), so
+  // this wait is bounded, not an arbitrary timeout.
+  let spawnError: Error | null = null;
+  let settled = false;
+  let resolveSettled: (() => void) | null = null;
+  const settledPromise = new Promise<void>((resolve) => { resolveSettled = resolve; });
+  const markSettled = (): void => {
+    if (settled) return;
+    settled = true;
+    resolveSettled?.();
+  };
+  const onSpawnError = (err: unknown): void => {
+    if (!spawnError) spawnError = err instanceof Error ? err : new Error(String(err));
+    markSettled();
+    rl.close();
+  };
+  child.on('error', onSpawnError);
+  child.stdin?.on('error', onSpawnError);
+  child.stdout?.on('error', onSpawnError);
+  child.stderr?.on('error', onSpawnError);
+  child.once('close', markSettled);
+
   const stdoutLines: AsyncIterable<string> = {
     async *[Symbol.asyncIterator]() {
       for await (const line of rl) yield line as string;
+      if (!settled) await settledPromise;
+      if (spawnError) throw spawnError;
     },
   };
   const wait = new Promise<{ exitCode: number | null }>((resolve) => {
     child.once('close', (code) => resolve({ exitCode: code }));
+    child.once('error', () => resolve({ exitCode: null }));
   });
   return {
     stdin: child.stdin as Writable,
@@ -443,6 +496,10 @@ export function createPersistentClaudeSession(
     handle = spawnFn(binary, extraArgs, env);
     lineIter = handle.stdoutLines[Symbol.asyncIterator]();
     spawnCount++;
+    // Sprint 380 T-380-005 — a fresh spawn after exit() must clear the
+    // teardown flag; otherwise isAlive() (handle !== null && !exited) stays
+    // falsely `false` for a brand-new, alive child on a kill+restart cycle.
+    exited = false;
     return handle;
   }
 

@@ -21,6 +21,7 @@ import { resolveReasoningEffort } from '../core/reasoning-effort.js';
 import { debugLog } from '../core/utils.js';
 import type { ProviderDefinition } from '../core/config-types.js';
 import { resolveCrossProviderCredentialKeys } from './cross-provider-keys.js';
+import { scrubCrossProviderEnv } from './provider.js';
 
 /**
  * MOAT-2 (ADR-G-013): grace window between a graceful SIGTERM and the SIGKILL
@@ -242,10 +243,10 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     // opts.env is the single source of truth for credentials; host env keys are never
     // trusted. A no-secret / single-provider spawn keeps PATH/LANG byte-for-byte and
     // simply carries no provider key. Pure JS map-ops — identical on every platform.
-    const childEnv: NodeJS.ProcessEnv = { ...process.env };
-    for (const key of this.crossProviderCredentialKeys) {
-      delete childEnv[key];
-    }
+    // born-518: scrub extracted to the shared providers/provider.ts helper so
+    // every adapter's spawn path can share one implementation instead of
+    // re-deriving it — see that module's docstring for adoption status.
+    const childEnv: NodeJS.ProcessEnv = scrubCrossProviderEnv(process.env, this.crossProviderCredentialKeys);
     // DECKBROKER-WIRE (354-006, flag-gated, ADR-G-005/G-017 row 422): when the
     // caller hands a DeckBroker (opts.deckBroker — minted by bootstrapProviders
     // only when config.deck_broker.enabled), resolve THIS task's own credential

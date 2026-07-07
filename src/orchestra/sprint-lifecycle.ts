@@ -91,7 +91,16 @@ export type CheckpointPhase = 'plan' | 'evaluate' | 'fix';
 interface CheckpointFile {
   phase: string;
   summary: string;
-  status: 'pending' | 'approved' | 'rejected';
+  /**
+   * 'timeout' (LIFECYCLE-CRITICAL-2, sprint-380 task 380-002): the bounded
+   * approval wait expired with no human decision — distinct from an explicit
+   * human 'rejected' so `deckent checkpoint list` / the MCP checkpoint tool
+   * can tell a lost/forgotten approval apart from a real rejection. Every
+   * other reader of this file (cli/commands/checkpoint.ts,
+   * mcp/tools/checkpoint.ts, connectors/bot-agentic.ts) only ever compares
+   * `status === 'pending'`, so this addition is non-breaking there.
+   */
+  status: 'pending' | 'approved' | 'rejected' | 'timeout';
   createdAt: string;
 }
 
@@ -452,17 +461,60 @@ export function cleanup(
 // ═══ Human Checkpoint Support ═════════════════════════════════════
 
 /**
+ * Bounded ceiling for a human sprint-checkpoint approval wait before it times
+ * out and the sprint parks (aborts cleanly) instead of polling forever.
+ *
+ * LIFECYCLE-CRITICAL-2 (sprint-380 task 380-002): `waitForHumanApproval` used
+ * to `while(true)` poll with NO bound — a lost, forgotten, or misrouted
+ * approval request hung the sprint indefinitely. 4h is a meaningful bound:
+ * long enough to survive a normal work interruption (meeting, end of day)
+ * without prematurely aborting a legitimate slow approval; short enough that
+ * a truly lost request surfaces the same day instead of hanging for days.
+ */
+export const CHECKPOINT_APPROVAL_TIMEOUT_MS = 4 * 60 * 60 * 1000;
+
+/**
+ * Re-escalation cadence while a checkpoint is still pending — re-fires the
+ * `human-checkpoint-required` notification so a missed/dismissed alert isn't
+ * the operator's only chance to notice before the hard timeout parks the
+ * sprint. Mirrors the re-notify-then-escalate shape already used by
+ * `AskBrainEscalationTracker` (nervous/ask-brain-escalation.ts).
+ */
+export const CHECKPOINT_ESCALATION_INTERVAL_MS = 30 * 60 * 1000;
+
+const CHECKPOINT_POLL_INTERVAL_MS = 5_000;
+
+export interface WaitForHumanApprovalOptions {
+  /** Overall wait ceiling before giving up and parking. Default {@link CHECKPOINT_APPROVAL_TIMEOUT_MS}. */
+  timeoutMs?: number;
+  /** Re-notify cadence while pending. Default {@link CHECKPOINT_ESCALATION_INTERVAL_MS}. */
+  escalationIntervalMs?: number;
+  /** Poll cadence. Default 5s — test seam only; production call sites never override this. */
+  pollIntervalMs?: number;
+}
+
+/**
  * Wait for human approval at a sprint checkpoint.
- * Writes a checkpoint JSON file to `.deckent/checkpoints/` and polls every 5s
- * until the status is changed to 'approved' or 'rejected'.
- * @returns true if approved, false if rejected
+ * Writes a checkpoint JSON file to `.deckent/checkpoints/` and polls until the
+ * status is changed to 'approved' or 'rejected' — or the bounded timeout is
+ * reached (LIFECYCLE-CRITICAL-2), in which case the checkpoint is marked
+ * 'timeout', a final critical escalation notification fires, and the wait
+ * resolves to `false` so the caller parks the sprint cleanly
+ * (`SprintStatus.ABORTED`) instead of hanging forever on a lost/forgotten
+ * approval request.
+ * @returns true if approved, false if rejected, timed out, or interrupted
  */
 export async function waitForHumanApproval(
   projectRoot: string,
   sprintId: string,
   phase: CheckpointPhase,
   summary: string,
+  opts: WaitForHumanApprovalOptions = {},
 ): Promise<boolean> {
+  const timeoutMs = Math.max(1, opts.timeoutMs ?? CHECKPOINT_APPROVAL_TIMEOUT_MS);
+  const escalationIntervalMs = Math.max(1, opts.escalationIntervalMs ?? CHECKPOINT_ESCALATION_INTERVAL_MS);
+  const pollIntervalMs = Math.max(1, opts.pollIntervalMs ?? CHECKPOINT_POLL_INTERVAL_MS);
+
   const checkpointsDir = join(projectRoot, '.deckent', 'checkpoints');
   mkdirSync(checkpointsDir, { recursive: true });
 
@@ -475,7 +527,7 @@ export async function waitForHumanApproval(
   };
 
   await writeFile(checkpointPath, JSON.stringify(checkpoint, null, 2), 'utf-8');
-  debugLog('waitForHumanApproval', `Checkpoint written: ${checkpointPath} — waiting for approval`);
+  debugLog('waitForHumanApproval', `Checkpoint written: ${checkpointPath} — waiting for approval (timeout ${timeoutMs}ms)`);
 
   // DECKENT→USER:NOTIFY (Hot Fix H6) — human-checkpoint-required (critical, immediate)
   try {
@@ -487,9 +539,15 @@ export async function waitForHumanApproval(
     );
   } catch (e) { debugLog('waitForHumanApproval:notify', e); }
 
-  // Poll every 5 seconds until approved or rejected
-  while (true) {
-    await new Promise(resolve => setTimeout(resolve, 5_000));
+  // Bounded poll loop (LIFECYCLE-CRITICAL-2): never wait unbounded. A
+  // re-escalation notice fires every `escalationIntervalMs` while still
+  // pending; reaching `timeoutMs` breaks out of the loop and falls through to
+  // the timeout-park path below instead of looping forever.
+  const startedAt = Date.now();
+  let lastEscalationAt = startedAt;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
 
     // Check for interrupt
     if (_isInterrupted) return false;
@@ -508,7 +566,50 @@ export async function waitForHumanApproval(
     } catch (e) {
       debugLog('waitForHumanApproval:readCheckpoint', e);
     }
+
+    const nowMs = Date.now();
+    if (nowMs - lastEscalationAt >= escalationIntervalMs) {
+      lastEscalationAt = nowMs;
+      const elapsedMinutes = Math.round((nowMs - startedAt) / 60_000);
+      try {
+        void notify(
+          'human-checkpoint-required',
+          sprintId,
+          `[Hatırlatma] Onay hâlâ bekleniyor: ${phase}`,
+          `${summary} — ${elapsedMinutes} dakikadır onay bekliyor.`,
+        );
+      } catch (e) { debugLog('waitForHumanApproval:escalationNotify', e); }
+    }
   }
+
+  // Bounded timeout reached — park instead of hanging (LIFECYCLE-CRITICAL-2).
+  // Mark the checkpoint 'timeout' (distinct from an explicit human
+  // 'rejected') so `deckent checkpoint list` / the MCP checkpoint tool can
+  // tell a lost approval apart from a real rejection, fire a final critical
+  // escalation, and resolve false: every existing call site
+  // (sprint-controller.ts PLAN/EVALUATE/FIX checkpoints) already treats
+  // `false` as "stop cleanly" (`sprint.status = SprintStatus.ABORTED`) —
+  // never as license to hang.
+  try {
+    const raw = await readFile(checkpointPath, 'utf-8');
+    const current = JSON.parse(raw) as CheckpointFile;
+    if (current.status === 'pending') {
+      current.status = 'timeout';
+      await writeFile(checkpointPath, JSON.stringify(current, null, 2), 'utf-8');
+    }
+  } catch (e) { debugLog('waitForHumanApproval:markTimeout', e); }
+
+  try {
+    void notify(
+      'human-checkpoint-required',
+      sprintId,
+      `[TIMEOUT] Onay alınamadı: ${phase}`,
+      `${summary} — ${Math.round(timeoutMs / 60_000)} dakika içinde onay/red gelmedi, sprint parklanıyor (ABORTED).`,
+    );
+  } catch (e) { debugLog('waitForHumanApproval:timeoutNotify', e); }
+
+  debugLog('waitForHumanApproval', `Checkpoint ${phase} timed out after ${timeoutMs}ms — parking sprint`);
+  return false;
 }
 
 // ═══ Pause / Resume ════════════════════════════════════════════════

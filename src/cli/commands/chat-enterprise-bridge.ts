@@ -53,7 +53,13 @@ function resolveEntryPath(): string {
   return join(__dirname, '..', 'entry.js');
 }
 
-function defaultSpawnFn(args: string[]): Promise<string> {
+/**
+ * Exported (was module-private) purely so tests/cli/spawn-error-listener.test.ts
+ * can exercise the real spawn implementation directly — mirrors the
+ * already-exported `defaultPersistentSpawn` in chat-session.ts for the
+ * identical testing need. No behavior change.
+ */
+export function defaultSpawnFn(args: string[]): Promise<string> {
   return new Promise<string>((resolve) => {
     const entryPath = resolveEntryPath();
     const child = spawn(process.execPath, [entryPath, ...args], {
@@ -61,11 +67,27 @@ function defaultSpawnFn(args: string[]): Promise<string> {
       env: { ...process.env },
     });
     let out = '';
+    let settled = false;
+    const settle = (value: string): void => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
     child.stdout?.setEncoding('utf-8');
     child.stderr?.setEncoding('utf-8');
     child.stdout?.on('data', (chunk: string) => { out += chunk; });
     child.stderr?.on('data', (chunk: string) => { out += chunk; });
-    child.once('close', () => resolve(out.trim()));
+    // Sprint 380 T-380-005 — an EventEmitter 'error' event with no listener
+    // throws as an uncaught exception (Node contract); without this, a spawn
+    // failure here (e.g. dist/cli/entry.js missing/moved) crashed the whole
+    // REPL process. Node also does not guarantee 'close' fires after
+    // 'error', so settle() here instead of leaving the Promise to hang
+    // forever — tagged like the existing `[mcp-error]` convention
+    // (chat-native.ts) used for other dispatcher-level failures.
+    child.once('error', (err) => {
+      settle(`[enterprise-error] ${err.message}`);
+    });
+    child.once('close', () => settle(out.trim()));
   });
 }
 

@@ -36,6 +36,43 @@ export function loadSkillManifest(skillDir: string): SkillDefinition {
   return JSON.parse(readFileSync(manifestPath, 'utf-8')) as SkillDefinition;
 }
 
+/**
+ * Derive display-safe trigger keywords from a v2 manifest's `activation.rules`
+ * when the manifest has no `triggers` array of its own (v2 skills route via
+ * structured TaskDNA conditions, not literal keywords). Reads the
+ * string-valued conditions (e.g. `{"intent.primary":"security"}` -> "security")
+ * as a display stand-in, deduped. Returns [] when there are no rules either.
+ */
+function deriveTriggersFromActivation(activation: SkillDefinition['activation']): string[] {
+  if (!activation?.rules?.length) return [];
+  const values = new Set<string>();
+  for (const rule of activation.rules) {
+    for (const value of Object.values(rule.when)) {
+      if (typeof value === 'string') values.add(value);
+    }
+  }
+  return Array.from(values);
+}
+
+/**
+ * Read-only render-safety normalization. v2 manifests (`manifestVersion: 2`,
+ * e.g. the shipped `secure-coding` skill) may omit v1-only fields entirely,
+ * which previously crashed `skill list`'s table render on
+ * `undefined.slice()`. Fills in safe in-memory defaults for every field the
+ * render touches — never migrates the schema or writes back to disk.
+ */
+function normalizeSkillForRender(skill: SkillDefinition): SkillDefinition {
+  return {
+    ...skill,
+    name: typeof skill.name === 'string' && skill.name.length > 0 ? skill.name : skill.id,
+    description: typeof skill.description === 'string' ? skill.description : '',
+    category: skill.category ?? 'domain',
+    enabled: typeof skill.enabled === 'boolean' ? skill.enabled : true,
+    priority: typeof skill.priority === 'number' ? skill.priority : 0,
+    triggers: Array.isArray(skill.triggers) ? skill.triggers : deriveTriggersFromActivation(skill.activation),
+  };
+}
+
 export function loadAllSkills(root: string): SkillDefinition[] {
   const skillsDir = getSkillsDir(root);
   if (!existsSync(skillsDir)) {
@@ -48,7 +85,8 @@ export function loadAllSkills(root: string): SkillDefinition[] {
     const manifestPath = join(skillsDir, entry.name, 'manifest.json');
     if (existsSync(manifestPath)) {
       try {
-        skills.push(JSON.parse(readFileSync(manifestPath, 'utf-8')) as SkillDefinition);
+        const raw = JSON.parse(readFileSync(manifestPath, 'utf-8')) as SkillDefinition;
+        skills.push(normalizeSkillForRender(raw));
       } catch {
         // Skip malformed skill manifests
       }

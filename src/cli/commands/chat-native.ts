@@ -57,6 +57,10 @@ import { McpClientBroker } from '../../mcp-client/broker.js';
 import { McpToolRegistry as McpClientToolRegistry } from '../../mcp-client/registry.js';
 import { loadMcpServers } from '../../mcp-client/config.js';
 import { dispatchMcpSlash, type ReplMcpBridge } from '../repl/mcp-bridge.js';
+// Sprint 380 T-380-014 — type-only (chat-session.ts already imports FROM this
+// file; this reverse edge is erased at compile time, so there is no runtime
+// cycle). Used only to duck-type-check `/clear`'s provider — see below.
+import type { PersistentClaudeSession } from './chat-session.js';
 
 // ═══ chat-native — Path C tool-use loop iskelet (Sprint 203 T-203-005) ═══
 //
@@ -645,6 +649,22 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     if (slash.action === 'exit') break;
     if (slash.action === 'clear') {
       transcript.length = 0;
+      // Sprint 380 T-380-014 — the JS-side transcript is only half the
+      // context: a warm PersistentClaudeSession (chat-session.ts) reuses the
+      // SAME long-lived `claude --input-format stream-json` child across
+      // turns, so its own conversation history survives a bare
+      // `transcript.length = 0` and the model kept silently recalling
+      // pre-/clear turns. Duck-typed exactly like entry.ts's `:exit` teardown
+      // (only PersistentClaudeSession exposes `exit`) — calling it here kills
+      // the current warm child; the NEXT turn's lazy `ensureSpawn()` spawns a
+      // brand-new child with zero prior stdin history, a true context reset
+      // without restarting the whole chat session (nogo: killing the entire
+      // session is NOT required). codex/gemini/subscription/test adapters
+      // have no warm state and are unaffected.
+      const maybeSession = provider as Partial<PersistentClaudeSession>;
+      if (typeof maybeSession.exit === 'function') {
+        await maybeSession.exit();
+      }
       continue;
     }
     // Sprint 224 T-224-002 — `/nervous` slash wire (chat-nervous-bridge caller).
@@ -1154,16 +1174,32 @@ export function defaultSubscriptionSpawn(
   env: NodeJS.ProcessEnv,
 ): { chunks: AsyncIterable<string>; wait: Promise<{ exitCode: number | null }> } {
   const child = nodeSpawn(binary, [...args], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  // Sprint 380 T-380-014 (born-509 SPAWN-ERROR-LISTENERS, this file's own
+  // spawn-site) — a spawn failure (e.g. ENOENT for a missing/misconfigured
+  // provider binary) fires Node's 'error' event on the ChildProcess; an
+  // EventEmitter 'error' event with NO listener throws as an uncaught
+  // exception (Node contract), crashing the whole REPL instead of producing a
+  // handled turn. Mirrors the fix already shipped for chat-session.ts's
+  // `defaultPersistentSpawn`. `chunks` re-throws the captured error once
+  // stdout ends so `send()`/`stream()` reject with a real error — the same
+  // pre-call-throw shape `gracefulErrors` already converts into a handled
+  // `chat.provider_error` turn.
+  let spawnError: Error | null = null;
+  child.on('error', (err) => {
+    if (!spawnError) spawnError = err instanceof Error ? err : new Error(String(err));
+  });
   const chunks: AsyncIterable<string> = {
     async *[Symbol.asyncIterator]() {
       const stdout = child.stdout;
       if (!stdout) return;
       stdout.setEncoding('utf-8');
       for await (const piece of stdout) yield String(piece);
+      if (spawnError) throw spawnError;
     },
   };
   const wait = new Promise<{ exitCode: number | null }>((resolve) => {
     child.once('close', (code) => resolve({ exitCode: code }));
+    child.once('error', () => resolve({ exitCode: null }));
   });
   return { chunks, wait };
 }
