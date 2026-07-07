@@ -201,3 +201,8 @@ claude-fable-x.md
 .deckent/prompts/
 .deckent/approvals/
 .brain/heartbeat-log.md
+
+# W7 (2026-07-07): kok tmp/test-artiklari repoya giremez
+.tmp/
+.tmp-npm/
+.test-archive-debt-*/
