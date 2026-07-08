@@ -135,7 +135,7 @@ import { resolveEffectiveWorkers } from '../core/config.js';
 import { clearDependencyBlockedState, writeEvent, emitProgress } from './event-stream.js';
 
 // Sprint 195 195-001 (W-INTEGRITY) — disk-verify gate before synthetic NO_GO.
-import { verifyDiskAgainstClaim, DISK_VS_CLAIM_MISMATCH_CHANNEL } from './disk-verify.js';
+import { verifyDiskAgainstClaim, computeScopedDiskChanges, DISK_VS_CLAIM_MISMATCH_CHANNEL } from './disk-verify.js';
 import { normalizeTaskResultShape, validateTaskResult } from '../core/task-result-schema.js';
 import {
   sanitizeHostFacingFiles,
@@ -859,6 +859,26 @@ export async function waitForResults(
           }
           enrichResultTokenUsage(result, enrichTask, projectRoot);
           enrichResultCost(result, enrichTask, projectRoot);
+          // LP-10 (2026-07-08): populate filesChanged/linesAdded/linesRemoved from
+          // host-side git ground truth, not the worker's self-report (which arrived
+          // as filesChanged=[] / linesAdded=null — an LLM cannot count its own diff).
+          // Scope-limited so a sibling worker's parallel edits are never attributed
+          // here. Fail-open: when git shows no change for this scope (a genuine
+          // no-op task, e.g. an already-fixed born-item) the guard leaves the
+          // worker's claim untouched, and the separate disk-verify NO_GO gate still
+          // catches a DONE-with-no-evidence. Mirrors the token/cost enrichment above.
+          if (enrichTask) {
+            try {
+              const disk = computeScopedDiskChanges(projectRoot, enrichTask.scope);
+              if (disk.filesChanged.length > 0 || disk.linesAdded > 0 || disk.linesRemoved > 0) {
+                result.filesChanged = disk.filesChanged;
+                result.linesAdded = disk.linesAdded;
+                result.linesRemoved = disk.linesRemoved;
+              }
+            } catch (e) {
+              debugLog('collectResults:diskChangesEnrich', e);
+            }
+          }
           sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, result.filesChanged);
           // Persist the orchestrator-enriched tokenUsage + cost back to the .result FILE.
           // enrichResultTokenUsage/enrichResultCost mutate the in-memory result only;

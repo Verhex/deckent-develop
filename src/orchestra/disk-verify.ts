@@ -21,6 +21,8 @@
 // ADR-010: zero new runtime deps — Node builtins + existing spawnSync.
 
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { debugLog } from '../core/utils.js';
 import type { TaskScope } from '../core/task-types.js';
 
@@ -102,6 +104,107 @@ export function verifyDiskAgainstClaim(
 
   const hasDiskEvidence = linesAdded > 0 || untrackedFiles.length > 0;
   return { hasDiskEvidence, linesAdded, untrackedFiles };
+}
+
+// ─── LP-10: host-side result-contract ground truth ─────────────────────
+
+/** Full scoped on-disk change summary for `.result` enrichment (LP-10). */
+export interface ScopedDiskChanges {
+  /** Tracked-modified (numstat) + new/untracked files, scope-limited, deduped. */
+  filesChanged: string[];
+  /** Added lines: tracked-mod `added` (numstat) + every line of a new file. */
+  linesAdded: number;
+  /** Removed lines: tracked-mod `removed` (numstat). New files remove nothing. */
+  linesRemoved: number;
+}
+
+/** Count lines of a (new) file for its all-added delta. Fail-open → 0. */
+function countFileLines(projectDir: string, relPath: string): number {
+  try {
+    const content = readFileSync(join(projectDir, relPath), 'utf-8');
+    if (content.length === 0) return 0;
+    // Lines = newline count, +1 when the file does not end in a trailing newline.
+    const nl = (content.match(/\n/g) ?? []).length;
+    return content.endsWith('\n') ? nl : nl + 1;
+  } catch (e) {
+    debugLog('disk-verify:countFileLines', e);
+    return 0;
+  }
+}
+
+/**
+ * Host-side ground truth for a task's on-disk changes, scoped to its write paths.
+ *
+ * LP-10 (2026-07-08): the `.result` contract carried filesChanged/linesAdded/
+ * linesRemoved from the WORKER's self-report — unreliable (an LLM cannot accurately
+ * count its own diff; live results arrived with `filesChanged:[]` and
+ * `linesAdded:null`, breaking Brain disk-verify + the born-backlog's completed-item
+ * view). Per the disk-verify-ground-truth rule (`feedback_trust_brain_eval_not_worker`)
+ * the orchestrator computes these host-side from git, scoped to the task's OWN paths
+ * so a parallel sibling worker's edits are never mis-attributed:
+ *   1. tracked mods — `git diff --numstat HEAD -- <filesWrite>` (added+removed+file)
+ *   2. new files    — `git ls-files --others --exclude-standard -- <dirs+filesWrite>`
+ *                     (+ per-file line count = all-added)
+ * Fail-open: any git/read error contributes nothing, so the caller can fall back to
+ * the worker's self-report rather than zeroing a real claim on a transient error.
+ */
+export function computeScopedDiskChanges(projectDir: string, scope: TaskScope): ScopedDiskChanges {
+  const filesWrite = (scope.filesWrite ?? []).filter(p => typeof p === 'string' && p.length > 0);
+  const directories = (scope.directories ?? []).filter(p => typeof p === 'string' && p.length > 0);
+  const changed = new Set<string>();
+  let linesAdded = 0;
+  let linesRemoved = 0;
+
+  // The WRITE scope only — an explicit filesWrite list is the write authority;
+  // fall back to the directories only when no files were declared (the dir-only
+  // "write anywhere in here" task). `scope.directories` is otherwise READ/context
+  // scope (PCOMP-W1), so counting diffs there would attribute a sibling worker's
+  // edits in a shared read-directory to this task.
+  const writeScope = filesWrite.length > 0 ? filesWrite : directories;
+
+  if (writeScope.length > 0) {
+    try {
+      const res = spawnSync('git', ['diff', '--numstat', 'HEAD', '--', ...writeScope], {
+        cwd: projectDir, encoding: 'utf-8', timeout: 10_000,
+      });
+      if (!res.error && res.status === 0 && typeof res.stdout === 'string') {
+        for (const line of res.stdout.split('\n')) {
+          if (!line.trim()) continue;
+          const parts = line.split('\t');
+          if (parts.length < 3) continue;
+          linesAdded += parseGitCount(parts[0]!);
+          linesRemoved += parseGitCount(parts[1]!);
+          const file = parts.slice(2).join('\t').trim();
+          if (file) changed.add(normalizePath(file));
+        }
+      }
+    } catch (e) {
+      debugLog('disk-verify:scopedNumstat', e);
+    }
+  }
+
+  // New (untracked) files within the same write scope — each is entirely added.
+  if (writeScope.length > 0) {
+    try {
+      const res = spawnSync('git', ['ls-files', '--others', '--exclude-standard', '--', ...writeScope], {
+        cwd: projectDir, encoding: 'utf-8', timeout: 10_000,
+      });
+      if (!res.error && res.status === 0 && typeof res.stdout === 'string') {
+        for (const line of res.stdout.split('\n')) {
+          const t = line.trim();
+          if (!t) continue;
+          const norm = normalizePath(t);
+          if (changed.has(norm)) continue;
+          changed.add(norm);
+          linesAdded += countFileLines(projectDir, t);
+        }
+      }
+    } catch (e) {
+      debugLog('disk-verify:scopedLsOthers', e);
+    }
+  }
+
+  return { filesChanged: [...changed], linesAdded, linesRemoved };
 }
 
 // ─── Default providers (production) ───────────────────────────────────

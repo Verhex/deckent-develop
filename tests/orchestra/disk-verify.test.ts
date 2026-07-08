@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 
 import {
   verifyDiskAgainstClaim,
+  computeScopedDiskChanges,
   createDefaultGitDiffNumstatProvider,
   createDefaultGitLsOthersProvider,
   makeStaticNumstatProvider,
@@ -602,5 +603,51 @@ describe('Sprint 197 197-001 — untracked file gate invariants', () => {
       expect(match?.payload.taskId).toBe(taskId);
       expect(match?.payload.untrackedFiles).toContain('src/orchestra/token-counter.ts');
     });
+  });
+});
+
+// ─── computeScopedDiskChanges — LP-10 host-side ground truth ───────────
+describe('computeScopedDiskChanges — filesChanged + linesAdded + linesRemoved', () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = makeTempDir('scoped-disk');
+    initGitRepo(dir);
+    mkdirSync(join(dir, 'src', 'core'), { recursive: true });
+    writeFileSync(join(dir, 'src', 'core', 'a.ts'), 'const x = 1;\nconst y = 2;\nconst z = 3;\n');
+    execSync('git add -A && git commit -q -m "seed"', { cwd: dir, stdio: 'pipe' });
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it('reports a tracked modification with both added and removed lines from numstat', () => {
+    // Replace line 2, add two lines → +3 / -1 on a tracked write file.
+    writeFileSync(join(dir, 'src', 'core', 'a.ts'), 'const x = 1;\nconst Y = 20;\nconst z = 3;\nconst w = 4;\nconst v = 5;\n');
+    const r = computeScopedDiskChanges(dir, { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/a.ts'] });
+    expect(r.filesChanged).toEqual(['src/core/a.ts']);
+    expect(r.linesAdded).toBe(3);
+    expect(r.linesRemoved).toBe(1);
+  });
+
+  it('counts a new untracked write file as all-added and lists it', () => {
+    writeFileSync(join(dir, 'src', 'core', 'b.ts'), 'line1\nline2\nline3\n');
+    const r = computeScopedDiskChanges(dir, { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/b.ts'] });
+    expect(r.filesChanged).toContain('src/core/b.ts');
+    expect(r.linesAdded).toBe(3);
+    expect(r.linesRemoved).toBe(0);
+  });
+
+  it('returns empty for a no-op task (already-fixed born-item shape) → caller keeps worker claim', () => {
+    const r = computeScopedDiskChanges(dir, { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/a.ts'] });
+    expect(r.filesChanged).toEqual([]);
+    expect(r.linesAdded).toBe(0);
+    expect(r.linesRemoved).toBe(0);
+  });
+
+  it('scopes to the WRITE authority — a sibling edit in a read-only directory is NOT attributed', () => {
+    // Edit a DIFFERENT file the task does not own; task writes only a.ts.
+    writeFileSync(join(dir, 'src', 'core', 'sibling.ts'), 'sibling change\n');
+    execSync('git add -A && git commit -q -m "sibling tracked"', { cwd: dir, stdio: 'pipe' });
+    writeFileSync(join(dir, 'src', 'core', 'sibling.ts'), 'sibling change\nmore\n');
+    const r = computeScopedDiskChanges(dir, { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/a.ts'] });
+    expect(r.filesChanged).toEqual([]); // sibling.ts not in filesWrite → not counted
   });
 });
