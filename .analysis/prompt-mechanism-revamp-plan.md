@@ -140,9 +140,10 @@ git-guard yalnız stash-scatter modunu kapattı; **orphan-yanlış-yol modu hâl
 | **F0.3** orphan-prompt arşiv (silinmez) | ✅ | 05a1fd42 | archiveOrphanPromptFile + _orphaned drain; 80 test yeşil; TRN'e veri |
 | **F0.4** ADR kelime-sınırı kırpma | ✅ | 9ffbfe7b | word-boundary cap; 31 test yeşil |
 | **F2.1** scope-gate (bloke-default) | ✅ | fbc2eea2 | core/scope-gate.ts (8 test, 573/518 case) + sprint-controller PLAN→SPAWN wire + CLI --force-scope/MCP acknowledgeScopePaths (parity); real-binary smoke: --force-scope help ✅ + gate dist'te ✅; 196 lifecycle yeşil |
+| **F1.1** Karpathy-4 drift sil | ✅ | 42b1d493 | 5 workspace-agent'ten ~467tok×5; builtins'le eşleşti; rules-parity 39/39 + prompt-w1 18/18 |
 | **F2.1b** buildScopeBlock 3-alt-liste (worker-dili) | ⏳ | — | takip: CONFIRMED/NEW/⚠ prompt rendering (bloke zaten canlı) |
-| F1.1 Karpathy-4 sil · F1.2 Idempotency-gate · F1.3 ADR over-match | ⏳ | — | KARAR-1'siz token-kazanımları |
-| F3.1 CLI prefix-flag · F4.x caching · F5.x routing · F6 hijyen | ⏳ | — | KARAR-3=CLI-kazanımları+ertele |
+| **F1.2** Idempotency-gate | ⏳ (revize) | — | **TRIVIAL DEĞİL:** mevcut default 'refactor'da düşür; genişletmek = "yalnız API-relevant sinyalde emit" default-flip + F1 pinning-testleri güncelle → taze-context'te (yargı+test-churn) |
+| F1.3 ADR over-match · F3.1 CLI prefix-flag · F4.x caching · F5.x routing · F6 hijyen | ⏳ | — | KARAR-3=CLI-kazanımları+ertele |
 > PRE-EXISTING (kapsam-dışı): `tmux-edge` 'skips mkdirSync' testi değişikliklerimden bağımsız kırık.
 
 ## Bekleyen 3 KARAR (Alperen)
