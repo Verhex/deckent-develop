@@ -160,8 +160,13 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           deps.toolSink({ verb: `${ev.tool} — ${t('native.tool_ran')}`, target: '', ...(ev.ok ? {} : { failed: true }) });
           break;
         case 'usage':
-          inputTokens = ev.inputTokens;
-          outputTokens = ev.outputTokens;
+          // `+=`: session.send() yields one 'usage' event per loop.ts round
+          // (loop.ts:114-130), and a multi-tool-call turn runs multiple
+          // rounds — a plain `=` here overwrote with each round and only the
+          // LAST round's tokens reached onTurnEnd, undercounting the
+          // displayed token/cost for any 2+-round turn (born-520).
+          inputTokens += ev.inputTokens;
+          outputTokens += ev.outputTokens;
           // accrual + ceiling check happen in the loop (via the threaded costGuard);
           // a crossed hard ceiling arrives here as an 'error' event, printed below.
           break;

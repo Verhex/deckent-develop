@@ -115,6 +115,16 @@ function execToolTier(name: string): ToolPermissionTier {
   return EXEC_SIDE_EFFECTING.has(name) ? 'confirm' : 'silent';
 }
 
+/** An MCP server may report `description: ''` (empty string, not undefined) — `??`
+ * only substitutes on null/undefined, so a blank string would flow straight into
+ * `registry.register()`, which requires a non-empty (post-trim) description and
+ * throws, crashing REPL launch (born-552). Treat blank/whitespace-only the same
+ * as missing, mirroring validateToolDefinition's own `trim().length === 0` check. */
+function mcpToolDescription(description: string | undefined, namespacedName: string): string {
+  const trimmed = (description ?? '').trim();
+  return trimmed.length > 0 ? trimmed : `MCP tool ${namespacedName}`;
+}
+
 function defineFromDispatcher(
   name: string,
   description: string,
@@ -372,7 +382,7 @@ export function buildNativeToolRegistry(opts: NativeToolRegistryOptions): ToolRe
     for (const t of bridge.listTools()) {
       registry.register({
         name: t.namespacedName,
-        description: t.descriptor.description ?? `MCP tool ${t.namespacedName}`,
+        description: mcpToolDescription(t.descriptor.description, t.namespacedName),
         inputSchema: t.descriptor.inputSchema ?? { type: 'object', additionalProperties: true },
         category: 'mcp',
         tier: 'confirm',

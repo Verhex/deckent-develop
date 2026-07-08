@@ -17,9 +17,6 @@ export interface AnthropicAdapterOptions {
 }
 
 function toAnthropicMessage(m: ProviderMessage): Record<string, unknown> {
-  if (m.role === 'tool') {
-    return { role: 'user', content: [{ type: 'tool_result', tool_use_id: m.toolCallId ?? '', content: m.content }] };
-  }
   if (m.role === 'assistant' && m.toolCalls?.length) {
     const blocks: Array<Record<string, unknown>> = [];
     if (m.content) blocks.push({ type: 'text', text: m.content });
@@ -27,6 +24,34 @@ function toAnthropicMessage(m: ProviderMessage): Record<string, unknown> {
     return { role: 'assistant', content: blocks };
   }
   return { role: m.role, content: m.content };
+}
+
+/**
+ * Anthropic requires every tool_result answering ONE assistant tool_use
+ * turn to live in a SINGLE user message's content array — a parallel
+ * round's sibling `role:'tool'` ProviderMessages must collapse into one
+ * `{role:'user', content:[tool_result, ...]}` entry, not one user message
+ * per result (the latter is a message-shape contract violation).
+ */
+function toAnthropicMessages(messages: readonly ProviderMessage[]): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [];
+  let i = 0;
+  while (i < messages.length) {
+    const m = messages[i]!;
+    if (m.role === 'tool') {
+      const blocks: Array<Record<string, unknown>> = [];
+      while (i < messages.length && messages[i]!.role === 'tool') {
+        const tm = messages[i]!;
+        blocks.push({ type: 'tool_result', tool_use_id: tm.toolCallId ?? '', content: tm.content });
+        i++;
+      }
+      out.push({ role: 'user', content: blocks });
+      continue;
+    }
+    out.push(toAnthropicMessage(m));
+    i++;
+  }
+  return out;
 }
 
 export function createAnthropicAdapter(opts: AnthropicAdapterOptions): ProviderAdapter {
@@ -43,7 +68,7 @@ export function createAnthropicAdapter(opts: AnthropicAdapterOptions): ProviderA
         stream: true,
         max_tokens: opts.maxTokens ?? 4096,
         system: req.system,
-        messages: req.messages.map(toAnthropicMessage),
+        messages: toAnthropicMessages(req.messages),
       };
       if (req.tools.length > 0) {
         body['tools'] = req.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.input_schema }));

@@ -568,17 +568,37 @@ export function createPersistentClaudeSession(
       if (parsed.done) {
         if (parsed.usage) lastUsage = parsed.usage;
         // Fallback yield: no deltas arrived at all — stream the best full text once
-        // so the consumer receives something visible.
+        // so the consumer receives something visible. Update `collected` immediately
+        // so the reconciliation below compares against what was actually shown,
+        // not a stale empty string (would otherwise re-yield the same text twice).
         if (collected.length === 0) {
           const fallback = parsed.resultText || assistantText;
-          if (fallback) yield { text: fallback };
+          if (fallback) {
+            yield { text: fallback };
+            collected = fallback;
+          }
         }
-        // Reconcile: prefer the most comprehensive text source for tool-call parsing.
-        // Delta streams can be partial; `resultText` and `assistantText` carry the
-        // complete reply. Use whichever is longest (longer = more complete).
+        // Sprint 383 born-511 — Reconcile: `resultText`/`assistantText` can carry
+        // more complete text than the delta stream (partial streams). Previously
+        // this silently swapped `collected` to the longer source without streaming
+        // the difference — chat-native.ts persists `response.text` (this function's
+        // `collected`) verbatim into the transcript/session memory, but only
+        // echoes it to the screen when `provider.stream` is unset, so the swap
+        // never reached the screen. Result: what got saved (and replayed on
+        // `/resume`) silently diverged from what the user watched stream by.
+        // Fix: stream the missing suffix as a normal chunk so the screen and the
+        // persisted final text always match. Only trust a candidate that is a
+        // strict extension of what already streamed (`startsWith`) — content that
+        // merely happens to be longer but diverges from what was shown is
+        // discarded rather than silently overwriting it.
         const rt = parsed.resultText ?? '';
-        if (rt.length > collected.length) collected = rt;
-        if (assistantText.length > collected.length) collected = assistantText;
+        let best = collected;
+        if (rt.length > best.length && rt.startsWith(collected)) best = rt;
+        if (assistantText.length > best.length && assistantText.startsWith(collected)) best = assistantText;
+        if (best.length > collected.length) {
+          yield { text: best.slice(collected.length) };
+          collected = best;
+        }
         break;
       }
     }

@@ -39,12 +39,21 @@ export interface FitResult {
  * Fit `messages` into `budgetTokens` by dropping the OLDEST messages.
  *
  * Guarantees:
- * - The kept window never starts with a `tool` result whose assistant
- *   tool-call message was dropped (orphan tool_result → provider 400s), and
- *   never starts mid-exchange on an assistant message: the start is advanced
- *   to the next `user` message after a cut.
+ * - The kept window never contains an orphan `tool` result — one whose
+ *   assistant tool-call message was cut out of the window (provider hard
+ *   error: a dangling tool_result with no matching tool_use). Per
+ *   transcript.ts, every `appendAssistant(..., toolCalls)` is immediately
+ *   followed by one `appendToolResult` per call with nothing interleaved, so
+ *   the span from the LAST `user` message to the end of the transcript is
+ *   always internally pairing-complete. That whole span is therefore kept
+ *   as one atomic unit, even over budget, instead of letting a naive
+ *   per-message cut land mid-pair (born-510).
+ * - The kept window never opens on a `tool` result or an assistant message
+ *   outside that mandatory tail span — the start is advanced to the next
+ *   `user` message after a cut (older, already-resolved turns are dropped
+ *   together rather than split).
  * - The final message is always kept, even if it alone exceeds the budget
- *   (an honest oversized turn beats sending the provider an empty request).
+ *   (an honest oversized turn beats sending the provider a malformed one).
  * - `budgetTokens <= 0` or a window already within budget → input returned
  *   unchanged (droppedCount 0).
  */
@@ -54,19 +63,32 @@ export function fitMessagesToBudget(messages: readonly ProviderMessage[], budget
     return { messages: [...messages], droppedCount: 0, estimatedTokens: total };
   }
 
-  // Walk backward accumulating the newest messages that fit.
+  // The current in-flight turn (last `user` message onward) is always
+  // pairing-complete by construction — never split it. No `user` message at
+  // all (degenerate/test-only input) falls back to the single-final-message
+  // guarantee this function has always made.
+  let lastUserIdx = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]!.role === 'user') { lastUserIdx = i; break; }
+  }
+  const boundary = lastUserIdx >= 0 ? lastUserIdx : messages.length - 1;
+
+  // Walk backward accumulating the newest messages that fit. Everything at
+  // or after `boundary` is force-included regardless of budget.
   let used = 0;
   let start = messages.length;
   while (start > 0) {
     const next = estimateMessageTokens(messages[start - 1]!);
-    if (used + next > budgetTokens && start < messages.length) break;
+    const mandatory = start > boundary;
+    if (!mandatory && used + next > budgetTokens) break;
     used += next;
     start--;
   }
 
-  // Pairing safety: never open the window on a tool result or an assistant
-  // message — advance to the next user turn boundary.
-  while (start < messages.length - 1 && messages[start]!.role !== 'user') {
+  // Pairing safety: never open the window before `boundary` on a tool result
+  // or an assistant message — advance to the next user turn boundary. Never
+  // advances into the mandatory tail itself (already pairing-complete).
+  while (start < boundary && messages[start]!.role !== 'user') {
     used -= estimateMessageTokens(messages[start]!);
     start++;
   }

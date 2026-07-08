@@ -59,7 +59,7 @@ export interface LoopDeps {
 
 /** Best-effort primary resource for permission glob matching. */
 function primaryResource(args: Record<string, unknown>): string {
-  const v = args['path'] ?? args['file_path'] ?? args['command'] ?? args['url'] ?? args['pattern'] ?? '';
+  const v = args['path'] ?? args['file_path'] ?? args['cmd'] ?? args['url'] ?? args['pattern'] ?? '';
   return typeof v === 'string' ? v : '';
 }
 

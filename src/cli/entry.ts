@@ -64,6 +64,18 @@ const HELP_AND_VERSION_FLAGS: ReadonlySet<string> = new Set([
 const REPL_ONLY_FLAGS: ReadonlySet<string> = new Set(['--native', '--legacy-loop']);
 
 /**
+ * born-550 (SEC, 383-002) — explicit opt-in for off-TTY (piped/non-interactive)
+ * invocations to auto-approve side-effecting tool calls (write/edit/bash).
+ * Same flag name/semantics as the `--auto-approve` contract already
+ * established for `deckent start`/`deckent run` (born-561): flag absent →
+ * no auto-approve, flag present → auto-approve. Recognized alongside
+ * REPL_ONLY_FLAGS so `deckent --auto-approve` (bare, piped) still routes to
+ * the default REPL instead of erroring through Commander, which has no
+ * top-level `--auto-approve`/`--yes` option.
+ */
+const OFF_TTY_AUTO_APPROVE_FLAGS: ReadonlySet<string> = new Set(['--auto-approve', '--yes']);
+
+/**
  * Decide whether the given argv should be redirected to `chat --native`.
  *
  * Pure function so tests can exercise the routing without spawning Node.
@@ -78,15 +90,31 @@ export function shouldLaunchDefaultRepl(argv: readonly string[]): boolean {
     if (HELP_AND_VERSION_FLAGS.has(a)) return false;
   }
 
-  // REPL-only flags (e.g. --native) must not be handed to Commander.
-  // If every arg is a REPL-only flag, launch the REPL.
-  if (args.every((a) => REPL_ONLY_FLAGS.has(a))) return true;
+  // REPL-only flags (e.g. --native) and the off-TTY auto-approve opt-in must
+  // not be handed to Commander. If every arg is one of those, launch the REPL.
+  if (args.every((a) => REPL_ONLY_FLAGS.has(a) || OFF_TTY_AUTO_APPROVE_FLAGS.has(a))) return true;
 
   // Any non-flag token is treated as a subcommand candidate — pass through to
   // Commander so it can handle the dispatch (or surface a "did-you-mean"
   // error for typos). Top-level flag-only argv (e.g. `deckent --foo`) also
   // passes through so Commander can surface its unknown-option error.
   return false;
+}
+
+/**
+ * born-550 (SEC, 383-002) — does argv carry the explicit off-TTY auto-approve
+ * opt-in (`--auto-approve` / `--yes`)? Piped/non-interactive stdin is the
+ * least-controlled invocation shape (no human present to see a y/N prompt),
+ * so unlike the interactive-TTY path (which always uses the real confirm
+ * gate), off-TTY side-effecting tool calls (write/edit/bash) now require this
+ * explicit flag — no flag means no auto-approve.
+ *
+ * Pure function so tests can exercise the decision without spawning Node.
+ *
+ * @param args argv with argv[0]/argv[1] (node, script path) already stripped.
+ */
+export function shouldAutoApproveOffTty(args: readonly string[]): boolean {
+  return args.some((a) => OFF_TTY_AUTO_APPROVE_FLAGS.has(a));
 }
 
 /**
@@ -680,7 +708,11 @@ export async function launchDefaultRepl(): Promise<void> {
   // Interactive confirm for side-effecting tools — reads the next line via the
   // arbiter (TTY, single stdin). 3-way: y = bir kez · a = bu tool'a hep izin
   // ver (persist) · N = reddet. Remembered tools skip the prompt entirely.
-  // Off-TTY auto-approves (pipe/smoke/tests stay headless).
+  // born-550 (SEC, 383-002): off-TTY (pipe/non-interactive) no longer
+  // blanket-auto-approves — that silently ran writes/edits/bash with nobody
+  // watching the prompt. Off-TTY now requires the explicit --auto-approve/
+  // --yes opt-in (shouldAutoApproveOffTty); without it, side-effecting calls
+  // are denied (`[deckent-denied]`), matching a declined interactive prompt.
   const askConfirm = (summary: string, toolName: string): Promise<boolean> => {
     if (perms.isAllowed(toolName)) return Promise.resolve(true);
     process.stdout.write(
@@ -703,9 +735,10 @@ export async function launchDefaultRepl(): Promise<void> {
   // bash) go to the confirm-gated tool-exec layer; read-only status/recall/
   // history slashes stay on the CLI bridge.
   const cliDispatcher = createCliToolDispatcher();
+  const offTtyAutoApprove = shouldAutoApproveOffTty(process.argv.slice(2));
   const execDispatcher = createToolExecDispatcher({
     cwd: process.cwd(),
-    confirm: isTty ? askConfirm : async () => true,
+    confirm: isTty ? askConfirm : async () => offTtyAutoApprove,
   });
   const EXEC_TOOLS = new Set([
     'deckent_write_file', 'deckent_read_file', 'deckent_edit_file', 'deckent_bash',
