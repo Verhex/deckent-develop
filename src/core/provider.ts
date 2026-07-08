@@ -26,6 +26,15 @@ export interface ProviderSpawnOptions {
    */
   reasoningEffort?: string;
   /**
+   * F3.1: when true, add the Claude CLI `--exclude-dynamic-system-prompt-sections`
+   * flag to the claude spawn — per-machine sections (cwd, env, memory paths, git
+   * status) move from the default system prompt into the first user message, keeping
+   * the system-prompt prefix byte-stable for prompt-cache reuse. Wired from
+   * `config.prompt.exclude_dynamic_system_prompt_sections` (default true). Only the
+   * claude arg-builders honor it; other providers ignore it (no equivalent flag).
+   */
+  excludeDynamicPromptSections?: boolean;
+  /**
    * Adaptive per-task timeout in seconds (Sprint 280 root-cause fix), computed by
    * `brainEstimateTimeout` via `emitTimeoutEvents` and passed at every spawn site.
    * SpawnBackend implementations (docker/tmux/subprocess) use it as the worker
@@ -140,7 +149,7 @@ export interface ProviderAdapter {
    * @param promptPath    Path to the prompt file (stdin redirection)
    * @param opts          Spawn options (allowedTools, autoApprove, reasoningEffort)
    */
-  buildCommand(model: ModelType, promptPath: string, opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove' | 'reasoningEffort'>): string;
+  buildCommand(model: ModelType, promptPath: string, opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove' | 'reasoningEffort' | 'excludeDynamicPromptSections'>): string;
 
   /**
    * Build CLI command + args for planner invocations.

@@ -986,6 +986,9 @@ export class DockerSpawnBackend implements SpawnBackend {
       // F1-RE (Sprint 252): resolved model reasoning-effort (claude --effort,
       // codex -c model_reasoning_effort); undefined → no flag (CLI default).
       reasoningEffort: opts?.reasoningEffort,
+      // F3.1: prefix-stable system prompt inside the container (per-machine sections
+      // → first user message). Only the claude spec emits the flag; others ignore it.
+      excludeDynamicPromptSections: opts?.excludeDynamicPromptSections,
     });
     // WORKER-GIT-GUARD (381-001): shadow `git` inside the container with a
     // denylist shim (stash/reset/checkout/clean/rebase/commit/revert -> exit

@@ -358,7 +358,7 @@ export class ClaudeAdapter implements ProviderAdapter {
   buildCommand(
     model: ModelType,
     promptPath: string,
-    opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove' | 'reasoningEffort'>,
+    opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove' | 'reasoningEffort' | 'excludeDynamicPromptSections'>,
   ): string {
     // Sprint 237: pass the real model name (apiId, e.g. claude-opus-4-8) to the
     // CLI, NOT the short alias ('opus') — so the worker runs the EXACT current
@@ -377,6 +377,10 @@ export class ClaudeAdapter implements ProviderAdapter {
       if (effort) {
         cmd += ` --effort ${effort}`;
       }
+      // F3.1: prefix-stable system prompt (per-machine sections → first user message).
+      if (opts?.excludeDynamicPromptSections) {
+        cmd += ' --exclude-dynamic-system-prompt-sections';
+      }
       return cmd;
     }
 
@@ -390,6 +394,10 @@ export class ClaudeAdapter implements ProviderAdapter {
     }
     if (effort) {
       cmd += ` --effort ${effort}`;
+    }
+    // F3.1: prefix-stable system prompt (per-machine sections → first user message).
+    if (opts?.excludeDynamicPromptSections) {
+      cmd += ' --exclude-dynamic-system-prompt-sections';
     }
     cmd += ` < ${promptPath}`;
     return cmd;

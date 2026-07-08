@@ -65,7 +65,7 @@ export interface SubprocessProviderConfig {
    * @param opts        Spawn options
    * @returns Shell command string
    */
-  buildCommandString(model: ModelType, promptPath: string, opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove' | 'reasoningEffort'>): string;
+  buildCommandString(model: ModelType, promptPath: string, opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove' | 'reasoningEffort' | 'excludeDynamicPromptSections'>): string;
   /**
    * Extra CLI args appended at SPAWN time so the provider emits a per-run usage
    * envelope on stdout — captured into `.tasks/task-{id}.log` so the orchestrator's
@@ -101,9 +101,15 @@ export const CLAUDE_SUBPROCESS_CONFIG: SubprocessProviderConfig = {
     if (effort) {
       args.push('--effort', effort);
     }
+    // F3.1: prefix-stable system prompt (per-machine sections → first user message)
+    // for cache reuse. Default system prompt only — this backend never passes
+    // --system-prompt, so the flag always applies.
+    if (opts?.excludeDynamicPromptSections) {
+      args.push('--exclude-dynamic-system-prompt-sections');
+    }
     return args;
   },
-  buildCommandString(model: ModelType, promptPath: string, opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove' | 'reasoningEffort'>): string {
+  buildCommandString(model: ModelType, promptPath: string, opts?: Pick<ProviderSpawnOptions, 'allowedTools' | 'autoApprove' | 'reasoningEffort' | 'excludeDynamicPromptSections'>): string {
     let cmd = `claude -p - --model ${modelRegistry.get(model)?.apiId ?? model}`;
     if (opts?.allowedTools) {
       cmd += ` --allowedTools '${opts.allowedTools}'`;
@@ -114,6 +120,10 @@ export const CLAUDE_SUBPROCESS_CONFIG: SubprocessProviderConfig = {
     const effort = resolveReasoningEffort('claude', opts?.reasoningEffort);
     if (effort) {
       cmd += ` --effort ${effort}`;
+    }
+    // F3.1: prefix-stable system prompt (per-machine sections → first user message).
+    if (opts?.excludeDynamicPromptSections) {
+      cmd += ' --exclude-dynamic-system-prompt-sections';
     }
     cmd += ` < ${promptPath}`;
     return cmd;

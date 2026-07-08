@@ -75,6 +75,26 @@ describe('buildProviderCommand', () => {
     const cmd = buildProviderCommand(PROVIDER_COMMAND_SPECS.claude, 'claude-opus-4-8', P, { autoApprove: true });
     expect(cmd).not.toContain('--effort');
   });
+
+  // F3.1: --exclude-dynamic-system-prompt-sections is claude-only + opt-in.
+  it('claude: appends --exclude-dynamic-system-prompt-sections when excludeDynamicPromptSections is set', () => {
+    const cmd = buildProviderCommand(PROVIDER_COMMAND_SPECS.claude, 'claude-opus-4-8', P, { excludeDynamicPromptSections: true });
+    expect(cmd).toContain('--exclude-dynamic-system-prompt-sections');
+  });
+
+  it('claude: no flag when excludeDynamicPromptSections is false/unset (opt-in, byte-safe)', () => {
+    expect(buildProviderCommand(PROVIDER_COMMAND_SPECS.claude, 'claude-opus-4-8', P, { excludeDynamicPromptSections: false }))
+      .not.toContain('--exclude-dynamic-system-prompt-sections');
+    expect(buildProviderCommand(PROVIDER_COMMAND_SPECS.claude, 'claude-opus-4-8', P, {}))
+      .not.toContain('--exclude-dynamic-system-prompt-sections');
+  });
+
+  it('codex/gemini: excludeDynamicPromptSectionsFlag=null → flag never emitted even when opted in', () => {
+    expect(buildProviderCommand(PROVIDER_COMMAND_SPECS.codex, 'gpt-5.5', P, { excludeDynamicPromptSections: true }))
+      .not.toContain('--exclude-dynamic-system-prompt-sections');
+    expect(buildProviderCommand(PROVIDER_COMMAND_SPECS.gemini, 'gemini-2.5-flash', P, { excludeDynamicPromptSections: true }))
+      .not.toContain('--exclude-dynamic-system-prompt-sections');
+  });
 });
 
 describe('getProviderCommandSpec', () => {

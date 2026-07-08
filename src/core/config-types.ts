@@ -975,6 +975,19 @@ export interface PromptConfig {
    * markers fall back to full content. No content is auto-summarized.
    */
   adr_render?: 'full' | 'operative';
+  /**
+   * Pass the Claude CLI `--exclude-dynamic-system-prompt-sections` flag on every
+   * claude worker spawn (F3.1). The flag moves per-machine sections (cwd, env,
+   * memory paths, git status) out of the default system prompt and into the first
+   * user message, so the system-prompt PREFIX stays byte-stable across spawns and
+   * across the sprint — most importantly, a mid-sprint `git` commit (git status
+   * changes) no longer invalidates whatever prompt-cache does apply
+   * (single-session / subscription level). Only takes effect with the default
+   * system prompt (deckent never passes `--system-prompt`), and only for the claude
+   * provider — other providers ignore it. Default: true. Set false to restore the
+   * pre-F3.1 spawn args byte-for-byte.
+   */
+  exclude_dynamic_system_prompt_sections?: boolean;
 }
 
 // ─── Nervous System Config Types ────────────────────────────────────

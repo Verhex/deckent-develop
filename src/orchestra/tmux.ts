@@ -24,6 +24,8 @@ export interface SpawnOptions {
   autoApprove?: boolean;
   /** F1-RE: native model reasoning-effort (e.g. claude `--effort high`). Opt-in. */
   reasoningEffort?: string;
+  /** F3.1: add claude `--exclude-dynamic-system-prompt-sections` (prefix-stable cache). Opt-in. */
+  excludeDynamicPromptSections?: boolean;
 }
 
 // ─── TmuxError ──────────────────────────────────────────────────────
@@ -163,6 +165,12 @@ function buildProviderWorkerCommand(
     if (effort) {
       cmd += ` --effort ${effort}`;
     }
+    // F3.1: stabilize the system-prompt prefix (per-machine sections → first user
+    // message) for cross-spawn cache reuse. Default system prompt only — deckent
+    // never passes --system-prompt, so the flag always applies here.
+    if (opts?.excludeDynamicPromptSections) {
+      cmd += ' --exclude-dynamic-system-prompt-sections';
+    }
     cmd += ` < ${promptFilePath}`;
     return cmd;
   }
@@ -180,6 +188,7 @@ function buildProviderWorkerCommand(
     allowedTools: opts?.allowedTools,
     autoApprove: opts?.autoApprove,
     reasoningEffort: resolveReasoningEffort(provider, opts?.reasoningEffort),
+    excludeDynamicPromptSections: opts?.excludeDynamicPromptSections,
   });
   // PSL-1 convention (spawn-backend-docker.ts): 'stdin' providers pipe the
   // prompt file in; 'inline' providers (gemini) already embed it via
@@ -211,6 +220,7 @@ export function buildWorkerCommand(
       allowedTools: opts?.allowedTools,
       autoApprove: opts?.autoApprove,
       reasoningEffort: opts?.reasoningEffort,
+      excludeDynamicPromptSections: opts?.excludeDynamicPromptSections,
     });
   }
 

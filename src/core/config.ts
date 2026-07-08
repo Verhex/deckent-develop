@@ -251,6 +251,10 @@ export const DEFAULT_TERMINAL_CONFIG: TerminalConfig = {
 export const DEFAULT_PROMPT_CONFIG: Required<PromptConfig> = {
   adr_min_relevance: 0.3,
   adr_render: 'full',
+  // F3.1: stabilize the claude system-prompt prefix for cache reuse (git-status &
+  // other per-machine sections move to the first user message). Verified via
+  // real-binary smoke; opt-out with `false`.
+  exclude_dynamic_system_prompt_sections: true,
 };
 
 /**
@@ -1008,6 +1012,15 @@ export function validateConfig(config: DeckentConfig): string[] {
         `Invalid value '${config.prompt.adr_render}' for field 'prompt.adr_render'. Valid: ${validAdrRender.join(', ')}.`,
       );
     }
+  }
+  if (
+    config.prompt?.exclude_dynamic_system_prompt_sections !== undefined &&
+    typeof config.prompt.exclude_dynamic_system_prompt_sections !== 'boolean'
+  ) {
+    errors.push(
+      `Invalid value '${config.prompt.exclude_dynamic_system_prompt_sections}' for field ` +
+      `'prompt.exclude_dynamic_system_prompt_sections'. Must be a boolean.`,
+    );
   }
 
   // ─── Plan config validation (Sprint 276 PLAN-INT-1) ─────────────────

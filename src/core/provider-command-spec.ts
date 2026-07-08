@@ -57,6 +57,14 @@ export interface ProviderCommandSpec {
    * Only invoked when a level was resolved (opt-in via `- ModelEffort:`).
    */
   reasoningEffortArgs: ((level: string) => readonly string[]) | null;
+  /**
+   * F3.1: the CLI flag that moves per-machine system-prompt sections (cwd, env,
+   * git status) into the first user message for a byte-stable cache prefix, or null
+   * for a provider whose CLI has no equivalent. claude →
+   * `--exclude-dynamic-system-prompt-sections`; codex/gemini → null. Emitted only
+   * when the caller opts in via `excludeDynamicPromptSections`.
+   */
+  excludeDynamicPromptSectionsFlag: string | null;
 }
 
 /**
@@ -88,6 +96,7 @@ export const PROVIDER_COMMAND_SPECS: Readonly<Record<string, ProviderCommandSpec
     promptFeed: 'stdin',
     oauthHomeDir: '.claude',
     reasoningEffortArgs: (level) => ['--effort', level], // low|medium|high|xhigh|max
+    excludeDynamicPromptSectionsFlag: '--exclude-dynamic-system-prompt-sections',
   },
   codex: {
     binary: 'codex',
@@ -103,6 +112,7 @@ export const PROVIDER_COMMAND_SPECS: Readonly<Record<string, ProviderCommandSpec
     promptFeed: 'stdin',
     oauthHomeDir: '.codex',
     reasoningEffortArgs: (level) => ['-c', `model_reasoning_effort=${level}`], // minimal|low|medium|high
+    excludeDynamicPromptSectionsFlag: null, // codex CLI has no equivalent flag
   },
   gemini: {
     binary: 'gemini',
@@ -115,6 +125,7 @@ export const PROVIDER_COMMAND_SPECS: Readonly<Record<string, ProviderCommandSpec
     promptFeed: 'inline',
     oauthHomeDir: '.gemini',
     reasoningEffortArgs: null, // gemini CLI has no reasoning-effort knob
+    excludeDynamicPromptSectionsFlag: null, // gemini CLI has no equivalent flag
   },
 };
 
@@ -131,7 +142,7 @@ export function buildProviderCommand(
   spec: ProviderCommandSpec,
   apiId: string,
   promptPath: string,
-  opts: { allowedTools?: string; autoApprove?: boolean; reasoningEffort?: string } = {},
+  opts: { allowedTools?: string; autoApprove?: boolean; reasoningEffort?: string; excludeDynamicPromptSections?: boolean } = {},
 ): string {
   const parts: string[] = [spec.binary];
   for (const arg of spec.baseArgs) {
@@ -148,6 +159,11 @@ export function buildProviderCommand(
   // resolved + provider-validated by the caller (resolveReasoningEffort).
   if (opts.reasoningEffort && spec.reasoningEffortArgs) {
     parts.push(...spec.reasoningEffortArgs(opts.reasoningEffort));
+  }
+  // F3.1: prefix-stable system prompt — opt-in, emitted only for a provider whose
+  // spec declares the flag (claude). Others have `excludeDynamicPromptSectionsFlag: null`.
+  if (opts.excludeDynamicPromptSections && spec.excludeDynamicPromptSectionsFlag) {
+    parts.push(spec.excludeDynamicPromptSectionsFlag);
   }
   return parts.join(' ');
 }

@@ -670,6 +670,19 @@ describe('SubprocessSpawnBackend — Provider Decoupling', () => {
     expect(cmd).toBe('claude -p - --model claude-opus-4-8 < /tmp/p.txt');
   });
 
+  // F3.1: --exclude-dynamic-system-prompt-sections is opt-in on both builders.
+  it('buildArgs appends --exclude-dynamic-system-prompt-sections when opted in, omits otherwise', () => {
+    expect(CLAUDE_SUBPROCESS_CONFIG.buildArgs('opus', { excludeDynamicPromptSections: true }))
+      .toContain('--exclude-dynamic-system-prompt-sections');
+    expect(CLAUDE_SUBPROCESS_CONFIG.buildArgs('opus', {}))
+      .not.toContain('--exclude-dynamic-system-prompt-sections');
+  });
+
+  it('buildCommandString appends the exclude-dynamic flag before the stdin redirect when opted in', () => {
+    const cmd = CLAUDE_SUBPROCESS_CONFIG.buildCommandString('opus', '/tmp/p.txt', { excludeDynamicPromptSections: true });
+    expect(cmd).toBe('claude -p - --model claude-opus-4-8 --exclude-dynamic-system-prompt-sections < /tmp/p.txt');
+  });
+
   it('should store providerConfig accessible via getProviderConfig()', () => {
     const backend = new SubprocessSpawnBackend(projectDir, { providerConfig: customConfig });
     expect(backend.getProviderConfig()).toBe(customConfig);

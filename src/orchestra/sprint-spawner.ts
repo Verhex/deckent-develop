@@ -700,6 +700,9 @@ export async function spawnWorkers(
     // F1-RE (Sprint 252): resolve the model reasoning-effort (opt-in, provider-
     // validated) once; passed to every spawn path below. undefined → no flag.
     const reasoningEffort = resolveReasoningEffort(taskProvider, task.modelEffort);
+    // F3.1: prefix-stable claude system prompt (config-global, default true). Passed
+    // to every spawn path; only claude arg-builders emit the flag, others ignore it.
+    const excludeDynamicPromptSections = config.prompt?.exclude_dynamic_system_prompt_sections !== false;
     // Sprint 280 root-cause fix: compute + emit the adaptive per-task timeout and
     // pass it to the spawn backend below as `taskTimeoutSeconds`, so docker_timeout
     // is the FALLBACK (not the de-facto ~20min cap). emitTimeoutEvents was dormant.
@@ -742,6 +745,7 @@ export async function spawnWorkers(
         autoApprove: spawnOpts?.autoApprove ?? false,
         projectDir: projectRoot,
         reasoningEffort,
+        excludeDynamicPromptSections,
         taskTimeoutSeconds,
       });
     } else if (wantsHostAdapter) {
@@ -765,6 +769,7 @@ export async function spawnWorkers(
         autoApprove: spawnOpts?.autoApprove ?? false,
         projectDir: projectRoot,
         reasoningEffort,
+        excludeDynamicPromptSections,
         taskTimeoutSeconds,
       });
     } else if (!isTmuxProvider(taskProvider)) {
@@ -780,6 +785,7 @@ export async function spawnWorkers(
       spawnWorker(task.id, model, prompt, projectRoot, {
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
+        excludeDynamicPromptSections,
       });
     }
 
@@ -956,6 +962,9 @@ export async function respawnEligibleTasks(
     // F1-RE (Sprint 252): resolve the model reasoning-effort (opt-in, provider-
     // validated) once; passed to every spawn path below. undefined → no flag.
     const reasoningEffort = resolveReasoningEffort(taskProvider, task.modelEffort);
+    // F3.1: prefix-stable claude system prompt (config-global, default true). Passed
+    // to every spawn path; only claude arg-builders emit the flag, others ignore it.
+    const excludeDynamicPromptSections = config.prompt?.exclude_dynamic_system_prompt_sections !== false;
     // Sprint 280 root-cause fix: compute + emit the adaptive per-task timeout and
     // pass it to the spawn backend below as `taskTimeoutSeconds`, so docker_timeout
     // is the FALLBACK (not the de-facto ~20min cap). emitTimeoutEvents was dormant.
@@ -994,6 +1003,7 @@ export async function respawnEligibleTasks(
         autoApprove: spawnOpts?.autoApprove ?? false,
         projectDir: projectRoot,
         reasoningEffort,
+        excludeDynamicPromptSections,
         taskTimeoutSeconds,
       });
     } else if (wantsHostAdapter) {
@@ -1016,6 +1026,7 @@ export async function respawnEligibleTasks(
         autoApprove: spawnOpts?.autoApprove ?? false,
         projectDir: projectRoot,
         reasoningEffort,
+        excludeDynamicPromptSections,
         taskTimeoutSeconds,
       });
     } else if (!isTmuxProvider(taskProvider)) {
@@ -1031,6 +1042,7 @@ export async function respawnEligibleTasks(
       spawnWorker(task.id, task.model, prompt, projectRoot, {
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
+        excludeDynamicPromptSections,
       });
     }
 
