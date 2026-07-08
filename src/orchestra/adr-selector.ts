@@ -201,30 +201,77 @@ function scoreScopeMatch(
     : { score: 0, reason: null };
 }
 
+/** Tokenize free text into significant words (>3 chars, lowercased). Shared by the
+ *  keyword-match axis and the IDF corpus so task and ADR are tokenized identically. */
+function tokenizeWords(text: string): string[] {
+  return text.toLowerCase().split(/[\s/\-_.,;:()[\]{}]+/).filter(w => w.length > 3);
+}
+
 /**
- * Score based on keyword overlap between task text and ADR text.
- * Extracts significant words (>3 chars) from task title+description,
- * checks how many appear in ADR title+content.
+ * Build an IDF (inverse document frequency) lookup over the accepted-ADR pool (F1.3).
+ *
+ * Root cause of ADR over-injection — live audit (`.deckent/prompts/injection-audit.jsonl`,
+ * 8345 records): the Routing ADR (adr-g-006) was injected into **93%** of worker prompts,
+ * adr-d-004 into 91%, adr-g-012 into 62% — almost always via keyword-match, not scope.
+ * The old {@link scoreKeywordMatch} counted every matched task word equally, so an ADR
+ * with a broad orchestration vocabulary (routing, layering, config) trivially cleared the
+ * 15% overlap threshold on nearly any task through generic words (task, worker, model,
+ * agent, config) that recur across most ADRs and most task descriptions in this project.
+ * These three broad ADRs then filled all topN=3 slots on most tasks, displacing the
+ * task-specific ADR that actually scoped-matched.
+ *
+ * Weighting each matched word by its corpus IDF collapses those high-DF generic hits
+ * toward the floor (a word in every ADR → IDF≈1.0) while keeping distinctive, low-DF
+ * terms — the real topical signal — at full weight (a word in one ADR → IDF≈max). A broad
+ * ADR now only keyword-matches tasks that share its DISTINCTIVE vocabulary. Matching
+ * semantics (which words count as present) are unchanged; only the per-word weight moves.
+ *
+ * Computed once per selection over the pool; deterministic (no Date/random).
  */
-function scoreKeywordMatch(adr: MemoryEntryV2, taskText: string): { score: number; reason: string | null } {
-  const taskWords = taskText
-    .toLowerCase()
-    .split(/[\s/\-_.,;:()[\]{}]+/)
-    .filter(w => w.length > 3);
+function buildIdfLookup(adrPool: MemoryEntryV2[]): (word: string) => number {
+  const df = new Map<string, number>();
+  for (const adr of adrPool) {
+    for (const w of new Set(tokenizeWords(`${adr.id} ${adr.title} ${adr.content}`))) {
+      df.set(w, (df.get(w) ?? 0) + 1);
+    }
+  }
+  const N = adrPool.length;
+  // A word never seen in the pool (df=0) is maximally distinctive → top IDF.
+  const defaultIdf = Math.log(N + 1) + 1;
+  return (word: string): number => {
+    const d = df.get(word);
+    return d === undefined ? defaultIdf : Math.log((N + 1) / (d + 1)) + 1;
+  };
+}
 
-  if (taskWords.length === 0) return { score: 0, reason: null };
+/**
+ * Score based on IDF-weighted keyword overlap between task text and ADR text (F1.3).
+ * Extracts significant words (>3 chars) from task title+description and computes the
+ * fraction of the task's *distinctiveness mass* (summed IDF) that the ADR text contains.
+ * `idfOf` comes from {@link buildIdfLookup} over the accepted-ADR pool.
+ */
+function scoreKeywordMatch(
+  adr: MemoryEntryV2,
+  taskText: string,
+  idfOf: (word: string) => number,
+): { score: number; reason: string | null } {
+  const uniqueWords = [...new Set(tokenizeWords(taskText))];
+  if (uniqueWords.length === 0) return { score: 0, reason: null };
 
-  const uniqueWords = [...new Set(taskWords)];
   const adrText = `${adr.id} ${adr.title} ${adr.content}`.toLowerCase();
 
-  let matchCount = 0;
+  let matchedWeight = 0;
+  let totalWeight = 0;
   for (const word of uniqueWords) {
-    if (adrText.includes(word)) matchCount++;
+    const weight = idfOf(word);
+    totalWeight += weight;
+    if (adrText.includes(word)) matchedWeight += weight;
   }
+  if (totalWeight === 0) return { score: 0, reason: null };
 
-  const ratio = matchCount / Math.max(uniqueWords.length, 1);
+  const ratio = matchedWeight / totalWeight;
 
-  // Require at least 15% keyword overlap for a match
+  // Require at least 15% of the task's IDF-weighted overlap for a match.
   if (ratio >= 0.15) {
     return { score: 0.3 * Math.min(ratio * 3, 1), reason: 'keyword-match' };
   }
@@ -351,6 +398,11 @@ export function selectRelevantAdrs(
     poolByNormId.set(normalizeAdrId(adr.id), adr);
   }
 
+  // F1.3: IDF corpus over the accepted-ADR pool — keyword-match weights each task
+  // word by its distinctiveness so broad ADRs stop matching every task via generic
+  // vocabulary. Built once, reused for the forced + scored loops below.
+  const idfOf = buildIdfLookup(adrPool);
+
   // Pre-phase: extract explicit ADR-NNN references from task text and force-include them
   const explicitRefs = extractExplicitAdrRefs(taskText);
   const forcedIds = new Set<string>();
@@ -371,7 +423,7 @@ export function selectRelevantAdrs(
     const scope = scoreScopeMatch(entry, taskDirs, taskFiles);
     if (scope.reason) { totalScore += scope.score; reasons.push(scope.reason); }
 
-    const keyword = scoreKeywordMatch(entry, taskText);
+    const keyword = scoreKeywordMatch(entry, taskText, idfOf);
     if (keyword.reason) { totalScore += keyword.score; reasons.push(keyword.reason); }
 
     const intentPref = scoreIntentPreference(entry, intent);
@@ -403,7 +455,7 @@ export function selectRelevantAdrs(
       const scope = scoreScopeMatch(adr, taskDirs, taskFiles);
       if (scope.reason) { totalScore += scope.score; reasons.push(scope.reason); }
 
-      const keyword = scoreKeywordMatch(adr, taskText);
+      const keyword = scoreKeywordMatch(adr, taskText, idfOf);
       if (keyword.reason) { totalScore += keyword.score; reasons.push(keyword.reason); }
 
       const intentPref = scoreIntentPreference(adr, intent);

@@ -221,6 +221,49 @@ describe('adr-selector', () => {
     expect(adr015!.matchReasons).toContain('keyword-match');
   });
 
+  // F1.3 — IDF-weighted keyword match: a broad-vocabulary ADR that overlaps a task
+  // only on GENERIC (high-DF) words must NOT keyword-match, while an ADR sharing the
+  // task's DISTINCTIVE (low-DF) vocabulary still does. Under the old raw-count logic
+  // the broad ADR (3 generic hits / 14 words = 0.21 ≥ 0.15) matched — the exact
+  // false-positive that put adr-g-006 in 93% of live prompts.
+  it('F1.3: broad ADR overlapping only on generic words does not keyword-match', () => {
+    const broad = makeAdr({
+      id: 'adr-broad',
+      title: 'Broad Orchestration',
+      content: 'sprint worker model agent config routing planner evaluator scope task',
+      sprint_num: 100,
+    });
+    // Fillers inflate the document-frequency of the generic words → low IDF.
+    const fillers = ['f1', 'f2', 'f3'].map(n =>
+      makeAdr({ id: `adr-${n}`, title: `Filler ${n}`, content: 'sprint worker model agent config task', sprint_num: 100 }),
+    );
+    const specific = makeAdr({
+      id: 'adr-spec',
+      title: 'Hermetic Testing',
+      content: 'hermetic tmpdir vitest coverage spawnsync',
+      sprint_num: 100,
+    });
+    const corpus = [broad, ...fillers, specific];
+
+    const task = makeTask(
+      'Add hermetic tmpdir fixture',
+      'Ensure vitest coverage stays hermetic using tmpdir fixtures and no spawnSync across the sprint worker task',
+      [],
+    );
+    // currentSprintNum === sprint_num → no age penalty muddying the scores.
+    const results = selectRelevantAdrs(task, corpus, 10, 100);
+
+    // Distinctive match preserved.
+    const spec = results.find(r => r.adrId === 'adr-spec');
+    expect(spec).toBeDefined();
+    expect(spec!.matchReasons).toContain('keyword-match');
+
+    // Broad ADR has no scope/intent/preset signal for this task, so its only possible
+    // axis is keyword — IDF drops it below threshold → it must not surface at all.
+    const broadResult = results.find(r => r.adrId === 'adr-broad');
+    expect(broadResult).toBeUndefined();
+  });
+
   // Test 6: Age penalty is correct
   it('applies age penalty to older ADRs', () => {
     const task = makeTask(
