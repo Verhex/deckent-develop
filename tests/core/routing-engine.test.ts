@@ -880,8 +880,11 @@ describe('routeTaskV2 — forceSkills UserOverride integration', () => {
     expect(decision.reasoning.some(r => r.includes('none') || r.includes('cleared'))).toBe(true);
   });
 
-  it('forceSkills works even when forced skill is not in skill pool', () => {
-    // DIRECTIVES specifies a skill that doesn't exist in the pool — still honored
+  it('drops forced skills that are not registered in the skill pool', () => {
+    // DIRECTIVES specifies skills absent from the pool (a typo, or an agent id): a
+    // non-existent skill is not an authoritative choice — it can never be injected
+    // into the worker prompt, so it is dropped (with a warning) rather than copied
+    // verbatim and silently credited as a used skill in outcome stats.
     const decision = routeTaskV2(
       {
         title: 'Implement feature',
@@ -889,12 +892,12 @@ describe('routeTaskV2 — forceSkills UserOverride integration', () => {
         scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/cmd.ts'] },
       },
       makePool(),
-      makeSkillPool(), // empty pool
+      makeSkillPool(), // empty pool → nothing forced can resolve
       { overrides: [{ source: 'task-directive', forceSkills: ['typescript-expert', 'testing-expert'], priority: 3 }] },
     );
 
-    expect(decision.skillIds).toContain('typescript-expert');
-    expect(decision.skillIds).toContain('testing-expert');
+    expect(decision.skillIds).toEqual([]);
+    expect((decision.overrideWarnings ?? []).length).toBe(2);
   });
 });
 
@@ -1036,5 +1039,47 @@ describe('routeTaskV2 — context budget integration', () => {
     );
 
     expect(decision.contextFit).toBe('overflow');
+  });
+});
+
+// ─── forceSkills phantom-id validation (learnings.json integrity) ────────────
+// A forced skill id that is not a registered skill was previously copied verbatim
+// into task.assignedSkills, silently dropped at prompt-injection time, yet recorded
+// as a used (100%-success) skill in routing outcome stats. Validation at routing
+// time drops phantoms before they can pollute the outcome→routing learning loop.
+describe('routeTaskV2 — forceSkills phantom-id validation', () => {
+  it('drops forced skill ids that are not in the skill pool', () => {
+    const decision = routeTaskV2(
+      { title: 'Harden auth', description: 'security fix', scope: { directories: ['src/auth/'], filesRead: [], filesWrite: ['src/auth/x.ts'] } },
+      makePool(),
+      makeSkillPool(makeSkill('typescript-expert'), makeSkill('testing-expert')),
+      { overrides: [{ source: 'task-directive', forceSkills: ['typescript-expert', 'security-auditor', 'testing'], priority: 3 }] },
+    );
+    // security-auditor (an agent id) and testing (real skill = testing-expert) are
+    // not registered skills → dropped; only the real skill survives.
+    expect(decision.skillIds).toEqual(['typescript-expert']);
+  });
+
+  it('warns with a nearest-match suggestion for a dropped phantom id', () => {
+    const decision = routeTaskV2(
+      { title: 'Write tests', description: 'add tests', scope: { directories: ['tests/'], filesRead: [], filesWrite: ['tests/x.test.ts'] } },
+      makePool(),
+      makeSkillPool(makeSkill('testing-expert')),
+      { overrides: [{ source: 'task-directive', forceSkills: ['testing'], priority: 3 }] },
+    );
+    expect(decision.skillIds).toEqual([]);
+    const warnings = decision.overrideWarnings ?? [];
+    expect(warnings.some(w => w.includes("'testing'") && w.includes('testing-expert'))).toBe(true);
+  });
+
+  it('keeps every forced id when all are registered (no regression)', () => {
+    const decision = routeTaskV2(
+      { title: 'Build module', description: 'implement', scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/m.ts'] } },
+      makePool(),
+      makeSkillPool(makeSkill('typescript-expert'), makeSkill('testing-expert')),
+      { overrides: [{ source: 'task-directive', forceSkills: ['typescript-expert', 'testing-expert'], priority: 3 }] },
+    );
+    expect(decision.skillIds).toEqual(['typescript-expert', 'testing-expert']);
+    expect(decision.overrideWarnings ?? []).toEqual([]);
   });
 });

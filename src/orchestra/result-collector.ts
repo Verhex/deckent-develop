@@ -690,7 +690,16 @@ export async function resolveSkillPrompts(
     try {
       const content = await readFile(skillPath, 'utf-8');
       results.push({ name: skillId, content });
-    } catch (e) { debugLog('resolveSkillPrompts:readSkillFile', e); }
+    } catch (e) {
+      // A skill assigned to the task whose SKILL.md could not be loaded is NOT
+      // injected into the worker prompt — yet downstream outcome tracking still
+      // credits it. Surface it (observability) rather than dropping it silently so
+      // a missing/unsynced skill file is visible, not an invisible phantom credit.
+      // (Phantom/typo'd ids are already stopped upstream at routing-engine's
+      // forceSkills validation; this catches the residual "valid id, missing file".)
+      metric('skill.prompt_load_failed', 1, { skillId });
+      debugLog('resolveSkillPrompts:readSkillFile', e);
+    }
   }
   return results;
 }

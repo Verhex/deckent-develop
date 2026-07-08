@@ -471,6 +471,27 @@ interface ScoredCandidate {
  * (`skillAgentAffinity` flag, default-off). When both flags are off the routing
  * output is byte-identical to the pre-reorder behavior.
  */
+/**
+ * Suggest the closest registered skill id for an unknown/typo'd forced skill.
+ * Cheap heuristic (no full edit-distance): prefer a pool id in a prefix/substring
+ * relationship with the unknown id, then one sharing its first token — this catches
+ * the dominant real cases ('testing' → 'testing-expert', 'typescript' → 'typescript-expert').
+ * Returns undefined when nothing plausible matches (caller then just reports "dropped").
+ */
+function suggestNearestSkill(
+  unknown: string,
+  skillPool: Map<string, SkillDefinition>,
+): string | undefined {
+  const u = unknown.toLowerCase();
+  const ids = [...skillPool.keys()];
+  const prefixMatch = ids.find(
+    (id) => id.toLowerCase().startsWith(u) || u.startsWith(id.toLowerCase()),
+  );
+  if (prefixMatch) return prefixMatch;
+  const firstToken = u.split(/[-_]/)[0];
+  return ids.find((id) => id.toLowerCase().split(/[-_]/)[0] === firstToken);
+}
+
 export function routeTaskV2(
   task: {
     title: string; description: string; scope: TaskScope; type?: TaskKind;
@@ -572,8 +593,23 @@ export function routeTaskV2(
   let skillConfidence: ConfidenceLevel = 'uncertain';
 
   if (resolved.forceSkills !== undefined) {
-    // forceSkills=[] means "Skills: none" (explicit no-skills directive), respect it
-    skillIds = resolved.forceSkills;
+    // forceSkills=[] means "Skills: none" (explicit no-skills directive), respect it.
+    // Validate every forced id against the real skill pool BEFORE it enters
+    // task.assignedSkills: an unknown/typo'd id (an agent id like 'security-auditor',
+    // or 'testing' when the real skill is 'testing-expert') was previously copied
+    // verbatim, silently dropped at prompt-injection time (resolveSkillPrompts catch),
+    // yet still recorded as a 100%-success skill in routing outcome stats — a phantom
+    // entry polluting the outcome→routing learning loop (learnings.json).
+    for (const id of resolved.forceSkills) {
+      if (skillPool.has(id)) {
+        skillIds.push(id);
+      } else {
+        const suggestion = suggestNearestSkill(id, skillPool);
+        const hint = suggestion ? ` — did you mean '${suggestion}'?` : '';
+        overrideWarnings.push(`Forced skill '${id}' is not a registered skill; dropped${hint}`);
+        reasoning.push(`Dropped unknown forced skill '${id}'${hint}`);
+      }
+    }
     for (const id of skillIds) skillScores.set(id, 100);
     skillConfidence = skillIds.length > 0 ? 'high' : 'uncertain';
     reasoning.push(
