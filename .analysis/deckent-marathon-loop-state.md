@@ -35,14 +35,15 @@
 ## 🎯 MARATHON GOAL — otonom loop (kalan iş; 2026-07-08 gece, Alperen "goal'e ekle" + "goal'a başla dediğimde koş")
 > **Tetik:** Alperen "goal'a başla" DEYİNCE otonom loop koşar (yatıyor; build gerektikçe BEN yaparım, /mcp restart gereksiz — CLI'dan güncel-dist okur). Başlamadan bu goal + teyit hazır. Sıra: **(a) prompt-gate G-serisi el-kod → (c) governance-wire el-kod → (b) born-sprint döngüsü** (dogfood-gate ile).
 >
-> **(a) Prompt-gate G-serisi (BEN el-kod, DISTINCT-FILE: prompt-gate/adr-selector/routing-engine/prompt-god-template):**
-> - **G1c** premise-groundtruth: `auditPlanGroundTruth` (planner.ts:763, ŞU AN yalnız numeric agents-claim + UNWIRED) → "X eksik/yok" iddia grep-check'e genişlet + gate-lint olarak wire. ⚠️ gate'i pure'dan **repo-aware**'e taşır (repo-grep'i evaluatePromptGate'e geçir). 387-012 bayat-Ed25519'u yakalar.
-> - **G3** operation-class→persona routing (routeTaskV2, G2b'nin KÖK-fix'i): taskDNA `operations` ağırlıklarını persona-seçimine bağla (refactorer'ı davranış-değiştiren task'tan uzak tut). Sinyal üretiliyor, tüketici eksik.
-> - **R-5/R-5a** (küçük): d-004 full-render'ı import-touching'e daralt · nogo-koşullu-talimat "compatibility note" render · ADR `prompt_summary` (G-006 truncation).
+> **(a) Prompt-gate G-serisi (BEN el-kod):**
+> - ~~**G1c** premise-groundtruth~~ ✅ TESLİM (commit `d5f8fb33`) — gate→repo-aware (`probeRepo` bounded git-grep); "X eksik/yok/missing" code-symbol iddiası repo'da varsa WARN. Konservatif (camelCase-hump ŞART, /i yok), WARN-only. Smoke: 'resolveTokenUsage is missing'→"occurs 8×". 22 test.
+> - **G3** operation→persona routing: **MEVCUT** (`getKindAffinityBonus` routing-engine.ts:846, refactorer +3-refactor/-2-code-dev, **config-gated default-off**). = "observe-then-flip" (R-1 disiplini — blind autonomous flip YAPMA). Gate G1a plan-time symptom'u zaten yakalıyor + G2b prompt'u mitige ediyor. **Alperen: shadow-observe→flip kararı.**
+> - **R-5/R-5a** ⏸️ ERTELENDİ (F1.3 IDF + G5 tier-split ADR-over-injection'ı zaten çözdü → marjinal). d-004-narrow + ADR prompt_summary düşük-öncelik.
 >
-> **(c) Governance-wire (BEN el-kod — subagent-haritası: NOT sprint-phases edit, düşük blast-radius):**
-> - **born-560** RBAC→SPAWN: `authorizeExecution` (nervous/authority-matrix.ts, built+0-caller) → `sprint-spawner.ts` per-task loop (~:557, `blockedTaskIds` desenini aynala), `config.enforce_rbac` gate'li (default-off soft). `task.actor` zaten threaded. "rbac persist"=AuthorityAuditContext ver (**Alperen-teyit gerek**). ADR-G-020 AUTHORITY-SSOT dilimi. `authority-enforcer.checkAuthority` DEĞİL (hard-mode yok).
-> - **born-562** 5 safety-net (doğru-kapsam): (1) cost_guard→`sprint-controller.ts` (resourceMonitor deseni ~:1290/1699/1743) + shouldStopDispatch'i sprint-spawner wave-loop'ta tüket · (2) resumeSprint→`resume.ts` runSprint-öncesi PAUSED-check · (3) **ApprovalExpiryDriver=BLOKELİ** (persistent broker+store yok; api/server createHttpServer — ERTELE/flag) · (4) resolveTokenUsage→`result-collector.ts` enrichResultTokenUsage (session-store tier) · (5) restoreFromSnapshot→`recover.ts` `--restore-tasks` flag.
+> **(c) Governance-wire (BEN el-kod — subagent-haritası: NOT sprint-phases edit):**
+> - ~~**born-562 #5** restoreFromSnapshot~~ ✅ TESLİM (commit `ae469d6c`) — `deckent recover --restore-tasks` rollback (i18n, gerçek-binary smoke).
+> - **born-560** RBAC→SPAWN: `authorizeExecution`→`sprint-spawner.ts` (~:557, blockedTaskIds-deseni), `config.enforce_rbac` default-off. ⏸️ **Alperen-denetim:** "rbac persist"=AuthorityAuditContext açık-tasarım-sorusu (blind yapılmadı). Enforcement-gate güvenli (dormant), persist ertelendi.
+> - **born-562 kalanı** ⏸️ **Alperen-denetim** (hot-file / involved): (1) cost_guard→sprint-controller HOT + shouldStopDispatch-consume · (2) resumeSprint→resume.ts Sprint-reconstruction gerek · (3) ApprovalExpiryDriver **BLOKELİ** (persistent broker yok) · (4) resolveTokenUsage→result-collector HOT (token-accuracy). **Otonom-blind hot-file surgery YAPILMADI** (advisor+kullanıcı disiplini).
 >
 > **(b) Born-sprint döngüsü (worker=sonnet, 37 OPEN, dedup ∅):** 494 502 517 529 530 537 541 548 575 579 583 + greenfield 496/497 + Windows-cluster 580 (sub-slice) + closed-hot single-owner 565/572/582. Her sprint: DIRECTIVES→dogfood-gate (plan --dry-run WARN/BLOCK gör→persona düzelt)→start→disk-verify→commit→build (sprint-arası, BEN).
 >
