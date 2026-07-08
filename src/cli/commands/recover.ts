@@ -5,6 +5,7 @@ import { cleanOrphanIpcDirs } from '../../core/orphan-cleaner.js';
 import { clearStaleLocks, clearStaleSpawnLocks } from '../../core/file-lock.js';
 import { postFinalizeCleanup } from '../../core/orphan-cleaner.js';
 import { runSelfAuditGate } from '../../orchestra/sprint-finalizer.js';
+import { restoreFromSnapshot } from '../../orchestra/task-restoration.js';
 import { TASKS_DIR, LOCKS_DIR } from '../../core/constants.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -123,12 +124,35 @@ export function registerRecover(program: Command): void {
     .option('--dry-run', 'Preview what would be cleaned without making changes')
     .option('--force', 'Skip interactive confirmation')
     .option('--skip-audit', 'Skip the audit step')
+    .option('--restore-tasks', 'Roll back: restore task files from the pre-archive snapshot instead of cleaning forward (born-562)')
     .option('--json', 'Output recovery result as JSON')
-    .action(async (sprintId: string, opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean; json?: boolean }) => {
+    .action(async (sprintId: string, opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean; restoreTasks?: boolean; json?: boolean }) => {
       const root = resolveProjectRoot();
       const lang = detectLang(root);
 
       try {
+        // born-562: rollback path — restore the pre-archive snapshot (createPreArchiveSnapshot
+        // writes it in CLEANUP, but nothing consumed it until now). Mutually exclusive with the
+        // forward-cleanup flow; returns before any archive/cleanup runs.
+        if (opts.restoreTasks) {
+          const result = restoreFromSnapshot(root, sprintId);
+          if (opts.json) {
+            print(JSON.stringify({
+              sprintId,
+              restoreTasks: true,
+              success: result.success,
+              restoredFiles: result.restoredFiles.length,
+              error: result.error ?? null,
+            }));
+          } else if (result.success) {
+            print(getMessage('recover.restore_success', lang, { count: String(result.restoredFiles.length), sprintId }));
+          } else {
+            printError(new Error(getMessage('recover.restore_failed', lang, { error: result.error ?? 'unknown', sprintId })));
+            process.exitCode = 1;
+          }
+          return;
+        }
+
         if (opts.json) {
           const report = await runRecovery(root, sprintId, { ...opts, dryRun: opts.dryRun }, lang);
           print(JSON.stringify({

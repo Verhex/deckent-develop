@@ -2013,6 +2013,8 @@ const MESSAGES: MessageMap = {
   'recover.result_stale_spawnlocks': { en: '  Stale spawnlocks:{count} cleared', tr: '  Bayat spawnlock: {count} temizlendi' },
   'recover.result_task_files': { en: '  Task files:      {archived} archived, {preserved} preserved', tr: '  Görev dosyaları: {archived} arşivlendi, {preserved} korundu' },
   'recover.complete': { en: '\n  ✓ Recovery complete. Sprint {sprintId} is ready for restart.\n', tr: '\n  ✓ Kurtarma tamamlandı. {sprintId} sprint\'i yeniden başlatmaya hazır.\n' },
+  'recover.restore_success': { en: '  ✓ Restored {count} task file(s) from the {sprintId} pre-archive snapshot (rollback).', tr: '  ✓ {sprintId} pre-archive snapshot\'ından {count} task dosyası geri yüklendi (rollback).' },
+  'recover.restore_failed': { en: '  Restore failed for {sprintId}: {error}', tr: '  {sprintId} için geri-yükleme başarısız: {error}' },
   'features.manifest_not_found': { en: 'features-manifest.json not found. Run `node scripts/sync-manifest.mjs` to generate.', tr: 'features-manifest.json bulunamadı. Oluşturmak için `node scripts/sync-manifest.mjs` çalıştırın.' },
   'features.feature_not_found': { en: 'feature "{name}" not found.', tr: '"{name}" özelliği bulunamadı.' },
   'features.invalid_category': { en: 'invalid category "{name}". Valid: {valid}', tr: 'geçersiz kategori "{name}". Geçerli: {valid}' },
