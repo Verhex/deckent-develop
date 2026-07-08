@@ -1192,6 +1192,25 @@ export function buildVerifyPrecedenceNote(verificationMode: 'targeted' | 'doc' =
 }
 
 /**
+ * G2b behavior-precedence override note (prompt-gate G-series). A CONDITIONAL runtime
+ * mitigation for the case the plan-time gate WARNs but does not block: a preserve-behavior
+ * persona (refactorer, "zero functional changes" mandate) still landed on a behavior-changing
+ * task. This suspends that mandate for THIS task so the worker implements the change instead
+ * of preserving the current/buggy behavior. Mirrors {@link buildVerifyPrecedenceNote}.
+ *
+ * Self-contained (no prompt-gate import) to avoid the task-builder→prompt-god-template→
+ * prompt-gate→task-builder cycle. Returns '' for every non-refactorer / refactor / doc task,
+ * so the vast majority of prompts (and the prompt-protected-set golden) are unchanged.
+ * G2b is a symptom-mitigation; the root fix is G3 (operation-class → persona routing).
+ */
+export function buildBehaviorPrecedenceNote(task: Pick<Task, 'assignedAgent' | 'routingMeta'>): string {
+  if (task.assignedAgent !== 'refactorer') return '';
+  const intent = (task.routingMeta?.taskDNA as { intent?: { primary?: string } } | undefined)?.intent?.primary;
+  if (!intent || intent === 'refactor' || intent === 'unknown' || intent === 'documentation') return '';
+  return `\n> Behavior-precedence (this task overrides your persona): this task CHANGES external behavior — it is a ${intent} task, not a refactor. Your persona's "zero functional changes / preserve behavior" mandate is SUSPENDED for THIS task: implement the behavior change the goCriteria asks for (do not preserve the current/buggy behavior). The task's goCriteria is the authority.`;
+}
+
+/**
  * Build the Definition-of-Done (goCriteria) block — a PROTECTED element the
  * compiler must reproduce byte-for-byte (Sprint 330 330-019).
  *
@@ -1378,7 +1397,7 @@ If BOTH pass → selfAssessment = "DONE"
 If minor issues remain → selfAssessment = "GO_WITH_TECH_DEBT" with details in notes
 If Bash tool is unavailable → report in notes, selfAssessment = "GO_WITH_TECH_DEBT"
 If targeted tests fail after 3 attempts → selfAssessment = "NO_GO" with error details
-${buildVerifyPrecedenceNote(verificationMode)}`);
+${buildVerifyPrecedenceNote(verificationMode)}${buildBehaviorPrecedenceNote(task)}`);
   }
 
   // NPM-Advisory (born-454, sprint-356 live incident): dependency mutation is

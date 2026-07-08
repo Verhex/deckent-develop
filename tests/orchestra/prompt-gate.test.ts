@@ -19,6 +19,9 @@ import type { Task } from '../../src/core/task-types.js';
 function agent(id: string): AgentDefinition {
   return createAgentDefinition({ id, name: id });
 }
+function agentWithDeniedTools(id: string, denied: string[]): AgentDefinition {
+  return { ...createAgentDefinition({ id, name: id }), deniedTools: denied };
+}
 function pool(...ids: string[]): Map<string, AgentDefinition> {
   return new Map(ids.map((id) => [id, agent(id)]));
 }
@@ -149,6 +152,27 @@ describe('G1a persona lints', () => {
     });
     expect(r.findings).toHaveLength(0);
     expect(r.ok).toBe(true);
+  });
+
+  it('G2 metadata: a NON-hardcoded agent carrying deniedTools:[Write] on a construction task → BLOCK (manifest signal, not name-matching)', () => {
+    const custom = agentWithDeniedTools('some-reviewer', ['Write']);
+    const r = evaluatePromptGate({
+      tasks: [task({ id: 'm1', assignedAgent: 'some-reviewer', routingMeta: dna('implementation', 'create') })],
+      agentPool: new Map([['some-reviewer', custom]]),
+    });
+    const f = r.findings.find((x) => x.lint === 'persona-capability');
+    expect(f).toBeDefined();
+    expect(f!.level).toBe('block');
+    expect(r.ok).toBe(false);
+  });
+
+  it('G2 metadata: a Write-ALLOWED agent (deniedTools:[]) not in the id-set → no capability block', () => {
+    const custom = agentWithDeniedTools('some-implementer', []);
+    const r = evaluatePromptGate({
+      tasks: [task({ id: 'm2', assignedAgent: 'some-implementer', routingMeta: dna('implementation', 'create') })],
+      agentPool: new Map([['some-implementer', custom]]),
+    });
+    expect(r.findings.some((x) => x.lint === 'persona-capability')).toBe(false);
   });
 
   it('doc-only task + reviewer persona → NOT construction → no role warning', () => {

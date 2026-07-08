@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildTaskPrompt } from '../../src/orchestra/prompt-god-template.js';
+import { buildTaskPrompt, buildBehaviorPrecedenceNote } from '../../src/orchestra/prompt-god-template.js';
 import type { SprintContext } from '../../src/orchestra/prompt-god-template.js';
 import type { Task } from '../../src/core/task-types.js';
 import { TaskStatus } from '../../src/core/task-types.js';
@@ -508,5 +508,41 @@ describe('WP-19: goCriteria-derived checklist rubric', () => {
     // Verdict maps to the checklist count, not a subjective %.
     expect(result.prompt).toMatch(/all .*→ DONE|ticked.*→ DONE/i);
     expect(result.prompt).not.toContain('<80% → GO_WITH_TECH_DEBT');
+  });
+});
+
+describe('buildBehaviorPrecedenceNote (G2b)', () => {
+  function withAgentIntent(agentId: string | undefined, primary?: string): Pick<Task, 'assignedAgent' | 'routingMeta'> {
+    return {
+      assignedAgent: agentId,
+      routingMeta: primary ? { taskDNA: { intent: { primary } } } : undefined,
+    };
+  }
+
+  it('fires for refactorer on a behavior-changing (implementation) task', () => {
+    const note = buildBehaviorPrecedenceNote(withAgentIntent('refactorer', 'implementation'));
+    expect(note).toContain('Behavior-precedence');
+    expect(note).toContain('SUSPENDED');
+    expect(note).toContain('implementation');
+  });
+
+  it('fires for refactorer on a bugfix task', () => {
+    expect(buildBehaviorPrecedenceNote(withAgentIntent('refactorer', 'bugfix'))).toContain('Behavior-precedence');
+  });
+
+  it('is empty for refactorer on a genuine refactor task', () => {
+    expect(buildBehaviorPrecedenceNote(withAgentIntent('refactorer', 'refactor'))).toBe('');
+  });
+
+  it('is empty for a non-refactorer agent (bug-fixer) — no persona mandate to override', () => {
+    expect(buildBehaviorPrecedenceNote(withAgentIntent('bug-fixer', 'implementation'))).toBe('');
+  });
+
+  it('is empty for refactorer with no taskDNA intent (conservative: no signal → no note)', () => {
+    expect(buildBehaviorPrecedenceNote(withAgentIntent('refactorer', undefined))).toBe('');
+  });
+
+  it('is empty for refactorer on a documentation task', () => {
+    expect(buildBehaviorPrecedenceNote(withAgentIntent('refactorer', 'documentation'))).toBe('');
   });
 });

@@ -57,12 +57,14 @@ export interface PromptGateInput {
 export const PRESERVE_BEHAVIOR_AGENTS: ReadonlySet<string> = new Set(['refactorer']);
 
 /**
- * Agents that are tool-level Write-denied (advisory/review-only per their agent.json
- * `deniedTools` + PROMPT.md). Assigning a code-WRITING task to them is a HARD
- * mismatch — they are structurally incapable of producing the diff. NOTE: `architect`
- * is mapped `implementer` in BUILTIN_AGENT_ROLES yet denies Write and self-describes
- * as advisory-only (agent.json deniedTools:['Write'], PROMPT.md:10) — the role map
- * misses it, so this capability set is what actually catches that mismatch.
+ * FALLBACK id-set for Write-denied (advisory/review-only) agents. G2 made the
+ * capability lint prefer the real manifest signal (`agent.deniedTools.includes('Write')`)
+ * over name-matching — this set is the fallback for when the agent def is absent or its
+ * tools are not populated (e.g. a hermetic fixture built via createAgentDefinition, whose
+ * deniedTools defaults to []), so the check never silently no-ops. NOTE: `architect` is
+ * mapped `implementer` in BUILTIN_AGENT_ROLES yet denies Write and self-describes as
+ * advisory-only (agent.json deniedTools:['Write'], PROMPT.md:10) — the role map misses it;
+ * both the metadata signal AND this set catch it.
  */
 export const WRITE_DENIED_AGENTS: ReadonlySet<string> = new Set([
   'architect',
@@ -123,9 +125,15 @@ export function isConstructionTask(task: Task): boolean {
 
 // ─── Lints ─────────────────────────────────────────────────────────────────────
 
-/** G1a-capability (BLOCK): a Write-denied persona on a code-writing task. */
-function lintCapability(task: Task, agentId: string): PromptGateFinding | null {
-  if (!WRITE_DENIED_AGENTS.has(agentId) || !isConstructionTask(task)) return null;
+/**
+ * G1a-capability (BLOCK): a Write-denied persona on a code-writing task. G2 prefers the
+ * real manifest signal (`agent.deniedTools`) over the hardcoded id-set (name-matching) so
+ * ANY Write-denied agent — including future ones — is caught; the id-set is the fallback
+ * for an absent/tool-empty agent def.
+ */
+function lintCapability(task: Task, agentId: string, agent?: AgentDefinition): PromptGateFinding | null {
+  const writeDenied = (agent?.deniedTools?.includes('Write') ?? false) || WRITE_DENIED_AGENTS.has(agentId);
+  if (!writeDenied || !isConstructionTask(task)) return null;
   return {
     taskId: task.id,
     lint: 'persona-capability',
@@ -216,13 +224,14 @@ export function evaluatePromptGate(input: PromptGateInput): PromptGateResult {
     const agentId = task.assignedAgent ?? 'generic';
 
     if (agentId !== 'generic') {
-      const cap = lintCapability(task, agentId);
+      const agent = input.agentPool.get(agentId);
+
+      const cap = lintCapability(task, agentId, agent);
       if (cap) findings.push(cap);
 
       const man = lintMandate(task, agentId);
       if (man) findings.push(man);
 
-      const agent = input.agentPool.get(agentId);
       if (agent) {
         // Role lint is redundant once capability already blocked the same task.
         if (!cap) {
