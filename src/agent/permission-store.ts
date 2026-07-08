@@ -4,7 +4,7 @@
 // Migrates legacy permissions.allow:[toolName] → { tool, pattern: '**' }.
 // Evolves chat-permissions.ts (tool-name set → rule set), same file location.
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import type { PermissionRule } from './permission-types.js';
 import { WorkerApprovalGate, type WorkerActionDescriptor, type GateVerdict, type FallbackResolver } from '../core/approval-worker-gate.js';
@@ -85,10 +85,24 @@ function loadDenies(cwd: string): PermissionRule[] {
 function persist(cwd: string, rules: PermissionRule[]): void {
   const p = settingsPath(cwd);
   let doc: Record<string, unknown> = {};
-  try {
-    if (existsSync(p)) doc = JSON.parse(readFileSync(p, 'utf-8')) as Record<string, unknown>;
-  } catch {
-    doc = {};
+  if (existsSync(p)) {
+    try {
+      doc = JSON.parse(readFileSync(p, 'utf-8')) as Record<string, unknown>;
+    } catch {
+      // Malformed JSON (e.g. crash mid-write, hand-edit typo): we cannot
+      // structurally merge unparseable content, but we must never silently
+      // destroy it. Back up the corrupted bytes before falling back to a
+      // fresh doc, and warn — read-merge-write's contract is "never erase
+      // unrelated content without a trace", even on the failure path.
+      const backupPath = `${p}.corrupted-${Date.now()}.bak`;
+      try {
+        copyFileSync(p, backupPath);
+        console.error(`[permission-store] ${p} is not valid JSON — backed up original content to ${backupPath} before rewriting permissions.`);
+      } catch {
+        console.error(`[permission-store] ${p} is not valid JSON and could not be backed up — rewriting with permissions only.`);
+      }
+      doc = {};
+    }
   }
   const permissions = (doc['permissions'] && typeof doc['permissions'] === 'object' && !Array.isArray(doc['permissions']))
     ? (doc['permissions'] as Record<string, unknown>)

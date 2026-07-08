@@ -798,6 +798,18 @@ export async function resolveProviderWithFallback(
  * Omitting `providerDefs` (or passing none) leaves the built-in behavior
  * byte-for-byte unchanged — backward-compat is load-bearing.
  *
+ * P0-SEC (born-518, audit §4.4): this function is the actual cross-provider
+ * leak SITE — it writes every configured provider's secret into the shared
+ * `process.env` by design (so each adapter's own `isAvailable()`/CLI-auth
+ * check can read its key back out). It intentionally does NOT scrub here,
+ * because `process.env` at this point is the parent (brain) process's own
+ * env, still needed unscrubbed by every provider's own auth check. A spawn
+ * path building a CHILD env from `process.env` (or from this function's
+ * `providerEnvOverrides` return value) MUST isolate it before handing it to
+ * a worker — use {@link scrubForeignProviderEnv} below, which derives the
+ * scrub set directly from this function's own return value so the two can
+ * never drift apart.
+ *
  * @param secrets       Key-value pairs loaded from the .deck file
  * @param providerDefs  Optional config-driven provider definitions
  *                      (`config.providers.registry`) — config precedence.
@@ -873,6 +885,106 @@ export function applyDeckSecretsToEnv(
   }
 
   return providerEnvOverrides;
+}
+
+// ─── Cross-Provider Credential Scrub (born-518-REDO, 382-002) ────────
+/**
+ * Central credential-scrub helpers for provider spawn paths — the isolation
+ * half of the contract {@link applyDeckSecretsToEnv} (the write half) starts.
+ *
+ * P0-SEC gap (born-518, audit §4.4): `applyDeckSecretsToEnv` writes every
+ * configured provider's secret into the shared `process.env` — by design, so
+ * each adapter can read its OWN key back out. The bug is on the READ side: a
+ * child process built from a bare `{...process.env}` (or equivalent)
+ * inherits every provider's secret unconditionally. In a mixed-provider
+ * fleet (e.g. a claude + codex sprint running side by side) a codex worker's
+ * child process could read the claude worker's `ANTHROPIC_API_KEY` straight
+ * out of its own inherited env — and vice versa — even though it never asked
+ * for that credential.
+ *
+ * These helpers were moved here (born-518-REDO) from `providers/provider.ts`
+ * so the write-site and the isolation-site live together as one contract.
+ * `providers/provider.ts` now re-exports them for backward compatibility —
+ * `providers/subprocess.ts` and `tests/providers/cred-scrub-all-adapters.test.ts`
+ * still import that path (out of this task's write scope); a follow-up task
+ * with those two files added to write scope can repoint both imports at this
+ * module directly and delete the shim.
+ */
+
+/**
+ * Return a COPY of `hostEnv` with every key in `scrubKeys` removed.
+ *
+ * Pure — never mutates `hostEnv`. Callers pass the full cross-provider
+ * credential key set so a child process's inherited env starts from zero
+ * foreign provider secrets.
+ *
+ * @param hostEnv    the base environment to derive the child env from
+ *                    (production callers pass `process.env`; tests inject a
+ *                    synthetic snapshot for hermeticity)
+ * @param scrubKeys  every provider credential env-var name to strip
+ */
+export function scrubCrossProviderEnv(
+  hostEnv: NodeJS.ProcessEnv,
+  scrubKeys: readonly string[],
+): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...hostEnv };
+  for (const key of scrubKeys) {
+    delete env[key];
+  }
+  return env;
+}
+
+/**
+ * Convenience wrapper: {@link scrubCrossProviderEnv}, then re-inject `ownEnv`
+ * (this spawn's OWN credential override, e.g. `{ANTHROPIC_API_KEY: '...'}`)
+ * on top of the scrubbed copy. Absent/empty `ownEnv` leaves the child with NO
+ * credential key for any provider, so the CLI falls back to its own
+ * session/subscription auth exactly as before this fix (ADR-076).
+ */
+export function buildProviderChildEnv(
+  hostEnv: NodeJS.ProcessEnv,
+  scrubKeys: readonly string[],
+  ownEnv?: Readonly<Record<string, string>>,
+): NodeJS.ProcessEnv {
+  const env = scrubCrossProviderEnv(hostEnv, scrubKeys);
+  if (ownEnv) {
+    Object.assign(env, ownEnv);
+  }
+  return env;
+}
+
+/**
+ * Build a child env for `targetProvider` that is guaranteed to carry ONLY the
+ * secret {@link applyDeckSecretsToEnv} wrote for that provider — never any
+ * other provider's.
+ *
+ * Unlike {@link buildProviderChildEnv} (which needs the caller to separately
+ * enumerate the full cross-provider key set), this derives `scrubKeys`
+ * directly from `providerEnvOverrides` — the SAME object
+ * {@link applyDeckSecretsToEnv} already returned — so the set of keys scrubbed
+ * can never drift out of sync with the set of keys actually written. This is
+ * the mandated pattern for any spawn path building a worker's child env from
+ * `providerEnvOverrides`/`process.env` post-`applyDeckSecretsToEnv` (closes
+ * audit §4.4 at the leak site itself, not just at individual call sites).
+ *
+ * @param hostEnv              base env to derive the child from (production:
+ *                             `process.env`; tests: a synthetic snapshot)
+ * @param targetProvider       the provider this child env is being built for
+ *                             — its own key(s), if any, are re-injected
+ * @param providerEnvOverrides the exact map returned by
+ *                             {@link applyDeckSecretsToEnv} for this bootstrap
+ */
+export function scrubForeignProviderEnv(
+  hostEnv: NodeJS.ProcessEnv,
+  targetProvider: string,
+  providerEnvOverrides: Readonly<Record<string, Readonly<Record<string, string>>>>,
+): NodeJS.ProcessEnv {
+  const foreignKeys: string[] = [];
+  for (const [provider, override] of Object.entries(providerEnvOverrides)) {
+    if (provider === targetProvider) continue;
+    foreignKeys.push(...Object.keys(override));
+  }
+  return buildProviderChildEnv(hostEnv, foreignKeys, providerEnvOverrides[targetProvider]);
 }
 
 // ─── OpenAI-Compatible Candidate Resolution (F1-012) ─────────────────

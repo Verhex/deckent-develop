@@ -452,7 +452,11 @@ export function registerStart(program: Command): void {
         try {
           sprintResult = await runSprint(root, config, {
             connector: bootstrap.connector,
-            autoApprove: true, // Deckent standard: workers MUST have full write permissions
+            // CLI/MCP parity (ADR-022-V2, born-561): honor the --auto-approve flag —
+            // commander leaves opts.autoApprove undefined when absent, so this
+            // normalizes to a strict boolean, default false — same semantics as
+            // deckent_start (src/mcp/tools/start.ts autoApprove === true).
+            autoApprove: opts.autoApprove === true,
             sandboxMode: opts.sandboxMode,
             timeoutMs,
             spawnBackend: sandboxSpawnBackend,

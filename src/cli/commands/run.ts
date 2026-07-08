@@ -257,7 +257,11 @@ export function registerRun(program: Command): void {
       const scopeDir = opts.scope ?? './';
       const timeoutMs = opts.timeout ? parseInt(opts.timeout, 10) : 300_000;
       const keepFiles = opts.keep ?? false;
-      const autoApprove = true; // Deckent standard: workers MUST have full write permissions
+      // CLI/MCP parity (ADR-022-V2, born-561): honor the --auto-approve flag —
+      // commander leaves opts.autoApprove undefined when absent, so this
+      // normalizes to a strict boolean, default false — same semantics as
+      // `deckent start` / deckent_start.
+      const autoApprove = opts.autoApprove === true;
       const verbose = opts.verbose ?? false;
 
       if (!(ALL_MODELS as readonly string[]).includes(model)) {

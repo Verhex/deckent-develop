@@ -6,6 +6,9 @@
 // Sprint 147 Task 5.
 
 import type {
+  ActionDefinition,
+  ApprovalPolicy,
+  AuthorityMatrix,
   DecisionOutput,
   DetectorResult,
   NervousSystemConfigV1,
@@ -14,6 +17,111 @@ import type {
 import { MATRIX_BY_MODE, resolvePolicy } from './authority-matrix.js';
 import { ACTION_BY_ID } from './action-registry.js';
 import { resolveRiskClass, type ExecutionRequest } from '../core/work-model.js';
+
+// ─── Detector-Action Reach-Fix (born-569 / 382-005) ──────────────────────────
+//
+// Audit finding: build-failure-recurrence, dead-event-stream and
+// notification-delivery-health emit suggestedActions.id values that were
+// never added to ACTION_REGISTRY (src/nervous/action-registry.ts). decide()
+// looked them up via ACTION_BY_ID, found nothing, and `continue`d — dropping
+// every suggested action for these 3 detectors. When ALL of a result's
+// suggestedActions are dropped, decide() returns [] and bootstrap.ts's
+// runPipeline short-circuits (`if (decisions.length === 0) return;`) before
+// proposer/dispatcher ever run, so the detection never reaches a channel.
+//
+// Registering these ids in the canonical ACTION_REGISTRY is out of this
+// task's write-scope, so this local fallback table synthesizes an
+// ActionDefinition for exactly these known-mismatched ids (never for a
+// genuinely unknown id — those still skip silently, preserving existing
+// behavior for future/removed actions a detector might reference).
+const DETECTOR_ACTION_FALLBACK: ReadonlyMap<string, Omit<ActionDefinition, 'id' | 'defaultRisk'>> =
+  new Map([
+    ['BUILD_FAILURE_INVESTIGATE', {
+      displayName: 'Build Failure Investigate',
+      description: 'Same file(s) failed tsc/build across consecutive sprints — needs root-cause investigation',
+      category: 'medium-risk',
+      requiredSafetyFloor: [],
+      reversible: true,
+    }],
+    ['INVESTIGATE_STALL', {
+      displayName: 'Investigate Sprint Stall',
+      description: 'Sprint event stream silent with active worker(s) — possible stall',
+      category: 'medium-risk',
+      requiredSafetyFloor: [],
+      reversible: true,
+    }],
+    ['FORCE_EVALUATE', {
+      displayName: 'Force Sprint Evaluation',
+      description: 'Force sprint evaluation now to unstick a possibly-stalled sprint',
+      category: 'medium-risk',
+      requiredSafetyFloor: [],
+      reversible: true,
+    }],
+    ['KILL_WORKERS', {
+      displayName: 'Kill Stalled Workers',
+      description: 'Kill worker(s) detected stalled by a dead event stream',
+      category: 'high-risk',
+      requiredSafetyFloor: [],
+      reversible: false,
+    }],
+    ['NOTIFICATION_BRIDGE_REPAIR', {
+      displayName: 'Notification Bridge Repair',
+      description: 'Nervous notification delivery is degraded — bridge needs repair',
+      category: 'high-risk',
+      requiredSafetyFloor: [],
+      reversible: true,
+    }],
+  ]);
+
+/**
+ * resolvePolicy() equivalent for {@link DETECTOR_ACTION_FALLBACK} actions —
+ * mirrors its override-precedence (safety-floor id check, user override,
+ * matrix override, risk-based default) but operates on an already-synthesized
+ * {@link ActionDefinition} instead of an ACTION_BY_ID lookup, since
+ * resolvePolicy() itself throws for an id it cannot find in the registry.
+ */
+function resolveFallbackPolicy(
+  matrix: AuthorityMatrix,
+  action: ActionDefinition,
+  userOverrides?: Readonly<Record<string, ApprovalPolicy>>,
+): { policy: ApprovalPolicy; isSafetyFloor: boolean; reason: string } {
+  const isSafetyFloor =
+    action.requiredSafetyFloor.length > 0 ||
+    (matrix.safetyFloor as readonly string[]).includes(action.id);
+
+  if (isSafetyFloor) {
+    return {
+      policy: 'approve',
+      isSafetyFloor: true,
+      reason: `Safety floor: ${action.id} requires explicit user approval`,
+    };
+  }
+
+  const userOverride = userOverrides?.[action.id];
+  if (userOverride) {
+    return {
+      policy: userOverride,
+      isSafetyFloor: false,
+      reason: `User override for ${action.id}: ${userOverride}`,
+    };
+  }
+
+  const matrixOverride = matrix.actionOverrides[action.id];
+  if (matrixOverride) {
+    return {
+      policy: matrixOverride,
+      isSafetyFloor: false,
+      reason: `Matrix override: ${matrixOverride}`,
+    };
+  }
+
+  const defaultPolicy = matrix.riskPolicyMap[action.defaultRisk];
+  return {
+    policy: defaultPolicy,
+    isSafetyFloor: false,
+    reason: `Risk-based default (${action.defaultRisk}): ${defaultPolicy} [reach-fix: unregistered action]`,
+  };
+}
 
 // ─── Risk-Gate Types ────────────────────────────────────────────────────────
 
@@ -56,17 +164,33 @@ export class DecisionEngine {
     const outputs: DecisionOutput[] = [];
 
     for (const suggested of detectorResult.suggestedActions) {
-      const action = ACTION_BY_ID.get(suggested.id);
-      if (!action) {
-        // Unknown action — skip silently (detector might reference future actions)
+      const registered = ACTION_BY_ID.get(suggested.id);
+
+      if (registered) {
+        const resolution = resolvePolicy(
+          matrix,
+          suggested.id,
+          this.config.actionOverrides,
+        );
+
+        outputs.push({
+          action: registered,
+          policy: resolution.policy,
+          risk: suggested.risk,
+          isSafetyFloor: resolution.isSafetyFloor,
+          reason: resolution.reason,
+        });
         continue;
       }
 
-      const resolution = resolvePolicy(
-        matrix,
-        suggested.id,
-        this.config.actionOverrides,
-      );
+      const fallback = DETECTOR_ACTION_FALLBACK.get(suggested.id);
+      if (!fallback) {
+        // Genuinely unknown action — skip silently (detector might reference future actions)
+        continue;
+      }
+
+      const action: ActionDefinition = { id: suggested.id, defaultRisk: suggested.risk, ...fallback };
+      const resolution = resolveFallbackPolicy(matrix, action, this.config.actionOverrides);
 
       outputs.push({
         action,

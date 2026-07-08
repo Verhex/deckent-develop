@@ -197,12 +197,19 @@ export interface ApprovalCardProps {
   /** Stamped on every decision this card produces (`ApprovalDecision.channel`). */
   channel: string;
   labels: ApprovalCardLabels;
+  /** born-508 (382-003) stdin-ownership mutex gate — ANDed with this card's OWN
+   *  pending-queue state (`head !== null`) below. Lets the caller (app.tsx)
+   *  defer to a higher-priority stdin consumer (the legacy tool-confirm modal)
+   *  so at most one REPL surface ever reacts to the same keypress. Optional,
+   *  defaults to true — omitting it keeps every existing caller/test
+   *  byte-identical to the pre-born-508 behavior. */
+  isActive?: boolean;
 }
 
 // ─── ApprovalCard ───────────────────────────────────────────────────────────
 
 export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
-  const { events, onDecide, decidedBy, channel, labels } = props;
+  const { events, onDecide, decidedBy, channel, labels, isActive: mutexActive = true } = props;
   const [head, setHead] = useState<ApprovalCardHead | null>(null);
   const [expanded, setExpanded] = useState(false);
   const queueRef = useRef<ApprovalCardQueue | null>(null);
@@ -257,7 +264,7 @@ export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
       default:
         return;
     }
-  }, { isActive: head !== null });
+  }, { isActive: head !== null && mutexActive });
 
   if (!head) return null;
 

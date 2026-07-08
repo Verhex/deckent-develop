@@ -8,10 +8,19 @@ import { z } from 'zod/v4';
 import { ACTION_REGISTRY } from '../../nervous/action-registry.js';
 import { NervousHistory } from '../../nervous/history.js';
 import { NervousIpcQueue } from '../../nervous/ipc-queue.js';
-import type { AuthorityMode, NervousSystemConfigV1 } from '../../core/nervous-types.js';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import type { AuthorityMode, NervousSystemConfigV1, ExecutionRecord } from '../../core/nervous-types.js';
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  readdirSync,
+  copyFileSync,
+  unlinkSync,
+  mkdirSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { removeNervousPending } from '../../core/pending-approvals.js';
+import { BRAIN_DIR, ARCHIVE_DIR, ARCHIVE_SPRINTS_SUBDIR } from '../../core/constants.js';
 import {
   acceptPanicGuard,
   listPendingPanicEvents,
@@ -200,6 +209,174 @@ export async function handleNervousReject(
     message: `Notification ${id} rejected. Decision queued for Executor.${reason ? ` Reason: ${reason}` : ''}`,
     ipcFile,
   };
+}
+
+// ─── Compensating-Action Executor (born-574 / task 382-004) ────────────────
+//
+// REPL/audit finding: `deckent_nervous_undo` (src/mcp/tools/nervous-edit.ts)
+// only ever returns an undo PLAN — nothing in the codebase executes a real
+// compensating action, so nothing can actually be undone (silent no-op).
+//
+// ADR-037 (nervous/action-handlers.ts) scopes what Nervous itself
+// self-executes with a REAL, direct disk effect to a narrow maintenance
+// allowlist (MAINTENANCE_ACTION_IDS); everything else only ever lands a
+// Brain-actionable proposal (.deckent/nervous-recommendations.jsonl) —
+// Nervous never touches that resource, so there is nothing on disk to
+// reverse for those action ids. Cross-referencing that allowlist against
+// ACTION_REGISTRY's `reversible:true` flags leaves exactly one action that is
+// BOTH self-executed AND reversible: `ORPHAN_TASK_ARCHIVE` (moves
+// `.tasks/task-<n>-*` files into `.brain/archive/sprints/<sprintId>-tasks/`,
+// see orchestra/sprint-docs-updater.ts `archiveOrphanTasks`).
+//
+// `runNervousCompensatingAction` performs a REAL, disk-verifiable reversal
+// for that one case and an honest `applied:false` + specific reason for
+// every other action id — never a silent/fake success. On a real reversal it
+// also appends the compensation to `NervousHistory.markUndone`, closing the
+// loop the existing undo PLAN already describes but never executes.
+//
+// Not yet wired into the live `deckent_nervous_undo` tool: that tool is
+// registered in nervous-edit.ts, out of this task's write scope. See this
+// task's .result notes (docImpact) for the follow-up wiring work.
+
+/** Registry action ids Nervous self-executes with a real, direct disk effect
+ *  (ADR-037 maintenance surface) AND that are marked `reversible:true`. Every
+ *  other reversible action is Brain-proposal-only — Nervous never mutated the
+ *  resource, so `applied:false` is the only honest answer for it. Kept as an
+ *  explicit allowlist (not re-derived from action-handlers.ts, out of this
+ *  file's write scope) — a newly-registered maintenance action needs this
+ *  list updated by hand; `applied:false` is the fail-safe default either way. */
+const SELF_EXECUTED_REVERSIBLE_ACTION_IDS: ReadonlySet<string> = new Set(['ORPHAN_TASK_ARCHIVE']);
+
+export interface NervousCompensatingResult {
+  readonly applied: boolean;
+  readonly recordId: string;
+  readonly actionId: string;
+  readonly detail: string;
+  readonly restoredFiles?: readonly string[];
+}
+
+/** Minimal `NervousHistory` surface `runNervousCompensatingAction` depends on
+ *  — injectable so tests can assert the call without touching disk twice. */
+export interface NervousCompensatingHistorySink {
+  markUndone(originalId: string, compensationDetail: Record<string, unknown>): Promise<void>;
+}
+
+function reverseOrphanTaskArchive(record: ExecutionRecord, root: string): NervousCompensatingResult {
+  const sprintId = record.payload['sprintId'];
+  if (typeof sprintId !== 'string' || sprintId.length === 0) {
+    return {
+      applied: false,
+      recordId: record.id,
+      actionId: record.actionId,
+      detail: 'ORPHAN_TASK_ARCHIVE record has no payload.sprintId — cannot locate the archive directory to restore from.',
+    };
+  }
+
+  const archiveDir = join(root, BRAIN_DIR, ARCHIVE_DIR, ARCHIVE_SPRINTS_SUBDIR, `${sprintId}-tasks`);
+  if (!existsSync(archiveDir)) {
+    return {
+      applied: false,
+      recordId: record.id,
+      actionId: record.actionId,
+      detail: `No archive directory found at ${archiveDir} — already restored, or never archived.`,
+    };
+  }
+
+  const archivedFiles = readdirSync(archiveDir);
+  if (archivedFiles.length === 0) {
+    return {
+      applied: false,
+      recordId: record.id,
+      actionId: record.actionId,
+      detail: `Archive directory ${archiveDir} is empty — nothing to restore.`,
+    };
+  }
+
+  const tasksDir = join(root, '.tasks');
+  if (!existsSync(tasksDir)) mkdirSync(tasksDir, { recursive: true });
+
+  const restored: string[] = [];
+  const conflicts: string[] = [];
+  for (const file of archivedFiles) {
+    const dest = join(tasksDir, file);
+    if (existsSync(dest)) {
+      conflicts.push(file);
+      continue;
+    }
+    copyFileSync(join(archiveDir, file), dest);
+    unlinkSync(join(archiveDir, file));
+    restored.push(file);
+  }
+
+  if (restored.length === 0) {
+    return {
+      applied: false,
+      recordId: record.id,
+      actionId: record.actionId,
+      detail: `All ${conflicts.length} archived file(s) already exist in .tasks/ — restore skipped to avoid overwriting live files.`,
+    };
+  }
+
+  return {
+    applied: true,
+    recordId: record.id,
+    actionId: record.actionId,
+    detail: conflicts.length > 0
+      ? `Restored ${restored.length} file(s) from ${archiveDir} to .tasks/ (${conflicts.length} skipped — already present).`
+      : `Restored ${restored.length} file(s) from ${archiveDir} to .tasks/.`,
+    restoredFiles: restored,
+  };
+}
+
+function computeCompensatingAction(record: ExecutionRecord, root: string): NervousCompensatingResult {
+  if (!SELF_EXECUTED_REVERSIBLE_ACTION_IDS.has(record.actionId)) {
+    return {
+      applied: false,
+      recordId: record.id,
+      actionId: record.actionId,
+      detail: `No compensating action available for "${record.actionId}" — Nervous only recommends this action (ADR-037); the underlying resource was never modified directly by Nervous, so there is nothing on disk to reverse.`,
+    };
+  }
+
+  switch (record.actionId) {
+    case 'ORPHAN_TASK_ARCHIVE':
+      return reverseOrphanTaskArchive(record, root);
+    default:
+      // Defensive: a future id added to SELF_EXECUTED_REVERSIBLE_ACTION_IDS
+      // without a matching case here must stay honest, not silently succeed.
+      return {
+        applied: false,
+        recordId: record.id,
+        actionId: record.actionId,
+        detail: `"${record.actionId}" has no reversal implementation — treat as unavailable, not success.`,
+      };
+  }
+}
+
+/**
+ * Real compensating-action executor for a Nervous `ExecutionRecord` (born-574
+ * / task 382-004). Performs a genuine, disk-verifiable reversal for the one
+ * action Nervous both self-executes and marks reversible (`ORPHAN_TASK_ARCHIVE`),
+ * and returns an honest `applied:false` + specific reason for every other
+ * action id — never a silent/fake success. On a real reversal, appends the
+ * compensation to `NervousHistory.markUndone` (default sink: `new
+ * NervousHistory(root)`, injectable for tests).
+ */
+export async function runNervousCompensatingAction(
+  record: ExecutionRecord,
+  root: string,
+  historySink?: NervousCompensatingHistorySink,
+): Promise<NervousCompensatingResult> {
+  const result = computeCompensatingAction(record, root);
+  if (result.applied) {
+    const sink = historySink ?? new NervousHistory(root);
+    await sink.markUndone(record.id, {
+      compensatingAction: result.actionId,
+      restoredFiles: result.restoredFiles ?? [],
+      detail: result.detail,
+    });
+  }
+  return result;
 }
 
 // ─── Tool Registrations ─────────────────────────────────────────────────────

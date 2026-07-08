@@ -48,6 +48,23 @@ export function buildLeaseDenialResponse(
   };
 }
 
+// Fail-CLOSED denial for the lease-check-itself-failed path (fs-error during
+// acquire/refresh). Distinct code from WRITER_LEASE_DENIED (that one means
+// "another window owns it"; this one means "could not determine ownership at
+// all" — both must deny, never silently permit the write).
+export function buildLeaseErrorResponse(
+  toolName: string,
+  errorMessage: string,
+): { content: { type: 'text'; text: string }[]; isError: true } {
+  const message = `Write tool '${toolName}' denied: writer-lease check failed (${errorMessage}). Retry once the underlying filesystem issue is resolved.`;
+  const errData = { error: true, success: false, code: 'WRITER_LEASE_ERROR', message };
+  const errSummary = formatErrorResponse({ code: 'WRITER_LEASE_ERROR', message });
+  return {
+    content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(errData, errSummary)) }],
+    isError: true,
+  };
+}
+
 export function installWriterLeaseGate(server: McpServer, ctx: WriterLeaseGateContext): void {
   type RegisterFn = (name: string, config: any, cb: any) => unknown;
   const original = (server.registerTool as RegisterFn).bind(server);
@@ -63,13 +80,14 @@ export function installWriterLeaseGate(server: McpServer, ctx: WriterLeaseGateCo
       try {
         lease = acquireOrCheckWriterLease(ctx.projectRoot, leaseOpts);
       } catch (err) {
-        // Fail-open (spec §Error-Handling): a lease fs-error must NOT brick the
-        // write surface. The only dangerous op (deckent_start) is backstopped by
-        // the deep sprint-lock (isSprintLocked), so allowing the write is safe.
+        // Fail-CLOSED (born-566): a lease fs-error must not silently permit an
+        // unserialized write. Ownership could not be determined, so the write
+        // is denied — a graceful tool-result, not a thrown transport error.
+        const errMsg = err instanceof Error ? err.message : String(err);
         process.stderr.write(
-          `deckent-mcp: writer-lease check failed for ${name}, allowing write (fail-open): ${err instanceof Error ? err.message : String(err)}\n`,
+          `deckent-mcp: writer-lease check failed for ${name}, denying write (fail-closed): ${errMsg}\n`,
         );
-        return cb(args, extra);
+        return buildLeaseErrorResponse(name, errMsg);
       }
       if (!lease.ok) return buildLeaseDenialResponse(name, lease.ownerPid, ctx.lang);
       return cb(args, extra);

@@ -30,6 +30,13 @@ import { atomicWriteFileSync as _atomicWrite } from './worker-lifecycle.js';
 import { SharedMemory } from '../orchestra/shared-memory.js';
 export type { SharedMemoryEntry } from '../orchestra/shared-memory.js';
 export { SharedMemory };
+import {
+  createWorkerApprovalGate,
+  type WorkerApprovalGateFactoryOptions,
+  type WorkerApprovalGateHandle,
+} from '../agent/permission-store.js';
+import { WorkerApprovalGate, type GateVerdict } from '../core/approval-worker-gate.js';
+import type { ApprovalScope, ApprovalRisk, Requester } from '../core/approval-contract.js';
 
 // ─── Token usage: orchestrator/adapter-owned (Worker Output Contract §1.1) ─
 //
@@ -686,4 +693,148 @@ export function authHealthCheck(
   }
 
   return { ok: false, stderr: diag };
+}
+
+// ─── WorkerApprovalGate — risky-action wiring (born-573 REDO, task 382-001) ─
+//
+// Relocated from the orphan `src/orchestra/worker.ts` (task 380-003/born-573
+// wrote the real gate-instantiation logic to a scope.filesWrite path that did
+// not exist in the repo at assignment time, so it landed in a brand-new file
+// nothing ever imported). This is the canonical, disk-backed instantiation
+// point now, living in the worker module every real entrypoint
+// (http-agentic-worker.ts, agentic-worker-entry.ts, cli/, spawn-backend-*)
+// already imports. Broker/gate construction is NOT re-implemented here — it
+// delegates to `agent/permission-store.ts`'s `createWorkerApprovalGate`
+// (already Sprint-1-wired) so there is exactly one place that does
+// `new ApprovalBroker` + `new WorkerApprovalGate`.
+// `src/orchestra/worker.ts` now re-exports these same 4 symbols as a thin
+// compatibility shim (the ADR-D-004 D004-E2 re-export-after-relocation
+// pattern) so its existing test keeps resolving a single canonical
+// definition instead of a second copy.
+
+export const RISKY_APPROVAL_SCOPES: readonly ApprovalScope[] = ['shell-exec', 'git-mutation', 'network'] as const;
+
+export interface RiskyClassification {
+  scope: ApprovalScope;
+  risk: ApprovalRisk;
+  reason: string;
+}
+
+interface RiskPattern {
+  re: RegExp;
+  risk: ApprovalRisk;
+  reason: string;
+}
+
+// Ordered most- to least-severe; the FIRST match wins within each class.
+const GIT_MUTATION_PATTERNS: readonly RiskPattern[] = [
+  { re: /\bgit\s+push\b[^|;&]*(--force\b|-f\b)/i, risk: 'critical', reason: 'git push --force' },
+  { re: /\bgit\s+reset\b[^|;&]*--hard\b/i, risk: 'critical', reason: 'git reset --hard' },
+  { re: /\bgit\s+clean\b[^|;&]*-[a-z]*f/i, risk: 'critical', reason: 'git clean -f' },
+  { re: /\bgit\s+branch\b[^|;&]*-D\b/i, risk: 'high', reason: 'git branch -D (force delete)' },
+  { re: /\bgit\s+push\b/i, risk: 'high', reason: 'git push' },
+  {
+    re: /\bgit\s+(commit|merge|rebase|reset|tag|cherry-pick|revert|rm|am|filter-branch)\b/i,
+    risk: 'high',
+    reason: 'git history/state mutation',
+  },
+];
+
+const NETWORK_PATTERNS: readonly RiskPattern[] = [
+  { re: /\b(npm|yarn|pnpm)\s+publish\b/i, risk: 'high', reason: 'package publish' },
+  { re: /\b(curl|wget)\b/i, risk: 'medium', reason: 'HTTP client invocation' },
+  { re: /\b(ssh|scp|sftp|rsync)\b/i, risk: 'medium', reason: 'remote-host transfer' },
+  { re: /\b(npm|yarn|pnpm)\s+(install|i|ci|add|update|up)\b/i, risk: 'medium', reason: 'package registry install' },
+  { re: /\bgit\s+(clone|pull|fetch)\b/i, risk: 'low', reason: 'git network fetch' },
+];
+
+function matchPattern(cmd: string, patterns: readonly RiskPattern[]): RiskPattern | undefined {
+  return patterns.find((p) => p.re.test(cmd));
+}
+
+/**
+ * Classify a shell command a worker is about to run into one of the 3 risky
+ * `ApprovalScope` classes. Always returns a classification for a non-empty
+ * command — shell-exec is itself risky, so an unrecognized command is gated
+ * at minimum as shell-exec/medium; a recognized git-mutation or network
+ * sub-pattern upgrades scope/risk (git-mutation > network priority).
+ */
+export function classifyRiskyWorkerCommand(cmd: string): RiskyClassification {
+  const gitMatch = matchPattern(cmd, GIT_MUTATION_PATTERNS);
+  if (gitMatch) return { scope: 'git-mutation', risk: gitMatch.risk, reason: gitMatch.reason };
+
+  const networkMatch = matchPattern(cmd, NETWORK_PATTERNS);
+  if (networkMatch) return { scope: 'network', risk: networkMatch.risk, reason: networkMatch.reason };
+
+  return { scope: 'shell-exec', risk: 'medium', reason: 'shell command execution' };
+}
+
+/**
+ * Real, disk-backed instantiation point for a worker's `WorkerApprovalGate` —
+ * thin delegate to `agent/permission-store.ts`'s `createWorkerApprovalGate`
+ * (builds the `ApprovalBroker` persisting to `.deckent/approvals/` under
+ * `projectRoot`, the same store the terminal's own broker uses) scoped to
+ * the given worker's identity. Not a fake/mock — `guard()` on the returned
+ * gate does a genuine submit + await-decision (or fallback-on-timeout).
+ */
+export function createOrchestraWorkerApprovalGate(
+  projectRoot: string,
+  workerId: string,
+  opts: WorkerApprovalGateFactoryOptions = {},
+): WorkerApprovalGateHandle {
+  const requester: Requester = { role: 'worker', instanceId: workerId };
+  return createWorkerApprovalGate(projectRoot, requester, opts);
+}
+
+const SUMMARY_MAX_LENGTH = 200;
+
+function buildSummary(cmd: string, classification: RiskyClassification): string {
+  const prefix = `worker run_bash (${classification.scope}): `;
+  const budget = SUMMARY_MAX_LENGTH - prefix.length;
+  const truncated = cmd.length > budget ? `${cmd.slice(0, Math.max(0, budget - 1))}…` : cmd;
+  return `${prefix}${truncated}`;
+}
+
+function buildDeniedError(classification: RiskyClassification, extra?: string): string {
+  const suffix = extra ? ` (${extra})` : '';
+  return `[approval-denied] tool=run_bash scope=${classification.scope} risk=${classification.risk} reason="${classification.reason}"${suffix}`;
+}
+
+export interface GuardRiskyWorkerActionResult {
+  verdict: GateVerdict;
+  /** Structured `[approval-denied] ...` string, present only when verdict === 'deny'. */
+  deniedOutput?: string;
+}
+
+/**
+ * Gate a risky shell command for a worker BEFORE it runs. Classifies `cmd`,
+ * submits it to the real gate's `guard()`, and on 'deny' returns a structured
+ * `[approval-denied] ...` string so a caller can surface the denial without a
+ * second ad-hoc deny path.
+ */
+export async function guardRiskyWorkerAction(
+  gate: WorkerApprovalGate,
+  scopeId: string,
+  cmd: string,
+): Promise<GuardRiskyWorkerActionResult> {
+  const classification = classifyRiskyWorkerCommand(cmd);
+  try {
+    const verdict = await gate.guard({
+      summary: buildSummary(cmd, classification),
+      details: { tool: 'run_bash', scope: classification.scope, risk: classification.risk, reason: classification.reason },
+      scopeId,
+      scope: classification.scope,
+      risk: classification.risk,
+      policy: 'require-approval',
+      defaultAction: 'deny',
+      rawArgs: { cmd },
+    });
+    if (verdict === 'deny') return { verdict, deniedOutput: buildDeniedError(classification) };
+    return { verdict };
+  } catch (err) {
+    return {
+      verdict: 'deny',
+      deniedOutput: buildDeniedError(classification, `gate error: ${err instanceof Error ? err.message : String(err)}`),
+    };
+  }
 }

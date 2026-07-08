@@ -402,6 +402,38 @@ export function resolveFooterLines(footerLines: string[], hasPendingApproval: bo
 }
 
 /**
+ * born-508 (382-003): stdin-ownership mutex. Ink's `useInput` does not
+ * "consume" an event — every ACTIVE hook in the tree receives the SAME
+ * keypress. Before this fix, InputBar stayed active (`confirm === null`)
+ * while an ApprovalCard was ALSO active (its own `head !== null`), so a
+ * queued chat message containing a bare 'y' (e.g. "yes, that works") fed the
+ * SAME keystroke to both — mapApprovalKey('y') === 'approve' could silently
+ * approve a destructive tool call mid-typing. This truth table is the single
+ * place that decides which of the three REPL stdin consumers (legacy confirm
+ * modal, InputBar, ApprovalCard) may be active at once — exactly one, ever.
+ * The confirm modal wins ties (it is the older, always-blocking gate; an
+ * approval landing mid-modal must not starve it or the modal orphans).
+ * Pure/JSX-free — same "pull decision logic out of the Ink component"
+ * pattern as confirmKeyToAnswer/resolveModeLabel above (ink-testing-library
+ * is not a project dependency; see tests/cli/approval-inputbar-mutex.test.tsx).
+ */
+export interface StdinOwner {
+  confirmActive: boolean;
+  inputBarActive: boolean;
+  approvalCardActive: boolean;
+}
+
+export function resolveStdinOwner(confirmOpen: boolean, approvalPending: boolean): StdinOwner {
+  return {
+    confirmActive: confirmOpen,
+    inputBarActive: !confirmOpen && !approvalPending,
+    // ApprovalCard ANDs this with its own `head !== null` internally — the
+    // gate here only needs to defer to a higher-priority open confirm modal.
+    approvalCardActive: !confirmOpen,
+  };
+}
+
+/**
  * Tap one ApprovalTerminalChannel event stream: forwards every event to its
  * single downstream consumer (ApprovalCard's own `events` prop) UNCHANGED,
  * while also feeding a second, app.tsx-local queue purely so the App can
@@ -1060,6 +1092,10 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (wake.current) { const w = wake.current; wake.current = null; w(); }
   };
 
+  // born-508: resolve which of {confirm modal, InputBar, ApprovalCard} owns
+  // stdin this render — exactly one, ever (see resolveStdinOwner above).
+  const stdinOwner = resolveStdinOwner(confirm !== null, approvalPending);
+
   // Confirm modal owns input only while it is open (single-key y / a / N). The
   // queue resolves the current head and advances to the next card (deny does not
   // cancel the rest); onChange updates `confirm` (null when the queue drains).
@@ -1069,7 +1105,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   useInput((input, key) => {
     const answer = confirmKeyToAnswer(input, key);
     if (answer !== null) confirmQueue.current!.answer(answer);
-  }, { isActive: confirm !== null });
+  }, { isActive: stdinOwner.confirmActive });
 
   // 358-006: Esc→interrupt while a turn is in flight (BUSY_KEY_ACTIONS contract,
   // busy-controls.ts). Double-Esc is idempotent by construction — the second
@@ -1126,6 +1162,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           decidedBy="terminal"
           channel="terminal"
           labels={approvalLabels ?? DEFAULT_APPROVAL_CARD_LABELS}
+          isActive={stdinOwner.approvalCardActive}
         />
       )}
 
@@ -1151,7 +1188,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
 
       {/* Pinned input with a VISIBLE cursor + interactive /menu — always last. */}
       <InputBar
-        active={confirm === null}
+        active={stdinOwner.inputBarActive}
         onSubmit={handleSubmit}
         onInterrupt={() => exit()}
         onClear={clearScreen}
