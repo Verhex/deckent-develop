@@ -10,6 +10,7 @@ import { modelRegistry } from '../core/model-registry.js';
 import { resolveReasoningEffort } from '../core/reasoning-effort.js';
 import { getProviderCommandSpec, buildProviderCommand } from '../core/provider-command-spec.js';
 import { getDefaultProviderName } from './sprint-utils.js';
+import { installGitGuard, resolveHostGitPath, buildGitGuardPathExport, buildGitGuardDir } from './git-worker-guard.js';
 import {
   TMUX_SESSION_NAME,
   TMUX_AUDITOR_WINDOW,
@@ -256,10 +257,17 @@ export function spawnWorker(
   ]);
   const promptPath = writePromptFile(projectDir, prompt, taskId);
   const cmd = buildWorkerCommand(model, promptPath, opts, adapter, taskId, opts?.taskTimeoutSeconds);
+  // WORKER-GIT-GUARD (381-001): shadow `git` with a denylist shim for this
+  // worker's tmux window (stash/reset/checkout/clean/rebase/commit/revert ->
+  // exit 97). Host real-git resolved via a PATH scan (no spawnSync — tmux.ts
+  // is a no-new-spawnSync hot-path file, see git-worker-guard.ts).
+  const gitGuardDir = buildGitGuardDir(taskId);
+  installGitGuard(gitGuardDir, resolveHostGitPath());
+  const guardedCmd = `${buildGitGuardPathExport(gitGuardDir)}; ${cmd}`;
   run([
     'send-keys',
     '-t', `${TMUX_SESSION_NAME}:${windowName}`,
-    cmd,
+    guardedCmd,
     'Enter',
   ]);
 

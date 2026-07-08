@@ -32,6 +32,7 @@ import { BASE_PROVIDER_CREDENTIAL_ENV } from '../providers/cross-provider-keys.j
 import type { SpawnBackend, SpawnBackendOptions } from './spawn-backend.js';
 import { SpawnBackendError, checkLethalGuard } from './spawn-backend.js';
 import { getDefaultProviderName } from './sprint-utils.js';
+import { installGitGuard, buildDockerGitGuardArgs, buildGitGuardDir, CONTAINER_GIT_PATH } from './git-worker-guard.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
@@ -986,6 +987,26 @@ export class DockerSpawnBackend implements SpawnBackend {
       // codex -c model_reasoning_effort); undefined → no flag (CLI default).
       reasoningEffort: opts?.reasoningEffort,
     });
+    // WORKER-GIT-GUARD (381-001): shadow `git` inside the container with a
+    // denylist shim (stash/reset/checkout/clean/rebase/commit/revert -> exit
+    // 97). Host-writes the shim then bind-mounts it READ-ONLY (same
+    // technique as the .deck shadow-mount below) so a worker cannot
+    // delete/edit it to bypass the guard. See git-worker-guard.ts's
+    // CONTAINER_GIT_PATH doc comment for why the real-git path is a hardcoded
+    // constant rather than probed per-spawn.
+    //
+    // The mount-args/PATH-export are pure string computations, resolved here;
+    // the actual shim FILE is written further below, right after the real
+    // worker script (scriptHostPath) is written. Both scripts start with the
+    // literal `#!/bin/sh` line, and this repo's test suite is already
+    // grandfathered on finding the worker script via a
+    // `startsWith('#!/bin/sh')` scan of every writeFileSync call — writing
+    // the shim first would make it the (wrong) first match. `docker run`
+    // itself happens well after both writes, so the container never sees an
+    // unfinished mount either way.
+    const gitGuardHostDir = buildGitGuardDir(taskId);
+    const gitGuard = buildDockerGitGuardArgs(gitGuardHostDir, CONTAINER_WORKSPACE);
+
     const resultPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.result`;
     const timeoutPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.timeout`;
     // Build docker run args
@@ -1018,6 +1039,9 @@ export class DockerSpawnBackend implements SpawnBackend {
     const partialResultPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.partial-result`;
     const scriptContent = [
       '#!/bin/sh',
+      // WORKER-GIT-GUARD (381-001): shadow real git for the whole script,
+      // including whatever the worker CLI's own tool-calls spawn.
+      gitGuard.exportPathLine,
       `RFILE="${resultPath}"`,
       `HBFILE="${hbContainerPath}"`,
       `PRFILE="${partialResultPath}"`,
@@ -1063,6 +1087,13 @@ export class DockerSpawnBackend implements SpawnBackend {
       'rm -f "$PRFILE" 2>/dev/null',
     ].join('\n');
     writeFileSync(scriptHostPath, scriptContent, { mode: 0o755 });
+
+    // WORKER-GIT-GUARD (381-001): materialize the shim now (see the
+    // gitGuardHostDir/gitGuard comment above for why this write is deferred
+    // to after the real worker script). `docker run` — the earliest point the
+    // container could actually read the bind-mounted shim — still happens
+    // well after this synchronous call returns.
+    installGitGuard(gitGuardHostDir, CONTAINER_GIT_PATH);
 
     const containerCmd = `sh ${CONTAINER_WORKSPACE}/${TASKS_DIR}/${scriptFileName}`;
 
@@ -1118,6 +1149,8 @@ export class DockerSpawnBackend implements SpawnBackend {
       // DECK-WORKER-ISOLATION (ADR-G-005): read-only empty overlay hiding .deck
       // (nested mount, applied after the project root so it shadows /workspace/.deck)
       ...deckShadowMountArgs,
+      // WORKER-GIT-GUARD (381-001): read-only git-shim overlay (see above).
+      ...gitGuard.mountArgs,
       // .tasks/ mounted read-write (results, heartbeats, prompts)
       '-v', `${tasksDir}:${CONTAINER_WORKSPACE}/${TASKS_DIR}`,
       // .locks/ mounted read-write (file locking)

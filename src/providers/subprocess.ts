@@ -22,6 +22,13 @@ import { debugLog } from '../core/utils.js';
 import type { ProviderDefinition } from '../core/config-types.js';
 import { resolveCrossProviderCredentialKeys } from './cross-provider-keys.js';
 import { scrubCrossProviderEnv } from './provider.js';
+import {
+  installGitGuard,
+  resolveHostGitPath,
+  prependGitGuardToPath,
+  isGitGuardSupportedPlatform,
+  buildGitGuardDir,
+} from '../orchestra/git-worker-guard.js';
 
 /**
  * MOAT-2 (ADR-G-013): grace window between a graceful SIGTERM and the SIGKILL
@@ -267,6 +274,36 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     // BUG-19: Set UTF-8 encoding environment for Windows (forced last, unchanged).
     childEnv['LANG'] = process.env['LANG'] ?? 'en_US.UTF-8';
     childEnv['PYTHONIOENCODING'] = 'utf-8';
+    // WORKER-GIT-GUARD (381-001): shadow `git` with a denylist shim so the
+    // worker's own git invocations cannot run destructive subcommands
+    // (stash/reset/checkout/clean/rebase/commit/revert). POSIX-only for now —
+    // native Windows subprocess workers are an honest, logged gap (a POSIX
+    // `sh` script named `git` is never resolved by Windows' PATHEXT lookup),
+    // not a silently-broken shim (Law #2).
+    //
+    // The shim dir is deliberately OUTSIDE the project tree (buildGitGuardDir
+    // — OS tmpdir, not `dir`/`tasksDir`): folding a project-relative path into
+    // childEnv.PATH would put the project's absolute path verbatim into an
+    // env var, breaking the DeckBroker non-leak invariant (DECKBROKER-WIRE,
+    // 354-006 — ".deck project path never appears in the spawned child env").
+    //
+    // The PATH string is computed HERE (pure, no I/O) so the spawned child
+    // sees it from its very first instruction. The shim FILE itself is
+    // materialized further below, right after the initial heartbeat write —
+    // deferring the write-to-disk keeps this git-guard I/O from becoming the
+    // FIRST writeFileSync call of spawn() (the heartbeat write is). The gap
+    // is a few synchronous statements, far shorter than the child's own CLI
+    // startup time before it could ever invoke `git`.
+    let gitGuardDir: string | undefined;
+    if (isGitGuardSupportedPlatform(this.platform)) {
+      gitGuardDir = buildGitGuardDir(taskId);
+      childEnv['PATH'] = prependGitGuardToPath(gitGuardDir, childEnv['PATH']);
+    } else {
+      debugLog(
+        'subprocess:git-guard-unsupported',
+        `WORKER-GIT-GUARD skipped for taskId=${taskId} on platform "${this.platform}" (POSIX-only shim; native Windows tracked as a known gap)`,
+      );
+    }
     // PGID-TEARDOWN (ADR-G-013, MOAT-2 residual): a plain (non-detached) spawn
     // inherits the coordinator's process group, so a signal sent to just this
     // child's pid never reaches any grandchild the worker forks (e.g. a CLI
@@ -307,6 +344,13 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
 
     // Write initial heartbeat
     this.writeHeartbeat(taskId, dir, 'EXECUTING', 0);
+
+    // WORKER-GIT-GUARD (381-001): materialize the shim now that childEnv.PATH
+    // already points at it (see the PATH computation above for why the I/O
+    // is deferred to here).
+    if (gitGuardDir) {
+      installGitGuard(gitGuardDir, resolveHostGitPath(process.env, this.platform));
+    }
 
     // BUG-23: Periodic heartbeat update (every 15 seconds)
     let hbSequence = 0;
