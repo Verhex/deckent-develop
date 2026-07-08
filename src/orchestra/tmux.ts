@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { writeFileSync, unlinkSync, mkdirSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { writeFileSync, unlinkSync, mkdirSync, existsSync, renameSync } from 'node:fs';
+import { join, basename } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import type { ModelType } from '../core/types.js';
 import type { ProviderAdapter } from '../core/provider.js';
@@ -83,6 +83,30 @@ function writePromptFile(projectRoot: string, prompt: string, taskId?: string): 
 /** Exported for testing */
 export function cleanupPromptFile(promptPath: string): void {
   try { unlinkSync(promptPath); } catch (e) { debugLog('cleanupPromptFile:unlinkSync', e); }
+}
+
+/**
+ * Archive an orphaned prompt tmpfile instead of deleting it (F0.3).
+ *
+ * The (prompt → result) pair is the unit the training-trace pipeline consumes;
+ * deleting the prompt mid-sprint — on kill()/health-check, before the sprint-end
+ * archivePromptFiles() runs — systematically destroyed the prompt half (every
+ * pre-F0.3 sprint archive had zero worker prompts). Moving it to a sprint-agnostic
+ * `.tasks/archive/_orphaned/` staging bucket preserves it, and makes a stale-hb
+ * misclassification (a still-running worker's prompt cleaned early) NON-destructive
+ * rather than a permanent loss. The sprint-end archivePromptFiles() drains this
+ * bucket into the sprint dir, so it inherits the same retention. Best-effort:
+ * falls back to unlink only if the move itself fails, and never throws.
+ */
+export function archiveOrphanPromptFile(promptPath: string, tasksDir: string): void {
+  try {
+    const stagingDir = join(tasksDir, 'archive', '_orphaned');
+    if (!existsSync(stagingDir)) mkdirSync(stagingDir, { recursive: true });
+    renameSync(promptPath, join(stagingDir, basename(promptPath)));
+  } catch (e) {
+    debugLog('archiveOrphanPromptFile:rename', e);
+    try { unlinkSync(promptPath); } catch (e2) { debugLog('archiveOrphanPromptFile:unlink', e2); }
+  }
 }
 
 /** @deprecated Use adaptive timeout via brainEstimateTimeout() + SpawnBackendOptions.taskTimeoutSeconds instead. Kept for backward compat fallback. */

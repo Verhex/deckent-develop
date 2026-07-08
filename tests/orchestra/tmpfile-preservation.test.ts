@@ -16,6 +16,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { archivePromptFiles } from '../../src/orchestra/spawn-backend-docker.js';
+import { archiveOrphanPromptFile } from '../../src/orchestra/tmux.js';
 import { cleanup } from '../../src/orchestra/sprint-lifecycle.js';
 import type { Sprint } from '../../src/core/types.js';
 import { SprintPhase, SprintStatus } from '../../src/core/types.js';
@@ -209,5 +210,53 @@ describe('Mid-sprint tmpfile preservation contract', () => {
       '.worker-156-001.sh',
       '.worker-156-002.sh',
     ]);
+  });
+});
+
+// ═══ F0.3: orphan-prompt preservation (training-trace) ══════════════════════
+// Mid-sprint cleanup (kill()/health-check) must ARCHIVE orphan prompts, not
+// delete them — the (prompt → result) pair is the training-trace unit. Prompts
+// are staged in .tasks/archive/_orphaned/ and drained into the sprint archive.
+
+describe('F0.3 archiveOrphanPromptFile — preserves instead of deleting', () => {
+  let root: string;
+  let tasksDir: string;
+
+  beforeEach(() => {
+    root = makeTempRoot();
+    tasksDir = join(root, '.tasks');
+  });
+  afterEach(() => { rmSync(root, { recursive: true, force: true }); });
+
+  it('moves an orphan prompt into .tasks/archive/_orphaned/ (not unlinked)', () => {
+    const promptFile = '.prompt-156-009-deadbeef.txt';
+    writeFileSync(join(tasksDir, promptFile), 'PROMPT CONTENT', 'utf-8');
+
+    archiveOrphanPromptFile(join(tasksDir, promptFile), tasksDir);
+
+    // Source removed from the active dir…
+    expect(existsSync(join(tasksDir, promptFile))).toBe(false);
+    // …but preserved in the orphan staging bucket (not destroyed).
+    expect(existsSync(join(tasksDir, 'archive', '_orphaned', promptFile))).toBe(true);
+  });
+
+  it('sprint-end archivePromptFiles drains _orphaned/ into the sprint archive', () => {
+    // A prompt was staged mid-sprint…
+    const staged = '.prompt-156-010-cafe.txt';
+    mkdirSync(join(tasksDir, 'archive', '_orphaned'), { recursive: true });
+    writeFileSync(join(tasksDir, 'archive', '_orphaned', staged), 'STAGED', 'utf-8');
+    // …plus a live top-level prompt at sprint-end.
+    const live = '.prompt-156-011-babe.txt';
+    writeFileSync(join(tasksDir, live), 'LIVE', 'utf-8');
+
+    const result = archivePromptFiles(tasksDir, 'sprint-156');
+
+    const archiveDir = join(tasksDir, 'archive', 'sprint-156');
+    // Both the live prompt AND the drained staged prompt land in the sprint archive.
+    expect(existsSync(join(archiveDir, live))).toBe(true);
+    expect(existsSync(join(archiveDir, staged))).toBe(true);
+    // Staging bucket is emptied.
+    expect(readdirSync(join(tasksDir, 'archive', '_orphaned')).length).toBe(0);
+    expect(result.archived).toBe(2);
   });
 });

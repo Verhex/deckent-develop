@@ -14,7 +14,7 @@ vi.mock('../../src/orchestra/tmux.js', () => ({
   listWorkers: vi.fn().mockReturnValue([]),
   ensureSession: vi.fn(),
   isSessionActive: vi.fn().mockReturnValue(true),
-  cleanupPromptFile: vi.fn(),
+  archiveOrphanPromptFile: vi.fn(),
 }));
 
 // ─── Mock node:fs ────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ const mockTmuxKillWorker = tmux.killWorker as MockInstance;
 const mockTmuxListWorkers = tmux.listWorkers as MockInstance;
 const mockTmuxEnsureSession = tmux.ensureSession as MockInstance;
 const mockTmuxIsSessionActive = tmux.isSessionActive as MockInstance;
-const mockTmuxCleanupPromptFile = tmux.cleanupPromptFile as MockInstance;
+const mockTmuxArchiveOrphanPromptFile = tmux.archiveOrphanPromptFile as MockInstance;
 const mockReaddirSync = readdirSync as unknown as MockInstance;
 const mockExistsSync = existsSync as unknown as MockInstance;
 
@@ -206,14 +206,14 @@ describe('ClaudeAdapter', () => {
       mockTmuxKillWorker.mockReset();
     });
 
-    it('should call cleanupPromptFile for each .prompt-*.txt file found', () => {
+    it('should archive each .prompt-*.txt file found', () => {
       mockExistsSync.mockReturnValue(true);
       mockReaddirSync.mockReturnValue(['.prompt-abc123.txt', '.prompt-def456.txt']);
       adapter.kill('task-001');
-      expect(mockTmuxCleanupPromptFile).toHaveBeenCalledTimes(2);
+      expect(mockTmuxArchiveOrphanPromptFile).toHaveBeenCalledTimes(2);
     });
 
-    it('should only clean up files matching .prompt-*.txt pattern', () => {
+    it('should only archive files matching .prompt-*.txt pattern', () => {
       mockExistsSync.mockReturnValue(true);
       mockReaddirSync.mockReturnValue([
         '.prompt-abc123.txt',
@@ -223,32 +223,34 @@ describe('ClaudeAdapter', () => {
         'task-001.result',
       ]);
       adapter.kill('task-001');
-      expect(mockTmuxCleanupPromptFile).toHaveBeenCalledTimes(2);
+      expect(mockTmuxArchiveOrphanPromptFile).toHaveBeenCalledTimes(2);
     });
 
-    it('should pass full path to cleanupPromptFile', () => {
+    it('should pass the full prompt path as the first argument', () => {
       mockExistsSync.mockReturnValue(true);
       mockReaddirSync.mockReturnValue(['.prompt-abc123.txt']);
       adapter.kill('task-001');
-      expect(mockTmuxCleanupPromptFile).toHaveBeenCalledWith(
+      expect(mockTmuxArchiveOrphanPromptFile).toHaveBeenCalledWith(
         expect.stringContaining('.prompt-abc123.txt'),
+        expect.any(String),
       );
     });
 
-    it('should include tasks dir in the cleanup path', () => {
+    it('should pass the tasks dir as the archive-root argument', () => {
       mockExistsSync.mockReturnValue(true);
       mockReaddirSync.mockReturnValue(['.prompt-abc123.txt']);
       adapter.kill('task-001');
-      expect(mockTmuxCleanupPromptFile).toHaveBeenCalledWith(
+      expect(mockTmuxArchiveOrphanPromptFile).toHaveBeenCalledWith(
+        expect.stringContaining('.tasks'),
         expect.stringContaining('.tasks'),
       );
     });
 
-    it('should not call cleanupPromptFile when no prompt files found', () => {
+    it('should not archive when no prompt files found', () => {
       mockExistsSync.mockReturnValue(true);
       mockReaddirSync.mockReturnValue(['task-001.json', 'task-001.hb']);
       adapter.kill('task-001');
-      expect(mockTmuxCleanupPromptFile).not.toHaveBeenCalled();
+      expect(mockTmuxArchiveOrphanPromptFile).not.toHaveBeenCalled();
     });
 
     it('should handle readdirSync throwing gracefully', () => {

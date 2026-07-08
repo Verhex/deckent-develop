@@ -1947,6 +1947,20 @@ export function archivePromptFiles(
     }
   } catch { /* ok — tasksDir may be empty */ }
 
+  // F0.3: drain the mid-sprint orphan staging bucket (.tasks/archive/_orphaned/,
+  // populated by ClaudeAdapter.archiveOrphanPromptFile when a prompt is cleaned
+  // before sprint-end) into this sprint's archive dir, so those prompts inherit
+  // the same retention instead of accumulating unbounded in staging.
+  const orphanStaging = join(tasksDir, 'archive', '_orphaned');
+  if (existsSync(orphanStaging)) {
+    try {
+      for (const f of readdirSync(orphanStaging) as string[]) {
+        try { renameSync(join(orphanStaging, f), join(archiveDir, f)); archived++; }
+        catch { /* skip files that can't be moved */ }
+      }
+    } catch { /* ok */ }
+  }
+
   // Apply retention policy: remove old sprint archives beyond retentionSprints
   if (retentionSprints > 0) {
     const archiveRoot = join(tasksDir, 'archive');

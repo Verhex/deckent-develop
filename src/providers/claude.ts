@@ -12,7 +12,7 @@ import {
   listWorkers,
   ensureSession,
   isSessionActive,
-  cleanupPromptFile,
+  archiveOrphanPromptFile,
 } from '../orchestra/tmux.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { getActiveWorkerIds } from '../core/active-workers.js';
@@ -164,12 +164,20 @@ export class ClaudeAdapter implements ProviderAdapter {
 
   /**
    * Clean up orphaned `.prompt-*.txt` tmpfiles left behind by spawnWorker.
-   * Called automatically after kill() to prevent file accumulation.
+   * Called automatically after kill() to keep `.tasks/` free of accumulated
+   * prompt files.
+   *
+   * F0.3 (training-trace preservation): orphan prompts are ARCHIVED (moved to
+   * `.tasks/archive/_orphaned/`), NOT deleted — the (prompt → result) pair is the
+   * training-trace unit, and unlinking the prompt here (before the sprint-end
+   * archivePromptFiles() runs) previously destroyed the prompt half systematically.
+   * Archiving also makes the selective-filter below fail SAFE: if a still-running
+   * worker's prompt is misclassified as orphan (stale `.hb`), it is preserved, not lost.
    *
    * Sprint 168 C0e (BUG-HH eradication): selective filter via
    * `getActiveWorkerIds()` — prompt files belonging to active workers are
-   * PROTECTED and never deleted. Only orphan prompts (no live `.hb` referencing
-   * their taskId) are removed.
+   * PROTECTED and never touched. Only orphan prompts (no live `.hb` referencing
+   * their taskId) are archived.
    *
    * Filter pattern matches Docker spawn naming
    * `.prompt-{taskId}-{promptId}[-fix].txt` (spawn-backend-docker.ts:226-230).
@@ -196,7 +204,7 @@ export class ClaudeAdapter implements ProviderAdapter {
           // Selective filter: protect prompts whose filename embeds an active taskId.
           // Docker pattern: `.prompt-{taskId}-{promptId}[-fix].txt` → match via `-${id}-`.
           if (active.some(id => file.includes(`-${id}-`))) continue;
-          cleanupPromptFile(join(tasksDir, file));
+          archiveOrphanPromptFile(join(tasksDir, file), tasksDir);
         }
       }
     } catch {
