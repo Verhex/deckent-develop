@@ -262,6 +262,114 @@ export function buildReplTeardown(deps: ReplTeardownDeps): () => Promise<void> {
  *  then up to another ~2s before SIGKILL) does not hang a plain `/exit`. */
 const REPL_TEARDOWN_TIMEOUT_MS = 5000;
 
+/** Dependencies for {@link buildToolDispatcher} — every collaborator injected so
+ *  the dispatch logic is unit-testable without mounting Ink (no ink-testing-library
+ *  in this project; same seam-extraction precedent as {@link buildReplTeardown}). */
+export interface ToolDispatcherDeps {
+  execDispatcher: { dispatch: (toolName: string, args: Record<string, unknown>) => Promise<string> };
+  cliDispatcher: { dispatch: (toolName: string, args: Record<string, unknown>) => Promise<string> };
+  askConfirm: (summary: string, toolName: string) => Promise<boolean>;
+  askConfirmAlways: (summary: string) => Promise<boolean>;
+  t: (key: string) => string;
+  /** Read the CURRENT sink, not a snapshot — `registerToolSink` assigns it
+   *  AFTER `<ReplApp>` mounts, well after this dispatcher is constructed. */
+  getToolSink: () => ToolSink | null;
+}
+
+/**
+ * born-528 (REPL-DENY-TOOLSINK) — builds the tool dispatcher used by the REPL's
+ * native/legacy engines. CLI-bridge tools (config set, sync, kill, …) are
+ * confirm-gated by tier before they run; EXEC_TOOLS (write/edit/bash) confirm
+ * inside execDispatcher instead and report denial via a `[deckent-denied]`
+ * prefix. Both denial paths now emit an identical toolSink honest-outcome
+ * block (dim ✗ "cancelled") — previously the CLI-bridge pre-gate denial
+ * returned early BEFORE reaching the toolSink call below it, so a denied
+ * CLI-bridge tool vanished from the transcript with no visible indicator.
+ */
+export function buildToolDispatcher(deps: ToolDispatcherDeps): { dispatch: (toolName: string, args: Record<string, unknown>) => Promise<string> } {
+  const { execDispatcher, cliDispatcher, askConfirm, askConfirmAlways, t, getToolSink } = deps;
+  const lineCount = (v: unknown): number | undefined =>
+    typeof v === 'string' ? v.split('\n').filter((_, i, a) => i < a.length - 1 || a[i] !== '').length : undefined;
+  const toolInfoFor = (name: string, args: Record<string, unknown>): ToolInfo | null => {
+    const path = typeof args['path'] === 'string' ? args['path'] : '';
+    switch (name) {
+      case 'deckent_write_file': return { verb: t('tool.wrote_file'), target: path, added: lineCount(args['content']) };
+      case 'deckent_edit_file': {
+        // Real +added / -removed from the old→new strings the edit applied.
+        const info: ToolInfo = { verb: t('tool.edited_file'), target: path };
+        const rm = lineCount(args['old']); const ad = lineCount(args['new']);
+        if (ad !== undefined) info.added = ad;
+        if (rm !== undefined) info.removed = rm;
+        return info;
+      }
+      case 'deckent_read_file': return { verb: t('tool.read_file'), target: path };
+      case 'deckent_bash': return { verb: t('tool.ran_cmd'), target: typeof args['cmd'] === 'string' ? args['cmd'] : '' };
+      default: return null;
+    }
+  };
+  return {
+    dispatch: async (toolName: string, args: Record<string, unknown>): Promise<string> => {
+      // CLI-bridge tools (config set, sync, kill, …) are confirm-gated by tier
+      // before they run. EXEC_TOOLS (write/edit/bash) have their own confirm
+      // inside execDispatcher, so they bypass this gate.
+      if (!EXEC_TOOLS.has(toolName)) {
+        const tier = classifyTool(toolName, args);
+        if (tier !== 'read') {
+          const argv = cliArgsFor(toolName, args) ?? [toolName];
+          const summary = `${t('tui.confirm_run')}: deckent ${argv.join(' ')}`;
+          const ok = tier === 'always'
+            ? await askConfirmAlways(summary)
+            : await askConfirm(summary, toolName);
+          if (!ok) {
+            if (process.stdin.isTTY) { try { process.stdin.setRawMode(true); } catch { /* not a tty */ } }
+            // born-528 fix: this early return used to skip the toolSink block
+            // below entirely — a denied CLI-bridge tool rendered NOTHING in the
+            // transcript. Route it through the SAME honest-outcome shape the
+            // isDenied branch below uses for EXEC_TOOLS's `[deckent-denied]`
+            // path, so both denial routes render an identical dim ✗ block.
+            const sink = getToolSink();
+            if (sink) sink({ verb: `${t('tui.cmd_cancelled')}: ${toolName}`, target: '', failed: true });
+            return `[${t('tui.cmd_cancelled')}] deckent ${argv.join(' ')}`;
+          }
+        }
+      }
+      const result = EXEC_TOOLS.has(toolName)
+        ? await execDispatcher.dispatch(toolName, args)
+        : await cliDispatcher.dispatch(toolName, args);
+      // WSL fix: spawning a child subprocess (the CLI tool bridge runs
+      // `node entry.js <cmd>`) can reset the parent TTY back to cooked mode →
+      // Ink's keypresses then echo raw (`^[[A`) and arrows die. Re-assert raw
+      // mode after every dispatch so input keeps working post-command.
+      if (process.stdin.isTTY) { try { process.stdin.setRawMode(true); } catch { /* not a tty */ } }
+      const info = toolInfoFor(toolName, args);
+      // Only surface a change block for a REAL action. Both failure paths carry
+      // a stable bracket-prefix marker — `[mcp-error] …` (error) and
+      // `[deckent] …` (denied/cancelled, e.g. "[deckent] iptal edildi: <tool>").
+      // The old `/reddedildi|denied/i` text-match missed the actual i18n cancel
+      // string ("iptal edildi" / "cancelled") → a DENIED write rendered a fake
+      // "⎿ +1" success block. Prefix-marker check is language-independent.
+      // Three honest outcomes (REPL-TOOL-DEBT-1/2): success → ● change block;
+      // DENIED ([deckent-denied] <tool>) → dim ✗ with localized "cancelled";
+      // ERROR ([mcp-error] …) → dim ✗ with the error detail. Success returns
+      // ([deckent] yazıldı/düzenlendi, bash output) must NOT match either marker
+      // — the old broad `[deckent]` prefix flagged a completed write as failed.
+      const isDenied = result.startsWith('[deckent-denied]');
+      const isError = result.startsWith('[mcp-error]');
+      const sink = getToolSink();
+      if (sink) {
+        if (isDenied) {
+          sink({ verb: `${t('tui.cmd_cancelled')}: ${toolName}`, target: '', failed: true });
+        } else if (isError) {
+          sink({ verb: result, target: '', failed: true });
+        } else if (info) {
+          sink(info);
+        }
+      }
+      return result;
+    },
+  };
+}
+
 /** Mount the Ink REPL for an interactive TTY and run until the user exits. */
 export async function runInkRepl(
   provider: ChatProviderAdapter,
@@ -441,78 +549,14 @@ export async function runInkRepl(
   // Tool/change block sink: after a side-effecting tool completes, emit a
   // localized ToolInfo so the App renders a claude-code-style change block.
   let toolSink: ToolSink | null = null;
-  const lineCount = (v: unknown): number | undefined =>
-    typeof v === 'string' ? v.split('\n').filter((_, i, a) => i < a.length - 1 || a[i] !== '').length : undefined;
-  const toolInfoFor = (name: string, args: Record<string, unknown>): ToolInfo | null => {
-    const path = typeof args['path'] === 'string' ? args['path'] : '';
-    switch (name) {
-      case 'deckent_write_file': return { verb: t('tool.wrote_file'), target: path, added: lineCount(args['content']) };
-      case 'deckent_edit_file': {
-        // Real +added / -removed from the old→new strings the edit applied.
-        const info: ToolInfo = { verb: t('tool.edited_file'), target: path };
-        const rm = lineCount(args['old']); const ad = lineCount(args['new']);
-        if (ad !== undefined) info.added = ad;
-        if (rm !== undefined) info.removed = rm;
-        return info;
-      }
-      case 'deckent_read_file': return { verb: t('tool.read_file'), target: path };
-      case 'deckent_bash': return { verb: t('tool.ran_cmd'), target: typeof args['cmd'] === 'string' ? args['cmd'] : '' };
-      default: return null;
-    }
-  };
-  const dispatcher = {
-    dispatch: async (toolName: string, args: Record<string, unknown>): Promise<string> => {
-      // CLI-bridge tools (config set, sync, kill, …) are confirm-gated by tier
-      // before they run. EXEC_TOOLS (write/edit/bash) have their own confirm
-      // inside execDispatcher, so they bypass this gate.
-      if (!EXEC_TOOLS.has(toolName)) {
-        const tier = classifyTool(toolName, args);
-        if (tier !== 'read') {
-          const argv = cliArgsFor(toolName, args) ?? [toolName];
-          const summary = `${t('tui.confirm_run')}: deckent ${argv.join(' ')}`;
-          const ok = tier === 'always'
-            ? await askConfirmAlways(summary)
-            : await askConfirm(summary, toolName);
-          if (!ok) {
-            if (process.stdin.isTTY) { try { process.stdin.setRawMode(true); } catch { /* not a tty */ } }
-            return `[${t('tui.cmd_cancelled')}] deckent ${argv.join(' ')}`;
-          }
-        }
-      }
-      const result = EXEC_TOOLS.has(toolName)
-        ? await execDispatcher.dispatch(toolName, args)
-        : await cliDispatcher.dispatch(toolName, args);
-      // WSL fix: spawning a child subprocess (the CLI tool bridge runs
-      // `node entry.js <cmd>`) can reset the parent TTY back to cooked mode →
-      // Ink's keypresses then echo raw (`^[[A`) and arrows die. Re-assert raw
-      // mode after every dispatch so input keeps working post-command.
-      if (process.stdin.isTTY) { try { process.stdin.setRawMode(true); } catch { /* not a tty */ } }
-      const info = toolInfoFor(toolName, args);
-      // Only surface a change block for a REAL action. Both failure paths carry
-      // a stable bracket-prefix marker — `[mcp-error] …` (error) and
-      // `[deckent] …` (denied/cancelled, e.g. "[deckent] iptal edildi: <tool>").
-      // The old `/reddedildi|denied/i` text-match missed the actual i18n cancel
-      // string ("iptal edildi" / "cancelled") → a DENIED write rendered a fake
-      // "⎿ +1" success block. Prefix-marker check is language-independent.
-      // Three honest outcomes (REPL-TOOL-DEBT-1/2): success → ● change block;
-      // DENIED ([deckent-denied] <tool>) → dim ✗ with localized "cancelled";
-      // ERROR ([mcp-error] …) → dim ✗ with the error detail. Success returns
-      // ([deckent] yazıldı/düzenlendi, bash output) must NOT match either marker
-      // — the old broad `[deckent]` prefix flagged a completed write as failed.
-      const isDenied = result.startsWith('[deckent-denied]');
-      const isError = result.startsWith('[mcp-error]');
-      if (toolSink) {
-        if (isDenied) {
-          toolSink({ verb: `${t('tui.cmd_cancelled')}: ${toolName}`, target: '', failed: true });
-        } else if (isError) {
-          toolSink({ verb: result, target: '', failed: true });
-        } else if (info) {
-          toolSink(info);
-        }
-      }
-      return result;
-    },
-  };
+  const dispatcher = buildToolDispatcher({
+    execDispatcher,
+    cliDispatcher,
+    askConfirm,
+    askConfirmAlways,
+    t,
+    getToolSink: () => toolSink,
+  });
 
   // Native-agent engine (M5-NATIVE-FLIP, 376-003) — DEFAULT ON. Rolls back to
   // the legacy runChatNativeLoop path only via `--legacy-loop` or project

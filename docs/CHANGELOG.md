@@ -2,6 +2,28 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint388] - 2026-07-08
+
+### Added
+
+- born-533 — REPL-MODEL-BUSY-GATE — /model /provider backend-splice race (P1)
+- born-527 — INPUT-BAR-CLUSTER — Home/End no-op + paste empty-history + /tmp keylog (P2)
+- born-521 — DESCRIBE-TOOL-PARAMS — describe_tool boş params raporluyor (P3)
+- born-536 — TOOL-EXEC-SYMLINK — inScope symlink-resolution eksik (P2)
+- born-540 — RENDER-REGION-CLEAR — writeAbove full-region clear eksik (P2)
+- born-547 — ENTRY-NDJSON-FALLBACK — non-assistant fallback branch eksik (P2)
+- born-556 — NATIVE-TRANSPORT-DOC — 32k/24k doc↔kod uyuşmazlığı (P3)
+- born-578 — INIT-REPAIR-FAILEDSTEPS — --repair failedSteps doldurmuyor (P3)
+- born-531 — SLASH-CASE-TRANSLIT — slash case-insensitive + slugify transliteration (P3)
+- born-504 — RECLASSIFY-BACKFILL — 10 eksik sprint-log satırı + re-run (P2)
+
+### Changed
+
+- born-557 — DOCTOR-ICON-CONSOLIDATE — 3 ikon-vokabülü birleştir (P3) (completed with tech debt)
+
+
+_Tasks: 13 total, 12 done, 1 tech debt, 1 no-go_
+
 ## [1.0.0-beta.1-sprint387] - 2026-07-08
 
 ### Added

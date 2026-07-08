@@ -9,6 +9,8 @@
 import { Box, Text, useInput } from 'ink';
 import { useState, useRef, type ReactElement } from 'react';
 import { appendFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { Key } from 'node:readline';
 import { editInput, EMPTY_INPUT, InputHistory, type InputState } from './line-edit.js';
 import { appendHistory, HistoryNavigator, loadHistory } from './input-history.js';
@@ -88,10 +90,56 @@ export function resolveMenuSubmit(buffer: string, matches: readonly SlashCommand
   return matches[sel]?.name ?? buffer;
 }
 
+/** Classification of a batched Ink `input` chunk that contains \r/\n (only
+ * relevant when `!key.return` — a real lone Enter keystroke is `key.return`,
+ * handled separately by editInput). */
+export type PasteChunkResult =
+  | { kind: 'insert'; text: string }
+  | { kind: 'submit'; line: string }
+  | { kind: 'noop' };
+
+/**
+ * Classify a raw multi-byte Ink `input` chunk against the current buffer:
+ *  • an internal newline survives stripping the TRAILING run of \r/\n → still
+ *    multi-line → `insert` as ONE message (newlines kept, Alperen: "paste tek
+ *    mesaj"); the user reviews + presses Enter for real.
+ *  • no internal newline left after stripping → a single line + trailing
+ *    newline ("text\r") → `submit`, UNLESS the resulting line (`buffer +
+ *    withoutTrailing`) is empty — a chunk that is PURELY \r/\n bytes (e.g. a
+ *    coalesced double-Enter, or a paste of only blank lines while the buffer
+ *    is empty) must never auto-submit or land in history, mirroring
+ *    editInput's own `submit: line.length > 0 ? line : undefined` contract.
+ * Pure — regression-tested without mounting Ink.
+ */
+export function resolvePasteChunk(buffer: string, input: string): PasteChunkResult {
+  const withoutTrailing = input.replace(/[\r\n]+$/, '');
+  if (/[\r\n]/.test(withoutTrailing)) {
+    return { kind: 'insert', text: input.replace(/\r\n?/g, '\n') };
+  }
+  const line = buffer + withoutTrailing;
+  return line.length > 0 ? { kind: 'submit', line } : { kind: 'noop' };
+}
+
+/** Resolve the debug keylog path: `DECKENT_INK_DEBUG_LOG` env override first,
+ * else the OS-appropriate temp dir. A hardcoded `/tmp/...` is POSIX-only —
+ * native Windows (non-WSL, Law #2 "every environment") has no `/tmp`, so the
+ * write throws ENOENT and the surrounding try/catch silently swallows it:
+ * `DECKENT_INK_DEBUG=1` would do nothing there with zero signal. */
+export function debugKeylogPath(): string {
+  return process.env['DECKENT_INK_DEBUG_LOG'] ?? join(tmpdir(), 'ink-keys.log');
+}
+
 /** Map an Ink keypress to the node:readline Key shape editInput expects.
- * Ink exposes arrows but NOT Home/End — those arrive as raw escape sequences
- * (xterm: ESC[H / ESC[F, or ESC[1~ / ESC[4~), so detect them from `input`. */
-function inkToKey(input: string, key: Parameters<Parameters<typeof useInput>[0]>[1]): Key {
+ * `key.home`/`key.end` are the properties Ink's own `useInput` hook actually
+ * fills (node_modules/ink/build/hooks/use-input.js: `home: keypress.name ===
+ * 'home'`, and parse-keypress.js maps every common xterm/rxvt/vt encoding —
+ * ESC[H, ESC[1~, ESC OH / ESC[F, ESC[4~, ESC OF, etc. — to that name), so
+ * they are the primary, Ink-idiomatic signal. The raw-escape-sequence check
+ * below is kept as a defense-in-depth fallback only (older Ink majors /
+ * terminal multiplexers that might not resolve `keypress.name`) — it must
+ * never be the sole detection path, unlike the pre-fix version of this
+ * function was documented (incorrectly) to require. */
+export function inkToKey(input: string, key: Parameters<Parameters<typeof useInput>[0]>[1]): Key {
   if (key.leftArrow) return { name: 'left' } as Key;
   if (key.rightArrow) return { name: 'right' } as Key;
   if (key.upArrow) return { name: 'up' } as Key;
@@ -99,8 +147,8 @@ function inkToKey(input: string, key: Parameters<Parameters<typeof useInput>[0]>
   if (key.return) return { name: 'return' } as Key;
   if (key.backspace) return { name: 'backspace' } as Key;
   if (key.delete) return { name: 'delete' } as Key;
-  if ((key as { home?: boolean }).home) return { name: 'home' } as Key;
-  if ((key as { end?: boolean }).end) return { name: 'end' } as Key;
+  if (key.home || input === '\x1b[H' || input === '\x1b[1~' || input === '\x1bOH') return { name: 'home' } as Key;
+  if (key.end || input === '\x1b[F' || input === '\x1b[4~' || input === '\x1bOF') return { name: 'end' } as Key;
   if (key.ctrl) return { name: input, ctrl: true } as Key;
   return { name: input, sequence: input } as Key;
 }
@@ -139,7 +187,7 @@ export function InputBar(props: InputBarProps): ReactElement {
 
   useInput((input, key) => {
     if (process.env['DECKENT_INK_DEBUG'] === '1') {
-      try { appendFileSync('/tmp/ink-keys.log', JSON.stringify({ input, key }) + '\n'); } catch { /* ignore */ }
+      try { appendFileSync(debugKeylogPath(), JSON.stringify({ input, key }) + '\n'); } catch { /* ignore */ }
     }
 
     if (key.ctrl && (input === 'l' || input === '\f')) { onClear?.(); return; } // Ctrl-L → clear
@@ -178,23 +226,20 @@ export function InputBar(props: InputBarProps): ReactElement {
       // any other key falls through to editInput → re-filters; reset selection
     }
 
-    // A batched chunk that contains a newline. Two cases:
-    //  • MULTI-LINE paste (internal newline) → insert as ONE message, newlines
-    //    kept (Alperen: "paste tek mesaj"); the user reviews + presses Enter.
-    //  • single line + trailing newline ("text\r") → submit it. (A real lone
-    //    Enter keystroke is key.return, handled by editInput below.)
+    // A batched chunk that contains a newline (a real lone Enter keystroke is
+    // key.return, handled by editInput below) — classify via resolvePasteChunk.
     if (!key.return && /[\r\n]/.test(input)) {
-      const withoutTrailing = input.replace(/[\r\n]+$/, '');
-      if (/[\r\n]/.test(withoutTrailing)) {
-        const text = input.replace(/\r\n?/g, '\n');
+      const result = resolvePasteChunk(stateRef.current.buffer, input);
+      if (result.kind === 'insert') {
         const s = stateRef.current;
-        set({ buffer: s.buffer.slice(0, s.cursor) + text + s.buffer.slice(s.cursor), cursor: s.cursor + text.length });
-      } else {
-        const line = stateRef.current.buffer + withoutTrailing;
-        history.current.push(line); // keep history (Ctrl-R) consistent with the lone-Enter path
-        recordHistoryEntry(projectRoot, persistentHistory, line);
-        onSubmit(line);
+        set({ buffer: s.buffer.slice(0, s.cursor) + result.text + s.buffer.slice(s.cursor), cursor: s.cursor + result.text.length });
+      } else if (result.kind === 'submit') {
+        history.current.push(result.line); // keep history (Ctrl-R) consistent with the lone-Enter path
+        recordHistoryEntry(projectRoot, persistentHistory, result.line);
+        onSubmit(result.line);
         set(EMPTY_INPUT);
+      } else {
+        set(EMPTY_INPUT); // chunk was purely \r/\n bytes → no submit, no history pollution
       }
       return;
     }

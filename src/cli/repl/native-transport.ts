@@ -202,7 +202,7 @@ export function resolveNativeSelection(
 /** Prompt-side context budget (estimated tokens) for a provider selection.
  *  Explicit `native_context_tokens` config wins; defaults keep generation
  *  headroom BELOW each transport family's typical window — local Ollama slots
- *  default to 32k (the 2026-07-07 empty-turn incident), hosted APIs are 128k+. */
+ *  default to 24k (the 2026-07-07 empty-turn incident), hosted APIs are 128k+. */
 export function resolveContextBudgetTokens(
   providerName: string,
   config: { native_context_tokens?: unknown },

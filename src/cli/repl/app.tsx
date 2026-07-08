@@ -518,6 +518,10 @@ export interface ReplLabels {
    * English fallback until a messages round wires a real i18n key (tui.turn_error)
    * through run.tsx (same seam precedent as the busy-controls labels above). */
   turnError?: string; // "turn failed: {error}"
+  /** REPL-MODEL-BUSY-GATE (388-001) — `/model`/`/provider` busy-reject warning;
+   * optional, English fallback until a messages round wires a real i18n key
+   * (tui.switch_busy) through run.tsx (same seam precedent as `turnError` above). */
+  switchBusy?: string; // "cannot switch {kind} while a turn is in progress — wait for it to finish, or /interrupt first"
 }
 
 /**
@@ -579,6 +583,41 @@ export function resolveNativeSlash(
   // one, see doc comment above) / 'none' (unknown slash, or a meta-command
   // with no agenticTool like /model — /cd — /term, already handled earlier).
   return { kind: 'passthrough' };
+}
+
+/**
+ * REPL-MODEL-BUSY-GATE (388-001) — decide whether a `/model`/`/provider`
+ * switch may apply now. `handleSubmit`'s switch branch used to call `onSwitch`
+ * unconditionally the instant the command was typed — INCLUDING while a turn
+ * was streaming (`working === true`, set by `inputIter` for the FULL duration
+ * of a turn on both the native-engine and legacy-loop paths). `onSwitch`
+ * (run.tsx) splices the shared provider/model backend the in-flight turn is
+ * still reading from — a TOCTOU race: the second half of a streaming/tool-
+ * dispatching turn could end up served by a DIFFERENT backend than the half
+ * that started it (corrupted-output/crash race, born-533). Gating on
+ * `working` refuses the switch while busy instead of racing it — the current
+ * turn finishes on the backend it started with, and the user re-issues the
+ * command once idle (the same reject-not-silently-drop precedent as
+ * `renderBusyDecision`'s interrupt-noop/steer-noop branches above). A bare
+ * `/model`/`/provider` with no argument is a read-only status query (nothing
+ * to splice) and is NOT gated by this function — the caller only invokes it
+ * on the actual-switch path. Pure — same "pull decision logic out of the Ink
+ * component" pattern as resolveStdinOwner/confirmKeyToAnswer above
+ * (ink-testing-library is not a project dependency; see
+ * tests/cli/repl-model-busy-gate.test.ts).
+ */
+export type SwitchGateDecision = { kind: 'apply' } | { kind: 'rejected'; line: string };
+
+export function resolveSwitchGate(
+  working: boolean,
+  kind: 'model' | 'provider',
+  labels: Pick<ReplLabels, 'switchBusy'>,
+): SwitchGateDecision {
+  if (!working) return { kind: 'apply' };
+  const line = (labels.switchBusy
+    ?? 'cannot switch {kind} while a turn is in progress — wait for it to finish, or /interrupt first'
+  ).replace('{kind}', kind);
+  return { kind: 'rejected', line };
 }
 
 /**
@@ -1183,10 +1222,14 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     // /model <id> · /provider <name> — runtime switch (handled here, not the loop).
     const sw = trimmed.match(/^\/(model|provider)(?:\s+(\S+))?$/i);
     if (sw) {
-      const kind = (sw[1] as string).toLowerCase();
+      const kind = (sw[1] as string).toLowerCase() as 'model' | 'provider';
       const arg = sw[2];
       pushTurn('user', trimmed);
       if (arg) {
+        // born-533 (388-001): refuse to splice the backend mid-turn — see
+        // resolveSwitchGate's doc comment above.
+        const gate = resolveSwitchGate(working, kind, labels);
+        if (gate.kind === 'rejected') { pushTurn('seg', gate.line); return; }
         const next = onSwitch(kind === 'model' ? { model: arg } : { provider: arg });
         if (next.switchError) {
           // Honest failure: selection (and status bar) stay on what actually

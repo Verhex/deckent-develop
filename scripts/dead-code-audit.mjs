@@ -208,6 +208,161 @@ function findModuleImporters(modulePath) {
   return { importedBy: importers, count: importers.length };
 }
 
+// ─── Dynamic 0-importer scan (born-506) ───────────────────────────────────
+//
+// KNOWN_SUSPECTS above is hand-maintained — a newly-orphaned module stays
+// invisible to the audit until a human notices it and adds an entry. The
+// functions below build a static import graph across the ENTIRE src/ tree in
+// a single pass (one read per file, zero subprocess spawns) and report any
+// module nobody imports, with no hand-list edit required.
+//
+// Known limitation (shared with the grep-based suspect scan above, not a new
+// regression): only STATIC string-literal import specifiers are resolved.
+// A fully dynamic specifier (template-literal `import(\`./providers/${name}.js\`)`)
+// or a module reached only from a `.tsx` file (dashboard) will not be seen —
+// these are reported to a human for triage, exactly like existing Dead
+// entries; the tool never deletes anything itself.
+
+/**
+ * Resolve package.json's `main` + `bin` entrypoints (dist/ output paths)
+ * back to their `src/` TypeScript source — these are expected to have zero
+ * in-repo importers by design and must not be flagged as dead.
+ * @returns {Set<string>} absolute resolved src/ file paths
+ */
+export function getEntrypointFiles() {
+  const entrypoints = new Set();
+  const pkgPath = join(projectRoot, 'package.json');
+  if (!existsSync(pkgPath)) return entrypoints;
+
+  let pkg;
+  try {
+    pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+  } catch {
+    return entrypoints;
+  }
+
+  const distPaths = [];
+  if (typeof pkg.main === 'string') distPaths.push(pkg.main);
+  if (pkg.bin && typeof pkg.bin === 'object') {
+    distPaths.push(...Object.values(pkg.bin));
+  } else if (typeof pkg.bin === 'string') {
+    distPaths.push(pkg.bin);
+  }
+
+  for (const distPath of distPaths) {
+    if (typeof distPath !== 'string') continue;
+    const srcPath = distPath.replace(/^\.?\/?dist\//, 'src/').replace(/\.js$/, '.ts');
+    const full = resolve(projectRoot, srcPath);
+    if (existsSync(full)) entrypoints.add(full);
+  }
+
+  return entrypoints;
+}
+
+const IMPORT_SPECIFIER_RE = /(?:from\s+|import\s*\(\s*|require\s*\(\s*)['"](\.\.?\/[^'"]+)['"]/g;
+
+/**
+ * Resolve a relative ESM import specifier (tsc Node16/nodenext output always
+ * ends in `.js`, even for `.ts` source) back to the TypeScript source file it
+ * refers to on disk.
+ * @param {string} fromDir - absolute directory of the importing file
+ * @param {string} spec - the raw specifier, e.g. "./foo.js" or "../bar/index.js"
+ * @returns {string | null} absolute resolved path, or null if unresolvable
+ */
+export function resolveImportSpecifier(fromDir, spec) {
+  const clean = spec.split('?')[0].split('#')[0];
+  const withoutExt = clean.replace(/\.(js|jsx|mjs|cjs)$/, '');
+
+  const direct = resolve(fromDir, `${withoutExt}.ts`);
+  if (existsSync(direct)) return direct;
+
+  const directTsx = resolve(fromDir, `${withoutExt}.tsx`);
+  if (existsSync(directTsx)) return directTsx;
+
+  const indexFile = resolve(fromDir, withoutExt, 'index.ts');
+  if (existsSync(indexFile)) return indexFile;
+
+  return null;
+}
+
+/**
+ * Build the set of every src/ file that is imported by at least one other
+ * src/ file, via static string-literal import/require/export-from/dynamic-
+ * import specifiers.
+ * @param {string[]} files - absolute paths, as returned by listSourceFiles
+ * @returns {Set<string>} absolute resolved paths that are imported somewhere
+ */
+export function buildImportGraph(files) {
+  const imported = new Set();
+
+  for (const file of files) {
+    let content;
+    try {
+      content = readFileSync(file, 'utf-8');
+    } catch {
+      continue;
+    }
+
+    const fromDir = dirname(file);
+    IMPORT_SPECIFIER_RE.lastIndex = 0;
+    let m;
+    while ((m = IMPORT_SPECIFIER_RE.exec(content)) !== null) {
+      const resolved = resolveImportSpecifier(fromDir, m[1]);
+      if (resolved) imported.add(resolved);
+    }
+  }
+
+  return imported;
+}
+
+/**
+ * Automatically discover src/ modules with zero static importers anywhere in
+ * the tree — no KNOWN_SUSPECTS entry required. Entrypoints (package.json
+ * main/bin), index.ts barrels, test files, .d.ts, and modules already tracked
+ * by KNOWN_SUSPECTS (to avoid duplicate report rows) are excluded.
+ * @returns {Array<{ module: string, category: string, reason: string, importCount: number, importedBy: string[], lineCount: number }>}
+ */
+export function findOrphanModules() {
+  const srcDir = join(projectRoot, 'src');
+  if (!existsSync(srcDir)) return [];
+
+  const files = listSourceFiles(srcDir);
+  const importGraph = buildImportGraph(files);
+  const entrypoints = getEntrypointFiles();
+  const knownModulePaths = new Set(KNOWN_SUSPECTS.map(s => resolve(projectRoot, s.module)));
+
+  const orphans = [];
+  for (const file of files) {
+    const resolvedFile = resolve(file);
+    const relPath = relative(projectRoot, file);
+
+    if (basename(file) === 'index.ts') continue;
+    if (relPath.startsWith('tests/') || relPath.includes('/tests/')) continue;
+    if (file.endsWith('.d.ts')) continue;
+    if (entrypoints.has(resolvedFile)) continue;
+    if (knownModulePaths.has(resolvedFile)) continue;
+    if (importGraph.has(resolvedFile)) continue;
+
+    let content;
+    try {
+      content = readFileSync(file, 'utf-8');
+    } catch {
+      continue;
+    }
+
+    orphans.push({
+      module: relPath,
+      category: 'Dead',
+      reason: 'Dynamic scan — zero static importers found anywhere in src/ (no KNOWN_SUSPECTS entry required, born-506)',
+      importCount: 0,
+      importedBy: [],
+      lineCount: content.split('\n').length,
+    });
+  }
+
+  return orphans;
+}
+
 /**
  * Audit known suspects from Sprint 132 and other investigations.
  * @returns {Array<{ module: string, category: string, reason: string, importCount: number, importedBy: string[], lineCount: number }>}
@@ -410,15 +565,31 @@ function main() {
 
   // Phase 1: Audit known suspects
   console.log('Phase 1: Auditing known suspects...');
-  const suspectResults = auditKnownSuspects();
-  console.log(`  Found ${suspectResults.length} suspects analyzed`);
+  const knownSuspectResults = auditKnownSuspects();
+  console.log(`  Found ${knownSuspectResults.length} suspects analyzed`);
 
-  for (const r of suspectResults) {
+  for (const r of knownSuspectResults) {
     const icon = r.category === 'Dead' ? '  [DEAD]' :
                  r.category === 'Dormant' ? '  [DORMANT]' :
                  r.category === 'Lightly-Used' ? '  [LIGHT]' : '  [ACTIVE]';
     console.log(`${icon} ${r.module} (${r.lineCount} lines, ${r.importCount} importers)`);
   }
+
+  // Phase 1.5: Dynamic 0-importer module scan (born-506) — catches newly
+  // orphaned modules automatically, with no KNOWN_SUSPECTS edit required.
+  console.log('');
+  console.log('Phase 1.5: Dynamic 0-importer module scan...');
+  const orphanResults = findOrphanModules();
+  console.log(`  Found ${orphanResults.length} orphan module(s) via dynamic scan`);
+  for (const r of orphanResults) {
+    console.log(`  [DEAD-DYNAMIC] ${r.module} (${r.lineCount} lines)`);
+  }
+
+  // Merge: known-suspect results (hand-curated, may include ADR-protected
+  // Dormant entries) + dynamically-discovered orphans (module-level, no
+  // human nomination needed). Same result shape throughout — report/JSON
+  // format is unchanged, only the underlying data source is now automatic.
+  const suspectResults = [...knownSuspectResults, ...orphanResults];
 
   // Phase 2: Find unused exports (lightweight sampling — full scan is expensive)
   console.log('');

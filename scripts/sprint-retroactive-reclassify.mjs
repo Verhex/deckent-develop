@@ -23,6 +23,12 @@
  *   --decisions-dir <path> Decisions dir (default: .deckent/decisions)
  *   --date <YYYY-MM-DD>    Override audit file date (testing)
  *   --dry-run              Do not write to DB / files; print plan
+ *   --backfill-missing     Before reclassifying, create/append sprint-log rows for
+ *                          entries whose sprint entry is missing or whose task is
+ *                          absent from the "## Task Outcomes" section (born-504)
+ *   --default-prior-decision <D>
+ *                          Decision to record for a backfilled task line when the
+ *                          entry doesn't carry its own `priorDecision` (default: NO_GO)
  */
 
 import Database from 'better-sqlite3';
@@ -74,6 +80,10 @@ export function validateEntry(entry, index = 0) {
     reason,
     agent: typeof entry.agent === 'string' ? entry.agent : undefined,
     skills: Array.isArray(entry.skills) ? entry.skills.filter((s) => typeof s === 'string') : undefined,
+    priorDecision:
+      typeof entry.priorDecision === 'string' && VALID_DECISIONS.has(entry.priorDecision)
+        ? entry.priorDecision
+        : undefined,
   };
 }
 
@@ -124,7 +134,16 @@ export function rewriteTaskOutcome(content, taskId, newDecision) {
   if (!replaced) {
     throw new Error(`taskId '${taskId}' not found in Task Outcomes section`);
   }
-  // Recompute header counters from the (now-updated) outcomes map.
+  return recomputeHeaderCounters(lines).join('\n');
+}
+
+/**
+ * Recompute the `- Completed:` / `- NO_GO:` / `- GO_WITH_TECH_DEBT:` header
+ * counters in-place from the (already-updated) `## Task Outcomes` lines.
+ * Shared by rewriteTaskOutcome and the backfill helpers below so the counter
+ * logic exists in exactly one place.
+ */
+function recomputeHeaderCounters(lines) {
   const outcomes = parseTaskOutcomes(lines.join('\n'));
   const counts = { DONE: 0, NO_GO: 0, GO_WITH_TECH_DEBT: 0 };
   for (const d of outcomes.values()) {
@@ -137,7 +156,143 @@ export function rewriteTaskOutcome(content, taskId, newDecision) {
       lines[i] = `- GO_WITH_TECH_DEBT: ${counts.GO_WITH_TECH_DEBT}`;
     }
   }
-  return lines.join('\n');
+  return lines;
+}
+
+const DEFAULT_PRIOR_DECISION = 'NO_GO';
+
+/**
+ * Choose the decision to record for a backfilled task-outcome line. Always
+ * differs from the entry's target decision — otherwise reclassifyEntries
+ * would see prior === target and skip it as 'already-classified', silently
+ * defeating the point of backfilling it in the first place.
+ */
+function pickPriorDecision(entry, defaultPriorDecision) {
+  if (entry.priorDecision) return entry.priorDecision;
+  const candidate = VALID_DECISIONS.has(defaultPriorDecision) ? defaultPriorDecision : DEFAULT_PRIOR_DECISION;
+  if (candidate === entry.decision) return candidate === 'NO_GO' ? 'DONE' : 'NO_GO';
+  return candidate;
+}
+
+/**
+ * Append task-outcome lines that are missing from an existing sprint entry's
+ * `## Task Outcomes` section (creating the section if the entry has none),
+ * then recompute header counters. Existing lines are never touched — this
+ * only adds rows for tasks the section doesn't mention yet.
+ */
+export function appendTaskOutcomes(content, pairs) {
+  const lines = content.split('\n');
+  const existing = parseTaskOutcomes(content);
+  const missing = pairs.filter((p) => !existing.has(p.task));
+  if (missing.length === 0) return content;
+
+  let sectionIdx = lines.findIndex((l) => /^##\s+task outcomes/i.test(l.trim()));
+  if (sectionIdx === -1) {
+    if (lines.length > 0 && lines[lines.length - 1] !== '') lines.push('');
+    lines.push('## Task Outcomes');
+    sectionIdx = lines.length - 1;
+  }
+  let insertAt = lines.length;
+  for (let i = sectionIdx + 1; i < lines.length; i++) {
+    if (lines[i].startsWith('## ')) {
+      insertAt = i;
+      break;
+    }
+  }
+  const newLines = missing.map((p) => `- ${p.task}: ${p.decision} — (backfilled)`);
+  lines.splice(insertAt, 0, ...newLines);
+  return recomputeHeaderCounters(lines).join('\n');
+}
+
+/**
+ * Synthesize a full sprint-log body (same shape as buildSprintEntrySummary)
+ * for a sprint that has no `type='sprint'` row at all. Marked as backfilled
+ * so the row is traceably synthetic, not a real finalize output.
+ */
+export function buildBackfillSprintContent(sprintId, pairs) {
+  const lines = [
+    `# ${sprintId}`,
+    '',
+    `- Total tasks: ${pairs.length}`,
+    '- Completed: 0',
+    '- NO_GO: 0',
+    '- GO_WITH_TECH_DEBT: 0',
+    '- Backfilled via sprint-retroactive-reclassify --backfill-missing',
+    '',
+    '## Task Outcomes',
+    ...pairs.map((p) => `- ${p.task}: ${p.decision} — (backfilled)`),
+  ];
+  return recomputeHeaderCounters(lines).join('\n');
+}
+
+/**
+ * Backfill sprint-log rows / task-outcome lines that a reclassify batch
+ * references but the DB does not yet have — closes the historical
+ * 'sprint-entry-missing' / 'task-not-in-outcomes' skip gap (born-504).
+ * Idempotent: a sprint/task that already has an outcome line is left alone.
+ * Returns a per-sprint report; does not itself change any decision — the
+ * subsequent reclassifyEntries() pass owns the actual decision change.
+ */
+export function backfillMissingSprintEntries(db, rawEntries, opts = {}) {
+  const { defaultPriorDecision = DEFAULT_PRIOR_DECISION, dryRun = false } = opts;
+  const entries = rawEntries.map((e) => validateEntry(e));
+
+  const selectStmt = db.prepare(`SELECT id, content FROM entries WHERE sprint_id = ? AND type = 'sprint' LIMIT 1`);
+  const updateStmt = db.prepare(`UPDATE entries SET content = ?, updated_at = ? WHERE id = ?`);
+  const insertStmt = db.prepare(
+    `INSERT INTO entries (id, type, title, content, sprint_id, sprint_num, source, decay_exempt, created_at, updated_at)
+     VALUES (@id, 'sprint', @title, @content, @sprintId, @sprintNum, 'backfill', 1, @now, @now)`,
+  );
+
+  const bySprintOrder = [];
+  const bySprint = new Map();
+  for (const e of entries) {
+    if (!bySprint.has(e.sprint)) {
+      bySprint.set(e.sprint, []);
+      bySprintOrder.push(e.sprint);
+    }
+    bySprint.get(e.sprint).push(e);
+  }
+
+  const now = new Date().toISOString();
+  const report = [];
+
+  for (const sprintId of bySprintOrder) {
+    const sprintEntries = bySprint.get(sprintId);
+    const pairs = sprintEntries.map((e) => ({ task: e.task, decision: pickPriorDecision(e, defaultPriorDecision) }));
+    const row = selectStmt.get(sprintId);
+
+    if (!row) {
+      const content = buildBackfillSprintContent(sprintId, pairs);
+      if (!dryRun) {
+        const sprintNum = parseInt(sprintId.replace(/\D/g, ''), 10) || 0;
+        insertStmt.run({
+          id: `sprint-log-${sprintNum}`,
+          title: `Sprint ${sprintId} (backfilled)`,
+          content,
+          sprintId,
+          sprintNum,
+          now,
+        });
+      }
+      report.push({ sprint: sprintId, action: 'created', tasksBackfilled: pairs.map((p) => p.task) });
+      continue;
+    }
+
+    const existingOutcomes = parseTaskOutcomes(row.content);
+    const missingPairs = pairs.filter((p) => !existingOutcomes.has(p.task));
+    if (missingPairs.length === 0) {
+      report.push({ sprint: sprintId, action: 'noop', tasksBackfilled: [] });
+      continue;
+    }
+    const updatedContent = appendTaskOutcomes(row.content, missingPairs);
+    if (!dryRun) {
+      updateStmt.run(updatedContent, now, row.id);
+    }
+    report.push({ sprint: sprintId, action: 'updated', tasksBackfilled: missingPairs.map((p) => p.task) });
+  }
+
+  return report;
 }
 
 function decisionToSuccess(d) {
@@ -269,6 +424,8 @@ export function runReclassify(opts) {
     decisionsDir,
     dateStr = new Date().toISOString().slice(0, 10),
     dryRun = false,
+    backfillMissing = false,
+    defaultPriorDecision = DEFAULT_PRIOR_DECISION,
   } = opts;
 
   if (!entries || entries.length === 0) {
@@ -280,7 +437,11 @@ export function runReclassify(opts) {
   db.pragma('foreign_keys = ON');
 
   let result;
+  let backfill = [];
   try {
+    if (backfillMissing) {
+      backfill = backfillMissingSprintEntries(db, entries, { defaultPriorDecision, dryRun });
+    }
     result = reclassifyEntries(db, entries, { agentsDir, skillsDir, dryRun });
   } finally {
     db.close();
@@ -299,13 +460,14 @@ export function runReclassify(opts) {
   if (auditPath) {
     const payload = {
       timestamp: new Date().toISOString(),
+      ...(backfillMissing ? { backfill } : {}),
       applied: result.applied,
       skipped: result.skipped,
     };
     writeFileSync(auditPath, JSON.stringify(payload, null, 2) + '\n', 'utf-8');
   }
 
-  return { ...result, auditPath };
+  return { ...result, backfill, auditPath };
 }
 
 function buildEntriesFromArgs(opts) {
@@ -335,6 +497,8 @@ async function main() {
   const decisionsDir = opts['decisions-dir'] || join(process.cwd(), '.deckent', 'decisions');
   const dateStr = opts.date || new Date().toISOString().slice(0, 10);
   const dryRun = Boolean(opts['dry-run']);
+  const backfillMissing = Boolean(opts['backfill-missing']);
+  const defaultPriorDecision = opts['default-prior-decision'] || DEFAULT_PRIOR_DECISION;
 
   if (!existsSync(dbPath)) {
     console.error(`memory.db not found at ${dbPath}`);
@@ -350,8 +514,15 @@ async function main() {
     decisionsDir,
     dateStr,
     dryRun,
+    backfillMissing,
+    defaultPriorDecision,
   });
 
+  if (result.backfill.length) {
+    const created = result.backfill.filter((b) => b.action === 'created').length;
+    const updated = result.backfill.filter((b) => b.action === 'updated').length;
+    console.log(`Backfilled ${created} sprint entr${created === 1 ? 'y' : 'ies'}, appended outcomes to ${updated} more`);
+  }
   console.log(`Reclassified ${result.applied.length} tasks${dryRun ? ' (dry-run)' : ''}`);
   if (result.skipped.length) {
     console.log(`Skipped ${result.skipped.length} (idempotent or invalid)`);

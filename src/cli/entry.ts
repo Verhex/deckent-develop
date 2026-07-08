@@ -224,6 +224,45 @@ export function extractClaudeStreamDelta(line: string): string | null | undefine
   return delta;
 }
 
+/**
+ * Sprint 388 Task 388-007 (born-547, ENTRY-NDJSON-FALLBACK) — extract a
+ * human-readable failure message from a claude stream-json `result` event
+ * that failed (`is_error: true`).
+ *
+ * The stream-json protocol has no distinct top-level `error` event: a failed
+ * turn (overloaded / rate-limited / max-turns / API error) is reported as a
+ * `result` event — the SAME top-level `type` as a successful one — carrying
+ * `is_error: true`. {@link extractClaudeStreamDelta} treats every non-
+ * `assistant` type uniformly (returns `null`, caller skips silently), which
+ * previously meant a failed turn's `result` event vanished exactly like a
+ * successful one's — the REPL user saw a truncated reply with no indication
+ * anything went wrong. This is intentionally a SEPARATE function (not a
+ * change to `extractClaudeStreamDelta`'s branches) so the assistant-delta
+ * path stays byte-for-byte unchanged; callers check this FIRST and only fall
+ * through to the existing delta extraction when it returns `undefined`.
+ *
+ * Returns:
+ *   - `string` — a human-readable failure message (never empty).
+ *   - `undefined` — not a failed `result` event (assistant events, successful
+ *     results, system/ping chatter, unparseable lines all fall through
+ *     unchanged to {@link extractClaudeStreamDelta}).
+ */
+export function extractClaudeStreamErrorText(line: string): string | undefined {
+  if (line.length === 0 || line.charCodeAt(0) !== 0x7B /* '{' */) return undefined;
+  let obj: unknown;
+  try {
+    obj = JSON.parse(line);
+  } catch {
+    return undefined;
+  }
+  if (!obj || typeof obj !== 'object') return undefined;
+  const event = obj as { type?: string; is_error?: unknown; result?: unknown; subtype?: unknown };
+  if (event.type !== 'result' || event.is_error !== true) return undefined;
+  if (typeof event.result === 'string' && event.result.length > 0) return event.result;
+  if (typeof event.subtype === 'string' && event.subtype.length > 0) return event.subtype;
+  return 'claude stream-json result: is_error=true';
+}
+
 /** Subscription mode env — drop API-key vars so the CLI uses its bundled session auth. */
 function subscriptionReplEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
@@ -373,6 +412,16 @@ function buildCliStream(
         const line = buffer.slice(0, nlIdx);
         buffer = buffer.slice(nlIdx + 1);
         if (line.length === 0) continue;
+        // born-547 — a failed-turn `result` event (is_error: true) is checked
+        // BEFORE the assistant-delta path so it is surfaced instead of silently
+        // dropped; extractClaudeStreamDelta itself is untouched.
+        const errorText = extractClaudeStreamErrorText(line);
+        if (errorText !== undefined) {
+          const notice = `\n[claude stream-json error] ${errorText}\n`;
+          collected += notice;
+          yield { text: notice };
+          continue;
+        }
         const delta = extractClaudeStreamDelta(line);
         if (delta === undefined) {
           // Looked like NDJSON but didn't parse — never swallow data.
@@ -387,13 +436,20 @@ function buildCliStream(
     // Flush trailing partial line (no terminating newline) — only relevant
     // in ndjson mode; raw mode already emitted everything inline above.
     if (mode === 'ndjson' && buffer.length > 0) {
-      const delta = extractClaudeStreamDelta(buffer);
-      if (delta === undefined) {
-        collected += buffer;
-        yield { text: buffer };
-      } else if (delta !== null && delta.length > 0) {
-        collected += delta;
-        yield { text: delta };
+      const trailingErrorText = extractClaudeStreamErrorText(buffer);
+      if (trailingErrorText !== undefined) {
+        const notice = `\n[claude stream-json error] ${trailingErrorText}\n`;
+        collected += notice;
+        yield { text: notice };
+      } else {
+        const delta = extractClaudeStreamDelta(buffer);
+        if (delta === undefined) {
+          collected += buffer;
+          yield { text: buffer };
+        } else if (delta !== null && delta.length > 0) {
+          collected += delta;
+          yield { text: delta };
+        }
       }
       buffer = '';
     }

@@ -152,12 +152,18 @@ export type BusyCommandAction =
  * Parse a raw REPL line into a busy-control action. Pure lexing only — the
  * caller (Ink-wire follow-up) invokes resolveQueueCommand / applyInterrupt /
  * applySteer with the parsed result; this function never dispatches itself.
+ *
+ * Command keyword matching is case-insensitive (`/Queue`, `/INTERRUPT`,
+ * `/Steer ...` all resolve the same as their lowercase form, born-531) — only
+ * the keyword itself is case-folded; a `/steer` message's own casing is
+ * sliced from the original (non-folded) `trimmed` string and preserved as-is.
  */
 export function parseBusyCommand(line: string): BusyCommandAction {
   const trimmed = line.trim();
-  if (trimmed === '/queue') return { kind: 'queue' };
-  if (trimmed === '/interrupt') return { kind: 'interrupt' };
-  if (trimmed === '/steer' || trimmed.startsWith('/steer ')) {
+  const lower = trimmed.toLowerCase();
+  if (lower === '/queue') return { kind: 'queue' };
+  if (lower === '/interrupt') return { kind: 'interrupt' };
+  if (lower === '/steer' || lower.startsWith('/steer ')) {
     return { kind: 'steer', message: trimmed.slice('/steer'.length).trim() };
   }
   return { kind: 'none' };

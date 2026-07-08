@@ -13,8 +13,8 @@
 //   • dispatch ASLA throw etmez — hata/iptal `[mcp-error]`/`[deckent]` string'i
 //     olarak döner (loop bunu tool_result olarak modele geri besler).
 
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
-import { resolve, relative, isAbsolute, dirname } from 'node:path';
+import { writeFileSync, readFileSync, existsSync, mkdirSync, lstatSync, readlinkSync } from 'node:fs';
+import { resolve, relative, isAbsolute, dirname, sep, parse } from 'node:path';
 import { spawn } from 'node:child_process';
 import type { McpToolDispatcher } from './chat-native.js';
 
@@ -157,6 +157,42 @@ export function defaultBashRun(cmd: string, cwd: string, runOpts: DefaultBashRun
   });
 }
 
+/** Symlink-chain resolution guard against cycles (A -> B -> A). */
+const MAX_SYMLINK_DEPTH = 40;
+
+/**
+ * `fs.realpathSync` refuses a path whose final target does not exist yet
+ * (ENOENT) — useless for `deckent_write_file` (creating a brand-new file)
+ * AND for detecting a broken symlink that points outside scope (born-536:
+ * a symlink escape does not require the escape target to exist). This walks
+ * the path root-to-leaf, resolving any symlink found at each accumulated
+ * prefix via `readlinkSync` (not `realpathSync`), so segments that don't
+ * exist yet are kept literal while every symlink actually on disk — broken
+ * or not, file or directory — is followed to its real target.
+ */
+function resolveRealPathLenient(absPath: string): string {
+  const root = parse(absPath).root;
+  const parts = absPath.slice(root.length).split(sep).filter((s) => s.length > 0);
+  let resolved = root;
+  let depth = 0;
+  for (const part of parts) {
+    resolved = resolved === root ? root + part : resolved + sep + part;
+    for (;;) {
+      let st;
+      try {
+        st = lstatSync(resolved);
+      } catch {
+        break; // not on disk yet — nothing to resolve, keep literal.
+      }
+      if (!st.isSymbolicLink()) break;
+      if (++depth > MAX_SYMLINK_DEPTH) throw new Error('ELOOP: too many symlink levels');
+      const target = readlinkSync(resolved);
+      resolved = isAbsolute(target) ? target : resolve(dirname(resolved), target);
+    }
+  }
+  return resolved;
+}
+
 /**
  * deckent'in aksiyon tool dispatcher'ını oluştur. Tool'lar:
  *   • deckent_read_file  {path}            → dosya içeriği (onaysız)
@@ -178,6 +214,24 @@ export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDis
     if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) {
       // rel === '' → cwd'nin kendisi (dosya değil); '..' → dışarı.
       return rel === '' ? null : null;
+    }
+    // Symlink-escape guard (born-536): the textual check above only proves
+    // the REQUESTED path spells out somewhere under cwd — a symlink placed
+    // inside cwd (file or directory, even a broken one) can still point its
+    // real target outside cwd, and writeFileSync/readFileSync follow that
+    // symlink at the OS level. Resolve both sides through the same
+    // symlink-aware resolver and compare the REAL paths too.
+    let realCwd: string;
+    let realAbs: string;
+    try {
+      realCwd = resolveRealPathLenient(cwd);
+      realAbs = resolveRealPathLenient(abs);
+    } catch {
+      return null; // e.g. symlink cycle — fail closed.
+    }
+    const realRel = relative(realCwd, realAbs);
+    if (realRel === '' || realRel.startsWith('..') || isAbsolute(realRel)) {
+      return null;
     }
     return abs;
   };

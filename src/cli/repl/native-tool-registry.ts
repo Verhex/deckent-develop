@@ -7,7 +7,7 @@
 // names ('read'|'confirm'|'always') map to the engine's ('silent'|'confirm'|
 // 'always'); read→silent. (MCP tool source is a deferred follow-up.)
 
-import { z } from 'zod';
+import { z, type ZodTypeAny } from 'zod';
 import { ToolRegistry } from '../../agent/tools/registry.js';
 import type { ToolDefinition, ToolPermissionTier, ToolResult } from '../../agent/tools/types.js';
 import { createToolExecDispatcher } from '../commands/chat-tool-exec.js';
@@ -207,11 +207,59 @@ const BRIDGE_RISK_BY_TIER: Record<ToolPermissionTier, CoreToolRiskLevel> = {
   always: 'destructive',
 };
 
-/** Generic passthrough — agent ToolDefinition only carries a JSON-schema
- * `inputSchema`, not a zod instance; a lossless JSON-schema->zod conversion is
- * out of scope for this bridge (TOOL-1's `paramsSchema` needs *a* ZodTypeAny,
- * not per-tool validation rules re-derived by hand). */
+/** Generic passthrough — the catalog fallback for a bridged tool whose
+ * `inputSchema` declares no enumerable top-level fields (e.g. the CLI-bridge
+ * tools' intentionally-open `genericSchema`, `{ properties: {} }`). TOOL-1's
+ * `paramsSchema` needs *a* ZodTypeAny even when there is nothing to derive. */
 const BRIDGE_PARAMS_SCHEMA = z.record(z.string(), z.unknown());
+
+/** Maps one JSON-schema property node (agent ToolDefinition.inputSchema's
+ * `properties[name]`) to its zod primitive. Scoped to exactly what
+ * `summarizeEagerSchema` (core/tool-core.ts) reads off a field — base type +
+ * optionality — never a general-purpose JSON-schema validator. */
+function jsonSchemaPropertyToZod(node: unknown): ZodTypeAny {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return z.unknown();
+  const prop = node as { type?: unknown; items?: unknown };
+  switch (prop.type) {
+    case 'string': return z.string();
+    case 'number':
+    case 'integer': return z.number();
+    case 'boolean': return z.boolean();
+    case 'array': return z.array(jsonSchemaPropertyToZod(prop.items));
+    case 'object': return jsonSchemaObjectToZod(node as Record<string, unknown>);
+    default: return z.unknown();
+  }
+}
+
+/** Best-effort JSON-schema object -> zod object converter (born-521). Every
+ * bridged tool already carries a real `inputSchema` (the `SCHEMAS` map above,
+ * or a caller-supplied JSON schema for CLI-bridge/skill/MCP tools) — this only
+ * translates that EXISTING declaration into a `ZodTypeAny` so `describe_tool`
+ * can report real params; it never re-derives or edits a tool's own schema. */
+function jsonSchemaObjectToZod(schema: Record<string, unknown>): ZodTypeAny {
+  const properties = schema['properties'];
+  if (!properties || typeof properties !== 'object' || Array.isArray(properties)) {
+    return BRIDGE_PARAMS_SCHEMA;
+  }
+  const requiredList = schema['required'];
+  const required = new Set(
+    Array.isArray(requiredList) ? requiredList.filter((r): r is string => typeof r === 'string') : [],
+  );
+  const shape: Record<string, ZodTypeAny> = {};
+  for (const [key, propSchema] of Object.entries(properties as Record<string, unknown>)) {
+    const zodType = jsonSchemaPropertyToZod(propSchema);
+    shape[key] = required.has(key) ? zodType : zodType.optional();
+  }
+  if (Object.keys(shape).length === 0) return BRIDGE_PARAMS_SCHEMA;
+  return z.object(shape).catchall(z.unknown());
+}
+
+/** Top-level entry: a bridged tool's `inputSchema` (JSON schema) -> the
+ * catalog's per-tool `paramsSchema`. Only object-typed schemas route through
+ * the field-by-field converter; anything else keeps the generic passthrough. */
+function bridgeParamsSchema(inputSchema: Record<string, unknown>): ZodTypeAny {
+  return inputSchema['type'] === 'object' ? jsonSchemaObjectToZod(inputSchema) : BRIDGE_PARAMS_SCHEMA;
+}
 
 /** Adapts every already-registered native ToolDefinition into a fresh TOOL-1
  * catalog. Self-referential by construction (called with a snapshot of
@@ -223,7 +271,7 @@ function buildToolSurfaceCatalog(defs: readonly ToolDefinition[]): CoreToolRegis
     catalog.register({
       name: def.name,
       description: def.description,
-      paramsSchema: BRIDGE_PARAMS_SCHEMA,
+      paramsSchema: bridgeParamsSchema(def.inputSchema),
       risk: BRIDGE_RISK_BY_TIER[def.tier],
       category: bridgeCategory(def.name),
       handlerRef: `native:${def.name}`,

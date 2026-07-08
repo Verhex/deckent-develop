@@ -381,13 +381,19 @@ export function renderHelp(registry: SlashRegistry): string {
  * Kullanıcı `/` yazıp Tab'a basınca eşleşen slash komutları listelenir/tamamlanır.
  * Non-slash satırlarda boş döner (normal sohbet). readline kontratı:
  *   dönüş `[matches, line]`; tek match → tamamlar, çok match → menü listeler.
+ *
+ * Prefix matching is case-insensitive (born-531) — `/St` <Tab> surfaces
+ * `/status` the same as `/st` would. `line` is returned as-typed (completer
+ * contract); only the match filter folds case, catalog names are already
+ * canonically lowercase.
  */
 export function slashCompleter(line: string): [string[], string] {
   if (!line.startsWith('/')) return [[], line];
+  const lower = line.toLowerCase();
   const names = buildSlashRegistry()
     .map((c) => c.name)
     .filter((n) => n !== '/quit'); // alias gizli
-  const hits = names.filter((n) => n.startsWith(line));
+  const hits = names.filter((n) => n.startsWith(lower));
   return [hits.length > 0 ? hits : names, line];
 }
 
@@ -398,9 +404,31 @@ export function slashCompleter(line: string): [string[], string] {
 // SlashAction functions; unknown/incomplete input returns an i18n `message`
 // action (the caller localizes via getMessage).
 
+/**
+ * Turkish-character → ASCII transliteration table (born-531) — used before
+ * the generic lowercase+ASCII-fold pass in `slugifyBacklogId` so `ç ğ ı ö ş ü`
+ * (and their uppercase forms, including dotted `İ`) map to a readable ASCII
+ * letter instead of falling into the `[^a-z0-9]` catch-all and collapsing to
+ * `-`. Standard ASCII-folding equivalents (matches deckent's other i18n
+ * transliteration tables) — case is preserved here; `.toLowerCase()` still
+ * runs afterward for the rest of the slug.
+ */
+const TURKISH_TRANSLIT_MAP: Readonly<Record<string, string>> = {
+  ç: 'c', Ç: 'C',
+  ğ: 'g', Ğ: 'G',
+  ı: 'i', İ: 'I',
+  ö: 'o', Ö: 'O',
+  ş: 's', Ş: 'S',
+  ü: 'u', Ü: 'U',
+};
+
+function transliterateTurkish(input: string): string {
+  return input.replace(/[çÇğĞıİöÖşŞüÜ]/g, (ch) => TURKISH_TRANSLIT_MAP[ch] ?? ch);
+}
+
 /** Derive a stable backlog id from a human title (deckent_autonomous backlog_add requires `id`). */
 function slugifyBacklogId(title: string): string {
-  return title
+  return transliterateTurkish(title)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');

@@ -303,6 +303,11 @@ export async function maybeOfferWorkerImageBuild(
   return code === 0 ? 'built' : 'build-failed';
 }
 
+/** Normalize a caught value to a display message (for failedSteps reporting). */
+function toErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 // ─── registerInit — ADR-012 pattern ────────────────────────────────
 
 export function registerInit(program: Command): void {
@@ -324,6 +329,7 @@ export function registerInit(program: Command): void {
     .action(async (options: { auto?: boolean; manual?: boolean; cursor?: boolean; claudeCode?: boolean; env?: string; allEnvs?: boolean; upgrade?: boolean; force?: boolean; repair?: boolean; yes?: boolean; install?: boolean; image?: boolean }) => {
       const root = resolveProjectRoot();
       const failedSteps: Array<{ step: string; error: string }> = [];
+      let currentStep = 'startup';
 
       try {
         let mode: PlanMode;
@@ -337,7 +343,9 @@ export function registerInit(program: Command): void {
         try {
           const splash = showSplash(DECKENT_VERSION);
           if (splash) print(splash);
-        } catch { /* splash failure is non-fatal */ }
+        } catch (error) {
+          failedSteps.push({ step: 'splash', error: toErrorMessage(error) });
+        }
 
         print(formatWelcomeBanner());
 
@@ -377,12 +385,15 @@ export function registerInit(program: Command): void {
         }
 
         // 4. Create directories
+        currentStep = 'create-directories';
         createDirectories(root);
 
         // 4b. Clear stale caches
+        currentStep = 'clear-stale-caches';
         clearStaleCaches(root);
 
         // 5. Config
+        currentStep = 'write-config';
         await writeConfig(root, mode, language, projectName);
 
         // 6. Stack detection
@@ -394,24 +405,32 @@ export function registerInit(program: Command): void {
           commands: { build: '', test: '', lint: '' },
         };
         let stackDetected = false;
+        currentStep = 'stack-detection';
         try {
           stackResult = detectFullStack(root);
           stackDetected = true;
-        } catch { /* fallback to defaults */ }
+        } catch (error) {
+          failedSteps.push({ step: 'stack-detection', error: toErrorMessage(error) });
+        }
 
         if (!detectedAnalysis) {
           try {
             detectedAnalysis = analyzeProject(root);
-          } catch { /* non-fatal */ }
+          } catch (error) {
+            failedSteps.push({ step: 'project-analysis', error: toErrorMessage(error) });
+          }
         }
 
+        currentStep = 'write-stack-file';
         writeStackAndDeckentFile(root, language, projectName, stackResult, stackDetected);
 
         // 7. Agent files
+        currentStep = 'write-agent-files';
         const detectedEnv = detectEnvironment();
         writeAgentFiles(root, detectedEnv, { force: options.force, allEnvs: options.allEnvs });
 
         // 7c. Multi-environment config
+        currentStep = 'write-multi-env-config';
         const requestedEnvs = options.allEnvs
           ? [...ALL_ENV_NAMES]
           : options.env
@@ -420,24 +439,31 @@ export function registerInit(program: Command): void {
         writeMultiEnvConfig(root, requestedEnvs);
 
         // 7d. Security files
+        currentStep = 'write-security-files';
         writeDeckSecurityFiles(root);
 
         // 8. Rule files — all supported providers (Claude/Codex/Gemini/Cursor)
+        currentStep = 'write-rule-files';
         await writeRuleFiles(root);
 
         // 9. DIRECTIVES.md
+        currentStep = 'write-directives-file';
         writeDirectivesFile(root, language, stackResult, projectName);
 
         // 10. Brain files
+        currentStep = 'write-brain-files';
         writeBrainFiles(root, projectName, language, stackResult, detectedAnalysis);
 
         // 10d. i18n
+        currentStep = 'write-i18n-files';
         writeI18nFiles(root);
 
         // 11. .gitignore
+        currentStep = 'update-gitignore';
         updateGitignore(root);
 
         // ── Provider detection & wizard ──────────────────────────────
+        currentStep = 'detect-providers';
         const providers = await detectAvailableProviders();
 
         print(formatDetectedSetup(buildDetectedSetup(providers, detectedAnalysis)));
@@ -454,6 +480,7 @@ export function registerInit(program: Command): void {
         }
 
         // Provider selection
+        currentStep = 'provider-wizard';
         const { autoConfig, steps: providerSteps } = buildProviderWizardSteps(providers);
         let providerConfig: { brain_provider: ProviderName; worker_provider: ProviderName; fallback_provider?: ProviderName };
 
@@ -478,6 +505,7 @@ export function registerInit(program: Command): void {
           providerConfig = resolveProviderWizardResult(wizardResult, providers);
         }
 
+        currentStep = 'write-provider-config';
         writeProviderConfig(root, mode, language, projectName, providerConfig);
 
         // 7e. Run deckent doctor + consent-based provisioning of missing tools
@@ -511,7 +539,9 @@ export function registerInit(program: Command): void {
             const failedChecks = finalDoctor.checks.filter(c => c.required && !c.passed);
             print(`\n  Health check: ${failedChecks.length} issue(s) remaining — run 'deckent doctor' for details`);
           }
-        } catch { /* doctor failure is non-fatal */ }
+        } catch (error) {
+          failedSteps.push({ step: 'doctor-checks', error: toErrorMessage(error) });
+        }
 
         // ── IDE environment detection & MCP guidance ────────────────
         const ideEnv = options.cursor ? 'cursor' as const
@@ -542,8 +572,8 @@ export function registerInit(program: Command): void {
             nonInteractive: !process.stdin.isTTY,
             lang: language,
           });
-        } catch {
-          /* worker-image offer is non-fatal — never block init */
+        } catch (error) {
+          failedSteps.push({ step: 'worker-image-build', error: toErrorMessage(error) });
         }
 
         print(formatNextSteps(language));
@@ -556,6 +586,7 @@ export function registerInit(program: Command): void {
           print('\n  To retry: deckent init --upgrade');
         }
       } catch (error) {
+        failedSteps.push({ step: currentStep, error: toErrorMessage(error) });
         printError(error);
         print(`\n  Init failed. To retry after fixing the issue: deckent init --upgrade`);
         if (failedSteps.length > 0) {

@@ -4,7 +4,8 @@
 // stream çıktısı bunun ÜSTÜNE akar, kullanıcının yazdığı (rl.line) KORUNUR.
 //
 // Mekanizma (ADR-010 — Node built-in readline + ANSI, yeni-dep YOK):
-//   writeAbove(text): mevcut input satırını temizle (clearLine/cursorTo) →
+//   writeAbove(text): mevcut input bölgesini (wrap'lı satırlar dahil, born-540)
+//   tam temizle (getCursorPos/moveCursor/cursorTo/clearScreenDown) →
 //   çıktıyı bas → `rl.prompt(true)` ile prompt'u + korunan buffer'ı yeniden çiz.
 //   Böylece akan çıktı ile altta beklenen input çakışmaz ("düşünüyor…fd" garble
 //   biter) ve yazdığın kaybolmaz.
@@ -14,7 +15,7 @@
 // iletebilelim"). Non-TTY/pipe yolu createPromptRegion'da düz-geçiş yapar
 // (test/HTTP/`printf | deckent` davranışı korunur).
 
-import { clearLine, cursorTo, type Interface as ReadlineInterface } from 'node:readline';
+import { clearScreenDown, cursorTo, moveCursor, type Interface as ReadlineInterface } from 'node:readline';
 
 export interface PromptRegion {
   /** Çıktıyı pinli prompt'un ÜSTÜNE yaz, kullanıcının yazdığını koru. */
@@ -38,7 +39,11 @@ const DEFAULT_PROMPT = '› '; // `› `
  * yapar (mevcut pipe davranışı korunur — \n eklenir).
  */
 export function createPromptRegion(
-  rl: Pick<ReadlineInterface, 'setPrompt' | 'prompt'>,
+  rl: Pick<ReadlineInterface, 'setPrompt' | 'prompt'> & {
+    /** Public Node readline.Interface method (optional here for back-compat with
+     * minimal test doubles); missing → treated as a single-row prompt (rows: 0). */
+    getCursorPos?: () => { rows: number; cols: number };
+  },
   out: NodeJS.WriteStream,
   opts: PromptRegionOptions = {},
 ): PromptRegion {
@@ -64,9 +69,16 @@ export function createPromptRegion(
         out.write(block);
         return;
       }
-      // Input satırını temizle → çıktıyı bas → prompt+buffer yeniden çiz.
+      // born-540 — hedef-bölge (pinned `› ` prompt + kullanıcı buffer'ı) terminal
+      // genişliğinden uzun olduğunda BİRDEN ÇOK satıra wrap olur; cursor bu
+      // wrap'lı bloğun EN ALT satırında durur. Tek `clearLine` yalnız o alt
+      // satırı silip üstteki wrap-satırlarını "artık" bırakırdı. `getCursorPos()`
+      // (rl.line'ın kaç satır wrap ettiğini raporlar) ile cursor'u bölgenin EN
+      // ÜSTÜNE taşı, oradan ekranın sonuna kadar tam temizle — sonra yaz.
+      const pos = rl.getCursorPos?.() ?? { rows: 0, cols: 0 };
+      moveCursor(out, 0, -pos.rows);
       cursorTo(out, 0);
-      clearLine(out, 0);
+      clearScreenDown(out);
       out.write(block);
       safePrompt();
     },
@@ -167,7 +179,7 @@ export function createThinkingTicker(
 //
 // claude-code "prompt altta SABİT, cevap üste akar" için: streamed token'ları
 // satırlara tamponlar, her TAM satırı emitLine ile basar. emitLine =
-// region.writeAbove → clearLine + satır + \n + rl.prompt(true), yani prompt her
+// region.writeAbove → tam-bölge clear + satır + \n + rl.prompt(true), yani prompt her
 // satırdan sonra altta yeniden çizilir (SABİT kalır, "kaybolmaz"). Akış
 // satır-granüler (token-granüler değil) ama prompt hep görünür — kullanıcının
 // birincil şikayetini ("prompt bar kayboluyor") çözer. flush() tur sonunda kalan

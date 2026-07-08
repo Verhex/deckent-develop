@@ -609,12 +609,30 @@ export function getProviderPartialHint(name: string): string {
 }
 
 /**
- * Format provider diagnostics with ✓ / ⚠ / ✗ symbols and actionable messages.
+ * Doctor's canonical tri-state status marker — single source of truth for the
+ * `[PASS]`/`[WARN]`/`[FAIL]` ASCII vocabulary (born-557, DOCTOR-ICON-CONSOLIDATE).
+ * Every doctor.ts section that renders a pass/warn/fail marker should call this
+ * instead of hand-rolling its own ternary, so the visual vocabulary can never
+ * drift again across sections rendered in the same `deckent doctor` invocation.
+ */
+export function doctorStatusIcon(state: 'pass' | 'warn' | 'fail'): string {
+  switch (state) {
+    case 'pass': return '[PASS]';
+    case 'warn': return '[WARN]';
+    case 'fail': return '[FAIL]';
+  }
+}
+
+/**
+ * Format provider diagnostics with [PASS] / [WARN] / [FAIL] markers and
+ * actionable messages (born-557: migrated off the ✓/⚠/✗ Unicode symbols onto
+ * the canonical {@link doctorStatusIcon} ASCII vocabulary shared with
+ * formatConnectorHealthLines/formatWorkerImageLines/the --pre-flight output).
  *
- * Output shape (per task 190-002 spec):
- *   `✓ Claude (ready) — Claude CLI 1.0.45`
- *   `⚠ Codex (binary OK, auth missing — set OPENAI_API_KEY)`
- *   `✗ Gemini (binary not found)`
+ * Output shape:
+ *   `[PASS] Claude (ready) — Claude CLI 1.0.45`
+ *   `[WARN] Codex (binary OK, auth missing — set OPENAI_API_KEY)`
+ *   `[FAIL] Gemini (binary not found)`
  *
  * Complements (does NOT replace) `formatProviderDiagnostics()` in core/provider.ts
  * which keeps the legacy `[OK]/[PARTIAL]/[MISSING]` bracket markers for callers
@@ -625,7 +643,7 @@ export function formatProviderDiagnosticsActionable(
 ): string {
   const lines: string[] = ['Provider Diagnostics:'];
   for (const d of details) {
-    const symbol = d.available ? '✓' : d.partial ? '⚠' : '✗';
+    const symbol = doctorStatusIcon(d.available ? 'pass' : d.partial ? 'warn' : 'fail');
     const label = capitalize(d.name);
     let stateLabel: string;
     if (d.available) {
@@ -912,10 +930,10 @@ export function formatAuthStateLines(results: AuthStateResult[], lang: string = 
 export function formatWorkerImageLines(report: WorkerImageReport, lang: string = 'en'): string[] {
   const lines: string[] = ['Worker Image:'];
   if (report.state === 'ready') {
-    lines.push(`  [PASS] ${getMessage('doctor.image_ready', lang)}`);
+    lines.push(`  ${doctorStatusIcon('pass')} ${getMessage('doctor.image_ready', lang)}`);
     return lines;
   }
-  lines.push(`  [WARN] ${getMessage('doctor.image_not_ready', lang, { state: report.state })}`);
+  lines.push(`  ${doctorStatusIcon('warn')} ${getMessage('doctor.image_not_ready', lang, { state: report.state })}`);
   if (report.missingClis.length > 0) {
     lines.push(`         ${getMessage('doctor.image_missing_clis', lang, { clis: report.missingClis.join(', ') })}`);
   }
@@ -1088,28 +1106,28 @@ export function formatConnectorHealthLines(
     const probe = authProbes?.[r.provider];
     if (r.available && probe?.state === 'logged-out') {
       // PSL-6: CLI installed but the probe proves no session — louder + actionable.
-      lines.push(`  [WARN] ${capitalize(r.provider)} CLI${versionStr} — ${authProbeLoggedOutLine(r.provider, lang)}`);
+      lines.push(`  ${doctorStatusIcon('warn')} ${capitalize(r.provider)} CLI${versionStr} — ${authProbeLoggedOutLine(r.provider, lang)}`);
     } else if (r.available && r.authStatus === 'ok') {
       const authLabel = r.provider === 'claude' ? 'session auth active' : 'API key configured';
-      lines.push(`  [PASS] ${capitalize(r.provider)} CLI${versionStr} — ${authLabel}`);
+      lines.push(`  ${doctorStatusIcon('pass')} ${capitalize(r.provider)} CLI${versionStr} — ${authLabel}`);
     } else if (!r.available) {
       const hint = getProviderInstallHint(r.provider);
       const msg = hint ? `not installed — ${hint}` : 'not available';
-      lines.push(`  [WARN] ${capitalize(r.provider)} CLI — ${msg}`);
+      lines.push(`  ${doctorStatusIcon('warn')} ${capitalize(r.provider)} CLI — ${msg}`);
     } else {
       // available but auth missing or expired
-      lines.push(`  [WARN] ${capitalize(r.provider)} CLI${versionStr} — auth missing`);
+      lines.push(`  ${doctorStatusIcon('warn')} ${capitalize(r.provider)} CLI${versionStr} — auth missing`);
     }
   }
 
   // .deck status
   const deckStatus = getDeckFileStatus(root);
-  const deckIcon = deckStatus.includes('not found') ? '[WARN]' : '[PASS]';
+  const deckIcon = doctorStatusIcon(deckStatus.includes('not found') ? 'warn' : 'pass');
   lines.push(`  ${deckIcon} .deck file — ${deckStatus}`);
 
   // Environment detection
   const env = detectEnvironment();
-  lines.push(`  [PASS] Environment — ${env} detected`);
+  lines.push(`  ${doctorStatusIcon('pass')} Environment — ${env} detected`);
 
   return lines;
 }
@@ -2189,7 +2207,8 @@ export function registerDoctor(program: Command): void {
           if (anyMissing) process.exitCode = 1;
           return;
         }
-        // Sprint 190 Task 190-002: ✓/⚠/✗ actionable format with per-provider hints.
+        // Sprint 190 Task 190-002: [PASS]/[WARN]/[FAIL] actionable format with
+        // per-provider hints (born-557: migrated off ✓/⚠/✗ onto doctorStatusIcon).
         // Legacy formatProviderDiagnostics still exported for callers needing
         // the [OK]/[PARTIAL]/[MISSING] bracket markers.
         print(formatProviderDiagnosticsActionable(diagnostics));
@@ -2249,7 +2268,7 @@ export function registerDoctor(program: Command): void {
         print('\nPre-flight Health Check');
         print('─'.repeat(50));
         for (const check of preFlightResult.checks) {
-          const icon = check.passed ? '[PASS]' : (check.required ? '[FAIL]' : '[WARN]');
+          const icon = doctorStatusIcon(check.passed ? 'pass' : (check.required ? 'fail' : 'warn'));
           const dur = check.durationMs != null ? ` (${check.durationMs}ms)` : '';
           print(`${icon} ${check.name}: ${check.message}${dur}`);
         }

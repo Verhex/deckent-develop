@@ -9452,3 +9452,37 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 387-027: born-581 — ESM-IMPORT-FIX — require('fs')→ESM import (P2) (DONE)
 
 ---
+## Sprint 388 — sprint-388
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-08
+**Duration:** 1188s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 13 |
+| Completed | 12 |
+| Tech Debt | 1 |
+| No-Go | 1 |
+| Coverage | NaN% |
+| Duration | 1187961ms |
+
+### Tasks
+
+- 388-001: born-533 — REPL-MODEL-BUSY-GATE — /model /provider backend-splice race (P1) (DONE)
+- 388-002: born-528 — REPL-DENY-TOOLSINK — confirm-red toolSink honest-outcome bypass (P2) (NO_GO)
+- 388-003: born-527 — INPUT-BAR-CLUSTER — Home/End no-op + paste empty-history + /tmp keylog (P2) (DONE)
+- 388-004: born-521 — DESCRIBE-TOOL-PARAMS — describe_tool boş params raporluyor (P3) (DONE)
+- 388-005: born-536 — TOOL-EXEC-SYMLINK — inScope symlink-resolution eksik (P2) (DONE)
+- 388-006: born-540 — RENDER-REGION-CLEAR — writeAbove full-region clear eksik (P2) (DONE)
+- 388-007: born-547 — ENTRY-NDJSON-FALLBACK — non-assistant fallback branch eksik (P2) (DONE)
+- 388-008: born-556 — NATIVE-TRANSPORT-DOC — 32k/24k doc↔kod uyuşmazlığı (P3) (DONE)
+- 388-009: born-557 — DOCTOR-ICON-CONSOLIDATE — 3 ikon-vokabülü birleştir (P3) (GO_WITH_TECH_DEBT)
+- 388-010: born-578 — INIT-REPAIR-FAILEDSTEPS — --repair failedSteps doldurmuyor (P3) (DONE)
+- 388-011: born-531 — SLASH-CASE-TRANSLIT — slash case-insensitive + slugify transliteration (P3) (DONE)
+- 388-012: born-504 — RECLASSIFY-BACKFILL — 10 eksik sprint-log satırı + re-run (P2) (DONE)
+- 388-013: born-506 — DEADCODE-DYNAMIC-SCAN — hand-list yerine otomatik 0-importer keşfi (P3) (DONE)
+
+---
