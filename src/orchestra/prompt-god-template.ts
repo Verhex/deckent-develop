@@ -10,6 +10,7 @@ import { join } from 'path';
 import type { Task, TaskScope } from '../core/task-types.js';
 import type { MemoryEntryV2 } from '../core/memory-types.js';
 import { selectRelevantAdrs, buildAdrPromptSection } from './adr-selector.js';
+import { evaluateScopeGate } from '../core/scope-gate.js';
 import { sanitizeScope } from './scope-sanitizer.js';
 import { truncateAtParagraph, inferTaskDomains, logInjectionAudit } from './task-builder.js';
 import { getDefaultProviderName } from './sprint-utils.js';
@@ -136,6 +137,19 @@ export interface SprintContext {
    * never blind-default-on (CLAUDE.md quality bar: risky reorder is flag-gated).
    */
   leadingT0Reorder?: boolean;
+  /**
+   * The repo's tracked files (`git ls-files`) at sprint time — F2.1b.
+   *
+   * When present and non-empty, {@link buildScopeBlock} splits the WRITE authority
+   * list into worker-facing sub-lists (Existing / New / ⚠ Unverified) using the same
+   * pre-spawn scope-gate classifier ({@link evaluateScopeGate}), so the prompt tells
+   * the worker which paths already exist (modify, don't recreate) versus which are
+   * genuinely new versus which look like a typo/wrong-dir (confirm or STOP+NO_GO —
+   * the sprint-380 / born-573 orphan-file mode). Populated best-effort by the caller
+   * (task-builder). Absent/empty → the flat legacy list is rendered byte-for-byte,
+   * so every existing caller and the prompt-determinism guard are unaffected.
+   */
+  trackedFiles?: string[];
 }
 
 /**
@@ -305,7 +319,7 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
   // ── 4. Scope Rules (sanitized) ──────────────────────────────────────
   // PROMPT-W1 (d): decide once which optional boilerplate this task needs.
   const boilerplate = conditionalBoilerplate(task);
-  const scopeBlock = buildScopeBlock(task.scope, scopeWarnings, boilerplate.hostConfig);
+  const scopeBlock = buildScopeBlock(task.scope, scopeWarnings, boilerplate.hostConfig, ctx.trackedFiles);
 
   // ── 5. Dependencies Block ───────────────────────────────────────────
   const depsBlock = buildDependenciesBlock(task.dependencies, ctx.dependencies, ctx.tasksDir);
@@ -560,7 +574,59 @@ export function conditionalBoilerplate(task: Task): ConditionalBoilerplate {
 
 // ─── Scope Block Builder ───────────────────────────────────────────────
 
-export function buildScopeBlock(scope: TaskScope, outWarnings: string[], emitHostConfigNote: boolean): string {
+/**
+ * F2.1b: render the WRITE authority list as worker-facing sub-lists.
+ *
+ * Reuses the pre-spawn scope-gate classifier ({@link evaluateScopeGate}, run with
+ * `acknowledgeScopePaths` so it classifies-only and never blocks here) so the prompt
+ * language matches the gate verdict exactly:
+ *   - **confirmed** → Existing: modify in place, do not recreate.
+ *   - **new-plausible** → New: expected to be created.
+ *   - **suspect** → ⚠ Unverified: no such path; likely typo/wrong-dir → confirm or
+ *     STOP+NO_GO (this is the orphan-file mode the gate blocks by default; a worker
+ *     only sees it here when the sprint was launched with `--force-scope`).
+ * Each sub-list is emitted only when non-empty. Deterministic (pure classifier).
+ */
+function buildWriteAuthorityList(sanitizedFiles: string[], trackedFiles: string[]): string {
+  const gate = evaluateScopeGate({
+    tasks: [{ id: 'scope', scope: { filesWrite: sanitizedFiles } }],
+    trackedFiles,
+    acknowledgeScopePaths: true,
+  });
+  const writes = gate.verdicts.filter(v => v.role === 'write');
+  const existing = writes.filter(v => v.classification === 'confirmed').map(v => v.path);
+  const created = writes.filter(v => v.classification === 'new-plausible').map(v => v.path);
+  const suspect = writes.filter(v => v.classification === 'suspect');
+
+  const list = (paths: string[]): string => paths.map(f => `  - ${f}`).join('\n');
+  const blocks: string[] = [];
+  if (existing.length > 0) {
+    blocks.push(`Existing — modify in place, do NOT recreate from scratch:\n${list(existing)}`);
+  }
+  if (created.length > 0) {
+    blocks.push(`New — you are expected to create these:\n${list(created)}`);
+  }
+  if (suspect.length > 0) {
+    const lines = suspect.map(v => {
+      const hint = v.suggestion ? ` → did you mean '${v.suggestion}'?` : '';
+      return `  - ${v.path}${hint}`;
+    }).join('\n');
+    blocks.push(
+      `⚠ Unverified — no such path in the repo; likely a typo or wrong directory. ` +
+      `Confirm it is genuinely new BEFORE writing. If it should be an existing file, ` +
+      `STOP and write a NO_GO result — do NOT create an orphan file:\n${lines}`,
+    );
+  }
+  // Fallback (should not happen — verdicts always classify): flat list.
+  return blocks.length > 0 ? blocks.join('\n\n') : list(sanitizedFiles);
+}
+
+export function buildScopeBlock(
+  scope: TaskScope,
+  outWarnings: string[],
+  emitHostConfigNote: boolean,
+  trackedFiles?: string[],
+): string {
   // Sanitize filesWrite
   const sanitized = sanitizeScope(scope.filesWrite);
   for (const w of sanitized.warnings) outWarnings.push(w);
@@ -598,12 +664,19 @@ export function buildScopeBlock(scope: TaskScope, outWarnings: string[], emitHos
   // is READ/context scope only; the directory-fallback wording applies only when
   // no Files: list was declared (PQ-4 F5 behaviour preserved).
   if (sanitized.filesWrite.length > 0) {
+    // F2.1b: when the tracked-file set is available, classify each write target so
+    // the worker sees Existing (modify, don't recreate) / New (create) / ⚠ Unverified
+    // (typo/wrong-dir → confirm or STOP+NO_GO) instead of one flat list. Absent/empty
+    // trackedFiles → the flat legacy list, byte-for-byte.
+    const writeAuthority = (trackedFiles && trackedFiles.length > 0)
+      ? buildWriteAuthorityList(sanitized.filesWrite, trackedFiles)
+      : scopeFiles;
     return `## Scope Rules
 READ/context scope — you may read these directories to understand the code:
 ${scopeDirs}
 
 WRITE authority (canonical — the ONLY files you may create or modify):
-${scopeFiles}
+${writeAuthority}
 
 A directory appearing in the read scope does NOT grant write permission there — the write list above is the single authority, and the auditor flags any write outside it. If a change seems needed in a file you cannot write, note it in your .result \`notes\` instead of editing it.${hostConfigNote}`;
   }

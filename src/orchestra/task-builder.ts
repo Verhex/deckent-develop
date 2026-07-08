@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { DeckentError } from '../core/errors.js';
 import { existsSync, readdirSync, readFileSync, appendFileSync, mkdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import type {
   Task, TaskScope, GoNoGoCriteria, ModelType, TaskEffort, TaskPriority,
@@ -1619,6 +1620,21 @@ export function buildWorkerPrompt(
     debugLog('buildWorkerPrompt:readBaseline', e);
   }
 
+  // F2.1b: the repo's tracked files, so the scope block can split the WRITE list into
+  // Existing / New / ⚠ Unverified for the worker (same classifier as the pre-spawn
+  // scope gate). Best-effort — a git failure yields undefined → the flat legacy scope
+  // list is rendered byte-for-byte. `git ls-files` on this repo is ~4.7k paths / <10ms.
+  let trackedFiles: string[] | undefined;
+  try {
+    const ls = spawnSync('git', ['ls-files'], { cwd: projectRoot, encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 });
+    if (ls.status === 0 && ls.stdout) {
+      const files = ls.stdout.split('\n').filter(Boolean);
+      if (files.length > 0) trackedFiles = files;
+    }
+  } catch (e) {
+    debugLog('buildWorkerPrompt:lsFiles', e);
+  }
+
   const ctx: SprintContext = {
     agentPrompt,
     agentId: task.assignedAgent ?? 'generic',
@@ -1629,6 +1645,7 @@ export function buildWorkerPrompt(
     sharedContext,
     upstreamHandoffs,
     preExistingFailures,
+    trackedFiles,
   };
   const artifact = buildTaskPrompt(task, ctx);
 

@@ -53,6 +53,54 @@ describe('PCOMP-W1: scope block has a single write authority', () => {
   });
 });
 
+// ─── F2.1b: WRITE-list classified into Existing / New / ⚠ Unverified ─────
+
+describe('F2.1b: buildScopeBlock classifies write targets when trackedFiles is given', () => {
+  const scope = {
+    directories: ['src/core/', 'src/orchestra/', 'src/agents/'],
+    filesRead: [],
+    filesWrite: [
+      'src/core/config.ts',            // tracked → Existing
+      'src/core/brand-new-feature.ts', // parent tracked, no collision → New
+      'src/orchestra/worker.ts',       // not tracked; basename exists at src/agents/worker.ts → ⚠ Unverified
+    ],
+  };
+  const trackedFiles = ['src/core/config.ts', 'src/agents/worker.ts', 'src/cli/index.ts'];
+
+  it('renders the flat legacy list (no sub-headers) when trackedFiles is absent', () => {
+    const out = buildScopeBlock(scope, [], false);
+    expect(out).toContain('  - src/core/config.ts');
+    expect(out).not.toContain('Existing — modify in place');
+    expect(out).not.toContain('⚠ Unverified');
+  });
+
+  it('splits the write list into Existing / New / ⚠ Unverified sub-lists with worker language', () => {
+    const out = buildScopeBlock(scope, [], false, trackedFiles);
+    // Existing (tracked) → modify, don't recreate.
+    expect(out).toContain('Existing — modify in place, do NOT recreate from scratch:');
+    expect(out).toMatch(/Existing[^⚠]*- src\/core\/config\.ts/s);
+    // New (plausible) → create.
+    expect(out).toContain('New — you are expected to create these:');
+    expect(out).toMatch(/New[^⚠]*- src\/core\/brand-new-feature\.ts/s);
+    // Suspect (wrong-dir) → confirm or STOP+NO_GO, with the did-you-mean hint.
+    expect(out).toContain('⚠ Unverified');
+    expect(out).toMatch(/STOP and write a NO_GO/);
+    expect(out).toContain("src/orchestra/worker.ts → did you mean 'src/agents/worker.ts'?");
+  });
+
+  it('omits empty sub-lists — all-tracked writes render only the Existing group', () => {
+    const allTracked = {
+      directories: ['src/core/'],
+      filesRead: [],
+      filesWrite: ['src/core/config.ts'],
+    };
+    const out = buildScopeBlock(allTracked, [], false, ['src/core/config.ts']);
+    expect(out).toContain('Existing — modify in place');
+    expect(out).not.toContain('New — you are expected to create');
+    expect(out).not.toContain('⚠ Unverified');
+  });
+});
+
 // ─── W4: tiered ADR injection ───────────────────────────────────────────
 
 const GOVERNING_ADR: MemoryEntryV2 = {
