@@ -7,6 +7,7 @@ import {
   selectRelevantAdrs,
   buildAdrPromptSection,
   classifyTaskIntent,
+  distillActiveConstraint,
   TASK_TYPE_ADR_PRESETS,
   type AdrRelevance,
 } from '../../src/orchestra/adr-selector.js';
@@ -400,5 +401,27 @@ describe('classifyTaskIntent', () => {
   it('classifies orchestra task correctly', () => {
     const task = makeTask('Sprint planner', 'Update sprint planner routing', ['src/orchestra/']);
     expect(classifyTaskIntent(task)).toBe('orchestra');
+  });
+});
+
+// ─── F0.4: active-constraint truncation is word-boundary, not mid-word ───────
+describe('distillActiveConstraint — word-boundary truncation (F0.4)', () => {
+  it('never slices a word in half when the summary exceeds the cap', () => {
+    // A long single-line summary whose 240-char cap would land mid-word.
+    const long = ('PURGE the legacy adapter and ' .repeat(20)).trim() + ' FINALWORDXYZ';
+    const out = distillActiveConstraint('', long);
+    expect(out.length).toBeGreaterThan(0);
+    expect(out.endsWith('…')).toBe(true);
+    // The tail before the ellipsis must be a whole word (no partial token), i.e.
+    // the char before '…' is not immediately preceded by a cut inside a word:
+    // reconstruct the kept text and assert every kept token appears whole in input.
+    const kept = out.slice(0, -1).trim();
+    const lastKeptWord = kept.split(' ').pop()!;
+    expect(long.split(' ')).toContain(lastKeptWord);
+  });
+
+  it('returns the summary unchanged when within the cap', () => {
+    const short = 'core/ → orchestra/ import direction only (advisory).';
+    expect(distillActiveConstraint('', short)).toBe(short);
   });
 });

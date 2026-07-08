@@ -687,7 +687,14 @@ const ACTIVE_CONSTRAINT_CAP = 240;
 export function distillActiveConstraint(content: string, summary?: string | null): string {
   const cap = (s: string): string => {
     const one = s.replace(/\s+/g, ' ').trim();
-    return one.length > ACTIVE_CONSTRAINT_CAP ? one.slice(0, ACTIVE_CONSTRAINT_CAP - 1).trimEnd() + '…' : one;
+    if (one.length <= ACTIVE_CONSTRAINT_CAP) return one;
+    // Cut at the last word boundary within the cap window so the head never slices
+    // mid-word (WP-20 previously produced e.g. "**✅ V1 PURG…" — a mangled half-token).
+    // Fall back to a hard cut only when the head window contains no space at all.
+    const head = one.slice(0, ACTIVE_CONSTRAINT_CAP - 1);
+    const lastSpace = head.lastIndexOf(' ');
+    const cut = lastSpace > 0 ? head.slice(0, lastSpace) : head;
+    return cut.trimEnd() + '…';
   };
 
   if (summary && summary.trim()) return cap(summary);
