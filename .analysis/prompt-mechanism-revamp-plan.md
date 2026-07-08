@@ -83,7 +83,7 @@
 - **G1b scope-kapanış** ⏳ — goCriteria'daki her doğrulanabilir iddiaya "karşılayacak filesWrite var mı?" (387-012 install-debt'i önlerdi). prompt-gate.ts'e yeni lint.
 - **G1c premise ground-truth** ⏳ — description'daki "X eksik/yok" iddialarına grep-spot-check. `auditPlanGroundTruth` (planner.ts:763) ZATEN VAR ama **UNWIRED** (yalnız test-caller) → genişlet+wire (387-012 bayat-Ed25519 premise'ini yakalardı).
 - **G1e test-assertion** ⏳ — private-state kalıpları ("X null olmalı") → observable-behavior öner (387-017).
-- **G2 persona-class metadata** ⏳ — agent.json'a `role` alanı (kısmen var: 2/20 agent + BUILTIN_AGENT_ROLES map). architect-mismap (implementer-map ama Write-denied) düzelt.
+- ~~**G2 persona-class metadata + behavior-precedence**~~ ✅ TESLİM (commit `656c36f4`). G2a: gate capability-lint'i `agent.deniedTools.includes('Write')` manifest-sinyali okur (name-matching yerine; id-set fallback korundu — architect zaten yakalanıyordu, hardening). G2b: refactorer davranış-değiştiren task'a düşerse "mandate SUSPENDED" behavior-precedence note (verify-precedence ikizi, self-contained, non-refactorer→'' protected-set-safe). +8 test. **Kök-fix G3 (operation-class→persona routing) hâlâ açık** — G2b semptom-mitigasyonu.
 - **G3 router operation-class** ⏳ — taskDNA operation-ağırlıklarını persona-seçimine bağla (RC-B kök; sinyal üretiliyor, tüketici eksik). Agent-satırsız task'ların güvenlik-ağı.
 - **G4 skill↔agent tek-karar kilidi** ⏳ (PCOMP-W5b tamamlama) — routing {agent,skills,personaClass} tek atomik nesne.
 - **G5 ADR render tier** ⏳ (= R-3/R-5) — d-004 full-kontrat yalnız import-touching task'ta; active_constraint===none → "Advisory" alt-başlığı; nogo-koşullu-talimat "compatibility note" render.
