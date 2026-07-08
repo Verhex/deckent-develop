@@ -146,7 +146,18 @@ git-guard yalnız stash-scatter modunu kapattı; **orphan-yanlış-yol modu hâl
 | F1.3 ADR over-match · F3.1 CLI prefix-flag · F4.x caching · F5.x routing · F6 hijyen | ⏳ | — | KARAR-3=CLI-kazanımları+ertele |
 > PRE-EXISTING (kapsam-dışı): `tmux-edge` 'skips mkdirSync' testi değişikliklerimden bağımsız kırık.
 
-## Bekleyen 3 KARAR (Alperen)
+## ▶ POST-COMPACT RESUME (buradan devam et — taze context)
+> **Durum:** Çekirdek teslim (8 commit: F0.1-0.4 · F2.1 · F1.1 + 2 docs). Kararlar verili (scope=bloke ✅, ADR-075=gözlem-flip, caching=CLI-kazanımları+ertele). **Ben (CC/Fable) el-kodlarım** (DISTINCT-FILE kapalı-liste). Her fix: oku→edit→test+tsc→(user-surface ise real-binary smoke)→commit. Build BENDE (sprint-arası). Sonra maraton loop'a dönülür (`.analysis/deckent-marathon-loop-state.md`).
+> **Kalan sıra (öncelik):**
+> 1. **F1.3 ADR over-match** — `adr-selector.ts`: code-task worker'ında routing-ADR (adr-g-006) relevance-cezası; adr-d-004 full-render koşulunu daralt (yalnız explicit-referans). Test: adr-selector.
+> 2. **F2.1b buildScopeBlock 3-alt-liste** — `prompt-god-template.ts:563 buildScopeBlock`: CONFIRMED/NEW/⚠-doğrulanamadı alt-listeleri (worker-dili: "yazmadan önce DUR+NO_GO"). scope-gate classifier'ını (`core/scope-gate.ts` evaluateScopeGate) prompt-build'e getir — projectRoot/trackedFiles threading gerekir (buildScopeBlock şu an projectRoot almıyor). Bloke zaten canlı; bu worker-dili katmanı.
+> 3. **F1.2 Idempotency default-flip** — `prompt-god-template.ts:553 conditionalBoilerplate`: "yalnız API-relevant sinyalde emit" (scope: connectors/providers/api/webhook/payment ∨ desc-keyword). F1 pinning-testleri yeni-sözleşmeye güncelle. YARGI + test-churn.
+> 4. **F3.1 CLI prefix-bayrağı** — `tmux.ts`/`providers/claude.ts`/`subprocess.ts` claude-spawn: `--exclude-dynamic-system-prompt-sections` (prefix-stabilite, yalnız default-prompt'la çalışır) + belki `--append-system-prompt`. TUZAK: `--system-prompt` (replace) CLAUDE.md/rules auto-load'u keser — kullanma. Gerçek-binary smoke ŞART (`claude -p --help` ile flag doğrula).
+> 5. **F5.1 ADR-075 gözlem-flip** — `.deckent/config.json`'a `routing.skill_agent_affinity: true` (dogfood'da aç) → `routing-affinity-observability.ts` sink canlı-veri kaydeder. Kısa-vade DIRECTIVES `- Agent:` zaten çalışıyor. Sonra multi-sprint denge-gözlem → default-on kararı.
+> 6. **F6 hijyen** — `docs/superpowers/specs/2026-06-26-worker-prompt-provider-cache-architecture-design.md` status-tablosu ("⬜ Not started"→segmentation+adapter VAR/wiring-eksik) + memory `feedback_agent_routing_imbalance` ("ADR-075 dead-code"→"live-but-off").
+> **Ertelendi (KARAR-3):** F4.x segmentation+ProviderCacheAdapter tam-wire → native-API/F2-008'e bağlı.
+
+## Bekleyen 3 KARAR (Alperen) — VERİLDİ ✅ (scope=bloke · ADR-075=gözlem-flip · caching=CLI+ertele)
 1. **Scope-gate** SUSPECT → bloke-default mı, yalnız-uyar mı? (KARAR-1)
 2. **ADR-075 affinity** → gözlem-sonra-flip mi, flag+sink kaldır mı? (KARAR-2)
 3. **Caching-derinliği** → (a) tam-wire şimdi (segmentation+adapter+CLI-flag, flag-gated, CLI'da yalnız byte+prefix) / (b) yalnız CLI-path kazanımları şimdi (F1.1/F1.2 byte + prefix-flag) + segmentation'ı F2-008/native-API'ye ertele / (c) tüm L1-caching'i maraton sonrasına ertele? (KARAR-3)
