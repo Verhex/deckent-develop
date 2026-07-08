@@ -543,6 +543,38 @@ function touchesHostConfig(scope: TaskScope | undefined): boolean {
   });
 }
 
+/**
+ * Path/text hints that a task may make EXTERNAL API calls — the only context where
+ * the Idempotency-Key retry-safety note is meaningful (F1.2). Paths cover the
+ * outbound-call layers (connectors → messaging APIs, providers → LLM APIs, the HTTP
+ * api layer, gateways) and any billing/webhook surface; text hints catch API work
+ * whose scope is generic. Bare `api` is deliberately excluded — it matches "public
+ * API surface" prose on unrelated tasks and would defeat the opt-in flip.
+ */
+const EXTERNAL_API_PATH_HINTS = [
+  'connectors/', 'providers/', 'src/api/', 'gateway/', 'webhook', 'payment', 'billing',
+];
+const EXTERNAL_API_TEXT_HINTS = [
+  'webhook', 'payment', 'idempoten', 'stripe', 'oauth', 'external api', 'api call',
+  'http request', 'http client', 'rest api', 'third-party api', 'rate limit',
+];
+
+/**
+ * True when a task plausibly performs external API calls (scope paths OR task text).
+ * Mirrors {@link touchesHostConfig}: an opt-in scope-detection gate rather than the
+ * old on-by-default behaviour. Errs toward inclusion — the note is a safety hint and
+ * mild over-inclusion is harmless, while the dominant core/orchestra internals that
+ * never call out no longer carry it.
+ */
+function touchesExternalApi(task: Task): boolean {
+  const paths = [...(task.scope?.filesWrite ?? []), ...(task.scope?.directories ?? [])];
+  if (paths.some(p => { const n = p.toLowerCase(); return EXTERNAL_API_PATH_HINTS.some(h => n.includes(h)); })) {
+    return true;
+  }
+  const text = `${task.title ?? ''} ${task.description ?? ''}`.toLowerCase();
+  return EXTERNAL_API_TEXT_HINTS.some(h => text.includes(h));
+}
+
 /** Which optional boilerplate blocks a task actually needs (PROMPT-W1 d). */
 interface ConditionalBoilerplate {
   /** Idempotency Key section — only meaningful when the task may call external APIs. */
@@ -552,22 +584,23 @@ interface ConditionalBoilerplate {
 }
 
 /**
- * Decide which optional boilerplate blocks to emit for a task (PROMPT-W1 d).
+ * Decide which optional boilerplate blocks to emit for a task (PROMPT-W1 d; F1.2).
  *
- * Two blocks are pure noise for a pure-refactor / no-API task and are gated off:
- *  - the **Idempotency Key** section (retry safety for EXTERNAL API calls); and
- *  - the **host-config** portability note (no-hardcode-`/workspace`).
- *
- * Gating is conservative so the common case is unchanged: a task with no `type`
- * keeps the Idempotency block (the F1 idempotency tests pin its presence for
- * no-type tasks); only a positively-identified `refactor` kind drops it. The
- * host-config note is emitted only when the scope actually touches host-facing
- * config — independent of the API noise — so a CI/workflow task still gets it.
+ * Both blocks are now OPT-IN by scope/text detection — emitted only where they are
+ * actually meaningful, not on by default:
+ *  - the **Idempotency Key** section (retry safety for EXTERNAL API calls) →
+ *    {@link touchesExternalApi}. Previously on for every non-`refactor` task, which
+ *    was dead gating: it landed on ~all core/orchestra internals that never call out
+ *    (live prompt-analysis). The docker `IDEMPOTENCY_KEY` env var is injected
+ *    unconditionally by spawn-backend-docker, so dropping the informational prompt
+ *    block never removes the actual retry key — the flip is signal-clarity, zero risk.
+ *  - the **host-config** portability note (no-hardcode-`/workspace`) →
+ *    {@link touchesHostConfig}, unchanged (still skipped for a pure refactor).
  */
 export function conditionalBoilerplate(task: Task): ConditionalBoilerplate {
   const isPureRefactor = task.type === 'refactor';
   return {
-    idempotency: !isPureRefactor,
+    idempotency: touchesExternalApi(task),
     hostConfig: !isPureRefactor && touchesHostConfig(task.scope),
   };
 }

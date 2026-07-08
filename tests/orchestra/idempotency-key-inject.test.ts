@@ -139,12 +139,15 @@ describe('buildTaskPrompt — Idempotency Key directive', () => {
     return {
       id: '156-006',
       title: 'Test task',
+      // F1.2: the Idempotency Key block is now opt-in (API-relevant work only). This
+      // suite verifies the KEY FORMAT, so the task carries an outbound-call scope
+      // (src/providers) to keep the block present — the key value is unaffected.
       description: 'Test description',
       model: 'sonnet',
       effort: 'normal',
       priority: 'NORMAL',
       reason: 'unit-test',
-      scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/foo.ts'] },
+      scope: { directories: ['src/providers/'], filesRead: [], filesWrite: ['src/providers/foo.ts'] },
       dependencies: [],
       goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: 'minor' },
       status: 'PENDING',

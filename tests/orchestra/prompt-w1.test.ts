@@ -223,9 +223,31 @@ describe('PROMPT-W1 (d) — conditionalBoilerplate gating', () => {
     expect(decision).toEqual({ idempotency: false, hostConfig: false });
   });
 
-  it('non-refactor src task keeps idempotency, drops host-config (no host-facing scope)', () => {
+  // F1.2 opt-in flip: idempotency is emitted ONLY for API-relevant work, not on by
+  // default. A non-API code task (src/orchestra scope) drops both blocks.
+  it('non-API code task drops idempotency + host-config (F1.2 opt-in flip)', () => {
     const decision = conditionalBoilerplate(makeTask({ type: 'code-development' }));
-    expect(decision).toEqual({ idempotency: true, hostConfig: false });
+    expect(decision).toEqual({ idempotency: false, hostConfig: false });
+  });
+
+  // F1.2 positive case: a task touching an outbound-call layer (providers/) keeps
+  // the Idempotency Key note.
+  it('API-touching scope (src/providers) keeps idempotency', () => {
+    const decision = conditionalBoilerplate(
+      makeTask({
+        type: 'code-development',
+        scope: { directories: ['src/providers/'], filesRead: [], filesWrite: ['src/providers/claude.ts'] },
+      }),
+    );
+    expect(decision.idempotency).toBe(true);
+  });
+
+  // F1.2 positive case (text signal): API-relevant scope-less task via description.
+  it('API-relevant description (webhook) keeps idempotency even with generic scope', () => {
+    const decision = conditionalBoilerplate(
+      makeTask({ type: 'code-development', description: 'Handle the inbound Stripe webhook payload' }),
+    );
+    expect(decision.idempotency).toBe(true);
   });
 
   it('host-facing scope (CI workflow) keeps the host-config note', () => {
@@ -238,9 +260,9 @@ describe('PROMPT-W1 (d) — conditionalBoilerplate gating', () => {
     expect(decision.hostConfig).toBe(true);
   });
 
-  it('no-type task keeps idempotency (backward-safe with the F1 idempotency tests)', () => {
+  it('no-type non-API task drops idempotency (F1.2 opt-in flip)', () => {
     const decision = conditionalBoilerplate(makeTask());
-    expect(decision.idempotency).toBe(true);
+    expect(decision.idempotency).toBe(false);
   });
 
   it('refactor task prompt omits the Idempotency Key section AND host-config note', () => {
@@ -249,8 +271,16 @@ describe('PROMPT-W1 (d) — conditionalBoilerplate gating', () => {
     expect(prompt).not.toContain('NEVER hard-code your container working directory');
   });
 
-  it('non-refactor task prompt keeps the Idempotency Key section', () => {
+  it('non-API task prompt omits the Idempotency Key section (F1.2)', () => {
     const { prompt } = buildTaskPrompt(makeTask(), makeCtx());
+    expect(prompt).not.toContain('## Idempotency Key');
+  });
+
+  it('API-touching task prompt keeps the Idempotency Key section (F1.2)', () => {
+    const { prompt } = buildTaskPrompt(
+      makeTask({ scope: { directories: ['src/connectors/'], filesRead: [], filesWrite: ['src/connectors/telegram.ts'] } }),
+      makeCtx(),
+    );
     expect(prompt).toContain('## Idempotency Key');
   });
 

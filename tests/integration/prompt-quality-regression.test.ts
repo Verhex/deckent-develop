@@ -7,7 +7,8 @@
  * that the Sprint 182 PQ-7 recovery worker left as inactive comments.
  *
  * Quality assertions covered (PQ-1..PQ-6 all LANDED in prompt-god-template.ts):
- *   (a) ${IDEMPOTENCY_KEY} literal absent + deterministic key present — PQ-1 (F1)
+ *   (a) ${IDEMPOTENCY_KEY} literal absent; Idempotency Key section omitted for these
+ *       non-API tasks under the F1.2 opt-in flip                      — PQ-1 (F1) + F1.2
  *   (b) "(content truncated)" marker absent                          — PQ-2/3 (F2/F3)
  *   (c) Agent block sourced from PROMPT.md only (no systemPrompt)    — PQ-4 (F4)
  *   (d) Title + description on separate lines/paragraphs             — PQ-4 (F6)
@@ -312,15 +313,14 @@ describe('Prompt Quality Regression (Sprint 181-001/002)', () => {
     // Act
     const { prompt, metadata } = buildTaskPrompt(task181_001, ctx181_001);
 
-    // ── (a) PQ-1 (F1): deterministic idempotency key, no literal placeholder ─
-    // Pre-PQ-1: template emitted the literal `${IDEMPOTENCY_KEY}` string because
-    // no shell-style interpolation ran. Post-PQ-1: computeIdempotencyKey()
-    // resolves the key to `${sprintId}-${taskId}-${retryCount}` at render time.
+    // ── (a) PQ-1 (F1) + F1.2 opt-in flip ────────────────────────────────
+    // The literal `${IDEMPOTENCY_KEY}` placeholder must never leak (PQ-1). This is
+    // a CI/CD workflow task (`.github/workflows/`) that makes no external API calls,
+    // so under the F1.2 opt-in flip the "## Idempotency Key" section is correctly
+    // OMITTED. The key-format/determinism guarantees are pinned in the dedicated
+    // idempotency unit tests (idempotency-key-inject, prompt-god-template-idempotency).
     expect(prompt).not.toContain('${IDEMPOTENCY_KEY}');
-    expect(prompt).toContain('sprint-181-181-001-0');
-    // The key must land in the "## Idempotency Key" section, on its own line —
-    // not buried inside another sentence — so the worker can copy it cleanly.
-    expect(prompt).toMatch(/## Idempotency Key\nsprint-181-181-001-0\n/);
+    expect(prompt).not.toContain('## Idempotency Key');
 
     // ── (b) PQ-2/3 (F2/F3): No truncation markers ───────────────────────
     // Pre-PQ-2: skill content was clipped via truncateAtParagraph() at EFFORT_TOKEN_MAP.low * 2.67 chars
@@ -441,10 +441,11 @@ describe('Prompt Quality Regression (Sprint 181-001/002)', () => {
     // Act
     const { prompt, metadata } = buildTaskPrompt(task181_002, ctx181_002);
 
-    // ── (a) PQ-1 (F1): deterministic idempotency key, no literal placeholder ─
+    // ── (a) PQ-1 (F1) + F1.2 opt-in flip ────────────────────────────────
+    // No literal placeholder leak (PQ-1). A dashboard dependency-sync task makes no
+    // external API calls, so the "## Idempotency Key" section is omitted (F1.2).
     expect(prompt).not.toContain('${IDEMPOTENCY_KEY}');
-    expect(prompt).toContain('sprint-181-181-002-0');
-    expect(prompt).toMatch(/## Idempotency Key\nsprint-181-181-002-0\n/);
+    expect(prompt).not.toContain('## Idempotency Key');
 
     // ── (b) PQ-2/3 (F2/F3): No truncation markers ───────────────────────
     expect(prompt).not.toContain('(content truncated)');
