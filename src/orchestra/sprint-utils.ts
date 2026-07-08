@@ -406,7 +406,19 @@ export function buildSpawnRetryHint(error: unknown, sprint: Sprint): string {
  * is NOT mistaken for a directive.
  */
 const PROOF_LABEL_PREFIX_RE =
-  /^\s*[-*]?\s*\*{0,2}\s*(?:Kan[ıi]t|Proof|Doğrulama|Verification|Verify|Test)\*{0,2}:\*{0,2}\s*/i;
+  /^\s*[-*]?\s*\*{0,2}\s*(?:Kan[ıi]t|Proof|Doğrulama|Verification|Verify|Test|go[-_\s]?criteria)\*{0,2}:\*{0,2}\s*/i;
+
+/**
+ * NO-GO label prefix matcher (F0.2). Recognizes the `nogo:` / `no-go:` /
+ * `noGoCriteria:` prohibition lines a DIRECTIVES author writes under `### goNogo`,
+ * in the same markdown forms as PROOF_LABEL_PREFIX_RE. These were previously
+ * unmatched, so a task's explicit prohibitions ("do not make description required")
+ * never reached the machine-visible noGoCriteria and every task fell back to the
+ * generic "build/tests fail" contract — a mechanical violation of the "GO/NO-GO
+ * must be task-specific, not generic" rule (brain.md).
+ */
+const NOGO_LABEL_PREFIX_RE =
+  /^\s*[-*]?\s*\*{0,2}\s*(?:no[-_\s]?go(?:[-_\s]?criteria)?)\*{0,2}:\*{0,2}\s*/i;
 
 /**
  * Strip the proof-label prefix from a directive line (WP-13). When no label
@@ -415,6 +427,13 @@ const PROOF_LABEL_PREFIX_RE =
  */
 function stripProofLabel(line: string): string {
   const withoutLabel = line.replace(PROOF_LABEL_PREFIX_RE, '');
+  if (withoutLabel !== line) return withoutLabel.trim();
+  return line.replace(/^\s*[-*]\s*/, '').trim();
+}
+
+/** Strip the NO-GO label prefix from a directive line (F0.2). */
+function stripNoGoLabel(line: string): string {
+  const withoutLabel = line.replace(NOGO_LABEL_PREFIX_RE, '');
   if (withoutLabel !== line) return withoutLabel.trim();
   return line.replace(/^\s*[-*]\s*/, '').trim();
 }
@@ -435,12 +454,18 @@ export function extractGoNogoCriteria(
 ): { goCriteria: string; noGoCriteria: string; techDebtAcceptable: string } {
   const lines = description.split('\n');
   const proofLines: string[] = [];
+  const noGoLines: string[] = [];
 
   for (const line of lines) {
     const trimmed = line.trim();
-    // Match proof/verification directive lines (Kanıt/Proof/Test/Verify…) in any
-    // markdown form — see PROOF_LABEL_PREFIX_RE (WP-13).
-    if (PROOF_LABEL_PREFIX_RE.test(trimmed)) {
+    // NO-GO prohibition lines (`nogo:` / `noGoCriteria:`) — checked FIRST so a
+    // `nogo:` line is never mis-collected as a GO/proof line (F0.2).
+    if (NOGO_LABEL_PREFIX_RE.test(trimmed)) {
+      noGoLines.push(trimmed);
+    }
+    // Match proof/verification + GO directive lines (Kanıt/Proof/Test/Verify/
+    // goCriteria…) in any markdown form — see PROOF_LABEL_PREFIX_RE (WP-13/F0.2).
+    else if (PROOF_LABEL_PREFIX_RE.test(trimmed)) {
       proofLines.push(trimmed);
     }
     // Match inline grep/command verification patterns (bulleted commands w/o a label)
@@ -453,17 +478,23 @@ export function extractGoNogoCriteria(
     .slice(0, 3)
     .map(stripProofLabel)
     .join('; ');
+  const specificNoGo = noGoLines
+    .slice(0, 3)
+    .map(stripNoGoLabel)
+    .join('; ');
+  const hasSpecific = proofLines.length > 0 || noGoLines.length > 0;
 
   // ── WM-7 path: kind × stack aware base ──────────────────────────────────
   if (opts?.kind) {
     const base = deriveBaseCriteria(opts.kind, opts.stack ?? 'generic', opts.commands);
-    if (proofLines.length > 0) {
-      // Compose the task-specific proof lines on top of the kind-aware base.
-      // For doc/audit/data the base already says "no build/test"; for code it
-      // carries the stack commands — neither path glues `tsc` onto a doc task.
+    if (hasSpecific) {
+      // Compose the task-specific GO proof lines + NO-GO prohibitions on top of
+      // the kind-aware base. For doc/audit/data the base already says "no
+      // build/test"; for code it carries the stack commands — neither path glues
+      // `tsc` onto a doc task.
       return {
-        goCriteria: `${base.goCriteria}; ${specificCriteria}`,
-        noGoCriteria: base.noGoCriteria,
+        goCriteria: proofLines.length > 0 ? `${base.goCriteria}; ${specificCriteria}` : base.goCriteria,
+        noGoCriteria: specificNoGo ? `${base.noGoCriteria}; ${specificNoGo}` : base.noGoCriteria,
         techDebtAcceptable: base.techDebtAcceptable,
       };
     }
@@ -473,10 +504,12 @@ export function extractGoNogoCriteria(
   // ── Legacy path (no kind context): preserved verbatim ───────────────────
   const baseCriteria = testTarget ? `${testTarget}; Tests pass` : 'Tests pass; tsc clean';
 
-  if (proofLines.length > 0) {
+  if (hasSpecific) {
     return {
-      goCriteria: `${baseCriteria}; ${specificCriteria}`,
-      noGoCriteria: 'Build fails or verification commands fail',
+      goCriteria: proofLines.length > 0 ? `${baseCriteria}; ${specificCriteria}` : baseCriteria,
+      noGoCriteria: specificNoGo
+        ? `Build fails or verification commands fail; ${specificNoGo}`
+        : 'Build fails or verification commands fail',
       techDebtAcceptable: 'Minor issues if all verification commands pass',
     };
   }

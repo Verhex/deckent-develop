@@ -267,6 +267,49 @@ Fix the config module.
       expect(result.goCriteria).not.toMatch(/\*\*?Proof:/);
       expect(result.goCriteria).not.toMatch(/^[\s;]*[-*]\s*\*/);
     });
+
+    // F0.2: the `- goCriteria:` / `- nogo:` form (used by DIRECTIVES authors under
+    // `### goNogo`) was previously unrecognized → task-specific criteria fell back
+    // to the generic base. Both labels must now feed the machine-visible contract.
+    it('F0.2: recognizes `- goCriteria:` as a task-specific GO criterion', () => {
+      const description = [
+        'Fix the tool registry.',
+        '',
+        '### goNogo',
+        "- goCriteria: empty-string description tool connects and REPL still launches (test); registry tests green.",
+        "- nogo: do not make description required.",
+      ].join('\n');
+      const result = extractGoNogoCriteria(description);
+      expect(result.goCriteria).toContain('REPL still launches');
+      expect(result.goCriteria).not.toMatch(/goCriteria:/i);
+    });
+
+    it('F0.2: recognizes `- nogo:` and surfaces it in noGoCriteria', () => {
+      const description = [
+        '### goNogo',
+        '- goCriteria: parser recognizes the new labels (test).',
+        '- nogo: do not make description required.',
+      ].join('\n');
+      const result = extractGoNogoCriteria(description);
+      expect(result.noGoCriteria).toContain('do not make description required');
+      expect(result.noGoCriteria).not.toMatch(/nogo:/i);
+    });
+
+    it('F0.2: nogo-only description still captures the prohibition (no proof lines)', () => {
+      const result = extractGoNogoCriteria('- nogo: do not touch the openai adapter.');
+      expect(result.noGoCriteria).toContain('do not touch the openai adapter');
+    });
+
+    it('F0.2: WM-7 kind path composes goCriteria/nogo onto the kind-aware base', () => {
+      const description = [
+        '### goNogo',
+        '- goCriteria: audit doc lists all 16 agents (disk-verify).',
+        '- nogo: do not invent counts.',
+      ].join('\n');
+      const result = extractGoNogoCriteria(description, undefined, { kind: 'documentation', stack: 'generic' });
+      expect(result.goCriteria).toContain('lists all 16 agents');
+      expect(result.noGoCriteria).toContain('do not invent counts');
+    });
   });
 
   describe('writeSprintState / readSprintState / clearSprintState', () => {
