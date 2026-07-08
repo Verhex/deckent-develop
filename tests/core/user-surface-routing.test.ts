@@ -79,10 +79,27 @@ const ciGuardian = makeAgent('ci-guardian', {
   },
 });
 
-// All four agents in one pool — the actual competition surface for
+// R-1b: mirrors .deckent/agents/terminal-ux-engineer/agent.json — the terminal
+// surface owner (domain 'terminal-ui', activation terminal-ui→8 / cli→6). Since
+// born-470 scope-domain routing is now default-ON, a src/cli task's terminal-ui
+// scope-domain routes here (via SCOPE_DOMAIN_TO_AGENT_ID) instead of the REST
+// specialist api-builder.
+const terminalUxEngineer = makeAgent('terminal-ux-engineer', {
+  source: 'builtin',
+  activation: {
+    rules: [
+      { when: { domains: { $contains: 'terminal-ui' } }, score: 8 },
+      { when: { domains: { $contains: 'cli' } }, score: 6 },
+    ],
+    exclude: [],
+    minScore: 5,
+  },
+});
+
+// All agents in one pool — the actual competition surface for
 // "refactorer collapse" regression cases.
 function fullPool(): AgentPool {
-  return makePool(refactorer, apiBuilder, frontendDesigner, ciGuardian);
+  return makePool(refactorer, apiBuilder, frontendDesigner, ciGuardian, terminalUxEngineer);
 }
 
 describe('user-surface routing (Sprint 216 / 216-003)', () => {
@@ -133,7 +150,7 @@ describe('user-surface routing (Sprint 216 / 216-003)', () => {
     expect(decision.reasoning.some(r => r.includes('user-surface bonus'))).toBe(true);
   });
 
-  it('CLI surface task (src/cli/commands/serve.ts) → api-builder wins even though "cli" is outside TASK_DOMAIN_TO_AGENT_ID', () => {
+  it('CLI surface task (src/cli/commands/serve.ts) → terminal-ux-engineer (R-1b: cli owns terminal-ui, not api)', () => {
     const decision = routeTaskV2(
       {
         title: 'Auto-mint localhost API token in serve',
@@ -148,19 +165,19 @@ describe('user-surface routing (Sprint 216 / 216-003)', () => {
       new Map(),
     );
 
-    // The Sprint 214 regression: api-builder's `domains $contains 'api'`
-    // rule does not fire for domain='cli', so without the surface bonus
-    // refactorer impl@7 wins by default. With USER_SURFACE_BONUS = 8 the
-    // bare bonus (0 + 8) clears refactorer's 7.
-    expect(decision.agentId).toBe('api-builder');
-    expect(decision.reasoning.some(r => r.includes('user-surface bonus'))).toBe(true);
+    // R-1b: with born-470 scope-domain routing default-ON, a src/cli task's
+    // 'terminal-ui' scope-domain routes to terminal-ux-engineer (activation cli@6 +
+    // DOMAIN_MATCH@3 = 9) and SUPPRESSES api-builder's surface bonus — terminal work
+    // no longer diverts to the REST specialist, and refactorer impl@7 still loses.
+    expect(decision.agentId).toBe('terminal-ux-engineer');
+    expect(decision.reasoning.some(r => r.includes("Scope-domain (born-470): 'terminal-ui'"))).toBe(true);
   });
 
   it('refactorer never wins a user-surface task (anti-collapse regression guard)', () => {
     const surfaceCases = [
       { dir: 'src/dashboard/', file: 'src/dashboard/EvolutionPage.tsx', expected: 'frontend-designer' },
       { dir: 'src/api/', file: 'src/api/memory-search-endpoint.ts', expected: 'api-builder' },
-      { dir: 'src/cli/commands/', file: 'src/cli/commands/chat.ts', expected: 'api-builder' },
+      { dir: 'src/cli/commands/', file: 'src/cli/commands/chat.ts', expected: 'terminal-ux-engineer' }, // R-1b: cli → terminal owner
     ];
 
     for (const tc of surfaceCases) {

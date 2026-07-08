@@ -86,8 +86,23 @@ const frontendDesigner = makeAgent('frontend-designer', {
   },
 });
 
+// R-1b: mirrors the real .deckent/agents/terminal-ux-engineer/agent.json —
+// domain 'terminal-ui', activation terminal-ui→8 / cli→6. With the
+// SCOPE_DOMAIN_TO_AGENT_ID['terminal-ui'] mapping it clears refactorer's impl@7.
+const terminalUxEngineer = makeAgent('terminal-ux-engineer', {
+  source: 'builtin',
+  activation: {
+    rules: [
+      { when: { domains: { $contains: 'terminal-ui' } }, score: 8 },
+      { when: { domains: { $contains: 'cli' } }, score: 6 },
+    ],
+    exclude: [],
+    minScore: 5,
+  },
+});
+
 function fullPool(): AgentPool {
-  return makePool(refactorer, apiBuilder, frontendDesigner);
+  return makePool(refactorer, apiBuilder, frontendDesigner, terminalUxEngineer);
 }
 
 // ─── Unit: extractScopeDomain ────────────────────────────────────────────────
@@ -210,18 +225,18 @@ describe('ROUTE-DOMAIN-SCOPE: SCOPE_DOMAIN_TO_AGENT_ID', () => {
     expect(SCOPE_DOMAIN_TO_AGENT_ID['doc']).toBe('doc-writer');
   });
 
-  it("'terminal-ui', 'core', 'orchestration', 'messaging' deliberately have no agent (the born-470 fix)", () => {
-    expect(SCOPE_DOMAIN_TO_AGENT_ID['terminal-ui']).toBeUndefined();
+  it("terminal-ui maps to terminal-ux-engineer (R-1b); core/orchestration/messaging still have no specialist", () => {
+    expect(SCOPE_DOMAIN_TO_AGENT_ID['terminal-ui']).toBe('terminal-ux-engineer');
     expect(SCOPE_DOMAIN_TO_AGENT_ID['core']).toBeUndefined();
     expect(SCOPE_DOMAIN_TO_AGENT_ID['orchestration']).toBeUndefined();
     expect(SCOPE_DOMAIN_TO_AGENT_ID['messaging']).toBeUndefined();
   });
 });
 
-// ─── Flag-off: byte-identical routing ────────────────────────────────────────
+// ─── R-1b: default is now ON; explicit-false restores the legacy path ─────────
 
-describe('routing-v2: domainFromScope flag-off (byte-identical)', () => {
-  it('omitted option === explicit false — CLI surface task still routes to api-builder (baseline unchanged)', () => {
+describe('routing-v2: domainFromScope default-ON (R-1b flip)', () => {
+  it('omitted option === explicit TRUE — a CLI-scoped task no longer collapses to api-builder', () => {
     const task = {
       title: 'Auto-mint localhost API token in serve',
       description: 'Add logic to randomly generate the API token on a fresh serve invocation.',
@@ -229,13 +244,17 @@ describe('routing-v2: domainFromScope flag-off (byte-identical)', () => {
     };
 
     const resultDefault = routeTaskV2(task, fullPool(), makeSkillPool());
+    const resultExplicitOn = routeTaskV2(task, fullPool(), makeSkillPool(), { domainFromScope: true });
     const resultExplicitOff = routeTaskV2(task, fullPool(), makeSkillPool(), { domainFromScope: false });
 
-    expect(resultDefault.agentId).toBe('api-builder');
-    expect(resultDefault.agentId).toBe(resultExplicitOff.agentId);
-    expect(resultDefault.agentScore).toBe(resultExplicitOff.agentScore);
-    expect(resultDefault.reasoning).toEqual(resultExplicitOff.reasoning);
-    expect(resultDefault.reasoning.some((r) => r.includes('Scope-domain'))).toBe(false);
+    // Default now equals explicit-ON (the flip), and the scope-domain reasoning fires.
+    expect(resultDefault.agentId).toBe(resultExplicitOn.agentId);
+    expect(resultDefault.reasoning.some((r) => r.includes('Scope-domain'))).toBe(true);
+    // R-1b: a src/cli/ task is no longer diverted to the REST/HTTP specialist.
+    expect(resultDefault.agentId).not.toBe('api-builder');
+    // explicit-false restores the pre-R-1b collapse (proves the flag is the lever).
+    expect(resultExplicitOff.agentId).toBe('api-builder');
+    expect(resultExplicitOff.reasoning.some((r) => r.includes('Scope-domain'))).toBe(false);
   });
 });
 
@@ -257,13 +276,11 @@ describe('routing-v2: domainFromScope flag-on', () => {
 
     // Flag-on: the born-470 fix — api-builder must NOT be selected.
     expect(resultOn.agentId).not.toBe('api-builder');
-    // No dedicated terminal-ui specialist exists in the built-in roster (verified
-    // against agent-pool.ts) — generic activation-rule scoring picks the best
-    // available implementer instead (refactorer's impl@7, unaffected by the
-    // suppressed domain/surface bonus).
-    expect(resultOn.agentId).toBe('refactorer');
+    // R-1b: terminal-ui now maps to the terminal-ux-engineer specialist, whose
+    // +DOMAIN_MATCH_BONUS clears refactorer's impl@7 — terminal work routes to the
+    // terminal owner instead of collapsing to the generic implementer.
+    expect(resultOn.agentId).toBe('terminal-ux-engineer');
     expect(resultOn.reasoning.some((r) => r.includes("Scope-domain (born-470): 'terminal-ui'"))).toBe(true);
-    expect(resultOn.reasoning.some((r) => r.includes('user-surface bonus'))).toBe(false);
   });
 
   it('flag-on, curated match that agrees with the real owner (src/api/) — api-builder still wins', () => {

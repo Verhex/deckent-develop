@@ -339,19 +339,26 @@ export function extractScopeDomain(scope: TaskScope): string | null {
 }
 
 /**
- * Curated scope-domain → owning agent id. Deliberately sparse: only domains
- * with a genuine built-in specialist agent are listed (verified against
- * `BUILTIN_AGENT_DOMAINS` in agent-pool.ts). `'terminal-ui'`, `'core'`,
- * `'orchestration'`, and `'messaging'` have no dedicated built-in agent —
- * they intentionally map to nothing, which SUPPRESSES the domain/surface
- * bonus entirely for those scopes (the born-470 fix: a REPL/Ink task no
- * longer accidentally routes to api-builder) and lets generic activation-rule
- * scoring (architect/refactorer) decide instead.
+ * Curated scope-domain → owning agent id. Only domains with a genuine built-in
+ * specialist agent are listed (verified against `BUILTIN_AGENT_DOMAINS` in
+ * agent-pool.ts).
+ *
+ * R-1b (2026-07-08 routing-skew fix): `'terminal-ui'` now maps to
+ * `terminal-ux-engineer` (its own `domain: 'terminal-ui'` agent, activation rule
+ * `domains $contains 'terminal-ui' → 8`). Previously it mapped to NOTHING because
+ * that agent did not exist when born-470 landed — so a REPL/CLI task's api-builder
+ * surface bonus was merely *suppressed*, dropping the task to refactorer's generic
+ * impl@7 (the empirical 39-task shadow: refactorer 24 + api-builder 15, zero
+ * terminal-ux-engineer). Mapping terminal-ui → terminal-ux-engineer gives it the
+ * +DOMAIN_MATCH_BONUS that clears refactorer's 7, routing terminal work to the
+ * terminal specialist. `'core'`/`'orchestration'`/`'messaging'` still map to
+ * nothing (no dedicated specialist → generic scoring decides).
  */
 export const SCOPE_DOMAIN_TO_AGENT_ID: Readonly<Record<string, string>> = {
   api: 'api-builder',
   frontend: 'frontend-designer',
   doc: 'doc-writer',
+  'terminal-ui': 'terminal-ux-engineer',
 };
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -513,7 +520,13 @@ export function routeTaskV2(
   const kindAffinityEnabled = options?.kindAffinity ?? false;
   const languagePenaltyEnabled = options?.languagePenalty ?? false;
   const agentCacheEnabled = options?.agentCache ?? false;
-  const domainFromScopeEnabled = options?.domainFromScope ?? false;
+  // R-1b (2026-07-08): born-470 curated scope-domain extraction is now ON by
+  // default (was default-off, "3-sprint-proven" pending a flip). The retrospective
+  // 39-task shadow proved the default-off routing collapses to 2 generic attractors
+  // (refactorer 24 + api-builder 15, 100% skew); scope-domain routing sends a
+  // src/cli/repl task to terminal-ux-engineer instead. A caller may still pass
+  // `domainFromScope: false` to restore the pre-R-1b path.
+  const domainFromScopeEnabled = options?.domainFromScope ?? true;
   // born-470: hoisted once — identical for every candidate this call.
   const scopeDomain = domainFromScopeEnabled ? extractScopeDomain(task.scope) : undefined;
 

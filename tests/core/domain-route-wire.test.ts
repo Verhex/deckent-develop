@@ -93,7 +93,8 @@ const docTask = {
 
 describe('DOMAIN-ROUTE-WIRE: flag matrix (off/off, on/off, off/on, on/on)', () => {
   it('off/off — no Scope-domain line, no OpenRouter doc-route line (baseline)', () => {
-    const result = routeTaskV2(cliTask, fullPool(), makeSkillPool());
+    // R-1b: domainFromScope now defaults ON, so "off" must be requested explicitly.
+    const result = routeTaskV2(cliTask, fullPool(), makeSkillPool(), { domainFromScope: false });
     expect(result.reasoning.some((r) => r.includes('Scope-domain'))).toBe(false);
     expect(result.reasoning.some((r) => r.includes('OpenRouter doc-route'))).toBe(false);
   });
@@ -106,6 +107,7 @@ describe('DOMAIN-ROUTE-WIRE: flag matrix (off/off, on/off, off/on, on/on)', () =
 
   it('off/on — OpenRouter doc-route suggestion line present, no Scope-domain line', () => {
     const result = routeTaskV2(docTask, fullPool(), makeSkillPool(), {
+      domainFromScope: false, // R-1b: default is ON — request "off" explicitly
       openRouterDocRoute: true,
       openRouterConfig: openRouterConfig(),
       openRouterCache: cacheWith(FREE_MODEL_ID),
@@ -194,17 +196,17 @@ describe('DOMAIN-ROUTE-WIRE: force-override is never clobbered (negative test)',
   });
 });
 
-// ─── Flag-off byte-identical guarantee ───────────────────────────────────────
+// ─── Default matrix: omitted === the resolved defaults ───────────────────────
 
-describe('DOMAIN-ROUTE-WIRE: flag-off is byte-identical', () => {
-  it('omitted options === explicit false for both flags', () => {
+describe('DOMAIN-ROUTE-WIRE: omitted options === the resolved defaults', () => {
+  it('omitted === {domainFromScope: true (R-1b), openRouterDocRoute: false}', () => {
     const resultOmitted = routeTaskV2(cliTask, fullPool(), makeSkillPool());
-    const resultExplicitOff = routeTaskV2(cliTask, fullPool(), makeSkillPool(), {
-      domainFromScope: false,
+    const resultDefaults = routeTaskV2(cliTask, fullPool(), makeSkillPool(), {
+      domainFromScope: true,   // R-1b: default flipped ON
       openRouterDocRoute: false,
     });
-    expect(resultOmitted.agentId).toBe(resultExplicitOff.agentId);
-    expect(resultOmitted.agentScore).toBe(resultExplicitOff.agentScore);
-    expect(resultOmitted.reasoning).toEqual(resultExplicitOff.reasoning);
+    expect(resultOmitted.agentId).toBe(resultDefaults.agentId);
+    expect(resultOmitted.agentScore).toBe(resultDefaults.agentScore);
+    expect(resultOmitted.reasoning).toEqual(resultDefaults.reasoning);
   });
 });
