@@ -1324,11 +1324,24 @@ ${dodBlock}${idempotencyBlock}`);
   // timeout despite a correct doc. Brain already exempts doc tasks at evaluation
   // (result-evaluator isDocTask→DONE); the prompt must match. Doc-only = every
   // inferred scope domain is 'doc' (reuses inferTaskDomains; cycle-safe).
-  const taskDomains = inferTaskDomains(
-    task.scope?.filesWrite ?? [],
-    task.scope?.directories ?? [],
-  );
-  const isDocOnlyTask = taskDomains.length > 0 && taskDomains.every(d => d === 'doc');
+  // LP-1 (2026-07-08 single-source classification): the doc-vs-code verify tier now
+  // derives from the SINGLE canonical `task.type` (set by detectTaskType at plan
+  // time) — the same field the DoD/goCriteria (criteria-deriver) and the ADR presets
+  // (taskKindToAdrDomain) already key on. Previously this block re-classified
+  // independently via inferTaskDomains, which let it drift: a non-`docs/` .md task
+  // showed a doc verify-steps block under a code DoD + core-dev ADRs (sprint-384
+  // 3-layer split). A doc kind (documentation/design) verifies by reading its file
+  // back; every other kind verifies via targeted tests. Defensive fallback to the
+  // file-domain heuristic only when task.type is unset (legacy/direct-run path) so a
+  // doc task is never forced into code verification by a missing type.
+  const isDocKind = task.type === 'documentation' || task.type === 'design';
+  let isDocOnlyTask: boolean;
+  if (task.type) {
+    isDocOnlyTask = isDocKind;
+  } else {
+    const taskDomains = inferTaskDomains(task.scope?.filesWrite ?? [], task.scope?.directories ?? []);
+    isDocOnlyTask = taskDomains.length > 0 && taskDomains.every(d => d === 'doc');
+  }
   // PROMPT-W1 (b): a doc-only task verifies by reading its file back; every other
   // task verifies via targeted tests, which is also the mode whose guidance must
   // take precedence over a persona's conflicting full-suite test-mandate.

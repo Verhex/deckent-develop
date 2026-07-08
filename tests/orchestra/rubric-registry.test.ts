@@ -224,6 +224,36 @@ describe('isDocumentWriteTask', () => {
 
     expect(isDocumentWriteTask(task)).toBe(false);
   });
+
+  // LP-1 (single-source classification): a doc file OUTSIDE docs/ with a non-source
+  // scope is documentation, not code — this is what fixes the 3-layer split where a
+  // non-docs/ .md task inherited the code DoD + core-dev ADR presets + code verify.
+  it('returns true for a top-level CHANGELOG.md with a non-source scope (LP-1)', () => {
+    const task = makeTask({
+      scope: { directories: ['./'], filesRead: [], filesWrite: ['CHANGELOG.md'] },
+    });
+    expect(isDocumentWriteTask(task)).toBe(true);
+  });
+
+  it('returns true for a .md in an arbitrary non-source directory (LP-1)', () => {
+    const task = makeTask({
+      scope: { directories: ['scratch-notes/'], filesRead: [], filesWrite: ['scratch-notes/note.md'] },
+    });
+    expect(isDocumentWriteTask(task)).toBe(true);
+  });
+
+  it('returns true for .txt / .rst doc files (LP-1 doc extensions)', () => {
+    expect(isDocumentWriteTask(makeTask({
+      scope: { directories: ['notes/'], filesRead: [], filesWrite: ['notes/a.txt', 'notes/b.rst'] },
+    }))).toBe(true);
+  });
+
+  it('keeps a .md ADJACENT to source classified as code, not doc (LP-1 hasSourceDirectories guard)', () => {
+    const task = makeTask({
+      scope: { directories: ['src/dashboard/'], filesRead: [], filesWrite: ['src/dashboard/README.md'] },
+    });
+    expect(isDocumentWriteTask(task)).toBe(false);
+  });
 });
 
 // ─── detectTaskType ─────────────────────────────────────────────────

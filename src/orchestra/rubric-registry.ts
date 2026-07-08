@@ -148,9 +148,19 @@ export function isAuditTask(task: Task): boolean {
 export function isDocumentWriteTask(task: Task): boolean {
   const writes = task.scope?.filesWrite ?? [];
   if (writes.length === 0) return false;
+  // LP-1 (2026-07-08 single-source classification): a doc-write task is one whose
+  // writes are ALL documentation files (.md/.mdx/.txt/.rst) and whose scope touches
+  // no source directory. Widened from the previous `docs/`-prefix-only rule: a doc
+  // file OUTSIDE docs/ (a top-level CHANGELOG.md, a scratch note) is documentation,
+  // not code. Under the old rule such a task fell through to `code-development`, so
+  // it inherited the code DoD (tsc+targeted tests), the core-dev ADR presets, AND a
+  // code verify-steps block — all three contradicting the evaluator's OWN
+  // isDocTask→doc verdict (a live 3-layer split, sprint-384 prompt audit). The
+  // hasSourceDirectories guard is kept (a .md adjacent to source, e.g. a
+  // snapshot-tested generated doc, stays code); docs/audits keeps its audit rubric.
+  const DOC_FILE = /\.(md|mdx|txt|rst)$/i;
   for (const f of writes) {
-    if (!f.startsWith('docs/')) return false;
-    if (!f.endsWith('.md')) return false;
+    if (!DOC_FILE.test(f)) return false;
     if (f.startsWith('docs/audits/')) return false;
   }
   if (hasSourceDirectories(task)) return false;

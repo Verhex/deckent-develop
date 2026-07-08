@@ -369,6 +369,30 @@ describe('buildTaskPrompt — MF-1 doc-task verify gate', () => {
     const result = buildTaskPrompt(task, makeCtx());
     expect(result.prompt).toContain('CRITICAL VERIFY STEPS (DO NOT SKIP)');
   });
+
+  // LP-1 (single-source): when task.type is set (production path — task-builder always
+  // sets it), the verify tier derives from it, NOT from an independent file heuristic.
+  // This is what stops the DoD (task.type) and verify-steps (was inferTaskDomains) from
+  // drifting apart on the same task (sprint-384 3-layer split).
+  it('task.type=documentation → doc verify-steps (single canonical source)', () => {
+    const task = makeTask({
+      type: 'documentation',
+      scope: { directories: ['scratch/'], filesRead: [], filesWrite: ['scratch/note.md'] },
+    });
+    const result = buildTaskPrompt(task, makeCtx());
+    expect(result.prompt).toContain('doc-only task — DO NOT run the test suite');
+    expect(result.prompt).not.toContain('CRITICAL VERIFY STEPS (DO NOT SKIP)');
+  });
+
+  it('task.type=code-development wins over a .md file heuristic → code verify-steps', () => {
+    const task = makeTask({
+      type: 'code-development',
+      scope: { directories: ['docs/'], filesRead: [], filesWrite: ['docs/generated.md'] },
+    });
+    const result = buildTaskPrompt(task, makeCtx());
+    expect(result.prompt).toContain('CRITICAL VERIFY STEPS (DO NOT SKIP)');
+    expect(result.prompt).not.toContain('doc-only task — DO NOT run the test suite');
+  });
 });
 
 // WP-14 (🔴): the "pre-existing failures" line in CRITICAL VERIFY STEPS must be
