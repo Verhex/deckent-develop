@@ -50,6 +50,7 @@
 > **Bağlayıcı (değişmez):** worker=sonnet · dedup-∅ (66/103 DONE'a karşı) · disk-verify ground-truth (Brain sentetik-NO_GO'ya güvenme, race-artifaktı disk-DONE override) · git-guard CANLI · her sprint commit (`git branch -vv` önce) · sprint'te build/login YOK · build BEN (sprint-arası) · usage: Fable-hafta ≥%95→DUR+haber (şu an headroom-iyi, Sonnet-ağırlıklı) · i18n-first · hermetik-test.
 
 ## Sprint günlüğü (canlı — her sprint sonrası satır ekle)
+> **Devir güncel:** 103 born → **73 DONE / 30 OPEN** (387:27 + 388:13 + 389:7 = 47 born kapandı). Sprint-389 (S6): 529 530 537 541 548 575 583 — disk-verify 7/7 (56 yeni+25 regresyon test yeşil, tsc temiz; Brain 6 DONE/1 DEBT/0 NO_GO); dogfood-gate 575/583 security-auditor→api-builder düzeltti. Commit: (pending).
 | Sprint | Tema | Task/Wave | Sonuç (DONE/DEBT/NO_GO) | Commit | born-devir | Usage-sonrası |
 |---|---|---|---|---|---|---|
 | — | (kurulum) | born-backlog inşası | — | 101da0d9·ef8d4acd | — | Fable %75 |

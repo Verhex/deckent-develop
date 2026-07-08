@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-389-007 | Tech debt from 389-007: HONESTY DISCLOSURE FIRST (LP-10 disk-verify): the raw fi | normal | sprint-389 | resolved |
 | debt-388-009 | Tech debt from 388-009: Investigated doctor.ts's icon vocabularies and found 4 d | normal | sprint-388 | resolved |
 | debt-387-002 | Tech debt from 387-002: Root-cause read (not assumed): bare `deckent` with piped | normal | sprint-387 | resolved |
 | debt-387-005 | Tech debt from 387-005: Fix implemented exactly as specified: MemoryStore constr | normal | sprint-387 | resolved |

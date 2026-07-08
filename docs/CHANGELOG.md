@@ -2,6 +2,24 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint389] - 2026-07-08
+
+### Added
+
+- born-529 — REPL-ERRORBOUNDARY-I18N — ReplErrorBoundary label prop (P3)
+- born-530 — REPL-CLEAR-ANSI — /clear gerçek ANSI-clear + in-flight stream cancel (P2)
+- born-537 — EDIT-FILE-UNIQUE — edit_file unique-match/replace-all + empty-old error (P2)
+- born-541 — RENDER-REGION-SAFEPROMPT — safePrompt narrow catch (P3)
+- born-548 — CRED-RESOLUTION — Gemini env + deepseek/qwen/glm .deck cred (P2)
+- born-575 — ENT-RBAC-ROUNDTRIP — enterprise RBAC/rate write-then-read round-trip (P2)
+
+### Changed
+
+- born-583 — GOV-MINORS — plugin-sig + opaque-bearer + deny-list loopback (P2) (completed with tech debt)
+
+
+_Tasks: 7 total, 7 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint388] - 2026-07-08
 
 ### Added

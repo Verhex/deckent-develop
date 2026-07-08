@@ -158,10 +158,17 @@ export function resolveNativeSelection(
 
   if (provider === 'deepseek' || provider === 'qwen' || provider === 'glm') {
     const meta = OPENAI_COMPAT_PRESET_META[provider];
-    const apiKey = env[meta.apiKeyEnv];
+    // born-548: `.deck` DECKENT_<apiKeyEnv> > env DECKENT_<apiKeyEnv> > env
+    // <apiKeyEnv> — same deck-key convention as core/provider.ts's
+    // applyDeckSecretsToEnv (DECKENT_DEEPSEEK_API_KEY, DECKENT_DASHSCOPE_API_KEY,
+    // DECKENT_ZHIPU_API_KEY), and the same precedence the claude/openai
+    // branches above already use. `detail` stays the bare env var name
+    // (pinned by tests/cli/native-transport-selection.test.ts).
+    const deckKey = `DECKENT_${meta.apiKeyEnv}`;
+    const apiKey = secrets[deckKey] || env[deckKey] || env[meta.apiKeyEnv];
     if (!apiKey) {
       return {
-        error: `${provider} native transport needs an API key — set ${meta.apiKeyEnv} in the environment`,
+        error: `${provider} native transport needs an API key — set ${deckKey} in .deck (or ${meta.apiKeyEnv} in the environment)`,
         errorCode: 'missing-api-key',
         detail: meta.apiKeyEnv,
         provider,

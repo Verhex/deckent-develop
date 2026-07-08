@@ -16,6 +16,7 @@
 // (test/HTTP/`printf | deckent` davranışı korunur).
 
 import { clearScreenDown, cursorTo, moveCursor, type Interface as ReadlineInterface } from 'node:readline';
+import { debugLog } from '../../core/utils.js';
 
 export interface PromptRegion {
   /** Çıktıyı pinli prompt'un ÜSTÜNE yaz, kullanıcının yazdığını koru. */
@@ -51,14 +52,22 @@ export function createPromptRegion(
   const prompt = opts.prompt ?? DEFAULT_PROMPT;
   if (isTty) rl.setPrompt(prompt);
 
-  // T-224-019 — rl.prompt() throws `Error: readline was closed` if a late
-  // output flush arrives after :exit closed the interface (warm-session tail
-  // chunk during teardown). Guard it: a closed-rl reprompt is a no-op, not a crash.
+  // T-224-019 — rl.prompt() throws `Error [ERR_USE_AFTER_CLOSE]: readline was
+  // closed` if a late output flush arrives after :exit closed the interface
+  // (warm-session tail chunk during teardown). That ONE case is expected —
+  // guard it as a no-op, not a crash. born-541: narrowed from a blanket catch
+  // — any OTHER error is unexpected and must not be silently swallowed. It is
+  // logged (not re-thrown): safePrompt runs deep in the streaming/render hot
+  // path with no wrapping try/catch upstream, so a re-throw here would crash
+  // the whole pinned-prompt REPL for what may be a recoverable render glitch.
   const safePrompt = (): void => {
     try {
       rl.prompt(true);
-    } catch {
-      /* readline closed during teardown — ignore */
+    } catch (err) {
+      if (err instanceof Error && (err as NodeJS.ErrnoException).code === 'ERR_USE_AFTER_CLOSE') {
+        return;
+      }
+      debugLog('chat-render-region.safePrompt', err);
     }
   };
 

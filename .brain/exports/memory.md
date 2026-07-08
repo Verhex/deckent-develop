@@ -1,5 +1,17 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-389 Learnings
+- Sprint sprint-389 Learnings: ## Sprint sprint-389 Learnings
+- born-583 — GOV-MINORS — plugin-sig + opaque-bearer + deny-list loopback (P2): GO_WITH_TECH_DEBT — HONESTY DISCLOSURE FIRST (LP-10 disk-verify): the raw finding source (born-backlog.json) referenced by DIRECTIVES.md is 
+
+## Gains
+- 389-001 — born-529 — REPL-ERRORBOUNDARY-I18N — ReplErrorBoundary label prop (P3) — Root cause: ReplErrorBoundary (src/cli/repl/app.tsx:681-688, out of write scope) was ALREADY corr...
+- 389-002 — born-530 — REPL-CLEAR-ANSI — /clear gerçek ANSI-clear + in-flight stream cancel (P2) — Root cause: clearScreen() (app.tsx) only reset the JS/Ink `turns` state — Ink's <Static> already ...
+- 389-003 — born-537 — EDIT-FILE-UNIQUE — edit_file unique-match/replace-all + empty-old error (P2) — deckent_edit_file now: (1) rejects empty old_string with an explicit [mcp-error] before any match...
+- 389-004 — born-541 — RENDER-REGION-SAFEPROMPT — safePrompt narrow catch (P3) — Narrowed safePrompt's blanket catch in src/cli/commands/chat-render-region.ts.
+- 389-005 — born-548 — CRED-RESOLUTION — Gemini env + deepseek/qwen/glm .deck cred (P2) — Two concrete, verified cred-resolution gaps fixed, both within write scope.
+- 389-006 — born-575 — ENT-RBAC-ROUNDTRIP — enterprise RBAC/rate write-then-read round-trip (P2) — Root cause: GET /api/enterprise/rbac (listRbacRoles) read only core/rbac.ts PERMISSION_MATRIX, an...
+
 ## Sprint sprint-388 Learnings
 - Sprint sprint-388 Learnings: ## Sprint sprint-388 Learnings
 - born-528 — REPL-DENY-TOOLSINK — confirm-red toolSink honest-outcome bypass (P2): NO_GO

@@ -662,7 +662,7 @@ export async function runInkRepl(
   if (altScreen) process.stdout.write('\x1b[?1049h\x1b[2J\x1b[H');
 
   const { unmount, waitUntilExit } = render(
-    <ReplErrorBoundary>
+    <ReplErrorBoundary label={t('tui.render_error')}>
     <ReplApp
       provider={switcher.proxy}
       dispatcher={dispatcher}

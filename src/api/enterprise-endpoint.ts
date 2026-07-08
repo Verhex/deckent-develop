@@ -1,8 +1,8 @@
 // enterprise-endpoint.ts — HTTP routes for the dashboard EnterprisePage (Sprint 269 B-Enterprise).
 // GET /api/enterprise/tenants → TenantInfo[]   (config `tenants` list ∪ .deckent/tenants/* dirs)
-// GET /api/enterprise/rbac    → RbacRole[]     (core/rbac.ts PERMISSION_MATRIX — role matrix SSOT)
+// GET /api/enterprise/rbac    → RbacRole[]     (core/rbac.ts PERMISSION_MATRIX ∪ config `rbac_roles`)
 // GET /api/enterprise/audit   → AuditEntry[]   (core/audit-query.ts readAuditEvents/queryAudit SSOT)
-// GET /api/enterprise/rate    → RateLimitInfo[] (live RateLimiter snapshot)
+// GET /api/enterprise/rate    → RateLimitInfo[] (live RateLimiter snapshot ∪ config `rate_rules`)
 //
 // Response shapes mirror src/dashboard/src/pages/EnterprisePage.tsx:10-37 exactly.
 // Missing data returns an empty array with 200 (never 404/500) — the page
@@ -10,6 +10,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
 import { readJsonSafe } from '../core/utils.js';
@@ -34,7 +35,7 @@ interface TenantInfo {
 }
 
 interface RbacRole {
-  role: Role;
+  role: string;
   permissions: string[];
 }
 
@@ -143,12 +144,25 @@ function listTenants(projectRoot: string): TenantInfo[] {
 
 // ─── RBAC ────────────────────────────────────────────────────────────
 
-/** Role matrix from core/rbac.ts — effective (inherited) permissions per role. */
-function listRbacRoles(): RbacRole[] {
-  return (Object.keys(PERMISSION_MATRIX) as Role[]).map((role) => ({
-    role,
-    permissions: [...PERMISSION_MATRIX[role]],
-  }));
+/**
+ * Effective RBAC role list: built-in role matrix (core/rbac.ts PERMISSION_MATRIX)
+ * merged with admin-defined custom roles persisted under config `rbac_roles`
+ * (handleEnterpriseRbacWrite). A custom entry with the same name as a built-in
+ * role overrides its permissions — the persisted value is always what write→read
+ * round-trips back (born-575).
+ */
+function listRbacRoles(projectRoot: string): RbacRole[] {
+  const merged = new Map<string, RbacRole>(
+    (Object.keys(PERMISSION_MATRIX) as Role[]).map((role) => [
+      role,
+      { role, permissions: [...PERMISSION_MATRIX[role]] },
+    ]),
+  );
+  const custom = rbacRoleArray(readRawConfig(projectRoot));
+  for (const entry of custom) {
+    merged.set(entry.role, { role: entry.role, permissions: [...entry.permissions] });
+  }
+  return [...merged.values()];
 }
 
 // ─── Audit ───────────────────────────────────────────────────────────
@@ -204,14 +218,29 @@ function listAuditEntries(projectRoot: string, params: URLSearchParams): AuditEn
 
 // ─── Rate ────────────────────────────────────────────────────────────
 
-function listRateLimits(deps: EnterpriseRouteDeps): RateLimitInfo[] {
+/**
+ * Effective rate-limit list: live RateLimiter snapshot (actual in-flight
+ * windows) followed by admin-defined rules persisted under config `rate_rules`
+ * (handleEnterpriseRateWrite) that have no live window yet — a persisted rule
+ * has full `remaining` budget (no requests observed) and no active reset
+ * window (resetAt: ''). The persisted `limit` always write→read round-trips
+ * back (born-575).
+ */
+function listRateLimits(projectRoot: string, deps: EnterpriseRouteDeps): RateLimitInfo[] {
   const snapshot = deps.rateLimiter?.snapshot() ?? [];
-  return snapshot.map((entry) => ({
+  const live = snapshot.map((entry) => ({
     endpoint: `/api/* [${entry.key}]`,
     limit: entry.limit,
     remaining: Math.max(0, entry.limit - entry.count),
     resetAt: new Date(entry.resetAt).toISOString(),
   }));
+  const persisted = rateLimitRuleArray(readRawConfig(projectRoot)).map((rule) => ({
+    endpoint: rule.endpoint,
+    limit: rule.limit,
+    remaining: rule.limit,
+    resetAt: '',
+  }));
+  return [...live, ...persisted];
 }
 
 // ─── Public API ──────────────────────────────────────────────────────
@@ -245,7 +274,7 @@ export function registerEnterpriseRoutes(
   }
 
   if (path === '/api/enterprise/rbac') {
-    const roles = listRbacRoles();
+    const roles = listRbacRoles(projectRoot);
     if (sprintId) writeAuditEvent(projectRoot, sprintId, { tenantId: 'local', actor, action: 'enterprise:rbac:read' });
     sendJson(res, roles);
     return true;
@@ -260,7 +289,7 @@ export function registerEnterpriseRoutes(
   }
 
   if (path === '/api/enterprise/rate') {
-    const rateData = listRateLimits(deps);
+    const rateData = listRateLimits(projectRoot, deps);
     if (sprintId) writeAuditEvent(projectRoot, sprintId, { tenantId: 'local', actor, action: 'enterprise:rate:read' });
     sendJson(res, rateData);
     return true;
@@ -353,9 +382,42 @@ interface AdminDecision {
 }
 
 /**
+ * Hash a token with SHA-256 so timingSafeEqual always compares equal-length
+ * buffers — prevents length-based timing side-channels (mirrors auth.ts
+ * hashToken; same discipline, independent copy since that module is out of
+ * this file's write scope).
+ */
+function hashOpaqueToken(token: string): Buffer {
+  return createHash('sha256').update(token).digest();
+}
+
+/**
+ * The project's configured static/opaque API token (`config.api_auth_token`
+ * only — deliberately NOT the DECKENT_API_TOKEN env-var fallback auth.ts also
+ * honors; this module has no business making an authorization decision
+ * depend on ambient process env, only on this project's own config). `null`
+ * when unset/empty — callers must fail OPEN to the pre-existing convention,
+ * never fail closed, since "no token configured" is itself a valid mode.
+ */
+function configuredStaticToken(projectRoot: string): string | null {
+  const raw = readRawConfig(projectRoot)['api_auth_token'];
+  return typeof raw === 'string' && raw.length > 0 ? raw : null;
+}
+
+/**
  * Authorize a tenant mutation — admin only (ADR-069/071 role-claim).
- * - Static / opaque bearer (non-JWT) → authorized as the local owner ('local'),
- *   matching the existing convention (auth-me mode:'static' = "local full access").
+ * - Static / opaque bearer (non-JWT): authorized as the local owner ('local').
+ *   When a static token IS configured (config.api_auth_token), the bearer
+ *   must crypto.timingSafeEqual-match it — a bearer that merely fails to
+ *   parse as a JWT is no longer, by itself, treated as proof of ownership
+ *   (born-583 GOV-MINORS defense-in-depth: the upstream bearer-auth gate
+ *   already enforces this in the real server, but this endpoint must not
+ *   depend on that holding for every code path). When NO static token is
+ *   configured, preserves the existing convention (auth-me mode:'static' =
+ *   "local full access") unchanged. Nothing in this function ever branches
+ *   on request origin/IP — a loopback-originating caller earns owner trust
+ *   through this exact same token check and no other way, so no address can
+ *   ever substitute for the real secret.
  * - OIDC JWT with role 'admin' → authorized (actor = sub / preferred_username).
  * - OIDC JWT without the admin role → denied; an access:denied audit event is
  *   written for the enterprise audit-trail (fail-secure).
@@ -373,12 +435,15 @@ function authorizeTenantAdmin(
 
   const claims = parseOidcClaims(bearer);
   if (claims === null) {
-    // Static / opaque token — owner's root token, full access (existing convention).
-    return { authorized: true, actor };
+    const staticToken = configuredStaticToken(projectRoot);
+    const ownerVerified =
+      staticToken === null ||
+      timingSafeEqual(hashOpaqueToken(bearer), hashOpaqueToken(staticToken));
+    if (ownerVerified) return { authorized: true, actor };
+  } else {
+    const role = roleFromClaims(claims as Record<string, unknown>);
+    if (role === 'admin') return { authorized: true, actor };
   }
-
-  const role = roleFromClaims(claims as Record<string, unknown>);
-  if (role === 'admin') return { authorized: true, actor };
 
   if (sprintId) {
     writeAuditEvent(projectRoot, sprintId, {
@@ -610,19 +675,42 @@ export async function handleEnterpriseTenantWrite(
 // ─── RBAC role mutations — POST / PUT / DELETE (DASH-UX-6) ──────────────────
 //
 // Admin-only writes for RBAC custom roles. Persisted in config.json under the
-// `rbac_roles` key as Array<{ role, permissions }>. The GET /api/enterprise/rbac
-// read endpoint is NOT changed (it still reads from PERMISSION_MATRIX).
+// `rbac_roles` key as Array<{ role, permissions }>. listRbacRoles() merges this
+// with PERMISSION_MATRIX so GET /api/enterprise/rbac round-trips a written
+// role immediately (born-575).
+
+// Permission-grant shape validation (born-583 GOV-MINORS). A custom role's
+// `permissions` entries are merged directly into the live RBAC surface
+// (listRbacRoles) with no prior integrity check — an empty/whitespace-only
+// or malformed entry silently becomes an ungrantable, unauditable no-op
+// "permission" that nothing can ever legitimately match. Require the same
+// resource[:action] / wildcard grammar core/rbac.ts's principalCan() already
+// recognizes: a bare word, 'resource:action', 'resource:*', '*:action', or
+// '*'. Verified against every permission string born-575's round-trip test
+// and enterprise-roles-rate.test.ts persist (e.g. 'invoices:read', 'x:read',
+// 'custom:only') — only genuinely malformed entries are newly rejected.
+const PERMISSION_TOKEN_RE = /^[a-z0-9][a-z0-9_-]*$/;
+
+function isWellFormedPermission(perm: string): boolean {
+  const parts = perm.split(':');
+  if (parts.length > 2) return false;
+  return parts.every((part) => part === '*' || PERMISSION_TOKEN_RE.test(part));
+}
+
+const PermissionToken = z.string().min(1).max(128).refine(isWellFormedPermission, {
+  message: "permission must be a bare word, 'resource:action', or a wildcard token",
+});
 
 const RbacRoleCreateSchema = z
   .object({
     role: z.string().min(1).max(64),
-    permissions: z.array(z.string()),
+    permissions: z.array(PermissionToken),
   })
   .strict();
 
 const RbacRoleUpdateSchema = z
   .object({
-    permissions: z.array(z.string()).optional(),
+    permissions: z.array(PermissionToken).optional(),
   })
   .strict();
 
@@ -738,8 +826,9 @@ export async function handleEnterpriseRbacWrite(
 // ─── Rate-limit rule mutations — POST / PUT / DELETE (DASH-UX-6) ────────────
 //
 // Admin-only writes for rate-limit rules. Persisted in config.json under the
-// `rate_rules` key as Array<{ id, endpoint, limit }>. The GET /api/enterprise/rate
-// read endpoint is NOT changed (it still reads from the live RateLimiter snapshot).
+// `rate_rules` key as Array<{ id, endpoint, limit }>. listRateLimits() merges
+// this with the live RateLimiter snapshot so GET /api/enterprise/rate
+// round-trips a written rule's limit immediately (born-575).
 
 const RateLimitCreateSchema = z
   .object({

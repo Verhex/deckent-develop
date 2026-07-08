@@ -157,6 +157,24 @@ export function defaultBashRun(cmd: string, cwd: string, runOpts: DefaultBashRun
   });
 }
 
+/**
+ * Count literal, non-overlapping occurrences of `needle` in `haystack`
+ * (born-537: `old_string` may contain regex metacharacters that must be
+ * matched literally, so this walks via `indexOf` rather than a RegExp).
+ */
+function countOccurrences(haystack: string, needle: string): number {
+  if (needle.length === 0) return 0;
+  let count = 0;
+  let idx = 0;
+  for (;;) {
+    idx = haystack.indexOf(needle, idx);
+    if (idx === -1) break;
+    count++;
+    idx += needle.length;
+  }
+  return count;
+}
+
 /** Symlink-chain resolution guard against cycles (A -> B -> A). */
 const MAX_SYMLINK_DEPTH = 40;
 
@@ -269,8 +287,15 @@ export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDis
             const before = readFileSync(abs, 'utf-8');
             const oldStr = String(args['old'] ?? '');
             const newStr = String(args['new'] ?? '');
-            if (!before.includes(oldStr)) return `[mcp-error] deckent_edit_file: eşleşme yok`;
-            writeFileSync(abs, before.replace(oldStr, newStr), 'utf-8');
+            if (oldStr.length === 0) return `[mcp-error] deckent_edit_file: old boş olamaz`;
+            const occurrences = countOccurrences(before, oldStr);
+            if (occurrences === 0) return `[mcp-error] deckent_edit_file: eşleşme yok`;
+            const replaceAll = args['replaceAll'] === true || args['replace_all'] === true;
+            if (occurrences > 1 && !replaceAll) {
+              return `[mcp-error] deckent_edit_file: old birden çok yerde eşleşiyor (${occurrences}) — old'u tekil eşleşecek şekilde daraltın ya da replaceAll:true kullanın`;
+            }
+            const after = replaceAll ? before.split(oldStr).join(newStr) : before.replace(oldStr, newStr);
+            writeFileSync(abs, after, 'utf-8');
             return `[deckent] düzenlendi: ${args['path']}`;
           }
           case 'deckent_bash': {

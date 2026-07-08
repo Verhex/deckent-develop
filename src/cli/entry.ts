@@ -268,6 +268,16 @@ function subscriptionReplEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
   delete env['ANTHROPIC_API_KEY'];
   delete env['DECKENT_CLAUDE_API_KEY'];
+  // born-548: Gemini CLI treats any of these as API-key auth, outranking its
+  // own OAuth session file (see provider-auth-probe.ts's probeGemini) — strip
+  // them here too, matching the parity fix already applied to
+  // chat-provider-parity.ts's subscriptionEnv() (F11-014). Without this, a
+  // GOOGLE_API_KEY/GEMINI_API_KEY set in the host env leaked through on the
+  // .stream() / --model-override .send() paths (this function), even though
+  // the SSOT-delegated .send() path already blocked it.
+  delete env['GEMINI_API_KEY'];
+  delete env['GOOGLE_API_KEY'];
+  delete env['DECKENT_GOOGLE_API_KEY'];
   return env;
 }
 

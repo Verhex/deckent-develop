@@ -356,6 +356,54 @@ export function truncateQueuePreview(text: string, max = 60): string {
 }
 
 /**
+ * REPL-CLEAR-ANSI (389-002, born-530) — `clearScreen` used to only reset the
+ * JS/Ink `turns` state; Ink's `<Static>` already flushed every prior turn
+ * straight to the REAL terminal (write-once, never redrawn — that is what
+ * "Static" means), so old lines survived on screen/scrollback even after the
+ * JS state emptied. `\x1b[2J` erases the visible screen, `\x1b[3J` erases the
+ * scrollback buffer (xterm extension, widely supported), `\x1b[H` homes the
+ * cursor — the same combination Node's own `console.clear()` uses on a TTY.
+ * Ink's OWN `instance.clear()` (node_modules/ink/build/ink.js) does NOT help
+ * here — it only resets the dynamic-region log-update bookkeeping, never the
+ * scrollback, and isn't reachable from inside this component anyway (only
+ * exposed via the top-level `render()` return in run.tsx, out of this task's
+ * write scope). A raw write is therefore the only option, and matches the
+ * codebase's own existing precedent (run.tsx's alt-screen-enter write:
+ * `process.stdout.write('\x1b[?1049h\x1b[2J\x1b[H')`).
+ */
+export const CLEAR_SCREEN_ANSI = '\x1b[2J\x1b[3J\x1b[H';
+
+/** Minimal duck-typed stdout shape — lets tests pass a fake stream instead of
+ *  a real TTY. */
+export interface ClearableStdout { isTTY?: boolean; write(chunk: string): unknown; }
+
+/** Write the real terminal clear-screen sequence. Guarded on `isTTY`: a
+ *  piped/non-interactive stdout must never receive raw escape codes
+ *  (ink-tui skill precedent — never assume an interactive terminal). */
+export function writeClearScreenAnsi(stream: ClearableStdout = process.stdout): void {
+  if (stream.isTTY) stream.write(CLEAR_SCREEN_ANSI);
+}
+
+/**
+ * REPL-CLEAR-ANSI (389-002, born-530) — honest in-flight-stream cancel for
+ * `/clear`. No mid-turn provider-abort seam exists anywhere in this codebase
+ * (same documented gap the 358-006 interrupt comment above notes for
+ * busy-controls.ts) — the turn that was streaming when `/clear` fired keeps
+ * running against the real provider underneath; there is no seam here to
+ * kill it. What CAN be honestly cancelled is the VIEW: `clearScreen` bumps a
+ * clear-epoch, and every render callback a turn still reaches (`output`, the
+ * tool sink) compares the epoch ITS turn started under against the CURRENT
+ * one — a turn that started before the bump is stale from that point on, and
+ * its remaining tokens/tool-results are silently dropped instead of being
+ * drawn onto the just-cleared screen. A turn that starts fresh (post-clear)
+ * stamps the new epoch and renders normally — "cancels what it CAN", same
+ * precedent as the existing interrupt.
+ */
+export function isTurnLive(turnEpoch: number, clearEpoch: number): boolean {
+  return turnEpoch === clearEpoch;
+}
+
+/**
  * APP-APPROVAL-WIRE (355-011) — pure, testable helpers for the ApprovalCard +
  * dual-stream wiring (same "pull decision logic out of the Ink component"
  * pattern as resolveModeLabel/bgPayloadsToTurnTexts above — ink-testing-library
@@ -845,6 +893,12 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const [sessionTok, setSessionTok] = useState(0);
   const idRef = useRef(1);
   const lastStats = useRef<TurnStats | null>(null);
+  // REPL-CLEAR-ANSI (389-002): clearEpoch bumps on every clearScreen() call;
+  // turnEpoch stamps the epoch the CURRENTLY in-flight turn started under
+  // (inputIter, at dequeue). isTurnLive compares the two — see its doc
+  // comment above for the full "cancel what you can" rationale.
+  const clearEpoch = useRef(0);
+  const turnEpoch = useRef(0);
   const headPushed = useRef(false);       // ● deckent header emitted for this turn?
   const segmenter = useRef<StreamSegmenter | null>(null);
   // F11-016 (368-003 wire): the raw useRef<string[]> FIFO is replaced by the
@@ -920,6 +974,14 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // next streamed token resurfaced pre-clear text onto the just-cleared screen
   // (output() renders `segmenter.partial()` verbatim).
   const clearScreen = (): void => {
+    // 389-002 (born-530): a real terminal clear — <Static> already flushed
+    // every prior turn permanently, so the JS-state reset below cannot erase
+    // it on its own (see writeClearScreenAnsi's doc comment above).
+    writeClearScreenAnsi();
+    // Bump the clear-epoch so a still-streaming turn's remaining output is
+    // recognized as stale by `output`/the tool sink and silently dropped
+    // instead of drawing pre-clear content onto the just-cleared screen.
+    clearEpoch.current += 1;
     setTurns([]); setPartial(''); headPushed.current = false;
     segmenter.current = createStreamSegmenter((seg) => pushSegment(seg.markdown));
   };
@@ -937,6 +999,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // reply first so the block lands AFTER the text that requested it.
   useEffect(() => {
     registerToolSink((info: ToolInfo) => {
+      // 389-002: a stale (pre-clear) turn's tool-result block must not land
+      // on the just-cleared screen either — same epoch guard as `output`.
+      if (!isTurnLive(turnEpoch.current, clearEpoch.current)) return;
       segmenter.current?.flush(); setPartial(''); // commit any in-flight reply first
       const turn: Turn = { id: idRef.current++, role: 'tool', text: '', tool: info };
       setTurns((t) => [...t, turn]); // pure updater — id consumed above (360-009)
@@ -1003,6 +1068,11 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           setQueued([...queue.current!.snapshot()]);
           pushTurn('user', line);
           setWorking(true);
+          // 389-002: stamp the epoch THIS turn is starting under — output()/
+          // the tool sink compare against clearEpoch.current on every call, so
+          // a /clear mid-turn only affects turns already in flight, never this
+          // fresh one.
+          turnEpoch.current = clearEpoch.current;
           // 358-006: busy-controls turn-start. Unconditional on purpose — with
           // the surface flag off nothing can feed the machine (commands fall
           // through to chat), so this stays invisible; gating would only add a
@@ -1039,6 +1109,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     }
 
     const output = (text: string) => {
+      // 389-002: a /clear fired since this turn started — drop its straggler
+      // tokens instead of feeding them into the (fresh, post-clear) segmenter.
+      if (!isTurnLive(turnEpoch.current, clearEpoch.current)) return;
       segmenter.current?.feed(text);
       setPartial(segmenter.current?.partial() ?? '');
     };

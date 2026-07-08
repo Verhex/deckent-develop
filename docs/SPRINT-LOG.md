@@ -9486,3 +9486,31 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 388-013: born-506 — DEADCODE-DYNAMIC-SCAN — hand-list yerine otomatik 0-importer keşfi (P3) (DONE)
 
 ---
+## Sprint 389 — sprint-389
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-08
+**Duration:** 1259s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 7 |
+| Completed | 7 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1259321ms |
+
+### Tasks
+
+- 389-001: born-529 — REPL-ERRORBOUNDARY-I18N — ReplErrorBoundary label prop (P3) (DONE)
+- 389-002: born-530 — REPL-CLEAR-ANSI — /clear gerçek ANSI-clear + in-flight stream cancel (P2) (DONE)
+- 389-003: born-537 — EDIT-FILE-UNIQUE — edit_file unique-match/replace-all + empty-old error (P2) (DONE)
+- 389-004: born-541 — RENDER-REGION-SAFEPROMPT — safePrompt narrow catch (P3) (DONE)
+- 389-005: born-548 — CRED-RESOLUTION — Gemini env + deepseek/qwen/glm .deck cred (P2) (DONE)
+- 389-006: born-575 — ENT-RBAC-ROUNDTRIP — enterprise RBAC/rate write-then-read round-trip (P2) (DONE)
+- 389-007: born-583 — GOV-MINORS — plugin-sig + opaque-bearer + deny-list loopback (P2) (GO_WITH_TECH_DEBT)
+
+---

@@ -1,177 +1,98 @@
-# DIRECTIVES — SPRINT-5: REPL/CLI POLISH KESİTİ (13 distinct-file, dogfood-gate)
+# DIRECTIVES — SPRINT-6: REPL/CLI/API TAIL KESİTİ (7 task, dogfood-gate)
 
 ## Goal
-Maraton devam: 13 DISTINCT-FILE OPEN born-item (dedup'lı — 53 DONE'a karşı kesişim ∅). REPL/CLI/scripts
-polish kesiti (P1-P3). Hepsi ayrı-dosya → tam-paralel (Dependencies: none). Bu sprint yeni **prompt-gate**'i
-(G1a persona + G1d karar-alanı) plan-time'da DOGFOOD eder — agent'ları routing seçer, gate denetler.
-git-guard CANLI. born-backlog SSOT: `.analysis/deckent-marathon-loop-state.md`. Yasa #1/#2/#3.
+Maraton (b): 7 OPEN born-item (dedup ∅ — 66 DONE'a karşı). REPL/CLI/api-governance polish kesiti.
+6 distinct-file paralel + 1 zincir (575→583 enterprise-endpoint serialize). prompt-gate (G1a/G1d/G1c)
+plan-time dogfood. git-guard CANLI. SSOT: `.analysis/deckent-marathon-loop-state.md`. Yasa #1/#2/#3.
 
 ## 🔒 BAĞLAYICI
-- **DISTINCT-FILE (KAPALI — dokunma):** sprint-planner / result-evaluator / sprint-phases / result-collector /
-  sprint-controller / server.ts / config.ts / routing-engine.ts / adr-selector.ts / prompt-gate.ts.
-- **git stash/reset/checkout/clean YASAK** (born-499 runtime-guard'lı; salt-okuma `git show HEAD:<yol>`).
-- Her task **kendi testi** + **hermetik** (I/O tmpdir/os.tmpdir, async spawn, spawnSync YOK, gitignored-state okuma YOK).
-- **i18n-FIRST:** kullanıcıya-görünen string `getMessage(key, lang)` (`src/cli/helpers/messages.ts`, en/tr).
-- `notes` TEK STRING. Self-assessment DÜRÜST (LP-10 `filesChanged` host-side disk-verify eder — boş+DONE = false-DONE).
-- **Surgical:** yalnız `Files:` listesine yaz; minimum-diff; mevcut testleri bozma.
+- **DISTINCT-FILE (KAPALI):** sprint-planner/result-evaluator/sprint-phases/result-collector/sprint-controller/server.ts/config.ts/routing-engine.ts/adr-selector.ts/prompt-gate.ts.
+- **git stash/reset/checkout/clean YASAK** (born-499 guard; salt-oku `git show HEAD:<yol>`).
+- Her task kendi testi + hermetik (tmpdir/async spawn/no spawnSync/no gitignored-state). i18n getMessage.
+- `notes` TEK STRING. Self DÜRÜST (LP-10 disk-verify). Surgical minimum-diff. Mevcut testleri bozma.
 
-## Task 1: born-533 — REPL-MODEL-BUSY-GATE — /model /provider backend-splice race (P1)
+## Task 1: born-529 — REPL-ERRORBOUNDARY-I18N — ReplErrorBoundary label prop (P3)
 - Model: sonnet
 - Skills: typescript-expert, ink-tui, testing-expert
-- Files: src/cli/repl/app.tsx, tests/cli/repl-model-busy-gate.test.ts
+- Files: src/cli/repl/run.tsx, tests/cli/repl-errorboundary-i18n.test.ts
 - Scope: src/cli/repl/, tests/cli/
 - Dependencies: none
 ### Description
-Tur çalışırken /model veya /provider backend'i splice ediyor → in-flight tur ile yeni-backend yarışıyor (bozuk-çıktı/crash). FIX: busy (tur-devam) sırasında /model·/provider'ı gate'le — ya kuyruğa al ya reddet+i18n-uyarı; in-flight backend'i splice etme.
+ReplErrorBoundary kullanıcıya-görünen label'ı hardcode (i18n-ihlali). FIX: label'ı prop olarak enjekte et, caller `getMessage(key, lang)`'dan doldursun; mekanizma string-free kalsın (İngilizce default).
 ### goNogo
-- goCriteria: aktif-tur sırasında /model → race YOK (test: busy'de değişim ya kuyruklanır ya reddedilir); idle'da normal çalışır.
-- nogo: model-switch özelliğini kaldırma.
+- goCriteria: ReplErrorBoundary label prop'tan gelir, hardcode string kalmaz (test); lang=tr → Türkçe render.
+- nogo: error-boundary davranışını (catch/fallback) değiştirme.
 
-## Task 2: born-528 — REPL-DENY-TOOLSINK — confirm-red toolSink honest-outcome bypass (P2)
+## Task 2: born-530 — REPL-CLEAR-ANSI — /clear gerçek ANSI-clear + in-flight stream cancel (P2)
 - Model: sonnet
 - Skills: typescript-expert, ink-tui, testing-expert
-- Files: src/cli/repl/run.tsx, tests/cli/repl-deny-toolsink.test.ts
+- Files: src/cli/repl/app.tsx, tests/cli/repl-clear-ansi.test.ts
 - Scope: src/cli/repl/, tests/cli/
 - Dependencies: none
 ### Description
-CLI-bridge tool confirm-denial erken-return ediyor → toolSink honest-outcome UI bloğu (denied-tool göstergesi) atlanıyor, red sessizce kayboluyor. FIX: confirm-denial'ı diğer tool-outcome'larıyla aynı toolSink honest-render yolundan geçir.
+/clear yalnız JS-transcript'i temizliyor; gerçek terminal ANSI-clear yok + in-flight stream iptal edilmiyor. FIX: /clear gerçek ANSI screen-clear yapsın + devam-eden stream'i iptal etsin. (513 /clear warm-child context fix'ini BOZMA — commit'li.)
 ### goNogo
-- goCriteria: confirm-tier tool reddedilince transcript görünür "denied" göstergesi gösterir (test), sessizlik değil; onaylı-yol bozulmaz.
-- nogo: onay-akışını değiştirme.
+- goCriteria: /clear → ekran ANSI-temizlenir + in-flight stream durur (test); normal-tur bozulmaz.
+- nogo: 513'ün warm-child context-reset'ini geri-alma.
 
-## Task 3: born-527 — INPUT-BAR-CLUSTER — Home/End no-op + paste empty-history + /tmp keylog (P2)
+## Task 3: born-537 — EDIT-FILE-UNIQUE — edit_file unique-match/replace-all + empty-old error (P2)
 - Model: sonnet
-- Skills: typescript-expert, ink-tui, testing-expert
-- Files: src/cli/repl/input-bar.tsx, tests/cli/input-bar-cluster.test.ts
-- Scope: src/cli/repl/, tests/cli/
-- Dependencies: none
-### Description
-Home/End Ink'in doldurmadığı property'leri kontrol ediyor (kalıcı no-op); çok-satır paste boş history-entry itebiliyor; debug keylog /tmp'e hardcode (POSIX-dışı sessiz no-op). FIX: Home/End'i Ink'in gerçekten doldurduğu key-property'lerle tespit et; trailing-newline paste boş-entry itmesin; keylog yolu platform-aware/config (Law #2).
-### goNogo
-- goCriteria: Home/End cursor hareketi çalışır (test); çok-satır+newline paste boş history yaratmaz.
-- nogo: input-bar API'sini yeniden-tasarlama.
-
-## Task 4: born-521 — DESCRIBE-TOOL-PARAMS — describe_tool boş params raporluyor (P3)
-- Model: sonnet
-- Effort: low
 - Skills: typescript-expert, testing-expert
-- Files: src/cli/repl/native-tool-registry.ts, tests/cli/describe-tool-params.test.ts
-- Scope: src/cli/repl/, tests/cli/
-- Dependencies: none
-### Description
-`deckent_describe_tool` her bridged-tool için boş params-listesi döndürüyor (tool-surface catalog lookup hatalı). FIX: catalog lookup'ı düzelt → gerçek parameter-schema dönsün.
-### goNogo
-- goCriteria: describe_tool(herhangi-bridged-tool) → boş-olmayan params (test).
-- nogo: tool-schema tanımlarını değiştirme.
-
-## Task 5: born-536 — TOOL-EXEC-SYMLINK — inScope symlink-resolution eksik (P2)
-- Model: sonnet
-- Skills: typescript-expert, security-specialist, testing-expert
-- Files: src/cli/commands/chat-tool-exec.ts, tests/cli/tool-exec-symlink.test.ts
+- Files: src/cli/commands/chat-tool-exec.ts, tests/cli/edit-file-unique.test.ts
 - Scope: src/cli/commands/, tests/cli/
 - Dependencies: none
 ### Description
-`inScope` kontrolü symlink çözmüyor → scope-dışına işaret eden symlink scope-içi görünüp yazma-izni alabiliyor (SEC). FIX: karşılaştırmadan önce `fs.realpath` ile hedef-yolu çöz; symlink scope-escape reddedilir.
+edit_file: (a) old_string birden çok eşleşince sessizce ilkini değiştiriyor (belirsizlik) · (b) replace-all yok · (c) boş old_string hata vermiyor. FIX: çoklu-eşleşmede hata (unique-ŞART) veya replace-all opsiyonu; boş old_string → açık hata. (536 symlink-resolution'ı BOZMA — commit'li.)
 ### goNogo
-- goCriteria: scope-dışına işaret eden symlink'e yazma denemesi REDDEDİLİR (test); meşru scope-içi yazma geçer.
-- nogo: scope-kontrolünü gevşetme.
+- goCriteria: çoklu-eşleşmeli old_string → hata/replace-all (test); boş old_string → açık hata; tek-eşleşme normal.
+- nogo: 536'nın fs.realpath scope-kontrolünü geri-alma.
 
-## Task 6: born-540 — RENDER-REGION-CLEAR — writeAbove full-region clear eksik (P2)
+## Task 4: born-541 — RENDER-REGION-SAFEPROMPT — safePrompt narrow catch (P3)
 - Model: sonnet
 - Skills: typescript-expert, ink-tui, testing-expert
-- Files: src/cli/commands/chat-render-region.ts, tests/cli/render-region-clear.test.ts
+- Files: src/cli/commands/chat-render-region.ts, tests/cli/render-region-safeprompt.test.ts
 - Scope: src/cli/commands/, tests/cli/
 - Dependencies: none
 ### Description
-`writeAbove` bölgeyi tam temizlemiyor → önceki-render artıkları kalıyor (görsel-bozukluk). FIX: writeAbove yazmadan önce hedef-bölgeyi tam clear etsin.
+`safePrompt` geniş catch-all ile tüm hatayı yutuyor (gerçek-hata gizleniyor). FIX: catch'i daralt — yalnız beklenen prompt-hatasını yut, beklenmeyen hatayı yeniden-fırlat/logla. (540 writeAbove full-clear'ı BOZMA — commit'li.)
 ### goNogo
-- goCriteria: writeAbove tekrar-çağrısı önceki-içeriği bırakmaz (test, tam-clear).
-- nogo: render-region API'sini değiştirme.
+- goCriteria: beklenmeyen hata safePrompt tarafından yutulmaz (test, re-throw/log); beklenen prompt-abort normal ele alınır.
+- nogo: 540'ın writeAbove clear'ını geri-alma.
 
-## Task 7: born-547 — ENTRY-NDJSON-FALLBACK — non-assistant fallback branch eksik (P2)
+## Task 5: born-548 — CRED-RESOLUTION — Gemini env + deepseek/qwen/glm .deck cred (P2)
 - Model: sonnet
-- Skills: typescript-expert, testing-expert
-- Files: src/cli/entry.ts, tests/cli/entry-ndjson-fallback.test.ts
-- Scope: src/cli/, tests/cli/
+- Skills: typescript-expert, provider-cli-matrix, testing-expert
+- Files: src/cli/entry.ts, src/cli/repl/native-transport.ts, tests/cli/cred-resolution.test.ts
+- Scope: src/cli/, src/cli/repl/, tests/cli/
 - Dependencies: none
 ### Description
-NDJSON çıktı-yolunda non-assistant mesaj-tipleri için fallback branch eksik → beklenmeyen tip düşürülüyor/crash. FIX: non-assistant NDJSON kayıtları için honest fallback branch ekle.
+Cred-resolution eksik: Gemini env-var yolu + deepseek/qwen/glm için `.deck` secret çözümü kapsanmıyor. FIX: bu provider'lar için cred-resolution'ı `.deck`→env deseniyle tamamla (mevcut applyDeckSecretsToEnv deseni). (547 NDJSON-fallback'i BOZMA — commit'li.)
 ### goNogo
-- goCriteria: non-assistant NDJSON kaydı → düzgün ele alınır (test), düşürülmez/crash değil.
-- nogo: assistant-yolunu değiştirme.
+- goCriteria: deepseek/qwen/glm `.deck` secret'ları env'e çözülür (test); Gemini env-var yolu çalışır; mevcut provider'lar bozulmaz.
+- nogo: secret'ları log'a yazma (scrub koru).
 
-## Task 8: born-556 — NATIVE-TRANSPORT-DOC — 32k/24k doc↔kod uyuşmazlığı (P3)
+## Task 6: born-575 — ENT-RBAC-ROUNDTRIP — enterprise RBAC/rate write-then-read round-trip (P2)
 - Model: sonnet
-- Effort: low
-- Skills: typescript-expert, testing-expert
-- Files: src/cli/repl/native-transport.ts, tests/cli/native-transport-limit.test.ts
-- Scope: src/cli/repl/, tests/cli/
+- Agent: api-builder
+- Skills: typescript-expert, secure-coding, testing-expert
+- Files: src/api/enterprise-endpoint.ts, tests/api/ent-rbac-roundtrip.test.ts
+- Scope: src/api/, tests/api/
 - Dependencies: none
 ### Description
-native-transport doc-yorumu 32k diyor, kod 24k kullanıyor (uyuşmazlık → yanlış-beklenti). FIX: doc↔kod tek-kaynağa hizala (kod-değeri doğruysa yorumu düzelt ya da tersi); test ile sabitle.
+enterprise-endpoint RBAC/rate write-then-read round-trip'i eksik/tutarsız (yazılan rol/limit geri-okunmuyor). FIX: RBAC-rol + rate-limit write→read round-trip'i tutarlı yap (yazılan hemen okunur).
 ### goNogo
-- goCriteria: doc-yorumu ile kod-sabiti aynı-değer (test asserts sabit); regresyon-koruma.
-- nogo: transport davranışını değiştirme (yalnız tutarlılık).
+- goCriteria: RBAC-rol write → read aynı-değeri döner (test, round-trip); rate-limit aynı; server.ts'e dokunma.
+- nogo: enterprise şemasını yeniden-tasarlama.
 
-## Task 9: born-557 — DOCTOR-ICON-CONSOLIDATE — 3 ikon-vokabülü birleştir (P3)
+## Task 7: born-583 — GOV-MINORS — plugin-sig + opaque-bearer + deny-list loopback (P2)
 - Model: sonnet
-- Effort: low
-- Skills: typescript-expert, testing-expert
-- Files: src/cli/commands/doctor.ts, tests/cli/doctor-icon-consolidate.test.ts
-- Scope: src/cli/commands/, tests/cli/
-- Dependencies: none
+- Agent: api-builder
+- Skills: typescript-expert, secure-coding, testing-expert
+- Files: src/api/enterprise-endpoint.ts, tests/api/gov-minors.test.ts
+- Scope: src/api/, tests/api/
+- Dependencies: Task 6
 ### Description
-doctor.ts 3 ayrı ikon-vokabülü kullanıyor (tutarsız görsel). FIX: tek-vokabüle konsolide et (mevcut lucide/ASCII deseniyle tutarlı).
+enterprise-endpoint governance minör-küme: (a) plugin-signature doğrulama gap · (b) opaque-bearer token karşılaştırma timing-unsafe (`===`) · (c) deny-list loopback (127.0.0.1/::1) bypass. FIX: her birini kapat — plugin-sig doğrula, opaque-bearer `crypto.timingSafeEqual`, loopback'i deny-list'e dahil et. (575 RBAC round-trip'i BOZMA — aynı dosya, zincir.) [Not: bot SAFE/RISKY connectors-parçası ayrı-born'a bırakıldı — dosya-belirsizliği/orphan-risk.]
 ### goNogo
-- goCriteria: doctor çıktısı tek-tutarlı ikon-seti kullanır (test); mevcut doctor davranışı bozulmaz.
-- nogo: doctor check-mantığını değiştirme.
-
-## Task 10: born-578 — INIT-REPAIR-FAILEDSTEPS — --repair failedSteps doldurmuyor (P3)
-- Model: sonnet
-- Skills: typescript-expert, testing-expert
-- Files: src/cli/commands/init.ts, tests/cli/init-repair-failedsteps.test.ts
-- Scope: src/cli/commands/, tests/cli/
-- Dependencies: none
-### Description
-`init --repair` failedSteps'i doldurmuyor → hangi-adım-başarısız görünmüyor (dürüstlük-eksiği). FIX: repair sırasında başarısız-adımları failedSteps'e doldur + honest rapor.
-### goNogo
-- goCriteria: `init --repair` başarısız-adımda failedSteps dolar + kullanıcıya gösterilir (test).
-- nogo: init happy-path'i değiştirme.
-
-## Task 11: born-531 — SLASH-CASE-TRANSLIT — slash case-insensitive + slugify transliteration (P3)
-- Model: sonnet
-- Skills: typescript-expert, testing-expert
-- Files: src/cli/repl/busy-controls.ts, src/cli/commands/chat-slash-registry.ts, tests/cli/slash-case-translit.test.ts
-- Scope: src/cli/repl/, src/cli/commands/, tests/cli/
-- Dependencies: none
-### Description
-Slash-parse case-sensitive (`/Help` tanınmıyor) + slugify TR-karakter transliterate etmiyor. FIX: slash-komut eşleşmesini case-insensitive yap + slugify'ı Türkçe-karakter transliterasyonlu yap (ör. ç→c). (493 slash-bridge'i BOZMA — commit'li.)
-### goNogo
-- goCriteria: `/Help`=`/help` (test); slugify TR-karakteri doğru transliterate eder.
-- nogo: komut-kataloğunu değiştirme.
-
-## Task 12: born-504 — RECLASSIFY-BACKFILL — 10 eksik sprint-log satırı + re-run (P2)
-- Model: sonnet
-- Agent: bug-fixer
-- Skills: typescript-expert, testing-expert
-- Files: scripts/sprint-retroactive-reclassify.mjs, tests/scripts/reclassify-backfill.test.ts
-- Scope: scripts/, tests/scripts/
-- Dependencies: none
-### Description
-sprint-retroactive-reclassify 10 eksik (sprint-entry-yok) kaydı atlıyor. FIX: eksik-satırları backfill et + tam-listeyle reclassify koşacak şekilde düzelt; backfill-önce yolu implement et.
-### goNogo
-- goCriteria: re-run 12/12 applied raporlar (test, backfill-sonrası); atlanan-satır kalmaz.
-- nogo: mevcut reclassify çıktısını bozma.
-
-## Task 13: born-506 — DEADCODE-DYNAMIC-SCAN — hand-list yerine otomatik 0-importer keşfi (P3)
-- Model: sonnet
-- Agent: bug-fixer
-- Skills: typescript-expert, testing-expert
-- Files: scripts/dead-code-audit.mjs, tests/scripts/deadcode-dynamic-scan.test.ts
-- Scope: scripts/, tests/scripts/
-- Dependencies: none
-### Description
-dead-code-audit el-bakımlı KNOWN_SUSPECTS listesi kullanıyor → yeni-orphan otomatik yakalanmıyor. FIX: findUnusedExports'u tüm src/'i tarayacak şekilde genişlet (ya da hand-list'i otomatik 0-importer tespitiyle değiştir).
-### goNogo
-- goCriteria: kasıtlı-orphan test-modülü el-liste düzenlemeden otomatik tespit edilir (test).
-- nogo: mevcut audit çıktı-formatını bozma.
+- goCriteria: opaque-bearer `timingSafeEqual` kullanır (test); loopback deny-list bypass edilemez; plugin-sig doğrulanır; server.ts'e dokunma.
+- nogo: 575'in RBAC round-trip'ini geri-alma.
