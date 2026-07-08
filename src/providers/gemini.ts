@@ -58,7 +58,17 @@ export function buildGeminiSpawnEnv(apiKey?: string): NodeJS.ProcessEnv {
     }
   }
   if (apiKey) {
-    env['GOOGLE_API_KEY'] = apiKey;
+    // Developer-API auth (F3-GEMKEY, live-verified against gemini-cli 0.49.0):
+    // the CLI treats `GOOGLE_API_KEY` as a *Vertex AI / Google Cloud* credential
+    // and routes there, rejecting a Gemini Developer-API key (the `AQ.`-style key
+    // from aistudio) with "API key not valid" (empirically reproduced: GOOGLE_API_KEY
+    // → 400 API_KEY_INVALID; GEMINI_API_KEY → authenticates, same key value). The
+    // Developer-API key must arrive as `GEMINI_API_KEY`, and `GOOGLE_API_KEY` must be
+    // ABSENT (when both are set the CLI prefers GOOGLE_API_KEY → Vertex → fails). We
+    // inject via GEMINI_API_KEY and strip any inherited GOOGLE_API_KEY so the CLI
+    // stays on the generativelanguage.googleapis.com Developer endpoint.
+    env['GEMINI_API_KEY'] = apiKey;
+    delete env['GOOGLE_API_KEY'];
   }
   // Non-interactive guard: prevents the CLI from dropping into an interactive
   // `gemini login` OAuth flow when auth fails (e.g. 429 RESOURCE_EXHAUSTED).

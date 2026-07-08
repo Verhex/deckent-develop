@@ -324,13 +324,14 @@ describe('GeminiAdapter', () => {
     expect(args).toContain('gemini-2.5-pro');
   });
 
-  it('spawn passes GOOGLE_API_KEY in env', () => {
+  it('spawn passes the key as GEMINI_API_KEY (Developer-API), not GOOGLE_API_KEY (F3-GEMKEY)', () => {
     setupMockChild();
     adapter.spawn('task-001a', 'gemini-2.5-pro', 'Hello');
 
     const spawnCall = mockSpawn.mock.calls[0];
     const spawnOpts = spawnCall[2];
-    expect(spawnOpts.env.GOOGLE_API_KEY).toBe('test-api-key-123');
+    expect(spawnOpts.env.GEMINI_API_KEY).toBe('test-api-key-123');
+    expect(spawnOpts.env.GOOGLE_API_KEY).toBeUndefined();
   });
 
   it('spawn writes heartbeat file', () => {
@@ -912,12 +913,26 @@ describe('GeminiAdapter', () => {
     }
   });
 
-  it('buildGeminiSpawnEnv injects GOOGLE_API_KEY only when key provided', () => {
+  it('buildGeminiSpawnEnv injects the key as GEMINI_API_KEY (Developer-API), not GOOGLE_API_KEY (F3-GEMKEY)', () => {
+    // Live-verified vs gemini-cli 0.49.0: GOOGLE_API_KEY routes the CLI to Vertex AI
+    // and rejects a Developer-API key; the key must arrive as GEMINI_API_KEY.
     delete process.env['GOOGLE_API_KEY'];
     const withKey = buildGeminiSpawnEnv('AIza-the-key');
-    expect(withKey['GOOGLE_API_KEY']).toBe('AIza-the-key');
+    expect(withKey['GEMINI_API_KEY']).toBe('AIza-the-key');
+    expect(withKey['GOOGLE_API_KEY']).toBeUndefined();
     const withoutKey = buildGeminiSpawnEnv();
-    expect(withoutKey['GOOGLE_API_KEY']).toBeUndefined();
+    expect(withoutKey['GEMINI_API_KEY']).toBeUndefined();
+  });
+
+  it('buildGeminiSpawnEnv strips an inherited GOOGLE_API_KEY so the CLI stays on the Developer endpoint (F3-GEMKEY)', () => {
+    process.env['GOOGLE_API_KEY'] = 'inherited-vertex-style-key';
+    try {
+      const env = buildGeminiSpawnEnv('AIza-the-key');
+      expect(env['GOOGLE_API_KEY']).toBeUndefined();
+      expect(env['GEMINI_API_KEY']).toBe('AIza-the-key');
+    } finally {
+      delete process.env['GOOGLE_API_KEY'];
+    }
   });
 
   it('buildGeminiSpawnEnv sets GEMINI_NONINTERACTIVE=1 to prevent interactive login hang', () => {
