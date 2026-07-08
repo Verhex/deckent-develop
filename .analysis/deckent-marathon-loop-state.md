@@ -50,7 +50,16 @@
 > **Bağlayıcı (değişmez):** worker=sonnet · dedup-∅ (66/103 DONE'a karşı) · disk-verify ground-truth (Brain sentetik-NO_GO'ya güvenme, race-artifaktı disk-DONE override) · git-guard CANLI · her sprint commit (`git branch -vv` önce) · sprint'te build/login YOK · build BEN (sprint-arası) · usage: Fable-hafta ≥%95→DUR+haber (şu an headroom-iyi, Sonnet-ağırlıklı) · i18n-first · hermetik-test.
 
 ## Sprint günlüğü (canlı — her sprint sonrası satır ekle)
-> **Devir güncel:** 103 born → **73 DONE / 30 OPEN** (387:27 + 388:13 + 389:7 = 47 born kapandı). Sprint-389 (S6): 529 530 537 541 548 575 583 — disk-verify 7/7 (56 yeni+25 regresyon test yeşil, tsc temiz; Brain 6 DONE/1 DEBT/0 NO_GO); dogfood-gate 575/583 security-auditor→api-builder düzeltti. Commit: (pending).
+> **Devir güncel:** 103 born → **73 DONE / 30 OPEN** (387:27 + 388:13 + 389:7 = 47 born kapandı). Sprint-389 (S6): 529 530 537 541 548 575 583 — disk-verify 7/7 (56 yeni+25 regresyon test yeşil, tsc temiz; Brain 6 DONE/1 DEBT/0 NO_GO); dogfood-gate 575/583 security-auditor→api-builder düzeltti. Commit: `6c204ae9`.
+>
+> ### 🌙 OTONOM-LOOP WIND-DOWN (2026-07-09 gece, güvenli-zarf-sınırı) — Alperen sabah-oversight bekliyor
+> **Ne yapıldı (goal-başla→wind-down):** (a) G1c ✅ `d5f8fb33` + G3-observe-flip-note + R-5-defer · (c) 562#5 restoreFromSnapshot ✅ `ae469d6c` · (b) 3 born-sprint (387/388/389 = **47 born, 73/103**). Toplam session: G1a/G1d/G2/G5/G1c prompt-gate + LP-9 + 5 sprint + born-dedup. Hepsi test+smoke+commit+build.
+> **NEDEN durdu:** temiz worker-appropriate backlog incelmiş; **kalan iş güvenli-otonom-zarfı DIŞINDA** → Alperen-oversight-ister:
+> - **Hot-file governance (BEN el-kod, oversight):** 560 RBAC (rbac-persist açık-tasarım-Q) · 562-kalanı (cost_guard→sprint-controller HOT · resolveTokenUsage→result-collector HOT · resumeSprint→Sprint-reconstruction · ApprovalExpiryDriver BLOKELİ). Reçeteler goal-doc'ta. **Blind-autonomous YAPILMADI.**
+> - **Routing-flip (Alperen-karar):** G3 = `getKindAffinityBonus` shadow-observe→flip (R-1 disiplini).
+> - **Greenfield (mimari-karar):** 496 Electron · 497 enterprise-extraction.
+> - **Belirsiz/büyük:** 517 i18n-sweep (i18n-lint ZATEN temiz → değer-belirsiz, önce doğrula) · 494 dash-perf (vite-fiddly) · 502 builtins-reconcile (canonical-karar).
+> **Devam için:** born-worker-sprint yeni-clean-item kalmadı; sıradaki ilerleme ya hot-file-governance (BEN, oversight'la) ya greenfield (mimari) ya routing-flip (karar). Alperen yön versin.
 | Sprint | Tema | Task/Wave | Sonuç (DONE/DEBT/NO_GO) | Commit | born-devir | Usage-sonrası |
 |---|---|---|---|---|---|---|
 | — | (kurulum) | born-backlog inşası | — | 101da0d9·ef8d4acd | — | Fable %75 |
