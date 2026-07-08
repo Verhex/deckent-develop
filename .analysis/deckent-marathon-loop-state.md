@@ -32,6 +32,22 @@
 ## born-backlog SSOT
 `.../scratchpad/born-backlog.json` — **103 madde** (14 P0 · 40 P1 · 37 P2 · 12 P3); 76 yeni born-508…583 + 27 mevcut MASTER-PLAN'a katlı. Tüm 118 REPL bulgusu hesapta (2 refute-drop, 1 downgrade). Disk-verify-çelişkili "DONE" satırlar ayrı-born (WorkerApprovalGate 34/70, TERM-RPC 54, F2-008 60, DEFER-002 75).
 
+## 🎯 MARATHON GOAL — otonom loop (kalan iş; 2026-07-08 gece, Alperen "goal'e ekle" + "goal'a başla dediğimde koş")
+> **Tetik:** Alperen "goal'a başla" DEYİNCE otonom loop koşar (yatıyor; build gerektikçe BEN yaparım, /mcp restart gereksiz — CLI'dan güncel-dist okur). Başlamadan bu goal + teyit hazır. Sıra: **(a) prompt-gate G-serisi el-kod → (c) governance-wire el-kod → (b) born-sprint döngüsü** (dogfood-gate ile).
+>
+> **(a) Prompt-gate G-serisi (BEN el-kod, DISTINCT-FILE: prompt-gate/adr-selector/routing-engine/prompt-god-template):**
+> - **G1c** premise-groundtruth: `auditPlanGroundTruth` (planner.ts:763, ŞU AN yalnız numeric agents-claim + UNWIRED) → "X eksik/yok" iddia grep-check'e genişlet + gate-lint olarak wire. ⚠️ gate'i pure'dan **repo-aware**'e taşır (repo-grep'i evaluatePromptGate'e geçir). 387-012 bayat-Ed25519'u yakalar.
+> - **G3** operation-class→persona routing (routeTaskV2, G2b'nin KÖK-fix'i): taskDNA `operations` ağırlıklarını persona-seçimine bağla (refactorer'ı davranış-değiştiren task'tan uzak tut). Sinyal üretiliyor, tüketici eksik.
+> - **R-5/R-5a** (küçük): d-004 full-render'ı import-touching'e daralt · nogo-koşullu-talimat "compatibility note" render · ADR `prompt_summary` (G-006 truncation).
+>
+> **(c) Governance-wire (BEN el-kod — subagent-haritası: NOT sprint-phases edit, düşük blast-radius):**
+> - **born-560** RBAC→SPAWN: `authorizeExecution` (nervous/authority-matrix.ts, built+0-caller) → `sprint-spawner.ts` per-task loop (~:557, `blockedTaskIds` desenini aynala), `config.enforce_rbac` gate'li (default-off soft). `task.actor` zaten threaded. "rbac persist"=AuthorityAuditContext ver (**Alperen-teyit gerek**). ADR-G-020 AUTHORITY-SSOT dilimi. `authority-enforcer.checkAuthority` DEĞİL (hard-mode yok).
+> - **born-562** 5 safety-net (doğru-kapsam): (1) cost_guard→`sprint-controller.ts` (resourceMonitor deseni ~:1290/1699/1743) + shouldStopDispatch'i sprint-spawner wave-loop'ta tüket · (2) resumeSprint→`resume.ts` runSprint-öncesi PAUSED-check · (3) **ApprovalExpiryDriver=BLOKELİ** (persistent broker+store yok; api/server createHttpServer — ERTELE/flag) · (4) resolveTokenUsage→`result-collector.ts` enrichResultTokenUsage (session-store tier) · (5) restoreFromSnapshot→`recover.ts` `--restore-tasks` flag.
+>
+> **(b) Born-sprint döngüsü (worker=sonnet, 37 OPEN, dedup ∅):** 494 502 517 529 530 537 541 548 575 579 583 + greenfield 496/497 + Windows-cluster 580 (sub-slice) + closed-hot single-owner 565/572/582. Her sprint: DIRECTIVES→dogfood-gate (plan --dry-run WARN/BLOCK gör→persona düzelt)→start→disk-verify→commit→build (sprint-arası, BEN).
+>
+> **Bağlayıcı (değişmez):** worker=sonnet · dedup-∅ (66/103 DONE'a karşı) · disk-verify ground-truth (Brain sentetik-NO_GO'ya güvenme, race-artifaktı disk-DONE override) · git-guard CANLI · her sprint commit (`git branch -vv` önce) · sprint'te build/login YOK · build BEN (sprint-arası) · usage: Fable-hafta ≥%95→DUR+haber (şu an headroom-iyi, Sonnet-ağırlıklı) · i18n-first · hermetik-test.
+
 ## Sprint günlüğü (canlı — her sprint sonrası satır ekle)
 | Sprint | Tema | Task/Wave | Sonuç (DONE/DEBT/NO_GO) | Commit | born-devir | Usage-sonrası |
 |---|---|---|---|---|---|---|
