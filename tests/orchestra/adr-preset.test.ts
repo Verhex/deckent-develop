@@ -107,6 +107,11 @@ describe('TASK_TYPE_ADR_PRESETS', () => {
     expect(TASK_TYPE_ADR_PRESETS).toBeDefined();
     expect(TASK_TYPE_ADR_PRESETS['core-dev']).toContain('adr-d-001');
     expect(TASK_TYPE_ADR_PRESETS['core-dev']).toContain('adr-d-004');
+    // R-2 (RC-2 fix): the routing ADR is NOT a universal core-dev preset — it must
+    // not be force-boosted onto a non-routing core task (e.g. a permission fix).
+    expect(TASK_TYPE_ADR_PRESETS['core-dev']).not.toContain('adr-g-006');
+    // It stays an orchestra preset, where routing IS the domain concern.
+    expect(TASK_TYPE_ADR_PRESETS['orchestra']).toContain('adr-g-006');
     expect(TASK_TYPE_ADR_PRESETS['docs']).toContain('adr-g-015');
     expect(TASK_TYPE_ADR_PRESETS['test']).toContain('adr-d-002');
     expect(TASK_TYPE_ADR_PRESETS['security']).toContain('adr-g-020');

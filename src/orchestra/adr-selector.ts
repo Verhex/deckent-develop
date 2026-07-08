@@ -48,7 +48,15 @@ export type TaskType = AdrTaskType;
 // dead no-op (every intent-preference score = 0), so selection fell back to keyword
 // matching only. Mapping preserves each domain's original architectural intent.
 export const TASK_TYPE_ADR_PRESETS: Record<AdrTaskType, string[]> = {
-  'core-dev':      ['adr-d-001', 'adr-d-004', 'adr-g-006'],
+  // R-2 (2026-07-08, RC-2 fix): adr-g-006 (Routing & Selection) removed from the
+  // core-dev preset — it is a routing-specific concern, not a universal core-dev
+  // one, so a non-routing core task (e.g. a src/agent permission fix) no longer
+  // gets it force-boosted into its top-N (sprint-386 386-006: g-006 injected onto a
+  // deckent_bash permission task where it was irrelevant). A genuine routing task
+  // still surfaces g-006 via keyword/scope match (F1.3) and via the orchestra
+  // preset below. d-001 (build baseline) + d-004 (import direction) stay: both are
+  // broadly relevant to any core code change.
+  'core-dev':      ['adr-d-001', 'adr-d-004'],
   'docs':          ['adr-g-015'],
   // adr-d-002 (State-Path & Test Hermeticity — absorbed old adr-003/087) is THE
   // hermeticity ADR (tmpdir, no spawnSync, CI-fresh); adr-g-009 = eval/surface.
@@ -72,7 +80,7 @@ export const TASK_TYPE_ADR_PRESETS: Record<AdrTaskType, string[]> = {
  * (dead scoring). Mapping preserves each intent's original architectural intent.
  */
 const INTENT_ADR_PREFERENCES: Record<string, string[]> = {
-  'core-dev':      ['adr-d-001', 'adr-g-001', 'adr-d-004', 'adr-g-006', 'adr-g-012'],
+  'core-dev':      ['adr-d-001', 'adr-g-001', 'adr-d-004', 'adr-g-012'],
   'orchestra':     ['adr-d-004', 'adr-g-006', 'adr-d-006'],
   'cli':           ['adr-d-005', 'adr-d-006', 'adr-g-011'],
   'mcp':           ['adr-g-008', 'adr-g-011'],
