@@ -12,7 +12,8 @@ export type PromptGateLint =
   | 'persona-mandate'    // agent carries a zero-functional-change mandate on a behavior-changing task
   | 'persona-role'       // reviewer/analyst persona on construction work
   | 'persona-domain'     // agent domain ≠ task domain (HIGH)
-  | 'decision-space';    // goCriteria offers a false choice (X VEYA/OR Y)
+  | 'decision-space'     // goCriteria offers a false choice (X VEYA/OR Y)
+  | 'premise';           // description claims a symbol is absent but it exists in the repo (stale)
 
 /** Emitted severity. `pass` findings are never materialized (absence = pass). */
 export type PromptGateLevel = 'pass' | 'warn' | 'block';

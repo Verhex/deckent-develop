@@ -769,14 +769,25 @@ export async function planSprint(
       `affinity=${skillAgentAffinity} distribution: ${JSON.stringify(summarizeAgentDistribution(affinitySink.records))}`,
     );
 
-    // G-series plan-time prompt-gate (G1a persona + G1d decision-space): flag every
-    // finalized task's (persona × intent) fit + goCriteria decision-shape, source-
-    // agnostic (forceAgent AND router picks). Pure — never throws; surfaced by the
-    // caller (deckent plan / MCP), blocks on BLOCK unless acknowledged.
+    // G-series plan-time prompt-gate (G1a persona + G1d decision-space + G1c premise):
+    // flag every finalized task's (persona × intent) fit, goCriteria decision-shape, and
+    // stale "X is missing" premises — source-agnostic (forceAgent AND router picks).
+    // Surfaced by the caller (deckent plan / MCP); blocks on BLOCK unless acknowledged.
     promptGate = evaluatePromptGate({
       tasks,
       agentPool: pool,
       acknowledgePromptGate: options?.acknowledgePromptGate,
+      // G1c: bounded, fail-soft repo probe — count tracked files containing a symbol.
+      // spawnSync git-grep exits 1 on no-match (→ status !== 0 → 0), so a missing symbol
+      // or any error never invents a finding.
+      probeRepo: (symbol: string): number => {
+        if (!symbol || symbol.length < 4) return 0;
+        const r = spawnSync('git', ['grep', '-I', '-l', '-F', '--', symbol], {
+          cwd: projectRoot, encoding: 'utf-8', timeout: 2000,
+        });
+        if (r.status !== 0 || typeof r.stdout !== 'string') return 0;
+        return r.stdout.split('\n').filter(Boolean).length;
+      },
     });
     if (promptGate.findings.length > 0) {
       debugLog(

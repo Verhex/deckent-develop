@@ -235,3 +235,55 @@ describe('source-agnostic + generic', () => {
     expect(r.findings.filter((x) => x.lint === 'persona-role')).toHaveLength(2);
   });
 });
+
+describe('G1c premise ground-truth lint', () => {
+  it('WARNs when a symbol claimed missing is present in the repo (probe > threshold)', () => {
+    const r = evaluatePromptGate({
+      tasks: [task({ id: 'p1', assignedAgent: 'bug-fixer', description: 'Add Ed25519 signing: resolveTokenUsage is missing.', routingMeta: dna('implementation', 'create') })],
+      agentPool: pool('bug-fixer'),
+      probeRepo: (s) => (s === 'resolveTokenUsage' ? 5 : 0),
+    });
+    const f = r.findings.find((x) => x.lint === 'premise');
+    expect(f).toBeDefined();
+    expect(f!.level).toBe('warn');
+    expect(f!.message).toContain('resolveTokenUsage');
+    expect(r.ok).toBe(true); // premise is WARN-only
+  });
+
+  it('no WARN when the probe returns 0 (symbol genuinely absent)', () => {
+    const r = evaluatePromptGate({
+      tasks: [task({ id: 'p2', assignedAgent: 'bug-fixer', description: 'newHelperFunc is missing.', routingMeta: dna('implementation', 'create') })],
+      agentPool: pool('bug-fixer'),
+      probeRepo: () => 0,
+    });
+    expect(r.findings.some((x) => x.lint === 'premise')).toBe(false);
+  });
+
+  it('gate stays pure when no probeRepo is supplied (no premise lint runs)', () => {
+    const r = evaluatePromptGate({
+      tasks: [task({ id: 'p3', assignedAgent: 'bug-fixer', description: 'resolveTokenUsage is missing.', routingMeta: dna('implementation', 'create') })],
+      agentPool: pool('bug-fixer'),
+    });
+    expect(r.findings.some((x) => x.lint === 'premise')).toBe(false);
+  });
+
+  it('conservative: a plain English word claimed missing is NOT probed (needs a code-identifier shape)', () => {
+    let called = 0;
+    const r = evaluatePromptGate({
+      tasks: [task({ id: 'p4', assignedAgent: 'bug-fixer', description: 'the login page is missing.', routingMeta: dna('implementation', 'create') })],
+      agentPool: pool('bug-fixer'),
+      probeRepo: () => { called++; return 9; },
+    });
+    expect(r.findings.some((x) => x.lint === 'premise')).toBe(false);
+    expect(called).toBe(0); // no camelCase/underscore token before "missing" → regex extracts nothing → probe never called
+  });
+
+  it('Turkish absence word (eksik) with a code identifier is matched', () => {
+    const r = evaluatePromptGate({
+      tasks: [task({ id: 'p5', assignedAgent: 'bug-fixer', description: 'executeComputerUseAction eksik, implement et.', routingMeta: dna('implementation', 'create') })],
+      agentPool: pool('bug-fixer'),
+      probeRepo: (s) => (s === 'executeComputerUseAction' ? 4 : 0),
+    });
+    expect(r.findings.some((x) => x.lint === 'premise')).toBe(true);
+  });
+});

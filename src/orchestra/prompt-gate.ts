@@ -45,6 +45,15 @@ export interface PromptGateInput {
   agentPool: Map<string, AgentDefinition>;
   /** If true, BLOCK findings do NOT set ok=false (CLI `--force-prompt-gate`). */
   acknowledgePromptGate?: boolean;
+  /**
+   * G1c premise ground-truth probe (optional). A bounded, fail-soft repo search that
+   * returns how many times a code-symbol occurs in the codebase. When supplied, the
+   * gate spot-checks "X is missing/absent/unimplemented" claims in task descriptions:
+   * a symbol claimed absent but found in the repo → WARN (stale premise, like the
+   * sprint-387-012 "Ed25519 keygen missing" premise that was already implemented).
+   * Absent → the premise lint is skipped (gate stays pure).
+   */
+  probeRepo?: (symbol: string) => number;
 }
 
 /**
@@ -210,6 +219,60 @@ function lintDecisionSpace(task: Task): PromptGateFinding | null {
   };
 }
 
+/**
+ * A CODE-symbol (camelCase or snake_case, so a real identifier — not a plain English
+ * word) claimed absent. The `(?:[a-z][A-Z]|_)` requires a camelCase hump or underscore,
+ * keeping this conservative: "executeComputerUseAction is unimplemented",
+ * "resolveTokenUsage() eksik" match; "the api is missing" does not.
+ */
+// NOTE: intentionally NOT case-insensitive — the `[a-z][A-Z]` camelCase-hump test only
+// works under case-sensitivity (a `/i` flag would make `[a-z][A-Z]` match any two letters
+// and flag plain words like "page"). Absence words carry their own case alternation.
+const ABSENCE_CLAIM_RE =
+  /\b([A-Za-z_][A-Za-z0-9_]*(?:[a-z][A-Z]|_)[A-Za-z0-9_]*)(?:\(\))?\s+(?:is\s+|are\s+)?(?:currently\s+)?(?:[Mm]issing|[Aa]bsent|[Uu]nimplemented|not\s+implemented|eksik|yok|mevcut\s+değil)\b/g;
+
+/** Max distinct symbols probed per task (bounds plan-time repo searches). */
+const MAX_PREMISE_PROBES = 4;
+/** A symbol must occur more than this many times to count as "really present" (not an incidental mention). */
+const PREMISE_PRESENT_THRESHOLD = 2;
+
+/**
+ * G1c-premise (WARN): a task description claims a code-symbol is missing/absent, but the
+ * repo probe finds it present. Catches the sprint-387-012 class of stale premise (nogo
+ * "add Ed25519 keygen" when `@noble/ed25519` signing already shipped). WARN-only and
+ * conservative (code-identifier shape + present-threshold) to keep false positives low.
+ */
+function lintPremise(task: Task, probeRepo: (symbol: string) => number): PromptGateFinding[] {
+  const desc = task.description ?? '';
+  if (!desc) return [];
+  const seen = new Set<string>();
+  const out: PromptGateFinding[] = [];
+  ABSENCE_CLAIM_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = ABSENCE_CLAIM_RE.exec(desc)) !== null && seen.size < MAX_PREMISE_PROBES) {
+    const symbol = m[1];
+    if (!symbol || seen.has(symbol)) continue;
+    seen.add(symbol);
+    let count = 0;
+    try {
+      count = probeRepo(symbol);
+    } catch {
+      count = 0; // fail-soft: a probe failure never invents a finding
+    }
+    if (count > PREMISE_PRESENT_THRESHOLD) {
+      out.push({
+        taskId: task.id,
+        lint: 'premise',
+        level: 'warn',
+        agentId: task.assignedAgent ?? 'generic',
+        message: `Premise may be stale: the description claims '${symbol}' is missing/absent, but it occurs ${count}× in the repo — the fix may already exist.`,
+        suggestion: `Verify '${symbol}' against the codebase before implementing; if it already exists, narrow the task to the true remaining gap (or close it).`,
+      });
+    }
+  }
+  return out;
+}
+
 // ─── Evaluator ───────────────────────────────────────────────────────────────
 
 /**
@@ -245,6 +308,10 @@ export function evaluatePromptGate(input: PromptGateInput): PromptGateResult {
 
     const dec = lintDecisionSpace(task);
     if (dec) findings.push(dec);
+
+    if (input.probeRepo) {
+      findings.push(...lintPremise(task, input.probeRepo));
+    }
   }
 
   const blockers = findings.filter((f) => f.level === 'block');
