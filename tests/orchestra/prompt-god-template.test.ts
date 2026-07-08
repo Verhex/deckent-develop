@@ -393,6 +393,22 @@ describe('buildTaskPrompt — MF-1 doc-task verify gate', () => {
     expect(result.prompt).toContain('CRITICAL VERIFY STEPS (DO NOT SKIP)');
     expect(result.prompt).not.toContain('doc-only task — DO NOT run the test suite');
   });
+
+  // LP-6 (tier-aware weight): a doc-only task never runs a package manager → the
+  // full npm-mutation advisory is dropped; a code task keeps it verbatim.
+  it('doc-only task omits the npm-mutation advisory; code task keeps it (LP-6)', () => {
+    const doc = buildTaskPrompt(makeTask({
+      type: 'documentation',
+      scope: { directories: ['scratch/'], filesRead: [], filesWrite: ['scratch/note.md'] },
+    }), makeCtx());
+    expect(doc.prompt).not.toContain('Dependency-Mutation Advisory');
+
+    const code = buildTaskPrompt(makeTask({
+      type: 'code-development',
+      scope: { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/x.ts'] },
+    }), makeCtx());
+    expect(code.prompt).toContain('Dependency-Mutation Advisory');
+  });
 });
 
 // WP-14 (🔴): the "pre-existing failures" line in CRITICAL VERIFY STEPS must be

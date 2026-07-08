@@ -99,6 +99,18 @@ describe('F2.1b: buildScopeBlock classifies write targets when trackedFiles is g
     expect(out).not.toContain('New — you are expected to create');
     expect(out).not.toContain('⚠ Unverified');
   });
+
+  // LP-4 (scope taxonomy): the scope block must exempt .tasks/ protocol files so the
+  // "ONLY these files" authority does not contradict the required lifecycle writes.
+  it('exempts .tasks/ protocol files from the scope audit (LP-4) — both branches', () => {
+    const withFiles = buildScopeBlock(
+      { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/x.ts'] }, [], false);
+    expect(withFiles).toMatch(/\.tasks\/.*exempt from this scope audit/s);
+    expect(withFiles).toContain('always writable');
+    const dirOnly = buildScopeBlock(
+      { directories: ['src/x/'], filesRead: [], filesWrite: [] }, [], false);
+    expect(dirOnly).toMatch(/\.tasks\/.*exempt from this scope audit/s);
+  });
 });
 
 // ─── W4: tiered ADR injection ───────────────────────────────────────────

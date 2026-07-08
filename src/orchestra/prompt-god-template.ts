@@ -689,6 +689,17 @@ export function buildScopeBlock(
     ? `\n\nWhen writing host-facing config (hooks in \`.claude/settings.json\`, scripts in \`package.json\`, CI workflows), NEVER hard-code your container working directory (e.g. \`/workspace/...\`). That path does not exist on the user's host machine and will break at runtime. Use a portable form instead: \`$CLAUDE_PROJECT_DIR/...\`, a path relative to the project root, or a bare command resolved via PATH.`
     : '';
 
+  // LP-4 (2026-07-08 scope taxonomy): the WRITE authority names only project
+  // artifacts, but the prompt also REQUIRES the worker to write its own
+  // `.tasks/task-<id>.{plan,hb,result}` (and a `.question` on escalation). Without
+  // this exemption the "ONLY these files" line reads as self-contradictory — a
+  // literal worker either skips its lifecycle files (result-missing → sprint stall)
+  // or fears a scope violation. State the taxonomy split explicitly: protocol files
+  // are lifecycle artifacts, always writable, and never counted as scope mutations
+  // (the auditor already whitelists them — this makes the prompt match the audit).
+  const tasksExemptionNote =
+    `\n\nSeparately, your worker-protocol files under \`.tasks/\` (your \`.plan\`, \`.hb\`, \`.result\`, and a \`.question\` if you escalate) are lifecycle artifacts, NOT project changes — they are always writable and are exempt from this scope audit. Writing them is required and never counts as touching a file outside your scope.`;
+
   // PCOMP-W1 (single write authority — sprint-348-005 prompt analysis): the old
   // template printed TWO conflicting authorities ("ONLY modify in these
   // directories" [7 dirs] vs "ONLY write to these files" [2 files]) — ambiguous
@@ -711,7 +722,7 @@ ${scopeDirs}
 WRITE authority (canonical — the ONLY files you may create or modify):
 ${writeAuthority}
 
-A directory appearing in the read scope does NOT grant write permission there — the write list above is the single authority, and the auditor flags any write outside it. If a change seems needed in a file you cannot write, note it in your .result \`notes\` instead of editing it.${hostConfigNote}`;
+A directory appearing in the read scope does NOT grant write permission there — the write list above is the single authority, and the auditor flags any write outside it. If a change seems needed in a file you cannot write, note it in your .result \`notes\` instead of editing it.${tasksExemptionNote}${hostConfigNote}`;
   }
 
   return `## Scope Rules
@@ -721,7 +732,7 @@ ${scopeDirs}
 You may ONLY write to these files:
 ${scopeFiles}
 
-DO NOT touch files outside your scope — the auditor will flag violations.${hostConfigNote}`;
+DO NOT touch files outside your scope — the auditor will flag violations.${tasksExemptionNote}${hostConfigNote}`;
 }
 
 // ─── Dependencies Block Builder ────────────────────────────────────────
@@ -1376,7 +1387,12 @@ ${buildVerifyPrecedenceNote(verificationMode)}`);
   // ignore-scripts=true` + container-vs-host ABI destroyed the better-sqlite3
   // binding for every host process. Static content (no task.id) → T0, so it
   // rides the shared cache prefix.
-  push('T0', 'npm-advisory', NPM_ADVISORY_BLOCK);
+  // LP-6 (2026-07-08 tier-aware weight): a doc-only task writes markdown/text and
+  // never touches a package manager, so the full incident-narrated advisory is pure
+  // noise that dilutes the one constraint that matters (scope). Skip it for doc-only
+  // tasks — the doc/code T0 prefix already diverges (verify-steps), so this adds no
+  // new cache split. Every non-doc task keeps the full advisory verbatim.
+  if (!isDocOnlyTask) push('T0', 'npm-advisory', NPM_ADVISORY_BLOCK);
 
   // Smoke note (WP-16) — Tier-1 Proof-of-Function context. Emitted next to the
   // VERIFY STEPS (its natural home) only when the task carries a Smoke: directive.
