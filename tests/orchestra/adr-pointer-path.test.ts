@@ -156,6 +156,6 @@ describe('buildAdrPromptSection pointer resolution (born-469)', () => {
 
     const out = buildAdrPromptSection(ranked, 'full', all, 'full', true, root);
 
-    expect(out).toContain('[full: docs/adr/adr-g-006-routing-selection.md]');
+    expect(out).toContain('[background constraint — full: docs/adr/adr-g-006-routing-selection.md]');
   });
 });

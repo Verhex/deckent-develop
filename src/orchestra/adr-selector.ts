@@ -695,7 +695,7 @@ export function buildAdrPromptSection(
             : '';
         const summaryBlock = summaryText ? `${summaryText}\n\n` : '';
         sections.push(
-          `## ${adr.adrId}: ${adr.title}\n\n${constraintHead}${summaryBlock}[full: ${resolveAdrPointerText(adr.adrId, adrDocsDir)}]`,
+          `## ${adr.adrId}: ${adr.title}\n\n${constraintHead}${summaryBlock}[background constraint — full: ${resolveAdrPointerText(adr.adrId, adrDocsDir)}]`,
         );
         continue;
       }

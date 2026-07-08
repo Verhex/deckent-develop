@@ -99,7 +99,7 @@ ${BODY_SENTINEL} — long amendment history follows here with many revisions.`;
 
     expect(section).toContain('## adr-008: Brain Central Import');
     expect(section).toContain('**Active constraint:**');
-    expect(section).toContain('[full: .brain/memory.db adr-008]');
+    expect(section).toContain('[background constraint — full: .brain/memory.db adr-008]');
     // The amendment-log body is dropped.
     expect(section).not.toContain(BODY_SENTINEL);
   });
@@ -132,8 +132,12 @@ ${BODY_SENTINEL} — long amendment history follows here with many revisions.`;
 
     const codeDev = buildTaskPrompt(makeTask({ ...baseTask, type: 'code-development' }), ctx);
     expect(codeDev.metadata.adrIds).toContain('adr-008');
-    expect(codeDev.prompt).toContain('[full: .brain/memory.db adr-008]');
+    expect(codeDev.prompt).toContain('[background constraint — full: .brain/memory.db adr-008]');
     expect(codeDev.prompt).not.toContain(BODY_SENTINEL);
+    // G5 (enforcement-tier render): the ADR heading splits binding vs advisory-context,
+    // so a marked "[background constraint — …]" ADR is no longer framed as a hard NO_GO gate.
+    expect(codeDev.prompt).toContain('are BINDING for THIS task');
+    expect(codeDev.prompt).toContain('ADVISORY CONTEXT');
 
     const noType = buildTaskPrompt(baseTask, ctx);
     expect(noType.metadata.adrIds).toContain('adr-008');

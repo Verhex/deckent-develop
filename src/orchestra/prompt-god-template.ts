@@ -496,7 +496,7 @@ function buildAdrBlock(
   const content = buildAdrPromptSection(filtered, 'full', allAdrs, 'operative', scopeGated);
   if (!content) return '';
 
-  return `=== Mandatory Architecture Rules (ADR) ===\nAll accepted ADRs below are mandatory constraints. Violating an accepted ADR requires a NO_GO result + ADR amendment proposal.\n\n${content}\n`;
+  return `=== Mandatory Architecture Rules (ADR) ===\nADRs rendered with a full body below are BINDING for THIS task: violating one requires a NO_GO result + an ADR amendment proposal. Entries marked "[background constraint — …]" are ADVISORY CONTEXT — surfaced for awareness, not a hard gate for this task; follow them where relevant and diverge only with a noted reason (not an automatic NO_GO).\n\n${content}\n`;
 }
 
 // ─── Smoke Note Builder (WP-16) ────────────────────────────────────────
