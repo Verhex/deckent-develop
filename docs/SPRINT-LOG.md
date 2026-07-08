@@ -9260,3 +9260,195 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 379-003: DIRECTIVES-RESTORE-QUIRK — kapanışta eski-içeriğe dönme fix'i (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 380 — sprint-380
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-07
+**Duration:** 1566s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 15 |
+| Completed | 15 |
+| Tech Debt | 5 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1565511ms |
+
+### Tasks
+
+- 380-001: born-558 — SKILL-LIST-V2-CRASH — `deckent skill list` v2-manifest'te exit 1 (GO_WITH_TECH_DEBT)
+- 380-002: born-559 — LIFECYCLE-CRITICAL-2 — approval sonsuz-bekleme + ADR-gate fail-open (DONE)
+- 380-003: born-573 — WORKER-APPROVAL-GATE-WIRE — WorkerApprovalGate prod'da hiç `new` edilmiyor (WIRE-ON) (GO_WITH_TECH_DEBT)
+- 380-004: born-518 — CROSS-PROVIDER-CRED-SCRUB — provider secret'ları paylaşılan process.env'de sızıyor (P0-SEC) (GO_WITH_TECH_DEBT)
+- 380-005: born-509 — SPAWN-ERROR-LISTENERS — REPL spawn-site'larında error/state-reset eksik → ENOENT crash (DONE)
+- 380-006: born-512 — PROVIDER-SWITCH-CRASH — geçersiz /provider adı REPL'i çökertiyor (DONE)
+- 380-007: born-514 — AGENTIC-DISPATCH-OVERMATCH — NL-intent regex'leri sıradan sohbeti tool-call'a kaçırıyor (GO_WITH_TECH_DEBT)
+- 380-008: born-515 — NERVOUS-SLASH-FALSE-SUCCESS — /nervous accept|reject executor'a hiç ulaşmıyor (DONE)
+- 380-009: born-516 — TOOL-BRIDGE-TIMEOUT — düz 30s SPAWN_TIMEOUT uzun deckent_audit/plan'ı öldürüyor (DONE)
+- 380-010: born-526 — PROVIDER-PARITY-ROBUST — exit-code okunmuyor + Ollama/HTTP timeout'suz + codex env-key boşluğu (DONE)
+- 380-011: born-535 — DECKENT-BASH-HARDEN — hanging-komut timeout'suz + bash hardcode (Win-native kırık) (DONE)
+- 380-012: born-62 — CURSOR-MODEL-WIRE — line-edit UTF-16 surrogate böler; code-point-safe cursor-model'i wire et (WIRE-ON) (DONE)
+- 380-013: born-505 — DOCTOR-DUP-PREFLIGHT — iki özdeş runPreFlightHealthCheck tanımı (GO_WITH_TECH_DEBT)
+- 380-014: born-513 — CHAT-NATIVE-CLEAR-CONTEXT — /clear yalnız JS-transcript'i siliyor, warm-child context'i kalıyor (DONE)
+
+---
+## Sprint 381 — sprint-381
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-08
+**Duration:** 1220s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1220418ms |
+
+### Tasks
+
+- 381-001: born-499-HARD — WORKER-GIT-GUARD — spawn-backend'lere git-shim enjekte et (GO_WITH_TECH_DEBT)
+
+---
+## Sprint 382 — sprint-382
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-08
+**Duration:** 699s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 8 |
+| Tech Debt | 3 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 699485ms |
+
+### Tasks
+
+- 382-001: born-573-REDO — WORKER-APPROVAL-GATE gerçek-site'a wire (Sprint-1 wrong-path düzelt) (DONE)
+- 382-002: born-518-REDO — CRED-SCRUB gerçek leak-site'a wire (Sprint-1 wrong-path düzelt) (GO_WITH_TECH_DEBT)
+- 382-003: born-508 — INPUTBAR↔APPROVALCARD MUTEX — tuş çift-tüketimi (yıkıcı kör-onay) (DONE)
+- 382-004: born-574 — NERVOUS-UNDO gerçek compensating-executor (DONE)
+- 382-005: born-569 — NERVOUS-DETECTOR-REACH — 3 detektör ACTION_REGISTRY mismatch (DONE)
+- 382-006: born-566 — WRITER-LEASE FAIL-CLOSED — fs-hatasında yazma reddedilsin (GO_WITH_TECH_DEBT)
+- 382-007: born-561 — AUTO-APPROVE-CONSISTENCY — CLI start/run hardcoded true'ları kaldır (GO_WITH_TECH_DEBT)
+- 382-008: born-555 — PERMISSION-STORE READ-MERGE-WRITE — settings.local.json'u ezmesin (DONE)
+
+---
+## Sprint 383 — sprint-383
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-08
+**Duration:** 607s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 8 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 607424ms |
+
+### Tasks
+
+- 383-001: born-552 — MCP-TOOL-EMPTY-DESC — boş-string açıklama REPL-launch'ı çökertiyor (DONE)
+- 383-002: born-550 — OFF-TTY-AUTOAPPROVE — piped stdin her yan-etkiyi kör-onaylıyor (SEC) (DONE)
+- 383-003: born-542 — SELF-MODIFY-GUARD-BYPASS — path-normalizasyon eksik (ADR-039 SEC) (DONE)
+- 383-004: born-532 — ANTHROPIC-PARALLEL-TOOLRESULT — sibling tool_result'lar bölünüyor (DONE)
+- 383-005: born-520 — NATIVE-TURN-ACCOUNTING — usage üzerine-yazılıyor + onTurnEnd reuse (DONE)
+- 383-006: born-519 — BASH-PERM-RESOURCE — primaryResource yanlış anahtar okuyor (DONE)
+- 383-007: born-510 — CONTEXT-BUDGET-ORPHAN-TOOLRESULT — compaction tool-pair'i bölüyor (DONE)
+- 383-008: born-511 — CHAT-SESSION-RECONCILE-SWAP — stream'lenen ile final sessizce farklı (DONE)
+
+---
+## Sprint 386 — sprint-386
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-08
+**Duration:** 798s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 12 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 6 |
+| Coverage | NaN% |
+| Duration | 798497ms |
+
+### Tasks
+
+- 386-001: born-552 — MCP-TOOL-EMPTY-DESC — boş-string açıklama REPL-launch'ı çökertiyor (NO_GO)
+- 386-002: born-550 — OFF-TTY-AUTOAPPROVE — piped stdin her yan-etkiyi kör-onaylıyor (SEC) (NO_GO)
+- 386-003: born-542 — SELF-MODIFY-GUARD-BYPASS — path-normalizasyon eksik (ADR-039 SEC) (DONE)
+- 386-004: born-532 — ANTHROPIC-PARALLEL-TOOLRESULT — sibling tool_result'lar bölünüyor (DONE)
+- 386-005: born-520 — NATIVE-TURN-ACCOUNTING — usage üzerine-yazılıyor + onTurnEnd reuse (NO_GO)
+- 386-006: born-519 — BASH-PERM-RESOURCE — primaryResource yanlış anahtar okuyor (DONE)
+- 386-007: born-510 — CONTEXT-BUDGET-ORPHAN-TOOLRESULT — compaction tool-pair'i bölüyor (DONE)
+- 386-008: born-511 — CHAT-SESSION-RECONCILE-SWAP — stream'lenen ile final sessizce farklı (DONE)
+
+---
+## Sprint 387 — sprint-387
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-08
+**Duration:** 2830s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 27 |
+| Completed | 24 |
+| Tech Debt | 6 |
+| No-Go | 3 |
+| Coverage | NaN% |
+| Duration | 2830495ms |
+
+### Tasks
+
+- 387-001: born-492 — W1-EXPERIENCE-ON — repl_surface i18n flip'i tamamla (P0) (DONE)
+- 387-002: born-493 — W2-WIRE — native-engine'i slash-dispatcher'a köprüle (24/37 komut sessiz-düşüyor) (P0) (GO_WITH_TECH_DEBT)
+- 387-003: born-551 — REPL-TURN-EXCEPTION-SURFACE — turn-loop istisnaları yutulmuyor (P1) (DONE)
+- 387-004: born-549 — SIGTERM-TEARDOWN — sinyal-temizliği eksik (warm-child/MCP/Windows) (P1) (DONE)
+- 387-005: born-563 — MEMORY-TENANT-ISOLATION — tenant izolasyonu default-ON (P1) (GO_WITH_TECH_DEBT)
+- 387-006: born-564 — PANIC-GATE-FAILCLOSED — fail-closed marker yanlış yorumlanıyor (P1) (DONE)
+- 387-007: born-567 — SPAWN-SAFETY-WIRE — assertSpawnSafe her spawn call-site'ına (P1) (DONE)
+- 387-008: born-568 — PROCESS-GROUP-KILL — 6 adapter'da SIGTERM→SIGKILL process-group (P1) (GO_WITH_TECH_DEBT)
+- 387-009: born-571 — FLOW-EVENT-DISPATCH — flow approve reader + `flow approve` komutu (P1) (DONE)
+- 387-010: born-83 — TOOL-CU — computer-use wire + navigate/region-screenshot + injection-harden (P2) (GO_WITH_TECH_DEBT)
+- 387-011: born-203 — ONB-2 — rich doctor: Windows-native profil + auth-state probe (P1) (DONE)
+- 387-012: born-503 — HUB-P0 — Ed25519 signing + sandbox-on-install + BUILTIN_TRUSTED_SKILLS id fix (P2) (GO_WITH_TECH_DEBT)
+- 387-013: born-522 — MCP-CLIENT-GATE — mcp_client_enabled ölü-gate: wire ya da kaldır (P2) (GO_WITH_TECH_DEBT)
+- 387-014: born-523 — AGENTIC-CONFIRM-HARDEN — readline reuse + SAFE-before-RISKY sıralama (P2) (DONE)
+- 387-015: born-524 — TOOL-PERM-TIER — deckent_start/run/process explicit tier (P2) (DONE)
+- 387-016: born-525 — CHAT-RENDER-MARKDOWN — inline-reset bleed + link paren truncation (P2) (NO_GO)
+- 387-017: born-534 — APPROVAL-CHANNEL-DISPOSE — dispose() decisionHandler null'lamıyor (P2) (DONE)
+- 387-018: born-538 — TOOL-BRIDGE-ERR-CLASS — permission-denied vs runtime-error ayır (P3) (DONE)
+- 387-019: born-539 — CHAT-PERM-CONCURRENCY — read-merge-write concurrent grant kaybı (P2) (DONE)
+- 387-020: born-543 — AGENT-LOOP-CANCEL — cancel() in-flight interrupt + orphan tool_use yok (P2) (DONE)
+- 387-021: born-544 — OPENAI-TOOLCALL-ID — tool-call ID benzersizliği (P2) (NO_GO)
+- 387-022: born-545 — ANTHROPIC-ERR-BODY — hata gövdesini yanıta dahil et (P3) (NO_GO)
+- 387-023: born-546 — TRANSCRIPT-EVICTION — truncation/eviction politikası (P2) (DONE)
+- 387-024: born-553 — MCP-BRIDGE-DROP-WARN — görünür drop-warning + double-audit fix (P2) (DONE)
+- 387-025: born-554 — TERM-SHELL-FALLBACK — platform-aware shell fallback (P2) (DONE)
+- 387-026: born-577 — AUTONOMOUS-START-HONEST — action=start ya loop spawn ya honest-rename (P2) (DONE)
+- 387-027: born-581 — ESM-IMPORT-FIX — require('fs')→ESM import (P2) (DONE)
+
+---

@@ -1076,6 +1076,14 @@ const MESSAGES: MessageMap = {
     en: 'switch failed — "{detail}" has no native tool-use transport; valid: claude, openai, ollama, deepseek, qwen, glm',
     tr: 'geçiş başarısız — "{detail}" için native tool-use transport yok; geçerli: claude, openai, ollama, deepseek, qwen, glm',
   },
+  // native-transport.ts:247 produces errorCode 'no-transport' when detectTransport
+  // finds nothing configured at all — this key was missing, so localizeNativeError
+  // (run.tsx) fell back to the raw (Turkish-hardcoded, provider-detect.ts) reason
+  // string regardless of `lang` (Task 387-001).
+  'native.switch.no-transport': {
+    en: 'switch failed — no native transport configured: set ANTHROPIC_API_KEY / OPENAI_API_KEY / openai_base_url / ollama_host',
+    tr: 'geçiş başarısız — native transport tanımlı değil: ANTHROPIC_API_KEY / OPENAI_API_KEY / openai_base_url / ollama_host tanımlayın',
+  },
   'tui.render_error': {
     en: 'REPL render error',
     tr: 'REPL render hatası',
@@ -2393,6 +2401,62 @@ const MESSAGES: MessageMap = {
     en: 'usage: /term ask|run|control — file-write approval is separate: /approve suggest|auto-edit|full-auto',
     tr: 'kullanım: /term ask|run|control — dosya-yazma onayı ayrıdır: /approve suggest|auto-edit|full-auto',
   },
+
+  // ─── /resume picker (APP-SURFACE-WIRE 358-006 — ReplLabels.resumeHeader/
+  // resumeHint/resumeSwitched/resumeNotFound/resumeAmbiguous; buildResumePickerLines/
+  // resolveResumeCommand in app.tsx, wired by run.tsx's buildReplLabels. Distinct
+  // from tui.resume_list_header/tui.resume_hint/etc. above — those serve the
+  // OLDER loop-side /resume in chat-native.ts/chat-resume.ts, a different feature
+  // with different placeholders ({session} vs {arg}); Task 387-001) ────────────
+  'tui.resume_picker_header': { en: 'Recent sessions', tr: 'Son oturumlar' },
+  'tui.resume_picker_hint': {
+    en: 'Tip: /resume <number> to continue a session',
+    tr: 'İpucu: bir oturumu sürdürmek için /resume <numara>',
+  },
+  'tui.resume_picker_switched': { en: 'resumed: {id}', tr: 'sürdürülüyor: {id}' },
+  'tui.resume_picker_not_found': { en: 'session not found: {arg}', tr: 'oturum bulunamadı: {arg}' },
+  'tui.resume_picker_ambiguous': {
+    en: 'ambiguous — matches: {matches}',
+    tr: 'belirsiz — eşleşenler: {matches}',
+  },
+
+  // ─── busy-controls: /queue /interrupt /steer (APP-SURFACE-WIRE 358-006 —
+  // ReplLabels.busy*; renderBusyDecision in app.tsx, wired by run.tsx's
+  // buildReplLabels. Task 387-001) ──────────────────────────────────────────
+  'tui.busy_queue_status': {
+    en: 'queue: {count} background · {state}',
+    tr: 'kuyruk: {count} arkaplan · {state}',
+  },
+  'tui.busy_state_busy': { en: 'busy', tr: 'meşgul' },
+  'tui.busy_state_idle': { en: 'idle', tr: 'boşta' },
+  'tui.busy_interrupted': {
+    en: 'interrupt requested — stopping after the current step',
+    tr: 'kesme istendi — mevcut adımdan sonra durulacak',
+  },
+  'tui.busy_interrupt_idle': { en: 'nothing running to interrupt', tr: 'kesilecek bir şey çalışmıyor' },
+  'tui.busy_interrupt_dup': { en: 'interrupt already requested', tr: 'kesme zaten istendi' },
+  'tui.busy_steer_queued': {
+    en: 'steer note queued (#{position}) — applied at turn end',
+    tr: 'yönlendirme notu sıraya alındı (#{position}) — tur sonunda uygulanacak',
+  },
+  'tui.busy_steer_idle': { en: 'nothing running to steer', tr: 'yönlendirilecek bir şey çalışmıyor' },
+  'tui.busy_steer_empty': { en: 'usage: /steer <message>', tr: 'kullanım: /steer <mesaj>' },
+
+  // ─── ApprovalCard (APP-APPROVAL-WIRE 355-011 — ApprovalCardLabels; wired by
+  // run.tsx's buildApprovalLabels. `progress` reuses tui.confirm_progress
+  // (identical "[{index}/{total}]" template, no need for a duplicate key).
+  // Task 387-001) ────────────────────────────────────────────────────────────
+  'tui.approval_card_hint': {
+    en: '(y = approve · n = deny · a = approve similar · d = details)',
+    tr: '(y = onayla · n = reddet · a = benzerlerini onayla · d = detay)',
+  },
+  'tui.approval_card_details_heading': { en: 'Details', tr: 'Detaylar' },
+  'tui.approval_card_no_args': { en: '(no arguments)', tr: '(argüman yok)' },
+  'tui.approval_risk_none': { en: 'NONE', tr: 'YOK' },
+  'tui.approval_risk_low': { en: 'LOW', tr: 'DÜŞÜK' },
+  'tui.approval_risk_medium': { en: 'MEDIUM', tr: 'ORTA' },
+  'tui.approval_risk_high': { en: 'HIGH', tr: 'YÜKSEK' },
+  'tui.approval_risk_critical': { en: 'CRITICAL', tr: 'KRİTİK' },
 
   // ─── `deckent plan-nl` preview/backup lines (Task 354-008 DIR-1-CMD —
   // sole-authority addition; cited by 354-008's own directive "yenisi

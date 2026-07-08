@@ -20,6 +20,17 @@ const MAGENTA = '\x1b[35m';
 function visibleWidth(s: string): number { return stripAnsi(s).length; }
 
 /**
+ * Wrap `content` in an outer ANSI style, re-opening `open` after any RESET
+ * already embedded in `content` (e.g. a nested inline-code/link span rendered
+ * by an earlier pass). A plain `${open}${content}${RESET}` wrap would let the
+ * inner span's own RESET clear the outer style early — this keeps the outer
+ * style active for the remainder of the span, closing only at the very end.
+ */
+function wrapStyle(open: string, content: string): string {
+  return `${open}${content.split(RESET).join(`${RESET}${open}`)}${RESET}`;
+}
+
+/**
  * Wrap visible text as an OSC-8 terminal hyperlink (clickable in VS Code /
  * iTerm / modern terminals). Falls back gracefully — terminals that ignore
  * OSC-8 just print the visible text. `\x1b]8;;URL\x07 TEXT \x1b]8;;\x07`.
@@ -130,8 +141,11 @@ export function renderMarkdown(text: string, tty?: boolean): string {
   result = result.replace(/<kbd>([^<]+)<\/kbd>/g, (_: string, k: string) => `${INVERSE} ${k} ${RESET}`);
 
   // 5. Markdown links [text](url): http(s) → clickable OSC-8; relative → cyan + dim path.
+  // URL group allows one level of balanced parens (e.g. Wikipedia-style
+  // `Foo_(bar)`) so the regex doesn't truncate at the URL's own inner ')'
+  // and leak the link's real closing ')' unprocessed into the output.
   result = result.replace(
-    /\[([^\]\n]+)\]\((\S+?)(?:\s+"[^"]*")?\)/g,
+    /\[([^\]\n]+)\]\(((?:[^()\s]|\([^()]*\))+)(?:\s+"[^"]*")?\)/g,
     (_: string, t: string, url: string) =>
       /^https?:\/\//.test(url) ? hyperlink(url, t) : `${CYAN}${t}${RESET} ${DIM}(${url})${RESET}`,
   );
@@ -145,9 +159,9 @@ export function renderMarkdown(text: string, tty?: boolean): string {
   // 8. ATX headings — hierarchy: # bold-cyan, ## bold, ### dim-bold.
   result = result.replace(/^(#{1,6}) (.+)$/gm, (_: string, hashes: string, content: string) => {
     const level = hashes.length;
-    if (level === 1) return `${BOLD}${CYAN}${content}${RESET}`;
-    if (level === 2) return `${BOLD}${content}${RESET}`;
-    return `${BOLD}${DIM}${content}${RESET}`;
+    if (level === 1) return wrapStyle(`${BOLD}${CYAN}`, content);
+    if (level === 2) return wrapStyle(BOLD, content);
+    return wrapStyle(`${BOLD}${DIM}`, content);
   });
 
   // 9. Admonitions: > [!NOTE] … → colored icon header + colored left-bar quote.
@@ -168,11 +182,11 @@ export function renderMarkdown(text: string, tty?: boolean): string {
   }
 
   // 10. Bold + italic + strikethrough (order matters: *** before ** before *).
-  result = result.replace(/\*\*\*([^*\n]+)\*\*\*/g, (_: string, c: string) => `${BOLD}${ITALIC}${c}${RESET}`);
-  result = result.replace(/\*\*([^*\n]+)\*\*/g, (_: string, c: string) => `${BOLD}${c}${RESET}`);
-  result = result.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, (_: string, c: string) => `${ITALIC}${c}${RESET}`);
-  result = result.replace(/(?<![\w\\])_([^_\n]+)_(?![\w])/g, (_: string, c: string) => `${ITALIC}${c}${RESET}`);
-  result = result.replace(/~~([^~\n]+)~~/g, (_: string, c: string) => `${STRIKE}${c}${RESET}`);
+  result = result.replace(/\*\*\*([^*\n]+)\*\*\*/g, (_: string, c: string) => wrapStyle(`${BOLD}${ITALIC}`, c));
+  result = result.replace(/\*\*([^*\n]+)\*\*/g, (_: string, c: string) => wrapStyle(BOLD, c));
+  result = result.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, (_: string, c: string) => wrapStyle(ITALIC, c));
+  result = result.replace(/(?<![\w\\])_([^_\n]+)_(?![\w])/g, (_: string, c: string) => wrapStyle(ITALIC, c));
+  result = result.replace(/~~([^~\n]+)~~/g, (_: string, c: string) => wrapStyle(STRIKE, c));
 
   // 11. Ordered lists (1. 2. …) — preserve leading indent (nesting).
   result = result.replace(/^(\s*)(\d+)\. (.+)$/gm, (_: string, ind: string, n: string, c: string) => `${ind}${CYAN}${n}.${RESET} ${c}`);

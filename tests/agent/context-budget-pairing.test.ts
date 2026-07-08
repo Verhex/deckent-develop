@@ -95,4 +95,27 @@ describe('fitMessagesToBudget — orphan tool_result regression (born-510)', () 
     expect(fit.droppedCount).toBe(0);
     expect(fit.messages).toEqual(msgs);
   });
+
+  it('never leaves an orphan tool_result when the input has NO leading user message at all', () => {
+    // Degenerate/defensive case: no `user` message anywhere, so there is no
+    // turn boundary to fall back on. A naive implementation may narrow the
+    // "mandatory" (always-kept) span down to just the final message, letting
+    // the budget-fit walk force-include a lone `tool` result while dropping
+    // its owning `assistant` tool-call for being non-mandatory — orphaning it.
+    const msgs = [
+      assistant('call1', [{ id: 'cA', name: 'echo', args: {} }]),
+      tool('r1' + 'x'.repeat(200), 'cA'),
+      assistant('call2', [{ id: 'cB', name: 'echo', args: {} }]),
+      tool('r2' + 'y'.repeat(200), 'cB'),
+    ];
+    // Sized so the trailing tool result alone fits the budget but tool + its
+    // owning assistant call together do not — the exact split point that
+    // used to strand the tool result as a lone orphan.
+    expect(estimateMessageTokens(msgs[3]!)).toBe(55);
+    expect(estimateMessageTokens(msgs[2]!)).toBe(7);
+    const fit = fitMessagesToBudget(msgs, 60);
+
+    assertNoOrphanToolResult(fit.messages);
+    expect(fit.messages.length).toBeGreaterThan(1);
+  });
 });

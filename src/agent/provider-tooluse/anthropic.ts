@@ -54,6 +54,26 @@ function toAnthropicMessages(messages: readonly ProviderMessage[]): Record<strin
   return out;
 }
 
+/**
+ * Best-effort drain of a non-ok response body into text, for error-message
+ * enrichment. Consumed the same way parseSSE consumes a body (async-iterable of
+ * Uint8Array) rather than via resp.text() — some fetch-shaped mocks (and this
+ * project's own test fakes) only implement the async-iterable body, not `.text()`.
+ * A read failure must never mask the underlying HTTP-status error, so this
+ * swallows and returns '' on any error.
+ */
+async function readBodyText(body: AsyncIterable<Uint8Array>): Promise<string> {
+  try {
+    const decoder = new TextDecoder();
+    let text = '';
+    for await (const chunk of body) text += decoder.decode(chunk, { stream: true });
+    text += decoder.decode();
+    return text;
+  } catch {
+    return '';
+  }
+}
+
 export function createAnthropicAdapter(opts: AnthropicAdapterOptions): ProviderAdapter {
   const fetchImpl = opts.fetchImpl ?? globalThis.fetch;
   const baseUrl = opts.baseUrl ?? 'https://api.anthropic.com/v1';
@@ -83,7 +103,11 @@ export function createAnthropicAdapter(opts: AnthropicAdapterOptions): ProviderA
         },
         body: JSON.stringify(body),
       });
-      if (!resp.ok || !resp.body) throw new Error(`anthropic http ${resp.status}`);
+      if (!resp.ok) {
+        const bodyText = resp.body ? await readBodyText(resp.body as AsyncIterable<Uint8Array>) : '';
+        throw new Error(`anthropic http ${resp.status}${bodyText ? `: ${bodyText}` : ''}`);
+      }
+      if (!resp.body) throw new Error(`anthropic http ${resp.status}`);
 
       let inputTokens = 0;
       let outputTokens = 0;

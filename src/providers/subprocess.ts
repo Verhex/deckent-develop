@@ -32,12 +32,87 @@ import {
 
 /**
  * MOAT-2 (ADR-G-013): grace window between a graceful SIGTERM and the SIGKILL
- * escalation in {@link SubprocessSpawnBackend.killWithSignal}. Long enough for a
+ * escalation in {@link killProcessGroupWithEscalation}. Long enough for a
  * well-behaved worker to flush + exit on SIGTERM, short enough that a signal-
  * ignoring worker cannot survive as an orphan once `child.unref()` lets the
  * coordinator drain.
  */
-const SIGKILL_ESCALATION_MS = 2_000;
+export const SIGKILL_ESCALATION_MS = 2_000;
+
+/**
+ * PGID-TEARDOWN (ADR-G-013, MOAT-2 residual): signal a worker's WHOLE
+ * process group, not just its own pid — a worker that forks its own
+ * subprocess (e.g. a CLI agent's bash tool) would otherwise leave that
+ * grandchild orphaned, since a single-pid signal never reaches it.
+ *
+ * POSIX: the caller must have spawned `proc` with `detached: true`, making it
+ * the LEADER of its own process group (its pid IS the group id). Signalling
+ * the negative pid (`process.kill(-pid, signal)`) is POSIX kill(2)'s
+ * documented "signal the entire process group" form, reaching the worker and
+ * everything it spawned. If the group-form call throws (e.g. ESRCH — the
+ * group is already gone), fall back to the direct single-pid signal so the
+ * worker is still reaped.
+ *
+ * win32: `process.kill()` has no negative-pid group-signal semantics, and
+ * `detached` means something different there (new console, not new process
+ * group) — this always falls through to the single-pid `proc.kill(signal)`.
+ * This is an intentional, honest residual (not a silent gap): logged via
+ * `debugLog` so it is discoverable, with a `taskkill /T` follow-up tracked as
+ * a roadmap item rather than solved here.
+ *
+ * born-568 (PROCESS-GROUP-KILL): exported as a shared primitive so every
+ * subprocess-based provider adapter (codex.ts, gemini.ts, …) reuses this
+ * exact POSIX-group / win32-fallback branching instead of re-deriving it.
+ */
+export function signalProcessGroup(
+  proc: ChildProcess,
+  signal: NodeJS.Signals,
+  platform: NodeJS.Platform,
+): void {
+  const pid = proc.pid;
+  if (platform !== 'win32' && typeof pid === 'number') {
+    try {
+      process.kill(-pid, signal);
+      return;
+    } catch {
+      // Group already reaped, or pid is not (or no longer) a group leader —
+      // fall back to signalling the direct child below.
+    }
+  }
+  if (platform === 'win32') {
+    debugLog(
+      'subprocess:signalProcessGroup',
+      `win32 has no process-group signal semantics — only the direct worker pid (${String(pid)}) is signalled with ${signal}; any grandchild process it spawned may survive (WORKER-PGID-TEARDOWN, ADR-G-013 roadmap: taskkill /T follow-up)`,
+    );
+  }
+  proc.kill(signal);
+}
+
+/**
+ * born-568 (PROCESS-GROUP-KILL): SIGTERM→(grace)→SIGKILL escalation against a
+ * worker's process group — the shared kill entrypoint every subprocess-based
+ * provider adapter calls. Sends `signal` via {@link signalProcessGroup}
+ * immediately; when `signal` is SIGTERM, also arms a SIGKILL follow-up after
+ * `graceMs` so a signal-ignoring worker cannot survive as an orphan. The
+ * escalation timer is unref'd (never pins the coordinator's event loop) and
+ * is cleared the moment the child actually exits. Mirrors the docker
+ * backend's `docker stop --time` graceful→force stop.
+ */
+export function killProcessGroupWithEscalation(
+  proc: ChildProcess,
+  signal: NodeJS.Signals,
+  platform: NodeJS.Platform,
+  graceMs: number = SIGKILL_ESCALATION_MS,
+): void {
+  signalProcessGroup(proc, signal, platform);
+  if (signal === 'SIGTERM') {
+    const escalation = setTimeout(() => {
+      try { signalProcessGroup(proc, 'SIGKILL', platform); } catch { /* already exited */ }
+    }, graceMs);
+    escalation.unref?.();
+    proc.once('exit', () => clearTimeout(escalation));
+  }
+}
 
 // ─── SubprocessProviderConfig ───────────────────────────────────────
 /**
@@ -319,11 +394,11 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     // child's pid never reaches any grandchild the worker forks (e.g. a CLI
     // agent's own bash-tool subprocesses) — those survive as orphans. On POSIX,
     // `detached: true` makes the worker the LEADER of a brand-new process group
-    // (its pid becomes the group id), so {@link signalWorkerGroup} can target the
+    // (its pid becomes the group id), so {@link signalProcessGroup} can target the
     // whole group via `process.kill(-pid, signal)`. Windows has no equivalent
     // group-signal semantics for `process.kill`, and `detached` means something
     // different there (new console, not new process group) — win32 keeps today's
-    // single-pid behavior unchanged (see signalWorkerGroup's win32 branch).
+    // single-pid behavior unchanged (see signalProcessGroup's win32 branch).
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
       stdio: ['pipe', logFd, logFd],
@@ -492,65 +567,15 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
     // the child's `exit` closure (which may lag SIGTERM). Idempotent with the
     // exit-handler clearInterval.
     if (entry.hbInterval) clearInterval(entry.hbInterval);
-    const proc = entry.process;
-    this.signalWorkerGroup(proc, signal);
     // MOAT-2 (ADR-G-013) — no orphan worker survives a clean run. `child.unref()`
     // lets the coordinator exit without waiting on the child, so a worker that
     // IGNORES a graceful SIGTERM would otherwise linger as an orphan (trading a
     // lingering coordinator for a lingering worker — still a lifecycle violation).
-    // Escalate SIGTERM→SIGKILL after a short grace; the grace timer is unref'd (it
-    // never itself pins the loop) and is cleared the moment the child actually
-    // exits. Mirrors the docker backend's `docker stop --time` graceful→force stop.
-    if (signal === 'SIGTERM') {
-      const escalation = setTimeout(() => {
-        try { this.signalWorkerGroup(proc, 'SIGKILL'); } catch { /* already exited */ }
-      }, SIGKILL_ESCALATION_MS);
-      escalation.unref?.();
-      proc.once('exit', () => clearTimeout(escalation));
-    }
+    // born-568: group-kill + SIGTERM→SIGKILL escalation now lives in the shared
+    // {@link killProcessGroupWithEscalation} primitive (also used by codex.ts /
+    // gemini.ts) instead of being re-derived here.
+    killProcessGroupWithEscalation(entry.process, signal, this.platform);
     this.workers.delete(taskId);
-  }
-
-  /**
-   * PGID-TEARDOWN (ADR-G-013, MOAT-2 residual): signal the worker's WHOLE
-   * process group, not just its own pid — a worker that forks its own
-   * subprocess (e.g. a CLI agent's bash tool) would otherwise leave that
-   * grandchild orphaned, since a single-pid signal never reaches it.
-   *
-   * POSIX: `spawn()` launches the worker `detached: true`, making it the
-   * leader of a brand-new process group — its pid IS the group id. Signalling
-   * the negative pid (`process.kill(-pid, signal)`) is POSIX kill(2)'s
-   * documented "signal the entire process group" form, reaching the worker
-   * and everything it spawned. If the group-form call throws (e.g. ESRCH —
-   * the group is already gone), fall back to the direct single-pid signal so
-   * the worker is still reaped.
-   *
-   * win32: `process.kill()` has no negative-pid group-signal semantics, and
-   * `detached` means something different there (new console, not new process
-   * group) — `spawn()` never sets `detached` on win32, so this always falls
-   * through to the original single-pid `proc.kill(signal)`. This is an
-   * intentional, honest residual (not a silent gap): logged via `debugLog` so
-   * it is discoverable, with a `taskkill /T` follow-up tracked as a roadmap
-   * item rather than solved here.
-   */
-  private signalWorkerGroup(proc: ChildProcess, signal: NodeJS.Signals): void {
-    const pid = proc.pid;
-    if (this.platform !== 'win32' && typeof pid === 'number') {
-      try {
-        process.kill(-pid, signal);
-        return;
-      } catch {
-        // Group already reaped, or pid is not (or no longer) a group leader —
-        // fall back to signalling the direct child below.
-      }
-    }
-    if (this.platform === 'win32') {
-      debugLog(
-        'subprocess:signalWorkerGroup',
-        `win32 has no process-group signal semantics — only the direct worker pid (${String(pid)}) is signalled with ${signal}; any grandchild process it spawned may survive (WORKER-PGID-TEARDOWN, ADR-G-013 roadmap: taskkill /T follow-up)`,
-      );
-    }
-    proc.kill(signal);
   }
 
   // ─── Heartbeat ─────────────────────────────────────────────────────

@@ -63,7 +63,7 @@ export function createApprovalTerminalChannel(
   // attachChannel first: in the common (default-name) case a duplicate collides on
   // this SAME name for both the relay channel and the eventstream client id, so
   // failing here — before subscribing — never leaves a dangling subscription behind.
-  let decisionHandler!: (input: ChannelDecisionInput) => void;
+  let decisionHandler: ((input: ChannelDecisionInput) => void) | null = null;
   const channel: RelayChannel = {
     send: () => {
       // Read side flows through the eventstream subscription below — a deliberate
@@ -78,6 +78,9 @@ export function createApprovalTerminalChannel(
   const subscription = eventStream.subscribe(clientId, options.filter);
 
   const decide = (id: string, input: ApprovalDecisionInput): void => {
+    // Disposed (or, unreachable in practice, pre-attach) — no live handler to
+    // route through; a no-op rather than a throw keeps a late/racing caller safe.
+    if (!decisionHandler) return;
     const { channel: _channel, ...rest } = input;
     decisionHandler({ ...rest, requestId: id });
   };
@@ -85,6 +88,10 @@ export function createApprovalTerminalChannel(
   const dispose = (): void => {
     subscription.unsubscribe();
     relay.detachChannel(channelName);
+    // Drop the reference to the relay's registered handler closure so post-dispose
+    // decide() calls are a no-op instead of silently still routing through the
+    // (now-detached) relay channel — otherwise this is a dangling-handler leak.
+    decisionHandler = null;
   };
 
   return { events: subscription.events, decide, dispose };

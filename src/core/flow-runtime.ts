@@ -1,5 +1,6 @@
 import { FlowScheduler, type DueDispatch } from './flow-scheduler.js';
 import { FlowRegistry } from './flow-registry.js';
+import { type EventTrigger, type IncomingEvent } from './event-trigger.js';
 
 export type DispatchCallback = (dispatches: DueDispatch[]) => void;
 
@@ -8,6 +9,10 @@ interface FlowRuntimeOptions {
   clock?: () => Date;
   setIntervalFn?: (fn: () => void, ms: number) => ReturnType<typeof setInterval>;
   clearIntervalFn?: (id: ReturnType<typeof setInterval>) => void;
+  /** Source of registered event triggers for the event-dispatch path (FLOW-EVENT-DISPATCH). Defaults to none. */
+  listTriggers?: () => EventTrigger[];
+  /** Source of incoming events to match against triggers. Defaults to none. */
+  listEvents?: () => IncomingEvent[];
 }
 
 /**
@@ -21,6 +26,8 @@ export class FlowRuntime {
   private readonly clock: () => Date;
   private readonly setIntervalFn: (fn: () => void, ms: number) => ReturnType<typeof setInterval>;
   private readonly clearIntervalFn: (id: ReturnType<typeof setInterval>) => void;
+  private readonly listTriggers: () => EventTrigger[];
+  private readonly listEvents: () => IncomingEvent[];
 
   private timerId: ReturnType<typeof setInterval> | undefined;
 
@@ -31,13 +38,17 @@ export class FlowRuntime {
     this.clock = options.clock ?? (() => new Date());
     this.setIntervalFn = options.setIntervalFn ?? setInterval;
     this.clearIntervalFn = options.clearIntervalFn ?? clearInterval;
+    this.listTriggers = options.listTriggers ?? (() => []);
+    this.listEvents = options.listEvents ?? (() => []);
   }
 
-  /** Run a single tick: collect due dispatches and call the callback. */
+  /** Run a single tick: collect due dispatches (scheduled + event-triggered) and call the callback. */
   tick(callback: DispatchCallback): void {
     const flows = this.registry.listFlows();
+    const triggers = this.listTriggers();
+    const events = this.listEvents();
     const now = this.clock();
-    const dispatches = this.scheduler.collectDue(flows, [], [], now);
+    const dispatches = this.scheduler.collectDue(flows, triggers, events, now);
     callback(dispatches);
   }
 

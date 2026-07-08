@@ -2,7 +2,7 @@
 // Promotes temp agents/skills to permanent based on performance.
 // Demotes permanent ones that underperform.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, cpSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, cpSync, readdirSync } from 'fs';
 import { createHash } from 'node:crypto';
 import { join } from 'path';
 import type { OutcomeTracker, EntityPerformance } from './outcome-tracker.js';
@@ -501,7 +501,6 @@ function writeVariantArtifacts(
 function findTempEntityDir(tempBaseDir: string, entityId: string): string | null {
   if (!existsSync(tempBaseDir)) return null;
   try {
-    const { readdirSync } = require('fs');
     const entries = readdirSync(tempBaseDir, { withFileTypes: true });
     for (const entry of entries) {
       if (entry.isDirectory() && entry.name.includes(entityId)) {

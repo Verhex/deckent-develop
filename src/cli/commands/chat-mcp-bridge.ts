@@ -110,9 +110,14 @@ export const MCP_AUDIT_CHANNEL = 'DECKENT→USER:MCP_TOOL_CALL';
 
 /**
  * Build a closure that mirrors a `McpToolCallRecord` into the sprint event
- * stream via `writeEvent`. Pass the return value as
- * `new McpClientBroker({ onCall: createMcpAuditSink(root) })` at construction
- * time so broker callsites are unchanged — the audit wire is one-way.
+ * stream via `writeEvent`. Intended for a broker constructed standalone
+ * (without `buildMcpBridge`) that still needs an audit trail — pass the
+ * return value as `new McpClientBroker({ onCall: createMcpAuditSink(root) })`.
+ *
+ * Do NOT wire this onto a broker that is also passed into `buildMcpBridge`
+ * with its default (non-overridden) `audit` sink — `dispatch()` already
+ * mirrors every `broker.callTool()` outcome to the event stream itself, so
+ * pairing both double-logs every call. Single audit path per broker instance.
  *
  * For the REPL (no active sprint) the channel still writes under a synthetic
  * sprint id (default `'repl'`) so a session always has a tracable JSONL log
@@ -147,6 +152,27 @@ export function renderMcpSlashLines(registry: McpToolRegistry): string[] {
 function formatTool(t: NamespacedTool): string {
   const desc = t.descriptor.description ? ` — ${t.descriptor.description}` : '';
   return `${t.namespacedName}${desc}`;
+}
+
+// ─── Result serialization ────────────────────────────────────────────────────
+
+/**
+ * Safely convert a tool result to its wire string. A non-JSON-serializable
+ * result (e.g. a BigInt or circular field) must NOT throw here — a throw
+ * inside `dispatch()`'s success path would land in the surrounding catch and
+ * double-audit an already-succeeded call as an error (born-553). Instead this
+ * returns a visible `[mcp-warn]` marker so the caller sees the call succeeded
+ * but its result could not be serialized, rather than a misleading generic
+ * `[mcp-error]`.
+ */
+function serializeToolResult(namespacedName: string, result: unknown): string {
+  if (typeof result === 'string') return result;
+  try {
+    return JSON.stringify(result);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return `[mcp-warn] ${namespacedName}: result not serializable, dropped — ${msg}`;
+  }
 }
 
 // ─── Namespaced registration helper ─────────────────────────────────────────
@@ -277,6 +303,7 @@ export function buildMcpBridge(opts: McpBridgeOptions): {
         const t0 = Date.now();
         try {
           const result = await broker.callTool(resolved.server, resolved.tool, args);
+          const output = serializeToolResult(namespacedName, result);
           audit({
             server: resolved.server,
             tool: resolved.tool,
@@ -288,7 +315,7 @@ export function buildMcpBridge(opts: McpBridgeOptions): {
           });
           return {
             ok: true,
-            output: typeof result === 'string' ? result : JSON.stringify(result),
+            output,
             tier,
           };
         } catch (err) {
@@ -344,6 +371,7 @@ export function buildMcpBridge(opts: McpBridgeOptions): {
       const t0 = Date.now();
       try {
         const result = await broker.callTool(resolved.server, resolved.tool, args);
+        const output = serializeToolResult(namespacedName, result);
         audit({
           server: resolved.server,
           tool: resolved.tool,
@@ -355,7 +383,7 @@ export function buildMcpBridge(opts: McpBridgeOptions): {
         });
         return {
           ok: true,
-          output: typeof result === 'string' ? result : JSON.stringify(result),
+          output,
           tier,
         };
       } catch (err) {

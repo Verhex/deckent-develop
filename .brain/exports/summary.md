@@ -51,6 +51,20 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-387 Learnings** (sprint-387): ## Sprint sprint-387 Learnings
+- born-493 — W2-WIRE — native-engine'i slash-dispatcher'a köprüle (24/37 komut sessiz-...
+- **Sprint sprint-386 Learnings** (sprint-386): ## Sprint sprint-386 Learnings
+- born-552 — MCP-TOOL-EMPTY-DESC — boş-string açıklama REPL-launch'ı çökertiyor: NO_GO...
+- **Sprint sprint-383 Learnings** (sprint-383): ## Sprint sprint-383 Learnings
+
+## Gains
+- 383-001 — born-552 — MCP-TOOL-EMPTY-DESC — boş-string açıklama REPL-launch...
+- **Sprint sprint-382 Learnings** (sprint-382): ## Sprint sprint-382 Learnings
+- born-518-REDO — CRED-SCRUB gerçek leak-site'a wire (Sprint-1 wrong-path düzelt): GO_...
+- **Sprint sprint-381 Learnings** (sprint-381): ## Sprint sprint-381 Learnings
+- born-499-HARD — WORKER-GIT-GUARD — spawn-backend'lere git-shim enjekte et: GO_WITH_T...
+- **Sprint sprint-380 Learnings** (sprint-380): ## Sprint sprint-380 Learnings
+- born-558 — SKILL-LIST-V2-CRASH — `deckent skill list` v2-manifest'te exit 1: GO_WITH...
 - **Sprint sprint-379 Learnings** (sprint-379): ## Sprint sprint-379 Learnings
 - DOCS-NUM-TRUTH — README/DECKENT sayı-ve-dil doğruluğu: GO_WITH_TECH_DEBT — Ground-tr...
 - **Sprint sprint-378 Learnings** (sprint-378): ## Sprint sprint-378 Learnings
@@ -59,20 +73,6 @@
 - MISSION-VERDICT-FIX — dürüst-DEBT fail sayılmaz: GO_WITH_TECH_DEBT — Investigation f...
 - **Sprint sprint-376 Learnings** (sprint-376): ## Sprint sprint-376 Learnings
 - TOOL-QB-FLIP — tool_surface + approval.question_bridge default-ON: GO_WITH_TECH_DEBT...
-- **Sprint sprint-375 Learnings** (sprint-375): ## Sprint sprint-375 Learnings
-- DOCS-P0-DELTA — analiz-delta-kutuları + features-index: GO_WITH_TECH_DEBT — Scope co...
-- **Sprint sprint-374 Learnings** (sprint-374): ## Sprint sprint-374 Learnings
-- CU-STATUS-CLI — `deckent cu-status` (computer-use ilk kullanıcı-yüzeyi): GO_WITH_TEC...
-- **Sprint sprint-373 Learnings** (sprint-373): ## Sprint sprint-373 Learnings
-
-## Gains
-- 373-001 — ADR-ONB-GLOBAL — global-kurulum + proje-scope katman ADR-taslağı...
-- **Sprint sprint-372 Learnings** (sprint-372): ## Sprint sprint-372 Learnings
-- ADR-ONB-GLOBAL — global-kurulum + proje-scope katman ADR-taslağı: NO_GO — Worker tim...
-- **Sprint sprint-371 Learnings** (sprint-371): ## Sprint sprint-371 Learnings
-- CATALOG-MATERIALIZE — builtin 3+3'ü pool-görünür yap (370-003 kapanışı): GO_WITH_TEC...
-- **Sprint sprint-370 Learnings** (sprint-370): ## Sprint sprint-370 Learnings
-- DOCS-FEATURES-5 — computer-use + connect-auth + panel feature-doc'ları: GO_WITH_TECH...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -130,5 +130,7 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: doc_sync_ground_truth_mismatch
+- Violation pattern: file_outside_scope
+- Violation pattern: stale_heartbeat
 
-_Total entries: 1013 | Generated: 2026-07-07_
+_Total entries: 1080 | Generated: 2026-07-08_

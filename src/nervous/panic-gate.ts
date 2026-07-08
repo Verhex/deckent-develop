@@ -102,14 +102,49 @@ function resolvedMarkerPath(projectRoot: string, taskId: string): string {
   return join(projectRoot, PANIC_IPC_DIR, 'resolved', `${taskId}.json`);
 }
 
+/**
+ * Fail-closed marker interpretation (born-564 / P1 fix).
+ *
+ * A marker only resolves `APPROVED` when it carries an unambiguous approve
+ * signal — either an explicit `decision` value, or the accept-marker shape
+ * actually produced by `acceptPanicGuard` (`{ taskId, acceptedAt,
+ * acceptedBy, reason? }`, src/cli/commands/nervous.ts).
+ *
+ * Everything else — including the dashboard's *reject* marker shape
+ * (`{ taskId, rejectedVia, at }`, src/api/nervous-endpoint.ts — no
+ * `decision` field) — MUST NOT fall through to a silent approval. Prior
+ * behavior treated any parseable marker without an explicit reject decision
+ * as approved, which turned a dashboard reject into a fail-OPEN auto-accept.
+ * Missing/ambiguous content now resolves `REJECTED` (fail-closed, safe
+ * side); only a recognized explicit-safe marker resolves `APPROVED`.
+ */
 function readDecisionFromMarker(path: string): 'APPROVED' | 'REJECTED' | null {
   try {
     const raw = readFileSync(path, 'utf-8');
-    const obj = JSON.parse(raw) as { decision?: string };
-    if (obj.decision === 'reject' || obj.decision === 'rejected') return 'REJECTED';
-    // Any present marker (even without an explicit decision field) is treated
-    // as approval — `acceptPanicGuard` writes the marker on accept.
-    return 'APPROVED';
+    const obj = JSON.parse(raw) as {
+      decision?: string;
+      rejectedVia?: string;
+      acceptedAt?: string;
+      acceptedBy?: string;
+    };
+
+    if (obj.decision === 'reject' || obj.decision === 'rejected' || obj.rejectedVia !== undefined) {
+      return 'REJECTED';
+    }
+
+    if (
+      obj.decision === 'approve' ||
+      obj.decision === 'approved' ||
+      obj.decision === 'accept' ||
+      obj.decision === 'accepted' ||
+      obj.acceptedAt !== undefined ||
+      obj.acceptedBy !== undefined
+    ) {
+      return 'APPROVED';
+    }
+
+    // Fail-closed default: marker present but neither shape is recognized.
+    return 'REJECTED';
   } catch {
     return null;
   }

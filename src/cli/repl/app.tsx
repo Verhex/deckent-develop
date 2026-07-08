@@ -12,10 +12,15 @@
 import { Box, Text, Static, useInput, useApp } from 'ink';
 import { useState, useRef, useEffect, Component, type ReactElement, type ReactNode } from 'react';
 import { homedir } from 'node:os';
-import { runChatNativeLoop, type ChatProviderAdapter, type McpToolDispatcher, type ChatMemoryAdapter } from '../commands/chat-native.js';
+import {
+  runChatNativeLoop, type ChatProviderAdapter, type McpToolDispatcher, type ChatMemoryAdapter,
+  buildNervousOutput, buildInterrogateOutput, resolveNativeSlashText,
+} from '../commands/chat-native.js';
 import { renderMarkdown } from '../commands/chat-render.js';
 import { InputBar } from './input-bar.js';
-import type { SlashRegistry } from '../commands/chat-slash-registry.js';
+import { resolveSlash, type SlashRegistry } from '../commands/chat-slash-registry.js';
+import type { ChatMode } from '../commands/chat-mode.js';
+import type { ReplEngine } from './native-agent-bridge.js';
 import type { ActiveSelection } from './provider-switch.js';
 import { createStreamSegmenter, type StreamSegmenter } from './stream-segmenter.js';
 import { measuredOnTurnEnd } from './native-elapsed.js';
@@ -509,6 +514,122 @@ export interface ReplLabels {
   busySteerQueued?: string;   // "steer note queued (#{position}) — applied at turn end"
   busySteerIdle?: string;     // "nothing running to steer"
   busySteerEmpty?: string;    // "usage: /steer <message>"
+  /** REPL-TURN-EXCEPTION-SURFACE (387-003) — turn-loop exception label; optional,
+   * English fallback until a messages round wires a real i18n key (tui.turn_error)
+   * through run.tsx (same seam precedent as the busy-controls labels above). */
+  turnError?: string; // "turn failed: {error}"
+}
+
+/**
+ * NATIVE-SLASH-BRIDGE (387-002) — resolve a slash line for the native-engine
+ * REPL surface. `handleSubmit` below special-cases ~15 of the 37 SLASH_CATALOG
+ * commands directly (exit/cancel/clear/term/queue/interrupt/steer/resume/cd/
+ * model/provider/approve); when `nativeEngine` drives the turn (the default
+ * REPL engine, M5-NATIVE-FLIP), every OTHER command — /help, /kill, /cleanup,
+ * /recover, /nervous, /interrogate, /mcp, /sync, /checkpoint, /autonomous,
+ * /audit, /usage, /resources, /directives, /status, /recall, /plan, /sprint,
+ * /retro, /doctor, /models, /analyze, /review, /explain, /agents, /skills,
+ * /features, /config — silently fell through to a PLAIN-TEXT chat turn
+ * (born-493): the legacy loop (runChatNativeLoop, chat-native.ts) resolves
+ * every one of these inside its OWN for-await loop, but the native engine
+ * bypasses that loop entirely (this component drives its own turn-by-turn
+ * dispatch), so none of chat-native.ts's slash handling ever ran.
+ *
+ * `/nervous` and `/interrogate` are resolved BEFORE calling resolveSlash —
+ * the SAME precedence chat-native.ts's own loop uses (its early interception
+ * runs before its own resolveSlash call) — because resolveSlash's OWN
+ * `/nervous` branch needs an injected NervousPendingStore this bridge does
+ * not have; the direct file-backed helpers (chat-nervous-bridge.ts, reused
+ * via chat-native.ts's `buildNervousOutput`) give full accept/reject/list
+ * behavior with zero extra wiring. `/resume` is NOT handled here — app.tsx
+ * already has its own picker (`resolveResumeCommand`, task 358-006) higher up
+ * in `handleSubmit`, unrelated to this bridge.
+ *
+ * Pure aside from the read-only file I/O inside the imported chat-native.ts
+ * helpers (no React/Ink dependency) — the same "pull decision logic out of
+ * the component" pattern as resolveResumeCommand/renderBusyDecision above.
+ */
+export type NativeSlashResult =
+  | { kind: 'reply'; text: string }
+  | { kind: 'dispatch'; tool: string; args: Record<string, unknown> }
+  | { kind: 'passthrough' };
+
+export function resolveNativeSlash(
+  trimmed: string,
+  ctx: { registry: SlashRegistry; cwd: string; lang: string; chatMode: ChatMode },
+): NativeSlashResult {
+  if (trimmed === '/nervous' || trimmed.startsWith('/nervous ')) {
+    const args = trimmed.split(/\s+/).slice(1);
+    return { kind: 'reply', text: buildNervousOutput(ctx.cwd, args, false, ctx.lang) };
+  }
+  if (trimmed === '/interrogate' || trimmed.startsWith('/interrogate ')) {
+    return { kind: 'reply', text: buildInterrogateOutput(ctx.cwd, ctx.lang) };
+  }
+  const action = resolveSlash(trimmed, ctx.registry);
+  if (action.action === 'agentic') return { kind: 'dispatch', tool: action.tool, args: action.args };
+  if (action.action === 'help' || action.action === 'message' || action.action === 'show-directives') {
+    return {
+      kind: 'reply',
+      text: resolveNativeSlashText(action, { chatMode: ctx.chatMode, lang: ctx.lang, directivesRoot: ctx.cwd }),
+    };
+  }
+  // 'exit' / 'clear' (already handled earlier in handleSubmit before this
+  // bridge runs) / 'nervous-list' / 'nervous-plan' (only ever returned when a
+  // NervousPendingStore is passed to resolveSlash — this bridge doesn't pass
+  // one, see doc comment above) / 'none' (unknown slash, or a meta-command
+  // with no agenticTool like /model — /cd — /term, already handled earlier).
+  return { kind: 'passthrough' };
+}
+
+/**
+ * REPL-TURN-EXCEPTION-SURFACE (387-003) — drive the native-engine turn loop
+ * with per-turn exception isolation. Previously (app.tsx's `nativeEngine`
+ * effect branch) a SINGLE line's exception — anything the engine call itself
+ * throws (a bug inside the AgentSession tool loop, a `confirm`/`toolSink`
+ * callback throwing, etc. — NOT the engine's own graceful 'error'/'notice'
+ * AgentEvents, which native-agent-bridge.ts's `runTurn` already renders via
+ * `output`) propagated straight out of the raw inline `for await` loop, past
+ * the caller's `.catch(() => exit())`, and tore down the WHOLE REPL with zero
+ * user-visible signal (read as a silent freeze — born-551). Catching it HERE,
+ * inside the loop body, both (a) surfaces it via `onTurnError` instead of
+ * vanishing and (b) lets the `for await` request its NEXT value from `lines`
+ * — which resumes app.tsx's `inputIter` generator past its `yield`, running
+ * the SAME turn-end cleanup (finalizeReply/markIdle/setWorking(false)) a
+ * normal turn already gets, so the turn AFTER a crash is not stuck "working"
+ * forever. Pure aside from the injected `engine`/`now` calls — same "pull
+ * decision logic out of the Ink component" pattern as
+ * tapApprovalEvents/buildSegmentTurns above (ink-testing-library is not a
+ * project dependency; see tests/cli/repl-turn-exception.test.ts).
+ */
+export async function runNativeTurnLoop(
+  lines: AsyncIterable<string>,
+  engine: ReplEngine,
+  cbs: {
+    output: (text: string) => void;
+    onTurnStats: (stats: { elapsedMs: number; tokens?: number }) => void;
+    onTurnError: (message: string) => void;
+  },
+  now: () => number = Date.now,
+): Promise<void> {
+  for await (const line of lines) {
+    const startMs = now();
+    try {
+      await engine(line, { output: cbs.output, onTurnEnd: measuredOnTurnEnd(startMs, now, cbs.onTurnStats) });
+    } catch (err) {
+      cbs.onTurnError(err instanceof Error ? err.message : String(err));
+    }
+  }
+}
+
+/** Format a turn-loop exception as the visible error line pushed into the
+ * transcript. The `⚠ ` prefix is owned by this function (same prefix
+ * ReplErrorBoundary below already uses for render errors) — kept OUT of the
+ * label default so a real localized string (messages round + run.tsx wiring,
+ * out of this task's scope) is not forced to embed a decorative glyph.
+ * `{error}` template + English-fallback follows the same precedent as
+ * `resumeSwitched`/`busySteerQueued` above. */
+export function formatTurnErrorLine(message: string, label?: string): string {
+  return `⚠ ${(label ?? 'turn failed: {error}').replace('{error}', message)}`;
 }
 
 /**
@@ -554,7 +675,7 @@ export interface ReplAppProps {
   /** UI language for loop-emitted strings (/resume picker). */
   lang?: string;
   /** When set (native flag on), drives the turn INSTEAD of runChatNativeLoop. */
-  nativeEngine?: (input: string, cbs: { output: (text: string) => void; onTurnEnd: (stats: { inputTokens: number; outputTokens: number }) => void }) => Promise<void>;
+  nativeEngine?: ReplEngine;
   /** repl_surface.enabled config-flag seam (default-off). The caller (run.tsx)
    * resolves the real project-config flag and passes it here; absent/false →
    * this component renders byte-identical to the pre-354-001 App. */
@@ -889,19 +1010,22 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     };
 
     if (nativeEngine) {
-      void (async () => {
-        for await (const line of inputIter()) {
-          const startMs = Date.now();
-          await nativeEngine(line, {
-            output,
-            onTurnEnd: measuredOnTurnEnd(startMs, () => Date.now(), (st) => {
-              lastStats.current = { elapsedMs: st.elapsedMs, ...(st.tokens !== undefined ? { tokens: st.tokens } : {}) };
-              const tok = st.tokens;
-              if (tok) setSessionTok((n) => n + tok);
-            }),
-          });
-        }
-      })().then(() => exit()).catch(() => exit());
+      void runNativeTurnLoop(inputIter(), nativeEngine, {
+        output,
+        onTurnStats: (st) => {
+          lastStats.current = { elapsedMs: st.elapsedMs, ...(st.tokens !== undefined ? { tokens: st.tokens } : {}) };
+          const tok = st.tokens;
+          if (tok) setSessionTok((n) => n + tok);
+        },
+        // 387-003: a per-turn exception no longer unwinds the whole loop —
+        // flush any in-flight partial/segment first (finalizeReply, same as a
+        // normal turn-end) so ordering stays correct, then surface the error
+        // as a visible transcript line instead of silently exiting.
+        onTurnError: (message) => {
+          finalizeReply();
+          pushTurn('seg', formatTurnErrorLine(message, labels.turnError));
+        },
+      }).then(() => exit()).catch(() => exit());
     } else {
       void runChatNativeLoop({
         provider,
@@ -945,7 +1069,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // inputs (true mid-turn abort is loop-side follow-up work).
   const cancelPendingInputs = (): void => { queue.current!.clear(); setQueued([]); };
 
-  const handleSubmit = (line: string): void => {
+  const handleSubmit = async (line: string): Promise<void> => {
     const trimmed = line.trim();
     if (trimmed.length === 0) return;
     if (['/exit', '/quit', ':exit', ':quit'].includes(trimmed.toLowerCase())) { exit(); return; }
@@ -1082,9 +1206,43 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (ap) {
       pushTurn('user', trimmed);
       const mode = ap[1] as ApprovalMode | undefined;
-      if (mode) { onApprovalMode(mode); setApproval(mode); pushTurn('seg', `${labels.approvalSet}: ${mode}`); }
+      if (mode) {
+        onApprovalMode(mode); setApproval(mode);
+        // born-493 (387-002) — also retarget the native AgentSession's OWN
+        // permission engine (see ReplEngine.setApprovalMode doc comment,
+        // native-agent-bridge.ts). No-op for the legacy engine (nativeEngine
+        // undefined) or a test fake that doesn't attach the method.
+        nativeEngine?.setApprovalMode?.(mode);
+        pushTurn('seg', `${labels.approvalSet}: ${mode}`);
+      }
       else { pushTurn('seg', `${labels.approvalUsage} (${approval})`); }
       return;
+    }
+    // NATIVE-SLASH-BRIDGE (387-002) — see resolveNativeSlash's doc comment
+    // above. Only active when the native engine drives the turn: the legacy
+    // engine (nativeEngine undefined) already resolves every slash command
+    // inside runChatNativeLoop's own for-await loop below — bridging here too
+    // would double-dispatch it.
+    if (nativeEngine && trimmed.startsWith('/')) {
+      const chatModeNow: ChatMode = termMode.mode === 'control' ? 'enterprise' : 'user';
+      const bridged = resolveNativeSlash(trimmed, { registry: slashRegistry, cwd, lang: lang ?? 'en', chatMode: chatModeNow });
+      if (bridged.kind !== 'passthrough') {
+        pushTurn('user', trimmed);
+        if (bridged.kind === 'reply') {
+          pushTurn('seg', bridged.text);
+        } else {
+          // 'dispatch' — reuse the SAME confirm-gated `dispatcher` the legacy
+          // engine already uses for slash-triggered CLI-bridge tools
+          // (run.tsx's dispatcher: classifyTool tier → askConfirm/
+          // askConfirmAlways → confirmTrigger). This is what makes /kill
+          // real confirm-gated (its 'always' tier ignores full-auto) and
+          // makes a 'confirm'-tier tool (e.g. /sync) skip the y/n prompt once
+          // /approve full-auto is set (askConfirm already checks the mode).
+          const dispatchResult = await dispatcher.dispatch(bridged.tool, bridged.args);
+          pushTurn('seg', dispatchResult);
+        }
+        return;
+      }
     }
     const enq = queue.current!.enqueue(trimmed);
     if (enq.kind === 'swallowed') return; // double-fire Enter quirk — nothing new to queue or wake

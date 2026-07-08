@@ -9,6 +9,21 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-387-002 | Tech debt from 387-002: Root-cause read (not assumed): bare `deckent` with piped | normal | sprint-387 | resolved |
+| debt-387-005 | Tech debt from 387-005: Fix implemented exactly as specified: MemoryStore constr | normal | sprint-387 | resolved |
+| debt-387-008 | Tech debt from 387-008: subprocess.ts already implemented POSIX process-group ki | normal | sprint-387 | resolved |
+| debt-387-010 | Tech debt from 387-010: Implemented within scope (src/core/computer-use-exec.ts  | normal | sprint-387 | resolved |
+| debt-387-012 | Tech debt from 387-012: BUILTIN_TRUSTED_SKILLS fix (skill-sandbox.ts:196-207): r | normal | sprint-387 | resolved |
+| debt-387-013 | Tech debt from 387-013: Investigated the mcp_client_enabled gate. Confirmed root | normal | sprint-387 | resolved |
+| debt-382-002 | Tech debt from 382-002: Moved the CRED-SCRUB logic to the real leak site as dire | normal | sprint-382 | resolved |
+| debt-382-006 | Tech debt from 382-006: Fixed fail-open bug in installWriterLeaseGate's gated ha | normal | sprint-382 | resolved |
+| debt-382-007 | Tech debt from 382-007: Fix: start.ts:455 `autoApprove: true` (hardcoded) -> `au | normal | sprint-382 | resolved |
+| debt-381-001 | Tech debt from 381-001: DONE core: new src/orchestra/git-worker-guard.ts builds+ | normal | sprint-381 | resolved |
+| debt-380-001 | Tech debt from 380-001: Root cause confirmed: loadAllSkills() (skill.ts) JSON.pa | normal | sprint-380 | resolved |
+| debt-380-003 | Tech debt from 380-003: Scope note: scope.filesWrite named src/orchestra/worker. | normal | sprint-380 | resolved |
+| debt-380-004 | Tech debt from 380-004: SCOPE TYPO FOUND + RESOLVED: write scope listed 'src/pro | normal | sprint-380 | resolved |
+| debt-380-007 | Tech debt from 380-007: Fixed AGENTIC-DISPATCH-OVERMATCH by narrowing all 4 clas | normal | sprint-380 | resolved |
+| debt-380-013 | Tech debt from 380-013: Consolidated the duplicate runPreFlightHealthCheck: doct | normal | sprint-380 | resolved |
 | debt-379-001 | Tech debt from 379-001: Ground-truth note: the rendered 'Scope Rules' section of | normal | sprint-379 | resolved |
 | debt-379-002 | Tech debt from 379-002: Measured (real, not assumed): npm pack --dry-run --json  | normal | sprint-379 | resolved |
 | debt-379-003 | Tech debt from 379-003: Root cause CONFIRMED with disk evidence + a real (non-mo | normal | sprint-379 | resolved |

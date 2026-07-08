@@ -14,6 +14,7 @@ import type { ProviderAdapter } from '../../agent/provider-tooluse/types.js';
 import type { ToolRegistry } from '../../agent/tools/registry.js';
 import type { AgentEvent } from '../../agent/events.js';
 import type { PermissionResponse } from '../../agent/loop.js';
+import type { ApprovalMode } from '../../agent/permission-types.js';
 import type { ToolInfo } from './app.js';
 import type { ChatTurnQueue, ChatTurnPayload } from './chat-turn-queue.js';
 
@@ -28,10 +29,26 @@ import type { ChatTurnQueue, ChatTurnPayload } from './chat-turn-queue.js';
  *  `tests/cli/native-agent-bridge.test.ts`'s exact `toEqual({inputTokens, outputTokens})`
  *  assertion on the raw engine contract. Leave as-is; see the divergence entry for the
  *  full disk-verified rationale. */
-export type ReplEngine = (
-  input: string,
-  cbs: { output: (text: string) => void; onTurnEnd: (stats: { inputTokens: number; outputTokens: number }) => void },
-) => Promise<void>;
+export interface ReplEngine {
+  (
+    input: string,
+    cbs: { output: (text: string) => void; onTurnEnd: (stats: { inputTokens: number; outputTokens: number }) => void },
+  ): Promise<void>;
+  /**
+   * born-493 (387-002) — bridges `/approve <mode>` to the native
+   * AgentSession's OWN permission engine (session.ts's `setApprovalMode`,
+   * previously a 0-caller dead export). Without this, `/approve full-auto`
+   * only updated run.tsx's legacy-dispatcher-local `approvalMode` variable
+   * (consumed by the run.tsx `dispatcher` object, used for slash-triggered
+   * CLI-bridge tools) — the native session's OWN tool-use loop (loop.ts's
+   * `decide()`, gating write/edit/bash calls the MODEL itself proposes)
+   * never saw the mode change and kept asking every time, so "onay modu
+   * ayarlandı" was a false claim for a native-engine session. Optional so a
+   * bare function value (e.g. a test fake) still structurally satisfies
+   * ReplEngine.
+   */
+  setApprovalMode?: (mode: ApprovalMode) => void;
+}
 
 export interface NativeEngineDeps {
   adapter: ProviderAdapter;
@@ -187,26 +204,30 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   };
 
   // TERM2-WIRE (356-011): bg-turns wiring is fully OFF by default — no queue
-  // supplied, or `bgTurnsEnabled` unset/false → return runTurn unwrapped, so
-  // the flag-off path stays byte-identical to pre-356-011 (no extra Promise
-  // hops, no queue reads at all).
+  // supplied, or `bgTurnsEnabled` unset/false → engine stays runTurn
+  // unwrapped, so the flag-off path stays byte-identical to pre-356-011 (no
+  // extra Promise hops, no queue reads at all).
   const bgQueue = deps.bgQueue;
-  if (!bgQueue || !deps.bgTurnsEnabled) return runTurn;
-
-  return async (input, cbs) => {
-    bgQueue.userTurnActive = true;
-    try {
-      await runTurn(input, cbs);
-    } finally {
-      bgQueue.userTurnActive = false;
-    }
-    // Hermes rule (chat-turn-queue.ts): drainAsTurns() no-ops while
-    // userTurnActive is true, so anything enqueued during the turn above was
-    // buffered, never mid-turn-injected. Now that the turn is over, drain and
-    // run each coalesced bucket as its own synthetic user turn — through the
-    // SAME output/onTurnEnd/recordTurn pipeline as a real turn.
-    for (const payload of bgQueue.drainAsTurns()) {
-      await runTurn(formatBgTurnInput(payload), cbs);
-    }
-  };
+  const engine: ReplEngine = (!bgQueue || !deps.bgTurnsEnabled)
+    ? runTurn
+    : async (input, cbs) => {
+        bgQueue.userTurnActive = true;
+        try {
+          await runTurn(input, cbs);
+        } finally {
+          bgQueue.userTurnActive = false;
+        }
+        // Hermes rule (chat-turn-queue.ts): drainAsTurns() no-ops while
+        // userTurnActive is true, so anything enqueued during the turn above
+        // was buffered, never mid-turn-injected. Now that the turn is over,
+        // drain and run each coalesced bucket as its own synthetic user turn
+        // — through the SAME output/onTurnEnd/recordTurn pipeline as a real
+        // turn.
+        for (const payload of bgQueue.drainAsTurns()) {
+          await runTurn(formatBgTurnInput(payload), cbs);
+        }
+      };
+  // born-493 (387-002) — see the ReplEngine.setApprovalMode doc comment above.
+  engine.setApprovalMode = (mode) => session.setApprovalMode(mode);
+  return engine;
 }

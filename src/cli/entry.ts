@@ -608,7 +608,8 @@ export async function launchDefaultRepl(): Promise<void> {
   if (inkMode) {
     const { runInkRepl } = await import('./repl/run.js');
     await runInkRepl(provider, providerName, (sel) =>
-      buildReplProvider(sel.provider as ReplProviderName, sel.model ? { model: sel.model } : {}));
+      buildReplProvider(sel.provider as ReplProviderName, sel.model ? { model: sel.model } : {}),
+      registerReplTeardown);
     return;
   }
 
@@ -638,6 +639,24 @@ export async function launchDefaultRepl(): Promise<void> {
   const baseReadlineOpts = replReadlineOptions(isTty);
   const rl = createInterface(isTty ? { ...baseReadlineOpts, completer: slashCompleter } : baseReadlineOpts);
   const region = createPromptRegion(rl, process.stdout, { isTty });
+
+  // born-549 (SIGTERM-TEARDOWN) — this legacy readline REPL's own warm-child
+  // (the persistent claude session built by buildReplProvider above) was only
+  // ever torn down on the normal `/exit` path below; a SIGINT/SIGTERM left it
+  // running as an orphan. Registered once, reused by both the signal path
+  // (via registerReplTeardown → onSignal) and the normal-exit path at the
+  // bottom of this function — idempotent so whichever fires first "wins".
+  let legacyTornDown = false;
+  const legacyTeardown = async (): Promise<void> => {
+    if (legacyTornDown) return;
+    legacyTornDown = true;
+    try { rl.close(); } catch { /* already closed */ }
+    const maybeSession = provider as Partial<PersistentClaudeSession>;
+    if (typeof maybeSession.exit === 'function') {
+      try { await maybeSession.exit(); } catch { /* best-effort */ }
+    }
+  };
+  const unregisterLegacyTeardown = registerReplTeardown(legacyTeardown);
 
   // T-224-020 — interactive `/` menu. When the user types a lone `/`, write the
   // command menu ONCE above the pinned prompt (the verified writeAbove path —
@@ -796,16 +815,13 @@ export async function launchDefaultRepl(): Promise<void> {
     interactiveTty: isTty,
   });
 
-  rl.close();
-
   // Sprint 223 T-223-001 — persistent claude session cleanup. The `:exit`
   // slash drops out of runChatNativeLoop, so we kill the warm claude child
   // here. Duck-typed: only PersistentClaudeSession exposes `exit`, so the
-  // codex/gemini/ollama/openai-compat branches are unaffected.
-  const maybeSession = provider as Partial<PersistentClaudeSession>;
-  if (typeof maybeSession.exit === 'function') {
-    await maybeSession.exit();
-  }
+  // codex/gemini/ollama/openai-compat branches are unaffected. born-549 —
+  // shared with the SIGINT/SIGTERM path via legacyTeardown (registered above).
+  unregisterLegacyTeardown();
+  await legacyTeardown();
 }
 
 // ─── Node Version Guard ─────────────────────────────────────────────────────
@@ -822,13 +838,77 @@ process.on('unhandledRejection', (reason: unknown) => {
   handleCliError(reason);
 });
 
+// ─── REPL Teardown Registry (born-549 SIGTERM-TEARDOWN) ─────────────────────
+//
+// A running REPL (entry.ts's own legacy readline path, or the Ink REPL in
+// repl/run.tsx) owns a warm-child persistent-session process, an optional MCP
+// client broker, and terminal state (alt-screen / raw mode) — none of which
+// the ADR-G-013 signal handler below knows about (it only ever interrupted
+// sprints/tmux, the Brain-orchestrator concern). Whichever REPL surface is
+// currently active registers its own async cleanup here so `onSignal` can
+// await it before falling through to the unchanged sprint/tmux + exit path.
+// A process that never launches a REPL (any other CLI subcommand, and the
+// pre-existing sigterm-cleanup test which calls `onSignal` directly without
+// a REPL in play) never registers a hook — `replTeardownHooks` stays empty,
+// so `onSignal` takes the exact synchronous fast-path it always has: same
+// call order, same exit code, zero behavior change with no REPL active.
+type ReplTeardownHook = () => Promise<void>;
+const replTeardownHooks: ReplTeardownHook[] = [];
+
+/**
+ * Bound the WHOLE registered-hook run, not each hook individually — a single
+ * slow MCP stdio server (the SDK's own close() sequence waits up to ~2s for a
+ * graceful exit before escalating to SIGTERM, then up to another ~2s before
+ * SIGKILL — see @modelcontextprotocol/sdk client/stdio.js) must not hang
+ * shutdown forever, but IS worth waiting out so its child does not become a
+ * true orphan. Mirrors the bound used by repl/run.tsx's own normal-exit path.
+ */
+const REPL_TEARDOWN_TIMEOUT_MS = 5000;
+
+/**
+ * Register REPL-owned async cleanup (warm-child kill, MCP broker dispose,
+ * terminal restore). Returns an unregister function so a REPL that exits
+ * normally (no signal involved) does not leave a stale hook behind for a
+ * later REPL launch in the same process.
+ */
+export function registerReplTeardown(hook: ReplTeardownHook): () => void {
+  replTeardownHooks.push(hook);
+  return () => {
+    const idx = replTeardownHooks.indexOf(hook);
+    if (idx >= 0) replTeardownHooks.splice(idx, 1);
+  };
+}
+
+/** Run every registered hook to settlement (never rejects), bounded overall. */
+async function runReplTeardownHooks(): Promise<void> {
+  const settled = Promise.allSettled(replTeardownHooks.map((hook) => hook()));
+  const timeout = new Promise<void>((resolve) => {
+    setTimeout(resolve, REPL_TEARDOWN_TIMEOUT_MS).unref();
+  });
+  await Promise.race([settled, timeout]);
+}
+
 // ─── Graceful Shutdown ───────────────────────────────────────────────────────
 // ADR-G-013 (SIGTERM-CLEANUP): SIGINT and SIGTERM share the identical cleanup
 // path — a `kill <pid>` / systemd stop / docker stop of the coordinator must
 // leave the same clean state (INTERRUPTED tasks, released locks, killed tmux
 // sessions) as Ctrl+C, not an orphaned sprint.
-export function onSignal(signal: string): void {
+//
+// born-549 (SIGTERM-TEARDOWN): `onSignal` is declared `async` so it can AWAIT
+// any registered REPL teardown (above) before the existing sprint/tmux
+// cleanup + exit — but it only does so when a REPL actually registered a
+// hook. An async function with no `await` on its executed path runs fully
+// synchronously to completion (the returned Promise is just a wrapper around
+// already-finished work), so the no-REPL / no-hooks case is BYTE-IDENTICAL to
+// the previous synchronous implementation: same order, same exit(0), same
+// tick — existing callers that never await `onSignal`'s return value (this
+// file's own `process.on` registration below, and the pre-existing
+// tests/cli/sigterm-cleanup.test.ts) keep working unchanged.
+export async function onSignal(signal: string): Promise<void> {
   process.stderr.write(`\nReceived ${signal}, exiting…\n`);
+  if (replTeardownHooks.length > 0) {
+    await runReplTeardownHooks();
+  }
   // Interrupt active sprint: mark tasks INTERRUPTED, heartbeats ABORTED, release locks
   try { interruptActiveSprint(); } catch { /* non-fatal */ }
   // Kill tmux sessions used by workers
@@ -836,8 +916,33 @@ export function onSignal(signal: string): void {
   process.exit(0);
 }
 
-process.on('SIGINT', () => onSignal('SIGINT'));
-process.on('SIGTERM', () => onSignal('SIGTERM'));
+/**
+ * born-549 (SIGTERM-TEARDOWN, Law #2 — every environment) — cross-platform
+ * shutdown-signal decision. POSIX (linux/darwin/…) delivers real SIGINT and
+ * SIGTERM. Windows has no native SIGTERM: Node's own signal emulation there
+ * only recognizes SIGINT (Ctrl+C) and SIGBREAK (Ctrl+Break) as real,
+ * interceptable console events — a `process.on('SIGTERM', …)` listener on
+ * win32 is never invoked by an actual OS event. Registering it there anyway
+ * would be a silent no-op masquerading as cross-platform support, so the
+ * Windows branch swaps SIGTERM for SIGBREAK instead of layering it on top —
+ * an honest platform adapter (unsupported → not registered, not fake-handled)
+ * rather than a faked one. Neither branch spawns or blocks a subprocess to
+ * make this work (no `spawnSync`) — both are plain, async-safe event
+ * listeners over the same `onSignal`.
+ *
+ * Exported as a pure function (same "pull the platform branch out so it's
+ * testable without a real OS" pattern as providers/codex.ts's injectable
+ * `platform` param) so the Windows-vs-POSIX choice is unit-testable without
+ * mocking the live process's `process.platform` or re-registering real
+ * signal listeners on the test runner itself.
+ */
+export function shutdownSignalsForPlatform(platform: NodeJS.Platform): readonly NodeJS.Signals[] {
+  return platform === 'win32' ? ['SIGINT', 'SIGBREAK'] : ['SIGINT', 'SIGTERM'];
+}
+
+for (const sig of shutdownSignalsForPlatform(process.platform)) {
+  process.on(sig, () => { void onSignal(sig); });
+}
 
 // ─── Entry ───────────────────────────────────────────────────────────────────
 // Sprint 220 Task 220-001: when the user invokes `deckent` with no subcommand

@@ -1,12 +1,14 @@
-// ═══ Computer-Use Exec Adapter — TOOL-CU dilim-3 (Sprint 371, Task 371-003) ═════
+// ═══ Computer-Use Exec Adapter — TOOL-CU dilim-3 (Sprint 371, Task 371-003; extended
+// Sprint 387, Task 387-010 — born-83: navigate/region-screenshot + injection-harden) ═════
 // The first REAL adapter layered on dilim-1's contract (computer-use-contract.ts) and
 // dilim-2's platform negotiation (computer-use-platform.ts). `executeComputerUseAction`
-// resolves flag+allowlist availability first, then — for screenshot/click/type — invokes
-// the platform-appropriate external tool through an INJECTED async spawn. This module
-// never spawns a real subprocess of its own accord in tests: every test in
+// resolves flag+allowlist availability first, then — for screenshot/click/type/navigate —
+// invokes the platform-appropriate external tool through an INJECTED async spawn. This
+// module never spawns a real subprocess of its own accord in tests: every test in
 // computer-use-exec.test.ts supplies a fake spawn, matching the "gerçek-araç çağrısı yok"
-// constraint. `navigate` stays honestly not-implemented (no browser-driver bridge exists
-// anywhere in the codebase), mirroring dilim-2's own not-implemented mapping.
+// constraint. `createRealComputerUseExecSpawn`/`createRealComputerUseExecDeps` (bottom of
+// file) are the production wiring a real caller injects — no test exercises them with a
+// real subprocess either.
 //
 // Tool selection mirrors dilim-2's CAPABILITY_TOOLS table:
 // - screenshot: grim/scrot/import/gnome-screenshot (linux), screencapture (darwin),
@@ -16,12 +18,40 @@
 // - click/type: xdotool (linux), System Events via osascript (darwin), powershell.exe
 //   (win32/wsl) — dilim-2 documented these as a "known-tool hypothesis a future adapter
 //   would build against"; this file is that adapter.
+// - navigate: `xdg-open` (linux) / `open` (darwin) / `Start-Process` via powershell.exe
+//   (win32/wsl) — an OS-level "open URL in the default handler" round-trip. This is
+//   intentionally NOT a browser-driver bridge (no Playwright/Puppeteer dependency exists
+//   anywhere in this codebase, and adding one is outside this task's scope — a new runtime
+//   dependency requires a package.json change this task cannot make); `waitUntil` is
+//   accepted by the schema but not honored — a fire-and-forget OS "open" has no page-load
+//   completion signal to observe, same honesty posture as the `delayMs` gap below.
+//
+// Injection-hardening (born-83): `type.text` and `navigate.url` are the only genuine
+// free-text/URL injection surfaces (click's x/y/clickCount/button are zod-validated
+// numbers/a fixed enum — not exploitable via string interpolation). Both now flow through
+// PARAMETRIZED invocation instead of hand-rolled script-string escaping:
+// - darwin: a STATIC AppleScript body (`on run argv ... item N of argv ...`) — the
+//   user-controlled value is passed as a genuine trailing `osascript` argv element, never
+//   concatenated into the script source.
+// - win32/wsl: a STATIC PowerShell `.ps1` temp-file body (`param($X) ...`) invoked via
+//   `-File <script> -X <value>` — the value flows through PowerShell's own argument
+//   binding, never concatenated into script source.
+// Neither approach needs script-literal escaping (`escapeAppleScriptString`/
+// `escapePowerShellSingleQuoted` are gone) because the value is never embedded in script
+// text at all. `escapeSendKeysLiterals` remains — that is SendKeys' OWN mini-DSL escaping
+// (`+^%~(){}`), orthogonal to script-injection safety and still required regardless of how
+// the string reaches `SendKeys.SendWait`.
 //
 // Honestly-declared gaps (Law #2 — fail honestly, never silently):
-// - `region`-scoped screenshot capture: no per-platform tool here supports a named-region
-//   selector (all of grim/scrot/import/gnome-screenshot/screencapture/powershell.exe
-//   capture the full screen only) — a `region` request resolves `unavailable` rather than
-//   silently taking a full-viewport capture and mislabeling it.
+// - `region`-scoped screenshot capture: implemented for linux (`grim -g` / `scrot -a`) and
+//   darwin (`screencapture -R`) against a concrete geometry convention this adapter defines
+//   (`"X,Y WxH"` grim/slurp-style, or `"X,Y,W,H"` comma-only — the dilim-1 contract leaves
+//   `region` as an opaque string, so this is where the concrete format is grounded).
+//   win32/wsl stay honest-`unavailable` — the existing full-screen PS capture script has no
+//   scripted sub-rectangle path yet, and building one is a materially separate slice of
+//   work from this task's scope. `import`/`gnome-screenshot` have no scriptable
+//   region/area flag and are excluded from the region-specific tool chain (same
+//   honest-partial-support posture as darwin's middle-click gap below).
 // - darwin middle-button click: System Events' `click at {x,y}` has no native middle-button
 //   or repeat-count-aware equivalent without a third-party helper (e.g. cliclick) that is
 //   not part of this codebase's dependency set — resolves `unavailable`. Right-button is
@@ -31,16 +61,29 @@
 //   parameter, and a naive char-by-char loop would break SendKeys' brace-escaped
 //   special-character sequences — so both send the string atomically instead of
 //   fabricating a broken per-character delay loop.
+// - Cross-file staleness this creates (out of this task's write scope, flagged not fixed):
+//   `computer-use-platform.ts`'s dilim-2 negotiator still hardcodes `navigate` as
+//   not-implemented for every platform, so `cu-status` will keep reporting navigate as
+//   unavailable even though this adapter now implements it. `executeComputerUseAction`
+//   also still has zero production callers — `cu-status.ts` only calls dilim-2's
+//   `negotiateComputerUseCapabilities`, never this file's executor. Wiring a real call site
+//   requires editing `src/cli/commands/cu-status.ts` (or a new command), which is outside
+//   this task's filesWrite; `createRealComputerUseExecDeps` below exists so that wiring is
+//   a one-line follow-up.
 //
 // ADR-D-004 (Layer-1 Import Direction) C1: core/ MUST NOT import connectors/ (connectors/
 import { DeckentError } from './errors.js';
 // imports cli/helpers — a forbidden transitive edge). `ComputerUseExecSpawnFn` below is
 // therefore a structurally independent mirror of connectors/capabilities/types.ts's
 // `SpawnFn` — same posture as the platform-id and security-class mirrors already
-// documented in this dilim's earlier two files.
+// documented in this dilim's earlier two files. `createRealComputerUseExecDeps`'s own WSL
+// sniff similarly re-implements `cu-status.ts`'s `detectCuPlatform` locally rather than
+// importing it (core/ MUST NOT import cli/ either).
 
+import { spawn as nodeSpawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { readFile, unlink } from 'node:fs/promises';
+import { readFile, unlink, writeFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -49,7 +92,9 @@ import {
   type ComputerUseAction,
   type ComputerUseClickAction,
   type ComputerUseConfig,
+  type ComputerUseNavigateAction,
   type ComputerUseResult,
+  type ComputerUseScreenshotAction,
   type ComputerUseTypeAction,
 } from './computer-use-contract.js';
 import { isKnownComputerUsePlatform, type ComputerUsePlatform } from './computer-use-platform.js';
@@ -119,24 +164,6 @@ function okResult(action: ComputerUseAction, screenshotBase64?: string): Compute
   };
 }
 
-const NAVIGATE_NOT_IMPLEMENTED_REASON =
-  'navigate requires a browser driver bridge (e.g. Playwright/Puppeteer) that is not integrated ' +
-  'anywhere in the codebase yet — real browser control is not part of this exec adapter (TOOL-CU dilim-3)';
-
-// ─── Script-Literal Escaping (genuine injection surface — see file header) ──────────────
-// osascript/powershell.exe receive the whole script as ONE argv element (`-e`/`-Command`);
-// spawn passes argv literally (no shell), so classic shell-injection does not apply here,
-// but an unescaped user-controlled string (click/type text) embedded in that script IS a
-// real AppleScript/PowerShell script-injection surface and must be escaped.
-
-function escapeAppleScriptString(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-}
-
-function escapePowerShellSingleQuoted(value: string): string {
-  return value.replace(/'/g, "''");
-}
-
 // ─── Tool Invocation Helpers ─────────────────────────────────────────────────────────────
 
 async function runSingleTool(
@@ -155,6 +182,33 @@ async function runSingleTool(
     throw new DeckentError('E_COMPUTER_USE_TOOL_FAILED', result.stderr || `${cmd} exited with code ${result.code}`);
   }
   return result;
+}
+
+// ─── Parametrized PowerShell Invocation (injection-hardened — see file header) ──────────
+// A STATIC script body (never containing interpolated user data) is written to a real temp
+// `.ps1` file and invoked via `-File <script> -Name value ...` — trailing args become
+// PowerShell parameters through the runtime's own argument binding, not string
+// concatenation into script source. This is the parametrize-invocation replacement for the
+// old `-Command '<script with interpolated text>'` approach (born-83).
+
+async function runParametrizedPowerShellScript(
+  spawn: ComputerUseExecSpawnFn,
+  scriptBody: string,
+  scriptArgs: readonly string[],
+  notFoundMessage: string,
+): Promise<ComputerUseExecSpawnResult> {
+  const scriptPath = join(tmpdir(), `deckent-cu-${randomUUID()}.ps1`);
+  await writeFile(scriptPath, scriptBody, 'utf-8');
+  try {
+    return await runSingleTool(
+      spawn,
+      'powershell.exe',
+      ['-NoProfile', '-File', scriptPath, ...scriptArgs],
+      notFoundMessage,
+    );
+  } finally {
+    await unlink(scriptPath).catch(() => {});
+  }
 }
 
 // ─── Screenshot ──────────────────────────────────────────────────────────────────────────
@@ -233,14 +287,103 @@ async function readAndCleanupScreenshot(path: string): Promise<string> {
   return data.toString('base64');
 }
 
-async function runScreenshot(platform: ComputerUsePlatform, spawn: ComputerUseExecSpawnFn): Promise<string> {
+// ─── Region-Scoped Screenshot (born-83 — see file header "Honestly-declared gaps") ──────
+// `region` is an opaque string in the dilim-1 contract; this adapter grounds it in a
+// concrete geometry convention: "X,Y WxH" (grim/slurp convention) or "X,Y,W,H"
+// (comma-only). An unparseable region string is an honest `unavailable`, not a silent
+// full-viewport fallback.
+
+interface ParsedCuRegion {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+}
+
+function parseCuRegion(region: string): ParsedCuRegion | undefined {
+  const spaced = /^(-?\d+),(-?\d+)\s+(\d+)x(\d+)$/.exec(region);
+  if (spaced) {
+    return { x: Number(spaced[1]), y: Number(spaced[2]), w: Number(spaced[3]), h: Number(spaced[4]) };
+  }
+  const commaOnly = /^(-?\d+),(-?\d+),(\d+),(\d+)$/.exec(region);
+  if (commaOnly) {
+    return { x: Number(commaOnly[1]), y: Number(commaOnly[2]), w: Number(commaOnly[3]), h: Number(commaOnly[4]) };
+  }
+  return undefined;
+}
+
+const LINUX_REGION_SCREENSHOT_TOOLS: ReadonlyArray<{ cmd: string; args: (outPath: string, r: ParsedCuRegion) => string[] }> = [
+  { cmd: 'grim', args: (o, r) => ['-g', `${r.x},${r.y} ${r.w}x${r.h}`, o] },
+  { cmd: 'scrot', args: (o, r) => ['-a', `${r.x},${r.y},${r.w},${r.h}`, '-o', o] },
+];
+
+async function captureScreenshotLinuxRegion(
+  spawn: ComputerUseExecSpawnFn,
+  outPath: string,
+  region: ParsedCuRegion,
+): Promise<void> {
+  let lastFailure: string | undefined;
+  for (const tool of LINUX_REGION_SCREENSHOT_TOOLS) {
+    try {
+      const r = await spawn(tool.cmd, tool.args(outPath, region));
+      if (r.code === 0) return;
+      lastFailure = r.stderr || `${tool.cmd} exited with code ${r.code}`;
+    } catch {
+      // ENOENT-style — tool absent on this host, try the next region-capable candidate.
+    }
+  }
+  if (lastFailure !== undefined) throw new DeckentError('E_COMPUTER_USE_TOOL_FAILED', lastFailure);
+  throw new ComputerUseToolNotFoundError(
+    `no region-capable screenshot tool available on linux (checked: ${LINUX_REGION_SCREENSHOT_TOOLS.map((t) => t.cmd).join(', ')}` +
+      ' — import/gnome-screenshot have no scriptable region flag)',
+  );
+}
+
+async function captureScreenshotDarwinRegion(
+  spawn: ComputerUseExecSpawnFn,
+  outPath: string,
+  region: ParsedCuRegion,
+): Promise<void> {
+  await runSingleTool(
+    spawn,
+    'screencapture',
+    ['-R', `${region.x},${region.y},${region.w},${region.h}`, '-x', '-t', 'png', outPath],
+    'no region-capable screenshot tool available on darwin (checked: screencapture -R)',
+  );
+}
+
+async function runScreenshot(
+  platform: ComputerUsePlatform,
+  action: ComputerUseScreenshotAction,
+  spawn: ComputerUseExecSpawnFn,
+): Promise<string> {
+  const region = action.region !== undefined ? parseCuRegion(action.region) : undefined;
+  if (action.region !== undefined && region === undefined) {
+    throw new ComputerUseToolNotFoundError(
+      `region '${action.region}' is not a recognized geometry — expected "X,Y WxH" (grim/slurp convention) or "X,Y,W,H"`,
+    );
+  }
+
   if (platform === 'wsl' || platform === 'win32') {
+    if (region !== undefined) {
+      throw new ComputerUseToolNotFoundError(
+        'region-scoped screenshot capture is not implemented on win32/wsl — the existing full-screen ' +
+          'PrimaryScreen.Bounds capture script has no scripted sub-rectangle path in this adapter yet',
+      );
+    }
     const path = await captureScreenshotWindows(spawn, platform === 'wsl');
     return readAndCleanupScreenshot(path);
   }
+
   const outPath = join(tmpdir(), `deckent-cu-${randomUUID()}.png`);
   if (platform === 'linux') {
-    await captureScreenshotLinux(spawn, outPath);
+    if (region !== undefined) {
+      await captureScreenshotLinuxRegion(spawn, outPath, region);
+    } else {
+      await captureScreenshotLinux(spawn, outPath);
+    }
+  } else if (region !== undefined) {
+    await captureScreenshotDarwinRegion(spawn, outPath, region);
   } else {
     await captureScreenshotDarwin(spawn, outPath);
   }
@@ -335,26 +478,45 @@ async function execTypeLinux(action: ComputerUseTypeAction, spawn: ComputerUseEx
   );
 }
 
+// STATIC AppleScript (born-83 injection-harden) — `action.text` is never concatenated into
+// this string. `on run argv` receives it as a genuine trailing `osascript` argv element
+// (`item 1 of argv`), so an arbitrary crafted string can never be interpreted as script
+// syntax — it is always the inert literal argument to `keystroke`.
+const CU_TYPE_APPLESCRIPT = 'on run argv\n  tell application "System Events" to keystroke (item 1 of argv)\nend run';
+
 async function execTypeDarwin(action: ComputerUseTypeAction, spawn: ComputerUseExecSpawnFn): Promise<void> {
-  const script = `tell application "System Events" to keystroke "${escapeAppleScriptString(action.text)}"`;
-  await runSingleTool(spawn, 'osascript', ['-e', script], 'no UI-input tool available on darwin (checked: osascript)');
+  await runSingleTool(
+    spawn,
+    'osascript',
+    ['-e', CU_TYPE_APPLESCRIPT, action.text],
+    'no UI-input tool available on darwin (checked: osascript)',
+  );
 }
 
-/** SendKeys treats + ^ % ~ ( ) { } as special — wrapping a literal in braces sends it as-is. */
+/** SendKeys' OWN mini-DSL treats + ^ % ~ ( ) { } as special — wrapping a literal in braces
+ *  sends it as-is. Orthogonal to script-injection safety (see file header): still required
+ *  no matter how the string reaches `SendKeys.SendWait`, because parametrized invocation
+ *  only protects against PowerShell script-syntax injection, not SendKeys' own semantics. */
 function escapeSendKeysLiterals(text: string): string {
   return text.replace(/[+^%~(){}]/g, (c) => `{${c}}`);
 }
 
-function windowsTypePsCommand(action: ComputerUseTypeAction): string {
-  const literal = escapePowerShellSingleQuoted(escapeSendKeysLiterals(action.text));
-  return `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${literal}');`;
-}
+// STATIC PowerShell script body (born-83 injection-harden) — never contains interpolated
+// user data. `$Text` is bound purely through `-File <script> -Text <value>` argument
+// binding (see runParametrizedPowerShellScript), so a crafted `-Text` value can never
+// break out into script syntax — it is always the inert literal argument to `SendWait`.
+const CU_TYPE_PS_SCRIPT = [
+  'param([Parameter(Mandatory=$true)][string]$Text)',
+  'Add-Type -AssemblyName System.Windows.Forms;',
+  '[System.Windows.Forms.SendKeys]::SendWait($Text);',
+].join('\n');
 
 async function execTypeWindows(action: ComputerUseTypeAction, spawn: ComputerUseExecSpawnFn): Promise<void> {
-  await runSingleTool(
+  const literal = escapeSendKeysLiterals(action.text);
+  await runParametrizedPowerShellScript(
     spawn,
-    'powershell.exe',
-    ['-NoProfile', '-Command', windowsTypePsCommand(action)],
+    CU_TYPE_PS_SCRIPT,
+    ['-Text', literal],
     'no UI-input tool available on win32/wsl (checked: powershell.exe)',
   );
 }
@@ -369,15 +531,59 @@ async function runType(
   return execTypeWindows(action, spawn);
 }
 
+// ─── Navigate ────────────────────────────────────────────────────────────────────────────
+// A real OS-level "open URL in the default handler" round-trip — NOT a browser-driver
+// bridge (see file header for why: no Playwright/Puppeteer dependency exists in this
+// codebase, and adding one is outside this task's scope). `waitUntil` is accepted by the
+// schema but not honored: a fire-and-forget OS "open" has no page-load completion signal
+// to observe (same honesty posture as the `delayMs` gap documented above `runType`).
+// `action.url` is zod-validated as a well-formed URL but is still user-controlled free
+// text — it flows to every platform's tool as a plain positional argv element (xdg-open/
+// open) or a parametrized `-Url` PowerShell argument, never concatenated into a script.
+
+async function execNavigateLinux(action: ComputerUseNavigateAction, spawn: ComputerUseExecSpawnFn): Promise<void> {
+  await runSingleTool(spawn, 'xdg-open', [action.url], 'no URL-open tool available on linux (checked: xdg-open)');
+}
+
+async function execNavigateDarwin(action: ComputerUseNavigateAction, spawn: ComputerUseExecSpawnFn): Promise<void> {
+  await runSingleTool(spawn, 'open', [action.url], 'no URL-open tool available on darwin (checked: open)');
+}
+
+const CU_NAVIGATE_PS_SCRIPT = [
+  'param([Parameter(Mandatory=$true)][string]$Url)',
+  'Start-Process -FilePath $Url | Out-Null;',
+].join('\n');
+
+async function execNavigateWindows(action: ComputerUseNavigateAction, spawn: ComputerUseExecSpawnFn): Promise<void> {
+  await runParametrizedPowerShellScript(
+    spawn,
+    CU_NAVIGATE_PS_SCRIPT,
+    ['-Url', action.url],
+    'no URL-open tool available on win32/wsl (checked: powershell.exe)',
+  );
+}
+
+async function runNavigate(
+  platform: ComputerUsePlatform,
+  action: ComputerUseNavigateAction,
+  spawn: ComputerUseExecSpawnFn,
+): Promise<void> {
+  if (platform === 'linux') return execNavigateLinux(action, spawn);
+  if (platform === 'darwin') return execNavigateDarwin(action, spawn);
+  return execNavigateWindows(action, spawn);
+}
+
 // ─── Entry Point ─────────────────────────────────────────────────────────────────────────
 
 /**
  * Executes a single computer-use action against an injected async spawn. Never assumes
- * availability: flag-off, an unallowlisted capability, an unknown platform, or an
- * unimplemented action (navigate; region-scoped screenshot) all resolve to an honest
- * `unavailable` result before `spawn` is ever called (Law #2 — fail honestly, never
- * silently). A tool that cannot be reached at all resolves `unavailable`; a tool that runs
- * and genuinely fails resolves `error`.
+ * availability: flag-off, an unallowlisted capability, or an unknown platform all resolve
+ * to an honest `unavailable` result before `spawn` is ever called (Law #2 — fail honestly,
+ * never silently). Per-action/per-platform gaps that remain (region-scoped screenshot on
+ * win32/wsl, an unparseable region string, darwin middle-click) resolve `unavailable` from
+ * inside `runScreenshot`/`runClick` — see file header "Honestly-declared gaps". A tool that
+ * cannot be reached at all resolves `unavailable`; a tool that runs and genuinely fails
+ * resolves `error`.
  */
 export async function executeComputerUseAction(
   action: ComputerUseAction,
@@ -399,24 +605,17 @@ export async function executeComputerUseAction(
     );
   }
 
-  if (action.kind === 'navigate') {
-    return unavailableResult(action, NAVIGATE_NOT_IMPLEMENTED_REASON);
-  }
-  if (action.kind === 'screenshot' && action.region !== undefined) {
-    return unavailableResult(
-      action,
-      'region-scoped screenshot capture is not implemented — every grounded per-platform tool ' +
-        '(grim/scrot/import/gnome-screenshot, screencapture, powershell.exe) captures the full screen only',
-    );
-  }
-
   try {
     if (action.kind === 'screenshot') {
-      const screenshotBase64 = await runScreenshot(platform, deps.spawn);
+      const screenshotBase64 = await runScreenshot(platform, action, deps.spawn);
       return okResult(action, screenshotBase64);
     }
     if (action.kind === 'click') {
       await runClick(platform, action, deps.spawn);
+      return okResult(action);
+    }
+    if (action.kind === 'navigate') {
+      await runNavigate(platform, action, deps.spawn);
       return okResult(action);
     }
     await runType(platform, action, deps.spawn);
@@ -427,4 +626,100 @@ export async function executeComputerUseAction(
     }
     return errorResult(action, e instanceof Error ? e.message : String(e));
   }
+}
+
+// ─── Real Production Wiring (born-83 — "real-caller reachability", see file header) ─────
+// No test exercises these with a real subprocess — every executeComputerUseAction test in
+// computer-use-exec.test.ts injects a fake spawn, matching this dilim's own "gerçek-araç
+// çağrısı yok" constraint. `createRealComputerUseExecSpawn` mirrors the async-spawn-wrapper
+// pattern already established elsewhere in core/ (e.g. daemon-hygiene.ts's `runCommand`:
+// `shell:false`, stdout/stderr accumulation, a hard timeout that SIGKILLs a hung child) —
+// reused here rather than invented fresh (Discipline 2 — simplicity first).
+
+const DEFAULT_CU_SPAWN_TIMEOUT_MS = 10_000;
+
+/** Real `ComputerUseExecSpawnFn` — an actual `node:child_process.spawn`, never a shell
+ *  (`shell: false`), matching the file's own "argv passed literally, no shell" contract. */
+export function createRealComputerUseExecSpawn(): ComputerUseExecSpawnFn {
+  return (command, args, opts) =>
+    new Promise<ComputerUseExecSpawnResult>((resolvePromise, reject) => {
+      let settled = false;
+      let child;
+      try {
+        child = nodeSpawn(command, [...args], { shell: false, windowsHide: true });
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error(String(err)));
+        return;
+      }
+
+      const timeoutMs = opts?.timeoutMs ?? DEFAULT_CU_SPAWN_TIMEOUT_MS;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        try {
+          child.kill('SIGKILL');
+        } catch {
+          /* best-effort */
+        }
+        reject(new Error(`${command} timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      let stdout = '';
+      let stderr = '';
+      child.stdout?.on('data', (chunk: Buffer) => {
+        stdout += chunk.toString('utf-8');
+      });
+      child.stderr?.on('data', (chunk: Buffer) => {
+        stderr += chunk.toString('utf-8');
+      });
+      child.on('error', (err) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        reject(err);
+      });
+      child.on('close', (code) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolvePromise({ code: code ?? -1, stdout, stderr });
+      });
+    });
+}
+
+/** Same WSL signal `cu-status.ts`'s `isWSLHost`/`detectCuPlatform` use (env vars +
+ *  `/proc/version` sniff) — reimplemented locally per ADR-D-004 C1 (core/ MUST NOT import
+ *  cli/), same structural-mirror posture already established throughout this dilim (see
+ *  file header). Returns `undefined` for a genuinely unmapped host — the caller falls back
+ *  to the raw `process.platform` string, which `isKnownComputerUsePlatform` then honestly
+ *  rejects inside `executeComputerUseAction`. */
+function detectRealComputerUsePlatform(): ComputerUsePlatform | undefined {
+  const p = process.platform;
+  if (p === 'win32') return 'win32';
+  if (p === 'darwin') return 'darwin';
+  if (p === 'linux') {
+    if (process.env['WSL_DISTRO_NAME'] !== undefined || process.env['WSL_INTEROP'] !== undefined) return 'wsl';
+    try {
+      return /microsoft/i.test(readFileSync('/proc/version', 'utf-8')) ? 'wsl' : 'linux';
+    } catch {
+      return 'linux';
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Production `ComputerUseExecDeps` factory — real spawn + real platform detection. NOT
+ * itself a caller of `executeComputerUseAction`: wiring an actual production call site
+ * (e.g. a `deckent cu-exec` command, or an `--execute` mode on `cu-status`) requires
+ * editing `src/cli/commands/*`, which is outside this task's write scope (see file
+ * header "Cross-file staleness"). This factory exists so that wiring is a one-line
+ * follow-up: `executeComputerUseAction(action, createRealComputerUseExecDeps(config))`.
+ */
+export function createRealComputerUseExecDeps(config?: ComputerUseConfig): ComputerUseExecDeps {
+  return {
+    config,
+    platform: detectRealComputerUsePlatform() ?? process.platform,
+    spawn: createRealComputerUseExecSpawn(),
+  };
 }

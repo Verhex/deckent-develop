@@ -3,9 +3,15 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { getLangFromConfig } from '../helpers/config-reader.js';
 import { FlowRegistry } from '../../core/flow-registry.js';
 import { parseCronExpr } from '../../core/scheduled-flow.js';
 import { FlowRuntime } from '../../core/flow-runtime.js';
+import {
+  enqueuePendingEventDispatches,
+  approveDispatch as approveEventDispatch,
+  pendingEventDispatchPath,
+} from '../../core/event-trigger.js';
 import type { DueDispatch } from '../../core/flow-scheduler.js';
 import {
   createSelfDispatchCallback,
@@ -73,6 +79,59 @@ export function handleFlowDispatchTick(
     emit(`Tick: ${dispatches.length} flow(s) due · ${added} queued for self-dispatch (pending approval → ${path}).`);
   }
   return added;
+}
+
+// ─── Event-dispatch approval wire (FLOW-EVENT-DISPATCH) ─────────────────────
+// New strings below use a small local bilingual table rather than the shared
+// src/cli/helpers/messages.ts registry: messages.ts sits outside this task's
+// write scope (src/cli/commands/flow.ts, src/core/flow-runtime.ts,
+// src/core/event-trigger.ts only). Follow-up should migrate these keys into
+// the central registry.
+type FlowLocalKey = 'eventDispatchQueued' | 'approveNotFound' | 'approveSucceeded';
+
+const FLOW_LOCAL_MESSAGES: Record<FlowLocalKey, { en: string; tr: string }> = {
+  eventDispatchQueued: {
+    en: '{count} event-triggered dispatch(es) queued for approval → {path}',
+    tr: '{count} event-tetiklemeli dispatch onay için kuyruğa alındı → {path}',
+  },
+  approveNotFound: {
+    en: 'No pending event dispatch found with id "{id}" (unknown id, or already approved).',
+    tr: '"{id}" kimlikli bekleyen bir event-dispatch bulunamadı (bilinmeyen id ya da zaten onaylanmış).',
+  },
+  approveSucceeded: {
+    en: 'Event dispatch "{id}" approved (trigger: {trigger}) — flow may now proceed.',
+    tr: '"{id}" event-dispatch onaylandı (tetikleyici: {trigger}) — flow artık ilerleyebilir.',
+  },
+};
+
+function flowLocalMessage(lang: string, key: FlowLocalKey, vars: Record<string, string>): string {
+  const entry = FLOW_LOCAL_MESSAGES[key];
+  const template = lang === 'tr' ? entry.tr : entry.en;
+  return template.replace(/\{(\w+)\}/g, (_, name: string) => vars[name] ?? `{${name}}`);
+}
+
+/**
+ * Handle one FlowRuntime tick's event-triggered dispatches: enqueue any
+ * matched EventTrigger/IncomingEvent pairs onto the persisted pending
+ * event-dispatch queue (event-trigger.ts) so a later `flow approve <id>` can
+ * act on them. Silent no-op when the tick produced no event-kind dispatches —
+ * existing scheduled-only ticks are unaffected.
+ */
+export function handleEventDispatchTick(
+  projectRoot: string,
+  dispatches: DueDispatch[],
+  lang: string,
+  deps: { print?: (msg: string) => void; clock?: () => Date } = {},
+): number {
+  const added = enqueuePendingEventDispatches(projectRoot, dispatches, { clock: deps.clock });
+  if (added.length === 0) return 0;
+
+  const emit = deps.print ?? ((m: string) => print(m));
+  emit(flowLocalMessage(lang, 'eventDispatchQueued', {
+    count: String(added.length),
+    path: pendingEventDispatchPath(projectRoot),
+  }));
+  return added.length;
 }
 
 export function registerFlow(program: Command): void {
@@ -150,20 +209,49 @@ export function registerFlow(program: Command): void {
     .action((opts: { once?: boolean; tenant?: string }) => {
       try {
         const root = resolveProjectRoot();
+        const lang = getLangFromConfig(root);
         const registry = new FlowRegistry(`${root}/.deckent/flows`);
         const runtime = new FlowRuntime(registry);
 
+        const onTick = (dispatches: DueDispatch[]): void => {
+          handleFlowDispatchTick(root, dispatches);
+          handleEventDispatchTick(root, dispatches, lang);
+        };
+
         if (opts.once) {
-          runtime.tick((dispatches) => { handleFlowDispatchTick(root, dispatches); });
+          runtime.tick(onTick);
           return;
         }
 
         print('Flow daemon started. Press Ctrl+C to stop.');
-        runtime.start((dispatches) => { handleFlowDispatchTick(root, dispatches); });
+        runtime.start(onTick);
         process.on('SIGINT', () => {
           runtime.stop();
           process.exit(0);
         });
+      } catch (error) {
+        printError(error);
+        process.exitCode = 1;
+      }
+    });
+
+  // ─── flow approve ─────────────────────────────────────────────────
+  flowCmd
+    .command('approve <id>')
+    .description('Approve a pending event-triggered flow dispatch so it can proceed')
+    .action((id: string) => {
+      try {
+        const root = resolveProjectRoot();
+        const lang = getLangFromConfig(root);
+        const entry = approveEventDispatch(root, id);
+
+        if (!entry) {
+          print(flowLocalMessage(lang, 'approveNotFound', { id }));
+          process.exitCode = 1;
+          return;
+        }
+
+        print(flowLocalMessage(lang, 'approveSucceeded', { id: entry.id, trigger: entry.trigger.id }));
       } catch (error) {
         printError(error);
         process.exitCode = 1;

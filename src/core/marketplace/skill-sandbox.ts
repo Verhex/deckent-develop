@@ -194,13 +194,16 @@ function tryResolveStringConcat(
 }
 
 // ─── Built-in Trusted Skills ─────────────────────────────────────────────────
+// IDs must match real `src/core/builtins/skills/*/manifest.json` id fields —
+// a stale id here silently breaks isTrusted() for that skill (it would be
+// scanned as untrusted third-party). No "node-expert" skill exists; there is
+// no substitute id for it, so it is omitted rather than mismapped.
 
 const BUILTIN_TRUSTED_SKILLS = new Set([
   'typescript-expert',
-  'react-expert',
-  'node-expert',
-  'test-expert',
-  'doc-expert',
+  'react-specialist',
+  'testing-expert',
+  'documentation-writer',
 ]);
 
 // ─── Filesystem abstraction for testing ──────────────────────────────────────
@@ -282,6 +285,28 @@ export class SkillSandbox {
       issues,
       scannedFiles,
     };
+  }
+
+  /**
+   * Fail-closed sandbox gate: trusted skills (built-in or explicitly trusted)
+   * bypass scanning; anything else MUST pass `validateSkillSafety` or this
+   * throws `SkillSandboxError` with every issue listed. Intended as the single
+   * enforcement point for both `skill publish` and `skill install` — unlike
+   * `validateSkillSafety`, which only reports, this makes "unsafe" a hard stop.
+   */
+  requireSafe(skillPath: string, skillId: string): SafetyReport {
+    if (this.isTrusted(skillId)) {
+      return { safe: true, issues: [], scannedFiles: 0 };
+    }
+
+    const report = this.validateSkillSafety(skillPath);
+    if (!report.safe) {
+      throw new SkillSandboxError(
+        `Skill "${skillId}" failed sandbox validation (${report.issues.length} issue(s)):\n` +
+        report.issues.map((issue) => `  - ${issue}`).join('\n'),
+      );
+    }
+    return report;
   }
 
   /**

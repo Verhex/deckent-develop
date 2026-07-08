@@ -5,7 +5,8 @@
 // and injected into the string-free component.
 
 import { render } from 'ink';
-import { ReplApp, ReplErrorBoundary, type ConfirmTrigger, type ToolSink, type ToolInfo } from './app.js';
+import { ReplApp, ReplErrorBoundary, type ConfirmTrigger, type ToolSink, type ToolInfo, type ReplLabels } from './app.js';
+import type { ApprovalCardLabels } from './approval-card.js';
 import {
   resolveNativeProvider,
   resolveNativeSelection,
@@ -53,6 +54,82 @@ function localizeNativeError(err: ProviderError, lang: string): string {
   const key = `native.switch.${err.errorCode}`;
   const localized = getMessage(key, lang, { provider: err.provider ?? '', detail: err.detail ?? '' });
   return localized === key ? err.error : localized;
+}
+
+/**
+ * Build the full `ReplLabels` set from the resolved language (repl_surface i18n
+ * flip, Task 387-001). Pure + exported so it is testable without mounting Ink —
+ * same "pull labels out of the render call" precedent as `isNativeAgentSelected`/
+ * `wireApprovalCrossProcess` above. Previously this object was constructed inline
+ * in the `<ReplApp>` JSX below and OMITTED the resume-picker/busy-control fields
+ * entirely, so app.tsx's pure helpers silently fell back to their hardcoded
+ * English `??` defaults regardless of `lang`.
+ */
+export function buildReplLabels(t: (key: string) => string): ReplLabels {
+  return {
+    thinking: t('tui.thinking'),
+    generating: t('tui.generating'),
+    ready: t('tui.ready'),
+    queued: t('tui.queued'),
+    confirmHint: t('tui.confirm_hint'),
+    confirmProgress: t('tui.confirm_progress'),
+    menuHint: t('tui.menu_hint'),
+    switched: t('tui.switched'),
+    switchUsage: t('tui.switch_usage'),
+    approvalSet: t('tui.approval_set'),
+    approvalUsage: t('tui.approval_usage'),
+    queueCleared: t('tui.queue_cleared'),
+    cdTo: t('tui.cd_to'),
+    cdFail: t('tui.cd_fail'),
+    // Mode badge (Ask/Run/Control) — previously unwired, so the badge
+    // stayed English even in a TR session; localized here (i18n-first).
+    modeAsk: t('tui.mode_ask'),
+    modeRun: t('tui.mode_run'),
+    modeControl: t('tui.mode_control'),
+    // `/term` dispatch lines (app.tsx substitutes {mode}/{approval}).
+    termSwitched: t('tui.term_switched'),
+    termStatus: t('tui.term_status'),
+    termUsage: t('tui.term_usage'),
+    // `/resume` picker (buildResumePickerLines/resolveResumeCommand, app.tsx).
+    resumeHeader: t('tui.resume_picker_header'),
+    resumeHint: t('tui.resume_picker_hint'),
+    resumeSwitched: t('tui.resume_picker_switched'),
+    resumeNotFound: t('tui.resume_picker_not_found'),
+    resumeAmbiguous: t('tui.resume_picker_ambiguous'),
+    // busy-controls: /queue /interrupt /steer (renderBusyDecision, app.tsx).
+    busyQueueStatus: t('tui.busy_queue_status'),
+    busyStateBusy: t('tui.busy_state_busy'),
+    busyStateIdle: t('tui.busy_state_idle'),
+    busyInterrupted: t('tui.busy_interrupted'),
+    busyInterruptIdle: t('tui.busy_interrupt_idle'),
+    busyInterruptDup: t('tui.busy_interrupt_dup'),
+    busySteerQueued: t('tui.busy_steer_queued'),
+    busySteerIdle: t('tui.busy_steer_idle'),
+    busySteerEmpty: t('tui.busy_steer_empty'),
+  };
+}
+
+/**
+ * Build `ApprovalCardLabels` from the resolved language (Task 387-001). Previously
+ * `<ReplApp>` never passed an `approvalLabels` prop at all, so `ApprovalCard`
+ * always rendered `DEFAULT_APPROVAL_CARD_LABELS` (English, app.tsx) regardless of
+ * `lang`. `progress` reuses `tui.confirm_progress` — same "[{index}/{total}]"
+ * template already used by the legacy confirm modal, no need for a duplicate key.
+ */
+export function buildApprovalLabels(t: (key: string) => string): ApprovalCardLabels {
+  return {
+    hint: t('tui.approval_card_hint'),
+    progress: t('tui.confirm_progress'),
+    detailsHeading: t('tui.approval_card_details_heading'),
+    noArgs: t('tui.approval_card_no_args'),
+    riskLabels: {
+      none: t('tui.approval_risk_none'),
+      low: t('tui.approval_risk_low'),
+      medium: t('tui.approval_risk_medium'),
+      high: t('tui.approval_risk_high'),
+      critical: t('tui.approval_risk_critical'),
+    },
+  };
 }
 
 /** Rebuilds a provider adapter for a selection (entry.ts passes buildReplProvider). */
@@ -121,11 +198,76 @@ export function wireApprovalCrossProcess(
   });
 }
 
+/**
+ * Registers an async cleanup hook and returns an unregister function — the
+ * shape entry.ts's `registerReplTeardown` (born-549 SIGTERM-TEARDOWN) already
+ * exposes. Injected rather than imported so run.tsx (a leaf REPL renderer,
+ * normally reached only via entry.ts's own lazy `import('./repl/run.js')`)
+ * never gains a static dependency back on its bootstrapper.
+ */
+export type ReplTeardownRegistrar = (hook: () => Promise<void>) => () => void;
+
+/** Dependencies for {@link buildReplTeardown} — every resource is optional so
+ *  the same builder covers a fully-wired session and a stripped-down test double. */
+export interface ReplTeardownDeps {
+  unmountInk: () => void;
+  altScreen: boolean;
+  restoreAltScreen: () => void;
+  approvalWatch?: { dispose: () => void };
+  approvalChannel?: { dispose: () => void };
+  memory?: { close: () => void };
+  mcpBroker?: { disconnectAll: () => Promise<void> };
+  switcherExit: () => Promise<void>;
+}
+
+/**
+ * born-549 (SIGTERM-TEARDOWN) — the ONE teardown path shared by normal
+ * `/exit` and an external SIGINT/SIGTERM: unmount Ink, restore alt-screen,
+ * dispose the approval watch/channel, close the memory DB, disconnect the MCP
+ * broker (kills any MCP stdio server child), then exit the warm-child
+ * provider session. Exported as a pure factory — no module state, every
+ * dependency injected — so it is unit-testable without mounting Ink (the
+ * project has no ink-testing-library dependency; see terminal-ux-engineer
+ * seam-first-testing guidance).
+ *
+ * Idempotent: a signal racing Ink's own `exitOnCtrlC` unmount, or a signal
+ * arriving after normal exit already ran, must not double-run or throw.
+ * Every step is independently best-effort — one dependency throwing (a
+ * half-closed MemoryStore, a broker with a hung transport) must never skip
+ * the remaining steps, since each is an independent resource leak if left
+ * untorn-down.
+ */
+export function buildReplTeardown(deps: ReplTeardownDeps): () => Promise<void> {
+  let done = false;
+  return async function teardown(): Promise<void> {
+    if (done) return;
+    done = true;
+    try { deps.unmountInk(); } catch { /* already unmounted */ }
+    if (deps.altScreen) {
+      try { deps.restoreAltScreen(); } catch { /* best-effort */ }
+    }
+    try { deps.approvalWatch?.dispose(); } catch { /* already disposed */ }
+    try { deps.approvalChannel?.dispose(); } catch { /* already disposed */ }
+    try { deps.memory?.close(); } catch { /* already closed */ }
+    if (deps.mcpBroker) {
+      try { await deps.mcpBroker.disconnectAll(); } catch { /* best-effort */ }
+    }
+    try { await deps.switcherExit(); } catch { /* best-effort */ }
+  };
+}
+
+/** Mirrors entry.ts's own REPL_TEARDOWN_TIMEOUT_MS bound for the signal path
+ *  — the normal-exit call site below bounds the same shared teardown so a
+ *  slow MCP close() (the SDK waits up to ~2s before escalating to SIGTERM,
+ *  then up to another ~2s before SIGKILL) does not hang a plain `/exit`. */
+const REPL_TEARDOWN_TIMEOUT_MS = 5000;
+
 /** Mount the Ink REPL for an interactive TTY and run until the user exits. */
 export async function runInkRepl(
   provider: ChatProviderAdapter,
   providerName: string,
   rebuild: ProviderRebuild,
+  registerTeardown: ReplTeardownRegistrar,
 ): Promise<void> {
   // Project config is loaded once here and reused by the surface wire below —
   // a load failure degrades to defaults (lang=en, every surface flag off).
@@ -156,6 +298,11 @@ export async function runInkRepl(
   // below (terminal.rpc_debug) can read approval.list off the SAME broker
   // instance instead of constructing a second one.
   let broker: ApprovalBroker | undefined;
+  // born-549 (SIGTERM-TEARDOWN) — hoisted out of the native-agent MCP setup
+  // block below so the exit-path teardown can dispose it (kills any MCP
+  // stdio server child); previously local to that block, so nothing outside
+  // it could ever reach the broker to disconnect.
+  let mcpClientBroker: import('../../mcp-client/broker.js').McpClientBroker | undefined;
   if (approvalsEnabled) {
     try {
       broker = new ApprovalBroker(process.cwd());
@@ -400,8 +547,8 @@ export async function runInkRepl(
         const { McpClientBroker } = await import('../../mcp-client/broker.js');
         const { McpToolRegistry } = await import('../../mcp-client/registry.js');
         const { buildMcpBridge } = await import('../commands/chat-mcp-bridge.js');
-        const broker = new McpClientBroker({});
-        const bridge = buildMcpBridge({ broker, registry: new McpToolRegistry(), projectRoot: process.cwd() });
+        mcpClientBroker = new McpClientBroker({});
+        const bridge = buildMcpBridge({ broker: mcpClientBroker, registry: new McpToolRegistry(), projectRoot: process.cwd() });
         const connected = await bridge.loadAndConnectAll();
         if (connected.length > 0) mcpBridge = bridge as unknown as import('./native-tool-registry.js').NativeMcpBridge;
       } catch { /* MCP optional — REPL stays usable */ }
@@ -470,7 +617,7 @@ export async function runInkRepl(
   const altScreen = process.env['DECKENT_ALTSCREEN'] === '1';
   if (altScreen) process.stdout.write('\x1b[?1049h\x1b[2J\x1b[H');
 
-  const { waitUntilExit } = render(
+  const { unmount, waitUntilExit } = render(
     <ReplErrorBoundary>
     <ReplApp
       provider={switcher.proxy}
@@ -490,31 +637,8 @@ export async function runInkRepl(
       {...(memory ? { memory } : {})}
       {...(sessionId ? { sessionId } : {})}
       lang={lang}
-      labels={{
-        thinking: t('tui.thinking'),
-        generating: t('tui.generating'),
-        ready: t('tui.ready'),
-        queued: t('tui.queued'),
-        confirmHint: t('tui.confirm_hint'),
-        confirmProgress: t('tui.confirm_progress'),
-        menuHint: t('tui.menu_hint'),
-        switched: t('tui.switched'),
-        switchUsage: t('tui.switch_usage'),
-        approvalSet: t('tui.approval_set'),
-        approvalUsage: t('tui.approval_usage'),
-        queueCleared: t('tui.queue_cleared'),
-        cdTo: t('tui.cd_to'),
-        cdFail: t('tui.cd_fail'),
-        // Mode badge (Ask/Run/Control) — previously unwired, so the badge
-        // stayed English even in a TR session; localized here (i18n-first).
-        modeAsk: t('tui.mode_ask'),
-        modeRun: t('tui.mode_run'),
-        modeControl: t('tui.mode_control'),
-        // `/term` dispatch lines (app.tsx substitutes {mode}/{approval}).
-        termSwitched: t('tui.term_switched'),
-        termStatus: t('tui.term_status'),
-        termUsage: t('tui.term_usage'),
-      }}
+      labels={buildReplLabels(t)}
+      approvalLabels={buildApprovalLabels(t)}
       registerConfirm={(trigger) => { confirmTrigger = trigger; }}
       registerToolSink={(sink) => { toolSink = sink; }}
       {...(nativeEngine ? { nativeEngine } : {})}
@@ -526,14 +650,29 @@ export async function runInkRepl(
     </ReplErrorBoundary>,
   );
 
+  // born-549 (SIGTERM-TEARDOWN) — ONE teardown shared by normal `/exit` and an
+  // external SIGINT/SIGTERM (registered with entry.ts's onSignal via the
+  // injected `registerTeardown`). Previously everything below `waitUntilExit()`
+  // only ran when the app itself called exit() — a signal killed the process
+  // before any of it (warm-child claude session, MCP broker child, alt-screen)
+  // ever ran.
+  const teardown = buildReplTeardown({
+    unmountInk: unmount,
+    altScreen,
+    restoreAltScreen: () => { process.stdout.write('\x1b[?1049l'); },
+    ...(approvalWatch ? { approvalWatch } : {}),
+    ...(approvalChannel ? { approvalChannel } : {}),
+    ...(memory ? { memory } : {}),
+    ...(mcpClientBroker ? { mcpBroker: mcpClientBroker } : {}),
+    switcherExit: () => switcher.exit(),
+  });
+  const unregisterTeardown = registerTeardown(teardown);
+
   await waitUntilExit();
 
-  if (altScreen) process.stdout.write('\x1b[?1049l'); // restore the main screen
-  try { approvalWatch?.dispose(); } catch { /* already disposed */ }
-  try { approvalChannel?.dispose(); } catch { /* already disposed */ }
-  try { memory?.close(); } catch { /* already closed */ }
-  // Bounded teardown of the active session, then deterministic exit (Ink unmount
-  // + restored stdin can otherwise keep the event loop alive).
-  await Promise.race([switcher.exit(), new Promise((r) => setTimeout(r, 1000))]);
+  // Deterministic exit (Ink unmount + restored stdin can otherwise keep the
+  // event loop alive) — bounded so a slow MCP close() cannot hang a plain `/exit`.
+  unregisterTeardown();
+  await Promise.race([teardown(), new Promise((r) => setTimeout(r, REPL_TEARDOWN_TIMEOUT_MS))]);
   process.exit(0);
 }

@@ -196,26 +196,34 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     agenticArgs: {},
   },
   {
-    // Meta-command: handled directly by the chat loop (chat-native.ts) BEFORE
-    // the registry, via the legacy nervous bridge — listed here for /help + menu
-    // visibility (no agenticTool, like /model and /cd). Sprint 358 T-358-004 —
-    // resolveSlash's OWN /nervous branch (below, gated on an injected store) now
-    // consumes the 357-006 plan-object bridge; that is the fallback path (fires
-    // only when a caller passes a store — chat-native.ts's earlier interception
-    // is unchanged by this task).
+    // Meta-command: handled directly BEFORE the registry, via the legacy
+    // nervous bridge — listed here for /help + menu visibility (no
+    // agenticTool, like /model and /cd). Sprint 358 T-358-004 — resolveSlash's
+    // OWN /nervous branch (below, gated on an injected store) now consumes the
+    // 357-006 plan-object bridge; that is the fallback path (fires only when
+    // a caller passes a store). Two independent callers intercept it directly
+    // instead: the legacy loop (chat-native.ts, `buildNervousOutput`) and the
+    // Ink native-engine bridge (repl/app.tsx, task 387-002, same helper) — both
+    // read the file-backed store directly rather than passing one in.
     name: '/nervous',
     desc: 'Bekleyen nervous bildirimleri (örn: /nervous accept <id>)',
     ...tag('nervous'),
   },
   {
-    // Meta-command: handled directly in chat-native.ts BEFORE the registry
-    // (PLAN-INT-1 Sprint 276 Task 9). Lists structural interrogation questions
-    // from the current DIRECTIVES.md — no CLI-spawn, no tool-bridge required.
+    // Meta-command: handled directly BEFORE the registry (PLAN-INT-1 Sprint
+    // 276 Task 9). Lists structural interrogation questions from the current
+    // DIRECTIVES.md — no CLI-spawn, no tool-bridge required. Two independent
+    // callers intercept it: the legacy loop (chat-native.ts,
+    // `buildInterrogateOutput`) and the Ink native-engine bridge
+    // (repl/app.tsx, task 387-002, same helper).
     name: '/interrogate',
     desc: 'DIRECTIVES sorgulama sorularını göster (pre-plan PLAN-INT-1)',
   },
   {
-    // Meta-command: handled in the chat loop (chat-resume) BEFORE the registry.
+    // Meta-command: handled directly BEFORE the registry by whichever REPL
+    // engine is active — the legacy loop (chat-resume.ts) or the Ink
+    // native-engine bridge's own picker (repl/app.tsx `resolveResumeCommand`,
+    // task 358-006).
     name: '/resume',
     desc: 'Önceki sohbet oturumunu sürdür (örn: /resume 1)',
   },
@@ -288,8 +296,13 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     // With no server configured it falls through here to the honest notice
     // (resolveSlash → resolveMcpSlash → chat.mcp_not_wired, Sprint 358 T-358-004
     // per-subaction fallback) so the line never round-trips to the provider
-    // (audit finding A3). Tagged from 'mcp-bridge' (the REPL-surface entry, not
-    // the CLI-only 'mcp' entry) — matches the actual dispatch-capable risk here.
+    // (audit finding A3). The Ink native-engine bridge (repl/app.tsx, task
+    // 387-002) has NO equivalent live per-session bridge wired (run.tsx's
+    // native mcpBridge only feeds the AgentSession's own tool registry, not a
+    // `/mcp`-slash-shaped dispatcher) — it always resolves through this same
+    // honest-notice fallback, never silently drops the line. Tagged from
+    // 'mcp-bridge' (the REPL-surface entry, not the CLI-only 'mcp' entry) —
+    // matches the actual dispatch-capable risk here.
     name: '/mcp',
     desc: 'Harici MCP araçları — list · call <tool> [args] (proje .mcp.json)',
     ...tag('mcp-bridge'),

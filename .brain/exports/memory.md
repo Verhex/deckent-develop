@@ -1,5 +1,90 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-387 Learnings
+- Sprint sprint-387 Learnings: ## Sprint sprint-387 Learnings
+- born-493 — W2-WIRE — native-engine'i slash-dispatcher'a köprüle (24/37 komut sessiz-düşüyor) (P0): GO_WITH_TECH_DEBT — Root-cause read (not assumed): bare `deckent` with piped stdin never mounts Ink at all (entry.ts launchDefaultRepl only 
+- born-563 — MEMORY-TENANT-ISOLATION — tenant izolasyonu default-ON (P1): GO_WITH_TECH_DEBT — Fix implemented exactly as specified: MemoryStore constructor now defaults strictTenantIsolation to true (fail-closed) i
+- born-568 — PROCESS-GROUP-KILL — 6 adapter'da SIGTERM→SIGKILL process-group (P1): GO_WITH_TECH_DEBT — subprocess.ts already implemented POSIX process-group kill + SIGTERM->SIGKILL escalation (PGID-TEARDOWN, ADR-G-013, prio
+- born-83 — TOOL-CU — computer-use wire + navigate/region-screenshot + injection-harden (P2): GO_WITH_TECH_DEBT — Implemented within scope (src/core/computer-use-exec.ts + its test file only — write authority confirmed limited to thes
+- born-503 — HUB-P0 — Ed25519 signing + sandbox-on-install + BUILTIN_TRUSTED_SKILLS id fix (P2): GO_WITH_TECH_DEBT — BUILTIN_TRUSTED_SKILLS fix (skill-sandbox.ts:196-207): replaced the 4 stale ids (react-expert, node-expert, test-expert,
+- born-522 — MCP-CLIENT-GATE — mcp_client_enabled ölü-gate: wire ya da kaldır (P2): GO_WITH_TECH_DEBT — Investigated the mcp_client_enabled gate. Confirmed root cause: isMcpClientEnabled/initReplMcpBridge (mcp-bridge.ts) are
+- born-525 — CHAT-RENDER-MARKDOWN — inline-reset bleed + link paren truncation (P2): NO_GO
+- born-544 — OPENAI-TOOLCALL-ID — tool-call ID benzersizliği (P2): NO_GO
+- born-545 — ANTHROPIC-ERR-BODY — hata gövdesini yanıta dahil et (P3): NO_GO
+
+## Gains
+- 387-001 — born-492 — W1-EXPERIENCE-ON — repl_surface i18n flip'i tamamla (P0) — Fixed the repl_surface i18n flip gap.
+- 387-003 — born-551 — REPL-TURN-EXCEPTION-SURFACE — turn-loop istisnaları yutulmuyor (P1) — Root-cause (read, not assumed): app.tsx's nativeEngine turn-loop effect (line ~957 pre-change) ra...
+- 387-004 — born-549 — SIGTERM-TEARDOWN — sinyal-temizliği eksik (warm-child/MCP/Windows) (P1) — Root cause: onSignal() (ADR-G-013) only ever ran interruptActiveSprint()+killAllSessions() (Brain...
+- 387-006 — born-564 — PANIC-GATE-FAILCLOSED — fail-closed marker yanlış yorumlanıyor (P1) — Fixed readDecisionFromMarker() in src/nervous/panic-gate.ts (lines ~105-149).
+- 387-007 — born-567 — SPAWN-SAFETY-WIRE — assertSpawnSafe her spawn call-site'ına (P1) — Root cause of the 'kısmi-koruma' (partial protection) gap: assertSpawnSafe/isSpawnSafe required c...
+- 387-009 — born-571 — FLOW-EVENT-DISPATCH — flow approve reader + `flow approve` komutu (P1) — Root cause: FlowRuntime.tick() hardcoded scheduler.collectDue(flows, [], [], now) — an event-kind...
+- 387-011 — born-203 — ONB-2 — rich doctor: Windows-native profil + auth-state probe (P1) — Closed the two disk-verified 'KALAN' gaps in born-203.
+- 387-014 — born-523 — AGENTIC-CONFIRM-HARDEN — readline reuse + SAFE-before-RISKY sıralama (P2) — Fix 1 (readline reuse): ConfirmOptions gained an optional `rl?: import('node:readline/promises')....
+- …and 10 more delivered
+
+## Sprint sprint-386 Learnings
+- Sprint sprint-386 Learnings: ## Sprint sprint-386 Learnings
+- born-552 — MCP-TOOL-EMPTY-DESC — boş-string açıklama REPL-launch'ı çökertiyor: NO_GO — DUPLICATE of already-completed sprint-383 task-383-001 (identical title/scope/goCriteria; see .brain/archive/sprints/spr
+- born-550 — OFF-TTY-AUTOAPPROVE — piped stdin her yan-etkiyi kör-onaylıyor (SEC): NO_GO — born-550 (this exact bug) was already fixed and committed in 8bcb0e32 (sprint-383, task 383-002) — verified via `git sta
+- born-520 — NATIVE-TURN-ACCOUNTING — usage üzerine-yazılıyor + onTurnEnd reuse: NO_GO — DUPLICATE-DEBT ASSIGNMENT: 386-005 targets born-520 (NATIVE-TURN-ACCOUNTING), but this exact debt item was already fully
+
+## Gains
+- 386-003 — born-542 — SELF-MODIFY-GUARD-BYPASS — path-normalizasyon eksik (ADR-039 SEC) — Investigated before coding (per plan).
+- 386-004 — born-532 — ANTHROPIC-PARALLEL-TOOLRESULT — sibling tool_result'lar bölünüyor — Investigated (Discipline 1) before touching anything: the parallel-tool_result-merge fix describe...
+- 386-006 — born-519 — BASH-PERM-RESOURCE — primaryResource yanlış anahtar okuyor — Investigated primaryResource() in src/agent/loop.ts:61-64 — it already reads args['cmd'] (not arg...
+- 386-007 — born-510 — CONTEXT-BUDGET-ORPHAN-TOOLRESULT — compaction tool-pair'i bölüyor — born-510's primary fix (budget cut landing on the assistant-toolcall/tool-result boundary within ...
+- 386-008 — born-511 — CHAT-SESSION-RECONCILE-SWAP — stream'lenen ile final sessizce farklı — This task is a duplicate of sprint-383's task-383-008 (identical title, description, and scope.fi...
+
+## Sprint sprint-383 Learnings
+- Sprint sprint-383 Learnings: ## Sprint sprint-383 Learnings
+
+## Gains
+- 383-001 — born-552 — MCP-TOOL-EMPTY-DESC — boş-string açıklama REPL-launch'ı çökertiyor — Root cause: native-tool-registry.ts MCP-bridge registration loop used `t.descriptor.description ?...
+- 383-002 — born-550 — OFF-TTY-AUTOAPPROVE — piped stdin her yan-etkiyi kör-onaylıyor (SEC) — born-550 SEC fix: launchDefaultRepl's off-TTY confirm gate (src/cli/entry.ts) unconditionally aut...
+- 383-003 — born-542 — SELF-MODIFY-GUARD-BYPASS — path-normalizasyon eksik (ADR-039 SEC) — Root cause: checkSelfModifying() compared the raw write-target string directly against DECKENT_SO...
+- 383-004 — born-532 — ANTHROPIC-PARALLEL-TOOLRESULT — sibling tool_result'lar bölünüyor — Root cause: toAnthropicMessage() in src/agent/provider-tooluse/anthropic.ts mapped each ProviderM...
+- 383-005 — born-520 — NATIVE-TURN-ACCOUNTING — usage üzerine-yazılıyor + onTurnEnd reuse — Root cause: runTurn's 'usage' case did a plain `=` assignment (inputTokens = ev.inputTokens; outp...
+- 383-006 — born-519 — BASH-PERM-RESOURCE — primaryResource yanlış anahtar okuyor — Fixed primaryResource() in src/agent/loop.ts:62 — it read args['command'] but the real deckent_ba...
+- 383-007 — born-510 — CONTEXT-BUDGET-ORPHAN-TOOLRESULT — compaction tool-pair'i bölüyor — Root cause: fitMessagesToBudget() force-kept only the single final message regardless of budget, ...
+- 383-008 — born-511 — CHAT-SESSION-RECONCILE-SWAP — stream'lenen ile final sessizce farklı — Root cause: runTurn()'s parsed.done reconciliation block in chat-session.ts silently swapped `col...
+
+## Sprint sprint-382 Learnings
+- Sprint sprint-382 Learnings: ## Sprint sprint-382 Learnings
+- born-518-REDO — CRED-SCRUB gerçek leak-site'a wire (Sprint-1 wrong-path düzelt): GO_WITH_TECH_DEBT — Moved the CRED-SCRUB logic to the real leak site as directed. src/core/provider.ts now hosts scrubCrossProviderEnv + bui
+- born-566 — WRITER-LEASE FAIL-CLOSED — fs-hatasında yazma reddedilsin: GO_WITH_TECH_DEBT — Fixed fail-open bug in installWriterLeaseGate's gated handler (src/mcp/writer-lease-gate.ts): the catch block around acq
+- born-561 — AUTO-APPROVE-CONSISTENCY — CLI start/run hardcoded true'ları kaldır: GO_WITH_TECH_DEBT — Fix: start.ts:455 `autoApprove: true` (hardcoded) -> `autoApprove: opts.autoApprove === true` (honors the --auto-approve
+
+## Gains
+- 382-001 — born-573-REDO — WORKER-APPROVAL-GATE gerçek-site'a wire (Sprint-1 wrong-path düzelt) — born-573 REDO fixed.
+- 382-003 — born-508 — INPUTBAR↔APPROVALCARD MUTEX — tuş çift-tüketimi (yıkıcı kör-onay) — born-508 fixed: added a pure exported resolveStdinOwner(confirmOpen, approvalPending) truth-table...
+- 382-004 — born-574 — NERVOUS-UNDO gerçek compensating-executor — Root cause: `deckent_nervous_undo` (registered in src/mcp/tools/nervous-edit.ts, OUT of this task...
+- 382-005 — born-569 — NERVOUS-DETECTOR-REACH — 3 detektör ACTION_REGISTRY mismatch — Root cause confirmed by reading source: build-failure-recurrence emits suggestedActions.id='BUILD...
+- 382-008 — born-555 — PERMISSION-STORE READ-MERGE-WRITE — settings.local.json'u ezmesin — Investigated the actual audit source (.analysis/deckent-repl-findings-board.html, finding on perm...
+
+## Sprint sprint-381 Learnings
+- Sprint sprint-381 Learnings: ## Sprint sprint-381 Learnings
+- born-499-HARD — WORKER-GIT-GUARD — spawn-backend'lere git-shim enjekte et: GO_WITH_TECH_DEBT — DONE core: new src/orchestra/git-worker-guard.ts builds+installs a POSIX git shim (buildGitGuardShim/installGitGuard) de
+
+## Sprint sprint-380 Learnings
+- Sprint sprint-380 Learnings: ## Sprint sprint-380 Learnings
+- born-558 — SKILL-LIST-V2-CRASH — `deckent skill list` v2-manifest'te exit 1: GO_WITH_TECH_DEBT — Root cause confirmed: loadAllSkills() (skill.ts) JSON.parse'd manifest.json verbatim with zero normalization, and the sk
+- born-573 — WORKER-APPROVAL-GATE-WIRE — WorkerApprovalGate prod'da hiç `new` edilmiyor (WIRE-ON): GO_WITH_TECH_DEBT — Scope note: scope.filesWrite named src/orchestra/worker.ts, which does not exist anywhere in the repo or git history (ve
+- born-518 — CROSS-PROVIDER-CRED-SCRUB — provider secret'ları paylaşılan process.env'de sızıyor (P0-SEC): GO_WITH_TECH_DEBT — SCOPE TYPO FOUND + RESOLVED: write scope listed 'src/providers/provider.ts', which did not exist. The audit's own citati
+- born-514 — AGENTIC-DISPATCH-OVERMATCH — NL-intent regex'leri sıradan sohbeti tool-call'a kaçırıyor: GO_WITH_TECH_DEBT — Fixed AGENTIC-DISPATCH-OVERMATCH by narrowing all 4 classifyAgenticIntent regexes in chat-agentic-dispatch.ts so a bare,
+- born-505 — DOCTOR-DUP-PREFLIGHT — iki özdeş runPreFlightHealthCheck tanımı: GO_WITH_TECH_DEBT — Consolidated the duplicate runPreFlightHealthCheck: doctor-checks.ts keeps the single canonical definition (zero changes
+
+## Gains
+- 380-002 — born-559 — LIFECYCLE-CRITICAL-2 — approval sonsuz-bekleme + ADR-gate fail-open — Fix 1 (sprint-lifecycle.ts waitForHumanApproval): replaced the unbounded `while(true)` approval p...
+- 380-005 — born-509 — SPAWN-ERROR-LISTENERS — REPL spawn-site'larında error/state-reset eksik → ENOENT crash
+- 380-006 — born-512 — PROVIDER-SWITCH-CRASH — geçersiz /provider adı REPL'i çökertiyor — Fixed born-512: switchTo() previously called rebuild(next) unguarded; an unrecognized provider na...
+- 380-008 — born-515 — NERVOUS-SLASH-FALSE-SUCCESS — /nervous accept|reject executor'a hiç ulaşmıyor — Fixed the false-success bug in handleNervousSlash's accept/reject path (chat-nervous-bridge.ts).
+- 380-009 — born-516 — TOOL-BRIDGE-TIMEOUT — düz 30s SPAWN_TIMEOUT uzun deckent_audit/plan'ı öldürüyor — Replaced the flat 30s SPAWN_TIMEOUT_MS in chat-tool-bridge.ts's defaultSpawnFn with a per-command...
+- 380-010 — born-526 — PROVIDER-PARITY-ROBUST — exit-code okunmuyor + Ollama/HTTP timeout'suz + codex env-key boşluğu — Fixed all 3 REPL findings (77+109 / born-518-devir P1-12/P1-13) in chat-provider-parity.ts, DID N...
+- 380-011 — born-535 — DECKENT-BASH-HARDEN — hanging-komut timeout'suz + bash hardcode (Win-native kırık) — born-535 DECKENT-BASH-HARDEN fixed inside defaultBashRun (chat-tool-exec.ts), the only real-logic...
+- 380-012 — born-62 — CURSOR-MODEL-WIRE — line-edit UTF-16 surrogate böler; code-point-safe cursor-model'i wire et (WIRE-ON) — Wired cursor-model.ts's code-point-safe primitives (applyCursorEdit, moveCursor, toBuffer) into l...
+- …and 1 more delivered
+
 ## Sprint sprint-379 Learnings
 - Sprint sprint-379 Learnings: ## Sprint sprint-379 Learnings
 - DOCS-NUM-TRUTH — README/DECKENT sayı-ve-dil doğruluğu: GO_WITH_TECH_DEBT — Ground-truth note: the rendered 'Scope Rules' section of my prompt only listed the two test-file paths, but .tasks/task-

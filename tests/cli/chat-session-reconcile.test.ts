@@ -139,6 +139,26 @@ describe('chat-session reconciliation — streamed/final consistency (born-511)'
     expect(streamedTexts).toEqual(['Tamamdır, yapıyorum.']);
   });
 
+  it('resultText and assistantText both extend the stream but diverge from each other → longer candidate wins, screen stays consistent', async () => {
+    const chunks = await driveTurn([
+      delta('Merhaba'),
+      // Both extend the streamed prefix ("Merhaba") individually, but diverge from
+      // EACH OTHER past that shared prefix. assistantText is longer, so it must win
+      // per the reconciliation order (chat-session.ts:594-601) — resultText's
+      // divergent tail must never be streamed or persisted.
+      assistantEvent('Merhaba herkese selamlar ve iyi günler!'),
+      resultEvent('Merhaba dünyalar!'),
+    ]);
+    const streamedTexts = chunks.filter((c) => c.text).map((c) => c.text as string);
+    const doneChunk = chunks.find((c) => c.done);
+    expect(doneChunk?.done?.text).toBe('Merhaba herkese selamlar ve iyi günler!');
+    // Invariant holds even when the two candidates disagree: whatever wins is fully streamed.
+    expect(streamedTexts.join('')).toBe(doneChunk?.done?.text);
+    expect(streamedTexts).toEqual(['Merhaba', ' herkese selamlar ve iyi günler!']);
+    // resultText's divergent tail ("dünyalar!") must never appear on screen.
+    expect(streamedTexts.join('')).not.toContain('dünyalar!');
+  });
+
   it('normal turn: delta sum already equals final text → no extra chunk, behavior unchanged', async () => {
     const chunks = await driveTurn([
       delta('İyi '),

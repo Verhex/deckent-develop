@@ -98,7 +98,12 @@ export class MemoryStore {
 
   constructor(dbPath: string, opts?: { strictTenantIsolation?: boolean }) {
     this.db = new Database(dbPath);
-    this.strictTenantIsolation = opts?.strictTenantIsolation ?? false;
+    // Fail-closed by default (born-563 / P1): a NULL-tenant row must NEVER match
+    // an explicit-tenantId query unless a caller deliberately opts back into the
+    // legacy permissive behavior. Callers that never pass a tenantId at all
+    // (the vast majority of call sites — single-tenant/tenant-unaware reads) are
+    // completely unaffected either way, since no tenant clause is built for them.
+    this.strictTenantIsolation = opts?.strictTenantIsolation ?? true;
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
     // DB-LOCK RESILIENCE (verified root cause, sprint-348): `.brain/memory.db` is a
@@ -753,12 +758,10 @@ export class MemoryStore {
 
     if (tenantId !== undefined) {
       const deletedClause = includeDeleted ? '' : ' AND deleted_at IS NULL';
-      // WARNING: When strictTenantIsolation is false (default), this query includes
-      // NULL-tenant rows alongside the requesting tenant's rows. This allows backward-
-      // compatible access to legacy/global entries but leaks NULL-tenant rows across
-      // tenant boundaries. Set strictTenantIsolation=true (via DeckentConfig
-      // strict_tenant_isolation) to close this leak and return only the requesting
-      // tenant's own rows.
+      // Fail-closed by default (born-563): only the requesting tenant's own rows
+      // match. Pass strictTenantIsolation=false to the constructor to opt back
+      // into the legacy permissive behavior (NULL-tenant rows also match), e.g.
+      // for a deliberately tenant-unaware legacy/global read path.
       const tenantClause = this.strictTenantIsolation
         ? ' AND tenant_id = ?'
         : ' AND (tenant_id = ? OR tenant_id IS NULL)';
@@ -799,12 +802,10 @@ export class MemoryStore {
 
     let rows: EntryRow[];
     if (tenantId !== undefined) {
-      // WARNING: When strictTenantIsolation is false (default), this query includes
-      // NULL-tenant rows alongside the requesting tenant's rows. This allows backward-
-      // compatible access to legacy/global entries but leaks NULL-tenant rows across
-      // tenant boundaries. Set strictTenantIsolation=true (via DeckentConfig
-      // strict_tenant_isolation) to close this leak and return only the requesting
-      // tenant's own rows.
+      // Fail-closed by default (born-563): only the requesting tenant's own rows
+      // match. Pass strictTenantIsolation=false to the constructor to opt back
+      // into the legacy permissive behavior (NULL-tenant rows also match), e.g.
+      // for a deliberately tenant-unaware legacy/global read path.
       const tenantClause = this.strictTenantIsolation
         ? 'tenant_id = ?'
         : '(tenant_id = ? OR tenant_id IS NULL)';
@@ -833,12 +834,10 @@ export class MemoryStore {
     const placeholders = tags.map(() => '?').join(', ');
     let rows: EntryRow[];
     if (tenantId !== undefined) {
-      // WARNING: When strictTenantIsolation is false (default), this query includes
-      // NULL-tenant rows alongside the requesting tenant's rows. This allows backward-
-      // compatible access to legacy/global entries but leaks NULL-tenant rows across
-      // tenant boundaries. Set strictTenantIsolation=true (via DeckentConfig
-      // strict_tenant_isolation) to close this leak and return only the requesting
-      // tenant's own rows.
+      // Fail-closed by default (born-563): only the requesting tenant's own rows
+      // match. Pass strictTenantIsolation=false to the constructor to opt back
+      // into the legacy permissive behavior (NULL-tenant rows also match), e.g.
+      // for a deliberately tenant-unaware legacy/global read path.
       const tenantClause = this.strictTenantIsolation
         ? 'e.tenant_id = ?'
         : '(e.tenant_id = ? OR e.tenant_id IS NULL)';

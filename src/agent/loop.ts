@@ -112,6 +112,10 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
     const calls: ProviderToolCall[] = [];
     try {
       for await (const ev of adapter.send(req)) {
+        // Mid-stream cancel(): stop consuming further provider events instead of
+        // running the in-flight turn to completion (breaking a for-await triggers
+        // the adapter's iterator.return(), giving it a chance to abort cleanly).
+        if (deps.isCancelled?.()) break;
         if (ev.type === 'text-delta') { assistantText += ev.text; yield { type: 'text-delta', text: ev.text }; }
         else if (ev.type === 'tool-call') { calls.push(ev); yield { type: 'tool-proposed', id: ev.id, tool: ev.name, args: ev.args }; }
         else if (ev.type === 'usage') {
@@ -133,6 +137,11 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       yield { type: 'turn-end' };
       return;
     }
+
+    // The stream was interrupted mid-turn: nothing proposed this round was ever
+    // executed, so committing it (transcript.appendAssistant below) would leave
+    // orphan tool_use ids with no matching tool_result — reject before that happens.
+    if (deps.isCancelled?.()) { yield { type: 'turn-end' }; return; }
 
     // Honest truncation signal: the backend cut generation at its token/context
     // ceiling. The turn still carries whatever arrived, but the user must know
@@ -162,10 +171,11 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       return;
     }
 
-    for (const call of calls) {
+    let cancelledAt = -1;
+    for (const [callIndex, call] of calls.entries()) {
       // cancel() stops the rest of the in-flight batch (incl. auto-tier calls),
       // not just subsequent ask-tier ones (review follow-up #1).
-      if (deps.isCancelled?.()) break;
+      if (deps.isCancelled?.()) { cancelledAt = callIndex; break; }
       const def = deps.registry.get(call.name);
       if (!def) {
         const output = `[unknown tool: ${call.name}]`;
@@ -207,6 +217,18 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       catch (e) { result = { ok: false, output: e instanceof Error ? e.message : String(e) }; }
       yield { type: 'tool-result', id: call.id, tool: call.name, ok: result.ok, output: result.output };
       transcript.appendToolResult(call.id, result.output);
+    }
+
+    if (cancelledAt !== -1) {
+      // The assistant message above already committed every proposed tool_use id
+      // (calls.map(...)) — an unexecuted tail would leave orphan tool_use entries
+      // with no tool_result, which the next provider call rejects. Pair each one
+      // in the transcript with a synthetic cancelled result; these calls never
+      // reached tool-executing, so (unlike an executed/denied call) no tool-result
+      // view event fires for them either — the batch was simply cut short.
+      for (const call of calls.slice(cancelledAt)) transcript.appendToolResult(call.id, '[cancelled]');
+      yield { type: 'turn-end' };
+      return;
     }
     // loop continues — the model sees the tool results on the next iteration.
   }

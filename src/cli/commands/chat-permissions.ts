@@ -71,8 +71,21 @@ export function createPermissionStore(cwd: string): PermissionStore {
     isAllowed: (tool) => cache.has(tool),
     allow: (tool) => {
       if (cache.has(tool)) return;
-      cache.add(tool);
-      writePermissions(cwd, cache);
+      // Atomic read-merge-write (born-539, consistent with the born-555
+      // agent/permission-store.ts pattern): re-read the CURRENT on-disk
+      // allow-set right before writing, instead of persisting this store's
+      // stale creation-time `cache` snapshot. Two PermissionStore instances
+      // sharing the same settings.local.json (e.g. two concurrent REPL/worker
+      // sessions) each hold an independent snapshot; writing the raw snapshot
+      // would let the later writer silently clobber an earlier concurrent
+      // grant (last-writer-wins → grant loss). Merging the fresh disk state
+      // with `tool` + everything this store already knows about fixes that.
+      const merged = loadPermissions(cwd);
+      merged.add(tool);
+      for (const t of cache) merged.add(t);
+      writePermissions(cwd, merged);
+      cache.clear();
+      for (const t of merged) cache.add(t);
     },
     list: () => [...cache].sort(),
   };

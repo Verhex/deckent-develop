@@ -14,11 +14,23 @@
 
 export type ToolPermission = 'read' | 'confirm' | 'always';
 
-/** Destructive tools — always re-confirm, never auto-approvable. */
+/**
+ * Destructive / high-stakes tools — always re-confirm, never auto-approvable.
+ * `deckent_start`/`deckent_run` join the destructive trio here on the
+ * CommandRisk ladder's 'Çalıştır' (execute/spawn-a-process) rung — one tier
+ * above the 'Değiştir' (local-state modify) tools in CONFIRM_TOOLS below
+ * (see src/cli/command-registry.ts entries for start/run/plan + the
+ * `toolPermissionToCommandRisk` translation in risk-language.ts: always ↔
+ * Çalıştır, confirm ↔ Değiştir). Each spawns real worker processes with real
+ * cost/time and irreversible repo writes — a materially new, high-stakes
+ * action every single call, not something a remembered "a" should silence.
+ */
 const ALWAYS_CONFIRM: ReadonlySet<string> = new Set([
   'deckent_kill',
   'deckent_cleanup',
   'deckent_recover',
+  'deckent_start',
+  'deckent_run',
 ]);
 
 /** Write tools — confirm once; "a" remembered for the session. */
@@ -61,6 +73,14 @@ export function classifyTool(tool: string, args: Record<string, unknown>): ToolP
   }
   if (tool === 'deckent_usage') return 'read';
   if (tool === 'deckent_resources') return 'read';
+  if (tool === 'deckent_process') {
+    // action=status|result poll a prior submission by executionId (read-only,
+    // per the tool's own MCP description). action=submit injects a NEW
+    // ExecutionRequest — same 'Çalıştır' (execute/spawn) class as
+    // deckent_start/deckent_run above, so it shares their 'always' tier.
+    const action = typeof args['action'] === 'string' ? (args['action'] as string) : 'submit';
+    return action === 'status' || action === 'result' ? 'read' : 'always';
+  }
   return 'read';
 }
 

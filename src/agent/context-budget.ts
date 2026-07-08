@@ -54,6 +54,12 @@ export interface FitResult {
  *   together rather than split).
  * - The final message is always kept, even if it alone exceeds the budget
  *   (an honest oversized turn beats sending the provider a malformed one).
+ *   When no `user` message exists anywhere in the input (degenerate/test-only
+ *   — never true for a real transcript, which always opens on `appendUser`),
+ *   this guarantee widens to the WHOLE input: with no turn boundary to fall
+ *   back on, the entire array is the only pairing-complete span available,
+ *   so it is kept intact rather than risking a partial cut stranding a
+ *   `tool` result without its owning `assistant` call.
  * - `budgetTokens <= 0` or a window already within budget → input returned
  *   unchanged (droppedCount 0).
  */
@@ -65,13 +71,14 @@ export function fitMessagesToBudget(messages: readonly ProviderMessage[], budget
 
   // The current in-flight turn (last `user` message onward) is always
   // pairing-complete by construction — never split it. No `user` message at
-  // all (degenerate/test-only input) falls back to the single-final-message
-  // guarantee this function has always made.
+  // all (degenerate/test-only input — a real transcript always opens on
+  // `appendUser`) means the whole array IS that in-flight turn, so it is
+  // the mandatory span in full rather than just its final message.
   let lastUserIdx = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i]!.role === 'user') { lastUserIdx = i; break; }
   }
-  const boundary = lastUserIdx >= 0 ? lastUserIdx : messages.length - 1;
+  const boundary = lastUserIdx >= 0 ? lastUserIdx : 0;
 
   // Walk backward accumulating the newest messages that fit. Everything at
   // or after `boundary` is force-included regardless of budget.

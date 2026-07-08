@@ -81,3 +81,27 @@ export async function verifySignature(
  */
 export const bytesToHex = ed.etc.bytesToHex;
 export const hexToBytes = ed.etc.hexToBytes;
+
+/**
+ * Canonical skill-signing payload: skill content + serialized manifest.
+ * Single source of truth for the convention `skill publish` signs against
+ * (previously inlined at skill-marketplace.ts) so a future verifier
+ * reconstructs the exact same bytes the signer produced.
+ */
+export function buildSkillSignPayload(skillContent: string, manifest: Record<string, unknown>): string {
+  return skillContent + JSON.stringify(manifest);
+}
+
+/**
+ * Verify a signed skill package (SKILL.md content + manifest.json) against a
+ * publisher's Ed25519 public key. Mirrors the sign step in `skill publish`
+ * (loadOrGenerateKeypair + signMessage over buildSkillSignPayload).
+ */
+export async function verifySkillSignature(
+  skillContent: string,
+  manifest: Record<string, unknown>,
+  signatureHex: string,
+  publicKey: Uint8Array,
+): Promise<boolean> {
+  return verifySignature(buildSkillSignPayload(skillContent, manifest), signatureHex, publicKey);
+}

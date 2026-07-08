@@ -15,6 +15,16 @@ export const IMMUTABLE_CORE = [
   'full-auto modu bile bu tabanı geçemez.',
 ].join(' ');
 
+/** English translation of {@link IMMUTABLE_CORE} — selected when `opts.lang === 'en'`
+ *  (repl_surface i18n flip, Task 387-001). Default (no `lang`) stays the Turkish
+ *  const above, unchanged, so pre-existing callers/tests are byte-identical. */
+export const IMMUTABLE_CORE_EN = [
+  'SAFETY BOUNDARY (immutable): no bypassing safety measures; model determinism is preserved.',
+  'PERMISSION DISCIPLINE (immutable): every file/command action passes through the permission gate;',
+  'the always-floor (kill/cleanup/recover, rm -rf, force-push, secret writes) NEVER runs automatically —',
+  'not even full-auto mode can cross this floor.',
+].join(' ');
+
 function readIfExists(path: string): string | null {
   try {
     return existsSync(path) ? readFileSync(path, 'utf-8') : null;
@@ -40,7 +50,8 @@ export interface ComposeOptions {
  * always first and always present.
  */
 export function composeSystemPrompt(opts: ComposeOptions): string {
-  const parts: string[] = [IMMUTABLE_CORE];
+  const isEnglish = opts.lang === 'en';
+  const parts: string[] = [isEnglish ? IMMUTABLE_CORE_EN : IMMUTABLE_CORE];
 
   const soul = readIfExists(join(opts.cwd, '.deckent', 'soul.md')) ?? defaultSoul();
   parts.push(soul);
@@ -50,7 +61,7 @@ export function composeSystemPrompt(opts: ComposeOptions): string {
     readIfExists(join(opts.cwd, '.deckent', 'workspace', 'IDENTITY.md')),
   ].filter((x): x is string => x !== null);
   if (knowledge.length > 0) {
-    parts.push('--- PROJE BİLGİSİ ---');
+    parts.push(isEnglish ? '--- PROJECT INFO ---' : '--- PROJE BİLGİSİ ---');
     parts.push(...knowledge);
   }
 

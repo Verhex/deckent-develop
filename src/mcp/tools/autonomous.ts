@@ -10,11 +10,14 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod/v4';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { enrichResponse } from '../helpers/enrich.js';
 import { backlogAdd, backlogList, backlogRemove } from '../../cli/commands/autonomous.js';
 import { makeApprovalGate } from '../../orchestra/autonomous/approval-adapter.js';
 import type { BacklogEntry } from '../../orchestra/autonomous/backlog-types.js';
+import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
 
 // ─── Filesystem layout (mirrors cli/commands/autonomous.ts) ──────────────────
 
@@ -39,6 +42,61 @@ function ensureAutonomousDir(root: string): void {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
+function loopPidPath(root: string): string {
+  return join(autonomousDir(root), 'loop.pid');
+}
+
+interface LoopPidRecord {
+  pid: number;
+  startedAt: string;
+}
+
+/** Best-effort read of the recorded loop pid — null on any missing/corrupt state. */
+function readLoopPid(root: string): LoopPidRecord | null {
+  const path = loopPidPath(root);
+  if (!existsSync(path)) return null;
+  try {
+    const raw: unknown = JSON.parse(readFileSync(path, 'utf-8'));
+    if (raw && typeof raw === 'object' && typeof (raw as { pid?: unknown }).pid === 'number') {
+      return raw as LoopPidRecord;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Is `pid` a live process? EPERM (process exists, no signal permission) still counts as alive. */
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/**
+ * Raw `autonomous.enabled` read straight off the project config file.
+ * Deliberately NOT `loadConfig()` (core/config.ts) — that module's fs surface
+ * (statSync + friends) goes beyond the existsSync/readFileSync pair this file
+ * already uses everywhere else, which would force every caller/test of this
+ * tool to mock a much wider fs API just to exercise `action=start`.
+ */
+function isAutonomousEnabled(root: string): boolean {
+  const configPath = join(root, PROJECT_CONFIG_PATH);
+  if (!existsSync(configPath)) return false;
+  try {
+    const doc: unknown = JSON.parse(readFileSync(configPath, 'utf-8'));
+    if (!doc || typeof doc !== 'object') return false;
+    const autonomous = (doc as Record<string, unknown>)['autonomous'];
+    return !!autonomous && typeof autonomous === 'object'
+      && (autonomous as Record<string, unknown>)['enabled'] === true;
+  } catch {
+    return false;
+  }
+}
+
 // ─── Tool registration ────────────────────────────────────────────────────────
 
 export function registerAutonomousTool(server: McpServer): void {
@@ -50,8 +108,10 @@ export function registerAutonomousTool(server: McpServer): void {
         'Control the deckent autonomous execution engine: query status, start/stop ' +
         'the loop, manage the backlog (add/list/remove), and resolve approval gates ' +
         '(pending/approve/reject). Mirrors the `deckent autonomous` CLI subcommands. ' +
-        'Note: `start` clears the stop marker and returns launch guidance — the loop ' +
-        'process itself must be started via `deckent autonomous start` from a terminal.',
+        'Note: `start` spawns the real loop as a DETACHED background process (never ' +
+        'blocks this MCP stdio transport) — it reports spawned=false with an honest ' +
+        'reason instead of spawning when autonomous.enabled is not true in project ' +
+        'config, or when a previously-spawned loop is already alive.',
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
         action: z.enum([
@@ -66,7 +126,8 @@ export function registerAutonomousTool(server: McpServer): void {
           'reject',
         ]).describe(
           'Action to perform. ' +
-          'status=query engine state; start=clear stop marker (run loop via CLI); ' +
+          'status=query engine state; start=spawn the real autonomous loop as a detached ' +
+          'background process (honest no-op if disabled/already running — see spawned field); ' +
           'stop=write stop marker; backlog_add/list/remove=manage work queue; ' +
           'pending=list parked approvals; approve/reject=resolve a parked trigger.',
         ),
@@ -172,11 +233,91 @@ export function registerAutonomousTool(server: McpServer): void {
           const stopFile = stopMarkerPath(root);
           const wasMarked = existsSync(stopFile);
           if (wasMarked) rmSync(stopFile);
+
+          // Don't spawn a second loop over the same backlog — an already-alive
+          // recorded pid wins over a fresh spawn.
+          const existingPid = readLoopPid(root);
+          if (existingPid && isPidAlive(existingPid.pid)) {
+            const enriched = enrichResponse('autonomous', {
+              action: 'start',
+              spawned: false,
+              alreadyRunning: true,
+              pid: existingPid.pid,
+              startedAt: existingPid.startedAt,
+              stopMarkerCleared: wasMarked,
+              message: `Autonomous loop already running (pid ${existingPid.pid}, started ` +
+                `${existingPid.startedAt}). Not spawning a duplicate — use action=stop to ` +
+                'signal it to exit cleanly.',
+            });
+            return { content: [{ type: 'text' as const, text: JSON.stringify(enriched) }] };
+          }
+          if (existingPid) {
+            // Stale record (process no longer alive) — clear it before proceeding.
+            try { rmSync(loopPidPath(root)); } catch { /* best-effort */ }
+          }
+
+          if (!isAutonomousEnabled(root)) {
+            const enriched = enrichResponse('autonomous', {
+              action: 'start',
+              spawned: false,
+              stopMarkerCleared: wasMarked,
+              message:
+                'Autonomous mode is disabled (config.autonomous.enabled is not true) — no ' +
+                'loop was spawned. Enable it first (`deckent autonomous enable`), then call ' +
+                'start again.',
+            });
+            return { content: [{ type: 'text' as const, text: JSON.stringify(enriched) }] };
+          }
+
+          // Real spawn: fork the CLI's own `autonomous start` as a DETACHED background
+          // process (mirrors deckent_start's Sprint-143 fix — see src/mcp/tools/start.ts)
+          // so the long-running loop never blocks this MCP server's stdio transport, and
+          // reuses handleStart's existing config/v1-v2/reactive/nervous wiring untouched.
+          const entryPath = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'cli', 'entry.js');
+          let child: ChildProcess;
+          try {
+            child = spawn(process.execPath, [entryPath, 'autonomous', 'start', '--root', root], {
+              detached: true,
+              stdio: 'ignore',
+              cwd: root,
+            });
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            const enriched = enrichResponse('autonomous', {
+              action: 'start',
+              spawned: false,
+              stopMarkerCleared: wasMarked,
+              message: `Failed to spawn the autonomous loop: ${message}`,
+            });
+            return {
+              content: [{ type: 'text' as const, text: JSON.stringify(enriched) }],
+              isError: true,
+            };
+          }
+
+          const pid = child.pid;
+          const startedAt = new Date().toISOString();
+          if (pid !== undefined) {
+            writeFileSync(loopPidPath(root), JSON.stringify({ pid, startedAt }, null, 2), 'utf-8');
+          }
+          // A spawn failure surfaces asynchronously via 'error' (e.g. missing entry
+          // point) — clear the pid record so the next start() doesn't report a phantom
+          // "already running" loop. A normal loop exit (stop marker honored) does the same.
+          child.on('error', () => { try { rmSync(loopPidPath(root)); } catch { /* best-effort */ } });
+          child.on('exit', () => { try { rmSync(loopPidPath(root)); } catch { /* best-effort */ } });
+          child.unref();
+
           const enriched = enrichResponse('autonomous', {
             action: 'start',
+            spawned: true,
+            pid,
+            startedAt,
             stopMarkerCleared: wasMarked,
-            message:
-              'Stop marker cleared. Launch the autonomous loop via: deckent autonomous start',
+            message: pid !== undefined
+              ? `Autonomous loop spawned as a detached background process (pid ${pid}). ` +
+                'Use action=status to check progress, action=stop to signal a clean stop.'
+              : 'Autonomous loop spawn requested, but the child process reported no pid — ' +
+                'it may have failed to start.',
           });
           return { content: [{ type: 'text' as const, text: JSON.stringify(enriched) }] };
         }

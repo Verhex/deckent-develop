@@ -59,6 +59,17 @@
 
 | **382 (S2)** | GOV-WIRE REDO + REPL/nervous P1 | 8 task | **8/8 DONE** (guard tuttu, scatter YOK; 56 test yeşil) | 99a8d3f7 | shim-cleanup→490 | — |
 | **383 (S3)** | REPL/agent/security P1 | 8 task | **8/8 DONE** (guard tuttu; 44 test yeşil) | 8bcb0e32 | — | Fable ~%75 |
+| **386 (dup)** | 383-item TEKRARI (dedup-öncesi) | 12 task / 13dk | **6 DONE / 6 NO_GO** — 6 NO_GO'nun HEPSİ "DUPLICATE of already-completed 383" (worker dürüstçe zaten-yapılmış buldu) → born-dedup kuralının canlı kanıtı | — | — | — |
+| **387 (S4) 🔄 CANLI** | BÜYÜK-KESİT REPL/agent/security/core | **27 task** dep-graph'lı (zincir 001→002→003, 001→004; 23 singleton paralel) | wave-1 EXECUTING (spawn OK; `collision.detected:2`=app.tsx/run.tsx serialize çalışıyor) | (pending) | dedup ∅ (26 DONE'a karşı kesişim yok, python-doğrulandı) | Sonnet-worker (Fable-cap yemez) |
+
+### Sprint-387 (S4) — ÖLÇEK-TURU dispatch notu (2026-07-08, Alperen "20-40 ölçek + born∥followup" direktifi)
+- **Ölçek:** 8-task limiti kaldırıldı; 27 worker-task tek sprint (dependency-graph'lı) + follow-up'lar aynı cycle'da (post-sprint el-kod).
+- **Seçim:** born-backlog 103 → subagent-reconcile: **27 DONE / 64 worker-ready / 12 excluded**; picked-27 = OPEN'lardan P0(2)+P1(9)+P2/P3(16), file-overlap-disjoint (yalnız app.tsx/run.tsx zinciri serialize). **picked ∩ DONE = ∅ (python-kanıtlı → 386-israfı riski YOK).**
+- **Path-verify:** 39/39 yol `test -f` ✅; subagent 8 yanlış-yol düzeltti (564→src/nervous/, 571→src/core/flow-runtime, 503→src/core/marketplace, 494→lib/, 495→src/cli/helpers/mcp-attach, 560→src/orchestra/, 580→src/api/).
+- **Routing (R-1b canlı):** REPL→terminal-ux(11), SEC→security-auditor(7, explicit `- Agent:` hint zira R-1 build'siz), agent-runtime→refactorer(7), api→api-builder(2). Eski %100-skew (refactorer24+api15) DÜZELDİ.
+- **goNogo:** F0.2 parser task-specific `- goCriteria:`/`- nogo:` merge etti (generic-floor + task-özel).
+- **DIŞLANAN (dedike-pas):** 490 (dev meta-sweep→decompose), 496/497 (greenfield electron/enterprise), 580 (Windows-cluster LARGE→sub-slice), closed-hot-file (560/562/582 sprint-phases · 565/572 server.ts → single-owner/el-kod), Alperen-gated (63/488/202), doc-heavy (495/507/489), live-key (477).
+- **Follow-up (post-sprint el-kod, aynı build):** R-1 (routing-engine src/agent→security), R-3 (adr-selector enforcement-tier render), R-5a (adr-selector prompt_summary), LP-9 (refactorer PROMPT.md yarım-yama), R-4 (authoring-lint kuralı). Sprint-sırası el-kod YAPILMADI (persona/routing tutarsızlık + worker-vitest import riski).
 
 **S2 eşleme:** 001=573-REDO(agents/worker.ts) · 002=518-REDO(core/provider.ts) · 003=508 ApprovalCard-mutex · 004=574 nervous-undo · 005=569 detector-reach · 006=566 writer-lease-failclosed · 007=561 auto-approve-consistency · 008=555 permission-merge. Tüm `Files:` yolları `test -f` ön-doğrulandı (573/518 dersi).
 

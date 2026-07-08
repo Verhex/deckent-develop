@@ -1,6 +1,6 @@
-// ═══ repl/mcp-bridge — REPL ↔ external-MCP-client live wire (F9-001) ═════════
+// ═══ repl/mcp-bridge — REPL ↔ external-MCP-client dispatch core (F9-001) ═════
 //
-// Sprint 260 Task 260-015.
+// Sprint 260 Task 260-015. Revisited 387-013 (MCP-CLIENT-GATE) — see below.
 //
 // THE GAP (F9-001): `buildMcpBridge` (src/cli/commands/chat-mcp-bridge.ts) and
 // `McpClientBroker` (src/mcp-client/broker.ts) were both built in Sprint 229
@@ -9,13 +9,37 @@
 // referenced by its 229-005 test; `McpClientBroker` was never instantiated
 // outside its own definition.
 //
-// THIS MODULE is that wire. `initReplMcpBridge()` is the composition root that
-// the REPL's tool-set build site calls to obtain a live MCP bridge: it
-// constructs the broker + namespaced registry, composes them via
-// `buildMcpBridge`, and returns the REPL-shaped surface (listSlashLines /
-// listTools / dispatch / connectAndRefresh / loadAndConnectAll).
+// `dispatchMcpSlash` / `parseMcpCallArgs` (below) ARE that wire for the legacy
+// loop: `chat-native.ts` builds a bridge inline (gated on MCP-server presence,
+// not on `mcp_client_enabled`) and calls `dispatchMcpSlash` for every `/mcp`
+// line — this dispatch core has a real production caller.
 //
-// GATING — opt-in, backward-safe:
+// `initReplMcpBridge()` / `isMcpClientEnabled()`, however, do NOT — this
+// composition root and its `mcp_client_enabled` flag are UNWIRED dead code as
+// of 387-013 (MCP-CLIENT-GATE, confirmed by three independent audit passes:
+// `docs/audits/last-standing-2026-06/*`). Neither production entry point
+// consults them:
+//   * `run.tsx` (native-agent default path, ADR-G-034/376-003) constructs its
+//     own `McpClientBroker` + `buildMcpBridge` inline and calls
+//     `loadAndConnectAll()` UNCONDITIONALLY on every launch — it never imports
+//     `isMcpClientEnabled` or `initReplMcpBridge`.
+//   * `chat-native.ts` (legacy loop) also constructs its own bridge inline,
+//     gated on MCP-server presence (`loadMcpServers(...).length > 0`) — again
+//     never consulting this flag.
+// Net effect: setting `mcp_client_enabled` anywhere in config has NO effect on
+// a live REPL session today, in either engine. `mcp_client_enabled` is also
+// not declared in `DeckentConfig`/`core/config.ts` or any `docs/` reference —
+// this module's own doc-comments were the only place implying it is a real,
+// consulted opt-in control. Closing this gap for real (wiring `run.tsx` /
+// `chat-native.ts` to consult the flag, or deleting the dead exports together
+// with their dedicated test `tests/cli/repl/mcp-bridge.test.ts`) needs a task
+// scoped to touch those files; 387-013's write-scope covers only this file, so
+// the functions below are kept (signatures/behavior unchanged, tests intact)
+// but must not be read as an active gate — see `tests/cli/mcp-client-gate.test.ts`
+// for an executable regression-guard on this exact fact.
+//
+// GATING (as designed, NOT currently wired to any caller) — opt-in,
+// backward-safe:
 //   * Gated behind a default-OFF `mcp_client_enabled` flag. Flag absent/false
 //     → `initReplMcpBridge` returns `null` and the REPL behaves exactly as
 //     before (no broker, no external surface).
@@ -42,10 +66,12 @@ import { getMessage } from '../helpers/messages.js';
 export type ReplMcpBridge = ReturnType<typeof buildMcpBridge>;
 
 /**
- * Minimal config shape this wire reads. The full `DeckentConfig` does not
- * declare `mcp_client_enabled` yet (it is an opt-in flag whose type
- * declaration is the F9 follow-up); we read it structurally so the wire stays
- * decoupled and backward-safe regardless of where the config is loaded.
+ * Minimal config shape `initReplMcpBridge`/`isMcpClientEnabled` read. The full
+ * `DeckentConfig` does NOT declare `mcp_client_enabled` (387-013: confirmed 0
+ * grep matches in `core/config.ts` and `docs/`) — it is an as-designed opt-in
+ * flag that no production caller has ever wired up (see the module header for
+ * the two bypass sites). Kept structural so this file stays decoupled from
+ * `DeckentConfig` if/when a future task wires it in for real.
  */
 export interface ReplMcpConfigLike {
   mcp_client_enabled?: boolean;
@@ -71,18 +97,24 @@ export interface InitReplMcpBridgeOptions {
 }
 
 /**
- * Whether the external-MCP-client wire is enabled. Default: OFF.
- * Only an explicit `true` opts in — `undefined`/`false`/any other value is off,
- * so existing REPL sessions are unaffected (backward-safe).
+ * As-designed truth-table for the `mcp_client_enabled` flag: only an explicit
+ * `true` opts in — `undefined`/`false`/any other value is off. NOT currently
+ * consulted by any production entry point (see module header, 387-013) — this
+ * function is correct in isolation but has no effect on a live REPL session.
  */
 export function isMcpClientEnabled(config: ReplMcpConfigLike | undefined): boolean {
   return config?.mcp_client_enabled === true;
 }
 
 /**
- * Build the live REPL MCP bridge when `mcp_client_enabled` is on, else `null`.
+ * Build a REPL MCP bridge gated on `mcp_client_enabled`, else `null`. This is
+ * the composition root the flag was designed to gate — but as of 387-013
+ * neither `run.tsx` nor `chat-native.ts` calls it (both build their own bridge
+ * inline, unconditionally / server-presence-gated respectively). Kept for a
+ * future wiring task; do not treat a caller's use of this function as
+ * evidence the flag is live elsewhere.
  *
- * Returning `null` (rather than an inert bridge) lets the caller cleanly skip
+ * Returning `null` (rather than an inert bridge) lets a caller cleanly skip
  * all external-MCP surfaces (the `/mcp` slash, tool listing, dispatch) when the
  * flag is off. When on, the returned bridge is composed but NOT connected —
  * `loadAndConnectAll()` is an explicit, separate step (no auto-connect).

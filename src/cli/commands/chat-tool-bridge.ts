@@ -114,6 +114,8 @@ export interface CliToolDispatcherOptions {
   projectRoot?: string;
   /** Override the English-default detached-start message labels — see DEFAULT_DETACHED_START_LABELS. */
   detachedLabels?: Partial<DetachedStartLabels>;
+  /** Override the English-default permission-denied classification label — see DEFAULT_PERMISSION_DENIED_LABEL. */
+  permissionDeniedLabel?: string;
 }
 
 function resolveEntryPath(): string {
@@ -355,6 +357,29 @@ export const DEFAULT_DETACHED_START_LABELS: DetachedStartLabels = {
   trackHint: 'track via /status or the live footer',
 };
 
+/**
+ * born-538 (TOOL-BRIDGE-ERR-CLASS): a spawn/spawnDetached failure whose errno
+ * is EACCES or EPERM means the OS/user identity refused to run the CLI at
+ * all — a permission problem, not a broken command. Distinguishing this from
+ * a genuine runtime failure (ENOENT, non-zero exit, timeout, …) lets the
+ * caller tell the user *why* a tool call failed instead of a one-size-fits-all
+ * "[mcp-error]". Node sets `.code` on the Error passed to the child's
+ * `'error'` event (born-509's listener, untouched by this change) for a
+ * spawn-level OS failure — see child_process docs.
+ */
+function isPermissionDeniedError(err: unknown): boolean {
+  const code = (err as NodeJS.ErrnoException | undefined)?.code;
+  return code === 'EACCES' || code === 'EPERM';
+}
+
+/**
+ * String-free mechanism (CLAUDE.md i18n-first), same seam as
+ * DetachedStartLabels: the caller may override via
+ * `CliToolDispatcherOptions.permissionDeniedLabel`; messages.ts wiring
+ * (getMessage + lang) is a follow-up outside this task's write scope.
+ */
+export const DEFAULT_PERMISSION_DENIED_LABEL = 'permission denied';
+
 function formatDetachedStartMessage(
   cliArgs: readonly string[],
   result: DetachedSpawnResult,
@@ -375,6 +400,14 @@ function formatDetachedStartMessage(
  * ordinary turn output. Write/destructive confirmation is enforced one layer
  * up (run.tsx, via tool-permissions.classifyTool) before dispatch is called.
  *
+ * born-538: a spawn/spawnDetached failure classified as permission-denied
+ * (EACCES/EPERM — see isPermissionDeniedError) is tagged `[deckent-denied] …`
+ * instead of `[mcp-error] …` — reusing the same denied-vs-error prefix split
+ * native-tool-registry.ts already produces and run.tsx already renders
+ * distinctly (isDenied/isError, run.tsx ~432-433), so this bridge's denied
+ * outcomes now flow through that existing UI path instead of reading as a
+ * generic broken-command error.
+ *
  * `start` / `run` / `process submit` are the exception to "spawn and await
  * stdout": they route through spawnDetachedDeckent (fire-and-forget, own
  * process group, logged to `.deckent/recently-works/`) so a multi-minute
@@ -384,6 +417,7 @@ export function createCliToolDispatcher(opts: CliToolDispatcherOptions = {}): Mc
   const spawnFn = opts.spawnFn ?? defaultSpawnFn;
   const spawnDetachedFn = opts.spawnDetachedFn ?? spawnDetachedDeckent;
   const labels: DetachedStartLabels = { ...DEFAULT_DETACHED_START_LABELS, ...opts.detachedLabels };
+  const permissionDeniedLabel = opts.permissionDeniedLabel ?? DEFAULT_PERMISSION_DENIED_LABEL;
   return {
     async dispatch(name, args) {
       let cliArgs: string[];
@@ -401,6 +435,7 @@ export function createCliToolDispatcher(opts: CliToolDispatcherOptions = {}): Mc
           const result = spawnDetachedFn(cliArgs, { projectRoot: opts.projectRoot });
           return formatDetachedStartMessage(cliArgs, result, labels);
         } catch (err) {
+          if (isPermissionDeniedError(err)) return `[deckent-denied] ${name}: ${permissionDeniedLabel}`;
           const msg = err instanceof Error ? err.message : String(err);
           return `[mcp-error] ${name}: ${msg}`;
         }
@@ -408,6 +443,7 @@ export function createCliToolDispatcher(opts: CliToolDispatcherOptions = {}): Mc
       try {
         return await spawnFn(cliArgs);
       } catch (err) {
+        if (isPermissionDeniedError(err)) return `[deckent-denied] ${name}: ${permissionDeniedLabel}`;
         const msg = err instanceof Error ? err.message : String(err);
         return `[mcp-error] ${name}: ${msg}`;
       }

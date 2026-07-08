@@ -21,6 +21,7 @@ import type { ModelTier } from '../core/model-equivalence.js';
 import { getModelForProviderTier } from '../core/model-equivalence.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { normalizeUsage, type TokenUsage } from '../core/token-usage.js';
+import { killProcessGroupWithEscalation } from './subprocess.js';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -232,10 +233,17 @@ export class GeminiAdapter implements ProviderAdapter {
 
   /** Default timeout in ms before a worker is killed automatically (0 = no timeout) */
   protected defaultTimeoutMs: number;
+  /**
+   * Host platform — injectable so the POSIX-group vs. win32-single-pid kill
+   * branch (born-568, PGID-TEARDOWN parity with subprocess.ts) is testable
+   * without a real spawn. Defaults to `process.platform`.
+   */
+  private readonly platform: NodeJS.Platform;
 
-  constructor(projectDir: string, opts?: { defaultTimeoutMs?: number }) {
+  constructor(projectDir: string, opts?: { defaultTimeoutMs?: number; platform?: NodeJS.Platform }) {
     this.projectDir = projectDir;
     this.defaultTimeoutMs = opts?.defaultTimeoutMs ?? 0;
+    this.platform = opts?.platform ?? process.platform;
   }
 
   // ─── spawn() ───────────────────────────────────────────────────────
@@ -278,10 +286,19 @@ export class GeminiAdapter implements ProviderAdapter {
     // Use pipe stdio so we can monitor stdout/stderr for fast-fail patterns
     // (login prompts, 429, RESOURCE_EXHAUSTED). An fd-based approach would make
     // child.stdout/stderr null, preventing real-time monitoring.
+    //
+    // PGID-TEARDOWN parity (born-568, ADR-G-013): on POSIX, `detached: true`
+    // makes this worker the LEADER of a brand-new process group (its pid IS
+    // the group id) — a prerequisite for killWithSignal's group-form kill
+    // (see killProcessGroupWithEscalation) to reach any grandchild the
+    // gemini CLI forks. win32 has no process-group signal semantics for
+    // `process.kill`, so `detached` is never set there (see subprocess.ts's
+    // signalProcessGroup for the same win32 residual).
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
       stdio: ['pipe', 'pipe', 'pipe'],
       env: buildGeminiSpawnEnv(apiKey),
+      detached: this.platform !== 'win32',
     };
 
     const child = spawn('gemini', args, spawnOpts);
@@ -703,7 +720,12 @@ export class GeminiAdapter implements ProviderAdapter {
       );
     }
     if (entry.timeoutHandle) clearTimeout(entry.timeoutHandle);
-    entry.process.kill(signal);
+    // born-568 (PROCESS-GROUP-KILL): group-form kill + SIGTERM→SIGKILL
+    // escalation, shared with subprocess.ts/codex.ts — see
+    // killProcessGroupWithEscalation for the POSIX-group / win32-fallback
+    // branching. Fast-fail paths (login prompt / quota exhaustion) route
+    // through this same method, so they inherit the fix automatically.
+    killProcessGroupWithEscalation(entry.process, signal, this.platform);
     this.workers.delete(taskId);
   }
 

@@ -2,6 +2,121 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint387] - 2026-07-08
+
+### Added
+
+- born-492 — W1-EXPERIENCE-ON — repl_surface i18n flip'i tamamla (P0)
+- born-551 — REPL-TURN-EXCEPTION-SURFACE — turn-loop istisnaları yutulmuyor (P1)
+- born-549 — SIGTERM-TEARDOWN — sinyal-temizliği eksik (warm-child/MCP/Windows) (P1)
+- born-564 — PANIC-GATE-FAILCLOSED — fail-closed marker yanlış yorumlanıyor (P1)
+- born-567 — SPAWN-SAFETY-WIRE — assertSpawnSafe her spawn call-site'ına (P1)
+- born-571 — FLOW-EVENT-DISPATCH — flow approve reader + `flow approve` komutu (P1)
+- born-203 — ONB-2 — rich doctor: Windows-native profil + auth-state probe (P1)
+- born-523 — AGENTIC-CONFIRM-HARDEN — readline reuse + SAFE-before-RISKY sıralama (P2)
+- born-524 — TOOL-PERM-TIER — deckent_start/run/process explicit tier (P2)
+- born-534 — APPROVAL-CHANNEL-DISPOSE — dispose() decisionHandler null'lamıyor (P2)
+
+### Changed
+
+- born-493 — W2-WIRE — native-engine'i slash-dispatcher'a köprüle (24/37 komut sessiz-düşüyor) (P0) (completed with tech debt)
+- born-563 — MEMORY-TENANT-ISOLATION — tenant izolasyonu default-ON (P1) (completed with tech debt)
+- born-568 — PROCESS-GROUP-KILL — 6 adapter'da SIGTERM→SIGKILL process-group (P1) (completed with tech debt)
+- born-83 — TOOL-CU — computer-use wire + navigate/region-screenshot + injection-harden (P2) (completed with tech debt)
+- born-503 — HUB-P0 — Ed25519 signing + sandbox-on-install + BUILTIN_TRUSTED_SKILLS id fix (P2) (completed with tech debt)
+- born-522 — MCP-CLIENT-GATE — mcp_client_enabled ölü-gate: wire ya da kaldır (P2) (completed with tech debt)
+
+### Fixed
+
+- born-553 — MCP-BRIDGE-DROP-WARN — görünür drop-warning + double-audit fix (P2)
+- born-581 — ESM-IMPORT-FIX — require('fs')→ESM import (P2)
+
+
+_Tasks: 27 total, 24 done, 6 tech debt, 3 no-go_
+
+## [1.0.0-beta.1-sprint386] - 2026-07-08
+
+### Added
+
+- born-542 — SELF-MODIFY-GUARD-BYPASS — path-normalizasyon eksik (ADR-039 SEC)
+- born-532 — ANTHROPIC-PARALLEL-TOOLRESULT — sibling tool_result'lar bölünüyor
+- born-519 — BASH-PERM-RESOURCE — primaryResource yanlış anahtar okuyor
+- born-510 — CONTEXT-BUDGET-ORPHAN-TOOLRESULT — compaction tool-pair'i bölüyor
+- born-511 — CHAT-SESSION-RECONCILE-SWAP — stream'lenen ile final sessizce farklı
+
+
+_Tasks: 12 total, 6 done, 0 tech debt, 6 no-go_
+
+## [1.0.0-beta.1-sprint383] - 2026-07-08
+
+### Added
+
+- born-552 — MCP-TOOL-EMPTY-DESC — boş-string açıklama REPL-launch'ı çökertiyor
+- born-550 — OFF-TTY-AUTOAPPROVE — piped stdin her yan-etkiyi kör-onaylıyor (SEC)
+- born-542 — SELF-MODIFY-GUARD-BYPASS — path-normalizasyon eksik (ADR-039 SEC)
+- born-532 — ANTHROPIC-PARALLEL-TOOLRESULT — sibling tool_result'lar bölünüyor
+- born-520 — NATIVE-TURN-ACCOUNTING — usage üzerine-yazılıyor + onTurnEnd reuse
+- born-519 — BASH-PERM-RESOURCE — primaryResource yanlış anahtar okuyor
+- born-510 — CONTEXT-BUDGET-ORPHAN-TOOLRESULT — compaction tool-pair'i bölüyor
+- born-511 — CHAT-SESSION-RECONCILE-SWAP — stream'lenen ile final sessizce farklı
+
+
+_Tasks: 8 total, 8 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint382] - 2026-07-08
+
+### Added
+
+- born-573-REDO — WORKER-APPROVAL-GATE gerçek-site'a wire (Sprint-1 wrong-path düzelt)
+- born-508 — INPUTBAR↔APPROVALCARD MUTEX — tuş çift-tüketimi (yıkıcı kör-onay)
+- born-574 — NERVOUS-UNDO gerçek compensating-executor
+- born-569 — NERVOUS-DETECTOR-REACH — 3 detektör ACTION_REGISTRY mismatch
+- born-555 — PERMISSION-STORE READ-MERGE-WRITE — settings.local.json'u ezmesin
+
+### Changed
+
+- born-518-REDO — CRED-SCRUB gerçek leak-site'a wire (Sprint-1 wrong-path düzelt) (completed with tech debt)
+- born-566 — WRITER-LEASE FAIL-CLOSED — fs-hatasında yazma reddedilsin (completed with tech debt)
+- born-561 — AUTO-APPROVE-CONSISTENCY — CLI start/run hardcoded true'ları kaldır (completed with tech debt)
+
+
+_Tasks: 8 total, 8 done, 3 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint381] - 2026-07-08
+
+
+### Changed
+
+- born-499-HARD — WORKER-GIT-GUARD — spawn-backend'lere git-shim enjekte et (completed with tech debt)
+
+
+_Tasks: 1 total, 1 done, 1 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint380] - 2026-07-07
+
+### Added
+
+- born-559 — LIFECYCLE-CRITICAL-2 — approval sonsuz-bekleme + ADR-gate fail-open
+- born-509 — SPAWN-ERROR-LISTENERS — REPL spawn-site'larında error/state-reset eksik → ENOENT crash
+- born-512 — PROVIDER-SWITCH-CRASH — geçersiz /provider adı REPL'i çökertiyor
+- born-515 — NERVOUS-SLASH-FALSE-SUCCESS — /nervous accept|reject executor'a hiç ulaşmıyor
+- born-516 — TOOL-BRIDGE-TIMEOUT — düz 30s SPAWN_TIMEOUT uzun deckent_audit/plan'ı öldürüyor
+- born-526 — PROVIDER-PARITY-ROBUST — exit-code okunmuyor + Ollama/HTTP timeout'suz + codex env-key boşluğu
+- born-535 — DECKENT-BASH-HARDEN — hanging-komut timeout'suz + bash hardcode (Win-native kırık)
+- born-62 — CURSOR-MODEL-WIRE — line-edit UTF-16 surrogate böler; code-point-safe cursor-model'i wire et (WIRE-ON)
+- born-513 — CHAT-NATIVE-CLEAR-CONTEXT — /clear yalnız JS-transcript'i siliyor, warm-child context'i kalıyor
+
+### Changed
+
+- born-558 — SKILL-LIST-V2-CRASH — `deckent skill list` v2-manifest'te exit 1 (completed with tech debt)
+- born-573 — WORKER-APPROVAL-GATE-WIRE — WorkerApprovalGate prod'da hiç `new` edilmiyor (WIRE-ON) (completed with tech debt)
+- born-518 — CROSS-PROVIDER-CRED-SCRUB — provider secret'ları paylaşılan process.env'de sızıyor (P0-SEC) (completed with tech debt)
+- born-514 — AGENTIC-DISPATCH-OVERMATCH — NL-intent regex'leri sıradan sohbeti tool-call'a kaçırıyor (completed with tech debt)
+- born-505 — DOCTOR-DUP-PREFLIGHT — iki özdeş runPreFlightHealthCheck tanımı (completed with tech debt)
+
+
+_Tasks: 15 total, 15 done, 5 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint379] - 2026-07-07
 
 

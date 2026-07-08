@@ -31,7 +31,7 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { ErrorRegistry } from '../../core/errors.js';
 import { detectAvailableProviders, formatDetectedProviders } from '../../core/provider.js';
-import { probeProviderAuth, type AuthProbeResult } from '../../core/provider-auth-probe.js';
+import { probeProviderAuth, type AuthProbeResult, type AuthProbeState } from '../../core/provider-auth-probe.js';
 import {
   checkWorkerImage,
   type WorkerImageReport,
@@ -750,9 +750,32 @@ function authProbeLoggedOutLine(name: string, lang: string): string {
 
 export type AuthStateVerdict = 'connected' | 'missing' | 'unknown';
 
+/**
+ * born-203 (ONB-2) — which config channel produced `state`. 'none' when
+ * state is 'missing'/'unknown' (no channel supplied a credential).
+ */
+export type AuthStateSource = 'env' | 'deck' | 'none';
+
 export interface AuthStateResult {
   provider: string;
   state: AuthStateVerdict;
+  /** born-203 (ONB-2): which channel produced `state` — deepens the bare verdict with its origin. Optional so pre-existing bare `{provider,state}` fixtures (connect.ts and its tests) keep compiling. */
+  source?: AuthStateSource;
+  /**
+   * born-203 (ONB-2): the REAL session probe (PSL-6 `probeProviderAuth`) state for
+   * this provider, when the caller supplies `authProbes` to buildAuthStateReport.
+   * Absent when no probe data was passed — existing callers (e.g. `deckent connect`)
+   * that never pass probes keep getting the original bare 3-state shape.
+   */
+  sessionState?: AuthProbeState;
+  /**
+   * born-203 (ONB-2): true when the cheap config-based verdict and the REAL session
+   * probe disagree in a way worth flagging (e.g. an env/.deck key is set but the
+   * real session is logged-out, or vice versa) — surfaces silent auth drift instead
+   * of hiding it. Undefined when no probe was supplied, or when the probe itself
+   * could not tell ('unknown' — never guessed, Law #2).
+   */
+  conflict?: boolean;
 }
 
 /** Providers this probe understands — matches AUTH_PROBE_PROVIDERS above. */
@@ -773,38 +796,88 @@ const AUTH_STATE_DECK_KEYS: Readonly<Record<string, string>> = {
 };
 
 /**
+ * born-203 (ONB-2) — cross-reference the cheap config-based verdict against the
+ * REAL session probe (PSL-6), when one was supplied. Returns `undefined` (no
+ * verdict) rather than guessing whenever the real probe itself could not tell
+ * ('unknown' or absent) — Law #2, never invent confidence.
+ */
+function computeAuthStateConflict(
+  state: AuthStateVerdict,
+  sessionState: AuthProbeState | undefined,
+): boolean | undefined {
+  if (sessionState === undefined || sessionState === 'unknown') return undefined;
+  if (state === 'connected' && sessionState === 'logged-out') return true;
+  if (state === 'missing' && sessionState === 'logged-in') return true;
+  return false;
+}
+
+/**
  * Honest, network-free, subprocess-free auth-STATE probe (config + env only).
  * `providerNames` defaults to the 3 providers this probe understands;
  * 'unknown' for any name outside that set — never guessed (same convention as
  * `probeProviderAuth`'s unsupported-provider default above).
+ *
+ * `authProbes` (born-203, ONB-2) is an optional cross-reference against the REAL
+ * PSL-6 session probe (`runAuthProbes`/`probeProviderAuth`) — when supplied, it
+ * deepens the bare verdict with `source`/`sessionState`/`conflict` (see
+ * {@link AuthStateResult}). Callers that omit it (e.g. `deckent connect`) get the
+ * exact original 3-state shape — no behavior change.
  */
 export function buildAuthStateReport(
   root: string,
   env: NodeJS.ProcessEnv = process.env,
   providerNames: readonly string[] = AUTH_STATE_PROVIDERS,
+  authProbes?: Record<string, AuthProbeResult>,
 ): AuthStateResult[] {
   const deckSecrets = loadDeckSecrets(root);
 
   return providerNames.map((name): AuthStateResult => {
+    let state: AuthStateVerdict;
+    let source: AuthStateSource;
+
     const envKeys = AUTH_STATE_ENV_KEYS[name];
     const envConnected = (envKeys ?? []).some((key) => {
       const value = env[key];
       return typeof value === 'string' && value.trim().length > 0;
     });
-    if (envConnected) return { provider: name, state: 'connected' };
-
-    const deckKey = AUTH_STATE_DECK_KEYS[name];
-    if (!deckKey) return { provider: name, state: 'unknown' };
-
-    const deckValue = deckSecrets[deckKey];
-    if (typeof deckValue === 'string' && deckValue.trim().length > 0) {
-      return { provider: name, state: 'connected' };
+    if (envConnected) {
+      state = 'connected'; source = 'env';
+    } else {
+      const deckKey = AUTH_STATE_DECK_KEYS[name];
+      if (!deckKey) {
+        state = 'unknown'; source = 'none';
+      } else {
+        const deckValue = deckSecrets[deckKey];
+        if (typeof deckValue === 'string' && deckValue.trim().length > 0) {
+          state = 'connected'; source = 'deck';
+        } else {
+          state = 'missing'; source = 'none';
+        }
+      }
     }
-    return { provider: name, state: 'missing' };
+
+    const sessionState = authProbes?.[name]?.state;
+    return {
+      provider: name,
+      state,
+      source,
+      sessionState,
+      conflict: computeAuthStateConflict(state, sessionState),
+    };
   });
 }
 
-/** Render the config-based auth-state report as one localized line per provider. */
+/**
+ * Render the config-based auth-state report as one localized line per provider.
+ * born-203 (ONB-2): when `source`/`conflict` are present (deepened report), a
+ * provenance suffix and a conflict note are appended — bare fixtures (no
+ * optional fields) render byte-identically to the original 3-state output.
+ *
+ * docImpact: the conflict note is plain English, not a getMessage() key —
+ * src/cli/helpers/messages.ts is outside this task's write scope (same
+ * precedent already set by connect.ts's own auth-state section). Flagged as
+ * tech debt for a follow-up i18n task.
+ */
 export function formatAuthStateLines(results: AuthStateResult[], lang: string = 'en'): string[] {
   const lines: string[] = [getMessage('doctor.auth_state_header', lang)];
   for (const r of results) {
@@ -813,7 +886,11 @@ export function formatAuthStateLines(results: AuthStateResult[], lang: string = 
       : r.state === 'missing'
         ? 'doctor.auth_state_missing'
         : 'doctor.auth_state_unknown';
-    lines.push(`  ${getMessage(key, lang, { provider: capitalize(r.provider) })}`);
+    const sourceSuffix = r.source && r.source !== 'none' ? ` (${r.source})` : '';
+    lines.push(`  ${getMessage(key, lang, { provider: capitalize(r.provider) })}${sourceSuffix}`);
+    if (r.conflict) {
+      lines.push(`    ! ${capitalize(r.provider)}: config says "${r.state}" but the real session probe says "${r.sessionState}" — auth may be misconfigured.`);
+    }
   }
   return lines;
 }
@@ -1759,9 +1836,13 @@ const STALE_LOCK_THRESHOLD_MS = 300_000;
 /**
  * Detect safe repairs WITHOUT mutating anything (read-only: existsSync/statSync/
  * migrateConfig dry-run). Call applyDoctorFixes() on the returned list to apply.
+ *
+ * `platformOverride` (born-203, ONB-2) is injectable for hermetic win32 simulation
+ * in tests; production call sites omit it and get the real `platform()`.
  */
-export function planDoctorFixes(root: string): DoctorFixAction[] {
+export function planDoctorFixes(root: string, platformOverride?: NodeJS.Platform): DoctorFixAction[] {
   const actions: DoctorFixAction[] = [];
+  const currentPlatform = platformOverride ?? platform();
 
   const deckentPath = join(root, DECKENT_DIR);
   if (!existsSync(deckentPath)) {
@@ -1785,8 +1866,17 @@ export function planDoctorFixes(root: string): DoctorFixAction[] {
 
   // Stale .deck-shadow permission drift (e.g. a docker mount that changed the
   // host file's mode). chmod-only — never unlinked, deletion is out of scope.
+  //
+  // win32 (born-203, ONB-2): SKIPPED here on purpose. Windows has no POSIX
+  // permission bits — Node synthesizes `stat().mode` from the read-only
+  // attribute only, and `chmodSync` cannot express real owner-only (0600)
+  // semantics on NTFS. Comparing that synthesized mode against
+  // DECK_SHADOW_SAFE_MODE would either never converge (false positive on
+  // every run) or "succeed" without actually restricting access — a silent,
+  // dishonest fix (Law #2). getWindowsFixCaveats() surfaces this as an
+  // honest manual item instead of a fake auto-fix.
   const shadowPath = join(tasksPath, '.deck-shadow');
-  if (existsSync(shadowPath)) {
+  if (currentPlatform !== 'win32' && existsSync(shadowPath)) {
     try {
       const mode = statSync(shadowPath).mode & 0o777;
       if (mode !== DECK_SHADOW_SAFE_MODE) {
@@ -1872,6 +1962,31 @@ export function planDoctorFixes(root: string): DoctorFixAction[] {
   }
 
   return actions;
+}
+
+/**
+ * Windows-native honesty caveat for `--fix` (born-203, ONB-2 — "tam Windows-native
+ * profil kapsaması"). planDoctorFixes() above SKIPS the `.deck-shadow` chmod action
+ * entirely on win32 because NTFS has no POSIX permission bits; rather than silently
+ * doing nothing, this surfaces an honest manual item using the SAME disclosure text
+ * the general Platform Profile section already shows for this exact limitation
+ * (`doctor.platform_adapt_permissions` — reused, no new i18n key needed). Empty on
+ * every other platform, and empty on win32 when `.deck-shadow` does not even exist
+ * (nothing to caveat).
+ */
+export function getWindowsFixCaveats(
+  root: string,
+  lang: string = 'en',
+  platformOverride?: NodeJS.Platform,
+): DoctorFixManualItem[] {
+  const currentPlatform = platformOverride ?? platform();
+  if (currentPlatform !== 'win32') return [];
+  const shadowPath = join(root, TASKS_DIR, '.deck-shadow');
+  if (!existsSync(shadowPath)) return [];
+  return [{
+    name: `${TASKS_DIR}/.deck-shadow permissions (Windows)`,
+    message: getMessage('doctor.platform_adapt_permissions', lang),
+  }];
 }
 
 /**
@@ -2028,6 +2143,16 @@ export function registerDoctor(program: Command): void {
         const manual: DoctorFixManualItem[] = fixDoctorResult.checks
           .filter(c => !c.passed && !DOCTOR_FIX_CHECK_NAMES.has(c.name))
           .map(c => ({ name: c.name, message: c.message }));
+        // born-203 (ONB-2): honest win32 caveat for the chmod action planDoctorFixes()
+        // deliberately skipped above — a no-op on every other platform.
+        manual.push(...getWindowsFixCaveats(root, lang));
+
+        // born-203 (ONB-2): full Windows-native profile coverage for `--fix` — the
+        // general Platform Profile disclosure used to be shown ONLY on the plain
+        // `doctor` human path, never here. Empty adaptedChecks on non-win32 keeps
+        // POSIX output byte-identical (nogo criteria: never change existing
+        // POSIX doctor behavior).
+        const fixPlatformProfile = buildPlatformProfileReport(lang);
 
         if (opts.json) {
           print(JSON.stringify({
@@ -2035,8 +2160,13 @@ export function registerDoctor(program: Command): void {
             actions,
             results: results ?? null,
             manual,
+            platformProfile: fixPlatformProfile,
           }, null, 2));
         } else {
+          if (fixPlatformProfile.adaptedChecks.length > 0) {
+            print(formatPlatformProfileLines(fixPlatformProfile, lang).join('\n'));
+            print('');
+          }
           print(formatDoctorFixLines(actions, results, manual, lang).join('\n'));
         }
         const failed = results?.some(r => !r.applied) ?? false;
@@ -2179,8 +2309,12 @@ export function registerDoctor(program: Command): void {
 
         // ONB-2-DILIM-3 (Task 368-002): honest platform profile (WSL/win32-native
         // adaptations) + config-based auth state (env + .deck, no network/subprocess).
+        // born-203 (ONB-2): pass the already-computed PSL-6 authProbes so the
+        // config-based verdict is cross-referenced with the REAL session state
+        // (deepens the report beyond a bare 3-state — no extra subprocess/timeout
+        // cost, authProbes was already computed above for the Provider Health section).
         const platformProfile = buildPlatformProfileReport(lang);
-        const authStateReport = buildAuthStateReport(root);
+        const authStateReport = buildAuthStateReport(root, process.env, AUTH_STATE_PROVIDERS, authProbes);
 
         // F1-IMG (Task 270-008): for the docker backend, report worker-image
         // readiness. Detection-only; wrapped so a docker hiccup never breaks doctor.

@@ -23,6 +23,7 @@ import type { ProviderDetectResult } from './claude.js';
 import { TASKS_DIR } from '../core/constants.js';
 import type { ModelTier } from '../core/model-equivalence.js';
 import { getModelForProviderTier } from '../core/model-equivalence.js';
+import { killProcessGroupWithEscalation } from './subprocess.js';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -117,10 +118,17 @@ export class CodexAdapter implements ProviderAdapter {
 
   /** Default timeout in ms before a worker is killed automatically (0 = no timeout) */
   protected defaultTimeoutMs: number;
+  /**
+   * Host platform — injectable so the POSIX-group vs. win32-single-pid kill
+   * branch (born-568, PGID-TEARDOWN parity with subprocess.ts) is testable
+   * without a real spawn. Defaults to `process.platform`.
+   */
+  private readonly platform: NodeJS.Platform;
 
-  constructor(projectDir: string, opts?: { defaultTimeoutMs?: number }) {
+  constructor(projectDir: string, opts?: { defaultTimeoutMs?: number; platform?: NodeJS.Platform }) {
     this.projectDir = projectDir;
     this.defaultTimeoutMs = opts?.defaultTimeoutMs ?? 0;
+    this.platform = opts?.platform ?? process.platform;
   }
 
   // ─── spawn() ────────────────────────────────────────────────────────
@@ -166,10 +174,18 @@ export class CodexAdapter implements ProviderAdapter {
       spawnEnv['OPENAI_API_KEY'] = deckentKey;
     }
 
+    // PGID-TEARDOWN parity (born-568, ADR-G-013): on POSIX, `detached: true`
+    // makes this worker the LEADER of a brand-new process group (its pid IS
+    // the group id) — a prerequisite for killWithSignal's group-form kill
+    // (see killProcessGroupWithEscalation) to reach any grandchild the
+    // codex CLI forks. win32 has no process-group signal semantics for
+    // `process.kill`, so `detached` is never set there (see subprocess.ts's
+    // signalProcessGroup for the same win32 residual).
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
       stdio: ['ignore', logFd, logFd],
       env: spawnEnv,
+      detached: this.platform !== 'win32',
     };
 
     const child = spawn('codex', args, spawnOpts);
@@ -527,7 +543,11 @@ export class CodexAdapter implements ProviderAdapter {
       );
     }
     if (entry.timeoutHandle) clearTimeout(entry.timeoutHandle);
-    entry.process.kill(signal);
+    // born-568 (PROCESS-GROUP-KILL): group-form kill + SIGTERM→SIGKILL
+    // escalation, shared with subprocess.ts/gemini.ts — see
+    // killProcessGroupWithEscalation for the POSIX-group / win32-fallback
+    // branching.
+    killProcessGroupWithEscalation(entry.process, signal, this.platform);
     this.workers.delete(taskId);
   }
 

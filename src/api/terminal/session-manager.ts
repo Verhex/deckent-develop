@@ -30,8 +30,29 @@ interface Session {
   listeners: Set<(d: string) => void>;
 }
 
+/**
+ * Platform-aware default shell resolution (Law #2 — an unsupported/unset
+ * shell must fail honestly, never silently fall back to a POSIX-only binary
+ * like `bash` on a platform that doesn't have one).
+ * - win32: `ComSpec` is the OS-set path to the configured command
+ *   interpreter (normally cmd.exe, but honors a user override to e.g.
+ *   powershell.exe); falls back to the always-present `cmd.exe` when
+ *   ComSpec is stripped from the environment (sandboxed/minimal containers).
+ * - POSIX: honors `$SHELL` when set (existing behavior, preserved);
+ *   otherwise falls back to `sh`, which POSIX guarantees exists, unlike `bash`.
+ */
+export function resolveDefaultShell(
+  nodePlatform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  if (nodePlatform === 'win32') {
+    return env['ComSpec']?.trim() || env['COMSPEC']?.trim() || 'cmd.exe';
+  }
+  return env['SHELL']?.trim() || 'sh';
+}
+
 type KindCmd = (i: CreateSessionInput) => Pick<SpawnSpec, 'file' | 'args'>;
-const SHELL_CMD: KindCmd = () => ({ file: process.env['SHELL'] ?? 'bash', args: [] });
+const SHELL_CMD: KindCmd = () => ({ file: resolveDefaultShell(), args: [] });
 const KIND_CMD: Record<string, KindCmd> = {
   ai: (i) => ({ file: i.tool ?? 'claude', args: [] }),
   deckent: (i) => ({ file: 'deckent', args: i.args ?? [] }),

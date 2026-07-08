@@ -16,12 +16,26 @@
 //     custom binWhitelist explicitly AND (b) supply a stricter argRegex that
 //     forbids whitespace. The defaults will refuse the unsafe combination.
 //
-// Usage:
+// Usage (preferred — validation cannot be skipped at the call-site):
+//   import { safeSpawn, safeSpawnSync } from '../core/spawn-safety.js';
+//   safeSpawnSync('npx', ['vitest', 'run', testFile], { ... }); // validates then delegates
+//   const child = safeSpawn('node', ['script.js'], { stdio: 'pipe' });
+//
+// Usage (manual guard — only when the actual spawn() call is unavoidably
+// elsewhere, e.g. a third-party library wraps it):
 //   import { assertSpawnSafe } from '../core/spawn-safety.js';
 //   assertSpawnSafe('npx', ['vitest', 'run', testFile]); // throws on violation
 //   spawnSync('npx', ['vitest', 'run', testFile], { ... });
 
 import { basename } from 'node:path';
+import {
+  spawn,
+  spawnSync,
+  type ChildProcess,
+  type SpawnOptions,
+  type SpawnSyncOptions,
+  type SpawnSyncReturns,
+} from 'node:child_process';
 
 // ─── Constants ───────────────────────────────────────────────────────────
 
@@ -165,4 +179,47 @@ export function isSpawnSafe(
   } catch {
     return false;
   }
+}
+
+// ─── Wired Wrappers — validation-cannot-be-skipped call-site API ──────────
+//
+// assertSpawnSafe/isSpawnSafe require the caller to remember a manual
+// pre-call before their own spawn()/spawnSync() invocation — a step that is
+// easy to omit, which is exactly why the primitive had zero callers despite
+// being fully implemented (ADR-G-002). safeSpawn/safeSpawnSync close that
+// gap: they are drop-in replacements for node:child_process's spawn/
+// spawnSync that run assertSpawnSafe internally before delegating, so
+// adopting them at a call-site is a single import swap and validation is
+// structurally impossible to bypass. They change no spawn semantics — same
+// args, same options, same return type — only add a validation gate in
+// front.
+
+/**
+ * Drop-in replacement for `node:child_process`'s `spawn`. Validates
+ * `bin`/`args` via assertSpawnSafe (throws SpawnSafetyError on violation)
+ * before delegating verbatim to spawn — same options, same return value.
+ */
+export function safeSpawn(
+  bin: string,
+  args: string[],
+  options?: SpawnOptions,
+  safetyOpts?: SpawnSafetyOptions,
+): ChildProcess {
+  assertSpawnSafe(bin, args, safetyOpts);
+  return spawn(bin, args, options ?? {});
+}
+
+/**
+ * Drop-in replacement for `node:child_process`'s `spawnSync`. Validates
+ * `bin`/`args` via assertSpawnSafe (throws SpawnSafetyError on violation)
+ * before delegating verbatim to spawnSync — same options, same return value.
+ */
+export function safeSpawnSync(
+  bin: string,
+  args: string[],
+  options?: SpawnSyncOptions,
+  safetyOpts?: SpawnSafetyOptions,
+): SpawnSyncReturns<Buffer | string> {
+  assertSpawnSafe(bin, args, safetyOpts);
+  return spawnSync(bin, args, options);
 }

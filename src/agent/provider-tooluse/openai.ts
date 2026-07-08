@@ -39,12 +39,25 @@ function toOpenAIMessage(m: ProviderMessage): Record<string, unknown> {
  */
 function drainToolCalls(acc: Map<number, { id: string; name: string; args: string }>): ProviderEvent[] {
   const events: ProviderEvent[] = [];
+  // Some OpenAI-compatible backends (buggy proxies, vLLM/Ollama edge cases) have
+  // been observed to echo the SAME id for two distinct parallel tool calls in one
+  // turn. A collision here would let the agent loop's tool_result correlation
+  // (keyed by toolCallId) match the wrong call, so every id emitted by one drain
+  // is deduped against this set before being yielded.
+  const usedIds = new Set<string>();
   for (const [idx, tc] of [...acc.entries()].sort((a, b) => a[0] - b[0])) {
     let args: Record<string, unknown> = {};
     try { args = tc.args ? (JSON.parse(tc.args) as Record<string, unknown>) : {}; } catch { args = {}; }
     // Synthesized id is index-scoped so same-named parallel calls stay distinct
     // for the Phase B transcript round-trip (toolCallId keying).
-    events.push({ type: 'tool-call', id: tc.id || `call-${tc.name}-${idx}`, name: tc.name, args });
+    let id = tc.id || `call-${tc.name}-${idx}`;
+    let dupCount = 0;
+    while (usedIds.has(id)) {
+      dupCount += 1;
+      id = `${tc.id || `call-${tc.name}-${idx}`}-dup${dupCount}`;
+    }
+    usedIds.add(id);
+    events.push({ type: 'tool-call', id, name: tc.name, args });
   }
   acc.clear();
   return events;

@@ -17,6 +17,7 @@ import {
   buildSlashRegistry,
   renderHelp,
   resolveSlash,
+  type SlashAction,
   type SlashCommand,
   type SlashRegistry,
 } from './chat-slash-registry.js';
@@ -486,6 +487,96 @@ export function buildHelpCatalogLabels(lang: string): CatalogRenderLabels {
   };
 }
 
+// ─── NATIVE-SLASH-BRIDGE (387-002) — shared slash-output builders ──────────
+//
+// The legacy loop below (runChatNativeLoop) intercepts /help, /nervous,
+// /interrogate and bare /directives inline. The Ink native-engine bridge
+// (src/cli/repl/app.tsx) drives its OWN turn-by-turn dispatch instead of this
+// loop, so it never reached any of these branches — ~24 of the 37 slash
+// commands silently fell through to a plain-text chat turn (born-493). These
+// exports centralize each branch's OUTPUT assembly (not its transcript/memory
+// bookkeeping, which stays loop-specific) so app.tsx's bridge renders
+// byte-identical results without duplicating the logic.
+
+/**
+ * Same trust-badged /help block the loop renders inline below, extracted so
+ * the Ink native-engine bridge (app.tsx) renders byte-identical output
+ * without re-assembling the registry/catalog/labels calls itself.
+ */
+export function buildHelpOutput(chatMode: ChatMode, lang: string): string {
+  const visible = getVisibleCommands(chatMode);
+  const sections = [renderHelp(visible)];
+  const catalogEntries = buildHelpCatalogEntries(visible);
+  if (catalogEntries.length > 0) {
+    sections.push('', getMessage('nervous.actions_label', lang), renderCatalog(catalogEntries, buildHelpCatalogLabels(lang)));
+  }
+  return sections.join('\n');
+}
+
+/**
+ * Same `/nervous` banner+result assembly the loop's own early interception
+ * (below) performs, extracted for reuse by the Ink native-engine bridge,
+ * which intercepts `/nervous` the same way — BEFORE resolveSlash, since
+ * resolveSlash's own store-gated `/nervous` branch needs an injected
+ * NervousPendingStore neither caller has.
+ */
+export function buildNervousOutput(root: string, args: readonly string[], tty: boolean, lang: string): string {
+  const pending = getPendingNervous(root);
+  const banner = args.length === 0 ? renderNervousPrompt(pending, tty) : '';
+  const slashResult = handleNervousSlash(args, root, tty, lang);
+  return banner.length > 0 ? `${banner}\n${slashResult}` : slashResult;
+}
+
+/**
+ * Same `/interrogate` read+render the loop's own early interception (below)
+ * performs, extracted for reuse by the Ink native-engine bridge.
+ */
+export function buildInterrogateOutput(root: string, lang: string): string {
+  try {
+    const dirContent = readFileSync(join(root, DIRECTIVES_FILE), 'utf-8');
+    const questions = buildInterrogationQuestions(dirContent, { lang });
+    const intro = getMessage('interrogate.intro', lang);
+    const numbered = questions.map((q, i) => `${i + 1}. ${q.text}`).join('\n');
+    return `${intro}\n\n${numbered}`;
+  } catch {
+    return getMessage('chat.directives_not_found', lang, { root });
+  }
+}
+
+/**
+ * Same bare-`/directives` read the loop's own `show-directives` branch
+ * (below) performs, extracted for reuse by the Ink native-engine bridge.
+ */
+export function readDirectivesOutput(root: string, lang: string): string {
+  try {
+    return readFileSync(join(root, DIRECTIVES_FILE), 'utf-8');
+  } catch {
+    return getMessage('chat.directives_not_found', lang, { root });
+  }
+}
+
+/**
+ * Resolves the 3 resolveSlash outcomes that need ONLY a rendered string
+ * (help / i18n message / directives) into that text. `agentic` is
+ * deliberately NOT handled here — it needs an async tool dispatch, the
+ * caller's job (both the loop below and app.tsx's bridge dispatch it
+ * themselves, through their own `dispatcher`). Centralizing i18n resolution
+ * here keeps the Ink native-engine bridge (app.tsx) from importing
+ * getMessage directly — app.tsx is a "mechanism" module and stays
+ * string-free per the project's i18n-first rule; a slash message KEY is
+ * chosen at RUNTIME by resolveSlash (chat-slash-registry.ts), so unlike
+ * app.tsx's other labels it cannot be pre-injected as a static prop — this
+ * function is the caller-side resolution seam instead.
+ */
+export function resolveNativeSlashText(
+  action: Extract<SlashAction, { action: 'help' | 'message' | 'show-directives' }>,
+  ctx: { chatMode: ChatMode; lang: string; directivesRoot: string },
+): string {
+  if (action.action === 'help') return buildHelpOutput(ctx.chatMode, ctx.lang);
+  if (action.action === 'show-directives') return readDirectivesOutput(ctx.directivesRoot, ctx.lang);
+  return getMessage(action.messageKey, ctx.lang, action.params);
+}
+
 // ─── Per-turn stats footer (Sprint 224 T-224-021) ──────────────────
 //
 // `⏱ 3.2s · 240 tok` — dim line shown after each interactive-TTY reply.
@@ -677,18 +768,7 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       const parts = line.split(/\s+/);
       const nervousArgs = parts.slice(1);
       const nervousRoot = opts.nervousRoot ?? process.cwd();
-      const pending = getPendingNervous(nervousRoot);
-      const isPlainList = nervousArgs.length === 0;
-      const banner = isPlainList
-        ? renderNervousPrompt(pending, opts.interactiveTty === true)
-        : '';
-      const slashResult = handleNervousSlash(
-        nervousArgs,
-        nervousRoot,
-        opts.interactiveTty === true,
-        lang,
-      );
-      const emitText = banner.length > 0 ? `${banner}\n${slashResult}` : slashResult;
+      const emitText = buildNervousOutput(nervousRoot, nervousArgs, opts.interactiveTty === true, lang);
       output(emitText);
       transcript.push({ role: 'user', content: line });
       transcript.push({ role: 'assistant', content: emitText });
@@ -735,16 +815,7 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     // Tests inject opts.projectRoot for hermetic file I/O (same pattern as /directives).
     if (line === '/interrogate' || line.startsWith('/interrogate ')) {
       const interrRoot = opts.projectRoot ?? process.cwd();
-      let interrText: string;
-      try {
-        const dirContent = readFileSync(join(interrRoot, DIRECTIVES_FILE), 'utf-8');
-        const questions = buildInterrogationQuestions(dirContent, { lang });
-        const intro = getMessage('interrogate.intro', lang);
-        const numbered = questions.map((q, i) => `${i + 1}. ${q.text}`).join('\n');
-        interrText = `${intro}\n\n${numbered}`;
-      } catch {
-        interrText = getMessage('chat.directives_not_found', lang, { root: interrRoot });
-      }
+      const interrText = buildInterrogateOutput(interrRoot, lang);
       output(interrText);
       transcript.push({ role: 'user', content: line });
       transcript.push({ role: 'assistant', content: interrText });
@@ -867,19 +938,9 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       // is intentionally NOT used here — it is the FULL unfiltered registry
       // (needed by resolveSlash's dispatch path, see chat-mode.ts), while /help
       // display must go through getVisibleCommands(chatMode) to hide enterprise
-      // slashes outside control mode. Concatenated into ONE output() call so
-      // existing single-emit assertions on `/help` stay intact.
-      const visible = getVisibleCommands(chatMode);
-      const sections = [renderHelp(visible)];
-      const catalogEntries = buildHelpCatalogEntries(visible);
-      if (catalogEntries.length > 0) {
-        sections.push(
-          '',
-          getMessage('nervous.actions_label', lang),
-          renderCatalog(catalogEntries, buildHelpCatalogLabels(lang)),
-        );
-      }
-      output(sections.join('\n'));
+      // slashes outside control mode. buildHelpOutput (387-002) is the SAME
+      // assembly the Ink native-engine bridge (app.tsx) now also calls.
+      output(buildHelpOutput(chatMode, lang));
       continue;
     }
     // Sprint 269 T-269-003 — i18n informational/error reply from the registry
@@ -893,13 +954,7 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     // DIRECTIVES.md. Root is injectable for hermetic tests; defaults to cwd.
     if (slashAction.action === 'show-directives') {
       const directivesRoot = opts.projectRoot ?? process.cwd();
-      let directivesText: string;
-      try {
-        directivesText = readFileSync(join(directivesRoot, DIRECTIVES_FILE), 'utf-8');
-      } catch {
-        directivesText = getMessage('chat.directives_not_found', lang, { root: directivesRoot });
-      }
-      output(directivesText);
+      output(readDirectivesOutput(directivesRoot, lang));
       continue;
     }
     if (slashAction.action === 'agentic') {
