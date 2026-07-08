@@ -128,7 +128,7 @@ For each refactoring applied:
 
 After completing all refactorings:
 1. Run `tsc --noEmit` to verify type correctness
-2. Run `npx vitest run` to verify all tests pass
-3. Compare test count before and after (must be equal or greater)
+2. Run the TARGETED test file(s) for the modules you changed — the task's verify block is the authority; run the full `npx vitest run` only if the task explicitly asks for it
+3. Compare the targeted test count before and after (must be equal or greater)
 4. Verify no new circular dependencies
 5. Confirm all imports resolve correctly
