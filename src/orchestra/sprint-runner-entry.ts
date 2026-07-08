@@ -31,6 +31,8 @@ export interface SprintRunnerConfig {
   projectRoot: string;
   jobId: string;
   autoApprove: boolean;
+  /** Dimension B: bypass the pre-spawn scope gate (CLI --force-scope parity). */
+  acknowledgeScopePaths?: boolean;
   sandboxMode?: boolean;
   timeoutMs?: number;
 }
@@ -186,7 +188,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const { projectRoot, jobId, autoApprove, sandboxMode, timeoutMs } = runnerConfig;
+  const { projectRoot, jobId, autoApprove, acknowledgeScopePaths, sandboxMode, timeoutMs } = runnerConfig;
 
   // ADR-043: Install crash handlers AS EARLY AS POSSIBLE after IPC
   // config is known. Anything thrown after this point lands in error.json
@@ -247,6 +249,7 @@ async function main(): Promise<void> {
 
     const sprint = await runSprint(projectRoot, config, {
       autoApprove,
+      acknowledgeScopePaths,
       sandboxMode,
       timeoutMs,
       connector: bootstrap?.connector,

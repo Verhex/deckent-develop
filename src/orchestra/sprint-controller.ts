@@ -53,6 +53,10 @@ import type { Connector } from './connector.js';
 // ─── Core — sprint lock ───────────────────────────────────────────
 import { acquireSprintLock, releaseSprintLock } from '../core/multi-ide.js';
 
+// ─── Core — pre-spawn scope gate (Dimension B, born-573/518) ──────
+import { spawnSync } from 'node:child_process';
+import { evaluateScopeGate } from '../core/scope-gate.js';
+
 // ─── Sprint Utilities ─────────────────────────────────────────────
 import {
   now, isDocTask,
@@ -607,6 +611,14 @@ export function consultCollisionDecision(
 export interface RunSprintOptions {
   autoApprove?: boolean;
   sandboxMode?: boolean;
+  /**
+   * Bypass the pre-spawn scope gate (Dimension B). When true, a task whose
+   * `filesWrite` path does not exist and looks like a typo/wrong-directory is
+   * allowed to spawn anyway (CLI `--force-scope`, MCP `acknowledgeScopePaths`).
+   * Independent of the cost-gate `--force` — the scope shield protects even
+   * force-run sprints unless this is explicitly set.
+   */
+  acknowledgeScopePaths?: boolean;
   testMode?: boolean;
   skipCleanup?: boolean;
   timeoutMs?: number;
@@ -1124,6 +1136,36 @@ export async function runSprint(
 
     // Set sprint ID for observability tagging (sprintId available after plan phase)
     setObservabilitySprintId(sprint.id, { perSprintFile: true });
+
+    // ─── PRE-SPAWN SCOPE GATE (Dimension B — born-573/518 wrong-path shield) ─
+    // Validate every planned task's filesWrite/filesRead against the repo's real
+    // tracked-file set BEFORE any worker spawns. Blocks (by default) when a WRITE
+    // path is a likely typo/wrong-directory (the sprint-380 orphan-file mode where
+    // a worker "dutifully created" src/orchestra/worker.ts instead of the real
+    // src/agents/worker.ts). Independent of the cost `--force` — this shield
+    // protects even force-run sprints; bypass only with acknowledgeScopePaths /
+    // --force-scope. Fail-OPEN: a git failure never blocks a legitimate sprint.
+    try {
+      const lsFiles = spawnSync('git', ['ls-files'], {
+        cwd: projectRoot, encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024,
+      });
+      if (lsFiles.status === 0 && typeof lsFiles.stdout === 'string') {
+        const scopeGate = evaluateScopeGate({
+          tasks: sprint.tasks.map(t => ({ id: t.id, scope: t.scope ?? {} })),
+          trackedFiles: lsFiles.stdout.split('\n').filter(Boolean),
+          acknowledgeScopePaths: opts?.acknowledgeScopePaths,
+        });
+        if (!scopeGate.ok) {
+          releaseSprintLock(projectRoot);
+          clearActiveSprint();
+          clearSprintState(projectRoot);
+          throw new BrainError(scopeGate.message, SprintPhase.PLAN);
+        }
+      }
+    } catch (e) {
+      if (e instanceof BrainError) throw e; // scope-gate block — propagate to caller
+      debugLog('runSprint:scopeGate', e);   // git/other failure → fail-open
+    }
 
     // Human Checkpoint: PLAN
     if (config.human_checkpoints?.includes('plan')) {

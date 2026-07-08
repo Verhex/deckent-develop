@@ -150,6 +150,7 @@ interface StartCommandOpts {
   sandbox?: boolean;
   dryRun?: boolean;
   force?: boolean;
+  forceScope?: boolean;
   watch?: boolean;
   timeout?: string;
   forceDirectives?: boolean;
@@ -164,6 +165,7 @@ export function registerStart(program: Command): void {
     .option('--sandbox', 'Use sandbox spawn backend (memory-cap + path-jail isolation, no Docker required)')
     .option('--dry-run', 'Plan sprint without spawning workers')
     .option('--force', 'Skip doctor pre-flight checks')
+    .option('--force-scope', 'Bypass the pre-spawn scope gate (allow write paths that do not exist / look like typos)')
     .option('--watch', 'Automatically open watch mode after sprint spawns workers')
     .option('--timeout <ms>', 'Sprint timeout in milliseconds (default: 30 minutes)')
     .option('--force-directives', 'Override existing DIRECTIVES.md in zero-config mode')
@@ -457,6 +459,9 @@ export function registerStart(program: Command): void {
             // normalizes to a strict boolean, default false — same semantics as
             // deckent_start (src/mcp/tools/start.ts autoApprove === true).
             autoApprove: opts.autoApprove === true,
+            // Dimension B: --force-scope bypasses the pre-spawn scope gate. Independent
+            // of --force (cost/doctor) — the scope shield protects even force-run sprints.
+            acknowledgeScopePaths: opts.forceScope === true,
             sandboxMode: opts.sandboxMode,
             timeoutMs,
             spawnBackend: sandboxSpawnBackend,

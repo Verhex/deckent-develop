@@ -49,13 +49,14 @@ export function registerStartTool(server: McpServer): void {
       inputSchema: z.object({
         autoApprove: z.boolean().optional().default(false).describe('Auto-approve worker tool calls with --dangerously-skip-permissions. CLI default is false; set true only when the caller has confirmed the run is safe (CLI/MCP parity — ADR-022-V2).'),
         acknowledgeCost: z.boolean().optional().default(false).describe('Bypass the pre-spawn cost gate when the realistic estimate exceeds cost_limits.sprint_max_usd. The caller must explicitly acknowledge the over-budget run; otherwise deckent_start returns COST_GATE_EXCEEDED. Equivalent to CLI --force from the cost-gate perspective.'),
+        acknowledgeScopePaths: z.boolean().optional().default(false).describe('Bypass the pre-spawn SCOPE gate (Dimension B). By default a sprint is blocked before spawn when a task\'s filesWrite path does not exist and looks like a typo/wrong-directory (the sprint-380 orphan-file mode). Set true to allow such paths as intentional new files. Equivalent to CLI --force-scope; independent of acknowledgeCost/force.'),
         dryRun: z.boolean().optional().default(false).describe('Plan the sprint without spawning workers. Returns the planned tasks list so you can review before committing. No workers are started, no files are changed.'),
         force: z.boolean().optional().default(false).describe('Skip pre-flight checks AND the cost gate. Use only when the environment is known-ready and the cost has been verified out-of-band. Equivalent to CLI --force.'),
         timeout: z.number().int().positive().optional().describe('Sprint maximum duration in milliseconds (default: 30 minutes = 1800000). Sprint is marked TIMEOUT if workers do not complete within this window.'),
         sandbox: z.boolean().optional().default(false).describe('Run sprint in sandbox mode: stashes local git changes before spawning and restores them after the sprint completes. Safe experimentation — no permanent changes on failure.'),
       }),
     },
-    async ({ autoApprove, acknowledgeCost, dryRun, force, timeout, sandbox }) => {
+    async ({ autoApprove, acknowledgeCost, acknowledgeScopePaths, dryRun, force, timeout, sandbox }) => {
       const root = process.cwd();
       // CLI/MCP Parity Notes (ADR-022-V2):
       // - autoApprove: CLI default false (the schema param mirrors this). The
@@ -281,6 +282,8 @@ export function registerStartTool(server: McpServer): void {
           // for CLI parity). Previously hardcoded to true which bypassed the
           // schema default and made the surface param dead-letter.
           autoApprove: autoApprove === true,
+          // Dimension B: parity with CLI --force-scope. Independent of acknowledgeCost.
+          acknowledgeScopePaths: acknowledgeScopePaths === true,
           sandboxMode: sandbox,
           timeoutMs: timeout,
         };
