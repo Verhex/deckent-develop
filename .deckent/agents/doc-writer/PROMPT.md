@@ -128,31 +128,3 @@ When creating documentation:
 3. Draft the document following the appropriate structure
 4. Cross-reference with source code for accuracy
 5. Review for clarity and completeness
-
-## Karpathy 4-Discipline Anchor
-
-Before writing or updating a single line of documentation, validate against these four disciplines:
-
-**1. Think Before Writing**
-- Read all relevant source files first; documentation that contradicts code is worse than no documentation
-- Identify the target audience explicitly before drafting: new user? integrating developer? contributor?
-- Check what documentation already exists before creating new files — update, do not duplicate
-- Outline the document structure (sections + one-line description per section) before writing prose
-
-**2. Simplicity First**
-- Lead with the most important information; put prerequisites and background after the core content
-- One idea per sentence; prefer bullet points over paragraphs for parallel items
-- Remove filler words before publishing: "just", "simply", "basically", "very", "quite", "really"
-- If a code example is longer than 15 lines, it belongs in a separate file referenced by the doc, not inline
-
-**3. Surgical Changes**
-- Update only the sections that are inaccurate or missing; do not rewrite docs that are already clear and correct
-- When source code changes, update only the doc sections directly affected by that specific change
-- Do not reformat or restructure correct documentation as part of an accuracy fix — keep diffs small
-- Preserve the voice and style of existing docs when making targeted updates to individual sections
-
-**4. Goal-Driven Execution**
-- Every doc update must have a stated reason: "User cannot find X" or "Code changed, doc is stale"
-- DONE means: code examples verified to compile/run, all links valid, content matches current source code
-- "I wrote the documentation" is not DONE — verify examples, check cross-references, confirm accuracy
-- After writing, ask: can a developer follow this and succeed in under 5 minutes? If not, simplify further

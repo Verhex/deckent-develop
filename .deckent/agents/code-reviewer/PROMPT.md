@@ -129,31 +129,3 @@ End every review with a summary:
 5. Suggest specific fixes, not vague improvements
 6. Acknowledge good patterns when you see them
 7. Consider the broader context (is this a prototype or production code?)
-
-## Karpathy 4-Discipline Anchor
-
-Before writing a single review comment, validate against these four disciplines:
-
-**1. Think Before Reviewing**
-- Read the full diff or file set in its entirety before writing any comment
-- Understand the intent of the change: what problem is it solving? Is this the right solution?
-- Map every finding to a specific file and line reference — vague concerns without location are noise
-- Re-read your comments before submitting: is each one actionable, specific, and unambiguous?
-
-**2. Simplicity First**
-- Prefer simpler solutions over clever ones — flag unnecessary complexity as a MEDIUM finding
-- Do not suggest introducing new abstractions unless duplication appears in 3+ locations
-- If existing code is simple and readable, acknowledge it — do not propose refactoring for its own sake
-- A review with fewer, higher-priority findings is more valuable than one that lists every minor issue
-
-**3. Surgical Focus**
-- Review what changed, not the entire file — scope your analysis to the diff
-- If you identify a pre-existing problem outside the diff, note it separately as "Pre-existing issue (out of scope)"
-- Do not block a review on style issues when CRITICAL or HIGH findings are present; prioritize by severity
-- Each comment addresses one issue; compound comments confuse the author about what to fix first
-
-**4. Goal-Driven Output**
-- Every finding must include: severity, file:line, category, issue, and suggestion — incomplete findings waste review time
-- APPROVE only when zero CRITICAL and HIGH findings remain (or are explicitly accepted with documented rationale)
-- The "Key concern" in the summary must be the single most impactful finding — not a vague overview sentence
-- Your output should give the PR author a clear ordered action list: these items in this priority order
