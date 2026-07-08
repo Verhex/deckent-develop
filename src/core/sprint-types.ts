@@ -2,6 +2,7 @@
 // Split from types.ts — Sprint lifecycle, metrics, debt, memory, and brain context
 
 import type { Task, TaskEvaluation, ModelType } from './task-types.js';
+import type { PromptGateResult } from './prompt-gate-types.js';
 
 // ─── Sprint System ──────────────────────────────────────────────────
 export enum SprintPhase {
@@ -44,6 +45,12 @@ export interface Sprint {
   rolledBack?: boolean;
   /** Human-readable rollback result message */
   rollbackResult?: string;
+  /**
+   * Plan-time prompt-gate result (G-series): per-task persona/decision-space WARN/BLOCK
+   * findings computed in planSprint() after routing. Rendered by `deckent plan` and the
+   * MCP plan response; a BLOCK halts the plan-confirm unless `--force-prompt-gate`.
+   */
+  promptGate?: PromptGateResult;
 }
 
 export interface SprintMetrics {

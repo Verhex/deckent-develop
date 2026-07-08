@@ -116,6 +116,8 @@ import {
 // ─── Sub-module imports ──────────────────────────────────────────
 import { resolveTaskModel, parsePatterns, deduplicatePatterns } from './model-selector.js';
 import { createTask, extractScopeFromDirective, parseStructuredDirectives, plannerTaskToParams, normalizeStructuredTaskDependencies } from './task-builder.js';
+import { evaluatePromptGate } from './prompt-gate.js';
+import type { PromptGateResult } from '../core/prompt-gate-types.js';
 
 // ─── BrainError ──────────────────────────────────────────────────
 import { BrainError } from './sprint-lifecycle.js';
@@ -241,9 +243,12 @@ export async function planSprint(
   config: ResolvedConfig,
   context: BrainContext,
   recommendation: SprintSizeRecommendation,
-  options?: { mode?: BrainPlanningMode; asDraft?: boolean; dryRun?: boolean },
+  options?: { mode?: BrainPlanningMode; asDraft?: boolean; dryRun?: boolean; acknowledgePromptGate?: boolean },
 ): Promise<Sprint> {
   const sprintId = getNextSprintId(projectRoot);
+  // G-series plan-time prompt-gate result (persona/decision-space); computed after
+  // routing inside the pool try-block, attached to the returned Sprint below.
+  let promptGate: PromptGateResult | undefined;
   emitProgress({ phase: 'PLAN', root: projectRoot });
   const defaultModel = recommendation.modelConstraint ?? config.activeModeConfig.default_model;
   let planMode = options?.mode ?? config.activeModeConfig.brain_planning ?? 'auto';
@@ -763,6 +768,22 @@ export async function planSprint(
       'planSprint:routing-affinity',
       `affinity=${skillAgentAffinity} distribution: ${JSON.stringify(summarizeAgentDistribution(affinitySink.records))}`,
     );
+
+    // G-series plan-time prompt-gate (G1a persona + G1d decision-space): flag every
+    // finalized task's (persona × intent) fit + goCriteria decision-shape, source-
+    // agnostic (forceAgent AND router picks). Pure — never throws; surfaced by the
+    // caller (deckent plan / MCP), blocks on BLOCK unless acknowledged.
+    promptGate = evaluatePromptGate({
+      tasks,
+      agentPool: pool,
+      acknowledgePromptGate: options?.acknowledgePromptGate,
+    });
+    if (promptGate.findings.length > 0) {
+      debugLog(
+        'planSprint:prompt-gate',
+        `${promptGate.findings.length} finding(s), ${promptGate.blockers.length} blocker(s), ok=${promptGate.ok}`,
+      );
+    }
   } catch (poolErr) {
     debugLog('planSprint:routing-v2', `V2 routing pool loading failed: ${poolErr}`);
   }
@@ -798,6 +819,7 @@ export async function planSprint(
     workers: tasks.map(t => `w-${t.id}`),
     reasoning: plannerResult?.reasoning,
     planningMode: usedMode,
+    promptGate,
   };
 }
 

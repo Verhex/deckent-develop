@@ -88,12 +88,14 @@ export function registerPlan(program: Command): void {
     .option('--structured', 'Force structured parsing (skip AI)')
     .option('--dry-run', 'Show plan without writing task files to disk')
     .option('--interrogate', 'Challenge directives with structural questions before planning')
+    .option('--force-prompt-gate', 'Bypass the plan-time prompt-gate BLOCK (persona-capability mismatch)')
     .action(async (opts: {
       confirm?: boolean;
       yes?: boolean;
       structured?: boolean;
       dryRun?: boolean;
       interrogate?: boolean;
+      forcePromptGate?: boolean;
     }) => {
       const root = resolveProjectRoot();
 
@@ -178,6 +180,7 @@ export function registerPlan(program: Command): void {
             mode: planMode,
             asDraft,
             dryRun,
+            acknowledgePromptGate: opts.forcePromptGate === true,
           });
         } finally {
           spinner.stop();
@@ -191,6 +194,29 @@ export function registerPlan(program: Command): void {
         const headers = ['ID', 'Title', 'Model', 'Priority'];
         const rows = sprint.tasks.map((t) => [t.id, t.title, t.model, t.priority]);
         print(formatTable(headers, rows));
+
+        // G-series prompt-gate surface (persona/decision-space). WARN findings are
+        // advisory; an unacknowledged BLOCK (persona-capability mismatch) halts the
+        // plan before the approval prompt, mirroring the cost/scope-gate UX.
+        const gate = sprint.promptGate;
+        if (gate && gate.findings.length > 0) {
+          print('');
+          print(getMessage('plan.prompt_gate_header', lang, { count: String(gate.findings.length) }));
+          for (const f of gate.findings) {
+            const tag = f.level === 'block' ? 'BLOCK' : 'WARN';
+            print(`  [${tag}] ${f.taskId} · ${f.lint} (${f.agentId}): ${f.message}`);
+            if (f.suggestion) print(`         → ${f.suggestion}`);
+          }
+          if (!gate.ok) {
+            print('');
+            printError(new Error(getMessage('plan.prompt_gate_blocked', lang, { count: String(gate.blockers.length) })));
+            process.exitCode = 1;
+            return;
+          }
+          if (gate.overrideApplied) {
+            print(getMessage('plan.prompt_gate_override', lang, { count: String(gate.blockers.length) }));
+          }
+        }
 
         if (sprint.reasoning) {
           print(getMessage('plan.reasoning', lang, { reasoning: sprint.reasoning }));

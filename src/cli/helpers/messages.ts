@@ -126,6 +126,18 @@ const MESSAGES: MessageMap = {
     en: 'Plan rejected.',
     tr: 'Plan reddedildi.',
   },
+  'plan.prompt_gate_header': {
+    en: 'Prompt-gate — {count} finding(s) (persona × intent / decision-space):',
+    tr: 'Prompt-gate — {count} bulgu (persona × intent / karar-alanı):',
+  },
+  'plan.prompt_gate_blocked': {
+    en: 'Plan blocked by prompt-gate: {count} persona-capability mismatch(es). Fix the DIRECTIVES `- Agent:` assignment (route code-writing work to an implementer persona), or re-run with --force-prompt-gate.',
+    tr: 'Plan prompt-gate tarafından bloke edildi: {count} persona-yetenek uyuşmazlığı. DIRECTIVES `- Agent:` atamasını düzeltin (kod-yazan işi bir implementer personasına yönlendirin) ya da --force-prompt-gate ile yeniden koşun.',
+  },
+  'plan.prompt_gate_override': {
+    en: 'Prompt-gate BLOCK bypassed via --force-prompt-gate ({count}).',
+    tr: 'Prompt-gate BLOCK --force-prompt-gate ile atlandı ({count}).',
+  },
 
   // ─── status command ─────────────────────────────────────────────────
   'status.no_active_sprint': {
