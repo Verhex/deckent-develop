@@ -132,6 +132,19 @@ git-guard yalnız stash-scatter modunu kapattı; **orphan-yanlış-yol modu hâl
 - **Bağımsız/sonra:** F0.3/F0.4, FAZ 1, FAZ 3/4/5/6 — maratona paralel ya da sonra.
 - **Her fix:** el-kodla → yeni test + `tsc` + gerçek-binary smoke (F0.3/F2/F3) → disk-verify → **commit** (kazanım-koruma). Build BENDE (sprint-arası).
 
+## İlerleme (canlı — CC el-kodluyor)
+| Fix | Durum | Commit | Not |
+|---|---|---|---|
+| **F0.1** phantom-skill kök-fix | ✅ | 01d3f494 | routing-engine forceSkills doğrula + suggest; result-collector metric; 62+80 test yeşil |
+| **F0.2** goNogo parser (goCriteria/nogo) | ✅ | 9b15c8e8 | additive; 4 yeni test; downstream 53 yeşil. **Maraton ön-koşulu land oldu** |
+| **F0.3** orphan-prompt arşiv (silinmez) | ✅ | 05a1fd42 | archiveOrphanPromptFile + _orphaned drain; 80 test yeşil; TRN'e veri |
+| **F0.4** ADR kelime-sınırı kırpma | ✅ | 9ffbfe7b | word-boundary cap; 31 test yeşil |
+| **F2.1** scope-gate (bloke-default) | ✅ | fbc2eea2 | core/scope-gate.ts (8 test, 573/518 case) + sprint-controller PLAN→SPAWN wire + CLI --force-scope/MCP acknowledgeScopePaths (parity); real-binary smoke: --force-scope help ✅ + gate dist'te ✅; 196 lifecycle yeşil |
+| **F2.1b** buildScopeBlock 3-alt-liste (worker-dili) | ⏳ | — | takip: CONFIRMED/NEW/⚠ prompt rendering (bloke zaten canlı) |
+| F1.1 Karpathy-4 sil · F1.2 Idempotency-gate · F1.3 ADR over-match | ⏳ | — | KARAR-1'siz token-kazanımları |
+| F3.1 CLI prefix-flag · F4.x caching · F5.x routing · F6 hijyen | ⏳ | — | KARAR-3=CLI-kazanımları+ertele |
+> PRE-EXISTING (kapsam-dışı): `tmux-edge` 'skips mkdirSync' testi değişikliklerimden bağımsız kırık.
+
 ## Bekleyen 3 KARAR (Alperen)
 1. **Scope-gate** SUSPECT → bloke-default mı, yalnız-uyar mı? (KARAR-1)
 2. **ADR-075 affinity** → gözlem-sonra-flip mi, flag+sink kaldır mı? (KARAR-2)
