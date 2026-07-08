@@ -69,6 +69,31 @@
 
 ---
 
+## 🔴 SPRINT-387 ANALİZİ → G-SERİSİ (Gate-öncelikli, 2026-07-08 — Alperen dış-analiz + CC hand-code)
+
+**Ampirik doğrulama:** dış-analizin risk-sıralaması sonuçla birebir (387-017/90→DONE · 387-026/82→DONE · 387-012/76→GO_WITH_TECH_DEBT, öngörülen scope-gap'ten). Sprint-geneli NO_GO %50→%11.
+
+**⭐ Analiz beni 2 noktada düzeltti (kod-doğrulandı):** (1) 387-012'nin `security-auditor` personası **router değil BENİM authoring seçimimdi** (DIRECTIVES `- Agent: security-auditor`) — router aklandı, çalışıyor ama yanlış-kullanıma korumasız. (2) 387-012 nogo-premise'im ("node:crypto yeterli") **bayat** — Ed25519 zaten `@noble/ed25519` ile sprint-150'den beri `signature.ts`'te implementte. **Kalan hata artık şablonda değil: authoring + routing katmanında, makine-gate'siz.**
+
+**Kök-neden katmanları:** RC-A AUTHORING (yanlış-persona + bayat-premise + scope-kapanışsızlık = 387-012'nin 3 yarası) · RC-B ROUTER (refactorer çekim-merkezi, 387-026; taskDNA operation-sinyali üretiliyor ama persona-seçiminde tüketilmiyor) · RC-C AUTHORING-DİL (sahte-VEYA karar-alanı, private-state assertion) · RC-D RENDER (ADR tier, bilinen R-3/R-5).
+
+### G-serisi çözüm mimarisi (ölçülebilir hedef: "prompt-kaynaklı failure sınıfı = 0", NO_GO ≤%5)
+- ~~**G1a persona-uygunluk**~~ ✅ TESLİM (commit `dc63c018`). Plan-time gate `planSprint:769` → `sprint.promptGate`; source-agnostik FINAL assignedAgent. capability-BLOCK (Write-denied+kod) · mandate-WARN (refactorer+davranış-değişim) · role-WARN (reviewer/analyst+construction) · domain-WARN (mevcut validatePersonaTaskMatch kompoze). **387-012+387-026'yı tek gate yakalar.** Mevcut `getAgentRole`+`validatePersonaTaskMatch` kompoze (paralel taksonomi YOK). `deckent plan`'da render + BLOCK→exit1 (`--force-prompt-gate`). 15 test + gerçek-binary smoke.
+- ~~**G1d karar-alanı**~~ ✅ TESLİM (`dc63c018`). goCriteria'da uppercase VEYA/OR → WARN + preferred-order öner (lowercase "or" prose flag'lenmez).
+- **G1b scope-kapanış** ⏳ — goCriteria'daki her doğrulanabilir iddiaya "karşılayacak filesWrite var mı?" (387-012 install-debt'i önlerdi). prompt-gate.ts'e yeni lint.
+- **G1c premise ground-truth** ⏳ — description'daki "X eksik/yok" iddialarına grep-spot-check. `auditPlanGroundTruth` (planner.ts:763) ZATEN VAR ama **UNWIRED** (yalnız test-caller) → genişlet+wire (387-012 bayat-Ed25519 premise'ini yakalardı).
+- **G1e test-assertion** ⏳ — private-state kalıpları ("X null olmalı") → observable-behavior öner (387-017).
+- **G2 persona-class metadata** ⏳ — agent.json'a `role` alanı (kısmen var: 2/20 agent + BUILTIN_AGENT_ROLES map). architect-mismap (implementer-map ama Write-denied) düzelt.
+- **G3 router operation-class** ⏳ — taskDNA operation-ağırlıklarını persona-seçimine bağla (RC-B kök; sinyal üretiliyor, tüketici eksik). Agent-satırsız task'ların güvenlik-ağı.
+- **G4 skill↔agent tek-karar kilidi** ⏳ (PCOMP-W5b tamamlama) — routing {agent,skills,personaClass} tek atomik nesne.
+- **G5 ADR render tier** ⏳ (= R-3/R-5) — d-004 full-kontrat yalnız import-touching task'ta; active_constraint===none → "Advisory" alt-başlığı; nogo-koşullu-talimat "compatibility note" render.
+- **G6 verify mikro** ⏳ — exact test-komutu bas (compiler test-dosyasını biliyor) + tsc pre-existing politikası.
+- **Ölçüm döngüsü** ⏳ — her retro'ya prompt-attribution satırı (non-DONE neden-sınıfı: authoring/routing/scope/premise/worker/dış). Baseline 387: NO_GO %11, prompt-debt≥1.
+
+**Öncelik (Alperen):** G1a+G1d ✅ → G2 → G5 → ölçüm-döngüsü. **"A" adımı (G1a+G1d) TESLİM; kalan G'ler born-sprint sonrası dedike.**
+
+---
+
 ## 0. Çerçeve — 3 kapanmayan geri-besleme döngüsü (+1 kesişen)
 
 deckentin bu üç boyutta **kağıt üstünde doğru mimarisi zaten var**; sorun tasarım değil **wiring**. Aynı desen üç kez tekrarlıyor: iyi-inşa-edilmiş + unit-test'li + **gerçek sprint yolunda sıfır çağıran** bir modül. "Devrim" = bu modülleri gerçek `task-builder`/`sprint-controller` yoluna **bağlamak**, yeni bir şey inşa etmek değil.
