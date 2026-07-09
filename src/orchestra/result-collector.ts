@@ -112,6 +112,29 @@ async function loadRespawn(): Promise<typeof RespawnFn> {
 // stays permanently open. Only an explicitly-enabled guard creates + starts a
 // monitor. Fail-safe: an import/create error leaves the monitor undefined (guard
 // off) rather than breaking the loop.
+/**
+ * born-562 — has the cost-guarded wait loop reached completion? True only when
+ * the guard has STOPPED new dispatch AND every already-dispatched (in-flight)
+ * task has reported — i.e. `collected` covers all non-PENDING tasks. The
+ * still-PENDING tasks were never dispatched and never will be under a cost stop,
+ * so waiting for them would idle to a bounded deadline (or HANG forever under
+ * `sprint_timeout_minutes: 0`). Returns false whenever the guard has not
+ * stopped, so the normal loop is untouched.
+ *
+ * @param stopped            costGuard.shouldStopDispatch() — false ⇒ always false.
+ * @param collectedCount     tasks that have reported a result so far.
+ * @param totalCount         total tasks in the sprint.
+ * @param stillPendingCount  tasks still PENDING (never dispatched).
+ */
+export function costGuardShouldComplete(
+  stopped: boolean,
+  collectedCount: number,
+  totalCount: number,
+  stillPendingCount: number,
+): boolean {
+  return stopped && collectedCount >= totalCount - stillPendingCount;
+}
+
 export async function loadCostGuardMonitor(
   projectRoot: string,
   sprintId: string,
@@ -1477,6 +1500,20 @@ export async function waitForResults(
         }
       }
       if (collected.size === taskIds.size) break;
+      // born-562 — cost-guard completion: once the guard has stopped new
+      // dispatch, complete as soon as every already-dispatched (in-flight) task
+      // has reported. The still-PENDING tasks were never dispatched and never
+      // will be, so without this the loop idles to a bounded deadline — and
+      // HANGS FOREVER under `sprint_timeout_minutes: 0` (unlimited), where the
+      // only other break (`collected === taskIds.size`) can never fire. Those
+      // un-dispatched tasks have no `.hb`/`.log` trace → EVALUATE's
+      // classifyMissingResult marks them NOT_DISPATCHED (out of the NO_GO
+      // blame-fix pipeline), identical to any un-reached task today. Inert when
+      // the guard is disabled (costGuard undefined → condition never true).
+      if (costGuard?.shouldStopDispatch()) {
+        const stillPending = sprint.tasks.filter(t => t.status === TaskStatus.PENDING).length;
+        if (costGuardShouldComplete(true, collected.size, taskIds.size, stillPending)) break;
+      }
       // Check for pending worker questions and auto-answer them
       // (sprintId → NPM-ADVISORY questions surface a human notification)
       checkWorkerQuestions(projectRoot, taskIds, collected, { sprintId: sprint.id });
