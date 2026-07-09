@@ -4,8 +4,8 @@
 // Tests use real SqliteMissionStore (tmpdir) + exported handler functions.
 // No spawnSync, no real project-root reads, no network I/O.
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteMissionStore } from '../../src/orchestra/autonomous/mission-store/sqlite-mission-store.js';
@@ -276,5 +276,58 @@ describe('registerAutonomousMission', () => {
     expect(subNames).toContain('create-list');
     expect(subNames).toContain('create-goal');
     expect(subNames).toContain('list');
+  });
+});
+
+describe('born-570 — engine-disabled honest warning on create', () => {
+  function writeAutonomousEnabled(root: string, enabled: boolean): void {
+    mkdirSync(join(root, '.deckent'), { recursive: true });
+    writeFileSync(
+      join(root, '.deckent', 'config.json'),
+      JSON.stringify({ autonomous: { enabled } }),
+      'utf-8',
+    );
+  }
+
+  const WARN_EN = 'the autonomous engine is disabled';
+
+  it('DISABLED (no config): create-list warns loudly the mission will not drain', () => {
+    const root = mkRoot();
+    const out = captureOutput(() =>
+      handleCreateList({ root, lang: 'en', title: 'X', items: [{ kind: 'task' }], id: 'l1' }),
+    );
+    expect(out).toContain('Mission created: l1');
+    expect(out).toContain(WARN_EN);
+    expect(out).not.toContain('autonomous_mission.'); // i18n key resolved
+  });
+
+  it('DISABLED (autonomous.enabled=false): create-goal warns', () => {
+    const root = mkRoot();
+    writeAutonomousEnabled(root, false);
+    const out = captureOutput(() =>
+      handleCreateGoal({ root, lang: 'en', goal: 'ship it', id: 'g1' }),
+    );
+    expect(out).toContain('Goal mission created: g1');
+    expect(out).toContain(WARN_EN);
+  });
+
+  it('ENABLED (autonomous.enabled=true): NO warning — mission will drain', () => {
+    const root = mkRoot();
+    writeAutonomousEnabled(root, true);
+    const out = captureOutput(() =>
+      handleCreateList({ root, lang: 'en', title: 'X', items: [{ kind: 'task' }], id: 'l2' }),
+    );
+    expect(out).toContain('Mission created: l2');
+    expect(out).not.toContain(WARN_EN);
+  });
+
+  it('ENABLED: create-goal also stays quiet', () => {
+    const root = mkRoot();
+    writeAutonomousEnabled(root, true);
+    const out = captureOutput(() =>
+      handleCreateGoal({ root, lang: 'en', goal: 'ship it', id: 'g2' }),
+    );
+    expect(out).toContain('Goal mission created: g2');
+    expect(out).not.toContain(WARN_EN);
   });
 });

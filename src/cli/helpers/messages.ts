@@ -1412,6 +1412,10 @@ const MESSAGES: MessageMap = {
     en: 'Goal mission created: {id} — {goal}',
     tr: 'Hedef misyonu oluşturuldu: {id} — {goal}',
   },
+  'autonomous_mission.engine_disabled_warning': {
+    en: 'Warning: the autonomous engine is disabled — this mission is queued but will NOT be processed until you run `deckent autonomous enable`.',
+    tr: 'Uyarı: otonom motor devre dışı — bu misyon kuyruğa alındı ancak `deckent autonomous enable` çalıştırılana kadar İŞLENMEYECEK.',
+  },
   'autonomous_mission.list.empty': {
     en: 'No autonomous missions found.',
     tr: 'Otonom misyon bulunamadı.',

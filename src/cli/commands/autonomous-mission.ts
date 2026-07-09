@@ -18,6 +18,38 @@ import { detectLang } from '../helpers/i18n.js';
 import { SqliteMissionStore } from '../../orchestra/autonomous/mission-store/sqlite-mission-store.js';
 import { createListMission } from '../../orchestra/autonomous/mission-store/mission-ingest.js';
 import { createGoalMission } from '../../orchestra/autonomous/mission-store/goal-mission.js';
+import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
+
+/**
+ * born-570 — is the autonomous engine explicitly enabled? A mission created
+ * while it is off is written to the store but NEVER drained (the v2 engine only
+ * runs when `autonomous.enabled` is true) — the silent "inert row" bug. This is
+ * a best-effort SYNC read of the project config (the exact file that
+ * `deckent autonomous enable` writes), so `create-*` can warn honestly instead
+ * of silently queueing work that will never run. Any missing-file / parse error
+ * is treated as disabled (warn) and never throws.
+ */
+function isAutonomousEngineEnabled(root: string): boolean {
+  try {
+    const raw = readFileSync(join(root, PROJECT_CONFIG_PATH), 'utf-8');
+    const cfg = JSON.parse(raw) as { autonomous?: { enabled?: boolean } };
+    return cfg.autonomous?.enabled === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * born-570 — after a mission is created, warn LOUDLY when the engine is disabled
+ * so the user is never silently misled into thinking the mission will run. The
+ * mission is still created (queue-then-enable stays valid); only the honest
+ * heads-up is added.
+ */
+function warnIfAutonomousEngineDisabled(root: string, lang: string): void {
+  if (!isAutonomousEngineEnabled(root)) {
+    print(getMessage('autonomous_mission.engine_disabled_warning', lang));
+  }
+}
 import { auditMissionLifecycle } from '../../orchestra/autonomous/mission-store/mission-audit-bridge.js';
 import { projectMission } from '../../orchestra/autonomous/mission-store/mission-view.js';
 import type { WorkItemKind } from '../../orchestra/autonomous/mission-store/mission-types.js';
@@ -110,6 +142,7 @@ export function handleCreateList(opts: CreateListOpts): void {
         count: String(opts.items.length),
       }),
     );
+    warnIfAutonomousEngineDisabled(opts.root, opts.lang);
   } finally {
     store.close();
   }
@@ -151,6 +184,7 @@ export function handleCreateGoal(opts: CreateGoalOpts): void {
         goal: opts.goal,
       }),
     );
+    warnIfAutonomousEngineDisabled(opts.root, opts.lang);
   } finally {
     store.close();
   }
