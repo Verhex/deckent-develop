@@ -17,7 +17,7 @@ import { isOpenAIModel } from '../core/types.js';
 import { PROVIDER_PACKAGES } from '../core/provider-packages.js';
 import { modelRegistry } from '../core/model-registry.js';
 import type { ProviderAdapter, ProviderSpawnOptions, ProviderAvailabilityDetail } from '../core/provider.js';
-import { ProviderError, resolveBinaryPath, parseSemverFromOutput } from '../core/provider.js';
+import { ProviderError, resolveBinaryPath, parseSemverFromOutput, buildCliInvocation } from '../core/provider.js';
 import { normalizeUsage, type TokenUsage } from '../core/token-usage.js';
 import type { ProviderDetectResult } from './claude.js';
 import { TASKS_DIR } from '../core/constants.js';
@@ -181,14 +181,19 @@ export class CodexAdapter implements ProviderAdapter {
     // codex CLI forks. win32 has no process-group signal semantics for
     // `process.kill`, so `detached` is never set there (see subprocess.ts's
     // signalProcessGroup for the same win32 residual).
+    // SPAWN-1 (born-580, DEP0190 + ADR-006 parity with subprocess.ts): route
+    // through buildCliInvocation so a win32 `codex.cmd` wrapper resolves via
+    // `cmd.exe /c` (shell:false); POSIX stays byte-identical (real binary, no wrapper).
+    const inv = buildCliInvocation('codex', args, this.platform);
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
       stdio: ['ignore', logFd, logFd],
       env: spawnEnv,
+      shell: inv.shell,
       detached: this.platform !== 'win32',
     };
 
-    const child = spawn('codex', args, spawnOpts);
+    const child = spawn(inv.command, inv.args, spawnOpts);
     closeSync(logFd);
 
     // Write heartbeat

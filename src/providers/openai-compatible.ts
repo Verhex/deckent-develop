@@ -27,7 +27,7 @@ import type {
   ProviderSpawnOptions,
   ProviderAvailabilityDetail,
 } from '../core/provider.js';
-import { ProviderError } from '../core/provider.js';
+import { ProviderError, buildCliInvocation } from '../core/provider.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { normalizeUsage, type TokenUsage } from '../core/token-usage.js';
 
@@ -124,6 +124,12 @@ export interface OpenAICompatibleConfig {
   spawnImpl?: typeof nodeSpawn;
   /** Auto-kill timeout (ms) for a spawned worker; 0 = no timeout. */
   defaultTimeoutMs?: number;
+  /**
+   * Host platform — injectable so the win32 cmd.exe-wrapper spawn path
+   * (born-580, DEP0190 + ADR-006 parity with subprocess.ts) is testable
+   * without a real spawn. Defaults to `process.platform`.
+   */
+  platform?: NodeJS.Platform;
 }
 
 // ─── Adapter ─────────────────────────────────────────────────────────
@@ -139,6 +145,7 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
   private readonly workerEntryPath: string;
   private readonly spawnImpl: typeof nodeSpawn;
   private readonly defaultTimeoutMs: number;
+  private readonly platform: NodeJS.Platform;
   private readonly workers = new Map<string, HttpWorkerEntry>();
 
   constructor(config: OpenAICompatibleConfig) {
@@ -152,6 +159,7 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
     this.workerEntryPath = config.workerEntryPath ?? DEFAULT_HTTP_WORKER_ENTRY_PATH;
     this.spawnImpl = config.spawnImpl ?? nodeSpawn;
     this.defaultTimeoutMs = config.defaultTimeoutMs ?? 0;
+    this.platform = config.platform ?? process.platform;
   }
 
   // ─── send() — primary HTTP entry ────────────────────────────────────
@@ -294,19 +302,26 @@ export class OpenAICompatibleAdapter implements ProviderAdapter {
     const logPath = join(tasksDir, `task-${taskId}.log`);
     const logFd = openSync(logPath, 'a');
 
+    // argv = [entry, taskId, model, baseURL, apiKeyEnv, providerName]. The
+    // subprocess reconstructs the adapter from these + the inherited apiKey env.
+    // SPAWN-1 (born-580, DEP0190 + ADR-006 parity with subprocess.ts): route
+    // through buildCliInvocation — `node` is a real binary on every platform so
+    // POSIX/win32 both stay byte-identical today, but this keeps every provider
+    // spawn on one cross-platform-safe invocation path (Law #2).
+    const inv = buildCliInvocation(
+      'node',
+      [this.workerEntryPath, taskId, String(model), this.baseURL, this.apiKeyEnv, this.name],
+      this.platform,
+    );
+
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
       stdio: ['ignore', logFd, logFd],
       env: { ...process.env, ...(opts?.env ?? {}) },
+      shell: inv.shell,
     };
 
-    // argv = [entry, taskId, model, baseURL, apiKeyEnv, providerName]. The
-    // subprocess reconstructs the adapter from these + the inherited apiKey env.
-    const child = this.spawnImpl(
-      'node',
-      [this.workerEntryPath, taskId, String(model), this.baseURL, this.apiKeyEnv, this.name],
-      spawnOpts,
-    );
+    const child = this.spawnImpl(inv.command, inv.args, spawnOpts);
     closeSync(logFd);
 
     this.writeHeartbeat(taskId, dir, 'EXECUTING');

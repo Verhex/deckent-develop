@@ -10,7 +10,7 @@ import { TerminalAudit, MemoryStoreAuditSink } from './terminal/audit.js';
 import { loadOrCreateAuditKey } from './terminal/audit-integrity.js';
 import { attachTerminalGateway } from './terminal/ws-gateway.js';
 import { OutboundLimiter } from './terminal/outbound-limiter.js';
-import type { CreateSessionInput, SessionKind, TenantId, SessionMeta } from './terminal/types.js';
+import type { AiTool, CreateSessionInput, SessionKind, TenantId, SessionMeta } from './terminal/types.js';
 import { z } from 'zod';
 import {
   DASHBOARD_FILE, BRAIN_DIR, SPRINTS_DIR, TASKS_DIR, LOCKS_DIR,
@@ -98,6 +98,16 @@ const TERMINAL_DEFAULT_IDLE_TIMEOUT_MS = 1_800_000;
 const TERMINAL_DEFAULT_SCROLLBACK_BYTES = 262_144;
 const TERMINAL_DEFAULT_ALLOW_SHELL_KIND = true;
 const TERMINAL_DEFAULT_OUTBOUND_QUOTA_BYTES = 1_073_741_824; // 1 GiB
+
+// AI-SESSION-TOOL-ALLOWLIST (born-565): `kind==='ai'` spawns the
+// client-supplied `tool` string directly as the executable file
+// (terminal/session-manager.ts KIND_CMD.ai: `file: i.tool ?? 'claude'`). The
+// `AiTool` union in terminal/types.ts is compile-time only and erases at
+// runtime — `input.tool as CreateSessionInput['tool']` was a type assertion,
+// not a check, so an unvalidated client string reached `spawn()` unchecked.
+// Runtime-mirrors the `AiTool` union so an unlisted value is rejected before
+// `terminalMgr.create()` is ever called (same shape as the shell-kind gate).
+const AI_SESSION_TOOL_ALLOWLIST = new Set<string>(['claude', 'gemini', 'codex'] satisfies AiTool[]);
 
 // ─── Rate Limiter ────────────────────────────────────────────────
 
@@ -1961,6 +1971,15 @@ export function createHttpServer(
           if (kind === 'shell' && !terminalAllowShellKind) {
             res.writeHead(403, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'shell session kind disabled by config' }));
+            return;
+          }
+          // AI-SESSION-TOOL-ALLOWLIST (born-565): reject an unlisted
+          // client-supplied `tool` BEFORE terminalMgr.create() ever runs, so
+          // an arbitrary string can never reach backend.spawn(). Omitted
+          // `tool` stays allowed — session-manager defaults it to 'claude'.
+          if (kind === 'ai' && input.tool !== undefined && !AI_SESSION_TOOL_ALLOWLIST.has(input.tool)) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'ai session tool not allowed' }));
             return;
           }
           try {

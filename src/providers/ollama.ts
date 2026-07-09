@@ -24,7 +24,7 @@ import type {
   ProviderSpawnOptions,
   ProviderAvailabilityDetail,
 } from '../core/provider.js';
-import { ProviderError } from '../core/provider.js';
+import { ProviderError, buildCliInvocation } from '../core/provider.js';
 import { TASKS_DIR } from '../core/constants.js';
 import type { ModelTier } from '../core/model-equivalence.js';
 import {
@@ -213,6 +213,13 @@ export class OllamaAdapter implements ProviderAdapter {
   private readonly spawnImpl: typeof spawn;
 
   /**
+   * Host platform — injectable so the win32 cmd.exe-wrapper spawn path
+   * (born-580, DEP0190 + ADR-006 parity with subprocess.ts) is testable
+   * without a real spawn. Defaults to `process.platform`.
+   */
+  private readonly platform: NodeJS.Platform;
+
+  /**
    * Cache of model ids returned by the live `/api/tags` probe (T-233-002).
    * Populated by `refreshSupportedModels()` and consulted by `isSupportedModel`
    * as a dynamic acceptance layer alongside the static catalog. `null` means
@@ -228,6 +235,7 @@ export class OllamaAdapter implements ProviderAdapter {
       fetchImpl?: typeof fetch;
       workerEntryPath?: string;
       spawnImpl?: typeof spawn;
+      platform?: NodeJS.Platform;
     },
   ) {
     this.projectDir = projectDir;
@@ -236,6 +244,7 @@ export class OllamaAdapter implements ProviderAdapter {
     this.fetchImpl = opts?.fetchImpl ?? ((...args) => fetch(...args));
     this.workerEntryPath = opts?.workerEntryPath ?? DEFAULT_WORKER_ENTRY_PATH;
     this.spawnImpl = opts?.spawnImpl ?? spawn;
+    this.platform = opts?.platform ?? process.platform;
   }
 
   // ─── spawn() ───────────────────────────────────────────────────────
@@ -276,17 +285,20 @@ export class OllamaAdapter implements ProviderAdapter {
     // timeout SIGKILL, kill SIGTERM, exit cleanup) is unchanged.
     const apiId = modelRegistry.get(model)?.apiId ?? model;
 
+    // SPAWN-1 (born-580, DEP0190 + ADR-006 parity with subprocess.ts): route
+    // through buildCliInvocation — `node` is a real binary on every platform so
+    // POSIX/win32 both stay byte-identical today, but this keeps every provider
+    // spawn on one cross-platform-safe invocation path (Law #2).
+    const inv = buildCliInvocation('node', [this.workerEntryPath, taskId, apiId, this.host], this.platform);
+
     const spawnOpts: NodeSpawnOptions = {
       cwd: dir,
       stdio: ['ignore', logFd, logFd],
       env: { ...process.env, ...(opts?.env ?? {}) },
+      shell: inv.shell,
     };
 
-    const child = this.spawnImpl(
-      'node',
-      [this.workerEntryPath, taskId, apiId, this.host],
-      spawnOpts,
-    );
+    const child = this.spawnImpl(inv.command, inv.args, spawnOpts);
     closeSync(logFd);
 
     this.writeHeartbeat(taskId, dir, 'EXECUTING');

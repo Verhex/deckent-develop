@@ -2,6 +2,23 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint390] - 2026-07-09
+
+### Added
+
+- born-501 — CLI-EPIPE-GRACEFUL — process-level EPIPE handler (P2)
+- born-576 — SDK-PACKAGE-EXPORTS — publish embeddable SDK entry in package.json (P2)
+- born-580 — PROVIDER-SPAWN-SAFE — bare spawn() → buildCliInvocation (P1, cross-platform Law#2)
+- born-500 — BRAIN-EXPORTS-FORMAT-AUDIT — format+consumer+size analizi (P1, doc)
+
+### Changed
+
+- born-565 — AI-SESSION-TOOL-ALLOWLIST — kind==='ai' client-tool validation (P1, güvenlik) (completed with tech debt)
+- born-579 — DOCTOR-PREFLIGHT-HONESTY — pre-flight npm-install honesty (P2) (completed with tech debt)
+
+
+_Tasks: 6 total, 6 done, 2 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint389] - 2026-07-08
 
 ### Added

@@ -1,5 +1,16 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-390 Learnings
+- Sprint sprint-390 Learnings: ## Sprint sprint-390 Learnings
+- born-565 — AI-SESSION-TOOL-ALLOWLIST — kind==='ai' client-tool validation (P1, güvenlik): GO_WITH_TECH_DEBT — Root cause confirmed by reading code: terminal/types.ts AiTool = 'claude'|'gemini'|'codex' is a TS-only union that erase
+- born-579 — DOCTOR-PREFLIGHT-HONESTY — pre-flight npm-install honesty (P2): GO_WITH_TECH_DEBT — Root cause: runPreFlightHealthCheck() (doctor-checks.ts:584, OUT of this task's write scope) spawns scripts/pre-flight-h
+
+## Gains
+- 390-001 — born-501 — CLI-EPIPE-GRACEFUL — process-level EPIPE handler (P2) — Added a module-scope 'error' listener on process.stdout and process.stderr in src/cli/entry.ts (n...
+- 390-003 — born-576 — SDK-PACKAGE-EXPORTS — publish embeddable SDK entry in package.json (P2) — Added "./sdk" subpath to package.json exports map -> { import: "./dist/sdk/index.js", types: "./d...
+- 390-005 — born-580 — PROVIDER-SPAWN-SAFE — bare spawn() → buildCliInvocation (P1, cross-platform Law#2) — Replaced all 5 bare spawn()/spawnImpl() call sites (codex.ts:191 spawn('codex',...), gemini.ts:30...
+- 390-006 — born-500 — BRAIN-EXPORTS-FORMAT-AUDIT — format+consumer+size analizi (P1, doc) — Completed comprehensive audit of .brain/exports/ directory.
+
 ## Sprint sprint-389 Learnings
 - Sprint sprint-389 Learnings: ## Sprint sprint-389 Learnings
 - born-583 — GOV-MINORS — plugin-sig + opaque-bearer + deny-list loopback (P2): GO_WITH_TECH_DEBT — HONESTY DISCLOSURE FIRST (LP-10 disk-verify): the raw finding source (born-backlog.json) referenced by DIRECTIVES.md is 

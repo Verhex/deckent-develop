@@ -9514,3 +9514,30 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 389-007: born-583 — GOV-MINORS — plugin-sig + opaque-bearer + deny-list loopback (P2) (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 390 — sprint-390
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-09
+**Duration:** 641s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 641190ms |
+
+### Tasks
+
+- 390-001: born-501 — CLI-EPIPE-GRACEFUL — process-level EPIPE handler (P2) (DONE)
+- 390-002: born-565 — AI-SESSION-TOOL-ALLOWLIST — kind==='ai' client-tool validation (P1, güvenlik) (GO_WITH_TECH_DEBT)
+- 390-003: born-576 — SDK-PACKAGE-EXPORTS — publish embeddable SDK entry in package.json (P2) (DONE)
+- 390-004: born-579 — DOCTOR-PREFLIGHT-HONESTY — pre-flight npm-install honesty (P2) (GO_WITH_TECH_DEBT)
+- 390-005: born-580 — PROVIDER-SPAWN-SAFE — bare spawn() → buildCliInvocation (P1, cross-platform Law#2) (DONE)
+- 390-006: born-500 — BRAIN-EXPORTS-FORMAT-AUDIT — format+consumer+size analizi (P1, doc) (DONE)
+
+---

@@ -899,6 +899,30 @@ if ((major ?? 0) < 24) {
   process.exit(1);
 }
 
+// ─── EPIPE Graceful Exit (born-501, CLI-EPIPE-GRACEFUL) ─────────────────────
+// A piped invocation (`deckent status | head`) closes its read end once the
+// downstream consumer is done — the next stdout/stderr write then fails with
+// EPIPE. Neither stream had an 'error' listener anywhere, so Node's
+// EventEmitter default (throw when no listener) turned that into an
+// uncaughtException, caught by installFatalHandlers (helpers/error-handler.ts,
+// wired from buildProgram()) — which prints a FATAL line AND persists a
+// crash-log under .deckent/crashes/. A closed downstream pipe is routine
+// shell plumbing, not a real crash (this accounted for ~80% of crash-logs) —
+// exit silently and cleanly instead. Any other stream error (disk full, EIO,
+// …) is re-thrown unchanged: a synchronous throw inside an EventEmitter
+// listener propagates out of emit() (Node does not swallow listener
+// exceptions), so it still surfaces as an uncaughtException and hits the
+// existing crash-log path unchanged.
+function handleStdStreamError(error: NodeJS.ErrnoException): void {
+  if (error.code === 'EPIPE') {
+    process.exit(0);
+    return;
+  }
+  throw error;
+}
+process.stdout.on('error', handleStdStreamError);
+process.stderr.on('error', handleStdStreamError);
+
 // ─── Unhandled Rejections ────────────────────────────────────────────────────
 process.on('unhandledRejection', (reason: unknown) => {
   handleCliError(reason);

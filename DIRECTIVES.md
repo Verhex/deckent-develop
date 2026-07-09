@@ -1,98 +1,97 @@
-# DIRECTIVES — SPRINT-6: REPL/CLI/API TAIL KESİTİ (7 task, dogfood-gate)
+# DIRECTIVES — SPRINT-7: GOV/API-SECURITY + CROSS-PLATFORM + NPM-CONSUMER TAIL (6 task, dogfood-gate)
 
 ## Goal
-Maraton (b): 7 OPEN born-item (dedup ∅ — 66 DONE'a karşı). REPL/CLI/api-governance polish kesiti.
-6 distinct-file paralel + 1 zincir (575→583 enterprise-endpoint serialize). prompt-gate (G1a/G1d/G1c)
-plan-time dogfood. git-guard CANLI. SSOT: `.analysis/deckent-marathon-loop-state.md`. Yasa #1/#2/#3.
+Maraton devam (loop-goal): 6 OPEN born-item (result-file dedup: 79 TRUE-DONE / 15 debt-landed / 39 OPEN → bu 6
+temiz+worker-uygun). 1 güvenlik (565 ai-session tool-allowlist) + 1 cross-platform Law#2 (580 provider spawn→
+buildCliInvocation) + 2 npm-consumer (576 SDK-exports · 579 doctor-honesty) + 1 robustness (501 EPIPE) + 1 audit
+(500 brain-exports, doc). 5 distinct-file paralel + 1 zincir (579→576 package.json serialize). prompt-gate
+(G1a/G1d/G1c) plan-time dogfood. git-guard CANLI. SSOT: `.analysis/deckent-marathon-loop-state.md`. Yasa #1/#2/#3.
 
 ## 🔒 BAĞLAYICI
-- **DISTINCT-FILE (KAPALI):** sprint-planner/result-evaluator/sprint-phases/result-collector/sprint-controller/server.ts/config.ts/routing-engine.ts/adr-selector.ts/prompt-gate.ts.
+- **DISTINCT-FILE (KAPALI):** sprint-planner/result-evaluator/sprint-phases/result-collector/sprint-controller/server.ts/config.ts/routing-engine.ts/adr-selector.ts/prompt-gate.ts. **565 = server.ts TEK-YAZAR** (bu sprint'te başka task server.ts'e dokunmaz).
 - **git stash/reset/checkout/clean YASAK** (born-499 guard; salt-oku `git show HEAD:<yol>`).
-- Her task kendi testi + hermetik (tmpdir/async spawn/no spawnSync/no gitignored-state). i18n getMessage.
+- Her task kendi testi + hermetik (tmpdir/async spawn/no spawnSync-in-test/no gitignored-state). i18n getMessage.
 - `notes` TEK STRING. Self DÜRÜST (LP-10 disk-verify). Surgical minimum-diff. Mevcut testleri bozma.
 
-## Task 1: born-529 — REPL-ERRORBOUNDARY-I18N — ReplErrorBoundary label prop (P3)
+## Task 1: born-501 — CLI-EPIPE-GRACEFUL — process-level EPIPE handler (P2)
 - Model: sonnet
-- Skills: typescript-expert, ink-tui, testing-expert
-- Files: src/cli/repl/run.tsx, tests/cli/repl-errorboundary-i18n.test.ts
-- Scope: src/cli/repl/, tests/cli/
-- Dependencies: none
-### Description
-ReplErrorBoundary kullanıcıya-görünen label'ı hardcode (i18n-ihlali). FIX: label'ı prop olarak enjekte et, caller `getMessage(key, lang)`'dan doldursun; mekanizma string-free kalsın (İngilizce default).
-### goNogo
-- goCriteria: ReplErrorBoundary label prop'tan gelir, hardcode string kalmaz (test); lang=tr → Türkçe render.
-- nogo: error-boundary davranışını (catch/fallback) değiştirme.
-
-## Task 2: born-530 — REPL-CLEAR-ANSI — /clear gerçek ANSI-clear + in-flight stream cancel (P2)
-- Model: sonnet
-- Skills: typescript-expert, ink-tui, testing-expert
-- Files: src/cli/repl/app.tsx, tests/cli/repl-clear-ansi.test.ts
-- Scope: src/cli/repl/, tests/cli/
-- Dependencies: none
-### Description
-/clear yalnız JS-transcript'i temizliyor; gerçek terminal ANSI-clear yok + in-flight stream iptal edilmiyor. FIX: /clear gerçek ANSI screen-clear yapsın + devam-eden stream'i iptal etsin. (513 /clear warm-child context fix'ini BOZMA — commit'li.)
-### goNogo
-- goCriteria: /clear → ekran ANSI-temizlenir + in-flight stream durur (test); normal-tur bozulmaz.
-- nogo: 513'ün warm-child context-reset'ini geri-alma.
-
-## Task 3: born-537 — EDIT-FILE-UNIQUE — edit_file unique-match/replace-all + empty-old error (P2)
-- Model: sonnet
+- Agent: api-builder
 - Skills: typescript-expert, testing-expert
-- Files: src/cli/commands/chat-tool-exec.ts, tests/cli/edit-file-unique.test.ts
-- Scope: src/cli/commands/, tests/cli/
+- Files: src/cli/entry.ts, tests/cli/epipe-graceful.test.ts
+- Scope: src/cli/, tests/cli/
 - Dependencies: none
 ### Description
-edit_file: (a) old_string birden çok eşleşince sessizce ilkini değiştiriyor (belirsizlik) · (b) replace-all yok · (c) boş old_string hata vermiyor. FIX: çoklu-eşleşmede hata (unique-ŞART) veya replace-all opsiyonu; boş old_string → açık hata. (536 symlink-resolution'ı BOZMA — commit'li.)
+`deckent status | head` gibi pipe-kesme kullanımında stdout/stderr EPIPE fırlıyor → crash-log üretiyor (crash-log'ların ~%80'i bu). FIX: process-seviyesi stdout/stderr `error`-handler ekle — `EPIPE`'te sessizce exit 0 (crash-log YAZMA); diğer hatalar mevcut davranışta kalsın. (Mevcut `process.on('unhandledRejection'/SIGTERM)` handler'larını BOZMA — entry.ts:903/1010 commit'li.)
 ### goNogo
-- goCriteria: çoklu-eşleşmeli old_string → hata/replace-all (test); boş old_string → açık hata; tek-eşleşme normal.
-- nogo: 536'nın fs.realpath scope-kontrolünü geri-alma.
+- goCriteria: stdout/stderr EPIPE → sessiz exit 0, crash-log yok (test: pipe-close simüle → no throw / no crash-log write); EPIPE-dışı stream-error mevcut davranışta.
+- nogo: unhandledRejection/signal handler'larını değiştirme; tüm hataları yutma (yalnız EPIPE).
+- Smoke: `node dist/cli/entry.js status --json | head -1` → EPIPE crash-log YOK, exit 0.
 
-## Task 4: born-541 — RENDER-REGION-SAFEPROMPT — safePrompt narrow catch (P3)
+## Task 2: born-565 — AI-SESSION-TOOL-ALLOWLIST — kind==='ai' client-tool validation (P1, güvenlik)
 - Model: sonnet
-- Skills: typescript-expert, ink-tui, testing-expert
-- Files: src/cli/commands/chat-render-region.ts, tests/cli/render-region-safeprompt.test.ts
-- Scope: src/cli/commands/, tests/cli/
+- Agent: api-builder
+- Skills: typescript-expert, secure-coding, testing-expert
+- Files: src/api/server.ts, tests/api/ai-session-tool-allowlist.test.ts
+- Scope: src/api/, tests/api/
 - Dependencies: none
 ### Description
-`safePrompt` geniş catch-all ile tüm hatayı yutuyor (gerçek-hata gizleniyor). FIX: catch'i daralt — yalnız beklenen prompt-hatasını yut, beklenmeyen hatayı yeniden-fırlat/logla. (540 writeAbove full-clear'ı BOZMA — commit'li.)
+`POST /api/terminal/sessions` — `kind==='shell'` için config-gate var (server.ts:1961) ama `kind==='ai'` için client-supplied `input.tool` string'i allowlist/deny-list doğrulaması OLMADAN `terminalMgr.create({ tool: input.tool })`'e ulaşıyor → keyfi tool spawn riski. FIX: `kind==='shell'`'e uygulanan aynı tool-allowlist/deny-list doğrulamasını `kind==='ai'` (ve genel olarak tüm kind) için de uygula — doğrulanmamış client-tool string'i ASLA `spawn()`'a ulaşmasın; reddedince 400/403 + net hata. (357-009 shell-kind config-gate'ini BOZMA — commit'li.)
 ### goNogo
-- goCriteria: beklenmeyen hata safePrompt tarafından yutulmaz (test, re-throw/log); beklenen prompt-abort normal ele alınır.
-- nogo: 540'ın writeAbove clear'ını geri-alma.
+- goCriteria: `kind==='ai'` + allowlist-dışı `tool` → 400/403 reddi (test, gerçek HTTP round-trip veya handler-invoke); allowlist-içi tool normal geçer; shell-kind gate bozulmaz.
+- nogo: terminal session şemasını yeniden-tasarlama; server.ts'in başka bölümüne dokunma (tek-yazar).
+- Smoke: `POST /api/terminal/sessions {kind:'ai', tool:'<disallowed>'}` → reddedilir (spawn'a ulaşmaz).
 
-## Task 5: born-548 — CRED-RESOLUTION — Gemini env + deepseek/qwen/glm .deck cred (P2)
+## Task 3: born-576 — SDK-PACKAGE-EXPORTS — publish embeddable SDK entry in package.json (P2)
 - Model: sonnet
+- Agent: api-builder
+- Skills: typescript-expert, testing-expert
+- Files: package.json, tests/sdk/package-exports.test.ts
+- Scope: ./, tests/sdk/
+- Dependencies: none
+### Description
+Gömülebilir SDK kod-tam ama package.json `exports` haritası public entry-point'i YAYINLAMIYOR → dış npm-tüketici `import { createDeckentClient } from 'deckent'` yapamaz (yalnız in-repo CLI/test çalışır). FIX: SDK'nın public entry-point'ini `exports` map'e ekle (mevcut `"main": "./dist/index.js"` + `"exports"` bloğu ile tutarlı; alt-path gerekiyorsa `"./sdk"` veya uygun subpath). Var olan export'ları BOZMA. (SDK giriş-noktasını `src/`de doğrula — spec code-complete diyor; yanlış-path verme.)
+### goNogo
+- goCriteria: package.json `exports` SDK-entry içerir (test: `exports` map'ten SDK subpath çözülür + hedef dosya var); mevcut CLI/bin export'ları korunur; JSON geçerli.
+- nogo: mevcut export/bin/main girişlerini kaldırma; olmayan bir entry-point uydurma (önce dosyayı doğrula).
+- Smoke: `node -e "require('./package.json').exports"` → SDK-entry görünür; hedef dist-dosyası mevcut.
+
+## Task 4: born-579 — DOCTOR-PREFLIGHT-HONESTY — pre-flight npm-install honesty (P2)
+- Model: sonnet
+- Agent: api-builder
+- Skills: typescript-expert, testing-expert
+- Files: src/cli/commands/doctor.ts, package.json, tests/cli/doctor-preflight-honesty.test.ts
+- Scope: src/cli/commands/, ./, tests/cli/
+- Dependencies: Task 3
+### Description
+`doctor --pre-flight` (doctor.ts:2260) npm-kurulu setup'larda sessizce devre-dışı (gereken `scripts/` yayınlanmıyor). FIX: ya `scripts/`'i package.json `files`'a ekleyip npm-tüketicide pre-flight çalışsın, YA da doctor --pre-flight bu install-modunda "check bu kurulumda mevcut değil" diye DÜRÜSTÇE raporlasın (sessizce skip ETME). Dürüst-rapor yolu tercih (minimum-diff, davranış-korur). (package.json'a 576 SDK-exports'undan SONRA dokun — zincir; `files`/`exports` çakışmasın. Mevcut doctor çıktılarını BOZMA — doctor.ts:630.)
+### goNogo
+- goCriteria: npm-install-modunda `doctor --pre-flight` ya çalışır ya "unavailable in this install mode" DÜRÜST raporlar (test: script-yokluğu simüle → honest-message, sessiz-skip yok); dev-modda mevcut davranış korunur.
+- nogo: 576'nın exports değişikliğini geri-alma (package.json zincir); doctor'un diğer alt-komutlarını değiştirme.
+- Smoke: `node dist/cli/entry.js doctor --pre-flight` → çalışır VEYA net "unavailable in npm-install" mesajı (sessiz-skip yok).
+
+## Task 5: born-580 — PROVIDER-SPAWN-SAFE — bare spawn() → buildCliInvocation (P1, cross-platform Law#2)
+- Model: sonnet
+- Agent: bug-fixer
 - Skills: typescript-expert, provider-cli-matrix, testing-expert
-- Files: src/cli/entry.ts, src/cli/repl/native-transport.ts, tests/cli/cred-resolution.test.ts
-- Scope: src/cli/, src/cli/repl/, tests/cli/
+- Files: src/providers/codex.ts, src/providers/gemini.ts, src/providers/ollama.ts, src/providers/openai-compatible.ts, src/providers/openrouter.ts, tests/providers/spawn-safe-crossplatform.test.ts
+- Scope: src/providers/, tests/providers/
 - Dependencies: none
 ### Description
-Cred-resolution eksik: Gemini env-var yolu + deepseek/qwen/glm için `.deck` secret çözümü kapsanmıyor. FIX: bu provider'lar için cred-resolution'ı `.deck`→env deseniyle tamamla (mevcut applyDeckSecretsToEnv deseni). (547 NDJSON-fallback'i BOZMA — commit'li.)
+Windows-native kırılma kümesi (Law #2): provider adapter'ları çıplak `spawn('codex'/'gemini'/'ollama', …)` kullanıyor (codex.ts:191, gemini.ts:304, ollama.ts:243 + openai-compatible/openrouter) → Windows-native'de `.cmd`/PATH-resolution kırılır. FIX: her çıplak `spawn(<bin>, …)`'ı `src/core/provider.ts`'teki mevcut+doğru `buildCliInvocation()` deseniyle değiştir (shell-safe, cross-platform CLI-invocation; başka yerlerde zaten kullanılıyor). Davranışı KORU — yalnız invocation-katmanı cross-platform-güvenli olsun. (Orchestra spawn-site'ları — sprint-job-runner/sprint-finalizer — bu task'ta DEĞİL, loop-machinery; ayrı el-inceleme.)
 ### goNogo
-- goCriteria: deepseek/qwen/glm `.deck` secret'ları env'e çözülür (test); Gemini env-var yolu çalışır; mevcut provider'lar bozulmaz.
-- nogo: secret'ları log'a yazma (scrub koru).
+- goCriteria: 5 provider'daki çıplak spawn → buildCliInvocation (test: invocation Windows-path/`.cmd` deseninde güvenli çözülür; mevcut arg-geçişi korunur); Linux/macOS davranışı bozulmaz.
+- nogo: orchestra spawn-site'larına (sprint-job-runner.ts/sprint-finalizer.ts) dokunma; provider protokol/arg-semantiğini değiştirme.
+- Smoke: `node -e "import('./dist/providers/codex.js')"` → import temiz; buildCliInvocation refere edilir (grep).
 
-## Task 6: born-575 — ENT-RBAC-ROUNDTRIP — enterprise RBAC/rate write-then-read round-trip (P2)
-- Model: sonnet
-- Agent: api-builder
-- Skills: typescript-expert, secure-coding, testing-expert
-- Files: src/api/enterprise-endpoint.ts, tests/api/ent-rbac-roundtrip.test.ts
-- Scope: src/api/, tests/api/
+## Task 6: born-500 — BRAIN-EXPORTS-FORMAT-AUDIT — format+consumer+size analizi (P1, doc)
+- Model: haiku
+- Agent: documentation-writer
+- Skills: documentation-writer
+- Files: .analysis/brain-exports-format-audit-2026-07-09.md
+- Scope: .analysis/
 - Dependencies: none
 ### Description
-enterprise-endpoint RBAC/rate write-then-read round-trip'i eksik/tutarsız (yazılan rol/limit geri-okunmuyor). FIX: RBAC-rol + rate-limit write→read round-trip'i tutarlı yap (yazılan hemen okunur).
+`.brain/exports/` (decisions.md **488KB**, memory.md 223KB, debt.md 20KB, summary.md 7.5KB) format+fonksiyon+per-consumer-gereklilik+size/truncation-politikası+DB↔FS-sync-kontratı analizi. Tüketiciler (doctor + adr-validator/memory-import + CLAUDE.md-include + bot + goal-planner) doğrulanmış → **dosyalar SİLİNMEZ**. Deliverable: `.analysis/brain-exports-format-audit-2026-07-09.md` — her dosyanın (a) formatı (b) hangi tüketici okur (c) size/truncation önerisi (özellikle 488KB decisions.md) (d) DB↔FS sync-kontratı. Yalnız ANALİZ + öneri; kod/dosya değişikliği YOK.
 ### goNogo
-- goCriteria: RBAC-rol write → read aynı-değeri döner (test, round-trip); rate-limit aynı; server.ts'e dokunma.
-- nogo: enterprise şemasını yeniden-tasarlama.
-
-## Task 7: born-583 — GOV-MINORS — plugin-sig + opaque-bearer + deny-list loopback (P2)
-- Model: sonnet
-- Agent: api-builder
-- Skills: typescript-expert, secure-coding, testing-expert
-- Files: src/api/enterprise-endpoint.ts, tests/api/gov-minors.test.ts
-- Scope: src/api/, tests/api/
-- Dependencies: Task 6
-### Description
-enterprise-endpoint governance minör-küme: (a) plugin-signature doğrulama gap · (b) opaque-bearer token karşılaştırma timing-unsafe (`===`) · (c) deny-list loopback (127.0.0.1/::1) bypass. FIX: her birini kapat — plugin-sig doğrula, opaque-bearer `crypto.timingSafeEqual`, loopback'i deny-list'e dahil et. (575 RBAC round-trip'i BOZMA — aynı dosya, zincir.) [Not: bot SAFE/RISKY connectors-parçası ayrı-born'a bırakıldı — dosya-belirsizliği/orphan-risk.]
-### goNogo
-- goCriteria: opaque-bearer `timingSafeEqual` kullanır (test); loopback deny-list bypass edilemez; plugin-sig doğrulanır; server.ts'e dokunma.
-- nogo: 575'in RBAC round-trip'ini geri-alma.
+- goCriteria: audit-md 4 export-dosyasını kapsar (format+consumer+size-öneri+sync-kontrat); decisions.md 488KB için somut truncation/pagination önerisi içerir; hiçbir export-dosyası silinmez/değişmez.
+- nogo: `.brain/exports/` veya `.brain/memory.db`'ye dokunma; kod değiştirme (salt-doc).

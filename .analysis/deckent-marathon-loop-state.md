@@ -60,6 +60,11 @@
 > - **Greenfield (mimari-karar):** 496 Electron · 497 enterprise-extraction.
 > - **Belirsiz/büyük:** 517 i18n-sweep (i18n-lint ZATEN temiz → değer-belirsiz, önce doğrula) · 494 dash-perf (vite-fiddly) · 502 builtins-reconcile (canonical-karar).
 > **Devam için:** born-worker-sprint yeni-clean-item kalmadı; sıradaki ilerleme ya hot-file-governance (BEN, oversight'la) ya greenfield (mimari) ya routing-flip (karar). Alperen yön versin.
+>
+> ### 🔄 LOOP-RESUME (2026-07-09, Alperen "işleri loop goal olarak devam et") — result-file dedup ground-truth
+> **Düzeltilmiş dedup (result-file bazlı, grep DEĞİL — advisor blocking-emphasis):** tüm `.brain/archive/sprints/*/task-*.{json,result}` tarandı → title→primary-born + `selfAssessment==DONE && filesChanged-nonempty`. Sonuç: **79 TRUE-DONE · 15 debt-landed (GO_WITH_TECH_DEBT+tests-pass+disk = dedup'ta DONE-say, 386-israfı riski) · 39 OPEN.** Wind-down'ın "temiz-item kalmadı"ı ~doğru: 387 gerçekten 510/511/519/520/532/542/550/552/564/567/568/571/577/581'i KAPATMIŞ (önceki overcount-liste yanlıştı).
+> **39 OPEN sınıflaması:** temiz-worker(~6: 501·565·576·579·580·500) · governance-HOT-park(560·562·582·565-partial) · greenfield-park(496·497·502) · Alperen-gated(63·202·488·498·477·64·82·490) · big-partial(83·493·503·563 debt-landed-kısmi) · doc(489·495·507·500) · defer(572 server.ts-çift-owner · 570 no-file/karar · 494 vite · 517 lint-clean-belirsiz).
+> **Sprint-390 (S7) authored:** 501·565·576·579·580·500 — result-dedup∅, plan-gate TEMIZ (persona WARN yok: api-builder×4 cli/api + bug-fixer providers + documentation-writer doc), zincir 004←003 (package.json), 565=server.ts tek-yazar. **Bu muhtemelen son saf-worker-sprint** (kalan=governance/greenfield/karar → honest wind-down, busywork-padding YOK — advisor).
 | Sprint | Tema | Task/Wave | Sonuç (DONE/DEBT/NO_GO) | Commit | born-devir | Usage-sonrası |
 |---|---|---|---|---|---|---|
 | — | (kurulum) | born-backlog inşası | — | 101da0d9·ef8d4acd | — | Fable %75 |

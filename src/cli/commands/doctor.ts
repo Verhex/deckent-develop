@@ -1726,6 +1726,31 @@ export function runDoctorChecks(root: string, providerNames?: string[], spawnBac
 export type { PreFlightResult, PreFlightCheckResult };
 export { runPreFlightHealthCheck };
 
+// born-579 (task 390-004): scripts/ is not in package.json `files`, so an
+// npm-installed consumer never has scripts/pre-flight-health-check.mjs on
+// disk. runPreFlightHealthCheck() used to spawn it anyway, get an empty
+// stdout on failure, and silently fall back to generic runDoctorChecks()
+// results mislabeled as the extended pre-flight check. Report the missing
+// capability honestly instead of substituting an unrelated check set. Dev
+// checkouts (where the script exists) are unaffected — same delegation as
+// before.
+export function resolvePreFlightResult(root: string): PreFlightResult {
+  const scriptPath = join(root, 'scripts', 'pre-flight-health-check.mjs');
+  if (!existsSync(scriptPath)) {
+    return {
+      passed: true,
+      abortSprint: false,
+      checks: [{
+        name: 'pre-flight-script',
+        passed: false,
+        required: false,
+        message: 'Unavailable in this install mode: scripts/pre-flight-health-check.mjs is not published to the npm package. Run `deckent doctor --pre-flight` from a deckent development checkout for full coverage.',
+      }],
+    };
+  }
+  return runPreFlightHealthCheck(root);
+}
+
 export interface RamExperimentReport {
   hostGB: number;
   source: string;
@@ -2258,7 +2283,7 @@ export function registerDoctor(program: Command): void {
 
       // --pre-flight: run extended pre-flight check and exit with abort signal
       if (opts.preFlight) {
-        const preFlightResult = runPreFlightHealthCheck(root);
+        const preFlightResult = resolvePreFlightResult(root);
         if (opts.json) {
           print(JSON.stringify(preFlightResult, null, 2));
           process.exitCode = preFlightResult.abortSprint ? 1 : 0;

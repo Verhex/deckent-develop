@@ -51,6 +51,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-390 Learnings** (sprint-390): ## Sprint sprint-390 Learnings
+- born-565 — AI-SESSION-TOOL-ALLOWLIST — kind==='ai' client-tool validation (P1, güven...
 - **Sprint sprint-389 Learnings** (sprint-389): ## Sprint sprint-389 Learnings
 - born-583 — GOV-MINORS — plugin-sig + opaque-bearer + deny-list loopback (P2): GO_WIT...
 - **Sprint sprint-388 Learnings** (sprint-388): ## Sprint sprint-388 Learnings
@@ -71,8 +73,6 @@
 - born-558 — SKILL-LIST-V2-CRASH — `deckent skill list` v2-manifest'te exit 1: GO_WITH...
 - **Sprint sprint-379 Learnings** (sprint-379): ## Sprint sprint-379 Learnings
 - DOCS-NUM-TRUTH — README/DECKENT sayı-ve-dil doğruluğu: GO_WITH_TECH_DEBT — Ground-tr...
-- **Sprint sprint-378 Learnings** (sprint-378): ## Sprint sprint-378 Learnings
-- RUN-CLI-ALIAS — `deckent run` çatı-komutu + sprint-alias: GO_WITH_TECH_DEBT — Conver...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -133,4 +133,4 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 
-_Total entries: 1106 | Generated: 2026-07-08_
+_Total entries: 1111 | Generated: 2026-07-09_
