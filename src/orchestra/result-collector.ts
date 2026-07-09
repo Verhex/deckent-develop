@@ -135,15 +135,24 @@ export function costGuardShouldComplete(
   return stopped && collectedCount >= totalCount - stillPendingCount;
 }
 
+/**
+ * born-562 enabled-path — injectable cost-guard options for hermetic tests:
+ * `getLimitCost` replaces the real transcript-ledger read, `intervalMs` shrinks
+ * the 60s monitor tick. Type-only import — erased at emit, no runtime cycle.
+ */
+export type CostGuardWaitOpts =
+  import('./sprint-phases.js').CostGuardOpts & { intervalMs?: number };
+
 export async function loadCostGuardMonitor(
   projectRoot: string,
   sprintId: string,
   config: ResolvedConfig,
+  opts?: CostGuardWaitOpts,
 ): Promise<import('./sprint-phases.js').CostGuardMonitor | undefined> {
   if (config.cost_guard?.enabled !== true) return undefined;
   try {
     const mod = await import('./sprint-phases.js');
-    const monitor = mod.createCostGuardMonitor(projectRoot, sprintId, config);
+    const monitor = mod.createCostGuardMonitor(projectRoot, sprintId, config, opts);
     monitor.start();
     return monitor;
   } catch (e) {
@@ -777,6 +786,9 @@ export function buildSpawnWriteTargets(task: Pick<Task, 'scope'>): string[] {
  * @param queue - Optional queued tasks to spawn as slots open
  * @param spawnOpts - Optional spawn settings for queued task execution
  * @param channelRegistry - Optional IPC channel registry for heartbeat wakeups
+ * @param config - Optional resolved config (dispatch pipeline, cost guard, …)
+ * @param costGuardOpts - born-562 test seam: injectable getLimitCost + intervalMs
+ *   for the mid-sprint cost-guard monitor. Production callers omit it.
  * @returns Array of collected task results
  */
 export async function waitForResults(
@@ -787,6 +799,7 @@ export async function waitForResults(
   spawnOpts?: { autoApprove?: boolean; spawnBackend?: SpawnBackend },
   channelRegistry?: ChannelRegistry,
   config?: ResolvedConfig,
+  costGuardOpts?: CostGuardWaitOpts,
 ): Promise<TaskResult[]> {
   // 0 = unlimited (no timeout). undefined falls back to 30min for backward compat.
   const timeout = timeoutMs !== undefined ? timeoutMs : 30 * 60 * 1000;
@@ -1187,6 +1200,12 @@ export async function waitForResults(
   // durable respawn-REQUEST; here — inside this loop, opt-in via
   // config.nervous_system.worker_respawn — we drain it and re-spawn the stale
   // task through the controller's OWN idempotent single-task spawn. No race.
+  //
+  // born-562 enabled-path: `costGuard` is declared here (assigned right before
+  // the main loop) so this closure can consult it — spawnIfNotAssigned bypasses
+  // the main-loop dispatch gate, so without this check a nervous respawn would
+  // spawn a NEW worker after a cost stop.
+  let costGuard: import('./sprint-phases.js').CostGuardMonitor | undefined;
   const drainNervousRespawns = async (): Promise<void> => {
     if (!config?.nervous_system?.worker_respawn) return;
     for (const reqTaskId of drainRespawnRequests(projectRoot)) {
@@ -1206,6 +1225,15 @@ export async function waitForResults(
       }
       assignedTaskIds.delete(reqTaskId);
       task.status = TaskStatus.PENDING;
+      // born-562 enabled-path: under a cost stop, kill the stale (token-burning)
+      // worker but do NOT respawn — the task stays PENDING so it counts into
+      // stillPending and costGuardShouldComplete can fire (otherwise the loop
+      // waits on it forever under sprint_timeout_minutes:0). NOTE: unlike a
+      // never-dispatched task, this one HAS .hb/.log traces, so EVALUATE
+      // classifies it SYNTHETIC_NO_GO (not NOT_DISPATCHED) and the FIX phase
+      // may spawn ONE ungated fix worker afterwards — a bounded, documented
+      // leak (FIX-phase cost gating is a separate follow-up).
+      if (costGuard?.shouldStopDispatch()) continue;
       await spawnIfNotAssigned(task);
     }
   };
@@ -1449,7 +1477,9 @@ export async function waitForResults(
   let lastTickErrorSignature: string | null = null;
   // born-562 — mid-sprint cost guard (opt-in via config.cost_guard.enabled).
   // Undefined + fully inert when disabled (the default) → zero behavior change.
-  const costGuard = config ? await loadCostGuardMonitor(projectRoot, sprint.id, config) : undefined;
+  // Declared above the drain closure (let-hoist); assigned here, AFTER the
+  // early all-collected return, so a no-loop call never leaks the interval.
+  costGuard = config ? await loadCostGuardMonitor(projectRoot, sprint.id, config, costGuardOpts) : undefined;
   try {
     while (unlimited || Date.now() - startTime < timeout) {
       ipcWakeupPromise = makeIpcWakeupPromise();
