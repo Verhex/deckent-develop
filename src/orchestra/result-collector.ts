@@ -104,6 +104,31 @@ async function loadRespawn(): Promise<typeof RespawnFn> {
   return cachedRespawn;
 }
 
+// born-562 — lazy mid-sprint cost-guard monitor loader. The dynamic import
+// breaks the result-collector ↔ sprint-phases init cycle (mirrors loadRespawn
+// above: sprint-phases imports waitForResults from here). Returns undefined when
+// the guard is disabled (config.cost_guard.enabled !== true — the default) so
+// the wait loop pays ZERO cost: no import, no setInterval, and the dispatch gate
+// stays permanently open. Only an explicitly-enabled guard creates + starts a
+// monitor. Fail-safe: an import/create error leaves the monitor undefined (guard
+// off) rather than breaking the loop.
+export async function loadCostGuardMonitor(
+  projectRoot: string,
+  sprintId: string,
+  config: ResolvedConfig,
+): Promise<import('./sprint-phases.js').CostGuardMonitor | undefined> {
+  if (config.cost_guard?.enabled !== true) return undefined;
+  try {
+    const mod = await import('./sprint-phases.js');
+    const monitor = mod.createCostGuardMonitor(projectRoot, sprintId, config);
+    monitor.start();
+    return monitor;
+  } catch (e) {
+    debugLog('waitForResults:costGuardLoad', e);
+    return undefined;
+  }
+}
+
 // Sprint 165 Bug Y — lazy helpers for processQueue stall fix
 let cachedComputeSlots: typeof ComputeSlotsFn | undefined;
 let cachedSelectEligible: typeof SelectEligibleFn | undefined;
@@ -1399,6 +1424,9 @@ export async function waitForResults(
   // right place to report it.
   let consecutiveTickErrors = 0;
   let lastTickErrorSignature: string | null = null;
+  // born-562 — mid-sprint cost guard (opt-in via config.cost_guard.enabled).
+  // Undefined + fully inert when disabled (the default) → zero behavior change.
+  const costGuard = config ? await loadCostGuardMonitor(projectRoot, sprint.id, config) : undefined;
   try {
     while (unlimited || Date.now() - startTime < timeout) {
       ipcWakeupPromise = makeIpcWakeupPromise();
@@ -1409,18 +1437,26 @@ export async function waitForResults(
         // N3: action any cooperative nervous respawn-requests before dispatch (no-op
         // unless config.nervous_system.worker_respawn). Single-owner — no race.
         await drainNervousRespawns();
-        // ADR-064 (TOPP B): unified dispatch tick — main loop spawn entry.
-        // Continuous dispatch — re-evaluate eligible Wave N+1 tasks each
-        // tick when dependency_pipeline_enabled is true; honor
-        // DECKENT_LEGACY_FIFO=1 rollback escape inside dispatchTick itself.
-        await dispatchTick(newlyCollected);
-        // Sprint 165 Bug Y — force re-scan idle slots for hayalet PENDING tasks
-        // (legacy FIFO mode and dependency pipeline mode both benefit).
-        await forceRescanIfIdle();
-        // Sprint 272 T2 — dispatch dependency-just-satisfied PENDING tasks NOW so
-        // the collection-done check below is only reached once every ready task
-        // is dispatched-and-awaited (never a synthetic NO_GO for unran work).
-        await dispatchReadyTasks();
+        // born-562: skip ALL new-task dispatch when the mid-sprint cost guard has
+        // tripped (sprint limit-cost >= config.cost_guard.max_limit_cost_usd).
+        // In-flight workers finish; un-dispatched PENDING tasks then finalize as
+        // NOT_DISPATCHED via the existing deadline path. Inert when the guard is
+        // disabled (costGuard undefined → the condition is always true), so the
+        // default dispatch sequence below is byte-for-byte unchanged.
+        if (!costGuard || !costGuard.shouldStopDispatch()) {
+          // ADR-064 (TOPP B): unified dispatch tick — main loop spawn entry.
+          // Continuous dispatch — re-evaluate eligible Wave N+1 tasks each
+          // tick when dependency_pipeline_enabled is true; honor
+          // DECKENT_LEGACY_FIFO=1 rollback escape inside dispatchTick itself.
+          await dispatchTick(newlyCollected);
+          // Sprint 165 Bug Y — force re-scan idle slots for hayalet PENDING tasks
+          // (legacy FIFO mode and dependency pipeline mode both benefit).
+          await forceRescanIfIdle();
+          // Sprint 272 T2 — dispatch dependency-just-satisfied PENDING tasks NOW so
+          // the collection-done check below is only reached once every ready task
+          // is dispatched-and-awaited (never a synthetic NO_GO for unran work).
+          await dispatchReadyTasks();
+        }
         await cascadeSkipDeadBlocked();
         consecutiveTickErrors = 0;
         lastTickErrorSignature = null;
@@ -1460,6 +1496,7 @@ export async function waitForResults(
     }
   } finally {
     watcher.close();
+    costGuard?.stop();
   }
   // Final sweep: collect any real .result files written during/after the last poll cycle
   // Note: Only read .result files here (not .timeout) to avoid side effects in edge cases
