@@ -143,6 +143,7 @@ import { metric } from '../core/observability.js';
 // ─── Collision Detection (Sprint 138 ADR-035) ──────────────────
 import { detectScopeCollisions } from './conflict-resolver.js';
 import { writeEvent, CHANNELS, getCurrentSprintId, readSequence } from './event-stream.js';
+import { collectRbacBlockedTaskIds } from './sprint-runtime.js';
 
 // ─── Decision Engine (Sprint 168 W2.5 — C0c wire) ──────────────
 // Wire: handleScopeCollision() is the pure decision function from C0c RC2.
@@ -504,6 +505,22 @@ export async function spawnWorkers(
     // FIX-5: no collisions this tick → clear the debounce so a future collision
     // (even one with an identical signature) re-emits exactly once.
     lastCollisionSignature = null;
+  }
+
+  // ─── RBAC Authority Gate (born-560, ADR-037 spawn-MAINLINE wire) ─────────────
+  // checkSprintSpawnRbac was wired only into the autonomous runtime-loop
+  // (enforceEntryRbac, kind=sprint); the normal `deckent start` SPAWN mainline
+  // never ran the ADR-037 authority matrix. Wire it here through the same
+  // helper. Dormant by default: config.enforce_rbac=false → soft-warn + audit,
+  // allowed, nothing deferred (dogfood behaviour unchanged). A task with no
+  // actor.role always permits (permissive default). Only enforce_rbac=true
+  // HARD-defers a task whose actor.role lacks a scope-inferred capability —
+  // added to blockedTaskIds so it is skipped exactly like a scope-collision
+  // loser and re-dispatches on a later wave if policy later permits.
+  const rbacSprintId = getCurrentSprintId(projectRoot) ?? sprint.id;
+  for (const id of collectRbacBlockedTaskIds(normalizedPendingTasks, config, { projectRoot, sprintId: rbacSprintId })) {
+    blockedTaskIds.add(id);
+    debugLog('spawnWorkers:rbac-blocked', `Task ${id} deferred by ADR-037 authority gate (enforce_rbac)`);
   }
 
   // Dependency pipeline guard: when enabled, only spawn tasks whose dependencies are all DONE

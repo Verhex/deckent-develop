@@ -72,8 +72,11 @@ export interface ExecutionRequestInput {
   budget?: ExecutionBudget;
 }
 
-/** Infer the capability/resource profile from scope (minimal, extensible). */
-function inferRequirements(scope: TaskScope): RequirementProfile {
+/** Infer the capability/resource profile from scope (minimal, extensible).
+ *  Exported (born-560) as the canonical scope→capability mapping so the SPAWN
+ *  mainline RBAC gate derives a task's required capabilities identically to
+ *  buildExecutionRequest — no second, drifting derivation. */
+export function inferRequirements(scope: TaskScope): RequirementProfile {
   const capabilities: Capability[] = ['fs-read'];
   if ((scope.filesWrite?.length ?? 0) > 0 || (scope.directories?.length ?? 0) > 0) {
     capabilities.push('fs-write');
