@@ -30,7 +30,8 @@
 - **Usage baseline (07-08):** session %38 (reset bu gece 02:20) · hafta-tümü %59 · **hafta-Fable %75** (reset 13 Tem 20:00). Headroom ~%20 Fable.
 
 ## born-backlog SSOT
-`.../scratchpad/born-backlog.json` — **103 madde** (14 P0 · 40 P1 · 37 P2 · 12 P3); 76 yeni born-508…583 + 27 mevcut MASTER-PLAN'a katlı. Tüm 118 REPL bulgusu hesapta (2 refute-drop, 1 downgrade). Disk-verify-çelişkili "DONE" satırlar ayrı-born (WorkerApprovalGate 34/70, TERM-RPC 54, F2-008 60, DEFER-002 75).
+**`.analysis/born-backlog.json` (2026-07-09'da repo'ya KALICILAŞTIRILDI — eski konum session-scratchpad'iydi, reboot'ta kayıp riski vardı)** — **103 madde** (14 P0 · 40 P1 · 37 P2 · 12 P3); 76 yeni born-508…583 + 27 mevcut MASTER-PLAN'a katlı. Tüm 118 REPL bulgusu hesapta (2 refute-drop, 1 downgrade). Disk-verify-çelişkili "DONE" satırlar ayrı-born (WorkerApprovalGate 34/70, TERM-RPC 54, F2-008 60, DEFER-002 75).
+**🔄 TAZE DEDUP (2026-07-09, result-file ground-truth — `.analysis/born-dedup-2026-07-09.json`, her born tek-sınıf):** **71 TRUE-DONE (DONE+filesChanged) · 11 debt-landed (DONE-say) · 21 OPEN.** 21 OPEN'da **temiz-worker adayı YOK** (wind-down #2 teyit): Alperen-gated/karar 63·64·82·202·477·488·490·498·502·572 · greenfield 496·497 (mimari-plan ajanları koşuyor) · governance-hot 560·562(kalan=ApprovalExpiryDriver BLOKELİ)·582 · doc 489(migration-gated)·495·507 · belirsiz 85(AGSK-1 dilim)·494(vite)·517(lint-clean-belirsiz).
 
 ## 🎯 MARATHON GOAL — otonom loop (kalan iş; 2026-07-08 gece, Alperen "goal'e ekle" + "goal'a başla dediğimde koş")
 > **Tetik:** Alperen "goal'a başla" DEYİNCE otonom loop koşar (yatıyor; build gerektikçe BEN yaparım, /mcp restart gereksiz — CLI'dan güncel-dist okur). Başlamadan bu goal + teyit hazır. Sıra: **(a) prompt-gate G-serisi el-kod → (c) governance-wire el-kod → (b) born-sprint döngüsü** (dogfood-gate ile).

@@ -1,0 +1,1846 @@
+[
+  {
+    "born_id": 62,
+    "title": "F11-016: finish Ink REPL stabilization — wire cursor-model.ts + close remaining known REPL correctness bugs",
+    "sources": [
+      "masterplan:62(F11-016)",
+      "repl:src/cli/repl/line-edit.ts:59",
+      "repl:src/cli/repl/line-edit.ts:80",
+      "repl:src/cli/repl/stream-segmenter.ts:80",
+      "repl:src/cli/repl/input-bar.tsx:98",
+      "repl:src/cli/repl/input-queue.ts:59",
+      "repl:src/cli/repl/line-edit.ts:55",
+      "repl:src/cli/repl/stream-segmenter.ts:83",
+      "repl:src/cli/repl/dual-stream.ts:54",
+      "repl:src/cli/repl/app.tsx:824"
+    ],
+    "severity": "P1",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/repl/line-edit.ts",
+      "src/cli/repl/cursor-model.ts",
+      "src/cli/repl/input-bar.tsx",
+      "src/cli/repl/stream-segmenter.ts",
+      "src/cli/repl/input-queue.ts",
+      "src/cli/repl/app.tsx",
+      "src/cli/repl/dual-stream.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Wire the already-built, tested cursor-model.ts (code-point-safe cursor/backspace/delete) into line-edit.ts/input-bar.tsx to fix UTF-16 surrogate-pair splitting on Backspace/Delete/Left/Right and CaretText slicing (input-bar.tsx:98 also slices by raw UTF-16 code unit, bisecting surrogate pairs); apply the same code-point-safe slicing to dual-stream.ts's truncateToWidth (and live-footer.ts's identical truncate); fix paste control-byte filter to scan the whole pasted string not just the first code unit; cap stream-segmenter table-mode buffering like the existing code-fence guard and stop MAX_CODE_BLOCK_LINES force-flush from resetting mode mid-fence; fix input-queue.ts duplicate-Enter guard to not swallow a legitimate repeat after a /steer rebuild; fix line-edit.ts's InputHistory class to not create phantom in-memory entries for whitespace-only submits; fix app.tsx turn-end steer-note/queue merge to not silently drop a legitimate re-steer through the same duplicate guard.",
+    "verify": "type an emoji then press Backspace once (no mojibake); paste text with a leading control byte beyond index 0 (no corruption); disk-check cursor-model.ts import count in line-edit.ts/input-bar.tsx > 0 (git grep); npm test -- tests/cli/repl",
+    "wire_on": true
+  },
+  {
+    "born_id": 63,
+    "title": "TERM-NAT native-agent default-flip — Alperen approval gate on the 12/12 evidence package",
+    "sources": [
+      "masterplan:63(TERM-NAT)"
+    ],
+    "severity": "P1",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/repl/run.tsx",
+      "src/cli/repl/app.tsx"
+    ],
+    "proposed_mode": "process",
+    "spec": "No code change pending — flip is gated on Alperen's decision per 375-008 evidence package (docs/analysis/m5-flip-evidence.md, 12/12 scenarios green). Track to closure.",
+    "verify": "Alperen approval recorded in MASTER-PLAN; if approved, flip default + verify rollback flag still works",
+    "wire_on": false
+  },
+  {
+    "born_id": 64,
+    "title": "CHAT-IDE: VS Code/JetBrains extension — publish + finish remaining slices",
+    "sources": [
+      "masterplan:64(CHAT-IDE)"
+    ],
+    "severity": "P2",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/extensions/vscode/"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Continue CHAT-IDE dilim-4+ (publish pipeline, remaining panel features) per existing plan notes.",
+    "verify": "extension loads in a real VS Code instance and round-trips a status/task-detail RPC call",
+    "wire_on": false
+  },
+  {
+    "born_id": 82,
+    "title": "SP2-FT: Deckent-core fine-tune (qwen/Hermes-base QLoRA) — deferred, keep queued",
+    "sources": [
+      "masterplan:82(SP2-FT)"
+    ],
+    "severity": "P3",
+    "subsystem": "core",
+    "primary_files": [
+      "scripts/"
+    ],
+    "proposed_mode": "process",
+    "spec": "Deferred per plan (⏸️). No action until unblocked; keep as queued backlog marker.",
+    "verify": "revisit when SP2 pipeline owner reprioritizes",
+    "wire_on": false
+  },
+  {
+    "born_id": 83,
+    "title": "TOOL-CU: finish computer-use/browser automation pack — real-tool dogfood slice + fix executeComputerUseAction 0-caller/unimplemented actions/injection risk",
+    "sources": [
+      "masterplan:83(TOOL-CU)",
+      "audit:mop-up(computer-use-exec.ts)"
+    ],
+    "severity": "P2",
+    "subsystem": "core",
+    "primary_files": [
+      "src/core/computer-use-exec.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Complete dilim-4 dogfood slice; additionally: wire executeComputerUseAction (currently 0-caller besides cu-status introspection), implement `navigate` and region-screenshot (currently permanently unimplemented), and harden the AppleScript/PowerShell string-injection surface beyond hand-rolled escaping (use parametrized invocation, not string concatenation).",
+    "verify": "deckent cu-status reports a real capability probe; a scripted navigate+screenshot round-trip succeeds on at least one platform; injection test with a crafted arg fails safely",
+    "wire_on": true
+  },
+  {
+    "born_id": 85,
+    "title": "AGSK-1: continue agent+skill catalog expansion — next dilim after CATALOG-MATERIALIZE",
+    "sources": [
+      "masterplan:85(AGSK-1)"
+    ],
+    "severity": "P2",
+    "subsystem": "core",
+    "primary_files": [
+      ".deckent/agents/",
+      ".deckent/skills/",
+      "src/core/agent-pool.ts",
+      "src/core/skill-pool.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Continue expansion dilims per existing plan; keep builtins/.deckent two-tree parity in sync (see also born-502 BUILTINS-RECONCILE which governs the canonical-source decision this expansion depends on).",
+    "verify": "deckent agent list / skill list show newly added items with correct affinity",
+    "wire_on": false
+  },
+  {
+    "born_id": 202,
+    "title": "ONB-CHAT: finish conversational onboarding — bind the executor to the terminal approval flow",
+    "sources": [
+      "masterplan:202(ONB-CHAT)"
+    ],
+    "severity": "P1",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/commands/",
+      "src/cli/repl/run.tsx"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Wire the confirm-gated executor (371-004 DONE) into run.tsx's real terminal-approval flow — the one remaining KALAN item on this row.",
+    "verify": "fresh-project chat onboarding walkthrough performs a real confirm-gated setup action end-to-end (run-proven)",
+    "wire_on": false
+  },
+  {
+    "born_id": 203,
+    "title": "ONB-2: finish rich doctor — Windows-native profile + auth-state probe",
+    "sources": [
+      "masterplan:203(ONB-2)"
+    ],
+    "severity": "P1",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/commands/doctor.ts",
+      "src/cli/commands/doctor-checks.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Complete the remaining KALAN items: full windows-native profile coverage and auth-state probe depth beyond the 3-state check already landed.",
+    "verify": "deckent doctor --fix run on a simulated Windows-native profile reports honest per-check state",
+    "wire_on": false
+  },
+  {
+    "born_id": 477,
+    "title": "OPENROUTER-PROVIDER: finish OpenRouter routing-wire live-probe",
+    "sources": [
+      "masterplan:477(OPENROUTER-PROVIDER)"
+    ],
+    "severity": "P2",
+    "subsystem": "core",
+    "primary_files": [
+      "src/providers/openrouter.ts",
+      "src/core/routing-engine.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Run the remaining canlı-probe (live key required) to close out routeTaskV2 doc-route wiring validation.",
+    "verify": "live OpenRouter call with a real key succeeds through routeTaskV2's flagged doc-route path",
+    "wire_on": false
+  },
+  {
+    "born_id": 488,
+    "title": "REPO-MIGRATION: deckent-develop → deckent read-only code migration (blocked on 487)",
+    "sources": [
+      "masterplan:488(REPO-MIGRATION)"
+    ],
+    "severity": "P0",
+    "subsystem": "gov",
+    "primary_files": [
+      "."
+    ],
+    "proposed_mode": "process",
+    "spec": "Irreversible migration step, Alperen-approval gated, blocked on born-487 preconditions plus W0/W4/W7 completion per 2026-07-07 decision. No code action until unblocked.",
+    "verify": "Alperen sign-off recorded + migration staging folder validated before any write",
+    "wire_on": false
+  },
+  {
+    "born_id": 489,
+    "title": "DOCS-GROUNDTRUTH-P0: close remaining P1/P2 ground-truth queue post-migration",
+    "sources": [
+      "masterplan:489(DOCS-GROUNDTRUTH-P0)"
+    ],
+    "severity": "P2",
+    "subsystem": "docs",
+    "primary_files": [
+      "docs/"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "P0 core already closed (375-005/006); P1/P2 tail deferred to new repo post-migration per row note.",
+    "verify": "docs:ref:check passes with P1/P2 items closed",
+    "wire_on": false
+  },
+  {
+    "born_id": 490,
+    "title": "ORPHAN-WIRE: wave-2+ wire-or-kill sweep across the full unwired/dead-code inventory (expanded by 2026-07-07 full-code audit)",
+    "sources": [
+      "masterplan:490(ORPHAN-WIRE)",
+      "audit:§5(approval-subsystem-worker-side: ApprovalAllowScopeStore·decidePolicy·storeRawArgs/resolveRawArgs·resolveFallback·approval.gate_enabled/relay_enabled — NOTE: WorkerApprovalGate promoted to dedicated entry 573, ApprovalExpiryDriver promoted to dedicated entry 562; both excluded from this sweep's scope to avoid double-ownership)",
+      "audit:§5(orchestra-safety-nets: capability-realizer.ts·self-learning-suggestions/ADR-debt-auto-maintenance)",
+      "audit:§5(config-dead-keys: Auditor-block-5-fields·heartbeat_timeout·tool_surface·rollback-resolver-gap·training_trace/live_trace·worker_output_contract-advisory-only·decision_engine/collaboration·mergeConfigs()·global-config.ts·global-store.ts·interaction-policy.ts·event-trigger.ts·enterprise-config.ts·lazy-loader.ts·agent-selector.ts)",
+      "audit:§5(cli-repl: chat-repl-ux.ts·agentic-session.ts·risk-language.ts·onboarding-chat-flow.ts·retro-parser/formatter.ts·chat-status-line.ts·chat-slash-menu.ts-reducer·agent-templates.ts·hints.ts·chat-intent-executor.ts·resolveNervousSlash-bridge·session-registry.ts-write-side)",
+      "audit:§5(api-dashboard: handleLogStream·SprintControlPanel·AppShell·ApprovalsPanel/ApprovalHistoryPanel·RoutingDistribution·Onboarding·4-analytics-modules·Slack/Teams-rich-approval-connectors — NOTE: rpc-write-handlers.ts promoted to dedicated entry 571, excluded from this sweep's scope to avoid double-ownership)",
+      "audit:§5(other: alert-dedup-helper·finding-lifecycle-module·vscode-4-modules-unassembled·notification-config.ts·discord/slack-standalone-notification-providers·codex-parity-model-registration·afterSprint-CI-report·codex-spawn-readiness.ts·metrics-updater.ts)",
+      "audit:mop-up(src/core/catalog/*-7-files-~900-lines)",
+      "audit:mop-up(src/orchestra/prompt-segmentation.ts+tier/cache-API)",
+      "audit:mop-up(src/orchestra/reconciler.ts-0-caller-false-header-claim)",
+      "audit:mop-up(src/orchestra/multi-agent.ts-fully-dead)",
+      "audit:mop-up(auth-session.ts-SessionStore·config-validator.ts-re-export·runIdentityMutation·recordCrossVerifyVerdict·recordSprintWorkerTrace·loadUserGeneratorsAsync)",
+      "audit:§2.4(checkStartLimitGate-unwired·startAuditor-intentionally-severed·ShareGPT-pipeline-untriggerable·Corpus-Lint-stub·sync-to-product.mjs-retired-ADR-D-008·7-referenceless-scripts)",
+      "audit:§4.5(transient-retry-default-off-task-retry.ts-0-caller)",
+      "audit:§3.1(health.session_warn-key-missing+registerSession-0-callers)",
+      "audit:§2.5(default-off-inventory: SIEM-forward·marketplace-signature-verify·bot-media/voice/identity·approval-API-decide·OIDC-exchange·DeckBroker)",
+      "repl:src/cli/commands/chat-repl-ux.ts:147",
+      "repl:src/cli/commands/chat-status-line.ts:40",
+      "repl:src/cli/commands/chat-render-region.ts:279",
+      "repl:src/cli/entry.ts:35",
+      "repl:src/cli/repl/native-transport.ts:93",
+      "repl:src/cli/commands/chat-native.ts:563"
+    ],
+    "severity": "P0",
+    "subsystem": "core-governance",
+    "primary_files": [
+      "src/orchestra/reconciler.ts",
+      "src/orchestra/multi-agent.ts",
+      "src/core/catalog/",
+      "src/orchestra/prompt-segmentation.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Extend docs/analysis/orphan-deliverables-2026-07.md with the mop-up's newly-discovered orphans (catalog/*, prompt-segmentation tier system, reconciler.ts, multi-agent.ts, auth-session SessionStore, recordSprintWorkerTrace/training-trace, and the REPL-layer dead code: chat-repl-ux.ts readline generator, chat-status-line.ts, createLineQueue, reduceSlashMenu, getRecentTurns, native-transport.ts's redundant resolveClaudeWireModel guard) before dispatching wave-2 wire-or-kill sprints. For each item: either wire it to a real caller with a smoke-proof, or delete it with an ADR note. Do not re-litigate the already-classified 5 intentional no-ops (rollback.ts self-modify guard, RUBRIC_REGISTRY/EFFECT_CLASS_REGISTRY frozen anti-gaming, docker credential per-provider allowlist, question-approval-bridge.ts's honest self-disclosure). Scope explicitly EXCLUDES WorkerApprovalGate (→573), ApprovalExpiryDriver (→562), and rpc-write-handlers.ts (→571) — those three were promoted to their own dedicated, higher-visibility entries and must not be double-wired here.",
+    "verify": "git grep import-count > 0 for every item marked 'wired' in the updated list; tests/governance allowlist-pin updated to match; disk-verify via git diff --stat per wave",
+    "wire_on": true
+  },
+  {
+    "born_id": 492,
+    "title": "W1-EXPERIENCE-ON: default-flip package — fix live correctness bugs surfaced now that repl_surface/approvals ship ON by default, and finish the flip's i18n thread",
+    "sources": [
+      "masterplan:492(W1-EXPERIENCE-ON)",
+      "audit:§3.1(🔴KRİTİK#3-repl_surface-i18n-flip-regression)",
+      "repl:src/agent/identity.ts:42",
+      "repl:src/cli/repl/run.tsx:493",
+      "repl:src/cli/repl/run.tsx:53"
+    ],
+    "severity": "P0",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/repl/run.tsx",
+      "src/cli/repl/app.tsx",
+      "src/agent/identity.ts",
+      "src/cli/helpers/messages.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Complete the i18n thread for the repl_surface/tool_surface/simple_mode/question_bridge default-flip: run.tsx:425-446 must populate ReplLabels' mode/resume/busy-control fields from getMessage (currently never populated → /ask·/run·/control, /queue·/interrupt·/steer, resume-picker default to hardcoded English regardless of session lang) and thread approvalLabels through so the ApprovalCard/mode-indicator stop being hardcoded English; add the missing resume-picker/busy-controls message keys to messages.ts; make composeSystemPrompt() (identity.ts:42) actually read the lang option it accepts instead of ignoring it; verify localizeNativeError's 'native.switch.no-transport' key exists in messages.ts (run.tsx:53).",
+    "verify": "set lang=tr, launch bare `deckent`, confirm /ask·/run·/control and resume-picker and ApprovalCard all render in Turkish; grep messages.ts for the new keys",
+    "wire_on": true
+  },
+  {
+    "born_id": 493,
+    "title": "W2-WIRE: bridge the native-agent engine to the slash-command dispatcher — ~24-27 of 37 SLASH_CATALOG commands currently silently degrade to plain chat text under the default engine",
+    "sources": [
+      "masterplan:493(W2-WIRE)",
+      "audit:§3.1(🔴KRİTİK#1-default-repl-20-slash-commands-silently-drop-to-chat)",
+      "repl:src/cli/repl/app.tsx:850",
+      "repl:src/cli/commands/chat-slash-registry.ts:111",
+      "repl:src/cli/repl/app.tsx:1033",
+      "repl:src/cli/repl/run.tsx:439",
+      "repl:src/cli/repl/app.tsx:1020",
+      "repl:src/cli/commands/chat-slash-registry.ts:199",
+      "repl:src/cli/commands/chat-slash-registry.ts:235",
+      "repl:src/cli/repl/app.tsx:928",
+      "repl:src/agent/session.ts:113"
+    ],
+    "severity": "P0",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/repl/app.tsx",
+      "src/cli/repl/native-agent-bridge.ts",
+      "src/cli/repl/native-tool-registry.ts",
+      "src/cli/commands/chat-slash-registry.ts",
+      "src/cli/commands/chat-native.ts",
+      "src/agent/session.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Bridge native-agent-bridge.ts (the default engine's turn loop) to chat-native.ts's resolveSlash dispatcher, OR register native tools for every agenticTool-bearing SLASH_CATALOG entry (24 of 37 currently unmatched) — the menu (Tab-completion) shows all 37 but handleSubmit only special-cases ~15; the rest (including /help itself, /kill /cleanup /recover /nervous /interrogate /mcp) fall through to app.tsx:1033's plain-text enqueue with no error, no crash, just silent no-op. This includes: wiring /help to render the trust-badged catalog under the native engine (not just the legacy path); persisting native-engine chat history so /resume has something to show (run.tsx:439, currently no `memory` field threaded into the native engine at all); making session.ts's AgentSession.setApprovalMode (dead code, zero callers) actually reachable from /approve <mode> so the 'onay modu ayarlandı' confirmation stops being false; and either lifting the repl_surface.enabled gate or documenting it clearly for /resume /ask /run /control /queue /interrupt /steer on a fresh/default project. Update the now-stale in-repo comments in chat-slash-registry.ts (lines ~199-296) that claim guaranteed pre-registry interception.",
+    "verify": "printf '/help\\n' | node dist/cli/entry.js (bare invocation, no --native flag) renders the full catalog, not prose; printf '/kill\\n' triggers the real confirm-gated deckent_kill path; /approve full-auto followed by a confirm-tier tool call actually skips the y/n prompt",
+    "wire_on": true
+  },
+  {
+    "born_id": 494,
+    "title": "W3-DASH-PERF: dashboard bundle/perf pass",
+    "sources": [
+      "masterplan:494(W3-DASH-PERF)"
+    ],
+    "severity": "P1",
+    "subsystem": "dashboard",
+    "primary_files": [
+      "src/dashboard/src/App.tsx",
+      "src/dashboard/src/hooks/use-live-data.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "React.lazy route-splitting (~30-40% bundle reduction), request-dedup in use-live-data.ts, Recharts render optimization.",
+    "verify": "bundle-size report before/after shows the claimed reduction; Chrome network tab shows no duplicate polling requests",
+    "wire_on": false
+  },
+  {
+    "born_id": 495,
+    "title": "W4-DOCS-TRUTH: run generators + enforce docs:ref:check in CI + unify drifted tool/command counts + rewrite DECKENT.md from the generator skeleton",
+    "sources": [
+      "masterplan:495(W4-DOCS-TRUTH)",
+      "audit:§3.1(mcp-attach.ts-hardcoded-30-tool-list-drifted-from-real-46)",
+      "audit:§4.2(CLAUDE.md-stale-deckent_start-event-loop-gotcha-superseded-by-Sprint-143-detached-fork)"
+    ],
+    "severity": "P0",
+    "subsystem": "docs",
+    "primary_files": [
+      "docs/",
+      "CLAUDE.md",
+      "mcp-attach.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Run all doc generators, make docs:ref:check CI-mandatory, unify the 4-different tool/command counts (46/20/31/14/20/79) across surfaces including mcp-attach.ts's hardcoded 30-tool list (drifted from the real 46), rewrite DECKENT.md from the ready single-source-generate skeleton, and remove/update CLAUDE.md's gotcha claiming deckent_start can block the MCP event loop (stale — fixed via detached fork in Sprint 143).",
+    "verify": "docs:ref:check green in CI; grep confirms no remaining hardcoded stale counts; CLAUDE.md gotchas section no longer claims event-loop blocking",
+    "wire_on": true
+  },
+  {
+    "born_id": 496,
+    "title": "DESK-1: Electron desktop-app skeleton (ADR-G-033)",
+    "sources": [
+      "masterplan:496(DESK-1)"
+    ],
+    "severity": "P1",
+    "subsystem": "dashboard",
+    "primary_files": [
+      "src/dashboard/",
+      "electron/"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Architecture doc + skeleton: dashboard-Vite + existing /api serve + preload-IPC, per ADR-G-033.",
+    "verify": "electron app launches and loads the existing dashboard against a real /api serve instance",
+    "wire_on": false
+  },
+  {
+    "born_id": 497,
+    "title": "MODULARIZE: Solo↔Enterprise layer boundary — enterprise/ extraction + config/rate/audit-secret wiring",
+    "sources": [
+      "masterplan:497(MODULARIZE)",
+      "audit:§4.4(MAJOR-5-audit-HMAC-secret-hardcoded-and-public-audit-writer.ts:35,269)"
+    ],
+    "severity": "P1",
+    "subsystem": "core-governance",
+    "primary_files": [
+      "src/enterprise/",
+      "src/core/audit-writer.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "enterprise/ file-map move+shim (0-import from orchestra/CLI already proven) + ENT-CONFIG-SSOT + RATE-ENFORCE-WIRE + CAP-PERM-TAG; as part of AUDIT-SECRET-WIRE, replace audit-writer.ts's hardcoded public HMAC secret ('deckent-audit', lines 35/269) with a real per-install/per-tenant secret so the audit chain actually resists tampering.",
+    "verify": "audit chain HMAC secret is generated/loaded per-install, not the literal string 'deckent-audit' (grep confirms zero matches); enterprise/ compiles standalone with 0 orchestra/CLI imports",
+    "wire_on": false
+  },
+  {
+    "born_id": 498,
+    "title": "W7-REPO-CLEANUP: pre-migration repo cleanup — remaining dead-file surgery, orphan decision round, root-scribble + .deckent cruft removal",
+    "sources": [
+      "masterplan:498(W7-REPO-CLEANUP)"
+    ],
+    "severity": "P0",
+    "subsystem": "gov",
+    "primary_files": [
+      "."
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Continue folder-by-folder Alperen-approved cleanup per existing plan; coordinate with born-490's orphan wave decisions (shared 69-orphan list) so the two efforts don't diverge.",
+    "verify": "git ls-files clean of the enumerated dead files; tracked-set simplification diff reviewed",
+    "wire_on": false
+  },
+  {
+    "born_id": 500,
+    "title": "BRAIN-EXPORTS-FORMAT-AUDIT: full format+consumer analysis of .brain/exports triad",
+    "sources": [
+      "masterplan:500(BRAIN-EXPORTS-FORMAT-AUDIT)"
+    ],
+    "severity": "P1",
+    "subsystem": "core-governance",
+    "primary_files": [
+      ".brain/exports/"
+    ],
+    "proposed_mode": "run",
+    "spec": "Analyze decisions/memory/summary.md format+function, per-consumer necessity, size/truncation policy, DB-FS sync contract — files themselves are NOT deleted (consumer-proven: doctor+adr-validator/memory-import/CLAUDE.md-include+bot+goal-planner).",
+    "verify": "consumer map document produced + at least one size/truncation policy change validated against real consumers",
+    "wire_on": false
+  },
+  {
+    "born_id": 501,
+    "title": "CLI-EPIPE-GRACEFUL: swallow EPIPE gracefully instead of crash-logging on piped CLI usage",
+    "sources": [
+      "masterplan:501(CLI-EPIPE-GRACEFUL)"
+    ],
+    "severity": "P2",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/entry.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Add a process-level stdout/stderr EPIPE handler that exits 0 silently instead of producing a crash log — matches the ~80% of crash-log entries caused by `deckent status | head`-style usage.",
+    "verify": "`deckent status | head -1` produces no crash-log entry and exits 0",
+    "wire_on": false
+  },
+  {
+    "born_id": 502,
+    "title": "BUILTINS-RECONCILE: resolve src/core/builtins ↔ .deckent/{agents,skills} bidirectional drift + fix bundle-builtins.mjs canonical-source assumption",
+    "sources": [
+      "masterplan:502(BUILTINS-RECONCILE)"
+    ],
+    "severity": "P0",
+    "subsystem": "core-governance",
+    "primary_files": [
+      "src/core/builtins/",
+      "bundle-builtins.mjs",
+      ".deckent/"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Decide canonical source-of-truth, merge file-by-file (11 agents with content drift + missing docs skill + missing api-design/manifest.json + extra api-designer/i18n-specialist/observability-engineer in builtins not in dev), add a drift-check gate to validate:publish so a blind bundle run never regresses shipped content again.",
+    "verify": "validate:publish fails if builtins/.deckent diverge; a clean bundle-builtins.mjs run is a no-op diff",
+    "wire_on": false
+  },
+  {
+    "born_id": 503,
+    "title": "HUB-P0: deckent-hub production-readiness (Ed25519 signing, manifest migration, sandbox enforcement, sandbox violations)",
+    "sources": [
+      "masterplan:503(HUB-P0)"
+    ],
+    "severity": "P2",
+    "subsystem": "core-governance",
+    "primary_files": [
+      "src/core/signature.ts",
+      "src/core/skill-sandbox.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Real Ed25519 keygen+signing for the 20 skills, migrate manifests to the public SKILL_TEMPLATE schema, require sandbox on `skill install` (not just publish), fix skill-sandbox.ts:197's 4 wrong BUILTIN_TRUSTED_SKILLS ids, fix youtube-downloader's execSync sandbox violations via declared scope.shellCommands.",
+    "verify": "skill install (not just publish) enforces sandbox; BUILTIN_TRUSTED_SKILLS ids match real skill ids; youtube-downloader has zero execSync calls outside declared shellCommands scope",
+    "wire_on": false
+  },
+  {
+    "born_id": 504,
+    "title": "RECLASSIFY-191-196-FOLLOWUP: backfill missing sprint-log rows then re-run the retroactive reclassify",
+    "sources": [
+      "masterplan:504(RECLASSIFY-191-196-FOLLOWUP)"
+    ],
+    "severity": "P2",
+    "subsystem": "core-governance",
+    "primary_files": [
+      "scripts/sprint-retroactive-reclassify.mjs"
+    ],
+    "proposed_mode": "run",
+    "spec": "backfill-sprint-log-rows for the 10 skipped (sprint-entry-missing) records, then re-run sprint-retroactive-reclassify.mjs with the complete list, or consciously close this out.",
+    "verify": "re-run reports 12/12 applied, or a documented conscious-close decision is recorded",
+    "wire_on": false
+  },
+  {
+    "born_id": 505,
+    "title": "DOCTOR-CHECKS-DUP-PREFLIGHT: de-duplicate the two independent runPreFlightHealthCheck() definitions",
+    "sources": [
+      "masterplan:505(DOCTOR-CHECKS-DUP-PREFLIGHT)",
+      "audit:§2.3(skill-list-crash-context-doctor.ts-canonical-path)"
+    ],
+    "severity": "P3",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/commands/doctor.ts",
+      "src/cli/commands/doctor-checks.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "doctor.ts is the live path (deckent doctor --pre-flight); doctor-checks.ts's copy is referenced only by its own test. Unify into one implementation.",
+    "verify": "grep confirms a single runPreFlightHealthCheck definition; doctor-checks.ts's test still passes against the unified function",
+    "wire_on": false
+  },
+  {
+    "born_id": 506,
+    "title": "DEADCODE-AUDIT-DYNAMIC-SCAN: replace dead-code-audit.mjs's hand-maintained KNOWN_SUSPECTS list with automatic 0-importer discovery",
+    "sources": [
+      "masterplan:506(DEADCODE-AUDIT-DYNAMIC-SCAN)"
+    ],
+    "severity": "P3",
+    "subsystem": "core-governance",
+    "primary_files": [
+      "scripts/dead-code-audit.mjs"
+    ],
+    "proposed_mode": "run",
+    "spec": "Extend findUnusedExports to scan all of src/ (not just the hand-list) or fully replace the hand-list with automated 0-importer detection, so newly-orphaned modules (like the ones born-490 just found) surface automatically next time.",
+    "verify": "a deliberately-orphaned test module is auto-detected without manual list edits",
+    "wire_on": false
+  },
+  {
+    "born_id": 507,
+    "title": "DOCS-CLI-REF-CONSOLIDATE: retire or complete the stale hand-curated top section of docs/reference/cli.md",
+    "sources": [
+      "masterplan:507(DOCS-CLI-REF-CONSOLIDATE)"
+    ],
+    "severity": "P2",
+    "subsystem": "docs",
+    "primary_files": [
+      "docs/reference/cli.md",
+      "scripts/generate-cli-docs.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Decide: retire the hand-curated section (41/176 commands, bayat) together with generate-cli-docs.ts + docs:generate-cli + cli-reference.test.ts, or expand it to the full 176 — deliberately deferred to the docs-rewrite phase per W7.",
+    "verify": "docs/reference/cli.md has one authoritative generator, no stale hand-curated duplicate section",
+    "wire_on": false
+  },
+  {
+    "born_id": 508,
+    "title": "InputBar has no mutual exclusion with ApprovalCard/its modifier-key handling — a keystroke during a pending approval is double-consumed as text input AND an approve/deny decision",
+    "sources": [
+      "repl:src/cli/repl/app.tsx:1121",
+      "repl:src/cli/repl/app.tsx:1121",
+      "repl:src/cli/repl/approval-card.tsx:233"
+    ],
+    "severity": "P0",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/repl/app.tsx",
+      "src/cli/repl/approval-card.tsx",
+      "src/cli/repl/input-bar.tsx"
+    ],
+    "proposed_mode": "run",
+    "spec": "InputBar's `active` prop only checks `confirm===null`; ApprovalCard's useInput only checks its own `head!==null` — both stay simultaneously active while an approval is pending (now a default-on, reachable state per repl_surface flip). Add real mutual exclusion (InputBar must go inactive whenever ApprovalCard has a pending item) and fix ApprovalCard's key handler to honor Ink's ctrl/meta modifier flags so Ctrl+A/Ctrl+N/Ctrl+D aren't misread as approve/approve-all.",
+    "verify": "submit a worker approval request, then type an ordinary chat message containing the letter 'y' — confirm the approval is NOT silently triggered by that keystroke",
+    "wire_on": false
+  },
+  {
+    "born_id": 509,
+    "title": "Child-process spawn call-sites across the REPL/CLI layer are missing error/timeout/state-reset handling — ENOENT and hang risk",
+    "sources": [
+      "repl:src/cli/commands/chat-session.ts:272",
+      "repl:src/cli/commands/chat-native.ts:1156",
+      "repl:src/cli/commands/chat.ts:523",
+      "repl:src/cli/commands/chat-tool-bridge.ts:109",
+      "repl:src/cli/commands/chat-session.ts:437",
+      "repl:src/cli/commands/chat-enterprise-bridge.ts:56"
+    ],
+    "severity": "P0",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/commands/chat-session.ts",
+      "src/cli/commands/chat-native.ts",
+      "src/cli/commands/chat.ts",
+      "src/cli/commands/chat-tool-bridge.ts",
+      "src/cli/commands/chat-enterprise-bridge.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "defaultPersistentSpawn (chat-session.ts:272) and defaultSubscriptionSpawn (chat-native.ts:1156) have no child.on('error',...) listener — an ENOENT on the configured provider binary crashes the whole process uncaught; chat.ts:523's interactive REPL omits gracefulErrors:true so a mid-session provider rejection propagates uncaught; chat-tool-bridge.ts/chat-enterprise-bridge.ts's defaultSpawnFn also lack an 'error' listener; chat-session.ts:437's ensureSpawn() never resets the 'exited' flag after teardown, so post-exit reuse misreports isAlive(). NOTE: the sibling claim that chat-enterprise-bridge.ts's missing timeout/reject causes a reachable hang was adversarially re-verified and REFUTED — bare/flag-only /audit fails fast before any async work, and /rbac·/flow·/cost only invoke bounded synchronous handlers on this call graph — so that specific sub-issue is downgraded to P3 defensive-hardening, not a live bug; fix it anyway while touching this file for consistency with the sibling module's existing timeout pattern.",
+    "verify": "point the configured provider binary at a nonexistent path and confirm the REPL degrades to a handled error message, not an uncaught crash; kill and restart a persistent session and confirm isAlive() reports honestly",
+    "wire_on": false
+  },
+  {
+    "born_id": 510,
+    "title": "context-budget.ts compaction can emit a window whose sole message is an orphaned tool-result, which providers reject",
+    "sources": [
+      "repl:src/agent/context-budget.ts:69"
+    ],
+    "severity": "P1",
+    "subsystem": "agent",
+    "primary_files": [
+      "src/agent/context-budget.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Fix compaction so a trimmed context window never ends up with a lone orphaned tool-result message with no preceding tool_use — detect this case and either keep the pairing intact or drop both together.",
+    "verify": "force a compaction boundary that would otherwise land exactly on a tool-result message and confirm the provider call still succeeds (no 'orphaned tool_result' 400)",
+    "wire_on": false
+  },
+  {
+    "born_id": 511,
+    "title": "chat-session.ts end-of-turn reconciliation silently swaps in a longer resultText/assistantText into `collected` with no catch-up of anything already streamed to the user",
+    "sources": [
+      "repl:src/cli/commands/chat-session.ts:522"
+    ],
+    "severity": "P1",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/commands/chat-session.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "When end-of-turn reconciliation detects a longer final resultText/assistantText than what was already streamed, either stream the delta to the user or make the swap visibly consistent with what's on screen — don't silently substitute a different final value than what the user watched stream in.",
+    "verify": "construct a case where the streamed content and the final resultText differ in length and confirm the displayed transcript matches what the user actually saw stream, or is explicitly reconciled with a visible update",
+    "wire_on": false
+  },
+  {
+    "born_id": 512,
+    "title": "provider-switch.ts crashes the REPL on an invalid /provider name via an unguarded rebuild(next) call",
+    "sources": [
+      "repl:src/cli/repl/provider-switch.ts:77"
+    ],
+    "severity": "P1",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/repl/provider-switch.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Guard rebuild(next) so an unrecognized provider name returns a handled error instead of throwing uncaught.",
+    "verify": "type /provider bogus-name in the REPL and confirm a graceful error message, not a crash",
+    "wire_on": false
+  },
+  {
+    "born_id": 513,
+    "title": "chat-native.ts /clear only wipes the JS-side transcript, not the warm persistent child's actual conversational context",
+    "sources": [
+      "repl:src/cli/commands/chat-native.ts:646"
+    ],
+    "severity": "P1",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/commands/chat-native.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Make /clear either restart the warm child process or send the provider's own context-reset mechanism, so the model doesn't silently retain the pre-clear conversation.",
+    "verify": "run /clear then ask the model to recall something from before the clear — it must not remember it",
+    "wire_on": false
+  },
+  {
+    "born_id": 514,
+    "title": "chat-agentic-dispatch.ts's natural-language intent regexes are overly broad and silently hijack ordinary chat turns as tool calls",
+    "sources": [
+      "repl:src/cli/commands/chat-agentic-dispatch.ts:63"
+    ],
+    "severity": "P1",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/commands/chat-agentic-dispatch.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Tighten the NL-intent regex set (or require an explicit confirmation before auto-dispatching) so an ordinary conversational sentence isn't misrouted into an unintended tool invocation.",
+    "verify": "construct a plain conversational sentence that currently matches one of the broad regexes and confirm it no longer auto-dispatches",
+    "wire_on": false
+  },
+  {
+    "born_id": 515,
+    "title": "REPL /nervous accept|reject never actually notifies the nervous executor and always logs a false 'success' outcome",
+    "sources": [
+      "repl:src/cli/commands/chat-nervous-bridge.ts:190"
+    ],
+    "severity": "P1",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/commands/chat-nervous-bridge.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Fix chat-nervous-bridge.ts so /nervous accept|reject genuinely calls through to the nervous executor before reporting success; a false-success log is worse than an honest failure.",
+    "verify": "run /nervous accept <id> and verify the nervous action is actually applied (not just logged) via disk-check of nervous state",
+    "wire_on": false
+  },
+  {
+    "born_id": 516,
+    "title": "chat-tool-bridge.ts's flat 30s SPAWN_TIMEOUT_MS kills long-running deckent_audit/deckent_plan calls on their own documented normal duration",
+    "sources": [
+      "repl:src/cli/commands/chat-tool-bridge.ts:81"
+    ],
+    "severity": "P1",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/commands/chat-tool-bridge.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Make SPAWN_TIMEOUT_MS per-tool-configurable (or raise it for known-long tools like deckent_audit/deckent_plan) instead of one flat 30s ceiling for every bridged tool.",
+    "verify": "invoke deckent_audit through the tool bridge on a sprint large enough to legitimately exceed 30s and confirm it completes instead of being killed",
+    "wire_on": false
+  },
+  {
+    "born_id": 517,
+    "title": "Systemic i18n hardcode sweep — several CLI/REPL surfaces bypass getMessage(key,lang) outside the repl_surface flip's own scope",
+    "sources": [
+      "repl:src/cli/commands/chat-tool-exec.ts:43",
+      "repl:src/cli/commands/chat.ts:58",
+      "repl:src/cli/commands/chat-native.ts:894",
+      "repl:src/cli/commands/chat-slash-registry.ts:350",
+      "repl:src/cli/commands/chat-render-region.ts:87",
+      "repl:src/cli/commands/chat-banner.ts:35",
+      "repl:src/cli/entry.ts:233",
+      "repl:src/cli/entry.ts:687",
+      "repl:src/cli/entry.ts:760",
+      "repl:src/cli/entry.ts:782",
+      "repl:src/cli/entry.ts:686",
+      "audit:§3.1(MAJÖR-5-sistemik-i18n-kaçağı)"
+    ],
+    "severity": "P2",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/commands/chat-tool-exec.ts",
+      "src/cli/commands/chat.ts",
+      "src/cli/commands/chat-native.ts",
+      "src/cli/commands/chat-slash-registry.ts",
+      "src/cli/commands/chat-render-region.ts",
+      "src/cli/commands/chat-banner.ts",
+      "src/cli/entry.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Per CLAUDE.md's i18n-FIRST rule, replace every remaining hardcoded user-facing string with getMessage(key,lang): chat-tool-exec.ts's write/edit/bash confirm+error prompts (hardcoded Turkish), chat.ts's provider-detection/spawn-path strings (hardcoded English), chat-native.ts's slash/agentic cancellation messages (hardcoded English), chat-slash-registry.ts's /help (ignores session lang, hardcoded Turkish), chat-render-region.ts's THINKING_VERBS/TOOL_VERBS ticker (hardcoded Turkish-only), chat-banner.ts's hint string (hardcoded Turkish-only), and entry.ts's Ollama-unreachable message/legacy tool-confirm hint/spinner label/Node-version-guard message (mixed hardcoded TR/EN, bypassing existing bilingual keys like tui.confirm_hint and error.node_version_*).",
+    "verify": "grep for the literal hardcoded strings in each file returns zero matches; switching lang=en/tr flips all listed surfaces consistently",
+    "wire_on": false
+  },
+  {
+    "born_id": 518,
+    "title": "Cross-provider credential scrub is incomplete — secrets written to shared process.env leak to providers whose spawn path doesn't scrub",
+    "sources": [
+      "repl:src/cli/commands/chat-provider-parity.ts:51",
+      "audit:§4.4(CRITICAL-1-cross-provider-credential-sızıntısı-subprocess.ts:190-provider.ts:806-869)"
+    ],
+    "severity": "P0",
+    "subsystem": "providers",
+    "primary_files": [
+      "src/providers/subprocess.ts",
+      "src/providers/provider.ts",
+      "src/cli/commands/chat-provider-parity.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "applyDeckSecretsToEnv() writes all provider secrets into the shared process.env; only subprocess.ts:190's scrub cleans up afterward — codex/gemini/ollama/openai-compat/openrouter spawn paths and the tmux Claude default do not scrub, so one provider's subprocess can observe another provider's secret via its inherited environment. Additionally, chat-provider-parity.ts's subscriptionEnv() strips API keys for claude/gemini but omits OPENAI_API_KEY/DECKENT_OPENAI_API_KEY for codex — close that gap in the same pass.",
+    "verify": "spawn each non-tmux provider adapter and dump its child's environment; confirm zero foreign-provider secret keys are present in any of them",
+    "wire_on": false
+  },
+  {
+    "born_id": 519,
+    "title": "deckent_bash permission resource always misresolves — primaryResource() reads args['command'] but the tool's own schema key is 'cmd'",
+    "sources": [
+      "repl:src/agent/loop.ts:48",
+      "repl:src/agent/loop.ts:48"
+    ],
+    "severity": "P1",
+    "subsystem": "agent",
+    "primary_files": [
+      "src/agent/loop.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Fix primaryResource() to read args['cmd'] (the schema-declared key for deckent_bash), not args['command'] — the permission-resource string used for scoped-allow matching and audit logging is currently always empty/wrong for every bash call.",
+    "verify": "invoke deckent_bash and confirm the audit log / scoped-allow resource string reflects the actual command, not empty/undefined",
+    "wire_on": false
+  },
+  {
+    "born_id": 520,
+    "title": "native-agent-bridge.ts turn-accounting bugs — usage stats overwritten (not accumulated) across a multi-round turn, and the bg-turn drain loop reuses a stale onTurnEnd closure",
+    "sources": [
+      "repl:src/cli/repl/native-agent-bridge.ts:145",
+      "repl:src/cli/repl/native-agent-bridge.ts:145",
+      "repl:src/cli/repl/native-agent-bridge.ts:179",
+      "repl:src/cli/repl/native-agent-bridge.ts:179"
+    ],
+    "severity": "P1",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/repl/native-agent-bridge.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "runTurn currently assigns (not accumulates) 'usage' on each round of a multi-round turn, undercounting displayed tokens/cost; separately, the background-turn drain loop reuses the caller's single onTurnEnd closure (with a startMs baked in at creation) across multiple synthetic turn-end events, producing wrong elapsed-time reporting for later synthetic turns.",
+    "verify": "run a multi-tool-call turn and confirm the displayed token/cost total matches the sum across all rounds, not just the last one",
+    "wire_on": false
+  },
+  {
+    "born_id": 521,
+    "title": "native-tool-registry.ts's deckent_describe_tool always reports an empty params list for every bridged tool",
+    "sources": [
+      "repl:src/cli/repl/native-tool-registry.ts:280"
+    ],
+    "severity": "P3",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/repl/native-tool-registry.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Fix the tool-surface catalog lookup so describe_tool actually returns each bridged tool's real parameter schema instead of an empty list.",
+    "verify": "call deckent_describe_tool on any bridged MCP tool and confirm a non-empty params list",
+    "wire_on": false
+  },
+  {
+    "born_id": 522,
+    "title": "mcp-bridge.ts's documented opt-in mcp_client_enabled gate is dead code — the real default-path wiring bypasses it entirely, making the config flag misleading",
+    "sources": [
+      "repl:src/cli/repl/mcp-bridge.ts:90"
+    ],
+    "severity": "P2",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/repl/mcp-bridge.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Either make mcp_client_enabled actually gate the real wiring path (run.tsx), or remove the flag/its documentation so it stops implying user control that doesn't exist.",
+    "verify": "toggle mcp_client_enabled off and confirm MCP bridging is actually disabled, or remove the flag from config schema+docs",
+    "wire_on": false
+  },
+  {
+    "born_id": 523,
+    "title": "agentic-confirm.ts hardening — opens a second readline.Interface on shared stdin/stdout while caller's own interface is active, plus SAFE-before-RISKY substring misclassification risk",
+    "sources": [
+      "repl:src/cli/commands/agentic-confirm.ts:46",
+      "audit:§3.1(MİNÖR-agentic-confirm.ts-SAFE-önce-RISKY-substring-sınıflandırma-riski)"
+    ],
+    "severity": "P2",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/commands/agentic-confirm.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "confirmAction() should reuse the caller's existing readline.Interface instead of opening a second one on the same stdin/stdout (risk of input-event conflicts/lost keystrokes); also fix the SAFE-before-RISKY substring check ordering so a risky action whose name happens to contain a SAFE substring isn't misclassified as safe.",
+    "verify": "trigger confirmAction while a caller-owned readline.Interface is active and confirm no stdin contention; construct an action name containing both a SAFE and RISKY substring and confirm RISKY wins",
+    "wire_on": false
+  },
+  {
+    "born_id": 524,
+    "title": "tool-permissions.ts classifyTool()'s catch-all 'read' default never special-cases deckent_start/deckent_run/deckent_process — these get the weakest permission tier by default",
+    "sources": [
+      "repl:src/cli/repl/tool-permissions.ts:64"
+    ],
+    "severity": "P2",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/repl/tool-permissions.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Add explicit tier entries for deckent_start/deckent_run/deckent_process instead of letting them fall through to the generic 'read' catch-all classification. NOTE: the adjacent claim about classifyExternalTool()'s prefix heuristic (tool-permissions.ts:95) being a reachable auto-approve bypass for destructive MCP tools was adversarially re-verified and REFUTED — native-tool-registry.ts hardcodes tier:'confirm' for every MCP tool regardless of name, and the real (name-agnostic) permission gate is AgentSession.decide(), which asks by default — so that specific claim is excluded from this backlog as a non-bug.",
+    "verify": "invoke deckent_start/run/process through the classifyTool() path and confirm each gets its own correct tier, not the generic read-tier default",
+    "wire_on": false
+  },
+  {
+    "born_id": 525,
+    "title": "chat-render.ts markdown rendering bugs — inline styling reset bleeds across the rest of a line, and the link regex truncates URLs with balanced parentheses",
+    "sources": [
+      "repl:src/cli/commands/chat-render.ts:146",
+      "repl:src/cli/commands/chat-render.ts:134"
+    ],
+    "severity": "P2",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/commands/chat-render.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Fix renderMarkdown so an inner inline-code/link RESET doesn't prematurely terminate outer heading/bold styling for the remainder of the line; fix the markdown link regex so it doesn't truncate at the first ')' inside a URL that itself contains balanced parentheses (leaking a stray ')' into the rendered text).",
+    "verify": "render a line with **bold containing `code`** text after it (styling should continue after the inline code); render a link whose URL contains parentheses e.g. Wikipedia-style URLs and confirm no truncation/leak",
+    "wire_on": false
+  },
+  {
+    "born_id": 526,
+    "title": "chat-provider-parity.ts robustness — subprocess exit code is never inspected (a failed subscription call reports as a successful empty reply) and Ollama/openai-compat HTTP calls have no timeout/AbortController",
+    "sources": [
+      "repl:src/cli/commands/chat-provider-parity.ts:77",
+      "repl:src/cli/commands/chat-provider-parity.ts:109"
+    ],
+    "severity": "P1",
+    "subsystem": "providers",
+    "primary_files": [
+      "src/cli/commands/chat-provider-parity.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Check the CLI subprocess's exit code before treating its output as a successful reply; add a timeout+AbortController to the Ollama/openai-compat HTTP call path so an unresponsive local server can't hang the whole turn indefinitely.",
+    "verify": "force the provider subprocess to exit non-zero and confirm the caller reports failure, not an empty success; point at an unreachable local Ollama port and confirm the call times out instead of hanging",
+    "wire_on": false
+  },
+  {
+    "born_id": 527,
+    "title": "input-bar.tsx bug cluster — Home/End key detection checks Ink properties Ink never populates (permanent no-op), multi-line paste can push an empty line into in-memory history, and the debug keylog path is hardcoded to /tmp",
+    "sources": [
+      "repl:src/cli/repl/input-bar.tsx:88",
+      "repl:src/cli/repl/input-bar.tsx:181",
+      "repl:src/cli/repl/input-bar.tsx:128"
+    ],
+    "severity": "P2",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/repl/input-bar.tsx"
+    ],
+    "proposed_mode": "run",
+    "spec": "Fix Home/End detection to use the Ink Key properties that are actually populated; guard the multi-line/trailing-newline paste path so it doesn't push an empty history entry; make the debug keylog path platform-aware (or config-driven) instead of hardcoded /tmp so it doesn't silently no-op on non-POSIX hosts.",
+    "verify": "press Home/End in the REPL and confirm cursor movement; paste a multi-line block ending in a newline and confirm no empty history entry is created",
+    "wire_on": false
+  },
+  {
+    "born_id": 528,
+    "title": "run.tsx CLI-bridge tool confirm-denial returns early, bypassing the toolSink 'honest outcome' UI block that renders a denied-tool indicator",
+    "sources": [
+      "repl:src/cli/repl/run.tsx:313",
+      "repl:src/cli/repl/run.tsx:313"
+    ],
+    "severity": "P2",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/repl/run.tsx"
+    ],
+    "proposed_mode": "run",
+    "spec": "Route the confirm-denial early-return through the same toolSink honest-outcome rendering path used for every other tool outcome, so a denied tool call is visibly marked denied instead of silently vanishing from the transcript.",
+    "verify": "deny a confirm-tier tool call and confirm the transcript visibly shows a denial indicator, not silence",
+    "wire_on": false
+  },
+  {
+    "born_id": 529,
+    "title": "ReplErrorBoundary is mounted without its `label` prop, so a render-error fallback always shows the hardcoded English string regardless of session language",
+    "sources": [
+      "repl:src/cli/repl/run.tsx:412",
+      "repl:src/cli/repl/run.tsx:412"
+    ],
+    "severity": "P3",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/repl/run.tsx"
+    ],
+    "proposed_mode": "run",
+    "spec": "Pass the label prop (with an i18n'd string) to ReplErrorBoundary at its mount site in run.tsx.",
+    "verify": "force a render error with lang=tr and confirm the fallback text is Turkish",
+    "wire_on": false
+  },
+  {
+    "born_id": 530,
+    "title": "'/clear' doesn't truly clear the terminal (only resets React state, leaving stale prior content on screen) and doesn't cancel an in-flight streaming reply (whose remaining output repopulates the just-cleared screen)",
+    "sources": [
+      "repl:src/cli/repl/app.tsx:721",
+      "repl:src/cli/repl/app.tsx:722"
+    ],
+    "severity": "P2",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/repl/app.tsx"
+    ],
+    "proposed_mode": "run",
+    "spec": "Make clearScreen()/'/clear' emit a real ANSI clear sequence in addition to resetting React state; make '/clear' cancel any in-flight streaming turn so its remaining output doesn't repopulate the screen it just cleared.",
+    "verify": "run /clear mid-stream during a long response and confirm both the terminal is actually blank and no further output appears from the cancelled turn",
+    "wire_on": false
+  },
+  {
+    "born_id": 531,
+    "title": "Slash-command parsing is inconsistent across the REPL — case-sensitivity, non-ASCII transliteration, and whitespace-collapse all diverge between sibling parsers",
+    "sources": [
+      "repl:src/cli/repl/busy-controls.ts:158",
+      "repl:src/cli/commands/chat-slash-registry.ts:383",
+      "repl:src/cli/commands/chat-slash-registry.ts:369",
+      "repl:src/cli/commands/chat-slash-registry.ts:491",
+      "repl:src/cli/commands/chat-slash-registry.ts:669"
+    ],
+    "severity": "P3",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/repl/busy-controls.ts",
+      "src/cli/commands/chat-slash-registry.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Make /queue·/interrupt·/steer parsing (busy-controls.ts) and slashCompleter/'/usage'·'/resources' subaction parsing (chat-slash-registry.ts) case-insensitive to match resolveSlash's own dispatch and chat-slash-menu's filter; make slugifyBacklogId transliterate non-ASCII (Turkish) characters instead of dropping them (collision risk); fix resolveSlash's blanket split(/\\s+/)+join(' ') so it doesn't silently collapse intentional multi-space runs in slash arguments.",
+    "verify": "type an uppercase slash command variant and confirm it dispatches identically to lowercase; slugify a Turkish backlog title and confirm no character-drop collision",
+    "wire_on": false
+  },
+  {
+    "born_id": 532,
+    "title": "anthropic.ts's parallel tool_use round-trip splits sibling tool_results into separate consecutive user messages instead of one combined message, violating the API's expected tool-loop shape",
+    "sources": [
+      "repl:src/agent/provider-tooluse/anthropic.ts:19"
+    ],
+    "severity": "P1",
+    "subsystem": "providers",
+    "primary_files": [
+      "src/agent/provider-tooluse/anthropic.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Combine all sibling tool_result blocks from one parallel tool_use round into a single user message (matching Anthropic's message-shape contract) instead of emitting one user message per tool_result.",
+    "verify": "trigger a turn with 2+ parallel tool calls and confirm the follow-up request sends one combined user message, not N separate ones; the Anthropic API accepts it without a 400",
+    "wire_on": false
+  },
+  {
+    "born_id": 533,
+    "title": "/model and /provider bypass the busy gate and can splice two backends into one in-flight native-agent turn (distinct from the already-fixed 'switch reported success but silently no-op'ed' incident bug)",
+    "sources": [
+      "repl:src/cli/repl/app.tsx:1004"
+    ],
+    "severity": "P1",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/repl/app.tsx"
+    ],
+    "proposed_mode": "run",
+    "spec": "Gate /model and /provider switches behind the same busy-check other mutating commands respect, so a switch mid-turn can't splice a different backend into an already-in-flight request/response cycle. Note: this is a genuinely different bug from the same-day incident fix (confirmed live and working via getAdapter/getModel getters) where the switch was previously a silent no-op — this is a race on an otherwise-working switch, not a repeat of that fixed bug.",
+    "verify": "start a long-running turn, immediately issue /model <other>, and confirm the in-flight turn either completes on its original backend or is cleanly cancelled — never a spliced mixed-backend response",
+    "wire_on": false
+  },
+  {
+    "born_id": 534,
+    "title": "approval-terminal-channel.ts's dispose() detaches the relay channel but leaves the closure-captured decisionHandler live, risking a double-invocation on a later decide() call",
+    "sources": [
+      "repl:src/cli/repl/approval-terminal-channel.ts:85"
+    ],
+    "severity": "P2",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/repl/approval-terminal-channel.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Null out or otherwise invalidate the captured decisionHandler reference inside dispose() so a decide() call after disposal cannot still fire the stale handler.",
+    "verify": "dispose a channel, then call decide() again and confirm no stale handler executes",
+    "wire_on": false
+  },
+  {
+    "born_id": 535,
+    "title": "deckent_bash hardening — no timeout/cancellation for a hanging shell command, and hardcodes spawn('bash', ...) which fails on native Windows without WSL/Git-Bash",
+    "sources": [
+      "repl:src/cli/commands/chat-tool-exec.ts:56",
+      "repl:src/cli/commands/chat-tool-exec.ts:58"
+    ],
+    "severity": "P1",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/commands/chat-tool-exec.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Add a timeout+cancellation path so a hanging shell command doesn't freeze the current turn indefinitely; make the shell binary selection platform-aware (cmd.exe/PowerShell on native Windows) instead of hardcoding 'bash' (part of the broader Windows-native breakage cluster, born-579).",
+    "verify": "run a deliberately-hanging shell command and confirm the turn recovers via timeout; on a native-Windows CI runner confirm deckent_bash doesn't ENOENT",
+    "wire_on": false
+  },
+  {
+    "born_id": 536,
+    "title": "chat-tool-exec.ts's inScope() path-traversal guard is purely lexical (path.relative) and never resolves symlinks — a symlink pointing outside scope can bypass the write-scope boundary",
+    "sources": [
+      "repl:src/cli/commands/chat-tool-exec.ts:86"
+    ],
+    "severity": "P2",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/commands/chat-tool-exec.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Resolve symlinks (fs.realpath) before the lexical relative-path scope check so a symlink can't be used to write outside the declared scope.",
+    "verify": "create a symlink inside scope pointing to a file outside scope, attempt a write through it, and confirm the guard rejects it",
+    "wire_on": false
+  },
+  {
+    "born_id": 537,
+    "title": "deckent_edit_file silently replaces only the FIRST occurrence of `old`, and an empty/missing `old` silently no-ops instead of erroring",
+    "sources": [
+      "repl:src/cli/commands/chat-tool-exec.ts:127"
+    ],
+    "severity": "P2",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/commands/chat-tool-exec.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Either require old to uniquely match exactly once (erroring on 0 or 2+ matches, matching the Edit-tool convention elsewhere in this codebase) or add an explicit replace-all option; make empty/missing old raise a visible error instead of a silent no-op.",
+    "verify": "call deckent_edit_file with an old string that matches twice and confirm an error, not a silent first-only replace",
+    "wire_on": false
+  },
+  {
+    "born_id": 538,
+    "title": "chat-tool-bridge.ts's '[mcp-error] tool not allowed: <name>' message is returned identically for genuinely-disallowed tools and for allowed tools that simply crashed, hiding the real failure",
+    "sources": [
+      "repl:src/cli/commands/chat-tool-bridge.ts:364"
+    ],
+    "severity": "P3",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/commands/chat-tool-bridge.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Distinguish the two cases in the returned message (permission-denied vs runtime-error) so a user/LLM can tell which actually happened.",
+    "verify": "crash an allowed tool and confirm the error message differs from a genuine permission-denial message",
+    "wire_on": false
+  },
+  {
+    "born_id": 539,
+    "title": "chat-permissions.ts's writePermissions overwrites permissions.allow from the in-memory Set only, losing concurrent grants written by another process",
+    "sources": [
+      "repl:src/cli/commands/chat-permissions.ts:57"
+    ],
+    "severity": "P2",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/commands/chat-permissions.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Read-merge-write instead of blind-overwrite: re-read the on-disk permissions.allow immediately before writing and union with the in-memory Set, so a concurrent grant from another process/session isn't silently lost.",
+    "verify": "grant a permission from two concurrent sessions and confirm both grants survive in the final settings.local.json",
+    "wire_on": false
+  },
+  {
+    "born_id": 540,
+    "title": "chat-render-region.ts's writeAbove only clears the current terminal row before redrawing, leaving stale content when the pinned input region grows across a redraw",
+    "sources": [
+      "repl:src/cli/commands/chat-render-region.ts:68"
+    ],
+    "severity": "P2",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/commands/chat-render-region.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Clear the full previously-occupied region (not just the current row) before redrawing writeAbove's content.",
+    "verify": "grow the pinned input region across multiple lines mid-session and confirm no stale row content remains above it",
+    "wire_on": false
+  },
+  {
+    "born_id": 541,
+    "title": "chat-render-region.ts's safePrompt swallows ALL exceptions from rl.prompt(true), not just the documented 'readline was closed' case",
+    "sources": [
+      "repl:src/cli/commands/chat-render-region.ts:55"
+    ],
+    "severity": "P3",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/commands/chat-render-region.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Narrow the catch to the specific documented 'readline was closed' error, and rethrow/log anything else instead of silently swallowing it.",
+    "verify": "force an unrelated exception inside rl.prompt(true) and confirm it now surfaces instead of vanishing",
+    "wire_on": false
+  },
+  {
+    "born_id": 542,
+    "title": "agent/guards/self-modifying.ts's checkSelfModifying() tests raw (possibly-absolute) write-target strings against relative source-path prefixes, making the self-modify guard bypassable with an absolute path",
+    "sources": [
+      "repl:src/agent/guards/self-modifying.ts:21"
+    ],
+    "severity": "P1",
+    "subsystem": "agent",
+    "primary_files": [
+      "src/agent/guards/self-modifying.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Normalize both the write-target and the source-path prefixes to the same absolute/relative form before comparison, closing the bypass. Security-relevant: this guard backs the ADR-039 self-modify protection referenced elsewhere in project memory.",
+    "verify": "attempt a self-modifying write using an absolute path variant of a path the guard is supposed to block, and confirm it's still blocked",
+    "wire_on": false
+  },
+  {
+    "born_id": 543,
+    "title": "agent/loop.ts cancel() robustness — cannot interrupt a tool handler already in flight, and mid-batch cancellation can leave orphaned tool_use blocks with no matching tool_result",
+    "sources": [
+      "repl:src/agent/loop.ts:150",
+      "repl:src/agent/loop.ts:150",
+      "repl:src/agent/loop.ts:168"
+    ],
+    "severity": "P2",
+    "subsystem": "agent",
+    "primary_files": [
+      "src/agent/loop.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Wrap `await def.handler(call)` with an isCancelled()/abort check so cancel() can actually interrupt an in-flight tool handler; when cancellation happens mid-batch, either synthesize a placeholder tool_result for orphaned tool_use blocks or otherwise ensure the transcript never contains an unmatched tool_use (which providers may reject on the next turn).",
+    "verify": "issue cancel() during a slow tool call and confirm the turn actually stops, not just the UI; force a mid-batch cancel and confirm no orphaned tool_use block reaches the next provider request",
+    "wire_on": false
+  },
+  {
+    "born_id": 544,
+    "title": "provider-tooluse/openai.ts synthesizes tool-call IDs that are only index+name-scoped per request, risking ID collisions against a backend that never emits real tool_call_id values",
+    "sources": [
+      "repl:src/agent/provider-tooluse/openai.ts:47"
+    ],
+    "severity": "P2",
+    "subsystem": "providers",
+    "primary_files": [
+      "src/agent/provider-tooluse/openai.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Scope synthesized tool-call IDs to something globally unique per turn (e.g. a monotonic counter + request id), not just index+name, to avoid collisions across multi-round turns.",
+    "verify": "construct a multi-round turn with repeated tool names at the same index across rounds and confirm no ID collision in the transcript",
+    "wire_on": false
+  },
+  {
+    "born_id": 545,
+    "title": "provider-tooluse/anthropic.ts discards the response body on a non-OK HTTP response, throwing only a bare status code and losing the actual error detail",
+    "sources": [
+      "repl:src/agent/provider-tooluse/anthropic.ts:61"
+    ],
+    "severity": "P3",
+    "subsystem": "providers",
+    "primary_files": [
+      "src/agent/provider-tooluse/anthropic.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Read and include the response body (or at least its error message field) in the thrown error, not just the HTTP status code.",
+    "verify": "force a 400/429 response and confirm the resulting error message includes the API's actual error detail, not just a number",
+    "wire_on": false
+  },
+  {
+    "born_id": 546,
+    "title": "agent/transcript.ts's Transcript has no truncation/eviction — a session's message history grows unbounded and is resent in full on every turn",
+    "sources": [
+      "repl:src/agent/transcript.ts:11"
+    ],
+    "severity": "P2",
+    "subsystem": "agent",
+    "primary_files": [
+      "src/agent/transcript.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Add a truncation/eviction policy (distinct from context-budget.ts's compaction, which has its own orphaned-tool-result bug tracked separately) so a long-running session doesn't resend an ever-growing full transcript on every turn, inflating cost and latency.",
+    "verify": "run a long synthetic session and confirm transcript size/resend-cost is bounded, not linearly growing forever",
+    "wire_on": false
+  },
+  {
+    "born_id": 547,
+    "title": "entry.ts's buildCliStream NDJSON mode-lock has no fallback for parsed-but-non-assistant JSON lines (delta===null), silently dropping them",
+    "sources": [
+      "repl:src/cli/entry.ts:333"
+    ],
+    "severity": "P2",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/entry.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Add a fallback branch for parsed-but-non-assistant NDJSON lines instead of silently dropping them when delta is null.",
+    "verify": "feed a non-assistant NDJSON line through buildCliStream and confirm it's handled/logged, not silently dropped",
+    "wire_on": false
+  },
+  {
+    "born_id": 548,
+    "title": "Provider credential-resolution inconsistency — subscriptionReplEnv() omits Gemini API-key vars used unconditionally for .stream(), and native-transport.ts's deepseek/qwen/glm resolution never consults the `.deck` secrets store unlike claude/openai",
+    "sources": [
+      "repl:src/cli/entry.ts:200",
+      "repl:src/cli/repl/native-transport.ts:161"
+    ],
+    "severity": "P2",
+    "subsystem": "providers",
+    "primary_files": [
+      "src/cli/entry.ts",
+      "src/cli/repl/native-transport.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Add the missing Gemini API-key env vars to subscriptionReplEnv(); make deepseek/qwen/glm credential resolution consult the `.deck` secrets store the same way claude/openai already do, for consistent subscription-mode behavior across providers.",
+    "verify": "run gemini subscription-mode .stream() and confirm it has its required env vars; store a deepseek key via `.deck` and confirm native-transport.ts actually reads it",
+    "wire_on": false
+  },
+  {
+    "born_id": 549,
+    "title": "entry.ts/run.tsx signal-handling doesn't tear down the persistent REPL/session on exit — SIGTERM/SIGINT leaves the warm provider child and MCP broker connections orphaned, and never fires at all on Windows",
+    "sources": [
+      "repl:src/cli/entry.ts:797",
+      "repl:src/cli/entry.ts:807",
+      "repl:src/cli/entry.ts:803",
+      "repl:src/cli/repl/run.tsx:403"
+    ],
+    "severity": "P1",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/entry.ts",
+      "src/cli/repl/run.tsx"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Make the global SIGINT/SIGTERM handler (onSignal) aware of the persistent REPL provider session so it tears down the warm child before exiting, instead of exiting immediately and bypassing the REPL's own teardown; tear down MCP broker/subprocess connections opened by run.tsx on REPL exit (currently never closed); as part of the Windows-native cluster (born-579), ensure this cleanup path actually fires on Windows (currently documented as never firing there).",
+    "verify": "start a persistent session, send SIGTERM, and confirm the warm child process is gone (not orphaned) via process-list check; repeat on a Windows-native runner and confirm the handler actually fires",
+    "wire_on": false
+  },
+  {
+    "born_id": 550,
+    "title": "Off-TTY (piped stdin) CLI invocation auto-approves every side-effecting tool call with no confirmation gate at all",
+    "sources": [
+      "repl:src/cli/entry.ts:708"
+    ],
+    "severity": "P1",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/entry.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Do not silently default to auto-approve-all when stdin is piped/non-TTY; require an explicit --auto-approve/--yes flag for side-effecting tool calls in this mode, since a piped invocation is exactly the automation/CI scenario where an unattended destructive action is highest-risk.",
+    "verify": "pipe input into a non-TTY invocation that triggers a destructive tool call and confirm it is NOT auto-approved without an explicit flag",
+    "wire_on": false
+  },
+  {
+    "born_id": 551,
+    "title": "An exception escaping the native engine's turn loop (e.g. a permission-grant disk-write failure) is silently swallowed instead of surfacing to the user",
+    "sources": [
+      "repl:src/cli/repl/app.tsx:866"
+    ],
+    "severity": "P1",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/repl/app.tsx"
+    ],
+    "proposed_mode": "run",
+    "spec": "Surface turn-loop exceptions to the user (transcript error indicator) instead of swallowing them — a failed permission-grant write should not vanish silently.",
+    "verify": "force a permission-grant disk-write failure mid-turn and confirm the user sees an error, not silence",
+    "wire_on": false
+  },
+  {
+    "born_id": 552,
+    "title": "An MCP tool with an empty-string (not undefined) description crashes the entire REPL launch on the native engine",
+    "sources": [
+      "repl:src/cli/repl/native-tool-registry.ts:375"
+    ],
+    "severity": "P1",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/repl/native-tool-registry.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Treat an empty-string description the same as undefined (default/fallback text) instead of letting it crash tool-registry construction at REPL launch.",
+    "verify": "connect an MCP server exposing a tool with description:'' and confirm the REPL still launches",
+    "wire_on": false
+  },
+  {
+    "born_id": 553,
+    "title": "chat-mcp-bridge.ts robustness — a misconfigured MCP server is silently dropped from the tool catalogue with no user-visible indication, and a non-JSON-serializable successful result gets double-audited (once 'ok', once 'error')",
+    "sources": [
+      "repl:src/cli/commands/chat-mcp-bridge.ts:234",
+      "repl:src/cli/commands/chat-mcp-bridge.ts:280"
+    ],
+    "severity": "P2",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/commands/chat-mcp-bridge.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Surface a visible warning when an MCP server is dropped from the catalogue instead of silent omission; fix the audit-write path so a successful-but-non-serializable result is recorded once, correctly, not twice with contradictory outcomes.",
+    "verify": "connect a misbehaving MCP server and confirm a visible warning appears; return a non-JSON-serializable result from a tool call and confirm exactly one audit entry is written",
+    "wire_on": false
+  },
+  {
+    "born_id": 554,
+    "title": "Web/API terminal 'shell' session kind defaults to a hardcoded 'bash' when $SHELL is unset, breaking on hosts without bash",
+    "sources": [
+      "repl:src/api/terminal/session-manager.ts:34"
+    ],
+    "severity": "P2",
+    "subsystem": "api",
+    "primary_files": [
+      "src/api/terminal/session-manager.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Fall back to a platform-appropriate default shell (cmd.exe/PowerShell on Windows, sh as a POSIX baseline) instead of hardcoding 'bash' when SHELL is unset.",
+    "verify": "unset SHELL on a host without bash on PATH and confirm the web terminal still launches a working shell",
+    "wire_on": false
+  },
+  {
+    "born_id": 555,
+    "title": "permission-store.ts's persist() silently discards ALL of settings.local.json's content (not just permissions.rules) when the file is malformed or has additional keys — a real data-loss risk",
+    "sources": [
+      "repl:src/agent/permission-store.ts:88"
+    ],
+    "severity": "P1",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/agent/permission-store.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Read-merge-write: preserve any unrelated keys already present in settings.local.json and only update the permissions.rules subtree, instead of overwriting the whole file's content.",
+    "verify": "add an unrelated custom key to settings.local.json, trigger a permission grant, and confirm the custom key survives the write",
+    "wire_on": false
+  },
+  {
+    "born_id": 556,
+    "title": "Doc/code mismatch — native-transport.ts's comment claims Ollama's default context budget is 32k tokens; the code two lines below actually returns 24k",
+    "sources": [
+      "repl:src/cli/repl/native-transport.ts:205"
+    ],
+    "severity": "P3",
+    "subsystem": "repl",
+    "primary_files": [
+      "src/cli/repl/native-transport.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Fix whichever is wrong (comment or the returned constant) so they agree.",
+    "verify": "grep confirms the comment and the returned value state the same number",
+    "wire_on": false
+  },
+  {
+    "born_id": 557,
+    "title": "doctor.ts defines 3 separate status-icon vocabularies independently, risking presentation drift across doctor's own output sections",
+    "sources": [
+      "audit:§3.1(MİNÖR-durum-ikon-vocabulary-tutarsızlığı-doctor.ts-3-sözlük)"
+    ],
+    "severity": "P3",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/commands/doctor.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Consolidate doctor.ts's 3 independent status-icon dictionaries into one shared vocabulary/module.",
+    "verify": "grep confirms a single icon-vocabulary source used by all doctor output sections",
+    "wire_on": false
+  },
+  {
+    "born_id": 558,
+    "title": "`deckent skill list` crashes (exit 1) on any v2-schema skill manifest — the one live-reproduced user-facing crash in the whole audit",
+    "sources": [
+      "audit:§2.3(skill-list-v2-manifest-crash)",
+      "audit:§6(live-probe-15-cmds-1-crash)",
+      "audit:§8(priority-action-1)"
+    ],
+    "severity": "P0",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/commands/skill.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "loadAllSkills() (skill.ts:39-58) does zero schema validation/normalization before skill.ts:234's `s.triggers.slice(0,3)` — a v2-schema manifest using `activation.rules` instead of `triggers` (e.g. the shipped secure-coding skill) has no `triggers` field and crashes. Add v2-manifest normalization/schema validation to loadAllSkills() so `triggers` is always a safe array (derived from activation.rules when needed) before any renderer touches it.",
+    "verify": "run `deckent skill list` in a project containing a v2-schema (activation.rules) skill manifest and confirm exit 0, not exit 1",
+    "wire_on": false
+  },
+  {
+    "born_id": 559,
+    "title": "Two default-ON CRITICAL failure modes in the sprint lifecycle — waitForHumanApproval has no timeout (infinite wait) and the ADR-compliance scanner fails OPEN (pass:true) on its own crash",
+    "sources": [
+      "audit:§4.5(CRITICAL-1-waitForHumanApproval-no-timeout·CRITICAL-2-ADR-scanner-fail-open)",
+      "audit:§8(priority-action-4)"
+    ],
+    "severity": "P0",
+    "subsystem": "orchestra",
+    "primary_files": [
+      "src/orchestra/sprint-lifecycle.ts",
+      "src/orchestra/authority-enforcer.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "sprint-lifecycle.ts:490-511's `while(true)` human-approval wait has no timeout — a forgotten/lost approval request hangs a sprint forever; authority-enforcer.ts:600-629's ADR-compliance scanner returns pass:true on its own crash instead of failing closed, silently disabling the compliance gate exactly when something has already gone wrong. Add a bounded timeout+escalation path to the approval wait, and flip the ADR scanner to fail-closed (pass:false + surfaced alert) on internal crash.",
+    "verify": "simulate a lost approval request and confirm the sprint escalates/times out instead of hanging forever; force the ADR scanner to throw internally and confirm the sprint treats it as a compliance FAILURE, not a silent pass",
+    "wire_on": false
+  },
+  {
+    "born_id": 560,
+    "title": "RBAC (ADR-037) is never called in the SPAWN phase mainline, is soft-by-default everywhere else, and its grant/revoke API has zero readers — a three-layer governance facade",
+    "sources": [
+      "audit:§4.4(CRITICAL-2-RBAC-mainline-spawn-never-called+soft)",
+      "audit:§4.2(hop-9-SPAWN-fazı-RBAC-hiç-çağırmıyor)",
+      "audit:§2.3(rbac-grant/revoke-process-only-Map-check-okumuyor)"
+    ],
+    "severity": "P0",
+    "subsystem": "core-governance",
+    "primary_files": [
+      "src/orchestra/sprint-phases.ts",
+      "src/core/authority-enforcer.ts",
+      "src/cli/commands/rbac.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Wire actual RBAC enforcement into the SPAWN phase (sprint-phases.ts~965-1027) instead of it being entirely absent from that call path; make authority-enforcer.ts's soft-mode (:261-271) an explicit, audited opt-in rather than the silent default; make rbac.ts's grant/revoke actually persist to something the enforcement check reads (currently an in-memory Map nobody consults).",
+    "verify": "attempt a SPAWN with a task outside an agent's granted role and confirm it is actually blocked (not just logged); grant a role via rbac.ts and confirm a subsequent enforcement check reads that grant",
+    "wire_on": false
+  },
+  {
+    "born_id": 561,
+    "title": "Auto-approve semantics are inconsistent across surfaces — CLI start.ts/run.ts hardcode or ignore the flag while MCP deckent_start defaults the opposite way",
+    "sources": [
+      "audit:§4.2(hop-1-start.ts:455-autoApprove-hardcoded-true·hop-2-MCP-deckent_start-default-false)",
+      "audit:§2.3(run---auto-approve-bayrağı-yok-sayılıyor-run.ts:260)",
+      "audit:§8(priority-action-7)"
+    ],
+    "severity": "P1",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/commands/start.ts",
+      "src/cli/commands/run.ts",
+      "src/mcp/tools/start.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Remove start.ts:455's hardcoded `autoApprove:true` and run.ts:260's ignored flag; align both CLI paths with MCP deckent_start's honored default-false semantics so --auto-approve means the same thing everywhere.",
+    "verify": "run `deckent run --auto-approve=false` and confirm it's actually honored (not silently ignored); compare CLI start vs MCP deckent_start default behavior side-by-side",
+    "wire_on": false
+  },
+  {
+    "born_id": 562,
+    "title": "Unwired safety-net cluster in the sprint/approval lifecycle — cost_guard monitor, resumeSprint, ApprovalExpiryDriver, ApprovalStore.prune(), resolveTokenUsage, and restoreFromSnapshot are all fully built but never called",
+    "sources": [
+      "audit:§4.5(MAJOR-7-cost_guard+resumeSprint+ApprovalExpiryDriver-üçü-tam-inşa-sıfır-çağıran)",
+      "audit:§4.2(hop-8-resolveTokenUsage-hiç-çağrılmıyor·hop-12-restoreFromSnapshot-çağrılmıyor)",
+      "audit:§4.3(ApprovalStore.prune()-prodüksiyonda-hiç-çağrılmıyor-sınırsız-dosya-birikimi)",
+      "audit:§8(priority-action-5)"
+    ],
+    "severity": "P1",
+    "subsystem": "orchestra",
+    "primary_files": [
+      "src/orchestra/sprint-phases.ts",
+      "src/orchestra/sprint-lifecycle.ts",
+      "src/orchestra/token-counter.ts",
+      "src/orchestra/sprint-finalizer.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Wire each of these five fully-built, zero-caller safety nets to a real call site: mid-sprint cost_guard monitor (sprint-phases.ts:3084-3196), resumeSprint (sprint-lifecycle.ts:615-680), ApprovalExpiryDriver's prune, ApprovalStore.prune() (unbounded file accumulation without it), the more-accurate resolveTokenUsage() (token-counter.ts:303-315, currently unused in favor of a less-accurate path), and restoreFromSnapshot (the pre-archive snapshot is currently write-only).",
+    "verify": "trigger a cost overrun and confirm cost_guard actually intervenes; kill and confirm resumeSprint is reachable from a real recovery path; run N sprints and confirm ApprovalStore's on-disk file count stays bounded, not growing linearly",
+    "wire_on": false
+  },
+  {
+    "born_id": 563,
+    "title": "Tenant isolation defaults OFF and NULL-tenant rows can leak across tenants in memory-store.ts",
+    "sources": [
+      "audit:§4.3(MAJOR-tenant-izolasyonu-default-OFF-NULL-tenant-satır-sızıntısı-memory-store.ts:756-767,99-101)"
+    ],
+    "severity": "P1",
+    "subsystem": "core",
+    "primary_files": [
+      "src/core/memory-store.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Make tenant isolation default-ON (or at minimum, make NULL-tenant rows never match a query scoped to a real tenant) so a multi-tenant deployment can't accidentally see cross-tenant data via the NULL-tenant fallback path.",
+    "verify": "seed rows under two distinct tenants plus one NULL-tenant row and confirm a tenant-scoped query never returns another tenant's rows",
+    "wire_on": false
+  },
+  {
+    "born_id": 564,
+    "title": "PANIC_IPC marker reader fails OPEN — absent an explicit reject marker, any parseable marker is treated as APPROVED",
+    "sources": [
+      "audit:§4.5(MAJOR-5-PANIC_IPC-marker-reader-panic-gate.ts:105-116)"
+    ],
+    "severity": "P1",
+    "subsystem": "orchestra",
+    "primary_files": [
+      "src/orchestra/panic-gate.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Flip panic-gate.ts's marker interpretation to fail-closed: require an explicit APPROVE marker, treat anything ambiguous/malformed as a deny, not an approve.",
+    "verify": "feed a malformed/ambiguous marker into the panic-gate reader and confirm it is treated as denied, not approved",
+    "wire_on": false
+  },
+  {
+    "born_id": 565,
+    "title": "Embedded/web terminal's 'ai' session kind spawns a client-supplied `tool` string without validation — the deny-list only covers kind==='shell'",
+    "sources": [
+      "audit:§4.4(MAJOR-3-embedded-terminal-ai-kind-client-supplied-tool-string-doğrulanmadan-spawn-server.ts:1961-1969)"
+    ],
+    "severity": "P1",
+    "subsystem": "dashboard",
+    "primary_files": [
+      "src/api/server.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Apply the same tool-allowlist/deny-list validation to kind==='ai' spawns that already exists for kind==='shell'; a client-supplied tool string should never reach spawn() unvalidated regardless of session kind.",
+    "verify": "attempt to open an 'ai'-kind embedded terminal session with a disallowed tool string and confirm it's rejected, matching the existing shell-kind behavior",
+    "wire_on": false
+  },
+  {
+    "born_id": 566,
+    "title": "MCP writer-lease gate fails OPEN on a filesystem error instead of denying the write",
+    "sources": [
+      "audit:§4.5(MAJOR-6-MCP-writer-lease-fs-hatasında-fail-open-writer-lease-gate.ts:65-73)"
+    ],
+    "severity": "P1",
+    "subsystem": "mcp",
+    "primary_files": [
+      "src/mcp/writer-lease-gate.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Flip the writer-lease gate's error handling to fail-closed: an fs error while checking/acquiring the lease should deny the write, not silently allow it.",
+    "verify": "simulate an fs error during a lease check and confirm the write is denied, not allowed",
+    "wire_on": false
+  },
+  {
+    "born_id": 567,
+    "title": "The \"mandatory\" assertSpawnSafe guard is never actually called before any real spawn call-site",
+    "sources": [
+      "audit:§4.4(MAJOR-8-mandatory-assertSpawnSafe-hiçbir-gerçek-spawn'dan-önce-çağrılmıyor-spawn-safety.ts)"
+    ],
+    "severity": "P1",
+    "subsystem": "core",
+    "primary_files": [
+      "src/core/spawn-safety.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Wire assertSpawnSafe into every real provider/subprocess spawn call-site (it currently guards nothing) so its documented safety checks actually run before a process is spawned.",
+    "verify": "grep confirms assertSpawnSafe is called at every provider spawn call-site; a crafted unsafe spawn args set is actually rejected by it in a live run",
+    "wire_on": false
+  },
+  {
+    "born_id": 568,
+    "title": "Process/signal hygiene — no process-group kill leaves grandchild processes orphaned, and only the Claude-subprocess adapter escalates SIGTERM to SIGKILL (the other 5 provider adapters just kill()+delete from the map)",
+    "sources": [
+      "audit:§4.5(MAJOR-4-orphan-child-birikimi-yalnız-claude-subprocess-SIGTERM→SIGKILL-diğer-5-adapter-tek-kill)",
+      "audit:§3.2(sinyal/kill-PID-process-group-kill-yok-grandchild-orphan-subprocess.ts:481-499)"
+    ],
+    "severity": "P1",
+    "subsystem": "providers",
+    "primary_files": [
+      "src/providers/subprocess.ts",
+      "src/providers/codex.ts",
+      "src/providers/gemini.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Kill the whole process group (not just the direct child) on every provider adapter's teardown path, so grandchild processes aren't orphaned; give all provider adapters the same SIGTERM→timeout→SIGKILL escalation the Claude-subprocess adapter already has instead of a bare single kill() call.",
+    "verify": "spawn a provider whose child itself spawns a grandchild, kill the adapter, and confirm the grandchild is also gone via process-list check on all 6 adapters",
+    "wire_on": false
+  },
+  {
+    "born_id": 569,
+    "title": "Nervous's stall/event-health detectors can't reach any notification channel, and even full-auto mode still degrades any non-maintenance action to an inert Brain-inbox suggestion",
+    "sources": [
+      "audit:§4.5(CRITICAL-ama-opt-in-9-nervous-stall/event-health-detektörleri-işlevsiz-ACTION_REGISTRY-mismatch)",
+      "audit:§2.5(NEYİ-YAPAMAZ-2-nervous-full-auto'da-bile-inert-Brain-inbox-önerisi·NEYİ-YAPAMAZ-3-3-detektör-hiçbir-kanala-ulaşamıyor)"
+    ],
+    "severity": "P1",
+    "subsystem": "nervous",
+    "primary_files": [
+      "src/nervous/decision-engine.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Fix the ACTION_REGISTRY mismatch so the build-failure-recurrence, dead-event-stream, and notification-delivery-health detectors can actually reach a real notification channel instead of being silently swallowed; decide and document whether full-auto mode should ever autonomously execute a non-maintenance action, or explicitly scope nervous's mandate to inbox-suggestion-only for that class of action.",
+    "verify": "trigger each of the 3 detectors in a test harness and confirm at least one real channel (log/notify/dashboard) receives the event",
+    "wire_on": false
+  },
+  {
+    "born_id": 570,
+    "title": "mission-mode + autonomous-mission v2 engine are inert by default — a row is written to SQLite but the engine that would drain it is type-cast disabled in default config, and the migration is one-directional",
+    "sources": [
+      "audit:§2.3(PARTIAL-mission-modu-SQLite-satırı-yazılır-ama-drenaj-eden-engine-v2-kapalı-kalıcı-inert)",
+      "audit:§2.5(NEYİ-YAPAMAZ-5-autonomous-mission-create-*-default-config'de-asla-çalışmaz)"
+    ],
+    "severity": "P2",
+    "subsystem": "orchestra",
+    "primary_files": [
+      "src/orchestra/"
+    ],
+    "proposed_mode": "run",
+    "spec": "Either enable the v2 engine by default (with a smoke-proof) or make `autonomous-mission create-*`/`mission` fail loudly with an honest 'engine disabled' message instead of silently writing an inert row that will never drain.",
+    "verify": "run `mission` end-to-end on a default-config project and confirm either real draining occurs, or an honest upfront error instead of a silently-inert write",
+    "wire_on": false
+  },
+  {
+    "born_id": 571,
+    "title": "`flow` can never automatically trigger a sprint/task — approveDispatch() has no reader and there is no `flow approve` subcommand; only the cron half of flow is real, the event-trigger dispatch half is dead",
+    "sources": [
+      "audit:§2.3(PARTIAL-flow-cron-gerçek-event-trigger-dispatch-ölü-flow-runtime.ts:37)",
+      "audit:§2.5(NEYİ-YAPAMAZ-1-flow-asla-otomatik-sprint/task-tetikleyemez)"
+    ],
+    "severity": "P1",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/commands/flow.ts",
+      "src/orchestra/flow-runtime.ts",
+      "src/core/event-trigger.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Wire a real reader for approveDispatch() and add the missing `flow approve` subcommand so an event-triggered flow can actually reach sprint/task dispatch, closing the gap between flow's real cron half and its currently-dead event-trigger half.",
+    "verify": "configure an event-triggered flow, fire the triggering event, and confirm a real sprint/task dispatch occurs end-to-end",
+    "wire_on": false
+  },
+  {
+    "born_id": 572,
+    "title": "API's run.start-detached / approval.decide RPC write-handlers are implemented but never routed by the server — directly contradicts TERM-RPC (born-54, marked DONE with 'v1 read+write TAMAM')",
+    "sources": [
+      "audit:§5(rpc-write-handlers.ts-server-import-etmiyor)",
+      "audit:§2.5(NEYİ-YAPAMAZ-6-API'den-run.start-detached/approval.decide-çağrılamaz)",
+      "masterplan:54(TERM-RPC, marked DONE — contradicted by this audit finding)"
+    ],
+    "severity": "P1",
+    "subsystem": "api",
+    "primary_files": [
+      "src/api/rpc-write-handlers.ts",
+      "src/api/server.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Either import/route rpc-write-handlers.ts's run.start-detached and approval.decide methods in server.ts so the API path actually works as TERM-RPC's DONE status claims, or correct that row's status to reflect the read-only reality and open a fresh tracked gap for the write-side.",
+    "verify": "call run.start-detached and approval.decide through the real HTTP RPC endpoint (not the REPL local-transport) and confirm a 200, not a 404/unrouted",
+    "wire_on": false
+  },
+  {
+    "born_id": 573,
+    "title": "WorkerApprovalGate is never `new`'d anywhere in production and the Slack/Teams rich-approval fan-out isn't actually connected — directly contradicts APR-WORKERGATE (born-34) and APR-CLIENTS (born-70), both marked DONE",
+    "sources": [
+      "audit:§4.4(MAJOR-7-WorkerApprovalGate-hiç-instantiate-edilmiyor)",
+      "audit:§2.5(NEYİ-YAPAMAZ-9-worker-taraf-approval-gate-hiçbir-seviyesiyle-aktif-değil)",
+      "masterplan:34(APR-WORKERGATE, marked DONE — contradicted)",
+      "masterplan:70(APR-CLIENTS, marked DONE — contradicted)"
+    ],
+    "severity": "P0",
+    "subsystem": "orchestra",
+    "primary_files": [
+      "src/orchestra/worker.ts",
+      "src/agent/permission-store.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Instantiate WorkerApprovalGate at the actual worker-side risky-action call site (currently it exists, tested, and unused) so worker-side approval enforcement is real, not decorative; verify and wire the Slack/Teams rich-approval fan-out that APR-CLIENTS claimed as DONE. This is a disk-verified contradiction of two closed MASTER-PLAN rows and should be treated as a P0 governance-integrity gap, not routine tech debt.",
+    "verify": "trigger a risky worker action and confirm a real WorkerApprovalGate instance is consulted (breakpoint/log-verified `new WorkerApprovalGate`); trigger a Slack/Teams-configured approval and confirm the message actually arrives in that channel",
+    "wire_on": false
+  },
+  {
+    "born_id": 574,
+    "title": "deckent_nervous_undo cannot actually undo anything — no compensating-action executor exists anywhere in the codebase, contradicting DEFER-002 (born-75)'s closure",
+    "sources": [
+      "audit:§2.5(NEYİ-YAPAMAZ-13-nervous_undo-hiçbir-şeyi-geri-alamaz-compensating-action-executor-kod-tabanında-yok)",
+      "masterplan:75(DEFER-002, closed GO_WITH_TECH_DEBT — contradicted by this audit finding)"
+    ],
+    "severity": "P1",
+    "subsystem": "mcp",
+    "primary_files": [
+      "src/mcp/tools/nervous.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Build the compensating-action executor deckent_nervous_undo actually needs (it currently has nothing to call), or change the tool's contract/documentation to honestly state that undo is not yet possible instead of silently no-oping.",
+    "verify": "accept a nervous action, then call deckent_nervous_undo and confirm a real compensating action is executed, not a silent no-op",
+    "wire_on": false
+  },
+  {
+    "born_id": 575,
+    "title": "Enterprise RBAC/rate-limit API write-then-read round-trip is broken — POST writes to config, but GET returns a static matrix/live snapshot instead of what was just written",
+    "sources": [
+      "audit:§2.3(PARTIAL-Enterprise-RBAC/rate-API-yaz-sonra-oku-round-trip-kırık-enterprise-endpoint.ts:630-866)",
+      "audit:§2.5(NEYİ-YAPAMAZ-7-Enterprise-RBAC/rate-ayarı-API'den-yaz-sonra-oku-yapılamaz)"
+    ],
+    "severity": "P2",
+    "subsystem": "api",
+    "primary_files": [
+      "src/api/enterprise-endpoint.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Make the GET path actually read back what the POST path wrote (or document clearly why they're intentionally different), closing the round-trip gap.",
+    "verify": "POST a new RBAC/rate config value, GET it back, and confirm the value matches what was written",
+    "wire_on": false
+  },
+  {
+    "born_id": 576,
+    "title": "Embeddable SDK is code-complete but package.json doesn't publish its exports — no external npm consumer can actually use it, contradicting F2-008 (born-60)'s completeness claim",
+    "sources": [
+      "audit:§2.3(PARTIAL-Embeddable-SDK-kod-tam-package.json-exports-yayınlamıyor)",
+      "audit:§2.5(NEYİ-YAPAMAZ-11-Embeddable-SDK-dış-npm-tüketicisi-tarafından-kullanılamaz)",
+      "masterplan:60(F2-008, marked DONE for internal round-trip — external consumability contradicted)"
+    ],
+    "severity": "P2",
+    "subsystem": "core",
+    "primary_files": [
+      "package.json"
+    ],
+    "proposed_mode": "run",
+    "spec": "Add the SDK's public entry point(s) to package.json's exports map so an external npm consumer (not just the in-repo CLI/tests) can actually `import { createDeckentClient } from 'deckent'`.",
+    "verify": "in a scratch external project, `npm install` this package and successfully import/instantiate createDeckentClient without any repo-relative path hack",
+    "wire_on": false
+  },
+  {
+    "born_id": 577,
+    "title": "`deckent_autonomous action=start` doesn't actually start the autonomous loop — it only deletes the .stop marker; the real engine only starts via the terminal `deckent autonomous start`",
+    "sources": [
+      "audit:§2.3(PARTIAL-deckent_autonomous-action=start-yalnız-.stop-marker-siler-loop-spawn-etmez)",
+      "audit:§2.5(NEYİ-YAPAMAZ-4-deckent_autonomous-action=start-motoru-gerçekten-başlatmaz)"
+    ],
+    "severity": "P2",
+    "subsystem": "mcp",
+    "primary_files": [
+      "src/mcp/tools/autonomous.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Either make the MCP tool actually spawn the autonomous loop (matching its name's implication), or rename/redocument it honestly as marker-clear-only and point users at the terminal command for a real start.",
+    "verify": "call deckent_autonomous action=start via MCP and confirm either a real loop is running afterward, or the tool's description is corrected to not imply that it is",
+    "wire_on": false
+  },
+  {
+    "born_id": 578,
+    "title": "`init --repair`'s failedSteps report field never populates — repair failures are invisible to the user",
+    "sources": [
+      "audit:§2.5(Yanıltıcı-raporlama-init---repair-başarısız-adım-raporlamaz)"
+    ],
+    "severity": "P3",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/commands/init.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Populate failedSteps with any step that actually failed during --repair, instead of leaving the report field permanently empty.",
+    "verify": "force one repair step to fail and confirm the CLI's final report lists it under failedSteps",
+    "wire_on": false
+  },
+  {
+    "born_id": 579,
+    "title": "`doctor --pre-flight` is silently disabled in npm-installed setups because scripts/ isn't packaged, reporting misleadingly as if everything were fine",
+    "sources": [
+      "audit:§2.5(Yanıltıcı-raporlama-doctor---pre-flight-npm-installed-kurulumda-sessizce-devre-dışı)"
+    ],
+    "severity": "P2",
+    "subsystem": "cli",
+    "primary_files": [
+      "src/cli/commands/doctor.ts",
+      "package.json"
+    ],
+    "proposed_mode": "run",
+    "spec": "Either package scripts/ so pre-flight works for npm-installed consumers, or make doctor --pre-flight report honestly that the check is unavailable in this install mode instead of silently skipping.",
+    "verify": "npm-install the package in a scratch project, run doctor --pre-flight, and confirm it either works or honestly says it can't",
+    "wire_on": false
+  },
+  {
+    "born_id": 580,
+    "title": "Windows-native breakage cluster — bare spawn() bypasses the safe CLI-invocation builder across 5 provider adapters plus the sprint job runner and finalize, credentials chmod is a no-op on NTFS, onboard skips its own win32-shell flag, and Docker backend event-loop/shell-out issues compound the platform gap",
+    "sources": [
+      "audit:§3.2(platform-matrisi-native-Windows-4-bağımsız-kırılma)",
+      "audit:§4.2(hop-12-native-Win-finalize-spawnSync('npx')-ENOENT)",
+      "audit:§8(priority-action-8)",
+      "audit:mop-up(spawn-backend-docker.ts:1471-1476-Atomics.wait-busy-sleep-blocks-event-loop-5s+sleep-binary-shell-out-absent-on-Windows)",
+      "audit:mop-up(resource-monitor.ts-docker-binary-hardcoded-no-podman-fallback-deckent-w--prefix-sole-discovery)",
+      "audit:§3.2(mcp/tools/init.ts:85,101-kozmetik-POSIX-/-path-bug)",
+      "audit:§3.2(Node->=24.0.0-baseline-excludes-18/20-LTS)"
+    ],
+    "severity": "P1",
+    "subsystem": "cross-platform",
+    "primary_files": [
+      "src/providers/codex.ts",
+      "src/providers/gemini.ts",
+      "src/providers/ollama.ts",
+      "src/orchestra/sprint-job-runner.ts",
+      "src/orchestra/sprint-finalizer.ts",
+      "src/core/credentials-per-project.ts",
+      "src/cli/commands/onboard.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Replace bare spawn() with buildCliInvocation() (already correct and used elsewhere) at codex.ts:175, gemini.ts:277, plus ollama/openai-compat/openrouter, and sprint-job-runner.ts:28's bare spawn('deckent'); fix sprint-finalizer.ts:279-311's spawnSync('npx') to go through a shell-aware invocation (currently ENOENTs on native Windows, breaking the self-audit gate); harden credentials-per-project.ts's chmod calls so Windows gets a real ACL-based restriction instead of a silent no-op; fix onboard.ts:225-230 to actually apply its own win32-shell flag instead of skipping it (currently a silent 'skipped' init); fix mcp/tools/init.ts:85,101's cosmetic POSIX '/' path construction; separately, spawn-backend-docker.ts's synchronous Atomics.wait/SharedArrayBuffer busy-sleep blocks the event loop up to 5s per call and shells out to a `sleep` binary absent on native Windows — replace with a real async wait; resource-monitor.ts hardcodes the `docker` binary with no podman fallback and a `deckent-w-` prefix as its sole discovery mechanism, going silently blind on any other backend — broaden discovery or fail loudly; confirm whether the Node >=24.0.0 baseline excluding 18/20 LTS is an intentional support-matrix decision and document the rationale if so.",
+    "verify": "run the full provider-spawn + sprint-job-runner + finalize + onboard chain on a native-Windows CI runner (not WSL) end-to-end without an ENOENT; confirm resource-monitor reports honestly (not silently blind) against a non-docker backend",
+    "wire_on": false
+  },
+  {
+    "born_id": 581,
+    "title": "promotion-pipeline.ts contains a bare `require('fs')` inside an ESM module — a runtime ReferenceError risk if no build-shim is present",
+    "sources": [
+      "audit:mop-up(promotion-pipeline.ts:504-çıplak-require('fs')-ESM-modülde)"
+    ],
+    "severity": "P2",
+    "subsystem": "core",
+    "primary_files": [
+      "src/orchestra/promotion-pipeline.ts"
+    ],
+    "proposed_mode": "run",
+    "spec": "Replace the bare require('fs') with a proper ESM `import` (matching the rest of the codebase's Node16/ESM convention) so this doesn't depend on an incidental build-shim.",
+    "verify": "run this module's code path without any CommonJS-shim build step and confirm no ReferenceError",
+    "wire_on": false
+  },
+  {
+    "born_id": 582,
+    "title": "Systemic error-swallowing in orchestra hot paths — sprint-finalizer.ts and sprint-phases.ts together contain 214+ catch blocks; needs a dedicated review pass for silently-eaten failures",
+    "sources": [
+      "audit:§4.5(MAJOR-3-finalize+phases'te-yaygın-error-swallowing-121+93-catch)"
+    ],
+    "severity": "P2",
+    "subsystem": "orchestra",
+    "primary_files": [
+      "src/orchestra/sprint-finalizer.ts",
+      "src/orchestra/sprint-phases.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Audit every catch block in these two files; for each, decide explicitly whether swallowing is intentional (add a comment saying why) or a bug (surface/log it) — this is a dedicated review sprint, not a single fix.",
+    "verify": "produce a per-catch-block disposition list (intentional vs fixed) covering all 214+ sites; spot-check 10 fixed sites for an actual surfaced error/log where previously silent",
+    "wire_on": false
+  },
+  {
+    "born_id": 583,
+    "title": "Residual governance minor-findings bundle — plugin signature verification defaults off with no trusted-key infra, an opaque bearer token grants full tenant-admin on enterprise endpoints, the terminal tool deny-list is a no-op on loopback, and the bot's tool-risk classifier uses a SAFE-before-RISKY substring check",
+    "sources": [
+      "audit:§4.4(MINOR/INFO-9-13: plugin-require_signature-default-false·opaque-bearer=tam-tenant-admin-enterprise-endpoint.ts:359-375·terminal-deny-list-loopback-no-op·bot-SAFE-önce-RISKY-sınıflandırma·gateway-credential-bootstrap-PLAUSIBLE)"
+    ],
+    "severity": "P2",
+    "subsystem": "core-governance",
+    "primary_files": [
+      "src/api/enterprise-endpoint.ts",
+      "src/connectors/"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Require a trusted-key chain before honoring plugin signatures (currently accepted with require_signature default false and no trusted-key infra at all); scope opaque bearer tokens to something less than blanket tenant-admin on enterprise endpoints; make the terminal tool deny-list actually apply on loopback connections; fix the bot's tool-risk classifier (connectors, distinct from the CLI's agentic-confirm.ts) to check RISKY patterns before SAFE substrings; verify the gateway credential-bootstrap path (flagged PLAUSIBLE, unconfirmed) end-to-end.",
+    "verify": "attempt an unsigned plugin load and confirm rejection once require_signature is on; call an enterprise endpoint with an opaque bearer scoped to a non-admin role and confirm it's denied admin actions; construct a bot-tool name containing both SAFE and RISKY substrings and confirm RISKY wins",
+    "wire_on": false
+  }
+]
