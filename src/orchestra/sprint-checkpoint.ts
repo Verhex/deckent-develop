@@ -659,7 +659,26 @@ export function restoreSprintFromCheckpoint(
   for (const id of taskIds) {
     const taskPath = join(projectRoot, TASKS_DIR, `task-${id}.json`);
     const t = readJsonSafe<Task>(taskPath);
-    if (t) tasks.push(t);
+    if (!t) continue;
+    // born-562 — un-pause a circuit-breaker-paused task on resume. The cascade
+    // circuit-breaker (sprint-controller PAUSE_SPRINT → pauseSprint) sets
+    // status=PAUSED + drops a `.paused` marker AFTER the last phase checkpoint
+    // already captured the task in `pendingTasks` (by id). restore reads the
+    // task.json verbatim, so it would rebuild the task PAUSED — and spawnWorkers
+    // only dispatches PENDING → the task is silently STRANDED on `deckent
+    // resume`. Flip it back to PENDING (the marker records it was pending work)
+    // and clear the marker so it re-dispatches on the same path as any other
+    // pending task. Marker-guarded: a no-op for every task that was never
+    // paused, so the common resume path stays byte-identical.
+    const pausedMarker = join(projectRoot, TASKS_DIR, `task-${id}.paused`);
+    if (t.status === TaskStatus.PAUSED && existsSync(pausedMarker)) {
+      t.status = TaskStatus.PENDING;
+      try { writeFileSync(taskPath, JSON.stringify(t, null, 2), 'utf-8'); }
+      catch (e) { debugLog('restoreSprintFromCheckpoint:unpause', e); }
+      try { unlinkSync(pausedMarker); }
+      catch (e) { debugLog('restoreSprintFromCheckpoint:unlinkPaused', e); }
+    }
+    tasks.push(t);
   }
 
   // Sprint 159 forensic: preserve startedAt across restart.
