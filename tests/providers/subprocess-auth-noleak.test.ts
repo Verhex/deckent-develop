@@ -157,7 +157,20 @@ describe('Sprint 333 333-001 — subprocess backend per-worker auth NON-LEAK (F1
     backend.spawn('t-base', 'gpt-5-codex' as ModelType, 'prompt', { env: { OPENAI_API_KEY: 'k' } });
 
     const env = spawnedEnv(spawnImpl);
-    expect(env['PATH']).toBe(process.env['PATH']);
+    // WORKER-GIT-GUARD (born-499): the subprocess backend prepends a per-task
+    // git-shim dir (buildGitGuardDir → <tmpdir>/deckent-git-guard/<taskId>-<hex>)
+    // to PATH on POSIX so a worker `git` resolves to the stash/reset-blocking
+    // wrapper; win32 skips it (POSIX-only shim). Either way the host PATH is
+    // preserved verbatim — as the suffix when the guard prepends, or unchanged
+    // on win32. The guard only prepends one entry; it never rewrites PATH.
+    const hostPath = process.env['PATH'] ?? '';
+    const childPath = env['PATH'] ?? '';
+    expect(childPath.endsWith(hostPath)).toBe(true);
+    if (childPath !== hostPath) {
+      expect(childPath.slice(0, childPath.length - hostPath.length)).toMatch(
+        /deckent-git-guard[/\\][^/\\:;]+[:;]$/,
+      );
+    }
     expect(env['LANG']).toBe('en_US.UTF-8');
     expect(env['PYTHONIOENCODING']).toBe('utf-8');
     expect(env['DECKENT_NONSECRET_PROBE']).toBe('keep-me');
