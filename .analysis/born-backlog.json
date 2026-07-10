@@ -2419,5 +2419,87 @@
   ],
   "spec": "Kapsam-envanteri cikar (hangi tests/* dizini hangi job'da; kosulmayanlar listesi) -> ya yeni job(lar) ya umbrella-genisletme; ardindan 9-dosya latent-set RCA+fix (kpi-backfill, brain/decisions 11-fail, init-builtin-seed, dead-code-decisions, orphan-deliverables 95-86 drifti, tmux-backend, docker-oom/hb, nervous-faz1-smoke). Maliyet-dengesi: e2e/docker aileleri belki nightly-job.",
   "verify": "CI job-haritasi = tests/* tam-kapsam (veya gerekceli-haric listesi); yeni job'lar yesil"
+ },
+ {
+  "sources": [
+   ".analysis/prompt-contract-verification-2026-07-10.md (Alperen dis-analiz dogrulamasi; Faz-0.9)"
+  ],
+  "subsystem": "orchestra",
+  "born_id": 618,
+  "severity": "P0",
+  "proposed_mode": "brain-el-kod-veya-dedike-sprint",
+  "title": "SAN-1: sanitizeScope Rule-5 trackedFiles-aware — kok-dosya sessiz-drop biter (README/.secrets-baseline vakasi) + scopeWarnings→prompt-gate BLOCK (bugun sifir-tuketici)",
+  "primary_files": [
+   "src/orchestra/scope-sanitizer.ts"
+  ]
+ },
+ {
+  "sources": [
+   ".analysis/prompt-contract-verification-2026-07-10.md (Alperen dis-analiz dogrulamasi; Faz-0.9)"
+  ],
+  "subsystem": "orchestra",
+  "born_id": 619,
+  "severity": "P0",
+  "proposed_mode": "brain-el-kod-veya-dedike-sprint",
+  "title": "G1b: satisfiability-lint — olu validateGoCriteriaScope (planner.ts:973) genislet+evaluatePromptGate'e wire (anilan∉filesWrite=BLOCK · Kanit-path-yok=BLOCK · unchanged∩WRITE=WARN)",
+  "primary_files": [
+   "src/orchestra/planner.ts",
+   "src/orchestra/prompt-gate.ts"
+  ]
+ },
+ {
+  "sources": [
+   ".analysis/prompt-contract-verification-2026-07-10.md (Alperen dis-analiz dogrulamasi; Faz-0.9)"
+  ],
+  "subsystem": "orchestra",
+  "born_id": 620,
+  "severity": "P0",
+  "proposed_mode": "brain-el-kod-veya-dedike-sprint",
+  "title": "SAN-2: scope-gate suggestion-adoption (listede→typo-dusur · unambiguous→auto-replace · force-scope yalniz gercek-belirsize) + fix-cascade scope RE-GATE (397-007-fix typo-miras vakasi)",
+  "primary_files": [
+   "src/core/scope-gate.ts",
+   "src/orchestra/sprint-controller.ts"
+  ]
+ },
+ {
+  "sources": [
+   ".analysis/prompt-contract-verification-2026-07-10.md (Alperen dis-analiz dogrulamasi; Faz-0.9)"
+  ],
+  "subsystem": "orchestra",
+  "born_id": 621,
+  "severity": "P0",
+  "proposed_mode": "brain-el-kod-veya-dedike-sprint",
+  "title": "G6: task-tipi-farkinda verify-matrisi (code/test/data/docs) + stack-detector typecheck alani (ciplak `npx tsc` DoD'u = sprint-ortasi dist-emit YASAK-op — keser)",
+  "primary_files": [
+   "src/core/stack-detector.ts",
+   "src/orchestra/prompt-god-template.ts"
+  ]
+ },
+ {
+  "sources": [
+   ".analysis/prompt-contract-verification-2026-07-10.md (Alperen dis-analiz dogrulamasi; Faz-0.9)"
+  ],
+  "subsystem": "orchestra",
+  "born_id": 622,
+  "severity": "P1",
+  "proposed_mode": "worker",
+  "title": "ROUTING-DECISION-LOG: selectBestAgent skor-dokumu journal'a (397-007 api-builder-kazanimi kapatilamadi) + G3 operation-class kok-fix",
+  "primary_files": [
+   "src/core/routing-engine.ts"
+  ]
+ },
+ {
+  "sources": [
+   ".analysis/prompt-contract-verification-2026-07-10.md (Alperen dis-analiz dogrulamasi; Faz-0.9)"
+  ],
+  "subsystem": "orchestra",
+  "born_id": 623,
+  "severity": "P2",
+  "proposed_mode": "worker",
+  "title": "E005-FOLLOWUP: path-resolution icin ayri error-code (397-007 ELOOP'a scope-violation kodu takti)",
+  "primary_files": [
+   "src/core/errors.ts",
+   "src/cli/commands/chat-tool-exec.ts"
+  ]
  }
 ]
