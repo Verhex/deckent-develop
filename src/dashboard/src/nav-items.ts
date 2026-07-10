@@ -74,3 +74,23 @@ export const navGroups: ReadonlyArray<NavGroup> = [
 
 /** Flat list derived from groups — used by AppShell and backward-compat consumers. */
 export const navItems: ReadonlyArray<NavItem> = navGroups.flatMap((g) => g.items);
+
+/**
+ * DESK-B2-DASHBOARD-BRIDGE (392-008): ADR-G-033 relocates interactive chat to
+ * the Desktop app, so the Chat entry (the "talk" group) must lead the nav
+ * when running inside Desktop. The "talk" group already leads `navGroups`
+ * today (Sprint 282 IA) — this is a defensive re-sort that guards the
+ * invariant even if a future edit reorders `navGroups`, rather than a silent
+ * behavioral no-op. Does not mutate `navGroups`/`navItems` (existing
+ * consumers/tests keep their current, unpinned order).
+ *
+ * NOTE: Layout.tsx (the nav's sole renderer) is not yet wired to call this
+ * with a live isDesktop flag — that wiring is a follow-up outside this
+ * task's write scope (App.tsx / nav-items.ts only).
+ */
+export function getNavGroups(isDesktop: boolean): ReadonlyArray<NavGroup> {
+  if (!isDesktop) return navGroups;
+  const talkGroups = navGroups.filter((g) => g.groupLabel === "talk");
+  const otherGroups = navGroups.filter((g) => g.groupLabel !== "talk");
+  return [...talkGroups, ...otherGroups];
+}

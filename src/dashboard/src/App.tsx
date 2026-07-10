@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { LanguageProvider } from "./i18n/LanguageProvider";
 import { AuthProvider } from "./hooks/useAuth";
@@ -49,6 +49,15 @@ function Lazy({ children }: { children: ReactNode }) {
   return <Suspense fallback={<SkeletonCard />}>{children}</Suspense>;
 }
 
+// DESK-B2-DASHBOARD-BRIDGE (392-008): `window.deckentDesktop` is only present
+// when the dashboard is loaded inside the DESK-1 Electron shell (typed via the
+// ambient hand-mirror at src/dashboard/src/types/desktop-global.d.ts — SSOT:
+// src/desktop/src/shared/desktop-api.ts, kept in sync by
+// scripts/lint-desktop-api-sync.mjs). Computed once at module scope: the
+// preload's contextBridge exposure happens before the renderer's own scripts
+// run, so this is stable for the lifetime of the page.
+const isDesktop = typeof window !== "undefined" && window.deckentDesktop?.isDesktop === true;
+
 // DASH-MOUNT-CARDS (374-003): LimitsCard (366-005) and EvaluateHealthCard
 // (370-007) were written but never mounted anywhere. DashboardPage.tsx itself
 // is out of this task's write scope, so the mount happens here — wrapping the
@@ -56,7 +65,16 @@ function Lazy({ children }: { children: ReactNode }) {
 // instead of adding a new nav entry. Additive, below the dashboard's own
 // content; Layout.tsx's <main className="grid ... gap-6"> already spaces
 // Outlet's direct children, so no extra layout CSS is needed here.
+//
+// DESK-B2-DASHBOARD-BRIDGE (392-008): ADR-G-033 relocates interactive chat to
+// the Desktop app — "/" is not a meaningful Desktop landing page, so inside
+// Desktop this component redirects straight to "/chat" instead of rendering
+// the observability dashboard. The browser path (isDesktop === false) is
+// untouched — same DashboardPage + cards render as before.
 function DashboardWithObservability() {
+  if (isDesktop) {
+    return <Navigate to="/chat" replace />;
+  }
   return (
     <>
       <DashboardPage />

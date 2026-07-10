@@ -3076,6 +3076,82 @@ const MESSAGES: MessageMap = {
     en: 'Opens a continuous, human-out-of-the-loop decision/work loop.',
     tr: 'Sürekli, insan-döngü-dışı bir karar/iş döngüsü açar.',
   },
+
+  // ─── desktop shell (DESK-1, born-496) ─────────────────────────────────
+  // Consumed via src/desktop/src/main/i18n.ts's t()/getDesktopStrings() —
+  // never call getMessage directly from desktop main-process modules.
+  'desktop.tray.open': { en: 'Open Deckent', tr: "Deckent'i Aç" },
+  'desktop.tray.quit': { en: 'Quit', tr: 'Çıkış' },
+  'desktop.tray.tooltip': { en: 'Deckent Desktop', tr: 'Deckent Masaüstü' },
+  'desktop.connection.add_title': { en: 'Add Connection', tr: 'Bağlantı Ekle' },
+  'desktop.connection.kind.local': { en: 'Local', tr: 'Yerel' },
+  'desktop.connection.kind.wsl': { en: 'WSL', tr: 'WSL' },
+  'desktop.connection.kind.ssh': { en: 'SSH', tr: 'SSH' },
+  'desktop.connection.kind.container': { en: 'Container', tr: 'Konteyner' },
+  'desktop.connection.kind_not_yet_supported': {
+    en: '{kind} connections are not yet available.',
+    tr: '{kind} bağlantıları henüz kullanılamıyor.',
+  },
+  'desktop.connection.connect_button': { en: 'Connect', tr: 'Bağlan' },
+  'desktop.connection.delete_confirm': {
+    en: 'Delete connection "{label}"?',
+    tr: '"{label}" bağlantısını sil?',
+  },
+  'desktop.connecting.spawning': {
+    en: 'Starting deckent daemon…',
+    tr: 'deckent daemon başlatılıyor…',
+  },
+  'desktop.connecting.adopting': {
+    en: 'Connecting to running daemon…',
+    tr: 'Çalışan daemon\'a bağlanılıyor…',
+  },
+  'desktop.connecting.health_check': {
+    en: 'Checking daemon health…',
+    tr: 'Daemon sağlığı kontrol ediliyor…',
+  },
+  'desktop.connecting.retry': {
+    en: 'Retrying connection…',
+    tr: 'Bağlantı yeniden deneniyor…',
+  },
+  'desktop.error.node_not_found': {
+    en: 'Node.js was not found on the target. Install Node.js 18+ to run deckent.',
+    tr: "Hedefte Node.js bulunamadı. deckent'i çalıştırmak için Node.js 18+ yükleyin.",
+  },
+  'desktop.error.deckent_not_found': {
+    en: 'deckent was not found on the target. Install it with `npm install -g deckent`.',
+    tr: "Hedefte deckent bulunamadı. `npm install -g deckent` ile yükleyin.",
+  },
+  'desktop.error.port_conflict': {
+    en: 'Port {port} is already in use on the target.',
+    tr: '{port} portu hedefte zaten kullanımda.',
+  },
+  'desktop.error.daemon_crashed': {
+    en: 'The deckent daemon crashed unexpectedly.',
+    tr: 'deckent daemon beklenmedik şekilde çöktü.',
+  },
+  'desktop.error.health_timeout': {
+    en: 'The daemon did not become healthy in time.',
+    tr: 'Daemon zamanında sağlıklı hale gelmedi.',
+  },
+  'desktop.error.view_logs': { en: 'View Logs', tr: 'Günlükleri Görüntüle' },
+  'desktop.window.minimize_to_tray_hint': {
+    en: 'Deckent keeps running in the tray. Right-click the tray icon to reopen or quit.',
+    tr: "Deckent, sistem tepsisinde çalışmaya devam eder. Yeniden açmak veya çıkmak için tepsi simgesine sağ tıklayın.",
+  },
+  'desktop.update.available': {
+    en: 'A new version is available.',
+    tr: 'Yeni bir sürüm mevcut.',
+  },
+  'desktop.update.downloading': { en: 'Downloading update…', tr: 'Güncelleme indiriliyor…' },
+  'desktop.update.restart_to_apply': {
+    en: 'Restart Deckent to apply the update.',
+    tr: "Güncellemeyi uygulamak için Deckent'i yeniden başlatın.",
+  },
+  'desktop.update.check_for_updates': {
+    en: 'Check for Updates',
+    tr: 'Güncellemeleri Denetle',
+  },
+  'desktop.menu.help': { en: 'Help', tr: 'Yardım' },
 };
 
 /**

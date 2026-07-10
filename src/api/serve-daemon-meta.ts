@@ -19,14 +19,29 @@
  * design: readers MUST treat it as a hint and re-verify via pid-ownership + /health
  * (steps 2-3), never as proof of a live daemon.
  */
-import { chmodSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { DECKENT_DIR, DECKENT_VERSION } from '../core/constants.js';
 import { processStartToken } from '../core/pid-ownership.js';
-import { readJsonSafe } from '../core/utils.js';
 import { createDebugLog } from '../core/debug-log.js';
 
 const debug = createDebugLog('serve-daemon-meta');
+
+/**
+ * Local minimal JSON reader — deliberately NOT core/utils.readJsonSafe: that
+ * import drags the whole core/types → config-types → connectors type-hub into
+ * every consumer's typecheck program, which breaks the desktop shell's
+ * DOM-lib tsconfig on unrelated files (sprint-392 xfix root-cause,
+ * --explainFiles-traced). This module must stay a leaf: node builtins +
+ * constants + pid-ownership + debug-log only.
+ */
+function readJsonFileSafe<T>(filePath: string): T | null {
+  try {
+    return JSON.parse(readFileSync(filePath, 'utf-8')) as T;
+  } catch {
+    return null;
+  }
+}
 
 /** Repo-relative path of the daemon handshake file. */
 export const SERVE_DAEMON_META_PATH = join(DECKENT_DIR, 'serve-daemon.json');
@@ -80,7 +95,7 @@ export function writeServeDaemonMeta(projectRoot: string, input: ServeDaemonMeta
  * minimal shape (pid + port + projectRoot) — callers never see a half-formed meta.
  */
 export function readServeDaemonMeta(projectRoot: string): ServeDaemonMeta | null {
-  const raw = readJsonSafe<ServeDaemonMeta>(join(projectRoot, SERVE_DAEMON_META_PATH));
+  const raw = readJsonFileSafe<ServeDaemonMeta>(join(projectRoot, SERVE_DAEMON_META_PATH));
   if (!raw || typeof raw !== 'object') return null;
   if (typeof raw.pid !== 'number' || typeof raw.port !== 'number' || typeof raw.projectRoot !== 'string') {
     return null;

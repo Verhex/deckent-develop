@@ -2074,5 +2074,68 @@
   "spec": "Loop bu alana sprint PLANLAMAZ (cakisma-onleme). Alperen merge edince result-file/commit-dedup ile kapanis islenir. Kapsam Alperen'de: REPL tool-dispatch baglanmamis tool'lar + muhtemelen born-586 @-referans ile birlikte.",
   "verify": "merge-sonrasi: ana-agacta tsc+ilgili suite yesil; loop-dedup guncellenir",
   "wire_on": "alperen-karari"
+ },
+ {
+  "sources": [
+   "advisor-2026-07-10 consult#7 (DESK-1 B2 security deep-read)"
+  ],
+  "subsystem": "desktop",
+  "proposed_mode": "worker",
+  "born_id": 597,
+  "severity": "P0",
+  "title": "DESK-CHANNEL-TIERING: loadURL-swap sonrasi daemon-served dashboard mainFrame olur -> connection-yonetim kanallarina TAM erisim (RELEASE-BLOCKING, DESK-1 B3)",
+  "primary_files": [
+   "src/desktop/src/main/ipc-handlers.ts"
+  ],
+  "spec": "isTrustedSender mainFrame-kontrolu remote-served dashboard'i da gecirir: connections.list (tum profiller+projectPaths) + add+connect (yerel deckent binary spawn, saldirgan-cwd) + remove. handleConnect http:// hardcode (ipc-handlers.ts:162) ile MITM->shell-control zinciri. FIX: kanal-katmanlama — connection-yonetim kanallari ek olarak isLocalRendererUrl(senderFrame.url) istesin; window/app kanallari mevcut kontrolde kalsin (RegisterIpcHandlersDeps'e inject).",
+  "verify": "unit: remote-frame fixture connection.* reddedilir, local-renderer gecer; window.* iki durumda da calisir",
+  "wire_on": "default-on (guvenlik); DESK-1 release-gate"
+ },
+ {
+  "sources": [
+   "advisor-2026-07-10 consult#7 (DESK-1 B2 security deep-read)"
+  ],
+  "subsystem": "desktop",
+  "proposed_mode": "worker",
+  "born_id": 598,
+  "severity": "P1",
+  "title": "DESK-ADOPT-PORT-MISMATCH: adopt health-verify meta.host:port ama final-URL profile.host:port -> canli-daemon farkli-portta ise olu-URL yuklenir",
+  "primary_files": [
+   "src/desktop/src/main/ipc-handlers.ts",
+   "src/desktop/src/main/daemon-lifecycle.ts"
+  ],
+  "spec": "decideConnectionAction :115 meta.host:meta.port dogrular; handleConnect :162 profile.host:profile.port kullanir. FIX: adopt'ta meta'nin host:port'unu kullan (veya adopt-sarti port-esitligi).",
+  "verify": "unit: meta-port!=profile-port fixture -> dogru URL veya spawn-karari"
+ },
+ {
+  "sources": [
+   "advisor-2026-07-10 consult#7 (DESK-1 B2 security deep-read)"
+  ],
+  "subsystem": "connectors",
+  "proposed_mode": "worker",
+  "born_id": 599,
+  "severity": "P2",
+  "title": "VOICE-BODYINIT-TYPE: local-voice.ts fetch body Buffer -> DOM-lib altinda tip-hatasi (latent); Uint8Array'e cevir",
+  "primary_files": [
+   "src/connectors/voice/local-voice.ts"
+  ],
+  "spec": "Buffer BodyInit'e atanamiyor (DOM lib). new Uint8Array(buffer) runtime-esdeger ve iki lib'de de gecerli. Desktop-tsconfig regresyon-muhafizi tsc:desktop (CI'ya girmeli — root lint zincirinde).",
+  "verify": "tsc:desktop yesil kalir; connectors testleri yesil"
+ },
+ {
+  "sources": [
+   "advisor-2026-07-10 consult#7 (DESK-1 B2 security deep-read)"
+  ],
+  "subsystem": "desktop",
+  "proposed_mode": "worker",
+  "born_id": 600,
+  "severity": "P1",
+  "title": "DESK-REMOTE-PROFILE-TRANSPORT: non-localhost profil http:// + uyarisiz -> https/tunel zorunlulugu veya loud-warn (wsl/ssh fazlari oncesi)",
+  "primary_files": [
+   "src/desktop/src/main/ipc-handlers.ts",
+   "src/desktop/src/shared/desktop-api.ts"
+  ],
+  "spec": "handleConnect plain http hardcode; localhost-disi host'ta ya https/ssh-tunel zorunlu ya acik kullanici-uyarisi (i18n). wsl/ssh kind'lari acilmadan cozulmeli.",
+  "verify": "unit: non-localhost profil -> uyari/redd yolu"
  }
 ]
