@@ -2532,5 +2532,21 @@
   ],
   "spec": "Progress denominatoru toplam-task'i (fix'ler dahil) yansitsin ya da fix'ler ayri satirda sayilsin; %100 asimi gorunmez olmali.",
   "verify": "fixture: 6+6fix -> dürüst gosterim"
+ },
+ {
+  "born_id": 626,
+  "severity": "P0",
+  "subsystem": "desktop",
+  "proposed_mode": "design-then-approve-then-build",
+  "title": "DESK-2: DESKTOP ÜRÜN-UX — Claude-Desktop/Codex-app sınıfı birinci-sınıf masaüstü deneyimi (dashboard-reuse DEĞİL)",
+  "sources": [
+   "Alperen 2026-07-10: \"dashboardın aynısı olması değil; kapsamlı enterprise-level ürün istiyorum — deckent serve çalıştırması başarı değil, netleştirelim\""
+  ],
+  "primary_files": [
+   "src/desktop/"
+  ],
+  "spec": "B1-B3 altyapısı (daemon/adopt/güvenlik/IPC) ÜZERINE sıfırdan desktop-ürün renderer'ı: chat-first ana-yüzey (agent-konuşması + tool-çağrı kartları + inline onay-kartları [Faz-1 611 API/SSE relay tüketicisi]) · run/sprint zaman-çizelgesi · gömülü terminal (daemon-PTY) · proje/profil değiştirici · ayarlar · oturum-geçmişi. Dashboard İZLEME-yüzeyi olarak ayrışır (Codex-analizin dashboard-kimlik çelişkisi de böyle çözülür). AKIŞ: (1) UX-blueprint tasarım-turu (bilgi-mimarisi + ekran-akışları + görsel-yön) → (2) Alperen-onayı → (3) dilim-dilim inşa (chat-çekirdeği → onay-kartları → timeline → terminal → ayarlar). MVP YASAK — tam-kapsam tasarlanır, sıralı ship edilir.",
+  "verify": "her dilim gerçek-binary smoke (Playwright-Electron) + Alperen user-truth turu",
+  "wire_on": "DESK-1 release-tanımı DESK-2'siz TAMAM SAYILMAZ (Alperen-netleştirmesi)"
  }
 ]
