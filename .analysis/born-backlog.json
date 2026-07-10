@@ -1920,5 +1920,142 @@
   "spec": "serve.ts deseni birebir: olu process.on(SIGINT/SIGTERM) listener'larini kaldir, cleanup'i src/cli/helpers/shutdown-hooks.ts registerShutdownHook'a tasi (idempotent-hook kontrati; sinyal-agnostik; entry tek sinyal-sahibi). Her komut icin cleanup gercekten calisiyor mu REPRODUCE-first dogrula (bazilari baska yoldan cikiyor olabilir - once reachability).",
   "verify": "her komut icin unit-test (hook kaydi + hook davranisi) + en az 1 komutta real-binary sinyal smoke; sigterm-cleanup/teardown suite'leri dokunulmadan yesil",
   "wire_on": "default-on (olu-kod -> calisan-kod; davranis-iyilestirme)"
+ },
+ {
+  "sources": [
+   "canli-vaka 2026-07-10: sprint-392 ilk start gate-BLOK + background exit code 0"
+  ],
+  "subsystem": "cli",
+  "proposed_mode": "worker",
+  "wire_on": "default-on (hijyen-onarim)",
+  "born_id": 588,
+  "severity": "P2",
+  "title": "START-GATE-EXIT-HONESTY: scope-gate BLOK'lu `deckent start` exit 0 donuyor — script/CI icin dishonest",
+  "primary_files": [
+   "src/cli/commands/start.ts"
+  ],
+  "spec": "Gate-blok (BrainError/SCOPE_GATE_SUSPECT, COST_GATE vb.) -> non-zero exit. Mesaj ayni kalir. Diger BrainError cikis-yollarinin exit-code envanterini de dogrula.",
+  "verify": "hermetik CLI-test: gate-blok senaryosu exit!=0; normal tamamlanma exit 0"
+ },
+ {
+  "sources": [
+   "audit-2026-07-10: .analysis/sprint-agent-skill-prompt-audit-2026-07-10.md"
+  ],
+  "subsystem": "core-routing",
+  "proposed_mode": "worker",
+  "wire_on": "default-on (hijyen-onarim)",
+  "born_id": 589,
+  "severity": "P0",
+  "title": "AUDIT-P0-1 DOMAIN-ALIAS: detectDomains path-segment vocabulary'si ile agent/skill kural-vocabulary'sini esle (alias-map) + kural-lint",
+  "primary_files": [
+   "src/core/routing-engine.ts",
+   ".deckent/agents/",
+   ".deckent/skills/"
+  ],
+  "spec": "detectDomains ciktilari (orchestra, core, cli, dashboard...) ile kural-kelimeleri (orchestration, database, frontend, terminal-ui...) alias-map'le eslensin; lint: hicbir kuralda alias-map disinda ates-alamaz kelime kalmasin. 6 agent + ~17 olu kural canlanir (sh-portability \"orchestration\"!=orchestra en acisi; accessibility-auditor 0-erisimli).",
+  "verify": "unit: alias-cozumleme; entegrasyon: onceden-olu kurallarin ates aldigi fixture; kural-lint gate yesil"
+ },
+ {
+  "sources": [
+   "audit-2026-07-10: .analysis/sprint-agent-skill-prompt-audit-2026-07-10.md"
+  ],
+  "subsystem": "core-routing",
+  "proposed_mode": "worker",
+  "wire_on": "default-on (hijyen-onarim)",
+  "born_id": 590,
+  "severity": "P0",
+  "title": "AUDIT-P0-2 ACTIVATION-VALIDATION: activation semasi validate edilsin + bozuk-manifest sessiz-pool-dusmesi gorunur olsun",
+  "primary_files": [
+   "src/core/skill-pool.ts",
+   "src/core/agent-pool.ts"
+  ],
+  "spec": "Tek gercek skorlama girdisi activation HIC validate edilmiyor; bozuk JSON sessizce pool'dan dusuyor. Zod-sema + yukleme-aninda warn/metric (sessiz-yutma yok).",
+  "verify": "bozuk-manifest fixture -> gorunur uyari + pool-durumu dogru; mevcut manifestler gecer"
+ },
+ {
+  "sources": [
+   "audit-2026-07-10: .analysis/sprint-agent-skill-prompt-audit-2026-07-10.md"
+  ],
+  "subsystem": "core-routing",
+  "proposed_mode": "worker",
+  "wire_on": "default-on (hijyen-onarim)",
+  "born_id": 591,
+  "severity": "P0",
+  "title": "AUDIT-P0-3 AVGCOVERAGE-REPAIR: agent avgCoverage phantom-zero-dilution fix + skill avgCoverage hic yazilmiyor",
+  "primary_files": [
+   "src/orchestra/sprint-finalizer.ts",
+   "src/core/agent-pool.ts",
+   "src/core/skill-pool.ts"
+  ],
+  "spec": "Agent'larda ~3/100 anlamsiz deger (dilution bug), skill'lerde alan hep 0. Ogrenme/rating dongusu (korunan moat) kirli-veri yiyor. Kaynagi bul, dogru-hesapla, gecmis-cop icin backfill-veya-sifirlama karari notu birak.",
+  "verify": "hermetik: sentetik sprint-sonucu -> dogru avgCoverage her iki katmanda"
+ },
+ {
+  "sources": [
+   "audit-2026-07-10: .analysis/sprint-agent-skill-prompt-audit-2026-07-10.md"
+  ],
+  "subsystem": "core-routing",
+  "proposed_mode": "worker",
+  "wire_on": "default-on (hijyen-onarim)",
+  "born_id": 592,
+  "severity": "P0",
+  "title": "AUDIT-P0-4 MANIFEST-REPAIR: api-design hayalet-skill (icerik yok, 12 kullanim/%100) + i18n-quality/secure-coding builtins->canli inmemis",
+  "primary_files": [
+   ".deckent/skills/",
+   "src/core/builtins/"
+  ],
+  "spec": "api-design icerigi yaz-veya-emekli-et (stat-history karariyla); i18n-quality + secure-coding builtins'te var canliya inmemis -> sync/materialize (i18n-FIRST yasasi fiilen gorunmez durumda). born-502 builtins-reconcile ile SINIR: burada yalniz bu 3 manifest.",
+  "verify": "skill-pool listesinde 3 skill icerikli+erisir; routing fixture'da secilebilir"
+ },
+ {
+  "sources": [
+   "audit-2026-07-10: .analysis/sprint-agent-skill-prompt-audit-2026-07-10.md"
+  ],
+  "subsystem": "core-routing",
+  "proposed_mode": "worker",
+  "wire_on": "default-on (hijyen-onarim)",
+  "born_id": 593,
+  "severity": "P0",
+  "title": "AUDIT-P0-5 DNA-FILTER-STAT-CREDIT: filterSkillPromptsByDNA prompt'tan dusurdugu skill'e stat-kredisi yazmasin",
+  "primary_files": [
+   "src/orchestra/result-collector.ts",
+   "src/core/skill-pool.ts"
+  ],
+  "spec": "Secilen skill DNA-filtresiyle prompt'tan sessizce dusuyor ama kullanim/success kredisi aliyor -> ogrenme-dongusu zehirleniyor. Dususte kredi yazma + dusme gorunur (metric/debug).",
+  "verify": "unit: filtrelenen skill stat-almaz; filtre-metrigi artar"
+ },
+ {
+  "sources": [
+   "audit-2026-07-10: .analysis/sprint-agent-skill-prompt-audit-2026-07-10.md"
+  ],
+  "subsystem": "core-routing",
+  "proposed_mode": "worker",
+  "wire_on": "default-on (hijyen-onarim)",
+  "born_id": 594,
+  "severity": "P1",
+  "title": "AUDIT-P1-1 TESTING-INTENT: test-agirlikli task'lar testing intent'ine siniflansin + intent'in sahibi olsun (test-writer arsivli, sprint-148'den beri sahipsiz)",
+  "primary_files": [
+   "src/core/routing-engine.ts",
+   ".deckent/agents/"
+  ],
+  "spec": "%100 test-dosyasi yazan task implementation siniflaniyor; evolved-rules ci-guardian/bug-fixer'i implementation'dan dislamis -> forceAgent her sprint 9/9 overrideWarning. Siniflandirma + sahiplik fix'i uyarilari kokten keser.",
+  "verify": "fixture: test-only task -> testing intent + uygun persona overrideWarning'siz secilir"
+ },
+ {
+  "sources": [
+   "audit-2026-07-10: .analysis/sprint-agent-skill-prompt-audit-2026-07-10.md"
+  ],
+  "subsystem": "core-routing",
+  "proposed_mode": "worker",
+  "wire_on": "default-on (hijyen-onarim)",
+  "born_id": 595,
+  "severity": "P1",
+  "title": "AUDIT-P1-2 OVERRIDE-WARNING-SURFACE: router overrideWarnings plan-review/plan-ciktisina yukselsin (kimse gormuyor)",
+  "primary_files": [
+   "src/orchestra/sprint-planner.ts",
+   "src/cli/commands/plan.ts"
+  ],
+  "spec": "Sprint-391'de 9/9 task overrideWarnings tasidi, hicbir yuzeyde gorunmedi. Plan-tablosu/dry-run ciktisina + plan-review'a tasi (prompt-gate WARN'lari gibi).",
+  "verify": "plan dry-run fixture: override-warning gorunur; warning'siz plan ayni cikti"
  }
 ]
