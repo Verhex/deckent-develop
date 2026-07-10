@@ -2501,5 +2501,36 @@
    "src/core/errors.ts",
    "src/cli/commands/chat-tool-exec.ts"
   ]
+ },
+ {
+  "born_id": 624,
+  "severity": "P1",
+  "subsystem": "orchestra",
+  "proposed_mode": "brain-el-kod",
+  "title": "CROSSFIX-CLASS-AWARE: cross-dependency fix battaniye-suclama — failure-SINIFI bakilmadan tum upstream'lere xfix (\"may be caused\")",
+  "sources": [
+   "canli-vaka sprint-398: 006 EXIT_WITHOUT_RESULT (infra/self) -> 5 DONE-upstream'e xfix fan-out; sprint-392 ayni desen (7 fix, hepsi no-defect)"
+  ],
+  "primary_files": [
+   "src/orchestra/result-evaluator.ts",
+   "src/orchestra/sprint-controller.ts"
+  ],
+  "spec": "Cascade oncesi failure-sinifla: EXIT_WITHOUT_RESULT/timeout/OOM/sentetik-infra -> upstream-xfix ACILMAZ (yalniz kendi-fix'i); gercek-NO_GO'da blame kanit-esikli (failing-test/dosya upstream-scope'uyla kesisiyorsa) — \"may be caused\" fan-out kalkar.",
+  "verify": "fixture: infra-NO_GO + 5-dep -> 0 xfix; gercek cross-kanitli NO_GO -> yalniz ilgili upstream"
+ },
+ {
+  "born_id": 625,
+  "severity": "P2",
+  "subsystem": "cli",
+  "proposed_mode": "worker",
+  "title": "STATUS-PROGRESS-DENOM: fix-task'lar eklenince \"8/6 (133%)\" — denominator dinamik degil",
+  "sources": [
+   "canli-vaka sprint-398 status ciktisi"
+  ],
+  "primary_files": [
+   "src/cli/commands/status.ts"
+  ],
+  "spec": "Progress denominatoru toplam-task'i (fix'ler dahil) yansitsin ya da fix'ler ayri satirda sayilsin; %100 asimi gorunmez olmali.",
+  "verify": "fixture: 6+6fix -> dürüst gosterim"
  }
 ]
