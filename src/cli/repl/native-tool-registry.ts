@@ -13,6 +13,7 @@ import type { ToolDefinition, ToolPermissionTier, ToolResult } from '../../agent
 import { createToolExecDispatcher } from '../commands/chat-tool-exec.js';
 import { createCliToolDispatcher } from '../commands/chat-tool-bridge.js';
 import { classifyTool } from './tool-permissions.js';
+import { CLI_BRIDGE_TOOLS, WORST_CASE_CLASSIFY_ARGS } from './cli-bridge-tool-specs.js';
 import type { McpToolDispatcher } from '../commands/chat-native.js';
 import { SkillPoolManager } from '../../core/skill-pool.js';
 import { SkillLoadingCache } from '../../core/skill-cache.js';
@@ -383,12 +384,18 @@ export function buildNativeToolRegistry(opts: NativeToolRegistryOptions): ToolRe
     registry.register(defineFromDispatcher(name, DESCRIPTIONS[name]!, SCHEMAS[name]!, execToolTier(name), exec));
   }
 
-  // CLI-bridge tools (deckent_status/history/plan/…) — tier from classifyTool.
+  // CLI-bridge tools — the FULL dispatchable surface (born-596 TERM-TOOL-PARITY:
+  // the dispatcher could always run ~29 subcommands, but only six read-only ones
+  // were advertised, so the model never saw start/plan/cost/usage/kill/…).
+  // Tier comes from classifyTool at each tool's MOST-privileged args
+  // (WORST_CASE_CLASSIFY_ARGS) so a static tier can only over-ask, never
+  // under-ask — destructive tools land on 'always' via ALWAYS_CONFIRM and the
+  // AgentSession permission engine re-confirms them every call.
   const cli = createCliToolDispatcher();
   const genericSchema: Record<string, unknown> = { type: 'object', properties: {}, additionalProperties: true };
-  for (const name of ['deckent_status', 'deckent_history', 'deckent_retro', 'deckent_doctor', 'deckent_models', 'deckent_review'] as const) {
-    const tier = LEGACY_TIER[classifyTool(name, {})];
-    registry.register(defineFromDispatcher(name, `Run the ${name} deckent command.`, genericSchema, tier, cli));
+  for (const spec of CLI_BRIDGE_TOOLS) {
+    const tier = LEGACY_TIER[classifyTool(spec.name, WORST_CASE_CLASSIFY_ARGS[spec.name] ?? {})];
+    registry.register(defineFromDispatcher(spec.name, spec.description, spec.schema ?? genericSchema, tier, cli));
   }
 
   // Skill-dispatch tool (F11) — worker parity: lets the native REPL agent invoke a

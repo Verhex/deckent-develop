@@ -2070,8 +2070,8 @@
   "primary_files": [
    "src/cli/repl/"
   ],
-  "proposed_mode": "alperen-owned (feat/term-tool-parity worktree)",
-  "spec": "Loop bu alana sprint PLANLAMAZ (cakisma-onleme). Alperen merge edince result-file/commit-dedup ile kapanis islenir. Kapsam Alperen'de: REPL tool-dispatch baglanmamis tool'lar + muhtemelen born-586 @-referans ile birlikte.",
+  "proposed_mode": "delivered-by-brain (2026-07-10 — Alperen devretti; GAP#1 shipped)",
+  "spec": "[TESLIM 2026-07-10: native-registry tam-katalog (29 tool, cli-bridge-tool-specs.ts) + worst-case-tier + parity-test] Loop bu alana sprint PLANLAMAZ (cakisma-onleme). Alperen merge edince result-file/commit-dedup ile kapanis islenir. Kapsam Alperen'de: REPL tool-dispatch baglanmamis tool'lar + muhtemelen born-586 @-referans ile birlikte.",
   "verify": "merge-sonrasi: ana-agacta tsc+ilgili suite yesil; loop-dedup guncellenir",
   "wire_on": "alperen-karari"
  },
@@ -2155,5 +2155,23 @@
   "spec": "11 kural alias'la COZULMEZ (worker ampirik kanitladi): integration-engineer messaging/integrations + terminal-ux-engineer terminal-ui = ayni-dizin cift-kural co-fire -> routing-KARAR degisimi (kural-collapse gerek); data-engineer/database-migration \"database\" = gercek segment yok (kural-rewrite); architecture/git/monorepo/simplification/onboarding/provider-cli = cross-cutting/dar-alt-kume (intent/stackDetection-tabanli kurala cevir). Her degisiklik routing-testi + lint yesil kalarak.",
   "verify": "lint-rule-vocabulary \"Known debt\" listesi kucultulur/sifirlanir; route-domain-scope + routing suite yesil; degisen her kural icin niyet-testi",
   "wire_on": "default-on (kural-onarimi); co-fire-collapse kalemleri routing-karar-degisimi icerir -> tek-tek test-pinli"
+ },
+ {
+  "born_id": 602,
+  "title": "LEGACY-TAGLOOP-CONFIRM-WIRE: eski tag-loop cliDispatcher GATE'siz — yikici tool tanitimi oncesi confirm-wiring (GAP#2)",
+  "sources": [
+   "alperen-terminal-oturumu 2026-07-10 (advisor-tespiti): createCliToolDispatcher() bare/no-confirm; native-engine permission.ts gate'li, legacy tag-loop DEGIL"
+  ],
+  "severity": "P1",
+  "subsystem": "repl",
+  "primary_files": [
+   "src/cli/commands/chat-tool-bridge.ts",
+   "src/cli/entry.ts",
+   "src/cli/commands/chat.ts"
+  ],
+  "proposed_mode": "design-then-fix",
+  "spec": "Legacy tag-loop yolu (entry.ts/chat.ts uzerinden) cliDispatcher'i confirm'suz kurar -> oraya start/kill gibi yikici tool tanitmak confirm-tabanini deler (bu yuzden GAP#1 YALNIZ native-engine'e uygulandi). FIX: legacy yola classifyTool-tabanli confirm-katmani wire et (native permission-deseninin karsiligi) VEYA legacy tag-loop yuzeyini read-only'de dondurup native-engine cutover'ini (M5) hizlandir - karar.",
+  "verify": "legacy yolda yikici tag -> confirm-akisi testi; read-only davranis regresyonsuz",
+  "wire_on": "guvenlik-fix; tanitim-genislemesi ancak gate sonrasi"
  }
 ]

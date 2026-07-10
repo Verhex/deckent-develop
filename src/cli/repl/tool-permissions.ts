@@ -40,6 +40,10 @@ const CONFIRM_TOOLS: ReadonlySet<string> = new Set([
   'deckent_set_directives',
   'deckent_docs',
   'deckent_checkpoint',
+  // born-596 advisor catch: review is NOT read-only — review.ts writes the
+  // review JSON to .tasks/ + .brain/reviews/ AND rewrites task JSON files
+  // (review.ts:173). It sat on the silent tier since the original six.
+  'deckent_review',
 ]);
 
 /** `deckent config` subcommands that mutate config.json (vs. read-only show/get/list/keys). */
