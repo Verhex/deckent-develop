@@ -176,6 +176,7 @@ import {
   type WorkerLifecycleState,
 } from '../agents/worker.js';
 import { buildWorkerApprovalGateEnv } from '../agents/worker-approval-env.js';
+import { isDependencySatisfying } from './scheduler-truth.js';
 
 // ─── Runtime vs Code Discriminator (Sprint 139 Task 024) ─────────
 import {
@@ -872,18 +873,16 @@ export async function respawnEligibleTasks(
 
   const waveStart = Date.now();
 
-  // Sprint 280 FIX-deadlock fix: a MANUAL_REVIEW_REQUIRED upstream must NOT
-  // deadlock its dependents. MRR is only set when a worker timed out / exited
-  // WITH disk-evidence (its deliverable IS on disk) — it is queued for human
-  // review / a FIX-phase retry, never for silent auto-completion to DONE. So a
-  // dependent waiting for that DONE would wait forever and the wave loop would
-  // idle until the sprint timeout (the observed 280-007 → 280-009/010 knot).
-  // Treating MRR as dependency-satisfying lets the wave progress; the MRR task
-  // itself still surfaces for review and is re-evaluated (→ NO_GO → FIX) in the
-  // EVALUATE phase the unblocked wave now allows the sprint to reach.
+  // born-610 SINGLE-TRUTH: dependency satisfaction comes from ONE predicate
+  // (scheduler-truth.ts). MRR is NO LONGER satisfying — it is unverified
+  // partial work (Alperen decision 2026-07-10); its dependents are cascade-
+  // skipped by cascadeSkipDeadBlocked instead of being spawned on top of an
+  // unreviewed foundation. Sprint-280's FIX-deadlock (the original reason MRR
+  // was counted as done here) stays solved via that skip path: nothing waits
+  // forever, the sprint completes, the human reviews afterwards.
   const doneTasks = new Set(
     sprint.tasks
-      .filter(t => t.status === TaskStatus.DONE || t.status === TaskStatus.MANUAL_REVIEW_REQUIRED)
+      .filter(t => isDependencySatisfying(t.status))
       .map(t => t.id),
   );
 

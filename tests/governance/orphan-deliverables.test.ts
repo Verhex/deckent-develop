@@ -498,7 +498,8 @@ const KNOWN_ORPHANS = [
   'src/orchestra/managed-docs/index.ts',
   'src/orchestra/monitor-adapter.ts',
   'src/orchestra/multi-agent.ts',
-  'src/orchestra/output-collector.ts',
+  // 'src/orchestra/output-collector.ts' — KAPANDI (born-614, 2026-07-10):
+  // recordSprintWorkerTrace artik runEvaluatePhase'ten cagriliyor (sprint-trace-wire).
   'src/orchestra/pattern-reader.ts',
   'src/orchestra/reconciler.ts',
   'src/orchestra/result-assembler.ts',
@@ -515,7 +516,7 @@ const KNOWN_ORPHANS = [
 
 describe('KNOWN_ORPHANS allowlist sanity', () => {
   it('has the expected count and only well-formed src/**/*.ts(x) entries', () => {
-    expect(KNOWN_ORPHANS.length).toBe(87);
+    expect(KNOWN_ORPHANS.length).toBe(86); // born-614 output-collector kapandi (87->86)
     for (const entry of KNOWN_ORPHANS) {
       expect(entry.startsWith('src/')).toBe(true);
       expect(entry.endsWith('.ts') || entry.endsWith('.tsx')).toBe(true);

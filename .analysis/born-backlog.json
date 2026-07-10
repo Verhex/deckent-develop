@@ -2615,5 +2615,13 @@
   "status": "OPEN",
   "source": "born-607 BEFORE-done advisor",
   "spec": "4 kalem: (1) nested handler ok:false dönerse dispatchToolCall status:'executed' + dış ok:true — iç başarısızlık maskeleniyor (native-tool-registry.ts:407-408 ToolResult-unwrap gerek). (2) parity-deny throw→status:'error'/[mcp-error] etiketi — policy-deny 'denied' sınıfında raporlanmalı (telemetri+model-görünürlüğü). (3) nested ask'te confirm-kartı 'a'=hep-izin-ver sunuyor ama parity persist etmiyor (bilinçli) — kartta nested için 'a'yı gizle veya 'yalnız bu sefer' etiketle. (4) nested exec toolSink/trace'e görünmüyor (TRN-614 pillar'ına dokunur — call_tool üzerinden koşan hedef-tool'lar trace'te kaybolmasın)."
+ },
+ {
+  "born_id": 634,
+  "title": "planDispatch reducer/journal birleşimi — modeli canlı-driver yap (ADR-064-W, Codex adım-3)",
+  "priority": "P2",
+  "status": "OPEN",
+  "source": "born-610 el-kod (2026-07-10)",
+  "spec": "born-610 tek-truth SÖZLÜĞÜ birleştirdi (scheduler-truth.ts) ama dispatch-YÜRÜTMESİ hâlâ imperatif ~6 closure'da (dispatchTick/processQueue/maybeRespawn/dispatchReadyTasks/forceRescanIfIdle/cascadeSkipDeadBlocked); planDispatch sıfır-prod-çağıranlı model. Tam birleşim: planDispatch'i driver yap — DEPENDENCY_BLOCKED event'leri, wave.respawn metriği, checkpoint yan-etkileri porte edilmeli (result-collector.ts ADR-064-W notu) + remainingQueue mutasyon semantiği. Büyük-cerrahî; 610'da bilinçli kapsam-dışı bırakıldı."
  }
 ]

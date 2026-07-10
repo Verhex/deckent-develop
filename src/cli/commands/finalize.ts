@@ -10,6 +10,7 @@ import { terminateOwnedSprintProcess, clearPid, readPid } from '../../orchestra/
 import { loadConfig } from '../../core/config.js';
 import { debugLog } from '../../core/utils.js';
 import { print, printError } from '../helpers/output.js';
+import { killWorker } from '../../orchestra/tmux.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
@@ -165,6 +166,32 @@ export function detectIncompleteTasks(tasks: Task[]): Task[] {
   return tasks.filter(t => activeStatuses.has(t.status));
 }
 
+/**
+ * born-610 STATUS-TRUTH (COMPLETE&active): on a forced finalize, the sprint's
+ * live WORKERS must die with the coordinator — pre-610 only the coordinator was
+ * terminated, so orphan worker subprocesses kept heartbeating (and writing to
+ * the repo) under a COMPLETE-stamped sprint (feedback_finalize_force_orphan_state,
+ * the other half of the Sprint-223 family). Best-effort per worker (a window/
+ * container already gone is success, not failure); `deps.kill` is a seam so the
+ * sweep is testable without tmux. COMPLETE may only be stamped after this sweep.
+ */
+export function forceKillLiveWorkers(
+  incomplete: readonly Task[],
+  deps: { kill: (taskId: string) => void } = { kill: killWorker },
+): { killed: string[]; failed: string[] } {
+  const killed: string[] = [];
+  const failed: string[] = [];
+  for (const t of incomplete) {
+    try {
+      deps.kill(t.id);
+      killed.push(t.id);
+    } catch {
+      failed.push(t.id); // already-gone or unkillable — sweep continues
+    }
+  }
+  return { killed, failed };
+}
+
 /** Detect mixed sprint IDs */
 export function detectMixedSprints(tasks: Task[]): string[] {
   const ids = new Set<string>();
@@ -222,6 +249,14 @@ export function registerFinalize(program: Command): void {
             }
             clearPid(root, sprintId);
           } catch (e) { debugLog('finalize:orphanTerminate', e); }
+          // born-610: kill the sprint's live WORKERS too — COMPLETE may not be
+          // stamped while worker subprocesses are alive (COMPLETE&active truth).
+          try {
+            const sweep = forceKillLiveWorkers(incomplete);
+            if (sweep.killed.length > 0) {
+              print(`Terminated ${sweep.killed.length} live worker(s): ${sweep.killed.join(', ')}`);
+            }
+          } catch (e) { debugLog('finalize:forceWorkerSweep', e); }
         }
 
         // (H) Duplicate finalize protection

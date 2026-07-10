@@ -1,16 +1,14 @@
 /**
- * Sprint 280 FIX-deadlock fix — a MANUAL_REVIEW_REQUIRED upstream must not
- * deadlock its dependents in the wave scheduler.
+ * Sprint-280 deadlock history + born-610 SINGLE-TRUTH re-pin.
  *
- * Observed knot (Sprint 280): worker 280-007 timed out WITH disk-evidence and
- * was reclassified MANUAL_REVIEW_REQUIRED (not DONE). `respawnEligibleTasks`
- * computed its dependency-satisfied set as `status === DONE` only, so the doc
- * tasks 280-009/010 (which depend on 007) were never dispatched and the EXECUTE
- * wave loop idled until the sprint timeout — the FIX phase never even started.
- *
- * Fix: MRR (timed-out-but-disk-complete, queued for review/FIX) satisfies
- * dependents so the wave progresses. A still-running upstream (EXECUTING) must
- * STILL block — that is the regression guard.
+ * Sprint-280: an MRR upstream deadlocked its dependents (satisfy-set was
+ * DONE-only and nothing else resolved MRR) — the then-fix counted MRR as
+ * dependency-SATISFYING. born-610 (Alperen, 2026-07-10) reversed that: MRR is
+ * UNVERIFIED partial work, never a foundation — dependents are cascade-skipped
+ * by cascadeSkipDeadBlocked (scheduler-truth.ts is the single vocabulary).
+ * The deadlock stays solved from the other direction: nothing waits forever.
+ * These tests now pin the NEW contract; the EXECUTING/DONE regression guards
+ * are unchanged.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFileSync, mkdirSync, rmSync, existsSync, mkdtempSync } from 'node:fs';
@@ -92,7 +90,7 @@ describe('respawnEligibleTasks — MANUAL_REVIEW_REQUIRED unblocks dependents (S
     finally { process.chdir(orig); }
   }
 
-  it('dependent of a MANUAL_REVIEW_REQUIRED upstream becomes eligible (no deadlock)', async () => {
+  it('born-610: dependent of a MANUAL_REVIEW_REQUIRED upstream is NOT spawned (single truth)', async () => {
     const upstream = task('280-007', TaskStatus.MANUAL_REVIEW_REQUIRED);
     const dependent = task('280-010', TaskStatus.PENDING, ['280-007']);
     persist([upstream, dependent]);
@@ -100,8 +98,8 @@ describe('respawnEligibleTasks — MANUAL_REVIEW_REQUIRED unblocks dependents (S
 
     const spawnedIds = await run(makeSprint([upstream, dependent]), backend);
 
-    expect(backend.spawned).toContain('280-010');
-    expect(spawnedIds).toContain('280-010');
+    expect(backend.spawned).not.toContain('280-010');
+    expect(spawnedIds).not.toContain('280-010');
   });
 
   it('dependent of a DONE upstream still dispatches (regression — DONE path preserved)', async () => {
@@ -126,7 +124,7 @@ describe('respawnEligibleTasks — MANUAL_REVIEW_REQUIRED unblocks dependents (S
     expect(backend.spawned).not.toContain('280-008');
   });
 
-  it('multi-dependent: both docs unblock when their shared MRR upstream is reviewed-pending', async () => {
+  it('born-610 multi-dependent: NEITHER doc spawns on a shared MRR upstream (skip-path owns them)', async () => {
     const upstream = task('280-007', TaskStatus.MANUAL_REVIEW_REQUIRED);
     const docA = task('280-009', TaskStatus.PENDING, ['280-007']);
     const docB = task('280-010', TaskStatus.PENDING, ['280-007']);
@@ -135,6 +133,7 @@ describe('respawnEligibleTasks — MANUAL_REVIEW_REQUIRED unblocks dependents (S
 
     await run(makeSprint([upstream, docA, docB]), backend);
 
-    expect(backend.spawned).toEqual(expect.arrayContaining(['280-009', '280-010']));
+    expect(backend.spawned).not.toContain('280-009');
+    expect(backend.spawned).not.toContain('280-010');
   });
 });

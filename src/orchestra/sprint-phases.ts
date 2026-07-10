@@ -40,6 +40,7 @@ import type { SpawnBackend } from './spawn-backend.js';
 // born-614 SPRINT-TRACE-WIRE: EVALUATE-sonu worker-transcript + Brain-verdict kaydı.
 import { recordSprintWorkerTrace } from './output-collector.js';
 import { createOutputCollector } from '../core/output-collector.js';
+import { isDependencySatisfying } from './scheduler-truth.js';
 
 // ─── Notify (DECKENT→USER:NOTIFY — Hot Fix H6) ──────────────────
 import { notify } from '../core/notify.js';
@@ -390,6 +391,10 @@ export function isTaskDispatched(
     task.status === TaskStatus.DOCUMENTING ||
     task.status === TaskStatus.DONE ||
     task.status === TaskStatus.NO_GO ||
+    // born-610: MRR is settled (terminally classified) — omitting it made an
+    // MRR task read as "not yet dispatched" at the EVALUATE boundary (4th
+    // divergence of the pre-610 multi-truth family).
+    task.status === TaskStatus.MANUAL_REVIEW_REQUIRED ||
     task.status === TaskStatus.PAUSED
   ) {
     return true;
@@ -469,7 +474,7 @@ export function findReadyUndispatchedTaskIds(
   const collectedIds = new Set(results.map(r => r.taskId));
   const doneIds = new Set<string>();
   for (const t of sprint.tasks) {
-    if (t.status !== TaskStatus.DONE) continue;
+    if (!isDependencySatisfying(t.status)) continue; // born-610 single truth
     doneIds.add(t.id);
     if (t.fixForTaskId) doneIds.add(t.fixForTaskId);
   }

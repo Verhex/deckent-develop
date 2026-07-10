@@ -34,6 +34,7 @@ import {
   type HandleWorkerQuestionOptions,
 } from './ipc-registry.js';
 import { bridgeQuestionToApproval } from './question-approval-bridge.js';
+import { isDependencySatisfying, isSchedulingTerminalFailure } from './scheduler-truth.js';
 import { ApprovalBroker } from '../core/approval-broker.js';
 import type { BrainAnswer, WorkerQuestion, TokenUsage } from '../core/task-types.js';
 
@@ -388,7 +389,7 @@ function planContinuous(state: DispatchState): DispatchPlan {
   // domain helper invoked by Brain re-evaluation paths.
   const doneIds = new Set<string>();
   for (const t of state.sprint.tasks) {
-    if (t.status !== TaskStatus.DONE) continue;
+    if (!isDependencySatisfying(t.status)) continue; // born-610 single truth
     doneIds.add(t.id);
     if (t.fixForTaskId) doneIds.add(t.fixForTaskId);
   }
@@ -485,7 +486,7 @@ export function findReadyUndispatchedTasks(
 ): Task[] {
   const doneIds = new Set<string>();
   for (const t of sprint.tasks) {
-    if (t.status !== TaskStatus.DONE) continue;
+    if (!isDependencySatisfying(t.status)) continue; // born-610 single truth
     doneIds.add(t.id);
     if (t.fixForTaskId) doneIds.add(t.fixForTaskId);
   }
@@ -1396,7 +1397,7 @@ export async function waitForResults(
       changed = false;
       const failedIds = new Set<string>();
       for (const t of sprint.tasks) {
-        if (t.status === TaskStatus.NO_GO || t.status === TaskStatus.MANUAL_REVIEW_REQUIRED) {
+        if (isSchedulingTerminalFailure(t.status)) { // born-610 single truth
           failedIds.add(t.id);
         }
       }
