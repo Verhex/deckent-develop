@@ -9,11 +9,9 @@
     "rules": [
       {
         "when": {
-          "domains": {
-            "$contains": "database"
-          }
+          "intent.primary": "migration"
         },
-        "score": 8
+        "score": 10
       }
     ],
     "exclude": [],
@@ -61,6 +59,6 @@
     "successCount": 24,
     "successRate": 0.8275862068965517,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-395"
+    "lastUsedInSprint": "sprint-396"
   }
 }

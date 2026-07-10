@@ -6,16 +6,7 @@
   "description": "Monorepo management, Turborepo, Nx, workspace configuration, dependency graph, build caching",
   "manifestVersion": 2,
   "activation": {
-    "rules": [
-      {
-        "when": {
-          "domains": {
-            "$contains": "monorepo"
-          }
-        },
-        "score": 10
-      }
-    ],
+    "rules": [],
     "exclude": [],
     "minScore": 5
   },
@@ -65,6 +56,6 @@
     "successCount": 0,
     "successRate": 0,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-395"
+    "lastUsedInSprint": "sprint-396"
   }
 }

@@ -7,17 +7,18 @@
     "rules": [
       {
         "when": {
-          "domains": {
-            "$contains": "terminal-ui"
-          }
-        },
-        "score": 8
-      },
-      {
-        "when": {
-          "domains": {
-            "$contains": "cli"
-          }
+          "$or": [
+            {
+              "domains": {
+                "$contains": "terminal-ui"
+              }
+            },
+            {
+              "domains": {
+                "$contains": "cli"
+              }
+            }
+          ]
         },
         "score": 6
       }
@@ -67,7 +68,7 @@
     "totalUses": 7,
     "successRate": 0.8571428571428571,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-395"
+    "lastUsedInSprint": "sprint-396"
   },
   "role": "implementer",
   "domain": "terminal-ui",

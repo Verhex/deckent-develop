@@ -106,34 +106,9 @@ const KNOWN_ORPHAN_RULES = [
       'dead weight, not a blocking gap.',
   },
   {
-    file: '.deckent/agents/terminal-ux-engineer/agent.json',
-    word: 'terminal-ui',
-    reason:
-      "terminal-ux-engineer ALSO has a separate, already-real 'cli'@6 rule for the same " +
-      "directory; aliasing cli<->terminal-ui would make both rules co-fire (6+8=14), which " +
-      'empirically flips tests/core/route-domain-scope.test.ts\'s flag-off legacy-collapse ' +
-      'assertions (2 failures observed) — a scoring-formula change, not a vocabulary fix. ' +
-      'Needs a manifest-content fix (collapse to one rule) instead.',
-  },
-  {
     file: '.deckent/skills/ink-tui/manifest.json',
     word: 'terminal-ui',
     reason: 'same root cause as terminal-ux-engineer above (would stack via the shared cli domain).',
-  },
-  {
-    file: '.deckent/agents/integration-engineer/agent.json',
-    word: 'messaging',
-    reason:
-      "integration-engineer ALSO has a separate, already-real 'connectors'@8 rule for the " +
-      "same directory; aliasing connectors<->messaging/integrations would make all three " +
-      'rules co-fire (8+8+6=22), which empirically flips a large connectors-scoped task from ' +
-      "'architect' (score 16) to 'integration-engineer' (score 22) — a routing DECISION " +
-      'change, not a vocabulary fix. Needs a manifest-content fix (collapse to one rule) instead.',
-  },
-  {
-    file: '.deckent/agents/integration-engineer/agent.json',
-    word: 'integrations',
-    reason: 'same root cause as the messaging entry above.',
   },
 ];
 
@@ -210,6 +185,30 @@ function extractDomainWords(node, words = new Set()) {
   return words;
 }
 
+// born-601 $or-collapse deseni (advisor 2026-07-10): builtin manifest'ler yabancı
+// projelere gider — bu-repo'da ölü bir kelime, gerçek `src/messaging/` dizini olan
+// bir projede BUGÜN ateşler. Bu yüzden collapse ölü-kelimeyi SİLMEZ, gerçek-kardeşli
+// tek `$or` kuralında tutar. Böyle bir kelime borç değil, SANCTIONED cross-project
+// reach'tir: aynı `$or` içinde en az bir kardeş-dal gerçek-segment/alias'la
+// çözülüyorsa, kalan dalların kelimeleri bu kümeye düşer.
+function extractCrossReachWords(node, isResolvable, crossReach = new Set()) {
+  if (Array.isArray(node)) {
+    for (const item of node) extractCrossReachWords(item, isResolvable, crossReach);
+    return crossReach;
+  }
+  if (node && typeof node === 'object') {
+    if (Array.isArray(node.$or)) {
+      const branchWords = node.$or.map((branch) => [...extractDomainWords(branch)]);
+      const hasResolvableBranch = branchWords.some((ws) => ws.some((w) => isResolvable(w)));
+      if (hasResolvableBranch) {
+        for (const ws of branchWords) for (const w of ws) if (!isResolvable(w)) crossReach.add(w);
+      }
+    }
+    for (const key of Object.keys(node)) extractCrossReachWords(node[key], isResolvable, crossReach);
+  }
+  return crossReach;
+}
+
 function scanManifests() {
   const realSegments = computeRealSegments();
   const aliasIndex = buildAliasIndex(DOMAIN_ALIAS_GROUPS);
@@ -217,6 +216,7 @@ function scanManifests() {
   const orphansByKey = new Map(KNOWN_ORPHAN_RULES.map((o) => [orphanKey(o.file, o.word), o]));
 
   const revived = [];
+  const crossReach = [];
   const knownDebt = [];
   const failures = [];
 
@@ -225,6 +225,9 @@ function scanManifests() {
     if (!activation) return;
     const words = extractDomainWords(activation.rules ?? []);
     extractDomainWords(activation.exclude ?? [], words);
+    const isResolvable = (w) => realSegments.has(w)
+      || [...(aliasIndex.get(w) ?? [])].some((s) => realSegments.has(s));
+    const crossReachWords = extractCrossReachWords(activation.rules ?? [], isResolvable);
 
     for (const word of words) {
       if (realSegments.has(word)) continue;
@@ -232,6 +235,11 @@ function scanManifests() {
       const siblings = aliasIndex.get(word);
       if (siblings && [...siblings].some((s) => realSegments.has(s))) {
         revived.push({ file: relPath, word });
+        continue;
+      }
+
+      if (crossReachWords.has(word)) {
+        crossReach.push({ file: relPath, word });
         continue;
       }
 
@@ -272,16 +280,18 @@ function scanManifests() {
     checkManifest(`.deckent/skills/${id}/manifest.json`, data);
   }
 
-  return { revived, knownDebt, failures };
+  return { revived, crossReach, knownDebt, failures };
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────────────────
 
-const { revived, knownDebt, failures } = scanManifests();
+const { revived, crossReach, knownDebt, failures } = scanManifests();
 
 console.log('Domain-vocabulary rule lint (born-589)');
 console.log(`  Revived via alias  : ${revived.length}`);
 for (const r of revived) console.log(`    - ${r.file} :: '${r.word}'`);
+console.log(`  Cross-reach (sanctioned $or, born-601): ${crossReach.length}`);
+for (const c of crossReach) console.log(`    - ${c.file} :: '${c.word}'`);
 console.log(`  Known debt (Task 4): ${knownDebt.length}`);
 for (const d of knownDebt) console.log(`    - ${d.file} :: '${d.word}' — ${d.reason}`);
 

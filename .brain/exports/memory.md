@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-396 Learnings
+- Sprint sprint-396 Learnings: ## Sprint sprint-396 Learnings
+- born-601a — AGENT-RULE-REWRITE — 4 agent-manifest kural-onarımı (P1): GO_WITH_TECH_DEBT — 4/4 manifests rewritten per Brain's per-agent spec. architecture-planner: domains.$contains('architecture') -> intent.pr
+
+## Gains
+- 396-002 — born-601b — SKILL-RULE-REWRITE — 6 skill-manifest kural-onarımı (P1) — All 6 manifests rewritten per-brief; every dead domain word verified gone via scripts/lint-rule-v...
+- 396-003 — born-603 — DEBT-INJECTION-NOOP-ECHO — dürüst no-op fix-wave debt'i yeniden doğmasın (P2) — born-603 DEBT-INJECTION-NOOP-ECHO fixed in src/orchestra/sprint-planner.ts (only file in write sc...
+
 ## Sprint sprint-395 Learnings
 - Sprint sprint-395 Learnings: ## Sprint sprint-395 Learnings
 - born-585 — PROJECTROOT-THREAD — buildWorkerPrompt 7 çağrı-sitesine gerçek projectRoot (P2): GO_WITH_TECH_DEBT — All 7 buildWorkerPrompt call sites now pass their in-scope projectRoot/root as the 4th arg, each matching exactly the va

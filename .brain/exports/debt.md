@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-396-001 | Tech debt from 396-001: 4/4 manifests rewritten per Brain's per-agent spec. arch | normal | sprint-396 | resolved |
 | debt-395-001 | Tech debt from 395-001: All 7 buildWorkerPrompt call sites now pass their in-sco | normal | sprint-395 | resolved |
 | debt-395-002 | Tech debt from 395-002: Migrated all 5 born-587 members off dead process.on(SIGI | normal | sprint-395 | resolved |
 | debt-395-003 | Tech debt from 395-003: Investigation-first (Discipline 1): reproduced the born- | normal | sprint-395 | resolved |

@@ -181,7 +181,12 @@ export function readContext(projectRoot: string): BrainContext {
           const meta = JSON.parse(d.metadata || '{}');
           return {
             id: d.id,
-            description: d.title,
+            // born-603: surface the FULL note (`content`), not the 80-char-sliced
+            // `title` — injectCriticalDebtTasks pattern-matches honest no-op
+            // fix-wave echoes against this text, and a truncated title can cut
+            // the no-defect marker off before the match. `title` is a
+            // defensive fallback only (content is always set by debt-manager.ts).
+            description: d.content || d.title,
             originTaskId: meta.originTaskId ?? '',
             originSprintId: meta.originSprintId ?? d.sprint_id ?? '',
             priority: (d.priority?.toUpperCase() ?? 'NORMAL') as DebtPriority,
@@ -287,6 +292,8 @@ export async function planSprint(
   // every sprint forever (a permanent no-op pile-up). Resolving them here makes
   // a skip a genuine closure. resolveDebt is idempotent + fail-soft (no-op when
   // there is no DB / the row is already resolved), so this is safe to run every plan.
+  // NOTE (born-603): `injected.skippedNoop` (heuristic honest-noop-echo class)
+  // is deliberately NOT looped/resolved here — see DebtInjectionResult doc.
   for (const skippedDebtId of injected.skipped) {
     resolveDebt(projectRoot, skippedDebtId, sprintId);
   }
@@ -989,6 +996,16 @@ export interface DebtInjectionResult {
   nextSeq: number;
   /** Debt IDs that were intentionally skipped (e.g. verified-no-result). */
   skipped: string[];
+  /**
+   * born-603: debt IDs skipped as an "honest no-op fix-wave echo" (heuristic
+   * text-pattern classification — see {@link isHonestNoopFixWaveEcho}).
+   * Deliberately kept SEPARATE from `skipped`: `planSprint()` resolves every
+   * id in `skipped` via `resolveDebt` (permanent closure), but this
+   * classification is a text-pattern guess, not a verified structural class
+   * — a false positive here must stay OPEN and get re-evaluated next sprint,
+   * not close real debt forever. Count this array's length for reporting.
+   */
+  skippedNoop: string[];
 }
 
 /**
@@ -999,6 +1016,30 @@ function legacyFallbackScope(): TaskScope {
   return { directories: ['src/'], filesRead: [], filesWrite: ['src/'] };
 }
 
+// born-603 (396-003): a fix-wave task (`<id>-fix` / `<id>-xfix`) that
+// investigated and found nothing wrong still produces a GO_WITH_TECH_DEBT /
+// NO_GO ledger row (recordDebtEntry has no "no-defect" DebtClass yet — that
+// producer-side fix is tracked separately, out of this task's scope).
+// sprint-395 saw such a row re-injected as a fresh CRITICAL "Priority fix for
+// critical debt item" task, which just spawns another no-op investigation
+// worker that reports the same "no defect" finding — an infinite low-value
+// loop. Conjunctive on purpose: an origin-suffix match alone would ALSO skip
+// real fix-wave defects (silently dropping actionable debt); a content match
+// alone would ALSO skip ordinary (non-fix-wave) debt whose note happens to
+// mention "no defect" about something unrelated. Both signals together
+// narrow this to the exact sprint-395 shape.
+const FIX_WAVE_ORIGIN_RE = /-(fix|xfix)$/;
+const NO_DEFECT_NOTE_RE = /no defect|no source change|no code change/i;
+
+/**
+ * True when `item` is an honest no-op echo from a fix-wave task: the origin
+ * task id is itself a priority-fix (`-fix`/`-xfix`), AND the debt note says
+ * no defect/source/code change was found. See {@link FIX_WAVE_ORIGIN_RE}.
+ */
+function isHonestNoopFixWaveEcho(item: DebtItem): boolean {
+  return FIX_WAVE_ORIGIN_RE.test(item.originTaskId) && NO_DEFECT_NOTE_RE.test(item.description);
+}
+
 /**
  * Translate CRITICAL debt items into priority fix tasks for the next sprint.
  *
@@ -1007,6 +1048,9 @@ function legacyFallbackScope(): TaskScope {
  *  - `class === 'timeout-partial'` → skip (Sprint 364): a killed-worker partial
  *    diff already accepted into the tree — no described defect, so a forced fix
  *    task only spawns a no-op worker that re-injects every sprint.
+ *  - born-603 (Sprint 396): honest no-op fix-wave echo (see
+ *    {@link isHonestNoopFixWaveEcho}) → skip WITHOUT resolving (tracked in
+ *    `skippedNoop`, not `skipped` — see {@link DebtInjectionResult}).
  *  - `originScope` present → inherit `directories` + `filesWrite`; `filesRead`
  *    mirrors `directories` so the worker can read the area it must write to.
  *  - `originScope` absent → broad legacy fallback `src/` (matches behaviour
@@ -1021,6 +1065,7 @@ export function injectCriticalDebtTasks(
 ): DebtInjectionResult {
   const tasks: Task[] = [];
   const skipped: string[] = [];
+  const skippedNoop: string[] = [];
   let seq = startingSeq;
 
   for (const item of debt) {
@@ -1033,6 +1078,15 @@ export function injectCriticalDebtTasks(
     // no-op worker that flails and re-injects every sprint.
     if (item.class === 'verified-no-result' || item.class === 'timeout-partial') {
       skipped.push(item.id);
+      continue;
+    }
+
+    // born-603: honest no-op fix-wave echo — a heuristic (text-pattern)
+    // classification, not a verified structural class, so it goes into
+    // `skippedNoop` (never resolved) instead of `skipped` (permanently
+    // resolved by planSprint's caller loop).
+    if (isHonestNoopFixWaveEcho(item)) {
+      skippedNoop.push(item.id);
       continue;
     }
 
@@ -1051,9 +1105,19 @@ export function injectCriticalDebtTasks(
       ? `Origin scope inherited (directories=[${scope.directories.join(', ')}], filesWrite=[${scope.filesWrite.join(', ')}]).`
       : 'No origin scope on debt — broad legacy fallback (src/) applied.';
 
+    // born-603: `item.description` now carries the full debt note (mapper
+    // change in readContext) rather than an 80-char-sliced title, so keep the
+    // task TITLE compact (it previously was, de-facto, via the DB's title
+    // slice) while the task DESCRIPTION carries the full note verbatim
+    // instead of the old generic "Priority fix for critical debt item X"
+    // placeholder — the worker sees exactly what was previously found.
+    const titleNote = item.description.length > 100
+      ? `${item.description.slice(0, 100)}…`
+      : item.description;
+
     tasks.push(createTask({
-      title: `Fix debt: ${item.description}`,
-      description: `Priority fix for critical debt item ${item.id}. ${scopeNote}`,
+      title: `Fix debt: ${titleNote}`,
+      description: `${item.description}\n\n${scopeNote}`,
       model: defaultModel,
       effort: 'high',
       priority: 'CRITICAL',
@@ -1068,5 +1132,5 @@ export function injectCriticalDebtTasks(
     }, seq++));
   }
 
-  return { tasks, nextSeq: seq, skipped };
+  return { tasks, nextSeq: seq, skipped, skippedNoop };
 }

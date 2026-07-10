@@ -12,14 +12,6 @@
           "intent.primary": "refactor"
         },
         "score": 8
-      },
-      {
-        "when": {
-          "domains": {
-            "$contains": "simplification"
-          }
-        },
-        "score": 10
       }
     ],
     "exclude": [],
@@ -60,6 +52,6 @@
     "successCount": 24,
     "successRate": 0.9230769230769231,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-395"
+    "lastUsedInSprint": "sprint-396"
   }
 }

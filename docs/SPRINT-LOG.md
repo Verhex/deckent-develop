@@ -9677,3 +9677,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 395-006: born-599 — VOICE-BODYINIT — Buffer→Uint8Array fetch-body tip-fixi (P2) (DONE)
 
 ---
+## Sprint 396 — sprint-396
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-10
+**Duration:** 1440s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1439542ms |
+
+### Tasks
+
+- 396-001: born-601a — AGENT-RULE-REWRITE — 4 agent-manifest kural-onarımı (P1) (GO_WITH_TECH_DEBT)
+- 396-002: born-601b — SKILL-RULE-REWRITE — 6 skill-manifest kural-onarımı (P1) (DONE)
+- 396-003: born-603 — DEBT-INJECTION-NOOP-ECHO — dürüst no-op fix-wave debt'i yeniden doğmasın (P2) (DONE)
+
+---

@@ -2,6 +2,23 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint396] - 2026-07-10
+
+### Added
+
+- born-601b — SKILL-RULE-REWRITE — 6 skill-manifest kural-onarımı (P1)
+
+### Changed
+
+- born-601a — AGENT-RULE-REWRITE — 4 agent-manifest kural-onarımı (P1) (completed with tech debt)
+
+### Fixed
+
+- born-603 — DEBT-INJECTION-NOOP-ECHO — dürüst no-op fix-wave debt'i yeniden doğmasın (P2)
+
+
+_Tasks: 3 total, 3 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint395] - 2026-07-10
 
 ### Added

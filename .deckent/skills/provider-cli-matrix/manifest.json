@@ -10,8 +10,9 @@
       {
         "when": {
           "domains": {
-            "$contains": "provider-cli"
-          }
+            "$contains": "providers"
+          },
+          "intent.primary": "implementation"
         },
         "score": 10
       }
@@ -55,6 +56,6 @@
     "successCount": 3,
     "successRate": 1,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-395"
+    "lastUsedInSprint": "sprint-396"
   }
 }

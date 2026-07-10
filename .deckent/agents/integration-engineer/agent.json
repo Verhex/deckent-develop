@@ -7,27 +7,25 @@
     "rules": [
       {
         "when": {
-          "domains": {
-            "$contains": "connectors"
-          }
+          "$or": [
+            {
+              "domains": {
+                "$contains": "connectors"
+              }
+            },
+            {
+              "domains": {
+                "$contains": "messaging"
+              }
+            },
+            {
+              "domains": {
+                "$contains": "integrations"
+              }
+            }
+          ]
         },
         "score": 8
-      },
-      {
-        "when": {
-          "domains": {
-            "$contains": "messaging"
-          }
-        },
-        "score": 8
-      },
-      {
-        "when": {
-          "domains": {
-            "$contains": "integrations"
-          }
-        },
-        "score": 6
       }
     ],
     "exclude": [],

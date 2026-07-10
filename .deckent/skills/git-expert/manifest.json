@@ -9,11 +9,9 @@
     "rules": [
       {
         "when": {
-          "domains": {
-            "$contains": "git"
-          }
+          "intent.primary": "bugfix"
         },
-        "score": 10
+        "score": 6
       }
     ],
     "exclude": [],
@@ -59,6 +57,6 @@
     "successCount": 8,
     "successRate": 0.8888888888888888,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-395"
+    "lastUsedInSprint": "sprint-396"
   }
 }
