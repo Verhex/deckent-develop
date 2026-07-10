@@ -1882,5 +1882,22 @@
   "spec": "After RED-1 (sprint-391 T1) makes buildWorkerPrompt honor its projectRoot param, the 7 production call sites still rely on the cwd default. Thread the real projectRoot each caller already has, so MCP-cwd!=projectRoot and future global-install/multi-project scenarios load ADR/memory from the right project. Byte-identical today (cwd==projectRoot in all current flows).",
   "verify": "unit test per call-site family: buildWorkerPrompt receives caller projectRoot; full orchestra suite green",
   "wire_on": "n/a (behavior-identical today)"
+ },
+ {
+  "born_id": 586,
+  "title": "REPL-AT-REFERENCE: @-referansla dosya/dizin/kaynak mention — native terminal input (Alperen 2026-07-10)",
+  "sources": [
+   "alperen-request-2026-07-10",
+   "terminal-pivot: terminal = ana yönetim+kullanım yüzeyi (tool-driven, yormayan)"
+  ],
+  "severity": "P1",
+  "subsystem": "repl",
+  "primary_files": [
+   "src/cli/repl/"
+  ],
+  "proposed_mode": "design-then-sprint",
+  "spec": "deckent native terminalinde (REPL/Ink) Claude Code tarzı @-referans: input'ta `@path/dosya` yazinca (a) fuzzy autocomplete popup (tracked+workdir dosyalar; dizinler; ileride MCP resources/agents/skills), (b) secilen referans prompt-context'ine dosya icerigi/dizin listesi olarak enjekte, (c) cok-referans destegi, (d) buyuk dosyada dürüst truncation-sinyali + boyut-limiti, (e) i18n + NO_COLOR + cursor-model uyumu. Mekanizma string-free (label caller'dan). Mevcut input-bar/cursor-model/stream-segmenter mimarisi uzerine — yeniden-yazma YOK.",
+  "verify": "hermetik input-bar testleri (autocomplete/selection/injection) + Tier-1 real-binary smoke (REPL acilir, @ yazinca popup, secim -> prompt'ta icerik)",
+  "wire_on": "default-on (yeni additive input-ozelligi; mevcut davranisi degistirmez)"
  }
 ]
