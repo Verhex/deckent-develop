@@ -120,4 +120,71 @@ describe('evaluateScopeGate', () => {
     const read = res.verdicts.find(v => v.role === 'read' && v.path === 'src/core/new-module.ts')!;
     expect(read.classification).toBe('confirmed');
   });
+
+  // born-584 — greenfield (fresh `deckent init`, zero tracked files): the
+  // invented-dir heuristic has NO signal (`git ls-files` exits 0 with empty
+  // stdout, the gate still runs), so nested write paths must NOT hard-block a
+  // legitimate first sprint — Advisory-WARN posture (Alperen, 2026-07-10).
+  describe('greenfield (0 tracked files) — advisory, never blocks (born-584)', () => {
+    it('does NOT block nested write paths in an empty repo', () => {
+      const res = evaluateScopeGate({
+        tasks: [task('t1', ['src/core/app.ts', 'src/cli/main.ts'])],
+        trackedFiles: [],
+      });
+      expect(res.ok).toBe(true);
+    });
+
+    it('flags the pass as greenfield with a visible notice and advisory verdicts', () => {
+      const res = evaluateScopeGate({
+        tasks: [task('t1', ['src/core/app.ts']), task('t2', ['lib/util.ts'])],
+        trackedFiles: [],
+      });
+      expect(res.ok).toBe(true);
+      if (!res.ok) return;
+      expect(res.greenfield).toBe(true);
+      expect(res.greenfieldNotice).toBeTruthy();
+      // Every nested write is surfaced as an advisory (visible, not silent).
+      const advisoryPaths = res.advisories.filter(a => a.role === 'write').map(a => a.path).sort();
+      expect(advisoryPaths).toEqual(['lib/util.ts', 'src/core/app.ts']);
+    });
+
+    it('root-only repo (tracked files, ZERO tracked dirs — e.g. README+LICENSE) is also advisory', () => {
+      // Structural predicate: trackedDirs.size === 0 is exactly the condition
+      // under which the invented-dir rule has no signal — not a numeric threshold.
+      const res = evaluateScopeGate({
+        tasks: [task('t1', ['src/core/app.ts'])],
+        trackedFiles: ['README.md', 'LICENSE'],
+      });
+      expect(res.ok).toBe(true);
+      if (!res.ok) return;
+      expect(res.greenfield).toBe(true);
+    });
+
+    it('all-confirmed writes in a root-only repo carry NO greenfield notice (nothing unvalidated)', () => {
+      const res = evaluateScopeGate({
+        tasks: [task('t1', ['README.md'])],
+        trackedFiles: ['README.md'],
+      });
+      expect(res.ok).toBe(true);
+      if (!res.ok) return;
+      expect(res.greenfield).toBeUndefined();
+      expect(res.greenfieldNotice).toBeUndefined();
+    });
+
+    it('non-greenfield behavior is untouched (no greenfield flag, block still fires)', () => {
+      const res = evaluateScopeGate({
+        tasks: [task('t1', ['src/invented/nowhere.ts'])],
+        trackedFiles: TRACKED,
+      });
+      expect(res.ok).toBe(false);
+      const pass = evaluateScopeGate({
+        tasks: [task('t1', ['src/core/config.ts'])],
+        trackedFiles: TRACKED,
+      });
+      expect(pass.ok).toBe(true);
+      if (!pass.ok) return;
+      expect(pass.greenfield).toBeUndefined();
+      expect(pass.greenfieldNotice).toBeUndefined();
+    });
+  });
 });

@@ -100,6 +100,25 @@ describe('F2.1b: buildScopeBlock classifies write targets when trackedFiles is g
     expect(out).not.toContain('⚠ Unverified');
   });
 
+  // born-584 twin — root-only repo (tracked files but ZERO tracked directories):
+  // the invented-dir rule has no signal, so nested new files must label
+  // "New — expected to create", never "⚠ Unverified … STOP+NO_GO" (which would
+  // mass-NO_GO a fresh project's first sprint). Empty trackedFiles already takes
+  // the legacy flat-list branch (:715) — root-only is the case that classifies.
+  it('root-only repo (no tracked dirs): nested writes label as New, never ⚠ Unverified (born-584)', () => {
+    const greenfieldScope = {
+      directories: ['src/core/'],
+      filesRead: [],
+      filesWrite: ['src/core/app.ts', 'lib/util.ts'],
+    };
+    const out = buildScopeBlock(greenfieldScope, [], false, ['README.md']);
+    expect(out).toContain('New — you are expected to create these:');
+    expect(out).toContain('  - src/core/app.ts');
+    expect(out).toContain('  - lib/util.ts');
+    expect(out).not.toContain('⚠ Unverified');
+    expect(out).not.toMatch(/STOP and write a NO_GO/);
+  });
+
   // LP-4 (scope taxonomy): the scope block must exempt .tasks/ protocol files so the
   // "ONLY these files" authority does not contradict the required lifecycle writes.
   it('exempts .tasks/ protocol files from the scope audit (LP-4) — both branches', () => {

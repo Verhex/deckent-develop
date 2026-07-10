@@ -53,6 +53,14 @@ export interface ScopeGatePass {
   advisories: ScopePathVerdict[];
   /** Set when write-suspects existed but `acknowledgeScopePaths` bypassed the block. */
   overrideApplied?: boolean;
+  /**
+   * born-584 — set when the repo has NO tracked directories (fresh `deckent init`
+   * greenfield, or a root-only repo like README+LICENSE): the invented-dir rule
+   * is unsatisfiable for every nested path, so the gate ran advisory-only.
+   */
+  greenfield?: boolean;
+  /** Human-readable one-line advisory for the caller to surface (CLI warn + event). */
+  greenfieldNotice?: string;
 }
 
 export interface ScopeGateBlocked {
@@ -140,6 +148,16 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
     }
   }
 
+  // born-584 — greenfield/root-only predicate: with ZERO tracked directories the
+  // invented-dir rule below is unsatisfiable for every nested path (and wrong-dir
+  // self-disables via the empty byBasename map), so "suspect" would be a
+  // 100%-false-positive label. Advisory-WARN posture (Alperen 2026-07-10):
+  // classify such paths new-plausible and surface a visible notice instead of
+  // hard-blocking a legitimate first sprint. Structural predicate, not a numeric
+  // threshold — `trackedDirs.size === 0` is exactly the condition under which the
+  // rule has no signal (also covers a root-only README+LICENSE repo).
+  const greenfield = trackedDirs.size === 0;
+
   // Files any task plans to create — a READ of one of these resolves to "confirmed"
   // (it will exist by the time the reading task runs, via a dependency).
   const plannedWrites = new Set<string>();
@@ -163,6 +181,13 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
     const parent = dirname(path);
     if (parent === '' || trackedDirs.has(parent)) {
       return { taskId, path, role, classification: 'new-plausible', reason: 'new file in an existing directory' };
+    }
+    if (greenfield) {
+      return {
+        taskId, path, role,
+        classification: 'new-plausible',
+        reason: 'greenfield repo (no tracked directories) — path validation has no signal',
+      };
     }
     return {
       taskId, path, role,
@@ -203,10 +228,25 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
     };
   }
 
+  // born-584 — count the writes the greenfield gate could NOT validate (anything
+  // not literally tracked). Zero ⇒ nothing to warn about (e.g. all-root writes in
+  // a root-only repo that happen to be tracked).
+  const greenfieldUnvalidated = greenfield
+    ? verdicts.filter(v => v.role === 'write' && v.classification !== 'confirmed').length
+    : 0;
+
   return {
     ok: true,
     verdicts,
     advisories,
     overrideApplied: writeSuspects.length > 0 ? true : undefined,
+    ...(greenfieldUnvalidated > 0
+      ? {
+          greenfield: true,
+          greenfieldNotice:
+            `Scope gate: greenfield repo (no tracked directories) — ${greenfieldUnvalidated} write path(s) ` +
+            `could not be validated against tracked files; proceeding advisory-only (born-584).`,
+        }
+      : {}),
   };
 }

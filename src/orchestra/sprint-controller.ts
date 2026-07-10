@@ -1161,6 +1161,21 @@ export async function runSprint(
           clearSprintState(projectRoot);
           throw new BrainError(scopeGate.message, SprintPhase.PLAN);
         }
+        // born-584 — greenfield advisory-WARN: the gate had no tracked-dir signal
+        // and validated nothing. Surface on BOTH channels (sprint-finalizer's
+        // advisory pattern): event-stream for MCP/bot/dashboard-driven sprints
+        // (stdout is invisible there) + one console.warn line for the CLI.
+        if (scopeGate.greenfield && scopeGate.greenfieldNotice) {
+          try {
+            writeEvent(projectRoot, sprint.id, 'brain', 'auditor', 'SCOPE_GATE_GREENFIELD_ADVISORY', {
+              notice: scopeGate.greenfieldNotice,
+              unvalidatedWrites: scopeGate.advisories
+                .filter(a => a.role === 'write')
+                .map(a => a.path),
+            });
+          } catch (evErr) { debugLog('runSprint:scopeGateGreenfield', evErr); }
+          console.warn(scopeGate.greenfieldNotice);
+        }
       }
     } catch (e) {
       if (e instanceof BrainError) throw e; // scope-gate block — propagate to caller
