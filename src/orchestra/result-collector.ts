@@ -1417,6 +1417,7 @@ export async function waitForResults(
           testsPassed: false,
           coverage: 0,
           selfAssessment: 'NO_GO',
+          cascadeSkipped: true, // born-610: fix/xfix kapilari bunu MUAF tutar
           notes:
             `Cascade-skipped (lifecycle-robustness P0-A): dependency ${failedDep} ended ` +
             `NO_GO/MANUAL_REVIEW, so this dependent was never dispatched. Re-run after the ` +

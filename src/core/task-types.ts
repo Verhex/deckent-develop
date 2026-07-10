@@ -474,6 +474,11 @@ export interface BrainAnswer {
 
 // ─── TaskResult ──────────────────────────────────────────────────────
 export interface TaskResult {
+  /** born-610: set by cascadeSkipDeadBlocked — this task was NEVER dispatched;
+   *  its NO_GO is a synthetic skip (dead upstream), not a worker failure.
+   *  Fix/cross-fix gates MUST exempt it (NOT_DISPATCHED-muafiyeti emsali) —
+   *  otherwise a dependencies:[] fix re-runs work on the unreviewed foundation. */
+  cascadeSkipped?: boolean;
   taskId: string;
   workerId: string;
   filesChanged: string[];

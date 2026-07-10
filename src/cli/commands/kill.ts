@@ -110,8 +110,12 @@ function detectTaskProvider(root: string, taskId: string): string {
   return 'claude';
 }
 
-/** Kill a single worker and clean up its resources. */
-function killSingle(root: string, taskId: string, lang: string): boolean {
+/** Kill a single worker and clean up its resources. Exported (born-610): the
+ * finalize --force worker-sweep reuses this SAME backend-aware composition
+ * (subprocess/docker-first for non-claude, tmux with subprocess-fallback, plus
+ * status/lock/prompt cleanup) instead of a tmux-only kill that silently no-ops
+ * on other backends (Law #2 — every environment). */
+export function killSingle(root: string, taskId: string, lang: string): boolean {
   const provider = detectTaskProvider(root, taskId);
 
   // For non-claude providers, try subprocess kill first

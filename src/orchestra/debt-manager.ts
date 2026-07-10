@@ -18,6 +18,7 @@ import { updateTaskStatus, releaseAllLocks } from '../agents/worker.js';
 import { MemoryStore } from '../core/memory-store.js';
 import type { MemoryEntryV2, CreateEntryInput } from '../core/memory-types.js';
 import { extractSprintFromDebtId } from '../core/memory-import.js';
+import { readJsonSafe, debugLog } from '../core/utils.js';
 
 // ═══ Internal Helpers ══════════════════════════════════════════════
 
@@ -410,6 +411,18 @@ export function handleEvaluation(
   // NO_GO — keep locks, create fix task
   updateTaskStatus(projectRoot, task.id, TaskStatus.NO_GO);
 
+  // born-610 (advisor P0): a cascade-skipped dependent was NEVER dispatched —
+  // its synthetic NO_GO means "dead upstream", not "this work failed". Spawning
+  // a dependencies:[] fix here would run the work ON TOP of the unreviewed MRR/
+  // NO_GO foundation the skip exists to avoid (and xfix fan-out would amplify
+  // it). Same principle as the NOT_DISPATCHED blame-fix exemption
+  // (sprint-phases.ts). Status is already NO_GO; the retry belongs to the NEXT
+  // sprint, after the upstream is reviewed/fixed.
+  if (result.cascadeSkipped === true) {
+    debugLog('handleEvaluation:cascadeSkipExempt', `task=${task.id} — no fix task for a never-dispatched skip`);
+    return;
+  }
+
   // ── Sprint 165 Task 1 — Bug X: honest-gate violation classification ──
   // Worker-crashed and dishonest-done-stub NO_GOs need explicit FIX
   // context. Notes prefixed with "[honest-gate]" come from the gate in
@@ -533,6 +546,13 @@ export function handleCrossDependencies(
   const noGoTasks = sprint.tasks.filter(t => evaluations.get(t.id) === TaskEvaluation.NO_GO);
 
   for (const noGoTask of noGoTasks) {
+    // born-610 (advisor P0): a cascade-skipped NO_GO carries zero evidence about
+    // its DONE dependencies — it never ran. Cross-blaming them ("may be caused
+    // by") from a synthetic skip is pure fan-out noise (born-624 family).
+    const noGoResult = readJsonSafe<TaskResult>(
+      join(projectRoot, TASKS_DIR, `task-${noGoTask.id}.result`),
+    );
+    if (noGoResult?.cascadeSkipped === true) continue;
     for (const depId of noGoTask.dependencies) {
       const depEval = evaluations.get(depId);
       if (depEval === TaskEvaluation.DONE || depEval === TaskEvaluation.GO_WITH_TECH_DEBT) {

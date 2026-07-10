@@ -10,7 +10,7 @@ import { terminateOwnedSprintProcess, clearPid, readPid } from '../../orchestra/
 import { loadConfig } from '../../core/config.js';
 import { debugLog } from '../../core/utils.js';
 import { print, printError } from '../helpers/output.js';
-import { killWorker } from '../../orchestra/tmux.js';
+import { killSingle } from './kill.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
@@ -177,17 +177,14 @@ export function detectIncompleteTasks(tasks: Task[]): Task[] {
  */
 export function forceKillLiveWorkers(
   incomplete: readonly Task[],
-  deps: { kill: (taskId: string) => void } = { kill: killWorker },
+  kill: (taskId: string) => boolean,
 ): { killed: string[]; failed: string[] } {
   const killed: string[] = [];
   const failed: string[] = [];
   for (const t of incomplete) {
-    try {
-      deps.kill(t.id);
-      killed.push(t.id);
-    } catch {
-      failed.push(t.id); // already-gone or unkillable — sweep continues
-    }
+    let ok = false;
+    try { ok = kill(t.id); } catch { ok = false; }
+    (ok ? killed : failed).push(t.id); // best-effort: sweep continues either way
   }
   return { killed, failed };
 }
@@ -252,9 +249,14 @@ export function registerFinalize(program: Command): void {
           // born-610: kill the sprint's live WORKERS too — COMPLETE may not be
           // stamped while worker subprocesses are alive (COMPLETE&active truth).
           try {
-            const sweep = forceKillLiveWorkers(incomplete);
+            const sweep = forceKillLiveWorkers(incomplete, (id) => killSingle(root, id, lang));
             if (sweep.killed.length > 0) {
               print(`Terminated ${sweep.killed.length} live worker(s): ${sweep.killed.join(', ')}`);
+            }
+            if (sweep.failed.length > 0) {
+              // Dürüst-uyarı: COMPLETE damgası yine basılacak ama operatör artık
+              // hangi worker'ların öldürülemediğini biliyor (sessiz no-op yasak).
+              print(`Warning: ${sweep.failed.length} worker(s) could not be terminated (${sweep.failed.join(', ')}) — check for stray processes before trusting COMPLETE.`);
             }
           } catch (e) { debugLog('finalize:forceWorkerSweep', e); }
         }

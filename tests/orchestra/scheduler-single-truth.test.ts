@@ -13,12 +13,15 @@
  * RED against the pre-610 code.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { writeFileSync, mkdirSync, rmSync, mkdtempSync, readFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync, rmSync, mkdtempSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { respawnEligibleTasks } from '../../src/orchestra/sprint-spawner.js';
 import { isTaskDispatched } from '../../src/orchestra/sprint-phases.js';
 import { forceKillLiveWorkers } from '../../src/cli/commands/finalize.js';
+import { handleEvaluation, handleCrossDependencies } from '../../src/orchestra/debt-manager.js';
+import { TaskEvaluation } from '../../src/core/types.js';
+import type { TaskResult } from '../../src/core/types.js';
 import { TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task, ResolvedConfig, ModelType } from '../../src/core/types.js';
 import type { SpawnBackend, SpawnBackendOptions } from '../../src/orchestra/spawn-backend.js';
@@ -115,10 +118,11 @@ describe('born-610 STATUS-TRUTH: finalize --force kills live workers (COMPLETE&a
     const killedIds: string[] = [];
     const sweep = forceKillLiveWorkers(
       [task('610-a', TaskStatus.EXECUTING), task('610-b', TaskStatus.CLAIMED), task('610-c', TaskStatus.EXECUTING)],
-      { kill: (id) => {
-        if (id === '610-b') throw new Error('window already gone');
+      (id) => {
+        if (id === '610-b') return false; // backend-aware killSingle: basarisiz = false
         killedIds.push(id);
-      } },
+        return true;
+      },
     );
     expect(killedIds).toEqual(['610-a', '610-c']);
     expect(sweep.killed).toEqual(['610-a', '610-c']);
@@ -127,10 +131,53 @@ describe('born-610 STATUS-TRUTH: finalize --force kills live workers (COMPLETE&a
 
   it('composition pin: the --force branch sweeps workers BEFORE finalizeSprint can stamp COMPLETE', () => {
     const src = readFileSync(join(process.cwd(), 'src', 'cli', 'commands', 'finalize.ts'), 'utf-8');
-    const forceBranch = src.indexOf('forceKillLiveWorkers(incomplete)');
+    const forceBranch = src.indexOf('forceKillLiveWorkers(incomplete,');
     const completeStamp = src.indexOf('await finalizeSprint(');
     expect(forceBranch).toBeGreaterThan(-1);
     expect(completeStamp).toBeGreaterThan(-1);
     expect(forceBranch).toBeLessThan(completeStamp); // sweep precedes the COMPLETE stamp
+  });
+});
+
+describe('born-610 FIX-kapisi muafiyeti (advisor P0: skip ustune fix insa edilemez)', () => {
+  let root: string;
+  beforeEach(() => { root = mkdtempSync(join(tmpdir(), 'st610fix-')); mkdirSync(join(root, '.tasks'), { recursive: true }); });
+  afterEach(() => { rmSync(root, { recursive: true, force: true }); });
+
+  function skipResult(taskId: string): TaskResult {
+    return {
+      taskId, filesChanged: [], linesAdded: 0, linesRemoved: 0, testsPassed: false,
+      coverage: 0, selfAssessment: 'NO_GO', cascadeSkipped: true,
+      notes: 'Cascade-skipped: dependency ended NO_GO/MANUAL_REVIEW',
+    } as unknown as TaskResult;
+  }
+
+  function persistTask(t: Task): void {
+    writeFileSync(join(root, '.tasks', `task-${t.id}.json`), JSON.stringify(t));
+  }
+
+  it('handleEvaluation: cascade-skipped NO_GO icin fix-task ACILMAZ', () => {
+    const t = task('610-skip', TaskStatus.NO_GO);
+    persistTask(t);
+    handleEvaluation(root, t, TaskEvaluation.NO_GO, skipResult('610-skip'));
+    expect(existsSync(join(root, '.tasks', 'task-610-skip-fix.json'))).toBe(false);
+  });
+
+  it('handleEvaluation: NORMAL NO_GO fix-task acar (muafiyet asiri-genis degil)', () => {
+    const t = task('610-real', TaskStatus.NO_GO);
+    persistTask(t);
+    const r = { ...skipResult('610-real'), cascadeSkipped: undefined, notes: 'gercek worker hatasi' } as unknown as TaskResult;
+    handleEvaluation(root, t, TaskEvaluation.NO_GO, r);
+    expect(existsSync(join(root, '.tasks', 'task-610-real-fix.json'))).toBe(true);
+  });
+
+  it('handleCrossDependencies: cascade-skipped NO_GO, DONE-bagimliligina xfix ATMAZ', () => {
+    const dep = task('610-dep', TaskStatus.DONE);
+    const skipped = task('610-victim', TaskStatus.NO_GO, ['610-dep']);
+    writeFileSync(join(root, '.tasks', 'task-610-victim.result'), JSON.stringify(skipResult('610-victim')));
+    const evals = new Map([['610-dep', TaskEvaluation.DONE], ['610-victim', TaskEvaluation.NO_GO]]);
+    const fixes = handleCrossDependencies(root, makeSprint([dep, skipped]), evals);
+    expect(fixes).toEqual([]);
+    expect(existsSync(join(root, '.tasks', 'task-610-dep-xfix.json'))).toBe(false);
   });
 });
