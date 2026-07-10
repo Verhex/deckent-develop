@@ -127,12 +127,12 @@ const MESSAGES: MessageMap = {
     tr: 'Plan reddedildi.',
   },
   'plan.prompt_gate_header': {
-    en: 'Prompt-gate — {count} finding(s) (persona × intent / decision-space):',
-    tr: 'Prompt-gate — {count} bulgu (persona × intent / karar-alanı):',
+    en: 'Prompt-gate — {count} finding(s) (persona × intent / decision-space / scope-contract):',
+    tr: 'Prompt-gate — {count} bulgu (persona × intent / karar-alanı / kapsam-kontratı):',
   },
   'plan.prompt_gate_blocked': {
-    en: 'Plan blocked by prompt-gate: {count} persona-capability mismatch(es). Fix the DIRECTIVES `- Agent:` assignment (route code-writing work to an implementer persona), or re-run with --force-prompt-gate.',
-    tr: 'Plan prompt-gate tarafından bloke edildi: {count} persona-yetenek uyuşmazlığı. DIRECTIVES `- Agent:` atamasını düzeltin (kod-yazan işi bir implementer personasına yönlendirin) ya da --force-prompt-gate ile yeniden koşun.',
+    en: 'Plan blocked by prompt-gate: {count} BLOCK finding(s). Review the findings above (persona / scope-silent-drop / scope-satisfiability), fix the DIRECTIVES accordingly, or re-run with --force-prompt-gate.',
+    tr: 'Plan prompt-gate tarafından bloke edildi: {count} BLOCK bulgusu. Yukarıdaki bulguları inceleyin (persona / scope-silent-drop / scope-satisfiability), DIRECTIVES\'i buna göre düzeltin ya da --force-prompt-gate ile yeniden koşun.',
   },
   'plan.prompt_gate_override': {
     en: 'Prompt-gate BLOCK bypassed via --force-prompt-gate ({count}).',
