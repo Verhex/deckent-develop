@@ -2,6 +2,71 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint395] - 2026-07-10
+
+### Added
+
+- born-594 — TESTING-INTENT — test-ağırlıklı task'lar testing sınıflansın + sahiplik (P1)
+- born-595 — OVERRIDE-WARNING-SURFACE — router uyarıları plan-çıktısına (P1)
+
+### Changed
+
+- born-585 — PROJECTROOT-THREAD — buildWorkerPrompt 7 çağrı-sitesine gerçek projectRoot (P2) (completed with tech debt)
+- born-587 — DEAD-LISTENER-MIGRATION — 5 komut shutdown-hook registry'ye (P1) (completed with tech debt)
+- born-588 — START-EXIT-HONESTY — gate-blok `deckent start` non-zero exit (P2) (completed with tech debt)
+
+### Fixed
+
+- born-599 — VOICE-BODYINIT — Buffer→Uint8Array fetch-body tip-fixi (P2)
+
+
+_Tasks: 6 total, 6 done, 3 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint394] - 2026-07-10
+
+### Added
+
+- DESK-B3-HARDENING — perm-check twin + session-notu + onConnected-tokens (P1)
+
+### Changed
+
+- born-597+598+600 — IPC kanal-katmanlama + adopt-URL + transport (P0, RELEASE-GATE) (completed with tech debt)
+- DESK-B3-I18N-LINT — lint-i18n-hardcode'a desktop-glob (P2) (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 2 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint393] - 2026-07-10
+
+### Added
+
+- born-589 — DOMAIN-ALIAS — detectDomains↔kural-vocabulary alias-map + kural-lint (P0)
+- born-590 — ACTIVATION-VALIDATION — zod-şema + sessiz-drop'u görünür yap (P0)
+- born-591 — AVGCOVERAGE-REPAIR — phantom-zero-dilution + skill-tarafı hiç-yazılmıyor (P0)
+- born-592 — MANIFEST-REPAIR — api-design hayaleti + i18n-quality/secure-coding canlıya insin (P0)
+- born-593 — DNA-FILTER-STAT-CREDIT — düşürülen skill'e kredi yazma (P0)
+
+
+_Tasks: 5 total, 5 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint392] - 2026-07-10
+
+### Added
+
+- DESK-B2-LIFECYCLE — daemon-lifecycle + meta-client (Electron-FREE çekirdek) (P0)
+- DESK-B2-RENDERER — thin pre-daemon UI (P1)
+- DESK-B2-DASHBOARD-BRIDGE — useIsDesktop + d.ts-aynası + sync-lint (P1)
+
+### Changed
+
+- DESK-B2-PROFILE-STORE — connection-profile-store (P0) (completed with tech debt)
+- DESK-B2-WINDOW-APP — index + window-manager + constants (P1) (completed with tech debt)
+- DESK-B2-IPC-SECURITY — ipc-handlers + security (P0, güvenlik) (completed with tech debt)
+- DESK-B2-TRAY-MENU-I18N — tray + menu + i18n köprüsü + update-stub (P1) (completed with tech debt)
+
+
+_Tasks: 15 total, 13 done, 7 tech debt, 2 no-go_
+
 ## [1.0.0-beta.1-sprint391] - 2026-07-09
 
 ### Added

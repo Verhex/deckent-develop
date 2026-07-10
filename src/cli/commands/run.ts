@@ -352,7 +352,7 @@ export function registerRun(program: Command): void {
         const skillPrompts = await resolveSkillPrompts(root, task);
 
         // Spawn worker via config-aware backend (provider resolved in the request)
-        const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts);
+        const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts, root);
         const { backend } = await spawnWorkerMultiProvider(taskId, model, prompt, root, {
           autoApprove,
           spawnBackend: cfg?.spawn_backend,

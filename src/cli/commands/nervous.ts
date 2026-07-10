@@ -11,6 +11,7 @@ import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync, wat
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { registerShutdownHook } from '../helpers/shutdown-hooks.js';
 import type {
   NervousNotification,
   ExecutionRecord,
@@ -532,13 +533,15 @@ function showLog(root: string, follow: boolean, lang: string): void {
 
   watchFile(historyPath, { interval: 1000 }, onFileChange);
 
-  // Handle SIGINT gracefully
-  const cleanup = (): void => {
+  // born-587 (DEAD-LISTENER-MIGRATION): a command-level process.on(SIGINT)
+  // here is dead code — entry.ts's bootstrap-time onSignal wins registration
+  // order and exits synchronously before this listener ever runs (see
+  // src/cli/helpers/shutdown-hooks.ts's module doc). Route the same cleanup
+  // through the shared registry instead so it actually runs before exit.
+  registerShutdownHook(async () => {
     unwatchFile(historyPath, onFileChange);
     print('');
-    process.exit(0);
-  };
-  process.on('SIGINT', cleanup);
+  });
 }
 
 // ─── Panic Guard Approval (Sprint 180 W4-2) ─────────────────────────────────

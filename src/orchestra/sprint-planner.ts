@@ -835,6 +835,39 @@ export async function planSprint(
 }
 
 /**
+ * A single router-level override warning (F8, Sprint 182 —
+ * forceAgent/forceSkills semantic-mismatch advisory), tagged with the task it
+ * belongs to.
+ */
+export interface OverrideWarningEntry {
+  taskId: string;
+  message: string;
+}
+
+/**
+ * born-595 (395-005): flatten each task's `routingMeta.overrideWarnings` into a
+ * flat, task-id-tagged list for surfacing at the `deckent plan` CLI surface.
+ *
+ * `overrideWarnings` are already produced by `routeTaskV2` / the routing loop
+ * above (attached to `task.routingMeta.overrideWarnings`) — this is a read-only
+ * projection over that existing data, not a new source of warnings. Task order
+ * and per-task warning order are preserved.
+ * @param tasks - Sprint tasks (post-routing, i.e. `sprint.tasks`)
+ * @returns Flattened `{ taskId, message }` entries, in task/warning order
+ */
+export function collectOverrideWarnings(tasks: Task[]): OverrideWarningEntry[] {
+  const entries: OverrideWarningEntry[] = [];
+  for (const task of tasks) {
+    const warnings = task.routingMeta?.overrideWarnings;
+    if (!warnings || warnings.length === 0) continue;
+    for (const message of warnings) {
+      entries.push({ taskId: task.id, message });
+    }
+  }
+  return entries;
+}
+
+/**
  * Transition all DRAFT tasks in a sprint to PENDING status and persist changes.
  * @param projectRoot - Project root directory
  * @param sprint - Sprint whose draft tasks should be confirmed

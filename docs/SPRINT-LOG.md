@@ -9571,3 +9571,109 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 391-009: RED-15/16 — ARCHIVE-DIRECTIVES-PATH — directives/ alt-dizin assert güncelle (P2, 2 test) (DONE)
 
 ---
+## Sprint 392 — sprint-392
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-10
+**Duration:** 2874s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 15 |
+| Completed | 13 |
+| Tech Debt | 7 |
+| No-Go | 2 |
+| Coverage | NaN% |
+| Duration | 2874274ms |
+
+### Tasks
+
+- 392-001: DESK-B2-LIFECYCLE — daemon-lifecycle + meta-client (Electron-FREE çekirdek) (P0) (DONE)
+- 392-002: DESK-B2-PROFILE-STORE — connection-profile-store (P0) (GO_WITH_TECH_DEBT)
+- 392-003: DESK-B2-WINDOW-APP — index + window-manager + constants (P1) (GO_WITH_TECH_DEBT)
+- 392-004: DESK-B2-IPC-SECURITY — ipc-handlers + security (P0, güvenlik) (GO_WITH_TECH_DEBT)
+- 392-005: DESK-B2-TRAY-MENU-I18N — tray + menu + i18n köprüsü + update-stub (P1) (GO_WITH_TECH_DEBT)
+- 392-006: DESK-B2-PRELOAD — contextBridge kontrat-implementasyonu (P0) (NO_GO)
+- 392-007: DESK-B2-RENDERER — thin pre-daemon UI (P1) (DONE)
+- 392-008: DESK-B2-DASHBOARD-BRIDGE — useIsDesktop + d.ts-aynası + sync-lint (P1) (DONE)
+
+---
+## Sprint 393 — sprint-393
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-10
+**Duration:** 1958s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1957586ms |
+
+### Tasks
+
+- 393-001: born-589 — DOMAIN-ALIAS — detectDomains↔kural-vocabulary alias-map + kural-lint (P0) (DONE)
+- 393-002: born-590 — ACTIVATION-VALIDATION — zod-şema + sessiz-drop'u görünür yap (P0) (DONE)
+- 393-003: born-591 — AVGCOVERAGE-REPAIR — phantom-zero-dilution + skill-tarafı hiç-yazılmıyor (P0) (DONE)
+- 393-004: born-592 — MANIFEST-REPAIR — api-design hayaleti + i18n-quality/secure-coding canlıya insin (P0) (DONE)
+- 393-005: born-593 — DNA-FILTER-STAT-CREDIT — düşürülen skill'e kredi yazma (P0) (DONE)
+
+---
+## Sprint 394 — sprint-394
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-10
+**Duration:** 1294s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1293525ms |
+
+### Tasks
+
+- 394-001: born-597+598+600 — IPC kanal-katmanlama + adopt-URL + transport (P0, RELEASE-GATE) (GO_WITH_TECH_DEBT)
+- 394-002: DESK-B3-HARDENING — perm-check twin + session-notu + onConnected-tokens (P1) (DONE)
+- 394-003: DESK-B3-I18N-LINT — lint-i18n-hardcode'a desktop-glob (P2) (GO_WITH_TECH_DEBT)
+
+---
+## Sprint 395 — sprint-395
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-10
+**Duration:** 1082s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 3 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1082095ms |
+
+### Tasks
+
+- 395-001: born-585 — PROJECTROOT-THREAD — buildWorkerPrompt 7 çağrı-sitesine gerçek projectRoot (P2) (GO_WITH_TECH_DEBT)
+- 395-002: born-587 — DEAD-LISTENER-MIGRATION — 5 komut shutdown-hook registry'ye (P1) (GO_WITH_TECH_DEBT)
+- 395-003: born-588 — START-EXIT-HONESTY — gate-blok `deckent start` non-zero exit (P2) (GO_WITH_TECH_DEBT)
+- 395-004: born-594 — TESTING-INTENT — test-ağırlıklı task'lar testing sınıflansın + sahiplik (P1) (DONE)
+- 395-005: born-595 — OVERRIDE-WARNING-SURFACE — router uyarıları plan-çıktısına (P1) (DONE)
+- 395-006: born-599 — VOICE-BODYINIT — Buffer→Uint8Array fetch-body tip-fixi (P2) (DONE)
+
+---

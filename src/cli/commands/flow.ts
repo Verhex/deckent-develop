@@ -4,6 +4,7 @@ import { join, dirname } from 'node:path';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
+import { registerShutdownHook } from '../helpers/shutdown-hooks.js';
 import { FlowRegistry } from '../../core/flow-registry.js';
 import { parseCronExpr } from '../../core/scheduled-flow.js';
 import { FlowRuntime } from '../../core/flow-runtime.js';
@@ -225,9 +226,13 @@ export function registerFlow(program: Command): void {
 
         print('Flow daemon started. Press Ctrl+C to stop.');
         runtime.start(onTick);
-        process.on('SIGINT', () => {
+        // born-587 (DEAD-LISTENER-MIGRATION): a command-level process.on
+        // (SIGINT) here is dead code — entry.ts's bootstrap-time onSignal
+        // wins registration order and exits synchronously before this
+        // listener ever runs (see src/cli/helpers/shutdown-hooks.ts's module
+        // doc). Route the same cleanup through the shared registry instead.
+        registerShutdownHook(async () => {
           runtime.stop();
-          process.exit(0);
         });
       } catch (error) {
         printError(error);

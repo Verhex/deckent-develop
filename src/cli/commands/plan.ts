@@ -7,6 +7,7 @@ import { bootstrapProviders } from '../../core/provider.js';
 import {
   readContext, planSprint, confirmDraftTasks, cleanupDraftTasks,
 } from '../../orchestra/brain.js';
+import { collectOverrideWarnings } from '../../orchestra/sprint-planner.js';
 import type { SprintSizeRecommendation } from '../../core/types.js';
 import type { BrainPlanningMode } from '../../core/types.js';
 import { print, printError, formatTable } from '../helpers/output.js';
@@ -194,6 +195,21 @@ export function registerPlan(program: Command): void {
         const headers = ['ID', 'Title', 'Model', 'Priority'];
         const rows = sprint.tasks.map((t) => [t.id, t.title, t.model, t.priority]);
         print(formatTable(headers, rows));
+
+        // OVERRIDE-WARNING-SURFACE (born-595 / 395-005): router-level
+        // forceAgent/forceSkills semantic-mismatch warnings (routingMeta.overrideWarnings)
+        // were previously only debugLog'd (DECKENT_DEBUG-gated) — invisible on every real
+        // surface (sprint-391: 9/9 tasks carried one, none were seen). Advisory only; the
+        // plan proceeds regardless. Placed before the --dry-run early-return below so
+        // dry-run output carries the block too.
+        const overrideWarnings = collectOverrideWarnings(sprint.tasks);
+        if (overrideWarnings.length > 0) {
+          print('');
+          print(getMessage('plan.override_warnings_header', lang, { count: String(overrideWarnings.length) }));
+          for (const w of overrideWarnings) {
+            print(`  [${w.taskId}] ${w.message}`);
+          }
+        }
 
         // G-series prompt-gate surface (persona/decision-space). WARN findings are
         // advisory; an unacknowledged BLOCK (persona-capability mismatch) halts the

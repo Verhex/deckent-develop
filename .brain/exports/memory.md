@@ -1,5 +1,47 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-395 Learnings
+- Sprint sprint-395 Learnings: ## Sprint sprint-395 Learnings
+- born-585 — PROJECTROOT-THREAD — buildWorkerPrompt 7 çağrı-sitesine gerçek projectRoot (P2): GO_WITH_TECH_DEBT — All 7 buildWorkerPrompt call sites now pass their in-scope projectRoot/root as the 4th arg, each matching exactly the va
+- born-587 — DEAD-LISTENER-MIGRATION — 5 komut shutdown-hook registry'ye (P1): GO_WITH_TECH_DEBT — Migrated all 5 born-587 members off dead process.on(SIGINT/SIGTERM) onto registerShutdownHook, mirroring the serve.ts pr
+- born-588 — START-EXIT-HONESTY — gate-blok `deckent start` non-zero exit (P2): GO_WITH_TECH_DEBT — Investigation-first (Discipline 1): reproduced the born-588 scenario with a BrainError-throwing runSprint mock exactly a
+
+## Gains
+- 395-004 — born-594 — TESTING-INTENT — test-ağırlıklı task'lar testing sınıflansın + sahiplik (P1) — Root cause (audit sprint-agent-skill-prompt-audit-2026-07-10.md §0/A1/E-P1#8): a test-dominant ta...
+- 395-005 — born-595 — OVERRIDE-WARNING-SURFACE — router uyarıları plan-çıktısına (P1) — born-595 OVERRIDE-WARNING-SURFACE: routingMeta.overrideWarnings (F8/Sprint182 forceAgent/forceSki...
+- 395-006 — born-599 — VOICE-BODYINIT — Buffer→Uint8Array fetch-body tip-fixi (P2) — Fixed the latent Buffer→BodyInit type mismatch at local-voice.ts:22 (STT fetch call).
+
+## Sprint sprint-394 Learnings
+- Sprint sprint-394 Learnings: ## Sprint sprint-394 Learnings
+- born-597+598+600 — IPC kanal-katmanlama + adopt-URL + transport (P0, RELEASE-GATE): GO_WITH_TECH_DEBT — All three born-597+598+600 fixes implemented and test-pinned in ipc-handlers.ts (only file in write scope besides the ne
+- DESK-B3-I18N-LINT — lint-i18n-hardcode'a desktop-glob (P2): GO_WITH_TECH_DEBT — Extended lint-i18n-hardcode.mjs to scan src/desktop/src/main/**/*.ts recursively, in addition to the existing flat src/c
+
+## Gains
+- 394-002 — DESK-B3-HARDENING — perm-check twin + session-notu + onConnected-tokens (P1) — All three hardening items implemented, surgical, no new window features/behavior: (a) security.ts...
+
+## Sprint sprint-393 Learnings
+- Sprint sprint-393 Learnings: ## Sprint sprint-393 Learnings
+
+## Gains
+- 393-001 — born-589 — DOMAIN-ALIAS — detectDomains↔kural-vocabulary alias-map + kural-lint (P0) — Implemented born-589 domain-vocabulary alias resolution entirely at the rule-evaluation layer, pe...
+- 393-002 — born-590 — ACTIVATION-VALIDATION — zod-şema + sessiz-drop'u görünür yap (P0) — born-590 ACTIVATION-VALIDATION.
+- 393-003 — born-591 — AVGCOVERAGE-REPAIR — phantom-zero-dilution + skill-tarafı hiç-yazılmıyor (P0) — born-591 AVGCOVERAGE-REPAIR.
+- 393-004 — born-592 — MANIFEST-REPAIR — api-design hayaleti + i18n-quality/secure-coding canlıya insin (P0) — SCOPE BLOCKER (primary NO_GO reason): task-393-004.json's scope.filesWrite contains ONLY tests/co...
+- 393-005 — born-593 — DNA-FILTER-STAT-CREDIT — düşürülen skill'e kredi yazma (P0) — born-593 DNA-FILTER-STAT-CREDIT fixed entirely inside resolveSkillPrompts (result-collector.ts, t...
+
+## Sprint sprint-392 Learnings
+- Sprint sprint-392 Learnings: ## Sprint sprint-392 Learnings
+- DESK-B2-PROFILE-STORE — connection-profile-store (P0): GO_WITH_TECH_DEBT — connection-profile-store.ts: factory createConnectionProfileStore({baseDir?}) over connection-profiles.json, default ~/.
+- DESK-B2-WINDOW-APP — index + window-manager + constants (P1): GO_WITH_TECH_DEBT — constants.ts: DEFAULT_PORT=3100, HEALTH_CHECK_TIMEOUT_MS/HEALTH_POLL_INITIAL_BACKOFF_MS/HEALTH_POLL_MAX_BACKOFF_MS (2000
+- DESK-B2-IPC-SECURITY — ipc-handlers + security (P0, güvenlik): GO_WITH_TECH_DEBT — ipc-handlers.ts: implements every DeckentDesktopApi channel (connection.list/add/remove/connect/disconnect, daemon.statu
+- DESK-B2-TRAY-MENU-I18N — tray + menu + i18n köprüsü + update-stub (P1): GO_WITH_TECH_DEBT — i18n.ts: Electron-import-free bridge over getMessage/getLanguage (../../../cli/helpers/messages.js). resolveDesktopLangu
+- DESK-B2-PRELOAD — contextBridge kontrat-implementasyonu (P0): NO_GO — Write-scope path src/desktop/src/preload/index.ts was flagged 'unverified' in the task prompt (no such path existed pre-
+
+## Gains
+- 392-001 — DESK-B2-LIFECYCLE — daemon-lifecycle + meta-client (Electron-FREE çekirdek) (P0) — All 4 blueprint functions implemented in daemon-lifecycle.ts: decideConnectionAction (meta-read -...
+- 392-007 — DESK-B2-RENDERER — thin pre-daemon UI (P1) — Thin, framework-free TS+DOM renderer for the 3 pre-daemon screens (ProfilePicker -> Connecting ->...
+- 392-008 — DESK-B2-DASHBOARD-BRIDGE — useIsDesktop + d.ts-aynası + sync-lint (P1) — Implemented: (1) src/dashboard/src/types/desktop-global.d.ts — ambient `declare global { interfac...
+
 ## Sprint sprint-391 Learnings
 - Sprint sprint-391 Learnings: ## Sprint sprint-391 Learnings
 

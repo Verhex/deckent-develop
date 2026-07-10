@@ -499,6 +499,9 @@ export function registerStart(program: Command): void {
         } else {
           printError(error);
         }
+        // born-588: a gate-blok (e.g. pre-spawn scope-gate) surfaces as a BrainError here —
+        // this line is what makes that block a non-zero exit for scripts/CI, not just a
+        // printed message. Keep it unconditional for both branches above.
         process.exitCode = 1;
       } finally {
         // Always clean up temp DIRECTIVES.md (moved from try/catch to finally)

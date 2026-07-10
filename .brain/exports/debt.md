@@ -9,6 +9,16 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-395-001 | Tech debt from 395-001: All 7 buildWorkerPrompt call sites now pass their in-sco | normal | sprint-395 | resolved |
+| debt-395-002 | Tech debt from 395-002: Migrated all 5 born-587 members off dead process.on(SIGI | normal | sprint-395 | resolved |
+| debt-395-003 | Tech debt from 395-003: Investigation-first (Discipline 1): reproduced the born- | normal | sprint-395 | resolved |
+| debt-394-001 | Tech debt from 394-001: All three born-597+598+600 fixes implemented and test-pi | normal | sprint-394 | resolved |
+| debt-394-003 | Tech debt from 394-003: Extended lint-i18n-hardcode.mjs to scan src/desktop/src/ | normal | sprint-394 | resolved |
+| debt-392-001 | Tech debt from 392-001: All 4 blueprint functions implemented in daemon-lifecycl | normal | sprint-392 | resolved |
+| debt-392-005 | Tech debt from 392-005: i18n.ts: Electron-import-free bridge over getMessage/get | normal | sprint-392 | resolved |
+| debt-392-002-xfix | Tech debt from 392-002-xfix: Investigated the cross-dependency theory ('392-004  | critical | sprint-392 | resolved |
+| debt-392-003-fix | Tech debt from 392-003-fix: Root cause of the 392-003 NO_GO was NOT a code defec | critical | sprint-392 | resolved |
+| debt-392-004-fix | Tech debt from 392-004-fix: No source change made — re-read src/desktop/src/main | critical | sprint-392 | resolved |
 | debt-390-002 | Tech debt from 390-002: Root cause confirmed by reading code: terminal/types.ts  | normal | sprint-390 | resolved |
 | debt-390-004 | Tech debt from 390-004: Root cause: runPreFlightHealthCheck() (doctor-checks.ts: | normal | sprint-390 | resolved |
 | debt-389-007 | Tech debt from 389-007: HONESTY DISCLOSURE FIRST (LP-10 disk-verify): the raw fi | normal | sprint-389 | resolved |

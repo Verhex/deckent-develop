@@ -38,11 +38,11 @@
   },
   "enabled": true,
   "stats": {
-    "totalUses": 17,
-    "successRate": 0.9411764705882353,
+    "totalUses": 19,
+    "successRate": 0.9473684210526315,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-393",
-    "successCount": 16
+    "lastUsedInSprint": "sprint-395",
+    "successCount": 18
   },
   "entrypoint": "SKILL.md"
 }

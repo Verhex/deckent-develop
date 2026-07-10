@@ -6,6 +6,7 @@ import { DASHBOARD_FILE } from '../../core/constants.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
 import { detectLang } from '../helpers/i18n.js';
+import { registerShutdownHook } from '../helpers/shutdown-hooks.js';
 // Canonical NO_COLOR check (R4-ISNOCOLOR SSOT) lives in ../helpers/output.ts.
 // Re-exported here so the former `dashboard.js` import path keeps working
 // against the single source of truth — no duplicate body.
@@ -205,12 +206,14 @@ export function registerDashboard(program: Command): void {
         fallbackTimer = setInterval(render, interval);
       }
 
-      const cleanup = (): void => {
+      // born-587 (DEAD-LISTENER-MIGRATION): a command-level process.on
+      // (SIGINT/SIGTERM) here is dead code — entry.ts's bootstrap-time
+      // onSignal wins registration order and exits synchronously before this
+      // listener ever runs (see src/cli/helpers/shutdown-hooks.ts's module
+      // doc). Route the same cleanup through the shared registry instead.
+      registerShutdownHook(async () => {
         watcher?.close();
         if (fallbackTimer !== null) clearInterval(fallbackTimer);
-        process.exit(0);
-      };
-      process.on('SIGINT', cleanup);
-      process.on('SIGTERM', cleanup);
+      });
     });
 }

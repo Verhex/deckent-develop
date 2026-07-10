@@ -247,7 +247,7 @@ export async function runTaskMode(
   // Both resolve to undefined/[] for 'generic' agent or empty skills — backward-safe fallback.
   const agentPrompt = await resolveAgentPrompt(projectRoot, task);
   const skillPrompts = await resolveSkillPrompts(projectRoot, task);
-  const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts);
+  const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts, projectRoot);
 
   // Emit event for nervous system / observers
   try {

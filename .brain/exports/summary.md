@@ -51,6 +51,16 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-395 Learnings** (sprint-395): ## Sprint sprint-395 Learnings
+- born-585 — PROJECTROOT-THREAD — buildWorkerPrompt 7 çağrı-sitesine gerçek projectRoo...
+- **Sprint sprint-394 Learnings** (sprint-394): ## Sprint sprint-394 Learnings
+- born-597+598+600 — IPC kanal-katmanlama + adopt-URL + transport (P0, RELEASE-GATE): ...
+- **Sprint sprint-393 Learnings** (sprint-393): ## Sprint sprint-393 Learnings
+
+## Gains
+- 393-001 — born-589 — DOMAIN-ALIAS — detectDomains↔kural-vocabulary alias-m...
+- **Sprint sprint-392 Learnings** (sprint-392): ## Sprint sprint-392 Learnings
+- DESK-B2-PROFILE-STORE — connection-profile-store (P0): GO_WITH_TECH_DEBT — connectio...
 - **Sprint sprint-391 Learnings** (sprint-391): ## Sprint sprint-391 Learnings
 
 ## Gains
@@ -65,16 +75,6 @@
 - born-493 — W2-WIRE — native-engine'i slash-dispatcher'a köprüle (24/37 komut sessiz-...
 - **Sprint sprint-386 Learnings** (sprint-386): ## Sprint sprint-386 Learnings
 - born-552 — MCP-TOOL-EMPTY-DESC — boş-string açıklama REPL-launch'ı çökertiyor: NO_GO...
-- **Sprint sprint-383 Learnings** (sprint-383): ## Sprint sprint-383 Learnings
-
-## Gains
-- 383-001 — born-552 — MCP-TOOL-EMPTY-DESC — boş-string açıklama REPL-launch...
-- **Sprint sprint-382 Learnings** (sprint-382): ## Sprint sprint-382 Learnings
-- born-518-REDO — CRED-SCRUB gerçek leak-site'a wire (Sprint-1 wrong-path düzelt): GO_...
-- **Sprint sprint-381 Learnings** (sprint-381): ## Sprint sprint-381 Learnings
-- born-499-HARD — WORKER-GIT-GUARD — spawn-backend'lere git-shim enjekte et: GO_WITH_T...
-- **Sprint sprint-380 Learnings** (sprint-380): ## Sprint sprint-380 Learnings
-- born-558 — SKILL-LIST-V2-CRASH — `deckent skill list` v2-manifest'te exit 1: GO_WITH...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -135,4 +135,4 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 
-_Total entries: 1125 | Generated: 2026-07-09_
+_Total entries: 1152 | Generated: 2026-07-10_

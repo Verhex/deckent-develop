@@ -28,6 +28,7 @@ import { print, printError } from '../helpers/output.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { ensureMcpAttached, type McpHost } from '../helpers/mcp-attach.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { registerShutdownHook } from '../helpers/shutdown-hooks.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -390,20 +391,22 @@ export function spawnChatProcess(
     shell: process.platform === 'win32',
   });
 
-  const forward = (signal: NodeJS.Signals) => () => {
+  // born-587 (DEAD-LISTENER-MIGRATION): a command-level process.on(SIGINT/
+  // SIGTERM) here is dead code — entry.ts's bootstrap-time onSignal wins
+  // registration order and exits synchronously before this listener ever runs
+  // (see src/cli/helpers/shutdown-hooks.ts's module doc). Route the same
+  // "don't orphan the spawned child" cleanup through the shared registry
+  // instead. Hooks are signal-agnostic by contract there, so the exact
+  // received signal (SIGINT vs SIGTERM) can no longer be forwarded verbatim —
+  // child.kill() (default SIGTERM) achieves the same functional effect.
+  const unregisterHook = registerShutdownHook(async () => {
     if (!child.killed) {
-      try { child.kill(signal); } catch { /* child already gone */ }
+      try { child.kill(); } catch { /* child already gone */ }
     }
-  };
-
-  const onSigint = forward('SIGINT');
-  const onSigterm = forward('SIGTERM');
-  process.on('SIGINT', onSigint);
-  process.on('SIGTERM', onSigterm);
+  });
 
   const detach = () => {
-    process.removeListener('SIGINT', onSigint);
-    process.removeListener('SIGTERM', onSigterm);
+    unregisterHook();
   };
 
   return { child, detach };

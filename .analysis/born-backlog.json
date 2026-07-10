@@ -2173,5 +2173,22 @@
   "spec": "Legacy tag-loop yolu (entry.ts/chat.ts uzerinden) cliDispatcher'i confirm'suz kurar -> oraya start/kill gibi yikici tool tanitmak confirm-tabanini deler (bu yuzden GAP#1 YALNIZ native-engine'e uygulandi). FIX: legacy yola classifyTool-tabanli confirm-katmani wire et (native permission-deseninin karsiligi) VEYA legacy tag-loop yuzeyini read-only'de dondurup native-engine cutover'ini (M5) hizlandir - karar.",
   "verify": "legacy yolda yikici tag -> confirm-akisi testi; read-only davranis regresyonsuz",
   "wire_on": "guvenlik-fix; tanitim-genislemesi ancak gate sonrasi"
+ },
+ {
+  "born_id": 603,
+  "title": "DEBT-INJECTION-NOOP-ECHO: fix-wave \"no defect found / no change\" arastirma-notlari CRITICAL priority-fix olarak yeniden enjekte ediliyor",
+  "sources": [
+   "canli-vaka 2026-07-10: sprint-395 plani 392-002-xfix/003-fix/004-fix yankilarini \"Priority fix for critical debt item\" olarak enjekte etti (sprint-planner.ts:1023); biri taze B3-guvenlik-dosyalarina stale-scope ile carpacakti"
+  ],
+  "severity": "P2",
+  "subsystem": "orchestra",
+  "proposed_mode": "worker",
+  "primary_files": [
+   "src/orchestra/sprint-planner.ts",
+   "src/orchestra/debt-manager.ts"
+  ],
+  "spec": "Skip-class mekanizmasi var (verified-no-result/timeout-partial) ama \"honest no-op investigation\" sinifi yok: notes'u \"no defect found/no source change\" diyen fix-wave DEBT kaydi bir daha CRITICAL-fix olarak dogmamali. Siniflandirmayi genislet (ornegin fix-wave kokenli + filesChanged-bos + no-defect-deseni -> auto-resolve veya skip-class) + injected-task description'i jenerik \"Priority fix\" yerine debt-notunu tasisin.",
+  "verify": "fixture: no-op fix-wave debt -> injection SKIP + gorunur-sayim; gercek-actionable debt injection ayni kalir",
+  "wire_on": "default-on (hijyen)"
  }
 ]

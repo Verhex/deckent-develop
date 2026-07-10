@@ -19,7 +19,14 @@ export function makeLocalVoiceAdapter(
       const res = await fetch(url.toString(), {
         method: 'POST',
         headers: { 'content-type': mime },
-        body: audio,
+        // Buffer's `.buffer` is typed ArrayBufferLike (ArrayBuffer | SharedArrayBuffer); a DOM-lib
+        // tsconfig's ArrayBufferView<ArrayBuffer> wants the narrower ArrayBuffer, so Buffer fails
+        // structural assignability to BodyInit there even though it IS a valid body at runtime
+        // (Buffer is a Uint8Array subclass). Cast keeps the exact same object/bytes on the wire —
+        // `new Uint8Array(audio)` would type-check too but copies, changing the sent body's identity.
+        // `Uint8Array<ArrayBuffer>` (not the DOM-only `BodyInit` name) resolves under both a
+        // DOM-lib tsconfig and a Node-only one (root has no "DOM" lib, so `BodyInit` is unnamed there).
+        body: audio as unknown as Uint8Array<ArrayBuffer>,
       });
       if (!res.ok) throw new Error(`stt ${res.status}`);
       const body = (await res.json()) as { text: string; language?: string };

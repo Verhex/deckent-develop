@@ -138,6 +138,10 @@ const MESSAGES: MessageMap = {
     en: 'Prompt-gate BLOCK bypassed via --force-prompt-gate ({count}).',
     tr: 'Prompt-gate BLOCK --force-prompt-gate ile atlandı ({count}).',
   },
+  'plan.override_warnings_header': {
+    en: 'Override warnings — {count} warning(s) (forceAgent/forceSkills routing overrides — advisory, plan proceeds):',
+    tr: 'Override uyarıları — {count} uyarı (forceAgent/forceSkills routing override\'ları — bilgilendirme, plan devam eder):',
+  },
 
   // ─── status command ─────────────────────────────────────────────────
   'status.no_active_sprint': {

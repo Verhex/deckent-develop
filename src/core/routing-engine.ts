@@ -287,6 +287,66 @@ export function getUserSurfaceBonus(agentId: string, taskDNA: TaskDNA, scopeDoma
   return 0;
 }
 
+// ─── TESTING-INTENT — test-dominant ownership bonus (born-594) ─────────────
+//
+// Audit root-cause #3 (sprint-agent-skill-prompt-audit-2026-07-10.md §0/A1/E-P1#8):
+// a task whose write scope is MAJORITY test-file writes, combined with a
+// test-fix-flavored title/description, classifies as `implementation` intent
+// (Sprint 148 retired the standalone 'testing' IntentType — see intent-classifier.ts
+// line 17/507). ci-guardian's manifest EXCLUDES `intent.primary === 'implementation'`
+// outright, and bug-fixer's sole rule (`intent.primary === 'bugfix'`) never fires for
+// 'implementation' — so every test-sweep task forced onto either agent trips an
+// overrideWarning (9/9 observed in sprint-391). `IntentType` (routing-types.ts) is a
+// cross-subsystem SSOT outside this task's single-writer scope (routing-engine.ts
+// only) — adding a 'testing' member there would ripple through every
+// `Record<IntentType, …>` consumer across core/orchestra, none of which are in scope
+// here (manifest vocabulary work is born-601's). This is therefore a routing-engine-
+// only ownership fix, in the same spirit as DOMAIN_MATCH_BONUS/USER_SURFACE_BONUS
+// above: a real test-dominant signal grants ci-guardian + bug-fixer a bypass-strength
+// bonus (same magnitude/bypass mechanics as USER_SURFACE_BONUS, Sprint 216-003) so
+// they become the live owners of test-dominant work without a manifest edit.
+
+/** Majority threshold for "scope/files çoğunluğu tests/" — half or more of a task's
+ *  write scope is test files. */
+export const TEST_DOMINANT_WRITE_RATIO_THRESHOLD = 0.5;
+
+const TEST_NOUN_PATTERN = /\btest(s|ing)?\b/i;
+const TEST_FIX_VERB_PATTERN = /\b(fix|sweep|flak\w*|regression|stabiliz\w*|hermetic)\b/i;
+
+/**
+ * True when a task reads as a test-dominant sweep/fix: MAJORITY of its write scope
+ * is test files (`taskDNA.scope.testWriteRatio`) AND its title/description carries a
+ * test-fix pattern (a "test" noun co-occurring with a fix/sweep/regression verb).
+ * Both signals are required — a task that merely touches one incidental test file
+ * alongside a src/ feature build (e.g. the T-145-004 fixture in
+ * agent-routing-health.test.ts) must NOT be reclassified; requiring the text
+ * pattern too keeps this narrow.
+ */
+export function isTestDominantTask(taskDNA: TaskDNA, taskText: string): boolean {
+  return (
+    taskDNA.scope.testWriteRatio >= TEST_DOMINANT_WRITE_RATIO_THRESHOLD &&
+    TEST_NOUN_PATTERN.test(taskText) &&
+    TEST_FIX_VERB_PATTERN.test(taskText)
+  );
+}
+
+/** Bypass-strength bonus — sized to match USER_SURFACE_BONUS's precedent: large
+ *  enough to (a) clear refactorer's generic impl@7 candidate score and (b) act as
+ *  the nonzero signal that bypasses an agent's own activation-exclude rule (mirrors
+ *  the surfaceBonus bypass mechanics in selectBestAgent below). */
+export const TEST_OWNERSHIP_BONUS = 8;
+
+/** The curated, narrow "live owners" of test-dominant work — exactly the two agents
+ *  named in born-594 (ci-guardian, bug-fixer). Not derived from any domain/surface
+ *  table; a hardcoded set by design, matching USER_SURFACE_AGENTS' precedent. */
+export const TEST_OWNERSHIP_AGENTS: ReadonlySet<string> = new Set(['ci-guardian', 'bug-fixer']);
+
+/** Returns TEST_OWNERSHIP_BONUS when `agentId` is a curated test-owner AND the task
+ *  is test-dominant, else 0. */
+export function getTestOwnershipBonus(agentId: string, testDominant: boolean): number {
+  return testDominant && TEST_OWNERSHIP_AGENTS.has(agentId) ? TEST_OWNERSHIP_BONUS : 0;
+}
+
 // ─── ROUTE-DOMAIN-SCOPE — scope-path domain extraction (born-470) ──────────
 //
 // born-470 (3-sprint-proven, 358-002: APR-XPROC-WIRE): the generic path-proxy
@@ -648,6 +708,16 @@ export function routeTaskV2(
     reasoning.push(`Scope-domain (born-470): ${scopeDomain ? `'${scopeDomain}'` : 'none (no curated match)'}`);
   }
 
+  // born-594 — test-dominant ownership signal (routing-engine-only; see isTestDominantTask
+  // above). Always-on, matching the born-589 domain-alias precedent (no new option flag).
+  const taskText = `${task.title} ${task.description}`;
+  const testDominant = isTestDominantTask(taskDNA, taskText);
+  reasoning.push(
+    testDominant
+      ? "Test-dominant signal (born-594): true — effective intent='testing' (ci-guardian/bug-fixer ownership eligible)"
+      : 'Test-dominant signal (born-594): false',
+  );
+
   // OPENROUTER-DOC-ROUTE wire (Sprint 362 Task 362-006) — see RoutingOptions.openRouterDocRoute.
   const openRouterDocRouteEnabled = options?.openRouterDocRoute ?? false;
   if (openRouterDocRouteEnabled) {
@@ -772,6 +842,7 @@ export function routeTaskV2(
       taskDNA,
       agentPool,
       cfg,
+      testDominant,
     );
     if (semanticWarning) {
       overrideWarnings.push(semanticWarning);
@@ -816,7 +887,7 @@ export function routeTaskV2(
       const agentResult = selectBestAgent(
         taskDNA, agentPool, cfg, learningData, allExcludeAgents, task.type,
         skillIds, skillAgentAffinityEnabled, kindAffinityEnabled,
-        `${task.title} ${task.description}`, languagePenaltyEnabled, scopeDomain,
+        taskText, languagePenaltyEnabled, scopeDomain, testDominant,
       );
       agentId = agentResult.agentId;
       agentScore = agentResult.score;
@@ -888,6 +959,7 @@ export function evaluateForceAgentSemantic(
   taskDNA: TaskDNA,
   agentPool: AgentPool,
   cfg: RoutingEngineConfig,
+  testDominant: boolean = false,
 ): string | null {
   const agent = agentPool.get(forcedAgentId);
   if (!agent) {
@@ -899,16 +971,20 @@ export function evaluateForceAgentSemantic(
 
   const activation = getAgentActivation(agent);
   const result = evaluateActivation(withAliasedDomains(taskDNA), activation);
-  if (result.excluded) {
+  // born-594 — a test-dominant task's ownership bonus bypasses the agent's own
+  // activation-exclude rule, mirroring the surfaceBonus bypass in selectBestAgent.
+  const testBonus = getTestOwnershipBonus(forcedAgentId, testDominant);
+  if (result.excluded && testBonus === 0) {
     return `forceAgent '${forcedAgentId}' is excluded by its own activation rules ` +
       `(reason='${result.excludeReason ?? 'unknown'}', intent=${taskDNA.intent.primary})`;
   }
 
   const ratio = cfg.forceAgentWarnRatio ?? 0.3;
   const threshold = cfg.agentMinScore * ratio;
-  if (result.score < threshold) {
+  const effectiveScore = result.score + testBonus;
+  if (effectiveScore < threshold) {
     return `forceAgent '${forcedAgentId}' has low semantic relevance: ` +
-      `activation score=${result.score} < threshold=${threshold.toFixed(2)} ` +
+      `activation score=${effectiveScore} < threshold=${threshold.toFixed(2)} ` +
       `(agentMinScore=${cfg.agentMinScore} × ratio=${ratio}, intent=${taskDNA.intent.primary}). ` +
       `Override honored; verify this is intentional.`;
   }
@@ -1033,6 +1109,7 @@ function selectBestAgent(
   taskText?: string,
   languagePenalty?: boolean,
   scopeDomain?: string | null,
+  testDominant: boolean = false,
 ): { agentId: string | null; score: number; confidence: ConfidenceLevel; reasoning: string[] } {
   const candidates: ScoredCandidate[] = [];
   const reasoning: string[] = [];
@@ -1057,10 +1134,18 @@ function selectBestAgent(
     // a user-facing task cannot collapse to refactorer's generic impl@7.
     // ROUTE-1 B2: suppressed for non-build tasks (touch-ups, refactor, doc, audit).
     const surfaceBonus = buildTask ? getUserSurfaceBonus(id, taskDNA, scopeDomain) : 0;
+    // born-594 — test-dominant ownership bonus; bypasses excludes the same way
+    // surfaceBonus does (see the two bypass branches below).
+    const testBonus = getTestOwnershipBonus(id, testDominant);
+    const bypassBonus = surfaceBonus + testBonus;
 
     if (excludeAgents.includes(id)) {
-      if (surfaceBonus > 0) {
-        reasoning.push(`Agent '${id}' surface exclude bypass (user-surface owner)`);
+      if (bypassBonus > 0) {
+        reasoning.push(
+          testBonus > 0
+            ? `Agent '${id}' test-ownership exclude bypass (override)`
+            : `Agent '${id}' surface exclude bypass (user-surface owner)`,
+        );
       } else {
         reasoning.push(`Agent '${id}' excluded by override`);
         continue;
@@ -1078,8 +1163,12 @@ function selectBestAgent(
     const result = evaluateActivation(aliasedTaskDNA, activation, affinityCtx);
 
     if (result.excluded) {
-      if (surfaceBonus > 0) {
-        reasoning.push(`Agent '${id}' surface exclude bypass: ${result.excludeReason}`);
+      if (bypassBonus > 0) {
+        reasoning.push(
+          testBonus > 0
+            ? `Agent '${id}' test-ownership exclude bypass: ${result.excludeReason}`
+            : `Agent '${id}' surface exclude bypass: ${result.excludeReason}`,
+        );
       } else {
         reasoning.push(`Agent '${id}' excluded: ${result.excludeReason}`);
         continue;
@@ -1099,6 +1188,9 @@ function selectBestAgent(
     }
     if (surfaceBonus > 0) {
       reasoning.push(`Agent '${id}' user-surface bonus: +${surfaceBonus} (domains=[${taskDNA.domains.map(d => d.name).join(', ')}]${scopeDomain ? `, scopeDomain='${scopeDomain}'` : ''})`);
+    }
+    if (testBonus > 0) {
+      reasoning.push(`Agent '${id}' test-ownership bonus: +${testBonus} (test-dominant task, testWriteRatio=${taskDNA.scope.testWriteRatio})`);
     }
 
     // PCOMP-W5: role-mismatch signal — a review/analyst persona on an implement
@@ -1124,12 +1216,12 @@ function selectBestAgent(
       reasoning.push(`Agent '${id}' language-mismatch penalty: ${langPenalty} (taskLanguage=${taskLanguage}, agentLanguage=${agentLanguage})`);
     }
 
-    const finalScore = result.score + bonus + domainBonus + surfaceBonus + rolePenalty + kindBonus + langPenalty;
+    const finalScore = result.score + bonus + domainBonus + surfaceBonus + testBonus + rolePenalty + kindBonus + langPenalty;
 
     if (finalScore >= cfg.agentMinScore) {
       candidates.push({
         id,
-        rawScore: result.score + domainBonus + surfaceBonus + rolePenalty + kindBonus + langPenalty,
+        rawScore: result.score + domainBonus + surfaceBonus + testBonus + rolePenalty + kindBonus + langPenalty,
         learningBonus: bonus,
         finalScore,
         matchedRules: result.matchedRules,

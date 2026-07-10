@@ -1201,7 +1201,7 @@ export async function waitForResults(
     try {
       const queueAgentPrompt = await resolveAgentPrompt(projectRoot, nextTask);
       const queueSkillPrompts = await resolveSkillPrompts(projectRoot, nextTask);
-      const prompt = buildWorkerPrompt(nextTask, queueAgentPrompt, queueSkillPrompts);
+      const prompt = buildWorkerPrompt(nextTask, queueAgentPrompt, queueSkillPrompts, projectRoot);
       const writeTargets = buildSpawnWriteTargets(nextTask);
       const allowedTools = writeTargets.length > 0
         ? `Read,Write(${writeTargets.join(',')}),Edit(${writeTargets.join(',')}),Bash,Glob,Grep`

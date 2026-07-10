@@ -1,6 +1,7 @@
 import type { Command } from 'commander';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { registerShutdownHook } from '../helpers/shutdown-hooks.js';
 import {
   runHeartbeat,
   HeartbeatDaemon,
@@ -59,13 +60,15 @@ export function registerHeartbeat(program: Command): void {
         printResult(firstResult);
         print(`Daemon running (PID ${process.pid}). Press Ctrl+C to stop.`);
 
-        const shutdown = (): void => {
+        // born-587 (DEAD-LISTENER-MIGRATION): a command-level process.on
+        // (SIGINT/SIGTERM) here is dead code — entry.ts's bootstrap-time
+        // onSignal wins registration order and exits synchronously before
+        // this listener ever runs (see src/cli/helpers/shutdown-hooks.ts's
+        // module doc). Route the same cleanup through the shared registry.
+        registerShutdownHook(async () => {
           print('\nStopping heartbeat daemon...');
           daemon.stop();
-          process.exit(0);
-        };
-        process.on('SIGINT', shutdown);
-        process.on('SIGTERM', shutdown);
+        });
         return;
       }
 

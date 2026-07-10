@@ -124,7 +124,7 @@ export function registerRunTool(server: McpServer): void {
         // Build worker prompt with agent/skill context
         const agentPrompt = await resolveAgentPrompt(root, task);
         const skillPrompts = await resolveSkillPrompts(root, task);
-        const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts);
+        const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts, root);
         const { backend } = await spawnWorkerMultiProvider(taskId, model as ModelType, prompt, root, {
           autoApprove,
           spawnBackend: cfg.spawn_backend,
