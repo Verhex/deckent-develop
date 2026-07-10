@@ -258,6 +258,10 @@
       "code": "const result = spawnSync('docker', ['--version'], {"
     },
     {
+      "file": "src/orchestra/debt-manager.ts",
+      "code": "const ls = spawnSync('git', ['ls-files'], {"
+    },
+    {
       "file": "src/orchestra/disk-verify.ts",
       "code": "const res = spawnSync('git', ['diff', '--numstat', 'HEAD', '--', ...writeScope], {"
     },
@@ -324,6 +328,10 @@
     {
       "file": "src/orchestra/sprint-planner.ts",
       "code": "const gitResult = spawnSync('git', ['status', '--porcelain'], { cwd: projectRoot, encoding: 'utf-8' });"
+    },
+    {
+      "file": "src/orchestra/sprint-planner.ts",
+      "code": "const ls = spawnSync('git', ['ls-files'], {"
     },
     {
       "file": "src/orchestra/sprint-planner.ts",
