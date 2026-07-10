@@ -1660,6 +1660,10 @@ const MESSAGES: MessageMap = {
     en: '  Tips      deckent serve --port <n>  --host <addr>',
     tr: '  İpuçları  deckent serve --port <n>  --host <adres>',
   },
+  'serve.daemon_meta_failed': {
+    en: 'Warning: could not write the desktop handshake file (.deckent/serve-daemon.json) — the server runs normally, but a desktop shell cannot auto-adopt this daemon: {error}',
+    tr: 'Uyarı: desktop el-sıkışma dosyası (.deckent/serve-daemon.json) yazılamadı — sunucu normal çalışıyor, ancak desktop kabuğu bu daemon\'ı otomatik devralamaz: {error}',
+  },
 
   // ─── bot daemon (start/stop/status) ────────────────────────────
   'bot.daemon_desc': {

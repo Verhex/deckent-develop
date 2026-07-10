@@ -1,6 +1,8 @@
 import type { Command } from 'commander';
 import { existsSync, readdirSync } from 'node:fs';
 import { createHttpServer } from '../../api/server.js';
+import { writeServeDaemonMeta, clearServeDaemonMeta } from '../../api/serve-daemon-meta.js';
+import { registerShutdownHook } from '../helpers/shutdown-hooks.js';
 import { LocalPtyBackend } from '../../api/terminal/session-backend.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
@@ -121,6 +123,24 @@ export function registerServe(program: Command): void {
       });
 
       const lang = getLanguage();
+
+      // DESK-1 (born-496): persist the daemon handshake file so a desktop shell
+      // can adopt this daemon (pid-ownership + /health verified — the file is a
+      // hint, not proof). Non-fatal: the server is fully usable without it.
+      try {
+        writeServeDaemonMeta(root, {
+          host,
+          port,
+          projectRoot: root,
+          apiToken: api.apiToken,
+          terminalToken: api.terminalToken,
+          terminalEnabled: terminalEnabled && api.terminalToken !== undefined,
+        });
+      } catch (metaErr) {
+        process.stderr.write(getMessage('serve.daemon_meta_failed', lang, {
+          error: metaErr instanceof Error ? metaErr.message : String(metaErr),
+        }) + '\n');
+      }
       print(getMessage('serve.listening', lang, { host, port: String(port) }));
       print('');
       print(getMessage('serve.token_injected', lang));
@@ -133,15 +153,17 @@ export function registerServe(program: Command): void {
       print(getMessage('serve.port_tip', lang));
       print('');
 
-      const cleanup = (): void => {
-        api.close().then(() => {
-          process.exit(0);
-        }).catch(() => {
-          process.exit(1);
-        });
-      };
-
-      process.on('SIGINT', cleanup);
-      process.on('SIGTERM', cleanup);
+      // Graceful shutdown via the entry-level shutdown-hook registry (born-496
+      // B1 live finding): a command-registered `process.on(SIGINT/SIGTERM)`
+      // listener here is DEAD CODE — entry.ts's bootstrap-time onSignal wins
+      // registration order and exits synchronously, so this command's previous
+      // cleanup (incl. api.close()) never ran on a real signal. The hook is
+      // awaited by onSignal (bounded) on SIGINT+SIGTERM (win32: SIGINT+SIGBREAK).
+      // Idempotent by contract: clear swallows ENOENT, close resolves twice.
+      registerShutdownHook(async () => {
+        // Sync file-clear FIRST so a hung close can never block it.
+        clearServeDaemonMeta(root);
+        await api.close();
+      });
     });
 }

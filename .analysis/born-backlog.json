@@ -1899,5 +1899,26 @@
   "spec": "deckent native terminalinde (REPL/Ink) Claude Code tarzı @-referans: input'ta `@path/dosya` yazinca (a) fuzzy autocomplete popup (tracked+workdir dosyalar; dizinler; ileride MCP resources/agents/skills), (b) secilen referans prompt-context'ine dosya icerigi/dizin listesi olarak enjekte, (c) cok-referans destegi, (d) buyuk dosyada dürüst truncation-sinyali + boyut-limiti, (e) i18n + NO_COLOR + cursor-model uyumu. Mekanizma string-free (label caller'dan). Mevcut input-bar/cursor-model/stream-segmenter mimarisi uzerine — yeniden-yazma YOK.",
   "verify": "hermetik input-bar testleri (autocomplete/selection/injection) + Tier-1 real-binary smoke (REPL acilir, @ yazinca popup, secim -> prompt'ta icerik)",
   "wire_on": "default-on (yeni additive input-ozelligi; mevcut davranisi degistirmez)"
+ },
+ {
+  "born_id": 587,
+  "title": "DEAD-SIGNAL-LISTENER-MIGRATION: 5 komutun ölü process.on(SIGINT/SIGTERM) cleanup'ını shutdown-hook registry'ye taşı",
+  "sources": [
+   "advisor-2026-07-10 consult#5: nervous.ts:541, chat.ts:401-402, flow.ts:228, heartbeat.ts:67-68, dashboard.ts:213-214 — hepsi entry.ts onSignal'dan SONRA kayitli, hicbiri gercek sinyalde calismaz",
+   "born-496 B1 canli-reproduce: serve ayni sinifin 1. uyesiydi, fix 571aadba-sonrasi commit'te"
+  ],
+  "severity": "P1",
+  "subsystem": "cli",
+  "primary_files": [
+   "src/cli/commands/nervous.ts",
+   "src/cli/commands/chat.ts",
+   "src/cli/commands/flow.ts",
+   "src/cli/commands/heartbeat.ts",
+   "src/cli/commands/dashboard.ts"
+  ],
+  "proposed_mode": "worker",
+  "spec": "serve.ts deseni birebir: olu process.on(SIGINT/SIGTERM) listener'larini kaldir, cleanup'i src/cli/helpers/shutdown-hooks.ts registerShutdownHook'a tasi (idempotent-hook kontrati; sinyal-agnostik; entry tek sinyal-sahibi). Her komut icin cleanup gercekten calisiyor mu REPRODUCE-first dogrula (bazilari baska yoldan cikiyor olabilir - once reachability).",
+  "verify": "her komut icin unit-test (hook kaydi + hook davranisi) + en az 1 komutta real-binary sinyal smoke; sigterm-cleanup/teardown suite'leri dokunulmadan yesil",
+  "wire_on": "default-on (olu-kod -> calisan-kod; davranis-iyilestirme)"
  }
 ]

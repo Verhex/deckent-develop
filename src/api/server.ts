@@ -14,7 +14,7 @@ import type { AiTool, CreateSessionInput, SessionKind, TenantId, SessionMeta } f
 import { z } from 'zod';
 import {
   DASHBOARD_FILE, BRAIN_DIR, SPRINTS_DIR, TASKS_DIR, LOCKS_DIR,
-  PROJECT_CONFIG_PATH, DIRECTIVES_FILE, MEMORY_DB_FILE,
+  PROJECT_CONFIG_PATH, DIRECTIVES_FILE, MEMORY_DB_FILE, DECKENT_VERSION,
 } from '../core/constants.js';
 import { SprintStatus, SprintPhase, TaskStatus } from '../core/types.js';
 import type { Task, Sprint } from '../core/types.js';
@@ -670,8 +670,20 @@ async function handleRequest(
   }
 
   // ─── Health endpoint (always accessible, no auth) ──────────
+  // DESK-1 (born-496): loopback callers additionally get identity fields so a
+  // desktop shell can confirm adopt-vs-spawn (pid + projectRoot match) and
+  // capability (terminalEnabled). Non-loopback callers (--host beyond
+  // 127.0.0.1) keep the exact minimal body — absolute projectRoot + PID must
+  // not leak to remote callers (no new fingerprinting surface).
   if (method === 'GET' && (url === '/health' || url === '/api/health')) {
-    sendJson(res, { status: 'ok', timestamp: new Date().toISOString() });
+    const body: Record<string, unknown> = { status: 'ok', timestamp: new Date().toISOString() };
+    if (isLocalhostRequest(req)) {
+      body.version = DECKENT_VERSION;
+      body.pid = process.pid;
+      body.projectRoot = projectRoot;
+      body.terminalEnabled = terminalManager !== undefined;
+    }
+    sendJson(res, body);
     return;
   }
 
@@ -1480,6 +1492,13 @@ export interface HttpApi {
   server: Server;
   /** Terminal auth token (test-exposed). Only set when terminal is enabled. */
   terminalToken?: string;
+  /**
+   * Effective /api/* bearer token after the full resolution chain (explicit >
+   * env > config > localhost auto-mint). DESK-1 (born-496): serve.ts persists
+   * it into the serve-daemon handshake file so a desktop shell can adopt a
+   * running daemon. Undefined ⇒ auth disabled.
+   */
+  apiToken?: string;
   /** PTY session manager (test-exposed). Only set when terminal is enabled. */
   terminalManager?: PtySessionManager;
   close(): Promise<void>;
@@ -2068,6 +2087,7 @@ export function createHttpServer(
   return {
     server,
     terminalToken,
+    apiToken: finalToken ?? undefined,
     terminalManager: terminalMgr,
     close(): Promise<void> {
       watcher?.close();

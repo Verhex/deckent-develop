@@ -22,6 +22,24 @@ vi.mock('../../src/cli/helpers/output.js', () => ({
   printError: vi.fn(),
 }));
 
+// born-496 B1 — handshake meta + shutdown-hook seams (hermetic: no real
+// /tmp/test-project/.deckent writes, no real registry mutation).
+const mockWriteMeta = vi.fn();
+const mockClearMeta = vi.fn();
+vi.mock('../../src/api/serve-daemon-meta.js', () => ({
+  writeServeDaemonMeta: (...args: unknown[]) => mockWriteMeta(...args),
+  clearServeDaemonMeta: (...args: unknown[]) => mockClearMeta(...args),
+}));
+
+const registeredHooks: Array<() => Promise<void>> = [];
+const mockRegisterShutdownHook = vi.fn((hook: () => Promise<void>) => {
+  registeredHooks.push(hook);
+  return () => {};
+});
+vi.mock('../../src/cli/helpers/shutdown-hooks.js', () => ({
+  registerShutdownHook: (hook: () => Promise<void>) => mockRegisterShutdownHook(hook),
+}));
+
 import { registerServe } from '../../src/cli/commands/serve.js';
 import { print } from '../../src/cli/helpers/output.js';
 
@@ -35,6 +53,7 @@ describe('registerServe', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    registeredHooks.length = 0;
     // Save existing listeners
     originalListeners.SIGINT = process.listeners('SIGINT') as NodeJS.SignalsListener[];
     originalListeners.SIGTERM = process.listeners('SIGTERM') as NodeJS.SignalsListener[];
@@ -88,57 +107,59 @@ describe('registerServe', () => {
     );
   });
 
-  it('registers SIGINT and SIGTERM handlers', async () => {
+  // born-496 B1 — the previous 3 tests here pinned serve's OWN
+  // process.on(SIGINT/SIGTERM) cleanup. That listener was reproduced-dead in
+  // production (entry.ts's bootstrap onSignal wins registration order and
+  // exits synchronously → later listeners never fire), so serve now registers
+  // through the entry-level shutdown-hook registry instead. Same intent
+  // (graceful api.close on shutdown), now on the path that actually runs.
+  it('registers a shutdown hook instead of dead process.on signal listeners', async () => {
     const onSpy = vi.spyOn(process, 'on');
     await program.parseAsync(['node', 'test', 'serve']);
 
-    const sigintCalls = onSpy.mock.calls.filter(([sig]) => sig === 'SIGINT');
-    const sigtermCalls = onSpy.mock.calls.filter(([sig]) => sig === 'SIGTERM');
-    expect(sigintCalls.length).toBeGreaterThan(0);
-    expect(sigtermCalls.length).toBeGreaterThan(0);
+    expect(mockRegisterShutdownHook).toHaveBeenCalledTimes(1);
+    // No serve-owned direct signal listeners anymore — entry owns signals.
+    const signalCalls = onSpy.mock.calls.filter(([sig]) => sig === 'SIGINT' || sig === 'SIGTERM');
+    expect(signalCalls).toEqual([]);
 
     onSpy.mockRestore();
   });
 
-  it('cleanup handler calls api.close and exits on success', async () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+  it('writes the daemon handshake meta on startup (adopt-vs-spawn hint)', async () => {
+    await program.parseAsync(['node', 'test', 'serve', '--port', '4100']);
+
+    expect(mockWriteMeta).toHaveBeenCalledWith(
+      '/tmp/test-project',
+      expect.objectContaining({
+        host: '127.0.0.1',
+        port: 4100,
+        projectRoot: '/tmp/test-project',
+      }),
+    );
+  });
+
+  it('shutdown hook clears the handshake meta FIRST, then closes the api', async () => {
     mockClose.mockResolvedValue(undefined);
-
-    const onSpy = vi.spyOn(process, 'on');
     await program.parseAsync(['node', 'test', 'serve']);
 
-    // Find the SIGINT cleanup handler
-    const sigintCall = onSpy.mock.calls.find(([sig]) => sig === 'SIGINT');
-    expect(sigintCall).toBeDefined();
-    const cleanupFn = sigintCall![1] as () => void;
+    const hook = registeredHooks[registeredHooks.length - 1]!;
+    await hook();
 
-    cleanupFn();
-    // Wait for promise chain
-    await new Promise((r) => setTimeout(r, 10));
-
+    expect(mockClearMeta).toHaveBeenCalledWith('/tmp/test-project');
     expect(mockClose).toHaveBeenCalled();
-    expect(exitSpy).toHaveBeenCalledWith(0);
-
-    exitSpy.mockRestore();
-    onSpy.mockRestore();
+    // Sync clear must precede the (potentially hanging) close.
+    expect(mockClearMeta.mock.invocationCallOrder[0]!)
+      .toBeLessThan(mockClose.mock.invocationCallOrder[0]!);
   });
 
-  it('cleanup handler exits with 1 on close error', async () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+  it('shutdown hook still clears the meta even when api.close rejects', async () => {
     mockClose.mockRejectedValue(new Error('close failed'));
-
-    const onSpy = vi.spyOn(process, 'on');
     await program.parseAsync(['node', 'test', 'serve']);
 
-    const sigintCall = onSpy.mock.calls.find(([sig]) => sig === 'SIGINT');
-    const cleanupFn = sigintCall![1] as () => void;
-
-    cleanupFn();
-    await new Promise((r) => setTimeout(r, 10));
-
-    expect(exitSpy).toHaveBeenCalledWith(1);
-
-    exitSpy.mockRestore();
-    onSpy.mockRestore();
+    const hook = registeredHooks[registeredHooks.length - 1]!;
+    // The registry's runShutdownHooks settles rejections (Promise.allSettled);
+    // at the hook level the rejection propagates — but the clear already ran.
+    await expect(hook()).rejects.toThrow('close failed');
+    expect(mockClearMeta).toHaveBeenCalledWith('/tmp/test-project');
   });
 });

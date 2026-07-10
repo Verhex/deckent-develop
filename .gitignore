@@ -49,6 +49,8 @@ coverage/
 .deckent/routing/
 .deckent/config.json
 .deckent/config.json.bak.*
+# DESK-1 daemon handshake file — carries live tokens, never committed (born-496)
+.deckent/serve-daemon.json
 # Identity provider runtime DB (ADR-092) — local state, like .brain/memory.db
 .deckent/identity.db
 .deckent/identity.db-wal

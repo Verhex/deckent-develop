@@ -5,6 +5,7 @@ import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { buildProgram } from './index.js';
 import { handleCliError } from './helpers/process.js';
+import { registerShutdownHook, hasShutdownHooks, runShutdownHooks } from './helpers/shutdown-hooks.js';
 import { interruptActiveSprint } from '../orchestra/sprint-controller.js';
 import { killAllSessions } from '../orchestra/tmux.js';
 import { bootstrapFromCatalog } from '../core/model-catalog.js';
@@ -928,55 +929,26 @@ process.on('unhandledRejection', (reason: unknown) => {
   handleCliError(reason);
 });
 
-// ─── REPL Teardown Registry (born-549 SIGTERM-TEARDOWN) ─────────────────────
+// ─── Shutdown-Hook Registry (born-549 SIGTERM-TEARDOWN → born-496 generalized) ─
 //
 // A running REPL (entry.ts's own legacy readline path, or the Ink REPL in
 // repl/run.tsx) owns a warm-child persistent-session process, an optional MCP
 // client broker, and terminal state (alt-screen / raw mode) — none of which
 // the ADR-G-013 signal handler below knows about (it only ever interrupted
-// sprints/tmux, the Brain-orchestrator concern). Whichever REPL surface is
-// currently active registers its own async cleanup here so `onSignal` can
-// await it before falling through to the unchanged sprint/tmux + exit path.
-// A process that never launches a REPL (any other CLI subcommand, and the
-// pre-existing sigterm-cleanup test which calls `onSignal` directly without
-// a REPL in play) never registers a hook — `replTeardownHooks` stays empty,
-// so `onSignal` takes the exact synchronous fast-path it always has: same
-// call order, same exit code, zero behavior change with no REPL active.
-type ReplTeardownHook = () => Promise<void>;
-const replTeardownHooks: ReplTeardownHook[] = [];
-
-/**
- * Bound the WHOLE registered-hook run, not each hook individually — a single
- * slow MCP stdio server (the SDK's own close() sequence waits up to ~2s for a
- * graceful exit before escalating to SIGTERM, then up to another ~2s before
- * SIGKILL — see @modelcontextprotocol/sdk client/stdio.js) must not hang
- * shutdown forever, but IS worth waiting out so its child does not become a
- * true orphan. Mirrors the bound used by repl/run.tsx's own normal-exit path.
- */
-const REPL_TEARDOWN_TIMEOUT_MS = 5000;
-
-/**
- * Register REPL-owned async cleanup (warm-child kill, MCP broker dispose,
- * terminal restore). Returns an unregister function so a REPL that exits
- * normally (no signal involved) does not leave a stale hook behind for a
- * later REPL launch in the same process.
- */
-export function registerReplTeardown(hook: ReplTeardownHook): () => void {
-  replTeardownHooks.push(hook);
-  return () => {
-    const idx = replTeardownHooks.indexOf(hook);
-    if (idx >= 0) replTeardownHooks.splice(idx, 1);
-  };
-}
-
-/** Run every registered hook to settlement (never rejects), bounded overall. */
-async function runReplTeardownHooks(): Promise<void> {
-  const settled = Promise.allSettled(replTeardownHooks.map((hook) => hook()));
-  const timeout = new Promise<void>((resolve) => {
-    setTimeout(resolve, REPL_TEARDOWN_TIMEOUT_MS).unref();
-  });
-  await Promise.race([settled, timeout]);
-}
+// sprints/tmux, the Brain-orchestrator concern). Whichever surface is
+// currently active registers its own async cleanup so `onSignal` can await it
+// before falling through to the unchanged sprint/tmux + exit path. A process
+// that registers no hook takes the exact synchronous fast-path it always has:
+// same call order, same exit code, zero behavior change.
+//
+// born-496 B1: the registry now lives in helpers/shutdown-hooks.ts (cycle-free
+// for command modules) because it is NOT REPL-specific — every long-running
+// command's own `process.on(SIGINT/SIGTERM)` listener is unreachable dead code
+// (this module's handler registers first and exits synchronously; see the
+// helper's module doc + born-587 for the remaining migrations). Commands must
+// register there instead. `registerReplTeardown` stays as the REPL-facing
+// alias so existing call sites and sigterm-teardown.test.ts stay untouched.
+export const registerReplTeardown = registerShutdownHook;
 
 // ─── Graceful Shutdown ───────────────────────────────────────────────────────
 // ADR-G-013 (SIGTERM-CLEANUP): SIGINT and SIGTERM share the identical cleanup
@@ -996,8 +968,8 @@ async function runReplTeardownHooks(): Promise<void> {
 // tests/cli/sigterm-cleanup.test.ts) keep working unchanged.
 export async function onSignal(signal: string): Promise<void> {
   process.stderr.write(`\nReceived ${signal}, exiting…\n`);
-  if (replTeardownHooks.length > 0) {
-    await runReplTeardownHooks();
+  if (hasShutdownHooks()) {
+    await runShutdownHooks();
   }
   // Interrupt active sprint: mark tasks INTERRUPTED, heartbeats ABORTED, release locks
   try { interruptActiveSprint(); } catch { /* non-fatal */ }
