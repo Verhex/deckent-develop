@@ -123,6 +123,7 @@ describe('spawn command enhanced (rich prompt, status checks, flags)', () => {
       task,
       'You are a TypeScript expert.',
       expect.any(Array),
+      '/mock/root',
     );
   });
 
@@ -146,6 +147,7 @@ describe('spawn command enhanced (rich prompt, status checks, flags)', () => {
         { name: 'testing', content: 'Testing skill content' },
         { name: 'refactoring', content: 'Refactoring skill content' },
       ],
+      '/mock/root',
     );
   });
 

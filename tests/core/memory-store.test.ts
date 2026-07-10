@@ -632,17 +632,6 @@ describe('Multi-tenant isolation', () => {
     expect(acmeOnly.map(e => e.id)).not.toContain('ti-beta');
   });
 
-  it('getByType with tenantId also returns legacy NULL-tenant rows', () => {
-    store.insert(makeInput({ id: 'ti-leg', type: 'debt' })); // null tenant
-    store.insert(makeInput({ id: 'ti-acme2', type: 'debt', tenant_id: 'acme' }));
-    store.insert(makeInput({ id: 'ti-beta2', type: 'debt', tenant_id: 'beta' }));
-    const acmeView = store.getByType('debt', 'acme');
-    // acme rows + legacy NULL rows are visible
-    expect(acmeView.map(e => e.id)).toContain('ti-leg');
-    expect(acmeView.map(e => e.id)).toContain('ti-acme2');
-    expect(acmeView.map(e => e.id)).not.toContain('ti-beta2');
-  });
-
   it('getById with tenantId returns entry when tenant matches', () => {
     store.insert(makeInput({ id: 'gid-acme', tenant_id: 'acme' }));
     const entry = store.getById('gid-acme', { tenantId: 'acme' });
@@ -654,12 +643,6 @@ describe('Multi-tenant isolation', () => {
     store.insert(makeInput({ id: 'gid-acme2', tenant_id: 'acme' }));
     const entry = store.getById('gid-acme2', { tenantId: 'beta' });
     expect(entry).toBeNull();
-  });
-
-  it('getById with tenantId returns legacy NULL-tenant entries', () => {
-    store.insert(makeInput({ id: 'gid-null' })); // null tenant
-    const entry = store.getById('gid-null', { tenantId: 'acme' });
-    expect(entry).not.toBeNull();
   });
 
   it('getByTags with tenantId isolates results', () => {
@@ -684,6 +667,41 @@ describe('Multi-tenant isolation', () => {
     expect(entry).not.toBeNull();
     expect(entry!.tenant_id).toBe('enterprise');
   });
+
+  // Strict tenant isolation is the pinned default (born-563) — legacy
+  // NULL-tenant visibility now requires an explicit opt-in via
+  // { strictTenantIsolation: false }, it is no longer the default behavior.
+  describe('opt-in permissive tenant isolation (strictTenantIsolation:false)', () => {
+    let permissiveStore: MemoryStore;
+    let permissiveTmpDir: string;
+
+    beforeEach(() => {
+      permissiveTmpDir = mkdtempSync(join(tmpdir(), 'memstore-permissive-'));
+      permissiveStore = new MemoryStore(join(permissiveTmpDir, 'permissive.db'), { strictTenantIsolation: false });
+    });
+
+    afterEach(() => {
+      permissiveStore.close();
+      rmSync(permissiveTmpDir, { recursive: true, force: true });
+    });
+
+    it('getByType with tenantId also returns legacy NULL-tenant rows', () => {
+      permissiveStore.insert(makeInput({ id: 'ti-leg', type: 'debt' })); // null tenant
+      permissiveStore.insert(makeInput({ id: 'ti-acme2', type: 'debt', tenant_id: 'acme' }));
+      permissiveStore.insert(makeInput({ id: 'ti-beta2', type: 'debt', tenant_id: 'beta' }));
+      const acmeView = permissiveStore.getByType('debt', 'acme');
+      // acme rows + legacy NULL rows are visible under explicit opt-in permissive mode
+      expect(acmeView.map(e => e.id)).toContain('ti-leg');
+      expect(acmeView.map(e => e.id)).toContain('ti-acme2');
+      expect(acmeView.map(e => e.id)).not.toContain('ti-beta2');
+    });
+
+    it('getById with tenantId returns legacy NULL-tenant entries', () => {
+      permissiveStore.insert(makeInput({ id: 'gid-null' })); // null tenant
+      const entry = permissiveStore.getById('gid-null', { tenantId: 'acme' });
+      expect(entry).not.toBeNull();
+    });
+  });
 });
 
 // ── Strict tenant isolation (ENT-2, Sprint 261) ───────────────────
@@ -691,22 +709,55 @@ describe('Multi-tenant isolation', () => {
 describe('strict tenant isolation', () => {
   let strictStore: MemoryStore;
   let strictTmpDir: string;
+  let permissiveStore: MemoryStore;
+  let permissiveTmpDir: string;
 
   beforeEach(() => {
     strictTmpDir = mkdtempSync(join(tmpdir(), 'memstore-strict-'));
     strictStore = new MemoryStore(join(strictTmpDir, 'strict.db'), { strictTenantIsolation: true });
+    permissiveTmpDir = mkdtempSync(join(tmpdir(), 'memstore-permissive-'));
+    permissiveStore = new MemoryStore(join(permissiveTmpDir, 'permissive.db'), { strictTenantIsolation: false });
   });
 
   afterEach(() => {
     strictStore.close();
     rmSync(strictTmpDir, { recursive: true, force: true });
+    permissiveStore.close();
+    rmSync(permissiveTmpDir, { recursive: true, force: true });
   });
 
-  it('default (non-strict) getByType includes NULL-tenant rows', () => {
-    store.insert(makeInput({ id: 'sti-null', type: 'adr' })); // null tenant
-    store.insert(makeInput({ id: 'sti-acme', type: 'adr', tenant_id: 'acme' }));
+  it('default (no opts) MemoryStore is strict — NULL-tenant rows excluded (born-563 pinned default)', () => {
+    store.insert(makeInput({ id: 'default-null', type: 'adr' })); // null tenant
+    store.insert(makeInput({ id: 'default-acme', type: 'adr', tenant_id: 'acme' }));
     const acmeView = store.getByType('adr', 'acme');
-    // permissive default: NULL-tenant row is visible to acme tenant
+    // strict is the pinned default: NULL-tenant row is NOT visible, matching strictStore
+    expect(acmeView.map(e => e.id)).toContain('default-acme');
+    expect(acmeView.map(e => e.id)).not.toContain('default-null');
+    const entry = store.getById('default-null', { tenantId: 'acme' });
+    expect(entry).toBeNull();
+  });
+
+  it('strict mode never leaks rows across tenants in either direction (cross-tenant-SIZMAZ)', () => {
+    strictStore.insert(makeInput({ id: 'leak-acme', type: 'memory', tenant_id: 'acme' }));
+    strictStore.insert(makeInput({ id: 'leak-beta', type: 'memory', tenant_id: 'beta' }));
+    const acmeView = strictStore.getByType('memory', 'acme');
+    const betaView = strictStore.getByType('memory', 'beta');
+    // A→B direction: acme never sees beta's row
+    expect(acmeView.map(e => e.id)).toContain('leak-acme');
+    expect(acmeView.map(e => e.id)).not.toContain('leak-beta');
+    // B→A direction: beta never sees acme's row
+    expect(betaView.map(e => e.id)).toContain('leak-beta');
+    expect(betaView.map(e => e.id)).not.toContain('leak-acme');
+    // Same bidirectional guarantee via getById
+    expect(strictStore.getById('leak-beta', { tenantId: 'acme' })).toBeNull();
+    expect(strictStore.getById('leak-acme', { tenantId: 'beta' })).toBeNull();
+  });
+
+  it('permissive (opt-in strictTenantIsolation:false) getByType includes NULL-tenant rows', () => {
+    permissiveStore.insert(makeInput({ id: 'sti-null', type: 'adr' })); // null tenant
+    permissiveStore.insert(makeInput({ id: 'sti-acme', type: 'adr', tenant_id: 'acme' }));
+    const acmeView = permissiveStore.getByType('adr', 'acme');
+    // explicit opt-in permissive: NULL-tenant row is visible to acme tenant
     expect(acmeView.map(e => e.id)).toContain('sti-null');
     expect(acmeView.map(e => e.id)).toContain('sti-acme');
   });
@@ -722,10 +773,10 @@ describe('strict tenant isolation', () => {
     expect(acmeView.map(e => e.id)).not.toContain('sti-beta');
   });
 
-  it('default (non-strict) getById with tenantId includes NULL-tenant rows', () => {
-    store.insert(makeInput({ id: 'gid-null-ns' })); // null tenant
-    const entry = store.getById('gid-null-ns', { tenantId: 'acme' });
-    expect(entry).not.toBeNull(); // permissive: NULL-tenant visible to acme
+  it('permissive (opt-in strictTenantIsolation:false) getById with tenantId includes NULL-tenant rows', () => {
+    permissiveStore.insert(makeInput({ id: 'gid-null-ns' })); // null tenant
+    const entry = permissiveStore.getById('gid-null-ns', { tenantId: 'acme' });
+    expect(entry).not.toBeNull(); // explicit opt-in permissive: NULL-tenant visible to acme
   });
 
   it('strict getById with tenantId excludes NULL-tenant rows', () => {
@@ -741,11 +792,11 @@ describe('strict tenant isolation', () => {
     expect(entry!.tenant_id).toBe('acme');
   });
 
-  it('default (non-strict) getByTags with tenantId includes NULL-tenant rows', () => {
-    store.insert(makeInput({ id: 'gbt-null-ns', tags: ['multi'] })); // null tenant
-    store.insert(makeInput({ id: 'gbt-acme-ns', tags: ['multi'], tenant_id: 'acme' }));
-    const acmeView = store.getByTags(['multi'], 'acme');
-    expect(acmeView.map(e => e.id)).toContain('gbt-null-ns'); // permissive: NULL visible
+  it('permissive (opt-in strictTenantIsolation:false) getByTags with tenantId includes NULL-tenant rows', () => {
+    permissiveStore.insert(makeInput({ id: 'gbt-null-ns', tags: ['multi'] })); // null tenant
+    permissiveStore.insert(makeInput({ id: 'gbt-acme-ns', tags: ['multi'], tenant_id: 'acme' }));
+    const acmeView = permissiveStore.getByTags(['multi'], 'acme');
+    expect(acmeView.map(e => e.id)).toContain('gbt-null-ns'); // explicit opt-in permissive: NULL visible
     expect(acmeView.map(e => e.id)).toContain('gbt-acme-ns');
   });
 

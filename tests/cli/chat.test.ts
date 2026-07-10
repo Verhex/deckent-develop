@@ -4,14 +4,29 @@ import { EventEmitter } from 'node:events';
 
 // ─── Hoisted Spies (referenced inside vi.mock factories) ────────────
 
-const hoisted = vi.hoisted(() => ({
-  claudeDetect: vi.fn(),
-  codexDetect: vi.fn(),
-  geminiDetect: vi.fn(),
-  spawnMock: vi.fn(),
-  printMock: vi.fn(),
-  printErrorMock: vi.fn(),
-}));
+const hoisted = vi.hoisted(() => {
+  const registeredHooks: Array<() => Promise<void>> = [];
+  const unregisterMocks: Array<ReturnType<typeof vi.fn>> = [];
+  return {
+    claudeDetect: vi.fn(),
+    codexDetect: vi.fn(),
+    geminiDetect: vi.fn(),
+    spawnMock: vi.fn(),
+    printMock: vi.fn(),
+    printErrorMock: vi.fn(),
+    registeredHooks,
+    unregisterMocks,
+    // Mock-registry mirroring src/cli/helpers/shutdown-hooks.ts's real
+    // registerShutdownHook — captures hooks + their unregister fns so tests
+    // can invoke/unregister them directly (no real OS signal is ever sent).
+    registerShutdownHookMock: vi.fn((hook: () => Promise<void>) => {
+      registeredHooks.push(hook);
+      const unregister = vi.fn();
+      unregisterMocks.push(unregister);
+      return unregister;
+    }),
+  };
+});
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
@@ -49,6 +64,10 @@ vi.mock('../../src/cli/helpers/process.js', () => ({
   resolveProjectRoot: vi.fn().mockReturnValue('/project'),
 }));
 
+vi.mock('../../src/cli/helpers/shutdown-hooks.js', () => ({
+  registerShutdownHook: hoisted.registerShutdownHookMock,
+}));
+
 // ─── Static Imports (after mocks) ────────────────────────────────────
 
 import {
@@ -80,6 +99,9 @@ function resetMocks(): void {
   hoisted.spawnMock.mockReset();
   hoisted.printMock.mockReset();
   hoisted.printErrorMock.mockReset();
+  hoisted.registerShutdownHookMock.mockClear();
+  hoisted.registeredHooks.length = 0;
+  hoisted.unregisterMocks.length = 0;
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────
@@ -156,7 +178,7 @@ describe('spawnChatProcess', () => {
     expect(opts.env.DECKENT_MCP_AUTO_ATTACH).toBe('1');
   });
 
-  it('forwards SIGINT to the child process and detaches cleanly', () => {
+  it('registers a shutdown hook (not a raw SIGINT listener); the hook kills the child via default SIGTERM and detach() unregisters it', async () => {
     let captured: ReturnType<typeof fakeChildProcess> | null = null;
     hoisted.spawnMock.mockImplementation(() => {
       captured = fakeChildProcess();
@@ -165,14 +187,29 @@ describe('spawnChatProcess', () => {
 
     const beforeCount = process.listenerCount('SIGINT');
     const { detach } = spawnChatProcess('codex');
-    const duringCount = process.listenerCount('SIGINT');
-    expect(duringCount).toBe(beforeCount + 1);
 
-    process.emit('SIGINT');
-    expect(captured!.kill).toHaveBeenCalledWith('SIGINT');
-
-    detach();
+    // born-587 (DEAD-LISTENER-MIGRATION): entry.ts's bootstrap-time onSignal
+    // always wins SIGINT/SIGTERM registration order, so a command-level
+    // process.on() listener here would be dead code. spawnChatProcess routes
+    // cleanup through the shared shutdown-hooks registry instead — no raw
+    // listener is ever added.
     expect(process.listenerCount('SIGINT')).toBe(beforeCount);
+    expect(hoisted.registerShutdownHookMock).toHaveBeenCalledTimes(1);
+
+    const hook = hoisted.registeredHooks[hoisted.registeredHooks.length - 1];
+    const unregister = hoisted.unregisterMocks[hoisted.unregisterMocks.length - 1];
+
+    await hook();
+    // Hooks are signal-agnostic (shutdown-hooks.ts contract) — the exact
+    // received signal (SIGINT vs SIGTERM) can no longer be forwarded
+    // verbatim. child.kill() called with NO explicit signal defaults to
+    // SIGTERM (Node child_process contract) — pinning that nuance here.
+    expect(captured!.kill).toHaveBeenCalledTimes(1);
+    expect(captured!.kill).toHaveBeenCalledWith();
+
+    expect(unregister).not.toHaveBeenCalled();
+    detach();
+    expect(unregister).toHaveBeenCalledTimes(1);
   });
 });
 

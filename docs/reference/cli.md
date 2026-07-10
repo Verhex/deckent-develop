@@ -1214,7 +1214,7 @@ deckent autonomous-mission list --json
 > Hand-curated sections above are produced by `scripts/generate-cli-docs.ts`; this block is maintained by `scripts/gen-reference-docs.mjs`.
 
 <!-- AUTOGEN:START id="cli" -->
-> 176 commands. Generated from `src/cli/commands/*.ts`.
+> 169 commands. Generated from `src/cli/commands/*.ts`.
 
 | Command | Description |
 |---------|-------------|
@@ -1226,13 +1226,13 @@ deckent autonomous-mission list --json
 | `deckent add <path>` | Add a document to managed docs |
 | `deckent agent` | Manage agent pool |
 | `deckent analyze` | Analyze project stack, size, and recommended methodology |
+| `deckent approve <id>` | Approve a pending event-triggered flow dispatch so it can proceed |
 | `deckent approve <sprintId> <phase>` | Approve a pending checkpoint |
 | `deckent approve <triggerId>` | Approve a parked trigger — resolves the running loop\'s gate |
 | `deckent archive-debt` | Report tech-debt status (DB-first; resolved debt is auto-managed in memory.db) |
 | `deckent attach` | Attach to the tmux orchestra session |
 | `deckent audit [sprint-id]` | Run Brain Self-Audit Gate for a sprint, or query/export/retain audit log events (query \| compliance \| forward \| retention) |
 | `deckent audit-verify` | Verify the audit HMAC chain (I4 invariant — tamper-evident audit log) |
-| `deckent auto` | Auto-detect mode from context |
 | `deckent autonomous` | Autonomous runtime — authority-bounded continuous loop |
 | `deckent autonomous-mission` | Manage autonomous v2 missions — list missions, goal missions |
 | `deckent backlog` | Manage the autonomous backlog (add / list / remove entries) |
@@ -1276,7 +1276,6 @@ deckent autonomous-mission list --json
 | `deckent flow` | Manage scheduled flows (process mode) |
 | `deckent get <key>` | Get a configuration value by key (supports dot notation) |
 | `deckent get <name>` | Show details for an MCP server (from merged view) |
-| `deckent global <style>` | Set global default (sprint\|task) |
 | `deckent grant <user> <role>` | Assign a role to a user |
 | `deckent heartbeat` | Run proactive heartbeat tasks from .deckent/HEARTBEAT.md |
 | `deckent help-info` | Show quick-reference help (localized) |
@@ -1311,7 +1310,6 @@ deckent autonomous-mission list --json
 | `deckent mcp` | Manage MCP servers (Claude-parity) |
 | `deckent memory` | Memory V2 management |
 | `deckent migrate` | Migrate config.json to the latest full format (adds missing fields with defaults) |
-| `deckent mode` | Get/set deckent_style (sprint\|task\|process\|auto) |
 | `deckent models` | Manage and browse the model catalog |
 | `deckent nervous` | Configure Nervous System authority mode and action overrides', ) .option('--lang &lt;code&gt;', 'Language override (en\|tr) |
 | `deckent nervous` | Nervous System dashboard — monitor, accept, reject proactive suggestions |
@@ -1324,7 +1322,6 @@ deckent autonomous-mission list --json
 | `deckent plan <goal>` | Decompose a high-level goal into a lightweight autonomous backlog (Phase 1) |
 | `deckent plan-nl` | Turn a free-form goal into a DIRECTIVES.md scaffold (single-task template; preview by default) |
 | `deckent plugin` | Manage plugins |
-| `deckent process` | Switch to process mode (continuous request-handling \u2014 ERP / automation via MCP + REST) |
 | `deckent process` | Process-mode execution surface — submit tasks/capabilities and poll their status (ADR-022 CLI/MCP parity) |
 | `deckent publish <skillPath>` | Validate, sign (Ed25519) and publish a skill to the marketplace |
 | `deckent rbac` | Role-based access control — check permissions and list roles |
@@ -1355,7 +1352,6 @@ deckent autonomous-mission list --json
 | `deckent roles` | List all roles and their effective permissions |
 | `deckent run` | Run managed doc updates without a sprint |
 | `deckent run` | Run the flow-runtime tick once (--once) or start the daemon |
-| `deckent run <description>` | Run a single one-shot task without a sprint cycle |
 | `deckent scan` | Hash + timestamp + rank all docs; write front-matter; sync memory.db |
 | `deckent search <query>` | Search skills in the marketplace registry |
 | `deckent serve` | Start HTTP API server with SSE support |
@@ -1363,9 +1359,7 @@ deckent autonomous-mission list --json
 | `deckent set <key> <value>` | Set a configuration value |
 | `deckent set-directives` | Write sprint goals to DIRECTIVES.md (content, file, or stdin) |
 | `deckent show` | Display model pricing (read-only) |
-| `deckent show` | Show current mode |
 | `deckent skill` | Manage skill pool |
-| `deckent sprint` | Switch to sprint mode |
 | `deckent start` | Start the autonomous loop (default-deny + human-approval gate) |
 | `deckent start [description]` | Start a new sprint (optionally with a one-line description for zero-config mode) |
 | `deckent stats` | Show memory.db statistics |
@@ -1380,7 +1374,6 @@ deckent autonomous-mission list --json
 | `deckent submit <description>` | Submit an ExecutionRequest (policy-gated: read-only auto-runs, side-effecting parks for approval) |
 | `deckent sync` | Update memory.db only (no front-matter writes) |
 | `deckent sync` | Sync adapter files and detect out-of-band changes since last sprint |
-| `deckent task` | Switch to task mode |
 | `deckent test` | Run a test sprint (no retro, no memory update, no decay) |
 | `deckent test <name>` | Test a plugin: validate manifest and entrypoint, run hooks if available |
 | `deckent tier <model>` | Look up the tier of a specific model by ID or API ID |

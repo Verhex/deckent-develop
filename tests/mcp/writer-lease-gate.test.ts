@@ -98,15 +98,20 @@ describe('installWriterLeaseGate', () => {
     await expect(handlers.get('deckent_start')!({}, {})).resolves.toBe('ran');
   });
 
-  it('fails open (runs the write) when the lease cannot be written', async () => {
-    // projectRoot is a FILE, so the lease dir under it cannot be created → acquire throws
+  it('fails CLOSED (denies the write, isError:true) when the lease cannot be written', async () => {
+    // projectRoot is a FILE, so the lease dir under it cannot be created → acquire throws.
+    // Spec (born-566, K2-approved): an fs error during the lease check itself must
+    // never silently permit an unserialized write — ownership could not be
+    // determined, so the write is denied with WRITER_LEASE_ERROR, not run.
     const root = sandbox();
     const filePath = join(root, 'not-a-dir');
     writeFileSync(filePath, 'x', 'utf-8');
     const { server, handlers } = makeStub();
     installWriterLeaseGate(server, { projectRoot: filePath, lang: 'en', isAlive: () => true });
     server.registerTool('deckent_start', { annotations: { readOnlyHint: false } }, async () => 'ran');
-    await expect(handlers.get('deckent_start')!({}, {})).resolves.toBe('ran');
+    const out = await handlers.get('deckent_start')!({}, {}) as { isError?: boolean; content: { text: string }[] };
+    expect(out.isError).toBe(true);
+    expect(out.content[0]!.text).toContain('WRITER_LEASE_ERROR');
   });
 
   it('mixed tool read action runs even when lease is held', async () => {

@@ -18,6 +18,14 @@
       "code": "spawnSync('tmux', ['kill-session', '-t', sessionName], { encoding: 'utf-8' });"
     },
     {
+      "file": "src/cli/commands/cu-status.ts",
+      "code": "const result = spawnSync('sh', ['-c', 'command -v -- \"$1\"', 'sh', command], { encoding: 'utf-8' });"
+    },
+    {
+      "file": "src/cli/commands/cu-status.ts",
+      "code": "const result = spawnSync('where', [command], { encoding: 'utf-8', windowsHide: true });"
+    },
+    {
       "file": "src/cli/commands/doctor-checks.ts",
       "code": "const authResult = spawnSync('claude', ['config', 'get', 'account'], { encoding: 'utf-8', shell: shellOpt });"
     },
@@ -88,10 +96,6 @@
     {
       "file": "src/cli/commands/doctor.ts",
       "code": "const result = spawnSync('node', ['--version'], { encoding: 'utf-8' });"
-    },
-    {
-      "file": "src/cli/commands/doctor.ts",
-      "code": "const result = spawnSync('node', [scriptPath, '--json', '--root', root, '--skip-tests'], {"
     },
     {
       "file": "src/cli/commands/doctor.ts",
@@ -238,6 +242,10 @@
       "code": "spawnSync(command, args, {"
     },
     {
+      "file": "src/core/spawn-safety.ts",
+      "code": "return spawnSync(bin, args, options);"
+    },
+    {
       "file": "src/core/subscription.ts",
       "code": "const result = spawnSync('claude', ['--version'], {"
     },
@@ -248,6 +256,14 @@
     {
       "file": "src/core/system-capacity.ts",
       "code": "const result = spawnSync('docker', ['--version'], {"
+    },
+    {
+      "file": "src/orchestra/disk-verify.ts",
+      "code": "const res = spawnSync('git', ['diff', '--numstat', 'HEAD', '--', ...writeScope], {"
+    },
+    {
+      "file": "src/orchestra/disk-verify.ts",
+      "code": "const res = spawnSync('git', ['ls-files', '--others', '--exclude-standard', '--', ...writeScope], {"
     },
     {
       "file": "src/orchestra/disk-verify.ts",
@@ -286,6 +302,10 @@
       "code": "const result = spawnSync('tmux', ['-V'], {"
     },
     {
+      "file": "src/orchestra/sprint-controller.ts",
+      "code": "const lsFiles = spawnSync('git', ['ls-files'], {"
+    },
+    {
       "file": "src/orchestra/sprint-finalizer.ts",
       "code": ": spawnSync('npx', ['tsc', '--noEmit'], {"
     },
@@ -307,7 +327,15 @@
     },
     {
       "file": "src/orchestra/sprint-planner.ts",
+      "code": "const r = spawnSync('git', ['grep', '-I', '-l', '-F', '--', symbol], {"
+    },
+    {
+      "file": "src/orchestra/sprint-planner.ts",
       "code": "const treeResult = spawnSync('git', ['ls-files'], { cwd: projectRoot, encoding: 'utf-8' });"
+    },
+    {
+      "file": "src/orchestra/task-builder.ts",
+      "code": "const ls = spawnSync('git', ['ls-files'], { cwd: projectRoot, encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 });"
     },
     {
       "file": "src/orchestra/task-restoration.ts",
@@ -422,6 +450,11 @@
     {
       "file": "src/orchestra/spawn-backend-docker.ts",
       "code": "const logResult = spawnSync('docker', ['logs', containerName], {",
+      "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
+    },
+    {
+      "file": "src/orchestra/spawn-backend-docker.ts",
+      "code": "const probe = spawnSync(",
       "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
     },
     {

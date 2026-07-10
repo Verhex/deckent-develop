@@ -175,10 +175,10 @@ describe('start --sandbox-mode', () => {
     );
   });
 
-  it('without --sandbox-mode, sprint runs normally with autoApprove', async () => {
+  it('without --sandbox-mode, sprint runs normally with autoApprove false by default (K3 fail-closed)', async () => {
     await runCommand('--force');
     expect(runSprint).toHaveBeenCalledWith('/mock/root', expect.anything(), expect.objectContaining({
-      autoApprove: true,
+      autoApprove: false,
     }));
   });
 

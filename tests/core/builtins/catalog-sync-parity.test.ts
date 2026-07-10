@@ -22,9 +22,19 @@
 // task instruction, the "currently absent" assertions below are written as dynamic,
 // self-adjusting checks (they pass today AND will keep passing once the follow-up lands) —
 // never as a hardcoded "must stay missing" assertion kept red for documentation purposes.
+//
+// 397-009 C5 fix: the module-level "live pool" below used to instantiate the pool managers
+// directly against PROJECT_ROOT. _loadBuiltinFallback gates on .deckent/config.json
+// EXISTING at the project root — a file that is gitignored + untracked (d3148926), present
+// on a dev machine that ran `deckent init` but ABSENT on a fresh CI checkout. That made
+// this pass locally and fail in CI (4 red here). It now runs against a disposable tmpdir
+// seeded with a copy of this repo's real (git-tracked) .deckent/skills + .deckent/agents
+// trees plus a minimal .deckent/config.json, so the gate opens deterministically
+// regardless of host state. This must stay synchronous at module scope (not a beforeAll)
+// because `inPool` below drives `describe`/`it.skipIf` collection-time decisions.
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -49,10 +59,21 @@ function hasAgentJson(dir: string, id: string): boolean {
   return existsSync(join(dir, id, 'agent.json'));
 }
 
-// Live pool state against THIS repo's own already-seeded .deckent tree — real fs reads,
-// no mocking, computed once at collection time (both loaders are synchronous).
-const livePoolSkills = new SkillPoolManager(PROJECT_ROOT).loadSkills();
-const livePoolAgents = new AgentPoolManager(PROJECT_ROOT).loadAgents();
+// Live pool state against a hermetic tmpdir copy of THIS repo's own already-seeded
+// .deckent tree (+ a minimal config.json to open the builtin-fallback gate
+// deterministically) — real fs reads, no mocking, computed once at collection time (both
+// loaders are synchronous).
+const liveTmpRoot = mkdtempSync(join(tmpdir(), 'deckent-catalog-sync-parity-live-'));
+cpSync(DECKENT_SKILLS_DIR, join(liveTmpRoot, '.deckent', 'skills'), { recursive: true });
+cpSync(DECKENT_AGENTS_DIR, join(liveTmpRoot, '.deckent', 'agents'), { recursive: true });
+writeFileSync(join(liveTmpRoot, '.deckent', 'config.json'), '{}', 'utf8');
+
+afterAll(() => {
+  try { rmSync(liveTmpRoot, { recursive: true, force: true }); } catch { /* best-effort cleanup */ }
+});
+
+const livePoolSkills = new SkillPoolManager(liveTmpRoot).loadSkills();
+const livePoolAgents = new AgentPoolManager(liveTmpRoot).loadAgents();
 
 describe('370-003 CATALOG-SYNC-PARITY: 368-001 skills + 369-003 agents pool-load visibility', () => {
   it('src/core/builtins carries all 6 new items on disk (SKILL.md / PROMPT.md), read live off the real tree', () => {

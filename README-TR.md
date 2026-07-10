@@ -9,7 +9,7 @@
 <p align="center"><strong>Ne istediğinizi anlatın. Bir AI agent ekibinin onu inşa edişini izleyin — paralel, kalite kapılarıyla, onayladığınız bir bütçeyle ve bir sonraki sefer için her şeyi hatırlayarak.</strong></p>
 
 <!-- AUTOGEN:START id="badges" -->
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-28397%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-29427%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-397%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
 <!-- AUTOGEN:END id="badges" -->
 
 ---
@@ -227,8 +227,8 @@ deckent izlenmek için kuruldu, bir kara kutu olmak için değil.
 - **Nervous System** — boşta worker'ları, routing anomalilerini, kapsam çakışmalarını, agent-sağlık düşüşlerini ve borç trendlerini izleyip aksiyon öneren proaktif bir meta-orkestratör
 
 ### Agent'lar ve skill'ler
-- **15 yerleşik agent** — security-auditor, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist
-- **21 yerleşik skill** — typescript-expert, testing-expert, react-specialist, security-specialist, docker-expert, python-expert, anthropic-sdk ve daha fazlası
+- **20 built-in agents** — security-auditor, doc-writer, bug-fixer, code-reviewer, refactorer, api-builder, performance-analyzer, ci-guardian, architect, architecture-planner, accessibility-auditor, data-engineer, devops-engineer, frontend-designer, migration-specialist ve daha fazlası (tam liste: `docs/reference/agents.md`)
+- **31 built-in skills** — typescript-expert, testing-expert, react-specialist, security-specialist, docker-expert, python-expert, anthropic-sdk ve daha fazlası
 - **Plugin'ler** — kendi yeniden-kullanılabilir yeteneklerinizi eklemek için `.deckent/plugins/` içine bir `manifest.json` + `SKILL.md` bırakın
 
 ### Güvenlik ve kalite
@@ -365,6 +365,6 @@ MIT — [Alperen @ Verhex](https://deckent.ai)
 <!-- AUTOGEN:START id="stat-counts" -->
 - **46 MCP tools** + **8 MCP resources**
 - **17 built-in agents** (+2 custom)
-- **29 built-in skills**
+- **30 built-in skills**
 - **20 dashboard pages**
 <!-- AUTOGEN:END id="stat-counts" -->

@@ -51,6 +51,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-397 Learnings** (sprint-397): ## Sprint sprint-397 Learnings
+- T7-ELOOP — chat-tool-exec raw-throw → DeckentError (CODE-FIX): GO_WITH_TECH_DEBT — F...
 - **Sprint sprint-396 Learnings** (sprint-396): ## Sprint sprint-396 Learnings
 - born-601a — AGENT-RULE-REWRITE — 4 agent-manifest kural-onarımı (P1): GO_WITH_TECH_D...
 - **Sprint sprint-395 Learnings** (sprint-395): ## Sprint sprint-395 Learnings
@@ -73,11 +75,9 @@
 - born-583 — GOV-MINORS — plugin-sig + opaque-bearer + deny-list loopback (P2): GO_WIT...
 - **Sprint sprint-388 Learnings** (sprint-388): ## Sprint sprint-388 Learnings
 - born-528 — REPL-DENY-TOOLSINK — confirm-red toolSink honest-outcome bypass (P2): NO_...
-- **Sprint sprint-387 Learnings** (sprint-387): ## Sprint sprint-387 Learnings
-- born-493 — W2-WIRE — native-engine'i slash-dispatcher'a köprüle (24/37 komut sessiz-...
 
 ## Active Technical Debt
-_No active technical debt._
+- [NORMAL] Tech debt from 397-007-fix: CODE-BUG confirmed already fixed on disk (uncommitte
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -135,5 +135,6 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 - Violation pattern: doc_sync_ground_truth_mismatch
+- Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 1157 | Generated: 2026-07-10_
+_Total entries: 1162 | Generated: 2026-07-10_

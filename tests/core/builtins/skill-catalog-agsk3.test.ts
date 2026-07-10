@@ -22,7 +22,10 @@ interface NewSkillSpec {
   id: string;
   name: string;
   expectedCategory: 'domain' | 'workflow';
-  expectedDomain: string;
+  /** Dead-word domain rules were rewritten to real signals in sprint-396 (born-601):
+   * onboarding-ux now carries an intent-rule, not a domains rule — expectedDomain
+   * became expectedRule with both shapes supported. */
+  expectedRule: { kind: 'domain'; value: string } | { kind: 'intent'; value: string };
   skillMdKeyword: string;
 }
 
@@ -31,14 +34,16 @@ const NEW_SKILLS: NewSkillSpec[] = [
     id: 'rpc-protocol',
     name: 'RPC Protocol',
     expectedCategory: 'domain',
-    expectedDomain: 'rpc',
+    expectedRule: { kind: 'domain', value: 'rpc' },
     skillMdKeyword: 'Dual-Consumer Testing',
   },
   {
     id: 'onboarding-ux',
     name: 'Onboarding UX',
     expectedCategory: 'workflow',
-    expectedDomain: 'onboarding',
+    // sprint-396 born-601: 'onboarding' ölü-domain kuralı intent.primary='config'
+    // dar-sinyaline çevrildi ('cli'ye alias her CLI-task'ta ateşlerdi — lint-gerekçesi).
+    expectedRule: { kind: 'intent', value: 'config' },
     skillMdKeyword: 'Degrade-Safe Teasers',
   },
 ];
@@ -120,10 +125,17 @@ describe('AGSK-3 dilim-3: rpc-protocol + onboarding-ux catalog', () => {
             expect(raw.category).toBe(spec.expectedCategory);
           });
 
-          it('carries activation.rules whose domains.$contains includes the expected domain', () => {
+          it('carries the expected activation rule (domain or intent — post-601 contract)', () => {
             const raw = readManifest(dir, spec.id);
-            const values = collectDomainRuleValues(raw.activation);
-            expect(values, `expected domains.$contains('${spec.expectedDomain}')`).toContain(spec.expectedDomain);
+            if (spec.expectedRule.kind === 'domain') {
+              const values = collectDomainRuleValues(raw.activation);
+              expect(values, `expected domains.$contains('${spec.expectedRule.value}')`).toContain(spec.expectedRule.value);
+            } else {
+              const intents = (raw.activation?.rules ?? [])
+                .map((r: { when?: Record<string, unknown> }) => r.when?.['intent.primary'])
+                .filter((v: unknown): v is string => typeof v === 'string');
+              expect(intents, `expected intent.primary rule '${spec.expectedRule.value}'`).toContain(spec.expectedRule.value);
+            }
           });
 
           it('SKILL.md stays within the 4KB rubric cap and covers its lineage theme', () => {

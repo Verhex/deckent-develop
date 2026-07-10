@@ -479,7 +479,7 @@ describe('status command', () => {
       progress: { done: 0, active: 0, blocked: 0, total: 0 },
 
       alerts: [],
-      updatedAt: '2026-03-16T00:00:00Z',
+      updatedAt: new Date().toISOString(),
     };
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(state));
@@ -508,7 +508,7 @@ describe('status command', () => {
       progress: { done: 0, active: 0, blocked: 0, total: 0 },
 
       alerts: [],
-      updatedAt: '2026-03-16T00:00:00Z',
+      updatedAt: new Date().toISOString(),
     };
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(state));
@@ -523,7 +523,7 @@ describe('status command', () => {
       progress: { done: 0, active: 0, blocked: 0, total: 0 },
 
       alerts: [],
-      updatedAt: '2026-03-16T00:00:00Z',
+      updatedAt: new Date().toISOString(),
     };
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(state));
@@ -539,7 +539,7 @@ describe('status command', () => {
       progress: { done: 0, active: 0, blocked: 0, total: 0 },
 
       alerts: [],
-      updatedAt: '2026-03-16T00:00:00Z',
+      updatedAt: new Date().toISOString(),
     };
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(state));
@@ -971,7 +971,7 @@ describe('start command', () => {
     vi.mocked(runSprint).mockResolvedValue(makeSprint());
     await runCommand(registerStart, ['start']);
     const optsArg = vi.mocked(runSprint).mock.calls[0]?.[2];
-    expect(optsArg?.autoApprove).toBe(true); // Deckent standard: always true
+    expect(optsArg?.autoApprove).toBe(false); // K3-approved: opt-in only via --auto-approve
     expect(optsArg?.sandboxMode).toBeFalsy();
   });
 

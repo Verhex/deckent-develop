@@ -9,7 +9,7 @@
 // present on a fresh checkout — no gitignored state). Async `spawn` only, never spawnSync.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, existsSync, rmSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +23,18 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..', '..');
 const GEN_SCRIPT = join(REPO_ROOT, 'scripts', 'gen-reference-docs.mjs');
+
+// born-461 (Sprint 397 fix): the real-repo assertions below used to hard-pin the
+// ADR count at 41, which went stale the moment an ADR was added (now 46). Recompute
+// it from the committed docs/adr/*.md filenames on every run so this test tracks the
+// live catalog instead of drifting. Deliberately an INDEPENDENT filename filter, not
+// a call to parseAdrs (the function under test) — deriving the expected value from the
+// code under test would let a regression to 0 pass silently (0 === 0).
+const ADR_FILENAME_RE = /^(?:adr-[gd]-\d+|\d{3,})-.*\.md$/;
+function countCommittedAdrFiles(): number {
+  return readdirSync(join(REPO_ROOT, 'docs', 'adr')).filter((n) => ADR_FILENAME_RE.test(n)).length;
+}
+const EXPECTED_ADR_COUNT = countCommittedAdrFiles();
 
 let tmpRoot: string;
 
@@ -155,16 +167,18 @@ describe('collectGenerations — fresh-mode preserves trailing content after AUT
 // ─── real repo — proves the regex + trailer fix against committed docs/adr ────
 
 describe('real docs/adr/*.md — regen is content-equivalent (diff-minimal proof)', () => {
-  it('collectGenerations reports 41 ADRs with zero drift against the committed README', () => {
+  it('collectGenerations reports the live ADR count with zero drift against the committed README', () => {
     const gens = collectGenerations({ root: REPO_ROOT });
     const adrGen = gens.find((g: { id: string }) => g.id === 'adr-index');
     expect(adrGen).toBeDefined();
-    expect(adrGen.count).toBe(41);
+    expect(adrGen.count).toBe(EXPECTED_ADR_COUNT);
     expect(adrGen.drift).toBe(false);
   });
 
-  it('`node scripts/gen-reference-docs.mjs --check` reports docs/adr/README.md in sync with 41 entries', async () => {
+  it('`node scripts/gen-reference-docs.mjs --check` reports docs/adr/README.md in sync with the live entry count', async () => {
     const result = await runCheck(REPO_ROOT);
-    expect(result.stdout).toMatch(/docs\/adr\/README\.md — in sync \(41 entries\)/);
+    expect(result.stdout).toMatch(
+      new RegExp(`docs/adr/README\\.md — in sync \\(${EXPECTED_ADR_COUNT} entries\\)`),
+    );
   });
 });

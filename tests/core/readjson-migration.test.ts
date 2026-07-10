@@ -19,6 +19,19 @@ function writeInvalid(filePath: string): void {
   writeFileSync(filePath, '{invalid json!!!', 'utf-8');
 }
 
+/**
+ * Asserts that `source` imports `symbol` as one of possibly several named
+ * imports from `fromPath` — e.g. matches both
+ * `import { readJsonSafe } from './utils.js'` and
+ * `import { readJsonSafe, debugLog } from './utils.js'`. A brittle exact-line
+ * match breaks every time an unrelated symbol is added to the same import.
+ */
+function expectImportsSymbol(source: string, symbol: string, fromPath: string): void {
+  const escapedPath = fromPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`import\\s*\\{[^}]*\\b${symbol}\\b[^}]*\\}\\s*from\\s*['"]${escapedPath}['"]`);
+  expect(source).toMatch(pattern);
+}
+
 beforeEach(() => {
   mkdirSync(TMP, { recursive: true });
 });
@@ -88,7 +101,7 @@ describe('global-config readJsonSafe migration', () => {
   it('source file imports readJsonSafe', async () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync('src/core/global-config.ts', 'utf-8');
-    expect(source).toContain("import { readJsonSafe } from './utils.js'");
+    expectImportsSymbol(source, 'readJsonSafe', './utils.js');
     expect(source).not.toContain('JSON.parse');
     expect(source).not.toContain('readFileSync');
   });
@@ -100,7 +113,7 @@ describe('skill-registry readJsonSafe migration', () => {
   it('source file imports readJsonSafe', async () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync('src/core/skill-registry.ts', 'utf-8');
-    expect(source).toContain("import { readJsonSafe } from './utils.js'");
+    expectImportsSymbol(source, 'readJsonSafe', './utils.js');
     expect(source).not.toContain('JSON.parse');
   });
 
@@ -128,7 +141,7 @@ describe('plugin readJsonSafe migration', () => {
   it('source file imports readJsonSafe', async () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync('src/core/plugin.ts', 'utf-8');
-    expect(source).toContain("import { readJsonSafe } from './utils.js'");
+    expectImportsSymbol(source, 'readJsonSafe', './utils.js');
     // loadPlugin still calls readJsonSafe -> should not have inline JSON.parse for readFileSync
     const jsonParseCount = (source.match(/JSON\.parse/g) || []).length;
     expect(jsonParseCount).toBe(0);
@@ -226,7 +239,7 @@ describe('agent-pool readJsonSafe migration', () => {
   it('source file imports readJsonSafe', async () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync('src/core/agent-pool.ts', 'utf-8');
-    expect(source).toContain("import { readJsonSafe } from './utils.js'");
+    expectImportsSymbol(source, 'readJsonSafe', './utils.js');
     const jsonParseCount = (source.match(/JSON\.parse/g) || []).length;
     expect(jsonParseCount).toBe(0);
   });
@@ -264,7 +277,7 @@ describe('credentials readJsonSafe migration', () => {
   it('source file imports readJsonSafe', async () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync('src/core/credentials.ts', 'utf-8');
-    expect(source).toContain("import { readJsonSafe } from './utils.js'");
+    expectImportsSymbol(source, 'readJsonSafe', './utils.js');
     const jsonParseCount = (source.match(/JSON\.parse/g) || []).length;
     // Only JSON.stringify should remain (for storeCredential)
     expect(jsonParseCount).toBe(0);
@@ -333,7 +346,7 @@ describe('skill-pool readJsonSafe migration', () => {
   it('source file imports readJsonSafe', async () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync('src/core/skill-pool.ts', 'utf-8');
-    expect(source).toContain("import { readJsonSafe } from './utils.js'");
+    expectImportsSymbol(source, 'readJsonSafe', './utils.js');
     const jsonParseCount = (source.match(/JSON\.parse/g) || []).length;
     expect(jsonParseCount).toBe(0);
   });
@@ -494,7 +507,7 @@ describe('webhook readJsonSafe migration', () => {
   it('source file imports readJsonSafe', async () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync('src/core/notification-providers/webhook.ts', 'utf-8');
-    expect(source).toContain("import { readJsonSafe } from '../utils.js'");
+    expectImportsSymbol(source, 'readJsonSafe', '../utils.js');
     expect(source).not.toMatch(/JSON\.parse\(readFileSync\(/);
   });
 });
@@ -505,7 +518,7 @@ describe('api/server readJsonSafe migration', () => {
   it('source file imports readJsonSafe', async () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync('src/api/server.ts', 'utf-8');
-    expect(source).toContain("import { readJsonSafe } from '../core/utils.js'");
+    expectImportsSymbol(source, 'readJsonSafe', '../core/utils.js');
     // readDashboardJson and readJsonFile should use readJsonSafe
     expect(source).not.toMatch(/JSON\.parse\(readFileSync\(/);
   });

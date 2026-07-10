@@ -75,14 +75,14 @@ describe('APPROVE-007 — CLI nervous IPC routing + liveness', () => {
   beforeEach(() => { mockRoot = mkdtempSync(join(tmpdir(), 'nervous-ipc-route-')); });
   afterEach(() => rmSync(mockRoot, { recursive: true, force: true }));
 
-  it('routes accept to the IPC queue when the executor is alive (CLI does not mutate pending)', async () => {
+  it('routes accept to the IPC queue when the executor is alive AND clears the durable pending entry (W0-TRUTH #491)', async () => {
     plantPending(mockRoot, 'n1');
     writeNervousHeartbeat(mockRoot); // executor "alive"
 
     const out = await captureStdout(() => runCli(['nervous', 'accept', 'n1', '--lang', 'en']));
 
     expect(ipcPendingCount(mockRoot)).toBe(1);            // wrote an IPC approval
-    expect(readPending(mockRoot)).toHaveLength(1);        // CLI did NOT remove (executor owns it)
+    expect(readPending(mockRoot)).toHaveLength(0);        // decided → display-hub clears now, even though the executor still owns execution
     expect(out.toLowerCase()).toContain('executor');
   });
 

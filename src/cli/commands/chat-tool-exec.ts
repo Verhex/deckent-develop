@@ -17,6 +17,7 @@ import { writeFileSync, readFileSync, existsSync, mkdirSync, lstatSync, readlink
 import { resolve, relative, isAbsolute, dirname, sep, parse } from 'node:path';
 import { spawn } from 'node:child_process';
 import type { McpToolDispatcher } from './chat-native.js';
+import { DeckentError } from '../../core/errors.js';
 
 /** Yan-etkili (onay gerektiren) tool adları. read salt-okunur → onaysız. */
 const SIDE_EFFECTING: ReadonlySet<string> = new Set([
@@ -188,7 +189,7 @@ const MAX_SYMLINK_DEPTH = 40;
  * exist yet are kept literal while every symlink actually on disk — broken
  * or not, file or directory — is followed to its real target.
  */
-function resolveRealPathLenient(absPath: string): string {
+export function resolveRealPathLenient(absPath: string): string {
   const root = parse(absPath).root;
   const parts = absPath.slice(root.length).split(sep).filter((s) => s.length > 0);
   let resolved = root;
@@ -203,7 +204,7 @@ function resolveRealPathLenient(absPath: string): string {
         break; // not on disk yet — nothing to resolve, keep literal.
       }
       if (!st.isSymbolicLink()) break;
-      if (++depth > MAX_SYMLINK_DEPTH) throw new Error('ELOOP: too many symlink levels');
+      if (++depth > MAX_SYMLINK_DEPTH) throw new DeckentError('DECKENT_E005', 'ELOOP: too many symlink levels');
       const target = readlinkSync(resolved);
       resolved = isAbsolute(target) ? target : resolve(dirname(resolved), target);
     }

@@ -10,8 +10,9 @@
       {
         "when": {
           "domains": {
-            "$contains": "provider-cli"
-          }
+            "$contains": "providers"
+          },
+          "intent.primary": "implementation"
         },
         "score": 10
       }

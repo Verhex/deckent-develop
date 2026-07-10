@@ -19,13 +19,18 @@ import type { AgenticAction } from '../../src/cli/commands/agentic-confirm.js';
 // the existing mechanism, unchanged. A non-matching line still falls
 // through to the provider untouched.
 //
-// Also folds in the sprint-359 task 359-009 false-positive evidence
-// (tests/cli/nl-dispatch-evidence.test.ts, `classifyAgenticIntent` itself is
-// NOT touched by this task): under the class-gate, an `'Oku'`-tier false
-// positive is harmless (direct dispatch of a read-only tool), and a
-// `'Değiştir'`-tier false positive still requires confirm before anything
-// runs — the worst case is an extra prompt, never a silent destructive
-// action.
+// Also folds in a defense-in-depth check inspired by the sprint-359 task
+// 359-009 false-positive evidence (tests/cli/nl-dispatch-evidence.test.ts):
+// under the class-gate, an `'Oku'`-tier match is harmless even if it were a
+// misclassification (direct dispatch of a read-only tool), and a
+// `'Değiştir'`-tier match still requires confirm before anything runs — the
+// worst case is an extra prompt, never a silent destructive action. The
+// specific false-positive utterances 359-009 found were fixed at the
+// classifier level by born-514 (task 380-007, AGENTIC-DISPATCH-OVERMATCH —
+// see tests/cli/nl-dispatch-evidence.test.ts, now a regression guard), so
+// the utterances below are genuine matches rather than false positives; they
+// still exercise the same tier-based class-gate behavior the false
+// positives used to.
 
 async function* lines(...items: string[]): AsyncIterable<string> {
   for (const item of items) yield item;
@@ -162,8 +167,8 @@ describe('nl-dispatch-class-gate — ADR-D-013 Option C (task 375-003)', () => {
     expect(sendSpy).toHaveBeenCalledTimes(1);
   });
 
-  describe('359-009 false positives are harmless under the class-gate', () => {
-    it("Oku-tier false positive: 'beni sonra ara' (call me later) dispatches deckent_memory_query directly, no confirm", async () => {
+  describe('born-514-sonrası hâlâ meşru-eşleşen utterances keep the class-gate defense-in-depth honest', () => {
+    it("Oku-tier match: 'recall the incident postmortem' dispatches deckent_memory_query directly, no confirm", async () => {
       const { adapter } = queuedProvider([]);
       const { dispatcher, dispatchSpy } = fakeDispatcher('{"found":0}');
       const confirmSpy = vi.fn(async () => true);
@@ -171,7 +176,7 @@ describe('nl-dispatch-class-gate — ADR-D-013 Option C (task 375-003)', () => {
       await runChatNativeLoop(baseOpts({
         provider: adapter,
         dispatcher,
-        input: lines('beni sonra ara'),
+        input: lines('recall the incident postmortem'),
         agenticConfirm: confirmSpy,
       }));
 
@@ -181,7 +186,7 @@ describe('nl-dispatch-class-gate — ADR-D-013 Option C (task 375-003)', () => {
       expect(confirmSpy).not.toHaveBeenCalled();
     });
 
-    it("Değiştir-tier false positive: \"what's the plan for tonight?\" still requires confirm before anything runs", async () => {
+    it("Değiştir-tier match: 'generate plan for the migration' still requires confirm before anything runs", async () => {
       const { adapter } = queuedProvider([]);
       const { dispatcher, dispatchSpy } = fakeDispatcher();
       const output = vi.fn();
@@ -190,7 +195,7 @@ describe('nl-dispatch-class-gate — ADR-D-013 Option C (task 375-003)', () => {
       await runChatNativeLoop(baseOpts({
         provider: adapter,
         dispatcher,
-        input: lines("what's the plan for tonight?"),
+        input: lines('generate plan for the migration'),
         output,
         agenticConfirm: confirmSpy,
       }));

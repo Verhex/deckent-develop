@@ -22,12 +22,22 @@ vi.mock('../../src/core/utils.js', () => ({
   readJsonSafe: vi.fn().mockReturnValue(null),
 }));
 
+// born-587 (DEAD-LISTENER-MIGRATION): registerDashboard() routes shutdown
+// cleanup through this shared registry instead of a raw process.on(SIGINT/
+// SIGTERM) — mock it so the "registers ..." test can capture and invoke the
+// hook directly, without sending a real OS signal.
+vi.mock('../../src/cli/helpers/shutdown-hooks.js', () => ({
+  registerShutdownHook: vi.fn(),
+}));
+
 import { readFileSync, existsSync } from 'node:fs';
 import { readJsonSafe } from '../../src/core/utils.js';
+import { registerShutdownHook } from '../../src/cli/helpers/shutdown-hooks.js';
 import { renderDashboard, readDashboardFile, registerDashboard } from '../../src/cli/commands/dashboard.js';
 
 const mockExistsSync = vi.mocked(existsSync);
 const mockReadFileSync = vi.mocked(readFileSync);
+const mockRegisterShutdownHook = vi.mocked(registerShutdownHook);
 
 // ─── Fixtures ───────────────────────────────────────────────────────
 
@@ -330,17 +340,38 @@ describe('registerDashboard', () => {
     expect(output).toContain('sprint-005');
   });
 
-  it('registers SIGINT and SIGTERM handlers', async () => {
+  it('registers a shutdown hook (not raw SIGINT/SIGTERM handlers) that idempotently clears the fallback refresh timer', async () => {
+    let callCount = 0;
+    mockExistsSync.mockImplementation(() => {
+      callCount++;
+      return false;
+    });
+
     const program = new Command();
     program.exitOverride();
     registerDashboard(program);
-    mockExistsSync.mockReturnValue(false);
 
     await program.parseAsync(['dashboard'], { from: 'user' });
 
+    // born-587 (DEAD-LISTENER-MIGRATION): entry.ts's bootstrap-time onSignal
+    // always wins SIGINT/SIGTERM registration order, so a command-level
+    // process.on() listener here would be dead code. registerDashboard()
+    // routes cleanup through the shared shutdown-hooks registry instead — no
+    // raw listener is ever added.
     const signals = processOnSpy.mock.calls.map((c) => c[0]);
-    expect(signals).toContain('SIGINT');
-    expect(signals).toContain('SIGTERM');
+    expect(signals).not.toContain('SIGINT');
+    expect(signals).not.toContain('SIGTERM');
+    expect(mockRegisterShutdownHook).toHaveBeenCalledTimes(1);
+
+    const hook = mockRegisterShutdownHook.mock.calls[0][0] as () => Promise<void>;
+    await hook();
+    await hook(); // idempotent re-entry (a second signal mid-cleanup) must not throw
+
+    const afterHookCalls = callCount;
+    vi.advanceTimersByTime(10_000);
+    // Real cleanup, not just a spy assertion: the fallback setInterval is
+    // actually cleared, so advancing time triggers no further renders.
+    expect(callCount).toBe(afterHookCalls);
   });
 
   it('accepts custom interval option', async () => {

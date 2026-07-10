@@ -28,6 +28,9 @@ vi.mock('../../../src/cli/helpers/output.js', () => ({
   formatTable: vi.fn().mockReturnValue('Table'),
   isNoColor: vi.fn().mockReturnValue(false),
   stripAnsi: vi.fn((s: string) => s),
+  // W0-TRUTH (#491) orphan-gate: status.ts calls this before rendering the
+  // human-friendly / --mode view. Default false (not orphaned).
+  isDashboardOrphaned: vi.fn(() => false),
 }));
 
 vi.mock('../../../src/cli/helpers/process.js', () => ({
@@ -56,7 +59,7 @@ function makeDashboard(overrides?: Partial<DashboardState>): DashboardState {
     agents: [{ id: 'w-001' } as unknown as DashboardState['agents'][0]],
     progress: { done: 5, active: 2, blocked: 0, total: 10 },
     alerts: [],
-    updatedAt: '2026-04-15T00:00:00Z',
+    updatedAt: new Date().toISOString(),
     ...overrides,
   };
 }

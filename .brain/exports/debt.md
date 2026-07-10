@@ -4,6 +4,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-397-007-fix | Tech debt from 397-007-fix: CODE-BUG confirmed already fixed on disk (uncommitte | normal | sprint-397 | active |
 
 ## Resolved Technical Debt
 

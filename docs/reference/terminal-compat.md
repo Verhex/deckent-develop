@@ -15,7 +15,7 @@ scenarios. That library is **not a project dependency** — `package.json` has
 twice before in this codebase:
 
 - [`tests/cli/repl-tool-multi-tag-repro.test.ts`](../../tests/cli/repl-tool-multi-tag-repro.test.ts) (sprint 285)
-- [`tests/cli/repl-surface-wire.test.tsx`](../../tests/cli/repl-surface-wire.test.tsx) (sprint 354)
+- [`tests/cli/repl-surface-wire.test.tsx`](https://github.com/VerhexIO/deckent/blob/main/tests/cli/repl-surface-wire.test.tsx) (sprint 354)
 
 Both land on the same fallback, which this task's own wording anticipates
 ("gerçek-PTY değil, seam'li" — not real-PTY, seam-based): pull the pure,
@@ -46,7 +46,7 @@ in `editInput`/`buildLiveFooter` to individually verify per platform. It does
 the byte sequences that logic expects at its input boundary (e.g. does
 PowerShell's Home key really arrive as the escape sequence `inkToKey` maps to
 `{name:'home'}`?). That boundary lives in Ink's own keypress parser and in
-[`inkToKey`](../../src/cli/repl/input-bar.tsx) (module-private, not exported —
+[`inkToKey`](https://github.com/VerhexIO/deckent/blob/main/src/cli/repl/input-bar.tsx) (module-private, not exported —
 touching `input-bar.tsx` was explicitly out of this task's nogo), so it is
 real-PTY / manual territory, not a seam.
 
@@ -55,12 +55,12 @@ Not covered by any seam at all (the logic lives inline inside `input-bar.tsx`'s
 in this task's write scope):
 
 - Real bracketed multi-line paste → single-message merge
-  ([`input-bar.tsx:128-146`](../../src/cli/repl/input-bar.tsx))
+  ([`input-bar.tsx:128-146`](https://github.com/VerhexIO/deckent/blob/main/src/cli/repl/input-bar.tsx#L128-L146))
 - Single-line paste + trailing-newline auto-submit (same block)
 - `inkToKey`'s Home/End escape-sequence detection per terminal
-  ([`input-bar.tsx:42-57`](../../src/cli/repl/input-bar.tsx))
+  ([`input-bar.tsx:42-57`](https://github.com/VerhexIO/deckent/blob/main/src/cli/repl/input-bar.tsx#L42-L57))
 - `process.stdin.setRawMode` negotiation, real TTY only
-  ([`run.tsx:235,247`](../../src/cli/repl/run.tsx))
+  ([`run.tsx:235,247`](https://github.com/VerhexIO/deckent/blob/main/src/cli/repl/run.tsx))
 - Ink's own resize reconciliation (internal to the `ink` package, not deckent code)
 
 ## Compat matrix

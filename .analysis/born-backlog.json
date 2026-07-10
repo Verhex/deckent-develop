@@ -2404,5 +2404,20 @@
   ],
   "spec": "Structured-parse yolunda filesWrite tureten mantigi bul (muhtemelen basename x scope-dir join veya Kanit/description path-cikarimi); Files-listesi varken ek-turetme yapilmasin. REPRODUCE: 397-011 fixture.",
   "verify": "fixture: Files+Scope'lu DIRECTIVES -> filesWrite birebir Files; gate false-BLOCK yok"
+ },
+ {
+  "born_id": 617,
+  "severity": "P1",
+  "subsystem": "gov",
+  "proposed_mode": "design-then-fix",
+  "title": "CI-TESTGLOB-GAP: tests/{kpi,brain,e2e,audits,governance,docker,config,nervous,connectors,training,...} aileleri CI'da HIC kosulmuyor + 9-dosya latent-red seti",
+  "sources": [
+   "faz-0 full-suite kesfi 2026-07-10: ci.yml yalniz core/agents/orchestra/cli/mcp+api-umbrella/docs+scripts kosuyor; 10-dosya/29-fail lokalde, yalniz 1'i CI-kapsaminda (fix'lendi)"
+  ],
+  "primary_files": [
+   ".github/workflows/ci.yml"
+  ],
+  "spec": "Kapsam-envanteri cikar (hangi tests/* dizini hangi job'da; kosulmayanlar listesi) -> ya yeni job(lar) ya umbrella-genisletme; ardindan 9-dosya latent-set RCA+fix (kpi-backfill, brain/decisions 11-fail, init-builtin-seed, dead-code-decisions, orphan-deliverables 95-86 drifti, tmux-backend, docker-oom/hb, nervous-faz1-smoke). Maliyet-dengesi: e2e/docker aileleri belki nightly-job.",
+  "verify": "CI job-haritasi = tests/* tam-kapsam (veya gerekceli-haric listesi); yeni job'lar yesil"
  }
 ]

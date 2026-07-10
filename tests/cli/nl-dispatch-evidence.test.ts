@@ -2,121 +2,127 @@ import { describe, it, expect } from 'vitest';
 
 import { classifyAgenticIntent } from '../../src/cli/commands/chat-agentic-dispatch.js';
 
-// ═══ nl-dispatch-evidence — Sıra-57 karar-kapısı kanıt paketi (359-009) ═══
+// ═══ nl-dispatch-evidence — born-514 (task 380-007, AGENTIC-DISPATCH-OVERMATCH) regression guard ═══
 //
-// Bu dosya KARAR VERMEZ — `agenticDispatch`'in (chat-native.ts opts.agenticDispatch →
-// classifyAgenticIntent, chat-agentic-dispatch.ts) MEVCUT davranışını test-sabitler.
-// Her `it` bloğu bir "sınır-vakası" (boundary case): sıradan bir cümlenin, salt-regex
-// tabanlı NL sınıflandırıcı tarafından yanlışlıkla bir deckent_* araç çağrısına
-// dönüştürülüp dönüştürülmediğini ölçer. Referans karar-belgesi:
-// docs/design/nl-dispatch-default-decision.md (bu dosyadaki her case oraya
-// kod-satır-referanslı olarak taşınır).
+// This file used to DOCUMENT a bug: `agenticDispatch`'s pre-born-514 rules matched on a
+// single bare, unqualified keyword ("ara", "memory", "find", "search", "plan", bare
+// "durum\w*"/"gecmis", "how is/are") anywhere in the sentence, silently misrouting 16/20
+// ordinary conversational sentences into a deckent_* tool call (sprint-359 task 359-009,
+// docs/design/nl-dispatch-default-decision.md). born-514 (chat-agentic-dispatch.ts, task
+// 380-007) tightened every rule to require either a distinctive/rare word (recall, planla) or
+// an explicit command-shape context (sprint-scoped, or a memory-noun + search-verb pairing in
+// the SAME utterance) — a bare generic word alone no longer fires.
 //
-// Sınıflandırma: her test'in adı "dispatch-OLUR" (yanlışlıkla eşleşir → false-positive
-// riski) veya "dispatch-OLMAZ" (doğru şekilde eşleşmez) etiketiyle başlar.
+// This file now KEEPS the same boundary-case sentences as a regression guard: each
+// `regression-guard` case asserts `intent.tool` is `null` (no dispatch) for a sentence that
+// used to be misrouted. If a future edit to chat-agentic-dispatch.ts widens a rule back to a
+// bare-keyword match, one of these cases fails and catches the regression before it ships.
+//
+// The `dispatch-OLMAZ` true-negative cases (ordinary small talk, unaffected by born-514) are
+// unchanged sanity checks that the classifier correctly falls through to `no_match`.
 
-describe('nl-dispatch-evidence — false-positive boundary cases (agenticDispatch)', () => {
-  // ─── "ara" (Turkish: search/call/occasionally) — RECALL_RE bare-keyword match ──
-  // chat-agentic-dispatch.ts RECALL_RE: /\b(?:hafiza\w*|recall|memory|ara|search|find)\b/
-  // "ara" is matched as a STANDALONE word regardless of its actual Turkish meaning in
-  // context (call somebody / a street / occasionally) — the classifier has no semantic
-  // disambiguation, only a bare-keyword regex.
+describe('nl-dispatch-evidence — born-514 regression guard (agenticDispatch)', () => {
+  // ─── "ara" (Turkish: search/call/occasionally) — recall rule now requires a memory-noun pairing ──
+  // chat-agentic-dispatch.ts: SEARCH_VERB_RE (`ara`/`search`/`find`) only fires the recall rule
+  // when MEMORY_WORD_RE (`hafiza\w*`/`memory`) also matches in the same utterance — a bare "ara"
+  // with no memory-noun context no longer dispatches.
 
-  it('dispatch-OLUR: "beni sonra ara" (call me later) → false-positive deckent_memory_query', () => {
+  it('regression-guard: "beni sonra ara" (call me later) → no memory-noun pairing, correctly no_match', () => {
     const intent = classifyAgenticIntent('beni sonra ara');
-    expect(intent.tool).toBe('deckent_memory_query');
+    expect(intent.tool).toBe(null);
   });
 
-  it('dispatch-OLUR: "işten çıkınca beni ara lütfen" (call me when you leave work) → false-positive deckent_memory_query', () => {
+  it('regression-guard: "işten çıkınca beni ara lütfen" (call me when you leave work) → no memory-noun pairing, correctly no_match', () => {
     const intent = classifyAgenticIntent('işten çıkınca beni ara lütfen');
-    expect(intent.tool).toBe('deckent_memory_query');
+    expect(intent.tool).toBe(null);
   });
 
-  // ─── "durum" prefix — STATUS_RE greedy \w* extension ───────────────────────────
-  // STATUS_RE: /\b(?:sprint\s+durum\w*|durum\w*(?:\s+ne(?:dir)?)?|...)\b/ — the bare
-  // `durum\w*` branch matches ANY word beginning with "durum" (dative/genitive/derived
-  // forms included), not just the literal noun "durum" (situation/status).
+  // ─── "durum" prefix — STATUS_RE now requires an explicit "durum(u/un)? ne(dir)?" / "durumu nasıl" shape ──
+  // chat-agentic-dispatch.ts STATUS_RE: the bare `durum\w*` branch was removed — declined forms
+  // like "duruma"/"durumda" (dative/locative) no longer match; only the literal
+  // "sprint durum\w*", "durum(u/un)? ne(dir)?", "durumu nasıl", or English "what's/is the status"
+  // shapes fire.
 
-  it('dispatch-OLUR: "bu duruma göre karar verelim" (let\'s decide based on this) → false-positive deckent_status', () => {
+  it('regression-guard: "bu duruma göre karar verelim" (let\'s decide based on this) → declined form, correctly no_match', () => {
     const intent = classifyAgenticIntent('bu duruma göre karar verelim');
-    expect(intent.tool).toBe('deckent_status');
+    expect(intent.tool).toBe(null);
   });
 
-  it('dispatch-OLUR: "olağanüstü durumda ne yapmalı" (what to do in an emergency) → false-positive deckent_status', () => {
+  it('regression-guard: "olağanüstü durumda ne yapmalı" (what to do in an emergency) → declined form, correctly no_match', () => {
     const intent = classifyAgenticIntent('olağanüstü durumda ne yapmalı');
-    expect(intent.tool).toBe('deckent_status');
+    expect(intent.tool).toBe(null);
   });
 
-  // ─── "memory" as an everyday English noun — RECALL_RE bare-keyword match ──────
+  // ─── "memory" as an everyday English noun — MEMORY_WORD_RE now requires a paired search-verb ──
 
-  it('dispatch-OLUR: "I have a great memory for names" → false-positive deckent_memory_query', () => {
+  it('regression-guard: "I have a great memory for names" → memory-noun with no search-verb, correctly no_match', () => {
     const intent = classifyAgenticIntent('I have a great memory for names');
-    expect(intent.tool).toBe('deckent_memory_query');
+    expect(intent.tool).toBe(null);
   });
 
-  it('dispatch-OLUR: "this laptop needs more memory" → false-positive deckent_memory_query', () => {
+  it('regression-guard: "this laptop needs more memory" → memory-noun with no search-verb, correctly no_match', () => {
     const intent = classifyAgenticIntent('this laptop needs more memory');
-    expect(intent.tool).toBe('deckent_memory_query');
+    expect(intent.tool).toBe(null);
   });
 
-  // ─── "find" / "search" as everyday verbs — RECALL_RE bare-keyword match ───────
+  // ─── "find" / "search" as everyday verbs — SEARCH_VERB_RE now requires a paired memory-noun ──
 
-  it('dispatch-OLUR: "did you find the bug?" → false-positive deckent_memory_query', () => {
+  it('regression-guard: "did you find the bug?" → search-verb with no memory-noun, correctly no_match', () => {
     const intent = classifyAgenticIntent('did you find the bug?');
-    expect(intent.tool).toBe('deckent_memory_query');
+    expect(intent.tool).toBe(null);
   });
 
-  it('dispatch-OLUR: "can you find my keys" → false-positive deckent_memory_query', () => {
+  it('regression-guard: "can you find my keys" → search-verb with no memory-noun, correctly no_match', () => {
     const intent = classifyAgenticIntent('can you find my keys');
-    expect(intent.tool).toBe('deckent_memory_query');
+    expect(intent.tool).toBe(null);
   });
 
-  it('dispatch-OLUR: "let\'s search for a new apartment" → false-positive deckent_memory_query', () => {
+  it('regression-guard: "let\'s search for a new apartment" → search-verb with no memory-noun, correctly no_match', () => {
     const intent = classifyAgenticIntent("let's search for a new apartment");
-    expect(intent.tool).toBe('deckent_memory_query');
+    expect(intent.tool).toBe(null);
   });
 
-  // ─── "plan" as an everyday noun — PLAN_RE bare-keyword match ───────────────────
-  // PLAN_RE: /\b(?:plan(?:la)?|sprint\s+planla|generate\s+plan)\b/ — bare "plan" fires
-  // regardless of whether the user means "sprint plan" or "dinner plan."
+  // ─── "plan" as an everyday noun — PLAN_RE now requires "planla" / "sprint plan\w*" / "generate plan" ──
+  // chat-agentic-dispatch.ts PLAN_RE: the bare "plan" branch was removed — only the Turkish verb
+  // form "planla", the sprint-scoped "sprint plan\w*", or the explicit "generate plan" shape fire.
 
-  it('dispatch-OLUR: "what\'s the plan for tonight?" → false-positive deckent_plan', () => {
+  it('regression-guard: "what\'s the plan for tonight?" → bare noun "plan", correctly no_match', () => {
     const intent = classifyAgenticIntent("what's the plan for tonight?");
-    expect(intent.tool).toBe('deckent_plan');
+    expect(intent.tool).toBe(null);
   });
 
-  it('dispatch-OLUR: "I need a diet plan" → false-positive deckent_plan', () => {
+  it('regression-guard: "I need a diet plan" → bare noun "plan", correctly no_match', () => {
     const intent = classifyAgenticIntent('I need a diet plan');
-    expect(intent.tool).toBe('deckent_plan');
+    expect(intent.tool).toBe(null);
   });
 
-  // ─── "status"/"how is X" small talk — STATUS_RE bare-keyword + phrase match ───
+  // ─── "status"/"how is X" small talk — STATUS_RE now requires the exact "what's/is the status" phrase ──
 
-  it('dispatch-OLUR: "just checking on the status of my order" → false-positive deckent_status', () => {
+  it('regression-guard: "just checking on the status of my order" → not the literal "what\'s/is the status" phrase, correctly no_match', () => {
     const intent = classifyAgenticIntent('just checking on the status of my order');
-    expect(intent.tool).toBe('deckent_status');
+    expect(intent.tool).toBe(null);
   });
 
-  it('dispatch-OLUR: "how is sprint going for you these days?" (small talk, not a status query) → false-positive deckent_status', () => {
+  it('regression-guard: "how is sprint going for you these days?" (small talk, not a status query) → correctly no_match', () => {
     const intent = classifyAgenticIntent('how is sprint going for you these days?');
-    expect(intent.tool).toBe('deckent_status');
+    expect(intent.tool).toBe(null);
   });
 
-  it('dispatch-OLUR: "how are we doing today, feeling ok?" → false-positive deckent_status', () => {
+  it('regression-guard: "how are we doing today, feeling ok?" → correctly no_match', () => {
     const intent = classifyAgenticIntent('how are we doing today, feeling ok?');
-    expect(intent.tool).toBe('deckent_status');
+    expect(intent.tool).toBe(null);
   });
 
   // ─── Turkish diacritic-stripped collisions — normalize() strips ç/ğ/ı/ö/ş/ü ───
 
-  it('dispatch-OLUR: "hafızam çok zayıf bu aralar" (my memory is weak lately) → false-positive deckent_memory_query', () => {
+  it('regression-guard: "hafızam çok zayıf bu aralar" (my memory is weak lately) → memory-noun with no standalone search-verb, correctly no_match', () => {
     const intent = classifyAgenticIntent('hafızam çok zayıf bu aralar');
-    expect(intent.tool).toBe('deckent_memory_query');
+    expect(intent.tool).toBe(null);
   });
 
-  it('dispatch-OLUR: "geçmiş olsun, tekrar dene" (get well soon, try again) → false-positive deckent_history', () => {
+  it('regression-guard: "geçmiş olsun, tekrar dene" (get well soon, try again) → not "gecmis + sprint" shape, correctly no_match', () => {
     const intent = classifyAgenticIntent('geçmiş olsun, tekrar dene');
-    expect(intent.tool).toBe('deckent_history');
+    expect(intent.tool).toBe(null);
   });
 
   // ─── True negatives — sanity check that ordinary small talk correctly falls through ──

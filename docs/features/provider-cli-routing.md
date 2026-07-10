@@ -7,7 +7,7 @@
 > `src/orchestra/spawn-backend-docker.ts` (docker, 364-004 parity) +
 > `src/orchestra/tmux.ts` (tmux, 364-003 parity)
 > **Doğuş:** sprint-362 (born-479) → sprint-364 (born-481 + üç-backend parity) →
-> sprint-365 (kesin-sınav, [codex-v6-final-363chain.md](../analysis/codex-v6-final-363chain.md))
+> sprint-365 (kesin-sınav, [codex-v6-final-363chain.md](https://github.com/VerhexIO/deckent/blob/main/docs/analysis/codex-v6-final-363chain.md))
 
 ## Ne yapar
 
@@ -98,5 +98,5 @@ kullanılır, davranış PSL-1 (Sprint 252) öncesiyle bire bir aynıdır.
   kontrol eder (tablo drift edemez).
 - `tests/orchestra/docker-provider-cli.test.ts` (13 test) + `tests/core/provider-command-spec.test.ts`
   (12 test) — docker backend + tablonun kendisi.
-- Anlatı/kronoloji: [codex-v6-final-363chain.md](../analysis/codex-v6-final-363chain.md) — V1→V6
+- Anlatı/kronoloji: [codex-v6-final-363chain.md](https://github.com/VerhexIO/deckent/blob/main/docs/analysis/codex-v6-final-363chain.md) — V1→V6
   zincirinin born-479/481 referanslı özet tablosu (bu doc'un kod-seviyesi karşılığı).

@@ -61,12 +61,26 @@ function readPrompt(dir: string, id: string): string {
   return readFileSync(resolve(dir, id, 'PROMPT.md'), 'utf8');
 }
 
+function domainContains(clause: Record<string, unknown> | undefined): string | undefined {
+  const domains = clause?.['domains'] as { $contains?: string } | undefined;
+  return domains?.$contains;
+}
+
+// $or-aware (sprint-396 rule-rewrite): a rule's `when` may carry a direct top-level
+// `domains.$contains` (pre-396 shape) OR wrap alternatives in `when.$or[]`, each shaped
+// like its own `{ domains: { $contains } }` clause (post-396 shape). Both shapes coexist
+// live across src/core/builtins (pre-396) and .deckent (post-396) trees, so both must be read.
 function collectDomainRuleValues(activation: unknown): string[] {
   const rules = (activation as { rules?: Array<{ when: Record<string, unknown> }> })?.rules ?? [];
   const values: string[] = [];
   for (const rule of rules) {
-    const domains = rule.when['domains'] as { $contains?: string } | undefined;
-    if (domains?.$contains) values.push(domains.$contains);
+    const direct = domainContains(rule.when);
+    if (direct) values.push(direct);
+    const orClauses = rule.when['$or'] as Array<Record<string, unknown>> | undefined;
+    for (const clause of orClauses ?? []) {
+      const value = domainContains(clause);
+      if (value) values.push(value);
+    }
   }
   return values;
 }

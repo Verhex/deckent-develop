@@ -89,7 +89,10 @@ const EDITED_AGENT_IDS = ['architecture-planner', 'data-engineer', 'integration-
 // collapse-specific describe blocks below for the actual live-behavior proof.
 const FULLY_RETIRED_WORD_BY_AGENT: Record<string, string> = {
   'architecture-planner': 'architecture',
-  'data-engineer': 'database',
+  // data-engineer 2026-07-10 revizyonu: 'database' cross-project $or-kuralında
+  // BİLİNÇLİ tutulur (Yasa-#2 foreign-reach; lint-orphan-gerekçeli) — düz-rewrite
+  // agent'ı migration-specialist'e evrensel-dominated bırakmıştı. Bu yüzden
+  // 'retired' pin'i data-engineer için $or-İÇİ-varlığı doğrular (aşağıda özel-case).
 };
 
 describe('born-601a: dead domain words removed / manifests stay schema-valid', () => {
@@ -100,6 +103,21 @@ describe('born-601a: dead domain words removed / manifests stay schema-valid', (
         const manifest = readAgentManifest(id);
         const words = domainWords(manifest.activation);
         expect(words.has(retired)).toBe(false);
+      });
+    }
+
+    {
+      // data-engineer özel-case (2026-07-10): 'database' KALIR ama yalnız
+      // cross-project $or-kuralı içinde; ayrıca migration@6 gerçek-sinyali durur.
+      const id = 'data-engineer';
+      it(`${id}: keeps 'database' ONLY inside the cross-project $or rule + migration intent-rule`, () => {
+        const manifest = readAgentManifest(id);
+        const rules = manifest.activation?.rules ?? [];
+        const orRule = rules.find((r: { when?: { $or?: unknown[] } }) => Array.isArray(r.when?.$or));
+        expect(orRule, 'cross-project $or rule missing').toBeDefined();
+        expect(JSON.stringify(orRule)).toContain('database');
+        const intentRule = rules.find((r: { when?: Record<string, unknown> }) => r.when?.['intent.primary'] === 'migration');
+        expect(intentRule, 'migration intent rule missing').toBeDefined();
       });
     }
 

@@ -118,7 +118,9 @@ export function countDashboardPages(pagesDir) {
 }
 
 const SPRINT_FILE_RE = /^sprint-(\d+)(?:\.md|-tasks)?$/;
-const DIRECTIVES_SPRINT_RE = /Sprint\s+(\d+)/i;
+// Match both the spaced form ("Sprint 172") and the hyphenated GOAL-phase form
+// ("SPRINT-14") that DIRECTIVES.md can carry after a re-numbering.
+const DIRECTIVES_SPRINT_RE = /Sprint[\s-]+(\d+)/i;
 
 export function detectLatestSprint(archiveDir) {
   if (!existsSync(archiveDir)) return null;
@@ -132,17 +134,28 @@ export function detectLatestSprint(archiveDir) {
   return Math.max(...nums);
 }
 
-// Active sprint: prefer DIRECTIVES.md header ("# DIRECTIVES — Sprint 172: ...");
-// fall back to max(archive sprint) + 1 to reflect the in-flight sprint.
+// Active sprint: reconcile two signals and take the higher.
+//   - DIRECTIVES.md header ("# DIRECTIVES — Sprint 172: ..." or "SPRINT-14: ...")
+//   - max(archive sprint) + 1 from `.brain/archive/sprints/` (the sprint history now
+//     lives under a `sprints/` subdirectory, not the archive root).
+// The DIRECTIVES header can carry a re-numbered GOAL-phase counter ("SPRINT-14") that
+// sits far below the true completed-sprint count; preferring the max keeps the
+// "sprints-N+" badge monotonic and correct across such re-numberings, so a regen never
+// silently rewinds the badge to a low phase number.
 export function detectActiveSprint(root) {
   const directivesPath = join(root, 'DIRECTIVES.md');
+  let fromDirectives = null;
   if (existsSync(directivesPath)) {
     const head = readFileSync(directivesPath, 'utf-8').split('\n', 5).join('\n');
     const m = DIRECTIVES_SPRINT_RE.exec(head);
-    if (m) return Number(m[1]);
+    if (m) fromDirectives = Number(m[1]);
   }
-  const archived = detectLatestSprint(join(root, '.brain/archive'));
-  return archived !== null ? archived + 1 : null;
+  const archived = detectLatestSprint(join(root, '.brain/archive/sprints'));
+  const fromArchive = archived !== null ? archived + 1 : null;
+  if (fromDirectives !== null && fromArchive !== null) {
+    return Math.max(fromDirectives, fromArchive);
+  }
+  return fromDirectives ?? fromArchive;
 }
 
 // CLI top-level commands: count exported `register*(program)` functions under

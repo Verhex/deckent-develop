@@ -68,7 +68,12 @@ describe('deckent_search_tools', () => {
 
   it('returns an empty array for a query with no matches', async () => {
     const reg = buildNativeToolRegistry({ cwd: () => tmpdir(), toolSurface: { enabled: true } });
-    const r = await reg.get('deckent_search_tools')!.handler({ query: 'zzz_no_such_tool_zzz' });
+    // Single opaque token — 'zzz_no_such_tool_zzz' used to token-collide with
+    // deckent_review's description ("GO / NO_GO / GO_WITH_TECH_DEBT" normalizes
+    // to a 'no' token via tool-search.ts's normalize(), same as the sentinel's
+    // embedded '_no_'), producing a false-positive hit. 'zzzqxjv' has no
+    // real-word substrings so it can never collide with a tool name/description.
+    const r = await reg.get('deckent_search_tools')!.handler({ query: 'zzzqxjv' });
     expect(r.ok).toBe(true);
     expect(JSON.parse(r.output)).toEqual([]);
   });

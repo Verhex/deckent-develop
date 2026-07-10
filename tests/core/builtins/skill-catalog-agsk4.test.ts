@@ -21,7 +21,9 @@ const MAX_SKILL_MD_BYTES = 4096;
 const SKILL_ID = 'provider-cli-matrix';
 const SKILL_NAME = 'Provider CLI Matrix';
 const EXPECTED_CATEGORY = 'domain';
-const EXPECTED_DOMAIN = 'provider-cli';
+// Sprint-396 rule-rewrite: activation.rules[].when.domains.$contains moved from 'provider-cli'
+// to 'providers' (+ an intent.primary:'implementation' sibling gate). Pinning the live contract.
+const EXPECTED_DOMAIN = 'providers';
 const SKILL_MD_KEYWORD = 'Repro-Before-Red Pattern';
 
 // Reference field set (api-builder, DISK-VERIFIED per task instruction) — the new skill

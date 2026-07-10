@@ -217,15 +217,17 @@ describe('cleanup §2.4 — archive-then-delete log integrity (integration)', ()
     process.exitCode = undefined;
   });
 
-  it('faithful-regression: .log file is archived to .brain/archive/sprint-042-tasks/ after cleanup', async () => {
+  it('faithful-regression: .log file is archived to .brain/archive/sprints/sprint-042-tasks/ after cleanup', async () => {
     // PRE-FIX: cleanup deleted .log without archiving → archive NOT created.
-    // POST-FIX: archive IS created with correct content.
+    // POST-FIX: archive IS created with correct content, under the 'sprints' segment
+    // (src/cli/commands/cleanup.ts's logArchiveDir nests all sprint archives under
+    // .brain/archive/sprints/<sprintId>-tasks/).
     const logContent = '{"event":"task-start","taskId":"042-001"}\n';
     writeFileSync(join(root, '.tasks', 'task-042-001.log'), logContent, 'utf-8');
 
     await runCleanupCommand(root);
 
-    const archivePath = join(root, '.brain', 'archive', 'sprint-042-tasks', 'task-042-001.log');
+    const archivePath = join(root, '.brain', 'archive', 'sprints', 'sprint-042-tasks', 'task-042-001.log');
     expect(existsSync(archivePath)).toBe(true);
     expect(readFileSync(archivePath, 'utf-8')).toBe(logContent);
   });
@@ -238,17 +240,18 @@ describe('cleanup §2.4 — archive-then-delete log integrity (integration)', ()
     await runCleanupCommand(root);
 
     // Archive should exist
-    const archivePath = join(root, '.brain', 'archive', 'sprint-042-tasks', 'task-042-002.log');
+    const archivePath = join(root, '.brain', 'archive', 'sprints', 'sprint-042-tasks', 'task-042-002.log');
     expect(existsSync(archivePath)).toBe(true);
     // Live .log deleted by mocked cleanup() which removes all task files
     expect(existsSync(liveLogPath)).toBe(false);
   });
 
   it('archive-kısa→live-kalır: .log is restored when archive fails (blocked archive dir)', async () => {
-    // Block the archive directory: place a FILE named 'sprint-042-tasks'
-    // so mkdirSync(archiveDir, {recursive:true}) on a child path fails with ENOTDIR
-    mkdirSync(join(root, '.brain', 'archive'), { recursive: true });
-    writeFileSync(join(root, '.brain', 'archive', 'sprint-042-tasks'), 'BLOCKED');
+    // Block the archive directory: place a FILE named 'sprint-042-tasks' under the
+    // 'sprints' segment so mkdirSync(archiveDir, {recursive:true}) on the full
+    // .brain/archive/sprints/sprint-042-tasks path fails (EEXIST, target is a file)
+    mkdirSync(join(root, '.brain', 'archive', 'sprints'), { recursive: true });
+    writeFileSync(join(root, '.brain', 'archive', 'sprints', 'sprint-042-tasks'), 'BLOCKED');
 
     const logContent = 'important log that must be retained\n';
     const liveLogPath = join(root, '.tasks', 'task-042-003.log');
@@ -268,7 +271,7 @@ describe('cleanup §2.4 — archive-then-delete log integrity (integration)', ()
 
     await runCleanupCommand(root);
 
-    const archiveDir = join(root, '.brain', 'archive', 'sprint-042-tasks');
+    const archiveDir = join(root, '.brain', 'archive', 'sprints', 'sprint-042-tasks');
     expect(existsSync(join(archiveDir, 'task-042-001.log'))).toBe(true);
     expect(existsSync(join(archiveDir, 'task-042-002.log'))).toBe(true);
     expect(existsSync(join(archiveDir, 'task-042-003.log'))).toBe(true);

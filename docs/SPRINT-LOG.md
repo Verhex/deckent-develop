@@ -9701,3 +9701,36 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 396-003: born-603 — DEBT-INJECTION-NOOP-ECHO — dürüst no-op fix-wave debt'i yeniden doğmasın (P2) (DONE)
 
 ---
+## Sprint 397 — sprint-397
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-10
+**Duration:** 2447s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 15 |
+| Completed | 15 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 2446552ms |
+
+### Tasks
+
+- 397-001: T1-ARITY — born-585 4.arg assert'leri (2 dosya) (DONE)
+- 397-002: T2-STATUS — f0a03b6f orphan-gate mock+fixture (4 dosya) (DONE)
+- 397-003: T3-START-NERVOUS-CLEANUP — F2+F3+F4 (4 dosya) (DONE)
+- 397-004: T4-DISPATCH — born-514 evidence→regression-guard (2 dosya) (DONE)
+- 397-005: T5-SIGNAL-SENTINEL — F6a registry-deseni + F7 sentinel (3 dosya) (DONE)
+- 397-006: T6-CORE-STALE — C2+C3+C6+M1 (4 dosya) (DONE)
+- 397-007: T7-ELOOP — chat-tool-exec raw-throw → DeckentError (CODE-FIX) (GO_WITH_TECH_DEBT)
+- 397-008: T8-KATALOG-REZERO+RULESHAPE — stats-sıfırlama + 396-$or uyum (DATA+TEST-FIX, 5 dosya) (DONE)
+- 397-009: T9-MATERIALIZE — C5 hermetik tmp-kopya (2 dosya) (DONE)
+- 397-010: T10-DOCS-SITE — vitepress 2-blocker (4 dosya, DOC-FIX) (DONE)
+- 397-011: T11-DOCS-SAYILAR — README/refdocs gerçeğe + K4 badge-RESTORE (5 dosya) (DONE)
+- 397-012: T12-BASELINES — spawnsync + secrets ratchet-refresh (2 data-dosyası) (DONE)
+
+---

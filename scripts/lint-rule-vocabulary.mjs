@@ -53,6 +53,23 @@ const KNOWN_ORPHAN_RULES = [
   {
     file: '.deckent/agents/data-engineer/agent.json',
     word: 'database',
+    reason: "deliberate cross-project reach (Yasa-#2): foreign projects with a real src/database|db|models " +
+      "dir must keep firing; no in-repo segment exists BY DESIGN. Restored 2026-07-10 after the plain " +
+      "rewrite left data-engineer universally dominated by migration-specialist (migration@6+3 < 10).",
+  },
+  {
+    file: '.deckent/agents/data-engineer/agent.json',
+    word: 'db',
+    reason: 'same cross-project-reach family as the database entry above.',
+  },
+  {
+    file: '.deckent/agents/data-engineer/agent.json',
+    word: 'models',
+    reason: 'same cross-project-reach family as the database entry above.',
+  },
+  {
+    file: '.deckent/agents/data-engineer/agent.json',
+    word: 'database',
     reason:
       "data-engineer's own triggerScopes (src/db/, src/models/, prisma/, drizzle/) don't exist " +
       'in this project; its real DB code lives in src/core/, which hosts many unrelated ' +

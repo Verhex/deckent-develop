@@ -264,8 +264,12 @@ describe('SkillSandbox', () => {
       const fs = createMockFS();
       const sandbox = new SkillSandbox(projectRoot, { fs });
 
+      // Ids must match real src/core/builtins/skills/*/manifest.json ids —
+      // 'react-specialist', not 'react-expert' (no 'react-expert' skill exists).
       expect(sandbox.isTrusted('typescript-expert')).toBe(true);
-      expect(sandbox.isTrusted('react-expert')).toBe(true);
+      expect(sandbox.isTrusted('react-specialist')).toBe(true);
+      expect(sandbox.isTrusted('testing-expert')).toBe(true);
+      expect(sandbox.isTrusted('documentation-writer')).toBe(true);
     });
 
     it('unknown skills are not trusted by default', () => {
@@ -297,10 +301,13 @@ describe('SkillSandbox', () => {
       const sandbox = new SkillSandbox(projectRoot, { fs });
 
       const builtins = sandbox.getBuiltinTrustedSkills();
+      // No 'node-expert' skill exists and the real react id is
+      // 'react-specialist' — the set is intentionally the 4 verified real ids.
       expect(builtins).toContain('typescript-expert');
-      expect(builtins).toContain('react-expert');
-      expect(builtins).toContain('node-expert');
-      expect(builtins.length).toBeGreaterThanOrEqual(5);
+      expect(builtins).toContain('react-specialist');
+      expect(builtins).toContain('testing-expert');
+      expect(builtins).toContain('documentation-writer');
+      expect(builtins.length).toBe(4);
     });
   });
 });

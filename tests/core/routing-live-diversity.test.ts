@@ -32,9 +32,9 @@ interface LiveTask {
 }
 
 // Five canonical scope patterns. Descriptions are picked so intent classifier
-// keyword scoring stays inside the bucket each agent owns — e.g. the database
+// keyword scoring stays inside the bucket each agent owns — e.g. the database/migration
 // case avoids 'schema/migration' words so intent stays at 'implementation' and
-// data-engineer's `intent=implementation AND domains $contains 'database'`
+// data-engineer's post-601 `intent.primary='migration'@6` rule
 // activation rule actually fires.
 const TASKS: LiveTask[] = [
   {
@@ -65,6 +65,10 @@ const TASKS: LiveTask[] = [
     },
   },
   {
+    // post-601 contract: data-engineer keeps a cross-project $or domain rule
+    // (database|db|models @8 — Yasa-#2 foreign-reach, lint-sanctioned orphan)
+    // alongside intent.primary='migration'@6. This fixture represents a
+    // foreign-project data-dir task (synthetic domains=[database]).
     label: 'database',
     expected: 'data-engineer',
     task: {

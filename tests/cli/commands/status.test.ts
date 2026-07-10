@@ -21,6 +21,10 @@ vi.mock('../../../src/cli/helpers/output.js', () => ({
   formatTable: vi.fn().mockReturnValue('Table'),
   isNoColor: vi.fn().mockReturnValue(false),
   stripAnsi: vi.fn((s: string) => s),
+  // W0-TRUTH (#491) orphan-gate: status.ts calls this before rendering the
+  // human-friendly view. Default false (not orphaned) — the gate itself is
+  // pinned separately below with an explicit orphaned=true override.
+  isDashboardOrphaned: vi.fn(() => false),
 }));
 
 vi.mock('../../../src/cli/helpers/process.js', () => ({
@@ -32,7 +36,7 @@ vi.mock('../../../src/monitor/sprint-state.js', () => ({
 }));
 
 import { readFileSync, existsSync, readdirSync, watch } from 'node:fs';
-import { print, printError, formatDashboard, formatHumanStatus, formatStandaloneStatus } from '../../../src/cli/helpers/output.js';
+import { print, printError, formatDashboard, formatHumanStatus, formatStandaloneStatus, isDashboardOrphaned } from '../../../src/cli/helpers/output.js';
 import { registerStatus, loadDepGraphForSprint } from '../../../src/cli/commands/status.js';
 import { getCurrentSprintId } from '../../../src/monitor/sprint-state.js';
 
@@ -44,7 +48,7 @@ function makeDashboard(overrides?: Partial<DashboardState>): DashboardState {
     agents: [],
     progress: { done: 3, active: 2, blocked: 0, total: 5 },
     alerts: [],
-    updatedAt: '2026-03-19T00:00:00Z',
+    updatedAt: new Date().toISOString(),
     ...overrides,
   };
 }
@@ -130,6 +134,15 @@ describe('status command (isolated)', () => {
     await runCommand(['status']);
     expect(formatHumanStatus).toHaveBeenCalled();
     expect(print).toHaveBeenCalledWith('Human Status Output');
+  });
+
+  it('(W0) isDashboardOrphaned=true routes to the no-active-sprint message, not the live view', async () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify(makeDashboard()));
+    vi.mocked(isDashboardOrphaned).mockReturnValueOnce(true);
+    await runCommand(['status']);
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('No active sprint'));
+    expect(formatHumanStatus).not.toHaveBeenCalled();
   });
 
   it('--raw renders legacy formatted dashboard', async () => {

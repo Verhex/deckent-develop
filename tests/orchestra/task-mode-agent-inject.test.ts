@@ -89,6 +89,7 @@ describe('runTaskMode — agent/skill inject (Fix B)', () => {
       expect.any(Object),
       '# Bug Fixer agent prompt',
       [],
+      '/tmp/proj',
     );
     expect(result.taskId).toBe('run-test-001');
   });
@@ -108,6 +109,7 @@ describe('runTaskMode — agent/skill inject (Fix B)', () => {
       expect.any(Object),
       undefined,
       [{ name: 'typescript-expert', content: '# TS skill' }],
+      '/tmp/proj',
     );
   });
 
@@ -120,7 +122,7 @@ describe('runTaskMode — agent/skill inject (Fix B)', () => {
       taskConfig(),
     );
 
-    expect(buildWorkerPrompt).toHaveBeenCalledWith(expect.any(Object), undefined, []);
+    expect(buildWorkerPrompt).toHaveBeenCalledWith(expect.any(Object), undefined, [], '/tmp/proj');
     expect(result.backend).toBe('subprocess');
     expect(result.provider).toBe('claude');
   });

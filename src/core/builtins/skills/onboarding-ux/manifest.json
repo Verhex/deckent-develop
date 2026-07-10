@@ -9,11 +9,9 @@
     "rules": [
       {
         "when": {
-          "domains": {
-            "$contains": "onboarding"
-          }
+          "intent.primary": "config"
         },
-        "score": 10
+        "score": 8
       }
     ],
     "exclude": [],
@@ -23,6 +21,7 @@
   "category": "workflow",
   "triggers": [
     "onboarding",
+    "init",
     "wizard",
     "step-machine",
     "teaser",

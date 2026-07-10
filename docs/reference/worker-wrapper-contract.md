@@ -11,7 +11,7 @@ introduced to close a specific historical failure mode (`born-4xx` markers below
 change to either wrapper generator MUST preserve every row of the table in
 [§ The 6-behavior contract](#the-6-behavior-contract), verified by the regression test listed
 in its row. It cross-references the Sprint-360 POSIX/portability audit
-([`docs/analysis/wrapper-posix-audit-360.md`](../analysis/wrapper-posix-audit-360.md)), which
+([`docs/analysis/wrapper-posix-audit-360.md`](https://github.com/VerhexIO/deckent/blob/main/docs/analysis/wrapper-posix-audit-360.md)), which
 re-verified these fixes by running the actual shell semantics rather than reading source.
 
 **Honest numbering note:** the task family driving this document names markers

@@ -2,6 +2,32 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint397] - 2026-07-10
+
+### Added
+
+- T1-ARITY — born-585 4.arg assert'leri (2 dosya)
+- T3-START-NERVOUS-CLEANUP — F2+F3+F4 (4 dosya)
+- T4-DISPATCH — born-514 evidence→regression-guard (2 dosya)
+- T5-SIGNAL-SENTINEL — F6a registry-deseni + F7 sentinel (3 dosya)
+- T6-CORE-STALE — C2+C3+C6+M1 (4 dosya)
+- T9-MATERIALIZE — C5 hermetik tmp-kopya (2 dosya)
+- T11-DOCS-SAYILAR — README/refdocs gerçeğe + K4 badge-RESTORE (5 dosya)
+- T12-BASELINES — spawnsync + secrets ratchet-refresh (2 data-dosyası)
+
+### Changed
+
+- T7-ELOOP — chat-tool-exec raw-throw → DeckentError (CODE-FIX) (completed with tech debt)
+
+### Fixed
+
+- T2-STATUS — f0a03b6f orphan-gate mock+fixture (4 dosya)
+- T8-KATALOG-REZERO+RULESHAPE — stats-sıfırlama + 396-$or uyum (DATA+TEST-FIX, 5 dosya)
+- T10-DOCS-SITE — vitepress 2-blocker (4 dosya, DOC-FIX)
+
+
+_Tasks: 15 total, 15 done, 2 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint396] - 2026-07-10
 
 ### Added

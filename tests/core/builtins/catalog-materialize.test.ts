@@ -13,17 +13,27 @@
 // by this fallback, so it stays hermetic and never mutates .deckent/** as a side effect of a
 // read.
 //
-// This file proves, against the real repo tree (read-only, no fixtures copied), that the 6
-// items are now pool members, AND (hermetically, via disposable tmp projects) that:
+// This file proves, hermetically, that the 6 items are now pool members, AND (via
+// disposable tmp projects) that:
 //   - a .deckent override still wins over the builtin default (D-004 precedence preserved)
 //   - the existing 14 already-materialized agents/skills are byte-for-byte unaffected
 //   - getAgentPrompt()'s new builtin-fallback tier resolves real PROMPT.md content for a
 //     never-synced id, while an id with a persisted (but PROMPT.md-less) agent.json still
 //     degrades to systemPrompt exactly as ADR-048 specifies (the tier is gated on "no
 //     .deckent/.tasks record at all", not merely "PROMPT.md missing")
+//
+// 397-009 C5 fix: the "live pool" block below used to instantiate the pool managers
+// directly against PROJECT_ROOT. _loadBuiltinFallback gates on .deckent/config.json
+// EXISTING at the project root — a file that is gitignored + untracked (d3148926), so it
+// is present on a dev machine that ran `deckent init` but ABSENT on a fresh CI checkout.
+// That made this block pass locally and fail in CI (11 red). It now runs against a
+// disposable tmpdir seeded with a copy of this repo's real (git-tracked)
+// .deckent/skills + .deckent/agents trees plus a minimal .deckent/config.json, so the
+// gate opens deterministically regardless of host state — the gate itself stays pinned
+// (see the "fallback is gated on .deckent/config.json" describe block below, unchanged).
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -35,9 +45,23 @@ const NEW_SKILLS = ['api-design', 'observability', 'i18n-quality'];
 const NEW_AGENTS = ['api-designer', 'observability-engineer', 'i18n-specialist'];
 
 describe('371-001 CATALOG-MATERIALIZE: builtin fallback makes the 6 new items pool-visible', () => {
-  describe('live pool (real repo tree, read-only)', () => {
-    const livePoolSkills = new SkillPoolManager(PROJECT_ROOT).loadSkills();
-    const livePoolAgents = new AgentPoolManager(PROJECT_ROOT).loadAgents();
+  describe('live pool (hermetic tmpdir copy of the real .deckent tree + minimal config.json)', () => {
+    let tmpRoot: string;
+    let livePoolSkills: ReturnType<SkillPoolManager['loadSkills']>;
+    let livePoolAgents: ReturnType<AgentPoolManager['loadAgents']>;
+
+    beforeAll(() => {
+      tmpRoot = mkdtempSync(join(tmpdir(), 'deckent-catalog-materialize-live-'));
+      cpSync(join(PROJECT_ROOT, '.deckent', 'skills'), join(tmpRoot, '.deckent', 'skills'), { recursive: true });
+      cpSync(join(PROJECT_ROOT, '.deckent', 'agents'), join(tmpRoot, '.deckent', 'agents'), { recursive: true });
+      writeFileSync(join(tmpRoot, '.deckent', 'config.json'), '{}', 'utf8');
+      livePoolSkills = new SkillPoolManager(tmpRoot).loadSkills();
+      livePoolAgents = new AgentPoolManager(tmpRoot).loadAgents();
+    });
+
+    afterAll(() => {
+      try { rmSync(tmpRoot, { recursive: true, force: true }); } catch { /* best-effort cleanup */ }
+    });
 
     for (const id of NEW_SKILLS) {
       it(`skill '${id}' is now pool-visible, enabled, source=builtin`, () => {
@@ -63,7 +87,7 @@ describe('371-001 CATALOG-MATERIALIZE: builtin fallback makes the 6 new items po
       });
 
       it(`agent '${id}' resolves real PROMPT.md content via getAgentPrompt() builtin fallback`, () => {
-        const resolution = getAgentPrompt(id, PROJECT_ROOT);
+        const resolution = getAgentPrompt(id, tmpRoot);
         expect(resolution.source).toBe('prompt-md-builtin');
         expect(resolution.degraded).toBe(false);
         expect(resolution.content.trim().length).toBeGreaterThan(0);
