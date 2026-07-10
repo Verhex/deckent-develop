@@ -2597,5 +2597,13 @@
   "status": "OPEN",
   "source": "born-611 BEFORE-substantive advisor (sprint-400 el-kod)",
   "spec": "approval-expiry-driver.ts:41 hiçbir prod yerden çalıştırılmıyor; gate kendi timeout'unu yönetiyor ama TERMINAL/API tarafında görünen pending'ler expiresAt geçse de auto-expire edilmiyor (liste kirlenir; POST 409 döner ama görsel-pending kalır). serve/API process'ine veya REPL approvals-surface'ına driver tak; born-611 wire'ında kapsam-dışı bırakıldı."
+ },
+ {
+  "born_id": 632,
+  "title": "shutdown-hooks zamanlama-testi paralel-yük altında flaky",
+  "priority": "P3",
+  "status": "OPEN",
+  "source": "607 blast-radius koşusu",
+  "spec": "tests/cli/shutdown-hooks.test.ts 'collectively bounded' testi elapsed>=4500 assert ediyor; VITEST_MAX_FORKS=2 tam cli+agent koşusunda 3157ms ölçüldü (fork-baskısı timer-coalescing) — standalone yeşil. Sınıf: duvar-saati assert'i CI-flake adayı; fake-timer veya tolerans-bandı ile hermetikleştir."
  }
 ]
