@@ -13,7 +13,9 @@ export type PromptGateLint =
   | 'persona-role'       // reviewer/analyst persona on construction work
   | 'persona-domain'     // agent domain ≠ task domain (HIGH)
   | 'decision-space'     // goCriteria offers a false choice (X VEYA/OR Y)
-  | 'premise';           // description claims a symbol is absent but it exists in the repo (stale)
+  | 'premise'            // description claims a symbol is absent but it exists in the repo (stale)
+  | 'scope-silent-drop'      // SAN-1: render-time sanitizeScope would silently drop a declared write path
+  | 'scope-satisfiability';  // G1b: task text ↔ write-authority consistency (mentioned/proof/unchanged)
 
 /** Emitted severity. `pass` findings are never materialized (absence = pass). */
 export type PromptGateLevel = 'pass' | 'warn' | 'block';

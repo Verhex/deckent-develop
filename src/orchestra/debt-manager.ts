@@ -2,6 +2,8 @@
 // Extracted from brain.ts — debt resolution, escalation, cross-dependencies
 import { writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { evaluateScopeGate, applyScopeResolutions } from '../core/scope-gate.js';
 import { TaskStatus, TaskEvaluation } from '../core/types.js';
 import type {
   Task, TaskResult, Sprint, DecayResult,
@@ -18,6 +20,46 @@ import type { MemoryEntryV2, CreateEntryInput } from '../core/memory-types.js';
 import { extractSprintFromDebtId } from '../core/memory-import.js';
 
 // ═══ Internal Helpers ══════════════════════════════════════════════
+
+/**
+ * sprint-399 SAN-2 wiring (verification-doc N4): a FIX task inherits the original
+ * task's scope VERBATIM — including any typo path (397-007-fix inherited
+ * `tests/cli/error-handling-unification.test.ts` unchanged). Re-run the scope gate's
+ * suggestion-resolution over the inherited filesWrite and adopt provable fixes.
+ * Advisory-only at this layer: fix creation happens MID-SPRINT, so an unresolved
+ * suspect must never hard-fail the fix cascade (it just stays as-is, like today).
+ */
+function regateInheritedScope(
+  projectRoot: string,
+  fixTaskId: string,
+  scope: Task['scope'],
+): Task['scope'] {
+  const writes = scope?.filesWrite ?? [];
+  if (writes.length === 0) return scope;
+  try {
+    const ls = spawnSync('git', ['ls-files'], {
+      cwd: projectRoot, encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024, timeout: 5000,
+    });
+    if (ls.status !== 0 || typeof ls.stdout !== 'string') return scope;
+    const gate = evaluateScopeGate({
+      tasks: [{ id: fixTaskId, scope: scope ?? {} }],
+      trackedFiles: ls.stdout.split('\n').filter(Boolean),
+      resolveSuggestions: true,
+      acknowledgeScopePaths: true, // never block mid-sprint fix creation
+    });
+    if (!gate.resolutions || gate.resolutions.length === 0) return scope;
+    const { filesWrite, applied } = applyScopeResolutions(writes, gate.resolutions);
+    if (applied.length === 0) return scope;
+    console.warn(
+      `Fix-cascade scope re-gate (${fixTaskId}): ${applied
+        .map(r => `${r.path} → ${r.action === 'drop-duplicate' ? 'dropped' : r.replacement}`)
+        .join('; ')}`,
+    );
+    return { ...scope, filesWrite };
+  } catch {
+    return scope; // fail-open: inherited scope is used unchanged
+  }
+}
 
 /**
  * Open the Memory V2 SQLite DB if it exists. Returns null when the DB
@@ -443,7 +485,7 @@ export function handleEvaluation(
     effort: task.effort,
     priority: 'CRITICAL',
     reason: enrichedReason,
-    scope: task.scope,
+    scope: regateInheritedScope(projectRoot, `${task.id}-fix`, task.scope),
     dependencies: [],
     goNogo: task.goNogo,
     status: TaskStatus.PENDING,
@@ -514,7 +556,7 @@ export function handleCrossDependencies(
           effort: depTask.effort,
           priority: 'CRITICAL',
           reason: `Cross-dependency: ${noGoTask.id} failed, may be caused by ${depId}`,
-          scope: depTask.scope,
+          scope: regateInheritedScope(projectRoot, `${depId}-xfix`, depTask.scope),
           dependencies: [],
           goNogo: depTask.goNogo,
           status: TaskStatus.PENDING,

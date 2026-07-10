@@ -11,7 +11,7 @@
 
 // ─── Node Builtins ─────────────────────────────────────────────────
 import { readFile, stat, writeFile } from 'node:fs/promises';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // ─── Core (value imports) ──────────────────────────────────────────
@@ -55,7 +55,7 @@ import { acquireSprintLock, releaseSprintLock } from '../core/multi-ide.js';
 
 // ─── Core — pre-spawn scope gate (Dimension B, born-573/518) ──────
 import { spawnSync } from 'node:child_process';
-import { evaluateScopeGate } from '../core/scope-gate.js';
+import { evaluateScopeGate, applyScopeResolutions } from '../core/scope-gate.js';
 
 // ─── Sprint Utilities ─────────────────────────────────────────────
 import {
@@ -1154,7 +1154,37 @@ export async function runSprint(
           tasks: sprint.tasks.map(t => ({ id: t.id, scope: t.scope ?? {} })),
           trackedFiles: lsFiles.stdout.split('\n').filter(Boolean),
           acknowledgeScopePaths: opts?.acknowledgeScopePaths,
+          // sprint-399 SAN-2 wiring: adopt the gate's own evidence — a typo whose
+          // did-you-mean is provable (duplicate-in-task / sole-basename-candidate)
+          // is fixed in place instead of forcing the whole sprint through
+          // --force-scope; only genuinely ambiguous suspects still block.
+          resolveSuggestions: true,
         });
+        if (scopeGate.resolutions && scopeGate.resolutions.length > 0) {
+          for (const task of sprint.tasks) {
+            const writes = task.scope?.filesWrite ?? [];
+            if (writes.length === 0) continue;
+            const { filesWrite, applied } = applyScopeResolutions(writes, scopeGate.resolutions);
+            if (applied.length === 0) continue;
+            task.scope = { ...task.scope, filesWrite };
+            try {
+              writeFileSync(
+                join(projectRoot, TASKS_DIR, `task-${task.id}.json`),
+                JSON.stringify(task, null, 2),
+              );
+            } catch (wErr) { debugLog('runSprint:scopeGateAdopt:persist', wErr); }
+            const summary = applied
+              .map(r => `${r.path} → ${r.action === 'drop-duplicate' ? 'dropped' : r.replacement} (${r.reason})`)
+              .join('; ');
+            try {
+              writeEvent(projectRoot, sprint.id, 'brain', 'auditor', 'SCOPE_GATE_RESOLUTION_APPLIED', {
+                taskId: task.id,
+                resolutions: applied,
+              });
+            } catch (evErr) { debugLog('runSprint:scopeGateAdopt', evErr); }
+            console.warn(`Scope gate: auto-resolved write path(s) in ${task.id}: ${summary}`);
+          }
+        }
         if (!scopeGate.ok) {
           releaseSprintLock(projectRoot);
           clearActiveSprint();

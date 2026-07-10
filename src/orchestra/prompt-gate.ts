@@ -32,6 +32,8 @@ import type {
 } from '../core/prompt-gate-types.js';
 import { getAgentRole } from '../core/agent-pool.js';
 import { validatePersonaTaskMatch } from './task-builder.js';
+import { sanitizeScope } from './scope-sanitizer.js';
+import { lintScopeSatisfiability } from './scope-satisfiability.js';
 
 export type {
   PromptGateFinding,
@@ -54,6 +56,14 @@ export interface PromptGateInput {
    * Absent → the premise lint is skipped (gate stays pure).
    */
   probeRepo?: (symbol: string) => number;
+  /**
+   * Repo tracked-file list (git ls-files), fail-soft optional — enables the two
+   * sprint-399 scope-contract lints: 'scope-silent-drop' (SAN-1: a declared write
+   * path that render-time sanitizeScope would silently remove → the 397-011/012
+   * README/.secrets-baseline failure mode) and 'scope-satisfiability' (G1b: task
+   * text ↔ write-authority consistency). Absent → both lints are skipped.
+   */
+  trackedFiles?: readonly string[];
 }
 
 /**
@@ -273,6 +283,92 @@ function lintPremise(task: Task, probeRepo: (symbol: string) => number): PromptG
   return out;
 }
 
+// ─── Scope-contract lints (sprint-399 wiring: SAN-1 BLOCK + G1b) ─────────────
+
+/**
+ * Extract backtick-quoted runner commands from goCriteria/description as the
+ * satisfiability lint's proofCommands. Conservative: only commands starting with a
+ * known runner are treated as proof commands (a quoted identifier is not a command).
+ */
+const PROOF_RUNNER_RE = /^(?:npx|npm|node|grep|find|cat|ls|go|cargo|pytest|vitest|deckent)\s/;
+function extractProofCommands(...texts: Array<string | undefined>): string[] {
+  const out: string[] = [];
+  for (const text of texts) {
+    if (!text) continue;
+    for (const m of text.matchAll(/`([^`\n]+)`/g)) {
+      const cmd = (m[1] ?? '').trim();
+      if (PROOF_RUNNER_RE.test(cmd)) out.push(cmd);
+    }
+  }
+  return out;
+}
+
+/**
+ * SAN-1 promotion (sprint-397 root cause, N1/N2): run the render-time scope sanitizer
+ * AT PLAN-TIME with the tracked root-file set. Any write path the render would drop or
+ * reject is surfaced as a BLOCK — a silently shrunken write authority produced the
+ * 397-011 (README.md/README-TR.md) and 397-012 (.secrets-baseline) failures, and the
+ * sanitizer's warnings previously had zero consumers.
+ */
+function lintScopeSilentDrop(task: Task, trackedFiles: readonly string[]): PromptGateFinding[] {
+  const filesWrite = task.scope?.filesWrite ?? [];
+  if (filesWrite.length === 0) return [];
+  const trackedRootFiles = new Set(trackedFiles.filter(f => !f.includes('/')));
+  const sanitized = sanitizeScope(filesWrite, trackedRootFiles);
+  const agentId = task.assignedAgent ?? 'generic';
+  const out: PromptGateFinding[] = [];
+  for (const w of sanitized.warnings) {
+    out.push({
+      taskId: task.id,
+      lint: 'scope-silent-drop',
+      level: 'block',
+      agentId,
+      message: `Write authority would silently shrink at render time: ${w}`,
+      suggestion:
+        'Qualify the path (directory prefix) or fix the entry in DIRECTIVES — the worker would never see this file in its WRITE list.',
+    });
+  }
+  for (const r of sanitized.rejected) {
+    out.push({
+      taskId: task.id,
+      lint: 'scope-silent-drop',
+      level: 'block',
+      agentId,
+      message: `Write path rejected by the scope sanitizer (absolute/traversal): "${r}"`,
+      suggestion: 'Use a repo-relative path without ".." segments.',
+    });
+  }
+  return out;
+}
+
+/** G1b (sprint-399 wiring): task-text ↔ write-authority satisfiability lint. */
+function lintSatisfiability(task: Task, trackedFiles: readonly string[]): PromptGateFinding[] {
+  const goCriteria = task.goNogo?.goCriteria ?? '';
+  const description = task.description ?? '';
+  const findings = lintScopeSatisfiability({
+    description,
+    goCriteria,
+    proofCommands: extractProofCommands(goCriteria, description),
+    filesWrite: task.scope?.filesWrite ?? [],
+    directories: task.scope?.directories ?? [],
+    trackedFiles,
+  });
+  const agentId = task.assignedAgent ?? 'generic';
+  return findings.map(f => ({
+    taskId: task.id,
+    lint: 'scope-satisfiability' as const,
+    level: f.severity === 'BLOCK' ? 'block' as const : 'warn' as const,
+    agentId,
+    message: `[${f.code}] ${f.message}`,
+    suggestion:
+      f.code === 'PROOF_PATH_MISSING'
+        ? `Fix the proof command's path or add '${f.path}' to scope.filesWrite (new-file proofs are legitimate only with write authority).`
+        : f.code === 'MENTIONED_NOT_WRITABLE'
+          ? `Add '${f.path}' to scope.filesWrite/directories, or reword the task so it does not require writing it.`
+          : `'${f.path}' is declared unchanged but is in filesWrite — drop it from the write list or drop the declaration.`,
+  }));
+}
+
 // ─── Evaluator ───────────────────────────────────────────────────────────────
 
 /**
@@ -311,6 +407,13 @@ export function evaluatePromptGate(input: PromptGateInput): PromptGateResult {
 
     if (input.probeRepo) {
       findings.push(...lintPremise(task, input.probeRepo));
+    }
+
+    // sprint-399 scope-contract lints — only with a real tracked-file list (fail-soft:
+    // no git signal → no findings, never a false block on e.g. a non-git workspace).
+    if (input.trackedFiles && input.trackedFiles.length > 0) {
+      findings.push(...lintScopeSilentDrop(task, input.trackedFiles));
+      findings.push(...lintSatisfiability(task, input.trackedFiles));
     }
   }
 

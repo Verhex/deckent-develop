@@ -182,9 +182,25 @@ function lintMentionedNotWritable(input: SatisfiabilityInput): SatisfiabilityFin
   const findings: SatisfiabilityFinding[] = [];
   const seen = new Set<string>();
 
+  // sprint-399 wiring fix (fixture-012 false positive): a path inside a backticked
+  // RUN command in goCriteria ("`node scripts/x.mjs` EXIT 0") is a run-target, not a
+  // write requirement — rule 2 (PROOF_PATH_MISSING) governs its existence. Exempt it
+  // from 1a ONLY when it is tracked (an untracked run-target still deserves rule 2's
+  // BLOCK, and a prose mention like 397-007's test file is untouched by this).
+  const runSpans: Array<{ start: number; end: number }> = [];
+  for (const m of input.goCriteria.matchAll(/`([^`\n]+)`/g)) {
+    const body = m[1] ?? '';
+    if (/^(?:npx|npm|node|grep|find|cat|ls|go|cargo|pytest|vitest|deckent)\s/.test(body.trim())) {
+      runSpans.push({ start: m.index ?? 0, end: (m.index ?? 0) + m[0].length });
+    }
+  }
+  const inRunSpan = (start: number, end: number): boolean =>
+    runSpans.some(s => start >= s.start && end <= s.end);
+
   // (1a) goCriteria — unconditional, high-precision: goCriteria is the contract.
   for (const mention of extractMentions(input.goCriteria)) {
     if (mention.kind === 'bare' && !isRootTrackedFile(mention.token, input.trackedFiles)) continue;
+    if (inRunSpan(mention.start, mention.end) && input.trackedFiles.includes(mention.token)) continue;
     const writable =
       input.filesWrite.includes(mention.token) || isCoveredByDirectories(mention.token, input.directories);
     if (writable) continue;

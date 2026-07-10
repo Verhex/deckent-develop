@@ -660,8 +660,13 @@ export function buildScopeBlock(
   emitHostConfigNote: boolean,
   trackedFiles?: string[],
 ): string {
-  // Sanitize filesWrite
-  const sanitized = sanitizeScope(scope.filesWrite);
+  // Sanitize filesWrite. sprint-399 SAN-1 wiring: give the sanitizer the tracked
+  // root-file set so a legitimate repo-root entry (README.md, .secrets-baseline…)
+  // survives Rule 5 instead of being silently dropped (the 397-011/012 failure).
+  const trackedRootFiles = trackedFiles && trackedFiles.length > 0
+    ? new Set(trackedFiles.filter(f => !f.includes('/')))
+    : undefined;
+  const sanitized = sanitizeScope(scope.filesWrite, trackedRootFiles);
   for (const w of sanitized.warnings) outWarnings.push(w);
   for (const r of sanitized.rejected) outWarnings.push(`Rejected path: ${r}`);
 

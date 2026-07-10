@@ -110,6 +110,37 @@ export interface ScopeGateBlocked {
 export type ScopeGateResult = ScopeGatePass | ScopeGateBlocked;
 
 /**
+ * sprint-399 wiring — apply gate resolutions to ONE task's filesWrite (pure; returns a
+ * new array). Per-task conditional mirrors how the resolutions were derived:
+ * - the resolved `path` is present and its `replacement` is ALSO present → drop the
+ *   typo entry (drop-duplicate semantics);
+ * - the `path` is present and the `replacement` is not → substitute it (auto-replace).
+ * A resolution whose `path` this task does not plan is a no-op for this task.
+ */
+export function applyScopeResolutions(
+  filesWrite: readonly string[],
+  resolutions: readonly ScopeResolution[],
+): { filesWrite: string[]; applied: ScopeResolution[] } {
+  const norm = (p: string) => p.replace(/^\.\//, '').toLowerCase();
+  let files = [...filesWrite];
+  const applied: ScopeResolution[] = [];
+  for (const r of resolutions) {
+    if (!r.replacement) continue;
+    const pathNorm = norm(r.path);
+    const idx = files.findIndex(f => norm(f) === pathNorm);
+    if (idx === -1) continue;
+    const hasReplacement = files.some(f => norm(f) === norm(r.replacement!));
+    if (hasReplacement) {
+      files = files.filter((_, i) => i !== idx);
+    } else {
+      files[idx] = r.replacement;
+    }
+    applied.push(r);
+  }
+  return { filesWrite: files, applied };
+}
+
+/**
  * Ubiquitous basenames that legitimately recur across many directories. A new
  * file with one of these names sharing a basename with an existing file elsewhere
  * is NOT evidence of a wrong directory (it is normal), so it is exempt from the

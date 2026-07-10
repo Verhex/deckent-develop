@@ -355,12 +355,27 @@ describe('lintScopeSatisfiability — real sprint-397 fixtures', () => {
     expect(findings.some(f => f.path === 'README.md')).toBe(false);
   });
 
-  it('task-012 (T12-BASELINES): catches both unscoped script mentions in goCriteria', () => {
+  it('task-012 (T12-BASELINES): tracked run-targets inside backticked commands are EXEMPT from 1a', () => {
+    // sprint-399 wiring fix: both script paths appear ONLY inside "`node …`" proof
+    // commands and are tracked — they are run-targets governed by rule 2, not write
+    // requirements. Pre-fix these produced 2 false-positive BLOCKs that would have
+    // blocked the real (legitimate) 397-012 plan at the wired gate.
     const input = loadFixture('task-012.json');
     const findings = findingsOf('MENTIONED_NOT_WRITABLE', lintScopeSatisfiability(input));
-    const paths = findings.map(f => f.path).sort();
-    expect(paths).toEqual(['scripts/lint-no-spawnsync.mjs', 'scripts/security/secret-baseline.mjs']);
-    expect(findings.every(f => f.severity === 'BLOCK')).toBe(true);
+    expect(findings).toEqual([]);
+  });
+
+  it('an UNTRACKED path inside a backticked run command still blocks (via rule 2, not 1a)', () => {
+    const input = loadFixture('task-012.json');
+    const tampered = {
+      ...input,
+      goCriteria: input.goCriteria + ' ve `node scripts/does-not-exist.mjs` EXIT 0',
+      proofCommands: [...(input.proofCommands ?? []), 'node scripts/does-not-exist.mjs'],
+    };
+    const findings = lintScopeSatisfiability(tampered);
+    expect(findings.some(
+      f => f.code === 'PROOF_PATH_MISSING' && f.path === 'scripts/does-not-exist.mjs' && f.severity === 'BLOCK',
+    )).toBe(true);
   });
 
   it('task-012: .secrets-baseline (legitimately in filesWrite) produces no finding', () => {

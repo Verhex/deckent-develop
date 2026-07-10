@@ -450,7 +450,7 @@ export function extractGoNogoCriteria(
   // derived from the task kind + detected project stack (doc→disk-verify,
   // code→stack commands, never `tsc` on a non-TS project). When ABSENT, the
   // legacy TypeScript-centric output is preserved verbatim (backward compatible).
-  opts?: { kind?: TaskKind; stack?: TechStackKind; commands?: { build?: string; test?: string } },
+  opts?: { kind?: TaskKind; stack?: TechStackKind; commands?: { build?: string; test?: string; typecheck?: string } },
 ): { goCriteria: string; noGoCriteria: string; techDebtAcceptable: string } {
   const lines = description.split('\n');
   const proofLines: string[] = [];

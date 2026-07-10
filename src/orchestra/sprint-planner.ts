@@ -428,7 +428,13 @@ export async function planSprint(
     // unknown stack → 'generic' (deriver stays neutral). (WM-7 E4)
     const wm7Stack = detectFullStack(projectRoot);
     const wm7StackKind = normalizeTechStack(wm7Stack?.language);
-    const wm7Commands = { build: wm7Stack?.commands?.build, test: wm7Stack?.commands?.test };
+    // sprint-399 G6a: carry `typecheck` through so criteria-deriver can prefer it over
+    // `build` (a bare `npx tsc` in a DoD is a mid-sprint dist-emit instruction — N5).
+    const wm7Commands = {
+      build: wm7Stack?.commands?.build,
+      test: wm7Stack?.commands?.test,
+      typecheck: wm7Stack?.commands?.typecheck,
+    };
 
     for (const src of directiveSources) {
       // Sprint 236: register locally-pulled ollama tags BEFORE model resolution
@@ -780,10 +786,22 @@ export async function planSprint(
     // flag every finalized task's (persona × intent) fit, goCriteria decision-shape, and
     // stale "X is missing" premises — source-agnostic (forceAgent AND router picks).
     // Surfaced by the caller (deckent plan / MCP); blocks on BLOCK unless acknowledged.
+    // sprint-399 scope-contract lints: give the gate the real tracked-file set
+    // (fail-soft — a git failure just skips the two scope lints, never blocks).
+    let gateTrackedFiles: string[] | undefined;
+    {
+      const ls = spawnSync('git', ['ls-files'], {
+        cwd: projectRoot, encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024, timeout: 5000,
+      });
+      if (ls.status === 0 && typeof ls.stdout === 'string') {
+        gateTrackedFiles = ls.stdout.split('\n').filter(Boolean);
+      }
+    }
     promptGate = evaluatePromptGate({
       tasks,
       agentPool: pool,
       acknowledgePromptGate: options?.acknowledgePromptGate,
+      trackedFiles: gateTrackedFiles,
       // G1c: bounded, fail-soft repo probe — count tracked files containing a symbol.
       // spawnSync git-grep exits 1 on no-match (→ status !== 0 → 0), so a missing symbol
       // or any error never invents a finding.

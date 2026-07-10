@@ -7,7 +7,7 @@ import { z } from 'zod';
 
 // ─── Core (types only — NO brain.ts imports) ──────────────────────
 import type {
-  BrainContext, SprintSizeRecommendation, PlannerResult, PlannerTask, ModelType,
+  BrainContext, SprintSizeRecommendation, PlannerResult, ModelType,
 } from '../core/types.js';
 import { ALL_MODELS } from '../core/types.js';
 import { BRAIN_PLAN_TIMEOUT_MS, BRAIN_PLAN_MAX_CONTEXT_LINES } from '../core/constants.js';
@@ -934,105 +934,8 @@ export function normalizePlannerDependencies(
   return { resolvedCount, dropped };
 }
 
-// ─── SCOPE-W2: Plan-time scope-sufficiency check ─────────────────────────────
-//
-// Detects the case where a task's goCriteria references test/build signals
-// ("tests pass", "vitest", "build", "coverage") or explicit test file paths but
-// those files are NOT in scope.filesWrite or scope.directories — causing workers
-// to hit boundary violations when trying to write test files outside their scope.
-
-/** Result of a scope-sufficiency validation. Additive — never blocks planning. */
-export interface ScopeSufficiencyResult {
-  sufficient: boolean;
-  warnings: string[];
-  suggestions: string[];
-  /** Test file paths automatically identified as missing from scope. */
-  autoExpandedFiles: string[];
-}
-
-/** Keywords in goCriteria that indicate a test/build verification dependency. */
-const TEST_BUILD_SIGNALS: string[] = [
-  'tests pass', 'test pass', 'vitest', 'build', 'coverage',
-  'npx vitest', 'npm test', 'tsc', 'jest',
-];
-
-/** Matches explicit test file paths inside goCriteria strings. */
-const TEST_PATH_RE = /\b(tests?\/[\w/.-]+\.(?:test|spec)\.(?:ts|tsx|js|jsx)|[\w/.-]+\.(?:test|spec)\.(?:ts|tsx|js|jsx))\b/gi;
-
-/**
- * Validate that a task's scope is sufficient for its goCriteria.
- *
- * Triggers when goCriteria contains explicit test file paths (*.test.ts etc.) OR
- * generic test/build signal keywords ("tests pass", "vitest", "build", …).
- * When triggered and relevant files are NOT in scope, emits warnings and
- * expansion suggestions.
- *
- * Additive — never blocks planning. Callers use warnings for operator visibility
- * and autoExpandedFiles for optional scope auto-expansion.
- */
-export function validateGoCriteriaScope(task: PlannerTask): ScopeSufficiencyResult {
-  const goCriteria = task.goNogo?.goCriteria ?? '';
-  const filesWrite = task.scope?.filesWrite ?? [];
-  const directories = task.scope?.directories ?? [];
-
-  // Extract explicit test file paths referenced in goCriteria first —
-  // their presence is a sufficiency signal independent of keyword matching.
-  const mentionedTestPaths: string[] = [];
-  let m: RegExpExecArray | null;
-  TEST_PATH_RE.lastIndex = 0;
-  while ((m = TEST_PATH_RE.exec(goCriteria)) !== null) {
-    if (m[1]) mentionedTestPaths.push(m[1]);
-  }
-
-  const lowerCriteria = goCriteria.toLowerCase();
-  const hasTestBuildSignal = TEST_BUILD_SIGNALS.some(s => lowerCriteria.includes(s));
-  const hasExplicitTestPaths = mentionedTestPaths.length > 0;
-
-  // No test/build signal AND no explicit test paths — nothing to validate
-  if (!hasTestBuildSignal && !hasExplicitTestPaths) {
-    return { sufficient: true, warnings: [], suggestions: [], autoExpandedFiles: [] };
-  }
-
-  const warnings: string[] = [];
-  const suggestions: string[] = [];
-  const autoExpandedFiles: string[] = [];
-
-  if (hasExplicitTestPaths) {
-    // Explicit test paths found — check each against scope
-    for (const testPath of mentionedTestPaths) {
-      const inFilesWrite = filesWrite.some(f => f === testPath || f.endsWith(testPath));
-      const inDirectories = directories.some(d => testPath.startsWith(d));
-
-      if (!inFilesWrite && !inDirectories) {
-        warnings.push(
-          `goCriteria references "${testPath}" but it is not in scope.filesWrite or scope.directories`,
-        );
-        suggestions.push(
-          `Add "${testPath}" to scope.filesWrite, OR add a dependent task that owns the test file`,
-        );
-        autoExpandedFiles.push(testPath);
-      }
-    }
-  } else {
-    // Generic test/build signal but no explicit file paths — check scope has test coverage
-    const hasTestDirInScope = directories.some(d => /^tests?([/\\]|$)/.test(d) || d.includes('/tests'));
-    const hasTestFileInScope = filesWrite.some(f => /\.(test|spec)\.(ts|tsx|js|jsx)$/.test(f));
-
-    if (!hasTestDirInScope && !hasTestFileInScope) {
-      warnings.push(
-        `goCriteria contains test/build signal keywords but scope has no test files or test directories`,
-      );
-      suggestions.push(
-        `Add the relevant test directory (e.g. "tests/orchestra/") to scope.directories, ` +
-        `or add a dependent task that owns and runs the tests`,
-      );
-    }
-  }
-
-  return {
-    sufficient: warnings.length === 0,
-    warnings,
-    suggestions,
-    autoExpandedFiles,
-  };
-}
+// ─── SCOPE-W2 → G1b (sprint-399): the plan-time scope-sufficiency check now lives in
+// scope-satisfiability.ts (lintScopeSatisfiability), wired into evaluatePromptGate.
+// The original validateGoCriteriaScope helper here was dead since birth (its only
+// caller was its own test) and was removed with that wiring — see the verification
+// doc .analysis/prompt-contract-verification-2026-07-10.md (N3).
