@@ -2190,5 +2190,203 @@
   "spec": "Skip-class mekanizmasi var (verified-no-result/timeout-partial) ama \"honest no-op investigation\" sinifi yok: notes'u \"no defect found/no source change\" diyen fix-wave DEBT kaydi bir daha CRITICAL-fix olarak dogmamali. Siniflandirmayi genislet (ornegin fix-wave kokenli + filesChanged-bos + no-defect-deseni -> auto-resolve veya skip-class) + injected-task description'i jenerik \"Priority fix\" yerine debt-notunu tasisin.",
   "verify": "fixture: no-op fix-wave debt -> injection SKIP + gorunur-sayim; gercek-actionable debt injection ayni kalir",
   "wire_on": "default-on (hijyen)"
+ },
+ {
+  "born_id": 604,
+  "title": "DEBT-CLASS-NO-DEFECT (v2): uretici-taraf yapisal sinif — recordDebtEntry fix-wave no-op'u kayit-aninda etiketlesin",
+  "sources": [
+   "advisor-2026-07-10 (taze) Q3: dogru discriminator kayit-aninda (filesChanged/linesAdded debt-manager.ts:392,430 + isPriorityFix/fixForTaskId); 0-dosya+GWTD belirsizligi icin tam-temiz ayirici = TaskResultV1 worker-kontrat-alani"
+  ],
+  "severity": "P2",
+  "subsystem": "orchestra",
+  "proposed_mode": "worker",
+  "primary_files": [
+   "src/orchestra/debt-manager.ts",
+   "src/core/sprint-types.ts"
+  ],
+  "spec": "DebtClass'a 'no-defect-found' ekle; recordDebtEntry fix-koken + 0-degisiklik + no-defect sinyalinde bu sinifi yazsin; sprint-planner skip'i text-match yerine bu sinifa gecer (born-603 v1 metin-eslesmesi emekli olur). TaskResultV1 Step-3 (BUILD-GATE isi) ile birlesir: worker-kontratina acik \"investigation-no-change\" alani.",
+  "verify": "fixture: no-op fix-result -> class=no-defect-found; planner skip class-tabanli; text-match kodu kaldirilir",
+  "wire_on": "default-on (hijyen, v1-yerine)"
+ },
+ {
+  "born_id": 605,
+  "title": "CATALOG-STATS-SIDECAR: canli agent/skill stats git-tracked manifest'ten gitignored sidecar'a tasinsin (K1-karar, Alperen 2026-07-10)",
+  "sources": [
+   "ci-rca-2026-07-10 C4: dogfood her sprint manifest stats'ini commit'liyor -> katalog-test drifti (terminal-ux-engineer 0->7, provider-cli-matrix 0->3, lastUsedInSprint her sprint)",
+   "K1-karar: sidecar secenegi onaylandi"
+  ],
+  "severity": "P1",
+  "subsystem": "core",
+  "proposed_mode": "design-then-sprint",
+  "primary_files": [
+   "src/core/agent-pool.ts",
+   "src/core/skill-pool.ts",
+   "src/orchestra/sprint-finalizer.ts"
+  ],
+  "spec": "Manifest = statik tanim; canli stats (totalUses/successRate/avgCoverage/lastUsedInSprint) ayri gitignored stats-dosyasina (per-entity veya tek ledger). Okuma-yolu birlesik (pool stats'i sidecar'dan yukler); yazma finalizer sidecar'a. Migration: mevcut manifest-stats sidecar'a tasinir + manifestler re-zero. Marketplace/rating tuketicileri ayni degerleri gormeye devam eder. .deckent/config.json track-karari ayni basliga baglanir (d3148926 untrack -> C5 hermetiklik vakasi).",
+  "verify": "sprint-sonrasi git status: manifest degismez; stats-testleri sidecar-fixture ile; katalog byte-drift testi kalici-yesil",
+  "wire_on": "default-on (yapi-degisikligi, testli)"
+ },
+ {
+  "born_id": 606,
+  "title": "CCVERIFY-PREPUSH-GATE: full-affected-suite disiplinini mekanik gate'e bagla (8-ihlal sinifinin kok-kesimi)",
+  "sources": [
+   "ci-rca-2026-07-10 surec-bulgusu: 8 kirici commit komsu-testleri supurmeden indi (a54878e1 dahil — Brain'in kendi verify-bataryasi da komsuyu kacirabildi); feedback_ccverify_full_affected_suite kurali 8x ihlal"
+  ],
+  "severity": "P1",
+  "subsystem": "gov",
+  "proposed_mode": "design-then-fix",
+  "primary_files": [
+   "scripts/",
+   ".github/workflows/"
+  ],
+  "spec": "Degisen-src-modulunu import eden TUM test-dosyalarini bulan (import-graph, born-585 trace araci benzeri) ve pre-push/pre-commit'te kosturan gate; alternatif/ek: CI'da \"changed-files -> affected-tests\" job'i PR-blocker. Amaç: yeni-test-yesil-ama-komsu-kirmizi commit sinifini mekanik kesmek.",
+  "verify": "fixture: SUT degisikligi + kirilan-komsu-test -> gate kirmizi; dokunulmamis alan -> gate hizli-yesil",
+  "wire_on": "once advisory (WARN), 1 hafta sonra enforce — dogfood-friksiyonu olcerek"
+ },
+ {
+  "sources": [
+   "codex-analiz-2026-07-10 (GPT-5.6 Sol Ultra, Alperen paylasti) — disk-verify ile dogrulandi"
+  ],
+  "born_id": 607,
+  "severity": "P0",
+  "subsystem": "repl",
+  "proposed_mode": "worker",
+  "title": "CALLTOOL-EXEC-WIRE: deckent_call_tool NOT_WIRED_EXEC + registry composition'a execImpl/confirm/toolSurface gecmiyor (progressive-disclosure canli degil)",
+  "primary_files": [
+   "src/cli/repl/run.tsx",
+   "src/cli/repl/native-tool-registry.ts"
+  ],
+  "spec": "run.tsx buildNativeToolRegistry({cwd,mcpBridge}) — execImpl/confirm yok -> catalog call-yolu fail-closed olu. FIX: gercek dispatcher + AgentSession-confirm seam'ini registry opts'a gecir; progressive-disclosure (search/describe/call) ile 596-eager-yuzeyinin iliskisini tek tasarimda birlestir (eager=advertise, catalog=uzun-kuyruk; ikisi ayni permission-yolunda).",
+  "verify": "unit: call_tool gercek-exec+confirm-yolu; eager-yuzey regresyonsuz (cli-bridge-tool-parity yesil)"
+ },
+ {
+  "sources": [
+   "codex-analiz-2026-07-10 (GPT-5.6 Sol Ultra, Alperen paylasti) — disk-verify ile dogrulandi"
+  ],
+  "born_id": 608,
+  "severity": "P0",
+  "subsystem": "gov",
+  "proposed_mode": "design-then-fix",
+  "title": "RELEASE-UNIFY (PUBLISH-BLOCKER): cift npm-publish (publish.yml+release.yml ayni v*-tag) + build vs build:all + docs.yml main-tetik/master-deploy",
+  "primary_files": [
+   ".github/workflows/publish.yml",
+   ".github/workflows/release.yml",
+   ".github/workflows/docs.yml"
+  ],
+  "spec": "Tek release-workflow + tek npm-publish-otoritesi; build:all + validate:publish zinciri; docs deploy-kosulu main'e duzeltilir. 5-aylik yayinlamama hedefinin dogrudan on-sarti.",
+  "verify": "workflow dry-run/act veya tag-simulasyonu; docs deploy main-push'ta calisir"
+ },
+ {
+  "sources": [
+   "codex-analiz-2026-07-10 (GPT-5.6 Sol Ultra, Alperen paylasti) — disk-verify ile dogrulandi"
+  ],
+  "born_id": 609,
+  "severity": "P0",
+  "subsystem": "core",
+  "proposed_mode": "worker",
+  "title": "MEMORY-TENANT-SCOPE: MemoryQueryParams'ta tenant yok; FTS filter tenant-predicate uretmiyor; API global-search cagiriyor (born-563 alt-kalemi, enterprise hard-gate)",
+  "primary_files": [
+   "src/core/memory-types.ts",
+   "src/core/memory-query.ts",
+   "src/api/memory-search-endpoint.ts"
+  ],
+  "spec": "tenantId param + query-layer predicate + API request-principal'dan scoping; single-tenant default davranis degismez (tenant yoksa mevcut yol). 497/ENT-CONFIG-SSOT ile hizali.",
+  "verify": "hermetik: iki-tenant fixture -> cross-tenant sonuc SIZMAZ; tenantsiz cagri regresyonsuz"
+ },
+ {
+  "sources": [
+   "codex-analiz-2026-07-10 (GPT-5.6 Sol Ultra, Alperen paylasti) — disk-verify ile dogrulandi"
+  ],
+  "born_id": 610,
+  "severity": "P1",
+  "subsystem": "orchestra",
+  "proposed_mode": "design-then-fix",
+  "title": "SCHEDULER-SINGLE-TRUTH: MRR upstream semantigi respawn-vs-collector celiskili + planDispatch canonical-ama-driver-degil + status COMPLETE&active canli-vakasi",
+  "primary_files": [
+   "src/orchestra/sprint-spawner.ts",
+   "src/orchestra/result-collector.ts"
+  ],
+  "spec": "respawnEligibleTasks MANUAL_REVIEW_REQUIRED'i dependency-satisfying sayiyor (:872); collector ayni durumu terminal-failure sayip cascade-skip ediyor (:1375); planDispatch (:284) kendini canonical ilan edip live-driver degil. Tek reducer/journal hedefi (Codex adim-3); once semantik-karar (MRR = satisfy mi block mu) + status-truth vakasinin reproduce'u. HOT-dosyalar — BEN el-kod/advisor.",
+  "verify": "REPRODUCE: COMPLETE+active status vakasi; karar-sonrasi iki yol ayni semantikte test-pinli"
+ },
+ {
+  "sources": [
+   "codex-analiz-2026-07-10 (GPT-5.6 Sol Ultra, Alperen paylasti) — disk-verify ile dogrulandi"
+  ],
+  "born_id": 611,
+  "severity": "P0",
+  "subsystem": "gov",
+  "proposed_mode": "brain-el-kod",
+  "title": "WORKER-APPROVAL-WIRE: createOrchestraWorkerApprovalGate/wrapDispatcherWithApprovalGate production worker-dispatcher'a bagli degil (APR-P0 spesifik wire; default-off dogal)",
+  "primary_files": [
+   "src/agents/worker.ts",
+   "src/agents/agentic-worker-tools.ts",
+   "src/core/config.ts"
+  ],
+  "spec": "Gate tanimli+testli ama worker.ts:780/agentic-worker-tools.ts:303 kullanmiyor; config default false kalir (dormant-ship disiplini) — wire + enabled-path integration-test (cost-guard-enabled-path emsali). Terminal-control-plane'in ana blocker'i.",
+  "verify": "enabled-trip testi: worker riskli-action -> broker suspend -> terminal/API relay -> resume; disabled byte-identik"
+ },
+ {
+  "sources": [
+   "codex-analiz-2026-07-10 (GPT-5.6 Sol Ultra, Alperen paylasti) — disk-verify ile dogrulandi"
+  ],
+  "born_id": 612,
+  "severity": "P1",
+  "subsystem": "core",
+  "proposed_mode": "worker",
+  "title": "PLUGIN-AUTHENTICITY: entrypoint-hash!=imza (publisher-key/trust-root yok) + allowed-path startsWith (path-boundary degil)",
+  "primary_files": [
+   "src/core/plugin-loader.ts"
+  ],
+  "spec": "Detached-signature/publisher-key dogrulama tasarimi + unsigned-plugin default-yukleme politikasi (en-az loud-warn/flag) + path-containment fix (path.relative-tabanli). Marketplace-oncesi gate.",
+  "verify": "imzasiz/yanlis-imzali fixture reddi-veya-warn; ../ path-escape fixture reddi"
+ },
+ {
+  "sources": [
+   "codex-analiz-2026-07-10 (GPT-5.6 Sol Ultra, Alperen paylasti) — disk-verify ile dogrulandi"
+  ],
+  "born_id": 613,
+  "severity": "P1",
+  "subsystem": "orchestra",
+  "proposed_mode": "worker",
+  "title": "LEARNING-KALIBRASYON: GWTD promotion'da DONE ile ayni success sayiliyor + planner learning-bonus yalniz tasks[0] DNA'sindan",
+  "primary_files": [
+   "src/orchestra/outcome-tracker.ts",
+   "src/orchestra/sprint-planner.ts"
+  ],
+  "spec": "outcome-tracker:135 GWTD agirliklandirilsin (orn. 0.5) veya ayri-boyut; sprint-planner:546 per-task DNA bonusu. Audit kirli-veri ailesiyle ayni moat-koruma sinifi. Davranis-degisimi=ogrenme-yolu -> test-pinli + notes'ta olcek-notu (591-emsali).",
+  "verify": "fixture: GWTD-agirlikli success-rate; multi-DNA sprintte per-task bonus"
+ },
+ {
+  "sources": [
+   "codex-analiz-2026-07-10 (GPT-5.6 Sol Ultra, Alperen paylasti) — disk-verify ile dogrulandi"
+  ],
+  "born_id": 614,
+  "severity": "P1",
+  "subsystem": "orchestra",
+  "proposed_mode": "worker",
+  "title": "SPRINT-TRACE-WIRE: worker output-collector trace-recorder \"no caller wired\" — TRN-P0'in sprint-yarisi",
+  "primary_files": [
+   "src/orchestra/output-collector.ts",
+   "src/core/config-types.ts"
+  ],
+  "spec": "REPL-trace canli; sprint-worker recorder'i result/verdict ile birlikte kayda baglansin (fine-tune/eval moat). Dormant-default-off + enabled-path testi.",
+  "verify": "enabled fixture: sprint-task -> trace dosyasi (outcome/verdict alanli); disabled byte-identik"
+ },
+ {
+  "sources": [
+   "codex-analiz-2026-07-10 (GPT-5.6 Sol Ultra, Alperen paylasti) — disk-verify ile dogrulandi"
+  ],
+  "born_id": 615,
+  "severity": "P2",
+  "subsystem": "core",
+  "proposed_mode": "worker",
+  "title": "MODEL-REGISTRY-GPT56-PARITY: gpt-5.6 ailesi registry'de yok; gpt-5 wire'da gpt-5.5e cevriliyor",
+  "primary_files": [
+   "src/core/model-registry.ts"
+  ],
+  "spec": "OpenAI guncel katalogla parite (gpt-5.6-sol/terra/luna vb.); zero-hardcode-live-data kuralina uygun kaynak-belirle.",
+  "verify": "models listesi guncel-id'leri icerir; eski-id cevirisi dokumante"
  }
 ]
