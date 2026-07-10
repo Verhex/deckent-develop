@@ -99,7 +99,11 @@ if (!gotSingleInstanceLock) {
       profileStore,
       getWindows: () => getAllWindows().values(),
       getWindowForProfile,
-      onConnected: (profileId, daemonUrl) => {
+      onConnected: (profileId, daemonUrl, _tokens) => {
+        // _tokens (api/terminal) intentionally dropped here: no consumer exists yet
+        // (terminal-panel/auth storage is a future feature, not this hardening task's
+        // scope) — threading it into window-manager now would be unused state, not a
+        // hardening change.
         claimWindowForProfile(profileId);
         connectWindow(profileId, daemonUrl);
       },

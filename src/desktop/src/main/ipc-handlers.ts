@@ -23,6 +23,21 @@
  * (`onConnected`/`onDaemonSpawned`/`onDisconnected`) for the caller to wire to
  * window-manager.ts's `connectWindow`/`registerOwnedDaemon`/`unregisterOwnedDaemon`,
  * the same DI discipline tray.ts already uses for its own sibling-module calls.
+ *
+ * born-600/601 (consult-#7 Finding-2/3): a post-connect loadURL swap makes the daemon's
+ * own served page the window's mainFrame — so mainFrame identity ALONE can no longer
+ * distinguish "our own local UI" from "remote content that now occupies the same frame".
+ * `connection.*` (list/add/remove/connect/disconnect — the channels that leak
+ * profile/projectPath data or spawn a local binary) therefore run through
+ * `guardedLocalHandle`, a stricter tier that ALSO requires the sender frame's own URL to
+ * be the app's local renderer (`RegisterIpcHandlersDeps.isLocalRendererUrl` — the same
+ * contract security.ts's `SecurityPolicyDeps.isLocalRendererUrl` already uses;
+ * window-manager.ts's `isLocalRendererUrl` satisfies both). `window.*`/`app.*` stay on
+ * the original mainFrame-only `guardedHandle`, since window-chrome controls must keep
+ * working after the swap. `handleConnect` also rejects a non-loopback `profile.host`
+ * outright (this app only ever speaks plain http, never TLS, to a daemon — safe only on
+ * loopback) and, on the adopt path, resolves the final URL from the handshake file's OWN
+ * host:port rather than the profile's (born-598) — see each function's own doc comment.
  */
 import { app, ipcMain, shell, BrowserWindow, type IpcMainInvokeEvent } from 'electron';
 import type {
@@ -37,9 +52,11 @@ import {
   pollHealth,
   resolveTokens,
   spawnDaemon,
+  type ConnectionAction,
   type DaemonLifecycleDeps,
   type ResolveTokensResult,
 } from './daemon-lifecycle.js';
+import { readServeDaemonMeta } from './daemon-meta-client.js';
 import { getDesktopStrings } from './i18n.js';
 import { isAllowedExternalUrl } from './security.js';
 
@@ -67,6 +84,18 @@ export interface RegisterIpcHandlersDeps {
   /** Every BrowserWindow this app currently owns — the sender-frame trust source of
    * truth. Any of these windows' mainFrame is a trusted sender for any channel. */
   getWindows(): Iterable<BrowserWindow>;
+  /** True for the app's own local-renderer origin (dev server URL, or the built
+   * out/renderer/index.html) — same contract as security.ts's
+   * `SecurityPolicyDeps.isLocalRendererUrl` (window-manager.ts's `isLocalRendererUrl`
+   * satisfies both). REQUIRED to actually gate `connection.*` (born-600/601 — see module
+   * header): mainFrame identity alone can no longer tell "our local UI" apart from
+   * "remote content now occupying the same frame" once a connect has loadURL-swapped the
+   * window. Optional at the TYPE level only because this module cannot itself edit
+   * index.ts's `registerIpcHandlers({...})` call site to wire it (out of this task's
+   * write scope — flagged as docImpact). Omitting it fails CLOSED: every `connection.*`
+   * call is rejected and loudly logged, never silently allowed. `window.*`/`app.*` are
+   * unaffected either way (mainFrame-only tier, see `guardedHandle`). */
+  isLocalRendererUrl?(url: string): boolean;
   /** The window currently showing `profileId` (if any) — used to target `daemon.status`
    * pushes. Returns undefined if the window was closed mid-connect (push is a no-op). */
   getWindowForProfile(profileId: string): BrowserWindow | undefined;
@@ -97,14 +126,30 @@ function isTrustedSender(event: IpcMainInvokeEvent, deps: RegisterIpcHandlersDep
   return false;
 }
 
-/** The single enforcement point for the sender-frame check — see module header. */
-function guardedHandle(
+/** Stricter tier for `connection.*` (born-600/601 — see module header). Requires BOTH
+ * the base mainFrame-identity check AND the sender frame's own URL to be the app's local
+ * renderer. Fails closed (and logs loudly) when `isLocalRendererUrl` was never wired. */
+function isTrustedLocalRendererSender(event: IpcMainInvokeEvent, deps: RegisterIpcHandlersDeps): boolean {
+  if (!isTrustedSender(event, deps)) return false;
+  if (!deps.isLocalRendererUrl) {
+    console.error(
+      '[ipc-handlers] RegisterIpcHandlersDeps.isLocalRendererUrl was not supplied — rejecting ALL connection-management calls (fail-closed default). Wire window-manager.ts\'s isLocalRendererUrl into the registerIpcHandlers({...}) call.'
+    );
+    return false;
+  }
+  return deps.isLocalRendererUrl(event.senderFrame?.url ?? '');
+}
+
+/** Shared ipcMain.handle wiring for both trust tiers — the single place either tier's
+ * rejection is logged/thrown. `guardedHandle`/`guardedLocalHandle` below only differ in
+ * which `isTrusted` predicate they pass in. */
+function guardedHandleWithCheck(
   channel: string,
-  deps: RegisterIpcHandlersDeps,
+  isTrusted: (event: IpcMainInvokeEvent) => boolean,
   handler: (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown,
 ): void {
   ipcMain.handle(channel, (event, ...args: unknown[]) => {
-    if (!isTrustedSender(event, deps)) {
+    if (!isTrusted(event)) {
       console.warn(
         `[ipc-handlers] rejected untrusted sender on channel "${channel}" (frame url: ${event.senderFrame?.url ?? 'unknown'})`
       );
@@ -114,11 +159,62 @@ function guardedHandle(
   });
 }
 
+/** The enforcement point for the mainFrame-only check — see module header. Used by
+ * `window.*`/`app.*`, which must keep working whether the window currently shows the
+ * local renderer or a connected daemon's page. */
+function guardedHandle(
+  channel: string,
+  deps: RegisterIpcHandlersDeps,
+  handler: (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown,
+): void {
+  guardedHandleWithCheck(channel, (event) => isTrustedSender(event, deps), handler);
+}
+
+/** The enforcement point for the stricter connection-management tier — see module
+ * header (born-600/601). Used by `connection.*` only. */
+function guardedLocalHandle(
+  channel: string,
+  deps: RegisterIpcHandlersDeps,
+  handler: (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown,
+): void {
+  guardedHandleWithCheck(channel, (event) => isTrustedLocalRendererSender(event, deps), handler);
+}
+
 function requireString(value: unknown, argName: string): string {
   if (typeof value !== 'string') {
     throw new Error(`expected string arg "${argName}"`);
   }
   return value;
+}
+
+/** Hosts this app will speak plain http to. It never negotiates TLS with a daemon, so
+ * anything off-loopback would send api/terminal tokens (see `resolveTokens` below) in
+ * cleartext over a real network path — born-600 (consult-#7 Finding-2/3, "http hardcode
+ * ile MITM→shell-control"). */
+const LOCAL_CONNECT_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+
+function isLocalConnectHost(host: string): boolean {
+  return LOCAL_CONNECT_HOSTS.has(host.trim().toLowerCase());
+}
+
+/** born-598 (consult-#7 Finding-3): on the adopt path, `decideConnectionAction` already
+ * health-verified the daemon at the HANDSHAKE FILE's own host:port — using
+ * `profile.host`/`profile.port` instead (a user-edited, unverified field) could
+ * loadURL-swap the window to a different, unverified endpoint than the one that actually
+ * answered. Re-reads the handshake file rather than threading decideConnectionAction's
+ * internal meta out, matching this module's existing "read again, it's a best-effort
+ * hint" posture (ADR-G-033) — falls back to profile's fields if the file raced away
+ * between that check and this one. The spawn path has no such mismatch risk: this module
+ * itself just commanded `deckent serve --port profile.port`, so profile's fields ARE the
+ * source of truth there. */
+function resolveConnectUrl(action: ConnectionAction, profile: ConnectionProfile): string {
+  if (action === 'adopt') {
+    const meta = readServeDaemonMeta(profile.projectPath);
+    if (meta) {
+      return `http://${meta.host}:${meta.port}/`;
+    }
+  }
+  return `http://${profile.host}:${profile.port}/`;
 }
 
 async function handleConnect(profileId: string, deps: RegisterIpcHandlersDeps): Promise<ConnectResult> {
@@ -132,6 +228,13 @@ async function handleConnect(profileId: string, deps: RegisterIpcHandlersDeps): 
     const event: DaemonStatusEvent = { profileId, status, errorKey, errorVars };
     win?.webContents.send(CHANNELS.daemonStatus, event);
   };
+
+  if (!isLocalConnectHost(profile.host)) {
+    const errorKey = 'desktop.error.remote_plain_http';
+    const errorVars = { host: profile.host };
+    pushStatus('error', errorKey, errorVars);
+    return { ok: false, errorKey, errorVars };
+  }
 
   const lifecycleDeps = deps.daemonLifecycleDeps ?? {};
   const action = await decideConnectionAction(profile, lifecycleDeps);
@@ -159,7 +262,7 @@ async function handleConnect(profileId: string, deps: RegisterIpcHandlersDeps): 
   }
 
   const tokens = resolveTokens(profile.projectPath, lifecycleDeps);
-  const url = `http://${profile.host}:${profile.port}/`;
+  const url = resolveConnectUrl(action, profile);
   pushStatus('connected');
   deps.onConnected?.(profileId, url, tokens);
   return { ok: true, url };
@@ -175,21 +278,21 @@ function handleDisconnect(profileId: string, deps: RegisterIpcHandlersDeps): voi
 /** Register every DeckentDesktopApi channel. Call once at startup, after
  * `installSecurityLockdown` (security.ts) has already been installed. */
 export function registerIpcHandlers(deps: RegisterIpcHandlersDeps): void {
-  guardedHandle(CHANNELS.connectionList, deps, () => deps.profileStore.list().profiles);
+  guardedLocalHandle(CHANNELS.connectionList, deps, () => deps.profileStore.list().profiles);
 
-  guardedHandle(CHANNELS.connectionAdd, deps, (_event, input) => {
+  guardedLocalHandle(CHANNELS.connectionAdd, deps, (_event, input) => {
     return deps.profileStore.add(input as ConnectionProfileInput);
   });
 
-  guardedHandle(CHANNELS.connectionRemove, deps, (_event, id) => {
+  guardedLocalHandle(CHANNELS.connectionRemove, deps, (_event, id) => {
     deps.profileStore.remove(requireString(id, 'id'));
   });
 
-  guardedHandle(CHANNELS.connectionConnect, deps, (_event, id) => {
+  guardedLocalHandle(CHANNELS.connectionConnect, deps, (_event, id) => {
     return handleConnect(requireString(id, 'id'), deps);
   });
 
-  guardedHandle(CHANNELS.connectionDisconnect, deps, (_event, id) => {
+  guardedLocalHandle(CHANNELS.connectionDisconnect, deps, (_event, id) => {
     handleDisconnect(requireString(id, 'id'), deps);
   });
 

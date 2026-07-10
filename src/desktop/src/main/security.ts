@@ -86,12 +86,31 @@ function hardenWebContents(contents: WebContents, deps: SecurityPolicyDeps): voi
 }
 
 function hardenSession(target: Session, deps: SecurityPolicyDeps): void {
+  // RULE: this function must only ever be called with `session.defaultSession` (see
+  // `installSecurityLockdown` below — it is the sole caller). Electron sessions are
+  // isolated per-`partition`: a BrowserWindow created with `webPreferences.partition` gets
+  // its OWN Session instance that neither the permission handlers nor the CSP injection
+  // below would ever touch, silently escaping this entire lockdown. window-manager.ts
+  // enforces the other half of this invariant with a guard against ever setting
+  // `partition`, so this app has exactly one Session and it is always the one hardened
+  // here.
+
   // Default-DENY: no permission (media, geolocation, notifications, clipboard, ...) is
   // ever needed by this shell. A future feature that genuinely needs one must change
   // this handler explicitly — it can never silently fall through to "granted".
   target.setPermissionRequestHandler((_webContents, permission, callback) => {
     console.warn(`[security] denied permission request: ${permission}`);
     callback(false);
+  });
+
+  // Twin of the async handler above, for the SYNCHRONOUS permission-check path
+  // (`setPermissionCheckHandler`). Electron's own docs are explicit that both handlers
+  // are required for complete coverage — some web APIs (e.g. sync `navigator.*` checks)
+  // consult only this check handler and never reach the request handler at all, so
+  // omitting this twin would leave those paths on Chromium's permissive default.
+  target.setPermissionCheckHandler((_webContents, permission) => {
+    console.warn(`[security] denied permission check: ${permission}`);
+    return false;
   });
 
   // CSP applies ONLY to the local renderer's own responses — a daemon's served

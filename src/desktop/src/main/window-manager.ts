@@ -29,7 +29,7 @@
  * (one window per simultaneously-connected profile) is a additive change,
  * not a rewrite.
  */
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, type BrowserWindowConstructorOptions } from 'electron';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { INITIAL_WINDOW_ID } from './constants.js';
@@ -104,16 +104,22 @@ export function createWindow(profileId: string): BrowserWindow {
     return existing;
   }
 
+  const webPreferences: NonNullable<BrowserWindowConstructorOptions['webPreferences']> = {
+    contextIsolation: true,
+    sandbox: true,
+    nodeIntegration: false,
+    preload: resolvePreloadPath(),
+  };
+  // Guard: security.ts's `hardenSession` only ever hardens `session.defaultSession` — a
+  // `partition` here would spawn a separate, un-hardened Session, so this app must never
+  // set one. Fails loudly (not just a comment) if a future edit adds it anyway.
+  if ('partition' in webPreferences) throw new Error('window-manager: BrowserWindow webPreferences must never set `partition` — see security.ts hardenSession');
+
   const window = new BrowserWindow({
     width: 1100,
     height: 720,
     show: false,
-    webPreferences: {
-      contextIsolation: true,
-      sandbox: true,
-      nodeIntegration: false,
-      preload: resolvePreloadPath(),
-    },
+    webPreferences,
   });
 
   window.once('ready-to-show', () => {

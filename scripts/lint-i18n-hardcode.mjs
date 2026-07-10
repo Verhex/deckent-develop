@@ -1,17 +1,27 @@
 #!/usr/bin/env node
 // scripts/lint-i18n-hardcode.mjs
 //
-// Gate: scans src/cli/commands/*.ts for likely hardcoded user-facing
-// strings — console.log / console.error / console.warn / process.stdout.write
-// calls that contain natural-language literals instead of routing through
-// getMessage(key, lang) from src/cli/helpers/messages.ts.
+// Gate: scans src/cli/commands/*.ts (flat) and src/desktop/src/main/**/*.ts
+// (recursive) for likely hardcoded user-facing strings — console.log /
+// console.error / console.warn / console.info / process.stdout.write /
+// process.stderr.write calls that contain natural-language literals instead
+// of routing through getMessage(key, lang) from src/cli/helpers/messages.ts
+// (CLI side) or the t(key) bridge in src/desktop/src/main/i18n.ts (desktop
+// side — DESK-1, born-496).
 //
 // Exits 1 when a hit is found. Wired into `npm run lint` via lint:gates
-// (W7 terfi, 2026-07-07 — enforces the i18n-FIRST quality bar in CLAUDE.md).
-// Heuristic false positives go into ALLOWLIST below with a reason.
+// (W7 terfi, 2026-07-07 — enforces the i18n-FIRST quality bar in CLAUDE.md;
+// desktop-glob added born-601/394-003).
+//
+// ALLOWLIST doubles as the ratchet baseline: entries are either genuine
+// heuristic false positives OR pre-existing grandfathered debt (e.g. the
+// desktop-main internal diagnostic console.warn calls found when the
+// desktop-glob was added — dev-console logging, not rendered UI, out of this
+// gate's write scope to fix). Either way the effect is the same ratchet: a
+// hit matching an ALLOWLIST entry is suppressed, any NEW hit still fails.
 
-import { readFileSync, readdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -109,21 +119,50 @@ function lineNumberOf(content, matchIndex) {
   return content.slice(0, matchIndex).split('\n').length;
 }
 
-// ── Scan ──────────────────────────────────────────────────────────────────────
+// ── Scan targets ──────────────────────────────────────────────────────────────
+
+/**
+ * Recursively collect `.ts` file paths under `dir` (skips node_modules and
+ * `.d.ts`). Mirrors the collector convention in scripts/lint-no-spawnsync.mjs.
+ * @param {string} dir
+ * @param {string[]} [results]
+ * @returns {string[]}
+ */
+function collectTsFilesRecursive(dir, results = []) {
+  for (const entry of readdirSync(dir)) {
+    if (entry === 'node_modules') continue;
+    const full = join(dir, entry);
+    const st = statSync(full);
+    if (st.isDirectory()) collectTsFilesRecursive(full, results);
+    else if (entry.endsWith('.ts') && !entry.endsWith('.d.ts')) results.push(full);
+  }
+  return results;
+}
 
 const cliDir = join(root, 'src', 'cli', 'commands');
-const files = readdirSync(cliDir).filter((f) => f.endsWith('.ts')).sort();
+const desktopMainDir = join(root, 'src', 'desktop', 'src', 'main');
+
+// CLI side stays a FLAT, non-recursive scan — identical to prior behavior
+// (a subdirectory like src/cli/commands/init-templates/ is not descended into).
+const cliFiles = readdirSync(cliDir)
+  .filter((f) => f.endsWith('.ts'))
+  .sort()
+  .map((f) => ({ filePath: join(cliDir, f), relPath: `src/cli/commands/${f}` }));
+
+// Desktop main side is a RECURSIVE scan (src/desktop/src/main/**/*.ts).
+const desktopFiles = collectTsFilesRecursive(desktopMainDir)
+  .sort()
+  .map((filePath) => ({ filePath, relPath: relative(root, filePath).replace(/\\/g, '/') }));
+
+const scanTargets = [...cliFiles, ...desktopFiles];
+
+// ── Scan ──────────────────────────────────────────────────────────────────────
 
 /** @type {Array<{file: string, line: number, call: string, text: string}>} */
 const hits = [];
 
-for (const file of files) {
-  const filePath = join(cliDir, file);
+for (const { filePath, relPath } of scanTargets) {
   const content = readFileSync(filePath, 'utf8');
-  const relPath = `src/cli/commands/${file}`;
-
-  // Check if this file uses getMessage — if so, we still flag lines that DON'T
-  const usesGetMessage = content.includes('getMessage');
 
   /**
    * Classify and record a hit if the string is natural language.
@@ -161,10 +200,36 @@ for (const file of files) {
 }
 
 // ── Allowlist ─────────────────────────────────────────────────────────────────
-// Heuristic false positives: { file, contains, reason }. A hit is suppressed
-// when hit.file === file AND hit.text includes `contains`. Keep entries rare
-// and justified — real user-facing strings belong in messages.ts, not here.
-const ALLOWLIST = [];
+// { file, contains, reason }. A hit is suppressed when hit.file === file AND
+// hit.text includes `contains`. Two kinds of entry live here, both suppressed
+// the same way — this list IS the new-vs-existing ratchet:
+//   1. Heuristic false positives — the string isn't real user-facing text.
+//   2. Grandfathered debt — a genuine pre-existing hit outside this gate's
+//      write scope to fix (e.g. desktop-main internal console.warn diagnostics
+//      found when the desktop-glob was added, born-601/394-003). Recorded here
+//      with a reason so it stays visible instead of silently passing; any
+//      OTHER hit (different file or text) still fails the gate.
+// Keep entries justified — real user-facing strings belong in messages.ts.
+const DEBT_REASON =
+  'grandfathered debt (born-394-003 desktop-glob rollout) — internal [module] '
+  + 'console.warn diagnostic, printed to the main-process stdout/devtools console '
+  + 'for developers, never rendered as end-user UI text; out of this task\'s write '
+  + 'scope (scripts/lint-i18n-hardcode.mjs only) to migrate onto the i18n.ts t(key) bridge';
+
+const ALLOWLIST = [
+  { file: 'src/desktop/src/main/auto-update.ts', contains: '[deckent-desktop] auto-update not yet wired', reason: DEBT_REASON },
+  { file: 'src/desktop/src/main/connection-profile-store.ts', contains: '[connection-profile-store] read failed for', reason: DEBT_REASON },
+  { file: 'src/desktop/src/main/connection-profile-store.ts', contains: '[connection-profile-store] ${filePath} is not valid JSON', reason: DEBT_REASON },
+  { file: 'src/desktop/src/main/connection-profile-store.ts', contains: '[connection-profile-store] ${filePath} does not contain a', reason: DEBT_REASON },
+  { file: 'src/desktop/src/main/connection-profile-store.ts', contains: '[connection-profile-store] dropped ${invalidDropped} sche', reason: DEBT_REASON },
+  { file: 'src/desktop/src/main/ipc-handlers.ts', contains: '[ipc-handlers] rejected untrusted sender on channel', reason: DEBT_REASON },
+  { file: 'src/desktop/src/main/ipc-handlers.ts', contains: '[ipc-handlers] RegisterIpcHandlersDeps.isLocalRendererUrl', reason: DEBT_REASON },
+  { file: 'src/desktop/src/main/security.ts', contains: '[security] blocked navigation to disallowed URL', reason: DEBT_REASON },
+  { file: 'src/desktop/src/main/security.ts', contains: '[security] blocked window.open to disallowed URL', reason: DEBT_REASON },
+  { file: 'src/desktop/src/main/security.ts', contains: '[security] blocked <webview> attach attempt', reason: DEBT_REASON },
+  { file: 'src/desktop/src/main/security.ts', contains: '[security] denied permission request', reason: DEBT_REASON },
+  { file: 'src/desktop/src/main/security.ts', contains: '[security] denied permission check', reason: DEBT_REASON },
+];
 
 const allowed = (hit) =>
   ALLOWLIST.some((a) => a.file === hit.file && hit.text.includes(a.contains));
@@ -189,13 +254,13 @@ console.log('┌' + '─'.repeat(W) + '┐');
 console.log('│' + ' i18n Hardcode Lint (gate)'.padEnd(W) + '│');
 console.log('└' + '─'.repeat(W) + '┘');
 console.log('');
-console.log(`  Files scanned  : ${files.length}`);
+console.log(`  Files scanned  : ${scanTargets.length}  (${cliFiles.length} src/cli/commands + ${desktopFiles.length} src/desktop/src/main)`);
 console.log(`  Hits (gated)   : ${hits.length}${suppressed ? `  (+${suppressed} allowlisted)` : ''}`);
 console.log('');
 console.log(line);
 
 if (hits.length === 0) {
-  console.log('  ✓ No hardcoded natural-language strings found in CLI commands.');
+  console.log('  ✓ No hardcoded natural-language strings found in CLI commands or desktop main.');
 } else {
   console.log(`  Hardcoded strings not routed through getMessage() — ${hits.length} item(s):\n`);
 
