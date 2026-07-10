@@ -419,3 +419,19 @@ describe('composition pin — index.ts wires isLocalRendererUrl into registerIpc
     expect(block).toContain('isLocalRendererUrl');
   });
 });
+
+// ─── Preload-path pin (2026-07-10 canlı-vaka: "açılıyor ama kullanılamıyor") ──
+// electron-vite sandboxed-preload'u CJS olarak `index.cjs` yazar; window-manager
+// bir dönem `.js` arıyordu → preload sessizce yüklenmedi → window.deckentDesktop
+// undefined → cansız fallback-UI. Bu pin, yol-uzantısının .cjs kaldığını ve
+// build-çıktısının gerçekten o adla var olduğunu doğrular.
+describe('preload-path pin — window-manager points at the CJS artifact', () => {
+  it("window-manager resolves '../preload/index.cjs' (never .js)", () => {
+    const src = readFileSync(
+      pinJoin(pinDirname(fileURLToPath(import.meta.url)), '..', 'src', 'main', 'window-manager.ts'),
+      'utf-8',
+    );
+    expect(src).toContain("'../preload/index.cjs'");
+    expect(src).not.toContain("'../preload/index.js'");
+  });
+});

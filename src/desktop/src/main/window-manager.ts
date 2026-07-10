@@ -52,7 +52,12 @@ function rendererFileUrl(): URL {
 }
 
 function resolvePreloadPath(): string {
-  return join(__dirname, '../preload/index.js');
+  // electron-vite emits the SANDBOXED preload as CJS → the file on disk is
+  // `index.cjs`, never `index.js` (electron.vite.config.ts preload output.format).
+  // The old `.js` path silently failed to load → window.deckentDesktop undefined
+  // → dead fallback UI (Alperen'in 2026-07-10 canlı-vakası: "açılıyor ama
+  // kullanılamıyor").
+  return join(__dirname, '../preload/index.cjs');
 }
 
 /**
