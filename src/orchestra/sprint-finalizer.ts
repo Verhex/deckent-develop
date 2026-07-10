@@ -1272,28 +1272,38 @@ export async function finalizeSprint(
       const learnings = tracker.getLearnings();
 
       for (const [agentId, perf] of Object.entries(learnings.agentPerformance)) {
-        // Compute average coverage from task results for this agent
+        // Compute average coverage from task results for this agent — only results
+        // that carry a REAL coverage measurement participate. A missing/undefined
+        // `coverage` is a MEASUREMENT GAP, not a 0%, and must not dilute the average
+        // (born-591 P0 phantom-zero-dilution fix) — neither in the numerator nor in
+        // the sample count used to weight it.
         const agentTasks = sprint.tasks.filter(t => t.assignedAgent === agentId);
+        const coveredResults = agentTasks
+          .map(t => resultsMap.get(t.id))
+          .filter((r): r is TaskResult => r != null && typeof r.coverage === 'number');
         let avgCov = 0;
-        if (agentTasks.length > 0) {
-          const totalCov = agentTasks.reduce((sum, t) => {
-            const r = resultsMap.get(t.id);
-            return sum + (r?.coverage ?? 0);
-          }, 0);
-          avgCov = totalCov / agentTasks.length;
+        if (coveredResults.length > 0) {
+          const totalCov = coveredResults.reduce((sum, r) => sum + r.coverage, 0);
+          avgCov = totalCov / coveredResults.length;
         }
 
         // Build cumulative stats from learnings performance data
         const agent = poolManager.getAgent(agentId);
         if (agent) {
           const stats = agent.stats ?? { totalUses: 0, successRate: 0, avgCoverage: 0, lastUsedInSprint: '' };
+          // Prior cumulative uses — captured BEFORE totalUses is overwritten below,
+          // so it reflects the agent's real use count as of the last sprint (no
+          // subtraction/algebra needed; born-591 P0 dilution fix).
+          const prevTotal = stats.totalUses;
           stats.totalUses = perf.totalTasks;
           stats.successRate = perf.successRate;
-          // Blend historical avg coverage with current sprint coverage
-          if (avgCov > 0 && agentTasks.length > 0) {
-            const prevTotal = stats.totalUses - agentTasks.length;
+          // Blend historical avg coverage with current-sprint coverage — weighted
+          // ONLY by coverage-bearing results and normalized by (prior uses + new
+          // coverage samples), NOT stats.totalUses (which would still count this
+          // sprint's non-covered tasks and re-dilute the average).
+          if (coveredResults.length > 0) {
             stats.avgCoverage = prevTotal > 0
-              ? ((stats.avgCoverage * prevTotal) + (avgCov * agentTasks.length)) / stats.totalUses
+              ? ((stats.avgCoverage * prevTotal) + (avgCov * coveredResults.length)) / (prevTotal + coveredResults.length)
               : avgCov;
           }
           stats.lastUsedInSprint = sprint.id;
@@ -1303,12 +1313,32 @@ export async function finalizeSprint(
       }
 
       for (const [skillId, perf] of Object.entries(learnings.skillPerformance)) {
+        // Same dilution-fix as the agent block above (born-591 P0 item b) — the
+        // skill side previously never computed/wrote avgCoverage at all (always 0).
+        const skillTasks = sprint.tasks.filter(t => t.assignedSkills?.includes(skillId));
+        const coveredResults = skillTasks
+          .map(t => resultsMap.get(t.id))
+          .filter((r): r is TaskResult => r != null && typeof r.coverage === 'number');
+        let avgCov = 0;
+        if (coveredResults.length > 0) {
+          const totalCov = coveredResults.reduce((sum, r) => sum + r.coverage, 0);
+          avgCov = totalCov / coveredResults.length;
+        }
+
         const skill = skillPoolManager.getSkill(skillId);
         if (skill) {
           const stats = skill.stats ?? { totalUses: 0, successRate: 0, avgCoverage: 0, lastUsedInSprint: '', successCount: 0 };
+          // Prior cumulative uses — captured BEFORE totalUses is overwritten below
+          // (same reasoning as the agent block above).
+          const prevTotal = stats.totalUses;
           stats.totalUses = perf.totalTasks;
           stats.successRate = perf.successRate;
           stats.successCount = perf.successCount;
+          if (coveredResults.length > 0) {
+            stats.avgCoverage = prevTotal > 0
+              ? ((stats.avgCoverage * prevTotal) + (avgCov * coveredResults.length)) / (prevTotal + coveredResults.length)
+              : avgCov;
+          }
           stats.lastUsedInSprint = sprint.id;
           skill.stats = stats;
           skillPoolManager.saveSkill(skill);

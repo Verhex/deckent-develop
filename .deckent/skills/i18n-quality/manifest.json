@@ -1,0 +1,63 @@
+{
+  "id": "i18n-quality",
+  "name": "i18n Quality",
+  "version": "0.1.0",
+  "description": "i18n-FIRST quality bar: every user-facing string through getMessage(key, lang, vars?) with en+tr pairs; mechanism modules stay string-free (labels injected by callers); honest fallback, no hardcoded TR/EN literals",
+  "entrypoint": "SKILL.md",
+  "category": "workflow",
+  "manifestVersion": 2,
+  "triggers": [
+    "i18n",
+    "getMessage",
+    "localization",
+    "hardcoded string"
+  ],
+  "stackDetection": {
+    "files": [],
+    "dependencies": [],
+    "commands": []
+  },
+  "composableWith": [
+    "typescript-expert",
+    "frontend-design"
+  ],
+  "priority": 6,
+  "promptInjection": {
+    "position": "append",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "source": "builtin",
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0
+  },
+  "activation": {
+    "rules": [
+      {
+        "name": "cli-surface",
+        "when": {
+          "domains": {
+            "$contains": "cli"
+          },
+          "intent.primary": "implementation"
+        },
+        "score": 6
+      },
+      {
+        "name": "dashboard-surface",
+        "when": {
+          "domains": {
+            "$contains": "dashboard"
+          },
+          "intent.primary": "implementation"
+        },
+        "score": 5
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  }
+}

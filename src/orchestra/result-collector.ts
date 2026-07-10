@@ -51,6 +51,10 @@ export function getSharedMemory(projectRoot: string, ttlMs?: number): SharedMemo
 // ─── Task builder ─────────────────────────────────────────────────
 import { buildWorkerPrompt } from './task-builder.js';
 
+// ─── DNA skill filtering (born-593 DNA-FILTER-STAT-CREDIT) ───────
+import { filterSkillPromptsByDNA } from './prompt-token-optimizer.js';
+import type { TaskDNA } from '../core/routing-types.js';
+
 // ─── Agent prompt single-source resolution (ADR-048, Sprint 182 F4) ──
 import { getAgentPrompt } from '../core/agent-pool.js';
 
@@ -758,6 +762,42 @@ export async function resolveSkillPrompts(
       debugLog('resolveSkillPrompts:readSkillFile', e);
     }
   }
+
+  // born-593 DNA-FILTER-STAT-CREDIT (kök-neden-4c): buildWorkerPrompt (task-builder.ts)
+  // silently drops DNA-irrelevant skills from the worker prompt via
+  // filterSkillPromptsByDNA, but that drop is a local variable there — it never
+  // reaches sprint-finalizer.ts, which credits usage/success stats for every id
+  // still sitting in task.assignedSkills, unconditionally. A dropped skill kept
+  // earning stat credit for a prompt it was never actually injected into,
+  // poisoning the learning loop. This function is the single choke point every
+  // spawn path (sprint-spawner, cli/run, cli/spawn, task-mode-runner,
+  // mcp/tools/run, this file's own queue path) routes through before
+  // buildWorkerPrompt runs, so it is the correct place to close the credit gap
+  // without touching the finalizer or buildWorkerPrompt's filtering itself.
+  // Mirrors buildWorkerPrompt's own gate exactly so the filtering DECISION is
+  // computed identically in both places — only what happens with a drop differs
+  // (there: silently omitted from the prompt; here: also excluded from credit
+  // + surfaced via debugLog/metric). filterSkillPromptsByDNA's scoring/threshold
+  // logic itself is untouched — its result is read, never altered.
+  const isV2 = task.routingMeta?.routingVersion === 'v2';
+  const rawDNA = task.routingMeta?.taskDNA;
+  if (isV2 && rawDNA && results.length > 1) {
+    const passingNames = new Set(filterSkillPromptsByDNA(results, rawDNA as TaskDNA).map(p => p.name));
+    const droppedNames = results.filter(r => !passingNames.has(r.name)).map(r => r.name);
+    if (droppedNames.length > 0) {
+      for (const skillId of droppedNames) {
+        debugLog(
+          'resolveSkillPrompts:dnaFiltered',
+          `skill ${skillId} dropped from worker prompt for task ${task.id} — excluded from stat credit`,
+        );
+        metric('skill.dna_filtered', 1, { skillId, taskId: task.id });
+      }
+      if (task.assignedSkills) {
+        task.assignedSkills = task.assignedSkills.filter(id => !droppedNames.includes(id));
+      }
+    }
+  }
+
   return results;
 }
 

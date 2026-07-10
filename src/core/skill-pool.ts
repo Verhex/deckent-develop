@@ -2,10 +2,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
 import type { SkillDefinition, SkillCategory } from './skill-types.js';
 import { createDefaultSkillStats } from './skill-types.js';
 import { createDefaultActivationConfig } from './routing-types.js';
-import { readJsonSafe } from './utils.js';
+import { readJsonSafe, debugLog } from './utils.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -135,20 +136,103 @@ const VALID_POSITIONS = ['prepend', 'append', 'section'] as const;
 import { ALL_MODELS } from './types.js';
 const VALID_MODELS = ALL_MODELS;
 
+// ─── Activation Schema (born-590 ACTIVATION-VALIDATION) ─────────────────────
+//
+// `activation` (ActivationConfig — routing-types.ts) is the sole real
+// scoring input the routing/activation engine reads (activation-engine.ts
+// indexes `config.rules`/`config.exclude`/`config.minScore` unconditionally
+// for every pool member), yet it was never validated at load time — a
+// manually-edited manifest with a malformed `activation` block silently
+// entered the pool with a broken scoring shape instead of being excluded.
+// Mirrors the ActivationConfig/ActivationRule/ExclusionRule interfaces
+// (routing-types.ts) exactly — kept file-local rather than importing a
+// schema from routing-types.ts (a types-only module outside this task's
+// write scope) and duplicated in agent-pool.ts for the same reason
+// parseMarkdownTitleAndLead is duplicated there: the two pool managers are
+// outside each other's write/read scope for this task.
+const activationRuleSchema = z.object({
+  name: z.string().optional(),
+  when: z.record(z.string(), z.unknown()),
+  score: z.number(),
+});
+const activationExclusionRuleSchema = z.object({
+  name: z.string().optional(),
+  when: z.record(z.string(), z.unknown()),
+  reason: z.string().optional(),
+});
+const activationConfigSchema = z.object({
+  rules: z.array(activationRuleSchema),
+  exclude: z.array(activationExclusionRuleSchema),
+  minScore: z.number(),
+});
+
+/**
+ * Validate `activation` (when present) against {@link activationConfigSchema}
+ * and append one human-readable error per zod issue to `errors`. Absent
+ * `activation` is intentionally left unvalidated — downstream already
+ * defaults it via createDefaultActivationConfig() at synthesis time, and
+ * requiring it on every hand-authored manifest would be a behavior-narrowing
+ * this task does not ask for ("davranışı DARALTMA").
+ */
+function validateActivationField(activation: unknown, errors: string[]): void {
+  if (activation === undefined) return;
+  const result = activationConfigSchema.safeParse(activation);
+  if (result.success) return;
+  for (const issue of result.error.issues) {
+    const fieldPath = issue.path.length > 0 ? `.${issue.path.join('.')}` : '';
+    errors.push(`"activation${fieldPath}" ${issue.message}`);
+  }
+}
+
+// ─── Load Diagnostics (born-590) ─────────────────────────────────────────────
+
+/** A manifest skipped during the most recent load because it failed validation or JSON parsing. */
+export interface InvalidManifestEntry {
+  id: string;
+  path: string;
+  errors: string[];
+}
+
 // ─── Skill Pool Manager ────────────────────────────────────────────────────
 
 export class SkillPoolManager {
   constructor(private projectRoot: string) {}
+
+  /** Manifests skipped during the most recent loadSkills() call (born-590 — see getInvalidManifests). */
+  private invalidManifests: InvalidManifestEntry[] = [];
+
+  /**
+   * Record a manifest that failed load-time validation or JSON parsing, and
+   * emit a visible signal via the existing debugLog primitive (stderr when
+   * DECKENT_DEBUG is set, always persisted to .brain/ERRORS.md) — replacing
+   * the previous fully-silent skip (born-590).
+   */
+  private _recordInvalidManifest(id: string, manifestPath: string, errors: string[]): void {
+    this.invalidManifests.push({ id, path: manifestPath, errors });
+    debugLog('skill-pool:invalid-manifest', `${id} (${manifestPath}): ${errors.join('; ')}`);
+  }
+
+  /** Manifests skipped during the most recent loadSkills() call because they failed validation or JSON parsing (born-590). */
+  getInvalidManifests(): InvalidManifestEntry[] {
+    return [...this.invalidManifests];
+  }
+
+  /** Count of manifests skipped during the most recent loadSkills() call (born-590). */
+  getInvalidCount(): number {
+    return this.invalidManifests.length;
+  }
 
   // ─── Load ───────────────────────────────────────────────────────────────────
 
   /**
    * Load all skills from .deckent/skills/ directory.
    * Returns a Map<string, SkillDefinition>.
-   * Skips directories with invalid manifest.json files silently.
+   * Skips directories with invalid manifest.json files — visibly (born-590):
+   * see getInvalidManifests()/getInvalidCount() for what was skipped and why.
    */
   loadSkills(): Map<string, SkillDefinition> {
     const pool = new Map<string, SkillDefinition>();
+    this.invalidManifests = [];
     const skillsDir = path.join(this.projectRoot, SKILLS_DIR);
 
     if (fs.existsSync(skillsDir)) {
@@ -169,7 +253,11 @@ export class SkillPoolManager {
           if (validation.valid) {
             const skill = raw as unknown as SkillDefinition;
             pool.set(skill.id, skill);
+          } else {
+            this._recordInvalidManifest(entry.name, manifestPath, validation.errors);
           }
+        } else {
+          this._recordInvalidManifest(entry.name, manifestPath, ['manifest.json exists but is unreadable or contains invalid JSON']);
         }
       }
     }
@@ -237,7 +325,10 @@ export class SkillPoolManager {
       const raw = synthesizeSkillManifest(entry.name, path.join(entryDir, SKILL_MD_FILENAME));
       if (!raw) continue;
       const validation = SkillPoolManager.validateSkillDefinition(raw);
-      if (!validation.valid) continue;
+      if (!validation.valid) {
+        this._recordInvalidManifest(entry.name, path.join(entryDir, SKILL_MD_FILENAME), validation.errors);
+        continue;
+      }
       const skill = raw as unknown as SkillDefinition;
       pool.set(skill.id, skill);
     }
@@ -330,11 +421,15 @@ export class SkillPoolManager {
 
   /**
    * Update stats for a skill after task evaluation.
+   * `coverage: null` means no coverage was measured for this task (a MEASUREMENT
+   * GAP, not a 0%) — totalUses/successRate still advance, but avgCoverage is left
+   * untouched so the gap can never dilute it toward 0 (born-591 P0 dilution fix,
+   * mirrors AgentPoolManager.updateAgentStats).
    */
   updateSkillStats(
     id: string,
     evaluation: string,
-    coverage: number,
+    coverage: number | null,
     sprintId: string,
   ): void {
     const skill = this.getSkill(id);
@@ -352,9 +447,12 @@ export class SkillPoolManager {
     stats.successCount = newSuccessCount;
     stats.successRate = stats.totalUses > 0 ? newSuccessCount / stats.totalUses : 0;
 
-    // Recalculate average coverage
-    const prevTotalCoverage = stats.avgCoverage * prevTotal;
-    stats.avgCoverage = stats.totalUses > 0 ? (prevTotalCoverage + coverage) / stats.totalUses : 0;
+    // Recalculate average coverage — skip entirely when this task had no real
+    // coverage measurement (null), so it never enters the running average.
+    if (coverage !== null) {
+      const prevTotalCoverage = stats.avgCoverage * prevTotal;
+      stats.avgCoverage = stats.totalUses > 0 ? (prevTotalCoverage + coverage) / stats.totalUses : 0;
+    }
 
     stats.lastUsedInSprint = sprintId;
     skill.stats = stats;
@@ -484,6 +582,9 @@ export class SkillPoolManager {
         }
       }
     }
+
+    // activation validation (born-590 — the sole real scoring input; previously unchecked)
+    validateActivationField(obj['activation'], errors);
 
     return { valid: errors.length === 0, errors };
   }

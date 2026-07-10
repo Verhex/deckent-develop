@@ -2,11 +2,12 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
 import type { AgentDefinition, AgentPool } from './agent-types.js';
 import { createDefaultStats } from './agent-types.js';
 import type { ActivationRule } from './routing-types.js';
 import { createDefaultActivationConfig } from './routing-types.js';
-import { readJsonSafe } from './utils.js';
+import { readJsonSafe, debugLog } from './utils.js';
 
 // ─── Builtin Fallback (371-001 CATALOG-MATERIALIZE) ─────────────────────────
 //
@@ -320,6 +321,62 @@ import { ALL_MODELS } from './types.js';
 const VALID_MODELS = ALL_MODELS;
 const VALID_SOURCES = ['builtin', 'user', 'learned'] as const;
 
+// ─── Activation Schema (born-590 ACTIVATION-VALIDATION) ─────────────────────
+//
+// `activation` (ActivationConfig — routing-types.ts) is the sole real
+// scoring input the routing/activation engine reads (activation-engine.ts
+// indexes `config.rules`/`config.exclude`/`config.minScore` unconditionally
+// for every pool member), yet it was never validated at load time — a
+// manually-edited agent.json with a malformed `activation` block silently
+// entered the pool with a broken scoring shape instead of being excluded.
+// Mirrors the ActivationConfig/ActivationRule/ExclusionRule interfaces
+// (routing-types.ts) exactly. Kept file-local and duplicated in
+// skill-pool.ts for the same reason parseMarkdownTitleAndLead is duplicated
+// there — see that file's comment (the two pool managers are outside each
+// other's write/read scope for this task).
+const activationRuleSchema = z.object({
+  name: z.string().optional(),
+  when: z.record(z.string(), z.unknown()),
+  score: z.number(),
+});
+const activationExclusionRuleSchema = z.object({
+  name: z.string().optional(),
+  when: z.record(z.string(), z.unknown()),
+  reason: z.string().optional(),
+});
+const activationConfigSchema = z.object({
+  rules: z.array(activationRuleSchema),
+  exclude: z.array(activationExclusionRuleSchema),
+  minScore: z.number(),
+});
+
+/**
+ * Validate `activation` (when present) against {@link activationConfigSchema}
+ * and append one human-readable error per zod issue to `errors`. Absent
+ * `activation` is intentionally left unvalidated — downstream already
+ * defaults it via createDefaultActivationConfig() at synthesis time, and
+ * requiring it on every hand-authored agent.json would be a
+ * behavior-narrowing this task does not ask for ("davranışı DARALTMA").
+ */
+function validateActivationField(activation: unknown, errors: string[]): void {
+  if (activation === undefined) return;
+  const result = activationConfigSchema.safeParse(activation);
+  if (result.success) return;
+  for (const issue of result.error.issues) {
+    const fieldPath = issue.path.length > 0 ? `.${issue.path.join('.')}` : '';
+    errors.push(`"activation${fieldPath}" ${issue.message}`);
+  }
+}
+
+// ─── Load Diagnostics (born-590) ─────────────────────────────────────────────
+
+/** A manifest skipped during the most recent load because it failed validation or JSON parsing. */
+export interface InvalidManifestEntry {
+  id: string;
+  path: string;
+  errors: string[];
+}
+
 export class AgentPoolManager {
   /** Maximum number of temp agents to keep in pool (LRU eviction). */
   private maxTempAgents: number;
@@ -331,17 +388,43 @@ export class AgentPoolManager {
 
   private projectRoot: string;
 
+  /** Manifests skipped during the most recent loadAgents() call (born-590 — see getInvalidManifests). */
+  private invalidManifests: InvalidManifestEntry[] = [];
+
+  /**
+   * Record a manifest that failed load-time validation or JSON parsing, and
+   * emit a visible signal via the existing debugLog primitive (stderr when
+   * DECKENT_DEBUG is set, always persisted to .brain/ERRORS.md) — replacing
+   * the previous fully-silent skip (born-590).
+   */
+  private _recordInvalidManifest(id: string, manifestPath: string, errors: string[]): void {
+    this.invalidManifests.push({ id, path: manifestPath, errors });
+    debugLog('agent-pool:invalid-manifest', `${id} (${manifestPath}): ${errors.join('; ')}`);
+  }
+
+  /** Manifests skipped during the most recent loadAgents() call because they failed validation or JSON parsing (born-590). */
+  getInvalidManifests(): InvalidManifestEntry[] {
+    return [...this.invalidManifests];
+  }
+
+  /** Count of manifests skipped during the most recent loadAgents() call (born-590). */
+  getInvalidCount(): number {
+    return this.invalidManifests.length;
+  }
+
   // ─── Load ────────────────────────────────────────────────────────────────────
 
   /**
    * Load all agents from .deckent/agents/ and .tasks/agents/ directories.
    * Returns an AgentPool (Map<string, AgentDefinition>).
-   * Skips directories with invalid agent.json files silently.
+   * Skips directories with invalid agent.json files — visibly (born-590):
+   * see getInvalidManifests()/getInvalidCount() for what was skipped and why.
    * Applies LRU eviction: keeps only the most-recently-used temp agents
    * up to `maxTempAgents` (default 50).
    */
   loadAgents(): AgentPool {
     const pool: AgentPool = new Map();
+    this.invalidManifests = [];
 
     // Load persistent agents from .deckent/agents/ (never evicted)
     const persistentDir = path.join(this.projectRoot, AGENTS_DIR);
@@ -424,7 +507,10 @@ export class AgentPoolManager {
       const raw = synthesizeAgentDefinition(entry.name, path.join(entryDir, PROMPT_MD_FILENAME));
       if (!raw) continue;
       const validation = AgentPoolManager.validateAgentDefinition(raw);
-      if (!validation.valid) continue;
+      if (!validation.valid) {
+        this._recordInvalidManifest(entry.name, path.join(entryDir, PROMPT_MD_FILENAME), validation.errors);
+        continue;
+      }
       const agent = raw as unknown as AgentDefinition;
       applyBuiltinImplementationRules(agent);
       pool.set(agent.id, agent);
@@ -445,7 +531,11 @@ export class AgentPoolManager {
       return;
     }
     // Batch read: map over all directory entries, attempt to read agent.json for each.
-    // No per-entry existsSync — readJsonSafe returns null for missing or invalid files.
+    // No per-entry existsSync on the happy path — readJsonSafe returns null for
+    // missing or invalid files. A null result only gets an existsSync check
+    // (below) to tell "no agent.json here at all" (not an error — many
+    // directories legitimately lack one) apart from "agent.json exists but is
+    // unreadable/malformed" (a genuine silent drop worth surfacing, born-590).
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       if (entry.name === 'archive') continue; // Skip archive directory
@@ -457,7 +547,11 @@ export class AgentPoolManager {
           const agent = raw as unknown as AgentDefinition;
           applyBuiltinImplementationRules(agent);
           pool.set(agent.id, agent);
+        } else {
+          this._recordInvalidManifest(entry.name, agentFile, validation.errors);
         }
+      } else if (fs.existsSync(agentFile)) {
+        this._recordInvalidManifest(entry.name, agentFile, ['agent.json exists but is unreadable or contains invalid JSON']);
       }
     }
   }
@@ -683,11 +777,14 @@ export class AgentPoolManager {
 
   /**
    * Update stats for an agent after task evaluation.
+   * `coverage: null` means no coverage was measured for this task (a MEASUREMENT
+   * GAP, not a 0%) — totalUses/successRate still advance, but avgCoverage is left
+   * untouched so the gap can never dilute it toward 0 (born-591 P0 dilution fix).
    */
   updateAgentStats(
     id: string,
     evaluation: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
-    coverage: number,
+    coverage: number | null,
     sprintId: string,
   ): void {
     const agent = this.getAgent(id);
@@ -703,9 +800,12 @@ export class AgentPoolManager {
     const newSuccessCount = prevSuccessCount + (wasSuccess ? 1 : 0);
     stats.successRate = stats.totalUses > 0 ? newSuccessCount / stats.totalUses : 0;
 
-    // Recalculate average coverage
-    const prevTotalCoverage = stats.avgCoverage * prevTotal;
-    stats.avgCoverage = stats.totalUses > 0 ? (prevTotalCoverage + coverage) / stats.totalUses : 0;
+    // Recalculate average coverage — skip entirely when this task had no real
+    // coverage measurement (null), so it never enters the running average.
+    if (coverage !== null) {
+      const prevTotalCoverage = stats.avgCoverage * prevTotal;
+      stats.avgCoverage = stats.totalUses > 0 ? (prevTotalCoverage + coverage) / stats.totalUses : 0;
+    }
 
     stats.lastUsedInSprint = sprintId;
     agent.stats = stats;
@@ -811,6 +911,9 @@ export class AgentPoolManager {
         }
       }
     }
+
+    // activation validation (born-590 — the sole real scoring input; previously unchecked)
+    validateActivationField(obj['activation'], errors);
 
     return { valid: errors.length === 0, errors };
   }

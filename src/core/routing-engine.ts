@@ -361,6 +361,117 @@ export const SCOPE_DOMAIN_TO_AGENT_ID: Readonly<Record<string, string>> = {
   'terminal-ui': 'terminal-ux-engineer',
 };
 
+// ─── DOMAIN-ALIAS — kural-vocabulary ↔ detectDomains emisyon-vocabulary (born-589) ──
+//
+// sprint-agent-skill-prompt-audit-2026-07-10.md (§0/B/C) found that `detectDomains`
+// (intent-classifier.ts) emits path-SEGMENT names (orchestra, core, cli, dashboard,
+// connectors, docker, mcp, …) extracted from scope.filesWrite/filesRead/directories, while a
+// number of built-in agent/skill `activation.rules` check `domains.$contains <word>` against a
+// DIFFERENT vocabulary detectDomains can never emit — e.g. sh-portability's sole rule checks
+// `orchestration`, but the only value detectDomains ever emits for that module is `orchestra`.
+//
+// This is a RULE-EVALUATION-LAYER fix only, by design: `withAliasedDomains` returns a
+// scoring-only COPY of a task's `domains` array (the input is never mutated) with each present
+// segment's alias siblings appended, so `evaluateActivation`'s `domains.$contains` check sees
+// both the real segment and every rule-vocabulary alias for it. `routeTaskV2`'s returned/
+// persisted `taskDNA` (the TaskDNA-filter / learning key) is untouched by this — normalizing the
+// alias into detectDomains' own OUTPUT would silently re-key historical learning data, which is
+// why expansion happens only immediately before each `evaluateActivation(...)` call, never inside
+// intent-classifier.ts.
+//
+// Every group below is a REAL segment whose ENTIRE purpose (not merely a narrow sub-topic within
+// a broader, multi-purpose directory) matches every alias word in the group — e.g. `dashboard`
+// IS exclusively frontend/UI code, so `frontend`/`accessibility`/`css` are safe 1:1 synonyms. A
+// narrow sub-topic living inside a broad, multi-purpose directory (e.g. "database" work is only
+// ONE of many unrelated concerns inside `core/`; "onboarding" wizard code is only one of many
+// concerns inside `cli/`) is deliberately NOT aliased here — reviving it would make the owning
+// rule newly fire on every unrelated task that merely shares the broad directory, which is a
+// scoring-formula change in disguise, not a vocabulary fix (verified against
+// tests/core/routing-live-diversity.test.ts, which asserts an unrelated `src/core/` task must
+// still route to `refactorer`, not `data-engineer`/`architecture-planner`).
+//
+// A SECOND, independently-discovered danger: a group must NOT be added when the target
+// agent/skill already has its OWN separate, currently-real rule for a DIFFERENT word in the same
+// group — reviving the dead sibling would then ADD to (not merely replace zero with) an
+// already-functioning score, which is exactly the scoring-formula change the nogo forbids, not a
+// vocabulary fix. Two candidate groups failed this check and are deliberately excluded:
+//   - `cli`/`terminal-ui`: terminal-ux-engineer has BOTH `cli`@6 (real) AND `terminal-ui`@8 (dead)
+//     as separate rules; aliasing would stack them to 14, which flips
+//     tests/core/route-domain-scope.test.ts's flag-off legacy-collapse assertions (proven by
+//     running the suite — 2 failures).
+//   - `connectors`/`messaging`/`integrations`: integration-engineer has `connectors`@8 (real) AND
+//     `messaging`@8 + `integrations`@6 (dead) as three separate rules; aliasing stacks them to 22
+//     — empirically flips a large connectors-scoped task from `architect` (16) to
+//     `integration-engineer` (22), a routing DECISION change, not just an internal score change.
+// Both un-aliasable words are exactly the ones scripts/lint-rule-vocabulary.mjs documents in its
+// known-orphan baseline as manifest-content work for a future task (e.g. collapsing the
+// redundant pair down to a single rule).
+
+/** Real segment ↔ rule-vocabulary alias groups. Exported so both the vocabulary-lint script
+ *  (scripts/lint-rule-vocabulary.mjs mirrors this list — keep the two in sync) and
+ *  tests/core/routing-domain-alias.test.ts share this exact catalogue instead of re-deriving it.
+ *  A word may appear in more than one group (none currently do); `buildDomainAliasIndex` unions
+ *  a word's siblings across every group it belongs to. */
+export const DOMAIN_ALIAS_GROUPS: ReadonlyArray<readonly string[]> = [
+  // sh-portability's sole activation rule checks `orchestration`; the real directory is `orchestra`.
+  ['orchestra', 'orchestration'],
+  // frontend-designer / frontend-design (`frontend`), accessibility-auditor / accessibility-expert
+  // (`accessibility`) and frontend-design's second rule (`css`) all target the real `dashboard`
+  // segment — every one of these agents/skills lists `src/dashboard/` in its own triggerScopes,
+  // and NONE of them also carries a separate, already-real rule for `dashboard` itself.
+  ['dashboard', 'frontend', 'accessibility', 'css'],
+  // devops-engineer's `infrastructure` — the closest real segment reachable from its own
+  // triggerScopes (`docker/`, `.github/`, `infra/`, `scripts/`) is `docker` (tests/docker/ exists;
+  // `.github/` is filtered by extractDomainFromPath's dot-guard, `infra/` doesn't exist in-repo).
+  // devops-engineer has no separate, already-real `docker` rule of its own to stack with.
+  ['docker', 'infrastructure'],
+  // rpc-protocol's `rpc` — this project's RPC/dispatch-envelope surface is the MCP server's
+  // stdio JSON-RPC-style tool dispatch (`src/mcp/`), which is the module's entire reason for
+  // being. No manifest carries a separate, already-real `mcp` rule to stack with.
+  ['mcp', 'rpc'],
+];
+
+/** Word → its alias siblings (excluding itself), unioned across every DOMAIN_ALIAS_GROUPS entry
+ *  the word belongs to. Built once at module load — the group list is a small, static literal. */
+function buildDomainAliasIndex(groups: ReadonlyArray<readonly string[]>): ReadonlyMap<string, ReadonlySet<string>> {
+  const index = new Map<string, Set<string>>();
+  for (const group of groups) {
+    for (const word of group) {
+      const siblings = index.get(word) ?? new Set<string>();
+      for (const sibling of group) {
+        if (sibling !== word) siblings.add(sibling);
+      }
+      index.set(word, siblings);
+    }
+  }
+  return index;
+}
+
+const domainAliasIndex = buildDomainAliasIndex(DOMAIN_ALIAS_GROUPS);
+
+/**
+ * Return a TaskDNA whose `domains` array is expanded with alias siblings for every segment
+ * already present — a scoring-only view for `evaluateActivation`'s `domains.$contains` checks.
+ * Never mutates `taskDNA` or its `.domains` array; returns the SAME reference when no alias
+ * applies (the common case) so callers pay no allocation cost for the vast majority of tasks.
+ */
+export function withAliasedDomains(taskDNA: TaskDNA): TaskDNA {
+  const present = new Set(taskDNA.domains.map((d) => d.name));
+  const extra: Array<{ name: string; weight: number }> = [];
+  for (const domain of taskDNA.domains) {
+    const siblings = domainAliasIndex.get(domain.name);
+    if (!siblings) continue;
+    for (const alias of siblings) {
+      if (!present.has(alias)) {
+        present.add(alias);
+        extra.push({ name: alias, weight: domain.weight });
+      }
+    }
+  }
+  if (extra.length === 0) return taskDNA;
+  return { ...taskDNA, domains: [...taskDNA.domains, ...extra] };
+}
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface RoutingOptions {
@@ -787,7 +898,7 @@ export function evaluateForceAgentSemantic(
   }
 
   const activation = getAgentActivation(agent);
-  const result = evaluateActivation(taskDNA, activation);
+  const result = evaluateActivation(withAliasedDomains(taskDNA), activation);
   if (result.excluded) {
     return `forceAgent '${forcedAgentId}' is excluded by its own activation rules ` +
       `(reason='${result.excludeReason ?? 'unknown'}', intent=${taskDNA.intent.primary})`;
@@ -932,6 +1043,11 @@ function selectBestAgent(
   // WM-7 — hoisted once: identical for every candidate this call (task-side only).
   const taskLanguage: HeuristicLanguage = languagePenalty ? detectHeuristicLanguage(taskText ?? '') : 'unknown';
 
+  // born-589 — hoisted once: a scoring-only, alias-expanded view of taskDNA.domains for
+  // evaluateActivation's `domains.$contains` checks. `taskDNA` itself (used by every other
+  // bonus below) is untouched.
+  const aliasedTaskDNA = withAliasedDomains(taskDNA);
+
   for (const [id, agent] of pool) {
     if (!agent.enabled) continue;
 
@@ -959,7 +1075,7 @@ function selectBestAgent(
     const affinityCtx: SkillAffinityContext | undefined = skillAgentAffinity
       ? { agentId: id, assignedSkills, enabled: true }
       : undefined;
-    const result = evaluateActivation(taskDNA, activation, affinityCtx);
+    const result = evaluateActivation(aliasedTaskDNA, activation, affinityCtx);
 
     if (result.excluded) {
       if (surfaceBonus > 0) {
@@ -1137,6 +1253,9 @@ function selectBestSkills(
   const reasoning: string[] = [];
   const buildTask = isSurfaceBuildTask(taskDNA.intent.primary, taskKind);
 
+  // born-589 — hoisted once: see the identical comment in selectBestAgent.
+  const aliasedTaskDNA = withAliasedDomains(taskDNA);
+
   for (const [id, skill] of pool) {
     if (!skill.enabled) continue;
     if (excludeSkills.includes(id)) {
@@ -1146,7 +1265,7 @@ function selectBestSkills(
 
     // Get activation config (v2 or migrated from v1)
     const activation = getSkillActivation(skill);
-    const result = evaluateActivation(taskDNA, activation);
+    const result = evaluateActivation(aliasedTaskDNA, activation);
 
     if (result.excluded) {
       reasoning.push(`Skill '${id}' excluded: ${result.excludeReason}`);

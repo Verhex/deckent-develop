@@ -2,7 +2,7 @@
   "id": "api-design",
   "name": "API Design",
   "version": "0.1.0",
-  "description": "",
+  "description": "Schema-first API contract design for deckent's HTTP/RPC surfaces: strict zod envelopes at the boundary, auth-middleware wiring, honest error shapes, docs/reference/api-surface.md contract alignment",
   "entrypoint": "SKILL.md",
   "category": "domain",
   "manifestVersion": 2,
@@ -25,7 +25,7 @@
     "successCount": 12,
     "successRate": 1,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-391"
+    "lastUsedInSprint": "sprint-393"
   },
   "activation": {
     "rules": [],
