@@ -36,7 +36,7 @@
     "build:all": "npm run clean && tsc && node scripts/copy-assets.mjs && npm run build:dashboard",
     "lint": "tsc --noEmit && tsc --noEmit -p src/dashboard && npm run lint:gates",
     "tsc:dashboard": "tsc --noEmit -p src/dashboard",
-    "install:all": "npm ci && npm ci --prefix src/dashboard",
+    "install:all": "npm ci && npm ci --prefix src/dashboard && npm ci --prefix src/desktop",
     "lint:adr": "node scripts/adr-validator.mjs",
     "lint:errors": "node scripts/check-error-handling.mjs",
     "lint:link": "node scripts/lint-links.mjs",
@@ -59,7 +59,11 @@
     "docs:ref:check": "node scripts/gen-reference-docs.mjs --check",
     "docs:stats": "node scripts/update-readme-stats.mjs --write",
     "docs:stats:check": "node scripts/update-readme-stats.mjs --check",
-    "prepublishOnly": "npm run docs:stats:check && npm run docs:ref:check && npm run lint:identity && npm run build"
+    "prepublishOnly": "npm run docs:stats:check && npm run docs:ref:check && npm run lint:identity && npm run build",
+    "tsc:desktop": "tsc --noEmit -p src/desktop",
+    "build:desktop": "npm run build --prefix src/desktop",
+    "dev:desktop": "npm run dev --prefix src/desktop",
+    "test:desktop": "vitest run --config vitest.desktop.config.ts"
   },
   "keywords": [
     "ai",

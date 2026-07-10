@@ -53,8 +53,9 @@ function walk(dir) {
     return results;
   }
   for (const entry of entries) {
-    // Skip dashboard (separate build pipeline)
-    if (entry === 'dashboard') continue;
+    // Skip dashboard + desktop (separate build pipelines — desktop would otherwise
+    // leak its package.json/tsconfig/config manifests into dist/, born-496)
+    if (entry === 'dashboard' || entry === 'desktop') continue;
     const full = join(dir, entry);
     const stat = statSync(full);
     if (stat.isDirectory()) {
