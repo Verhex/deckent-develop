@@ -226,6 +226,7 @@ describe('evaluateScopeGate', () => {
       expect(res.ok).toBe(true);
       if (!res.ok) return;
       expect(res.resolutions).toEqual([{
+        taskId: 't1',
         path: 'docs/refdocs-adr-regen.test.ts',
         action: 'drop-duplicate',
         replacement: 'tests/docs/refdocs-adr-regen.test.ts',
@@ -243,6 +244,7 @@ describe('evaluateScopeGate', () => {
       expect(res.ok).toBe(true);
       if (!res.ok) return;
       expect(res.resolutions).toEqual([{
+        taskId: 't1',
         path: 'tests/cli/error-handling-unification.test.ts',
         action: 'auto-replace',
         replacement: 'tests/core/error-handling-unification.test.ts',
@@ -299,6 +301,7 @@ describe('evaluateScopeGate', () => {
       expect(withFalseFlag.message).toEqual(withoutFlag.message);
       // resolutions is still advisory data in false-mode — present, but did not affect blocking.
       expect(withFalseFlag.resolutions).toEqual([{
+        taskId: 't1',
         path: 'docs/refdocs-adr-regen.test.ts',
         action: 'drop-duplicate',
         replacement: 'tests/docs/refdocs-adr-regen.test.ts',

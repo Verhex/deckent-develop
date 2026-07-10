@@ -67,6 +67,14 @@ export interface ScopeGateInput {
  * A suspect with no suggestion, or with 2+ same-basename candidates, gets no resolution.
  */
 export interface ScopeResolution {
+  /**
+   * The task whose verdict produced this resolution. Resolutions are derived from
+   * TASK-LOCAL evidence (rule a: duplicate in the SAME task's filesWrite) — applying
+   * one to another task that shares the typo path is wrong (advisor-confirmed
+   * cross-task misapplication, sprint-399 BEFORE-done): a path ambiguous for task B
+   * must keep blocking B even when task A's context resolved it.
+   */
+  taskId: string;
   path: string;
   action: 'drop-duplicate' | 'auto-replace';
   replacement?: string;
@@ -109,33 +117,38 @@ export interface ScopeGateBlocked {
 
 export type ScopeGateResult = ScopeGatePass | ScopeGateBlocked;
 
+/** A resolution as actually applied — `appliedAction` is what really happened. */
+export type AppliedScopeResolution = ScopeResolution & { appliedAction: 'dropped' | 'replaced' };
+
 /**
- * sprint-399 wiring — apply gate resolutions to ONE task's filesWrite (pure; returns a
- * new array). Per-task conditional mirrors how the resolutions were derived:
- * - the resolved `path` is present and its `replacement` is ALSO present → drop the
- *   typo entry (drop-duplicate semantics);
- * - the `path` is present and the `replacement` is not → substitute it (auto-replace).
- * A resolution whose `path` this task does not plan is a no-op for this task.
+ * sprint-399 wiring — apply ONE task's OWN gate resolutions to its filesWrite (pure;
+ * returns a new array). STRICTLY task-scoped: only resolutions carrying this task's
+ * `taskId` are considered (a resolution is task-local evidence — see ScopeResolution).
+ * Per-entry: if the `replacement` is already planned, the typo entry is dropped;
+ * otherwise it is substituted. `appliedAction` reports the ACTUAL effect (an
+ * auto-replace whose target already exists degrades to a drop — telemetry must not lie).
  */
 export function applyScopeResolutions(
+  taskId: string,
   filesWrite: readonly string[],
   resolutions: readonly ScopeResolution[],
-): { filesWrite: string[]; applied: ScopeResolution[] } {
+): { filesWrite: string[]; applied: AppliedScopeResolution[] } {
   const norm = (p: string) => p.replace(/^\.\//, '').toLowerCase();
   let files = [...filesWrite];
-  const applied: ScopeResolution[] = [];
+  const applied: AppliedScopeResolution[] = [];
   for (const r of resolutions) {
-    if (!r.replacement) continue;
+    if (r.taskId !== taskId || !r.replacement) continue;
     const pathNorm = norm(r.path);
     const idx = files.findIndex(f => norm(f) === pathNorm);
     if (idx === -1) continue;
     const hasReplacement = files.some(f => norm(f) === norm(r.replacement!));
     if (hasReplacement) {
       files = files.filter((_, i) => i !== idx);
+      applied.push({ ...r, appliedAction: 'dropped' });
     } else {
       files[idx] = r.replacement;
+      applied.push({ ...r, appliedAction: 'replaced' });
     }
-    applied.push(r);
   }
   return { filesWrite: files, applied };
 }
@@ -287,6 +300,7 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
     if (taskWrites.some(w => normPath(w) === suggestionNorm)) {
       // rule (a) — born-N6 / 397-011: suggestion already planned in the same task.
       resolutionByVerdict.set(s, {
+        taskId: s.taskId,
         path: s.path,
         action: 'drop-duplicate',
         replacement: s.suggestion,
@@ -298,6 +312,7 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
     if (siblings && siblings.length === 1) {
       // rule (b) — born-N6 / 397-007: unambiguous, sole tracked candidate for this basename.
       resolutionByVerdict.set(s, {
+        taskId: s.taskId,
         path: s.path,
         action: 'auto-replace',
         replacement: s.suggestion,

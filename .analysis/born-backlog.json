@@ -2431,7 +2431,9 @@
   "title": "SAN-1: sanitizeScope Rule-5 trackedFiles-aware — kok-dosya sessiz-drop biter (README/.secrets-baseline vakasi) + scopeWarnings→prompt-gate BLOCK (bugun sifir-tuketici)",
   "primary_files": [
    "src/orchestra/scope-sanitizer.ts"
-  ]
+  ],
+  "status": "DONE",
+  "spec": "[✅ DONE 2026-07-10 sprint-399+wiring — SAN-1: sanitizer trackedRootFiles-aware + prompt-gate scope-silent-drop BLOCK; gerçek-binary smoke exit-1 kanıtlı] undefined"
  },
  {
   "sources": [
@@ -2445,7 +2447,9 @@
   "primary_files": [
    "src/orchestra/planner.ts",
    "src/orchestra/prompt-gate.ts"
-  ]
+  ],
+  "status": "DONE",
+  "spec": "[✅ DONE 2026-07-10 sprint-399+wiring — G1b: scope-satisfiability.ts modülü + evaluatePromptGate wire + ölü validateGoCriteriaScope kaldırıldı; smoke-2 BLOCK exit-1] undefined"
  },
  {
   "sources": [
@@ -2459,7 +2463,9 @@
   "primary_files": [
    "src/core/scope-gate.ts",
    "src/orchestra/sprint-controller.ts"
-  ]
+  ],
+  "status": "DONE",
+  "spec": "[✅ DONE 2026-07-10 sprint-399+wiring — SAN-2: scope-gate resolveSuggestions + taskId-scoped adoption (controller pre-spawn, abort-sonrası) + fix-cascade re-gate (debt-manager 2-site)] undefined"
  },
  {
   "sources": [
@@ -2473,7 +2479,9 @@
   "primary_files": [
    "src/core/stack-detector.ts",
    "src/orchestra/prompt-god-template.ts"
-  ]
+  ],
+  "status": "DONE",
+  "spec": "[✅ DONE 2026-07-10 sprint-399+wiring — G6: STACK_COMMANDS.typecheck + criteria-deriver tercihi + sprint-planner/utils zinciri; DoD çıplak-tsc üretmez (unit+deriver kanıtlı; verify-matrix çekirdeği WM-7 deriveBaseCriteria zaten kind-aware)] undefined"
  },
  {
   "sources": [
@@ -2556,5 +2564,21 @@
   "status": "OPEN",
   "source": "sprint-398 task-006 worker-raporu + Brain triyajı",
   "spec": "4 bağımsız ama aynı-aile bulgu (detay: tests/governance/latent-set-closure.note.md): (1) WORKER-GIT-GUARD shim argv-only denylist — cwd/repo-identity kontrolü yok, tmpdir test-fixture git-op'larını da bloke ediyor (~8 dosya worker-ortamında kırılıyor); fix: gerçek proje-repo-root'a scope veya tmpdir-escape-hatch. (2) /tmp/deckent-home 100MB tmpfs dolunca homedir()-yazan yollar ENOSPC (codex-config, keyring, npm-cache). (3) tests/core/credentials.test.ts hermetiklik açığı: CredentialManager keyringPath verilmeden gerçek ~/.deckent/.keyring'e düşüyor (ADR-D-002 C1). (4) src/agents/worker-lifecycle.ts:175 import-time process-exit handler leak → 4 mock'lu test dosyasında teardown-sonrası uncaught (TASKS_DIR mock hatası). Lokalde/CI'da yeşil — yalnız worker-sandbox'ında patlıyor; worker-içi test-koşu güvenilirliği için gerekli."
+ },
+ {
+  "born_id": 628,
+  "title": "Prompt-gate BLOCK enforcement start/MCP yoluna",
+  "priority": "P1",
+  "status": "OPEN",
+  "source": "sprint-399 BEFORE-done advisor",
+  "spec": "Advisor-bulgu (E): prompt-gate blocker kontrolü YALNIZ src/cli/commands/plan.ts:217-233 CLI-yolunda; deckent start → runSprint → runPlanPhase sprint.promptGate okumuyor, MCP plan-yüzeyinde sıfır referans. SAN-1/G1b BLOCK bulguları ana koşu-yolunda hesaplanıp DÜŞÜYOR (persona-lint döneminden miras üst-katman sıfır-tüketici deseni). FIX: runSprint plan-fazı sonrası promptGate.ok kontrolü (acknowledgePromptGate/--force-prompt-gate opsiyonlarıyla; scope-gate ile aynı UX) + MCP deckent_plan yanıtına findings; dry-run/plan-CLI davranışı aynı kalır."
+ },
+ {
+  "born_id": 629,
+  "title": "Plan-yüzeyi pre-adoption scope gösterimi + render-time git-fail sessiz-drop penceresi",
+  "priority": "P2",
+  "status": "OPEN",
+  "source": "sprint-399 BEFORE-done advisor",
+  "spec": "Advisor-notlar (B): (1) SAN-2 adoption yalnız runSprint pre-spawn yolunda — deckent plan çıktısı ve start.ts:329 plan-tablosu PRE-adoption scope gösterir; operatörün gördüğü ile workerın aldığı farklı olabilir (kozmetik ama güven-yüzeyi). (2) task-builder render-anında git ls-files başarısız olursa trackedRootFiles=undefined → sanitizer Rule-5 sessiz-drop O RENDER için geri döner ve hiçbir katman yakalamaz (plan-time gate geçmişti); düşük-olasılık — render-yolu git-fail durumunda scopeWarnings üretimini worker-prompta uyarı-bloğu olarak basmak veya spawnı geciktirmek değerlendirilebilir."
  }
 ]

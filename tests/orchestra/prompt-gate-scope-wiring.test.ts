@@ -169,8 +169,8 @@ describe('SAN-2 wiring — resolution adoption repairs the 397 typo modes', () =
     });
     expect(gate.ok).toBe(true);
     const resolutions = gate.resolutions ?? [];
-    expect(resolutions.some(r => r.action === 'auto-replace')).toBe(true);
-    const { filesWrite } = applyScopeResolutions(fx.filesWrite, resolutions);
+    expect(resolutions.some(r => r.action === 'auto-replace' && r.taskId === '397-007')).toBe(true);
+    const { filesWrite } = applyScopeResolutions('397-007', fx.filesWrite, resolutions);
     expect(filesWrite).toContain('tests/core/error-handling-unification.test.ts');
     expect(filesWrite).not.toContain('tests/cli/error-handling-unification.test.ts');
   });
@@ -183,8 +183,28 @@ describe('SAN-2 wiring — resolution adoption repairs the 397 typo modes', () =
       resolveSuggestions: true,
     });
     expect(gate.ok).toBe(true);
-    const { filesWrite: fixed } = applyScopeResolutions(filesWrite, gate.resolutions ?? []);
+    const { filesWrite: fixed } = applyScopeResolutions('397-011', filesWrite, gate.resolutions ?? []);
     expect(fixed).toEqual(['tests/docs/refdocs-adr-regen.test.ts']);
+  });
+
+  it('cross-task guard: another task sharing the typo path is NOT mutated by a foreign resolution', () => {
+    // Advisor-confirmed repro (sprint-399 BEFORE-done): t1 resolves its typo via its own
+    // duplicate; t2 carries the same typo but is AMBIGUOUS (2 same-basename candidates) —
+    // t2 must keep blocking and applyScopeResolutions must not touch t2's filesWrite.
+    const gate = evaluateScopeGate({
+      tasks: [
+        { id: 't1', scope: { filesWrite: ['src/wrong/dup.ts', 'src/a/dup.ts'], filesRead: [], directories: [] } },
+        { id: 't2', scope: { filesWrite: ['src/wrong/dup.ts'], filesRead: [], directories: [] } },
+      ],
+      trackedFiles: ['src/a/dup.ts', 'src/b/dup.ts'],
+      resolveSuggestions: true,
+    });
+    expect(gate.ok).toBe(false); // t2's ambiguous suspect still blocks
+    const resolutions = gate.resolutions ?? [];
+    expect(resolutions.every(r => r.taskId === 't1')).toBe(true);
+    const { filesWrite: t2Files, applied } = applyScopeResolutions('t2', ['src/wrong/dup.ts'], resolutions);
+    expect(applied).toEqual([]);
+    expect(t2Files).toEqual(['src/wrong/dup.ts']);
   });
 
   it('a genuinely ambiguous suspect still blocks even with resolveSuggestions', () => {

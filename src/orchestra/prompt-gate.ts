@@ -310,10 +310,9 @@ function extractProofCommands(...texts: Array<string | undefined>): string[] {
  * 397-011 (README.md/README-TR.md) and 397-012 (.secrets-baseline) failures, and the
  * sanitizer's warnings previously had zero consumers.
  */
-function lintScopeSilentDrop(task: Task, trackedFiles: readonly string[]): PromptGateFinding[] {
+function lintScopeSilentDrop(task: Task, trackedRootFiles: ReadonlySet<string>): PromptGateFinding[] {
   const filesWrite = task.scope?.filesWrite ?? [];
   if (filesWrite.length === 0) return [];
-  const trackedRootFiles = new Set(trackedFiles.filter(f => !f.includes('/')));
   const sanitized = sanitizeScope(filesWrite, trackedRootFiles);
   const agentId = task.assignedAgent ?? 'generic';
   const out: PromptGateFinding[] = [];
@@ -379,6 +378,11 @@ function lintSatisfiability(task: Task, trackedFiles: readonly string[]): Prompt
 export function evaluatePromptGate(input: PromptGateInput): PromptGateResult {
   const findings: PromptGateFinding[] = [];
 
+  // Built once for the whole plan (hoisted — advisor hygiene note, sprint-399).
+  const trackedRootFiles = input.trackedFiles
+    ? new Set(input.trackedFiles.filter(f => !f.includes('/')))
+    : undefined;
+
   for (const task of input.tasks) {
     const agentId = task.assignedAgent ?? 'generic';
 
@@ -411,8 +415,8 @@ export function evaluatePromptGate(input: PromptGateInput): PromptGateResult {
 
     // sprint-399 scope-contract lints — only with a real tracked-file list (fail-soft:
     // no git signal → no findings, never a false block on e.g. a non-git workspace).
-    if (input.trackedFiles && input.trackedFiles.length > 0) {
-      findings.push(...lintScopeSilentDrop(task, input.trackedFiles));
+    if (input.trackedFiles && input.trackedFiles.length > 0 && trackedRootFiles) {
+      findings.push(...lintScopeSilentDrop(task, trackedRootFiles));
       findings.push(...lintSatisfiability(task, input.trackedFiles));
     }
   }

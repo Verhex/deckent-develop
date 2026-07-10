@@ -1160,11 +1160,20 @@ export async function runSprint(
           // --force-scope; only genuinely ambiguous suspects still block.
           resolveSuggestions: true,
         });
+        if (!scopeGate.ok) {
+          releaseSprintLock(projectRoot);
+          clearActiveSprint();
+          clearSprintState(projectRoot);
+          throw new BrainError(scopeGate.message, SprintPhase.PLAN);
+        }
+        // Adoption runs strictly AFTER the ok-check (advisor, sprint-399 BEFORE-done):
+        // a blocked sprint must not mutate task files on disk nor emit adoption events —
+        // the block message must describe the disk state the operator will inspect.
         if (scopeGate.resolutions && scopeGate.resolutions.length > 0) {
           for (const task of sprint.tasks) {
             const writes = task.scope?.filesWrite ?? [];
             if (writes.length === 0) continue;
-            const { filesWrite, applied } = applyScopeResolutions(writes, scopeGate.resolutions);
+            const { filesWrite, applied } = applyScopeResolutions(task.id, writes, scopeGate.resolutions);
             if (applied.length === 0) continue;
             task.scope = { ...task.scope, filesWrite };
             try {
@@ -1174,7 +1183,7 @@ export async function runSprint(
               );
             } catch (wErr) { debugLog('runSprint:scopeGateAdopt:persist', wErr); }
             const summary = applied
-              .map(r => `${r.path} → ${r.action === 'drop-duplicate' ? 'dropped' : r.replacement} (${r.reason})`)
+              .map(r => `${r.path} → ${r.appliedAction === 'dropped' ? 'dropped' : r.replacement} (${r.reason})`)
               .join('; ');
             try {
               writeEvent(projectRoot, sprint.id, 'brain', 'auditor', 'SCOPE_GATE_RESOLUTION_APPLIED', {
@@ -1184,12 +1193,6 @@ export async function runSprint(
             } catch (evErr) { debugLog('runSprint:scopeGateAdopt', evErr); }
             console.warn(`Scope gate: auto-resolved write path(s) in ${task.id}: ${summary}`);
           }
-        }
-        if (!scopeGate.ok) {
-          releaseSprintLock(projectRoot);
-          clearActiveSprint();
-          clearSprintState(projectRoot);
-          throw new BrainError(scopeGate.message, SprintPhase.PLAN);
         }
         // born-584 — greenfield advisory-WARN: the gate had no tracked-dir signal
         // and validated nothing. Surface on BOTH channels (sprint-finalizer's

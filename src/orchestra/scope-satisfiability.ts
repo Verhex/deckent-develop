@@ -198,12 +198,36 @@ function lintMentionedNotWritable(input: SatisfiabilityInput): SatisfiabilityFin
     runSpans.some(s => start >= s.start && end <= s.end);
 
   // (1a) goCriteria — unconditional, high-precision: goCriteria is the contract.
+  const goMasked = maskPathSpans(input.goCriteria);
   for (const mention of extractMentions(input.goCriteria)) {
     if (mention.kind === 'bare' && !isRootTrackedFile(mention.token, input.trackedFiles)) continue;
-    if (inRunSpan(mention.start, mention.end) && input.trackedFiles.includes(mention.token)) continue;
     const writable =
       input.filesWrite.includes(mention.token) || isCoveredByDirectories(mention.token, input.directories);
     if (writable) continue;
+    if (inRunSpan(mention.start, mention.end) && input.trackedFiles.includes(mention.token)) {
+      // Tracked run-target. Silent for the dominant legitimate pattern (a regression
+      // proof runs an UNCHANGED tracked test — the fixture-012 class). But when the
+      // surrounding sentence carries a positive change-verb ("yeni case ekle / pinle /
+      // genişlet"), the task likely must EXTEND the file it cannot write — the
+      // 397-007 single-mention-in-backtick window (advisor, sprint-399 BEFORE-done):
+      // surface a WARN instead of staying silent. Negation still suppresses.
+      const sentence = sentenceAround(input.goCriteria, goMasked, mention.start, mention.end);
+      if (containsLemma(sentence, POSITIVE_VERB_LEMMAS) && !containsLemma(sentence, NEGATION_LEMMAS)) {
+        const key = `WARN-RUN:${mention.token}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          findings.push({
+            severity: 'WARN',
+            code: 'MENTIONED_NOT_WRITABLE',
+            path: mention.token,
+            message:
+              `goCriteria runs "${mention.token}" and the sentence implies changing it, ` +
+              `but it is not in filesWrite or directories (run-only proofs of unchanged files are fine)`,
+          });
+        }
+      }
+      continue;
+    }
     const key = `BLOCK:${mention.token}`;
     if (seen.has(key)) continue;
     seen.add(key);

@@ -48,11 +48,11 @@ function regateInheritedScope(
       acknowledgeScopePaths: true, // never block mid-sprint fix creation
     });
     if (!gate.resolutions || gate.resolutions.length === 0) return scope;
-    const { filesWrite, applied } = applyScopeResolutions(writes, gate.resolutions);
+    const { filesWrite, applied } = applyScopeResolutions(fixTaskId, writes, gate.resolutions);
     if (applied.length === 0) return scope;
     console.warn(
       `Fix-cascade scope re-gate (${fixTaskId}): ${applied
-        .map(r => `${r.path} → ${r.action === 'drop-duplicate' ? 'dropped' : r.replacement}`)
+        .map(r => `${r.path} → ${r.appliedAction === 'dropped' ? 'dropped' : r.replacement}`)
         .join('; ')}`,
     );
     return { ...scope, filesWrite };

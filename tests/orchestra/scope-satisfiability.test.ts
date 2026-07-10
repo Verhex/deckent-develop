@@ -365,6 +365,21 @@ describe('lintScopeSatisfiability — real sprint-397 fixtures', () => {
     expect(findings).toEqual([]);
   });
 
+  it('397-007 window: tracked run-target whose sentence implies CHANGING it → WARN', () => {
+    // Advisor (sprint-399 BEFORE-done): "`npx vitest run X` yeni case ekle" — the task
+    // must extend a file it cannot write; pure run-only proofs stay silent, but a
+    // positive change-verb in the same sentence surfaces a WARN.
+    const input = loadFixture('task-012.json');
+    const changed = {
+      ...input,
+      goCriteria: '`npx vitest run scripts/lint-no-spawnsync.mjs` koşusuna yeni case ekle ve yeşil kalsın.',
+    };
+    const findings = lintScopeSatisfiability(changed);
+    expect(findings.some(
+      f => f.code === 'MENTIONED_NOT_WRITABLE' && f.severity === 'WARN' && f.path === 'scripts/lint-no-spawnsync.mjs',
+    )).toBe(true);
+  });
+
   it('an UNTRACKED path inside a backticked run command still blocks (via rule 2, not 1a)', () => {
     const input = loadFixture('task-012.json');
     const tampered = {
