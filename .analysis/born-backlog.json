@@ -2308,8 +2308,9 @@
    "src/orchestra/sprint-spawner.ts",
    "src/orchestra/result-collector.ts"
   ],
-  "spec": "respawnEligibleTasks MANUAL_REVIEW_REQUIRED'i dependency-satisfying sayiyor (:872); collector ayni durumu terminal-failure sayip cascade-skip ediyor (:1375); planDispatch (:284) kendini canonical ilan edip live-driver degil. Tek reducer/journal hedefi (Codex adim-3); once semantik-karar (MRR = satisfy mi block mu) + status-truth vakasinin reproduce'u. HOT-dosyalar — BEN el-kod/advisor.",
-  "verify": "REPRODUCE: COMPLETE+active status vakasi; karar-sonrasi iki yol ayni semantikte test-pinli"
+  "spec": "[DONE 2026-07-10 Faz-2 el-kod, Alperen-kararli: MRR=terminal-non-satisfying + force=worker-kill. scheduler-truth.ts tek-sozluk + 6 site bagli + isTaskDispatched-MRR + cascadeSkipped fix/xfix-muafiyeti (advisor P0: ana-vaat FIX-kapisindan deliniyordu) + backend-aware forceKillLiveWorkers (killSingle kompozisyonu, durust-failed-uyarisi) + planDispatch durust-demote. RED-first 8/8 + 21395-test blast. Kalan: born-634 reducer-birlesimi, born-635 checkpoint-restore-semantigi + selectEligibleForSpawn 6.site-baglama + FIFO-modu-deligi.] respawnEligibleTasks MANUAL_REVIEW_REQUIRED'i dependency-satisfying sayiyor (:872); collector ayni durumu terminal-failure sayip cascade-skip ediyor (:1375); planDispatch (:284) kendini canonical ilan edip live-driver degil. Tek reducer/journal hedefi (Codex adim-3); once semantik-karar (MRR = satisfy mi block mu) + status-truth vakasinin reproduce'u. HOT-dosyalar — BEN el-kod/advisor.",
+  "verify": "REPRODUCE: COMPLETE+active status vakasi; karar-sonrasi iki yol ayni semantikte test-pinli",
+  "status": "DONE"
  },
  {
   "sources": [
@@ -2623,5 +2624,13 @@
   "status": "OPEN",
   "source": "born-610 el-kod (2026-07-10)",
   "spec": "born-610 tek-truth SÖZLÜĞÜ birleştirdi (scheduler-truth.ts) ama dispatch-YÜRÜTMESİ hâlâ imperatif ~6 closure'da (dispatchTick/processQueue/maybeRespawn/dispatchReadyTasks/forceRescanIfIdle/cascadeSkipDeadBlocked); planDispatch sıfır-prod-çağıranlı model. Tam birleşim: planDispatch'i driver yap — DEPENDENCY_BLOCKED event'leri, wave.respawn metriği, checkpoint yan-etkileri porte edilmeli (result-collector.ts ADR-064-W notu) + remainingQueue mutasyon semantiği. Büyük-cerrahî; 610'da bilinçli kapsam-dışı bırakıldı."
+ },
+ {
+  "born_id": 635,
+  "title": "born-610 kalanlari: checkpoint-restore MRR-semantigi + FIFO-modu tek-truth-deligi + selectEligibleForSpawn baglama",
+  "priority": "P2",
+  "status": "OPEN",
+  "source": "born-610 BEFORE-done advisor",
+  "spec": "(1) sprint-checkpoint.ts:707-712 restore in-progress'i MRR yapar -> yeni sozlukte resume=downstream-cascade-skip (pre-610 respawn ederdi); bilincli-karar + resume-path testi gerek. (2) dependency_pipeline_enabled=false FIFO'da dep-check yok -> MRR-bagimlisi spawn edilebilir (pre-existing delik; scheduler-truth header'ina not). (3) selectEligibleForSpawn (sprint-spawner.ts:1181) doneIds hardcode DONE — isDependencySatisfying'e bagla; fixForTaskId aggregation eksikligi ayrica degerlendirilsin (davranis-degistirir)."
  }
 ]
