@@ -2388,5 +2388,21 @@
   ],
   "spec": "OpenAI guncel katalogla parite (gpt-5.6-sol/terra/luna vb.); zero-hardcode-live-data kuralina uygun kaynak-belirle.",
   "verify": "models listesi guncel-id'leri icerir; eski-id cevirisi dokumante"
+ },
+ {
+  "born_id": 616,
+  "severity": "P2",
+  "subsystem": "orchestra",
+  "proposed_mode": "worker",
+  "title": "STRUCTURED-PARSER-PHANTOM-FILES: Files-listesi dogru iken task-JSON filesWrite'a Scope-dizinleriyle birlesik hayalet-path'ler ekleniyor (scope-gate false-BLOCK)",
+  "sources": [
+   "canli-vaka sprint-397 T11: tests/docs/X.test.ts dogru + docs/X.test.ts hayaleti -> gate BLOCK; 392'de nav-items benzeri"
+  ],
+  "primary_files": [
+   "src/orchestra/task-builder.ts",
+   "src/orchestra/sprint-planner.ts"
+  ],
+  "spec": "Structured-parse yolunda filesWrite tureten mantigi bul (muhtemelen basename x scope-dir join veya Kanit/description path-cikarimi); Files-listesi varken ek-turetme yapilmasin. REPRODUCE: 397-011 fixture.",
+  "verify": "fixture: Files+Scope'lu DIRECTIVES -> filesWrite birebir Files; gate false-BLOCK yok"
  }
 ]
