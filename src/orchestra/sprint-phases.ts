@@ -37,6 +37,9 @@ import { getDebtItems } from '../core/debt-store.js';
 import { isPidAlive as isPidAliveShared } from '../core/pid-liveness.js';
 import type { ProviderAdapter } from '../core/provider.js';
 import type { SpawnBackend } from './spawn-backend.js';
+// born-614 SPRINT-TRACE-WIRE: EVALUATE-sonu worker-transcript + Brain-verdict kaydı.
+import { recordSprintWorkerTrace } from './output-collector.js';
+import { createOutputCollector } from '../core/output-collector.js';
 
 // ─── Notify (DECKENT→USER:NOTIFY — Hot Fix H6) ──────────────────
 import { notify } from '../core/notify.js';
@@ -2094,6 +2097,39 @@ export async function runEvaluatePhase(
       }
     }
     debugLog('runEvaluatePhase:done', `evaluations.size=${evaluations.size} keys=[${[...evaluations.keys()].join(',')}]`);
+
+    // ─── born-614 SPRINT-TRACE-WIRE (TRN-P0 sprint-yarısı) ─────────────
+    // Record each evaluated task's worker transcript + FINAL Brain verdict to
+    // `.deckent/traces/sprint-worker.jsonl` (SP-2 fine-tune pipeline format).
+    // Runs AFTER every verdict settles (post-loop): the label must be Brain's
+    // evaluation, never the worker's self-claim (result-evaluator: "Brain makes
+    // the final call"). Default-OFF (`training_trace.enabled`), fail-soft —
+    // a trace fault never drops EVALUATE (ADR-G-009). Tasks without a collected
+    // result (NOT_DISPATCHED / timeout-synthetic) have no transcript to record.
+    try {
+      if (config?.training_trace?.enabled === true) {
+        const traceCollector = createOutputCollector(projectRoot);
+        for (const [traceTaskId, verdict] of evaluations) {
+          const traceResult = resultsMap.get(traceTaskId);
+          if (!traceResult) continue;
+          const traceTask = sprint.tasks.find(t => t.id === traceTaskId);
+          recordSprintWorkerTrace({
+            enabled: true,
+            projectRoot,
+            collector: traceCollector,
+            meta: {
+              taskId: traceTaskId,
+              sprintId: sprint.id,
+              agent: traceTask?.assignedAgent ?? 'generic',
+              model: traceTask?.model ?? 'unknown',
+              selfAssessment: verdict,
+              workerSelfAssessment: traceResult.selfAssessment,
+              ts: new Date().toISOString(),
+            },
+          });
+        }
+      }
+    } catch (e) { debugLog('runEvaluatePhase:sprintTrace', e); }
 
     // ─── Post-Execution Overlap Check (Sprint 324 — Task 324-004) ──────
     // After all workers complete: detect files actually changed by >1 worker.

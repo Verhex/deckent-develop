@@ -150,4 +150,40 @@ describe('toSprintTrainingExample', () => {
     expect(ex.messages[1]!.content).not.toContain(SECRET);
     expect(ex.messages[1]!.content).toContain('[REDACTED]');
   });
+
+  it('born-614: carries workerSelfAssessment alongside the Brain-verdict label (honesty-gap signal)', () => {
+    const ex = toSprintTrainingExample(EVENTS, {
+      taskId: '350-780',
+      sprintId: 'sprint-350',
+      agent: 'architect',
+      model: 'sonnet',
+      selfAssessment: 'NO_GO',            // Brain'in nihai verdict'i = outcome-label kaynagi
+      workerSelfAssessment: 'DONE',       // worker'in kendi (yanlis) iddiasi
+      ts: 'T',
+    });
+    expect(ex.meta.selfAssessment).toBe('NO_GO');
+    expect(ex.meta.workerSelfAssessment).toBe('DONE');
+  });
+
+  it('born-614: workerSelfAssessment absent -> field omitted (pre-614 shape byte-identical)', () => {
+    const ex = toSprintTrainingExample(EVENTS, {
+      taskId: 't', sprintId: 's', agent: 'a', model: 'm', selfAssessment: 'DONE', ts: 'T',
+    });
+    expect('workerSelfAssessment' in ex.meta).toBe(false);
+  });
+});
+
+describe('born-614 call-site composition pin (yarim-wire sinifina karsi)', () => {
+  it('runEvaluatePhase contains the training_trace-gated recordSprintWorkerTrace sweep', () => {
+    // Ayni siniftan uc yarim-wire yasandi (desktop isLocalRendererUrl, tool_surface
+    // default-ON, recordSprintWorkerTrace'in kendisi) - modul testli olsa da cagiran
+    // kaybolursa bu pin kirmiziya doner.
+    const src = readFileSync(join(process.cwd(), 'src', 'orchestra', 'sprint-phases.ts'), 'utf-8');
+    const evalPhase = src.slice(src.indexOf('export async function runEvaluatePhase('));
+    expect(evalPhase).toContain("config?.training_trace?.enabled === true");
+    expect(evalPhase).toContain('recordSprintWorkerTrace({');
+    expect(evalPhase).toContain('workerSelfAssessment: traceResult.selfAssessment');
+    // Verdict (Brain evaluation) label olarak geciyor - worker-iddiasi degil:
+    expect(evalPhase).toContain('selfAssessment: verdict');
+  });
 });

@@ -21,6 +21,8 @@ export interface TraceMeta {
   sprintId?: string;
   agent?: string;
   selfAssessment?: string;
+  /** born-614: worker's own claim alongside the Brain verdict (honesty-gap signal). */
+  workerSelfAssessment?: string;
 }
 export interface OpenAiMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -36,7 +38,15 @@ export interface SprintTraceMeta {
   sprintId: string;
   agent: string;
   model: string;
+  /** The GROUND-TRUTH outcome label. born-614 wiring passes Brain's final
+   *  TaskEvaluation verdict here (not the worker's claim) — the pipeline's
+   *  normalizeOutcome maps it to the training `outcome` label, and a label
+   *  derived from a self-claim would poison the moat (feedback: trust Brain
+   *  eval, not worker). */
   selfAssessment: string;
+  /** The worker's OWN claim, kept alongside the Brain verdict (born-614) —
+   *  the claim↔verdict delta is itself a training signal (honesty gap). */
+  workerSelfAssessment?: string;
   ts: string;
 }
 
@@ -92,6 +102,9 @@ export function toSprintTrainingExample(events: readonly LogEvent[], meta: Sprin
       sprintId: meta.sprintId,
       agent: meta.agent,
       selfAssessment: meta.selfAssessment,
+      ...(meta.workerSelfAssessment !== undefined
+        ? { workerSelfAssessment: meta.workerSelfAssessment }
+        : {}),
     },
   };
 }

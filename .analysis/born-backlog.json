@@ -2373,8 +2373,9 @@
    "src/orchestra/output-collector.ts",
    "src/core/config-types.ts"
   ],
-  "spec": "REPL-trace canli; sprint-worker recorder'i result/verdict ile birlikte kayda baglansin (fine-tune/eval moat). Dormant-default-off + enabled-path testi.",
-  "verify": "enabled fixture: sprint-task -> trace dosyasi (outcome/verdict alanli); disabled byte-identik"
+  "spec": "[DONE 2026-07-10 Faz-1 el-kod: runEvaluatePhase verdict-settle-sonrasi tek-sweep — Brain-verdict=ground-truth-label (worker-iddiasiyla etiketleme moat'i zehirlerdi) + workerSelfAssessment=durustluk-acigi-sinyali (meta additive); default-OFF training_trace.enabled, fail-soft, composition-pin'li; 10/10 + orchestra+training+agent 541-dosya blast. Gercek-sprint kaniti=Faz-1 cikis-smoke'unda.] REPL-trace canli; sprint-worker recorder'i result/verdict ile birlikte kayda baglansin (fine-tune/eval moat). Dormant-default-off + enabled-path testi.",
+  "verify": "enabled fixture: sprint-task -> trace dosyasi (outcome/verdict alanli); disabled byte-identik",
+  "status": "DONE"
  },
  {
   "sources": [
