@@ -1895,8 +1895,8 @@
   "primary_files": [
    "src/cli/repl/"
   ],
-  "proposed_mode": "design-then-sprint",
-  "spec": "deckent native terminalinde (REPL/Ink) Claude Code tarzı @-referans: input'ta `@path/dosya` yazinca (a) fuzzy autocomplete popup (tracked+workdir dosyalar; dizinler; ileride MCP resources/agents/skills), (b) secilen referans prompt-context'ine dosya icerigi/dizin listesi olarak enjekte, (c) cok-referans destegi, (d) buyuk dosyada dürüst truncation-sinyali + boyut-limiti, (e) i18n + NO_COLOR + cursor-model uyumu. Mekanizma string-free (label caller'dan). Mevcut input-bar/cursor-model/stream-segmenter mimarisi uzerine — yeniden-yazma YOK.",
+  "proposed_mode": "alperen-owned (feat/term-tool-parity worktree)",
+  "spec": "[2026-07-10 Alperen kendi worktree'sinde ustlendi — loop PLANLAMASIN] deckent native terminalinde (REPL/Ink) Claude Code tarzı @-referans: input'ta `@path/dosya` yazinca (a) fuzzy autocomplete popup (tracked+workdir dosyalar; dizinler; ileride MCP resources/agents/skills), (b) secilen referans prompt-context'ine dosya icerigi/dizin listesi olarak enjekte, (c) cok-referans destegi, (d) buyuk dosyada dürüst truncation-sinyali + boyut-limiti, (e) i18n + NO_COLOR + cursor-model uyumu. Mekanizma string-free (label caller'dan). Mevcut input-bar/cursor-model/stream-segmenter mimarisi uzerine — yeniden-yazma YOK.",
   "verify": "hermetik input-bar testleri (autocomplete/selection/injection) + Tier-1 real-binary smoke (REPL acilir, @ yazinca popup, secim -> prompt'ta icerik)",
   "wire_on": "default-on (yeni additive input-ozelligi; mevcut davranisi degistirmez)"
  },
@@ -2057,5 +2057,22 @@
   ],
   "spec": "Sprint-391'de 9/9 task overrideWarnings tasidi, hicbir yuzeyde gorunmedi. Plan-tablosu/dry-run ciktisina + plan-review'a tasi (prompt-gate WARN'lari gibi).",
   "verify": "plan dry-run fixture: override-warning gorunur; warning'siz plan ayni cikti"
+ },
+ {
+  "born_id": 596,
+  "title": "TERM-TOOL-PARITY: native terminalde bagli-olmayan tool'lar (web-search/skill-dispatch paritesi vb.) — ALPEREN-OWNED",
+  "sources": [
+   "memory: project_native_repl_tool_parity_gap (F11 adayi)",
+   "alperen 2026-07-10: feat/term-tool-parity worktree'sinde kendisi calisiyor"
+  ],
+  "severity": "P1",
+  "subsystem": "repl",
+  "primary_files": [
+   "src/cli/repl/"
+  ],
+  "proposed_mode": "alperen-owned (feat/term-tool-parity worktree)",
+  "spec": "Loop bu alana sprint PLANLAMAZ (cakisma-onleme). Alperen merge edince result-file/commit-dedup ile kapanis islenir. Kapsam Alperen'de: REPL tool-dispatch baglanmamis tool'lar + muhtemelen born-586 @-referans ile birlikte.",
+  "verify": "merge-sonrasi: ana-agacta tsc+ilgili suite yesil; loop-dedup guncellenir",
+  "wire_on": "alperen-karari"
  }
 ]
