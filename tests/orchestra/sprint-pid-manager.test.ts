@@ -284,8 +284,8 @@ describe('sprint-pid-manager', () => {
       expect(existsSync(snapPath)).toBe(false);
       expect(existsSync(join(tmpRoot, '.deckent', 'sprint-state.json'))).toBe(false);
 
-      // Archive directory should have files
-      const archiveDir = join(tmpRoot, '.brain', 'archive');
+      // Archive directory should have files (archiveOrphan writes under .brain/archive/sprints/)
+      const archiveDir = join(tmpRoot, '.brain', 'archive', 'sprints');
       expect(existsSync(archiveDir)).toBe(true);
       const archiveFiles = readdirSync(archiveDir);
       expect(archiveFiles.length).toBeGreaterThanOrEqual(2);

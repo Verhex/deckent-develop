@@ -1,97 +1,178 @@
-# DIRECTIVES — SPRINT-7: GOV/API-SECURITY + CROSS-PLATFORM + NPM-CONSUMER TAIL (6 task, dogfood-gate)
+# DIRECTIVES — SPRINT-8: 16-RED TEST-SWEEP (RCA-kanıtlı, 9 task, dogfood-gate)
 
 ## Goal
-Maraton devam (loop-goal): 6 OPEN born-item (result-file dedup: 79 TRUE-DONE / 15 debt-landed / 39 OPEN → bu 6
-temiz+worker-uygun). 1 güvenlik (565 ai-session tool-allowlist) + 1 cross-platform Law#2 (580 provider spawn→
-buildCliInvocation) + 2 npm-consumer (576 SDK-exports · 579 doctor-honesty) + 1 robustness (501 EPIPE) + 1 audit
-(500 brain-exports, doc). 5 distinct-file paralel + 1 zincir (579→576 package.json serialize). prompt-gate
-(G1a/G1d/G1c) plan-time dogfood. git-guard CANLI. SSOT: `.analysis/deckent-marathon-loop-state.md`. Yasa #1/#2/#3.
+Maraton devam (loop-goal): full tests/orchestra sweep'in açığa çıkardığı 16 pre-existing red'in kapanışı.
+RCA ground-truth (temp-worktree + ampirik reproduce): 15 = 4 ürün-değişikliğinin test-sweep'siz artığı
+(fc365609 arşiv-düzeni · 68072ad2 git-guard · fbc2eea2 scope-gate · 01d3f494 forceSkills-doğrulama ·
+05a1fd42 F0.3) + 1 = task-builder lokal-state hermeticity leak (CODE-FIX dahil). origin/main CI'sı
+2026-07-07'den beri KIRMIZI (fc365609 ailesi) — bu sprint lokal tests/orchestra'yı tam-yeşile çeker.
+9 distinct-file paralel. prompt-gate plan-time dogfood. git-guard CANLI.
+SSOT: `.analysis/deckent-marathon-loop-state.md`. Yasa #1/#2/#3.
 
 ## 🔒 BAĞLAYICI
-- **DISTINCT-FILE (KAPALI):** sprint-planner/result-evaluator/sprint-phases/result-collector/sprint-controller/server.ts/config.ts/routing-engine.ts/adr-selector.ts/prompt-gate.ts. **565 = server.ts TEK-YAZAR** (bu sprint'te başka task server.ts'e dokunmaz).
+- **DISTINCT-FILE (KAPALI):** sprint-planner/result-evaluator/sprint-phases/result-collector/sprint-controller/server.ts/config.ts/routing-engine.ts/adr-selector.ts/prompt-gate.ts. **Task 1 = task-builder.ts TEK-YAZAR** (bu sprint'te başka task task-builder.ts'e dokunmaz).
 - **git stash/reset/checkout/clean YASAK** (born-499 guard; salt-oku `git show HEAD:<yol>`).
-- Her task kendi testi + hermetik (tmpdir/async spawn/no spawnSync-in-test/no gitignored-state). i18n getMessage.
-- `notes` TEK STRING. Self DÜRÜST (LP-10 disk-verify). Surgical minimum-diff. Mevcut testleri bozma.
+- Her task hermetik (tmpdir/async spawn/no spawnSync-in-test/no gitignored-state). i18n getMessage (user-facing string yok bu sprint'te — mekanizma).
+- `notes` TEK STRING. Self DÜRÜST (LP-10 disk-verify). Surgical minimum-diff. Mevcut GEÇEN testleri bozma.
+- **TEST-FIX ilkesi:** intent'i koru — assert'i "geçsin diye" gevşetme; ürünün YENİ davranış-kontratını assert et. Şüphede NO_GO yaz.
 
-## Task 1: born-501 — CLI-EPIPE-GRACEFUL — process-level EPIPE handler (P2)
-- Model: sonnet
-- Agent: api-builder
-- Skills: typescript-expert, testing-expert
-- Files: src/cli/entry.ts, tests/cli/epipe-graceful.test.ts
-- Scope: src/cli/, tests/cli/
-- Dependencies: none
-### Description
-`deckent status | head` gibi pipe-kesme kullanımında stdout/stderr EPIPE fırlıyor → crash-log üretiyor (crash-log'ların ~%80'i bu). FIX: process-seviyesi stdout/stderr `error`-handler ekle — `EPIPE`'te sessizce exit 0 (crash-log YAZMA); diğer hatalar mevcut davranışta kalsın. (Mevcut `process.on('unhandledRejection'/SIGTERM)` handler'larını BOZMA — entry.ts:903/1010 commit'li.)
-### goNogo
-- goCriteria: stdout/stderr EPIPE → sessiz exit 0, crash-log yok (test: pipe-close simüle → no throw / no crash-log write); EPIPE-dışı stream-error mevcut davranışta.
-- nogo: unhandledRejection/signal handler'larını değiştirme; tüm hataları yutma (yalnız EPIPE).
-- Smoke: `node dist/cli/entry.js status --json | head -1` → EPIPE crash-log YOK, exit 0.
-
-## Task 2: born-565 — AI-SESSION-TOOL-ALLOWLIST — kind==='ai' client-tool validation (P1, güvenlik)
-- Model: sonnet
-- Agent: api-builder
-- Skills: typescript-expert, secure-coding, testing-expert
-- Files: src/api/server.ts, tests/api/ai-session-tool-allowlist.test.ts
-- Scope: src/api/, tests/api/
-- Dependencies: none
-### Description
-`POST /api/terminal/sessions` — `kind==='shell'` için config-gate var (server.ts:1961) ama `kind==='ai'` için client-supplied `input.tool` string'i allowlist/deny-list doğrulaması OLMADAN `terminalMgr.create({ tool: input.tool })`'e ulaşıyor → keyfi tool spawn riski. FIX: `kind==='shell'`'e uygulanan aynı tool-allowlist/deny-list doğrulamasını `kind==='ai'` (ve genel olarak tüm kind) için de uygula — doğrulanmamış client-tool string'i ASLA `spawn()`'a ulaşmasın; reddedince 400/403 + net hata. (357-009 shell-kind config-gate'ini BOZMA — commit'li.)
-### goNogo
-- goCriteria: `kind==='ai'` + allowlist-dışı `tool` → 400/403 reddi (test, gerçek HTTP round-trip veya handler-invoke); allowlist-içi tool normal geçer; shell-kind gate bozulmaz.
-- nogo: terminal session şemasını yeniden-tasarlama; server.ts'in başka bölümüne dokunma (tek-yazar).
-- Smoke: `POST /api/terminal/sessions {kind:'ai', tool:'<disallowed>'}` → reddedilir (spawn'a ulaşmaz).
-
-## Task 3: born-576 — SDK-PACKAGE-EXPORTS — publish embeddable SDK entry in package.json (P2)
-- Model: sonnet
-- Agent: api-builder
-- Skills: typescript-expert, testing-expert
-- Files: package.json, tests/sdk/package-exports.test.ts
-- Scope: ./, tests/sdk/
-- Dependencies: none
-### Description
-Gömülebilir SDK kod-tam ama package.json `exports` haritası public entry-point'i YAYINLAMIYOR → dış npm-tüketici `import { createDeckentClient } from 'deckent'` yapamaz (yalnız in-repo CLI/test çalışır). FIX: SDK'nın public entry-point'ini `exports` map'e ekle (mevcut `"main": "./dist/index.js"` + `"exports"` bloğu ile tutarlı; alt-path gerekiyorsa `"./sdk"` veya uygun subpath). Var olan export'ları BOZMA. (SDK giriş-noktasını `src/`de doğrula — spec code-complete diyor; yanlış-path verme.)
-### goNogo
-- goCriteria: package.json `exports` SDK-entry içerir (test: `exports` map'ten SDK subpath çözülür + hedef dosya var); mevcut CLI/bin export'ları korunur; JSON geçerli.
-- nogo: mevcut export/bin/main girişlerini kaldırma; olmayan bir entry-point uydurma (önce dosyayı doğrula).
-- Smoke: `node -e "require('./package.json').exports"` → SDK-entry görünür; hedef dist-dosyası mevcut.
-
-## Task 4: born-579 — DOCTOR-PREFLIGHT-HONESTY — pre-flight npm-install honesty (P2)
-- Model: sonnet
-- Agent: api-builder
-- Skills: typescript-expert, testing-expert
-- Files: src/cli/commands/doctor.ts, package.json, tests/cli/doctor-preflight-honesty.test.ts
-- Scope: src/cli/commands/, ./, tests/cli/
-- Dependencies: Task 3
-### Description
-`doctor --pre-flight` (doctor.ts:2260) npm-kurulu setup'larda sessizce devre-dışı (gereken `scripts/` yayınlanmıyor). FIX: ya `scripts/`'i package.json `files`'a ekleyip npm-tüketicide pre-flight çalışsın, YA da doctor --pre-flight bu install-modunda "check bu kurulumda mevcut değil" diye DÜRÜSTÇE raporlasın (sessizce skip ETME). Dürüst-rapor yolu tercih (minimum-diff, davranış-korur). (package.json'a 576 SDK-exports'undan SONRA dokun — zincir; `files`/`exports` çakışmasın. Mevcut doctor çıktılarını BOZMA — doctor.ts:630.)
-### goNogo
-- goCriteria: npm-install-modunda `doctor --pre-flight` ya çalışır ya "unavailable in this install mode" DÜRÜST raporlar (test: script-yokluğu simüle → honest-message, sessiz-skip yok); dev-modda mevcut davranış korunur.
-- nogo: 576'nın exports değişikliğini geri-alma (package.json zincir); doctor'un diğer alt-komutlarını değiştirme.
-- Smoke: `node dist/cli/entry.js doctor --pre-flight` → çalışır VEYA net "unavailable in npm-install" mesajı (sessiz-skip yok).
-
-## Task 5: born-580 — PROVIDER-SPAWN-SAFE — bare spawn() → buildCliInvocation (P1, cross-platform Law#2)
+## Task 1: RED-1 — TASK-BUILDER-ADR-CWD-LEAK — buildWorkerPrompt projectRoot honor + hermetik test (P1, CODE-FIX)
 - Model: sonnet
 - Agent: bug-fixer
-- Skills: typescript-expert, provider-cli-matrix, testing-expert
-- Files: src/providers/codex.ts, src/providers/gemini.ts, src/providers/ollama.ts, src/providers/openai-compatible.ts, src/providers/openrouter.ts, tests/providers/spawn-safe-crossplatform.test.ts
-- Scope: src/providers/, tests/providers/
+- Skills: typescript-expert, testing-expert
+- Files: src/orchestra/task-builder.ts, tests/orchestra/task-builder.test.ts
+- Scope: src/orchestra/, tests/orchestra/
 - Dependencies: none
 ### Description
-Windows-native kırılma kümesi (Law #2): provider adapter'ları çıplak `spawn('codex'/'gemini'/'ollama', …)` kullanıyor (codex.ts:191, gemini.ts:304, ollama.ts:243 + openai-compatible/openrouter) → Windows-native'de `.cmd`/PATH-resolution kırılır. FIX: her çıplak `spawn(<bin>, …)`'ı `src/core/provider.ts`'teki mevcut+doğru `buildCliInvocation()` deseniyle değiştir (shell-safe, cross-platform CLI-invocation; başka yerlerde zaten kullanılıyor). Davranışı KORU — yalnız invocation-katmanı cross-platform-güvenli olsun. (Orchestra spawn-site'ları — sprint-job-runner/sprint-finalizer — bu task'ta DEĞİL, loop-machinery; ayrı el-inceleme.)
+`buildWorkerPrompt`/ADR-injection yolu `.brain/memory.db`'yi kendi `projectRoot` parametresi yerine
+`process.cwd()`'den yüklüyor (task-builder.ts:1587 `const root = process.cwd()`; parametre :1572'de
+`= process.cwd()` default'lu; aynı fonksiyondaki DİĞER okumalar :1603/:1607/:1616/:1629 parametreyi
+ZATEN kullanıyor — ADR-load tek aykırı) → lokal-state'li ağaçta "includes full agentPrompt without
+truncation" testi 3001≠3000 X-count ile kırılıyor (G5 "ADVISORY CONTEXT" başlık-X'i sızıyor).
+FIX (advisor blast-radius-onaylı; 7 production çağrı-sitesi 3-arg → değişiklik byte-identik):
+(a) :1587'yi tam olarak `const root = projectRoot;` yap — EK fallback-mantığı EKLEME, parametre
+default'una DOKUNMA; (b) :1563-1565'teki bayat JSDoc'u gerçeğe güncelle; (c) testi hermetikleştir:
+tmp projectRoot fixture, gitignored lokal-state okumasın; (d) yeni test: projectRoot'ta DB varken
+cwd'de yokken ADR bloğunun projectRoot'tan geldiğini kanıtla.
+(Çağrı-sitelerine gerçek projectRoot threading = born-585, BU SPRINT'TE DEĞİL.)
 ### goNogo
-- goCriteria: 5 provider'daki çıplak spawn → buildCliInvocation (test: invocation Windows-path/`.cmd` deseninde güvenli çözülür; mevcut arg-geçişi korunur); Linux/macOS davranışı bozulmaz.
-- nogo: orchestra spawn-site'larına (sprint-job-runner.ts/sprint-finalizer.ts) dokunma; provider protokol/arg-semantiğini değiştirme.
-- Smoke: `node -e "import('./dist/providers/codex.js')"` → import temiz; buildCliInvocation refere edilir (grep).
+- goCriteria: X-count testi lokal `.brain/memory.db` VARKEN de yeşil (hermetik); yeni projectRoot-honor testi yeşil; tests/orchestra/task-builder.test.ts 263/263 yeşil; tsc temiz; `npm run test:ci-sim` task-builder için yeşil (bu hermeticity-sınıfının kanonik reproducer'ı).
+- nogo: ADR-injection içeriğini/formatını değiştirme; parametre default'unu değiştirme; çağrı-sitelerine dokunma (born-585 ayrı); başka prompt-bölümüne dokunma.
+- Kanıt: `npx vitest run tests/orchestra/task-builder.test.ts` → 0 fail.
 
-## Task 6: born-500 — BRAIN-EXPORTS-FORMAT-AUDIT — format+consumer+size analizi (P1, doc)
-- Model: haiku
-- Agent: documentation-writer
-- Skills: documentation-writer
-- Files: .analysis/brain-exports-format-audit-2026-07-09.md
-- Scope: .analysis/
+## Task 2: RED-2 — BRAIN-PROVIDER-MOCK — path-duyarlı mock (F0.3 _orphaned drain) (P2)
+- Model: sonnet
+- Agent: ci-guardian
+- Skills: ci-testing, typescript-expert
+- Files: tests/orchestra/brain-provider.test.ts
+- Scope: tests/orchestra/
 - Dependencies: none
 ### Description
-`.brain/exports/` (decisions.md **488KB**, memory.md 223KB, debt.md 20KB, summary.md 7.5KB) format+fonksiyon+per-consumer-gereklilik+size/truncation-politikası+DB↔FS-sync-kontratı analizi. Tüketiciler (doctor + adr-validator/memory-import + CLAUDE.md-include + bot + goal-planner) doğrulanmış → **dosyalar SİLİNMEZ**. Deliverable: `.analysis/brain-exports-format-audit-2026-07-09.md` — her dosyanın (a) formatı (b) hangi tüketici okur (c) size/truncation önerisi (özellikle 488KB decisions.md) (d) DB↔FS sync-kontratı. Yalnız ANALİZ + öneri; kod/dosya değişikliği YOK.
+"cleanup with SpawnBackend > does not archive non-prompt hidden files" (satır ~586): F0.3 (05a1fd42)
+`archivePromptFiles`'a `.tasks/archive/_orphaned/` staging-drain'i ekledi; testin battaniye mock'ları
+(`existsSync=true` her yol + tek `readdirSync` dizisi her dizin) aynı `.prompt-xyz.txt`'yi hem ana-dizin
+hem _orphaned taramasında gösteriyor → 2 rename ≠ 1. FIX: mock'ları path-duyarlı yap (ana `.tasks/`
+listesi ile `_orphaned/` listesi ayrı; _orphaned boş) → orijinal kontrat (non-prompt hidden dosyalar
+arşivlenmez) gerçekten test edilsin.
 ### goNogo
-- goCriteria: audit-md 4 export-dosyasını kapsar (format+consumer+size-öneri+sync-kontrat); decisions.md 488KB için somut truncation/pagination önerisi içerir; hiçbir export-dosyası silinmez/değişmez.
-- nogo: `.brain/exports/` veya `.brain/memory.db`'ye dokunma; kod değiştirme (salt-doc).
+- goCriteria: dosyanın 19 testi yeşil; assert-intent korunur (non-prompt hidden dosya arşivlenmez + prompt dosyası TEK kez taşınır).
+- nogo: src koduna dokunma; asserti silme/gevşetme.
+- Kanıt: `npx vitest run tests/orchestra/brain-provider.test.ts` → 0 fail.
+
+## Task 3: RED-3 — PID-MANAGER-ARCHIVE-PATH — sprints/ alt-dizin assert güncelle (P2)
+- Model: sonnet
+- Agent: ci-guardian
+- Skills: ci-testing, typescript-expert
+- Files: tests/orchestra/sprint-pid-manager.test.ts
+- Scope: tests/orchestra/
+- Dependencies: none
+### Description
+fc365609 (W7): `archiveOrphan` artık `.brain/archive/sprints/` altına yazıyor
+(sprint-pid-manager.ts:277); test `.brain/archive/` kökünü okuyup entry sayıyor. FIX: asserted-path'i
+yeni düzene güncelle (arşivlenen içerik-doğrulaması aynı kalsın).
+### goNogo
+- goCriteria: dosyanın 21 testi yeşil; arşiv-içerik asserti (dosya gerçekten taşındı) korunur.
+- nogo: src koduna dokunma.
+- Kanıt: `npx vitest run tests/orchestra/sprint-pid-manager.test.ts` → 0 fail.
+
+## Task 4: RED-4/5 — DEBT-INTEGRATION-LSFILES-MOCK — scope-gate uyumlu git-mock (P2, 2 test)
+- Model: sonnet
+- Agent: ci-guardian
+- Skills: ci-testing, typescript-expert
+- Files: tests/orchestra/runsprint-debt-integration.test.ts
+- Scope: tests/orchestra/
+- Dependencies: none
+### Description
+fbc2eea2 (F2.1) pre-spawn scope-gate'i ekledi (sprint-controller.ts:1140-1166): CRITICAL-debt'ten inject
+edilen fix-task'ın scope'u (src/) tracked-files'a karşı doğrulanıyor; testin global `spawnSync` mock'u
+`git ls-files`'a boş stdout döndürüyor → trackedFiles=[] → gate BrainError → 2 test kırık. FIX:
+`git ls-files` çağrısına src/-yolları içeren stdout döndür (diğer git-mock davranışlarını koru) →
+testler gate'in VARLIĞIYLA uyumlu koşsun.
+### goNogo
+- goCriteria: dosyanın 13 testi yeşil; debt-inject akış-assert'leri değişmeden geçer.
+- nogo: src koduna dokunma; gate'i bypass eden test-hack (örn. gate'i mock'lama) — mock'u GERÇEK gate'ten geçir.
+- Kanıt: `npx vitest run tests/orchestra/runsprint-debt-integration.test.ts` → 0 fail.
+
+## Task 5: RED-6/7/8 — DOCS-CLEANUP-ARCHIVE-PATH — sprints/ alt-dizin assert güncelle (P2, 3 test)
+- Model: sonnet
+- Agent: ci-guardian
+- Skills: ci-testing, typescript-expert
+- Files: tests/orchestra/sprint-docs-cleanup.test.ts
+- Scope: tests/orchestra/
+- Dependencies: none
+### Description
+fc365609: `archiveOrphanTasks` hedefi `.brain/archive/sprints/sprint-NNN-tasks/` oldu
+(sprint-docs-updater.ts:560); 3 test eski `.brain/archive/sprint-139-tasks/` yolunu assert ediyor.
+FIX: path-assert'leri yeni düzene güncelle (count+içerik assert'leri aynı).
+### goNogo
+- goCriteria: dosyanın 12 testi yeşil; .log/.timeout/.prompt-* arşivleme kontratları içerik-düzeyinde korunur.
+- nogo: src koduna dokunma.
+- Kanıt: `npx vitest run tests/orchestra/sprint-docs-cleanup.test.ts` → 0 fail.
+
+## Task 6: RED-9 — TMUX-EDGE-GUARD-AWARE — battaniye mkdirSync asserti hedefli yap (P2)
+- Model: sonnet
+- Agent: ci-guardian
+- Skills: ci-testing, typescript-expert
+- Files: tests/orchestra/tmux-edge.test.ts
+- Scope: tests/orchestra/
+- Dependencies: none
+### Description
+68072ad2 (born-499 git-guard): `spawnWorker` koşulsuz `installGitGuard` çağırıyor → guard shim-dir
+`mkdirSync(tmpdir()/deckent-git-guard/…)` (tmux.ts:298-299 → git-worker-guard.ts:153). Test
+"skips mkdirSync when .tasks dir already exists" battaniye `not.toHaveBeenCalled()` assert'iyle eskidi.
+FIX: 249a788d guard-aware deseninin aynısı — assert'i hedefe daralt:
+`not.toHaveBeenCalledWith('/myproject/.tasks', …)` (guard'ın kendi mkdir'i meşru).
+### goNogo
+- goCriteria: dosyanın 31 testi yeşil; ".tasks varken mkdir atlanır" intent'i hedefli-assert ile korunur.
+- nogo: src koduna dokunma; guard'ı mock'layıp yok sayma (guard-aware assert şart).
+- Kanıt: `npx vitest run tests/orchestra/tmux-edge.test.ts` → 0 fail.
+
+## Task 7: RED-10..13 — ROUTING-AFFINITY-SKILL-POOL — sentetik skill'leri pool'a kaydet (P1, 4 test)
+- Model: sonnet
+- Agent: ci-guardian
+- Skills: ci-testing, typescript-expert
+- Files: tests/orchestra/routing-affinity-enable.test.ts
+- Scope: tests/orchestra/
+- Dependencies: none
+### Description
+01d3f494 (F0.1) phantom forced-skill doğrulaması ekledi (routing-engine.ts:608-625): skill-pool'da
+olmayan forced skill DROP edilir. Test boş `new Map()` skill-pool geçiyor → `security-specialist`
+düşer → 4 test (flag-OFF baseline / flag-OMITTED / flag-ON flip / ON-vs-OFF) tek kök-nedenle kırık.
+FIX: testin kullandığı sentetik skill('ler)i pool Map'ine gerçek-shape'te kaydet → ADR-075
+affinity-baseline intent'i (flag-OFF=byte-identik, flag-ON=flip) yeniden gerçekten ölçülsün.
+### goNogo
+- goCriteria: dosyanın 14 testi yeşil; 4 assert'in NİYETİ değişmeden (baseline byte-identik + flip yönü) geçer.
+- nogo: routing-engine.ts'e dokunma (KAPALI dosya); flag-doğrulamasını gevşetme.
+- Kanıt: `npx vitest run tests/orchestra/routing-affinity-enable.test.ts` → 0 fail.
+
+## Task 8: RED-14 — ROUTING-HEALTH-SKILL-POOL — emptySkillPool → kayıtlı skill'ler (P2)
+- Model: sonnet
+- Agent: ci-guardian
+- Skills: ci-testing, typescript-expert
+- Files: tests/orchestra/agent-routing-health.test.ts
+- Scope: tests/orchestra/
+- Dependencies: none
+### Description
+Aynı kök-neden (01d3f494): "forced skills override is respected" (satır ~382) `emptySkillPool()`
+kullanıyor (dosya :182) → forced `typescript-expert`/`testing-expert` phantom-drop → `[]`. FIX:
+bu iki skill'i pool'a gerçek-shape'te kaydet; override-intent'i (forced > otomatik seçim) korunarak geçsin.
+### goNogo
+- goCriteria: dosyanın 12 testi yeşil; forced-override asserti gerçek pool'la geçer.
+- nogo: src koduna dokunma.
+- Kanıt: `npx vitest run tests/orchestra/agent-routing-health.test.ts` → 0 fail.
+
+## Task 9: RED-15/16 — ARCHIVE-DIRECTIVES-PATH — directives/ alt-dizin assert güncelle (P2, 2 test)
+- Model: sonnet
+- Agent: ci-guardian
+- Skills: ci-testing, typescript-expert
+- Files: tests/orchestra/archive-directives-default-preserve.test.ts
+- Scope: tests/orchestra/
+- Dependencies: none
+### Description
+fc365609: `archiveDirectives` artık `.brain/archive/directives/DIRECTIVES-<sprint>.md` yazıyor
+(sprint-docs-updater.ts:388, ARCHIVE_DIRECTIVES_SUBDIR); 2 test `.brain/archive/DIRECTIVES-…` kökünü
+bekliyor. FIX: path-assert'leri güncelle (preserve-default + overwrite-opt-in kontratları aynı).
+### goNogo
+- goCriteria: dosyanın 4 testi yeşil; auto_archive_directives=false → preserve default'u içerik-düzeyinde korunur.
+- nogo: src koduna dokunma.
+- Kanıt: `npx vitest run tests/orchestra/archive-directives-default-preserve.test.ts` → 0 fail.

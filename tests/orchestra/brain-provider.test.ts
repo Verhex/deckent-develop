@@ -569,11 +569,20 @@ describe('cleanup with SpawnBackend', () => {
 
   it('does not archive non-prompt hidden files', () => {
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue([
-      '.gitkeep',
-      '.dashboard',
-      '.prompt-xyz.txt',
-    ] as never);
+    // F0.3 (05a1fd42): archivePromptFiles also drains .tasks/archive/_orphaned/
+    // via its own readdirSync call. A blanket single-list mock makes
+    // '.prompt-xyz.txt' appear in both the main .tasks/ scan and the
+    // _orphaned scan, producing 2 renames instead of 1. Path-aware mock:
+    // main .tasks/ listing vs. archive/* listings (staging + retention root) are separate.
+    vi.mocked(readdirSync).mockImplementation((p: any) => {
+      const path = String(p);
+      if (path.includes('archive')) return [] as any;
+      return [
+        '.gitkeep',
+        '.dashboard',
+        '.prompt-xyz.txt',
+      ] as any;
+    });
     const sprint = makeSprint();
 
     cleanup(ROOT, sprint);

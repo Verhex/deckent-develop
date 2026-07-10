@@ -2,6 +2,26 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint391] - 2026-07-09
+
+### Added
+
+- RED-2 — BRAIN-PROVIDER-MOCK — path-duyarlı mock (F0.3 _orphaned drain) (P2)
+- RED-3 — PID-MANAGER-ARCHIVE-PATH — sprints/ alt-dizin assert güncelle (P2)
+- RED-4/5 — DEBT-INTEGRATION-LSFILES-MOCK — scope-gate uyumlu git-mock (P2, 2 test)
+- RED-6/7/8 — DOCS-CLEANUP-ARCHIVE-PATH — sprints/ alt-dizin assert güncelle (P2, 3 test)
+- RED-9 — TMUX-EDGE-GUARD-AWARE — battaniye mkdirSync asserti hedefli yap (P2)
+- RED-10..13 — ROUTING-AFFINITY-SKILL-POOL — sentetik skill'leri pool'a kaydet (P1, 4 test)
+- RED-14 — ROUTING-HEALTH-SKILL-POOL — emptySkillPool → kayıtlı skill'ler (P2)
+- RED-15/16 — ARCHIVE-DIRECTIVES-PATH — directives/ alt-dizin assert güncelle (P2, 2 test)
+
+### Fixed
+
+- RED-1 — TASK-BUILDER-ADR-CWD-LEAK — buildWorkerPrompt projectRoot honor + hermetik test (P1, CODE-FIX)
+
+
+_Tasks: 9 total, 9 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint390] - 2026-07-09
 
 ### Added

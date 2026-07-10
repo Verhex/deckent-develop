@@ -9541,3 +9541,33 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 390-006: born-500 — BRAIN-EXPORTS-FORMAT-AUDIT — format+consumer+size analizi (P1, doc) (DONE)
 
 ---
+## Sprint 391 — sprint-391
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-09
+**Duration:** 367s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 9 |
+| Completed | 9 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 367242ms |
+
+### Tasks
+
+- 391-001: RED-1 — TASK-BUILDER-ADR-CWD-LEAK — buildWorkerPrompt projectRoot honor + hermetik test (P1, CODE-FIX) (DONE)
+- 391-002: RED-2 — BRAIN-PROVIDER-MOCK — path-duyarlı mock (F0.3 _orphaned drain) (P2) (DONE)
+- 391-003: RED-3 — PID-MANAGER-ARCHIVE-PATH — sprints/ alt-dizin assert güncelle (P2) (DONE)
+- 391-004: RED-4/5 — DEBT-INTEGRATION-LSFILES-MOCK — scope-gate uyumlu git-mock (P2, 2 test) (DONE)
+- 391-005: RED-6/7/8 — DOCS-CLEANUP-ARCHIVE-PATH — sprints/ alt-dizin assert güncelle (P2, 3 test) (DONE)
+- 391-006: RED-9 — TMUX-EDGE-GUARD-AWARE — battaniye mkdirSync asserti hedefli yap (P2) (DONE)
+- 391-007: RED-10..13 — ROUTING-AFFINITY-SKILL-POOL — sentetik skill'leri pool'a kaydet (P1, 4 test) (DONE)
+- 391-008: RED-14 — ROUTING-HEALTH-SKILL-POOL — emptySkillPool → kayıtlı skill'ler (P2) (DONE)
+- 391-009: RED-15/16 — ARCHIVE-DIRECTIVES-PATH — directives/ alt-dizin assert güncelle (P2, 2 test) (DONE)
+
+---

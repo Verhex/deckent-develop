@@ -1560,9 +1560,10 @@ function readUpstreamHandoffs(task: Task, projectRoot: string): UpstreamHandoffE
  * @param task The task the worker will execute.
  * @param agentPrompt Optional agent PROMPT.md content.
  * @param skillPrompts Optional skill prompt blocks.
- * @param projectRoot Project root used to read `worker_comms` config + SharedMemory
- *   (Sprint 278 COMM-1 / 278-003). Defaults to `process.cwd()` — the established
- *   spawn-path root (same assumption as the in-function memory.db load).
+ * @param projectRoot Project root honored uniformly by every read in this function —
+ *   `worker_comms` config + SharedMemory (Sprint 278 COMM-1 / 278-003), the ADR/
+ *   `.brain/memory.db` load, the baseline-failure read, and `git ls-files`. Defaults
+ *   to `process.cwd()` — the established spawn-path root.
  * @returns The assembled worker prompt (also sets `task.estimatedTokens`).
  */
 export function buildWorkerPrompt(
@@ -1584,7 +1585,7 @@ export function buildWorkerPrompt(
   // Load accepted ADRs from Memory V2 if available (best-effort) for the ADR block.
   let allAdrs: MemoryEntryV2[] | undefined;
   try {
-    const root = process.cwd();
+    const root = projectRoot;
     const dbPath = join(root, BRAIN_DIR, MEMORY_DB_FILE);
     if (existsSync(dbPath)) {
       const store = new MemoryStore(dbPath);

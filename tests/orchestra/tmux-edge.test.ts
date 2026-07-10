@@ -178,7 +178,16 @@ describe.skipIf(isWindows)('spawnWorker edge cases', () => {
 
     spawnWorker('task-edge-02', 'opus', 'do work', '/myproject');
 
-    expect(mockedMkdirSync).not.toHaveBeenCalled();
+    // WORKER-GIT-GUARD (born-499): spawnWorker unconditionally calls
+    // installGitGuard(gitGuardDir, ...) which mkdirSync's the per-task shim
+    // dir (<tmpdir>/deckent-git-guard/<taskId>-<hex>) regardless of whether
+    // .tasks already exists — that mkdir is legitimate and must not be
+    // asserted away. The intent under test is narrower: writePromptFile must
+    // NOT mkdir the .tasks dir itself when existsSync says it's already there.
+    expect(mockedMkdirSync).not.toHaveBeenCalledWith(
+      '/myproject/.tasks',
+      { recursive: true },
+    );
   });
 
   it('writes prompt content to file (not embedded in command)', () => {

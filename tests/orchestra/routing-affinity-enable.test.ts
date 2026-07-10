@@ -29,6 +29,8 @@ import {
   type AgentSelectionSink,
 } from '../../src/core/routing-affinity-observability.js';
 import type { AgentDefinition, AgentPool } from '../../src/core/agent-types.js';
+import { createSkillDefinition } from '../../src/core/skill-types.js';
+import type { SkillDefinition } from '../../src/core/skill-types.js';
 import type { ActivationConfig, UserOverride } from '../../src/core/routing-types.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -99,6 +101,30 @@ const forceSecuritySkill: UserOverride[] = [
   { source: 'task-directive', forceSkills: [AFFINITY_SKILL], priority: 3 },
 ];
 
+// Real-shape skill fixture (mirrors src/core/builtins/skills/security-specialist/
+// manifest.json) — the forced-skill validation (routing-engine.ts:608-625, F0.1)
+// drops any forceSkills id absent from the skill-pool Map, so AFFINITY_SKILL must
+// be registered here for the tie/affinity assertions below to measure anything.
+const SECURITY_SKILL: SkillDefinition = createSkillDefinition({
+  id: AFFINITY_SKILL,
+  name: 'Security Specialist',
+  category: 'domain',
+  triggers: ['security', 'auth', 'jwt', 'encryption', 'vulnerability', 'owasp', 'csrf', 'xss', 'sql-injection'],
+  stackDetection: { files: [], dependencies: [], commands: [] },
+  composableWith: ['typescript-expert', 'python-expert', 'api-builder', 'devops-engineer'],
+  priority: 10,
+  activation: {
+    rules: [{ name: 'security-intent', when: { 'intent.primary': 'security' }, score: 10 }],
+    exclude: [],
+    minScore: 5,
+  },
+});
+
+/** Skill pool containing the registered AFFINITY_SKILL, real-shape (not an empty Map). */
+function buildSkillPool(): Map<string, SkillDefinition> {
+  return new Map([[SECURITY_SKILL.id, SECURITY_SKILL]]);
+}
+
 describe('routing-affinity enablement (343-007, ADR-075)', () => {
   it('precondition: AFFINITY_SKILL maps to AFFINITY_AGENT in SKILL_AGENT_MAP', () => {
     expect(SKILL_AGENT_MAP[AFFINITY_SKILL]).toBe(AFFINITY_AGENT);
@@ -106,7 +132,7 @@ describe('routing-affinity enablement (343-007, ADR-075)', () => {
 
   it('flag-OFF → generalist wins the tie (byte-identical baseline)', () => {
     const pool = buildTiePool();
-    const decision = routeTaskV2(TASK, pool, new Map(), {
+    const decision = routeTaskV2(TASK, pool, buildSkillPool(), {
       overrides: forceSecuritySkill,
       skillAgentAffinity: false,
     });
@@ -116,14 +142,14 @@ describe('routing-affinity enablement (343-007, ADR-075)', () => {
 
   it('flag-OMITTED → identical to flag-off (default-off contract)', () => {
     const pool = buildTiePool();
-    const decision = routeTaskV2(TASK, pool, new Map(), { overrides: forceSecuritySkill });
+    const decision = routeTaskV2(TASK, pool, buildSkillPool(), { overrides: forceSecuritySkill });
     expect(decision.agentId).toBe('refactorer');
     expect(decision.skillIds).toEqual([AFFINITY_SKILL]);
   });
 
   it('flag-ON → affinity bonus flips the tie to the skill-mapped agent', () => {
     const pool = buildTiePool();
-    const decision = routeTaskV2(TASK, pool, new Map(), {
+    const decision = routeTaskV2(TASK, pool, buildSkillPool(), {
       overrides: forceSecuritySkill,
       skillAgentAffinity: true,
     });
@@ -136,11 +162,11 @@ describe('routing-affinity enablement (343-007, ADR-075)', () => {
   });
 
   it('flag-ON vs flag-OFF: skillIds are byte-identical (only the agent differs)', () => {
-    const off = routeTaskV2(TASK, buildTiePool(), new Map(), {
+    const off = routeTaskV2(TASK, buildTiePool(), buildSkillPool(), {
       overrides: forceSecuritySkill,
       skillAgentAffinity: false,
     });
-    const on = routeTaskV2(TASK, buildTiePool(), new Map(), {
+    const on = routeTaskV2(TASK, buildTiePool(), buildSkillPool(), {
       overrides: forceSecuritySkill,
       skillAgentAffinity: true,
     });

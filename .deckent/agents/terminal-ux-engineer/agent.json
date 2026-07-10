@@ -67,7 +67,7 @@
     "totalUses": 7,
     "successRate": 0.8571428571428571,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-390"
+    "lastUsedInSprint": "sprint-391"
   },
   "role": "implementer",
   "domain": "terminal-ui",

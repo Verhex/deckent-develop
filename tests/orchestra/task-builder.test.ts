@@ -1,4 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { MemoryStore } from '../../src/core/memory-store.js';
 import {
   createTask,
   extractScopeFromDirective,
@@ -58,6 +62,15 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     createdAt: new Date().toISOString(),
     ...overrides,
   };
+}
+
+/**
+ * TASK-BUILDER-ADR-CWD-LEAK (391-001): a fresh tmp dir with no `.brain/memory.db`,
+ * so `buildWorkerPrompt`'s ADR-load path is deterministically empty regardless of
+ * whatever real `.brain/memory.db` exists at the actual repo cwd during a local run.
+ */
+function makeEmptyProjectRoot(): string {
+  return mkdtempSync(join(tmpdir(), 'task-builder-empty-root-'));
 }
 
 function makePlannerTask(overrides: Partial<PlannerTask> = {}): PlannerTask {
@@ -722,13 +735,23 @@ describe('buildWorkerPrompt — agentPrompt parameter', () => {
   });
 
   it('includes full agentPrompt without truncation', () => {
-    const longPrompt = 'X'.repeat(3000);
-    const task = makeTask({ assignedAgent: 'test-agent' });
-    const prompt = buildWorkerPrompt(task, longPrompt);
-    // agentPrompt is included without truncation (Sprint 147+ behavior)
-    const agentSection = prompt.split('## Your Task')[0]!;
-    const xCount = (agentSection.match(/X/g) || []).length;
-    expect(xCount).toBe(3000);
+    // TASK-BUILDER-ADR-CWD-LEAK (391-001): explicit empty projectRoot keeps this
+    // hermetic — without it, buildWorkerPrompt's ADR-load defaulted to
+    // process.cwd(), so a local checkout with a real `.brain/memory.db` could
+    // inject an ADR block (its "ADVISORY CONTEXT" header contains a literal "X")
+    // before '## Your Task' and inflate the count.
+    const emptyRoot = makeEmptyProjectRoot();
+    try {
+      const longPrompt = 'X'.repeat(3000);
+      const task = makeTask({ assignedAgent: 'test-agent' });
+      const prompt = buildWorkerPrompt(task, longPrompt, undefined, emptyRoot);
+      // agentPrompt is included without truncation (Sprint 147+ behavior)
+      const agentSection = prompt.split('## Your Task')[0]!;
+      const xCount = (agentSection.match(/X/g) || []).length;
+      expect(xCount).toBe(3000);
+    } finally {
+      rmSync(emptyRoot, { recursive: true, force: true });
+    }
   });
 
   it('uses "generic" for assignedAgent when not set', () => {
@@ -2177,6 +2200,50 @@ describe('buildWorkerPrompt — ADR injection', () => {
     // Without a real MemoryStore DB, queryRelevantADRs returns empty.
     // The prompt should still be well-formed.
     expect(prompt).toContain('Deckent worker agent');
+  });
+
+  // TASK-BUILDER-ADR-CWD-LEAK (391-001): buildWorkerPrompt's ADR-load previously
+  // read `.brain/memory.db` from `process.cwd()` instead of the `projectRoot`
+  // parameter it was given — the one inconsistent read in the function (every
+  // other read: worker_comms/SharedMemory, baseline, git ls-files already used
+  // `projectRoot`). Proves the fix: the ADR block is sourced from `projectRoot`
+  // even when `process.cwd()` points at a directory with no `.brain/memory.db`
+  // at all (so a cwd-based read would find nothing).
+  it('loads the ADR block from projectRoot, not process.cwd()', () => {
+    const cwdFixture = mkdtempSync(join(tmpdir(), 'task-builder-cwd-fixture-'));
+    const rootFixture = mkdtempSync(join(tmpdir(), 'task-builder-root-fixture-'));
+    const originalCwd = process.cwd();
+    let store: MemoryStore | undefined;
+    try {
+      mkdirSync(join(rootFixture, '.brain'), { recursive: true });
+      store = new MemoryStore(join(rootFixture, '.brain', 'memory.db'));
+      store.insert({
+        id: 'adr-999',
+        type: 'adr',
+        title: 'Fixture Marker ADR',
+        content: '# ADR-999: Fixture Marker\n\n**Status:** accepted\n\nFIXTURE_ADR_MARKER_CONTENT_XYZ.\n',
+        status: 'accepted',
+        sprint_id: 'sprint-999',
+        sprint_num: 999,
+      });
+      store.close();
+      store = undefined;
+
+      // cwd has NO .brain/memory.db — a cwd-based read finds nothing here.
+      process.chdir(cwdFixture);
+
+      // Task text explicitly references ADR-999 so it force-includes with a
+      // full (non-condensed) body, regardless of relevance scoring.
+      const task = makeTask({ description: 'Implements ADR-999 fixture behavior.' });
+      const prompt = buildWorkerPrompt(task, undefined, undefined, rootFixture);
+
+      expect(prompt).toContain('FIXTURE_ADR_MARKER_CONTENT_XYZ');
+    } finally {
+      store?.close();
+      process.chdir(originalCwd);
+      rmSync(cwdFixture, { recursive: true, force: true });
+      rmSync(rootFixture, { recursive: true, force: true });
+    }
   });
 });
 

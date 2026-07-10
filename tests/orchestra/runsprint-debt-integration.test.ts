@@ -357,10 +357,18 @@ function setupMocks(
   if (debtItems) {
     seedDebtStore(debtItems);
   }
-  // git commands in readContext
-  mockedSpawnSync.mockReturnValue({
-    status: 0, stdout: '', stderr: '', pid: 1, signal: null, output: [],
-  } as never);
+  // git commands in readContext + the pre-spawn scope-gate's `git ls-files`
+  // call (sprint-controller.ts) both go through this mock. `git ls-files`
+  // must report a tracked src/ path so evaluateScopeGate's directory check
+  // classifies legacy-fallback scopes (filesWrite: ['src/']) as
+  // new-plausible instead of suspect; every other git subcommand keeps the
+  // original empty-stdout behavior.
+  mockedSpawnSync.mockImplementation((_command, args) => {
+    const isLsFiles = Array.isArray(args) && args[0] === 'ls-files';
+    return {
+      status: 0, stdout: isLsFiles ? 'src/index.ts\n' : '', stderr: '', pid: 1, signal: null, output: [],
+    } as never;
+  });
 
   mockedExistsSync.mockImplementation((path: unknown) => {
     const p = String(path);

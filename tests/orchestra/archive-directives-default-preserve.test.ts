@@ -30,7 +30,7 @@ const TEST_ROOT = join(tmpdir(), 'deckent-test-archive-directives-default-preser
 describe('archiveDirectives — default preserve (Sprint 168 C0a-4 BUG-CC)', () => {
   beforeEach(() => {
     rmSync(TEST_ROOT, { recursive: true, force: true });
-    mkdirSync(join(TEST_ROOT, '.brain', 'archive'), { recursive: true });
+    mkdirSync(join(TEST_ROOT, '.brain', 'archive', 'directives'), { recursive: true });
   });
 
   afterEach(() => {
@@ -51,7 +51,7 @@ describe('archiveDirectives — default preserve (Sprint 168 C0a-4 BUG-CC)', () 
     expect(preservedContent).toBe(originalContent);
 
     // Archive copy MUST be written
-    const archivePath = join(TEST_ROOT, '.brain', 'archive', 'DIRECTIVES-sprint-168.md');
+    const archivePath = join(TEST_ROOT, '.brain', 'archive', 'directives', 'DIRECTIVES-sprint-168.md');
     expect(existsSync(archivePath)).toBe(true);
     expect(readFileSync(archivePath, 'utf-8')).toBe(originalContent);
   });
@@ -64,7 +64,7 @@ describe('archiveDirectives — default preserve (Sprint 168 C0a-4 BUG-CC)', () 
     archiveDirectives(TEST_ROOT, 'sprint-168', 'CLEANUP', { autoArchive: true });
 
     // Archive copy still written
-    const archivePath = join(TEST_ROOT, '.brain', 'archive', 'DIRECTIVES-sprint-168.md');
+    const archivePath = join(TEST_ROOT, '.brain', 'archive', 'directives', 'DIRECTIVES-sprint-168.md');
     expect(existsSync(archivePath)).toBe(true);
     expect(readFileSync(archivePath, 'utf-8')).toBe(originalContent);
 
@@ -84,7 +84,7 @@ describe('archiveDirectives — default preserve (Sprint 168 C0a-4 BUG-CC)', () 
     // No archive written, no error
     expect(existsSync(join(TEST_ROOT, 'DIRECTIVES.md'))).toBe(false);
     expect(
-      existsSync(join(TEST_ROOT, '.brain', 'archive', 'DIRECTIVES-sprint-168.md')),
+      existsSync(join(TEST_ROOT, '.brain', 'archive', 'directives', 'DIRECTIVES-sprint-168.md')),
     ).toBe(false);
   });
 
@@ -99,7 +99,7 @@ describe('archiveDirectives — default preserve (Sprint 168 C0a-4 BUG-CC)', () 
     expect(readFileSync(join(TEST_ROOT, 'DIRECTIVES.md'), 'utf-8')).toBe(originalContent);
     // No archive copy created
     expect(
-      existsSync(join(TEST_ROOT, '.brain', 'archive', 'DIRECTIVES-sprint-168.md')),
+      existsSync(join(TEST_ROOT, '.brain', 'archive', 'directives', 'DIRECTIVES-sprint-168.md')),
     ).toBe(false);
   });
 });

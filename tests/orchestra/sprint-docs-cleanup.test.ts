@@ -44,7 +44,7 @@ describe('archiveOrphanTasks — extended extension support', () => {
     const count = archiveOrphanTasks(root, 'sprint-139');
 
     expect(count).toBe(2);
-    const archiveDir = join(root, '.brain', 'archive', 'sprint-139-tasks');
+    const archiveDir = join(root, '.brain', 'archive', 'sprints', 'sprint-139-tasks');
     expect(existsSync(join(archiveDir, 'task-139-001.log'))).toBe(true);
     expect(existsSync(join(archiveDir, 'task-139-001.json'))).toBe(true);
     // Originals should be removed
@@ -59,7 +59,7 @@ describe('archiveOrphanTasks — extended extension support', () => {
     const count = archiveOrphanTasks(root, 'sprint-139');
 
     expect(count).toBe(2);
-    const archiveDir = join(root, '.brain', 'archive', 'sprint-139-tasks');
+    const archiveDir = join(root, '.brain', 'archive', 'sprints', 'sprint-139-tasks');
     expect(existsSync(join(archiveDir, 'task-139-002.timeout'))).toBe(true);
   });
 
@@ -70,7 +70,7 @@ describe('archiveOrphanTasks — extended extension support', () => {
     const count = archiveOrphanTasks(root, 'sprint-139');
 
     expect(count).toBe(2);
-    const archiveDir = join(root, '.brain', 'archive', 'sprint-139-tasks');
+    const archiveDir = join(root, '.brain', 'archive', 'sprints', 'sprint-139-tasks');
     expect(existsSync(join(archiveDir, '.prompt-abc123.txt'))).toBe(true);
   });
 

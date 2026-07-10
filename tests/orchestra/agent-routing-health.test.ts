@@ -8,6 +8,7 @@ import { routeTaskV2 } from '../../src/core/routing-engine.js';
 import { classifyIntent, detectPrimaryIntent, analyzeWriteScope } from '../../src/core/intent-classifier.js';
 import { getDynamicExclusions } from '../../src/core/activation-engine.js';
 import type { AgentDefinition, AgentPool } from '../../src/core/agent-types.js';
+import { createSkillDefinition } from '../../src/core/skill-types.js';
 import type { SkillDefinition } from '../../src/core/skill-types.js';
 import type { TaskScope } from '../../src/core/task-types.js';
 
@@ -171,15 +172,40 @@ function buildAgentPool(): AgentPool {
   return pool;
 }
 
-function emptySkillPool(): Map<string, SkillDefinition> {
-  return new Map();
+// Registers the two skills the forced-override test (Test 12) pins, in
+// real SkillDefinition shape — a truly empty pool silently drops forced
+// skill ids at routeTaskV2's forced-skill validation (skillPool.has(id)),
+// phantom-dropping the override. Deterministic `activation: { rules: [] }`
+// keeps the base score at 0 for every non-forced test in this file, so
+// neither skill can outscore cfg.skillMinScore on its own and change an
+// agentId assertion elsewhere.
+function buildSkillPool(): Map<string, SkillDefinition> {
+  const pool = new Map<string, SkillDefinition>();
+
+  pool.set('typescript-expert', createSkillDefinition({
+    id: 'typescript-expert',
+    name: 'typescript-expert',
+    category: 'language',
+    triggers: ['typescript', 'ts'],
+    activation: { rules: [], exclude: [], minScore: 5 },
+  }));
+
+  pool.set('testing-expert', createSkillDefinition({
+    id: 'testing-expert',
+    name: 'testing-expert',
+    category: 'domain',
+    triggers: ['test', 'spec', 'coverage', 'vitest'],
+    activation: { rules: [], exclude: [], minScore: 5 },
+  }));
+
+  return pool;
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
 describe('Agent Routing Health — Sprint 146', () => {
   const pool = buildAgentPool();
-  const skills = emptySkillPool();
+  const skills = buildSkillPool();
 
   // Test 1: T-145-020 ANA-PLAN-TR documentation task → doc-writer
   it('T-145-020: root .md filesWrite → intent documentation, agent doc-writer', () => {
