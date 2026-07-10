@@ -31,8 +31,15 @@ import type { ChannelRegistry } from '../agents/worker-ipc.js';
 import {
   writeAnswerFile,
   checkWorkerQuestions,
+  type HandleWorkerQuestionOptions,
 } from './ipc-registry.js';
+import { bridgeQuestionToApproval } from './question-approval-bridge.js';
+import { ApprovalBroker } from '../core/approval-broker.js';
 import type { BrainAnswer, WorkerQuestion, TokenUsage } from '../core/task-types.js';
+
+// born-611 B-katmanı: soru-köprüsü timeout'u gate'in 5dk insan-penceresiyle hizalı
+// (bridge'in kendi default'u 60sn — insan-karar için kısa; advisor S3).
+const QUESTION_BRIDGE_TIMEOUT_MS = 5 * 60_000;
 
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
@@ -1501,6 +1508,31 @@ export async function waitForResults(
 
   setupIpcListeners();
 
+  // born-611 B-katmanı (CKPT-QUESTION-BRIDGE-WIRE canlıya alma): flag-on iken CLI
+  // worker'ların `.question`'ları hardcoded 'continue' yerine runtime-wide
+  // ApprovalBroker'a köprülenir (terminal/API'den kararlanabilir). Brain-side
+  // dış-karar SÜRÜCÜSÜ ŞART (advisor R2): karar başka process'te diske yazılır;
+  // interval'siz her soru timeout-continue'ya sürüklenirdi (60sn statüko-regresyonu).
+  // Timeout gate'in 5dk politikasıyla hizalı; fail-open 'continue' = statüko.
+  let questionBridgeWire:
+    | { options: Pick<HandleWorkerQuestionOptions, 'questionBridgeEnabled' | 'bridge' | 'broker'>; dispose: () => void }
+    | undefined;
+  if (config?.approval?.question_bridge === true) {
+    const qbBroker = new ApprovalBroker(projectRoot);
+    const qbTimer = setInterval(() => {
+      try { qbBroker.checkForExternalDecisions(); } catch (e) { debugLog('waitForResults:qbDrive', e); }
+    }, 1000);
+    qbTimer.unref();
+    questionBridgeWire = {
+      options: {
+        questionBridgeEnabled: true,
+        broker: qbBroker,
+        bridge: (q, b, o) => bridgeQuestionToApproval(q, b, { ...o, timeoutMs: QUESTION_BRIDGE_TIMEOUT_MS }),
+      },
+      dispose: () => clearInterval(qbTimer),
+    };
+  }
+
   // Use fs.watch with fallback polling (5s instead of 15s)
   const watcher = createResultWatcher(projectRoot, WATCH_FALLBACK_MS);
   // born-452 tick-armor: a single tick-step throwing (collectResults /
@@ -1586,7 +1618,10 @@ export async function waitForResults(
       }
       // Check for pending worker questions and auto-answer them
       // (sprintId → NPM-ADVISORY questions surface a human notification)
-      checkWorkerQuestions(projectRoot, taskIds, collected, { sprintId: sprint.id });
+      checkWorkerQuestions(projectRoot, taskIds, collected, {
+        sprintId: sprint.id,
+        ...(questionBridgeWire?.options ?? {}),
+      });
       // Periodic progress log (every 5 minutes)
       const now = Date.now();
       if (now - lastProgressLog >= PROGRESS_LOG_INTERVAL_MS) {
@@ -1604,6 +1639,7 @@ export async function waitForResults(
   } finally {
     watcher.close();
     costGuard?.stop();
+    questionBridgeWire?.dispose();
   }
   // Final sweep: collect any real .result files written during/after the last poll cycle
   // Note: Only read .result files here (not .timeout) to avoid side effects in edge cases

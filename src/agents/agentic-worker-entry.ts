@@ -36,6 +36,7 @@ import {
   type AgenticRunnerResult,
   type SelfAssessment,
 } from './agentic-worker-runner.js';
+import { setupWorkerApprovalGateFromEnv } from './worker-approval-env.js';
 import { normalizeUsage } from '../core/token-usage.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -401,6 +402,11 @@ export async function runWorkerEntry(
   };
   if (deps.fetchImpl) runnerOpts.fetchImpl = deps.fetchImpl;
 
+  // born-611: approval-gate env-kontratı (orchestrator `approval.gate_enabled`
+  // iken DECKENT_APPROVAL_GATE enjekte eder; yokken sıfır-ayakizi — gate kurulmaz).
+  const approvalSetup = setupWorkerApprovalGateFromEnv(projectDir, taskId);
+  if (approvalSetup.approvalGate) runnerOpts.approvalGate = approvalSetup.approvalGate;
+
   let runResult: AgenticRunnerResult;
   try {
     runResult = await runner(runnerOpts);
@@ -410,6 +416,8 @@ export async function runWorkerEntry(
     const p = writeResultFile(taskId, projectDir, r);
     writeHeartbeat(taskId, projectDir, 'NO_GO', 2, 0);
     return { exitCode: 1, resultPath: p, result: r };
+  } finally {
+    approvalSetup.dispose();
   }
 
   const result = await buildResultFromRunner(runResult, projectDir, model);

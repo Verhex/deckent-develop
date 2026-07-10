@@ -189,13 +189,25 @@ export function createWorkerApprovalGate(
   opts: WorkerApprovalGateFactoryOptions = {},
 ): WorkerApprovalGateHandle {
   const broker = new ApprovalBroker(cwd);
+  // born-611 R1 (advisor-confirmed cross-process race): a decision written by
+  // ANOTHER process (terminal/API) moments before the gate's timeout must WIN
+  // over the fallback guess — otherwise the fallback's decide() overwrites the
+  // human's allow on disk while the UI shows "approved". Flushing the external-
+  // decision seam right before resolving the fallback settles any real decision
+  // first; the gate's own decide() then throws APR_ALREADY_DECIDED and its
+  // catch path returns the GENUINE decision instead.
+  const baseResolver = opts.fallbackResolver;
+  const flushingResolver: FallbackResolver = (ctx) => {
+    try { broker.checkForExternalDecisions(); } catch { /* fail-soft: fallback still applies */ }
+    return baseResolver ? baseResolver(ctx) : 'deny';
+  };
   const gate = new WorkerApprovalGate({
     broker,
     requester,
     tenantId: opts.tenantId ?? 'local',
     userId: opts.userId ?? 'local-user',
     timeoutMs: opts.timeoutMs,
-    fallbackResolver: opts.fallbackResolver,
+    fallbackResolver: flushingResolver,
   });
   return { gate, broker };
 }

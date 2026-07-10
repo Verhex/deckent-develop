@@ -2580,5 +2580,21 @@
   "status": "OPEN",
   "source": "sprint-399 BEFORE-done advisor",
   "spec": "Advisor-notlar (B): (1) SAN-2 adoption yalnız runSprint pre-spawn yolunda — deckent plan çıktısı ve start.ts:329 plan-tablosu PRE-adoption scope gösterir; operatörün gördüğü ile workerın aldığı farklı olabilir (kozmetik ama güven-yüzeyi). (2) task-builder render-anında git ls-files başarısız olursa trackedRootFiles=undefined → sanitizer Rule-5 sessiz-drop O RENDER için geri döner ve hiçbir katman yakalamaz (plan-time gate geçmişti); düşük-olasılık — render-yolu git-fail durumunda scopeWarnings üretimini worker-prompta uyarı-bloğu olarak basmak veya spawnı geciktirmek değerlendirilebilir."
+ },
+ {
+  "born_id": 630,
+  "title": "Worker-approval yaşam-kalitesi ailesi: allowscope-wire + deny-retry-spam + bekleme-hb + classifier-dedup",
+  "priority": "P1",
+  "status": "OPEN",
+  "source": "born-611 BEFORE-substantive advisor (sprint-400 el-kod)",
+  "spec": "Advisor S5/S6 kalanları: (1) createWorkerApprovalGate allowStore GEÇİRMİYOR (permission-store.ts:192-199) → worker-gate tarafında always-allow yapısal-ölü — aynı komut her seferinde onay ister (deny-yorgunluğu). (2) [approval-denied] normal tool-result → model aynı komutu yeniden dener, her deneme YENİ request = bildirim yağmuru; (scopeId,scope,cmd) process-içi deny-cache veya N-denial-sonrası stop-mesajı. (3) Onay beklerken entry hb-refresh yok → Auditor >2min stale-alarm + adapter taskTimeout SIGKILL riski; bekleme-sırası hb-refresh ekle. (4) agents/worker.ts:729-751 classifyRiskyWorkerCommand kopyası agentic-worker-tools sınıflandırıcısından DRIFT (git checkout--/stash-drop/pip-apt eksik) + orchestra/worker.ts:33-34 ölü-import — tek classifier'a indir. (5) Deny-tally .result.notes'a (Brain-eval sinyali)."
+ },
+ {
+  "born_id": 631,
+  "title": "ApprovalExpiryDriver prod-sürücüsüz (ölü) — pending süresiz kalır",
+  "priority": "P2",
+  "status": "OPEN",
+  "source": "born-611 BEFORE-substantive advisor (sprint-400 el-kod)",
+  "spec": "approval-expiry-driver.ts:41 hiçbir prod yerden çalıştırılmıyor; gate kendi timeout'unu yönetiyor ama TERMINAL/API tarafında görünen pending'ler expiresAt geçse de auto-expire edilmiyor (liste kirlenir; POST 409 döner ama görsel-pending kalır). serve/API process'ine veya REPL approvals-surface'ına driver tak; born-611 wire'ında kapsam-dışı bırakıldı."
  }
 ]

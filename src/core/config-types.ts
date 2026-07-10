@@ -173,6 +173,13 @@ export interface ApprovalConfig {
    *  config.json` authors; it is intentionally NOT mirrored onto
    *  `ResolvedConfig.approval` (see that type's doc comment). */
   api_decide?: boolean;
+  /** Activate the brain-side question→approval bridge (question-approval-bridge.ts
+   *  via ipc-registry's CKPT-QUESTION-BRIDGE-WIRE seam): a CLI worker's `.question`
+   *  becomes a runtime-wide ApprovalRequest decidable from the terminal/API instead
+   *  of the hardcoded 'continue' auto-answer. Default: false. Timeout falls back to
+   *  the historical 'continue' (fail-open — a QUESTION is consultation, not a risky
+   *  action; enforcement is `gate_enabled`'s job on in-process workers). */
+  question_bridge?: boolean;
 }
 
 // ─── Night-Landed Flag Configs (Sprint 356, Task 356-012 TRACE-CONFIG-TYPES) ──
@@ -1315,6 +1322,7 @@ export interface ResolvedConfig {
     rules: ApprovalPolicyRule[];
     gate_enabled: boolean;
     relay_enabled: boolean;
+    question_bridge: boolean;
   };
   /** Observability configuration (passed through from DeckentConfig) */
   observability?: DeckentConfig['observability'];

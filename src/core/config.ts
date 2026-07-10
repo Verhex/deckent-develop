@@ -1161,6 +1161,7 @@ export function resolveApprovalConfig(
     rules,
     gate_enabled: config.approval?.gate_enabled ?? false,
     relay_enabled: config.approval?.relay_enabled ?? false,
+    question_bridge: config.approval?.question_bridge === true,
   };
 }
 

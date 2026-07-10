@@ -175,6 +175,7 @@ import {
   removeWorkerStateMachine,
   type WorkerLifecycleState,
 } from '../agents/worker.js';
+import { buildWorkerApprovalGateEnv } from '../agents/worker-approval-env.js';
 
 // ─── Runtime vs Code Discriminator (Sprint 139 Task 024) ─────────
 import {
@@ -764,6 +765,7 @@ export async function spawnWorkers(
         reasoningEffort,
         excludeDynamicPromptSections,
         taskTimeoutSeconds,
+        env: buildWorkerApprovalGateEnv(config.approval?.gate_enabled === true, task.sprintId, task.id),
       });
     } else if (wantsHostAdapter) {
       // MF-2 (Sprint 250): host-only provider (codex/gemini/ollama) but its
@@ -796,6 +798,7 @@ export async function spawnWorkers(
           allowedTools,
           autoApprove: spawnOpts?.autoApprove ?? false,
           projectDir: projectRoot,
+          env: buildWorkerApprovalGateEnv(config.approval?.gate_enabled === true, task.sprintId, task.id),
         });
       }
     } else {
@@ -1022,6 +1025,7 @@ export async function respawnEligibleTasks(
         reasoningEffort,
         excludeDynamicPromptSections,
         taskTimeoutSeconds,
+        env: buildWorkerApprovalGateEnv(config.approval?.gate_enabled === true, task.sprintId, task.id),
       });
     } else if (wantsHostAdapter) {
       // MF-2 (Sprint 250): FIX-phase re-spawn of a host-only provider whose
@@ -1053,6 +1057,7 @@ export async function respawnEligibleTasks(
           allowedTools,
           autoApprove: spawnOpts?.autoApprove ?? false,
           projectDir: projectRoot,
+          env: buildWorkerApprovalGateEnv(config.approval?.gate_enabled === true, task.sprintId, task.id),
         });
       }
     } else {

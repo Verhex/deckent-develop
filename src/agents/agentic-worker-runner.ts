@@ -32,6 +32,7 @@ import {
   type ToolExecOptions,
 } from '../cli/commands/chat-tool-exec.js';
 import type { McpToolDispatcher } from '../cli/commands/chat-native.js';
+import { wrapDispatcherWithApprovalGate, type ApprovalGateLike } from './agentic-worker-tools.js';
 import { OLLAMA_TOOLS } from './agentic-worker-tools.js';
 import { isPathInScope, type ScopeLike } from './scope-guard.js';
 import {
@@ -111,6 +112,15 @@ export interface AgenticRunnerOptions {
    * duplication.
    */
   liveTrace?: { enabled?: boolean };
+  /**
+   * born-611 (APR-P0): when supplied AND `enabled`, the tool dispatcher is
+   * wrapped with `wrapDispatcherWithApprovalGate` so risky tool-classes
+   * (shell-exec/git-mutation/network) pass `gate.guard()` BEFORE dispatch.
+   * Omitted/disabled → dispatcher reference is byte-identical (no wrapper).
+   * The caller (entry) owns gate construction + external-decision driving —
+   * see `worker-approval-env.ts`.
+   */
+  approvalGate?: { enabled: boolean; gate: ApprovalGateLike; scopeId: string };
 }
 
 /**
@@ -435,9 +445,19 @@ export async function runAgenticWorker(
     dispatcher: injectedDispatcher,
     logger = () => undefined,
     liveTrace,
+    approvalGate,
   } = opts;
 
-  const dispatcher = injectedDispatcher ?? buildDefaultDispatcher(projectRoot);
+  const baseDispatcher = injectedDispatcher ?? buildDefaultDispatcher(projectRoot);
+  // born-611: approval-gate sarımı — flag-off/absent yolunda wrapper YOK,
+  // referans bire-bir baseDispatcher (wrapDispatcherWithApprovalGate kontratı).
+  const dispatcher = approvalGate
+    ? wrapDispatcherWithApprovalGate(baseDispatcher, {
+        enabled: approvalGate.enabled,
+        gate: approvalGate.gate,
+        scopeId: approvalGate.scopeId,
+      })
+    : baseDispatcher;
   const emitProgress = createProgressEmitter(taskId, projectRoot, liveTrace?.enabled === true);
   emitProgress(WLT_STEP.START, `model=${model} host=${host} maxIterations=${maxIterations}`);
 

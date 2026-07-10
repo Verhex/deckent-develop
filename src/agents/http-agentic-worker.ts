@@ -47,7 +47,8 @@ import {
   type ToolExecOptions,
 } from '../cli/commands/chat-tool-exec.js';
 import type { McpToolDispatcher } from '../cli/commands/chat-native.js';
-import { OLLAMA_TOOLS } from './agentic-worker-tools.js';
+import { OLLAMA_TOOLS, wrapDispatcherWithApprovalGate, type ApprovalGateLike } from './agentic-worker-tools.js';
+import { setupWorkerApprovalGateFromEnv } from './worker-approval-env.js';
 import { isPathInScope } from './scope-guard.js';
 import {
   writeEvent,
@@ -187,6 +188,14 @@ export interface HttpAgenticRunnerOptions {
    */
   emitEvent?: HttpAgenticEventEmitter;
   logger?: (line: string) => void;
+  /**
+   * born-611 (APR-P0): when supplied AND `enabled`, the tool dispatcher is
+   * wrapped with `wrapDispatcherWithApprovalGate` (risky tool-classes gate
+   * through `guard()` before dispatch). Omitted/disabled → byte-identical
+   * dispatcher reference. Gate construction + external-decision driving is
+   * the entry's job — see `worker-approval-env.ts`.
+   */
+  approvalGate?: { enabled: boolean; gate: ApprovalGateLike; scopeId: string };
 }
 
 // ─── Tool argument parsing + dispatch glue ────────────────────────────────────
@@ -303,9 +312,19 @@ export async function runHttpAgenticWorker(
     dispatcher: injectedDispatcher,
     emitEvent: injectedEmitEvent,
     logger = () => undefined,
+    approvalGate,
   } = opts;
 
-  const dispatcher = injectedDispatcher ?? buildDefaultDispatcher(projectRoot);
+  const baseDispatcher = injectedDispatcher ?? buildDefaultDispatcher(projectRoot);
+  // born-611: approval-gate sarımı — flag-off/absent yolunda wrapper YOK,
+  // referans bire-bir baseDispatcher (wrapDispatcherWithApprovalGate kontratı).
+  const dispatcher = approvalGate
+    ? wrapDispatcherWithApprovalGate(baseDispatcher, {
+        enabled: approvalGate.enabled,
+        gate: approvalGate.gate,
+        scopeId: approvalGate.scopeId,
+      })
+    : baseDispatcher;
   const emitEvent = injectedEmitEvent ?? buildDefaultEmitEvent(projectRoot);
 
   const messages: HttpAgenticMessage[] = [
@@ -715,6 +734,11 @@ export async function runHttpWorkerEntry(
     send,
   };
 
+  // born-611: approval-gate env-kontratı (orchestrator `approval.gate_enabled`
+  // iken DECKENT_APPROVAL_GATE enjekte eder; yokken sıfır-ayakizi — gate kurulmaz).
+  const approvalSetup = setupWorkerApprovalGateFromEnv(projectDir, taskId);
+  if (approvalSetup.approvalGate) runnerOpts.approvalGate = approvalSetup.approvalGate;
+
   let runResult: HttpAgenticResult;
   try {
     runResult = await runner(runnerOpts);
@@ -724,6 +748,8 @@ export async function runHttpWorkerEntry(
     const p = writeResultFile(taskId, projectDir, r);
     writeHeartbeat(taskId, projectDir, 'NO_GO', 2, 0, provider);
     return { exitCode: 1, resultPath: p, result: r };
+  } finally {
+    approvalSetup.dispose();
   }
 
   const result = await buildResultFromLoop(runResult, projectDir, provider, model);
