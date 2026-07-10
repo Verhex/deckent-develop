@@ -99,6 +99,11 @@ if (!gotSingleInstanceLock) {
       profileStore,
       getWindows: () => getAllWindows().values(),
       getWindowForProfile,
+      // born-597 channel-tiering güvenlik-katmanının ZORUNLU köprüsü: bu alan
+      // verilmezse ipc-handlers fail-closed olarak TÜM connection.* çağrılarını
+      // reddeder (tasarım gereği) — yani bu satır düşerse desktop bağlantı-akışı
+      // komple kilitlenir (2026-07-10 Codex cross-check'inin yakaladığı canlı vaka).
+      isLocalRendererUrl,
       onConnected: (profileId, daemonUrl, _tokens) => {
         // _tokens (api/terminal) intentionally dropped here: no consumer exists yet
         // (terminal-panel/auth storage is a future feature, not this hardening task's

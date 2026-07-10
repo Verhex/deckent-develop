@@ -394,3 +394,28 @@ describe('adopt-path meta race (best-effort fallback)', () => {
     }
   });
 });
+
+// ─── Composition-pin (Codex cross-check vakası, 2026-07-10) ───────────────────
+// Sprint-394'te guard (ipc-handlers) ve hardening (index) AYRI single-writer
+// task'lardı; aradaki köprü — index.ts'in registerIpcHandlers deps'ine
+// isLocalRendererUrl'ü GEÇMESİ — hiçbir testin konusu değildi ve düştü:
+// production desktop'ta tüm connection.* fail-closed kilitliydi. Bu test o
+// sınıfı statik pinler: gerçek kompozisyon kaynağında (index.ts) deps bloğu
+// alanı içermek ZORUNDA. (Kaba source-assert — Electron'lu index.ts'i
+// import etmeden kompozisyonu pinlemenin hermetik yolu.)
+import { readFileSync } from 'node:fs';
+import { dirname as pinDirname, join as pinJoin } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+describe('composition pin — index.ts wires isLocalRendererUrl into registerIpcHandlers', () => {
+  it('the registerIpcHandlers({...}) block in index.ts contains isLocalRendererUrl', () => {
+    const indexSrc = readFileSync(
+      pinJoin(pinDirname(fileURLToPath(import.meta.url)), '..', 'src', 'main', 'index.ts'),
+      'utf-8',
+    );
+    const start = indexSrc.indexOf('registerIpcHandlers({');
+    expect(start, 'registerIpcHandlers call not found in index.ts').toBeGreaterThan(-1);
+    const block = indexSrc.slice(start, indexSrc.indexOf('});', start));
+    expect(block).toContain('isLocalRendererUrl');
+  });
+});
