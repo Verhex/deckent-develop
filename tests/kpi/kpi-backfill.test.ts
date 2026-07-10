@@ -200,10 +200,14 @@ describe('KpiService — self-healing backfill on read', () => {
   });
 
   it('goCriteria: listSprintViews on a forward-collection-gap DB returns non-empty results with a numeric cost_per_sprint', () => {
-    // Seed ONLY sprint history (NULL-tenant, mirroring real persisted records) —
-    // no kpi_measurements at all.
+    // Seed ONLY sprint history — no kpi_measurements at all. Tenanted seed:
+    // born-563 strict-tenant fail-closed (pinned in memory-store tests, 397-T6)
+    // means a 'default'-tenant read no longer sees NULL-tenant rows, so a
+    // NULL-tenant seed would (correctly) be invisible to the backfill. The
+    // LEGACY NULL-tenant-DB self-heal policy is a real open product question —
+    // ledgered under the born-609 tenant family, not this test's contract.
     const mem = new MemoryStore(dbPath);
-    seedSprintRecord(mem, { sprintId: 'sprint-330', total: 28, completed: 28, noGo: 0 });
+    seedSprintRecord(mem, { sprintId: 'sprint-330', total: 28, completed: 28, noGo: 0, tenantId: 'default' });
     mem.close();
 
     const svc = new KpiService(dbPath);

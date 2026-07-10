@@ -60,9 +60,9 @@ describe.skipIf(!hasConfig)('Nervous Faz 1 smoke config (.deckent/config.json)',
     expect(detectors['stale_worker']['threshold_ms']).toBe(180000);
   });
 
-  it('dead_event_stream detector is disabled (reserved)', () => {
+  it('dead_event_stream detector is enabled (Sprint 148 reserve cleared)', () => {
     const detectors = ns['detectors'] as Record<string, Record<string, unknown>>;
-    expect(detectors['dead_event_stream']['enabled']).toBe(false);
+    expect(detectors['dead_event_stream']['enabled']).toBe(true);
   });
 
   it('directives_protection detector is enabled', () => {
@@ -70,10 +70,10 @@ describe.skipIf(!hasConfig)('Nervous Faz 1 smoke config (.deckent/config.json)',
     expect(detectors['directives_protection']['enabled']).toBe(true);
   });
 
-  it('exactly 5 detectors are enabled', () => {
+  it('exactly 8 detectors are enabled', () => {
     const detectors = ns['detectors'] as Record<string, Record<string, unknown>>;
     const enabledCount = Object.values(detectors).filter((d) => d['enabled'] === true).length;
-    expect(enabledCount).toBe(5);
+    expect(enabledCount).toBe(8);
   });
 
   it('W0 6 new detectors are all disabled', () => {

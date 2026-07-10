@@ -95,8 +95,9 @@ describe('Docker HB Deploy Wire — Script Template', () => {
 
   it('worker script has TERM trap that fsyncs and exits cleanly', () => {
     const source = readSource('spawn-backend-docker.ts');
-    // TERM trap must fsync .result + .hb then exit 0
-    expect(source).toMatch(/trap\s+'fsync_file "\$RFILE"; fsync_file "\$HBFILE"; exit 0'\s+TERM/);
+    // TERM trap must fsync .result + .hb then exit 143 (128+SIGTERM — born-466:
+    // exit 0 made on_exit misclassify a docker-stop as a clean run).
+    expect(source).toMatch(/trap\s+'fsync_file "\$RFILE"; fsync_file "\$HBFILE"; exit 143'\s+TERM/);
   });
 
   it('worker script heartbeat loop interval is 15s (HB gap < 5s from host perspective)', () => {

@@ -2,6 +2,22 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint398] - 2026-07-10
+
+### Added
+
+- LAT-ADR — brain/decisions + dead-code-decisions: yeni-taksonomiye taşı (17 fail)
+- LAT-ORPHAN — governance orphan-allowlist ratchet-refresh (1 fail)
+- LAT-EXEC — tmux-backend + docker-oom + docker-hb (4 fail)
+- LAT-NERVOUS — nervous-faz1-smoke (2 fail)
+
+### Changed
+
+- LAT-KPI-SEED — kpi-backfill + init-builtin-seed (3 fail) (completed with tech debt)
+
+
+_Tasks: 12 total, 10 done, 2 tech debt, 2 no-go_
+
 ## [1.0.0-beta.1-sprint397] - 2026-07-10
 
 ### Added

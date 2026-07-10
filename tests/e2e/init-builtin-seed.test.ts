@@ -16,7 +16,12 @@ import { join } from 'node:path';
 
 import { seedBuiltins } from '../../src/cli/commands/init-steps.js';
 
-// ─── Expected Built-in Agents (15) ─────────────────────────────────
+// ─── Expected Built-in Agents (17) ─────────────────────────────────
+// Grown from the original 15 by sprint-361 (integration-engineer,
+// terminal-ux-engineer — commit 70fe74be). NOT listed here: api-designer,
+// i18n-specialist, observability-engineer (sprint-369, commit ea87df64) —
+// those ship PROMPT.md only, no agent.json yet, so they are excluded from
+// this fully-wired allowlist pending manifest completion.
 
 const EXPECTED_AGENTS = [
   'accessibility-auditor',
@@ -30,13 +35,22 @@ const EXPECTED_AGENTS = [
   'devops-engineer',
   'doc-writer',
   'frontend-designer',
+  'integration-engineer',
   'migration-specialist',
   'performance-analyzer',
   'refactorer',
   'security-auditor',
+  'terminal-ux-engineer',
 ];
 
-// ─── Expected Built-in Skills (21) ──────────────────────────────────
+// ─── Expected Built-in Skills (28) ──────────────────────────────────
+// Grown from the original 21 by sprints 359/363/364 (file-watch-hygiene,
+// ink-tui — commit 06947b09; onboarding-ux, rpc-protocol — commit 08330de5;
+// provider-cli-matrix — commit 874c7b6b) and commit ec91a409 (secure-coding)
+// plus sh-portability (commit 06947b09). NOT listed here: api-design,
+// i18n-quality, observability (sprint-368, commit 220a66f5) — those ship
+// SKILL.md only, no manifest.json yet, so they are excluded from this
+// fully-wired allowlist pending manifest completion.
 
 const EXPECTED_SKILLS = [
   'accessibility-expert',
@@ -48,15 +62,22 @@ const EXPECTED_SKILLS = [
   'devops-engineer',
   'docker-expert',
   'documentation-writer',
+  'file-watch-hygiene',
   'frontend-design',
   'git-expert',
   'graphql-expert',
+  'ink-tui',
   'migration-expert',
   'monorepo-expert',
+  'onboarding-ux',
   'performance-optimizer',
+  'provider-cli-matrix',
   'python-expert',
   'react-specialist',
+  'rpc-protocol',
+  'secure-coding',
   'security-specialist',
+  'sh-portability',
   'system-architect',
   'testing-expert',
   'typescript-expert',
@@ -181,21 +202,27 @@ describe('Built-in Agent + Skill Seeding Pipeline', () => {
 });
 
 describe('Built-in Source Directory Integrity', () => {
-  it('src/core/builtins/agents/ contains exactly 15 agents', () => {
+  it('src/core/builtins/agents/ contains exactly 20 agents', () => {
     const builtinsAgentDir = join(process.cwd(), 'src', 'core', 'builtins', 'agents');
     expect(existsSync(builtinsAgentDir)).toBe(true);
     const agents = readdirSync(builtinsAgentDir);
-    expect(agents.length).toBe(15);
+    // 17 fully-wired (EXPECTED_AGENTS) + 3 manifest-incomplete carryovers
+    // (api-designer, i18n-specialist, observability-engineer — sprint-369,
+    // PROMPT.md only, no agent.json yet).
+    expect(agents.length).toBe(20);
     for (const agent of EXPECTED_AGENTS) {
       expect(agents).toContain(agent);
     }
   });
 
-  it('src/core/builtins/skills/ contains exactly 21 skills', () => {
+  it('src/core/builtins/skills/ contains exactly 31 skills', () => {
     const builtinsSkillDir = join(process.cwd(), 'src', 'core', 'builtins', 'skills');
     expect(existsSync(builtinsSkillDir)).toBe(true);
     const skills = readdirSync(builtinsSkillDir);
-    expect(skills.length).toBe(21);
+    // 28 fully-wired (EXPECTED_SKILLS) + 3 manifest-incomplete carryovers
+    // (api-design, i18n-quality, observability — sprint-368, SKILL.md only,
+    // no manifest.json yet).
+    expect(skills.length).toBe(31);
     for (const skill of EXPECTED_SKILLS) {
       expect(skills).toContain(skill);
     }

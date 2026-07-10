@@ -1,160 +1,93 @@
-# DIRECTIVES — SPRINT-14: CI-YEŞİLİ (GOAL-v3 Faz-0, 12 task)
+# DIRECTIVES — SPRINT-15: COVERAGE-JOB LATENT-SET (Faz-0 kapanışı, 6 task)
 
 ## Goal
-5 CI-workflow'unu yeşile çek. **KANIT-TABANI (her task ÖNCE kendi ailesini okusun): `.analysis/ci-red-rca-2026-07-10.md`**
-— her ailenin kök-nedeni/kırıcı-commit'i/fix-yönü orada; K-kararlar (Alperen): K2 fail-closed onay · K3 autoApprove=false
-onay · **K4 README sprint-badge GERİ-GELECEK (test AYNEN kalır)** · K1 sidecar=born-605 (bu sprintte T8 cerrahi re-zero).
-TEST-FIX ilkesi: intent'i koru, ürünün YENİ kontratını pinle, gevşetme yok. SSOT: marathon GOAL-v3. Yasa #1/#2/#3.
+CI'ın Coverage-Report job'u TAM-suite koşuyor → staged-job'larda görünmeyen 9 latent-dosya/28-fail orada CI'ı
+kırıyor (kalan tek-kırmızı job bu; Secret/Docs/E2E/Dashboard yeşile döndü). Her task DIAGNOSE-FIRST: kırıcı-commit'i
+`git log -- <SUT>` ile bul → sınıfla (TEST-STALE / CODE-BUG / DATA) → TEST-STALE ise intent-koruyarak yeni-kontratı
+pinle; CODE-BUG ise dokunma NO_GO+not (Brain karar verir). Bilinen bağlam: ADR-taksonomi redesign'ı (Haziran-30,
+89→41→46 ADR, `adr-g/d-NNN` id'leri — eski ADR-001..021/ADR-038 düzeni ARŞİV) + W7 arşiv-düzeni + born-587/394-395
+değişiklikleri. SSOT: marathon GOAL-v3 Faz-0. Yasa #1/#2/#3.
 
 ## 🔒 BAĞLAYICI
-- Tüm task'lar DISTINCT-FILE (RCA-partisyonu çakışmasız tasarlandı); kapalı hot-dosyalar aynen (kimse src/orchestra-core'a dokunmaz; tek src-değişikliği T7'nin chat-tool-exec.ts'i + T8'in 2 manifest-datası).
-- git stash/reset/checkout/clean YASAK · hermetik test · spawnSync yasak · `notes` TEK STRING · Self DÜRÜST · surgical.
-- Her task kanıt-komutunda TAM test-dosyası koşar (tek-test değil).
+- DISTINCT-FILE; src'ye dokunmak YASAK (yalnız tests/ + gerekçeli data-dosyası) — CODE-BUG bulunursa NO_GO+not.
+- git stash/reset/checkout/clean YASAK · hermetik test (gitignored-state okumadan; `.brain/exports/*` TRACKED'dır serbest) · `notes` TEK STRING · Self DÜRÜST.
+- Kanıt her task'ta TAM dosya-koşusu.
 
-## Task 1: T1-ARITY — born-585 4.arg assert'leri (2 dosya)
+## Task 1: LAT-ADR — brain/decisions + dead-code-decisions: yeni-taksonomiye taşı (17 fail)
 - Model: sonnet | Agent: ci-guardian | Skills: ci-testing, typescript-expert
-- Files: tests/orchestra/task-mode-agent-inject.test.ts, tests/cli/commands/spawn-enhanced.test.ts
+- Files: tests/brain/decisions.test.ts, tests/audits/dead-code-decisions.test.ts
 - Scope: tests/
 - Dependencies: none
 ### Description
-RCA F6b: buildWorkerPrompt artık 4-arg (projectRoot); exact-arity assert'lere 4. arg ekle (inject ×3: '/tmp/proj'; spawn-enhanced ×2: '/mock/root').
+İkisi de `.brain/exports/decisions.md`'yi ESKİ ADR-düzeniyle assert ediyor (ADR-001..021 sıralı-numara, ADR-014/15/16/17/18
+konu-eşleşmeleri, ADR-038 dead-code). Redesign-sonrası gerçek: `adr-g-NNN`/`adr-d-NNN` id'leri, 46 ADR, crosswalk
+`.analysis/adr-review-crosswalk.md` + docs/adr/README.md. FIX: (a) format-testlerini yeni-düzene dinamikleştir
+(sabit-21 yerine header-sayımı; sıralı-numara yerine id-desen doğrulaması); (b) konu-testlerini crosswalk'tan yeni-id'lere
+taşı (örn. ADR-038-dead-code'un halefi hangi adr-g ise ona; crosswalk'ta yoksa konunun VAR olduğunu içerik-grep'le pinle);
+(c) decisions.md'nin GERÇEK güncel içeriğine karşı yaz — kafadan id uydurma.
 ### goNogo
-- goCriteria: 2 dosya tam yeşil; assert'ler 4-arg'ı PİNLER (gevşek matcher değil).
-- Kanıt: `npx vitest run tests/orchestra/task-mode-agent-inject.test.ts tests/cli/commands/spawn-enhanced.test.ts` → 0 fail.
+- goCriteria: 2 dosya tam yeşil; testler yeni-taksonomi kontratını pinler (eski-düzen nostaljisi silinir, konu-kapsamı korunur).
+- Kanıt: `npx vitest run tests/brain/decisions.test.ts tests/audits/dead-code-decisions.test.ts` → 0 fail.
 
-## Task 2: T2-STATUS — f0a03b6f orphan-gate mock+fixture (4 dosya)
-- Model: sonnet | Agent: ci-guardian | Skills: ci-testing, typescript-expert
-- Files: tests/cli/commands/status.test.ts, tests/cli/commands/status-mode.test.ts, tests/cli/commands/status-agents.test.ts, tests/cli/commands.test.ts
+## Task 2: LAT-ORPHAN — governance orphan-allowlist ratchet-refresh (1 fail)
+- Model: sonnet | Agent: ci-guardian | Skills: ci-testing
+- Files: tests/governance/orphan-deliverables.test.ts
 - Scope: tests/
 - Dependencies: none
 ### Description
-RCA F1 (+commands.test'teki F4 satırı — dosya YALNIZ bu task'ta): output.js mock'larına `isDashboardOrphaned: vi.fn(()=>false)` (RCA deneyle kanıtladı) + sabit-2026-03 fixture'ları `new Date()`; commands.test'in autoApprove-satırı K3-yeni-default'u (false) pinler.
+Repo-wide gate 95-orphan buluyor, allowlist 86 bekliyor (9-drift). DIAGNOSE: 9 yeni-orphan'ı listele (test çıktısı verir) —
+her biri için `git log`'la kaynağı bul; GERÇEKTEN kasıtlı-bekleyen ise allowlist'e GEREKÇELİ ekle; şüpheli/ölü ise ekleme,
+notes'a yaz (silme kararı Brain'in). Battaniye-sayı-güncelleme YASAK — giriş-başına gerekçe.
 ### goNogo
-- goCriteria: 4 dosya tam yeşil; orphan-gate'in KENDİSİ ayrıca pinli (orphaned=true fixture'ında gate-davranışı assert'i — yeni davranışı gerçekten test et, sadece susturma).
-- Kanıt: `npx vitest run tests/cli/commands/status.test.ts tests/cli/commands/status-mode.test.ts tests/cli/commands/status-agents.test.ts tests/cli/commands.test.ts` → 0 fail.
+- goCriteria: dosya yeşil; allowlist-diff'i giriş-başına gerekçeli; şüpheliler notes'ta.
+- Kanıt: `npx vitest run tests/governance/orphan-deliverables.test.ts` → 0 fail.
 
-## Task 3: T3-START-NERVOUS-CLEANUP — F2+F3+F4 (4 dosya)
+## Task 3: LAT-KPI-SEED — kpi-backfill + init-builtin-seed (3 fail)
 - Model: sonnet | Agent: ci-guardian | Skills: ci-testing, typescript-expert
-- Files: tests/cli/commands/start.test.ts, tests/cli/start-sandbox.test.ts, tests/cli/nervous-ipc-route.test.ts, tests/cli/cleanup-log-archive.test.ts
+- Files: tests/kpi/kpi-backfill.test.ts, tests/e2e/init-builtin-seed.test.ts
 - Scope: tests/
 - Dependencies: none
 ### Description
-RCA F2 (handleAccept pending-drop → length 0) + F3 (arşiv 'sprints' segmenti ×4) + F4 (K3: autoApprove default=false pinle — start.test'in bilinen-42-red üyesi autoApprove-testi dahil).
+DIAGNOSE-first: kpi-backfill 1-fail (muhtemel W7-arşiv-yolu veya sprint-verisi drifti) · init-builtin-seed 2-fail
+(muhtemel builtin-katalog değişimleri: 396-$or/materialize-işleri sonrası seed-beklentileri). Kök-neden → intent-koruyan fix.
 ### goNogo
-- goCriteria: 4 dosya tam yeşil; K3-default + pending-drop + yeni-arşiv-yolu İÇERİK-düzeyinde pinli.
-- Kanıt: `npx vitest run tests/cli/commands/start.test.ts tests/cli/start-sandbox.test.ts tests/cli/nervous-ipc-route.test.ts tests/cli/cleanup-log-archive.test.ts` → 0 fail.
+- goCriteria: 2 dosya tam yeşil; her fix notes'ta kök-neden+kırıcı-commit'li.
+- Kanıt: `npx vitest run tests/kpi/kpi-backfill.test.ts tests/e2e/init-builtin-seed.test.ts` → 0 fail.
 
-## Task 4: T4-DISPATCH — born-514 evidence→regression-guard (2 dosya)
-- Model: sonnet | Agent: ci-guardian | Skills: ci-testing, typescript-expert
-- Files: tests/cli/nl-dispatch-evidence.test.ts, tests/cli/nl-dispatch-class-gate.test.ts
+## Task 4: LAT-EXEC — tmux-backend + docker-oom + docker-hb (4 fail)
+- Model: sonnet | Agent: ci-guardian | Skills: ci-testing, docker-expert
+- Files: tests/e2e/tmux-backend.test.ts, tests/e2e/docker-oom-reproducer.test.ts, tests/docker/docker-hb.test.ts
 - Scope: tests/
 - Dependencies: none
 ### Description
-RCA F5: 16 evidence-testi eski false-positive'leri BELGELİYORDU (kodun yorumu misroute-ölçümü diyor) → `toBe(null)` regression-guard'a çevir (başlık/yorumlar yeni-amacı anlatsın); class-gate'e born-514-sonrası hâlâ meşru-eşleşen utterance.
+DIAGNOSE-first (muhtemel adaylar: born-499 git-guard mkdir'leri, W7-yolları, 587-sinyal, heartbeat çifte-yazar davranışı).
+Docker-testleri docker'sız ortamda skip-guard'lı olmalı — CI'da nasıl koştuğuna dikkat (skip-yolu bozulmuş olabilir).
 ### goNogo
-- goCriteria: 2 dosya tam yeşil; en az 2 pozitif-eşleşme testi kalır (gate hâlâ bir şey yakalıyor — hepsi-null'a çökertme YASAK).
-- Kanıt: `npx vitest run tests/cli/nl-dispatch-evidence.test.ts tests/cli/nl-dispatch-class-gate.test.ts` → 0 fail.
+- goCriteria: 3 dosya tam yeşil (lokal); docker-yokken dürüst-skip korunur.
+- Kanıt: `npx vitest run tests/e2e/tmux-backend.test.ts tests/e2e/docker-oom-reproducer.test.ts tests/docker/docker-hb.test.ts` → 0 fail.
 
-## Task 5: T5-SIGNAL-SENTINEL — F6a registry-deseni + F7 sentinel (3 dosya)
+## Task 5: LAT-NERVOUS — nervous-faz1-smoke (2 fail)
 - Model: sonnet | Agent: ci-guardian | Skills: ci-testing, typescript-expert
-- Files: tests/cli/chat.test.ts, tests/cli/dashboard.test.ts, tests/cli/tool-repl-wire.test.ts
+- Files: tests/config/nervous-faz1-smoke.test.ts
 - Scope: tests/
 - Dependencies: none
 ### Description
-RCA F6a: chat/dashboard sinyal-testlerini shutdown-hook-registry desenine yeniden yaz (model: tests/cli/sigterm-cleanup.test.ts; born-587 cleanup'ı İLK KEZ gerçekten koşuyor — child.kill() SIGTERM nüansını pinle). F7: arama-sentineli 'zzz_no_such_tool_zzz' → tek-token 'zzzqxjv' (review-description 'NO_GO' token-çakışması).
+DIAGNOSE-first: born-587 nervous.ts ölü-listener-migrasyonu (sprint-395) muhtemel kırıcı — smoke, kaldırılan
+process.on'ları veya cleanup-davranışını assert ediyor olabilir. Registry-desenine intent-koruyarak taşı
+(model: tests/cli/dead-listener-migration.test.ts).
 ### goNogo
-- goCriteria: 3 dosya tam yeşil; hook kayıt/çağrı/unregister pinli; sentinel-testi anlamını korur.
-- Kanıt: `npx vitest run tests/cli/chat.test.ts tests/cli/dashboard.test.ts tests/cli/tool-repl-wire.test.ts` → 0 fail.
+- goCriteria: dosya tam yeşil; nervous-cleanup kontratı yeni-desende pinli.
+- Kanıt: `npx vitest run tests/config/nervous-faz1-smoke.test.ts` → 0 fail.
 
-## Task 6: T6-CORE-STALE — C2+C3+C6+M1 (4 dosya)
-- Model: sonnet | Agent: ci-guardian | Skills: ci-testing, typescript-expert
-- Files: tests/core/memory-store.test.ts, tests/core/readjson-migration.test.ts, tests/core/marketplace/skill-sandbox.test.ts, tests/mcp/writer-lease-gate.test.ts
+## Task 6: LAT-SWEEP-PROOF — coverage-eşdeğeri tam-suite yerel kanıt (kapanış-task'ı)
+- Model: sonnet | Agent: ci-guardian | Skills: ci-testing
+- Files: tests/governance/latent-set-closure.note.md
 - Scope: tests/
-- Dependencies: none
+- Dependencies: Task 1, Task 2, Task 3, Task 4, Task 5
 ### Description
-RCA C2 (strict-tenant default=true born-563 → strict-default pinle + permissive'i açık-opt-in testiyle) · C3 (import-satırı regex'e) · C6 (BUILTIN_TRUSTED_SKILLS gerçek-id + 4) · M1 (K2-onaylı fail-CLOSED → isError:true; testin 'spec compliance' yorumu yeni-spec'e güncellensin).
+Diğer 5 task DONE olduktan sonra: `VITEST_MAX_FORKS=2 npm test` TAM-suite koş; kalan-fail varsa dosya+kök-neden
+listesini `tests/governance/latent-set-closure.note.md`'ye yaz (0-fail ise "0 fail @ <commit>" yaz). Fix YAPMA —
+yalnız kanıt-koşusu+rapor (Brain kapanışta kullanır).
 ### goNogo
-- goCriteria: 4 dosya tam yeşil; C2'de cross-tenant-SIZMAZ yönü ayrıca assert'li.
-- Kanıt: `npx vitest run tests/core/memory-store.test.ts tests/core/readjson-migration.test.ts tests/core/marketplace/skill-sandbox.test.ts tests/mcp/writer-lease-gate.test.ts` → 0 fail.
-
-## Task 7: T7-ELOOP — chat-tool-exec raw-throw → DeckentError (CODE-FIX)
-- Model: sonnet | Agent: bug-fixer | Skills: typescript-expert, testing-expert
-- Files: src/cli/commands/chat-tool-exec.ts, tests/cli/error-handling-unification.test.ts
-- Scope: src/cli/, tests/cli/
-- Dependencies: none
-### Description
-RCA C1 (tek gerçek CODE-BUG): :206 `throw new Error('ELOOP…')` konvansiyon-ihlali → DeckentError'a çevir (mevcut error-code taksonomisine uygun; mesaj-içeriği korunur). error-handling-unification'daki allowlist'e DOKUNMA (kod düzelince gerek kalmaz).
-### goNogo
-- goCriteria: error-handling-unification tam yeşil; ELOOP-yolu davranış-testi (symlink-loop fixture veya mevcut test) DeckentError-tipini pinler.
-- Kanıt: `npx vitest run tests/cli/error-handling-unification.test.ts tests/cli/chat-tool-exec*.test.ts` → 0 fail (varsa).
-
-## Task 8: T8-KATALOG-REZERO+RULESHAPE — stats-sıfırlama + 396-$or uyum (DATA+TEST-FIX, 5 dosya)
-- Model: sonnet | Agent: ci-guardian | Skills: ci-testing, typescript-expert
-- Files: .deckent/agents/terminal-ux-engineer/agent.json, .deckent/skills/provider-cli-matrix/manifest.json, tests/core/builtins/agent-catalog-agsk2.test.ts, tests/core/builtins/skill-catalog-agsk4.test.ts, src/core/builtins/skills/provider-cli-matrix/manifest.json
-- Scope: .deckent/, tests/, src/core/builtins/
-- Dependencies: none
-### Description
-Advisor ground-truth: bu ailede 6 kırmızı — 2 stats + 4 kural-shape (sprint-396 $or-rewrite'ları). (a) STATS
-(TAM-shape — agsk2 toEqual exact-match; advisor-doğrulanmış): agent → `{"totalUses":0,"successRate":0,
-"avgCoverage":0,"lastUsedInSprint":""}` (successCount YOK, lastUsedInSprint="" — kaldırma/null DEĞİL); skill →
-aynı + `"successCount":0`. $or-kural blokları BYTE-AYNI kalır (stats kardeş-anahtar). (b) agsk2 testinin
-`collectDomainRuleValues` (:64-72) yalnız top-level $contains okuyor → $or-aware collector'a genişlet
-(TEST-FIX ilkesi: ürünün yeni kontratını pinle). (c) agsk4 byte-identical: builtin provider-cli-matrix
-manifest'ine 396'nın AYNI kural-rewrite'ını cerrahi elle-kopyala (bundle-builtins.mjs KOŞMA — yasak toplu-sync'e;
-tek-dosya parite-fix'i serbest). Kalıcı çözüm born-605; notes'a bant-yardımı yaz.
-### goNogo
-- goCriteria: agsk2+agsk4 TAM yeşil (6/6 eski-kırmızı kapanır); manifest-diff'leri yalnız stats + builtin-kural-parite; $or-blokları canlıda byte-aynı.
-- Kanıt: `npx vitest run tests/core/builtins/agent-catalog-agsk2.test.ts tests/core/builtins/skill-catalog-agsk4.test.ts` → 0 fail.
-
-## Task 9: T9-MATERIALIZE — C5 hermetik tmp-kopya (2 dosya)
-- Model: sonnet | Agent: ci-guardian | Skills: ci-testing, typescript-expert
-- Files: tests/core/builtins/catalog-materialize.test.ts, tests/core/builtins/catalog-sync-parity.test.ts
-- Scope: tests/
-- Dependencies: none
-### Description
-RCA C5: `_loadBuiltinFallback` `.deckent/config.json`-gate'li; config d3148926'da untrack → taze-checkout'ta (CI) 11 test kırmızı, dev-makinede yeşil (works-locally). FIX: "live pool" blokları minimal-config.json'lu tmpdir-kopyada koşsun (RCA worktree'de 31/31 kanıtladı). Gate-davranışının KENDİSİ de pinli kalsın (configsüz→fallback-yok testi).
-### goNogo
-- goCriteria: 2 dosya, gitignored-state'siz temiz-ortamda yeşil (kanıt: testin kendisi hermetik-fixture kullanır); gate-pinli.
-- Kanıt: `npx vitest run tests/core/builtins/catalog-materialize.test.ts tests/core/builtins/catalog-sync-parity.test.ts` → 0 fail.
-
-## Task 10: T10-DOCS-SITE — vitepress 2-blocker (4 dosya, DOC-FIX)
-- Model: sonnet | Agent: doc-writer | Skills: documentation-writer
-- Files: docs/MASTER-PLAN.md, docs/reference/terminal-compat.md, docs/reference/worker-wrapper-contract.md, docs/features/provider-cli-routing.md
-- Scope: docs/
-- Dependencies: none
-### Description
-RCA DOC (2 Temmuz'dan beri kırmızı; fix worktree'de build-yeşil kanıtlı): (a) MASTER-PLAN.md:155 (satır kaymış olabilir — item-469 metni) ham `<dosya>` → backtick'e al (BAŞKA içerik değiştirme — canlı defter!); (b) 8 dead-link: terminal-compat 5 src/tests-linki + worker-wrapper-contract/provider-cli-routing `../analysis/*` linkleri → GitHub-blob-URL'ye çevir ya da metin-referansına indir (hedef-dosyalar publish-edilmiyor).
-### goNogo
-- goCriteria: `cd docs && npx vitepress build` → "build complete"; MASTER-PLAN diff'i YALNIZ o tag-satırı.
-- Kanıt: `cd docs && npx vitepress build` EXIT 0.
-
-## Task 11: T11-DOCS-SAYILAR — README/refdocs gerçeğe + K4 badge-RESTORE (5 dosya)
-- Model: sonnet | Agent: doc-writer | Skills: documentation-writer, typescript-expert
-- Files: README.md, README-TR.md, docs/reference/agents.md, docs/reference/cli.md, scripts/update-readme-stats.mjs, tests/docs/refdocs-adr-regen.test.ts, tests/scripts/ci-baseline-detect.test.ts, tests/docs/validate-publish.test.ts
-- Scope: ./, docs/, tests/
-- Dependencies: none
-### Description
-RCA D1-D4: (a) README-TR:367 '17 built-in agents'→20 + `npm run docs:ref` regen'inin ürettiği dosyaları KOŞTURARAK tazele (docs/reference/agents.md/cli.md — script üretir, elle yazma); (b) refdocs-adr-regen 41-hardcode → docs/adr dosya-sayısından dinamik; (c) **K4-KARARI: README.md'ye sprint-badge GERİ** — advisor'ın bulduğu tam-satır (AUTOGEN badges-bloğu İÇİNE, aynı şekilde):
-`[![sprints](https://img.shields.io/badge/sprints-397%2B-teal)](https://github.com/VerhexIO/deckent)` —
-ci-baseline-detect.test AYNEN kalır. **KALICILIK (advisor):** `scripts/update-readme-stats.mjs` badge'i bir sonraki
-regen'de DÜŞÜRÜR çünkü `detectActiveSprint` (:137-146) "SPRINT-14" tireli-formu yakalamıyor + arşiv-fallback
-`.brain/archive` kökünü okuyor (artık alt-dizinli) → fallback'i `.brain/archive/sprints/`e çevir + tireli-form
-regex'i (tek-satırlık ikili-fix, dosya Files'ta); (d) validate-publish.test ORPHAN → mevcut `scripts/validate-publish.mjs` GATES-API'sine yeniden yaz.
-### goNogo
-- goCriteria: Docs+Scripts job'unun 5 dosyası yeşil; badge README'de görünür + test değişmeden geçer; readme-number-truth yeşil.
-- Kanıt: `npx vitest run tests/docs/ tests/scripts/ci-baseline-detect.test.ts` → 0 fail.
-
-## Task 12: T12-BASELINES — spawnsync + secrets ratchet-refresh (2 data-dosyası)
-- Model: sonnet | Agent: ci-guardian | Skills: ci-testing, secure-coding
-- Files: scripts/spawnsync-baseline.json, .secrets-baseline
-- Scope: ./, scripts/
-- Dependencies: none
-### Description
-RCA D5+SEC (manual-review = RCA-raporu, kayıtlı): (a) spawnsync-baseline'ı RCA'nın 7-yeni+2-drift dökümüne göre site-başına tazele (hepsi git/docker-probe ailesi, ADR-D-002-uyumlu; her girişe kısa-neden); (b) ⚠️ TUZAK (advisor): build-mode allowlist'li hit'leri ÖNCE filtreler sonra dosyayı YALNIZ-yenilerle DEĞİŞTİRİR —
-doğrudan koşarsan mevcut 9 girişi düşürür ve kendi Kanıt'ın kırmızıya döner. DOĞRU REÇETE: `.secrets-baseline`ı
-kenara taşı (boş-allowlist) → `--build-baseline` (TÜM hit'ler: eski-9-site + yeni-9-unique) → SONRA HER girişin
-note-alanını zenginleştir ("AWS docs example key — redaction fixture" vb.). Kod/test DOSYASINA DOKUNMA. Not:
-bu haftanın yeni test-token'ları (api-token-abc vb.) detector-desenlerine girmiyor — advisor doğruladı, sorun değil.
-### goNogo
-- goCriteria: `node scripts/security/secret-baseline.mjs` EXIT 0 + `node scripts/lint-no-spawnsync.mjs` EXIT 0 (script-adını grep'le doğrula); baseline-diff'leri girişlere-neden'li.
-- Kanıt: iki lint-komutu EXIT 0 + `npm run lint` yeşil.
+- goCriteria: not-dosyası gerçek koşu-çıktısıyla; 0-fail hedef ama dürüst-rapor esas.
+- Kanıt: not-dosyası + koşu özet-satırı.

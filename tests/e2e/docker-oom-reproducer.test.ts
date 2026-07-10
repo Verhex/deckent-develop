@@ -39,9 +39,10 @@ function createTmpDir(): string {
 describe('Docker OOM Recovery — Partial Result Script Template', () => {
   it('worker script writes .partial-result BEFORE Claude CLI starts', () => {
     const source = readDockerSource();
-    // .partial-result must be written before the `timeout $TIMEOUT` Claude CLI line
+    // .partial-result must be written before the `timeout -k 30 $TIMEOUT` Claude
+    // CLI line (born-466: -k 30 hard-kills a TERM-swallowing worker).
     const partialWriteIdx = source.indexOf('cat > "$PRFILE"');
-    const claudeRunIdx = source.indexOf('timeout $TIMEOUT');
+    const claudeRunIdx = source.indexOf('timeout -k 30 $TIMEOUT');
     expect(partialWriteIdx).toBeGreaterThan(-1);
     expect(claudeRunIdx).toBeGreaterThan(-1);
     expect(partialWriteIdx).toBeLessThan(claudeRunIdx);

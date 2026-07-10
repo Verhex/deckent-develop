@@ -113,12 +113,25 @@ describe('AGSK-2 dilim-2: integration-engineer + terminal-ux-engineer catalog', 
 
           it('has a zeroed stats object shaped like every other builtin', () => {
             const raw = readAgentJson(dir, spec.id) as unknown as AgentDefinition;
-            expect(raw.stats).toEqual({
-              totalUses: 0,
-              successRate: 0,
-              avgCoverage: 0,
-              lastUsedInSprint: '',
-            });
+            if (dir === BUILTINS_DIR) {
+              // Şablon-ağaç: yeni builtin SIFIR stats ile gemiye biner.
+              expect(raw.stats).toEqual({
+                totalUses: 0,
+                successRate: 0,
+                avgCoverage: 0,
+                lastUsedInSprint: '',
+              });
+            } else {
+              // Canlı havuz (.deckent): sprint-finalizer stats'ı tasarım gereği
+              // mutasyonlar (born-605 stats-sidecar'a kadar) — şekil + invariant pinle.
+              expect(Object.keys(raw.stats).sort()).toEqual(
+                ['avgCoverage', 'lastUsedInSprint', 'successRate', 'totalUses'],
+              );
+              expect(raw.stats.totalUses).toBeGreaterThanOrEqual(0);
+              expect(raw.stats.successRate).toBeGreaterThanOrEqual(0);
+              expect(raw.stats.successRate).toBeLessThanOrEqual(1);
+              expect(typeof raw.stats.lastUsedInSprint).toBe('string');
+            }
           });
 
           it('is a superset of the api-builder (disk-verified reference) field set', () => {

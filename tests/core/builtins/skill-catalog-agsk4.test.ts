@@ -79,13 +79,27 @@ describe('AGSK-4: provider-cli-matrix catalog', () => {
 
       it('has a zeroed stats object shaped like every other builtin', () => {
         const raw = readManifest(dir, SKILL_ID) as unknown as SkillDefinition;
-        expect(raw.stats).toEqual({
-          totalUses: 0,
-          successCount: 0,
-          successRate: 0,
-          avgCoverage: 0,
-          lastUsedInSprint: '',
-        });
+        if (dir === BUILTINS_DIR) {
+          // Şablon-ağaç: yeni builtin SIFIR stats ile gemiye biner.
+          expect(raw.stats).toEqual({
+            totalUses: 0,
+            successCount: 0,
+            successRate: 0,
+            avgCoverage: 0,
+            lastUsedInSprint: '',
+          });
+        } else {
+          // Canlı havuz (.deckent): sprint-finalizer stats'ı tasarım gereği
+          // mutasyonlar (born-605 stats-sidecar'a kadar) — şekil + invariant pinle.
+          expect(Object.keys(raw.stats).sort()).toEqual(
+            ['avgCoverage', 'lastUsedInSprint', 'successCount', 'successRate', 'totalUses'],
+          );
+          expect(raw.stats.totalUses).toBeGreaterThanOrEqual(0);
+          expect(raw.stats.successCount).toBeGreaterThanOrEqual(0);
+          expect(raw.stats.successRate).toBeGreaterThanOrEqual(0);
+          expect(raw.stats.successRate).toBeLessThanOrEqual(1);
+          expect(typeof raw.stats.lastUsedInSprint).toBe('string');
+        }
       });
 
       it('is a superset of the api-builder (disk-verified reference) field set', () => {
@@ -127,9 +141,13 @@ describe('AGSK-4: provider-cli-matrix catalog', () => {
     });
   }
 
-  it('the two trees are byte-identical (bundle-builtins.mjs invariant)', () => {
+  it('the two trees match: SKILL.md byte-eş, manifest stats-hariç eş', () => {
     expect(readSkillMd(BUILTINS_DIR, SKILL_ID)).toBe(readSkillMd(POOL_DIR, SKILL_ID));
-    expect(readManifest(BUILTINS_DIR, SKILL_ID)).toEqual(readManifest(POOL_DIR, SKILL_ID));
+    // stats hariç karşılaştır: canlı havuzda sprint-finalizer stats'ı mutasyonlar
+    // (born-605 stats-sidecar'a kadar); manifest'in geri kalanı bire-bir eş kalmalı.
+    const { stats: _b, ...builtinRest } = readManifest(BUILTINS_DIR, SKILL_ID) as Record<string, unknown> & { stats?: unknown };
+    const { stats: _p, ...poolRest } = readManifest(POOL_DIR, SKILL_ID) as Record<string, unknown> & { stats?: unknown };
+    expect(builtinRest).toEqual(poolRest);
   });
 
   it('skill-pool load-smoke: SkillPoolManager.loadSkills() picks up the new skill from the real .deckent/skills pool', () => {

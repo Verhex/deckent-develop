@@ -1,5 +1,16 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-398 Learnings
+- Sprint sprint-398 Learnings: ## Sprint sprint-398 Learnings
+- LAT-KPI-SEED — kpi-backfill + init-builtin-seed (3 fail): GO_WITH_TECH_DEBT — FIXED (tests/e2e/init-builtin-seed.test.ts, 2/2 fails resolved) — root-cause: builtin agent/skill catalog legitimately g
+- LAT-SWEEP-PROOF — coverage-eşdeğeri tam-suite yerel kanıt (kapanış-task'ı): NO_GO — Worker exited without writing result (exitCode=0, source=wrapper). EXIT_WITHOUT_RESULT marker workPresent=true diff [10 
+
+## Gains
+- 398-001 — LAT-ADR — brain/decisions + dead-code-decisions: yeni-taksonomiye taşı (17 fail) — Root cause: both test files asserted the OLD sequential ADR-001..021 / ADR-038 taxonomy against ....
+- 398-002 — LAT-ORPHAN — governance orphan-allowlist ratchet-refresh (1 fail) — DIAGNOSE (9-drift = 10 additions - 1 removal): (1) REMOVED src/cli/repl/cursor-model.ts from KNOW...
+- 398-004 — LAT-EXEC — tmux-backend + docker-oom + docker-hb (4 fail) — Root cause (DIAGNOSE-first): the 4 failures were NOT caused by any of the suggested candidates (b...
+- 398-005 — LAT-NERVOUS — nervous-faz1-smoke (2 fail) — DIAGNOSE-first result: the born-587 hypothesis (nervous.ts SIGINT/process.on -> shutdown-hook-reg...
+
 ## Sprint sprint-397 Learnings
 - Sprint sprint-397 Learnings: ## Sprint sprint-397 Learnings
 - T7-ELOOP — chat-tool-exec raw-throw → DeckentError (CODE-FIX): GO_WITH_TECH_DEBT — Fix: resolveRealPathLenient() line 206 raw `throw new Error('ELOOP: too many symlink levels')` -> `throw new DeckentErro

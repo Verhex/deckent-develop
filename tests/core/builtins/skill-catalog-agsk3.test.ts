@@ -103,13 +103,27 @@ describe('AGSK-3 dilim-3: rpc-protocol + onboarding-ux catalog', () => {
 
           it('has a zeroed stats object shaped like every other builtin', () => {
             const raw = readManifest(dir, spec.id) as unknown as SkillDefinition;
-            expect(raw.stats).toEqual({
-              totalUses: 0,
-              successCount: 0,
-              successRate: 0,
-              avgCoverage: 0,
-              lastUsedInSprint: '',
-            });
+            if (dir === BUILTINS_DIR) {
+              // Şablon-ağaç: yeni builtin SIFIR stats ile gemiye biner.
+              expect(raw.stats).toEqual({
+                totalUses: 0,
+                successCount: 0,
+                successRate: 0,
+                avgCoverage: 0,
+                lastUsedInSprint: '',
+              });
+            } else {
+              // Canlı havuz (.deckent): sprint-finalizer stats'ı tasarım gereği
+              // mutasyonlar (born-605 stats-sidecar'a kadar) — şekil + invariant pinle.
+              expect(Object.keys(raw.stats).sort()).toEqual(
+                ['avgCoverage', 'lastUsedInSprint', 'successCount', 'successRate', 'totalUses'],
+              );
+              expect(raw.stats.totalUses).toBeGreaterThanOrEqual(0);
+              expect(raw.stats.successCount).toBeGreaterThanOrEqual(0);
+              expect(raw.stats.successRate).toBeGreaterThanOrEqual(0);
+              expect(raw.stats.successRate).toBeLessThanOrEqual(1);
+              expect(typeof raw.stats.lastUsedInSprint).toBe('string');
+            }
           });
 
           it('is a superset of the api-builder (disk-verified reference) field set', () => {
@@ -158,10 +172,14 @@ describe('AGSK-3 dilim-3: rpc-protocol + onboarding-ux catalog', () => {
     });
   }
 
-  it('the two trees are byte-identical for both new skills (bundle-builtins.mjs invariant)', () => {
+  it('the two trees match for both new skills: SKILL.md byte-eş, manifest stats-hariç eş', () => {
     for (const spec of NEW_SKILLS) {
       expect(readSkillMd(BUILTINS_DIR, spec.id)).toBe(readSkillMd(POOL_DIR, spec.id));
-      expect(readManifest(BUILTINS_DIR, spec.id)).toEqual(readManifest(POOL_DIR, spec.id));
+      // stats hariç karşılaştır: canlı havuzda sprint-finalizer stats'ı mutasyonlar
+      // (born-605 stats-sidecar'a kadar); manifest'in geri kalanı bire-bir eş kalmalı.
+      const { stats: _b, ...builtinRest } = readManifest(BUILTINS_DIR, spec.id) as Record<string, unknown> & { stats?: unknown };
+      const { stats: _p, ...poolRest } = readManifest(POOL_DIR, spec.id) as Record<string, unknown> & { stats?: unknown };
+      expect(builtinRest).toEqual(poolRest);
     }
   });
 

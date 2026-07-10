@@ -11,24 +11,37 @@ describe('decisions.md — ADR format and content (Memory V2 export)', () => {
     expect(existsSync(DECISIONS_PATH)).toBe(true);
   });
 
-  it('contains at least 21 ADRs', () => {
+  // New taxonomy (2026-06-30 redesign): ids are `adr-g-NNN` (Global/Constitution) or
+  // `adr-d-NNN` (Dogfooding/Dev), NOT the old sequential `adr-NNN` 1..21 scheme. Crosswalk:
+  // .analysis/adr-review-crosswalk.md. Header-count replaces the old fixed-21 pin so the test
+  // doesn't need bumping every time an ADR is added — it still catches wholesale loss/format drift.
+  const ID_HEADER_RE = /^## adr-(?:g|d)-\d{3}:/gm;
+  const ANY_HEADER_RE = /^## adr-\S+:/gm;
+
+  it('contains ADR headers in the new adr-g-NNN / adr-d-NNN taxonomy', () => {
     const content = readFileSync(DECISIONS_PATH, 'utf-8');
-    const adrMatches = content.match(/^## adr-\d+:/gm);
-    expect(adrMatches).not.toBeNull();
-    expect(adrMatches!.length).toBeGreaterThanOrEqual(21);
+    const anyHeaders = content.match(ANY_HEADER_RE) ?? [];
+    const idHeaders = content.match(ID_HEADER_RE) ?? [];
+    expect(anyHeaders.length).toBeGreaterThan(0);
+    // every header conforms to the new id pattern — no stray/old-format (`adr-NNN`) headers
+    expect(idHeaders.length).toBe(anyHeaders.length);
+    // sanity floor guarding against wholesale ADR loss, without pinning an exact drifting count
+    expect(idHeaders.length).toBeGreaterThanOrEqual(40);
   });
 
-  it('ADR headers include sequential numbers from 001 to 021', () => {
+  it('ADR ids are class-prefixed, zero-padded 3-digit numbers (adr-g-NNN / adr-d-NNN)', () => {
     const content = readFileSync(DECISIONS_PATH, 'utf-8');
-    for (let i = 1; i <= 21; i++) {
-      const padded = String(i).padStart(3, '0');
-      expect(content).toContain(`adr-${padded}`);
+    const ids = [...content.matchAll(/^## adr-(g|d)-(\d{3}):/gm)];
+    expect(ids.length).toBeGreaterThan(0);
+    for (const [, cls, num] of ids) {
+      expect(['g', 'd']).toContain(cls);
+      expect(num).toMatch(/^\d{3}$/);
     }
   });
 
   it('each ADR has Decision and Context fields', () => {
     const content = readFileSync(DECISIONS_PATH, 'utf-8');
-    const adrBlocks = content.split(/^## adr-\d+:/m).slice(1);
+    const adrBlocks = content.split(/^## adr-\S+:/m).slice(1);
     expect(adrBlocks.length).toBeGreaterThan(0);
     for (const block of adrBlocks) {
       const hasDecision = /Decision/.test(block);
@@ -38,47 +51,56 @@ describe('decisions.md — ADR format and content (Memory V2 export)', () => {
     }
   });
 
-  it('ADR-014 covers .deck secret file system', () => {
+  // Topic pins below are remapped from the old ADR-014..021 numbers to their successor id per
+  // .analysis/adr-review-crosswalk.md (lines 31-38), keeping the original keyword content-grep so
+  // the topic coverage itself is still verified (not just an id lookup).
+
+  it('.deck secret file system topic (old ADR-014) covers adr-g-005', () => {
     const content = readFileSync(DECISIONS_PATH, 'utf-8');
-    expect(content).toContain('adr-014');
+    expect(content).toContain('## adr-g-005:');
+    expect(content).toContain('.deck');
   });
 
-  it('ADR-015 covers TaskRouter', () => {
+  it('TaskRouter topic (old ADR-015) covers adr-g-006', () => {
     const content = readFileSync(DECISIONS_PATH, 'utf-8');
-    expect(content).toContain('adr-015');
+    expect(content).toContain('## adr-g-006:');
     expect(content).toContain('TaskRouter');
   });
 
-  it('ADR-016 covers Connector module', () => {
+  it('Connector module topic (old ADR-016) covers adr-g-007', () => {
     const content = readFileSync(DECISIONS_PATH, 'utf-8');
-    expect(content).toContain('adr-016');
+    expect(content).toContain('## adr-g-007:');
     expect(content).toContain('Connector');
   });
 
-  it('ADR-017 covers MCP-native provider adapters', () => {
+  it('MCP-native provider adapters topic (old ADR-017) covers adr-g-008', () => {
     const content = readFileSync(DECISIONS_PATH, 'utf-8');
-    expect(content).toContain('adr-017');
+    expect(content).toContain('## adr-g-008:');
     expect(content).toContain('MCP');
   });
 
-  it('ADR-018 covers multi-environment config', () => {
+  it('multi-environment config topic (old ADR-018) covers adr-g-004', () => {
     const content = readFileSync(DECISIONS_PATH, 'utf-8');
-    expect(content).toContain('adr-018');
+    expect(content).toContain('## adr-g-004:');
+    // ADR-018 was merged into ADR-G-004 — the absorption record is the content-grep pin.
+    expect(content).toContain('ADR-018');
   });
 
-  it('ADR-019 covers language-agnostic worker verify', () => {
+  it('language-agnostic worker verify topic (old ADR-019) covers adr-g-009', () => {
     const content = readFileSync(DECISIONS_PATH, 'utf-8');
-    expect(content).toContain('adr-019');
+    expect(content).toContain('## adr-g-009:');
+    expect(content).toContain('ADR-019');
   });
 
-  it('ADR-020 covers rich sprint output', () => {
+  it('rich sprint output topic (old ADR-020) covers adr-g-010', () => {
     const content = readFileSync(DECISIONS_PATH, 'utf-8');
-    expect(content).toContain('adr-020');
+    expect(content).toContain('## adr-g-010:');
+    expect(content).toContain('ADR-020');
   });
 
-  it('ADR-021 covers Kraken ASCII brand identity', () => {
+  it('Kraken ASCII brand identity topic (old ADR-021) covers adr-g-010', () => {
     const content = readFileSync(DECISIONS_PATH, 'utf-8');
-    expect(content).toContain('adr-021');
+    expect(content).toContain('## adr-g-010:');
     expect(content).toContain('Kraken');
   });
 });

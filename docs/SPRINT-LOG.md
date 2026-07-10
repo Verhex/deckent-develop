@@ -9734,3 +9734,30 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 397-012: T12-BASELINES — spawnsync + secrets ratchet-refresh (2 data-dosyası) (DONE)
 
 ---
+## Sprint 398 — sprint-398
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-10
+**Duration:** 2073s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 12 |
+| Completed | 10 |
+| Tech Debt | 2 |
+| No-Go | 2 |
+| Coverage | NaN% |
+| Duration | 2072918ms |
+
+### Tasks
+
+- 398-001: LAT-ADR — brain/decisions + dead-code-decisions: yeni-taksonomiye taşı (17 fail) (DONE)
+- 398-002: LAT-ORPHAN — governance orphan-allowlist ratchet-refresh (1 fail) (DONE)
+- 398-003: LAT-KPI-SEED — kpi-backfill + init-builtin-seed (3 fail) (GO_WITH_TECH_DEBT)
+- 398-004: LAT-EXEC — tmux-backend + docker-oom + docker-hb (4 fail) (DONE)
+- 398-005: LAT-NERVOUS — nervous-faz1-smoke (2 fail) (DONE)
+- 398-006: LAT-SWEEP-PROOF — coverage-eşdeğeri tam-suite yerel kanıt (kapanış-task'ı) (NO_GO)
+
+---

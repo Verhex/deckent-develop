@@ -106,63 +106,63 @@ describe('dead-code-decisions.md schema', () => {
 });
 
 // ─── ADR-038 Write Verification ──────────────────────────────────────────
+//
+// Taxonomy migration (2026-06-30 redesign): ADR-038 (Dead Code Disposition) no longer exists as
+// its own numbered entry. Per .analysis/adr-review-crosswalk.md (line 55), it was archived and its
+// durable policy folded into **adr-d-006** ("Code Architecture Conventions") — the Sprint-139
+// audit/module list stays a historical record (verified above), only the 4-tier disposition
+// policy carries forward as an active convention. decisions.md keeps the absorption record as an
+// uppercase "ADR-038" prose reference inside the adr-d-006 block (no lowercase `adr-038` id exists
+// any more), so these assertions target adr-d-006 and content-grep for the ADR-038 reference.
 
-describe('ADR-038 in Memory V2 exports', () => {
+describe('ADR-038 dead-code policy — absorbed into adr-d-006', () => {
   // Memory V2 migration: DECISIONS.md no longer exists. ADRs are in exports/decisions.md
   const decisionsPath = join(projectRoot, '.brain', 'exports', 'decisions.md');
 
-  it('ADR-038 exists in decisions export', () => {
-    const content = readFileSync(decisionsPath, 'utf-8');
-    expect(content).toContain('adr-038');
-  });
-
-  it('ADR-038 has accepted status', () => {
-    const content = readFileSync(decisionsPath, 'utf-8');
-    expect(content).toContain('adr-038');
-    expect(content).toMatch(/adr-038[\s\S]*?accepted/i);
-  });
-
-  it('ADR-038 has Decision and Context fields', () => {
-    const content = readFileSync(decisionsPath, 'utf-8');
-    const adr038Start = content.indexOf('adr-038');
-    expect(adr038Start).toBeGreaterThan(-1);
-    const rest = content.slice(adr038Start);
+  function getSuccessorBlock(content: string): string {
+    const start = content.indexOf('## adr-d-006:');
+    expect(start).toBeGreaterThan(-1);
+    const rest = content.slice(start);
     const nextAdr = rest.indexOf('\n## adr-', 10);
-    const adr038 = nextAdr > 0 ? rest.slice(0, nextAdr) : rest;
+    return nextAdr > 0 ? rest.slice(0, nextAdr) : rest;
+  }
 
-    expect(adr038).toContain('Decision');
-    expect(adr038).toContain('Context');
+  it('successor adr-d-006 exists and references ADR-038', () => {
+    const content = readFileSync(decisionsPath, 'utf-8');
+    const block = getSuccessorBlock(content);
+    expect(block).toContain('ADR-038');
   });
 
-  it('ADR-038 references dead code disposition', () => {
+  it('adr-d-006 has accepted status', () => {
     const content = readFileSync(decisionsPath, 'utf-8');
-    const adr038Start = content.indexOf('adr-038');
-    const rest = content.slice(adr038Start);
-    const nextAdr = rest.indexOf('\n## adr-', 10);
-    const adr038 = nextAdr > 0 ? rest.slice(0, nextAdr) : rest;
-
-    expect(adr038.toLowerCase()).toContain('dead code');
+    const block = getSuccessorBlock(content);
+    expect(block).toMatch(/accepted/i);
   });
 
-  it('ADR-038 defines disposition categories', () => {
+  it('adr-d-006 has Decision and Context fields', () => {
     const content = readFileSync(decisionsPath, 'utf-8');
-    const adr038Start = content.indexOf('adr-038');
-    const rest = content.slice(adr038Start);
-    const nextAdr = rest.indexOf('\n## adr-', 10);
-    const adr038 = nextAdr > 0 ? rest.slice(0, nextAdr) : rest;
+    const block = getSuccessorBlock(content);
+    expect(block).toContain('Decision');
+    expect(block).toContain('Context');
+  });
 
+  it('adr-d-006 references dead code disposition', () => {
+    const content = readFileSync(decisionsPath, 'utf-8');
+    const block = getSuccessorBlock(content);
+    expect(block.toLowerCase()).toContain('dead code');
+  });
+
+  it('adr-d-006 defines disposition categories', () => {
+    const content = readFileSync(decisionsPath, 'utf-8');
+    const block = getSuccessorBlock(content);
     // At minimum should mention Remove/Defer approach
-    expect(adr038.toLowerCase()).toMatch(/remove|defer|deprecate|disposition/);
+    expect(block.toLowerCase()).toMatch(/remove|defer|deprecate|disposition/);
   });
 
-  it('ADR-038 mentions alternatives', () => {
+  it('adr-d-006 mentions alternatives/consequences', () => {
     const content = readFileSync(decisionsPath, 'utf-8');
-    const adr038Start = content.indexOf('adr-038');
-    const rest = content.slice(adr038Start);
-    const nextAdr = rest.indexOf('\n## adr-', 10);
-    const adr038 = nextAdr > 0 ? rest.slice(0, nextAdr) : rest;
-
-    expect(adr038.toLowerCase()).toMatch(/alternative|consequence/);
+    const block = getSuccessorBlock(content);
+    expect(block.toLowerCase()).toMatch(/alternative|consequence/);
   });
 });
 

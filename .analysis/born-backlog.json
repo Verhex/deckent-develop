@@ -2223,7 +2223,7 @@
    "src/core/skill-pool.ts",
    "src/orchestra/sprint-finalizer.ts"
   ],
-  "spec": "Manifest = statik tanim; canli stats (totalUses/successRate/avgCoverage/lastUsedInSprint) ayri gitignored stats-dosyasina (per-entity veya tek ledger). Okuma-yolu birlesik (pool stats'i sidecar'dan yukler); yazma finalizer sidecar'a. Migration: mevcut manifest-stats sidecar'a tasinir + manifestler re-zero. Marketplace/rating tuketicileri ayni degerleri gormeye devam eder. .deckent/config.json track-karari ayni basliga baglanir (d3148926 untrack -> C5 hermetiklik vakasi).",
+  "spec": "Manifest = statik tanim; canli stats (totalUses/successRate/avgCoverage/lastUsedInSprint) ayri gitignored stats-dosyasina (per-entity veya tek ledger). Okuma-yolu birlesik (pool stats'i sidecar'dan yukler); yazma finalizer sidecar'a. Migration: mevcut manifest-stats sidecar'a tasinir + manifestler re-zero. Marketplace/rating tuketicileri ayni degerleri gormeye devam eder. .deckent/config.json track-karari ayni basliga baglanir (d3148926 untrack -> C5 hermetiklik vakasi). [2026-07-10 kanıt#3+advisor: AGSK katalog-testleri canlı-havuz zero-pin — agsk2/3/4 şekil+invariant repin yapıldı (agsk3 latent yakalandı: rpc-protocol/onboarding-ux ilk-route'ta kırardı). EK-1: scripts/bundle-builtins.mjs:118 --clean-stats skill'e avgScore yazıyor, gerçek şekil avgCoverage — sidecar işinde düzelt. EK-2: .deckent/settings/resource-log.jsonl 61k-satır tracked runtime-log (secret-temiz) — aynı sınıf; rotate/gitignore sidecar-kararıyla birlikte ele al.]",
   "verify": "sprint-sonrasi git status: manifest degismez; stats-testleri sidecar-fixture ile; katalog byte-drift testi kalici-yesil",
   "wire_on": "default-on (yapi-degisikligi, testli)"
  },
@@ -2548,5 +2548,13 @@
   "spec": "[BLUEPRINT v1+v2 ✅ KARARLI — SSOT: .analysis/desk2-blueprint-2026-07-10.md; 12-ekran+Slice-0 persona-framework+12-GAP] [KARARLAR 2026-07-10: Studio-dark+power-mode · yeni-accent (teal/cyan ailesi; gold=dashboard) · ana-yüzey adı=CONSOLE · v1=TAM-11-dilim] [KAPSAM-DİREKTİFİ: persona-adaptif (enterprise/team/solo-dev/kod-bilmeyen) + iş-süreci/ERP orkestrasyon yüzeyleri birinci-sınıf tasarım-boyutu — blueprint-v2 addendum üretimde] B1-B3 altyapısı (daemon/adopt/güvenlik/IPC) ÜZERINE sıfırdan desktop-ürün renderer'ı: chat-first ana-yüzey (agent-konuşması + tool-çağrı kartları + inline onay-kartları [Faz-1 611 API/SSE relay tüketicisi]) · run/sprint zaman-çizelgesi · gömülü terminal (daemon-PTY) · proje/profil değiştirici · ayarlar · oturum-geçmişi. Dashboard İZLEME-yüzeyi olarak ayrışır (Codex-analizin dashboard-kimlik çelişkisi de böyle çözülür). AKIŞ: (1) UX-blueprint tasarım-turu (bilgi-mimarisi + ekran-akışları + görsel-yön) → (2) Alperen-onayı → (3) dilim-dilim inşa (chat-çekirdeği → onay-kartları → timeline → terminal → ayarlar). MVP YASAK — tam-kapsam tasarlanır, sıralı ship edilir.",
   "verify": "her dilim gerçek-binary smoke (Playwright-Electron) + Alperen user-truth turu",
   "wire_on": "DESK-1 release-tanımı DESK-2'siz TAMAM SAYILMAZ (Alperen-netleştirmesi)"
+ },
+ {
+  "born_id": 627,
+  "title": "Worker-sandbox test-ortamı artefakt ailesi (398-006 raporundan)",
+  "priority": "P2",
+  "status": "OPEN",
+  "source": "sprint-398 task-006 worker-raporu + Brain triyajı",
+  "spec": "4 bağımsız ama aynı-aile bulgu (detay: tests/governance/latent-set-closure.note.md): (1) WORKER-GIT-GUARD shim argv-only denylist — cwd/repo-identity kontrolü yok, tmpdir test-fixture git-op'larını da bloke ediyor (~8 dosya worker-ortamında kırılıyor); fix: gerçek proje-repo-root'a scope veya tmpdir-escape-hatch. (2) /tmp/deckent-home 100MB tmpfs dolunca homedir()-yazan yollar ENOSPC (codex-config, keyring, npm-cache). (3) tests/core/credentials.test.ts hermetiklik açığı: CredentialManager keyringPath verilmeden gerçek ~/.deckent/.keyring'e düşüyor (ADR-D-002 C1). (4) src/agents/worker-lifecycle.ts:175 import-time process-exit handler leak → 4 mock'lu test dosyasında teardown-sonrası uncaught (TASKS_DIR mock hatası). Lokalde/CI'da yeşil — yalnız worker-sandbox'ında patlıyor; worker-içi test-koşu güvenilirliği için gerekli."
  }
 ]

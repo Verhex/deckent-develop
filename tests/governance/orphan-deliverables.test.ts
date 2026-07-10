@@ -124,17 +124,18 @@ export interface OrphanScanResult {
 
 /**
  * Full orphan sweep: files under `root/src/**` (`.ts`/`.tsx`, `src/dashboard/`
- * excluded — separate bundler-resolution sub-project, see analysis doc §0)
- * that no other file under `root/src/**` or `root/scripts/**` imports via a
- * relative specifier. `root/tests/**` is deliberately excluded from the
- * importer search — a file reached only from a test is exactly the
- * "delivered but not wired" pattern this sweep targets.
+ * and `src/desktop/` excluded — both are separate bundler-resolution
+ * sub-projects with their own package.json/tsconfig/bundler-config, see
+ * analysis doc §0 and task 398-002) that no other file under `root/src/**`
+ * or `root/scripts/**` imports via a relative specifier. `root/tests/**` is
+ * deliberately excluded from the importer search — a file reached only from
+ * a test is exactly the "delivered but not wired" pattern this sweep targets.
  */
 export function findOrphanFiles(
   root: string,
   existsCheck: (p: string) => boolean = existsSync,
 ): OrphanScanResult {
-  const candidates = walkFiles(join(root, 'src'), SOURCE_EXTENSIONS, ['dashboard']);
+  const candidates = walkFiles(join(root, 'src'), SOURCE_EXTENSIONS, ['dashboard', 'desktop']);
   const importerFiles = [
     ...walkFiles(join(root, 'src'), IMPORTER_EXTENSIONS),
     ...walkFiles(join(root, 'scripts'), IMPORTER_EXTENSIONS),
@@ -370,6 +371,56 @@ describe('findOrphanFiles — fixture determinism', () => {
 // untracked, 375-004 was already DONE) before adding — this keeps the
 // roundtrip-gap-pin accurate rather than leaving it permanently red for
 // everyone after this sprint closes.
+//
+// --- Sprint 398 Task 398-002 (LAT-ORPHAN ratchet-refresh) — 3 pin changes ---
+// Diagnosed via `git log` per new/vanished entry the live scan surfaced
+// (see docs/analysis/orphan-deliverables-2026-07.md for the running log —
+// docImpact: that doc predates this refresh and does not yet reflect it):
+//
+// REMOVED (closed gap): `src/cli/repl/cursor-model.ts` is no longer an
+// orphan — sprint-380 (commit 947473e2) wired it via a real consumer,
+// `src/cli/repl/line-edit.ts` (`import { applyCursorEdit, moveCursor,
+// toBuffer, type CursorState } from './cursor-model.js'`). Verified live
+// with `grep -rn cursor-model src/`.
+//
+// ADDED, intentional (kasıtlı, kept-with-rationale): `src/orchestra/worker.ts`
+// — its own file header (born-573 REDO, task 382-001) documents this as a
+// deliberate thin re-export shim, kept ONLY so
+// `tests/orchestra/worker-approval-gate-wire.test.ts` keeps resolving a
+// single canonical definition; the real implementation lives in
+// `src/agents/worker.ts` (imported by http-agentic-worker.ts,
+// spawn-backend-docker.ts, debt-manager.ts, sprint-lifecycle.ts,
+// sprint-spawner.ts, and more). Same re-export-after-relocation pattern
+// ADR-D-004 already sanctions for `orchestra/event-stream.ts`.
+//
+// ADDED, SUSPICIOUS / dead-code candidate — flagged, not endorsed:
+// `src/cli/repl/native-flag.ts` (`isNativeAgentEnabled`). Sprint-376 M5
+// NATIVE-FLIP (commit a778151a, task 376-003) replaced its call site in
+// `run.tsx` with a new local `isNativeAgentSelected`; that commit's own
+// added comment says the old gate "is no longer called from this module."
+// Its only remaining importers are two test files
+// (`tests/cli/native-flag-wire.test.ts`,
+// `tests/cli/native-stabilization-proof.test.ts`) exercising a gate that no
+// longer runs in production — the exact "delivered but not wired" shape
+// this sweep exists to catch. Pinned here because the roundtrip-gap-pin
+// must reflect the live scan exactly, but this entry is NOT a vouched-for
+// intentional deliverable like the others above — flagging for Brain to
+// decide whether to delete the file + its two orphaned tests, or to keep it
+// as a documented legacy/rollback reference.
+//
+// FIXED AT THE SOURCE (scanner bug, not a per-file pin): 8 new candidates
+// under `src/desktop/**` (electron.vite.config.ts, src/main/index.ts,
+// src/main/tray.ts, src/preload/index.ts, src/renderer/main.ts, and 3
+// tests/*.test.ts) were a scanner gap, not real orphans — `src/desktop/`
+// has its own package.json + tsconfig.json + electron.vite.config.ts +
+// node_modules (born-496: "DESK-1 B2 scaffold — src/desktop sub-package
+// (dashboard-isolation pattern)"), structurally identical to
+// `src/dashboard/` which `findOrphanFiles` already excludes from
+// `candidates`. Added `'desktop'` alongside `'dashboard'` in the
+// excludeDirNames call above instead of allowlisting each file individually
+// — desktop's real cross-boundary imports (e.g. `../../../core/
+// pid-ownership.js`, `../../../cli/helpers/messages.js`) stay visible to
+// the importer-side walk, which is unaffected by this change.
 // ═══════════════════════════════════════════════════════════════════════════
 
 const KNOWN_ORPHANS = [
@@ -391,8 +442,8 @@ const KNOWN_ORPHANS = [
   'src/cli/helpers/output-mode.ts',
   'src/cli/helpers/risk-language.ts',
   'src/cli/helpers/sprint-summary.ts',
-  'src/cli/repl/cursor-model.ts',
   'src/cli/repl/ink-probe.tsx',
+  'src/cli/repl/native-flag.ts',
   'src/connectors/approval-clients-wire.ts',
   'src/connectors/approval-telegram.ts',
   'src/connectors/identity/verify-bind.ts',
@@ -455,6 +506,7 @@ const KNOWN_ORPHANS = [
   'src/orchestra/spawn-backend-subprocess.ts',
   'src/orchestra/task-analyzer.ts',
   'src/orchestra/timeout-watcher.ts',
+  'src/orchestra/worker.ts',
   'src/providers/cache-adapter-resource.ts',
   'src/providers/cache-adapter.ts',
   'src/sdk/index.ts',
@@ -463,7 +515,7 @@ const KNOWN_ORPHANS = [
 
 describe('KNOWN_ORPHANS allowlist sanity', () => {
   it('has the expected count and only well-formed src/**/*.ts(x) entries', () => {
-    expect(KNOWN_ORPHANS.length).toBe(86);
+    expect(KNOWN_ORPHANS.length).toBe(87);
     for (const entry of KNOWN_ORPHANS) {
       expect(entry.startsWith('src/')).toBe(true);
       expect(entry.endsWith('.ts') || entry.endsWith('.tsx')).toBe(true);

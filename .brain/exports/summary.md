@@ -51,6 +51,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-398 Learnings** (sprint-398): ## Sprint sprint-398 Learnings
+- LAT-KPI-SEED — kpi-backfill + init-builtin-seed (3 fail): GO_WITH_TECH_DEBT — FIXED ...
 - **Sprint sprint-397 Learnings** (sprint-397): ## Sprint sprint-397 Learnings
 - T7-ELOOP — chat-tool-exec raw-throw → DeckentError (CODE-FIX): GO_WITH_TECH_DEBT — F...
 - **Sprint sprint-396 Learnings** (sprint-396): ## Sprint sprint-396 Learnings
@@ -73,11 +75,10 @@
 - born-565 — AI-SESSION-TOOL-ALLOWLIST — kind==='ai' client-tool validation (P1, güven...
 - **Sprint sprint-389 Learnings** (sprint-389): ## Sprint sprint-389 Learnings
 - born-583 — GOV-MINORS — plugin-sig + opaque-bearer + deny-list loopback (P2): GO_WIT...
-- **Sprint sprint-388 Learnings** (sprint-388): ## Sprint sprint-388 Learnings
-- born-528 — REPL-DENY-TOOLSINK — confirm-red toolSink honest-outcome bypass (P2): NO_...
 
 ## Active Technical Debt
-- [NORMAL] Tech debt from 397-007-fix: CODE-BUG confirmed already fixed on disk (uncommitte
+- [NORMAL] Tech debt from 398-003-xfix: tests/e2e/init-builtin-seed.test.ts: FULLY GREEN, 1
+- [HIGH] Tech debt from 397-007-fix: CODE-BUG confirmed already fixed on disk (uncommitte
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -137,4 +138,4 @@
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 1162 | Generated: 2026-07-10_
+_Total entries: 1169 | Generated: 2026-07-10_

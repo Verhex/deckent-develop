@@ -116,7 +116,7 @@ describe('TmuxBackend Unit Tests (mock-based)', () => {
     it('wraps with timeout when taskId is provided', async () => {
       const { buildWorkerCommand, WORKER_TIMEOUT_SECONDS } = await import('../../src/orchestra/tmux.js');
       const cmd = buildWorkerCommand('opus', '/proj/.tasks/.prompt-abc.txt', undefined, undefined, '001-001');
-      expect(cmd).toContain(`timeout ${WORKER_TIMEOUT_SECONDS}`);
+      expect(cmd).toContain(`timeout -k 30 ${WORKER_TIMEOUT_SECONDS}`);
       expect(cmd).toContain('task-001-001.timeout');
       expect(cmd).toContain('WORKER_TIMEOUT');
     });
@@ -124,7 +124,7 @@ describe('TmuxBackend Unit Tests (mock-based)', () => {
     it('uses custom timeout seconds when provided', async () => {
       const { buildWorkerCommand } = await import('../../src/orchestra/tmux.js');
       const cmd = buildWorkerCommand('haiku', '/proj/.tasks/.prompt-x.txt', undefined, undefined, '002-001', 300);
-      expect(cmd).toContain('timeout 300');
+      expect(cmd).toContain('timeout -k 30 300');
     });
 
     it('delegates to adapter.buildCommand when adapter is provided', async () => {

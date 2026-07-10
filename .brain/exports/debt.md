@@ -4,12 +4,14 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-397-007-fix | Tech debt from 397-007-fix: CODE-BUG confirmed already fixed on disk (uncommitte | normal | sprint-397 | active |
+| debt-398-003-xfix | Tech debt from 398-003-xfix: tests/e2e/init-builtin-seed.test.ts: FULLY GREEN, 1 | normal | sprint-398 | active |
+| debt-397-007-fix | Tech debt from 397-007-fix: CODE-BUG confirmed already fixed on disk (uncommitte | high | sprint-397 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-398-003 | Tech debt from 398-003: FIXED (tests/e2e/init-builtin-seed.test.ts, 2/2 fails re | normal | sprint-398 | resolved |
 | debt-396-001 | Tech debt from 396-001: 4/4 manifests rewritten per Brain's per-agent spec. arch | normal | sprint-396 | resolved |
 | debt-395-001 | Tech debt from 395-001: All 7 buildWorkerPrompt call sites now pass their in-sco | normal | sprint-395 | resolved |
 | debt-395-002 | Tech debt from 395-002: Migrated all 5 born-587 members off dead process.on(SIGI | normal | sprint-395 | resolved |
