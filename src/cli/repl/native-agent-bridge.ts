@@ -16,7 +16,9 @@ import type { AgentEvent } from '../../agent/events.js';
 import { primaryResource, writeTargets, type PermissionResponse } from '../../agent/loop.js';
 import { decide, resolveTier } from '../../agent/permission.js';
 import { checkSelfModifying } from '../../agent/guards/self-modifying.js';
-import type { ToolSurfaceOptions } from './native-tool-registry.js';
+import { BRIDGE_RISK_BY_TIER, type ToolSurfaceOptions } from './native-tool-registry.js';
+import { meetsRiskThreshold } from '../../core/tool-dispatch.js';
+import type { ToolRiskLevel as CoreToolRiskLevel } from '../../core/tool-registry.js';
 import type { ApprovalMode } from '../../agent/permission-types.js';
 import type { ToolInfo } from './app.js';
 import type { ChatTurnQueue, ChatTurnPayload } from './chat-turn-queue.js';
@@ -147,6 +149,14 @@ export interface ParityExecContext {
   confirm: (summary: string, toolName: string) => Promise<'y' | 'a' | 'n'>;
   cwd: string;
   t: (key: string) => string;
+  /**
+   * born-607 P1 (advisor BEFORE-done): an EXPLICIT `tool_surface.riskThreshold`
+   * is honored as an additional ask-floor — a decide()-'allow' (silent tier /
+   * grant / full-auto) is escalated to ask when the target's bridged risk meets
+   * the threshold. Absent (the default) → pure engine-parity, no extra floor.
+   * Without this the config knob was dead on every production path.
+   */
+  riskThreshold?: CoreToolRiskLevel;
 }
 
 /**
@@ -172,13 +182,21 @@ export function createParityExecImpl(ctx: ParityExecContext) {
     const elevated = checkSelfModifying(ctx.cwd, writeTargets(callArgs)).elevated;
     let tier = resolveTier(def, ctx.policy);
     if (elevated) tier = 'always';
-    const decision = decide(name, resource, tier, {
+    let decision = decide(name, resource, tier, {
       rules: ctx.ruleStore.activeRules(),
       denies: ctx.ruleStore.activeDenies(),
       policy: ctx.policy,
       mode: ctx.getMode(),
     });
     if (decision === 'deny') throw new Error(`[denied by policy] ${name}`);
+    // Explicit riskThreshold = extra ask-floor (see ParityExecContext.riskThreshold).
+    if (
+      decision === 'allow' &&
+      ctx.riskThreshold !== undefined &&
+      meetsRiskThreshold(BRIDGE_RISK_BY_TIER[tier], ctx.riskThreshold)
+    ) {
+      decision = 'ask';
+    }
     if (decision === 'ask') {
       const answer = await ctx.confirm(
         `${ctx.t('native.run_tool')}: ${name}${resource ? ` (${resource})` : ''}`,
@@ -238,6 +256,9 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
       confirm: deps.confirm,
       cwd: deps.cwd,
       t,
+      ...(deps.toolSurface.riskThreshold !== undefined
+        ? { riskThreshold: deps.toolSurface.riskThreshold }
+        : {}),
     });
     // Inner risk-threshold gate is delegated to the parity resolver above — a
     // second asker here would double-prompt (single-gate doctrine).

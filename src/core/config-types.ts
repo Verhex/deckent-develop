@@ -215,8 +215,11 @@ export interface LiveTraceConfig {
 export interface ToolSurfaceConfig {
   /** Enable the 3 progressive-disclosure meta-tools (resolved default: true). */
   enabled?: boolean;
-  /** Risk-gate threshold for `deckent_call_tool` dispatch (default: engine default).
-   *  Invalid values are dropped at resolve time (fail-open guard, born-607). */
+  /** EXPLICIT ask-floor for `deckent_call_tool`'s nested dispatch (born-607): when
+   *  set, a nested call whose target risk meets this threshold asks EVEN IF the
+   *  engine-parity gate would allow it (silent tier / grant / full-auto). Absent
+   *  (default) → pure engine-parity, no extra floor. Invalid values are dropped
+   *  at resolve time (fail-open guard). */
   riskThreshold?: ToolRiskLevel;
 }
 

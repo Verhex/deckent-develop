@@ -1750,7 +1750,9 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // progressive-disclosure meta-tool surface ships ON by default too — same
     // opt-out rationale as repl_surface above (explicit { enabled: false } still
     // disables it).
-    tool_surface: config.tool_surface ?? { enabled: true },
+    // born-607 P1 (advisor): FIELD-level default — a partial block like
+    // `{ riskThreshold: 'safe' }` must not silently disable the default-ON surface.
+    tool_surface: { ...(config.tool_surface ?? {}), enabled: config.tool_surface?.enabled ?? true },
     deck_broker: config.deck_broker,
     training_trace: config.training_trace,
     live_trace: config.live_trace,
@@ -2488,7 +2490,9 @@ export function mergeConfigs(
     // progressive-disclosure meta-tool surface ships ON by default too — same
     // opt-out rationale as repl_surface above (explicit { enabled: false } still
     // disables it).
-    tool_surface: config.tool_surface ?? { enabled: true },
+    // born-607 P1 (advisor): FIELD-level default — a partial block like
+    // `{ riskThreshold: 'safe' }` must not silently disable the default-ON surface.
+    tool_surface: { ...(config.tool_surface ?? {}), enabled: config.tool_surface?.enabled ?? true },
     deck_broker: config.deck_broker,
     training_trace: config.training_trace,
     live_trace: config.live_trace,

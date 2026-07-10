@@ -9,10 +9,11 @@
  * Hermetic: fake registry/policy/ruleStore; no disk, no session.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
+import { mergeConfigs } from '../../src/core/config.js';
 import {
   buildNativeToolRegistry,
   resolveToolSurfaceOptions,
@@ -181,5 +182,120 @@ describe('call_tool end-to-end (registry handler → dispatch → parity exec)',
     const reg = buildNativeToolRegistry({ cwd: () => tmpdir(), toolSurface: { enabled: true } });
     const res = await reg.get('deckent_call_tool')!.handler({ name: 'deckent_status', args: {} });
     expect(String((res as { output: string }).output)).toMatch(/execution seam not wired|error/);
+  });
+
+  it('REAL e2e: fake mcpBridge tool → call_tool handler → dispatch → parity → target handler, EXACTLY 1 prompt', async () => {
+    const log: string[] = [];
+    let targetRan = 0;
+    const surface: ToolSurfaceOptions = { enabled: true };
+    const reg = buildNativeToolRegistry({
+      cwd: () => tmpdir(),
+      toolSurface: surface,
+      mcpBridge: {
+        listTools: () => [{ namespacedName: 'mcp_fake_deploy', descriptor: { description: 'fake deploy tool' } }],
+        dispatch: async () => { targetRan += 1; return { ok: true, output: 'deployed' }; },
+      },
+    });
+    surface.execImpl = createParityExecImpl({
+      ...parityCtx({ confirmAnswer: 'y', confirmLog: log }),
+      registry: reg,
+    });
+    surface.confirm = () => 'allow';
+    const res = await reg.get('deckent_call_tool')!.handler({ name: 'mcp_fake_deploy', args: {} });
+    expect((res as { ok: boolean }).ok).toBe(true);
+    expect(targetRan).toBe(1);
+    expect(log).toHaveLength(1); // MCP tools register confirm-tier → parity asks ONCE, no double-prompt
+  });
+});
+
+// ─── advisor BEFORE-done test debt: the 2 untested gates + mode/self-mod/degrade ──
+
+describe('parity gate coverage (advisor: tierMap/alwaysFloor were unproven)', () => {
+  it("tierMap override parity: policy's silent→confirm escalation asks on the nested path too", async () => {
+    const log: string[] = [];
+    const ctx = parityCtx({
+      defs: [{ name: 'deckent_status', tier: 'silent', handler: async () => 'ok' }],
+      confirmLog: log, confirmAnswer: 'y',
+    });
+    (ctx.policy as unknown as { tierMap: Record<string, string> }).tierMap['deckent_status'] = 'confirm';
+    await createParityExecImpl(ctx)({ name: 'deckent_status', args: {} });
+    expect(log).toHaveLength(1);
+  });
+
+  it('alwaysFloor parity: a floored tool asks even in full-auto mode (decide rule-2 precedes mode)', async () => {
+    const log: string[] = [];
+    const ctx = parityCtx({
+      defs: [{ name: 'deckent_bash', tier: 'confirm', handler: async () => 'x' }],
+      mode: 'full-auto', confirmLog: log, confirmAnswer: 'y',
+    });
+    (ctx.policy as unknown as { alwaysFloor: string[] }).alwaysFloor.push('deckent_bash');
+    await createParityExecImpl(ctx)({ name: 'deckent_bash', args: { cmd: 'ls' } });
+    expect(log).toHaveLength(1);
+  });
+
+  it('mode parity: full-auto lets a confirm-tier target through with no prompt', async () => {
+    const log: string[] = [];
+    const exec = createParityExecImpl(parityCtx({
+      defs: [{ name: 'deckent_kill', tier: 'confirm', handler: async () => 'k' }],
+      mode: 'full-auto', confirmLog: log,
+    }));
+    await exec({ name: 'deckent_kill', args: {} });
+    expect(log).toEqual([]);
+  });
+
+  it("self-mod elevation parity: in a deckent repo, a src/ write asks DESPITE a '**' grant", async () => {
+    const root = mkdtempSync(join(tmpdir(), 'selfmod-'));
+    try {
+      mkdirSync(join(root, '.deckent'), { recursive: true });
+      writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'deckent' }));
+      const log: string[] = [];
+      const ctx = parityCtx({
+        defs: [{ name: 'deckent_write_file', tier: 'confirm', handler: async () => 'w' }],
+        rules: [{ tool: 'deckent_write_file', pattern: '**' }],
+        confirmLog: log, confirmAnswer: 'y',
+      });
+      ctx.cwd = root;
+      await createParityExecImpl(ctx)({ name: 'deckent_write_file', args: { path: 'src/core/config.ts' } });
+      expect(log).toHaveLength(1); // grant would auto-allow; elevation forces the ask
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("'a' degrade pin: nested 'a' runs the call but the SECOND identical call asks again (no persist)", async () => {
+    const log: string[] = [];
+    const exec = createParityExecImpl(parityCtx({
+      defs: [{ name: 'deckent_kill', tier: 'confirm', handler: async () => 'k' }],
+      confirmAnswer: 'a', confirmLog: log,
+    }));
+    await exec({ name: 'deckent_kill', args: {} });
+    await exec({ name: 'deckent_kill', args: {} });
+    expect(log).toHaveLength(2);
+  });
+
+  it('explicit riskThreshold honor (P1): threshold=safe escalates even a silent-tier allow to ask', async () => {
+    const log: string[] = [];
+    const exec = createParityExecImpl({
+      ...parityCtx({
+        defs: [{ name: 'deckent_status', tier: 'silent', handler: async () => 's' }],
+        confirmLog: log, confirmAnswer: 'y',
+      }),
+      riskThreshold: 'safe',
+    });
+    await exec({ name: 'deckent_status', args: {} });
+    expect(log).toHaveLength(1); // absent threshold → this would be silent (tested above)
+  });
+});
+
+describe('config resolution (P1: partial block must not kill default-ON)', () => {
+  it('a partial tool_surface block (riskThreshold only) keeps enabled=true', () => {
+    const resolved = mergeConfigs(null, { tool_surface: { riskThreshold: 'safe' } } as never);
+    expect(resolved.tool_surface?.enabled).toBe(true);
+    expect(resolved.tool_surface?.riskThreshold).toBe('safe');
+  });
+
+  it('explicit enabled:false still opts out; absent block stays default-ON', () => {
+    expect(mergeConfigs(null, { tool_surface: { enabled: false } } as never).tool_surface?.enabled).toBe(false);
+    expect(mergeConfigs(null, {}).tool_surface?.enabled).toBe(true);
   });
 });

@@ -2257,8 +2257,9 @@
    "src/cli/repl/run.tsx",
    "src/cli/repl/native-tool-registry.ts"
   ],
-  "spec": "run.tsx buildNativeToolRegistry({cwd,mcpBridge}) — execImpl/confirm yok -> catalog call-yolu fail-closed olu. FIX: gercek dispatcher + AgentSession-confirm seam'ini registry opts'a gecir; progressive-disclosure (search/describe/call) ile 596-eager-yuzeyinin iliskisini tek tasarimda birlestir (eager=advertise, catalog=uzun-kuyruk; ikisi ayni permission-yolunda).",
-  "verify": "unit: call_tool gercek-exec+confirm-yolu; eager-yuzey regresyonsuz (cli-bridge-tool-parity yesil)"
+  "spec": "[DONE 2026-07-10 Faz-1 el-kod: Gap-A threading (3 meta-tool prod-register, a778151a yarim-wire tamam) + Gap-B engine-parity execImpl (loop 5-gate paritesi; deny-glob-bypass P0 kapali) + P1: riskThreshold explicit-ask-floor olarak onore + partial-config field-merge; 21+13 test (tierMap/alwaysFloor/self-mod/mode/a-degrade/e2e) + core+cli 864-dosya blast + dist-smoke 4/4 (call_tool→gercek deckent_status dispatch). P2 kalanlar=born-633.] run.tsx buildNativeToolRegistry({cwd,mcpBridge}) — execImpl/confirm yok -> catalog call-yolu fail-closed olu. FIX: gercek dispatcher + AgentSession-confirm seam'ini registry opts'a gecir; progressive-disclosure (search/describe/call) ile 596-eager-yuzeyinin iliskisini tek tasarimda birlestir (eager=advertise, catalog=uzun-kuyruk; ikisi ayni permission-yolunda).",
+  "verify": "unit: call_tool gercek-exec+confirm-yolu; eager-yuzey regresyonsuz (cli-bridge-tool-parity yesil)",
+  "status": "DONE"
  },
  {
   "sources": [
@@ -2605,5 +2606,13 @@
   "status": "OPEN",
   "source": "607 blast-radius koşusu",
   "spec": "tests/cli/shutdown-hooks.test.ts 'collectively bounded' testi elapsed>=4500 assert ediyor; VITEST_MAX_FORKS=2 tam cli+agent koşusunda 3157ms ölçüldü (fork-baskısı timer-coalescing) — standalone yeşil. Sınıf: duvar-saati assert'i CI-flake adayı; fake-timer veya tolerans-bandı ile hermetikleştir."
+ },
+ {
+  "born_id": 633,
+  "title": "call_tool nested-dispatch dürüstlük ailesi (607 BEFORE-done P2 kalanları)",
+  "priority": "P2",
+  "status": "OPEN",
+  "source": "born-607 BEFORE-done advisor",
+  "spec": "4 kalem: (1) nested handler ok:false dönerse dispatchToolCall status:'executed' + dış ok:true — iç başarısızlık maskeleniyor (native-tool-registry.ts:407-408 ToolResult-unwrap gerek). (2) parity-deny throw→status:'error'/[mcp-error] etiketi — policy-deny 'denied' sınıfında raporlanmalı (telemetri+model-görünürlüğü). (3) nested ask'te confirm-kartı 'a'=hep-izin-ver sunuyor ama parity persist etmiyor (bilinçli) — kartta nested için 'a'yı gizle veya 'yalnız bu sefer' etiketle. (4) nested exec toolSink/trace'e görünmüyor (TRN-614 pillar'ına dokunur — call_tool üzerinden koşan hedef-tool'lar trace'te kaybolmasın)."
  }
 ]

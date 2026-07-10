@@ -230,7 +230,9 @@ function bridgeCategory(name: string): CoreToolCategory {
  * ('moderate'), so the existing confirm/always-tier tools require a confirm
  * decision through `deckent_call_tool` too, exactly like they already do
  * through the AgentSession's own permission engine for a direct call. */
-const BRIDGE_RISK_BY_TIER: Record<ToolPermissionTier, CoreToolRiskLevel> = {
+// Exported (born-607 P1): the parity resolver honors an EXPLICIT `riskThreshold`
+// as an additional ask-floor and needs the same tier→risk bridge this catalog uses.
+export const BRIDGE_RISK_BY_TIER: Record<ToolPermissionTier, CoreToolRiskLevel> = {
   silent: 'safe',
   confirm: 'moderate',
   always: 'destructive',
