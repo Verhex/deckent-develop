@@ -78,6 +78,34 @@ export interface ToolSurfaceOptions {
   riskThreshold?: CoreToolRiskLevel;
 }
 
+/** Whitelist for {@link resolveToolSurfaceOptions} — mirrors RISK_ORDER's keys.
+ *  An invalid config string previously fell through as-is; `RISK_ORDER[bad]` is
+ *  undefined so `meetsRiskThreshold` returned false for EVERY risk → the confirm
+ *  gate never fired (fail-OPEN, advisor born-607 P0). */
+const VALID_RISK_THRESHOLDS: ReadonlySet<string> = new Set(['safe', 'moderate', 'destructive']);
+
+/**
+ * born-607 Gap-A: resolve the raw `tool_surface` config block into registry
+ * options. Pure + validating: `enabled` must be literally `true` (config default
+ * resolves it true; a load-failure `{}` fallback stays OFF — fail-closed), and an
+ * invalid `riskThreshold` string is DROPPED (dispatch falls back to its own
+ * 'moderate' default) instead of silently disabling the confirm gate.
+ * The returned object is intentionally the SAME mutable reference callers pass to
+ * both `buildNativeToolRegistry` and `createNativeEngine` — the bridge later fills
+ * `execImpl`/`confirm` in place (dispatch reads them per-call), which is what
+ * finally arms `deckent_call_tool` with the engine-parity resolver.
+ */
+export function resolveToolSurfaceOptions(
+  raw: { enabled?: boolean; riskThreshold?: string } | undefined,
+): ToolSurfaceOptions | undefined {
+  if (!raw || raw.enabled !== true) return undefined;
+  const opts: ToolSurfaceOptions = { enabled: true };
+  if (typeof raw.riskThreshold === 'string' && VALID_RISK_THRESHOLDS.has(raw.riskThreshold)) {
+    opts.riskThreshold = raw.riskThreshold as CoreToolRiskLevel;
+  }
+  return opts;
+}
+
 const LEGACY_TIER: Record<'read' | 'confirm' | 'always', ToolPermissionTier> = {
   read: 'silent',
   confirm: 'confirm',
@@ -356,7 +384,14 @@ function registerToolSurfaceTools(registry: ToolRegistry, opts: ToolSurfaceOptio
       required: ['name'],
     },
     category: 'catalog',
-    tier: 'confirm',
+    // born-607: 'confirm' → 'silent'. call_tool is a ROUTER — its own outer tier
+    // asking would (a) double-prompt against the inner per-target gate and (b) an
+    // outer "always" would persist a `pattern:'**'` grant (call_tool args carry no
+    // path/cmd → primaryResource '') silencing EVERY future nested call. The single
+    // gate is the engine-parity resolver the bridge injects as `execImpl` (same
+    // deny-rules/tierMap/floor/self-mod/mode checks as the loop's direct path);
+    // without that injection the default remains NOT_WIRED_EXEC → fail-closed.
+    tier: 'silent',
     source: 'builtin',
     handler: async (toolArgs) => {
       const name = typeof toolArgs['name'] === 'string' ? toolArgs['name'] : '';

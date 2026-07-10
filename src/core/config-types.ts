@@ -208,13 +208,15 @@ export interface LiveTraceConfig {
 }
 
 /** Native-REPL progressive-disclosure meta-tools — `deckent_search_tools` /
- *  `deckent_describe_tool` / `deckent_call_tool` (TOOL-REPL-WIRE, 354-002). Opt-in —
- *  absent block = disabled (registers nothing; rest of the native tool list unchanged).
- *  @see ToolSurfaceOptions (cli/repl/native-tool-registry.ts). */
+ *  `deckent_describe_tool` / `deckent_call_tool` (TOOL-REPL-WIRE, 354-002; canlıya
+ *  alınışı born-607). Config-resolve default-ON (a778151a, sprint-376) — an absent
+ *  block resolves `{ enabled: true }`; explicit `enabled: false` opts out.
+ *  @see ToolSurfaceOptions + resolveToolSurfaceOptions (cli/repl/native-tool-registry.ts). */
 export interface ToolSurfaceConfig {
-  /** Enable the 3 progressive-disclosure meta-tools (default: false). */
+  /** Enable the 3 progressive-disclosure meta-tools (resolved default: true). */
   enabled?: boolean;
-  /** Risk-gate threshold for `deckent_call_tool` dispatch (default: engine default). */
+  /** Risk-gate threshold for `deckent_call_tool` dispatch (default: engine default).
+   *  Invalid values are dropped at resolve time (fail-open guard, born-607). */
   riskThreshold?: ToolRiskLevel;
 }
 

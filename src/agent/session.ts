@@ -48,6 +48,9 @@ export interface AgentSession {
   respondPermission(id: string, response: PermissionResponse): void;
   cancel(): void;
   setApprovalMode(mode: ApprovalMode): void;
+  /** Live approval mode — the call_tool parity resolver (born-607) reads this so a
+   *  nested dispatch honors the SAME mode the loop's direct path would. */
+  getApprovalMode(): ApprovalMode;
   /** The cross-turn transcript (a copy) — for trace recording. */
   transcript(): ProviderMessage[];
 }
@@ -112,6 +115,9 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     },
     setApprovalMode(next: ApprovalMode): void {
       mode = next;
+    },
+    getApprovalMode(): ApprovalMode {
+      return mode;
     },
     transcript(): ProviderMessage[] {
       return transcript.toProviderMessages();

@@ -16,7 +16,7 @@ import {
   type ProviderError,
 } from './native-transport.js';
 import { loadDeckSecrets } from '../../core/deck-file.js';
-import { buildNativeToolRegistry } from './native-tool-registry.js';
+import { buildNativeToolRegistry, resolveToolSurfaceOptions } from './native-tool-registry.js';
 import { createNativeEngine, resolveCostCeilingUsd } from './native-agent-bridge.js';
 import { buildTurnRecorder } from './trace-wire.js';
 import { composeSystemPrompt } from '../../agent/identity.js';
@@ -635,9 +635,22 @@ export async function runInkRepl(
         now: () => new Date().toISOString(),
       });
       const costCeilingUsd = resolveCostCeilingUsd(process.env, cfg as { native_cost_ceiling_usd?: unknown });
+      // born-607 Gap-A: thread the resolved `tool_surface` config into the registry
+      // (default-ON since a778151a but consumer-less until now — the 3 progressive-
+      // disclosure meta-tools never registered in prod). The SAME object goes to
+      // createNativeEngine, which arms `execImpl` with the engine-parity resolver.
+      // Config-load failure ({} fallback above) → undefined → OFF (fail-closed).
+      const toolSurfaceOpts = resolveToolSurfaceOptions(
+        (cfg as { tool_surface?: { enabled?: boolean; riskThreshold?: string } }).tool_surface,
+      );
       nativeEngine = createNativeEngine({
         adapter: resolved.adapter,
-        registry: buildNativeToolRegistry({ cwd: () => process.cwd(), ...(mcpBridge ? { mcpBridge } : {}) }),
+        registry: buildNativeToolRegistry({
+          cwd: () => process.cwd(),
+          ...(mcpBridge ? { mcpBridge } : {}),
+          ...(toolSurfaceOpts ? { toolSurface: toolSurfaceOpts } : {}),
+        }),
+        ...(toolSurfaceOpts ? { toolSurface: toolSurfaceOpts } : {}),
         cwd: process.cwd(),
         model: resolved.model,
         getAdapter: () => live.adapter,

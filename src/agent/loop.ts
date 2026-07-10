@@ -57,14 +57,17 @@ export interface LoopDeps {
   costGuard?: CostGuardState;
 }
 
-/** Best-effort primary resource for permission glob matching. */
-function primaryResource(args: Record<string, unknown>): string {
+/** Best-effort primary resource for permission glob matching. Exported for the
+ *  call_tool parity resolver (born-607) — a nested dispatch must derive the SAME
+ *  resource this loop would, or deny-globs diverge between direct and nested paths. */
+export function primaryResource(args: Record<string, unknown>): string {
   const v = args['path'] ?? args['file_path'] ?? args['cmd'] ?? args['url'] ?? args['pattern'] ?? '';
   return typeof v === 'string' ? v : '';
 }
 
-/** Candidate write-target paths for the self-modifying guard. */
-function writeTargets(args: Record<string, unknown>): string[] {
+/** Candidate write-target paths for the self-modifying guard. Exported for the
+ *  call_tool parity resolver (born-607) — same rationale as primaryResource. */
+export function writeTargets(args: Record<string, unknown>): string[] {
   const out: string[] = [];
   for (const k of ['path', 'file_path']) if (typeof args[k] === 'string') out.push(args[k] as string);
   if (Array.isArray(args['files'])) for (const f of args['files']) if (typeof f === 'string') out.push(f);

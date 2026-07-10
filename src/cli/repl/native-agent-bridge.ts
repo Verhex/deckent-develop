@@ -13,7 +13,10 @@ import { createCostGuard } from '../../agent/guards/cost.js';
 import type { ProviderAdapter } from '../../agent/provider-tooluse/types.js';
 import type { ToolRegistry } from '../../agent/tools/registry.js';
 import type { AgentEvent } from '../../agent/events.js';
-import type { PermissionResponse } from '../../agent/loop.js';
+import { primaryResource, writeTargets, type PermissionResponse } from '../../agent/loop.js';
+import { decide, resolveTier } from '../../agent/permission.js';
+import { checkSelfModifying } from '../../agent/guards/self-modifying.js';
+import type { ToolSurfaceOptions } from './native-tool-registry.js';
 import type { ApprovalMode } from '../../agent/permission-types.js';
 import type { ToolInfo } from './app.js';
 import type { ChatTurnQueue, ChatTurnPayload } from './chat-turn-queue.js';
@@ -89,6 +92,16 @@ export interface NativeEngineDeps {
    * supplied, no synthetic turn is ever produced unless this is explicitly true.
    */
   bgTurnsEnabled?: boolean;
+  /**
+   * born-607 CALLTOOL-EXEC-WIRE — the SAME mutable ToolSurfaceOptions object that
+   * was passed to `buildNativeToolRegistry`. When present+enabled, this bridge
+   * fills `execImpl` with the ENGINE-PARITY resolver (deny-rules → tierMap/floor →
+   * self-mod elevation → approval-mode, the loop's own gate order) and `confirm`
+   * with an allow-passthrough (the inner risk-threshold gate is DELEGATED to the
+   * parity resolver — two askers would double-prompt). Absent → registry default
+   * stays NOT_WIRED_EXEC (fail-closed).
+   */
+  toolSurface?: ToolSurfaceOptions;
 }
 
 /** Format one drained ChatTurnPayload (ChatTurnQueue.drainAsTurns()) as the
@@ -120,6 +133,63 @@ export function resolveCostCeilingUsd(
   return undefined;
 }
 
+/** Structural slice of the session's rule store the parity resolver consults. */
+export interface ParityRuleStoreLike {
+  activeRules(): ReturnType<ReturnType<typeof createRuleStore>['activeRules']>;
+  activeDenies(): ReturnType<ReturnType<typeof createRuleStore>['activeDenies']>;
+}
+
+export interface ParityExecContext {
+  registry: Pick<ToolRegistry, 'get'>;
+  policy: ReturnType<typeof loadPolicy>;
+  ruleStore: ParityRuleStoreLike;
+  getMode: () => ApprovalMode;
+  confirm: (summary: string, toolName: string) => Promise<'y' | 'a' | 'n'>;
+  cwd: string;
+  t: (key: string) => string;
+}
+
+/**
+ * born-607 — ENGINE-PARITY exec resolver for `deckent_call_tool`. A nested
+ * dispatch (call_tool → target) is NOT a model-proposed tool_use, so the loop's
+ * own gate (loop.ts: deny-rules → tierMap/alwaysFloor → self-mod elevation →
+ * approval-mode → grants) never sees it. This resolver re-applies the IDENTICAL
+ * checks — same helpers, same order, same policy/ruleStore/mode instances —
+ * then invokes the target's registered native handler. Divergence here is a
+ * policy-bypass ramp (advisor born-607 P0: a user's deny-glob must hold on BOTH
+ * paths). Nested asks never persist a grant ('a' degrades to once): the ask has
+ * no per-resource pattern worth an 'always', and an elevated (self-modifying)
+ * call must be re-confirmed every time anyway.
+ */
+export function createParityExecImpl(ctx: ParityExecContext) {
+  return async ({ name, args }: { name: string; args: unknown }): Promise<unknown> => {
+    const def = ctx.registry.get(name);
+    if (!def) throw new Error(`unknown tool: ${name}`);
+    const callArgs = (args && typeof args === 'object' && !Array.isArray(args))
+      ? (args as Record<string, unknown>)
+      : {};
+    const resource = primaryResource(callArgs);
+    const elevated = checkSelfModifying(ctx.cwd, writeTargets(callArgs)).elevated;
+    let tier = resolveTier(def, ctx.policy);
+    if (elevated) tier = 'always';
+    const decision = decide(name, resource, tier, {
+      rules: ctx.ruleStore.activeRules(),
+      denies: ctx.ruleStore.activeDenies(),
+      policy: ctx.policy,
+      mode: ctx.getMode(),
+    });
+    if (decision === 'deny') throw new Error(`[denied by policy] ${name}`);
+    if (decision === 'ask') {
+      const answer = await ctx.confirm(
+        `${ctx.t('native.run_tool')}: ${name}${resource ? ` (${resource})` : ''}`,
+        name,
+      );
+      if (answer === 'n') throw new Error(`[rejected by user] ${name}`);
+    }
+    return def.handler(callArgs);
+  };
+}
+
 /** Map a confirm-queue answer to a session permission decision. */
 function toDecision(answer: 'y' | 'a' | 'n'): PermissionResponse {
   if (answer === 'n') return { decision: 'deny' };
@@ -136,11 +206,16 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
     usdPerMillionTokens: deps.usdPerMillionTokens ?? 3,
     ...(deps.costCeilingUsd !== undefined ? { ceilingUsd: deps.costCeilingUsd } : {}),
   });
+  // Hoisted (born-607): the parity resolver below must consult the SAME policy +
+  // rule-store instances the session's loop uses — a second createRuleStore would
+  // fork session-lifetime grant/deny state between direct and nested dispatch.
+  const policy = loadPolicy(deps.cwd);
+  const ruleStore = createRuleStore(deps.cwd);
   const session = createAgentSession({
     adapter: deps.adapter,
     registry: deps.registry,
-    policy: loadPolicy(deps.cwd),
-    ruleStore: createRuleStore(deps.cwd),
+    policy,
+    ruleStore,
     cwd: deps.cwd,
     model: deps.model,
     lang: deps.lang,
@@ -150,6 +225,24 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
     ...(deps.getModel ? { getModel: deps.getModel } : {}),
     ...(deps.getContextBudgetTokens ? { getContextBudgetTokens: deps.getContextBudgetTokens } : {}),
   });
+
+  // born-607 CALLTOOL-EXEC-WIRE: arm `deckent_call_tool` with the engine-parity
+  // resolver (see createParityExecImpl). Fills the shared options object in
+  // place; dispatch reads it per-call.
+  if (deps.toolSurface?.enabled) {
+    deps.toolSurface.execImpl = createParityExecImpl({
+      registry: deps.registry,
+      policy,
+      ruleStore,
+      getMode: () => session.getApprovalMode(),
+      confirm: deps.confirm,
+      cwd: deps.cwd,
+      t,
+    });
+    // Inner risk-threshold gate is delegated to the parity resolver above — a
+    // second asker here would double-prompt (single-gate doctrine).
+    deps.toolSurface.confirm = () => 'allow';
+  }
 
   // Localize a loop signal by its stable code ('native.<code>' message key);
   // an unmapped/unlocalized code falls back to the loop's English default.

@@ -38,7 +38,10 @@ describe('tool_surface — flag-on registers exactly 3 meta-tools', () => {
     expect(reg.get('deckent_describe_tool')).toBeDefined();
     expect(reg.get('deckent_describe_tool')!.tier).toBe('silent');
     expect(reg.get('deckent_call_tool')).toBeDefined();
-    expect(reg.get('deckent_call_tool')!.tier).toBe('confirm');
+    // born-607: 'confirm' → 'silent' — call_tool is a router; the single gate is
+    // the bridge-injected engine-parity execImpl (an outer ask would double-prompt,
+    // and an outer 'always' would persist a '**' grant silencing every nested call).
+    expect(reg.get('deckent_call_tool')!.tier).toBe('silent');
   });
 
   it('does not remove or alter any pre-existing tool (superset of the flag-off list)', () => {
