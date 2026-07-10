@@ -2324,8 +2324,9 @@
    "src/agents/agentic-worker-tools.ts",
    "src/core/config.ts"
   ],
-  "spec": "Gate tanimli+testli ama worker.ts:780/agentic-worker-tools.ts:303 kullanmiyor; config default false kalir (dormant-ship disiplini) — wire + enabled-path integration-test (cost-guard-enabled-path emsali). Terminal-control-plane'in ana blocker'i.",
-  "verify": "enabled-trip testi: worker riskli-action -> broker suspend -> terminal/API relay -> resume; disabled byte-identik"
+  "spec": "[✅ DONE 2026-07-10 Faz-1 el-kod — dispatcher-wire (2 runner + 2 entry + 4 spawn-site env-injection) + R1 fallback-flush + B-katmanı question-bridge canlı (question_bridge config-tipli); 11/11 enabled-path + 1010-dosya blast-radius + GERÇEK-BINARY smoke: worker-submit→API-GET-listele→API-POST-allow→worker-keşif-çöz tam-tur. CLI-worker=danışma(question-bridge) / in-process-worker=enforcement(gate) dürüstlük-sınırı. Kalan yaşam-kalitesi=born-630, expiry-driver=born-631.] Gate tanimli+testli ama worker.ts:780/agentic-worker-tools.ts:303 kullanmiyor; config default false kalir (dormant-ship disiplini) — wire + enabled-path integration-test (cost-guard-enabled-path emsali). Terminal-control-plane'in ana blocker'i.",
+  "verify": "enabled-trip testi: worker riskli-action -> broker suspend -> terminal/API relay -> resume; disabled byte-identik",
+  "status": "DONE"
  },
  {
   "sources": [
