@@ -402,7 +402,7 @@ export function registerInit(program: Command): void {
           framework: 'unknown',
           buildTool: 'unknown',
           testFramework: 'unknown',
-          commands: { build: '', test: '', lint: '' },
+          commands: { build: '', test: '', lint: '', typecheck: '' },
         };
         let stackDetected = false;
         currentStep = 'stack-detection';

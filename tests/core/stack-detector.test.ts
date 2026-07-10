@@ -844,11 +844,12 @@ describe('STACK_COMMANDS', () => {
     expect(STACK_COMMANDS).toHaveProperty('rust');
   });
 
-  it('each entry has build, test, lint fields', () => {
+  it('each entry has build, test, lint, typecheck fields', () => {
     for (const key of Object.keys(STACK_COMMANDS)) {
       expect(STACK_COMMANDS[key]).toHaveProperty('build');
       expect(STACK_COMMANDS[key]).toHaveProperty('test');
       expect(STACK_COMMANDS[key]).toHaveProperty('lint');
+      expect(STACK_COMMANDS[key]).toHaveProperty('typecheck');
     }
   });
 
@@ -862,6 +863,29 @@ describe('STACK_COMMANDS', () => {
     expect(STACK_COMMANDS['go'].build).toBe('go build ./...');
     expect(STACK_COMMANDS['go'].test).toBe('go test ./...');
     expect(STACK_COMMANDS['go'].lint).toBe('golangci-lint run');
+  });
+
+  // ─── typecheck field (Sprint 399 T-002) ──────────────────────────────────
+  // Dedicated no-emit verification command, honest-empty where no genuine
+  // lightweight typecheck-only command is known for the language.
+
+  it('typescript typecheck is the no-emit tsc invocation', () => {
+    expect(STACK_COMMANDS['typescript'].typecheck).toBe('npx tsc --noEmit');
+  });
+
+  it('go typecheck is go vet', () => {
+    expect(STACK_COMMANDS['go'].typecheck).toBe('go vet ./...');
+  });
+
+  it('rust typecheck is cargo check', () => {
+    expect(STACK_COMMANDS['rust'].typecheck).toBe('cargo check');
+  });
+
+  it('honest-empty typecheck for stacks with no known dedicated command', () => {
+    expect(STACK_COMMANDS['python'].typecheck).toBe('');
+    expect(STACK_COMMANDS['javascript'].typecheck).toBe('');
+    expect(STACK_COMMANDS['java_maven'].typecheck).toBe('');
+    expect(STACK_COMMANDS['csharp'].typecheck).toBe('');
   });
 });
 
@@ -882,6 +906,7 @@ describe('detectFullStack', () => {
     expect(result.commands.build).toBe('npx tsc');
     expect(result.commands.test).toBe('npx vitest run');
     expect(result.commands.lint).toBe('npx eslint');
+    expect(result.commands.typecheck).toBe('npx tsc --noEmit');
   });
 
   it('returns commands for Rust project', () => {
@@ -969,6 +994,7 @@ describe('detectFullStack', () => {
     expect(result.commands.build).toBe('');
     expect(result.commands.test).toBe('');
     expect(result.commands.lint).toBe('');
+    expect(result.commands.typecheck).toBe('');
   });
 
   it('includes framework and testFramework in result', () => {

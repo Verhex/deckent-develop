@@ -1,0 +1,33 @@
+{
+  "_source": "git show 2afa0ba0:DIRECTIVES.md — Task 11: T11-DOCS-SAYILAR (README/refdocs gerçeğe + K4 badge-RESTORE); filesWrite extended with the 2 typo-dupe entries confirmed as real on-disk scope.filesWrite by .analysis/prompt-contract-verification-2026-07-10.md §1",
+  "description": "RCA D1-D4: (a) README-TR:367 '17 built-in agents'→20 + `npm run docs:ref` regen'inin ürettiği dosyaları KOŞTURARAK tazele (docs/reference/agents.md/cli.md — script üretir, elle yazma); (b) refdocs-adr-regen 41-hardcode → docs/adr dosya-sayısından dinamik; (c) K4-KARARI: README.md'ye sprint-badge GERİ — advisor'ın bulduğu tam-satır (AUTOGEN badges-bloğu İÇİNE, aynı şekilde): `[![sprints](https://img.shields.io/badge/sprints-397%2B-teal)](https://github.com/VerhexIO/deckent)` — ci-baseline-detect.test AYNEN kalır. KALICILIK (advisor): `scripts/update-readme-stats.mjs` badge'i bir sonraki regen'de DÜŞÜRÜR çünkü `detectActiveSprint` (:137-146) 'SPRINT-14' tireli-formu yakalamıyor + arşiv-fallback `.brain/archive` kökünü okuyor (artık alt-dizinli) → fallback'i `.brain/archive/sprints/`e çevir + tireli-form regex'i (tek-satırlık ikili-fix, dosya Files'ta); (d) validate-publish.test ORPHAN → mevcut `scripts/validate-publish.mjs` GATES-API'sine yeniden yaz.",
+  "goCriteria": "Docs+Scripts job'unun 5 dosyası yeşil; badge README'de görünür + test değişmeden geçer; readme-number-truth yeşil.",
+  "proofCommands": [
+    "npx vitest run tests/docs/ tests/scripts/ci-baseline-detect.test.ts → 0 fail."
+  ],
+  "filesWrite": [
+    "README.md",
+    "README-TR.md",
+    "docs/reference/agents.md",
+    "docs/reference/cli.md",
+    "scripts/update-readme-stats.mjs",
+    "tests/docs/refdocs-adr-regen.test.ts",
+    "tests/scripts/ci-baseline-detect.test.ts",
+    "tests/docs/validate-publish.test.ts",
+    "docs/refdocs-adr-regen.test.ts",
+    "docs/validate-publish.test.ts"
+  ],
+  "directories": [],
+  "trackedFiles": [
+    "README.md",
+    "README-TR.md",
+    "docs/reference/agents.md",
+    "docs/reference/cli.md",
+    "scripts/update-readme-stats.mjs",
+    "scripts/validate-publish.mjs",
+    "tests/docs/refdocs-adr-regen.test.ts",
+    "tests/scripts/ci-baseline-detect.test.ts",
+    "tests/docs/validate-publish.test.ts",
+    "package.json"
+  ]
+}

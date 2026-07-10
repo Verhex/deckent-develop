@@ -25,26 +25,29 @@ const CACHE_CHECK_FILES = [
 
 // ─── STACK_COMMANDS ─────────────────────────────────────────────────────────
 
-export const STACK_COMMANDS: Record<string, { build: string; test: string; lint: string }> = {
+export const STACK_COMMANDS: Record<string, { build: string; test: string; lint: string; typecheck: string }> = {
   // Compiled languages
-  typescript: { build: 'npx tsc', test: 'npx vitest run', lint: 'npx eslint' },
-  go: { build: 'go build ./...', test: 'go test ./...', lint: 'golangci-lint run' },
-  rust: { build: 'cargo build', test: 'cargo test', lint: 'cargo clippy' },
-  java_maven: { build: 'mvn compile', test: 'mvn test', lint: '' },
-  java_gradle: { build: 'gradle build', test: 'gradle test', lint: '' },
-  kotlin_maven: { build: 'mvn compile', test: 'mvn test', lint: 'ktlint' },
-  kotlin_gradle: { build: 'gradle build', test: 'gradle test', lint: 'ktlint' },
-  csharp: { build: 'dotnet build', test: 'dotnet test', lint: 'dotnet format --verify-no-changes' },
-  swift: { build: 'swift build', test: 'swift test', lint: 'swiftlint' },
-  c_cmake: { build: 'cmake --build build', test: 'ctest --test-dir build', lint: '' },
-  c_make: { build: 'make', test: 'make test', lint: '' },
+  // `typecheck` is a dedicated no-emit/no-artifact verification command, distinct from `build`.
+  // Only set when a genuine lightweight typecheck-only command is known for the language —
+  // otherwise honest-empty ('') rather than guessed (never re-use `build` as a fake typecheck).
+  typescript: { build: 'npx tsc', test: 'npx vitest run', lint: 'npx eslint', typecheck: 'npx tsc --noEmit' },
+  go: { build: 'go build ./...', test: 'go test ./...', lint: 'golangci-lint run', typecheck: 'go vet ./...' },
+  rust: { build: 'cargo build', test: 'cargo test', lint: 'cargo clippy', typecheck: 'cargo check' },
+  java_maven: { build: 'mvn compile', test: 'mvn test', lint: '', typecheck: '' },
+  java_gradle: { build: 'gradle build', test: 'gradle test', lint: '', typecheck: '' },
+  kotlin_maven: { build: 'mvn compile', test: 'mvn test', lint: 'ktlint', typecheck: '' },
+  kotlin_gradle: { build: 'gradle build', test: 'gradle test', lint: 'ktlint', typecheck: '' },
+  csharp: { build: 'dotnet build', test: 'dotnet test', lint: 'dotnet format --verify-no-changes', typecheck: '' },
+  swift: { build: 'swift build', test: 'swift test', lint: 'swiftlint', typecheck: '' },
+  c_cmake: { build: 'cmake --build build', test: 'ctest --test-dir build', lint: '', typecheck: '' },
+  c_make: { build: 'make', test: 'make test', lint: '', typecheck: '' },
   // Interpreted languages (no build step)
-  javascript: { build: '', test: 'npx vitest run', lint: 'npx eslint' },
-  python: { build: '', test: 'pytest', lint: 'ruff check' },
-  ruby: { build: '', test: 'bundle exec rspec', lint: 'rubocop' },
-  php: { build: '', test: 'vendor/bin/phpunit', lint: 'vendor/bin/phpstan analyse' },
-  dart: { build: 'dart compile exe', test: 'dart test', lint: 'dart analyze' },
-  flutter: { build: 'flutter build', test: 'flutter test', lint: 'flutter analyze' },
+  javascript: { build: '', test: 'npx vitest run', lint: 'npx eslint', typecheck: '' },
+  python: { build: '', test: 'pytest', lint: 'ruff check', typecheck: '' },
+  ruby: { build: '', test: 'bundle exec rspec', lint: 'rubocop', typecheck: '' },
+  php: { build: '', test: 'vendor/bin/phpunit', lint: 'vendor/bin/phpstan analyse', typecheck: '' },
+  dart: { build: 'dart compile exe', test: 'dart test', lint: 'dart analyze', typecheck: '' },
+  flutter: { build: 'flutter build', test: 'flutter test', lint: 'flutter analyze', typecheck: '' },
 };
 
 // ─── FullStackResult ────────────────────────────────────────────────────────
@@ -54,7 +57,7 @@ export interface FullStackResult {
   framework: string;
   buildTool: string;
   testFramework: string;
-  commands: { build: string; test: string; lint: string };
+  commands: { build: string; test: string; lint: string; typecheck: string };
   detectedLanguages?: string[];
 }
 
@@ -154,7 +157,7 @@ export function detectFullStack(projectRoot: string): FullStackResult {
   const stack = detectProjectStack(projectRoot);
 
   const commandKey = resolveCommandKey(stack.language, stack.buildTool);
-  const commands = STACK_COMMANDS[commandKey] ?? { build: '', test: '', lint: '' };
+  const commands = STACK_COMMANDS[commandKey] ?? { build: '', test: '', lint: '', typecheck: '' };
 
   return {
     language: stack.language,

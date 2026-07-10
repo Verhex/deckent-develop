@@ -1,14 +1,13 @@
 {
   "_meta": {
     "version": "2.0",
-    "generatedAt": "2026-07-10T13:49:19.386Z",
+    "generatedAt": "2026-07-10T15:46:36.859Z",
     "generatedBy": "scripts/sync-manifest.mjs",
-    "sprintId": "sprint-398",
+    "sprintId": "sprint-399",
     "description": "Feature usage manifest — curated feature catalog (FEATURE_DEFINITIONS in scripts/sync-manifest.mjs) bucketed by an import-count heuristic plus manual lifecycle annotations. NOT a full import-graph analysis. Categories: active, lightly_used, dormant, dead.",
     "usageWindow": "last-10-sprints",
     "sourceAnalysis": {
       "sprintsChecked": [
-        "sprint-389",
         "sprint-390",
         "sprint-391",
         "sprint-392",
@@ -17,7 +16,8 @@
         "sprint-395",
         "sprint-396",
         "sprint-397",
-        "sprint-398"
+        "sprint-398",
+        "sprint-399"
       ],
       "methodology": "curated catalog + grep-based import count (basename match) + @deprecated detection + manual blockedBy/deprecatedSince/supersededBy annotations"
     }

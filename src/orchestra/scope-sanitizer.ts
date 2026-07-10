@@ -65,12 +65,22 @@ const GLOBAL_PROTECTED = new Set([
  * 2. Path traversal (..) → rejected
  * 3. dist/ prefix → removed
  * 4. Extension-only names (.ts, .md) → removed
- * 5. Unqualified filenames (no directory separator) → removed + warning
+ * 5. Unqualified filenames (no directory separator) → removed + warning,
+ *    UNLESS the exact path is present in `trackedRootFiles` (a known git-tracked
+ *    root file, e.g. README.md) — those are preserved. Rule 6 still wins: a
+ *    GLOBAL_PROTECTED root file drops even if it is also in `trackedRootFiles`.
  * 6. Global protected files → removed
  * 7. "(yeni)" suffix stripped
  * 8. Duplicate paths (case-insensitive) → deduped
+ *
+ * @param trackedRootFiles optional set of exact, git-tracked root filenames
+ *   (e.g. `{'README.md', '.secrets-baseline'}`) that Rule 5 must not drop.
+ *   Omit for prior behavior (all unqualified filenames warn+drop).
  */
-export function sanitizeScope(filesWrite: string[]): SanitizeResult {
+export function sanitizeScope(
+  filesWrite: string[],
+  trackedRootFiles?: ReadonlySet<string>,
+): SanitizeResult {
   const warnings: string[] = [];
   const rejected: string[] = [];
   const cleaned: string[] = [];
@@ -114,9 +124,13 @@ export function sanitizeScope(filesWrite: string[]): SanitizeResult {
     // Rule 5: Unqualified filename (no / separator and not a dotfile pattern)
     // e.g. "init.ts" without "src/" prefix
     if (!path.includes('/') && !path.includes('\\')) {
-      // Check if it's a global protected file first (rule 6 handles those)
+      // Check if it's a global protected file first (rule 6 handles those,
+      // and always wins over trackedRootFiles — see Rule 6 below)
       if (GLOBAL_PROTECTED.has(path.toLowerCase())) {
         // Rule 6 will handle this below
+      } else if (trackedRootFiles?.has(path)) {
+        // Known git-tracked root file (exact match) — preserve (sprint-397
+        // evidence: README.md / README-TR.md / .secrets-baseline silently dropped)
       } else {
         warnings.push(`Unqualified filename removed: "${path}" — needs directory prefix`);
         continue;

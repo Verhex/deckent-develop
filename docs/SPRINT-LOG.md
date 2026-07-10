@@ -9761,3 +9761,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 398-006: LAT-SWEEP-PROOF — coverage-eşdeğeri tam-suite yerel kanıt (kapanış-task'ı) (NO_GO)
 
 ---
+## Sprint 399 — sprint-399
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-10
+**Duration:** 1966s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 3 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1966320ms |
+
+### Tasks
+
+- 399-001: SAN-1-CORE — sanitizeScope Rule-5 trackedRootFiles-aware (sessiz kök-dosya drop biter) (GO_WITH_TECH_DEBT)
+- 399-002: G6a-CORE — STACK_COMMANDS typecheck alanı + criteria-deriver tercih zinciri (DoD'daki çıplak-tsc dist-emit talimatı biter) (GO_WITH_TECH_DEBT)
+- 399-003: SAN-2-CORE — scope-gate suggestion-adoption çözümleyici (typo-suspect'ler otomatik çözülür, force-scope daralır) (GO_WITH_TECH_DEBT)
+- 399-004: G1b-CORE — YENİ scope-satisfiability lint modülü (görev-metni ↔ yazma-yetkisi tutarlılık kontratı) (DONE)
+
+---

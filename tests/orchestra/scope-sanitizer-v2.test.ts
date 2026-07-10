@@ -133,6 +133,74 @@ describe('isPlaceholderPath edge cases', () => {
   });
 });
 
+describe('sanitizeScope Rule-5 trackedRootFiles-aware (sprint-397 evidence: 011/012)', () => {
+  const TRACKED = new Set(['README.md', 'README-TR.md', '.secrets-baseline', 'DIRECTIVES.md']);
+
+  // 397-011 replay: README.md + README-TR.md were silently dropped as
+  // "unqualified filenames" even though they were real, git-tracked root files.
+  it('397-011 replay: preserves README.md and README-TR.md when tracked', () => {
+    const result = sanitizeScope(
+      ['README.md', 'README-TR.md', 'src/core/config.ts'],
+      TRACKED,
+    );
+    expect(result.filesWrite).toEqual(['README.md', 'README-TR.md', 'src/core/config.ts']);
+    expect(result.warnings).toEqual([]);
+  });
+
+  // 397-012 replay: .secrets-baseline was in the task JSON's WRITE authority but
+  // dropped by Rule 5 before rendering.
+  it('397-012 replay: preserves .secrets-baseline when tracked', () => {
+    const result = sanitizeScope(['.secrets-baseline', 'src/core/config.ts'], TRACKED);
+    expect(result.filesWrite).toEqual(['.secrets-baseline', 'src/core/config.ts']);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('preserves DIRECTIVES.md when tracked', () => {
+    const result = sanitizeScope(['DIRECTIVES.md', 'src/core/config.ts'], TRACKED);
+    expect(result.filesWrite).toEqual(['DIRECTIVES.md', 'src/core/config.ts']);
+  });
+
+  it('still drops an unqualified name that is NOT in trackedRootFiles', () => {
+    const result = sanitizeScope(['init.ts', 'README.md', 'src/core/config.ts'], TRACKED);
+    expect(result.filesWrite).toEqual(['README.md', 'src/core/config.ts']);
+    expect(result.warnings.length).toBe(1);
+    expect(result.warnings[0]).toContain('init.ts');
+  });
+
+  it('GLOBAL_PROTECTED still wins even when the file is also in trackedRootFiles', () => {
+    const tracked = new Set(['config.json', 'README.md']);
+    const result = sanitizeScope(['config.json', 'README.md', 'src/core/config.ts'], tracked);
+    expect(result.filesWrite).toEqual(['README.md', 'src/core/config.ts']);
+    expect(result.filesWrite).not.toContain('config.json');
+  });
+
+  it('exact-match only — a similarly named but untracked file still drops', () => {
+    const result = sanitizeScope(['readme.md', 'src/core/config.ts'], TRACKED);
+    // "readme.md" (lowercase) is not an exact match for tracked "README.md"
+    expect(result.filesWrite).toEqual(['src/core/config.ts']);
+    expect(result.warnings.length).toBe(1);
+  });
+
+  it('backward-compat: omitting trackedRootFiles behaves exactly as before (all existing tests unaffected)', () => {
+    const withoutTracked = sanitizeScope(['README.md', 'init.ts', 'src/core/config.ts']);
+    const withEmptyTracked = sanitizeScope(
+      ['README.md', 'init.ts', 'src/core/config.ts'],
+      new Set(),
+    );
+    expect(withoutTracked).toEqual(withEmptyTracked);
+    expect(withoutTracked.filesWrite).toEqual(['src/core/config.ts']);
+    expect(withoutTracked.warnings.length).toBe(2);
+  });
+
+  it('Windows backslash path behavior unchanged regardless of trackedRootFiles', () => {
+    const withTracked = sanitizeScope(['src\\core\\config.ts'], TRACKED);
+    const withoutTracked = sanitizeScope(['src\\core\\config.ts']);
+    expect(withTracked).toEqual(withoutTracked);
+    expect(withTracked.filesWrite).toEqual(['src\\core\\config.ts']);
+    expect(withTracked.warnings).toEqual([]);
+  });
+});
+
 describe('isJsAccessPattern edge cases', () => {
   it('detects JS-like access patterns', () => {
     expect(isJsAccessPattern('.directories')).toBe(true);

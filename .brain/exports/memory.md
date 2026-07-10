@@ -1,5 +1,14 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-399 Learnings
+- Sprint sprint-399 Learnings: ## Sprint sprint-399 Learnings
+- SAN-1-CORE — sanitizeScope Rule-5 trackedRootFiles-aware (sessiz kök-dosya drop biter): GO_WITH_TECH_DEBT — Rule-5 is now trackedRootFiles-aware: sanitizeScope(filesWrite, trackedRootFiles?) takes an optional ReadonlySet<string>
+- G6a-CORE — STACK_COMMANDS typecheck alanı + criteria-deriver tercih zinciri (DoD'daki çıplak-tsc dist-emit talimatı biter): GO_WITH_TECH_DEBT — Implemented as specified: (a) STACK_COMMANDS type gained a REQUIRED `typecheck: string` field; every literal (typescript
+- SAN-2-CORE — scope-gate suggestion-adoption çözümleyici (typo-suspect'ler otomatik çözülür, force-scope daralır): GO_WITH_TECH_DEBT — Added resolveSuggestions?:boolean (default false) to ScopeGateInput and resolutions?:ScopeResolution[] to both ScopeGate
+
+## Gains
+- 399-004 — G1b-CORE — YENİ scope-satisfiability lint modülü (görev-metni ↔ yazma-yetkisi tutarlılık kontratı)
+
 ## Sprint sprint-398 Learnings
 - Sprint sprint-398 Learnings: ## Sprint sprint-398 Learnings
 - LAT-KPI-SEED — kpi-backfill + init-builtin-seed (3 fail): GO_WITH_TECH_DEBT — FIXED (tests/e2e/init-builtin-seed.test.ts, 2/2 fails resolved) — root-cause: builtin agent/skill catalog legitimately g

@@ -44,15 +44,47 @@ export interface ScopeGateInput {
    * (CLI `--force-scope`, MCP `acknowledgeScopePaths: true`).
    */
   acknowledgeScopePaths?: boolean;
+  /**
+   * sprint-399/003 — if true, a write-suspect the gate can already prove safe (see
+   * {@link ScopeResolution}) is resolved instead of blocking: only the remaining,
+   * genuinely-unresolved suspects still block. Default **false** — with the flag
+   * unset/false the block/suspects computation is bit-identical to the pre-399/003
+   * gate (a resolvable suspect still blocks); `resolutions` is still returned as
+   * advisory data either way. Flipping this on for real sprints is a Brain-wiring
+   * decision, not something this evaluator decides for itself.
+   */
+  resolveSuggestions?: boolean;
+}
+
+/**
+ * sprint-399/003 — a write-suspect the gate can resolve on its own evidence, without
+ * a human override:
+ * - `drop-duplicate` (born-N6 / 397-011): the suggested path is ALREADY planned as a
+ *   write in the SAME task — the suspect is a redundant typo-duplicate of a write the
+ *   task is already doing correctly.
+ * - `auto-replace` (born-N6 / 397-007): the suggested path is the ONLY tracked file
+ *   with that basename — an unambiguous wrong-directory rename.
+ * A suspect with no suggestion, or with 2+ same-basename candidates, gets no resolution.
+ */
+export interface ScopeResolution {
+  path: string;
+  action: 'drop-duplicate' | 'auto-replace';
+  replacement?: string;
+  reason: string;
 }
 
 export interface ScopeGatePass {
   ok: true;
   verdicts: ScopePathVerdict[];
-  /** Non-blocking advisories: new-plausible files + suspect READ paths. */
+  /**
+   * Non-blocking advisories: new-plausible files + suspect READ paths + (when
+   * `resolveSuggestions` is true) write-suspects that were resolved instead of blocked.
+   */
   advisories: ScopePathVerdict[];
   /** Set when write-suspects existed but `acknowledgeScopePaths` bypassed the block. */
   overrideApplied?: boolean;
+  /** sprint-399/003 — write-suspects the gate resolved (see {@link ScopeResolution}). */
+  resolutions?: ScopeResolution[];
   /**
    * born-584 — set when the repo has NO tracked directories (fresh `deckent init`
    * greenfield, or a root-only repo like README+LICENSE): the invented-dir rule
@@ -66,11 +98,13 @@ export interface ScopeGatePass {
 export interface ScopeGateBlocked {
   ok: false;
   reason: 'SCOPE_GATE_SUSPECT';
-  /** The WRITE-path suspects that triggered the block. */
+  /** The WRITE-path suspects that triggered the block (post-resolution, see `resolveSuggestions`). */
   suspects: ScopePathVerdict[];
   verdicts: ScopePathVerdict[];
   /** Human-readable explanation suitable for an error message. */
   message: string;
+  /** sprint-399/003 — write-suspects the gate resolved (see {@link ScopeResolution}). */
+  resolutions?: ScopeResolution[];
 }
 
 export type ScopeGateResult = ScopeGatePass | ScopeGateBlocked;
@@ -130,7 +164,7 @@ const MAX_LISTED_SUSPECTS = 20;
  * dependency artifact). Pure function: no I/O, no prompting, no side effects.
  */
 export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
-  const { tasks, trackedFiles, acknowledgeScopePaths } = input;
+  const { tasks, trackedFiles, acknowledgeScopePaths, resolveSuggestions } = input;
 
   const tracked = new Set(trackedFiles);
   const byBasename = new Map<string, string[]>();
@@ -207,22 +241,63 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
     v => v.classification === 'new-plausible' || (v.classification === 'suspect' && v.role === 'read'),
   );
 
-  if (writeSuspects.length > 0 && !acknowledgeScopePaths) {
-    const shown = writeSuspects.slice(0, MAX_LISTED_SUSPECTS);
+  // sprint-399/003 — suggestion-adoption: resolve the write-suspects the gate can
+  // already prove safe from evidence it already has (no new lookups), instead of
+  // forcing every sprint containing one typo through a blanket --force-scope.
+  // Computed unconditionally (`resolutions` is always advisory data); only
+  // `resolveSuggestions` decides whether a resolved suspect still blocks below.
+  const taskById = new Map(tasks.map(t => [t.id, t]));
+  const normPath = (p: string) => p.replace(/^\.\//, '').toLowerCase();
+  const resolutionByVerdict = new Map<ScopePathVerdict, ScopeResolution>();
+  for (const s of writeSuspects) {
+    if (!s.suggestion) continue; // invented-dir suspect — no candidate to resolve to (rule c)
+    const taskWrites = taskById.get(s.taskId)?.scope.filesWrite ?? [];
+    const suggestionNorm = normPath(s.suggestion);
+    if (taskWrites.some(w => normPath(w) === suggestionNorm)) {
+      // rule (a) — born-N6 / 397-011: suggestion already planned in the same task.
+      resolutionByVerdict.set(s, {
+        path: s.path,
+        action: 'drop-duplicate',
+        replacement: s.suggestion,
+        reason: `duplicate of '${s.suggestion}', already planned as a write in the same task`,
+      });
+      continue;
+    }
+    const siblings = byBasename.get(basename(s.path));
+    if (siblings && siblings.length === 1) {
+      // rule (b) — born-N6 / 397-007: unambiguous, sole tracked candidate for this basename.
+      resolutionByVerdict.set(s, {
+        path: s.path,
+        action: 'auto-replace',
+        replacement: s.suggestion,
+        reason: `unambiguous — '${s.suggestion}' is the only tracked file with this basename`,
+      });
+    }
+    // else: 2+ same-basename candidates — left unresolved (rule c).
+  }
+  const resolutions = [...resolutionByVerdict.values()];
+
+  const blockingWriteSuspects = resolveSuggestions
+    ? writeSuspects.filter(s => !resolutionByVerdict.has(s))
+    : writeSuspects;
+
+  if (blockingWriteSuspects.length > 0 && !acknowledgeScopePaths) {
+    const shown = blockingWriteSuspects.slice(0, MAX_LISTED_SUSPECTS);
     const list = shown.map(s => {
       const hint = s.suggestion ? ` → did you mean '${s.suggestion}'?` : '';
       return `  • [${s.taskId}] ${s.path} (${s.reason})${hint}`;
     }).join('\n');
-    const more = writeSuspects.length > shown.length
-      ? `\n  … and ${writeSuspects.length - shown.length} more`
+    const more = blockingWriteSuspects.length > shown.length
+      ? `\n  … and ${blockingWriteSuspects.length - shown.length} more`
       : '';
     return {
       ok: false,
       reason: 'SCOPE_GATE_SUSPECT',
-      suspects: writeSuspects,
+      suspects: blockingWriteSuspects,
       verdicts,
+      resolutions,
       message:
-        `Scope gate: ${writeSuspects.length} write path(s) do not exist and look like a typo or wrong directory:\n${list}${more}\n` +
+        `Scope gate: ${blockingWriteSuspects.length} write path(s) do not exist and look like a typo or wrong directory:\n${list}${more}\n` +
         `If these are intentional new files, override with acknowledgeScopePaths=true (MCP) / --force-scope (CLI). ` +
         `If a path should be an existing file, fix the DIRECTIVES scope before spawning.`,
     };
@@ -235,11 +310,16 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
     ? verdicts.filter(v => v.role === 'write' && v.classification !== 'confirmed').length
     : 0;
 
+  const resolvedWriteSuspects = resolveSuggestions
+    ? writeSuspects.filter(s => resolutionByVerdict.has(s))
+    : [];
+
   return {
     ok: true,
     verdicts,
-    advisories,
-    overrideApplied: writeSuspects.length > 0 ? true : undefined,
+    advisories: [...advisories, ...resolvedWriteSuspects],
+    overrideApplied: blockingWriteSuspects.length > 0 ? true : undefined,
+    resolutions,
     ...(greenfieldUnvalidated > 0
       ? {
           greenfield: true,

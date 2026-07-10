@@ -1,0 +1,20 @@
+{
+  "_source": "git show 2afa0ba0:DIRECTIVES.md — Task 12: T12-BASELINES (spawnsync + secrets ratchet-refresh)",
+  "description": "RCA D5+SEC (manual-review = RCA-raporu, kayıtlı): (a) spawnsync-baseline'ı RCA'nın 7-yeni+2-drift dökümüne göre site-başına tazele (hepsi git/docker-probe ailesi, ADR-D-002-uyumlu; her girişe kısa-neden); (b) ⚠️ TUZAK (advisor): build-mode allowlist'li hit'leri ÖNCE filtreler sonra dosyayı YALNIZ-yenilerle DEĞİŞTİRİR — doğrudan koşarsan mevcut 9 girişi düşürür ve kendi Kanıt'ın kırmızıya döner. DOĞRU REÇETE: `.secrets-baseline`ı kenara taşı (boş-allowlist) → `--build-baseline` (TÜM hit'ler: eski-9-site + yeni-9-unique) → SONRA HER girişin note-alanını zenginleştir ('AWS docs example key — redaction fixture' vb.). Kod/test DOSYASINA DOKUNMA. Not: bu haftanın yeni test-token'ları (api-token-abc vb.) detector-desenlerine girmiyor — advisor doğruladı, sorun değil.",
+  "goCriteria": "`node scripts/security/secret-baseline.mjs` EXIT 0 + `node scripts/lint-no-spawnsync.mjs` EXIT 0 (script-adını grep'le doğrula); baseline-diff'leri girişlere-neden'li.",
+  "proofCommands": [
+    "iki lint-komutu EXIT 0 + `npm run lint` yeşil."
+  ],
+  "filesWrite": [
+    "scripts/spawnsync-baseline.json",
+    ".secrets-baseline"
+  ],
+  "directories": [],
+  "trackedFiles": [
+    ".secrets-baseline",
+    "scripts/spawnsync-baseline.json",
+    "scripts/lint-no-spawnsync.mjs",
+    "scripts/security/secret-baseline.mjs",
+    "package.json"
+  ]
+}

@@ -20,6 +20,12 @@ export interface DerivedBaseCriteria {
 export interface StackCommands {
   build?: string;
   test?: string;
+  /** Dedicated no-emit/no-artifact verification command (e.g. `npx tsc --noEmit`, `cargo check`),
+   *  distinct from `build`. OPTIONAL — some (opts.commands) call sites only carry build/test and
+   *  must remain assignable here. When present, this REPLACES the `build` proof line in goCriteria
+   *  (a passing typecheck already implies the build compiles; naming both would be redundant and,
+   *  for languages where `build` emits dist artifacts mid-sprint, actively unsafe to suggest). */
+  typecheck?: string;
   /** Specific test file paths to target (e.g. extracted from task Files/Kanıt). When absent
    *  the test criterion uses the "targeted test file(s)" generic phrase rather than the bare
    *  run-all command, avoiding a "run the full suite" implication in goCriteria. */
@@ -76,10 +82,17 @@ export function deriveBaseCriteria(
 
 function deriveCodeCriteria(stack: TechStackKind, commands?: StackCommands): DerivedBaseCriteria {
   const build = commands?.build?.trim();
+  const typecheck = commands?.typecheck?.trim();
   const test = commands?.test?.trim();
   const testFiles = commands?.testFiles;
   const parts: string[] = [];
-  if (build) parts.push(`\`${build}\` succeeds`);
+  // Preference chain: a dedicated typecheck command REPLACES the build proof line (never both —
+  // e.g. `npx tsc --noEmit` passes, not `npx tsc` succeeds); absent that, fall back to build.
+  if (typecheck) {
+    parts.push(`\`${typecheck}\` passes`);
+  } else if (build) {
+    parts.push(`\`${build}\` succeeds`);
+  }
   if (test) {
     // Use a targeted-file command when file paths are known; otherwise use the
     // generic "targeted" phrase so goCriteria never implies running the full suite

@@ -2,6 +2,21 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint399] - 2026-07-10
+
+### Added
+
+- G1b-CORE — YENİ scope-satisfiability lint modülü (görev-metni ↔ yazma-yetkisi tutarlılık kontratı)
+
+### Changed
+
+- SAN-1-CORE — sanitizeScope Rule-5 trackedRootFiles-aware (sessiz kök-dosya drop biter) (completed with tech debt)
+- G6a-CORE — STACK_COMMANDS typecheck alanı + criteria-deriver tercih zinciri (DoD'daki çıplak-tsc dist-emit talimatı biter) (completed with tech debt)
+- SAN-2-CORE — scope-gate suggestion-adoption çözümleyici (typo-suspect'ler otomatik çözülür, force-scope daralır) (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 3 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint398] - 2026-07-10
 
 ### Added

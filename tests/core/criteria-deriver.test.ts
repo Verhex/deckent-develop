@@ -58,6 +58,50 @@ describe('deriveBaseCriteria — code kind', () => {
   });
 });
 
+// ─── deriveBaseCriteria — typecheck preference chain (Sprint 399 T-002) ─────
+// STACK_COMMANDS.typescript.build = 'npx tsc' has no --noEmit + tsconfig has no noEmit/outDir
+// guard, so a bare "`npx tsc` succeeds" goCriteria line instructs a dist-emit mid-sprint
+// (ESM-cache hazard). When a dedicated `typecheck` command is supplied it must REPLACE the
+// build proof line, never accompany it.
+
+describe('deriveBaseCriteria — typecheck preference', () => {
+  it('uses typecheck command instead of build when both are provided', () => {
+    const result = deriveBaseCriteria('code-development', 'typescript', {
+      build: 'npx tsc',
+      typecheck: 'npx tsc --noEmit',
+      test: 'npx vitest run',
+    });
+    expect(result.goCriteria).toContain('`npx tsc --noEmit` passes');
+    expect(result.goCriteria).not.toContain('`npx tsc` succeeds');
+  });
+
+  it('falls back to build succeeds when typecheck is absent', () => {
+    const result = deriveBaseCriteria('code-development', 'go', {
+      build: 'go build ./...',
+      test: 'go test ./...',
+    });
+    expect(result.goCriteria).toContain('`go build ./...` succeeds');
+  });
+
+  it('falls back to build succeeds when typecheck is an empty string (honest-empty stack)', () => {
+    const result = deriveBaseCriteria('code-development', 'python', {
+      build: '',
+      typecheck: '',
+      test: 'pytest',
+    });
+    expect(result.goCriteria).not.toContain('passes');
+    expect(result.goCriteria).toContain('targeted test file(s)');
+  });
+
+  it('uses typecheck alone when build is absent', () => {
+    const result = deriveBaseCriteria('code-development', 'rust', {
+      typecheck: 'cargo check',
+      test: 'cargo test',
+    });
+    expect(result.goCriteria).toContain('`cargo check` passes');
+  });
+});
+
 // ─── deriveBaseCriteria — non-build kinds not affected ──────────────────────
 
 describe('deriveBaseCriteria — non-build kinds', () => {

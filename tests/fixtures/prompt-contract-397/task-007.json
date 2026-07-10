@@ -1,0 +1,19 @@
+{
+  "_source": "git show 2afa0ba0:DIRECTIVES.md — Task 7: T7-ELOOP (chat-tool-exec raw-throw → DeckentError)",
+  "description": "RCA C1 (tek gerçek CODE-BUG): :206 `throw new Error('ELOOP…')` konvansiyon-ihlali → DeckentError'a çevir (mevcut error-code taksonomisine uygun; mesaj-içeriği korunur). error-handling-unification'daki allowlist'e DOKUNMA (kod düzelince gerek kalmaz).",
+  "goCriteria": "error-handling-unification tam yeşil; ELOOP-yolu davranış-testi (symlink-loop fixture veya mevcut test) DeckentError-tipini pinler.",
+  "proofCommands": [
+    "npx vitest run tests/cli/error-handling-unification.test.ts tests/cli/chat-tool-exec*.test.ts → 0 fail (varsa)."
+  ],
+  "filesWrite": [
+    "src/cli/commands/chat-tool-exec.ts",
+    "tests/cli/error-handling-unification.test.ts"
+  ],
+  "directories": [],
+  "trackedFiles": [
+    "src/cli/commands/chat-tool-exec.ts",
+    "tests/cli/chat-tool-exec.test.ts",
+    "tests/core/error-handling-unification.test.ts",
+    "package.json"
+  ]
+}

@@ -187,4 +187,123 @@ describe('evaluateScopeGate', () => {
       expect(pass.greenfieldNotice).toBeUndefined();
     });
   });
+
+  // sprint-399/003 — SAN-2-CORE: born-N6 (397-007/011) evidence-backed suspect
+  // resolution. `resolveSuggestions` is opt-in; the sprint that first surfaced this
+  // gap had NO wiring for it and had to fall back to a blanket --force-scope.
+  describe('resolveSuggestions — suggestion-adoption (sprint-399/003, born-N6)', () => {
+    // 397-011 fixture: the SAME task's filesWrite lists both the wrong-dir typo
+    // (docs/refdocs-adr-regen.test.ts) and the already-correct path
+    // (tests/docs/refdocs-adr-regen.test.ts) side by side — a typo-duplicate.
+    const DUPE_TRACKED = [...TRACKED, 'tests/docs/refdocs-adr-regen.test.ts'];
+    function dupeTask() {
+      return task('t1', ['docs/refdocs-adr-regen.test.ts', 'tests/docs/refdocs-adr-regen.test.ts']);
+    }
+
+    // 397-007 fixture: task wrote to tests/cli/error-handling-unification.test.ts
+    // but the real (sole) tracked file is tests/core/error-handling-unification.test.ts.
+    const RENAME_TRACKED = [...TRACKED, 'tests/core/error-handling-unification.test.ts'];
+    function renameTask() {
+      return task('t1', ['tests/cli/error-handling-unification.test.ts']);
+    }
+
+    it('REPRODUCE: 397-011 dupe-typo still blocks with resolveSuggestions unset (RED-before-fix baseline)', () => {
+      const res = evaluateScopeGate({ tasks: [dupeTask()], trackedFiles: DUPE_TRACKED });
+      expect(res.ok).toBe(false);
+    });
+
+    it('REPRODUCE: 397-007 wrong-dir rename still blocks with resolveSuggestions unset (RED-before-fix baseline)', () => {
+      const res = evaluateScopeGate({ tasks: [renameTask()], trackedFiles: RENAME_TRACKED });
+      expect(res.ok).toBe(false);
+    });
+
+    it('rule (a) drop-duplicate: resolveSuggestions=true does not block the 397-011 typo-dupe', () => {
+      const res = evaluateScopeGate({
+        tasks: [dupeTask()],
+        trackedFiles: DUPE_TRACKED,
+        resolveSuggestions: true,
+      });
+      expect(res.ok).toBe(true);
+      if (!res.ok) return;
+      expect(res.resolutions).toEqual([{
+        path: 'docs/refdocs-adr-regen.test.ts',
+        action: 'drop-duplicate',
+        replacement: 'tests/docs/refdocs-adr-regen.test.ts',
+        reason: expect.stringContaining('tests/docs/refdocs-adr-regen.test.ts'),
+      }]);
+      expect(res.advisories.some(a => a.path === 'docs/refdocs-adr-regen.test.ts' && a.role === 'write')).toBe(true);
+    });
+
+    it('rule (b) auto-replace: resolveSuggestions=true does not block the 397-007 unambiguous rename', () => {
+      const res = evaluateScopeGate({
+        tasks: [renameTask()],
+        trackedFiles: RENAME_TRACKED,
+        resolveSuggestions: true,
+      });
+      expect(res.ok).toBe(true);
+      if (!res.ok) return;
+      expect(res.resolutions).toEqual([{
+        path: 'tests/cli/error-handling-unification.test.ts',
+        action: 'auto-replace',
+        replacement: 'tests/core/error-handling-unification.test.ts',
+        reason: expect.stringContaining('tests/core/error-handling-unification.test.ts'),
+      }]);
+    });
+
+    it('rule (c) ambiguous: same basename in 2+ tracked dirs stays unresolved and still blocks in true-mode', () => {
+      const AMBIGUOUS_TRACKED = [...TRACKED, 'tests/core/error-handling-unification.test.ts', 'tests/api/error-handling-unification.test.ts'];
+      const res = evaluateScopeGate({
+        tasks: [renameTask()],
+        trackedFiles: AMBIGUOUS_TRACKED,
+        resolveSuggestions: true,
+      });
+      expect(res.ok).toBe(false);
+      if (res.ok) return;
+      expect(res.resolutions).toEqual([]);
+      expect(res.suspects.map(s => s.path)).toEqual(['tests/cli/error-handling-unification.test.ts']);
+    });
+
+    it('rule (c) no suggestion (invented-dir): no resolution is produced', () => {
+      const res = evaluateScopeGate({
+        tasks: [task('t1', ['src/nonexistent-dir/brand-new-thing.ts'])],
+        trackedFiles: TRACKED,
+        resolveSuggestions: true,
+      });
+      expect(res.ok).toBe(false);
+      if (res.ok) return;
+      expect(res.resolutions).toEqual([]);
+    });
+
+    it('a suspect READ path never gets a resolution', () => {
+      const res = evaluateScopeGate({
+        tasks: [task('t1', ['src/core/config.ts'], ['src/orchestra/worker.ts'])],
+        trackedFiles: TRACKED,
+        resolveSuggestions: true,
+      });
+      expect(res.ok).toBe(true);
+      if (!res.ok) return;
+      expect(res.resolutions).toEqual([]);
+    });
+
+    it('false-mode (default/omitted) is bit-identical to pre-399/003 behavior — resolved suspects still block', () => {
+      const withoutFlag = evaluateScopeGate({ tasks: [dupeTask()], trackedFiles: DUPE_TRACKED });
+      const withFalseFlag = evaluateScopeGate({
+        tasks: [dupeTask()],
+        trackedFiles: DUPE_TRACKED,
+        resolveSuggestions: false,
+      });
+      expect(withoutFlag.ok).toBe(false);
+      expect(withFalseFlag.ok).toBe(false);
+      if (withoutFlag.ok || withFalseFlag.ok) return;
+      expect(withFalseFlag.suspects).toEqual(withoutFlag.suspects);
+      expect(withFalseFlag.message).toEqual(withoutFlag.message);
+      // resolutions is still advisory data in false-mode — present, but did not affect blocking.
+      expect(withFalseFlag.resolutions).toEqual([{
+        path: 'docs/refdocs-adr-regen.test.ts',
+        action: 'drop-duplicate',
+        replacement: 'tests/docs/refdocs-adr-regen.test.ts',
+        reason: expect.stringContaining('tests/docs/refdocs-adr-regen.test.ts'),
+      }]);
+    });
+  });
 });

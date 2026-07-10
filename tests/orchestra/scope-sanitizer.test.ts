@@ -20,6 +20,15 @@ describe('scope-sanitizer', () => {
     expect(result.warnings[0]).toContain('init.ts');
   });
 
+  it('backward-compat: no trackedRootFiles arg → unqualified root file still dropped', () => {
+    // Sprint-397 evidence file, but called the old (single-arg) way — must behave
+    // identically to before trackedRootFiles existed.
+    const result = sanitizeScope(['README.md', 'src/core/config.ts']);
+    expect(result.filesWrite).toEqual(['src/core/config.ts']);
+    expect(result.warnings.length).toBe(1);
+    expect(result.warnings[0]).toContain('README.md');
+  });
+
   it('removes global protected files like config.json', () => {
     const result = sanitizeScope(['config.json', 'src/core/config.ts']);
     expect(result.filesWrite).toEqual(['src/core/config.ts']);

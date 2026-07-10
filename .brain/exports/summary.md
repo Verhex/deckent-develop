@@ -51,6 +51,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-399 Learnings** (sprint-399): ## Sprint sprint-399 Learnings
+- SAN-1-CORE — sanitizeScope Rule-5 trackedRootFiles-aware (sessiz kök-dosya drop bite...
 - **Sprint sprint-398 Learnings** (sprint-398): ## Sprint sprint-398 Learnings
 - LAT-KPI-SEED — kpi-backfill + init-builtin-seed (3 fail): GO_WITH_TECH_DEBT — FIXED ...
 - **Sprint sprint-397 Learnings** (sprint-397): ## Sprint sprint-397 Learnings
@@ -73,12 +75,10 @@
 - 391-001 — RED-1 — TASK-BUILDER-ADR-CWD-LEAK — buildWorkerPrompt projectRoo...
 - **Sprint sprint-390 Learnings** (sprint-390): ## Sprint sprint-390 Learnings
 - born-565 — AI-SESSION-TOOL-ALLOWLIST — kind==='ai' client-tool validation (P1, güven...
-- **Sprint sprint-389 Learnings** (sprint-389): ## Sprint sprint-389 Learnings
-- born-583 — GOV-MINORS — plugin-sig + opaque-bearer + deny-list loopback (P2): GO_WIT...
 
 ## Active Technical Debt
-- [NORMAL] Tech debt from 398-003-xfix: tests/e2e/init-builtin-seed.test.ts: FULLY GREEN, 1
-- [HIGH] Tech debt from 397-007-fix: CODE-BUG confirmed already fixed on disk (uncommitte
+- [HIGH] Tech debt from 398-003-xfix: tests/e2e/init-builtin-seed.test.ts: FULLY GREEN, 1
+- [CRITICAL] Tech debt from 397-007-fix: CODE-BUG confirmed already fixed on disk (uncommitte
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -138,4 +138,4 @@
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 1169 | Generated: 2026-07-10_
+_Total entries: 1175 | Generated: 2026-07-10_
