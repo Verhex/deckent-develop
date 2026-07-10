@@ -2601,11 +2601,11 @@
  },
  {
   "born_id": 632,
-  "title": "shutdown-hooks zamanlama-testi paralel-yük altında flaky",
-  "priority": "P3",
+  "title": "Duvar-saati assert flake ailesi (shutdown-hooks + sprint-spawner-throttle)",
+  "priority": "P2",
   "status": "OPEN",
   "source": "607 blast-radius koşusu",
-  "spec": "tests/cli/shutdown-hooks.test.ts 'collectively bounded' testi elapsed>=4500 assert ediyor; VITEST_MAX_FORKS=2 tam cli+agent koşusunda 3157ms ölçüldü (fork-baskısı timer-coalescing) — standalone yeşil. Sınıf: duvar-saati assert'i CI-flake adayı; fake-timer veya tolerans-bandı ile hermetikleştir."
+  "spec": "tests/cli/shutdown-hooks.test.ts 'collectively bounded' testi elapsed>=4500 assert ediyor; VITEST_MAX_FORKS=2 tam cli+agent koşusunda 3157ms ölçüldü (fork-baskısı timer-coalescing) — standalone yeşil. Sınıf: duvar-saati assert'i CI-flake adayı; fake-timer veya tolerans-bandı ile hermetikleştir. EK (2026-07-10 CI): tests/orchestra/sprint-spawner-throttle.test.ts 'spawns immediately... <50ms' assert'i CI Orchestra-26.x'te 522ms ölçtü (24.x + lokal yeşil; 607-push'unda dosyaya dokunulmamıştı — rerun'la yeşillendi). Aile-fix: her iki dosyada fake-timer'a geç veya tolerans-bandını yük-dayanıklı yap; CI-flake avı için aynı desenli diğer duvar-saati assert'lerini grep'le tara (toBeLessThan(50|100) sınıfı)."
  },
  {
   "born_id": 633,
