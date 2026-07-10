@@ -186,4 +186,18 @@ describe('born-614 call-site composition pin (yarim-wire sinifina karsi)', () =>
     // Verdict (Brain evaluation) label olarak geciyor - worker-iddiasi degil:
     expect(evalPhase).toContain('selfAssessment: verdict');
   });
+
+  it('CANLI-KANIT DERSI (sprint-400): sprint-controller call-siteleri config parametresini GECIRIR', () => {
+    // Ilk canli-sinav TAM BU yuzden basarisiz oldu: sweep runEvaluatePhase'te vardi
+    // ama iki cagri-sitesi de config'i `undefined` geciyordu (a778151a tool_surface
+    // olum-bicimiyle ayni: opsiyonel-param yarim-wire). Bu pin cagri-sitelerini kilitler.
+    const src = readFileSync(join(process.cwd(), 'src', 'orchestra', 'sprint-controller.ts'), 'utf-8');
+    const calls = src.split('await runEvaluatePhase(').slice(1);
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+    for (const c of calls) {
+      const argsHead = c.slice(0, 400);
+      // 6. arg config olmali - "config, undefined, deferredTaskIds" deseni
+      expect(argsHead).toContain('config, undefined, deferredTaskIds');
+    }
+  });
 });

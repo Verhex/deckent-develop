@@ -919,6 +919,7 @@ export async function retryEvaluateIfEmpty(
   evaluations: Map<string, TaskEvaluation>,
   coverageHardFloor: number | undefined,
   deferredTaskIds: ReadonlySet<string>,
+  config?: ResolvedConfig,
 ): Promise<void> {
   if (evaluations.size !== 0 || results.length === 0) return;
 
@@ -928,7 +929,9 @@ export async function retryEvaluateIfEmpty(
   );
   await runEvaluatePhase(
     projectRoot, sprint, results, evaluations, coverageHardFloor,
-    undefined, undefined, deferredTaskIds, { enforceDispatchGate: true },
+    // born-614 yarım-wire dersi: config'i DÜŞÜRME — training_trace sweep'i ve
+    // gelecekteki her config-gated EVALUATE davranışı bu parametreye bağlı.
+    config, undefined, deferredTaskIds, { enforceDispatchGate: true },
   );
   if (evaluations.size > 0) return;
 
@@ -1642,13 +1645,16 @@ export async function runSprint(
 
   await runEvaluatePhase(
     projectRoot, sprint, results, evaluations, config.coverage_hard_floor,
-    undefined, undefined, deferredTaskIds, { enforceDispatchGate: true },
+    // born-614 yarım-wire dersi (a778151a tool_surface'ın ölüm-biçimi): opsiyonel
+    // config-param'ı undefined geçmek = flag'in tüketicisiz kalması. Sprint-400
+    // canlı-kanıtı tam bu satır yüzünden İLK seferde başarısız oldu.
+    config, undefined, deferredTaskIds, { enforceDispatchGate: true },
   );
 
   // Sprint 370 Task 370-001: EVALUATE_PREMATURE gate can return with `evaluations`
   // still empty while `results` is populated — retry once, then abort loudly.
   await retryEvaluateIfEmpty(
-    projectRoot, sprint, results, evaluations, config.coverage_hard_floor, deferredTaskIds,
+    projectRoot, sprint, results, evaluations, config.coverage_hard_floor, deferredTaskIds, config,
   );
 
   // Sprint 140 cost-cascade circuit-breaker (B11 wire): N consecutive NO_GO →

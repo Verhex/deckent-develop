@@ -64,7 +64,8 @@
     "tsc:desktop": "tsc --noEmit -p src/desktop",
     "build:desktop": "npm run build --prefix src/desktop",
     "dev:desktop": "npm run dev --prefix src/desktop",
-    "test:desktop": "vitest run --config vitest.desktop.config.ts"
+    "test:desktop": "vitest run --config vitest.desktop.config.ts",
+    "verify:affected": "node scripts/ccverify-affected.mjs"
   },
   "keywords": [
     "ai",

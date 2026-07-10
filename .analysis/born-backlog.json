@@ -2632,5 +2632,13 @@
   "status": "OPEN",
   "source": "born-610 BEFORE-done advisor",
   "spec": "(1) sprint-checkpoint.ts:707-712 restore in-progress'i MRR yapar -> yeni sozlukte resume=downstream-cascade-skip (pre-610 respawn ederdi); bilincli-karar + resume-path testi gerek. (2) dependency_pipeline_enabled=false FIFO'da dep-check yok -> MRR-bagimlisi spawn edilebilir (pre-existing delik; scheduler-truth header'ina not). (3) selectEligibleForSpawn (sprint-spawner.ts:1181) doneIds hardcode DONE — isDependencySatisfying'e bagla; fixForTaskId aggregation eksikligi ayrica degerlendirilsin (davranis-degistirir)."
+ },
+ {
+  "born_id": 636,
+  "title": "COST-10X programi: $2.4/task -> $0.24 (API-mode) — kalite sureclerle korunarak",
+  "priority": "P1",
+  "status": "OPEN",
+  "source": "Alperen hedefi 2026-07-10 (400-001 maliyet-analizi)",
+  "spec": "Anatomi (400-001, Sonnet): cacheRead $1.05 (25-30 tur x ~135k ctx) + output $0.79 (53k, thinking dahil) + cacheCreation $0.51 + input $0.04 = $2.38 (sayac dogrulandi; cache'siz $11.69 olurdu). AYNI-MODEL taban ~$1.0-1.2: (K1) tur-azaltma — paralel tool-cagrilari + verify-dongusu kisaltma; (K2) task-tipi effort/thinking ayari (routing effort alani var — mekanik iste dusuk-effort); (K3) L1 prompt-boilerplate cache-tier + eski tool-sonucu budama. 10X MIMARI-KOLLAR: (K4) model-katmanlama — Brain-eval+disk-verify+gate+FIX sureci kaliteyi tasidigi icin haiku/ollama-sinifi genisletilebilir (ADR-G-028 hybrid-scoring canli; haiku ayni-profil ~$0.79, uygun-sinifta $0.3-0.4; haiku=yalniz-doc kurali gate-korumali revizyon adayi — Alperen-karari gerekir); (K5) Batch API %50 — PLAN/EVALUATE tek-atim Brain-cagrilari icin adapter; (K6) SP-2 kendi-model — 614-trace moat'i tam bu hedefe akiyor. Olcum: her sprint retro'suna $/task ortalamasi + kol-bazli kirilim (mevcut cost-config zinciri dogru calisiyor)."
  }
 ]
