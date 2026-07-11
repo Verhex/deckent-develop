@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-415 Learnings
+- Sprint sprint-415 Learnings: ## Sprint sprint-415 Learnings
+
+## Gains
+- 415-001 — RC5A — cross-platform packed-install matrix: üç-OS gerçek-kurulum smoke'u (XPLAT-01) — 8/8 goCriteria ticked with evidence.
+- 415-002 — RC5B — release-attestation'a cross-platform şartı: matrix-yeşili olmadan publish yok — 1) npx tsc --noEmit -> exit 0, clean, no output.
+- 415-003 — SEC03 — API/terminal token-redaction: raw-token stderr'den ölür (RC-6 öne-alım) — RED evidence (pre-fix, read directly off server.ts before editing): line ~1651 `process.stderr.wr...
+
 ## Sprint sprint-414 Learnings
 - Sprint sprint-414 Learnings: ## Sprint sprint-414 Learnings
 - RC4A — release.yml bütünlük-zinciri: tag-eşitliği + required-CI attestation + SHA-pin + trusted-publishing (REL-01/02 + SEC-06): GO_WITH_TECH_DEBT — Implemented all 6 GÖREV items in release.yml/publish.yml (my sole write scope), RED-first-updated the 2 in-scope test fi

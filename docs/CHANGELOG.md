@@ -9,6 +9,17 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint415] - 2026-07-11
+
+### Added
+
+- RC5A — cross-platform packed-install matrix: üç-OS gerçek-kurulum smoke'u (XPLAT-01)
+- RC5B — release-attestation'a cross-platform şartı: matrix-yeşili olmadan publish yok
+- SEC03 — API/terminal token-redaction: raw-token stderr'den ölür (RC-6 öne-alım)
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint414] - 2026-07-11
 
 ### Added

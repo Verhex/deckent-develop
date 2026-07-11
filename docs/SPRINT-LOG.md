@@ -10150,3 +10150,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 414-003: SCHED4 — full reducer SHADOW-only + differential journal (strangler dilim-4) (DONE)
 
 ---
+## Sprint 415 — sprint-415
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-11
+**Duration:** 973s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 972691ms |
+
+### Tasks
+
+- 415-001: RC5A — cross-platform packed-install matrix: üç-OS gerçek-kurulum smoke'u (XPLAT-01) (DONE)
+- 415-002: RC5B — release-attestation'a cross-platform şartı: matrix-yeşili olmadan publish yok (DONE)
+- 415-003: SEC03 — API/terminal token-redaction: raw-token stderr'den ölür (RC-6 öne-alım) (DONE)
+
+---

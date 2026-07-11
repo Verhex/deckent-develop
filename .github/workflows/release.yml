@@ -53,8 +53,8 @@ permissions:
   contents: write
   id-token: write
   # actions: read — required by the "Verify CI attestation" step's `gh run list` call
-  # (REL-02). Default GITHUB_TOKEN scopes collapse to `none` for any permission not
-  # explicitly listed once this block exists, so this must be named, not inherited.
+  # (REL-02 + REL-02B). Default GITHUB_TOKEN scopes collapse to `none` for any permission
+  # not explicitly listed once this block exists, so this must be named, not inherited.
   actions: read
 
 jobs:
@@ -112,23 +112,38 @@ jobs:
             echo "REL-01 registry-occupancy preflight clear: deckent@${TAG_VERSION} not yet published"
           fi
 
-      # REL-02 (RC4A): a tag can be pushed to ANY commit — "main is already gated by CI"
-      # is not an executable guarantee for the commit a tag actually points at. This
-      # step demands positive proof: at least one successful run of the required `CI`
-      # workflow for this exact commit SHA, via the GitHub CLI (preinstalled on
-      # GitHub-hosted runners; GITHUB_TOKEN is sufficient given the `actions: read`
-      # permission above — no extra PAT needed).
+      # REL-02 (RC4A) + REL-02B (RC5B, 415-002): a tag can be pushed to ANY commit —
+      # "main is already gated by CI" is not an executable guarantee for the commit a tag
+      # actually points at. This step demands positive proof: at least one successful run
+      # of EACH required workflow for this exact commit SHA, via the GitHub CLI
+      # (preinstalled on GitHub-hosted runners; GITHUB_TOKEN is sufficient given the
+      # `actions: read` permission above — no extra PAT needed).
+      # Attestation-kapsamı (attestation scope) = CI + XPLAT: the packed-install
+      # cross-platform matrix (`Cross-Platform E2E`, task 415-001) is a genuinely distinct
+      # signal from `CI` — CI never installs the packed tarball on macOS/Linux/Windows, so
+      # "CI passed" alone does not prove the release installs cleanly on every supported
+      # platform (IMMUTABLE LAW 2 — EVERY ENVIRONMENT). Either workflow missing a
+      # successful run for this commit blocks publish; each check is its own named error
+      # on its own log line, so it is immediately clear which gate is unmet.
       - name: Verify CI attestation for this commit
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          SUCCESS_COUNT=$(gh run list --repo "${GITHUB_REPOSITORY}" --commit "${GITHUB_SHA}" --workflow CI --json conclusion --jq '[.[] | select(.conclusion == "success")] | length')
-          if [ "${SUCCESS_COUNT}" -lt 1 ]; then
+
+          CI_SUCCESS_COUNT=$(gh run list --repo "${GITHUB_REPOSITORY}" --commit "${GITHUB_SHA}" --workflow CI --json conclusion --jq '[.[] | select(.conclusion == "success")] | length')
+          if [ "${CI_SUCCESS_COUNT}" -lt 1 ]; then
             echo "::error::REL-02 no successful CI run found for commit ${GITHUB_SHA} (required workflow: CI). A release tag MUST point at a commit that passed the full required CI suite before publish — tags can be pushed to any commit, so 'main is already gated' is not an executable guarantee. If this is unexpected, confirm the workflow token has 'actions: read' permission."
             exit 1
           fi
-          echo "REL-02 CI attestation verified: ${SUCCESS_COUNT} successful CI run(s) for ${GITHUB_SHA}"
+          echo "REL-02 CI attestation verified: ${CI_SUCCESS_COUNT} successful CI run(s) for ${GITHUB_SHA}"
+
+          XPLAT_SUCCESS_COUNT=$(gh run list --repo "${GITHUB_REPOSITORY}" --commit "${GITHUB_SHA}" --workflow "Cross-Platform E2E" --json conclusion --jq '[.[] | select(.conclusion == "success")] | length')
+          if [ "${XPLAT_SUCCESS_COUNT}" -lt 1 ]; then
+            echo "::error::REL-02B no successful Cross-Platform E2E run found for commit ${GITHUB_SHA} (required workflow: Cross-Platform E2E). A release tag MUST point at a commit that passed the cross-platform packed-install matrix (macOS/Linux/Windows) before publish — CI alone never exercises the packed-tarball install path, so it is not a substitute for this gate. If this is unexpected, confirm the workflow token has 'actions: read' permission."
+            exit 1
+          fi
+          echo "REL-02B Cross-Platform E2E attestation verified: ${XPLAT_SUCCESS_COUNT} successful Cross-Platform E2E run(s) for ${GITHUB_SHA}"
 
       - name: Install dependencies
         run: npm ci

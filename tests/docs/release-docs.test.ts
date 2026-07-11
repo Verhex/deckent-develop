@@ -93,6 +93,14 @@ describe('release integrity chain — doc honesty (RC4A)', () => {
     expect(verifyCiIdx).toBeLessThan(publishIdx);
   });
 
+  it('the CI-attestation gate covers BOTH required workflows (CI + Cross-Platform E2E), not CI alone (415-002 RC5B)', () => {
+    // Doc-honesty: the step's own comment must state its attestation scope so a reader
+    // does not have to reverse-engineer the shell to learn CI alone is insufficient.
+    expect(releaseContent).toMatch(/Attestation-kapsam[ıi].*CI \+ XPLAT/);
+    expect(releaseContent).toContain('gh run list --repo "${GITHUB_REPOSITORY}" --commit "${GITHUB_SHA}" --workflow "Cross-Platform E2E"');
+    expect(releaseContent).toContain('::error::REL-02B');
+  });
+
   it('publish.yml documents why its dry-run step needs no registry credential', () => {
     expect(publishContent).toMatch(/dry-run.*does not perform any authenticated registry write/is);
   });

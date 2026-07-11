@@ -1762,6 +1762,38 @@ const MESSAGES: MessageMap = {
     en: 'Warning: could not write the desktop handshake file (.deckent/serve-daemon.json) — the server runs normally, but a desktop shell cannot auto-adopt this daemon: {error}',
     tr: 'Uyarı: desktop el-sıkışma dosyası (.deckent/serve-daemon.json) yazılamadı — sunucu normal çalışıyor, ancak desktop kabuğu bu daemon\'ı otomatik devralamaz: {error}',
   },
+  // SEC-03 (415-003): raw-token stderr redaction — a bearer token must never
+  // land in a process-log stream (CI/journald/log-shippers capture stderr
+  // verbatim). These log a short fingerprint + the 0600 file the real value
+  // was persisted to, instead of the token itself.
+  'serve.token.auto_generated': {
+    en: '[deckent:info] Auto-generated API token (active for /api/* Bearer auth) — fingerprint {fingerprint}, full token in {path} (0600)',
+    tr: '[deckent:info] Otomatik üretilen API token (aktif /api/* Bearer auth için) — parmak izi {fingerprint}, tam token {path} dosyasında (0600)',
+  },
+  'serve.token.auto_minted': {
+    en: '[deckent:info] Auto-minted localhost API token (this is the ACTIVE token for /api/* Bearer auth; the dashboard on localhost receives it automatically) — fingerprint {fingerprint}, full token in {path} (0600)',
+    tr: '[deckent:info] Otomatik oluşturulan localhost API token (bu /api/* Bearer auth için AKTİF token; localhost\'taki dashboard bunu otomatik alır) — parmak izi {fingerprint}, tam token {path} dosyasında (0600)',
+  },
+  'serve.token.terminal_minted': {
+    en: '[deckent:info] Terminal session token (embedded web terminal only — NOT the /api/* API token) — fingerprint {fingerprint}, full token in {path} (0600)',
+    tr: '[deckent:info] Terminal oturum token\'ı (yalnızca gömülü web terminali — /api/* API token\'ı DEĞİL) — parmak izi {fingerprint}, tam token {path} dosyasında (0600)',
+  },
+  'serve.token.persist_failed': {
+    en: '[deckent:warn] Could not persist the {file} token file — {error}. The active token still works for auth; only the on-disk copy is missing.',
+    tr: '[deckent:warn] {file} token dosyası kalıcı hale getirilemedi — {error}. Aktif token auth için hâlâ çalışıyor; yalnızca disk kopyası eksik.',
+  },
+  'serve.token.posix_chmod_failed': {
+    en: '[deckent:warn] Could not set owner-only (0600) permissions on {path} — {error}',
+    tr: '[deckent:warn] {path} üzerinde yalnızca-sahip (0600) izinleri ayarlanamadı — {error}',
+  },
+  'serve.token.win_acl_unavailable': {
+    en: '[deckent:warn] Could not determine the current Windows user (USERNAME unset) — skipping icacls hardening for {path}. The file may be readable by other accounts.',
+    tr: '[deckent:warn] Mevcut Windows kullanıcısı belirlenemedi (USERNAME tanımsız) — {path} için icacls sıkılaştırması atlanıyor. Dosya diğer hesaplar tarafından okunabilir olabilir.',
+  },
+  'serve.token.win_acl_warn': {
+    en: '[deckent:warn] icacls hardening issue for {path}: {detail}. The file may be readable by other accounts.',
+    tr: '[deckent:warn] {path} için icacls sıkılaştırma sorunu: {detail}. Dosya diğer hesaplar tarafından okunabilir olabilir.',
+  },
 
   // ─── bot daemon (start/stop/status) ────────────────────────────
   'bot.daemon_desc': {

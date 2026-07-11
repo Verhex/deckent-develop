@@ -118,7 +118,7 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
     })
   })
 
-  describe('Verify CI Attestation Step (REL-02)', () => {
+  describe('Verify CI Attestation Step (REL-02 CI + REL-02B Cross-Platform E2E, 415-002 RC5B)', () => {
     it('should exist, before Install dependencies', () => {
       const idx = workflowContent.indexOf('- name: Verify CI attestation for this commit')
       const installIdx = workflowContent.indexOf('- name: Install dependencies')
@@ -130,9 +130,30 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       expect(workflowContent).toContain('gh run list --repo "${GITHUB_REPOSITORY}" --commit "${GITHUB_SHA}" --workflow CI')
     })
 
-    it('should require at least one successful run and fail otherwise', () => {
+    it('should require at least one successful CI run and fail with a named REL-02 error', () => {
       expect(workflowContent).toMatch(/select\(\.conclusion == "success"\)/)
-      expect(workflowContent).toMatch(/SUCCESS_COUNT.*-lt 1[\s\S]*?exit 1/)
+      expect(workflowContent).toMatch(/CI_SUCCESS_COUNT.*-lt 1[\s\S]*?::error::REL-02 /)
+    })
+
+    it('should ALSO query gh run list for the Cross-Platform E2E workflow, same commit SHA (415-001 packed-install matrix)', () => {
+      expect(workflowContent).toContain('gh run list --repo "${GITHUB_REPOSITORY}" --commit "${GITHUB_SHA}" --workflow "Cross-Platform E2E"')
+    })
+
+    it('should require at least one successful Cross-Platform E2E run and fail with a distinctly-named REL-02B error', () => {
+      expect(workflowContent).toMatch(/XPLAT_SUCCESS_COUNT.*-lt 1[\s\S]*?::error::REL-02B /)
+    })
+
+    it('CI check and Cross-Platform E2E check are two separate named errors on two separate log lines — not merged', () => {
+      const ciErrorIdx = workflowContent.indexOf('::error::REL-02 no successful CI run found')
+      const xplatErrorIdx = workflowContent.indexOf('::error::REL-02B no successful Cross-Platform E2E run found')
+      expect(ciErrorIdx).toBeGreaterThan(-1)
+      expect(xplatErrorIdx).toBeGreaterThan(-1)
+      expect(xplatErrorIdx).toBeGreaterThan(ciErrorIdx)
+
+      const ciSuccessEchoIdx = workflowContent.indexOf('REL-02 CI attestation verified:')
+      const xplatSuccessEchoIdx = workflowContent.indexOf('REL-02B Cross-Platform E2E attestation verified:')
+      expect(ciSuccessEchoIdx).toBeGreaterThan(-1)
+      expect(xplatSuccessEchoIdx).toBeGreaterThan(ciSuccessEchoIdx)
     })
 
     it('should authenticate gh via GITHUB_TOKEN (no extra PAT)', () => {

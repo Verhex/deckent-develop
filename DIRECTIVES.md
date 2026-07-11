@@ -1,107 +1,85 @@
-# DIRECTIVES — SPRINT-414: RC-4 RELEASE-INTEGRITY + SCHED-4 SHADOW-REDUCER
+# DIRECTIVES — SPRINT-415: RC-5 EVERY-ENVIRONMENT INSTALL-MATRIX + SEC-03 TOKEN-REDACTION
 
 ## Goal
-RC-treni dilim-4 (543: REL-01/02/03/04 + SEC-06 — tag-bütünlüğü, CI-attestation, SHA-pin,
-trusted-publishing, changelog-kanonikliği) + SCHED-treni dilim-4 (527: full reducer SHADOW-only).
-Tasarım-SSOT: `docs/analysis/beta-blocker-sweep-2026-07-11.md` + `docs/analysis/scheduler-unify-design-2026-07-11.md`.
-DURUM: validate:publish 8/8 tam-yeşil (sprint-413) — release-yolunun kendisi bu sprint'in konusu.
-⚠️ Workflow-pin kör-noktaları: tests/github/ + tests/docs/ + tests/workflows/ ÜÇ ayrı dizin
-workflow-şekillerini pinler — workflow değiştiren task bu üçünü de senkronlar.
+RC-treni dilim-5 (543: XPLAT-01 — Win/WSL/macOS/Linux packed-install matrix REQUIRED) + RC-6'dan
+öne-alınan SEC-03 (token-redaction). SCHED-5 bilinçli ERTELENDİ: shadow-reducer dogfood-flag'i az
+önce açıldı — live-switch ancak journal-kanıtı toplandıktan sonra (bu sprint'in koşusu kanıt üretir).
+Tasarım-SSOT: `docs/analysis/beta-blocker-sweep-2026-07-11.md` (XPLAT-01 + SEC-03).
+⚠️ Workflow-pin kör-noktaları artık BEŞ dizin: tests/github/ tests/workflows/ tests/docs/
+tests/scripts/ tests/governance/ — workflow değiştiren task BEŞİNİ de tarar.
 
 ## 🔒 BAĞLAYICI (her task)
 - Yalnız kendi Files'ına yaz · `.deckent/`, `.brain/`, `.tasks/` DOKUNMA · git stash-reset YASAK · `npm run build` YASAK · notes TEK STRING · Self DÜRÜST.
 - REPRODUCE-FIRST: fix'ten önce hatalı davranışı RED testle kanıtla.
-- i18n-FIRST (user-facing CLI metni); workflow/script iç-log'ları EN serbest.
+- i18n-FIRST (user-facing CLI metni; log-prefix'li satırda getMessage aynı-satırda).
 - Test hermetik: tmpdir, async spawn, ≤16GB.
 
-## Task 1: RC4A — release.yml bütünlük-zinciri: tag-eşitliği + required-CI attestation + SHA-pin + trusted-publishing (REL-01/02 + SEC-06)
+## Task 1: RC5A — cross-platform packed-install matrix: üç-OS gerçek-kurulum smoke'u (XPLAT-01)
 - Model: sonnet | Effort: high | Provider: claude
-- Files: .github/workflows/release.yml, .github/workflows/publish.yml, tests/github/release.test.ts, tests/workflows/publish.test.ts, tests/docs/release-docs.test.ts
-- Scope: .github/workflows/, tests/github/, tests/workflows/, tests/docs/
+- Files: .github/workflows/cross-platform-e2e.yml, scripts/xplat-install-smoke.mjs, tests/workflows/cross-platform-e2e.test.ts
+- Scope: .github/workflows/, scripts/, tests/workflows/
 - Dependencies: none
 ### Description
-KANIT (sol-sweep + CC spot): (a) REL-01: workflow HER v*-tag'ini package/lock equality kontrolsüz
-publish eder (release.yml:~49 tag-trigger; version-check adımı YOK); (b) REL-02: yalnız
-governance+core smoke koşar (:~91) — tag-commit'in FULL required-CI'dan geçtiği kanıtlanmaz
-(yorumdaki 'main zaten gated' varsayımı yürütülebilir-contract değil — tag herhangi bir commit'e
-atılabilir); (c) SEC-06: floating action-tag'ler (@v4/@v2/@v3) + OIDC id-token:write YANINDA
-uzun-ömürlü NPM_TOKEN (:117). GÖREV: (1) publish-job'ın BAŞINA 'verify-release-integrity' adımı:
-tag == package.json version == package-lock.json version (üçlü exact-equality; uyuşmazlık →
-adlı-hata + fail) + registry-occupancy preflight (`npm view deckent@$VERSION version` → varsa
-DUR: immutable-registry çifte-publish koruması; network-hatası dürüst-warn+devam); (2)
-'verify-ci-attestation' adımı: `gh run list --commit $GITHUB_SHA --workflow CI` → conclusion
-success ŞART (yoksa/failure → fail; gh token permission'ını kontrol et — GITHUB_TOKEN yeterli);
-(3) TÜM uses: action'ları immutable commit-SHA'ya pinle (`uses: owner/repo@<40-hex> # vX.Y.Z`
-yorumuyla — mevcut major-tag'lerin bugünkü SHA'larını çöz); (4) NPM_TOKEN kaldırılır → npm
-trusted-publishing/OIDC (id-token:write mevcut; `npm publish --provenance` OIDC ile token'sız —
-registry-side trusted-publisher ayarının Alperen'in npmjs.com'da yapması gereken adım olduğunu
-notes'a ve workflow-yorumuna AÇIKÇA yaz; ayar yoksa publish'in nasıl hata vereceğini belirt —
-sessiz değil); (5) release-notes adımı ROOT CHANGELOG.md'den okur + EXACT-ANCHORED eşleşme (escape'li tam-başlık;
-'1.0.0-beta.1' regex'inin '1.0.0-beta.1-sprint410' başlıklarını da yakalayan prefix-tuzağı ÖLÜR;
-bölüm-boş VEYA duplicate-başlık → FAIL, sessiz-boş-notes YASAK) — Task-2 kanonik-dosyaları
-hazırlar, workflow-tarafı SENİN tek-sahipliğinde; (6) üç pin-dizinini yeni şekle senkronla
-(adım-adları/sırası/koşulları). RED-first: mevcut şeklin 'version-check'siz + NPM_TOKEN'lı +
-prefix-parser'lı' olduğunu pinleyen testler önce güncellenir (envanter notes'a).
+KANIT (sol-sweep XPLAT-01): doctor native-Windows'u 'fully supported' gösterir (doctor.ts:~95)
+ama Windows CI informational/allow-failure ve yalnız core-test kapsamındadır (ci.yml:~196); WSL ve
+macOS gerçek release-install matrisinde YOK — 'Every Environment' yasasının release-kanıtı eksik.
+GÖREV: (1) YENİ scripts/xplat-install-smoke.mjs — OS-AGNOSTİK tek-script (CI adımları yalnız bunu
+çağırır; platform-dalları script içinde): `npm pack` → tmpdir'e `npm install -g <tarball>`
+(prefix-izoleli — global-kirlilik YOK: npm_config_prefix=tmpdir) → kurulu-binary ile `deckent
+init --yes` (413-001 non-interactive akışı) → çıktıda outcome-bloğu var + exit-code sözleşmesi
+(0|2 kabul; 1 FAIL) → `deckent doctor` koşar + çıkar; her adım adlı-log + ilk-hatada dürüst
+nonzero; (2) .github/workflows/cross-platform-e2e.yml'e 'packed-install' job'ı: matrix
+[ubuntu-latest, macos-latest, windows-latest] × node-24 — continue-on-error/allow-failure YASAK
+(üçü de required); WSL: ubuntu-job zaten POSIX-kanıtı, ayrıca windows-job'a WSL-adımı EKLEME
+(runner-WSL kurulumu kırılgan — dürüst-not: WSL-kanıtı = Alperen'in lokal ortamı + ubuntu-parity;
+workflow-yorumuna yaz); (3) mevcut jobs'lara DOKUNMA (yalnız yeni job ekle); (4) pin-testi:
+tests/workflows/cross-platform-e2e.test.ts yeni-job şeklini pinler (matrix üç-OS + no-allow-failure
++ script-çağrısı); BEŞ pin-dizinini tara (başka dosya bu workflow'u pinliyorsa senkronla). Lokal
+kanıt: script'i linux'ta gerçek koştur (npm pack + izole-prefix install ~2-3dk) → çıktı notes'a.
+Smoke: node scripts/xplat-install-smoke.mjs → son satır 'XPLAT SMOKE OK (linux)'
 ### goNogo
-- goCriteria: üçlü-equality + occupancy-preflight + CI-attestation adımları YAML'da ve üç pin-dizini senkron-testli; sıfır floating action-tag (SHA+yorum); NPM_TOKEN referansı sıfır; trusted-publisher registry-side gereksinimi dürüstçe belgelenmiş; tests/github+workflows+docs yeşil.
-- nogo: publish-adımı attestation'sız ulaşılabilir kalırsa NO_GO; herhangi bir action floating kalırsa NO_GO; yerel npm publish denemesi yapılırsa NO_GO.
+- goCriteria: script üç-platform-dallı + linux'ta gerçek-koşu kanıtı; workflow üç-OS required (allow-failure/continue-on-error sıfır); mevcut job'lar byte-değişmemiş; pin-test yeni-şekli pinliyor; 5-dizin taraması notes'ta.
+- nogo: allow-failure/continue-on-error eklenirse NO_GO; global npm-prefix kirletilirse NO_GO; mevcut job'lar değişirse NO_GO.
 
-## Task 2: RC4B — changelog-kanonikliği + release-prepare (REL-03/04): tek-kaynak notes + bump-version retire
+## Task 2: RC5B — release-attestation'a cross-platform şartı: matrix-yeşili olmadan publish yok
 - Model: sonnet | Effort: medium | Provider: claude
-- Files: CHANGELOG.md, docs/CHANGELOG.md, scripts/release-prepare.mjs, scripts/bump-version.sh, tests/release/release-prepare.test.ts
-- Scope: CHANGELOG.md, docs/, scripts/, tests/release/
+- Files: .github/workflows/release.yml, tests/github/workflows/release.test.ts, tests/governance/release-workflow-unify.test.ts, tests/scripts/publish-workflow.test.ts, tests/docs/release-docs.test.ts, tests/workflows/publish.test.ts
+- Scope: .github/workflows/, tests/github/, tests/governance/, tests/scripts/, tests/docs/, tests/workflows/
 - Dependencies: Task 1
 ### Description
-KANIT (sol-sweep REL-03/04 + CC spot): (a) çelişen kanoniklik — root CHANGELOG.md 'tam liste
-docs/'ta' der (satır 3), docs/CHANGELOG.md kendini root'a yönlendirir AMA en-güncel sprint-girişleri
-docs'ta yaşar; (b) release.yml notes-parser'ı awk PREFIX-match (:~105): '1.0.0-beta.1' regex'i
-'1.0.0-beta.1-sprint410' başlıklarını da yakalayıp ilk-100-satırı birleştirir; (c) bump-version.sh
-prerelease-metadata'yı atar, yalnız package.json değiştirir, elle 'npm publish' önerir —
-sole-authority modeline aykırı; (d) root-CHANGELOG MRR'yi dependency-satisfying diye anlatır —
-scheduler-truth.ts:10 ile ÇELİŞİR (born-610 sonrası bayat). GÖREV: (1) kanoniklik-kararı uygula:
-root CHANGELOG.md = RELEASE-notes kanoniği (versiyon-başlıklı bölümler), docs/CHANGELOG.md =
-otomatik sprint-günlüğü (başına net rol-bandosu; sprint-finalizer'ın docs'a yazmaya devam ettiğini
-BOZMA — yalnız açıklama-başlığı); (2) workflow'un notes-adımı SENİN kapsamın DEĞİL (Task-1 yapar) —
-sen root-CHANGELOG'un exact-anchor'lanabilir bölüm-formatını garanti et (tekil, tam-başlıklı,
-boş-olmayan versiyon-bölümü); (3) scripts/release-prepare.mjs (node): --version vX.Y.Z[-pre] alır → package.json + package-lock
-(her iki version-alanı) + root-CHANGELOG yeni-bölüm-iskeleti ATOMIC günceller (tag ATMAZ, publish
-ETMEZ — bunlar workflow-authority); prerelease-metadata'yı doğru taşır; bump-version.sh İÇİ
-retire-stub'a döner (çağrılırsa: 'retired — use release-prepare.mjs' + exit 1; dosya-silme YOK,
-tarih-notu); (4) root-CHANGELOG MRR-açıklaması scheduler-truth gerçeğine düzeltilir (MRR
-terminal-non-satisfying, born-610); (5) test: release-prepare round-trip (tmpdir kopya-fixture;
-üç dosya senkron + prerelease korunur) + root-CHANGELOG bölüm-formatı doğrulaması (tekil-başlık,
-boş-değil — Task-1'in exact-anchor parser'ının tüketeceği kontrat).
+KANIT: 414-001'in verify-ci-attestation adımı yalnız 'CI' workflow'unu doğrular — Task-1'in yeni
+packed-install matrix'i (Cross-Platform E2E) publish-şartı DEĞİL; sol RC-5 gate'i 'her platform
+required' ister ve bu ancak release-attestation'a bağlanınca yürütülebilir-contract olur. GÖREV:
+(1) release.yml verify-ci-attestation adımını genişlet: tag-commit için HEM 'CI' HEM
+'Cross-Platform E2E' workflow-run'ları success olmalı (gh run list --commit ile; herhangi biri
+yok/failure → adlı-hata + fail; iki kontrol AYRI log-satırı — hangisi eksik net görünsün);
+(2) adım-yorumunu güncelle (attestation-kapsamı: CI + XPLAT); (3) BEŞ pin-dizininde release.yml'i
+pinleyen her testi yeni-şekle senkronla (RED-first: önce mevcut tek-workflow-attestation pinini
+güncelle). Action-SHA'ları ve OIDC yapısına DOKUNMA (414-001 teslimi).
 ### goNogo
-- goCriteria: kanoniklik-bandoları iki dosyada; release-prepare atomic+testli (tag ve publish yapmaz); bump-version retire-stub; MRR-metni düzeltilmiş; bölüm-format kontratı testli; tests/release yeşil.
-- nogo: sprint-finalizer'ın docs-changelog yazımı kırılırsa NO_GO; script tag veya publish mutasyonu yaparsa NO_GO.
+- goCriteria: attestation iki-workflow'lu (ayrı-log, adlı-hata); 5-dizin pin-senkron testli-yeşil; SHA-pin/OIDC yapısı byte-korunur (diff-kanıt notes'ta).
+- nogo: attestation tek-workflow'a düşerse NO_GO; SHA-pin veya OIDC satırları değişirse NO_GO.
 
-## Task 3: SCHED4 — full reducer SHADOW-only + differential journal (strangler dilim-4)
-- Model: sonnet | Effort: high | Provider: claude
-- Files: src/orchestra/scheduler-reducer.ts, src/orchestra/scheduler-driver.ts, src/orchestra/scheduler-journal.ts, src/orchestra/result-collector.ts, src/core/config-types.ts, src/core/config.ts, tests/orchestra/scheduler-shadow-equivalence.test.ts
-- Scope: src/orchestra/, src/core/config-types.ts, src/core/config.ts, tests/orchestra/
+## Task 3: SEC03 — API/terminal token-redaction: raw-token stderr'den ölür (RC-6 öne-alım)
+- Model: sonnet | Agent: bug-fixer | Effort: high | Provider: claude
+- Files: src/api/server.ts, src/cli/helpers/messages.ts, tests/api/token-redaction.test.ts
+- Scope: src/api/, src/cli/helpers/messages.ts, tests/api/
 - Dependencies: none
 ### Description
-ÖNCE OKU (zorunlu): `docs/analysis/scheduler-unify-design-2026-07-11.md` — Net-Öneri şeması +
-Sprint-4 dilimi + Riskler. GÖREV (EXECUTION-ETKİSİ SIFIR — yalnız gözlem): (1) YENİ
-scheduler-reducer.ts: `reduceSchedulerTick(snapshot)` PURE (fs, env ve Date.now importu YOK) —
-SchedulerSnapshot (trigger kind+sequence, strategy, nowMs, costStop, slotBudget, ordered-queue
-KOPYASI, statuses, collected/assigned setleri, effective-dependency-state [sprint-411 helper'ı
-KULLAN], collision-blockers, retry-deadlines) → SchedulerDecision { nextQueue, dispositions,
-orderedEffects[SpawnTask·KillWorker·CascadeSkip·Blocked·ClearBlocked·EmitMetric·WriteCheckpoint] };
-davranış-modeli MEVCUT canlı closure'ların semantiği (planDispatch modelinden yararlan ama
-tasarım-doc'un boşluk-matrisindeki eksiklerini [collision/retry/cascade] snapshot-girdileriyle
-kapat); (2) scheduler-driver.ts: shadow-koşucu — canlı tick'lerin yanında AYNI verinin immutable
-klonundan (queue MUTLAKA klon — canlı planDispatch remainingQueue'yu mutate eder, tasarım-doc
-riski) reducer'ı koşar; (3) scheduler-journal.ts: `.deckent/runtime/scheduler-shadow/<sprintId>.jsonl`
-append — her tick: {seq, trigger, legacyDecision-özeti, reducerDecision-özeti, divergence:[]}
-(fail-soft: journal-hatası canlıyı ASLA etkilemez); (4) result-collector'ın watcher-tick'ine
-flag'li kanca: config `scheduler.shadow_reducer` (default FALSE — config-types+config üçlü-desen;
-dogfood'ta elle açılacak); flag-kapalıyken sıfır-yeni-davranış (testle pinle); (5)
-shadow-equivalence testi: sentetik sprint-fixture'larında (DONE/NO_GO/MRR/fix/retry/cost-stop
-kombinasyonları) legacy-closure kararları vs reducer kararları — bilinen-eşdeğer vakalarda
-divergence boş; KASITLI-fark vakaları (ör. FIFO dep-deliği: legacy spawn-eder/reducer Blocked der)
-'expected-divergence' olarak İŞARETLİ-pinli (bunlar dilim-7'nin kanıt-envanteri). KAPSAM-DIŞI:
-canlı yürütmeye müdahale, closure-silme, planDispatch-değişikliği — dilim-5+.
+KANIT (sol-sweep SEC-03 + CC grep-teyit): ÜÇ raw-token stderr'e yazılıyor — server.ts:1651
+(auto-generated API token), :1679 (localhost-minted token), :1963 (terminal session token).
+Süreç-log'ları toplayan her sistem (CI, journald, log-shipper) bearer-token'ları düz-metin depolar.
+GÖREV: (1) üç satırda raw-token ÖLÜR → yerine fingerprint (sha256 ilk-12-hex, 'tok:ab12…' formatı)
++ token'ın NEREDE olduğu bilgisi; (2) token 0600-dosyaya yazılır: `.deckent/runtime/api-token`
+(atomic tmp+rename + chmod 0600 — 411-001'in deck-file desenini KOPYALA; Windows: icacls-deseni
+varsa kullan yoksa dürüst-warn) — terminal-token için ayrı dosya `.deckent/runtime/terminal-token`;
+dosya-yolu stderr-mesajında verilir; (3) mevcut TÜKETİCİLERİ KIRMA: localhost-dashboard'ın
+token-alma mekanizması (HTML-injection ~:2000) ve testlerin token-okuma yolları AYNEN çalışır —
+değişen yalnız STDERR-LOG içeriği (grep'le tüm resolvedToken/finalToken/terminalToken
+kullanım-envanterini çıkar, notes'a yaz; injection SEC-03-kapsamı-DIŞI, RC-6 notu); (4) i18n:
+yeni mesajlar getMessage en+tr; (5) RED-first: bugünkü stderr'in raw-token içerdiğini yakalayan
+test → GREEN: stderr'de token YOK + fingerprint VAR + 0600-dosya VAR + dosya-içeriği=aktif-token
+(server'a gerçek-istek ile doğrula — supertest/fetch deseni mevcut api-testlerinden).
 ### goNogo
-- goCriteria: reducer pure (import-kanıtı notes'ta); snapshot queue-klonu testle pinli; flag default-off + kapalıyken sıfır-davranış-değişimi testi; journal fail-soft; equivalence-testi eşdeğer+expected-divergence iki-sınıflı; tests/orchestra tamamı yeşil.
-- nogo: canlı spawn/kill yoluna herhangi bir müdahale varsa NO_GO; reducer'da Date.now/env/fs varsa NO_GO; canlı queue referansı shadow'a klonsuz geçerse NO_GO.
+- goCriteria: üç stderr-satırında raw-token sıfır (RED→GREEN); fingerprint + 0600-dosya (POSIX-mode assert) + dosya-token'ı gerçek-auth'ta çalışıyor; dashboard/test tüketicileri yeşil (tests/api tamamı); i18n en+tr; kullanım-envanteri notes'ta.
+- nogo: dashboard localhost-auth kırılırsa NO_GO; token herhangi bir log-satırında düz-metin kalırsa NO_GO; mode-teyitsiz dosya-yazımı NO_GO.

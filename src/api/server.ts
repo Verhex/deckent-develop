@@ -1,7 +1,9 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
-import { readFileSync, existsSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, writeFileSync, mkdirSync, renameSync, unlinkSync, chmodSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { platform as osPlatform } from 'node:os';
+import { spawn as nodeSpawn } from 'node:child_process';
+import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import type { SessionBackend } from './terminal/session-backend.js';
 import { PtySessionManager } from './terminal/session-manager.js';
 import { LocalTokenAuthProvider, JwksAuthProvider } from './terminal/auth-provider.js';
@@ -14,7 +16,7 @@ import type { AiTool, CreateSessionInput, SessionKind, TenantId, SessionMeta } f
 import { z } from 'zod';
 import {
   DASHBOARD_FILE, BRAIN_DIR, SPRINTS_DIR, TASKS_DIR, LOCKS_DIR,
-  PROJECT_CONFIG_PATH, DIRECTIVES_FILE, MEMORY_DB_FILE, DECKENT_VERSION,
+  PROJECT_CONFIG_PATH, DIRECTIVES_FILE, MEMORY_DB_FILE, DECKENT_VERSION, RUNTIME_DIR,
 } from '../core/constants.js';
 import { SprintStatus, SprintPhase, TaskStatus } from '../core/types.js';
 import type { Task, Sprint } from '../core/types.js';
@@ -73,6 +75,7 @@ import { ApprovalBroker, ApprovalBrokerError } from '../core/approval-broker.js'
 import { ApprovalExpiryDriver } from '../core/approval-expiry-driver.js';
 import { rpcRequestSchema, dispatchRpcRequest, type RpcHandler, type RpcHandlerMap } from '../core/term-rpc.js';
 import { probeSubscriptionLimits, type SpawnImpl } from '../core/limit-preflight.js';
+import { getMessage, getLanguage } from '../cli/helpers/messages.js';
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -1570,6 +1573,103 @@ export interface HttpServerOptions {
   approvalExpirySweepMs?: number;
 }
 
+// ─── SEC-03: token-fingerprint + runtime token-file persistence ────────────
+// A raw bearer token must never land in a process-log stream — any log
+// collector (CI, journald, a log-shipper) that captures stderr would then
+// store the live credential in plaintext. Every startup log line that used to
+// interpolate a raw token now logs a short, non-reversible SHA-256 fingerprint
+// instead; the actual token is persisted to an owner-only (0600) file under
+// `.deckent/runtime/` and the log line names that file's path so an operator
+// who legitimately needs the value can read it from disk.
+
+/** `tok:` + the first 12 hex chars of SHA-256(token) — identifies a token across log lines without revealing it. */
+function tokenFingerprint(token: string): string {
+  return `tok:${createHash('sha256').update(token).digest('hex').slice(0, 12)}`;
+}
+
+/**
+ * Atomically persist a runtime token file (same-directory tmp write + rename
+ * + owner-only hardening) and return its absolute path.
+ *
+ * Mirrors core/deck-file.ts's `createDeckTemplate`/`applyWindowsOwnerOnlyAcl`
+ * tmp+rename+chmod(0600) pattern byte-for-byte; that helper isn't exported
+ * and deck-file.ts is outside this task's write scope, so the platform-
+ * specific hardening is duplicated here rather than imported.
+ */
+function writeRuntimeTokenFile(projectRoot: string, fileName: string, token: string, lang: string): string {
+  const dir = join(projectRoot, RUNTIME_DIR);
+  mkdirSync(dir, { recursive: true });
+  const tokenPath = join(dir, fileName);
+  const tmpPath = `${tokenPath}.tmp`;
+  writeFileSync(tmpPath, `${token}\n`, { encoding: 'utf-8', mode: 0o600 });
+  try {
+    renameSync(tmpPath, tokenPath);
+  } catch (renameErr) {
+    try {
+      unlinkSync(tmpPath);
+    } catch {
+      // Best-effort cleanup — the renameErr thrown below is what the caller needs to see.
+    }
+    throw renameErr;
+  }
+
+  if (osPlatform() === 'win32') {
+    const username = process.env['USERNAME'];
+    if (!username) {
+      process.stderr.write(
+        `${getMessage('serve.token.win_acl_unavailable', lang, { path: tokenPath })}\n`,
+      );
+      return tokenPath;
+    }
+    try {
+      const child = nodeSpawn('icacls', [tokenPath, '/inheritance:r', '/grant:r', `${username}:F`], {
+        stdio: ['ignore', 'ignore', 'pipe'],
+      });
+      let stderrOutput = '';
+      child.stderr?.on('data', (chunk: Buffer | string) => {
+        stderrOutput += chunk.toString();
+      });
+      child.on('error', (err) => {
+        process.stderr.write(
+          `${getMessage('serve.token.win_acl_warn', lang, { path: tokenPath, detail: err.message })}\n`,
+        );
+      });
+      child.on('close', (code) => {
+        if (code !== 0) {
+          process.stderr.write(
+            `${getMessage('serve.token.win_acl_warn', lang, {
+              path: tokenPath,
+              detail: `icacls exited with code ${code}${stderrOutput.trim() ? `: ${stderrOutput.trim()}` : ''}`,
+            })}\n`,
+          );
+        }
+      });
+    } catch (err) {
+      process.stderr.write(
+        `${getMessage('serve.token.win_acl_warn', lang, {
+          path: tokenPath,
+          detail: err instanceof Error ? err.message : String(err),
+        })}\n`,
+      );
+    }
+  } else {
+    try {
+      // Re-assert 0600 unconditionally: the mode passed to writeFileSync is masked
+      // by the process umask before landing on disk, so a permissive umask can leave
+      // the file wider than owner-only. chmodSync ignores umask entirely.
+      chmodSync(tokenPath, 0o600);
+    } catch (err) {
+      process.stderr.write(
+        `${getMessage('serve.token.posix_chmod_failed', lang, {
+          path: tokenPath,
+          error: err instanceof Error ? err.message : String(err),
+        })}\n`,
+      );
+    }
+  }
+  return tokenPath;
+}
+
 export function createHttpServer(projectRoot: string, port?: number, staticDir?: string, apiToken?: string): HttpApi;
 export function createHttpServer(projectRoot: string, opts?: HttpServerOptions): HttpApi;
 export function createHttpServer(
@@ -1582,6 +1682,11 @@ export function createHttpServer(
   let resolvedStaticDir: string | undefined;
   let resolvedToken: string | undefined;
   let host: string;
+  // SEC-03: no ResolvedConfig loaded at this synchronous point (see the
+  // rawCfgForBind/rawCfgForApproval sync-read comments below) — same
+  // env-fallback getLanguage() call already used for module-level messages
+  // elsewhere (cli/commands/agent.ts, cli/commands/chat.ts) without a config object in scope.
+  const lang = getLanguage();
 
   let autoGenerateToken = false;
   let rateLimitMax = 100;
@@ -1648,7 +1753,26 @@ export function createHttpServer(
   // Auto-generate token if requested and none provided
   if (!resolvedToken && autoGenerateToken) {
     resolvedToken = randomUUID();
-    process.stderr.write(`[deckent:info] Auto-generated API token (active for /api/* Bearer auth): ${resolvedToken}\n`);
+    // SEC-03: never interpolate the raw token into a stderr line (process
+    // logs are frequently captured verbatim by CI/journald/log-shippers) —
+    // log a short fingerprint plus the 0600 file the real value was persisted to.
+    let apiTokenPath: string | undefined;
+    try {
+      apiTokenPath = writeRuntimeTokenFile(projectRoot, 'api-token', resolvedToken, lang);
+    } catch (err) {
+      process.stderr.write(
+        `${getMessage('serve.token.persist_failed', lang, {
+          file: 'api-token',
+          error: err instanceof Error ? err.message : String(err),
+        })}\n`,
+      );
+    }
+    process.stderr.write(
+      `${getMessage('serve.token.auto_generated', lang, {
+        fingerprint: tokenFingerprint(resolvedToken),
+        path: apiTokenPath ?? join(projectRoot, RUNTIME_DIR, 'api-token'),
+      })}\n`,
+    );
   }
 
   // Resolve final token — single resolution order (A4, Sprint 269):
@@ -1676,7 +1800,27 @@ export function createHttpServer(
   const isLoopbackHost = host === '127.0.0.1' || host === '::1' || host === 'localhost';
   if (!finalToken && isLoopbackHost && process.env['DECKENT_API_AUTH_DISABLED'] !== '1') {
     finalToken = randomBytes(32).toString('hex');
-    process.stderr.write(`[deckent:info] Auto-minted localhost API token (this is the ACTIVE token for /api/* Bearer auth; the dashboard on localhost receives it automatically): ${finalToken}\n`);
+    // SEC-03: same fingerprint+file-path redaction as the auto-generate branch
+    // above — these two branches are mutually exclusive per run (this one only
+    // fires when `!finalToken`, which the auto-generate branch already falsified
+    // whenever it ran), so they safely share the same `.deckent/runtime/api-token` file.
+    let apiTokenPath: string | undefined;
+    try {
+      apiTokenPath = writeRuntimeTokenFile(projectRoot, 'api-token', finalToken, lang);
+    } catch (err) {
+      process.stderr.write(
+        `${getMessage('serve.token.persist_failed', lang, {
+          file: 'api-token',
+          error: err instanceof Error ? err.message : String(err),
+        })}\n`,
+      );
+    }
+    process.stderr.write(
+      `${getMessage('serve.token.auto_minted', lang, {
+        fingerprint: tokenFingerprint(finalToken),
+        path: apiTokenPath ?? join(projectRoot, RUNTIME_DIR, 'api-token'),
+      })}\n`,
+    );
   }
 
   // Inform at startup about auth status (only reached on a remote bind with no token)
@@ -1960,7 +2104,25 @@ export function createHttpServer(
       terminalToken = randomUUID();
       // A4 (Sprint 269): label this clearly as the TERMINAL token — it was
       // previously logged as "API token", sending users to /api/* 403s.
-      process.stderr.write(`[deckent:info] Terminal session token (embedded web terminal only — NOT the /api/* API token): ${terminalToken}\n`);
+      // SEC-03: fingerprint + runtime file path, never the raw value (see the
+      // API-token branches above for the shared rationale).
+      let terminalTokenPath: string | undefined;
+      try {
+        terminalTokenPath = writeRuntimeTokenFile(projectRoot, 'terminal-token', terminalToken, lang);
+      } catch (err) {
+        process.stderr.write(
+          `${getMessage('serve.token.persist_failed', lang, {
+            file: 'terminal-token',
+            error: err instanceof Error ? err.message : String(err),
+          })}\n`,
+        );
+      }
+      process.stderr.write(
+        `${getMessage('serve.token.terminal_minted', lang, {
+          fingerprint: tokenFingerprint(terminalToken),
+          path: terminalTokenPath ?? join(projectRoot, RUNTIME_DIR, 'terminal-token'),
+        })}\n`,
+      );
       terminalMgr = new PtySessionManager(terminalBackend, {
         scrollbackBytes: terminalScrollbackBytes,
         idleTimeoutMs: terminalIdleTimeoutMs,

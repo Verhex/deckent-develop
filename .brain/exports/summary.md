@@ -51,6 +51,10 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-415 Learnings** (sprint-415): ## Sprint sprint-415 Learnings
+
+## Gains
+- 415-001 — RC5A — cross-platform packed-install matrix: üç-OS gerçek-kurulu...
 - **Sprint sprint-414 Learnings** (sprint-414): ## Sprint sprint-414 Learnings
 - RC4A — release.yml bütünlük-zinciri: tag-eşitliği + required-CI attestation + SHA-pi...
 - **Sprint sprint-413 Learnings** (sprint-413): ## Sprint sprint-413 Learnings
@@ -77,8 +81,6 @@
 
 ## Gains
 - 406-001 — BUILTINS-DRIFT-GATE — 502 dilim-1: drift-envanteri + mekanik dri...
-- **Sprint sprint-405 Learnings** (sprint-405): ## Sprint sprint-405 Learnings
-- PLUGIN-AUTH — born-612 (P1): plugin özgünlük + path-containment: GO_WITH_TECH_DEBT —...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -147,4 +149,4 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 1250 | Generated: 2026-07-11_
+_Total entries: 1253 | Generated: 2026-07-11_
