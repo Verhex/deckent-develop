@@ -249,7 +249,7 @@ jobs:
         # always() — eşik ihlali durumunda bile rapor artefakt olarak yüklensin
         # ki contributor coverage farkını görebilsin.
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage/
