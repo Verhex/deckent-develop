@@ -100,7 +100,7 @@ When upgrading, document compatibility:
 | Runtime / Framework | x.x | y.y | Yes / Partial / No | Notes |
 | Core libraries | x.x | y.y | Yes / Partial / No | Notes |
 
-*Example (Node.js project): Node 18→20, TypeScript 5.3→5.5, React 18→19*
+*Example (Node.js project): Node 22→24, TypeScript 5.3→5.5, React 18→19*
 
 ### Compatibility Checks
 - Use the package manager's dependency tree tool (e.g. `npm ls`, `pip show`, `go mod graph`, `cargo tree`) to identify all affected transitive dependencies

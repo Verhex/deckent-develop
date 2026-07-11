@@ -1,62 +1,77 @@
-# DIRECTIVES — SPRINT-410: PUBLISH-CİLASI (494 dash-perf · 501 EPIPE · 505 doctor-ölü-ikiz)
+# DIRECTIVES — SPRINT-411: SOL-ANALİZ TURU (gpt-5.6-sol × ultra-effort — 634/635 · 643 · beta-blocker)
 
 ## Goal
-Yayın-öncesi kalite-cilası: dashboard bundle/istek-sağlığı + CLI boru-zarafeti + ölü-ikiz temizliği.
+Alperen-direktifi: gpt-5.6-sol ile derin çapraz-analiz (XVER). Üç tasarım/denetim raporu — hepsi
+sonraki kararların ve inşanın DOĞRUDAN girdisi. Kod YAZILMAZ; yalnız analiz-raporu (docs/analysis/).
 
 ## 🔒 BAĞLAYICI (her task)
-- Yalnız kendi Files/Scope'una yaz · git stash/reset YASAK · **build YASAK (npm run build / build:all dahil)** · notes TEK STRING · Self DÜRÜST.
-- REPRODUCE-first: önce mevcut davranışı kanıtlayan RED/ölçüm, sonra fix; kanıtı notes'a yaz.
-- Değişen modülü import eden TÜM testleri koş (dashboard için `npm run test:dashboard`).
+- Yalnız kendi Files'ına yaz (docs/analysis/*.md) · kod-dosyası DEĞİŞTİRME · git stash/reset YASAK · build YASAK · notes TEK STRING · Self DÜRÜST.
+- KANIT-DİSİPLİNİ: her iddia dosya:satır referanslı; okuyup doğrulamadığın şeyi İDDİA ETME; belirsizse "doğrulanamadı" de.
+- Türkçe yaz (kod/terim EN). Rapor yapısı: Özet → Kanıt-tabanlı analiz → Seçenekler (+trade-off) → Net Öneri → Uygulama-planı (adım+dosya) → Riskler.
 
-## Task 1: DASH-PERF — MASTER-PLAN 494: React.lazy route-splitting + istek-dedup
-- Model: sonnet | Agent: frontend-designer
-- Files: src/dashboard/src/App.tsx, src/dashboard/src/lib/use-live-data.ts, tests/dashboard/dash-perf-494.test.tsx
-- Scope: src/dashboard/, tests/dashboard/
+## Task 1: SCHEDULER-UNIFY — born-634/635: planDispatch reducer'ını canlı-driver yapma tasarımı
+- Model: gpt-5.6-sol | Provider: codex | Effort: high
+- Files: docs/analysis/scheduler-unify-design-2026-07-11.md
+- Scope: docs/analysis/
 - Dependencies: none
 ### Description
-Kanıtlı iki sorun (user-truth-audit W3): (1) App.tsx tüm route-bileşenlerini EAGER import ediyor
-(~satır 6-26) → bundle şişkin (~%30-40 fazla); FIX: route-bileşenlerini `React.lazy(() => import(...))`
-+ tek `<Suspense fallback>` (mevcut yükleme-göstergesi bileşeni varsa onu kullan; yoksa sade,
-lucide-ikonlu — EMOJI YASAK) ile böl. (2) use-live-data.ts aynı endpoint'e eşzamanlı çoklu-istek
-atabiliyor (polling-fırtınası); FIX: in-flight istek-dedup (aynı URL için süren promise paylaşılır)
-+ unmount'ta iptal (AbortController) — polling-aralığı/veri-şekli DEĞİŞMEZ. Testler: lazy-split'in
-varlık-pin'i (App source'unda React.lazy + eager-import'ların yokluğu) + dedup unit (fake-fetch:
-eşzamanlı 3 çağrı → 1 fetch). Dashboard test-config'i AYRI: `npm run test:dashboard`
-(vitest.dashboard.config.ts) — testini oraya uygun yaz ve o komutla koş.
+BAĞLAM: born-610 tek-truth SÖZLÜĞÜNÜ birleştirdi (src/orchestra/scheduler-truth.ts) ama dispatch-YÜRÜTMESİ
+hâlâ ~6 imperatif closure'da dağınık: dispatchTick / processQueue / maybeRespawn / dispatchReadyTasks /
+forceRescanIfIdle / cascadeSkipDeadBlocked (src/orchestra/result-collector.ts + sprint-spawner.ts).
+`planDispatch` (result-collector.ts:350) pinned-MODEL ama 0-prod-çağıranlı (dosyanın :297 yorumunu oku —
+port edilmesi gereken checkpoint'ler orada). GÖREV: bu birleşimin (ADR-064-W Codex-adım-3) TAM tasarımı:
+(1) 6 closure'ın her birinin bugünkü sorumluluk/tetiklenme/yan-etki haritası (dosya:satır); (2) planDispatch
+modelinin bugünkü sözleşmesi ve closure'larla örtüşme/boşluk matrisi; (3) birleşim SEÇENEKLERİ (büyük-bang
+reducer / kademeli-strangler / event-log+replay) trade-off'larıyla; (4) NET öneri + adım-adım migration-planı
+(her adım tek-sprint'lik, geriye-dönüş noktalı, composition-pin test-stratejili); (5) born-635 kalanlarının
+(checkpoint-restore MRR-semantiği [610 Alperen-kararı: MRR=terminal-non-satisfying — restore-yolu buna
+nasıl uyar?] + FIFO-modu dep-check deliği) bu tasarıma nasıl oturduğu; (6) 610'un cascadeSkipped/fix-gate
+muafiyetlerinin ve 476 fix-task-mirasının reducer'da korunma garantisi. Sınıf-riski: scheduler=sprint'lerin
+kalbi — yanlış birleşim tüm dogfood'u durdurur; tasarım muhafazakâr ve kanıt-yoğun olmalı.
 ### goNogo
-- goCriteria: RED-önce (eager-import listesi + çoklu-fetch fixture-kanıtı); lazy+Suspense canlı; dedup+abort testli; `npm run test:dashboard` yeşil; davranış/veri-şekli değişmedi (pin).
-- nogo: route davranışı/görseli değişirse NO_GO; emoji girerse NO_GO.
+- goCriteria: rapor var; 6-closure haritası dosya:satır'lı ve TAM; örtüşme-matrisi; ≥3 seçenek trade-off'lu; net-öneri + tek-sprint'lik adımlarla migration-planı; 610/476-koruma garantileri açık.
+- nogo: kod değiştirilirse NO_GO; kanıtsız iddia (satır-refsiz mimari-beyan) yoğunsa NO_GO.
 
-## Task 2: CLI-EPIPE — MASTER-PLAN 501: borulu-kullanımda zarif çıkış
-- Model: sonnet
-- Files: src/cli/entry.ts, tests/cli/epipe-graceful.test.ts
-- Scope: src/cli/, tests/cli/
+## Task 2: TERM-FLOW-UNIFY — born-643: golden-flow vs fiili-native-tool-akışı birleşim tasarımı (Alperen-kararının girdisi)
+- Model: gpt-5.6-sol | Provider: codex | Effort: high
+- Files: docs/analysis/term-flow-unify-design-2026-07-11.md
+- Scope: docs/analysis/
 - Dependencies: none
 ### Description
-Crashes-analizi (2026-07-07): kayıtların ~%80'i `write EPIPE` — `deckent status | head` gibi her
-boru-kesiminde crash-log üretiliyor (publish-cilası: ilk-izlenim). FIX: process-level stdout/stderr
-error-handler — hata `EPIPE` ise sessiz `process.exit(0)` (POSIX boru-geleneneği); DİĞER stream-hataları
-mevcut davranışta kalır (yutma YOK — sınıf-ayrımı). Kurulum entry.ts'in erken-safhasında, bir kez;
-crash-logger'ın EPIPE'ı artık kaydetmediği de pin'lenir. RED-önce: EPIPE-hatasının bugün handler'sız
-fırladığının unit-kanıtı (stdout.emit('error', epipeErr) fixture). Cross-platform not: Windows'ta
-eşdeğer kod `EOF`/`EPIPE` — ikisini de kapsa (Yasa #2).
+BAĞLAM (gap-rapor `docs/MASTER-PLAN.md` satır-541 + kaynak): hedef-deneyim "kullanıcı REPL'de NL yazar →
+DIRECTIVES üretilir → plan-preview → onay → detached-run → canlı-izleme → sonuç yeni-turn". BUGÜN İKİ AYRI
+DÜNYA VAR: (A) tasarlanmış-ama-orphan: golden-flow (src/orchestra/golden-flow.ts, yalnız `deckent do`
+CLI'dan; NL-intent placeholder-scaffold; plan-preview REPL'de render edilmiyor; TERM-MODE risk-gate
+checkActionAllowed 0-çağıran; startSprint'i senkron stdio:inherit) ↔ (B) fiilen-çalışan: native-agent
+tool-bridge (LLM kendisi deckent_set_directives→plan→start[detached]→status tool'larını çağırıyor; onay
+generic confirm-modal; 642 bg-turns artık sonucu geri getiriyor). GÖREV: iki dünyanın birleşim tasarımı:
+(1) her iki akışın uçtan-uca adım-haritası (dosya:satır) + güçlü/zayıf yanları; (2) SEÇENEKLER: B-resmileşir
+(golden-flow parçaları B'ye organ-nakli: plan-preview kartı, risk-gate, DIRECTIVES-builder'ı tool'un içine)
+/ A-REPL'e-bağlanır / hibrit; (3) her seçenekte 511 kabul-ölçütünün ("1 gerçek born, CLI-komutu ELLE
+yazmadan uçtan-uca") nasıl sağlandığı; (4) NET öneri + uygulama-planı (sprint-dilimli) + hangi parçalar
+ölür/organ-nakli olur listesi; (5) DESK-2 blueprint'iyle (`.analysis/desk2-blueprint-2026-07-10.md` —
+oku) tutarlılık kontrolü.
 ### goNogo
-- goCriteria: RED-kanıt; EPIPE/EOF → exit-0 sessiz (testli); diğer stream-hataları davranış-koruma (pin); crash-log EPIPE-kaydı düşmüyor; entry importer testleri yeşil.
-- nogo: tüm stream-hataları yutulursa NO_GO.
+- goCriteria: iki-akış haritası dosya:satır'lı; ≥3 seçenek 511-ölçütü karşılaması açık; net-öneri + dilimli-plan + ölü/nakil listesi; DESK-2 tutarlılık bölümü.
+- nogo: kod değişirse NO_GO; tek-seçenek dayatması (trade-off'suz) NO_GO.
 
-## Task 3: DOCTOR-DEDUP — MASTER-PLAN 505: runPreFlightHealthCheck ölü-ikizi tekleştir
-- Model: sonnet | Agent: bug-fixer
-- Files: src/cli/commands/doctor.ts, src/cli/commands/doctor-checks.ts, tests/cli/doctor-dedup-505.test.ts
-- Scope: src/cli/, tests/cli/
+## Task 3: BETA-BLOCKER-SWEEP — v1.0.0-beta öncesi bütünsel risk-taraması (çapraz-göz)
+- Model: gpt-5.6-sol | Provider: codex | Effort: high
+- Files: docs/analysis/beta-blocker-sweep-2026-07-11.md
+- Scope: docs/analysis/
 - Dependencies: none
 ### Description
-W7-audit: `doctor.ts` ve `doctor-checks.ts` birbirinden bağımsız İKİ özdeş `runPreFlightHealthCheck()`
-tanımlıyor — canlı yol doctor.ts (`deckent doctor --pre-flight`); doctor-checks.ts kopyası yalnız kendi
-testince referanslı (ölü-ikiz; drift-mayını). FIX: TEK tanım kalsın — doctor-checks.ts'teki implementasyonu
-doctor.ts'ten re-export'a çevir ya da tersine (hangisi daha az churn — mevcut import-yönlerine bak;
-D-004 katman-kurallarına uy); ölü-ikizin KENDİ testi canlı-tek-tanımı test eder hale gelir (silme değil
-yönlendirme — test-kaybı yok). İki tanımın bugün ÖZDEŞ olduğunu diff'le doğrula; değillerse farkı notes'a
-yaz ve canlı-yolun davranışını koru. RED-önce: iki bağımsız tanımın varlık-kanıtı (kaynak-metin).
+BAĞLAM: yayın-zinciri hazırlanıyor (release.yml tek-otorite; validate:publish; builtins-merge sürüyor;
+🔒 YAYIN-ŞARTI: desktop-app Alperen-onayı). GÖREV (bağımsız-göz, Anthropic-hattının kör-noktalarını ara):
+npm-paketine GİDEN yüzeyin beta-blocker taraması: (1) package.json files/bin/exports/engines gerçeği —
+paketlenen-set ile çalışması-gereken-set tutarlı mı (dist/, builtins, assets; `npm pack --dry-run`
+zihniyetiyle dosya-listesi analizi); (2) taze-kurulum yolu: `deckent init` bir YABANCI projede ilk 10
+dakikada neye çarpar (global-config yokluğu, docker-yokluğu fail-honest mı, auth-yokluğu mesajları,
+Windows-yolları); (3) validate:publish kapsam-boşlukları; (4) güvenlik-yüzeyi hızlı-tarama (secrets
+default'ları, telemetry, dış-çağrılar); (5) versiyonlama/changelog tutarlılığı. Her bulgu: kanıt
+(dosya:satır) + şiddet (BLOCKER/MAJOR/MINOR) + tek-cümle fix-önerisi. BLOCKER'ları ayrı özet-tabloda topla.
+Bilinen-açıkları (desktop-gate, 502-merge-sürüyor) tekrar-keşif diye yazma — docs/MASTER-PLAN.md 530-542
+satırlarını okuyup düş.
 ### goNogo
-- goCriteria: tek-tanım (grep: `function runPreFlightHealthCheck` repo'da 1); re-export yönü D-004-temiz; her iki eski test-dosyası da yeşil (kayıpsız); doctor canlı-davranış pin'i.
-- nogo: davranış farkı sessizce yutulursa NO_GO.
+- goCriteria: BLOCKER-özet-tablosu + kanıtlı bulgular (dosya:satır) + şiddet+fix-önerisi; bilinen-açıklar mükerrer-listelenmemiş; paket-yüzeyi analizi somut (files/bin/exports adları).
+- nogo: kod değişirse NO_GO; genel-geçer tavsiye listesi (kanıtsız) NO_GO.

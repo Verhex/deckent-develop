@@ -402,13 +402,12 @@ describe('live two-tree scan (real repo, read-only)', () => {
     expect(report.skills.excluded).toContain('docs');
   });
 
-  it('RED-önce: catches the known-real secure-coding manifest drift (missing `entrypoint` in builtins)', () => {
-    // If this ever fails because someone fixed src/core/builtins/skills/secure-coding/manifest.json
-    // to include `entrypoint`, that's good news — update/remove this assertion accordingly.
+  it('secure-coding manifest drift is CLOSED — the two trees agree (Alperen karar-turu merge, 2026-07-11)', () => {
+    // Bu test eskiden canlı-drift'i (builtins'te eksik `entrypoint`) RED-önce kanıtı olarak
+    // pinliyordu; 502 karar-turu merge'i o gap'i kapattı. Test artık TERSİNİ pinler:
+    // secure-coding iki ağaçta manifest-eşit kalmalı (yeniden-drift = burada kırmızı).
     const report = scanAll(CATEGORIES);
     const secureCodingDiff = report.skills.commonDiffs.find((d) => d.item === 'secure-coding' && d.file === 'manifest');
-    expect(secureCodingDiff, 'expected a live manifest drift for secure-coding').toBeDefined();
-    expect(secureCodingDiff?.kind).toBe('json');
-    expect((secureCodingDiff?.detail as { diffKeys?: string[] }).diffKeys).toContain('entrypoint');
+    expect(secureCodingDiff, 'secure-coding manifest iki-ağaçta yeniden drift etti!').toBeUndefined();
   });
 });

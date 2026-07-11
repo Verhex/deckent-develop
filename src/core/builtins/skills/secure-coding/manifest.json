@@ -37,6 +37,14 @@
     ]
   },
   "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": "",
+    "successCount": 0
+  },
+  "entrypoint": "SKILL.md",
   "stackDetection": {
     "files": [],
     "dependencies": [],

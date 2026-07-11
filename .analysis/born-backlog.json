@@ -2816,5 +2816,22 @@
     "spec": "start pre-flight'i claude-CLI'yi 'not found' diye reddetti; which claude=OK, --version=2.1.207; ikinci deneme gecti. Probe muhtemelen spawn-timeout/ENOENT ayrimi yapmiyor (356-009 timeout->unknown sinifi 'present' icin uygulanmamis olabilir). FIX: probe'da ENOENT (gercek yok) vs timeout/transient (unknown + tek-retry) ayrimi; yanlis-negatif sprint-launch'i dusurmesin.",
     "verify": "probe-fixture: ENOENT->not-found; timeout->retry->unknown; flake-senaryosu testli",
     "wire_on": "sprint"
+  },
+  {
+    "born_id": "646",
+    "severity": "P2",
+    "subsystem": "core/catalog",
+    "title": "OBSERVABILITY-SKILL kuratorlu manifest'i yok (yalniz SKILL.md; fallback generic/inert) — kuratorlu triggers/activation yazilsin",
+    "sources": [
+      "builtins-drift karar-turu (Alperen onay, 2026-07-11)"
+    ],
+    "primary_files": [
+      "src/core/builtins/skills/observability/manifest.json",
+      ".deckent/skills/observability/manifest.json"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Iki agaca ayni kuratorlu manifest (observability domain-triggers + activation.rules + priority); api-design/i18n-quality desenini izle.",
+    "verify": "iki-agac esit + lint-manifests temiz + routing skill-secimi testi",
+    "wire_on": "sprint"
   }
 ]

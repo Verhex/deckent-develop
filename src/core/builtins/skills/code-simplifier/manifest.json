@@ -12,14 +12,6 @@
           "intent.primary": "refactor"
         },
         "score": 8
-      },
-      {
-        "when": {
-          "domains": {
-            "$contains": "simplification"
-          }
-        },
-        "score": 10
       }
     ],
     "exclude": [],

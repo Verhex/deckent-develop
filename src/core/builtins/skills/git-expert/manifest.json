@@ -9,11 +9,9 @@
     "rules": [
       {
         "when": {
-          "domains": {
-            "$contains": "git"
-          }
+          "intent.primary": "bugfix"
         },
-        "score": 10
+        "score": 6
       }
     ],
     "exclude": [],

@@ -7,17 +7,18 @@
     "rules": [
       {
         "when": {
-          "domains": {
-            "$contains": "terminal-ui"
-          }
-        },
-        "score": 8
-      },
-      {
-        "when": {
-          "domains": {
-            "$contains": "cli"
-          }
+          "$or": [
+            {
+              "domains": {
+                "$contains": "terminal-ui"
+              }
+            },
+            {
+              "domains": {
+                "$contains": "cli"
+              }
+            }
+          ]
         },
         "score": 6
       }

@@ -53,7 +53,7 @@ After each task completes:
 
 After all tasks are evaluated:
 
-- [ ] Run the test scope the task's verify block names (targeted files by default; a full-suite run only when the task explicitly requires it — in-container full-suite runs OOM/timeout) <!-- ci-context -->
+- [ ] Run the test scope the task's verify block names (targeted files by default; a full-suite run only when the task explicitly requires it — in-container full-suite runs OOM/timeout)
 - [ ] Compare against baseline: test count delta, coverage delta, regressions
 - [ ] Generate CI report JSON at `.brain/ci-report-sprint-{id}.json`
 - [ ] Add "## CI Health" section to RETRO.md

@@ -10,6 +10,12 @@
           "intent.primary": "refactor"
         },
         "score": 10
+      },
+      {
+        "when": {
+          "intent.primary": "implementation"
+        },
+        "score": 7
       }
     ],
     "exclude": [],

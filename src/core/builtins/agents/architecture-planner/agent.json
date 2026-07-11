@@ -19,9 +19,7 @@
       },
       {
         "when": {
-          "domains": {
-            "$contains": "architecture"
-          }
+          "intent.primary": "architecture"
         },
         "score": 9
       }
