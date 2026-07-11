@@ -1,6 +1,27 @@
 # Changelog
 
-> **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
+> **Auto-generated per-sprint log — do not hand-edit.** Every section below is appended
+> automatically by the sprint-finalizer's changelog updater
+> (`src/orchestra/doc-updaters/changelog.ts`) at the end of each sprint, one
+> `## [VERSION-sprintNNN]` entry per sprint with the task-level Added/Changed/Fixed breakdown. This
+> is a verbose machine-written archive, **not** release notes. The **canonical, hand-curated
+> release notes** (one exact-anchored section per shipped version, read by
+> `.github/workflows/release.yml` at publish time) live at the project root:
+> [CHANGELOG.md](../CHANGELOG.md).
+
+## [1.0.0-beta.1-sprint414] - 2026-07-11
+
+### Added
+
+- RC4B — changelog-kanonikliği + release-prepare (REL-03/04): tek-kaynak notes + bump-version retire
+- SCHED4 — full reducer SHADOW-only + differential journal (strangler dilim-4)
+
+### Changed
+
+- RC4A — release.yml bütünlük-zinciri: tag-eşitliği + required-CI attestation + SHA-pin + trusted-publishing (REL-01/02 + SEC-06) (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 1 tech debt, 0 no-go_
 
 ## [1.0.0-beta.1-sprint413] - 2026-07-11
 

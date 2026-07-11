@@ -1,6 +1,14 @@
 # Changelog
 
-See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the full changelog.
+> **Canonical release notes.** This file is the single source of truth for per-version release
+> notes — one exact-anchored `## [X.Y.Z]` section per shipped version, hand-curated (or scaffolded
+> by `scripts/release-prepare.mjs` and filled in before tagging). `.github/workflows/release.yml`'s
+> changelog extractor reads sections from *this* file only, matched by an exact-anchored heading
+> (singular, non-empty — see `docs/release/release-checklist.md` step 6). For the
+> **automatically-generated, verbose per-sprint log** (every sprint's task-level
+> Added/Changed/Fixed, appended by the sprint-finalizer), see
+> [docs/CHANGELOG.md](docs/CHANGELOG.md) — that file is a machine-written archive, not release
+> notes.
 
 ## [1.0.0-beta.1] — 2026-04-22 (current)
 
@@ -17,7 +25,7 @@ v1.0.0-beta.1 is the current release. All sprint work since Beta GA (Sprint 150)
 - **Nervous System** — ADR-040 proactive meta-orchestrator: observer → detector-registry → decision-engine → proposer → dispatcher → executor. 12 detectors. Subscribe/accept/reject API via `deckent_nervous_*` MCP tools.
 - **ModelRegistry** — 13 models / 3 providers / 4 tiers (premium_plus / premium / standard / economy). Provider-agnostic `brain_tier`/`worker_tier` config. `deckent_models` MCP tool (live data).
 - **Docker Backend (default)** — Container isolation, configurable timeout, atomic heartbeat write (SIGTERM + fsync grace period), 10 e2e tests. `spawn_backend: docker` is now the default.
-- **Wave-Based Dependency Pipeline** — Kahn's topological algorithm, `dependency_pipeline_enabled: true` default (ADR-045/064). MRR-deadlock fix: `DONE ∪ MANUAL_REVIEW_REQUIRED` satisfies dependency gate.
+- **Wave-Based Dependency Pipeline** — Kahn's topological algorithm, `dependency_pipeline_enabled: true` default (ADR-045/064). Sprint-280's original MRR-deadlock fix (`DONE ∪ MANUAL_REVIEW_REQUIRED` satisfies the dependency gate) was **superseded born-610** (2026-07-10, `src/orchestra/scheduler-truth.ts`): `MANUAL_REVIEW_REQUIRED` is now single-truth **terminal-non-satisfying** — unverified partial work never satisfies a dependent, and is cascade-skipped exactly like `NO_GO`, so the sprint still completes and a human reviews the MRR work afterwards.
 - **Enterprise Foundation** — RBAC, multi-tenant isolation, audit-query, scheduled flows, OIDC exchange (`POST /api/auth/oidc/exchange`), embedded web terminal (PTY/WS, ADR-062, ADR-068/069/071).
 - **OpenAI-Compatible HTTP Adapter** — Ollama + HTTP provider support (ADR-077). 4 providers: claude / codex / gemini / ollama.
 - **Training Data Pipeline** — Live per-turn trace recorder (JSONL), CC-transcript extractor (aligned + general OpenAI-messages corpora, SP-2).

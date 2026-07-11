@@ -52,6 +52,10 @@ on:
 permissions:
   contents: write
   id-token: write
+  # actions: read — required by the "Verify CI attestation" step's `gh run list` call
+  # (REL-02). Default GITHUB_TOKEN scopes collapse to `none` for any permission not
+  # explicitly listed once this block exists, so this must be named, not inherited.
+  actions: read
 
 jobs:
   release:
@@ -59,16 +63,72 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24.x'
           cache: npm
           registry-url: 'https://registry.npmjs.org'
+
+      # REL-01 (RC4A): a tag alone used to be sufficient to publish — no check that the
+      # tag, package.json, and package-lock.json all agree on the version being shipped,
+      # and no check that this exact version isn't already occupying the registry (which
+      # would otherwise surface only as a confusing registry-side 403/409 mid-publish,
+      # after build/test time was already spent). Both checks run before any expensive
+      # step (install/build/test) so a mismatch fails fast.
+      - name: Verify release integrity (tag/package/lock triple-equality + registry occupancy)
+        run: |
+          set -euo pipefail
+
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          LOCK_VERSION=$(node -p "require('./package-lock.json').version")
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ] || [ "$TAG_VERSION" != "$LOCK_VERSION" ]; then
+            echo "::error::REL-01 version-triple-mismatch — tag=v${TAG_VERSION} package.json=${PKG_VERSION} package-lock.json=${LOCK_VERSION}. All three MUST match exactly before a release tag may publish."
+            exit 1
+          fi
+          echo "REL-01 version triple-equality verified: ${TAG_VERSION}"
+
+          # Registry-occupancy preflight — immutable-registry double-publish protection.
+          # A network/registry error here must not silently be treated as "safe to
+          # publish" (that would defeat the point), but it also must not falsely block a
+          # legitimate release on a registry hiccup — so an inconclusive check warns
+          # honestly and lets the actual publish step below be the final authority.
+          set +e
+          EXISTING_VERSION=$(npm view "deckent@${TAG_VERSION}" version 2>/tmp/npm-view-stderr.log)
+          NPM_VIEW_STATUS=$?
+          set -e
+          if [ "$NPM_VIEW_STATUS" -eq 0 ] && [ -n "$EXISTING_VERSION" ]; then
+            echo "::error::REL-01 registry-occupancy violation — deckent@${TAG_VERSION} already exists on the npm registry (immutable-registry double-publish protection). Bump the version and re-tag."
+            exit 1
+          fi
+          if [ "$NPM_VIEW_STATUS" -ne 0 ] && ! grep -qiE 'E404|not found' /tmp/npm-view-stderr.log; then
+            echo "::warning::registry-occupancy preflight could not be verified (network/registry error) — continuing honestly without blocking: $(tail -c 500 /tmp/npm-view-stderr.log)"
+          else
+            echo "REL-01 registry-occupancy preflight clear: deckent@${TAG_VERSION} not yet published"
+          fi
+
+      # REL-02 (RC4A): a tag can be pushed to ANY commit — "main is already gated by CI"
+      # is not an executable guarantee for the commit a tag actually points at. This
+      # step demands positive proof: at least one successful run of the required `CI`
+      # workflow for this exact commit SHA, via the GitHub CLI (preinstalled on
+      # GitHub-hosted runners; GITHUB_TOKEN is sufficient given the `actions: read`
+      # permission above — no extra PAT needed).
+      - name: Verify CI attestation for this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          SUCCESS_COUNT=$(gh run list --repo "${GITHUB_REPOSITORY}" --commit "${GITHUB_SHA}" --workflow CI --json conclusion --jq '[.[] | select(.conclusion == "success")] | length')
+          if [ "${SUCCESS_COUNT}" -lt 1 ]; then
+            echo "::error::REL-02 no successful CI run found for commit ${GITHUB_SHA} (required workflow: CI). A release tag MUST point at a commit that passed the full required CI suite before publish — tags can be pushed to any commit, so 'main is already gated' is not an executable guarantee. If this is unexpected, confirm the workflow token has 'actions: read' permission."
+            exit 1
+          fi
+          echo "REL-02 CI attestation verified: ${SUCCESS_COUNT} successful CI run(s) for ${GITHUB_SHA}"
 
       - name: Install dependencies
         run: npm ci
@@ -97,29 +157,79 @@ jobs:
           npx vitest run tests/core/
         timeout-minutes: 5
 
+      # Reads the ROOT CHANGELOG.md (not docs/CHANGELOG.md — that mirror is a generated
+      # long-form archive; the root file is the canonical per-version release-notes
+      # source, see docs/release/release-checklist.md step 6). Exact-anchored: the old
+      # `^## \[?v?${VERSION}\]?|^## ${VERSION}` awk pattern had no end-boundary, so it
+      # would prefix-match e.g. VERSION=1.0.0-beta.1 against a "## v1.0.0-beta.1-sprintNNN"
+      # heading (this repo already has that exact naming convention — see the
+      # "v0.3.0-beta.1-sprint84" heading in CHANGELOG.md) and silently splice the wrong
+      # section into the GitHub Release. The lookahead below requires the version token to
+      # end at `]`, whitespace, or end-of-line. An empty section or duplicate heading now
+      # FAILS the step instead of silently falling back to a placeholder "Release vX.Y.Z"
+      # body — a real release must never ship with empty/wrong notes silently.
       - name: Extract changelog for this version
         id: changelog
         run: |
+          set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
-          if [ -f docs/CHANGELOG.md ]; then
-            NOTES=$(awk "/^## \[?v?${VERSION}\]?|^## ${VERSION}/{found=1; next} found && /^## /{exit} found{print}" docs/CHANGELOG.md | head -100)
-          fi
-          if [ -z "$NOTES" ]; then
-            NOTES="Release ${GITHUB_REF_NAME}"
-          fi
-          echo "$NOTES" > /tmp/release-notes.txt
+          cat > /tmp/extract-changelog.mjs <<'NODEEOF'
+          import { readFileSync, writeFileSync } from 'node:fs';
+
+          const version = process.argv[2];
+          const changelog = readFileSync('CHANGELOG.md', 'utf8');
+          const escaped = version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const headingRe = new RegExp(`^## \\[?v?${escaped}\\]?(?=[\\]\\s]|$)`);
+          const lines = changelog.split('\n');
+          const matchedLines = [];
+          for (let i = 0; i < lines.length; i++) {
+            if (headingRe.test(lines[i])) matchedLines.push(i);
+          }
+
+          if (matchedLines.length === 0) {
+            console.error(`release-notes FAIL: no CHANGELOG.md heading exact-matches version ${version}`);
+            process.exit(1);
+          }
+          if (matchedLines.length > 1) {
+            console.error(`release-notes FAIL: ${matchedLines.length} duplicate CHANGELOG.md headings exact-match version ${version} (0-indexed lines ${matchedLines.join(', ')})`);
+            process.exit(1);
+          }
+
+          const start = matchedLines[0] + 1;
+          let end = lines.length;
+          for (let i = start; i < lines.length; i++) {
+            if (/^## /.test(lines[i])) { end = i; break; }
+          }
+          const body = lines.slice(start, end).join('\n').trim();
+          if (!body) {
+            console.error(`release-notes FAIL: CHANGELOG.md section for version ${version} is empty — silent-empty release notes are forbidden`);
+            process.exit(1);
+          }
+          writeFileSync('/tmp/release-notes.txt', body + '\n');
+          console.log(`release-notes extracted for ${version} (${body.split('\n').length} lines)`);
+          NODEEOF
+          node /tmp/extract-changelog.mjs "$VERSION"
           echo "notes_file=/tmp/release-notes.txt" >> "$GITHUB_OUTPUT"
 
+      # SEC-06 (RC4A): the long-lived npm auth secret this step used to read is gone.
+      # Publishing now relies entirely on npm trusted publishing (OIDC): the `id-token:
+      # write` permission above lets npm's CLI (Node 24.x bundles npm >=11.5.1, the
+      # trusted-publishing floor) exchange a short-lived GitHub Actions OIDC token for
+      # registry credentials at publish time — no secret stored in this repo at all.
+      # REQUIRED ONE-TIME MANUAL STEP (not automatable from this workflow): Alperen must
+      # register this GitHub repo + this workflow file as a trusted publisher for the
+      # `deckent` package on https://www.npmjs.com/package/deckent/access (Settings →
+      # Trusted Publisher). Until that registry-side setting exists, this step fails
+      # loudly with `npm error code ENEEDAUTH` / "Unable to authenticate" — it does NOT
+      # silently skip or no-op.
       # --ignore-scripts: suppress prepublishOnly (see header note 1) so the build:all
       # output from above is what actually gets published, not a hook-triggered rebuild.
       - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --provenance --access public --ignore-scripts
 
       # Moved after publish — see header note 3.
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           name: ${{ github.ref_name }}
           body_path: ${{ steps.changelog.outputs.notes_file }}
@@ -128,7 +238,7 @@ jobs:
           generate_release_notes: true
 
       - name: Upload dist artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: dist-${{ github.ref_name }}
           path: dist/

@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-414 Learnings
+- Sprint sprint-414 Learnings: ## Sprint sprint-414 Learnings
+- RC4A — release.yml bütünlük-zinciri: tag-eşitliği + required-CI attestation + SHA-pin + trusted-publishing (REL-01/02 + SEC-06): GO_WITH_TECH_DEBT — Implemented all 6 GÖREV items in release.yml/publish.yml (my sole write scope), RED-first-updated the 2 in-scope test fi
+
+## Gains
+- 414-002 — RC4B — changelog-kanonikliği + release-prepare (REL-03/04): tek-kaynak notes + bump-version retire — 8/8 DoD items ticked with evidence.
+- 414-003 — SCHED4 — full reducer SHADOW-only + differential journal (strangler dilim-4) — SCHED4 (sprint-413 dilim-4, docs/analysis/scheduler-unify-design-2026-07-11.md) implemented as a ...
+
 ## Sprint sprint-413 Learnings
 - Sprint sprint-413 Learnings: ## Sprint sprint-413 Learnings
 - RC2C — born-652: init gerçek non-interactive akış + EOF-dürüstlüğü (RC-2 kapanış-kilidi): GO_WITH_TECH_DEBT — Root cause (confirmed via async-spawn repro BEFORE any fix, at /tmp with vite-node running the real unmodified prompt.ts

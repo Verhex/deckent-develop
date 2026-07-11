@@ -288,6 +288,16 @@ export interface CostGuardConfig {
   max_limit_cost_usd?: number;
 }
 
+// ─── Scheduler Shadow Config (SCHED4, docs/analysis/scheduler-unify-design-2026-07-11.md Sprint-4 dilimi) ──
+/** Full-reducer SHADOW-only observation config — execution-impact ZERO (never
+ *  drives spawn/kill). Opt-in — absent block = disabled. */
+export interface SchedulerConfig {
+  /** Run `reduceSchedulerTick()` (scheduler-reducer.ts) alongside the live
+   *  dispatch tick, purely for differential-journal comparison against the
+   *  live-observed outcome (default: false). */
+  shadow_reducer?: boolean;
+}
+
 // ─── Identity Provider Config (ADR-092 Faz-1b) ───────────────────────────
 
 /** Built-in local identity provider — roles/bindings managed directly in config. */
@@ -870,6 +880,10 @@ export interface DeckentConfig {
   /** Mid-sprint token-usage abort guard (Sprint 279 WK-cost). Default-disabled (opt-in). */
   cost_guard?: CostGuardConfig;
 
+  // ─── Scheduler (SCHED4 shadow-reducer) ───────────────────────────────
+  /** Full-reducer SHADOW-only observation config (docs/analysis/scheduler-unify-design-2026-07-11.md). Default-disabled (opt-in). */
+  scheduler?: SchedulerConfig;
+
   // ─── Gate (Sprint 325 — outcome downgrade triggers) ──────────────────
   /** Sprint outcome gate configuration (flag-gated, default-off).
    *  Absent block or max_tech_debt_ratio=0 → byte-identical behavior. */
@@ -1331,6 +1345,9 @@ export interface ResolvedConfig {
   };
   /** Mid-sprint cost guard configuration (passed through from DeckentConfig). Default-disabled. */
   cost_guard?: CostGuardConfig;
+  /** Full-reducer SHADOW-only scheduler observation config (passed through from
+   *  DeckentConfig, SCHED4). Default-disabled — execution-impact ZERO even when on. */
+  scheduler?: SchedulerConfig;
   /** Sprint outcome gate configuration (passed through from DeckentConfig). Default-disabled. */
   gate?: GateConfig;
   /** Resolved approval config (Sprint 355 CFG-APR-WIRE). Unlike the other

@@ -38,10 +38,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24.x'
           cache: npm
@@ -75,7 +75,10 @@ jobs:
         timeout-minutes: 15
 
       # NOT a real publish — this workflow never uploads to the registry (see header).
+      # `npm publish --dry-run` does not perform any authenticated registry write (empirically
+      # verified: an unauthenticated dry-run against the real npmjs.org registry exits 0 with
+      # only a benign "requires you to be logged in (dry-run)" warning), so unlike the real
+      # publish in release.yml this step never needed a credential at all — SEC-06 (RC4A)
+      # removes the long-lived npm auth secret reference that was here.
       - name: Dry run publish (validate package)
         run: npm publish --dry-run --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

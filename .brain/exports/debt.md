@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-414-001 | Tech debt from 414-001: Implemented all 6 GÖREV items in release.yml/publish.yml | normal | sprint-414 | resolved |
 | debt-413-001 | Tech debt from 413-001: Root cause (confirmed via async-spawn repro BEFORE any f | normal | sprint-413 | resolved |
 | debt-413-004 | Tech debt from 413-004: SCHED3 dilim-3 (docs/analysis/scheduler-unify-design-202 | normal | sprint-413 | resolved |
 | debt-412-001 | Tech debt from 412-001: Implemented the three-state init outcome contract (READY | normal | sprint-412 | resolved |

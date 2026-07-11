@@ -10126,3 +10126,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 413-004: SCHED3 — canonical spawn executor: tüm spawn-yolları tek kapıdan (strangler dilim-3) (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 414 — sprint-414
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-11
+**Duration:** 2169s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 2169326ms |
+
+### Tasks
+
+- 414-001: RC4A — release.yml bütünlük-zinciri: tag-eşitliği + required-CI attestation + SHA-pin + trusted-publishing (REL-01/02 + SEC-06) (GO_WITH_TECH_DEBT)
+- 414-002: RC4B — changelog-kanonikliği + release-prepare (REL-03/04): tek-kaynak notes + bump-version retire (DONE)
+- 414-003: SCHED4 — full reducer SHADOW-only + differential journal (strangler dilim-4) (DONE)
+
+---

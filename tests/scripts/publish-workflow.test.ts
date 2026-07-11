@@ -46,9 +46,10 @@ describe('.github/workflows/publish.yml', () => {
     expect(workflowContent).toContain('npm publish --provenance');
   });
 
-  it('should have NODE_AUTH_TOKEN environment variable', () => {
-    expect(workflowContent).toContain('NODE_AUTH_TOKEN');
-    expect(workflowContent).toContain('secrets.NPM_TOKEN');
+  it('uses OIDC trusted publishing — no long-lived registry token (414-001 SEC-06)', () => {
+    expect(workflowContent).not.toContain('NODE_AUTH_TOKEN');
+    expect(workflowContent).not.toContain('secrets.NPM_TOKEN');
+    expect(workflowContent).toContain('id-token: write');
   });
 
   it('should have registry-url set to npmjs.org', () => {
@@ -60,12 +61,12 @@ describe('.github/workflows/publish.yml', () => {
     expect(workflowContent).toContain('ubuntu-latest');
   });
 
-  it('should have checkout step', () => {
-    expect(workflowContent).toContain('actions/checkout@v4');
+  it('should have checkout step (SHA-pinned, 414-001 SEC-06)', () => {
+    expect(workflowContent).toMatch(/actions\/checkout@[0-9a-f]{40} # v4/);
   });
 
-  it('should have setup-node step', () => {
-    expect(workflowContent).toContain('actions/setup-node@v4');
+  it('should have setup-node step (SHA-pinned, 414-001 SEC-06)', () => {
+    expect(workflowContent).toMatch(/actions\/setup-node@[0-9a-f]{40} # v4/);
   });
 
   it('should have cache enabled for npm', () => {

@@ -929,6 +929,14 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  // ─── Scheduler shadow-reducer validation (SCHED4) ───────────────────
+  if (config.scheduler !== undefined) {
+    const sch = config.scheduler;
+    if (sch.shadow_reducer !== undefined && typeof sch.shadow_reducer !== 'boolean') {
+      errors.push('scheduler.shadow_reducer must be a boolean');
+    }
+  }
+
   // ─── Gate config validation (Sprint 325) ───────────────────────────
   if (config.gate !== undefined) {
     const g = config.gate;
@@ -1729,6 +1737,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     worker_comms: config.worker_comms,
     // Cost Guard — passed through (opt-in, absent = disabled)
     cost_guard: config.cost_guard,
+    // Scheduler shadow-reducer (SCHED4) — passed through (opt-in, absent = disabled)
+    scheduler: config.scheduler,
     // Gate — passed through (opt-in, default-off)
     gate: config.gate,
     // Approval — validated + defaulted via resolveApprovalConfig (Sprint 355 CFG-APR-WIRE)
@@ -2469,6 +2479,8 @@ export function mergeConfigs(
     worker_comms: config.worker_comms,
     // Cost Guard — passed through (opt-in, absent = disabled)
     cost_guard: config.cost_guard,
+    // Scheduler shadow-reducer (SCHED4) — passed through (opt-in, absent = disabled)
+    scheduler: config.scheduler,
     // Gate — passed through (opt-in, default-off)
     gate: config.gate,
     // Approval — validated + defaulted via resolveApprovalConfig (Sprint 355 CFG-APR-WIRE)

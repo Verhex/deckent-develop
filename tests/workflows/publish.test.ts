@@ -64,9 +64,12 @@ describe('.github/workflows/publish.yml', () => {
     expect(workflowContent).toContain('npm publish --dry-run --access public');
   });
 
-  it('should have NODE_AUTH_TOKEN environment variable', () => {
-    expect(workflowContent).toContain('NODE_AUTH_TOKEN');
-    expect(workflowContent).toContain('secrets.NPM_TOKEN');
+  it('carries zero npm-auth-secret references (SEC-06) — dry-run needs no registry auth', () => {
+    // Empirically verified (task 414-001): an unauthenticated `npm publish --dry-run
+    // --access public` against the real npmjs.org registry exits 0 with only a benign
+    // "requires you to be logged in (dry-run)" warning — no credential is needed here.
+    expect(workflowContent).not.toContain('NODE_AUTH_TOKEN');
+    expect(workflowContent).not.toContain('NPM_TOKEN');
   });
 
   it('should have registry-url set to npmjs.org', () => {
@@ -78,12 +81,12 @@ describe('.github/workflows/publish.yml', () => {
     expect(workflowContent).toContain('ubuntu-latest');
   });
 
-  it('should have checkout step', () => {
-    expect(workflowContent).toContain('actions/checkout@v4');
+  it('should have checkout step pinned to an immutable commit SHA (SEC-06)', () => {
+    expect(workflowContent).toMatch(/actions\/checkout@[0-9a-f]{40} # v4\.\d+\.\d+/);
   });
 
-  it('should have setup-node step', () => {
-    expect(workflowContent).toContain('actions/setup-node@v4');
+  it('should have setup-node step pinned to an immutable commit SHA (SEC-06)', () => {
+    expect(workflowContent).toMatch(/actions\/setup-node@[0-9a-f]{40} # v4\.\d+\.\d+/);
   });
 
   it('should have cache enabled for npm', () => {
@@ -92,12 +95,6 @@ describe('.github/workflows/publish.yml', () => {
 
   it('should have type check step', () => {
     expect(workflowContent).toContain('npm run lint');
-  });
-
-  it('has NODE_AUTH_TOKEN on the single remaining (dry-run) step', () => {
-    // born-608: gerçek publish-adımı release.yml'e taşındı — burada tek adım kaldı.
-    const nodeAuthCount = (workflowContent.match(/NODE_AUTH_TOKEN/g) || []).length;
-    expect(nodeAuthCount).toBeGreaterThanOrEqual(1);
   });
 });
 

@@ -464,13 +464,13 @@ describe('release.yml — build:all + validate:publish chain, in order', () => {
     expect(publishIdx).toBeGreaterThan(smokeIdx);
   });
 
-  it('publish step preserves --provenance --access public and NODE_AUTH_TOKEN (secret settings kept)', () => {
+  it('publish step preserves --provenance --access public via OIDC (no registry token — 414-001 SEC-06)', () => {
     const publishStep = steps.find((s) => hasRealNpmPublish(s.run));
     expect(publishStep).toBeDefined();
     expect(publishStep!.run).toContain('--provenance');
     expect(publishStep!.run).toContain('--access public');
     const env = publishStep!.env as Record<string, unknown> | undefined;
-    expect(env?.NODE_AUTH_TOKEN).toContain('secrets.NPM_TOKEN');
+    expect(env?.NODE_AUTH_TOKEN).toBeUndefined();
   });
 
   it('publish step uses --ignore-scripts (suppresses prepublishOnly re-running plain build)', () => {

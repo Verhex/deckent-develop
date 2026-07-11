@@ -36,6 +36,8 @@ import {
 import { bridgeQuestionToApproval } from './question-approval-bridge.js';
 import { isDependencySatisfying, isSchedulingTerminalFailure } from './scheduler-truth.js';
 import { computeEffectiveDependencyState } from './scheduler-state.js';
+import { captureShadowSchedulerSnapshot, finalizeShadowSchedulerTick } from './scheduler-driver.js';
+import type { SchedulerSnapshot } from './scheduler-reducer.js';
 import { ApprovalBroker } from '../core/approval-broker.js';
 import type { BrainAnswer, WorkerQuestion, TokenUsage } from '../core/task-types.js';
 
@@ -1453,7 +1455,54 @@ export async function waitForResults(
     return totalSkipped;
   };
 
+  // ─── SCHED4 (born-634/635, docs/analysis/scheduler-unify-design-2026-07-11.md
+  // Sprint-4 dilimi) — full-reducer SHADOW-only observation hook. Flag-gated
+  // (config.scheduler.shadow_reducer, default false); OFF is byte-identical to
+  // before this hook existed — captureShadowTick short-circuits to `null` and
+  // finalizeShadowTick is then a no-op, so the dispatch/cascade calls around
+  // them are completely unchanged either way. EXECUTION-ETKİSİ SIFIR: capture
+  // reads+clones only, finalize only journals — neither spawns, kills, or
+  // mutates sprint/queue/task state.
+  const shadowReducerEnabled = config?.scheduler?.shadow_reducer === true;
+  let shadowTickSequence = 0;
+  const captureShadowTick = (
+    triggerKind: 'initial' | 'watcher',
+    completedTaskIds: readonly string[],
+  ): SchedulerSnapshot | null => {
+    if (!shadowReducerEnabled || !config) return null;
+    try {
+      const currentlyExecuting = sprint.tasks.filter(t =>
+        t.status === TaskStatus.EXECUTING || t.status === TaskStatus.CLAIMED || t.status === TaskStatus.TESTING,
+      ).length;
+      const maxWorkers = resolveEffectiveWorkers(config, getSystemProfile());
+      return captureShadowSchedulerSnapshot({
+        trigger: { kind: triggerKind, sequence: ++shadowTickSequence },
+        strategy: process.env.DECKENT_LEGACY_FIFO === '1' ? 'legacy-fifo' : 'continuous',
+        nowMs: Date.now(),
+        costStop: costGuard?.shouldStopDispatch() ?? false,
+        slotBudget: Math.max(0, maxWorkers - currentlyExecuting),
+        dependencyPipelineEnabled: config.dependency_pipeline_enabled === true,
+        sprint,
+        remainingQueue,
+        assignedTaskIds,
+        collectedIds: collected,
+        completedTaskIds,
+      });
+    } catch (e) {
+      debugLog('waitForResults:shadowScheduler:capture', e);
+      return null;
+    }
+  };
+  const finalizeShadowTick = async (snapshot: SchedulerSnapshot | null): Promise<void> => {
+    if (!snapshot) return;
+    await finalizeShadowSchedulerTick(projectRoot, sprint.id, snapshot, {
+      assignedTaskIdsAfter: assignedTaskIds,
+      collectedIdsAfter: collected,
+    }).catch(e => debugLog('waitForResults:shadowScheduler:finalize', e));
+  };
+
   const initiallyCollected = await collectResults();
+  const shadowTickInitial = captureShadowTick('initial', initiallyCollected);
   // ADR-064 (TOPP B): unified dispatch tick — replaces the dual
   // `await processQueue(...); await maybeRespawn();` sequence so the
   // wave-barrier between Wave N completion and Wave N+1 spawn collapses
@@ -1465,6 +1514,7 @@ export async function waitForResults(
   // skips a runnable task.
   await dispatchReadyTasks();
   await cascadeSkipDeadBlocked();
+  await finalizeShadowTick(shadowTickInitial);
   if (collected.size === taskIds.size) return results;
 
   // IPC dual-mode: register HEARTBEAT listeners for any channels in registry
@@ -1566,6 +1616,9 @@ export async function waitForResults(
       await Promise.race([watcher.waitForChange(), ipcWakeupPromise]);
       try {
         const newlyCollected = await collectResults();
+        // SCHED4 shadow snapshot — captured HERE, before drainNervousRespawns/
+        // dispatch mutate anything this tick (see the closure's doc comment above).
+        const shadowTickWatcher = captureShadowTick('watcher', newlyCollected);
         // N3: action any cooperative nervous respawn-requests before dispatch (no-op
         // unless config.nervous_system.worker_respawn). Single-owner — no race.
         await drainNervousRespawns();
@@ -1590,6 +1643,7 @@ export async function waitForResults(
           await dispatchReadyTasks();
         }
         await cascadeSkipDeadBlocked();
+        await finalizeShadowTick(shadowTickWatcher);
         consecutiveTickErrors = 0;
         lastTickErrorSignature = null;
       } catch (tickErr) {

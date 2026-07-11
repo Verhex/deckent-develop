@@ -33,7 +33,9 @@ function runScriptAsync(
     child.stdout.setEncoding('utf-8');
     child.stdout.on('data', (d: string) => { stdout += d; });
     child.stderr.setEncoding('utf-8');
-    child.stderr.on('data', () => { /* drained to avoid backpressure; output asserts use stdout */ });
+    // stderr is folded into `output` so asserts can see stderr-only scripts
+    // (e.g. the retired bump-version.sh stub prints its notice to >&2).
+    child.stderr.on('data', (d: string) => { stdout += d; });
     const timer = setTimeout(() => { child.kill('SIGKILL'); resolve({ success: false, output: stdout, error: 'timeout' }); }, timeoutMs);
     child.on('error', (err) => { clearTimeout(timer); resolve({ success: false, output: stdout, error: err.message }); });
     child.on('close', (code) => { clearTimeout(timer); resolve({ success: code === 0, output: stdout, error: code === 0 ? undefined : `exit ${code}` }); });
@@ -133,55 +135,21 @@ describe.skipIf(isWindows)('OSS Scripts', () => {
     });
   });
 
-  describe('bump-version.sh', () => {
-    it('should show usage if no arguments provided', async () => {
-      const result = await runScriptAsync('bump-version.sh', []);
-      expect(result.success).toBe(false);
-      expect(result.output).toContain('Usage:');
-    });
-
-    it('should support major, minor, patch bump types', async () => {
-      for (const bumpType of ['major', 'minor', 'patch']) {
-        const result = await runScriptAsync('bump-version.sh', [bumpType, '--dry-run']);
-        expect(result.success).toBe(true);
-        expect(result.output).toContain('Current version:');
-        expect(result.output).toContain('New version:');
+  describe('bump-version.sh (retired stub — 414-002 RC4B/REL-04)', () => {
+    it('always fails with the retirement notice, regardless of arguments', async () => {
+      for (const args of [[], ['patch', '--dry-run'], ['major'], ['invalid']] as string[][]) {
+        const result = await runScriptAsync('bump-version.sh', args);
+        expect(result.success).toBe(false);
+        expect(result.output).toContain('retired');
+        expect(result.output).toContain('release-prepare.mjs');
       }
     });
 
-    it('should show what changes would occur in --dry-run mode', async () => {
-      const result = await runScriptAsync('bump-version.sh', ['minor', '--dry-run']);
-      expect(result.success).toBe(true);
-      expect(result.output).toContain('Dry-run mode');
-      expect(result.output).toContain('Changes would be');
-      expect(result.output).toContain('Update package.json');
-      expect(result.output).toContain('Create git tag');
-    });
-
-    it('should reject invalid bump types', async () => {
-      const result = await runScriptAsync('bump-version.sh', ['invalid']);
-      expect(result.success).toBe(false);
-      expect(result.output).toContain('Invalid bump type');
-    });
-
-    it('should parse semantic version correctly', async () => {
-      const result = await runScriptAsync('bump-version.sh', ['patch', '--dry-run']);
-      const pkgJson = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, 'package.json'), 'utf-8'));
-      expect(result.output).toContain(pkgJson.version);
-    });
-
-    it('should show next steps after version bump would complete', async () => {
-      const result = await runScriptAsync('bump-version.sh', ['major', '--dry-run']);
-      expect(result.success).toBe(true);
-      // In dry-run mode, it shows "Run without --dry-run to apply"
-      // which implies the next steps will happen after that
-      expect(result.output).toContain('without --dry-run');
-    });
-
-    it('should handle pre-release or build metadata in version', async () => {
-      const result = await runScriptAsync('bump-version.sh', ['patch', '--dry-run']);
-      // Should successfully parse version even with metadata
-      expect(result.success).toBe(true);
+    it('never mutates package.json (stub exits before any write)', async () => {
+      const before = fs.readFileSync(path.join(PROJECT_ROOT, 'package.json'), 'utf-8');
+      await runScriptAsync('bump-version.sh', ['patch']);
+      const after = fs.readFileSync(path.join(PROJECT_ROOT, 'package.json'), 'utf-8');
+      expect(after).toBe(before);
     });
   });
 
@@ -203,10 +171,11 @@ describe.skipIf(isWindows)('OSS Scripts', () => {
       });
     });
 
-    it('bump-version.sh should recognize all bump types', { timeout: 10000 }, async () => {
+    it('bump-version.sh stays a failing stub for every historical bump type', { timeout: 10000 }, async () => {
       for (const type of ['major', 'minor', 'patch']) {
         const result = await runScriptAsync('bump-version.sh', [type, '--dry-run']);
-        expect(result.success).toBe(true);
+        expect(result.success).toBe(false);
+        expect(result.output).toContain('release-prepare.mjs');
       }
     });
   });

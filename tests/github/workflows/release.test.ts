@@ -27,6 +27,10 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       expect(workflowContent).toContain("contents: write")
       expect(workflowContent).toContain("id-token: write")
     })
+
+    it('should define actions:read permission (REL-02 — gh run list needs it)', () => {
+      expect(workflowContent).toMatch(/permissions:[\s\S]*?actions: read/)
+    })
   })
 
   describe('Release Job', () => {
@@ -42,6 +46,8 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
     it('should have required steps', () => {
       expect(workflowContent).toContain("- name: Checkout")
       expect(workflowContent).toContain("- name: Setup Node.js")
+      expect(workflowContent).toContain("- name: Verify release integrity")
+      expect(workflowContent).toContain("- name: Verify CI attestation for this commit")
       expect(workflowContent).toContain("- name: Install dependencies")
       expect(workflowContent).toContain("- name: Type check (lint)")
       expect(workflowContent).toContain("- name: Release smoke test-gate")
@@ -52,8 +58,8 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
   })
 
   describe('Checkout Step', () => {
-    it('should use actions/checkout@v4', () => {
-      expect(workflowContent).toContain("uses: actions/checkout@v4")
+    it('should use actions/checkout pinned to an immutable commit SHA (SEC-06)', () => {
+      expect(workflowContent).toMatch(/uses: actions\/checkout@[0-9a-f]{40} # v4\.\d+\.\d+/)
     })
 
     it('should fetch full history (fetch-depth: 0)', () => {
@@ -62,8 +68,8 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
   })
 
   describe('Setup Node.js Step', () => {
-    it('should use actions/setup-node@v4', () => {
-      expect(workflowContent).toContain("uses: actions/setup-node@v4")
+    it('should use actions/setup-node pinned to an immutable commit SHA (SEC-06)', () => {
+      expect(workflowContent).toMatch(/uses: actions\/setup-node@[0-9a-f]{40} # v4\.\d+\.\d+/)
     })
 
     it('should specify node-version 24.x (Active LTS)', () => {
@@ -76,6 +82,61 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
 
     it('should configure registry-url for npm', () => {
       expect(workflowContent).toContain("registry-url: 'https://registry.npmjs.org'")
+    })
+  })
+
+  describe('Verify Release Integrity Step (REL-01)', () => {
+    it('should exist, before Install dependencies', () => {
+      const idx = workflowContent.indexOf('- name: Verify release integrity')
+      const installIdx = workflowContent.indexOf('- name: Install dependencies')
+      expect(idx).toBeGreaterThan(-1)
+      expect(idx).toBeLessThan(installIdx)
+    })
+
+    it('should derive the tag version from GITHUB_REF_NAME', () => {
+      expect(workflowContent).toMatch(/Verify release integrity[\s\S]*?TAG_VERSION="\$\{GITHUB_REF_NAME#v\}"/)
+    })
+
+    it('should read package.json and package-lock.json versions', () => {
+      expect(workflowContent).toContain("require('./package.json').version")
+      expect(workflowContent).toContain("require('./package-lock.json').version")
+    })
+
+    it('should triple-compare tag/package/lock and fail on mismatch', () => {
+      expect(workflowContent).toMatch(/TAG_VERSION" != "\$PKG_VERSION"/)
+      expect(workflowContent).toMatch(/TAG_VERSION" != "\$LOCK_VERSION"/)
+      expect(workflowContent).toMatch(/Verify release integrity[\s\S]*?exit 1/)
+    })
+
+    it('should run a registry-occupancy preflight via npm view', () => {
+      expect(workflowContent).toContain('npm view "deckent@${TAG_VERSION}" version')
+    })
+
+    it('should honestly warn (not silently pass) on a network/registry error, distinct from a clean 404', () => {
+      expect(workflowContent).toContain("grep -qiE 'E404|not found'")
+      expect(workflowContent).toMatch(/::warning::registry-occupancy preflight could not be verified/)
+    })
+  })
+
+  describe('Verify CI Attestation Step (REL-02)', () => {
+    it('should exist, before Install dependencies', () => {
+      const idx = workflowContent.indexOf('- name: Verify CI attestation for this commit')
+      const installIdx = workflowContent.indexOf('- name: Install dependencies')
+      expect(idx).toBeGreaterThan(-1)
+      expect(idx).toBeLessThan(installIdx)
+    })
+
+    it('should query gh run list for this exact commit SHA against the CI workflow', () => {
+      expect(workflowContent).toContain('gh run list --repo "${GITHUB_REPOSITORY}" --commit "${GITHUB_SHA}" --workflow CI')
+    })
+
+    it('should require at least one successful run and fail otherwise', () => {
+      expect(workflowContent).toMatch(/select\(\.conclusion == "success"\)/)
+      expect(workflowContent).toMatch(/SUCCESS_COUNT.*-lt 1[\s\S]*?exit 1/)
+    })
+
+    it('should authenticate gh via GITHUB_TOKEN (no extra PAT)', () => {
+      expect(workflowContent).toMatch(/Verify CI attestation for this commit[\s\S]*?GH_TOKEN: \$\{\{ secrets\.GITHUB_TOKEN \}\}/)
     })
   })
 
@@ -117,11 +178,41 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
     it('should output notes_file to GITHUB_OUTPUT', () => {
       expect(workflowContent).toContain('echo "notes_file=/tmp/release-notes.txt" >> "$GITHUB_OUTPUT"')
     })
+
+    it('should read the ROOT CHANGELOG.md, not docs/CHANGELOG.md', () => {
+      expect(workflowContent).toMatch(/Extract changelog for this version[\s\S]*?readFileSync\('CHANGELOG\.md', 'utf8'\)/)
+      expect(workflowContent).not.toMatch(/Extract changelog for this version[\s\S]{0,2000}docs\/CHANGELOG\.md/)
+    })
+
+    it('should exact-anchor the version heading (kills the old prefix-trap regex)', () => {
+      // Old buggy pattern (RED-proof — must not reappear): a bare awk regex alternation
+      // with no end-boundary after the version token, so it prefix-matched e.g.
+      // "1.0.0-beta.1" against a "## v1.0.0-beta.1-sprint410"-shaped heading.
+      expect(workflowContent).not.toContain('awk "/^## \\[?v?')
+      // New pattern: a lookahead boundary requiring the version token to end at `]`,
+      // whitespace, or end-of-line — the fix that kills the prefix-trap. (Source text on
+      // disk has doubled backslashes — it's a template-literal regex source string.)
+      expect(workflowContent).toContain('(?=[\\\\]\\\\s]|$)')
+    })
+
+    it('should escape regex metacharacters in the version string', () => {
+      expect(workflowContent).toContain("version.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')")
+    })
+
+    it('should FAIL (not silently fall back) on zero matches, duplicate headings, or an empty section', () => {
+      expect(workflowContent).toMatch(/no CHANGELOG\.md heading exact-matches version[\s\S]*?process\.exit\(1\)/)
+      expect(workflowContent).toMatch(/duplicate CHANGELOG\.md headings exact-match version[\s\S]*?process\.exit\(1\)/)
+      expect(workflowContent).toMatch(/section for version \$\{version\} is empty[\s\S]*?process\.exit\(1\)/)
+    })
+
+    it('should NOT contain the old silent-empty placeholder fallback', () => {
+      expect(workflowContent).not.toContain('NOTES="Release ${GITHUB_REF_NAME}"')
+    })
   })
 
   describe('Create GitHub Release Step', () => {
-    it('should use softprops/action-gh-release@v2', () => {
-      expect(workflowContent).toContain("uses: softprops/action-gh-release@v2")
+    it('should use softprops/action-gh-release pinned to an immutable commit SHA (SEC-06)', () => {
+      expect(workflowContent).toMatch(/uses: softprops\/action-gh-release@[0-9a-f]{40} # v2\.\d+\.\d+/)
     })
 
     it('should use ref_name as release name', () => {
@@ -154,14 +245,25 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       expect(workflowContent).toMatch(/npm publish[\s\S]*?--access public/)
     })
 
-    it('should use NODE_AUTH_TOKEN from secrets', () => {
-      expect(workflowContent).toMatch(/Publish to npm[\s\S]*?NODE_AUTH_TOKEN:[\s\S]*?\$\{\{ secrets\.NPM_TOKEN \}\}/)
+    it('should carry zero npm-auth-secret references — SEC-06: trusted-publishing/OIDC only', () => {
+      expect(workflowContent).not.toContain('NPM_TOKEN')
+      expect(workflowContent).not.toMatch(/Publish to npm[\s\S]*?NODE_AUTH_TOKEN/)
+    })
+
+    it('should honestly document the npmjs.com trusted-publisher registry-side requirement', () => {
+      expect(workflowContent).toMatch(/trusted publisher[\s\S]{0,400}Publish to npm/i)
+      expect(workflowContent).toContain('npmjs.com')
+    })
+
+    it('should document the failure mode when the registry-side trusted-publisher is not configured', () => {
+      expect(workflowContent).toContain('ENEEDAUTH')
+      expect(workflowContent).toMatch(/Unable to authenticate/)
     })
   })
 
   describe('Upload Artifacts Step', () => {
-    it('should use actions/upload-artifact@v4', () => {
-      expect(workflowContent).toContain("uses: actions/upload-artifact@v4")
+    it('should use actions/upload-artifact pinned to an immutable commit SHA (SEC-06)', () => {
+      expect(workflowContent).toMatch(/uses: actions\/upload-artifact@[0-9a-f]{40} # v4\.\d+\.\d+/)
     })
 
     it('should upload dist directory', () => {
@@ -178,15 +280,17 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
   })
 
   describe('Complete Flow Validation', () => {
-    it('should have at least 9 distinct steps', () => {
+    it('should have at least 13 distinct steps (RC4A adds 2 verify steps)', () => {
       const steps = workflowContent.match(/- name: /g)
       expect(steps).not.toBeNull()
-      expect(steps!.length).toBeGreaterThanOrEqual(9)
+      expect(steps!.length).toBeGreaterThanOrEqual(13)
     })
 
-    it('should execute steps in logical order: checkout → setup → install → lint → build → test-gate → changelog → publish → release', () => {
+    it('should execute steps in logical order: checkout → setup → verify-integrity → verify-ci → install → lint → build → test-gate → changelog → publish → release', () => {
       const checkoutIdx = workflowContent.indexOf('- name: Checkout')
       const setupIdx = workflowContent.indexOf('- name: Setup Node.js')
+      const verifyIntegrityIdx = workflowContent.indexOf('- name: Verify release integrity')
+      const verifyCiIdx = workflowContent.indexOf('- name: Verify CI attestation for this commit')
       const installIdx = workflowContent.indexOf('- name: Install dependencies')
       const lintIdx = workflowContent.indexOf('- name: Type check (lint)')
       const testIdx = workflowContent.indexOf('- name: Release smoke test-gate')
@@ -198,8 +302,12 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       // born-608 (407-001) yeni-sıra: build, test-gate'ten ÖNCE — validate:publish
       // derlenmiş dist ister; smoke-gate build-sonrası koşar; npm publish,
       // GitHub-Release'ten önce (publish başarısızsa release-notu atılmaz).
+      // RC4A (414-001) ekler: verify-integrity + verify-ci, setup ile install arasında —
+      // pahalı adımlardan (install/build/test) ÖNCE fail-fast.
       expect(checkoutIdx).toBeLessThan(setupIdx)
-      expect(setupIdx).toBeLessThan(installIdx)
+      expect(setupIdx).toBeLessThan(verifyIntegrityIdx)
+      expect(verifyIntegrityIdx).toBeLessThan(verifyCiIdx)
+      expect(verifyCiIdx).toBeLessThan(installIdx)
       expect(installIdx).toBeLessThan(lintIdx)
       expect(lintIdx).toBeLessThan(buildIdx)
       expect(buildIdx).toBeLessThan(testIdx)
