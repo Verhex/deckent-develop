@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-408 Learnings
+- Sprint sprint-408 Learnings: ## Sprint sprint-408 Learnings
+
+## Gains
+- 408-001 — BG-TURNS-PRODUCER — born-642 (P0): detached-run bitişi → REPL yeni-turn (ChatTurnQueue üreticisi) — RED-once confirmed before writing any code: app.tsx's registerBgEventSink effect only calls bgQue...
+- 408-002 — BUILD-VIOLATION-GUARD — born-644 (P1): sprint-içi izinsiz-build audit + önleme — AUDIT (docs/analysis/build-violation-audit-2026-07-11.md): searched sprint-403/404 archived .log ...
+- 408-003 — TRACE-QOL — born-639(3): worker-logs ham-tail'e insan-okur LogEvent render — Added an opt-in human-render layer to worker-logs.ts (SSE tail of .tasks/task-<id>.log).
+
 ## Sprint sprint-407 Learnings
 - Sprint sprint-407 Learnings: ## Sprint sprint-407 Learnings
 - COST-K2 — born-636-K2: task-tipi→effort tiering (flag'li, default-off): GO_WITH_TECH_DEBT — IMPLEMENTED: exported resolveEffortTier(intent: IntentType): TaskEffort in routing-engine.ts (pure, no config access, mi

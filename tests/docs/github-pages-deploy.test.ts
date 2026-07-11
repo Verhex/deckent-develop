@@ -115,8 +115,13 @@ describe('docs.yml deploy job', () => {
     expect(content).toContain('needs: build');
   });
 
-  it('only deploys on master push', () => {
-    expect(content).toContain("if: github.event_name == 'push' && github.ref == 'refs/heads/master'");
+  it('only deploys on main push AND with Pages explicitly enabled (repo var)', () => {
+    // born-608 (407-001): eski master-koşulu hiç eşleşmiyordu (job kalıcı-ölüydü).
+    // CC (2026-07-11): canlanınca Pages'in repoda kapalı olduğu ortaya çıktı →
+    // deploy DECKENT_PAGES_ENABLED repo-değişkenine bağlandı (yokken dürüst-SKIP).
+    expect(content).toContain(
+      "if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DECKENT_PAGES_ENABLED == 'true'",
+    );
   });
 
   it('has github-pages environment', () => {

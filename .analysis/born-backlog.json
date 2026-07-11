@@ -2701,7 +2701,7 @@
       "src/api/worker-logs.ts"
     ],
     "proposed_mode": "sprint",
-    "spec": "(1) docker stream-port yalniz claude-provider'a yapildi — codex/gemini docker .log'lari hala RAW dump -> onlarin trace-icerigi bos kalir; ayni normalizeStreamEvent hattina baglanmali (her-ortam yasasi). (2) token-counter.ts tryLoadCliLogTokens tier-2 fallback top-level 'usage' bekliyor; claude+docker .log artik LogEvent-JSONL (usage .content icinde nested) -> tier-2 eslesmiyor (guvenlik-agi: mergeWithWorkerClaim workerReported'i donduruyor, NIHAI SAYI DEGISMIYOR — yalniz provenance). token-counter LogEvent-farkinda yapilmali. (3) worker-logs.ts ham-tail gorunumu artik JSONL — insan-okur render istenirse ayri QoL. || DONE 2026-07-11 404-005: writeNormalizedDockerLog provider-agnostik (codex gercek-366-log formatiyla + gemini; taninmayan-satir passthrough-raw, veri-kaybi yok); usage uc-provider fixture BIREBIR; token-counter tier-2 LogEvent-nested usage okur, nihai-sayi pin.",
+    "spec": "(1) docker stream-port yalniz claude-provider'a yapildi — codex/gemini docker .log'lari hala RAW dump -> onlarin trace-icerigi bos kalir; ayni normalizeStreamEvent hattina baglanmali (her-ortam yasasi). (2) token-counter.ts tryLoadCliLogTokens tier-2 fallback top-level 'usage' bekliyor; claude+docker .log artik LogEvent-JSONL (usage .content icinde nested) -> tier-2 eslesmiyor (guvenlik-agi: mergeWithWorkerClaim workerReported'i donduruyor, NIHAI SAYI DEGISMIYOR — yalniz provenance). token-counter LogEvent-farkinda yapilmali. (3) worker-logs.ts ham-tail gorunumu artik JSONL — insan-okur render istenirse ayri QoL. || DONE 2026-07-11 404-005: writeNormalizedDockerLog provider-agnostik (codex gercek-366-log formatiyla + gemini; taninmayan-satir passthrough-raw, veri-kaybi yok); usage uc-provider fixture BIREBIR; token-counter tier-2 LogEvent-nested usage okur, nihai-sayi pin. || (3) QoL DONE 2026-07-11 408-003: worker-logs insan-okur LogEvent render (opsiyon-arkasi, passthrough+geriye-uyum pin) — born-639 TAMAMEN kapandi.",
     "verify": "codex/gemini docker fixture -> LogEvent JSONL; token-counter tier-2 nested-usage testi; nihai-sayi regresyon-pin",
     "wire_on": "sprint",
     "status": "DONE"
@@ -2759,9 +2759,10 @@
       "src/cli/repl/chat-turn-queue.ts"
     ],
     "proposed_mode": "sprint",
-    "spec": "Gap-rapor: kuyruk kurulur+drain edilir ama HEP BOS — run.tsx registerBgEventSink/bgQueue gecirmiyor; repl_surface.bg_turns flag'i rezerve ama HIC okunmuyor; detached-sprint bitisini (recently-works/sprint-state) ChatTurnBgEvent'e ceviren watcher yok. FIX: watcher + run.tsx wiring + flag.",
+    "spec": "Gap-rapor: kuyruk kurulur+drain edilir ama HEP BOS — run.tsx registerBgEventSink/bgQueue gecirmiyor; repl_surface.bg_turns flag'i rezerve ama HIC okunmuyor; detached-sprint bitisini (recently-works/sprint-state) ChatTurnBgEvent'e ceviren watcher yok. FIX: watcher + run.tsx wiring + flag. || DONE 2026-07-11 408-001: run-completion-watch (jobs-dizini watch+poll, dedup+dispose, unref'd) + run.tsx flag'li kurulum (repl_surface.bg_turns, default-off) + enqueueBg besleme; RED-kanitli; mid-turn-enjekte korunur.",
     "verify": "detached sprint bitince REPL'de yeni-turn (mid-turn-enjekte-yok korunur); flag-testli",
-    "wire_on": "sprint"
+    "wire_on": "sprint",
+    "status": "DONE"
   },
   {
     "born_id": "643",
@@ -2793,8 +2794,9 @@
       "src/orchestra/spawn-backend-docker.ts"
     ],
     "proposed_mode": "sprint",
-    "spec": "dist/* mtime 08:43:20 = sprint-403 kosarken (benim build'im 08:25'teydi, sprint 08:26'da basladi). Suphe: bir worker container'da npm run build kostu (volume-mount -> host dist'i ezer; ESM-cache zehirlenme riski + kural-ihlali). Audit: 403 worker loglarinda 'npm run build' ara; onleme: worker-wrapper'da build-komut advisory-blogu (NPM-ADVISORY deseni) ya da dist'i worker-mount'tan cikar (read-only mount).",
+    "spec": "dist/* mtime 08:43:20 = sprint-403 kosarken (benim build'im 08:25'teydi, sprint 08:26'da basladi). Suphe: bir worker container'da npm run build kostu (volume-mount -> host dist'i ezer; ESM-cache zehirlenme riski + kural-ihlali). Audit: 403 worker loglarinda 'npm run build' ara; onleme: worker-wrapper'da build-komut advisory-blogu (NPM-ADVISORY deseni) ya da dist'i worker-mount'tan cikar (read-only mount). || DONE 2026-07-11 408-002: AUDIT=KANIT-YOK (16/16 false-positive — worker'lar aklandi; rapor docs/analysis/build-violation-audit-2026-07-11.md) + dist-mtime nobetcisi (distMutated .result-isareti + loud-warn, advisory).",
     "verify": "worker-log kaniti + onleme-testi",
-    "wire_on": "sprint"
+    "wire_on": "sprint",
+    "status": "DONE"
   }
 ]

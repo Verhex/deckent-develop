@@ -2,6 +2,17 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint408] - 2026-07-11
+
+### Added
+
+- BG-TURNS-PRODUCER — born-642 (P0): detached-run bitişi → REPL yeni-turn (ChatTurnQueue üreticisi)
+- BUILD-VIOLATION-GUARD — born-644 (P1): sprint-içi izinsiz-build audit + önleme
+- TRACE-QOL — born-639(3): worker-logs ham-tail'e insan-okur LogEvent render
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint407] - 2026-07-11
 
 ### Added

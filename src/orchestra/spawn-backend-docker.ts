@@ -4,7 +4,7 @@
 // Results collected via shared .tasks/ volume mount.
 
 import { spawnSync, spawn as nodeSpawn } from 'node:child_process';
-import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync, openSync, fsyncSync, closeSync, readdirSync, renameSync, rmdirSync, chmodSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync, openSync, fsyncSync, closeSync, readdirSync, renameSync, rmdirSync, chmodSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { homedir, totalmem } from 'node:os';
@@ -913,6 +913,90 @@ function dedupeTrimmed(paths: string[]): string[] {
   return result;
 }
 
+// ─── born-644 (408-002 BUILD-VIOLATION-GUARD): dist-mtime sentinel ─────────
+// Live incident (2026-07-11): host `dist/` was found rebuilt mid-sprint — suspected an
+// in-container `npm run build`/`tsc`/`build:all`. The docker backend bind-mounts the WHOLE
+// project root read-write (`-v ${dir}:${CONTAINER_WORKSPACE}`, see runSpawn's dockerArgs), so
+// any such command run inside a container writes straight through to host `dist/`, poisoning
+// every other worker's ESM module cache mid-sprint (a live-loaded `dist/` module can be
+// half-rewritten under a concurrent worker's require). This is advisory-only, mirroring the
+// NPM-ADVISORY precedent (born-454, see the worker-prompt's own dependency-mutation
+// escalation contract): it NEVER blocks a spawn or alters a worker's own selfAssessment — it
+// only flags `.result.distMutated` + a loud stderr warning once the mutation is observed after
+// container exit, so Brain/the operator see it without any worker being punished for it.
+
+/** Cheap content-mutation snapshot of a directory tree — not a cryptographic hash. */
+export interface DistFingerprint {
+  fileCount: number;
+  maxMtimeMs: number;
+}
+
+/**
+ * Snapshot `distDir` for later mutation comparison. Returns null when the directory does not
+ * exist (fresh clone / pre-first-build — absence is not itself a mutation signal).
+ *
+ * Per-entry `statSync` failures are swallowed (entry vanished mid-walk, e.g. a concurrent
+ * build actively deleting/recreating files) — never let the sentinel itself crash a spawn.
+ * Exported for unit tests.
+ */
+export function computeDistFingerprint(distDir: string): DistFingerprint | null {
+  if (!existsSync(distDir)) return null;
+  let entries: string[];
+  try {
+    entries = readdirSync(distDir, { recursive: true }) as string[];
+  } catch (e) {
+    debugLog('docker-backend:dist-fingerprint', e);
+    return null;
+  }
+  let fileCount = 0;
+  let maxMtimeMs = 0;
+  for (const rel of entries) {
+    try {
+      const st = statSync(join(distDir, rel));
+      if (!st.isFile()) continue;
+      fileCount++;
+      if (st.mtimeMs > maxMtimeMs) maxMtimeMs = st.mtimeMs;
+    } catch (e) {
+      debugLog('docker-backend:dist-fingerprint-entry', e);
+    }
+  }
+  return { fileCount, maxMtimeMs };
+}
+
+/**
+ * Pure comparison — true iff the two snapshots indicate `dist/` was mutated (file added,
+ * removed, or an existing file's content rewritten) between capture points. A null<->non-null
+ * transition (dist/ appeared or disappeared entirely) also counts as a mutation.
+ */
+export function distFingerprintsChanged(
+  before: DistFingerprint | null,
+  after: DistFingerprint | null,
+): boolean {
+  if (before === null && after === null) return false;
+  if (before === null || after === null) return true;
+  return before.fileCount !== after.fileCount || before.maxMtimeMs !== after.maxMtimeMs;
+}
+
+/**
+ * Advisory-only `.result` patch: merges `distMutated: true` into the existing result JSON when
+ * `mutated` is true AND the file exists. A no-op (returns false, writes nothing) when not
+ * mutated, when `.result` is missing, or when the existing JSON cannot be parsed — this must
+ * never throw out and never fabricate a `.result` the worker did not write itself (that would
+ * cross from advisory into blocking). Exported for unit tests.
+ */
+export function applyDistMutationAdvisory(resultPath: string, mutated: boolean): boolean {
+  if (!mutated || !existsSync(resultPath)) return false;
+  try {
+    const parsed = JSON.parse(readFileSync(resultPath, 'utf-8')) as Record<string, unknown>;
+    parsed.distMutated = true;
+    writeFileSync(resultPath, JSON.stringify(parsed, null, 2), 'utf-8');
+    return true;
+  } catch (e) {
+    debugLog('docker-backend:dist-mutation-patch', e);
+    return false;
+  }
+}
+
 // ─── Docker Spawn Backend ─────────────────────────────────────────────────
 
 export class DockerSpawnBackend implements SpawnBackend {
@@ -1427,6 +1511,12 @@ export class DockerSpawnBackend implements SpawnBackend {
 
     debugLog('docker-backend:spawn', `taskId=${taskId} container=${containerName} model=${model}`);
 
+    // born-644 (BUILD-VIOLATION-GUARD): snapshot dist/ BEFORE the container starts — see the
+    // dist-mtime sentinel block comment above computeDistFingerprint for why this is the
+    // right moment (this is the last host-side checkpoint before the container gains write
+    // access to the mounted project root).
+    const distFingerprintBefore = computeDistFingerprint(join(dir, 'dist'));
+
     // Sprint 163 T-002: retry spawn with health check.
     // Each attempt: docker run + 3s wait + docker inspect. If inspect reports
     // Running=true OR Running=false+ExitCode=0 (instant-exit success), proceed.
@@ -1477,7 +1567,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     markActive(taskId);
 
     // Set up container monitoring (async, fire-and-forget)
-    this.monitorContainer(taskId, containerName, tasksDir, model);
+    this.monitorContainer(taskId, containerName, tasksDir, model, dir, distFingerprintBefore);
   }
 
   /**
@@ -1867,8 +1957,19 @@ export class DockerSpawnBackend implements SpawnBackend {
 
   /**
    * Monitor container until it exits, then update heartbeat and cleanup.
+   *
+   * `projectDir` + `distFingerprintBefore` (born-644 BUILD-VIOLATION-GUARD): the pre-spawn
+   * dist/ snapshot from runSpawn, carried through so the exit handler can compare against the
+   * post-exit state — see the dist-mtime sentinel block comment above computeDistFingerprint.
    */
-  private monitorContainer(taskId: string, containerName: string, tasksDir: string, model: string): void {
+  private monitorContainer(
+    taskId: string,
+    containerName: string,
+    tasksDir: string,
+    model: string,
+    projectDir: string,
+    distFingerprintBefore: DistFingerprint | null,
+  ): void {
     const child = nodeSpawn('docker', ['wait', containerName], {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -2010,6 +2111,28 @@ export class DockerSpawnBackend implements SpawnBackend {
         if (!existsSync(timeoutPath)) {
           writeFileSync(timeoutPath, `container_exit_${exitCode}`, 'utf-8');
         }
+      }
+
+      // born-644 (BUILD-VIOLATION-GUARD): advisory-only dist/ mutation check — compares
+      // against the pre-spawn snapshot from runSpawn. Runs AFTER the fallback/reconciliation
+      // block above so whatever `.result` ends up on disk (worker-written or host-fallback)
+      // is the one that gets flagged. Never blocks: wrapped in its own try/catch, and
+      // applyDistMutationAdvisory/computeDistFingerprint already swallow their own errors.
+      try {
+        const distFingerprintAfter = computeDistFingerprint(join(projectDir, 'dist'));
+        if (distFingerprintsChanged(distFingerprintBefore, distFingerprintAfter)) {
+          const patched = applyDistMutationAdvisory(resultPath, true);
+          const warning =
+            `[deckent:spawn-backend-docker] BUILD-VIOLATION-GUARD: dist/ mutated during the `
+            + `container run for task ${taskId} (advisory only — NOT blocking). Suspect an `
+            + `in-container build command (npm run build / tsc / build:all) — the docker `
+            + `backend mounts the project root read-write, so this writes straight through to `
+            + `host dist/. resultPatched=${patched}`;
+          console.warn(warning);
+          debugLog('docker-backend:dist-mutation', warning);
+        }
+      } catch (e) {
+        debugLog('docker-backend:dist-fingerprint-after', e);
       }
 
       // Extract container logs BEFORE removal (docker logs requires container to exist)

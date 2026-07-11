@@ -9980,3 +9980,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 407-004: PLAN-SURFACE-KALAN — born-629(b,c): post-adoption gösterim + scope-gate yeni-dizin sınıfı (DONE)
 
 ---
+## Sprint 408 — sprint-408
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-11
+**Duration:** 887s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 887278ms |
+
+### Tasks
+
+- 408-001: BG-TURNS-PRODUCER — born-642 (P0): detached-run bitişi → REPL yeni-turn (ChatTurnQueue üreticisi) (DONE)
+- 408-002: BUILD-VIOLATION-GUARD — born-644 (P1): sprint-içi izinsiz-build audit + önleme (DONE)
+- 408-003: TRACE-QOL — born-639(3): worker-logs ham-tail'e insan-okur LogEvent render (DONE)
+
+---

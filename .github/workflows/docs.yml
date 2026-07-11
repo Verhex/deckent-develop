@@ -70,7 +70,12 @@ jobs:
     runs-on: ubuntu-latest
     # born-608 (task 407-001): repo's default/main branch is `main`, not `master` — the
     # old condition never matched, so this job was permanently dead.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # CC follow-up (2026-07-11): reviving the job exposed that GitHub Pages is NOT
+    # enabled on this repo (deploy-pages 404 on 8b69c8f5) — the dead condition had
+    # been hiding the missing setting. Gate on an explicit repo variable so the job
+    # SKIPS honestly (not red) until Alperen enables Pages (Settings → Pages) and
+    # sets the repo variable DECKENT_PAGES_ENABLED=true.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DECKENT_PAGES_ENABLED == 'true'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

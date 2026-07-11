@@ -38,7 +38,13 @@ import { createApprovalStoreWatch, type ApprovalStoreWatchHandle } from '../../c
 import type { ApprovalRequest } from '../../core/approval-contract.js';
 import { randomUUID } from 'node:crypto';
 import { MemoryStore } from '../../core/memory-store.js';
-import { BRAIN_DIR, MEMORY_DB_FILE, DECKENT_DIR } from '../../core/constants.js';
+import { BRAIN_DIR, MEMORY_DB_FILE, DECKENT_DIR, JOBS_DIR } from '../../core/constants.js';
+import type { ChatTurnBgEvent } from './chat-turn-queue.js';
+import {
+  createRunCompletionWatch,
+  type RunCompletionInfo,
+  type RunCompletionWatchHandle,
+} from './run-completion-watch.js';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { createLocalRpcTransport, buildReplRpcHandlers, runRpcDebugCommand } from './rpc-client.js';
@@ -199,6 +205,55 @@ export function wireApprovalCrossProcess(
 }
 
 /**
+ * born-642 (408-001) BG-TURNS-PRODUCER — formats a `RunCompletionInfo`
+ * (run-completion-watch.ts) into the `ChatTurnBgEvent` shape ChatTurnQueue
+ * buffers (chat-turn-queue.ts). Deliberately NOT routed through `getMessage`:
+ * the summary is built from language-neutral status TOKENS
+ * (DONE/TECH_DEBT/NO_GO/FAILED — the SAME literal tokens already surfaced
+ * unlocalized elsewhere in the CLI, e.g. TaskEvaluation, JobState.status,
+ * `deckent status`'s job field) plus raw counts, not natural-language prose —
+ * so no new i18n key is required. `src/cli/helpers/messages.ts` is outside
+ * this task's write scope; a future task with write access there can replace
+ * this with a fully localized `getMessage` template without touching the
+ * wiring around it (see this task's .result notes).
+ */
+export function buildBgTurnEvent(info: RunCompletionInfo): ChatTurnBgEvent {
+  const source = info.sprintId ?? info.jobId;
+  if (info.status === 'FAILED') {
+    return { source, summary: info.error ? `${source} — FAILED: ${info.error}` : `${source} — FAILED` };
+  }
+  const total = info.totalTasks ?? 0;
+  const done = info.done ?? 0;
+  const techDebt = info.techDebt ?? 0;
+  const noGo = info.noGo ?? 0;
+  return { source, summary: `${source} — ${done}/${total} DONE · ${techDebt} TECH_DEBT · ${noGo} NO_GO` };
+}
+
+/**
+ * born-642 (408-001) BG-TURNS-PRODUCER — wires run-completion-watch.ts's
+ * detached-run-finish notifications into the ChatTurnQueue PRODUCER seam
+ * app.tsx already exposes (`registerBgEventSink`) but nothing ever fed —
+ * `enqueueBg` has zero production callers before this task (grep-verified:
+ * app.tsx's own `useEffect` only calls `registerBgEventSink(...)` when the
+ * prop is supplied, and run.tsx never supplied it). Mirrors
+ * {@link wireApprovalCrossProcess}: pure factory + injectable watchFactory,
+ * so `enabled=false` never calls watchFactory at all — no fs.watch, no
+ * timer, no directory read — byte-identical to pre-408-001 run.tsx whenever
+ * `repl_surface.bg_turns` is absent/false.
+ */
+export function wireBgTurnsProducer(
+  enabled: boolean,
+  jobsDir: string,
+  enqueueBg: (event: ChatTurnBgEvent) => void,
+  watchFactory: typeof createRunCompletionWatch = createRunCompletionWatch,
+): RunCompletionWatchHandle | undefined {
+  if (!enabled) return undefined;
+  return watchFactory(jobsDir, {
+    onComplete: (info) => enqueueBg(buildBgTurnEvent(info)),
+  });
+}
+
+/**
  * Registers an async cleanup hook and returns an unregister function — the
  * shape entry.ts's `registerReplTeardown` (born-549 SIGTERM-TEARDOWN) already
  * exposes. Injected rather than imported so run.tsx (a leaf REPL renderer,
@@ -215,6 +270,9 @@ export interface ReplTeardownDeps {
   restoreAltScreen: () => void;
   approvalWatch?: { dispose: () => void };
   approvalChannel?: { dispose: () => void };
+  /** born-642 (408-001) BG-TURNS-PRODUCER — run-completion-watch.ts handle;
+   *  absent when `repl_surface.bg_turns` is off (see wireBgTurnsProducer). */
+  runCompletionWatch?: { dispose: () => void };
   memory?: { close: () => void };
   mcpBroker?: { disconnectAll: () => Promise<void> };
   switcherExit: () => Promise<void>;
@@ -248,6 +306,7 @@ export function buildReplTeardown(deps: ReplTeardownDeps): () => Promise<void> {
     }
     try { deps.approvalWatch?.dispose(); } catch { /* already disposed */ }
     try { deps.approvalChannel?.dispose(); } catch { /* already disposed */ }
+    try { deps.runCompletionWatch?.dispose(); } catch { /* already disposed */ }
     try { deps.memory?.close(); } catch { /* already closed */ }
     if (deps.mcpBroker) {
       try { await deps.mcpBroker.disconnectAll(); } catch { /* best-effort */ }
@@ -381,7 +440,7 @@ export async function runInkRepl(
   // a load failure degrades to defaults (lang=en, every surface flag off).
   let projectCfg: {
     language?: string;
-    repl_surface?: { enabled?: boolean; approvals?: boolean };
+    repl_surface?: { enabled?: boolean; approvals?: boolean; bg_turns?: boolean };
     terminal?: { rpc_debug?: boolean; native_agent?: boolean };
   } = {};
   try { projectCfg = await loadConfig() as typeof projectCfg; } catch { /* defaults */ }
@@ -448,6 +507,19 @@ export async function runInkRepl(
       }
     } catch { approvalChannel = undefined; approvalWatch = undefined; broker = undefined; }
   }
+
+  // born-642 (408-001) BG-TURNS-PRODUCER — `repl_surface.bg_turns` gate. Off
+  // by default (reserved-field precedent, config-types.ts): the producer side
+  // of ChatTurnQueue (app.tsx's `registerBgEventSink`) previously had zero
+  // feeders. `bgEventSink` is populated by app.tsx's own effect once the prop
+  // below is passed — `wireBgTurnsProducer` calls it every time a detached
+  // run's job file transitions to COMPLETE/FAILED.
+  const bgTurnsEnabled = surf.bg_turns === true;
+  let bgEventSink: ((event: ChatTurnBgEvent) => void) | null = null;
+  let runCompletionWatch: RunCompletionWatchHandle | undefined;
+  try {
+    runCompletionWatch = wireBgTurnsProducer(bgTurnsEnabled, join(process.cwd(), JOBS_DIR), (event) => bgEventSink?.(event));
+  } catch { runCompletionWatch = undefined; }
 
   const perms = createPermissionStore(process.cwd());
 
@@ -703,6 +775,7 @@ export async function runInkRepl(
       {...(stateFeed ? { stateFeed } : {})}
       approvalsEnabled={approvalsEnabled}
       {...(approvalChannel ? { approvalChannel } : {})}
+      {...(bgTurnsEnabled ? { registerBgEventSink: (enqueue: (event: ChatTurnBgEvent) => void) => { bgEventSink = enqueue; } } : {})}
     />
     </ReplErrorBoundary>,
   );
@@ -719,6 +792,7 @@ export async function runInkRepl(
     restoreAltScreen: () => { process.stdout.write('\x1b[?1049l'); },
     ...(approvalWatch ? { approvalWatch } : {}),
     ...(approvalChannel ? { approvalChannel } : {}),
+    ...(runCompletionWatch ? { runCompletionWatch } : {}),
     ...(memory ? { memory } : {}),
     ...(mcpClientBroker ? { mcpBroker: mcpClientBroker } : {}),
     switcherExit: () => switcher.exit(),

@@ -44,7 +44,7 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       expect(workflowContent).toContain("- name: Setup Node.js")
       expect(workflowContent).toContain("- name: Install dependencies")
       expect(workflowContent).toContain("- name: Type check (lint)")
-      expect(workflowContent).toContain("- name: Run tests")
+      expect(workflowContent).toContain("- name: Release smoke test-gate")
       expect(workflowContent).toContain("- name: Build")
       expect(workflowContent).toContain("- name: Create GitHub Release")
       expect(workflowContent).toContain("- name: Publish to npm")
@@ -92,8 +92,9 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
   })
 
   describe('Test Step', () => {
-    it('should run tests (staged vitest)', () => {
-      expect(workflowContent).toMatch(/Run tests[\s\S]*?npx vitest run/)
+    it('should run the release smoke test-gate (staged vitest)', () => {
+      // born-608 (407-001): tam-suite CI'da; release-zinciri kompakt smoke-gate koşar.
+      expect(workflowContent).toMatch(/Release smoke test-gate[\s\S]*?npx vitest run/)
     })
   })
 
@@ -183,25 +184,28 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       expect(steps!.length).toBeGreaterThanOrEqual(9)
     })
 
-    it('should execute steps in logical order: checkout → setup → install → lint → test → build → changelog → release → publish', () => {
+    it('should execute steps in logical order: checkout → setup → install → lint → build → test-gate → changelog → publish → release', () => {
       const checkoutIdx = workflowContent.indexOf('- name: Checkout')
       const setupIdx = workflowContent.indexOf('- name: Setup Node.js')
       const installIdx = workflowContent.indexOf('- name: Install dependencies')
       const lintIdx = workflowContent.indexOf('- name: Type check (lint)')
-      const testIdx = workflowContent.indexOf('- name: Run tests')
+      const testIdx = workflowContent.indexOf('- name: Release smoke test-gate')
       const buildIdx = workflowContent.indexOf('- name: Build')
       const changelogIdx = workflowContent.indexOf('- name: Extract changelog for this version')
       const releaseIdx = workflowContent.indexOf('- name: Create GitHub Release')
       const publishIdx = workflowContent.indexOf('- name: Publish to npm')
 
+      // born-608 (407-001) yeni-sıra: build, test-gate'ten ÖNCE — validate:publish
+      // derlenmiş dist ister; smoke-gate build-sonrası koşar; npm publish,
+      // GitHub-Release'ten önce (publish başarısızsa release-notu atılmaz).
       expect(checkoutIdx).toBeLessThan(setupIdx)
       expect(setupIdx).toBeLessThan(installIdx)
       expect(installIdx).toBeLessThan(lintIdx)
-      expect(lintIdx).toBeLessThan(testIdx)
-      expect(testIdx).toBeLessThan(buildIdx)
-      expect(buildIdx).toBeLessThan(changelogIdx)
-      expect(changelogIdx).toBeLessThan(releaseIdx)
-      expect(releaseIdx).toBeLessThan(publishIdx)
+      expect(lintIdx).toBeLessThan(buildIdx)
+      expect(buildIdx).toBeLessThan(testIdx)
+      expect(testIdx).toBeLessThan(changelogIdx)
+      expect(changelogIdx).toBeLessThan(publishIdx)
+      expect(publishIdx).toBeLessThan(releaseIdx)
     })
 
     it('should have permissions properly set for provenance', () => {

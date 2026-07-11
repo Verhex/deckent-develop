@@ -123,6 +123,10 @@
     },
     {
       "file": "src/cli/commands/start.ts",
+      "code": "const lsFiles = spawnSync('git', ['ls-files'], {"
+    },
+    {
+      "file": "src/cli/commands/start.ts",
       "code": "const result = spawnSync('git', ['stash', '--include-untracked', '--message', 'deckent-sandbox'], {"
     },
     {
