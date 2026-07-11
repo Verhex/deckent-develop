@@ -369,6 +369,21 @@ function validateActivationField(activation: unknown, errors: string[]): void {
   }
 }
 
+// ─── Manifest Normalization (born-641 POOL-LOAD-NORMALIZE) ──────────────────
+//
+// Mirrors skill-pool.ts:normalizeSkillManifest — see that file's comment for the
+// full born-641 rationale (kept file-local for the same reason
+// parseMarkdownTitleAndLead/validateActivationField are duplicated there: the two
+// pool managers are outside each other's write/read scope for this task). Applied
+// ONLY after validate*Definition() confirms the manifest is valid — a
+// present-but-wrong-typed field is still rejected (fail-soft skip+warn is
+// UNCHANGED); this only fills fields that are literally absent. Limited to fields
+// already declared on AgentDefinition — no new fields invented.
+function normalizeAgentManifest(raw: Record<string, unknown>): void {
+  if (raw['deniedTools'] === undefined) raw['deniedTools'] = [];
+  if (raw['expertise'] === undefined) raw['expertise'] = [];
+}
+
 // ─── Load Diagnostics (born-590) ─────────────────────────────────────────────
 
 /** A manifest skipped during the most recent load because it failed validation or JSON parsing. */
@@ -615,6 +630,7 @@ export class AgentPoolManager {
         this._recordInvalidManifest(entry.name, path.join(entryDir, PROMPT_MD_FILENAME), validation.errors);
         continue;
       }
+      normalizeAgentManifest(raw);
       const agent = raw as unknown as AgentDefinition;
       applyBuiltinImplementationRules(agent);
       pool.set(agent.id, agent);
@@ -648,6 +664,7 @@ export class AgentPoolManager {
       if (raw) {
         const validation = AgentPoolManager.validateAgentDefinition(raw);
         if (validation.valid) {
+          normalizeAgentManifest(raw);
           const agent = raw as unknown as AgentDefinition;
           applyBuiltinImplementationRules(agent);
           pool.set(agent.id, agent);

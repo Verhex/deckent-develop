@@ -9931,3 +9931,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 405-003: STATS-SIDECAR — born-605 (P1): canlı agent/skill stats'ı git-tracked manifest'ten gitignored sidecar'a (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 406 — sprint-406
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-11
+**Duration:** 1053s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1052844ms |
+
+### Tasks
+
+- 406-001: BUILTINS-DRIFT-GATE — 502 dilim-1: drift-envanteri + mekanik drift-check gate (DONE)
+- 406-002: APPROVAL-QOL — born-630: allowStore-wire + deny-spam kesici + bekleme-heartbeat (DONE)
+- 406-003: MANIFEST-SCHEMA-LINT — 641-kalan: skill/agent manifest zorunlu-alan validasyonu + pool-load normalizasyonu (DONE)
+
+---

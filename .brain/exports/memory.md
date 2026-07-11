@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-406 Learnings
+- Sprint sprint-406 Learnings: ## Sprint sprint-406 Learnings
+
+## Gains
+- 406-001 — BUILTINS-DRIFT-GATE — 502 dilim-1: drift-envanteri + mekanik drift-check gate — Built scripts/builtins-drift-check.mjs (drift-INVENTORY tool + no-new-drift RATCHET, modeled on l...
+- 406-002 — APPROVAL-QOL — born-630: allowStore-wire + deny-spam kesici + bekleme-heartbeat — 3 kalem hepsi RED->GREEN (empirik doğrulandı): iki kaynak dosyayı geçici olarak `git show HEAD:<p...
+- 406-003 — MANIFEST-SCHEMA-LINT — 641-kalan: skill/agent manifest zorunlu-alan validasyonu + pool-load normalizasyonu — born-641 class-fix, both layers.
+
 ## Sprint sprint-405 Learnings
 - Sprint sprint-405 Learnings: ## Sprint sprint-405 Learnings
 - PLUGIN-AUTH — born-612 (P1): plugin özgünlük + path-containment: GO_WITH_TECH_DEBT — SUMMARY — all 3 problems fixed inside src/core/plugin-loader.ts (only file in write scope), fully additive/dormant for e

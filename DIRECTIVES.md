@@ -1,79 +1,79 @@
-# DIRECTIVES — SPRINT-405: FAZ-3 SERTLEŞTİRME (609 mem-tenant · 612 plugin-auth · 605 stats-sidecar)
+# DIRECTIVES — SPRINT-406: PUBLISH-YOLU (502-D1 builtins-drift · 523 approval-QoL · 641-kalan manifest-lint)
 
 ## Goal
-Faz-3 (GOAL-v3): çok-tenant/enterprise sertleştirme. Yasa #2 (her-ortam + milyon-ölçek + multi-tenant)
-bu sprint'in anayasası — ama her task tek-kullanıcı davranışını BİREBİR korur (additive-safe).
+Faz-4 PUBLISH-GATE'in (535) ön-şart temizliği: builtins↔.deckent drift-gerçeği görünür+gate'li olsun
+(502-D1), approval deny-yorgunluğu bitsin (523), manifest şema-deliği sınıf-olarak kapansın (641-kalan).
 
 ## 🔒 BAĞLAYICI (her task)
-- Yalnız kendi Files/Scope'una yaz · git stash/reset YASAK · **build YASAK (npm run build dahil — dist'e ASLA dokunma; volume-mount host'u ezer)** · notes TEK STRING · Self DÜRÜST.
+- Yalnız kendi Files/Scope'una yaz · git stash/reset YASAK · **build YASAK (npm run build dahil — dist'e ASLA dokunma)** · notes TEK STRING · Self DÜRÜST.
 - REPRODUCE-first: önce mevcut davranışı kanıtlayan RED/ölçüm, sonra fix; kanıtı notes'a yaz.
 - Değişen modülü import eden TÜM testleri koş (`VITEST_MAX_FORKS=2 npx vitest run <ilgili dizinler>`).
 
-## Task 1: MEM-TENANT — born-609 (P0): MemoryQuery tenant-scoping (additive)
+## Task 1: BUILTINS-DRIFT-GATE — 502 dilim-1: drift-envanteri + mekanik drift-check gate
 - Model: sonnet
-- Files: src/core/memory-types.ts, src/core/memory-query.ts, src/api/memory-search-endpoint.ts, tests/core/memory-tenant-scope.test.ts
-- Scope: src/core/, src/api/, tests/core/
+- Files: scripts/builtins-drift-check.mjs, tests/scripts/builtins-drift-check.test.ts, docs/analysis/builtins-drift-inventory-2026-07-11.md
+- Scope: scripts/, tests/scripts/, docs/analysis/
 - Dependencies: none
 ### Description
-SORUN: MemoryQueryParams'ta tenant kavramı YOK; FTS query-layer tenant-predicate üretmiyor →
-multi-tenant kurulumda her principal tüm memory'yi okur (Yasa #2 ihlali; enterprise-gate ön-şartı).
-FIX (additive-safe): (1) memory-types'a opsiyonel `tenantId?: string`; (2) memory-query predicate:
-tenantId VERİLDİĞİNDE hem yapılandırılmış-filtre hem FTS-yolu `tenant_id = ?` daraltması üretir;
-tenantId YOKKEN mevcut yol BYTE-AYNI (regresyon-pin: aynı fixture-DB'de tenant'sız sorgu fix-öncesi/
-sonrası aynı satırları döner); (3) memory-search-endpoint request-principal'dan tenantId'yi çözer ve
-query'ye geçirir (principal-tenant zaten ws-gateway/audit'te var — aynı çözümleme kaynağını kullan,
-yeniden icat etme; principal yoksa tenant'sız yol). SINIR — BİLİNÇLİ KAPSAM-DIŞI: LEGACY-NULL-TENANT
-politikası (strict-flip sonrası NULL-tenant eski-satırların kaderi: fallback-mı-migration-mı) ALPEREN
-kararı bekliyor — bu task'ta strict-mod/flip YOK, yalnız opsiyonel-daraltma; notes'a "legacy-NULL
-kararı açık" düş. RED-önce: tenant-kolonlu fixture-DB'de bugün tenantId geçmenin HİÇBİR filtre
-üretmediğini kanıtla. Şema: tenant_id kolonu yoksa migration EKLEME — kolonu koşullu-kullan
-(PRAGMA table_info ile varlık-kontrolü; yoksa predicate atlanır + honest-warn döner) — DB-şema
-mutasyonu ayrı-karar.
+SORUN (MASTER-PLAN 502, publish-ÖNCESİ P0): `src/core/builtins/{agents,skills}` ↔ `.deckent/{agents,skills}`
+ÇİFT-YÖNLÜ gerçek-drift (bilinen: 11 agent-dosyasında içerik farkı; iki tarafta da diğerinde olmayan
+öğeler; bundle-builtins.mjs'in ".deckent kanonik" öncülü ÖLÜ). Bugün her build'in paketlediği builtins
+hangi tarafın doğrusu BELİRSİZ. DİLİM-1 = KARAR-HAZIRLIĞI + GATE (merge YAPMA — kanoniklik kararı
+Alperen'in): (1) YENİ `scripts/builtins-drift-check.mjs`: iki ağacı dosya-dosya karşılaştırır
+(yalnız-A / yalnız-B / içerik-farklı; JSON derin-eşitlik manifest'lerde, metin-diff PROMPT.md/SKILL.md'de);
+`--json` makine-çıktısı + insan-okur tablo; `--check` modu: pinned-baseline
+(`.deckent/builtins-drift-baseline.json`) ile karşılaştırıp YENİ-drift'te exit 1 (truth/orphan-ratchet
+emsali; baseline-yok → exit 2 + `--write` önerisi). (2) Envanter-raporu
+`docs/analysis/builtins-drift-inventory-2026-07-11.md`: her drift-öğesi için hangi taraf hangi
+sprint/commit'te değişmiş (git log -1 --format='%h %ad %s' <dosya> her iki yol için), dosya-başı
+KANONİKLİK-ÖNERİSİ (+gerekçe tek-cümle) — karar-tablosu Alperen'e hazır. (3) Stats-alanları (605
+sidecar'a taşındı) diff'te GÜRÜLTÜ olabilir — manifest-karşılaştırmasında `stats` alanını normalize-et
+(diff-dışı bırak + raporda not). RED-önce: bilinen-drift örneğinin (secure-coding iki-ağaç TAM-onarımı
+sonrası eşit olmalı; api-design manifest'i builtins'te eksik idi — güncel gerçeği ölç) script'le
+yakalandığının kanıtı.
 ### goNogo
-- goCriteria: RED-kanıt; tenantId-verili sorgu yalnız o tenant'ın satırlarını döner (FTS dahil); tenant'sız yol byte-aynı (pin-test); endpoint principal→tenant threading testli; kolon-yoksa dürüst-atlama testli; memory importer testleri yeşil.
-- nogo: DB-şema migration eklenirse NO_GO; tenant'sız davranış değişirse NO_GO.
+- goCriteria: script canlı (iki-ağaç gerçek-koşusu notes'ta özet-sayılarla); --check ratchet exit-davranışı testli (hermetik tmpdir-fixture); envanter-raporu dosya-başı öneri+git-iz ile tam; stats-normalizasyonu testli.
+- nogo: MERGE/kanoniklik-uygulaması yapılırsa (karar Alperen'in) NO_GO; drift-listesi örneklem/truncate edilirse NO_GO (tam-liste).
 
-## Task 2: PLUGIN-AUTH — born-612 (P1): plugin özgünlük + path-containment
+## Task 2: APPROVAL-QOL — born-630: allowStore-wire + deny-spam kesici + bekleme-heartbeat
+- Model: sonnet | Agent: bug-fixer
+- Files: src/agent/permission-store.ts, src/agents/worker-approval-env.ts, tests/agent/approval-qol.test.ts
+- Scope: src/agent/, src/agents/, tests/agent/
+- Dependencies: none
+### Description
+Advisor S5/S6 kalanları — 3 kalem: (1) `createWorkerApprovalGate` allowStore GEÇİRMİYOR
+(permission-store.ts:192-199 civarı) → "always-allow" grant'ları worker-gate'te yapısal-ölü; aynı komut
+her seferinde onay istiyor (deny-yorgunluğu). FIX: allowStore'u gate-kurulumuna geçir + karar-önü
+matchesAllow kompozisyonu (358-008 guard-önü deseninin worker-tarafı simetriği; audit-korumalı:
+submit+decide yine kaydedilir). (2) [approval-denied] normal tool-result olarak dönünce model aynı
+komutu yeniden deniyor → her deneme YENİ request = bildirim-yağmuru. FIX: (scopeId, scope, cmd)
+anahtarlı process-içi deny-cache — aynı komutun N'inci denemesi broker'a GİTMEDEN cached-deny döner
+(N=1 sonrası; cache gate-dispose'da temizlenir) + tool-result metnine "bu komut bu run'da reddedildi,
+yeniden deneme" yönergesi. (3) Onay beklerken worker hb-refresh yok → Auditor >2dk stale-alarmı +
+timeout riski. FIX: guard bekleme-döngüsünde task-hb dosyasını periyodik tazele (mevcut hb-yazım
+yardımcıını reuse; unref'd). Üçü de RED-önce (bugünkü davranış fixture-kanıtlı) + composition-pin
+(kurulum-sitesi allowStore'u gerçekten geçiriyor).
+### goNogo
+- goCriteria: 3 kalem RED→GREEN; allow-grant ikinci istekte onaysız-geçer (testli); deny-cache N-denial sonrası broker'a gitmez + dispose-temiz; bekleme-hb tazeleniyor (fake-timer); permission-store/worker-approval importer testleri yeşil.
+- nogo: allowStore geçirilip matchesAllow karar-önünde ÇAĞRILMAZSA (yarım-wire) NO_GO; audit-kaydı atlanırsa NO_GO.
+
+## Task 3: MANIFEST-SCHEMA-LINT — 641-kalan: skill/agent manifest zorunlu-alan validasyonu + pool-load normalizasyonu
 - Model: sonnet
-- Files: src/core/plugin-loader.ts, tests/core/plugin-authenticity.test.ts
-- Scope: src/core/, tests/core/
+- Files: src/core/skill-pool.ts, src/core/agent-pool.ts, scripts/lint-manifests.mjs, tests/core/manifest-schema-lint.test.ts
+- Scope: src/core/, scripts/, tests/core/
 - Dependencies: none
 ### Description
-SORUN (marketplace-öncesi gate): (1) entrypoint-hash ≠ imza — publisher-key/trust-root doğrulaması yok
-(hash yalnız bütünlük, kimlik değil); (2) unsigned-plugin sessizce yükleniyor; (3) allowed-path
-kontrolü zayıf (prefix-tabanlı → `/plugins-evil` `/plugins`'i geçer sınıfı). FIX: (1) detached-signature
-doğrulama iskeleti: plugin-manifest'te opsiyonel `signature{alg:'ed25519', publisherKeyId, sig}`;
-doğrulama `src/core/signature.ts` MEVCUT Ed25519 altyapısını kullanır (yeniden icat ETME — skill-imza
-deseninin aynısı); trust-root = config `plugins.trusted_publisher_keys[]` (resolver-passthrough
-ÜÇLÜSÜ: tip+iki-resolver+roundtrip — born-464 dersi). (2) unsigned-plugin politikası: default =
-YÜKLE + LOUD-WARN (stderr, her yüklemede; sessiz-geçme YASAK); `plugins.require_signature: true`
-(default false) → unsigned = yükleme-red (fail-closed, enterprise-profil 534'e hazırlık). (3)
-path-containment: prefix-karşılaştırma yerine `path.relative()` tabanlı gerçek-containment
-(başında `..` yok + absolute-değil) — Windows-ayracı dahil (Yasa #2; sep-karışık testler). RED-önce:
-(a) bugün sahte-imzalı/imzasız plugin'in sessizce yüklendiği, (b) `/plugins-evil` prefix-bypass'ının
-bugün GEÇTİĞİ fixture-kanıtları.
+born-641'in kalıcı-kapanışı — secure-coding sınıfı (eksik-alanlı manifest) İKİ kez routing'i düşürdü
+(stackDetection → sonra composableWith); nokta-guard'lar semptom, sınıf-çözüm iki katman: (1)
+POOL-LOAD NORMALİZASYONU: skill-pool/agent-pool manifest'i yüklerken eksik opsiyonel-alanları güvenli
+default'larla doldurur (skill: triggers[] · composableWith[] · stackDetection{files[],dependencies[],commands[]}
+· category?; agent: deniedTools[] · expertise[] — mevcut tip-tanımlarındaki alanlarla sınırlı, YENİ alan
+icat etme) → tüm motorlar (routing/selector/gate) undefined görmez; normalizasyon FAIL-SOFT
+(bozuk-JSON = skip + loud-warn, mevcut davranış). (2) `scripts/lint-manifests.mjs`: iki ağaçtaki tüm
+manifest'leri şema-kontrol eder (zorunlu-alan eksik = liste + exit 1; --fix YOK — rapor-only);
+CI'ya eklenebilir yapıda (package.json script'i `lint:manifests` ekle — package.json Files'da değil,
+notes'a satır-önerisi yaz, Brain ekler). RED-önce: composableWith'siz sentetik-manifest'in bugün
+pool-load'dan normalize EDİLMEDEN geçtiğini kanıtla.
 ### goNogo
-- goCriteria: RED-kanıtlar; imzalı-plugin doğrulanır + bozuk-imza red (testli); unsigned default loud-warn + require_signature=true'da red; path-containment relative-tabanlı (evil-prefix + `..`-kaçış + Win-sep testleri); config-üçlüsü tam; plugin-loader importer testleri yeşil.
-- nogo: unsigned sessiz-yükleme kalırsa NO_GO; containment yalnız POSIX test edilirse NO_GO.
-
-## Task 3: STATS-SIDECAR — born-605 (P1): canlı agent/skill stats'ı git-tracked manifest'ten gitignored sidecar'a
-- Model: sonnet | Agent: refactorer
-- Files: src/core/agent-pool.ts, src/core/skill-pool.ts, src/orchestra/sprint-finalizer.ts, tests/core/stats-sidecar.test.ts
-- Scope: src/core/, src/orchestra/, tests/core/
-- Dependencies: none
-### Description
-SORUN: canlı stats (totalUses/successRate/avgCoverage/lastUsedInSprint) git-tracked agent/skill
-manifest'lerine yazılıyor → her sprint repo-diff kirliliği + hermetiklik vakaları (C5) + iki-ağaç
-sync-çatışması. FIX (davranış-koruyucu taşıma): (1) yeni gitignored sidecar
-`.deckent/stats/catalog-stats.json` (tek-ledger: {agents:{id:{...}}, skills:{id:{...}}}, atomic
-tmp+rename yazım); (2) OKUMA birleşik: pool'lar stats'ı sidecar'dan yükler; sidecar'da yoksa
-manifest'teki mevcut değere düşer (migration-dostu okuma — tüketiciler [marketplace/rating/routing
-learningBonus] AYNI değerleri görmeye devam eder, regresyon-pin); (3) YAZMA: sprint-finalizer stats
-güncellemesini SADECE sidecar'a yapar (manifest'e stats-yazımı biter); (4) migration: ilk sidecar-yazımında
-manifest'teki mevcut stats değerleri sidecar'a taşınır (manifest re-zero'lama BU task'ta YAPILMAZ —
-git-tracked dosyaları toplu değiştirmek ayrı-onay; notes'a düş). `.gitignore`'a `.deckent/stats/`
-zaten-yoksa ekleme gerekir → SINIR: .gitignore Files'ında değil; gitignore-satırını notes'a öner
-(Brain ekler). RED-önce: bugün finalizer'ın manifest'i mutasyona uğrattığının fixture-kanıtı.
-### goNogo
-- goCriteria: RED-kanıt; finalizer artık manifest'e stats yazmaz (pin) + sidecar atomic-yazım; okuma-birleşik (sidecar>manifest-fallback) tüketici-regresyon-pin'li; ilk-yazım migration'ı testli; pool/finalizer importer testleri (AGSK ailesi dahil) yeşil.
-- nogo: tüketicilerin gördüğü stats değerleri değişirse NO_GO; manifest re-zero yapılırsa NO_GO.
+- goCriteria: RED-kanıt; pool-load normalizasyonu (iki pool) testli — eksik-alanlı manifest yüklendiğinde tüm alanlar güvenli-default; lint-script iki-ağaç gerçek-koşusu temiz ya da dürüst-liste (notes'ta); routing 641-testleri + pool importer testleri yeşil.
+- nogo: normalizasyon tip-dışı alan uydurursa NO_GO; lint --fix yaparsa NO_GO.

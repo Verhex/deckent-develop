@@ -2,6 +2,17 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint406] - 2026-07-11
+
+### Added
+
+- BUILTINS-DRIFT-GATE — 502 dilim-1: drift-envanteri + mekanik drift-check gate
+- APPROVAL-QOL — born-630: allowStore-wire + deny-spam kesici + bekleme-heartbeat
+- MANIFEST-SCHEMA-LINT — 641-kalan: skill/agent manifest zorunlu-alan validasyonu + pool-load normalizasyonu
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint405] - 2026-07-11
 
 ### Added

@@ -185,6 +185,34 @@ function validateActivationField(activation: unknown, errors: string[]): void {
   }
 }
 
+// ─── Manifest Normalization (born-641 POOL-LOAD-NORMALIZE) ──────────────────
+//
+// born-641 (secure-coding-shaped manifest missing an optional field) dropped V2
+// routing TWICE via two DIFFERENT unguarded downstream reads (stackDetection,
+// then composableWith) — each incident got a point-guard (`?? []`) at its own
+// crash site, but the underlying class (a manifest that omits an optional field
+// passes validation, yet the field stays `undefined` for every OTHER consumer)
+// was never closed. This normalizes the pool-load path itself so no downstream
+// engine (routing/selector/gate) ever sees `undefined` for these fields again —
+// applied ONLY after validate*Definition() confirms the manifest is valid, so a
+// present-but-wrong-typed field is still rejected (fail-soft skip+warn is
+// UNCHANGED); this only fills fields that are literally absent. Limited to
+// fields already declared on SkillDefinition — no new fields invented.
+function normalizeSkillManifest(raw: Record<string, unknown>): void {
+  if (raw['triggers'] === undefined) raw['triggers'] = [];
+  if (raw['composableWith'] === undefined) raw['composableWith'] = [];
+  if (raw['category'] === undefined) raw['category'] = 'domain';
+
+  if (raw['stackDetection'] === undefined) {
+    raw['stackDetection'] = { files: [], dependencies: [], commands: [] };
+  } else if (raw['stackDetection'] && typeof raw['stackDetection'] === 'object' && !Array.isArray(raw['stackDetection'])) {
+    const sd = raw['stackDetection'] as Record<string, unknown>;
+    if (sd['files'] === undefined) sd['files'] = [];
+    if (sd['dependencies'] === undefined) sd['dependencies'] = [];
+    if (sd['commands'] === undefined) sd['commands'] = [];
+  }
+}
+
 // ─── Load Diagnostics (born-590) ─────────────────────────────────────────────
 
 /** A manifest skipped during the most recent load because it failed validation or JSON parsing. */
@@ -311,6 +339,7 @@ export class SkillPoolManager {
         if (raw) {
           const validation = SkillPoolManager.validateSkillDefinition(raw);
           if (validation.valid) {
+            normalizeSkillManifest(raw);
             const skill = raw as unknown as SkillDefinition;
             this._overlayStats(skill, statsLedger);
             pool.set(skill.id, skill);
@@ -412,6 +441,7 @@ export class SkillPoolManager {
         this._recordInvalidManifest(entry.name, path.join(entryDir, SKILL_MD_FILENAME), validation.errors);
         continue;
       }
+      normalizeSkillManifest(raw);
       const skill = raw as unknown as SkillDefinition;
       this._overlayStats(skill, statsLedger);
       pool.set(skill.id, skill);

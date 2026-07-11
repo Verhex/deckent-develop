@@ -7,9 +7,16 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import type { PermissionRule } from './permission-types.js';
-import { WorkerApprovalGate, type WorkerActionDescriptor, type GateVerdict, type FallbackResolver } from '../core/approval-worker-gate.js';
+import {
+  WorkerApprovalGate,
+  type WorkerActionDescriptor,
+  type GateVerdict,
+  type FallbackResolver,
+  type ApprovalAllowScopeLike,
+} from '../core/approval-worker-gate.js';
 import { ApprovalBroker } from '../core/approval-broker.js';
 import type { Requester } from '../core/approval-contract.js';
+import { ApprovalAllowScopeStore } from '../core/approval-allowscope.js';
 
 export type GrantLifetime = 'once' | 'session' | 'always';
 
@@ -166,6 +173,17 @@ export interface WorkerApprovalGateFactoryOptions {
   userId?: string;
   timeoutMs?: number;
   fallbackResolver?: FallbackResolver;
+  /**
+   * born-630 (APPROVAL-QOL) — optional override for tests. Defaults to a
+   * real, disk-backed `ApprovalAllowScopeStore(cwd)` (the same store a
+   * terminal "always allow" decision persists a grant to,
+   * `.deckent/settings/approval-allows.json`). Wiring this in is what makes
+   * `WorkerApprovalGate`'s existing guard-önü `matchesAllow` composition
+   * (358-008, core/approval-worker-gate.ts) actually fire on the worker
+   * path — before this, `allowStore` was never constructed here, so a live
+   * always-allow grant was structurally dead for every worker gate.
+   */
+  allowStore?: ApprovalAllowScopeLike;
 }
 
 export interface WorkerApprovalGateHandle {
@@ -174,6 +192,16 @@ export interface WorkerApprovalGateHandle {
    *  other consumers (e.g. a relay/dashboard channel) or, in tests, call
    *  `decide()` directly to resolve a submitted request. */
   broker: ApprovalBroker;
+  /** The gate's always-allow lookup (see {@link WorkerApprovalGateFactoryOptions.allowStore}) —
+   *  exposed so a caller can `grantAllow(...)` into the SAME store instance. */
+  allowStore: ApprovalAllowScopeLike;
+  /**
+   * born-630 (APPROVAL-QOL) — releases this handle's process-local deny-cache
+   * (see `guard()` wrapping below). Idempotent. A caller that layers its own
+   * dispose lifecycle on top (e.g. `agents/worker-approval-env.ts`'s
+   * `setupWorkerApprovalGateFromEnv`) MUST chain this in.
+   */
+  dispose: () => void;
 }
 
 /**
@@ -201,6 +229,7 @@ export function createWorkerApprovalGate(
     try { broker.checkForExternalDecisions(); } catch { /* fail-soft: fallback still applies */ }
     return baseResolver ? baseResolver(ctx) : 'deny';
   };
+  const allowStore = opts.allowStore ?? new ApprovalAllowScopeStore(cwd);
   const gate = new WorkerApprovalGate({
     broker,
     requester,
@@ -208,8 +237,57 @@ export function createWorkerApprovalGate(
     userId: opts.userId ?? 'local-user',
     timeoutMs: opts.timeoutMs,
     fallbackResolver: flushingResolver,
+    allowStore,
   });
-  return { gate, broker };
+
+  // ─── born-630 (APPROVAL-QOL) item 2: process-local deny-cache ────────────
+  // A denied `[approval-denied] ...` verdict comes back to the model as a
+  // normal tool result (both real callers — agents/worker.ts
+  // guardRiskyWorkerAction, agents/agentic-worker-tools.ts
+  // wrapDispatcherWithApprovalGate — deliberately surface a denial this way
+  // so the model can self-correct) — but a model that does NOT self-correct
+  // re-issues the exact same command, and every re-issue is a brand-new
+  // broker submit(), i.e. a fresh notification. This cache short-circuits a
+  // repeat of the SAME (scopeId, scope, cmd) after its first real denial —
+  // no second broker round-trip, no second notification. Cleared by
+  // `dispose()`.
+  //
+  // Cache-hit THROWS rather than resolving 'deny' directly: both existing
+  // call sites already wrap `gate.guard()` in try/catch and fold a thrown
+  // error's `.message` into the `[approval-denied] ... (gate error: ...)`
+  // tool-result text — the only channel available here (out of this task's
+  // write scope) to carry a "don't retry" instruction through to the model.
+  const deniedKeys = new Set<string>();
+  const originalGuard = gate.guard.bind(gate);
+  gate.guard = async (action: WorkerActionDescriptor): Promise<GateVerdict> => {
+    const key = denyCacheKey(action);
+    if (key !== null && deniedKeys.has(key)) {
+      throw new Error(
+        `command already denied earlier this run (scopeId=${action.scopeId}, scope=${action.scope}) — do not retry it`,
+      );
+    }
+    const verdict = await originalGuard(action);
+    if (verdict === 'deny' && key !== null) deniedKeys.add(key);
+    return verdict;
+  };
+
+  return {
+    gate,
+    broker,
+    allowStore,
+    dispose: () => { deniedKeys.clear(); },
+  };
+}
+
+/** Deny-cache key for {@link createWorkerApprovalGate}'s process-local cache —
+ *  `(scopeId, scope, cmd)`, `cmd` read from `rawArgs.cmd`/`rawArgs.command`
+ *  (mirrors the exact extraction the risky-command classifiers already use).
+ *  An action with no discernible `cmd` string is never cached — conservative,
+ *  avoids collapsing unrelated non-shell actions onto the same empty-cmd key. */
+function denyCacheKey(action: WorkerActionDescriptor): string | null {
+  const rawCmd = action.rawArgs?.['cmd'] ?? action.rawArgs?.['command'];
+  if (typeof rawCmd !== 'string' || rawCmd.length === 0) return null;
+  return `${action.scopeId} ${action.scope} ${rawCmd}`;
 }
 
 export interface RiskyToolCallGuardResult {
