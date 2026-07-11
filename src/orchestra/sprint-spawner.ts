@@ -184,7 +184,7 @@ import {
   type WorkerLifecycleState,
 } from '../agents/worker.js';
 import { buildWorkerApprovalGateEnv } from '../agents/worker-approval-env.js';
-import { isDependencySatisfying } from './scheduler-truth.js';
+import { computeEffectiveDependencyState } from './scheduler-state.js';
 
 // ─── Runtime vs Code Discriminator (Sprint 139 Task 024) ─────────
 import {
@@ -888,11 +888,14 @@ export async function respawnEligibleTasks(
   // unreviewed foundation. Sprint-280's FIX-deadlock (the original reason MRR
   // was counted as done here) stays solved via that skip path: nothing waits
   // forever, the sprint completes, the human reviews afterwards.
-  const doneTasks = new Set(
-    sprint.tasks
-      .filter(t => isDependencySatisfying(t.status))
-      .map(t => t.id),
-  );
+  //
+  // SCHED1 (born-634/635, docs/analysis/scheduler-unify-design-2026-07-11.md):
+  // aggregate-aware via the single scheduler-state helper — INTENTIONAL
+  // behavior change, this was previously the one caller WITHOUT one-level
+  // fix-aggregation (a DONE `<id>-fix` now also satisfies `<id>` here, same as
+  // it already did in findReadyUndispatchedTasks/planContinuous). Pinned by
+  // scheduler-effective-dependencies.test.ts.
+  const { satisfyingIds: doneTasks } = computeEffectiveDependencyState(sprint.tasks, waveStart);
 
   // Build dependency graph for enforcement (Sprint 139 Task 028)
   const graph = buildDependencyGraph(sprint.tasks, /* includeCollisions */ true);
@@ -900,7 +903,7 @@ export async function respawnEligibleTasks(
     .filter(t => t.status === TaskStatus.PENDING)
     .map(t => t.id);
 
-  const enforcement = enforceWaveDependency(graph, pendingIds, doneTasks);
+  const enforcement = enforceWaveDependency(graph, pendingIds, new Set(doneTasks));
 
   // Emit blocked events to event stream
   const sprintIdForDeps = getCurrentSprintId(projectRoot) ?? sprint.id;
@@ -1175,6 +1178,14 @@ export function computeSlotsAvailable(sprint: Sprint, maxWorkers: number): numbe
  *
  * Sprint 165 Bug Y fix — used by force re-scan path to detect orphan PENDING
  * tasks that the legacy `for (taskId of completedTaskIds)` loop missed.
+ *
+ * SCHED1 (born-634/635): dependency satisfaction + retry-backoff eligibility
+ * are now sourced from the single `computeEffectiveDependencyState` helper.
+ * INTENTIONAL behavior change vs. the prior hardcoded `status === DONE` set:
+ * a DONE `<id>-fix` now also satisfies `<id>` here (previously only true in
+ * findReadyUndispatchedTasks/planContinuous — see scheduler-unify design doc
+ * overlap matrix "Fix aggregation" row). Pinned by
+ * scheduler-effective-dependencies.test.ts.
  */
 export function selectEligibleForSpawn(
   sprint: Sprint,
@@ -1182,13 +1193,12 @@ export function selectEligibleForSpawn(
   slotsAvailable: number,
   assignedTaskIds: ReadonlySet<string>,
   collectedIds: ReadonlySet<string>,
+  nowMs: number = Date.now(),
 ): Task[] {
   if (slotsAvailable <= 0) return [];
 
   const depPipelineEnabled = config?.dependency_pipeline_enabled === true;
-  const doneIds = new Set(
-    sprint.tasks.filter(t => t.status === TaskStatus.DONE).map(t => t.id),
-  );
+  const { satisfyingIds, retryEligibleIds } = computeEffectiveDependencyState(sprint.tasks, nowMs);
 
   const eligible: Task[] = [];
   for (const task of sprint.tasks) {
@@ -1197,10 +1207,9 @@ export function selectEligibleForSpawn(
     if (assignedTaskIds.has(task.id)) continue;
     if (collectedIds.has(task.id)) continue;
     // Transient-retry backoff: skip task until retryAfter timestamp passes
-    const retryAfter = (task as RetryableTask).retryAfter;
-    if (retryAfter !== undefined && retryAfter > Date.now()) continue;
+    if (!retryEligibleIds.has(task.id)) continue;
     if (depPipelineEnabled && task.dependencies && task.dependencies.length > 0) {
-      const allDone = task.dependencies.every(dep => doneIds.has(dep));
+      const allDone = task.dependencies.every(dep => satisfyingIds.has(dep));
       if (!allDone) continue;
     }
     eligible.push(task);

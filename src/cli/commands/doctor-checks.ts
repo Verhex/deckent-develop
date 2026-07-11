@@ -17,7 +17,7 @@ import {
 const DECISIONS_EXPORT_RELATIVE = 'exports/decisions.md';
 import { MemoryStore } from '../../core/memory-store.js';
 import { ErrorRegistry } from '../../core/errors.js';
-import { isDeckFileCommitted } from '../../core/deck-file.js';
+import { isDeckFileCommitted, loadDeckSecrets } from '../../core/deck-file.js';
 import {
   detectStaleDaemons,
   listDeckentProcesses,
@@ -394,6 +394,39 @@ export function checkDeckSecurity(root: string): DoctorCheck {
   return { name: '.deck Security', passed: true, message: '.deck file exists and is NOT tracked by git (safe)', required: false };
 }
 
+/**
+ * SEC-02 (ADR-G-005 subprocess-visibility honesty-slice, Task 411-002).
+ *
+ * The docker spawn backend shadows `.deck` with an empty read-only overlay
+ * (DECK-WORKER-ISOLATION, done) — a docker worker cannot read it. The
+ * subprocess backend has no such mount trick: it runs the worker as a host
+ * process inside the project root, where `.deck` stays disk-readable. A full
+ * fix (host-side credential broker) is tracked separately; this check is the
+ * honest middle ground — WARN rather than silently pass when the risk is real.
+ *
+ * Silent PASS (no alarming text) for every case where the risk does not
+ * apply: a non-subprocess backend, a missing `.deck`, or a `.deck` that has
+ * no non-empty secret value (template-only — nothing to expose). The WARN
+ * message is a fixed, generic string — it never echoes a key name or value.
+ */
+export function checkDeckSubprocessVisibility(root: string, spawnBackend?: string, lang: string = 'en'): DoctorCheck {
+  const name = '.deck Subprocess Visibility';
+  const okMessage = getMessage('doctor.deck_subprocess_visibility_ok', lang);
+  if (spawnBackend !== 'subprocess') {
+    return { name, passed: true, message: okMessage, required: false };
+  }
+  const deckPath = join(root, '.deck');
+  if (!existsSync(deckPath)) {
+    return { name, passed: true, message: okMessage, required: false };
+  }
+  const secrets = loadDeckSecrets(root);
+  const hasNonEmptySecret = Object.values(secrets).some((value) => value.trim().length > 0);
+  if (!hasNonEmptySecret) {
+    return { name, passed: true, message: okMessage, required: false };
+  }
+  return { name, passed: false, message: getMessage('doctor.deck_subprocess_visibility_warn', lang), required: false };
+}
+
 export function getLastSprintId(root: string): string | null {
   try {
     const configPath = join(root, PROJECT_CONFIG_PATH);
@@ -453,13 +486,14 @@ export function readAllCIReports(root: string, count = 5): CIReport[] {
   }
 }
 
-export function runDoctorChecks(root: string, providerNames?: string[], spawnBackend?: string): DoctorResult {
+export function runDoctorChecks(root: string, providerNames?: string[], spawnBackend?: string, lang: string = 'en'): DoctorResult {
   const checks: DoctorCheck[] = [
     checkPlatform(),
     checkNode(), checkGit(), checkTmux(providerNames, spawnBackend), checkDocker(spawnBackend), checkClaude(),
     checkWorkspace(root), checkBrainDir(root), checkDirectives(root),
     checkBrainBudget(root), checkDebt(root), checkStaleLocks(root),
     checkDeckSecurity(root), checkWritePermissions(root), checkGitignore(root),
+    checkDeckSubprocessVisibility(root, spawnBackend, lang),
   ];
   return {
     ok: checks.filter(c => c.required).every(c => c.passed),

@@ -47,6 +47,7 @@ import {
   runProviderDiagnostics,
   checkDaemonHygiene,
   runPreFlightHealthCheck,
+  checkDeckSubprocessVisibility,
   type PreFlightResult,
   type PreFlightCheckResult,
 } from './doctor-checks.js';
@@ -1712,6 +1713,9 @@ export function runDoctorChecks(root: string, providerNames?: string[], spawnBac
     checkWorkspace(root), checkBrainDir(root), checkDirectives(root),
     checkBrainBudget(root), checkDebt(root), checkStaleLocks(root),
     checkDeckSecurity(root), checkWritePermissions(root), checkGitignore(root),
+    // 411-002 SEC-02 honesty slice — this module's runDoctorChecks is a live twin of
+    // doctor-checks.ts::runDoctorChecks (born-651: dedup them); keep both lists in sync.
+    checkDeckSubprocessVisibility(root, spawnBackend, lang),
   ];
   return {
     ok: checks.filter(c => c.required).every(c => c.passed),

@@ -1860,6 +1860,46 @@ Config values may reference secrets as `"$DECK:KEY"` (e.g. `"token": "$DECK:DISC
 
 **(−)** **Zero-worker-exposure is true for the docker backend but not yet the subprocess backend:** a subprocess worker runs in the project root and can still read `.deck` from disk (env is scrubbed to its own provider credential, but the file is reachable) — closing it needs the host-side credential broker (DECK-WORKER-ISOLATION, subprocess half). The docker shadow is source-true but the running backend reflects it only after a `dist/` rebuild (BUILD-GATE). Other open gaps: `createDeckTemplate` writes `.deck` unconditionally and can **overwrite an existing secret file** on re-init (DECK-OVERWRITE-GUARD); `KNOWN_DECK_KEYS` (9 keys) drifts from real usage (`DECKENT_DEEPSEEK_API_KEY`, `DASHSCOPE`, `ZHIPU`, `WEBHOOK_KEY` warn as "unknown" — DECK-KEYS-SYNC); `.deck` is written without `0o600` perms and is absent from `.npmignore` (defense-in-depth — DECK-HARDEN, though `package.json` `files` currently excludes it from publish). Global+project secret scope is roadmap.
 
+## Status Note (2026-07-11 — RC-1, Task 411-001 + 411-002)
+
+RC-1 closed two of this ADR's open gaps without waiting for the full
+DECK-WORKER-ISOLATION subprocess half:
+
+- **DECK-OVERWRITE-GUARD closed (Task 411-001).** `createDeckTemplate`
+  (`src/core/deck-file.ts`) is now no-op-if-exists (byte-identical preserved
+  on repeat calls), writes atomically (same-dir tmp + rename), and sets
+  owner-only permissions (POSIX `0600` re-asserted via `chmodSync` to defeat a
+  permissive umask; Windows gets an `icacls` owner-only ACL grant). A re-init
+  can no longer erase or widen the exposure of a live `.deck`.
+- **Subprocess-visibility honesty-slice landed (Task 411-002, SEC-02).** The
+  subprocess backend's disk-readable `.deck` (see *Context* / Decision §2
+  above — unchanged, still open) is no longer a silent gap: `deckent doctor`
+  gains a `.deck Subprocess Visibility` check (`checkDeckSubprocessVisibility`,
+  `src/cli/commands/doctor-checks.ts`) that WARNs when `spawn_backend ===
+  'subprocess'` AND a real, non-empty `.deck` exists, pointing the user at the
+  docker backend (already shadowed) for sensitive environments. It is
+  advisory-only (`required: false`, never blocks `doctor`'s overall `ok`),
+  stays silent-pass for every case where the risk doesn't apply (non-subprocess
+  backend, missing `.deck`, template-only `.deck` with no non-empty value),
+  and its warning text is a fixed, generic string — it never echoes a key name
+  or secret value. This is a **surfacing fix, not a containment fix**: the
+  file is still disk-readable to a subprocess worker; only the operator's
+  visibility into that fact changed.
+- **Credential-broker follow-up still open, unchanged.** Closing the
+  subprocess half of DECK-WORKER-ISOLATION for real (a host-side credential
+  broker so a subprocess worker never touches `.deck` regardless of backend,
+  matching the docker backend's shadow-overlay guarantee) remains out of RC-1
+  scope and is tracked as its own born work-item, per the roadmap below.
+- **Known implementation gap (disk-verified, Task 411-002):** `src/cli/commands/doctor.ts`
+  maintains its own separate, non-deduplicated `runDoctorChecks` (same
+  duplication pattern the born-505/Task-410-003 dedup already closed for
+  `runPreFlightHealthCheck`, but not for this function) — every real caller
+  (`mcp/tools/doctor.ts`, `api/server.ts`, `cli/commands/start.ts`,
+  `cli/commands/init.ts`) uses `doctor.ts`'s copy, not `doctor-checks.ts`'s.
+  The new check above is implemented and tested in `doctor-checks.ts`; a
+  follow-up task must mirror it into `doctor.ts` (or finish the dedup) before
+  the live `deckent doctor` CLI actually prints the warning.
+
 ## References / Absorbed
 
 - **Absorbs:** ADR-014 (.deck Secret File System — dedicated file, `DECKENT_` registry, auto-gitignore).

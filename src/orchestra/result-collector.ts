@@ -35,6 +35,7 @@ import {
 } from './ipc-registry.js';
 import { bridgeQuestionToApproval } from './question-approval-bridge.js';
 import { isDependencySatisfying, isSchedulingTerminalFailure } from './scheduler-truth.js';
+import { computeEffectiveDependencyState } from './scheduler-state.js';
 import { ApprovalBroker } from '../core/approval-broker.js';
 import type { BrainAnswer, WorkerQuestion, TokenUsage } from '../core/task-types.js';
 
@@ -484,12 +485,10 @@ export function findReadyUndispatchedTasks(
   collectedIds: ReadonlySet<string>,
   assignedTaskIds: ReadonlySet<string>,
 ): Task[] {
-  const doneIds = new Set<string>();
-  for (const t of sprint.tasks) {
-    if (!isDependencySatisfying(t.status)) continue; // born-610 single truth
-    doneIds.add(t.id);
-    if (t.fixForTaskId) doneIds.add(t.fixForTaskId);
-  }
+  // SCHED1 (born-634/635): aggregate-set construction delegated to the single
+  // scheduler-state helper — behavior UNCHANGED (this call site already had
+  // one-level fix-aggregation; see scheduler-effective-dependencies.test.ts).
+  const { satisfyingIds: doneIds } = computeEffectiveDependencyState(sprint.tasks, Date.now());
   const ready: Task[] = [];
   for (const task of sprint.tasks) {
     if (task.status !== TaskStatus.PENDING) continue;

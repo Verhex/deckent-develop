@@ -10052,3 +10052,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 410-003: DOCTOR-DEDUP — MASTER-PLAN 505: runPreFlightHealthCheck ölü-ikizi tekleştir (DONE)
 
 ---
+## Sprint 411 — sprint-411
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-11
+**Duration:** 1231s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1230758ms |
+
+### Tasks
+
+- 411-001: RC1-A — .deck secret-lifecycle çekirdeği (SEC-01: overwrite-guard + 0600 + Windows-ACL) (DONE)
+- 411-002: RC1-B — subprocess-backend .deck görünürlüğü dürüstlük-dilimi (SEC-02) (GO_WITH_TECH_DEBT)
+- 411-003: SCHED1 — semantics-kernel: effective-dependency-state tekleme (strangler dilim-1, davranış-koruyucu) (DONE)
+
+---

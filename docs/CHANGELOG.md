@@ -2,6 +2,20 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint411] - 2026-07-11
+
+### Added
+
+- RC1-A — .deck secret-lifecycle çekirdeği (SEC-01: overwrite-guard + 0600 + Windows-ACL)
+- SCHED1 — semantics-kernel: effective-dependency-state tekleme (strangler dilim-1, davranış-koruyucu)
+
+### Changed
+
+- RC1-B — subprocess-backend .deck görünürlüğü dürüstlük-dilimi (SEC-02) (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint410] - 2026-07-11
 
 ### Added

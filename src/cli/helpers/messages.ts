@@ -407,6 +407,16 @@ const MESSAGES: MessageMap = {
     tr: 'Hassas veritabanı dosyaları git tarafından düzgün yok sayılmıyor.',
   },
 
+  // ─── doctor: subprocess .deck visibility (SEC-02, ADR-G-005, Task 411-002) ──
+  'doctor.deck_subprocess_visibility_warn': {
+    en: 'subprocess workers can read .deck from disk — use the docker backend (shadowed) for sensitive environments.',
+    tr: 'subprocess worker\'lar .deck\'i okuyabilir; hassas ortamda docker backend (shadow\'lu) kullanın.',
+  },
+  'doctor.deck_subprocess_visibility_ok': {
+    en: '.deck subprocess visibility: not applicable',
+    tr: '.deck subprocess görünürlüğü: uygulanamaz',
+  },
+
   // ─── doctor: platform profile (ONB-2-DILIM-3, Sprint 368 — 368-002) ──
   'doctor.platform_profile_header': {
     en: 'Platform Profile:',

@@ -438,9 +438,9 @@ describe('runDoctorChecks (checks module)', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('returns checks array with 15 items', () => {
+  it('returns checks array with 16 items', () => {
     const result = runDoctorChecks('/mock');
-    expect(result.checks.length).toBe(15);
+    expect(result.checks.length).toBe(16); // 15 + '.deck Subprocess Visibility' (411-002, SEC-02 honesty slice)
   });
 
   it('returns ok=false when node missing', () => {

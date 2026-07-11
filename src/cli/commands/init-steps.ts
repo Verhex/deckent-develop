@@ -381,7 +381,13 @@ export function writeDeckSecurityFiles(root: string): void {
   try {
     createDeckTemplate(root);
     ensureDeckGitignore(root);
-  } catch { /* non-fatal */ }
+  } catch (err) {
+    // Non-fatal — init must not abort over .deck/.gitignore setup — but silently
+    // swallowing hid real failures (e.g. permission errors) from the operator.
+    process.stderr.write(
+      `[deckent] WARN: failed to write .deck security files: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+  }
 }
 
 /**

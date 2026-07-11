@@ -1,5 +1,15 @@
-import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
-import { execSync } from 'node:child_process';
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  appendFileSync,
+  mkdirSync,
+  chmodSync,
+  renameSync,
+  unlinkSync,
+} from 'node:fs';
+import { execSync, spawn as nodeSpawn } from 'node:child_process';
+import { platform as osPlatform } from 'node:os';
 import { join } from 'node:path';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -122,12 +132,91 @@ export function validateDeckFile(secrets: Record<string, string>): DeckFileValid
   };
 }
 
+/** Minimal spawned-process shape needed for the Windows ACL branch — mockable in tests. */
+export interface SpawnedAclProcessLike {
+  stderr: NodeJS.ReadableStream | null;
+  on(event: 'close', listener: (code: number | null) => void): this;
+  on(event: 'error', listener: (error: Error) => void): this;
+}
+
+/** Injectable async spawn for the win32 icacls branch (defaults to node:child_process spawn). */
+export type SpawnImpl = (command: string, args: string[]) => SpawnedAclProcessLike;
+
+/** Options for {@link createDeckTemplate} — platform/spawn are injectable for hermetic tests. */
+export interface CreateDeckTemplateOptions {
+  /** Injectable platform (defaults to the real OS platform via node:os). */
+  platform?: NodeJS.Platform;
+  /** Injectable async spawn for the win32 icacls branch (defaults to node:child_process spawn). */
+  spawnImpl?: SpawnImpl;
+}
+
+/**
+ * Windows has no POSIX permission bits — chmod is a no-op there. Restrict access via
+ * `icacls` instead: drop inherited ACEs and grant the current user exclusive Full
+ * Control. Runs via async spawn (never spawnSync) so init never blocks on it; any
+ * failure (no USERNAME, launch failure, non-zero exit, or an `error` event) degrades
+ * honestly — a loud stderr warning, never a thrown error — leaving the file created
+ * but not ACL-hardened rather than aborting init.
+ */
+function applyWindowsOwnerOnlyAcl(deckPath: string, spawnImpl?: SpawnImpl): void {
+  const username = process.env['USERNAME'];
+  if (!username) {
+    process.stderr.write(
+      `[deckent] WARN: could not determine the current Windows user (USERNAME unset) — ` +
+        `skipping icacls hardening for ${deckPath}. The file may be readable by other accounts.\n`,
+    );
+    return;
+  }
+
+  const spawn: SpawnImpl =
+    spawnImpl ?? ((command, args) => nodeSpawn(command, args, { stdio: ['ignore', 'ignore', 'pipe'] }));
+
+  let child: SpawnedAclProcessLike;
+  try {
+    child = spawn('icacls', [deckPath, '/inheritance:r', '/grant:r', `${username}:F`]);
+  } catch (err) {
+    process.stderr.write(
+      `[deckent] WARN: failed to launch icacls for ${deckPath}: ` +
+        `${err instanceof Error ? err.message : String(err)}. The file may be readable by other accounts.\n`,
+    );
+    return;
+  }
+
+  let stderrOutput = '';
+  child.stderr?.on('data', (chunk: Buffer | string) => {
+    stderrOutput += chunk.toString();
+  });
+  child.on('error', (err) => {
+    process.stderr.write(
+      `[deckent] WARN: icacls hardening failed for ${deckPath}: ${err.message}. ` +
+        `The file may be readable by other accounts.\n`,
+    );
+  });
+  child.on('close', (code) => {
+    if (code !== 0) {
+      process.stderr.write(
+        `[deckent] WARN: icacls exited with code ${code} for ${deckPath}` +
+          `${stderrOutput.trim() ? `: ${stderrOutput.trim()}` : ''}. The file may be readable by other accounts.\n`,
+      );
+    }
+  });
+}
+
 /**
  * Create .deck template with all known keys as empty values with comments.
+ *
+ * DECK-OVERWRITE-GUARD (ADR-G-005): no-op if a .deck already exists — an existing
+ * file may hold live user secrets, and re-init (e.g. re-running `deckent init` on an
+ * already-initialized project) must never touch its bytes. The first write is atomic
+ * (same-directory tmp file + rename) and owner-only: POSIX gets `{ mode: 0o600 }` at
+ * write time plus a post-write `chmodSync(0o600)` to defeat a permissive umask;
+ * Windows gets an `icacls` ACL grant (chmod is meaningless there).
  */
-export function createDeckTemplate(projectRoot: string): void {
+export function createDeckTemplate(projectRoot: string, opts: CreateDeckTemplateOptions = {}): void {
   mkdirSync(projectRoot, { recursive: true });
   const deckPath = join(projectRoot, DECK_FILE_NAME);
+
+  if (existsSync(deckPath)) return;
 
   const lines: string[] = [
     '# ─── Deckent Secrets (.deck) ─────────────────────────────────────',
@@ -152,7 +241,39 @@ export function createDeckTemplate(projectRoot: string): void {
     '',
   ];
 
-  writeFileSync(deckPath, lines.join('\n'), 'utf-8');
+  // Atomic create: write to a same-directory tmp file, then rename onto the final
+  // path — a crash mid-write can never leave a torn/partial .deck, and a concurrent
+  // reader always sees either "missing" or "fully written" (same tmp+rename pattern
+  // as src/core/credentials-per-project.ts saveFile).
+  const tmpPath = `${deckPath}.tmp`;
+  writeFileSync(tmpPath, lines.join('\n'), { encoding: 'utf-8', mode: 0o600 });
+  try {
+    renameSync(tmpPath, deckPath);
+  } catch (renameErr) {
+    try {
+      unlinkSync(tmpPath);
+    } catch {
+      // Best-effort cleanup — the renameErr thrown below is what the caller needs to see.
+    }
+    throw renameErr;
+  }
+
+  const plat = opts.platform ?? osPlatform();
+  if (plat === 'win32') {
+    applyWindowsOwnerOnlyAcl(deckPath, opts.spawnImpl);
+  } else {
+    try {
+      // Re-assert 0600 unconditionally: the mode passed to writeFileSync is masked
+      // by the process umask before landing on disk, so a permissive umask can leave
+      // the file wider than owner-only. chmodSync ignores umask entirely.
+      chmodSync(deckPath, 0o600);
+    } catch (err) {
+      process.stderr.write(
+        `[deckent] WARN: could not set owner-only (0600) permissions on ${deckPath}: ` +
+          `${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
+  }
 }
 
 /**

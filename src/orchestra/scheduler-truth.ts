@@ -23,8 +23,13 @@ import { TaskStatus } from '../core/types.js';
 
 /**
  * The ONLY status that satisfies a dependent's `dependencies` entry.
- * (Fix-task aggregation — a DONE `x-fix` satisfying deps on `x` — is the
- * caller's responsibility: it is an ID-mapping concern, not a status one.)
+ * (Fix-task aggregation — a DONE `x-fix` satisfying deps on `x` — is an
+ * ID-mapping concern, not a status one, so it lives one layer up: see
+ * `computeEffectiveDependencyState` in scheduler-state.ts, the single place
+ * that computation now runs for selectEligibleForSpawn, respawnEligibleTasks,
+ * and findReadyUndispatchedTasks. planDispatch/planContinuous still rolls its
+ * own aggregate set inline — pending unification, tracked as SCHED-treni
+ * dilim-4 in docs/analysis/scheduler-unify-design-2026-07-11.md.)
  */
 export function isDependencySatisfying(status: TaskStatus): boolean {
   return status === TaskStatus.DONE;

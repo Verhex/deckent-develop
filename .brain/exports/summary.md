@@ -51,6 +51,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-411 Learnings** (sprint-411): ## Sprint sprint-411 Learnings
+- RC1-B — subprocess-backend .deck görünürlüğü dürüstlük-dilimi (SEC-02): GO_WITH_TECH...
 - **Sprint sprint-410 Learnings** (sprint-410): ## Sprint sprint-410 Learnings
 
 ## Gains
@@ -79,10 +81,6 @@
 - GATE-FLAG-THREAD — 628-kalan: --force-prompt-gate CLI + MCP acknowledgePromptGate: G...
 - **Sprint sprint-402 Learnings** (sprint-402): ## Sprint sprint-402 Learnings
 - PROMPT-GATE-BLOCK-START — born-628: gate-BLOCK'u start/MCP ana-yoluna taşı: GO_WITH_...
-- **Sprint sprint-401 Learnings** (sprint-401): ## Sprint sprint-401 Learnings
-
-## Gains
-- 401-001 — DOC-AFFECTED-GATE — affected-tests kullanım rehberi — docs/guide...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -149,4 +147,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: file_outside_scope
 
-_Total entries: 1230 | Generated: 2026-07-11_
+_Total entries: 1234 | Generated: 2026-07-11_

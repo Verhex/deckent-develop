@@ -1,84 +1,97 @@
-# DIRECTIVES — SPRINT-411: ✅ TAMAMLANDI (manuel sol-koşumu, 2026-07-11) — BU SPRINT'İ KOŞMA
->
-> ⚠️ Bu 3 task Alperen tarafından gpt-5.6-sol'a MANUEL prompt olarak koşuldu (çift-limit-yakma
-> önlendi); raporlar teslim edildi → `docs/analysis/scheduler-unify-design-2026-07-11.md` +
-> `term-flow-unify-design-2026-07-11.md` + `beta-blocker-sweep-2026-07-11.md`. Kararlar
-> karar-turu-3'te verildi (MASTER-PLAN 527/543/544). Aşağısı tarihsel kayıt.
-
-# (arşiv) SPRINT-411: SOL-ANALİZ TURU (gpt-5.6-sol × ultra-effort — 634/635 · 643 · beta-blocker)
+# DIRECTIVES — SPRINT-412: RC-1 SECRET-LIFECYCLE + SCHED-1 SEMANTICS-KERNEL (karar-turu-3 Faz-A açılışı)
 
 ## Goal
-Alperen-direktifi: gpt-5.6-sol ile derin çapraz-analiz (XVER). Üç tasarım/denetim raporu — hepsi
-sonraki kararların ve inşanın DOĞRUDAN girdisi. Kod YAZILMAZ; yalnız analiz-raporu (docs/analysis/).
+Karar-turu-3 (Alperen, 2026-07-11) üç-tren kararının ilk sprint'i: **RC-1** (543 RC-TRAIN dilim-1:
+.deck secret-lifecycle — SEC-01 overwrite/mode + SEC-02 dürüstlük-dilimi) + **SCHED-1** (527
+strangler dilim-1: semantics-kernel — davranış-koruyucu predicate/fix-aggregation tekleme).
+Tasarım-SSOT: `docs/analysis/beta-blocker-sweep-2026-07-11.md` (RC) +
+`docs/analysis/scheduler-unify-design-2026-07-11.md` (SCHED). Publish-zinciri bu trene bağlı.
 
 ## 🔒 BAĞLAYICI (her task)
-- Yalnız kendi Files'ına yaz (docs/analysis/*.md) · kod-dosyası DEĞİŞTİRME · git stash/reset YASAK · build YASAK · notes TEK STRING · Self DÜRÜST.
-- KANIT-DİSİPLİNİ: her iddia dosya:satır referanslı; okuyup doğrulamadığın şeyi İDDİA ETME; belirsizse "doğrulanamadı" de.
-- Türkçe yaz (kod/terim EN). Rapor yapısı: Özet → Kanıt-tabanlı analiz → Seçenekler (+trade-off) → Net Öneri → Uygulama-planı (adım+dosya) → Riskler.
+- Yalnız kendi Files'ına yaz · `.deckent/`, `.brain/`, `.tasks/` DOKUNMA · git stash/reset YASAK · `npm run build` YASAK · notes TEK STRING · Self DÜRÜST (mock-only = GO_WITH_TECH_DEBT, asla DONE).
+- REPRODUCE-FIRST: her fix'ten ÖNCE mevcut hatalı davranışı RED testle kanıtla (test adına `red`/`reproduce` etiketi), sonra GREEN'e çevir.
+- i18n-FIRST: kullanıcıya görünen HER yeni string `getMessage(key, lang)` üzerinden (src/cli/helpers/messages.ts, en+tr çifti) — hardcode TR/EN kabul edilmez.
+- Test hermetik: tmpdir, async spawn (spawnSync YASAK), ≤16GB; kendi test dosyanı VE dokunduğun modülü import eden mevcut testleri koş.
+- Cross-platform (Yasa #2): POSIX + Windows dalları; desteklenmeyen yol SESSİZCE değil DÜRÜSTÇE degrade olur (loud-warn).
 
-## Task 1: SCHEDULER-UNIFY — born-634/635: planDispatch reducer'ını canlı-driver yapma tasarımı
-- Model: gpt-5.6-sol | Provider: codex | Effort: high
-- Files: docs/analysis/scheduler-unify-design-2026-07-11.md
-- Scope: docs/analysis/
+## Task 1: RC1-A — .deck secret-lifecycle çekirdeği (SEC-01: overwrite-guard + 0600 + Windows-ACL)
+- Model: sonnet | Agent: bug-fixer | Effort: high | Provider: claude
+- Files: src/core/deck-file.ts, src/cli/commands/init-steps.ts, scripts/smoke-deck-lifecycle.mjs, tests/core/deck-file-secret-lifecycle.test.ts
+- Scope: src/core/deck-file.ts, src/cli/commands/init-steps.ts, scripts/, tests/core/
 - Dependencies: none
 ### Description
-BAĞLAM: born-610 tek-truth SÖZLÜĞÜNÜ birleştirdi (src/orchestra/scheduler-truth.ts) ama dispatch-YÜRÜTMESİ
-hâlâ ~6 imperatif closure'da dağınık: dispatchTick / processQueue / maybeRespawn / dispatchReadyTasks /
-forceRescanIfIdle / cascadeSkipDeadBlocked (src/orchestra/result-collector.ts + sprint-spawner.ts).
-`planDispatch` (result-collector.ts:350) pinned-MODEL ama 0-prod-çağıranlı (dosyanın :297 yorumunu oku —
-port edilmesi gereken checkpoint'ler orada). GÖREV: bu birleşimin (ADR-064-W Codex-adım-3) TAM tasarımı:
-(1) 6 closure'ın her birinin bugünkü sorumluluk/tetiklenme/yan-etki haritası (dosya:satır); (2) planDispatch
-modelinin bugünkü sözleşmesi ve closure'larla örtüşme/boşluk matrisi; (3) birleşim SEÇENEKLERİ (büyük-bang
-reducer / kademeli-strangler / event-log+replay) trade-off'larıyla; (4) NET öneri + adım-adım migration-planı
-(her adım tek-sprint'lik, geriye-dönüş noktalı, composition-pin test-stratejili); (5) born-635 kalanlarının
-(checkpoint-restore MRR-semantiği [610 Alperen-kararı: MRR=terminal-non-satisfying — restore-yolu buna
-nasıl uyar?] + FIFO-modu dep-check deliği) bu tasarıma nasıl oturduğu; (6) 610'un cascadeSkipped/fix-gate
-muafiyetlerinin ve 476 fix-task-mirasının reducer'da korunma garantisi. Sınıf-riski: scheduler=sprint'lerin
-kalbi — yanlış birleşim tüm dogfood'u durdurur; tasarım muhafazakâr ve kanıt-yoğun olmalı.
+KANIT (sol-sweep SEC-01 + CC disk-verify): `createDeckTemplate` (src/core/deck-file.ts:128-156)
+KOŞULSUZ `writeFileSync` — mevcut .deck'teki kullanıcı API-key'leri re-init'te boş template ile
+SİLİNİR (canlı-reproduce edildi); mode verilmiyor → 0644 (dünyaya-okunur secret). Çağıran
+`writeDeckSecurityFiles` (src/cli/commands/init-steps.ts:380-385) koşulsuz + `catch {}` sessiz-yutar.
+GÖREV: (1) `createDeckTemplate` → **no-op-if-exists**: dosya varsa İÇERİĞE DOKUNMA (byte-aynı kalır);
+(2) ilk yazım **atomic** (aynı-dizin tmp + rename) ve **owner-only**: POSIX'te `{ mode: 0o600 }` +
+yazım-sonrası `chmodSync(0o600)` teyidi (umask'a karşı); (3) **Windows dalı**: chmod anlamsız →
+`icacls <file> /inheritance:r /grant:r "%USERNAME%":F` dene (async spawn), başarısızsa işlemi
+KIRMADAN stderr loud-warn (dürüst-degrade; mesaj i18n'e gerek yok — mekanizma-katmanı EN log
+kabul, ama init-yüzeyine sızan metin varsa getMessage); platform dalı test-edilebilir olsun
+(fonksiyon parametresiyle platform enjekte edilebilir); (4) `writeDeckSecurityFiles` sessiz `catch {}`
+→ non-fatal kalır AMA stderr'e warn yazar; (5) `ensureDeckGitignore` davranışı DEĞİŞMEZ.
+RED-first: mevcut-.deck'li tmpdir fixture'da sentinel key yaz → bugünkü kod onu EZER (RED kanıtı) →
+fix sonrası korunur + yeni-dosya mode 0600 assert (POSIX). scripts/smoke-deck-lifecycle.mjs:
+tmpdir → template → sentinel yaz → template tekrar → sentinel korunmuş + (POSIX) stat mode 600 →
+'SMOKE OK' basar, aksi exit 1.
+Smoke: node scripts/smoke-deck-lifecycle.mjs → SMOKE OK
 ### goNogo
-- goCriteria: rapor var; 6-closure haritası dosya:satır'lı ve TAM; örtüşme-matrisi; ≥3 seçenek trade-off'lu; net-öneri + tek-sprint'lik adımlarla migration-planı; 610/476-koruma garantileri açık.
-- nogo: kod değiştirilirse NO_GO; kanıtsız iddia (satır-refsiz mimari-beyan) yoğunsa NO_GO.
+- goCriteria: RED-reproduce testi var (eski davranış: ezme + 0644); no-op-if-exists + atomic + 0600 + chmod-teyit GREEN; Windows-dalı testli (mock/enjekte) + dürüst-warn; writeDeckSecurityFiles warn'lı non-fatal; smoke-script teslim + lokal koşusu OK; dokunulan modülleri import eden mevcut testler yeşil.
+- nogo: mevcut .deck içeriğine dokunan herhangi bir yol kalırsa NO_GO; mode-teyitsiz (yalnız writeFileSync-mode) bırakılırsa NO_GO; Windows sessiz-no-op kalırsa NO_GO.
 
-## Task 2: TERM-FLOW-UNIFY — born-643: golden-flow vs fiili-native-tool-akışı birleşim tasarımı (Alperen-kararının girdisi)
-- Model: gpt-5.6-sol | Provider: codex | Effort: high
-- Files: docs/analysis/term-flow-unify-design-2026-07-11.md
-- Scope: docs/analysis/
+## Task 2: RC1-B — subprocess-backend .deck görünürlüğü dürüstlük-dilimi (SEC-02)
+- Model: sonnet | Effort: medium | Provider: claude
+- Files: src/cli/commands/doctor-checks.ts, src/cli/helpers/messages.ts, docs/adr/adr-g-005-secret-file-system.md, tests/cli/doctor-subprocess-secret-warn.test.ts
+- Scope: src/cli/commands/, src/cli/helpers/messages.ts, docs/adr/, tests/cli/
+- Dependencies: Task 1
+### Description
+KANIT (sol-sweep SEC-02): subprocess worker host proje-kökündeki .deck'i OKUYABİLİR — Docker
+shadow (src/orchestra/spawn-backend-docker.ts:729-752) yalnız container-yolunu kapatır;
+ADR-G-005 (docs/adr/adr-g-005-secret-file-system.md:25) açığı kabul eder. TAM fix (host
+credential-broker, worker-FS'ten tam ayrım) RC-1 kapsamını aşar — AYRI born olacak; bu task
+DÜRÜSTLÜK dilimi (sessiz-açık YASAK, Yasa #2 dürüst-fail ilkesi): (1) doctor'a yeni check:
+`spawn_backend === 'subprocess'` VE .deck mevcut VE en az bir non-empty secret satırı varsa →
+WARN-seviye bulgu: "subprocess worker'lar .deck'i okuyabilir; hassas ortamda docker backend
+(shadow'lu) kullanın" (getMessage ile en+tr; doctor çıktı-desenine uy — mevcut check'lerin
+yapısını kopyala); .deck yoksa/boşsa check PASS-sessiz; (2) ADR-G-005 dosyasına tarihli
+durum-notu bölümü: RC-1'de eklenen guard'lar (overwrite/0600 — Task-1) + subprocess-görünürlük
+AÇIK + credential-broker follow-up işaretçisi; (3) RED-first: subprocess-config'li tmpdir
+fixture'da bugünkü doctor'ın UYARI VERMEDİĞİNİ kanıtla, sonra GREEN.
+Smoke: node dist/cli/entry.js doctor (subprocess-config + dolu-.deck tmp-projede) → çıktıda subprocess-secret uyarı satırı
+### goNogo
+- goCriteria: doctor-check RED→GREEN testli; i18n en+tr çifti; .deck-yok/boş yolunda uyarı YOK (false-positive testi); ADR-G-005 durum-notu eklendi; mevcut doctor testleri yeşil.
+- nogo: hardcoded user-facing string varsa NO_GO; uyarı .deck'in İÇERİĞİNİ (key adı/değeri) sızdırırsa NO_GO.
+
+## Task 3: SCHED1 — semantics-kernel: effective-dependency-state tekleme (strangler dilim-1, davranış-koruyucu)
+- Model: sonnet | Effort: high | Provider: claude
+- Files: src/orchestra/scheduler-state.ts, src/orchestra/scheduler-truth.ts, src/orchestra/sprint-spawner.ts, src/orchestra/result-collector.ts, tests/orchestra/scheduler-effective-dependencies.test.ts
+- Scope: src/orchestra/, tests/orchestra/
 - Dependencies: none
 ### Description
-BAĞLAM (gap-rapor `docs/MASTER-PLAN.md` satır-541 + kaynak): hedef-deneyim "kullanıcı REPL'de NL yazar →
-DIRECTIVES üretilir → plan-preview → onay → detached-run → canlı-izleme → sonuç yeni-turn". BUGÜN İKİ AYRI
-DÜNYA VAR: (A) tasarlanmış-ama-orphan: golden-flow (src/orchestra/golden-flow.ts, yalnız `deckent do`
-CLI'dan; NL-intent placeholder-scaffold; plan-preview REPL'de render edilmiyor; TERM-MODE risk-gate
-checkActionAllowed 0-çağıran; startSprint'i senkron stdio:inherit) ↔ (B) fiilen-çalışan: native-agent
-tool-bridge (LLM kendisi deckent_set_directives→plan→start[detached]→status tool'larını çağırıyor; onay
-generic confirm-modal; 642 bg-turns artık sonucu geri getiriyor). GÖREV: iki dünyanın birleşim tasarımı:
-(1) her iki akışın uçtan-uca adım-haritası (dosya:satır) + güçlü/zayıf yanları; (2) SEÇENEKLER: B-resmileşir
-(golden-flow parçaları B'ye organ-nakli: plan-preview kartı, risk-gate, DIRECTIVES-builder'ı tool'un içine)
-/ A-REPL'e-bağlanır / hibrit; (3) her seçenekte 511 kabul-ölçütünün ("1 gerçek born, CLI-komutu ELLE
-yazmadan uçtan-uca") nasıl sağlandığı; (4) NET öneri + uygulama-planı (sprint-dilimli) + hangi parçalar
-ölür/organ-nakli olur listesi; (5) DESK-2 blueprint'iyle (`.analysis/desk2-blueprint-2026-07-10.md` —
-oku) tutarlılık kontrolü.
+ÖNCE OKU (zorunlu): `docs/analysis/scheduler-unify-design-2026-07-11.md` — Sprint-1 dilimi +
+örtüşme-matrisi + riskler. BAĞLAM: born-610 predicate SÖZLÜĞÜ tekledi (scheduler-truth.ts) ama
+fix-aggregation "caller's responsibility" kaldı (scheduler-truth.ts:26-27) ve site'lar ayrışık:
+`selectEligibleForSpawn` (sprint-spawner.ts:1189-1190) hardcoded `status === TaskStatus.DONE` +
+fix-aggregation YOK; `dispatchReadyTasks` (result-collector.ts:~482) aggregate-aware DONE-seti
+KENDİ kurar. GÖREV (SCHED-treni dilim-1; Alperen-onaylı kademeli-strangler): (1) YENİ
+`src/orchestra/scheduler-state.ts`: `computeEffectiveDependencyState(tasks, nowMs)` → PURE
+(disk, env ve Date.now OKUMAZ — now dışarıdan): satisfyingIds (isDependencySatisfying + BİR-SEVİYE
+fix-aggregation: DONE `<id>-fix`/fixForTaskId original'ı satisfy eder — mevcut dispatchReadyTasks
+semantiğini AYNEN taşı, yeniden icat etme), terminalFailureIds (isSchedulingTerminalFailure,
+aynı fix-aggregation merceğiyle), retry-eligibility helper'ı (retryAfter <= nowMs). (2)
+`selectEligibleForSpawn` hardcoded DONE-set yerine bu helper'ı kullanır — DAVRANIŞ-DEĞİŞİMİ
+BİLİNÇLİ ve TEK: DONE fix-task'ı artık idle-rescan/respawn-eligibility'de de original'ı satisfy
+eder (tasarım-doc composition-kanıtı; ayrı test-case ile pinle); `Date.now()` çağrısı imzaya
+`nowMs = Date.now()` default-parametre olarak taşınır (geriye-uyumlu). (3) `dispatchReadyTasks`
+kendi aggregate-set kurulumunu helper'a delege eder — DAVRANIŞ AYNI (mevcut testler yeşil).
+(4) respawnEligibleTasks predicate kullanımı helper'la hizalanır (sprint-spawner.ts:~884).
+(5) YENİ exhaustive test: status ∈ {DONE, NO_GO, MRR, PENDING, EXECUTING} × fix {yok, PENDING-fix,
+DONE-fix, NO_GO-fix} × pipeline {on, off} tablosu — her hücrenin beklenen eligible/blocked/skip
+sonucu; + mevcut scheduler/dispatch testlerinin TAMAMI yeşil (tests/orchestra/ blast-radius'u koş).
+SINIF-RİSKİ: scheduler = sprint'lerin kalbi — kapsam-dışı refactor YASAK (closure'lara, checkpoint'e,
+FIFO-moduna DOKUNMA; onlar dilim 2-7). planDispatch'e DOKUNMA (dilim-4 shadow).
 ### goNogo
-- goCriteria: iki-akış haritası dosya:satır'lı; ≥3 seçenek 511-ölçütü karşılaması açık; net-öneri + dilimli-plan + ölü/nakil listesi; DESK-2 tutarlılık bölümü.
-- nogo: kod değişirse NO_GO; tek-seçenek dayatması (trade-off'suz) NO_GO.
-
-## Task 3: BETA-BLOCKER-SWEEP — v1.0.0-beta öncesi bütünsel risk-taraması (çapraz-göz)
-- Model: gpt-5.6-sol | Provider: codex | Effort: high
-- Files: docs/analysis/beta-blocker-sweep-2026-07-11.md
-- Scope: docs/analysis/
-- Dependencies: none
-### Description
-BAĞLAM: yayın-zinciri hazırlanıyor (release.yml tek-otorite; validate:publish; builtins-merge sürüyor;
-🔒 YAYIN-ŞARTI: desktop-app Alperen-onayı). GÖREV (bağımsız-göz, Anthropic-hattının kör-noktalarını ara):
-npm-paketine GİDEN yüzeyin beta-blocker taraması: (1) package.json files/bin/exports/engines gerçeği —
-paketlenen-set ile çalışması-gereken-set tutarlı mı (dist/, builtins, assets; `npm pack --dry-run`
-zihniyetiyle dosya-listesi analizi); (2) taze-kurulum yolu: `deckent init` bir YABANCI projede ilk 10
-dakikada neye çarpar (global-config yokluğu, docker-yokluğu fail-honest mı, auth-yokluğu mesajları,
-Windows-yolları); (3) validate:publish kapsam-boşlukları; (4) güvenlik-yüzeyi hızlı-tarama (secrets
-default'ları, telemetry, dış-çağrılar); (5) versiyonlama/changelog tutarlılığı. Her bulgu: kanıt
-(dosya:satır) + şiddet (BLOCKER/MAJOR/MINOR) + tek-cümle fix-önerisi. BLOCKER'ları ayrı özet-tabloda topla.
-Bilinen-açıkları (desktop-gate, 502-merge-sürüyor) tekrar-keşif diye yazma — docs/MASTER-PLAN.md 530-542
-satırlarını okuyup düş.
-### goNogo
-- goCriteria: BLOCKER-özet-tablosu + kanıtlı bulgular (dosya:satır) + şiddet+fix-önerisi; bilinen-açıklar mükerrer-listelenmemiş; paket-yüzeyi analizi somut (files/bin/exports adları).
-- nogo: kod değişirse NO_GO; genel-geçer tavsiye listesi (kanıtsız) NO_GO.
+- goCriteria: scheduler-state.ts pure (Date.now, process.env ve fs importu YOK — lint-kanıt notes'ta); exhaustive tablo-testi TAM; tek-davranış-değişimi (fix-agg idle+respawn'a) ayrı test-case'le pinli; selectEligibleForSpawn + dispatchReadyTasks + respawnEligibleTasks helper'a bağlı; tests/orchestra/ tamamı yeşil.
+- nogo: closure, checkpoint, FIFO-modu veya planDispatch'e dokunulursa NO_GO; helper'da fs, env veya Date.now okuma varsa NO_GO; mevcut test kırığı kalırsa NO_GO.

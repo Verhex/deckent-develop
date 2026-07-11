@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-411 Learnings
+- Sprint sprint-411 Learnings: ## Sprint sprint-411 Learnings
+- RC1-B — subprocess-backend .deck görünürlüğü dürüstlük-dilimi (SEC-02): GO_WITH_TECH_DEBT — Implemented SEC-02 honesty-slice fully within the granted write scope: added checkDeckSubprocessVisibility(root, spawnBa
+
+## Gains
+- 411-001 — RC1-A — .deck secret-lifecycle çekirdeği (SEC-01: overwrite-guard + 0600 + Windows-ACL) — SEC-01 fixed: createDeckTemplate (src/core/deck-file.ts) is now no-op-if-exists (existsSync guard...
+- 411-003 — SCHED1 — semantics-kernel: effective-dependency-state tekleme (strangler dilim-1, davranış-koruyucu) — SCHED1 (scheduler-unify design doc Sprint-1 slice) landed.
+
 ## Sprint sprint-410 Learnings
 - Sprint sprint-410 Learnings: ## Sprint sprint-410 Learnings
 
