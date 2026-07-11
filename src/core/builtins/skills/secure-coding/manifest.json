@@ -36,5 +36,10 @@
       "sanitize"
     ]
   },
-  "enabled": true
+  "enabled": true,
+  "stackDetection": {
+    "files": [],
+    "dependencies": [],
+    "commands": []
+  }
 }

@@ -6,7 +6,9 @@
  * first spawn happens immediately; each subsequent spawn waits at least
  * `token_throttle_ms` ms.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+  describe, it, expect, beforeEach, afterEach, vi,
+} from 'vitest';
 import { writeFileSync, mkdirSync, rmSync, existsSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -122,16 +124,24 @@ describe('sprint-spawner — token_throttle_ms wire (Sprint 202 Task 202-004)', 
 
     const origCwd = process.cwd();
     process.chdir(testRoot);
+    vi.useFakeTimers();
     try {
-      await spawnWorkers(testRoot, sprint, config, { spawnBackend: backend });
+      const spawnPromise = spawnWorkers(testRoot, sprint, config, { spawnBackend: backend });
+      await vi.runAllTimersAsync();
+      await spawnPromise;
     } finally {
+      vi.useRealTimers();
       process.chdir(origCwd);
     }
 
     expect(backend.calls).toHaveLength(3);
-    // With no throttle, all three spawns should happen well under 50ms total.
+    // born-632: with token_throttle_ms=0 the throttle branch never calls
+    // sleep(), so no fake timer ever fires and the mocked clock cannot
+    // advance between spawn calls — the span is deterministically 0, proving
+    // by construction that no throttle delay was injected (previously a
+    // "<50ms" wall-clock guess that measured 522ms under CI fork pressure).
     const totalSpan = backend.calls[2]!.timestamp - backend.calls[0]!.timestamp;
-    expect(totalSpan).toBeLessThan(50);
+    expect(totalSpan).toBe(0);
   });
 
   it('inserts at least token_throttle_ms between consecutive spawn calls', async () => {
@@ -144,20 +154,26 @@ describe('sprint-spawner — token_throttle_ms wire (Sprint 202 Task 202-004)', 
 
     const origCwd = process.cwd();
     process.chdir(testRoot);
+    vi.useFakeTimers();
     try {
-      await spawnWorkers(testRoot, sprint, config, { spawnBackend: backend });
+      const spawnPromise = spawnWorkers(testRoot, sprint, config, { spawnBackend: backend });
+      await vi.runAllTimersAsync();
+      await spawnPromise;
     } finally {
+      vi.useRealTimers();
       process.chdir(origCwd);
     }
 
     expect(backend.calls).toHaveLength(3);
-    // Each subsequent spawn must wait >= THROTTLE ms after the previous one.
-    // Allow a small timer-resolution tolerance (~10 ms below the floor).
-    const SCHEDULER_SLACK = 10;
+    // born-632: under fake timers, Date.now() advances in exact lockstep with
+    // the setTimeout delay sleep() was invoked with — the gap is now an exact,
+    // deterministic reflection of the throttle floor argument rather than a
+    // real-scheduler measurement, so no slack constant is needed anymore
+    // (previously required a real-clock tolerance band below the floor).
     const gap1 = backend.calls[1]!.timestamp - backend.calls[0]!.timestamp;
     const gap2 = backend.calls[2]!.timestamp - backend.calls[1]!.timestamp;
-    expect(gap1).toBeGreaterThanOrEqual(THROTTLE - SCHEDULER_SLACK);
-    expect(gap2).toBeGreaterThanOrEqual(THROTTLE - SCHEDULER_SLACK);
+    expect(gap1).toBe(THROTTLE);
+    expect(gap2).toBe(THROTTLE);
   });
 
   it('does not delay the first spawn (only inter-worker pacing)', async () => {
@@ -168,18 +184,26 @@ describe('sprint-spawner — token_throttle_ms wire (Sprint 202 Task 202-004)', 
     const backend = makeTimedBackend();
     const config = makeConfig(THROTTLE);
 
-    const t0 = Date.now();
     const origCwd = process.cwd();
     process.chdir(testRoot);
+    vi.useFakeTimers();
+    let elapsed: number;
     try {
-      await spawnWorkers(testRoot, sprint, config, { spawnBackend: backend });
+      const t0 = Date.now();
+      const spawnPromise = spawnWorkers(testRoot, sprint, config, { spawnBackend: backend });
+      await vi.runAllTimersAsync();
+      await spawnPromise;
+      elapsed = Date.now() - t0;
     } finally {
+      vi.useRealTimers();
       process.chdir(origCwd);
     }
-    const elapsed = Date.now() - t0;
 
     expect(backend.calls).toHaveLength(1);
-    // A single-task wave must NOT wait the throttle floor.
-    expect(elapsed).toBeLessThan(THROTTLE);
+    // born-632: a single-task wave never enters the throttle branch
+    // (spawnedThisWave stays 0), so no timer fires and the fake clock cannot
+    // advance — elapsed is deterministically 0, proving no floor delay was
+    // injected before the first (and only) spawn.
+    expect(elapsed).toBe(0);
   });
 });

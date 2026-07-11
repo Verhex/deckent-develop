@@ -1,0 +1,444 @@
+{
+  "taskId": "404-001",
+  "sprintId": "sprint-404",
+  "steps": [
+    {
+      "step": 4,
+      "name": "routing-step-4",
+      "input": {
+        "taskId": "404-001",
+        "title": "RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)",
+        "scope": [
+          "src/cli/helpers/",
+          "tests/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "terminal-ux-engineer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill budget: max 1 (small task, 1 module(s), effort=normal)"
+    },
+    {
+      "step": 5,
+      "name": "routing-step-5",
+      "input": {
+        "taskId": "404-001",
+        "title": "RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)",
+        "scope": [
+          "src/cli/helpers/",
+          "tests/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "terminal-ux-engineer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill 'api-design' learning bonus: +1 (sprint recency)"
+    },
+    {
+      "step": 6,
+      "name": "routing-step-6",
+      "input": {
+        "taskId": "404-001",
+        "title": "RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)",
+        "scope": [
+          "src/cli/helpers/",
+          "tests/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "terminal-ux-engineer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill 'ci-testing' excluded: Excluded by rule"
+    },
+    {
+      "step": 7,
+      "name": "routing-step-7",
+      "input": {
+        "taskId": "404-001",
+        "title": "RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)",
+        "scope": [
+          "src/cli/helpers/",
+          "tests/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "terminal-ux-engineer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill 'code-simplifier' learning bonus: +1 (sprint recency)"
+    },
+    {
+      "step": 8,
+      "name": "routing-step-8",
+      "input": {
+        "taskId": "404-001",
+        "title": "RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)",
+        "scope": [
+          "src/cli/helpers/",
+          "tests/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "terminal-ux-engineer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill 'frontend-design' learning bonus: +1 (sprint recency)"
+    },
+    {
+      "step": 9,
+      "name": "routing-step-9",
+      "input": {
+        "taskId": "404-001",
+        "title": "RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)",
+        "scope": [
+          "src/cli/helpers/",
+          "tests/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "terminal-ux-engineer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill 'git-expert' learning bonus: -2 (sprint recency)"
+    },
+    {
+      "step": 10,
+      "name": "routing-step-10",
+      "input": {
+        "taskId": "404-001",
+        "title": "RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)",
+        "scope": [
+          "src/cli/helpers/",
+          "tests/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "terminal-ux-engineer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill 'performance-optimizer' learning bonus: -2 (sprint recency)"
+    },
+    {
+      "step": 12,
+      "name": "routing-step-12",
+      "input": {
+        "taskId": "404-001",
+        "title": "RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)",
+        "scope": [
+          "src/cli/helpers/",
+          "tests/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "terminal-ux-engineer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill 'secure-coding' learning bonus: +1 (sprint recency)"
+    },
+    {
+      "step": 13,
+      "name": "routing-step-13",
+      "input": {
+        "taskId": "404-001",
+        "title": "RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)",
+        "scope": [
+          "src/cli/helpers/",
+          "tests/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "terminal-ux-engineer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill 'sh-portability' learning bonus: +1 (sprint recency)"
+    },
+    {
+      "step": 14,
+      "name": "routing-step-14",
+      "input": {
+        "taskId": "404-001",
+        "title": "RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)",
+        "scope": [
+          "src/cli/helpers/",
+          "tests/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "terminal-ux-engineer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill 'testing-expert' intent-priority bonus: +2 (intent=implementation)"
+    },
+    {
+      "step": 15,
+      "name": "routing-step-15",
+      "input": {
+        "taskId": "404-001",
+        "title": "RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)",
+        "scope": [
+          "src/cli/helpers/",
+          "tests/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "terminal-ux-engineer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill 'typescript-expert' intent-priority bonus: +2 (intent=implementation)"
+    },
+    {
+      "step": 16,
+      "name": "routing-step-16",
+      "input": {
+        "taskId": "404-001",
+        "title": "RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)",
+        "scope": [
+          "src/cli/helpers/",
+          "tests/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "terminal-ux-engineer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Skill selected: 'typescript-expert' (score=6, rules=[])"
+    },
+    {
+      "step": 17,
+      "name": "routing-step-17",
+      "input": {
+        "taskId": "404-001",
+        "title": "RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)",
+        "scope": [
+          "src/cli/helpers/",
+          "tests/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "terminal-ux-engineer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Dynamic exclusions: [frontend-designer, accessibility-auditor, migration-specialist]"
+    },
+    {
+      "step": 18,
+      "name": "routing-step-18",
+      "input": {
+        "taskId": "404-001",
+        "title": "RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)",
+        "scope": [
+          "src/cli/helpers/",
+          "tests/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "terminal-ux-engineer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent 'accessibility-auditor' excluded by override"
+    },
+    {
+      "step": 20,
+      "name": "routing-step-20",
+      "input": {
+        "taskId": "404-001",
+        "title": "RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)",
+        "scope": [
+          "src/cli/helpers/",
+          "tests/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "terminal-ux-engineer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent 'ci-guardian' excluded: Excluded by rule"
+    },
+    {
+      "step": 22,
+      "name": "routing-step-22",
+      "input": {
+        "taskId": "404-001",
+        "title": "RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)",
+        "scope": [
+          "src/cli/helpers/",
+          "tests/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "terminal-ux-engineer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent 'doc-writer' excluded: Excluded by rule"
+    },
+    {
+      "step": 23,
+      "name": "routing-step-23",
+      "input": {
+        "taskId": "404-001",
+        "title": "RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)",
+        "scope": [
+          "src/cli/helpers/",
+          "tests/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "terminal-ux-engineer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent 'frontend-designer' excluded by override"
+    },
+    {
+      "step": 24,
+      "name": "routing-step-24",
+      "input": {
+        "taskId": "404-001",
+        "title": "RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)",
+        "scope": [
+          "src/cli/helpers/",
+          "tests/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "terminal-ux-engineer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent 'migration-specialist' excluded by override"
+    },
+    {
+      "step": 28,
+      "name": "routing-step-28",
+      "input": {
+        "taskId": "404-001",
+        "title": "RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)",
+        "scope": [
+          "src/cli/helpers/",
+          "tests/",
+          "tests/cli/helpers/"
+        ],
+        "intent": "implementation"
+      },
+      "output": {
+        "agent": "terminal-ux-engineer",
+        "skills": [
+          "typescript-expert"
+        ],
+        "confidence": "low"
+      },
+      "durationMs": 0,
+      "reasoning": "Agent selected: 'terminal-ux-engineer' (score=9, rules=[rule(score=6)])"
+    }
+  ],
+  "decidedAt": "2026-07-11T05:56:43.402Z"
+}

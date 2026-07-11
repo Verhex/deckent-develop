@@ -41,8 +41,13 @@
     "totalUses": 19,
     "successRate": 0.9473684210526315,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-402",
+    "lastUsedInSprint": "sprint-403",
     "successCount": 18
   },
-  "entrypoint": "SKILL.md"
+  "entrypoint": "SKILL.md",
+  "stackDetection": {
+    "files": [],
+    "dependencies": [],
+    "commands": []
+  }
 }

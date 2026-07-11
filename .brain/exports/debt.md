@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-403-002 | Tech debt from 403-002: CLI path fully wired end-to-end, no gap: src/cli/command | normal | sprint-403 | resolved |
 | debt-402-001 | Tech debt from 402-001: RED-kanit: pre-fix `grep -c promptGate src/orchestra/spr | normal | sprint-402 | resolved |
 | debt-399-001 | Tech debt from 399-001: Rule-5 is now trackedRootFiles-aware: sanitizeScope(file | normal | sprint-399 | resolved |
 | debt-399-002 | Tech debt from 399-002: Implemented as specified: (a) STACK_COMMANDS type gained | normal | sprint-399 | resolved |

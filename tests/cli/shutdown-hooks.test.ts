@@ -10,9 +10,12 @@
  *     not break sibling cleanup), and is collectively time-bounded so one hung
  *     hook cannot hang shutdown.
  *
- * Hermetic: in-memory only; real timers (bound test uses a short real race).
+ * Hermetic: in-memory only; the bound-race test drives vitest fake timers
+ * (born-632) instead of racing a real wall-clock window.
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import {
+  describe, it, expect, afterEach, vi,
+} from 'vitest';
 import {
   registerShutdownHook,
   hasShutdownHooks,
@@ -63,16 +66,29 @@ describe('shutdown-hooks registry', () => {
   });
 
   it('is collectively bounded — a never-resolving hook cannot hang the run', async () => {
-    // Contract-level probe without waiting the real 5s: the run must be a race
-    // against a timer (resolves even though the hook never does). We assert the
-    // exported bound is the documented 5s and race the run against a generous
-    // 6s ceiling using a hook that never settles.
+    // born-632: the previous version raced runShutdownHooks() against a real
+    // 4.5s–6.5s wall-clock window; VITEST_MAX_FORKS=2 fork pressure coalesces
+    // timers and measured 3157ms in CI (under the lower bound → flaky RED).
+    // Fake timers make the race deterministic: we can assert the EXACT
+    // instant the bound fires (pending one tick before it, resolved the tick
+    // it crosses), which is a strictly stronger proof of "collectively
+    // bounded" than a tolerance window ever was.
     expect(SHUTDOWN_HOOKS_TIMEOUT_MS).toBe(5000);
-    track(() => new Promise<void>(() => { /* never settles */ }));
-    const start = Date.now();
-    await runShutdownHooks();
-    const elapsed = Date.now() - start;
-    expect(elapsed).toBeGreaterThanOrEqual(4500);
-    expect(elapsed).toBeLessThan(SHUTDOWN_HOOKS_TIMEOUT_MS + 1500);
-  }, 10_000);
+    vi.useFakeTimers();
+    try {
+      track(() => new Promise<void>(() => { /* never settles */ }));
+
+      let resolved = false;
+      const runPromise = runShutdownHooks().then(() => { resolved = true; });
+
+      await vi.advanceTimersByTimeAsync(SHUTDOWN_HOOKS_TIMEOUT_MS - 1);
+      expect(resolved).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(resolved).toBe(true);
+      await runPromise;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

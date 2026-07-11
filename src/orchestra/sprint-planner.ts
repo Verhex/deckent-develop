@@ -770,6 +770,15 @@ export async function planSprint(
             .join(' | '),
         );
       } catch (taskErr) {
+        // born-641 (2026-07-11): this swallow hid a total plan-time routing
+        // collapse for ~10 days (secure-coding manifest TypeError killed V2
+        // routing for EVERY task; assignments silently degraded to the
+        // spawn-time path). A routing failure must stay non-fatal, but it must
+        // be OPERATOR-VISIBLE, not debug-only.
+        console.warn(
+          `[deckent] WARN: V2 routing failed for task ${task.id} — assignment falls back ` +
+          `(agent quality degraded). Cause: ${taskErr instanceof Error ? taskErr.message : String(taskErr)}`,
+        );
         debugLog('planSprint:routing-v2', `V2 routing failed for task ${task.id}: ${taskErr}`);
       }
     }

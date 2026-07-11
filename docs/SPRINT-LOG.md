@@ -9856,3 +9856,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 402-004: E005-SPLIT — born-623: path-resolution'a ayrı error-code (DONE)
 
 ---
+## Sprint 403 — sprint-403
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-11
+**Duration:** 959s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 959101ms |
+
+### Tasks
+
+- 403-001: RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts) (DONE)
+- 403-002: GATE-FLAG-THREAD — 628-kalan: --force-prompt-gate CLI + MCP acknowledgePromptGate (GO_WITH_TECH_DEBT)
+- 403-003: FLAKE-WALLCLOCK — born-632: duvar-saati assert ailesi hermetikleştir (DONE)
+- 403-004: NESTED-HONESTY — born-633: call_tool nested-dispatch dürüstlük ailesi (4 kalem) (DONE)
+
+---

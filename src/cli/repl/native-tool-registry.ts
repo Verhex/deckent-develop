@@ -30,6 +30,8 @@ import {
   type ConfirmFn,
   type ExecImplFn,
   type ToolDispatchPlan,
+  type DispatchResult,
+  type DispatchError,
 } from '../../core/tool-dispatch.js';
 
 /** Minimal structural shape of the buildMcpBridge return (chat-mcp-bridge.ts). */
@@ -321,6 +323,78 @@ const NOT_WIRED_EXEC: ExecImplFn = ({ name }) => {
   );
 };
 
+/**
+ * born-633 NESTED-HONESTY item(2) — thrown by `createParityExecImpl`
+ * (native-agent-bridge.ts) for a policy-deny / user-reject. Both currently
+ * surface as `DispatchResult.status:'error'` (an execImpl throw —
+ * tool-dispatch.ts/core has no separate status for this), so these markers are
+ * the ONLY signal `toCallToolResult` below has to tell a policy denial apart
+ * from a genuine internal error. Exported so native-agent-bridge.ts's throw
+ * sites and this file's classifier share the SAME literal strings.
+ */
+export const PARITY_POLICY_DENIAL_PREFIX = '[denied by policy]';
+export const PARITY_USER_REJECTION_PREFIX = '[rejected by user]';
+
+function isApprovalDenialError(error: DispatchError | undefined): boolean {
+  if (!error) return false;
+  return error.message.startsWith(PARITY_POLICY_DENIAL_PREFIX) || error.message.startsWith(PARITY_USER_REJECTION_PREFIX);
+}
+
+/**
+ * Duck-types a `ToolResult` (agent/tools/types.ts) out of an execImpl return
+ * value. Every REAL nested target's handler always resolves one
+ * (`ToolDefinition.handler`'s return type) — this stays defensive only for a
+ * test-injected fake execImpl that returns something else (a bare string,
+ * e.g. tests/cli/tool-repl-wire.test.ts's `'fake-result'` fixtures). Exported
+ * for reuse by native-agent-bridge.ts's toolSink wiring (born-633 item 4) —
+ * ONE duck-type check, not two divergent ones.
+ */
+export function asToolResult(value: unknown): ToolResult | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const v = value as Partial<ToolResult>;
+  return typeof v.ok === 'boolean' && typeof v.output === 'string' ? (v as ToolResult) : undefined;
+}
+
+/**
+ * born-633 NESTED-HONESTY item(1)+(2) — `deckent_call_tool`'s own result must
+ * be honest about a NESTED failure, not just its own dispatch mechanics.
+ *
+ * (1) `dispatchToolCall` reports `status:'executed'` whenever `execImpl` did
+ * NOT throw — a target handler that returns a HANDLED `{ok:false, output}`
+ * (no throw) still counts as 'executed'. Before this fix the wrapper blindly
+ * mapped `status==='executed'` to the outer `ok:true`, masking every nested
+ * handled-failure as a success. The inner `ok` is unwrapped here and WINS over
+ * the dispatch-level status; the inner `output` (error text) needs no separate
+ * handling — it is already nested inside `JSON.stringify(result)` at
+ * `result.result.output`.
+ *
+ * (2) A parity policy-deny/user-reject (`createParityExecImpl`'s thrown
+ * `[denied by policy]`/`[rejected by user]`) is indistinguishable at the
+ * `DispatchResult.status` level from a genuine internal error — both surface
+ * as `status:'error'`. Detected via `isApprovalDenialError` and reclassified
+ * with an honest `[approval-denied]` tag — a class DISTINCT from the
+ * pre-existing `[deckent-denied]`, which stays reserved for a REAL
+ * dispatch-level 'denied' (e.g. the risk-threshold gate with no confirm seam,
+ * tests/cli/tool-repl-wire.test.ts:141-149 — unchanged, must not regress) —
+ * plus a `status:'denied'` override in the returned JSON envelope (the nested
+ * `telemetry.status` is left untouched: it is core/tool-dispatch.ts's own
+ * truthful record of the execImpl-throw code path).
+ */
+function toCallToolResult(result: DispatchResult): ToolResult {
+  if (result.status === 'executed') {
+    const inner = asToolResult(result.result);
+    const ok = inner ? inner.ok : true;
+    return { ok, output: `${ok ? '' : '[mcp-error] '}${JSON.stringify(result)}` };
+  }
+  if (result.status === 'denied') {
+    return { ok: false, output: `[deckent-denied] ${JSON.stringify(result)}` };
+  }
+  if (result.status === 'error' && isApprovalDenialError(result.error)) {
+    return { ok: false, output: `[approval-denied] ${JSON.stringify({ ...result, status: 'denied' })}` };
+  }
+  return { ok: false, output: `[mcp-error] ${JSON.stringify(result)}` };
+}
+
 function registerToolSurfaceTools(registry: ToolRegistry, opts: ToolSurfaceOptions): void {
   const catalog = buildToolSurfaceCatalog(registry.list());
   const searchIndex = new ToolSearchIndex(catalog);
@@ -406,8 +480,7 @@ function registerToolSurfaceTools(registry: ToolRegistry, opts: ToolSurfaceOptio
         ...(opts.confirm ? { confirm: opts.confirm } : {}),
         riskThreshold: opts.riskThreshold ?? DEFAULT_RISK_THRESHOLD,
       });
-      const tag = result.status === 'executed' ? '' : result.status === 'denied' ? '[deckent-denied] ' : '[mcp-error] ';
-      return { ok: result.status === 'executed', output: `${tag}${JSON.stringify(result)}` };
+      return toCallToolResult(result);
     },
   });
 }

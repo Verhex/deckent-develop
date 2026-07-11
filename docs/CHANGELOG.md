@@ -2,6 +2,21 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint403] - 2026-07-11
+
+### Added
+
+- RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)
+- FLAKE-WALLCLOCK — born-632: duvar-saati assert ailesi hermetikleştir
+- NESTED-HONESTY — born-633: call_tool nested-dispatch dürüstlük ailesi (4 kalem)
+
+### Changed
+
+- GATE-FLAG-THREAD — 628-kalan: --force-prompt-gate CLI + MCP acknowledgePromptGate (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint402] - 2026-07-11
 
 ### Added

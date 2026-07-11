@@ -15,13 +15,13 @@ const MESSAGES: MessageMap = {
   },
   // PLAN phase
   'hint.PLAN': {
-    tr: '`deckent start` ile sprint\'i başlatın',
-    en: 'Run `deckent start` to begin the sprint',
+    tr: '`deckent start` ile run\'ı başlatın',
+    en: 'Run `deckent start` to begin the run',
   },
   // IDLE phase
   'hint.IDLE': {
-    tr: '`deckent plan` ile sprint planlayın',
-    en: 'Run `deckent plan` to plan a sprint',
+    tr: '`deckent plan` ile run planlayın',
+    en: 'Run `deckent plan` to plan a run',
   },
   // Generic messages
   'status.tasks_running': {
@@ -149,8 +149,8 @@ const MESSAGES: MessageMap = {
     tr: 'Aktif sprint yok. Önce `deckent start` çalıştırın.',
   },
   'status.pending_approvals.header': {
-    en: '⏳ Pending approvals: {count} — act in the sprint terminal or the dashboard:',
-    tr: '⏳ Bekleyen onaylar: {count} — sprint terminalinde veya dashboard\'tan onayla:',
+    en: '⏳ Pending approvals: {count} — act in the run terminal or the dashboard:',
+    tr: '⏳ Bekleyen onaylar: {count} — run terminalinde veya dashboard\'tan onayla:',
   },
   'status.pending_approvals.more': {
     en: '… and {count} more (run `deckent nervous` to see all)',
@@ -359,8 +359,8 @@ const MESSAGES: MessageMap = {
     tr: 'git kurulu değil — deckent güvenli geri-alma ve geçmiş için kullanır.',
   },
   'doctor.honest_explain_tmux': {
-    en: 'tmux is not installed — needed to run Claude-based sprints.',
-    tr: 'tmux kurulu değil — Claude tabanlı sprintleri çalıştırmak için gerekli.',
+    en: 'tmux is not installed — needed to run Claude-based runs.',
+    tr: 'tmux kurulu değil — Claude tabanlı runları çalıştırmak için gerekli.',
   },
   'doctor.honest_explain_docker': {
     en: 'Docker is not ready — needed for isolated worker containers.',
@@ -379,16 +379,16 @@ const MESSAGES: MessageMap = {
     tr: 'deckent\'in hafıza klasörü eksik veya tamamlanmamış.',
   },
   'doctor.honest_explain_directives': {
-    en: 'No sprint goals have been defined yet.',
-    tr: 'Henüz sprint hedefleri tanımlanmamış.',
+    en: 'No run goals have been defined yet.',
+    tr: 'Henüz run hedefleri tanımlanmamış.',
   },
   'doctor.honest_explain_brain_budget': {
     en: 'deckent\'s memory has grown past its healthy size.',
     tr: 'deckent\'in hafızası sağlıklı boyutunu aştı.',
   },
   'doctor.honest_explain_debt': {
-    en: 'There are unresolved critical issues from past sprints.',
-    tr: 'Geçmiş sprintlerden çözülmemiş kritik sorunlar var.',
+    en: 'There are unresolved critical issues from past runs.',
+    tr: 'Geçmiş runlardan çözülmemiş kritik sorunlar var.',
   },
   'doctor.honest_explain_locks': {
     en: 'Some old task locks were left behind and need cleanup.',
@@ -592,7 +592,7 @@ const MESSAGES: MessageMap = {
     en: 'No checkpoints found.',
     tr: 'Checkpoint bulunamadı.',
   },
-  'checkpoint.col_sprint': { en: 'Sprint', tr: 'Sprint' },
+  'checkpoint.col_sprint': { en: 'Run', tr: 'Run' },
   'checkpoint.col_phase': { en: 'Phase', tr: 'Faz' },
   'checkpoint.col_status': { en: 'Status', tr: 'Durum' },
   'checkpoint.col_summary': { en: 'Summary', tr: 'Özet' },
@@ -842,8 +842,8 @@ const MESSAGES: MessageMap = {
     tr: '  1. Proje hedeflerinizi DIRECTIVES.md dosyasına yazın',
   },
   'init.next_step_start': {
-    en: '  2. Run `deckent start` to begin your first sprint',
-    tr: '  2. İlk sprint\'i başlatmak için `deckent start` çalıştırın',
+    en: '  2. Run `deckent start` to begin your first run',
+    tr: '  2. İlk run\'ı başlatmak için `deckent start` çalıştırın',
   },
 
   // ─── evolve command ─────────────────────────────────────────────────
@@ -902,8 +902,8 @@ const MESSAGES: MessageMap = {
     tr: 'Claude CLI bulunamadi. Kurulum: npm install -g @anthropic-ai/claude-code',
   },
   'error.no_directives': {
-    en: 'DIRECTIVES.md not found. Create it with sprint goals, or run: deckent init',
-    tr: 'DIRECTIVES.md bulunamadi. Sprint hedeflerinizi yazin veya calistirin: deckent init',
+    en: 'DIRECTIVES.md not found. Create it with run goals, or run: deckent init',
+    tr: 'DIRECTIVES.md bulunamadi. Run hedeflerinizi yazin veya calistirin: deckent init',
   },
   'error.config_invalid': {
     en: 'Configuration is invalid. Run: deckent doctor to diagnose',
@@ -918,8 +918,8 @@ const MESSAGES: MessageMap = {
     tr: 'Baska bir worker kilidi tutuyor. Bekleyin veya calistirin: deckent cleanup',
   },
   'error.usage_exceeded': {
-    en: 'Usage threshold reached. Sprint has been auto-paused.',
-    tr: 'Kullanim esigi asildi. Sprint otomatik olarak duraklatildi.',
+    en: 'Usage threshold reached. Run has been auto-paused.',
+    tr: 'Kullanim esigi asildi. Run otomatik olarak duraklatildi.',
   },
   'error.build_failed': {
     en: 'Build failed. Run your project\'s type check / lint command to check for errors.',
@@ -1576,8 +1576,8 @@ const MESSAGES: MessageMap = {
     en: [
       '🤖 deckent bot — commands:',
       '  /help      this list',
-      '  /status    current sprint status',
-      '  /history   recent sprints',
+      '  /status    current run status',
+      '  /history   recent runs',
       '  /pending   actions awaiting your approval',
       '',
       '🔐 approve <id>  /  reject <id>   — approve or reject a parked action',
@@ -1588,8 +1588,8 @@ const MESSAGES: MessageMap = {
     tr: [
       '🤖 deckent bot — komutlar:',
       '  /help      bu liste',
-      '  /status    aktif sprint durumu',
-      '  /history   son sprint\'ler',
+      '  /status    aktif run durumu',
+      '  /history   son run\'lar',
       '  /pending   onayını bekleyen işlemler',
       '',
       '🔐 approve <id>  /  reject <id>   — parklanmış işlemi onayla veya reddet',
@@ -1619,20 +1619,20 @@ const MESSAGES: MessageMap = {
     tr: '⏲️ Süresi doldu — {tool} çalıştırılmadı (onay çok eskidi). Hâlâ istiyorsan tekrar iste.',
   },
   'bot.action_sprint_changed': {
-    en: '🛡️ Not executed — {tool} was tied to sprint {sprint}, which is no longer the active sprint. Refusing so a stale command can\'t hit a different sprint.',
-    tr: '🛡️ Çalıştırılmadı — {tool}, {sprint} sprint\'ine bağlıydı ama o artık aktif sprint değil. Bayat bir komut başka sprint\'i vurmasın diye reddedildi.',
+    en: '🛡️ Not executed — {tool} was tied to run {sprint}, which is no longer the active run. Refusing so a stale command can\'t hit a different run.',
+    tr: '🛡️ Çalıştırılmadı — {tool}, {sprint} run\'ına bağlıydı ama o artık aktif run değil. Bayat bir komut başka run\'ı vurmasın diye reddedildi.',
   },
   'bot.kill_done': {
-    en: '✅ Killed sprint {sprint} (pid {pid}).',
-    tr: '✅ {sprint} sprint\'i öldürüldü (pid {pid}).',
+    en: '✅ Killed run {sprint} (pid {pid}).',
+    tr: '✅ {sprint} run\'ı öldürüldü (pid {pid}).',
   },
   'bot.kill_reused': {
-    en: '🛡️ Not executed — sprint {sprint}\'s process is gone and its pid now belongs to something else. Refusing to signal a foreign process.',
-    tr: '🛡️ Çalıştırılmadı — {sprint} sprint\'inin process\'i gitmiş ve pid\'i artık başka bir şeye ait. Yabancı bir process\'e sinyal göndermeyi reddediyorum.',
+    en: '🛡️ Not executed — run {sprint}\'s process is gone and its pid now belongs to something else. Refusing to signal a foreign process.',
+    tr: '🛡️ Çalıştırılmadı — {sprint} run\'ının process\'i gitmiş ve pid\'i artık başka bir şeye ait. Yabancı bir process\'e sinyal göndermeyi reddediyorum.',
   },
   'bot.kill_already_stopped': {
-    en: 'ℹ️ Sprint {sprint} is already stopped — nothing to kill.',
-    tr: 'ℹ️ {sprint} sprint\'i zaten durmuş — öldürülecek bir şey yok.',
+    en: 'ℹ️ Run {sprint} is already stopped — nothing to kill.',
+    tr: 'ℹ️ {sprint} run\'ı zaten durmuş — öldürülecek bir şey yok.',
   },
 
   // ─── serve command ──────────────────────────────────────────────────
@@ -1777,8 +1777,8 @@ const MESSAGES: MessageMap = {
     tr: 'Süre(s)',
   },
   'resources.sprint_peak': {
-    en: 'Sprint concurrent peak: {peak} ({containers} containers)',
-    tr: 'Sprint eşzamanlı tepe: {peak} ({containers} container)',
+    en: 'Run concurrent peak: {peak} ({containers} containers)',
+    tr: 'Run eşzamanlı tepe: {peak} ({containers} container)',
   },
 
   // ─── usage command ─────────────────────────────────────────────────
@@ -1799,8 +1799,8 @@ const MESSAGES: MessageMap = {
     tr: 'Kullanım — {since} → {until}',
   },
   'usage.header_sprint': {
-    en: 'Usage — Sprint {sprint}',
-    tr: 'Kullanım — Sprint {sprint}',
+    en: 'Usage — Run {sprint}',
+    tr: 'Kullanım — Run {sprint}',
   },
   'usage.col_model': {
     en: 'Model',
@@ -1847,16 +1847,16 @@ const MESSAGES: MessageMap = {
     tr: 'Haftalık bütçe referansı: ~${budget} eşdeğer',
   },
   'usage.no_sprint_data': {
-    en: 'No sprint data found. Sessions could not be mapped to sprint {sprint} tasks.',
-    tr: 'Sprint verisi bulunamadı. Oturumlar sprint {sprint} görevlerine eşlenemedi.',
+    en: 'No run data found. Sessions could not be mapped to run {sprint} tasks.',
+    tr: 'Run verisi bulunamadı. Oturumlar run {sprint} görevlerine eşlenemedi.',
   },
   'usage.cache_gate': {
     en: 'Cache gate: {status} (warm-share {share}%, warmer: {taskId})',
     tr: 'Önbellek kapısı: {status} (ısıtma payı %{share}, ısıtıcı: {taskId})',
   },
   'usage.cache_gate_na': {
-    en: 'Cache gate: N/A (single-session sprint)',
-    tr: 'Önbellek kapısı: N/A (tek oturumlu sprint)',
+    en: 'Cache gate: N/A (single-session run)',
+    tr: 'Önbellek kapısı: N/A (tek oturumlu run)',
   },
   'usage.unknown_models': {
     en: '⚠ No price found for model(s): {models} — their burn is counted as $0. Run `deckent config update-pricing` or add the model to .deckent/cost-config.json.',
@@ -2011,7 +2011,7 @@ const MESSAGES: MessageMap = {
   'recover.preview_stale_spawnlocks': { en: '  Stale spawnlocks:{count} would be cleared', tr: '  Bayat spawnlock: {count} temizlenecek' },
   'recover.preview_task_files': { en: '  Task files:      {count} would be archived', tr: '  Görev dosyaları: {count} arşivlenecek' },
   'recover.preview_run_to_execute': { en: '\n  Run without --dry-run to execute.\n', tr: '\n  Çalıştırmak için --dry-run olmadan tekrar deneyin.\n' },
-  'recover.confirm_header': { en: '\n  ⚠ Recovery will clean up sprint {sprintId}:', tr: '\n  ⚠ Kurtarma, {sprintId} sprint\'ini temizleyecek:' },
+  'recover.confirm_header': { en: '\n  ⚠ Recovery will clean up run {sprintId}:', tr: '\n  ⚠ Kurtarma, {sprintId} run\'ını temizleyecek:' },
   'recover.confirm_remove_ipc': { en: '    - Remove orphan IPC directories (dead PIDs only)', tr: '    - Artık IPC dizinlerini kaldır (yalnızca ölü PID\'ler)' },
   'recover.confirm_clear_locks': { en: '    - Clear stale lock files (>5min)', tr: '    - Bayat kilit dosyalarını temizle (>5dk)' },
   'recover.confirm_archive_tasks': { en: '    - Archive terminal task files (DONE/NO_GO)', tr: '    - Sonlanmış görev dosyalarını arşivle (DONE/NO_GO)' },
@@ -2019,12 +2019,12 @@ const MESSAGES: MessageMap = {
   'recover.confirm_hint': { en: '  Use --force to skip this confirmation, or --dry-run to preview.\n', tr: '  Bu onayı atlamak için --force, önizleme için --dry-run kullanın.\n' },
   'recover.confirm_prompt': { en: '  Proceed? (y/N)  ', tr: '  Devam edilsin mi? (y/N) ' },
   'recover.aborted': { en: '  Aborted.', tr: '  İptal edildi.' },
-  'recover.recovering': { en: '\n  Recovering sprint {sprintId}...', tr: '\n  {sprintId} sprint\'i kurtarılıyor...' },
+  'recover.recovering': { en: '\n  Recovering run {sprintId}...', tr: '\n  {sprintId} run\'ı kurtarılıyor...' },
   'recover.result_orphan_ipc': { en: '  Orphan IPC dirs: {count} removed', tr: '  Artık IPC dizinleri: {count} kaldırıldı' },
   'recover.result_stale_locks': { en: '  Stale locks:     {count} cleared', tr: '  Bayat kilitler:  {count} temizlendi' },
   'recover.result_stale_spawnlocks': { en: '  Stale spawnlocks:{count} cleared', tr: '  Bayat spawnlock: {count} temizlendi' },
   'recover.result_task_files': { en: '  Task files:      {archived} archived, {preserved} preserved', tr: '  Görev dosyaları: {archived} arşivlendi, {preserved} korundu' },
-  'recover.complete': { en: '\n  ✓ Recovery complete. Sprint {sprintId} is ready for restart.\n', tr: '\n  ✓ Kurtarma tamamlandı. {sprintId} sprint\'i yeniden başlatmaya hazır.\n' },
+  'recover.complete': { en: '\n  ✓ Recovery complete. Run {sprintId} is ready for restart.\n', tr: '\n  ✓ Kurtarma tamamlandı. {sprintId} run\'ı yeniden başlatmaya hazır.\n' },
   'recover.restore_success': { en: '  ✓ Restored {count} task file(s) from the {sprintId} pre-archive snapshot (rollback).', tr: '  ✓ {sprintId} pre-archive snapshot\'ından {count} task dosyası geri yüklendi (rollback).' },
   'recover.restore_failed': { en: '  Restore failed for {sprintId}: {error}', tr: '  {sprintId} için geri-yükleme başarısız: {error}' },
   'features.manifest_not_found': { en: 'features-manifest.json not found. Run `node scripts/sync-manifest.mjs` to generate.', tr: 'features-manifest.json bulunamadı. Oluşturmak için `node scripts/sync-manifest.mjs` çalıştırın.' },
@@ -2038,10 +2038,10 @@ const MESSAGES: MessageMap = {
   'features.detail_description': { en: 'Description', tr: 'Açıklama' },
   'features.header_all': { en: 'All Categories', tr: 'Tüm Kategoriler' },
   'features.header_title': { en: 'Deckent Features — {category}', tr: 'Deckent Özellikleri — {category}' },
-  'features.header_meta': { en: 'Sprint: {sprint} | Generated: {generated}', tr: 'Sprint: {sprint} | Oluşturma: {generated}' },
+  'features.header_meta': { en: 'Run: {sprint} | Generated: {generated}', tr: 'Run: {sprint} | Oluşturma: {generated}' },
   'features.total': { en: 'Total: {count} features', tr: 'Toplam: {count} özellik' },
-  'history.no_history': { en: 'No sprint history found.', tr: 'Sprint geçmişi bulunamadı.' },
-  'history.no_match': { en: 'No matching sprint history found.', tr: 'Eşleşen sprint geçmişi bulunamadı.' },
+  'history.no_history': { en: 'No run history found.', tr: 'Run geçmişi bulunamadı.' },
+  'history.no_match': { en: 'No matching run history found.', tr: 'Eşleşen run geçmişi bulunamadı.' },
   'config.set': { en: 'Set {key} = {value}', tr: '{key} = {value} olarak ayarlandı' },
   'config.invalid': { en: 'Invalid config: {errors}', tr: 'Geçersiz yapılandırma: {errors}' },
   'config.key_not_found': { en: 'Key not found: {key}', tr: 'Anahtar bulunamadı: {key}' },
@@ -2051,14 +2051,14 @@ const MESSAGES: MessageMap = {
   'config.migrate_dry_run': { en: '[dry-run] Would add {count} missing field(s):', tr: '[dry-run] {count} eksik alan eklenecek:' },
   'config.migrate_complete': { en: 'Migration complete. Added {count} field(s):', tr: 'Geçiş tamamlandı. {count} alan eklendi:' },
   'config.migrate_backup': { en: 'Backup saved to: {path}', tr: 'Yedek kaydedildi: {path}' },
-  'retro.none_found': { en: 'No retrospective found. Run `deckent start` to complete a sprint first.', tr: 'Retrospektif bulunamadı. Önce bir sprint tamamlamak için `deckent start` çalıştırın.' },
-  'retro.no_previous_sprint': { en: 'No previous sprint found for comparison.', tr: 'Karşılaştırma için önceki sprint bulunamadı.' },
+  'retro.none_found': { en: 'No retrospective found. Run `deckent start` to complete a run first.', tr: 'Retrospektif bulunamadı. Önce bir run tamamlamak için `deckent start` çalıştırın.' },
+  'retro.no_previous_sprint': { en: 'No previous run found for comparison.', tr: 'Karşılaştırma için önceki run bulunamadı.' },
   'web.deprecated_use_serve': { en: 'Note: `deckent web` is deprecated — please use `deckent serve` instead.', tr: 'Not: `deckent web` kullanımdan kaldırıldı — bunun yerine `deckent serve` kullanın.' },
   'web.dev_server_hint': { en: 'Run \'cd src/dashboard && npm run dev\' for Vite dev server on port 5173', tr: 'Vite geliştirme sunucusu için 5173 portunda \'cd src/dashboard && npm run dev\' komutunu çalıştırın' },
   'web.dashboard_not_found': { en: 'Warning: bundled dashboard not found at {name}', tr: 'Uyarı: paketlenmiş panel {name} konumunda bulunamadı' },
   'web.build_dashboard_hint': { en: 'Run \'npm run build:dashboard\' (repo) or reinstall deckent. API still works.', tr: '\'npm run build:dashboard\' komutunu çalıştırın (repo) veya deckent\'i yeniden kurun. API yine de çalışır.' },
   'web.listening': { en: 'Deckent Web Dashboard on http://localhost:{name}', tr: 'Deckent Web Paneli http://localhost:{name} adresinde çalışıyor' },
-  'dashboard.sprint_line': { en: 'Sprint: {id} (#{number})', tr: 'Sprint: {id} (#{number})' },
+  'dashboard.sprint_line': { en: 'Run: {id} (#{number})', tr: 'Run: {id} (#{number})' },
   'dashboard.phase_status': { en: 'Phase: {phase}  Status: {status}', tr: 'Faz: {phase}  Durum: {status}' },
   'dashboard.col_id': { en: 'ID', tr: 'ID' },
   'dashboard.col_task': { en: 'Task', tr: 'Görev' },
@@ -2069,7 +2069,7 @@ const MESSAGES: MessageMap = {
   'dashboard.progress': { en: '{done}/{total} done {active} active {blocked} pending', tr: '{done}/{total} tamam {active} aktif {blocked} bekliyor' },
   'dashboard.no_alerts': { en: 'No alerts.', tr: 'Uyarı yok.' },
   'dashboard.alerts_label': { en: 'Alerts:', tr: 'Uyarılar:' },
-  'dashboard.no_active_sprint': { en: 'No active sprint. Run deckent start first.', tr: 'Aktif sprint yok. Önce `deckent start` çalıştırın.' },
+  'dashboard.no_active_sprint': { en: 'No active run. Run deckent start first.', tr: 'Aktif run yok. Önce `deckent start` çalıştırın.' },
 
   // ─── gateway connector ──────────────────────────────────────────────
   'gateway.unbound': {
@@ -2533,8 +2533,8 @@ const MESSAGES: MessageMap = {
   // keys to messages.ts". English values mirror do.ts's literal strings
   // byte-for-byte (formatDoPlanPreview + registerDo)) ────────────────────────
   'do.preview_banner_run': {
-    en: 'Deckent Do — plan preview ({count} task(s)). Confirm below to start the sprint now.',
-    tr: 'Deckent Do — plan önizleme ({count} görev). Sprint\'i şimdi başlatmak için aşağıdan onaylayın.',
+    en: 'Deckent Do — plan preview ({count} task(s)). Confirm below to start the run now.',
+    tr: 'Deckent Do — plan önizleme ({count} görev). Run\'ı şimdi başlatmak için aşağıdan onaylayın.',
   },
   'do.preview_banner_dry_run': {
     en: 'Deckent Do — plan preview (dry-run; {count} task(s)). Nothing was started. Re-run with --run to execute.',
@@ -2561,8 +2561,8 @@ const MESSAGES: MessageMap = {
     tr: 'do: hedef boş olamaz',
   },
   'do.confirm_start': {
-    en: 'Proceed and start this sprint now?',
-    tr: 'Devam edilsin ve sprint şimdi başlatılsın mı?',
+    en: 'Proceed and start this run now?',
+    tr: 'Devam edilsin ve run şimdi başlatılsın mı?',
   },
   'do.dry_run_complete': {
     en: 'Dry-run complete — nothing was started. Re-run with --run to execute this plan.',
@@ -2573,8 +2573,8 @@ const MESSAGES: MessageMap = {
     tr: '"{stage}" aşamasında iptal edildi ({reason}). Hiçbir şey başlatılmadı.',
   },
   'do.finished': {
-    en: 'Sprint finished — exitCode {exitCode} ({outcome}).',
-    tr: 'Sprint tamamlandı — exitCode {exitCode} ({outcome}).',
+    en: 'Run finished — exitCode {exitCode} ({outcome}).',
+    tr: 'Run tamamlandı — exitCode {exitCode} ({outcome}).',
   },
   'do.outcome_success': { en: 'success', tr: 'başarılı' },
   'do.outcome_failure': { en: 'failure', tr: 'başarısız' },
@@ -2702,8 +2702,8 @@ const MESSAGES: MessageMap = {
     tr: '[limit-gate] Engelleme --force-limits ile aşıldı.',
   },
   'limits.start_gate_blocked': {
-    en: '[limit-gate] Sprint start blocked — {window} usage at {pct}% (resets {reset}). Use --force-limits to override.',
-    tr: '[limit-gate] Sprint başlatma engellendi — {window} kullanımı %{pct} (sıfırlanma: {reset}). Aşmak için --force-limits kullanın.',
+    en: '[limit-gate] Run start blocked — {window} usage at {pct}% (resets {reset}). Use --force-limits to override.',
+    tr: '[limit-gate] Run başlatma engellendi — {window} kullanımı %{pct} (sıfırlanma: {reset}). Aşmak için --force-limits kullanın.',
   },
   'limits.start_gate_warn': {
     en: '[limit-gate] Warning: {window} usage at {pct}% — proceeding.',
@@ -2998,8 +2998,8 @@ const MESSAGES: MessageMap = {
     tr: 'Mevcut abonelik-penceresi kullanımınızı görmek için `deckent limits` çalıştırın.',
   },
   'onboarding.chat.suggestion.start_sprint': {
-    en: 'Once setup is done, run `deckent plan` then `deckent start` to plan and launch a sprint.',
-    tr: 'Kurulum bittiğinde bir sprint planlayıp başlatmak için `deckent plan`, ardından `deckent start` çalıştırın.',
+    en: 'Once setup is done, run `deckent plan` then `deckent start` to plan and launch a run.',
+    tr: 'Kurulum bittiğinde bir run planlayıp başlatmak için `deckent plan`, ardından `deckent start` çalıştırın.',
   },
   'onboarding.chat.suggestion.run_doctor': {
     en: 'Run `deckent doctor` to diagnose and fix common setup problems.',

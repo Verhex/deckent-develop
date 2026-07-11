@@ -66,7 +66,7 @@ describe('getMessage', () => {
     });
 
     it('returns Turkish for hint.IDLE in tr', () => {
-      expect(getMessage('hint.IDLE', 'tr')).toContain('sprint planlayın');
+      expect(getMessage('hint.IDLE', 'tr')).toContain('run planlayın');
     });
 
     it('returns English for hint.PLAN in en', () => {

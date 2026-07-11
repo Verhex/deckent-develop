@@ -16,7 +16,13 @@ import type { AgentEvent } from '../../agent/events.js';
 import { primaryResource, writeTargets, type PermissionResponse } from '../../agent/loop.js';
 import { decide, resolveTier } from '../../agent/permission.js';
 import { checkSelfModifying } from '../../agent/guards/self-modifying.js';
-import { BRIDGE_RISK_BY_TIER, type ToolSurfaceOptions } from './native-tool-registry.js';
+import {
+  BRIDGE_RISK_BY_TIER,
+  PARITY_POLICY_DENIAL_PREFIX,
+  PARITY_USER_REJECTION_PREFIX,
+  asToolResult,
+  type ToolSurfaceOptions,
+} from './native-tool-registry.js';
 import { meetsRiskThreshold } from '../../core/tool-dispatch.js';
 import type { ToolRiskLevel as CoreToolRiskLevel } from '../../core/tool-registry.js';
 import type { ApprovalMode } from '../../agent/permission-types.js';
@@ -157,6 +163,28 @@ export interface ParityExecContext {
    * Without this the config knob was dead on every production path.
    */
   riskThreshold?: CoreToolRiskLevel;
+  /**
+   * born-633 NESTED-HONESTY item(4) — the SAME run.tsx toolSink the loop's own
+   * direct tool-call path reports through. A nested dispatch never reaches the
+   * AgentSession's own 'tool-result' event (the loop only ever sees the OUTER
+   * `deckent_call_tool` invocation), so without this the actual target tool
+   * that ran stayed invisible in the toolSink/change-block log. Optional —
+   * absent means the pre-633 behavior (no nested entry) is preserved byte-for-
+   * byte, e.g. for callers/tests that don't wire it.
+   */
+  toolSink?: (info: ToolInfo) => void;
+}
+
+/** Resolves `key` via the injected localizer, falling back to `fallback` when
+ *  the key isn't registered yet — the SAME unlocalized-key guard `runTurn`'s
+ *  `localizeSignal` uses, hoisted here so `createParityExecImpl` (a
+ *  free-standing exported function, outside `createNativeEngine`'s closure)
+ *  can share it. Lets born-633's new nested-confirm hint (item 3) ship from
+ *  day one even before messages.ts (out of this task's write-scope) gains a
+ *  real translated entry for it. */
+function localizeOrFallback(t: (key: string) => string, key: string, fallback: string): string {
+  const label = t(key);
+  return label === key ? fallback : label;
 }
 
 /**
@@ -188,7 +216,7 @@ export function createParityExecImpl(ctx: ParityExecContext) {
       policy: ctx.policy,
       mode: ctx.getMode(),
     });
-    if (decision === 'deny') throw new Error(`[denied by policy] ${name}`);
+    if (decision === 'deny') throw new Error(`${PARITY_POLICY_DENIAL_PREFIX} ${name}`);
     // Explicit riskThreshold = extra ask-floor (see ParityExecContext.riskThreshold).
     if (
       decision === 'allow' &&
@@ -198,13 +226,35 @@ export function createParityExecImpl(ctx: ParityExecContext) {
       decision = 'ask';
     }
     if (decision === 'ask') {
+      // born-633 item(3): this reuses the SAME confirm queue/UI as the
+      // top-level model-proposed tool-use path, whose 'a' answer means
+      // "always" (a PERSISTED grant — see toDecision below). The nested path
+      // never persists 'a' (a fresh ruleStore lookup runs on every nested
+      // call — see the "'a' degrade pin" test) — the label must say so, or
+      // 'a' here silently overpromises what it does.
+      const onceHint = localizeOrFallback(
+        ctx.t,
+        'native.nested_confirm_once',
+        '(this call only — "always" is not saved for nested calls)',
+      );
       const answer = await ctx.confirm(
-        `${ctx.t('native.run_tool')}: ${name}${resource ? ` (${resource})` : ''}`,
+        `${ctx.t('native.run_tool')}: ${name}${resource ? ` (${resource})` : ''} ${onceHint}`,
         name,
       );
-      if (answer === 'n') throw new Error(`[rejected by user] ${name}`);
+      if (answer === 'n') throw new Error(`${PARITY_USER_REJECTION_PREFIX} ${name}`);
     }
-    return def.handler(callArgs);
+    const handlerResult = await def.handler(callArgs);
+    // born-633 item(4): the loop's own 'tool-result' event only ever sees the
+    // OUTER deckent_call_tool invocation — record the REAL nested target call
+    // too, nested-marked so it reads distinctly from a top-level tool-result.
+    const handlerToolResult = asToolResult(handlerResult);
+    ctx.toolSink?.({
+      verb: `${name} — ${ctx.t('native.tool_ran')}`,
+      target: resource,
+      note: '[nested]',
+      ...(handlerToolResult && !handlerToolResult.ok ? { failed: true } : {}),
+    });
+    return handlerResult;
   };
 }
 
@@ -256,6 +306,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
       confirm: deps.confirm,
       cwd: deps.cwd,
       t,
+      toolSink: deps.toolSink,
       ...(deps.toolSurface.riskThreshold !== undefined
         ? { riskThreshold: deps.toolSurface.riskThreshold }
         : {}),
@@ -267,12 +318,8 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
 
   // Localize a loop signal by its stable code ('native.<code>' message key);
   // an unmapped/unlocalized code falls back to the loop's English default.
-  const localizeSignal = (code: string | undefined, fallback: string): string => {
-    if (!code) return fallback;
-    const key = `native.${code}`;
-    const label = t(key);
-    return label === key ? fallback : label;
-  };
+  const localizeSignal = (code: string | undefined, fallback: string): string =>
+    code ? localizeOrFallback(t, `native.${code}`, fallback) : fallback;
 
   const runTurn: ReplEngine = async (input, cbs) => {
     let inputTokens = 0;

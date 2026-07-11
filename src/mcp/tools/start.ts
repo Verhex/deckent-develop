@@ -50,13 +50,14 @@ export function registerStartTool(server: McpServer): void {
         autoApprove: z.boolean().optional().default(false).describe('Auto-approve worker tool calls with --dangerously-skip-permissions. CLI default is false; set true only when the caller has confirmed the run is safe (CLI/MCP parity — ADR-022-V2).'),
         acknowledgeCost: z.boolean().optional().default(false).describe('Bypass the pre-spawn cost gate when the realistic estimate exceeds cost_limits.sprint_max_usd. The caller must explicitly acknowledge the over-budget run; otherwise deckent_start returns COST_GATE_EXCEEDED. Equivalent to CLI --force from the cost-gate perspective.'),
         acknowledgeScopePaths: z.boolean().optional().default(false).describe('Bypass the pre-spawn SCOPE gate (Dimension B). By default a sprint is blocked before spawn when a task\'s filesWrite path does not exist and looks like a typo/wrong-directory (the sprint-380 orphan-file mode). Set true to allow such paths as intentional new files. Equivalent to CLI --force-scope; independent of acknowledgeCost/force.'),
+        acknowledgePromptGate: z.boolean().optional().default(false).describe('Bypass the plan-time G-series prompt gate BLOCK (persona-capability / decision-space / scope-contract findings — born-628). By default a sprint halts at PLAN when a task\'s finalized (persona × intent) fit fails a hard lint. Set true to allow such tasks to spawn anyway. Equivalent to CLI --force-prompt-gate; independent of acknowledgeCost/force/acknowledgeScopePaths.'),
         dryRun: z.boolean().optional().default(false).describe('Plan the sprint without spawning workers. Returns the planned tasks list so you can review before committing. No workers are started, no files are changed.'),
         force: z.boolean().optional().default(false).describe('Skip pre-flight checks AND the cost gate. Use only when the environment is known-ready and the cost has been verified out-of-band. Equivalent to CLI --force.'),
         timeout: z.number().int().positive().optional().describe('Sprint maximum duration in milliseconds (default: 30 minutes = 1800000). Sprint is marked TIMEOUT if workers do not complete within this window.'),
         sandbox: z.boolean().optional().default(false).describe('Run sprint in sandbox mode: stashes local git changes before spawning and restores them after the sprint completes. Safe experimentation — no permanent changes on failure.'),
       }),
     },
-    async ({ autoApprove, acknowledgeCost, acknowledgeScopePaths, dryRun, force, timeout, sandbox }) => {
+    async ({ autoApprove, acknowledgeCost, acknowledgeScopePaths, acknowledgePromptGate, dryRun, force, timeout, sandbox }) => {
       const root = process.cwd();
       // CLI/MCP Parity Notes (ADR-022-V2):
       // - autoApprove: CLI default false (the schema param mirrors this). The
@@ -68,6 +69,15 @@ export function registerStartTool(server: McpServer): void {
       // - acknowledgeCost: Sprint 189 T-008 parity addition. CLI uses --force
       //   to bypass the cost gate; MCP requires an explicit acknowledgeCost
       //   flag so over-budget runs are always intentional.
+      // - acknowledgePromptGate (born-628, task-403-002): CLI --force-prompt-gate
+      //   parity. Threaded into `runnerConfig` below (same boundary as
+      //   acknowledgeScopePaths) so the forked runner's IPC config.json carries
+      //   the value. KNOWN GAP: sprint-runner-entry.ts (SprintRunnerConfig +
+      //   the runSprint() call inside the forked child) is a separate module
+      //   that does not yet read this field — a follow-up task must add it
+      //   there before an MCP-supplied acknowledgePromptGate=true actually
+      //   reaches runSprint(); CLI `deckent start --force-prompt-gate` has no
+      //   such gap since it calls runSprint() directly.
       // - spawn_backend: Both CLI and MCP read from config via loadConfig() → sprint-controller
       //   uses config.spawn_backend automatically. No explicit handling needed here.
       // - timeout: Both pass timeoutMs to runSprint (undefined = 30min default in result-collector).
@@ -275,7 +285,12 @@ export function registerStartTool(server: McpServer): void {
         const ipcDir = getIpcDir(root, jobId);
         mkdirSync(ipcDir, { recursive: true });
 
-        const runnerConfig: SprintRunnerConfig = {
+        // born-628: `SprintRunnerConfig` (src/orchestra/sprint-runner-entry.ts) does
+        // not yet declare `acknowledgePromptGate` — that module's forked-child
+        // runSprint() call is a separate follow-up (see comment above). The local
+        // intersection type below still lets this handler persist the value into
+        // the IPC config.json (forward-compatible) without touching that file.
+        const runnerConfig: SprintRunnerConfig & { acknowledgePromptGate?: boolean } = {
           projectRoot: root,
           jobId,
           // Sprint 189 T-009: honor caller-supplied autoApprove (default false
@@ -284,6 +299,8 @@ export function registerStartTool(server: McpServer): void {
           autoApprove: autoApprove === true,
           // Dimension B: parity with CLI --force-scope. Independent of acknowledgeCost.
           acknowledgeScopePaths: acknowledgeScopePaths === true,
+          // born-628: parity with CLI --force-prompt-gate. Independent of the other flags.
+          acknowledgePromptGate: acknowledgePromptGate === true,
           sandboxMode: sandbox,
           timeoutMs: timeout,
         };

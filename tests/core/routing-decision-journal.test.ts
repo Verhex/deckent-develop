@@ -209,3 +209,40 @@ describe('ROUTING-DECISION-JOURNAL (born-622)', () => {
     // throw plus the correct decision is the whole contract here.
   });
 });
+
+describe('born-641: malformed skill manifest must not kill routing', () => {
+  it('routeTaskV2 survives a skill missing triggers AND stackDetection (live secure-coding case)', () => {
+    const root = makeProjectRoot();
+    const task = {
+      title: 'Fix login bug',
+      description: 'Fix the auth bug in login flow',
+      scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/x.ts'] },
+    };
+    const pool = makePool(makeAgent('bug-fixer', {
+      activation: { rules: [{ when: { 'intent.primary': 'bugfix' }, score: 8 }], exclude: [], minScore: 3 },
+    }));
+    // The live crash-shape: a skill whose manifest carries NO triggers and NO
+    // stackDetection (secure-coding, W5b extraction). Before born-641 the
+    // un-guarded `skill.stackDetection.dependencies` read threw a TypeError
+    // that the planner's per-task catch swallowed — plan-time routing was
+    // dead for EVERY task while this skill was in the pool.
+    const brokenSkill = {
+      id: 'secure-coding',
+      enabled: true,
+      activation: { rules: [{ when: { 'intent.primary': 'bugfix' }, score: 5 }], exclude: [], minScore: 1 },
+    } as unknown as SkillDefinition;
+    const skills = new Map<string, SkillDefinition>([['secure-coding', brokenSkill]]);
+
+    const decision = routeTaskV2(task, pool, skills, {
+      sprintId: 'sprint-641', taskId: 'T641', projectRoot: root,
+      // projectStack present → the stack-bonus block (the crash site) executes.
+      projectStack: {
+        language: 'typescript', framework: 'none', dependencies: ['vitest'],
+      } as unknown as NonNullable<Parameters<typeof routeTaskV2>[3]>['projectStack'],
+    });
+
+    expect(decision.agentId).toBe('bug-fixer');
+    // Journal must ALSO have been written — the decision-trail survives too.
+    expect(existsSync(routingDecisionJournalPath(root, 'sprint-641'))).toBe(true);
+  });
+});

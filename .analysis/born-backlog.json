@@ -2578,9 +2578,9 @@
     "born_id": 628,
     "title": "Prompt-gate BLOCK enforcement start/MCP yoluna",
     "priority": "P1",
-    "status": "OPEN",
+    "status": "DONE",
     "source": "sprint-399 BEFORE-done advisor",
-    "spec": "Advisor-bulgu (E): prompt-gate blocker kontrolü YALNIZ src/cli/commands/plan.ts:217-233 CLI-yolunda; deckent start → runSprint → runPlanPhase sprint.promptGate okumuyor, MCP plan-yüzeyinde sıfır referans. SAN-1/G1b BLOCK bulguları ana koşu-yolunda hesaplanıp DÜŞÜYOR (persona-lint döneminden miras üst-katman sıfır-tüketici deseni). FIX: runSprint plan-fazı sonrası promptGate.ok kontrolü (acknowledgePromptGate/--force-prompt-gate opsiyonlarıyla; scope-gate ile aynı UX) + MCP deckent_plan yanıtına findings; dry-run/plan-CLI davranışı aynı kalır. || KISMI 2026-07-11 sprint-402-001 (durust-DEBT): runSprint decidePromptGateBlock + MCP-plan findings CANLI (16 test + composition-pin); KALAN: --force-prompt-gate CLI-flag + MCP acknowledgePromptGate threading (start.ts'ler scope-disiydi) — acknowledgeScopePaths kanali ayni-desende."
+    "spec": "Advisor-bulgu (E): prompt-gate blocker kontrolü YALNIZ src/cli/commands/plan.ts:217-233 CLI-yolunda; deckent start → runSprint → runPlanPhase sprint.promptGate okumuyor, MCP plan-yüzeyinde sıfır referans. SAN-1/G1b BLOCK bulguları ana koşu-yolunda hesaplanıp DÜŞÜYOR (persona-lint döneminden miras üst-katman sıfır-tüketici deseni). FIX: runSprint plan-fazı sonrası promptGate.ok kontrolü (acknowledgePromptGate/--force-prompt-gate opsiyonlarıyla; scope-gate ile aynı UX) + MCP deckent_plan yanıtına findings; dry-run/plan-CLI davranışı aynı kalır. || KISMI 2026-07-11 sprint-402-001 (durust-DEBT): runSprint decidePromptGateBlock + MCP-plan findings CANLI (16 test + composition-pin); KALAN: --force-prompt-gate CLI-flag + MCP acknowledgePromptGate threading (start.ts'ler scope-disiydi) — acknowledgeScopePaths kanali ayni-desende. || TAM-KAPANIS 2026-07-11: 403-002 CLI --force-prompt-gate + MCP acknowledgePromptGate + config-persist; forked-child son-mili (sprint-runner-entry) CC el-fix. Zincir: CLI/MCP start -> runnerConfig -> runSprint -> decidePromptGateBlock."
   },
   {
     "born_id": 629,
@@ -2610,17 +2610,17 @@
     "born_id": 632,
     "title": "Duvar-saati assert flake ailesi (shutdown-hooks + sprint-spawner-throttle)",
     "priority": "P2",
-    "status": "OPEN",
+    "status": "DONE",
     "source": "607 blast-radius koşusu",
-    "spec": "tests/cli/shutdown-hooks.test.ts 'collectively bounded' testi elapsed>=4500 assert ediyor; VITEST_MAX_FORKS=2 tam cli+agent koşusunda 3157ms ölçüldü (fork-baskısı timer-coalescing) — standalone yeşil. Sınıf: duvar-saati assert'i CI-flake adayı; fake-timer veya tolerans-bandı ile hermetikleştir. EK (2026-07-10 CI): tests/orchestra/sprint-spawner-throttle.test.ts 'spawns immediately... <50ms' assert'i CI Orchestra-26.x'te 522ms ölçtü (24.x + lokal yeşil; 607-push'unda dosyaya dokunulmamıştı — rerun'la yeşillendi). Aile-fix: her iki dosyada fake-timer'a geç veya tolerans-bandını yük-dayanıklı yap; CI-flake avı için aynı desenli diğer duvar-saati assert'lerini grep'le tara (toBeLessThan(50|100) sınıfı)."
+    "spec": "tests/cli/shutdown-hooks.test.ts 'collectively bounded' testi elapsed>=4500 assert ediyor; VITEST_MAX_FORKS=2 tam cli+agent koşusunda 3157ms ölçüldü (fork-baskısı timer-coalescing) — standalone yeşil. Sınıf: duvar-saati assert'i CI-flake adayı; fake-timer veya tolerans-bandı ile hermetikleştir. EK (2026-07-10 CI): tests/orchestra/sprint-spawner-throttle.test.ts 'spawns immediately... <50ms' assert'i CI Orchestra-26.x'te 522ms ölçtü (24.x + lokal yeşil; 607-push'unda dosyaya dokunulmamıştı — rerun'la yeşillendi). Aile-fix: her iki dosyada fake-timer'a geç veya tolerans-bandını yük-dayanıklı yap; CI-flake avı için aynı desenli diğer duvar-saati assert'lerini grep'le tara (toBeLessThan(50|100) sınıfı). || DONE 2026-07-11 403-003: iki dosya fake-timer (davranis-anlami korunarak); duvar-saati aday-envanteri notes'ta (dilim-2 karari Brain)."
   },
   {
     "born_id": 633,
     "title": "call_tool nested-dispatch dürüstlük ailesi (607 BEFORE-done P2 kalanları)",
     "priority": "P2",
-    "status": "OPEN",
+    "status": "DONE",
     "source": "born-607 BEFORE-done advisor",
-    "spec": "4 kalem: (1) nested handler ok:false dönerse dispatchToolCall status:'executed' + dış ok:true — iç başarısızlık maskeleniyor (native-tool-registry.ts:407-408 ToolResult-unwrap gerek). (2) parity-deny throw→status:'error'/[mcp-error] etiketi — policy-deny 'denied' sınıfında raporlanmalı (telemetri+model-görünürlüğü). (3) nested ask'te confirm-kartı 'a'=hep-izin-ver sunuyor ama parity persist etmiyor (bilinçli) — kartta nested için 'a'yı gizle veya 'yalnız bu sefer' etiketle. (4) nested exec toolSink/trace'e görünmüyor (TRN-614 pillar'ına dokunur — call_tool üzerinden koşan hedef-tool'lar trace'te kaybolmasın)."
+    "spec": "4 kalem: (1) nested handler ok:false dönerse dispatchToolCall status:'executed' + dış ok:true — iç başarısızlık maskeleniyor (native-tool-registry.ts:407-408 ToolResult-unwrap gerek). (2) parity-deny throw→status:'error'/[mcp-error] etiketi — policy-deny 'denied' sınıfında raporlanmalı (telemetri+model-görünürlüğü). (3) nested ask'te confirm-kartı 'a'=hep-izin-ver sunuyor ama parity persist etmiyor (bilinçli) — kartta nested için 'a'yı gizle veya 'yalnız bu sefer' etiketle. (4) nested exec toolSink/trace'e görünmüyor (TRN-614 pillar'ına dokunur — call_tool üzerinden koşan hedef-tool'lar trace'te kaybolmasın). || DONE 2026-07-11 403-004: 4/4 kalem RED->GREEN (git apply -R ile ters-kanit); ic-fail disari ok:false, policy-deny ayri-sinif, nested-confirm etiketi durust, nested exec toolSink-gorunur."
   },
   {
     "born_id": 634,
@@ -2699,6 +2699,96 @@
     "proposed_mode": "sprint",
     "spec": "(1) docker stream-port yalniz claude-provider'a yapildi — codex/gemini docker .log'lari hala RAW dump -> onlarin trace-icerigi bos kalir; ayni normalizeStreamEvent hattina baglanmali (her-ortam yasasi). (2) token-counter.ts tryLoadCliLogTokens tier-2 fallback top-level 'usage' bekliyor; claude+docker .log artik LogEvent-JSONL (usage .content icinde nested) -> tier-2 eslesmiyor (guvenlik-agi: mergeWithWorkerClaim workerReported'i donduruyor, NIHAI SAYI DEGISMIYOR — yalniz provenance). token-counter LogEvent-farkinda yapilmali. (3) worker-logs.ts ham-tail gorunumu artik JSONL — insan-okur render istenirse ayri QoL.",
     "verify": "codex/gemini docker fixture -> LogEvent JSONL; token-counter tier-2 nested-usage testi; nihai-sayi regresyon-pin",
+    "wire_on": "sprint"
+  },
+  {
+    "born_id": "640",
+    "title": "RUNTIME-TRUTH-COMPILER: her ozellik icin kod-var -> bagli -> acik -> canli-kanit zincirini derleyen truth-raporu (Faz-2 son halka, MASTER-PLAN 530)",
+    "sources": [
+      "GOAL-v3 Faz-2",
+      "yarim-wire vaka-ailesi (tool_surface a778151a, recordSprintWorkerTrace, runEvaluatePhase-config, registerCodexParityModels, docker-envelope, gate-BLOCK-CLI-only — 6+ canli vaka)"
+    ],
+    "severity": "P0",
+    "subsystem": "core/truth",
+    "primary_files": [
+      "src/core/feature-truth.ts (YENI)",
+      "src/cli/commands/truth.ts (YENI)",
+      ".deckent/settings/features-manifest.json",
+      "scripts/affected-tests.mjs (import-graph reuse)"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "SINIF: 'wiring% != calisiyor' — teslim-edilmis-ama-bagsiz modul hastaliginin MEKANIK kok-kesimi. TASARIM (4-seviyeli truth-zinciri, feature basina): L1-CODE (modul+export mevcut — statik, dosya/sembol kontrolu) -> L2-WIRED (prod cagri-sitesi mevcut — scripts/affected-tests.mjs'in import-graph cozucusunu REUSE ederek entrypoint'lerden [cli/entry, mcp/server, api/server] erisilebilirlik + feature-tanimindaki callsite-pattern grep'i) -> L3-ENABLED (config-flag'in BU projede cozulen degeri — loadConfig canli-okuma) -> L4-LIVE-PROOF (kanit-artefakti: {kind:'journal-recent' orn .deckent/traces/sprint-worker.jsonl son-N-gun entry | 'artifact-file' | 'smoke-cmd' run-proven}). VERI-MODELI: features-manifest FEATURE_DEFINITIONS'a opsiyonel truth-blogu {entryModule, prodCallsitePattern, flagPath, proof:{kind,ref,maxAgeDays}}; blogu olmayan feature 'truth-tanimsiz' diye DURUST raporlanir (sessiz-gecme yok). YUZEYLER: `deckent truth` CLI (tablo: code/wired/enabled/proof sutunlari + 'yarim-wire adaylari' bolumu = code-OK+wired-YOK) + deckent_truth MCP paritesi + `--check` CI-modu (pinned-baseline ratchet: yeni yarim-wire = exit 1; orphan-ratchet emsali) + .deckent/truth-report.json persist. DOGFOOD-KANIT: bilinen 6 vakanin fix-ONCESI hallerini fixture'layip compiler'in yakaladigini goster (regression-vault). Lawlar: cross-platform (path-sep), fail-soft (rapor-hatasi runtime'i etkilemez), i18n (CLI ciktisi getMessage).",
+    "verify": "deckent truth gercek-binary smoke (tablo basar, bilinen-yesil feature code+wired+enabled OK); fixture-vault: 6 tarihsel yarim-wire vakasi compiler'da 'wired=YOK' dusuyor; --check ratchet testi; MCP-CLI parite testi",
+    "wire_on": "sprint"
+  },
+  {
+    "born_id": "641",
+    "severity": "P0",
+    "subsystem": "core/routing",
+    "title": "ROUTING-COLLAPSE: secure-coding manifest'i (triggers+stackDetection YOK) plan-time V2 routing'i ~10 gun HER-task coktu; sessiz-yutma + spawn-time cifte-otorite",
+    "sources": [
+      "Alperen 'neden api-builder' sorusu 2026-07-11 + debug-iz"
+    ],
+    "primary_files": [
+      "src/core/routing-engine.ts",
+      "src/orchestra/sprint-planner.ts",
+      "src/orchestra/sprint-spawner.ts"
+    ],
+    "proposed_mode": "el-fix+sprint",
+    "spec": "ZINCIR: secure-coding W5b-ekstraksiyonu stackDetection/triggers'siz -> routing-engine:1533 unguarded read TypeError -> planSprint per-task catch debugLog-only yuttu -> plan-time atama HIC olusmadi -> atamayi sprint-spawner.ts:1260 spawn-time yolu yapti (api-builder over-selection = 397-007 hastaligi oradan) -> 622-journal'i da hic ateslenmedi. EL-FIX DONE 2026-07-11: (1) motor null-safe (skillTriggers/stackDetection?./dependencies??[]) + RED-test; (2) secure-coding manifest onarimi (iki agac); (3) planSprint catch loud-warn (operator-gorunur); (4) journal cift-onek path-fix. CANLI-KANIT: dry-run journal'i skor-dokumleriyle dustu, atamalar mantiklilasti (i18n->terminal-ux-engineer). KALANLAR: (a) spawner:1260 cifte-otorite — plan-time atama canliyken spawn-time override catisma-riski + journal'siz; (b) manifest sema-lint'i (born-590 ailesi): stackDetection/triggers zorunlu-alan validasyonu sync/lint'te; (c) ERRORS.md'de kac gundur oldugu olculsun.",
+    "verify": "dry-run: WARN yok + decisions-jsonl var; routing-decision-journal 7/7; born-641 testi",
+    "status": "KISMI-DONE",
+    "wire_on": "el-fix"
+  },
+  {
+    "born_id": "642",
+    "severity": "P0",
+    "subsystem": "cli/repl",
+    "title": "TERM-DEV-LOOP gap-1: ChatTurnQueue ureticisiz (detached-sprint bitisi REPL'e yeni-turn dusmuyor) — 511'in en kritik halkasi",
+    "sources": [
+      "gap-analiz ajani 2026-07-11 (7-halka rapor)"
+    ],
+    "primary_files": [
+      "src/cli/repl/run.tsx",
+      "src/cli/repl/chat-turn-queue.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Gap-rapor: kuyruk kurulur+drain edilir ama HEP BOS — run.tsx registerBgEventSink/bgQueue gecirmiyor; repl_surface.bg_turns flag'i rezerve ama HIC okunmuyor; detached-sprint bitisini (recently-works/sprint-state) ChatTurnBgEvent'e ceviren watcher yok. FIX: watcher + run.tsx wiring + flag.",
+    "verify": "detached sprint bitince REPL'de yeni-turn (mid-turn-enjekte-yok korunur); flag-testli",
+    "wire_on": "sprint"
+  },
+  {
+    "born_id": "643",
+    "severity": "P0",
+    "subsystem": "cli/repl",
+    "title": "TERM-DEV-LOOP gap-2: golden-flow REPL'e bagli degil (yalniz `deckent do` CLI); plan-preview karti + TERM-MODE risk-gate orphan; NL-intent placeholder-scaffold",
+    "sources": [
+      "gap-analiz ajani 2026-07-11"
+    ],
+    "primary_files": [
+      "src/orchestra/golden-flow.ts",
+      "src/cli/repl/app.tsx",
+      "src/cli/repl/term-mode.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Gap-rapor: (1) runGoldenFlow yalniz do.ts'ten; /do slash SLASH_CATALOG'da yok -> REPL'den erisilemez; (2) buildPlanNlIntent deterministik TODO-placeholder scaffold (gercek NL->plan yok — native-agent tool-akisi fiili yol); (3) checkActionAllowed (TERM-MODE risk-gate) prod'da 0-cagiran; (4) plan-preview REPL'de render edilmiyor (yalniz CLI stdin-confirm); (5) golden-flow startSprint'i senkron stdio:inherit — spawnDetachedDeckent DEGIL. TASARIM-KARARI GEREK (Alperen): fiili yol (native-agent tool'lari) MI resmilesecek yoksa golden-flow MU REPL'e baglanacak — ikisini birlestiren netlik; sonra insa. DESK-2/511 ile koordine.",
+    "verify": "511 kabul-olcutu: 1 gercek born terminal-akisiyla uctan-uca",
+    "wire_on": "design-then-sprint"
+  },
+  {
+    "born_id": "644",
+    "severity": "P1",
+    "subsystem": "orchestra/governance",
+    "title": "SPRINT-ICI IZINSIZ BUILD: sprint-403 sirasinda dist 08:43'te yeniden derlendi (build YASAK kurali) — fail kim/nereden audit + onleme",
+    "sources": [
+      "dist mtime forensik 2026-07-11"
+    ],
+    "primary_files": [
+      "src/orchestra/spawn-backend-docker.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "dist/* mtime 08:43:20 = sprint-403 kosarken (benim build'im 08:25'teydi, sprint 08:26'da basladi). Suphe: bir worker container'da npm run build kostu (volume-mount -> host dist'i ezer; ESM-cache zehirlenme riski + kural-ihlali). Audit: 403 worker loglarinda 'npm run build' ara; onleme: worker-wrapper'da build-komut advisory-blogu (NPM-ADVISORY deseni) ya da dist'i worker-mount'tan cikar (read-only mount).",
+    "verify": "worker-log kaniti + onleme-testi",
     "wire_on": "sprint"
   }
 ]

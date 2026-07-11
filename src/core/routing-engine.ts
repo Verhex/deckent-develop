@@ -692,7 +692,10 @@ export interface RoutingDecisionRecord {
 /** Path to this sprint's decision journal — mirrors the sprint-scoped,
  *  append-only convention of `.deckent/routing/outcomes/<sprintId>.json`. */
 export function routingDecisionJournalPath(projectRoot: string, sprintId: string): string {
-  return join(projectRoot, ROUTING_DECISIONS_DIR, `sprint-${sprintId}.jsonl`);
+  // Live sprintIds already carry the 'sprint-' prefix (getNextSprintId →
+  // 'sprint-404') — don't double it (born-641 cosmetic: 'sprint-sprint-404.jsonl').
+  const fileStem = sprintId.startsWith('sprint-') ? sprintId : `sprint-${sprintId}`;
+  return join(projectRoot, ROUTING_DECISIONS_DIR, `${fileStem}.jsonl`);
 }
 
 /**
@@ -1503,10 +1506,16 @@ function selectBestSkills(
     }
 
     // Stack detection bonus (project language/framework match)
+    // born-641 (2026-07-11): null-safe reads — a single manifest missing
+    // triggers/stackDetection (live case: secure-coding, extracted without the
+    // fields in W5b) must degrade to a zero bonus for THAT skill, never throw.
+    // The un-guarded `skill.stackDetection.dependencies` read killed V2 routing
+    // for EVERY task on the live plan path for ~10 days (silent per-task catch).
+    const skillTriggers = skill.triggers ?? [];
     let stackBonus = 0;
     if (projectStack) {
       if (skill.category === 'language') {
-        const langMatch = skill.triggers.some(t => t.toLowerCase() === projectStack.language.toLowerCase());
+        const langMatch = skillTriggers.some(t => t.toLowerCase() === projectStack.language.toLowerCase());
         if (langMatch) {
           stackBonus += 3;
         } else {
@@ -1518,7 +1527,7 @@ function selectBestSkills(
           // overrides bypass routing entirely, so explicit pins are unaffected.
           const projStack = normalizeTechStack(projectStack.language);
           if (projStack !== 'generic') {
-            const normMatch = skill.triggers.some(t => normalizeTechStack(t) === projStack);
+            const normMatch = skillTriggers.some(t => normalizeTechStack(t) === projStack);
             if (!normMatch) {
               stackBonus -= LANGUAGE_MISMATCH_PENALTY;
               reasoning.push(`Skill '${id}' language-mismatch penalty: -${LANGUAGE_MISMATCH_PENALTY} (skill not for ${projStack} stack)`);
@@ -1527,11 +1536,11 @@ function selectBestSkills(
         }
       }
       if (skill.category === 'framework') {
-        const fwMatch = skill.triggers.some(t => t.toLowerCase() === projectStack.framework.toLowerCase());
+        const fwMatch = skillTriggers.some(t => t.toLowerCase() === projectStack.framework.toLowerCase());
         if (fwMatch) stackBonus += 3;
       }
-      for (const dep of skill.stackDetection.dependencies) {
-        if (projectStack.dependencies.includes(dep)) {
+      for (const dep of skill.stackDetection?.dependencies ?? []) {
+        if ((projectStack.dependencies ?? []).includes(dep)) {
           stackBonus += 1;
           break; // only +1 for dependency match total
         }

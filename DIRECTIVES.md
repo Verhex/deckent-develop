@@ -33,8 +33,8 @@ occurrence'ları (inline-string'ler, başka dosyalar) notes'a dilim-2 envanteri 
 
 ## Task 2: GATE-FLAG-THREAD — 628-kalan: --force-prompt-gate CLI + MCP acknowledgePromptGate
 - Model: sonnet | Agent: api-builder
-- Files: src/cli/commands/start.ts, src/mcp/tools/start.ts, tests/cli/start-prompt-gate-flag.test.ts
-- Scope: src/cli/, src/mcp/, tests/cli/
+- Files: src/cli/commands/start.ts, src/mcp/tools/start.ts, tests/cli/start-prompt-gate-flag.test.ts, docs/reference/api-surface.md
+- Scope: src/cli/, src/mcp/, tests/cli/, docs/reference/
 - Dependencies: none
 ### Description
 402-001 runSprint'e `RunSprintOptions.acknowledgePromptGate` + `decidePromptGateBlock`'u indirdi

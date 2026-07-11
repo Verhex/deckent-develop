@@ -151,6 +151,7 @@ interface StartCommandOpts {
   dryRun?: boolean;
   force?: boolean;
   forceScope?: boolean;
+  forcePromptGate?: boolean;
   watch?: boolean;
   timeout?: string;
   forceDirectives?: boolean;
@@ -166,6 +167,7 @@ export function registerStart(program: Command): void {
     .option('--dry-run', 'Plan sprint without spawning workers')
     .option('--force', 'Skip doctor pre-flight checks')
     .option('--force-scope', 'Bypass the pre-spawn scope gate (allow write paths that do not exist / look like typos)')
+    .option('--force-prompt-gate', 'Bypass the plan-time prompt-gate BLOCK (persona-capability mismatch)')
     .option('--watch', 'Automatically open watch mode after sprint spawns workers')
     .option('--timeout <ms>', 'Sprint timeout in milliseconds (default: 30 minutes)')
     .option('--force-directives', 'Override existing DIRECTIVES.md in zero-config mode')
@@ -462,6 +464,10 @@ export function registerStart(program: Command): void {
             // Dimension B: --force-scope bypasses the pre-spawn scope gate. Independent
             // of --force (cost/doctor) — the scope shield protects even force-run sprints.
             acknowledgeScopePaths: opts.forceScope === true,
+            // born-628: --force-prompt-gate bypasses the plan-time G-series prompt gate
+            // BLOCK (persona-capability / decision-space / scope-contract findings).
+            // Independent of --force / --force-scope — mirrors the scope-gate override UX.
+            acknowledgePromptGate: opts.forcePromptGate === true,
             sandboxMode: opts.sandboxMode,
             timeoutMs,
             spawnBackend: sandboxSpawnBackend,

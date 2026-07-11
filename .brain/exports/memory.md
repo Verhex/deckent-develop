@@ -1,5 +1,14 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-403 Learnings
+- Sprint sprint-403 Learnings: ## Sprint sprint-403 Learnings
+- GATE-FLAG-THREAD — 628-kalan: --force-prompt-gate CLI + MCP acknowledgePromptGate: GO_WITH_TECH_DEBT — CLI path fully wired end-to-end, no gap: src/cli/commands/start.ts adds --force-prompt-gate (StartCommandOpts.forcePromp
+
+## Gains
+- 403-001 — RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts) — Converted 34 message-value pairs (68 en+tr lines) in messages.ts from 'Sprint/sprint' to 'Run/run...
+- 403-003 — FLAKE-WALLCLOCK — born-632: duvar-saati assert ailesi hermetikleştir — Both flaky wall-clock asserts converted to vi.useFakeTimers() (matches the codebase's existing id...
+- 403-004 — NESTED-HONESTY — born-633: call_tool nested-dispatch dürüstlük ailesi (4 kalem) — All 4 born-633 items fixed with RED->GREEN test pairs (verified RED by reverse-applying the sourc...
+
 ## Sprint sprint-402 Learnings
 - Sprint sprint-402 Learnings: ## Sprint sprint-402 Learnings
 - PROMPT-GATE-BLOCK-START — born-628: gate-BLOCK'u start/MCP ana-yoluna taşı: GO_WITH_TECH_DEBT — RED-kanit: pre-fix `grep -c promptGate src/orchestra/sprint-controller.ts` = 0 (captured before any edit) -- runSprint's
