@@ -70,6 +70,7 @@ import { createOutputCollector, type OutputCollector } from '../core/output-coll
 import { reconcileStatusResponse } from './status-reconcile.js';
 import { ApprovalStore, type ApprovalStoreEntry, type ApprovalStoreCategory } from '../core/approval-store.js';
 import { ApprovalBroker, ApprovalBrokerError } from '../core/approval-broker.js';
+import { ApprovalExpiryDriver } from '../core/approval-expiry-driver.js';
 import { rpcRequestSchema, dispatchRpcRequest, type RpcHandler, type RpcHandlerMap } from '../core/term-rpc.js';
 import { probeSubscriptionLimits, type SpawnImpl } from '../core/limit-preflight.js';
 
@@ -84,6 +85,13 @@ const MIME_TYPES: Record<string, string> = {
 const DEFAULT_PORT = 3100;
 const LOCALHOST_ONLY = '127.0.0.1';
 const MAX_BODY_SIZE = 1024 * 1024; // 1MB
+
+// APPROVAL-EXPIRY-DRIVER-WIRE (404-004): sweep cadence when neither an
+// explicit `opts.approvalExpirySweepMs` nor `approval.expiry_sweep_ms` in
+// `.deckent/config.json` is set. Approvals expire/decide on minute-to-hour
+// scales, so a 1-minute sweep is responsive without being wasteful (same
+// order of magnitude as the terminal idle-reaper's 30s cadence below).
+const DEFAULT_APPROVAL_EXPIRY_SWEEP_MS = 60_000;
 
 // TERM-CONFIG-WIRE (357-009): mirrors DEFAULT_TERMINAL_CONFIG /
 // DEFAULT_OUTBOUND_DAILY_QUOTA_BYTES in ../core/config.ts byte-for-byte —
@@ -1501,6 +1509,23 @@ export interface HttpApi {
   apiToken?: string;
   /** PTY session manager (test-exposed). Only set when terminal is enabled. */
   terminalManager?: PtySessionManager;
+  /**
+   * TTL-expiry + retention-prune sweeper (404-004 APPROVAL-EXPIRY-DRIVER,
+   * test-exposed). Always constructed and started — mirrors the terminal
+   * idle-reaper's unconditional-when-server-runs posture; GET /api/approvals
+   * is documented as never flag-gated, and this driver is the disk-hygiene
+   * counterpart of that same always-on surface.
+   */
+  approvalExpiryDriver?: ApprovalExpiryDriver;
+  /**
+   * The EXACT `ApprovalBroker` instance `approvalExpiryDriver` sweeps
+   * (test-exposed). `ApprovalBroker.expire()` only TTL-expires requests
+   * previously `.submit()`'d through THIS SAME instance (approval-broker.ts
+   * `requestsById` is populated solely by `submit()`) — tests that want to
+   * observe a real sweep must submit through this reference, not a
+   * newly-constructed broker pointed at the same directory.
+   */
+  approvalBroker?: ApprovalBroker;
   close(): Promise<void>;
 }
 
@@ -1535,6 +1560,14 @@ export interface HttpServerOptions {
     algorithm: 'HS256' | 'RS256';
     key: string;
   };
+  /**
+   * Explicit override for the approval TTL-expiry + retention-prune sweep
+   * cadence (404-004 APPROVAL-EXPIRY-DRIVER). Wins over the project config's
+   * `approval.expiry_sweep_ms`; both absent falls back to
+   * `DEFAULT_APPROVAL_EXPIRY_SWEEP_MS` — same explicit-param > config-file >
+   * hardcoded-default resolution chain as `host`/`terminal.bind` above.
+   */
+  approvalExpirySweepMs?: number;
 }
 
 export function createHttpServer(projectRoot: string, port?: number, staticDir?: string, apiToken?: string): HttpApi;
@@ -1555,6 +1588,7 @@ export function createHttpServer(
   let rateLimitExemptLoopback = true;
   let terminalBackend: SessionBackend | undefined;
   let resolvedOidc: HttpServerOptions['oidc'];
+  let approvalExpirySweepMsOpt: number | undefined;
 
   // TERM-CONFIG-WIRE (357-009): `terminal.bind` fallback for the server's
   // listen host. Same raw sync-read pattern as the token/OIDC blocks below
@@ -1573,6 +1607,23 @@ export function createHttpServer(
       ? rawCfgForBind.terminal.bind
       : undefined;
 
+  // APPROVAL-EXPIRY-DRIVER-WIRE (404-004): `approval.expiry_sweep_ms` fallback
+  // for the TTL-expiry/retention-prune sweep interval. Same raw sync-read
+  // pattern as `rawCfgForBind` above — createHttpServer is synchronous,
+  // loadConfig is async. `ApprovalConfig` (config-types.ts) is out of this
+  // task's write scope, same gap `isApprovalApiDecideEnabled` below already
+  // documents for `approval.api_decide` — read raw, never through
+  // `ResolvedConfig`.
+  const rawCfgForApproval = readJsonSafe<{ approval?: { expiry_sweep_ms?: unknown } }>(
+    join(projectRoot, PROJECT_CONFIG_PATH),
+  );
+  const approvalConfigSweepMs =
+    typeof rawCfgForApproval?.approval?.expiry_sweep_ms === 'number' &&
+    Number.isFinite(rawCfgForApproval.approval.expiry_sweep_ms) &&
+    rawCfgForApproval.approval.expiry_sweep_ms > 0
+      ? rawCfgForApproval.approval.expiry_sweep_ms
+      : undefined;
+
   if (typeof portOrOpts === 'object' && portOrOpts !== null) {
     listenPort = portOrOpts.port ?? DEFAULT_PORT;
     resolvedStaticDir = portOrOpts.staticDir;
@@ -1583,12 +1634,16 @@ export function createHttpServer(
     rateLimitExemptLoopback = portOrOpts.rateLimitExemptLoopback ?? true;
     terminalBackend = portOrOpts.terminalBackend;
     resolvedOidc = portOrOpts.oidc;
+    approvalExpirySweepMsOpt = portOrOpts.approvalExpirySweepMs;
   } else {
     listenPort = portOrOpts ?? DEFAULT_PORT;
     resolvedStaticDir = staticDir;
     resolvedToken = apiToken;
     host = terminalConfigBind ?? LOCALHOST_ONLY;
   }
+
+  const resolvedApprovalExpirySweepMs =
+    approvalExpirySweepMsOpt ?? approvalConfigSweepMs ?? DEFAULT_APPROVAL_EXPIRY_SWEEP_MS;
 
   // Auto-generate token if requested and none provided
   if (!resolvedToken && autoGenerateToken) {
@@ -1701,6 +1756,35 @@ export function createHttpServer(
     outputCollector = createOutputCollector(projectRoot);
   } catch {
     outputCollector = null;
+  }
+
+  // ─── Approval TTL-expiry + retention-prune driver (404-004
+  // APPROVAL-EXPIRY-DRIVER) ────────────────────────────────────────
+  // approval-expiry-driver.ts existed with zero production callers — nothing
+  // ever ran `ApprovalBroker.expire()`, so `ApprovalStore.prune()` could never
+  // clean up a TTL-expired-but-undecided entry (prune() only removes entries
+  // that already carry a `decision.decidedAt`; see approval-store.ts). One
+  // shared broker+store pair, unconditional (mirrors GET /api/approvals'
+  // "never flag-gated" posture — this is that same surface's disk-hygiene
+  // counterpart), started before `server.listen` below and stopped in
+  // `close()`. `ApprovalExpiryDriver.start()` unref's its own interval
+  // (ADR-G-013) — same MOAT-2 lesson as the terminal idle-reaper's
+  // `.unref?.()` further down. Wrapped fail-soft exactly like `outputCollector`
+  // above — several existing test suites replace `node:fs` with a partial
+  // mock (no `mkdirSync`); a constructor failure there must leave the
+  // approval surface absent, not crash every unrelated createHttpServer() call.
+  let approvalBroker: ApprovalBroker | undefined;
+  let approvalStore: ApprovalStore | undefined;
+  let approvalExpiryDriver: ApprovalExpiryDriver | undefined;
+  try {
+    approvalBroker = new ApprovalBroker(projectRoot);
+    approvalStore = new ApprovalStore(projectRoot);
+    approvalExpiryDriver = new ApprovalExpiryDriver({ broker: approvalBroker, store: approvalStore });
+    approvalExpiryDriver.start(resolvedApprovalExpirySweepMs);
+  } catch {
+    approvalBroker = undefined;
+    approvalStore = undefined;
+    approvalExpiryDriver = undefined;
   }
 
   // Config-driven chat adapter for /api/chat/stream (Sprint 269 B-ChatStream).
@@ -2089,6 +2173,8 @@ export function createHttpServer(
     terminalToken,
     apiToken: finalToken ?? undefined,
     terminalManager: terminalMgr,
+    approvalExpiryDriver,
+    approvalBroker,
     close(): Promise<void> {
       watcher?.close();
       liveBridge?.close();
@@ -2098,6 +2184,7 @@ export function createHttpServer(
       }
       terminalMgr?.reapIdle();
       terminalAuditStore?.close();
+      approvalExpiryDriver?.stop();
       for (const client of sseClients) {
         client.end();
       }

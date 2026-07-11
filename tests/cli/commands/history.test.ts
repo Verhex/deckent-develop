@@ -53,14 +53,14 @@ describe('history command (isolated)', () => {
   it('shows message when sprints dir does not exist', async () => {
     vi.mocked(existsSync).mockReturnValue(false);
     await runCommand(['history']);
-    expect(print).toHaveBeenCalledWith('No sprint history found.');
+    expect(print).toHaveBeenCalledWith('No run history found.');
   });
 
   it('shows message when sprints dir is empty', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as any);
     await runCommand(['history']);
-    expect(print).toHaveBeenCalledWith('No sprint history found.');
+    expect(print).toHaveBeenCalledWith('No run history found.');
   });
 
   it('filters only sprint-*.md files', async () => {

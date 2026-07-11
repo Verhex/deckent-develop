@@ -1,92 +1,121 @@
-# DIRECTIVES — SPRINT-403: RUN-RENAME D1 + GATE-FLAG-THREAD + FLAKE + NESTED-HONESTY (510 · 519-kalan · 525 · 526)
+# DIRECTIVES — SPRINT-404: RUNTIME-TRUTH-COMPILER + PLAN-YÜZEYİ + EXPIRY-DRIVER + TRACE-TAIL (640 · 522 · 524 · 639)
 
 ## Goal
-Alperen-direktifi (2026-07-11): kullanıcı-yüzeyi "sprint"→"run" kelime-revizyonu BAŞLASIN (dilim-1: i18n değerleri);
-628 gate-flag'inin start-yüzeylerine bağlanması; CI-yeşil için duvar-saati flake ailesi; call_tool dürüstlük kalanları.
+Faz-2'nin son halkası: "wiring% ≠ çalışıyor" hastalığının mekanik kök-kesimi (`deckent truth`) +
+plan-yüzeyi gerçeği + onay-expiry prod-sürücüsü + trace her-ortam-tamamlığı.
 
 ## 🔒 BAĞLAYICI (her task)
-- Yalnız kendi Files/Scope'una yaz · git stash/reset YASAK · build YASAK · notes TEK STRING · Self DÜRÜST.
+- Yalnız kendi Files/Scope'una yaz · git stash/reset YASAK · **build YASAK (npm run build dahil — dist'e ASLA dokunma)** · notes TEK STRING · Self DÜRÜST.
 - REPRODUCE-first: önce mevcut davranışı kanıtlayan RED/ölçüm, sonra fix; kanıtı notes'a yaz.
 - Değişen modülü import eden TÜM testleri koş (`VITEST_MAX_FORKS=2 npx vitest run <ilgili dizinler>`).
 
-## Task 1: RUN-RENAME-D1 — sprint→run kullanıcı-yüzeyi kelime-revizyonu (dilim-1: messages.ts)
-- Model: sonnet | Agent: refactorer
-- Files: src/cli/helpers/messages.ts
-- Scope: src/cli/helpers/, tests/
+## Task 1: TRUTH-CORE — born-640a: feature-truth zincir-derleyici çekirdeği
+- Model: sonnet | Agent: architect-değil-implementer; refactorer
+- Files: src/core/feature-truth.ts, tests/core/feature-truth.test.ts
+- Scope: src/core/, tests/core/
 - Dependencies: none
 ### Description
-KARAR (Alperen 2026-07-06, MASTER-PLAN satır-492+510): kullanıcı-yüzeyinde "sprint" kelimesi → "run"
-(run=iş-koşusu; İÇ kod-adları/mesaj-KEY'leri DEĞİŞMEZ). Bugün messages.ts'de ~153 "sprint" occurrence
-var ve CLI "Run 402 (sprint) (sprint-402)" gibi karışık basıyor. DİLİM-1 kapsamı: YALNIZ
-src/cli/helpers/messages.ts içindeki en+tr DEĞER-metinlerinde görünen "Sprint/sprint" kelimesini
-"Run/run"a çevir. SINIRLAR: (1) mesaj KEY-adları (örn. `sprint.started`) AYNEN kalır — key-rename
-ayrı dilim; (2) `{sprintId}` gibi interpolasyon-değişken adları ve içine gelen "sprint-403" gibi
-DATA değerleri kalır (onlar veri, display-şablon değil); (3) TR metinde de teknik terim "run"
-kullanılır (kod/terim EN kuralı, örn. "Run tamamlandı"); (4) "sprint" kelimesi bir KOMUT-adını
-(`deckent start` argümanı vb.) veya dosya-yolunu aktarıyorsa DOKUNMA. Değer-değişimlerinden etkilenen
-TÜM test-beklentilerini senkronla (affected-testleri `node scripts/affected-tests.mjs --changed
-src/cli/helpers/messages.ts --json` ile bul; docs/guides/affected-tests-gate.md rehber). Kalan
-occurrence'ları (inline-string'ler, başka dosyalar) notes'a dilim-2 envanteri olarak grep-listeyle yaz.
+YENİ modül `src/core/feature-truth.ts`: her özellik için 4-seviyeli truth-zinciri derleyen SAF motor
+(yan-etkisiz; CLI/MCP yüzeyi Task-2'de). Seviyeler: **L1-CODE** (entryModule dosyası var + named-export
+mevcut — kaynak-metin taraması, require etmeden); **L2-WIRED** (prodCallsitePattern regex'i src/ altında
+en az 1 non-test dosyada eşleşiyor — tests/ hariç; eşleşen dosya:satır listesi kanıt olarak döner);
+**L3-ENABLED** (flagPath'in verilen resolved-config objesinde çözülen değeri — config OKUMA çağıranın işi,
+motor pure kalır: `resolveTruth(defs, {config, projectRoot, now})`); **L4-LIVE-PROOF**
+(proof.kind='artifact-file' → dosya var+boş-değil; 'journal-recent' → jsonl son-satır ts'i
+maxAgeDays içinde; 'smoke-cmd' → BU dilimde KOŞULMAZ, 'declared' olarak raporlanır — koşum Task-2 CLI'ında
+opsiyonel). Veri-modeli: `FeatureTruthDef {id, title, entryModule, exportName?, prodCallsitePattern?,
+flagPath?, proof?}` + `FeatureTruthResult {id, code:'ok'|'missing', wired:'ok'|'none'|'undefined',
+enabled:'on'|'off'|'no-flag', proof:'ok'|'stale'|'missing'|'declared'|'undefined', evidence:{...}}` +
+`classifyHalfWire(result)` → code-ok+wired-none = YARIM-WİRE adayı. Truth-tanımı OLMAYAN alanlar
+'undefined' diye DÜRÜST raporlanır (sessiz-geçme yok). Cross-platform path (join/sep), fail-soft
+(tek-def hatası diğerlerini düşürmez — sonuçta error alanıyla raporlanır; born-641 dersi: throw YOK,
+yutma da YOK). RED-önce: tarihsel yarım-wire vakası fixture'ı (örn. export-var + çağrı-sitesi-yok modül)
+→ classifyHalfWire yakalar; ayrıca 6-vaka mini-vault: tool_surface-a778151a / recordSprintWorkerTrace /
+runEvaluatePhase-config / registerCodexParityModels / docker-envelope / gate-BLOCK-CLI-only şekillerini
+temsil eden sentetik fixture'lar (adlarıyla) testte belgelenir.
 ### goNogo
-- goCriteria: messages.ts değer-metinlerinde kullanıcı-görünür "sprint" kelimesi kalmadı (key-adları/veri-interpolasyonları hariç — grep-kanıtı notes'ta); en+tr paritesi korunur (tests/i18n yeşil); etkilenen tüm test-beklentileri senkron; dilim-2 envanteri notes'ta.
-- nogo: key-rename yapılırsa (kapsam-aşımı) NO_GO; test-senkronsuz bırakılırsa NO_GO.
+- goCriteria: motor pure+hermetik (tmpdir fixture); 4-seviye + undefined-dürüstlüğü testli; classifyHalfWire 6-vaka-vault fixture'larını yakalar; fail-soft (bozuk-def → error-alanı, throw yok) testli; tsc temiz.
+- nogo: motor config/disk'i kendisi global-okursa (pure-ihlal) NO_GO; sessiz-geçme varsa NO_GO.
 
-## Task 2: GATE-FLAG-THREAD — 628-kalan: --force-prompt-gate CLI + MCP acknowledgePromptGate
+## Task 2: TRUTH-SURFACE — born-640b: `deckent truth` CLI + MCP + --check ratchet
 - Model: sonnet | Agent: api-builder
-- Files: src/cli/commands/start.ts, src/mcp/tools/start.ts, tests/cli/start-prompt-gate-flag.test.ts, docs/reference/api-surface.md
-- Scope: src/cli/, src/mcp/, tests/cli/, docs/reference/
+- Files: src/cli/commands/truth.ts, src/mcp/tools/truth.ts, src/cli/index.ts, src/mcp/server.ts, .deckent/settings/features-manifest.json, tests/cli/truth-command.test.ts
+- Scope: src/cli/, src/mcp/, .deckent/settings/, tests/cli/
+- Dependencies: Task 1
+### Description
+Task-1 motorunun yüzeyleri. (1) `deckent truth` CLI: features-manifest'ten (
+`.deckent/settings/features-manifest.json`) truth-bloğu taşıyan feature'ları okur + resolved-config'i
+loadConfig'den alır + motoru koşar + tablo basar (kolonlar: feature | code | wired | enabled | proof;
+NO_COLOR-uyumlu; i18n: kullanıcı-metinleri getMessage en+tr — YENİ anahtarlar ekle); sonda "YARIM-WİRE
+adayları" bölümü (classifyHalfWire). `--json` ham-çıktı; `--check`: `.deckent/truth-baseline.json`
+pinned-baseline'ıyla karşılaştır — YENİ yarım-wire adayı = exit 1 + isim listesi (orphan-ratchet emsali;
+baseline yoksa oluşturmayı öner, exit 2). (2) MCP `deckent_truth` tool paritesi (src/mcp/server.ts'e
+register + katalog-sayaç senkronu — mevcut tool-count testleri varsa güncelle). (3) Manifest'e truth-bloğu
+İLK 5 gerçek-örnek: training_trace (entryModule src/orchestra/output-collector.ts export
+recordSprintWorkerTrace; callsite-pattern 'recordSprintWorkerTrace\\(' ; flagPath training_trace.enabled;
+proof journal-recent .deckent/traces/sprint-worker.jsonl 7-gün) + tool_surface + approval-gate +
+routing-decision-journal + affected-tests-gate — beşi de BUGÜN yeşil olmalı (canlı-kanıt!).
+Gerçek-binary smoke-koşumunu build-sonrası Brain host-side yapar; sen yalnız komut-iskeletini ve
+hermetik testleri teslim et.
+### goNogo
+- goCriteria: CLI tablo+--json+--check testli (hermetik tmpdir-manifest); MCP parite + register; 5 gerçek truth-bloğu manifest'te; i18n en+tr yeni-anahtarlar; ratchet exit-davranışı testli.
+- nogo: motor yeniden-implement edilirse (Task-1'i import etmek yerine) NO_GO; tool-register yarım-wire kalırsa (register edilmeden "eklendi" denirse) NO_GO.
+
+## Task 3: PLAN-SURFACE-TRUTH — born-629: start-replan ezmesi + Model/Agent-hint drop + post-adoption gösterim
+- Model: sonnet | Agent: bug-fixer
+- Files: src/orchestra/task-builder.ts, src/orchestra/sprint-planner.ts, tests/orchestra/plan-surface-truth.test.ts
+- Scope: src/orchestra/, tests/orchestra/
 - Dependencies: none
 ### Description
-402-001 runSprint'e `RunSprintOptions.acknowledgePromptGate` + `decidePromptGateBlock`'u indirdi
-(sprint-controller.ts) ama start-yüzeyleri henüz geçirmiyor. FIX: start.ts'e `--force-prompt-gate`
-opsiyonu (mevcut `--force-scope` deseninin BİREBİR simetriği — start.ts:168 option-tanımı +
-start.ts:462 `acknowledgeScopePaths: opts.forceScope === true` geçiş-noktası); MCP
-src/mcp/tools/start.ts input-şemasına `acknowledgePromptGate` alanı (acknowledgeScopePaths'in yanına)
-ve runSprint çağrısına threading. RED test: bugün flag yok (option-parse hatası / şema-alanı yok) →
-fix sonrası flag geçince RunSprintOptions.acknowledgePromptGate=true ulaşır (composition-pin:
-start.ts kaynağında `acknowledgePromptGate: opts.forcePromptGate === true` satırı + MCP şema-alanı
-assert). docs/reference/api-surface.md deckent_start şemasını belgeliyorsa güncelle (402-001
-docImpact-notu).
+Üç kanıtlı-vaka tek-kök: DIRECTIVES'teki `- Model: haiku | Agent: doc-writer` hint'leri parse'da
+DÜŞÜYOR (task JSON'a inmiyor) → hand-fix de işe yaramıyor çünkü `deckent start` RE-PLAN yapıp ezer
+(kanıt: sprint-401 haiku→sonnet; sprint-403 Agent-hint'leri de düştü). FIX: (1) task-builder parse'ında
+`Model:` → task.forceModel + `Agent:` → task.forceAgent güvenilir-yakalama — mevcut satır-formatı
+`- Model: X | Agent: Y` VE ayrı-satır varyantlarını destekle; yakalanamayan hint = stderr-WARN
+(sessiz-düşme YASAK — born-458 dep-ref emsali); (2) forceModel/forceAgent zaten task-JSON'a inen alanlar —
+routeTaskV2 override-yolu bunları sayğılıyor (sprint-planner :676-685 overrides bloğu) → uçtan-uca test:
+DIRECTIVES-metni fixture'ından parse→plan→task.forceAgent='doc-writer' + routing kararı ona uyar;
+(3) RED-önce: bugünkü parser'ın hint'i düşürdüğünü kanıtlayan test (mevcut davranış), sonra fix.
+NOT: scope-gate yeni-dizin false-positive'i ve pre-adoption gösterimi AYRI dilim — bu task yalnız
+hint-zinciri; kalan kalemleri notes'a envanterle.
 ### goNogo
-- goCriteria: CLI flag + MCP alanı canlı (composition-pin testli); mevcut start/gate testleri yeşil (tests/cli/start-gate-exit.test.ts 3/3 + prompt-gate-start-path 16/16 dahil); api-surface doc güncel (varsa).
-- nogo: flag tanımlanıp runSprint'e GEÇİRİLMEZSE (yarım-wire) NO_GO.
+- goCriteria: RED-kanıt (hint-drop bugün gerçek); `- Model: X | Agent: Y` satırı parse→task.forceModel/forceAgent'a iner (uçtan-uca test); yakalanamayan-hint stderr-WARN; parser/task-builder/planner importer testleri yeşil.
+- nogo: yalnız yeni-format eklenip mevcut DIRECTIVES-formatı (marathon'un kullandığı) desteklenmezse NO_GO.
 
-## Task 3: FLAKE-WALLCLOCK — born-632: duvar-saati assert ailesi hermetikleştir
-- Model: sonnet | Agent: ci-guardian | Skills: ci-testing
-- Files: tests/cli/shutdown-hooks.test.ts, tests/orchestra/sprint-spawner-throttle.test.ts
-- Scope: tests/
+## Task 4: APPROVAL-EXPIRY-DRIVER — born-631: prod-sürücü bağla
+- Model: sonnet | Agent: api-builder
+- Files: src/api/server.ts, tests/api/approval-expiry-wire.test.ts
+- Scope: src/api/, tests/api/
 - Dependencies: none
 ### Description
-İki kanıtlı CI-flake: (1) tests/cli/shutdown-hooks.test.ts 'collectively bounded' `elapsed>=4500`
-assert'i — VITEST_MAX_FORKS=2 tam-koşuda 3157ms ölçüldü (fork-baskısı timer-coalescing; standalone
-yeşil); (2) tests/orchestra/sprint-spawner-throttle.test.ts '<50ms' assert'i CI'da 522ms ölçtü
-(rerun'la yeşillendi). FIX: her ikisini fake-timer'a (`vi.useFakeTimers`) geçir — davranış-anlamını
-koruyarak (throttle SIRALAMASINI/çağrı-sayısını asserte et, duvar-saatini değil); fake-timer
-uygulanamayan yerde yük-dayanıklı tolerans-bandı + gerekçe-yorumu. EK-görev: aynı sınıftaki diğer
-adayları tara — `grep -rn "toBeLessThan(\(50\|100\|200\))" tests/` + `elapsed`/`Date.now()` assert
-desenleri — bulguları fix ETMEDEN envanter olarak notes'a yaz (dilim-2 kararı Brain'in).
+`src/core/approval-expiry-driver.ts` motoru VAR ama hiçbir prod-süreç çalıştırmıyor (0-caller,
+yarım-wire ailesi) → expiresAt'i geçen pending'ler süresiz görünür-kalır (liste kirlenir; POST 409 döner
+ama görsel-pending kalır). FIX: serve/API sürecine (src/api/server.ts) driver'ı bağla — server-start'ta
+oluştur, interval unref'd (MOAT-2 dersi: event-loop'u pinleme), server-close'da dispose; aralık config'ten
+(`approval.expiry_sweep_ms` gibi mevcut-şemaya uygun opsiyonel alan — resolver-passthrough ÜÇLÜSÜNÜ
+unutma: tip + iki-resolver + canlı-roundtrip testi; born-464 dersi). RED-önce: bugün server'da driver
+referansı 0 (grep-kanıt) + expired-pending'in temizlenmediği fixture-testi; fix-sonrası: expired pending
+sweep'te expired'a geçer + composition-pin (server source'unda driver-kurulum satırı asserte).
 ### goNogo
-- goCriteria: iki dosya fake-timer/dayanıklı-bant ile hermetik (VITEST_MAX_FORKS=2 tam cli+orchestra koşusunda yeşil — kanıt notes'ta); davranış-anlamı korunur (throttle/bound semantiği hâlâ asserte ediliyor, test içi boşaltma YOK); aday-envanteri notes'ta.
-- nogo: assert silinip yerine hiçbir anlamlı kontrol konmazsa NO_GO.
+- goCriteria: RED-kanıt; server-start→driver canlı (composition-pin) + unref'd + dispose testli; config-üçlüsü tam (tip+resolver×2+roundtrip); api importer testleri yeşil.
+- nogo: driver kurulup interval ref'li kalırsa (linger) NO_GO; config-alanı resolver-passthrough'suz kalırsa NO_GO.
 
-## Task 4: NESTED-HONESTY — born-633: call_tool nested-dispatch dürüstlük ailesi (4 kalem)
+## Task 5: TRACE-TAIL — born-639: codex/gemini docker stream + token-counter tier-2 LogEvent-farkındalığı
 - Model: sonnet | Agent: refactorer
-- Files: src/cli/repl/native-tool-registry.ts, src/cli/repl/native-agent-bridge.ts, tests/cli/nested-dispatch-honesty.test.ts
-- Scope: src/cli/repl/, tests/cli/
+- Files: src/orchestra/spawn-backend-docker.ts, src/orchestra/token-counter.ts, tests/orchestra/trace-tail-parity.test.ts
+- Scope: src/orchestra/, tests/orchestra/
 - Dependencies: none
 ### Description
-607'nin BEFORE-done P2 kalanları — iç-başarısızlık dışarıya "başarılı" görünüyor: (1) nested handler
-ok:false dönerse dispatchToolCall status:'executed' + dış ok:true basıyor (native-tool-registry.ts:407-408)
-→ ToolResult-unwrap: iç ok:false → dış ok:false + iç error-metni korunur; (2) parity-deny throw'u
-status:'error'/[mcp-error] etiketiyle raporlanıyor → policy-deny AYRI sınıf: status:'denied' (veya
-mevcut status-enum'una uygun dürüst-etiket) + '[approval-denied]'-ailesi etiketi (telemetri + modelin
-kendi hata-görüşü için); (3) nested ask'te confirm 'a'=hep-izin-ver sunuluyor ama parity persist
-etmiyor (bilinçli) → nested-yolda 'a' seçeneğini 'yalnız bu sefer' anlamına indir (once'a degrade
-ZATEN var — kullanıcıya görünen etiketi dürüstleştir; string'ler caller-injected/i18n-uyumlu kalsın);
-(4) nested exec toolSink/trace'e görünmüyor → call_tool üzerinden koşan hedef-tool çağrısı da
-toolSink'e (ve varsa turn-trace'e) kaydedilsin — dış call_tool kaydının İÇİNDE nested-işaretli
-(TRN-614 pillar bağlantısı: trace'te kaybolmasın). RED-testler: her kalem için önce bugünkü maskeleme
-davranışını kanıtla, sonra fix.
+402-002'nin dürüst-kalanları. (1) docker stream-port yalnız claude'a yapıldı — codex/gemini docker
+`.log`'ları hâlâ RAW dump → onların trace-içeriği boş (HER-ORTAM yasası). writeNormalizedDockerLog'u
+provider-agnostik genişlet: codex (thread.started/JSON-event formatı — 366-001 kanıtındaki gerçek-format)
+ve gemini çıktılarını normalizeStreamEvent'in tanıdığı forma köprüle; tanınmayan-satır=passthrough-raw
+LogEvent (content=ham-satır, type='text') — veri-kaybı YOK. ⚠️ usage-patch kontratı: her-provider'ın
+mevcut usage-extraction'ı BİREBİR korunur (fixture-pin; resolveTokenUsage dersi). (2) token-counter.ts
+tier-2 fallback (`tryLoadCliLogTokens`) top-level 'usage' bekliyor; LogEvent-JSONL'de usage `.content`
+içinde nested → tier-2'yi LogEvent-farkında yap (her satırı parse et, content-nested usage'ı da tara);
+güvenlik-ağı (mergeWithWorkerClaim) davranışı DEĞİŞMEZ — nihai-sayı regresyon-pin fixture'la. RED-önce:
+codex-format fixture'ında bugün readLogEvents=0 + tier-2 miss kanıtı.
 ### goNogo
-- goCriteria: 4 kalem için RED→GREEN test çifti; iç-fail dışarı ok:false; policy-deny ayrı-sınıf etiket; nested confirm-etiketi dürüst; nested exec toolSink-görünür (nested-işaretli); native-tool-registry + bridge'i import eden tüm testler yeşil (calltool-exec-wire dahil).
-- nogo: yalnız (1) yapılıp diğer kalemler sessizce atlanırsa NO_GO (dürüst-eksik=DEBT kabul, sessiz-eksik değil).
+- goCriteria: RED-kanıt; codex+gemini fixture'ları LogEvent üretir (passthrough dahil); usage-sayıları üç-provider fixture'ında BİREBİR korunur; tier-2 nested-usage bulur + nihai-sayı pin; trace/token importer testleri yeşil.
+- nogo: usage sayısı değişirse NO_GO; yalnız codex yapılıp gemini sessiz-atlanırsa NO_GO (dürüst-DEBT kabul).

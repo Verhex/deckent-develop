@@ -246,3 +246,38 @@ describe('born-641: malformed skill manifest must not kill routing', () => {
     expect(existsSync(routingDecisionJournalPath(root, 'sprint-641'))).toBe(true);
   });
 });
+
+describe('born-638/641: Write-denied persona hard-excluded on construction intents', () => {
+  it('architect (deniedTools Write) cannot win an implementation task even with a huge activation score', () => {
+    const root = makeProjectRoot();
+    const architect = makeAgent('architect', {
+      deniedTools: ['Write'],
+      activation: { rules: [{ when: { 'intent.primary': 'implementation' }, score: 50 }], exclude: [], minScore: 1 },
+    });
+    const builder = makeAgent('api-builder', {
+      activation: { rules: [{ when: { 'intent.primary': 'implementation' }, score: 6 }], exclude: [], minScore: 1 },
+    });
+    const decision = routeTaskV2(
+      {
+        title: 'Add CLI command for schema listing',
+        description: 'Implement a new CLI command that writes source code',
+        scope: { directories: ['src/cli/'], filesRead: [], filesWrite: ['src/cli/commands/x.ts'] },
+      },
+      makePool(architect, builder),
+      makeSkillPool(),
+      { sprintId: 'sprint-638', taskId: 'T638', projectRoot: root },
+    );
+    expect(decision.agentId).toBe('api-builder');
+    // The journal must not fabricate a score for the hard-excluded persona.
+    const recs = readDecisionLines(root, 'sprint-638');
+    expect(recs[0]!.candidates.some(c => c.agentId === 'architect')).toBe(false);
+  });
+
+  it('review/analysis intents keep Write-denied personas selectable (security stays with security-auditor)', () => {
+    const root = makeProjectRoot();
+    const decision = routeTaskV2(testTask, makePool(securityAgent()), makeSkillPool(), {
+      sprintId: 'sprint-638b', taskId: 'T638b', projectRoot: root,
+    });
+    expect(decision.agentId).toBe('security-auditor');
+  });
+});

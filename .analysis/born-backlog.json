@@ -2588,7 +2588,7 @@
     "priority": "P2",
     "status": "OPEN",
     "source": "sprint-399 BEFORE-done advisor",
-    "spec": "Advisor-notlar (B): (1) SAN-2 adoption yalnız runSprint pre-spawn yolunda — deckent plan çıktısı ve start.ts:329 plan-tablosu PRE-adoption scope gösterir; operatörün gördüğü ile workerın aldığı farklı olabilir (kozmetik ama güven-yüzeyi). (2) task-builder render-anında git ls-files başarısız olursa trackedRootFiles=undefined → sanitizer Rule-5 sessiz-drop O RENDER için geri döner ve hiçbir katman yakalamaz (plan-time gate geçmişti); düşük-olasılık — render-yolu git-fail durumunda scopeWarnings üretimini worker-prompta uyarı-bloğu olarak basmak veya spawnı geciktirmek değerlendirilebilir. || KANIT-2 (2026-07-11 sprint-401): deckent start YENIDEN-plan yapip hand-fix'li task JSON'u ezdi (haiku/doc-writer -> sonnet/generic) — parser Model:/Agent: drop bug'i start-yolunda hand-fix'le bile asilamiyor; ayrica scope-gate kasitli-yeni-dizin (docs/guides/) sinifinda false-positive verdi, --force-scope tam start-dongusu maliyetine mal oldu."
+    "spec": "Advisor-notlar (B): (1) SAN-2 adoption yalnız runSprint pre-spawn yolunda — deckent plan çıktısı ve start.ts:329 plan-tablosu PRE-adoption scope gösterir; operatörün gördüğü ile workerın aldığı farklı olabilir (kozmetik ama güven-yüzeyi). (2) task-builder render-anında git ls-files başarısız olursa trackedRootFiles=undefined → sanitizer Rule-5 sessiz-drop O RENDER için geri döner ve hiçbir katman yakalamaz (plan-time gate geçmişti); düşük-olasılık — render-yolu git-fail durumunda scopeWarnings üretimini worker-prompta uyarı-bloğu olarak basmak veya spawnı geciktirmek değerlendirilebilir. || KANIT-2 (2026-07-11 sprint-401): deckent start YENIDEN-plan yapip hand-fix'li task JSON'u ezdi (haiku/doc-writer -> sonnet/generic) — parser Model:/Agent: drop bug'i start-yolunda hand-fix'le bile asilamiyor; ayrica scope-gate kasitli-yeni-dizin (docs/guides/) sinifinda false-positive verdi, --force-scope tam start-dongusu maliyetine mal oldu. || KISMI-FIX 2026-07-11 404-003: Model:/Agent:/Effort:/Provider: hint'leri parse->forceModel/forceAgent guvenilir (RED-kanitli, ucta-uca test; yakalanamayan-hint stderr-WARN). KALAN: pre-adoption gosterim + scope-gate yeni-dizin FP."
   },
   {
     "born_id": 630,
@@ -2602,9 +2602,9 @@
     "born_id": 631,
     "title": "ApprovalExpiryDriver prod-sürücüsüz (ölü) — pending süresiz kalır",
     "priority": "P2",
-    "status": "OPEN",
+    "status": "DONE",
     "source": "born-611 BEFORE-substantive advisor (sprint-400 el-kod)",
-    "spec": "approval-expiry-driver.ts:41 hiçbir prod yerden çalıştırılmıyor; gate kendi timeout'unu yönetiyor ama TERMINAL/API tarafında görünen pending'ler expiresAt geçse de auto-expire edilmiyor (liste kirlenir; POST 409 döner ama görsel-pending kalır). serve/API process'ine veya REPL approvals-surface'ına driver tak; born-611 wire'ında kapsam-dışı bırakıldı."
+    "spec": "approval-expiry-driver.ts:41 hiçbir prod yerden çalıştırılmıyor; gate kendi timeout'unu yönetiyor ama TERMINAL/API tarafında görünen pending'ler expiresAt geçse de auto-expire edilmiyor (liste kirlenir; POST 409 döner ama görsel-pending kalır). serve/API process'ine veya REPL approvals-surface'ına driver tak; born-611 wire'ında kapsam-dışı bırakıldı. || DONE 2026-07-11 404-004: server-start'ta driver (unref'd + dispose + config-uclusu approval.expiry_sweep_ms); DURUST-NOT: ApprovalBroker.expire() yalniz ayni-instance submit'lerini supurur (cross-process pending ayri-kalem -> born-630 ailesine)."
   },
   {
     "born_id": 632,
@@ -2697,9 +2697,10 @@
       "src/api/worker-logs.ts"
     ],
     "proposed_mode": "sprint",
-    "spec": "(1) docker stream-port yalniz claude-provider'a yapildi — codex/gemini docker .log'lari hala RAW dump -> onlarin trace-icerigi bos kalir; ayni normalizeStreamEvent hattina baglanmali (her-ortam yasasi). (2) token-counter.ts tryLoadCliLogTokens tier-2 fallback top-level 'usage' bekliyor; claude+docker .log artik LogEvent-JSONL (usage .content icinde nested) -> tier-2 eslesmiyor (guvenlik-agi: mergeWithWorkerClaim workerReported'i donduruyor, NIHAI SAYI DEGISMIYOR — yalniz provenance). token-counter LogEvent-farkinda yapilmali. (3) worker-logs.ts ham-tail gorunumu artik JSONL — insan-okur render istenirse ayri QoL.",
+    "spec": "(1) docker stream-port yalniz claude-provider'a yapildi — codex/gemini docker .log'lari hala RAW dump -> onlarin trace-icerigi bos kalir; ayni normalizeStreamEvent hattina baglanmali (her-ortam yasasi). (2) token-counter.ts tryLoadCliLogTokens tier-2 fallback top-level 'usage' bekliyor; claude+docker .log artik LogEvent-JSONL (usage .content icinde nested) -> tier-2 eslesmiyor (guvenlik-agi: mergeWithWorkerClaim workerReported'i donduruyor, NIHAI SAYI DEGISMIYOR — yalniz provenance). token-counter LogEvent-farkinda yapilmali. (3) worker-logs.ts ham-tail gorunumu artik JSONL — insan-okur render istenirse ayri QoL. || DONE 2026-07-11 404-005: writeNormalizedDockerLog provider-agnostik (codex gercek-366-log formatiyla + gemini; taninmayan-satir passthrough-raw, veri-kaybi yok); usage uc-provider fixture BIREBIR; token-counter tier-2 LogEvent-nested usage okur, nihai-sayi pin.",
     "verify": "codex/gemini docker fixture -> LogEvent JSONL; token-counter tier-2 nested-usage testi; nihai-sayi regresyon-pin",
-    "wire_on": "sprint"
+    "wire_on": "sprint",
+    "status": "DONE"
   },
   {
     "born_id": "640",
@@ -2717,9 +2718,10 @@
       "scripts/affected-tests.mjs (import-graph reuse)"
     ],
     "proposed_mode": "sprint",
-    "spec": "SINIF: 'wiring% != calisiyor' — teslim-edilmis-ama-bagsiz modul hastaliginin MEKANIK kok-kesimi. TASARIM (4-seviyeli truth-zinciri, feature basina): L1-CODE (modul+export mevcut — statik, dosya/sembol kontrolu) -> L2-WIRED (prod cagri-sitesi mevcut — scripts/affected-tests.mjs'in import-graph cozucusunu REUSE ederek entrypoint'lerden [cli/entry, mcp/server, api/server] erisilebilirlik + feature-tanimindaki callsite-pattern grep'i) -> L3-ENABLED (config-flag'in BU projede cozulen degeri — loadConfig canli-okuma) -> L4-LIVE-PROOF (kanit-artefakti: {kind:'journal-recent' orn .deckent/traces/sprint-worker.jsonl son-N-gun entry | 'artifact-file' | 'smoke-cmd' run-proven}). VERI-MODELI: features-manifest FEATURE_DEFINITIONS'a opsiyonel truth-blogu {entryModule, prodCallsitePattern, flagPath, proof:{kind,ref,maxAgeDays}}; blogu olmayan feature 'truth-tanimsiz' diye DURUST raporlanir (sessiz-gecme yok). YUZEYLER: `deckent truth` CLI (tablo: code/wired/enabled/proof sutunlari + 'yarim-wire adaylari' bolumu = code-OK+wired-YOK) + deckent_truth MCP paritesi + `--check` CI-modu (pinned-baseline ratchet: yeni yarim-wire = exit 1; orphan-ratchet emsali) + .deckent/truth-report.json persist. DOGFOOD-KANIT: bilinen 6 vakanin fix-ONCESI hallerini fixture'layip compiler'in yakaladigini goster (regression-vault). Lawlar: cross-platform (path-sep), fail-soft (rapor-hatasi runtime'i etkilemez), i18n (CLI ciktisi getMessage).",
+    "spec": "SINIF: 'wiring% != calisiyor' — teslim-edilmis-ama-bagsiz modul hastaliginin MEKANIK kok-kesimi. TASARIM (4-seviyeli truth-zinciri, feature basina): L1-CODE (modul+export mevcut — statik, dosya/sembol kontrolu) -> L2-WIRED (prod cagri-sitesi mevcut — scripts/affected-tests.mjs'in import-graph cozucusunu REUSE ederek entrypoint'lerden [cli/entry, mcp/server, api/server] erisilebilirlik + feature-tanimindaki callsite-pattern grep'i) -> L3-ENABLED (config-flag'in BU projede cozulen degeri — loadConfig canli-okuma) -> L4-LIVE-PROOF (kanit-artefakti: {kind:'journal-recent' orn .deckent/traces/sprint-worker.jsonl son-N-gun entry | 'artifact-file' | 'smoke-cmd' run-proven}). VERI-MODELI: features-manifest FEATURE_DEFINITIONS'a opsiyonel truth-blogu {entryModule, prodCallsitePattern, flagPath, proof:{kind,ref,maxAgeDays}}; blogu olmayan feature 'truth-tanimsiz' diye DURUST raporlanir (sessiz-gecme yok). YUZEYLER: `deckent truth` CLI (tablo: code/wired/enabled/proof sutunlari + 'yarim-wire adaylari' bolumu = code-OK+wired-YOK) + deckent_truth MCP paritesi + `--check` CI-modu (pinned-baseline ratchet: yeni yarim-wire = exit 1; orphan-ratchet emsali) + .deckent/truth-report.json persist. DOGFOOD-KANIT: bilinen 6 vakanin fix-ONCESI hallerini fixture'layip compiler'in yakaladigini goster (regression-vault). Lawlar: cross-platform (path-sep), fail-soft (rapor-hatasi runtime'i etkilemez), i18n (CLI ciktisi getMessage). || DONE 2026-07-11 sprint-404 (001+002): motor+CLI+MCP+ratchet; CANLI: 5-blok tam-yesil, --check exit 2/0 dogru, baseline pinli. IKI CANLI-DERS: (1) worker truth-bloklarini URETILEN manifest'e yazdi, regen sildi -> bloklar sync-manifest.mjs TRUTH_DEFINITIONS'a tasindi (generator-kaynak); (2) journal-recent checker nested meta.ts'i gormuyordu -> motor fix. deckent_truth MCP: kod+register testli, canli-MCP dogrulamasi Alperen /mcp restart sonrasi.",
     "verify": "deckent truth gercek-binary smoke (tablo basar, bilinen-yesil feature code+wired+enabled OK); fixture-vault: 6 tarihsel yarim-wire vakasi compiler'da 'wired=YOK' dusuyor; --check ratchet testi; MCP-CLI parite testi",
-    "wire_on": "sprint"
+    "wire_on": "sprint",
+    "status": "DONE"
   },
   {
     "born_id": "641",

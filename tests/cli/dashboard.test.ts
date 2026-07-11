@@ -86,7 +86,9 @@ describe('renderDashboard', () => {
   it('renders sprint info box with correct ID and number', () => {
     const state = makeDashboardState();
     const output = renderDashboard(state);
-    expect(output).toContain('Sprint: sprint-005 (#5)');
+    // RUN-RENAME-D1 (403-001 / MASTER-PLAN 510): user-facing label is 'Run';
+    // the sprint-005 ID itself is data and keeps its internal name.
+    expect(output).toContain('Run: sprint-005 (#5)');
     expect(output).toContain('Phase: EXECUTE');
     expect(output).toContain('Status: ACTIVE');
   });
@@ -322,7 +324,7 @@ describe('registerDashboard', () => {
     await program.parseAsync(['dashboard'], { from: 'user' });
 
     const output = stdoutSpy.mock.calls.map((c) => c[0]).join('');
-    expect(output).toContain('No active sprint. Run deckent start first.');
+    expect(output).toContain('No active run. Run deckent start first.');
   });
 
   it('renders dashboard when file exists', async () => {
@@ -384,7 +386,7 @@ describe('registerDashboard', () => {
 
     // Verify it ran initial render
     const output = stdoutSpy.mock.calls.map((c) => c[0]).join('');
-    expect(output).toContain('No active sprint');
+    expect(output).toContain('No active run');
   });
 
   it('auto-refreshes on interval', async () => {

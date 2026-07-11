@@ -1,14 +1,13 @@
 {
   "_meta": {
     "version": "2.0",
-    "generatedAt": "2026-07-11T05:44:30.008Z",
+    "generatedAt": "2026-07-11T07:00:45.687Z",
     "generatedBy": "scripts/sync-manifest.mjs",
-    "sprintId": "sprint-403",
+    "sprintId": "sprint-404",
     "description": "Feature usage manifest — curated feature catalog (FEATURE_DEFINITIONS in scripts/sync-manifest.mjs) bucketed by an import-count heuristic plus manual lifecycle annotations. NOT a full import-graph analysis. Categories: active, lightly_used, dormant, dead.",
     "usageWindow": "last-10-sprints",
     "sourceAnalysis": {
       "sprintsChecked": [
-        "sprint-394",
         "sprint-395",
         "sprint-396",
         "sprint-397",
@@ -17,7 +16,8 @@
         "sprint-400",
         "sprint-401",
         "sprint-402",
-        "sprint-403"
+        "sprint-403",
+        "sprint-404"
       ],
       "methodology": "curated catalog + grep-based import count (basename match) + @deprecated detection + manual blockedBy/deprecatedSince/supersededBy annotations"
     }
@@ -402,6 +402,51 @@
       ],
       "description": "Original topological wave builder. Primary execution path superseded by dependency-scheduler.",
       "supersededBy": "dependency-scheduler"
+    }
+  ],
+  "truth": [
+    {
+      "id": "training-trace",
+      "label": "Sprint-worker training trace (TRN-1/born-614+637)",
+      "entryModule": "src/orchestra/output-collector.ts",
+      "exportName": "recordSprintWorkerTrace",
+      "prodCallsitePattern": "recordSprintWorkerTrace\\(",
+      "flagPath": "training_trace.enabled",
+      "proof": {
+        "kind": "journal-recent",
+        "ref": ".deckent/traces/sprint-worker.jsonl",
+        "maxAgeDays": 7
+      }
+    },
+    {
+      "id": "tool-surface",
+      "label": "Native terminal tool surface (born-596/607)",
+      "entryModule": "src/cli/repl/native-tool-registry.ts",
+      "exportName": "resolveToolSurfaceOptions",
+      "prodCallsitePattern": "resolveToolSurfaceOptions\\(",
+      "flagPath": "tool_surface.enabled"
+    },
+    {
+      "id": "worker-approval-gate",
+      "label": "Worker approval gate (APR/born-611)",
+      "entryModule": "src/agent/permission-store.ts",
+      "exportName": "createWorkerApprovalGate",
+      "prodCallsitePattern": "createWorkerApprovalGate\\(",
+      "flagPath": "approval.gate_enabled"
+    },
+    {
+      "id": "routing-decision-journal",
+      "label": "Routing decision journal (born-622/641)",
+      "entryModule": "src/core/routing-engine.ts",
+      "exportName": "routeTaskV2",
+      "prodCallsitePattern": "routeTaskV2\\("
+    },
+    {
+      "id": "prompt-gate-block",
+      "label": "Prompt-gate BLOCK on start path (born-628)",
+      "entryModule": "src/orchestra/sprint-controller.ts",
+      "exportName": "decidePromptGateBlock",
+      "prodCallsitePattern": "decidePromptGateBlock\\("
     }
   ]
 }

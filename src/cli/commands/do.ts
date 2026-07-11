@@ -70,7 +70,7 @@ export function formatDoPlanPreview(preview: GoldenFlowPlanPreview, run: boolean
   const lines: string[] = [];
   lines.push(
     run
-      ? `Deckent Do — plan preview (${preview.taskCount} task(s)). Confirm below to start the sprint now.`
+      ? `Deckent Do — plan preview (${preview.taskCount} task(s)). Confirm below to start the run now.`
       : `Deckent Do — plan preview (dry-run; ${preview.taskCount} task(s)). Nothing was started. Re-run with --run to execute.`,
   );
   lines.push('');
@@ -150,7 +150,7 @@ export function createDoSeams(
     approvePlan: async (preview: GoldenFlowPlanPreview) => {
       print(formatDoPlanPreview(preview, opts.run));
       if (!opts.run) return false; // dry-run: preview-only, never reaches startSprint
-      return confirm('Proceed and start this sprint now?');
+      return confirm('Proceed and start this run now?');
     },
     startSprint: async (preview: GoldenFlowPlanPreview) => {
       const state = swapDirectives(root, preview.directivesMarkdown);

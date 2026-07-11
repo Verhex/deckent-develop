@@ -2,6 +2,19 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint404] - 2026-07-11
+
+### Added
+
+- TRUTH-CORE — born-640a: feature-truth zincir-derleyici çekirdeği
+- TRUTH-SURFACE — born-640b: `deckent truth` CLI + MCP + --check ratchet
+- PLAN-SURFACE-TRUTH — born-629: start-replan ezmesi + Model/Agent-hint drop + post-adoption gösterim
+- APPROVAL-EXPIRY-DRIVER — born-631: prod-sürücü bağla
+- TRACE-TAIL — born-639: codex/gemini docker stream + token-counter tier-2 LogEvent-farkındalığı
+
+
+_Tasks: 5 total, 5 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint403] - 2026-07-11
 
 ### Added

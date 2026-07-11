@@ -54,6 +54,13 @@ import { dirname, join } from 'node:path';
  * so it cannot be the fallback for tasks that must produce a diff; the prompt-gate
  * persona-capability check now BLOCKs such routes on the runSprint path (born-628).
  */
+/** Intents whose tasks must produce a source diff — a Write-denied persona is
+ *  structurally unable to complete them (born-638/641; see the hard-exclude in
+ *  selectBestAgent and the persona-capability BLOCK in prompt-gate). */
+export const CONSTRUCTION_INTENTS: ReadonlySet<string> = new Set([
+  'implementation', 'bugfix', 'refactor', 'config', 'migration',
+]);
+
 export const AGENT_FALLBACK_CHAIN: Record<IntentType, string[]> = {
   'implementation': ['refactorer', 'bug-fixer'],
   'bugfix': ['bug-fixer', 'refactorer'],
@@ -1244,6 +1251,22 @@ function selectBestAgent(
 
   for (const [id, agent] of pool) {
     if (!agent.enabled) continue;
+
+    // born-641/638 kalıcı-halka (2026-07-11): a Write-denied persona (e.g.
+    // architect, deniedTools:['Write']) can never produce the diff a
+    // construction task requires — selecting it only sets up a guaranteed
+    // prompt-gate BLOCK downstream (persona-capability check, born-628).
+    // Governance-by-construction: hard-exclude it here for construction
+    // intents instead of letting it win on activation score (live case:
+    // 404-002 "manifest/CLI" keywords pushed architect to 16 and the gate
+    // had to veto the whole plan). Review/analysis intents stay selectable.
+    if (
+      CONSTRUCTION_INTENTS.has(taskDNA.intent.primary) &&
+      (agent.deniedTools ?? []).includes('Write')
+    ) {
+      reasoning.push(`Agent '${id}' write-denied exclude (construction intent '${taskDNA.intent.primary}')`);
+      continue;
+    }
 
     // Sprint 216-003 — user-surface bonus. A surface-owner agent on its own
     // surface (cli/api→api-builder, dashboard→frontend-designer, e2e→ci-guardian)

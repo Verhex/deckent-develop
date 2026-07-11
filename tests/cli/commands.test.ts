@@ -583,14 +583,14 @@ describe('history command', () => {
   it('prints message when no history dir', async () => {
     vi.mocked(existsSync).mockReturnValue(false);
     await runCommand(registerHistory, ['history']);
-    expect(stdout()).toContain('No sprint history');
+    expect(stdout()).toContain('No run history');
   });
 
   it('prints message when no sprint files', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([] as unknown as ReturnType<typeof readdirSync>);
     await runCommand(registerHistory, ['history']);
-    expect(stdout()).toContain('No sprint history');
+    expect(stdout()).toContain('No run history');
   });
 
   it('shows "-" for missing tasks/coverage/duration fields', async () => {

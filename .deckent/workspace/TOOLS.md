@@ -45,10 +45,11 @@ Dashboard: deckent web
 | start | `deckent_start` |
 | status | `deckent_status` |
 | sync | `deckent_sync` |
+| truth | `deckent_truth` |
 | usage | `deckent_usage` |
 | watch | `deckent_watch` |
 
-_Total: 37 MCP tools_
+_Total: 38 MCP tools_
 
 **Key operational tools:** `deckent_audit`, `deckent_nervous`, `deckent_watch`, `deckent_recover`, `deckent_status`, `deckent_memory_query`
 
@@ -151,9 +152,10 @@ _Total: 37 MCP tools_
 | `sync` | deckent sync |
 | `test-run` | deckent test-run |
 | `trace-extract` | deckent trace-extract |
+| `truth` | deckent truth |
 | `upgrade` | deckent upgrade |
 | `usage` | deckent usage |
 | `watch` | deckent watch |
 | `web` | deckent web |
 
-_Total: 100 CLI command modules_
+_Total: 101 CLI command modules_

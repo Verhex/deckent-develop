@@ -1003,6 +1003,61 @@ export function maskCodeBlocks(content: string): string {
 }
 
 /**
+ * born-629 — Split one directive line into `{key, value}` segments.
+ *
+ * DIRECTIVES.md task headers combine multiple single-value directives on one
+ * line, pipe-joined (e.g. `- Model: sonnet | Agent: bug-fixer`). The previous
+ * per-directive extraction anchored a regex at the START of the whole line
+ * (`^[\s-]*Model:\s*`) and captured everything up to the end of the line as
+ * the value — so on a combined line, `Model`'s captured value included the
+ * trailing `| Agent: ...` text (corrupting it into an unrecognized model id),
+ * and `Agent` was never found at all (the line doesn't start with `Agent:`).
+ *
+ * Splitting on `|` first and anchoring each piece independently fixes both:
+ * a line with no `|` behaves byte-identically to the old single-anchor match
+ * (one segment, same value), while a combined line yields one segment per
+ * pipe-joined directive.
+ */
+export function splitDirectiveLineSegments(line: string): Array<{ key: string; value: string }> {
+  const stripped = line.trim().replace(/^[-*]\s*/, '');
+  if (!stripped) return [];
+  const segments: Array<{ key: string; value: string }> = [];
+  for (const part of stripped.split('|')) {
+    const m = /^([A-Za-z][\w]*)\s*:\s*(.*)$/.exec(part.trim());
+    if (m) segments.push({ key: m[1]!.toLowerCase(), value: m[2]!.trim() });
+  }
+  return segments;
+}
+
+/**
+ * born-629 — First value for `key` across every line of a directive block.
+ * First occurrence wins (mirrors the previous `lines.find(...)` semantics).
+ * Understands both one-directive-per-line and pipe-combined directive lines
+ * via `splitDirectiveLineSegments`.
+ */
+export function findDirectiveValue(lines: readonly string[], key: string): string | undefined {
+  const target = key.toLowerCase();
+  for (const line of lines) {
+    const hit = splitDirectiveLineSegments(line).find(s => s.key === target);
+    if (hit) return hit.value;
+  }
+  return undefined;
+}
+
+/**
+ * born-629 — stderr-WARN when a `Model:`/`Agent:` directive was present in the
+ * block but its value never became a usable hint on the task (unrecognized
+ * model id, empty agent value). Mirrors the born-458 dependency-ref precedent
+ * (`resolveTaskDependenciesLoud`): a hint the operator wrote is announced when
+ * it cannot be captured, never silently dropped.
+ */
+function warnUncapturedHint(taskTitle: string, label: string, rawValue: string): void {
+  process.stderr.write(
+    `[deckent] WARN: directive hint '${label}: ${rawValue}' (task "${taskTitle}") force${label}'e inmedi — değer tanınmadı/boş, hint düşürüldü.\n`,
+  );
+}
+
+/**
  * Parse a DIRECTIVES.md document into structured task definitions.
  * Splits on "## Task N:" or "## Gorev N:" headings and extracts title, scope,
  * test targets, and optional Model/Effort overrides from each section.
@@ -1064,25 +1119,23 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
       ? testLine.trim().replace(/^-\s+/, '').replace(/^Test:\s*/i, '').trim()
       : undefined;
 
-    // Extract optional Provider: override (e.g., "Provider: codex", "Provider: ollama")
+    // Extract optional Provider: override (e.g., "Provider: codex", "Provider: ollama").
     // NOTE: Provider parse runs BEFORE Model parse — adapter-providers (e.g. ollama)
     // accept raw model tags (pass-through) that are not in the static ALL_MODELS list.
-    const providerLine = lines.find(l => /^[\s-]*Provider:\s*/i.test(l.trim()));
-    const rawProvider = providerLine
-      ? providerLine.trim().replace(/^-\s+/, '').replace(/^Provider:\s*/i, '').trim().toLowerCase()
-      : undefined;
+    // born-629: findDirectiveValue understands both one-per-line ("- Provider: X")
+    // and pipe-combined ("- Model: X | Agent: Y") directive lines — the previous
+    // whole-line-anchored `.find` silently dropped every directive after the
+    // first '|' on a combined line.
+    const rawProvider = findDirectiveValue(lines, 'provider')?.toLowerCase();
     // VALID_PROVIDERS_ALL is the canonical extended source (includes 'ollama' alongside claude/codex/gemini).
     const parsedProvider = (rawProvider && VALID_PROVIDERS_ALL.includes(rawProvider) ? rawProvider : undefined) as ProviderName | undefined;
 
-    // Extract optional Model: override (e.g., "Model: opus", "Model: qwen3.6:27b")
+    // Extract optional Model: override (e.g., "Model: opus", "Model: qwen3.6:27b").
     // Adapter-providers (ollama/codex/gemini) accept raw model tags not in the
     // static ALL_MODELS list (pass-through); non-adapter providers (claude)
     // validate — a gibberish model is dropped to undefined. Restores the
     // Sprint-235 contract that 325-001 lost when it added verbatim `- Model:` parse.
-    const modelLine = lines.find(l => /^[\s-]*Model:\s*/i.test(l.trim()));
-    const forceModel = modelLine
-      ? modelLine.trim().replace(/^-\s+/, '').replace(/^Model:\s*/i, '').trim().toLowerCase()
-      : undefined;
+    const forceModel = findDirectiveValue(lines, 'model')?.toLowerCase();
     const parsedForceModel = (
       !forceModel
         ? undefined
@@ -1091,24 +1144,26 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
           ? forceModel
           : undefined
     ) as ModelType | undefined;
+    // born-458 precedent: a hint the operator wrote must never vanish silently —
+    // Model: was present but didn't resolve to a usable value for this provider.
+    if (forceModel && !parsedForceModel) warnUncapturedHint(title, 'Model', forceModel);
 
     // Extract optional Effort: override (e.g., "Effort: max")
-    const effortLine = lines.find(l => /^[\s-]*Effort:\s*/i.test(l.trim()));
-    const forceEffort = effortLine
-      ? effortLine.trim().replace(/^-\s+/, '').replace(/^Effort:\s*/i, '').trim().toLowerCase()
-      : undefined;
+    const forceEffort = findDirectiveValue(lines, 'effort')?.toLowerCase();
     const validEfforts: string[] = ['low', 'normal', 'high'];
     // safe: validEfforts.includes() confirms the string is a valid TaskEffort before assignment
     const parsedForceEffort = (forceEffort && validEfforts.includes(forceEffort) ? forceEffort : undefined) as TaskEffort | undefined;
 
     // Extract optional Agent: override (e.g., "Agent: security-auditor" or "Agent: none")
-    const agentLine = lines.find(l => /^[\s-]*Agent:\s*/i.test(l.trim()));
-    const rawAgent = agentLine
-      ? agentLine.trim().replace(/^-\s+/, '').replace(/^Agent:\s*/i, '').trim()
-      : undefined;
+    const rawAgentSeg = findDirectiveValue(lines, 'agent');
+    const rawAgent = rawAgentSeg?.trim() || undefined;
     const forceAgent = rawAgent
       ? (rawAgent.toLowerCase() === 'none' ? 'generic' : rawAgent.toLowerCase() === 'auto' ? undefined : rawAgent)
       : undefined;
+    // Agent: label was present but its value was never usable (empty after trim).
+    // 'none'→'generic' and 'auto'→undefined are deliberate mappings, not losses —
+    // both leave `rawAgent` defined, so they never trip this WARN.
+    if (rawAgentSeg !== undefined && rawAgent === undefined) warnUncapturedHint(title, 'Agent', rawAgentSeg);
 
     // Extract optional Skills: override (e.g., "Skills: typescript-expert, -ci-testing")
     const skillsLine = lines.find(l => /^[\s-]*Skills:\s*/i.test(l.trim()));
@@ -1221,16 +1276,18 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
 
         // Extract Provider override — Provider parse BEFORE Model parse so adapter-providers
         // (e.g. ollama) can pass-through raw model tags that are not in static ALL_MODELS.
-        const providerLine = allLines.find(l => /Provider:\s*/i.test(l));
-        const rawProvider = providerLine ? providerLine.replace(/.*Provider:\s*/i, '').trim().toLowerCase() : undefined;
+        // born-629: findDirectiveValue understands pipe-combined directive lines
+        // (e.g. "- Model: X | Agent: Y") — the previous greedy `.replace(/.*Key:\s*/i, '')`
+        // captured everything to the end of the line, corrupting Model's value with a
+        // trailing "| Agent: ..." fragment on a combined line.
+        const rawProvider = findDirectiveValue(allLines, 'provider')?.toLowerCase();
         // VALID_PROVIDERS_ALL is the canonical extended source (includes 'ollama').
         const parsedProvider = (rawProvider && VALID_PROVIDERS_ALL.includes(rawProvider) ? rawProvider : undefined) as ProviderName | undefined;
 
         // Extract Model override — adapter-providers pass raw tags through;
         // non-adapter (claude) validates against ALL_MODELS (Sprint-235 contract;
         // 325-001 verbatim-parse regression fix).
-        const modelLine = allLines.find(l => /Model:\s*/i.test(l));
-        const rawModel = modelLine ? modelLine.replace(/.*Model:\s*/i, '').trim().toLowerCase() : undefined;
+        const rawModel = findDirectiveValue(allLines, 'model')?.toLowerCase();
         const parsedForceModel = (
           !rawModel
             ? undefined
@@ -1239,10 +1296,11 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
               ? rawModel
               : undefined
         ) as ModelType | undefined;
+        // born-458 precedent: a hint the operator wrote must never vanish silently.
+        if (rawModel && !parsedForceModel) warnUncapturedHint(title, 'Model', rawModel);
 
         // Extract Effort override
-        const effortLine = allLines.find(l => /Effort:\s*/i.test(l));
-        const rawEffort = effortLine ? effortLine.replace(/.*Effort:\s*/i, '').trim().toLowerCase() : undefined;
+        const rawEffort = findDirectiveValue(allLines, 'effort')?.toLowerCase();
         const validEfforts = ['low', 'normal', 'high'];
         const parsedForceEffort = (rawEffort && validEfforts.includes(rawEffort) ? rawEffort : undefined) as TaskEffort | undefined;
 
@@ -1251,11 +1309,16 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
         const testTarget = testLine ? testLine.replace(/.*Test:\s*/i, '').trim() : undefined;
 
         // Extract Agent override
-        const agentLineBullet = allLines.find(l => /Agent:\s*/i.test(l));
-        const rawAgentBullet = agentLineBullet ? agentLineBullet.replace(/.*Agent:\s*/i, '').trim() : undefined;
+        const rawAgentBulletSeg = findDirectiveValue(allLines, 'agent');
+        const rawAgentBullet = rawAgentBulletSeg?.trim() || undefined;
         const forceAgentBullet = rawAgentBullet
           ? (rawAgentBullet.toLowerCase() === 'none' ? 'generic' : rawAgentBullet.toLowerCase() === 'auto' ? undefined : rawAgentBullet)
           : undefined;
+        // 'none'/'auto' are deliberate mappings (rawAgentBullet stays defined for both) —
+        // only an empty captured value after a found Agent: label is a true loss.
+        if (rawAgentBulletSeg !== undefined && rawAgentBullet === undefined) {
+          warnUncapturedHint(title, 'Agent', rawAgentBulletSeg);
+        }
 
         // Extract Skills override
         const skillsLineBullet = allLines.find(l => /Skills:\s*/i.test(l));

@@ -178,7 +178,7 @@ describe('renderLogSummary', () => {
     const summaries = summarizeByTask([SAMPLE_A, SAMPLE_B]);
     const sprint = summarizeSprint([SAMPLE_A, SAMPLE_B]);
     const result = renderLogSummary(summaries, sprint, 'en');
-    expect(result).toContain('Sprint concurrent peak');
+    expect(result).toContain('Run concurrent peak');
     expect(result).toContain('2 containers');
   });
 

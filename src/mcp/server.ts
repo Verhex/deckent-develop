@@ -24,7 +24,7 @@ init → set_directives → plan → start → status → review → retro → c
 ## Sprint Lifecycle
 PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 
-## Tools (46)
+## Tools (47)
 - deckent_init: Initialize Deckent in the current project directory
 - deckent_set_directives: Write sprint goals and task definitions to DIRECTIVES.md
 - deckent_plan: Generate task plan from DIRECTIVES (mode: ai/structured/auto)
@@ -54,6 +54,7 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 - deckent_nervous_status: Show Nervous System dashboard (pending, recent, config)
 - deckent_nervous_config: Read/set Nervous System authority mode and overrides
 - deckent_feature_query: Query feature manifest by category (active/lightly_used/dormant/dead/all)
+- deckent_truth: Feature truth-chain report (code/wired/enabled/proof per feature) — read-only
 - deckent_audit: Run Brain Self-Audit Gate for a sprint (tsc, vitest, honesty checks) — read-only
 - deckent_recover: Recover a crashed or stuck sprint (clean orphan IPC dirs, stale locks, archive tasks) — destructive
 - deckent_models: List and refresh model catalog (live fetch from models.dev with 24h cache + bundled fallback)
@@ -149,6 +150,9 @@ export function createServer(ctx?: Partial<WriterLeaseGateContext>): McpServer {
   installWriterLeaseGate(server, gateCtx);
 
   registerTools(server);
+  // 404-002 + CC follow-up (2026-07-11): deckent_truth registration moved into
+  // registerTools() (tools/index.ts SSOT) — catalog, count (47) and help all
+  // derive from the single source again.
   registerResources(server);
 
   mcpNotifyAdapter = new McpNotificationAdapter(server);

@@ -178,6 +178,58 @@ function categorizeFeature(feature) {
   return 'dormant';
 }
 
+// ─── Truth-chain definitions (born-640, MASTER-PLAN 530) ───────────────────
+// Source of truth for `deckent truth` — the generated features-manifest.json
+// carries these verbatim under the top-level `truth` array. Sprint-404's
+// worker wrote them into the GENERATED json directly and this script's next
+// regen silently wiped them (caught by the first live `deckent truth` run —
+// the truth tool's own data source had a truth gap). Generated files are
+// never hand-edited; declare here instead.
+// Fields: id/label/entryModule[/exportName][/prodCallsitePattern][/flagPath][/proof]
+// Only claim what the engine can honestly verify — omitted field = 'undefined'
+// in the report (dürüst-eksik), never a fabricated green.
+const TRUTH_DEFINITIONS = [
+  {
+    id: 'training-trace',
+    label: 'Sprint-worker training trace (TRN-1/born-614+637)',
+    entryModule: 'src/orchestra/output-collector.ts',
+    exportName: 'recordSprintWorkerTrace',
+    prodCallsitePattern: 'recordSprintWorkerTrace\\(',
+    flagPath: 'training_trace.enabled',
+    proof: { kind: 'journal-recent', ref: '.deckent/traces/sprint-worker.jsonl', maxAgeDays: 7 },
+  },
+  {
+    id: 'tool-surface',
+    label: 'Native terminal tool surface (born-596/607)',
+    entryModule: 'src/cli/repl/native-tool-registry.ts',
+    exportName: 'resolveToolSurfaceOptions',
+    prodCallsitePattern: 'resolveToolSurfaceOptions\\(',
+    flagPath: 'tool_surface.enabled',
+  },
+  {
+    id: 'worker-approval-gate',
+    label: 'Worker approval gate (APR/born-611)',
+    entryModule: 'src/agent/permission-store.ts',
+    exportName: 'createWorkerApprovalGate',
+    prodCallsitePattern: 'createWorkerApprovalGate\\(',
+    flagPath: 'approval.gate_enabled',
+  },
+  {
+    id: 'routing-decision-journal',
+    label: 'Routing decision journal (born-622/641)',
+    entryModule: 'src/core/routing-engine.ts',
+    exportName: 'routeTaskV2',
+    prodCallsitePattern: 'routeTaskV2\\(',
+  },
+  {
+    id: 'prompt-gate-block',
+    label: 'Prompt-gate BLOCK on start path (born-628)',
+    entryModule: 'src/orchestra/sprint-controller.ts',
+    exportName: 'decidePromptGateBlock',
+    prodCallsitePattern: 'decidePromptGateBlock\\(',
+  },
+];
+
 // ─── Main ──────────────────────────────────────────────────────────────────
 
 function generateManifest() {
@@ -222,6 +274,9 @@ function generateManifest() {
       },
     },
     ...categories,
+    // born-640: truth-chain blocks consumed by `deckent truth` (see
+    // TRUTH_DEFINITIONS above — regen-safe home for what sprint-404 lost).
+    truth: TRUTH_DEFINITIONS,
   };
 
   return manifest;

@@ -143,7 +143,7 @@ describe('retro command rich output', () => {
     await runCommand(['retro', '--compare']);
     const calls = vi.mocked(print).mock.calls.map((c) => c[0]);
     const output = calls.join('\n');
-    expect(output).toContain('No previous sprint found');
+    expect(output).toContain('No previous run found');
   });
 });
 

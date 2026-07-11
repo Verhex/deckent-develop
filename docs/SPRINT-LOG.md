@@ -9881,3 +9881,29 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 403-004: NESTED-HONESTY — born-633: call_tool nested-dispatch dürüstlük ailesi (4 kalem) (DONE)
 
 ---
+## Sprint 404 — sprint-404
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-11
+**Duration:** 2425s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 2424690ms |
+
+### Tasks
+
+- 404-001: TRUTH-CORE — born-640a: feature-truth zincir-derleyici çekirdeği (DONE)
+- 404-002: TRUTH-SURFACE — born-640b: `deckent truth` CLI + MCP + --check ratchet (DONE)
+- 404-003: PLAN-SURFACE-TRUTH — born-629: start-replan ezmesi + Model/Agent-hint drop + post-adoption gösterim (DONE)
+- 404-004: APPROVAL-EXPIRY-DRIVER — born-631: prod-sürücü bağla (DONE)
+- 404-005: TRACE-TAIL — born-639: codex/gemini docker stream + token-counter tier-2 LogEvent-farkındalığı (DONE)
+
+---

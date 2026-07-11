@@ -1,0 +1,5 @@
+{
+  "halfWireCandidates": [],
+  "generatedAt": "2026-07-11T07:02:10.850Z",
+  "note": "Pinned half-wire candidate ratchet (born-640b). Regenerate with `deckent truth --check --write`."
+}

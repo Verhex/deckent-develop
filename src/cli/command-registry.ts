@@ -114,6 +114,8 @@ export const COMMAND_REGISTRY: readonly CommandRegistryEntry[] = [
   entry('trace', 'Core', 'Değiştir', 'core', ['cli']),
   entry('mode', 'Core', 'Değiştir', 'core', ['cli']),
   entry('features', 'Core', 'Oku', 'core', ['cli', 'mcp', 'repl'], ['deckent_feature_query']),
+  // born-640b (404-002): feature truth-chain report — read-only diagnostic.
+  entry('truth', 'Core', 'Oku', 'core', ['cli', 'mcp'], ['deckent_truth']),
   entry('audit-verify', 'Core', 'Oku', 'orchestra', ['cli']),
   entry('models', 'Core', 'Değiştir', 'core', ['cli', 'mcp', 'repl'], ['deckent_models']),
   entry('resources', 'Core', 'Oku', 'monitor', ['cli', 'repl']),

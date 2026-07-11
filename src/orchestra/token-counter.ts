@@ -263,16 +263,60 @@ export function tryLoadCliLogTokens(projectRoot: string, taskId: string): TokenU
     const direct = extractTokenUsageFromClaudeCli(content);
     if (direct) return direct;
 
-    // Logs may contain mixed output: try the last JSON-looking line.
+    // Logs may contain mixed output: try the last JSON-looking line — including
+    // a LogEvent-normalized JSONL row (`{ts,seq,type,content}` — born-637/born-639
+    // writeNormalizedDockerLog + the subprocess backend's captureStreamToLog),
+    // whose usage envelope is nested one level deeper under `.content` instead of
+    // at the line's own top level (see extractNestedLogEventUsage).
     const lines = content.split('\n').reverse();
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed.startsWith('{')) continue;
       const parsed = extractTokenUsageFromClaudeCli(trimmed);
       if (parsed) return parsed;
+
+      const nested = extractNestedLogEventUsage(trimmed);
+      if (nested) return nested;
     }
   }
   return null;
+}
+
+/**
+ * born-639 (404-005 TRACE-TAIL): true iff a usage-bearing payload carries an
+ * Anthropic-specific field name (`cache_read_input_tokens` /
+ * `cache_creation_input_tokens`). Used as a disambiguator before unwrapping a
+ * LogEvent row's nested `.content` in {@link extractNestedLogEventUsage}:
+ * codex's own v2 `turn.completed` usage event coincidentally reuses the
+ * identical `input_tokens`/`output_tokens` field names (see
+ * providers/codex.ts), so a bare presence check on those two alone would
+ * misattribute a codex usage payload as a Claude one — it uses
+ * `cached_input_tokens` (no "_read_"), never `cache_read_input_tokens`.
+ * Gemini's `usageMetadata` uses entirely different camelCase names and never
+ * matches at all. Fails closed (false) when ambiguous: a safe miss, not a
+ * wrong cross-provider match — the caller simply moves on to the next
+ * candidate line, and `enrichResultTokenUsage`'s existing already-real-counts
+ * fallback (result-collector.ts Step 2) protects the final number regardless.
+ */
+function looksLikeClaudeUsageShape(payload: unknown): boolean {
+  const usage = readUsageObject(payload);
+  return !!usage && ('cache_read_input_tokens' in usage || 'cache_creation_input_tokens' in usage);
+}
+
+/**
+ * born-639 (404-005 TRACE-TAIL): unwrap a LogEvent row (`{ts,seq,type,content}`)
+ * and retry the existing Claude-CLI-specific extractor against its nested
+ * `.content` — gated by {@link looksLikeClaudeUsageShape} so a differently-
+ * shaped provider payload nested at the same position is never misattributed.
+ * `mergeWithWorkerClaim` and every other caller are untouched by this helper;
+ * it only widens what `tryLoadCliLogTokens` can find on a single line.
+ */
+function extractNestedLogEventUsage(trimmedLine: string): TokenUsage | null {
+  const parsed = parseIfString(trimmedLine);
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const content = (parsed as { content?: unknown }).content;
+  if (content === undefined || !looksLikeClaudeUsageShape(content)) return null;
+  return extractTokenUsageFromClaudeCli(content);
 }
 
 // ─── Provenance-tagged resolver ─────────────────────────────────────

@@ -1,5 +1,15 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-404 Learnings
+- Sprint sprint-404 Learnings: ## Sprint sprint-404 Learnings
+
+## Gains
+- 404-001 — TRUTH-CORE — born-640a: feature-truth zincir-derleyici çekirdeği — Yeni SAF motor src/core/feature-truth.ts: resolveTruth(defs, {config, projectRoot, now}) 4-seviye...
+- 404-002 — TRUTH-SURFACE — born-640b: `deckent truth` CLI + MCP + --check ratchet — TRUTH-SURFACE (born-640b): surfaced Task-1's pure engine — resolveTruth/classifyHalfWire are IMPO...
+- 404-003 — PLAN-SURFACE-TRUTH — born-629: start-replan ezmesi + Model/Agent-hint drop + post-adoption gösterim — Root cause confirmed by reading task-builder.ts + a throwaway RED repro run against the UNMODIFIE...
+- 404-004 — APPROVAL-EXPIRY-DRIVER — born-631: prod-sürücü bağla — RED-kanıt: grep -rn "ApprovalExpiryDriver" src/api/server.ts gave 0 matches before this task.
+- 404-005 — TRACE-TAIL — born-639: codex/gemini docker stream + token-counter tier-2 LogEvent-farkındalığı — Root cause confirmed by reading code + the real captured codex-cli 0.138.0 log (.brain/archive/sp...
+
 ## Sprint sprint-403 Learnings
 - Sprint sprint-403 Learnings: ## Sprint sprint-403 Learnings
 - GATE-FLAG-THREAD — 628-kalan: --force-prompt-gate CLI + MCP acknowledgePromptGate: GO_WITH_TECH_DEBT — CLI path fully wired end-to-end, no gap: src/cli/commands/start.ts adds --force-prompt-gate (StartCommandOpts.forcePromp

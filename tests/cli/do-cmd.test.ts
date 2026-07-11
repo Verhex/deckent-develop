@@ -124,7 +124,7 @@ describe('do command (isolated, real tmpdir fs)', () => {
 
       await runCommand(['do', 'wire the export button', '--run'], { confirm, spawnStart });
 
-      expect(confirm).toHaveBeenCalledWith('Proceed and start this sprint now?');
+      expect(confirm).toHaveBeenCalledWith('Proceed and start this run now?');
       expect(spawnStart).toHaveBeenCalledWith(tmpRoot);
       expect(directivesDuringSpawn).toContain('wire the export button');
 
@@ -132,7 +132,7 @@ describe('do command (isolated, real tmpdir fs)', () => {
       expect(existsSync(join(tmpRoot, DIRECTIVES_FILE))).toBe(false);
 
       const output = vi.mocked(print).mock.calls.map((c) => c[0] as string).join('\n');
-      expect(output).toContain('Confirm below to start the sprint now');
+      expect(output).toContain('Confirm below to start the run now');
       expect(output).toContain('Sprint finished — exitCode 0 (success)');
       expect(process.exitCode).toBeUndefined();
     });
@@ -205,7 +205,7 @@ describe('formatDoPlanPreview', () => {
   it('renders a --run-specific banner when run=true', () => {
     const intent = buildPlanNlIntent('goal');
     const preview = buildPlanPreview(intent);
-    expect(formatDoPlanPreview(preview, true)).toContain('Confirm below to start the sprint now');
+    expect(formatDoPlanPreview(preview, true)).toContain('Confirm below to start the run now');
     expect(formatDoPlanPreview(preview, false)).toContain('Nothing was started');
   });
 });

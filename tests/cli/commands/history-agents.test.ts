@@ -113,7 +113,7 @@ describe('history command agent/skill display', () => {
     vi.mocked(readdirSync).mockReturnValue(['sprint-025.md'] as any);
     vi.mocked(readFileSync).mockReturnValue(SPRINT_WITH_AGENTS);
     await runCommand(['history', '--agent', 'nonexistent']);
-    expect(print).toHaveBeenCalledWith('No matching sprint history found.');
+    expect(print).toHaveBeenCalledWith('No matching run history found.');
   });
 
   it('shows no matching history for unmatched skill', async () => {
@@ -121,7 +121,7 @@ describe('history command agent/skill display', () => {
     vi.mocked(readdirSync).mockReturnValue(['sprint-025.md'] as any);
     vi.mocked(readFileSync).mockReturnValue(SPRINT_WITH_AGENTS);
     await runCommand(['history', '--skill', 'python']);
-    expect(print).toHaveBeenCalledWith('No matching sprint history found.');
+    expect(print).toHaveBeenCalledWith('No matching run history found.');
   });
 
   it('uses agent/skill info from sprint log content when filtering', async () => {

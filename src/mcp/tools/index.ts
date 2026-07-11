@@ -24,6 +24,7 @@ import { registerMemoryQueryTool } from './memory-query.js';
 import { registerWatch } from './watch.js';
 import { registerNervousTools } from './nervous.js';
 import { registerFeatureQueryTool } from './feature-query.js';
+import { registerTruthTool } from './truth.js';
 import { registerAuditTool } from './audit.js';
 import { registerRecoverTool } from './recover.js';
 import { registerModelsTool } from './models.js';
@@ -90,6 +91,7 @@ export const TOOL_CATALOG: McpToolCatalogEntry[] = [
   { name: 'deckent_nervous_status', description: 'Show the Nervous System dashboard (pending, recent, config)', readOnly: true },
   { name: 'deckent_nervous_config', description: 'Read or set Nervous System authority mode and overrides', readOnly: false },
   { name: 'deckent_feature_query', description: 'Query the feature manifest by category (active/lightly_used/dormant/dead/all)', readOnly: true },
+  { name: 'deckent_truth', description: 'Feature truth-chain report: code -> wired -> enabled -> proof per feature (born-640)', readOnly: true },
   { name: 'deckent_audit', description: 'Run the Brain Self-Audit Gate for a sprint (tsc, vitest, honesty checks)', readOnly: true },
   { name: 'deckent_recover', description: 'Recover a crashed or stuck sprint (clean orphan IPC dirs, stale locks, archive tasks)', readOnly: false },
   { name: 'deckent_models', description: 'Browse model catalog: list by provider, refresh from models.dev, look up tier', readOnly: true },
@@ -142,6 +144,10 @@ export function registerTools(server: McpServer): void {
   registerWatch(server);
   registerNervousTools(server);
   registerFeatureQueryTool(server);
+  // born-640b follow-up kapanışı (2026-07-11): deckent_truth SSOT-yolundan —
+  // 404-002 scope-sınırı gereği server.ts'e ad-hoc kaydetmişti; katalog+kayıt+
+  // help+sayaç (47) yeniden tek-kaynaktan türüyor.
+  registerTruthTool(server);
   registerAuditTool(server);
   registerRecoverTool(server);
   registerModelsTool(server);

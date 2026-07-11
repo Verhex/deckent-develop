@@ -412,15 +412,112 @@ export function patchResultUsageFromEnvelope(
  * @returns The number of LogEvent rows written.
  */
 export function writeNormalizedDockerLog(logPath: string, logContent: string, provider: string): number {
+  // born-639 (404-005 TRACE-TAIL): a provider whose docker spec has no NDJSON
+  // stream flag (gemini's docker spec is `--output-format json` — ONE envelope,
+  // which may be pretty-printed across several lines) dumps a SINGLE JSON value
+  // for the whole run. Splitting that by newline FIRST would shred it into
+  // unparsable fragments (each individually degrading to a raw-text passthrough
+  // instead of one coherent event). Try the whole trimmed content as one JSON
+  // value first — a genuine NDJSON stream (claude stream-json, codex --json) is
+  // always MULTIPLE top-level JSON values and fails this parse, falling through
+  // to the per-line path below completely unchanged.
+  const trimmed = logContent.trim();
+  if (trimmed.length > 0 && isSingleJsonValue(trimmed)) {
+    const raw = normalizeDockerLogLine(trimmed, provider);
+    writeLogEvent(logPath, normalizeStreamEvent(raw, provider), 1);
+    return 1;
+  }
+
   let seq = 1;
   let written = 0;
   for (const line of logContent.split(/\r?\n/)) {
     if (line.trim().length === 0) continue;
-    writeLogEvent(logPath, normalizeStreamEvent(line, provider), seq);
+    const raw = normalizeDockerLogLine(line, provider);
+    writeLogEvent(logPath, normalizeStreamEvent(raw, provider), seq);
     seq += 1;
     written += 1;
   }
   return written;
+}
+
+/** True iff `text` parses as exactly one JSON value (object/array/scalar). */
+function isSingleJsonValue(text: string): boolean {
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * born-639 (404-005 TRACE-TAIL): pre-normalization bridge applied to a single
+ * docker-logs line/envelope BEFORE it reaches `normalizeStreamEvent`. Provider
+ * event shapes that `normalizeStreamEvent` cannot classify on its own are
+ * translated onto one of its own recognized literal `type` values (see
+ * {@link bridgeCodexEvent}). A no-op for every provider other than codex
+ * (gemini's single-envelope shape is ALREADY correctly classified by
+ * `normalizeStreamEvent`'s generic `response`-field detection — no bridge
+ * needed), and a no-op for any line that is not a JSON object — both fall
+ * through to `normalizeStreamEvent`'s own text-fallback exactly as before this
+ * task, so claude's existing, already-tested behavior is byte-identical.
+ */
+function normalizeDockerLogLine(line: string, provider: string): string | Record<string, unknown> {
+  if (provider !== 'codex') return line;
+  const trimmed = line.trim();
+  if (trimmed[0] !== '{') return line;
+  let obj: unknown;
+  try {
+    obj = JSON.parse(trimmed);
+  } catch {
+    return line;
+  }
+  return isPlainObject(obj) ? bridgeCodexEvent(obj) : line;
+}
+
+/**
+ * born-639 (404-005 TRACE-TAIL): bridge codex's real v2 thread/turn/item event
+ * stream (verified against a live capture, codex-cli 0.138.0 —
+ * `.brain/archive/sprints/sprint-366-tasks/task-366-001.log`, the born-366-001
+ * evidence) onto normalizeStreamEvent's own recognized literal `type` values
+ * (LOG_EVENT_TYPES, core/log-event.ts). Codex's flat event names
+ * (`thread.started`, `turn.started`, `item.started`/`item.completed`,
+ * `turn.completed`) match none of `normalizeStreamEvent`'s `directType()`
+ * cases, so every one of them previously degraded to a generic `text`
+ * passthrough (safe — never dropped — but flat: a real turn/tool_use/
+ * tool_result/lifecycle distinction was available and simply unused).
+ * `turn.completed` was ALREADY correctly detected as `usage` via
+ * `hasUsageShape` (its payload carries a `usage` object) — mapped here too,
+ * explicitly, purely for self-documentation; it changes nothing.
+ *
+ * Never throws, never drops: an event/item-type this function does not
+ * recognize (anything outside the two item types verified in the reference
+ * capture — `file_change`, `agent_message` — or any unlisted top-level type)
+ * is returned UNCHANGED, so `normalizeStreamEvent`'s own passthrough still
+ * classifies it (degrading to `text`, exactly as before this task). Whenever
+ * this function DOES override `type`, the original codex discriminator string
+ * is preserved under a `codexEventType` sibling key — no information is lost.
+ *
+ * Exported for unit tests (tests/orchestra/trace-tail-parity.test.ts).
+ */
+export function bridgeCodexEvent(obj: Record<string, unknown>): Record<string, unknown> {
+  const t = obj['type'];
+  const remap = (logType: string): Record<string, unknown> => ({ ...obj, type: logType, codexEventType: t });
+  if (t === 'thread.started') return remap('lifecycle');
+  if (t === 'turn.started') return remap('turn');
+  if (t === 'turn.completed') return remap('usage');
+  if (t === 'item.started' || t === 'item.completed') {
+    const item = obj['item'];
+    const itemType = isPlainObject(item) ? item['type'] : undefined;
+    if (itemType === 'file_change') return remap(t === 'item.started' ? 'tool_use' : 'tool_result');
+    if (itemType === 'agent_message') return remap('text');
+  }
+  return obj;
+}
+
+/** Narrow to a plain object (not null, not array). */
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
 /**
@@ -1924,20 +2021,19 @@ export class DockerSpawnBackend implements SpawnBackend {
         if (logContent.trim()) {
           const logPath = join(tasksDir, `task-${taskId}.log`);
           // born-637 (TRACE-CONTENT-PARITY docker-parity): claude's container CLI
-          // now runs `--output-format stream-json` (claudeStreamJsonBaseArgs,
-          // runSpawn) — its docker-logs dump is the FULL NDJSON event stream, not
-          // one final envelope. Normalize-write it into the structured LogEvent
-          // JSONL contract so readLogEvents/recordSprintWorkerTrace (the dashboard
-          // SSE tail + TRN-1 training-trace) see every turn/tool_use/tool_result/
-          // text event instead of zero (the sprint-401 live-trace bug this task
-          // fixes). codex/gemini are UNCHANGED — still the raw dump; their own
-          // docker-parity is a tracked follow-up, not silently regressed.
+          // runs `--output-format stream-json` (claudeStreamJsonBaseArgs, runSpawn)
+          // — its docker-logs dump is the FULL NDJSON event stream, not one final
+          // envelope. born-639 (404-005 TRACE-TAIL): codex (already `--json`
+          // NDJSON, provider-command-spec.ts) and gemini (`--output-format json`,
+          // a single envelope) get the SAME normalize-write treatment now —
+          // writeNormalizedDockerLog is provider-agnostic (whole-envelope fast
+          // path + the codex event-bridge + normalizeStreamEvent's own never-drop
+          // fallback), so readLogEvents/recordSprintWorkerTrace (dashboard SSE
+          // tail + TRN-1 training-trace) see every provider's real trace instead
+          // of the previous raw dump, which those readers always saw as zero
+          // events (no `ts`/`seq`/`content` LogEvent shape on a raw CLI line).
           const logProviderBinary = getProviderBinaryForModel(model);
-          if (logProviderBinary === 'claude') {
-            writeNormalizedDockerLog(logPath, logContent, logProviderBinary);
-          } else {
-            writeFileSync(logPath, logContent, 'utf-8');
-          }
+          writeNormalizedDockerLog(logPath, logContent, logProviderBinary);
           // Patch the .result with REAL token usage parsed from the CLI envelope in the
           // captured container stdout — at the SOURCE, sidestepping the orchestrator
           // enrich-timing race (the .log lands only after the container exits, which can
