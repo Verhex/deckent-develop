@@ -51,6 +51,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-417 Learnings** (sprint-417): ## Sprint sprint-417 Learnings
+- WIN665 — Windows init exit-code ezilmesi: SETUP_INCOMPLETE basıyor, exit 1 dönüyor (...
 - **Sprint sprint-416 Learnings** (sprint-416): ## Sprint sprint-416 Learnings
 - TT550 — RESULT-INGEST-IDNORM: malformed result-taskId phantom-fix + trace-kaybı üret...
 - **Sprint sprint-415 Learnings** (sprint-415): ## Sprint sprint-415 Learnings
@@ -77,11 +79,9 @@
 
 ## Gains
 - 408-001 — BG-TURNS-PRODUCER — born-642 (P0): detached-run bitişi → REPL ye...
-- **Sprint sprint-407 Learnings** (sprint-407): ## Sprint sprint-407 Learnings
-- COST-K2 — born-636-K2: task-tipi→effort tiering (flag'li, default-off): GO_WITH_TECH...
 
 ## Active Technical Debt
-- [NORMAL] Timeout-partial from 416-002-fix: worker killed mid-execution, work accepted
+- [HIGH] Timeout-partial from 416-002-fix: worker killed mid-execution, work accepted
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -148,4 +148,4 @@
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: file_outside_scope
 
-_Total entries: 1259 | Generated: 2026-07-11_
+_Total entries: 1263 | Generated: 2026-07-11_

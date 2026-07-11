@@ -1,85 +1,87 @@
-# DIRECTIVES — SPRINT-416: TRACE-TRUTH P0 DİLİMİ (549 CAPTURE · 550 INGEST · 551 FIX-TRACE)
+# DIRECTIVES — SPRINT-417: WIN-EXITCODE-KİLİDİ + TT550-DAR + TT552 TRACE-V2
 
 ## Goal
-TRACE-TRUTH treni (Alperen, 2026-07-12; MASTER-PLAN 549-559, memory
-project_trace_truth_train_2026_07_12) ilk dilimi — ölçüm-gerçeği + korpus-dürüstlüğü. Kural:
-554/555 (metering/turn-economy) BU üçlü düzelmeden koşulmaz. **Alperen kararı: bu trende model=opus.**
-552 TRACE-V2 sonraki sprint. Trace-korpusu SP-2 moat'ının hammaddesi — veri-kaybı geri-dönüşsüz sınıf.
+born-665 (P0, XPLAT-matrix kırmızı-kilidi) + TT550'nin küçültülmüş yeniden-koşusu (sprint-416'da
+2× worker-timeout; born-667) + TT552 TRACE-V2 (SP-2 moat önkoşulu). TRACE-treni kuralı sürüyor:
+554/555 bu tren bitmeden koşulmaz. **TRACE-task'ları model=opus (Alperen).**
+SSOT: MASTER-PLAN 560 + 550 + 552; memory project_trace_truth_train_2026_07_12.
 
 ## 🔒 BAĞLAYICI (her task)
 - Yalnız kendi Files'ına yaz · `.deckent/`, `.brain/`, `.tasks/` DOKUNMA · git stash-reset YASAK · `npm run build` YASAK · notes TEK STRING · Self DÜRÜST.
-- REPRODUCE-FIRST: fix'ten önce hatalı davranışı RED testle kanıtla (docker'a GERÇEK bağımlılık YASAK — spawn/exec enjekte-edilebilir olsun).
-- Test hermetik: tmpdir, async spawn (test-kodunda spawnSync YASAK), ≤16GB.
-- `.deckent/traces/sprint-worker.jsonl` CANLI dosya — testler ona DOKUNMAZ (tmpdir-fixture).
+- REPRODUCE-FIRST: fix'ten önce hatalı davranışı RED testle kanıtla.
+- Test hermetik: tmpdir, async spawn, ≤16GB; `.deckent/traces/` canlı-dosyalarına DOKUNMA.
+- ZAMAN-DİSİPLİNİ (born-667 dersi): forensik-okumayı sınırla — 20dk içinde koda başla; bulamadığını dürüstçe 'açık' bırak, timeout'a sürüklenme.
 
-## Task 1: TT549 — CAPTURE-TRUTH: docker-log yakalama 1MiB'ta kesiliyor (%44 korpus kesik, usage-patch ölüyor)
-- Model: opus | Effort: high | Provider: claude
-- Files: src/orchestra/spawn-backend-docker.ts, tests/orchestra/docker-capture-truth.test.ts
-- Scope: src/orchestra/, tests/orchestra/
+## Task 1: WIN665 — Windows init exit-code ezilmesi: SETUP_INCOMPLETE basıyor, exit 1 dönüyor (XPLAT-kilidi)
+- Model: sonnet | Agent: bug-fixer | Effort: high | Provider: claude
+- Files: src/cli/commands/init.ts, src/cli/entry.ts, scripts/xplat-install-smoke.mjs, tests/cli/init-exitcode-contract.test.ts
+- Scope: src/cli/, scripts/, tests/cli/
 - Dependencies: none
 ### Description
-KANIT (trace-audit, CC-doğrulanmış): `docker logs` çağrısı spawnSync ile **maxBuffer'sız** (Node
-default 1MiB) ve **error/status kontrolsüz** (src/orchestra/spawn-backend-docker.ts:~2141) →
-trace-korpusunun %44'ü (16/36) kesik; kesiklerin TAMAMI 1.075–1.171MB bandında (sabit-boyut
-imzası — başka açıklama yok). Aynı kesik terminal-envelope'u ve **usage-patch'i** de öldürüyor →
-cost-heuristic 293× sapma (413-001 vakası). GÖREV: (1) yakalama STREAM-tabanlı olur: `docker logs`
-async-spawn + stdout/stderr chunk'ları doğrudan hedef-dosyaya/buffer'a akıtılır — sabit-buffer
-üst-sınırı YOK (makul emniyet-tavanı 256MB, aşımda dürüst-truncation-marker + loud-warn; sessiz-kesme
-ASLA); (2) exit/error dürüst: spawn-error, non-zero-exit, sinyal → adlı loud-warn + eldeki-kısmî-veri
-`captureIncomplete:true` işaretiyle teslim (kayıp gizlenmez); (3) spawn enjekte-edilebilir
-(worker-image-check.ts SpawnImpl deseni — testler gerçek-docker'sız); (4) usage-patch'in aynı
-akıştan beslendiğini doğrula — kesik-fix'iyle patch'in de kurtulduğunu ayrı test-case'le pinle
-(memory-uyarısı: [[project_resolvetokenusage_wire_is_harmful]] — usage-patch KONTRATINA dokunma,
-yalnız girdisinin tam-veri olmasını sağla); (5) RED-first: enjekte-spawn'la >1MiB sahte-log →
-bugünkü kodun ~1MiB'ta kestiğini + error-yutmayı kanıtla → GREEN: tam-boyut + marker-yok +
-error-yolu dürüst. tests/orchestra/ blast'ı koş.
+KANIT (ba3190db Cross-Platform E2E, windows-latest İLK koşu): packed-install + binary-resolve OK;
+kurulu `deckent.cmd` ile `init --yes` çıktısı DOĞRU ('Setup outcome: SETUP_INCOMPLETE' +
+blocker-bloğu) AMA süreç **exit 1** döndü (sözleşme: SETUP_INCOMPLETE=2); ubuntu+macos aynı akışta
+exit 2 doğru. ŞÜPHELİLER (born-665): (a) entry/commander global-error-handler'ı ya da init-akışında
+outcome-SONRASI bir adım Windows'ta hata verip process.exitCode'u 1'e eziyor (log'da DEP0190
+shell:true spawn-uyarıları var — cursor-detect/MCP-yazım/provisioning-artığı adaylar); (b) exitCode
+set-edildikten sonra printError+exitCode=1 yazan yol; (c) .cmd-shim errorlevel (düşük-olasılık).
+GÖREV: (1) init'in exit-code YAŞAM-DÖNGÜSÜNÜ oku: `process.exitCode` set-noktaları + onu
+SONRADAN yazabilecek her yol (grep 'exitCode' src/cli/ — envanter notes'a); outcome-sonrası
+adımların (cursor/MCP/ide-adapter yazımları, doctor, provisioning) hata-yollarında exitCode'a
+dokunanları bul; (2) SÖZLEŞME-KORUMASI: outcome-exitCode set edildikten sonra HİÇBİR non-fatal
+adım onu EZEMEZ — merkezi koruma (örn. outcome-kararı en-son yazılır ya da 'finalExitCode'
+kilidi); Windows-spesifik hata veren adım ayrıca dürüst-warn'lanır ama exit-sözleşmesini bozmaz;
+(3) xplat-smoke'a teşhis-artırımı: init'in stderr'i AYRI yakalanıp FAIL halinde son-20-satırı
+loga basılır (bir-sonraki CI-koşusu kesin-kanıt versin); (4) RED-first (platform-agnostik):
+outcome-sonrası-adımı-hata-veren fixture'da bugün exitCode'un ezildiğini kanıtla → GREEN: sözleşme
+korunur. KESİN Windows-kanıtı push-sonrası CI'dadır — notes'a 'CI-doğrulama-bekliyor' yaz, DONE
+iddiasını buna göre dürüst ver (kod+test+lokal-kanıt = GO_WITH_TECH_DEBT kabul edilebilir).
+Smoke: node scripts/xplat-install-smoke.mjs → XPLAT SMOKE OK (linux)
 ### goNogo
-- goCriteria: RED (1MiB-kesme + error-yutma) → GREEN (stream, tavan-aşımı marker'lı, exit-dürüst); spawn-injectable; usage-patch tam-veri pinli (kontrat değişmedi-diff-kanıt); tests/orchestra tamamı yeşil.
-- nogo: maxBuffer-büyütme-yaması (stream'siz) yeterli sayılırsa NO_GO; sessiz-truncation kalırsa NO_GO; gerçek-docker'a bağımlı test NO_GO; usage-patch kontratı değişirse NO_GO.
+- goCriteria: exitCode-yazar envanteri notes'ta; ezen-yol RED→GREEN (sözleşme-kilidi); smoke stderr-teşhisi eklendi; linux-smoke yeşil; mevcut init testleri yeşil.
+- nogo: sözleşme-kilidi olmadan yalnız tekil-adım yamanırsa NO_GO; exitCode envanteri boşsa NO_GO.
 
-## Task 2: TT550 — RESULT-INGEST-IDNORM: malformed result-taskId phantom-fix + trace-kaybı üretiyor (+üçüncü-neden kazısı)
-- Model: opus | Effort: high | Provider: claude
+## Task 2: TT550D — result-ingest taskId-normalize (DAR kapsam — kazı YOK)
+- Model: opus | Agent: bug-fixer | Effort: medium | Provider: claude
 - Files: src/orchestra/result-collector.ts, tests/orchestra/result-ingest-idnorm.test.ts
 - Scope: src/orchestra/, tests/orchestra/
 - Dependencies: none
 ### Description
-KANIT (trace-audit, ≥2 CANLI vaka: 412-003 + 409-002): worker result-dosyasına taskId'yi
-`task-XXX` (prefix'li) yazarsa buildResultsMap (src/orchestra/result-collector.ts:~286)
-VERBATIM-index'lediği için lookup-MISS → tek kökten ÜÇ zarar: (a) phantom fix-worker doğar
-($2.23/4.25dk — "impl zaten worktree'de" diyen boş-fix), (b) trace kaybolur, (c) NO_GO-label
-kaybolur (korpus-bias). GÖREV: (1) ingest-noktasında taskId-NORMALİZASYON: `task-` prefix'i
-soyulur + dosya-adından türetilen expected-taskId ile içerik-taskId karşılaştırılır — uyuşmazlıkta
-LOUD-WARN (hangi dosya, hangi iki değer) + normalize-edilmiş kabul (veri atılmaz); normalize
-TEK ingest-noktasında olur (downstream ikinci-normalize İCAT ETME); (2) **ÜÇÜNCÜ-NEDEN KAZISI
-(görevin yarısı bu):** 404-002 vakasında ID DÜZGÜNKEN de result düşmüş — result-collector
-ingest-yolunu (glob/timing/lock/collectedIds) forensik oku, olası kök(ler)i kanıt-satırlarıyla
-notes'a yaz; reproduce edebiliyorsan RED-test + fix, edemiyorsan dürüst 'reproduce-edilemedi +
-şüpheli-mekanizma-listesi' (uydurma-fix YASAK); (3) RED-first: `task-412-003` içerikli
-result-fixture → bugünkü map-miss kanıtı → GREEN: normalize + warn + fix-task doğmaz (debt-manager
-yoluna sızmadığını handleEvaluation-seviyesinde pinle). ⚠ Bu dosyada sprint-414 shadow-driver
-kancası var — o bölgeye DOKUNMA. tests/orchestra/ blast'ı koş.
+YENİDEN-KOŞU (sprint-416'da 2× worker-timeout — bu kez DAR: yalnız normalize; 'üçüncü-neden
+kazısı' KAPSAM-DIŞI, born-655'te açık kalır). KANIT: worker result'a taskId'yi `task-XXX` yazarsa
+buildResultsMap (result-collector.ts:~286) verbatim-index → lookup-miss → phantom-fix + trace-kaybı
++ NO_GO-label-kaybı (canlı: 412-003, 409-002). GÖREV: (1) TEK ingest-noktasında normalize:
+`task-` prefix soyulur; dosya-adından türeyen expected-id ile içerik-id uyuşmazlığında LOUD-WARN
+(dosya + iki değer) + normalize-kabul; (2) RED-first: `task-XXX` fixture → bugünkü miss → GREEN:
+normalize + warn + phantom-fix doğmaz (handleEvaluation-seviyesi pin); (3) sprint-414
+shadow-driver kancasına ve sprint-411 scheduler-state bölgesine DOKUNMA. 20-dakika-kuralı: bu task
+küçük — uzatma.
 ### goNogo
-- goCriteria: RED (verbatim-miss) → GREEN (tek-nokta normalize + loud-warn + phantom-fix-doğmaz pini); üçüncü-neden kazısı kanıt-satırlı (fix VEYA dürüst-bulgu); shadow-kancası byte-korunur; tests/orchestra tamamı yeşil.
-- nogo: normalize birden-çok noktaya kopyalanırsa NO_GO; uyuşmazlık sessiz-kabul edilirse NO_GO; üçüncü-neden bölümü boş/genel-geçerse NO_GO.
+- goCriteria: RED→GREEN tek-nokta normalize + loud-warn + phantom-fix-doğmaz pini; shadow/scheduler-state bölgeleri byte-korunur; tests/orchestra tamamı yeşil.
+- nogo: normalize çoklanırsa NO_GO; sessiz-kabul NO_GO; kazıya girilirse (kapsam-aşımı) NO_GO.
 
-## Task 3: TT551 — FIX-PHASE-TRACE: FIX-fazı trace yazmıyor → korpus success-biased (0 NO_GO etiketi)
+## Task 3: TT552 — TRACE-V2: sidecar/projection ayrımı + prompt-inject + gerçek tool_calls + quarantine
 - Model: opus | Effort: high | Provider: claude
-- Files: src/orchestra/sprint-phases.ts, src/orchestra/trace-recorder.ts, tests/orchestra/fix-phase-trace.test.ts
-- Scope: src/orchestra/, tests/orchestra/
+- Files: src/agent/trace-recorder.ts, src/orchestra/sprint-phases.ts, src/core/trace-schema.ts, scripts/trace-pipeline/pipeline.ts, tests/orchestra/trace-v2-schema.test.ts
+- Scope: src/agent/, src/orchestra/, src/core/, scripts/trace-pipeline/, tests/orchestra/
 - Dependencies: none
 ### Description
-KANIT (trace-audit): recordSprintWorkerTrace YALNIZ EVALUATE-fazında çağrılıyor
-(src/orchestra/sprint-phases.ts:~2121) — runFixPhase trace YAZMIYOR → NO_GO→FIX→DONE yörüngeleri
-(SFT için EN değerli örnekler: hata+düzeltme çifti) ve ara-NO_GO verdict'leri kayıt-dışı; mevcut
-36-kayıtlık korpus 27 DONE / 9 debt / **0 NO_GO** (success-biased). GÖREV: (1) FIX-fazına
-trace-wire: EVALUATE'teki recordSprintWorkerTrace çağrı-desenini AYNEN izle (yeniden-icat yok;
-recorder tek-API kalır — trace-recorder.ts yoksa fonksiyonun gerçek ev-dosyasını bul ve Files'ı
-ona göre uygula, notes'a yaz); fix-worker'ın trace'i orijinal-attempt'ten AYRI kayıt olur;
-(2) meta-alanları: attempt (1..n), retryOf (orijinal taskId), purpose ('fix'|'xfix'|'original'),
-verdict (evaluation-sonucu — NO_GO dahil); MEVCUT kayıt-şemasını KIRMA (yeni alanlar additive;
-mevcut tüketici pipeline.ts okumaya devam eder — grep'le tüketici-envanteri notes'a); (3) RED-first:
-fix-yolu fixture'ında bugün trace-YAZILMADIĞI kanıtı → GREEN: fix-attempt kaydı + NO_GO-verdict'li
-orijinal kaydı + additive-şema; (4) canlı-dosyaya dokunmadan tmpdir-fixture. tests/orchestra/ blast.
+KANIT (MASTER-PLAN 552 + trace-audit): bugünkü trace SFT-kullanılamaz — 0 system/user mesajı
+(task-prompt YOK), 0 native tool_calls, TÜM tool-mesajları boş tool_call_id (403-001: 1868 orphan),
+~%66 telemetri-gürültüsü (thinking_tokens/init/rate-limit), kaynak ts/seq düşürülüyor, Read
+çift-temsil, truncation yalnız downstream (pipeline.ts:176). GÖREV (549+551 temeli üstüne
+anlam-katmanı): (1) ŞEMA-V2 + schemaVersion alanı + ESKİ-OKUYUCU korunur (dual-read; mevcut
+tüketici-envanterini grep'le çıkar, notes'a); (2) TELEMETRY-SIDECAR ↔ TRAINING-PROJECTION AYRIMI:
+ham-akış telemetrisi ayrı kanala (sidecar), eğitim-kaydında yalnız konuşma+tool-akışı; (3)
+SYSTEM+TASK-PROMPT INJECT: worker'ın gerçek prompt'u arşivden (.tasks arşivindeki .prompt-*.txt
+deseni — gerçek ev-yolunu bul, notes'a) kayda system/user mesajları olarak bağlanır; (4) GERÇEK
+tool_calls: assistant-mesajlarında native tool_calls dizisi + tool-result'larda EŞLEŞEN
+tool_call_id (orphan-sınıfı ölür); ts/seq kaynaktan taşınır; Read çift-temsili tekleşir; (5)
+INCOMPLETE-QUARANTINE: kesik/eksik kayıt (captureIncomplete, id-eşleşmesiz, prompt'suz)
+corpus-DIŞI damgalanır (quarantine:true + neden) — sessizce eğitim-setine sızmaz; (6) RED-first:
+mevcut-format örnek-kaydında SFT-kusurlarını (orphan-id, telemetri-oranı, prompt-yokluğu) assert'le
+kanıtla → GREEN: v2-kayıt aynı fixture'dan temiz üretilir. Dosya-adları farklıysa (trace-schema.ts/
+pipeline yolu) gerçek evlerini bul, Files-amaçlarına sadık uygula, sapmaları notes'a yaz.
 ### goNogo
-- goCriteria: RED (fix-fazı 0-trace) → GREEN (fix+orijinal ayrı-kayıt, attempt/retryOf/purpose/verdict alanları); şema additive (mevcut-tüketici testleri yeşil + envanter notes'ta); recorder tek-API; tests/orchestra tamamı yeşil.
-- nogo: ikinci bir recorder-API doğarsa NO_GO; mevcut şema-alanı kırılırsa NO_GO; NO_GO-verdict hâlâ kayıt-dışıysa NO_GO.
+- goCriteria: schemaVersion+dual-read (eski-okuyucu testli); sidecar/projection ayrımı; prompt-inject gerçek-arşivden; tool_call_id eşleşmesi (orphan=0 yeni-kayıtta); quarantine damgası; RED(SFT-kusurları)→GREEN; tüketici-envanteri notes'ta; tests/orchestra tamamı yeşil.
+- nogo: eski-okuyucu kırılırsa NO_GO; telemetri eğitim-projeksiyonunda kalırsa NO_GO; quarantine'siz kesik-kayıt corpus'a girerse NO_GO.

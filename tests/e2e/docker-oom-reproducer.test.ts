@@ -344,11 +344,12 @@ describe('Docker OOM Recovery — Docker Logs Drain', () => {
   });
 
   it('docker logs has a timeout to prevent hanging on large output', () => {
+    // 416-001 (TT549): the spawnSync `timeout:` option died with the move to
+    // streamed capture — the hang-guard now lives in captureDockerLogs as an
+    // explicit deadline that kills the child and returns the partial capture
+    // marked incomplete (DOCKER_LOG_CAPTURE_TIMEOUT_MS).
     const source = readDockerSource();
-    const logsSection = source.slice(
-      source.indexOf("'docker', ['logs'"),
-      source.indexOf("'docker', ['logs'") + 200,
-    );
-    expect(logsSection).toContain('timeout:');
+    expect(source).toContain('DOCKER_LOG_CAPTURE_TIMEOUT_MS');
+    expect(source).toContain('captureDockerLogs');
   });
 });

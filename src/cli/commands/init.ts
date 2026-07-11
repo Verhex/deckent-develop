@@ -663,6 +663,13 @@ export function registerInit(program: Command): void {
         }
 
         print(formatInitOutcomeBlock({ outcome, blockers: usageBlockers }, language));
+        // This is the LAST write to process.exitCode in this action handler — the
+        // outcome-exitCode contract (READY=0/undefined, SETUP_INCOMPLETE=2, FAILED=1)
+        // is decided here. entry.ts's exit-code contract lock (lockExitCodeContract,
+        // WIN665/417-001) captures whatever value is set at this point once the
+        // command's top-level promise settles, so a stray async rejection from an
+        // already-finished init step (docker/MCP/cursor probe, …) firing afterward
+        // can no longer silently overwrite it.
         if (outcome !== 'READY') {
           process.exitCode = initOutcomeExitCode(outcome);
         }

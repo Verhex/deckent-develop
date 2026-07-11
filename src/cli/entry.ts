@@ -933,10 +933,78 @@ function handleStdStreamError(error: NodeJS.ErrnoException): void {
 process.stdout.on('error', handleStdStreamError);
 process.stderr.on('error', handleStdStreamError);
 
-// ─── Unhandled Rejections ────────────────────────────────────────────────────
-process.on('unhandledRejection', (reason: unknown) => {
-  handleCliError(reason);
-});
+// ─── Exit-Code Contract Lock (born-665 / WIN665, Task 417-001) ─────────────
+//
+// A command's own action handler decides `process.exitCode` as its LAST step
+// before its returned promise settles — e.g. `deckent init`'s three-state
+// outcome contract (init-wizard.ts's `initOutcomeExitCode`: READY=0,
+// SETUP_INCOMPLETE=2, FAILED=1). Observed on windows-latest CI (born-665):
+// `deckent init --yes` printed the correct 'Setup outcome: SETUP_INCOMPLETE'
+// block (contract says exit 2) yet the packed-install process exited 1. This
+// handler used to call `handleCliError` UNCONDITIONALLY for every
+// `unhandledRejection`, including one firing from an ALREADY-FINISHED init
+// step (a fire-and-forget probe/write started earlier in the flow) well
+// AFTER the outcome decision had already set `process.exitCode = 2`.
+// `handleCliError` then silently overwrote it to 1 — and error-handler.ts's
+// `formatFatalAndExit` (a SECOND `unhandledRejection` listener, installed by
+// `buildProgram()` → `installFatalHandlers()` later in this file) would
+// hard-`process.exit(1)` right after, with neither listener aware a contract
+// decision had already been made.
+//
+// The lock activates only once the top-level command dispatch (parseAsync /
+// launchDefaultRepl, below) has SETTLED — a rejection occurring DURING a
+// command's own execution keeps the pre-existing `handleCliError(reason)`
+// behavior completely unchanged (no regression). Once settled, any further
+// rejection is surfaced as an honest warning (never swallowed) and
+// `process.exitCode` is restored to the already-decided value; calling
+// `process.exit()` ourselves — as the FIRST registered `unhandledRejection`
+// listener — pre-empts `formatFatalAndExit`'s own `process.exit()` call:
+// Node invokes same-event listeners in registration order, and a listener
+// that calls `process.exit()` stops the remaining listeners from running
+// (verified empirically against a throwaway repro script, not assumed).
+let exitCodeContractLocked = false;
+let lockedExitCode: number | undefined;
+
+/** `process.exitCode`'s declared type is `string | number | null | undefined` — normalize to our number|undefined lock state. */
+function normalizeExitCode(value: string | number | null | undefined): number | undefined {
+  if (value === null || value === undefined) return undefined;
+  return typeof value === 'number' ? value : Number(value);
+}
+
+/** Call once the top-level command dispatch has settled. Idempotent. */
+export function lockExitCodeContract(): void {
+  if (exitCodeContractLocked) return;
+  exitCodeContractLocked = true;
+  lockedExitCode = normalizeExitCode(process.exitCode);
+}
+
+/** Test-only reset so a suite can re-arm the lock without re-importing the module. */
+export function __resetExitCodeContractLockForTest(): void {
+  exitCodeContractLocked = false;
+  lockedExitCode = undefined;
+}
+
+/**
+ * Guarded `unhandledRejection` handler — registered before `buildProgram()`
+ * runs (below) so it always fires first. Unlocked: unchanged pre-existing
+ * `handleCliError` behavior. Locked: honest stderr warning + exit-code
+ * contract preserved, never silently crushed to 1.
+ */
+export function guardUnhandledRejection(reason: unknown): void {
+  if (!exitCodeContractLocked) {
+    handleCliError(reason);
+    return;
+  }
+  const detail = reason instanceof Error ? (reason.stack ?? reason.message) : String(reason);
+  process.stderr.write(
+    `\n[deckent] warning: a non-fatal async rejection occurred after the command finished — `
+    + `exit code contract preserved at ${String(lockedExitCode ?? 0)}.\n${detail}\n`,
+  );
+  process.exitCode = lockedExitCode;
+  process.exit(lockedExitCode === undefined ? 0 : lockedExitCode);
+}
+
+process.on('unhandledRejection', guardUnhandledRejection);
 
 // ─── Shutdown-Hook Registry (born-549 SIGTERM-TEARDOWN → born-496 generalized) ─
 //
@@ -1049,9 +1117,14 @@ function isEntryMain(): boolean {
 // `deckent` / `npx deckent <cmd>` cannot silently fall back to the REPL.
 if (isEntryMain()) {
   if (shouldLaunchDefaultRepl(process.argv)) {
-    launchDefaultRepl().catch((err: unknown) => {
-      handleCliError(err);
-    });
+    launchDefaultRepl()
+      .catch((err: unknown) => {
+        handleCliError(err);
+      })
+      .finally(() => {
+        // WIN665 / 417-001 — dispatch has settled; arm the exit-code contract lock.
+        lockExitCodeContract();
+      });
   } else {
     buildProgram()
       .hook('preAction', async () => {
@@ -1060,6 +1133,10 @@ if (isEntryMain()) {
       .parseAsync(process.argv)
       .catch((err: unknown) => {
         handleCliError(err);
+      })
+      .finally(() => {
+        // WIN665 / 417-001 — dispatch has settled; arm the exit-code contract lock.
+        lockExitCodeContract();
       });
   }
 }

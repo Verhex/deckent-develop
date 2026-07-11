@@ -178,10 +178,22 @@ async function main() {
       throw new SmokeStepError('init', `no outcome-block found in output (last 2000 chars):\n${initOutput.slice(-2000)}`);
     }
     if (![0, 2].includes(initResult.exitCode)) {
+      // WIN665 / 417-001 — stderr-only diagnostic, captured SEPARATELY from the
+      // combined stdout+stderr slice above: on windows-latest CI the outcome-block
+      // (stdout) has printed correctly while the exit code itself was wrong (2 → 1,
+      // likely an unrelated async rejection firing after the outcome decision — see
+      // entry.ts's exit-code contract lock). Isolating stderr's own tail here gives
+      // the NEXT CI run a chance to show the exact warning/stack the contract lock
+      // now prints in that scenario, instead of it being buried in the combined slice.
+      const stderrTail = initResult.stderr.trim().length > 0
+        ? initResult.stderr.trim().split(/\r?\n/).slice(-20).join('\n')
+        : '(stderr was empty)';
       throw new SmokeStepError(
         'init',
         `exit code ${initResult.exitCode} outside the accepted contract `
-        + `{0=READY, 2=SETUP_INCOMPLETE}; 1=FAILED\n${initOutput.slice(-2000)}`,
+        + `{0=READY, 2=SETUP_INCOMPLETE}; 1=FAILED\n`
+        + `--- combined output (last 2000 chars) ---\n${initOutput.slice(-2000)}\n`
+        + `--- stderr only (last 20 lines) ---\n${stderrTail}`,
       );
     }
     stepLog('init', `OK — exit ${initResult.exitCode}, outcome-block present`);

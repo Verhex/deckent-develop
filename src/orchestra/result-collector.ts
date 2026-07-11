@@ -292,6 +292,40 @@ export function buildResultsMap(results: TaskResult[]): Map<string, TaskResult> 
   return map;
 }
 
+/**
+ * born-655 (TT550D) — single worker-result INGEST-point taskId normalizer.
+ *
+ * The filename deckent itself created (`.tasks/task-<expectedTaskId>.result`) is
+ * the AUTHORITATIVE task id — the collector read that file precisely because it
+ * wanted `expectedTaskId`'s result. A worker's self-reported `result.taskId` can
+ * drift, most commonly by re-emitting the `task-<id>` prefix. Left un-normalized,
+ * that drifted content id flows into {@link buildResultsMap} (consumed by
+ * handleEvaluation / cross-dependency cascade / sprint-finalizer / sprint-metrics),
+ * whose O(1) index is keyed by `r.taskId`; a lookup by the bare sprint task id then
+ * MISSES — spawning a phantom fix task and losing the worker's real trace + NO_GO
+ * label (live: 412-003, 409-002).
+ *
+ * Normalizing at THIS one disk-read ingest chokepoint — before enrichment / persist
+ * / push — repairs every downstream consumer at once (and also fixes the latent
+ * `task-task-<id>.log` / `task-task-<id>.result` path bugs in the enrich/persist
+ * steps, which build their paths from `result.taskId`). On any drift we adopt the
+ * filename-derived id and LOUD-WARN — never silently (a silent accept would leave
+ * the drift invisible). Mutates `result` in place.
+ */
+export function normalizeIngestedTaskId(
+  result: TaskResult,
+  expectedTaskId: string,
+  resultPath: string,
+): void {
+  if (result.taskId === expectedTaskId) return; // no drift — fast path
+  console.warn(
+    `[result-ingest] taskId drift: file=${resultPath} ` +
+    `expected="${expectedTaskId}" content="${String(result.taskId)}" — ` +
+    `normalizing to the filename-derived id.`,
+  );
+  result.taskId = expectedTaskId;
+}
+
 // ═══ TOPP B — Continuous Dispatch Planner (Sprint 178 / ADR-064) ══
 // `planDispatch` is the PURE, flag-agnostic, unit-tested model of one dispatch
 // tick — legacy FIFO drain + dep-pipeline re-evaluation — the canonical spec for
@@ -905,6 +939,13 @@ export async function waitForResults(
       if (resultExists) {
         const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(resultPath));
         if (result) {
+          // born-655 (TT550D): normalize the worker-reported taskId against the
+          // filename-derived (authoritative) id at THIS single ingest chokepoint,
+          // BEFORE enrichment/persist/push read result.taskId. A `task-XXX`-prefixed
+          // (or otherwise drifted) content id would otherwise lookup-miss in the
+          // downstream buildResultsMap index (handleEvaluation) → phantom fix + lost
+          // trace/NO_GO label (live: 412-003, 409-002).
+          normalizeIngestedTaskId(result, taskId, resultPath);
           // Sprint 231 T1 — synthetic exit-0-no-result uniform disk-verify gate.
           // Docker EXIT trap (spawn-backend-docker.ts) writes a NO_GO `.result`
           // when the worker exits cleanly without producing one. Shape:

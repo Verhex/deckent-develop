@@ -10198,3 +10198,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 416-003: TT551 — FIX-PHASE-TRACE: FIX-fazı trace yazmıyor → korpus success-biased (0 NO_GO etiketi) (DONE)
 
 ---
+## Sprint 417 — sprint-417
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-11
+**Duration:** 1756s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1756346ms |
+
+### Tasks
+
+- 417-001: WIN665 — Windows init exit-code ezilmesi: SETUP_INCOMPLETE basıyor, exit 1 dönüyor (XPLAT-kilidi) (GO_WITH_TECH_DEBT)
+- 417-002: TT550D — result-ingest taskId-normalize (DAR kapsam — kazı YOK) (DONE)
+- 417-003: TT552 — TRACE-V2: sidecar/projection ayrımı + prompt-inject + gerçek tool_calls + quarantine (DONE)
+
+---

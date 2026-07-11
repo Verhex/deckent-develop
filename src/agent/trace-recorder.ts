@@ -11,6 +11,12 @@ import { dirname } from 'node:path';
 import type { ProviderMessage } from './provider-tooluse/types.js';
 import type { LogEvent } from '../core/log-event.js';
 import { redactSensitive } from '../core/redact-sensitive.js';
+import {
+  projectTranscript,
+  TRACE_SCHEMA_VERSION,
+  type TelemetryEvent,
+  type WorkerPrompt,
+} from '../core/trace-schema.js';
 
 export interface TraceMeta {
   source: string;
@@ -47,14 +53,41 @@ export interface TraceMeta {
    *  explicitly (alongside `selfAssessment`) so a training consumer can filter
    *  fix-phase verdicts. */
   verdict?: string;
+  /** TT552 (TRACE-V2) — record-format discriminator mirrored into meta so a
+   *  meta-only reader (training/pipeline.ts parseTraceLine) can tell v1 from v2.
+   *  Absent ⇒ legacy v1. Populated ONLY on the v2 projection path. */
+  schemaVersion?: number;
+  /** TT552 — the record is corpus-OUT (incomplete/promptless/orphan-bearing).
+   *  A quarantined record must never silently reach the training set; the
+   *  pipeline skips it. Populated ONLY on the v2 path. */
+  quarantine?: boolean;
+  /** TT552 — why the record was quarantined (e.g. 'no-prompt',
+   *  'orphan-tool-result', 'no-conversation'). Populated ONLY on the v2 path. */
+  quarantineReasons?: string[];
 }
 export interface OpenAiMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
   tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }>;
   tool_call_id?: string;
+  /** TT552 (TRACE-V2) — source LogEvent.seq/ts provenance, carried by the v2
+   *  projection (the v1 mapping dropped them). Optional + set ONLY on the v2
+   *  path, so every v1 message stays byte-identical (field simply absent). The
+   *  ShareGPT projection ignores them, so training output is unaffected. */
+  seq?: number;
+  ts?: string;
 }
-export interface TrainingExample { messages: OpenAiMessage[]; meta: TraceMeta; }
+export interface TrainingExample {
+  messages: OpenAiMessage[];
+  meta: TraceMeta;
+  /** TT552 (TRACE-V2) — top-level record-format version. Absent ⇒ legacy v1. */
+  schemaVersion?: number;
+  /** TT552 — TELEMETRY-SIDECAR: raw-stream telemetry (turn/usage/lifecycle/
+   *  stderr) split OUT of `messages`, retained seq/ts/type-only. The ShareGPT
+   *  training projection never reads this field, so telemetry can never reach
+   *  the training set. Present ONLY on v2 records. */
+  telemetry?: TelemetryEvent[];
+}
 
 /** Task-labeling context for a sprint-worker trace entry (TRN-1). */
 export interface SprintTraceMeta {
@@ -80,6 +113,19 @@ export interface SprintTraceMeta {
   /** TT551 — FIX-phase Brain verdict (NO_GO included) — de-biases the corpus. */
   verdict?: string;
   ts: string;
+  /** TT552 (TRACE-V2) — opt-in signal from the sprint-worker caller
+   *  (sprint-phases.ts) that this record must be emitted in the v2 schema
+   *  (prompt-injected + telemetry-split + native tool_calls + quarantine).
+   *  Absent/false ⇒ legacy v1 mapping (byte-identical to pre-TT552), which
+   *  every existing direct caller/test relies on. */
+  traceV2?: boolean;
+  /** TT552 — the worker's real SYSTEM prompt (worker-contract + skills + persona
+   *  + ADRs), injected as a `system` message on the v2 path. Absent ⇒ 'no-prompt'
+   *  quarantine reason. */
+  systemPrompt?: string;
+  /** TT552 — the worker's real TASK prompt (`## Your Task` onward), injected as
+   *  a `user` message on the v2 path. */
+  taskPrompt?: string;
 }
 
 function toOpenAiMessage(m: ProviderMessage): OpenAiMessage {
@@ -141,6 +187,11 @@ function logEventToOpenAiMessage(ev: LogEvent): OpenAiMessage {
  * so a training consumer can filter/weight examples by outcome.
  */
 export function toSprintTrainingExample(events: readonly LogEvent[], meta: SprintTraceMeta): TrainingExample {
+  // TT552 (TRACE-V2) — the caller opts into the semantic v2 projection via
+  // `traceV2`. Without it, the v1 mapping below runs byte-identical to pre-TT552
+  // (every existing direct caller/test — trn1, trace-content-parity,
+  // fix-phase-trace — passes no `traceV2`, so their asserted shape is preserved).
+  if (meta.traceV2 === true) return toSprintTrainingExampleV2(events, meta);
   return {
     messages: events.map(logEventToOpenAiMessage),
     meta: {
@@ -155,6 +206,47 @@ export function toSprintTrainingExample(events: readonly LogEvent[], meta: Sprin
         ? { workerSelfAssessment: meta.workerSelfAssessment }
         : {}),
       ...additiveTraceLabels(meta),
+    },
+  };
+}
+
+/**
+ * TT552 (TRACE-V2) — build the schema-v2 sprint-worker training example: the
+ * real worker prompt injected as system/user turns, raw-stream telemetry split
+ * into the `telemetry` sidecar (out of `messages`), native `tool_calls` on
+ * assistant turns with each `tool_result` matched to its originating id (the
+ * empty-id orphan class dies), source seq/ts carried, and the Read
+ * double-representation unified. An incomplete/promptless/orphan-bearing
+ * transcript is stamped `quarantine:true` (+ reasons) so it is corpus-OUT. The
+ * projection itself is the pure `core/trace-schema.ts` layer.
+ */
+export function toSprintTrainingExampleV2(events: readonly LogEvent[], meta: SprintTraceMeta): TrainingExample {
+  const prompt: WorkerPrompt = {
+    ...(meta.systemPrompt !== undefined ? { system: meta.systemPrompt } : {}),
+    ...(meta.taskPrompt !== undefined ? { task: meta.taskPrompt } : {}),
+  };
+  const projection = projectTranscript(events, prompt);
+  const quarantined = projection.quarantineReasons.length > 0;
+  return {
+    schemaVersion: TRACE_SCHEMA_VERSION,
+    messages: projection.messages,
+    telemetry: projection.telemetry,
+    meta: {
+      source: 'sprint-worker',
+      model: meta.model,
+      ts: meta.ts,
+      taskId: meta.taskId,
+      sprintId: meta.sprintId,
+      agent: meta.agent,
+      selfAssessment: meta.selfAssessment,
+      schemaVersion: TRACE_SCHEMA_VERSION,
+      ...(meta.workerSelfAssessment !== undefined
+        ? { workerSelfAssessment: meta.workerSelfAssessment }
+        : {}),
+      ...additiveTraceLabels(meta),
+      ...(quarantined
+        ? { quarantine: true, quarantineReasons: projection.quarantineReasons }
+        : {}),
     },
   };
 }

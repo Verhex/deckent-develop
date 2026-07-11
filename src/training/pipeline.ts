@@ -294,6 +294,22 @@ export interface PipelineSummary {
   skippedMalformed: number;
   truncatedCount: number;
   redactedCount: number;
+  /** TT552 (TRACE-V2) — records held OUT of the clean corpus: a v2
+   *  `meta.quarantine` stamp (promptless / orphan-tool / incomplete) or a
+   *  v1 `envelope-fallback` reconstruction (no prompt, no tool-flow). Counted,
+   *  never silently dropped. */
+  quarantinedSkipped: number;
+}
+
+/**
+ * TT552 dual-read corpus gate: a trace is corpus-EXCLUDED when the v2 builder
+ * stamped `meta.quarantine` (incomplete/promptless/orphan-bearing) OR it is a
+ * v1 `envelope-fallback` reconstruction (an inherently incomplete record — no
+ * prompt, no real tool-flow). Excluding both closes the "quarantine'siz
+ * kesik-kayıt corpus'a girer" NO_GO: no incomplete record silently trains.
+ */
+export function isCorpusExcluded(trace: TraceLike): boolean {
+  return trace.meta?.quarantine === true || trace.meta?.contentSource === 'envelope-fallback';
 }
 
 /**
@@ -316,6 +332,7 @@ export async function runPipeline(opts: PipelineOptions): Promise<PipelineSummar
     skippedMalformed: 0,
     truncatedCount: 0,
     redactedCount: 0,
+    quarantinedSkipped: 0,
   };
 
   try {
@@ -326,6 +343,13 @@ export async function runPipeline(opts: PipelineOptions): Promise<PipelineSummar
       const trace = parseTraceLine(raw);
       if (trace === null) {
         summary.skippedMalformed++;
+        continue;
+      }
+
+      // TT552 dual-read gate: quarantined / envelope-fallback incomplete
+      // records are counted and held OUT of the corpus (never silently trained).
+      if (isCorpusExcluded(trace)) {
+        summary.quarantinedSkipped++;
         continue;
       }
 

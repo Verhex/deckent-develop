@@ -4,12 +4,13 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-416-002-fix | Timeout-partial from 416-002-fix: worker killed mid-execution, work accepted | normal | sprint-416 | active |
+| debt-416-002-fix | Timeout-partial from 416-002-fix: worker killed mid-execution, work accepted | high | sprint-416 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-417-001 | Tech debt from 417-001: exitCode-yazar envanteri (grep 'process.exitCode ='/'pro | normal | sprint-417 | resolved |
 | rollback-sprint-416 | Sprint sprint-416 rollback SUCCESS | normal | sprint-416 | resolved |
 | debt-414-001 | Tech debt from 414-001: Implemented all 6 GÖREV items in release.yml/publish.yml | normal | sprint-414 | resolved |
 | debt-413-001 | Tech debt from 413-001: Root cause (confirmed via async-spawn repro BEFORE any f | normal | sprint-413 | resolved |

@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-417 Learnings
+- Sprint sprint-417 Learnings: ## Sprint sprint-417 Learnings
+- WIN665 — Windows init exit-code ezilmesi: SETUP_INCOMPLETE basıyor, exit 1 dönüyor (XPLAT-kilidi): GO_WITH_TECH_DEBT — exitCode-yazar envanteri (grep 'process.exitCode ='/'process.exit(' across src/cli/): init.ts:667 (initOutcomeExitCode, 
+
+## Gains
+- 417-002 — TT550D — result-ingest taskId-normalize (DAR kapsam — kazı YOK) — TT550D — result-ingest taskId-normalize (DAR scope, born-655 residual left open as scoped).
+- 417-003 — TT552 — TRACE-V2: sidecar/projection ayrımı + prompt-inject + gerçek tool_calls + quarantine — TT552 TRACE-V2 — sprint-worker trace made SFT-usable via a pure semantic layer + branch-on-signal...
+
 ## Sprint sprint-416 Learnings
 - Sprint sprint-416 Learnings: ## Sprint sprint-416 Learnings
 - TT550 — RESULT-INGEST-IDNORM: malformed result-taskId phantom-fix + trace-kaybı üretiyor (+üçüncü-neden kazısı): GO_WITH_TECH_DEBT — Worker timeout/killed (exitCode=1) but git diff shows 14 files modified. Brain should reconcile via Spurious NO_GO helpe

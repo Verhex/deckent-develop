@@ -40,6 +40,7 @@ import type { SpawnBackend } from './spawn-backend.js';
 // born-614 SPRINT-TRACE-WIRE: EVALUATE-sonu worker-transcript + Brain-verdict kaydı.
 import { recordSprintWorkerTrace } from './output-collector.js';
 import { createOutputCollector } from '../core/output-collector.js';
+import { loadWorkerPromptMeta } from '../core/trace-schema.js';
 import { isDependencySatisfying } from './scheduler-truth.js';
 
 // ─── Notify (DECKENT→USER:NOTIFY — Hot Fix H6) ──────────────────
@@ -2130,6 +2131,11 @@ export async function runEvaluatePhase(
               selfAssessment: verdict,
               workerSelfAssessment: traceResult.selfAssessment,
               ts: new Date().toISOString(),
+              // TT552 (TRACE-V2): emit the schema-v2 projection, injecting the
+              // worker's REAL prompt from the .tasks archive (original attempt →
+              // non-`-fix` prompt file). Missing prompt → v2 'no-prompt' quarantine.
+              traceV2: true,
+              ...loadWorkerPromptMeta(join(projectRoot, TASKS_DIR), traceTaskId, { preferFix: false }),
             },
           });
         }
@@ -2432,6 +2438,11 @@ export async function runFixPhase(
             attempt,
             ...(retryOf !== undefined ? { retryOf } : {}),
             ts: new Date().toISOString(),
+            // TT552 (TRACE-V2): v2 projection with the fix-worker's REAL prompt
+            // (a fix/xfix attempt → prefer the `-fix` prompt file, not the
+            // original, to avoid injecting the wrong prompt onto a retry trace).
+            traceV2: true,
+            ...loadWorkerPromptMeta(join(projectRoot, TASKS_DIR), traceTask.id, { preferFix: purpose !== 'original' }),
           },
         });
       } catch (e) { debugLog('runFixPhase:sprintTrace', e); }
