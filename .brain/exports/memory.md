@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-405 Learnings
+- Sprint sprint-405 Learnings: ## Sprint sprint-405 Learnings
+- PLUGIN-AUTH — born-612 (P1): plugin özgünlük + path-containment: GO_WITH_TECH_DEBT — SUMMARY — all 3 problems fixed inside src/core/plugin-loader.ts (only file in write scope), fully additive/dormant for e
+- STATS-SIDECAR — born-605 (P1): canlı agent/skill stats'ı git-tracked manifest'ten gitignored sidecar'a: GO_WITH_TECH_DEBT — IMPLEMENTED: live agent/skill stats (totalUses/successRate/avgCoverage/lastUsedInSprint) now write to a new gitignored s
+
+## Gains
+- 405-001 — MEM-TENANT — born-609 (P0): MemoryQuery tenant-scoping (additive) — MemoryQueryParams gained optional tenantId (camelCase, matching MemoryStore.getById/getByType/get...
+
 ## Sprint sprint-404 Learnings
 - Sprint sprint-404 Learnings: ## Sprint sprint-404 Learnings
 

@@ -2,8 +2,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import type { AgentDefinition, AgentPool } from './agent-types.js';
+import type { AgentDefinition, AgentPool, AgentStats } from './agent-types.js';
 import { createDefaultStats } from './agent-types.js';
 import type { ActivationRule } from './routing-types.js';
 import { createDefaultActivationConfig } from './routing-types.js';
@@ -377,6 +378,71 @@ export interface InvalidManifestEntry {
   errors: string[];
 }
 
+// ─── Stats Sidecar (born-605 STATS-SIDECAR) ─────────────────────────────────
+//
+// Live agent/skill stats (totalUses/successRate/avgCoverage/lastUsedInSprint) used
+// to be written straight into the git-tracked agent.json/manifest.json on every
+// sprint finalize (sprint-finalizer.ts's "8d2" sync block) — per-sprint repo-diff
+// noise + a hermeticity/C5 violation + a two-tree sync conflict source. Live stats
+// now live in a single gitignored ledger, `.deckent/stats/catalog-stats.json`
+// (shape: `{ agents: {id: AgentStats}, skills: {id: SkillStats} }`, shared with
+// skill-pool.ts), written atomically (tmp + rename, mirrors approval-broker.ts's
+// atomicWriteJson). READ is unified: loadAgents() overlays the sidecar value onto
+// each pool entry's `stats` when present, else the manifest-loaded value is left
+// untouched — migration-friendly, a consumer (marketplace/rating/routing bonus)
+// sees the identical value regardless of which store currently holds it, and the
+// git-tracked manifest's own `stats` field is NEVER rewritten by this task (a bulk
+// manifest re-zero is a separate, explicitly-approved change). Duplicated
+// file-local in skill-pool.ts for the same reason parseMarkdownTitleAndLead is
+// duplicated there — the two pool managers are outside each other's write/read
+// scope for this task.
+
+const STATS_SIDECAR_RELATIVE_PATH = path.join('.deckent', 'stats', 'catalog-stats.json');
+
+interface StatsSidecarLedger {
+  agents: Record<string, AgentStats>;
+  skills: Record<string, unknown>;
+}
+
+/** Defensive read — a missing/corrupt/malformed ledger degrades to an empty one, never throws. */
+function readStatsSidecarLedger(projectRoot: string): StatsSidecarLedger {
+  const raw = readJsonSafe<Partial<StatsSidecarLedger>>(
+    path.join(projectRoot, STATS_SIDECAR_RELATIVE_PATH),
+  );
+  const agents = raw?.agents && typeof raw.agents === 'object' && !Array.isArray(raw.agents)
+    ? raw.agents
+    : {};
+  const skills = raw?.skills && typeof raw.skills === 'object' && !Array.isArray(raw.skills)
+    ? raw.skills
+    : {};
+  return { agents: agents as Record<string, AgentStats>, skills };
+}
+
+/**
+ * Read-merge-write a single agent's stats into the shared sidecar ledger, atomically
+ * (tmp file + rename — a crash mid-write never leaves a torn file, and a same-tick
+ * skill-stats write from SkillPoolManager against the same physical file is never
+ * clobbered since each write re-reads the full ledger first).
+ */
+function writeAgentStatsToSidecar(projectRoot: string, id: string, stats: AgentStats): void {
+  const ledger = readStatsSidecarLedger(projectRoot);
+  ledger.agents[id] = stats;
+  const fullPath = path.join(projectRoot, STATS_SIDECAR_RELATIVE_PATH);
+  fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+  const tmpPath = `${fullPath}.${randomUUID()}.tmp`;
+  fs.writeFileSync(tmpPath, JSON.stringify(ledger, null, 2) + '\n', 'utf8');
+  try {
+    fs.renameSync(tmpPath, fullPath);
+  } catch (err) {
+    try {
+      fs.unlinkSync(tmpPath);
+    } catch {
+      // Best-effort cleanup — the rename error below is what the caller needs.
+    }
+    throw err;
+  }
+}
+
 export class AgentPoolManager {
   /** Maximum number of temp agents to keep in pool (LRU eviction). */
   private maxTempAgents: number;
@@ -435,7 +501,15 @@ export class AgentPoolManager {
     const tempPool: AgentPool = new Map();
     this._loadFromDir(tempDir, tempPool);
 
-    // Apply LRU eviction: keep only maxTempAgents most-recently-used temp agents
+    // Apply LRU eviction: keep only maxTempAgents most-recently-used temp agents.
+    // NOTE (born-605): this sort reads the PRE-sidecar-overlay `stats.lastUsedInSprint`
+    // (overlay runs once at the very end, below — see _applyStatsSidecarOverlay for
+    // why: reading the sidecar per-agent here would add extra fs reads that break
+    // tests/core/agent-pool.test.ts's exact-call-count/ordered-mock assertions,
+    // which this task's write scope cannot touch). A temp agent whose ONLY stats
+    // updates came through the sidecar-only finalizer path since being created may
+    // therefore sort as staler than it really is — a narrow, pre-existing-test-
+    // constrained limitation, not a correctness issue for the overlay itself.
     if (tempPool.size > this.maxTempAgents) {
       const sorted = Array.from(tempPool.values()).sort((a, b) => {
         const aNum = sprintNumber(a.stats?.lastUsedInSprint ?? '');
@@ -453,8 +527,38 @@ export class AgentPoolManager {
     }
 
     this._loadBuiltinFallback(pool);
+    this._applyStatsSidecarOverlay(pool);
 
     return pool;
+  }
+
+  /**
+   * Overlay sidecar stats onto every pool entry that has one (sidecar wins), else
+   * the manifest-loaded `stats` value is left as-is (unified read, born-605).
+   * Reads the ledger exactly once, and short-circuits entirely on an empty pool
+   * (nothing to overlay onto — also keeps a from-scratch project's loadAgents()
+   * call free of a pointless fs read).
+   */
+  private _applyStatsSidecarOverlay(pool: AgentPool): void {
+    if (pool.size === 0) return;
+    const statsLedger = readStatsSidecarLedger(this.projectRoot);
+    for (const agent of pool.values()) {
+      const sidecarStats = statsLedger.agents[agent.id];
+      if (sidecarStats && typeof sidecarStats === 'object') {
+        agent.stats = sidecarStats;
+      }
+    }
+  }
+
+  /**
+   * Persist ONLY `stats` for an agent to the gitignored stats sidecar
+   * (.deckent/stats/catalog-stats.json) — the git-tracked agent.json manifest is
+   * never touched by this call (born-605: sprint-finalizer's per-sprint sync no
+   * longer mutates the manifest). Does not affect saveAgent()/updateAgentStats(),
+   * whose manifest-write contract is unchanged.
+   */
+  saveAgentStats(id: string, stats: AgentStats): void {
+    writeAgentStatsToSidecar(this.projectRoot, id, stats);
   }
 
   /**

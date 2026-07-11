@@ -9907,3 +9907,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 404-005: TRACE-TAIL — born-639: codex/gemini docker stream + token-counter tier-2 LogEvent-farkındalığı (DONE)
 
 ---
+## Sprint 405 — sprint-405
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-11
+**Duration:** 1252s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1251831ms |
+
+### Tasks
+
+- 405-001: MEM-TENANT — born-609 (P0): MemoryQuery tenant-scoping (additive) (DONE)
+- 405-002: PLUGIN-AUTH — born-612 (P1): plugin özgünlük + path-containment (GO_WITH_TECH_DEBT)
+- 405-003: STATS-SIDECAR — born-605 (P1): canlı agent/skill stats'ı git-tracked manifest'ten gitignored sidecar'a (GO_WITH_TECH_DEBT)
+
+---

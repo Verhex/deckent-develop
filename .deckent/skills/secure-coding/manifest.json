@@ -38,16 +38,32 @@
   },
   "enabled": true,
   "stats": {
-    "totalUses": 19,
-    "successRate": 0.9473684210526315,
+    "totalUses": 20,
+    "successRate": 0.95,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-404",
-    "successCount": 18
+    "lastUsedInSprint": "sprint-405",
+    "successCount": 19
   },
   "entrypoint": "SKILL.md",
   "stackDetection": {
     "files": [],
     "dependencies": [],
     "commands": []
+  },
+  "category": "domain",
+  "triggers": [
+    "security",
+    "secure-coding",
+    "auth",
+    "vulnerability",
+    "injection",
+    "sanitize",
+    "crypto"
+  ],
+  "composableWith": [],
+  "priority": 9,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
   }
 }

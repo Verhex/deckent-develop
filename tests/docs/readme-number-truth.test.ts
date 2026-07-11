@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 // 379-001 DOCS-NUM-TRUTH — pins README.md / README-TR.md / DECKENT.md against the
 // live, code-derived counts named by the user-truth-audit as "GERÇEK" (real):
-// 46 MCP tools · 20 built-in agents · 31 built-in skills · 14 models · 20 dashboard
+// 47 MCP tools · 20 built-in agents · 31 built-in skills · 14 models · 20 dashboard
 // pages. Every count below is recomputed from source on each run — never a
 // hardcoded pin — so this test does not itself go stale as the codebase grows.
 //
@@ -70,8 +70,8 @@ const DASHBOARD_PAGES = countDashboardPages(join(ROOT, 'src/dashboard/src/pages'
 // commit changes one of these live counts, this assertion (not the doc-content
 // assertions below) is the one that should be updated to match the new reality.
 describe('live counts match the current known-true values', () => {
-  it('46 MCP tools, 8 MCP resources', () => {
-    expect(MCP_TOOLS).toBe(46);
+  it('47 MCP tools, 8 MCP resources', () => {
+    expect(MCP_TOOLS).toBe(47);
     expect(MCP_RESOURCES).toBe(8);
   });
 

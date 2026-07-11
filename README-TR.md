@@ -9,7 +9,7 @@
 <p align="center"><strong>Ne istediğinizi anlatın. Bir AI agent ekibinin onu inşa edişini izleyin — paralel, kalite kapılarıyla, onayladığınız bir bütçeyle ve bir sonraki sefer için her şeyi hatırlayarak.</strong></p>
 
 <!-- AUTOGEN:START id="badges" -->
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-29427%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-397%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-29850%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![coverage](https://img.shields.io/badge/coverage-89.96%25-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-406%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
 <!-- AUTOGEN:END id="badges" -->
 
 ---
@@ -241,7 +241,7 @@ deckent izlenmek için kuruldu, bir kara kutu olmak için değil.
 ### Yüzeyler
 - **Etkileşimli REPL** — markdown streaming, slash komutları ve oturum-ortası model/provider değiştirmeyle `deckent`
 - **Web paneli** — 20 sayfa (React + Vite + Tailwind): canlı durum, worker'lar, directives, memory explorer, borç, geçmiş, config, chat, nervous system, evolution, enterprise — artı gömülü bir web terminali (WebSocket üzeri PTY, token-auth + audit)
-- **MCP sunucusu** — stdio üzerinde 46 tool + 8 resource, böylece herhangi bir MCP istemcisi (Claude Code, Claude Desktop, …) deckent'i sürebilir
+- **MCP sunucusu** — stdio üzerinde 47 tool + 8 resource, böylece herhangi bir MCP istemcisi (Claude Code, Claude Desktop, …) deckent'i sürebilir
 - **Otonom motor** — recurring (cron), one-off ve reactive tetikleyicili kalıcı bir backlog; deckent bir kuyruğu kendi başına işler
 - **Connector'lar** — bildirim ve uzaktan-tetikleme için Discord, Telegram ve WhatsApp
 - **Enterprise temeli** — çok-tenant izolasyon, audit query, OIDC/SSO panel girişi (RS256-pinned JWT, PKCE), rol-tabanlı erişim, zamanlanmış akışlar ve webhook'lar — hepsi aynı MIT kod tabanında, gated edition yok
@@ -326,7 +326,7 @@ deckent bir MCP sunucusu sunar, böylece herhangi bir MCP-uyumlu araç onu süre
 claude mcp add deckent -- npx deckent-mcp     # herhangi bir MCP istemcisi aynı şekilde çalışır
 ```
 
-stdio üzerinde **46 tool + 8 resource**. → [docs/reference/mcp-guide.md](docs/reference/mcp-guide.md)
+stdio üzerinde **47 tool + 8 resource**. → [docs/reference/mcp-guide.md](docs/reference/mcp-guide.md)
 
 ---
 
@@ -363,7 +363,7 @@ MIT — [Alperen @ Verhex](https://deckent.ai)
 **GitHub:** [github.com/VerhexIO/deckent](https://github.com/VerhexIO/deckent) · **Website:** [deckent.ai](https://deckent.ai) · **English:** [README.md](README.md)
 
 <!-- AUTOGEN:START id="stat-counts" -->
-- **46 MCP tools** + **8 MCP resources**
+- **47 MCP tools** + **8 MCP resources**
 - **17 built-in agents** (+2 custom)
 - **30 built-in skills**
 - **20 dashboard pages**

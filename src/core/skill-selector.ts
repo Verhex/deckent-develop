@@ -167,8 +167,12 @@ export function resolveComposition(
   const conflicts: string[] = [];
 
   for (const skill of skills) {
+    // born-641 ailesi (2026-07-11, vaka-2): composableWith bir manifest'te hiç
+    // olmayabilir (canlı: secure-coding W5b-ekstraksiyonu) — undefined okuma
+    // TÜM routing'i düşürüyordu (loud-warn yakaladı). Eksik alan = kısıtsız.
+    const skillComposable = skill.composableWith ?? [];
     // If composableWith is empty, skill has no restrictions
-    if (skill.composableWith.length === 0) {
+    if (skillComposable.length === 0) {
       resolved.push(skill);
       continue;
     }
@@ -176,14 +180,15 @@ export function resolveComposition(
     // Check if this skill conflicts with any already-resolved skill
     let hasConflict = false;
     for (const existing of resolved) {
+      const existingComposable = existing.composableWith ?? [];
       // If existing skill has composableWith restrictions and this skill is not in the list
-      if (existing.composableWith.length > 0 && !existing.composableWith.includes(skill.id)) {
+      if (existingComposable.length > 0 && !existingComposable.includes(skill.id)) {
         conflicts.push(`"${skill.name}" conflicts with "${existing.name}": not in composableWith`);
         hasConflict = true;
         break;
       }
       // If this skill has composableWith restrictions and existing skill is not in the list
-      if (!skill.composableWith.includes(existing.id)) {
+      if (!skillComposable.includes(existing.id)) {
         conflicts.push(`"${skill.name}" conflicts with "${existing.name}": not in composableWith`);
         hasConflict = true;
         break;

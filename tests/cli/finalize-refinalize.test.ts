@@ -184,6 +184,16 @@ function readJson<T>(p: string): T {
   return JSON.parse(readFileSync(p, 'utf-8')) as T;
 }
 
+// born-605 (405-003): finalizer stats artık gitignored sidecar'a yazar
+// (.deckent/stats/catalog-stats.json) — manifest'ler dokunulmaz. Disk-okuyan
+// bu E2E, kaynağı sidecar'a çevirir (görülen değerler birebir aynı).
+function readSidecarStats(root: string, kind: 'agents' | 'skills', id: string): { totalUses: number; successRate: number; lastUsedInSprint: string } {
+  const ledger = readJson<{ agents: Record<string, never>; skills: Record<string, never> }>(
+    join(root, '.deckent', 'stats', 'catalog-stats.json'),
+  );
+  return (ledger[kind] as Record<string, { totalUses: number; successRate: number; lastUsedInSprint: string }>)[id]!;
+}
+
 function makeSprint(tasks: Task[], overrides: Partial<Sprint> = {}): Sprint {
   return {
     id: SPRINT_ID,
@@ -335,21 +345,21 @@ describe('finalizeSprint — double-finalize stats idempotency (FINALIZE-RECOUNT
     // uses (pre-scan must not skip mid-run stamps).
     await finalizeSprint(root, makeSprint(tasks), evaluations, results, finalizeOpts);
 
-    const afterFirst = readJson<{ stats: { totalUses: number; successRate: number; lastUsedInSprint: string } }>(agentPath);
-    expect(afterFirst.stats.totalUses).toBe(2);
-    expect(afterFirst.stats.successRate).toBe(1);
-    expect(afterFirst.stats.lastUsedInSprint).toBe(SPRINT_ID);
+    const afterFirst = readSidecarStats(root, 'agents', 'test-agent-268');
+    expect(afterFirst.totalUses).toBe(2);
+    expect(afterFirst.successRate).toBe(1);
+    expect(afterFirst.lastUsedInSprint).toBe(SPRINT_ID);
 
     // Re-finalize (the sprint-267 `finalize --force` re-run) — idempotent.
     await finalizeSprint(root, makeSprint(tasks), evaluations, results, finalizeOpts);
 
-    const afterSecond = readJson<{ stats: { totalUses: number; successRate: number } }>(agentPath);
-    expect(afterSecond.stats.totalUses).toBe(2); // NOT 4
-    expect(afterSecond.stats.successRate).toBe(1); // NOT 0.5
+    const afterSecond = readSidecarStats(root, 'agents', 'test-agent-268');
+    expect(afterSecond.totalUses).toBe(2); // NOT 4
+    expect(afterSecond.successRate).toBe(1); // NOT 0.5
 
-    const skillAfter = readJson<{ stats: { totalUses: number; successRate: number } }>(skillPath);
-    expect(skillAfter.stats.totalUses).toBe(2);
-    expect(skillAfter.stats.successRate).toBe(1);
+    const skillAfter = readSidecarStats(root, 'skills', 'test-skill-268');
+    expect(skillAfter.totalUses).toBe(2);
+    expect(skillAfter.successRate).toBe(1);
   });
 
   it('V2: second finalize skips recordOutcome via the recentSprints marker', async () => {
@@ -502,12 +512,11 @@ describe('finalize CLI — end-to-end re-finalize pipeline (tmpdir)', () => {
     expect(state.status).toBe(SprintStatus.COMPLETE);
     expect(state.phase).toBe(SprintPhase.COMPLETE);
     expect(existsSync(pidPath)).toBe(false);
-    // Stats recorded exactly once for the sprint (V1 default path)
-    const agent = readJson<{ stats: { totalUses: number; successRate: number } }>(
-      join(root, '.deckent', 'agents', 'test-agent-268', 'agent.json'),
-    );
-    expect(agent.stats.totalUses).toBe(2);
-    expect(agent.stats.successRate).toBe(1);
+    // Stats recorded exactly once for the sprint (V1 default path) —
+    // born-605: sidecar-ledger'dan okunur (manifest artık stats taşımaz).
+    const agent = readSidecarStats(root, 'agents', 'test-agent-268');
+    expect(agent.totalUses).toBe(2);
+    expect(agent.successRate).toBe(1);
   });
 
   it('without recoverable startedAt the duration is "unknown" and a foreign sprint-state is preserved', async () => {
@@ -547,8 +556,8 @@ describe('finalize CLI — end-to-end re-finalize pipeline (tmpdir)', () => {
     await runFinalizeCli(['--force']);
     await runFinalizeCli(['--force']);
 
-    const agent = readJson<{ stats: { totalUses: number; successRate: number } }>(agentPath);
-    expect(agent.stats.totalUses).toBe(1); // NOT 2 — re-finalize is stats-idempotent
-    expect(agent.stats.successRate).toBe(1);
+    const agent = readSidecarStats(root, 'agents', 'test-agent-268');
+    expect(agent.totalUses).toBe(1); // NOT 2 — re-finalize is stats-idempotent
+    expect(agent.successRate).toBe(1);
   });
 });

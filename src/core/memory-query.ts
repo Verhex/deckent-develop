@@ -209,7 +209,7 @@ function ftsSearch(
     `{title_norm content_norm summary_norm tag_norm}: (${normalized})`;
 
   // Build WHERE clauses for structured filters
-  const { whereClauses, bindParams } = buildFilterClauses(params, 'e');
+  const { whereClauses, bindParams } = buildFilterClauses(db, params, 'e');
 
   // Generate snippets for multiple columns to find best match.
   // FTS5 columns: 0=title, 1=content, 2=summary, 3=tag_text,
@@ -257,7 +257,7 @@ function structuredSearch(
   params: MemoryQueryParams,
   limit: number,
 ): MemorySearchResult[] {
-  const { whereClauses, bindParams } = buildFilterClauses(params, 'e');
+  const { whereClauses, bindParams } = buildFilterClauses(db, params, 'e');
 
   // tags_contain subquery
   const { tagClause, tagBinds } = buildTagsContainClause(params);
@@ -285,9 +285,32 @@ function structuredSearch(
   }));
 }
 
+// ─── Tenant column guard (born-609) ──────────────────────────────────
+
+/**
+ * Defensive existence check for `entries.tenant_id` via PRAGMA table_info.
+ * `memory-store.ts` already adds this column via an additive migration on every
+ * `MemoryStore` open, so in practice the column always exists — this guard exists
+ * for the case `searchMemory` is ever pointed at an older/foreign DB file: the
+ * predicate is skipped rather than throwing (honest no-op, per task spec).
+ */
+function hasTenantColumn(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any,
+): boolean {
+  try {
+    const cols = db.prepare(`PRAGMA table_info(entries)`).all() as Array<{ name: string }>;
+    return cols.some(c => c.name === 'tenant_id');
+  } catch {
+    return false;
+  }
+}
+
 // ─── Filter clause builder ───────────────────────────────────────────
 
 function buildFilterClauses(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any,
   params: MemoryQueryParams,
   alias: string,
 ): { whereClauses: string[]; bindParams: Record<string, unknown> } {
@@ -297,6 +320,21 @@ function buildFilterClauses(
   // deleted_at filter (default: exclude deleted)
   if (!params.include_deleted) {
     clauses.push(`${alias}.deleted_at IS NULL`);
+  }
+
+  // tenant filter (born-609, additive-only). Fail-closed exact match — a NULL-tenant
+  // row never matches an explicit tenantId, mirroring MemoryStore's born-563 default.
+  // Nothing runs here at all when tenantId is omitted, so the tenant-less path stays
+  // byte-identical to pre-609 behavior.
+  if (params.tenantId !== undefined) {
+    if (hasTenantColumn(db)) {
+      clauses.push(`${alias}.tenant_id = @tenant_id`);
+      binds['tenant_id'] = params.tenantId;
+    } else {
+      log.warn(
+        `tenantId="${params.tenantId}" requested but entries.tenant_id column does not exist — skipping tenant predicate (honest no-op)`,
+      );
+    }
   }
 
   // type filter

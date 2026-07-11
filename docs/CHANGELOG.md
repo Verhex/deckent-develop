@@ -2,6 +2,20 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint405] - 2026-07-11
+
+### Added
+
+- MEM-TENANT — born-609 (P0): MemoryQuery tenant-scoping (additive)
+
+### Changed
+
+- PLUGIN-AUTH — born-612 (P1): plugin özgünlük + path-containment (completed with tech debt)
+- STATS-SIDECAR — born-605 (P1): canlı agent/skill stats'ı git-tracked manifest'ten gitignored sidecar'a (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 2 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint404] - 2026-07-11
 
 ### Added

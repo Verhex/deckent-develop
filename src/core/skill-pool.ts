@@ -2,8 +2,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import type { SkillDefinition, SkillCategory } from './skill-types.js';
+import type { SkillDefinition, SkillCategory, SkillStats } from './skill-types.js';
 import { createDefaultSkillStats } from './skill-types.js';
 import { createDefaultActivationConfig } from './routing-types.js';
 import { readJsonSafe, debugLog } from './utils.js';
@@ -193,6 +194,61 @@ export interface InvalidManifestEntry {
   errors: string[];
 }
 
+// ─── Stats Sidecar (born-605 STATS-SIDECAR) ─────────────────────────────────
+//
+// Mirrors agent-pool.ts's identical sidecar section — see that file's comment
+// for the full rationale. Duplicated file-local (not a shared module) because
+// the two pool managers are outside each other's write/read scope for this
+// task, same reasoning as the existing parseMarkdownTitleAndLead duplication.
+// Both pool managers target the SAME physical ledger file
+// (`.deckent/stats/catalog-stats.json`, `{agents:{}, skills:{}}`) — each write
+// re-reads the full ledger first (read-merge-write) so a same-tick write from
+// the other pool manager's own key is never clobbered.
+
+const STATS_SIDECAR_RELATIVE_PATH = path.join('.deckent', 'stats', 'catalog-stats.json');
+
+interface StatsSidecarLedger {
+  agents: Record<string, unknown>;
+  skills: Record<string, SkillStats>;
+}
+
+/** Defensive read — a missing/corrupt/malformed ledger degrades to an empty one, never throws. */
+function readStatsSidecarLedger(projectRoot: string): StatsSidecarLedger {
+  const raw = readJsonSafe<Partial<StatsSidecarLedger>>(
+    path.join(projectRoot, STATS_SIDECAR_RELATIVE_PATH),
+  );
+  const agents = raw?.agents && typeof raw.agents === 'object' && !Array.isArray(raw.agents)
+    ? raw.agents
+    : {};
+  const skills = raw?.skills && typeof raw.skills === 'object' && !Array.isArray(raw.skills)
+    ? raw.skills
+    : {};
+  return { agents, skills: skills as Record<string, SkillStats> };
+}
+
+/**
+ * Read-merge-write a single skill's stats into the shared sidecar ledger, atomically
+ * (tmp file + rename — mirrors approval-broker.ts's atomicWriteJson pattern).
+ */
+function writeSkillStatsToSidecar(projectRoot: string, id: string, stats: SkillStats): void {
+  const ledger = readStatsSidecarLedger(projectRoot);
+  ledger.skills[id] = stats;
+  const fullPath = path.join(projectRoot, STATS_SIDECAR_RELATIVE_PATH);
+  fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+  const tmpPath = `${fullPath}.${randomUUID()}.tmp`;
+  fs.writeFileSync(tmpPath, JSON.stringify(ledger, null, 2) + '\n', 'utf8');
+  try {
+    fs.renameSync(tmpPath, fullPath);
+  } catch (err) {
+    try {
+      fs.unlinkSync(tmpPath);
+    } catch {
+      // Best-effort cleanup — the rename error below is what the caller needs.
+    }
+    throw err;
+  }
+}
+
 // ─── Skill Pool Manager ────────────────────────────────────────────────────
 
 export class SkillPoolManager {
@@ -234,6 +290,10 @@ export class SkillPoolManager {
     const pool = new Map<string, SkillDefinition>();
     this.invalidManifests = [];
     const skillsDir = path.join(this.projectRoot, SKILLS_DIR);
+    // Read once — overlaid onto every skill as it's constructed (unified read,
+    // born-605): sidecar value wins when present, else the manifest-loaded
+    // `stats` is left as-is.
+    const statsLedger = readStatsSidecarLedger(this.projectRoot);
 
     if (fs.existsSync(skillsDir)) {
       let entries: fs.Dirent[] = [];
@@ -252,6 +312,7 @@ export class SkillPoolManager {
           const validation = SkillPoolManager.validateSkillDefinition(raw);
           if (validation.valid) {
             const skill = raw as unknown as SkillDefinition;
+            this._overlayStats(skill, statsLedger);
             pool.set(skill.id, skill);
           } else {
             this._recordInvalidManifest(entry.name, manifestPath, validation.errors);
@@ -262,9 +323,31 @@ export class SkillPoolManager {
       }
     }
 
-    this._loadBuiltinFallback(pool);
+    this._loadBuiltinFallback(pool, statsLedger);
 
     return pool;
+  }
+
+  /**
+   * Overlay sidecar stats onto `skill` when present for its id — sidecar wins,
+   * else the manifest-loaded `stats` value is left as-is (unified read, born-605).
+   */
+  private _overlayStats(skill: SkillDefinition, statsLedger: StatsSidecarLedger): void {
+    const sidecarStats = statsLedger.skills[skill.id];
+    if (sidecarStats && typeof sidecarStats === 'object') {
+      skill.stats = sidecarStats;
+    }
+  }
+
+  /**
+   * Persist ONLY `stats` for a skill to the gitignored stats sidecar
+   * (.deckent/stats/catalog-stats.json) — the git-tracked manifest.json is
+   * never touched by this call (born-605: sprint-finalizer's per-sprint sync
+   * no longer mutates the manifest). Does not affect saveSkill()/
+   * updateSkillStats(), whose manifest-write contract is unchanged.
+   */
+  saveSkillStats(id: string, stats: SkillStats): void {
+    writeSkillStatsToSidecar(this.projectRoot, id, stats);
   }
 
   /**
@@ -283,7 +366,7 @@ export class SkillPoolManager {
    * part is required for real npm-installed usage, where builtins live
    * under node_modules/deckent/, never under the user's own project root.
    */
-  private _loadBuiltinFallback(pool: Map<string, SkillDefinition>): void {
+  private _loadBuiltinFallback(pool: Map<string, SkillDefinition>, statsLedger: StatsSidecarLedger): void {
     if (!fs.existsSync(path.join(this.projectRoot, CONFIG_FILENAME))) return;
 
     const builtinDir = resolveBuiltinSkillsDir();
@@ -330,6 +413,7 @@ export class SkillPoolManager {
         continue;
       }
       const skill = raw as unknown as SkillDefinition;
+      this._overlayStats(skill, statsLedger);
       pool.set(skill.id, skill);
     }
   }

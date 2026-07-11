@@ -30,7 +30,7 @@
 - Task routing: task-router.ts assigns agent + skills + provider per task
 
 ## MCP Integration
-- 46 tools — canlı/tam liste `docs/reference/mcp-tools.md` (AUTOGEN, `npm run docs:ref`); örnekler: init, set_directives, plan, start, status, doctor, retro, history, sync, config, review, run, kill, cleanup, help, **memory_query**, **autonomous**, **models**, nervous_subscribe, nervous_accept, nervous_reject, nervous_status, nervous_config, **process**, vb.
+- 47 tools — canlı/tam liste `docs/reference/mcp-tools.md` (AUTOGEN, `npm run docs:ref`); örnekler: init, set_directives, plan, start, status, doctor, retro, history, sync, config, review, run, kill, cleanup, help, **memory_query**, **autonomous**, **models**, nervous_subscribe, nervous_accept, nervous_reject, nervous_status, nervous_config, **process**, vb.
 - 8 resources: dashboard, directives, memory, debt, config, retro, tasks, agents
 - Canonical tool list is auto-generated — see `docs/reference/mcp-tools.md` (`npm run docs:ref`)
 - Registration: `claude mcp add deckent -- npx deckent-mcp`
@@ -171,7 +171,7 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP
 
 ## MCP Tool Reference — MCP Arac Referansi
 
-> **Tam araç listesi (46 araç) koddan otomatik türetilir — bkz. `docs/reference/mcp-tools.md`** (`npm run docs:ref`).
+> **Tam araç listesi (47 araç) koddan otomatik türetilir — bkz. `docs/reference/mcp-tools.md`** (`npm run docs:ref`).
 > Eskiden burada duran el-yazımı tablo **drift etmişti** (33 vs 35 vs 46); canonical generated referans tek-kaynaktır.
 > Araç adları yukarıdaki `## MCP Integration` bölümünde listelenir; somut parametre örnekleri aşağıdadır.
 

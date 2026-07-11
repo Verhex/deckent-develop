@@ -5,7 +5,7 @@
 Deckent ships an MCP server that exposes orchestration to MCP-compatible IDEs (Claude Code, Cursor, etc.). The tools below are registered in `src/mcp/tools/*.ts` and surfaced via `deckent-mcp` stdio transport.
 
 <!-- AUTOGEN:START id="mcp-tools" -->
-> 46 tools registered. Generated from `src/mcp/tools/*.ts`.
+> 47 tools registered. Generated from `src/mcp/tools/*.ts`.
 
 | Tool | Title | Description |
 |------|-------|-------------|
@@ -53,6 +53,7 @@ Deckent ships an MCP server that exposes orchestration to MCP-compatible IDEs (C
 | `deckent_start` | Start Sprint | Start a full sprint in the background. Runs the complete lifecycle: PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → CLEANUP. Pre-spawn cost gate (Sprint 189 T-008): if the estimated sprint cost exceeds cost_limits.sprint_max_usd (.deckent/cost-config.json), the tool returns COST_GATE_EXCEEDED — override with acknowledgeCost=true (or force=true to skip the gate entirely). Returns immediately with a jobId — the sprint continues asynchronously. Use deckent_status to monitor progress and deckent_review to evaluate results. Prerequisite: deckent_init + deckent_set_directives must have been run. |
 | `deckent_status` | Sprint Status | Get the current sprint dashboard status. Returns: agents (active worker list with task assignments), progress (done/total counts + progress bar + ETA), alerts (stale workers, boundary violations, lock issues), job (background job state: RUNNING/COMPLETE/FAILED + sprintId + metrics), agentAssignments (which agent handles which tasks), skillAssignments (which skills are active). Call repeatedly to poll progress. No prerequisite — safe to call anytime. |
 | `deckent_sync` | Sync Deckent | Sync AI adapter files (CLAUDE.md, AGENTS.md) to ensure they import DECKENT.md as the single source of truth. Additive only — prepends the @DECKENT.md reference if missing, never overwrites existing content. Use when CLAUDE.md or AGENTS.md loses its Deckent reference (e.g. after a manual edit or merge conflict). Requires DECKENT.md to exist (run deckent_init first). |
+| `deckent_truth` | Feature Truth Chain | Resolve the 4-level feature truth-chain (code → wired → enabled → proof) for every truth-block |
 | `deckent_usage` | Usage | Show token/limit consumption from Claude Code transcripts. |
 | `deckent_watch` | Watch Sprint Events | Subscribe to live sprint event stream via MCP logging notifications. |
 <!-- AUTOGEN:END id="mcp-tools" -->

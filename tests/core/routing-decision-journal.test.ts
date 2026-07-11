@@ -281,3 +281,14 @@ describe('born-638/641: Write-denied persona hard-excluded on construction inten
     expect(decision.agentId).toBe('security-auditor');
   });
 });
+
+describe('born-641 vaka-2: composableWith-siz skill kompozisyonu routing-i dusurmez', () => {
+  it('two selected skills where one lacks composableWith → no throw, both resolvable', async () => {
+    const { resolveComposition } = await import('../../src/core/skill-selector.js');
+    const healthy = { id: 's1', name: 's1', composableWith: [] } as never;
+    const broken = { id: 'secure-coding', name: 'secure-coding' } as never; // composableWith YOK (canli-vaka)
+    const { resolved, conflicts } = resolveComposition([healthy, broken]);
+    expect(resolved.map((s: { id: string }) => s.id)).toEqual(['s1', 'secure-coding']);
+    expect(conflicts).toEqual([]);
+  });
+});

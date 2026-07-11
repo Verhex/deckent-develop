@@ -220,6 +220,13 @@ export interface MemoryQueryParams {
   min_score?: number;
   /** FTS5 token join mode: 'or' (default, broader recall) or 'and' (all tokens must match). */
   mode?: 'and' | 'or';
+  /**
+   * Multi-tenant scope narrowing (born-609, additive-only). When set, results are
+   * restricted to rows whose `tenant_id` exactly matches (fail-closed — a NULL-tenant
+   * row never matches, mirroring `MemoryStore.getById/getByType/getByTags`'s born-563
+   * default). Omitted (default) → behavior is unchanged from pre-609 (no tenant clause).
+   */
+  tenantId?: string;
 }
 
 /** A single search result with relevance score. */

@@ -1214,7 +1214,7 @@ deckent autonomous-mission list --json
 > Hand-curated sections above are produced by `scripts/generate-cli-docs.ts`; this block is maintained by `scripts/gen-reference-docs.mjs`.
 
 <!-- AUTOGEN:START id="cli" -->
-> 169 commands. Generated from `src/cli/commands/*.ts`.
+> 170 commands. Generated from `src/cli/commands/*.ts`.
 
 | Command | Description |
 |---------|-------------|
@@ -1378,6 +1378,7 @@ deckent autonomous-mission list --json
 | `deckent test <name>` | Test a plugin: validate manifest and entrypoint, run hooks if available |
 | `deckent tier <model>` | Look up the tier of a specific model by ID or API ID |
 | `deckent track` | Track doc freshness (hash + DCR + stale) |
+| `deckent truth` | Resolve the 4-level feature truth-chain (code → wired → enabled → proof) for manifest truth-blocks |
 | `deckent undo <action-id>` | Undo a recent reversible action |
 | `deckent update` | Fetch latest pricing from LiteLLM + OpenRouter |
 | `deckent update <name>` | Update an installed skill from its original source |

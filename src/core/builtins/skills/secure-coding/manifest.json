@@ -41,5 +41,21 @@
     "files": [],
     "dependencies": [],
     "commands": []
+  },
+  "category": "domain",
+  "triggers": [
+    "security",
+    "secure-coding",
+    "auth",
+    "vulnerability",
+    "injection",
+    "sanitize",
+    "crypto"
+  ],
+  "composableWith": [],
+  "priority": 9,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
   }
 }

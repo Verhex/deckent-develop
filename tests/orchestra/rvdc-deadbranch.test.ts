@@ -203,10 +203,12 @@ describe('sprint-finalizer — ROUTE-V1-DEADBRANCH-COLLAPSE (351-010)', () => {
     expect(learnings.totalOutcomes).toBe(2);
     expect(learnings.agentPerformance['rvdc-agent']!.totalTasks).toBe(2);
 
-    // The 8d2 learnings→manifest sync is the SOLE writer of agent.json
-    // totalUses — never double-incremented by a parallel V1 direct-write.
-    const agentPath = join(root, '.deckent', 'agents', 'rvdc-agent', 'agent.json');
-    const agent = readJson<{ stats: { totalUses: number } }>(agentPath);
-    expect(agent.stats.totalUses).toBe(2);
+    // The 8d2 learnings→stats sync is the SOLE writer of totalUses — never
+    // double-incremented by a parallel V1 direct-write. born-605 (405-003):
+    // stats artık gitignored sidecar-ledger'da; manifest dokunulmaz kalır.
+    const ledger = readJson<{ agents: Record<string, { totalUses: number }> }>(
+      join(root, '.deckent', 'stats', 'catalog-stats.json'),
+    );
+    expect(ledger.agents['rvdc-agent']!.totalUses).toBe(2);
   });
 });

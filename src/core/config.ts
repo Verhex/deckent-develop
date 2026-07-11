@@ -1752,6 +1752,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // disables it).
     // born-607 P1 (advisor): FIELD-level default — a partial block like
     // `{ riskThreshold: 'safe' }` must not silently disable the default-ON surface.
+    // born-612 (405-002 + CC son-mil): plugin-security bloğu passthrough (born-464 üçlüsü).
+    plugins: config.plugins,
     tool_surface: { ...(config.tool_surface ?? {}), enabled: config.tool_surface?.enabled ?? true },
     deck_broker: config.deck_broker,
     training_trace: config.training_trace,
@@ -2492,6 +2494,8 @@ export function mergeConfigs(
     // disables it).
     // born-607 P1 (advisor): FIELD-level default — a partial block like
     // `{ riskThreshold: 'safe' }` must not silently disable the default-ON surface.
+    // born-612 (405-002 + CC son-mil): plugin-security bloğu passthrough (born-464 üçlüsü).
+    plugins: config.plugins,
     tool_surface: { ...(config.tool_surface ?? {}), enabled: config.tool_surface?.enabled ?? true },
     deck_broker: config.deck_broker,
     training_trace: config.training_trace,

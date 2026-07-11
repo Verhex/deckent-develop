@@ -137,6 +137,8 @@ vi.mock('../../src/core/agent-pool.js', () => ({
     updateAgentStats: vi.fn(),
     getAgent: mockGetAgent,
     saveAgent: mockSaveAgent,
+    // born-605 (405-003): finalizer stats'ı artık sidecar-API'ye yazar.
+    saveAgentStats: mockSaveAgent,
   })),
 }));
 vi.mock('../../src/core/skill-pool.js', () => ({
@@ -145,6 +147,7 @@ vi.mock('../../src/core/skill-pool.js', () => ({
     updateSkillStats: vi.fn(),
     getSkill: mockGetSkill,
     saveSkill: mockSaveSkill,
+    saveSkillStats: mockSaveSkill,
   })),
 }));
 
@@ -315,7 +318,8 @@ describe('avgCoverage — agent block (sprint-finalizer 8d2 sync)', () => {
     await finalizeSprint('/tmp/project', sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
 
     expect(mockSaveAgent).toHaveBeenCalled();
-    const saved = mockSaveAgent.mock.calls[0][0];
+    // born-605: yeni imza saveAgentStats(id, stats) — stats arg[1]'de.
+    const saved = { stats: mockSaveAgent.mock.calls[0][1] };
     // (90+80)/2 = 85 — NOT (90+0+80)/3 = 56.67 (the old phantom-zero-dilution result)
     expect(saved.stats.avgCoverage).toBeCloseTo(85, 5);
   });
@@ -340,7 +344,8 @@ describe('avgCoverage — agent block (sprint-finalizer 8d2 sync)', () => {
 
     await finalizeSprint('/tmp/project', sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
 
-    const saved = mockSaveAgent.mock.calls[0][0];
+    // born-605: yeni imza saveAgentStats(id, stats) — stats arg[1]'de.
+    const saved = { stats: mockSaveAgent.mock.calls[0][1] };
     // (70*5 + 85*2) / (5+2) = 520/7 — the non-covered task contributes to NEITHER
     // the numerator nor the denominator.
     expect(saved.stats.avgCoverage).toBeCloseTo(520 / 7, 5);
@@ -358,7 +363,8 @@ describe('avgCoverage — agent block (sprint-finalizer 8d2 sync)', () => {
 
     await finalizeSprint('/tmp/project', sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
 
-    const saved = mockSaveAgent.mock.calls[0][0];
+    // born-605: yeni imza saveAgentStats(id, stats) — stats arg[1]'de.
+    const saved = { stats: mockSaveAgent.mock.calls[0][1] };
     // (99*1 + 0*1) / (1+1) = 49.5 — proves the blend ran at all. The OLD code's
     // `if (avgCov > 0 ...)` guard treated a genuine 0% as falsy and skipped the
     // update entirely, leaving avgCoverage stale at 99.
@@ -387,7 +393,7 @@ describe('avgCoverage — skill block (sprint-finalizer 8d2 sync)', () => {
     await finalizeSprint('/tmp/project', sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
 
     expect(mockSaveSkill).toHaveBeenCalled();
-    const saved = mockSaveSkill.mock.calls[0][0];
+    const saved = { stats: mockSaveSkill.mock.calls[0][1] };
     // (100+60)/2 = 80 — NOT diluted by t2's measurement gap, and no longer stuck at 0.
     expect(saved.stats.avgCoverage).toBeCloseTo(80, 5);
   });
@@ -401,7 +407,7 @@ describe('avgCoverage — skill block (sprint-finalizer 8d2 sync)', () => {
 
     await finalizeSprint('/tmp/project', sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
 
-    const saved = mockSaveSkill.mock.calls[0][0];
+    const saved = { stats: mockSaveSkill.mock.calls[0][1] };
     expect(saved.stats.successCount).toBe(1);
     expect(saved.stats.avgCoverage).toBeCloseTo(100, 5);
   });

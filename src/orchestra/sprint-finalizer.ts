@@ -1265,7 +1265,15 @@ export async function finalizeSprint(
       }
     } catch (e) { debugLog('finalizeSprint:ruleEvolution', e); }
 
-    // 8d2. Sync V2 learnings → agent.json / manifest.json (so Dashboard/CLI see real stats)
+    // 8d2. Sync V2 learnings → stats sidecar (.deckent/stats/catalog-stats.json), so
+    // Dashboard/CLI see real stats without mutating the git-tracked agent.json /
+    // manifest.json on every sprint (born-605 STATS-SIDECAR — the manifest write
+    // here used to cause per-sprint repo-diff noise + a hermeticity/C5 violation).
+    // AgentPoolManager.getAgent()/SkillPoolManager.getSkill() already overlay the
+    // sidecar onto the loaded `stats` (unified read), so `stats` below starts from
+    // whichever store currently holds the freshest value — including a first-ever
+    // sidecar write, which therefore carries the manifest's prior history forward
+    // instead of resetting it.
     try {
       const poolManager = new AgentPoolManager(projectRoot);
       const skillPoolManager = new SkillPoolManager(projectRoot);
@@ -1307,8 +1315,7 @@ export async function finalizeSprint(
               : avgCov;
           }
           stats.lastUsedInSprint = sprint.id;
-          agent.stats = stats;
-          poolManager.saveAgent(agent);
+          poolManager.saveAgentStats(agentId, stats);
         }
       }
 
@@ -1340,12 +1347,11 @@ export async function finalizeSprint(
               : avgCov;
           }
           stats.lastUsedInSprint = sprint.id;
-          skill.stats = stats;
-          skillPoolManager.saveSkill(skill);
+          skillPoolManager.saveSkillStats(skillId, stats);
         }
       }
 
-      debugLog('finalizeSprint:syncStatsToManifests', `Synced ${Object.keys(learnings.agentPerformance).length} agents, ${Object.keys(learnings.skillPerformance).length} skills to manifest files`);
+      debugLog('finalizeSprint:syncStatsToManifests', `Synced ${Object.keys(learnings.agentPerformance).length} agents, ${Object.keys(learnings.skillPerformance).length} skills to stats sidecar (.deckent/stats/catalog-stats.json)`);
     } catch (e) { debugLog('finalizeSprint:syncStatsToManifests', e); }
 
     // 8e. Evaluate promotions/demotions

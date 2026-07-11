@@ -2223,9 +2223,10 @@
       "src/core/skill-pool.ts",
       "src/orchestra/sprint-finalizer.ts"
     ],
-    "spec": "Manifest = statik tanim; canli stats (totalUses/successRate/avgCoverage/lastUsedInSprint) ayri gitignored stats-dosyasina (per-entity veya tek ledger). Okuma-yolu birlesik (pool stats'i sidecar'dan yukler); yazma finalizer sidecar'a. Migration: mevcut manifest-stats sidecar'a tasinir + manifestler re-zero. Marketplace/rating tuketicileri ayni degerleri gormeye devam eder. .deckent/config.json track-karari ayni basliga baglanir (d3148926 untrack -> C5 hermetiklik vakasi). [2026-07-10 kanıt#3+advisor: AGSK katalog-testleri canlı-havuz zero-pin — agsk2/3/4 şekil+invariant repin yapıldı (agsk3 latent yakalandı: rpc-protocol/onboarding-ux ilk-route'ta kırardı). EK-1: scripts/bundle-builtins.mjs:118 --clean-stats skill'e avgScore yazıyor, gerçek şekil avgCoverage — sidecar işinde düzelt. EK-2: .deckent/settings/resource-log.jsonl 61k-satır tracked runtime-log (secret-temiz) — aynı sınıf; rotate/gitignore sidecar-kararıyla birlikte ele al.]",
+    "spec": "Manifest = statik tanim; canli stats (totalUses/successRate/avgCoverage/lastUsedInSprint) ayri gitignored stats-dosyasina (per-entity veya tek ledger). Okuma-yolu birlesik (pool stats'i sidecar'dan yukler); yazma finalizer sidecar'a. Migration: mevcut manifest-stats sidecar'a tasinir + manifestler re-zero. Marketplace/rating tuketicileri ayni degerleri gormeye devam eder. .deckent/config.json track-karari ayni basliga baglanir (d3148926 untrack -> C5 hermetiklik vakasi). [2026-07-10 kanıt#3+advisor: AGSK katalog-testleri canlı-havuz zero-pin — agsk2/3/4 şekil+invariant repin yapıldı (agsk3 latent yakalandı: rpc-protocol/onboarding-ux ilk-route'ta kırardı). EK-1: scripts/bundle-builtins.mjs:118 --clean-stats skill'e avgScore yazıyor, gerçek şekil avgCoverage — sidecar işinde düzelt. EK-2: .deckent/settings/resource-log.jsonl 61k-satır tracked runtime-log (secret-temiz) — aynı sınıf; rotate/gitignore sidecar-kararıyla birlikte ele al.] || DONE 2026-07-11 405-003 + CC son-mil: gitignored sidecar-ledger (.deckent/stats/catalog-stats.json, atomic) + birlesik-okuma (sidecar>manifest-fallback) + finalizer yalniz-sidecar; CC: 3 scope-disi test-dosyasi yeni-kontrata senkron (9 test) + .gitignore satiri. ACIK: manifest re-zero (git-tracked toplu-degisim) Alperen-onayli ayri-adim.",
     "verify": "sprint-sonrasi git status: manifest degismez; stats-testleri sidecar-fixture ile; katalog byte-drift testi kalici-yesil",
-    "wire_on": "default-on (yapi-degisikligi, testli)"
+    "wire_on": "default-on (yapi-degisikligi, testli)",
+    "status": "DONE"
   },
   {
     "born_id": 606,
@@ -2293,8 +2294,9 @@
       "src/core/memory-query.ts",
       "src/api/memory-search-endpoint.ts"
     ],
-    "spec": "tenantId param + query-layer predicate + API request-principal'dan scoping; single-tenant default davranis degismez (tenant yoksa mevcut yol). 497/ENT-CONFIG-SSOT ile hizali. [EK 2026-07-10: LEGACY-NULL-TENANT self-heal politikası — strict-flip sonrası kpi-backfill/okuma yolları NULL-tenant legacy-satırları görmez; tek-kullanıcı legacy-DB için bilinçli-fallback mı migration mı karar gerek (kpi-backfill canlı-vakası).]",
-    "verify": "hermetik: iki-tenant fixture -> cross-tenant sonuc SIZMAZ; tenantsiz cagri regresyonsuz"
+    "spec": "tenantId param + query-layer predicate + API request-principal'dan scoping; single-tenant default davranis degismez (tenant yoksa mevcut yol). 497/ENT-CONFIG-SSOT ile hizali. [EK 2026-07-10: LEGACY-NULL-TENANT self-heal politikası — strict-flip sonrası kpi-backfill/okuma yolları NULL-tenant legacy-satırları görmez; tek-kullanıcı legacy-DB için bilinçli-fallback mı migration mı karar gerek (kpi-backfill canlı-vakası).] || DONE 2026-07-11 405-001 (additive): tenantId param + FTS/filtre predicate (kolon-yoksa durust-atlama) + endpoint principal-threading; tenant'siz yol byte-ayni pin. ACIK-KARAR (Alperen): LEGACY-NULL-TENANT politikasi (strict-flip yapilmadi).",
+    "verify": "hermetik: iki-tenant fixture -> cross-tenant sonuc SIZMAZ; tenantsiz cagri regresyonsuz",
+    "status": "DONE"
   },
   {
     "sources": [
@@ -2343,8 +2345,9 @@
     "primary_files": [
       "src/core/plugin-loader.ts"
     ],
-    "spec": "Detached-signature/publisher-key dogrulama tasarimi + unsigned-plugin default-yukleme politikasi (en-az loud-warn/flag) + path-containment fix (path.relative-tabanli). Marketplace-oncesi gate.",
-    "verify": "imzasiz/yanlis-imzali fixture reddi-veya-warn; ../ path-escape fixture reddi"
+    "spec": "Detached-signature/publisher-key dogrulama tasarimi + unsigned-plugin default-yukleme politikasi (en-az loud-warn/flag) + path-containment fix (path.relative-tabanli). Marketplace-oncesi gate. || DONE 2026-07-11 405-002 + CC son-mil: Ed25519 detached-sig dogrulama (signature.ts reuse) + unsigned default loud-warn / require_signature=true fail-closed + path.relative containment (Win-sep testli); config-uclusu CC tamamladi (DeckentConfig/ResolvedConfig plugins-blok + iki-resolver passthrough).",
+    "verify": "imzasiz/yanlis-imzali fixture reddi-veya-warn; ../ path-escape fixture reddi",
+    "status": "DONE"
   },
   {
     "sources": [
@@ -2737,7 +2740,7 @@
       "src/orchestra/sprint-spawner.ts"
     ],
     "proposed_mode": "el-fix+sprint",
-    "spec": "ZINCIR: secure-coding W5b-ekstraksiyonu stackDetection/triggers'siz -> routing-engine:1533 unguarded read TypeError -> planSprint per-task catch debugLog-only yuttu -> plan-time atama HIC olusmadi -> atamayi sprint-spawner.ts:1260 spawn-time yolu yapti (api-builder over-selection = 397-007 hastaligi oradan) -> 622-journal'i da hic ateslenmedi. EL-FIX DONE 2026-07-11: (1) motor null-safe (skillTriggers/stackDetection?./dependencies??[]) + RED-test; (2) secure-coding manifest onarimi (iki agac); (3) planSprint catch loud-warn (operator-gorunur); (4) journal cift-onek path-fix. CANLI-KANIT: dry-run journal'i skor-dokumleriyle dustu, atamalar mantiklilasti (i18n->terminal-ux-engineer). KALANLAR: (a) spawner:1260 cifte-otorite — plan-time atama canliyken spawn-time override catisma-riski + journal'siz; (b) manifest sema-lint'i (born-590 ailesi): stackDetection/triggers zorunlu-alan validasyonu sync/lint'te; (c) ERRORS.md'de kac gundur oldugu olculsun.",
+    "spec": "ZINCIR: secure-coding W5b-ekstraksiyonu stackDetection/triggers'siz -> routing-engine:1533 unguarded read TypeError -> planSprint per-task catch debugLog-only yuttu -> plan-time atama HIC olusmadi -> atamayi sprint-spawner.ts:1260 spawn-time yolu yapti (api-builder over-selection = 397-007 hastaligi oradan) -> 622-journal'i da hic ateslenmedi. EL-FIX DONE 2026-07-11: (1) motor null-safe (skillTriggers/stackDetection?./dependencies??[]) + RED-test; (2) secure-coding manifest onarimi (iki agac); (3) planSprint catch loud-warn (operator-gorunur); (4) journal cift-onek path-fix. CANLI-KANIT: dry-run journal'i skor-dokumleriyle dustu, atamalar mantiklilasti (i18n->terminal-ux-engineer). KALANLAR: (a) spawner:1260 cifte-otorite — plan-time atama canliyken spawn-time override catisma-riski + journal'siz; (b) manifest sema-lint'i (born-590 ailesi): stackDetection/triggers zorunlu-alan validasyonu sync/lint'te; (c) ERRORS.md'de kac gundur oldugu olculsun. || VAKA-2 (2026-07-11 sprint-405 dry-run): secure-coding'in EKSIK-onarimi (yalniz stackDetection eklenmisti) resolveComposition'da composableWith.length undefined-okumasiyla YINE dustu — LOUD-WARN yakaladi (fix'in ROI'si aninda). El-fix: skill-selector null-safe + secure-coding TAM-manifest (category/triggers/composableWith/priority/promptInjection, iki-agac) + regresyon-test. KALICI-DERS: alan-alan onarim degil TAM-sema onarimi; kok-cozum = manifest sema-lint + pool-load normalizasyonu (641-kalan).",
     "verify": "dry-run: WARN yok + decisions-jsonl var; routing-decision-journal 7/7; born-641 testi",
     "status": "KISMI-DONE",
     "wire_on": "el-fix"

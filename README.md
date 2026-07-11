@@ -7,7 +7,7 @@
 <p align="center"><strong>Describe what you want. Watch a team of AI agents build it — in parallel, with quality gates, on a budget you approve, remembering everything for next time.</strong></p>
 
 <!-- AUTOGEN:START id="badges" -->
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-29427%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-397%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-29850%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![coverage](https://img.shields.io/badge/coverage-89.96%25-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-406%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v1.0.0--beta.1-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
 <!-- AUTOGEN:END id="badges" -->
 
 ---
@@ -239,7 +239,7 @@ deckent is built to be watched, not to be a black box.
 ### Surfaces
 - **Interactive REPL** — `deckent` with markdown streaming, slash commands, and mid-session model/provider switching
 - **Web dashboard** — 20 pages (React + Vite + Tailwind): live status, workers, directives, memory explorer, debt, history, config, chat, nervous system, evolution, enterprise — plus an embedded web terminal (PTY over WebSocket, token-auth + audited)
-- **MCP server** — 46 tools + 8 resources over stdio, so any MCP client (Claude Code, Claude Desktop, …) can drive deckent
+- **MCP server** — 47 tools + 8 resources over stdio, so any MCP client (Claude Code, Claude Desktop, …) can drive deckent
 - **Autonomous engine** — a durable backlog with recurring (cron), one-off, and reactive triggers; deckent works a queue on its own
 - **Connectors** — Discord, Telegram, and WhatsApp for notifications and remote triggering
 - **Enterprise foundation** — multi-tenant isolation, audit query, OIDC/SSO dashboard login (RS256-pinned JWT, PKCE), role-based access, scheduled flows, and webhooks — all in the same MIT codebase, no gated edition
@@ -324,7 +324,7 @@ deckent ships an MCP server, so any MCP-compatible tool can drive it:
 claude mcp add deckent -- npx deckent-mcp     # any MCP client works the same way
 ```
 
-**46 tools + 8 resources** over stdio. → [docs/reference/mcp-guide.md](https://github.com/VerhexIO/deckent/blob/main/docs/reference/mcp-guide.md)
+**47 tools + 8 resources** over stdio. → [docs/reference/mcp-guide.md](https://github.com/VerhexIO/deckent/blob/main/docs/reference/mcp-guide.md)
 
 ---
 
@@ -361,7 +361,7 @@ MIT — [Alperen @ Verhex](https://deckent.ai)
 **GitHub:** [github.com/VerhexIO/deckent](https://github.com/VerhexIO/deckent) · **Website:** [deckent.ai](https://deckent.ai) · **Türkçe:** [README-TR.md](README-TR.md)
 
 <!-- AUTOGEN:START id="stat-counts" -->
-- **46 MCP tools** + **8 MCP resources**
+- **47 MCP tools** + **8 MCP resources**
 - **17 built-in agents** (+2 custom)
 - **30 built-in skills**
 - **20 dashboard pages**

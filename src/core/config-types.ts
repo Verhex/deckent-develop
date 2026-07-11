@@ -947,6 +947,17 @@ export interface DeckentConfig {
   /** Embedded web terminal configuration (Sprint 175). */
   terminal?: TerminalConfig;
 
+  // ─── Plugin Security (born-612, 405-002 + CC son-mil) ────────────────
+  /** Plugin authenticity policy: Ed25519 trust-root + unsigned-plugin stance.
+   *  Shape mirrors PluginsRawConfig (src/core/plugin-loader.ts) — resolved
+   *  there via resolvePluginSecurityConfig(). */
+  plugins?: {
+    /** When true, unsigned plugins are rejected (fail-closed). Default false = load + loud-warn. */
+    require_signature?: boolean;
+    /** Trusted publisher keys ({ keyId, publicKey } records) — the signature trust-root. */
+    trusted_publisher_keys?: Array<{ keyId: string; publicKey: string }>;
+  };
+
   // ─── Native REPL Surface ─────────────────────────────────────────────
   /** Native-REPL progressive-disclosure meta-tools (TOOL-REPL-WIRE, 354-002). @see ToolSurfaceConfig */
   tool_surface?: ToolSurfaceConfig;
@@ -1339,6 +1350,8 @@ export interface ResolvedConfig {
    * on it being present without forcing every ResolvedConfig literal to spell
    * it out. Sprint 175. */
   terminal?: TerminalConfig;
+  /** Plugin authenticity policy (passed through from DeckentConfig, born-612 405-002+CC). */
+  plugins?: DeckentConfig['plugins'];
   /** Native-REPL progressive-disclosure meta-tools (passed through from DeckentConfig, 354-002). */
   tool_surface?: DeckentConfig['tool_surface'];
   /** Native-REPL mode-indicator + live-footer + approval-card surface (passed through from DeckentConfig, 354-001/355-011). */

@@ -213,3 +213,4 @@ claude-fable-x.md
 .tmp/
 .tmp-npm/
 .test-archive-debt-*/
+.deckent/stats/

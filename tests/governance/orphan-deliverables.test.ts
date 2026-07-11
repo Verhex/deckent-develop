@@ -448,7 +448,8 @@ const KNOWN_ORPHANS = [
   'src/connectors/approval-telegram.ts',
   'src/connectors/identity/verify-bind.ts',
   'src/core/agent-selector.ts',
-  'src/core/approval-expiry-driver.ts',
+  // 'src/core/approval-expiry-driver.ts' — KAPANDI born-631 (405-004, 2026-07-11):
+  // server-start'ta canlı-sürücü (unref'd + dispose) → artık orphan değil.
   'src/core/approval-fallback.ts',
   'src/core/audit-export.ts',
   'src/core/auth-session.ts',
@@ -516,7 +517,7 @@ const KNOWN_ORPHANS = [
 
 describe('KNOWN_ORPHANS allowlist sanity', () => {
   it('has the expected count and only well-formed src/**/*.ts(x) entries', () => {
-    expect(KNOWN_ORPHANS.length).toBe(86); // born-614 output-collector kapandi (87->86)
+    expect(KNOWN_ORPHANS.length).toBe(85); // born-631 approval-expiry-driver kapandi (86->85)
     for (const entry of KNOWN_ORPHANS) {
       expect(entry.startsWith('src/')).toBe(true);
       expect(entry.endsWith('.ts') || entry.endsWith('.tsx')).toBe(true);
