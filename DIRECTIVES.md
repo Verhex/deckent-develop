@@ -1,4 +1,11 @@
-# DIRECTIVES — SPRINT-411: SOL-ANALİZ TURU (gpt-5.6-sol × ultra-effort — 634/635 · 643 · beta-blocker)
+# DIRECTIVES — SPRINT-411: ✅ TAMAMLANDI (manuel sol-koşumu, 2026-07-11) — BU SPRINT'İ KOŞMA
+>
+> ⚠️ Bu 3 task Alperen tarafından gpt-5.6-sol'a MANUEL prompt olarak koşuldu (çift-limit-yakma
+> önlendi); raporlar teslim edildi → `docs/analysis/scheduler-unify-design-2026-07-11.md` +
+> `term-flow-unify-design-2026-07-11.md` + `beta-blocker-sweep-2026-07-11.md`. Kararlar
+> karar-turu-3'te verildi (MASTER-PLAN 527/543/544). Aşağısı tarihsel kayıt.
+
+# (arşiv) SPRINT-411: SOL-ANALİZ TURU (gpt-5.6-sol × ultra-effort — 634/635 · 643 · beta-blocker)
 
 ## Goal
 Alperen-direktifi: gpt-5.6-sol ile derin çapraz-analiz (XVER). Üç tasarım/denetim raporu — hepsi

@@ -2634,7 +2634,7 @@
     "priority": "P2",
     "status": "OPEN",
     "source": "born-610 el-kod (2026-07-10)",
-    "spec": "born-610 tek-truth SÖZLÜĞÜ birleştirdi (scheduler-truth.ts) ama dispatch-YÜRÜTMESİ hâlâ imperatif ~6 closure'da (dispatchTick/processQueue/maybeRespawn/dispatchReadyTasks/forceRescanIfIdle/cascadeSkipDeadBlocked); planDispatch sıfır-prod-çağıranlı model. Tam birleşim: planDispatch'i driver yap — DEPENDENCY_BLOCKED event'leri, wave.respawn metriği, checkpoint yan-etkileri porte edilmeli (result-collector.ts ADR-064-W notu) + remainingQueue mutasyon semantiği. Büyük-cerrahî; 610'da bilinçli kapsam-dışı bırakıldı."
+    "spec": "born-610 tek-truth SÖZLÜĞÜ birleştirdi (scheduler-truth.ts) ama dispatch-YÜRÜTMESİ hâlâ imperatif ~6 closure'da (dispatchTick/processQueue/maybeRespawn/dispatchReadyTasks/forceRescanIfIdle/cascadeSkipDeadBlocked); planDispatch sıfır-prod-çağıranlı model. Tam birleşim: planDispatch'i driver yap — DEPENDENCY_BLOCKED event'leri, wave.respawn metriği, checkpoint yan-etkileri porte edilmeli (result-collector.ts ADR-064-W notu) + remainingQueue mutasyon semantiği. Büyük-cerrahî; 610'da bilinçli kapsam-dışı bırakıldı. || TASARIM ✅ + KARAR ✅ (turu-3, 2026-07-11, sol-ultra): kademeli-strangler + saf-reducer + tek typed-effect executor + shadow-differential journal, 8 dilim (MASTER-PLAN 527); büyük-bang/facade NO_GO; planDispatch bugünkü haliyle canlı-driver YAPILMAZ (queue-mutate ediyor — shadow'da clone şart); tasarım-doc docs/analysis/scheduler-unify-design-2026-07-11.md; sıra Faz-C, davranışsız dilim 1-2 öne serpilebilir."
   },
   {
     "born_id": 635,
@@ -2642,7 +2642,7 @@
     "priority": "P2",
     "status": "OPEN",
     "source": "born-610 BEFORE-done advisor",
-    "spec": "(1) sprint-checkpoint.ts:707-712 restore in-progress'i MRR yapar -> yeni sozlukte resume=downstream-cascade-skip (pre-610 respawn ederdi); bilincli-karar + resume-path testi gerek. (2) dependency_pipeline_enabled=false FIFO'da dep-check yok -> MRR-bagimlisi spawn edilebilir (pre-existing delik; scheduler-truth header'ina not). (3) selectEligibleForSpawn (sprint-spawner.ts:1181) doneIds hardcode DONE — isDependencySatisfying'e bagla; fixForTaskId aggregation eksikligi ayrica degerlendirilsin (davranis-degistirir)."
+    "spec": "(1) sprint-checkpoint.ts:707-712 restore in-progress'i MRR yapar -> yeni sozlukte resume=downstream-cascade-skip (pre-610 respawn ederdi); bilincli-karar + resume-path testi gerek. (2) dependency_pipeline_enabled=false FIFO'da dep-check yok -> MRR-bagimlisi spawn edilebilir (pre-existing delik; scheduler-truth header'ina not). (3) selectEligibleForSpawn (sprint-spawner.ts:1181) doneIds hardcode DONE — isDependencySatisfying'e bagla; fixForTaskId aggregation eksikligi ayrica degerlendirilsin (davranis-degistirir). || KARAR ✅ (turu-3, 2026-07-11): sol-tasarima oturdu — (1)=SCHED-2 checkpoint-v2 (tam status-map; MRR restore'da kaybolmaz, stale-active→MRR descendant'lari cascade-skip; restore ayni reducer'a trigger.kind='restore' ile girer); (2)=SCHED-7 (FIFO yalniz cadence secer, dependency_policy=strict iki stratejide degismez; blocked-head destructive-shift yerine ilk-eligible-sonraki); (3)=SCHED-1 semantics-kernel. Detay docs/analysis/scheduler-unify-design-2026-07-11.md."
   },
   {
     "born_id": 636,
@@ -2780,9 +2780,20 @@
       "src/cli/repl/term-mode.ts"
     ],
     "proposed_mode": "sprint",
-    "spec": "Gap-rapor: (1) runGoldenFlow yalniz do.ts'ten; /do slash SLASH_CATALOG'da yok -> REPL'den erisilemez; (2) buildPlanNlIntent deterministik TODO-placeholder scaffold (gercek NL->plan yok — native-agent tool-akisi fiili yol); (3) checkActionAllowed (TERM-MODE risk-gate) prod'da 0-cagiran; (4) plan-preview REPL'de render edilmiyor (yalniz CLI stdin-confirm); (5) golden-flow startSprint'i senkron stdio:inherit — spawnDetachedDeckent DEGIL. TASARIM-KARARI GEREK (Alperen): fiili yol (native-agent tool'lari) MI resmilesecek yoksa golden-flow MU REPL'e baglanacak — ikisini birlestiren netlik; sonra insa. DESK-2/511 ile koordine.",
-    "verify": "511 kabul-olcutu: 1 gercek born terminal-akisiyla uctan-uca",
-    "wire_on": "design-then-sprint"
+    "spec": "Gap-rapor: (1) runGoldenFlow yalniz do.ts'ten; /do slash SLASH_CATALOG'da yok -> REPL'den erisilemez; (2) buildPlanNlIntent deterministik TODO-placeholder scaffold (gercek NL->plan yok — native-agent tool-akisi fiili yol); (3) checkActionAllowed (TERM-MODE risk-gate) prod'da 0-cagiran; (4) plan-preview REPL'de render edilmiyor (yalniz CLI stdin-confirm); (5) golden-flow startSprint'i senkron stdio:inherit — spawnDetachedDeckent DEGIL. TASARIM-KARARI GEREK (Alperen): fiili yol (native-agent tool'lari) MI resmilesecek yoksa golden-flow MU REPL'e baglanacak — ikisini birlestiren netlik; sonra insa. DESK-2/511 ile koordine. || KARAR ✅ (turu-3, 2026-07-11, sol-ultra tasarim): HIBRIT — B conversational front-door + typed RunProposal + host-owned durable RunFlowCoordinator + golden-flow'dan stage/cancel organ-nakli; 7 dilim (MASTER-PLAN 544 TERM-RUNFLOW); A-REPL'e-baglanir ve B-tools-resmilesir REDDEDILDI; olur-listesi: buildPlanNlIntent-canonical/sync-stdio-start/DIRECTIVES-swap/exit-code-evaluate; tasarim-doc docs/analysis/term-flow-unify-design-2026-07-11.md.",
+    "verify": "511 kabul-olcutu: 1 gercek born terminal-akisiyla uctan-uca (TERM-6 diliminde)",
+    "wire_on": "sprint",
+    "status": "DECIDED"
+  },
+  {
+    "born_id": 649,
+    "title": "RC-TRAIN: v1.0.0-beta blocker-odakli release-candidate treni (6 dilim; sol-ultra sweep 9 BLOCKER)",
+    "priority": "P0",
+    "status": "OPEN",
+    "source": "sol-ultra beta-blocker-sweep + Alperen karar-turu-3 (2026-07-11)",
+    "spec": "KARAR ✅ (turu-3): 'mevcut-haliyle-yayin' + 'yalniz-pack-fix' NO_GO; publish = RC-1..6 tamami + 536-Desktop-onayi. Dilimler: RC-1 secret-lifecycle (.deck no-op-if-exists/CAS + atomic 0600 + Windows-ACL adapter + worker-filesystem'den credential ayrimi; SEC-01/02) · RC-2 transactional-init (READY/SETUP_INCOMPLETE/FAILED durust-cikis; auth-yokken 'ready' basilmaz; Docker CLI+daemon+image birlikte-degerlendirme, fallback-veya-blocked; INIT-01/02 + i18n INIT-04 + Node-24-SSOT INIT-03) · RC-3 deterministic-package-contract (npm pack --json parser [tests/cli/f1df-pack.test.ts:37 deseni] + packed-tarball tmpdir-extract install-smoke: root+SDK import, 2 bin, dashboard, Dockerfile, builtins; kategorili size/file budget + baseline-delta; PUB-01/02, PKG-01..05; CC-canli-kanit: validate:publish exit 1 — tarball 5.35MB>5MB, favicon.png 779KB) · RC-4 release-integrity (tag=pkg=lock=changelog exact-equality gate + tag-commit required-CI attestation + SHA-pinned actions + trusted-publishing/OIDC, NPM_TOKEN kaldir + changelog-canonical secimi + bump-version.sh retire; REL-01..04, SEC-06) · RC-5 every-environment install-matrix (Win-native/WSL/macOS/Linux packed-install→init→plan→detached→completion REQUIRED, allow-failure yok; XPLAT-01) · RC-6 security+release-rehearsal (token-redaction SEC-03 + catalog-fetch lazy/network-policy SEC-04 + fail-closed audit/SBOM SEC-05 + clean build:all→pack→install→binary prova + registry version-occupancy preflight). Guvenlik/version-integrity dilimlerinde eski-unsafe davranis kalici-rollback secenegi OLMAZ. Kanit-tablosu docs/analysis/beta-blocker-sweep-2026-07-11.md; MASTER-PLAN 543.",
+    "verify": "her dilim kendi publish-gate'ini yesile cevirir; final=validate:publish yesil + rehearsal + Desktop-onay",
+    "wire_on": "sprint"
   },
   {
     "born_id": "644",

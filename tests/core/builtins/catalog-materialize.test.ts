@@ -263,14 +263,23 @@ describe('371-001 CATALOG-MATERIALIZE: builtin fallback makes the 6 new items po
 
     it('an initialized project (config.json present) sees the manifest-less builtins via the fallback', () => {
       // Only builtins with SKILL.md/PROMPT.md but NO manifest.json/agent.json anywhere
-      // (this task's actual scope — the 6 new items) go through the fallback. A builtin
-      // that already ships its own manifest.json/agent.json (e.g. 'refactorer',
-      // 'api-builder') is deliberately excluded here — see _loadBuiltinFallback's
-      // comment for why (avoids trusting arbitrary builtin manifest content verbatim).
+      // go through the fallback. A builtin that already ships its own
+      // manifest.json/agent.json (e.g. 'refactorer', 'api-builder') is deliberately
+      // excluded here — see _loadBuiltinFallback's comment for why (avoids trusting
+      // arbitrary builtin manifest content verbatim).
+      //
+      // Karar-turu builtins-merge (2026-07-11, 9a7991d0): 'api-design' and
+      // 'i18n-quality' gained real builtin manifest.json files, moving them into the
+      // manifest-bearing class alongside 'refactorer'/'api-builder' — so they are now
+      // expected to be EXCLUDED from the fallback (they reach the pool via
+      // sync/materialize instead). 'observability' stays manifest-less until born-646
+      // and keeps proving the skill-side fallback still works.
       const agents = new AgentPoolManager(initializedRoot).loadAgents();
       const skills = new SkillPoolManager(initializedRoot).loadSkills();
       expect(agents.has('api-designer')).toBe(true);
-      expect(skills.has('api-design')).toBe(true);
+      expect(skills.has('observability')).toBe(true);
+      expect(skills.has('api-design')).toBe(false);
+      expect(skills.has('i18n-quality')).toBe(false);
       expect(agents.has('refactorer')).toBe(false);
       expect(skills.has('api-builder')).toBe(false);
 
