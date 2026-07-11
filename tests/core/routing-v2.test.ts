@@ -183,9 +183,15 @@ describe('routing-v2: skillAgentAffinity flag', () => {
       skillAgentAffinity: true,
     });
 
-    // architect score unchanged — typescript-expert doesn't map to architect
-    expect(resultOff.agentId).toBe('architect');
-    expect(resultOn.agentId).toBe('architect');
+    // The real assertion here is affinity-NEUTRALITY: typescript-expert does
+    // not map to the pool agent in SKILL_AGENT_MAP, so flag-on must not change
+    // the outcome (same winner, same score). Note: this task's DNA classifies
+    // as 'implementation' (not 'architecture'), so architect's rule never
+    // fires and routing resolves via the STATIC fallback chain — which since
+    // born-638 (2026-07-11) starts with the Write-capable 'refactorer' instead
+    // of the Write-denied 'architect' (agent.json deniedTools:['Write']).
+    expect(resultOff.agentId).toBe('refactorer');
+    expect(resultOn.agentId).toBe('refactorer');
     expect(resultOff.agentScore).toBe(resultOn.agentScore);
   });
 

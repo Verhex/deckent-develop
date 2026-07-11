@@ -23,6 +23,13 @@ export interface TraceMeta {
   selfAssessment?: string;
   /** born-614: worker's own claim alongside the Brain verdict (honesty-gap signal). */
   workerSelfAssessment?: string;
+  /** born-637 (TRACE-CONTENT-PARITY): marks a MINIMAL single-message reconstruction
+   *  parsed out of a CLI's final result envelope, used when a sprint worker's
+   *  structured JSONL log carried zero LogEvent rows (see
+   *  orchestra/output-collector.ts recordSprintWorkerTrace). Omitted for a full
+   *  LogEvent-derived transcript — a training consumer filters/weights a partial
+   *  reconstruction differently via this field's presence. */
+  contentSource?: 'envelope-fallback';
 }
 export interface OpenAiMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -102,6 +109,37 @@ export function toSprintTrainingExample(events: readonly LogEvent[], meta: Sprin
       sprintId: meta.sprintId,
       agent: meta.agent,
       selfAssessment: meta.selfAssessment,
+      ...(meta.workerSelfAssessment !== undefined
+        ? { workerSelfAssessment: meta.workerSelfAssessment }
+        : {}),
+    },
+  };
+}
+
+/**
+ * born-637 (TRACE-CONTENT-PARITY envelope-fallback): build a MINIMAL training
+ * example from a CLI's final result-envelope string, for use when the sprint
+ * worker's structured JSONL log carried zero LogEvent rows (today: any
+ * backend not yet stream-ported to the `writeLogEvent` contract — see
+ * `orchestra/output-collector.ts` `recordSprintWorkerTrace`). No system
+ * message (none is recoverable from a bare envelope) — the envelope's
+ * `result` string becomes the sole assistant message, redacted like every
+ * other trace message. `meta.contentSource` is always stamped
+ * `'envelope-fallback'` so a training consumer can filter/weight this apart
+ * from a full transcript ({@link toSprintTrainingExample}).
+ */
+export function toEnvelopeFallbackTrainingExample(envelopeResult: string, meta: SprintTraceMeta): TrainingExample {
+  return {
+    messages: [{ role: 'assistant', content: redactSensitive(envelopeResult) }],
+    meta: {
+      source: 'sprint-worker',
+      model: meta.model,
+      ts: meta.ts,
+      taskId: meta.taskId,
+      sprintId: meta.sprintId,
+      agent: meta.agent,
+      selfAssessment: meta.selfAssessment,
+      contentSource: 'envelope-fallback',
       ...(meta.workerSelfAssessment !== undefined
         ? { workerSelfAssessment: meta.workerSelfAssessment }
         : {}),

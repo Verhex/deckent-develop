@@ -51,6 +51,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-402 Learnings** (sprint-402): ## Sprint sprint-402 Learnings
+- PROMPT-GATE-BLOCK-START — born-628: gate-BLOCK'u start/MCP ana-yoluna taşı: GO_WITH_...
 - **Sprint sprint-401 Learnings** (sprint-401): ## Sprint sprint-401 Learnings
 
 ## Gains
@@ -75,8 +77,6 @@
 
 ## Gains
 - 393-001 — born-589 — DOMAIN-ALIAS — detectDomains↔kural-vocabulary alias-m...
-- **Sprint sprint-392 Learnings** (sprint-392): ## Sprint sprint-392 Learnings
-- DESK-B2-PROFILE-STORE — connection-profile-store (P0): GO_WITH_TECH_DEBT — connectio...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -139,4 +139,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 1194 | Generated: 2026-07-11_
+_Total entries: 1198 | Generated: 2026-07-11_

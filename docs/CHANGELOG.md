@@ -2,6 +2,21 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint402] - 2026-07-11
+
+### Added
+
+- TRACE-CONTENT-PARITY — born-637 (P0): docker-backend trace-içerik kanalı
+- ROUTING-DECISION-JOURNAL — born-622: selectBestAgent skor-dökümü kalıcı-journal'a
+- E005-SPLIT — born-623: path-resolution'a ayrı error-code
+
+### Changed
+
+- PROMPT-GATE-BLOCK-START — born-628: gate-BLOCK'u start/MCP ana-yoluna taşı (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint401] - 2026-07-11
 
 ### Added

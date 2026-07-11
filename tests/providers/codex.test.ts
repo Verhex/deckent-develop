@@ -73,8 +73,16 @@ describe('CodexAdapter', () => {
       expect(adapter.supportedModels).toContain('o4-mini');
     });
 
-    it('should support exactly 6 models', () => {
-      expect(adapter.supportedModels).toHaveLength(6);
+    it('should support exactly 11 models (6 builtin + 5 codex-parity)', () => {
+      // 2026-07-11 (MASTER-PLAN 538): providers/codex.ts registers
+      // CODEX_PARITY_MODELS (gpt-5.5 + gpt-5.6/-sol/-terra/-luna) into the
+      // singleton registry at module-load, so the adapter's registry-derived
+      // model list grew 6 → 11. First-class ids replace the gpt-5→5.5 shim
+      // as the addressing path; the shim itself stays for backward-compat.
+      expect(adapter.supportedModels).toHaveLength(11);
+      for (const id of ['gpt-5.5', 'gpt-5.6', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']) {
+        expect(adapter.supportedModels).toContain(id);
+      }
     });
 
     it('should support gpt-5, gpt-5-mini, gpt-4.1-mini models', () => {

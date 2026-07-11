@@ -2499,7 +2499,9 @@
     "title": "ROUTING-DECISION-LOG: selectBestAgent skor-dokumu journal'a (397-007 api-builder-kazanimi kapatilamadi) + G3 operation-class kok-fix",
     "primary_files": [
       "src/core/routing-engine.ts"
-    ]
+    ],
+    "status": "DONE",
+    "spec": " || DONE 2026-07-11 sprint-402-003: RoutingDecisionRecord jsonl (.deckent/routing/decisions/), cift-hesap yok, cache-hit dahil, fail-soft; 454/454 importer-test."
   },
   {
     "sources": [
@@ -2513,7 +2515,9 @@
     "primary_files": [
       "src/core/errors.ts",
       "src/cli/commands/chat-tool-exec.ts"
-    ]
+    ],
+    "status": "DONE",
+    "spec": " || DONE 2026-07-11 sprint-402-004: DECKENT_E075 path-resolution kodu; ELOOP->E075, gercek scope-ihlali E005 (iki-yonlu testler); capability-broker E005 kullanimları ayri-konsept, dokunulmadi."
   },
   {
     "born_id": 624,
@@ -2576,7 +2580,7 @@
     "priority": "P1",
     "status": "OPEN",
     "source": "sprint-399 BEFORE-done advisor",
-    "spec": "Advisor-bulgu (E): prompt-gate blocker kontrolü YALNIZ src/cli/commands/plan.ts:217-233 CLI-yolunda; deckent start → runSprint → runPlanPhase sprint.promptGate okumuyor, MCP plan-yüzeyinde sıfır referans. SAN-1/G1b BLOCK bulguları ana koşu-yolunda hesaplanıp DÜŞÜYOR (persona-lint döneminden miras üst-katman sıfır-tüketici deseni). FIX: runSprint plan-fazı sonrası promptGate.ok kontrolü (acknowledgePromptGate/--force-prompt-gate opsiyonlarıyla; scope-gate ile aynı UX) + MCP deckent_plan yanıtına findings; dry-run/plan-CLI davranışı aynı kalır."
+    "spec": "Advisor-bulgu (E): prompt-gate blocker kontrolü YALNIZ src/cli/commands/plan.ts:217-233 CLI-yolunda; deckent start → runSprint → runPlanPhase sprint.promptGate okumuyor, MCP plan-yüzeyinde sıfır referans. SAN-1/G1b BLOCK bulguları ana koşu-yolunda hesaplanıp DÜŞÜYOR (persona-lint döneminden miras üst-katman sıfır-tüketici deseni). FIX: runSprint plan-fazı sonrası promptGate.ok kontrolü (acknowledgePromptGate/--force-prompt-gate opsiyonlarıyla; scope-gate ile aynı UX) + MCP deckent_plan yanıtına findings; dry-run/plan-CLI davranışı aynı kalır. || KISMI 2026-07-11 sprint-402-001 (durust-DEBT): runSprint decidePromptGateBlock + MCP-plan findings CANLI (16 test + composition-pin); KALAN: --force-prompt-gate CLI-flag + MCP acknowledgePromptGate threading (start.ts'ler scope-disiydi) — acknowledgeScopePaths kanali ayni-desende."
   },
   {
     "born_id": 629,
@@ -2657,8 +2661,44 @@
       "src/agent/trace-recorder.ts"
     ],
     "proposed_mode": "sprint",
-    "spec": "614 canli-kanit sonucu: trace meta-wire CANLI (ilk entry yazildi, selfAssessment=Brain-verdict + workerSelfAssessment OK) ama messages:[] cunku recordSprintWorkerTrace -> readLogEvents(.tasks/task-<id>.log) LogEvent-kontrati (ts/seq/type/content) bekliyor; docker/tmux backend .log'a YALNIZ claude-CLI final result-envelope'unu dump eder (result-collector.ts:586 doc-comment bunu soyluyor), isLogEvent hepsini eler. Subprocess backend zaten dogru yazar (normalizeStreamEvent->writeLogEvent, spawn-backend-subprocess.ts:107). FIX (no-MVP, her-backend): docker/tmux canli-cikti yakalama yolunu ayni normalizeStreamEvent->writeLogEvent boru hattina baglamak (docker capture zaten var: captureDockerOutput); ARTI recordSprintWorkerTrace'e envelope-fallback (0 event ise final-envelope'dan minimal messages sentezle — num_turns/result mevcut) ki eski loglar da bos kalmasin. Egitim-moat P0 (pivot TRN WIRE) — icerik olmadan trace'in SP-2 degeri sifir.",
+    "spec": "614 canli-kanit sonucu: trace meta-wire CANLI (ilk entry yazildi, selfAssessment=Brain-verdict + workerSelfAssessment OK) ama messages:[] cunku recordSprintWorkerTrace -> readLogEvents(.tasks/task-<id>.log) LogEvent-kontrati (ts/seq/type/content) bekliyor; docker/tmux backend .log'a YALNIZ claude-CLI final result-envelope'unu dump eder (result-collector.ts:586 doc-comment bunu soyluyor), isLogEvent hepsini eler. Subprocess backend zaten dogru yazar (normalizeStreamEvent->writeLogEvent, spawn-backend-subprocess.ts:107). FIX (no-MVP, her-backend): docker/tmux canli-cikti yakalama yolunu ayni normalizeStreamEvent->writeLogEvent boru hattina baglamak (docker capture zaten var: captureDockerOutput); ARTI recordSprintWorkerTrace'e envelope-fallback (0 event ise final-envelope'dan minimal messages sentezle — num_turns/result mevcut) ki eski loglar da bos kalmasin. Egitim-moat P0 (pivot TRN WIRE) — icerik olmadan trace'in SP-2 degeri sifir. || DONE 2026-07-11 sprint-402-002: (1) envelope-fallback (redaksiyonlu, contentSource='envelope-fallback' damgali; recover-edilemezse hic satir yazilmiyor — bos-messages'tan durust); (2) docker stream-port CLAUDE-scoped (stream-json+--verbose, writeNormalizedDockerLog=subprocess-referans hatti; usage-patch PRISTINE-blob okumaya devam — 4 token alani fixture'la BIREBIR kanitli). CANLI-KANIT: build sonrasi ilk sprint'in trace'inde messages>0 beklenir (sprint-403). Kalanlar -> born-639.",
     "verify": "docker-backend sprint sonrasi .deckent/traces/sprint-worker.jsonl son entry messages.length > 0 (gercek konusma-turleri); unit: envelope-fallback testi + docker-capture->LogEvent normalizasyon testi; composition-pin: readLogEvents cagri-yolunun her backend'de dolu event dondugu",
+    "wire_on": "sprint",
+    "status": "DONE"
+  },
+  {
+    "born_id": "638",
+    "title": "FALLBACK-WRITE-DENIED: construction-intent fallback'leri architect'e (deniedTools:['Write']) dusuyordu -> Write-yetkin persona",
+    "sources": [
+      "sprint-402 task-001 collateral-discovery 2026-07-11"
+    ],
+    "severity": "P0",
+    "subsystem": "core/routing",
+    "primary_files": [
+      "src/core/routing-engine.ts"
+    ],
+    "proposed_mode": "el-fix",
+    "spec": "402-001 gate-BLOCK start-yoluna inince 2 runsprint-debt-integration testi kirmizi oldu: debt-fix task'lari unknown-intent ultimate-fallback'le architect'e gidiyordu; architect agent.json deniedTools:['Write'] (advisory-only) -> diff yazamayan persona construction task'i aldi (gate bunu dogru yakaladi). EL-FIX (2026-07-11): 'implementation':['refactorer','bug-fixer'] + 'unknown':['bug-fixer','refactorer'] + ultimate-fallback 'bug-fixer'; router-agent-fallback testleri yeni-davranisa senkron. KALAN (takip): diger zincirlerin architect-kuyruklari (refactor/devops/config/performance/migration/architecture 2.siralari) + BUILTIN_AGENT_ROLES architect->implementer yanlis-haritasi (prompt-gate.ts:83-86 belgeliyor) — gate artik bunlari BLOCK'la gorunur kilar.",
+    "verify": "runsprint-debt-integration 13/13 + router-agent-fallback 11/11 yesil; prompt-gate-start-path 16/16",
+    "status": "DONE",
+    "wire_on": "el-fix"
+  },
+  {
+    "born_id": "639",
+    "title": "TRACE-CONTENT kalanlari: codex/gemini docker stream-paritesi + token-counter tier-2 LogEvent-farkindaligi",
+    "sources": [
+      "sprint-402-002 durust-teslim notlari 2026-07-11"
+    ],
+    "severity": "P1",
+    "subsystem": "orchestra/trace",
+    "primary_files": [
+      "src/orchestra/spawn-backend-docker.ts",
+      "src/orchestra/token-counter.ts",
+      "src/api/worker-logs.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "(1) docker stream-port yalniz claude-provider'a yapildi — codex/gemini docker .log'lari hala RAW dump -> onlarin trace-icerigi bos kalir; ayni normalizeStreamEvent hattina baglanmali (her-ortam yasasi). (2) token-counter.ts tryLoadCliLogTokens tier-2 fallback top-level 'usage' bekliyor; claude+docker .log artik LogEvent-JSONL (usage .content icinde nested) -> tier-2 eslesmiyor (guvenlik-agi: mergeWithWorkerClaim workerReported'i donduruyor, NIHAI SAYI DEGISMIYOR — yalniz provenance). token-counter LogEvent-farkinda yapilmali. (3) worker-logs.ts ham-tail gorunumu artik JSONL — insan-okur render istenirse ayri QoL.",
+    "verify": "codex/gemini docker fixture -> LogEvent JSONL; token-counter tier-2 nested-usage testi; nihai-sayi regresyon-pin",
     "wire_on": "sprint"
   }
 ]

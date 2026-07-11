@@ -39,6 +39,8 @@ import { getAgentDomain, getAgentRole, type AgentDomain, type AgentRole } from '
 import { debugLog } from './utils.js';
 import { resolveOpenRouterDocRoute, type OpenRouterRouteConfig } from './routing-openrouter.js';
 import type { FreeModelCache } from './openrouter-models.js';
+import { mkdirSync, appendFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 // ─── Agent Fallback Chain ──────────────────────────────────────────────────
 
@@ -47,9 +49,13 @@ import type { FreeModelCache } from './openrouter-models.js';
  * When no agent meets the activation score threshold, this chain provides
  * deterministic agent selection based on the task's primary intent.
  * Post-Sprint-148: test-writer removed, testing tasks route to architect/refactorer.
+ * born-638 (2026-07-11): construction-intent fallbacks must be Write-capable —
+ * `architect` denies Write (agent.json deniedTools:['Write'], advisory-only persona),
+ * so it cannot be the fallback for tasks that must produce a diff; the prompt-gate
+ * persona-capability check now BLOCKs such routes on the runSprint path (born-628).
  */
 export const AGENT_FALLBACK_CHAIN: Record<IntentType, string[]> = {
-  'implementation': ['architect', 'refactorer'],
+  'implementation': ['refactorer', 'bug-fixer'],
   'bugfix': ['bug-fixer', 'refactorer'],
   'refactor': ['refactorer', 'architect'],
   'documentation': ['doc-writer'],
@@ -60,7 +66,7 @@ export const AGENT_FALLBACK_CHAIN: Record<IntentType, string[]> = {
   'design': ['frontend-designer'],
   'migration': ['migration-specialist', 'architect'],
   'architecture': ['architecture-planner', 'architect'],
-  'unknown': ['architect'],
+  'unknown': ['bug-fixer', 'refactorer'],
 };
 
 /**
@@ -76,11 +82,11 @@ export function selectAgentByFallback(
   primary: IntentType,
   activeAgentIds: Set<string>,
 ): string {
-  const chain = AGENT_FALLBACK_CHAIN[primary] ?? ['architect'];
+  const chain = AGENT_FALLBACK_CHAIN[primary] ?? ['bug-fixer'];
   for (const agentId of chain) {
     if (activeAgentIds.has(agentId)) return agentId;
   }
-  return 'architect'; // ultimate fallback
+  return 'bug-fixer'; // ultimate fallback — must be Write-capable (born-638)
 }
 
 // ─── Domain-Match Bonus (Sprint 209 — Task 209-002) ────────────────────────
@@ -639,6 +645,76 @@ interface ScoredCandidate {
   matchedRules: string[];
 }
 
+// ─── ROUTING-DECISION-JOURNAL (born-622, Sprint 402 Task 402-003) ──────────
+//
+// selectBestAgent computes a multi-signal score per candidate but the
+// decision-moment breakdown was never persisted anywhere — routing was
+// unauditable ("why did api-builder win/lose", 397-007). This is a SEPARATE
+// concern from `.deckent/routing/outcomes/` (post-hoc evaluation outcomes,
+// outcome-tracker.ts) and `.deckent/runtime/decisions/` (free-text reasoning
+// steps, decision-logger.ts): this journal captures the raw per-candidate
+// numeric signal breakdown at the moment selectBestAgent decides.
+//
+// Fail-soft (ADR-G-009), mirrors `recordSprintWorkerTrace` in
+// src/orchestra/output-collector.ts: a journal-write error must NEVER affect
+// routing. Signals are harvested from already-computed intermediate values
+// inside selectBestAgent's existing scoring loop — never recomputed.
+
+const ROUTING_DECISIONS_DIR = '.deckent/routing/decisions';
+
+/** One scored candidate at a routing decision point — signals are the exact
+ *  already-computed bonus/penalty contributions that summed to `totalScore`. */
+export interface RoutingDecisionCandidate {
+  agentId: string;
+  totalScore: number;
+  signals: Record<string, number>;
+  /** True only when this candidate was under an active exclude rule
+   *  (override-exclude or activation-exclude) that a surface/test-ownership
+   *  bonus bypassed — not merely "has a nonzero surface/test bonus". */
+  bypass: boolean;
+}
+
+/** One selectBestAgent decision-moment record, appended to the sprint's
+ *  decision journal (one JSON object per line). */
+export interface RoutingDecisionRecord {
+  taskId: string;
+  sprintId: string;
+  ts: string;
+  candidates: RoutingDecisionCandidate[];
+  winner: string | null;
+  reason: string;
+  /** True when this record reflects an agent-selection-cache hit — no
+   *  per-signal breakdown is available from the cache entry (honest-empty,
+   *  never fabricated/recomputed). */
+  cached: boolean;
+}
+
+/** Path to this sprint's decision journal — mirrors the sprint-scoped,
+ *  append-only convention of `.deckent/routing/outcomes/<sprintId>.json`. */
+export function routingDecisionJournalPath(projectRoot: string, sprintId: string): string {
+  return join(projectRoot, ROUTING_DECISIONS_DIR, `sprint-${sprintId}.jsonl`);
+}
+
+/**
+ * Append one routing decision record to the sprint's decision journal.
+ * Fail-soft (ADR-G-009): any read/mkdir/write error is swallowed — a
+ * decision-journal write failure must never affect routing. No-op when
+ * `projectRoot` is not supplied (missing decision-trail context).
+ */
+function appendRoutingDecisionRecord(
+  projectRoot: string | undefined,
+  record: RoutingDecisionRecord,
+): void {
+  if (!projectRoot) return;
+  try {
+    const filePath = routingDecisionJournalPath(projectRoot, record.sprintId);
+    mkdirSync(dirname(filePath), { recursive: true });
+    appendFileSync(filePath, JSON.stringify(record) + '\n', 'utf-8');
+  } catch {
+    // Fail-soft (ADR-G-009): a decision-journal write error must never affect routing.
+  }
+}
+
 // ─── Main API ───────────────────────────────────────────────────────────────
 
 /**
@@ -880,6 +956,23 @@ export function routeTaskV2(
         agentConfidence = (cached.confidence ?? 'uncertain') as ConfidenceLevel;
         reasoning.push('[agent-cache hit]', ...(cached.reasoningLines ?? []));
         cacheHit = true;
+
+        // born-622 (402-003): still record a decision — a cache hit is a real
+        // decision, not an invisible one. No per-signal breakdown is available
+        // from the cache entry (honest-empty, never fabricated/recomputed).
+        if (options?.projectRoot && options?.sprintId && options?.taskId) {
+          appendRoutingDecisionRecord(options.projectRoot, {
+            taskId: options.taskId,
+            sprintId: options.sprintId,
+            ts: new Date().toISOString(),
+            candidates: cached.agentId
+              ? [{ agentId: cached.agentId, totalScore: cached.score, signals: {}, bypass: false }]
+              : [],
+            winner: cached.agentId || null,
+            reason: cached.reason,
+            cached: true,
+          });
+        }
       }
     }
 
@@ -893,6 +986,22 @@ export function routeTaskV2(
       agentScore = agentResult.score;
       agentConfidence = agentResult.confidence;
       reasoning.push(...agentResult.reasoning);
+
+      // born-622 (402-003): decision-moment journal — recorded BEFORE the
+      // fallback chain below may reassign agentId, so this reflects
+      // selectBestAgent's own signal-based verdict (a separate mechanism
+      // from the static/dynamic fallback chain).
+      if (options?.projectRoot && options?.sprintId && options?.taskId) {
+        appendRoutingDecisionRecord(options.projectRoot, {
+          taskId: options.taskId,
+          sprintId: options.sprintId,
+          ts: new Date().toISOString(),
+          candidates: agentResult.candidates,
+          winner: agentResult.agentId,
+          reason: agentResult.reasoning[agentResult.reasoning.length - 1] ?? '',
+          cached: false,
+        });
+      }
 
       // Store in cache when enabled and an agent was found (skip null — let fallback handle it)
       if (cacheKey !== undefined && agentId !== null) {
@@ -913,8 +1022,8 @@ export function routeTaskV2(
         reasoning.push(`Agent fallback chain: '${agentId}' (intent=${taskDNA.intent.primary})`);
       } else if (agentId === null) {
         // No activeAgentIds provided — use static fallback
-        const chain = AGENT_FALLBACK_CHAIN[taskDNA.intent.primary] ?? ['architect'];
-        agentId = chain[0] ?? 'architect';
+        const chain = AGENT_FALLBACK_CHAIN[taskDNA.intent.primary] ?? ['bug-fixer'];
+        agentId = chain[0] ?? 'bug-fixer'; // Write-capable default (born-638)
         agentScore = 50;
         agentConfidence = 'low';
         reasoning.push(`Agent static fallback: '${agentId}' (intent=${taskDNA.intent.primary})`);
@@ -1110,8 +1219,13 @@ function selectBestAgent(
   languagePenalty?: boolean,
   scopeDomain?: string | null,
   testDominant: boolean = false,
-): { agentId: string | null; score: number; confidence: ConfidenceLevel; reasoning: string[] } {
+): { agentId: string | null; score: number; confidence: ConfidenceLevel; reasoning: string[]; candidates: RoutingDecisionCandidate[] } {
   const candidates: ScoredCandidate[] = [];
+  // born-622 (402-003): every agent that reaches a finalScore this call — NOT
+  // gated by cfg.agentMinScore — so a below-threshold "loser" is still
+  // auditable. Hard-excluded agents (no bypass) never reach finalScore and
+  // are correctly absent (no fabricated score).
+  const decisionCandidates: RoutingDecisionCandidate[] = [];
   const reasoning: string[] = [];
 
   // ROUTE-1 B2 — suppress path-proxy + user-surface bonus for touch-up / non-build tasks.
@@ -1138,9 +1252,14 @@ function selectBestAgent(
     // surfaceBonus does (see the two bypass branches below).
     const testBonus = getTestOwnershipBonus(id, testDominant);
     const bypassBonus = surfaceBonus + testBonus;
+    // born-622 (402-003): true only when an exclude rule was actually bypassed
+    // below — NOT "bypassBonus > 0" alone (a non-excluded agent can carry a
+    // nonzero surface/test bonus without ever needing to bypass anything).
+    let bypassApplied = false;
 
     if (excludeAgents.includes(id)) {
       if (bypassBonus > 0) {
+        bypassApplied = true;
         reasoning.push(
           testBonus > 0
             ? `Agent '${id}' test-ownership exclude bypass (override)`
@@ -1164,6 +1283,7 @@ function selectBestAgent(
 
     if (result.excluded) {
       if (bypassBonus > 0) {
+        bypassApplied = true;
         reasoning.push(
           testBonus > 0
             ? `Agent '${id}' test-ownership exclude bypass: ${result.excludeReason}`
@@ -1218,6 +1338,24 @@ function selectBestAgent(
 
     const finalScore = result.score + bonus + domainBonus + surfaceBonus + testBonus + rolePenalty + kindBonus + langPenalty;
 
+    // born-622 (402-003): harvest the journal candidate from the intermediate
+    // values already computed above — no second scoring pass.
+    decisionCandidates.push({
+      agentId: id,
+      totalScore: finalScore,
+      signals: {
+        activation: result.score,
+        learningBonus: bonus,
+        domainBonus,
+        surfaceBonus,
+        testBonus,
+        rolePenalty,
+        kindBonus,
+        langPenalty,
+      },
+      bypass: bypassApplied,
+    });
+
     if (finalScore >= cfg.agentMinScore) {
       candidates.push({
         id,
@@ -1231,7 +1369,7 @@ function selectBestAgent(
 
   if (candidates.length === 0) {
     reasoning.push('No agent met minimum score threshold');
-    return { agentId: null, score: 0, confidence: 'uncertain', reasoning };
+    return { agentId: null, score: 0, confidence: 'uncertain', reasoning, candidates: decisionCandidates };
   }
 
   // Sort by finalScore descending, then by learning bonus for tiebreaker
@@ -1247,7 +1385,7 @@ function selectBestAgent(
 
   reasoning.push(`Agent selected: '${best.id}' (score=${best.finalScore}, rules=[${best.matchedRules.join(', ')}])`);
 
-  return { agentId: best.id, score: best.finalScore, confidence, reasoning };
+  return { agentId: best.id, score: best.finalScore, confidence, reasoning, candidates: decisionCandidates };
 }
 
 // ─── Skill Selection ────────────────────────────────────────────────────────

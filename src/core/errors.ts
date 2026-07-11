@@ -611,6 +611,20 @@ registry.set('DECKENT_E073', {
   ],
 });
 
+// ─── Tool-Exec Path-Resolution Codes (DECKENT_E075) ─────────────────
+
+registry.set('DECKENT_E075', {
+  message: 'path resolution failed',
+  suggestion: 'This is a filesystem problem (symlink cycle, path too long, or permission denied), not a scope violation — inspect the path directly',
+  whatHappened: 'Deckent tried to resolve the real (symlink-following) filesystem path of a tool-exec argument, and the resolution itself failed before any scope check could run.',
+  why: 'A filesystem-level error — a symlink cycle (ELOOP), a path exceeding the OS length limit (ENAMETOOLONG), or a permission failure (EACCES) — prevented walking the path at all. This is distinct from DECKENT_E005 (scope violation), which only fires once a path resolves successfully to somewhere outside the allowed scope.',
+  howToFix: [
+    'Symlink cycle: trace the chain with `readlink -f <path>` or `ls -la` along each segment and remove the loop',
+    'Path too long: shorten the path or move the target closer to the filesystem root',
+    'Permission denied: check `ls -la` on the path and its parent directories and fix ownership/permissions',
+  ],
+});
+
 // ─── ErrorRegistry API ──────────────────────────────────────────────
 
 export const ErrorRegistry = {

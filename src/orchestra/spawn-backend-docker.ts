@@ -11,7 +11,7 @@ import { homedir, totalmem } from 'node:os';
 import type { ModelType } from '../core/types.js';
 import { getProviderForModel, UnknownModelError } from '../core/task-types.js';
 import { modelRegistry } from '../core/model-registry.js';
-import { getProviderCommandSpec, buildProviderCommand } from '../core/provider-command-spec.js';
+import { getProviderCommandSpec, buildProviderCommand, type ProviderCommandSpec } from '../core/provider-command-spec.js';
 import { createClaudeAdapter } from '../providers/claude.js';
 import { createCodexAdapter } from '../providers/codex.js';
 import { createGeminiAdapter } from '../providers/gemini.js';
@@ -20,6 +20,7 @@ import { TASKS_DIR } from '../core/constants.js';
 import { DECK_FILE_NAME } from '../core/deck-file.js';
 import { debugLog } from '../core/utils.js';
 import { DeckentError } from '../core/errors.js';
+import { normalizeStreamEvent, writeLogEvent } from '../core/log-event.js';
 import {
   acquireSpawnLocks,
   releaseAllSpawnLocks,
@@ -361,7 +362,7 @@ const USAGE_ADAPTER_FACTORIES: Record<string, (root: string) => { extractUsage?:
  * the real usage HERE (at the source, the moment the envelope is captured) is the
  * authoritative fix. No-op + never throws when no parseable envelope is present.
  */
-function patchResultUsageFromEnvelope(
+export function patchResultUsageFromEnvelope(
   tasksDir: string,
   taskId: string,
   model: ModelType,
@@ -389,6 +390,72 @@ function patchResultUsageFromEnvelope(
   } catch (e) {
     debugLog('docker-backend:usage-patch', e);
   }
+}
+
+/**
+ * born-637 (TRACE-CONTENT-PARITY docker-parity): normalize a captured
+ * `docker logs` blob into the structured LogEvent JSONL contract
+ * (`writeLogEvent`/`normalizeStreamEvent`, core/log-event.ts) and write it to
+ * `logPath` — the SAME contract the subprocess backend's reference
+ * implementation targets (spawn-backend-subprocess.ts `captureStreamToLog`),
+ * adapted for a post-exit blob instead of a live stream (`docker logs` only
+ * arrives once the container has already exited — see `monitorContainer`).
+ *
+ * Never throws: a malformed/plain-text line degrades to a `text` event
+ * (`normalizeStreamEvent` never drops), and `writeLogEvent` itself is
+ * fail-safe. Blank lines are skipped (NDJSON inter-record whitespace).
+ *
+ * Exported for unit tests (tests/orchestra/trace-content-parity.test.ts) —
+ * proves a stream-json docker-logs fixture round-trips through
+ * `OutputCollector.readLogEvents` with a non-zero event count.
+ *
+ * @returns The number of LogEvent rows written.
+ */
+export function writeNormalizedDockerLog(logPath: string, logContent: string, provider: string): number {
+  let seq = 1;
+  let written = 0;
+  for (const line of logContent.split(/\r?\n/)) {
+    if (line.trim().length === 0) continue;
+    writeLogEvent(logPath, normalizeStreamEvent(line, provider), seq);
+    seq += 1;
+    written += 1;
+  }
+  return written;
+}
+
+/**
+ * born-637 (TRACE-CONTENT-PARITY docker-parity): docker-container-LOCAL
+ * override of the claude {@link ProviderCommandSpec}'s `baseArgs` —
+ * `--output-format json` (a single final envelope) becomes `--output-format
+ * stream-json` (the full NDJSON event stream) + `--verbose` (required by the
+ * claude CLI alongside `--print` + `stream-json`; mirrors
+ * cli/entry.ts:streamingArgsForProvider's own flag pairing).
+ *
+ * This is a LOCAL clone applied only to the docker-spawned command string —
+ * the shared `PROVIDER_COMMAND_SPECS.claude` (core/provider-command-spec.ts)
+ * is never mutated, so tmux.ts's claude invocation (and any other consumer of
+ * the shared spec) keeps requesting the single envelope, unaffected.
+ *
+ * Why this is safe for token-usage capture: `ClaudeAdapter.extractUsage`
+ * (providers/claude.ts) already scans EVERY line of the captured output for a
+ * usage-bearing JSON payload and keeps the last match — stream-json's final
+ * `type:"result"` NDJSON line carries the identical `usage{...}` shape as the
+ * old single-envelope dump, so real token counts are unchanged (proven by the
+ * usage-patch regression fixture in tests/orchestra/trace-content-parity.test.ts).
+ *
+ * A no-op (returns a shallow copy) when `baseArgs` does not carry
+ * `--output-format json` in the exact expected shape — defensive against a
+ * future spec edit changing the flag pairing out from under this override.
+ *
+ * Exported for unit tests.
+ */
+export function claudeStreamJsonBaseArgs(baseArgs: readonly string[]): string[] {
+  const idx = baseArgs.indexOf('--output-format');
+  if (idx === -1 || baseArgs[idx + 1] !== 'json') return [...baseArgs];
+  const next = [...baseArgs];
+  next[idx + 1] = 'stream-json';
+  next.push('--verbose');
+  return next;
 }
 
 export function getProviderBinaryForModel(model: ModelType): string {
@@ -974,10 +1041,18 @@ export class DockerSpawnBackend implements SpawnBackend {
 
     // Sprint 237/252: wire model name (apiId, e.g. claude-opus-4-8, gpt-5.5), not alias.
     const apiId = modelRegistry.get(model)?.apiId ?? model;
+    // born-637 (TRACE-CONTENT-PARITY docker-parity): claude-only, docker-local
+    // stream-json override — see claudeStreamJsonBaseArgs for why this is safe
+    // (token-usage capture unaffected) and why it does NOT touch the shared
+    // spec (tmux.ts's claude command is untouched). codex/gemini keep spec as-is
+    // (their docker-parity is a tracked follow-up, not silently changed here).
+    const dockerSpec: ProviderCommandSpec = providerBinary === 'claude'
+      ? { ...spec, baseArgs: claudeStreamJsonBaseArgs(spec.baseArgs) }
+      : spec;
     // IMMUTABLE — deckent workers run with full autonomy (autoApprove). The spec
     // maps that to the correct per-provider flag (claude --dangerously-skip-
     // permissions, codex --dangerously-bypass-approvals-and-sandbox, gemini yolo).
-    const workerCmd = buildProviderCommand(spec, apiId, containerPromptPath, {
+    const workerCmd = buildProviderCommand(dockerSpec, apiId, containerPromptPath, {
       // born-471 (ALLOWLIST-SSOT): re-derived from the task's own on-disk
       // scope, not trusted verbatim from opts.allowedTools — see the
       // ALLOWLIST-SSOT block comment above resolveAllowedTools.
@@ -1848,12 +1923,31 @@ export class DockerSpawnBackend implements SpawnBackend {
         const logContent = (logResult.stdout ?? '') + (logResult.stderr ?? '');
         if (logContent.trim()) {
           const logPath = join(tasksDir, `task-${taskId}.log`);
-          writeFileSync(logPath, logContent, 'utf-8');
+          // born-637 (TRACE-CONTENT-PARITY docker-parity): claude's container CLI
+          // now runs `--output-format stream-json` (claudeStreamJsonBaseArgs,
+          // runSpawn) — its docker-logs dump is the FULL NDJSON event stream, not
+          // one final envelope. Normalize-write it into the structured LogEvent
+          // JSONL contract so readLogEvents/recordSprintWorkerTrace (the dashboard
+          // SSE tail + TRN-1 training-trace) see every turn/tool_use/tool_result/
+          // text event instead of zero (the sprint-401 live-trace bug this task
+          // fixes). codex/gemini are UNCHANGED — still the raw dump; their own
+          // docker-parity is a tracked follow-up, not silently regressed.
+          const logProviderBinary = getProviderBinaryForModel(model);
+          if (logProviderBinary === 'claude') {
+            writeNormalizedDockerLog(logPath, logContent, logProviderBinary);
+          } else {
+            writeFileSync(logPath, logContent, 'utf-8');
+          }
           // Patch the .result with REAL token usage parsed from the CLI envelope in the
           // captured container stdout — at the SOURCE, sidestepping the orchestrator
           // enrich-timing race (the .log lands only after the container exits, which can
           // lag the agent-written .result by 20-30s). The agent cannot know its own token
           // counts; they live only in the --output-format json / --json envelope here.
+          // Uses the PRISTINE logContent (not the normalized .log now on disk) —
+          // extractUsage already scans every line for a usage-bearing envelope
+          // (providers/claude.ts), so this stays byte-identical across both the old
+          // single-envelope and the new stream-json format (see the usage-patch
+          // regression fixture in tests/orchestra/trace-content-parity.test.ts).
           patchResultUsageFromEnvelope(tasksDir, taskId, model, logContent);
         }
       } catch (e) { debugLog('docker-backend:log-extract', e); }

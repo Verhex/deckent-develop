@@ -1,5 +1,14 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-402 Learnings
+- Sprint sprint-402 Learnings: ## Sprint sprint-402 Learnings
+- PROMPT-GATE-BLOCK-START — born-628: gate-BLOCK'u start/MCP ana-yoluna taşı: GO_WITH_TECH_DEBT — RED-kanit: pre-fix `grep -c promptGate src/orchestra/sprint-controller.ts` = 0 (captured before any edit) -- runSprint's
+
+## Gains
+- 402-002 — TRACE-CONTENT-PARITY — born-637 (P0): docker-backend trace-içerik kanalı — RED-kanit: 'RED-kanıt: envelope-only .log -> pre-fix davranış' describe-block'unda 2 test — readL...
+- 402-003 — ROUTING-DECISION-JOURNAL — born-622: selectBestAgent skor-dökümü kalıcı-journal'a — RED-kanit: before this task, routeTaskV2 never created .deckent/routing/decisions/ at all -- sele...
+- 402-004 — E005-SPLIT — born-623: path-resolution'a ayrı error-code — RED-kanit: fix'ten once resolveRealPathLenient() bir ELOOP symlink-dongusunde DeckentError('DECKE...
+
 ## Sprint sprint-401 Learnings
 - Sprint sprint-401 Learnings: ## Sprint sprint-401 Learnings
 

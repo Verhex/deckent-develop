@@ -9831,3 +9831,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 401-001: DOC-AFFECTED-GATE — affected-tests kullanım rehberi (DONE)
 
 ---
+## Sprint 402 — sprint-402
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-11
+**Duration:** 964s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 964169ms |
+
+### Tasks
+
+- 402-001: PROMPT-GATE-BLOCK-START — born-628: gate-BLOCK'u start/MCP ana-yoluna taşı (GO_WITH_TECH_DEBT)
+- 402-002: TRACE-CONTENT-PARITY — born-637 (P0): docker-backend trace-içerik kanalı (DONE)
+- 402-003: ROUTING-DECISION-JOURNAL — born-622: selectBestAgent skor-dökümü kalıcı-journal'a (DONE)
+- 402-004: E005-SPLIT — born-623: path-resolution'a ayrı error-code (DONE)
+
+---

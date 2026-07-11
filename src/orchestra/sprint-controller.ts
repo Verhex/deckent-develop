@@ -25,6 +25,7 @@ import type {
   Task, TaskResult, Sprint,
   ResolvedConfig, ProviderName,
 } from '../core/types.js';
+import type { PromptGateResult } from '../core/prompt-gate-types.js';
 
 import { TASKS_DIR } from '../core/constants.js';
 import { CascadeDetector } from '../core/cascade-detector.js';
@@ -606,6 +607,40 @@ export function consultCollisionDecision(
   return decision;
 }
 
+// ═══ Prompt Gate — PLAN-phase BLOCK decision (born-628) ════════════
+
+/**
+ * Decide whether the PLAN-phase G-series prompt gate (`sprint.promptGate`,
+ * computed unconditionally by `planSprint`) should halt `runSprint` — pure,
+ * no I/O, so it is unit-testable without mocking the sprint lifecycle.
+ * WARN-only findings (zero blockers) never block. A BLOCK halts unless
+ * `acknowledgePromptGate` was set (CLI `--force-prompt-gate` / MCP
+ * `acknowledgePromptGate`), exactly mirroring the scope-gate UX immediately
+ * above this call site in `runSprint`.
+ */
+export function decidePromptGateBlock(
+  promptGate: PromptGateResult | undefined,
+  acknowledgePromptGate: boolean | undefined,
+): { blocked: boolean; overridden: boolean; message?: string } {
+  if (!promptGate || promptGate.blockers.length === 0) {
+    return { blocked: false, overridden: false };
+  }
+  const shown = promptGate.blockers.slice(0, 10);
+  const list = shown
+    .map(f => `  • [${f.taskId}] ${f.lint} (${f.agentId}): ${f.message}`)
+    .join('\n');
+  const more = promptGate.blockers.length > shown.length
+    ? `\n  … and ${promptGate.blockers.length - shown.length} more`
+    : '';
+  const message =
+    `Prompt gate: ${promptGate.blockers.length} blocking finding(s):\n${list}${more}\n` +
+    'Override with acknowledgePromptGate=true (MCP) / --force-prompt-gate (CLI) if these are intentional.';
+  if (acknowledgePromptGate) {
+    return { blocked: false, overridden: true, message };
+  }
+  return { blocked: true, overridden: false, message };
+}
+
 // ═══ RunSprintOptions ═════════════════════════════════════════════
 
 export interface RunSprintOptions {
@@ -619,6 +654,15 @@ export interface RunSprintOptions {
    * force-run sprints unless this is explicitly set.
    */
   acknowledgeScopePaths?: boolean;
+  /**
+   * Bypass the plan-time G-series prompt gate BLOCK (persona-capability /
+   * decision-space / scope-contract findings — born-628). When true, a task
+   * whose finalized (persona × intent) fit fails a hard lint is allowed to
+   * spawn anyway (CLI `--force-prompt-gate`, MCP `acknowledgePromptGate`).
+   * WARN-level findings never block regardless of this flag. Mirrors
+   * `acknowledgeScopePaths` — independent of the cost-gate `--force`.
+   */
+  acknowledgePromptGate?: boolean;
   testMode?: boolean;
   skipCleanup?: boolean;
   timeoutMs?: number;
@@ -1216,6 +1260,28 @@ export async function runSprint(
     } catch (e) {
       if (e instanceof BrainError) throw e; // scope-gate block — propagate to caller
       debugLog('runSprint:scopeGate', e);   // git/other failure → fail-open
+    }
+
+    // ─── PRE-SPAWN PROMPT GATE (born-628 — top-layer zero-consumer fix) ─────
+    // `sprint.promptGate` (G-series persona/decision-space/scope-contract
+    // findings) is already computed by planSprint() on EVERY plan path,
+    // including this one — but until now only `deckent plan`
+    // (src/cli/commands/plan.ts) ever read it and blocked. `deckent start` /
+    // MCP `deckent_start` planned straight past an unacknowledged BLOCK.
+    // Mirrors the scope-gate UX immediately above: WARN findings never block;
+    // a BLOCK halts PLAN unless `opts.acknowledgePromptGate` was set (CLI
+    // --force-prompt-gate / MCP acknowledgePromptGate).
+    {
+      const promptGateDecision = decidePromptGateBlock(sprint.promptGate, opts?.acknowledgePromptGate);
+      if (promptGateDecision.blocked) {
+        releaseSprintLock(projectRoot);
+        clearActiveSprint();
+        clearSprintState(projectRoot);
+        throw new BrainError(promptGateDecision.message ?? 'Prompt gate blocked the sprint.', SprintPhase.PLAN);
+      }
+      if (promptGateDecision.overridden) {
+        console.warn(promptGateDecision.message);
+      }
     }
 
     // Human Checkpoint: PLAN

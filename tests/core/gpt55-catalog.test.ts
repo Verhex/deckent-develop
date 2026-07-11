@@ -74,6 +74,91 @@ describe('model-registry: CODEX_PARITY_MODELS (gpt-5.5)', () => {
   });
 });
 
+describe('model-registry: gpt-5.6 family (Alperen 2026-07-11, feed-verified)', () => {
+  const FAMILY = [
+    { id: 'gpt-5.6', tier: 'premium', cost: { input: 5, output: 30 } },
+    { id: 'gpt-5.6-sol', tier: 'premium', cost: { input: 5, output: 30 } },
+    { id: 'gpt-5.6-terra', tier: 'standard', cost: { input: 2.5, output: 15 } },
+    { id: 'gpt-5.6-luna', tier: 'economy', cost: { input: 1, output: 6 } },
+  ] as const;
+
+  it('declares all four with feed-verified fields, out of BUILTIN_MODELS', () => {
+    for (const { id, tier, cost } of FAMILY) {
+      expect(BUILTIN_MODELS.some(m => m.id === id)).toBe(false);
+      const def = CODEX_PARITY_MODELS.find(m => m.id === id);
+      expect(def, id).toBeDefined();
+      expect(def!.apiId).toBe(id);
+      expect(def!.provider).toBe('codex');
+      expect(def!.tier).toBe(tier);
+      expect(def!.contextWindow).toBe(1_050_000);
+      expect(def!.maxOutputTokens).toBe(128_000);
+      expect(def!.costPerMillion).toEqual(cost);
+      expect(def!.capabilities.reasoning).toBe(true);
+    }
+  });
+
+  it('registerCodexParityModels() makes the family first-class on a fresh registry', () => {
+    const registry = new ModelRegistry();
+    registerCodexParityModels(registry);
+    for (const { id, tier } of FAMILY) {
+      expect(registry.has(id), id).toBe(true);
+      expect(registry.resolveApiId(id)).toBe(id);
+      expect(registry.getTier(id)).toBe(tier);
+    }
+  });
+
+  it('providers/codex.ts module-load registers the parity catalog on the GLOBAL registry (half-wire closed 2026-07-11)', async () => {
+    // Before 2026-07-11 registerCodexParityModels had ZERO callers in src/ —
+    // gpt-5.5 was reachable only via the legacy gpt-5 apiId shim. The codex
+    // provider module now registers the family at import time (mirrors
+    // providers/ollama.ts). Importing the module must be sufficient.
+    await import('../../src/providers/codex.js');
+    const { modelRegistry } = await import('../../src/core/model-registry.js');
+    for (const id of ['gpt-5.5', 'gpt-5.6', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']) {
+      expect(modelRegistry.has(id), id).toBe(true);
+    }
+  });
+});
+
+describe('pricing-data-baseline.json: providers.openai.models gpt-5.6 family', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'deckent-gpt56-catalog-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('ships feed-verified entries with per-model aliases', () => {
+    const config = loadCostConfig(tmpDir, { forceReload: true });
+    const cases: Array<[string, number, number, string, string[]]> = [
+      ['gpt-5.6', 0.000005, 0.00003, 'premium', ['gpt-5.6', 'gpt56']],
+      ['gpt-5.6-sol', 0.000005, 0.00003, 'premium', ['gpt-5.6-sol', 'gpt56-sol', 'sol']],
+      ['gpt-5.6-terra', 0.0000025, 0.000015, 'standard', ['gpt-5.6-terra', 'gpt56-terra', 'terra']],
+      ['gpt-5.6-luna', 0.000001, 0.000006, 'economy', ['gpt-5.6-luna', 'gpt56-luna', 'luna']],
+    ];
+    for (const [id, inCost, outCost, tier, aliases] of cases) {
+      const pricing = config.providers.openai?.models[id];
+      expect(pricing, id).toBeDefined();
+      expect(pricing!.input_cost_per_token).toBe(inCost);
+      expect(pricing!.output_cost_per_token).toBe(outCost);
+      expect(pricing!.deckent_tier).toBe(tier);
+      expect(pricing!.deckent_aliases).toEqual(aliases);
+      // unit-safety pin (per-token, not per-MTok)
+      expect(pricing!.input_cost_per_token).toBeLessThan(0.01);
+    }
+  });
+
+  it('is resolvable via findModel() by short alias (sol/terra/luna)', () => {
+    const config = loadCostConfig(tmpDir, { forceReload: true });
+    expect(findModel(config, 'sol')?.modelId).toBe('gpt-5.6-sol');
+    expect(findModel(config, 'terra')?.modelId).toBe('gpt-5.6-terra');
+    expect(findModel(config, 'luna')?.modelId).toBe('gpt-5.6-luna');
+  });
+});
+
 describe('pricing-data-baseline.json: providers.openai.models["gpt-5.5"]', () => {
   let tmpDir: string;
 

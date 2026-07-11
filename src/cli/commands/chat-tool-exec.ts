@@ -200,11 +200,22 @@ export function resolveRealPathLenient(absPath: string): string {
       let st;
       try {
         st = lstatSync(resolved);
-      } catch {
-        break; // not on disk yet — nothing to resolve, keep literal.
+      } catch (err) {
+        const code = err instanceof Error && 'code' in err ? (err as NodeJS.ErrnoException).code : undefined;
+        // ENOENT/ENOTDIR — segment doesn't exist yet (e.g. a new file being
+        // created): nothing to resolve, keep literal, same as before. Any
+        // OTHER fs error (EACCES, ENAMETOOLONG, ...) is a genuine
+        // path-resolution failure, not a "doesn't exist yet" — born-623:
+        // surface it as DECKENT_E075, never silently swallowed.
+        if (code === 'ENOENT' || code === 'ENOTDIR') break;
+        throw new DeckentError('DECKENT_E075', `path resolution failed at "${resolved}"${code ? `: ${code}` : ''}`);
       }
       if (!st.isSymbolicLink()) break;
-      if (++depth > MAX_SYMLINK_DEPTH) throw new DeckentError('DECKENT_E005', 'ELOOP: too many symlink levels');
+      // born-623: an ELOOP symlink-cycle is a filesystem path-resolution
+      // failure, not a scope violation — DECKENT_E075, not DECKENT_E005
+      // (397-007 conflated the two, misdiagnosing operators toward "scope
+      // exceeded" when the real problem was a broken/cyclic symlink).
+      if (++depth > MAX_SYMLINK_DEPTH) throw new DeckentError('DECKENT_E075', 'ELOOP: too many symlink levels');
       const target = readlinkSync(resolved);
       resolved = isAbsolute(target) ? target : resolve(dirname(resolved), target);
     }
@@ -224,15 +235,19 @@ export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDis
   const confirm = opts.confirm ?? (async () => true);
   const bashRun = opts.bashRun ?? ((cmd: string, cwd: string) => defaultBashRun(cmd, cwd, { timeoutMs: opts.bashTimeoutMs }));
 
-  // cwd dışına çıkışı engelle (path traversal). Geçerli mutlak yolu döner ya da null.
+  // cwd dışına çıkışı engelle (path traversal). Geçerli mutlak yolu döner;
+  // boş/geçersiz girdide null; gerçek scope-ihlalinde DECKENT_E005, path
+  // fs-çözüm hatasında (symlink döngüsü vb.) DECKENT_E075 fırlatır — ikisi
+  // dispatch()'in dış catch'inde ayrı kodlarla yakalanır (born-623).
   const inScope = (p: string): string | null => {
     if (typeof p !== 'string' || p.length === 0) return null;
     const cwd = resolveCwd();
     const abs = isAbsolute(p) ? p : resolve(cwd, p);
     const rel = relative(cwd, abs);
     if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) {
-      // rel === '' → cwd'nin kendisi (dosya değil); '..' → dışarı.
-      return rel === '' ? null : null;
+      // rel === '' → cwd'nin kendisi (dosya değil); '..' → dışarı. Both are
+      // a genuine out-of-scope target — DECKENT_E005.
+      throw new DeckentError('DECKENT_E005', `path escapes scope: ${p}`);
     }
     // Symlink-escape guard (born-536): the textual check above only proves
     // the REQUESTED path spells out somewhere under cwd — a symlink placed
@@ -240,17 +255,17 @@ export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDis
     // real target outside cwd, and writeFileSync/readFileSync follow that
     // symlink at the OS level. Resolve both sides through the same
     // symlink-aware resolver and compare the REAL paths too.
-    let realCwd: string;
-    let realAbs: string;
-    try {
-      realCwd = resolveRealPathLenient(cwd);
-      realAbs = resolveRealPathLenient(abs);
-    } catch {
-      return null; // e.g. symlink cycle — fail closed.
-    }
+    //
+    // born-623: resolveRealPathLenient throws DECKENT_E075 for a genuine
+    // fs-resolution failure (symlink cycle, EACCES, ENAMETOOLONG, ...) — let
+    // that propagate as-is, it is NOT a scope violation and must not be
+    // relabeled as one. Only a path that resolves successfully to somewhere
+    // outside cwd is a real DECKENT_E005 scope violation.
+    const realCwd = resolveRealPathLenient(cwd);
+    const realAbs = resolveRealPathLenient(abs);
     const realRel = relative(realCwd, realAbs);
     if (realRel === '' || realRel.startsWith('..') || isAbsolute(realRel)) {
-      return null;
+      throw new DeckentError('DECKENT_E005', `path escapes scope via symlink: ${p}`);
     }
     return abs;
   };
@@ -308,6 +323,13 @@ export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDis
             return `[mcp-error] unknown tool: ${name}`;
         }
       } catch (err) {
+        // born-623: surface the DeckentError code (E005 scope-violation vs.
+        // E075 path-resolution-failure) so callers can tell "operator
+        // exceeded scope" apart from "filesystem couldn't resolve the path"
+        // instead of both collapsing into one indistinguishable message.
+        if (err instanceof DeckentError) {
+          return `[mcp-error] ${name}: [${err.code}] ${err.message}`;
+        }
         const msg = err instanceof Error ? err.message : String(err);
         return `[mcp-error] ${name}: ${msg}`;
       }

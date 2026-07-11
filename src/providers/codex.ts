@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import type { ModelType, OpenAIModel } from '../core/types.js';
 import { isOpenAIModel } from '../core/types.js';
 import { PROVIDER_PACKAGES } from '../core/provider-packages.js';
-import { modelRegistry } from '../core/model-registry.js';
+import { modelRegistry, registerCodexParityModels } from '../core/model-registry.js';
 import type { ProviderAdapter, ProviderSpawnOptions, ProviderAvailabilityDetail } from '../core/provider.js';
 import { ProviderError, resolveBinaryPath, parseSemverFromOutput, buildCliInvocation } from '../core/provider.js';
 import { normalizeUsage, type TokenUsage } from '../core/token-usage.js';
@@ -24,6 +24,15 @@ import { TASKS_DIR } from '../core/constants.js';
 import type { ModelTier } from '../core/model-equivalence.js';
 import { getModelForProviderTier } from '../core/model-equivalence.js';
 import { killProcessGroupWithEscalation } from './subprocess.js';
+
+// Side-effect: register the Codex parity catalog (gpt-5.5 + gpt-5.6 family)
+// into the singleton registry the first time this module is imported —
+// mirrors `registerOllamaModels(modelRegistry)` in providers/ollama.ts.
+// Until 2026-07-11 this function had ZERO callers (half-wire): `gpt-5.5` was
+// reachable only through the legacy `id: 'gpt-5'` builtin whose apiId remaps
+// to gpt-5.5 (Sprint-248 shim). First-class ids are now directly addressable
+// (`--model gpt-5.6-sol` etc.); the gpt-5 shim stays for backward-compat.
+registerCodexParityModels(modelRegistry);
 
 // ─── Constants ───────────────────────────────────────────────────────
 

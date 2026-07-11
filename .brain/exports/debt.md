@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-402-001 | Tech debt from 402-001: RED-kanit: pre-fix `grep -c promptGate src/orchestra/spr | normal | sprint-402 | resolved |
 | debt-399-001 | Tech debt from 399-001: Rule-5 is now trackedRootFiles-aware: sanitizeScope(file | normal | sprint-399 | resolved |
 | debt-399-002 | Tech debt from 399-002: Implemented as specified: (a) STACK_COMMANDS type gained | normal | sprint-399 | resolved |
 | debt-399-003 | Tech debt from 399-003: Added resolveSuggestions?:boolean (default false) to Sco | normal | sprint-399 | resolved |

@@ -29,9 +29,13 @@ const ACTIVE_AGENT_IDS = new Set([
 ]);
 
 describe('AGENT_FALLBACK_CHAIN', () => {
-  it('T1: core-dev (implementation) → architect', () => {
+  // born-638 (2026-07-11): construction-intent fallbacks must be Write-capable.
+  // architect denies Write (agent.json deniedTools:['Write']) — routing a
+  // construction task there produced a persona that cannot write the diff
+  // (surfaced live by the born-628 prompt-gate on the runSprint path).
+  it('T1: core-dev (implementation) → refactorer (Write-capable; architect denies Write)', () => {
     const result = selectAgentByFallback('implementation', ACTIVE_AGENT_IDS);
-    expect(result).toBe('architect');
+    expect(result).toBe('refactorer');
   });
 
   it('T2: documentation → doc-writer', () => {
@@ -58,16 +62,16 @@ describe('AGENT_FALLBACK_CHAIN', () => {
     expect(ACTIVE_AGENT_IDS.has('test-writer')).toBe(false);
   });
 
-  it('T7: unknown primary → fallback architect', () => {
+  it('T7: unknown primary → fallback bug-fixer (Write-capable, born-638)', () => {
     const result = selectAgentByFallback('unknown', ACTIVE_AGENT_IDS);
-    expect(result).toBe('architect');
+    expect(result).toBe('bug-fixer');
   });
 
-  it('T8: unknown/legacy intent routes to architect (not test-writer)', () => {
+  it('T8: unknown/legacy intent routes to bug-fixer (not test-writer)', () => {
     // Even if a legacy 'testing' string somehow arrives, fallback handles it safely
     // (testing was removed from IntentType in T-148-003)
     const result = selectAgentByFallback('unknown', ACTIVE_AGENT_IDS);
-    expect(result).toBe('architect');
+    expect(result).toBe('bug-fixer');
     expect(result).not.toBe('test-writer');
   });
 
@@ -83,17 +87,17 @@ describe('AGENT_FALLBACK_CHAIN', () => {
   });
 
   it('first unavailable agent skipped, second in chain used', () => {
-    // Remove architect from active set
+    // Remove refactorer from active set
     const limitedSet = new Set(ACTIVE_AGENT_IDS);
-    limitedSet.delete('architect');
+    limitedSet.delete('refactorer');
     const result = selectAgentByFallback('implementation', limitedSet);
-    expect(result).toBe('refactorer'); // second in chain
+    expect(result).toBe('bug-fixer'); // second in chain
   });
 
-  it('all agents unavailable → ultimate fallback architect (string)', () => {
+  it('all agents unavailable → ultimate fallback bug-fixer (Write-capable, born-638)', () => {
     const emptySet = new Set<string>();
     const result = selectAgentByFallback('documentation', emptySet);
     // doc-writer not in empty set, ultimate fallback
-    expect(result).toBe('architect');
+    expect(result).toBe('bug-fixer');
   });
 });

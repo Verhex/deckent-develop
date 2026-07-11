@@ -97,12 +97,12 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
   {
     id: 'gpt-5',
     // Sprint 248 (Provider Parity): the deckent-facing id stays `gpt-5` (premium
-    // codex slot — preserves the 13-model invariant + tier maps), but the wire
-    // model is `gpt-5.5`, the current ChatGPT-subscription frontier. A bare
-    // `--model gpt-5` is rejected by codex with a ChatGPT account
-    // ("model is not supported"); `gpt-5.5` is accepted. The CodexAdapter sends
-    // `resolveApiId(model)` so this mapping reaches the CLI. Full first-class
-    // gpt-5.5/gpt-5.4-mini ids + per-auth-mode maps are the auto-detect feature.
+    // codex slot — preserves the builtin-count invariant + tier maps), but the
+    // wire model is `gpt-5.5`. LEGACY ALIAS-SLOT (2026-07-11, Alperen): first-class
+    // `gpt-5.5` + the gpt-5.6 family are now registered at codex module-load via
+    // `registerCodexParityModels()` (see providers/codex.ts) — new work should
+    // address models by their real ids; this entry remains only so existing
+    // configs/task-JSONs that say `gpt-5` keep working.
     apiId: 'gpt-5.5',
     provider: 'codex',
     tier: 'premium',
@@ -225,6 +225,56 @@ export const CODEX_PARITY_MODELS: readonly ModelDefinition[] = [
     tier: 'premium',
     contextWindow: 1_050_000,
     costPerMillion: { input: 5, output: 30 },
+    capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: true },
+    status: 'ga',
+    maxOutputTokens: 128_000,
+  },
+  // gpt-5.6 family (Alperen, 2026-07-11). Values verified against the live
+  // LiteLLM feed same-day (keys "gpt-5.6" / "gpt-5.6-sol" / "gpt-5.6-terra" /
+  // "gpt-5.6-luna", litellm_provider: openai, mode: chat, ctx 1,050,000,
+  // max_output 128k, supports_reasoning true for all four).
+  // `gpt-5.6-sol` is the designated cross-verify counterpart for comprehensive
+  // analyses (XVER-1 Anthropic↔OpenAI çapraz-doğrulama).
+  {
+    id: 'gpt-5.6',
+    apiId: 'gpt-5.6',
+    provider: 'codex',
+    tier: 'premium',
+    contextWindow: 1_050_000,
+    costPerMillion: { input: 5, output: 30 },
+    capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: true },
+    status: 'ga',
+    maxOutputTokens: 128_000,
+  },
+  {
+    id: 'gpt-5.6-sol',
+    apiId: 'gpt-5.6-sol',
+    provider: 'codex',
+    tier: 'premium',
+    contextWindow: 1_050_000,
+    costPerMillion: { input: 5, output: 30 },
+    capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: true },
+    status: 'ga',
+    maxOutputTokens: 128_000,
+  },
+  {
+    id: 'gpt-5.6-terra',
+    apiId: 'gpt-5.6-terra',
+    provider: 'codex',
+    tier: 'standard',
+    contextWindow: 1_050_000,
+    costPerMillion: { input: 2.5, output: 15 },
+    capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: true },
+    status: 'ga',
+    maxOutputTokens: 128_000,
+  },
+  {
+    id: 'gpt-5.6-luna',
+    apiId: 'gpt-5.6-luna',
+    provider: 'codex',
+    tier: 'economy',
+    contextWindow: 1_050_000,
+    costPerMillion: { input: 1, output: 6 },
     capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: true },
     status: 'ga',
     maxOutputTokens: 128_000,

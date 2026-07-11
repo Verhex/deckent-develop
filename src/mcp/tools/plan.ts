@@ -90,6 +90,19 @@ export function registerPlanTool(server: McpServer): void {
       const modelDistribution = computeModelDistribution(tasks);
       const riskAssessment = computeRiskAssessment(tasks.length);
 
+      // born-628: surface the G-series plan-time prompt gate (persona /
+      // decision-space / scope-contract findings, already computed by
+      // planSprint()) in the MCP response — previously only `deckent plan`
+      // (CLI) rendered it; deckent_plan callers had zero visibility that
+      // deckent_start would later halt PLAN on an unacknowledged BLOCK.
+      const promptGate = sprint.promptGate
+        ? {
+          ok: sprint.promptGate.ok,
+          findings: sprint.promptGate.findings,
+          blockerCount: sprint.promptGate.blockers.length,
+        }
+        : undefined;
+
       const baseResponse = {
         sprintId: sprint.id,
         sprintNumber: sprint.number,
@@ -104,10 +117,16 @@ export function registerPlanTool(server: McpServer): void {
         waveBreakdown,
         modelDistribution,
         riskAssessment,
+        promptGate,
       };
 
       const enrichedPlan = enrichResponse('plan', baseResponse);
-      const summary = formatPlanResponse(baseResponse);
+      let summary = formatPlanResponse(baseResponse);
+      if (promptGate && promptGate.blockerCount > 0) {
+        summary += ` ⚠ Prompt gate: ${promptGate.blockerCount} blocking finding(s) — `
+          + '`deckent start` will halt at PLAN unless re-run with acknowledgePromptGate=true '
+          + '(CLI: --force-prompt-gate).';
+      }
 
       return {
         content: [{
