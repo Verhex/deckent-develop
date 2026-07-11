@@ -32,6 +32,7 @@ import {
   planInstall,
 } from '../../core/provisioner.js';
 import { print, printError } from '../helpers/output.js';
+import { DeckentError } from '../../core/errors.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { detectAvailableProviders } from '../../core/provider.js';
@@ -419,7 +420,7 @@ export function registerInit(program: Command): void {
           // *silently*, writing nothing to disk. Fail honestly instead.
           if (!process.stdin.isTTY) {
             language = detectSystemLanguage();
-            throw new Error(getMessage('init.non_interactive_requires_yes', language));
+            throw new DeckentError('DECKENT_E004', getMessage('init.non_interactive_requires_yes', language));
           }
 
           language = await promptSelect('Select language / Dil seçin:', [

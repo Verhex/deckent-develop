@@ -804,9 +804,13 @@ describe('Init wizard integration', () => {
   let cwdSpy: ReturnType<typeof vi.spyOn>;
   let stdoutSpy: ReturnType<typeof vi.spyOn>;
   let stderrSpy: ReturnType<typeof vi.spyOn>;
+  const originalStdinIsTTY = process.stdin.isTTY;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // 413-001 non-TTY gate: these integration tests drive the INTERACTIVE
+    // wizard through mocked prompts, so declare a TTY (CI has none).
+    Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true });
     root = mkdtempSync(join(tmpdir(), 'deckent-init-'));
     cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(root);
     stdoutSpy = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
@@ -815,6 +819,7 @@ describe('Init wizard integration', () => {
   });
 
   afterEach(() => {
+    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true });
     cwdSpy.mockRestore();
     stdoutSpy.mockRestore();
     stderrSpy.mockRestore();

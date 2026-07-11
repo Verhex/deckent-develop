@@ -214,3 +214,6 @@ claude-fable-x.md
 .tmp-npm/
 .test-archive-debt-*/
 .deckent/stats/
+
+# Alperen (2026-07-12): bot ses-deneyi — lokal kalir, repoya girmez
+examples/voice-wrapper/
