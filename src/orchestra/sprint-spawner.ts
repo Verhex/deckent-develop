@@ -105,6 +105,9 @@ import { SpawnBackendFactory } from './spawn-backend.js';
 import { resolveReasoningEffort } from '../core/reasoning-effort.js';
 import { bootstrapProviders } from '../core/provider.js';
 
+// ─── Canonical Spawn Executor (SCHED3, born-634/635) ──────────────
+import { executeSpawnTask } from './scheduler-effects.js';
+
 // ─── Tmux ────────────────────────────────────────────────────────
 import { ensureSession, spawnWorker } from './tmux.js';
 
@@ -944,148 +947,51 @@ export async function respawnEligibleTasks(
       await sleep(delayMs);
     }
 
-    const agentPrompt = await resolveAgentPrompt(projectRoot, task);
-    const taskSkillPrompts = await resolveSkillPrompts(projectRoot, task);
-    const prompt = buildWorkerPrompt(task, agentPrompt, taskSkillPrompts, projectRoot);
-    const writeTargets = buildAllowedWriteTargets(task);
-    const allowedTools = writeTargets.length > 0
-      ? `Read,Write(${writeTargets.join(',')}),Edit(${writeTargets.join(',')}),Bash,Glob,Grep`
-      : 'Read,Write,Edit,Bash,Glob,Grep';
-
-    // Sprint 361 Task 361-005 (FIX-MODEL-PRESERVE, born-476): same inheritance
-    // guarantee as spawnWorkers() — a fix-task respawned through the wave/
-    // dependency-unblock path must not lose its provider/backend/modelEffort
-    // pin either. Must run before resolveTaskProvider() below.
-    preserveFixTaskRoutingFields(projectRoot, sprint.id, task);
-
-    const taskProvider = resolveTaskProvider(task);
-
-    // Sprint 156 Task 012 — observability for fresh-eyes rotation on fix tasks
+    // Sprint 156 Task 012 — observability for fresh-eyes rotation on fix tasks.
+    // Kept here (wave-level metric side effect) — SCHED3 dilim-3 explicitly
+    // does not move metrics/events into the canonical executor.
     emitRotationMetricIfApplicable(projectRoot, sprint.id, task);
 
-    // Sprint 234 AS-2 Faz 2: same host-HTTP adapter routing as `spawnWorkers`.
-    // Wave-2+ respawns must honor the predicate so ollama tasks promoted from
-    // PENDING during dependency unblock also reach the host adapter.
-    // Sprint 252 (PSL-1 verify): `- Backend: docker|tmux|subprocess` forces a
-    // host-adapter provider (codex/gemini/ollama) onto a real spawn backend
-    // instead of its host CLI — exercises the ProviderCommandSpec + per-provider
-    // OAuth mount in the container. Uses the existing backend vocabulary (no
-    // invented 'host' value; host-vs-cloud is a separate axis). Default
-    // (undefined) keeps host-adapter routing unchanged.
-    const wantsHostAdapter = isAdapterProvider(taskProvider) && !task.backend;
-    // Honest per-task backend resolution: when `- Backend:` is set and DIFFERS
-    // from the configured spawn_backend, resolve THAT backend (so the override is
-    // truthful, not silently the configured one). When it matches config (the
-    // common case, e.g. `- Backend: docker` under spawn_backend=docker), reuse the
-    // already-resolved/injected `backend` — preserves the spawnOpts injection
-    // path (tests, controller) and avoids re-creating an identical backend.
-    const effectiveBackend: SpawnBackend | undefined =
-      task.backend && task.backend !== config.spawn_backend
-        ? SpawnBackendFactory.create({
-            backend: task.backend,
-            projectDir: projectRoot,
-            dockerImage: config.docker_image,
-            dockerTimeoutSeconds: config.docker_timeout,
-            dockerMemoryLimit: config.worker_memory_limit,
-          })
-        : backend;
-    // F1-RE (Sprint 252): resolve the model reasoning-effort (opt-in, provider-
-    // validated) once; passed to every spawn path below. undefined → no flag.
-    const reasoningEffort = resolveReasoningEffort(taskProvider, task.modelEffort);
-    // F3.1: prefix-stable claude system prompt (config-global, default true). Passed
-    // to every spawn path; only claude arg-builders emit the flag, others ignore it.
-    const excludeDynamicPromptSections = config.prompt?.exclude_dynamic_system_prompt_sections !== false;
-    // Sprint 280 root-cause fix: compute + emit the adaptive per-task timeout and
-    // pass it to the spawn backend below as `taskTimeoutSeconds`, so docker_timeout
-    // is the FALLBACK (not the de-facto ~20min cap). emitTimeoutEvents was dormant.
-    // Fail-safe: the estimate is best-effort — any fault (e.g. a partial config
-    // with no `timeout` block) must NOT abort the spawn; leave taskTimeoutSeconds
-    // undefined so the backend uses its static docker_timeout fallback.
+    // Sprint 280 root-cause fix: compute + emit the adaptive per-task timeout
+    // and forward it to executeSpawnTask as `taskTimeoutSeconds`, so
+    // docker_timeout is the FALLBACK (not the de-facto ~20min cap).
+    // Fail-safe: the estimate is best-effort — any fault (e.g. a partial
+    // config with no `timeout` block) must NOT abort the spawn; leave
+    // taskTimeoutSeconds undefined so the backend uses its static fallback.
     let taskTimeoutSeconds: number | undefined;
     try {
       taskTimeoutSeconds = emitTimeoutEvents(
         task, config, sprintHistory, projectRoot, getCurrentSprintId(projectRoot) ?? sprint.id,
       );
     } catch (e) { debugLog('spawn:timeoutEstimate', e); }
-    let adapterRouted = wantsHostAdapter
-      ? getProviderAdapterForTask(taskProvider)
-      : null;
-    // MF-2 lazy re-check (Sprint 252): a host-only provider may not have been
-    // registered at bootstrap (e.g. the ollama daemon came up AFTER sprint start,
-    // or a transient detection miss). Re-run the idempotent bootstrap ONCE and
-    // re-resolve — this lets a now-available provider run instead of honest-failing
-    // it. Best-effort: on fault we keep null and fall through to the honest-fail.
-    if (wantsHostAdapter && !adapterRouted) {
-      try {
-        await bootstrapProviders(config, projectRoot);
-        adapterRouted = getProviderAdapterForTask(taskProvider);
-      } catch (e) {
-        debugLog('spawn:lazyAdapterRebootstrap', e);
-      }
-    }
-    if (adapterRouted) {
-      const refresh = (adapterRouted as { refreshSupportedModels?: () => Promise<void> }).refreshSupportedModels;
-      if (typeof refresh === 'function') {
-        await refresh.call(adapterRouted);
-      }
-      adapterRouted.spawn(task.id, task.model, prompt, {
-        allowedTools,
-        autoApprove: spawnOpts?.autoApprove ?? false,
-        projectDir: projectRoot,
-        reasoningEffort,
-        excludeDynamicPromptSections,
-        taskTimeoutSeconds,
-        env: buildWorkerApprovalGateEnv(config.approval?.gate_enabled === true, task.sprintId, task.id),
-      });
-    } else if (wantsHostAdapter) {
-      // MF-2 (Sprint 250): FIX-phase re-spawn of a host-only provider whose
-      // adapter is missing — this is exactly how Sprint 249 gemini 010/013
-      // degraded to claude via docker. Honest NO_GO instead of silent degrade.
-      writeProviderUnavailableNoGo(task, projectRoot);
-      task.status = TaskStatus.NO_GO;
-      try {
-        writeFileSync(
-          join(projectRoot, TASKS_DIR, `task-${task.id}.json`),
-          JSON.stringify(task, null, 2),
-          'utf-8',
-        );
-      } catch (e) { debugLog('respawnEligibleTasks:honestFailWrite', e); }
-      continue;
-    } else if (effectiveBackend) {
-      effectiveBackend.spawn(task.id, task.model, prompt, {
-        allowedTools,
-        autoApprove: spawnOpts?.autoApprove ?? false,
-        projectDir: projectRoot,
-        reasoningEffort,
-        excludeDynamicPromptSections,
-        taskTimeoutSeconds,
-      });
-    } else if (!isTmuxProvider(taskProvider)) {
-      const adapter = getProviderAdapterForTask(taskProvider);
-      if (adapter) {
-        adapter.spawn(task.id, task.model, prompt, {
-          allowedTools,
-          autoApprove: spawnOpts?.autoApprove ?? false,
-          projectDir: projectRoot,
-          env: buildWorkerApprovalGateEnv(config.approval?.gate_enabled === true, task.sprintId, task.id),
-        });
-      }
-    } else {
-      spawnWorker(task.id, task.model, prompt, projectRoot, {
-        allowedTools,
-        autoApprove: spawnOpts?.autoApprove ?? false,
-        excludeDynamicPromptSections,
-      });
-    }
 
-    task.status = TaskStatus.EXECUTING;
-    try {
-      writeFileSync(
-        join(projectRoot, TASKS_DIR, `task-${task.id}.json`),
-        JSON.stringify(task, null, 2),
-        'utf-8',
-      );
-    } catch (e) { debugLog('respawnEligibleTasks:writeTaskFile', e); }
+    // SCHED3 (born-634/635, docs/analysis/scheduler-unify-design-2026-07-11.md):
+    // single canonical executor — fix-routing-lineage inheritance, prompt/
+    // provider/backend/reasoning-effort resolution, backend dispatch, and
+    // task persistence all happen inside executeSpawnTask now (previously
+    // duplicated inline here AND diverged from the local queue path's
+    // spawnIfNotAssigned in result-collector.ts).
+    const disposition = await executeSpawnTask(
+      { task, taskTimeoutSeconds },
+      {
+        projectRoot,
+        sprintFallbackId: sprint.id,
+        config,
+        spawnOpts,
+        backend,
+        resolveAgentPrompt,
+        resolveSkillPrompts,
+        buildWriteTargets: buildAllowedWriteTargets,
+      },
+    );
+
+    if (disposition.kind === 'routing-lineage-missing') {
+      debugLog('respawnEligibleTasks:routingLineageMissing', disposition.detail);
+      continue;
+    }
+    if (disposition.kind === 'provider-unavailable') {
+      continue;
+    }
 
     spawnedThisWave++;
   }

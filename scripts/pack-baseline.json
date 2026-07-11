@@ -1,0 +1,179 @@
+{
+  "generatedAt": "2026-07-11T20:10:52.571Z",
+  "totalBytes": 12631066,
+  "totalFiles": 1853,
+  "categories": {
+    ".::asset": {
+      "count": 1,
+      "bytes": 1073
+    },
+    ".::.md": {
+      "count": 1,
+      "bytes": 20967
+    },
+    "assets::asset": {
+      "count": 1,
+      "bytes": 2466
+    },
+    "dist/agent::.md": {
+      "count": 1,
+      "bytes": 734
+    },
+    "dist/agent::.d.ts": {
+      "count": 22,
+      "bytes": 29125
+    },
+    "dist/agent::.js": {
+      "count": 22,
+      "bytes": 74235
+    },
+    "dist/agents::.d.ts": {
+      "count": 27,
+      "bytes": 75347
+    },
+    "dist/agents::.js": {
+      "count": 27,
+      "bytes": 234743
+    },
+    "dist/api::.d.ts": {
+      "count": 40,
+      "bytes": 76898
+    },
+    "dist/api::.js": {
+      "count": 40,
+      "bytes": 322493
+    },
+    "dist/cli::.d.ts": {
+      "count": 174,
+      "bytes": 435175
+    },
+    "dist/cli::.js": {
+      "count": 174,
+      "bytes": 2007150
+    },
+    "dist/cli::asset": {
+      "count": 1,
+      "bytes": 195
+    },
+    "dist/connectors::.d.ts": {
+      "count": 62,
+      "bytes": 122623
+    },
+    "dist/connectors::.js": {
+      "count": 62,
+      "bytes": 264639
+    },
+    "dist/connectors::.md": {
+      "count": 1,
+      "bytes": 4418
+    },
+    "dist/core::.d.ts": {
+      "count": 248,
+      "bytes": 932924
+    },
+    "dist/core::.js": {
+      "count": 248,
+      "bytes": 2042548
+    },
+    "dist/core::.json": {
+      "count": 49,
+      "bytes": 102713
+    },
+    "dist/core::.md": {
+      "count": 54,
+      "bytes": 250782
+    },
+    "dist/dashboard::.js": {
+      "count": 13,
+      "bytes": 1238432
+    },
+    "dist/dashboard::asset": {
+      "count": 4,
+      "bytes": 142834
+    },
+    "dist/extensions::.d.ts": {
+      "count": 4,
+      "bytes": 9895
+    },
+    "dist/extensions::.js": {
+      "count": 4,
+      "bytes": 15705
+    },
+    "dist::.d.ts": {
+      "count": 1,
+      "bytes": 142
+    },
+    "dist::.js": {
+      "count": 1,
+      "bytes": 142
+    },
+    "dist/mcp-client::.d.ts": {
+      "count": 4,
+      "bytes": 6172
+    },
+    "dist/mcp-client::.js": {
+      "count": 4,
+      "bytes": 10430
+    },
+    "dist/mcp::.d.ts": {
+      "count": 55,
+      "bytes": 27296
+    },
+    "dist/mcp::.js": {
+      "count": 55,
+      "bytes": 350156
+    },
+    "dist/monitor::.d.ts": {
+      "count": 6,
+      "bytes": 43533
+    },
+    "dist/monitor::.js": {
+      "count": 6,
+      "bytes": 127601
+    },
+    "dist/nervous::.d.ts": {
+      "count": 32,
+      "bytes": 76198
+    },
+    "dist/nervous::.js": {
+      "count": 32,
+      "bytes": 240927
+    },
+    "dist/orchestra::.d.ts": {
+      "count": 169,
+      "bytes": 667477
+    },
+    "dist/orchestra::.js": {
+      "count": 169,
+      "bytes": 2286324
+    },
+    "dist/providers::.d.ts": {
+      "count": 14,
+      "bytes": 96122
+    },
+    "dist/providers::.js": {
+      "count": 14,
+      "bytes": 243010
+    },
+    "dist/sdk::.d.ts": {
+      "count": 2,
+      "bytes": 5416
+    },
+    "dist/sdk::.js": {
+      "count": 2,
+      "bytes": 9415
+    },
+    "dist/training::.d.ts": {
+      "count": 3,
+      "bytes": 5639
+    },
+    "dist/training::.js": {
+      "count": 3,
+      "bytes": 21606
+    },
+    ".::.json": {
+      "count": 1,
+      "bytes": 5346
+    }
+  }
+}

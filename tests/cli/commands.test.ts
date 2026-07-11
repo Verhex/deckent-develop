@@ -1196,10 +1196,15 @@ describe('stub commands', () => {
 // ─── Init Command ───────────────────────────────────────────────────
 
 describe('init command', () => {
+  const originalStdinIsTTY = process.stdin.isTTY;
   beforeEach(() => {
     vi.clearAllMocks();
     captureOutput();
     process.exitCode = undefined;
+    // 413-001 non-TTY gate: init now honestly FAILs early when stdin is not a
+    // TTY and --yes is absent. These tests simulate the INTERACTIVE flow via a
+    // mocked node:readline, so declare a TTY to keep exercising that path.
+    Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true });
     // Hermeticity: detectOllama() (src/core/provider.ts) probes the LOCAL
     // Ollama server (http://localhost:11434/api/tags) with a real fetch.
     // On machines where Ollama runs this made a second provider "available",
@@ -1215,6 +1220,7 @@ describe('init command', () => {
     vi.mocked(spawnSync).mockReturnValue({ status: 1, stdout: '', stderr: '', pid: 0, output: [], signal: null } as ReturnType<typeof spawnSync>);
   });
   afterEach(() => {
+    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true });
     vi.unstubAllGlobals();
     restoreOutput();
     process.exitCode = undefined;

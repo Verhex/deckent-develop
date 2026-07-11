@@ -57,9 +57,6 @@ export function getSharedMemory(projectRoot: string, ttlMs?: number): SharedMemo
   return new SharedMemory(projectRoot, ttlMs);
 }
 
-// ─── Task builder ─────────────────────────────────────────────────
-import { buildWorkerPrompt } from './task-builder.js';
-
 // ─── DNA skill filtering (born-593 DNA-FILTER-STAT-CREDIT) ───────
 import { filterSkillPromptsByDNA } from './prompt-token-optimizer.js';
 import type { TaskDNA } from '../core/routing-types.js';
@@ -68,8 +65,11 @@ import type { TaskDNA } from '../core/routing-types.js';
 import { getAgentPrompt } from '../core/agent-pool.js';
 
 // ─── tmux ─────────────────────────────────────────────────────────
-import { spawnWorker, killWorker } from './tmux.js';
+import { killWorker } from './tmux.js';
 import { drainRespawnRequests } from '../nervous/respawn-request.js';
+
+// ─── Canonical Spawn Executor (SCHED3, born-634/635) ─────────────
+import { executeSpawnTask } from './scheduler-effects.js';
 
 // ─── Token Counter (Sprint 196 — Task 196-005 / WP-4) ────────────
 // Orchestrator-side token-usage fill. `mergeWithWorkerClaim` /
@@ -1206,29 +1206,35 @@ export async function waitForResults(
     // Widening the try/catch to cover the whole spawn attempt makes any failure in
     // this sequence retryable next tick instead of a silent permanent stall.
     try {
-      const queueAgentPrompt = await resolveAgentPrompt(projectRoot, nextTask);
-      const queueSkillPrompts = await resolveSkillPrompts(projectRoot, nextTask);
-      const prompt = buildWorkerPrompt(nextTask, queueAgentPrompt, queueSkillPrompts, projectRoot);
-      const writeTargets = buildSpawnWriteTargets(nextTask);
-      const allowedTools = writeTargets.length > 0
-        ? `Read,Write(${writeTargets.join(',')}),Edit(${writeTargets.join(',')}),Bash,Glob,Grep`
-        : 'Read,Write,Edit,Bash,Glob,Grep';
-      if (queueBackend) {
-        queueBackend.spawn(nextTask.id, nextTask.model, prompt, {
-          allowedTools,
-          autoApprove: spawnOpts?.autoApprove ?? false,
-          projectDir: projectRoot,
-        });
-      } else {
-        spawnWorker(nextTask.id, nextTask.model, prompt, projectRoot, {
-          allowedTools,
-          autoApprove: spawnOpts?.autoApprove ?? false,
-        });
+      // SCHED3 (born-634/635, docs/analysis/scheduler-unify-design-2026-07-11.md):
+      // delegate to the same canonical executor the heavyweight dependency-
+      // respawn path (respawnEligibleTasks) uses. Two CONSCIOUS behavior
+      // changes vs. the pre-SCHED3 local spawn (pinned by
+      // tests/orchestra/scheduler-spawn-executor.test.ts):
+      //   (a) this local/queue path now applies fix-task routing-lineage
+      //       inheritance (forceModel/provider/backend/modelEffort) —
+      //       previously only respawnEligibleTasks did.
+      //   (b) this local/queue path now persists task-<id>.json after spawn —
+      //       previously it only mutated the in-memory task object.
+      const disposition = await executeSpawnTask(
+        { task: nextTask },
+        {
+          projectRoot,
+          sprintFallbackId: sprint.id,
+          config,
+          spawnOpts,
+          backend: queueBackend,
+          resolveAgentPrompt,
+          resolveSkillPrompts,
+          buildWriteTargets: buildSpawnWriteTargets,
+        },
+      );
+
+      if (disposition.kind === 'routing-lineage-missing' || disposition.kind === 'provider-unavailable') {
+        assignedTaskIds.delete(nextTask.id);
+        return false;
       }
-      // Mark task in-memory so subsequent slot calculations see it as
-      // occupying a slot. Disk persistence stays in spawnWorkers /
-      // respawnEligibleTasks paths; legacy FIFO queue does not persist.
-      nextTask.status = TaskStatus.EXECUTING;
+
       lastSpawnAttempt = Date.now();
       // PLANOBS-001 emit-site: SPAWN — fail-safe, never throws
       emitProgress({ root: projectRoot, phase: 'SPAWN', detail: nextTask.id });

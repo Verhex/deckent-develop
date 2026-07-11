@@ -1356,15 +1356,20 @@ describe('sprint-controller provider decoupling', () => {
   it('isTmuxProvider is the single source of truth for tmux routing', async () => {
     const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
     // Sprint 136: isTmuxProvider moved to sprint-spawner.ts
+    // 413-004 (SCHED-3): the canonical spawn path moved into
+    // scheduler-effects.ts, so tmux routing now legitimately spans both
+    // files — the invariant is that isTmuxProvider() stays the ONLY
+    // predicate, wherever the call sites live.
     const source = actualFs.readFileSync(
       new URL('../../src/orchestra/sprint-spawner.ts', import.meta.url),
       'utf-8',
+    ) + actualFs.readFileSync(
+      new URL('../../src/orchestra/scheduler-effects.ts', import.meta.url),
+      'utf-8',
     );
-    // isTmuxProvider should be used in routing logic
     expect(source).toContain('isTmuxProvider(');
-    // Should appear in spawnWorkers and cleanup
     const isTmuxCount = (source.match(/isTmuxProvider\(/g) ?? []).length;
-    expect(isTmuxCount).toBeGreaterThanOrEqual(3); // import + 2+ usages
+    expect(isTmuxCount).toBeGreaterThanOrEqual(3); // import + 2+ usages across the pair
   });
 
   it('resolveTaskProvider tries registry default before hardcoded fallback', async () => {

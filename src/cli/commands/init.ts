@@ -403,8 +403,25 @@ export function registerInit(program: Command): void {
 
           const recommendationDisplay = formatRecommendations(recommendation.reasons);
           if (recommendationDisplay) print(recommendationDisplay);
+        } else if (options.yes) {
+          // RC2C / born-652: `--yes` MUST be fully non-interactive — zero prompts,
+          // ever. Honest, documented defaults (no new flags invented): lang=en,
+          // plan=balanced, project-name=basename(cwd).
+          language = 'en';
+          mode = 'balanced';
+          projectName = dirName;
         } else {
-          // Interactive mode
+          // Interactive mode — requires a real TTY to read answers from. A piped /
+          // redirected stdin without --yes used to fall through to promptSelect
+          // anyway, which either silently hung forever or (worse) partially
+          // consumed piped input across multiple readline instances and then hung
+          // on stdin EOF — the process would drain the event loop and exit 0
+          // *silently*, writing nothing to disk. Fail honestly instead.
+          if (!process.stdin.isTTY) {
+            language = detectSystemLanguage();
+            throw new Error(getMessage('init.non_interactive_requires_yes', language));
+          }
+
           language = await promptSelect('Select language / Dil seçin:', [
             { label: 'English', value: 'en' },
             { label: 'Türkçe', value: 'tr' },
@@ -535,6 +552,12 @@ export function registerInit(program: Command): void {
           if (availableProviders.length > 1) {
             providerConfig.fallback_provider = availableProviders[1]!.name;
           }
+        } else if (options.yes) {
+          // RC2C / born-652: --yes never prompts, even for multi-provider selection —
+          // runWizard's nonInteractive path resolves each step to its documented default
+          // (the first available provider; see buildProviderWizardSteps).
+          const wizardResult = await runWizard(providerSteps, { nonInteractive: true });
+          providerConfig = resolveProviderWizardResult(wizardResult, providers);
         } else {
           print('');
           const wizardResult = await runWizard(providerSteps, { nonInteractive: false });

@@ -1,5 +1,16 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-413 Learnings
+- Sprint sprint-413 Learnings: ## Sprint sprint-413 Learnings
+- RC2C — born-652: init gerçek non-interactive akış + EOF-dürüstlüğü (RC-2 kapanış-kilidi): GO_WITH_TECH_DEBT — Root cause (confirmed via async-spawn repro BEFORE any fix, at /tmp with vite-node running the real unmodified prompt.ts
+- SCHED3 — canonical spawn executor: tüm spawn-yolları tek kapıdan (strangler dilim-3): GO_WITH_TECH_DEBT — SCHED3 dilim-3 (docs/analysis/scheduler-unify-design-2026-07-11.md): implemented the single canonical spawn executor.
+
+W
+
+## Gains
+- 413-002 — RC3A — PUB-01+PUB-02+PKG-05: validate-publish JSON-parser + kategorili-baseline-ratchet + drift-gate — PUB-01/PUB-02/PKG-05 all closed.
+- 413-003 — RC3B — PKG-01: packed-install-contract — tarball gerçekten kurulabilir-mi kanıtı — PKG-01 gap closed: new hermetic tests/release/packed-install-contract.test.ts proves, on a REAL n...
+
 ## Sprint sprint-412 Learnings
 - Sprint sprint-412 Learnings: ## Sprint sprint-412 Learnings
 - RC2-A — init outcome-makinesi: READY · SETUP_INCOMPLETE · FAILED dürüst-çıkış (INIT-01): GO_WITH_TECH_DEBT — Implemented the three-state init outcome contract (READY/SETUP_INCOMPLETE/FAILED) per RC2-A INIT-01. Root cause confirme

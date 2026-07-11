@@ -10101,3 +10101,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 412-004: SCHED2 — checkpoint-v2: MRR restore'da kaybolmaz (strangler dilim-2) (DONE)
 
 ---
+## Sprint 413 — sprint-413
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-11
+**Duration:** 1932s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1931603ms |
+
+### Tasks
+
+- 413-001: RC2C — born-652: init gerçek non-interactive akış + EOF-dürüstlüğü (RC-2 kapanış-kilidi) (GO_WITH_TECH_DEBT)
+- 413-002: RC3A — PUB-01+PUB-02+PKG-05: validate-publish JSON-parser + kategorili-baseline-ratchet + drift-gate (DONE)
+- 413-003: RC3B — PKG-01: packed-install-contract — tarball gerçekten kurulabilir-mi kanıtı (DONE)
+- 413-004: SCHED3 — canonical spawn executor: tüm spawn-yolları tek kapıdan (strangler dilim-3) (GO_WITH_TECH_DEBT)
+
+---

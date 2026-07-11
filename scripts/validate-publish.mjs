@@ -23,9 +23,15 @@
  * Exit codes: 0 = all gates pass, 1 = one or more gates failed.
  */
 
-import { execSync } from 'node:child_process';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { execSync, spawn } from 'node:child_process';
+import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const SCRIPT_DIR = resolve(fileURLToPath(import.meta.url), '..');
+
+/** Category-baseline ratchet file — see checkPackCategoryBaseline (Sprint 413 413-002). */
+const BASELINE_PATH = join(SCRIPT_DIR, 'pack-baseline.json');
 
 // ─── Gate catalog ──────────────────────────────────────────────────────────
 
@@ -68,8 +74,15 @@ export const BIN_FILES = ['dist/cli/entry.js', 'dist/mcp/server.js'];
 // The dashboard bundle is a functional product feature (served by `deckent serve`)
 // and cannot be excluded without breaking the UI.
 const MAX_PACK_BYTES = 5 * 1024 * 1024; // 5 MB (see Sprint 271 calibration above)
-const TARGET_FILE_COUNT = 920;
-const FILE_COUNT_TOLERANCE = 800; // accept ~120..1720 (band — exact match is brittle)
+
+// Sprint 413 (413-002, PUB-02): the absolute file-count pin (920±800, upper bound
+// 1720) is retired — it WARNed on the honest, all-legitimate 1853-file compiled
+// output (876 .js + 863 .d.ts + 57 .md + 50 .json + 7 assets) and made
+// `runReadinessGates().ok` false on zero actual regression; raising the tolerance
+// again would just hide the next real bloat regression instead of catching it.
+// Replaced by a categorical baseline-delta ratchet — see checkPackCategoryBaseline /
+// scripts/pack-baseline.json below — that tracks (dir-depth-2 × extension-class)
+// buckets against a committed, pack-generated baseline instead of one global count.
 
 const INTERNAL_STATE_PATTERNS = ['.deckent/', '.brain/', '.tasks/', '.locks/', '.dashboard'];
 
@@ -172,6 +185,83 @@ export function parseSizeToBytes(sizeStr) {
   }
 }
 
+// ─── JSON pack parser (live CLI path — Sprint 413 413-002 / PUB-01) ───────────
+//
+// `parsePackOutput` above scrapes npm's human-readable `npm pack --dry-run` text —
+// the section-header format and even whether stdout is non-empty vary across npm
+// versions / non-TTY environments (PUB-01: reproduced empty-output risk on npm 11.x
+// non-TTY). It stays exported unchanged because three test files outside this task's
+// write scope unit-test it directly against synthetic npm-notice fixtures. The real
+// CLI invocation (runCli, below) no longer uses it: it shells out to
+// `npm pack --dry-run --json --ignore-scripts` and parses the JSON directly via
+// parsePackJson. No text fallback on parse failure — an empty/malformed pack result
+// must FAIL the gates honestly (PUB-01 regression lock), never silently pass.
+
+/**
+ * Format a byte count for human display, matching the `packageSize` field shape
+ * `parsePackOutput`/`parseSizeToBytes` round-trip (e.g. "3.6 MB", "512 B").
+ * @param {number} bytes
+ * @returns {string}
+ */
+export function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} kB`;
+  return `${Math.round(bytes)} B`;
+}
+
+/**
+ * Parse `npm pack --dry-run --json --ignore-scripts` stdout. Returns the same shape
+ * as parsePackOutput ({ files, fileSizes, packageSize, packageSizeBytes, fileCount })
+ * so every gate below can consume either via normalizeParsed. On malformed JSON, an
+ * empty array, or a missing/non-array `files[]` — the honest empty/zeroed shape is
+ * returned (never throws, never fabricates data); downstream gates (checkPackSizeAndCount's
+ * `packageSizeBytes <= 0` branch, checkPackCategoryBaseline's empty-fileSizes branch)
+ * turn that into an explicit FAIL.
+ * @param {string} jsonText
+ * @returns {{ files: string[], fileSizes: Array<{ path: string, bytes: number }>, packageSize: string, packageSizeBytes: number, fileCount: number, packageName: string }}
+ */
+export function parsePackJson(jsonText) {
+  /** @type {unknown} */
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch {
+    return { files: [], fileSizes: [], packageSize: '', packageSizeBytes: 0, fileCount: 0, packageName: '' };
+  }
+
+  const entry = Array.isArray(parsed) ? parsed[0] : undefined;
+  if (!entry || typeof entry !== 'object' || !Array.isArray(/** @type {{files?: unknown}} */ (entry).files)) {
+    return { files: [], fileSizes: [], packageSize: '', packageSizeBytes: 0, fileCount: 0, packageName: '' };
+  }
+
+  const rawFiles = /** @type {{ files: Array<{ path?: unknown, size?: unknown }>, size?: unknown, entryCount?: unknown, name?: unknown }} */ (entry);
+  const fileSizes = rawFiles.files
+    .map((f) => ({ path: String(f?.path ?? ''), bytes: Number(f?.size ?? 0) || 0 }))
+    .filter((f) => f.path.length > 0);
+  const files = fileSizes.map((f) => f.path);
+  const packageSizeBytes = Number(rawFiles.size ?? 0) || 0;
+
+  return {
+    files,
+    fileSizes,
+    packageSize: formatBytes(packageSizeBytes),
+    packageSizeBytes,
+    fileCount: Number(rawFiles.entryCount ?? files.length) || files.length,
+    packageName: typeof rawFiles.name === 'string' ? rawFiles.name : '',
+  };
+}
+
+/**
+ * Accept either a raw npm-pack TEXT blob (legacy path, parsed via parsePackOutput)
+ * or an already-parsed pack object (JSON path, e.g. from parsePackJson) — lets every
+ * gate below stay agnostic to which parser produced the data.
+ * @param {string | { files: string[], fileSizes: Array<{ path: string, bytes: number }>, packageSize: string, packageSizeBytes: number, fileCount: number }} input
+ */
+export function normalizeParsed(input) {
+  return typeof input === 'string' ? parsePackOutput(input) : input;
+}
+
 /**
  * Extract minimum Node major version from a semver-range string.
  * Accepts: ">=24.0.0", ">=24", "24.x", "24", "^24.0.0".
@@ -189,11 +279,11 @@ export function extractMinNodeMajor(range) {
 // ─── Gate 1: pack size + file count ───────────────────────────────────────
 
 /**
- * @param {string} packOutput
+ * @param {string | ReturnType<typeof parsePackJson>} packOutput raw npm-notice text OR a pre-parsed pack object (normalizeParsed)
  * @returns {{ gate: string, ok: boolean, severity: 'info'|'warning'|'error', message: string }}
  */
 export function checkPackSizeAndCount(packOutput) {
-  const { packageSize, packageSizeBytes, fileCount, fileSizes } = parsePackOutput(packOutput);
+  const { packageSize, packageSizeBytes, fileCount, fileSizes } = normalizeParsed(packOutput);
   const topOffenders = rankLargestFiles(fileSizes, 20);
 
   if (packageSizeBytes <= 0) {
@@ -207,9 +297,6 @@ export function checkPackSizeAndCount(packOutput) {
   }
 
   const sizeOk = packageSizeBytes <= MAX_PACK_BYTES;
-  const countOk =
-    fileCount > 0 &&
-    Math.abs(fileCount - TARGET_FILE_COUNT) <= FILE_COUNT_TOLERANCE;
 
   if (!sizeOk) {
     return {
@@ -221,21 +308,11 @@ export function checkPackSizeAndCount(packOutput) {
     };
   }
 
-  if (!countOk) {
-    return {
-      gate: 'pack_size_and_count',
-      ok: false,
-      severity: 'warning',
-      message: `File count ${fileCount} far from target ${TARGET_FILE_COUNT} (tolerance ±${FILE_COUNT_TOLERANCE})`,
-      topOffenders,
-    };
-  }
-
   return {
     gate: 'pack_size_and_count',
     ok: true,
     severity: 'info',
-    message: `Pack ${packageSize} (${packageSizeBytes} bytes), ${fileCount} files (target ~${TARGET_FILE_COUNT})`,
+    message: `Pack ${packageSize} (${packageSizeBytes} bytes), ${fileCount} files`,
     topOffenders,
   };
 }
@@ -319,7 +396,7 @@ export function checkEntryPoints(pkg) {
  * @returns {{ gate: string, ok: boolean, severity: 'info'|'warning'|'error', message: string }}
  */
 export function checkNoInternalStateLeak(packOutput) {
-  const { files } = parsePackOutput(packOutput);
+  const { files } = normalizeParsed(packOutput);
   /** @type {string[]} */
   const leaks = [];
   for (const pattern of INTERNAL_STATE_PATTERNS) {
@@ -379,6 +456,28 @@ export function checkLinkLint(cmdResult) {
     message: ok
       ? 'npm run lint:link exited 0'
       : `npm run lint:link exited ${cmdResult?.exitCode}: ${(cmdResult?.stdout ?? '').slice(0, 200)}`,
+  };
+}
+
+// ─── PKG-05: lint:builtins-drift (standalone diagnostic) ──────────────────
+//
+// Not added to GATES/runReadinessGates — those are asserted at exactly 8 entries by
+// tests outside this task's write scope (same precedent as checkCriticalFilesInTarball
+// below). Wired into the CLI print/exit-code path only (runCli + entry block).
+
+/**
+ * @param {{ exitCode: number, stdout?: string }} cmdResult
+ * @returns {{ gate: string, ok: boolean, severity: 'info'|'warning'|'error', message: string }}
+ */
+export function checkBuiltinsDrift(cmdResult) {
+  const ok = cmdResult?.exitCode === 0;
+  return {
+    gate: 'builtins_drift',
+    ok,
+    severity: ok ? 'info' : 'error',
+    message: ok
+      ? 'npm run lint:builtins-drift exited 0'
+      : `npm run lint:builtins-drift exited ${cmdResult?.exitCode}: ${(cmdResult?.stdout ?? '').slice(0, 200)}`,
   };
 }
 
@@ -499,7 +598,7 @@ export function checkDashboardBundle(projectRoot) {
  * @returns {{ gate: string, ok: boolean, severity: 'info'|'warning'|'error', message: string, missing: string[] }}
  */
 export function checkCriticalFilesInTarball(packOutput, pkg) {
-  const { files } = parsePackOutput(packOutput);
+  const { files } = normalizeParsed(packOutput);
   const normalize = (/** @type {string} */ p) => p.replace(/^\.\//, '');
   const present = new Set(files.map(normalize));
 
@@ -532,6 +631,138 @@ export function checkCriticalFilesInTarball(packOutput, pkg) {
     severity: 'info',
     message: `All ${required.length + 2} critical files (entry/types/bin/dashboard) present in packed tarball`,
     missing: [],
+  };
+}
+
+// ─── PKG-02: pack category-baseline delta ratchet (standalone diagnostic) ────
+//
+// Replaces the retired absolute file-count pin (see MAX_PACK_BYTES comment above).
+// Buckets packed files by (dir-depth-2 × extension-class) instead of one global
+// count, and ratchets against a committed baseline (scripts/pack-baseline.json,
+// generated for real via `node scripts/validate-publish.mjs --write-baseline` — never
+// hand-authored). Not added to GATES/runReadinessGates — same 8-entries constraint as
+// checkCriticalFilesInTarball above; wired into the CLI print/exit-code path only.
+
+const CATEGORY_COUNT_GROWTH_TOLERANCE = 0.10; // a category may grow up to +10% in file count
+const CATEGORY_TOTAL_BYTES_GROWTH_LIMIT = 5 * 1024 * 1024; // total packed bytes may grow up to 5 MB vs baseline
+
+/**
+ * Classify a packed file path into an extension bucket. `.d.ts` is checked before
+ * `.js`/generic so declaration files don't fall into the `.js`-adjacent bucket.
+ * @param {string} path
+ * @returns {'.js' | '.d.ts' | '.md' | '.json' | 'asset'}
+ */
+export function classifyPackEntry(path) {
+  if (path.endsWith('.d.ts')) return '.d.ts';
+  if (path.endsWith('.js')) return '.js';
+  if (path.endsWith('.md')) return '.md';
+  if (path.endsWith('.json')) return '.json';
+  return 'asset';
+}
+
+/**
+ * Bucket key = first two path segments (or `.` for a root-level file) joined with
+ * `::` + the extension class, e.g. `dist/cli::.js`, `.::asset`.
+ * @param {string} path
+ * @returns {string}
+ */
+export function categoryKeyForPath(path) {
+  const parts = path.split('/');
+  const dir = parts.length <= 1 ? '.' : parts.slice(0, Math.min(2, parts.length - 1)).join('/');
+  return `${dir}::${classifyPackEntry(path)}`;
+}
+
+/**
+ * @param {Array<{ path: string, bytes: number }>} fileSizes
+ * @returns {{ categories: Record<string, { count: number, bytes: number }>, totalBytes: number, totalFiles: number }}
+ */
+export function buildCategoryInventory(fileSizes) {
+  /** @type {Record<string, { count: number, bytes: number }>} */
+  const categories = {};
+  let totalBytes = 0;
+  for (const { path, bytes } of fileSizes) {
+    const key = categoryKeyForPath(path);
+    const bucket = categories[key] ?? { count: 0, bytes: 0 };
+    bucket.count += 1;
+    bucket.bytes += bytes;
+    categories[key] = bucket;
+    totalBytes += bytes;
+  }
+  return { categories, totalBytes, totalFiles: fileSizes.length };
+}
+
+/**
+ * @param {Array<{ path: string, bytes: number }>} fileSizes
+ * @param {{ categories: Record<string, { count: number, bytes: number }>, totalBytes: number } | null | undefined} baseline
+ * @returns {{ gate: string, ok: boolean, severity: 'info'|'warning'|'error', message: string, newCategories: string[], grown: string[] }}
+ */
+export function checkPackCategoryBaseline(fileSizes, baseline) {
+  if (!fileSizes || fileSizes.length === 0) {
+    return {
+      gate: 'pack_category_baseline',
+      ok: false,
+      severity: 'error',
+      message: 'Empty pack file list — cannot evaluate category baseline (npm pack produced no files)',
+      newCategories: [],
+      grown: [],
+    };
+  }
+
+  if (!baseline || !baseline.categories) {
+    return {
+      gate: 'pack_category_baseline',
+      ok: false,
+      severity: 'error',
+      message: `No baseline loaded (${BASELINE_PATH} missing or malformed) — run: node scripts/validate-publish.mjs --write-baseline`,
+      newCategories: [],
+      grown: [],
+    };
+  }
+
+  const current = buildCategoryInventory(fileSizes);
+  const newCategories = Object.keys(current.categories).filter((key) => !(key in baseline.categories));
+
+  /** @type {string[]} */
+  const grown = [];
+  for (const [key, cur] of Object.entries(current.categories)) {
+    const base = baseline.categories[key];
+    if (!base || base.count <= 0) continue; // new categories are reported separately above
+    if (cur.count > base.count * (1 + CATEGORY_COUNT_GROWTH_TOLERANCE)) {
+      const pct = (((cur.count - base.count) / base.count) * 100).toFixed(1);
+      grown.push(`${key}: ${base.count}→${cur.count} (+${pct}%)`);
+    }
+  }
+
+  const totalBytesDelta = current.totalBytes - (baseline.totalBytes ?? 0);
+
+  /** @type {string[]} */
+  const reasons = [];
+  if (newCategories.length > 0) reasons.push(`new categories not in baseline: ${newCategories.join(', ')}`);
+  if (grown.length > 0) reasons.push(`category count grew >10%: ${grown.join('; ')}`);
+  if (totalBytesDelta > CATEGORY_TOTAL_BYTES_GROWTH_LIMIT) {
+    reasons.push(
+      `total packed size grew ${(totalBytesDelta / (1024 * 1024)).toFixed(2)} MB vs baseline (limit 5 MB)`,
+    );
+  }
+
+  if (reasons.length > 0) {
+    return {
+      gate: 'pack_category_baseline',
+      ok: false,
+      severity: 'error',
+      message: `Pack category baseline delta gate failed — ${reasons.join(' | ')}`,
+      newCategories,
+      grown,
+    };
+  }
+
+  return {
+    gate: 'pack_category_baseline',
+    ok: true,
+    severity: 'info',
+    message: `Pack matches category baseline (${current.totalFiles} files across ${Object.keys(current.categories).length} categories, Δ${(totalBytesDelta / 1024).toFixed(1)} kB vs baseline)`,
+    newCategories: [],
+    grown: [],
   };
 }
 
@@ -573,7 +804,10 @@ export function runReadinessGates(input) {
 // ─── CLI entry ────────────────────────────────────────────────────────────
 
 /**
- * Execute a shell command and capture exit code + stdout. Never throws.
+ * Execute a shell command and capture exit code + stdout. Never throws. Retained
+ * (sync execSync, not spawnSync) for adr_lint/link_lint/builtins_drift — those are
+ * plain `npm run` invocations with no output-format fragility; only the pack call
+ * (PUB-01) needed the async-spawn + JSON rewrite below.
  * @param {string} cmd
  * @param {string} cwd
  * @returns {{ exitCode: number, stdout: string }}
@@ -602,33 +836,118 @@ function safeExec(cmd, cwd) {
 }
 
 /**
+ * Async subprocess runner — never spawnSync (blocks the event loop; ADR-D-002 /
+ * PUB-01 both call this out). Captures stdout/stderr separately so JSON.parse never
+ * has to fight interleaved log noise.
+ * @param {string} cmd
+ * @param {string[]} args
+ * @param {string} cwd
+ * @returns {Promise<{ exitCode: number, stdout: string, stderr: string }>}
+ */
+function spawnAsync(cmd, args, cwd) {
+  return new Promise((resolvePromise) => {
+    const proc = spawn(cmd, args, { cwd, env: process.env });
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => {
+      stdout += d.toString();
+    });
+    proc.stderr.on('data', (d) => {
+      stderr += d.toString();
+    });
+    proc.on('close', (code) => resolvePromise({ exitCode: code ?? 1, stdout, stderr }));
+    proc.on('error', (err) => resolvePromise({ exitCode: 1, stdout: '', stderr: String(err) }));
+  });
+}
+
+/**
+ * Load scripts/pack-baseline.json. Never throws — a missing/malformed baseline is
+ * reported by checkPackCategoryBaseline as an honest FAIL, not a crash.
+ * @returns {{ categories: Record<string, { count: number, bytes: number }>, totalBytes: number, totalFiles: number } | null}
+ */
+function loadPackBaseline() {
+  try {
+    const raw = JSON.parse(readFileSync(BASELINE_PATH, 'utf-8'));
+    if (!raw || typeof raw !== 'object' || !raw.categories) return null;
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * @param {string} projectRoot
  */
-export function runCli(projectRoot) {
+export async function runCli(projectRoot) {
   const root = resolve(projectRoot);
   const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf-8'));
 
-  const packResult = safeExec('npm pack --dry-run 2>&1', root);
+  const packResult = await spawnAsync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], root);
+  const parsedPack = parsePackJson(packResult.stdout);
   const adrResult = safeExec('npm run --silent lint:adr', root);
   const linkResult = safeExec('npm run --silent lint:link', root);
+  const builtinsDriftResult = safeExec('npm run --silent lint:builtins-drift', root);
 
   const result = runReadinessGates({
-    packOutput: packResult.stdout,
+    packOutput: parsedPack,
     pkg,
     adrResult,
     linkResult,
     projectRoot: root,
   });
 
-  return { ...result, packOutput: packResult.stdout, pkg };
+  const categoryBaselineCheck = checkPackCategoryBaseline(parsedPack.fileSizes, loadPackBaseline());
+  const builtinsDriftCheck = checkBuiltinsDrift(builtinsDriftResult);
+
+  return { ...result, packOutput: parsedPack, pkg, categoryBaselineCheck, builtinsDriftCheck };
+}
+
+/**
+ * `--write-baseline`: run a REAL `npm pack --dry-run --json` and (re)write
+ * scripts/pack-baseline.json from it. Refuses to write on an empty/invalid pack
+ * result — a baseline must always be pack-generated, never fabricated.
+ * @param {string} projectRoot
+ * @returns {Promise<number>} process exit code
+ */
+async function writePackBaseline(projectRoot) {
+  const root = resolve(projectRoot);
+  const packResult = await spawnAsync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], root);
+  const parsedPack = parsePackJson(packResult.stdout);
+
+  if (parsedPack.fileSizes.length === 0) {
+    console.error(
+      `Refusing to write baseline: npm pack produced no files (empty/invalid output).\n${packResult.stderr.slice(0, 500)}`,
+    );
+    return 1;
+  }
+
+  const inventory = buildCategoryInventory(parsedPack.fileSizes);
+  const baseline = {
+    generatedAt: new Date().toISOString(),
+    totalBytes: inventory.totalBytes,
+    totalFiles: inventory.totalFiles,
+    categories: inventory.categories,
+  };
+  writeFileSync(BASELINE_PATH, `${JSON.stringify(baseline, null, 2)}\n`, 'utf-8');
+  console.log(
+    `Wrote ${BASELINE_PATH}: ${inventory.totalFiles} files, ${Object.keys(inventory.categories).length} categories, ${(inventory.totalBytes / (1024 * 1024)).toFixed(2)} MB unpacked.`,
+  );
+  return 0;
 }
 
 const entryArg = process.argv[1] ?? '';
 if (entryArg.endsWith('validate-publish.mjs')) {
-  const projectRoot = resolve(process.argv[2] ?? '.');
+  const cliArgs = process.argv.slice(2);
+  const writeBaseline = cliArgs.includes('--write-baseline');
+  const projectRoot = cliArgs.find((a) => !a.startsWith('--')) ?? '.';
+
+  if (writeBaseline) {
+    process.exit(await writePackBaseline(projectRoot));
+  }
+
   console.log('\n  npm publish readiness — 8 gate validation\n');
 
-  const result = runCli(projectRoot);
+  const result = await runCli(projectRoot);
 
   for (const check of result.checks) {
     const tag =
@@ -648,14 +967,19 @@ if (entryArg.endsWith('validate-publish.mjs')) {
   }
 
   const criticalFiles = checkCriticalFilesInTarball(result.packOutput, result.pkg);
-  if (!criticalFiles.ok) {
-    console.log(`  [\x1b[31mFAIL\x1b[0m] ${criticalFiles.gate}: ${criticalFiles.message}`);
+  const extraChecks = [criticalFiles, result.categoryBaselineCheck, result.builtinsDriftCheck];
+  for (const check of extraChecks) {
+    if (!check.ok) {
+      console.log(`  [\x1b[31mFAIL\x1b[0m] ${check.gate}: ${check.message}`);
+    }
   }
 
   console.log(
     `\n  Summary: ${result.summary.passed} passed, ${result.summary.failed} failed, ${result.summary.warnings} warnings`,
   );
-  console.log(result.ok ? '\n  Beta launch READY.\n' : '\n  Beta launch BLOCKED — fix gates above.\n');
 
-  process.exit(result.ok && criticalFiles.ok ? 0 : 1);
+  const allOk = result.ok && extraChecks.every((c) => c.ok);
+  console.log(allOk ? '\n  Beta launch READY.\n' : '\n  Beta launch BLOCKED — fix gates above.\n');
+
+  process.exit(allOk ? 0 : 1);
 }

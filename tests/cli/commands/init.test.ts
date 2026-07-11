@@ -192,9 +192,13 @@ void _doctorMocks;
 // ─── Tests ───────────────────────────────────────────────────────────
 
 describe('init command (isolated)', () => {
+  const originalStdinIsTTY = process.stdin.isTTY;
   beforeEach(() => {
     vi.clearAllMocks();
     process.exitCode = undefined;
+    // 413-001 non-TTY gate: interactive-flow tests simulate prompts via mocks,
+    // so declare a TTY; --auto/--yes paths are unaffected by this property.
+    Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true });
 
     // Default: no files exist (fresh project)
     vi.mocked(existsSync).mockReturnValue(false);
@@ -211,6 +215,7 @@ describe('init command (isolated)', () => {
   });
 
   afterEach(() => {
+    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, configurable: true });
     process.exitCode = undefined;
   });
 
@@ -2046,10 +2051,17 @@ describe('human-friendly init output', () => {
     });
 
     it('calls analyzeProject in interactive mode too (stack detection always runs)', async () => {
-      vi.mocked(promptSelect).mockResolvedValue('max_plan' as any);
-      vi.mocked(promptText).mockResolvedValue('my-project');
-      await runCommand(['init']);
-      expect(analyzeProject).toHaveBeenCalled();
+      // 413-001 non-TTY gate: this test exercises the interactive path.
+      const originalIsTTY = process.stdin.isTTY;
+      Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true });
+      try {
+        vi.mocked(promptSelect).mockResolvedValue('max_plan' as any);
+        vi.mocked(promptText).mockResolvedValue('my-project');
+        await runCommand(['init']);
+        expect(analyzeProject).toHaveBeenCalled();
+      } finally {
+        Object.defineProperty(process.stdin, 'isTTY', { value: originalIsTTY, configurable: true });
+      }
     });
   });
 

@@ -51,6 +51,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-413 Learnings** (sprint-413): ## Sprint sprint-413 Learnings
+- RC2C — born-652: init gerçek non-interactive akış + EOF-dürüstlüğü (RC-2 kapanış-kil...
 - **Sprint sprint-412 Learnings** (sprint-412): ## Sprint sprint-412 Learnings
 - RC2-A — init outcome-makinesi: READY · SETUP_INCOMPLETE · FAILED dürüst-çıkış (INIT-...
 - **Sprint sprint-411 Learnings** (sprint-411): ## Sprint sprint-411 Learnings
@@ -79,8 +81,6 @@
 
 ## Gains
 - 404-001 — TRUTH-CORE — born-640a: feature-truth zincir-derleyici çekirdeği...
-- **Sprint sprint-403 Learnings** (sprint-403): ## Sprint sprint-403 Learnings
-- GATE-FLAG-THREAD — 628-kalan: --force-prompt-gate CLI + MCP acknowledgePromptGate: G...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -147,5 +147,6 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: file_outside_scope
 - Violation pattern: file_outside_scope
+- Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 1240 | Generated: 2026-07-11_
+_Total entries: 1246 | Generated: 2026-07-11_

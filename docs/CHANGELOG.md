@@ -2,6 +2,21 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint413] - 2026-07-11
+
+### Added
+
+- RC3A — PUB-01+PUB-02+PKG-05: validate-publish JSON-parser + kategorili-baseline-ratchet + drift-gate
+- RC3B — PKG-01: packed-install-contract — tarball gerçekten kurulabilir-mi kanıtı
+
+### Changed
+
+- RC2C — born-652: init gerçek non-interactive akış + EOF-dürüstlüğü (RC-2 kapanış-kilidi) (completed with tech debt)
+- SCHED3 — canonical spawn executor: tüm spawn-yolları tek kapıdan (strangler dilim-3) (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 2 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint412] - 2026-07-11
 
 ### Added

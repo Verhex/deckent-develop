@@ -906,6 +906,12 @@ const MESSAGES: MessageMap = {
     tr: 'Tam raporu görmek için `deckent doctor` komutunu elle çalıştırın.',
   },
 
+  // ─── init: non-interactive environment guard (RC2C / born-652, Sprint 413 — 413-001) ──
+  'init.non_interactive_requires_yes': {
+    en: 'Non-interactive environment detected (no TTY on stdin) — re-run with `deckent init --yes` for an unattended setup.',
+    tr: 'Etkileşimsiz (non-interactive) ortam algılandı (stdin bir TTY değil) — insansız kurulum için `deckent init --yes` ile tekrar çalıştırın.',
+  },
+
   // ─── init: .deck security-file write failure (RC1-A follow-up, i18n-gate) ──
   'init.deck_security_write_failed': {
     en: 'WARN: failed to write .deck security files: {error}',
