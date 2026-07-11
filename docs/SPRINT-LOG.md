@@ -10028,3 +10028,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 409-003: ROUTING-TEK-OTORİTE — 641-spawner: spawn-time agent-override'ı plan-time otoriteyle birleştir (DONE)
 
 ---
+## Sprint 410 — sprint-410
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-11
+**Duration:** 331s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 330890ms |
+
+### Tasks
+
+- 410-001: DASH-PERF — MASTER-PLAN 494: React.lazy route-splitting + istek-dedup (DONE)
+- 410-002: CLI-EPIPE — MASTER-PLAN 501: borulu-kullanımda zarif çıkış (DONE)
+- 410-003: DOCTOR-DEDUP — MASTER-PLAN 505: runPreFlightHealthCheck ölü-ikizi tekleştir (DONE)
+
+---

@@ -2800,5 +2800,21 @@
     "verify": "worker-log kaniti + onleme-testi",
     "wire_on": "sprint",
     "status": "DONE"
+  },
+  {
+    "born_id": "645",
+    "severity": "P2",
+    "subsystem": "cli/doctor",
+    "title": "PRE-FLIGHT CLAUDE-PROBE FLAKE: 'Claude CLI: not found' yanlis-negatifi (binary PATH'te + calisiyor; ayni komut 20sn sonra gecti)",
+    "sources": [
+      "sprint-410 launch 2026-07-11"
+    ],
+    "primary_files": [
+      "src/cli/commands/doctor.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "start pre-flight'i claude-CLI'yi 'not found' diye reddetti; which claude=OK, --version=2.1.207; ikinci deneme gecti. Probe muhtemelen spawn-timeout/ENOENT ayrimi yapmiyor (356-009 timeout->unknown sinifi 'present' icin uygulanmamis olabilir). FIX: probe'da ENOENT (gercek yok) vs timeout/transient (unknown + tek-retry) ayrimi; yanlis-negatif sprint-launch'i dusurmesin.",
+    "verify": "probe-fixture: ENOENT->not-found; timeout->retry->unknown; flake-senaryosu testli",
+    "wire_on": "sprint"
   }
 ]

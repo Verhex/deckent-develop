@@ -2,6 +2,17 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint410] - 2026-07-11
+
+### Added
+
+- tests/dashboard/dash-perf-494.test.tsx (14 tests) as this task's dedicated MASTER-PLAN-494 proof artifact, covering ground the existing suites don't: (a) eager-import negative-pin for the 9 lazy pages scoped to this task's page list, (b) lazy+Suspense positive-pin, (c) a literal 3-concurrent-caller dedup fixture on dedupedFetch (task text explicitly asked for '3 çağrı'; the pre-existing request-dedup.test.ts only exercises 2 callers) plus a 3-consumer useLiveData polling-storm variant, (d) abort-on-unmount pin, (e) no-emoji guard on App.tsx source.
+- CLI-EPIPE — MASTER-PLAN 501: borulu-kullanımda zarif çıkış
+- DOCTOR-DEDUP — MASTER-PLAN 505: runPreFlightHealthCheck ölü-ikizi tekleştir
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint409] - 2026-07-11
 
 ### Added

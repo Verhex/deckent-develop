@@ -51,6 +51,10 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-410 Learnings** (sprint-410): ## Sprint sprint-410 Learnings
+
+## Gains
+- 410-001 — DASH-PERF — MASTER-PLAN 494: React.lazy route-splitting + istek-...
 - **Sprint sprint-409 Learnings** (sprint-409): ## Sprint sprint-409 Learnings
 
 ## Gains
@@ -79,10 +83,6 @@
 
 ## Gains
 - 401-001 — DOC-AFFECTED-GATE — affected-tests kullanım rehberi — docs/guide...
-- **Sprint sprint-400 Learnings** (sprint-400): ## Sprint sprint-400 Learnings
-
-## Gains
-- 400-001 — AFFECTED-RESOLVER — import-graph ile değişen-dosya→etkilenen-tes...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -149,4 +149,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: file_outside_scope
 
-_Total entries: 1227 | Generated: 2026-07-11_
+_Total entries: 1230 | Generated: 2026-07-11_

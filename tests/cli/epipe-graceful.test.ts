@@ -1,9 +1,12 @@
 /**
- * CLI-EPIPE-GRACEFUL (Sprint 390 Task 390-001, born-501)
+ * CLI-EPIPE-GRACEFUL (Sprint 390 Task 390-001, born-501; extended by
+ * Sprint 410 Task 410-002 for Windows cross-platform coverage)
  *
  * `deckent status | head` (or any piped invocation) closes its read end once
  * the downstream consumer is done reading. The next stdout/stderr write then
- * fails with EPIPE. Before this fix, neither `process.stdout` nor
+ * fails — POSIX (linux/darwin) reports `EPIPE`; Windows has no EPIPE errno
+ * for a closed named pipe and reports the same condition as `EOF` (Law #2 —
+ * every environment). Before this fix, neither `process.stdout` nor
  * `process.stderr` had an `'error'` listener anywhere in the codebase — Node's
  * EventEmitter default (throw when no listener) turned that into an
  * uncaughtException, caught by `installFatalHandlers` (helpers/error-handler.ts)
@@ -12,27 +15,38 @@
  * though a closed downstream pipe is routine shell plumbing, not a real crash.
  *
  * This suite verifies:
- *   1. EPIPE on stdout/stderr → silent `process.exit(0)`, no throw. Silent +
- *      non-throwing is exactly what proves no crash-log write happens: the
- *      crash-log is only ever written from `formatFatalAndExit`, which is
- *      only ever reached via an `uncaughtException` — and an uncaughtException
- *      can only fire here if the listener throws. `writeFileSync` itself
- *      (node:fs, a non-configurable ESM built-in export) cannot be spied on
- *      in this test runner, so "no throw" is the direct, provable stand-in.
- *   2. A non-EPIPE stream error is NOT swallowed — the listener re-throws,
- *      preserving the existing behavior (would still surface as an
- *      uncaughtException and hit the pre-existing crash-log path unchanged).
+ *   1. RED-proof: with the handler removed, an EPIPE error on stdout DOES
+ *      throw (Node's default no-listener EventEmitter behavior) — a literal
+ *      demonstration that the fix is necessary, not an assumption.
+ *   2. EPIPE and EOF on stdout/stderr → silent `process.exit(0)`, no throw.
+ *   3. A non-EPIPE/EOF stream error is NOT swallowed — the listener
+ *      re-throws, preserving the existing behavior (would still surface as
+ *      an uncaughtException and hit the pre-existing crash-log path
+ *      unchanged).
+ *   4. Crash-log pin: with the REAL (unmocked) `installFatalHandlers` wired
+ *      up against a tmpdir cwd, emitting EPIPE/EOF never creates
+ *      `.deckent/crashes` — a real filesystem check, not an inference from
+ *      "didn't throw".
  *
  * Hermeticity: no real subprocess, no real pipe, no `spawnSync`. Emits
  * synthetic 'error' events directly on `process.stdout`/`process.stderr` (the
- * exact seam Node uses for a real EPIPE) and stubs `process.exit` so the test
- * runner itself is never terminated. Mirrors the hoisted-mock import pattern
- * already used by `tests/cli/sigterm-cleanup.test.ts` so importing entry.ts
- * does not trigger its `isEntryMain()` dispatch branch or touch unrelated
- * modules (sprint-controller/tmux/model-catalog/cli/index all mocked).
+ * exact seam Node uses for a real EPIPE/EOF) and stubs `process.exit` so the
+ * test runner itself is never terminated. Mirrors the hoisted-mock import
+ * pattern already used by `tests/cli/sigterm-cleanup.test.ts` so importing
+ * entry.ts does not trigger its `isEntryMain()` dispatch branch or touch
+ * unrelated modules (sprint-controller/tmux/model-catalog/cli/index all
+ * mocked). The crash-log pin uses a real `os.tmpdir()` fixture (mkdtempSync,
+ * cleaned in `afterEach`) rather than touching the repo's own `.deckent/`.
  */
 
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
+import { mkdtempSync, existsSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  installFatalHandlers,
+  __resetFatalHandlersForTest,
+} from '../../src/cli/helpers/error-handler.js';
 
 // ─── Hoisted mocks so importing entry.ts has no top-level side-effects ──
 
@@ -64,6 +78,10 @@ function epipeError(): NodeJS.ErrnoException {
   return Object.assign(new Error('write EPIPE'), { code: 'EPIPE' });
 }
 
+function eofError(): NodeJS.ErrnoException {
+  return Object.assign(new Error('write EOF'), { code: 'EOF' });
+}
+
 function otherStreamError(): NodeJS.ErrnoException {
   return Object.assign(new Error('write EIO'), { code: 'EIO' });
 }
@@ -76,7 +94,27 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('process stdout/stderr EPIPE → graceful exit (born-501)', () => {
+describe('RED-proof — without the handler, EPIPE throws (born-501 necessity)', () => {
+  it('removing the installed listener reproduces the pre-fix throw', () => {
+    // entry.ts (imported in beforeAll) already registered handleStdStreamError
+    // as the 'error' listener on process.stdout. Temporarily strip it to
+    // reproduce the exact pre-501 state — zero 'error' listeners — and prove
+    // Node's default EventEmitter behavior (throw when an 'error' event has
+    // no listener) is what previously turned every piped invocation into an
+    // uncaughtException/crash-log. Restored in `finally` so later tests in
+    // this file still see the real handler installed.
+    const listeners = process.stdout.listeners('error') as Array<(...args: unknown[]) => void>;
+    expect(listeners.length).toBeGreaterThan(0);
+    process.stdout.removeAllListeners('error');
+    try {
+      expect(() => process.stdout.emit('error', epipeError())).toThrow(/EPIPE/);
+    } finally {
+      for (const l of listeners) process.stdout.on('error', l);
+    }
+  });
+});
+
+describe('process stdout/stderr EPIPE/EOF → graceful exit (born-501, 410-002)', () => {
   it('EPIPE on stdout exits silently (exit code 0), no throw → no crash-log path reached', () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((): never => undefined as never) as never);
     const stdoutWriteSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
@@ -102,6 +140,30 @@ describe('process stdout/stderr EPIPE → graceful exit (born-501)', () => {
     expect(stderrWriteSpy).not.toHaveBeenCalled();
   });
 
+  it('EOF on stdout (Windows equivalent, 410-002) exits silently, no throw', () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((): never => undefined as never) as never);
+    const stdoutWriteSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const stderrWriteSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    expect(() => process.stdout.emit('error', eofError())).not.toThrow();
+
+    expect(exitSpy).toHaveBeenCalledWith(0);
+    expect(stdoutWriteSpy).not.toHaveBeenCalled();
+    expect(stderrWriteSpy).not.toHaveBeenCalled();
+  });
+
+  it('EOF on stderr (Windows equivalent, 410-002) exits silently, no throw', () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((): never => undefined as never) as never);
+    const stdoutWriteSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const stderrWriteSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    expect(() => process.stderr.emit('error', eofError())).not.toThrow();
+
+    expect(exitSpy).toHaveBeenCalledWith(0);
+    expect(stdoutWriteSpy).not.toHaveBeenCalled();
+    expect(stderrWriteSpy).not.toHaveBeenCalled();
+  });
+
   it('non-EPIPE stream error is re-thrown (existing crash-log behavior preserved)', () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((): never => undefined as never) as never);
 
@@ -116,5 +178,49 @@ describe('process stdout/stderr EPIPE → graceful exit (born-501)', () => {
     const err = otherStreamError();
     expect(() => process.stderr.emit('error', err)).toThrow(err);
     expect(exitSpy).not.toHaveBeenCalledWith(0);
+  });
+});
+
+describe('crash-log pin — EPIPE/EOF never reach the crash-log path (410-002)', () => {
+  // Wires up the REAL (unmocked) installFatalHandlers so the production
+  // uncaughtException→crash-log path is actually live, then proves via a
+  // real filesystem check (not an inference from "didn't throw") that
+  // .deckent/crashes is never created for EPIPE/EOF. cwd is pointed at a
+  // tmpdir fixture so this never touches the repo's own .deckent/crashes.
+  let tmpDir: string | undefined;
+  let cwdSpy: ReturnType<typeof vi.spyOn> | undefined;
+
+  afterEach(() => {
+    __resetFatalHandlersForTest();
+    cwdSpy?.mockRestore();
+    if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
+    tmpDir = undefined;
+    cwdSpy = undefined;
+  });
+
+  function setUp(): string {
+    const dir = mkdtempSync(join(tmpdir(), 'deckent-epipe-crashlog-'));
+    tmpDir = dir;
+    cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(dir);
+    installFatalHandlers({ force: true });
+    return dir;
+  }
+
+  it('EPIPE on stdout leaves .deckent/crashes uncreated', () => {
+    const dir = setUp();
+    vi.spyOn(process, 'exit').mockImplementation(((): never => undefined as never) as never);
+
+    process.stdout.emit('error', epipeError());
+
+    expect(existsSync(join(dir, '.deckent', 'crashes'))).toBe(false);
+  });
+
+  it('EOF on stderr leaves .deckent/crashes uncreated', () => {
+    const dir = setUp();
+    vi.spyOn(process, 'exit').mockImplementation(((): never => undefined as never) as never);
+
+    process.stderr.emit('error', eofError());
+
+    expect(existsSync(join(dir, '.deckent', 'crashes'))).toBe(false);
   });
 });

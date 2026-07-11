@@ -900,22 +900,31 @@ if ((major ?? 0) < 24) {
   process.exit(1);
 }
 
-// ─── EPIPE Graceful Exit (born-501, CLI-EPIPE-GRACEFUL) ─────────────────────
+// ─── EPIPE/EOF Graceful Exit (born-501, CLI-EPIPE-GRACEFUL; 410-002 cross-platform) ─
 // A piped invocation (`deckent status | head`) closes its read end once the
-// downstream consumer is done — the next stdout/stderr write then fails with
-// EPIPE. Neither stream had an 'error' listener anywhere, so Node's
-// EventEmitter default (throw when no listener) turned that into an
-// uncaughtException, caught by installFatalHandlers (helpers/error-handler.ts,
-// wired from buildProgram()) — which prints a FATAL line AND persists a
-// crash-log under .deckent/crashes/. A closed downstream pipe is routine
-// shell plumbing, not a real crash (this accounted for ~80% of crash-logs) —
-// exit silently and cleanly instead. Any other stream error (disk full, EIO,
-// …) is re-thrown unchanged: a synchronous throw inside an EventEmitter
-// listener propagates out of emit() (Node does not swallow listener
-// exceptions), so it still surfaces as an uncaughtException and hits the
-// existing crash-log path unchanged.
+// downstream consumer is done — the next stdout/stderr write then fails.
+// Neither stream had an 'error' listener anywhere, so Node's EventEmitter
+// default (throw when no listener) turned that into an uncaughtException,
+// caught by installFatalHandlers (helpers/error-handler.ts, wired from
+// buildProgram()) — which prints a FATAL line AND persists a crash-log under
+// .deckent/crashes/. A closed downstream pipe is routine shell plumbing, not
+// a real crash (this accounted for ~80% of crash-logs) — exit silently and
+// cleanly instead.
+//
+// 410-002 (Law #2 — every environment): POSIX (linux/darwin) reports this
+// condition as 'EPIPE'. Windows has no EPIPE errno for a closed named pipe —
+// libuv's Windows backend surfaces the same "downstream reader is gone"
+// write failure as 'EOF' instead. Both codes are handled identically here so
+// the graceful exit is not a POSIX-only fix that silently no-ops on win32
+// (same pattern as {@link shutdownSignalsForPlatform}'s honest platform
+// branch below).
+//
+// Any other stream error (disk full, EIO, …) is re-thrown unchanged: a
+// synchronous throw inside an EventEmitter listener propagates out of emit()
+// (Node does not swallow listener exceptions), so it still surfaces as an
+// uncaughtException and hits the existing crash-log path unchanged.
 function handleStdStreamError(error: NodeJS.ErrnoException): void {
-  if (error.code === 'EPIPE') {
+  if (error.code === 'EPIPE' || error.code === 'EOF') {
     process.exit(0);
     return;
   }

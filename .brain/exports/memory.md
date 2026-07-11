@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-410 Learnings
+- Sprint sprint-410 Learnings: ## Sprint sprint-410 Learnings
+
+## Gains
+- 410-001 — DASH-PERF — MASTER-PLAN 494: React.lazy route-splitting + istek-dedup — DISCOVERY: both fixes this task describes were already implemented by sprint-377 (commit c8e839aa...
+- 410-002 — CLI-EPIPE — MASTER-PLAN 501: borulu-kullanımda zarif çıkış — Discovery: the base EPIPE fix (born-501) already shipped in sprint-390 (commit 03adf3e4) — entry....
+- 410-003 — DOCTOR-DEDUP — MASTER-PLAN 505: runPreFlightHealthCheck ölü-ikizi tekleştir — Disk-verify BEFORE any edit showed the dedup this task describes was already completed in a prior...
+
 ## Sprint sprint-409 Learnings
 - Sprint sprint-409 Learnings: ## Sprint sprint-409 Learnings
 

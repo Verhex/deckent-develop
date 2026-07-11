@@ -1,66 +1,62 @@
-# DIRECTIVES — SPRINT-409: REPL-KALİTE + ROUTING-TEK-OTORİTE (born-527 · born-528 · 641-spawner)
+# DIRECTIVES — SPRINT-410: PUBLISH-CİLASI (494 dash-perf · 501 EPIPE · 505 doctor-ölü-ikiz)
 
 ## Goal
-Terminal-deneyim kalitesi (Alperen'in ana-yüzeyi): input-bar bug-kümesi + denied-tool görünürlüğü +
-routing çifte-otoritesinin tekleşmesi.
+Yayın-öncesi kalite-cilası: dashboard bundle/istek-sağlığı + CLI boru-zarafeti + ölü-ikiz temizliği.
 
 ## 🔒 BAĞLAYICI (her task)
-- Yalnız kendi Files/Scope'una yaz · git stash/reset YASAK · **build YASAK (npm run build dahil)** · notes TEK STRING · Self DÜRÜST.
+- Yalnız kendi Files/Scope'una yaz · git stash/reset YASAK · **build YASAK (npm run build / build:all dahil)** · notes TEK STRING · Self DÜRÜST.
 - REPRODUCE-first: önce mevcut davranışı kanıtlayan RED/ölçüm, sonra fix; kanıtı notes'a yaz.
-- Değişen modülü import eden TÜM testleri koş (`VITEST_MAX_FORKS=2 npx vitest run <ilgili dizinler>`).
+- Değişen modülü import eden TÜM testleri koş (dashboard için `npm run test:dashboard`).
 
-## Task 1: INPUT-BAR-FIXES — born-527: Home/End algılama + paste-history + keylog platform-farkındalığı
-- Model: sonnet
-- Files: src/cli/repl/input-bar.tsx, tests/cli/input-bar-527.test.ts
-- Scope: src/cli/repl/, tests/cli/
+## Task 1: DASH-PERF — MASTER-PLAN 494: React.lazy route-splitting + istek-dedup
+- Model: sonnet | Agent: frontend-designer
+- Files: src/dashboard/src/App.tsx, src/dashboard/src/lib/use-live-data.ts, tests/dashboard/dash-perf-494.test.tsx
+- Scope: src/dashboard/, tests/dashboard/
 - Dependencies: none
 ### Description
-Üç kalem (correctness-review bulgusu): (1) Home/End tuş-algılama Ink'in HİÇ doldurmadığı Key-property'lerini
-kontrol ediyor → çalışmıyor; Ink'in gerçekten doldurduğu property'lere (ya da raw-sequence eşlemesine —
-mevcut key→aksiyon tablosu desenine uy) geçir. (2) Çok-satırlı/sonu-newline'lı paste yolu history'ye BOŞ
-girdi itiyor → guard (boş/whitespace-only history-push yok; mevcut redaksiyon+cap korunur). (3) Debug-keylog
-yolu hardcoded /tmp → non-POSIX'te sessiz no-op (Yasa #2); platform-farkındalı (os.tmpdir()) ya da
-config-driven yap; kapalıyken sıfır-IO. Üçü de RED-önce: Ink-key fixture'larıyla bugünkü kırık davranış
-kanıtlanır (ink-testing-library deseni mevcut testlerde var — reuse).
+Kanıtlı iki sorun (user-truth-audit W3): (1) App.tsx tüm route-bileşenlerini EAGER import ediyor
+(~satır 6-26) → bundle şişkin (~%30-40 fazla); FIX: route-bileşenlerini `React.lazy(() => import(...))`
++ tek `<Suspense fallback>` (mevcut yükleme-göstergesi bileşeni varsa onu kullan; yoksa sade,
+lucide-ikonlu — EMOJI YASAK) ile böl. (2) use-live-data.ts aynı endpoint'e eşzamanlı çoklu-istek
+atabiliyor (polling-fırtınası); FIX: in-flight istek-dedup (aynı URL için süren promise paylaşılır)
++ unmount'ta iptal (AbortController) — polling-aralığı/veri-şekli DEĞİŞMEZ. Testler: lazy-split'in
+varlık-pin'i (App source'unda React.lazy + eager-import'ların yokluğu) + dedup unit (fake-fetch:
+eşzamanlı 3 çağrı → 1 fetch). Dashboard test-config'i AYRI: `npm run test:dashboard`
+(vitest.dashboard.config.ts) — testini oraya uygun yaz ve o komutla koş.
 ### goNogo
-- goCriteria: 3 kalem RED→GREEN (Home/End imleç-hareketi; boş-history-push yok; keylog os.tmpdir/config + kapalı=0-IO); cursor-model/input-history mevcut testleri yeşil; NO_COLOR/i18n etkilenmez.
-- nogo: key-tablosu yeniden-yazılırsa (surgical-ihlal) NO_GO.
+- goCriteria: RED-önce (eager-import listesi + çoklu-fetch fixture-kanıtı); lazy+Suspense canlı; dedup+abort testli; `npm run test:dashboard` yeşil; davranış/veri-şekli değişmedi (pin).
+- nogo: route davranışı/görseli değişirse NO_GO; emoji girerse NO_GO.
 
-## Task 2: DENIED-TOOL-HONESTY — born-528: confirm-red'i toolSink dürüst-çıktı yolundan geçir
+## Task 2: CLI-EPIPE — MASTER-PLAN 501: borulu-kullanımda zarif çıkış
 - Model: sonnet
-- Files: src/cli/repl/run.tsx, tests/cli/denied-tool-honesty.test.ts
-- Scope: src/cli/repl/, tests/cli/
+- Files: src/cli/entry.ts, tests/cli/epipe-graceful.test.ts
+- Scope: src/cli/, tests/cli/
 - Dependencies: none
 ### Description
-SORUN: run.tsx CLI-bridge tool'unda kullanıcı confirm'i REDDEDİNCE erken-return toolSink'i atlıyor →
-reddedilen çağrı transcript'ten SESSİZCE kayboluyor (kullanıcı ne olduğunu göremiyor; 633'ün
-kardeş-dürüstlük vakası). FIX: denial erken-return'ü diğer her tool-sonucunun geçtiği toolSink
-honest-outcome render yolundan geçir — görünür `denied` işaretli kayıt (633'te eklenen status-'denied'
-sınıfıyla TUTARLI etiket; nested-yol zaten dürüst — dış-yol da aynı sözlüğü kullansın). RED-önce:
-bugün denial'da toolSink'e hiçbir kaydın düşmediği fixture-kanıtı. Model-görünürlüğü: tool-result
-metni de "user denied" bilgisini taşısın (yeniden-deneme yağmuruna karşı 630-deny-cache zaten var —
-bozma).
+Crashes-analizi (2026-07-07): kayıtların ~%80'i `write EPIPE` — `deckent status | head` gibi her
+boru-kesiminde crash-log üretiliyor (publish-cilası: ilk-izlenim). FIX: process-level stdout/stderr
+error-handler — hata `EPIPE` ise sessiz `process.exit(0)` (POSIX boru-geleneneği); DİĞER stream-hataları
+mevcut davranışta kalır (yutma YOK — sınıf-ayrımı). Kurulum entry.ts'in erken-safhasında, bir kez;
+crash-logger'ın EPIPE'ı artık kaydetmediği de pin'lenir. RED-önce: EPIPE-hatasının bugün handler'sız
+fırladığının unit-kanıtı (stdout.emit('error', epipeErr) fixture). Cross-platform not: Windows'ta
+eşdeğer kod `EOF`/`EPIPE` — ikisini de kapsa (Yasa #2).
 ### goNogo
-- goCriteria: RED-kanıt; denial → toolSink'te denied-işaretli kayıt + model'e dürüst tool-result; onaylı-yol byte-aynı (pin); run.tsx/toolSink importer testleri (calltool-exec-wire + nested-dispatch-honesty dahil) yeşil.
-- nogo: onay-akışının davranışı değişirse NO_GO.
+- goCriteria: RED-kanıt; EPIPE/EOF → exit-0 sessiz (testli); diğer stream-hataları davranış-koruma (pin); crash-log EPIPE-kaydı düşmüyor; entry importer testleri yeşil.
+- nogo: tüm stream-hataları yutulursa NO_GO.
 
-## Task 3: ROUTING-TEK-OTORİTE — 641-spawner: spawn-time agent-override'ı plan-time otoriteyle birleştir
+## Task 3: DOCTOR-DEDUP — MASTER-PLAN 505: runPreFlightHealthCheck ölü-ikizi tekleştir
 - Model: sonnet | Agent: bug-fixer
-- Files: src/orchestra/sprint-spawner.ts, tests/orchestra/spawner-single-authority.test.ts
-- Scope: src/orchestra/, tests/orchestra/
+- Files: src/cli/commands/doctor.ts, src/cli/commands/doctor-checks.ts, tests/cli/doctor-dedup-505.test.ts
+- Scope: src/cli/, tests/cli/
 - Dependencies: none
 ### Description
-641-kalanı: `sprint-spawner.ts:1260` civarı `if (routing.agent !== 'generic') task.assignedAgent = routing.agent;`
-— spawn-anında İKİNCİ bir routing ataması. Plan-time routing artık CANLI (641-dirilişi) olduğundan bu
-yol: (a) plan-time atamayı sessizce EZEBİLİR (çifte-otorite çatışması), (b) journal'SIZ (görünmez-karar,
-622-kontratının ihlali). FIX (tek-otorite): task.assignedAgent zaten anlamlı (generic-değil VE boş-değil)
-ise spawn-time yeniden-atama YAPILMAZ (plan-time otorite kazanır); yalnız assignedAgent yok/generic'se
-spawn-time fallback devreye girer VE bu karar routing-decision-journal'a `source:'spawn-fallback'`
-işaretli yazılır (routingDecisionJournalPath/append mevcut — reuse; sprintId/taskId spawn-bağlamında
-mevcut). Önce bu spawn-yolunun NE ZAMAN tetiklendiğini analiz et (hangi akış: respawn? fix-task? normal?)
-ve notes'a yaz — davranış-koruma sınırını ona göre kur (fix-task model-mirası 476-kuralı BOZULMAZ).
-RED-önce: plan-time atamalı task fixture'ında spawn-yolunun bugün atamayı ezdiğini (ya da ezebildiğini)
-kanıtla.
+W7-audit: `doctor.ts` ve `doctor-checks.ts` birbirinden bağımsız İKİ özdeş `runPreFlightHealthCheck()`
+tanımlıyor — canlı yol doctor.ts (`deckent doctor --pre-flight`); doctor-checks.ts kopyası yalnız kendi
+testince referanslı (ölü-ikiz; drift-mayını). FIX: TEK tanım kalsın — doctor-checks.ts'teki implementasyonu
+doctor.ts'ten re-export'a çevir ya da tersine (hangisi daha az churn — mevcut import-yönlerine bak;
+D-004 katman-kurallarına uy); ölü-ikizin KENDİ testi canlı-tek-tanımı test eder hale gelir (silme değil
+yönlendirme — test-kaybı yok). İki tanımın bugün ÖZDEŞ olduğunu diff'le doğrula; değillerse farkı notes'a
+yaz ve canlı-yolun davranışını koru. RED-önce: iki bağımsız tanımın varlık-kanıtı (kaynak-metin).
 ### goNogo
-- goCriteria: RED-kanıt + tetiklenme-analizi notes'ta; plan-time atama artık ezilmiyor (pin); spawn-fallback journal'lı (source-etiketli, fail-soft); 476 fix-task-mirası + spawner importer testleri yeşil.
-- nogo: spawn-fallback tamamen kaldırılırsa (assignedAgent'sız task agent'sız kalır) NO_GO.
+- goCriteria: tek-tanım (grep: `function runPreFlightHealthCheck` repo'da 1); re-export yönü D-004-temiz; her iki eski test-dosyası da yeşil (kayıpsız); doctor canlı-davranış pin'i.
+- nogo: davranış farkı sessizce yutulursa NO_GO.
