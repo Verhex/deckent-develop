@@ -9786,3 +9786,48 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 399-004: G1b-CORE — YENİ scope-satisfiability lint modülü (görev-metni ↔ yazma-yetkisi tutarlılık kontratı) (DONE)
 
 ---
+## Sprint 400 — sprint-400
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-10
+**Duration:** 1185s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1184820ms |
+
+### Tasks
+
+- 400-001: AFFECTED-RESOLVER — import-graph ile değişen-dosya→etkilenen-test çözücüsü (DONE)
+- 400-002: GATE-RUNNER — affected-set'i koşturan ccverify kapısı (DONE)
+
+---
+## Sprint 401 — sprint-401
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-11
+**Duration:** 205s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 204906ms |
+
+### Tasks
+
+- 401-001: DOC-AFFECTED-GATE — affected-tests kullanım rehberi (DONE)
+
+---

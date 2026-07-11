@@ -1,5 +1,18 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-401 Learnings
+- Sprint sprint-401 Learnings: ## Sprint sprint-401 Learnings
+
+## Gains
+- 401-001 — DOC-AFFECTED-GATE — affected-tests kullanım rehberi — docs/guides/ dizini yoktu — canonical write path doğrulandı, gerçekten yeni dosya (typo değil).
+
+## Sprint sprint-400 Learnings
+- Sprint sprint-400 Learnings: ## Sprint sprint-400 Learnings
+
+## Gains
+- 400-001 — AFFECTED-RESOLVER — import-graph ile değişen-dosya→etkilenen-test çözücüsü — AFFECTED-RESOLVER implemented as a pure resolver (no git calls) per spec.
+- 400-002 — GATE-RUNNER — affected-set'i koşturan ccverify kapısı — scripts/ccverify-affected.mjs implements the GATE-RUNNER: (1) changed-file resolution — `--change...
+
 ## Sprint sprint-399 Learnings
 - Sprint sprint-399 Learnings: ## Sprint sprint-399 Learnings
 - SAN-1-CORE — sanitizeScope Rule-5 trackedRootFiles-aware (sessiz kök-dosya drop biter): GO_WITH_TECH_DEBT — Rule-5 is now trackedRootFiles-aware: sanitizeScope(filesWrite, trackedRootFiles?) takes an optional ReadonlySet<string>

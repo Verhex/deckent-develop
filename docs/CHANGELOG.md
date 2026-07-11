@@ -2,6 +2,25 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint401] - 2026-07-11
+
+### Added
+
+- DOC-AFFECTED-GATE — affected-tests kullanım rehberi
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
+## [1.0.0-beta.1-sprint400] - 2026-07-10
+
+### Added
+
+- AFFECTED-RESOLVER — import-graph ile değişen-dosya→etkilenen-test çözücüsü
+- GATE-RUNNER — affected-set'i koşturan ccverify kapısı
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint399] - 2026-07-10
 
 ### Added
