@@ -48,20 +48,20 @@ describe('.github/workflows/publish.yml', () => {
     expect(workflowContent).toContain('npx vitest run');
   });
 
-  it('should have dry-run step before actual publish', () => {
+  it('is dry-run-only — the REAL publish lives solely in release.yml (born-608)', () => {
+    // 407-001: publish.yml, publish-otoritesi olmaktan EMEKLİ edildi — aynı v*-tag'de
+    // release.yml ile çift-yayın yarışıyordu. Artık yalnız doğrulama (dry-run) koşar.
     expect(workflowContent).toContain('--dry-run');
-    const dryRunIndex = workflowContent.indexOf('--dry-run');
-    const publishProvenanceIndex = workflowContent.indexOf('npm publish --provenance');
-    expect(dryRunIndex).toBeGreaterThan(0);
-    expect(dryRunIndex).toBeLessThan(publishProvenanceIndex);
+    // Başlık-yorumu tarihçeyi anlatırken 'npm publish --provenance' der — pin yalnız GERÇEK run-adımını yasaklar.
+    expect(workflowContent).not.toMatch(/^\s*run:.*npm publish --provenance/m);
   });
 
   it('should have dry-run step with --access public', () => {
     expect(workflowContent).toContain('npm publish --dry-run --access public');
   });
 
-  it('should have publish step with provenance and --access public', () => {
-    expect(workflowContent).toContain('npm publish --provenance --access public');
+  it('keeps the dry-run verify step with --access public', () => {
+    expect(workflowContent).toContain('npm publish --dry-run --access public');
   });
 
   it('should have NODE_AUTH_TOKEN environment variable', () => {
@@ -94,9 +94,10 @@ describe('.github/workflows/publish.yml', () => {
     expect(workflowContent).toContain('npm run lint');
   });
 
-  it('should have NODE_AUTH_TOKEN on both dry-run and publish steps', () => {
+  it('has NODE_AUTH_TOKEN on the single remaining (dry-run) step', () => {
+    // born-608: gerçek publish-adımı release.yml'e taşındı — burada tek adım kaldı.
     const nodeAuthCount = (workflowContent.match(/NODE_AUTH_TOKEN/g) || []).length;
-    expect(nodeAuthCount).toBeGreaterThanOrEqual(2);
+    expect(nodeAuthCount).toBeGreaterThanOrEqual(1);
   });
 });
 

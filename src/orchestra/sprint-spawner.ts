@@ -4,8 +4,8 @@
 //   routeSprintTasks()
 
 // ─── Node Builtins ─────────────────────────────────────────────────
-import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 
 // ─── Core (value imports — enums used at runtime) ──────────────────
 import {
@@ -126,6 +126,14 @@ import { ParallelPipelineManager } from './parallel-pipeline.js';
 // ─── Task Router ────────────────────────────────────────────────
 import { routeTask, emitTimeoutEvents } from './task-router.js';
 import { aggregateSprintHistory } from './timeout-estimator.js';
+
+// ─── Routing-Decision-Journal (409-003 ROUTING-TEK-OTORİTE) ──────
+// Reuses the path convention from core/routing-engine.ts's born-622 journal
+// (`.deckent/routing/decisions/<sprintId>.jsonl`). The append itself is
+// re-implemented locally (routing-engine.ts's own appendRoutingDecisionRecord
+// is unexported and out of this task's write scope) using the same fail-soft
+// contract (ADR-G-009): a journal-write fault must never affect spawn.
+import { routingDecisionJournalPath, type RoutingDecisionCandidate } from '../core/routing-engine.js';
 
 // Sprint 280 root-cause fix: adaptive per-task timeout is wired into every spawn
 // path (emitTimeoutEvents was a 0-caller dormant function, so docker_timeout
@@ -1242,22 +1250,99 @@ export function validateTaskDependencies(tasks: Task[]): import('./parallel-pipe
 }
 
 /**
+ * Append one spawn-time agent-fallback decision to the sprint's routing-
+ * decision journal (`.deckent/routing/decisions/<sprintId>.jsonl`, same file
+ * routing-engine.ts's born-622 journal writes to — path reused via
+ * `routingDecisionJournalPath`). Tagged `source: 'spawn-fallback'` so it is
+ * distinguishable from plan-time `selectBestAgent` decision records sharing
+ * the file. Fires ONLY when `routeSprintTasks` actually reassigns
+ * `task.assignedAgent` (see call site) — the normal, plan-time-pinned case
+ * never reaches here, so this journal stays a faithful "invisible decision"
+ * audit trail rather than noise on every task.
+ *
+ * Fail-soft (ADR-G-009), mirrors routing-engine.ts's own
+ * `appendRoutingDecisionRecord`: a journal-write fault must never affect
+ * spawn. No-op when `journalContext` is absent (409-003: the sole current
+ * caller, sprint-controller.ts's `runSprint` Phase 1.5, does not thread
+ * projectRoot/sprintId through — out of this task's write scope. The
+ * single-authority pin below is unconditional either way; only the audit
+ * trail degrades to silent-fail-soft without journalContext).
+ */
+function appendSpawnFallbackRoutingDecision(
+  journalContext: { projectRoot: string; sprintId: string } | undefined,
+  taskId: string,
+  agentId: string,
+  reason: string,
+): void {
+  if (!journalContext) return;
+  try {
+    const candidates: RoutingDecisionCandidate[] = [
+      { agentId, totalScore: 0, signals: {}, bypass: false },
+    ];
+    const record = {
+      taskId,
+      sprintId: journalContext.sprintId,
+      ts: new Date().toISOString(),
+      candidates,
+      winner: agentId,
+      reason,
+      cached: false,
+      source: 'spawn-fallback' as const,
+    };
+    const filePath = routingDecisionJournalPath(journalContext.projectRoot, journalContext.sprintId);
+    mkdirSync(dirname(filePath), { recursive: true });
+    appendFileSync(filePath, JSON.stringify(record) + '\n', 'utf-8');
+  } catch {
+    // Fail-soft (ADR-G-009): a decision-journal write error must never affect spawn.
+  }
+}
+
+/**
  * Route all sprint tasks to providers using the TaskRouter.
  * Sets task.provider, task.assignedAgent, and task.assignedSkills based on routing decisions.
  * Exported for testability — called from runSprint Phase 1.5.
+ *
+ * 409-003 ROUTING-TEK-OTORİTE — single-authority pin: plan-time routing
+ * (sprint-planner.ts's routeTaskV2 → selectBestAgent, now live per born-641)
+ * already resolves `task.assignedAgent` with full multi-signal context
+ * (skill affinity, learning bonus, forceAgent override, user-surface bonus —
+ * routing-engine.ts's `getUserSurfaceBonus` feeds selectBestAgent directly).
+ * `routeTask`'s own `applyUserSurfaceBonus` reapplies that SAME surface
+ * signal in isolation and can disagree with the already-decided winner
+ * (proven by tests/orchestra/router-surface-wire.test.ts, whose fixtures
+ * intentionally show routeTask returning a different agent than a
+ * pre-existing `assignedAgent`) — previously this function overwrote
+ * `task.assignedAgent` unconditionally whenever `routing.agent !== 'generic'`,
+ * a silent, un-journaled second authority on top of plan-time's decision.
+ * Now: a task that already carries a meaningful (non-empty, non-'generic')
+ * plan-time assignment keeps it — spawn-time only fills in when plan-time
+ * left nothing real (routing-failure swallow, or a genuine 'generic'
+ * verdict), and that fallback is journaled (tagged, fail-soft) so it is
+ * never an invisible decision.
+ *
  * @param tasks - Array of tasks to route
  * @param config - Resolved config with skill_routing overrides
  * @param availableProviders - List of available provider names (from Connector or registry)
+ * @param journalContext - Optional projectRoot/sprintId for the spawn-fallback
+ *   decision journal. Omitted by the current sprint-controller.ts call site
+ *   (out of scope to thread through here) — fallback pin logic still applies
+ *   unconditionally; only the audit-trail write degrades to a no-op.
  */
 export function routeSprintTasks(
   tasks: Task[],
   config: ResolvedConfig,
   availableProviders: ProviderName[],
+  journalContext?: { projectRoot: string; sprintId: string },
 ): void {
   for (const task of tasks) {
     const routing = routeTask(task, config, availableProviders);
     task.provider = routing.provider;
-    if (routing.agent !== 'generic') task.assignedAgent = routing.agent;
+    const hasPlanTimeAssignment =
+      task.assignedAgent != null && task.assignedAgent !== '' && task.assignedAgent !== 'generic';
+    if (!hasPlanTimeAssignment && routing.agent !== 'generic') {
+      task.assignedAgent = routing.agent;
+      appendSpawnFallbackRoutingDecision(journalContext, task.id, routing.agent, routing.reason);
+    }
     if (routing.skills.length > 0) task.assignedSkills = routing.skills;
   }
 }

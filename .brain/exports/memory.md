@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-409 Learnings
+- Sprint sprint-409 Learnings: ## Sprint sprint-409 Learnings
+
+## Gains
+- 409-001 — INPUT-BAR-FIXES — born-527: Home/End algılama + paste-history + keylog platform-farkındalığı — Disk-verify BEFORE coding (git blame + git log) found 2 of the 3 born-527 items already fixed+tes...
+- 409-002 — DENIED-TOOL-HONESTY — born-528: confirm-red'i toolSink dürüst-çıktı yolundan geçir
+- 409-003 — ROUTING-TEK-OTORİTE — 641-spawner: spawn-time agent-override'ı plan-time otoriteyle birleştir — Trigger-analysis: routeSprintTasks (sprint-spawner.ts) is called from exactly ONE call site — spr...
+
 ## Sprint sprint-408 Learnings
 - Sprint sprint-408 Learnings: ## Sprint sprint-408 Learnings
 

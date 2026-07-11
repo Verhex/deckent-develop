@@ -51,6 +51,10 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-409 Learnings** (sprint-409): ## Sprint sprint-409 Learnings
+
+## Gains
+- 409-001 — INPUT-BAR-FIXES — born-527: Home/End algılama + paste-history + ...
 - **Sprint sprint-408 Learnings** (sprint-408): ## Sprint sprint-408 Learnings
 
 ## Gains
@@ -79,8 +83,6 @@
 
 ## Gains
 - 400-001 — AFFECTED-RESOLVER — import-graph ile değişen-dosya→etkilenen-tes...
-- **Sprint sprint-399 Learnings** (sprint-399): ## Sprint sprint-399 Learnings
-- SAN-1-CORE — sanitizeScope Rule-5 trackedRootFiles-aware (sessiz kök-dosya drop bite...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -145,5 +147,6 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: stale_heartbeat
 - Violation pattern: doc_sync_ground_truth_mismatch
+- Violation pattern: file_outside_scope
 
-_Total entries: 1223 | Generated: 2026-07-11_
+_Total entries: 1227 | Generated: 2026-07-11_

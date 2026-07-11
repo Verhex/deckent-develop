@@ -872,9 +872,10 @@
       "src/cli/repl/input-bar.tsx"
     ],
     "proposed_mode": "run",
-    "spec": "Fix Home/End detection to use the Ink Key properties that are actually populated; guard the multi-line/trailing-newline paste path so it doesn't push an empty history entry; make the debug keylog path platform-aware (or config-driven) instead of hardcoded /tmp so it doesn't silently no-op on non-POSIX hosts.",
+    "spec": "Fix Home/End detection to use the Ink Key properties that are actually populated; guard the multi-line/trailing-newline paste path so it doesn't push an empty history entry; make the debug keylog path platform-aware (or config-driven) instead of hardcoded /tmp so it doesn't silently no-op on non-POSIX hosts. || DONE 2026-07-11 409-001: Home/End gercek-Ink-property/sequence eslemesi + bos-history-push guard + keylog os.tmpdir/config-driven (kapali=0-IO); RED->GREEN.",
     "verify": "press Home/End in the REPL and confirm cursor movement; paste a multi-line block ending in a newline and confirm no empty history entry is created",
-    "wire_on": false
+    "wire_on": false,
+    "status": "DONE"
   },
   {
     "born_id": 528,
@@ -889,9 +890,10 @@
       "src/cli/repl/run.tsx"
     ],
     "proposed_mode": "run",
-    "spec": "Route the confirm-denial early-return through the same toolSink honest-outcome rendering path used for every other tool outcome, so a denied tool call is visibly marked denied instead of silently vanishing from the transcript.",
+    "spec": "Route the confirm-denial early-return through the same toolSink honest-outcome rendering path used for every other tool outcome, so a denied tool call is visibly marked denied instead of silently vanishing from the transcript. || DONE 2026-07-11 409-002(+fix-turu): confirm-denial toolSink durust-cikti yolundan (denied-isaretli kayit + model'e 'user denied' tool-result; 633-sozluguyle tutarli); onayli-yol byte-ayni pin.",
     "verify": "deny a confirm-tier tool call and confirm the transcript visibly shows a denial indicator, not silence",
-    "wire_on": false
+    "wire_on": false,
+    "status": "DONE"
   },
   {
     "born_id": 529,
@@ -2741,7 +2743,7 @@
       "src/orchestra/sprint-spawner.ts"
     ],
     "proposed_mode": "el-fix+sprint",
-    "spec": "ZINCIR: secure-coding W5b-ekstraksiyonu stackDetection/triggers'siz -> routing-engine:1533 unguarded read TypeError -> planSprint per-task catch debugLog-only yuttu -> plan-time atama HIC olusmadi -> atamayi sprint-spawner.ts:1260 spawn-time yolu yapti (api-builder over-selection = 397-007 hastaligi oradan) -> 622-journal'i da hic ateslenmedi. EL-FIX DONE 2026-07-11: (1) motor null-safe (skillTriggers/stackDetection?./dependencies??[]) + RED-test; (2) secure-coding manifest onarimi (iki agac); (3) planSprint catch loud-warn (operator-gorunur); (4) journal cift-onek path-fix. CANLI-KANIT: dry-run journal'i skor-dokumleriyle dustu, atamalar mantiklilasti (i18n->terminal-ux-engineer). KALANLAR: (a) spawner:1260 cifte-otorite — plan-time atama canliyken spawn-time override catisma-riski + journal'siz; (b) manifest sema-lint'i (born-590 ailesi): stackDetection/triggers zorunlu-alan validasyonu sync/lint'te; (c) ERRORS.md'de kac gundur oldugu olculsun. || VAKA-2 (2026-07-11 sprint-405 dry-run): secure-coding'in EKSIK-onarimi (yalniz stackDetection eklenmisti) resolveComposition'da composableWith.length undefined-okumasiyla YINE dustu — LOUD-WARN yakaladi (fix'in ROI'si aninda). El-fix: skill-selector null-safe + secure-coding TAM-manifest (category/triggers/composableWith/priority/promptInjection, iki-agac) + regresyon-test. KALICI-DERS: alan-alan onarim degil TAM-sema onarimi; kok-cozum = manifest sema-lint + pool-load normalizasyonu (641-kalan). || KALICI-KAPANIS 2026-07-11 406-003: pool-load normalizasyonu (iki pool, tip-sinirli default'lar, fail-soft) + scripts/lint-manifests.mjs (rapor-only) + lint:gates zincirine eklendi; gate canli-temiz. Kalan tek-kalem: spawner cifte-otorite (ayri is).",
+    "spec": "ZINCIR: secure-coding W5b-ekstraksiyonu stackDetection/triggers'siz -> routing-engine:1533 unguarded read TypeError -> planSprint per-task catch debugLog-only yuttu -> plan-time atama HIC olusmadi -> atamayi sprint-spawner.ts:1260 spawn-time yolu yapti (api-builder over-selection = 397-007 hastaligi oradan) -> 622-journal'i da hic ateslenmedi. EL-FIX DONE 2026-07-11: (1) motor null-safe (skillTriggers/stackDetection?./dependencies??[]) + RED-test; (2) secure-coding manifest onarimi (iki agac); (3) planSprint catch loud-warn (operator-gorunur); (4) journal cift-onek path-fix. CANLI-KANIT: dry-run journal'i skor-dokumleriyle dustu, atamalar mantiklilasti (i18n->terminal-ux-engineer). KALANLAR: (a) spawner:1260 cifte-otorite — plan-time atama canliyken spawn-time override catisma-riski + journal'siz; (b) manifest sema-lint'i (born-590 ailesi): stackDetection/triggers zorunlu-alan validasyonu sync/lint'te; (c) ERRORS.md'de kac gundur oldugu olculsun. || VAKA-2 (2026-07-11 sprint-405 dry-run): secure-coding'in EKSIK-onarimi (yalniz stackDetection eklenmisti) resolveComposition'da composableWith.length undefined-okumasiyla YINE dustu — LOUD-WARN yakaladi (fix'in ROI'si aninda). El-fix: skill-selector null-safe + secure-coding TAM-manifest (category/triggers/composableWith/priority/promptInjection, iki-agac) + regresyon-test. KALICI-DERS: alan-alan onarim degil TAM-sema onarimi; kok-cozum = manifest sema-lint + pool-load normalizasyonu (641-kalan). || KALICI-KAPANIS 2026-07-11 406-003: pool-load normalizasyonu (iki pool, tip-sinirli default'lar, fail-soft) + scripts/lint-manifests.mjs (rapor-only) + lint:gates zincirine eklendi; gate canli-temiz. Kalan tek-kalem: spawner cifte-otorite (ayri is). || SPAWNER-KALAN DONE 2026-07-11 409-003: spawn-time yeniden-atama yalniz assignedAgent yok/generic'se (plan-time otorite kazanir) + spawn-fallback journal'li (source:'spawn-fallback'); 476 fix-mirasi korunur. born-641 ailesi TAMAMEN kapandi (kalan tek: kac-gundur-olcumu — dusuk-oncelik not).",
     "verify": "dry-run: WARN yok + decisions-jsonl var; routing-decision-journal 7/7; born-641 testi",
     "status": "DONE",
     "wire_on": "el-fix"

@@ -105,10 +105,13 @@ export type PasteChunkResult =
  *    mesaj"); the user reviews + presses Enter for real.
  *  • no internal newline left after stripping → a single line + trailing
  *    newline ("text\r") → `submit`, UNLESS the resulting line (`buffer +
- *    withoutTrailing`) is empty — a chunk that is PURELY \r/\n bytes (e.g. a
- *    coalesced double-Enter, or a paste of only blank lines while the buffer
- *    is empty) must never auto-submit or land in history, mirroring
- *    editInput's own `submit: line.length > 0 ? line : undefined` contract.
+ *    withoutTrailing`) is empty OR whitespace-only — a chunk that is PURELY
+ *    \r/\n bytes (e.g. a coalesced double-Enter, or a paste of only blank
+ *    lines while the buffer is empty), or reduces to spaces/tabs only, must
+ *    never auto-submit or land in history — `.trim()` before the length
+ *    check mirrors appendHistory's own `trimmed.trim().length === 0` skip
+ *    (input-history.ts), so both history sinks (in-session + persisted) agree
+ *    on what counts as "empty".
  * Pure — regression-tested without mounting Ink.
  */
 export function resolvePasteChunk(buffer: string, input: string): PasteChunkResult {
@@ -117,7 +120,7 @@ export function resolvePasteChunk(buffer: string, input: string): PasteChunkResu
     return { kind: 'insert', text: input.replace(/\r\n?/g, '\n') };
   }
   const line = buffer + withoutTrailing;
-  return line.length > 0 ? { kind: 'submit', line } : { kind: 'noop' };
+  return line.trim().length > 0 ? { kind: 'submit', line } : { kind: 'noop' };
 }
 
 /** Resolve the debug keylog path: `DECKENT_INK_DEBUG_LOG` env override first,

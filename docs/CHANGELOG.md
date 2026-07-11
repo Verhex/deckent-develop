@@ -2,6 +2,20 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint409] - 2026-07-11
+
+### Added
+
+- DENIED-TOOL-HONESTY — born-528: confirm-red'i toolSink dürüst-çıktı yolundan geçir
+- ROUTING-TEK-OTORİTE — 641-spawner: spawn-time agent-override'ı plan-time otoriteyle birleştir
+
+### Fixed
+
+- INPUT-BAR-FIXES — born-527: Home/End algılama + paste-history + keylog platform-farkındalığı
+
+
+_Tasks: 4 total, 4 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint408] - 2026-07-11
 
 ### Added
