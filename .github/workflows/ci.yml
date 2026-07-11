@@ -40,7 +40,7 @@ jobs:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
@@ -57,7 +57,7 @@ jobs:
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
@@ -82,7 +82,7 @@ jobs:
         # better-sqlite3 v12.10.0 prebuilds: v24 + v26 (v20/v23 removed).
         node-version: [24.x, 26.x]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -101,7 +101,7 @@ jobs:
       matrix:
         node-version: [24.x, 26.x]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -125,7 +125,7 @@ jobs:
       matrix:
         node-version: [24.x, 26.x]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -144,7 +144,7 @@ jobs:
       matrix:
         node-version: [24.x, 26.x]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -164,7 +164,7 @@ jobs:
     # Coverage job runs these same tests — this job is supplementary.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
@@ -180,7 +180,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: typecheck
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
@@ -200,7 +200,7 @@ jobs:
     continue-on-error: true
     needs: typecheck
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
@@ -222,7 +222,7 @@ jobs:
     # build kırılır (no continue-on-error). Floors mevcut baseline'dan -5%
     # kalibre; sprint başına ~1% ratchet politikası (CONTRIBUTING.md).
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
@@ -260,7 +260,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test-core, test-orchestra, test-cli, test-remaining, test-dashboard]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
