@@ -4,6 +4,7 @@
 // Results collected via shared .tasks/ volume mount.
 
 import { spawnSync, spawn as nodeSpawn } from 'node:child_process';
+import type { SpawnOptionsWithoutStdio } from 'node:child_process';
 import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync, openSync, fsyncSync, closeSync, readdirSync, renameSync, rmdirSync, chmodSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
@@ -997,6 +998,207 @@ export function applyDistMutationAdvisory(resultPath: string, mutated: boolean):
   }
 }
 
+// ─── born-671 (416-001 CAPTURE-TRUTH): streamed docker-logs capture ─────────
+// TT549 live incident (CC-doğrulandı): monitorContainer captured `docker logs`
+// via spawnSync with NO maxBuffer → Node's 1 MiB default SILENTLY truncated 44%
+// (16/36) of the trace corpus at the 1.075–1.171 MB band, AND the ENOBUFS error
+// spawnSync sets on that overflow was never checked. The cut dropped the terminal
+// usage envelope → patchResultUsageFromEnvelope got truncated input → cost-heuristic
+// 293× drift (413-001). This replaces the fixed-buffer spawnSync with an async
+// STREAM: chunks accumulate with only a generous 256 MiB SAFETY ceiling (an honest
+// on-disk marker + loud warn on the rare overflow — NEVER a silent cut), and a
+// spawn-error / non-zero-exit / terminating-signal is surfaced (captureIncomplete +
+// named loud warn) with the partial data STILL returned, never hidden. A raw
+// maxBuffer bump cannot do any of this — the streaming child + honest ceiling are
+// the structural difference (why the NO_GO "stream'siz maxBuffer-büyütme" is avoided).
+
+/**
+ * Safety ceiling for a single streamed `docker logs` capture (256 MiB). This is
+ * NOT the old 1 MiB maxBuffer cut — it exists only to stop a runaway/adversarial
+ * log from exhausting host memory, and hitting it is surfaced HONESTLY (marker +
+ * warn + captureIncomplete), never silently. Realistic worker traces are 1–10 MB.
+ */
+export const DOCKER_LOG_CAPTURE_CEILING_BYTES = 256 * 1024 * 1024;
+
+/**
+ * Wall-clock cap for reading `docker logs` off an already-exited container (30 s).
+ * On timeout the child is killed and the partial capture returned as incomplete so
+ * a hung `docker logs` never stalls the downstream `docker rm -f` / lock release.
+ * Deliberately higher than the old spawnSync 10 s — a large (but legitimate) log must
+ * not be cut for speed; completeness wins (the whole point of this fix).
+ */
+export const DOCKER_LOG_CAPTURE_TIMEOUT_MS = 30_000;
+
+/**
+ * Honest, self-identifying marker appended to captured content when the safety
+ * ceiling is hit. It flows into the `.log` as a `text` LogEvent (writeNormalizedDockerLog
+ * splits on newline), so the truncation is visible ON DISK, not merely in a warning.
+ */
+export const DOCKER_LOG_TRUNCATION_MARKER =
+  '\n[deckent:docker-logs-capture] TRUNCATED at the 256MiB safety ceiling — capture '
+  + 'stopped here (honest marker, NOT a silent 1MiB cut). captureIncomplete=true\n';
+
+/**
+ * Minimal child shape {@link captureDockerLogs} needs — the SpawnImpl pattern from
+ * core/worker-image-check.ts, extended with `kill()` for the ceiling cut. A real
+ * `node:child_process` ChildProcess satisfies it structurally.
+ */
+export interface DockerLogsChildLike {
+  stdout: NodeJS.ReadableStream | null;
+  stderr: NodeJS.ReadableStream | null;
+  on(event: 'close', listener: (code: number | null, signal: NodeJS.Signals | null) => void): this;
+  on(event: 'error', listener: (error: Error) => void): this;
+  kill(signal?: NodeJS.Signals): boolean;
+}
+
+/** Injectable async spawn for {@link captureDockerLogs} (defaults to node spawn). */
+export type DockerLogsSpawnImpl = (
+  command: string,
+  args: string[],
+  options: SpawnOptionsWithoutStdio,
+) => DockerLogsChildLike;
+
+/** Result of a streamed docker-logs capture. */
+export interface DockerLogCapture {
+  /** Full captured output — stdout THEN stderr, matching the old `(stdout)+(stderr)` concat. */
+  content: string;
+  /** True when the 256 MiB safety ceiling was hit — `content` carries the honest marker. */
+  truncated: boolean;
+  /** True when data may be missing: truncation, spawn error, non-zero exit, or signal. */
+  captureIncomplete: boolean;
+  /** docker-logs exit code, or null when the spawn errored / was killed before a clean exit. */
+  exitCode: number | null;
+  /** Terminating signal, if any. */
+  signal: NodeJS.Signals | null;
+  /** Bytes retained (equals the ceiling when truncated). */
+  bytesCaptured: number;
+}
+
+/**
+ * Stream `docker logs <container>` into memory with NO fixed 1 MiB cap — the core
+ * fix for TT549. stdout+stderr chunks accumulate as they arrive; the only bound is
+ * the generous {@link DOCKER_LOG_CAPTURE_CEILING_BYTES} safety ceiling, and hitting
+ * it (or any spawn-error / non-zero-exit / signal) is surfaced honestly rather than
+ * swallowed. The returned `content` is the SAME pristine string the old spawnSync
+ * path produced, so its two consumers (writeNormalizedDockerLog +
+ * patchResultUsageFromEnvelope) are byte-for-byte unchanged — only their INPUT is
+ * now full-data instead of 1 MiB-truncated.
+ *
+ * Injectable `spawnImpl` (SpawnImpl pattern, core/worker-image-check.ts) keeps the
+ * regression tests hermetic — no real docker. Exported for unit tests. Never throws:
+ * a synchronous spawn failure resolves to an empty, `captureIncomplete` result.
+ */
+export function captureDockerLogs(
+  containerName: string,
+  spawnImpl?: DockerLogsSpawnImpl,
+  opts?: { ceilingBytes?: number; timeoutMs?: number },
+): Promise<DockerLogCapture> {
+  const ceiling = opts?.ceilingBytes ?? DOCKER_LOG_CAPTURE_CEILING_BYTES;
+  const timeoutMs = opts?.timeoutMs ?? DOCKER_LOG_CAPTURE_TIMEOUT_MS;
+  const doSpawn: DockerLogsSpawnImpl =
+    spawnImpl ?? ((command, args, options) => nodeSpawn(command, args, options));
+
+  return new Promise<DockerLogCapture>((resolveCapture) => {
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    let totalBytes = 0;
+    let truncated = false;
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const finish = (outcome: {
+      exitCode: number | null;
+      signal: NodeJS.Signals | null;
+      spawnError?: Error;
+    }): void => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      let content =
+        Buffer.concat(stdoutChunks).toString('utf8') + Buffer.concat(stderrChunks).toString('utf8');
+      // A deliberate ceiling-kill sets neither exitCode nor signal here (we own the
+      // cut) — `truncated` alone carries that meaning, so it is NOT double-counted as
+      // an abnormal exit below.
+      const exitDishonest =
+        outcome.spawnError !== undefined ||
+        outcome.signal !== null ||
+        (outcome.exitCode !== null && outcome.exitCode !== 0);
+      const captureIncomplete = truncated || exitDishonest;
+      if (truncated) {
+        content += DOCKER_LOG_TRUNCATION_MARKER;
+        console.warn(
+          `[deckent:spawn-backend-docker] captureDockerLogs: '${containerName}' hit the `
+          + `${ceiling}-byte capture ceiling — output truncated with an honest on-disk marker `
+          + `(retained ${totalBytes} bytes). SAFETY cap, not the old 1MiB silent cut.`,
+        );
+      }
+      if (outcome.spawnError !== undefined) {
+        console.warn(
+          `[deckent:spawn-backend-docker] captureDockerLogs: docker logs spawn/read error for `
+          + `'${containerName}' — ${outcome.spawnError.message}. captureIncomplete=true; returning `
+          + `${totalBytes} bytes of partial log (loss surfaced, not hidden).`,
+        );
+      } else if (exitDishonest) {
+        console.warn(
+          `[deckent:spawn-backend-docker] captureDockerLogs: docker logs for '${containerName}' `
+          + `exited abnormally (exitCode=${outcome.exitCode}, signal=${outcome.signal}). `
+          + `captureIncomplete=true; returning ${totalBytes} bytes of partial log (loss surfaced, not hidden).`,
+        );
+      }
+      resolveCapture({
+        content,
+        truncated,
+        captureIncomplete,
+        exitCode: outcome.exitCode,
+        signal: outcome.signal,
+        bytesCaptured: totalBytes,
+      });
+    };
+
+    let child: DockerLogsChildLike;
+    try {
+      child = doSpawn('docker', ['logs', containerName], { shell: false });
+    } catch (err) {
+      finish({ exitCode: null, signal: null, spawnError: err instanceof Error ? err : new Error(String(err)) });
+      return;
+    }
+
+    const absorb = (chunks: Buffer[], chunk: string | Buffer): void => {
+      if (truncated || settled) return;
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      const remaining = ceiling - totalBytes;
+      if (buf.length >= remaining) {
+        // Ceiling hit — retain only what fits, mark truncated, stop the stream.
+        if (remaining > 0) {
+          chunks.push(buf.subarray(0, remaining));
+          totalBytes += remaining;
+        }
+        truncated = true;
+        try { child.kill('SIGKILL'); } catch { /* best-effort — process may already be gone */ }
+        finish({ exitCode: null, signal: null });
+        return;
+      }
+      chunks.push(buf);
+      totalBytes += buf.length;
+    };
+
+    child.stdout?.on('data', (c: string | Buffer) => absorb(stdoutChunks, c));
+    child.stderr?.on('data', (c: string | Buffer) => absorb(stderrChunks, c));
+    child.on('error', (err) => finish({ exitCode: null, signal: null, spawnError: err }));
+    child.on('close', (code, signal) => finish({ exitCode: code, signal }));
+
+    timer = setTimeout(() => {
+      try { child.kill('SIGKILL'); } catch { /* best-effort */ }
+      finish({
+        exitCode: null,
+        signal: null,
+        spawnError: new Error(`docker logs read timed out after ${timeoutMs}ms`),
+      });
+    }, timeoutMs);
+    if (typeof timer.unref === 'function') timer.unref();
+  });
+}
+
 // ─── Docker Spawn Backend ─────────────────────────────────────────────────
 
 export class DockerSpawnBackend implements SpawnBackend {
@@ -1974,7 +2176,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
-    child.stdout?.on('data', (data: Buffer) => {
+    child.stdout?.on('data', async (data: Buffer) => {
       const exitCode = parseInt(data.toString().trim(), 10);
       debugLog('docker-backend:exit', `taskId=${taskId} exitCode=${exitCode}`);
 
@@ -2135,12 +2337,18 @@ export class DockerSpawnBackend implements SpawnBackend {
         debugLog('docker-backend:dist-fingerprint-after', e);
       }
 
-      // Extract container logs BEFORE removal (docker logs requires container to exist)
+      // Extract container logs BEFORE removal (docker logs requires container to exist).
+      // born-671 (416-001 CAPTURE-TRUTH): STREAM the capture instead of the old
+      // spawnSync — that path had NO maxBuffer, so Node's 1 MiB default silently cut
+      // 44% of trace corpora at ~1.1 MB and killed the terminal usage envelope (293×
+      // cost drift, 413-001). captureDockerLogs streams stdout+stderr with only a
+      // 256 MiB honest-marker safety ceiling and surfaces any error/non-zero-exit
+      // instead of swallowing it. AWAITED so the `docker rm -f` below never races the
+      // reader off the still-existing container. `content` is the SAME pristine string
+      // the old path produced, so the two consumers below are byte-for-byte unchanged.
       try {
-        const logResult = spawnSync('docker', ['logs', containerName], {
-          encoding: 'utf-8', timeout: 10_000, stdio: ['pipe', 'pipe', 'pipe'],
-        });
-        const logContent = (logResult.stdout ?? '') + (logResult.stderr ?? '');
+        const capture = await captureDockerLogs(containerName);
+        const logContent = capture.content;
         if (logContent.trim()) {
           const logPath = join(tasksDir, `task-${taskId}.log`);
           // born-637 (TRACE-CONTENT-PARITY docker-parity): claude's container CLI

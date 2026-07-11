@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-416 Learnings
+- Sprint sprint-416 Learnings: ## Sprint sprint-416 Learnings
+- TT550 — RESULT-INGEST-IDNORM: malformed result-taskId phantom-fix + trace-kaybı üretiyor (+üçüncü-neden kazısı): GO_WITH_TECH_DEBT — Worker timeout/killed (exitCode=1) but git diff shows 14 files modified. Brain should reconcile via Spurious NO_GO helpe
+
+## Gains
+- 416-001 — TT549 — CAPTURE-TRUTH: docker-log yakalama 1MiB'ta kesiliyor (%44 korpus kesik, usage-patch ölüyor) — Worker timeout/killed (exitCode=1) but git diff shows 14 files modified.
+- 416-003 — TT551 — FIX-PHASE-TRACE: FIX-fazı trace yazmıyor → korpus success-biased (0 NO_GO etiketi) — Worker timeout/killed (exitCode=1) but git diff shows 14 files modified.
+
 ## Sprint sprint-415 Learnings
 - Sprint sprint-415 Learnings: ## Sprint sprint-415 Learnings
 

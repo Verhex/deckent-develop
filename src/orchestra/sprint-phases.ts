@@ -2392,6 +2392,51 @@ export async function runFixPhase(
     // observers see the EVALUATE→FIX transition.
     persistPhaseTransition(projectRoot, sprint, SprintPhase.FIX, SprintStatus.FIXING);
 
+    // ─── FIX-PHASE TRACE-WIRE (TT551 / 416-003) ──────────────────────────
+    // runEvaluatePhase records only the attempt-1 verdict (this file, ~L2106).
+    // The FIX phase — where the highest-value SFT signal lives (the NO_GO→FIX
+    // error/fix PAIR, plus every INTERMEDIATE NO_GO fix-verdict) — recorded
+    // NOTHING, so the sprint-worker corpus was success-biased (0 NO_GO labels).
+    // Mirror the EVALUATE post-verdict wire: each fix-worker result is recorded
+    // as its OWN entry, labeled APART from the original attempt via additive
+    // meta (purpose/attempt/retryOf/verdict). Single recorder API
+    // (recordSprintWorkerTrace); this closure only DRY-shares the three FIX
+    // call-sites (main wave / re-dispatch / post-fix scan) — it is NOT a second
+    // recorder. Default-OFF (`training_trace.enabled`), fail-soft (ADR-G-009):
+    // a trace fault never drops FIX.
+    const fixTraceEnabled = config?.training_trace?.enabled === true;
+    const fixTraceCollector = fixTraceEnabled ? createOutputCollector(projectRoot) : undefined;
+    const recordFixWorkerTrace = (
+      traceTask: Task,
+      traceResult: TaskResult,
+      verdict: TaskEvaluation,
+      purpose: 'original' | 'fix' | 'xfix',
+      attempt: number,
+      retryOf: string | undefined,
+    ): void => {
+      if (!fixTraceEnabled || !fixTraceCollector) return;
+      try {
+        recordSprintWorkerTrace({
+          enabled: true,
+          projectRoot,
+          collector: fixTraceCollector,
+          meta: {
+            taskId: traceTask.id,
+            sprintId: sprint.id,
+            agent: traceTask.assignedAgent ?? 'generic',
+            model: traceTask.model ?? 'unknown',
+            selfAssessment: verdict,                    // Brain verdict = outcome label (mirror EVALUATE)
+            workerSelfAssessment: traceResult.selfAssessment,
+            verdict,                                    // explicit FIX-phase verdict (NO_GO included)
+            purpose,
+            attempt,
+            ...(retryOf !== undefined ? { retryOf } : {}),
+            ts: new Date().toISOString(),
+          },
+        });
+      } catch (e) { debugLog('runFixPhase:sprintTrace', e); }
+    };
+
     // ─── Provider-Limit FIX Guard (Sprint 272 — Task 006, F1-LIM faz-2b) ──
     // 269 live lesson: when the provider usage-limit was exhausted EVERY
     // worker exited-without-result, and the FIX wave re-ran into the SAME
@@ -2559,6 +2604,12 @@ export async function runFixPhase(
           const fixEval = toTaskEvaluation(fixRubricResult);
           handleEvaluation(projectRoot, fixTask, fixEval, fixResult);
           evaluations.set(fixTask.id, fixEval);
+
+          // TT551: record the fix attempt as its OWN trace entry (attempt-2),
+          // labeled apart from the original via retryOf=fixForTaskId. This is
+          // the must-have wire: when fixEval is NO_GO the intermediate NO_GO
+          // verdict — previously never recorded — reaches the corpus.
+          recordFixWorkerTrace(fixTask, fixResult, fixEval, 'fix', 2, fixTask.fixForTaskId);
 
           // MF-5 (Sprint 331 — Task 331-014): mirror the EVALUATE-phase
           // brain-verdict enrichment onto the `-fix.result` file so a fix-result
@@ -2753,6 +2804,9 @@ export async function runFixPhase(
             const rEval = toTaskEvaluation(rRubricResult);
             handleEvaluation(projectRoot, rTask, rEval, rResult);
             evaluations.set(rTask.id, rEval);
+            // TT551: a NOT_DISPATCHED task re-run is the ORIGINAL work-item's
+            // 2nd honest attempt (no fix task, so retryOf stays undefined).
+            recordFixWorkerTrace(rTask, rResult, rEval, 'original', 2, undefined);
             if (rEval === TaskEvaluation.NO_GO) failed += 1; else succeeded += 1;
           }
         }
@@ -2831,6 +2885,14 @@ export async function runFixPhase(
           evaluations.set(pTask.id, pEval);
           persistBrainVerdict(
             projectRoot, pTask.id, pEval, pRubricResult.totalScore, { honest: true }, pResult,
+          );
+          // TT551: a stalled task rescued by the post-fix scan — 'fix' when it
+          // carries a fixForTaskId, else the ORIGINAL's first real attempt.
+          recordFixWorkerTrace(
+            pTask, pResult, pEval,
+            pTask.fixForTaskId ? 'fix' : 'original',
+            pTask.fixForTaskId ? 2 : 1,
+            pTask.fixForTaskId,
           );
           if (pEval === TaskEvaluation.NO_GO) failed += 1; else succeeded += 1;
         }

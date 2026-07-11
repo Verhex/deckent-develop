@@ -1,85 +1,85 @@
-# DIRECTIVES — SPRINT-415: RC-5 EVERY-ENVIRONMENT INSTALL-MATRIX + SEC-03 TOKEN-REDACTION
+# DIRECTIVES — SPRINT-416: TRACE-TRUTH P0 DİLİMİ (549 CAPTURE · 550 INGEST · 551 FIX-TRACE)
 
 ## Goal
-RC-treni dilim-5 (543: XPLAT-01 — Win/WSL/macOS/Linux packed-install matrix REQUIRED) + RC-6'dan
-öne-alınan SEC-03 (token-redaction). SCHED-5 bilinçli ERTELENDİ: shadow-reducer dogfood-flag'i az
-önce açıldı — live-switch ancak journal-kanıtı toplandıktan sonra (bu sprint'in koşusu kanıt üretir).
-Tasarım-SSOT: `docs/analysis/beta-blocker-sweep-2026-07-11.md` (XPLAT-01 + SEC-03).
-⚠️ Workflow-pin kör-noktaları artık BEŞ dizin: tests/github/ tests/workflows/ tests/docs/
-tests/scripts/ tests/governance/ — workflow değiştiren task BEŞİNİ de tarar.
+TRACE-TRUTH treni (Alperen, 2026-07-12; MASTER-PLAN 549-559, memory
+project_trace_truth_train_2026_07_12) ilk dilimi — ölçüm-gerçeği + korpus-dürüstlüğü. Kural:
+554/555 (metering/turn-economy) BU üçlü düzelmeden koşulmaz. **Alperen kararı: bu trende model=opus.**
+552 TRACE-V2 sonraki sprint. Trace-korpusu SP-2 moat'ının hammaddesi — veri-kaybı geri-dönüşsüz sınıf.
 
 ## 🔒 BAĞLAYICI (her task)
 - Yalnız kendi Files'ına yaz · `.deckent/`, `.brain/`, `.tasks/` DOKUNMA · git stash-reset YASAK · `npm run build` YASAK · notes TEK STRING · Self DÜRÜST.
-- REPRODUCE-FIRST: fix'ten önce hatalı davranışı RED testle kanıtla.
-- i18n-FIRST (user-facing CLI metni; log-prefix'li satırda getMessage aynı-satırda).
-- Test hermetik: tmpdir, async spawn, ≤16GB.
+- REPRODUCE-FIRST: fix'ten önce hatalı davranışı RED testle kanıtla (docker'a GERÇEK bağımlılık YASAK — spawn/exec enjekte-edilebilir olsun).
+- Test hermetik: tmpdir, async spawn (test-kodunda spawnSync YASAK), ≤16GB.
+- `.deckent/traces/sprint-worker.jsonl` CANLI dosya — testler ona DOKUNMAZ (tmpdir-fixture).
 
-## Task 1: RC5A — cross-platform packed-install matrix: üç-OS gerçek-kurulum smoke'u (XPLAT-01)
-- Model: sonnet | Effort: high | Provider: claude
-- Files: .github/workflows/cross-platform-e2e.yml, scripts/xplat-install-smoke.mjs, tests/workflows/cross-platform-e2e.test.ts
-- Scope: .github/workflows/, scripts/, tests/workflows/
+## Task 1: TT549 — CAPTURE-TRUTH: docker-log yakalama 1MiB'ta kesiliyor (%44 korpus kesik, usage-patch ölüyor)
+- Model: opus | Effort: high | Provider: claude
+- Files: src/orchestra/spawn-backend-docker.ts, tests/orchestra/docker-capture-truth.test.ts
+- Scope: src/orchestra/, tests/orchestra/
 - Dependencies: none
 ### Description
-KANIT (sol-sweep XPLAT-01): doctor native-Windows'u 'fully supported' gösterir (doctor.ts:~95)
-ama Windows CI informational/allow-failure ve yalnız core-test kapsamındadır (ci.yml:~196); WSL ve
-macOS gerçek release-install matrisinde YOK — 'Every Environment' yasasının release-kanıtı eksik.
-GÖREV: (1) YENİ scripts/xplat-install-smoke.mjs — OS-AGNOSTİK tek-script (CI adımları yalnız bunu
-çağırır; platform-dalları script içinde): `npm pack` → tmpdir'e `npm install -g <tarball>`
-(prefix-izoleli — global-kirlilik YOK: npm_config_prefix=tmpdir) → kurulu-binary ile `deckent
-init --yes` (413-001 non-interactive akışı) → çıktıda outcome-bloğu var + exit-code sözleşmesi
-(0|2 kabul; 1 FAIL) → `deckent doctor` koşar + çıkar; her adım adlı-log + ilk-hatada dürüst
-nonzero; (2) .github/workflows/cross-platform-e2e.yml'e 'packed-install' job'ı: matrix
-[ubuntu-latest, macos-latest, windows-latest] × node-24 — continue-on-error/allow-failure YASAK
-(üçü de required); WSL: ubuntu-job zaten POSIX-kanıtı, ayrıca windows-job'a WSL-adımı EKLEME
-(runner-WSL kurulumu kırılgan — dürüst-not: WSL-kanıtı = Alperen'in lokal ortamı + ubuntu-parity;
-workflow-yorumuna yaz); (3) mevcut jobs'lara DOKUNMA (yalnız yeni job ekle); (4) pin-testi:
-tests/workflows/cross-platform-e2e.test.ts yeni-job şeklini pinler (matrix üç-OS + no-allow-failure
-+ script-çağrısı); BEŞ pin-dizinini tara (başka dosya bu workflow'u pinliyorsa senkronla). Lokal
-kanıt: script'i linux'ta gerçek koştur (npm pack + izole-prefix install ~2-3dk) → çıktı notes'a.
-Smoke: node scripts/xplat-install-smoke.mjs → son satır 'XPLAT SMOKE OK (linux)'
+KANIT (trace-audit, CC-doğrulanmış): `docker logs` çağrısı spawnSync ile **maxBuffer'sız** (Node
+default 1MiB) ve **error/status kontrolsüz** (src/orchestra/spawn-backend-docker.ts:~2141) →
+trace-korpusunun %44'ü (16/36) kesik; kesiklerin TAMAMI 1.075–1.171MB bandında (sabit-boyut
+imzası — başka açıklama yok). Aynı kesik terminal-envelope'u ve **usage-patch'i** de öldürüyor →
+cost-heuristic 293× sapma (413-001 vakası). GÖREV: (1) yakalama STREAM-tabanlı olur: `docker logs`
+async-spawn + stdout/stderr chunk'ları doğrudan hedef-dosyaya/buffer'a akıtılır — sabit-buffer
+üst-sınırı YOK (makul emniyet-tavanı 256MB, aşımda dürüst-truncation-marker + loud-warn; sessiz-kesme
+ASLA); (2) exit/error dürüst: spawn-error, non-zero-exit, sinyal → adlı loud-warn + eldeki-kısmî-veri
+`captureIncomplete:true` işaretiyle teslim (kayıp gizlenmez); (3) spawn enjekte-edilebilir
+(worker-image-check.ts SpawnImpl deseni — testler gerçek-docker'sız); (4) usage-patch'in aynı
+akıştan beslendiğini doğrula — kesik-fix'iyle patch'in de kurtulduğunu ayrı test-case'le pinle
+(memory-uyarısı: [[project_resolvetokenusage_wire_is_harmful]] — usage-patch KONTRATINA dokunma,
+yalnız girdisinin tam-veri olmasını sağla); (5) RED-first: enjekte-spawn'la >1MiB sahte-log →
+bugünkü kodun ~1MiB'ta kestiğini + error-yutmayı kanıtla → GREEN: tam-boyut + marker-yok +
+error-yolu dürüst. tests/orchestra/ blast'ı koş.
 ### goNogo
-- goCriteria: script üç-platform-dallı + linux'ta gerçek-koşu kanıtı; workflow üç-OS required (allow-failure/continue-on-error sıfır); mevcut job'lar byte-değişmemiş; pin-test yeni-şekli pinliyor; 5-dizin taraması notes'ta.
-- nogo: allow-failure/continue-on-error eklenirse NO_GO; global npm-prefix kirletilirse NO_GO; mevcut job'lar değişirse NO_GO.
+- goCriteria: RED (1MiB-kesme + error-yutma) → GREEN (stream, tavan-aşımı marker'lı, exit-dürüst); spawn-injectable; usage-patch tam-veri pinli (kontrat değişmedi-diff-kanıt); tests/orchestra tamamı yeşil.
+- nogo: maxBuffer-büyütme-yaması (stream'siz) yeterli sayılırsa NO_GO; sessiz-truncation kalırsa NO_GO; gerçek-docker'a bağımlı test NO_GO; usage-patch kontratı değişirse NO_GO.
 
-## Task 2: RC5B — release-attestation'a cross-platform şartı: matrix-yeşili olmadan publish yok
-- Model: sonnet | Effort: medium | Provider: claude
-- Files: .github/workflows/release.yml, tests/github/workflows/release.test.ts, tests/governance/release-workflow-unify.test.ts, tests/scripts/publish-workflow.test.ts, tests/docs/release-docs.test.ts, tests/workflows/publish.test.ts
-- Scope: .github/workflows/, tests/github/, tests/governance/, tests/scripts/, tests/docs/, tests/workflows/
-- Dependencies: Task 1
-### Description
-KANIT: 414-001'in verify-ci-attestation adımı yalnız 'CI' workflow'unu doğrular — Task-1'in yeni
-packed-install matrix'i (Cross-Platform E2E) publish-şartı DEĞİL; sol RC-5 gate'i 'her platform
-required' ister ve bu ancak release-attestation'a bağlanınca yürütülebilir-contract olur. GÖREV:
-(1) release.yml verify-ci-attestation adımını genişlet: tag-commit için HEM 'CI' HEM
-'Cross-Platform E2E' workflow-run'ları success olmalı (gh run list --commit ile; herhangi biri
-yok/failure → adlı-hata + fail; iki kontrol AYRI log-satırı — hangisi eksik net görünsün);
-(2) adım-yorumunu güncelle (attestation-kapsamı: CI + XPLAT); (3) BEŞ pin-dizininde release.yml'i
-pinleyen her testi yeni-şekle senkronla (RED-first: önce mevcut tek-workflow-attestation pinini
-güncelle). Action-SHA'ları ve OIDC yapısına DOKUNMA (414-001 teslimi).
-### goNogo
-- goCriteria: attestation iki-workflow'lu (ayrı-log, adlı-hata); 5-dizin pin-senkron testli-yeşil; SHA-pin/OIDC yapısı byte-korunur (diff-kanıt notes'ta).
-- nogo: attestation tek-workflow'a düşerse NO_GO; SHA-pin veya OIDC satırları değişirse NO_GO.
-
-## Task 3: SEC03 — API/terminal token-redaction: raw-token stderr'den ölür (RC-6 öne-alım)
-- Model: sonnet | Agent: bug-fixer | Effort: high | Provider: claude
-- Files: src/api/server.ts, src/cli/helpers/messages.ts, tests/api/token-redaction.test.ts
-- Scope: src/api/, src/cli/helpers/messages.ts, tests/api/
+## Task 2: TT550 — RESULT-INGEST-IDNORM: malformed result-taskId phantom-fix + trace-kaybı üretiyor (+üçüncü-neden kazısı)
+- Model: opus | Effort: high | Provider: claude
+- Files: src/orchestra/result-collector.ts, tests/orchestra/result-ingest-idnorm.test.ts
+- Scope: src/orchestra/, tests/orchestra/
 - Dependencies: none
 ### Description
-KANIT (sol-sweep SEC-03 + CC grep-teyit): ÜÇ raw-token stderr'e yazılıyor — server.ts:1651
-(auto-generated API token), :1679 (localhost-minted token), :1963 (terminal session token).
-Süreç-log'ları toplayan her sistem (CI, journald, log-shipper) bearer-token'ları düz-metin depolar.
-GÖREV: (1) üç satırda raw-token ÖLÜR → yerine fingerprint (sha256 ilk-12-hex, 'tok:ab12…' formatı)
-+ token'ın NEREDE olduğu bilgisi; (2) token 0600-dosyaya yazılır: `.deckent/runtime/api-token`
-(atomic tmp+rename + chmod 0600 — 411-001'in deck-file desenini KOPYALA; Windows: icacls-deseni
-varsa kullan yoksa dürüst-warn) — terminal-token için ayrı dosya `.deckent/runtime/terminal-token`;
-dosya-yolu stderr-mesajında verilir; (3) mevcut TÜKETİCİLERİ KIRMA: localhost-dashboard'ın
-token-alma mekanizması (HTML-injection ~:2000) ve testlerin token-okuma yolları AYNEN çalışır —
-değişen yalnız STDERR-LOG içeriği (grep'le tüm resolvedToken/finalToken/terminalToken
-kullanım-envanterini çıkar, notes'a yaz; injection SEC-03-kapsamı-DIŞI, RC-6 notu); (4) i18n:
-yeni mesajlar getMessage en+tr; (5) RED-first: bugünkü stderr'in raw-token içerdiğini yakalayan
-test → GREEN: stderr'de token YOK + fingerprint VAR + 0600-dosya VAR + dosya-içeriği=aktif-token
-(server'a gerçek-istek ile doğrula — supertest/fetch deseni mevcut api-testlerinden).
+KANIT (trace-audit, ≥2 CANLI vaka: 412-003 + 409-002): worker result-dosyasına taskId'yi
+`task-XXX` (prefix'li) yazarsa buildResultsMap (src/orchestra/result-collector.ts:~286)
+VERBATIM-index'lediği için lookup-MISS → tek kökten ÜÇ zarar: (a) phantom fix-worker doğar
+($2.23/4.25dk — "impl zaten worktree'de" diyen boş-fix), (b) trace kaybolur, (c) NO_GO-label
+kaybolur (korpus-bias). GÖREV: (1) ingest-noktasında taskId-NORMALİZASYON: `task-` prefix'i
+soyulur + dosya-adından türetilen expected-taskId ile içerik-taskId karşılaştırılır — uyuşmazlıkta
+LOUD-WARN (hangi dosya, hangi iki değer) + normalize-edilmiş kabul (veri atılmaz); normalize
+TEK ingest-noktasında olur (downstream ikinci-normalize İCAT ETME); (2) **ÜÇÜNCÜ-NEDEN KAZISI
+(görevin yarısı bu):** 404-002 vakasında ID DÜZGÜNKEN de result düşmüş — result-collector
+ingest-yolunu (glob/timing/lock/collectedIds) forensik oku, olası kök(ler)i kanıt-satırlarıyla
+notes'a yaz; reproduce edebiliyorsan RED-test + fix, edemiyorsan dürüst 'reproduce-edilemedi +
+şüpheli-mekanizma-listesi' (uydurma-fix YASAK); (3) RED-first: `task-412-003` içerikli
+result-fixture → bugünkü map-miss kanıtı → GREEN: normalize + warn + fix-task doğmaz (debt-manager
+yoluna sızmadığını handleEvaluation-seviyesinde pinle). ⚠ Bu dosyada sprint-414 shadow-driver
+kancası var — o bölgeye DOKUNMA. tests/orchestra/ blast'ı koş.
 ### goNogo
-- goCriteria: üç stderr-satırında raw-token sıfır (RED→GREEN); fingerprint + 0600-dosya (POSIX-mode assert) + dosya-token'ı gerçek-auth'ta çalışıyor; dashboard/test tüketicileri yeşil (tests/api tamamı); i18n en+tr; kullanım-envanteri notes'ta.
-- nogo: dashboard localhost-auth kırılırsa NO_GO; token herhangi bir log-satırında düz-metin kalırsa NO_GO; mode-teyitsiz dosya-yazımı NO_GO.
+- goCriteria: RED (verbatim-miss) → GREEN (tek-nokta normalize + loud-warn + phantom-fix-doğmaz pini); üçüncü-neden kazısı kanıt-satırlı (fix VEYA dürüst-bulgu); shadow-kancası byte-korunur; tests/orchestra tamamı yeşil.
+- nogo: normalize birden-çok noktaya kopyalanırsa NO_GO; uyuşmazlık sessiz-kabul edilirse NO_GO; üçüncü-neden bölümü boş/genel-geçerse NO_GO.
+
+## Task 3: TT551 — FIX-PHASE-TRACE: FIX-fazı trace yazmıyor → korpus success-biased (0 NO_GO etiketi)
+- Model: opus | Effort: high | Provider: claude
+- Files: src/orchestra/sprint-phases.ts, src/orchestra/trace-recorder.ts, tests/orchestra/fix-phase-trace.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+- Dependencies: none
+### Description
+KANIT (trace-audit): recordSprintWorkerTrace YALNIZ EVALUATE-fazında çağrılıyor
+(src/orchestra/sprint-phases.ts:~2121) — runFixPhase trace YAZMIYOR → NO_GO→FIX→DONE yörüngeleri
+(SFT için EN değerli örnekler: hata+düzeltme çifti) ve ara-NO_GO verdict'leri kayıt-dışı; mevcut
+36-kayıtlık korpus 27 DONE / 9 debt / **0 NO_GO** (success-biased). GÖREV: (1) FIX-fazına
+trace-wire: EVALUATE'teki recordSprintWorkerTrace çağrı-desenini AYNEN izle (yeniden-icat yok;
+recorder tek-API kalır — trace-recorder.ts yoksa fonksiyonun gerçek ev-dosyasını bul ve Files'ı
+ona göre uygula, notes'a yaz); fix-worker'ın trace'i orijinal-attempt'ten AYRI kayıt olur;
+(2) meta-alanları: attempt (1..n), retryOf (orijinal taskId), purpose ('fix'|'xfix'|'original'),
+verdict (evaluation-sonucu — NO_GO dahil); MEVCUT kayıt-şemasını KIRMA (yeni alanlar additive;
+mevcut tüketici pipeline.ts okumaya devam eder — grep'le tüketici-envanteri notes'a); (3) RED-first:
+fix-yolu fixture'ında bugün trace-YAZILMADIĞI kanıtı → GREEN: fix-attempt kaydı + NO_GO-verdict'li
+orijinal kaydı + additive-şema; (4) canlı-dosyaya dokunmadan tmpdir-fixture. tests/orchestra/ blast.
+### goNogo
+- goCriteria: RED (fix-fazı 0-trace) → GREEN (fix+orijinal ayrı-kayıt, attempt/retryOf/purpose/verdict alanları); şema additive (mevcut-tüketici testleri yeşil + envanter notes'ta); recorder tek-API; tests/orchestra tamamı yeşil.
+- nogo: ikinci bir recorder-API doğarsa NO_GO; mevcut şema-alanı kırılırsa NO_GO; NO_GO-verdict hâlâ kayıt-dışıysa NO_GO.

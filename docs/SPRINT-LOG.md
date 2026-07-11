@@ -10174,3 +10174,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 415-003: SEC03 — API/terminal token-redaction: raw-token stderr'den ölür (RC-6 öne-alım) (DONE)
 
 ---
+## Sprint 416 — sprint-416
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-11
+**Duration:** 2170s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 2170406ms |
+
+### Tasks
+
+- 416-001: TT549 — CAPTURE-TRUTH: docker-log yakalama 1MiB'ta kesiliyor (%44 korpus kesik, usage-patch ölüyor) (DONE)
+- 416-002: TT550 — RESULT-INGEST-IDNORM: malformed result-taskId phantom-fix + trace-kaybı üretiyor (+üçüncü-neden kazısı) (GO_WITH_TECH_DEBT)
+- 416-003: TT551 — FIX-PHASE-TRACE: FIX-fazı trace yazmıyor → korpus success-biased (0 NO_GO etiketi) (DONE)
+
+---

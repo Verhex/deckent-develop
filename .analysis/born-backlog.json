@@ -2918,5 +2918,35 @@
     "spec": "Iki belirti: (a) 414-001'in write-scope'una planner hem tests/docs/release-docs.test.ts hem docs/release-docs.test.ts koydu -> worker durust-notla iki kopya birakti (CC docs-kopyasini sildi; vitest-include disiydi); (b) routing decision-journal'da scope girisleri 'src/core/deck-file.ts/' gibi DOSYA-ADI+slash sahte-dizinler iceriyor. FIX: scope-derivation dosya-yollarini dizin sanmamali (uzanti-tespiti) + turetilmis-yol gercekte Files'ta yoksa eklememeli; test: 411-001/414-001 gercek Files-listeleri fixture -> turetilen scope sahte-yol icermez.",
     "verify": "decision-journal yeni sprint'te sahte-dizin icermez; ayni Files-listesi tek-konum uretir",
     "wire_on": "sprint"
+  },
+  {
+    "born_id": 665,
+    "title": "WINDOWS init exit-code ezilmesi: outcome=SETUP_INCOMPLETE basiliyor AMA exit 1 donuyor (sozlesme=2) — RC-treni Windows-kilidi",
+    "priority": "P0",
+    "status": "OPEN",
+    "source": "ba3190db Cross-Platform E2E ILK windows-kosusu (2026-07-12) — matrix isini yapti",
+    "spec": "CI-kanit (Packed Install — windows-latest): pack+izole-global-install+binary-resolve OK; kurulu deckent.cmd ile `init --yes` ciktisinda 'Setup outcome: SETUP_INCOMPLETE' + dogru blocker-blogu VAR ama surec exit 1 (FAILED-kodu) — xplat-smoke sozlesme-kontrolu yakaladi. Ubuntu+macOS ayni akista exit 2 doğru. SUPHELILER (Windows-ortamsiz kesinlestirilemedi): (a) entry/commander global-handler'i process.exitCode'u ezip 1 yaziyor (init-sonu bir adim Windows'ta throw ediyor olabilir — DEP0190 shell:true spawn'lari aday); (b) outcome-SONRASI koslan bir adim (cursor/mcp-yazimi? provisioning-artigi?) printError+exitCode=1; (c) .cmd shim errorlevel-tasima (dusuk-olasilik: node dogal-exit'te exitCode korunur). TESHIS-YOLU: xplat-smoke'a gecici verbose (init stderr'ini ayri-yakala + process.exitCode-izi) ya da init'e DECKENT_DEBUG_EXIT ortam-flag'i; fix sonrasi windows-CI yesili = kanit. RC-5 matrix'i required oldugu icin BU FIX'e kadar her push'ta XPLAT kirmizi kalacak — oncelik P0.",
+    "verify": "windows-latest Packed Install job yesil (exit 2 + SETUP_INCOMPLETE)",
+    "wire_on": "sprint"
+  },
+  {
+    "born_id": 666,
+    "title": "init --yes sessiz auto-provisioning: 3 provider-CLI'yi sormadan npm-global kuruyor (2+dk network) — insansiz-akis politika karari",
+    "priority": "P1",
+    "status": "OPEN",
+    "source": "ba3190db windows-kosusu yan-bulgu (2026-07-12)",
+    "spec": "CI-kanit: `init --yes` resolveProvisionMode({yes:true}) yoluyla claude+codex+gemini'yi otomatik npm install -g yapti (sessiz kabul; 2+dk; CI/airgap'te istenmeyen network + supply-chain yuzeyi; AS-7 offline-pillar celiskisi). KARAR GEREKIR (Alperen): --yes = 'sorulara-evet' MI 'no-install + durust-blocker' MI? Oneri (CC): --yes default NO-INSTALL (SETUP_INCOMPLETE + remediation zaten durust), auto-install yalniz acik `--install` flag'iyle; boylece insansiz akis deterministik+network'suz. xplat-smoke da hizlanir (~2dk).",
+    "verify": "izole-PATH `init --yes` network'suz tamamlanir; `--yes --install` eski davranis",
+    "wire_on": "decision-then-sprint"
+  },
+  {
+    "born_id": 667,
+    "title": "opus-worker timeout ×2 (416-002 orijinal+fix): worker-timeout suresi model-tier'a duyarsiz — uzun-dusunen opus killed, sentetik-placeholder Brain'i yaniltti",
+    "priority": "P1",
+    "status": "OPEN",
+    "source": "sprint-416 canli-vaka (2026-07-12)",
+    "spec": "416-002 (forensik-agir TT550) iki denemede de 'Worker timeout/killed (exitCode=1)' placeholder'iyla oldu; git-diff-sayisi (14/18) baska worker'larin es-zamanli diff'iydi (yaniltici sinyal) — Brain 'Spurious NO_GO reconcile' yoluyla GO_WITH_TECH_DEBT verdi ve sprint 6/6-DONE raporladi; CC disk-verify gercegi yakaladi (result-collector degismemis). IKI is: (1) worker-timeout model-tier/effort-duyarli olsun (opus-high forensik task'a sonnet-tier sure dar) ya da task-timeout DIRECTIVES'ten ayarlanabilir; (2) reconcile-helper'in 'git diff N files' sinyali SPRINT-GENELI diff'e degil task-scope-diff'ine bakmali (yanlis-pozitif kaynak). Iliskili: feedback_docker_oom_false_no_go + feedback_brain_synthetic_nogo_disk_verify.",
+    "verify": "opus-task uzun-kosuda timeout'suz tamamlanir; reconcile yalniz task-scope-diff'iyle tetiklenir",
+    "wire_on": "sprint"
   }
 ]

@@ -30,6 +30,23 @@ export interface TraceMeta {
    *  LogEvent-derived transcript — a training consumer filters/weights a partial
    *  reconstruction differently via this field's presence. */
   contentSource?: 'envelope-fallback';
+  /** TT551 (FIX-PHASE-TRACE) — attempt index (1..n): 1 is the original worker,
+   *  ≥2 is a FIX re-run. Additive; omitted by the attempt-1 EVALUATE wire and
+   *  the native-REPL source. */
+  attempt?: number;
+  /** TT551 — the ORIGINAL taskId this trace is a retry of (the fix task's
+   *  `fixForTaskId`). Omitted for a first-attempt / non-retry trace. */
+  retryOf?: string;
+  /** TT551 — what this trace IS relative to the work-item: 'original' (first
+   *  attempt or NOT_DISPATCHED re-dispatch), 'fix' (a NO_GO→FIX re-run), or
+   *  'xfix' (a fix-of-a-fix). Omitted by the attempt-1 EVALUATE wire. */
+  purpose?: 'original' | 'fix' | 'xfix';
+  /** TT551 — the FIX-phase Brain evaluation verdict, NO_GO INCLUDED. The field
+   *  that de-biases the corpus: EVALUATE-only recording captured ~0 NO_GO labels
+   *  because fix-attempt + intermediate-NO_GO verdicts went unrecorded. Carried
+   *  explicitly (alongside `selfAssessment`) so a training consumer can filter
+   *  fix-phase verdicts. */
+  verdict?: string;
 }
 export interface OpenAiMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -54,6 +71,14 @@ export interface SprintTraceMeta {
   /** The worker's OWN claim, kept alongside the Brain verdict (born-614) —
    *  the claim↔verdict delta is itself a training signal (honesty gap). */
   workerSelfAssessment?: string;
+  /** TT551 (FIX-PHASE-TRACE) — attempt index (1..n); ≥2 is a FIX re-run. */
+  attempt?: number;
+  /** TT551 — the original taskId this is a retry of (fix task's fixForTaskId). */
+  retryOf?: string;
+  /** TT551 — trace purpose relative to the work-item. */
+  purpose?: 'original' | 'fix' | 'xfix';
+  /** TT551 — FIX-phase Brain verdict (NO_GO included) — de-biases the corpus. */
+  verdict?: string;
   ts: string;
 }
 
@@ -67,6 +92,23 @@ function toOpenAiMessage(m: ProviderMessage): OpenAiMessage {
     };
   }
   return { role: m.role, content: m.content };
+}
+
+/**
+ * TT551 (FIX-PHASE-TRACE) — the additive FIX-phase label fields (attempt /
+ * retryOf / purpose / verdict), each included ONLY when defined so a pre-TT551
+ * trace (the attempt-1 EVALUATE wire, the native-REPL source) stays
+ * byte-identical and every existing meta consumer (training/pipeline.ts
+ * buildLabels reads only selfAssessment/agent/model) is unaffected. Shared by
+ * BOTH sprint-worker example builders so the two mapping paths cannot drift.
+ */
+function additiveTraceLabels(meta: SprintTraceMeta): Partial<Pick<TraceMeta, 'attempt' | 'retryOf' | 'purpose' | 'verdict'>> {
+  return {
+    ...(meta.attempt !== undefined ? { attempt: meta.attempt } : {}),
+    ...(meta.retryOf !== undefined ? { retryOf: meta.retryOf } : {}),
+    ...(meta.purpose !== undefined ? { purpose: meta.purpose } : {}),
+    ...(meta.verdict !== undefined ? { verdict: meta.verdict } : {}),
+  };
 }
 
 /** Build a training example: a system message + the mapped transcript. */
@@ -112,6 +154,7 @@ export function toSprintTrainingExample(events: readonly LogEvent[], meta: Sprin
       ...(meta.workerSelfAssessment !== undefined
         ? { workerSelfAssessment: meta.workerSelfAssessment }
         : {}),
+      ...additiveTraceLabels(meta),
     },
   };
 }
@@ -143,6 +186,7 @@ export function toEnvelopeFallbackTrainingExample(envelopeResult: string, meta: 
       ...(meta.workerSelfAssessment !== undefined
         ? { workerSelfAssessment: meta.workerSelfAssessment }
         : {}),
+      ...additiveTraceLabels(meta),
     },
   };
 }

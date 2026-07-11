@@ -9,6 +9,23 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint416] - 2026-07-11
+
+### Added
+
+- TT549 — CAPTURE-TRUTH: docker-log yakalama 1MiB'ta kesiliyor (%44 korpus kesik, usage-patch ölüyor)
+
+### Changed
+
+- TT550 — RESULT-INGEST-IDNORM: malformed result-taskId phantom-fix + trace-kaybı üretiyor (+üçüncü-neden kazısı) (completed with tech debt)
+
+### Fixed
+
+- TT551 — FIX-PHASE-TRACE: FIX-fazı trace yazmıyor → korpus success-biased (0 NO_GO etiketi)
+
+
+_Tasks: 6 total, 6 done, 2 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint415] - 2026-07-11
 
 ### Added
