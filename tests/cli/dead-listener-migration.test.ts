@@ -96,6 +96,7 @@ vi.mock('../../src/cli/helpers/config-reader.js', () => ({
   getLangFromConfig: vi.fn(() => 'en'),
 }));
 vi.mock('../../src/core/constants.js', () => ({
+  SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur
   NERVOUS_HISTORY_FILE: '.deckent/nervous/history.jsonl',
   NERVOUS_PENDING_FILE: '.deckent/nervous/pending.json',
   PANIC_IPC_DIR: '.deckent/panic-ipc',

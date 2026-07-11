@@ -82,6 +82,7 @@ vi.mock('../../../src/core/deck-file.js', () => ({
 
 vi.mock('../../../src/core/constants.js', () => ({
   DECKENT_DIR: '.deckent',
+  SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur
   BRAIN_DIR: '.brain',
   MEMORY_FILE: 'MEMORY.md',
   DEBT_FILE: 'DEBT.md',

@@ -137,6 +137,9 @@ vi.mock('../../src/core/constants.js', () => ({
   DEBT_FILE: 'DEBT.md',
   DECKENT_VERSION: '0.4.0-test',
   DECKENT_DIR: '.deckent',
+  // born-630 (406-002): permission-store→approval-allowscope zinciri artık
+  // SETTINGS_DIR'i modül-yüklemede okuyor — factory-mock'a eksik export eklendi.
+  SETTINGS_DIR: '.deckent/settings',
   SPRINT_STATE_FILE: '.deckent/sprint-state.json',
   SPRINT_ACTIVE_FILE: '.deckent/sprint-active.json',
 }));

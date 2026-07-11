@@ -1,3 +1,47 @@
+# SOLE npm-publish authority (born-608, task 407-001, P0 publish-blocker fix).
+#
+# publish.yml used to ALSO run a real `npm publish` on the same `push: tags: v*` event
+# this workflow fires on (plus a third path via `release: published`, which this
+# workflow's own "Create GitHub Release" step triggers) — a genuine double/triple-publish
+# race. publish.yml is now narrowed to a read-only dry-run/verify workflow; this file is
+# the only one that ever calls a real `npm publish`.
+#
+# Chain order (mirrors the task directive exactly): install → build:all → validate:publish
+# → smoke test-gate → publish → GitHub Release notes → dist artifact upload.
+#
+# Two deliberate, documented deviations from a naive "just fix the trigger" patch:
+#
+# 1. `npm run build` → `npm run build:all`. Plain `build` (tsc + copy-assets) never built
+#    the dashboard (`src/dashboard` is a separate sub-package with its own deps/bundler —
+#    `build:all` additionally runs `build:dashboard`). Every previous release therefore
+#    published a package whose `deckent serve` dashboard was hollow.
+#
+#    IMPORTANT gotcha found while fixing this: `package.json`'s `prepublishOnly` hook
+#    itself runs plain `npm run build` (not `build:all`) automatically on every `npm
+#    publish` invocation. Even with build:all run explicitly below, `npm publish` would
+#    silently re-trigger the hook, re-run plain `build`, and delete `dist/dashboard/`
+#    again right before the real publish — reintroducing the hollow-dashboard bug through
+#    a side door. `package.json` is outside this task's write scope, so the in-scope fix
+#    is `--ignore-scripts` on the publish step below, which suppresses the hook entirely
+#    (validate:publish already ran the equivalent readiness checks, and lint/test already
+#    ran above, so skipping prepublishOnly's redundant hook here is safe — the follow-up
+#    to make `prepublishOnly` itself call `build:all`, so a stray manual/local `npm
+#    publish` stays correct too, is a docImpact note in this task's .result).
+#
+# 2. Test-gate is a minimal smoke, not a duplicate of ci.yml's full ~9-directory matrix.
+#    A tag is cut from a commit that was already fully gated by ci.yml on its merge to
+#    main — re-running the entire suite here is pure duplication cost, not new signal.
+#    Reusing ci.yml directly (`workflow_call`) would be cleaner but requires adding a
+#    `workflow_call` trigger to ci.yml, which is outside this task's write scope —
+#    tracked as a docImpact follow-up. The smoke here instead runs this task's own new
+#    governance pins (tests/governance/, which includes the release-workflow-unify pin
+#    asserting this exact single-publish-authority invariant) plus the fastest,
+#    foundational test slice (tests/core/) as a final sanity check before publishing.
+#
+# 3. "Create GitHub Release" moved to AFTER "Publish to npm" (was before). A failed
+#    publish no longer leaves a GitHub Release + release notes for a version that was
+#    never actually published to npm.
+
 name: Release
 
 on:
@@ -35,18 +79,23 @@ jobs:
       - name: Type check (lint)
         run: npm run lint
 
-      - name: Run tests (staged to avoid OOM)
+      # build:all (not build) — see header note 1: dashboard bundle must ship.
+      - name: Build
+        run: npm run build:all
+
+      # 8-gate readiness check: pack size, entry points, bin exec bits, dashboard
+      # bundle, ADR/link lint (scripts/validate-publish.mjs). See header chain-order note.
+      - name: Validate publish readiness
+        run: npm run validate:publish
+
+      # Minimal smoke, not a duplicate of ci.yml's full matrix — see header note 2.
+      - name: Release smoke test-gate
         env:
           NODE_OPTIONS: '--max-old-space-size=8192'
         run: |
-          npx vitest run tests/core/ tests/agents/
-          npx vitest run tests/orchestra/ --pool=forks
-          npx vitest run tests/cli/
-          npx vitest run tests/mcp/ tests/api/ tests/integration/ tests/security/ tests/providers/ tests/monitor/ tests/docs/ tests/skills/ tests/analytics/ tests/scripts/
-        timeout-minutes: 15
-
-      - name: Build
-        run: npm run build
+          npx vitest run tests/governance/
+          npx vitest run tests/core/
+        timeout-minutes: 5
 
       - name: Extract changelog for this version
         id: changelog
@@ -61,6 +110,14 @@ jobs:
           echo "$NOTES" > /tmp/release-notes.txt
           echo "notes_file=/tmp/release-notes.txt" >> "$GITHUB_OUTPUT"
 
+      # --ignore-scripts: suppress prepublishOnly (see header note 1) so the build:all
+      # output from above is what actually gets published, not a hook-triggered rebuild.
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public --ignore-scripts
+
+      # Moved after publish — see header note 3.
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -69,11 +126,6 @@ jobs:
           files: |
             dist/**/*
           generate_release_notes: true
-
-      - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --provenance --access public
 
       - name: Upload dist artifacts
         uses: actions/upload-artifact@v4

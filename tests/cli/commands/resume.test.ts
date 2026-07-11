@@ -52,6 +52,7 @@ vi.mock('../../../src/core/constants.js', async () => {
   return {
     ...actual,
     DECKENT_DIR: '.deckent',
+  SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur
     TASKS_DIR: '.tasks',
     SPRINT_STATE_FILE: '.deckent/sprint-state.json',
   };

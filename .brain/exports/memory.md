@@ -1,5 +1,14 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-407 Learnings
+- Sprint sprint-407 Learnings: ## Sprint sprint-407 Learnings
+- COST-K2 — born-636-K2: task-tipi→effort tiering (flag'li, default-off): GO_WITH_TECH_DEBT — IMPLEMENTED: exported resolveEffortTier(intent: IntentType): TaskEffort in routing-engine.ts (pure, no config access, mi
+
+## Gains
+- 407-001 — RELEASE-UNIFY — born-608 (P0 PUBLISH-BLOCKER): tek release-workflow + tek npm-publish otoritesi — RELEASE-UNIFY (born-608 P0) implemented.
+- 407-002 — COST-K1 — born-636-K1: worker tur-azaltma (paralel tool-çağrısı + verify-döngüsü disiplini) — Added a compact, static (task-invariant) 'Turn Economy' directive (born-636-K1) to the god-prompt...
+- 407-004 — PLAN-SURFACE-KALAN — born-629(b,c): post-adoption gösterim + scope-gate yeni-dizin sınıfı — RED-before evidence (both parts): wrote tests/cli/plan-surface-postadoption.test.ts BEFORE any fi...
+
 ## Sprint sprint-406 Learnings
 - Sprint sprint-406 Learnings: ## Sprint sprint-406 Learnings
 

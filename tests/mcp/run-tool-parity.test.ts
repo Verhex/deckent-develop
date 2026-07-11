@@ -13,6 +13,7 @@ vi.mock('node:fs', () => ({
 }));
 
 vi.mock('../../src/core/constants.js', () => ({
+  SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur
   TASKS_DIR: '.tasks',
 }));
 

@@ -774,6 +774,10 @@ export interface DeckentConfig {
   routing?: {
     /** Prefer agents that have a history of success with the selected skills (default: false). */
     skill_agent_affinity?: boolean;
+    /** born-636-K2 (407-003 + CC son-mil): task-type→effort tiering (documentation/config
+     *  → 'low' · security/migration/audit → 'high'); explicit `Effort:` hint always wins.
+     *  Default-off = byte-identical planning. */
+    effort_tiering?: boolean;
     /** Cache agent selection across tasks in the same sprint to reduce routing overhead (default: false). */
     agent_cache?: boolean;
     /**

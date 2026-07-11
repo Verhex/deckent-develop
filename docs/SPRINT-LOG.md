@@ -9955,3 +9955,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 406-003: MANIFEST-SCHEMA-LINT — 641-kalan: skill/agent manifest zorunlu-alan validasyonu + pool-load normalizasyonu (DONE)
 
 ---
+## Sprint 407 — sprint-407
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-11
+**Duration:** 1252s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1251623ms |
+
+### Tasks
+
+- 407-001: RELEASE-UNIFY — born-608 (P0 PUBLISH-BLOCKER): tek release-workflow + tek npm-publish otoritesi (DONE)
+- 407-002: COST-K1 — born-636-K1: worker tur-azaltma (paralel tool-çağrısı + verify-döngüsü disiplini) (DONE)
+- 407-003: COST-K2 — born-636-K2: task-tipi→effort tiering (flag'li, default-off) (GO_WITH_TECH_DEBT)
+- 407-004: PLAN-SURFACE-KALAN — born-629(b,c): post-adoption gösterim + scope-gate yeni-dizin sınıfı (DONE)
+
+---

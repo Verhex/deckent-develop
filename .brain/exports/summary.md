@@ -51,6 +51,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-407 Learnings** (sprint-407): ## Sprint sprint-407 Learnings
+- COST-K2 — born-636-K2: task-tipi→effort tiering (flag'li, default-off): GO_WITH_TECH...
 - **Sprint sprint-406 Learnings** (sprint-406): ## Sprint sprint-406 Learnings
 
 ## Gains
@@ -77,8 +79,6 @@
 - SAN-1-CORE — sanitizeScope Rule-5 trackedRootFiles-aware (sessiz kök-dosya drop bite...
 - **Sprint sprint-398 Learnings** (sprint-398): ## Sprint sprint-398 Learnings
 - LAT-KPI-SEED — kpi-backfill + init-builtin-seed (3 fail): GO_WITH_TECH_DEBT — FIXED ...
-- **Sprint sprint-397 Learnings** (sprint-397): ## Sprint sprint-397 Learnings
-- T7-ELOOP — chat-tool-exec raw-throw → DeckentError (CODE-FIX): GO_WITH_TECH_DEBT — F...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -144,4 +144,4 @@ _No active technical debt._
 - Violation pattern: stale_heartbeat
 - Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 1216 | Generated: 2026-07-11_
+_Total entries: 1220 | Generated: 2026-07-11_

@@ -191,6 +191,67 @@ function pickClosest(target: string, candidates: string[]): string {
 
 const MAX_LISTED_SUSPECTS = 20;
 
+// ─── born-629c (407-004) — intentional-new-directory vs typo classification ──
+
+/**
+ * A write path that escapes the repo root (`..` traversal, absolute, `~`-home) —
+ * always typo-class, never eligible for the intentional-new-dir carve-out below.
+ */
+function looksOutOfRoot(path: string): boolean {
+  if (path.startsWith('/') || path.startsWith('~')) return true;
+  let depth = 0;
+  for (const seg of path.split('/')) {
+    if (seg === '..') {
+      depth--;
+      if (depth < 0) return true;
+    } else if (seg !== '.' && seg !== '') {
+      depth++;
+    }
+  }
+  return false;
+}
+
+/** Control characters and characters invalid/reserved on common filesystems — never a legitimate new-directory signal. */
+const SUSPICIOUS_CHAR_RE = /[\x00-\x1f<>:"|?*\\]/;
+function hasSuspiciousCharacters(path: string): boolean {
+  return SUSPICIOUS_CHAR_RE.test(path);
+}
+
+/**
+ * How many NEW (untracked) directory levels below the nearest tracked ancestor
+ * still read as "a normal new subdirectory" — beyond this an invented path looks
+ * too deep to be a plausible one-off addition and stays typo-class (BLOCK).
+ */
+const MAX_NEW_DIR_DEPTH = 2;
+
+/**
+ * How many tracked files must already live under a directory before a brand-new
+ * subdirectory of it is trusted as "this is an established content root — a new
+ * subfolder is a normal categorization move" (WARN, born-629c) rather than "this
+ * directory barely has any content — a stray new subfolder is exactly the
+ * born-573/518 hallucination pattern" (BLOCK). Deliberately well above a thin/
+ * fresh directory's file count so sparse areas keep the stricter check.
+ */
+const MIN_ESTABLISHED_ROOT_FILES = 15;
+
+/**
+ * Nearest tracked ancestor of `dir` (itself untracked) plus how many NEW path
+ * segments separate them. Returns null when NO prefix of `dir` is tracked at all
+ * — a fully invented top-level tree, not merely a new subdirectory of something
+ * that already exists.
+ */
+function findTrackedAncestor(
+  dir: string,
+  trackedDirs: ReadonlySet<string>,
+): { ancestor: string; newDepth: number } | null {
+  const segments = dir.split('/');
+  for (let i = segments.length - 1; i >= 1; i--) {
+    const prefix = segments.slice(0, i).join('/');
+    if (trackedDirs.has(prefix)) return { ancestor: prefix, newDepth: segments.length - i };
+  }
+  return null;
+}
+
 /**
  * Evaluate the scope gate for a planned sprint.
  *
@@ -201,8 +262,14 @@ const MAX_LISTED_SUSPECTS = 20;
  *    basename exists elsewhere → almost certainly the wrong directory (573/518).
  * 3. **new-plausible** — not tracked, no basename collision, and the parent
  *    directory already contains tracked files → a legitimate brand-new file.
- * 4. **suspect (invented-dir)** — not tracked, no basename collision, and the
- *    parent directory is not in the repo at all → invented location.
+ * 4. **new-plausible (intentional new-dir, born-629c)** — parent directory does
+ *    NOT exist yet, but its nearest tracked ancestor is an established root (many
+ *    tracked files) and the path is otherwise unsuspicious (in-root, no odd
+ *    characters, normal depth) → a plausible deliberate new directory, not a
+ *    typo (WARN via advisories, never blocks).
+ * 5. **suspect (invented-dir)** — not tracked, no basename collision, and either
+ *    escapes the repo root / has a suspicious character / is too deep / has no
+ *    (or too thin an) tracked ancestor → invented/typo location.
  *
  * Only WRITE-path suspects block (a suspect READ is advisory — it may be a
  * dependency artifact). Pure function: no I/O, no prompting, no side effects.
@@ -266,6 +333,34 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
         classification: 'new-plausible',
         reason: 'greenfield repo (no tracked directories) — path validation has no signal',
       };
+    }
+    // born-629c (407-004) — intentional-new-directory carve-out: a brand-new
+    // subdirectory of an ESTABLISHED tracked root (many files already live there),
+    // at normal depth, with no out-of-root/suspicious-character signal, reads as a
+    // deliberate new directory rather than a typo/hallucinated path (the
+    // docs/guides-style false positive) — classify it the same as any other
+    // legitimate new file (`new-plausible`, non-blocking) instead of `suspect`.
+    // Reuses the EXISTING `new-plausible` value rather than adding a 4th enum
+    // value: prompt-god-template.ts's buildWriteAuthorityList (worker-prompt
+    // scope rendering) buckets verdicts by classification into
+    // confirmed/new-plausible/suspect only — a new value would silently vanish
+    // from that worker-facing list. Typo-class (out-of-root / suspicious-char /
+    // too-deep / thin-ancestor) falls through unchanged to the suspect BLOCK below.
+    if (!looksOutOfRoot(path) && !hasSuspiciousCharacters(path)) {
+      const ancestorInfo = findTrackedAncestor(parent, trackedDirs);
+      if (ancestorInfo && ancestorInfo.newDepth <= MAX_NEW_DIR_DEPTH) {
+        const ancestorPrefix = `${ancestorInfo.ancestor}/`;
+        const ancestorFileCount = trackedFiles.filter(f => f.startsWith(ancestorPrefix)).length;
+        if (ancestorFileCount >= MIN_ESTABLISHED_ROOT_FILES) {
+          return {
+            taskId, path, role,
+            classification: 'new-plausible',
+            reason: `new directory '${parent}' — no such directory yet, but its established tracked `
+              + `ancestor '${ancestorInfo.ancestor}' (${ancestorFileCount} tracked files) makes this look `
+              + 'like an intentional new directory, not a typo (WARN, not blocked)',
+          };
+        }
+      }
     }
     return {
       taskId, path, role,

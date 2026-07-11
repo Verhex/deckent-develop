@@ -2,6 +2,21 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint407] - 2026-07-11
+
+### Added
+
+- RELEASE-UNIFY — born-608 (P0 PUBLISH-BLOCKER): tek release-workflow + tek npm-publish otoritesi
+- COST-K1 — born-636-K1: worker tur-azaltma (paralel tool-çağrısı + verify-döngüsü disiplini)
+- PLAN-SURFACE-KALAN — born-629(b,c): post-adoption gösterim + scope-gate yeni-dizin sınıfı
+
+### Changed
+
+- COST-K2 — born-636-K2: task-tipi→effort tiering (flag'li, default-off) (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint406] - 2026-07-11
 
 ### Added

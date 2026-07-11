@@ -19,6 +19,7 @@ import { buildConnectorAdapterWithKpiSummary, buildSprintKpiSummaryFn } from '..
 import { loadCostConfig, initCostConfig } from '../../core/cost-config-loader.js';
 import { estimateSprintCost, formatEstimate, resolveBillingModeForAuth, type TaskCostInput } from '../../core/cost-calculator.js';
 import { evaluateCostGate, evaluateSpendWarnAtSpawn } from '../../core/cost-gate.js';
+import { evaluateScopeGate, applyScopeResolutions } from '../../core/scope-gate.js';
 import { writeEvent } from '../../core/event-stream.js';
 import { notifyAsync } from '../../core/notify.js';
 import { existsSync, unlinkSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
@@ -108,6 +109,63 @@ export function restoreSandbox(projectRoot: string, state: SandboxState): void {
     // Then restore original stash
     spawnSync('git', ['stash', 'pop'], { cwd: projectRoot, encoding: 'utf-8' });
   } catch { /* non-fatal */ }
+}
+
+// ─── Dry-Run Scope Preview (born-629b / 407-004) ─────────────────
+
+export interface DryRunScopePreview {
+  /** Post-adoption (when validated) filesWrite per task id — pre-adoption on fallback. */
+  scopeByTask: Map<string, string[]>;
+  /** True once git ls-files + evaluateScopeGate ran successfully. */
+  validated: boolean;
+  /** Set when the scope gate would BLOCK a real `deckent start` at this repo state. */
+  blockedMessage?: string;
+}
+
+/**
+ * Preview the POST-adoption scope.filesWrite per task the same way runSprint
+ * (sprint-controller.ts, real pre-spawn gate) computes it right before spawn:
+ * evaluateScopeGate + applyScopeResolutions against the real tracked-file set.
+ * `deckent start --dry-run` calls planSprint() directly and never reaches that
+ * gate, so without this the operator-visible plan table showed PRE-adoption
+ * scope while the worker ultimately receives the adopted (typo-fixed) scope — a
+ * trust-surface mismatch. Preview-only: never mutates task files, never blocks;
+ * fails open to the pre-adoption scope on any git/gate error. When the gate would
+ * actually BLOCK, adoption never runs in the real sprint either (sprint-controller
+ * .ts applies resolutions strictly after the ok-check) — so this returns the
+ * pre-adoption scope plus the block message instead of a fictitious adopted one.
+ */
+export function computeDryRunScopePreview(
+  root: string,
+  tasks: Array<{ id: string; scope?: { filesWrite?: string[]; filesRead?: string[]; directories?: string[] } }>,
+  acknowledgeScopePaths: boolean,
+): DryRunScopePreview {
+  const scopeByTask = new Map<string, string[]>(tasks.map(t => [t.id, t.scope?.filesWrite ?? []]));
+  try {
+    const lsFiles = spawnSync('git', ['ls-files'], {
+      cwd: root, encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024,
+    });
+    if (lsFiles.status !== 0 || typeof lsFiles.stdout !== 'string') {
+      return { scopeByTask, validated: false };
+    }
+    const scopeGate = evaluateScopeGate({
+      tasks: tasks.map(t => ({ id: t.id, scope: t.scope ?? {} })),
+      trackedFiles: lsFiles.stdout.split('\n').filter(Boolean),
+      acknowledgeScopePaths,
+      resolveSuggestions: true,
+    });
+    if (!scopeGate.ok) {
+      return { scopeByTask, validated: true, blockedMessage: scopeGate.message };
+    }
+    for (const t of tasks) {
+      const writes = t.scope?.filesWrite ?? [];
+      const { filesWrite } = applyScopeResolutions(t.id, writes, scopeGate.resolutions ?? []);
+      scopeByTask.set(t.id, filesWrite);
+    }
+    return { scopeByTask, validated: true };
+  } catch {
+    return { scopeByTask, validated: false };
+  }
 }
 
 // ─── Watch Subprocess Log Helper ─────────────────────────────────
@@ -327,9 +385,38 @@ export function registerStart(program: Command): void {
             id: sprint.id,
             count: String(sprint.tasks.length),
           }));
-          const headers = ['ID', 'Title', 'Model', 'Priority'];
-          const rows = sprint.tasks.map(t => [t.id, t.title, t.model, t.priority]);
+
+          // born-629(b) / 407-004: show POST-adoption scope in the plan table (not
+          // PRE-adoption) — see computeDryRunScopePreview's doc comment for why.
+          // messages.ts is outside this task's write scope, so the honest-note text
+          // below is an inline lang-branch rather than a getMessage() key (noted as
+          // a follow-up in the task result).
+          const scopePreview = computeDryRunScopePreview(root, sprint.tasks, opts.forceScope === true);
+          const headers = ['ID', 'Title', 'Model', 'Priority', 'Scope (write)'];
+          const rows = sprint.tasks.map(t => [
+            t.id, t.title, t.model, t.priority,
+            (scopePreview.scopeByTask.get(t.id) ?? []).join(', ') || '—',
+          ]);
           print(formatTable(headers, rows));
+
+          if (scopePreview.blockedMessage) {
+            print(lang === 'tr'
+              ? `⚠ Scope-gate bu run'ı spawn anında BLOKE eder: ${scopePreview.blockedMessage}`
+              : `⚠ The scope gate would BLOCK this run at spawn time: ${scopePreview.blockedMessage}`);
+          } else if (scopePreview.validated) {
+            print(lang === 'tr'
+              ? 'Not: Scope (write) sütunu spawn-öncesi scope-gate adoption önizlemesidir (best-effort) — '
+                + "nihai scope, gerçek başlatmada task-XXX.json'a yazılır."
+              : 'Note: the Scope (write) column is a best-effort pre-spawn scope-gate adoption preview — '
+                + 'the final scope is written to task-XXX.json at actual spawn time.');
+          } else {
+            print(lang === 'tr'
+              ? 'Not: scope adoption doğrulanamadı (git ls-files başarısız) — gösterilen scope adoption-ÖNCESİdir; '
+                + "scope adoption uygulanabilir, nihai scope task-JSON'da."
+              : 'Note: scope adoption could not be validated (git ls-files failed) — the scope shown is '
+                + 'PRE-adoption; scope adoption may still apply, the final scope lives in task-JSON.');
+          }
+
           if (sprint.reasoning) {
             print(getMessage('start.reasoning', lang, { reasoning: sprint.reasoning }));
           }

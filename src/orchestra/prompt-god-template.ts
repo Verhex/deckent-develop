@@ -202,6 +202,27 @@ const KARPATHY_ESSENCE = `## Karpathy Discipline
 4. **Goal-driven** — map every change to the goCriteria above; assess yourself honestly.`;
 
 /**
+ * Turn-economy behavioral directive (born-636-K1, Sprint 407 Task 407-002).
+ *
+ * born-636 measured a code task at $2.38 total, $1.05 (44%) of which was
+ * cacheRead across ~25-30 turns × ~135k context — TURN COUNT, not per-turn
+ * token size, is the dominant cost multiplier. This is a prompt-layer-only
+ * behavioral fix: a compact, task-invariant directive on tool-call batching
+ * and verify-loop discipline. Static (no task.id interpolation) and
+ * unconditional — unlike {@link NPM_ADVISORY_BLOCK}, which is skipped for
+ * doc-only tasks, this block applies to EVERY task (doc or code) since
+ * batching read/search tool calls is universally relevant. Impact is
+ * measured by future sprints' num_turns average (Brain-tracked); this
+ * constant is the prompt-layer evidence, not a behavior claim.
+ */
+const TURN_ECONOMY_BLOCK = `## Turn Economy
+Every conversation turn re-sends cached context — fewer turns beats fewer tokens per turn.
+1. Batch independent read/search tool calls (Read + Grep + Glob) into the SAME turn — never issue them one-by-one across turns when none depends on another's output.
+2. Do not re-read a file already in your context unless its on-disk state changed since your last read.
+3. Run lint/build + targeted tests once per logical block of edits, not after every micro-edit — the max-3-attempt verify rule above already caps retries; do not burn turns on early, incomplete verify runs.
+4. When drafting your .plan file, gather every target file's content in ONE turn (parallel reads) before writing the plan.`;
+
+/**
  * Dependency-mutation advisory (born-454, sprint-356 live incident). The worker
  * NEVER mutates node_modules/lockfiles itself; a genuine dependency need is
  * escalated through the file-based worker→Brain question channel
@@ -1452,8 +1473,15 @@ Field shapes (strict — a wrong shape here breaks the orchestrator's result par
 ${buildDodChecklist(task.goNogo?.goCriteria)}
 CRITICAL: never exit without writing the .result file — even on failure, write selfAssessment "NO_GO" with error details. A missing result file stalls the entire sprint.`);
 
-  // Karpathy 4-discipline cognitive anchor (concise, provider-agnostic) — global T0.
-  push('T0', 'karpathy', KARPATHY_ESSENCE);
+  // Karpathy 4-discipline cognitive anchor + Turn Economy directive (born-636-K1) —
+  // both global T0, unconditional (every task, doc or code), concatenated into ONE
+  // 'karpathy' segment. Folded into the existing registered kind rather than a new
+  // 'turn-economy' kind: PromptSegmentKind (prompt-segmentation.ts) is a closed
+  // registry backing a Readonly<Record<...>> SSOT (TIER_BY_KIND) that a dedicated
+  // guard test (prompt-segmentation.test.ts) checks every emitted segment against —
+  // adding an unregistered kind there is out of this task's write scope, so the two
+  // task-invariant cognitive-anchor blocks share the segment instead.
+  push('T0', 'karpathy', `${KARPATHY_ESSENCE}\n\n${TURN_ECONOMY_BLOCK}`);
 
   // Shared Context (Sprint 278 COMM-1 / 278-003) — appended LAST, after every
   // shared/structural section, so this per-spawn-variable block sits in the most

@@ -32,6 +32,7 @@ vi.mock('../../src/core/config.js', () => ({
 }));
 
 vi.mock('../../src/core/constants.js', () => ({
+  SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur
   PROJECT_CONFIG_PATH: '.deckent/config.json',
   GLOBAL_CONFIG_PATH: '/home/mock/.deckent/config.json',
   GLOBAL_DECKENT_DIR: '/home/mock/.deckent',

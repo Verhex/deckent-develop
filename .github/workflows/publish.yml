@@ -1,3 +1,24 @@
+# RETIRED as a publish authority (born-608, task 407-001, P0 publish-blocker fix).
+#
+# Decision: this workflow and release.yml BOTH triggered on `push: tags: v*`, and this
+# workflow ALSO triggered on `release: types: [published]` — which release.yml itself
+# fires (it creates the GitHub Release). A single `git push --tags` could therefore run
+# `npm publish` from this file, from release.yml, AND a second time from this file's own
+# release-published trigger — a real double/triple-publish race, catastrophic for a
+# package registry that only accepts one publish per version.
+#
+# release.yml is now the SOLE npm-publish authority. This file is narrowed (not deleted)
+# to a standalone build+lint+test+dry-run readiness check — useful on its own merits
+# (catches packaging regressions even if release.yml's job never starts) but it MUST NOT
+# perform a real `npm publish` ever again. Triggers are left as-is (still fire on tag
+# push / release published) since running an extra read-only verification pass on those
+# events is harmless and keeps pre-existing trigger-shape assertions elsewhere valid;
+# only the mutating step was removed.
+#
+# `id-token: write` was dropped from permissions: it existed only for OIDC provenance
+# signing during a real `npm publish --provenance`, which no longer happens here —
+# least-privilege now that this workflow never uploads to the registry.
+
 name: Publish to npm
 
 on:
@@ -10,7 +31,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   publish:
@@ -36,8 +56,13 @@ jobs:
       - name: Type check
         run: npm run lint
 
-      - name: Build
-        run: npm run build
+      - name: Build (build:all — dashboard bundle required for validate:publish gates)
+        run: npm run build:all
+
+      # 8-gate readiness check: pack size, entry points, bin exec bits, dashboard
+      # bundle, ADR/link lint (scripts/validate-publish.mjs).
+      - name: Validate publish readiness
+        run: npm run validate:publish
 
       - name: Run tests (staged to avoid OOM)
         env:
@@ -49,12 +74,8 @@ jobs:
           npx vitest run tests/mcp/ tests/api/ tests/integration/ tests/security/ tests/providers/ tests/monitor/ tests/docs/ tests/skills/ tests/analytics/ tests/scripts/
         timeout-minutes: 15
 
+      # NOT a real publish — this workflow never uploads to the registry (see header).
       - name: Dry run publish (validate package)
         run: npm publish --dry-run --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish to npm
-        run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

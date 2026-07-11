@@ -45,6 +45,7 @@ vi.mock('../../src/core/constants.js', () => ({
   DEBT_FILE: 'DEBT.md',
   DECKENT_VERSION: '0.0.0-test',
   DECKENT_DIR: '.deckent',
+  SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur
 }));
 
 const capturedEvents: { channel: string; payload: unknown }[] = [];

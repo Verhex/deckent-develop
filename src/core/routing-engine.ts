@@ -2,7 +2,7 @@
 // Layer 3: The main routing orchestrator.
 // Replaces selectAgent() + selectSkills() with a unified, intent-based decision.
 
-import type { TaskScope, ModelType, ProviderName, Task } from './task-types.js';
+import type { TaskScope, ModelType, ProviderName, Task, TaskEffort } from './task-types.js';
 import { TaskStatus } from './task-types.js';
 import type { AgentDefinition, AgentPool } from './agent-types.js';
 import type { SkillDefinition } from './skill-types.js';
@@ -360,6 +360,47 @@ export function getTestOwnershipBonus(agentId: string, testDominant: boolean): n
   return testDominant && TEST_OWNERSHIP_AGENTS.has(agentId) ? TEST_OWNERSHIP_BONUS : 0;
 }
 
+// ─── EFFORT TIERING — task-tipi→effort (born-636-K2, COST-K2) ─────────────
+//
+// `task.effort` existed but nothing derived it from the task's TYPE — every
+// task defaulted to 'normal' (sprint-planner.ts's structured/directive path
+// hardcoded the fallback; see `resolveEffortTier` callers there). The caller
+// is responsible for flag-gating (config.routing.effort_tiering,
+// default-off) and for absolute `- Effort:` hint precedence — this function
+// is a pure classification, no config access, mirroring the
+// `isTestDominantTask`/`getTestOwnershipBonus` precedent immediately above.
+//
+// Deliberately keyed on `IntentType` (this module's own Step-1 signal, via
+// `classifyIntent`) rather than routed through the canonical `TaskKind`
+// adapter (`work-model.ts intentToKind`): `intentToKind` collapses
+// `'migration'` into `'refactor'`, but this tiering table treats migration
+// as HIGH-risk and refactor as NORMAL — a distinction only `IntentType`
+// keeps. Same "routing-engine-local taxonomy use" call the born-594
+// `isTestDominantTask` comment above already makes for the same reason.
+//
+// `'audit'` and `'test'` are not `IntentType` values (they're scope-shape /
+// rubric-registry signals, `orchestra/`-owned). `'test'` collapses into the
+// `'normal'` fallback bucket identically to code-development/refactor — no
+// separate branch needed. `'audit'` DOES change the outcome (→ high) but is
+// resolved by the CALLER (it already computes `detectTaskType()` for goNogo
+// criteria) rather than accepted as a parameter here — keeps this function
+// single-purpose and avoids importing `orchestra/rubric-registry.ts` into
+// `core/`, which ADR-D-004 C1 forbids (core/ must never import orchestra/).
+const LOW_EFFORT_INTENTS: ReadonlySet<IntentType> = new Set(['documentation', 'config']);
+const HIGH_EFFORT_INTENTS: ReadonlySet<IntentType> = new Set(['security', 'migration']);
+
+/**
+ * Derive a `TaskEffort` tier from a task's classified `IntentType`.
+ * documentation/config → low · security/migration → high · everything else
+ * (implementation/bugfix/architecture/refactor/performance/devops/design/
+ * unknown, and the test-dominant case handled upstream) → normal.
+ */
+export function resolveEffortTier(intent: IntentType): TaskEffort {
+  if (HIGH_EFFORT_INTENTS.has(intent)) return 'high';
+  if (LOW_EFFORT_INTENTS.has(intent)) return 'low';
+  return 'normal';
+}
+
 // ─── ROUTE-DOMAIN-SCOPE — scope-path domain extraction (born-470) ──────────
 //
 // born-470 (3-sprint-proven, 358-002: APR-XPROC-WIRE): the generic path-proxy
@@ -552,7 +593,21 @@ export interface RoutingOptions {
   overrides?: UserOverride[];
   learningData?: LearningBonus[];
   config?: Partial<RoutingEngineConfig>;
-  /** Task effort level for dynamic skill token budget calculation */
+  /**
+   * Task effort level for dynamic skill token budget calculation
+   * (`calculateSkillBudget` → `SKILL_TOKEN_BUDGET_BY_EFFORT`, 1000/1500/2500
+   * per skill). born-636-K2 (COST-K2) trace: as of this writing NONE of
+   * `routeTaskV2`'s call sites (mid-sprint-adapter.ts, task-mode-runner.ts,
+   * sprint-planner.ts, mcp/tools/run.ts, cli/commands/run.ts) actually pass
+   * this option — it is always `undefined` in production, so this path is
+   * presently dead. The REAL, already-wired `task.effort` → worker-spawn
+   * consumption path is `task-router.ts brainEstimateTimeout()` →
+   * `timeout-estimator.ts` (`timeoutConfig.effort_base`) → the per-task spawn
+   * backend timeout (`SpawnBackendOptions.taskTimeoutSeconds`) — a
+   * completely separate mechanism from this field. Wiring `task.effort` into
+   * this option (so the skill-budget path becomes live too) is a distinct,
+   * cross-cutting follow-up, not part of `resolveEffortTier` (this file).
+   */
   effort?: 'low' | 'normal' | 'high';
   /** Sprint ID for decision trail persistence */
   sprintId?: string;

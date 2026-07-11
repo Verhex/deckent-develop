@@ -2277,8 +2277,9 @@
       ".github/workflows/release.yml",
       ".github/workflows/docs.yml"
     ],
-    "spec": "Tek release-workflow + tek npm-publish-otoritesi; build:all + validate:publish zinciri; docs deploy-kosulu main'e duzeltilir. 5-aylik yayinlamama hedefinin dogrudan on-sarti.",
-    "verify": "workflow dry-run/act veya tag-simulasyonu; docs deploy main-push'ta calisir"
+    "spec": "Tek release-workflow + tek npm-publish-otoritesi; build:all + validate:publish zinciri; docs deploy-kosulu main'e duzeltilir. 5-aylik yayinlamama hedefinin dogrudan on-sarti. || DONE 2026-07-11 407-001 (ci-guardian): release.yml TEK npm-publish otoritesi (build:all+validate:publish zinciri); publish.yml dry-run-verify'a daraltildi; docs.yml main-fix; governance YAML-parse pin-testi (cift-publish eski-halde kirmizi). Canli-yayin adimi Alperen (tag+publish).",
+    "verify": "workflow dry-run/act veya tag-simulasyonu; docs deploy main-push'ta calisir",
+    "status": "DONE"
   },
   {
     "sources": [
@@ -2589,9 +2590,9 @@
     "born_id": 629,
     "title": "Plan-yüzeyi pre-adoption scope gösterimi + render-time git-fail sessiz-drop penceresi",
     "priority": "P2",
-    "status": "OPEN",
+    "status": "DONE",
     "source": "sprint-399 BEFORE-done advisor",
-    "spec": "Advisor-notlar (B): (1) SAN-2 adoption yalnız runSprint pre-spawn yolunda — deckent plan çıktısı ve start.ts:329 plan-tablosu PRE-adoption scope gösterir; operatörün gördüğü ile workerın aldığı farklı olabilir (kozmetik ama güven-yüzeyi). (2) task-builder render-anında git ls-files başarısız olursa trackedRootFiles=undefined → sanitizer Rule-5 sessiz-drop O RENDER için geri döner ve hiçbir katman yakalamaz (plan-time gate geçmişti); düşük-olasılık — render-yolu git-fail durumunda scopeWarnings üretimini worker-prompta uyarı-bloğu olarak basmak veya spawnı geciktirmek değerlendirilebilir. || KANIT-2 (2026-07-11 sprint-401): deckent start YENIDEN-plan yapip hand-fix'li task JSON'u ezdi (haiku/doc-writer -> sonnet/generic) — parser Model:/Agent: drop bug'i start-yolunda hand-fix'le bile asilamiyor; ayrica scope-gate kasitli-yeni-dizin (docs/guides/) sinifinda false-positive verdi, --force-scope tam start-dongusu maliyetine mal oldu. || KISMI-FIX 2026-07-11 404-003: Model:/Agent:/Effort:/Provider: hint'leri parse->forceModel/forceAgent guvenilir (RED-kanitli, ucta-uca test; yakalanamayan-hint stderr-WARN). KALAN: pre-adoption gosterim + scope-gate yeni-dizin FP."
+    "spec": "Advisor-notlar (B): (1) SAN-2 adoption yalnız runSprint pre-spawn yolunda — deckent plan çıktısı ve start.ts:329 plan-tablosu PRE-adoption scope gösterir; operatörün gördüğü ile workerın aldığı farklı olabilir (kozmetik ama güven-yüzeyi). (2) task-builder render-anında git ls-files başarısız olursa trackedRootFiles=undefined → sanitizer Rule-5 sessiz-drop O RENDER için geri döner ve hiçbir katman yakalamaz (plan-time gate geçmişti); düşük-olasılık — render-yolu git-fail durumunda scopeWarnings üretimini worker-prompta uyarı-bloğu olarak basmak veya spawnı geciktirmek değerlendirilebilir. || KANIT-2 (2026-07-11 sprint-401): deckent start YENIDEN-plan yapip hand-fix'li task JSON'u ezdi (haiku/doc-writer -> sonnet/generic) — parser Model:/Agent: drop bug'i start-yolunda hand-fix'le bile asilamiyor; ayrica scope-gate kasitli-yeni-dizin (docs/guides/) sinifinda false-positive verdi, --force-scope tam start-dongusu maliyetine mal oldu. || KISMI-FIX 2026-07-11 404-003: Model:/Agent:/Effort:/Provider: hint'leri parse->forceModel/forceAgent guvenilir (RED-kanitli, ucta-uca test; yakalanamayan-hint stderr-WARN). KALAN: pre-adoption gosterim + scope-gate yeni-dizin FP. || (b)+(c) DONE 2026-07-11 407-004: plan-tablosu post-adoption gercegi (durust-not/adopted-alan) + scope-gate yeni-dizin SINIFI (kasitli-yeni-dizin WARN, typo-sinifi BLOCK kalir — docs/guides vakasi kapanir)."
   },
   {
     "born_id": 630,
@@ -2647,7 +2648,7 @@
     "priority": "P1",
     "status": "OPEN",
     "source": "Alperen hedefi 2026-07-10 (400-001 maliyet-analizi)",
-    "spec": "Anatomi (400-001, Sonnet): cacheRead $1.05 (25-30 tur x ~135k ctx) + output $0.79 (53k, thinking dahil) + cacheCreation $0.51 + input $0.04 = $2.38 (sayac dogrulandi; cache'siz $11.69 olurdu). AYNI-MODEL taban ~$1.0-1.2: (K1) tur-azaltma — paralel tool-cagrilari + verify-dongusu kisaltma; (K2) task-tipi effort/thinking ayari (routing effort alani var — mekanik iste dusuk-effort); (K3) L1 prompt-boilerplate cache-tier + eski tool-sonucu budama. 10X MIMARI-KOLLAR: (K4) model-katmanlama — Brain-eval+disk-verify+gate+FIX sureci kaliteyi tasidigi icin haiku/ollama-sinifi genisletilebilir (ADR-G-028 hybrid-scoring canli; haiku ayni-profil ~$0.79, uygun-sinifta $0.3-0.4; haiku=yalniz-doc kurali gate-korumali revizyon adayi — Alperen-karari gerekir); (K5) Batch API %50 — PLAN/EVALUATE tek-atim Brain-cagrilari icin adapter; (K6) SP-2 kendi-model — 614-trace moat'i tam bu hedefe akiyor. Olcum: her sprint retro'suna $/task ortalamasi + kol-bazli kirilim (mevcut cost-config zinciri dogru calisiyor)."
+    "spec": "Anatomi (400-001, Sonnet): cacheRead $1.05 (25-30 tur x ~135k ctx) + output $0.79 (53k, thinking dahil) + cacheCreation $0.51 + input $0.04 = $2.38 (sayac dogrulandi; cache'siz $11.69 olurdu). AYNI-MODEL taban ~$1.0-1.2: (K1) tur-azaltma — paralel tool-cagrilari + verify-dongusu kisaltma; (K2) task-tipi effort/thinking ayari (routing effort alani var — mekanik iste dusuk-effort); (K3) L1 prompt-boilerplate cache-tier + eski tool-sonucu budama. 10X MIMARI-KOLLAR: (K4) model-katmanlama — Brain-eval+disk-verify+gate+FIX sureci kaliteyi tasidigi icin haiku/ollama-sinifi genisletilebilir (ADR-G-028 hybrid-scoring canli; haiku ayni-profil ~$0.79, uygun-sinifta $0.3-0.4; haiku=yalniz-doc kurali gate-korumali revizyon adayi — Alperen-karari gerekir); (K5) Batch API %50 — PLAN/EVALUATE tek-atim Brain-cagrilari icin adapter; (K6) SP-2 kendi-model — 614-trace moat'i tam bu hedefe akiyor. Olcum: her sprint retro'suna $/task ortalamasi + kol-bazli kirilim (mevcut cost-config zinciri dogru calisiyor). || K1+K2 DONE 2026-07-11 sprint-407: K1 turn-economy god-prompt bolumu (boyut-pin'li; etki-olcumu sonraki sprint num_turns ortalamasi) · K2 routing.effort_tiering flag (default-off; tip->effort tablosu + hint-precedence; config-uclusu CC son-mil). ACIK: K3 cache-tier · K4/K5 ALPEREN · K6 SP-2."
   },
   {
     "born_id": "637",

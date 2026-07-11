@@ -48,6 +48,7 @@ vi.mock('../../../src/cli/helpers/wizard.js', () => ({
 
 vi.mock('../../../src/core/constants.js', () => ({
   DECKENT_DIR: '.deckent',
+  SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur
   DECKENT_VERSION: '1.0.0',
   DECKENT_FILE: 'DECKENT.md',
   CLAUDE_FILE: 'CLAUDE.md',

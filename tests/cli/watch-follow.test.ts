@@ -48,6 +48,7 @@ vi.mock('../../src/core/constants.js', () => ({
   DASHBOARD_FILE: '.dashboard',
   TASKS_DIR: '.tasks',
   DECKENT_DIR: '.deckent',
+  SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur
   BRAIN_DIR: '.brain',
   SPRINTS_DIR: '.brain/sprints',
   DEBT_TABLE_HEADER: '# Debt',

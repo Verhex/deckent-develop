@@ -23,7 +23,7 @@ import type {
   ResolvedConfig,
   BrainContext, SprintSizeRecommendation,
   BrainPlanningMode, PlannerResult, ProviderName,
-  ModelType,
+  ModelType, TaskEffort,
 } from '../core/types.js';
 
 import {
@@ -52,6 +52,7 @@ import { detectProjectStack, detectFullStack } from '../core/stack-detector.js';
 import { normalizeTechStack, rubricTypeToKind } from '../core/work-model.js';
 import { detectTaskType } from './rubric-registry.js';
 import { SkillPoolManager } from '../core/skill-pool.js';
+import { classifyIntent } from '../core/intent-classifier.js';
 
 // ─── Planner ─────────────────────────────────────────────────────
 import { callBrainPlanner, callBrainPlannerWithReason } from './planner.js';
@@ -105,7 +106,7 @@ import { detectDeadlocks } from '../monitor/auditor.js';
 
 // ─── Agent Pool & Selection ──────────────────────────────────────
 import { AgentPoolManager } from '../core/agent-pool.js';
-import { routeTaskV2 } from '../core/routing-engine.js';
+import { routeTaskV2, resolveEffortTier } from '../core/routing-engine.js';
 import type { UserOverride } from '../core/routing-types.js';
 import {
   InMemoryAgentSelectionSink,
@@ -436,6 +437,24 @@ export async function planSprint(
       typecheck: wm7Stack?.commands?.typecheck,
     };
 
+    // born-636-K2 (COST-K2): routing.effort_tiering config-flag, default-off.
+    // docImpact: DeckentConfig.routing (config-types.ts) needs a matching
+    // `effort_tiering?: boolean` field (sibling of skill_agent_affinity/
+    // kindAffinity/languagePenalty) + config.ts loadConfig/mergeConfigs
+    // pass-through (the born-464 "tip + iki-resolver" pattern) — both files
+    // are out of this task's write scope. `config.routing` itself IS already
+    // typed + already passed through on the real `loadConfig()` runtime path
+    // (config.ts:1699 `routing: config.routing`, a whole-object passthrough
+    // that does not strip unrecognized JSON keys — only TS's static view of
+    // the field is incomplete), so this flag genuinely works end-to-end
+    // through that path today; the structural cast below is how it's read
+    // until the type/roundtrip-guard follow-up lands. Known gap (disk-verified,
+    // pre-existing, unrelated to this diff): `mergeConfigs()` does not pass
+    // `routing` through AT ALL (only `loadConfig` does) — configs built via
+    // `mergeConfigs()` (many hermetic tests) never see ANY `routing.*` flag,
+    // including the three that already ship. See .result notes.
+    const effortTieringEnabled = config.routing?.effort_tiering ?? false;
+
     for (const src of directiveSources) {
       // Sprint 236: register locally-pulled ollama tags BEFORE model resolution
       // (resolveTaskModel → registry lookups) so a `- Model: <tag>` not in the
@@ -478,7 +497,17 @@ export async function planSprint(
         resolvedModel = recommendation.modelConstraint ??
           resolveTaskModel(src.title, src.description, src.scope, config, parsedPatterns, undefined, undefined, src.provider);
       }
-      const resolvedEffort = src.forceEffort ?? 'normal';
+      // born-636-K2: task-tipi→effort tiering, flag-gated (effortTieringEnabled,
+      // hoisted above the loop). `detectedTaskType` is computed once here and
+      // reused below for `goNogo.kind` (previously a second, redundant call to
+      // the same pure scope-only function — dedupe, zero behavior change).
+      const detectedTaskType = detectTaskType({ scope: src.scope } as Task);
+      const tieredEffort: TaskEffort = detectedTaskType === 'audit'
+        ? 'high'
+        : resolveEffortTier(classifyIntent({ title: src.title, description: src.description, scope: src.scope }).intent.primary);
+      // `- Effort:` directive ALWAYS wins (404-003 hint-chain, unchanged `??`);
+      // flag-off (default) preserves the exact pre-existing 'normal' fallback.
+      const resolvedEffort = src.forceEffort ?? (effortTieringEnabled ? tieredEffort : 'normal');
       tasks.push(createTask({
         title: src.title,
         description: src.description,
@@ -492,7 +521,7 @@ export async function planSprint(
         provider: src.provider,
         dependencies: src.dependencies ?? [],
         goNogo: extractGoNogoCriteria(src.description, src.testTarget, {
-          kind: rubricTypeToKind(detectTaskType({ scope: src.scope } as Task)),
+          kind: rubricTypeToKind(detectedTaskType),
           stack: wm7StackKind,
           commands: wm7Commands,
         }),

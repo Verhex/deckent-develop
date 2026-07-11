@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-407-003 | Tech debt from 407-003: IMPLEMENTED: exported resolveEffortTier(intent: IntentTy | normal | sprint-407 | resolved |
 | debt-405-002 | Tech debt from 405-002: SUMMARY — all 3 problems fixed inside src/core/plugin-lo | normal | sprint-405 | resolved |
 | debt-405-003 | Tech debt from 405-003: IMPLEMENTED: live agent/skill stats (totalUses/successRa | normal | sprint-405 | resolved |
 | debt-403-002 | Tech debt from 403-002: CLI path fully wired end-to-end, no gap: src/cli/command | normal | sprint-403 | resolved |
