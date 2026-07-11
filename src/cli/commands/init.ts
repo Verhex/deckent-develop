@@ -11,7 +11,7 @@
  */
 
 import { spawn as nodeSpawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { PlanMode } from '../../core/types.js';
@@ -36,7 +36,8 @@ import { getMessage, getLanguage } from '../helpers/messages.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { detectAvailableProviders } from '../../core/provider.js';
 import { DECKENT_DIR } from '../../core/constants.js';
-import { DEFAULT_WORKER_IMAGE } from '../../core/worker-image-check.js';
+import { DEFAULT_WORKER_IMAGE, buildSuggestedImageCmd } from '../../core/worker-image-check.js';
+import { probeDockerDaemon } from '../../core/system-capacity.js';
 import { handleImageBuild } from './image.js';
 import type { ImageBuildOptions } from './image.js';
 import {
@@ -61,6 +62,11 @@ import {
   detectSystemLanguage,
   buildSetupSteps,
   buildDetectedSetup,
+  buildInitUsageBlockers,
+  classifyInitOutcome,
+  initOutcomeExitCode,
+  formatInitOutcomeBlock,
+  type FailedDoctorCheckInput,
 } from './init-wizard.js';
 
 import {
@@ -203,24 +209,31 @@ function resolveWorkerImagePlan(root: string, imageOverride?: string): ResolvedW
   };
 }
 
-/** Resolve docker daemon availability via async `docker info` (never spawnSync). */
+/** Resolve docker daemon availability via the shared, timeout-bounded async probe (system-capacity.ts). */
 function probeDockerAvailable(): Promise<boolean> {
-  return new Promise((resolve) => {
-    let settled = false;
-    const done = (value: boolean): void => {
-      if (!settled) {
-        settled = true;
-        resolve(value);
-      }
-    };
-    try {
-      const child = nodeSpawn('docker', ['info'], { stdio: 'ignore' });
-      child.on('error', () => done(false));
-      child.on('close', (code) => done(code === 0));
-    } catch {
-      done(false);
-    }
-  });
+  return probeDockerDaemon();
+}
+
+/**
+ * If config.json currently says `spawn_backend: docker`, rewrite it to
+ * `subprocess` and report whether a downgrade happened (RC2-B / INIT-02).
+ * Called when the worker-image offer is declined or the build fails: a docker
+ * backend with no built image cannot run a single worker, so leaving the
+ * config pointed at docker is the same lying-config bug this task fixes for a
+ * dead daemon — just discovered one step later in the init flow.
+ */
+function downgradeDockerBackendToSubprocess(root: string): boolean {
+  const configPath = join(root, DECKENT_DIR, 'config.json');
+  try {
+    if (!existsSync(configPath)) return false;
+    const cfg = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+    if (cfg['spawn_backend'] !== 'docker') return false;
+    cfg['spawn_backend'] = 'subprocess';
+    writeFileSync(configPath, JSON.stringify(cfg, null, 2) + '\n');
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Resolve worker-image presence via async `docker image inspect <tag>` (never spawnSync). */
@@ -278,6 +291,11 @@ export async function maybeOfferWorkerImageBuild(
   }
 
   const plan = resolveWorkerImagePlan(root, options.image);
+  const requiredProviders = [
+    ...(plan.withCodex ? ['codex'] : []),
+    ...(plan.withGemini ? ['gemini'] : []),
+  ];
+  const buildCmd = buildSuggestedImageCmd(plan.image, requiredProviders);
 
   const isWorkerImagePresent = seams.isWorkerImagePresent ?? probeWorkerImagePresent;
   if (await isWorkerImagePresent(plan.image)) {
@@ -290,6 +308,11 @@ export async function maybeOfferWorkerImageBuild(
   const confirm = seams.confirm ?? ((message: string) => promptConfirm(message, false));
   if (!(await confirm(question))) {
     print(`  ${getMessage('doctor.image_fix_declined', lang)}`);
+    // RC2-B / INIT-02: no image means docker can't run a worker either — never
+    // leave config.json pointed at a backend that can't function.
+    if (downgradeDockerBackendToSubprocess(root)) {
+      print(`  ${getMessage('init.docker_image_decline_fallback', lang, { cmd: buildCmd })}`);
+    }
     return 'declined';
   }
 
@@ -300,7 +323,13 @@ export async function maybeOfferWorkerImageBuild(
     withCodex: plan.withCodex,
     withGemini: plan.withGemini,
   });
-  return code === 0 ? 'built' : 'build-failed';
+  if (code !== 0) {
+    if (downgradeDockerBackendToSubprocess(root)) {
+      print(`  ${getMessage('init.docker_image_build_failed_fallback', lang, { cmd: buildCmd })}`);
+    }
+    return 'build-failed';
+  }
+  return 'built';
 }
 
 /** Normalize a caught value to a display message (for failedSteps reporting). */
@@ -330,10 +359,17 @@ export function registerInit(program: Command): void {
       const root = resolveProjectRoot();
       const failedSteps: Array<{ step: string; error: string }> = [];
       let currentStep = 'startup';
+      // Outcome-contract evidence (412-001): collected as the flow runs, read once at
+      // the end (and in the fatal catch) to classify READY / SETUP_INCOMPLETE / FAILED.
+      let finalRequiredFailedChecks: FailedDoctorCheckInput[] = [];
+      let doctorVerificationError: string | undefined;
+      // Declared here (not inside the try block) so the fatal catch below — a sibling
+      // scope to try, not a child of it — can still read it even if the crash happened
+      // before either branch of the try block assigned a real value.
+      let language = 'en';
 
       try {
         let mode: PlanMode;
-        let language: string;
         let projectName: string;
         let detectedAnalysis: ReturnType<typeof analyzeProject> | undefined;
 
@@ -535,12 +571,14 @@ export function registerInit(program: Command): void {
           }
           // Re-verify after provisioning
           const finalDoctor = runDoctorChecks(root);
+          const failedChecks = finalDoctor.checks.filter(c => c.required && !c.passed);
+          finalRequiredFailedChecks = failedChecks.map(c => ({ name: c.name, message: c.message }));
           if (!finalDoctor.ok) {
-            const failedChecks = finalDoctor.checks.filter(c => c.required && !c.passed);
             print(`\n  Health check: ${failedChecks.length} issue(s) remaining — run 'deckent doctor' for details`);
           }
         } catch (error) {
           failedSteps.push({ step: 'doctor-checks', error: toErrorMessage(error) });
+          doctorVerificationError = toErrorMessage(error);
         }
 
         // ── IDE environment detection & MCP guidance ────────────────
@@ -576,7 +614,21 @@ export function registerInit(program: Command): void {
           failedSteps.push({ step: 'worker-image-build', error: toErrorMessage(error) });
         }
 
-        print(formatNextSteps(language));
+        // ── Honest outcome contract (412-001) ─────────────────────────
+        // READY / SETUP_INCOMPLETE / FAILED, decided from real provider+doctor
+        // evidence gathered above. "You're ready!" (formatNextSteps) is ONLY
+        // printed for READY — SETUP_INCOMPLETE gets its own message inside the
+        // outcome block below, never the ready phrase.
+        const usageBlockers = buildInitUsageBlockers({
+          availableProviderCount: availableProviderNames.length,
+          failedRequiredDoctorChecks: finalRequiredFailedChecks,
+          doctorVerificationError,
+        }, language);
+        const outcome = classifyInitOutcome(false, usageBlockers);
+
+        if (outcome === 'READY') {
+          print(formatNextSteps(language));
+        }
 
         if (options.repair && failedSteps.length > 0) {
           print('\n  Failed steps:');
@@ -584,6 +636,11 @@ export function registerInit(program: Command): void {
             print(`  ✗ ${step.step}: ${step.error}`);
           }
           print('\n  To retry: deckent init --upgrade');
+        }
+
+        print(formatInitOutcomeBlock({ outcome, blockers: usageBlockers }, language));
+        if (outcome !== 'READY') {
+          process.exitCode = initOutcomeExitCode(outcome);
         }
       } catch (error) {
         failedSteps.push({ step: currentStep, error: toErrorMessage(error) });
@@ -595,6 +652,7 @@ export function registerInit(program: Command): void {
             print(`  ✗ ${step.step}: ${step.error}`);
           }
         }
+        print(formatInitOutcomeBlock({ outcome: 'FAILED', blockers: [] }, language));
         process.exitCode = 1;
       }
     });

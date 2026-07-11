@@ -5,7 +5,7 @@
 // Sprint 140+ will add mid-worker resume and heartbeat daemon integration.
 // Sprint 145+ will add external state store.
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, unlinkSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { DECKENT_DIR, TASKS_DIR, BRAIN_DIR, RECENT_WORKS_DIR } from '../core/constants.js';
@@ -15,7 +15,12 @@ import { SprintPhase, SprintStatus } from '../core/types.js';
 import type { Task } from '../core/types.js';
 import { TaskStatus } from '../core/types.js';
 import type { Heartbeat } from '../core/types.js';
+import type { TaskResult } from '../core/types.js';
 import { writeSprintState, readSprintState } from './sprint-utils.js';
+// SCHED2 checkpoint-v2 (born-634/635 dilim-2) — cascade-skip on restore reuses
+// the sprint-411 scheduler-state helper (fix-aggregation-aware terminal-failure
+// set) instead of re-deriving the born-610 vocabulary locally.
+import { computeEffectiveDependencyState } from './scheduler-state.js';
 import type { SerializedDependencyGraph } from './dependency-scheduler.js';
 import {
   persistDependencyGraph,
@@ -36,6 +41,20 @@ export interface WorkerState {
   taskId: string;
   status: 'EXECUTING' | 'DONE' | 'NO_GO';
   spawnedAt: string;
+}
+
+/**
+ * v2 (SCHED2 checkpoint-v2, born-634/635 dilim-2): one entry per task in the
+ * sprint at checkpoint time — the COMPLETE status snapshot. Unlike
+ * completedTasks/pendingTasks/activeWorkers (three DISJOINT buckets that only
+ * ever captured DONE|NO_GO / PENDING / EXECUTING|CLAIMED), this includes every
+ * status, notably MANUAL_REVIEW_REQUIRED and PAUSED — the statuses that used
+ * to fall through all three buckets and vanish on restore.
+ */
+export interface CheckpointTaskState {
+  id: string;
+  status: TaskStatus;
+  fixForTaskId?: string;
 }
 
 /**
@@ -69,6 +88,44 @@ export interface SprintCheckpoint {
    * Optional for backward compatibility with Sprint 138 checkpoints.
    */
   depGraph?: SerializedDependencyGraph;
+  /**
+   * v2 schema marker. Absent ⇒ legacy v1 checkpoint (dual-reader path in
+   * `restoreSprintFromCheckpoint` applies). Written by default; suppressed
+   * when `DECKENT_CHECKPOINT_V1=1` (ACİL-ROLLBACK to the pre-v2 writer shape).
+   */
+  schemaVersion?: 2;
+  /**
+   * v2: full ordered per-task status snapshot — sprint.tasks order preserved.
+   * The fix for "already-MRR task vanishes on restore"
+   * (docs/analysis/scheduler-unify-design-2026-07-11.md, "Checkpoint-restore
+   * MRR semantiği"): completedTasks/pendingTasks/activeWorkers above stay
+   * unchanged (existing consumers depend on their exact bucket semantics) —
+   * this is the additive superset restore now reads from when present.
+   */
+  taskStates?: CheckpointTaskState[];
+  /**
+   * v2: ordered PENDING task IDs — a proxy for the live in-memory dispatch
+   * queue (`remainingQueue` in result-collector.ts), which this slice does
+   * NOT thread through (wiring the actual queue into the checkpoint is
+   * born-634/635 dilim-6, out of scope here). Same order as `taskStates`.
+   */
+  remainingQueue?: string[];
+  /**
+   * v2: last applied SchedulerDecision sequence number. The reducer/journal
+   * (dilim-4+) doesn't exist yet, so this is always 0 in this slice — the
+   * field is reserved now so v2 won't need a breaking schema change later.
+   * Use `getCheckpointDecisionSeq()` to read with the "absent ⇒ 0" default.
+   */
+  lastDecisionSeq?: number;
+}
+
+/**
+ * v2: `lastDecisionSeq` with the "yoksa 0" (absent ⇒ 0) default applied.
+ * Always 0 today (no live reducer/journal yet — dilim-4+); exists so future
+ * consumers never hand-roll the `?? 0` fallback differently.
+ */
+export function getCheckpointDecisionSeq(checkpoint: SprintCheckpoint): number {
+  return checkpoint.lastDecisionSeq ?? 0;
 }
 
 // ─── Paths ───────────────────────────────────────────────────────────
@@ -210,6 +267,23 @@ export function writeCheckpoint(
       checkpoint.depGraph = serializeDependencyGraph(graph, sprint.id);
       // Also persist separate JSON + Mermaid files for human inspection
       persistDependencyGraph(projectRoot, sprint.id, graph);
+    }
+
+    // ─── v2 schema (SCHED2 checkpoint-v2, born-634/635 dilim-2) ─────────
+    // ACİL-ROLLBACK: DECKENT_CHECKPOINT_V1=1 reverts the WRITER to the exact
+    // pre-v2 shape (no schemaVersion/taskStates/remainingQueue/
+    // lastDecisionSeq). The dual-reader in restoreSprintFromCheckpoint always
+    // stays on regardless of this env — it must keep reading both shapes.
+    if (process.env.DECKENT_CHECKPOINT_V1 !== '1') {
+      checkpoint.schemaVersion = 2;
+      checkpoint.taskStates = sprint.tasks.map(t => {
+        const state: CheckpointTaskState = { id: t.id, status: t.status };
+        if (t.fixForTaskId) state.fixForTaskId = t.fixForTaskId;
+        return state;
+      });
+      // Live queue wiring is dilim-6 — this is a best-effort proxy.
+      checkpoint.remainingQueue = pendingTasks;
+      checkpoint.lastDecisionSeq = 0;
     }
 
     // Atomic write: tmp → rename. Cleans up tmp on rename failure.
@@ -584,6 +658,16 @@ export interface RestoreResult {
   staleTasksWithResult: string[];
   /** Stale EXECUTING task IDs that had no .result and were marked NO_GO on disk. */
   staleTasksMarkedNoGo: string[];
+  /**
+   * v2 (SCHED2 checkpoint-v2 dilim-2): PENDING task IDs cascade-skipped
+   * during THIS restore because a (possibly transitive) dependency resolved
+   * to NO_GO/MANUAL_REVIEW_REQUIRED — either already terminal at checkpoint
+   * time, or a stale-active worker just classified as such above. Written as
+   * synthetic `cascadeSkipped:true` NO_GO results (born-610 fix/xfix
+   * muafiyeti applies) — zero workers were ever spawned for them, since the
+   * resume path skips PLAN/SPAWN/EXECUTE entirely.
+   */
+  cascadeSkippedTasks: string[];
 }
 
 function parseSprintNumber(sprintId: string): number {
@@ -594,22 +678,152 @@ function parseSprintNumber(sprintId: string): number {
 }
 
 /**
+ * DUAL-READER legacy decoder (SCHED2 checkpoint-v2 dilim-2, item 2): a v1
+ * checkpoint's three buckets (completedTasks/pendingTasks/activeWorkers)
+ * never recorded a task already in a non-bucketed status (e.g. already
+ * MANUAL_REVIEW_REQUIRED or PAUSED) at checkpoint-write time — the exact
+ * "vanishes on restore" bug v2's `taskStates` closes going forward. For an
+ * OLD checkpoint already on disk, the only remaining source of truth is the
+ * sprint's own persisted `task-*.json` records — scan them by `sprintId`
+ * match and add any id not already present. Mutates `taskIds` in place.
+ * Fail-soft: an unreadable `.tasks/` dir or malformed task file is skipped,
+ * never thrown — restore must not crash on a legacy checkpoint.
+ */
+function supplementLegacyCheckpointTaskIds(
+  projectRoot: string,
+  sprintId: string,
+  taskIds: Set<string>,
+): void {
+  const tasksDir = join(projectRoot, TASKS_DIR);
+  let entries: string[];
+  try {
+    entries = readdirSync(tasksDir);
+  } catch (e) {
+    debugLog('restoreSprintFromCheckpoint:legacyDecoder:readdir', e);
+    return;
+  }
+  for (const entry of entries) {
+    if (!entry.startsWith('task-') || !entry.endsWith('.json')) continue;
+    const id = entry.slice('task-'.length, entry.length - '.json'.length);
+    if (taskIds.has(id)) continue;
+    const t = readJsonSafe<Task>(join(tasksDir, entry));
+    if (!t || t.sprintId !== sprintId) continue;
+    taskIds.add(id);
+    debugLog('restoreSprintFromCheckpoint:legacyDecoder',
+      `v1 checkpoint for ${sprintId} was missing task ${id} (status=${t.status}) — recovered from its persisted task-*.json record.`);
+  }
+}
+
+/**
+ * Cascade-skip PENDING descendants of any terminal-failure task in the
+ * (already fully reconstructed + stale-worker-classified) task list — the
+ * restore-side counterpart of `cascadeSkipDeadBlocked`
+ * (result-collector.ts), which never runs on the resume path because
+ * `sprint-controller.ts` jumps straight past PLAN/SPAWN/EXECUTE to EVALUATE.
+ * Reuses `computeEffectiveDependencyState` (scheduler-state.ts, sprint-411)
+ * for the fix-aggregation-aware `terminalFailureIds` set — the born-610
+ * single-truth vocabulary, not a locally reinvented predicate. Transitive:
+ * a freshly-skipped task can itself unblock the next pass, mirroring
+ * `cascadeSkipDeadBlocked`'s while-loop shape.
+ *
+ * Mutates `tasks` in place (status → NO_GO) and writes both the task.json
+ * and a synthetic `cascadeSkipped:true` `.result` to disk — the same shape
+ * `cascadeSkipDeadBlocked` writes, so the born-610 fix/xfix exemption
+ * (debt-manager.ts) applies identically regardless of which path produced
+ * the skip. No spawn call exists anywhere in this function or its caller —
+ * "spawn sıfır" is structural here, not a flag to check.
+ *
+ * @returns IDs of tasks cascade-skipped during this call.
+ */
+function cascadeSkipPendingDescendants(
+  projectRoot: string,
+  tasks: Task[],
+): string[] {
+  const skipped: string[] = [];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const state = computeEffectiveDependencyState(tasks, Date.now());
+    for (const t of tasks) {
+      if (t.status !== TaskStatus.PENDING) continue;
+      const failedDep = (t.dependencies ?? []).find(d => state.terminalFailureIds.has(d));
+      if (!failedDep) continue;
+
+      const resultPath = join(projectRoot, TASKS_DIR, `task-${t.id}.result`);
+      if (existsSync(resultPath)) continue; // idempotency guard — already collected elsewhere
+
+      t.status = TaskStatus.NO_GO;
+      const taskPath = join(projectRoot, TASKS_DIR, `task-${t.id}.json`);
+      try {
+        writeFileSync(taskPath, JSON.stringify(t, null, 2), 'utf-8');
+      } catch (e) {
+        debugLog('restoreSprintFromCheckpoint:cascadeSkip:writeTask', e);
+      }
+
+      const skip: TaskResult = {
+        taskId: t.id,
+        workerId: `w-${t.id}`,
+        filesChanged: [],
+        linesAdded: 0,
+        linesRemoved: 0,
+        testsPassed: false,
+        coverage: 0,
+        selfAssessment: 'NO_GO',
+        cascadeSkipped: true, // born-610: fix/xfix kapilari bunu MUAF tutar
+        notes:
+          `Cascade-skipped on checkpoint restore (SCHED2 checkpoint-v2, dilim-2): dependency ` +
+          `${failedDep} ended NO_GO/MANUAL_REVIEW_REQUIRED, so this dependent was never ` +
+          `(re-)dispatched. Re-run after the dependency is fixed.`,
+        tokenUsage: {
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          provider: t.provider,
+          model: t.forceModel ?? t.model,
+        },
+      };
+      try {
+        writeFileSync(resultPath, JSON.stringify(skip, null, 2), 'utf-8');
+      } catch (e) {
+        debugLog('restoreSprintFromCheckpoint:cascadeSkip:writeResult', e);
+      }
+
+      skipped.push(t.id);
+      changed = true;
+      debugLog('restoreSprintFromCheckpoint:cascadeSkip', `task ${t.id} skipped on restore (dep ${failedDep} failed)`);
+    }
+  }
+  return skipped;
+}
+
+/**
  * Restore a sprint from its latest checkpoint after a Brain restart.
  *
  * Flow:
  *   1. Read `.deckent/<sprintId>-checkpoint.json`. Missing → action 'fresh'.
- *   2. Rebuild `sprint.tasks` by reading every task.json referenced in the
- *      checkpoint (completed ∪ pending ∪ activeWorkers).
+ *   2. Rebuild `sprint.tasks`: v2 checkpoints (`schemaVersion===2`) read the
+ *      complete `taskStates` snapshot directly; v1 checkpoints fall back to
+ *      the legacy completed∪pending∪activeWorkers union, supplemented from
+ *      the sprint's own persisted task-*.json records (DUAL-READER —
+ *      `supplementLegacyCheckpointTaskIds`) so an already-MRR/PAUSED task
+ *      doesn't vanish just because no v1 bucket ever captured its status.
  *   3. Preserve `startedAt` from `cp.sprintStartedAt ?? cp.timestamp` — Sprint
  *      159 forensic showed restart was clobbering this with the new wall clock,
  *      producing negative durations.
  *   4. Classify activeWorkers:
  *        - `.result` exists → push to `staleTasksWithResult` (EVALUATE can consume it)
  *        - `.result` missing → mark task.json status=NO_GO on disk and push to `staleTasksMarkedNoGo`
- *   5. Decide action:
- *        - No pending tasks AND no active workers → 'complete'
+ *   5. Cascade-skip (`cascadeSkipPendingDescendants`): every PENDING task
+ *      transitively depending on a NO_GO/MANUAL_REVIEW_REQUIRED task — old or
+ *      freshly classified in step 4 — gets a synthetic `cascadeSkipped:true`
+ *      NO_GO `.result` written, since the resume path never runs the live
+ *      `cascadeSkipDeadBlocked` closure (it skips PLAN/SPAWN/EXECUTE).
+ *   6. Decide action:
+ *        - No pending tasks AND no active workers (per the checkpoint's OWN
+ *          buckets — deliberately not re-derived from step 5's outcome, see
+ *          the inline comment at the call site) → 'complete'
  *        - Otherwise → 'resume-evaluate'
- *   6. Sync `.deckent/sprint-state.json` via writeSprintState so external observers
+ *   7. Sync `.deckent/sprint-state.json` via writeSprintState so external observers
  *      see the resumed phase immediately.
  *
  * Fail-soft on every I/O step — a malformed task.json or unwritable state file
@@ -626,6 +840,7 @@ export function restoreSprintFromCheckpoint(
       action: 'fresh',
       staleTasksWithResult: [],
       staleTasksMarkedNoGo: [],
+      cascadeSkippedTasks: [],
     };
   }
 
@@ -646,20 +861,38 @@ export function restoreSprintFromCheckpoint(
       action: 'fresh',
       staleTasksWithResult: [],
       staleTasksMarkedNoGo: [],
+      cascadeSkippedTasks: [],
     };
   }
 
-  // Rebuild task list: union of all three task buckets in the checkpoint.
+  // ─── Rebuild task-id universe (SCHED2 checkpoint-v2 dilim-2, DUAL-READER) ─
+  // v2: `taskStates` is already the complete per-task snapshot (superset of
+  // the three legacy buckets), in the correct order — use it directly.
+  // v1 (legacy, no schemaVersion): keep the original 3-bucket union, then
+  // supplement from the sprint's own persisted task-*.json records — this is
+  // exactly the "already-MRR task fell out of every bucket" gap the v2
+  // schema closes; v1 checkpoints never recorded it at all, so disk is the
+  // only remaining source of truth.
   const taskIds = new Set<string>();
-  for (const id of cp.completedTasks ?? []) taskIds.add(id);
-  for (const id of cp.pendingTasks ?? []) taskIds.add(id);
-  for (const w of cp.activeWorkers ?? []) taskIds.add(w.taskId);
+  const isV2 = cp.schemaVersion === 2 && !!cp.taskStates;
+  if (isV2) {
+    for (const state of cp.taskStates!) taskIds.add(state.id);
+  } else {
+    for (const id of cp.completedTasks ?? []) taskIds.add(id);
+    for (const id of cp.pendingTasks ?? []) taskIds.add(id);
+    for (const w of cp.activeWorkers ?? []) taskIds.add(w.taskId);
+    supplementLegacyCheckpointTaskIds(projectRoot, sprintId, taskIds);
+  }
 
   const tasks: Task[] = [];
   for (const id of taskIds) {
     const taskPath = join(projectRoot, TASKS_DIR, `task-${id}.json`);
     const t = readJsonSafe<Task>(taskPath);
-    if (!t) continue;
+    if (!t) {
+      debugLog('restoreSprintFromCheckpoint:unreadableTask',
+        `Checkpoint referenced task ${id} but task-${id}.json is missing/unreadable on disk — dropped from restore.`);
+      continue;
+    }
     // born-562 — un-pause a circuit-breaker-paused task on resume. The cascade
     // circuit-breaker (sprint-controller PAUSE_SPRINT → pauseSprint) sets
     // status=PAUSED + drops a `.paused` marker AFTER the last phase checkpoint
@@ -679,6 +912,21 @@ export function restoreSprintFromCheckpoint(
       catch (e) { debugLog('restoreSprintFromCheckpoint:unlinkPaused', e); }
     }
     tasks.push(t);
+  }
+
+  // DUAL-READER honest-warn: only meaningful for the legacy path — a v2
+  // checkpoint's taskStates is already the complete superset by construction.
+  if (!isV2) {
+    for (const t of tasks) {
+      for (const dep of t.dependencies ?? []) {
+        if (!taskIds.has(dep)) {
+          debugLog('restoreSprintFromCheckpoint:legacyDecoder:missingDependency',
+            `Legacy v1 checkpoint restore for ${sprintId}: task ${t.id} depends on ${dep}, which ` +
+            `has no persisted task-*.json for this sprint — its status is unknown, so cascade-skip ` +
+            `cannot evaluate it.`);
+        }
+      }
+    }
   }
 
   // Sprint 159 forensic: preserve startedAt across restart.
@@ -746,6 +994,27 @@ export function restoreSprintFromCheckpoint(
     }
   }
 
+  // ─── Cascade-skip PENDING descendants (SCHED2 checkpoint-v2 dilim-2, item 3) ─
+  // Binds restore to the born-610 single-truth vocabulary via the sprint-411
+  // scheduler-state helper (computeEffectiveDependencyState) — NOT a
+  // reinvented local predicate. Runs AFTER the stale-worker classification
+  // above so it sees both (a) tasks already NO_GO/MANUAL_REVIEW_REQUIRED at
+  // checkpoint-write time (the live cascadeSkipDeadBlocked closure may not
+  // have reached their descendants before the crash) and (b) stale-active
+  // workers just converted to NO_GO/MRR — whose descendants NEVER get
+  // cascade-skipped by any other path, because the resume path jumps
+  // straight to EVALUATE (sprint-controller.ts skips PLAN/SPAWN/EXECUTE
+  // entirely — zero workers are spawned here, by construction, not by flag).
+  const cascadeSkippedTasks = cascadeSkipPendingDescendants(projectRoot, tasks);
+
+  // Action decision stays anchored to the checkpoint's OWN pendingTasks/
+  // activeWorkers buckets (unchanged from pre-v2 behavior) — NOT re-derived
+  // from the post-cascade-skip `tasks[]` state. This is deliberately
+  // conservative: touching the 'complete' vs 'resume-evaluate' decision is
+  // out of this slice's scope (dilim-2 is checkpoint schema + restore
+  // cascade-skip, not the resume control-flow itself), and 'complete' short-
+  // circuits straight past EVALUATE/FIX — the cascade-skip `.result` files
+  // just written above still need that pipeline to run.
   const hasActiveWorkers = (cp.activeWorkers ?? []).length > 0;
   const hasPending = (cp.pendingTasks ?? []).length > 0;
   const action: RestoreAction = !hasPending && !hasActiveWorkers
@@ -778,5 +1047,6 @@ export function restoreSprintFromCheckpoint(
     restoredSprint,
     staleTasksWithResult,
     staleTasksMarkedNoGo,
+    cascadeSkippedTasks,
   };
 }

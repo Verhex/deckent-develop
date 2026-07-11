@@ -1,5 +1,14 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-412 Learnings
+- Sprint sprint-412 Learnings: ## Sprint sprint-412 Learnings
+- RC2-A — init outcome-makinesi: READY · SETUP_INCOMPLETE · FAILED dürüst-çıkış (INIT-01): GO_WITH_TECH_DEBT — Implemented the three-state init outcome contract (READY/SETUP_INCOMPLETE/FAILED) per RC2-A INIT-01. Root cause confirme
+- RC2-B — backend-transaction: Docker CLI+daemon+image birlikte-değerlendirme (INIT-02): GO_WITH_TECH_DEBT — Root cause confirmed by reading: system-capacity.ts::detectSystemCapacity() only probed `docker --version` (sync), and w
+
+## Gains
+- 412-003 — DOCTOR-TWIN — born-651: runDoctorChecks canlı-ikizini öldür (tek canonical liste)
+- 412-004 — SCHED2 — checkpoint-v2: MRR restore'da kaybolmaz (strangler dilim-2) — SCHED2 checkpoint-v2 (dilim-2).
+
 ## Sprint sprint-411 Learnings
 - Sprint sprint-411 Learnings: ## Sprint sprint-411 Learnings
 - RC1-B — subprocess-backend .deck görünürlüğü dürüstlük-dilimi (SEC-02): GO_WITH_TECH_DEBT — Implemented SEC-02 honesty-slice fully within the granted write scope: added checkDeckSubprocessVisibility(root, spawnBa

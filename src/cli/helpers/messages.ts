@@ -856,6 +856,84 @@ const MESSAGES: MessageMap = {
     tr: '  2. İlk run\'ı başlatmak için `deckent start` çalıştırın',
   },
 
+  // ─── init outcome contract (RC2-A / INIT-01, Sprint 412 — 412-001) ──────
+  'init.outcome_header': {
+    en: 'Setup outcome: {outcome}',
+    tr: 'Kurulum sonucu: {outcome}',
+  },
+  'init.outcome_ready_message': {
+    en: 'All usage blockers are clear — a provider and the required checks are in place.',
+    tr: 'Tüm kullanım engelleri temizlendi — bir provider ve zorunlu kontroller yerinde.',
+  },
+  'init.outcome_setup_incomplete_message': {
+    en: 'Setup files were written, but deckent cannot run tasks yet — resolve the following first:',
+    tr: 'Kurulum dosyaları yazıldı, ama deckent henüz görev çalıştıramaz — önce şunların çözülmesi gerekiyor:',
+  },
+  'init.outcome_failed_message': {
+    en: 'Init did not complete — see the failed step(s) above, fix the issue, then retry.',
+    tr: 'Init tamamlanamadı — yukarıdaki başarısız adım(lar)ı görün, sorunu düzeltin, sonra tekrar deneyin.',
+  },
+  'init.outcome_blockers_header': {
+    en: 'Blockers:',
+    tr: 'Engeller:',
+  },
+  'init.outcome_fix_label': {
+    en: 'Fix',
+    tr: 'Çözüm',
+  },
+  'init.outcome_blocker_no_provider': {
+    en: 'No AI provider CLI was detected (Claude, Codex, or Gemini) — deckent has no provider to execute tasks with.',
+    tr: 'Hiçbir AI provider CLI algılanmadı (Claude, Codex veya Gemini) — deckent\'in görev çalıştıracağı bir provider yok.',
+  },
+  'init.outcome_remediation_no_provider': {
+    en: 'Install a provider CLI and authenticate, e.g.: {cmd}',
+    tr: 'Bir provider CLI kurup oturum açın, örn.: {cmd}',
+  },
+  'init.outcome_blocker_doctor_check': {
+    en: '{name} check failed: {message}',
+    tr: '{name} kontrolü başarısız: {message}',
+  },
+  'init.outcome_remediation_doctor_check': {
+    en: 'Run `deckent doctor` for full diagnostics and fix hints.',
+    tr: 'Tam tanı ve çözüm ipuçları için `deckent doctor` çalıştırın.',
+  },
+  'init.outcome_blocker_doctor_verification_failed': {
+    en: 'Could not verify environment health — the doctor check step itself failed ({error}).',
+    tr: 'Ortam sağlığı doğrulanamadı — doctor kontrol adımının kendisi başarısız oldu ({error}).',
+  },
+  'init.outcome_remediation_doctor_verification_failed': {
+    en: 'Run `deckent doctor` manually to see the full report.',
+    tr: 'Tam raporu görmek için `deckent doctor` komutunu elle çalıştırın.',
+  },
+
+  // ─── init: .deck security-file write failure (RC1-A follow-up, i18n-gate) ──
+  'init.deck_security_write_failed': {
+    en: 'WARN: failed to write .deck security files: {error}',
+    tr: 'UYARI: .deck güvenlik dosyaları yazılamadı: {error}',
+  },
+
+  // ─── init: backend transaction — CLI+daemon (RC2-B / INIT-02, Sprint 412 — 412-002) ──
+  'init.docker_backend_selected': {
+    en: 'Docker CLI + daemon detected → spawn_backend: docker (isolated worker containers)',
+    tr: 'Docker CLI + daemon algılandı → spawn_backend: docker (izole worker container\'ları)',
+  },
+  'init.docker_image_missing_hint': {
+    en: 'deckent-worker image not found — build with:',
+    tr: 'deckent-worker imajı bulunamadı — şu komutla derleyin:',
+  },
+  'init.docker_daemon_down_fallback': {
+    en: 'Docker CLI found, but the daemon is not running — fell back to the subprocess backend (deckent still works). To use Docker: start the daemon (e.g. `sudo systemctl start docker` on Linux, or open Docker Desktop), then run `deckent config set spawn_backend docker`.',
+    tr: 'Docker CLI bulundu ama daemon çalışmıyor — subprocess backend\'e düşüldü (deckent yine de çalışır). Docker kullanmak için: daemon\'ı başlatın (Linux\'ta örn. `sudo systemctl start docker`, ya da Docker Desktop\'ı açın), sonra `deckent config set spawn_backend docker` çalıştırın.',
+  },
+  'init.docker_image_decline_fallback': {
+    en: 'Worker image not built — fell back to the subprocess backend (deckent still works). To use Docker: build the image ({cmd}), then run `deckent config set spawn_backend docker`.',
+    tr: 'Worker imajı derlenmedi — subprocess backend\'e düşüldü (deckent yine de çalışır). Docker kullanmak için: imajı derleyin ({cmd}), sonra `deckent config set spawn_backend docker` çalıştırın.',
+  },
+  'init.docker_image_build_failed_fallback': {
+    en: 'Worker image build failed — fell back to the subprocess backend (deckent still works). Fix the build error, run `{cmd}` again, then `deckent config set spawn_backend docker`.',
+    tr: 'Worker imaj derlemesi başarısız oldu — subprocess backend\'e düşüldü (deckent yine de çalışır). Derleme hatasını düzeltin, `{cmd}` komutunu tekrar çalıştırın, sonra `deckent config set spawn_backend docker` çalıştırın.',
+  },
+
   // ─── evolve command ─────────────────────────────────────────────────
   'evolve.no_sprint_data': {
     en: 'No sprint data found. Run some sprints first to see evolution trends.',

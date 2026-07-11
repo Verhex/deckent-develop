@@ -645,8 +645,8 @@ describe('i18n integration', () => {
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     const passedMsg = calls.find(c => String(c).includes('checks passed'));
     expect(passedMsg).toBeDefined();
-    // runDoctorChecks returns 15 checks total (including platform, Docker, .deck security, write permissions, gitignore)
-    expect(String(passedMsg)).toMatch(/\/15/);
+    // runDoctorChecks returns 16 checks total (15 + '.deck Subprocess Visibility', 411-002/412-003)
+    expect(String(passedMsg)).toMatch(/\/16/);
   });
 
   it('uses tr language when config has language=tr in legacy mode', async () => {

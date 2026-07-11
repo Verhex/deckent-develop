@@ -9,6 +9,8 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-412-001 | Tech debt from 412-001: Implemented the three-state init outcome contract (READY | normal | sprint-412 | resolved |
+| debt-412-002 | Tech debt from 412-002: Root cause confirmed by reading: system-capacity.ts::det | normal | sprint-412 | resolved |
 | debt-411-002 | Tech debt from 411-002: Implemented SEC-02 honesty-slice fully within the grante | normal | sprint-411 | resolved |
 | debt-407-003 | Tech debt from 407-003: IMPLEMENTED: exported resolveEffortTier(intent: IntentTy | normal | sprint-407 | resolved |
 | debt-405-002 | Tech debt from 405-002: SUMMARY — all 3 problems fixed inside src/core/plugin-lo | normal | sprint-405 | resolved |

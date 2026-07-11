@@ -1,97 +1,121 @@
-# DIRECTIVES — SPRINT-412: RC-1 SECRET-LIFECYCLE + SCHED-1 SEMANTICS-KERNEL (karar-turu-3 Faz-A açılışı)
+# DIRECTIVES — SPRINT-412: RC-2 TRANSACTIONAL-INIT + DOCTOR-TWIN + SCHED-2 CHECKPOINT-V2
 
 ## Goal
-Karar-turu-3 (Alperen, 2026-07-11) üç-tren kararının ilk sprint'i: **RC-1** (543 RC-TRAIN dilim-1:
-.deck secret-lifecycle — SEC-01 overwrite/mode + SEC-02 dürüstlük-dilimi) + **SCHED-1** (527
-strangler dilim-1: semantics-kernel — davranış-koruyucu predicate/fix-aggregation tekleme).
-Tasarım-SSOT: `docs/analysis/beta-blocker-sweep-2026-07-11.md` (RC) +
-`docs/analysis/scheduler-unify-design-2026-07-11.md` (SCHED). Publish-zinciri bu trene bağlı.
+RC-treni dilim-2 (543: dürüst-init INIT-01/02) + born-651 doctor-ikiz-dedup + SCHED-treni dilim-2
+(527: checkpoint-v2, öne-serpme — Alperen-onaylı). Tasarım-SSOT: `docs/analysis/beta-blocker-sweep-2026-07-11.md`
+(INIT bulguları) + `docs/analysis/scheduler-unify-design-2026-07-11.md` (checkpoint-restore MRR bölümü).
 
 ## 🔒 BAĞLAYICI (her task)
-- Yalnız kendi Files'ına yaz · `.deckent/`, `.brain/`, `.tasks/` DOKUNMA · git stash/reset YASAK · `npm run build` YASAK · notes TEK STRING · Self DÜRÜST (mock-only = GO_WITH_TECH_DEBT, asla DONE).
-- REPRODUCE-FIRST: her fix'ten ÖNCE mevcut hatalı davranışı RED testle kanıtla (test adına `red`/`reproduce` etiketi), sonra GREEN'e çevir.
-- i18n-FIRST: kullanıcıya görünen HER yeni string `getMessage(key, lang)` üzerinden (src/cli/helpers/messages.ts, en+tr çifti) — hardcode TR/EN kabul edilmez.
-- Test hermetik: tmpdir, async spawn (spawnSync YASAK), ≤16GB; kendi test dosyanı VE dokunduğun modülü import eden mevcut testleri koş.
-- Cross-platform (Yasa #2): POSIX + Windows dalları; desteklenmeyen yol SESSİZCE değil DÜRÜSTÇE degrade olur (loud-warn).
+- Yalnız kendi Files'ına yaz · `.deckent/`, `.brain/`, `.tasks/` DOKUNMA · git stash-reset YASAK · `npm run build` YASAK · notes TEK STRING · Self DÜRÜST (mock-only = GO_WITH_TECH_DEBT).
+- REPRODUCE-FIRST: fix'ten önce mevcut hatalı davranışı RED testle kanıtla.
+- i18n-FIRST: user-facing HER yeni string getMessage(key, lang) ile (en+tr çifti).
+- Test hermetik: tmpdir, async spawn (spawnSync YASAK), ≤16GB; dokunduğun modülü import eden mevcut testleri de koş.
+- Cross-platform: POSIX + Windows dalları; desteklenmeyen yol dürüst-degrade (loud-warn), sessiz asla.
 
-## Task 1: RC1-A — .deck secret-lifecycle çekirdeği (SEC-01: overwrite-guard + 0600 + Windows-ACL)
+## Task 1: RC2-A — init outcome-makinesi: READY · SETUP_INCOMPLETE · FAILED dürüst-çıkış (INIT-01)
 - Model: sonnet | Agent: bug-fixer | Effort: high | Provider: claude
-- Files: src/core/deck-file.ts, src/cli/commands/init-steps.ts, scripts/smoke-deck-lifecycle.mjs, tests/core/deck-file-secret-lifecycle.test.ts
-- Scope: src/core/deck-file.ts, src/cli/commands/init-steps.ts, scripts/, tests/core/
+- Files: src/cli/commands/init.ts, src/cli/commands/init-wizard.ts, src/cli/helpers/wizard.ts, src/cli/helpers/messages.ts, tests/cli/init-outcome-honesty.test.ts
+- Scope: src/cli/commands/, src/cli/helpers/, tests/cli/
 - Dependencies: none
 ### Description
-KANIT (sol-sweep SEC-01 + CC disk-verify): `createDeckTemplate` (src/core/deck-file.ts:128-156)
-KOŞULSUZ `writeFileSync` — mevcut .deck'teki kullanıcı API-key'leri re-init'te boş template ile
-SİLİNİR (canlı-reproduce edildi); mode verilmiyor → 0644 (dünyaya-okunur secret). Çağıran
-`writeDeckSecurityFiles` (src/cli/commands/init-steps.ts:380-385) koşulsuz + `catch {}` sessiz-yutar.
-GÖREV: (1) `createDeckTemplate` → **no-op-if-exists**: dosya varsa İÇERİĞE DOKUNMA (byte-aynı kalır);
-(2) ilk yazım **atomic** (aynı-dizin tmp + rename) ve **owner-only**: POSIX'te `{ mode: 0o600 }` +
-yazım-sonrası `chmodSync(0o600)` teyidi (umask'a karşı); (3) **Windows dalı**: chmod anlamsız →
-`icacls <file> /inheritance:r /grant:r "%USERNAME%":F` dene (async spawn), başarısızsa işlemi
-KIRMADAN stderr loud-warn (dürüst-degrade; mesaj i18n'e gerek yok — mekanizma-katmanı EN log
-kabul, ama init-yüzeyine sızan metin varsa getMessage); platform dalı test-edilebilir olsun
-(fonksiyon parametresiyle platform enjekte edilebilir); (4) `writeDeckSecurityFiles` sessiz `catch {}`
-→ non-fatal kalır AMA stderr'e warn yazar; (5) `ensureDeckGitignore` davranışı DEĞİŞMEZ.
-RED-first: mevcut-.deck'li tmpdir fixture'da sentinel key yaz → bugünkü kod onu EZER (RED kanıtı) →
-fix sonrası korunur + yeni-dosya mode 0600 assert (POSIX). scripts/smoke-deck-lifecycle.mjs:
-tmpdir → template → sentinel yaz → template tekrar → sentinel korunmuş + (POSIX) stat mode 600 →
-'SMOKE OK' basar, aksi exit 1.
-Smoke: node scripts/smoke-deck-lifecycle.mjs → SMOKE OK
+KANIT (sol-sweep INIT-01 + CC disk-verify): provider/auth YOKKEN init exit 0 + "You're ready"
+basıyor — `buildProviderWizardSteps` (src/cli/helpers/wizard.ts:~236) no-provider durumunda sessizce
+Claude-fallback config üretir; init.ts (~537) finalDoctor başarısızsa yalnız "N issue(s) remaining"
+PRINT eder, exit-code'a dönüşmez ve next-steps/"ready" koşulsuz basılır (init.ts:~579). Yabancı
+kullanıcı ilk-10-dakikada yalan-READY görür. GÖREV: (1) init'e üç-durumlu OUTCOME sözleşmesi:
+READY (kullanılabilir provider+auth kanıtı VAR; exit 0) · SETUP_INCOMPLETE (kurulum yazıldı ama
+en az bir kullanım-engeli var: provider-CLI yok, auth yok, required-doctor-check FAIL; exit 2) ·
+FAILED (init adımı gerçekten patladı — failedSteps dolu; exit 1); (2) outcome bloğu çıktının SONUNDA
+net basılır: durum + engel-listesi + her engel için TEK-SATIR exact-remediation (komut örneğiyle);
+SETUP_INCOMPLETE'ta "You're ready" ASLA basılmaz — yerine "kurulum tamam, kullanım için şunlar
+eksik" dili; (3) no-provider fallback'i SESSİZ Claude-seçimi olmaktan çıkar: fallback yine yazılır
+(config geçerli kalsın) ama outcome'u SETUP_INCOMPLETE'a çeker ve engel-listesine girer;
+(4) tüm yeni metinler getMessage en+tr; mevcut init akış-adımları ve wizard etkileşimi DEĞİŞMEZ
+(yalnız sonuç-raporlama + exit-code); --yes non-interactive yolu da aynı sözleşmeyi verir.
+RED-first: PATH'ten provider-CLI'ları arındırılmış tmpdir'de bugünkü init'in exit 0 + ready
+bastığını kanıtla, sonra GREEN (exit 2 + SETUP_INCOMPLETE + remediation). exit-code'ları tüketen
+mevcut testler/scriptler varsa envanterle (grep) ve kırılanları güncelle — sessiz bırakma.
+Smoke: node dist/cli/entry.js init --yes (provider-CLI'sız PATH, tmp-proje) → çıktıda SETUP_INCOMPLETE + exit-code 2
 ### goNogo
-- goCriteria: RED-reproduce testi var (eski davranış: ezme + 0644); no-op-if-exists + atomic + 0600 + chmod-teyit GREEN; Windows-dalı testli (mock/enjekte) + dürüst-warn; writeDeckSecurityFiles warn'lı non-fatal; smoke-script teslim + lokal koşusu OK; dokunulan modülleri import eden mevcut testler yeşil.
-- nogo: mevcut .deck içeriğine dokunan herhangi bir yol kalırsa NO_GO; mode-teyitsiz (yalnız writeFileSync-mode) bırakılırsa NO_GO; Windows sessiz-no-op kalırsa NO_GO.
+- goCriteria: RED-reproduce testi (bugün: no-auth → exit 0 + ready) + GREEN (üç-outcome + exit 0·2·1 sözleşmesi + remediation-satırları); no-provider fallback artık sessiz-READY üretmiyor; i18n en+tr; --yes yolu testli; mevcut init testleri yeşil.
+- nogo: outcome yalnız print olup exit-code'a bağlanmazsa NO_GO; hardcoded user-facing string NO_GO; wizard etkileşim-akışı değiştirilirse NO_GO.
 
-## Task 2: RC1-B — subprocess-backend .deck görünürlüğü dürüstlük-dilimi (SEC-02)
-- Model: sonnet | Effort: medium | Provider: claude
-- Files: src/cli/commands/doctor-checks.ts, src/cli/helpers/messages.ts, docs/adr/adr-g-005-secret-file-system.md, tests/cli/doctor-subprocess-secret-warn.test.ts
-- Scope: src/cli/commands/, src/cli/helpers/messages.ts, docs/adr/, tests/cli/
+## Task 2: RC2-B — backend-transaction: Docker CLI+daemon+image birlikte-değerlendirme (INIT-02)
+- Model: sonnet | Agent: bug-fixer | Effort: high | Provider: claude
+- Files: src/core/system-capacity.ts, src/cli/commands/init-steps.ts, src/cli/commands/init.ts, src/cli/helpers/messages.ts, tests/cli/init-backend-transaction.test.ts
+- Scope: src/core/, src/cli/commands/, src/cli/helpers/messages.ts, tests/cli/
 - Dependencies: Task 1
 ### Description
-KANIT (sol-sweep SEC-02): subprocess worker host proje-kökündeki .deck'i OKUYABİLİR — Docker
-shadow (src/orchestra/spawn-backend-docker.ts:729-752) yalnız container-yolunu kapatır;
-ADR-G-005 (docs/adr/adr-g-005-secret-file-system.md:25) açığı kabul eder. TAM fix (host
-credential-broker, worker-FS'ten tam ayrım) RC-1 kapsamını aşar — AYRI born olacak; bu task
-DÜRÜSTLÜK dilimi (sessiz-açık YASAK, Yasa #2 dürüst-fail ilkesi): (1) doctor'a yeni check:
-`spawn_backend === 'subprocess'` VE .deck mevcut VE en az bir non-empty secret satırı varsa →
-WARN-seviye bulgu: "subprocess worker'lar .deck'i okuyabilir; hassas ortamda docker backend
-(shadow'lu) kullanın" (getMessage ile en+tr; doctor çıktı-desenine uy — mevcut check'lerin
-yapısını kopyala); .deck yoksa/boşsa check PASS-sessiz; (2) ADR-G-005 dosyasına tarihli
-durum-notu bölümü: RC-1'de eklenen guard'lar (overwrite/0600 — Task-1) + subprocess-görünürlük
-AÇIK + credential-broker follow-up işaretçisi; (3) RED-first: subprocess-config'li tmpdir
-fixture'da bugünkü doctor'ın UYARI VERMEDİĞİNİ kanıtla, sonra GREEN.
-Smoke: node dist/cli/entry.js doctor (subprocess-config + dolu-.deck tmp-projede) → çıktıda subprocess-secret uyarı satırı
+KANIT (sol-sweep INIT-02 + CC disk-verify): backend seçimi yalnız `docker --version`a bakar
+(src/core/system-capacity.ts:~40-46 spawnSync probe) — CLI kurulu ama DAEMON ölü/ulaşılamazken
+config'e spawn_backend:docker yazılıp kalıyor; sonraki daemon-probe yalnız image-offer'ı atlar,
+config'i subprocess'e GERİ ÇEVİRMEZ (init.ts:~206/269, init-steps.ts:~215). Kullanıcının ilk
+sprint'i ölü-daemon'a çarpar. GÖREV: (1) system-capacity'ye (ya da uygun yere) ayrı daemon-probe:
+`docker info` (async spawn, ~3-5s timeout) → dockerCli / dockerDaemon AYRI sinyaller; (2) backend
+seçimi TRANSACTION olur: docker ancak CLI+daemon İKİSİ de canlıysa seçilir; CLI-var-daemon-yok →
+spawn_backend:subprocess yazılır + dürüst-mesaj ("Docker CLI bulundu ama daemon çalışmıyor —
+subprocess backend'e düşüldü; docker'a geçmek için: <komut> sonra deckent config set
+spawn_backend docker"); (3) image-offer reddedilirse/başarısızsa da config docker'da BIRAKILMAZ —
+subprocess'e düş + aynı-desen mesaj (kullanıcı bilinçli docker istiyorsa remediation-komutu verilir);
+(4) bu geçişler Task-1'in outcome-bloğuna engel DEĞİL bilgi-notu olarak akar (backend-düşmesi
+SETUP_INCOMPLETE sebebi değildir — sistem kullanılabilir); (5) i18n en+tr. RED-first: daemon-ölü
+senaryoyu probe-injection'la simüle et (gerçek docker'a bağımlı test YASAK — spawn enjekte edilebilir
+olsun) → bugünkü kodun docker yazdığını kanıtla → GREEN subprocess+mesaj.
+Smoke: node dist/cli/entry.js init --yes (docker-CLI'sız PATH, tmp-proje) → config.json spawn_backend=subprocess + çıktıda dürüst backend-satırı
 ### goNogo
-- goCriteria: doctor-check RED→GREEN testli; i18n en+tr çifti; .deck-yok/boş yolunda uyarı YOK (false-positive testi); ADR-G-005 durum-notu eklendi; mevcut doctor testleri yeşil.
-- nogo: hardcoded user-facing string varsa NO_GO; uyarı .deck'in İÇERİĞİNİ (key adı/değeri) sızdırırsa NO_GO.
+- goCriteria: daemon-probe CLI-probe'dan ayrı ve enjekte-edilebilir; CLI-var-daemon-yok RED→GREEN (config subprocess + remediation-mesaj); image-decline yolu da config'i docker'da bırakmıyor; i18n en+tr; mevcut init/system-capacity testleri yeşil.
+- nogo: gerçek-docker'a bağımlı (CI'da flaky) test yazılırsa NO_GO; daemon-yokken config'te docker kalırsa NO_GO.
 
-## Task 3: SCHED1 — semantics-kernel: effective-dependency-state tekleme (strangler dilim-1, davranış-koruyucu)
+## Task 3: DOCTOR-TWIN — born-651: runDoctorChecks canlı-ikizini öldür (tek canonical liste)
+- Model: sonnet | Agent: refactorer | Effort: medium | Provider: claude
+- Files: src/cli/commands/doctor.ts, src/cli/commands/doctor-checks.ts, tests/cli/doctor-checks.test.ts, tests/cli/doctor-twin-dedup.test.ts
+- Scope: src/cli/commands/, tests/cli/
+- Dependencies: none
+### Description
+KANIT (born-651, sprint-411 CC canlı-vakası): doctor.ts:~1708 LOKAL `runDoctorChecks` kendi
+check-listesini kurar; canlı `deckent doctor` (doctor.ts:~2224) ONU çağırır — doctor-checks.ts'teki
+kardeş-fonksiyona eklenen check gerçek-binary'de görünmedi (411-002'de yaşandı; CC iki listeye
+senkron-yorumla ekledi — o geçici yorum kaldırılacak). born-505 (410-003) yalnız
+runPreFlightHealthCheck ikizini teklemişti. GÖREV: (1) İKİ listenin fark-envanterini çıkar
+(check-adı bazında; notes'a yaz) — fark varsa davranış-koruyan birleşim kur (canlı doctor'ın
+bugün bastığı check-seti DEĞİŞMEZ; yalnız kaynak tekleşir); (2) canonical liste TEK yerde yaşar
+(tercih: doctor-checks.ts), doctor.ts kendi gövdesini silip delege eder / re-export eder —
+dış-import yüzeyi (başka modüller doctor.ts'ten runDoctorChecks import ediyorsa) kırılmaz;
+(3) yeni pin-test: "bir check YALNIZ canonical listeye eklendiğinde gerçek runDoctorChecks
+çıktısında görünür" (411-002 vakasının regresyon-kilidi) + "doctor.ts içinde ikinci bir
+DoctorCheck[] listesi yok" statik-kanıt (kaynak-okuma testi kabul); (4) 16-sayı-pini canonical'a
+taşınır. REPRODUCE: fark-envanteri RED-kanıt sayılır (iki listenin bugün ayrışabildiğini göster).
+Smoke: node dist/cli/entry.js doctor (subprocess+dolu-.deck tmp-projede) → '.deck Subprocess Visibility' satırı hâlâ basılır
+### goNogo
+- goCriteria: doctor.ts'te ikinci check-listesi kalmaz (statik-kanıt testli); canlı doctor check-seti davranış-aynı (önce-sonra envanteri notes'ta); dış-import yüzeyi korunur (tsc temiz); 411-002 regresyon-kilidi testi var; mevcut doctor testleri yeşil.
+- nogo: canlı doctor'ın bastığı check-seti sessizce değişirse NO_GO; delegasyon yerine üçüncü kopya oluşursa NO_GO.
+
+## Task 4: SCHED2 — checkpoint-v2: MRR restore'da kaybolmaz (strangler dilim-2)
 - Model: sonnet | Effort: high | Provider: claude
-- Files: src/orchestra/scheduler-state.ts, src/orchestra/scheduler-truth.ts, src/orchestra/sprint-spawner.ts, src/orchestra/result-collector.ts, tests/orchestra/scheduler-effective-dependencies.test.ts
+- Files: src/orchestra/sprint-checkpoint.ts, src/orchestra/sprint-controller.ts, tests/orchestra/checkpoint-mrr-restore.test.ts
 - Scope: src/orchestra/, tests/orchestra/
 - Dependencies: none
 ### Description
-ÖNCE OKU (zorunlu): `docs/analysis/scheduler-unify-design-2026-07-11.md` — Sprint-1 dilimi +
-örtüşme-matrisi + riskler. BAĞLAM: born-610 predicate SÖZLÜĞÜ tekledi (scheduler-truth.ts) ama
-fix-aggregation "caller's responsibility" kaldı (scheduler-truth.ts:26-27) ve site'lar ayrışık:
-`selectEligibleForSpawn` (sprint-spawner.ts:1189-1190) hardcoded `status === TaskStatus.DONE` +
-fix-aggregation YOK; `dispatchReadyTasks` (result-collector.ts:~482) aggregate-aware DONE-seti
-KENDİ kurar. GÖREV (SCHED-treni dilim-1; Alperen-onaylı kademeli-strangler): (1) YENİ
-`src/orchestra/scheduler-state.ts`: `computeEffectiveDependencyState(tasks, nowMs)` → PURE
-(disk, env ve Date.now OKUMAZ — now dışarıdan): satisfyingIds (isDependencySatisfying + BİR-SEVİYE
-fix-aggregation: DONE `<id>-fix`/fixForTaskId original'ı satisfy eder — mevcut dispatchReadyTasks
-semantiğini AYNEN taşı, yeniden icat etme), terminalFailureIds (isSchedulingTerminalFailure,
-aynı fix-aggregation merceğiyle), retry-eligibility helper'ı (retryAfter <= nowMs). (2)
-`selectEligibleForSpawn` hardcoded DONE-set yerine bu helper'ı kullanır — DAVRANIŞ-DEĞİŞİMİ
-BİLİNÇLİ ve TEK: DONE fix-task'ı artık idle-rescan/respawn-eligibility'de de original'ı satisfy
-eder (tasarım-doc composition-kanıtı; ayrı test-case ile pinle); `Date.now()` çağrısı imzaya
-`nowMs = Date.now()` default-parametre olarak taşınır (geriye-uyumlu). (3) `dispatchReadyTasks`
-kendi aggregate-set kurulumunu helper'a delege eder — DAVRANIŞ AYNI (mevcut testler yeşil).
-(4) respawnEligibleTasks predicate kullanımı helper'la hizalanır (sprint-spawner.ts:~884).
-(5) YENİ exhaustive test: status ∈ {DONE, NO_GO, MRR, PENDING, EXECUTING} × fix {yok, PENDING-fix,
-DONE-fix, NO_GO-fix} × pipeline {on, off} tablosu — her hücrenin beklenen eligible/blocked/skip
-sonucu; + mevcut scheduler/dispatch testlerinin TAMAMI yeşil (tests/orchestra/ blast-radius'u koş).
-SINIF-RİSKİ: scheduler = sprint'lerin kalbi — kapsam-dışı refactor YASAK (closure'lara, checkpoint'e,
-FIFO-moduna DOKUNMA; onlar dilim 2-7). planDispatch'e DOKUNMA (dilim-4 shadow).
+ÖNCE OKU (zorunlu): `docs/analysis/scheduler-unify-design-2026-07-11.md` — "Checkpoint-restore MRR
+semantiği" bölümü + Sprint-2 dilimi. KANIT (CC disk-verify): checkpoint yalnız üç ayrık küme yazar —
+completedTasks=isTerminalStatus(DONE|NO_GO) (sprint-checkpoint.ts:~176 + ~558-563), pendingTasks=PENDING,
+activeWorkers=EXECUTING|CLAIMED → checkpoint anında ZATEN-MRR olan task ÜÇ KÜMENİN DE DIŞINDA kalır;
+restore üç kümenin union'ından liste kurar (~652) → MRR task restore'da KAYBOLUR. Ayrıca stale-active
+worker restore'da MRR'a çevrilirken (~688+) downstream cascade çalışmaz (controller EVALUATE'a
+sıçrar, sprint-controller.ts:~1167). GÖREV (dilim-2 — reducer'a bağlama DEĞİL, o dilim-6):
+(1) checkpoint şeması v2: schemaVersion alanı + TAM task-durum haritası (her task: id, status,
+fixForTaskId varsa, sıra korunur) + remainingQueue + activeWorkers + lastDecisionSeq (yoksa 0);
+v1-writer yerine v2 yazılır, ACİL-ROLLBACK: env DECKENT_CHECKPOINT_V1=1 eski-writer'ı geri açar;
+(2) DUAL-READER: v1 checkpoint'ler okunmaya devam eder (legacy decoder — eksik task'ları yalnız
+aynı sprint'in persisted task-kayıtlarından tamamlar, bulamazsa dürüst-warn); (3) restore-semantiği
+born-610 sözlüğüne bağlanır: MRR terminal-non-satisfying — restore edilen sprint'te ZATEN-MRR task
+kaybolmaz (haritada taşınır), stale-active→MRR dönüşümünün PENDING descendant'ları (direkt+transitif)
+restore-yolunda cascade-skip işaretlenir (mevcut cascadeSkipped sözleşmesiyle: sentetik-NO_GO +
+cascadeSkipped:true — fix/xfix üretmez) ve bu task'lar için spawn SIFIR; scheduler-truth
+predicate'lerini ve (uygunsa) sprint-411'in scheduler-state helper'ını KULLAN, yeniden-icat etme;
+(4) test: v2 round-trip (MRR'lı sprint → checkpoint → restore → MRR aynen + descendant'lar
+cascade-skip + spawn-çağrısı yok) + v1-decoder yolu + rollback-env yolu. KAPSAM-DIŞI: reducer,
+closure'lar, planDispatch, FIFO — dokunma.
 ### goNogo
-- goCriteria: scheduler-state.ts pure (Date.now, process.env ve fs importu YOK — lint-kanıt notes'ta); exhaustive tablo-testi TAM; tek-davranış-değişimi (fix-agg idle+respawn'a) ayrı test-case'le pinli; selectEligibleForSpawn + dispatchReadyTasks + respawnEligibleTasks helper'a bağlı; tests/orchestra/ tamamı yeşil.
-- nogo: closure, checkpoint, FIFO-modu veya planDispatch'e dokunulursa NO_GO; helper'da fs, env veya Date.now okuma varsa NO_GO; mevcut test kırığı kalırsa NO_GO.
+- goCriteria: v2 şema + dual-reader + rollback-env üçü de testli; zaten-MRR round-trip'te kaybolmuyor; stale-active→MRR descendant'ları restore'da cascade-skip (fix-üretmez, cascadeSkipped:true) + spawn sıfır kanıtı; tests/orchestra/ tamamı yeşil.
+- nogo: reducer·closure·planDispatch·FIFO'ya dokunulursa NO_GO; v1 okunamaz hale gelirse NO_GO; MRR restore'da hâlâ kayboluyorsa NO_GO.

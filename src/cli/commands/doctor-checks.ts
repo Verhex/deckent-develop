@@ -3,14 +3,16 @@ import { readFileSync, existsSync, readdirSync, accessSync, constants as fsConst
 import { join } from 'node:path';
 import { platform } from 'node:os';
 import { spawnSync } from 'node:child_process';
+import { DebtPriority } from '../../core/types.js';
 import type { DoctorResult } from '../../core/types.js';
 import type { ProviderAvailabilityDetail, ProviderAdapter } from '../../core/provider.js';
 import { runProviderDiagnostics as runProviderDiagnosticsImpl } from '../../core/provider.js';
 import {
-  DECKENT_DIR, BRAIN_DIR, DEBT_FILE, DECISIONS_FILE,
-  DIRECTIVES_FILE, LOCKS_DIR, DEBT_TABLE_HEADER, MEMORY_DB_FILE,
+  DECKENT_DIR, BRAIN_DIR, DECISIONS_FILE,
+  DIRECTIVES_FILE, LOCKS_DIR, MEMORY_DB_FILE,
   PROJECT_CONFIG_PATH,
 } from '../../core/constants.js';
+import { getDebtItems } from '../../core/debt-store.js';
 
 // Memory V2 (Sprint 179 W3-6): exports/decisions.md is the auto-generated
 // source. doctor must accept EITHER this OR legacy .brain/DECISIONS.md.
@@ -60,9 +62,29 @@ export function isRunningInWSL(): boolean {
   }
 }
 
-export function checkPlatform(): DoctorCheck {
+export function checkPlatform(spawnBackend?: string): DoctorCheck {
   const currentPlatform = platform();
   if (currentPlatform === 'win32') {
+    // tmux genuinely doesn't run natively on Windows, but docker (Docker
+    // Desktop) and subprocess backends work fine there — reporting
+    // "UNSUPPORTED" regardless of the configured backend would be a
+    // misdiagnosis when the user has explicitly opted into docker/subprocess.
+    if (spawnBackend === 'docker') {
+      return {
+        name: 'Platform',
+        passed: true,
+        message: 'Windows (docker backend — fully supported via Docker Desktop; tmux not required)',
+        required: false,
+      };
+    }
+    if (spawnBackend === 'subprocess') {
+      return {
+        name: 'Platform',
+        passed: true,
+        message: 'Windows (subprocess backend — fully supported; tmux not required)',
+        required: false,
+      };
+    }
     return {
       name: 'Platform',
       passed: false,
@@ -135,10 +157,18 @@ function checkGit(): DoctorCheck {
   };
 }
 
-export function checkTmux(providerNames?: string[], spawnBackend?: string): DoctorCheck {
+export function checkTmux(providerNames?: string[], spawnBackend?: string, lang: string = 'en'): DoctorCheck {
   if (platform() === 'win32' || spawnBackend === 'subprocess' || spawnBackend === 'docker') {
-    const reason = spawnBackend === 'docker' ? 'docker backend' : 'subprocess backend';
-    return { name: 'tmux', passed: true, message: `not required (${reason})`, required: false };
+    // Honest-label the reason: an explicit spawn_backend override is a
+    // CONFIG-PREFERENCE reason; win32 with no override (or one that is
+    // neither 'docker' nor 'subprocess') is a PLATFORM-INCOMPATIBILITY reason
+    // — tmux genuinely does not run natively on Windows.
+    const reasonKey = spawnBackend === 'docker'
+      ? 'doctor.tmux_not_required_docker'
+      : spawnBackend === 'subprocess'
+        ? 'doctor.tmux_not_required_subprocess'
+        : 'doctor.tmux_not_required_win32';
+    return { name: 'tmux', passed: true, message: getMessage(reasonKey, lang), required: false };
   }
   const needsTmux = !providerNames || providerNames.includes('claude') || providerNames.length === 0;
   const required = needsTmux;
@@ -293,21 +323,13 @@ function checkBrainBudget(root: string, memoryBudget = 900): DoctorCheck {
 }
 
 function checkDebt(root: string): DoctorCheck {
-  const debtPath = join(root, BRAIN_DIR, DEBT_FILE);
-  if (!existsSync(debtPath)) {
-    return { name: 'Debt', passed: true, message: 'No debt file', required: false };
+  // DB-first — debt lives in memory.db, not .brain/DEBT.md (removed, Task #4d).
+  const items = getDebtItems(root, { activeOnly: true });
+  const criticalCount = items.filter(d => d.priority === DebtPriority.CRITICAL).length;
+  if (criticalCount > 0) {
+    return { name: 'Debt', passed: false, message: `${criticalCount} CRITICAL debt item(s)`, required: false };
   }
-  try {
-    const content = readFileSync(debtPath, 'utf-8');
-    const lines = content.split('\n').filter(l => l.startsWith('|') && !l.startsWith(DEBT_TABLE_HEADER.slice(0, 5)) && !l.startsWith('|-'));
-    const criticalCount = lines.filter(l => l.includes('CRITICAL')).length;
-    if (criticalCount > 0) {
-      return { name: 'Debt', passed: false, message: `${criticalCount} CRITICAL debt item(s)`, required: false };
-    }
-    return { name: 'Debt', passed: true, message: `${lines.length} debt items, no critical`, required: false };
-  } catch {
-    return { name: 'Debt', passed: false, message: 'Cannot parse DEBT.md', required: false };
-  }
+  return { name: 'Debt', passed: true, message: `${items.length} open debt items, no critical`, required: false };
 }
 
 function checkStaleLocks(root: string, lockStaleThresholdMs = 300_000): DoctorCheck {
@@ -488,8 +510,8 @@ export function readAllCIReports(root: string, count = 5): CIReport[] {
 
 export function runDoctorChecks(root: string, providerNames?: string[], spawnBackend?: string, lang: string = 'en'): DoctorResult {
   const checks: DoctorCheck[] = [
-    checkPlatform(),
-    checkNode(), checkGit(), checkTmux(providerNames, spawnBackend), checkDocker(spawnBackend), checkClaude(),
+    checkPlatform(spawnBackend),
+    checkNode(), checkGit(), checkTmux(providerNames, spawnBackend, lang), checkDocker(spawnBackend), checkClaude(),
     checkWorkspace(root), checkBrainDir(root), checkDirectives(root),
     checkBrainBudget(root), checkDebt(root), checkStaleLocks(root),
     checkDeckSecurity(root), checkWritePermissions(root), checkGitignore(root),

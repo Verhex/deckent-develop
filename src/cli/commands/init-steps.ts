@@ -34,7 +34,7 @@ import { ensureDeckentImport } from '../../core/utils.js';
 import { regenerateRules } from '../../core/rule-generator.js';
 import { deepMerge } from '../../core/config.js';
 import { getModePreset } from '../../core/mode-presets.js';
-import { detectSystemCapacity, suggestMaxWorkers, suggestSpawnBackend } from '../../core/system-capacity.js';
+import { detectSystemCapacity, suggestMaxWorkers, decideSpawnBackendTransaction, probeDockerDaemon } from '../../core/system-capacity.js';
 import { generateProjectConventionsSkill, getGeneratedContent, generateTempAgents } from '../../orchestra/temp-skill-generator.js';
 import { seedDocsConfig } from '../../orchestra/managed-docs/docs-config.js';
 import { ADR_SEED_DATA, createIdentitySeed } from '../../core/adr-seed.js';
@@ -211,24 +211,33 @@ export async function writeConfig(
   }
   // ─── System Capacity Auto-Detection (Sprint 150 MVP) ───────────────
   const capacity = detectSystemCapacity();
+  const configLang = getLanguage(language);
 
-  // Auto-detect spawn_backend
+  // Auto-detect spawn_backend — TRANSACTIONAL (RC2-B / INIT-02): docker is only
+  // ever written when BOTH the CLI (`docker --version`, detectSystemCapacity)
+  // AND the daemon (async `docker info`, probeDockerDaemon) are alive. A
+  // CLI-present-daemon-dead host used to get spawn_backend: docker written and
+  // left there — the user's first sprint then crashed against a dead daemon.
+  // Falling back to subprocess here is honest and actionable, never silent.
   if (platform() === 'win32') {
     newConfig.spawn_backend = 'subprocess';
   } else if (!newConfig.spawn_backend) {
-    const suggestedBackend = suggestSpawnBackend(capacity);
-    newConfig.spawn_backend = suggestedBackend;
-    if (suggestedBackend === 'docker') {
-      print('  ✓ Docker detected → spawn_backend: docker (isolated worker containers)');
+    const daemonAvailable = capacity.dockerAvailable ? await probeDockerDaemon() : false;
+    const decision = decideSpawnBackendTransaction(capacity, daemonAvailable);
+    newConfig.spawn_backend = decision.backend;
+    if (decision.backend === 'docker') {
+      print(`  ${getMessage('init.docker_backend_selected', configLang)}`);
       // Check if worker image exists
       const { spawnSync: sp } = await import('node:child_process');
       const imgCheck = sp('docker', ['images', '-q', 'deckent-worker:latest'], {
         encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
       });
       if (!(imgCheck.stdout?.trim())) {
-        print('  ⚠ deckent-worker image not found — build with:');
+        print(`  ${getMessage('init.docker_image_missing_hint', configLang)}`);
         print('    docker build -f Dockerfile.worker -t deckent-worker:latest .');
       }
+    } else if (decision.daemonDowngraded) {
+      print(`  ${getMessage('init.docker_daemon_down_fallback', configLang)}`);
     }
   }
 
@@ -384,9 +393,8 @@ export function writeDeckSecurityFiles(root: string): void {
   } catch (err) {
     // Non-fatal — init must not abort over .deck/.gitignore setup — but silently
     // swallowing hid real failures (e.g. permission errors) from the operator.
-    process.stderr.write(
-      `[deckent] WARN: failed to write .deck security files: ${err instanceof Error ? err.message : String(err)}\n`,
-    );
+    const detail = err instanceof Error ? err.message : String(err);
+    process.stderr.write('[deckent] ' + getMessage('init.deck_security_write_failed', getLanguage(root)).replace('{error}', detail) + '\n');
   }
 }
 

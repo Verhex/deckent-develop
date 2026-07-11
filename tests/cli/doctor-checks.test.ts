@@ -140,6 +140,32 @@ describe('checkPlatform (checks module)', () => {
     expect(check.passed).toBe(true);
     expect(check.message).toContain('untested');
   });
+
+  // born-651 (task 412-003, DOCTOR-TWIN dedup): checkPlatform used to be a
+  // live twin — doctor.ts's copy was backend-aware on win32 (docker/subprocess
+  // pass), doctor-checks.ts's copy hardcoded UNSUPPORTED regardless of
+  // spawn_backend. The canonical body (now the only one) must keep the
+  // backend-aware behavior, since that was the one actually shipped in
+  // `deckent doctor`.
+  it('win32 + docker backend passes (backend-aware, not a blanket UNSUPPORTED)', () => {
+    vi.mocked(platform).mockReturnValue('win32' as NodeJS.Platform);
+    const check = checkPlatform('docker');
+    expect(check.passed).toBe(true);
+    expect(check.message).toContain('docker backend');
+  });
+
+  it('win32 + subprocess backend passes (backend-aware)', () => {
+    vi.mocked(platform).mockReturnValue('win32' as NodeJS.Platform);
+    const check = checkPlatform('subprocess');
+    expect(check.passed).toBe(true);
+    expect(check.message).toContain('subprocess backend');
+  });
+
+  it('win32 with no backend override still fails (genuine platform incompatibility, not a config choice)', () => {
+    vi.mocked(platform).mockReturnValue('win32' as NodeJS.Platform);
+    const check = checkPlatform();
+    expect(check.passed).toBe(false);
+  });
 });
 
 // ─── checkTmux ───────────────────────────────────────────────────────
@@ -174,6 +200,17 @@ describe('checkTmux (checks module)', () => {
     vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(1, '') as ReturnType<typeof spawnSync>);
     const check = checkTmux(['codex']);
     expect(check.required).toBe(false);
+  });
+
+  // born-651 (task 412-003, DOCTOR-TWIN dedup): checkTmux was a live twin —
+  // doctor.ts's copy i18n'd the "not required" reasons via getMessage;
+  // doctor-checks.ts's copy hardcoded English-only text. The canonical body
+  // must keep the i18n behavior.
+  it('is i18n\'d via getMessage for the "not required" reason (lang param, born-651)', () => {
+    const enCheck = checkTmux(undefined, 'docker', 'en');
+    const trCheck = checkTmux(undefined, 'docker', 'tr');
+    expect(enCheck.message).toContain('docker backend');
+    expect(trCheck.message).not.toBe(enCheck.message);
   });
 });
 
@@ -450,6 +487,43 @@ describe('runDoctorChecks (checks module)', () => {
     });
     const result = runDoctorChecks('/mock');
     expect(result.ok).toBe(false);
+  });
+});
+
+// ─── checkDebt (born-651, task 412-003: DOCTOR-TWIN dedup) ────────────
+//
+// checkDebt was a live twin — doctor.ts's copy was DB-first (getDebtItems
+// from core/debt-store.ts), doctor-checks.ts's copy still parsed the
+// long-removed root .brain/DEBT.md file. Not exported (never was), so it's
+// only reachable through runDoctorChecks()'s 'Debt' entry.
+
+describe('checkDebt via runDoctorChecks (checks module, DB-first — born-651)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(platform).mockReturnValue('linux' as NodeJS.Platform);
+    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, 'v22.0.0') as ReturnType<typeof spawnSync>);
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([] as ReturnType<typeof readdirSync>);
+    vi.mocked(readFileSync).mockReturnValue('# Content' as unknown as ReturnType<typeof readFileSync>);
+    vi.mocked(accessSync).mockReturnValue(undefined);
+    mockMemoryStore.totalCount.mockReturnValue(50);
+    mockMemoryStore.getByType.mockReturnValue([]);
+  });
+
+  it('reads debt from MemoryStore.getByType("debt") (DB-first) — a CRITICAL entry fails the check', () => {
+    mockMemoryStore.getByType.mockReturnValue([
+      { id: '1', title: 'x', status: 'open', priority: 'CRITICAL', metadata: '{}', sprint_id: null, created_at: '2026-01-01' },
+    ]);
+    const result = runDoctorChecks('/mock');
+    const debtCheck = result.checks.find(c => c.name === 'Debt');
+    expect(debtCheck?.passed).toBe(false);
+    expect(debtCheck?.message).toContain('CRITICAL');
+  });
+
+  it('uses DB-first "open debt items" wording, not the removed DEBT.md-parser\'s "debt items" wording', () => {
+    const result = runDoctorChecks('/mock');
+    const debtCheck = result.checks.find(c => c.name === 'Debt');
+    expect(debtCheck?.message).toMatch(/open debt items/);
   });
 });
 

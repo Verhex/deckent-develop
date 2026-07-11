@@ -6,7 +6,7 @@
  */
 
 import { totalmem, freemem, cpus, platform } from 'node:os';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn as nodeSpawn } from 'node:child_process';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -114,4 +114,94 @@ export function suggestSpawnBackend(cap: SystemCapacity): 'docker' | 'subprocess
   if (cap.platform === 'win32') return 'subprocess';
   if (cap.dockerAvailable) return 'docker';
   return 'subprocess';
+}
+
+// ─── Docker Daemon Probe (RC2-B / INIT-02, Sprint 412 — 412-002) ─────
+
+/** Minimal async child-process shape used by {@link probeDockerDaemon} — mockable in tests. */
+export interface DaemonProbeProcessLike {
+  on(event: 'close', listener: (code: number | null) => void): this;
+  on(event: 'error', listener: (error: Error) => void): this;
+  kill?(signal?: NodeJS.Signals | number): boolean;
+}
+
+/** Injectable async spawn for {@link probeDockerDaemon} — defaults to node:child_process spawn. */
+export type DaemonSpawnImpl = (command: string, args: string[]) => DaemonProbeProcessLike;
+
+const DOCKER_DAEMON_PROBE_TIMEOUT_MS = 4_000;
+
+/**
+ * Probe docker DAEMON reachability via async `docker info` — deliberately a
+ * SEPARATE signal from the CLI-presence probe in {@link detectSystemCapacity}
+ * (`docker --version`, synchronous). A host can have the CLI installed while
+ * the daemon is dead (Docker Desktop not started, dockerd crashed, socket
+ * permission denied) — conflating the two let `spawn_backend: docker` get
+ * written for a daemon that will never answer a worker's first `docker run`.
+ * Timeout-bounded (never hangs init) and injectable (never depends on a real
+ * docker install in tests). Any spawn error, non-zero exit, or timeout
+ * resolves `false` — this never throws.
+ */
+export function probeDockerDaemon(spawnImpl?: DaemonSpawnImpl): Promise<boolean> {
+  const spawn: DaemonSpawnImpl = spawnImpl ?? ((command, args) => nodeSpawn(command, args, { stdio: 'ignore' }));
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (value: boolean): void => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
+    let child: DaemonProbeProcessLike;
+    try {
+      child = spawn('docker', ['info']);
+    } catch {
+      done(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      try {
+        child.kill?.();
+      } catch {
+        // best-effort — we're already resolving false
+      }
+      done(false);
+    }, DOCKER_DAEMON_PROBE_TIMEOUT_MS);
+    timer.unref?.();
+
+    child.on('error', () => {
+      clearTimeout(timer);
+      done(false);
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      done(code === 0);
+    });
+  });
+}
+
+/** Result of a transactional backend decision — see {@link decideSpawnBackendTransaction}. */
+export interface SpawnBackendDecision {
+  backend: 'docker' | 'subprocess' | 'tmux';
+  /** True when the CLI-only suggestion was 'docker' but the daemon probe failed — downgraded to subprocess. */
+  daemonDowngraded: boolean;
+}
+
+/**
+ * Transactional backend decision (RC2-B / INIT-02): docker is chosen ONLY when
+ * BOTH signals are alive — the CLI-based heuristic ({@link suggestSpawnBackend})
+ * says docker AND the caller's independent daemon probe ({@link probeDockerDaemon})
+ * confirmed it. CLI-present-daemon-dead never returns 'docker' — it downgrades
+ * to 'subprocess' and flags `daemonDowngraded` so the caller can surface an
+ * honest, actionable message instead of silently writing a broken config.
+ */
+export function decideSpawnBackendTransaction(
+  cap: SystemCapacity,
+  daemonAvailable: boolean,
+): SpawnBackendDecision {
+  const cliSuggestion = suggestSpawnBackend(cap);
+  if (cliSuggestion === 'docker' && !daemonAvailable) {
+    return { backend: 'subprocess', daemonDowngraded: true };
+  }
+  return { backend: cliSuggestion, daemonDowngraded: false };
 }

@@ -1,26 +1,19 @@
 import { readFileSync, existsSync, readdirSync, statSync, mkdirSync, chmodSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { platform, totalmem } from 'node:os';
-import { spawnSync, spawn as nodeSpawn } from 'node:child_process';
+import { spawn as nodeSpawn } from 'node:child_process';
 import type { Command } from 'commander';
 import { planInstall } from '../../core/provisioner.js';
 import type { DoctorResult, SystemProfile } from '../../core/types.js';
 import type { DetectedProvider, ProviderAvailabilityDetail } from '../../core/provider.js';
 import type { HealthCheckResult } from '../../orchestra/connector.js';
 import {
-  DECKENT_DIR, BRAIN_DIR, DECISIONS_FILE,
-  DIRECTIVES_FILE, LOCKS_DIR, MEMORY_DB_FILE,
+  DECKENT_DIR, BRAIN_DIR,
+  LOCKS_DIR,
   PROJECT_CONFIG_PATH, TASKS_DIR,
 } from '../../core/constants.js';
-import { DebtPriority } from '../../core/types.js';
-import { getDebtItems } from '../../core/debt-store.js';
 import { migrateConfig } from '../../core/config-migration.js';
 import { createDefaultConfig } from '../../core/config.js';
-
-// Memory V2 (Sprint 179 W3-6): exports/decisions.md is the auto-generated
-// source. doctor must accept EITHER this OR legacy .brain/DECISIONS.md.
-const DECISIONS_EXPORT_RELATIVE = 'exports/decisions.md';
-import { MemoryStore } from '../../core/memory-store.js';
 import { getSystemProfile } from '../../core/system-profile.js';
 import { detectHostMemory } from '../../core/host-detector.js';
 import { resolveAutoMaxWorkers } from '../../orchestra/spawn-coordinator.js';
@@ -29,7 +22,6 @@ import { print, formatDoctorResult, formatCIHealthSection } from '../helpers/out
 import type { CIBaseline, CIReport } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
-import { ErrorRegistry } from '../../core/errors.js';
 import { detectAvailableProviders, formatDetectedProviders } from '../../core/provider.js';
 import { probeProviderAuth, type AuthProbeResult, type AuthProbeState } from '../../core/provider-auth-probe.js';
 import {
@@ -47,21 +39,22 @@ import {
   runProviderDiagnostics,
   checkDaemonHygiene,
   runPreFlightHealthCheck,
-  checkDeckSubprocessVisibility,
+  checkPlatform,
+  checkTmux,
+  checkClaude,
+  checkGitignore,
+  checkWritePermissions,
+  checkDeckSecurity,
+  checkDocker,
+  runDoctorChecks,
+  getMemoryEntryCount,
   type PreFlightResult,
   type PreFlightCheckResult,
+  type DoctorCheck,
 } from './doctor-checks.js';
 import { detectEnvironment } from '../../core/environment.js';
-import { loadDeckSecrets, validateDeckFile, KNOWN_DECK_KEYS, isDeckFileCommitted } from '../../core/deck-file.js';
+import { loadDeckSecrets, validateDeckFile, KNOWN_DECK_KEYS } from '../../core/deck-file.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
-import { accessSync, constants as fsConstants } from 'node:fs';
-
-interface DoctorCheck {
-  name: string;
-  passed: boolean;
-  message: string;
-  required: boolean;
-}
 
 export function isRunningInWSL(): boolean {
   // Check WSL environment variable (set by WSL2 interop)
@@ -78,60 +71,10 @@ export function isRunningInWSL(): boolean {
   }
 }
 
-export function checkPlatform(spawnBackend?: string): DoctorCheck {
-  const currentPlatform = platform();
-  if (currentPlatform === 'win32') {
-    // Backend-aware (DOCTOR-1, row 210): tmux genuinely doesn't run natively on
-    // Windows, but docker (Docker Desktop) and subprocess backends work fine there.
-    // Reporting "UNSUPPORTED" regardless of the configured backend is a misdiagnosis
-    // when the user has explicitly opted into docker or subprocess.
-    if (spawnBackend === 'docker') {
-      return {
-        name: 'Platform',
-        passed: true,
-        message: 'Windows (docker backend — fully supported via Docker Desktop; tmux not required)',
-        required: false,
-      };
-    }
-    if (spawnBackend === 'subprocess') {
-      return {
-        name: 'Platform',
-        passed: true,
-        message: 'Windows (subprocess backend — fully supported; tmux not required)',
-        required: false,
-      };
-    }
-    return {
-      name: 'Platform',
-      passed: false,
-      message: 'Windows UNSUPPORTED for tmux backend — use WSL2 for full features. Subprocess mode only.',
-      required: false,
-    };
-  }
-  if (currentPlatform === 'linux') {
-    const inWSL = isRunningInWSL();
-    return {
-      name: 'Platform',
-      passed: true,
-      message: inWSL ? 'WSL2/Linux (fully supported)' : 'Linux (fully supported)',
-      required: false,
-    };
-  }
-  if (currentPlatform === 'darwin') {
-    return {
-      name: 'Platform',
-      passed: true,
-      message: 'macOS (fully supported)',
-      required: false,
-    };
-  }
-  return {
-    name: 'Platform',
-    passed: true,
-    message: `${currentPlatform} (untested — may work)`,
-    required: false,
-  };
-}
+// checkPlatform: canonical definition lives in doctor-checks.ts (born-651,
+// task 412-003 — was a live twin with its own body; see the runDoctorChecks
+// re-export block below for the dedup rationale). Imported above, re-exported
+// there to preserve this module's existing public surface.
 
 // ─── Platform Profile Report (ONB-2-DILIM-3, Sprint 368 — 368-002) ───────────
 //
@@ -219,220 +162,17 @@ export function formatPlatformProfileLines(report: PlatformProfileReport, lang: 
   return lines;
 }
 
-function checkNode(): DoctorCheck {
-  const result = spawnSync('node', ['--version'], { encoding: 'utf-8' });
-  if (result.status !== 0) {
-    const entry = ErrorRegistry.get('DECKENT_E010');
-    return { name: 'Node.js', passed: false, message: `not found — ${entry?.suggestion ?? 'Install Node.js >=18'}`, required: true };
-  }
-  const version = result.stdout.trim();
-  const major = parseInt(version.replace('v', '').split('.')[0] ?? '0', 10);
-  if (major < 18) {
-    const entry = ErrorRegistry.get('DECKENT_E010');
-    return {
-      name: 'Node.js',
-      passed: false,
-      message: `${version} found but >=18 required — ${entry?.suggestion ?? 'Upgrade Node.js'}`,
-      required: true,
-    };
-  }
-  return {
-    name: 'Node.js',
-    passed: true,
-    message: `${version} (>=18 required)`,
-    required: true,
-  };
-}
+// checkNode / checkGit: canonical bodies live in doctor-checks.ts only (not
+// exported by this module before the dedup either, so no re-export needed).
+// checkTmux / checkClaude: canonical bodies live in doctor-checks.ts
+// (born-651, task 412-003); imported above, re-exported below.
 
-function checkGit(): DoctorCheck {
-  const result = spawnSync('git', ['--version'], { encoding: 'utf-8' });
-  if (result.status !== 0) {
-    const entry = ErrorRegistry.get('DECKENT_E009');
-    return { name: 'git', passed: false, message: `not found — ${entry?.suggestion ?? 'Install git'}. Needed for: rollback, safety points, branch management`, required: true };
-  }
-  const match = result.stdout.trim().match(/(\d+\.\d+\.\d+)/);
-  return {
-    name: 'git',
-    passed: true,
-    message: match ? `v${match[1]}` : result.stdout.trim(),
-    required: true,
-  };
-}
-
-export function checkTmux(providerNames?: string[], spawnBackend?: string, lang: string = 'en'): DoctorCheck {
-  // tmux is NOT required on Windows, subprocess, or Docker backend
-  if (platform() === 'win32' || spawnBackend === 'subprocess' || spawnBackend === 'docker') {
-    // Honest-label the reason (369-002, follow-up to 368-002's out-of-scope note): an
-    // explicit spawn_backend override is a CONFIG-PREFERENCE reason; win32 with no
-    // override (or one that is neither 'docker' nor 'subprocess') is a
-    // PLATFORM-INCOMPATIBILITY reason — tmux genuinely does not run natively on Windows.
-    // Falling through to "subprocess backend" regardless used to imply a config choice
-    // the user never made.
-    const reasonKey = spawnBackend === 'docker'
-      ? 'doctor.tmux_not_required_docker'
-      : spawnBackend === 'subprocess'
-        ? 'doctor.tmux_not_required_subprocess'
-        : 'doctor.tmux_not_required_win32';
-    return { name: 'tmux', passed: true, message: getMessage(reasonKey, lang), required: false };
-  }
-  const needsTmux = !providerNames || providerNames.includes('claude') || providerNames.length === 0;
-  const required = needsTmux;
-  const result = spawnSync('tmux', ['-V'], { encoding: 'utf-8' });
-  if (result.status !== 0) {
-    const entry = ErrorRegistry.get('DECKENT_E001');
-    if (!required) {
-      return { name: 'tmux', passed: false, message: 'not found — not required when using Codex/Gemini providers', required: false };
-    }
-    return { name: 'tmux', passed: false, message: `not found — ${entry?.suggestion ?? 'Install tmux'}`, required: true };
-  }
-  return {
-    name: 'tmux',
-    passed: true,
-    message: result.stdout.trim(),
-    required,
-  };
-}
-
-export function checkClaude(checkAuth = false): DoctorCheck {
-  const shellOpt = process.platform === 'win32';
-  const result = spawnSync('claude', ['--version'], { encoding: 'utf-8', shell: shellOpt });
-  if (result.status !== 0) {
-    const entry = ErrorRegistry.get('DECKENT_E002');
-    return { name: 'Claude CLI', passed: false, message: `not found — ${entry?.suggestion ?? 'Install Claude CLI'}`, required: true };
-  }
-  const version = result.stdout.trim();
-  if (checkAuth) {
-    // Attempt auth check: `claude config get` returns non-zero if not logged in
-    const authResult = spawnSync('claude', ['config', 'get', 'account'], { encoding: 'utf-8', shell: shellOpt });
-    if (authResult.status !== 0 || (!authResult.stdout?.trim() && !authResult.stderr?.trim())) {
-      return {
-        name: 'Claude CLI',
-        passed: false,
-        message: `v${version} — not authenticated. Run: claude login`,
-        required: true,
-      };
-    }
-  }
-  return {
-    name: 'Claude CLI',
-    passed: true,
-    message: `v${version}`,
-    required: true,
-  };
-}
-
-function checkWorkspace(root: string): DoctorCheck {
-  const exists = existsSync(join(root, DECKENT_DIR));
-  return {
-    name: 'Workspace',
-    passed: exists,
-    message: exists ? '.deckent/ found' : '.deckent/ missing — run `deckent init`',
-    required: false,
-  };
-}
-
-function checkBrainDir(root: string): DoctorCheck {
-  const brainPath = join(root, BRAIN_DIR);
-  if (!existsSync(brainPath)) {
-    return { name: 'Brain Dir', passed: false, message: '.brain/ missing', required: false };
-  }
-  // Memory V2 accept-either (Sprint 179 W3-6): decisions can live in EITHER
-  // legacy .brain/DECISIONS.md OR Memory V2 (.brain/memory.db + .brain/exports/decisions.md).
-  // A fresh V2 install no longer ships DECISIONS.md, so requiring it would
-  // produce a false-positive on every clean install.
-  const hasV2Decisions =
-    existsSync(join(brainPath, MEMORY_DB_FILE))
-    || existsSync(join(brainPath, DECISIONS_EXPORT_RELATIVE));
-  const hasLegacyDecisions = existsSync(join(brainPath, DECISIONS_FILE));
-
-  const missing: string[] = [];
-  // Memory V2: memory.db is the single source of truth — legacy .brain/ root
-  // .md files (MEMORY/RETRO/PATTERNS/DEBT) are no longer expected.
-  if (!hasV2Decisions && !hasLegacyDecisions) {
-    missing.push(`${MEMORY_DB_FILE} or ${DECISIONS_FILE}`);
-  }
-  if (missing.length > 0) {
-    return { name: 'Brain Dir', passed: false, message: `Missing: ${missing.join(', ')}`, required: false };
-  }
-  return { name: 'Brain Dir', passed: true, message: 'All brain files present', required: false };
-}
-
-function checkDirectives(root: string): DoctorCheck {
-  const path = join(root, DIRECTIVES_FILE);
-  if (!existsSync(path)) {
-    const entry = ErrorRegistry.get('DECKENT_E003');
-    return { name: 'Directives', passed: false, message: `DIRECTIVES.md missing — ${entry?.suggestion ?? 'Create DIRECTIVES.md or run deckent init'}`, required: false };
-  }
-  try {
-    const content = readFileSync(path, 'utf-8').trim();
-    if (content.length === 0) {
-      return { name: 'Directives', passed: false, message: 'DIRECTIVES.md is empty — add sprint goals with ## Task sections', required: false };
-    }
-  } catch {
-    return { name: 'Directives', passed: false, message: 'Cannot read DIRECTIVES.md — check file permissions', required: false };
-  }
-  return { name: 'Directives', passed: true, message: 'DIRECTIVES.md found', required: false };
-}
-
-/** DB-first memory entry count — replaces legacy countBrainLines. */
-function getMemoryEntryCount(projectRoot: string): number {
-  const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
-  if (!existsSync(dbPath)) return 0;
-  try {
-    const store = new MemoryStore(dbPath);
-    try { return store.totalCount(); }
-    finally { store.close(); }
-  } catch { return 0; }
-}
-
-function checkBrainBudget(root: string, memoryBudget = 900): DoctorCheck {
-  const lines = getMemoryEntryCount(root);
-  const passed = lines <= memoryBudget;
-  return {
-    name: 'Brain Budget',
-    passed,
-    message: `${lines}/${memoryBudget} lines${passed ? '' : ' — OVER BUDGET, run cleanup --decay'}`,
-    required: false,
-  };
-}
-
-function checkDebt(root: string): DoctorCheck {
-  // Task #4d: DB-first — debt lives in memory.db, not .brain/DEBT.md.
-  const items = getDebtItems(root, { activeOnly: true });
-  const criticalCount = items.filter(d => d.priority === DebtPriority.CRITICAL).length;
-  if (criticalCount > 0) {
-    return { name: 'Debt', passed: false, message: `${criticalCount} CRITICAL debt item(s)`, required: false };
-  }
-  return { name: 'Debt', passed: true, message: `${items.length} open debt items, no critical`, required: false };
-}
-
-function checkStaleLocks(root: string, lockStaleThresholdMs = 300_000): DoctorCheck {
-  const locksPath = join(root, LOCKS_DIR);
-  if (!existsSync(locksPath)) {
-    return { name: 'Locks', passed: true, message: 'No lock files', required: false };
-  }
-  try {
-    const lockFiles = readdirSync(locksPath).filter(f => f.endsWith('.lock'));
-    if (lockFiles.length === 0) {
-      return { name: 'Locks', passed: true, message: 'No lock files', required: false };
-    }
-    let staleCount = 0;
-    for (const file of lockFiles) {
-      try {
-        const lock = JSON.parse(readFileSync(join(locksPath, file), 'utf-8'));
-        if (lock.acquiredAt && (Date.now() - new Date(lock.acquiredAt).getTime()) > lockStaleThresholdMs) {
-          staleCount++;
-        }
-      } catch { /* skip malformed */ }
-    }
-    if (staleCount > 0) {
-      return { name: 'Locks', passed: false, message: `${staleCount} stale lock(s) — run \`deckent cleanup\` to remove stale locks`, required: false };
-    }
-    return { name: 'Locks', passed: true, message: `${lockFiles.length} active lock(s)`, required: false };
-  } catch {
-    return { name: 'Locks', passed: true, message: 'Cannot read locks', required: false };
-  }
-}
+// checkWorkspace / checkBrainDir / checkDirectives / checkBrainBudget /
+// checkDebt / checkStaleLocks: canonical bodies live in doctor-checks.ts only
+// (none were exported by this module before the dedup, so no re-export is
+// needed — see the runDoctorChecks re-export block below for the rationale).
+// getMemoryEntryCount is imported from doctor-checks.ts above (used below by
+// the human-summary formatter).
 
 /**
  * Read the last sprint ID from .deckent/config.json.
@@ -1579,149 +1319,29 @@ export function formatSystemProfile(profile: SystemProfile, subscription?: strin
   return lines.join('\n');
 }
 
-/**
- * Check that .brain/memory.db (and WAL/SHM) are gitignored and not tracked.
- */
-export function checkGitignore(root: string): DoctorCheck {
-  const criticalFiles = ['.brain/memory.db', '.brain/memory.db-shm', '.brain/memory.db-wal'];
-
-  // Check .gitignore entries exist
-  const gitignorePath = join(root, '.gitignore');
-  if (!existsSync(gitignorePath)) {
-    return { name: 'Gitignore', passed: false, message: '.gitignore not found', required: false };
-  }
-  const gitignoreContent = readFileSync(gitignorePath, 'utf-8');
-  const gitignoreLines = gitignoreContent.split('\n').map(l => l.trim());
-  const missingEntries = criticalFiles.filter(f => !gitignoreLines.includes(f));
-  if (missingEntries.length > 0) {
-    return { name: 'Gitignore', passed: false, message: `Missing from .gitignore: ${missingEntries.join(', ')}`, required: false };
-  }
-
-  // Check none are tracked by git
-  const result = spawnSync('git', ['ls-files', ...criticalFiles], {
-    cwd: root,
-    encoding: 'utf-8',
-    timeout: 5_000,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-  const tracked = (result.stdout ?? '').trim();
-  if (tracked.length > 0) {
-    const trackedFiles = tracked.split('\n').join(', ');
-    return { name: 'Gitignore', passed: false, message: `Tracked by git: ${trackedFiles} — run: git rm --cached <file>`, required: false };
-  }
-
-  return { name: 'Gitignore', passed: true, message: 'memory.db files properly gitignored', required: false };
-}
-
-/**
- * Check write permissions for critical directories (.tasks/, .brain/).
- */
-export function checkWritePermissions(root: string): DoctorCheck {
-  const dirsToCheck = ['.tasks', '.brain'];
-  const failures: string[] = [];
-  for (const dir of dirsToCheck) {
-    const dirPath = join(root, dir);
-    if (!existsSync(dirPath)) continue;
-    try {
-      accessSync(dirPath, fsConstants.W_OK);
-    } catch {
-      failures.push(dir);
-    }
-  }
-  if (failures.length > 0) {
-    return { name: 'Write Permissions', passed: false, message: `No write access to: ${failures.join(', ')}`, required: true };
-  }
-  return { name: 'Write Permissions', passed: true, message: 'Write access OK (.tasks/, .brain/)', required: true };
-}
-
-/**
- * Check if .deck file is committed to git (security risk).
- */
-export function checkDeckSecurity(root: string): DoctorCheck {
-  const deckPath = join(root, '.deck');
-  if (!existsSync(deckPath)) {
-    return { name: '.deck Security', passed: true, message: '.deck file not found', required: false };
-  }
-  const isCommitted = isDeckFileCommitted(root);
-  if (isCommitted) {
-    return { name: '.deck Security', passed: false, message: '.deck file is tracked by git — secrets may be exposed! Add .deck to .gitignore', required: false };
-  }
-  return { name: '.deck Security', passed: true, message: '.deck file exists and is NOT tracked by git (safe)', required: false };
-}
-
-export function checkDocker(spawnBackend?: string): DoctorCheck {
-  const wantsDocker = spawnBackend === 'docker' || spawnBackend === 'auto';
-  const isRequired = spawnBackend === 'docker'; // Required only when explicitly set
-  const result = spawnSync('docker', ['info'], {
-    encoding: 'utf-8',
-    timeout: 5_000,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-  if (result.status !== 0) {
-    return {
-      name: 'Docker',
-      passed: !wantsDocker,
-      message: wantsDocker
-        ? 'Docker not available — install Docker or switch spawn_backend to tmux/subprocess'
-        : 'not installed (optional — enables isolated worker containers)',
-      required: isRequired,
-    };
-  }
-  // Check if deckent-worker image exists
-  const imgResult = spawnSync('docker', ['images', '-q', 'deckent-worker:latest'], {
-    encoding: 'utf-8',
-    timeout: 5_000,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-  const hasImage = (imgResult.stdout?.trim().length ?? 0) > 0;
-  if (!hasImage && wantsDocker) {
-    return {
-      name: 'Docker',
-      passed: false,
-      message: 'Docker available but deckent-worker image missing — run: docker build -f Dockerfile.worker -t deckent-worker:latest .',
-      required: isRequired,
-    };
-  }
-  // Memory warning for Docker backend
-  let memWarning = '';
-  if (wantsDocker) {
-    try {
-      const memResult = spawnSync('docker', ['info', '--format', '{{.MemTotal}}'], {
-        encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
-      });
-      const memBytes = parseInt(memResult.stdout?.trim() ?? '0', 10);
-      if (memBytes > 0 && memBytes < 4 * 1024 * 1024 * 1024) {
-        const memGB = (memBytes / (1024 * 1024 * 1024)).toFixed(1);
-        memWarning = ` (warning: Docker memory ${memGB}GB < 4GB — workers may OOM)`;
-      }
-    } catch { /* non-fatal */ }
-  }
-  return {
-    name: 'Docker',
-    passed: true,
-    message: hasImage
-      ? `Docker available + deckent-worker image ready${memWarning}`
-      : `Docker available (deckent-worker image not built yet)${memWarning}`,
-    required: isRequired,
-  };
-}
-
-export function runDoctorChecks(root: string, providerNames?: string[], spawnBackend?: string, lang: string = 'en'): DoctorResult {
-  const checks: DoctorCheck[] = [
-    checkPlatform(spawnBackend),
-    checkNode(), checkGit(), checkTmux(providerNames, spawnBackend, lang), checkDocker(spawnBackend), checkClaude(),
-    checkWorkspace(root), checkBrainDir(root), checkDirectives(root),
-    checkBrainBudget(root), checkDebt(root), checkStaleLocks(root),
-    checkDeckSecurity(root), checkWritePermissions(root), checkGitignore(root),
-    // 411-002 SEC-02 honesty slice — this module's runDoctorChecks is a live twin of
-    // doctor-checks.ts::runDoctorChecks (born-651: dedup them); keep both lists in sync.
-    checkDeckSubprocessVisibility(root, spawnBackend, lang),
-  ];
-  return {
-    ok: checks.filter(c => c.required).every(c => c.passed),
-    checks,
-  };
-}
+// DoctorCheck / checkPlatform / checkTmux / checkClaude / checkGitignore /
+// checkWritePermissions / checkDeckSecurity / checkDocker / runDoctorChecks:
+// canonical definitions live in doctor-checks.ts (born-651, task 412-003 —
+// this module's runDoctorChecks used to build its own check-list from local
+// function bodies that had drifted from doctor-checks.ts's sibling
+// functions — e.g. checkDebt here was DB-first while doctor-checks.ts's was
+// still parsing the removed .brain/DEBT.md; a check added only to
+// doctor-checks.ts's runDoctorChecks never appeared in the real `deckent
+// doctor` output, born-651/411-002). All divergent bodies were reconciled
+// into doctor-checks.ts (keeping this module's live behavior unchanged) and
+// this module now re-exports them to preserve its existing public surface
+// for any external importer.
+export type { DoctorCheck };
+export {
+  checkPlatform,
+  checkTmux,
+  checkClaude,
+  checkGitignore,
+  checkWritePermissions,
+  checkDeckSecurity,
+  checkDocker,
+  runDoctorChecks,
+};
 
 // PreFlightCheckResult / PreFlightResult / runPreFlightHealthCheck: canonical
 // definition lives in doctor-checks.ts (born-505, task 380-013 — was

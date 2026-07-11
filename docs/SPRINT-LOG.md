@@ -10076,3 +10076,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 411-003: SCHED1 — semantics-kernel: effective-dependency-state tekleme (strangler dilim-1, davranış-koruyucu) (DONE)
 
 ---
+## Sprint 412 — sprint-412
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-11
+**Duration:** 2334s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 2333806ms |
+
+### Tasks
+
+- 412-001: RC2-A — init outcome-makinesi: READY · SETUP_INCOMPLETE · FAILED dürüst-çıkış (INIT-01) (GO_WITH_TECH_DEBT)
+- 412-002: RC2-B — backend-transaction: Docker CLI+daemon+image birlikte-değerlendirme (INIT-02) (GO_WITH_TECH_DEBT)
+- 412-003: DOCTOR-TWIN — born-651: runDoctorChecks canlı-ikizini öldür (tek canonical liste) (DONE)
+- 412-004: SCHED2 — checkpoint-v2: MRR restore'da kaybolmaz (strangler dilim-2) (DONE)
+
+---

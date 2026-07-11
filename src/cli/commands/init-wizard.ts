@@ -7,6 +7,9 @@
  * Split from init.ts (Sprint 144 Task 1).
  */
 
+import { getMessage } from '../helpers/messages.js';
+import { PROVIDER_PACKAGES } from '../../core/provider-packages.js';
+
 // ─── Types ──────────────────────────────────────────────────────────
 
 export interface DetectedSetup {
@@ -176,4 +179,126 @@ export function buildDetectedSetup(
     providers: providers.map(p => ({ name: p.name, available: p.available, authMethod: p.authMethod, version: p.version })),
     stack: detectedAnalysis ? { language: detectedAnalysis.language, framework: detectedAnalysis.framework, testFramework: detectedAnalysis.testFramework } : undefined,
   };
+}
+
+// ─── Init Outcome Contract (RC2-A / INIT-01, Sprint 412 Task 412-001) ────────
+//
+// `deckent init` used to print "You're ready!" and exit 0 unconditionally, even
+// with no provider CLI and no doctor evidence of a usable setup — a dishonest
+// READY for a brand-new user. This section defines a three-state, honestly-
+// reported outcome. Pure classification + formatting only; init.ts wires it to
+// the real provider/doctor results and process.exitCode.
+
+export type InitOutcome = 'READY' | 'SETUP_INCOMPLETE' | 'FAILED';
+
+export interface InitBlocker {
+  /** Machine-stable id (e.g. 'no-provider', 'doctor:Node.js') for tests/tooling. */
+  id: string;
+  /** Plain-language reason this blocks actual usage. */
+  reason: string;
+  /** ONE-LINE exact remediation, including a runnable command example. */
+  remediation: string;
+}
+
+export interface InitOutcomeResult {
+  outcome: InitOutcome;
+  blockers: InitBlocker[];
+}
+
+/** Failed-doctor-check shape needed to build blockers (subset of DoctorResult['checks'] entries). */
+export interface FailedDoctorCheckInput {
+  name: string;
+  message: string;
+}
+
+export interface InitUsageBlockerInput {
+  /** Count of AI provider CLIs detected as available (any auth method). */
+  availableProviderCount: number;
+  /** Required doctor checks still failing AFTER auto-provisioning was attempted. */
+  failedRequiredDoctorChecks: FailedDoctorCheckInput[];
+  /** Set when the doctor-verification step itself threw — readiness could not be confirmed. */
+  doctorVerificationError?: string;
+}
+
+/**
+ * Build the ordered list of usage blockers from real provider/doctor evidence.
+ * Empty result -> nothing blocks usage (candidate for READY). Pure — no fs/process access.
+ *
+ * Note: "no provider CLI" and "no auth" collapse into a single 'no-provider' blocker.
+ * `core/provider.ts` detection only proves CLI *presence*, not live session/auth state
+ * (that is the separate PSL-6 `probeProviderAuth` probe, intentionally not wired into
+ * init's flow by this task — see task 412-001 notes); an authenticated-state gap that a
+ * REQUIRED doctor check can actually catch is covered by the doctor-check blocker below.
+ */
+export function buildInitUsageBlockers(input: InitUsageBlockerInput, lang: string): InitBlocker[] {
+  const blockers: InitBlocker[] = [];
+
+  if (input.availableProviderCount === 0) {
+    blockers.push({
+      id: 'no-provider',
+      reason: getMessage('init.outcome_blocker_no_provider', lang),
+      remediation: getMessage('init.outcome_remediation_no_provider', lang, {
+        cmd: `${PROVIDER_PACKAGES.claude.installHint} && claude login`,
+      }),
+    });
+  }
+
+  for (const check of input.failedRequiredDoctorChecks) {
+    blockers.push({
+      id: `doctor:${check.name}`,
+      reason: getMessage('init.outcome_blocker_doctor_check', lang, { name: check.name, message: check.message }),
+      remediation: getMessage('init.outcome_remediation_doctor_check', lang),
+    });
+  }
+
+  if (input.doctorVerificationError) {
+    blockers.push({
+      id: 'doctor-verification-failed',
+      reason: getMessage('init.outcome_blocker_doctor_verification_failed', lang, { error: input.doctorVerificationError }),
+      remediation: getMessage('init.outcome_remediation_doctor_verification_failed', lang),
+    });
+  }
+
+  return blockers;
+}
+
+/** FAILED wins over everything (an init step actually threw); otherwise blockers decide. */
+export function classifyInitOutcome(hadFatalFailure: boolean, blockers: InitBlocker[]): InitOutcome {
+  if (hadFatalFailure) return 'FAILED';
+  return blockers.length > 0 ? 'SETUP_INCOMPLETE' : 'READY';
+}
+
+/** Exit code for the three-state contract: READY=0, SETUP_INCOMPLETE=2, FAILED=1. */
+export function initOutcomeExitCode(outcome: InitOutcome): number {
+  switch (outcome) {
+    case 'READY': return 0;
+    case 'SETUP_INCOMPLETE': return 2;
+    case 'FAILED': return 1;
+  }
+}
+
+/**
+ * Render the outcome block printed at the END of `deckent init` output: the
+ * literal state token (language-independent, for scripts/tests) plus a
+ * localized explanation, and — for SETUP_INCOMPLETE — the blocker/remediation
+ * list. SETUP_INCOMPLETE NEVER uses "You're ready" language.
+ */
+export function formatInitOutcomeBlock(result: InitOutcomeResult, lang: string): string {
+  const lines: string[] = ['', getMessage('init.outcome_header', lang, { outcome: result.outcome })];
+
+  if (result.outcome === 'READY') {
+    lines.push(getMessage('init.outcome_ready_message', lang));
+  } else if (result.outcome === 'SETUP_INCOMPLETE') {
+    lines.push(getMessage('init.outcome_setup_incomplete_message', lang));
+    lines.push(getMessage('init.outcome_blockers_header', lang));
+    const fixLabel = getMessage('init.outcome_fix_label', lang);
+    result.blockers.forEach((blocker, i) => {
+      lines.push(`  ${i + 1}. ${blocker.reason}`);
+      lines.push(`     ${fixLabel}: ${blocker.remediation}`);
+    });
+  } else {
+    lines.push(getMessage('init.outcome_failed_message', lang));
+  }
+
+  return lines.join('\n');
 }

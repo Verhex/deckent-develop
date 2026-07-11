@@ -2,6 +2,21 @@
 
 > **This file has been consolidated.** The canonical changelog is at the project root: [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint412] - 2026-07-11
+
+### Added
+
+- DOCTOR-TWIN — born-651: runDoctorChecks canlı-ikizini öldür (tek canonical liste)
+- SCHED2 — checkpoint-v2: MRR restore'da kaybolmaz (strangler dilim-2)
+
+### Changed
+
+- RC2-A — init outcome-makinesi: READY · SETUP_INCOMPLETE · FAILED dürüst-çıkış (INIT-01) (completed with tech debt)
+- RC2-B — backend-transaction: Docker CLI+daemon+image birlikte-değerlendirme (INIT-02) (completed with tech debt)
+
+
+_Tasks: 5 total, 5 done, 2 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint411] - 2026-07-11
 
 ### Added

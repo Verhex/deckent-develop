@@ -1399,7 +1399,7 @@ describe('init command', () => {
     expect(process.exitCode).toBe(1);
   });
 
-  it('shows next steps message', async () => {
+  it('shows honest outcome instead of unconditional next steps (412-001 INIT-01)', async () => {
     const mockQuestion = vi.fn()
       .mockResolvedValueOnce('1')
       .mockResolvedValueOnce('1')
@@ -1412,8 +1412,12 @@ describe('init command', () => {
     vi.mocked(readFileSync).mockReturnValue('');
 
     await runCommand(registerInit, ['init']);
-    expect(stdout()).toContain('deckent set-directives');
-    expect(stdout()).toContain('deckent start');
+    // Pre-412-001 this fixture (no usable provider evidence) printed the
+    // unconditional "You're ready" next-steps block. The honest-outcome
+    // contract only prints next steps for READY; here we must see the
+    // outcome block instead, and never the ready phrase.
+    expect(stdout()).toContain('Setup outcome:');
+    expect(stdout()).not.toContain('deckent set-directives');
   });
 
   it('creates plugins directory', async () => {

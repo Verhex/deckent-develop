@@ -1144,6 +1144,11 @@ export async function runSprint(
             sprintId: prevSprintId,
             staleWithResult: recovery.staleTasksWithResult,
             staleMarkedNoGo: recovery.staleTasksMarkedNoGo,
+            // SCHED2 checkpoint-v2 (born-634/635 dilim-2): PENDING descendants
+            // of a NO_GO/MRR upstream that restoreSprintFromCheckpoint just
+            // cascade-skipped — zero workers spawned for these, evidenced here
+            // for observability since the resume path never reaches SPAWN.
+            cascadeSkipped: recovery.cascadeSkippedTasks,
           });
           isResumeEvaluate = true;
           recoveredSprint = recovery.restoredSprint ?? null;
