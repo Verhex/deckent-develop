@@ -65,10 +65,10 @@
   "enabled": true,
   "source": "builtin",
   "stats": {
-    "totalUses": 7,
-    "successRate": 0.8571428571428571,
+    "totalUses": 0,
+    "successRate": 0,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-405"
+    "lastUsedInSprint": ""
   },
   "role": "implementer",
   "domain": "terminal-ui",

@@ -2225,7 +2225,7 @@
       "src/core/skill-pool.ts",
       "src/orchestra/sprint-finalizer.ts"
     ],
-    "spec": "Manifest = statik tanim; canli stats (totalUses/successRate/avgCoverage/lastUsedInSprint) ayri gitignored stats-dosyasina (per-entity veya tek ledger). Okuma-yolu birlesik (pool stats'i sidecar'dan yukler); yazma finalizer sidecar'a. Migration: mevcut manifest-stats sidecar'a tasinir + manifestler re-zero. Marketplace/rating tuketicileri ayni degerleri gormeye devam eder. .deckent/config.json track-karari ayni basliga baglanir (d3148926 untrack -> C5 hermetiklik vakasi). [2026-07-10 kanıt#3+advisor: AGSK katalog-testleri canlı-havuz zero-pin — agsk2/3/4 şekil+invariant repin yapıldı (agsk3 latent yakalandı: rpc-protocol/onboarding-ux ilk-route'ta kırardı). EK-1: scripts/bundle-builtins.mjs:118 --clean-stats skill'e avgScore yazıyor, gerçek şekil avgCoverage — sidecar işinde düzelt. EK-2: .deckent/settings/resource-log.jsonl 61k-satır tracked runtime-log (secret-temiz) — aynı sınıf; rotate/gitignore sidecar-kararıyla birlikte ele al.] || DONE 2026-07-11 405-003 + CC son-mil: gitignored sidecar-ledger (.deckent/stats/catalog-stats.json, atomic) + birlesik-okuma (sidecar>manifest-fallback) + finalizer yalniz-sidecar; CC: 3 scope-disi test-dosyasi yeni-kontrata senkron (9 test) + .gitignore satiri. ACIK: manifest re-zero (git-tracked toplu-degisim) Alperen-onayli ayri-adim.",
+    "spec": "Manifest = statik tanim; canli stats (totalUses/successRate/avgCoverage/lastUsedInSprint) ayri gitignored stats-dosyasina (per-entity veya tek ledger). Okuma-yolu birlesik (pool stats'i sidecar'dan yukler); yazma finalizer sidecar'a. Migration: mevcut manifest-stats sidecar'a tasinir + manifestler re-zero. Marketplace/rating tuketicileri ayni degerleri gormeye devam eder. .deckent/config.json track-karari ayni basliga baglanir (d3148926 untrack -> C5 hermetiklik vakasi). [2026-07-10 kanıt#3+advisor: AGSK katalog-testleri canlı-havuz zero-pin — agsk2/3/4 şekil+invariant repin yapıldı (agsk3 latent yakalandı: rpc-protocol/onboarding-ux ilk-route'ta kırardı). EK-1: scripts/bundle-builtins.mjs:118 --clean-stats skill'e avgScore yazıyor, gerçek şekil avgCoverage — sidecar işinde düzelt. EK-2: .deckent/settings/resource-log.jsonl 61k-satır tracked runtime-log (secret-temiz) — aynı sınıf; rotate/gitignore sidecar-kararıyla birlikte ele al.] || DONE 2026-07-11 405-003 + CC son-mil: gitignored sidecar-ledger (.deckent/stats/catalog-stats.json, atomic) + birlesik-okuma (sidecar>manifest-fallback) + finalizer yalniz-sidecar; CC: 3 scope-disi test-dosyasi yeni-kontrata senkron (9 test) + .gitignore satiri. ACIK: manifest re-zero (git-tracked toplu-degisim) Alperen-onayli ayri-adim. || RE-ZERO KARAR+UYGULAMA (Alperen 2026-07-11): 40 manifest iki-agacta sifirlandi (kayipsiz: sidecar tam-kapsam dogrulandi, tasinacak deger yoktu); npm-paketi taze-kullaniciya sifir-stats'la gider.",
     "verify": "sprint-sonrasi git status: manifest degismez; stats-testleri sidecar-fixture ile; katalog byte-drift testi kalici-yesil",
     "wire_on": "default-on (yapi-degisikligi, testli)",
     "status": "DONE"
@@ -2297,7 +2297,7 @@
       "src/core/memory-query.ts",
       "src/api/memory-search-endpoint.ts"
     ],
-    "spec": "tenantId param + query-layer predicate + API request-principal'dan scoping; single-tenant default davranis degismez (tenant yoksa mevcut yol). 497/ENT-CONFIG-SSOT ile hizali. [EK 2026-07-10: LEGACY-NULL-TENANT self-heal politikası — strict-flip sonrası kpi-backfill/okuma yolları NULL-tenant legacy-satırları görmez; tek-kullanıcı legacy-DB için bilinçli-fallback mı migration mı karar gerek (kpi-backfill canlı-vakası).] || DONE 2026-07-11 405-001 (additive): tenantId param + FTS/filtre predicate (kolon-yoksa durust-atlama) + endpoint principal-threading; tenant'siz yol byte-ayni pin. ACIK-KARAR (Alperen): LEGACY-NULL-TENANT politikasi (strict-flip yapilmadi).",
+    "spec": "tenantId param + query-layer predicate + API request-principal'dan scoping; single-tenant default davranis degismez (tenant yoksa mevcut yol). 497/ENT-CONFIG-SSOT ile hizali. [EK 2026-07-10: LEGACY-NULL-TENANT self-heal politikası — strict-flip sonrası kpi-backfill/okuma yolları NULL-tenant legacy-satırları görmez; tek-kullanıcı legacy-DB için bilinçli-fallback mı migration mı karar gerek (kpi-backfill canlı-vakası).] || DONE 2026-07-11 405-001 (additive): tenantId param + FTS/filtre predicate (kolon-yoksa durust-atlama) + endpoint principal-threading; tenant'siz yol byte-ayni pin. ACIK-KARAR (Alperen): LEGACY-NULL-TENANT politikasi (strict-flip yapilmadi). || KARAR (Alperen 2026-07-11): LEGACY-NULL = MIGRATION NULL->'local' (strict-mod ILK acilista tek-seferlik backfill + otomatik yedek). Implementasyon = born-647.",
     "verify": "hermetik: iki-tenant fixture -> cross-tenant sonuc SIZMAZ; tenantsiz cagri regresyonsuz",
     "status": "DONE"
   },
@@ -2650,7 +2650,7 @@
     "priority": "P1",
     "status": "OPEN",
     "source": "Alperen hedefi 2026-07-10 (400-001 maliyet-analizi)",
-    "spec": "Anatomi (400-001, Sonnet): cacheRead $1.05 (25-30 tur x ~135k ctx) + output $0.79 (53k, thinking dahil) + cacheCreation $0.51 + input $0.04 = $2.38 (sayac dogrulandi; cache'siz $11.69 olurdu). AYNI-MODEL taban ~$1.0-1.2: (K1) tur-azaltma — paralel tool-cagrilari + verify-dongusu kisaltma; (K2) task-tipi effort/thinking ayari (routing effort alani var — mekanik iste dusuk-effort); (K3) L1 prompt-boilerplate cache-tier + eski tool-sonucu budama. 10X MIMARI-KOLLAR: (K4) model-katmanlama — Brain-eval+disk-verify+gate+FIX sureci kaliteyi tasidigi icin haiku/ollama-sinifi genisletilebilir (ADR-G-028 hybrid-scoring canli; haiku ayni-profil ~$0.79, uygun-sinifta $0.3-0.4; haiku=yalniz-doc kurali gate-korumali revizyon adayi — Alperen-karari gerekir); (K5) Batch API %50 — PLAN/EVALUATE tek-atim Brain-cagrilari icin adapter; (K6) SP-2 kendi-model — 614-trace moat'i tam bu hedefe akiyor. Olcum: her sprint retro'suna $/task ortalamasi + kol-bazli kirilim (mevcut cost-config zinciri dogru calisiyor). || K1+K2 DONE 2026-07-11 sprint-407: K1 turn-economy god-prompt bolumu (boyut-pin'li; etki-olcumu sonraki sprint num_turns ortalamasi) · K2 routing.effort_tiering flag (default-off; tip->effort tablosu + hint-precedence; config-uclusu CC son-mil). ACIK: K3 cache-tier · K4/K5 ALPEREN · K6 SP-2."
+    "spec": "Anatomi (400-001, Sonnet): cacheRead $1.05 (25-30 tur x ~135k ctx) + output $0.79 (53k, thinking dahil) + cacheCreation $0.51 + input $0.04 = $2.38 (sayac dogrulandi; cache'siz $11.69 olurdu). AYNI-MODEL taban ~$1.0-1.2: (K1) tur-azaltma — paralel tool-cagrilari + verify-dongusu kisaltma; (K2) task-tipi effort/thinking ayari (routing effort alani var — mekanik iste dusuk-effort); (K3) L1 prompt-boilerplate cache-tier + eski tool-sonucu budama. 10X MIMARI-KOLLAR: (K4) model-katmanlama — Brain-eval+disk-verify+gate+FIX sureci kaliteyi tasidigi icin haiku/ollama-sinifi genisletilebilir (ADR-G-028 hybrid-scoring canli; haiku ayni-profil ~$0.79, uygun-sinifta $0.3-0.4; haiku=yalniz-doc kurali gate-korumali revizyon adayi — Alperen-karari gerekir); (K5) Batch API %50 — PLAN/EVALUATE tek-atim Brain-cagrilari icin adapter; (K6) SP-2 kendi-model — 614-trace moat'i tam bu hedefe akiyor. Olcum: her sprint retro'suna $/task ortalamasi + kol-bazli kirilim (mevcut cost-config zinciri dogru calisiyor). || K1+K2 DONE 2026-07-11 sprint-407: K1 turn-economy god-prompt bolumu (boyut-pin'li; etki-olcumu sonraki sprint num_turns ortalamasi) · K2 routing.effort_tiering flag (default-off; tip->effort tablosu + hint-precedence; config-uclusu CC son-mil). ACIK: K3 cache-tier · K4/K5 ALPEREN · K6 SP-2. || K4-PILOT + K5 KARAR (Alperen 2026-07-11): K4=haiku doc+config pilotu ACIK (kod yasak; 2-3 sprint sonra kiyas-raporu) · K5=born-648 (Batch-API flag'li). K4-genis (basit-kod) ACILMADI."
   },
   {
     "born_id": "637",
@@ -2832,6 +2832,40 @@
     "proposed_mode": "sprint",
     "spec": "Iki agaca ayni kuratorlu manifest (observability domain-triggers + activation.rules + priority); api-design/i18n-quality desenini izle.",
     "verify": "iki-agac esit + lint-manifests temiz + routing skill-secimi testi",
+    "wire_on": "sprint"
+  },
+  {
+    "born_id": "647",
+    "severity": "P1",
+    "subsystem": "core/memory",
+    "title": "LEGACY-NULL-MIGRATION: strict-tenant flag'i + ilk-acilista NULL->'local' backfill (+yedek) — Alperen-karari 2026-07-11",
+    "sources": [
+      "karar-turu 2026-07-11 (born-609 acik-karari kapandi)"
+    ],
+    "primary_files": [
+      "src/core/memory-store.ts",
+      "src/core/memory-query.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Karar: strict-tenant modu (config-flag, default-off, uclu-desen) ILK acilista tek-seferlik migration kosar: tenant_id IS NULL satirlar rezerve 'local' tenant'ina damgalanir; ONCESINDE memory.db otomatik-yedek (.brain/memory.db.pre-tenant-backup-<ts>); migration idempotent + marker'li; 1230 mevcut satir kaybolmaz. Strict-modda NULL-tenant sorgu-fallback'i YOK (izolasyon tam). .brain/memory.db SILINMEZ-kurali: yalniz UPDATE, silme yok.",
+    "verify": "fixture-DB: strict-ilk-acilis -> yedek var + NULL=0 + 'local' sayisi eski-NULL sayisina esit + ikinci-acilis no-op; strict-off davranis byte-ayni",
+    "wire_on": "sprint"
+  },
+  {
+    "born_id": "648",
+    "severity": "P1",
+    "subsystem": "core/provider",
+    "title": "BATCH-API (K5, Alperen-onayli 2026-07-11): acele-olmayan tek-atimlik Brain-cagrilari Batch'e (%50 indirim) — flag'li default-off",
+    "sources": [
+      "COST-10X karar-turu 2026-07-11"
+    ],
+    "primary_files": [
+      "src/providers/claude.ts",
+      "src/core/provider.ts"
+    ],
+    "proposed_mode": "sprint",
+    "spec": "Kapsam: retro/analiz/doc-uretimi gibi beklemeye-toleransli, TEK-atimlik Brain-cagrilari Anthropic Batch-API'ye (canli-sprint dispatch-akisi KAPSAM-DISI — dakikalar-mertebesi gecikme uygun degil). Tasarim: cost.batch_api flag'i (uclu-desen) + cagiran-tarafta 'batchable' isareti + poll/backoff + fail-fallback normal-API; API-key gerektirir (subscription Batch desteklemez — API-mode isleriyle sinirli, project_api_mode_deferred notuna bagli). ILK-dilim: hangi cagri-siteleri batchable envanteri + adapter-iskeleti.",
+    "verify": "flag-off byte-ayni; batchable-cagri fixture'da Batch-endpoint'e gider + fallback testli",
     "wire_on": "sprint"
   }
 ]

@@ -21,11 +21,11 @@
   "enabled": true,
   "source": "builtin",
   "stats": {
-    "totalUses": 12,
-    "successCount": 12,
-    "successRate": 1,
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
     "avgCoverage": 0,
-    "lastUsedInSprint": "sprint-405"
+    "lastUsedInSprint": ""
   },
   "activation": {
     "rules": [],
