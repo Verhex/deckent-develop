@@ -19,6 +19,7 @@ vi.mock('../../../src/orchestra/sprint-checkpoint.js', () => ({
 }));
 
 vi.mock('../../../src/core/config.js', () => ({
+  resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: (...args: unknown[]) => mockLoadConfig(...args),
 }));
