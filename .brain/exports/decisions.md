@@ -4913,9 +4913,14 @@ CLI `deckent recall|remember|memory rebuild|export|stats`; MCP `deckent_memory_q
 
 **Status:** accepted
 
-KARAR (Alperen KESIN-KURAL, 2026-07-12): Kod-yollarinda model-adi, provider-adi ve akis-degeri STRING-LITERAL olarak YASAKTIR.
-Tek-kaynak: model/provider kimlikleri yalnizca src/core/model-registry.ts SSOT unda yasar; tum tuketiciler registry + config uzerinden cozer.
-Cozumleme: default lar resolveDefaultModel(config) / resolveBrainModel(config) / getAllKnownModelIds() gibi tek-kaynak resolver lardan gelir; validasyon CANLI registry-listesiyle yapilir (donmus snapshot yasak — 2026-07-12 gpt-5.6-sol devri vakasi).
-Enforcement: scripts/lint-no-model-literal.mjs ratchet gate (lint-no-spawnsync emsali) — yeni literal CI kirmizi; mevcut 85 ihlal baseline de grandfathered ve ratchet le eritilir.
-Gerekce: sonnet kullanmayan kullanici ya da model-adi degisikligi sistemi DUSUREMEZ; deckent milyonlarca ortam/kullanici icin model-agnostik yasamak zorundadir (Yasa #2).
-Iz: born-682/683/684/685 + MASTER-PLAN 565; canli-ispat: validateConfig donmus ALL_MODELS listesi mesru brain-devrini reddetti (fix a2736e71).
+## Context
+deckent kod-yollarinda model-adi (sonnet/opus/haiku/gpt-*) ve akis-degerleri string-literal olarak yasiyordu (~19 gercek ihlal + 85 sanctioned site). Canli-ispat (2026-07-12): validateConfig un donmus ALL_MODELS snapshot i, mesru brain-devrini (gpt-5.6-sol) reddetti. Sonnet kullanmayan kullanici ya da bir model-adi degisikligi sistemi dusurebilirdi — milyonlarca ortam/kullanici hedefiyle (Yasa #2) bagdasmaz.
+
+## Decision (Today)
+Kod-yollarinda model-adi, provider-adi ve akis-degeri STRING-LITERAL YASAKTIR (Alperen KESIN-KURAL, 2026-07-12). Tek-kaynak: kimlikler yalnizca src/core/model-registry.ts SSOT unda yasar. Cozumleme: resolveDefaultModel(config) / resolveBrainModel(config) / getAllKnownModelIds() tek-kaynak resolver lari; validasyon CANLI registry-listesiyle. Enforcement: scripts/lint-no-model-literal.mjs ratchet-gate (lint-no-spawnsync emsali) — yeni literal CI-kirmizi; 85 mevcut site baseline de grandfathered ve ratchet le eritilir.
+
+## Decision (Tomorrow)
+Grandfathered 85 site resolver lara tasinir (tmux-fallback, CLI/MCP default lari oncelikli); baseline sifira iner; provider/akis-degerleri icin ayni desen genisletilir.
+
+## Consequences
+Model-adi degisikligi/yeni model = yalnizca registry-kaydi; sistem model-agnostik kalir. Iz: born-682/683/684/685 · MASTER-PLAN 565 · fix a2736e71.
