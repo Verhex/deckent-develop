@@ -33,7 +33,8 @@
 // RESERVED_LABEL_RE / heading guards (assertSafeField, buildTaskBlock).
 
 import type { RunProposal } from '../core/run-flow-contract.js';
-import type { PlannerResult, PlannerTask } from '../core/types.js';
+import type { DeckentConfig, PlannerResult, PlannerTask } from '../core/types.js';
+import { resolveBrainModel } from '../core/config.js';
 import { buildDirectives, type DirectiveBuildIntent, type DirectiveBuildTask } from './directives-builder.js';
 import { callZeroConfigPlanner } from './planner.js';
 
@@ -46,8 +47,11 @@ export interface RunProposalCompileResult {
  * Injectable NL -> plan seam. Production default (`defaultRunProposalPlanner`)
  * calls the real AI/structured planner core; tests inject a hermetic fake that
  * returns a canned `PlannerResult` — never a real subprocess/provider call.
+ * The optional `config` param (Task 431-003) lets a caller drive the planner's
+ * model choice via `resolveBrainModel(config)`; omitted by every fake planner
+ * that ignores it, so existing single-param injected planners stay assignable.
  */
-export type RunProposalPlanner = (proposal: RunProposal) => PlannerResult;
+export type RunProposalPlanner = (proposal: RunProposal, config?: DeckentConfig) => PlannerResult;
 
 /**
  * Thrown when NL -> plan compilation fails to produce a real, usable plan —
@@ -88,10 +92,17 @@ function traceabilityLine(proposal: RunProposal): string {
  * throws in orchestra/) — `compileRunProposalIntent` still guarantees ANY
  * planner failure (this default OR an injected one) surfaces as the same
  * typed class, so both paths honor the "never scaffold" contract.
+ *
+ * Model selection (Task 431-003, born-683 continuation): `resolveBrainModel(config)`
+ * replaces the former bare `'sonnet'` literal. `config` is left WITHOUT a default
+ * value on purpose — every current call site omits it, and `resolveBrainModel(undefined)`
+ * already falls back to `DEFAULT_MODES['balanced'].brain_model` = `'sonnet'`, so existing
+ * behavior is reproduced exactly. Do not default `config` to `createDefaultConfig()`: that
+ * resolves `mode: 'performance'` -> `brain_model: 'opus'`, a silent regression.
  */
-function defaultRunProposalPlanner(proposal: RunProposal): PlannerResult {
+function defaultRunProposalPlanner(proposal: RunProposal, config?: DeckentConfig): PlannerResult {
   const description = proposal.intentSummary.trim();
-  const result = callZeroConfigPlanner(description, 'sonnet', proposal.project);
+  const result = callZeroConfigPlanner(description, resolveBrainModel(config), proposal.project);
   if (!result) {
     throw new RunProposalPlanError(
       proposal.flowId,
@@ -123,15 +134,18 @@ function toDirectiveTask(task: PlannerTask, proposal: RunProposal): DirectiveBui
  * the injectable planner seam (`planner` defaults to the production AI/
  * structured planner core — see {@link defaultRunProposalPlanner}). Throws
  * {@link RunProposalPlanError} rather than degrading to a scaffold when the
- * planner cannot produce at least one real task.
+ * planner cannot produce at least one real task. The optional `config`
+ * (Task 431-003) is forwarded to `planner` untouched, driving
+ * `resolveBrainModel(config)` in the production default.
  */
 export function compileRunProposalIntent(
   proposal: RunProposal,
   planner: RunProposalPlanner = defaultRunProposalPlanner,
+  config?: DeckentConfig,
 ): DirectiveBuildIntent {
   let plan: PlannerResult;
   try {
-    plan = planner(proposal);
+    plan = planner(proposal, config);
   } catch (e) {
     if (e instanceof RunProposalPlanError) throw e;
     throw new RunProposalPlanError(
@@ -159,13 +173,15 @@ export function compileRunProposalIntent(
 /**
  * Compile a `RunProposal` straight to DIRECTIVES.md markdown. Calls
  * buildDirectives() purely (in-memory, no fs) — this function never writes
- * DIRECTIVES.md or any other file itself; that stays the caller's job.
+ * DIRECTIVES.md or any other file itself; that stays the caller's job. The
+ * optional `config` (Task 431-003) is forwarded to `compileRunProposalIntent`.
  */
 export function compileRunProposal(
   proposal: RunProposal,
   planner: RunProposalPlanner = defaultRunProposalPlanner,
+  config?: DeckentConfig,
 ): RunProposalCompileResult {
-  const intent = compileRunProposalIntent(proposal, planner);
+  const intent = compileRunProposalIntent(proposal, planner, config);
   const directivesMarkdown = buildDirectives(intent);
   return { intent, directivesMarkdown };
 }

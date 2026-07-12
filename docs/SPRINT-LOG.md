@@ -10569,3 +10569,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 430-004: Uçtan-uca entegrasyon kanıtı: finalize sırasında eski scheduler-shadow jsonl arşivleme doğrulaması (DONE)
 
 ---
+## Sprint 431 — sprint-431
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-12
+**Duration:** 849s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 849483ms |
+
+### Tasks
+
+- 431-001: scripts/lint-no-model-literal.mjs ratchet + baseline (GO_WITH_TECH_DEBT)
+- 431-002: config.ts: resolveDefaultModel(config) + resolveBrainModel(config) SSOT resolver (DONE)
+- 431-003: run-proposal-compiler.ts: hardcoded 'sonnet' → resolveBrainModel wiring (DONE)
+- 431-004: Entegrasyon: model-literal ratchet + resolver wiring uçtan-uca doğrulama (DONE)
+
+---

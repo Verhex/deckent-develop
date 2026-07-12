@@ -1,0 +1,345 @@
+{
+  "note": "Model-name string-literal ratchet baseline (born-item 431-001). `sanctioned` = un-audited grandfathered call sites (model names hardcoded outside the src/core/model-registry.ts SSOT); a site absent here fails the gate. Known model ids are derived dynamically at scan time from model-registry.ts `id` fields, never copy-pasted here. Regenerate with --update.",
+  "sanctioned": [
+    {
+      "file": "src/cli/auto-setup.ts",
+      "code": "return (model?.id ?? 'sonnet') as ModelType;"
+    },
+    {
+      "file": "src/cli/commands/agent.ts",
+      "code": ".option('--model <model>', `Model to use (${VALID_MODELS.join('|')})`, 'sonnet')"
+    },
+    {
+      "file": "src/cli/commands/agent.ts",
+      "code": "const model = opts.model ?? 'sonnet';"
+    },
+    {
+      "file": "src/cli/commands/agent.ts",
+      "code": "function createDefaultAgent(name: string, model = 'sonnet'): AgentConfig {"
+    },
+    {
+      "file": "src/cli/commands/autonomous.ts",
+      "code": "const model = o.model ?? 'sonnet';"
+    },
+    {
+      "file": "src/cli/commands/autonomous.ts",
+      "code": "goalDeps: buildLiveGoalDeps(realPlannerComplete('sonnet')),"
+    },
+    {
+      "file": "src/cli/commands/autonomous.ts",
+      "code": "jitComplete: realPlannerComplete('sonnet'),"
+    },
+    {
+      "file": "src/cli/commands/run.ts",
+      "code": ".option('--model <model>', `Model to use (default: sonnet). Options: ${ALL_MODELS.join(', ')}`, 'sonnet')"
+    },
+    {
+      "file": "src/cli/commands/run.ts",
+      "code": "const model = (opts.model ?? 'sonnet') as ModelType;"
+    },
+    {
+      "file": "src/cli/repl/native-transport.ts",
+      "code": "'openai-compatible': 'gpt-4.1',"
+    },
+    {
+      "file": "src/cli/repl/native-transport.ts",
+      "code": "/** Map a claude model id/alias ('fable', 'opus', …) onto its API-pinned wire id"
+    },
+    {
+      "file": "src/cli/repl/native-transport.ts",
+      "code": "/** Wire/alias model id for the native transport (e.g. 'fable', 'qwen3.6:27b'). */"
+    },
+    {
+      "file": "src/core/agent-pool.ts",
+      "code": "preferredModel: 'sonnet',"
+    },
+    {
+      "file": "src/core/agent-selector.ts",
+      "code": "model: 'sonnet',"
+    },
+    {
+      "file": "src/core/agent-types.ts",
+      "code": "preferredModel: 'sonnet',"
+    },
+    {
+      "file": "src/core/config-migration.ts",
+      "code": "case 'gemini-2.0-flash':"
+    },
+    {
+      "file": "src/core/config-migration.ts",
+      "code": "case 'gemini-2.5-flash':"
+    },
+    {
+      "file": "src/core/config-migration.ts",
+      "code": "case 'gemini-2.5-pro':"
+    },
+    {
+      "file": "src/core/config-migration.ts",
+      "code": "case 'gpt-4.1-mini':"
+    },
+    {
+      "file": "src/core/config-migration.ts",
+      "code": "case 'gpt-4.1':"
+    },
+    {
+      "file": "src/core/config-migration.ts",
+      "code": "case 'gpt-5-mini':"
+    },
+    {
+      "file": "src/core/config-migration.ts",
+      "code": "case 'gpt-5':"
+    },
+    {
+      "file": "src/core/config-migration.ts",
+      "code": "case 'haiku':"
+    },
+    {
+      "file": "src/core/config-migration.ts",
+      "code": "case 'o3':"
+    },
+    {
+      "file": "src/core/config-migration.ts",
+      "code": "case 'o4-mini':"
+    },
+    {
+      "file": "src/core/config-migration.ts",
+      "code": "case 'opus':"
+    },
+    {
+      "file": "src/core/config-migration.ts",
+      "code": "case 'sonnet':"
+    },
+    {
+      "file": "src/core/config-types.ts",
+      "code": "/** Wire/alias model id for the native transport (e.g. \"fable\", \"qwen3.6:27b\"). */"
+    },
+    {
+      "file": "src/core/config.ts",
+      "code": "brain_model: 'opus',"
+    },
+    {
+      "file": "src/core/config.ts",
+      "code": "brain_model: 'opus',"
+    },
+    {
+      "file": "src/core/config.ts",
+      "code": "brain_model: 'sonnet',"
+    },
+    {
+      "file": "src/core/config.ts",
+      "code": "brain_model: 'sonnet',"
+    },
+    {
+      "file": "src/core/config.ts",
+      "code": "default_model: 'opus',"
+    },
+    {
+      "file": "src/core/config.ts",
+      "code": "default_model: 'opus',"
+    },
+    {
+      "file": "src/core/config.ts",
+      "code": "default_model: 'sonnet',"
+    },
+    {
+      "file": "src/core/config.ts",
+      "code": "default_model: 'sonnet',"
+    },
+    {
+      "file": "src/core/model-equivalence.ts",
+      "code": "claude: 'haiku',"
+    },
+    {
+      "file": "src/core/model-equivalence.ts",
+      "code": "claude: 'opus',"
+    },
+    {
+      "file": "src/core/model-equivalence.ts",
+      "code": "claude: 'sonnet',"
+    },
+    {
+      "file": "src/core/model-equivalence.ts",
+      "code": "codex: 'gpt-4.1',"
+    },
+    {
+      "file": "src/core/model-equivalence.ts",
+      "code": "codex: 'gpt-5-mini',"
+    },
+    {
+      "file": "src/core/model-equivalence.ts",
+      "code": "codex: 'gpt-5',"
+    },
+    {
+      "file": "src/core/model-equivalence.ts",
+      "code": "gemini: 'gemini-2.0-flash',"
+    },
+    {
+      "file": "src/core/model-equivalence.ts",
+      "code": "gemini: 'gemini-2.5-flash',"
+    },
+    {
+      "file": "src/core/model-equivalence.ts",
+      "code": "gemini: 'gemini-2.5-pro',"
+    },
+    {
+      "file": "src/core/model-tier-guard.ts",
+      "code": "/** The model the upstream selector chose (e.g. 'haiku', 'gpt-5-mini'). */"
+    },
+    {
+      "file": "src/core/model-tier-guard.ts",
+      "code": "const upgraded = getModelForProviderTier(provider, 'standard') ?? 'sonnet';"
+    },
+    {
+      "file": "src/core/routing-engine.ts",
+      "code": "model: 'sonnet',"
+    },
+    {
+      "file": "src/core/subscription.ts",
+      "code": "['-p', 'respond with just your model name', '--model', 'opus'],"
+    },
+    {
+      "file": "src/core/task-types.ts",
+      "code": "export type ClaudeModel = 'opus' | 'sonnet' | 'haiku';"
+    },
+    {
+      "file": "src/core/task-types.ts",
+      "code": "export type GeminiModel = 'gemini-2.5-pro' | 'gemini-2.5-flash' | 'gemini-2.0-flash' | 'gemini-3.1-pro-preview';"
+    },
+    {
+      "file": "src/core/task-types.ts",
+      "code": "export type OpenAIModel = 'gpt-5' | 'gpt-5-mini' | 'gpt-4.1' | 'gpt-4.1-mini' | 'o3' | 'o4-mini';"
+    },
+    {
+      "file": "src/mcp/tools/catalog-parity.ts",
+      "code": "preferredModel: (model as ModelType | undefined) ?? 'sonnet',"
+    },
+    {
+      "file": "src/mcp/tools/plan.ts",
+      "code": "const m = t.model ?? 'sonnet';"
+    },
+    {
+      "file": "src/mcp/tools/run.ts",
+      "code": "model: z.enum(ALL_MODELS as unknown as readonly [string, ...string[]]).optional().default('sonnet').describe('AI model to use. Supports all providers (Claude, OpenAI, Gemini). Default: sonnet'),"
+    },
+    {
+      "file": "src/nervous/detectors/token-spike.ts",
+      "code": "const model = data.tokenUsage.model ?? 'sonnet';"
+    },
+    {
+      "file": "src/orchestra/autonomous/backlog-eval.ts",
+      "code": "model: (entry.model ?? result.tokenUsage?.model ?? 'sonnet') as Task['model'],"
+    },
+    {
+      "file": "src/orchestra/codex-spawn-readiness.ts",
+      "code": "/** deckent-facing model id, e.g. 'gpt-5'. */"
+    },
+    {
+      "file": "src/orchestra/codex-spawn-readiness.ts",
+      "code": "/** Wire model id actually sent to the CLI (modelRegistry apiId), e.g. 'gpt-5.5'. */"
+    },
+    {
+      "file": "src/orchestra/codex-spawn-readiness.ts",
+      "code": "const models = opts?.models ?? (['gpt-5'] as OpenAIModel[]);"
+    },
+    {
+      "file": "src/orchestra/execution-request-builder.ts",
+      "code": "model: (req.model ?? 'sonnet') as ModelType,"
+    },
+    {
+      "file": "src/orchestra/model-selector.ts",
+      "code": "const claudeModel: ModelType = TIER_CLAUDE_MODEL[tier] ?? 'sonnet';"
+    },
+    {
+      "file": "src/orchestra/model-selector.ts",
+      "code": "economy: 'haiku',"
+    },
+    {
+      "file": "src/orchestra/model-selector.ts",
+      "code": "premium_plus: 'opus', // Falls back to premium until premium_plus models are added"
+    },
+    {
+      "file": "src/orchestra/model-selector.ts",
+      "code": "premium: 'opus',"
+    },
+    {
+      "file": "src/orchestra/model-selector.ts",
+      "code": "return TIER_CLAUDE_MODEL[tier] ?? 'opus';"
+    },
+    {
+      "file": "src/orchestra/model-selector.ts",
+      "code": "return TIER_CLAUDE_MODEL[tier] ?? 'sonnet';"
+    },
+    {
+      "file": "src/orchestra/model-selector.ts",
+      "code": "standard: 'sonnet',"
+    },
+    {
+      "file": "src/orchestra/planner.ts",
+      "code": "model: 'sonnet',"
+    },
+    {
+      "file": "src/orchestra/reconciler.ts",
+      "code": "opus: 'sonnet',"
+    },
+    {
+      "file": "src/orchestra/reconciler.ts",
+      "code": "sonnet: 'haiku',"
+    },
+    {
+      "file": "src/orchestra/sprint-docs-updater.ts",
+      "code": "?? 'opus';"
+    },
+    {
+      "file": "src/orchestra/sprint-utils.ts",
+      "code": "?? 'opus'"
+    },
+    {
+      "file": "src/orchestra/task-mode-runner.ts",
+      "code": "/** Model to use (default: 'sonnet') */"
+    },
+    {
+      "file": "src/orchestra/task-mode-runner.ts",
+      "code": "const model: ModelType = ctx.model ?? 'sonnet';"
+    },
+    {
+      "file": "src/orchestra/tmux.ts",
+      "code": "const cmd = buildWorkerCommand('sonnet', promptPath, opts, adapter);"
+    },
+    {
+      "file": "src/providers/codex.ts",
+      "code": "get economy() { return (getModelForProviderTier('codex', 'economy') ?? 'gpt-4.1-mini') as OpenAIModel; },"
+    },
+    {
+      "file": "src/providers/codex.ts",
+      "code": "get premium() { return (getModelForProviderTier('codex', 'premium') ?? 'gpt-5') as OpenAIModel; },"
+    },
+    {
+      "file": "src/providers/codex.ts",
+      "code": "get standard() { return (getModelForProviderTier('codex', 'standard') ?? 'gpt-4.1') as OpenAIModel; },"
+    },
+    {
+      "file": "src/providers/codex.ts",
+      "code": "return (getModelForProviderTier('codex', tier) ?? 'gpt-4.1') as OpenAIModel;"
+    },
+    {
+      "file": "src/providers/gemini.ts",
+      "code": "get economy() { return (getModelForProviderTier('gemini', 'economy') ?? 'gemini-2.0-flash') as GeminiModel; },"
+    },
+    {
+      "file": "src/providers/gemini.ts",
+      "code": "get premium_plus() { return (modelRegistry.getByProviderAndTier('gemini', 'premium_plus')?.id ?? getModelForProviderTier('gemini', 'premium') ?? 'gemini-2.5-pro') as GeminiModel; },"
+    },
+    {
+      "file": "src/providers/gemini.ts",
+      "code": "get premium() { return (getModelForProviderTier('gemini', 'premium') ?? 'gemini-2.5-pro') as GeminiModel; },"
+    },
+    {
+      "file": "src/providers/gemini.ts",
+      "code": "get standard() { return (getModelForProviderTier('gemini', 'standard') ?? 'gemini-2.5-flash') as GeminiModel; },"
+    },
+    {
+      "file": "src/providers/gemini.ts",
+      "code": "return (getModelForProviderTier('gemini', tier) ?? 'gemini-2.5-flash') as GeminiModel;"
+    }
+  ]
+}

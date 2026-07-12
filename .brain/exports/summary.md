@@ -49,8 +49,11 @@
 | adr-g-033 | Dashboard (Observability Surface) | accepted |
 | adr-g-034 | Native Agentic Terminal | accepted |
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
+| adr-g-036 | ADR-G-036: Zero-Hardcode Model & Flow Values (Parametric-Only) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-431 Learnings** (sprint-431): ## Sprint sprint-431 Learnings
+- scripts/lint-no-model-literal.mjs ratchet + baseline: GO_WITH_TECH_DEBT — Mirrors sc...
 - **Sprint sprint-430 Learnings** (sprint-430): ## Sprint sprint-430 Learnings
 
 ## Gains
@@ -75,10 +78,6 @@
 - TT556 — PLANNER-PREFLIGHT: scope-satisfiability genişletme + gate-false-positive ail...
 - **Sprint sprint-422 Learnings** (sprint-422): ## Sprint sprint-422 Learnings
 - TT556 — PLANNER-PREFLIGHT: scope-satisfiability genişletme + gate-false-positive ail...
-- **Sprint sprint-421 Learnings** (sprint-421): ## Sprint sprint-421 Learnings
-
-## Gains
-- 421-001 — DEP669B — nodemailer 9.x semver-MAJOR bump (GHSA-rcmh + GHSA-p6g...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -151,4 +150,4 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 
-_Total entries: 1320 | Generated: 2026-07-12_
+_Total entries: 1325 | Generated: 2026-07-12_

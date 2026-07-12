@@ -9,6 +9,21 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint431] - 2026-07-12
+
+### Added
+
+- config.ts: resolveDefaultModel(config) + resolveBrainModel(config) SSOT resolver
+- run-proposal-compiler.ts: hardcoded 'sonnet' → resolveBrainModel wiring
+- Entegrasyon: model-literal ratchet + resolver wiring uçtan-uca doğrulama
+
+### Changed
+
+- scripts/lint-no-model-literal.mjs ratchet + baseline (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint430] - 2026-07-12
 
 ### Added

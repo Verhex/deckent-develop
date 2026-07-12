@@ -3093,19 +3093,21 @@
   "born_id": 682,
   "title": "do-planner model-hardcode: callZeroConfigPlanner(description, 'sonnet', ...) — brain codex/gpt-5.6-sol'a devredildi ama NL-planlama hâlâ sonnet'te (zero-hardcode-live-data ihlali)",
   "priority": "P1",
-  "status": "OPEN",
+  "status": "DONE",
   "source": "brain-devir günü tespiti (2026-07-12): run-proposal-compiler.ts defaultRunProposalPlanner 'sonnet' literal'i; brain_provider/brain_model config'i okunmuyor",
   "spec": "defaultRunProposalPlanner (ve callZeroConfigPlanner zinciri) planner-modelini config'ten çözsün: resolveBrainPlanningMode emsali bir resolveBrainModel(config) → activeModeConfig.brain_model + brain_provider; codex-brain'de NL-planlama gpt-5.6-sol'dan akar; test: config-override'lı planner-model seçimi.",
-  "date": "2026-07-12"
+  "date": "2026-07-12",
+  "resolution": "DONE sprint-431 (431-003): callZeroConfigPlanner('sonnet') -> resolveBrainModel(config); default-semantigi bilinçli (config'siz = 'sonnet' bit-es, createDefaultConfig TUZAGI belgelendi)"
  },
  {
   "born_id": 683,
   "title": "ZERO-HARDCODE-MODEL programi (Alperen KESIN-KURAL 2026-07-12): model-adi/akis-degeri literal YASAK — sonnet-kullanmayan kullanici ya da model-adi degisikligi sistemi dusurmemeli; ADR + lint-ratchet + tek-kaynak resolver",
   "priority": "P0",
-  "status": "OPEN",
+  "status": "IN_PROGRESS",
   "source": "Alperen direktifi (2026-07-12): 'hardcode bir akis asla istemiyoruz... 0 hardcode bu kesin kural adrlerde mevcut olmaliydi'. Envanter: src'de ~19 gercek-ihlal (config DEFAULT_MODES presetleri, tmux.ts:385 spawn-fallback, mcp/tools/run default, cli agent/run defaultlari, autonomous.ts realPlannerComplete('sonnet') x2) + born-682 (do-planner 'sonnet').",
   "spec": "(1) YENI ADR (governance): model/provider/akis-degerleri registry+config'ten cozulur; literal yalniz model-registry/catalog SSOT'unda yasar. (2) lint-ratchet (lint-no-spawnsync emsali birebir): scripts/lint-no-model-literal.mjs + baseline + CI-gate — yeni literal giremez, mevcutlar ratchet'le erir. (3) tek-kaynak resolver: resolveDefaultModel(config)/resolveBrainModel(config) (resolveBrainPlanningMode emsali) — DEFAULT_MODES dahil tum defaultlar tier-bazli registry-turevi olur (orn. tier:standard-ga -> aktif-provider'in standard modeli). (4) born-682 bu programin ilk dilimi. (5) proof: config'te var-olmayan/yeniden-adlanan model → dürüst-hata + fallback-zinciri, sistem ayakta.",
-  "date": "2026-07-12"
+  "date": "2026-07-12",
+  "resolution": "DILIM-1 DONE sprint-431 (3 DONE + 1 debt + 1 NO_GO->CC-el): lint-no-model-literal ratchet (85 sanctioned) + resolveDefaultModel/resolveBrainModel + 682-wiring + ADR-G-036 brain-DB'de; CC-el: package.json script-girisi (431-004'un scope-disi 1-satiri). KALAN: 85-ihlal gocu (ratchet-erime; tmux-fallback + CLI/MCP default'lari resolver'a) — sonraki do-kosulari"
  },
  {
   "born_id": 684,

@@ -19,15 +19,31 @@
 // No `vi.mock('node:child_process', ...)` anywhere in this file — a real
 // AI/provider call would show up as an actual attempted spawn, not a mock hit.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   compileRunProposal,
   compileRunProposalIntent,
   RunProposalPlanError,
   type RunProposalPlanner,
 } from '../../src/orchestra/run-proposal-compiler.js';
+import { callZeroConfigPlanner } from '../../src/orchestra/planner.js';
+import { DEFAULT_MODES } from '../../src/core/config.js';
 import type { RunProposal } from '../../src/core/run-flow-contract.js';
-import type { PlannerResult, PlannerTask } from '../../src/core/types.js';
+import type { DeckentConfig, PlannerResult, PlannerTask } from '../../src/core/types.js';
+
+// Task 431-003 — spy (never replace) `callZeroConfigPlanner` so the model-selection
+// tests below (group 5) can assert on the `model` argument `defaultRunProposalPlanner`
+// passes in. `actual.callZeroConfigPlanner` is preserved as the real implementation —
+// it still calls the real `resolveAdapter()`, which still throws because no provider is
+// registered in this hermetic process — so group 4's "production default is wired to the
+// real planner core" guarantee is untouched by this wrapper.
+vi.mock('../../src/orchestra/planner.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/orchestra/planner.js')>();
+  return {
+    ...actual,
+    callZeroConfigPlanner: vi.fn(actual.callZeroConfigPlanner),
+  };
+});
 
 // ─── Fixtures ───────────────────────────────────────────────────────────────
 
@@ -219,4 +235,48 @@ describe('compileRunProposalIntent — production default is wired to the real p
       // Never a TODO-scaffold intent — the call above threw before returning anything.
     },
   );
+});
+
+// ─── 5. Model selection: resolveBrainModel(config) wiring (Task 431-003) ───────
+//
+// The former bare 'sonnet' literal at defaultRunProposalPlanner's
+// callZeroConfigPlanner call site is now resolveBrainModel(config). Every call
+// below still exercises the REAL callZeroConfigPlanner (wrapped, not replaced,
+// by the vi.fn spy above) — it still throws via the real resolveAdapter() with
+// no provider registered, so these assertions read the `model` argument off
+// the spy's recorded call, then let the same RunProposalPlanError surface.
+
+describe('defaultRunProposalPlanner — model resolution via resolveBrainModel(config)', () => {
+  it("passes the balanced-mode fallback 'sonnet' when no config is given (regression-guard for the former hardcoded literal)", () => {
+    const proposal = makeProposal({ flowId: 'flow-431-no-config' });
+    const spy = vi.mocked(callZeroConfigPlanner);
+    spy.mockClear();
+
+    expect(() => compileRunProposalIntent(proposal)).toThrow(RunProposalPlanError);
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0]?.[1]).toBe('sonnet');
+  });
+
+  it("passes 'sonnet' for an economic-mode config (economic.brain_model = 'sonnet')", () => {
+    const proposal = makeProposal({ flowId: 'flow-431-economic' });
+    const spy = vi.mocked(callZeroConfigPlanner);
+    spy.mockClear();
+
+    const config: DeckentConfig = { mode: 'economic', modes: DEFAULT_MODES };
+    expect(() => compileRunProposalIntent(proposal, undefined, config)).toThrow(RunProposalPlanError);
+
+    expect(spy.mock.calls[0]?.[1]).toBe('sonnet');
+  });
+
+  it("passes 'opus' for a performance-mode config (performance.brain_model = 'opus')", () => {
+    const proposal = makeProposal({ flowId: 'flow-431-performance' });
+    const spy = vi.mocked(callZeroConfigPlanner);
+    spy.mockClear();
+
+    const config: DeckentConfig = { mode: 'performance', modes: DEFAULT_MODES };
+    expect(() => compileRunProposalIntent(proposal, undefined, config)).toThrow(RunProposalPlanError);
+
+    expect(spy.mock.calls[0]?.[1]).toBe('opus');
+  });
 });

@@ -4905,3 +4905,17 @@ CLI `deckent recall|remember|memory rebuild|export|stats`; MCP `deckent_memory_q
 - **Cross-ref:** ADR-G-019 (ADR taxonomy — these columns store it) · ADR-G-032 (Self-Learning Loop — runs on this substrate) · ADR-G-031 (tenant_id / audit-hmac enterprise) · ADR-D-005 (dependency policy — sqlite-vec opt-in justification).
 - **Born work-items:** TAXONOMY-READPATH (rowToEntry + buildFilterClauses class/scope filter + adr-file-sync enforcement_level parse + upsert taxonomy-update → class/scope-aware recall/injection; shared with ADR-G-019) · SCHEMA-VERSION-BUMP (schema_version bump + backup-guard + direct-SQL migration-only API) · LEARNINGS-QUALITY · MEM-2 (scope-layers) · MEM-3 (index/SLA) · vector-layer (opt-in, never-calls-home).
 - **Direction:** `.analysis/adr-governance-redesign-plan.md` §5 (DB strategy = better-sqlite evrim).
+
+
+---
+
+## adr-g-036: ADR-G-036: Zero-Hardcode Model & Flow Values (Parametric-Only)
+
+**Status:** accepted
+
+KARAR (Alperen KESIN-KURAL, 2026-07-12): Kod-yollarinda model-adi, provider-adi ve akis-degeri STRING-LITERAL olarak YASAKTIR.
+Tek-kaynak: model/provider kimlikleri yalnizca src/core/model-registry.ts SSOT unda yasar; tum tuketiciler registry + config uzerinden cozer.
+Cozumleme: default lar resolveDefaultModel(config) / resolveBrainModel(config) / getAllKnownModelIds() gibi tek-kaynak resolver lardan gelir; validasyon CANLI registry-listesiyle yapilir (donmus snapshot yasak — 2026-07-12 gpt-5.6-sol devri vakasi).
+Enforcement: scripts/lint-no-model-literal.mjs ratchet gate (lint-no-spawnsync emsali) — yeni literal CI kirmizi; mevcut 85 ihlal baseline de grandfathered ve ratchet le eritilir.
+Gerekce: sonnet kullanmayan kullanici ya da model-adi degisikligi sistemi DUSUREMEZ; deckent milyonlarca ortam/kullanici icin model-agnostik yasamak zorundadir (Yasa #2).
+Iz: born-682/683/684/685 + MASTER-PLAN 565; canli-ispat: validateConfig donmus ALL_MODELS listesi mesru brain-devrini reddetti (fix a2736e71).

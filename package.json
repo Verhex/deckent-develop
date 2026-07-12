@@ -41,6 +41,7 @@
     "lint:errors": "node scripts/check-error-handling.mjs",
     "lint:link": "node scripts/lint-links.mjs",
     "lint:spawnsync": "node scripts/lint-no-spawnsync.mjs",
+    "lint:model-literal": "node scripts/lint-no-model-literal.mjs",
     "lint:parity": "node scripts/lint-cli-mcp-parity.mjs",
     "lint:i18n": "node scripts/lint-i18n-hardcode.mjs",
     "lint:identity": "node scripts/lint-identity-md.mjs",

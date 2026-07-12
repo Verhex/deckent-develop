@@ -9,6 +9,8 @@ import {
   ConfigValidationError,
   MODE_ALIASES,
   resolveMode,
+  resolveBrainModel,
+  resolveDefaultModel,
   VALID_PROVIDERS,
   clearConfigCache,
 } from '../../src/core/config.js';
@@ -508,6 +510,88 @@ describe('resolveMode', () => {
 
   it('returns unknown mode string as-is', () => {
     expect(resolveMode('totally_unknown_mode')).toBe('totally_unknown_mode');
+  });
+});
+
+// ─── resolveBrainModel & resolveDefaultModel (Task 431-002) ──────────
+
+describe('resolveBrainModel', () => {
+  it("returns 'opus' for performance mode", () => {
+    expect(resolveBrainModel({ mode: 'performance' })).toBe('opus');
+  });
+
+  it("returns 'sonnet' for balanced mode", () => {
+    expect(resolveBrainModel({ mode: 'balanced' })).toBe('sonnet');
+  });
+
+  it("returns 'sonnet' for economic mode", () => {
+    expect(resolveBrainModel({ mode: 'economic' })).toBe('sonnet');
+  });
+
+  it("returns 'opus' for api mode", () => {
+    expect(resolveBrainModel({ mode: 'api' })).toBe('opus');
+  });
+
+  it('falls back to balanced brain_model for undefined config', () => {
+    expect(resolveBrainModel(undefined)).toBe('sonnet');
+  });
+
+  it('falls back to balanced brain_model for null config', () => {
+    expect(resolveBrainModel(null)).toBe('sonnet');
+  });
+
+  it('falls back to balanced brain_model for an unknown/corrupt mode string', () => {
+    const cfg = { mode: 'totally_unknown_mode' as unknown as PlanMode };
+    expect(resolveBrainModel(cfg)).toBe('sonnet');
+  });
+
+  it('falls back to balanced brain_model when modes is present but missing the referenced mode key', () => {
+    const cfg = { mode: 'performance' as PlanMode, modes: {} };
+    expect(resolveBrainModel(cfg)).toBe('sonnet');
+  });
+
+  it('does not throw for a malformed config object', () => {
+    expect(() => resolveBrainModel({} as unknown as Partial<import('../../src/core/types.js').ResolvedConfig>)).not.toThrow();
+  });
+});
+
+describe('resolveDefaultModel', () => {
+  it("returns 'opus' for performance mode", () => {
+    expect(resolveDefaultModel({ mode: 'performance' })).toBe('opus');
+  });
+
+  it("returns 'opus' for balanced mode", () => {
+    expect(resolveDefaultModel({ mode: 'balanced' })).toBe('opus');
+  });
+
+  it("returns 'sonnet' for economic mode", () => {
+    expect(resolveDefaultModel({ mode: 'economic' })).toBe('sonnet');
+  });
+
+  it("returns 'sonnet' for api mode", () => {
+    expect(resolveDefaultModel({ mode: 'api' })).toBe('sonnet');
+  });
+
+  it('falls back to balanced default_model for undefined config', () => {
+    expect(resolveDefaultModel(undefined)).toBe('opus');
+  });
+
+  it('falls back to balanced default_model for null config', () => {
+    expect(resolveDefaultModel(null)).toBe('opus');
+  });
+
+  it('falls back to balanced default_model for an unknown/corrupt mode string', () => {
+    const cfg = { mode: 'totally_unknown_mode' as unknown as PlanMode };
+    expect(resolveDefaultModel(cfg)).toBe('opus');
+  });
+
+  it('falls back to balanced default_model when modes is present but missing the referenced mode key', () => {
+    const cfg = { mode: 'performance' as PlanMode, modes: {} };
+    expect(resolveDefaultModel(cfg)).toBe('opus');
+  });
+
+  it('does not throw for a malformed config object', () => {
+    expect(() => resolveDefaultModel({} as unknown as Partial<import('../../src/core/types.js').ResolvedConfig>)).not.toThrow();
   });
 });
 

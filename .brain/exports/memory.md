@@ -1,5 +1,14 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-431 Learnings
+- Sprint sprint-431 Learnings: ## Sprint sprint-431 Learnings
+- scripts/lint-no-model-literal.mjs ratchet + baseline: GO_WITH_TECH_DEBT — Mirrors scripts/lint-no-spawnsync.mjs 1:1: pure exported fns (sliceRegistryArray, extractIdFields, deriveKnownModelIdsFr
+
+## Gains
+- 431-002 — config.ts: resolveDefaultModel(config) + resolveBrainModel(config) SSOT resolver — Added resolveBrainModel(config) and resolveDefaultModel(config) to src/core/config.ts, placed rig...
+- 431-003 — run-proposal-compiler.ts: hardcoded 'sonnet' → resolveBrainModel wiring — Removed the bare 'sonnet' literal at run-proposal-compiler.ts's callZeroConfigPlanner call site, ...
+- 431-004 — Entegrasyon: model-literal ratchet + resolver wiring uçtan-uca doğrulama — VERIFIED GREEN: (1) `npx tsc --noEmit` (repo root) = exit 0, zero errors, including src/api/run-f...
+
 ## Sprint sprint-430 Learnings
 - Sprint sprint-430 Learnings: ## Sprint sprint-430 Learnings
 

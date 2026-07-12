@@ -19,6 +19,7 @@ import type {
   AutoDocsConfig,
   BrainPlanningMode,
   DeckentConfig,
+  ModelType,
   PlanMode,
   PlanModeConfig,
   PromptConfig,
@@ -466,6 +467,41 @@ export const DEFAULT_MODES: Record<string, PlanModeConfig> = {
     brain_planning: 'auto',
   },
 };
+
+/**
+ * Resolve the effective Brain model for a config — single-source reader for
+ * `config.modes[mode].brain_model` (Task 431-002, born-683 drift fix: this lookup
+ * was previously re-implemented ad-hoc at every call site).
+ *
+ * Lookup chain:
+ *   1. `mode = config?.mode ?? 'balanced'`
+ *   2. `modes = config?.modes ?? DEFAULT_MODES`
+ *   3. `modes[mode]?.brain_model`
+ *   4. Unknown mode / missing modes → `DEFAULT_MODES['balanced']` fallback
+ *
+ * Defensive: undefined/null/malformed config never throws — always resolves to a
+ * valid ModelType. Mirrors {@link resolveChatProvider}'s null-safe pattern.
+ */
+export function resolveBrainModel(
+  config: Partial<ResolvedConfig> | Partial<DeckentConfig> | undefined | null,
+): ModelType {
+  const mode = config?.mode ?? 'balanced';
+  const modes = config?.modes ?? DEFAULT_MODES;
+  return modes[mode]?.brain_model ?? DEFAULT_MODES['balanced']!.brain_model;
+}
+
+/**
+ * Resolve the effective default (worker) model for a config — single-source reader
+ * for `config.modes[mode].default_model`. See {@link resolveBrainModel} for the
+ * shared lookup chain and rationale.
+ */
+export function resolveDefaultModel(
+  config: Partial<ResolvedConfig> | Partial<DeckentConfig> | undefined | null,
+): ModelType {
+  const mode = config?.mode ?? 'balanced';
+  const modes = config?.modes ?? DEFAULT_MODES;
+  return modes[mode]?.default_model ?? DEFAULT_MODES['balanced']!.default_model;
+}
 
 // ─── Config Validation Error ─────────────────────────────────────────
 

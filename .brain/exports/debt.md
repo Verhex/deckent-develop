@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-431-001 | Tech debt from 431-001: Mirrors scripts/lint-no-spawnsync.mjs 1:1: pure exported | normal | sprint-431 | resolved |
 | debt-429-003 | Tech debt from 429-003: born-677 root cause: buildTaskBlock() joined goCriteria/ | normal | sprint-429 | resolved |
 | debt-429-011 | Tech debt from 429-011: Moved tool-inventory persist from flat `.deckent/<sprint | normal | sprint-429 | resolved |
 | debt-427-011 | Tech debt from 427-011: born-670a WIRE-PROBE implemented: runPlanPhase (sprint-p | normal | sprint-427 | resolved |
