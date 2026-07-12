@@ -4,6 +4,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-420-001-fix | Tech debt from 420-001-fix: CORE COMPLETE (7/8 goCriteria verified). Two product | normal | sprint-420 | active |
 
 ## Resolved Technical Debt
 

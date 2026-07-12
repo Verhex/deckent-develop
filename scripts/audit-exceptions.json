@@ -1,57 +1,15 @@
 [
   {
-    "advisoryId": "1117870",
-    "package": "fast-uri",
-    "reason": "Transitive dependency (path traversal via percent-encoded dot segments, GHSA-q3j6-qgpj-74h6). Fix requires a dependency bump; out of scope for task 419-003 (SEC05 — gate wiring only) and this worker cannot mutate the lockfile per the Dependency-Mutation Advisory. Temporary short-expiry exception so the new fail-closed gate ships green; must be re-triaged as a real dependency-bump task before expiry.",
-    "owner": "deckent-security-triage",
-    "expires": "2026-07-26T00:00:00Z"
-  },
-  {
-    "advisoryId": "1117884",
-    "package": "fast-uri",
-    "reason": "Transitive dependency (host confusion via percent-encoded authority delimiters, GHSA-v39h-62p7-jpjc). Same fast-uri package/upstream fix as advisory 1117870 — see that entry's reason. Temporary short-expiry exception, not a fix.",
-    "owner": "deckent-security-triage",
-    "expires": "2026-07-26T00:00:00Z"
-  },
-  {
-    "advisoryId": "1120913",
-    "package": "hono",
-    "reason": "Transitive dependency (CORS middleware reflects any Origin with credentials on wildcard default, GHSA-88fw-hqm2-52qc). Fix requires a dependency bump; out of scope for task 419-003. Temporary short-expiry exception so the new fail-closed gate ships green.",
-    "owner": "deckent-security-triage",
-    "expires": "2026-07-26T00:00:00Z"
-  },
-  {
     "advisoryId": "1113165",
     "package": "nodemailer",
-    "reason": "Direct dependency (addressparser recursive-call DoS, GHSA-rcmh-qjqh-p98v). Fix requires a semver-major bump (nodemailer 9.0.3+); out of scope for task 419-003 and this worker cannot mutate the lockfile per the Dependency-Mutation Advisory. Temporary short-expiry exception, not a fix.",
+    "reason": "Direct dependency (addressparser recursive-call DoS, GHSA-rcmh-qjqh-p98v). Fix requires a semver-major bump (nodemailer 9.0.3+); out of scope for task 419-003 and this worker cannot mutate the lockfile per the Dependency-Mutation Advisory. DEP669A (2026-07-12) bumped fast-uri/hono/path-to-regexp/undici/ws (non-major) but nodemailer stayed explicitly out of scope (semver-major) per DEP669A's own directive — deferred to DEP669B. Temporary short-expiry exception, not a fix.",
     "owner": "deckent-security-triage",
     "expires": "2026-07-26T00:00:00Z"
   },
   {
     "advisoryId": "1121191",
     "package": "nodemailer",
-    "reason": "Direct dependency (raw-option bypass of disableFileAccess/disableUrlAccess enabling arbitrary file read + SSRF, GHSA-p6gq-j5cr-w38f). Same nodemailer package/upstream fix as advisory 1113165 — see that entry's reason. Temporary short-expiry exception, not a fix.",
-    "owner": "deckent-security-triage",
-    "expires": "2026-07-26T00:00:00Z"
-  },
-  {
-    "advisoryId": "1115573",
-    "package": "path-to-regexp",
-    "reason": "Transitive dependency (DoS via sequential optional groups, GHSA-j3q9-mxjg-w52f). Fix requires a dependency bump; out of scope for task 419-003. Temporary short-expiry exception so the new fail-closed gate ships green.",
-    "owner": "deckent-security-triage",
-    "expires": "2026-07-26T00:00:00Z"
-  },
-  {
-    "advisoryId": "1121245",
-    "package": "undici",
-    "reason": "Transitive dependency via discord.js (WebSocket client DoS via fragment count bypass, GHSA-vxpw-j846-p89q). Fix requires a discord.js semver-major bump; out of scope for task 419-003 and this worker cannot mutate the lockfile per the Dependency-Mutation Advisory. Temporary short-expiry exception, not a fix.",
-    "owner": "deckent-security-triage",
-    "expires": "2026-07-26T00:00:00Z"
-  },
-  {
-    "advisoryId": "1122891",
-    "package": "ws",
-    "reason": "Direct dependency (memory exhaustion DoS from tiny fragments/data chunks, GHSA-96hv-2xvq-fx4p). Fix requires a dependency bump; out of scope for task 419-003. Temporary short-expiry exception so the new fail-closed gate ships green.",
+    "reason": "Direct dependency (raw-option bypass of disableFileAccess/disableUrlAccess enabling arbitrary file read + SSRF, GHSA-p6gq-j5cr-w38f). Same nodemailer package/upstream fix as advisory 1113165 — see that entry's reason. DEP669A (2026-07-12) left nodemailer untouched by directive (DEP669B scope). Temporary short-expiry exception, not a fix.",
     "owner": "deckent-security-triage",
     "expires": "2026-07-26T00:00:00Z"
   }

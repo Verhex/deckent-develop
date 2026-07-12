@@ -31,4 +31,24 @@ For the full history and amendment log, see [ADR-D-005](../adr/adr-d-005-depende
 - **Removing a dependency:** Update this table and the ADR-D-005 amendment log.
 - **Version bumps:** Do not require an ADR amendment unless the package's role changes.
 
-_Last updated: 2026-06-28 (F11 fix: telegraf → grammy; added nodemailer + openai optional deps)_
+## Security Bump Log
+
+Non-major security bumps applied against `scripts/audit-exceptions.json` high/critical findings
+(SEC-05 fail-closed gate, ADR-D-005). Each row closes the named advisory exception(s) — see
+`scripts/check-dependency-audit.mjs` for the gate mechanics.
+
+| Package | Old → New | Advisory | Reason | Task |
+|---------|-----------|----------|--------|------|
+| `fast-uri` | `3.1.0` → `3.1.3` | [GHSA-q3j6-qgpj-74h6](https://github.com/advisories/GHSA-q3j6-qgpj-74h6), [GHSA-v39h-62p7-jpjc](https://github.com/advisories/GHSA-v39h-62p7-jpjc) | Path-traversal / host-confusion via percent-encoded segments. Transitive via `@modelcontextprotocol/sdk` → `ajv@8.18.0` (`ajv` declares `^3.0.1`, so `3.1.3` resolves without an override). | DEP669A |
+| `hono` | `4.12.8` → `4.12.29` | [GHSA-88fw-hqm2-52qc](https://github.com/advisories/GHSA-88fw-hqm2-52qc) (+ multiple lower-severity fixes bundled in the same non-major range) | CORS middleware reflected any `Origin` with credentials on the wildcard default. Transitive via `@modelcontextprotocol/sdk` (declares `^4.11.4`); bumped to latest `4.x` to close every advisory below `4.12.25` in one pass, still within the declared range. | DEP669A |
+| `path-to-regexp` | `8.3.0` → `8.4.2` | [GHSA-j3q9-mxjg-w52f](https://github.com/advisories/GHSA-j3q9-mxjg-w52f) | DoS via sequential optional groups. Transitive via `@modelcontextprotocol/sdk` → `express@5.2.1` → `router@2.2.0` (declares `^8.0.0`). | DEP669A |
+| `undici` | `6.24.1` → `6.27.0` | [GHSA-vxpw-j846-p89q](https://github.com/advisories/GHSA-vxpw-j846-p89q) | WebSocket client DoS via fragment-count bypass. Transitive via optional `discord.js@14.26.3` and `@discordjs/rest@2.6.1`, both of which pin `undici` to an **exact** `6.24.1` in their own `package.json` (not a caret range) — a plain lockfile bump could not move it. Closed via a root `"overrides": { "undici": "6.27.0" }` in `package.json`, forcing the whole tree to the patched `6.x` release without requiring a `discord.js` major bump. | DEP669A |
+| `ws` | `8.20.0` → `8.21.0` | [GHSA-96hv-2xvq-fx4p](https://github.com/advisories/GHSA-96hv-2xvq-fx4p) | Memory-exhaustion DoS from tiny fragments/data chunks. Direct dependency (`^8.18.0` already permitted `8.21.0`); lockfile-only bump, no `package.json` range change needed. | DEP669A |
+
+`nodemailer` (`GHSA-rcmh-qjqh-p98v`, `GHSA-p6gq-j5cr-w38f`) requires a semver-major bump
+(`9.0.3+`) and stays on the short-expiry exception list — explicitly out of scope for DEP669A,
+deferred to DEP669B.
+
+_Last updated: 2026-07-12 (DEP669A: non-major security bump slice — fast-uri, hono,
+path-to-regexp, undici (via override), ws; F11 fix: telegraf → grammy; added nodemailer + openai
+optional deps)_

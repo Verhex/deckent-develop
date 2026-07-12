@@ -24,6 +24,7 @@ import {
 import { readJsonSafe, debugLog } from '../core/utils.js';
 import { metric } from '../core/observability.js';
 import { writeEvent, CHANNELS } from '../orchestra/event-stream.js';
+import { voteWorkerLivenessFromRecord } from '../orchestra/heartbeat-monitor.js';
 import { clearOrphanLocks, clearOrphanSpawnLocks, clearStaleSpawnLocks } from '../core/file-lock.js';
 import { checkAuthority, emitAuthorityViolation } from '../orchestra/authority-enforcer.js';
 import { MemoryStore } from '../core/memory-store.js';
@@ -404,15 +405,41 @@ export function isWorkerStale(
     }
   }
 
-  // Signal B: Process/container is still running.
-  // Sprint 279 (WK-7): prefer the async-batch-probed liveness cache (non-blocking,
-  // O(n)→parallel) that the scan loop pre-warms; fall back to the synchronous probe
-  // on a cache miss (cold cache / direct call) so standalone behavior is preserved.
-  const cachedAlive = livenessCache.get(hb.workerId);
-  const processAlive = cachedAlive !== undefined ? cachedAlive : isWorkerProcessAlive(hb);
-  if (processAlive) {
-    return false; // Process alive — worker is running, just slow to update HB
+  // Signal B (TT553 adoption — task 420-001): the canonical HOST-PRIMARY decision
+  // (heartbeat-monitor.ts::decideWorkerLiveness) is the authority, reached through
+  // the single `voteWorkerLivenessFromRecord` adopter — no local liveness copy.
+  // host-signal inputs come from EXISTING records: the async-pre-warmed
+  // `livenessCache` (docker/tmux) and the record's own pid/.log (subprocess). This
+  // closes the 412-003 wrong-kill: a live subprocess worker with a stale/hardcoded
+  // `.hb` timestamp is no longer killed just because `isWorkerProcessAlive` returns
+  // false for the subprocess backend.
+  const vote = voteWorkerLivenessFromRecord(
+    {
+      taskId: hb.taskId,
+      workerId: hb.workerId,
+      backend: hb.backend,
+      pid: (hb as Heartbeat & { pid?: number }).pid,
+    },
+    {
+      cachedProcessAlive: livenessCache.get(hb.workerId),
+      tasksDir: join(projectRoot, TASKS_DIR),
+      now: () => currentTime,
+    },
+  );
+  if ('unavailable' in vote) {
+    // HONEST fallback (never silent): the host signal could not be derived, so
+    // log why and fall back to the pre-existing async-cache / sync process probe.
+    debugLog('auditor:isWorkerStale', vote.reason);
+    const cachedAlive = livenessCache.get(hb.workerId);
+    const processAlive = cachedAlive !== undefined ? cachedAlive : isWorkerProcessAlive(hb);
+    if (processAlive) {
+      return false; // Process alive — worker is running, just slow to update HB
+    }
+  } else if (vote.alive) {
+    return false; // Host signal says alive — suppress the wrong-kill.
   }
+  // vote.alive === false (host says dead) → fall through to Signal C, preserving
+  // the exact pre-existing ordering for the genuinely-stale cases.
 
   // Signal C: Monotonic sequence check — sequence increased since last read
   if (hbPath) {

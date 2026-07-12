@@ -10270,3 +10270,26 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 419-003: SEC05 — dependency-audit fail-closed + imzalı-istisna allowlist (RC-6 dilimi) (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 420 — sprint-420
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-12
+**Duration:** 2026s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 2026379ms |
+
+### Tasks
+
+- 420-001: LIVE668A — decideWorkerLiveness ADOPT (3. deneme; iki gerçek kill-yolu) (GO_WITH_TECH_DEBT)
+- 420-002: DEP669A — non-major dependency-bump dilimi: fast-uri · hono · path-to-regexp · undici · ws (⏰2026-07-26) (DONE)
+
+---

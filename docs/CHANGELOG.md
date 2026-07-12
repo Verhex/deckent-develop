@@ -9,6 +9,19 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint420] - 2026-07-12
+
+### Added
+
+- DEP669A — non-major dependency-bump dilimi: fast-uri · hono · path-to-regexp · undici · ws (⏰2026-07-26)
+
+### Changed
+
+- LIVE668A — decideWorkerLiveness ADOPT (3. deneme; iki gerçek kill-yolu) (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 2 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint419] - 2026-07-12
 
 ### Added

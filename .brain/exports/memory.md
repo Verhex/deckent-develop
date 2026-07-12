@@ -1,5 +1,12 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-420 Learnings
+- Sprint sprint-420 Learnings: ## Sprint sprint-420 Learnings
+- LIVE668A — decideWorkerLiveness ADOPT (3. deneme; iki gerçek kill-yolu): GO_WITH_TECH_DEBT — Worker timeout/killed (exitCode=1) but git diff shows 24 files modified. Brain should reconcile via Spurious NO_GO helpe
+
+## Gains
+- 420-002 — DEP669A — non-major dependency-bump dilimi: fast-uri · hono · path-to-regexp · undici · ws (⏰2026-07-26) — Non-major bump slice, all 5 target packages closed: fast-uri 3.1.0->3.1.3 (GHSA-q3j6, GHSA-v39h),...
+
 ## Sprint sprint-419 Learnings
 - Sprint sprint-419 Learnings: ## Sprint sprint-419 Learnings
 - LIVE668A — decideWorkerLiveness ADOPT: iki gerçek kill-yolu host-primary'ye döner: GO_WITH_TECH_DEBT — Worker timeout/killed (exitCode=1) but git diff shows 27 files modified. Brain should reconcile via Spurious NO_GO helpe

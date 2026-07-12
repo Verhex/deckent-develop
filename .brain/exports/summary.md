@@ -51,6 +51,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-420 Learnings** (sprint-420): ## Sprint sprint-420 Learnings
+- LIVE668A — decideWorkerLiveness ADOPT (3. deneme; iki gerçek kill-yolu): GO_WITH_TEC...
 - **Sprint sprint-419 Learnings** (sprint-419): ## Sprint sprint-419 Learnings
 - LIVE668A — decideWorkerLiveness ADOPT: iki gerçek kill-yolu host-primary'ye döner: G...
 - **Sprint sprint-418 Learnings** (sprint-418): ## Sprint sprint-418 Learnings
@@ -71,13 +73,9 @@
 - RC2-A — init outcome-makinesi: READY · SETUP_INCOMPLETE · FAILED dürüst-çıkış (INIT-...
 - **Sprint sprint-411 Learnings** (sprint-411): ## Sprint sprint-411 Learnings
 - RC1-B — subprocess-backend .deck görünürlüğü dürüstlük-dilimi (SEC-02): GO_WITH_TECH...
-- **Sprint sprint-410 Learnings** (sprint-410): ## Sprint sprint-410 Learnings
-
-## Gains
-- 410-001 — DASH-PERF — MASTER-PLAN 494: React.lazy route-splitting + istek-...
 
 ## Active Technical Debt
-_No active technical debt._
+- [NORMAL] Tech debt from 420-001-fix: CORE COMPLETE (7/8 goCriteria verified). Two product
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -144,5 +142,6 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
+- Violation pattern: file_outside_scope
 
-_Total entries: 1274 | Generated: 2026-07-12_
+_Total entries: 1279 | Generated: 2026-07-12_

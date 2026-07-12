@@ -50,6 +50,10 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
 });
 
 vi.mock('../../src/core/model-registry.js', () => ({
+  // cost-ledger.ts (418-001) imports these from model-registry at module load —
+  // factory mocks must cover newly-consumed exports (SETTINGS_DIR-class gotcha).
+  registerCodexParityModels: vi.fn(),
+  BUILTIN_MODELS: [],
   modelRegistry: {
     get: vi.fn(),
     has: vi.fn().mockReturnValue(true),

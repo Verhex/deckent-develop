@@ -33,7 +33,7 @@
 // not done here.
 
 import { existsSync, statSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import type { SpawnSyncReturns } from 'node:child_process';
 import { join } from 'node:path';
 import type { Heartbeat } from '../core/types.js';
@@ -120,25 +120,105 @@ export function tmuxWindowTarget(workerId: string): string {
   return workerId;
 }
 
-// ─── Default real host probes (all injectable) ───────────────────────────────
+// ─── Host probes: async real spawn (ADR-D-002 C4) + spawn-free sync defaults ──
+//
+// task 420-001 (spawnSync→async): the real docker / tmux / tasklist host probes
+// are async `spawn` — they never block a scan's event loop (the ADR-D-002 C4
+// hot-path rule; the former spawnSync sanction is retired). The SYNCHRONOUS
+// decision path (createHostLivenessProbe/probe/decideWorkerLiveness — locked sync
+// by their callers) therefore cannot run a real docker/tmux/Windows-pid probe
+// itself: it decides from signals a caller pre-collected out-of-band (the
+// auditor's async-pre-warmed livenessCache) or from the spawn-free POSIX
+// `kill(0)` pid check. When neither is available the sync default is fail-closed
+// (honest "not alive"), and the async probes below are the real-host
+// implementation a batch / pre-warm caller uses.
 
 const DOCKER_PROBE_TIMEOUT_MS = 3000;
 const TMUX_PROBE_TIMEOUT_MS = 3000;
 const TASKLIST_PROBE_TIMEOUT_MS = 5000;
 
-/** docker container-state probe — `docker inspect -f {{.State.Running}} <name>` === "true". */
-function defaultDockerRunning(containerName: string): boolean {
-  try {
-    const res = spawnSync(
-      'docker',
-      ['inspect', '-f', '{{.State.Running}}', containerName],
-      { encoding: 'utf-8', timeout: DOCKER_PROBE_TIMEOUT_MS },
-    );
-    if (res.status !== 0 || typeof res.stdout !== 'string') return false;
-    return res.stdout.trim() === 'true';
-  } catch {
-    return false; // fail-closed — probe error ⇒ treat as not-running
-  }
+/** Async spawn seam — injectable for hermetic tests (defaults to node:child_process spawn). */
+export type AsyncSpawn = typeof spawn;
+
+/**
+ * Run an async host probe and resolve a boolean verdict. Never throws — a
+ * synchronous spawn error, a timeout, or a non-zero exit all resolve through
+ * `decide` or a fail-closed `false`, matching the old spawnSync catch semantics
+ * without blocking the event loop.
+ */
+function runAsyncHostProbe(
+  spawnFn: AsyncSpawn,
+  command: string,
+  args: string[],
+  timeoutMs: number,
+  decide: (code: number | null, stdout: string) => boolean,
+): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    const finish = (verdict: boolean): void => {
+      if (settled) return;
+      settled = true;
+      resolve(verdict);
+    };
+
+    let child: ReturnType<AsyncSpawn>;
+    try {
+      child = spawnFn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch {
+      finish(false); // spawn threw synchronously (ENOENT etc.) — fail-closed
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      try { child.kill(); } catch { /* already gone */ }
+      finish(false);
+    }, timeoutMs);
+    if (typeof timer.unref === 'function') timer.unref();
+
+    let stdout = '';
+    child.stdout?.on('data', (chunk: unknown) => { stdout += String(chunk); });
+    child.on('error', () => { clearTimeout(timer); finish(false); });
+    child.on('close', (code: number | null) => { clearTimeout(timer); finish(decide(code, stdout)); });
+  });
+}
+
+/** docker container-state probe (async) — `docker inspect -f {{.State.Running}} <name>` === "true". */
+export function probeDockerRunningAsync(containerName: string, spawnFn: AsyncSpawn = spawn): Promise<boolean> {
+  return runAsyncHostProbe(
+    spawnFn, 'docker', ['inspect', '-f', '{{.State.Running}}', containerName], DOCKER_PROBE_TIMEOUT_MS,
+    (code, stdout) => code === 0 && stdout.trim() === 'true',
+  );
+}
+
+/** tmux pane-liveness probe (async) — a window with at least one non-dead pane (`#{pane_dead}`===0) is alive. */
+export function probeTmuxPaneAliveAsync(windowTarget: string, spawnFn: AsyncSpawn = spawn): Promise<boolean> {
+  return runAsyncHostProbe(
+    spawnFn, 'tmux', ['list-panes', '-t', windowTarget, '-F', '#{pane_dead}'], TMUX_PROBE_TIMEOUT_MS,
+    (code, stdout) => code === 0 && stdout.split('\n').some((line) => line.trim() === '0'),
+  );
+}
+
+/**
+ * Windows process-alive probe (async) — `tasklist /FI "PID eq <pid>" /NH /FO CSV`
+ * emits one CSV row per match. Anchors on the 2nd CSV field so a small pid can
+ * never false-match the leading digits of a larger process's pid/session field.
+ */
+export function probeProcessAliveWindowsAsync(pid: number, spawnFn: AsyncSpawn = spawn): Promise<boolean> {
+  if (!Number.isInteger(pid) || pid <= 0) return Promise.resolve(false);
+  return runAsyncHostProbe(
+    spawnFn, 'tasklist', ['/FI', `PID eq ${pid}`, '/NH', '/FO', 'CSV'], TASKLIST_PROBE_TIMEOUT_MS,
+    (code, stdout) => code === 0 && new RegExp(`^"[^"]*","${pid}"`, 'm').test(stdout),
+  );
+}
+
+/**
+ * docker container-state — the SYNCHRONOUS default is fail-closed (spawn-free): a
+ * sync scan never spawns a docker probe. Real probing is async
+ * {@link probeDockerRunningAsync}, or a pre-collected signal injected via
+ * {@link HostProbeDeps.isDockerContainerRunning}.
+ */
+function defaultDockerRunning(_containerName: string): boolean {
+  return false;
 }
 
 /**
@@ -162,12 +242,16 @@ export function isProcessAlivePosix(pid: number): boolean {
  * Windows process-alive probe — honest branch (Yasa #2), NOT a POSIX-only stub.
  * `tasklist /FI "PID eq <pid>" /NH /FO CSV` lists the process when it exists; an
  * absent pid yields the "INFO: No tasks…" line (no CSV row containing the pid).
- * `spawnImpl` is injectable so tests exercise this branch WITHOUT a Windows host.
+ * `spawnImpl` is injectable so tests (and a caller holding a synchronous tasklist
+ * result) exercise this branch WITHOUT a Windows host. The DEFAULT spawnImpl is
+ * fail-closed (spawn-free) — the real spawning Windows probe is the async
+ * {@link probeProcessAliveWindowsAsync} (task 420-001 spawnSync→async).
  */
 export function isProcessAliveWindows(
   pid: number,
-  spawnImpl: (cmd: string, args: string[]) => SpawnSyncReturns<string> = (cmd, args) =>
-    spawnSync(cmd, args, { encoding: 'utf-8', timeout: TASKLIST_PROBE_TIMEOUT_MS }),
+  spawnImpl: (cmd: string, args: string[]) => SpawnSyncReturns<string> = () => ({
+    pid: 0, status: 1, signal: null, output: [], stdout: '', stderr: '',
+  }),
 ): boolean {
   if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
@@ -188,20 +272,14 @@ function defaultProcessAlive(pid: number, platform: NodeJS.Platform): boolean {
   return platform === 'win32' ? isProcessAliveWindows(pid) : isProcessAlivePosix(pid);
 }
 
-/** tmux pane-liveness probe — a window with at least one non-dead pane is alive. */
-function defaultTmuxPaneAlive(windowTarget: string): boolean {
-  try {
-    const res = spawnSync(
-      'tmux',
-      ['list-panes', '-t', windowTarget, '-F', '#{pane_dead}'],
-      { encoding: 'utf-8', timeout: TMUX_PROBE_TIMEOUT_MS },
-    );
-    if (res.status !== 0 || typeof res.stdout !== 'string') return false;
-    // Any pane reporting `0` (not dead) ⇒ the worker's pane is still alive.
-    return res.stdout.split('\n').some((line) => line.trim() === '0');
-  } catch {
-    return false;
-  }
+/**
+ * tmux pane-liveness — the SYNCHRONOUS default is fail-closed (spawn-free): a sync
+ * scan never spawns a tmux probe. Real probing is async
+ * {@link probeTmuxPaneAliveAsync}, or a pre-collected signal injected via
+ * {@link HostProbeDeps.isTmuxPaneAlive}.
+ */
+function defaultTmuxPaneAlive(_windowTarget: string): boolean {
+  return false;
 }
 
 // ─── Secondary signal: host-captured `.log` activity ─────────────────────────
@@ -430,4 +508,106 @@ export function buildLivenessTarget(
     pid: opts.pid,
     tasksDir: opts.tasksDir,
   };
+}
+
+// ─── Record → decision adapter (the SINGLE production adopter — task 420-001) ──
+//
+// The two production kill-paths — `auditor.ts::isWorkerStale` and
+// `sprint-checkpoint.ts::detectStaleWorkers` — historically each judged liveness
+// from the worker's OWN `.hb` timestamp/mtime (the 412-003 wrong-kill chain).
+// This adapter is the ONE place a persisted `.hb` record is turned into a
+// canonical {@link decideWorkerLiveness} verdict, so BOTH paths adopt the
+// host-primary decision WITHOUT cloning its per-backend branching a third time.
+//
+// It NEVER spawns from a synchronous caller: docker/tmux liveness must be a
+// signal the caller already collected out-of-band (the auditor's async-pre-warmed
+// `livenessCache`); subprocess liveness uses the spawn-free `pid` (`kill(0)`) plus
+// the host-captured `.log` mtime. When the required host signal is not available
+// the result is an explicit `{ unavailable, reason }` carrying the literal
+// {@link HOST_SIGNAL_UNAVAILABLE} — the caller then falls back HONESTLY to its old
+// mtime/timestamp behavior (never a silent guess; silent-fallback is a NO_GO).
+
+/** Marker substring every `unavailable` reason carries (grep + test anchor). */
+export const HOST_SIGNAL_UNAVAILABLE = 'host-signal-unavailable';
+
+/** A `.hb`-derived liveness vote — alive/dead, or an explicit unavailable signal. */
+export type RecordLivenessVote =
+  | { alive: boolean; reason: string }
+  | { unavailable: true; reason: string };
+
+/** Inputs a synchronous caller supplies from records it already holds. */
+export interface RecordLivenessInputs {
+  /**
+   * docker/tmux liveness the caller already probed out-of-band (the auditor's
+   * async-pre-warmed `livenessCache`). `undefined` ⇒ not pre-probed ⇒ the
+   * docker/tmux vote is `host-signal-unavailable` — a sync scan never spawns a
+   * fresh probe here.
+   */
+  cachedProcessAlive?: boolean;
+  /** Project `.tasks/` dir — enables the host-captured `.log`-activity signal. */
+  tasksDir?: string;
+  /** Clock seam (default Date.now) — threaded so callers with an injected clock stay deterministic. */
+  now?: () => number;
+}
+
+/** The minimal `.hb` shape this adapter reads — pid is the additive TT553 field. */
+export type LivenessRecord = Pick<Heartbeat, 'taskId' | 'workerId'> & {
+  backend?: WorkerBackendKind;
+  pid?: number;
+};
+
+/**
+ * Turn a persisted heartbeat record into a canonical {@link decideWorkerLiveness}
+ * verdict. The SINGLE adopter both production kill-paths call — the reason a
+ * "third decision copy" never has to exist.
+ */
+export function voteWorkerLivenessFromRecord(
+  hb: LivenessRecord,
+  inputs: RecordLivenessInputs = {},
+): RecordLivenessVote {
+  const backend = hb.backend;
+  if (backend !== 'docker' && backend !== 'tmux' && backend !== 'subprocess') {
+    return {
+      unavailable: true,
+      reason: `${HOST_SIGNAL_UNAVAILABLE}: heartbeat for ${hb.workerId} has no known backend`,
+    };
+  }
+
+  if (backend === 'docker' || backend === 'tmux') {
+    // The container/pane state must have been collected out-of-band; a sync scan
+    // never spawns to probe it here (that is the async batch-probe's job).
+    if (typeof inputs.cachedProcessAlive !== 'boolean') {
+      return {
+        unavailable: true,
+        reason: `${HOST_SIGNAL_UNAVAILABLE}: no pre-probed ${backend} liveness for ${hb.workerId}`,
+      };
+    }
+    const cached = inputs.cachedProcessAlive;
+    const target = buildLivenessTarget(hb.taskId, backend, {
+      workerId: hb.workerId,
+      tasksDir: inputs.tasksDir,
+    });
+    const verdict = decideWorkerLiveness(target, {
+      isDockerContainerRunning: () => cached,
+      isTmuxPaneAlive: () => cached,
+      now: inputs.now,
+    });
+    return { alive: verdict.alive, reason: verdict.reason };
+  }
+
+  // subprocess: the spawn-free `pid` (kill(0)) + host `.log` activity are the only
+  // honest host signals a synchronous scan can read straight from the record.
+  if (typeof hb.pid !== 'number' && !inputs.tasksDir) {
+    return {
+      unavailable: true,
+      reason: `${HOST_SIGNAL_UNAVAILABLE}: subprocess heartbeat for ${hb.workerId} has no pid and no tasksDir`,
+    };
+  }
+  const target = buildLivenessTarget(hb.taskId, backend, {
+    workerId: hb.workerId,
+    pid: hb.pid,
+    tasksDir: inputs.tasksDir,
+  });
+  const verdict = decideWorkerLiveness(target, { now: inputs.now });
+  return { alive: verdict.alive, reason: verdict.reason };
 }

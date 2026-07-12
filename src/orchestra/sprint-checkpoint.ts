@@ -32,6 +32,10 @@ import type { DependencyGraph } from './dependency-scheduler.js';
 // Sprint 195 195-001 (W-INTEGRITY) — disk-verify gate before recovery NO_GO.
 import { verifyDiskAgainstClaim, DISK_VS_CLAIM_MISMATCH_CHANNEL } from './disk-verify.js';
 import { writeEvent } from './event-stream.js';
+// TT553 adoption (task 420-001) — the checkpoint kill-path defers to the canonical
+// host-primary liveness decision via its single adopter, instead of judging solely
+// from the worker's own `.hb` timestamp (the 412-003 wrong-kill).
+import { voteWorkerLivenessFromRecord } from './heartbeat-monitor.js';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -529,6 +533,30 @@ export function detectStaleWorkers(
       continue;
     }
 
+    // TT553 adoption (task 420-001): consult the canonical HOST-PRIMARY decision
+    // (via the single `voteWorkerLivenessFromRecord` adopter) BEFORE the local
+    // timestamp check. A worker the host reports alive is NOT stale even with a
+    // stale/hardcoded `.hb` timestamp (the 412-003 wrong-kill). This module holds
+    // no out-of-band liveness cache, so docker/tmux report `host-signal-unavailable`
+    // and fall back HONESTLY to the sanctioned `isStaleHeartbeat` mtime behavior;
+    // subprocess uses the spawn-free pid (`kill(0)`) + host `.log` signal.
+    const vote = voteWorkerLivenessFromRecord(
+      {
+        taskId: worker.taskId,
+        workerId: worker.workerId,
+        backend: hb.backend,
+        pid: (hb as Heartbeat & { pid?: number }).pid,
+      },
+      { tasksDir: join(projectRoot, TASKS_DIR), now: () => nowMs },
+    );
+    if ('alive' in vote && vote.alive) {
+      continue; // host signal says alive — suppress the wrong-kill.
+    }
+    if ('unavailable' in vote) {
+      debugLog('sprint-checkpoint:detectStaleWorkers', vote.reason); // honest, not silent
+    }
+    // Host says dead OR host-signal-unavailable → honest fallback to the
+    // pre-existing timestamp staleness check (unchanged behavior).
     if (isStaleHeartbeat(hb, thresholdMs, nowMs)) {
       const hbTime = new Date(hb.timestamp).getTime();
       stale.push({
