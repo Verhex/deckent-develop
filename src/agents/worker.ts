@@ -116,6 +116,35 @@ export {
 } from './worker-log.js';
 export type { WorkerLogAction } from './worker-log.js';
 
+// ─── Re-export: worker-verify-tool.ts (TT555 verify_task tool surface) ──
+// The platform-neutral one-turn verify helper (honest, separately-captured
+// lint+test exit codes — never a `cmd | tail` masked 0) plus the sprint-start
+// env-probe. Lives in orchestra/ (core-only deps, ADR-D-004 C2); surfaced here
+// so every worker entrypoint that already imports the worker module reaches it
+// through one canonical router — the same re-export-as-tool-surface pattern the
+// lock / lifecycle / verify blocks above use.
+export {
+  verifyTask,
+  runVerifyTask,
+  resolveVerifyCommands,
+  spawnCommandRunner,
+  probeToolInventory,
+  formatToolInventory,
+  PROBED_TOOLS,
+} from '../orchestra/worker-verify-tool.js';
+export type {
+  ResolvedVerifyCommands,
+  StackCommandResolver,
+  CommandOutcome,
+  CommandRunner,
+  VerifyStepResult,
+  VerifyTaskResult,
+  VerifyTaskInput,
+  ProbedTool,
+  ToolInventory,
+  ToolExistsFn,
+} from '../orchestra/worker-verify-tool.js';
+
 // ─── Re-export: Lock Operations (core/file-lock.ts) ────────────────
 export { LockError } from '../core/file-lock.js';
 import {

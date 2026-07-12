@@ -10293,3 +10293,26 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 420-002: DEP669A — non-major dependency-bump dilimi: fast-uri · hono · path-to-regexp · undici · ws (⏰2026-07-26) (DONE)
 
 ---
+## Sprint 421 — sprint-421
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-12
+**Duration:** 1317s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1317489ms |
+
+### Tasks
+
+- 421-001: DEP669B — nodemailer 9.x semver-MAJOR bump (GHSA-rcmh + GHSA-p6gq; son 2 istisna) (DONE)
+- 421-002: TT555 — TURN-ECONOMY-2: pipe-exit-maskesi + verify_task tool + artifact-tekrarı + env-probe (veri-kanıtlı) (DONE)
+
+---

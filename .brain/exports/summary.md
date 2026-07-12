@@ -51,6 +51,10 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-421 Learnings** (sprint-421): ## Sprint sprint-421 Learnings
+
+## Gains
+- 421-001 — DEP669B — nodemailer 9.x semver-MAJOR bump (GHSA-rcmh + GHSA-p6g...
 - **Sprint sprint-420 Learnings** (sprint-420): ## Sprint sprint-420 Learnings
 - LIVE668A — decideWorkerLiveness ADOPT (3. deneme; iki gerçek kill-yolu): GO_WITH_TEC...
 - **Sprint sprint-419 Learnings** (sprint-419): ## Sprint sprint-419 Learnings
@@ -71,11 +75,9 @@
 - RC2C — born-652: init gerçek non-interactive akış + EOF-dürüstlüğü (RC-2 kapanış-kil...
 - **Sprint sprint-412 Learnings** (sprint-412): ## Sprint sprint-412 Learnings
 - RC2-A — init outcome-makinesi: READY · SETUP_INCOMPLETE · FAILED dürüst-çıkış (INIT-...
-- **Sprint sprint-411 Learnings** (sprint-411): ## Sprint sprint-411 Learnings
-- RC1-B — subprocess-backend .deck görünürlüğü dürüstlük-dilimi (SEC-02): GO_WITH_TECH...
 
 ## Active Technical Debt
-- [NORMAL] Tech debt from 420-001-fix: CORE COMPLETE (7/8 goCriteria verified). Two product
+- [HIGH] Tech debt from 420-001-fix: CORE COMPLETE (7/8 goCriteria verified). Two product
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -143,5 +145,6 @@
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
+- Violation pattern: stale_heartbeat
 
-_Total entries: 1279 | Generated: 2026-07-12_
+_Total entries: 1283 | Generated: 2026-07-12_

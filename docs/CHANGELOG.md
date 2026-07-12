@@ -9,6 +9,16 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint421] - 2026-07-12
+
+### Added
+
+- DEP669B — nodemailer 9.x semver-MAJOR bump (GHSA-rcmh + GHSA-p6gq; son 2 istisna)
+- TT555 — TURN-ECONOMY-2: pipe-exit-maskesi + verify_task tool + artifact-tekrarı + env-probe (veri-kanıtlı)
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint420] - 2026-07-12
 
 ### Added

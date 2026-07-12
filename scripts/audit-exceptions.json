@@ -1,16 +1,1 @@
-[
-  {
-    "advisoryId": "1113165",
-    "package": "nodemailer",
-    "reason": "Direct dependency (addressparser recursive-call DoS, GHSA-rcmh-qjqh-p98v). Fix requires a semver-major bump (nodemailer 9.0.3+); out of scope for task 419-003 and this worker cannot mutate the lockfile per the Dependency-Mutation Advisory. DEP669A (2026-07-12) bumped fast-uri/hono/path-to-regexp/undici/ws (non-major) but nodemailer stayed explicitly out of scope (semver-major) per DEP669A's own directive — deferred to DEP669B. Temporary short-expiry exception, not a fix.",
-    "owner": "deckent-security-triage",
-    "expires": "2026-07-26T00:00:00Z"
-  },
-  {
-    "advisoryId": "1121191",
-    "package": "nodemailer",
-    "reason": "Direct dependency (raw-option bypass of disableFileAccess/disableUrlAccess enabling arbitrary file read + SSRF, GHSA-p6gq-j5cr-w38f). Same nodemailer package/upstream fix as advisory 1113165 — see that entry's reason. DEP669A (2026-07-12) left nodemailer untouched by directive (DEP669B scope). Temporary short-expiry exception, not a fix.",
-    "owner": "deckent-security-triage",
-    "expires": "2026-07-26T00:00:00Z"
-  }
-]
+[]

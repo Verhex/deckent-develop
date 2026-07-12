@@ -1,5 +1,12 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-421 Learnings
+- Sprint sprint-421 Learnings: ## Sprint sprint-421 Learnings
+
+## Gains
+- 421-001 — DEP669B — nodemailer 9.x semver-MAJOR bump (GHSA-rcmh + GHSA-p6gq; son 2 istisna) — npmAdvisory: escalated nodemailer 6.9.14 -> 9.0.3 as [NPM-ADVISORY] via the .question/.answer cha...
+- 421-002 — TT555 — TURN-ECONOMY-2: pipe-exit-maskesi + verify_task tool + artifact-tekrarı + env-probe (veri-kanıtlı) — TT555 TURN-ECONOMY-2 — prompt-layer + tool-surface only; scheduler/closures untouched (nogo honor...
+
 ## Sprint sprint-420 Learnings
 - Sprint sprint-420 Learnings: ## Sprint sprint-420 Learnings
 - LIVE668A — decideWorkerLiveness ADOPT (3. deneme; iki gerçek kill-yolu): GO_WITH_TECH_DEBT — Worker timeout/killed (exitCode=1) but git diff shows 24 files modified. Brain should reconcile via Spurious NO_GO helpe

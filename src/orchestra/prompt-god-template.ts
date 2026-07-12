@@ -126,6 +126,19 @@ export interface SprintContext {
    */
   preExistingFailures?: number;
   /**
+   * One-line host tool inventory probed at sprint start (TT555 — task 421-002,
+   * waste-class (d)). Sourced by the caller from
+   * `formatToolInventory(probeToolInventory())` (worker-verify-tool.ts) — the
+   * probe is a side-effecting PATH check that MUST stay out of this pure,
+   * deterministic compiler, so it is injected as a resolved string exactly like
+   * {@link SprintContext.preExistingFailures}. Rendered by {@link buildEnvProbeBlock}
+   * into an `env-probe` block (e.g. `python3=yes docker=no rg=yes`) so a worker
+   * does not burn a trial-and-error turn discovering an absent tool. `undefined`
+   * (the default until a caller wires it) → NO block, so the compiled prompt is
+   * byte-for-byte identical to the pre-TT555 output and every prompt pin holds.
+   */
+  toolInventory?: string;
+  /**
    * Leading-T0 cache reorder (Sprint 330 330-019 — provider-agnostic prompt cache).
    *
    * EXPERIMENTAL, default-OFF ({@link DEFAULT_LEADING_T0_REORDER}). When true the
@@ -221,6 +234,35 @@ Every conversation turn re-sends cached context — fewer turns beats fewer toke
 2. Do not re-read a file already in your context unless its on-disk state changed since your last read.
 3. Run lint/build + targeted tests once per logical block of edits, not after every micro-edit — the max-3-attempt verify rule above already caps retries; do not burn turns on early, incomplete verify runs.
 4. When drafting your .plan file, gather every target file's content in ONE turn (parallel reads) before writing the plan.`;
+
+/**
+ * Pipe-exit honesty directive (TT555 — task 421-002, waste-class (a)).
+ *
+ * trace-audit 555 (413-001/003 live): a worker piped a failing check through a
+ * pager (`cmd 2>&1 | tail`); the shell reports the PIPELINE's exit status — the
+ * pager's 0 — so the failure surfaced as `is_error:false` and the worker burned
+ * a whole turn re-running it. This compact, task-invariant T0 directive teaches
+ * the un-masked read (`${PIPESTATUS[0]}` / separate-line `$?` / the verify_task
+ * helper). Pinned ≤400 chars by tests/orchestra/turn-economy-2.test.ts so it
+ * cannot silently grow. Concatenated into the shared 'karpathy' T0 segment next
+ * to {@link TURN_ECONOMY_BLOCK} (same closed-registry-kind rationale) — not a new
+ * PromptSegmentKind.
+ */
+const PIPE_EXIT_BLOCK = `## Pipe-Exit Honesty
+A failing command piped to a pager (\`cmd | tail\`) reports the PIPE's exit code — the pager's 0 — so a real failure reads back as \`is_error:false\` and you burn a turn. NEVER pipe a check to \`tail\`/\`head\`. Read the TRUE code: bash \`\${PIPESTATUS[0]}\`, or run the command unpiped and read \`$?\` on the NEXT line, or call verify_task (separate check/test exit codes).`;
+
+/**
+ * Artifact-reuse directive (TT555 — task 421-002, waste-class (c)).
+ *
+ * 413-002/003 re-ran `npm pack` / build inside the same sprint, regenerating an
+ * artifact an earlier task had already produced. This is the RULE half (the
+ * mechanism — a real artifact cache under `.tasks/artifacts/<sprint>/` — is
+ * born-660-continuation work): tell the worker to reuse an existing artifact
+ * rather than regenerate it. Task-invariant → folded into the 'karpathy' T0
+ * segment alongside {@link PIPE_EXIT_BLOCK}.
+ */
+const ARTIFACT_REUSE_BLOCK = `## Artifact Reuse
+If a pack/build artifact already exists under \`.tasks/artifacts/<sprint>/\`, REUSE it — do not re-run \`npm pack\`/build to regenerate an artifact an earlier task in this sprint already produced.`;
 
 /**
  * Dependency-mutation advisory (born-454, sprint-356 live incident). The worker
@@ -380,6 +422,7 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
     idempotencyKey,
     emitIdempotency: boilerplate.idempotency,
     preExistingFailures: ctx.preExistingFailures,
+    toolInventory: ctx.toolInventory,
   });
 
   // Leading-T0 reorder (default-OFF): regroup tiers (T0→T1→T2) for the longest
@@ -540,6 +583,28 @@ export function buildSmokeNote(smoke?: { command: string; expect: string }): str
   return `## Proof-of-Function Smoke (Tier-1)
 A \`Smoke:\` proof command is attached to this task: \`${smoke.command}\`${expect}.
 This host-smoke is run by Brain ON THE HOST after your task completes (with a real auth token) — it is Brain's gate, NOT yours. You do NOT need to run it inside your container. If the command fails inside your sandbox (missing host binary, unbindable port, or absent token), that is EXPECTED — do NOT mark NO_GO for a sandbox smoke failure. Make your code changes land and your targeted tests pass; Brain runs the real smoke host-side.`;
+}
+
+// ─── Env-Probe Block Builder (TT555 — task 421-002, waste-class d) ──────
+
+/**
+ * Render the sprint-start host tool-inventory block from the caller-probed
+ * one-line inventory (SprintContext `toolInventory`).
+ *
+ * PURE: takes the already-resolved inventory STRING (the side-effecting PATH
+ * probe lives in worker-verify-tool.ts's {@link import('./worker-verify-tool.js').probeToolInventory},
+ * invoked by the caller at sprint start), so the compiler stays deterministic and
+ * hermetic. Returns '' when the inventory is absent/blank so the section — header
+ * included — is omitted entirely, keeping the default prompt byte-for-byte
+ * identical (no cache-prefix split, no pin churn). Emitted as a volatile T2
+ * segment (`env-probe`): the inventory varies per HOST, so it must never land in
+ * the shared T0/T1 cache prefix (classifyTier maps the unregistered kind to T2).
+ */
+export function buildEnvProbeBlock(toolInventory?: string): string {
+  const inv = (toolInventory ?? '').trim();
+  if (inv.length === 0) return '';
+  return `## Environment Tool Inventory
+Probed on THIS host at sprint start — do not spend a turn re-discovering these: ${inv}. A tool marked \`no\` is absent here; reach for an available alternative (e.g. \`python3=no\` → use a Node.js one-liner) instead of invoking it and failing.`;
 }
 
 // ─── Conditional Boilerplate Gating (PROMPT-W1 d) ──────────────────────
@@ -1187,6 +1252,8 @@ interface RenderInput {
   emitIdempotency: boolean;
   /** Live pre-existing test-failure count at the sprint baseline (WP-14); undefined when uncaptured. */
   preExistingFailures?: number;
+  /** One-line host tool inventory (TT555); undefined → no env-probe block. */
+  toolInventory?: string;
 }
 
 /**
@@ -1314,7 +1381,7 @@ export function buildExitPathTestHint(task: {
 }
 
 function renderSegments(input: RenderInput): PromptSegment[] {
-  const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, task, effort, idempotencyKey, emitIdempotency, preExistingFailures } = input;
+  const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, task, effort, idempotencyKey, emitIdempotency, preExistingFailures, toolInventory } = input;
 
   // Tier-tagged assembly (Sprint 330 330-019). Push order below IS the default
   // production order — `buildTaskPromptSegmented` joins these contents with
@@ -1322,7 +1389,12 @@ function renderSegments(input: RenderInput): PromptSegment[] {
   // pre-330-019 `sections.join('\n\n')`. The {@link PromptTier} tags drive the
   // optional (default-OFF) leading-T0 cache reorder and the protected-set guard.
   const segments: PromptSegment[] = [];
-  const push = (tier: PromptTier, kind: PromptSegmentKind, content: string): void => {
+  // `kind` is widened to `PromptSegmentKind | string` (the same type PromptSegment.kind
+  // already allows) so a task-specific, unregistered kind — e.g. TT555's volatile
+  // 'env-probe' — can be emitted without editing the closed PromptSegmentKind registry
+  // (prompt-segmentation.ts, out of this task's write scope). classifyTier maps any
+  // unregistered kind to T2, so such a segment can never poison the shared T0/T1 prefix.
+  const push = (tier: PromptTier, kind: PromptSegmentKind | string, content: string): void => {
     segments.push({ tier, kind, content });
   };
 
@@ -1371,6 +1443,15 @@ ${dodBlock}${idempotencyBlock}`);
 3. Write the code changes described above
 4. Doc-impact: if your change makes any doc/ADR text stale, do NOT edit docs outside your write authority — add a \`docImpact:\` line to your .result \`notes\` naming the doc + what became stale (the orchestrator turns these into follow-up tasks). Only edit a doc that is explicitly IN your write list.
 5. Report: write your result file to .tasks/task-${task.id}.result`);
+
+  // Env-probe (TT555 — waste-class d): a one-line host tool inventory probed at
+  // sprint start, injected right after "What To Do" so the worker sees which
+  // tools exist BEFORE it acts. Empty when the caller passed no inventory →
+  // omitted (byte-for-byte legacy prompt). Volatile per-host → T2 ('env-probe'
+  // is an unregistered kind: classifyTier maps it to T2, so it never poisons the
+  // shared T0/T1 cache prefix).
+  const envProbeBlock = buildEnvProbeBlock(toolInventory);
+  if (envProbeBlock) push('T2', 'env-probe', envProbeBlock);
 
   // Verify steps — Sprint 250 MF-1: Tier-0 doc-only tasks must NOT run the full
   // test suite. The prompt previously told EVERY worker to run the project test
@@ -1473,15 +1554,17 @@ Field shapes (strict — a wrong shape here breaks the orchestrator's result par
 ${buildDodChecklist(task.goNogo?.goCriteria)}
 CRITICAL: never exit without writing the .result file — even on failure, write selfAssessment "NO_GO" with error details. A missing result file stalls the entire sprint.`);
 
-  // Karpathy 4-discipline cognitive anchor + Turn Economy directive (born-636-K1) —
-  // both global T0, unconditional (every task, doc or code), concatenated into ONE
-  // 'karpathy' segment. Folded into the existing registered kind rather than a new
-  // 'turn-economy' kind: PromptSegmentKind (prompt-segmentation.ts) is a closed
-  // registry backing a Readonly<Record<...>> SSOT (TIER_BY_KIND) that a dedicated
-  // guard test (prompt-segmentation.test.ts) checks every emitted segment against —
-  // adding an unregistered kind there is out of this task's write scope, so the two
-  // task-invariant cognitive-anchor blocks share the segment instead.
-  push('T0', 'karpathy', `${KARPATHY_ESSENCE}\n\n${TURN_ECONOMY_BLOCK}`);
+  // Karpathy 4-discipline anchor + Turn Economy (born-636-K1) + Pipe-Exit Honesty
+  // + Artifact Reuse (TT555 task 421-002) — all global T0, unconditional (every
+  // task, doc or code), concatenated into ONE 'karpathy' segment. Folded into the
+  // existing registered kind rather than new kinds: PromptSegmentKind
+  // (prompt-segmentation.ts) is a closed registry backing a Readonly<Record<...>>
+  // SSOT (TIER_BY_KIND) that a dedicated guard test (prompt-segmentation.test.ts)
+  // checks every emitted segment against — adding an unregistered T0 kind there is
+  // out of this task's write scope, so these task-invariant cognitive-anchor blocks
+  // share the segment instead. (PIPE_EXIT_BLOCK is separately ≤400-char pinned; the
+  // Turn Economy ≤1200 footprint pin measures its own constant and is unaffected.)
+  push('T0', 'karpathy', `${KARPATHY_ESSENCE}\n\n${TURN_ECONOMY_BLOCK}\n\n${PIPE_EXIT_BLOCK}\n\n${ARTIFACT_REUSE_BLOCK}`);
 
   // Shared Context (Sprint 278 COMM-1 / 278-003) — appended LAST, after every
   // shared/structural section, so this per-spawn-variable block sits in the most

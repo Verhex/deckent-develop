@@ -1,58 +1,57 @@
-# DIRECTIVES — SPRINT-420: LIVE668A-YENİDEN + DEP-BUMP-A (⏰2026-07-26)
+# DIRECTIVES — SPRINT-421: DEP669B NODEMAILER-MAJOR + TT555 TURN-ECONOMY-2
 
 ## Goal
-LIVE668A üçüncü-deneme (kök çözüldü: heartbeat_timeout 120→600s — task artık kill-korumalı) +
-born-669 DEP-BUMP treninin non-major dilimi (istisna-expiry ⏰2026-07-26; RC-6 kapanış-ön-şartı).
-**TRACE-task'ı model=opus (Alperen).**
+born-669 son-dilimi (nodemailer semver-MAJOR ×2 advisory; ⏰2026-07-26) + TT555 turn-economy
+(TRACE-treni P1; **model=opus** Alperen). SSOT: MASTER-PLAN 562 + 555; memory
+project_trace_truth_train_2026_07_12.
 
 ## 🔒 BAĞLAYICI (her task)
 - Yalnız kendi Files'ına yaz · `.deckent/`, `.brain/`, `.tasks/` DOKUNMA · git stash-reset YASAK · `npm run build` YASAK · notes TEK STRING · Self DÜRÜST.
-- REPRODUCE-FIRST; test hermetik (tmpdir, async spawn, ≤16GB); 20dk-forensik-sınırı.
+- REPRODUCE-FIRST; test hermetik (tmpdir, async spawn, ≤16GB); 20dk-forensik-sınırı — envanter kısa, koda erken.
 
-## Task 1: LIVE668A — decideWorkerLiveness ADOPT (3. deneme; iki gerçek kill-yolu)
-- Model: opus | Agent: bug-fixer | Effort: high | Provider: claude
-- Files: src/monitor/auditor.ts, src/orchestra/sprint-checkpoint.ts, src/orchestra/heartbeat-monitor.ts, tests/orchestra/liveness-adopt.test.ts
-- Scope: src/monitor/, src/orchestra/, tests/orchestra/
-- Dependencies: none
-### Description
-ÖNCEKİ İKİ DENEME worker-timeout kurbanı oldu (kök: heartbeat_timeout=120s < opus-düşünme-turu;
-şimdi 600s — İRONİ: bu task tam o mekanizmayı düzeltiyor). KANIT (418-002 debt'i): canonical
-`decideWorkerLiveness` (src/orchestra/heartbeat-monitor.ts) hazır+testli AMA iki GERÇEK kill-yolu
-eski-yolda: (a) src/monitor/auditor.ts::isWorkerStale mtime-PRIMARY, (b) src/orchestra/
-sprint-checkpoint.ts::isStaleHeartbeat/detectStaleWorkers dosya-içi hb.timestamp. GÖREV: (1) iki
-yol da decideWorkerLiveness'ı çağırır (üçüncü-kopya YASAK); host-sinyal girdileri mevcut
-kayıtlardan; sağlanamayan ortamda DÜRÜST-fallback (eski mtime-davranışı + karar-log'unda
-'host-signal-unavailable'); (2) RED-first ×2 (auditor-yolu ve checkpoint-yolu ayrı): bayat-ts +
-canlı-host fixture'ında bugün kill çıktığını kanıtla → GREEN; (3) BONUS (aynı modül):
-heartbeat-monitor.ts'teki 3 spawnSync-probe async-spawn'a çevrilir (sanction geri-alınır —
-scripts/spawnsync-baseline.json'a DOKUNMA, o CC-işi); (4) checkpoint-v2/550-normalize bölgeleri
-byte-korunur. HIZLI ÇALIŞ: envanter-not kısa, koda erken gir.
-### goNogo
-- goCriteria: iki kill-yolu canonical-çağrılı (kopya-yok grep-kanıtı); 2× RED→GREEN; dürüst-fallback testli; spawnSync→async (modül-içi); korunan-bölgeler diff-kanıtlı; tests/orchestra+monitor yeşil.
-- nogo: üçüncü karar-kopyası NO_GO; sessiz-fallback NO_GO.
-
-## Task 2: DEP669A — non-major dependency-bump dilimi: fast-uri · hono · path-to-regexp · undici · ws (⏰2026-07-26)
+## Task 1: DEP669B — nodemailer 9.x semver-MAJOR bump (GHSA-rcmh + GHSA-p6gq; son 2 istisna)
 - Model: sonnet | Agent: bug-fixer | Effort: high | Provider: claude
-- Files: package.json, package-lock.json, scripts/audit-exceptions.json, docs/reference/dependencies.md, tests/release/dep-bump-audit.test.ts
-- Scope: package.json, package-lock.json, scripts/, docs/reference/, tests/release/
+- Files: package.json, package-lock.json, scripts/audit-exceptions.json, docs/reference/dependencies.md, src/connectors/email-connector.ts, tests/connectors/email-nodemailer-major.test.ts
+- Scope: package.json, package-lock.json, scripts/, docs/reference/, src/connectors/, tests/connectors/, tests/release/
 - Dependencies: none
 ### Description
-İZİN-NOTU: bu task lockfile-mutasyonuna AÇIKÇA yetkilidir (NPM-ADVISORY istisnası — Brain-onaylı;
-yalnız listedeki paketler). KANIT (born-669 + scripts/audit-exceptions.json): 8 high-advisory
-kısa-expiry istisnayla yaşıyor; ⏰2026-07-26'da CI bilinçli kırmızıya döner. BU DİLİM yalnız
-NON-MAJOR bump'lar: fast-uri (GHSA-q3j6+v39h) · hono (GHSA-88fw) · path-to-regexp (GHSA-j3q9) ·
-undici (GHSA-vxpw — discord.js'in gerektirdiği aralıkta kalınabiliyorsa; major gerekiyorsa ATLA +
-notes'a) · ws (GHSA-96hv — direkt, minor/patch aralığında kalınabiliyorsa). nodemailer (semver-
-MAJOR) KAPSAM-DIŞI — DEP669B'ye. GÖREV: (1) her paket için minimal-yeterli bump (`npm ls <pkg>`
-zincir-envanteri notes'a; override/resolution gerekiyorsa package.json overrides bloğu — gerekçeli);
-(2) bump SONRASI `node scripts/check-dependency-audit.mjs` → kapanan advisory'lerin İSTİSNALARI
-audit-exceptions.json'dan SİLİNİR (kapanmayan kalır); (3) ADR-D-005: docs/reference/dependencies.md'ye
-her bump satırı (paket, eski→yeni, advisory, gerekçe); (4) test: dep-bump-audit.test.ts —
-audit-script'i gerçek-koşup 'silinen-istisnaların advisory'leri artık bulgu-listesinde YOK' pinler;
-(5) BLAST: değişen paketleri kullanan aileler (hono→api/gateway testleri; ws→connectors;
-path-to-regexp→api-routing; undici→connectors) + tests/api tests/connectors tam koşu — kırılan
-varsa minimal-uyum fix'i (davranış-koruyucu) ya da o paketi GERİ AL + dürüst-not.
-Smoke: node scripts/check-dependency-audit.mjs → kalan-istisna sayısı azaldı, exit 0
+İZİN-NOTU: lockfile-mutasyonuna AÇIKÇA yetkilisin (yalnız nodemailer-zinciri). KANIT: kalan son
+2 audit-istisnası nodemailer (direkt-bağımlılık; GHSA-rcmh addressparser-DoS + GHSA-p6gq
+raw-option dosya-okuma/SSRF) — fix 9.0.3+ SEMVER-MAJOR. GÖREV: (1) nodemailer'ın gerçek
+kullanım-yüzeyini envanterle (grep import/createTransport/sendMail — hangi dosyalar, hangi
+API'ler; notes'a); (2) 9.x'e bump + MAJOR breaking-change'leri changelog'dan tara (Node-floor,
+transport-API, TLS-default'ları) ve dokunan kullanım-noktalarını DAVRANIŞ-KORUYUCU uyarla;
+(3) audit-exceptions.json'dan 2 nodemailer-istisnasını SİL + `node scripts/check-dependency-audit.mjs`
+→ SIFIR-istisna PASS kanıtı; (4) dependencies.md major-bump satırı (ADR-D-005 rationale);
+(5) test: email-yüzeyinin mevcut testleri + yeni major-uyum testi (transport-oluşturma +
+send-yolu mock-SMTP'yle; gerçek-mail YOK); tests/connectors tamamı + smoke.
+Smoke: node scripts/check-dependency-audit.mjs → 0 finding, 0 exception, PASS
 ### goNogo
-- goCriteria: non-major bump'lar uygulanmış + zincir-envanteri; kapanan istisnalar silinmiş (script-kanıt); dependencies.md satırları; blast-aileleri yeşil (ya da geri-alım+dürüst-not); nodemailer'a DOKUNULMAMIŞ.
-- nogo: semver-major sızarsa NO_GO; istisna-silmeden 'kapandı' denirse NO_GO; blast koşulmadan DONE NO_GO.
+- goCriteria: nodemailer 9.x + kullanım-envanteri + breaking-uyum davranış-koruyucu; istisnalar silinmiş + audit SIFIR-istisna PASS; dependencies.md satırı; tests/connectors yeşil.
+- nogo: istisna silinmeden PASS iddiası NO_GO; kullanım-yüzeyi envantersiz bump NO_GO; başka paket lockfile'da oynarsa NO_GO.
+
+## Task 2: TT555 — TURN-ECONOMY-2: pipe-exit-maskesi + verify_task tool + artifact-tekrarı + env-probe (veri-kanıtlı)
+- Model: opus | Agent: bug-fixer | Effort: high | Provider: claude
+- Files: src/agents/worker.ts, src/orchestra/prompt-god-template.ts, src/orchestra/worker-verify-tool.ts, tests/orchestra/turn-economy-2.test.ts
+- Scope: src/agents/, src/orchestra/, tests/orchestra/
+- Dependencies: none
+### Description
+KANIT (trace-audit 555; 413-002/003 verisi: sürenin %96.9'u API; cache zaten %96-98 — çarpan
+TURN-SAYISI): dört veri-kanıtlı israf-sınıfı: (a) `2>&1 | tail` EXIT-CODE-MASKESİ — başarısız
+test is_error:false görünüyor (413-001/003 canlı; worker bir tur daha yakıyor); (b) verify-döngüsü
+platform-bağımlı elle-komutlarla (mükerrer tur); (c) aynı-sprint'te mükerrer npm-pack/artifact
+(413-002/003); (d) env-probe yokluğu (python3-yok→Node-tekrarı sınıfı). GÖREV (worker-PROMPT +
+tool-yüzeyi katmanı — scheduler'a DOKUNMA): (1) worker god-prompt'una PIPE-EXIT kuralı bölümü
+(≤400-char pin'li; `${PIPESTATUS[0]}`/ayrı-echo deseni + tail-maskesinin yasaklanması) — K1
+turn-economy bölümünün yanına, boyut-pin testine uy; (2) YENİ worker-verify-tool.ts: platform-nötr
+`verify_task` yardımcı-aracı (lint+test komutlarını proje-config'ten çözer, exit-code'ları
+AYRI-AYRI dürüst döndürür — tek turda verify; worker.ts tool-kaydına ekle; DIKKAT: 29-tool
+yüzey-pinleri varsa say-güncelle); (3) sprint-başı ENV-PROBE bloğu: worker-prompt'a mevcut
+araç-envanteri (python3/docker/rg var-yok) tek-satır enjekte — deneme-yanılma turu ölür; (4)
+artifact-tekrarı için prompt-kuralı: 'pack/build çıktısı .tasks/artifacts/<sprint>/ altında varsa
+YENİDEN üretme' (mekanizma değil kural — mekanizma born-660-devamına); (5) RED-first: (a)-maskesi
+için tail'li-komut fixture'ında is_error:false kanıtı → GREEN: verify_task ile dürüst-fail.
+Prompt-değişiklikleri boyut-pin testleriyle uyumlu (grep mevcut pin'leri).
+### goNogo
+- goCriteria: pipe-exit kuralı + boyut-pin uyumu; verify_task tool (ayrı-exit-code'lu, platform-nötr) kayıtlı + tool-sayı-pinleri senkron; env-probe enjekte testli; RED(maske)→GREEN(dürüst-fail); tests/orchestra+agents yeşil.
+- nogo: scheduler/closure'lara dokunulursa NO_GO; tool-sayı-pini kırık kalırsa NO_GO; prompt-pin aşılırsa NO_GO.

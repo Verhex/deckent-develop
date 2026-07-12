@@ -49,6 +49,46 @@ Non-major security bumps applied against `scripts/audit-exceptions.json` high/cr
 (`9.0.3+`) and stays on the short-expiry exception list — explicitly out of scope for DEP669A,
 deferred to DEP669B.
 
-_Last updated: 2026-07-12 (DEP669A: non-major security bump slice — fast-uri, hono,
-path-to-regexp, undici (via override), ws; F11 fix: telegraf → grammy; added nodemailer + openai
-optional deps)_
+### DEP669B — nodemailer 9.x bump: usage-surface inventory + breaking-change analysis (blocked, not applied)
+
+Investigated for the `9.0.3+` semver-major bump closing `GHSA-rcmh-qjqh-p98v` (addressparser
+recursion DoS, fixed `7.0.11`) and `GHSA-p6gq-j5cr-w38f` (`raw` option bypasses
+`disableFileAccess`/`disableUrlAccess`, fixed `9.0.1`) — the higher floor of the two, `9.0.1`,
+governs; `9.0.3` additionally hardens STARTTLS/socket handling and HTTP-proxy CONNECT.
+
+- **Usage surface** (full inventory, `grep -r nodemailer src/`): exactly two files reference
+  the package — `src/connectors/capabilities/mail-transport.ts` (the only real usage: dynamic
+  `import('nodemailer')` → `createTransport({ host, port, secure, auth })` → wrapped
+  `sendMail()`) and `src/connectors/voice/openai-voice.ts` (a comment only, no API call).
+  The `send_mail` capability (`src/connectors/capabilities/builtin/send-mail.ts`) is the sole
+  caller, building `{ from, to, subject, text, attachments: [{ filename, path }] }` — always
+  **local artifact-store paths**, never the `raw` option, never SES, never OAuth2.
+- **Breaking-change impact on this usage surface: none.** `7.0.0` removes the legacy AWS SES
+  SDK (v2/v3) — not used (SMTP only). `8.0.0` renames error code `'NoAuth'` → `'ENOAUTH'` —
+  not used (no error-code string matching in this codebase). `9.0.0` enables TLS-certificate
+  validation by default for *remote HTTPS fetches* (attachments-by-URL, OAuth2 endpoints,
+  proxies) — not used (attachments are always local paths; no OAuth2 transport). A behavior-
+  preserving bump for this codebase's actual call shape would be a drop-in version change with
+  no source adaptation required.
+- **Blocked — not applied.** This worker's write scope does not include `package.json` /
+  `package-lock.json`, and the workspace's Dependency-Mutation Advisory prohibits a worker from
+  running any install/update against the shared lockfile regardless of task-level authorization
+  claims (escalated via the `[NPM-ADVISORY]` question channel — host confirmed: not approved
+  inside the workspace). `tests/release/dep-bump-audit.test.ts` (outside this worker's write
+  scope) currently pins `nodemailer` at `^6.9.14` and asserts exactly the 2 exceptions below
+  remain — both must be updated **together, host-side**, in the same change as the actual
+  `npm install nodemailer@9.0.3` lockfile mutation, or the pinned test breaks. The 2 exceptions
+  in `scripts/audit-exceptions.json` therefore remain in place (removing them without the real
+  fix installed would make `check-dependency-audit.mjs` fail-closed on the still-present
+  findings). Static usage-surface guard tests added in
+  `tests/connectors/email-nodemailer-major.test.ts` lock in the "no breaking-surface usage"
+  findings above so a future host-side bump has an automated regression check.
+- **Next step (host-side):** `npm install nodemailer@^9.0.3` (updates `package.json` +
+  `package-lock.json`), then in the same change remove the 2 `nodemailer` rows from
+  `scripts/audit-exceptions.json`, update `tests/release/dep-bump-audit.test.ts`'s pinned
+  version/exception-count assertions, and bump the `nodemailer` row above to `^9.0.3`.
+
+_Last updated: 2026-07-12 (DEP669B: nodemailer 9.x usage-surface inventory + breaking-change
+analysis — bump itself blocked pending host-side lockfile mutation, see above; DEP669A:
+non-major security bump slice — fast-uri, hono, path-to-regexp, undici (via override), ws;
+F11 fix: telegraf → grammy; added nodemailer + openai optional deps)_

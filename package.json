@@ -120,7 +120,7 @@
   },
   "optionalDependencies": {
     "discord.js": "^14.26.3",
-    "nodemailer": "^6.9.14",
+    "nodemailer": "^9.0.3",
     "openai": "^4.103.0"
   },
   "overrides": {
