@@ -63,6 +63,16 @@ export interface TerminalConfig {
    * config value when both are present.
    */
   native_agent?: boolean;
+  /**
+   * TERM-FLOW-UNIFY Sprint-1 dilim (422-001,
+   * docs/analysis/term-flow-unify-design-2026-07-11.md): gates the
+   * host-owned RunFlow state machine (`core/run-flow-contract.ts` +
+   * `orchestra/run-flow-reducer.ts`). Opt-in — absent/`false` = off
+   * (default: false). Unlike `native_agent` above, undefined here means OFF,
+   * not ON — this slice ships contract + pure reducer only, with ZERO
+   * production caller; no code reads this flag yet.
+   */
+  run_flow_v2?: boolean;
 }
 
 // ─── Resource Monitor Config ────────────────────────────────────────

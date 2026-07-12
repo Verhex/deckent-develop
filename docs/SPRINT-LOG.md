@@ -10316,3 +10316,26 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 421-002: TT555 — TURN-ECONOMY-2: pipe-exit-maskesi + verify_task tool + artifact-tekrarı + env-probe (veri-kanıtlı) (DONE)
 
 ---
+## Sprint 422 — sprint-422
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-12
+**Duration:** 957s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 956916ms |
+
+### Tasks
+
+- 422-001: TERM1 — run-flow-contract + reducer: typed RunProposal→…→Completion durum-makinesi (flag'li, production-caller YOK) (DONE)
+- 422-002: TT556 — PLANNER-PREFLIGHT: scope-satisfiability genişletme + gate-false-positive ailesi (born-661+650+653) (GO_WITH_TECH_DEBT)
+
+---

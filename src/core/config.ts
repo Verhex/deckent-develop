@@ -228,7 +228,13 @@ export const DEFAULT_AUTO_DOCS: AutoDocsConfig = {
 // "undefined" as the native-ON default, only `false` as the rollback signal.
 // Baking `native_agent: true` into this const would change its key-shape,
 // which tests/core/config-terminal.test.ts locks with an exact `toEqual`
-// snapshot — the default lives in the call-site check instead. Both
+// snapshot — the default lives in the call-site check instead. TERM-FLOW-
+// UNIFY Sprint-1 (422-001) adds a second absent-by-default field for the
+// same key-shape reason: `run_flow_v2` (default OFF, opposite direction
+// from `native_agent`'s default-ON) has no reader yet this slice, so there
+// is no call site to bake a default into at all — omission here already
+// resolves it to `undefined` (falsy / off), which is exactly what the flag
+// needs. Both
 // loadConfig and mergeConfigs already deepMerge `config.terminal` over this
 // const in one shared line each, so a project's
 // `{ terminal: { native_agent: false } }` override still reaches both

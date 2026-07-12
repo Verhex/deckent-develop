@@ -4,12 +4,13 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-420-001-fix | Tech debt from 420-001-fix: CORE COMPLETE (7/8 goCriteria verified). Two product | high | sprint-420 | active |
+| debt-420-001-fix | Tech debt from 420-001-fix: CORE COMPLETE (7/8 goCriteria verified). Two product | critical | sprint-420 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-422-002 | Timeout-partial from 422-002: worker killed mid-execution, work accepted | normal | sprint-422 | resolved |
 | debt-419-001 | Timeout-partial from 419-001: worker killed mid-execution, work accepted | normal | sprint-419 | resolved |
 | debt-419-003 | Tech debt from 419-003: Implemented the SEC-05 fail-closed dependency-audit gate | normal | sprint-419 | resolved |
 | debt-418-001 | Tech debt from 418-001: TT554 METERING-TRUTH — 4 kalem RED→GREEN, evidence-refer | normal | sprint-418 | resolved |

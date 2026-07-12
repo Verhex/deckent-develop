@@ -1,5 +1,12 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-422 Learnings
+- Sprint sprint-422 Learnings: ## Sprint sprint-422 Learnings
+- TT556 — PLANNER-PREFLIGHT: scope-satisfiability genişletme + gate-false-positive ailesi (born-661+650+653): GO_WITH_TECH_DEBT — Worker timeout/killed (exitCode=1) but git diff shows 24 files modified. Brain should reconcile via Spurious NO_GO helpe
+
+## Gains
+- 422-001 — TERM1 — run-flow-contract + reducer: typed RunProposal→…→Completion durum-makinesi (flag'li, production-caller YOK) — TERM1 Sprint-1 dilim: run-flow-contract.ts (src/core/) defines the Net Öneri state set (COLLECTIN...
+
 ## Sprint sprint-421 Learnings
 - Sprint sprint-421 Learnings: ## Sprint sprint-421 Learnings
 
