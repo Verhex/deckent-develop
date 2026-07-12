@@ -75,8 +75,18 @@ function runCmd(cmd, args, cwd, timeoutMs, env) {
     let stderr = '';
     proc.stdout?.on('data', (d) => { stdout += d.toString(); });
     proc.stderr?.on('data', (d) => { stderr += d.toString(); });
-    proc.on('error', (err) => resolvePromise({ exitCode: -1, stdout, stderr: `${stderr}\n${err.message}` }));
-    proc.on('close', (code) => resolvePromise({ exitCode: code ?? 1, stdout, stderr }));
+    proc.on('error', (err) => resolvePromise({ exitCode: -1, timedOut: false, stdout, stderr: `${stderr}\n${err.message}` }));
+    // Spawn-timeout kills the child (SIGTERM) → close fires with code=null.
+    // Surface that HONESTLY as timedOut instead of masking it as exit 1 —
+    // the first two windows-latest CI legs failed exactly on this mask
+    // (born-665 forensics: init exceeded 120s because `--yes` silently
+    // npm-installs three provider CLIs, ~2min on the runner; born-666).
+    proc.on('close', (code, signal) => resolvePromise({
+      exitCode: code ?? 1,
+      timedOut: code === null && signal !== null,
+      stdout,
+      stderr,
+    }));
   });
 }
 
@@ -171,7 +181,10 @@ async function main() {
     const initTarget = join(tmpRoot, 'init-target');
     mkdirSync(initTarget, { recursive: true });
     stepLog('init', `deckent init --yes (non-interactive) in ${initTarget}`);
-    const initResult = await runCmd('deckent', ['init', '--yes'], initTarget, 120_000, runnerEnv);
+    // 420s: `--yes` currently auto-installs 3 provider CLIs (~2min on slow
+    // runners — born-666 decision pending); headroom so timeout means "hung",
+    // not "network was slow".
+    const initResult = await runCmd('deckent', ['init', '--yes'], initTarget, 420_000, runnerEnv);
     const initOutput = `${initResult.stdout}\n${initResult.stderr}`;
     const hasOutcomeBlock = /Setup outcome:|Kurulum sonucu:/.test(initOutput);
     if (!hasOutcomeBlock) {
@@ -190,7 +203,10 @@ async function main() {
         : '(stderr was empty)';
       throw new SmokeStepError(
         'init',
-        `exit code ${initResult.exitCode} outside the accepted contract `
+        initResult.timedOut
+          ? `TIMED OUT (killed by smoke harness) — not an exit-code contract failure; `
+            + `likely cause: --yes auto-provisioning network installs (born-666)`
+          : `exit code ${initResult.exitCode} outside the accepted contract `
         + `{0=READY, 2=SETUP_INCOMPLETE}; 1=FAILED\n`
         + `--- combined output (last 2000 chars) ---\n${initOutput.slice(-2000)}\n`
         + `--- stderr only (last 20 lines) ---\n${stderrTail}`,
