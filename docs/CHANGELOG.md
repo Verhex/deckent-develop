@@ -9,6 +9,20 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint418] - 2026-07-12
+
+### Added
+
+- SEC04 — model-catalog fetch'i lazy: her CLI-komutu network'e çıkmasın (RC-6 dilimi)
+
+### Changed
+
+- TT554 — METERING-TRUTH: tarife/capability-drift + ledger-eksiği + estimator + reporter (COST-10X ölçüm-tabanı) (completed with tech debt)
+- TT553 — HOST-LIFECYCLE: heartbeat HOST-sinyaline döner (worker dosya-disiplini ölür) (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 2 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint417] - 2026-07-11
 
 ### Added

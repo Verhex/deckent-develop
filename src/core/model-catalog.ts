@@ -95,6 +95,13 @@ export interface CatalogLoadOptions {
   timeoutMs?: number;
   /** Now provider for deterministic tests. */
   now?: () => number;
+  /**
+   * SEC-04 (task 418-003): called immediately before a live network fetch
+   * is attempted — never when serving from a warm cache and never in
+   * offline mode. Lets callers surface a one-line network-policy notice
+   * without duplicating the cache-warmth/offline decision made here.
+   */
+  onFetchAttempt?: () => void;
 }
 
 // ─── Provider Mapping ──────────────────────────────────────────────────────
@@ -346,6 +353,7 @@ export async function loadCatalog(
       };
     }
 
+    opts.onFetchAttempt?.();
     try {
       const fresh = await fetchRemoteCatalog(url, {
         fetchImpl: opts.fetchImpl,
@@ -417,6 +425,8 @@ let _catalogBootstrapped = false;
 interface BootstrapOptions {
   offline?: boolean;
   force?: boolean;
+  /** SEC-04 (task 418-003) — see CatalogLoadOptions.onFetchAttempt. */
+  onFetchAttempt?: () => void;
   /** @internal test seam */
   _fetchImpl?: typeof fetch;
   /** @internal test seam */
@@ -485,6 +495,7 @@ export async function bootstrapFromCatalog(opts?: BootstrapOptions): Promise<voi
       forceRefresh: opts?.force,
       fetchImpl: opts?._fetchImpl,
       cachePath: opts?._cachePath,
+      onFetchAttempt: opts?.onFetchAttempt,
     });
     const registry = opts?._registry ?? modelRegistry;
     // Apply apiId-aware override: remote entries update bundled apiIds by apiId match

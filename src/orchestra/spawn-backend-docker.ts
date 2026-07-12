@@ -43,7 +43,10 @@ const DEFAULT_IMAGE = 'deckent-worker:latest';
 const DEFAULT_TIMEOUT_SECONDS = 1200; // 20 minutes
 const CONTAINER_WORKSPACE = '/workspace';
 const DEFAULT_GRACEFUL_TIMEOUT_SECONDS = 15;
-const CONTAINER_PREFIX = 'deckent-w-';
+// Exported as the SSOT container-name prefix so the host-liveness probe
+// (heartbeat-monitor.ts) derives `deckent-w-<taskId>` from the SAME constant the
+// backend uses to `docker run --name` / `docker wait` — no drifting duplicate.
+export const CONTAINER_PREFIX = 'deckent-w-';
 
 /**
  * born-468 (WRAPPER-HB-GATE): the in-container wrapper's own heartbeat tick
@@ -55,6 +58,15 @@ const CONTAINER_PREFIX = 'deckent-w-';
  * normal worker write cadence always wins, short enough that a genuinely
  * stalled worker's heartbeat still refreshes well before the auditor's >2min
  * stale threshold (auditor.md).
+ *
+ * TT553 (task 418-002) note: this wrapper tick is a CURRENTACTION-CARRIER
+ * refresh, NOT the liveness authority. A docker worker's real liveness is the
+ * HOST container-state signal (`docker wait`/`docker inspect`, see
+ * monitorContainer + heartbeat-monitor.ts). Once the auditor/checkpoint kill
+ * paths adopt heartbeat-monitor.ts::decideWorkerLiveness (host-primary), this
+ * mtime-appeasement tick becomes vestigial — a container that stops updating
+ * its `.hb` but is still Running must NOT be killed. Kept for now because those
+ * two kill paths are out of this task's write scope (see .result docImpact).
  */
 export const WRAPPER_HB_STALE_THRESHOLD_SECONDS = 40;
 
@@ -1752,7 +1764,13 @@ export class DockerSpawnBackend implements SpawnBackend {
       `taskId=${taskId} containerId=${containerId.slice(0, 12)} instantExit=${instantExitSuccess}`,
     );
 
-    // Write initial heartbeat
+    // Write initial heartbeat.
+    // TT553 (task 418-002): `livenessSource:'host'` is an ADDITIVE marker — this
+    // worker's liveness is decided by the HOST (`docker wait`/`docker inspect`
+    // container-state, see monitorContainer + heartbeat-monitor.ts's `container-state`
+    // signal), NOT by this `.hb`'s freshness. The `.hb` remains a currentAction
+    // carrier only; a stale/hardcoded timestamp here can never justify a kill.
+    // Backward-compatible: legacy readers ignore the extra key.
     const hbPath = join(tasksDir, `task-${taskId}.hb`);
     writeFileSync(hbPath, JSON.stringify({
       workerId: `docker-${taskId}`,
@@ -1763,6 +1781,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       startedAt: new Date().toISOString(),
       backend: 'docker',
       containerId: containerId.slice(0, 12),
+      livenessSource: 'host',
     }, null, 2), 'utf-8');
 
     // Sprint 170 P0-5: .hb is now on disk — heartbeat is authoritative, race window closed

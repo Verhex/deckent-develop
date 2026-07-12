@@ -44,11 +44,64 @@ export interface BudgetWarning {
   percentOver: number;
 }
 
+/** Component-aware worker-prompt estimate (TT554 METERING-TRUTH item 3). */
+export interface WorkerPromptEstimate {
+  /** Calibrated token count of the caller-visible prompt body. */
+  visibleTokens: number;
+  /** Sum of the fixed prompt loads (system prompt + tool schema + connector). */
+  fixedLoadTokens: number;
+  /** `visibleTokens + fixedLoadTokens` — the realistic prompt size. */
+  totalTokens: number;
+  /** Per-component breakdown for reporting. */
+  breakdown: {
+    systemPrompt: number;
+    toolSchema: number;
+    connectorSurface: number;
+    visibleText: number;
+  };
+}
+
 // ─── Constants ──────────────────────────────────────────────────────
 
 const WORDS_PER_TOKEN = 0.75;
 
 const DEFAULT_BUDGET = 200000;
+
+/**
+ * Fixed prompt loads the NAIVE (visible-text-only) estimate omits — the root cause
+ * of the 8–10× under-count measured in the TT554 (418) trace-audit, consistent with
+ * this module's historical ~5.6× note. Every worker turn carries these regardless of
+ * task size: the CLI/harness system prompt + injected project context, the
+ * tool-definition schemas, and the connector wrapper. They dwarf a typical task body,
+ * so leaving them out of the estimate is exactly why `estimatedTokens` ran 8–10× low.
+ *
+ * SOURCE / CALIBRATION: the fields below are apportioned to reproduce that observed
+ * ~8–10× under-count for a representative worker prompt (asserted in
+ * tests/core/metering-truth.test.ts) — an order-of-magnitude fixed load, NOT a
+ * per-component measurement. Refine each field when a labelled per-component trace
+ * lands. This feeds an ESTIMATE only; the REAL captured usage
+ * (providers/session-usage-store.ts) always wins downstream, so an imperfect split
+ * never mis-bills — it only sharpens pre-run budgeting.
+ */
+export const PROMPT_FIXED_LOADS = {
+  /** Claude Code / CLI harness system prompt + injected CLAUDE.md + rule files. */
+  systemPrompt: 10_000,
+  /** Tool-definition JSON schemas presented to the model each turn. */
+  toolSchema: 3_500,
+  /** Connector/gateway wrapper surface (session/pairing framing). */
+  connectorSurface: 800,
+} as const;
+
+/** Sum of {@link PROMPT_FIXED_LOADS} — the per-turn fixed overhead in tokens. */
+export const PROMPT_FIXED_LOAD_TOTAL =
+  PROMPT_FIXED_LOADS.systemPrompt + PROMPT_FIXED_LOADS.toolSchema + PROMPT_FIXED_LOADS.connectorSurface;
+
+/**
+ * Multiplier applied to the `words/0.75` visible-text count. That approximation
+ * undercounts real BPE tokens on code / structured text by roughly this factor
+ * (part of the historical 5.6× note). Calibrated; refine against `count_tokens`.
+ */
+export const VISIBLE_TEXT_CALIBRATION = 1.3;
 
 /**
  * Derive token budgets from ModelRegistry context windows.
@@ -199,5 +252,33 @@ export class TokenCounter {
       : 0;
 
     return { estimatedTokens, modelBudget, withinBudget, utilizationPercent };
+  }
+
+  /**
+   * Component-aware worker-prompt token estimate (TT554 METERING-TRUTH item 3).
+   *
+   * The legacy naive estimate (`countTokens` over the visible task text, or
+   * `estimateTaskContextBudget` over scope lines) runs 8–10× low against real
+   * captured input. The gap is NOT the per-word ratio — it is the FIXED prompt loads
+   * the naive path never counts (see {@link PROMPT_FIXED_LOADS}). This adds them
+   * explicitly: `visibleText` is the caller-visible prompt body (task + agent + skills
+   * + scope excerpt), scaled by {@link VISIBLE_TEXT_CALIBRATION} and added on top of
+   * the fixed loads. Returns a breakdown so callers can show where the tokens go.
+   *
+   * Additive — `countTokens` / `estimateTaskContextBudget` are unchanged.
+   */
+  estimateWorkerPromptTokens(visibleText: string): WorkerPromptEstimate {
+    const visibleTokens = Math.ceil(this.countTokens(visibleText) * VISIBLE_TEXT_CALIBRATION);
+    return {
+      visibleTokens,
+      fixedLoadTokens: PROMPT_FIXED_LOAD_TOTAL,
+      totalTokens: visibleTokens + PROMPT_FIXED_LOAD_TOTAL,
+      breakdown: {
+        systemPrompt: PROMPT_FIXED_LOADS.systemPrompt,
+        toolSchema: PROMPT_FIXED_LOADS.toolSchema,
+        connectorSurface: PROMPT_FIXED_LOADS.connectorSurface,
+        visibleText: visibleTokens,
+      },
+    };
   }
 }

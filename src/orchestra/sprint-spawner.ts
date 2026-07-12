@@ -187,6 +187,7 @@ import {
   type WorkerLifecycleState,
 } from '../agents/worker.js';
 import { buildWorkerApprovalGateEnv } from '../agents/worker-approval-env.js';
+import type { WorkerBackendKind } from './heartbeat-monitor.js';
 import { computeEffectiveDependencyState } from './scheduler-state.js';
 
 // ─── Runtime vs Code Discriminator (Sprint 139 Task 024) ─────────
@@ -824,12 +825,25 @@ export async function spawnWorkers(
     // STARTING → EXECUTING (spawn call succeeded)
     sm.transition('EXECUTING');
 
+    // TT553 (task 418-002): capture the worker's HOST-liveness backend at the
+    // SSOT spawn point, so the host-liveness layer (heartbeat-monitor.ts) can
+    // dispatch the right probe (docker→container-state, tmux→pane, subprocess/
+    // host-adapter→process-pid) instead of re-deriving it from scattered spawn
+    // signals downstream. Additive on the HEARTBEAT event payload — a host-adapter
+    // (ollama/codex/gemini) runs as a host subprocess, so it maps to 'subprocess'.
+    const livenessBackend: WorkerBackendKind = adapterRouted
+      ? 'subprocess'
+      : effectiveBackend
+        ? (effectiveBackend.name === 'docker' ? 'docker'
+          : effectiveBackend.name === 'tmux' ? 'tmux' : 'subprocess')
+        : isTmuxProvider(taskProvider) ? 'tmux' : 'subprocess';
+
     // Emit lifecycle state to event stream
     const sprintIdForEvent = getCurrentSprintId(projectRoot) ?? sprint.id;
     writeEvent(
       projectRoot, sprintIdForEvent, 'worker', 'brain',
       CHANNELS.HEARTBEAT,
-      { workerId: wid, taskId: task.id, lifecycleState: sm.state },
+      { workerId: wid, taskId: task.id, lifecycleState: sm.state, backend: livenessBackend },
     );
 
     // Update task status to EXECUTING and persist to disk

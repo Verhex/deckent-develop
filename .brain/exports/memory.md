@@ -1,5 +1,15 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-418 Learnings
+- Sprint sprint-418 Learnings: ## Sprint sprint-418 Learnings
+- TT554 — METERING-TRUTH: tarife/capability-drift + ledger-eksiği + estimator + reporter (COST-10X ölçüm-tabanı): GO_WITH_TECH_DEBT — TT554 METERING-TRUTH — 4 kalem RED→GREEN, evidence-referenced (hardcode-yamasız). Verify: `npx tsc --noEmit` exit 0; tar
+- TT553 — HOST-LIFECYCLE: heartbeat HOST-sinyaline döner (worker dosya-disiplini ölür): GO_WITH_TECH_DEBT — TT553 HOST-LIFECYCLE — liveness now derives from a HOST signal, not the worker's .hb file-write discipline.
+
+WHAT SHIPPE
+
+## Gains
+- 418-003 — SEC04 — model-catalog fetch'i lazy: her CLI-komutu network'e çıkmasın (RC-6 dilimi) — Root cause: entry.ts's Commander preAction hook called bootstrapFromCatalog() unconditionally for...
+
 ## Sprint sprint-417 Learnings
 - Sprint sprint-417 Learnings: ## Sprint sprint-417 Learnings
 - WIN665 — Windows init exit-code ezilmesi: SETUP_INCOMPLETE basıyor, exit 1 dönüyor (XPLAT-kilidi): GO_WITH_TECH_DEBT — exitCode-yazar envanteri (grep 'process.exitCode ='/'process.exit(' across src/cli/): init.ts:667 (initOutcomeExitCode, 

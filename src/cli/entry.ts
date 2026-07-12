@@ -10,6 +10,8 @@ import { interruptActiveSprint } from '../orchestra/sprint-controller.js';
 import { killAllSessions } from '../orchestra/tmux.js';
 import { bootstrapFromCatalog } from '../core/model-catalog.js';
 import { loadConfig, resolveChatProvider, type ChatProviderName } from '../core/config.js';
+import { isCatalogDependent } from './command-registry.js';
+import { getMessage } from './helpers/messages.js';
 import { resolveChatAdapter } from './commands/chat-provider-parity.js';
 import {
   runChatNativeLoop,
@@ -116,6 +118,37 @@ export function shouldLaunchDefaultRepl(argv: readonly string[]): boolean {
  */
 export function shouldAutoApproveOffTty(args: readonly string[]): boolean {
   return args.some((a) => OFF_TTY_AUTO_APPROVE_FLAGS.has(a));
+}
+
+/**
+ * SEC-04 (task 418-003) — first non-flag token in argv, i.e. the top-level
+ * command name Commander will dispatch to. All top-level program options in
+ * this CLI are boolean-only (`-V/--version`, `--version-json` — see
+ * buildProgram()), so no top-level option ever consumes the following token
+ * as a value; the first non-dash token is always the real command name.
+ *
+ * This deliberately reads argv directly instead of Commander's own
+ * `actionCommand.name()` (only available inside a live preAction hook
+ * invocation): several top-level commands have SUBcommands that share a
+ * name with an unrelated top-level command (e.g. `deckent autonomous
+ * start` vs top-level `deckent start`; `deckent flow run` vs top-level
+ * `deckent run`) — `actionCommand.name()` would return the leaf name
+ * ("start"/"run") in both cases, colliding with the top-level command's own
+ * classification. Reading argv[2] instead always yields the true top-level
+ * command ("autonomous"/"flow"), so the collision cannot happen.
+ */
+export function topLevelCommandName(argv: readonly string[]): string | undefined {
+  return argv.slice(2).find((a) => !a.startsWith('-'));
+}
+
+/**
+ * SEC-04 (task 418-003) — does this invocation need the model catalog
+ * bootstrapped? Delegates the actual classification to the command
+ * registry (`isCatalogDependent`) — no hand-written command list here.
+ */
+export function shouldBootstrapCatalogFor(argv: readonly string[]): boolean {
+  const name = topLevelCommandName(argv);
+  return name !== undefined && isCatalogDependent(name);
 }
 
 /**
@@ -1128,7 +1161,19 @@ if (isEntryMain()) {
   } else {
     buildProgram()
       .hook('preAction', async () => {
-        await bootstrapFromCatalog({ offline: process.env['DECKENT_OFFLINE'] === '1' });
+        // SEC-04 (task 418-003): lazy catalog-bootstrap — only commands whose
+        // execution path actually needs model-catalog data trigger this (see
+        // command-registry.ts `catalogDependent`). Read-only commands like
+        // `status`/`doctor`/`history`/`config` skip this entirely: no cache
+        // read, no network, no bootstrap call at all.
+        if (!shouldBootstrapCatalogFor(process.argv)) return;
+        const lang = getLangFromConfig(process.cwd());
+        await bootstrapFromCatalog({
+          offline: process.env['DECKENT_OFFLINE'] === '1',
+          onFetchAttempt: () => {
+            process.stderr.write(`${getMessage('catalog.network_fetch_notice', lang)}\n`);
+          },
+        });
       })
       .parseAsync(process.argv)
       .catch((err: unknown) => {

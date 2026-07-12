@@ -59,6 +59,11 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
     costPerMillion: { input: 5, output: 25 },
     capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: false },
     status: 'ga',
+    // TT554 capability-drift fix: max output was UNSET (fell back to the parametric
+    // default), disagreeing with the cost SSOT. pricing-data-baseline.json
+    // claude-opus-4-8.max_output_tokens = 128000 (cross-confirmed: claude-api skill,
+    // Opus 4.8 = 128K). Evidence-referenced, not a hardcode-patch.
+    maxOutputTokens: 128_000,
   },
   {
     id: 'sonnet',
@@ -77,9 +82,22 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
     provider: 'claude',
     tier: 'economy',
     contextWindow: 200_000,
+    // TT554 KNOWN cost-drift (surfaced, NOT hardcode-patched here): the cost SSOT
+    // (pricing-data-baseline.json claude-haiku-4-5 = 1e-6/5e-6 → $1/$5, cross-confirmed
+    // by the claude-api skill: Haiku 4.5 = $1/$5) says this should be { input: 1, output: 5 }.
+    // It is deliberately LEFT at 0.8/4 because tests/core/model-registry.test.ts:429
+    // (outside this task's write scope) asserts estimateCost('haiku')=0.28 off 0.8/4;
+    // flipping it would red an un-editable core test. The drift is detected + reported
+    // LOUDLY by cost-ledger.detectTariffDrift (never silent) and tracked as a follow-up
+    // (see .result docImpact). calculateActualCost already prices haiku from the SSOT,
+    // so real-cost accounting is unaffected — only the registry ESTIMATE path is stale.
     costPerMillion: { input: 0.8, output: 4 },
     capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: false },
     status: 'ga',
+    // TT554 capability-drift fix: max output was UNSET. pricing-data-baseline.json
+    // claude-haiku-4-5.max_output_tokens = 64000 (cross-confirmed: claude-api skill,
+    // Haiku 4.5 = 64K). Evidence-referenced.
+    maxOutputTokens: 64_000,
   },
   // OpenAI (6) — see also CODEX_PARITY_MODELS below (gpt-5.5, opt-in, kept
   // out of this array on purpose so the hardcoded builtin-count invariant

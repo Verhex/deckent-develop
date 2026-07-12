@@ -37,6 +37,12 @@ const MESSAGES: MessageMap = {
     en: 'No active sprint',
   },
 
+  // ─── catalog network policy (SEC-04, task 418-003) ────────────────────
+  'catalog.network_fetch_notice': {
+    en: 'Fetching the latest model catalog from models.dev… (set DECKENT_OFFLINE=1 to skip)',
+    tr: 'Güncel model kataloğu models.dev üzerinden alınıyor… (atlamak için DECKENT_OFFLINE=1 ayarlayın)',
+  },
+
   // ─── start command ──────────────────────────────────────────────────
   'start.sandbox_not_implemented': {
     en: 'Sandbox mode not yet implemented. Running normally.',

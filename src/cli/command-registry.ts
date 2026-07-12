@@ -69,6 +69,16 @@ export interface CommandRegistryEntry {
    * tools (e.g. the 5 `deckent_nervous_*` tools) into one CLI-grain row.
    */
   readonly mcpNames?: readonly string[];
+  /**
+   * SEC-04 (task 418-003): true iff this command's execution path needs the
+   * live/cached model catalog (fresh apiId/cost/context data merged into
+   * modelRegistry). Only these commands may trigger the CLI's lazy
+   * catalog-bootstrap network fetch (src/cli/entry.ts preAction hook via
+   * `isCatalogDependent`) — every other command runs network-free by
+   * default. Absent/false is the safe default (most commands never touch
+   * model selection).
+   */
+  readonly catalogDependent?: boolean;
 }
 
 function entry(
@@ -78,8 +88,9 @@ function entry(
   scope: CommandScope,
   surfaces: readonly CommandSurface[],
   mcpNames?: readonly string[],
+  catalogDependent?: boolean,
 ): CommandRegistryEntry {
-  return { name, category, risk, scope, summaryKey: `cmdCatalog.${name}.summary`, surfaces, mcpNames };
+  return { name, category, risk, scope, summaryKey: `cmdCatalog.${name}.summary`, surfaces, mcpNames, catalogDependent };
 }
 
 /**
@@ -117,7 +128,7 @@ export const COMMAND_REGISTRY: readonly CommandRegistryEntry[] = [
   // born-640b (404-002): feature truth-chain report — read-only diagnostic.
   entry('truth', 'Core', 'Oku', 'core', ['cli', 'mcp'], ['deckent_truth']),
   entry('audit-verify', 'Core', 'Oku', 'orchestra', ['cli']),
-  entry('models', 'Core', 'Değiştir', 'core', ['cli', 'mcp', 'repl'], ['deckent_models']),
+  entry('models', 'Core', 'Değiştir', 'core', ['cli', 'mcp', 'repl'], ['deckent_models'], true),
   entry('resources', 'Core', 'Oku', 'monitor', ['cli', 'repl']),
   entry('usage', 'Core', 'Oku', 'api', ['cli', 'mcp', 'repl'], ['deckent_usage']),
   entry('limits', 'Core', 'Oku', 'core', ['cli']),          // 361-002 subscription limit-probe
@@ -128,20 +139,20 @@ export const COMMAND_REGISTRY: readonly CommandRegistryEntry[] = [
   entry('audit', 'Core', 'Çalıştır', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_audit']),
 
   // ─── Run (sprint/task lifecycle execution) ──────────────────────────────
-  entry('start', 'Run', 'Çalıştır', 'orchestra', ['cli', 'mcp'], ['deckent_start']),
-  entry('plan', 'Run', 'Değiştir', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_plan']),
+  entry('start', 'Run', 'Çalıştır', 'orchestra', ['cli', 'mcp'], ['deckent_start'], true),
+  entry('plan', 'Run', 'Değiştir', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_plan'], true),
   entry('attach', 'Run', 'Çalıştır', 'cli', ['cli']),
   entry('spawn', 'Run', 'Çalıştır', 'agents', ['cli']),
   entry('serve', 'Run', 'Çalıştır', 'api', ['cli']),
   entry('web', 'Run', 'Çalıştır', 'api', ['cli']),
   entry('watch', 'Run', 'Oku', 'monitor', ['cli', 'mcp'], ['deckent_watch']),
-  entry('run', 'Run', 'Çalıştır', 'orchestra', ['cli', 'mcp'], ['deckent_run']),
+  entry('run', 'Run', 'Çalıştır', 'orchestra', ['cli', 'mcp'], ['deckent_run'], true),
   entry('test', 'Run', 'Çalıştır', 'orchestra', ['cli']),
   entry('review', 'Run', 'Değiştir', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_review']),
   entry('finalize', 'Run', 'Değiştir', 'orchestra', ['cli']),
   entry('set-directives', 'Run', 'Değiştir', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_set_directives']),
   entry('heartbeat', 'Run', 'Çalıştır', 'orchestra', ['cli']),
-  entry('chat', 'Run', 'Çalıştır', 'cli', ['cli']),
+  entry('chat', 'Run', 'Çalıştır', 'cli', ['cli'], undefined, true),
   entry('checkpoint', 'Run', 'Değiştir', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_checkpoint']),
   entry('resume', 'Run', 'Çalıştır', 'orchestra', ['cli', 'repl']),
   entry('interrogate', 'Run', 'Oku', 'orchestra', ['repl']),
@@ -219,6 +230,15 @@ export function bySurface(surface: CommandSurface): readonly CommandRegistryEntr
 
 export function getCommand(name: string): CommandRegistryEntry | undefined {
   return COMMAND_REGISTRY.find((e) => e.name === name);
+}
+
+/**
+ * SEC-04 (task 418-003): does the named top-level command need the model
+ * catalog bootstrapped? Unknown names are treated as non-dependent (safe
+ * default — no network).
+ */
+export function isCatalogDependent(name: string): boolean {
+  return getCommand(name)?.catalogDependent === true;
 }
 
 /**

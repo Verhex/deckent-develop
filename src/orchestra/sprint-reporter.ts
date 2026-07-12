@@ -589,3 +589,121 @@ export async function buildSprintLimitBurnRow(
     return null;
   }
 }
+
+// ═══ TT554 Task 418-001 — METERING-TRUTH reporter guards ═════════════
+//
+// The live metrics path (`calculateMetrics` in sprint-metrics.ts — outside this
+// task's write scope) carries two truth bugs the 418 trace-audit caught:
+//
+//   • Coverage = NaN%  — `results.reduce((s, r) => s + r.coverage, 0) / results.length`
+//     only guards `results.length > 0`; a single result whose `coverage` is
+//     undefined / NaN poisons the whole average into NaN.
+//   • Total-Tasks conflation (5-vs-4) — `Math.max(sprint.tasks.length,
+//     evaluations.size)` reports ATTEMPTS (retries + injected fix tasks swell the
+//     evaluations map) as the distinct TASK count.
+//
+// These pure guards fix both, mirroring the `computeSprintMetrics` precedent above
+// (guarded helpers added directly to the barrel). Wiring them into the live
+// `calculateMetrics` is a follow-up (that file is read-only for this task) — until
+// then the live path still emits the bug; see the task .result docImpact line.
+
+/** A result contributing a coverage number to the sprint average. */
+export interface CoverageContributor {
+  coverage?: number;
+}
+
+/**
+ * Average coverage across results, counting ONLY finite coverage values. Returns 0
+ * when no result carries a finite coverage — NEVER `NaN` (the sprint-metrics bug: a
+ * single `undefined` / `NaN` coverage poisons the reduce). Pure, side-effect-free.
+ */
+export function computeSafeCoveragePercent(results: readonly CoverageContributor[]): number {
+  let sum = 0;
+  let count = 0;
+  for (const r of results) {
+    const c = r?.coverage;
+    if (typeof c === 'number' && Number.isFinite(c)) {
+      sum += c;
+      count += 1;
+    }
+  }
+  return count > 0 ? sum / count : 0;
+}
+
+/** Distinct-task vs attempt counts for the sprint metrics table. */
+export interface TaskAttemptCounts {
+  /** Distinct tasks the sprint planned (never inflated by retries). */
+  tasks: number;
+  /** Total attempts observed (results / evaluations — retries + injected fixes). */
+  attempts: number;
+}
+
+/**
+ * Separate the distinct TASK count from the ATTEMPT count. The live path collapsed
+ * both into `Math.max(tasks, evaluations.size)`, so a 4-task sprint with one retry
+ * printed "5 tasks". `tasks` stays the sprint's own planned count; `attempts` is the
+ * larger of the evaluation / result counts (each retry or injected fix is an attempt,
+ * not a new task). Pure.
+ */
+export function resolveTaskVsAttempt(
+  sprintTaskCount: number,
+  evaluationCount: number,
+  resultCount: number,
+): TaskAttemptCounts {
+  return {
+    tasks: Math.max(0, sprintTaskCount),
+    attempts: Math.max(0, evaluationCount, resultCount),
+  };
+}
+
+/** A result carrying the REAL files-changed / cost fields the reporter should surface. */
+export interface FilesChangedCostContributor {
+  filesChanged?: string[];
+  linesAdded?: number;
+  linesRemoved?: number;
+  cost?: { usd?: number };
+}
+
+/** Ground-truth files-changed + cost aggregates for the sprint metrics table. */
+export interface FilesChangedCostSummary {
+  /** Distinct files touched across all results (deduped — one file, one count). */
+  filesChanged: number;
+  /** Total real lines added across results. */
+  linesAdded: number;
+  /** Total real lines removed across results. */
+  linesRemoved: number;
+  /** Total real USD across results that carry a `cost.usd` (host-side enriched). */
+  costUsd: number;
+}
+
+/**
+ * Aggregate the REAL files-changed and cost fields from collected results so the
+ * metrics table can show ground truth instead of the hardcoded-0 placeholders
+ * (`SprintMetrics.crossAssignments`/`contextLinesUsed` are literal `0`s). The
+ * per-task real fields already flow into each `TaskResult` host-side —
+ * `result.filesChanged`/`linesAdded`/`linesRemoved` from git ground-truth
+ * (result-collector.ts LP-10) and `result.cost.usd` from `enrichResultCost`
+ * (calculateActualCost) — so this only needs to SUM them for the report.
+ *
+ * `filesChanged` is a DISTINCT file count (the same file touched by two tasks counts
+ * once); `costUsd` sums `result.cost.usd`. Missing / non-finite fields are skipped —
+ * never NaN. Pure, side-effect-free.
+ */
+export function computeFilesChangedAndCost(
+  results: readonly FilesChangedCostContributor[],
+): FilesChangedCostSummary {
+  const files = new Set<string>();
+  let linesAdded = 0;
+  let linesRemoved = 0;
+  let costUsd = 0;
+  for (const r of results) {
+    for (const f of r?.filesChanged ?? []) {
+      if (typeof f === 'string' && f) files.add(f);
+    }
+    if (typeof r?.linesAdded === 'number' && Number.isFinite(r.linesAdded)) linesAdded += r.linesAdded;
+    if (typeof r?.linesRemoved === 'number' && Number.isFinite(r.linesRemoved)) linesRemoved += r.linesRemoved;
+    const usd = r?.cost?.usd;
+    if (typeof usd === 'number' && Number.isFinite(usd)) costUsd += usd;
+  }
+  return { filesChanged: files.size, linesAdded, linesRemoved, costUsd };
+}

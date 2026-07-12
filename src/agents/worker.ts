@@ -295,9 +295,18 @@ export function createHeartbeat(
   filesChangedCount?: number,
   agentId?: string,
   backend?: 'docker' | 'tmux' | 'subprocess',
+  pid?: number,
 ): Heartbeat {
   const count = filesChangedCount ?? 0;
-  return {
+  // TT553 (task 418-002): `pid` is an ADDITIVE, optional field — the input the
+  // subprocess host-liveness probe (heartbeat-monitor.ts, `process-pid` signal)
+  // reads so a native worker's liveness is judged by the OS (`kill(pid,0)`), NOT
+  // by whether/when this `.hb` was written. Defaults to the running worker's own
+  // pid so a deckent-native worker publishes it automatically; a caller may pass
+  // an explicit pid or `undefined` to omit it. Backward-compatible: legacy readers
+  // ignore the extra key, and liveness never depends on it being present.
+  const resolvedPid = pid ?? process.pid;
+  const hb: Heartbeat & { pid?: number } = {
     workerId,
     taskId,
     status,
@@ -310,6 +319,8 @@ export function createHeartbeat(
     agentId,
     backend,
   };
+  if (typeof resolvedPid === 'number' && resolvedPid > 0) hb.pid = resolvedPid;
+  return hb;
 }
 
 export function writeHeartbeat(projectRoot: string, heartbeat: Heartbeat, sprintId?: string): void {
