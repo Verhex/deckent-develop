@@ -51,6 +51,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-423 Learnings** (sprint-423): ## Sprint sprint-423 Learnings
+- TT556 — PLANNER-PREFLIGHT: scope-satisfiability genişletme + gate-false-positive ail...
 - **Sprint sprint-422 Learnings** (sprint-422): ## Sprint sprint-422 Learnings
 - TT556 — PLANNER-PREFLIGHT: scope-satisfiability genişletme + gate-false-positive ail...
 - **Sprint sprint-421 Learnings** (sprint-421): ## Sprint sprint-421 Learnings
@@ -73,11 +75,9 @@
 - 415-001 — RC5A — cross-platform packed-install matrix: üç-OS gerçek-kurulu...
 - **Sprint sprint-414 Learnings** (sprint-414): ## Sprint sprint-414 Learnings
 - RC4A — release.yml bütünlük-zinciri: tag-eşitliği + required-CI attestation + SHA-pi...
-- **Sprint sprint-413 Learnings** (sprint-413): ## Sprint sprint-413 Learnings
-- RC2C — born-652: init gerçek non-interactive akış + EOF-dürüstlüğü (RC-2 kapanış-kil...
 
 ## Active Technical Debt
-- [CRITICAL] Tech debt from 420-001-fix: CORE COMPLETE (7/8 goCriteria verified). Two product
+_No active technical debt._
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -147,4 +147,4 @@
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 
-_Total entries: 1287 | Generated: 2026-07-12_
+_Total entries: 1291 | Generated: 2026-07-12_

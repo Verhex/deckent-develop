@@ -9,6 +9,23 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint423] - 2026-07-12
+
+### Added
+
+- TERM1 — run-flow-contract + reducer: typed RunProposal→…→Completion durum-makinesi (flag'li, production-caller YOK)
+
+### Changed
+
+- TT556 — PLANNER-PREFLIGHT: scope-satisfiability genişletme + gate-false-positive ailesi (born-661+650+653) (completed with tech debt)
+
+### Fixed
+
+- Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: CORE COMPLETE (7/8 goCriteria verified). Two production …
+
+
+_Tasks: 3 total, 3 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint422] - 2026-07-12
 
 ### Added

@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-423 Learnings
+- Sprint sprint-423 Learnings: ## Sprint sprint-423 Learnings
+- TT556 — PLANNER-PREFLIGHT: scope-satisfiability genişletme + gate-false-positive ailesi (born-661+650+653): GO_WITH_TECH_DEBT — TT556 PLANNER-PREFLIGHT — born-650 + 653 + 661. Verified: `npx tsc --noEmit` clean (exit 0); targeted tests green — plan
+
+## Gains
+- 423-001 — Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: CORE COMPLETE (7/8 goCriteria verified). Two production … — DEBT ALREADY RESOLVED ON DISK (disk-verify ground truth per operating rule — the Brain-minted 'fi...
+- 423-002 — TERM1 — run-flow-contract + reducer: typed RunProposal→…→Completion durum-makinesi (flag'li, production-caller YOK) — This task's exact spec (title, description, goCriteria, write-scope) was already delivered under ...
+
 ## Sprint sprint-422 Learnings
 - Sprint sprint-422 Learnings: ## Sprint sprint-422 Learnings
 - TT556 — PLANNER-PREFLIGHT: scope-satisfiability genişletme + gate-false-positive ailesi (born-661+650+653): GO_WITH_TECH_DEBT — Worker timeout/killed (exitCode=1) but git diff shows 24 files modified. Brain should reconcile via Spurious NO_GO helpe

@@ -10339,3 +10339,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 422-002: TT556 — PLANNER-PREFLIGHT: scope-satisfiability genişletme + gate-false-positive ailesi (born-661+650+653) (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 423 — sprint-423
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-12
+**Duration:** 1378s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1377844ms |
+
+### Tasks
+
+- 423-001: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Notes: CORE COMPLETE (7/8 goCriteria verified). Two production … (DONE)
+- 423-002: TERM1 — run-flow-contract + reducer: typed RunProposal→…→Completion durum-makinesi (flag'li, production-caller YOK) (DONE)
+- 423-003: TT556 — PLANNER-PREFLIGHT: scope-satisfiability genişletme + gate-false-positive ailesi (born-661+650+653) (GO_WITH_TECH_DEBT)
+
+---

@@ -121,7 +121,7 @@ Deckent'in tam otonom çok-ajanlı geliştirme platformu haline geldiği nokta �
 | Metrik | Değer |
 |--------|-------|
 | Version | 1.0.0-beta.1 |
-| Sprint | sprint-422 |
+| Sprint | sprint-423 |
 | MCP Tools | 47 |
 | MCP Resources | 8 |
 | CLI Commands | 70+ |
@@ -147,10 +147,10 @@ _Sprint geçmişi yok._
 ## Sprint Metrics
 | Metrik | Değer |
 |--------|-------|
-| Sprint | sprint-422 |
-| Toplam Task | 2 |
-| Tamamlanan | 2 |
+| Sprint | sprint-423 |
+| Toplam Task | 3 |
+| Tamamlanan | 3 |
 | Tech Debt | 1 |
 | No-Go | 0 |
-| Süre | 15dk 56sn |
+| Süre | 22dk 57sn |
 | Coverage | N/A |

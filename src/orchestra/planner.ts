@@ -15,6 +15,12 @@ import type { ProviderAdapter } from '../core/provider.js';
 import { providerRegistry, ProviderError } from '../core/provider.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { debugLog } from '../core/utils.js';
+import type { TaskScope } from '../core/task-types.js';
+import {
+  stripPhantomScope,
+  expandScopeWithAffectedTests,
+  type AffectedTestFile,
+} from '../core/task-builder-scope.js';
 // Dependency-ref resolution reuse (323-031): resolveDependencyRef handles
 // slot-id (NNN-NNN) exact match AND title-token match (substring-trap safe);
 // isPlanSlotId classifies dropped refs. No import cycle — only sprint-planner
@@ -939,3 +945,107 @@ export function normalizePlannerDependencies(
 // The original validateGoCriteriaScope helper here was dead since birth (its only
 // caller was its own test) and was removed with that wiring — see the verification
 // doc .analysis/prompt-contract-verification-2026-07-10.md (N3).
+
+// ─── Plan-time Scope Preflight (423-003: born-653 phantom-strip + born-661 expansion) ─
+//
+// A single in-place pass over finalized tasks (mirrors normalizePlannerDependencies:
+// mutate + report, never silent). Two concerns:
+//   - born-653: strip phantom scope entries a naive derivation produced from the
+//     declared Files (file-path-as-directory, substring-derived phantom paths). Requires
+//     the task's DECLARED Files (its true write intent) — supplied via `declaredFilesOf`,
+//     because by this stage scope.filesWrite already carries the derived extras.
+//   - born-661: expand write scope with the test files that import a task's source
+//     modules (capped ≤25) so a worker can update the tests its change breaks in-scope.
+//
+// The full-dependency-graph vision (born-661) is intentionally NOT built here — this is a
+// bounded import-mention scan. Live wiring (a single call in sprint-planner.ts just before
+// evaluatePromptGate) is the remaining follow-up; sprint-planner.ts is outside this task's
+// write authority. See the .result docImpact note.
+
+/** Minimal task read-shape for the scope preflight (id + mutable scope). */
+interface PreflightTask {
+  id: string;
+  scope?: TaskScope;
+}
+
+export interface ScopePreflightOptions {
+  /**
+   * The candidate test-file corpus (typically tests/** from the tracked-file list, with
+   * optional content for import-matching). When absent, the born-661 expansion is skipped.
+   */
+  testFiles?: readonly AffectedTestFile[];
+  /**
+   * Returns a task's DECLARED Files (original write intent) for born-653 phantom grounding.
+   * When absent, phantom-strip is skipped (a post-derivation filesWrite cannot self-ground
+   * without the original Files — the fix's true home is the derivation in task-builder).
+   */
+  declaredFilesOf?: (task: PreflightTask) => readonly string[];
+  /** Max affected tests added per task (defaults to AFFECTED_TEST_CAP = 25). */
+  cap?: number;
+}
+
+/** Per-task outcome of the scope preflight. */
+export interface ScopePreflightEntry {
+  taskId: string;
+  addedTests: string[];
+  removedPhantoms: string[];
+  /** True when the affected-test match count exceeded the cap and was truncated. */
+  capped: boolean;
+}
+
+/** Outcome of `preflightTaskScopes`: per-task detail + human-readable report lines. */
+export interface ScopePreflightResult {
+  entries: ScopePreflightEntry[];
+  /** One line per task that changed — surfaced to the operator (never silent). */
+  reportLines: string[];
+}
+
+/**
+ * Run the plan-time scope preflight over `tasks`, mutating each task's `scope` IN PLACE
+ * (born-653 phantom-strip then born-661 affected-test expansion). Behaviour-preserving
+ * for a task whose scope is already clean and has no affected tests: nothing changes and
+ * it contributes no report line. Both passes are individually opt-in via `options`, so a
+ * caller with only a tracked-test corpus (no declared-Files map) still gets 661.
+ */
+export function preflightTaskScopes(
+  tasks: PreflightTask[],
+  options: ScopePreflightOptions = {},
+): ScopePreflightResult {
+  const entries: ScopePreflightEntry[] = [];
+  const reportLines: string[] = [];
+
+  for (const task of tasks) {
+    if (!task.scope) continue;
+    let scope = task.scope;
+    const removedPhantoms: string[] = [];
+
+    // born-653: strip phantoms against the task's declared write intent.
+    if (options.declaredFilesOf) {
+      const stripped = stripPhantomScope(scope, options.declaredFilesOf(task));
+      scope = stripped.scope;
+      removedPhantoms.push(...stripped.removed);
+    }
+
+    // born-661: expand with affected tests.
+    let addedTests: string[] = [];
+    let capped = false;
+    if (options.testFiles && options.testFiles.length > 0) {
+      const expanded = expandScopeWithAffectedTests(scope, options.testFiles, { cap: options.cap });
+      scope = expanded.scope;
+      addedTests = expanded.scan.added;
+      capped = expanded.scan.capped;
+      if (addedTests.length > 0) reportLines.push(`[${task.id}] ${expanded.scan.report}`);
+    }
+
+    if (removedPhantoms.length > 0) {
+      reportLines.push(`[${task.id}] phantom-scope-strip: -${removedPhantoms.length} (${removedPhantoms.join(', ')})`);
+    }
+
+    task.scope = scope;
+    if (addedTests.length > 0 || removedPhantoms.length > 0) {
+      entries.push({ taskId: task.id, addedTests, removedPhantoms, capped });
+    }
+  }
+
+  return { entries, reportLines };
+}

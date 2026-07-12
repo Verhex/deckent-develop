@@ -34,6 +34,7 @@ import { getAgentRole } from '../core/agent-pool.js';
 import { validatePersonaTaskMatch } from './task-builder.js';
 import { sanitizeScope } from './scope-sanitizer.js';
 import { lintScopeSatisfiability } from './scope-satisfiability.js';
+import { isRealPathCandidate } from '../core/task-builder-scope.js';
 
 export type {
   PromptGateFinding,
@@ -351,7 +352,13 @@ function lintSatisfiability(task: Task, trackedFiles: readonly string[]): Prompt
     filesWrite: task.scope?.filesWrite ?? [],
     directories: task.scope?.directories ?? [],
     trackedFiles,
-  });
+  })
+    // born-650: the satisfiability path-extraction regex greedily matches code tokens
+    // ("Date.now/process.env" → "now/process.env") and money/number tokens
+    // ("$2.23/4.25dk" → "23/4.25dk") as slash-qualified paths, producing false BLOCKs.
+    // Drop any finding whose `path` does not look like a real file path — a genuinely
+    // missing path ("src/core/x.ts") still passes the predicate and still blocks.
+    .filter(f => isRealPathCandidate(f.path));
   const agentId = task.assignedAgent ?? 'generic';
   return findings.map(f => ({
     taskId: task.id,

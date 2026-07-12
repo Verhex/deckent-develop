@@ -2883,9 +2883,9 @@
     "born_id": 650,
     "title": "G6 scope-satisfiability false-positive: goCriteria icindeki kod-token'lari (Date.now/process.env/fs) dosya-yolu saniyor -> haksiz BLOCK",
     "priority": "P2",
-    "status": "OPEN",
+    "status": "DONE",
     "source": "sprint-412-hazirligi canli-reproduce (2026-07-11, CC)",
-    "spec": "Canli-vaka: DIRECTIVES task goCriteria'sinda 'Date.now/process.env/fs importu YOK' ifadesi -> prompt-gate [BLOCK] MENTIONED_NOT_WRITABLE \"now/process.env\" uretti (slash'i yol-ayraci sandi); workaround: metni virgulle yeniden-kelimeledik. FIX: G6 path-extraction'i gercek-yol-desenine sikilastir — aday sinirlar: (a) bilinen kod-API blacklist (Date.now, process.env, import.meta vb.), (b) yol-adayi min-kriter (uzanti VEYA src/-tests/-docs/-scripts/ dizin-oneki), (c) backtick/kod-span icini tarama-disi birak. Test: ayni goCriteria cumlesi gate'ten BLOCK'suz gecer + gercek eksik-yol vakasi hala yakalanir (RED-cift). Ilgili: project_prompt_gate_plan_time (G-serisi).",
+    "spec": "Canli-vaka: DIRECTIVES task goCriteria'sinda 'Date.now/process.env/fs importu YOK' ifadesi -> prompt-gate [BLOCK] MENTIONED_NOT_WRITABLE \"now/process.env\" uretti (slash'i yol-ayraci sandi); workaround: metni virgulle yeniden-kelimeledik. FIX: G6 path-extraction'i gercek-yol-desenine sikilastir — aday sinirlar: (a) bilinen kod-API blacklist (Date.now, process.env, import.meta vb.), (b) yol-adayi min-kriter (uzanti VEYA src/-tests/-docs/-scripts/ dizin-oneki), (c) backtick/kod-span icini tarama-disi birak. Test: ayni goCriteria cumlesi gate'ten BLOCK'suz gecer + gercek eksik-yol vakasi hala yakalanir (RED-cift). Ilgili: project_prompt_gate_plan_time (G-serisi). || DONE sprint-423 (423-003 opus, 3.kosu — timeout-fix sonrasi): 650 G6 gercek-yol-deseni+kod-API-blacklist · 653 uzanti-tespitli scope-derivation (sahte-yol-sifir, gercek-liste fixture'li) · 661 affected-test-expansion (cap-25, raporlu); 172/172.",
     "verify": "reproduce-DIRECTIVES fixture'i gate'ten temiz gecer; gercek MENTIONED_NOT_WRITABLE vakasi regresyonsuz",
     "wire_on": "sprint"
   },
@@ -2913,9 +2913,9 @@
     "born_id": 653,
     "title": "planner scope-turetmesi Files'tan sahte-yollar uretiyor (tests/docs/x.test.ts -> docs/-koku; src/core/deck-file.ts/ gibi dosya-adi+slash dizinleri)",
     "priority": "P2",
-    "status": "OPEN",
+    "status": "DONE",
     "source": "sprint-414 canli-vaka (414-001 worker'i docs/release-docs.test.ts kopyasi birakti + decision-journal scope listelerinde 'src/core/deck-file.ts/' turevleri)",
-    "spec": "Iki belirti: (a) 414-001'in write-scope'una planner hem tests/docs/release-docs.test.ts hem docs/release-docs.test.ts koydu -> worker durust-notla iki kopya birakti (CC docs-kopyasini sildi; vitest-include disiydi); (b) routing decision-journal'da scope girisleri 'src/core/deck-file.ts/' gibi DOSYA-ADI+slash sahte-dizinler iceriyor. FIX: scope-derivation dosya-yollarini dizin sanmamali (uzanti-tespiti) + turetilmis-yol gercekte Files'ta yoksa eklememeli; test: 411-001/414-001 gercek Files-listeleri fixture -> turetilen scope sahte-yol icermez.",
+    "spec": "Iki belirti: (a) 414-001'in write-scope'una planner hem tests/docs/release-docs.test.ts hem docs/release-docs.test.ts koydu -> worker durust-notla iki kopya birakti (CC docs-kopyasini sildi; vitest-include disiydi); (b) routing decision-journal'da scope girisleri 'src/core/deck-file.ts/' gibi DOSYA-ADI+slash sahte-dizinler iceriyor. FIX: scope-derivation dosya-yollarini dizin sanmamali (uzanti-tespiti) + turetilmis-yol gercekte Files'ta yoksa eklememeli; test: 411-001/414-001 gercek Files-listeleri fixture -> turetilen scope sahte-yol icermez. || DONE sprint-423 (423-003 opus, 3.kosu — timeout-fix sonrasi): 650 G6 gercek-yol-deseni+kod-API-blacklist · 653 uzanti-tespitli scope-derivation (sahte-yol-sifir, gercek-liste fixture'li) · 661 affected-test-expansion (cap-25, raporlu); 172/172.",
     "verify": "decision-journal yeni sprint'te sahte-dizin icermez; ayni Files-listesi tek-konum uretir",
     "wire_on": "sprint"
   },
