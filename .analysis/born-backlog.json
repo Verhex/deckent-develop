@@ -3126,5 +3126,14 @@
   "source": "683-dry-run gate-bulgusu (2026-07-12, gateFindings sayesinde gorunur): BLOCK 431-002 goCriteria references \"ts/types.ts\"",
   "spec": "born-650/653/675 ailesinin yeni alt-turu: tire-siniri yol-tokenizasyonunda kelime-bolme; fix path-regex tire-icerir-basename; regresyon: task-types.ts / config-types.ts / run-flow-contract.ts goCriteria fixture. Ayrica dusun: goCriteria icindeki salt-KANIT dosya-referansi (yazilmayacak) MENTIONED_NOT_WRITABLE BLOCK yerine WARN olmali mi — 556 false-negative dengesiyle birlikte.",
   "date": "2026-07-12"
+ },
+ {
+  "born_id": 686,
+  "title": "XPLAT-matrix flake-ailesi: ardisik docs-only commitlerde farkli bacaklar dustu (4aeef366 win packed-install npm-install-4dk-fail; f22df693 ubuntu/tmux e2e) — REQUIRED-gate guveni asiniyor",
+  "priority": "P1",
+  "status": "OPEN",
+  "source": "gun-kapanisi CI-izleme (2026-07-12/13 gecesi); rerun lar geciyor (win rerun yesil) = flake, regresyon degil",
+  "spec": "Sertlestirme: (a) xplat-smoke install/e2e adimlarina 1-otomatik-retry + npm timeout/cache ayari; (b) fail aninda tani-artifact (npm debug-log, tmux server-log) upload; (c) workflow-level flaky-quarantine ISTEMIYORUZ (required kalir) — adim-ici retry tercih; (d) flake-orani izlenebilir olsun (job-summary satiri).",
+  "date": "2026-07-13"
  }
 ]
