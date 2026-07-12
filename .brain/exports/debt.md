@@ -9,6 +9,7 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-425-001 | Tech debt from 425-001: Implemented the flag-gated (terminal.run_flow_v2, defaul | normal | sprint-425 | resolved |
 | debt-423-003 | Tech debt from 423-003: TT556 PLANNER-PREFLIGHT — born-650 + 653 + 661. Verified | normal | sprint-423 | resolved |
 | debt-422-002 | Timeout-partial from 422-002: worker killed mid-execution, work accepted | normal | sprint-422 | resolved |
 | debt-420-001-fix | Tech debt from 420-001-fix: CORE COMPLETE (7/8 goCriteria verified). Two product | critical | sprint-420 | resolved |

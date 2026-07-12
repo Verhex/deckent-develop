@@ -10386,3 +10386,26 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 424-002: SCHED5ON — shadow-journal divergence-analizi: 9-sprint verisinden sınıflandırma-raporu (SALT-ANALİZ, kod-yok) (DONE)
 
 ---
+## Sprint 425 — sprint-425
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-12
+**Duration:** 1006s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1006483ms |
+
+### Tasks
+
+- 425-001: TERM3 — native RunProposal akışı: tool→coordinator→plan-preview-card→approval (flag'li) (GO_WITH_TECH_DEBT)
+- 425-002: SCHED5K — divergence-raporunun KOŞULLU-GO koşullarını kapat (kapsam-boşlukları) (DONE)
+
+---

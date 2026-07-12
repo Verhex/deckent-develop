@@ -193,3 +193,49 @@ export const CLI_BRIDGE_TOOLS: readonly CliBridgeToolSpec[] = [
 export const WORST_CASE_CLASSIFY_ARGS: Readonly<Record<string, Record<string, unknown>>> = {
   deckent_config: { _rest: ['set'] },
 };
+
+// ─── deckent_propose_run (TERM-FLOW-UNIFY Sprint-3 dilim, 425-001) ──────────
+// Flag-gated behind `terminal.run_flow_v2` (default OFF) via native-tool-
+// registry.ts's `runFlow` option — deliberately NOT part of CLI_BRIDGE_TOOLS
+// above: its dispatch is NOT createCliToolDispatcher/a CLI subcommand, it
+// drives run-flow-controller.ts's host-owned RunFlow coordinator instead. The
+// model supplies only a natural-language `intentSummary` — flowId/tenant/
+// project/actor/origin/revision are host-derived by the controller, never
+// model-invented (design doc: "model yalnız typed RunProposal üretir",
+// simplified at the tool-input layer to the one field a model can meaningfully
+// author; the rest is identity/session context, not something to prompt for).
+
+export const RUN_FLOW_PROPOSAL_TOOL_NAME = 'deckent_propose_run';
+
+export const RUN_FLOW_PROPOSAL_TOOL_SPEC: CliBridgeToolSpec = {
+  name: RUN_FLOW_PROPOSAL_TOOL_NAME,
+  description:
+    'Propose a run from a natural-language intent summary. Compiles a real Brain plan preview ' +
+    '(task summaries, gate/policy result, content-addressed digest) for human approval via the ' +
+    'in-terminal plan-preview card — this call itself never starts anything and never requires ' +
+    "confirmation (the card's approve/reject is the actual gate). Canonical entry point when " +
+    'terminal.run_flow_v2 is on.',
+  schema: {
+    type: 'object',
+    properties: {
+      intentSummary: { type: 'string', description: 'Natural-language summary of the work to run.' },
+    },
+    required: ['intentSummary'],
+  },
+};
+
+/** Appended (native-tool-registry.ts) to set/plan/start descriptions ONLY when
+ *  terminal.run_flow_v2 is on — flag-off descriptions stay byte-identical
+ *  (this constant is inert unless a caller opts in). Technical/model-facing
+ *  metadata, same non-i18n convention as every other description in this file. */
+export const RUN_FLOW_ESCAPE_HATCH_NOTE =
+  '(Low-level escape hatch — when terminal.run_flow_v2 is on, the canonical path is deckent_propose_run.)';
+
+/** The 3 tools this note applies to — the "expert escape-hatch" trio the
+ *  design doc keeps around unchanged (set-directives/plan/start) once
+ *  deckent_propose_run becomes the canonical native-flow entry point. */
+export const RUN_FLOW_ESCAPE_HATCH_NAMES: ReadonlySet<string> = new Set([
+  'deckent_set_directives',
+  'deckent_plan',
+  'deckent_start',
+]);

@@ -51,6 +51,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-425 Learnings** (sprint-425): ## Sprint sprint-425 Learnings
+- TERM3 — native RunProposal akışı: tool→coordinator→plan-preview-card→approval (flag'...
 - **Sprint sprint-424 Learnings** (sprint-424): ## Sprint sprint-424 Learnings
 
 ## Gains
@@ -73,10 +75,6 @@
 - WIN665 — Windows init exit-code ezilmesi: SETUP_INCOMPLETE basıyor, exit 1 dönüyor (...
 - **Sprint sprint-416 Learnings** (sprint-416): ## Sprint sprint-416 Learnings
 - TT550 — RESULT-INGEST-IDNORM: malformed result-taskId phantom-fix + trace-kaybı üret...
-- **Sprint sprint-415 Learnings** (sprint-415): ## Sprint sprint-415 Learnings
-
-## Gains
-- 415-001 — RC5A — cross-platform packed-install matrix: üç-OS gerçek-kurulu...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -149,4 +147,4 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 
-_Total entries: 1294 | Generated: 2026-07-12_
+_Total entries: 1298 | Generated: 2026-07-12_

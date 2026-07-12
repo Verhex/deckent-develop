@@ -1,5 +1,14 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-425 Learnings
+- Sprint sprint-425 Learnings: ## Sprint sprint-425 Learnings
+- TERM3 — native RunProposal akışı: tool→coordinator→plan-preview-card→approval (flag'li): GO_WITH_TECH_DEBT — Implemented the flag-gated (terminal.run_flow_v2, default OFF) native RunProposal slice per the task spec.
+
+run-flow-con
+
+## Gains
+- 425-002 — SCHED5K — divergence-raporunun KOŞULLU-GO koşullarını kapat (kapsam-boşlukları) — Read docs/analysis/scheduler-shadow-divergence-2026-07-12.md in full before coding.
+
 ## Sprint sprint-424 Learnings
 - Sprint sprint-424 Learnings: ## Sprint sprint-424 Learnings
 

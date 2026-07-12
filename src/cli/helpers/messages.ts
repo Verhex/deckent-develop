@@ -149,6 +149,53 @@ const MESSAGES: MessageMap = {
     tr: 'Override uyarıları — {count} uyarı (forceAgent/forceSkills routing override\'ları — bilgilendirme, plan devam eder):',
   },
 
+  // ─── run-flow plan-preview card (TERM-FLOW-UNIFY Sprint-3 dilim, 425-001) ──
+  // plan-preview-card.tsx's PlanPreviewCardLabels, sourced via buildPlanPreviewCardLabels(lang).
+  'runFlow.planPreview.heading': {
+    en: 'Plan preview — approve to continue',
+    tr: 'Plan önizlemesi — devam etmek için onayla',
+  },
+  'runFlow.planPreview.digestLabel': {
+    en: 'Digest:',
+    tr: 'Özet-imza:',
+  },
+  'runFlow.planPreview.gate.pass': {
+    en: 'GATE: PASS',
+    tr: 'GATE: GEÇTİ',
+  },
+  'runFlow.planPreview.gate.fail': {
+    en: 'GATE: FAIL',
+    tr: 'GATE: BAŞARISIZ',
+  },
+  'runFlow.planPreview.gate.skipped': {
+    en: 'GATE: SKIPPED',
+    tr: 'GATE: ATLANDI',
+  },
+  'runFlow.planPreview.policy.allow': {
+    en: 'POLICY: ALLOW',
+    tr: 'POLİTİKA: İZİN VER',
+  },
+  'runFlow.planPreview.policy.deny': {
+    en: 'POLICY: DENY',
+    tr: 'POLİTİKA: REDDET',
+  },
+  'runFlow.planPreview.policy.needsApproval': {
+    en: 'POLICY: NEEDS APPROVAL',
+    tr: 'POLİTİKA: ONAY GEREKLİ',
+  },
+  'runFlow.planPreview.hint': {
+    en: '(y = approve · n = reject · d = details)',
+    tr: '(y = onayla · n = reddet · d = detay)',
+  },
+  'runFlow.planPreview.detailsHeading': {
+    en: 'Details',
+    tr: 'Detay',
+  },
+  'runFlow.planPreview.noTasks': {
+    en: '(no tasks)',
+    tr: '(görev yok)',
+  },
+
   // ─── status command ─────────────────────────────────────────────────
   'status.no_active_sprint': {
     en: 'No active sprint. Run `deckent start` first.',

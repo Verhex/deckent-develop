@@ -9,6 +9,19 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint425] - 2026-07-12
+
+### Added
+
+- SCHED5K — divergence-raporunun KOŞULLU-GO koşullarını kapat (kapsam-boşlukları)
+
+### Changed
+
+- TERM3 — native RunProposal akışı: tool→coordinator→plan-preview-card→approval (flag'li) (completed with tech debt)
+
+
+_Tasks: 2 total, 2 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint424] - 2026-07-12
 
 ### Added

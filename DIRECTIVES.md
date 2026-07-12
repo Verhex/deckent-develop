@@ -1,51 +1,55 @@
-# DIRECTIVES — SPRINT-424: TERM-DİLİM-2 SHARED-PREVIEW + SCHED-5-ÖN DIVERGENCE-ANALİZ
+# DIRECTIVES — SPRINT-425: TERM-DİLİM-3 NATIVE-PROPOSAL-CARD + SCHED-5 KOŞUL-KAPATMA
 
 ## Goal
-TERM-treni dilim-2 (shared actual-preview + digest) + SCHED-treni dilim-5-öncesi divergence-analizi
-(9-sprint shadow-journal birikti). Tasarım-SSOT: `docs/analysis/term-flow-unify-design-2026-07-11.md`
-Sprint-2 + `docs/analysis/scheduler-unify-design-2026-07-11.md` dilim-5.
+TERM-treni dilim-3 (native proposal→card→approval; flag'li) + SCHED-5'in KOŞULLU-GO koşul-kapatması.
+Tasarım-SSOT: `docs/analysis/term-flow-unify-design-2026-07-11.md` Sprint-3 +
+`docs/analysis/scheduler-shadow-divergence-2026-07-12.md` (koşullar-bölümü ZORUNLU-OKU).
 
 ## 🔒 BAĞLAYICI (her task)
-- Yalnız kendi Files'ına yaz · `.deckent/` runtime'ına DOKUNMA (scheduler-shadow SALT-OKU) · `.brain/`, `.tasks/` DOKUNMA · git stash-reset YASAK · `npm run build` YASAK · notes TEK STRING · Self DÜRÜST.
-- REPRODUCE-FIRST; test hermetik; 20dk-forensik-sınırı.
+- Yalnız kendi Files'ına yaz · `.deckent/` runtime SALT-OKU · `.brain/`, `.tasks/` DOKUNMA · git stash-reset YASAK · `npm run build` YASAK · notes TEK STRING · Self DÜRÜST.
+- REPRODUCE-FIRST; test hermetik; 20dk-forensik-sınırı. i18n-FIRST (REPL user-metni).
 
-## Task 1: TERM2 — shared actual-preview: plan-preview-service + proposal-compiler (CLI/MCP adapter'lı)
+## Task 1: TERM3 — native RunProposal akışı: tool→coordinator→plan-preview-card→approval (flag'li)
 - Model: sonnet | Agent: bug-fixer | Effort: high | Provider: claude
-- Files: src/orchestra/run-proposal-compiler.ts, src/orchestra/plan-preview-service.ts, src/cli/commands/plan.ts, src/mcp/tools/plan.ts, tests/orchestra/plan-preview-service.test.ts
-- Scope: src/orchestra/, src/cli/commands/plan.ts, src/mcp/, tests/orchestra/
+- Files: src/cli/repl/run-flow-controller.ts, src/cli/repl/plan-preview-card.tsx, src/cli/repl/native-tool-registry.ts, src/cli/repl/cli-bridge-tool-specs.ts, src/cli/helpers/messages.ts, tests/cli/run-flow-controller.test.ts
+- Scope: src/cli/, tests/cli/
 - Dependencies: none
 ### Description
-ÖNCE OKU (zorunlu): `docs/analysis/term-flow-unify-design-2026-07-11.md` Sprint-2 satırı +
-"Preview" karşılaştırması. KANIT-BAĞLAM: plan-preview iki dünyada da GERÇEK-Brain-planı değil ve
-preview→execution digest-bağı yok (TOCTOU riski). BU DİLİM: (1) YENİ run-proposal-compiler.ts:
-RunProposal (sprint-422 contract'ı) → DIRECTIVES-markdown — directives-builder'ı code-repo
-ADAPTER'ı olarak ÇAĞIRIR (builder'a dokunma); (2) YENİ plan-preview-service.ts: DIRECTIVES →
-GERÇEK plan-üretim çekirdeği (mevcut plan-akışının fonksiyonunu bul; CLI-spawn DEĞİL) →
-PlanPreview {planDigest: kanonik-JSON sha256, task-özetleri, gate-sonucu}; SALT-OKUR (task-dosyası
-YAZMAZ — dry-run semantiği); (3) CLI `plan` + MCP `deckent_plan` iç-implementasyonda servise
-delege — DAVRANIŞ-PARİTE (mevcut plan-testleri byte-yeşil; digest yalnız EK alan); (4) test:
-determinizm (aynı-DIRECTIVES→aynı-digest) + farklı-set→farklı-digest + salt-okur pini + CLI/MCP
-parite.
+ÖNCE OKU (zorunlu): tasarım-doc Sprint-3 satırı + "Net Öneri" akış-şeması. KANIT-BAĞLAM: bugün
+model raw set→plan→start tool'larını kendi sırasıyla çağırıyor; onay gerçek-planı görmeden
+generic-confirm'de. BU DİLİM (terminal.run_flow_v2 flag'i ALTINDA; default-OFF — kapalıyken
+SIFIR davranış-değişimi testle pinli): (1) YENİ run-flow-controller.ts: 422-reducer'ı süren
+host-koordinatör — deckent_propose_run tool-çağrısını alır → run-proposal-compiler+
+plan-preview-service (424) ile GERÇEK PlanPreview üretir → reducer'ı PREVIEWING→AWAITING_APPROVAL'a
+sürer; (2) YENİ plan-preview-card.tsx: Ink transcript-içi kart — task-özetleri + digest + gate-sonucu
++ approve/reject (mevcut approval-kart desenlerini KOPYALA — APR-kartları emsal; string'ler
+getMessage en+tr); (3) flag-açıkken registry'ye YENİ tool `deckent_propose_run` (typed RunProposal
+şemalı) eklenir; ESKİ set/plan/start tool'ları KALIR (expert escape-hatch — tasarım-kararı) ama
+flag-açık system-prompt'a 'canonical yol propose_run' notu; tool-sayı-pinleri güncellenir (flag-off
+sayı DEĞİŞMEZ — pin iki-durumlu); (4) onay→APPROVED'a kadar (start dilim-4'ün işi — STARTING'e
+GEÇME; approved-snapshot'ı flow-store yerine bellekte tut, TODO-notu dilim-4); (5) test: flag-off
+sıfır-fark + flag-on propose→preview→approve/reject yörüngeleri (Ink render-test mevcut kart-test
+desenleriyle).
 ### goNogo
-- goCriteria: compiler builder-adapter'lı; preview gerçek-plan-yolundan + deterministik-digest; salt-okur pini; CLI/MCP parite (mevcut testler byte-yeşil) + delege-kanıtı; tests/orchestra yeşil.
-- nogo: ikinci plan-üretim-yolu icat NO_GO; mevcut çıktı-formatı değişirse NO_GO; servis task-dosyası yazarsa NO_GO.
+- goCriteria: flag-off sıfır-davranış pini; controller reducer+424-servis üstünden (yeniden-icat yok); kart Ink-testli + i18n en+tr; tool-sayı-pinleri iki-durumlu; approve→APPROVED'ta durur (start yok); tests/cli yeşil.
+- nogo: flag-off davranış değişirse NO_GO; start/detached'e geçilirse NO_GO; ikinci plan-yolu doğarsa NO_GO.
 
-## Task 2: SCHED5ON — shadow-journal divergence-analizi: 9-sprint verisinden sınıflandırma-raporu (SALT-ANALİZ, kod-yok)
-- Model: sonnet | Agent: doc-writer | Effort: medium | Provider: claude
-- Files: docs/analysis/scheduler-shadow-divergence-2026-07-12.md
-- Scope: docs/analysis/
+## Task 2: SCHED5K — divergence-raporunun KOŞULLU-GO koşullarını kapat (kapsam-boşlukları)
+- Model: sonnet | Agent: bug-fixer | Effort: high | Provider: claude
+- Files: src/orchestra/scheduler-driver.ts, src/orchestra/scheduler-journal.ts, tests/orchestra/scheduler-shadow-coverage.test.ts
+- Scope: src/orchestra/, tests/orchestra/
 - Dependencies: none
 ### Description
-KANIT-KAYNAK (SALT-OKU): `.deckent/runtime/scheduler-shadow/sprint-4{15..23}.jsonl` — 9 sprint'lik
-legacy-vs-reducer karar-kıyası. GÖREV (kod DEĞİŞTİRME — yalnız rapor): (1) tüm journal'ları tara:
-toplam-tick, divergence-sayısı, divergence-türleri (spawn-only-in-reducer / spawn-only-in-legacy /
-cascade-farkı / queue-farkı...) sprint-bazlı tablo; (2) her divergence-örneğini tasarım-doc'un
-'expected-divergence' sınıflarıyla (FIFO-dep-deliği vb.) eşleştir — hangileri BEKLENEN (tasarımın
-düzelttiği legacy-hata) hangileri BEKLENMEDİK (reducer-hatası adayı); bilinen-vaka: sprint-415
-seq-144 spawn-only-in-reducer 415-002 (dep-ready'de reducer-haklı görünüyor — doğrula); (3)
-dilim-5 live-switch için NET GO/NO-GO önerisi + beklenmedik-divergence varsa her biri için
-reproduce-fixture tarifi; (4) rapor-yapısı: Özet → tablo → örnek-kayıtlar (verbatim-JSON) →
-sınıflandırma → öneri. Kanıt-disiplini: her iddia journal-satır-referanslı (seq+sprint).
+ÖNCE OKU (zorunlu): `docs/analysis/scheduler-shadow-divergence-2026-07-12.md` §4.2
+kapsam-boşlukları + §5 koşullar. GÖREV — raporun GO-koşullarını YAŞAYAN-KANITA çevir (live-switch
+DEĞİL — o koşullar kapanınca): (1) rapordaki her kapsam-boşluğu için (legacy-fifo 0-tick ·
+cost-stop-tick'i · retry-backoff-tick'i · restore-yolu... raporda ne listelendiyse) SENTETIK
+shadow-fixture: o senaryoyu üreten sprint-fixture'ında driver'ı koş → legacy-vs-reducer kıyası
+testte (journal'a değil assert'e); expected-divergence sınıfları (FIFO-dep-deliği: legacy-spawn/
+reducer-Blocked) İŞARETLİ-assert; (2) beklenmedik-divergence çıkarsa DÜRÜSTÇE kırmızı bırak +
+notes'a (fix dilim-5'in kendisine); (3) journal'a coverage-özeti alanı (hangi trigger-türleri
+görüldü — gelecek dogfood'un kapsamı ölçülebilir olsun); (4) rapordaki 415/seq-144 vakasının
+'reducer-haklı' hükmü fixture'la pinlenir.
 ### goNogo
-- goCriteria: 9-sprint tam-tarama tablosu; her divergence sınıflı (beklenen/beklenmedik gerekçeli); 415-vakası doğrulanmış; net GO/NO-GO önerisi; kod-dosyası değişmemiş.
-- nogo: journal-dışı spekülasyon NO_GO; kod değişirse NO_GO; sınıfsız-divergence bırakılırsa NO_GO.
+- goCriteria: raporun HER kapsam-boşluğu için sentetik-fixture kıyası; expected-divergence işaretli-assert; 415-vakası pinli; coverage-özeti journal-alanı; tests/orchestra yeşil (beklenmedik-divergence varsa dürüst-kırmızı + notes).
+- nogo: canlı spawn-yoluna müdahale NO_GO; boşluk atlanırsa NO_GO.

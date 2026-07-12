@@ -13,7 +13,15 @@ import type { ToolDefinition, ToolPermissionTier, ToolResult } from '../../agent
 import { createToolExecDispatcher } from '../commands/chat-tool-exec.js';
 import { createCliToolDispatcher } from '../commands/chat-tool-bridge.js';
 import { classifyTool } from './tool-permissions.js';
-import { CLI_BRIDGE_TOOLS, WORST_CASE_CLASSIFY_ARGS } from './cli-bridge-tool-specs.js';
+import {
+  CLI_BRIDGE_TOOLS,
+  WORST_CASE_CLASSIFY_ARGS,
+  RUN_FLOW_PROPOSAL_TOOL_NAME,
+  RUN_FLOW_PROPOSAL_TOOL_SPEC,
+  RUN_FLOW_ESCAPE_HATCH_NOTE,
+  RUN_FLOW_ESCAPE_HATCH_NAMES,
+} from './cli-bridge-tool-specs.js';
+import type { RunFlowController } from './run-flow-controller.js';
 import type { McpToolDispatcher } from '../commands/chat-native.js';
 import { SkillPoolManager } from '../../core/skill-pool.js';
 import { SkillLoadingCache } from '../../core/skill-cache.js';
@@ -61,6 +69,31 @@ export interface NativeToolRegistryOptions {
    * `registerToolSurfaceTools` for the plan->risk-gate->confirm->execImpl chain.
    */
   toolSurface?: ToolSurfaceOptions;
+  /**
+   * TERM-FLOW-UNIFY Sprint-3 dilim (425-001), `terminal.run_flow_v2` — default
+   * OFF (omitted, as every current call site does since run.tsx's config->
+   * options wiring is a follow-up, keeps this function's output byte-identical
+   * to pre-425-001). When enabled, registers `deckent_propose_run` and appends
+   * an escape-hatch note to set/plan/start's descriptions — see
+   * `registerRunFlowProposalTool`.
+   */
+  runFlow?: RunFlowRegistryOptions;
+}
+
+export interface RunFlowRegistryOptions {
+  enabled: boolean;
+  /** Seam-injected — production callers pass a real RunFlowController
+   *  (run-flow-controller.ts's createRunFlowController). */
+  controller: RunFlowController;
+}
+
+/**
+ * Pure resolver for `terminal.run_flow_v2` — mirrors `resolveToolSurfaceOptions`'s
+ * fail-closed shape: only a literal `true` enables; anything else (undefined,
+ * false, a load-failure `{}` fallback) stays OFF.
+ */
+export function resolveRunFlowEnabled(raw: { run_flow_v2?: boolean } | undefined): boolean {
+  return raw?.run_flow_v2 === true;
 }
 
 /**
@@ -485,6 +518,41 @@ function registerToolSurfaceTools(registry: ToolRegistry, opts: ToolSurfaceOptio
   });
 }
 
+/**
+ * TERM-FLOW-UNIFY Sprint-3 dilim (425-001). `deckent_propose_run` is 'silent'
+ * tier ON PURPOSE — this is the exact fix the design doc's "Net Öneri" calls
+ * out (today's generic per-tool confirm fires BEFORE the real plan exists;
+ * "Outer permission gerçek plan üretilmeden önce yalnız tool adı/resource
+ * üzerinden verilir"). The REAL digest-bound approval gate is
+ * plan-preview-card.tsx's y/n keys, driven by the caller's
+ * RunFlowController.approve()/reject() — never a generic AgentSession
+ * per-tool confirm on this call itself. `generatePlanPreview` (424-001) is
+ * READ-ONLY by construction, so this tool never writes a task file either.
+ */
+function registerRunFlowProposalTool(registry: ToolRegistry, controller: RunFlowController): void {
+  registry.register({
+    name: RUN_FLOW_PROPOSAL_TOOL_NAME,
+    description: RUN_FLOW_PROPOSAL_TOOL_SPEC.description,
+    inputSchema: RUN_FLOW_PROPOSAL_TOOL_SPEC.schema ?? { type: 'object', properties: {} },
+    category: 'coding',
+    tier: 'silent',
+    source: 'builtin',
+    handler: async (args) => {
+      const intentSummary = typeof args['intentSummary'] === 'string' ? args['intentSummary'].trim() : '';
+      if (intentSummary.length === 0) {
+        return { ok: false, output: '[mcp-error] deckent_propose_run: intentSummary is required' };
+      }
+      try {
+        const context = await controller.proposeRun(intentSummary);
+        return { ok: true, output: JSON.stringify({ state: context.state, preview: context.preview ?? null }) };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { ok: false, output: `[mcp-error] deckent_propose_run: ${message}` };
+      }
+    },
+  });
+}
+
 export function buildNativeToolRegistry(opts: NativeToolRegistryOptions): ToolRegistry {
   const registry = new ToolRegistry();
 
@@ -505,7 +573,13 @@ export function buildNativeToolRegistry(opts: NativeToolRegistryOptions): ToolRe
   const genericSchema: Record<string, unknown> = { type: 'object', properties: {}, additionalProperties: true };
   for (const spec of CLI_BRIDGE_TOOLS) {
     const tier = LEGACY_TIER[classifyTool(spec.name, WORST_CASE_CLASSIFY_ARGS[spec.name] ?? {})];
-    registry.register(defineFromDispatcher(spec.name, spec.description, spec.schema ?? genericSchema, tier, cli));
+    // TERM-FLOW-UNIFY Sprint-3 dilim (425-001): flag-off (opts.runFlow omitted or
+    // disabled, every current call site) leaves `description` byte-identical to
+    // pre-425-001 — the note is appended ONLY when terminal.run_flow_v2 is on.
+    const description = opts.runFlow?.enabled && RUN_FLOW_ESCAPE_HATCH_NAMES.has(spec.name)
+      ? `${spec.description} ${RUN_FLOW_ESCAPE_HATCH_NOTE}`
+      : spec.description;
+    registry.register(defineFromDispatcher(spec.name, description, spec.schema ?? genericSchema, tier, cli));
   }
 
   // Skill-dispatch tool (F11) — worker parity: lets the native REPL agent invoke a
@@ -565,6 +639,13 @@ export function buildNativeToolRegistry(opts: NativeToolRegistryOptions): ToolRe
   // stays byte-identical to the pre-354-002 tool list.
   if (opts.toolSurface?.enabled) {
     registerToolSurfaceTools(registry, opts.toolSurface);
+  }
+
+  // TERM-FLOW-UNIFY Sprint-3 dilim (425-001) — `terminal.run_flow_v2`, default
+  // OFF. When absent or false the block below never runs, so every
+  // registration above this line stays byte-identical to pre-425-001.
+  if (opts.runFlow?.enabled) {
+    registerRunFlowProposalTool(registry, opts.runFlow.controller);
   }
 
   return registry;

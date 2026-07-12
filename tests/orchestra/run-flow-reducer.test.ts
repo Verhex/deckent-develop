@@ -411,6 +411,12 @@ describe('known-consumer allowlist (Sprint-1 pin evolved for Sprint-2: preview-s
       // designed consumer of the contract/reducer pair — not a leak.
       'orchestra/plan-preview-service.ts',
       'orchestra/run-proposal-compiler.ts',
+      // Sprint-3 dilim (425-001): the native host-coordinator + card drive the
+      // reducer behind terminal.run_flow_v2 — the designed front-door consumers.
+      'cli/repl/run-flow-controller.ts',
+      'cli/repl/plan-preview-card.tsx',
+      'cli/repl/native-tool-registry.ts',
+      'cli/repl/cli-bridge-tool-specs.ts',
     ];
     expect(offenders.filter((o) => !KNOWN_CONSUMERS.includes(o))).toEqual([]);
   });
