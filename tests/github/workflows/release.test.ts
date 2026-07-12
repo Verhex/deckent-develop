@@ -49,6 +49,7 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       expect(workflowContent).toContain("- name: Verify release integrity")
       expect(workflowContent).toContain("- name: Verify CI attestation for this commit")
       expect(workflowContent).toContain("- name: Install dependencies")
+      expect(workflowContent).toContain("- name: Dependency audit (fail-closed, signed-exception allowlist; SEC-05)")
       expect(workflowContent).toContain("- name: Type check (lint)")
       expect(workflowContent).toContain("- name: Release smoke test-gate")
       expect(workflowContent).toContain("- name: Build")
@@ -164,6 +165,36 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
   describe('Install Dependencies Step', () => {
     it('should use npm ci', () => {
       expect(workflowContent).toMatch(/Install dependencies[\s\S]*?run: npm ci/)
+    })
+  })
+
+  describe('Dependency Audit Step (SEC-05, 419-003)', () => {
+    it('should exist, after CI attestation + install, before publish', () => {
+      const verifyCiIdx = workflowContent.indexOf('- name: Verify CI attestation for this commit')
+      const installIdx = workflowContent.indexOf('- name: Install dependencies')
+      const auditIdx = workflowContent.indexOf('- name: Dependency audit (fail-closed, signed-exception allowlist; SEC-05)')
+      const publishIdx = workflowContent.indexOf('- name: Publish to npm')
+      expect(auditIdx).toBeGreaterThan(-1)
+      expect(verifyCiIdx).toBeLessThan(auditIdx)
+      expect(installIdx).toBeLessThan(auditIdx)
+      expect(auditIdx).toBeLessThan(publishIdx)
+    })
+
+    it('should invoke the fail-closed gate script (not a bare `npm audit`)', () => {
+      expect(workflowContent).toMatch(/Dependency audit \(fail-closed, signed-exception allowlist; SEC-05\)[\s\S]*?run: node scripts\/check-dependency-audit\.mjs/)
+    })
+
+    it('should carry zero continue-on-error anywhere in this workflow — audit is a hard gate, not advisory', () => {
+      expect(workflowContent).not.toContain('continue-on-error')
+    })
+
+    it('must not touch the SHA-pinned action / OIDC permission structure elsewhere in the file', () => {
+      // Regression guard: this step is a bare `run:` (no `uses:`), so it introduces no new
+      // action pin; the pre-existing pinned actions and the id-token/actions permissions
+      // block must be exactly as many as before this task.
+      const shaPinnedActionCount = (workflowContent.match(/uses: [a-zA-Z0-9/_.-]+@[0-9a-f]{40}/g) || []).length
+      expect(shaPinnedActionCount).toBe(4) // checkout, setup-node, action-gh-release, upload-artifact
+      expect(workflowContent).toContain('id-token: write')
     })
   })
 
@@ -313,6 +344,7 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       const verifyIntegrityIdx = workflowContent.indexOf('- name: Verify release integrity')
       const verifyCiIdx = workflowContent.indexOf('- name: Verify CI attestation for this commit')
       const installIdx = workflowContent.indexOf('- name: Install dependencies')
+      const auditIdx = workflowContent.indexOf('- name: Dependency audit (fail-closed, signed-exception allowlist; SEC-05)')
       const lintIdx = workflowContent.indexOf('- name: Type check (lint)')
       const testIdx = workflowContent.indexOf('- name: Release smoke test-gate')
       const buildIdx = workflowContent.indexOf('- name: Build')
@@ -325,11 +357,14 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       // GitHub-Release'ten önce (publish başarısızsa release-notu atılmaz).
       // RC4A (414-001) ekler: verify-integrity + verify-ci, setup ile install arasında —
       // pahalı adımlardan (install/build/test) ÖNCE fail-fast.
+      // SEC-05 (419-003) ekler: dependency audit, install'dan sonra lint'ten önce —
+      // fail-closed gate, pahalı build/test adımlarından ÖNCE.
       expect(checkoutIdx).toBeLessThan(setupIdx)
       expect(setupIdx).toBeLessThan(verifyIntegrityIdx)
       expect(verifyIntegrityIdx).toBeLessThan(verifyCiIdx)
       expect(verifyCiIdx).toBeLessThan(installIdx)
-      expect(installIdx).toBeLessThan(lintIdx)
+      expect(installIdx).toBeLessThan(auditIdx)
+      expect(auditIdx).toBeLessThan(lintIdx)
       expect(lintIdx).toBeLessThan(buildIdx)
       expect(buildIdx).toBeLessThan(testIdx)
       expect(testIdx).toBeLessThan(changelogIdx)

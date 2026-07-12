@@ -1,88 +1,77 @@
-# DIRECTIVES — SPRINT-418: TT554 METERING-TRUTH + TT553 HOST-LIFECYCLE + SEC-04 CATALOG-LAZY
+# DIRECTIVES — SPRINT-419: LIVENESS-ADOPT + TT554-ARTIK + SEC-05 FAIL-CLOSED-AUDIT
 
 ## Goal
-TRACE-treni P1 dilimi (549-kilidi AÇILDI — ölçüm-işleri artık koşulabilir) + RC-6'dan SEC-04.
-**TRACE-task'ları model=opus (Alperen).** born-667 dersi: 20-dakika forensik-sınırı geçerli.
-SSOT: MASTER-PLAN 553/554 + sweep-raporu SEC-04; memory project_trace_truth_train_2026_07_12 +
-[[project_resolvetokenusage_wire_is_harmful]] (554 için ZORUNLU-OKU) + feedback_zero_hardcode_live_data.
+born-668 yarım-wire kapatma (553/554 debt'leri) + RC-6'nın SEC-05 dilimi. **TRACE-task'ları
+model=opus (Alperen).** ⚠️ Workflow-pin kör-noktaları BEŞ dizin: tests/github/ tests/workflows/
+tests/docs/ tests/scripts/ tests/governance/.
 
 ## 🔒 BAĞLAYICI (her task)
 - Yalnız kendi Files'ına yaz · `.deckent/`, `.brain/`, `.tasks/` DOKUNMA · git stash-reset YASAK · `npm run build` YASAK · notes TEK STRING · Self DÜRÜST.
 - REPRODUCE-FIRST: fix'ten önce hatalı davranışı RED testle kanıtla.
-- i18n-FIRST (user-facing CLI metni); test hermetik (tmpdir, async spawn, ≤16GB).
-- ZAMAN-DİSİPLİNİ: 20dk içinde koda başla; bulamadığını dürüstçe 'açık' bırak.
+- Test hermetik: tmpdir, async spawn, ≤16GB. ZAMAN-DİSİPLİNİ: 20dk forensik-sınırı.
 
-## Task 1: TT554 — METERING-TRUTH: tarife/capability-drift + ledger-eksiği + estimator + reporter (COST-10X ölçüm-tabanı)
+## Task 1: LIVE668A — decideWorkerLiveness ADOPT: iki gerçek kill-yolu host-primary'ye döner
 - Model: opus | Agent: bug-fixer | Effort: high | Provider: claude
-- Files: src/core/model-registry.ts, src/core/token-counter.ts, src/orchestra/sprint-reporter.ts, src/core/cost-ledger.ts, tests/core/metering-truth.test.ts
-- Scope: src/core/, src/orchestra/, tests/core/, tests/orchestra/
+- Files: src/monitor/auditor.ts, src/orchestra/sprint-checkpoint.ts, tests/orchestra/liveness-adopt.test.ts
+- Scope: src/monitor/, src/orchestra/, tests/orchestra/
 - Dependencies: none
 ### Description
-ÖNCE OKU (zorunlu): memory project_resolvetokenusage_wire_is_harmful — usage-patch/result-collector
-KONTRATINA DOKUNMA (born-562 regresyon-dersi); bu task yalnız TARİFE/ESTİMATÖR/REPORTER katmanı.
-KANIT (trace-audit 554): (1) model-registry sonnet-5 tarife 3/15 — provider-envelope 5/25 ima
-ediyor (%40 düşük; 413-002/003 vakası: provider $8.48'in yalnız $5.08'i=%59.9 ledger'da) + ctx
-1M-vs-200K & maxOut 128K-vs-32K capability-drift (model-registry.ts:~68) + haiku yardımcı-maliyet
-ledger-dışı ($0.0127); (2) estimatedTokens 8-10× düşük (chars/4 — CLI system-prompt + tool-schema
-+ connector yüzeyi hesapta yok; token-counter.ts'in eski 5.6× notuyla tutarlı); (3) reporter:
-coverage=NaN% + Total-Tasks attempt/task karışımı (5-vs-4). GÖREV: (1) TARİFE/CAPABILITY
-canlı-doğrulama: registry'deki her claude-model satırı için provider-envelope'tan (trace/ledger'daki
-gerçek usage-cost oranları) türetilen ORAN-testi — hardcode-düzeltme değil, kanıt-tablosuyla
-düzeltme (zero-hardcode-live-data: sayılar canlı-kaynak referanslı; sonnet-5 5/25 + ctx/maxOut
-gerçek değerleri kanıtla-yaz); haiku yardımcı-çağrıları ledger'a girer; (2) provider modelUsage →
-ledger köprüsü + LOCAL-vs-PROVIDER variance-alert (eşik-aşımında loud-warn — sessiz-sapma ölür);
-(3) estimator: chars/4 çıplak-metin yerine bileşen-farkındalıklı (system-prompt + tool-schema
-sabit-yükleri; kalibrasyon-katsayısı gerçek-trace'ten türetilir, kaynak-notu koda yazılır);
-(4) reporter: coverage-NaN fix + attempt-vs-task ayrımı (5-attempt/4-task doğru basılır) +
-files-changed/cost gerçek-alanları. RED-first her kalem için (mevcut yanlış-değer assert'le
-kanıtlanır). ⚠ BUILD-GATE: bu kod-fix'i Alperen build+restart'ına kadar MCP'de görünmez — notes'a yaz.
+KANIT (418-002 dürüst-debt'i): canonical `decideWorkerLiveness` (src/orchestra/
+heartbeat-monitor.ts, sprint-418) modül-sınırında RED→GREEN'li AMA iki GERÇEK kill-yolu hâlâ
+eski-yolda — (a) src/monitor/auditor.ts::isWorkerStale mtime-PRIMARY, (b) src/orchestra/
+sprint-checkpoint.ts::isStaleHeartbeat/detectStaleWorkers dosya-içi hb.timestamp okuyor →
+bayat-ts yanlış-kill PROD'da hâlâ mümkün (412-003 phantom-fix zinciri sınıfı). GÖREV: (1) iki
+yol da decideWorkerLiveness'ı ÇAĞIRIR (üçüncü-kopya karar-mantığı YASAK; adapter-girdilerini
+[pid/container/pane bilgisi] mevcut kayıtlardan besle — yoksa dürüst-fallback: host-sinyali
+sağlanamayan ortamda ESKİ mtime-davranışı korunur ve karar-log'unda 'host-signal-unavailable'
+yazılır, sessiz-varsayım yok); (2) RED-first İKİ yol için ayrı: bayat-ts + canlı-host fixture'ında
+bugün kill-kararı çıktığını kanıtla → GREEN: canlı sayılır + karar-log adlı-sinyalli; (3)
+checkpoint'in restore-yolu (sprint-412 v2) ve 550-normalize bölgeleri byte-korunur. Mevcut
+auditor/checkpoint testleri güncellenirken davranış-değişimi ayrı-pinli.
 ### goNogo
-- goCriteria: 4 kalem RED→GREEN; tarife/ctx değerleri kanıt-referanslı (hardcode-yamasız); variance-alert testli; usage-patch/result-collector kontratı byte-korunur (diff-kanıt); tests/core+orchestra ilgili-aile yeşil.
-- nogo: usage-patch kontratına dokunulursa NO_GO (born-562); tarife kanıtsız-elle yazılırsa NO_GO; variance sessiz kalırsa NO_GO.
+- goCriteria: iki kill-yolu da canonical-çağrılı (grep-kanıt: karar-mantığı kopyası yok); 2× RED→GREEN; host-signal-unavailable dürüst-fallback testli; checkpoint-v2/550 bölgeleri diff-korunur; tests/orchestra + monitor-aile yeşil.
+- nogo: üçüncü karar-kopyası doğarsa NO_GO; fallback sessiz-varsayımsa NO_GO.
 
-## Task 2: TT553 — HOST-LIFECYCLE: heartbeat HOST-sinyaline döner (worker dosya-disiplini ölür)
-- Model: opus | Agent: bug-fixer | Effort: high | Provider: claude
-- Files: src/agents/worker.ts, src/orchestra/heartbeat-monitor.ts, src/orchestra/spawn-backend-docker.ts, src/orchestra/sprint-spawner.ts, tests/orchestra/host-lifecycle-heartbeat.test.ts
-- Scope: src/agents/, src/orchestra/, tests/orchestra/
+## Task 2: MET668B — TT554-artıkları: haiku yardımcı-maliyet ledger-flip + reporter canlı-wiring
+- Model: opus | Agent: bug-fixer | Effort: medium | Provider: claude
+- Files: src/orchestra/result-evaluator.ts, src/orchestra/sprint-finalizer.ts, src/orchestra/sprint-reporter.ts, src/core/cost-ledger.ts, tests/orchestra/metering-live-wire.test.ts
+- Scope: src/orchestra/, src/core/, tests/orchestra/
 - Dependencies: none
 ### Description
-KANIT (trace-audit 553): lifecycle worker'ın .hb-dosya-yazma DİSİPLİNİNE emanet — trace'te
-hardcoded-ts hb `2026-07-11T00:00:00.000Z` 33× (WORKER-GUIDE ihlali; disk .hb tek-obje olduğundan
-görünmüyordu) + worker'lar manuel .hb/date tool-call'larıyla israf + stale-hb yanlış-kill →
-412-003 phantom-fix zinciri. GÖREV: liveness HOST-sinyalinden türer, worker yalnız SEMANTIC
-currentAction yayınlar: (1) liveness-kaynağı platform-adapter matrisiyle (Yasa #2):
-docker=container-state+log-activity · subprocess=process-alive(pid) + stdout/stderr-activity ·
-tmux=pane-activity; adapter arayüzü tek (hostLivenessProbe), platform-dalları içerde;
-Windows-subprocess dalı dürüst (tasklist/pid-probe ya da process-handle); (2) .hb dosyası
-GERİYE-UYUMLU kalır (okuyucular kırılmaz) ama LIVENESS kararı artık host-sinyalinden; .hb yalnız
-currentAction taşıyıcısı (yazılamazsa kill-sebebi DEĞİL); hardcoded/bayat-ts artık yanlış-kill
-üretemez (RED: bayat-ts .hb + canlı-host-sinyal fixture'ında bugün kill kararı çıktığını kanıtla
-→ GREEN: canlı sayılır); (3) stale-eşiği host-sinyal-yokluğuna göre; kill-kararı log'unda hangi
-sinyalin öldüğü adlı-yazılır; (4) WORKER-GUIDE/worker-prompt'taki manuel-hb talimatı
-sadeleşir (currentAction-only). Mevcut heartbeat-testleri güncellenir — davranış-değişimi
-(dosya-yazamayan-ama-canlı worker artık ölmez) AYRI test-case'le pinli.
+KANIT (418-001 dürüst-debt'i): metering-çekirdeği (cost-ledger.ts + variance-alert + reporter-fix)
+sprint-418'de kuruldu AMA iki artık read-only-scope'taydı: (a) haiku yardımcı-çağrı maliyeti
+($0.0127 sınıfı — Brain'in doc/summary yardımcı-çağrıları) hâlâ ledger-DIŞI; (b) reporter'ın
+gerçek-cost/files-changed alanları canlı-veri yoluna bağlı değil. GÖREV: (1) haiku/yardımcı-çağrı
+maliyetlerinin üretildiği yerleri envanterle (grep: haiku çağrı-noktaları; notes'a) ve ledger'a
+akıt — ÇİFT-SAYIM YASAK (mevcut worker-cost yoluyla kesişimi kontrol et, testle pinle); (2)
+reporter gerçek-cost/files-changed'i canlı-kaynaktan basar (418-001'in bıraktığı seam'leri kullan;
+yeni-seam icat etme); (3) RED-first: bugün haiku-maliyetinin ledger-toplamında OLMADIĞINI +
+reporter'ın placeholder bastığını kanıtla → GREEN. ⚠ usage-patch/result-collector kontratına
+DOKUNMA (born-562). ⚠BUILD-GATE notu notes'a.
 ### goNogo
-- goCriteria: hostLivenessProbe adapter (docker/subprocess/tmux + Win-dalı) testli; bayat-ts RED→GREEN (yanlış-kill ölür); .hb geriye-uyumlu (okuyucu-testleri yeşil); kill-log adlı-sinyalli; tests/orchestra tamamı yeşil.
-- nogo: .hb-format kırılırsa NO_GO; tek-platform fix'i (adapter'sız) NO_GO; liveness hâlâ dosya-mtime'a bağlıysa NO_GO.
+- goCriteria: haiku-maliyet ledger'da (çift-sayım-yok pini) + reporter canlı-alanlar RED→GREEN; kontrat-koruma diff-kanıt; ilgili orchestra testleri yeşil.
+- nogo: çift-sayım oluşursa NO_GO; usage-patch kontratına dokunulursa NO_GO.
 
-## Task 3: SEC04 — model-catalog fetch'i lazy: her CLI-komutu network'e çıkmasın (RC-6 dilimi)
-- Model: sonnet | Agent: bug-fixer | Effort: medium | Provider: claude
-- Files: src/cli/entry.ts, src/core/model-catalog.ts, src/cli/helpers/messages.ts, tests/cli/catalog-lazy-bootstrap.test.ts
-- Scope: src/cli/, src/core/model-catalog.ts, tests/cli/
+## Task 3: SEC05 — dependency-audit fail-closed + imzalı-istisna allowlist (RC-6 dilimi)
+- Model: sonnet | Agent: bug-fixer | Effort: high | Provider: claude
+- Files: .github/workflows/ci.yml, .github/workflows/release.yml, scripts/audit-exceptions.json, scripts/check-dependency-audit.mjs, tests/workflows/dependency-audit-gate.test.ts, tests/github/workflows/release.test.ts
+- Scope: .github/workflows/, scripts/, tests/workflows/, tests/github/, tests/governance/, tests/scripts/, tests/docs/
 - Dependencies: none
 ### Description
-KANIT (sol-sweep SEC-04): argümanlı HER CLI-komutu preAction-hook'unda (src/cli/entry.ts:~1130)
-catalog-bootstrap ediyor — warm-cache/offline yoksa models.dev'e 5s-timeout'lu GET (enterprise/
-airgap'te her `deckent status` bile dış-çağrı; AS-7 offline-pillar çelişkisi). GÖREV: (1) fetch
-LAZY olur: yalnız MODEL-BAĞIMLI akışlar tetikler (plan/start/run/models/chat sınıfı — komut-
-sınıflandırmasını command-registry'den türet, elle-liste İCAT ETME; registry'de uygun alan yoksa
-minimal ekle); status/doctor/history/config gibi okuma-komutları network'süz; (2) network-policy
-GÖRÜNÜR: fetch olacağı zaman stderr'e tek-satır bilgi (i18n; DECKENT_OFFLINE=1 ya da mevcut
-offline-config'i varsa ONA saygı — envanterle, yeniden-icat etme); (3) warm-cache davranışı
-DEĞİŞMEZ (cache varken sıfır-network aynı kalır); (4) RED-first: bugün `status`-sınıfı bir komutun
-fetch-yoluna girdiğini enjekte-fetch'le kanıtla → GREEN: girmiyor; model-bağımlı komut hâlâ
-fetch'liyor + policy-satırı basıyor.
-Smoke: DECKENT_OFFLINE=1 deckent status → network-denemesiz exit 0 (CC post-sprint kurulu-binary ile koşar)
+KANIT (sol-sweep SEC-05): high-severity npm-audit CI'da `continue-on-error: true` (ci.yml:~56-67)
+— kırmızı-audit YEŞİL-CI verir; release-workflow güvenlik-gate'i HİÇ koşmaz. GÖREV: (1) YENİ
+scripts/check-dependency-audit.mjs: `npm audit --json --omit=dev` async-spawn + parse →
+high/critical bulgu = FAIL; İSTİSNA yalnız scripts/audit-exceptions.json'dan: her kayıt
+{advisoryId, package, reason, owner, expires(ISO)} — süresi-geçmiş istisna GEÇERSİZ (fail) +
+istisna-kullanımı raporda adlı-basılır (sessiz-bypass yok); network-hatası dürüst-FAIL
+(fail-closed: 'audit koşulamadı' ≠ 'temiz'); (2) ci.yml audit-adımı continue-on-error KALKAR →
+yeni script'i çağırır; (3) release.yml verify-zincirine audit-adımı eklenir (attestation'dan
+sonra, publish'ten önce; SHA-pin/OIDC yapısına DOKUNMA); (4) BEŞ pin-dizini senkron (RED-first:
+mevcut continue-on-error pinini önce güncelle); (5) script'in unit-testi enjekte-audit-çıktısıyla
+(temiz / high'lı / istisnalı / süresi-geçmiş-istisnalı / audit-koşulamadı beş-yolu). Mevcut gerçek
+vulnerability-seti varsa: fix-denemesi KAPSAM-DIŞI — bulguları istisna-DEĞİL, notes'a envanter yaz
+(Brain karar verir); CI-yeşili için gerekiyorsa geçici-istisna AÇIK-gerekçeli + kısa-expiry.
+Smoke: node scripts/check-dependency-audit.mjs → temiz-ya-da-adlı-rapor, exit-code dürüst
 ### goNogo
-- goCriteria: komut-sınıflandırması registry-türevli; status-sınıfı RED→GREEN network'süz; model-bağımlı yol + policy-satırı testli; warm-cache yolu byte-davranış-aynı; i18n en+tr; mevcut cli testleri yeşil.
-- nogo: elle-komut-listesi hardcode'lanırsa NO_GO; warm-cache davranışı değişirse NO_GO; offline-config zaten varsa ve yok-sayılırsa NO_GO.
+- goCriteria: fail-closed beş-yol testli; istisna şeması expires/owner/reason zorunlu + süre-aşımı fail; ci.yml continue-on-error sıfır; release-zincirinde audit-adımı; 5-dizin pin-senkron; SHA-pin/OIDC diff-korunur.
+- nogo: continue-on-error herhangi bir audit-adımında kalırsa NO_GO; süresiz-istisna kabul edilirse NO_GO; network-hatası sessiz-geçerse NO_GO.

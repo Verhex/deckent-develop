@@ -25,7 +25,7 @@ import type {
 import type { TaskDNA } from '../core/routing-types.js';
 
 import {
-  BRAIN_DIR, JOBS_DIR, DASHBOARD_FILE, RECENT_WORKS_DIR,
+  BRAIN_DIR, JOBS_DIR, DASHBOARD_FILE, RECENT_WORKS_DIR, TASKS_DIR,
 } from '../core/constants.js';
 
 import { runRetention } from '../core/sprint-file-retention.js';
@@ -39,8 +39,16 @@ import {
   writeRetrospective, appendRetroSection, writeSprintLog, calculateMetrics,
   updateProjectDocs,
   buildAgentPerformance, archiveDirectives, archiveOrphanTasks,
-  buildSprintLimitBurnRow,
+  buildSprintLimitBurnRow, buildFilesChangedCostSection,
 } from './sprint-reporter.js';
+
+// ─── Cost Ledger — helper-call (off-primary) cost bridge (MET668B / 419-002) ──
+// orchestra → core import: ADR-008 allowed direction. Pure functions; the disk
+// read (collectHelperCost) lives here in orchestra, not in core.
+import {
+  buildHelperLedger, extractHelperUsageEntries, loadBundledClaudePricing,
+  type ModelUsageMap, type HelperEnvelope, type CostLedger,
+} from '../core/cost-ledger.js';
 
 // ─── Sprint Docs Updater (direct — cleanTasksArchive not re-exported via sprint-reporter) ──
 import { cleanTasksArchive } from './sprint-docs-updater.js';
@@ -855,6 +863,128 @@ export function emitFinalizeSpendAdvisory(
 }
 
 
+// ═══ Helper-call cost surfacing (MET668B / task 419-002) ══════════
+//
+// The haiku auxiliary-call cost ($0.0127 class — Brain's doc/summary helper turns) lands
+// in each task's provider envelope `modelUsage` map but is dropped by the aggregate-only
+// capture path (result-collector.ts, born-562 — untouchable), so `result.cost.usd` /
+// `buildUsageTotals` cover the PRIMARY model only. This read-side wire re-prices the
+// NON-primary (helper) models via the cost-ledger bridge and surfaces the delta — WITHOUT
+// touching the capture contract, and WITHOUT folding into buildUsageTotals (which is pinned
+// by the KPI tests and would then double-count). Best-effort + fail-safe: never blocks finalize.
+
+/** Result of {@link collectHelperCost} — the previously off-ledger auxiliary-call cost. */
+export interface HelperCostReport {
+  /** Total USD of previously off-ledger auxiliary (helper) model calls this sprint. */
+  helperUsd: number;
+  /** The priced helper ledger (rows carry model + kind:'helper' + usd). */
+  ledger: CostLedger;
+  /** How many task envelopes contributed at least one helper (non-primary) entry. */
+  envelopesWithHelper: number;
+}
+
+/** Injectable seams for {@link collectHelperCost} — used by hermetic tests. */
+export interface CollectHelperCostOptions {
+  /**
+   * Per-task `modelUsage` reader. Default: best-effort parse of `.tasks/task-<id>.log`.
+   * Return `undefined` when no envelope is available (never throw — the caller also guards).
+   */
+  readModelUsage?: (projectRoot: string, taskId: string) => ModelUsageMap | undefined;
+  /** Override the cost-config loader (default: loadCostConfig). */
+  loadConfig?: (root: string) => CostConfig;
+}
+
+const EMPTY_HELPER_LEDGER: CostLedger = { rows: [], totalUsd: 0, unpricedCount: 0 };
+
+/**
+ * Best-effort `modelUsage` extractor from a task's CLI `.log` envelope. Minimal + fail-safe:
+ * tries the whole file as a single JSON envelope first (the `--output-format json` common
+ * case), then scans line-by-line for a JSONL record carrying a `modelUsage` map; returns the
+ * LAST such map found, or `undefined` on any failure. It deliberately does NOT reinvent the
+ * full envelope parser (born-562) — an unreadable / multi-envelope-pretty-printed log simply
+ * yields `undefined` (honest miss), which the caller treats as "no helper cost for this task".
+ */
+function readModelUsageFromLog(projectRoot: string, taskId: string): ModelUsageMap | undefined {
+  try {
+    const logPath = join(projectRoot, TASKS_DIR, `task-${taskId}.log`);
+    if (!existsSync(logPath)) return undefined;
+    const raw = readFileSync(logPath, 'utf-8');
+
+    const asMap = (v: unknown): ModelUsageMap | undefined =>
+      v !== null && typeof v === 'object' ? (v as ModelUsageMap) : undefined;
+
+    // 1. Whole-file single JSON envelope (possibly pretty-printed).
+    try {
+      const whole = JSON.parse(raw) as { modelUsage?: unknown };
+      const m = asMap(whole?.modelUsage);
+      if (m) return m;
+    } catch { /* not a single JSON object — fall through to JSONL scan */ }
+
+    // 2. JSONL scan — last line carrying a modelUsage map wins.
+    let found: ModelUsageMap | undefined;
+    for (const line of raw.split('\n')) {
+      const t = line.trim();
+      if (!t.startsWith('{')) continue;
+      try {
+        const obj = JSON.parse(t) as { modelUsage?: unknown };
+        const m = asMap(obj?.modelUsage);
+        if (m) found = m;
+      } catch { /* skip non-JSON line */ }
+    }
+    return found;
+  } catch (e) {
+    debugLog('collectHelperCost:readModelUsageFromLog', e);
+    return undefined;
+  }
+}
+
+/**
+ * Aggregate the previously off-ledger helper-call cost across a sprint's results.
+ *
+ * For each result: read its provider envelope `modelUsage` map (best-effort), take the
+ * PRIMARY model from `result.tokenUsage?.model` (the model already priced into
+ * `result.cost.usd`), and price only the NON-primary models via {@link buildHelperLedger}
+ * (double-count guard lives in extractHelperUsageEntries — an unresolvable primary emits
+ * nothing). Per-result reads are individually guarded so one bad log cannot zero the rest;
+ * the whole body is fail-safe (returns an all-zero report, never throws).
+ */
+export function collectHelperCost(
+  projectRoot: string,
+  results: readonly TaskResult[],
+  opts?: CollectHelperCostOptions,
+): HelperCostReport {
+  try {
+    const read = opts?.readModelUsage ?? readModelUsageFromLog;
+    const loadConfig = opts?.loadConfig ?? ((root: string): CostConfig => loadCostConfig(root));
+    const config = loadConfig(projectRoot);
+    const ssot = loadBundledClaudePricing();
+
+    const envelopes: HelperEnvelope[] = [];
+    let envelopesWithHelper = 0;
+    for (const r of results) {
+      let modelUsage: ModelUsageMap | undefined;
+      try {
+        modelUsage = read(projectRoot, r.taskId);
+      } catch (e) {
+        debugLog('collectHelperCost:read', e);
+        continue;
+      }
+      if (!modelUsage) continue;
+      const primaryModel = r.tokenUsage?.model;
+      envelopes.push({ primaryModel, modelUsage });
+      // Presence check via the same guard (no pricing) — cheaper than a full per-result ledger.
+      if (extractHelperUsageEntries(modelUsage, primaryModel, ssot).length > 0) envelopesWithHelper += 1;
+    }
+
+    const ledger = buildHelperLedger(envelopes, config, ssot);
+    return { helperUsd: ledger.totalUsd, ledger, envelopesWithHelper };
+  } catch (e) {
+    debugLog('finalizeSprint:collectHelperCost', e);
+    return { helperUsd: 0, ledger: EMPTY_HELPER_LEDGER, envelopesWithHelper: 0 };
+  }
+}
+
+
 // ═══ Finalize Sprint ══════════════════════════════════════════════
 
 /**
@@ -1075,6 +1205,31 @@ export async function finalizeSprint(
       appendRetroSection(projectRoot, sprint.id, '### Limit Burn', section);
     }
   } catch (e) { debugLog('finalizeSprint:limitBurnRow', e); }
+
+  // ─── MET668B (419-002) — helper-call cost + REAL files/cost retro wire ──
+  // (a) Surface the previously off-ledger auxiliary (haiku helper) cost, priced from each
+  //     task's envelope modelUsage minus the already-captured primary (double-count guarded).
+  // (b) Render REAL files-changed/cost from the live `results` via the 418-001 seam
+  //     (computeFilesChangedAndCost) — replacing the hardcoded-0 placeholders in the report.
+  // Best-effort + fail-safe: never blocks finalize. Helper cost is kept SEPARATE from
+  // buildUsageTotals/KPI (which stays primary-only) so it is added exactly once.
+  try {
+    const helper = collectHelperCost(projectRoot, results);
+    if (helper.helperUsd > 0) {
+      writeEvent(
+        projectRoot, sprintIdForEvents, 'brain', '*',
+        CHANNELS.METRIC_EMITTED,
+        {
+          name: 'sprint.helperCost', sprintId: sprint.id,
+          helperUsd: helper.helperUsd,
+          rows: helper.ledger.rows.length,
+          unpriced: helper.ledger.unpricedCount,
+        },
+      );
+    }
+    const section = buildFilesChangedCostSection(results, { helperCostUsd: helper.helperUsd });
+    appendRetroSection(projectRoot, sprint.id, '## Files Changed & Cost', section);
+  } catch (e) { debugLog('finalizeSprint:helperCostWire', e); }
 
   // Sprint 198 198-002 defensive fallback — guarantees a sprint-log DB
   // row even when writeRetrospective threw or its own try/catch returned

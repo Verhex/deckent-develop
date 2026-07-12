@@ -66,42 +66,6 @@
       "code": "const result = spawnSync('tmux', ['-V'], { encoding: 'utf-8' });"
     },
     {
-      "file": "src/cli/commands/doctor.ts",
-      "code": "const authResult = spawnSync('claude', ['config', 'get', 'account'], { encoding: 'utf-8', shell: shellOpt });"
-    },
-    {
-      "file": "src/cli/commands/doctor.ts",
-      "code": "const imgResult = spawnSync('docker', ['images', '-q', 'deckent-worker:latest'], {"
-    },
-    {
-      "file": "src/cli/commands/doctor.ts",
-      "code": "const memResult = spawnSync('docker', ['info', '--format', '{{.MemTotal}}'], {"
-    },
-    {
-      "file": "src/cli/commands/doctor.ts",
-      "code": "const result = spawnSync('claude', ['--version'], { encoding: 'utf-8', shell: shellOpt });"
-    },
-    {
-      "file": "src/cli/commands/doctor.ts",
-      "code": "const result = spawnSync('docker', ['info'], {"
-    },
-    {
-      "file": "src/cli/commands/doctor.ts",
-      "code": "const result = spawnSync('git', ['--version'], { encoding: 'utf-8' });"
-    },
-    {
-      "file": "src/cli/commands/doctor.ts",
-      "code": "const result = spawnSync('git', ['ls-files', ...criticalFiles], {"
-    },
-    {
-      "file": "src/cli/commands/doctor.ts",
-      "code": "const result = spawnSync('node', ['--version'], { encoding: 'utf-8' });"
-    },
-    {
-      "file": "src/cli/commands/doctor.ts",
-      "code": "const result = spawnSync('tmux', ['-V'], { encoding: 'utf-8' });"
-    },
-    {
       "file": "src/cli/commands/onboard.ts",
       "code": "const initResult = spawnSync('npx', initArgs, {"
     },
@@ -280,6 +244,18 @@
     {
       "file": "src/orchestra/disk-verify.ts",
       "code": "const res = spawnSync('git', args, {"
+    },
+    {
+      "file": "src/orchestra/heartbeat-monitor.ts",
+      "code": "const res = spawnSync("
+    },
+    {
+      "file": "src/orchestra/heartbeat-monitor.ts",
+      "code": "const res = spawnSync("
+    },
+    {
+      "file": "src/orchestra/heartbeat-monitor.ts",
+      "code": "spawnSync(cmd, args, { encoding: 'utf-8', timeout: TASKLIST_PROBE_TIMEOUT_MS }),"
     },
     {
       "file": "src/orchestra/honest-gate.ts",

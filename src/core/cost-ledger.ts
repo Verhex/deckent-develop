@@ -330,6 +330,139 @@ export function reconcileLedgerAgainstProvider(
   return { ledger, variance, warned };
 }
 
+// ─── Helper-call (off-primary) cost bridge (MET668B / task 419-002) ──────────
+//
+// The haiku auxiliary-call cost ($0.0127 class — Brain's doc/summary helper turns)
+// is produced inside the provider envelope's per-model `modelUsage` map
+// (`{ "claude-opus-4-8": {...}, "claude-haiku-4-5": {...} }`, src/providers/claude.ts).
+// The capture path (result-collector.ts, born-562 — untouchable) folds that envelope
+// into a SINGLE aggregate TokenUsage → `result.cost.usd` covers the PRIMARY model only,
+// so the helper (non-primary) model's cost is dropped: OFF-LEDGER. These pure helpers
+// surface it WITHOUT touching the capture contract — a read-side bridge that prices only
+// the NON-primary models, so the previously off-ledger helper cost joins the ledger with
+// NO double-count of the already-captured primary.
+
+/** One provider-envelope per-model usage entry (the camelCase `modelUsage` block). */
+export interface ModelUsageEntry {
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheReadTokens?: number;
+  cacheCreationTokens?: number;
+  /** Provider-reported per-model cost — carried for reference only; the ledger RE-PRICES from tokens. */
+  costUSD?: number;
+}
+
+/** The provider envelope's `modelUsage` map: wire-model-id → per-model usage. */
+export type ModelUsageMap = Record<string, ModelUsageEntry>;
+
+/** A single task's contribution to the helper ledger: its primary model + full modelUsage map. */
+export interface HelperEnvelope {
+  /**
+   * Wire/deckent/alias id of the task's PRIMARY model — its cost is already captured on the
+   * task result (`result.cost.usd`) and MUST be excluded here to avoid double-counting.
+   */
+  primaryModel: string | undefined;
+  /** The provider envelope's per-model usage map (may be undefined when no envelope was captured). */
+  modelUsage: ModelUsageMap | undefined;
+}
+
+/** Non-negative finite number, else 0 — mirrors the capture-side numeric hygiene. */
+function nonNegNum(v: unknown): number {
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0;
+}
+
+/**
+ * Canonicalize a bare model id/alias/wire-id to its SSOT key, or null when the SSOT does
+ * not know it (non-claude / unregistered). Wraps {@link resolveSsotForModel} so a plain
+ * string (an envelope's `modelUsage` key OR the captured primary model) resolves the same
+ * way a full {@link ModelDefinition} would — the registry's date-suffixed
+ * `claude-haiku-4-5-20251001` and the deckent id `haiku` both collapse to `claude-haiku-4-5`.
+ */
+export function canonicalClaudeModelKey(
+  model: string,
+  ssotModels: Record<string, ModelPricing>,
+): string | null {
+  return resolveSsotForModel({ id: model, apiId: model }, ssotModels)?.key ?? null;
+}
+
+/**
+ * Extract the HELPER (off-primary) per-model usage entries from a provider envelope's
+ * `modelUsage` map, EXCLUDING the primary model whose cost is already captured on the task
+ * result. This is the double-count guard the task nogo forbids breaking.
+ *
+ * Guard semantics (advisor item 1 — the graded direction):
+ *  - The primary model is matched by SSOT-canonical key, so `opus` / `claude-opus-4-8` /
+ *    a date-suffixed alias all exclude the same envelope entry.
+ *  - CONSERVATIVE fallback: when `primaryModel` cannot be resolved to an SSOT key
+ *    (undefined, or a non-claude / unregistered id) the primary vs helper split is
+ *    unknowable, so NO entries are emitted — an honest under-count beats a forbidden
+ *    double-count (never re-add the primary as a "helper").
+ *  - Zero-usage entries (no input/output/cache tokens) are skipped as noise.
+ *
+ * Pure: the returned {@link CostLedgerEntry}s (all `kind: 'helper'`) are priced by
+ * {@link buildCostLedger} via the existing cost-calculator — no reinvention.
+ */
+export function extractHelperUsageEntries(
+  modelUsage: ModelUsageMap | undefined,
+  primaryModel: string | undefined,
+  ssotModels: Record<string, ModelPricing> = loadBundledClaudePricing(),
+): CostLedgerEntry[] {
+  if (!modelUsage || typeof modelUsage !== 'object') return [];
+  // Conservative guard: an unresolvable primary makes the primary/helper split unknowable.
+  const primaryKey = primaryModel ? canonicalClaudeModelKey(primaryModel, ssotModels) : null;
+  if (!primaryKey) return [];
+
+  const entries: CostLedgerEntry[] = [];
+  for (const [wireId, usage] of Object.entries(modelUsage)) {
+    if (usage === null || typeof usage !== 'object') continue;
+    const key = canonicalClaudeModelKey(wireId, ssotModels);
+    // Skip the already-captured primary model (the double-count guard).
+    if (key !== null && key === primaryKey) continue;
+
+    const inputTokens = nonNegNum(usage.inputTokens);
+    const outputTokens = nonNegNum(usage.outputTokens);
+    const cacheReadTokens = nonNegNum(usage.cacheReadTokens);
+    const cacheCreationTokens = nonNegNum(usage.cacheCreationTokens);
+    if (inputTokens === 0 && outputTokens === 0 && cacheReadTokens === 0 && cacheCreationTokens === 0) {
+      continue; // no measurable helper usage — nothing to price
+    }
+
+    entries.push({
+      // Prefer the canonical SSOT key (always priceable); fall back to the raw wire id so a
+      // non-claude helper prices honestly as unknown-model (unpricedCount++), never dropped.
+      model: key ?? wireId,
+      usage: {
+        inputTokens,
+        outputTokens,
+        ...(usage.cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
+        ...(usage.cacheCreationTokens !== undefined ? { cacheCreationTokens } : {}),
+      },
+      kind: 'helper',
+    });
+  }
+  return entries;
+}
+
+/**
+ * Build a HELPER-only cost ledger across a set of task provider-envelopes — the previously
+ * off-ledger auxiliary-call cost (e.g. Brain's haiku doc/summary turns). Each envelope
+ * contributes ONLY its non-primary models (see {@link extractHelperUsageEntries}), so the
+ * result is exactly the delta that `buildUsageTotals`/`result.cost.usd` (primary-only) miss.
+ * Pure — config + SSOT injected, no disk I/O.
+ */
+export function buildHelperLedger(
+  envelopes: readonly HelperEnvelope[],
+  config: CostConfig,
+  ssotModels: Record<string, ModelPricing> = loadBundledClaudePricing(),
+  provider = 'claude',
+): CostLedger {
+  const entries: CostLedgerEntry[] = [];
+  for (const env of envelopes) {
+    entries.push(...extractHelperUsageEntries(env.modelUsage, env.primaryModel, ssotModels));
+  }
+  return buildCostLedger(entries, config, provider);
+}
+
 // Re-export the singleton registry so callers can `detectTariffDrift` against the
 // live catalog without a second import.
 export { modelRegistry, type ModelRegistry };

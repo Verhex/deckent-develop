@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-419 Learnings
+- Sprint sprint-419 Learnings: ## Sprint sprint-419 Learnings
+- LIVE668A — decideWorkerLiveness ADOPT: iki gerçek kill-yolu host-primary'ye döner: GO_WITH_TECH_DEBT — Worker timeout/killed (exitCode=1) but git diff shows 27 files modified. Brain should reconcile via Spurious NO_GO helpe
+- SEC05 — dependency-audit fail-closed + imzalı-istisna allowlist (RC-6 dilimi): GO_WITH_TECH_DEBT — Implemented the SEC-05 fail-closed dependency-audit gate. scripts/check-dependency-audit.mjs async-spawns `npm audit --j
+
+## Gains
+- 419-002 — MET668B — TT554-artıkları: haiku yardımcı-maliyet ledger-flip + reporter canlı-wiring — MET668B — TT554-artıkları (haiku helper-cost ledger-flip + reporter live-wire) tamamlandı; her ik...
+
 ## Sprint sprint-418 Learnings
 - Sprint sprint-418 Learnings: ## Sprint sprint-418 Learnings
 - TT554 — METERING-TRUTH: tarife/capability-drift + ledger-eksiği + estimator + reporter (COST-10X ölçüm-tabanı): GO_WITH_TECH_DEBT — TT554 METERING-TRUTH — 4 kalem RED→GREEN, evidence-referenced (hardcode-yamasız). Verify: `npx tsc --noEmit` exit 0; tar

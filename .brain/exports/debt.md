@@ -4,16 +4,18 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-416-002-fix | Timeout-partial from 416-002-fix: worker killed mid-execution, work accepted | critical | sprint-416 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-419-001 | Timeout-partial from 419-001: worker killed mid-execution, work accepted | normal | sprint-419 | resolved |
+| debt-419-003 | Tech debt from 419-003: Implemented the SEC-05 fail-closed dependency-audit gate | normal | sprint-419 | resolved |
 | debt-418-001 | Tech debt from 418-001: TT554 METERING-TRUTH — 4 kalem RED→GREEN, evidence-refer | normal | sprint-418 | resolved |
 | debt-418-002 | Tech debt from 418-002: TT553 HOST-LIFECYCLE — liveness now derives from a HOST  | normal | sprint-418 | resolved |
 | debt-417-001 | Tech debt from 417-001: exitCode-yazar envanteri (grep 'process.exitCode ='/'pro | normal | sprint-417 | resolved |
 | rollback-sprint-416 | Sprint sprint-416 rollback SUCCESS | normal | sprint-416 | resolved |
+| debt-416-002-fix | Timeout-partial from 416-002-fix: worker killed mid-execution, work accepted | critical | sprint-416 | resolved |
 | debt-414-001 | Tech debt from 414-001: Implemented all 6 GÖREV items in release.yml/publish.yml | normal | sprint-414 | resolved |
 | debt-413-001 | Tech debt from 413-001: Root cause (confirmed via async-spawn repro BEFORE any f | normal | sprint-413 | resolved |
 | debt-413-004 | Tech debt from 413-004: SCHED3 dilim-3 (docs/analysis/scheduler-unify-design-202 | normal | sprint-413 | resolved |

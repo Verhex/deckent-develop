@@ -9,6 +9,20 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint419] - 2026-07-12
+
+### Added
+
+- MET668B — TT554-artıkları: haiku yardımcı-maliyet ledger-flip + reporter canlı-wiring
+
+### Changed
+
+- LIVE668A — decideWorkerLiveness ADOPT: iki gerçek kill-yolu host-primary'ye döner (completed with tech debt)
+- SEC05 — dependency-audit fail-closed + imzalı-istisna allowlist (RC-6 dilimi) (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 2 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint418] - 2026-07-12
 
 ### Added

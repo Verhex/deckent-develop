@@ -70,12 +70,15 @@ describe('CI Workflow (.github/workflows/ci.yml)', () => {
       expect(content).toContain('security:');
     });
 
-    it('should run npm audit with high audit level', () => {
-      expect(content).toContain('npm audit --audit-level=high');
+    it('should run the fail-closed dependency-audit gate (SEC-05, 419-003)', () => {
+      // The old advisory `npm audit --audit-level=high` + continue-on-error
+      // pair died with SEC-05: the audit is now a fail-closed script with a
+      // signed-exception allowlist.
+      expect(content).toContain('node scripts/check-dependency-audit.mjs');
     });
 
     it('should name the security audit step', () => {
-      expect(content).toContain('npm audit (high severity)');
+      expect(content).toContain('Dependency audit (fail-closed, signed-exception allowlist; SEC-05)');
     });
   });
 

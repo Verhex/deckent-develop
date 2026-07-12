@@ -51,6 +51,8 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-419 Learnings** (sprint-419): ## Sprint sprint-419 Learnings
+- LIVE668A — decideWorkerLiveness ADOPT: iki gerçek kill-yolu host-primary'ye döner: G...
 - **Sprint sprint-418 Learnings** (sprint-418): ## Sprint sprint-418 Learnings
 - TT554 — METERING-TRUTH: tarife/capability-drift + ledger-eksiği + estimator + report...
 - **Sprint sprint-417 Learnings** (sprint-417): ## Sprint sprint-417 Learnings
@@ -73,13 +75,9 @@
 
 ## Gains
 - 410-001 — DASH-PERF — MASTER-PLAN 494: React.lazy route-splitting + istek-...
-- **Sprint sprint-409 Learnings** (sprint-409): ## Sprint sprint-409 Learnings
-
-## Gains
-- 409-001 — INPUT-BAR-FIXES — born-527: Home/End algılama + paste-history + ...
 
 ## Active Technical Debt
-- [CRITICAL] Timeout-partial from 416-002-fix: worker killed mid-execution, work accepted
+_No active technical debt._
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -147,4 +145,4 @@
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 
-_Total entries: 1269 | Generated: 2026-07-12_
+_Total entries: 1274 | Generated: 2026-07-12_

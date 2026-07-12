@@ -707,3 +707,60 @@ export function computeFilesChangedAndCost(
   }
   return { filesChanged: files.size, linesAdded, linesRemoved, costUsd };
 }
+
+// ═══ MET668B Task 419-002 — Files-Changed / Cost live retro section ═══════════
+//
+// 418-001 added `computeFilesChangedAndCost` as a pure seam but left it UN-wired: the
+// live metrics table still shows the hardcoded-0 placeholders (SprintMetrics
+// `crossAssignments`/`contextLinesUsed` are literal 0s and SprintMetrics has no
+// files/cost field at all; `calculateMetrics` is read-only for this task). This renders
+// the REAL aggregate from the collected results (canlı-kaynak) so finalizeSprint can
+// append it to the retro — mirroring the buildLivenessStatsSection / Limit-Burn wire
+// pattern above. It REUSES the 418-001 seam; no new aggregation is invented.
+//
+// The optional `helperCostUsd` surfaces the previously off-ledger auxiliary-call cost
+// (MET668B part 1, buildHelperLedger.totalUsd) on its OWN line, kept SEPARATE from the
+// per-task cost sum so the two are never conflated in the display either (no double-count).
+
+/** Options for {@link buildFilesChangedCostSection}. */
+export interface FilesChangedCostSectionOptions {
+  /**
+   * Previously off-ledger helper-call USD (buildHelperLedger total). Rendered as its OWN
+   * line plus a combined total — omitted (no helper/total lines) when absent or ≤ 0.
+   */
+  helperCostUsd?: number;
+}
+
+/**
+ * Render the REAL files-changed + cost aggregate as a retro markdown section.
+ *
+ * The "## Files Changed & Cost" heading is the contract surface downstream retro readers
+ * key off. Always rendered (even for an empty sprint → all-zero) so reviewers can
+ * distinguish "no work / no cost" from "section missing / still on placeholders".
+ */
+export function buildFilesChangedCostSection(
+  results: readonly FilesChangedCostContributor[],
+  opts?: FilesChangedCostSectionOptions,
+): string {
+  const s = computeFilesChangedAndCost(results);
+  const lines = [
+    '## Files Changed & Cost',
+    '',
+    `- Files changed: ${s.filesChanged}`,
+    `- Lines: +${s.linesAdded} / -${s.linesRemoved}`,
+    `- Task cost: $${s.costUsd.toFixed(4)}`,
+  ];
+  const helper = opts?.helperCostUsd;
+  if (typeof helper === 'number' && Number.isFinite(helper) && helper > 0) {
+    lines.push(`- Helper-call cost (auxiliary, was off-ledger): $${helper.toFixed(4)}`);
+    // Combined figure is ADVISORY only. The auxiliary cost may overlap the task cost in the
+    // intermittent opus envelope quirk (top-level output_tokens absent → capture folds helper
+    // output at the primary rate; born-562 forbids fixing that in the capture path). The two
+    // component lines above stay authoritative and separate — only this sum can over-count.
+    lines.push(
+      `- Total cost (task + auxiliary — advisory; auxiliary may overlap when top-level output absent): ` +
+      `$${(s.costUsd + helper).toFixed(4)}`,
+    );
+  }
+  return lines.join('\n') + '\n';
+}
