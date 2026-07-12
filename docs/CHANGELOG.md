@@ -9,6 +9,18 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint430] - 2026-07-12
+
+### Added
+
+- Scheduler-shadow retention config şeması (config-types.ts + config.ts defaults + config-reference.md)
+- 14-günlük yaş-bazlı retention motoru (scheduler-shadow-retention.ts) + unit testler
+- Finalize akışına scheduler-shadow retention wiring (sprint-finalizer.ts Step 12f)
+- Uçtan-uca entegrasyon kanıtı: finalize sırasında eski scheduler-shadow jsonl arşivleme doğrulaması
+
+
+_Tasks: 4 total, 4 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint429] - 2026-07-12
 
 ### Added

@@ -10544,3 +10544,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 429-011: HYG — 427-011 inventory-dosyası .deckent hijyeni doğrulaması (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 430 — sprint-430
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-12
+**Duration:** 970s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 969856ms |
+
+### Tasks
+
+- 430-001: Scheduler-shadow retention config şeması (config-types.ts + config.ts defaults + config-reference.md) (DONE)
+- 430-002: 14-günlük yaş-bazlı retention motoru (scheduler-shadow-retention.ts) + unit testler (DONE)
+- 430-003: Finalize akışına scheduler-shadow retention wiring (sprint-finalizer.ts Step 12f) (DONE)
+- 430-004: Uçtan-uca entegrasyon kanıtı: finalize sırasında eski scheduler-shadow jsonl arşivleme doğrulaması (DONE)
+
+---

@@ -51,6 +51,10 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-430 Learnings** (sprint-430): ## Sprint sprint-430 Learnings
+
+## Gains
+- 430-001 — Scheduler-shadow retention config şeması (config-types.ts + conf...
 - **Sprint sprint-429 Learnings** (sprint-429): ## Sprint sprint-429 Learnings
 - N677 — directives-builder delimiter-güvenliği: GO_WITH_TECH_DEBT — born-677 root cau...
 - **Sprint sprint-428 Learnings** (sprint-428): ## Sprint sprint-428 Learnings
@@ -75,8 +79,6 @@
 
 ## Gains
 - 421-001 — DEP669B — nodemailer 9.x semver-MAJOR bump (GHSA-rcmh + GHSA-p6g...
-- **Sprint sprint-420 Learnings** (sprint-420): ## Sprint sprint-420 Learnings
-- LIVE668A — decideWorkerLiveness ADOPT (3. deneme; iki gerçek kill-yolu): GO_WITH_TEC...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -149,4 +151,4 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 
-_Total entries: 1317 | Generated: 2026-07-12_
+_Total entries: 1320 | Generated: 2026-07-12_

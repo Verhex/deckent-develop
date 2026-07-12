@@ -29,6 +29,7 @@ import {
 } from '../core/constants.js';
 
 import { runRetention } from '../core/sprint-file-retention.js';
+import { archiveStaleSchedulerShadowJournals } from '../core/scheduler-shadow-retention.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { updateLastSprintId, debugLog } from '../core/utils.js';
@@ -1891,6 +1892,25 @@ export async function finalizeSprint(
   if (prunedHandoffs > 0) {
     debugLog('finalizeSprint:pruneStaleHandoffs', `Pruned ${prunedHandoffs} stale handoff file(s)`);
   }
+
+  // 12f. Scheduler-shadow journal retention — archive .deckent/runtime/scheduler-shadow/*.jsonl
+  // files older than retention_days (age-based, fail-soft, mirrors Step 12d).
+  debugLog('finalizeSprint:breadcrumb', 'Step 12f (schedulerShadowRetention) — entering');
+  try {
+    // Read retention config from project config if available
+    let schedulerShadowRetentionConfig: Record<string, unknown> = {};
+    try {
+      const cfgPath = join(projectRoot, '.deckent', 'config.json');
+      if (existsSync(cfgPath)) {
+        const raw = JSON.parse(readFileSync(cfgPath, 'utf-8'));
+        if (raw?.scheduler_shadow_retention) schedulerShadowRetentionConfig = raw.scheduler_shadow_retention;
+      }
+    } catch { /* use defaults */ }
+
+    const schedulerShadowResult = archiveStaleSchedulerShadowJournals(projectRoot, schedulerShadowRetentionConfig);
+    debugLog('finalizeSprint:schedulerShadowRetention',
+      `Retention complete: archived=${schedulerShadowResult.archived.length}, bytesFreed=${schedulerShadowResult.bytesFreed}`);
+  } catch (e) { debugLog('finalizeSprint:schedulerShadowRetention', e); }
 
   // 13. Write job completion summary to .deckent/runtime/jobs/ for MCP polling and CLI notification
   debugLog('finalizeSprint:breadcrumb', 'Step 13 (jobSummary) — entering');

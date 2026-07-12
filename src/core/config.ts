@@ -970,6 +970,14 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  // ─── Scheduler shadow-retention validation ─────────────────────────
+  if (config.scheduler_shadow_retention?.retention_days !== undefined) {
+    const v = config.scheduler_shadow_retention.retention_days;
+    if (typeof v !== 'number' || v < 1 || v > 365) {
+      errors.push('scheduler_shadow_retention.retention_days must be a number between 1 and 365');
+    }
+  }
+
   // ─── Gate config validation (Sprint 325) ───────────────────────────
   if (config.gate !== undefined) {
     const g = config.gate;
@@ -1359,6 +1367,11 @@ export function createDefaultConfig(): DeckentConfig {
       keep_last_n: 10,
       size_cap_mb: 500,
       archive_path: '.deckent/archive/sprints/',
+    },
+    // Scheduler Shadow Retention (kullanıcı talebi: 14 gün)
+    scheduler_shadow_retention: {
+      retention_days: 14,
+      archive_path: '.deckent/archive/scheduler-shadow/',
     },
     // Runtime Style
     deckent_style: 'sprint',

@@ -1,5 +1,14 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-430 Learnings
+- Sprint sprint-430 Learnings: ## Sprint sprint-430 Learnings
+
+## Gains
+- 430-001 — Scheduler-shadow retention config şeması (config-types.ts + config.ts defaults + config-reference.md) — SchedulerShadowRetentionConfig interface added to config-types.ts directly after SprintFileRetent...
+- 430-002 — 14-günlük yaş-bazlı retention motoru (scheduler-shadow-retention.ts) + unit testler — New pure module src/core/scheduler-shadow-retention.ts mirrors sprint-file-retention.ts's fail-so...
+- 430-003 — Finalize akışına scheduler-shadow retention wiring (sprint-finalizer.ts Step 12f) — Added Step 12f (schedulerShadowRetention) to finalizeSprint() in src/orchestra/sprint-finalizer.t...
+- 430-004 — Uçtan-uca entegrasyon kanıtı: finalize sırasında eski scheduler-shadow jsonl arşivleme doğrulaması — Created tests/orchestra/scheduler-shadow-retention-finalize.test.ts — 3 tests, all real (unmocked...
+
 ## Sprint sprint-429 Learnings
 - Sprint sprint-429 Learnings: ## Sprint sprint-429 Learnings
 - N677 — directives-builder delimiter-güvenliği: GO_WITH_TECH_DEBT — born-677 root cause: buildTaskBlock() joined goCriteria/nogo items with '; ' and validateTask() called assertNoDelimiter

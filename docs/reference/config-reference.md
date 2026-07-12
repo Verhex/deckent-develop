@@ -962,6 +962,8 @@ Proactive meta-orchestrator (ADR-040).
 | `sprint_file_retention.keep_last_n` | `10` (863) | number | Sprints kept in the project root (sprint-file-retention.ts:255). |
 | `sprint_file_retention.size_cap_mb` | `500` (864) | number | Total sprint-file size cap. |
 | `sprint_file_retention.archive_path` | `".deckent/archive/sprints/"` (865) | path | Archive directory. |
+| `scheduler_shadow_retention.retention_days` | `14` (config.ts:1374) | number (1–365, validate config.ts:974-978) | Age in days before a `.deckent/runtime/scheduler-shadow/*.jsonl` file is archived; consumed by scheduler-shadow-retention.ts (future task). |
+| `scheduler_shadow_retention.archive_path` | `".deckent/archive/scheduler-shadow/"` (config.ts:1375) | path | Archive directory for scheduler-shadow files. |
 | `terminal.enabled` | `true` | boolean | Embedded web terminal (ADR-062). |
 | `terminal.bind` | `"127.0.0.1"` | IP | WS bind address (localhost = safe default). |
 | `terminal.maxSessions` | `10` | number | Max concurrent PTY sessions. |

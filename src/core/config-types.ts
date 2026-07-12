@@ -923,6 +923,8 @@ export interface DeckentConfig {
   /** Retention policy for sprint-prefixed files in .deckent/ (events, checkpoints, gates, pre-archives).
    *  Hybrid strategy: keep_last_n + size_cap_mb — whichever triggers first wins. */
   sprint_file_retention?: Partial<SprintFileRetentionConfig>;
+  /** Retention policy for scheduler-shadow JSONL files (age-based archive). */
+  scheduler_shadow_retention?: Partial<SchedulerShadowRetentionConfig>;
 
   // ─── Nervous System ─────────────────────────────────────────────────
   /** Proactive meta-orchestrator nervous system configuration (Sprint 147+) */
@@ -1239,6 +1241,16 @@ export interface SprintFileRetentionConfig {
   /** Maximum total size in MB for sprint files before oldest are archived (default: 500) */
   size_cap_mb: number;
   /** Archive destination path relative to project root (default: '.deckent/archive/sprints/') */
+  archive_path: string;
+}
+
+/** Configuration for scheduler-shadow JSONL file retention in
+ *  .deckent/runtime/scheduler-shadow/ directory. Age-based strategy:
+ *  files older than retention_days are archived to archive_path. */
+export interface SchedulerShadowRetentionConfig {
+  /** Age in days after which a scheduler-shadow JSONL file is archived (default: 14) */
+  retention_days: number;
+  /** Archive destination path relative to project root (default: '.deckent/archive/scheduler-shadow/') */
   archive_path: string;
 }
 
