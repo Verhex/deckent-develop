@@ -1,5 +1,19 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-428 Learnings
+- Sprint sprint-428 Learnings: ## Sprint sprint-428 Learnings
+
+## Gains
+- 428-001 — W674A — ctx-doldurma: toolInventory + verifyCommands (born-674) — buildWorkerPrompt (task-builder.ts) now populates SprintContext.toolInventory via readToolInvento...
+- 428-002 — W674B — tools.allowlist_enabled flag'i + toolAllowlist ctx (born-674) — Added typed ToolsConfig { allowlist_enabled?: boolean } (config-types.ts) and wired it as tools?:...
+- 428-003 — W674C — üç-blok uçtan-uca render kanıtı (born-674) — New tests/orchestra/prompt-blocks-e2e.test.ts (only file in write scope; nothing else touched).
+- 428-004 — T6A — cli-bridge-tool-specs canonical-yol notu (TERM-6) — Sprint-3 (425-001) had already scaffolded the full canonical-cutover mechanism in cli-bridge-tool...
+- 428-005 — T6B — DECKENT.md canonical-akış dokümantasyonu (TERM-6) — Added 'Native Terminal Work-Launching Flow' section to DECKENT.md documenting the canonical flow ...
+- 428-006 — T6C — do.ts compatibility-adapter (TERM-6; sync-stdio + DIRECTIVES-swap ölür) — Flag-on (config.terminal.run_flow_v2 === true) `deckent do` now delegates entirely to the 426/427...
+- 428-007 — T6D — plan-nl compatibility-preview-adapter (TERM-6) — buildPlanNlIntent dies as the runtime-canonical preview source when terminal.run_flow_v2 is on: a...
+- 428-008 — T6E — cli/index route-wiring (TERM-6) — T6E cli/index route-wiring.
+- …and 5 more delivered
+
 ## Sprint sprint-427 Learnings
 - Sprint sprint-427 Learnings: ## Sprint sprint-427 Learnings
 - WIRE-PROBE — sprint-start env-probe doldurma (born-670a): GO_WITH_TECH_DEBT — born-670a WIRE-PROBE implemented: runPlanPhase (sprint-phases.ts) now calls the new probeAndPersistToolInventory(project

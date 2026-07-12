@@ -51,6 +51,10 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-428 Learnings** (sprint-428): ## Sprint sprint-428 Learnings
+
+## Gains
+- 428-001 — W674A — ctx-doldurma: toolInventory + verifyCommands (born-674) ...
 - **Sprint sprint-427 Learnings** (sprint-427): ## Sprint sprint-427 Learnings
 - WIRE-PROBE — sprint-start env-probe doldurma (born-670a): GO_WITH_TECH_DEBT — born-6...
 - **Sprint sprint-426 Learnings** (sprint-426): ## Sprint sprint-426 Learnings
@@ -73,8 +77,6 @@
 - LIVE668A — decideWorkerLiveness ADOPT (3. deneme; iki gerçek kill-yolu): GO_WITH_TEC...
 - **Sprint sprint-419 Learnings** (sprint-419): ## Sprint sprint-419 Learnings
 - LIVE668A — decideWorkerLiveness ADOPT: iki gerçek kill-yolu host-primary'ye döner: G...
-- **Sprint sprint-418 Learnings** (sprint-418): ## Sprint sprint-418 Learnings
-- TT554 — METERING-TRUTH: tarife/capability-drift + ledger-eksiği + estimator + report...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -147,4 +149,4 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 
-_Total entries: 1309 | Generated: 2026-07-12_
+_Total entries: 1312 | Generated: 2026-07-12_

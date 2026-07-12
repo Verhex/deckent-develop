@@ -387,3 +387,47 @@ describe('Bug Y bonus — dependency_pipeline_enabled semantics', () => {
     expect(eligible[0].id).toBe('165-001');
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// SCHED-7 (428-011) — stall-pin sync: dependency-pipeline mode never
+// selects a dependent of a terminally-failed (NO_GO / MANUAL_REVIEW_REQUIRED)
+// root. This mirrors, on the legacy `selectEligibleForSpawn` pure-helper
+// path, the same safety property tests/orchestra/scheduler-fifo-dependency-
+// safety.test.ts (428-010) pins for the new `reduceSchedulerTick` engine
+// ("MRR/NO_GO dependency spawn değil cascade üretir" — the two paths' pinned
+// guarantees must agree). `selectEligibleForSpawn` already gets this for
+// free from `computeEffectiveDependencyState`'s `satisfyingIds` gate (a
+// NO_GO/MRR root is never "satisfying", so `allDone` stays false) — no
+// production code change; this locks the existing behavior down explicitly.
+// ═══════════════════════════════════════════════════════════════════════
+
+describe('SCHED-7 (428-011) — dependency pipeline never spawns a dependent of a terminally-failed root', () => {
+  it.each([TaskStatus.NO_GO, TaskStatus.MANUAL_REVIEW_REQUIRED])(
+    'root=%s: the PENDING dependent stays ineligible; an unrelated sibling still spawns',
+    (rootStatus) => {
+      const tasks = [
+        makeTask('165-root', { status: rootStatus }),
+        makeTask('165-dep', { status: TaskStatus.PENDING, dependencies: ['165-root'] }),
+        makeTask('165-sibling', { status: TaskStatus.PENDING }),
+      ];
+      const sprint = makeSprint(tasks);
+      const config = makeConfig(true); // dependency pipeline enabled
+
+      const eligible = selectEligibleForSpawn(sprint, config, 3, EMPTY_SET, EMPTY_SET);
+      expect(eligible.map(t => t.id)).not.toContain('165-dep');
+      expect(eligible.map(t => t.id)).toContain('165-sibling');
+    },
+  );
+
+  it('legacy mode (dependency_pipeline_enabled=false) still ignores the failed root — Sprint 165 freeze unaffected', () => {
+    const tasks = [
+      makeTask('165-root', { status: TaskStatus.NO_GO }),
+      makeTask('165-dep', { status: TaskStatus.PENDING, dependencies: ['165-root'] }),
+    ];
+    const sprint = makeSprint(tasks);
+    const config = makeConfig(false); // legacy — deps ignored entirely
+
+    const eligible = selectEligibleForSpawn(sprint, config, 2, EMPTY_SET, EMPTY_SET);
+    expect(eligible.map(t => t.id)).toContain('165-dep');
+  });
+});

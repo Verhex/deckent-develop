@@ -62,6 +62,8 @@ vi.mock('../../src/core/utils.js', () => ({
   countBrainLines: vi.fn().mockReturnValue(100),
   ensureDeckentImport: vi.fn(),
   readJsonSafe: vi.fn().mockReturnValue(null),
+  // sprint-428 (born-674): task-builder fail-soft catch'leri çağırır
+  debugLog: vi.fn(),
 }));
 
 vi.mock('../../src/orchestra/brain.js', () => ({

@@ -41,9 +41,26 @@ import { DIRECTIVES_FILE } from '../../core/constants.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
 import { promptConfirm } from '../helpers/prompt.js';
+import { loadConfig } from '../../core/config.js';
+import type { ResolvedConfig } from '../../core/types.js';
+import { getMessage } from '../helpers/messages.js';
+import type { PlanPreview, RunFlowContext } from '../../core/run-flow-contract.js';
+import {
+  createRunFlowController as createRunFlowControllerImpl,
+  type RunFlowController,
+  type RunFlowControllerDeps,
+} from '../repl/run-flow-controller.js';
+import {
+  formatTaskSummaryLine,
+  formatDigestShort,
+  buildPlanPreviewCardLabels,
+} from '../repl/plan-preview-card.js';
 
 export interface DoCommandOptions {
   run?: boolean;
+  /** TERM-6 (428-006) — non-interactive approval for the RunFlow path
+   *  (terminal.run_flow_v2). Ignored on the flag-off golden-flow path. */
+  yes?: boolean;
 }
 
 /** Outcome of spawning `deckent start` for real. */
@@ -61,6 +78,16 @@ export interface DoSeamDeps {
   confirm?: (question: string) => Promise<boolean>;
   spawnStart?: (root: string) => Promise<DoStartResult>;
   onEvent?: (event: GoldenFlowEvent) => void;
+  /**
+   * TERM-6 (428-006) — RunFlow compatibility-adapter seam, flag-on path only.
+   * Mirrors run.tsx's `wireRunFlowMount(enabled, deps, controllerFactory)`
+   * injectable-factory convention exactly. Defaults to the real
+   * `createRunFlowController` (426/427 services this adapter delegates to —
+   * never a second implementation). Tests inject a controller built from the
+   * SAME real factory with a fake `spawnStart` baked in, so no detached
+   * process ever spawns in a unit test.
+   */
+  createRunFlowController?: (deps: RunFlowControllerDeps) => RunFlowController;
 }
 
 // ═══ Plan-preview formatting ═══════════════════════════════════════════════
@@ -84,6 +111,113 @@ export function formatDoPlanPreview(preview: GoldenFlowPlanPreview, run: boolean
   lines.push('');
   lines.push(preview.directivesMarkdown);
   return lines.join('\n');
+}
+
+// ═══ RunFlow compatibility-adapter (TERM-6, 428-006 — flag-on path only) ════
+//
+// terminal.run_flow_v2=true: `deckent do` delegates entirely to the 426/427
+// RunFlow services (run-flow-controller.ts -> plan-preview-service.ts /
+// run-proposal-compiler.ts -> run-job-service.ts / run-flow-store.ts) instead
+// of golden-flow. The controller's own default `spawnStart` already builds a
+// DETACHED `deckent start --flow-id ... --revision ... --plan-digest ...`
+// invocation via spawnDetachedDeckent — so this path never swaps
+// DIRECTIVES.md and never spawns a sync-stdio child (those organs die here,
+// per the design doc's "Ölecek parçalar" table; they remain in the golden-flow
+// branch below, byte-identical, for flag-off).
+//
+// All user-facing text below is composed from EXISTING messages.ts keys only
+// (do.* + runFlow.*) — messages.ts is outside this task's write scope, so no
+// new key can be added; i18n-FIRST is satisfied by reusing what already
+// exists (several of these do.* keys were added by a prior task's docImpact
+// but never wired to a real caller until now — see messages.ts's own
+// 355-010 comment).
+
+/** Plain-text rendering of a REAL RunFlow `PlanPreview` for the non-interactive
+ *  CLI. Reuses plan-preview-card.tsx's PURE helpers/i18n labels (426/427
+ *  services) — not a second implementation of the card's rendering rules. */
+export function formatRunFlowDoPreview(preview: PlanPreview, run: boolean, lang: string): string {
+  const labels = buildPlanPreviewCardLabels(lang);
+  const lines: string[] = [
+    getMessage(run ? 'do.preview_banner_run' : 'do.preview_banner_dry_run', lang, {
+      count: String(preview.taskSummaries.length),
+    }),
+    '',
+    labels.heading,
+  ];
+  if (preview.taskSummaries.length === 0) {
+    lines.push(labels.noTasks);
+  } else {
+    preview.taskSummaries.forEach((task, index) => lines.push(formatTaskSummaryLine(index, task)));
+  }
+  lines.push('', labels.gateLabels[preview.gateResult], labels.policyLabels[preview.policyDecision]);
+  lines.push(`${labels.digestLabel} ${formatDigestShort(preview.planDigest)}`);
+  return lines.join('\n');
+}
+
+/**
+ * The flag-on trajectory: proposal-compile -> real preview -> non-interactive
+ * approval (--yes required, else an honest reject — no interactive prompt
+ * fallback) -> exact-snapshot start -> rich result. Every RunFlow call is
+ * wrapped in one try/catch reporting via `runFlow.mount.error` — mirrors
+ * app.tsx's `handleRunFlowApprove` catch-never-throw discipline (a CLI
+ * command must not crash out of a controller error either).
+ */
+export async function runDoRunFlow(
+  root: string,
+  config: ResolvedConfig,
+  goal: string,
+  opts: { run: boolean; yes: boolean },
+  deps: DoSeamDeps,
+): Promise<void> {
+  const lang = config.language;
+  const controllerFactory = deps.createRunFlowController ?? createRunFlowControllerImpl;
+  const controller = controllerFactory({ root, config, origin: 'cli' });
+
+  let context: RunFlowContext;
+  try {
+    context = await controller.proposeRun(goal);
+  } catch (error) {
+    printError(getMessage('runFlow.mount.error', lang, {
+      error: error instanceof Error ? error.message : String(error),
+    }));
+    process.exitCode = 1;
+    return;
+  }
+
+  const preview = context.preview;
+  if (!preview) {
+    printError(getMessage('runFlow.mount.error', lang, {
+      error: `unexpected RunFlow state after proposeRun: '${context.state}' (no preview)`,
+    }));
+    process.exitCode = 1;
+    return;
+  }
+
+  print(formatRunFlowDoPreview(preview, opts.run, lang));
+
+  if (!opts.run) {
+    controller.reject('dry-run');
+    print(getMessage('do.dry_run_complete', lang));
+    return;
+  }
+
+  if (!opts.yes) {
+    controller.reject('yes-required');
+    print(getMessage('do.cancelled', lang, { stage: 'AWAITING_APPROVAL', reason: 'yes-required' }));
+    return;
+  }
+
+  try {
+    controller.approve({ id: 'cli-non-interactive' });
+    const finalCtx = controller.startApproved ? controller.startApproved() : controller.getContext();
+    const jobId = finalCtx.handle?.jobId ?? preview.flowId;
+    print(getMessage('runFlow.mount.started', lang, { jobId }));
+  } catch (error) {
+    printError(getMessage('runFlow.mount.error', lang, {
+      error: error instanceof Error ? error.message : String(error),
+    }));
+    process.exitCode = 1;
+  }
 }
 
 // ═══ DIRECTIVES.md transient swap (restored after the spawned sprint exits) ═
@@ -172,6 +306,7 @@ export function registerDo(program: Command, deps: DoSeamDeps = {}): void {
     .command('do <goal>')
     .description('Golden-flow: turn a goal into a sprint plan (dry-run preview by default; --run to actually start it)')
     .option('--run', 'Approve and start the sprint for real (default is a dry-run preview only)')
+    .option('--yes', 'Non-interactive approval when RunFlow (terminal.run_flow_v2) is enabled — required together with --run to actually start; otherwise an honest reject (no interactive prompt)')
     .action(async (goal: string, opts: DoCommandOptions) => {
       const trimmedGoal = goal.trim();
       if (!trimmedGoal) {
@@ -183,6 +318,17 @@ export function registerDo(program: Command, deps: DoSeamDeps = {}): void {
       const run = !!opts.run;
       try {
         const root = resolveProjectRoot();
+        const config = await loadConfig(root);
+
+        // TERM-6 (428-006) — flag-on: delegate to the 426/427 RunFlow chain
+        // instead of golden-flow. See runDoRunFlow's own doc comment for why
+        // this is the ONLY flag check (mirrors start.ts's exact convention)
+        // and structurally cannot fall through to the golden-flow branch below.
+        if (config.terminal?.run_flow_v2 === true) {
+          await runDoRunFlow(root, config, trimmedGoal, { run, yes: !!opts.yes }, deps);
+          return;
+        }
+
         const seams = createDoSeams(root, { run }, deps);
         const result: GoldenFlowResult<DoStartResult, DoEvaluateResult> = await runGoldenFlow(trimmedGoal, seams);
 

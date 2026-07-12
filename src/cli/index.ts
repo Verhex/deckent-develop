@@ -133,6 +133,14 @@ export function buildProgram(): Command {
   registerExplain(program);
   registerSetDirectives(program);
   registerConnect(program);
+  // TERM-6 (428-008, T6E): `plan-nl`/`do` are the ONLY two commands whose
+  // action handlers branch on config.terminal.run_flow_v2 (see registerPlanNl
+  // in plan-nl.ts / registerDo in do.ts — T6D/T6C, 428-007/428-006). That
+  // routing lives entirely inside each command's own handler; this file only
+  // registers the single command either way — no separate RunFlow-flavored
+  // command is (or should be) added here. Flag-off keeps both byte-identical
+  // to their pre-TERM-6 behavior. See docs/analysis/term-flow-unify-design-
+  // 2026-07-11.md Sprint-6 row.
   registerPlanNl(program);
   registerDo(program);
   registerHeartbeat(program);

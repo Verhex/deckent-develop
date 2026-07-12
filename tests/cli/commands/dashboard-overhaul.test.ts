@@ -20,6 +20,9 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
 vi.mock('../../../src/core/constants.js', () => ({
   SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur
   DASHBOARD_FILE: '.dashboard',
+  // sprint-428 import-zinciri (task-builder→sprint-pid-manager) modül-yüklemede okur
+  DECKENT_DIR: '.deckent',
+  BRAIN_DIR: '.brain',
 }));
 
 import { renderDashboard, readDashboardFile, isNoColor } from '../../../src/cli/commands/dashboard.js';

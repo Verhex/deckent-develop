@@ -3014,9 +3014,28 @@
   "born_id": 674,
   "title": "WIRE-FINISH: uc prompt-bloguna ctx-doldurma — spawn-yolu SprintContext'e toolInventory (readToolInventory) + verifyCommands + toolAllowlist gecirmiyor; tools.allowlist_enabled flag'i yok",
   "priority": "P1",
-  "status": "OPEN",
+  "status": "DONE",
   "source": "sprint-427 427-011/012/014 GO_W_DEBT ucgeni (2026-07-12)",
   "spec": "427'nin uc yarim-wire'inin tek kapanis noktasi: (a) worker-prompt build cagrisinda (sprint-phases/spawn-yolu) SprintContext.toolInventory=readToolInventory(...) + verifyCommands=resolveVerifyCommands(...) + toolAllowlist=computeToolAllowlist(...) doldurulur; (b) config'e tools.allowlist_enabled (default OFF) eklenir ve 427-014 blogu ona baglanir; (c) PROOF: gercek sprint'te worker-prompt'ta env-probe/VERIFY-STEPS/allowlist bloklarinin gercek-veriyle render'i trace'ten kanitlanir (proof-of-function); (d) etki-olcumu: sonraki 2-3 sprint num_turns ortalamasi 529-K1 kiyasina eklenir.",
+  "date": "2026-07-12",
+  "resolution": "DONE sprint-428 (428-001/002/003): ctx-doldurma uclusu fail-soft + typed-flag + e2e render-kaniti; etki-olcumu num_turns kiyasiyla izlenecek"
+ },
+ {
+  "born_id": 675,
+  "title": "Scope-parser cok-noktali dosya-adi drop: soul.default.md WRITE-listesinden render-time dusuyor (gate dogru-uyardi, parser hatali) — sanitizeScope/path-tokenizer coklu-nokta basename fix",
+  "priority": "P2",
+  "status": "OPEN",
+  "source": "sprint-428 gate-BLOCK canli-vaka (2026-07-12): src/agent/assets/soul.default.md hem Files hem Scope nitelemesiyle bile default.md/soul.default.md diye bolunup dusuruldu",
+  "spec": "born-650/653 false-positive ailesinin yeni alt-turu ama bu kez SILENT-DROP gercek (worker dosyayi hic gormezdi). Path-tokenizer cok-noktali basename i (x.y.md) tek dosya-adi olarak korumali; regresyon-testi: soul.default.md + a.b.c.ts fixture. Ilgili: project_prompt_contract_verification_2026_07_10 (sanitizeScope Rule 5 kok-dosya drop — ayni bolge).",
+  "date": "2026-07-12"
+ },
+ {
+  "born_id": 676,
+  "title": "Scheduler executed-engine loud-log yok: hangi engine'in (legacy|reducer) tick'i YURUTTUGU runtime'da kanitlanabilir degil (journal iki karari da yaziyor, yuruteni degil)",
+  "priority": "P2",
+  "status": "OPEN",
+  "source": "sprint-428 kapanis disk-verify (2026-07-12): engine=reducer canli kosusunun kaniti dolayli kaldi (config+composition-test+0-divergence)",
+  "spec": "SCHED dilim-8 default-flip ONKOSULU: (a) sprint-start'ta bir kez 'scheduler engine: X' loud-log + journal tick-kaydina executedEngine alani (additive); (b) flip-karari bu alanin gercek-sprint kanitiyla verilir.",
   "date": "2026-07-12"
  }
 ]

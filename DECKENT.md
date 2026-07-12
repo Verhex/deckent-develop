@@ -91,6 +91,105 @@ Deckent ile tipik bir sprint akisi asagidaki adimlari izler:
 
 ---
 
+## Native Terminal Work-Launching Flow — Terminal İş-Başlatma Akışı
+
+### Canonical Flow (terminal.run_flow_v2 ON)
+
+When `terminal.run_flow_v2` is enabled, the canonical entry point for launching work via the native
+terminal is **`deckent_propose_run`**. The flow is:
+
+```
+Natural Language Intent
+        ↓
+  deckent_propose_run
+        ↓
+   Brain Plan Preview
+   (tasks, gates, digest)
+        ↓
+  In-Terminal Card
+  (approve/reject UI)
+        ↓
+   Snapshot Start
+   (worker spawn)
+        ↓
+ Correlated Result
+```
+
+**Step-by-step:**
+
+1. **Natural Language Intent** — You describe the work in plain language: "Add TypeScript strict mode to src/core", "Fix flaky test in utils", etc.
+
+2. **`deckent_propose_run` Call** — The terminal agent proposes a run with your `intentSummary`. This call:
+   - Generates a real Brain plan preview (task summaries, gate/policy results, content-addressed digest)
+   - Never starts anything and never requires a confirmation prompt
+   - Returns immediately with the preview compiled
+
+3. **Plan Preview Card** — The terminal renders an in-terminal UI card showing:
+   - Proposed tasks and their summaries
+   - Any gate/policy checks (security, dependency, etc.)
+   - Content digest (hash of the plan)
+   - Your choices: **Approve**, **Reject**, or **Edit**
+
+4. **Human Approval** — You review and approve the plan via the card (not a text prompt). This is the actual gate.
+
+5. **Snapshot Start** — On approval, deckent snapshots the plan state and spawns workers.
+
+6. **Correlated Result** — Workers report results linked back to the original proposal for audit and tracing.
+
+### Legacy Flow (terminal.run_flow_v2 OFF, or expert escape hatch)
+
+The prior work-launching flow remains available as an **expert low-level escape hatch**:
+
+```
+DIRECTIVES.md
+      ↓
+ deckent_set_directives
+      ↓
+  DIRECTIVES written
+      ↓
+  deckent_plan
+      ↓
+  .tasks/ JSON created
+      ↓
+  deckent_start
+      ↓
+  Workers spawn
+```
+
+This flow is useful when:
+- You need precise manual control over task definitions and scope
+- You're debugging or iterating on task structure
+- `terminal.run_flow_v2` is disabled (the default)
+
+**Explicit note:** When `terminal.run_flow_v2` is ON, this path is labeled an expert escape hatch in the native
+terminal tool descriptions, and `deckent_propose_run` is the canonical entry point. When the flag is OFF, the
+legacy flow is the only path available.
+
+### Configuration
+
+```json
+{
+  "terminal": {
+    "run_flow_v2": false
+  }
+}
+```
+
+Set in `.deckent/config.json` (see `deckent config set terminal.run_flow_v2 true` via the CLI).
+
+- **Default:** `false` (legacy flow active)
+- **Canonical mode:** `true` (enables `deckent_propose_run` as the main entry point)
+
+### Traceability & Audit
+
+Both flows produce a result record linked to the initiating act:
+- **Canonical flow:** Proposal ID → Plan preview digest → Approval event → Snapshot → Worker results
+- **Legacy flow:** DIRECTIVES version → Plan JSON → Start event → Worker results
+
+The Brain's memory system (`memory.db`) records both paths equally for audit and learning.
+
+---
+
 ## DIRECTIVES Format Guide — DIRECTIVES Format Rehberi
 
 DIRECTIVES.md dosyasi sprint hedeflerini tanimlar. Her task asagidaki formati izlemelidir:

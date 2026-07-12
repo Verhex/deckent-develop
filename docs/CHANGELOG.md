@@ -9,6 +9,24 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint428] - 2026-07-12
+
+### Added
+
+- W674A — ctx-doldurma: toolInventory + verifyCommands (born-674)
+- W674B — tools.allowlist_enabled flag'i + toolAllowlist ctx (born-674)
+- W674C — üç-blok uçtan-uca render kanıtı (born-674)
+- T6A — cli-bridge-tool-specs canonical-yol notu (TERM-6)
+- T6B — DECKENT.md canonical-akış dokümantasyonu (TERM-6)
+- T6C — do.ts compatibility-adapter (TERM-6; sync-stdio + DIRECTIVES-swap ölür)
+- T6D — plan-nl compatibility-preview-adapter (TERM-6)
+- T6E — cli/index route-wiring (TERM-6)
+- T6F — term-flow composition-pin testi (TERM-6)
+- S7A — scheduler FIFO dependency-safety (SCHED-7)
+
+
+_Tasks: 13 total, 13 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint427] - 2026-07-12
 
 ### Added

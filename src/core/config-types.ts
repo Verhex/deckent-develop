@@ -264,6 +264,19 @@ export interface ReplSurfaceConfig {
   bg_turns?: boolean;
 }
 
+/** Task-based worker tool-surface reduction (born-664 / 559, ALLOW-WIRE 427-014,
+ *  wired 428-002/W674B). Opt-in — absent block/`allowlist_enabled` = the full
+ *  default tool surface (pre-674 behavior, byte-exact-pinned). When true,
+ *  `buildWorkerPrompt` (orchestra/task-builder.ts) populates
+ *  `SprintContext.toolAllowlist` via `computeToolAllowlist`
+ *  (core/tool-allowlist.ts), which `buildToolAllowlistBlock`
+ *  (orchestra/prompt-god-template.ts) renders as a narrowed-surface block.
+ *  @see ToolAllowlistResult (core/tool-allowlist.ts) */
+export interface ToolsConfig {
+  /** Populate the per-task narrowed tool allowlist in the worker prompt (default: false). */
+  allowlist_enabled?: boolean;
+}
+
 /** Host-side `DeckBroker` credential minting for spawned tasks (DECKBROKER-WIRE,
  *  354-006, ADR-G-005/G-017 row 422). Opt-in — absent block/`enabled` = the pre-
  *  existing `applyDeckSecretsToEnv`/`process.env` credential path is unaffected.
@@ -316,6 +329,26 @@ export interface SchedulerConfig {
    *  dispatch tick, purely for differential-journal comparison against the
    *  live-observed outcome (default: false). */
   shadow_reducer?: boolean;
+  /**
+   * Live scheduler driver gate (SCHED5, docs/analysis/scheduler-unify-design-2026-07-11.md
+   * "Continuous live switch", Sprint-5 dilimi / Task 426-xxx). Formalizes the
+   * `resolveSchedulerEngine` local-cast idiom (scheduler-driver.ts) — SCHED-7
+   * (428-011) promotes it onto this typed block; `resolveSchedulerEngine`'s
+   * runtime resolution semantics are UNCHANGED by this promotion (still: any
+   * value except the literal `'reducer'` resolves to `'legacy'`).
+   * - `'legacy'` (default, or field absent): `createSchedulerDriver` is a pure
+   *   passthrough — the pre-SCHED5 imperative closures (processQueue +
+   *   maybeRespawn [+ forceRescanIfIdle] + dispatchReadyTasks) run unmodified.
+   * - `'reducer'`: the driver captures a `SchedulerSnapshot`, runs the pure
+   *   `reduceSchedulerTick` (scheduler-reducer.ts), and executes its
+   *   SpawnTask/KillWorker effects through the canonical `executeSpawnTask`
+   *   path (scheduler-effects.ts). CascadeSkip/Blocked/checkpoint effects are
+   *   NOT executed via this path yet (dilim-6/7 scope) — the pre-existing
+   *   cascadeSkipDeadBlocked/DEPENDENCY_BLOCKED/checkpoint mechanisms in
+   *   result-collector.ts keep running unconditionally, independent of engine.
+   * @see resolveSchedulerEngine (orchestra/scheduler-driver.ts)
+   */
+  engine?: 'legacy' | 'reducer';
 }
 
 // ─── Identity Provider Config (ADR-092 Faz-1b) ───────────────────────────
@@ -748,6 +781,22 @@ export interface DeckentConfig {
   human_checkpoints?: ('plan' | 'evaluate' | 'fix')[];
 
   // ─── Sprint ─────────────────────────────────────────────────────────
+  /**
+   * Task dependency pipeline (SCHED-7 / 428-011 promotion — formalizes the
+   * pre-existing `DeckentConfigWithPipeline` local-cast idiom in config.ts;
+   * this is the field that idiom's own doc comment named as its follow-up).
+   * Default: **true** (Sprint 156 Task 2 flipped false→true; Sprint 169 Task 9
+   * confirmed it as the production default per ADR-045, Wave-Based Execution
+   * Semantics). `loadConfig`/`mergeConfigs` resolve an absent value to `true`
+   * — this optional field only types the raw `.deckent/config.json` shape a
+   * user may override; the default itself is asserted in config.ts, not here.
+   * When true, `sprint-spawner.ts` uses wave-based spawning, applies
+   * cascade-on-NO_GO (dependents → PAUSED/cascade-skip) and unblock-on-DONE
+   * (dependents → PENDING). When false, `task.dependencies` is ignored
+   * (legacy FIFO — all PENDING tasks are eligible in sprint order).
+   * Rollback: set `dependency_pipeline_enabled: false` in `.deckent/config.json`.
+   */
+  dependency_pipeline_enabled?: boolean;
   /** Retry tasks that failed due to transient errors (network blip, timeout). Default: false (opt-in). */
   retry_transient_failures?: boolean;
   /** Enable fix phase after initial execution (default: true) */
@@ -1001,6 +1050,8 @@ export interface DeckentConfig {
   tool_surface?: ToolSurfaceConfig;
   /** Native-REPL mode-indicator + live-footer + approval-card surface (354-001/355-011). @see ReplSurfaceConfig */
   repl_surface?: ReplSurfaceConfig;
+  /** Task-based worker tool-surface reduction (born-674, ALLOW-WIRE 427-014 / W674B 428-002). @see ToolsConfig */
+  tools?: ToolsConfig;
 
   // ─── Prompt Generation (Sprint 182 PQ-5 / F7) ──────────────────────
   /** Worker prompt generation tuning. */
@@ -1322,7 +1373,10 @@ export interface ResolvedConfig {
   routing?: DeckentConfig['routing'];
   /** Delay in ms before cleanup deletes .tasks/ files. Default: 180000 (180s) */
   cleanup_delay_ms?: number;
-  /** Enable task dependency pipeline — only spawn tasks whose deps are DONE. Default: false */
+  /** Enable task dependency pipeline — only spawn tasks whose deps are DONE.
+   *  Resolved default: **true** (ADR-045; see {@link DeckentConfig.dependency_pipeline_enabled}
+   *  for the full history/rollback note). Always populated by `loadConfig`/
+   *  `mergeConfigs` — optional here only for literal-construction convenience. */
   dependency_pipeline_enabled?: boolean;
   /** How many terminal tasks (DONE/NO_GO) must complete before a checkpoint is written.
    * Lower values → more frequent checkpoints → safer for long sprints.
@@ -1397,6 +1451,8 @@ export interface ResolvedConfig {
   tool_surface?: DeckentConfig['tool_surface'];
   /** Native-REPL mode-indicator + live-footer + approval-card surface (passed through from DeckentConfig, 354-001/355-011). */
   repl_surface?: DeckentConfig['repl_surface'];
+  /** Task-based worker tool-surface reduction (passed through from DeckentConfig, born-674 / W674B 428-002). */
+  tools?: DeckentConfig['tools'];
   /** Resolved worker prompt generation tuning (Sprint 182 PQ-5 / F7).
    *  Same optional-on-both-sides pattern as `terminal`; `loadConfig`/`mergeConfigs`
    *  always populate it with DEFAULT_PROMPT_CONFIG. Consumers may rely on it. */

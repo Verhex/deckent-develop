@@ -227,9 +227,13 @@ export const RUN_FLOW_PROPOSAL_TOOL_SPEC: CliBridgeToolSpec = {
 /** Appended (native-tool-registry.ts) to set/plan/start descriptions ONLY when
  *  terminal.run_flow_v2 is on — flag-off descriptions stay byte-identical
  *  (this constant is inert unless a caller opts in). Technical/model-facing
- *  metadata, same non-i18n convention as every other description in this file. */
+ *  metadata, same non-i18n convention as every other description in this file.
+ *  Wording mirrors the design SSOT verbatim (term-flow-unify-design-
+ *  2026-07-11.md: "Expert low-level escape hatch kalır") — Sprint-6 T6A closes
+ *  the gap where "expert" existed only in a code comment, never in the actual
+ *  model-facing string. */
 export const RUN_FLOW_ESCAPE_HATCH_NOTE =
-  '(Low-level escape hatch — when terminal.run_flow_v2 is on, the canonical path is deckent_propose_run.)';
+  '(Expert low-level escape hatch — when terminal.run_flow_v2 is on, the canonical path is deckent_propose_run.)';
 
 /** The 3 tools this note applies to — the "expert escape-hatch" trio the
  *  design doc keeps around unchanged (set-directives/plan/start) once

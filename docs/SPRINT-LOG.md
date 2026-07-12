@@ -10478,3 +10478,37 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 427-024: RECON-DIFF — timeout-placeholder task-scope-diff sinyali (born-667b, P0) (DONE)
 
 ---
+## Sprint 428 — sprint-428
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-12
+**Duration:** 1871s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 13 |
+| Completed | 13 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1870741ms |
+
+### Tasks
+
+- 428-001: W674A — ctx-doldurma: toolInventory + verifyCommands (born-674) (DONE)
+- 428-002: W674B — tools.allowlist_enabled flag'i + toolAllowlist ctx (born-674) (DONE)
+- 428-003: W674C — üç-blok uçtan-uca render kanıtı (born-674) (DONE)
+- 428-004: T6A — cli-bridge-tool-specs canonical-yol notu (TERM-6) (DONE)
+- 428-005: T6B — DECKENT.md canonical-akış dokümantasyonu (TERM-6) (DONE)
+- 428-006: T6C — do.ts compatibility-adapter (TERM-6; sync-stdio + DIRECTIVES-swap ölür) (DONE)
+- 428-007: T6D — plan-nl compatibility-preview-adapter (TERM-6) (DONE)
+- 428-008: T6E — cli/index route-wiring (TERM-6) (DONE)
+- 428-009: T6F — term-flow composition-pin testi (TERM-6) (DONE)
+- 428-010: S7A — scheduler FIFO dependency-safety (SCHED-7) (DONE)
+- 428-011: S7B — FIFO config-migration + stall-pin güncelleme (SCHED-7) (DONE)
+- 428-012: B542 — container build-yasağı guard'ı (born-644) (DONE)
+- 428-013: S7C — FIFO composition-kanıtı (SCHED-7 kapanışı) (DONE)
+
+---

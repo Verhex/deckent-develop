@@ -15,12 +15,29 @@
 // (timestamped `.bak.<iso>`, mirroring the pattern in
 // core/config-migration.ts — reimplemented inline here since that module is
 // outside this task's scope and the logic is a few lines).
+//
+// TERM-FLOW-UNIFY Sprint-6 (428-007, docs/analysis/term-flow-unify-design-
+// 2026-07-11.md "Ölecek / compatibility-only parçalar"): buildPlanNlIntent
+// dies as the RUNTIME-CANONICAL preview source once `terminal.run_flow_v2`
+// is on — the preview command becomes a compatibility-preview-adapter that
+// delegates to the shared plan-preview-service (the same real Brain-planner
+// path CLI `plan --dry-run` / MCP `deckent_plan` already use), forcing
+// `structured` mode so the command stays the deterministic, LLM-free
+// scaffold it has always been. The scaffold markdown is fed to the real
+// planner in-memory only (DIRECTIVES.md on disk is never touched by the
+// preview path); the printed preview shape is unchanged, with one added
+// compatibility line surfacing the real plan digest. Flag-off (default) and
+// `--write` are entirely unaffected — see registerPlanNl's action handler.
 
 import { existsSync, copyFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import { DIRECTIVES_FILE } from '../../core/constants.js';
 import { buildDirectives, type DirectiveBuildIntent } from '../../orchestra/directives-builder.js';
+import { readContext } from '../../orchestra/brain.js';
+import { generatePlanPreview, type PlanPreviewResult } from '../../orchestra/plan-preview-service.js';
+import { loadConfig } from '../../core/config.js';
+import type { ResolvedConfig, SprintSizeRecommendation } from '../../core/types.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 import { getMessage } from '../helpers/messages.js';
@@ -68,6 +85,34 @@ export function formatPlanNlPreview(directivesText: string): string {
   ].join('\n');
 }
 
+/**
+ * TERM-FLOW-UNIFY Sprint-6 (428-007) compatibility-preview-adapter: renders
+ * the plan-nl preview through the shared plan-preview-service instead of
+ * treating the buildPlanNlIntent scaffold as the final answer. The scaffold
+ * markdown is substituted into the real project's {@link BrainContext}
+ * in-memory only (`readContext`'s own `directives` field is overridden) —
+ * DIRECTIVES.md on disk is never read from or written to here, preserving
+ * plan-preview-service's own READ-ONLY-by-construction guarantee. `structured`
+ * mode is forced so this stays a deterministic, LLM-free preview, matching
+ * buildPlanNlIntent's existing single-task-scaffold boundary.
+ */
+export async function buildPlanNlCompatibilityPreview(
+  root: string,
+  config: ResolvedConfig,
+  directivesMarkdown: string,
+): Promise<PlanPreviewResult> {
+  const context = readContext(root);
+  const recommendation: SprintSizeRecommendation = {
+    size: 'full',
+    maxWorkers: typeof config.activeModeConfig.max_workers === 'number' ? config.activeModeConfig.max_workers : 4,
+    modelConstraint: null,
+    reason: 'plan-nl compatibility-preview-adapter (TERM-FLOW-UNIFY Sprint-6, 428-007)',
+  };
+  return generatePlanPreview(root, config, { ...context, directives: directivesMarkdown }, recommendation, {
+    mode: 'structured',
+  });
+}
+
 function backupExistingDirectives(directivesPath: string): string | null {
   if (!existsSync(directivesPath)) return null;
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -108,6 +153,20 @@ export function registerPlanNl(program: Command): void {
       }
 
       if (!opts.write) {
+        const config = await loadConfig(root);
+        if (config.terminal?.run_flow_v2 === true) {
+          try {
+            const preview = await buildPlanNlCompatibilityPreview(root, config, text);
+            print(formatPlanNlPreview(text));
+            print(
+              `[plan-nl] compatibility-preview-adapter (terminal.run_flow_v2): real plan digest ${preview.planDigest}.`,
+            );
+          } catch (error) {
+            printError(error instanceof Error ? error.message : String(error));
+            process.exitCode = 1;
+          }
+          return;
+        }
         print(formatPlanNlPreview(text));
         return;
       }

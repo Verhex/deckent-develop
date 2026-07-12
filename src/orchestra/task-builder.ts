@@ -59,10 +59,15 @@ import { buildTaskPrompt } from './prompt-god-template.js';
 import type { SprintContext, SharedContextEntry, UpstreamHandoffEntry } from './prompt-god-template.js';
 import { SharedMemory } from './shared-memory.js';
 import { HandoffProtocol } from './handoff-protocol.js';
-import type { WorkerCommsConfig } from '../core/config-types.js';
+import type { WorkerCommsConfig, ToolsConfig } from '../core/config-types.js';
 import { deriveTestScope } from './scope-deriver.js';
 import type { AgentDefinition } from '../core/agent-types.js';
 import { type AgentDomain, getAgentDomain } from '../core/agent-pool.js';
+import { readToolInventory } from './sprint-phases.js';
+import { resolveVerifyCommands } from './worker-verify-tool.js';
+import type { ResolvedVerifyCommands } from './worker-verify-tool.js';
+import { computeToolAllowlist } from '../core/tool-allowlist.js';
+import type { ToolAllowlistResult } from '../core/tool-allowlist.js';
 
 // ─── Model enum values for Zod schemas ───────────────────────────────────
 // ALL_MODELS is readonly ModelType[] — extract as tuple for z.enum()
@@ -1542,6 +1547,27 @@ function readWorkerCommsConfig(projectRoot: string): WorkerCommsConfig | undefin
   }
 }
 
+/**
+ * Read the project-level `tools` config block (born-674, W674B / 428-002).
+ *
+ * Synchronous + best-effort, same rationale as `readWorkerCommsConfig` above:
+ * `buildWorkerPrompt` is sync and all its spawn-path callers invoke it
+ * synchronously, so the async 3-layer `loadConfig` can't be used here.
+ * `tools.allowlist_enabled` is opt-in (absent block/field ⇒ disabled/false), so
+ * reading the project `.deckent/config.json` directly is sufficient. Any
+ * read/parse failure yields `undefined` (flag stays off) — never throws.
+ */
+function readToolsConfig(projectRoot: string): ToolsConfig | undefined {
+  try {
+    const p = join(projectRoot, PROJECT_CONFIG_PATH);
+    if (!existsSync(p)) return undefined;
+    const parsed = JSON.parse(readFileSync(p, 'utf-8')) as { tools?: ToolsConfig };
+    return parsed?.tools;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Stringify a SharedMemory value for prompt rendering (strings pass through). */
 function stringifySharedValue(value: unknown): string {
   if (typeof value === 'string') return value;
@@ -1699,6 +1725,49 @@ export function buildWorkerPrompt(
     debugLog('buildWorkerPrompt:lsFiles', e);
   }
 
+  // born-674 (428-001): the sprint-start host tool-inventory persisted by
+  // 427-011 (readToolInventory, sprint-phases.ts) and the stack-resolved
+  // check/test commands (resolveVerifyCommands, worker-verify-tool.ts) so
+  // buildEnvProbeBlock / buildCheckCommandLine / buildTestCommandLine render
+  // real per-sprint/per-project data instead of staying permanently empty.
+  // Both are fail-soft: any read/resolve error yields undefined, never
+  // disrupting prompt construction — same contract as preExistingFailures/
+  // trackedFiles above.
+  let toolInventory: string | undefined;
+  try {
+    if (task.sprintId) {
+      toolInventory = readToolInventory(projectRoot, task.sprintId);
+    }
+  } catch (e) {
+    debugLog('buildWorkerPrompt:readToolInventory', e);
+  }
+
+  let verifyCommands: ResolvedVerifyCommands | undefined;
+  try {
+    verifyCommands = resolveVerifyCommands(projectRoot);
+  } catch (e) {
+    debugLog('buildWorkerPrompt:resolveVerifyCommands', e);
+  }
+
+  // born-674 (428-002, W674B): task-scoped tool allowlist via 427-013's pure
+  // computeToolAllowlist (core/tool-allowlist.ts) — populated ONLY when
+  // tools.allowlist_enabled is true (default false, absent block). Flag-off
+  // leaves toolAllowlist undefined, so buildToolAllowlistBlock (427-014,
+  // prompt-god-template.ts) renders nothing and the compiled prompt stays
+  // byte-exact with pre-674 output. Fail-soft, same contract as
+  // toolInventory/verifyCommands above.
+  let toolAllowlist: ToolAllowlistResult | undefined;
+  try {
+    if (readToolsConfig(projectRoot)?.allowlist_enabled === true) {
+      toolAllowlist = computeToolAllowlist({
+        taskType: task.type ?? 'generic',
+        scope: { filesWrite: task.scope.filesWrite },
+      });
+    }
+  } catch (e) {
+    debugLog('buildWorkerPrompt:computeToolAllowlist', e);
+  }
+
   const ctx: SprintContext = {
     agentPrompt,
     agentId: task.assignedAgent ?? 'generic',
@@ -1710,6 +1779,9 @@ export function buildWorkerPrompt(
     upstreamHandoffs,
     preExistingFailures,
     trackedFiles,
+    toolInventory,
+    verifyCommands,
+    toolAllowlist,
   };
   const artifact = buildTaskPrompt(task, ctx);
 

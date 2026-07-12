@@ -34,27 +34,17 @@ import { metric } from './observability.js';
 import { interpolateConfig } from './deck-interpolation.js';
 
 /**
- * Local intersection alias bridging the `dependency_pipeline_enabled` flag,
- * which is declared on `ResolvedConfig` (config-types.ts) but is not yet a
- * member of `DeckentConfig`. Used by createDefaultConfig/loadConfig/mergeConfigs
- * to flip the default to `true` without modifying the shared type file.
- *
- * Sprint 156 Task 2: default flipped false → true to activate the dependency
- * pipeline (wave-based spawning + cascade NO_GO + unblock DONE) by default.
- * Sprint 169 Task 9 (H5 GA anchor): confirmed production default — ADR-045
- * (Wave-Based Execution Semantics) governs this flag. Rollback path: set
- * `dependency_pipeline_enabled: false` in .deckent/config.json.
- * A follow-up sprint should add `dependency_pipeline_enabled` to `DeckentConfig`
- * directly and remove this alias.
- */
-type DeckentConfigWithPipeline = DeckentConfig & { dependency_pipeline_enabled?: boolean };
-
-/**
  * Local intersection alias for `token_throttle_ms` — the pre-spawn quota gate
- * pacing knob added in Sprint 202 Task 202-004. Mirrors the
- * `DeckentConfigWithPipeline` pattern: declared here so callers can read
- * `config.token_throttle_ms` without modifying config-types.ts (out of this
- * task's scope). Default 500 ms.
+ * pacing knob added in Sprint 202 Task 202-004. Declared here so callers can
+ * read `config.token_throttle_ms` without modifying config-types.ts (out of
+ * this task's scope). Default 500 ms.
+ *
+ * (Sprint 428 SCHED-7 note: this WAS one of a small family of such local-cast
+ * aliases alongside `DeckentConfigWithPipeline` for `dependency_pipeline_enabled`
+ * — 428-011 promoted that FIFO/dependency-behavior field directly onto
+ * `DeckentConfig` [config-types.ts] and removed its alias. `token_throttle_ms`
+ * is a cost-pacing knob, not a FIFO/dependency switch, so it is intentionally
+ * left as a local-cast idiom here.)
  */
 type DeckentConfigWithThrottle = DeckentConfig & { token_throttle_ms?: number };
 
@@ -963,12 +953,10 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
     // SCHED5 (docs/analysis/scheduler-unify-design-2026-07-11.md dilim-5):
     // `engine` selects the live scheduler driver (default 'legacy', see
-    // scheduler-driver.ts's resolveSchedulerEngine). Not yet promoted to
-    // SchedulerConfig (config-types.ts, out of this slice's write scope) —
-    // validated here via a local cast, mirroring the token_throttle_ms /
-    // dependency_pipeline_enabled local-cast idiom used elsewhere in this file.
-    const engine = (sch as { engine?: unknown }).engine;
-    if (engine !== undefined && engine !== 'legacy' && engine !== 'reducer') {
+    // scheduler-driver.ts's resolveSchedulerEngine). Promoted onto
+    // SchedulerConfig (config-types.ts) by SCHED-7 (428-011) — typed directly,
+    // no local cast needed.
+    if (sch.engine !== undefined && sch.engine !== 'legacy' && sch.engine !== 'reducer') {
       errors.push("scheduler.engine must be 'legacy' or 'reducer'");
     }
   }
@@ -1248,7 +1236,7 @@ function getConfigMtime(projectRoot: string): number {
  * @returns A new DeckentConfig instance with default values
  */
 export function createDefaultConfig(): DeckentConfig {
-  const config: DeckentConfigWithPipeline & DeckentConfigWithThrottle = {
+  const config: DeckentConfigWithThrottle = {
     mode: DEFAULT_MODE,
     modes: structuredClone(DEFAULT_MODES),
     // Provider (Sprint 150 Decision 4 — grouped `providers` is canonical; flat keys deprecated)
@@ -1319,19 +1307,8 @@ export function createDefaultConfig(): DeckentConfig {
     routing_engine: 'v2',
     // Cleanup delay: wait before deleting .tasks/ files (ms)
     cleanup_delay_ms: 180_000,
-    /**
-     * Dependency pipeline enabled.
-     *
-     * Sprint 156 Task 2 — default flipped false → true.
-     * Sprint 169 Task 9 (H5 GA anchor) — confirmed production default per ADR-045
-     * (Wave-Based Execution Semantics). Wave-based spawning is the standard runtime.
-     * Rollback: set `dependency_pipeline_enabled: false` in .deckent/config.json.
-     * When true, sprint-spawner.ts uses wave-based spawning, applies
-     * cascade-on-NO_GO (dependents → PAUSED) and unblock-on-DONE (dependents → PENDING).
-     * Race conditions in DIRECTIVES with explicit `dependencies` are eliminated.
-     * Cast via DeckentConfigWithPipeline because the field is declared on
-     * ResolvedConfig but not yet on DeckentConfig (see alias at top of file).
-     */
+    // Dependency pipeline enabled — see DeckentConfig.dependency_pipeline_enabled
+    // (config-types.ts) for the full history/rollback note. Default true.
     dependency_pipeline_enabled: true,
     // Sprint checkpoint interval: how many terminal tasks before writing a checkpoint
     sprint_checkpoint_interval: 5,
@@ -1744,8 +1721,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // Cleanup delay
     cleanup_delay_ms: config.cleanup_delay_ms,
     // Dependency pipeline (Sprint 156: default true; user/project config can override)
-    dependency_pipeline_enabled:
-      (config as DeckentConfigWithPipeline).dependency_pipeline_enabled ?? true,
+    dependency_pipeline_enabled: config.dependency_pipeline_enabled ?? true,
     // Pre-sprint full-vitest baseline (Sprint 255: default FALSE — the full suite
     // blocks sprint start; opt-in only). Speeds sprint start dramatically.
     pre_sprint_tests: config.pre_sprint_tests ?? false,
@@ -1808,6 +1784,10 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // flag blocks — declared on the type in 369, wired here by CC hand-fix.
     computer_use: config.computer_use,
     worker_output_contract: config.worker_output_contract,
+    // Tool allowlist (born-674, W674B 428-002) — task-based worker tool-surface
+    // reduction. Opt-in, default-off: absent block ⇒ buildWorkerPrompt's
+    // toolAllowlist stays undefined, full default tool surface (pre-674 bit-exact).
+    tools: config.tools,
     // Messaging connectors (BOT-001) — passed through; tokens .deck-interpolated below.
     notify_connectors: (config as DeckentConfig).notify_connectors,
     notify_on_complete: (config as DeckentConfig).notify_on_complete,
@@ -2498,8 +2478,7 @@ export function mergeConfigs(
     adaptive_config: config.adaptive_config ?? { min_samples: 3, no_go_threshold: 0.3, coverage_lookback: 3 },
     deckent_style: config.deckent_style ?? 'sprint',
     // Sprint 156: default true unless overridden by user/project config
-    dependency_pipeline_enabled:
-      (config as DeckentConfigWithPipeline).dependency_pipeline_enabled ?? true,
+    dependency_pipeline_enabled: config.dependency_pipeline_enabled ?? true,
     // Sprint 202 Task 202-004 — pre-spawn pacing (computeBackoff wire).
     token_throttle_ms:
       (config as DeckentConfigWithThrottle).token_throttle_ms ?? 500,
@@ -2551,6 +2530,8 @@ export function mergeConfigs(
     // Sprint 369-005/008 follow-up (born-464 pattern) — see loadConfig twin above.
     computer_use: config.computer_use,
     worker_output_contract: config.worker_output_contract,
+    // Tool allowlist (born-674, W674B 428-002) — see loadConfig twin above.
+    tools: config.tools,
   };
   return merged;
 }

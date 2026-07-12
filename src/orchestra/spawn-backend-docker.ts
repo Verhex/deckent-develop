@@ -866,6 +866,41 @@ export function ensureDeckShadowFile(tasksDir: string): string {
   return shadowHostPath;
 }
 
+// ─── born-644 (428-012 BUILD-VIOLATION-GUARD, B542): dist read-only mount guard ──
+// The dist-mtime sentinel further below (computeDistFingerprint/distFingerprintsChanged/
+// applyDistMutationAdvisory, wired in monitorContainer) only DETECTS a dist/ mutation
+// AFTER the container has already exited — advisory-only, mirroring the NPM-ADVISORY
+// precedent (born-454), never blocking. This is the MECHANICAL half: a nested read-only
+// bind mount of the host `dist/` directory over the container's `${CONTAINER_WORKSPACE}/dist`
+// — same overlay technique as buildDeckShadowMountArgs (ADR-G-005): the whole project
+// root is already bind-mounted READ-WRITE at CONTAINER_WORKSPACE, and a nested
+// `-v ...:ro` mount on top of one subtree shadows only that subtree read-only. A worker
+// container that runs `npm run build`/`tsc`/`build:all` now hits a real filesystem-level
+// EROFS/EACCES immediately, instead of silently writing through to host dist/ — the
+// WORKER-GUIDE.md "no build in worker" rule becomes structurally unavoidable rather than
+// advisory-only. The two layers are independent and both stay wired: this mount blocks
+// the write; the sentinel still catches it (defense-in-depth) if the mount is ever
+// bypassed or misconfigured.
+
+/**
+ * Build the read-only dist/ overlay mount args for `docker run`.
+ *
+ * **CONDITIONAL by design — only mounts when the host `dist/` already exists.**
+ * Mirrors {@link buildDeckShadowMountArgs}: a nested bind mount over a MISSING target
+ * materializes a phantom directory on the host underlying dir before mounting
+ * (CONTAINER_WORKSPACE IS the project root, same inode) — mounting a not-yet-built
+ * `dist/` read-only would make docker create an empty, host-created `dist/` directory
+ * that then blocks the very next legitimate `npm run build`. No `dist/` yet (fresh
+ * clone / pre-first-build) ⇒ no mount; the dist-mtime sentinel already treats a null
+ * fingerprint as the honest "not built yet" state, so nothing regresses.
+ *
+ * Pure — exported for unit tests.
+ */
+export function buildDistReadOnlyMountArgs(distExists: boolean, distHostPath: string): string[] {
+  if (!distExists) return [];
+  return ['-v', `${distHostPath}:${CONTAINER_WORKSPACE}/dist:ro`];
+}
+
 // ─── born-468: WRAPPER-HB-GATE (heartbeat staleness gate) ──────────────────
 // The wrapper's background heartbeat tick used to unconditionally overwrite
 // $HBFILE every 15s with a skeletal {workerId,taskId,status,sequence,
@@ -1300,7 +1335,8 @@ export class DockerSpawnBackend implements SpawnBackend {
    * Spawn a worker in an isolated Docker container.
    *
    * Container setup:
-   * - Project directory mounted read-only at /workspace
+   * - Project directory mounted READ-WRITE at /workspace (worker writes code);
+   *   dist/ is remounted read-only on top (born-644 host-dist-ezme guard'ı)
    * - .tasks/ mounted read-write (shared volume for results)
    * - Claude auth cache mounted read-only
    * - API keys passed as env vars if available
@@ -1656,6 +1692,13 @@ export class DockerSpawnBackend implements SpawnBackend {
       : join(tasksDir, '.deck-shadow');
     const deckShadowMountArgs = buildDeckShadowMountArgs(deckExists, deckShadowHostPath);
 
+    // born-644 (428-012 BUILD-VIOLATION-GUARD, B542): read-only dist/ overlay — see
+    // buildDistReadOnlyMountArgs doc comment. Mechanical enforcement of the
+    // WORKER-GUIDE.md "no build in worker" rule, complementing (not replacing) the
+    // post-exit dist-mtime sentinel (distFingerprintBefore/After below).
+    const distHostPath = join(dir, 'dist');
+    const distReadOnlyMountArgs = buildDistReadOnlyMountArgs(existsSync(distHostPath), distHostPath);
+
     const dockerArgs: string[] = [
       'run', '-d',
       '--name', containerName,
@@ -1671,6 +1714,10 @@ export class DockerSpawnBackend implements SpawnBackend {
       '--tmpfs', `${containerHome}:size=100m,uid=${uid},gid=${gid}`,
       // Project mounted read-write — workers need to create/edit files in scope
       '-v', `${dir}:${CONTAINER_WORKSPACE}`,
+      // born-644 (428-012 BUILD-VIOLATION-GUARD, B542): read-only dist/ overlay —
+      // mechanical "no build in worker" enforcement (nested mount, shadows only
+      // /workspace/dist as read-only; see buildDistReadOnlyMountArgs).
+      ...distReadOnlyMountArgs,
       // DECK-WORKER-ISOLATION (ADR-G-005): read-only empty overlay hiding .deck
       // (nested mount, applied after the project root so it shadows /workspace/.deck)
       ...deckShadowMountArgs,

@@ -427,6 +427,9 @@ describe('known-consumer allowlist (Sprint-1 pin evolved for Sprint-2: preview-s
       // legitimate Layer-0 consumer, not a leak.
       'mcp/tools/start.ts',
       'cli/commands/start.ts',
+      // Sprint-6 dilim (428-006): `deckent do` flag-on yolda RunFlow'a delege
+      // eden compatibility-adapter oldu — tasarımın öngördüğü tüketici.
+      'cli/commands/do.ts',
     ];
     expect(offenders.filter((o) => !KNOWN_CONSUMERS.includes(o))).toEqual([]);
   });
