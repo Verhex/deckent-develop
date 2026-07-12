@@ -373,7 +373,7 @@ describe('config: terminal.run_flow_v2 flag (default-off, opt-in override)', () 
   });
 });
 
-describe('zero production caller (Sprint-1 dilim pin — no src/ consumer beyond the pair itself)', () => {
+describe('known-consumer allowlist (Sprint-1 pin evolved for Sprint-2: preview-service/compiler are the legitimate consumers)', () => {
   // Matches an actual ESM import/require specifier ending in the module's
   // .js output path (this project's Node16 resolution requires the `.js`
   // extension — see CLAUDE.md gotchas) — NOT a prose doc-comment mentioning
@@ -406,6 +406,12 @@ describe('zero production caller (Sprint-1 dilim pin — no src/ consumer beyond
     };
     walk(srcRoot);
 
-    expect(offenders).toEqual([]);
+    const KNOWN_CONSUMERS = [
+      // Sprint-2 dilim (424-001): the shared actual-preview layer is the
+      // designed consumer of the contract/reducer pair — not a leak.
+      'orchestra/plan-preview-service.ts',
+      'orchestra/run-proposal-compiler.ts',
+    ];
+    expect(offenders.filter((o) => !KNOWN_CONSUMERS.includes(o))).toEqual([]);
   });
 });

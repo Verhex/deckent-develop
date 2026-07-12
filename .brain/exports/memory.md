@@ -1,5 +1,12 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-424 Learnings
+- Sprint sprint-424 Learnings: ## Sprint sprint-424 Learnings
+
+## Gains
+- 424-001 — TERM2 — shared actual-preview: plan-preview-service + proposal-compiler (CLI/MCP adapter'lı) — run-proposal-compiler.ts: compileRunProposal(RunProposal) -> {intent, directivesMarkdown}, callin...
+- 424-002 — SCHED5ON — shadow-journal divergence-analizi: 9-sprint verisinden sınıflandırma-raporu (SALT-ANALİZ, kod-yok) — 9-sprint tam-tarama (sprint-415..423, 2671 tick, node ile satır-atlamasız JSON.parse taraması) ta...
+
 ## Sprint sprint-423 Learnings
 - Sprint sprint-423 Learnings: ## Sprint sprint-423 Learnings
 - TT556 — PLANNER-PREFLIGHT: scope-satisfiability genişletme + gate-false-positive ailesi (born-661+650+653): GO_WITH_TECH_DEBT — TT556 PLANNER-PREFLIGHT — born-650 + 653 + 661. Verified: `npx tsc --noEmit` clean (exit 0); targeted tests green — plan

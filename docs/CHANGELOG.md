@@ -9,6 +9,16 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint424] - 2026-07-12
+
+### Added
+
+- TERM2 — shared actual-preview: plan-preview-service + proposal-compiler (CLI/MCP adapter'lı)
+- SCHED5ON — shadow-journal divergence-analizi: 9-sprint verisinden sınıflandırma-raporu (SALT-ANALİZ, kod-yok)
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint423] - 2026-07-12
 
 ### Added

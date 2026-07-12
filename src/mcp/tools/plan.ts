@@ -1,7 +1,8 @@
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { loadConfig } from '../../core/config.js';
-import { readContext, planSprint } from '../../orchestra/brain.js';
+import { readContext } from '../../orchestra/brain.js';
+import { generatePlanPreview } from '../../orchestra/plan-preview-service.js';
 import { bootstrapProviders } from '../../core/provider.js';
 import { debugLog } from '../../core/utils.js';
 import type { BrainPlanningMode, SprintSizeRecommendation } from '../../core/types.js';
@@ -69,15 +70,15 @@ export function registerPlanTool(server: McpServer): void {
         modelConstraint: null,
         reason: 'No usage constraints',
       };
-      const sprint = await planSprint(root, config, context, recommendation, {
+      // The plan tool is a PREVIEW only — its schema documents "Always dry-run …
+      // tasks are never written to disk", and execution is deckent_start's job.
+      // generatePlanPreview (TERM2 424-001) is the shared read-only preview
+      // service CLI `plan --dry-run` also delegates to — it always forces
+      // planSprint's dryRun so .tasks/task-*.json is never written here.
+      const preview = await generatePlanPreview(root, config, context, recommendation, {
         mode: input.mode as BrainPlanningMode | undefined,
-        // The plan tool is a PREVIEW only — its schema documents "Always dry-run …
-        // tasks are never written to disk", and execution is deckent_start's job.
-        // Force dryRun so planSprint skips the .tasks/task-*.json write; the tool
-        // previously passed no dryRun at all and wrote real task files despite the
-        // advertised guarantee.
-        dryRun: true,
       });
+      const sprint = preview.sprint;
 
       const tasks = sprint.tasks.map((t) => ({
         id: t.id,
@@ -118,6 +119,10 @@ export function registerPlanTool(server: McpServer): void {
         modelDistribution,
         riskAssessment,
         promptGate,
+        // planDigest (TERM2 424-001) — content hash of the real plan preview
+        // (task summaries + gate/policy outcome), for future digest-bound
+        // approval flows (design doc "Net Öneri"). Additive field only.
+        planDigest: preview.planDigest,
       };
 
       const enrichedPlan = enrichResponse('plan', baseResponse);

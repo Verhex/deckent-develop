@@ -10363,3 +10363,26 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 423-003: TT556 — PLANNER-PREFLIGHT: scope-satisfiability genişletme + gate-false-positive ailesi (born-661+650+653) (GO_WITH_TECH_DEBT)
 
 ---
+## Sprint 424 — sprint-424
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-12
+**Duration:** 891s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 890618ms |
+
+### Tasks
+
+- 424-001: TERM2 — shared actual-preview: plan-preview-service + proposal-compiler (CLI/MCP adapter'lı) (DONE)
+- 424-002: SCHED5ON — shadow-journal divergence-analizi: 9-sprint verisinden sınıflandırma-raporu (SALT-ANALİZ, kod-yok) (DONE)
+
+---

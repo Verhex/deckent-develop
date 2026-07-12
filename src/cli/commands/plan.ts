@@ -8,6 +8,7 @@ import {
   readContext, planSprint, confirmDraftTasks, cleanupDraftTasks,
 } from '../../orchestra/brain.js';
 import { collectOverrideWarnings } from '../../orchestra/sprint-planner.js';
+import { generatePlanPreview } from '../../orchestra/plan-preview-service.js';
 import type { SprintSizeRecommendation } from '../../core/types.js';
 import type { BrainPlanningMode } from '../../core/types.js';
 import { print, printError, formatTable } from '../helpers/output.js';
@@ -176,13 +177,27 @@ export function registerPlan(program: Command): void {
         const spinner = createSpinner(spinnerLabel);
         spinner.start();
         let sprint;
+        let planDigest: string | undefined;
         try {
-          sprint = await planSprint(root, config, context, recommendation, {
-            mode: planMode,
-            asDraft,
-            dryRun,
-            acknowledgePromptGate: opts.forcePromptGate === true,
-          });
+          if (dryRun) {
+            // --dry-run is already a pure preview (never writes task files) —
+            // delegate to the shared plan-preview-service (TERM2 424-001)
+            // instead of calling planSprint ad hoc, so CLI/MCP share one
+            // real-plan-generation + digest code path.
+            const preview = await generatePlanPreview(root, config, context, recommendation, {
+              mode: planMode,
+              acknowledgePromptGate: opts.forcePromptGate === true,
+            });
+            sprint = preview.sprint;
+            planDigest = preview.planDigest;
+          } else {
+            sprint = await planSprint(root, config, context, recommendation, {
+              mode: planMode,
+              asDraft,
+              dryRun,
+              acknowledgePromptGate: opts.forcePromptGate === true,
+            });
+          }
         } finally {
           spinner.stop();
         }
@@ -250,6 +265,9 @@ export function registerPlan(program: Command): void {
 
         if (dryRun) {
           print('[dry-run] No task files written to disk.');
+          if (planDigest) {
+            print(`[dry-run] Plan digest: ${planDigest}`);
+          }
           return;
         }
 
