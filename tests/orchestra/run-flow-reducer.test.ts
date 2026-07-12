@@ -417,6 +417,9 @@ describe('known-consumer allowlist (Sprint-1 pin evolved for Sprint-2: preview-s
       'cli/repl/plan-preview-card.tsx',
       'cli/repl/native-tool-registry.ts',
       'cli/repl/cli-bridge-tool-specs.ts',
+      // Sprint-4 dilim (426-002): app.tsx mounts the card + derives PlanPreview
+      // from the controller context — the designed live-mount consumer.
+      'cli/repl/app.tsx',
     ];
     expect(offenders.filter((o) => !KNOWN_CONSUMERS.includes(o))).toEqual([]);
   });
