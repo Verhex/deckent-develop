@@ -3037,5 +3037,23 @@
   "source": "sprint-428 kapanis disk-verify (2026-07-12): engine=reducer canli kosusunun kaniti dolayli kaldi (config+composition-test+0-divergence)",
   "spec": "SCHED dilim-8 default-flip ONKOSULU: (a) sprint-start'ta bir kez 'scheduler engine: X' loud-log + journal tick-kaydina executedEngine alani (additive); (b) flip-karari bu alanin gercek-sprint kanitiyla verilir.",
   "date": "2026-07-12"
+ },
+ {
+  "born_id": 677,
+  "title": "RunFlow NL-hedefte \";\" karakteri directives-builder goCriteria round-trip hatasi veriyor (hard-error) — user-metni delimiter-guvenli degil",
+  "priority": "P1",
+  "status": "OPEN",
+  "source": "511 gercek-binary dogfood ILK deneme (2026-07-12): deckent do \"...loud-log yazsin; ...eklensin; ...\" → Error: contains the \";\" join delimiter",
+  "spec": "Iki kok: (a) compiler NL-hedefi TODO-goCriteria stringine ham gomuyor — kullanici metni join-delimiter icerebilir; escape/normalize edilmeli (ya da liste-serializasyonu delimiter-siz yapiya gecmeli), hard-error YANLIS; (b) zero-config yolda goCriteria TODO-placeholder — gercek kriter sentezi yok (plan-fazina ertelenmis olabilir; dogrula, dogruysa TODO-metni delimitersiz uret). Regresyon-testi: noktali-virgullu/virgullu/newline-li NL-hedef fixture ucu.",
+  "date": "2026-07-12"
+ },
+ {
+  "born_id": 678,
+  "title": "511 kalan-yarisi: RunFlow NL→GERCEK-plan sentezi yok — do/propose_run zero-config yolu tek-task TODO-SCAFFOLD uretiyor (gate dogru-reddediyor, ama kullanici calisir plan alamiyor)",
+  "priority": "P0",
+  "status": "OPEN",
+  "source": "511 gercek-binary dogfood (2026-07-12): dry-run preview spine calisti (proposal→preview→digest→gate→policy) ama goCriteria/nogo TODO-placeholder; compiler kendi notu: RunProposal to multi-task decomposition is a follow-up",
+  "spec": "run-proposal-compiler NL-hedeften GERCEK cok-task plan sentezleyecek: planner (deckent plan AI/structured esdegeri) proposal-compile asamasina baglanir — gercek task-ayristirma + dosya-scope + task-bazli verifiable goCriteria/nogo (TODO-placeholder olur); gate o zaman gercek plani degerlendirir. buildPlanNlIntent canonical-oldugu icin YENIDEN diriltilmez — planner-cekirdegi kullanilir. Kabul: deckent do \"<gercek born>\" --run --yes ile gate-yesil gercek sprint; 511 ancak bununla kapanir. TERM dilim-6.5 olarak dilim-7 (DESK-2) ONCESINE girer.",
+  "date": "2026-07-12"
  }
 ]
