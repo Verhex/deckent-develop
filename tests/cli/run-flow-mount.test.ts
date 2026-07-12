@@ -286,9 +286,10 @@ describe('createRunFlowController — startApproved() (426-002)', () => {
     expect(storedSnapshot?.planDigest).toBe(previewed.preview!.planDigest);
     expect(storedSnapshot?.sprint.id).toBe('sprint-001');
 
-    const storedHandle = loadRunHandle(root, 'flow-1');
-    expect(storedHandle).toBeDefined();
-    expect(storedHandle?.handle.jobId).toBe('job-durable');
+    // born-681 tek-yazar sözleşmesi: parent handle'ı DİSKE YAZMAZ (child yazar,
+    // persist-before-run) — in-memory context.handle iş-kimliğini taşır.
+    expect(loadRunHandle(root, 'flow-1')).toBeUndefined();
+    expect(controller.getContext().handle?.jobId).toBe('job-durable');
   });
 
   it('is idempotent: calling startApproved() twice does not spawn a second time', async () => {

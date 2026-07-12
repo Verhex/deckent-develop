@@ -233,8 +233,10 @@ describe('term-flow composition-gate — full chain in ONE fixture (TERM-6, 428-
       expect(storedSnapshot?.revision).toBe(preview.revision);
       expect(storedSnapshot?.sprint.id).toBe('sprint-tf-1');
 
-      const storedHandle = loadRunHandle(root, 'flow-tf-1');
-      expect(storedHandle?.handle.jobId).toBe('job-flow-tf-1');
+      // born-681 tek-yazar: parent disk-handle yazmaz (child persist-before-run);
+      // iş-kimliği in-memory context.handle'da.
+      expect(loadRunHandle(root, 'flow-tf-1')).toBeUndefined();
+      expect(started.handle?.jobId).toBe('job-flow-tf-1');
 
       // Double-start pin, layer 1: a second startApproved() call (e.g. a
       // duplicated caller invocation) is a CAS-verified no-op — spawnStart is

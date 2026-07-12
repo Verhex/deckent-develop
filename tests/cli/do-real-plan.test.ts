@@ -327,8 +327,8 @@ describe('deckent do — flag-on, fake-planner-driven real multi-task plan (N678
       const storedSnapshot = loadApprovedSnapshot(tmpRoot, 'flow-rp-1');
       expect(storedSnapshot?.planDigest).toBe(preview.planDigest);
       expect(storedSnapshot?.sprint.tasks).toHaveLength(3);
-      const storedHandle = loadRunHandle(tmpRoot, 'flow-rp-1');
-      expect(storedHandle?.handle.jobId).toBe('job-flow-rp-1');
+      // born-681 tek-yazar: parent disk-handle yazmaz (child persist-before-run).
+      expect(loadRunHandle(tmpRoot, 'flow-rp-1')).toBeUndefined();
       expect(process.exitCode).toBeUndefined();
     });
   });

@@ -50,7 +50,7 @@ import { readContext } from '../../orchestra/brain.js';
 // TERM-FLOW-UNIFY Sprint-4 mount (426-002) — Task-1's durable store + start
 // service (426-001). USE ONLY: this file never writes to run-flow-store.ts or
 // run-job-service.ts, it imports their exported API (task write-scope boundary).
-import { saveApprovedSnapshot, loadRunHandle, saveRunHandle, type StoredApprovedSnapshot } from '../../core/run-flow-store.js';
+import { saveApprovedSnapshot, loadRunHandle, type StoredApprovedSnapshot } from '../../core/run-flow-store.js';
 import { startApprovedRun, type RunHandle } from '../../orchestra/run-job-service.js';
 import { spawnDetachedDeckent } from '../helpers/detached-start.js';
 // TERM5-CTRL (sprint-427, task 5) — the SAME completion-notification shape
@@ -254,6 +254,12 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
         `run-flow-controller: startApproved() requires state 'APPROVED' (call approve() first; current state: '${state}')`,
       );
     }
+    // born-681: in-process idempotency artık CONTEXT'ten gelir (disk-handle'dan
+    // değil — parent handle YAZMAZ, tek-yazar child). Aynı controller'da ikinci
+    // çağrı: iş zaten başladıysa (handle reduce edilmiş) sessiz no-op replay.
+    if ((state === 'STARTING' || state === 'DETACHED_RUNNING') && context.handle) {
+      return context;
+    }
     if (!flowId || !approvedSnapshot) {
       throw new Error('run-flow-controller: startApproved() requires an approved snapshot (call approve() first)');
     }
@@ -300,15 +306,12 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
       spawnStart,
     });
 
-    if (result.status === 'started') {
-      saveRunHandle(deps.root, {
-        flowId,
-        revision: stored.revision,
-        planDigest: stored.planDigest,
-        handle: result.handle,
-        startedAt: nowFn(),
-      });
-    }
+    // born-681: parent handle-persist ETMEZ — tek-yazar CHILD'dır
+    // (cli/commands/start.ts --flow-id dalı, persist-before-run). Parent'ın
+    // spawn-sonrası yazımı child'ın duplicate-check'ini zehirliyordu: child
+    // açılır açılmaz kendi handle'ını görüp no-op'luyordu → canlı koşu hiç
+    // başlamıyordu (flow-18fb63df canlı-vakası). Parent yalnız loadRunHandle
+    // ile GERÇEK duplicate'leri (önceki child-persist'leri) yakalar.
 
     context = reduceRunFlow(context, {
       schemaVersion: RUN_FLOW_EVENT_SCHEMA_VERSION,

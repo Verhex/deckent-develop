@@ -271,17 +271,9 @@ describe('deckent_start — approved-snapshot branch (born-673b)', () => {
         { projectRoot: sandboxRoot, flowId: 'flow-1' },
       );
 
-      expect(vi.mocked(saveRunHandle)).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(saveRunHandle)).toHaveBeenCalledWith(
-        sandboxRoot,
-        expect.objectContaining({
-          flowId: 'flow-1',
-          revision: 1,
-          planDigest: 'digest-abc',
-          handle: expect.objectContaining({ flowId: 'flow-1', jobId: 'flow-flow-1-r1', logRef: '/fake/log.log' }),
-          startedAt: expect.any(String),
-        }),
-      );
+      // born-681 tek-yazar sözleşmesi: MCP-parent handle'ı PERSIST ETMEZ —
+      // yazar, spawn edilen child'ın kendisidir (persist-before-run).
+      expect(vi.mocked(saveRunHandle)).not.toHaveBeenCalled();
     });
 
     it('forwards autoApprove/force-scope/force-prompt-gate/sandbox/timeout onto the spawned CLI args (CLI parity)', async () => {

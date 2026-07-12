@@ -3078,5 +3078,15 @@
   "resolution": "CC-el ayni-gun: runDoRunFlow basina await bootstrapProviders(config); do-testleri planner-mock oldugu icin etkilenmedi; gercek-binary 4-task plan kaniti alindi",
   "spec": "kapali",
   "date": "2026-07-12"
+ },
+ {
+  "born_id": 681,
+  "title": "RunFlow snapshot-start CLAIM-semantigi yok: parent spawn-sonrasi handle-persist + child handle-check -> child kendini duplicate sanip NO-OP — her canli do --run kosusu sprint baslatmiyor (P0)",
+  "priority": "P0",
+  "status": "DONE",
+  "source": "511 canli-kosu (2026-07-12): flow-18fb63df detached-log \"already started as job ...-r1 — no-op\"; handle.jsonl parent tarafindan yazilmis, sprint hic dogmadi",
+  "spec": "Fix: is-kimligi (jobId/claim-token) parent tarafinda uretilir, child'a --job-id ile gecer; child mevcut handle.jobId kendi job-id'sine esitse bu CLAIMED-kendisi demektir -> KOSAR (no-op degil); farkli-jobId + canli-is -> gercek-duplicate no-op kalir. Testler: 426/427 no-op pinleri claim-semantigine tasinir + parent-yazdi-child-kostu e2e.",
+  "date": "2026-07-12",
+  "resolution": "CC-el ayni-gun (2026-07-12): parent-persist SOKULDU (controller+mcp) — tek-yazar CHILD (persist-before-run); in-process idempotency context.handle'dan (yeni erken-donus); 6 pin tek-yazar sozlesmesine tasindi; 107/107. Bilinen-sinir (kabul): child persist-sonrasi-crash stale-handle birakir -> sweep-tooling ayri is."
  }
 ]

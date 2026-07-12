@@ -25,7 +25,7 @@ import {
   IPC_CONFIG_FILE,
   type SprintRunnerConfig,
 } from '../../orchestra/sprint-runner-entry.js';
-import { loadApprovedSnapshot, loadRunHandle, saveRunHandle } from '../../core/run-flow-store.js';
+import { loadApprovedSnapshot, loadRunHandle } from '../../core/run-flow-store.js';
 import {
   startApprovedRun,
   RunJobFlowNotApprovedError,
@@ -186,15 +186,11 @@ export function registerStartTool(server: McpServer): void {
             };
           }
 
-          if (status === 'started') {
-            saveRunHandle(root, {
-              flowId: flowId!,
-              revision: revision!,
-              planDigest: planDigest!,
-              handle,
-              startedAt: new Date().toISOString(),
-            });
-          }
+          // born-681: parent handle-persist ETMEZ — tek-yazar CHILD'dır
+          // (cli/commands/start.ts --flow-id dalı, persist-before-run).
+          // Spawn-sonrası parent-yazımı child'ın duplicate-check'ini
+          // zehirliyordu (kendi handle'ını görüp no-op). Gerçek duplicate'ler
+          // loadRunHandle'daki child-persist'lerle yakalanır.
 
           const startData = {
             success: true,

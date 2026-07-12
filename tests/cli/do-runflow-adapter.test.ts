@@ -297,8 +297,8 @@ describe('do command — RunFlow compatibility adapter (terminal.run_flow_v2, 42
       const storedSnapshot = loadApprovedSnapshot(tmpRoot, 'flow-1');
       expect(storedSnapshot).toBeDefined();
       expect(storedSnapshot?.sprint.id).toBe('sprint-001');
-      const storedHandle = loadRunHandle(tmpRoot, 'flow-1');
-      expect(storedHandle?.handle.jobId).toBe('job-flow-1');
+      // born-681 tek-yazar: parent disk-handle yazmaz (child persist-before-run).
+      expect(loadRunHandle(tmpRoot, 'flow-1')).toBeUndefined();
 
       // No golden-flow organs anywhere near this path.
       expect(existsSync(join(tmpRoot, DIRECTIVES_FILE))).toBe(false);
