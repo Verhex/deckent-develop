@@ -47,6 +47,7 @@ vi.mock('../../../src/cli/helpers/wizard.js', () => ({
 }));
 
 vi.mock('../../../src/core/constants.js', () => ({
+  RUNTIME_DIR: '.deckent/runtime',  // sprint-429 (429-011) tool-inventory yolu modül-yüklemede okur
   DECKENT_DIR: '.deckent',
   SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur
   DECKENT_VERSION: '1.0.0',

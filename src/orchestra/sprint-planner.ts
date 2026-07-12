@@ -36,6 +36,7 @@ import { MemoryStore } from '../core/memory-store.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { getNextSprintId, readJsonSafe, debugLog } from '../core/utils.js';
+import { resolveBrainPlanningMode } from '../core/config.js';
 import { isUnconditionalRule } from './rule-evolver.js';
 import { resolveDebt } from './debt-manager.js';
 
@@ -257,21 +258,28 @@ export async function planSprint(
   let promptGate: PromptGateResult | undefined;
   emitProgress({ phase: 'PLAN', root: projectRoot });
   const defaultModel = recommendation.modelConstraint ?? config.activeModeConfig.default_model;
-  let planMode = options?.mode ?? config.activeModeConfig.brain_planning ?? 'auto';
+  // 429-006 (PLNR1): resolve through resolveBrainPlanningMode so an explicit
+  // top-level `config.brain_planning` overrides the mode preset — reading
+  // `config.activeModeConfig.brain_planning` directly here would silently
+  // ignore the top-level user override (the original bug).
+  let planMode = options?.mode ?? resolveBrainPlanningMode(config);
   const initialStatus = options?.asDraft ? TaskStatus.DRAFT : TaskStatus.PENDING;
 
-  // Sprint 238 İŞ1: Per-task `- Provider:`/`- Model:` directives are deterministic
-  // routing decisions that must be honored EXACTLY. AI planning cannot guarantee a
-  // 1:1 directive→task mapping (it may split/merge tasks), so whenever DIRECTIVES
-  // carry explicit provider/model overrides we route to structured planning in any
-  // mode — extending the existing auto→structured fallback (count-mismatch) below.
+  // Sprint 238 İŞ1 (+ 429-007 PLNR2): Per-task `- Provider:`/`- Model:`/`- Agent:`/
+  // `- Skills:` directives are deterministic routing decisions that must be honored
+  // EXACTLY. AI planning cannot guarantee a 1:1 directive→task mapping (it may
+  // split/merge tasks), so whenever DIRECTIVES carry explicit provider/model/agent/
+  // skills overrides we route to structured planning in any mode — extending the
+  // existing auto→structured fallback (count-mismatch) below. `forceSkills` may be
+  // `[]` for an explicit "Skills: none" — still truthy in JS, so no `!== undefined`
+  // check is needed here.
   const parsedDirectives = parseStructuredDirectives(context.directives);
-  if (planMode !== 'structured' && parsedDirectives.some(t => t.provider || t.forceModel)) {
+  if (planMode !== 'structured' && parsedDirectives.some(t => t.provider || t.forceModel || t.forceAgent || t.forceSkills)) {
     if (planMode === 'ai') {
       void notify(
         'phase-change', sprintId,
         '[Brain] plan:structured-override',
-        'Per-task provider/model overrides present in DIRECTIVES — using structured planning to honor them exactly (AI planning cannot guarantee exact routing).',
+        'Per-task provider/model/agent/skills overrides present in DIRECTIVES — using structured planning to honor them exactly (AI planning cannot guarantee exact routing).',
       );
     }
     planMode = 'structured';

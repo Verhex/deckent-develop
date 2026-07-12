@@ -117,6 +117,7 @@ vi.mock('../../src/core/notify.js', () => ({
 }));
 
 vi.mock('../../src/core/constants.js', () => ({
+  RUNTIME_DIR: '.deckent/runtime',  // sprint-429 (429-011) tool-inventory yolu modül-yüklemede okur
   BRAIN_DIR: '.brain',
   TASKS_DIR: '.tasks',
   DEBT_FILE: 'DEBT.md',

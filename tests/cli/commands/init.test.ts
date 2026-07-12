@@ -48,6 +48,7 @@ vi.mock('../../../src/core/utils.js', () => ({
 }));
 
 vi.mock('../../../src/core/config.js', () => ({
+  resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   deepMerge: vi.fn().mockImplementation((base: Record<string, unknown>, override: Record<string, unknown>) => {
     const result = { ...base };
     for (const key of Object.keys(override)) {

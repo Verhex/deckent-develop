@@ -10,6 +10,7 @@ vi.mock('node:fs', () => ({
 }));
 
 vi.mock('../../../src/core/constants.js', () => ({
+  RUNTIME_DIR: '.deckent/runtime',  // sprint-429 (429-011) tool-inventory yolu modül-yüklemede okur
   SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur
   JOBS_DIR: '.deckent/jobs',
   TASKS_DIR: '.tasks',

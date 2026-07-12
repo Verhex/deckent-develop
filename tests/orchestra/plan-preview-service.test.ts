@@ -20,7 +20,7 @@ vi.mock('../../src/orchestra/brain.js', () => ({
 
 import { planSprint } from '../../src/orchestra/brain.js';
 import { generatePlanPreview } from '../../src/orchestra/plan-preview-service.js';
-import { compileRunProposal } from '../../src/orchestra/run-proposal-compiler.js';
+import { compileRunProposal, type RunProposalPlanner } from '../../src/orchestra/run-proposal-compiler.js';
 import { parseStructuredDirectives } from '../../src/orchestra/task-builder.js';
 import { extractGoNogo } from '../../src/orchestra/directives-builder.js';
 import type { RunProposal } from '../../src/core/run-flow-contract.js';
@@ -217,9 +217,31 @@ describe('generatePlanPreview', () => {
 // DIRECTIVES.md content that a future native-flow caller can feed straight
 // into generatePlanPreview's `context.directives`.
 
+// 429-001 (born-678): compiler artık scaffold üretmez — gerçek plan şart.
+// Bu round-trip suite'i hermetik kalsın diye tek-task'lı fake-planner enjekte edilir
+// (gerçek AI/provider çağrısı YOK); title eski scaffold-dönemi beklentisiyle aynı.
+const fakeSingleTaskPlanner: RunProposalPlanner = () => ({
+  reasoning: 'Single-task plan for the round-trip fixture.',
+  tasks: [{
+    title: 'Fix the flaky retry test',
+    description: 'Deflake the retry test by replacing the sleep with a deterministic clock.',
+    scope: { directories: ['tests/utils/'], filesRead: [], filesWrite: ['tests/utils/retry.test.ts'] },
+    dependencies: [],
+    model: 'sonnet',
+    effort: 'normal',
+    priority: 'NORMAL',
+    reason: 'Deterministic single-task fixture for the round-trip suite.',
+    goNogo: {
+      goCriteria: 'retry.test.ts passes 50 consecutive runs with the fake clock.',
+      noGoCriteria: 'The test still sleeps or fails intermittently.',
+      techDebtAcceptable: '',
+    },
+  }],
+});
+
 describe('compileRunProposal (builder-adapter round-trip)', () => {
   it('produces DIRECTIVES markdown that parseStructuredDirectives reads back losslessly', () => {
-    const { directivesMarkdown } = compileRunProposal(proposal());
+    const { directivesMarkdown } = compileRunProposal(proposal(), fakeSingleTaskPlanner);
 
     const parsed = parseStructuredDirectives(directivesMarkdown);
     expect(parsed).toHaveLength(1);
@@ -233,7 +255,7 @@ describe('compileRunProposal (builder-adapter round-trip)', () => {
   });
 
   it('folds flowId/tenant/project/actor/origin into the description as traceability prose (never a directive label line)', () => {
-    const { directivesMarkdown } = compileRunProposal(proposal({ flowId: 'flow-42', tenant: 'acme', project: 'widgets' }));
+    const { directivesMarkdown } = compileRunProposal(proposal({ flowId: 'flow-42', tenant: 'acme', project: 'widgets' }), fakeSingleTaskPlanner);
 
     expect(directivesMarkdown).toContain('flow-42');
     expect(directivesMarkdown).toContain('acme');
@@ -246,6 +268,6 @@ describe('compileRunProposal (builder-adapter round-trip)', () => {
 
   it('is deterministic — same RunProposal ⇒ byte-identical markdown', () => {
     const p = proposal();
-    expect(compileRunProposal(p).directivesMarkdown).toBe(compileRunProposal(p).directivesMarkdown);
+    expect(compileRunProposal(p, fakeSingleTaskPlanner).directivesMarkdown).toBe(compileRunProposal(p, fakeSingleTaskPlanner).directivesMarkdown);
   });
 });

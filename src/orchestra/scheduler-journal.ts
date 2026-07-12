@@ -33,6 +33,17 @@ export interface SchedulerShadowRecord {
     readonly cascadeSkippedTaskIds: readonly string[];
     readonly blockedTaskIds: readonly string[];
   };
+  /**
+   * born-676 (SCHED-8 önkoşulu): which of `legacyDecision`/`reducerDecision`
+   * above was the one actually EXECUTED this tick — both decisions are always
+   * present (compare-and-journal), so without this field a reader cannot
+   * tell which is real vs. simulated. Additive + optional: records written
+   * before this field existed (e.g. `.deckent/runtime/scheduler-shadow/
+   * sprint-424..428.jsonl`) simply omit it. A reader MUST treat a missing
+   * field as "not recorded" — NEVER infer 'legacy' by default from its
+   * absence (dual-read).
+   */
+  readonly executedEngine?: 'legacy' | 'reducer';
   readonly divergence: readonly SchedulerShadowDivergenceEntry[];
 }
 
@@ -91,6 +102,13 @@ export interface SchedulerShadowCoverageSummary {
   readonly reducerCascadeSkipTicks: number;
   /** Ticks where the reducer marked at least one task Blocked this tick. */
   readonly dependencyBlockTicks: number;
+  /**
+   * born-676: tally of `executedEngine` across all records — 'unknown'
+   * buckets any record written before the field existed (dual-read; never
+   * inferred as 'legacy'). This is the aggregable evidence SCHED-8's
+   * default-flip decision reads from.
+   */
+  readonly executedEngineCounts: Readonly<Record<'legacy' | 'reducer' | 'unknown', number>>;
   readonly divergenceCountByKind: Record<SchedulerShadowDivergenceEntry['kind'], number>;
   readonly totalDivergenceCount: number;
 }
@@ -117,6 +135,11 @@ export function summarizeSchedulerShadowCoverage(
   let legacyCascadeSkipTicks = 0;
   let reducerCascadeSkipTicks = 0;
   let dependencyBlockTicks = 0;
+  const executedEngineCounts: Record<'legacy' | 'reducer' | 'unknown', number> = {
+    legacy: 0,
+    reducer: 0,
+    unknown: 0,
+  };
   const divergenceCountByKind: Record<SchedulerShadowDivergenceEntry['kind'], number> = {
     'spawn-only-in-legacy': 0,
     'spawn-only-in-reducer': 0,
@@ -140,6 +163,7 @@ export function summarizeSchedulerShadowCoverage(
     if (record.legacyDecision.cascadeSkippedTaskIds.length > 0) legacyCascadeSkipTicks++;
     if (record.reducerDecision.cascadeSkippedTaskIds.length > 0) reducerCascadeSkipTicks++;
     if (record.reducerDecision.blockedTaskIds.length > 0) dependencyBlockTicks++;
+    executedEngineCounts[record.executedEngine ?? 'unknown']++;
 
     for (const entry of record.divergence) {
       divergenceCountByKind[entry.kind]++;
@@ -161,6 +185,7 @@ export function summarizeSchedulerShadowCoverage(
     legacyCascadeSkipTicks,
     reducerCascadeSkipTicks,
     dependencyBlockTicks,
+    executedEngineCounts,
     divergenceCountByKind,
     totalDivergenceCount,
   };

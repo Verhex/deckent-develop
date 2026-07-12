@@ -1,10 +1,12 @@
 /**
- * Sprint 238 İŞ1 — Per-task provider/model override precedence.
+ * Sprint 238 İŞ1 (+ 429-007 PLNR2) — Per-task provider/model/agent/skills override
+ * precedence.
  *
- * When DIRECTIVES carry explicit per-task `- Provider:` / `- Model:` overrides,
- * those are deterministic routing decisions that MUST be honored exactly. AI
- * planning cannot guarantee a 1:1 directive→task mapping, so `planSprint()`
- * routes to structured planning in ANY mode whenever such overrides are present.
+ * When DIRECTIVES carry explicit per-task `- Provider:` / `- Model:` / `- Agent:` /
+ * `- Skills:` overrides, those are deterministic routing decisions that MUST be
+ * honored exactly. AI planning cannot guarantee a 1:1 directive→task mapping, so
+ * `planSprint()` routes to structured planning in ANY mode whenever such overrides
+ * are present.
  *
  * Contract (asserted on the OUTCOME — the produced task JSON — not the internal
  * planning mode, per design review):
@@ -14,6 +16,10 @@
  *  - mode='structured' + override → same (regression baseline; already worked).
  *  - mode='ai' WITHOUT override → AI path still runs (precedence does not hijack
  *    normal AI planning).
+ *  - mode='ai'/'auto' + an `- Agent:`/`- Skills:`-ONLY override (no Provider/Model)
+ *    → ALSO honored exactly via structured planning (429-007 PLNR2 — the original
+ *    guard only checked provider/forceModel, so an Agent/Skills-only directive
+ *    silently fell through to the AI planner and the override was lost).
  *
  * Hermetic: provider/spawn/fs/model-selector mocked, no disk I/O, no network.
  */
@@ -164,6 +170,7 @@ vi.mock('../../src/core/memory-store.js', () => ({
 // ─── Imports under test ───────────────────────────────────────────
 
 import { planSprint } from '../../src/orchestra/sprint-planner.js';
+import * as notifyModule from '../../src/core/notify.js';
 
 // ─── Fixtures ─────────────────────────────────────────────────────
 
@@ -234,6 +241,21 @@ const PLAIN_DIRECTIVES = [
   'A task with no provider override.',
 ].join('\n');
 
+// DIRECTIVES with an Agent/Skills-ONLY override — deliberately NO `- Provider:`/
+// `- Model:` line, to reproduce the 429-007 PLNR2 (Bug-2) gap.
+const AGENT_SKILLS_DIRECTIVES = [
+  '# DIRECTIVES — Sprint 429 test',
+  '',
+  '## Task 1: Agent Skills Only Task',
+  '- Agent: security-auditor',
+  '- Skills: typescript-expert, ci-testing',
+  '- Files: src/baz.ts',
+  '- Scope: src/',
+  '',
+  '### Description',
+  'A task with only Agent/Skills overrides (no Provider/Model).',
+].join('\n');
+
 let errorSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
@@ -284,5 +306,36 @@ describe('Sprint 238 İŞ1 — per-task provider/model override precedence', () 
 
     // No explicit provider/model → AI path is taken → AI-only task present.
     expect(sprint.tasks.some((x) => x.title === 'AI Planned Task')).toBe(true);
+  });
+
+  it('mode=ai + Agent/Skills-ONLY override (no Provider/Model) → honored exactly via structured (429-007 PLNR2 regression)', async () => {
+    const notifySpy = vi.spyOn(notifyModule, 'notify').mockResolvedValue(undefined);
+
+    const sprint = await planSprint(ROOT, makeConfig(), makeContext(AGENT_SKILLS_DIRECTIVES), recommendation, { mode: 'ai' });
+
+    const t = sprint.tasks.find((x) => x.title === 'Agent Skills Only Task');
+    expect(t).toBeDefined();
+    expect(t!.forceAgent).toBe('security-auditor');
+    expect(t!.forceSkills).toEqual(['typescript-expert', 'ci-testing']);
+    // AI-only task must be absent — proves the AI planner output was bypassed.
+    expect(sprint.tasks.some((x) => x.title === 'AI Planned Task')).toBe(false);
+    // The structured-override notify fires in mode='ai' regardless of WHICH
+    // override field (provider/model/agent/skills) triggered it.
+    expect(notifySpy).toHaveBeenCalledWith(
+      'phase-change', 'sprint-238', '[Brain] plan:structured-override',
+      expect.stringContaining('agent/skills'),
+    );
+
+    notifySpy.mockRestore();
+  });
+
+  it('mode=auto + Agent/Skills-ONLY override → honored exactly', async () => {
+    const sprint = await planSprint(ROOT, makeConfig(), makeContext(AGENT_SKILLS_DIRECTIVES), recommendation, { mode: 'auto' });
+
+    const t = sprint.tasks.find((x) => x.title === 'Agent Skills Only Task');
+    expect(t).toBeDefined();
+    expect(t!.forceAgent).toBe('security-auditor');
+    expect(t!.forceSkills).toEqual(['typescript-expert', 'ci-testing']);
+    expect(sprint.tasks.some((x) => x.title === 'AI Planned Task')).toBe(false);
   });
 });

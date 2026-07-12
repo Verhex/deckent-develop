@@ -1,191 +1,165 @@
-# DIRECTIVES — SPRINT-428: 13 MİKRO-TASK — WIRE-FINISH · TERM-6 CUTOVER · SCHED-7 FIFO · BUILD-GUARD
+# DIRECTIVES — SPRINT-429: 11 MİKRO-TASK — NL→GERÇEK-PLAN (511) · TERM-7 API · PLANNER-PRECEDENCE · GATE-FIX'LER
 
 ## Goal
-born-674 WIRE-FINISH (Task 1-3: üç prompt-bloğunun ctx-doldurması — cache/turn-maliyet etkisi burada
-doğar) · TERM dilim-6 canonical-cutover (Task 4-9, run_flow_v2 flag'i altında) · SCHED dilim-7
-FIFO-safety (Task 10-11) · born-644/542 container-build-guard (Task 12) + kompozisyon-kanıtı (Task 13'ü 9'a katıldı).
-Tasarım-SSOT: `docs/analysis/term-flow-unify-design-2026-07-11.md` Sprint-6 satırı + Riskler,
-`docs/analysis/scheduler-unify-design-2026-07-11.md` Sprint-7 satırı; born-spec'ler `.analysis/born-backlog.json`.
-NOT: dogfood `scheduler.engine=reducer` bu sprint'te CANLI (ilk gerçek koşu) — sorun görürsen notes'a yaz.
+born-678 P0 NL→gerçek-plan sentezi (Task 1-2 — 511'in kalan yarısı, dilim-6.5) · born-677 delimiter (Task 3) ·
+born-675 çok-noktalı-basename (Task 4) · born-676 executed-engine loud-log (Task 5, SCHED-8 önkoşulu) ·
+planner brain_planning precedence Bug-1 + Bug-2-artığı (Task 6-7, eski 🔴) · TERM dilim-7 API-consumer (Task 8-10).
+Born-spec'ler `.analysis/born-backlog.json`; TERM tasarımı `docs/analysis/term-flow-unify-design-2026-07-11.md` Sprint-7 satırı.
 
 ## 🔒 BAĞLAYICI (her task)
 - Yalnız kendi Files'ına yaz · `.deckent/` runtime SALT-OKU · `.brain/`, `.tasks/` DOKUNMA · git stash-reset YASAK · `npm run build` YASAK · notes TEK STRING · Self DÜRÜST.
-- REPRODUCE-FIRST; test hermetik; 15dk-forensik-sınırı. i18n-FIRST (REPL user-metni).
-- TERM task'ları (4-9): terminal.run_flow_v2 flag-off SIFIR davranış-değişimi.
+- REPRODUCE-FIRST; test hermetik; 15dk-forensik-sınırı. i18n-FIRST (user-metni).
 
-## Task 1: W674A — ctx-doldurma: toolInventory + verifyCommands (born-674)
-- Model: sonnet | Agent: bug-fixer | Effort: normal | Provider: claude
-- Files: src/orchestra/task-builder.ts, tests/orchestra/ctx-population-wire.test.ts
+## Task 1: N678A — run-proposal-compiler'a planner-çekirdeği: NL→gerçek çok-task plan
+- Model: sonnet | Agent: bug-fixer | Effort: high | Provider: claude
+- Files: src/orchestra/run-proposal-compiler.ts, tests/orchestra/run-proposal-planner.test.ts
 - Scope: src/orchestra/, tests/orchestra/
 - Dependencies: none
 ### Description
-born-674 spec'ini OKU. buildWorkerPrompt'un SprintContext kurulumunda: toolInventory =
-readToolInventory(projectRoot, sprintId) (427-011'in persist'i) + verifyCommands =
-resolveVerifyCommands(projectRoot) (worker-verify-tool) doldurulur → 427'nin env-probe ve
-VERIFY-STEPS blokları GERÇEK veriyle render olur. Her ikisi fail-soft (hata → alan undefined,
-prompt-build durmaz). Inventory-dosyası yoksa bugünkü davranış bit-eş.
+born-678 spec'ini OKU (P0). Bugün compileProposal NL-hedeften tek-task TODO-SCAFFOLD üretiyor
+(kendi yorumu: 'multi-task decomposition is a follow-up') → gate haklı olarak reddediyor, kullanıcı
+çalışır plan alamıyor. FIX: compiler'a injectable planner-seam — prod'da sprint-planner'ın
+AI/structured çekirdeği NL-hedefi GERÇEK çok-task plana çevirir (task-ayrıştırma + dosya-scope +
+task-bazlı DOĞRULANABİLİR goCriteria/nogo; TODO-placeholder ölür); test'te fake-planner (hermetik —
+gerçek AI-çağrısı YOK). buildPlanNlIntent canonical-ölü — DİRİLTME; planner-çekirdeği kullan.
+Planner-hatası typed-hata (sessiz-scaffold'a düşme YOK — dürüst).
 ### goNogo
-- goCriteria: iki alan gerçek-kaynaktan dolar (testle); fail-soft; dosya-yoksa bit-eş; test yeşil.
-- nogo: prompt-build hatayla kırılırsa NO_GO.
+- goCriteria: NL→çok-task gerçek plan (fake-planner testli); TODO-placeholder üretimi ölü; planner-hatası typed; seam injectable; test yeşil.
+- nogo: buildPlanNlIntent dirilirse NO_GO; sessiz-scaffold fallback NO_GO.
 
-## Task 2: W674B — tools.allowlist_enabled flag'i + toolAllowlist ctx (born-674)
+## Task 2: N678B — do/propose_run gate-yeşil uçtan-uca (511 hermetik kabulü)
 - Model: sonnet | Agent: bug-fixer | Effort: normal | Provider: claude
-- Files: src/core/config-types.ts, src/core/config.ts, src/orchestra/task-builder.ts, tests/orchestra/allowlist-flag-wire.test.ts
-- Scope: src/core/, src/orchestra/, tests/orchestra/
+- Files: tests/cli/do-real-plan.test.ts
+- Scope: tests/cli/
 - Dependencies: Task 1
 ### Description
-Config'e tools.allowlist_enabled (typed, DEFAULT false) eklenir; flag-on iken buildWorkerPrompt
-ctx.toolAllowlist = computeToolAllowlist(task…) (427-013 çekirdeği) doldurur → 427-014 bloğu canlanır.
-Flag-off bugünkü tam-yüzey bit-eş (pinli). Dogfood config-DOSYASINA dokunma.
+`deckent do` flag-on yolu fake-planner'lı gerçek çok-task planla: propose→preview(digest)→GATE
+GEÇER→(--run --yes) snapshot-start (runSprint mock) zinciri e2e; ayrıca gate-kırmızı senaryosu
+(kriter-siz plan) dürüst-red. 428'in term-flow-composition desenini kopyala-uyarla.
 ### goNogo
-- goCriteria: flag typed+default-off; flag-on ctx dolar (testle); flag-off bit-eş pinli; test yeşil.
-- nogo: default-on NO_GO; dogfood-config değişirse NO_GO.
+- goCriteria: gate-yeşil tam-zincir + gate-kırmızı dürüst-red e2e; test yeşil.
+- nogo: gerçek sprint spawn NO_GO.
 
-## Task 3: W674C — üç-blok uçtan-uca render kanıtı (born-674)
+## Task 3: N677 — directives-builder delimiter-güvenliği
 - Model: sonnet | Agent: bug-fixer | Effort: normal | Provider: claude
-- Files: tests/orchestra/prompt-blocks-e2e.test.ts
-- Scope: tests/orchestra/
-- Dependencies: Task 1, Task 2
-### Description
-Tmp-proje fixture'ında (gerçek stack-dosyalarıyla) probe→persist→buildWorkerPrompt zinciri koşar;
-env-probe + VERIFY-STEPS + (flag-on) allowlist bloklarının GERÇEK-VERİ render'ı assert edilir
-(mock-değil; probe'un kendisi injectable-fake'le hermetik tutulabilir ama resolve/render zinciri gerçek).
-### goNogo
-- goCriteria: üç blok gerçek-zincirle render (testle); hermetik; test yeşil.
-- nogo: blok-metni mock'lanırsa NO_GO.
-
-## Task 4: T6A — cli-bridge-tool-specs canonical-yol notu (TERM-6)
-- Model: sonnet | Agent: bug-fixer | Effort: normal | Provider: claude
-- Files: src/cli/repl/cli-bridge-tool-specs.ts, tests/cli/canonical-cutover-specs.test.ts
-- Scope: src/cli/, tests/cli/
+- Files: src/orchestra/directives-builder.ts, tests/orchestra/directives-delimiter-safety.test.ts
+- Scope: src/orchestra/, tests/orchestra/
 - Dependencies: none
 ### Description
-Tasarım Sprint-6: flag-açıkken system-prompt/tool-tanıtımı 'canonical yol = deckent_propose_run'
-der; ham set/plan/start tool'ları KALIR ama 'expert escape-hatch' etiketiyle. Flag-off metin bit-eş;
-tool-sayı-pinleri iki-durumlu kalır.
+born-677 spec'ini OKU. CANLI-VAKA: NL-hedefte ';' → 'contains the ";" join delimiter — would not
+round-trip' HARD-ERROR. Kullanıcı-metni delimiter-güvenli değil: builder liste-serializasyonunda
+user-içeriği escape/normalize etsin (ya da delimiter-siz yapıya geçsin) — hard-error ölür,
+round-trip korunur. Fixture: ';' · ',' · newline · backtick içeren NL-hedef üçlüsü.
 ### goNogo
-- goCriteria: flag-on canonical-not + escape-hatch etiketi; flag-off bit-eş; pinler güncel; test yeşil.
-- nogo: tool silinirse NO_GO.
+- goCriteria: delimiter'li user-metni round-trip'li işlenir (hard-error yok); mevcut round-trip garantisi korunur; test yeşil.
+- nogo: doğrulama tamamen kaldırılırsa NO_GO (güvence kalksın istemiyoruz — user-metni güvenli hale gelsin).
 
-## Task 5: T6B — DECKENT.md canonical-akış dokümantasyonu (TERM-6)
-- Model: haiku | Agent: doc-writer | Effort: normal | Provider: claude
-- Files: DECKENT.md
-- Scope: DECKENT.md
-- Dependencies: Task 4
-### Description
-DECKENT.md'de native-terminal iş-başlatma anlatımı canonical-akışa güncellenir: NL→propose_run→
-gerçek-plan-önizleme→onay→snapshot-start→correlated-result (flag'li olduğu ve eski yolun expert
-escape-hatch kaldığı DÜRÜSTÇE yazılır — flag-off default'u yanlış anlatma). Kod YOK, yalnız doc.
-(soul.default.md'nin aynı-içerik güncellemesi CC/host-side yapılacak — scope-parser çok-noktalı
-dosya-adı düşürme bug'ı nedeniyle bu task'a alınmadı, born-675.)
-### goNogo
-- goCriteria: DECKENT.md akışı doğru+dürüst anlatır; kod-değişikliği sıfır.
-- nogo: koda dokunursa NO_GO.
-
-## Task 6: T6C — do.ts compatibility-adapter (TERM-6; sync-stdio + DIRECTIVES-swap ölür)
+## Task 4: P675 — scope-sanitizer çok-noktalı basename düşürmesi
 - Model: sonnet | Agent: bug-fixer | Effort: normal | Provider: claude
-- Files: src/cli/commands/do.ts, tests/cli/do-runflow-adapter.test.ts
-- Scope: src/cli/, tests/cli/
+- Files: src/orchestra/scope-sanitizer.ts, tests/orchestra/scope-sanitizer-multidot.test.ts
+- Scope: src/orchestra/, tests/orchestra/
 - Dependencies: none
 ### Description
-ÖNCE OKU: tasarım 'Ölecek parçalar' (defaultSpawnStart do.ts:119 · swapDirectives do.ts:96 ·
-exit-code-only evaluate do.ts:163). Flag-açıkken `deckent do` RunFlow-yoluna delege eder:
-proposal-compile→preview→(non-interactive onay semantiği: --yes şart, yoksa dürüst-red)→
-snapshot-start→rich-result (426/427 servisleri — YENİDEN İCAT YOK); global DIRECTIVES-swap ve
-sync-stdio spawn bu yolda YOK. Flag-off eski davranış bit-eş.
+born-675 spec'ini OKU. CANLI-VAKA: 'src/agent/assets/soul.default.md' Files+Scope nitelemesiyle bile
+'default.md'/'soul.default.md' diye bölünüp WRITE-listesinden GERÇEKTEN düştü (gate doğru uyardı,
+parser hatalı — sessiz-drop sınıfı). Path-tokenizer çok-noktalı basename'i (x.y.md, a.b.c.ts) tek
+dosya-adı olarak korusun. Regresyon: soul.default.md + a.b.c.ts + dizin-önekli/öneksiz varyantlar.
 ### goNogo
-- goCriteria: flag-on delege-zinciri servislerle (testle); swap/sync-spawn flag-on yolda sıfır; flag-off bit-eş; test yeşil.
-- nogo: flag-off değişirse NO_GO; ikinci akış-kopyası yazılırsa NO_GO.
+- goCriteria: çok-noktalı basename korunur (drop yok); mevcut gerçek-drop davranışları (gerçekten öneksiz ad) korunur; test yeşil.
+- nogo: sanitizer'ın gerçek-koruma davranışı gevşerse NO_GO.
 
-## Task 7: T6D — plan-nl compatibility-preview-adapter (TERM-6)
+## Task 5: L676 — scheduler executed-engine loud-log + journal alanı (SCHED-8 önkoşulu)
 - Model: sonnet | Agent: bug-fixer | Effort: normal | Provider: claude
-- Files: src/cli/commands/plan-nl.ts, tests/cli/plan-nl-adapter.test.ts
-- Scope: src/cli/, tests/cli/
+- Files: src/orchestra/scheduler-driver.ts, src/orchestra/scheduler-journal.ts, tests/orchestra/scheduler-executed-engine.test.ts
+- Scope: src/orchestra/, tests/orchestra/
 - Dependencies: none
 ### Description
-Tasarım: buildPlanNlIntent runtime-canonical kaynağı olarak ölür; plan-nl flag-açıkken
-plan-preview-service'e delege eden compatibility-preview-adapter olur (çıktı-şekli korunur);
-flag-off bit-eş.
+born-676 spec'ini OKU. (a) sprint-start'ta BİR KEZ 'scheduler engine: legacy|reducer' loud-log
+(mevcut sprint-log kanalı); (b) journal tick-kaydına additive executedEngine alanı (hangi kararın
+YÜRÜTÜLDÜĞÜ — journal bugün iki kararı da yazıyor, yürüteni yazmıyor); eski-okuyucu kırılmaz.
 ### goNogo
-- goCriteria: flag-on delege (testle); çıktı-şekli korunur; flag-off bit-eş; test yeşil.
-- nogo: buildPlanNlIntent'e yeni tüketici eklenirse NO_GO.
+- goCriteria: loud-log tek-satır; executedEngine additive+doğru; dual-read korunur; test yeşil.
+- nogo: journal-şeması kırılırsa NO_GO.
 
-## Task 8: T6E — cli/index route-wiring (TERM-6)
+## Task 6: PLNR1 — brain_planning top-level precedence (eski-🔴 Bug-1)
 - Model: sonnet | Agent: bug-fixer | Effort: normal | Provider: claude
-- Files: src/cli/index.ts, tests/cli/index-runflow-wiring.test.ts
-- Scope: src/cli/, tests/cli/
-- Dependencies: Task 6, Task 7
+- Files: src/core/config.ts, src/core/config-types.ts, src/orchestra/sprint-planner.ts, tests/orchestra/brain-planning-precedence.test.ts
+- Scope: src/core/, src/orchestra/, tests/orchestra/
+- Dependencies: none
 ### Description
-do/plan-nl adapter'larının index-kayıtları flag-duyarlı bağlanır (yeni komut YOK — mevcut komutların
-flag-on davranış-değişimi Task 6-7'de; burada yalnız kayıt/yönlendirme + help-metni tutarlılığı).
-Flag-off bit-eş.
+KANIT-BAĞLAM (2026-06-06'dan beri açık): DEFAULT_MODES 4 preset'te de brain_planning:'auto' hardcode
+(config.ts ~397-428); top-level user `brain_planning` ResolvedConfig'te YOK → sprint-planner (~:245)
+preset'in 'auto'sunu alır → kullanıcının top-level 'structured' niyeti YOK SAYILIR (init-template bu
+knob'u reklamlıyor — kullanıcı tuzağı). FIX: top-level brain_planning typed-alan olur ve EXPLICIT
+top-level, preset'i EZER (preset yalnız top-level-yokken kazanır); deckent-dev'in manuel
+modes.performance maskesi davranışı değişmemeli (aynı sonucu üretir).
 ### goNogo
-- goCriteria: kayıtlar tutarlı; flag-off bit-eş; test yeşil.
-- nogo: yeni komut doğarsa NO_GO.
+- goCriteria: top-level explicit > preset; top-level-yokken preset (bugünkü) korunur; init-template knob'u artık gerçek; test dört-preset kapsamlı; test yeşil.
+- nogo: preset-only kullanıcıların davranışı değişirse NO_GO.
 
-## Task 9: T6F — term-flow composition-pin testi (TERM-6)
+## Task 7: PLNR2 — structured-force guard'ına Agent/Skills override'ları (Bug-2 artığı)
 - Model: sonnet | Agent: bug-fixer | Effort: normal | Provider: claude
-- Files: tests/cli/term-flow-composition.test.ts
-- Scope: tests/cli/
+- Files: src/orchestra/sprint-planner.ts, tests/orchestra/planner-override-precedence.test.ts
+- Scope: src/orchestra/, tests/orchestra/
+- Dependencies: Task 6
+### Description
+4640fc30'un guard'ı (sprint-planner ~:254) yalnız t.provider||t.forceModel kontrol ediyor — yalnız
+`- Agent:`/`- Skills:` taşıyan direktif ai/auto'da structured'a zorlanmıyor → o override'lar AI-planner'da
+düşüyor. Guard forceAgent/forceSkills'i de kapsasın; mevcut 4-case testine yeni case'ler eklenir.
+### goNogo
+- goCriteria: Agent/Skills-only direktif structured'a zorlanır (notify'lı); mevcut case'ler yeşil kalır; test yeşil.
+- nogo: provider/model yolu değişirse NO_GO.
+
+## Task 8: D71 — api/run-flow-routes: REST consumer (TERM-7)
+- Model: sonnet | Agent: bug-fixer | Effort: normal | Provider: claude
+- Files: src/api/run-flow-routes.ts, tests/api/run-flow-routes.test.ts
+- Scope: src/api/, tests/api/
+- Dependencies: Task 1
+### Description
+ÖNCE OKU: TERM-tasarım Sprint-7 satırı ('Desktop aynı flow-service'i tüketir'). YENİ route-modülü:
+propose (NL→proposal+preview) · preview-get · approve/reject · flow-state-get — HEPSİ mevcut
+compiler/preview-service/reducer/store üstünden (yeniden-icat yok, terminal-controller'la aynı
+servisler); mevcut api auth/rate-limit desenlerini izle; terminal.run_flow_v2 kapalıyken 404/kapalı
+dürüst yanıt. Start-endpoint'i YOK (bu dilimde yalnız propose→approve; start dilim-sonrası karar).
+### goNogo
+- goCriteria: dört route servis-delegeli; flag-off dürüst-kapalı; auth/rate-limit mevcut desen; test yeşil.
+- nogo: ikinci akış-kopyası NO_GO; start-endpoint eklenirse NO_GO.
+
+## Task 9: D72 — run-flow SSE event-stream + server wiring (TERM-7)
+- Model: sonnet | Agent: bug-fixer | Effort: normal | Provider: claude
+- Files: src/api/run-flow-event-stream.ts, src/api/server.ts, tests/api/run-flow-event-stream.test.ts
+- Scope: src/api/, tests/api/
 - Dependencies: Task 8
 ### Description
-Tasarımın composition-gate'i: TEK fixture'da NL→typed-proposal→builder-validation→actual-preview→
-digest-bound-approval→exact-snapshot→tek-detached-job(mock-spawn)→rich-result→idle-new-turn zinciri
-(426/427 gerçek servis/reducer'larıyla, spawn mock). Duplicate-event double-start üretmez (risk-pini).
-NOT: gerçek-binary 511-dogfood koşusu CC/host-side yapılacak — bu test onun hermetik ikizi.
+Flow-event'lerinin (versioned RunFlowEvent) SSE akışı: flowId-scoped subscribe; mevcut api SSE
+desenini (server'daki emsal) kopyala-uyarla; server.ts'e route+stream kayıtları flag-duyarlı.
 ### goNogo
-- goCriteria: tam-zincir tek-fixture; double-start pini; gerçek servisler (mock yalnız spawn); test yeşil.
-- nogo: zincir parçalanırsa NO_GO.
+- goCriteria: flowId-scoped SSE; versioned-event şekli korunur; flag-off kapalı; test yeşil.
+- nogo: global-broadcast (scope'suz) NO_GO.
 
-## Task 10: S7A — scheduler FIFO dependency-safety (SCHED-7)
+## Task 10: D73 — API composition + consumer-pin güncellemesi (TERM-7 kapanışı)
 - Model: sonnet | Agent: bug-fixer | Effort: normal | Provider: claude
-- Files: src/orchestra/scheduler-reducer.ts, tests/orchestra/scheduler-fifo-dependency-safety.test.ts
+- Files: tests/api/run-flow-api-composition.test.ts, tests/orchestra/run-flow-reducer.test.ts
+- Scope: tests/
+- Dependencies: Task 9
+### Description
+Route-level e2e: propose→preview→approve→state zinciri (fake-planner + mock-auth); SSE'de event-sırası.
+VE (ders — bayat-pin sınıfı ölsün): run-flow-reducer.test KNOWN_CONSUMERS pinine Task 8-9'un yeni
+meşru tüketicileri (api/run-flow-routes.ts, api/run-flow-event-stream.ts) yorum-satırlı eklenir.
+### goNogo
+- goCriteria: zincir e2e; pin güncel (allowlist-dışı sızıntı sıfır kalır); test yeşil.
+- nogo: pin genişletmesi yorum-gerekçesiz olursa NO_GO.
+
+## Task 11: HYG — 427-011 inventory-dosyası .deckent hijyeni doğrulaması
+- Model: sonnet | Agent: bug-fixer | Effort: normal | Provider: claude
+- Files: src/orchestra/sprint-phases.ts, tests/orchestra/tool-inventory-hygiene.test.ts
 - Scope: src/orchestra/, tests/orchestra/
 - Dependencies: none
 ### Description
-ÖNCE OKU: scheduler-tasarım Sprint-7 satırı. Reducer'da blocked-head korunur + SONRAKİ eligible task
-seçilir (kuyruk stall olmaz); MRR/NO_GO'lu dependency spawn DEĞİL cascade üretir (bypass geri
-açılmaz). NOT: dogfood engine=reducer CANLI — legacy semantiği de bit-eş kalmalı.
+427-011'in persist'i `.deckent/<sprintId>-tool-inventory.txt` — sprint başına dosya birikir (temizlik
+yok) ve yol düz `.deckent/` kökünde. (a) Yol `.deckent/runtime/tool-inventory/<sprintId>.txt`'e taşınır
+(runtime-artifact evi; eski-yoldan okuma fallback'i BİR sürüm korunur — dual-read); (b) finalize/cleanup
+akışındaki mevcut artifact-temizlik desenine bağlanır (birikme ölür); (c) gitignore-kapsamı doğrulanır.
 ### goNogo
-- goCriteria: blocked-head + next-eligible fixture'lı; MRR/NO_GO-dep cascade; stall-yok; test yeşil.
-- nogo: dependency-bypass açılırsa NO_GO.
-
-## Task 11: S7B — FIFO config-migration + stall-pin güncelleme (SCHED-7)
-- Model: sonnet | Agent: bug-fixer | Effort: normal | Provider: claude
-- Files: src/core/config-types.ts, src/core/config.ts, tests/orchestra/processqueue-stall.test.ts
-- Scope: src/core/, tests/orchestra/
-- Dependencies: Task 2, Task 10
-### Description
-Tasarım Sprint-7 config-migration: FIFO/dependency davranış-anahtarları typed-config'e (mevcut
-local-cast idiom'ları resmileşir — 427-023 model_multiplier + scheduler.engine emsal);
-processqueue-stall pinleri Task-10 davranışına senkron. Default'lar bugünkü davranışı ÜRETİR.
-### goNogo
-- goCriteria: typed-config geriye-uyumlu; stall-pinler güncel+yeşil; test yeşil.
-- nogo: default davranış değişirse NO_GO.
-
-## Task 12: B542 — container build-yasağı guard'ı (born-644)
-- Model: sonnet | Agent: bug-fixer | Effort: normal | Provider: claude
-- Files: src/orchestra/spawn-backend-docker.ts, tests/orchestra/docker-dist-guard.test.ts
-- Scope: src/orchestra/, tests/orchestra/
-- Dependencies: none
-### Description
-born-644/satır-542 spec'ini OKU: sprint-403'te worker container'da build koşup volume-mount'la
-host-dist'i ezdi (ESM-cache zehirlenmesi). Guard: dist/ container'a READ-ONLY mount edilir
-(docker run -v …:ro) — worker build'i container-içi kalır, host-dist ezilemez; mount-satırı testle
-pinli. WORKER-GUIDE'daki build-yasağı metni zaten var — mekanik enforcement bu.
-### goNogo
-- goCriteria: dist ro-mount pinli; mevcut mount-davranışları bit-eş (yalnız ro-bayrağı); test yeşil.
-- nogo: volume-yolu değişirse NO_GO; 549 stream-capture bozulursa NO_GO.
-
-## Task 13: S7C — FIFO composition-kanıtı (SCHED-7 kapanışı)
-- Model: sonnet | Agent: bug-fixer | Effort: normal | Provider: claude
-- Files: tests/orchestra/scheduler-fifo-composition.test.ts
-- Scope: tests/orchestra/
-- Dependencies: Task 11
-### Description
-Task 10-11'in birleşik kanıtı: blocked-head+next-eligible+cascade davranışı driver→reducer→executor
-tam-zincirde (427'nin composition-test desenini kopyala-uyarla); legacy-vs-reducer engine'de
-davranış-eşdeğerliği (FIFO-dep-deliği İŞARETLİ-assert kalır).
-### goNogo
-- goCriteria: tam-zincir composition; iki-engine kıyası; test yeşil.
-- nogo: fixture canlı-sprint'e dokunursa NO_GO.
+- goCriteria: yeni-yol + dual-read; temizlik mevcut desenle; gitignore kapsıyor (testle); test yeşil.
+- nogo: aktif-sprint inventory'si silinirse NO_GO.

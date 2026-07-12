@@ -103,6 +103,66 @@ function assertNonEmpty(field: string, value: string): void {
   if (!value.trim()) throw new DeckentError('DECKENT_E074', `directives-builder: "${field}" must not be empty`);
 }
 
+// ═══ Delimiter-safe escaping (goCriteria/nogo) ══════════════════════════
+//
+// goCriteria/nogo items are frequently user/NL-authored free text (e.g. an NL
+// target embedded verbatim by a caller) and must not be rejected just because
+// they happen to contain the '; ' join delimiter, a literal backslash, or an
+// embedded newline (born-677: an ordinary semicolon in NL prose hard-errored).
+// This module owns BOTH the writer (buildTaskBlock) and the reader
+// (splitCriteriaLine/extractGoNogo) for this `- goCriteria: a; b` line format,
+// so a private, reversible backslash-escape can replace the previous
+// reject-on-collision check without touching the external, unchanged
+// parseStructuredDirectives parser (which owns the ','-delimited Files/Scope/
+// Dependencies/Skills lines — those keep their hard collision check).
+
+function escapeListItem(item: string, delimiter: string): string {
+  let out = '';
+  for (const ch of item) {
+    if (ch === '\\' || ch === delimiter) out += `\\${ch}`;
+    else if (ch === '\n') out += '\\n';
+    else if (ch === '\r') out += '\\r';
+    else out += ch;
+  }
+  return out;
+}
+
+function splitEscaped(joined: string, delimiter: string): string[] {
+  const parts: string[] = [];
+  let cur = '';
+  for (let i = 0; i < joined.length; i++) {
+    const ch = joined[i];
+    if (ch === '\\' && i + 1 < joined.length) {
+      cur += ch + joined[i + 1];
+      i++;
+    } else if (ch === delimiter) {
+      parts.push(cur);
+      cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  parts.push(cur);
+  return parts;
+}
+
+function unescapeListItem(item: string): string {
+  let out = '';
+  for (let i = 0; i < item.length; i++) {
+    const ch = item[i];
+    if (ch === '\\' && i + 1 < item.length) {
+      const next = item[i + 1];
+      if (next === 'n') out += '\n';
+      else if (next === 'r') out += '\r';
+      else out += next;
+      i++;
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
+
 // ═══ Writer ══════════════════════════════════════════════════════════════
 
 function normalizeScopeDir(dir: string): string {
@@ -125,8 +185,7 @@ function validateTask(task: DirectiveBuildTask): void {
   assertNoDelimiterCollision('scope', task.scope, ',');
   assertNoDelimiterCollision('deps', task.deps, ',');
   if (task.skills) assertNoDelimiterCollision('skills', task.skills, ',');
-  assertNoDelimiterCollision('goCriteria', task.goCriteria, ';');
-  assertNoDelimiterCollision('nogo', task.nogo, ';');
+  // goCriteria/nogo items are escaped instead of rejected — see escapeListItem above.
 }
 
 function buildTaskBlock(task: DirectiveBuildTask, seq: number): string[] {
@@ -145,8 +204,8 @@ function buildTaskBlock(task: DirectiveBuildTask, seq: number): string[] {
   lines.push('### Description');
   lines.push(task.desc.trim());
   lines.push('### goNogo');
-  lines.push(`- goCriteria: ${task.goCriteria.join('; ')}`);
-  lines.push(`- nogo: ${task.nogo.join('; ')}`);
+  lines.push(`- goCriteria: ${task.goCriteria.map(item => escapeListItem(item, ';')).join('; ')}`);
+  lines.push(`- nogo: ${task.nogo.map(item => escapeListItem(item, ';')).join('; ')}`);
   return lines;
 }
 
@@ -183,9 +242,8 @@ function splitCriteriaLine(section: string, label: 'goCriteria' | 'nogo'): strin
   const lineRe = new RegExp(`^\\s*-\\s*${label}\\s*:\\s*(.*)$`, 'im');
   const match = lineRe.exec(section);
   if (!match?.[1]) return [];
-  return match[1]
-    .split(';')
-    .map(s => s.trim())
+  return splitEscaped(match[1], ';')
+    .map(s => unescapeListItem(s.trim()))
     .filter(Boolean);
 }
 

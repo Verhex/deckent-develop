@@ -30,7 +30,7 @@ import type {
 } from '../core/types.js';
 
 import {
-  TASKS_DIR, DECKENT_VERSION, DECKENT_DIR,
+  TASKS_DIR, DECKENT_VERSION, DECKENT_DIR, RUNTIME_DIR,
 } from '../core/constants.js';
 
 import { readJsonSafe, debugLog } from '../core/utils.js';
@@ -868,28 +868,53 @@ export function checkBuildStaleness(
 // readToolInventory() returns undefined and buildEnvProbeBlock renders ''
 // exactly like today.
 
-/** Resolve the per-sprint tool-inventory file path. */
+// ─── 429-011 HYG: runtime-artifact home + dual-read ─────────────────
+// The original born-670a path (`.deckent/<sprintId>-tool-inventory.txt`)
+// lived flat at the .deckent root, accumulated forever (no cleanup), and
+// was never covered by .gitignore (confirmed via `git status` /
+// `git check-ignore` — a real per-sprint file leak). Moved to the same
+// runtime purpose-folder as JOBS_DIR/DECISIONS_LOG_DIR/EVALUATIONS_DIR
+// (core/constants.ts RUNTIME_DIR) and wired into runCleanupPhase below.
+const TOOL_INVENTORY_DIR = join(RUNTIME_DIR, 'tool-inventory');
+
+/** Resolve the per-sprint tool-inventory file path (new, canonical home). */
 export function toolInventoryPath(projectRoot: string, sprintId: string): string {
+  return join(projectRoot, TOOL_INVENTORY_DIR, `${sprintId}.txt`);
+}
+
+/**
+ * Resolve the pre-429-011 flat-root path. Read-only fallback for one
+ * version — a sprint whose PLAN phase ran under the old code already has
+ * its inventory at this path; {@link readToolInventory} falls back to it so
+ * such a sprint doesn't lose its env-probe block mid-flight. Never written
+ * to by new code. Candidate for removal once no in-flight sprint predates
+ * this change.
+ */
+function legacyToolInventoryPath(projectRoot: string, sprintId: string): string {
   return join(projectRoot, DECKENT_DIR, `${sprintId}-tool-inventory.txt`);
 }
 
 /** Persist an already-formatted one-line inventory (e.g. `python3=yes docker=no rg=yes`) to disk. */
 export function writeToolInventory(projectRoot: string, sprintId: string, inventoryLine: string): void {
-  const dir = join(projectRoot, DECKENT_DIR);
+  const dir = join(projectRoot, TOOL_INVENTORY_DIR);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(toolInventoryPath(projectRoot, sprintId), inventoryLine, 'utf-8');
 }
 
 /**
  * Read back the one-line inventory a prior {@link writeToolInventory} call
- * persisted for this sprint. Returns undefined when absent/blank (no probe
- * ran this sprint, or it failed) — a caller (e.g. task-builder.ts
- * buildWorkerPrompt, in a later wire) passes this straight through to
+ * persisted for this sprint. Tries the new runtime-artifact path first,
+ * then falls back to the pre-429-011 flat-root path (dual-read — see
+ * {@link legacyToolInventoryPath}). Returns undefined when neither exists or
+ * is blank (no probe ran this sprint, or it failed) — a caller (e.g.
+ * task-builder.ts buildWorkerPrompt) passes this straight through to
  * SprintContext.toolInventory; undefined there means buildEnvProbeBlock
  * renders '' exactly like today.
  */
 export function readToolInventory(projectRoot: string, sprintId: string): string | undefined {
-  const filePath = toolInventoryPath(projectRoot, sprintId);
+  const filePath = existsSync(toolInventoryPath(projectRoot, sprintId))
+    ? toolInventoryPath(projectRoot, sprintId)
+    : legacyToolInventoryPath(projectRoot, sprintId);
   if (!existsSync(filePath)) return undefined;
   try {
     const raw = readFileSync(filePath, 'utf-8').trim();
@@ -898,6 +923,28 @@ export function readToolInventory(projectRoot: string, sprintId: string): string
     debugLog('readToolInventory', e);
     return undefined;
   }
+}
+
+/**
+ * Remove this sprint's tool-inventory artifact(s) — both the new
+ * runtime-artifact path and the pre-429-011 legacy flat-root path, if
+ * present. Scoped to exactly one sprintId (never a wildcard/cross-sprint
+ * sweep), so it can only ever remove the completing sprint's own file —
+ * a concurrently-running sprint's inventory is untouched. Fail-soft, each
+ * removal independently try/catched (mirrors cleanupSprintMetadata's style
+ * in sprint-controller.ts). Called from runCleanupPhase (Phase 8), which
+ * only runs at genuine sprint completion.
+ */
+export function cleanupToolInventory(projectRoot: string, sprintId: string): void {
+  try {
+    const p = toolInventoryPath(projectRoot, sprintId);
+    if (existsSync(p)) unlinkSync(p);
+  } catch (e) { debugLog('cleanupToolInventory:new', e); }
+
+  try {
+    const p = legacyToolInventoryPath(projectRoot, sprintId);
+    if (existsSync(p)) unlinkSync(p);
+  } catch (e) { debugLog('cleanupToolInventory:legacy', e); }
 }
 
 /**
@@ -3186,6 +3233,7 @@ export function runCleanupPhase(
       const _spawnBackend = spawnBackend;
       setTimeout(() => {
         try { cleanup(projectRoot, _sprint, _spawnBackend); } catch (e) { debugLog('runCleanupPhase:cleanupDelayed', e); }
+        try { cleanupToolInventory(projectRoot, _sprint.id); } catch (e) { debugLog('runCleanupPhase:cleanupToolInventoryDelayed', e); }
       }, cleanupDelay);
     } else {
       try {
@@ -3193,6 +3241,7 @@ export function runCleanupPhase(
       } catch (err) {
         safeDashboardUpdate(projectRoot, sprint, `Phase ${sprint.phase} error: ${err instanceof Error ? err.message : String(err)}`);
       }
+      try { cleanupToolInventory(projectRoot, sprint.id); } catch (e) { debugLog('runCleanupPhase:cleanupToolInventory', e); }
     }
   }
 

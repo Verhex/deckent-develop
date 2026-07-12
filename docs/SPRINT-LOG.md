@@ -10512,3 +10512,35 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 428-013: S7C — FIFO composition-kanıtı (SCHED-7 kapanışı) (DONE)
 
 ---
+## Sprint 429 — sprint-429
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-12
+**Duration:** 2598s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 11 |
+| Completed | 11 |
+| Tech Debt | 2 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 2598291ms |
+
+### Tasks
+
+- 429-001: N678A — run-proposal-compiler'a planner-çekirdeği: NL→gerçek çok-task plan (DONE)
+- 429-002: N678B — do/propose_run gate-yeşil uçtan-uca (511 hermetik kabulü) (DONE)
+- 429-003: N677 — directives-builder delimiter-güvenliği (GO_WITH_TECH_DEBT)
+- 429-004: P675 — scope-sanitizer çok-noktalı basename düşürmesi (DONE)
+- 429-005: L676 — scheduler executed-engine loud-log + journal alanı (SCHED-8 önkoşulu) (DONE)
+- 429-006: PLNR1 — brain_planning top-level precedence (eski-🔴 Bug-1) (DONE)
+- 429-007: PLNR2 — structured-force guard'ına Agent/Skills override'ları (Bug-2 artığı) (DONE)
+- 429-008: D71 — api/run-flow-routes: REST consumer (TERM-7) (DONE)
+- 429-009: D72 — run-flow SSE event-stream + server wiring (TERM-7) (DONE)
+- 429-010: D73 — API composition + consumer-pin güncellemesi (TERM-7 kapanışı) (DONE)
+- 429-011: HYG — 427-011 inventory-dosyası .deckent hijyeni doğrulaması (GO_WITH_TECH_DEBT)
+
+---

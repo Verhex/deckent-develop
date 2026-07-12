@@ -3024,36 +3024,59 @@
   "born_id": 675,
   "title": "Scope-parser cok-noktali dosya-adi drop: soul.default.md WRITE-listesinden render-time dusuyor (gate dogru-uyardi, parser hatali) — sanitizeScope/path-tokenizer coklu-nokta basename fix",
   "priority": "P2",
-  "status": "OPEN",
+  "status": "DONE",
   "source": "sprint-428 gate-BLOCK canli-vaka (2026-07-12): src/agent/assets/soul.default.md hem Files hem Scope nitelemesiyle bile default.md/soul.default.md diye bolunup dusuruldu",
   "spec": "born-650/653 false-positive ailesinin yeni alt-turu ama bu kez SILENT-DROP gercek (worker dosyayi hic gormezdi). Path-tokenizer cok-noktali basename i (x.y.md) tek dosya-adi olarak korumali; regresyon-testi: soul.default.md + a.b.c.ts fixture. Ilgili: project_prompt_contract_verification_2026_07_10 (sanitizeScope Rule 5 kok-dosya drop — ayni bolge).",
-  "date": "2026-07-12"
+  "date": "2026-07-12",
+  "resolution": "DONE sprint-429 (429-004): path-tokenizer cok-noktali basename korur; soul.default.md + a.b.c.ts regresyon-pinli"
  },
  {
   "born_id": 676,
   "title": "Scheduler executed-engine loud-log yok: hangi engine'in (legacy|reducer) tick'i YURUTTUGU runtime'da kanitlanabilir degil (journal iki karari da yaziyor, yuruteni degil)",
   "priority": "P2",
-  "status": "OPEN",
+  "status": "DONE",
   "source": "sprint-428 kapanis disk-verify (2026-07-12): engine=reducer canli kosusunun kaniti dolayli kaldi (config+composition-test+0-divergence)",
   "spec": "SCHED dilim-8 default-flip ONKOSULU: (a) sprint-start'ta bir kez 'scheduler engine: X' loud-log + journal tick-kaydina executedEngine alani (additive); (b) flip-karari bu alanin gercek-sprint kanitiyla verilir.",
-  "date": "2026-07-12"
+  "date": "2026-07-12",
+  "resolution": "DONE sprint-429 (429-005): loud-log + executedEngine journal-alani"
  },
  {
   "born_id": 677,
   "title": "RunFlow NL-hedefte \";\" karakteri directives-builder goCriteria round-trip hatasi veriyor (hard-error) — user-metni delimiter-guvenli degil",
   "priority": "P1",
-  "status": "OPEN",
+  "status": "DONE",
   "source": "511 gercek-binary dogfood ILK deneme (2026-07-12): deckent do \"...loud-log yazsin; ...eklensin; ...\" → Error: contains the \";\" join delimiter",
   "spec": "Iki kok: (a) compiler NL-hedefi TODO-goCriteria stringine ham gomuyor — kullanici metni join-delimiter icerebilir; escape/normalize edilmeli (ya da liste-serializasyonu delimiter-siz yapiya gecmeli), hard-error YANLIS; (b) zero-config yolda goCriteria TODO-placeholder — gercek kriter sentezi yok (plan-fazina ertelenmis olabilir; dogrula, dogruysa TODO-metni delimitersiz uret). Regresyon-testi: noktali-virgullu/virgullu/newline-li NL-hedef fixture ucu.",
-  "date": "2026-07-12"
+  "date": "2026-07-12",
+  "resolution": "DONE sprint-429 (429-003): reversible backslash-escape; ;/,/newline/backtick fixture; eski hard-error pin CC-el senkron"
  },
  {
   "born_id": 678,
   "title": "511 kalan-yarisi: RunFlow NL→GERCEK-plan sentezi yok — do/propose_run zero-config yolu tek-task TODO-SCAFFOLD uretiyor (gate dogru-reddediyor, ama kullanici calisir plan alamiyor)",
   "priority": "P0",
-  "status": "OPEN",
+  "status": "DONE",
   "source": "511 gercek-binary dogfood (2026-07-12): dry-run preview spine calisti (proposal→preview→digest→gate→policy) ama goCriteria/nogo TODO-placeholder; compiler kendi notu: RunProposal to multi-task decomposition is a follow-up",
   "spec": "run-proposal-compiler NL-hedeften GERCEK cok-task plan sentezleyecek: planner (deckent plan AI/structured esdegeri) proposal-compile asamasina baglanir — gercek task-ayristirma + dosya-scope + task-bazli verifiable goCriteria/nogo (TODO-placeholder olur); gate o zaman gercek plani degerlendirir. buildPlanNlIntent canonical-oldugu icin YENIDEN diriltilmez — planner-cekirdegi kullanilir. Kabul: deckent do \"<gercek born>\" --run --yes ile gate-yesil gercek sprint; 511 ancak bununla kapanir. TERM dilim-6.5 olarak dilim-7 (DESK-2) ONCESINE girer.",
+  "date": "2026-07-12",
+  "resolution": "DONE sprint-429 (429-001/002): planner-cekirdegi seam; gercek-binary 4-task plan + GATE-GECTI kaniti (2026-07-12)"
+ },
+ {
+  "born_id": 679,
+  "title": "Approvals cross-process EXPIRY yok + expired-karara sessiz-ret + bot re-notify dedup yok — suresi-dolmus request sonsuz onay-dongusu yaratiyor (Telegram canli-vaka)",
+  "priority": "P1",
+  "status": "OPEN",
+  "source": "Alperen Telegram-vakasi (2026-07-12): DECKENT_APPROVAL_DEMO fixture karti (10dk-expiry) suresi doldu; dosya .deckent/approvals/ta kaldi; bot her turda yeniden sordu; onay/red karar uretmedi. MASTER-PLAN 523 APPROVAL-QOL \"KALAN: cross-process expire (404-004)\" notunun canli-kaniti. Bilesik neden: bot 34h bayat-dist (ops-kurali kondu).",
+  "spec": "UC is: (a) cross-process feed/broker expiresAt gecmis request-dosyasini SWEEP eder (karar-dosyasiz kapanis kaydi + dosya arsiv/silme); (b) expired isteğe gelen approve/reject DURUST yanit dondurur (\"suresi dolmus\") — sessiz no-op olmez; (c) bot ayni request-id icin notify-DEDUP yapar (bir kez sor + hatirlatma-politikasi ayri). Regresyon: expired-request fixture + bot-callback e2e.",
+  "date": "2026-07-12"
+ },
+ {
+  "born_id": 680,
+  "title": "do-yolu bootstrapProviders cagirmiyordu — gercek-binary RunFlow \"No providers registered\" (511-dogfood 2. bulgu)",
+  "priority": "P1",
+  "status": "DONE",
+  "source": "511 re-dogfood (2026-07-12): plan.ts/start.ts konvansiyonu do.ts RunFlow-dalinda eksikti",
+  "resolution": "CC-el ayni-gun: runDoRunFlow basina await bootstrapProviders(config); do-testleri planner-mock oldugu icin etkilenmedi; gercek-binary 4-task plan kaniti alindi",
+  "spec": "kapali",
   "date": "2026-07-12"
  }
 ]

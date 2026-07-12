@@ -37,6 +37,9 @@ coverage/
 # Sprint metrics (runtime + deckent archive)
 .deckent/archive/metrics/
 .deckent/sprint-*-metrics.jsonl
+# Sprint tool-inventory (runtime artifact — 427-011/429-011)
+.deckent/sprint-*-tool-inventory.txt
+.deckent/runtime/tool-inventory/
 
 # Test artifacts
 .test/

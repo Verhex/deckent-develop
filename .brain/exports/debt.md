@@ -9,6 +9,8 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-429-003 | Tech debt from 429-003: born-677 root cause: buildTaskBlock() joined goCriteria/ | normal | sprint-429 | resolved |
+| debt-429-011 | Tech debt from 429-011: Moved tool-inventory persist from flat `.deckent/<sprint | normal | sprint-429 | resolved |
 | debt-427-011 | Tech debt from 427-011: born-670a WIRE-PROBE implemented: runPlanPhase (sprint-p | normal | sprint-427 | resolved |
 | debt-427-012 | Tech debt from 427-012: born-670b WIRE-VERIFY implemented in prompt-god-template | normal | sprint-427 | resolved |
 | debt-427-014 | Tech debt from 427-014: ALLOW-WIRE (born-664/559): Task-13's PURE selector (src/ | normal | sprint-427 | resolved |

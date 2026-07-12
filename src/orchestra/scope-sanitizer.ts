@@ -47,6 +47,24 @@ export function isJsAccessPattern(path: string): boolean {
   return /^\.[a-z][a-zA-Z]*$/.test(path);
 }
 
+/** A real file extension is alpha-led (".ts", ".md"); a trailing digit/symbol run is not. */
+const REAL_EXTENSION_RE = /\.[A-Za-z][A-Za-z0-9]*$/;
+
+/**
+ * born-675 — does a BARE (no `/`/`\`) filename look like a genuine compound-name file
+ * (`soul.default.md`, `a.b.c.ts`) rather than a plain single-extension name (`init.ts`)?
+ * Live case: `src/agent/assets/soul.default.md` reached sanitizeScope reduced to a bare
+ * fragment upstream, and Rule 5 silently dropped it as "just needs a directory prefix"
+ * — real, identifiable multi-part basenames are distinctive enough to be worth
+ * preserving even without their directory context; a plain `word.ext` bare name is not
+ * (still genuinely unqualified, still dropped — see Rule 5).
+ */
+export function hasMultiDotBasename(path: string): boolean {
+  if (path.includes('/') || path.includes('\\')) return false;
+  const dotCount = (path.match(/\./g) ?? []).length;
+  return dotCount >= 2 && REAL_EXTENSION_RE.test(path);
+}
+
 /** Global protected filenames that workers should never write to */
 const GLOBAL_PROTECTED = new Set([
   'config.json',
@@ -69,6 +87,10 @@ const GLOBAL_PROTECTED = new Set([
  *    UNLESS the exact path is present in `trackedRootFiles` (a known git-tracked
  *    root file, e.g. README.md) — those are preserved. Rule 6 still wins: a
  *    GLOBAL_PROTECTED root file drops even if it is also in `trackedRootFiles`.
+ *    ALSO preserved (silently, no warning — born-675): a bare filename with a
+ *    multi-dot compound basename (`soul.default.md`, `a.b.c.ts`,
+ *    {@link hasMultiDotBasename}) — a genuinely-unqualified single-extension name
+ *    (`init.ts`) still drops as before.
  * 6. Global protected files → removed
  * 7. "(yeni)" suffix stripped
  * 8. Duplicate paths (case-insensitive) → deduped
@@ -131,6 +153,12 @@ export function sanitizeScope(
       } else if (trackedRootFiles?.has(path)) {
         // Known git-tracked root file (exact match) — preserve (sprint-397
         // evidence: README.md / README-TR.md / .secrets-baseline silently dropped)
+      } else if (hasMultiDotBasename(path)) {
+        // Compound-name file (soul.default.md, a.b.c.ts) that lost its directory
+        // prefix upstream — preserve (born-675: silent-drop of a real file).
+        // No warning: prompt-gate's SAN-1 lint treats every sanitizeScope warning
+        // as a shrink-BLOCK regardless of final filesWrite membership, so warning
+        // here on a path we are NOT dropping would be a false-positive BLOCK.
       } else {
         warnings.push(`Unqualified filename removed: "${path}" — needs directory prefix`);
         continue;

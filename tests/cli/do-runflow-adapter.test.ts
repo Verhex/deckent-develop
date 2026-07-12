@@ -24,7 +24,25 @@ import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+// 429-001 (born-678): compiler artık scaffold üretmez — AI/provider SINIRI olan
+// callZeroConfigPlanner mock'lanır (do-real-plan.test.ts emsali); canned tek-task
+// GERÇEK-şekilli plan döner, böylece propose-yolu hermetik kalır.
+vi.mock('../../src/orchestra/planner.js', () => ({
+  callZeroConfigPlanner: vi.fn(() => ({
+    reasoning: 'canned single-task plan (hermetic planner boundary)',
+    tasks: [{
+      title: 'Planned task',
+      description: 'Canned single-task plan for RunFlow tests (429-001 planner-seam).',
+      scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/planned.ts'] },
+      dependencies: [],
+      model: 'sonnet', effort: 'normal', priority: 'NORMAL', reason: 'canned',
+      goNogo: { goCriteria: 'The planned change works.', noGoCriteria: 'The planned change breaks.', techDebtAcceptable: '' },
+    }],
+  })),
+}));
+
 vi.mock('../../src/core/config.js', () => ({
+  resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
 }));
 

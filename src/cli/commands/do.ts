@@ -42,6 +42,7 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
 import { promptConfirm } from '../helpers/prompt.js';
 import { loadConfig } from '../../core/config.js';
+import { bootstrapProviders } from '../../core/provider.js';
 import type { ResolvedConfig } from '../../core/types.js';
 import { getMessage } from '../helpers/messages.js';
 import type { PlanPreview, RunFlowContext } from '../../core/run-flow-contract.js';
@@ -170,6 +171,10 @@ export async function runDoRunFlow(
   deps: DoSeamDeps,
 ): Promise<void> {
   const lang = config.language;
+  // born-680 (511-dogfood canlı-vakası): compiler'ın default planner'ı provider
+  // ister — plan.ts/start.ts ile AYNI bootstrap-konvansiyonu, yoksa gerçek-binary
+  // 'No providers registered' ile düşer (test-yolu planner'ı mock'lar, etkilenmez).
+  await bootstrapProviders(config);
   const controllerFactory = deps.createRunFlowController ?? createRunFlowControllerImpl;
   const controller = controllerFactory({ root, config, origin: 'cli' });
 

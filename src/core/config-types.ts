@@ -484,6 +484,15 @@ export interface ProviderDefinition {
 export interface DeckentConfig {
   mode: PlanMode;
   modes: Record<string, PlanModeConfig>;
+  /**
+   * Top-level Brain planning-mode override ('ai' | 'structured' | 'auto').
+   * Explicit top-level value wins over `modes.<mode>.brain_planning` (the
+   * active preset); absent → the active mode preset's `brain_planning`
+   * continues to apply unchanged (Task 429-006 PLNR1 — previously a dead
+   * field advertised by `deckent init` templates but never wired). Resolve
+   * via `resolveBrainPlanningMode()` (config.ts) — never read directly.
+   */
+  brain_planning?: BrainPlanningMode;
   language?: string;
   projectName?: string;
   /** Last completed sprint ID (e.g. 'sprint-091') */
@@ -1237,6 +1246,11 @@ export interface ResolvedConfig {
   mode: PlanMode;
   activeModeConfig: PlanModeConfig;
   modes: Record<string, PlanModeConfig>;
+  /** Explicit top-level Brain planning-mode override; see DeckentConfig.brain_planning.
+   *  Precedence (Task 429-006): explicit top-level > modes.<mode>.brain_planning
+   *  (preset) > 'auto'. Resolve via `resolveBrainPlanningMode()` (config.ts) —
+   *  never read this field directly. */
+  brain_planning?: BrainPlanningMode;
   language: string;
   projectName: string;
   projectRoot: string;

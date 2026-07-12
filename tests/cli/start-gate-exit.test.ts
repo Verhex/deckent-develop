@@ -6,6 +6,7 @@ import { Command } from 'commander';
 // alone is dishonest for scripts/CI. See task-395-003.plan for the investigation.
 
 vi.mock('../../src/core/config.js', () => ({
+  resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
 }));
 

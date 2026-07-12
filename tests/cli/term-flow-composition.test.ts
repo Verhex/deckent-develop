@@ -36,6 +36,23 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+// 429-001 (born-678): compiler artık scaffold üretmez — AI/provider SINIRI olan
+// callZeroConfigPlanner mock'lanır (do-real-plan.test.ts emsali); canned tek-task
+// GERÇEK-şekilli plan döner, böylece propose-yolu hermetik kalır.
+vi.mock('../../src/orchestra/planner.js', () => ({
+  callZeroConfigPlanner: vi.fn(() => ({
+    reasoning: 'canned single-task plan (hermetic planner boundary)',
+    tasks: [{
+      title: 'Planned task',
+      description: 'Canned single-task plan for RunFlow tests (429-001 planner-seam).',
+      scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/planned.ts'] },
+      dependencies: [],
+      model: 'sonnet', effort: 'normal', priority: 'NORMAL', reason: 'canned',
+      goNogo: { goCriteria: 'The planned change works.', noGoCriteria: 'The planned change breaks.', techDebtAcceptable: '' },
+    }],
+  })),
+}));
+
 vi.mock('../../src/orchestra/brain.js', () => ({
   planSprint: vi.fn(),
   readContext: vi.fn(),
@@ -58,7 +75,7 @@ import { createChatTurnQueue } from '../../src/cli/repl/chat-turn-queue.js';
 import type { ChatTurnBgEvent, ChatTurnPayload } from '../../src/cli/repl/chat-turn-queue.js';
 import { getMessage } from '../../src/cli/helpers/messages.js';
 import { JOBS_DIR } from '../../src/core/constants.js';
-import { DeckentError } from '../../src/core/errors.js';
+import { parseStructuredDirectives } from '../../src/orchestra/task-builder.js';
 import type { RunProposal } from '../../src/core/run-flow-contract.js';
 import { SprintStatus, SprintPhase, TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task, ResolvedConfig, BrainContext } from '../../src/core/types.js';
@@ -177,7 +194,9 @@ describe('term-flow composition-gate — full chain in ONE fixture (TERM-6, 428-
       expect(compiled.directivesMarkdown).toContain(nlGoal);
       expect(compiled.directivesMarkdown).toContain('flow-tf-1');
       expect(compiled.intent.tasks).toHaveLength(1);
-      expect(compiled.intent.tasks[0]!.title).toBe(nlGoal);
+      // 429-001 (born-678): title artık NL-hedefin verbatim kopyası değil,
+      // PLANNER-ayrıştırmasının task-başlığı (buradaki canned-mock: 'Planned task').
+      expect(compiled.intent.tasks[0]!.title).toBe('Planned task');
 
       // ── 3. actual-preview (real generatePlanPreview, not a stub) ────────
       expect(proposed.preview).toBeDefined();
@@ -302,14 +321,21 @@ describe('term-flow composition-gate — full chain in ONE fixture (TERM-6, 428-
 
 // ─── builder-validation is a genuine gate, not a pass-through ──────────────
 
-describe('term-flow composition-gate — builder-validation rejects unsafe input', () => {
-  it('compileRunProposal throws rather than emit DIRECTIVES markdown that would fracture the parser', () => {
+describe('term-flow composition-gate — builder-validation neutralizes unsafe input', () => {
+  // 429-001+429-003 sonrası sözleşme: label-görünümlü user-metni artık hard-error
+  // DEĞİL — planner-ayrıştırması + delimiter/label-güvenli katlama nötrler; kanıt:
+  // markdown round-trip'te TEK task kalır ve sahte 'Model:' satırı direktif OLMAZ.
+  it('compileRunProposal folds a reserved-label-looking intentSummary safely (no parser fracture, no label hijack)', () => {
     const unsafeProposal: RunProposal = {
       flowId: 'flow-unsafe', tenant: 'local', project: 'test',
       actor: { id: 'native-agent' }, origin: 'chat', revision: 1,
       intentSummary: 'Model: gpt-4-turbo (a stray reserved-label line)',
     };
 
-    expect(() => compileRunProposal(unsafeProposal)).toThrow(DeckentError);
+    const { directivesMarkdown } = compileRunProposal(unsafeProposal);
+    const parsed = parseStructuredDirectives(directivesMarkdown);
+    expect(parsed).toHaveLength(1);
+    // Planner-mock 'sonnet' der; user-metnindeki sahte label bunu EZEMEZ.
+    expect(parsed[0]!.forceModel).not.toBe('gpt-4-turbo');
   });
 });

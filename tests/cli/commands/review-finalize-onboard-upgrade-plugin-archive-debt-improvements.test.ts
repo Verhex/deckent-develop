@@ -40,6 +40,7 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
 }));
 
 vi.mock('../../../src/core/constants.js', () => ({
+  RUNTIME_DIR: '.deckent/runtime',  // sprint-429 (429-011) tool-inventory yolu modül-yüklemede okur
   BRAIN_DIR: '.brain',
   TASKS_DIR: '.tasks',
   DECKENT_DIR: '.deckent',
@@ -90,6 +91,7 @@ vi.mock('../../../src/orchestra/sprint-controller.js', () => ({
 }));
 
 vi.mock('../../../src/core/config.js', () => ({
+  resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn().mockResolvedValue({}),
 }));
 

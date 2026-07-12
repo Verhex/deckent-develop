@@ -9,6 +9,31 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint429] - 2026-07-12
+
+### Added
+
+- N678A — run-proposal-compiler'a planner-çekirdeği: NL→gerçek çok-task plan
+- N678B — do/propose_run gate-yeşil uçtan-uca (511 hermetik kabulü)
+- P675 — scope-sanitizer çok-noktalı basename düşürmesi
+- L676 — scheduler executed-engine loud-log + journal alanı (SCHED-8 önkoşulu)
+- D71 — api/run-flow-routes: REST consumer (TERM-7)
+- D72 — run-flow SSE event-stream + server wiring (TERM-7)
+- D73 — API composition + consumer-pin güncellemesi (TERM-7 kapanışı)
+
+### Changed
+
+- N677 — directives-builder delimiter-güvenliği (completed with tech debt)
+- HYG — 427-011 inventory-dosyası .deckent hijyeni doğrulaması (completed with tech debt)
+
+### Fixed
+
+- PLNR1 — brain_planning top-level precedence (eski-🔴 Bug-1)
+- PLNR2 — structured-force guard'ına Agent/Skills override'ları (Bug-2 artığı)
+
+
+_Tasks: 11 total, 11 done, 2 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint428] - 2026-07-12
 
 ### Added

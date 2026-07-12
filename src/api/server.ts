@@ -55,6 +55,8 @@ import { registerAutonomousRoutes } from './autonomous-endpoint.js';
 import { registerProcessRoutes } from './process-endpoint.js';
 import { registerReactiveRoutes } from './reactive-endpoint.js';
 import { registerMissionsRoute } from './missions-route.js';
+import { registerRunFlowRoutes } from './run-flow-routes.js';
+import { registerRunFlowEventStreamRoute } from './run-flow-event-stream.js';
 import { registerEnterpriseRoutes, handleEnterpriseTenantWrite, handleEnterpriseRbacWrite, handleEnterpriseRateWrite } from './enterprise-endpoint.js';
 import { resolveChatProvider } from '../core/config.js';
 import { resolveChatAdapter } from '../cli/commands/chat-provider-parity.js';
@@ -1058,6 +1060,12 @@ async function handleRequest(
     if (registerNervousRoutes(url, method, res, projectRoot)) return;
     if (registerAutonomousRoutes(url, method, res, projectRoot, req)) return;
     if (registerMissionsRoute(url, method, res, projectRoot, req)) return;
+    // TERM-FLOW-UNIFY Sprint-7 (429-008/429-009, `terminal.run_flow_v2`):
+    // flowId-scoped SSE stream BEFORE the REST routes below — both answer
+    // false (fall through) for a non-matching path, so order only matters
+    // for readability here (the two path shapes are disjoint).
+    if (await registerRunFlowEventStreamRoute(url, method, res, projectRoot, req, allowedOrigin)) return;
+    if (await registerRunFlowRoutes(url, method, res, undefined, projectRoot, req)) return;
     if (await registerProcessRoutes(url, method, res, undefined, projectRoot, req)) return;
     // Enterprise dashboard data: /api/enterprise/{tenants,rbac,audit,rate} (269-001)
     if (registerEnterpriseRoutes(url, method, res, projectRoot, rateLimiter ? { rateLimiter } : {}, req)) return;
@@ -1146,6 +1154,8 @@ async function handleRequest(
 
     if (registerNervousRoutes(url, method, res, projectRoot)) return;
     if (registerAutonomousRoutes(url, method, res, projectRoot, req)) return;
+    // TERM-FLOW-UNIFY Sprint-7 (429-008, `terminal.run_flow_v2`): propose/decision.
+    if (await registerRunFlowRoutes(url, method, res, body, projectRoot, req)) return;
     if (await registerProcessRoutes(url, method, res, body, projectRoot, req)) return;
     if (registerReactiveRoutes(url, method, res, body, projectRoot)) return;
 

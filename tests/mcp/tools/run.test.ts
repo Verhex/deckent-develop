@@ -9,6 +9,7 @@ vi.mock('node:fs', () => ({
 }));
 
 vi.mock('../../../src/core/constants.js', () => ({
+  RUNTIME_DIR: '.deckent/runtime',  // sprint-429 (429-011) tool-inventory yolu modül-yüklemede okur
   SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur
   TASKS_DIR: '.tasks',
 }));
@@ -31,6 +32,7 @@ vi.mock('../../../src/orchestra/sprint-controller.js', () => ({
 }));
 
 vi.mock('../../../src/core/config.js', () => ({
+  resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
 }));
 

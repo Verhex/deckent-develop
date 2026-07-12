@@ -17,6 +17,7 @@ import { normalizeGlobalScopePlatform, resolveGlobalScopePaths } from './global-
 import type { GlobalScopeEnv } from './global-scope-resolver.js';
 import type {
   AutoDocsConfig,
+  BrainPlanningMode,
   DeckentConfig,
   PlanMode,
   PlanModeConfig,
@@ -573,6 +574,14 @@ export function validateConfig(config: DeckentConfig): string[] {
         errors.push(`${prefix}.budget_per_sprint must be a positive number`);
       }
     }
+  }
+
+  // ─── Top-level brain_planning validation (Task 429-006 PLNR1) ───────
+  // Mirrors the per-mode check above — the top-level override must be one of
+  // the same valid values, since it takes precedence over the preset's own.
+  if (config.brain_planning !== undefined &&
+      !(VALID_BRAIN_PLANNING as readonly string[]).includes(config.brain_planning)) {
+    errors.push(`Invalid value '${config.brain_planning}' for field 'brain_planning'. Valid: ${VALID_BRAIN_PLANNING.join(', ')}`);
   }
 
   // ─── Skills config validation ───────────────────────────────────────
@@ -1144,6 +1153,25 @@ export function resolveEffectiveWorkers(
   return maxWorkers;
 }
 
+/**
+ * Resolve the effective Brain planning mode.
+ *
+ * Precedence (Task 429-006 — PLNR1, eski-🔴 Bug-1):
+ *   1. explicit top-level `config.brain_planning`        → wins outright
+ *   2. `config.activeModeConfig.brain_planning` (preset)  → today's behavior
+ *   3. 'auto'
+ *
+ * The top-level field lets a user pin `brain_planning` in config.json without
+ * editing every mode preset — mirroring the `max_workers` top-level override
+ * pattern (Sprint 319 B-MAXWORKERS-WIRE / {@link resolveEffectiveWorkers}).
+ * An absent top-level value falls through to the prior preset-only behavior
+ * unchanged. Callers (e.g. sprint-planner.ts) MUST resolve through this
+ * helper instead of reading `config.activeModeConfig.brain_planning` directly.
+ */
+export function resolveBrainPlanningMode(config: ResolvedConfig): BrainPlanningMode {
+  return config.brain_planning ?? config.activeModeConfig.brain_planning ?? 'auto';
+}
+
 // ─── Coverage gate resolver (Sprint 179 W2-4) ────────────────────────
 
 /**
@@ -1650,6 +1678,10 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // override into the resolved config so resolveEffectiveWorkers can honor it.
     // Absent → undefined → prior activeModeConfig/preset behavior is preserved.
     max_workers: (config as DeckentConfigWithMaxWorkers).max_workers,
+    // Task 429-006 (PLNR1): carry the top-level explicit brain_planning override
+    // through so resolveBrainPlanningMode can honor it. Absent → undefined →
+    // prior activeModeConfig/preset behavior is preserved.
+    brain_planning: config.brain_planning,
     model_strategy: resolvedModelStrategy,
     auto_docs: config.auto_docs ?? { ...DEFAULT_AUTO_DOCS },
     spawn_backend: config.spawn_backend,
@@ -2462,6 +2494,9 @@ export function mergeConfigs(
     // Sprint 319 (B-MAXWORKERS-WIRE): carry the top-level explicit worker-count
     // override (see loadConfig + resolveEffectiveWorkers). Absent → undefined.
     max_workers: (config as DeckentConfigWithMaxWorkers).max_workers,
+    // Task 429-006 (PLNR1): carry the top-level explicit brain_planning override
+    // (see loadConfig + resolveBrainPlanningMode). Absent → undefined.
+    brain_planning: config.brain_planning,
     auto_docs: config.auto_docs ?? { ...DEFAULT_AUTO_DOCS },
     skills: config.skills,
     // F1-012 — pass grouped `providers` (incl. config-driven `registry`) through.

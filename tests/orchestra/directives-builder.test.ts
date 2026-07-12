@@ -207,10 +207,13 @@ describe('buildDirectives fragility guards', () => {
     expect(() => buildDirectives(intent)).toThrow(/join delimiter/);
   });
 
-  it('throws when a goCriteria/nogo item contains the ";" join delimiter', () => {
+  it('a goCriteria/nogo item with the ";" join delimiter round-trips via escaping (born-677 — eski hard-error öldü)', () => {
     const intent = makeIntent();
     intent.tasks[0]!.goCriteria = ['first; second'];
-    expect(() => buildDirectives(intent)).toThrow(/join delimiter/);
+    // 429-003: user-metni delimiter-güvenli — throw yerine reversible escape.
+    const md = buildDirectives(intent);
+    const reconstructed = reconstructBuildTask(parseStructuredDirectives(md)[0]!);
+    expect(reconstructed.goCriteria).toContain('first; second');
   });
 
   it('throws when the top-level title/goal would fracture the first block split', () => {

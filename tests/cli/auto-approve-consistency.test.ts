@@ -26,6 +26,7 @@ const hoisted = vi.hoisted(() => ({
 // for why each module is (or isn't) mocked.
 
 vi.mock('../../src/core/config.js', () => ({
+  resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
 }));
 

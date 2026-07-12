@@ -39,6 +39,7 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
 }));
 
 vi.mock('../../../src/core/constants.js', () => ({
+  RUNTIME_DIR: '.deckent/runtime',  // sprint-429 (429-011) tool-inventory yolu modül-yüklemede okur
   SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur
   DASHBOARD_FILE: '.dashboard',
   TASKS_DIR: '.tasks',

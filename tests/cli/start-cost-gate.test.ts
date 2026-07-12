@@ -16,6 +16,7 @@ import { Command } from 'commander';
 // ─── Mocks ──────────────────────────────────────────────────────────
 
 vi.mock('../../src/core/config.js', () => ({
+  resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
   readAuthMode: vi.fn().mockResolvedValue('subscription'),
 }));

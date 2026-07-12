@@ -195,6 +195,18 @@ export async function finalizeShadowSchedulerTick(
   sprintId: string,
   snapshot: SchedulerSnapshot,
   observed: ShadowTickObservedOutcome,
+  /**
+   * born-676 (SCHED-8 önkoşulu): which engine's decision was actually EXECUTED
+   * this tick — `legacyDecision`/`reducerDecision` below are always BOTH
+   * present (compare-and-journal), so on their own a reader cannot tell which
+   * of the two corresponds to real, executed effects vs. a shadow simulation.
+   * Additive + optional: the current call site doesn't pass it yet (that
+   * live-wiring, from `resolveSchedulerEngine`/`createSchedulerDriver`'s
+   * already-resolved engine, is SCHED-8's job) — omitting it here keeps every
+   * existing 4-arg call compiling unchanged and produces the same journal
+   * byte-shape as before this field existed.
+   */
+  executedEngine?: SchedulerEngine,
 ): Promise<void> {
   try {
     const decision = reduceSchedulerTick(snapshot);
@@ -241,6 +253,7 @@ export async function finalizeShadowSchedulerTick(
         cascadeSkippedTaskIds: reducerCascadeSkippedTaskIds,
         blockedTaskIds: reducerBlockedTaskIds,
       },
+      executedEngine,
       divergence,
     });
   } catch (err) {
@@ -342,6 +355,16 @@ export function createSchedulerDriver(
   deps: SchedulerDriverDeps,
 ): (input: SchedulerDriverTickInput) => Promise<SchedulerDriverTickResult> {
   let sequence = 0;
+
+  // born-676 (SCHED-8 önkoşulu): loud, one-line, sprint-start announcement of
+  // which engine this scheduling round actually executes — today this was
+  // only provable INDIRECTLY (config + composition-test + 0-divergence, per
+  // sprint-428's disk-verify). Fires exactly once per driver construction
+  // (once per waitForResults call), never per tick. Mirrors the closure's own
+  // fallback-to-legacy guard below so the log never claims 'reducer' when
+  // deps.config is absent and every tick would silently run legacy anyway.
+  const effectiveEngine: SchedulerEngine = engine === 'reducer' && deps.config ? 'reducer' : 'legacy';
+  console.log(`[deckent] scheduler engine: ${effectiveEngine}`);
 
   return async (input: SchedulerDriverTickInput): Promise<SchedulerDriverTickResult> => {
     if (engine !== 'reducer' || !deps.config) {
