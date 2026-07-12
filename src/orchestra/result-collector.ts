@@ -36,7 +36,12 @@ import {
 import { bridgeQuestionToApproval } from './question-approval-bridge.js';
 import { isDependencySatisfying, isSchedulingTerminalFailure } from './scheduler-truth.js';
 import { computeEffectiveDependencyState } from './scheduler-state.js';
-import { captureShadowSchedulerSnapshot, finalizeShadowSchedulerTick } from './scheduler-driver.js';
+import {
+  captureShadowSchedulerSnapshot,
+  finalizeShadowSchedulerTick,
+  createSchedulerDriver,
+  resolveSchedulerEngine,
+} from './scheduler-driver.js';
 import type { SchedulerSnapshot } from './scheduler-reducer.js';
 import { ApprovalBroker } from '../core/approval-broker.js';
 import type { BrainAnswer, WorkerQuestion, TokenUsage } from '../core/task-types.js';
@@ -1542,6 +1547,44 @@ export async function waitForResults(
     }).catch(e => debugLog('waitForResults:shadowScheduler:finalize', e));
   };
 
+  // ─── SCHED5 (docs/analysis/scheduler-unify-design-2026-07-11.md, dilim-5) —
+  // injected runtime driver: BOTH the initial tick (below) and every watcher
+  // tick (main loop) call this SAME function — closes the design doc's
+  // "initial bypass" risk (a driver reachable only from the watcher loop would
+  // leave the initial pass on a second, divergent truth). Default engine is
+  // 'legacy' — see createSchedulerDriver's doc comment (scheduler-driver.ts)
+  // for the exact zero-behavior-diff contract.
+  const schedulerEngine = resolveSchedulerEngine(config?.scheduler);
+  const schedulerDriver = createSchedulerDriver(schedulerEngine, {
+    sprint,
+    config,
+    remainingQueue,
+    assignedTaskIds,
+    collectedIds: collected,
+    getSlotBudget: () => {
+      const currentlyExecuting = sprint.tasks.filter(t =>
+        t.status === TaskStatus.EXECUTING || t.status === TaskStatus.CLAIMED || t.status === TaskStatus.TESTING,
+      ).length;
+      const maxWorkers = config ? resolveEffectiveWorkers(config, getSystemProfile()) : 0;
+      return Math.max(0, maxWorkers - currentlyExecuting);
+    },
+    getCostStop: () => costGuard?.shouldStopDispatch() ?? false,
+    spawnDeps: {
+      projectRoot,
+      sprintFallbackId: sprint.id,
+      config,
+      spawnOpts,
+      backend: queueBackend,
+      resolveAgentPrompt,
+      resolveSkillPrompts,
+      buildWriteTargets: buildSpawnWriteTargets,
+    },
+    killWorker: (taskId: string) => {
+      if (queueBackend) queueBackend.kill(taskId);
+      else killWorker(taskId);
+    },
+  });
+
   const initiallyCollected = await collectResults();
   const shadowTickInitial = captureShadowTick('initial', initiallyCollected);
   // ADR-064 (TOPP B): unified dispatch tick — replaces the dual
@@ -1549,11 +1592,21 @@ export async function waitForResults(
   // wave-barrier between Wave N completion and Wave N+1 spawn collapses
   // to a single function call. Initial pass — Wave 2 may be eligible
   // immediately if Wave 1 results were already on disk when entered.
-  await dispatchTick(initiallyCollected);
-  // Sprint 272 T2 — dispatch tasks whose deps were already satisfied at entry
-  // before the early all-collected return, so the EVALUATE transition never
-  // skips a runnable task.
-  await dispatchReadyTasks();
+  //
+  // SCHED5: routed through the injected schedulerDriver — legacy engine runs
+  // this exact sequence unchanged (runLegacyTick below); reducer engine
+  // replaces it with one reduceSchedulerTick() decision + executeSchedulerDecision.
+  await schedulerDriver({
+    trigger: 'initial',
+    completedTaskIds: initiallyCollected,
+    runLegacyTick: async () => {
+      await dispatchTick(initiallyCollected);
+      // Sprint 272 T2 — dispatch tasks whose deps were already satisfied at entry
+      // before the early all-collected return, so the EVALUATE transition never
+      // skips a runnable task.
+      await dispatchReadyTasks();
+    },
+  });
   await cascadeSkipDeadBlocked();
   await finalizeShadowTick(shadowTickInitial);
   if (collected.size === taskIds.size) return results;
@@ -1670,18 +1723,29 @@ export async function waitForResults(
         // disabled (costGuard undefined → the condition is always true), so the
         // default dispatch sequence below is byte-for-byte unchanged.
         if (!costGuard || !costGuard.shouldStopDispatch()) {
-          // ADR-064 (TOPP B): unified dispatch tick — main loop spawn entry.
-          // Continuous dispatch — re-evaluate eligible Wave N+1 tasks each
-          // tick when dependency_pipeline_enabled is true; honor
-          // DECKENT_LEGACY_FIFO=1 rollback escape inside dispatchTick itself.
-          await dispatchTick(newlyCollected);
-          // Sprint 165 Bug Y — force re-scan idle slots for hayalet PENDING tasks
-          // (legacy FIFO mode and dependency pipeline mode both benefit).
-          await forceRescanIfIdle();
-          // Sprint 272 T2 — dispatch dependency-just-satisfied PENDING tasks NOW so
-          // the collection-done check below is only reached once every ready task
-          // is dispatched-and-awaited (never a synthetic NO_GO for unran work).
-          await dispatchReadyTasks();
+          // SCHED5: same injected schedulerDriver as the initial tick above
+          // (see its construction comment). Legacy engine runs the exact
+          // ADR-064/Sprint 165/Sprint 272 sequence below unchanged; reducer
+          // engine replaces it with one reduceSchedulerTick() decision
+          // executed via executeSchedulerDecision.
+          await schedulerDriver({
+            trigger: 'watcher',
+            completedTaskIds: newlyCollected,
+            runLegacyTick: async () => {
+              // ADR-064 (TOPP B): unified dispatch tick — main loop spawn entry.
+              // Continuous dispatch — re-evaluate eligible Wave N+1 tasks each
+              // tick when dependency_pipeline_enabled is true; honor
+              // DECKENT_LEGACY_FIFO=1 rollback escape inside dispatchTick itself.
+              await dispatchTick(newlyCollected);
+              // Sprint 165 Bug Y — force re-scan idle slots for hayalet PENDING tasks
+              // (legacy FIFO mode and dependency pipeline mode both benefit).
+              await forceRescanIfIdle();
+              // Sprint 272 T2 — dispatch dependency-just-satisfied PENDING tasks NOW so
+              // the collection-done check below is only reached once every ready task
+              // is dispatched-and-awaited (never a synthetic NO_GO for unran work).
+              await dispatchReadyTasks();
+            },
+          });
         }
         await cascadeSkipDeadBlocked();
         await finalizeShadowTick(shadowTickWatcher);

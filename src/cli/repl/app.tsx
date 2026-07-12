@@ -39,6 +39,9 @@ import { composeDualStream } from './dual-stream.js';
 import type { ApprovalTerminalChannel } from './approval-terminal-channel.js';
 import type { ApprovalStreamEvent } from '../../core/approval-eventstream.js';
 import type { ApprovalRisk } from '../../core/approval-contract.js';
+import { PlanPreviewCard, type PlanPreviewCardLabels } from './plan-preview-card.js';
+import type { RunFlowContext, PlanPreview } from '../../core/run-flow-contract.js';
+import type { RunFlowController } from './run-flow-controller.js';
 
 export type ConfirmAnswer = 'y' | 'a' | 'n';
 // toolName is optional: the dispatcher passes it so an 'a' (always) decision can
@@ -487,6 +490,84 @@ export function resolveStdinOwner(confirmOpen: boolean, approvalPending: boolean
 }
 
 /**
+ * TERM-FLOW-UNIFY Sprint-4 mount (426-002) — pure, testable helpers for
+ * mounting run-flow-controller.ts's RunFlowController + plan-preview-card.tsx
+ * into the REPL (same "pull decision logic out of the Ink component" pattern
+ * as resolveStdinOwner/resolveFooterLines above — ink-testing-library is not
+ * a project dependency, see tests/cli/run-flow-mount.test.ts). Deliberately
+ * a FOURTH stdin consumer computed OUTSIDE resolveStdinOwner's own return
+ * shape (not folded into `StdinOwner`) — tests/cli/approval-inputbar-mutex.test.tsx
+ * (out of this task's write scope) asserts `resolveStdinOwner`'s exact 3-key
+ * return via `toEqual`, so widening that shape would break an out-of-scope
+ * test; the InputBar/PlanPreviewCard exclusion is instead ANDed in directly
+ * at the two JSX call sites below.
+ */
+
+/** English-default labels for PlanPreviewCard, mirroring DEFAULT_APPROVAL_CARD_LABELS's
+ *  fallback-until-real-labels-are-wired precedent (run.tsx wires real en/tr via
+ *  buildPlanPreviewCardLabels — plan-preview-card.tsx). */
+export const DEFAULT_PLAN_PREVIEW_CARD_LABELS: PlanPreviewCardLabels = {
+  heading: 'Plan preview — approve to continue',
+  digestLabel: 'Digest:',
+  gateLabels: { pass: 'GATE: PASS', fail: 'GATE: FAIL', skipped: 'GATE: SKIPPED' },
+  policyLabels: { allow: 'POLICY: ALLOW', deny: 'POLICY: DENY', 'needs-approval': 'POLICY: NEEDS APPROVAL' },
+  hint: '(y = approve · n = reject · d = details)',
+  detailsHeading: 'Details',
+  noTasks: '(no tasks)',
+};
+
+/** Derive the PlanPreviewCard's `preview` prop from the controller's live
+ *  context — null whenever the flow is not AWAITING_APPROVAL (proposed-but-
+ *  not-yet-previewed, approved, rejected, cancelled, …), so the card only
+ *  ever shows a REAL, currently-actionable preview. */
+export function deriveRunFlowPreview(ctx: RunFlowContext): PlanPreview | null {
+  return ctx.state === 'AWAITING_APPROVAL' ? (ctx.preview ?? null) : null;
+}
+
+/** Whether PlanPreviewCard may own stdin this render — defers to the legacy
+ *  confirm modal AND a genuinely pending ApprovalCard (both higher-priority,
+ *  pre-existing stdin consumers), same precedence rule resolveStdinOwner
+ *  documents for ApprovalCard vs. the confirm modal. */
+export function resolveRunFlowCardActive(confirmOpen: boolean, approvalPending: boolean): boolean {
+  return !confirmOpen && !approvalPending;
+}
+
+/** Localized labels for the approve/reject/error lines pushed to the
+ *  transcript after a PlanPreviewCard decision (buildRunFlowMountLabels, run.tsx).
+ *  `started`/`error` are `{jobId}`/`{error}` templates (same convention as
+ *  ReplLabels' other templated fields, e.g. `resumeSwitched`). */
+export interface RunFlowMountLabels {
+  started: string;
+  rejected: string;
+  error: string;
+}
+
+export const DEFAULT_RUN_FLOW_MOUNT_LABELS: RunFlowMountLabels = {
+  started: 'Run started — job {jobId}.',
+  rejected: 'Run proposal rejected.',
+  error: 'Run flow error: {error}',
+};
+
+/** The outcome of a PlanPreviewCard decision, after the controller's
+ *  approve()/startApproved()/reject() calls have run (side effects already
+ *  happened by the time this is built — this only formats the RESULT). */
+export type RunFlowOutcome =
+  | { readonly kind: 'started'; readonly jobId: string }
+  | { readonly kind: 'rejected' }
+  | { readonly kind: 'error'; readonly message: string };
+
+export function formatRunFlowOutcomeLine(outcome: RunFlowOutcome, labels: RunFlowMountLabels): string {
+  switch (outcome.kind) {
+    case 'started':
+      return labels.started.replace('{jobId}', outcome.jobId);
+    case 'rejected':
+      return labels.rejected;
+    case 'error':
+      return labels.error.replace('{error}', outcome.message);
+  }
+}
+
+/**
  * Tap one ApprovalTerminalChannel event stream: forwards every event to its
  * single downstream consumer (ApprovalCard's own `events` prop) UNCHANGED,
  * while also feeding a second, app.tsx-local queue purely so the App can
@@ -790,6 +871,21 @@ export interface ReplAppProps {
    * DEFAULT_APPROVAL_CARD_LABELS (English) until messages round-8 (Task 15,
    * MESSAGES-KEYS-4 — depends on this task) wires localized keys through run.tsx. */
   approvalLabels?: ApprovalCardLabels;
+  /**
+   * TERM-FLOW-UNIFY Sprint-4 mount (426-002) — `terminal.run_flow_v2` seam
+   * (run.tsx's `wireRunFlowMount`). Present only when the flag is on AND the
+   * native engine is active; absent -> PlanPreviewCard never renders and the
+   * InputBar/stdin-mutex render stays byte-identical to the pre-426-002 App.
+   */
+  runFlowController?: RunFlowController;
+  /** Optional label override for the plan-preview card; defaults to
+   * DEFAULT_PLAN_PREVIEW_CARD_LABELS (English) until run.tsx's
+   * buildPlanPreviewCardLabels(lang) supplies real en/tr labels. */
+  runFlowCardLabels?: PlanPreviewCardLabels;
+  /** Optional label override for the approve/reject/error transcript lines;
+   * defaults to DEFAULT_RUN_FLOW_MOUNT_LABELS (English) until run.tsx's
+   * buildRunFlowMountLabels(t) supplies real en/tr labels. */
+  runFlowMountLabels?: RunFlowMountLabels;
 }
 
 type ApprovalMode = 'suggest' | 'auto-edit' | 'full-auto';
@@ -877,7 +973,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels } = props;
   const { exit } = useApp();
   const [selection, setSelection] = useState<ActiveSelection>(initialSelection);
   const [approval, setApproval] = useState<ApprovalMode>('suggest');
@@ -949,6 +1045,13 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     approvalEvents.current = tapApprovalEvents(approvalChannel.events, approvalTracker.current);
   }
 
+  // TERM-FLOW-UNIFY Sprint-4 mount (426-002) seam state — inert unless
+  // runFlowController is supplied (run.tsx's `terminal.run_flow_v2` gate).
+  // Synced from the controller's own context (single source of truth) inside
+  // the registerToolSink effect below, right after a completed tool call.
+  const [runFlowPreview, setRunFlowPreview] = useState<PlanPreview | null>(null);
+  const runFlowPending = runFlowPreview !== null;
+
   // 360-009: turn objects are built BEFORE setTurns so every updater stays
   // pure (append-only) — React may re-invoke an updater, and the previous
   // inline `idRef.current++` / `headPushed.current` mutations inside it could
@@ -1005,8 +1108,13 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       segmenter.current?.flush(); setPartial(''); // commit any in-flight reply first
       const turn: Turn = { id: idRef.current++, role: 'tool', text: '', tool: info };
       setTurns((t) => [...t, turn]); // pure updater — id consumed above (360-009)
+      // TERM-FLOW-UNIFY Sprint-4 mount (426-002): a completed tool call may
+      // have been `deckent_propose_run` (native-tool-registry.ts) — sync the
+      // card's preview from the controller's OWN context (single source of
+      // truth, no duplicate state) rather than special-casing the tool name.
+      if (runFlowController) setRunFlowPreview(deriveRunFlowPreview(runFlowController.getContext()));
     });
-  }, [registerToolSink]);
+  }, [registerToolSink, runFlowController]);
 
   // Live-footer state-feed seam: poll it while enabled (Task 354-014 wires the
   // real heartbeat/dashboard-state reader; this component only renders it).
@@ -1366,6 +1474,38 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (wake.current) { const w = wake.current; wake.current = null; w(); }
   };
 
+  // TERM-FLOW-UNIFY Sprint-4 mount (426-002) — PlanPreviewCard decisions.
+  // Side effects (controller.approve/startApproved/reject) run here; the
+  // outcome is formatted by the pure formatRunFlowOutcomeLine above and
+  // pushed as a 'bg' transcript line (same role the resume-teaser/busy-
+  // controls decisions already use for system-generated status lines — no
+  // new Turn role needed). Errors are caught, never thrown out of the
+  // handler (an Ink useInput callback throwing would crash the whole REPL).
+  const mountLabels = runFlowMountLabels ?? DEFAULT_RUN_FLOW_MOUNT_LABELS;
+  const handleRunFlowApprove = (preview: PlanPreview): void => {
+    if (!runFlowController) return;
+    setRunFlowPreview(null);
+    try {
+      runFlowController.approve({ id: 'repl-user' });
+      const finalCtx = runFlowController.startApproved ? runFlowController.startApproved() : runFlowController.getContext();
+      pushTurn('bg', formatRunFlowOutcomeLine({ kind: 'started', jobId: finalCtx.handle?.jobId ?? preview.flowId }, mountLabels));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      pushTurn('bg', formatRunFlowOutcomeLine({ kind: 'error', message }, mountLabels));
+    }
+  };
+  const handleRunFlowReject = (): void => {
+    if (!runFlowController) return;
+    setRunFlowPreview(null);
+    try {
+      runFlowController.reject();
+      pushTurn('bg', formatRunFlowOutcomeLine({ kind: 'rejected' }, mountLabels));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      pushTurn('bg', formatRunFlowOutcomeLine({ kind: 'error', message }, mountLabels));
+    }
+  };
+
   // born-508: resolve which of {confirm modal, InputBar, ApprovalCard} owns
   // stdin this render — exactly one, ever (see resolveStdinOwner above).
   const stdinOwner = resolveStdinOwner(confirm !== null, approvalPending);
@@ -1440,6 +1580,21 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         />
       )}
 
+      {/* TERM-FLOW-UNIFY Sprint-4 mount (426-002): the native `deckent_propose_run`
+          plan-preview card — inert unless runFlowController is supplied
+          (flag-off render stays byte-identical). Rendered after ApprovalCard so
+          it defers to a genuinely pending approval for stdin ownership (see
+          resolveRunFlowCardActive above). */}
+      {runFlowController && runFlowPreview && (
+        <PlanPreviewCard
+          preview={runFlowPreview}
+          labels={runFlowCardLabels ?? DEFAULT_PLAN_PREVIEW_CARD_LABELS}
+          onApprove={handleRunFlowApprove}
+          onReject={handleRunFlowReject}
+          isActive={resolveRunFlowCardActive(stdinOwner.confirmActive, approvalPending)}
+        />
+      )}
+
       {/* REPL-SURFACE-WIRE (354-001): mode indicator + live-footer — both
           inert unless replSurfaceEnabled (flag-off render stays byte-identical
           to the pre-354-001 App). Footer lines pass through resolveFooterLines
@@ -1462,7 +1617,11 @@ export function ReplApp(props: ReplAppProps): ReactElement {
 
       {/* Pinned input with a VISIBLE cursor + interactive /menu — always last. */}
       <InputBar
-        active={stdinOwner.inputBarActive}
+        // TERM-FLOW-UNIFY Sprint-4 mount (426-002): a pending plan-preview card is
+        // a fourth stdin consumer — `runFlowPending` is always false when
+        // runFlowController is absent (the flag-off default), so this AND is a
+        // no-op then (`x && !false === x`, byte-identical to the pre-426-002 prop).
+        active={stdinOwner.inputBarActive && !runFlowPending}
         onSubmit={handleSubmit}
         onInterrupt={() => exit()}
         onClear={clearScreen}

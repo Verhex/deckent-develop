@@ -48,6 +48,7 @@ import { buildWorkerApprovalGateEnv } from '../agents/worker-approval-env.js';
 import { writeEvent, CHANNELS, getCurrentSprintId } from './event-stream.js';
 import { metric } from '../core/observability.js';
 import { buildWorkerPrompt } from './task-builder.js';
+import type { SchedulerDecision } from './scheduler-reducer.js';
 
 // ─── Fix-Task Routing-Field Inheritance ───────────────────────────────────
 // Relocated from sprint-spawner.ts `preserveFixTaskRoutingFields` (born-476,
@@ -348,4 +349,87 @@ export async function executeSpawnTask(
   persistTask(projectRoot, task);
 
   return { kind: 'spawned', taskId: task.id };
+}
+
+// ═══ SCHED5 — Reducer-Decision Executor (dilim-5, docs/analysis/ ══════════
+// scheduler-unify-design-2026-07-11.md) ═════════════════════════════════════
+//
+// When `scheduler.engine === 'reducer'` (scheduler-driver.ts's
+// resolveSchedulerEngine/createSchedulerDriver), the four previously-separate
+// spawn-selection closures (processQueue / maybeRespawn / forceRescanIfIdle /
+// dispatchReadyTasks in result-collector.ts) are replaced by ONE
+// `reduceSchedulerTick()` decision (scheduler-reducer.ts). This function is
+// the single place that turns that decision into real spawn/kill calls —
+// every `SpawnTask` effect still routes through `executeSpawnTask` above (the
+// same canonical executor SCHED3 already unified queue/idle/ready/respawn
+// onto), so "one decision, one executor" holds end-to-end.
+//
+// Scope (dilim-5 only, per the design doc's own 8-sprint table): SpawnTask +
+// KillWorker. CascadeSkip / Blocked / ClearBlocked / EmitMetric /
+// WriteCheckpoint are intentionally NOT executed here — those effects go live
+// in dilim-6 ("Cascade ve restore live") and dilim-7 ("FIFO safety/config
+// migration"). The pre-existing cascadeSkipDeadBlocked / DEPENDENCY_BLOCKED /
+// checkpoint mechanisms in result-collector.ts / sprint-spawner.ts keep
+// running unconditionally, independent of engine, so nothing regresses.
+
+export interface SchedulerDecisionExecutionDeps extends SpawnTaskDeps {
+  /** Live task lookup — a `SchedulerEffect` only carries a taskId. */
+  readonly taskMap: ReadonlyMap<string, Task>;
+  /** Bug-F idempotency guard, mirrors result-collector.ts's spawnIfNotAssigned:
+   *  added before the spawn attempt, rolled back on a non-'spawned' disposition. */
+  readonly assignedTaskIds: Set<string>;
+  /** Abstracts `queueBackend.kill(id)` vs the tmux `killWorker(id)` fallback —
+   *  caller-supplied so this module never imports tmux.js directly. */
+  readonly killWorker: (taskId: string) => void;
+}
+
+export interface SchedulerDecisionExecutionResult {
+  readonly spawnedTaskIds: string[];
+  readonly killedWorkerIds: string[];
+}
+
+/**
+ * Execute a `SchedulerDecision`'s SpawnTask/KillWorker effects, IN ORDER,
+ * through the canonical single executor (`executeSpawnTask`). Never throws —
+ * a single effect's failure is logged and skipped so the rest of the tick's
+ * effects still apply.
+ */
+export async function executeSchedulerDecision(
+  decision: SchedulerDecision,
+  deps: SchedulerDecisionExecutionDeps,
+): Promise<SchedulerDecisionExecutionResult> {
+  const spawnedTaskIds: string[] = [];
+  const killedWorkerIds: string[] = [];
+
+  for (const effect of decision.orderedEffects) {
+    if (effect.kind === 'KillWorker') {
+      try {
+        deps.killWorker(effect.taskId);
+      } catch (e) { debugLog('executeSchedulerDecision:killWorker', e); }
+      killedWorkerIds.push(effect.taskId);
+      continue;
+    }
+    if (effect.kind !== 'SpawnTask') continue; // dilim-6/7 effects — see doc comment above
+
+    const task = deps.taskMap.get(effect.taskId);
+    if (!task) {
+      debugLog('executeSchedulerDecision:missingTask', `SpawnTask effect for unknown task ${effect.taskId}`);
+      continue;
+    }
+    if (deps.assignedTaskIds.has(effect.taskId)) continue; // idempotency (Bug F parity)
+    deps.assignedTaskIds.add(effect.taskId);
+    try {
+      const disposition = await executeSpawnTask({ task }, deps);
+      if (disposition.kind === 'spawned') {
+        spawnedTaskIds.push(effect.taskId);
+      } else {
+        deps.assignedTaskIds.delete(effect.taskId);
+      }
+    } catch (e) {
+      debugLog('executeSchedulerDecision:spawn', e);
+      deps.assignedTaskIds.delete(effect.taskId);
+    }
+  }
+
+  return { spawnedTaskIds, killedWorkerIds };
 }

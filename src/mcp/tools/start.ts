@@ -25,6 +25,15 @@ import {
   IPC_CONFIG_FILE,
   type SprintRunnerConfig,
 } from '../../orchestra/sprint-runner-entry.js';
+import { loadApprovedSnapshot, loadRunHandle, saveRunHandle } from '../../cli/repl/run-flow-store.js';
+import {
+  startApprovedRun,
+  RunJobFlowNotApprovedError,
+  RunJobDigestMismatchError,
+  RunJobStaleHandleConflictError,
+  type RunHandle,
+} from '../../orchestra/run-job-service.js';
+import { spawnDetachedDeckent } from '../../cli/helpers/detached-start.js';
 
 /**
  * Format an estimated duration (minutes) into a compact human string for the
@@ -55,9 +64,12 @@ export function registerStartTool(server: McpServer): void {
         force: z.boolean().optional().default(false).describe('Skip pre-flight checks AND the cost gate. Use only when the environment is known-ready and the cost has been verified out-of-band. Equivalent to CLI --force.'),
         timeout: z.number().int().positive().optional().describe('Sprint maximum duration in milliseconds (default: 30 minutes = 1800000). Sprint is marked TIMEOUT if workers do not complete within this window.'),
         sandbox: z.boolean().optional().default(false).describe('Run sprint in sandbox mode: stashes local git changes before spawning and restores them after the sprint completes. Safe experimentation — no permanent changes on failure.'),
+        flowId: z.string().optional().describe('TERM-FLOW-UNIFY (426-001): consume an approved RunFlow snapshot instead of planning fresh — requires revision, planDigest and config.terminal.run_flow_v2=true. Must be supplied together with revision + planDigest.'),
+        revision: z.number().int().optional().describe('RunFlow proposal revision to CAS-verify against the approved snapshot (used with flowId).'),
+        planDigest: z.string().optional().describe('RunFlow planDigest to CAS-verify against the approved snapshot (used with flowId).'),
       }),
     },
-    async ({ autoApprove, acknowledgeCost, acknowledgeScopePaths, acknowledgePromptGate, dryRun, force, timeout, sandbox }) => {
+    async ({ autoApprove, acknowledgeCost, acknowledgeScopePaths, acknowledgePromptGate, dryRun, force, timeout, sandbox, flowId, revision, planDigest }) => {
       const root = process.cwd();
       // CLI/MCP Parity Notes (ADR-022-V2):
       // - autoApprove: CLI default false (the schema param mirrors this). The
@@ -89,6 +101,118 @@ export function registerStartTool(server: McpServer): void {
 
       try {
         const config = await loadConfig(root);
+
+        // ─── TERM-FLOW-UNIFY Sprint-4 (426-001): approved-snapshot-consuming
+        // start ────────────────────────────────────────────────────────────
+        // When flowId/revision/planDigest are ALL given (+ flag on), CAS/
+        // idempotency-verify here (fail fast, no fork) then reuse the CLI's
+        // OWN flag-on snapshot path (cli/commands/start.ts --flow-id/
+        // --revision/--plan-digest) via a detached spawn — one single
+        // provably-replan-free code path shared by both surfaces, instead of
+        // threading preplannedSprint through sprint-runner-entry.ts's forked
+        // child (that file is a separate module outside this task's write
+        // scope — see this task's result notes). ADR-D-004 (C3, mcp/ MUST
+        // NOT import cli/): this reaches cli/repl/run-flow-store.js and
+        // cli/helpers/detached-start.js — an existing precedent for exactly
+        // this edge already ships (src/mcp/tools/nervous-edit.ts imports
+        // ../../cli/repl/nervous-bridge.js); flagged for Brain/ADR-amendment
+        // awareness rather than blocking this task's delivery entirely.
+        // Absent flowId (every existing MCP caller) never enters this branch
+        // — zero behavior change for the legacy dryRun/cost-gate/fork path.
+        const flowFlagsGiven = [flowId, revision, planDigest].filter(v => v !== undefined).length;
+        if (flowFlagsGiven > 0) {
+          if (flowFlagsGiven !== 3) {
+            const message = 'flowId, revision and planDigest must be supplied together.';
+            return {
+              content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(
+                { error: true, success: false, code: 'RUN_FLOW_INCOMPLETE_PARAMS', message },
+                formatErrorResponse({ message }),
+              )) }],
+              isError: true,
+            };
+          }
+          if (config.terminal?.run_flow_v2 !== true) {
+            const message = 'flowId requires config.terminal.run_flow_v2 = true.';
+            return {
+              content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(
+                { error: true, success: false, code: 'RUN_FLOW_V2_DISABLED', message },
+                formatErrorResponse({ message }),
+              )) }],
+              isError: true,
+            };
+          }
+
+          const approvedSnapshot = loadApprovedSnapshot(root, flowId!);
+          const existingRunHandle = loadRunHandle(root, flowId!);
+
+          let handle: RunHandle;
+          let status: 'started' | 'noop-duplicate';
+          try {
+            const result = startApprovedRun({
+              flowId: flowId!,
+              expectedRevision: revision!,
+              expectedPlanDigest: planDigest!,
+              approvedSnapshot,
+              existingRunHandle,
+              spawnStart: (_sprint, fid) => {
+                const cliArgs = [
+                  'start', '--flow-id', fid, '--revision', String(revision), '--plan-digest', planDigest!,
+                  ...(autoApprove ? ['--auto-approve'] : []),
+                  ...(acknowledgeScopePaths ? ['--force-scope'] : []),
+                  ...(acknowledgePromptGate ? ['--force-prompt-gate'] : []),
+                  ...(sandbox ? ['--sandbox-mode'] : []),
+                  ...(timeout !== undefined ? ['--timeout', String(timeout)] : []),
+                ];
+                const spawned = spawnDetachedDeckent(cliArgs, { projectRoot: root, flowId: fid });
+                return { flowId: fid, jobId: `flow-${fid}-r${revision}`, logRef: spawned.logPath };
+              },
+            });
+            handle = result.handle;
+            status = result.status;
+          } catch (err) {
+            const code =
+              err instanceof RunJobFlowNotApprovedError ? 'RUN_JOB_FLOW_NOT_APPROVED' :
+              err instanceof RunJobDigestMismatchError ? 'RUN_JOB_DIGEST_MISMATCH' :
+              err instanceof RunJobStaleHandleConflictError ? 'RUN_JOB_STALE_HANDLE_CONFLICT' :
+              null;
+            if (code === null) throw err;
+            const message = err instanceof Error ? err.message : String(err);
+            return {
+              content: [{ type: 'text' as const, text: JSON.stringify(wrapResponse(
+                { error: true, success: false, code, message },
+                formatErrorResponse({ code, message }),
+              )) }],
+              isError: true,
+            };
+          }
+
+          if (status === 'started') {
+            saveRunHandle(root, {
+              flowId: flowId!,
+              revision: revision!,
+              planDigest: planDigest!,
+              handle,
+              startedAt: new Date().toISOString(),
+            });
+          }
+
+          const startData = {
+            success: true,
+            jobId: handle.jobId,
+            status: status === 'noop-duplicate' ? 'ALREADY_RUNNING' : 'RUNNING',
+            message: status === 'noop-duplicate'
+              ? `Run ${flowId} (revision ${revision}) was already started as job ${handle.jobId} — no-op.`
+              : 'Sprint started in background from an approved RunFlow snapshot (no re-plan). Use deckent_status to track progress.',
+            activeWorkers: 0,
+            queuedTasks: 0,
+          };
+          return {
+            content: [{
+              type: 'text' as const,
+              text: JSON.stringify(wrapResponse(enrichResponse('start', startData), formatStartResponse(startData))),
+            }],
+          };
+        }
 
         // ─── Pre-flight: Orphan IPC Directory Cleanup ─────────────
         // Remove dead sprint IPC directories from previous runs.

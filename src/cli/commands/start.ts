@@ -29,6 +29,14 @@ import { prepareZeroConfig, cleanupZeroConfig } from './quick-start.js';
 import { isSprintLocked } from '../../core/multi-ide.js';
 import { detectOrphan, archiveOrphan, listPidFiles } from '../../orchestra/sprint-pid-manager.js';
 import { createSandboxBackend } from '../../orchestra/spawn-backend.js';
+import { loadApprovedSnapshot, loadRunHandle, saveRunHandle } from '../repl/run-flow-store.js';
+import {
+  startApprovedRun,
+  RunJobFlowNotApprovedError,
+  RunJobDigestMismatchError,
+  RunJobStaleHandleConflictError,
+  type RunHandle,
+} from '../../orchestra/run-job-service.js';
 
 // ─── Provider Cache ───────────────────────────────────────────────
 
@@ -213,6 +221,10 @@ interface StartCommandOpts {
   watch?: boolean;
   timeout?: string;
   forceDirectives?: boolean;
+  /** TERM-FLOW-UNIFY Sprint-4 (426-001) — see registerStart's option block below. */
+  flowId?: string;
+  revision?: string;
+  planDigest?: string;
 }
 
 export function registerStart(program: Command): void {
@@ -229,6 +241,9 @@ export function registerStart(program: Command): void {
     .option('--watch', 'Automatically open watch mode after sprint spawns workers')
     .option('--timeout <ms>', 'Sprint timeout in milliseconds (default: 30 minutes)')
     .option('--force-directives', 'Override existing DIRECTIVES.md in zero-config mode')
+    .option('--flow-id <id>', 'TERM-FLOW-UNIFY (426-001): consume an approved RunFlow snapshot instead of planning fresh — requires --revision, --plan-digest and config.terminal.run_flow_v2=true')
+    .option('--revision <n>', 'RunFlow proposal revision to CAS-verify against the approved snapshot (used with --flow-id)')
+    .option('--plan-digest <digest>', 'RunFlow planDigest to CAS-verify against the approved snapshot (used with --flow-id)')
     .action(async (description: string | undefined, opts: StartCommandOpts) => {
       const root = resolveProjectRoot();
 
@@ -257,6 +272,101 @@ export function registerStart(program: Command): void {
       try {
         const config = await loadConfig(root);
         const lang = config.language;
+
+        // ─── TERM-FLOW-UNIFY Sprint-4 (426-001): approved-snapshot-consuming
+        // start ────────────────────────────────────────────────────────────
+        // When --flow-id/--revision/--plan-digest are ALL given (+ flag on),
+        // this branch NEVER calls planSprint/runPlanPhase — see
+        // orchestra/run-job-service.ts (CAS/idempotency, structurally
+        // replan-free) + RunSprintOptions.preplannedSprint. Completely
+        // self-contained and returns before any of the legacy zero-config /
+        // sandbox / doctor / cost-gate / dry-run logic below is reached.
+        // Absent flow flags (every existing invocation) never enters this
+        // branch at all — zero behavior change for the legacy path.
+        const flowFlagsGiven = [opts.flowId, opts.revision, opts.planDigest].filter(v => v !== undefined).length;
+        if (flowFlagsGiven > 0) {
+          if (flowFlagsGiven !== 3) {
+            printError(new Error('--flow-id, --revision and --plan-digest must be supplied together.'));
+            process.exitCode = 1;
+            return;
+          }
+          if (config.terminal?.run_flow_v2 !== true) {
+            printError(new Error('--flow-id requires config.terminal.run_flow_v2 = true.'));
+            process.exitCode = 1;
+            return;
+          }
+          const expectedRevision = Number(opts.revision);
+          if (!Number.isFinite(expectedRevision)) {
+            printError(new Error(`--revision must be a number, got: ${opts.revision}`));
+            process.exitCode = 1;
+            return;
+          }
+          const flowId = opts.flowId!;
+          const expectedPlanDigest = opts.planDigest!;
+          const approvedSnapshot = loadApprovedSnapshot(root, flowId);
+          const existingRunHandle = loadRunHandle(root, flowId);
+
+          let handle: RunHandle;
+          let status: 'started' | 'noop-duplicate';
+          try {
+            const jobId = `flow-${flowId}-r${expectedRevision}`;
+            const result = startApprovedRun({
+              flowId,
+              expectedRevision,
+              expectedPlanDigest,
+              approvedSnapshot,
+              existingRunHandle,
+              spawnStart: (_sprint, fid) => ({ flowId: fid, jobId, logRef: jobId }),
+            });
+            handle = result.handle;
+            status = result.status;
+          } catch (err) {
+            if (
+              err instanceof RunJobFlowNotApprovedError ||
+              err instanceof RunJobDigestMismatchError ||
+              err instanceof RunJobStaleHandleConflictError
+            ) {
+              printError(err);
+              process.exitCode = 1;
+              return;
+            }
+            throw err;
+          }
+
+          if (status === 'noop-duplicate') {
+            print(`Run ${flowId} (revision ${expectedRevision}) already started as job ${handle.jobId} — no-op.`);
+            return;
+          }
+
+          // Persist the handle BEFORE actually running: idempotency must win
+          // over a theoretical crash-mid-sprint retry (a later re-invocation
+          // with the same flowId+digest sees this handle and no-ops instead
+          // of double-starting).
+          saveRunHandle(root, {
+            flowId,
+            revision: expectedRevision,
+            planDigest: expectedPlanDigest,
+            handle,
+            startedAt: new Date().toISOString(),
+          });
+
+          const bootstrap = await bootstrapProviders(config);
+          bootstrapNotifyDispatcher({
+            projectRoot: root,
+            webhook: resolveWebhookBootstrapOption(config),
+          });
+          const sprintResult = await runSprint(root, config, {
+            connector: bootstrap.connector,
+            autoApprove: opts.autoApprove === true,
+            acknowledgeScopePaths: opts.forceScope === true,
+            acknowledgePromptGate: opts.forcePromptGate === true,
+            sandboxMode: opts.sandboxMode,
+            timeoutMs: opts.timeout ? parseInt(opts.timeout, 10) : undefined,
+            preplannedSprint: approvedSnapshot!.sprint,
+          });
+          print(formatSprintSummary(sprintResult));
+          return;
+        }
 
         // ─── Provider Bootstrap (with cache) ─────────────────────
         const configHash = makeConfigHash(config);

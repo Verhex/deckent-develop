@@ -26,7 +26,7 @@
 // an import cycle with result-collector.ts, which is where planDispatch
 // lives).
 
-import type { Task, Sprint } from '../core/types.js';
+import type { Task, Sprint, ResolvedConfig } from '../core/types.js';
 import { TaskStatus } from '../core/types.js';
 import { computeEffectiveDependencyState } from './scheduler-state.js';
 import { buildDependencyGraph } from './dependency-scheduler.js';
@@ -38,10 +38,13 @@ import type {
   SchedulerSnapshot,
   SchedulerTaskSnapshot,
   SchedulerTrigger,
+  SchedulerTriggerKind,
   DispatchStrategy,
 } from './scheduler-reducer.js';
 import { appendSchedulerShadowRecord } from './scheduler-journal.js';
 import type { SchedulerShadowDivergenceEntry } from './scheduler-journal.js';
+import { executeSchedulerDecision } from './scheduler-effects.js';
+import type { SpawnTaskDeps } from './scheduler-effects.js';
 import { debugLog } from '../core/utils.js';
 
 // ─── Capture (pre-tick) ────────────────────────────────────────────────────
@@ -243,4 +246,150 @@ export async function finalizeShadowSchedulerTick(
   } catch (err) {
     debugLog('scheduler-driver:finalizeShadowSchedulerTick', err);
   }
+}
+
+// ═══ SCHED5 — Injected Runtime Driver (dilim-5, docs/analysis/ ════════════
+// scheduler-unify-design-2026-07-11.md, "Continuous live switch") ══════════
+//
+// SCHED4 above wires `reduceSchedulerTick` into a SHADOW-only observation
+// path (capture/finalize never spawn, kill, or mutate anything live). This
+// section adds the LIVE counterpart: `createSchedulerDriver` returns ONE
+// function that BOTH the "initial" tick and every "watcher" tick in
+// result-collector.ts's `waitForResults` call — closing the design doc's
+// dilim-5 risk verbatim ("Initial spawn reducer'a alınmazsa 'tek truth'
+// iddiası eksik kalır"): there is exactly one call-site SHAPE (`driver(...)`)
+// for both triggers, never a bypassed initial pass.
+//
+// Config gate: `scheduler.engine` — 'legacy' (default) | 'reducer'.
+//   - 'legacy' (default, or config/engine absent): the driver is a pure
+//     passthrough — it awaits the caller-supplied `runLegacyTick()` and does
+//     nothing else. This IS the entire legacy contract: the exact pre-SCHED5
+//     closure sequence (processQueue+maybeRespawn[+forceRescanIfIdle]+
+//     dispatchReadyTasks) runs unmodified, so behavior is byte-identical to
+//     before this dilim — pinned by scheduler-driver-composition.test.ts.
+//   - 'reducer': the driver captures a live snapshot (same shape as the
+//     SCHED4 shadow capture above), runs `reduceSchedulerTick`, and executes
+//     the resulting SpawnTask/KillWorker effects through
+//     `executeSchedulerDecision` (scheduler-effects.ts) — the SAME canonical
+//     `executeSpawnTask` every other trigger has routed through since SCHED3.
+//     `runLegacyTick` is never invoked. CascadeSkip/Blocked/checkpoint
+//     effects are intentionally NOT executed here (dilim-6/7 scope, see
+//     scheduler-effects.ts's doc comment) — the pre-existing
+//     cascadeSkipDeadBlocked/DEPENDENCY_BLOCKED/checkpoint mechanisms keep
+//     running unconditionally in result-collector.ts, independent of engine.
+
+export type SchedulerEngine = 'legacy' | 'reducer';
+
+/**
+ * Local cast — `scheduler.engine` is not yet promoted to `SchedulerConfig`
+ * (config-types.ts, out of this slice's write scope). Mirrors the
+ * `token_throttle_ms` / `dependency_pipeline_enabled` local-cast idiom
+ * already used elsewhere in this codebase (e.g. sprint-spawner.ts's
+ * readTokenThrottleMs). Every shape except the literal `{engine:'reducer'}`
+ * resolves to 'legacy' — same fail-safe default-off contract as
+ * `scheduler.shadow_reducer`.
+ */
+export function resolveSchedulerEngine(scheduler: unknown): SchedulerEngine {
+  const engine = (scheduler as { engine?: unknown } | undefined)?.engine;
+  return engine === 'reducer' ? 'reducer' : 'legacy';
+}
+
+export interface SchedulerDriverTickInput {
+  readonly trigger: SchedulerTriggerKind;
+  /** Task IDs newly collected THIS tick — mirrors captureShadowTick's own
+   *  `completedTaskIds` argument; drives legacy-fifo's one-pop-per-completion. */
+  readonly completedTaskIds: readonly string[];
+  /** The EXACT pre-SCHED5 closure sequence for this trigger. Invoked verbatim
+   *  when the driver's engine is 'legacy'; never invoked when 'reducer'. */
+  readonly runLegacyTick: () => Promise<void>;
+}
+
+export interface SchedulerDriverTickResult {
+  readonly engine: SchedulerEngine;
+  readonly spawnedTaskIds: readonly string[];
+  readonly killedWorkerIds: readonly string[];
+}
+
+export interface SchedulerDriverDeps {
+  readonly sprint: Sprint;
+  /** Optional — mirrors `SpawnTaskDeps.config`. The reducer engine is only
+   *  reachable via `resolveSchedulerEngine(config?.scheduler)` returning
+   *  'reducer', which itself requires a `config` to exist; this stays
+   *  optional so a caller that somehow requests 'reducer' without a config
+   *  falls back to `runLegacyTick` (defense-in-depth) instead of throwing. */
+  readonly config: ResolvedConfig | undefined;
+  /** Live, mutable FIFO overflow queue — spliced in place to mirror the
+   *  reducer's `nextQueue` (never reassigned; callers hold a `const` reference,
+   *  same contract as `captureShadowSchedulerSnapshot`'s clone-only read). */
+  readonly remainingQueue: Task[];
+  /** Live, mutable — SpawnTask effects add to it before spawning and roll
+   *  back on failure, mirroring result-collector.ts's spawnIfNotAssigned
+   *  Bug-F idempotency guard. */
+  readonly assignedTaskIds: Set<string>;
+  readonly collectedIds: ReadonlySet<string>;
+  readonly getSlotBudget: () => number;
+  readonly getCostStop: () => boolean;
+  readonly spawnDeps: SpawnTaskDeps;
+  readonly killWorker: (taskId: string) => void;
+}
+
+/**
+ * Build the single injected driver function — call it identically from both
+ * the initial tick and every watcher tick in `waitForResults`.
+ */
+export function createSchedulerDriver(
+  engine: SchedulerEngine,
+  deps: SchedulerDriverDeps,
+): (input: SchedulerDriverTickInput) => Promise<SchedulerDriverTickResult> {
+  let sequence = 0;
+
+  return async (input: SchedulerDriverTickInput): Promise<SchedulerDriverTickResult> => {
+    if (engine !== 'reducer' || !deps.config) {
+      await input.runLegacyTick();
+      return { engine: 'legacy', spawnedTaskIds: [], killedWorkerIds: [] };
+    }
+
+    sequence++;
+    const strategy: DispatchStrategy = process.env.DECKENT_LEGACY_FIFO === '1' ? 'legacy-fifo' : 'continuous';
+    let snapshot: SchedulerSnapshot;
+    try {
+      snapshot = captureShadowSchedulerSnapshot({
+        trigger: { kind: input.trigger, sequence },
+        strategy,
+        nowMs: Date.now(),
+        costStop: deps.getCostStop(),
+        slotBudget: deps.getSlotBudget(),
+        dependencyPipelineEnabled: deps.config.dependency_pipeline_enabled === true,
+        sprint: deps.sprint,
+        remainingQueue: deps.remainingQueue,
+        assignedTaskIds: deps.assignedTaskIds,
+        collectedIds: deps.collectedIds,
+        completedTaskIds: input.completedTaskIds,
+      });
+    } catch (e) {
+      debugLog('createSchedulerDriver:capture', e);
+      return { engine: 'reducer', spawnedTaskIds: [], killedWorkerIds: [] };
+    }
+
+    const decision = reduceSchedulerTick(snapshot);
+    const taskMap = new Map(deps.sprint.tasks.map(t => [t.id, t]));
+    const execResult = await executeSchedulerDecision(decision, {
+      ...deps.spawnDeps,
+      taskMap,
+      assignedTaskIds: deps.assignedTaskIds,
+      killWorker: deps.killWorker,
+    });
+
+    // Mirror the reducer's nextQueue back onto the live queue — splice in
+    // place, never reassign (the caller holds a `const remainingQueue`).
+    const survivingIds = new Set(decision.nextQueue.map(t => t.id));
+    const survivors = deps.remainingQueue.filter(t => survivingIds.has(t.id));
+    deps.remainingQueue.splice(0, deps.remainingQueue.length, ...survivors);
+
+    return {
+      engine: 'reducer',
+      spawnedTaskIds: execResult.spawnedTaskIds,
+      killedWorkerIds: execResult.killedWorkerIds,
+    };
+  };
 }

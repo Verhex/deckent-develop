@@ -941,6 +941,16 @@ export function validateConfig(config: DeckentConfig): string[] {
     if (sch.shadow_reducer !== undefined && typeof sch.shadow_reducer !== 'boolean') {
       errors.push('scheduler.shadow_reducer must be a boolean');
     }
+    // SCHED5 (docs/analysis/scheduler-unify-design-2026-07-11.md dilim-5):
+    // `engine` selects the live scheduler driver (default 'legacy', see
+    // scheduler-driver.ts's resolveSchedulerEngine). Not yet promoted to
+    // SchedulerConfig (config-types.ts, out of this slice's write scope) —
+    // validated here via a local cast, mirroring the token_throttle_ms /
+    // dependency_pipeline_enabled local-cast idiom used elsewhere in this file.
+    const engine = (sch as { engine?: unknown }).engine;
+    if (engine !== undefined && engine !== 'legacy' && engine !== 'reducer') {
+      errors.push("scheduler.engine must be 'legacy' or 'reducer'");
+    }
   }
 
   // ─── Gate config validation (Sprint 325) ───────────────────────────

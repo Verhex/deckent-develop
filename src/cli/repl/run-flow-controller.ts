@@ -41,11 +41,17 @@ import {
   createInitialRunFlowContext,
 } from '../../core/run-flow-contract.js';
 import type { ActorContext, RequestOrigin } from '../../core/work-model.js';
-import type { BrainPlanningMode, ResolvedConfig, SprintSizeRecommendation } from '../../core/types.js';
+import type { BrainPlanningMode, ResolvedConfig, Sprint, SprintSizeRecommendation } from '../../core/types.js';
 import { reduceRunFlow } from '../../orchestra/run-flow-reducer.js';
 import { compileRunProposal } from '../../orchestra/run-proposal-compiler.js';
 import { generatePlanPreview } from '../../orchestra/plan-preview-service.js';
 import { readContext } from '../../orchestra/brain.js';
+// TERM-FLOW-UNIFY Sprint-4 mount (426-002) — Task-1's durable store + start
+// service (426-001). USE ONLY: this file never writes to run-flow-store.ts or
+// run-job-service.ts, it imports their exported API (task write-scope boundary).
+import { saveApprovedSnapshot, loadRunHandle, saveRunHandle, type StoredApprovedSnapshot } from './run-flow-store.js';
+import { startApprovedRun, type RunHandle } from '../../orchestra/run-job-service.js';
+import { spawnDetachedDeckent } from '../helpers/detached-start.js';
 
 export interface RunFlowControllerDeps {
   /** Project root — threaded straight into readContext()/generatePlanPreview(). */
@@ -65,6 +71,15 @@ export interface RunFlowControllerDeps {
   /** Defaults to 'structured' — deterministic, no AI/provider bootstrap, the
    *  same forced mode CLI `plan --dry-run` already uses (see plan.ts). */
   mode?: BrainPlanningMode;
+  /**
+   * TERM-FLOW-UNIFY Sprint-4 mount (426-002) — seam for startApproved()'s
+   * actual detached spawn. Production default builds the SAME
+   * `deckent start --flow-id <id> --revision <n> --plan-digest <digest>` CLI
+   * args as mcp/tools/start.ts's own spawnStart closure (see startApproved's
+   * doc comment below) via spawnDetachedDeckent — no reinvention. Tests
+   * inject a fake so no real sprint is ever spawned.
+   */
+  spawnStart?: (sprint: Sprint, flowId: string) => RunHandle;
 }
 
 export interface RunFlowController {
@@ -76,6 +91,20 @@ export interface RunFlowController {
    *  stale-digest approval is possible by construction). */
   approve(approvedBy: ActorContext): RunFlowContext;
   reject(reason?: string): RunFlowContext;
+  /**
+   * TERM-FLOW-UNIFY Sprint-4 mount (426-002) — drives an APPROVED context
+   * through Task-1's run-flow-store/run-job-service APIs to STARTING then
+   * DETACHED_RUNNING. This is where dilim-3's "approvedSnapshot lives only
+   * in-process, stops at APPROVED" limit (see approve()'s doc comment) is
+   * actually lifted — deliberately NOT inside approve() itself, which stays
+   * pinned to APPROVED/no-handle by tests/cli/run-flow-controller.test.ts
+   * (out of this task's write scope). Idempotent when called again while
+   * already STARTING/DETACHED_RUNNING (the reducer's own duplicate-replay
+   * handling — see run-flow-reducer.ts). Optional so the pre-426-002
+   * RunFlowController shape (e.g. that test file's fakeController()) still
+   * structurally satisfies this interface without modification.
+   */
+  startApproved?(): RunFlowContext;
 }
 
 function defaultRecommendation(config: ResolvedConfig): SprintSizeRecommendation {
@@ -91,6 +120,12 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
   let context: RunFlowContext = createInitialRunFlowContext();
   const nowFn = deps.now ?? (() => new Date().toISOString());
   const generateFlowId = deps.generateFlowId ?? (() => randomUUID());
+  // TERM-FLOW-UNIFY Sprint-4 mount (426-002) — the real planned Sprint (task
+  // list) from generatePlanPreview's result, retained here so startApproved()
+  // can persist a Task-1 StoredApprovedSnapshot (richer than the core
+  // ApprovedPlanSnapshot — see run-flow-store.ts's file header). PlanPreview
+  // itself carries no task list, only summaries.
+  let plannedSprint: Sprint | undefined;
 
   async function proposeRun(intentSummary: string): Promise<RunFlowContext> {
     const trimmed = intentSummary.trim();
@@ -131,6 +166,7 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
     const result = await generatePlanPreview(deps.root, deps.config, brainContext, recommendation, {
       mode: deps.mode ?? 'structured',
     });
+    plannedSprint = result.sprint;
 
     const preview: PlanPreview = {
       flowId,
@@ -174,6 +210,81 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
     return context;
   }
 
+  /** See {@link RunFlowController.startApproved} for the full rationale. */
+  function startApproved(): RunFlowContext {
+    const { flowId, approvedSnapshot, state } = context;
+    if (state !== 'APPROVED' && state !== 'STARTING' && state !== 'DETACHED_RUNNING') {
+      throw new Error(
+        `run-flow-controller: startApproved() requires state 'APPROVED' (call approve() first; current state: '${state}')`,
+      );
+    }
+    if (!flowId || !approvedSnapshot) {
+      throw new Error('run-flow-controller: startApproved() requires an approved snapshot (call approve() first)');
+    }
+    if (!plannedSprint) {
+      throw new Error('run-flow-controller: startApproved() has no planned Sprint to persist (unexpected — proposeRun must have run)');
+    }
+
+    const stored: StoredApprovedSnapshot = {
+      flowId,
+      revision: approvedSnapshot.revision,
+      planDigest: approvedSnapshot.planDigest,
+      approvedBy: approvedSnapshot.approvedBy,
+      approvedAt: approvedSnapshot.approvedAt,
+      sprint: plannedSprint,
+    };
+    saveApprovedSnapshot(deps.root, stored);
+
+    context = reduceRunFlow(context, {
+      schemaVersion: RUN_FLOW_EVENT_SCHEMA_VERSION,
+      flowId,
+      timestamp: nowFn(),
+      type: 'START_REQUESTED',
+      revision: stored.revision,
+      planDigest: stored.planDigest,
+    });
+
+    const existingRunHandle = loadRunHandle(deps.root, flowId);
+    const spawnStart = deps.spawnStart ?? ((_sprint: Sprint, fid: string): RunHandle => {
+      const cliArgs = [
+        'start', '--flow-id', fid,
+        '--revision', String(stored.revision),
+        '--plan-digest', stored.planDigest,
+      ];
+      const spawned = spawnDetachedDeckent(cliArgs, { projectRoot: deps.root, flowId: fid });
+      return { flowId: fid, jobId: `flow-${fid}-r${stored.revision}`, logRef: spawned.logPath };
+    });
+
+    const result = startApprovedRun({
+      flowId,
+      expectedRevision: stored.revision,
+      expectedPlanDigest: stored.planDigest,
+      approvedSnapshot: stored,
+      ...(existingRunHandle ? { existingRunHandle } : {}),
+      spawnStart,
+    });
+
+    if (result.status === 'started') {
+      saveRunHandle(deps.root, {
+        flowId,
+        revision: stored.revision,
+        planDigest: stored.planDigest,
+        handle: result.handle,
+        startedAt: nowFn(),
+      });
+    }
+
+    context = reduceRunFlow(context, {
+      schemaVersion: RUN_FLOW_EVENT_SCHEMA_VERSION,
+      flowId,
+      timestamp: nowFn(),
+      type: 'RUN_STARTED',
+      handle: result.handle,
+    });
+
+    return context;
+  }
+
   function reject(reason?: string): RunFlowContext {
     const { flowId, preview, proposal } = context;
     const revision = preview?.revision ?? proposal?.revision;
@@ -196,5 +307,6 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
     proposeRun,
     approve,
     reject,
+    startApproved,
   };
 }

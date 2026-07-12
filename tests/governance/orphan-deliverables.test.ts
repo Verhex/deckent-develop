@@ -444,9 +444,8 @@ const KNOWN_ORPHANS = [
   'src/cli/helpers/sprint-summary.ts',
   'src/cli/repl/ink-probe.tsx',
   'src/cli/repl/native-flag.ts',
-  // 'src/cli/repl/plan-preview-card.tsx' — TERM dilim-3 (sprint-425) kartı; canlı
-  // mount TERM4B'de (sprint-426) gelir → mount landığında bu satırı pin'den DÜŞÜR.
-  'src/cli/repl/plan-preview-card.tsx',
+  // 'src/cli/repl/plan-preview-card.tsx' — KAPANDI sprint-426 TERM4B (2026-07-12):
+  // app.tsx canlı-mount → artık orphan değil (5d94a831'deki geçici pin düştü).
   'src/connectors/approval-clients-wire.ts',
   'src/connectors/approval-telegram.ts',
   'src/connectors/identity/verify-bind.ts',
@@ -520,7 +519,7 @@ const KNOWN_ORPHANS = [
 
 describe('KNOWN_ORPHANS allowlist sanity', () => {
   it('has the expected count and only well-formed src/**/*.ts(x) entries', () => {
-    expect(KNOWN_ORPHANS.length).toBe(86); // 85->86: plan-preview-card (sprint-425; TERM4B mount'unda geri 85'e düşür)
+    expect(KNOWN_ORPHANS.length).toBe(85); // 86->85: plan-preview-card TERM4B mount'uyla kapandi (sprint-426)
     for (const entry of KNOWN_ORPHANS) {
       expect(entry.startsWith('src/')).toBe(true);
       expect(entry.endsWith('.ts') || entry.endsWith('.tsx')).toBe(true);

@@ -56,6 +56,16 @@ export interface SpawnDetachedOptions {
   projectRoot?: string;
   /** Inject a fake spawn for hermetic tests; omit for the real node:child_process spawn. */
   spawnFn?: DetachedSpawnFn;
+  /**
+   * TERM-FLOW-UNIFY Sprint-4 (426-001): durable job-correlation id for this
+   * detached spawn (design-doc risk: "detached spawn cevabı yalnız child'ın
+   * doğduğunu gösterir... watcher... detached handle sprint/flow correlation
+   * taşımaz; multi-session/multi-tenant yanlış-eşleşme mümkündür" — a bare
+   * pid is not a safe correlator across sessions). Optional/additive — when
+   * omitted (every caller today), behavior and the log filename are
+   * unchanged.
+   */
+  flowId?: string;
 }
 
 export interface DetachedSpawnResult {
@@ -63,6 +73,9 @@ export interface DetachedSpawnResult {
   pid: number | null;
   /** Absolute path to the log file the child's stdout+stderr are redirected to. */
   logPath: string;
+  /** The `flowId` this spawn was correlated to via `SpawnDetachedOptions.flowId`,
+   *  or `null` when the caller did not supply one. */
+  flowId: string | null;
 }
 
 // ─── Entry resolution ────────────────────────────────────────────────────────
@@ -101,7 +114,10 @@ export function spawnDetachedDeckent(
   mkdirSync(recentWorksDir, { recursive: true });
 
   const cmdLabel = (argv[0] ?? 'cmd').replace(/[^a-zA-Z0-9_-]/g, '_');
-  const logPath = join(recentWorksDir, `${cmdLabel}-${Date.now()}.log`);
+  // flowId (when supplied) is folded into the log filename so a durable job
+  // is findable by its correlator, not just by pid — see SpawnDetachedOptions.flowId.
+  const flowIdSegment = opts.flowId ? `${opts.flowId.replace(/[^a-zA-Z0-9_-]/g, '_')}-` : '';
+  const logPath = join(recentWorksDir, `${cmdLabel}-${flowIdSegment}${Date.now()}.log`);
   const logFd = openSync(logPath, 'a');
 
   const spawnFn = opts.spawnFn ?? defaultSpawnFn;
@@ -122,5 +138,5 @@ export function spawnDetachedDeckent(
   }
   child.unref();
 
-  return { pid: child.pid ?? null, logPath };
+  return { pid: child.pid ?? null, logPath, flowId: opts.flowId ?? null };
 }

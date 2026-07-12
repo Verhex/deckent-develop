@@ -196,6 +196,22 @@ const MESSAGES: MessageMap = {
     tr: '(görev yok)',
   },
 
+  // ─── run-flow REPL mount outcomes (TERM-FLOW-UNIFY Sprint-4 mount, 426-002) ─
+  // Pushed as a 'bg' transcript line after approve→start / reject on the
+  // PlanPreviewCard — buildRunFlowMountLabels(t) in run.tsx.
+  'runFlow.mount.started': {
+    en: 'Run started — job {jobId}.',
+    tr: 'Run başlatıldı — iş {jobId}.',
+  },
+  'runFlow.mount.rejected': {
+    en: 'Run proposal rejected.',
+    tr: 'Run önerisi reddedildi.',
+  },
+  'runFlow.mount.error': {
+    en: 'Run flow error: {error}',
+    tr: 'Run akışı hatası: {error}',
+  },
+
   // ─── status command ─────────────────────────────────────────────────
   'status.no_active_sprint': {
     en: 'No active sprint. Run `deckent start` first.',

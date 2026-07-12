@@ -16,8 +16,12 @@ import {
   type ProviderError,
 } from './native-transport.js';
 import { loadDeckSecrets } from '../../core/deck-file.js';
-import { buildNativeToolRegistry, resolveToolSurfaceOptions } from './native-tool-registry.js';
+import { buildNativeToolRegistry, resolveToolSurfaceOptions, resolveRunFlowEnabled } from './native-tool-registry.js';
 import { createNativeEngine, resolveCostCeilingUsd } from './native-agent-bridge.js';
+import { createRunFlowController, type RunFlowController, type RunFlowControllerDeps } from './run-flow-controller.js';
+import { buildPlanPreviewCardLabels } from './plan-preview-card.js';
+import type { RunFlowMountLabels } from './app.js';
+import type { ResolvedConfig } from '../../core/types.js';
 import { buildTurnRecorder } from './trace-wire.js';
 import { composeSystemPrompt } from '../../agent/identity.js';
 import type { ChatProviderAdapter } from '../commands/chat-native.js';
@@ -138,6 +142,21 @@ export function buildApprovalLabels(t: (key: string) => string): ApprovalCardLab
   };
 }
 
+/**
+ * TERM-FLOW-UNIFY Sprint-4 mount (426-002) — real en/tr labels for the
+ * approve/reject/error transcript lines pushed after a PlanPreviewCard
+ * decision (app.tsx's RunFlowMountLabels), sourced from messages.ts's
+ * `runFlow.mount.*` keys — same "pull labels out of the render call"
+ * precedent as {@link buildReplLabels}/{@link buildApprovalLabels} above.
+ */
+export function buildRunFlowMountLabels(t: (key: string) => string): RunFlowMountLabels {
+  return {
+    started: t('runFlow.mount.started'),
+    rejected: t('runFlow.mount.rejected'),
+    error: t('runFlow.mount.error'),
+  };
+}
+
 /** Rebuilds a provider adapter for a selection (entry.ts passes buildReplProvider). */
 export type ProviderRebuild = (sel: ActiveSelection) => ChatProviderAdapter;
 
@@ -251,6 +270,24 @@ export function wireBgTurnsProducer(
   return watchFactory(jobsDir, {
     onComplete: (info) => enqueueBg(buildBgTurnEvent(info)),
   });
+}
+
+/**
+ * TERM-FLOW-UNIFY Sprint-4 mount (426-002) — `terminal.run_flow_v2` gate for
+ * the REPL-owned RunFlowController. Mirrors {@link wireApprovalCrossProcess}/
+ * {@link wireBgTurnsProducer}'s injectable-factory shape: `enabled=false`
+ * never invokes `controllerFactory` at all (no fs read, no controller
+ * instance — byte-identical to pre-426-002 whenever the flag is off), and a
+ * test injects a fake factory so no real `createRunFlowController` (which
+ * would touch `readContext`/`planSprint`) runs in a unit test.
+ */
+export function wireRunFlowMount(
+  enabled: boolean,
+  deps: RunFlowControllerDeps,
+  controllerFactory: typeof createRunFlowController = createRunFlowController,
+): RunFlowController | undefined {
+  if (!enabled) return undefined;
+  return controllerFactory(deps);
 }
 
 /**
@@ -441,7 +478,7 @@ export async function runInkRepl(
   let projectCfg: {
     language?: string;
     repl_surface?: { enabled?: boolean; approvals?: boolean; bg_turns?: boolean };
-    terminal?: { rpc_debug?: boolean; native_agent?: boolean };
+    terminal?: { rpc_debug?: boolean; native_agent?: boolean; run_flow_v2?: boolean };
   } = {};
   try { projectCfg = await loadConfig() as typeof projectCfg; } catch { /* defaults */ }
   let lang = 'en';
@@ -642,6 +679,11 @@ export async function runInkRepl(
   // to its boot adapter — "geçildi: claude · fable" was a false positive.
   let nativeSwitch: ((sel: Partial<ActiveSelection>) => ActiveSelection & { switchError?: string }) | undefined;
   let nativeSelection: ActiveSelection | undefined;
+  // TERM-FLOW-UNIFY Sprint-4 mount (426-002) — `terminal.run_flow_v2` gate;
+  // only ever constructed when the native engine is selected (the
+  // `deckent_propose_run` tool it powers is registered on the native
+  // registry only — see buildNativeToolRegistry below).
+  let runFlowController: RunFlowController | undefined;
   if (isNativeAgentSelected(process.argv.slice(2), projectCfg)) {
     const cfg = await loadConfig().catch(() => ({} as Record<string, unknown>));
     const nativeCfg: NativeTransportConfig = {
@@ -715,12 +757,22 @@ export async function runInkRepl(
       const toolSurfaceOpts = resolveToolSurfaceOptions(
         (cfg as { tool_surface?: { enabled?: boolean; riskThreshold?: string } }).tool_surface,
       );
+      // TERM-FLOW-UNIFY Sprint-4 mount (426-002) — `terminal.run_flow_v2`.
+      // wireRunFlowMount never touches fs/planSprint when the flag is off
+      // (undefined -> `runFlow` omitted below -> buildNativeToolRegistry's
+      // output stays byte-identical to pre-426-002, pinned by
+      // tests/cli/run-flow-controller.test.ts's flag-off registry pin).
+      runFlowController = wireRunFlowMount(resolveRunFlowEnabled(projectCfg.terminal), {
+        root: process.cwd(),
+        config: cfg as ResolvedConfig,
+      });
       nativeEngine = createNativeEngine({
         adapter: resolved.adapter,
         registry: buildNativeToolRegistry({
           cwd: () => process.cwd(),
           ...(mcpBridge ? { mcpBridge } : {}),
           ...(toolSurfaceOpts ? { toolSurface: toolSurfaceOpts } : {}),
+          ...(runFlowController ? { runFlow: { enabled: true, controller: runFlowController } } : {}),
         }),
         ...(toolSurfaceOpts ? { toolSurface: toolSurfaceOpts } : {}),
         cwd: process.cwd(),
@@ -776,6 +828,7 @@ export async function runInkRepl(
       approvalsEnabled={approvalsEnabled}
       {...(approvalChannel ? { approvalChannel } : {})}
       {...(bgTurnsEnabled ? { registerBgEventSink: (enqueue: (event: ChatTurnBgEvent) => void) => { bgEventSink = enqueue; } } : {})}
+      {...(runFlowController ? { runFlowController, runFlowCardLabels: buildPlanPreviewCardLabels(lang), runFlowMountLabels: buildRunFlowMountLabels(t) } : {})}
     />
     </ReplErrorBoundary>,
   );

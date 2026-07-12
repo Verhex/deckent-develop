@@ -689,6 +689,18 @@ export interface RunSprintOptions {
    * when `config.resource_monitor.enabled === true`.
    */
   resourceMonitorFactory?: (opts: ResourceMonitorOpts) => ResourceMonitor;
+  /**
+   * TERM-FLOW-UNIFY Sprint-4 (426-001, `terminal.run_flow_v2`): an
+   * already-approved, CAS-verified Sprint (see orchestra/run-job-service.ts)
+   * to consume INSTEAD of planning fresh. When set, the "Fresh Path" below
+   * skips its `runPlanPhase(...)` call entirely — no `planSprint()` call
+   * happens on this run (design-doc risk: "detached start fresh lifecycle'da
+   * runPlanPhase'i YENİDEN çağırıyor"). `safetyPoint` is left `null` in this
+   * branch (an already-legitimate degraded state — see runPlanPhase's own
+   * non-git-repo/creation-failure fallback). Absent (undefined) for every
+   * existing caller — zero behavior change when this is not set.
+   */
+  preplannedSprint?: Sprint;
 }
 
 // ═══ Coordination Wire Helpers ════════════════════════════════════
@@ -1180,9 +1192,18 @@ export async function runSprint(
   } else {
     // ─── Fresh Path: PLAN → SPAWN → EXECUTE ─────────────────────────
     // Phase 1: PLAN
-    const planResult = await runPlanPhase(
-      projectRoot, config, opts, activeProvider, rollbackEnabled,
-    );
+    let planResult: { sprint: Sprint; safetyPoint: SafetyPoint | null };
+    if (opts?.preplannedSprint) {
+      // TERM-FLOW-UNIFY Sprint-4 (426-001): consume an approved snapshot —
+      // runPlanPhase (and the planSprint() call inside it) is NEVER invoked
+      // on this branch. See RunSprintOptions.preplannedSprint doc comment.
+      opts.preplannedSprint.startedAt = opts.preplannedSprint.startedAt ?? now();
+      planResult = { sprint: opts.preplannedSprint, safetyPoint: null };
+    } else {
+      planResult = await runPlanPhase(
+        projectRoot, config, opts, activeProvider, rollbackEnabled,
+      );
+    }
     sprint = planResult.sprint;
     safetyPoint = planResult.safetyPoint;
 

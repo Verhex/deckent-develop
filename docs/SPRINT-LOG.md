@@ -10409,3 +10409,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 425-002: SCHED5K — divergence-raporunun KOŞULLU-GO koşullarını kapat (kapsam-boşlukları) (DONE)
 
 ---
+## Sprint 426 — sprint-426
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-12
+**Duration:** 2502s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 2501692ms |
+
+### Tasks
+
+- 426-001: TERM4A — run-flow-store + run-job-service + snapshot-tüketen start (flag'li) (GO_WITH_TECH_DEBT)
+- 426-002: TERM4B — REPL canlı-mount: controller run/app'e + approve→start tetiği (flag'li) (DONE)
+- 426-003: SCHED5 — continuous live-switch: initial+watcher tek injected driver (engine-config'li) (DONE)
+
+---

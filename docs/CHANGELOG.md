@@ -9,6 +9,20 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint426] - 2026-07-12
+
+### Added
+
+- TERM4B — REPL canlı-mount: controller run/app'e + approve→start tetiği (flag'li)
+- SCHED5 — continuous live-switch: initial+watcher tek injected driver (engine-config'li)
+
+### Changed
+
+- TERM4A — run-flow-store + run-job-service + snapshot-tüketen start (flag'li) (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint425] - 2026-07-12
 
 ### Added
