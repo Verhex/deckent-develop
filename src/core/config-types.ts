@@ -28,6 +28,16 @@ export interface TimeoutConfig {
   subprocess_max_timeout: number;
   /** Base timeout per effort level in seconds */
   effort_base: { low: number; normal: number; high: number };
+  /**
+   * Optional model-tier timeout multiplier (born-667a / TIMEOUT-TIER, Task 427-023).
+   * Keyed by the provider-agnostic {@link ModelTier} (economy/standard/premium/
+   * premium_plus) so an opus-equivalent model on any provider (gpt-5, gemini-2.5-pro, ...)
+   * gets the same widened timeout as Claude opus — not just a Claude-literal name.
+   * Applied on top of `effort_base` in `brainEstimateTimeout` (timeout-estimator.ts).
+   * Absent tier or absent field entirely = 1.0 (no change) — backward-compatible: a
+   * config with no `model_multiplier` produces today's timeout values bit-for-bit.
+   */
+  model_multiplier?: Partial<Record<ModelTier, number>>;
   /** Scale timeout based on lines-of-code estimate (default: true) */
   loc_scaling_enabled: boolean;
   /** Scale timeout based on historical sprint data (default: true) */

@@ -33,7 +33,7 @@ import {
 } from '../../src/cli/repl/app.js';
 import { wireRunFlowMount, buildRunFlowMountLabels } from '../../src/cli/repl/run.js';
 import { createRunFlowController, type RunFlowController, type RunFlowControllerDeps } from '../../src/cli/repl/run-flow-controller.js';
-import { loadApprovedSnapshot, loadRunHandle } from '../../src/cli/repl/run-flow-store.js';
+import { loadApprovedSnapshot, loadRunHandle } from '../../src/core/run-flow-store.js';
 import type { RunFlowContext } from '../../src/core/run-flow-contract.js';
 import type { RunHandle } from '../../src/orchestra/run-job-service.js';
 import { getMessage } from '../../src/cli/helpers/messages.js';

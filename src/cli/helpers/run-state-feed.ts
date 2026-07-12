@@ -20,7 +20,7 @@
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { TASKS_DIR, SPRINT_STATE_FILE, RUNTIME_DIR } from '../../core/constants.js';
+import { TASKS_DIR, SPRINT_STATE_FILE, RUNTIME_DIR, JOBS_DIR } from '../../core/constants.js';
 import type { LiveFooterState, LiveFooterProviderState, LiveFooterAuthState } from './live-footer.js';
 import { readWorkerProgress, type ProgressReaderFs, type WorkerProgressSummary } from './progress-reader.js';
 
@@ -65,6 +65,28 @@ interface RawProviderHealthCache {
   auth?: unknown;
 }
 
+// TERM5-FEED (sprint-427, task 2) — tolerant raw shape for
+// `.deckent/runtime/jobs/<sprintId>.json`. Deliberately decoupled from
+// orchestra/sprint-finalizer.ts's `SprintCompletionRecord` export (ADR-D-004
+// C2/C3 — cli/ helpers stay independent of orchestra/'s internal types) —
+// mirrors run-completion-watch.ts's own `RawJobRecord` precedent of a local,
+// permissive shape rather than importing the writer's type.
+interface RawCompletionRecord {
+  flowId?: unknown;
+  verdictSummary?: { done?: unknown; techDebt?: unknown; noGo?: unknown };
+}
+
+interface RawJobRecord {
+  jobId?: unknown;
+  sprintId?: unknown;
+  status?: unknown;
+  /** Additive field (427-001, TERM5-FIN) — absent on every job file written
+   *  before that change and on any job never started via the run-flow-v2
+   *  path. Its absence (or a missing/mismatched `flowId` within it) is the
+   *  "legacy-yol" this task's correlation logic must leave untouched. */
+  completionRecord?: RawCompletionRecord;
+}
+
 // ─── Pure core ──────────────────────────────────────────────────────────────
 
 export interface StateFeedInput {
@@ -79,6 +101,17 @@ export interface StateFeedInput {
    * Optional — omitted entirely when the caller has no progress data (e.g.
    * pure-core unit tests), in which case worker detail falls back to hb. */
   workerProgress?: Record<string, WorkerProgressSummary>;
+  /** Raw parsed `.deckent/runtime/jobs/*.json` records. Optional — omitted
+   *  entirely when the caller has no job data (e.g. pure-core unit tests, or
+   *  `flowId` below is unset so `readLiveFooterState` never scanned
+   *  JOBS_DIR), in which case no `completion` event is ever produced. */
+  jobRecords?: RawJobRecord[];
+  /** The flowId of the currently-watched detached run-handle
+   *  (`DetachedSpawnResult.flowId`, detached-start.ts) to correlate
+   *  against. When omitted, or when no `jobRecords` entry's
+   *  `completionRecord.flowId` matches it, the legacy (no-correlation) path
+   *  applies unchanged — no `completion` field is added to the result. */
+  flowId?: string;
 }
 
 // ─── WLT-FEED-WIRE — per-worker detail (Sprint 356, Task 356-005) ──────────
@@ -94,10 +127,42 @@ export interface WorkerFeedDetail {
   currentAction: string;
 }
 
+// ─── TERM5-FEED — flowId-correlated completion (Sprint 427, Task 427-002) ──
+// Correlates Task-1's (427-001) additive `completionRecord.flowId` against
+// the flowId of a caller-watched detached run-handle
+// (`DetachedSpawnResult.flowId`, detached-start.ts). Purely additive/opt-in:
+// a caller that never supplies `StateFeedOptions.flowId` (every caller
+// today) gets the exact pre-existing behavior — no `completion` field, no
+// extra fs work (see `readLiveFooterState`).
+
+export interface CorrelatedCompletionEvent {
+  /** The flowId this event matched against — always equals the `flowId`
+   *  the caller supplied. */
+  readonly flowId: string;
+  /** Stable job identifier: `job.jobId` if present, else `job.sprintId`,
+   *  else falls back to `flowId` itself (mirrors run-completion-watch.ts's
+   *  `firstNonEmptyString` fallback chain — never empty). */
+  readonly jobId: string;
+  readonly sprintId?: string;
+  /** Raw on-disk job status string (e.g. "COMPLETE") — passed through
+   *  untyped since this reader must not throw on an unrecognized value. */
+  readonly status?: string;
+  readonly verdictSummary?: {
+    readonly done: number;
+    readonly techDebt: number;
+    readonly noGo: number;
+  };
+}
+
 export interface StateFeedState extends LiveFooterState {
   /** Per-active-worker detail, keyed by taskId. Omitted entirely when there
    * are zero active workers (same omit-when-absent convention as `next`). */
   workers?: Record<string, WorkerFeedDetail>;
+  /** Set only when `StateFeedOptions.flowId`/`StateFeedInput.flowId` was
+   *  supplied AND a job record's `completionRecord.flowId` matches it.
+   *  Omitted for every legacy record (no `completionRecord`, or no `flowId`
+   *  watched) — same omit-when-absent convention as `next`/`workers`. */
+  completion?: CorrelatedCompletionEvent;
 }
 
 function normalizeAuth(value: unknown): LiveFooterAuthState | undefined {
@@ -108,6 +173,54 @@ function normalizeProvider(raw: RawProviderHealthCache['provider']): LiveFooterP
   if (!raw || typeof raw.name !== 'string') return undefined;
   const healthy: boolean | 'unknown' = raw.healthy === true ? true : raw.healthy === false ? false : 'unknown';
   return { name: raw.name, healthy };
+}
+
+function firstNonEmptyString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.length > 0) return value;
+  }
+  return undefined;
+}
+
+function normalizeVerdictSummary(
+  raw: RawCompletionRecord['verdictSummary'],
+): CorrelatedCompletionEvent['verdictSummary'] {
+  if (!raw) return undefined;
+  const { done, techDebt, noGo } = raw;
+  if (typeof done !== 'number' || typeof techDebt !== 'number' || typeof noGo !== 'number') return undefined;
+  return { done, techDebt, noGo };
+}
+
+/**
+ * Scans already-parsed job records for one whose `completionRecord.flowId`
+ * matches `flowId`, returning a typed `CorrelatedCompletionEvent` for the
+ * first hit. Returns `undefined` — no correlation attempted at all — when
+ * either `flowId` or `jobRecords` is absent, which is exactly the
+ * "flowId'siz eski kayıtlar aynen çalışır" legacy path.
+ */
+function findCorrelatedCompletion(
+  jobRecords: RawJobRecord[] | undefined,
+  flowId: string | undefined,
+): CorrelatedCompletionEvent | undefined {
+  if (!flowId || !jobRecords) return undefined;
+
+  for (const job of jobRecords) {
+    const recordFlowId = job.completionRecord?.flowId;
+    if (recordFlowId !== flowId) continue;
+
+    const sprintId = firstNonEmptyString(job.sprintId);
+    const status = firstNonEmptyString(job.status);
+    const verdictSummary = normalizeVerdictSummary(job.completionRecord?.verdictSummary);
+
+    return {
+      flowId,
+      jobId: firstNonEmptyString(job.jobId, job.sprintId) ?? flowId,
+      ...(sprintId !== undefined ? { sprintId } : {}),
+      ...(status !== undefined ? { status } : {}),
+      ...(verdictSummary !== undefined ? { verdictSummary } : {}),
+    };
+  }
+  return undefined;
 }
 
 function resolveWorkerCurrentAction(
@@ -130,7 +243,7 @@ function resolveWorkerCurrentAction(
  * (buildLiveFooter then honestly collapses to "idle").
  */
 export function computeLiveFooterState(input: StateFeedInput): StateFeedState {
-  const { sprintState, heartbeats, finishedTaskIds, providerCache, workerProgress } = input;
+  const { sprintState, heartbeats, finishedTaskIds, providerCache, workerProgress, jobRecords, flowId } = input;
   const state: StateFeedState = {};
 
   const heartbeatTaskIds = heartbeats
@@ -179,6 +292,9 @@ export function computeLiveFooterState(input: StateFeedInput): StateFeedState {
   const next = taskIds.find((id) => !startedTaskIds.has(id) && !finishedTaskIds.has(id));
   if (next !== undefined) state.next = next;
 
+  const completion = findCorrelatedCompletion(jobRecords, flowId);
+  if (completion !== undefined) state.completion = completion;
+
   return state;
 }
 
@@ -195,6 +311,12 @@ export interface StateFeedOptions {
    * "inject a fake for hermetic tests" precedent as `fs` above, just a
    * separate seam because `readWorkerProgress` needs different primitives. */
   progressFs?: ProgressReaderFs;
+  /** The flowId of a currently-watched detached run-handle
+   *  (`DetachedSpawnResult.flowId`, detached-start.ts) to correlate
+   *  against — see `StateFeedState.completion`. When omitted (every caller
+   *  today), `readLiveFooterState` never scans `JOBS_DIR` at all: zero extra
+   *  fs work, byte-identical legacy behavior. */
+  flowId?: string;
 }
 
 function readJson<T>(fs: StateFeedFs, path: string): T | null {
@@ -239,10 +361,42 @@ function readHeartbeatsAndResults(
 }
 
 /**
+ * Reads every `*.json` file under `jobsDir` (TERM5-FEED, sprint-427 task 2).
+ * Only ever called when `options.flowId` is set — see `readLiveFooterState`.
+ * Degrade-safe end-to-end, matching `readHeartbeatsAndResults`: a missing
+ * dir, an unreadable dir, or a single malformed file all skip rather than throw.
+ */
+function readJobRecords(fs: StateFeedFs, jobsDir: string): RawJobRecord[] {
+  const records: RawJobRecord[] = [];
+  if (!fs.existsSync(jobsDir)) return records;
+
+  let files: string[];
+  try {
+    files = fs.readdirSync(jobsDir);
+  } catch {
+    return records;
+  }
+
+  for (const file of files) {
+    if (!file.endsWith('.json')) continue;
+    try {
+      records.push(JSON.parse(fs.readFileSync(join(jobsDir, file))) as RawJobRecord);
+    } catch {
+      // malformed job file — skip silently (matches readHeartbeatsAndResults precedent)
+    }
+  }
+
+  return records;
+}
+
+/**
  * Reads .tasks/*.hb + .deckent/sprint-state.json (+ optional provider-health
  * cache) through `options.fs` and returns the resulting LiveFooterState.
  * Never triggers a provider/auth probe; a missing or corrupt file at any seam
- * degrades to "absent" rather than throwing.
+ * degrades to "absent" rather than throwing. When `options.flowId` is set,
+ * also scans `JOBS_DIR` for a flowId-correlated completion event
+ * (TERM5-FEED, sprint-427 task 2) — omitted entirely, with zero extra fs
+ * work, when `options.flowId` is not supplied (legacy path).
  */
 export function readLiveFooterState(options: StateFeedOptions): StateFeedState {
   const fs = options.fs ?? REAL_FS;
@@ -254,8 +408,17 @@ export function readLiveFooterState(options: StateFeedOptions): StateFeedState {
   const { heartbeats, finishedTaskIds } = readHeartbeatsAndResults(fs, tasksDir);
   const providerCache = readJson<RawProviderHealthCache>(fs, providerCacheFile);
   const workerProgress = readWorkerProgress(tasksDir, { fs: options.progressFs });
+  const jobRecords = options.flowId ? readJobRecords(fs, join(options.projectRoot, JOBS_DIR)) : undefined;
 
-  return computeLiveFooterState({ sprintState, heartbeats, finishedTaskIds, providerCache, workerProgress });
+  return computeLiveFooterState({
+    sprintState,
+    heartbeats,
+    finishedTaskIds,
+    providerCache,
+    workerProgress,
+    jobRecords,
+    flowId: options.flowId,
+  });
 }
 
 /**

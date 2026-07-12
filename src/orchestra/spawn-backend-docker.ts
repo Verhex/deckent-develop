@@ -211,6 +211,21 @@ export function buildExitWithoutResultMarker(input: ExitWithoutResultMarkerInput
 }
 
 /**
+ * born-667b (RECON-DIFF, task 427-024): POSIX-single-quote every entry of a
+ * task's `scope.filesWrite` list and join them into a `git ... -- <pathspec>`
+ * argument string. Embedded `'` is escaped via the standard `'\''` POSIX idiom
+ * (close quote, escaped literal quote, reopen quote). Blank/non-string entries
+ * are dropped. Pure — exported for unit tests.
+ */
+export function buildScopedDiffPathspec(scopeFilesWrite: readonly string[]): string {
+  return scopeFilesWrite
+    .map((f) => (typeof f === 'string' ? f.trim() : ''))
+    .filter((f) => f.length > 0)
+    .map((f) => `'${f.split('\'').join('\'\\\'\'')}'`)
+    .join(' ');
+}
+
+/**
  * Build the container EXIT-trap shell function (`on_exit`). Extracted from the
  * inline `spawn()` body so it is unit-testable. Behavior:
  *  - `.result` already present → fsync + return (normal worker exit; unchanged).
@@ -219,8 +234,39 @@ export function buildExitWithoutResultMarker(input: ExitWithoutResultMarkerInput
  *  - non-zero exit + git diff ⇒ TIMEOUT_WITH_WORK (unchanged; Brain reconciles).
  *  - else ⇒ enriched EXIT_WITHOUT_RESULT marker (workPresent + diffStat + last hb),
  *    still a NO_GO candidate. The JSON mirrors {@link buildExitWithoutResultMarker}.
+ *
+ * born-667b (RECON-DIFF, task 427-024): `scopeFilesWrite` narrows BOTH the
+ * TIMEOUT_WITH_WORK file-count and the EXIT_WITHOUT_RESULT workPresent/diffStat
+ * signal to this task's own `scope.filesWrite` via a native git `-- <pathspec>`
+ * filter — the docker backend bind-mounts the WHOLE project root read-write, so
+ * an UNFILTERED `git diff` inside one worker's container also shows every OTHER
+ * concurrently-running worker's uncommitted changes (TT550 phantom-vakası: a
+ * worker that touched nothing itself still got workPresent=true because a
+ * sibling worker was mid-edit). Optional + defaults to the pre-existing
+ * unscoped behavior so the 2-arg call in
+ * tests/orchestra/docker-exit-marker.test.ts is untouched. An explicitly empty
+ * list (as opposed to omitted) has an empty intersection by construction —
+ * `changed_files`/`diff_stat` are set directly with no git call at all, the
+ * honest answer per born-667b's goCriteria ("kesişim-boş → workPresent=false
+ * dürüst yazılır").
  */
-export function buildOnExitTrap(taskId: string, model: string): string {
+export function buildOnExitTrap(taskId: string, model: string, scopeFilesWrite?: readonly string[]): string {
+  const scoped = scopeFilesWrite !== undefined;
+  const pathspec = scoped ? buildScopedDiffPathspec(scopeFilesWrite) : '';
+  const scopedButEmpty = scoped && pathspec.length === 0;
+
+  const changedFilesLine = !scoped
+    ? '  changed_files=$({ git diff --name-only; git ls-files --others --exclude-standard; } 2>/dev/null | sort -u || true)'
+    : scopedButEmpty
+      ? '  changed_files=""'
+      : `  changed_files=$({ git diff --name-only -- ${pathspec}; git ls-files --others --exclude-standard -- ${pathspec}; } 2>/dev/null | sort -u || true)`;
+
+  const diffStatLine = !scoped
+    ? '    diff_stat=$(git diff --shortstat 2>/dev/null | sed \'s/^[[:space:]]*//\' | tr -d \'"\' || true)'
+    : scopedButEmpty
+      ? '    diff_stat=""'
+      : `    diff_stat=$(git diff --shortstat -- ${pathspec} 2>/dev/null | sed 's/^[[:space:]]*//' | tr -d '"' || true)`;
+
   return [
     'on_exit() {',
     // born-466: $? here is the LAST command's code (rm/echo masked it to 0 on
@@ -256,7 +302,8 @@ export function buildOnExitTrap(taskId: string, model: string): string {
     // born-467: tracked diff alone misses NEW files (most deckent tasks create
     // new test files) — include untracked-but-not-ignored so workPresent is
     // honest when a worker produced only new files before dying.
-    '  changed_files=$({ git diff --name-only; git ls-files --others --exclude-standard; } 2>/dev/null | sort -u || true)',
+    // born-667b: scoped to scope.filesWrite when provided — see buildScopedDiffPathspec.
+    changedFilesLine,
     '  if [ -n "$changed_files" ] && [ "$exit_code" -ne 0 ]; then',
     // Build JSON array from changed files using pure POSIX sh (no jq dependency)
     '    local json_array="["',
@@ -292,7 +339,8 @@ export function buildOnExitTrap(taskId: string, model: string): string {
     '    local work_present=false',
     '    [ -n "$changed_files" ] && work_present=true',
     '    local diff_stat=""',
-    '    diff_stat=$(git diff --shortstat 2>/dev/null | sed \'s/^[[:space:]]*//\' | tr -d \'"\' || true)',
+    // born-667b: scoped to scope.filesWrite when provided — see buildScopedDiffPathspec.
+    diffStatLine,
     '    local hb_status="unknown"',
     '    local hb_seq=0',
     '    if [ -f "$HBFILE" ]; then',
@@ -1506,7 +1554,11 @@ export class DockerSpawnBackend implements SpawnBackend {
     // last-chance flush window + enriched EXIT_WITHOUT_RESULT marker (workPresent +
     // diffStat + last hb) for clean exit-0 without .result, while preserving the
     // TIMEOUT_WITH_WORK path. See buildOnExitTrap above.
-    const onExitFn = buildOnExitTrap(taskId, model);
+    // born-667b (RECON-DIFF, task 427-024): narrow the container's git-diff
+    // work-present signal to THIS task's own scope.filesWrite — see
+    // buildOnExitTrap's doc comment for why an unfiltered diff false-positives
+    // on concurrent sibling workers (TT550 phantom-vakası).
+    const onExitFn = buildOnExitTrap(taskId, model, this.readTaskFilesWrite(dir, taskId));
 
     // Sprint 151: .partial-result path — intermediate checkpoint for OOM kill recovery
     const partialResultPath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/task-${taskId}.partial-result`;
@@ -2114,6 +2166,30 @@ export class DockerSpawnBackend implements SpawnBackend {
       debugLog('docker-backend:auth-mode', `taskId=${taskId} failed to read authMode: ${(err as Error).message}`);
     }
     return undefined;
+  }
+
+  /**
+   * born-667b (RECON-DIFF, task 427-024): read `scope.filesWrite` from
+   * `task-<taskId>.json` for {@link buildOnExitTrap}'s scoped git-diff signal.
+   * Returns `[]` (never throws/blocks a spawn) when the task JSON is missing,
+   * unreadable, or malformed — mirrors {@link readTaskKind}/{@link readTaskAuthMode}'s
+   * graceful-degradation contract. An empty return is itself meaningful here:
+   * buildOnExitTrap treats "task JSON has no filesWrite entries" the same as
+   * "task JSON unreadable" — both produce an honest empty-intersection signal
+   * rather than silently reverting to the unscoped sprint-wide diff.
+   */
+  private readTaskFilesWrite(projectDir: string, taskId: string): string[] {
+    const taskJsonPath = join(projectDir, TASKS_DIR, `task-${taskId}.json`);
+    if (!existsSync(taskJsonPath)) return [];
+    try {
+      const raw = readFileSync(taskJsonPath, 'utf-8');
+      const parsed = JSON.parse(raw) as { scope?: { filesWrite?: unknown } };
+      const candidate = parsed.scope?.filesWrite;
+      return Array.isArray(candidate) ? candidate.filter((f): f is string => typeof f === 'string' && f.length > 0) : [];
+    } catch (err) {
+      debugLog('docker-backend:diff-scope', `taskId=${taskId} failed to parse task JSON: ${(err as Error).message}`);
+      return [];
+    }
   }
 
   /**

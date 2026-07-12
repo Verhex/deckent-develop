@@ -28,10 +28,10 @@
 // collaborators (prompt resolution, write-target computation) are passed in
 // via `SpawnTaskDeps` instead of imported.
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { Task, ResolvedConfig } from '../core/types.js';
+import type { Task, ResolvedConfig, TaskResult } from '../core/types.js';
 import { TaskStatus } from '../core/types.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { debugLog } from '../core/utils.js';
@@ -364,13 +364,22 @@ export async function executeSpawnTask(
 // same canonical executor SCHED3 already unified queue/idle/ready/respawn
 // onto), so "one decision, one executor" holds end-to-end.
 //
-// Scope (dilim-5 only, per the design doc's own 8-sprint table): SpawnTask +
-// KillWorker. CascadeSkip / Blocked / ClearBlocked / EmitMetric /
-// WriteCheckpoint are intentionally NOT executed here — those effects go live
-// in dilim-6 ("Cascade ve restore live") and dilim-7 ("FIFO safety/config
-// migration"). The pre-existing cascadeSkipDeadBlocked / DEPENDENCY_BLOCKED /
-// checkpoint mechanisms in result-collector.ts / sprint-spawner.ts keep
-// running unconditionally, independent of engine, so nothing regresses.
+// Scope (dilim-5, per the design doc's own 8-sprint table): SpawnTask +
+// KillWorker. Blocked / ClearBlocked / EmitMetric remain NOT executed here —
+// those stay dilim-7 ("FIFO safety/config migration") scope. The pre-existing
+// cascadeSkipDeadBlocked / DEPENDENCY_BLOCKED mechanisms in result-collector.ts
+// / sprint-spawner.ts keep running unconditionally, independent of engine, so
+// nothing regresses.
+//
+// CascadeSkip + WriteCheckpoint (SCHED6-EFF, task 427-008, dilim-6 "Cascade ve
+// restore live") ARE executed below — see their branches in
+// `executeSchedulerDecision` and the persist-before-commit contract on
+// `SchedulerDecisionExecutionDeps.writeCheckpoint`. Any caller still routing
+// through this executor without wiring `writeCheckpoint` (e.g. the current
+// scheduler-driver.ts:376 call site) simply gets a documented no-op for that
+// one effect kind — CascadeSkip has no such opt-out, since it needs no
+// injected collaborator beyond the taskMap/filesystem this module already
+// has.
 
 export interface SchedulerDecisionExecutionDeps extends SpawnTaskDeps {
   /** Live task lookup — a `SchedulerEffect` only carries a taskId. */
@@ -381,18 +390,98 @@ export interface SchedulerDecisionExecutionDeps extends SpawnTaskDeps {
   /** Abstracts `queueBackend.kill(id)` vs the tmux `killWorker(id)` fallback —
    *  caller-supplied so this module never imports tmux.js directly. */
   readonly killWorker: (taskId: string) => void;
+  /**
+   * WriteCheckpoint effect executor — caller-supplied so this leaf module never
+   * needs a full `Sprint`/`eventStreamOffset`/dependency-graph object (the shape
+   * `sprint-checkpoint.ts`'s `writeCheckpoint()` actually requires); the caller
+   * binds its own sprint state into a `(reason) => void` closure. Optional — a
+   * caller that hasn't wired a real checkpoint writer yet (no live call site
+   * does, as of SCHED6-EFF) gets a documented no-op for this one effect kind
+   * instead of a hard crash.
+   */
+  readonly writeCheckpoint?: (reason: string) => void;
 }
 
 export interface SchedulerDecisionExecutionResult {
   readonly spawnedTaskIds: string[];
   readonly killedWorkerIds: string[];
+  /** Task IDs actually committed (status flipped to NO_GO + persisted) THIS call —
+   *  excludes any CascadeSkip effect that was a pure replay no-op (see
+   *  `executeSchedulerDecision`'s persist-before-commit contract). */
+  readonly cascadeSkippedTaskIds: string[];
+  /** Count of WriteCheckpoint effects for which `deps.writeCheckpoint` was
+   *  actually invoked without throwing (0 when the dep is omitted). */
+  readonly checkpointsWritten: number;
+}
+
+function cascadeSkipResultPath(projectRoot: string, taskId: string): string {
+  return join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
 }
 
 /**
- * Execute a `SchedulerDecision`'s SpawnTask/KillWorker effects, IN ORDER,
- * through the canonical single executor (`executeSpawnTask`). Never throws —
- * a single effect's failure is logged and skipped so the rest of the tick's
- * effects still apply.
+ * Synthetic NO_GO result for a task the scheduler decided to skip because a
+ * dependency it needed already failed terminally — same shape/semantics as
+ * the legacy `cascadeSkipDeadBlocked` closure's result (result-collector.ts),
+ * notably `cascadeSkipped: true` (task-types.ts) which the fix/cross-fix
+ * gates (debt-manager.ts) MUST exempt from spawning follow-up work.
+ */
+function buildCascadeSkipResult(task: Task, failedDependencyId: string): TaskResult {
+  return {
+    taskId: task.id,
+    workerId: `w-${task.id}`,
+    filesChanged: [],
+    linesAdded: 0,
+    linesRemoved: 0,
+    testsPassed: false,
+    coverage: 0,
+    selfAssessment: 'NO_GO',
+    cascadeSkipped: true,
+    notes:
+      `Cascade-skipped (SCHED6-EFF persist-before-commit executor): dependency ${failedDependencyId} `
+      + 'ended NO_GO/MANUAL_REVIEW, so this dependent was never dispatched. Re-run after the '
+      + 'dependency is fixed.',
+    tokenUsage: {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      provider: task.provider,
+      model: task.forceModel ?? task.model,
+    },
+  };
+}
+
+/**
+ * The "persist" half of persist-before-commit: atomic tmp-write + rename (same
+ * atomic-write idiom as sprint-checkpoint.ts/evaluation-audit-trail.ts) so a
+ * crash mid-write never leaves a half-serialized `.result` file. Throws on
+ * failure — the caller must NOT advance task status/collected state when this
+ * throws (that in-spite-of-failure commit is the exact legacy bug, see the
+ * `.plan` file / design doc "Riskler" section for the persist-before-commit
+ * risk this executor closes).
+ */
+function persistCascadeSkipResultAtomic(projectRoot: string, result: TaskResult): void {
+  const filePath = cascadeSkipResultPath(projectRoot, result.taskId);
+  const tmpPath = `${filePath}.tmp`;
+  writeFileSync(tmpPath, JSON.stringify(result, null, 2), 'utf-8');
+  renameSync(tmpPath, filePath);
+}
+
+/**
+ * Execute a `SchedulerDecision`'s effects, IN ORDER, through the canonical
+ * single executor (`executeSpawnTask` for SpawnTask). Never throws — a single
+ * effect's failure is logged and skipped so the rest of the tick's effects
+ * still apply.
+ *
+ * CascadeSkip (SCHED6-EFF persist-before-commit contract): the synthetic
+ * `.result` is written to disk FIRST (atomically); task status/collected
+ * state is only "committed" (status → NO_GO, task json persisted, id added to
+ * `cascadeSkippedTaskIds`) AFTER that persist succeeds. If the `.result`
+ * already exists on disk (a replay of an already-applied — or
+ * crash-interrupted — decision), the persist step is skipped entirely so a
+ * duplicate skip is never written; the commit step still runs if-and-only-if
+ * `task.status` is still PENDING, which correctly finishes a commit that a
+ * prior crash interrupted between persist and commit, while being a total
+ * no-op once both halves have already landed.
  */
 export async function executeSchedulerDecision(
   decision: SchedulerDecision,
@@ -400,6 +489,8 @@ export async function executeSchedulerDecision(
 ): Promise<SchedulerDecisionExecutionResult> {
   const spawnedTaskIds: string[] = [];
   const killedWorkerIds: string[] = [];
+  const cascadeSkippedTaskIds: string[] = [];
+  let checkpointsWritten = 0;
 
   for (const effect of decision.orderedEffects) {
     if (effect.kind === 'KillWorker') {
@@ -409,7 +500,37 @@ export async function executeSchedulerDecision(
       killedWorkerIds.push(effect.taskId);
       continue;
     }
-    if (effect.kind !== 'SpawnTask') continue; // dilim-6/7 effects — see doc comment above
+    if (effect.kind === 'CascadeSkip') {
+      const task = deps.taskMap.get(effect.taskId);
+      if (!task) {
+        debugLog('executeSchedulerDecision:cascadeSkip:missingTask', `CascadeSkip effect for unknown task ${effect.taskId}`);
+        continue;
+      }
+      if (!existsSync(cascadeSkipResultPath(deps.projectRoot, task.id))) {
+        try {
+          persistCascadeSkipResultAtomic(deps.projectRoot, buildCascadeSkipResult(task, effect.failedDependencyId));
+        } catch (e) {
+          debugLog('executeSchedulerDecision:cascadeSkip:persist', `${effect.idempotencyKey}: ${String(e)}`);
+          continue; // persist failed — task stays PENDING, retryable next tick with the same key
+        }
+      }
+      if (task.status === TaskStatus.PENDING) {
+        task.status = TaskStatus.NO_GO;
+        persistTask(deps.projectRoot, task);
+        cascadeSkippedTaskIds.push(task.id);
+      }
+      continue;
+    }
+    if (effect.kind === 'WriteCheckpoint') {
+      try {
+        if (deps.writeCheckpoint) {
+          deps.writeCheckpoint(effect.reason);
+          checkpointsWritten++;
+        }
+      } catch (e) { debugLog('executeSchedulerDecision:writeCheckpoint', e); }
+      continue;
+    }
+    if (effect.kind !== 'SpawnTask') continue; // Blocked/ClearBlocked/EmitMetric — dilim-7 scope
 
     const task = deps.taskMap.get(effect.taskId);
     if (!task) {
@@ -431,5 +552,7 @@ export async function executeSchedulerDecision(
     }
   }
 
-  return { spawnedTaskIds, killedWorkerIds };
+  return {
+    spawnedTaskIds, killedWorkerIds, cascadeSkippedTaskIds, checkpointsWritten,
+  };
 }

@@ -21,6 +21,12 @@ import { writeSprintState, readSprintState } from './sprint-utils.js';
 // the sprint-411 scheduler-state helper (fix-aggregation-aware terminal-failure
 // set) instead of re-deriving the born-610 vocabulary locally.
 import { computeEffectiveDependencyState } from './scheduler-state.js';
+// SCHED6-CKPT (docs/analysis/scheduler-unify-design-2026-07-11.md, "Restore
+// trigger.kind='restore' ile aynı reducer'a girer") — cascade-skip on restore
+// now DECIDES through the same pure `reduceSchedulerTick` the live scheduler
+// uses (scheduler-reducer.ts), instead of a separately hand-rolled predicate.
+import { reduceSchedulerTick, toSchedulerTaskSnapshot } from './scheduler-reducer.js';
+import type { SchedulerSnapshot } from './scheduler-reducer.js';
 import type { SerializedDependencyGraph } from './dependency-scheduler.js';
 import {
   persistDependencyGraph,
@@ -745,49 +751,99 @@ function supplementLegacyCheckpointTaskIds(
 /**
  * Cascade-skip PENDING descendants of any terminal-failure task in the
  * (already fully reconstructed + stale-worker-classified) task list — the
- * restore-side counterpart of `cascadeSkipDeadBlocked`
- * (result-collector.ts), which never runs on the resume path because
- * `sprint-controller.ts` jumps straight past PLAN/SPAWN/EXECUTE to EVALUATE.
- * Reuses `computeEffectiveDependencyState` (scheduler-state.ts, sprint-411)
- * for the fix-aggregation-aware `terminalFailureIds` set — the born-610
- * single-truth vocabulary, not a locally reinvented predicate. Transitive:
- * a freshly-skipped task can itself unblock the next pass, mirroring
- * `cascadeSkipDeadBlocked`'s while-loop shape.
+ * restore-side counterpart of `cascadeSkipDeadBlocked` (result-collector.ts),
+ * which never runs on the resume path because `sprint-controller.ts` jumps
+ * straight past PLAN/SPAWN/EXECUTE to EVALUATE.
  *
- * Mutates `tasks` in place (status → NO_GO) and writes both the task.json
- * and a synthetic `cascadeSkipped:true` `.result` to disk — the same shape
- * `cascadeSkipDeadBlocked` writes, so the born-610 fix/xfix exemption
- * (debt-manager.ts) applies identically regardless of which path produced
- * the skip. No spawn call exists anywhere in this function or its caller —
- * "spawn sıfır" is structural here, not a flag to check.
+ * SCHED6-CKPT (docs/analysis/scheduler-unify-design-2026-07-11.md, "Restore
+ * trigger.kind='restore' ile aynı reducer'a girer"): the DECISION of which
+ * tasks to cascade-skip is now made by `reduceSchedulerTick` (scheduler-
+ * reducer.ts) — the exact same pure reducer the live scheduler uses — instead
+ * of a separately hand-rolled predicate, so the born-610 terminal-failure
+ * vocabulary and the transitive-closure logic can never drift between the two
+ * call sites again. `slotBudget: 0` + `completedTaskIds: []` make "spawn
+ * sıfır" a STRUCTURAL property of the resulting decision (the reducer's own
+ * spawn-selection code cannot mathematically emit a SpawnTask/KillWorker
+ * effect from this snapshot), not merely an omission in this function.
+ * `trigger.kind` stays `'watcher'` — `SchedulerTriggerKind` has no `'restore'`
+ * literal yet (widening it lives in scheduler-reducer.ts, outside this file's
+ * write scope); the reducer's own doc comment confirms its cascade-skip pass
+ * is not kind-gated, so this is a documented stand-in, not a semantic gap.
  *
- * @returns IDs of tasks cascade-skipped during this call.
+ * `reduceSchedulerTick`'s own internal cascade-skip pass already resolves the
+ * FULL transitive closure in one call (a freshly-decided skip is folded into
+ * its own `failedIds` set for the next inner pass) — no outer while-loop is
+ * needed here anymore.
+ *
+ * Effect application mirrors `executeSchedulerDecision`'s (scheduler-
+ * effects.ts, SCHED6-EFF) CascadeSkip branch inline: atomic tmp-write+rename
+ * persist of the synthetic `cascadeSkipped:true` NO_GO `TaskResult` FIRST,
+ * then commit (`status → NO_GO` + task.json persist) if-and-only-if the task
+ * is still PENDING. That executor is `async`; every caller of
+ * `restoreSprintFromCheckpoint` (sprint-controller.ts, resume.ts) invokes it
+ * synchronously, so it cannot be called directly here — this replays its
+ * persist-before-commit contract instead of duplicating a divergent one. This
+ * also fixes a latent gap in the previous restore-local implementation: it
+ * unconditionally skipped a PENDING task whose `.result` already existed
+ * (crash between a prior persist and its status commit), leaving that task
+ * PENDING forever; the commit-if-still-PENDING check below finishes that
+ * interrupted commit instead.
+ *
+ * @returns IDs of tasks cascade-skipped (committed to NO_GO) during this call.
  */
 function cascadeSkipPendingDescendants(
   projectRoot: string,
   tasks: Task[],
 ): string[] {
+  const nowMs = Date.now();
+  const taskById = new Map(tasks.map(t => [t.id, t]));
+
+  const snapshot: SchedulerSnapshot = {
+    trigger: { kind: 'watcher', sequence: 0 },
+    strategy: 'continuous',
+    nowMs,
+    costStop: false,
+    // Structural "spawn sıfır": zero slots means reduceSchedulerTick's own
+    // spawn-selection loops can never emit a SpawnTask effect from this
+    // snapshot, and an empty completedTaskIds means the legacy-fifo
+    // completion loop (the only source of KillWorker effects) never runs.
+    slotBudget: 0,
+    orderedQueue: [],
+    tasks: tasks.map(toSchedulerTaskSnapshot),
+    assignedTaskIds: new Set(),
+    // Restore has no live in-tick "already decided this tick" bookkeeping to
+    // protect against (that in-memory state is exactly what a crash lost) —
+    // the disk-existence check in the persist step below is the idempotency
+    // guard instead, and it correctly finishes an interrupted commit rather
+    // than excluding the task from being re-decided.
+    collectedIds: new Set(),
+    completedTaskIds: [],
+    dependencyPipelineEnabled: true,
+    effectiveDependencyState: computeEffectiveDependencyState(tasks, nowMs),
+    collisionBlockedIds: new Set(),
+  };
+
+  const decision = reduceSchedulerTick(snapshot);
   const skipped: string[] = [];
-  let changed = true;
-  while (changed) {
-    changed = false;
-    const state = computeEffectiveDependencyState(tasks, Date.now());
-    for (const t of tasks) {
-      if (t.status !== TaskStatus.PENDING) continue;
-      const failedDep = (t.dependencies ?? []).find(d => state.terminalFailureIds.has(d));
-      if (!failedDep) continue;
 
-      const resultPath = join(projectRoot, TASKS_DIR, `task-${t.id}.result`);
-      if (existsSync(resultPath)) continue; // idempotency guard — already collected elsewhere
+  for (const effect of decision.orderedEffects) {
+    if (effect.kind === 'SpawnTask' || effect.kind === 'KillWorker') {
+      // Structurally unreachable given slotBudget=0 / completedTaskIds=[]
+      // above — logged (never executed) so a future reducer change that
+      // breaks this invariant is visible instead of silently spawning.
+      debugLog(
+        'restoreSprintFromCheckpoint:cascadeSkip:unexpectedSpawnEffect',
+        `reducer emitted ${effect.kind} for ${effect.taskId} during restore — skipped, never executed`,
+      );
+      continue;
+    }
+    if (effect.kind !== 'CascadeSkip') continue; // Blocked/ClearBlocked/EmitMetric/WriteCheckpoint — no-ops on restore
 
-      t.status = TaskStatus.NO_GO;
-      const taskPath = join(projectRoot, TASKS_DIR, `task-${t.id}.json`);
-      try {
-        writeFileSync(taskPath, JSON.stringify(t, null, 2), 'utf-8');
-      } catch (e) {
-        debugLog('restoreSprintFromCheckpoint:cascadeSkip:writeTask', e);
-      }
+    const t = taskById.get(effect.taskId);
+    if (!t) continue; // defensive — every effect taskId originates from `tasks` itself
 
+    const resultPath = join(projectRoot, TASKS_DIR, `task-${t.id}.result`);
+    if (!existsSync(resultPath)) {
       const skip: TaskResult = {
         taskId: t.id,
         workerId: `w-${t.id}`,
@@ -799,9 +855,10 @@ function cascadeSkipPendingDescendants(
         selfAssessment: 'NO_GO',
         cascadeSkipped: true, // born-610: fix/xfix kapilari bunu MUAF tutar
         notes:
-          `Cascade-skipped on checkpoint restore (SCHED2 checkpoint-v2, dilim-2): dependency ` +
-          `${failedDep} ended NO_GO/MANUAL_REVIEW_REQUIRED, so this dependent was never ` +
-          `(re-)dispatched. Re-run after the dependency is fixed.`,
+          `Cascade-skipped on checkpoint restore (SCHED6-CKPT reducer-parity — decided by the ` +
+          `same reduceSchedulerTick pass the live scheduler uses): dependency ` +
+          `${effect.failedDependencyId} ended NO_GO/MANUAL_REVIEW_REQUIRED, so this dependent was ` +
+          `never (re-)dispatched. Re-run after the dependency is fixed.`,
         tokenUsage: {
           inputTokens: 0,
           outputTokens: 0,
@@ -811,16 +868,31 @@ function cascadeSkipPendingDescendants(
         },
       };
       try {
-        writeFileSync(resultPath, JSON.stringify(skip, null, 2), 'utf-8');
+        const tmpPath = `${resultPath}.tmp`;
+        writeFileSync(tmpPath, JSON.stringify(skip, null, 2), 'utf-8');
+        renameSync(tmpPath, resultPath);
       } catch (e) {
-        debugLog('restoreSprintFromCheckpoint:cascadeSkip:writeResult', e);
+        debugLog('restoreSprintFromCheckpoint:cascadeSkip:persist', `${effect.idempotencyKey}: ${String(e)}`);
+        continue; // persist failed — task stays PENDING, retried next restore with the same idempotencyKey
       }
+    }
 
+    if (t.status === TaskStatus.PENDING) {
+      t.status = TaskStatus.NO_GO;
+      const taskPath = join(projectRoot, TASKS_DIR, `task-${t.id}.json`);
+      try {
+        writeFileSync(taskPath, JSON.stringify(t, null, 2), 'utf-8');
+      } catch (e) {
+        debugLog('restoreSprintFromCheckpoint:cascadeSkip:writeTask', e);
+      }
       skipped.push(t.id);
-      changed = true;
-      debugLog('restoreSprintFromCheckpoint:cascadeSkip', `task ${t.id} skipped on restore (dep ${failedDep} failed)`);
+      debugLog(
+        'restoreSprintFromCheckpoint:cascadeSkip',
+        `task ${t.id} skipped on restore (dep ${effect.failedDependencyId} failed, idempotencyKey=${effect.idempotencyKey})`,
+      );
     }
   }
+
   return skipped;
 }
 

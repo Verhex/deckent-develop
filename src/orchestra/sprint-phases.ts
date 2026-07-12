@@ -11,6 +11,7 @@
 // ─── Node Builtins ─────────────────────────────────────────────────
 import {
   readFileSync, writeFileSync, existsSync, readdirSync, statSync, unlinkSync,
+  mkdirSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -56,12 +57,15 @@ import {
   type ProviderFailureInput,
 } from '../core/provider-failure-classifier.js';
 
+// ─── Pre-Start Guards (born-672a GUARD-EXTRACT) — safe circular, see NOTE
+// at the top of pre-start-guards.ts (deferred function-body-only usage) ──
+import { runPreStartGuards } from './pre-start-guards.js';
+
 // ─── Rollback ─────────────────────────────────────────────────────
 import type { SafetyPoint } from './rollback.js';
 import {
-  createSafetyPoint, rollback, getRollbackPolicy,
-  recordRollbackInDebt, saveSafetyPoint, deleteSafetyPoint,
-  isGitRepo, cleanOrphanSafetyPoint,
+  rollback, getRollbackPolicy,
+  recordRollbackInDebt, deleteSafetyPoint,
 } from './rollback.js';
 
 // ─── Partial Promotion (PROMOTE-W1b) ─────────────────────────────
@@ -71,11 +75,11 @@ import { revertFilesToHead } from '../agents/worker-rollback.js';
 // ─── Plugin Hooks ─────────────────────────────────────────────────
 import {
   runHooks, runCiRegressionCheck, resolveCiGuardianConfig,
-  runPreSprintValidation, parseTscErrorFiles,
+  parseTscErrorFiles,
 } from '../core/plugin-hooks.js';
 import type {
-  BeforeSprintContext, AfterTaskContext,
-  CiRegressionCheckResult, CiValidationResult,
+  AfterTaskContext,
+  CiRegressionCheckResult,
 } from '../core/plugin-hooks.js';
 
 // ─── Auditor ──────────────────────────────────────────────────────
@@ -168,6 +172,10 @@ import { writeEvent, getCurrentSprintId, readEvents, SCOPE_INSUFFICIENT_CHANNEL 
 import { verifyProofOfFunction } from './proof-of-function.js';
 import { checkWorkerLiveness } from './worker-liveness.js';
 import type { FailureContext } from './result-evaluator.js';
+
+// ─── Tool Inventory Probe (born-670a WIRE-PROBE) ──────────────────
+import { probeToolInventory, formatToolInventory } from './worker-verify-tool.js';
+import type { ToolInventory } from './worker-verify-tool.js';
 
 // ─── Disk-Verify Gate (Sprint 199 199-001 — Synthetic NO_GO Kaynak 6) ──
 // Mirrors the pattern at result-collector.ts:513-583 (Sprint 195 195-001).
@@ -838,6 +846,81 @@ export function checkBuildStaleness(
 }
 
 
+// ═══ Tool Inventory Probe (born-670a WIRE-PROBE) ═══════════════════
+//
+// probeToolInventory (worker-verify-tool.ts, TT555 waste-class d) probes the
+// host's PATH for a fixed tool whitelist. This wire runs it ONCE at sprint
+// start (inside runPlanPhase, below) and persists the formatted one-line
+// result to disk so prompt-god-template's buildEnvProbeBlock
+// (SprintContext.toolInventory) can render real per-host data instead of
+// staying permanently empty (its state before born-670a).
+//
+// File-based hand-off, mirroring baseline-tracker.ts's writeBaseline/
+// readBaseline pair (WP-14's `preExistingFailures`): the per-task prompt is
+// compiled by a different caller (task-builder.ts buildWorkerPrompt) than
+// the one that probes (this PLAN phase, which runs once per sprint, not
+// once per task) — a disk file is the hand-off, not in-memory threading.
+//
+// Fail-soft by contract (born-670a goCriteria): a probe error must never
+// abort sprint start. probeToolInventory's own defaultToolExists already
+// resolves false on a spawn error rather than throwing, but the wrapper
+// below catches defensively too — no file is written on error, so
+// readToolInventory() returns undefined and buildEnvProbeBlock renders ''
+// exactly like today.
+
+/** Resolve the per-sprint tool-inventory file path. */
+export function toolInventoryPath(projectRoot: string, sprintId: string): string {
+  return join(projectRoot, DECKENT_DIR, `${sprintId}-tool-inventory.txt`);
+}
+
+/** Persist an already-formatted one-line inventory (e.g. `python3=yes docker=no rg=yes`) to disk. */
+export function writeToolInventory(projectRoot: string, sprintId: string, inventoryLine: string): void {
+  const dir = join(projectRoot, DECKENT_DIR);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  writeFileSync(toolInventoryPath(projectRoot, sprintId), inventoryLine, 'utf-8');
+}
+
+/**
+ * Read back the one-line inventory a prior {@link writeToolInventory} call
+ * persisted for this sprint. Returns undefined when absent/blank (no probe
+ * ran this sprint, or it failed) — a caller (e.g. task-builder.ts
+ * buildWorkerPrompt, in a later wire) passes this straight through to
+ * SprintContext.toolInventory; undefined there means buildEnvProbeBlock
+ * renders '' exactly like today.
+ */
+export function readToolInventory(projectRoot: string, sprintId: string): string | undefined {
+  const filePath = toolInventoryPath(projectRoot, sprintId);
+  if (!existsSync(filePath)) return undefined;
+  try {
+    const raw = readFileSync(filePath, 'utf-8').trim();
+    return raw.length > 0 ? raw : undefined;
+  } catch (e) {
+    debugLog('readToolInventory', e);
+    return undefined;
+  }
+}
+
+/**
+ * Probe the host once and persist the formatted inventory for this sprint.
+ * Fail-soft: any error (probe rejection, disk I/O) is swallowed — never
+ * throws, never leaves a partial/corrupt file. `probe` is injectable so
+ * callers (and tests) can supply a fixed inventory instead of hitting the
+ * real PATH — defaults to the real {@link probeToolInventory}.
+ */
+export async function probeAndPersistToolInventory(
+  projectRoot: string,
+  sprintId: string,
+  probe: () => Promise<ToolInventory> = () => probeToolInventory(),
+): Promise<void> {
+  try {
+    const inventory = await probe();
+    writeToolInventory(projectRoot, sprintId, formatToolInventory(inventory));
+  } catch (e) {
+    debugLog('probeAndPersistToolInventory', e);
+  }
+}
+
+
 // ═══ Phase Result Types ═══════════════════════════════════════════
 
 export interface PlanPhaseResult {
@@ -881,15 +964,14 @@ export async function runPlanPhase(
     // the moment planning starts. Fail-soft: never throws.
     persistPhaseTransition(projectRoot, sprint, SprintPhase.PLAN, SprintStatus.PLANNING);
 
-    // Sprint 156 Task 008: Pre-flight build-staleness check. Compares
-    // dist/orchestra/sprint-phases.js mtime against the previous sprint's
-    // .deckent/sprint-state.json mtime. If dist is newer, emits
-    // SPRINT→USER:BUILD_STALE_WARNING so the user can re-validate. Runs
-    // BEFORE writeSprintState (in runSpawnPhase) so the read reflects the
-    // previous sprint's state, not the in-flight one. Fail-safe — never
-    // throws.
-    try { checkBuildStaleness(projectRoot, sprint.id); }
-    catch (e) { debugLog('runPlanPhase:checkBuildStaleness', e); }
+    // born-670a WIRE-PROBE: probe the host's tool inventory ONCE at sprint
+    // start (see the Tool Inventory Probe section above) so the worker
+    // prompt's env-probe block can render real data. Fail-soft — double-
+    // wrapped per this phase's established defense-in-depth convention
+    // (every other side-effecting step below is independently guarded too).
+    try {
+      await probeAndPersistToolInventory(projectRoot, sprint.id);
+    } catch (e) { debugLog('runPlanPhase:toolInventory', e); }
 
     // Show Kraken splash on first sprint start (non-fatal)
     if (sprint.number === 1) {
@@ -899,60 +981,12 @@ export async function runPlanPhase(
       } catch (e) { debugLog('runPlanPhase:showSplash', e); }
     }
 
-    // Run pre-sprint CI validation — keeps the fast tsc gate; the SLOW full
-    // pre-sprint vitest is skipped unless `pre_sprint_tests` is opted in (Sprint
-    // 255: the full suite blocking SPAWN was the main sprint-start latency).
-    const ciResult: CiValidationResult = runPreSprintValidation(
-      projectRoot,
-      sprint.id,
-      config.pre_sprint_tests ? undefined : { track_test_count: false },
-    );
-    if (!ciResult.passed) {
-      throw new BrainError(
-        ciResult.blockedReason ?? 'CI validation failed — sprint blocked',
-        SprintPhase.PLAN,
-      );
-    }
-
-    // Run beforeSprint hooks after planning (non-fatal)
-    try {
-      const ctx: BeforeSprintContext = {
-        hook: 'beforeSprint',
-        sprintId: sprint.id,
-        tasks: sprint.tasks,
-        config,
-        projectRoot,
-      };
-      await runHooks('beforeSprint', ctx);
-    } catch (e) { debugLog('runPlanPhase:beforeSprintHook', e); }
-
-    // Create git safety point after planning but before workers spawn
-    let safetyPoint: SafetyPoint | null = null;
-    if (rollbackEnabled) {
-      // Pre-check: clean up orphan safety points from previous sprints
-      try {
-        cleanOrphanSafetyPoint(projectRoot, sprint.id);
-      } catch (e) { debugLog('runPlanPhase:cleanOrphanSafetyPoint', e); }
-
-      // Pre-check: verify git repo exists
-      if (!isGitRepo(projectRoot)) {
-        const msg = 'Rollback disabled: not a git repository. Run `git init` or set rollback_policy to "never".';
-        debugLog('runPlanPhase:noGitRepo', msg);
-        // Visible warning — do not silently disable
-        console.warn(`[rollback] ${msg}`);
-      } else {
-        try {
-          safetyPoint = createSafetyPoint(projectRoot, sprint.id);
-          saveSafetyPoint(projectRoot, safetyPoint);
-        } catch (e) {
-          // Stash pop failure (DECKENT_E057) is critical — propagate to abort sprint
-          if (e instanceof Error && e.message.includes('Stash pop failed')) {
-            throw e;
-          }
-          debugLog('runPlanPhase:createSafetyPoint', e);
-        }
-      }
-    }
+    // born-672a GUARD-EXTRACT: build-staleness pre-flight, pre-spawn CI/tsc
+    // gate, beforeSprint hooks, and the git rollback safety point — bundled
+    // into pre-start-guards.ts (born-672b will run the same sequence from
+    // the exact-snapshot start path). Order/fail-soft-vs-hard semantics are
+    // bit-exact with the pre-extraction inline blocks.
+    const { safetyPoint } = await runPreStartGuards(projectRoot, sprint, config, rollbackEnabled);
 
     return { sprint, safetyPoint };
   } catch (err) {

@@ -10433,3 +10433,48 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 426-003: SCHED5 — continuous live-switch: initial+watcher tek injected driver (engine-config'li) (DONE)
 
 ---
+## Sprint 427 — sprint-427
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-12
+**Duration:** 3311s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 24 |
+| Completed | 24 |
+| Tech Debt | 4 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 3310989ms |
+
+### Tasks
+
+- 427-001: TERM5-FIN — sprint-finalizer rich completion-record (flowId'li) (DONE)
+- 427-002: TERM5-FEED — run-state-feed flowId-korelasyonu (DONE)
+- 427-003: TERM5-WATCH — run-completion-watch korelasyon (yanlış-eşleşme ölür) (DONE)
+- 427-004: TERM5-QUEUE — chat-turn-queue correlated result-turn (idle-wake) (DONE)
+- 427-005: TERM5-CTRL — controller terminal-state reduce (correlated event'ten) (DONE)
+- 427-006: TERM5-UI — REPL result-turn render + i18n (DONE)
+- 427-007: SCHED6-RED — reducer cascade/restore kararları (DONE)
+- 427-008: SCHED6-EFF — CascadeSkip/WriteCheckpoint executor (persist-before-commit) (DONE)
+- 427-009: SCHED6-CKPT — checkpoint restore reducer-parity (MRR korunur) (DONE)
+- 427-010: SCHED6-COMP — cascade composition-testi + debt tek-yol (DONE)
+- 427-011: WIRE-PROBE — sprint-start env-probe doldurma (born-670a) (GO_WITH_TECH_DEBT)
+- 427-012: WIRE-VERIFY — worker-prompt verify-komut dürüstlüğü (born-670b) (GO_WITH_TECH_DEBT)
+- 427-013: ALLOW-CORE — task-bazlı tool-allowlist çekirdeği (559) (DONE)
+- 427-014: ALLOW-WIRE — allowlist'in prompt/yüzeye flag'li uygulanması (559) (GO_WITH_TECH_DEBT)
+- 427-015: TRSEG-WRITE — sprint-partitioned trace-segment + manifest (557) (DONE)
+- 427-016: TRSEG-RETAIN — retention/compaction + eski-okuyucu (557) (DONE)
+- 427-017: REDACT-SK — sk-ant- uzunluk-bağımsız redaction (558) (DONE)
+- 427-018: GUARD-EXTRACT — pre-start guard bloğu ayrıştırma (born-672a) (DONE)
+- 427-019: GUARD-WIRE — snapshot-start yoluna guard'lar (born-672b) (DONE)
+- 427-020: STORE-CORE — run-flow-store'un core'a taşınması (born-671) (GO_WITH_TECH_DEBT)
+- 427-021: E2E-CLI — start snapshot-dalı CLI e2e testi (born-673a) (DONE)
+- 427-022: E2E-MCP — start snapshot-dalı MCP e2e testi (born-673b) (DONE)
+- 427-023: TIMEOUT-TIER — model-tier-duyarlı timeout tabanı (born-667a, P0) (DONE)
+- 427-024: RECON-DIFF — timeout-placeholder task-scope-diff sinyali (born-667b, P0) (DONE)
+
+---

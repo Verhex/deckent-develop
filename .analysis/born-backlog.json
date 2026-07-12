@@ -2943,11 +2943,12 @@
   "born_id": 667,
   "title": "opus-worker timeout ×2 (416-002 orijinal+fix): worker-timeout suresi model-tier'a duyarsiz — uzun-dusunen opus killed, sentetik-placeholder Brain'i yaniltti",
   "priority": "P0",
-  "status": "OPEN",
+  "status": "DONE",
   "source": "sprint-416 canli-vaka (2026-07-12)",
   "spec": "416-002 (forensik-agir TT550) iki denemede de 'Worker timeout/killed (exitCode=1)' placeholder'iyla oldu; git-diff-sayisi (14/18) baska worker'larin es-zamanli diff'iydi (yaniltici sinyal) — Brain 'Spurious NO_GO reconcile' yoluyla GO_WITH_TECH_DEBT verdi ve sprint 6/6-DONE raporladi; CC disk-verify gercegi yakaladi (result-collector degismemis). IKI is: (1) worker-timeout model-tier/effort-duyarli olsun (opus-high forensik task'a sonnet-tier sure dar) ya da task-timeout DIRECTIVES'ten ayarlanabilir; (2) reconcile-helper'in 'git diff N files' sinyali SPRINT-GENELI diff'e degil task-scope-diff'ine bakmali (yanlis-pozitif kaynak). Iliskili: feedback_docker_oom_false_no_go + feedback_brain_synthetic_nogo_disk_verify. || KISMI-EL-FIX 2026-07-12: dogfood heartbeat_timeout 120→600s (CC) — kok tam-fix'i TT553-adopt (host-liveness) + timeout model-tier-duyarliligi acik. || 600s BILE ilk-deneme-opus'a yetmedi (420-001; fix-worker taze-context'le bitirdi) — timeout tam-fix'i (model-tier-duyarli + task-timeout DIRECTIVES-ayari) hala ACIK, oncelik P1 kaliyor. || GERCEK-FREN TESHISI 2026-07-12 (3.kurban TT556/422-002): kill-eden heartbeat DEGIL adaptive-timeout effort_base.high=2400s (40dk) — opus-forensik ~1 saatte kesiliyor; CC el-fix: dogfood effort_base high 2400→5400 / normal 1200→1800. KALICI kod-fix (model-tier-duyarli taban: opus-high icin carpan) HALA ACIK — P0.",
   "verify": "opus-task uzun-kosuda timeout'suz tamamlanir; reconcile yalniz task-scope-diff'iyle tetiklenir",
-  "wire_on": "sprint"
+  "wire_on": "sprint",
+  "resolution": "DONE sprint-427 (427-023/024): model_multiplier config (geriye-uyumlu) + placeholder task-scope-diff sinyali (phantom-fix kaynagi olduruldu)"
  },
  {
   "born_id": 668,
@@ -2973,36 +2974,49 @@
   "born_id": 670,
   "title": "TT555-WIRE: verify_task + env-probe INSA edildi ama worker-yuzeyine WIRE EDILMEDI (0 cagiran; prompt metni 'call verify_task' diyor, tool yuzeyde yok)",
   "priority": "P1",
-  "status": "OPEN",
+  "status": "DONE",
   "source": "CC spawnSync-fix taramasi (2026-07-12): worker-verify-tool.ts fonksiyonlarinin tek tuketicisi worker.ts re-export'u; ctx.toolInventory hicbir spawn-yolunda doldurulmuyor (buildEnvProbeBlock hep bos); prompt-god-template.ts:252 worker'a verify_task cagirmasini soyluyor",
   "spec": "555'in turn-azaltma makinesi uyuyor — cache-18M/turn-maliyet hedefi icin etkisiz. Is: (a) sprint-start'ta probeToolInventory kos + SprintContext.toolInventory doldur (prompt env-probe blogu canlansin); (b) verify_task'i worker'in GERCEK tool-yuzeyine kaydet (hangi bridge: docker/tmux/subprocess worker'lari claude-CLI — MCP-config ya da WORKER-GUIDE komut-sozlesmesi; yuzey yoksa prompt'taki 'call verify_task' ibaresini gercekci alternatife cevir — yalanci-prompt birakma); (c) wiring-kaniti: gercek sprint trace'inde verify_task/env-probe kullanimi gorunur OLMALI (proof-of-function); (d) 559 tool-allowlist ile birlikte tasarlanabilir.",
-  "date": "2026-07-12"
+  "date": "2026-07-12",
+  "resolution": "DONE-KISMI sprint-427 (427-011/012 GO_W_DEBT): probe persist + yalanci-prompt oldu; ctx-doldurma born-674'e"
  },
  {
   "born_id": 671,
   "title": "ADR-D-004 C3 gerilimi: mcp/tools/start.ts -> cli/repl/run-flow-store.js importu (426-001 durust-bayrak) — store'un evi + ADR ratify",
   "priority": "P2",
-  "status": "OPEN",
+  "status": "DONE",
   "source": "sprint-426 426-001 worker-notu (2026-07-12)",
   "spec": "run-flow-store.ts cli/repl'de oturuyor ama mcp+cli+controller tuketiyor -> dogru ev core/ (run-flow-contract zaten core'da). Is: dosya-tasima + import-guncelleme + run-flow-reducer.test KNOWN_CONSUMERS pin-guncelleme + ADR-D-004'e mcp->cli edge karari (nervous-edit.ts emsali de ayni sinifta — ikisini birlikte cozumle: ya paylasilan-katmana tasima ya ADR-istisna-notu).",
-  "date": "2026-07-12"
+  "date": "2026-07-12",
+  "resolution": "DONE sprint-427 (427-020): store core'a tasindi, mcp->cli importu sifir, pinler guncel"
  },
  {
   "born_id": 672,
   "title": "RunFlow flag-on start-yolu runPlanPhase yan-etkilerini atliyor: safety-point (git rollback dali) + pre-spawn CI/tsc gate + checkBuildStaleness + beforeSprint hooks YOK",
   "priority": "P1",
-  "status": "OPEN",
+  "status": "DONE",
   "source": "sprint-426 426-001 worker-notu (dürüst debt, 2026-07-12)",
   "spec": "Kasitli sonuc ('yeni plan-fazi cagrilmaz') ama flag-on yolda GERCEK guvenlik-gerilemesi. Is: bu dort yan-etkiyi plan-fazindan ayristirip snapshot-start yolunda da kosulan ortak pre-start guard blogu yap (safety-point + gate + staleness + hooks); flag-off yol bit-es kalir; TERM dilim-6 cutover ONCESI sart.",
-  "date": "2026-07-12"
+  "date": "2026-07-12",
+  "resolution": "DONE sprint-427 (427-018/019): pre-start-guards modulu + snapshot-start dalinda dort-guard"
  },
  {
   "born_id": 673,
   "title": "start snapshot-dali e2e integration-testi yok: cli/commands/start.ts + mcp/tools/start.ts yeni dallari yalniz run-job-service katmaninda unit-testli",
   "priority": "P2",
-  "status": "OPEN",
+  "status": "DONE",
   "source": "sprint-426 426-001 debt-kalemi (2026-07-12)",
   "spec": "runSprint action-handler seviyesinde mock'lanarak iki giris-noktasinin (CLI + MCP) flag-on/flag-off dallari e2e test edilsin; 'flag-acikken fresh-replan olmaz' kaniti servis-katmani otesine tasinsin.",
+  "date": "2026-07-12",
+  "resolution": "DONE sprint-427 (427-021/022): CLI+MCP snapshot-dali e2e"
+ },
+ {
+  "born_id": 674,
+  "title": "WIRE-FINISH: uc prompt-bloguna ctx-doldurma — spawn-yolu SprintContext'e toolInventory (readToolInventory) + verifyCommands + toolAllowlist gecirmiyor; tools.allowlist_enabled flag'i yok",
+  "priority": "P1",
+  "status": "OPEN",
+  "source": "sprint-427 427-011/012/014 GO_W_DEBT ucgeni (2026-07-12)",
+  "spec": "427'nin uc yarim-wire'inin tek kapanis noktasi: (a) worker-prompt build cagrisinda (sprint-phases/spawn-yolu) SprintContext.toolInventory=readToolInventory(...) + verifyCommands=resolveVerifyCommands(...) + toolAllowlist=computeToolAllowlist(...) doldurulur; (b) config'e tools.allowlist_enabled (default OFF) eklenir ve 427-014 blogu ona baglanir; (c) PROOF: gercek sprint'te worker-prompt'ta env-probe/VERIFY-STEPS/allowlist bloklarinin gercek-veriyle render'i trace'ten kanitlanir (proof-of-function); (d) etki-olcumu: sonraki 2-3 sprint num_turns ortalamasi 529-K1 kiyasina eklenir.",
   "date": "2026-07-12"
  }
 ]

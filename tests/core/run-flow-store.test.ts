@@ -1,4 +1,5 @@
-// ═══ run-flow-store.test — TERM-FLOW-UNIFY Sprint-4 dilim (426-001) ════════
+// ═══ run-flow-store.test — TERM-FLOW-UNIFY Sprint-4 dilim (426-001), moved
+// to tests/core/ alongside its source (born-671, sprint-427 task 427-020) ═══
 //
 // Hermetic — every fixture lives under os.tmpdir() (CUSTOM Test Hermeticity
 // rule: no gitignored local state, no writes to the project root/HOME).
@@ -18,7 +19,7 @@ import {
   loadRunHandle,
   type StoredApprovedSnapshot,
   type StoredRunHandleRecord,
-} from '../../src/cli/repl/run-flow-store.js';
+} from '../../src/core/run-flow-store.js';
 import type { Sprint } from '../../src/core/types.js';
 import { SprintPhase, SprintStatus } from '../../src/core/sprint-types.js';
 

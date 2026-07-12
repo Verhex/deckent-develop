@@ -46,6 +46,11 @@ export interface RunCompletionInfo {
   readonly techDebt?: number;
   readonly noGo?: number;
   readonly error?: string;
+  /** Run-flow correlation id (TERM5-WATCH, sprint-427 task 3) — mirrors
+   *  run-state-feed.ts's `CorrelatedCompletionEvent.flowId`. Populated from
+   *  `completionRecord.flowId` when present on disk (427-001's additive
+   *  field); `undefined` for every legacy job record. */
+  readonly flowId?: string;
 }
 
 export interface RunCompletionWatchHandlers {
@@ -67,6 +72,15 @@ export interface RunCompletionWatchOptions {
   watch?: RunCompletionWatchFsWatcher;
   /** Injectable one-shot directory scan (tests). Default: real fs read of `jobsDir`. */
   scan?: (dir: string) => RunCompletionInfo[];
+  /**
+   * Run-flow correlation id to filter against (TERM5-WATCH, sprint-427 task
+   * 3 — mirrors run-state-feed.ts's `StateFeedOptions.flowId`). When set,
+   * `onComplete` fires only for a record whose `flowId` matches; a record
+   * with no `flowId` (every legacy job) never matches. When omitted
+   * (every caller today), the watcher is unfiltered — byte-identical to the
+   * pre-427-003 behavior of firing for any terminal job project-wide.
+   */
+  flowId?: string;
 }
 
 export interface RunCompletionWatchHandle {
@@ -93,6 +107,13 @@ interface RawJobRecord {
     done?: unknown;
     techDebt?: unknown;
     noGo?: unknown;
+  };
+  /** Additive field (427-001, TERM5-FIN). Only `flowId` is read here — the
+   *  same tolerant "local, permissive shape" precedent run-state-feed.ts's
+   *  own `RawCompletionRecord` follows, not an import of the writer's type
+   *  (ADR-D-004 C2/C3). */
+  completionRecord?: {
+    flowId?: unknown;
   };
 }
 
@@ -138,6 +159,7 @@ export function parseRunCompletionRecord(raw: string, fallbackJobId: string): Ru
     techDebt: numberOrUndefined(metrics?.techDebt),
     noGo: numberOrUndefined(metrics?.noGo),
     error: firstNonEmptyString(job.error),
+    flowId: firstNonEmptyString(job.completionRecord?.flowId),
   };
 }
 
@@ -194,6 +216,10 @@ export function createRunCompletionWatch(
 ): RunCompletionWatchHandle {
   const scan = opts.scan ?? defaultScan;
   const pollIntervalMs = opts.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+  // TERM5-WATCH (sprint-427 task 3): opt-in flowId filter — `undefined` when
+  // the caller doesn't supply one, which keeps the guard below always-false
+  // and the scan loop byte-identical to the pre-427-003 unfiltered behavior.
+  const watchFlowId = opts.flowId;
 
   const fired = new Set<string>();
   let disposed = false;
@@ -209,6 +235,10 @@ export function createRunCompletionWatch(
     }
 
     for (const record of records) {
+      // Multi-session false-match guard: a record with no flowId (every
+      // legacy job) never matches a supplied filter — mirrors
+      // run-state-feed.ts's "legacy job record ... never matches" invariant.
+      if (watchFlowId !== undefined && record.flowId !== watchFlowId) continue;
       if (fired.has(record.jobId)) continue;
       fired.add(record.jobId);
       if (isBaseline) continue; // seed dedup only — never notify for pre-existing history

@@ -25,7 +25,22 @@ import type { EffectiveDependencyState } from './scheduler-state.js';
 
 // ─── Snapshot (input) ────────────────────────────────────────────────────
 
-/** Where in the live tick sequence this snapshot was captured. */
+/**
+ * Where in the live tick sequence this snapshot was captured. The design doc
+ * (Sprint-6 dilimi) names a THIRD kind, `'restore'`
+ * ("Restore trigger.kind='restore' ile aynı reducer'a girer") for the
+ * checkpoint-restore entry point — deliberately NOT added to this union yet:
+ * `scheduler-journal.ts`'s `SchedulerShadowRecord.trigger` (out of this
+ * task's scope.filesWrite) is narrowly typed `'initial' | 'watcher'` and
+ * would need to widen in lockstep, so introducing the literal is left to
+ * SCHED6-CKPT (the task that actually wires a restore call site) to do
+ * atomically with that journal-type update. This reducer does not need the
+ * literal to satisfy a restore trigger correctly regardless — the cascade-skip
+ * pass below is intentionally NOT kind-gated (see its doc comment): any
+ * snapshot captured post-restore, whatever `trigger.kind` it is labeled with,
+ * is decided by the exact same already-terminal/already-collected exclusion
+ * that makes every other tick idempotent.
+ */
 export type SchedulerTriggerKind = 'initial' | 'watcher';
 
 export interface SchedulerTrigger {
@@ -85,7 +100,24 @@ export interface SchedulerSnapshot {
 export type SchedulerEffect =
   | { readonly kind: 'SpawnTask'; readonly taskId: string; readonly reason: 'queue-drain' | 'pending-slot-fill' }
   | { readonly kind: 'KillWorker'; readonly taskId: string; readonly reason: 'legacy-fifo-replace' }
-  | { readonly kind: 'CascadeSkip'; readonly taskId: string; readonly failedDependencyId: string }
+  | {
+      readonly kind: 'CascadeSkip';
+      readonly taskId: string;
+      readonly failedDependencyId: string;
+      /**
+       * Deterministic — derived ONLY from `taskId` + `failedDependencyId`,
+       * never from `snapshot.trigger.sequence`/`nowMs`. The design doc's
+       * "Riskler" persist-before-commit gap requires the eventual executor
+       * (SCHED6-EFF) to be able to recognize "this exact cascade-skip
+       * decision was already durably applied" across a crash/replay/restore
+       * boundary — recomputing the same (taskId, failedDependencyId) pair
+       * MUST always yield this same key, so a re-decided tick (e.g. a
+       * restore-trigger snapshot where the persist step never completed)
+       * stays idempotent at the executor layer, not just at this reducer's
+       * own already-terminal/already-collected exclusion below.
+       */
+      readonly idempotencyKey: string;
+    }
   | {
       readonly kind: 'Blocked';
       readonly taskId: string;
@@ -147,7 +179,16 @@ export function reduceSchedulerTick(snapshot: SchedulerSnapshot): SchedulerDecis
 
   // ─── Cascade-skip pass — mirrors cascadeSkipDeadBlocked, runs regardless of
   // costStop (the live main loop calls it unconditionally, even under a
-  // tripped cost guard).
+  // tripped cost guard) AND regardless of trigger.kind — including 'restore'.
+  // Idempotent-by-construction, not by a kind check: `collectedIds.has(t.id)`
+  // excludes a task whose cascade-skip result was already durably written
+  // (the common restore case — the crash happened AFTER persist), and
+  // `t.status !== TaskStatus.PENDING` excludes one whose status was already
+  // flipped terminal by a prior tick's executor. A task that is STILL PENDING
+  // and uncollected on a restore snapshot (the crash happened BEFORE persist
+  // completed — the design doc's persist-before-commit risk) is correctly
+  // RE-decided here, with the same deterministic `idempotencyKey` it would
+  // have received pre-crash, so the executor layer can recognize a retry.
   const failedIds = new Set<string>(snapshot.effectiveDependencyState.terminalFailureIds);
   const cascadeSkippedIds = new Set<string>();
   let changed = true;
@@ -159,7 +200,12 @@ export function reduceSchedulerTick(snapshot: SchedulerSnapshot): SchedulerDecis
       if (snapshot.assignedTaskIds.has(t.id)) continue;
       const failedDep = t.dependencies.find(d => failedIds.has(d));
       if (!failedDep) continue;
-      orderedEffects.push({ kind: 'CascadeSkip', taskId: t.id, failedDependencyId: failedDep });
+      orderedEffects.push({
+        kind: 'CascadeSkip',
+        taskId: t.id,
+        failedDependencyId: failedDep,
+        idempotencyKey: `cascade-skip:${t.id}:${failedDep}`,
+      });
       dispositions.set(t.id, 'cascade-skip');
       cascadeSkippedIds.add(t.id);
       failedIds.add(t.id); // transitive: a freshly-skipped task is terminal for ITS dependents too

@@ -51,6 +51,10 @@
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-427 Learnings** (sprint-427): ## Sprint sprint-427 Learnings
+- WIRE-PROBE — sprint-start env-probe doldurma (born-670a): GO_WITH_TECH_DEBT — born-6...
+- **Sprint sprint-426 Learnings** (sprint-426): ## Sprint sprint-426 Learnings
+- TERM4A — run-flow-store + run-job-service + snapshot-tüketen start (flag'li): GO_WIT...
 - **Sprint sprint-425 Learnings** (sprint-425): ## Sprint sprint-425 Learnings
 - TERM3 — native RunProposal akışı: tool→coordinator→plan-preview-card→approval (flag'...
 - **Sprint sprint-424 Learnings** (sprint-424): ## Sprint sprint-424 Learnings
@@ -71,10 +75,6 @@
 - LIVE668A — decideWorkerLiveness ADOPT: iki gerçek kill-yolu host-primary'ye döner: G...
 - **Sprint sprint-418 Learnings** (sprint-418): ## Sprint sprint-418 Learnings
 - TT554 — METERING-TRUTH: tarife/capability-drift + ledger-eksiği + estimator + report...
-- **Sprint sprint-417 Learnings** (sprint-417): ## Sprint sprint-417 Learnings
-- WIN665 — Windows init exit-code ezilmesi: SETUP_INCOMPLETE basıyor, exit 1 dönüyor (...
-- **Sprint sprint-416 Learnings** (sprint-416): ## Sprint sprint-416 Learnings
-- TT550 — RESULT-INGEST-IDNORM: malformed result-taskId phantom-fix + trace-kaybı üret...
 
 ## Active Technical Debt
 _No active technical debt._
@@ -147,4 +147,4 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 
-_Total entries: 1298 | Generated: 2026-07-12_
+_Total entries: 1309 | Generated: 2026-07-12_

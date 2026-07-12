@@ -21,8 +21,8 @@
 // (dual-read). Telemetry lives in a SEPARATE top-level `telemetry` sidecar that
 // the ShareGPT projection never reads, so it can never reach the training set.
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import type { LogEvent, LogEventType } from './log-event.js';
 import { redactSensitive } from './redact-sensitive.js';
 
@@ -364,4 +364,160 @@ function safeStringify(v: unknown): string {
   } catch {
     return String(v);
   }
+}
+
+// ─── Sprint-partitioned segments + append-only manifest (born-662 / TRSEG) ────
+// The v1/v2 trace record is written to ONE monotonically-growing
+// `sprint-worker.jsonl`, referenced by line number. That reference ages within
+// hours: any compaction/deletion (`sed -i`) rewrites the whole file — line
+// numbers shift AND the inode changes, which a watcher reads as external
+// tampering (the born-662 CANLI observation). This layer replaces line-number
+// identity with (a) SPRINT-PARTITIONED append-only segment files, (b) an
+// APPEND-ONLY manifest (deltas folded on read — race-free + inode-stable, unlike
+// a rewrite-in-place JSON), and (c) a STABLE record-ID derived from the record's
+// logical identity (task/attempt/fix), never its file position. It is additive:
+// the legacy single-file path (agent/trace-recorder.ts `appendTrace`) is
+// untouched, and a segment file is a byte-identical JSONL of the same v1/v2
+// records, so every existing reader (training/pipeline.ts) round-trips it (dual-read).
+
+/** Append-only manifest format. Absent/`1` ⇒ the v1 folded shape below. */
+export const TRACE_MANIFEST_VERSION = 1;
+
+/**
+ * Stable, position-INDEPENDENT record identity for one trace record. Derived
+ * from the record's logical coordinates (sprint · task · attempt · fix-purpose),
+ * NOT its line number, so a citation survives compaction/re-ordering (the
+ * born-662 "satır-no alıntısı eskimez" requirement). Same logical record ⇒ same
+ * id across runs; a FIX re-run (higher `attempt` / `purpose:'fix'`) gets a
+ * distinct id from its original.
+ */
+export function stableRecordId(parts: {
+  sprintId: string;
+  taskId: string;
+  attempt?: number;
+  purpose?: string;
+}): string {
+  const attempt = parts.attempt ?? 1;
+  const purpose = parts.purpose ?? 'original';
+  return `${parts.sprintId}::${parts.taskId}::a${attempt}::${purpose}`;
+}
+
+/**
+ * Filename-safe segment file for a sprint partition. Non-portable characters are
+ * collapsed to `_`; a bare numeric/`sprint-`-prefixed id both land on the
+ * readable `sprint-<id>.jsonl` convention (no double `sprint-` prefix).
+ */
+export function segmentFileName(sprintId: string): string {
+  const safe = sprintId.replace(/[^A-Za-z0-9._-]/g, '_').replace(/^-+|-+$/g, '') || 'unknown';
+  const stem = safe.startsWith('sprint-') ? safe : `sprint-${safe}`;
+  return `${stem}.jsonl`;
+}
+
+/** One append-only manifest line: a single segment-append event. */
+export interface TraceManifestDelta {
+  sprintId: string;
+  /** The segment file (relative name) this record was appended to. */
+  file: string;
+  /** The record's stable id (`stableRecordId`). */
+  recordId: string;
+  /** The record's `meta.ts` (ISO-8601 — lexical order == chronological order). */
+  ts: string;
+}
+
+/** Folded per-sprint segment aggregate — one entry per partition. */
+export interface TraceSegmentEntry {
+  sprintId: string;
+  file: string;
+  recordCount: number;
+  firstTs: string;
+  lastTs: string;
+}
+
+/** The manifest as a folded aggregate view over all append-only deltas. */
+export interface TraceManifest {
+  version: number;
+  segments: TraceSegmentEntry[];
+}
+
+/**
+ * Defensive parse of one manifest delta line — never throws. A malformed/torn
+ * line (a mid-append read on WSL/network fs — see file-watch-hygiene) returns
+ * null and is skipped, picked up cleanly on the next fold rather than crashing.
+ */
+export function parseManifestDelta(raw: string): TraceManifestDelta | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsed)) return null;
+  const { sprintId, file, recordId, ts } = parsed;
+  if (
+    typeof sprintId !== 'string' ||
+    typeof file !== 'string' ||
+    typeof recordId !== 'string' ||
+    typeof ts !== 'string'
+  ) {
+    return null;
+  }
+  return { sprintId, file, recordId, ts };
+}
+
+/**
+ * Fold append-only deltas into the per-sprint aggregate. Pure. `recordCount` is
+ * the delta count per sprint; `firstTs`/`lastTs` are the min/max `ts` (ISO-8601
+ * strings compare chronologically). Insertion order of first-seen sprints is
+ * preserved.
+ */
+export function foldManifest(deltas: readonly TraceManifestDelta[]): TraceManifest {
+  const bySprint = new Map<string, TraceSegmentEntry>();
+  for (const d of deltas) {
+    const cur = bySprint.get(d.sprintId);
+    if (cur === undefined) {
+      bySprint.set(d.sprintId, {
+        sprintId: d.sprintId,
+        file: d.file,
+        recordCount: 1,
+        firstTs: d.ts,
+        lastTs: d.ts,
+      });
+      continue;
+    }
+    cur.recordCount++;
+    if (d.ts < cur.firstTs) cur.firstTs = d.ts;
+    if (d.ts > cur.lastTs) cur.lastTs = d.ts;
+  }
+  return { version: TRACE_MANIFEST_VERSION, segments: [...bySprint.values()] };
+}
+
+/**
+ * Append one delta line to the manifest (creates the dir + file as needed).
+ * Append-only (`O_APPEND`): a single delta is well under `PIPE_BUF`, so
+ * concurrent appends stay line-atomic and never clobber each other — the
+ * property a rewrite-in-place JSON manifest lacks.
+ */
+export function appendManifestDelta(manifestPath: string, delta: TraceManifestDelta): void {
+  mkdirSync(dirname(manifestPath), { recursive: true });
+  appendFileSync(manifestPath, JSON.stringify(delta) + '\n', 'utf-8');
+}
+
+/**
+ * Read + fold the append-only manifest into its aggregate view. A missing file
+ * (nothing recorded yet) folds to an empty manifest — fail-soft, never throws.
+ */
+export function readManifest(manifestPath: string): TraceManifest {
+  let raw: string;
+  try {
+    raw = readFileSync(manifestPath, 'utf-8');
+  } catch {
+    return { version: TRACE_MANIFEST_VERSION, segments: [] };
+  }
+  const deltas: TraceManifestDelta[] = [];
+  for (const line of raw.split('\n')) {
+    if (line.length === 0) continue;
+    const d = parseManifestDelta(line);
+    if (d !== null) deltas.push(d);
+  }
+  return foldManifest(deltas);
 }

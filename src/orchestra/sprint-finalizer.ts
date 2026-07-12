@@ -169,6 +169,15 @@ export interface FinalizeSprintOptions {
   skipIdentityRegen?: boolean;
   /** Rule regeneration callback (Task 11 hook point) */
   onRuleRegen?: (projectRoot: string) => void | Promise<void>;
+  /**
+   * Run-flow correlation id (TERM5-FIN / sprint-427 task 1). Not derivable from
+   * `Sprint` (no `flowId` field) and orchestra/ MUST NOT import
+   * cli/repl/run-flow-store.ts to look one up (ADR-D-004 C2) — so a caller that
+   * started this sprint via the run-flow-v2 path threads it in here. Absent for
+   * every current caller; surfaced (when present) on the job completion record's
+   * `completionRecord.flowId` for later flowId-correlated consumers.
+   */
+  flowId?: string;
 }
 
 
@@ -982,6 +991,76 @@ export function collectHelperCost(
     debugLog('finalizeSprint:collectHelperCost', e);
     return { helperUsd: 0, ledger: EMPTY_HELPER_LEDGER, envelopesWithHelper: 0 };
   }
+}
+
+
+// ═══ Rich Completion Record (TERM5-FIN — sprint-427 task 1) ═══════
+//
+// Data-foundation for the design doc's "Ölecek / compatibility-only parçalar"
+// row "Exit-code-only evaluate → Rich finalizer result'ıyla değiştirilir"
+// (docs/analysis/term-flow-unify-design-2026-07-11.md). Purely additive: this
+// record is appended as a NEW `completionRecord` key on the existing Step-13
+// job-completion-summary artifact (`.deckent/runtime/jobs/<sprintId>.json`) —
+// the artifact run-completion-watch.ts already polls/fs.watches, so no new
+// mechanism is introduced. Later TERM5 tasks (2-6) correlate on `flowId`.
+
+/** Per-verdict counts, independent of `SprintMetrics` (different shape/purpose). */
+export interface CompletionVerdictSummary {
+  done: number;
+  techDebt: number;
+  noGo: number;
+}
+
+/** One evaluated task's summary — a flat array entry, distinct from the
+ *  existing keyed `evaluations` record (a future result-turn renderer wants
+ *  an ordered list, not a map). */
+export interface CompletionTaskSummary {
+  taskId: string;
+  title: string;
+  evaluation: TaskEvaluation;
+  selfAssessment: string;
+}
+
+export interface SprintCompletionRecord {
+  /** Run-flow correlation id — present only when the caller threaded one in
+   *  via `FinalizeSprintOptions.flowId` (absent for every current caller). */
+  flowId?: string;
+  verdictSummary: CompletionVerdictSummary;
+  taskSummary: CompletionTaskSummary[];
+}
+
+/**
+ * Build the additive rich completion record from the same `evaluations` +
+ * `resultsMap` already available at the Step-13 callsite (mirrors the
+ * existing `richEvaluations` construction there). Pure — no I/O, no throw.
+ */
+export function buildSprintCompletionRecord(
+  sprint: Sprint,
+  evaluations: Map<string, TaskEvaluation>,
+  resultsMap: Map<string, TaskResult>,
+  flowId?: string,
+): SprintCompletionRecord {
+  const verdictSummary: CompletionVerdictSummary = { done: 0, techDebt: 0, noGo: 0 };
+  const taskSummary: CompletionTaskSummary[] = [];
+
+  for (const [taskId, evaluation] of evaluations) {
+    const task = sprint.tasks.find(t => t.id === taskId);
+    const result = resultsMap.get(taskId);
+    taskSummary.push({
+      taskId,
+      title: task?.title ?? '',
+      evaluation,
+      selfAssessment: result?.selfAssessment ?? evaluation,
+    });
+
+    if (evaluation === TaskEvaluation.NO_GO) verdictSummary.noGo += 1;
+    else if (evaluation === TaskEvaluation.GO_WITH_TECH_DEBT) verdictSummary.techDebt += 1;
+    else if (evaluation === TaskEvaluation.DONE) verdictSummary.done += 1;
+  }
+
+  const record: SprintCompletionRecord = { verdictSummary, taskSummary };
+  if (flowId) record.flowId = flowId;
+  return record;
 }
 
 
@@ -1877,6 +1956,11 @@ export async function finalizeSprint(
       };
     }
 
+    // Rich completion-record (TERM5-FIN — sprint-427 task 1): additive-only,
+    // appended as a NEW key below — every pre-existing jobData field/value
+    // stays exactly as it was.
+    const completionRecord = buildSprintCompletionRecord(sprint, evaluations, resultsMap, opts?.flowId);
+
     const jobFile = join(jobsDir, `${sprint.id}.json`);
     const jobData = {
       status: 'COMPLETE',
@@ -1893,6 +1977,7 @@ export async function finalizeSprint(
       },
       agentBreakdown,
       evaluations: richEvaluations,
+      completionRecord,
     };
     writeFileSync(jobFile, JSON.stringify(jobData, null, 2) + '\n');
     debugLog('finalizeSprint:jobSummary', `Job summary written to ${jobFile}`);

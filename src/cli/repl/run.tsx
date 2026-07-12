@@ -157,6 +157,93 @@ export function buildRunFlowMountLabels(t: (key: string) => string): RunFlowMoun
   };
 }
 
+/**
+ * TERM5-UI (sprint-427, task 6) — real en/tr labels for the correlated
+ * result-turn pushed once a job completion matches this REPL's OWN live
+ * run-flow ({@link buildRunFlowResultEvent} below), sourced from messages.ts's
+ * `runFlow.result.*` keys — same "pull labels out of the render call"
+ * precedent as {@link buildRunFlowMountLabels} above. `{flowId}`/`{done}`/
+ * `{total}`/`{techDebt}`/`{noGo}`/`{error}` are i18n templates substituted by
+ * `buildRunFlowResultEvent`, not `getMessage` itself (same convention
+ * `formatRunFlowOutcomeLine`/`RunFlowMountLabels` already use).
+ */
+export interface RunFlowResultLabels {
+  completed: string; // "Run {flowId} completed — {done}/{total} DONE · {techDebt} TECH_DEBT · {noGo} NO_GO"
+  failed: string;     // "Run {flowId} failed: {error}"
+}
+
+export function buildRunFlowResultLabels(t: (key: string) => string): RunFlowResultLabels {
+  return {
+    completed: t('runFlow.result.completed'),
+    failed: t('runFlow.result.failed'),
+  };
+}
+
+/**
+ * TERM5-UI (sprint-427, task 6) — formats a flowId-correlated
+ * `RunCompletionInfo` (run-completion-watch.ts) as a rich, LOCALIZED
+ * `ChatTurnBgEvent`: the verdict summary + flowId the task requires, unlike
+ * {@link buildBgTurnEvent}'s deliberately language-neutral tokens above (that
+ * function serves the unfiltered, non-correlated bg-turns path). This one is
+ * only ever reached AFTER a flowId match ({@link wireRunFlowResultWatch}), so
+ * it can afford a full `getMessage` sentence.
+ */
+export function buildRunFlowResultEvent(info: RunCompletionInfo, labels: RunFlowResultLabels): ChatTurnBgEvent {
+  const flowId = info.flowId ?? info.jobId;
+  const source = info.flowId ?? info.sprintId ?? info.jobId;
+  if (info.status === 'FAILED') {
+    return { source, summary: labels.failed.replace('{flowId}', flowId).replace('{error}', info.error ?? info.jobId) };
+  }
+  const total = info.totalTasks ?? 0;
+  const done = info.done ?? 0;
+  const techDebt = info.techDebt ?? 0;
+  const noGo = info.noGo ?? 0;
+  return {
+    source,
+    summary: labels.completed
+      .replace('{flowId}', flowId)
+      .replace('{done}', String(done))
+      .replace('{total}', String(total))
+      .replace('{techDebt}', String(techDebt))
+      .replace('{noGo}', String(noGo)),
+  };
+}
+
+/**
+ * TERM5-UI (sprint-427, task 6) — connects Task-3's flowId-filterable
+ * `createRunCompletionWatch` to Task-5's `RunFlowController.applyRunCompletion`.
+ * Mounted ONCE at REPL boot (same shape as {@link wireRunFlowMount}/
+ * {@link wireBgTurnsProducer} above) — deliberately UNFILTERED at construction
+ * (no static `RunCompletionWatchOptions.flowId`), because the controller's own
+ * flowId is not known until `proposeRun()` runs, well after this watch is
+ * built. The match is instead checked dynamically, per event, against
+ * `controller.getContext().flowId` — a non-matching or flow-less event is a
+ * SILENT skip here, never reaching `applyRunCompletion` at all: that method's
+ * own loud `console.error` path is reserved for a genuinely mis-wired caller
+ * (its own doc comment), not the routine "this job belongs to a different
+ * session" case an unfiltered project-wide watch sees constantly. A matching
+ * event drives the controller's state machine AND hands `onResult` a rich,
+ * localized `ChatTurnBgEvent` for the transcript.
+ */
+export function wireRunFlowResultWatch(
+  enabled: boolean,
+  jobsDir: string,
+  controller: RunFlowController,
+  labels: RunFlowResultLabels,
+  onResult: (event: ChatTurnBgEvent) => void,
+  watchFactory: typeof createRunCompletionWatch = createRunCompletionWatch,
+): RunCompletionWatchHandle | undefined {
+  if (!enabled) return undefined;
+  return watchFactory(jobsDir, {
+    onComplete: (info) => {
+      const flowId = controller.getContext().flowId;
+      if (!flowId || info.flowId !== flowId) return;
+      controller.applyRunCompletion?.(info);
+      onResult(buildRunFlowResultEvent(info, labels));
+    },
+  });
+}
+
 /** Rebuilds a provider adapter for a selection (entry.ts passes buildReplProvider). */
 export type ProviderRebuild = (sel: ActiveSelection) => ChatProviderAdapter;
 
@@ -310,6 +397,9 @@ export interface ReplTeardownDeps {
   /** born-642 (408-001) BG-TURNS-PRODUCER — run-completion-watch.ts handle;
    *  absent when `repl_surface.bg_turns` is off (see wireBgTurnsProducer). */
   runCompletionWatch?: { dispose: () => void };
+  /** TERM5-UI (sprint-427, task 6) — the flowId-correlated result-turn watch;
+   *  absent when `runFlowController` is absent (see wireRunFlowResultWatch). */
+  runFlowResultWatch?: { dispose: () => void };
   memory?: { close: () => void };
   mcpBroker?: { disconnectAll: () => Promise<void> };
   switcherExit: () => Promise<void>;
@@ -344,6 +434,7 @@ export function buildReplTeardown(deps: ReplTeardownDeps): () => Promise<void> {
     try { deps.approvalWatch?.dispose(); } catch { /* already disposed */ }
     try { deps.approvalChannel?.dispose(); } catch { /* already disposed */ }
     try { deps.runCompletionWatch?.dispose(); } catch { /* already disposed */ }
+    try { deps.runFlowResultWatch?.dispose(); } catch { /* already disposed */ }
     try { deps.memory?.close(); } catch { /* already closed */ }
     if (deps.mcpBroker) {
       try { await deps.mcpBroker.disconnectAll(); } catch { /* best-effort */ }
@@ -684,6 +775,12 @@ export async function runInkRepl(
   // `deckent_propose_run` tool it powers is registered on the native
   // registry only — see buildNativeToolRegistry below).
   let runFlowController: RunFlowController | undefined;
+  // TERM5-UI (sprint-427, task 6) — the REPL-local sink app.tsx's own
+  // registerRunFlowResultSink effect wires into ChatTurnQueue.enqueueCorrelatedResult;
+  // only ever set once runFlowController exists (mirrors bgEventSink's own
+  // registration-then-set precedent above).
+  let runFlowResultSink: ((event: ChatTurnBgEvent) => void) | null = null;
+  let runFlowResultWatch: RunCompletionWatchHandle | undefined;
   if (isNativeAgentSelected(process.argv.slice(2), projectCfg)) {
     const cfg = await loadConfig().catch(() => ({} as Record<string, unknown>));
     const nativeCfg: NativeTransportConfig = {
@@ -766,6 +863,23 @@ export async function runInkRepl(
         root: process.cwd(),
         config: cfg as ResolvedConfig,
       });
+      // TERM5-UI (sprint-427, task 6) — connects Task-4/5's ChatTurnQueue.
+      // enqueueCorrelatedResult + RunFlowController.applyRunCompletion to a
+      // LIVE REPL transcript: a job-file completion whose flowId matches this
+      // controller's own live flow renders as a rich result-turn (verdict
+      // summary + flowId) the moment it lands on disk — no waiting for the
+      // next natural turn-end drain (see enqueueCorrelatedResult's own doc
+      // comment, chat-turn-queue.ts). Gate mirrors runFlowController's own
+      // presence — flag-off (`runFlowController` undefined) never reaches here.
+      if (runFlowController) {
+        runFlowResultWatch = wireRunFlowResultWatch(
+          true,
+          join(process.cwd(), JOBS_DIR),
+          runFlowController,
+          buildRunFlowResultLabels(t),
+          (event) => { runFlowResultSink?.(event); },
+        );
+      }
       nativeEngine = createNativeEngine({
         adapter: resolved.adapter,
         registry: buildNativeToolRegistry({
@@ -828,7 +942,12 @@ export async function runInkRepl(
       approvalsEnabled={approvalsEnabled}
       {...(approvalChannel ? { approvalChannel } : {})}
       {...(bgTurnsEnabled ? { registerBgEventSink: (enqueue: (event: ChatTurnBgEvent) => void) => { bgEventSink = enqueue; } } : {})}
-      {...(runFlowController ? { runFlowController, runFlowCardLabels: buildPlanPreviewCardLabels(lang), runFlowMountLabels: buildRunFlowMountLabels(t) } : {})}
+      {...(runFlowController ? {
+        runFlowController,
+        runFlowCardLabels: buildPlanPreviewCardLabels(lang),
+        runFlowMountLabels: buildRunFlowMountLabels(t),
+        registerRunFlowResultSink: (enqueue: (event: ChatTurnBgEvent) => void) => { runFlowResultSink = enqueue; },
+      } : {})}
     />
     </ReplErrorBoundary>,
   );
@@ -846,6 +965,7 @@ export async function runInkRepl(
     ...(approvalWatch ? { approvalWatch } : {}),
     ...(approvalChannel ? { approvalChannel } : {}),
     ...(runCompletionWatch ? { runCompletionWatch } : {}),
+    ...(runFlowResultWatch ? { runFlowResultWatch } : {}),
     ...(memory ? { memory } : {}),
     ...(mcpClientBroker ? { mcpBroker: mcpClientBroker } : {}),
     switcherExit: () => switcher.exit(),

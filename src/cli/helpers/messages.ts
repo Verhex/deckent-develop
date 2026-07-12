@@ -212,6 +212,18 @@ const MESSAGES: MessageMap = {
     tr: 'Run akışı hatası: {error}',
   },
 
+  // ─── run-flow correlated result-turn (TERM5-UI, sprint-427 task 6) ────────
+  // A flowId-correlated job completion pushed as a rich 'bg' transcript turn
+  // (verdict-summary + flowId) — buildRunFlowResultLabels(t) in run.tsx.
+  'runFlow.result.completed': {
+    en: 'Run {flowId} completed — {done}/{total} DONE · {techDebt} TECH_DEBT · {noGo} NO_GO',
+    tr: 'Run {flowId} tamamlandı — {done}/{total} DONE · {techDebt} TECH_DEBT · {noGo} NO_GO',
+  },
+  'runFlow.result.failed': {
+    en: 'Run {flowId} failed: {error}',
+    tr: 'Run {flowId} başarısız: {error}',
+  },
+
   // ─── status command ─────────────────────────────────────────────────
   'status.no_active_sprint': {
     en: 'No active sprint. Run `deckent start` first.',

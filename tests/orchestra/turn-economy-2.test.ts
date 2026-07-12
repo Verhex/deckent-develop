@@ -79,8 +79,10 @@ function makeCtx(overrides: Partial<SprintContext> = {}): SprintContext {
 // Byte-exact mirrors of the module-private constants (same precedent as
 // prompt-turn-economy.test.ts's TURN_ECONOMY_TEXT) — proves the COMPILED prompt
 // carries the exact, unshortened text, and lets us pin PIPE_EXIT's size.
+// 427-012 (born-670b): 'call verify_task' ibaresi öldü — o tool worker-yüzeyinde
+// hiç var olmadı (yalancı-prompt); yerine VERIFY STEPS bölümüne işaret edilir.
 const PIPE_EXIT_TEXT = `## Pipe-Exit Honesty
-A failing command piped to a pager (\`cmd | tail\`) reports the PIPE's exit code — the pager's 0 — so a real failure reads back as \`is_error:false\` and you burn a turn. NEVER pipe a check to \`tail\`/\`head\`. Read the TRUE code: bash \`\${PIPESTATUS[0]}\`, or run the command unpiped and read \`$?\` on the NEXT line, or call verify_task (separate check/test exit codes).`;
+A failing command piped to a pager (\`cmd | tail\`) reports the PIPE's exit code — the pager's 0 — so a real failure reads back as \`is_error:false\` and you burn a turn. NEVER pipe a check to \`tail\`/\`head\`. Read the TRUE code: bash \`\${PIPESTATUS[0]}\`, or run the command unpiped and read \`$?\` on the NEXT line — see the VERIFY STEPS section below for this task's exact commands.`;
 
 const ARTIFACT_REUSE_TEXT = `## Artifact Reuse
 If a pack/build artifact already exists under \`.tasks/artifacts/<sprint>/\`, REUSE it — do not re-run \`npm pack\`/build to regenerate an artifact an earlier task in this sprint already produced.`;
@@ -116,11 +118,12 @@ describe('TT555 (a): Pipe-Exit Honesty directive', () => {
     expect(PIPE_EXIT_TEXT.length).toBeLessThanOrEqual(400);
   });
 
-  it('teaches the un-masked read patterns (PIPESTATUS / separate-line $? / verify_task)', () => {
+  it('teaches the un-masked read patterns (PIPESTATUS / separate-line $? / VERIFY STEPS)', () => {
     const { prompt } = buildTaskPrompt(makeTask(), makeCtx());
     expect(prompt).toMatch(/\$\{PIPESTATUS\[0\]\}/);
     expect(prompt).toMatch(/NEVER pipe a check to `tail`\/`head`/);
-    expect(prompt).toMatch(/call verify_task/);
+    // 427-012: yüzeyde-olmayan tool referansı prompt'ta SIFIR (yalancı-prompt pini)
+    expect(prompt).not.toMatch(/call verify_task/);
   });
 });
 

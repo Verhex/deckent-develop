@@ -74,6 +74,10 @@ import {
   runRollbackCheck, runFixPhase, runRetroPhase,
   runCleanupPhase, pollForResultFile,
 } from './sprint-phases.js';
+import type { PlanPhaseResult } from './sprint-phases.js';
+
+// ─── Pre-Start Guards (born-672a/672b — snapshot-start guard wiring) ─
+import { runPreStartGuards } from './pre-start-guards.js';
 
 // ─── Worker Liveness (Sprint 192 W-INTEGRITY I-2 — pre-synthetic gate) ─
 import { checkWorkerLiveness } from './worker-liveness.js';
@@ -693,14 +697,65 @@ export interface RunSprintOptions {
    * TERM-FLOW-UNIFY Sprint-4 (426-001, `terminal.run_flow_v2`): an
    * already-approved, CAS-verified Sprint (see orchestra/run-job-service.ts)
    * to consume INSTEAD of planning fresh. When set, the "Fresh Path" below
-   * skips its `runPlanPhase(...)` call entirely — no `planSprint()` call
-   * happens on this run (design-doc risk: "detached start fresh lifecycle'da
-   * runPlanPhase'i YENİDEN çağırıyor"). `safetyPoint` is left `null` in this
-   * branch (an already-legitimate degraded state — see runPlanPhase's own
-   * non-git-repo/creation-failure fallback). Absent (undefined) for every
-   * existing caller — zero behavior change when this is not set.
+   * skips `planSprint()` — no re-planning happens on this run (design-doc
+   * risk: "detached start fresh lifecycle'da runPlanPhase'i YENİDEN
+   * çağırıyor"). Only planning is skipped: born-672b (Task 427-019,
+   * GUARD-WIRE) wires {@link resolvePlanPhaseResult} to still run the same 4
+   * pre-start guards (build-staleness, CI/tsc gate, beforeSprint hooks, git
+   * rollback safety point) via `runPreStartGuards` that `runPlanPhase` runs
+   * for a freshly-planned sprint — `safetyPoint` is populated from that
+   * call, not left `null`. Absent (undefined) for every existing caller —
+   * zero behavior change when this is not set.
    */
   preplannedSprint?: Sprint;
+}
+
+/**
+ * Resolve the Fresh Path's PLAN-phase result for {@link runSprint}.
+ *
+ * born-672b (GUARD-WIRE, Task 427-019) closes the honest security
+ * regression born-672a's extraction exposed: the `opts.preplannedSprint`
+ * (TERM-FLOW-UNIFY Sprint-4, 426-001) branch used to fabricate
+ * `{ sprint: opts.preplannedSprint, safetyPoint: null }` directly — skipping
+ * not only `planSprint()` (intended) but also the 4 pre-start guards
+ * (build-staleness, CI/tsc gate, beforeSprint hooks, git rollback safety
+ * point) that {@link runPlanPhase} always runs for a freshly-planned sprint
+ * (unintended — only planning was meant to be skipped, not safety).
+ *
+ * Both branches now run {@link runPreStartGuards} identically:
+ *   - preplanned branch: skip `planSprint()`, still run the 4 guards.
+ *   - fresh branch: `runPlanPhase` (unchanged) plans AND runs the 4 guards.
+ *
+ * A guard failure is wrapped in the same `BrainError('Plan phase failed:
+ * ...', SprintPhase.PLAN)` shape `runPlanPhase`'s own catch produces, so a
+ * CI-gate block or a stash-pop conflict surfaces identically to callers
+ * (e.g. the CLI's BrainError-aware catch) regardless of which path ran it.
+ *
+ * Absent `opts.preplannedSprint` (every existing caller) is a pure
+ * delegation to `runPlanPhase` — zero behavior change on that path.
+ */
+export async function resolvePlanPhaseResult(
+  projectRoot: string,
+  config: ResolvedConfig,
+  opts: RunSprintOptions | undefined,
+  activeProvider: ProviderAdapter | null,
+  rollbackEnabled: boolean,
+): Promise<PlanPhaseResult> {
+  if (!opts?.preplannedSprint) {
+    return runPlanPhase(projectRoot, config, opts, activeProvider, rollbackEnabled);
+  }
+
+  const sprint = opts.preplannedSprint;
+  sprint.startedAt = sprint.startedAt ?? now();
+  try {
+    const { safetyPoint } = await runPreStartGuards(projectRoot, sprint, config, rollbackEnabled);
+    return { sprint, safetyPoint };
+  } catch (err) {
+    throw new BrainError(
+      `Plan phase failed: ${err instanceof Error ? err.message : String(err)}`,
+      SprintPhase.PLAN,
+    );
+  }
 }
 
 // ═══ Coordination Wire Helpers ════════════════════════════════════
@@ -1191,19 +1246,11 @@ export async function runSprint(
     results = resumeResults;
   } else {
     // ─── Fresh Path: PLAN → SPAWN → EXECUTE ─────────────────────────
-    // Phase 1: PLAN
-    let planResult: { sprint: Sprint; safetyPoint: SafetyPoint | null };
-    if (opts?.preplannedSprint) {
-      // TERM-FLOW-UNIFY Sprint-4 (426-001): consume an approved snapshot —
-      // runPlanPhase (and the planSprint() call inside it) is NEVER invoked
-      // on this branch. See RunSprintOptions.preplannedSprint doc comment.
-      opts.preplannedSprint.startedAt = opts.preplannedSprint.startedAt ?? now();
-      planResult = { sprint: opts.preplannedSprint, safetyPoint: null };
-    } else {
-      planResult = await runPlanPhase(
-        projectRoot, config, opts, activeProvider, rollbackEnabled,
-      );
-    }
+    // Phase 1: PLAN — see RunSprintOptions.preplannedSprint + born-672b
+    // resolvePlanPhaseResult doc comments for the preplanned-vs-fresh split.
+    const planResult: PlanPhaseResult = await resolvePlanPhaseResult(
+      projectRoot, config, opts, activeProvider, rollbackEnabled,
+    );
     sprint = planResult.sprint;
     safetyPoint = planResult.safetyPoint;
 

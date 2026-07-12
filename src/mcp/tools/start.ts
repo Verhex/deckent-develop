@@ -25,7 +25,7 @@ import {
   IPC_CONFIG_FILE,
   type SprintRunnerConfig,
 } from '../../orchestra/sprint-runner-entry.js';
-import { loadApprovedSnapshot, loadRunHandle, saveRunHandle } from '../../cli/repl/run-flow-store.js';
+import { loadApprovedSnapshot, loadRunHandle, saveRunHandle } from '../../core/run-flow-store.js';
 import {
   startApprovedRun,
   RunJobFlowNotApprovedError,
@@ -111,12 +111,12 @@ export function registerStartTool(server: McpServer): void {
         // provably-replan-free code path shared by both surfaces, instead of
         // threading preplannedSprint through sprint-runner-entry.ts's forked
         // child (that file is a separate module outside this task's write
-        // scope — see this task's result notes). ADR-D-004 (C3, mcp/ MUST
-        // NOT import cli/): this reaches cli/repl/run-flow-store.js and
-        // cli/helpers/detached-start.js — an existing precedent for exactly
-        // this edge already ships (src/mcp/tools/nervous-edit.ts imports
-        // ../../cli/repl/nervous-bridge.js); flagged for Brain/ADR-amendment
-        // awareness rather than blocking this task's delivery entirely.
+        // scope — see this task's result notes). run-flow-store.ts now lives
+        // in core/ (born-671, sprint-427 task 427-020) — this reaches
+        // core/run-flow-store.js directly, no more ADR-D-004 C3 mcp->cli
+        // precedent for the store read. cli/helpers/detached-start.js is a
+        // SEPARATE mcp->cli edge (still the src/mcp/tools/nervous-edit.ts ->
+        // ../../cli/repl/nervous-bridge.js precedent, unchanged by this task).
         // Absent flowId (every existing MCP caller) never enters this branch
         // — zero behavior change for the legacy dryRun/cost-gate/fork path.
         const flowFlagsGiven = [flowId, revision, planDigest].filter(v => v !== undefined).length;

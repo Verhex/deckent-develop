@@ -5,10 +5,13 @@
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Task } from '../core/task-types.js';
+import type { Task, ModelType } from '../core/task-types.js';
+import { isValidModel } from '../core/task-types.js';
 import type { ResolvedConfig } from '../core/config-types.js';
 import type { TimeoutConfig } from '../core/config-types.js';
 import { DEFAULT_TIMEOUT_CONFIG } from '../core/config.js';
+import { getModelTier } from '../core/model-equivalence.js';
+import type { ModelTier } from '../core/model-equivalence.js';
 import { BRAIN_DIR, SPRINTS_DIR } from '../core/constants.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -19,6 +22,8 @@ export interface TimeoutBreakdown {
   scopeMultiplier: number;
   historyFactor: number;
   backendFactor: number;
+  /** Model-tier factor (born-667a / TIMEOUT-TIER). 1.0 when unconfigured or model/tier unresolved. */
+  modelMultiplier: number;
   estimated: number;
   clampedTo: number;
   clampReason: 'min_floor' | 'max_ceiling' | 'within_bounds';
@@ -128,6 +133,32 @@ const BACKEND_FACTORS: Record<string, number> = {
   subprocess: 0.8,
 };
 
+// ─── Model-Tier Factor (born-667a / TIMEOUT-TIER, Task 427-023) ────
+// TT550/TT556: effort_base is model-blind — an opus worker on a `high`-effort
+// forensic task was killed at the same timeout budget as a sonnet worker on
+// the same effort, because `effort_base` only tracks effort, not the model
+// actually doing the work. `timeout.model_multiplier` (config-types.ts) lets
+// an operator widen (or shrink) the estimate per model tier; this resolver
+// looks it up safely — an absent config, an unrecognized model, or a tier
+// missing from the table all fall back to 1.0 (no change), never a throw.
+
+/**
+ * Resolve the configured multiplier for a task's model, keyed by the
+ * provider-agnostic {@link ModelTier} (economy/standard/premium/premium_plus)
+ * so opus-equivalent models on Codex/Gemini benefit identically to Claude opus.
+ */
+export function resolveModelMultiplier(
+  model: ModelType,
+  table: Partial<Record<ModelTier, number>> | undefined,
+): number {
+  if (!table || !isValidModel(model)) return 1.0;
+  const tier = getModelTier(model);
+  const multiplier = table[tier];
+  return typeof multiplier === 'number' && Number.isFinite(multiplier) && multiplier > 0
+    ? multiplier
+    : 1.0;
+}
+
 // ─── LoC Estimation ─────────────────────────────────────────────────
 
 /**
@@ -176,8 +207,9 @@ export function estimateTaskLoC(task: Task): number {
  * 3. scopeMultiplier = 1 + (filesWrite > 5 ? (filesWrite - 5) * 0.05 : 0)
  * 4. historyFactor = max(1.0, (histAvg/1000) / base * 1.2)     [if enabled]
  * 5. backendFactor = {docker: 1.0, tmux: 0.9, subprocess: 0.8}
- * 6. estimated = round(base * loc * scope * history * backend)
- * 7. clamp to [min_timeout, max_timeout] per backend
+ * 6. modelMultiplier = timeout.model_multiplier[tier(task.model)] ?? 1.0 [born-667a]
+ * 7. estimated = round(base * loc * scope * history * backend * model)
+ * 8. clamp to [min_timeout, max_timeout] per backend
  */
 export function brainEstimateTimeout(
   task: Task,
@@ -211,10 +243,16 @@ export function brainEstimateTimeout(
   // Step 5: Backend factor
   const backendFactor = BACKEND_FACTORS[backend] ?? 1.0;
 
-  // Step 6: Estimate
-  const estimated = Math.round(base * locMultiplier * scopeMultiplier * historyFactor * backendFactor);
+  // Step 6: Model-tier factor (born-667a / TIMEOUT-TIER) — opt-in, 1.0 when
+  // timeout.model_multiplier is unconfigured (backward-compatible default).
+  const modelMultiplier = resolveModelMultiplier(task.model, timeoutConfig.model_multiplier);
 
-  // Step 7: Clamp
+  // Step 7: Estimate
+  const estimated = Math.round(
+    base * locMultiplier * scopeMultiplier * historyFactor * backendFactor * modelMultiplier,
+  );
+
+  // Step 8: Clamp
   const { min, max } = getBackendBounds(backend, timeoutConfig);
   let clampedTo: number;
   let clampReason: TimeoutBreakdown['clampReason'];
@@ -236,6 +274,7 @@ export function brainEstimateTimeout(
     scopeMultiplier,
     historyFactor,
     backendFactor,
+    modelMultiplier,
     estimated,
     clampedTo,
     clampReason,

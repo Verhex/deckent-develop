@@ -1,5 +1,31 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-427 Learnings
+- Sprint sprint-427 Learnings: ## Sprint sprint-427 Learnings
+- WIRE-PROBE — sprint-start env-probe doldurma (born-670a): GO_WITH_TECH_DEBT — born-670a WIRE-PROBE implemented: runPlanPhase (sprint-phases.ts) now calls the new probeAndPersistToolInventory(project
+- WIRE-VERIFY — worker-prompt verify-komut dürüstlüğü (born-670b): GO_WITH_TECH_DEBT — born-670b WIRE-VERIFY implemented in prompt-god-template.ts (the only file in my write scope, plus the new test file). (
+- ALLOW-WIRE — allowlist'in prompt/yüzeye flag'li uygulanması (559): GO_WITH_TECH_DEBT — ALLOW-WIRE (born-664/559): Task-13's PURE selector (src/core/tool-allowlist.ts computeToolAllowlist) is now surfaced to 
+- STORE-CORE — run-flow-store'un core'a taşınması (born-671): GO_WITH_TECH_DEBT — Moved src/cli/repl/run-flow-store.ts -> src/core/run-flow-store.ts (born-671): pure relocation, only relative import spe
+
+## Gains
+- 427-001 — TERM5-FIN — sprint-finalizer rich completion-record (flowId'li) — Added additive rich completion-record to sprint-finalizer's existing Step-13 job-completion-summa...
+- 427-002 — TERM5-FEED — run-state-feed flowId-korelasyonu — Added flowId-correlation to run-state-feed's read model, additive/opt-in only.
+- 427-003 — TERM5-WATCH — run-completion-watch korelasyon (yanlış-eşleşme ölür) — Added an opt-in RunCompletionWatchOptions.flowId filter to createRunCompletionWatch, mirroring Ta...
+- 427-004 — TERM5-QUEUE — chat-turn-queue correlated result-turn (idle-wake) — Added ChatTurnQueue.enqueueCorrelatedResult(event, enabled) — the only new surface on the pure-co...
+- 427-005 — TERM5-CTRL — controller terminal-state reduce (correlated event'ten) — Added RunFlowController.applyRunCompletion?(event: RunCompletionInfo): RunFlowContext — the contr...
+- 427-006 — TERM5-UI — REPL result-turn render + i18n — Wired Task-3 (createRunCompletionWatch's flowId filterability) + Task-4 (ChatTurnQueue.enqueueCor...
+- 427-007 — SCHED6-RED — reducer cascade/restore kararları — Read DIRECTIVES.md Task 7 + docs/analysis/scheduler-unify-design-2026-07-11.md Sprint-6 row and f...
+- 427-008 — SCHED6-EFF — CascadeSkip/WriteCheckpoint executor (persist-before-commit) — Read docs/analysis/scheduler-unify-design-2026-07-11.md (Net Oneri executor bullet list + Sprint-...
+- …and 12 more delivered
+
+## Sprint sprint-426 Learnings
+- Sprint sprint-426 Learnings: ## Sprint sprint-426 Learnings
+- TERM4A — run-flow-store + run-job-service + snapshot-tüketen start (flag'li): GO_WITH_TECH_DEBT — Implemented the Sprint-4 slice behind terminal.run_flow_v2 (default off). NEW src/cli/repl/run-flow-store.ts: durable, p
+
+## Gains
+- 426-002 — TERM4B — REPL canlı-mount: controller run/app'e + approve→start tetiği (flag'li) — run-flow-controller.ts REPL'e gercekten mount edildi (app.tsx/run.tsx), flag-off sifir-fark.
+- 426-003 — SCHED5 — continuous live-switch: initial+watcher tek injected driver (engine-config'li) — SCHED5 continuous live-switch delivered per docs/analysis/scheduler-unify-design-2026-07-11.md di...
+
 ## Sprint sprint-425 Learnings
 - Sprint sprint-425 Learnings: ## Sprint sprint-425 Learnings
 - TERM3 — native RunProposal akışı: tool→coordinator→plan-preview-card→approval (flag'li): GO_WITH_TECH_DEBT — Implemented the flag-gated (terminal.run_flow_v2, default OFF) native RunProposal slice per the task spec.

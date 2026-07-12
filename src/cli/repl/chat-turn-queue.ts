@@ -14,6 +14,20 @@
 // enforces the "not mid-turn" invariant: while `userTurnActive` is true it is
 // a no-op returning `[]` and leaves the queue untouched, rather than trusting
 // the caller to only invoke it at the right moment.
+//
+// TERM5-QUEUE (Sprint 427, Task 427-004) — `enqueueCorrelatedResult` layers a
+// flowId-correlated, rich-result completion (Task-3/427-003's flowId-filtered
+// `createRunCompletionWatch`, run-completion-watch.ts) on top of the same two
+// primitives, with zero change to either: it buffers via `enqueueBg` and then
+// immediately attempts `drainAsTurns()`. While idle that attempt succeeds and
+// hands the caller a turn to render right away ("idle REPL uyanir"); mid-turn
+// it inherits `drainAsTurns()`'s existing no-op, so the event simply waits in
+// the buffer for the next natural turn-end drain ("active-turn'de buffer").
+// Formatting the `ChatTurnBgEvent` stays the caller's job (see the doc on
+// `ChatTurnBgEvent.summary` below) — mirrors run.tsx's `buildBgTurnEvent`
+// (born-642) precedent. That wiring, plus the `enabled` flag's real source
+// (`config.terminal.run_flow_v2`), lives in run.tsx and is a follow-up task —
+// this module only owns the idle-produce-vs-active-buffer mechanism.
 
 /** One background-completed-work notification. */
 export interface ChatTurnBgEvent {
@@ -41,6 +55,19 @@ export interface ChatTurnQueue {
   drainAsTurns(): ChatTurnPayload[];
   /** Number of buffered buckets (post-coalesce), not raw event count. */
   size(): number;
+  /**
+   * TERM5-QUEUE (427-004) — buffers a flowId-correlated, already-formatted
+   * completion event (`enqueueBg` underneath) and immediately attempts to
+   * drain it. Returns the drained `ChatTurnPayload[]` when idle (a non-empty
+   * result is the "produce this turn now / wake the REPL" signal) or `[]`
+   * while `userTurnActive` is true (the event stays buffered — exactly
+   * `drainAsTurns()`'s existing mid-turn no-op, unchanged).
+   *
+   * `enabled=false` is a total no-op: the event is never buffered and `[]` is
+   * returned, byte-identical to never calling this method at all — the
+   * caller gates this with its own flag (e.g. `terminal.run_flow_v2`).
+   */
+  enqueueCorrelatedResult(event: ChatTurnBgEvent, enabled: boolean): ChatTurnPayload[];
 }
 
 interface ChatTurnBucket {
@@ -71,6 +98,12 @@ export function createChatTurnQueue(): ChatTurnQueue {
 
     size() {
       return buckets.length;
+    },
+
+    enqueueCorrelatedResult(event, enabled) {
+      if (!enabled) return [];
+      queue.enqueueBg(event);
+      return queue.drainAsTurns();
     },
   };
 

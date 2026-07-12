@@ -151,6 +151,24 @@ export function bgPayloadsToTurnTexts(payloads: readonly ChatTurnPayload[]): str
 }
 
 /**
+ * TERM5-UI (sprint-427, task 6) — drains a flowId-correlated `ChatTurnBgEvent`
+ * through the SAME `ChatTurnQueue` every generic bg-turn already flows
+ * through (`enqueueCorrelatedResult`, chat-turn-queue.ts), returning the
+ * turn-text(s) to push right away. `enqueueCorrelatedResult` produces
+ * immediately while idle ("idle REPL uyanır", per its own doc comment) or
+ * returns `[]` while a turn is in flight — the event stays buffered and
+ * surfaces later through the EXISTING turn-end `drainAsTurns()` drain,
+ * unchanged. `enabled=true`: the caller (run.tsx) already gates registration
+ * of the sink that calls this on `runFlowController`'s own presence. Pure
+ * aside from the injected `queue` — same "pull decision logic out of the Ink
+ * component" pattern as {@link bgPayloadsToTurnTexts} above (ink-testing-
+ * library is not a project dependency).
+ */
+export function drainRunFlowResultTurns(queue: ChatTurnQueue, event: ChatTurnBgEvent): string[] {
+  return bgPayloadsToTurnTexts(queue.enqueueCorrelatedResult(event, true));
+}
+
+/**
  * APP-SURFACE-WIRE (358-006) — pure, testable helpers for the startup
  * resume-teaser, the /resume picker (session-resume.ts), and the busy-controls
  * state machine (busy-controls.ts). Same "pull decision logic out of the Ink
@@ -886,6 +904,15 @@ export interface ReplAppProps {
    * defaults to DEFAULT_RUN_FLOW_MOUNT_LABELS (English) until run.tsx's
    * buildRunFlowMountLabels(t) supplies real en/tr labels. */
   runFlowMountLabels?: RunFlowMountLabels;
+  /**
+   * TERM5-UI (sprint-427, task 6) — registers the sink run.tsx's
+   * `wireRunFlowResultWatch` feeds a flowId-correlated, already-localized
+   * `ChatTurnBgEvent` (verdict-summary + flowId, `buildRunFlowResultEvent`)
+   * into. Present only when `runFlowController` is present (same flag gate);
+   * absent -> the ChatTurnQueue.enqueueCorrelatedResult path is never
+   * reached, byte-identical to the pre-427-006 render.
+   */
+  registerRunFlowResultSink?: (enqueue: (event: ChatTurnBgEvent) => void) => void;
 }
 
 type ApprovalMode = 'suggest' | 'auto-edit' | 'full-auto';
@@ -973,7 +1000,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, registerRunFlowResultSink } = props;
   const { exit } = useApp();
   const [selection, setSelection] = useState<ActiveSelection>(initialSelection);
   const [approval, setApproval] = useState<ApprovalMode>('suggest');
@@ -1132,6 +1159,17 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (!registerBgEventSink) return;
     registerBgEventSink((event) => bgQueue.current!.enqueueBg(event));
   }, [registerBgEventSink]);
+
+  // TERM5-UI (sprint-427, task 6): flowId-correlated result-turn sink — unlike
+  // the generic bg-event sink above, this drains IMMEDIATELY (drainRunFlowResultTurns
+  // -> enqueueCorrelatedResult), so an idle REPL renders the rich verdict-summary
+  // turn the moment it lands rather than waiting for the next user turn to end.
+  useEffect(() => {
+    if (!registerRunFlowResultSink) return;
+    registerRunFlowResultSink((event) => {
+      for (const text of drainRunFlowResultTurns(bgQueue.current!, event)) pushTurn('bg', text);
+    });
+  }, [registerRunFlowResultSink]);
 
   // APP-SURFACE-WIRE (358-006): startup resume-teaser. One disk read per mount
   // (listRecentSessions is degrade-safe: missing/unreadable jobs dir → []).

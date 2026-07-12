@@ -9,6 +9,31 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint427] - 2026-07-12
+
+### Added
+
+- TERM5-FIN — sprint-finalizer rich completion-record (flowId'li)
+- TERM5-FEED — run-state-feed flowId-korelasyonu
+- TERM5-WATCH — run-completion-watch korelasyon (yanlış-eşleşme ölür)
+- TERM5-QUEUE — chat-turn-queue correlated result-turn (idle-wake)
+- TERM5-CTRL — controller terminal-state reduce (correlated event'ten)
+- TERM5-UI — REPL result-turn render + i18n
+- SCHED6-RED — reducer cascade/restore kararları
+- SCHED6-EFF — CascadeSkip/WriteCheckpoint executor (persist-before-commit)
+- SCHED6-CKPT — checkpoint restore reducer-parity (MRR korunur)
+- SCHED6-COMP — cascade composition-testi + debt tek-yol
+
+### Changed
+
+- WIRE-PROBE — sprint-start env-probe doldurma (born-670a) (completed with tech debt)
+- WIRE-VERIFY — worker-prompt verify-komut dürüstlüğü (born-670b) (completed with tech debt)
+- ALLOW-WIRE — allowlist'in prompt/yüzeye flag'li uygulanması (559) (completed with tech debt)
+- STORE-CORE — run-flow-store'un core'a taşınması (born-671) (completed with tech debt)
+
+
+_Tasks: 24 total, 24 done, 4 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint426] - 2026-07-12
 
 ### Added

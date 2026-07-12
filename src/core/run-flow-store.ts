@@ -1,4 +1,5 @@
-// ═══ run-flow-store — TERM-FLOW-UNIFY Sprint-4 dilim (426-001) ═════════════
+// ═══ run-flow-store — TERM-FLOW-UNIFY Sprint-4 dilim (426-001), moved to
+// core/ (born-671, sprint-427 task 427-020) ═════════════════════════════
 //
 // docs/analysis/term-flow-unify-design-2026-07-11.md ("Net Öneri" + Sprint-4
 // row "Yeni run-job-service.ts, run-flow-store.ts"). Fixes the explicit TODO
@@ -6,11 +7,6 @@
 // resulting approvedSnapshot lives only in this in-process controller
 // instance. A real START_REQUESTED caller must persist it to a durable
 // run-flow-store before consuming it." THIS file is that durable store.
-// Wiring run-flow-controller.approve() to actually CALL saveApprovedSnapshot
-// is a follow-up (run-flow-controller.ts is not in this task's write scope) —
-// this slice ships the persistence capability + its consumer (orchestra/
-// run-job-service.ts), both flag-gated behind `terminal.run_flow_v2`
-// (default off) with no production caller wired into the approval path yet.
 //
 // STORED SHAPE IS RICHER THAN THE CORE CONTRACT: core/run-flow-contract.ts's
 // `ApprovedPlanSnapshot` is the reducer's in-memory CAS record (flowId/
@@ -22,16 +18,14 @@
 // start fresh lifecycle'da runPlanPhase'i YENİDEN çağırıyor"). This is the
 // store's own on-disk schema, not a redefinition of the core contract type.
 //
-// ADR-D-004 (Layer-1 import direction, C3 — surfaces MUST NOT import one
-// another): this file lives under cli/repl/ per this task's assigned write
-// path. src/mcp/tools/start.ts (a DIFFERENT surface) reads from this store
-// too — an existing precedent for that exact edge already ships in this
-// codebase (src/mcp/tools/nervous-edit.ts imports
-// ../../cli/repl/nervous-bridge.js), so this file follows that precedent
-// rather than duplicating a second store implementation. Flagged in this
-// task's result notes for Brain's awareness (ADR amendment candidate).
-// orchestra/run-job-service.ts, by contrast, NEVER imports this file (C2) —
-// callers load a snapshot/handle here and inject the plain data in.
+// MOVED TO core/ (born-671, 427-020): originally lived under cli/repl/ —
+// src/mcp/tools/start.ts (a different surface) importing it from there was
+// a live ADR-D-004 C3 violation (a surface reaching into another surface's
+// internals). core/ is Layer-0 — every surface (cli/, mcp/, orchestra/) may
+// import it freely, so the mcp<->cli edge that motivated the move is gone.
+// No re-export shim left at the old path; every consumer was repointed at
+// core/run-flow-store.js directly. tests/orchestra/run-flow-reducer.test.ts's
+// known-consumer allowlist now pins the legitimate consumer list.
 //
 // Atomic write = tmp file + writeFileSync + renameSync (same pattern as
 // core/approval-store.ts's atomicWriteJson) so a crash mid-write never
@@ -52,14 +46,16 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import { RUNTIME_DIR } from '../../core/constants.js';
-import type { Sprint } from '../../core/types.js';
-import type { ActorContext } from '../../core/work-model.js';
+import { RUNTIME_DIR } from './constants.js';
+import type { Sprint } from './types.js';
+import type { ActorContext } from './work-model.js';
 // RunHandle is duck-typed against core/run-flow-contract.ts but deliberately
 // imported from run-job-service.ts, NOT the contract file itself — see that
 // module's RunHandle doc comment (tests/orchestra/run-flow-reducer.test.ts's
-// known-consumer allowlist pin, out of this task's write scope).
-import type { RunHandle } from '../../orchestra/run-job-service.js';
+// known-consumer allowlist pin, out of this task's write scope). This makes
+// core/ import orchestra/ — the one edge ADR-D-004 already scans
+// (authority-enforcer.ts, advisory/soft: warns + emits, no hard-block).
+import type { RunHandle } from '../orchestra/run-job-service.js';
 
 // ─── Stored record shapes ───────────────────────────────────────────────────
 

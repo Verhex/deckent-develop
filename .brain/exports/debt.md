@@ -9,6 +9,11 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-427-011 | Tech debt from 427-011: born-670a WIRE-PROBE implemented: runPlanPhase (sprint-p | normal | sprint-427 | resolved |
+| debt-427-012 | Tech debt from 427-012: born-670b WIRE-VERIFY implemented in prompt-god-template | normal | sprint-427 | resolved |
+| debt-427-014 | Tech debt from 427-014: ALLOW-WIRE (born-664/559): Task-13's PURE selector (src/ | normal | sprint-427 | resolved |
+| debt-427-020 | Tech debt from 427-020: Moved src/cli/repl/run-flow-store.ts -> src/core/run-flo | normal | sprint-427 | resolved |
+| debt-426-001 | Tech debt from 426-001: Implemented the Sprint-4 slice behind terminal.run_flow_ | normal | sprint-426 | resolved |
 | debt-425-001 | Tech debt from 425-001: Implemented the flag-gated (terminal.run_flow_v2, defaul | normal | sprint-425 | resolved |
 | debt-423-003 | Tech debt from 423-003: TT556 PLANNER-PREFLIGHT — born-650 + 653 + 661. Verified | normal | sprint-423 | resolved |
 | debt-422-002 | Timeout-partial from 422-002: worker killed mid-execution, work accepted | normal | sprint-422 | resolved |

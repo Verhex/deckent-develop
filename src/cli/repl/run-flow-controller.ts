@@ -39,6 +39,7 @@ import {
   type RunFlowContext,
   type RunProposal,
   createInitialRunFlowContext,
+  isTerminalRunFlowState,
 } from '../../core/run-flow-contract.js';
 import type { ActorContext, RequestOrigin } from '../../core/work-model.js';
 import type { BrainPlanningMode, ResolvedConfig, Sprint, SprintSizeRecommendation } from '../../core/types.js';
@@ -49,9 +50,13 @@ import { readContext } from '../../orchestra/brain.js';
 // TERM-FLOW-UNIFY Sprint-4 mount (426-002) — Task-1's durable store + start
 // service (426-001). USE ONLY: this file never writes to run-flow-store.ts or
 // run-job-service.ts, it imports their exported API (task write-scope boundary).
-import { saveApprovedSnapshot, loadRunHandle, saveRunHandle, type StoredApprovedSnapshot } from './run-flow-store.js';
+import { saveApprovedSnapshot, loadRunHandle, saveRunHandle, type StoredApprovedSnapshot } from '../../core/run-flow-store.js';
 import { startApprovedRun, type RunHandle } from '../../orchestra/run-job-service.js';
 import { spawnDetachedDeckent } from '../helpers/detached-start.js';
+// TERM5-CTRL (sprint-427, task 5) — the SAME completion-notification shape
+// run.tsx already receives from `createRunCompletionWatch`'s `onComplete`
+// callback (wireBgTurnsProducer, run.tsx) — see applyRunCompletion below.
+import type { RunCompletionInfo } from './run-completion-watch.js';
 
 export interface RunFlowControllerDeps {
   /** Project root — threaded straight into readContext()/generatePlanPreview(). */
@@ -105,6 +110,37 @@ export interface RunFlowController {
    * structurally satisfies this interface without modification.
    */
   startApproved?(): RunFlowContext;
+  /**
+   * TERM5-CTRL (sprint-427, task 5) — the controller's completion channel:
+   * consumes a flowId-correlated completion notification
+   * (run-completion-watch.ts's `RunCompletionInfo`, e.g. delivered by
+   * `createRunCompletionWatch`'s `onComplete` callback filtered to this
+   * controller's own flowId — the same channel run.tsx's
+   * `wireBgTurnsProducer` already consumes) and drives
+   * DETACHED_RUNNING -> COMPLETED / (STARTING|DETACHED_RUNNING) -> FAILED
+   * through the SAME `reduceRunFlow` every other method in this file goes
+   * through — no hand-rolled state mutation here.
+   *
+   * Two invariants, both defense-in-depth against a mis-wired or duplicate
+   * caller (the production caller is already flowId-filtered at the watch
+   * layer, but this method never assumes that holds):
+   *   - a wrong-flow event (`event.flowId` unset, or not equal to the live
+   *     `getContext().flowId`) is a loud-logged no-op — context is returned
+   *     unchanged.
+   *   - once the flow has already reached a terminal state
+   *     (COMPLETED/FAILED/CANCELLED/BLOCKED — e.g. this exact event
+   *     redelivered by an at-least-once watcher) this is a SILENT no-op —
+   *     an expected replay, not an anomaly.
+   * A context that is non-terminal but not yet STARTING/DETACHED_RUNNING is
+   * a genuine ordering bug, not a race this method smooths over — it is left
+   * to surface `reduceRunFlow`'s own typed `RunFlowTransitionError`.
+   *
+   * Optional for the same reason `startApproved` is: the pre-427-005
+   * `RunFlowController` shape (e.g. tests/cli/run-flow-controller.test.ts's
+   * `fakeController()`) still structurally satisfies this interface without
+   * modification.
+   */
+  applyRunCompletion?(event: RunCompletionInfo): RunFlowContext;
 }
 
 function defaultRecommendation(config: ResolvedConfig): SprintSizeRecommendation {
@@ -302,11 +338,51 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
     return context;
   }
 
+  /** See {@link RunFlowController.applyRunCompletion} for the full rationale. */
+  function applyRunCompletion(event: RunCompletionInfo): RunFlowContext {
+    const { flowId, state } = context;
+
+    if (flowId === undefined || event.flowId !== flowId) {
+      console.error(
+        `[run-flow-controller] ignoring completion event for jobId='${event.jobId}' ` +
+          `(event.flowId='${event.flowId ?? '<unset>'}') — controller is tracking flowId='${flowId ?? '<unset>'}'`,
+      );
+      return context;
+    }
+
+    if (isTerminalRunFlowState(state)) {
+      // Idempotent replay — the flow already reached a terminal state (most
+      // commonly this exact event redelivered by an at-least-once watcher).
+      // Silent: this is expected steady-state behavior, not an anomaly.
+      return context;
+    }
+
+    context = reduceRunFlow(
+      context,
+      event.status === 'COMPLETE'
+        ? {
+            schemaVersion: RUN_FLOW_EVENT_SCHEMA_VERSION,
+            flowId,
+            timestamp: nowFn(),
+            type: 'RUN_COMPLETED',
+          }
+        : {
+            schemaVersion: RUN_FLOW_EVENT_SCHEMA_VERSION,
+            flowId,
+            timestamp: nowFn(),
+            type: 'RUN_FAILED',
+            error: event.error ?? `run ${event.jobId} failed`,
+          },
+    );
+    return context;
+  }
+
   return {
     getContext: () => context,
     proposeRun,
     approve,
     reject,
     startApproved,
+    applyRunCompletion,
   };
 }

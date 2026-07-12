@@ -100,6 +100,22 @@ function now(): string {
   return new Date().toISOString();
 }
 
+/**
+ * Cascade-skip detector — the SINGLE source of truth `handleEvaluation`'s
+ * direct-fix gate and `handleCrossDependencies`' cross-fix gate both consult
+ * (SCHED6-COMP, sprint-427 task 427-010: "debt-manager'ın cascade-kaynaklı
+ * debt kaydı tek-yoldan"). A never-dispatched cascade-skip (`cascadeSkipped:
+ * true` — see task-types.ts) must never be recognized differently by the two
+ * gates, whether the `TaskResult` they inspect arrives as an in-memory
+ * parameter (`handleEvaluation`) or is re-read from disk
+ * (`handleCrossDependencies`) — one shared predicate means the two gates
+ * cannot drift apart and independently double-record a fix/xfix for the same
+ * synthetic skip.
+ */
+function isCascadeSkippedResult(result: TaskResult | null | undefined): boolean {
+  return result?.cascadeSkipped === true;
+}
+
 function getSprintNumber(sprintId: string): number {
   const match = sprintId.match(/sprint-(\d+)/);
   return match?.[1] ? parseInt(match[1], 10) : 0;
@@ -418,7 +434,7 @@ export function handleEvaluation(
   // it). Same principle as the NOT_DISPATCHED blame-fix exemption
   // (sprint-phases.ts). Status is already NO_GO; the retry belongs to the NEXT
   // sprint, after the upstream is reviewed/fixed.
-  if (result.cascadeSkipped === true) {
+  if (isCascadeSkippedResult(result)) {
     debugLog('handleEvaluation:cascadeSkipExempt', `task=${task.id} — no fix task for a never-dispatched skip`);
     return;
   }
@@ -552,7 +568,7 @@ export function handleCrossDependencies(
     const noGoResult = readJsonSafe<TaskResult>(
       join(projectRoot, TASKS_DIR, `task-${noGoTask.id}.result`),
     );
-    if (noGoResult?.cascadeSkipped === true) continue;
+    if (isCascadeSkippedResult(noGoResult)) continue;
     for (const depId of noGoTask.dependencies) {
       const depEval = evaluations.get(depId);
       if (depEval === TaskEvaluation.DONE || depEval === TaskEvaluation.GO_WITH_TECH_DEBT) {

@@ -29,7 +29,7 @@ import { prepareZeroConfig, cleanupZeroConfig } from './quick-start.js';
 import { isSprintLocked } from '../../core/multi-ide.js';
 import { detectOrphan, archiveOrphan, listPidFiles } from '../../orchestra/sprint-pid-manager.js';
 import { createSandboxBackend } from '../../orchestra/spawn-backend.js';
-import { loadApprovedSnapshot, loadRunHandle, saveRunHandle } from '../repl/run-flow-store.js';
+import { loadApprovedSnapshot, loadRunHandle, saveRunHandle } from '../../core/run-flow-store.js';
 import {
   startApprovedRun,
   RunJobFlowNotApprovedError,

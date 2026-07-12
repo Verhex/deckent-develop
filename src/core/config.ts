@@ -790,6 +790,26 @@ export function validateConfig(config: DeckentConfig): string[] {
         );
       }
     }
+
+    // born-667a (Task 427-023, TIMEOUT-TIER): optional model-tier multiplier.
+    // Absent entirely = 1.0 for every tier (today's behavior, unchanged).
+    const modelMultiplier = (config.timeout as Partial<TimeoutConfig>).model_multiplier;
+    if (modelMultiplier !== undefined) {
+      const validTiers = ['economy', 'standard', 'premium', 'premium_plus'] as const;
+      for (const [tier, value] of Object.entries(modelMultiplier)) {
+        if (!(validTiers as readonly string[]).includes(tier)) {
+          errors.push(
+            `Invalid tier '${tier}' for field 'timeout.model_multiplier'. Valid: ${validTiers.join(', ')}`,
+          );
+          continue;
+        }
+        if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+          errors.push(
+            `Invalid value '${value}' for field 'timeout.model_multiplier.${tier}'. Must be a finite number > 0.`,
+          );
+        }
+      }
+    }
   }
 
   // ─── Nervous System validation ─────────────────────────────────────

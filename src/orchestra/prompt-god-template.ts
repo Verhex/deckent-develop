@@ -11,9 +11,11 @@ import type { Task, TaskScope } from '../core/task-types.js';
 import type { MemoryEntryV2 } from '../core/memory-types.js';
 import { selectRelevantAdrs, buildAdrPromptSection } from './adr-selector.js';
 import { evaluateScopeGate } from '../core/scope-gate.js';
+import type { ToolAllowlistResult } from '../core/tool-allowlist.js';
 import { sanitizeScope } from './scope-sanitizer.js';
 import { truncateAtParagraph, inferTaskDomains, logInjectionAudit } from './task-builder.js';
 import { getDefaultProviderName } from './sprint-utils.js';
+import type { ResolvedVerifyCommands } from './worker-verify-tool.js';
 import {
   reorderLeadingT0,
   DEFAULT_LEADING_T0_REORDER,
@@ -139,6 +141,45 @@ export interface SprintContext {
    */
   toolInventory?: string;
   /**
+   * Stack-resolved check/test commands (born-670b WIRE-VERIFY, task 427-012).
+   *
+   * Sourced by the caller from `resolveVerifyCommands(projectRoot)`
+   * (worker-verify-tool.ts) — that resolution reads the project's stack
+   * config off disk (`detectFullStack`), so it MUST stay out of this pure,
+   * deterministic compiler and is injected as an already-resolved value,
+   * exactly like {@link SprintContext.toolInventory}. When present, the
+   * CRITICAL VERIFY STEPS block cites these EXACT commands instead of a
+   * generic multi-language examples list, so a worker never burns a
+   * verify-loop turn on a wrong-for-stack guess (555 goal). `undefined`
+   * (the default until a caller wires it) → the legacy generic-examples
+   * text, byte-identical to the pre-427-012 prompt.
+   */
+  verifyCommands?: ResolvedVerifyCommands;
+  /**
+   * Task-scoped worker tool allowlist (born-664 / 559, task 427-014 ALLOW-WIRE).
+   *
+   * The resolved {@link ToolAllowlistResult} from `computeToolAllowlist`
+   * (`src/core/tool-allowlist.ts`) — a PURE, deterministic selection of the
+   * narrowed tool surface for THIS task. Sourced by the caller (task-builder.ts
+   * `buildWorkerPrompt`) ONLY when `config.tools.allowlist_enabled` is true; that
+   * config flag, the LIVE tool universe (native tools + connectors/MCP), and the
+   * per-task compute all live at the call site — out of this pure compiler, exactly
+   * like {@link SprintContext.toolInventory} / {@link SprintContext.verifyCommands}.
+   * When present, {@link buildToolAllowlistBlock} renders a narrowed-surface block.
+   * `undefined` (the default until the caller wire lands — the flag is default-OFF)
+   * → NO block, so the compiled prompt is byte-for-byte identical to the
+   * pre-427-014 output and every prompt pin (prompt-determinism / prompt-segmentation
+   * protected-set + stable-prefix) holds.
+   *
+   * NOTE — real enforcement injection point: this block only DESCRIBES the surface to
+   * the worker. The surface is actually ENFORCED by the provider CLI `--allowedTools`
+   * flag, built from a task's write scope by `resolveAllowedTools`
+   * (spawn-backend-docker.ts) and the sprint-spawner / scheduler-effects / spawn.ts
+   * mirrors → provider `buildCommand` (claude.ts). Making that flag honor the
+   * computed allowlist is out of this task's write scope (a tracked follow-up).
+   */
+  toolAllowlist?: ToolAllowlistResult;
+  /**
    * Leading-T0 cache reorder (Sprint 330 330-019 — provider-agnostic prompt cache).
    *
    * EXPERIMENTAL, default-OFF ({@link DEFAULT_LEADING_T0_REORDER}). When true the
@@ -242,14 +283,25 @@ Every conversation turn re-sends cached context — fewer turns beats fewer toke
  * pager (`cmd 2>&1 | tail`); the shell reports the PIPELINE's exit status — the
  * pager's 0 — so the failure surfaced as `is_error:false` and the worker burned
  * a whole turn re-running it. This compact, task-invariant T0 directive teaches
- * the un-masked read (`${PIPESTATUS[0]}` / separate-line `$?` / the verify_task
- * helper). Pinned ≤400 chars by tests/orchestra/turn-economy-2.test.ts so it
- * cannot silently grow. Concatenated into the shared 'karpathy' T0 segment next
- * to {@link TURN_ECONOMY_BLOCK} (same closed-registry-kind rationale) — not a new
- * PromptSegmentKind.
+ * the un-masked read (`${PIPESTATUS[0]}` / separate-line `$?`).
+ *
+ * born-670b (WIRE-VERIFY, task 427-012) — YALANCI-PROMPT fix: this block used
+ * to also offer "call verify_task" as a third alternative. `verify_task` is a
+ * TS function (worker-verify-tool.ts), never a tool registered on the actual
+ * worker-facing surface (e.g. claude-CLI's tool list) — telling every worker
+ * it can "call" a tool that does not exist on its surface is exactly the
+ * lying-prompt failure mode this fix kills. The block now points at the
+ * VERIFY STEPS section instead (the heading that actually exists in every
+ * prompt, code or doc-only), which for code tasks (same task, part (a)) now
+ * cites this project's concrete, stack-resolved check/test commands.
+ *
+ * Pinned by tests/orchestra/verify-commands-prompt.test.ts so it cannot
+ * silently regrow a non-existent-tool reference. Concatenated into the shared
+ * 'karpathy' T0 segment next to {@link TURN_ECONOMY_BLOCK} (same
+ * closed-registry-kind rationale) — not a new PromptSegmentKind.
  */
 const PIPE_EXIT_BLOCK = `## Pipe-Exit Honesty
-A failing command piped to a pager (\`cmd | tail\`) reports the PIPE's exit code — the pager's 0 — so a real failure reads back as \`is_error:false\` and you burn a turn. NEVER pipe a check to \`tail\`/\`head\`. Read the TRUE code: bash \`\${PIPESTATUS[0]}\`, or run the command unpiped and read \`$?\` on the NEXT line, or call verify_task (separate check/test exit codes).`;
+A failing command piped to a pager (\`cmd | tail\`) reports the PIPE's exit code — the pager's 0 — so a real failure reads back as \`is_error:false\` and you burn a turn. NEVER pipe a check to \`tail\`/\`head\`. Read the TRUE code: bash \`\${PIPESTATUS[0]}\`, or run the command unpiped and read \`$?\` on the NEXT line — see the VERIFY STEPS section below for this task's exact commands.`;
 
 /**
  * Artifact-reuse directive (TT555 — task 421-002, waste-class (c)).
@@ -423,6 +475,8 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
     emitIdempotency: boilerplate.idempotency,
     preExistingFailures: ctx.preExistingFailures,
     toolInventory: ctx.toolInventory,
+    verifyCommands: ctx.verifyCommands,
+    toolAllowlist: ctx.toolAllowlist,
   });
 
   // Leading-T0 reorder (default-OFF): regroup tiers (T0→T1→T2) for the longest
@@ -605,6 +659,38 @@ export function buildEnvProbeBlock(toolInventory?: string): string {
   if (inv.length === 0) return '';
   return `## Environment Tool Inventory
 Probed on THIS host at sprint start — do not spend a turn re-discovering these: ${inv}. A tool marked \`no\` is absent here; reach for an available alternative (e.g. \`python3=no\` → use a Node.js one-liner) instead of invoking it and failing.`;
+}
+
+// ─── Tool-Allowlist Block Builder (born-664 / 559 — task 427-014 ALLOW-WIRE) ──
+
+/**
+ * Render the task-scoped tool-allowlist block from the caller-resolved
+ * {@link SprintContext.toolAllowlist}.
+ *
+ * PURE: takes the already-computed {@link ToolAllowlistResult} (the config-flag
+ * read + live tool universe + per-task compute all live at the call site, out of
+ * this deterministic compiler — same precedent as {@link buildEnvProbeBlock}'s
+ * pre-resolved inventory string). Returns '' when the allowlist is absent OR grants
+ * no tools, so the section — header included — is omitted entirely and the compiled
+ * prompt stays byte-for-byte identical to the pre-427-014 output (flag-off = today).
+ *
+ * The escape hatch is stated HONESTLY: a worker records an ungranted-tool need on a
+ * `toolEscalation:` line in its `.result` notes (mirroring the existing
+ * `npmAdvisory:` / `docImpact:` notes-line convention). It never tells the worker to
+ * "call" a tool that is not on its actual surface — the YALANCI-PROMPT failure mode
+ * born-670b (task 427-012) killed.
+ *
+ * Emitted as a volatile T2 segment (`tool-allowlist`): the granted set varies per
+ * task, so it must never land in the shared T0/T1 cache prefix — `classifyTier` maps
+ * the unregistered kind to T2.
+ */
+export function buildToolAllowlistBlock(allowlist?: ToolAllowlistResult): string {
+  if (!allowlist || allowlist.allowed.length === 0) return '';
+  const total = allowlist.allowed.length + allowlist.escalatable.length;
+  const tools = allowlist.allowed.map(t => `\`${t}\``).join(', ');
+  return `## Tool Surface (narrowed for this task)
+Your default tool surface is reduced to the ${allowlist.allowed.length} tool(s) this task needs (of ${total} available): ${tools}.
+A tool not listed above is NOT granted by default. If your task genuinely needs one, name it and why on a \`toolEscalation:\` line in your \`.result\` notes and continue with the tools above — do NOT assume an ungranted tool is available on your surface.`;
 }
 
 // ─── Conditional Boilerplate Gating (PROMPT-W1 d) ──────────────────────
@@ -1254,6 +1340,10 @@ interface RenderInput {
   preExistingFailures?: number;
   /** One-line host tool inventory (TT555); undefined → no env-probe block. */
   toolInventory?: string;
+  /** Stack-resolved check/test commands (born-670b WIRE-VERIFY); undefined → legacy generic-examples text. */
+  verifyCommands?: ResolvedVerifyCommands;
+  /** Task-scoped tool allowlist (born-664 / 559 ALLOW-WIRE); undefined → no tool-allowlist block. */
+  toolAllowlist?: ToolAllowlistResult;
 }
 
 /**
@@ -1380,8 +1470,40 @@ export function buildExitPathTestHint(task: {
   return "\n   Exit-path test hint: mock `process.exit` (e.g. `vi.spyOn(process, 'exit').mockImplementation(...)`), assert the exit code without terminating the test process, and never call the real exit in tests.";
 }
 
+/**
+ * Build the type-check guidance line for CRITICAL VERIFY STEPS (born-670b
+ * WIRE-VERIFY, task 427-012). When the caller supplies the stack-resolved
+ * check command ({@link SprintContext.verifyCommands}), cites that EXACT
+ * command instead of a multi-language examples list — a worker no longer has
+ * to guess between `tsc`/`mypy`/`go vet`/`cargo check` and risk burning a
+ * verify-loop turn on a wrong-for-stack command (555 goal). Undefined/absent
+ * → the legacy multi-language examples line, byte-identical to the
+ * pre-427-012 prompt.
+ */
+export function buildCheckCommandLine(verifyCommands?: ResolvedVerifyCommands): string {
+  if (verifyCommands?.check) {
+    return `Run: \`${verifyCommands.check}\` — this project's resolved type-check command (do not substitute a different language's tool).`;
+  }
+  return 'Examples: `tsc --noEmit` (TypeScript), `mypy` (Python), `go vet ./...` (Go), `cargo check` (Rust)';
+}
+
+/**
+ * Build the targeted-test guidance line for CRITICAL VERIFY STEPS (born-670b
+ * WIRE-VERIFY, task 427-012). Mirrors {@link buildCheckCommandLine}: when the
+ * resolved test command is supplied, tells the worker to scope THAT exact
+ * command to the file(s) it changed instead of guessing a runner.
+ * Undefined/absent → the legacy single-example line, byte-identical to the
+ * pre-427-012 prompt.
+ */
+export function buildTestCommandLine(verifyCommands?: ResolvedVerifyCommands): string {
+  if (verifyCommands?.test) {
+    return `Run: \`${verifyCommands.test} <path-to-the-test-file(s)-you-changed>\` — this project's resolved test command, scoped to your changed file(s) — do NOT run it bare/unscoped (that is the Full test suite).`;
+  }
+  return 'Example: `npx vitest run tests/orchestra/my-module.test.ts` — do NOT run the Full test suite (`npx vitest run` without args).';
+}
+
 function renderSegments(input: RenderInput): PromptSegment[] {
-  const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, task, effort, idempotencyKey, emitIdempotency, preExistingFailures, toolInventory } = input;
+  const { agentBlock, skillBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, task, effort, idempotencyKey, emitIdempotency, preExistingFailures, toolInventory, verifyCommands, toolAllowlist } = input;
 
   // Tier-tagged assembly (Sprint 330 330-019). Push order below IS the default
   // production order — `buildTaskPromptSegmented` joins these contents with
@@ -1453,6 +1575,16 @@ ${dodBlock}${idempotencyBlock}`);
   const envProbeBlock = buildEnvProbeBlock(toolInventory);
   if (envProbeBlock) push('T2', 'env-probe', envProbeBlock);
 
+  // Tool-allowlist (born-664 / 559 — task 427-014 ALLOW-WIRE): a narrowed,
+  // task-scoped default tool surface, injected next to the env-probe block (both
+  // describe the worker's available surface before it acts). Empty when the caller
+  // passed no allowlist (the config.tools.allowlist_enabled flag is default-OFF, and
+  // the caller wire is a tracked follow-up) → omitted, byte-for-byte legacy prompt.
+  // Per-task volatile → T2 ('tool-allowlist' is an unregistered kind: classifyTier
+  // maps it to T2, so it never poisons the shared T0/T1 cache prefix).
+  const toolAllowlistBlock = buildToolAllowlistBlock(toolAllowlist);
+  if (toolAllowlistBlock) push('T2', 'tool-allowlist', toolAllowlistBlock);
+
   // Verify steps — Sprint 250 MF-1: Tier-0 doc-only tasks must NOT run the full
   // test suite. The prompt previously told EVERY worker to run the project test
   // suite; shell-capable external CLIs (codex/gemini) obeyed and ran the full
@@ -1495,9 +1627,9 @@ You MUST run the project's type check and TARGETED tests before marking your tas
 Check the project's TOOLS.md or package.json scripts to find the right commands.
 
 1. **Type check / static analysis** — fix ALL errors (max 3 attempts)
-   Examples: \`tsc --noEmit\` (TypeScript), \`mypy\` (Python), \`go vet ./...\` (Go), \`cargo check\` (Rust)
+   ${buildCheckCommandLine(verifyCommands)}
 2. **TARGETED test file(s) only** — run ONLY the test file(s) that cover the module(s) you changed (max 3 attempts)
-   Example: \`npx vitest run tests/orchestra/my-module.test.ts\` — do NOT run the Full test suite (\`npx vitest run\` without args).
+   ${buildTestCommandLine(verifyCommands)}
    ${buildPreExistingFailuresNote(preExistingFailures)}${buildExitPathTestHint(task)}
 
 If BOTH pass → selfAssessment = "DONE"

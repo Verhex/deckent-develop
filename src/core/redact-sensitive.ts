@@ -21,6 +21,13 @@ export function redactSensitive(text: string): string {
   // API keys: sk-... patterns (OpenAI, Anthropic style) — at least 20 chars after prefix
   result = result.replace(/\b(sk-[a-zA-Z0-9_-]{20,})\b/g, REDACTED);
 
+  // Anthropic API keys: sk-ant-... — length-independent (short keys, e.g. test fixtures
+  // like sk-ant-test-111, must redact too; the {20,}-floor sk- rule above misses them).
+  // Leading \b prevents embedded false positives (e.g. `ask-ant-...` has no boundary
+  // before `sk`, so it never anchors). Scoped to the sk-ant- prefix — the general sk-
+  // rule stays untouched.
+  result = result.replace(/\b(sk-ant-[a-zA-Z0-9_-]+)\b/g, REDACTED);
+
   // API keys: key-... patterns — at least 20 chars after prefix
   result = result.replace(/\b(key-[a-zA-Z0-9_-]{20,})\b/g, REDACTED);
 

@@ -373,15 +373,15 @@ describe('config: terminal.run_flow_v2 flag (default-off, opt-in override)', () 
   });
 });
 
-describe('known-consumer allowlist (Sprint-1 pin evolved for Sprint-2: preview-service/compiler are the legitimate consumers)', () => {
+describe('known-consumer allowlist (Sprint-1 pin evolved for Sprint-2: preview-service/compiler are the legitimate consumers; born-671/427-020 folds run-flow-store in after its cli/repl/ -> core/ move)', () => {
   // Matches an actual ESM import/require specifier ending in the module's
   // .js output path (this project's Node16 resolution requires the `.js`
   // extension — see CLAUDE.md gotchas) — NOT a prose doc-comment mentioning
   // the filename (e.g. config-types.ts cites `run-flow-contract.ts` by name
   // in its flag doc-comment; that is not an import and must not count).
-  const IMPORT_PATTERN = /\b(?:from|require\()\s*['"][^'"]*\/run-flow-(?:reducer|contract)\.js['"]/;
+  const IMPORT_PATTERN = /\b(?:from|require\()\s*['"][^'"]*\/run-flow-(?:reducer|contract|store)\.js['"]/;
 
-  it('nothing under src/ imports run-flow-reducer or run-flow-contract except the reducer/contract pair', () => {
+  it('nothing under src/ imports run-flow-reducer, run-flow-contract, or run-flow-store except their designed consumers', () => {
     const testFileDir = fileURLToPath(new URL('.', import.meta.url));
     const srcRoot = join(testFileDir, '..', '..', 'src');
     const offenders: string[] = [];
@@ -420,6 +420,13 @@ describe('known-consumer allowlist (Sprint-1 pin evolved for Sprint-2: preview-s
       // Sprint-4 dilim (426-002): app.tsx mounts the card + derives PlanPreview
       // from the controller context — the designed live-mount consumer.
       'cli/repl/app.tsx',
+      // born-671 (sprint-427, 427-020): run-flow-store.ts moved cli/repl/ ->
+      // core/ (Layer-0, freely importable) — these two start entrypoints
+      // reading it directly used to be an mcp<->cli ADR-D-004 C3 violation
+      // precedent (mcp/tools/start.ts reaching into cli/repl/); now a
+      // legitimate Layer-0 consumer, not a leak.
+      'mcp/tools/start.ts',
+      'cli/commands/start.ts',
     ];
     expect(offenders.filter((o) => !KNOWN_CONSUMERS.includes(o))).toEqual([]);
   });
