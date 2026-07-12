@@ -3088,5 +3088,14 @@
   "spec": "Fix: is-kimligi (jobId/claim-token) parent tarafinda uretilir, child'a --job-id ile gecer; child mevcut handle.jobId kendi job-id'sine esitse bu CLAIMED-kendisi demektir -> KOSAR (no-op degil); farkli-jobId + canli-is -> gercek-duplicate no-op kalir. Testler: 426/427 no-op pinleri claim-semantigine tasinir + parent-yazdi-child-kostu e2e.",
   "date": "2026-07-12",
   "resolution": "CC-el ayni-gun (2026-07-12): parent-persist SOKULDU (controller+mcp) — tek-yazar CHILD (persist-before-run); in-process idempotency context.handle'dan (yeni erken-donus); 6 pin tek-yazar sozlesmesine tasindi; 107/107. Bilinen-sinir (kabul): child persist-sonrasi-crash stale-handle birakir -> sweep-tooling ayri is."
+ },
+ {
+  "born_id": 682,
+  "title": "do-planner model-hardcode: callZeroConfigPlanner(description, 'sonnet', ...) — brain codex/gpt-5.6-sol'a devredildi ama NL-planlama hâlâ sonnet'te (zero-hardcode-live-data ihlali)",
+  "priority": "P1",
+  "status": "OPEN",
+  "source": "brain-devir günü tespiti (2026-07-12): run-proposal-compiler.ts defaultRunProposalPlanner 'sonnet' literal'i; brain_provider/brain_model config'i okunmuyor",
+  "spec": "defaultRunProposalPlanner (ve callZeroConfigPlanner zinciri) planner-modelini config'ten çözsün: resolveBrainPlanningMode emsali bir resolveBrainModel(config) → activeModeConfig.brain_model + brain_provider; codex-brain'de NL-planlama gpt-5.6-sol'dan akar; test: config-override'lı planner-model seçimi.",
+  "date": "2026-07-12"
  }
 ]
