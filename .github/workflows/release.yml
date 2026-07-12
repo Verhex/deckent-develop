@@ -151,6 +151,15 @@ jobs:
       - name: Rebuild native binding (better-sqlite3)
         run: npm run ci:rebuild-native
 
+      # SEC-05 (419-003): the CI `security` job's audit gate (npm audit --json, fail-closed,
+      # signed-exception allowlist — scripts/check-dependency-audit.mjs) never ran on the
+      # release chain; a release could publish with unaudited or newly-regressed high/critical
+      # dependency vulnerabilities. Placed after the CI/Cross-Platform-E2E attestation checks
+      # and dependency install (needs package-lock.json + node_modules present), before the
+      # expensive lint/build/test/publish steps — fail fast on a real finding.
+      - name: Dependency audit (fail-closed, signed-exception allowlist; SEC-05)
+        run: node scripts/check-dependency-audit.mjs
+
       - name: Type check (lint)
         run: npm run lint
 

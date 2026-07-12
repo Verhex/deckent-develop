@@ -64,9 +64,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run ci:rebuild-native
-      - name: npm audit (high severity)
-        run: npm audit --audit-level=high
-        continue-on-error: true
+      - name: Dependency audit (fail-closed, signed-exception allowlist; SEC-05)
+        run: node scripts/check-dependency-audit.mjs
 
   test-core:
     name: Tests — Core + Agents
