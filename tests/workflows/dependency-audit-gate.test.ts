@@ -228,12 +228,14 @@ describe('check-dependency-audit.mjs — fail-closed gate (SEC-05)', () => {
   });
 
   describe('the real scripts/audit-exceptions.json shipped with this repo', () => {
-    it('is a valid array where every entry passes schema validation', async () => {
+    it('is a valid array with zero invalid entries — currently EMPTY (DEP669A+B closed all advisories)', async () => {
       const { loadExceptions } = await importAuditGate();
       const realPath = path.join(PROJECT_ROOT, 'scripts', 'audit-exceptions.json');
       const result = loadExceptions(realPath);
       expect(result.invalid).toEqual([]);
-      expect(result.valid.length).toBeGreaterThan(0);
+      // Sıfır-istisna pini (dep-bump-audit.test.ts'teki pinin ikizi): istisna
+      // eklemek bilinçli karardır — bu pini aynı diff'te güncelle.
+      expect(result.valid).toEqual([]);
     });
   });
 });

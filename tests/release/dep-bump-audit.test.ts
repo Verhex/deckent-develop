@@ -79,8 +79,8 @@ describe('DEP669A — dependency-bump slice (offline-safe lockfile/manifest pins
     expect(pkg.overrides.undici).toBe('6.27.0');
   });
 
-  it('nodemailer stays completely untouched (out of scope — semver-major, deferred to DEP669B)', () => {
-    expect(pkg.optionalDependencies.nodemailer).toBe('^6.9.14');
+  it('nodemailer is on the 9.x line (DEP669B semver-major bump, CC-el 2026-07-12)', () => {
+    expect(pkg.optionalDependencies.nodemailer).toBe('^9.0.3');
   });
 });
 
@@ -116,7 +116,7 @@ describe('DEP669A — real audit-script run (SEC-05 gate, same mechanics as CI)'
     30000,
   );
 
-  it('scripts/audit-exceptions.json no longer carries an entry for any closed advisory — only nodemailer remains', async () => {
+  it('scripts/audit-exceptions.json is EMPTY — DEP669A+B closed every advisory (⏰-bıçak söküldü)', async () => {
     const { loadExceptions } = await import(join(PROJECT_ROOT, 'scripts', 'check-dependency-audit.mjs'));
     const exceptionsPath = join(PROJECT_ROOT, 'scripts', 'audit-exceptions.json');
     const { valid, invalid } = loadExceptions(exceptionsPath);
@@ -127,7 +127,8 @@ describe('DEP669A — real audit-script run (SEC-05 gate, same mechanics as CI)'
       expect(exceptedIds, `stale exception for closed advisory ${closedId} was not removed`).not.toContain(closedId);
     }
 
-    expect(valid.every((e: { package: string }) => e.package === 'nodemailer')).toBe(true);
-    expect(valid.length).toBe(2);
+    // Sıfır-istisna pini: yeni bir imzalı-istisna eklemek BİLİNÇLİ bir karardır —
+    // bu pini aynı diff'te güncelle ki istisna review'da yüksek sesle görünsün.
+    expect(valid).toEqual([]);
   });
 });
