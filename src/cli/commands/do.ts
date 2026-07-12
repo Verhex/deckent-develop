@@ -151,6 +151,10 @@ export function formatRunFlowDoPreview(preview: PlanPreview, run: boolean, lang:
     preview.taskSummaries.forEach((task, index) => lines.push(formatTaskSummaryLine(index, task)));
   }
   lines.push('', labels.gateLabels[preview.gateResult], labels.policyLabels[preview.policyDecision]);
+  // born-684: gate 'fail' ise NEDEN de basılır — onay-kararı kör verilmesin.
+  if (preview.gateResult === 'fail' && preview.gateFindings?.length) {
+    for (const finding of preview.gateFindings) lines.push(`  ! ${finding}`);
+  }
   lines.push(`${labels.digestLabel} ${formatDigestShort(preview.planDigest)}`);
   return lines.join('\n');
 }

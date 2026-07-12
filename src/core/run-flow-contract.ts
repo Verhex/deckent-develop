@@ -93,6 +93,10 @@ export interface PlanPreview {
   readonly policyDecision: RunFlowPolicyDecision;
   readonly gateResult: RunFlowGateResult;
   readonly estimatedCostUsd?: number;
+  /** born-684: gate 'fail' dediğinde NEDENİ de yüzeye taşınır — onay-kararı
+   *  körce verilmesin. Kısa insan-okur satırlar ("BLOCK 431-002 · g6-...: msg");
+   *  planDigest payload'ına DAHİL DEĞİL (additive, CAS-nötr). */
+  readonly gateFindings?: readonly string[];
 }
 
 /**

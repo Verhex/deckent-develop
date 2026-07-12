@@ -211,6 +211,8 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
       taskSummaries: result.taskSummaries,
       policyDecision: result.policyDecision,
       gateResult: result.gateResult,
+      // born-684: gate-fail nedeni onay-yüzeyine taşınır (digest-dışı additive).
+      ...(result.gateFindings.length > 0 ? { gateFindings: result.gateFindings } : {}),
     };
 
     context = reduceRunFlow(context, {

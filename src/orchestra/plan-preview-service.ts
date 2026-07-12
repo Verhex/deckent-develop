@@ -47,6 +47,8 @@ export interface PlanPreviewResult {
   readonly taskSummaries: readonly RunFlowTaskSummary[];
   readonly gateResult: RunFlowGateResult;
   readonly policyDecision: RunFlowPolicyDecision;
+  /** born-684: promptGate bulgularının insan-okur özeti (digest-dışı). */
+  readonly gateFindings: readonly string[];
 }
 
 function computeTaskSummaries(sprint: Sprint): RunFlowTaskSummary[] {
@@ -56,6 +58,14 @@ function computeTaskSummaries(sprint: Sprint): RunFlowTaskSummary[] {
 function computeGateResult(sprint: Sprint): RunFlowGateResult {
   if (!sprint.promptGate) return 'skipped';
   return sprint.promptGate.ok ? 'pass' : 'fail';
+}
+
+/** born-684: gate-bulgularını kısa insan-okur satırlara indir (digest-dışı). */
+function computeGateFindings(sprint: Sprint): readonly string[] {
+  if (!sprint.promptGate) return [];
+  return sprint.promptGate.findings.map(
+    (f) => `${f.level.toUpperCase()} ${f.taskId} · ${f.lint}: ${f.message}`,
+  );
 }
 
 function computePolicyDecision(gateResult: RunFlowGateResult): RunFlowPolicyDecision {
@@ -94,5 +104,5 @@ export async function generatePlanPreview(
   const policyDecision = computePolicyDecision(gateResult);
   const planDigest = computePlanDigest(taskSummaries, gateResult, policyDecision);
 
-  return { sprint, planDigest, taskSummaries, gateResult, policyDecision };
+  return { sprint, planDigest, taskSummaries, gateResult, policyDecision, gateFindings: computeGateFindings(sprint) };
 }
