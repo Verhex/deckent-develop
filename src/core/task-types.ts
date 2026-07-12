@@ -2,7 +2,7 @@
 // Split from types.ts — Task, planning, and model-related types
 // Model data is now delegated to ModelRegistry (single source of truth).
 
-import { modelRegistry } from './model-registry.js';
+import { modelRegistry, registerCodexParityModels } from './model-registry.js';
 import type { TaskKind, ActorContext } from './work-model.js';
 
 // ─── Models ──────────────────────────────────────────────────────────
@@ -78,6 +78,20 @@ export const CLAUDE_MODELS: readonly ClaudeModel[] = modelRegistry
 
 /** All valid model names across all providers — derived from ModelRegistry */
 export const ALL_MODELS: readonly ModelType[] = modelRegistry.getAllModelIds() as unknown as readonly ModelType[];
+
+/**
+ * LIVE model-id listesi (born-683 zero-hardcode). `ALL_MODELS` modül-yükleme
+ * ANINDA donan bir snapshot'tır — opt-in aileler (registerCodexParityModels'in
+ * gpt-5.5/5.6'sı, dinamik ollama tag'leri) provider-modülü yüklenmeden orada
+ * görünmez; config-validasyonu bu yüzden gpt-5.6-sol gibi kayıtlı-ama-geç
+ * modelleri reddediyordu (2026-07-12 canlı-vakası). Bu çağrı validasyon-ANINDA
+ * parity-kaydını garanti edip (idempotent Map.set) registry'nin o anki tam
+ * listesini döner — literal liste YOK, tek-kaynak registry.
+ */
+export function getAllKnownModelIds(): readonly string[] {
+  registerCodexParityModels();
+  return modelRegistry.getAllModelIds();
+}
 
 /**
  * Mapping from internal model aliases to actual provider API model IDs.

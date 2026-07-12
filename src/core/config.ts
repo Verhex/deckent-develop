@@ -27,7 +27,7 @@ import type {
   TerminalConfig,
   TimeoutConfig,
 } from './types.js';
-import { ALL_MODELS, PROVIDER_MODEL_MAP } from './types.js';
+import { getAllKnownModelIds, PROVIDER_MODEL_MAP } from './types.js';
 import type { ProviderName } from './types.js';
 import { MODE_PRESETS } from './mode-presets.js';
 import type { ModelStrategy } from './mode-presets.js';
@@ -409,7 +409,6 @@ export function resolveMode(mode: string): string {
 // ─── Default Mode Definitions (Blueprint 13) ────────────────────────
 
 const VALID_MODES: readonly PlanMode[] = ['performance', 'balanced', 'economic', 'api'] as const;
-const VALID_MODELS = ALL_MODELS;
 const VALID_BRAIN_PLANNING = ['ai', 'structured', 'auto'] as const;
 
 /** All valid provider names — original Anthropic/OpenAI/Google trio (subscription/API). */
@@ -552,12 +551,16 @@ export function validateConfig(config: DeckentConfig): string[] {
       maxWorkersWarnings.push(`${prefix}.max_workers is ${mc.max_workers} (>=20) — high worker count may cause resource contention`);
     }
 
-    if (!(VALID_MODELS as readonly string[]).includes(mc.brain_model)) {
-      errors.push(`Invalid value '${mc.brain_model}' for field '${prefix}.brain_model'. Valid: ${VALID_MODELS.join(', ')}`);
+    // born-683 (zero-hardcode): validasyon LIVE registry-listesiyle — donmuş
+    // ALL_MODELS snapshot'ı opt-in aileleri (gpt-5.6-sol vb.) tanımıyordu ve
+    // meşru brain-devrini düşürüyordu (2026-07-12 canlı-vakası).
+    const knownModels = getAllKnownModelIds();
+    if (!knownModels.includes(mc.brain_model)) {
+      errors.push(`Invalid value '${mc.brain_model}' for field '${prefix}.brain_model'. Valid: ${knownModels.join(', ')}`);
     }
 
-    if (!(VALID_MODELS as readonly string[]).includes(mc.default_model)) {
-      errors.push(`Invalid value '${mc.default_model}' for field '${prefix}.default_model'. Valid: ${VALID_MODELS.join(', ')}`);
+    if (!knownModels.includes(mc.default_model)) {
+      errors.push(`Invalid value '${mc.default_model}' for field '${prefix}.default_model'. Valid: ${knownModels.join(', ')}`);
     }
 
     if (typeof mc.haiku_allowed !== 'boolean') {
