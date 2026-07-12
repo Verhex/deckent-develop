@@ -151,22 +151,22 @@ describe('TT555 (a): verify_task exit-code honesty', () => {
   // GREEN cases below.
   it.skipIf(process.platform === 'win32')(
     'RED: a command piped to a pager MASKS the real exit code (is_error:false)',
-    () => {
-      const masked = spawnCommandRunner('exit 7 | cat', process.cwd());
+    async () => {
+      const masked = await spawnCommandRunner('exit 7 | cat', process.cwd());
       // The pipeline reports the pager's status (cat = 0) — the failure vanished.
       expect(masked.exitCode).toBe(0);
 
-      const honest = spawnCommandRunner('exit 7', process.cwd());
+      const honest = await spawnCommandRunner('exit 7', process.cwd());
       // Unpiped, the SAME command surfaces its TRUE non-zero code.
       expect(honest.exitCode).toBe(7);
     },
   );
 
-  it('GREEN: reports each step\'s TRUE, separately-captured exit code', () => {
+  it('GREEN: reports each step\'s TRUE, separately-captured exit code', async () => {
     const codes: Record<string, number> = { CHECK_CMD: 2, TEST_CMD: 1 };
     const runner: CommandRunner = (cmd) => ({ exitCode: codes[cmd] ?? 0, stdout: `ran ${cmd}`, stderr: '' });
 
-    const r = verifyTask({ commands: { check: 'CHECK_CMD', test: 'TEST_CMD' }, cwd: '/proj', runner });
+    const r = await verifyTask({ commands: { check: 'CHECK_CMD', test: 'TEST_CMD' }, cwd: '/proj', runner });
 
     expect(r.ok).toBe(false);
     expect(r.steps).toHaveLength(2);
@@ -174,38 +174,38 @@ describe('TT555 (a): verify_task exit-code honesty', () => {
     expect(r.steps[1]).toMatchObject({ step: 'test', command: 'TEST_CMD', exitCode: 1, ok: false, skipped: false });
   });
 
-  it('a passing check never masks a failing test (separate codes, no short-circuit)', () => {
+  it('a passing check never masks a failing test (separate codes, no short-circuit)', async () => {
     const runner: CommandRunner = (cmd) => ({ exitCode: cmd === 'T' ? 1 : 0, stdout: '', stderr: '' });
-    const r = verifyTask({ commands: { check: 'C', test: 'T' }, cwd: '/proj', runner });
+    const r = await verifyTask({ commands: { check: 'C', test: 'T' }, cwd: '/proj', runner });
     expect(r.steps[0]).toMatchObject({ step: 'check', exitCode: 0, ok: true });
     expect(r.steps[1]).toMatchObject({ step: 'test', exitCode: 1, ok: false });
     expect(r.ok).toBe(false);
   });
 
-  it('all-pass → ok:true', () => {
+  it('all-pass → ok:true', async () => {
     const runner: CommandRunner = () => ({ exitCode: 0, stdout: '', stderr: '' });
-    const r = verifyTask({ commands: { check: 'C', test: 'T' }, cwd: '/proj', runner });
+    const r = await verifyTask({ commands: { check: 'C', test: 'T' }, cwd: '/proj', runner });
     expect(r.ok).toBe(true);
     expect(r.steps.every((s) => s.ok && !s.skipped)).toBe(true);
   });
 
-  it('an empty command is reported as skipped (never guessed), not run', () => {
+  it('an empty command is reported as skipped (never guessed), not run', async () => {
     let called = 0;
     const runner: CommandRunner = () => { called++; return { exitCode: 5, stdout: '', stderr: '' }; };
-    const r = verifyTask({ commands: { check: '', test: 'T' }, cwd: '/proj', runner });
+    const r = await verifyTask({ commands: { check: '', test: 'T' }, cwd: '/proj', runner });
     expect(r.steps[0]).toMatchObject({ step: 'check', skipped: true, ok: true, exitCode: 0, command: '' });
     expect(r.steps[1]).toMatchObject({ step: 'test', skipped: false, exitCode: 5, ok: false });
     expect(called).toBe(1); // only the non-empty test command ran (the empty check was skipped)
     expect(r.ok).toBe(false); // the test command failed (skipped check did not mask it)
   });
 
-  it('demonstrates the harm of masking: a pager-masked (always-0) runner false-greens', () => {
+  it('demonstrates the harm of masking: a pager-masked (always-0) runner false-greens', async () => {
     // This is exactly what `cmd | tail` does to the shell's exit status. verify_task
     // faithfully surfaces whatever the runner returns; its honesty therefore depends
     // on the runner NOT masking — which the DEFAULT (spawnCommandRunner) guarantees
     // by never piping (proven by the RED above).
     const maskingRunner: CommandRunner = () => ({ exitCode: 0, stdout: '', stderr: '' });
-    const masked = verifyTask({ commands: { check: 'FAILING', test: 'FAILING' }, cwd: '/proj', runner: maskingRunner });
+    const masked = await verifyTask({ commands: { check: 'FAILING', test: 'FAILING' }, cwd: '/proj', runner: maskingRunner });
     expect(masked.ok).toBe(true); // false-green — the bug when a pager swallows the code
   });
 });
@@ -227,10 +227,10 @@ describe('TT555 (b): resolveVerifyCommands', () => {
       .toEqual({ check: '', test: '' });
   });
 
-  it('runVerifyTask composes resolve → run with both seams injected (hermetic)', () => {
+  it('runVerifyTask composes resolve → run with both seams injected (hermetic)', async () => {
     const resolver = () => ({ build: '', test: 'RUN_TESTS', lint: 'LINT', typecheck: '' });
     const runner: CommandRunner = (cmd) => ({ exitCode: cmd === 'RUN_TESTS' ? 3 : 0, stdout: '', stderr: '' });
-    const r = runVerifyTask('/p', { resolver, runner });
+    const r = await runVerifyTask('/p', { resolver, runner });
     expect(r.steps[0]).toMatchObject({ step: 'check', command: 'LINT', exitCode: 0, ok: true });
     expect(r.steps[1]).toMatchObject({ step: 'test', command: 'RUN_TESTS', exitCode: 3, ok: false });
     expect(r.ok).toBe(false);
@@ -240,8 +240,8 @@ describe('TT555 (b): resolveVerifyCommands', () => {
 // ─── (5) env-probe — inventory + opt-in prompt injection (waste-class d) ─────
 
 describe('TT555 (d): env-probe inventory', () => {
-  it('probeToolInventory reports each probed tool via the injected existence check', () => {
-    const inv = probeToolInventory((t) => t === 'python3' || t === 'rg'); // docker absent
+  it('probeToolInventory reports each probed tool via the injected existence check', async () => {
+    const inv = await probeToolInventory((t) => t === 'python3' || t === 'rg'); // docker absent
     expect(inv).toEqual({ python3: true, docker: false, rg: true });
   });
 
