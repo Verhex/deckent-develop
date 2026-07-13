@@ -3132,11 +3132,12 @@
   "born_id": 686,
   "title": "XPLAT-matrix flake-ailesi: ardisik docs-only commitlerde farkli bacaklar dustu (4aeef366 win packed-install npm-install-4dk-fail; f22df693 ubuntu/tmux e2e) — REQUIRED-gate guveni asiniyor",
   "priority": "P1",
-  "status": "OPEN",
+  "status": "DONE",
   "source": "gun-kapanisi CI-izleme (2026-07-12/13 gecesi); rerun lar geciyor (win rerun yesil) = flake, regresyon degil",
   "spec": "Sertlestirme: (a) xplat-smoke install/e2e adimlarina 1-otomatik-retry + npm timeout/cache ayari; (b) fail aninda tani-artifact (npm debug-log, tmux server-log) upload; (c) workflow-level flaky-quarantine ISTEMIYORUZ (required kalir) — adim-ici retry tercih; (d) flake-orani izlenebilir olsun (job-summary satiri).",
   "date": "2026-07-13",
-  "evidence_update": "5. vaka: 461d2a96 (win packed-install) — kod-commit'inde de dustu, rerun'da gecti; sertlestirme koreografisi geceye alindi (2026-07-14)."
+  "evidence_update": "5. vaka: 461d2a96 (win packed-install) — kod-commit'inde de dustu, rerun'da gecti; sertlestirme koreografisi geceye alindi (2026-07-14).",
+  "fix": "sprint-434 (do-kosusu, ci-guardian): bounded bash-retry x2 (npm ci + packed-install smoke, 30s ara) + npm fetch-retry env'leri (job-scoped, smoke'un ic npm cagrilarina da iner) + failure-only tani-artifact (SHA-pin'li upload-artifact v4.6.2; npm _logs + .tasks/task-*.log; if-no-files-found ignore) + tests/governance/workflow-yaml-pins.test.ts; 0 continue-on-error — required-gate GEVSEMEDI. Kanit: YAML-valid + 88 governance + 59 workflow-pin testi yesil; davranis-kaniti sonraki push'larin CI'inda birikecek (5-vaka baseline'ina karsi izlenir)."
  },
  {
   "born_id": 687,

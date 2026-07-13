@@ -52,6 +52,8 @@
 | adr-g-036 | Zero-Hardcode Model & Flow Values (Parametric-Only) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-434 Learnings** (sprint-434): ## Sprint sprint-434 Learnings
+- Packed-install retry-hardening: GO_WITH_TECH_DEBT — packed-install job hardened, sco...
 - **Sprint sprint-433 Learnings** (sprint-433): ## Sprint sprint-433 Learnings
 - STATUS-JSON-CONTRACT CLI düzeltmesini uygula: GO_WITH_TECH_DEBT — Fixed both no-acti...
 - **Sprint sprint-432 Learnings** (sprint-432): ## Sprint sprint-432 Learnings
@@ -74,13 +76,9 @@
 - TERM4A — run-flow-store + run-job-service + snapshot-tüketen start (flag'li): GO_WIT...
 - **Sprint sprint-425 Learnings** (sprint-425): ## Sprint sprint-425 Learnings
 - TERM3 — native RunProposal akışı: tool→coordinator→plan-preview-card→approval (flag'...
-- **Sprint sprint-424 Learnings** (sprint-424): ## Sprint sprint-424 Learnings
-
-## Gains
-- 424-001 — TERM2 — shared actual-preview: plan-preview-service + proposal-c...
 
 ## Active Technical Debt
-- [NORMAL] Tech debt from 433-001-fix: Investigated the 433-001 NO_GO (brainEvaluationReaso
+- [HIGH] Tech debt from 433-001-fix: Investigated the 433-001 NO_GO (brainEvaluationReaso
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -150,4 +148,4 @@
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 
-_Total entries: 1333 | Generated: 2026-07-13_
+_Total entries: 1337 | Generated: 2026-07-13_

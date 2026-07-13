@@ -10644,3 +10644,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 433-003: Gerçek binary entegrasyon ve smoke kanıtını tamamla (NO_GO)
 
 ---
+## Sprint 434 — sprint-434
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-13
+**Duration:** 1121s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1121235ms |
+
+### Tasks
+
+- 434-001: Packed-install retry-hardening (GO_WITH_TECH_DEBT)
+- 434-002: Governance pin-test senkronu (DONE)
+- 434-003: YAML test-entegrasyonu (DONE)
+
+---

@@ -70,6 +70,17 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    env:
+      # Real npm-level retry (make-fetch-happen) layered under the bounded
+      # bash retry loops below — absorbs transient registry blips inside a
+      # single npm invocation. Job-scoped so it also reaches the npm pack /
+      # npm install -g calls xplat-install-smoke.mjs makes internally (it
+      # inherits process.env) without editing that script (out of scope here).
+      npm_config_fetch_retries: '3'
+      npm_config_fetch_retry_factor: '2'
+      npm_config_fetch_retry_mintimeout: '5000'
+      npm_config_fetch_retry_maxtimeout: '60000'
+      npm_config_fetch_timeout: '300000'
     steps:
       - uses: actions/checkout@v4
 
@@ -78,11 +89,66 @@ jobs:
           node-version: '24'
           cache: npm
 
-      - run: npm ci
+      - name: npm install (npm ci, bounded retry)
+        shell: bash
+        run: |
+          set -uo pipefail
+          max_attempts=2
+          attempt=1
+          until npm ci; do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "::error::npm ci failed after ${max_attempts} attempt(s)" >&2
+              exit 1
+            fi
+            attempt=$((attempt + 1))
+            echo "npm ci failed — retrying (attempt ${attempt}/${max_attempts}) after 30s..." >&2
+            sleep 30
+          done
+
       - run: npm run ci:rebuild-native
 
       - run: npm run build:all
 
-      - name: Packed-install smoke — npm pack → isolated-prefix global install → deckent init --yes → deckent doctor
-        run: node scripts/xplat-install-smoke.mjs
-        timeout-minutes: 10
+      - name: Packed-install smoke — npm pack → isolated-prefix global install → deckent init --yes → deckent doctor (bounded retry)
+        shell: bash
+        timeout-minutes: 18
+        run: |
+          set -uo pipefail
+          max_attempts=2
+          attempt=1
+          until node scripts/xplat-install-smoke.mjs; do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "::error::packed-install smoke (npm pack path) failed after ${max_attempts} attempt(s)" >&2
+              exit 1
+            fi
+            attempt=$((attempt + 1))
+            echo "packed-install smoke failed — retrying (attempt ${attempt}/${max_attempts}) after 30s..." >&2
+            sleep 30
+          done
+
+      - name: Resolve npm diagnostic log path
+        if: failure()
+        id: npm-diag
+        shell: bash
+        run: |
+          npm_cache_dir="$(npm config get cache 2>/dev/null)"
+          if [ -z "$npm_cache_dir" ]; then
+            npm_cache_dir="$HOME/.npm"
+          fi
+          echo "logs-glob=${npm_cache_dir}/_logs/**" >> "$GITHUB_OUTPUT"
+
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: packed-install-diagnostics-${{ matrix.os }}
+          # npm debug log (registry/pack/install failures) + any tmux
+          # pipe-pane worker log the smoke run may have produced
+          # (src/orchestra/tmux.ts) — no dedicated "server log" file exists
+          # in this codebase; if-no-files-found: ignore keeps this honest
+          # for legs where neither path materializes.
+          path: |
+            ${{ steps.npm-diag.outputs.logs-glob }}
+            .tasks/task-*.log
+          if-no-files-found: ignore
+          retention-days: 7

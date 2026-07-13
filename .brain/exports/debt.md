@@ -4,12 +4,13 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-433-001-fix | Tech debt from 433-001-fix: Investigated the 433-001 NO_GO (brainEvaluationReaso | normal | sprint-433 | active |
+| debt-433-001-fix | Tech debt from 433-001-fix: Investigated the 433-001 NO_GO (brainEvaluationReaso | high | sprint-433 | active |
 
 ## Resolved Technical Debt
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
+| debt-434-001 | Tech debt from 434-001: packed-install job hardened, scope-limited to .github/wo | normal | sprint-434 | resolved |
 | debt-432-004 | Tech debt from 432-004: Audit: finalizeSprint has exactly ONE call site inside s | normal | sprint-432 | resolved |
 | debt-431-001 | Tech debt from 431-001: Mirrors scripts/lint-no-spawnsync.mjs 1:1: pure exported | normal | sprint-431 | resolved |
 | debt-429-003 | Tech debt from 429-003: born-677 root cause: buildTaskBlock() joined goCriteria/ | normal | sprint-429 | resolved |

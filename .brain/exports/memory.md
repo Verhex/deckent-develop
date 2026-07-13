@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-434 Learnings
+- Sprint sprint-434 Learnings: ## Sprint sprint-434 Learnings
+- Packed-install retry-hardening: GO_WITH_TECH_DEBT — packed-install job hardened, scope-limited to .github/workflows/cross-platform-e2e.yml only (e2e job untouched, scripts/
+
+## Gains
+- 434-002 — Governance pin-test senkronu — Wrote tests/governance/workflow-yaml-pins.test.ts (39 tests, self-contained minimal YAML-subset p...
+- 434-003 — YAML test-entegrasyonu — Integration verification task — 434-001 (cross-platform-e2e.yml packed-install retry-hardening) a...
+
 ## Sprint sprint-433 Learnings
 - Sprint sprint-433 Learnings: ## Sprint sprint-433 Learnings
 - STATUS-JSON-CONTRACT CLI düzeltmesini uygula: GO_WITH_TECH_DEBT — Fixed both no-active JSON contract gaps in src/cli/commands/status.ts (born-688 / MASTER-PLAN row 568). (1) No-dashboard

@@ -9,6 +9,20 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint434] - 2026-07-13
+
+### Added
+
+- Governance pin-test senkronu
+- YAML test-entegrasyonu
+
+### Changed
+
+- Packed-install retry-hardening (completed with tech debt)
+
+
+_Tasks: 3 total, 3 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint433] - 2026-07-13
 
 ### Added
