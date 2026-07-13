@@ -2933,11 +2933,12 @@
   "born_id": 666,
   "title": "init --yes sessiz auto-provisioning: 3 provider-CLI'yi sormadan npm-global kuruyor (2+dk network) — insansiz-akis politika karari",
   "priority": "P1",
-  "status": "OPEN",
+  "status": "DECIDED",
   "source": "ba3190db windows-kosusu yan-bulgu (2026-07-12)",
   "spec": "CI-kanit: `init --yes` resolveProvisionMode({yes:true}) yoluyla claude+codex+gemini'yi otomatik npm install -g yapti (sessiz kabul; 2+dk; CI/airgap'te istenmeyen network + supply-chain yuzeyi; AS-7 offline-pillar celiskisi). KARAR GEREKIR (Alperen): --yes = 'sorulara-evet' MI 'no-install + durust-blocker' MI? Oneri (CC): --yes default NO-INSTALL (SETUP_INCOMPLETE + remediation zaten durust), auto-install yalniz acik `--install` flag'iyle; boylece insansiz akis deterministik+network'suz. xplat-smoke da hizlanir (~2dk).",
   "verify": "izole-PATH `init --yes` network'suz tamamlanir; `--yes --install` eski davranis",
-  "wire_on": "decision-then-sprint"
+  "wire_on": "decision-then-sprint",
+  "decision": "ALPEREN-KARARI B (karar-turu-4, 2026-07-13): `--yes` HICBIR sey install ETMEZ; kurulum yalniz explicit `--install` flag'i veya interactive scoped-consent. Uygulama isi: init akisinda no-install default + --install + offline/no-network negative test (satir 561)."
  },
  {
   "born_id": 667,
@@ -3135,5 +3136,32 @@
   "source": "gun-kapanisi CI-izleme (2026-07-12/13 gecesi); rerun lar geciyor (win rerun yesil) = flake, regresyon degil",
   "spec": "Sertlestirme: (a) xplat-smoke install/e2e adimlarina 1-otomatik-retry + npm timeout/cache ayari; (b) fail aninda tani-artifact (npm debug-log, tmux server-log) upload; (c) workflow-level flaky-quarantine ISTEMIYORUZ (required kalir) — adim-ici retry tercih; (d) flake-orani izlenebilir olsun (job-summary satiri).",
   "date": "2026-07-13"
+ },
+ {
+  "born_id": 687,
+  "title": "PROVIDER-DEVIR HIC YURURLUGE GIRMEDI: grouped providers.brain=claude flat brain_provider=codex'i eziyor (grouped>flat precedence) — effective fleet Claude/Claude kaldi; sol-analiz K10 dogrulandi (config get brain_provider=claude)",
+  "priority": "P0",
+  "status": "OPEN",
+  "source": "sol-ultra full-spectrum analiz K10 (2026-07-13) + CC disk-verify; devir 2026-07-12'de yapildi sanilmisti",
+  "spec": "Dogfood hot-fix YAPILDI (config set providers.brain codex -> get=codex). Kalici is (karar #8=B): (a) grouped canonical + flat/grouped CONFLICT FAIL-LOUD (sessiz silme yerine hata/uyari); (b) requested/effective/fallback provider+model INVOCATION RECEIPT her AI cagrisinda; (c) config-migration compatibility path + testler. Dosyalar: src/core/config-migration.ts:615-649, src/core/config.ts, receipt: model-selector/providers.",
+  "master_plan_row": 567
+ },
+ {
+  "born_id": 688,
+  "title": "status --json JSON-SOZLESMESI KIRIK: bos-state dalinda TR insan-metni basip exit 0 donuyor (JSON parse edilemez) — sol-analiz K3 dogrulandi",
+  "priority": "P1",
+  "status": "OPEN",
+  "source": "sol-ultra analiz K3 (2026-07-13) + CC disk-verify (node dist/cli/entry.js status --json)",
+  "spec": "src/cli/commands/status.ts:407-431 no-active dali --json guard'ini atliyor. Fix: her state'te (aktif-yok dahil) gecerli JSON schema don ({active:false, pendingApprovals:[...]}); exit-code sozlesmesi korunur; hermetik test: bos-state + aktif-state JSON.parse edilir. SURF-3 discoverability kanit-kriterinin parcasi.",
+  "master_plan_row": 568
+ },
+ {
+  "born_id": 689,
+  "title": "FLOW-CORRELATION KOPUK: completion-record'da flowId yok (sprint-430/431 = 0 flowId); composition-testi flowId'yi ELLE inject ediyor — gercek propagation kaniti yok (sol-analiz M2/SURF-0)",
+  "priority": "P0",
+  "status": "OPEN",
+  "source": "sol-ultra analiz M2 + A1 (2026-07-13); CC disk-verify: grep -c flowId .deckent/runtime/jobs/sprint-430.json = 0",
+  "spec": "SURF-0 truth-receipt dilimi: flowId/commandId'yi proposal->job->sprint-controller->finalizer->completion boyunca ADDITIVE tasi (RunSprintOptions'a flowId; start.ts --flow-id zaten var, zincir ici propagation eksik: sprint-phases.ts:3062-3069 finalizer cagrilari flowId gecirmiyor). Kanit: gercek `do --run --yes` kosusunda .deckent/runtime/jobs/<id>.json flowId tasir + result-turn ayni ID; composition-test elle inject etmez. Dosyalar: sprint-controller.ts, sprint-phases.ts, sprint-finalizer.ts, start.ts, run-completion-watch.ts.",
+  "master_plan_row": 566
  }
 ]
