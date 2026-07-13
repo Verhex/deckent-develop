@@ -3223,5 +3223,14 @@
   "source": "canli-vaka 2026-07-14 gece (1570143b XPLAT win bacagi); born-686 sertlestirmesinin ilk gercek-dusus otopsisi",
   "fix": "CC-el: (1) xplat-install-smoke.mjs failDetail() — timedOut+elapsed+stderr+stdout-tail her step-FAIL'de (kor 'exited 1' oldu); (2) install timeout 180s→360s (yavas win-runner ~300s mesru); (3) workflow: failure-only 'Collect diagnostics into workspace' (npm _logs → xplat-diag/) + upload path=xplat-diag/** (v4 workspace-disi-path reddi cozuldu); (4) job timeout 20→28dk (retry x2 payi; gate GEVSEMEDI); (5) pin-analyzer coversNpmLogs collect-step-farkindaligi. 144 governance/workflow/script testi yesil + YAML-valid.",
   "master_plan_row": 571
+ },
+ {
+  "born_id": 696,
+  "title": "GECE-VAKASI cift: (a) Anthropic 'Stream idle timeout - partial response received' — sprint-436'nin 5 worker'i toplu EXIT_WITHOUT_RESULT (gece API-instabilitesi, 845s-turn'de stream kesilmesi; kod-disi); (b) FIX-fazi STALL — 436-001-fix 'Queued' ama 0 worker, 45dk+ spawn tetiklenmedi",
+  "priority": "P1",
+  "status": "OPEN",
+  "source": "canli-vaka 2026-07-14 01:30-02:00 (born-679 kosusu sprint-436); result: markerType=EXIT_WITHOUT_RESULT exit=1 opus $2.02; log: 'API Error: Stream idle timeout' x2",
+  "spec": "(a) icin is: worker-wrapper stream-idle-timeout'u TIPLI provider-hata olarak yakalayip result'a yazsin (EXIT_WITHOUT_RESULT yerine PROVIDER_STREAM_TIMEOUT marker'i) + FIX-fazina 'API-saglik-bekle + tek-retry' politikasi; (b) icin is: FIX-spawn'inin queued-task'i worker-havuzu bosaldiginda GERCEKTEN tetikledigini garanti eden watchdog/receipt (queued>Ndk + 0-worker = loud-alert). born-679 isi bu sprint'ten CIKMADI — API duzelince yeniden kosulacak.",
+  "master_plan_row": null
  }
 ]
