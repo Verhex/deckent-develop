@@ -3055,6 +3055,11 @@ function finalizeFailedMessage(
  * Run the RETRO phase (includes DECAY via finalizeSprint).
  * In test mode, only calculates metrics without writing retro/memory files.
  * Mutates `sprint` (status, phase, metrics) in place.
+ * @param flowId - SURF-0.4 (Task 432-004): optional upstream run-flow
+ *   correlation id (`RunSprintOptions.flowId`, 432-001). Additive only —
+ *   forwarded verbatim to `finalizeSprint`'s `FinalizeSprintOptions.flowId`
+ *   (432-003) so it lands on the sprint completion record. Absent for every
+ *   caller that does not pass it, so this is a zero-behavior-change addition.
  * @returns Computed sprint metrics; a {@link RetroPhaseFailure} marker if
  *   `finalizeSprint` threw (fail-soft — not re-thrown); or undefined if
  *   metrics calculation failed in test mode.
@@ -3066,6 +3071,7 @@ export async function runRetroPhase(
   results: TaskResult[],
   config: ResolvedConfig,
   testMode?: boolean,
+  flowId?: string,
 ): Promise<SprintMetrics | RetroPhaseFailure | undefined> {
   if (!testMode) {
     try {
@@ -3159,6 +3165,7 @@ export async function runRetroPhase(
       return await finalizeSprint(projectRoot, sprint, evaluations, results, {
         config,
         onRuleRegen: async (root: string): Promise<void> => { await regenerateRules(root); },
+        flowId,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

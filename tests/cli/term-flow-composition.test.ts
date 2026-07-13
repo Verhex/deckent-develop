@@ -64,12 +64,18 @@ import {
   type RunFlowControllerDeps,
 } from '../../src/cli/repl/run-flow-controller.js';
 import { compileRunProposal } from '../../src/orchestra/run-proposal-compiler.js';
+import { buildSprintCompletionRecord } from '../../src/orchestra/sprint-finalizer.js';
 import { loadApprovedSnapshot, loadRunHandle } from '../../src/core/run-flow-store.js';
 import type { RunHandle } from '../../src/orchestra/run-job-service.js';
-import { createRunCompletionWatch, type RunCompletionWatchFsWatcher } from '../../src/cli/repl/run-completion-watch.js';
+import {
+  createRunCompletionWatch,
+  parseRunCompletionRecord,
+  type RunCompletionWatchFsWatcher,
+} from '../../src/cli/repl/run-completion-watch.js';
 import {
   wireRunFlowResultWatch,
   buildRunFlowResultLabels,
+  buildRunFlowResultEvent,
 } from '../../src/cli/repl/run.js';
 import { createChatTurnQueue } from '../../src/cli/repl/chat-turn-queue.js';
 import type { ChatTurnBgEvent, ChatTurnPayload } from '../../src/cli/repl/chat-turn-queue.js';
@@ -77,7 +83,7 @@ import { getMessage } from '../../src/cli/helpers/messages.js';
 import { JOBS_DIR } from '../../src/core/constants.js';
 import { parseStructuredDirectives } from '../../src/orchestra/task-builder.js';
 import type { RunProposal } from '../../src/core/run-flow-contract.js';
-import { SprintStatus, SprintPhase, TaskStatus } from '../../src/core/types.js';
+import { SprintStatus, SprintPhase, TaskStatus, TaskEvaluation } from '../../src/core/types.js';
 import type { Sprint, Task, ResolvedConfig, BrainContext } from '../../src/core/types.js';
 
 const mockPlanSprint = vi.mocked(planSprint);
@@ -268,13 +274,30 @@ describe('term-flow composition-gate — full chain in ONE fixture (TERM-6, 428-
         (dir, handlers) => createRunCompletionWatch(dir, handlers, { watch: manual.watch, pollIntervalMs: 999_000 }),
       );
 
+      // 432-005 (SURF-0.5): the completion record is now produced by the REAL
+      // finalizer function `buildSprintCompletionRecord(sprint, evals, results,
+      // flowId)` — its own `if (flowId) record.flowId = flowId` conditional is
+      // what threads the flowId onto the on-disk artifact, NOT a hand-injected
+      // literal. So the flowId the watch surfaces below is one production
+      // finalizer code emitted, exercising the exact `completionRecord.flowId`
+      // path a real sprint's finalizeSprint writes to jobs/<sprintId>.json.
+      const finalizeEvaluations = new Map<string, TaskEvaluation>([
+        ['001-001', TaskEvaluation.DONE],
+        ['001-002', TaskEvaluation.GO_WITH_TECH_DEBT],
+      ]);
+      const completionRecord = buildSprintCompletionRecord(
+        makeSprint(), finalizeEvaluations, new Map(), 'flow-tf-1',
+      );
+      // The REAL function carried the flowId — not the test literal.
+      expect(completionRecord.flowId).toBe('flow-tf-1');
+
       writeFileSync(
         join(jobsDir, 'job-flow-tf-1.json'),
         JSON.stringify({
           status: 'COMPLETE',
           sprintId: 'sprint-tf-1',
           metrics: { totalTasks: 2, done: 1, techDebt: 1, noGo: 0 },
-          completionRecord: { flowId: 'flow-tf-1' },
+          completionRecord,
         }),
         'utf-8',
       );
@@ -319,6 +342,52 @@ describe('term-flow composition-gate — full chain in ONE fixture (TERM-6, 428-
       watchHandle!.dispose();
     },
   );
+});
+
+// ─── legacy (flowId-less) completion record — dual-read preserved ──────────
+//
+// goCriteria #2 (432-005): a completion record produced BEFORE the flowId
+// field existed (or by any sprint started off the run-flow-v2 path) carries no
+// flowId. The finalizer's own `if (flowId) record.flowId = flowId` guard omits
+// the key entirely, and the watch parser must read that legacy shape without a
+// throw, surfacing `flowId: undefined` — and the result-turn must fall back to
+// the sprintId, never inventing a correlation id. Proven end-to-end here with
+// the REAL finalizer + REAL parser + REAL result-turn builder (no mock, no
+// hand-injected id): the flowless path is the exact inverse of the main test.
+
+describe('term-flow composition-gate — legacy (flowId-less) record dual-read (432-005)', () => {
+  it('a finalizer completion record built WITHOUT a flowId reads back undefined — no throw, absent semantics + sprintId fallback preserved', () => {
+    const evaluations = new Map<string, TaskEvaluation>([
+      ['001-001', TaskEvaluation.DONE],
+      ['001-002', TaskEvaluation.GO_WITH_TECH_DEBT],
+    ]);
+    // REAL finalizer function, NO flowId arg — the `if (flowId)` guard must
+    // leave the key entirely absent (not `flowId: undefined` serialized).
+    const legacyRecord = buildSprintCompletionRecord(makeSprint(), evaluations, new Map());
+    expect('flowId' in legacyRecord).toBe(false);
+    expect(legacyRecord.flowId).toBeUndefined();
+
+    const rawJob = JSON.stringify({
+      status: 'COMPLETE',
+      sprintId: 'sprint-tf-1',
+      metrics: { totalTasks: 2, done: 1, techDebt: 1, noGo: 0 },
+      completionRecord: legacyRecord,
+    });
+
+    // REAL watch parser — a legacy job reads cleanly, flowId stays undefined.
+    const info = parseRunCompletionRecord(rawJob, 'job-legacy');
+    expect(info).not.toBeNull();
+    expect(info!.status).toBe('COMPLETE');
+    expect(info!.sprintId).toBe('sprint-tf-1');
+    expect(info!.flowId).toBeUndefined();
+
+    // REAL result-turn builder — with no flowId the correlation source falls
+    // back to sprintId (never a fabricated id); the summary still renders.
+    const labels = buildRunFlowResultLabels((k) => getMessage(k, 'en'));
+    const event = buildRunFlowResultEvent(info!, labels);
+    expect(event.source).toBe('sprint-tf-1');
+    expect(event.summary).toContain('1/2');
+  });
 });
 
 // ─── builder-validation is a genuine gate, not a pass-through ──────────────

@@ -363,6 +363,10 @@ export function registerStart(program: Command): void {
             sandboxMode: opts.sandboxMode,
             timeoutMs: opts.timeout ? parseInt(opts.timeout, 10) : undefined,
             preplannedSprint: approvedSnapshot!.sprint,
+            // SURF-0.2 (Task 432-002): the --flow-id value received above reaches
+            // runSprint as-is via this already-extracted `flowId` const -- no new
+            // id generation, no env fallback.
+            flowId,
           });
           print(formatSprintSummary(sprintResult));
           return;

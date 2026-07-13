@@ -708,6 +708,18 @@ export interface RunSprintOptions {
    * zero behavior change when this is not set.
    */
   preplannedSprint?: Sprint;
+  /**
+   * SURF-0.1 (Task 432-001): optional correlation id for the originating
+   * run-flow. Additive only -- no generation, defaulting, or routing
+   * behavior is attached here; absent (undefined) for every existing
+   * caller, so this is a zero-behavior-change addition.
+   */
+  flowId?: string;
+  /**
+   * SURF-0.1 (Task 432-001): optional correlation id for the originating
+   * command within `flowId`. Additive only -- see `flowId` above.
+   */
+  commandId?: string;
 }
 
 /**
@@ -1875,7 +1887,11 @@ export async function runSprint(
   emitPhaseChange(SprintPhase.FIX, SprintPhase.RETRO, sprint.id);
 
   // Phase 6+7: RETRO + DECAY
-  await runRetroPhase(projectRoot, sprint, evaluations, results, config, opts?.testMode);
+  // SURF-0 seam (born-689, CC cross-task fix): forward the caller's
+  // correlation id so RunSprintOptions.flowId (432-001) actually reaches
+  // runRetroPhase → finalizeSprint → completionRecord.flowId (432-003/004) —
+  // without this hop the whole chain silently drops the id.
+  await runRetroPhase(projectRoot, sprint, evaluations, results, config, opts?.testMode, opts?.flowId);
 
   // Nervous System: RETRO complete + RETRO→CLEANUP
   emitSprintEvent('SPRINT_RETRO_COMPLETE', { sprintId: sprint.id });

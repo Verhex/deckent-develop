@@ -10594,3 +10594,29 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 431-004: Entegrasyon: model-literal ratchet + resolver wiring uçtan-uca doğrulama (DONE)
 
 ---
+## Sprint 432 — sprint-432
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-13
+**Duration:** 2058s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 7 |
+| Completed | 7 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 2058226ms |
+
+### Tasks
+
+- 432-001: SURF-0.1 — RunSprintOptions correlation contract (DONE)
+- 432-002: SURF-0.2 — start CLI flowId ingress (DONE)
+- 432-003: SURF-0.3 — Finalizer completion receipt (DONE)
+- 432-004: SURF-0.4 — Sprint phases finalizer propagation (GO_WITH_TECH_DEBT)
+- 432-005: SURF-0.5 — Completion watch ve uçtan uca truth-receipt doğrulaması (DONE)
+
+---

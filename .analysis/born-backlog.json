@@ -3172,5 +3172,14 @@
   "source": "canli-vaka 2026-07-13 (SURF-0 ilk do-denemesi); sol-analiz A8'in ongordugu sinif (run-flow-controller.ts:199 config-omit)",
   "fix": "(1) planner.ts resolveAdapter(adapter?, model?) — model verilirse providerRegistry.getProvider(getProviderForModel(model)) oncelikli, bilinmeyen model/kayitsiz provider fail-soft default; callBrainPlannerWithReason + callZeroConfigPlanner iki call-site model-aware. (2) run-proposal-compiler config-tipi RunProposalPlannerConfig union'a genisletildi (ResolvedConfig dogrudan gecer). (3) run-flow-controller.ts + api/run-flow-routes.ts compileRunProposal'a canli config gecirir. 4 yeni resolveAdapter testi + 190 etkilenen test yesil; GERCEK-BINARY KANIT: do dry-run codex/gpt-5.6-sol ile 5-task plan + GATE GECTI (digest 001e473437c7) — ILK canli Codex-Brain receipt'i.",
   "master_plan_row": 567
+ },
+ {
+  "born_id": 691,
+  "title": "DO-UX: planner bos-filesWrite task'i uretince kullaniciya CIPLAK builder-hatasi siziyor ('directives-builder: files must contain at least one entry (DISTINCT-FILE)') — run akisi tek-cumle teknik hatayla olur, plan-onarim/yeniden-deneme yok",
+  "priority": "P2",
+  "status": "OPEN",
+  "source": "canli-vaka 2026-07-13 gece (born-688 do-kosusu ilk deneme, codex/sol planner)",
+  "spec": "Katmanlar: (a) zero-config planner prompt'una 'her task scope.filesWrite >=1 dosya' kurali (buildZeroConfigPlanPrompt); (b) compileRunProposalIntent bos-filesWrite task'i yakalayip RunProposalPlanError'a TIPLI mesajla cevirsin (hangi task, neden); (c) opsiyonel tek-seferlik planner-retry (ayni intent + ihlal geri-bildirimi). do-UX: kullanici-donuk mesaj i18n'li olmali.",
+  "master_plan_row": 566
  }
 ]

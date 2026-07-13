@@ -9,6 +9,22 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint432] - 2026-07-13
+
+### Added
+
+- SURF-0.1 — RunSprintOptions correlation contract
+- SURF-0.2 — start CLI flowId ingress
+- SURF-0.3 — Finalizer completion receipt
+- SURF-0.5 — Completion watch ve uçtan uca truth-receipt doğrulaması
+
+### Changed
+
+- SURF-0.4 — Sprint phases finalizer propagation (completed with tech debt)
+
+
+_Tasks: 7 total, 7 done, 1 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint431] - 2026-07-12
 
 ### Added
