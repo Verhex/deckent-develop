@@ -3202,5 +3202,14 @@
   "source": "canli-vaka 2026-07-14 gece (f36fec85 CI=failure); ci_green_root_causes ailesine yeni desen: deterministik-olmayan-tamper",
   "fix": "CC-el: XOR 0xff flip (garantili-farkli byte) + aciklayici yorum; 3x lokal kosu yesil. DERS: kripto-tamper testlerinde sabit-deger yazma, mevcut degeri OKUYUP degistir.",
   "master_plan_row": null
+ },
+ {
+  "born_id": 694,
+  "title": "CI-HERMETICITY: 433-002'nin real-binary integration testi CI'da dusuyor — CI test-job'lari fresh-checkout'ta dist/ OLMADAN kosar (build yok), test dist'e kosulsuz assert ediyordu",
+  "priority": "P1",
+  "status": "DONE",
+  "source": "canli-vaka 2026-07-14 gece (f8b5d8a6 CI 'Tests — CLI' failure); karpathy CUSTOM 'CI=fresh checkout' kuralinin worker tarafindan kacirilmis hali",
+  "fix": "CC-el: describe.skipIf(!DIST_AVAILABLE) skip-guard (platform-tags emsali) + gerekce-yorumu; iki-yonlu dogrulama (dist-var: 2 test kosar yesil; dist-yok simulasyonu: suite skip, exit 0). FOLLOW-UP fikri: hermetic-test lint'ine 'dist/ referansi olan test skipIf-guard tasimali' deseni eklenebilir.",
+  "master_plan_row": null
  }
 ]
