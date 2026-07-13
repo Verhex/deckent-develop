@@ -3163,5 +3163,14 @@
   "source": "sol-ultra analiz M2 + A1 (2026-07-13); CC disk-verify: grep -c flowId .deckent/runtime/jobs/sprint-430.json = 0",
   "spec": "SURF-0 truth-receipt dilimi: flowId/commandId'yi proposal->job->sprint-controller->finalizer->completion boyunca ADDITIVE tasi (RunSprintOptions'a flowId; start.ts --flow-id zaten var, zincir ici propagation eksik: sprint-phases.ts:3062-3069 finalizer cagrilari flowId gecirmiyor). Kanit: gercek `do --run --yes` kosusunda .deckent/runtime/jobs/<id>.json flowId tasir + result-turn ayni ID; composition-test elle inject etmez. Dosyalar: sprint-controller.ts, sprint-phases.ts, sprint-finalizer.ts, start.ts, run-completion-watch.ts.",
   "master_plan_row": 566
+ },
+ {
+  "born_id": 690,
+  "title": "DO-LOOP KIRILDI (devir yan-etkisi): planner adapter'i KOR-DEFAULT — providers.brain=codex olunca callZeroConfigPlanner 'sonnet'i codex'e spawn etti (400 invalid model) → 'no usable plan'; iki katman: (a) resolveAdapter model-sahibini sormuyor, (b) controller/API compileRunProposal'a config gecirmiyordu (resolveBrainModel(undefined)=sonnet fallback)",
+  "priority": "P0",
+  "status": "DONE",
+  "source": "canli-vaka 2026-07-13 (SURF-0 ilk do-denemesi); sol-analiz A8'in ongordugu sinif (run-flow-controller.ts:199 config-omit)",
+  "fix": "(1) planner.ts resolveAdapter(adapter?, model?) — model verilirse providerRegistry.getProvider(getProviderForModel(model)) oncelikli, bilinmeyen model/kayitsiz provider fail-soft default; callBrainPlannerWithReason + callZeroConfigPlanner iki call-site model-aware. (2) run-proposal-compiler config-tipi RunProposalPlannerConfig union'a genisletildi (ResolvedConfig dogrudan gecer). (3) run-flow-controller.ts + api/run-flow-routes.ts compileRunProposal'a canli config gecirir. 4 yeni resolveAdapter testi + 190 etkilenen test yesil; GERCEK-BINARY KANIT: do dry-run codex/gpt-5.6-sol ile 5-task plan + GATE GECTI (digest 001e473437c7) — ILK canli Codex-Brain receipt'i.",
+  "master_plan_row": 567
  }
 ]

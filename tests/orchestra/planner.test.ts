@@ -271,6 +271,41 @@ describe('resolveAdapter', () => {
   it('does NOT silently fall back to any hardcoded provider', () => {
     expect(() => resolveAdapter()).toThrow();
   });
+
+  // ─── born-690: model-aware resolution ──────────────────────────────
+  // The default provider and the requested model are independent axes.
+  // With brain_provider=codex the registry default became codex, and the
+  // planner spawned `codex exec --model sonnet` → hard 400. resolveAdapter
+  // must prefer the adapter that OWNS the model.
+
+  it('born-690: prefers the model-owning provider over the registry default', () => {
+    const codex = makeCodexAdapter(); // name: 'codex'
+    const claude = makeMockAdapter({ name: 'claude' });
+    providerRegistry.registerProvider(codex, true); // codex is DEFAULT
+    providerRegistry.registerProvider(claude);
+    // 'sonnet' is registry-owned by claude → claude adapter wins, not the default
+    expect(resolveAdapter(undefined, 'sonnet')).toBe(claude);
+  });
+
+  it('born-690: falls back to registry default for models unknown to the model registry', () => {
+    const codex = makeCodexAdapter();
+    providerRegistry.registerProvider(codex, true);
+    expect(resolveAdapter(undefined, 'my-custom-ollama-tag' as ModelType)).toBe(codex);
+  });
+
+  it('born-690: falls back to registry default when the owning provider is not registered', () => {
+    const codex = makeCodexAdapter();
+    providerRegistry.registerProvider(codex, true);
+    // 'sonnet' is owned by claude, but claude is not registered → default (codex)
+    expect(resolveAdapter(undefined, 'sonnet')).toBe(codex);
+  });
+
+  it('born-690: an explicitly provided adapter still wins over model-aware resolution', () => {
+    const codex = makeCodexAdapter();
+    const claude = makeMockAdapter({ name: 'claude' });
+    providerRegistry.registerProvider(claude, true);
+    expect(resolveAdapter(codex, 'sonnet')).toBe(codex);
+  });
 });
 
 // ═══ buildPlannerSpawnArgs ═══════════════════════════════════════════

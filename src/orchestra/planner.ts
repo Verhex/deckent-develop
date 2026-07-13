@@ -16,6 +16,7 @@ import { providerRegistry, ProviderError } from '../core/provider.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { debugLog } from '../core/utils.js';
 import type { TaskScope } from '../core/task-types.js';
+import { getProviderForModel } from '../core/task-types.js';
 import {
   stripPhantomScope,
   expandScopeWithAffectedTests,
@@ -368,12 +369,25 @@ export function buildPlannerSpawnArgs(
 
 /**
  * @internal Resolve the provider adapter to use for planner calls.
- * If an adapter is explicitly provided, use it. Otherwise uses
- * ProviderRegistry.getDefault(). Throws if no provider is available —
- * callers must ensure at least one provider is registered.
+ * If an adapter is explicitly provided, use it. Otherwise, when a `model`
+ * is given, resolve the adapter that OWNS that model (born-690: the default
+ * provider and the requested model are independent axes — spawning the
+ * default CLI with a foreign model name is a hard 400, e.g. `codex exec
+ * --model sonnet`). Falls back to ProviderRegistry.getDefault() when the
+ * model is unknown to the registry or its provider is not registered
+ * (custom ollama tags keep their historical default-provider behavior).
+ * Throws if no provider is available at all — callers must ensure at least
+ * one provider is registered.
  */
-export function resolveAdapter(adapter?: ProviderAdapter): ProviderAdapter {
+export function resolveAdapter(adapter?: ProviderAdapter, model?: ModelType): ProviderAdapter {
   if (adapter) return adapter;
+  if (model) {
+    try {
+      return providerRegistry.getProvider(getProviderForModel(model));
+    } catch {
+      // UnknownModelError or ProviderNotFoundError → historical default path.
+    }
+  }
   // Throws ProviderError('No providers registered') if registry is empty
   return providerRegistry.getDefault();
 }
@@ -444,7 +458,7 @@ export function callBrainPlannerWithReason(
   // Surface as `no_providers` reason so the caller does not silently fall back.
   let resolved: ProviderAdapter;
   try {
-    resolved = resolveAdapter(adapter);
+    resolved = resolveAdapter(adapter, model);
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
     return {
@@ -692,7 +706,7 @@ export function callZeroConfigPlanner(
   timeout?: number,
 ): PlannerResult | null {
   const prompt = buildZeroConfigPlanPrompt(description, projectName, fileTree);
-  const resolved = resolveAdapter(adapter);
+  const resolved = resolveAdapter(adapter, model);
   const { command, args } = buildPlannerSpawnArgs(resolved, prompt, model);
 
   const result = spawnSync(command, args, {

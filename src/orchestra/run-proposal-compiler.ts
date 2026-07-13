@@ -34,6 +34,7 @@
 
 import type { RunProposal } from '../core/run-flow-contract.js';
 import type { DeckentConfig, PlannerResult, PlannerTask } from '../core/types.js';
+import type { ResolvedConfig } from '../core/config-types.js';
 import { resolveBrainModel } from '../core/config.js';
 import { buildDirectives, type DirectiveBuildIntent, type DirectiveBuildTask } from './directives-builder.js';
 import { callZeroConfigPlanner } from './planner.js';
@@ -51,7 +52,14 @@ export interface RunProposalCompileResult {
  * model choice via `resolveBrainModel(config)`; omitted by every fake planner
  * that ignores it, so existing single-param injected planners stay assignable.
  */
-export type RunProposalPlanner = (proposal: RunProposal, config?: DeckentConfig) => PlannerResult;
+/** Config shape accepted by the planner seam — same union `resolveBrainModel` takes,
+ *  so call sites can forward a live `ResolvedConfig` directly (born-690). */
+export type RunProposalPlannerConfig = Partial<DeckentConfig> | Partial<ResolvedConfig>;
+
+export type RunProposalPlanner = (
+  proposal: RunProposal,
+  config?: RunProposalPlannerConfig,
+) => PlannerResult;
 
 /**
  * Thrown when NL -> plan compilation fails to produce a real, usable plan —
@@ -100,7 +108,7 @@ function traceabilityLine(proposal: RunProposal): string {
  * behavior is reproduced exactly. Do not default `config` to `createDefaultConfig()`: that
  * resolves `mode: 'performance'` -> `brain_model: 'opus'`, a silent regression.
  */
-function defaultRunProposalPlanner(proposal: RunProposal, config?: DeckentConfig): PlannerResult {
+function defaultRunProposalPlanner(proposal: RunProposal, config?: RunProposalPlannerConfig): PlannerResult {
   const description = proposal.intentSummary.trim();
   const result = callZeroConfigPlanner(description, resolveBrainModel(config), proposal.project);
   if (!result) {
@@ -141,7 +149,7 @@ function toDirectiveTask(task: PlannerTask, proposal: RunProposal): DirectiveBui
 export function compileRunProposalIntent(
   proposal: RunProposal,
   planner: RunProposalPlanner = defaultRunProposalPlanner,
-  config?: DeckentConfig,
+  config?: RunProposalPlannerConfig,
 ): DirectiveBuildIntent {
   let plan: PlannerResult;
   try {
@@ -179,7 +187,7 @@ export function compileRunProposalIntent(
 export function compileRunProposal(
   proposal: RunProposal,
   planner: RunProposalPlanner = defaultRunProposalPlanner,
-  config?: DeckentConfig,
+  config?: RunProposalPlannerConfig,
 ): RunProposalCompileResult {
   const intent = compileRunProposalIntent(proposal, planner, config);
   const directivesMarkdown = buildDirectives(intent);

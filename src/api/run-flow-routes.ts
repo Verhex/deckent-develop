@@ -218,7 +218,9 @@ async function handlePropose(
   let plannedSprint: Sprint;
   let preview: PlanPreview;
   try {
-    const compiled = compileRunProposal(proposal, proposalPlannerOverride);
+    // born-690: forward the live config (same contract as the terminal
+    // controller) so brain-model resolution never falls back to balanced-mode.
+    const compiled = compileRunProposal(proposal, proposalPlannerOverride, config);
     const brainContext = { ...readContext(projectRoot), directives: compiled.directivesMarkdown };
     const recommendation = defaultRecommendation(config);
     const result = await generatePlanPreview(projectRoot, config, brainContext, recommendation, {
