@@ -121,14 +121,49 @@ function defaultRunProposalPlanner(proposal: RunProposal, config?: RunProposalPl
   return result;
 }
 
-/** Map one real, AI-decomposed `PlannerTask` to a `DirectiveBuildTask` — no TODO placeholders. */
+/**
+ * Canonical task-title sanitizer — the SINGLE deterministic transform applied to
+ * every planner task title on BOTH ends of a DIRECTIVES dependency edge: where the
+ * title is emitted as a `## Task N:` heading AND where another task references it by
+ * title in its `- Dependencies:` list. Both directives-builder join delimiters —
+ * ',' (Files/Scope/Dependencies/Skills lines) and ';' (goCriteria/nogo lines) — plus
+ * any surrounding whitespace are folded to a safe spaced hyphen so a title can never
+ * split a comma-joined dependency list nor trip assertNoDelimiterCollision, and so a
+ * dependency reference always maps to the IDENTICAL canonical title its target task
+ * carries (DIRECTIVES round-trip consistency — born-692). Identity on delimiter-free
+ * titles, so existing single-word/phrase titles are unchanged.
+ */
+function canonicalTaskTitle(title: string): string {
+  return title.replace(/\s*[,;]+\s*/g, ' - ').trim();
+}
+
+/**
+ * Map one real, AI-decomposed `PlannerTask` to a `DirectiveBuildTask` — no TODO
+ * placeholders. Enforces two compiler-boundary invariants BEFORE the intent can reach
+ * the (unchanged) directives-builder, so a bare `DeckentError` never leaks from that
+ * builder for these two production cases (born-691 / born-692):
+ *   - every task must declare at least one non-blank writable file — an empty
+ *     `scope.filesWrite` is a typed {@link RunProposalPlanError} naming the ORIGINAL
+ *     (unsanitized) task title, never a silent TODO scaffold;
+ *   - the task title and every dependency reference are run through the SAME
+ *     {@link canonicalTaskTitle} sanitizer so a delimiter-bearing title round-trips
+ *     and its dependency edges still resolve to the identical canonical title.
+ */
 function toDirectiveTask(task: PlannerTask, proposal: RunProposal): DirectiveBuildTask {
+  if (!task.scope.filesWrite.some((f) => f.trim().length > 0)) {
+    throw new RunProposalPlanError(
+      proposal.flowId,
+      `run-proposal-compiler: planner task "${task.title}" declares no writable file ` +
+        `(scope.filesWrite is empty) — a real task must write at least one file. ` +
+        `Planner reason: ${task.reason || '(none given)'}. Refusing to fall back to a TODO scaffold.`,
+    );
+  }
   return {
-    title: task.title,
+    title: canonicalTaskTitle(task.title),
     desc: `${task.description}\n\n${traceabilityLine(proposal)}\n\nReason: ${task.reason}`,
     files: [...task.scope.filesWrite],
     scope: [...task.scope.directories],
-    deps: [...task.dependencies],
+    deps: task.dependencies.map(canonicalTaskTitle),
     model: task.model,
     effort: task.effort,
     skills: task.forceSkills,
@@ -190,6 +225,22 @@ export function compileRunProposal(
   config?: RunProposalPlannerConfig,
 ): RunProposalCompileResult {
   const intent = compileRunProposalIntent(proposal, planner, config);
-  const directivesMarkdown = buildDirectives(intent);
+  let directivesMarkdown: string;
+  try {
+    directivesMarkdown = buildDirectives(intent);
+  } catch (e) {
+    // Defense-in-depth: the two known leak vectors (empty filesWrite / delimiter-bearing
+    // titles) are already closed at intent construction (toDirectiveTask), so the common
+    // path never reaches here. Any RESIDUAL directives-builder DeckentError from another
+    // free-text field (e.g. a file path or reserved-label collision) must still not surface
+    // to the caller as a bare builder error — rewrap it as this module's typed plan error.
+    if (e instanceof RunProposalPlanError) throw e;
+    throw new RunProposalPlanError(
+      proposal.flowId,
+      `run-proposal-compiler: directives-builder rejected the compiled plan for flowId=${proposal.flowId}: ` +
+        `${e instanceof Error ? e.message : String(e)}.`,
+      { cause: e },
+    );
+  }
   return { intent, directivesMarkdown };
 }

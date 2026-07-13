@@ -9,6 +9,17 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint435] - 2026-07-13
+
+### Added
+
+- Planner derleme sınırlarını sağlamlaştır
+- Zero-config prompt kurallarını sıkılaştır
+- Run proposal ve do entegrasyonunu doğrula
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint434] - 2026-07-13
 
 ### Added

@@ -3181,19 +3181,21 @@
   "born_id": 691,
   "title": "DO-UX: planner bos-filesWrite task'i uretince kullaniciya CIPLAK builder-hatasi siziyor ('directives-builder: files must contain at least one entry (DISTINCT-FILE)') — run akisi tek-cumle teknik hatayla olur, plan-onarim/yeniden-deneme yok",
   "priority": "P2",
-  "status": "OPEN",
+  "status": "DONE",
   "source": "canli-vaka 2026-07-13 gece (born-688 do-kosusu ilk deneme, codex/sol planner)",
   "spec": "Katmanlar: (a) zero-config planner prompt'una 'her task scope.filesWrite >=1 dosya' kurali (buildZeroConfigPlanPrompt); (b) compileRunProposalIntent bos-filesWrite task'i yakalayip RunProposalPlanError'a TIPLI mesajla cevirsin (hangi task, neden); (c) opsiyonel tek-seferlik planner-retry (ayni intent + ihlal geri-bildirimi). do-UX: kullanici-donuk mesaj i18n'li olmali.",
-  "master_plan_row": 566
+  "master_plan_row": 566,
+  "fix": "sprint-435 (do-kosusu, 3/3 0-debt): (691) compileRunProposalIntent bos-filesWrite task'inda TIPLI RunProposalPlanError (orijinal task-basligiyla); (692) canonicalTaskTitle tek-kanonik sanitizer — ',' ve ';' delimiter'lari iki ucta da (heading + deps-referansi) ayni donusumle ' - ' olur, round-trip tutarli; buildZeroConfigPlanPrompt'a 2 kaynak-onleme kurali. 5 yeni test (CC: tests/orchestra/'ya tasindi) + compiler/planner/do aileleri 133 yesil. 3. flowId-receipt: b6c031fa (M2=3/3)."
  },
  {
   "born_id": 692,
   "title": "DO-UX (691 ailesi): planner task-BASLIGINDA virgul kullaninca deps-referansi directives-builder ',' join-delimiter round-trip hatasiyla oluyor — ciplak teknik hata kullaniciya siziyor, plan-onarim yok",
   "priority": "P2",
-  "status": "OPEN",
+  "status": "DONE",
   "source": "canli-vaka 2026-07-14 gece (born-686 do-kosusu ilk deneme, codex/sol planner)",
   "spec": "Katmanlar: (a) zero-config planner prompt'una 'task title icinde virgul/join-delimiter YASAK' kurali; (b) compileRunProposalIntent/toDirectiveTask basliktaki delimiter'i sanitize etsin (or. virgul->tire) YA DA deps eslesmesini title yerine index/slot-id ile yapsin (kalici cozum); (c) hata tipli+i18n RunProposalPlanError'a cevrilsin. 691 ile birlikte tek 'planner-output-sanitization' dilimi yapilabilir.",
-  "master_plan_row": 566
+  "master_plan_row": 566,
+  "fix": "sprint-435 (do-kosusu, 3/3 0-debt): (691) compileRunProposalIntent bos-filesWrite task'inda TIPLI RunProposalPlanError (orijinal task-basligiyla); (692) canonicalTaskTitle tek-kanonik sanitizer — ',' ve ';' delimiter'lari iki ucta da (heading + deps-referansi) ayni donusumle ' - ' olur, round-trip tutarli; buildZeroConfigPlanPrompt'a 2 kaynak-onleme kurali. 5 yeni test (CC: tests/orchestra/'ya tasindi) + compiler/planner/do aileleri 133 yesil. 3. flowId-receipt: b6c031fa (M2=3/3)."
  },
  {
   "born_id": 693,

@@ -1,5 +1,13 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-435 Learnings
+- Sprint sprint-435 Learnings: ## Sprint sprint-435 Learnings
+
+## Gains
+- 435-001 — Planner derleme sınırlarını sağlamlaştır — born-691 + born-692 solved at the single run-proposal-compiler boundary (only src/orchestra/run-p...
+- 435-002 — Zero-config prompt kurallarını sıkılaştır — Added two explicit, testable open-source-abuse-prevention rules to buildZeroConfigPlanPrompt (src...
+- 435-003 — Run proposal ve do entegrasyonunu doğrula — Two real-case hermetic tests added, both green with zero mocks of the module under test (no vi.mo...
+
 ## Sprint sprint-434 Learnings
 - Sprint sprint-434 Learnings: ## Sprint sprint-434 Learnings
 - Packed-install retry-hardening: GO_WITH_TECH_DEBT — packed-install job hardened, scope-limited to .github/workflows/cross-platform-e2e.yml only (e2e job untouched, scripts/

@@ -10668,3 +10668,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 434-003: YAML test-entegrasyonu (DONE)
 
 ---
+## Sprint 435 — sprint-435
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-13
+**Duration:** 1054s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1054445ms |
+
+### Tasks
+
+- 435-001: Planner derleme sınırlarını sağlamlaştır (DONE)
+- 435-002: Zero-config prompt kurallarını sıkılaştır (DONE)
+- 435-003: Run proposal ve do entegrasyonunu doğrula (DONE)
+
+---

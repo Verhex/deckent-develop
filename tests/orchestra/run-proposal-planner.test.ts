@@ -26,7 +26,7 @@ import {
   RunProposalPlanError,
   type RunProposalPlanner,
 } from '../../src/orchestra/run-proposal-compiler.js';
-import { callZeroConfigPlanner } from '../../src/orchestra/planner.js';
+import { callZeroConfigPlanner, buildZeroConfigPlanPrompt } from '../../src/orchestra/planner.js';
 import { DEFAULT_MODES } from '../../src/core/config.js';
 import type { RunProposal } from '../../src/core/run-flow-contract.js';
 import type { DeckentConfig, PlannerResult, PlannerTask } from '../../src/core/types.js';
@@ -278,5 +278,44 @@ describe('defaultRunProposalPlanner — model resolution via resolveBrainModel(c
     expect(() => compileRunProposalIntent(proposal, undefined, config)).toThrow(RunProposalPlanError);
 
     expect(spy.mock.calls[0]?.[1]).toBe('opus');
+  });
+});
+
+// ─── 6. Pin the two planner-prompt rules (435-002) that back run-proposal-compiler's ──
+//        boundary invariants (born-691 empty-filesWrite, born-692 comma-title). These
+//        rules live in buildZeroConfigPlanPrompt's own TASK SPLITTING RULES / GOREV
+//        BOLME KURALLARI bullet list (planner.ts) — pinned here so a future edit to
+//        that prompt cannot silently drop either rule without a test failure.
+//        buildZeroConfigPlanPrompt is a pure string-template function (no subprocess,
+//        no provider call) — hermetic like every other test in this file, and it
+//        passes through the `vi.mock(...)` spread above (`...actual`) untouched.
+
+describe('buildZeroConfigPlanPrompt — pins the two new TASK SPLITTING RULES (435-002)', () => {
+  it('EN prompt states EVERY task.scope.filesWrite must contain at least one file path', () => {
+    const prompt = buildZeroConfigPlanPrompt('Ship a feature', 'deckent', [], 'en');
+    expect(prompt).toContain(
+      "EVERY task's scope.filesWrite MUST contain at least one file path — an empty filesWrite array is invalid",
+    );
+  });
+
+  it('EN prompt states a task title MUST NOT contain a comma character', () => {
+    const prompt = buildZeroConfigPlanPrompt('Ship a feature', 'deckent', [], 'en');
+    expect(prompt).toContain(
+      'A task\'s "title" MUST NOT contain a comma (,) character — rephrase with "and"/a dash instead',
+    );
+  });
+
+  it('TR prompt (default language) states scope.filesWrite EN AZ bir dosya yolu içermeli', () => {
+    const prompt = buildZeroConfigPlanPrompt('Bir özellik gönder', 'deckent');
+    expect(prompt).toContain(
+      "HER görevin scope.filesWrite alanı EN AZ bir dosya yolu içermeli — boş filesWrite array'i geçersizdir",
+    );
+  });
+
+  it('TR prompt (default language) states title VİRGÜL karakteri İÇEREMEZ', () => {
+    const prompt = buildZeroConfigPlanPrompt('Bir özellik gönder', 'deckent');
+    expect(prompt).toContain(
+      'Bir görevin "title" alanı VİRGÜL (,) karakteri İÇEREMEZ — bunun yerine "ve" bağlacı veya tire kullan',
+    );
   });
 });

@@ -608,6 +608,8 @@ TASK SPLITTING RULES:
 - Specify dependencies if any (e.g., UI depends on backend API)
 - Create exactly ${ZERO_CONFIG_MIN_TASKS}-${ZERO_CONFIG_MAX_TASKS} tasks (no more, no less)
 - Define scope (directories + filesWrite) for each task
+- EVERY task's scope.filesWrite MUST contain at least one file path — an empty filesWrite array is invalid
+- A task's "title" MUST NOT contain a comma (,) character — rephrase with "and"/a dash instead
 - Write GO/NO-GO criteria for each task
 - The last task MUST be an integration/test task
 
@@ -653,6 +655,8 @@ GÖREV BÖLME KURALLARI:
 - Bağımlılık varsa dependencies array'inde belirt (örn. UI, backend API'ye bağlıysa)
 - Toplam ${ZERO_CONFIG_MIN_TASKS}-${ZERO_CONFIG_MAX_TASKS} görev oluştur (ne az ne fazla)
 - Her görev için scope (directories + filesWrite) belirle
+- HER görevin scope.filesWrite alanı EN AZ bir dosya yolu içermeli — boş filesWrite array'i geçersizdir
+- Bir görevin "title" alanı VİRGÜL (,) karakteri İÇEREMEZ — bunun yerine "ve" bağlacı veya tire kullan
 - Her görev için GO/NO-GO kriterleri yaz
 - Son görev MUTLAKA entegrasyon/test görevi olsun
 
