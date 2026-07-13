@@ -1,5 +1,23 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-433 Learnings
+- Sprint sprint-433 Learnings: ## Sprint sprint-433 Learnings
+- STATUS-JSON-CONTRACT CLI düzeltmesini uygula: GO_WITH_TECH_DEBT — Fixed both no-active JSON contract gaps in src/cli/commands/status.ts (born-688 / MASTER-PLAN row 568). (1) No-dashboard
+- Gerçek binary entegrasyon ve smoke kanıtını tamamla: NO_GO — tsc --noEmit: PASS (clean, exit 0). New file tests/cli/status-json-contract.integration.test.ts added: async-spawn (no s
+
+## Gains
+- 433-002 — Hermetik STATUS-JSON-CONTRACT regresyon testlerini ekle — Added tests/cli/status-json-contract.test.ts with 4 hermetic, real-subprocess tests (no mocks, as...
+
+## Sprint sprint-432 Learnings
+- Sprint sprint-432 Learnings: ## Sprint sprint-432 Learnings
+- SURF-0.4 — Sprint phases finalizer propagation: GO_WITH_TECH_DEBT — Audit: finalizeSprint has exactly ONE call site inside sprint-phases.ts -- runRetroPhase (~line 3159), inside the non-te
+
+## Gains
+- 432-001 — SURF-0.1 — RunSprintOptions correlation contract — Added optional flowId?: string and commandId?: string fields to RunSprintOptions (src/orchestra/s...
+- 432-002 — SURF-0.2 — start CLI flowId ingress — Single 1-line addition (plus a short comment) in the flowFlagsGiven runSprint call (src/cli/comma...
+- 432-003 — SURF-0.3 — Finalizer completion receipt — goCriteria is already fully satisfied by committed code — zero source edits made (verified agains...
+- 432-005 — SURF-0.5 — Completion watch ve uçtan uca truth-receipt doğrulaması — VERDICT NO_GO — the end-to-end flowId truth-receipt cannot be closed because the chain is BROKEN ...
+
 ## Sprint sprint-431 Learnings
 - Sprint sprint-431 Learnings: ## Sprint sprint-431 Learnings
 - scripts/lint-no-model-literal.mjs ratchet + baseline: GO_WITH_TECH_DEBT — Mirrors scripts/lint-no-spawnsync.mjs 1:1: pure exported fns (sliceRegistryArray, extractIdFields, deriveKnownModelIdsFr

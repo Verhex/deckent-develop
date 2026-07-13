@@ -3135,7 +3135,8 @@
   "status": "OPEN",
   "source": "gun-kapanisi CI-izleme (2026-07-12/13 gecesi); rerun lar geciyor (win rerun yesil) = flake, regresyon degil",
   "spec": "Sertlestirme: (a) xplat-smoke install/e2e adimlarina 1-otomatik-retry + npm timeout/cache ayari; (b) fail aninda tani-artifact (npm debug-log, tmux server-log) upload; (c) workflow-level flaky-quarantine ISTEMIYORUZ (required kalir) — adim-ici retry tercih; (d) flake-orani izlenebilir olsun (job-summary satiri).",
-  "date": "2026-07-13"
+  "date": "2026-07-13",
+  "evidence_update": "5. vaka: 461d2a96 (win packed-install) — kod-commit'inde de dustu, rerun'da gecti; sertlestirme koreografisi geceye alindi (2026-07-14)."
  },
  {
   "born_id": 687,
@@ -3150,19 +3151,21 @@
   "born_id": 688,
   "title": "status --json JSON-SOZLESMESI KIRIK: bos-state dalinda TR insan-metni basip exit 0 donuyor (JSON parse edilemez) — sol-analiz K3 dogrulandi",
   "priority": "P1",
-  "status": "OPEN",
+  "status": "DONE",
   "source": "sol-ultra analiz K3 (2026-07-13) + CC disk-verify (node dist/cli/entry.js status --json)",
   "spec": "src/cli/commands/status.ts:407-431 no-active dali --json guard'ini atliyor. Fix: her state'te (aktif-yok dahil) gecerli JSON schema don ({active:false, pendingApprovals:[...]}); exit-code sozlesmesi korunur; hermetik test: bos-state + aktif-state JSON.parse edilir. SURF-3 discoverability kanit-kriterinin parcasi.",
-  "master_plan_row": 568
+  "master_plan_row": 568,
+  "fix": "sprint-433 (do-kosusu, 433-001/002 + CC post-sprint smoke): buildNoActiveStatusJson — her state'te gecerli JSON; hermetik unit+integration testler (tests/cli/status-json-contract*.test.ts, 73 aile-testi yesil); GERCEK-BINARY KANIT: node dist/cli/entry.js status --json → {\"active\":false,\"pendingApprovals\":[]} exit 0. DERS: 433-003 NO_GO yapisaldi — sprint-ici dist-smoke imkansiz (build yasak), smoke post-sprint CC isi."
  },
  {
   "born_id": 689,
   "title": "FLOW-CORRELATION KOPUK: completion-record'da flowId yok (sprint-430/431 = 0 flowId); composition-testi flowId'yi ELLE inject ediyor — gercek propagation kaniti yok (sol-analiz M2/SURF-0)",
   "priority": "P0",
-  "status": "OPEN",
+  "status": "DONE",
   "source": "sol-ultra analiz M2 + A1 (2026-07-13); CC disk-verify: grep -c flowId .deckent/runtime/jobs/sprint-430.json = 0",
   "spec": "SURF-0 truth-receipt dilimi: flowId/commandId'yi proposal->job->sprint-controller->finalizer->completion boyunca ADDITIVE tasi (RunSprintOptions'a flowId; start.ts --flow-id zaten var, zincir ici propagation eksik: sprint-phases.ts:3062-3069 finalizer cagrilari flowId gecirmiyor). Kanit: gercek `do --run --yes` kosusunda .deckent/runtime/jobs/<id>.json flowId tasir + result-turn ayni ID; composition-test elle inject etmez. Dosyalar: sprint-controller.ts, sprint-phases.ts, sprint-finalizer.ts, start.ts, run-completion-watch.ts.",
-  "master_plan_row": 566
+  "master_plan_row": 566,
+  "fix": "sprint-432 (5+2 task) + CC dikis-fix (runSprint:1890 opts?.flowId → runRetroPhase — mikro-task'lar-arasi sahipsiz halka, disk-verify yakaladi) + surf0-flowid-seam-pin.test.ts 4 source-assert. GERCEK-BINARY RECEIPT: sprint-433 do-kosusu completionRecord.flowId=9c3d577a-5c24-45c6-86e2-5a0c7ba50224 (do'nun bastigi flow-ID ile birebir; jobs/sprint-433.json). M2 metrigi yeni-kosularda 1/1."
  },
  {
   "born_id": 690,

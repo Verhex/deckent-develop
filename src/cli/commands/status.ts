@@ -11,7 +11,7 @@ import { getCurrentSprintId } from '../../monitor/sprint-state.js';
 import { formatStatus, resolveOutputMode } from '../../core/output-formatter.js';
 import { eventBus } from '../../orchestra/event-bus.js';
 import { StatusRenderer } from '../helpers/status-renderer.js';
-import { readPendingApprovals } from '../../core/pending-approvals.js';
+import { readPendingApprovals, type PendingApproval } from '../../core/pending-approvals.js';
 import { hideCursor, showCursor, clearScreen } from '../helpers/ansi.js';
 
 interface StatusOpts {
@@ -323,6 +323,19 @@ export function buildPendingApprovalsSection(root: string, lang: string): string
   return lines.join('\n');
 }
 
+/**
+ * Canonical `deckent status --json` payload for every "no active run" state
+ * (no dashboard at all, or a dashboard whose writer died — isDashboardOrphaned).
+ * Both call sites must emit this exact shape so a JSON consumer never has to
+ * special-case which branch produced it (born-688 contract).
+ */
+export function buildNoActiveStatusJson(root: string): { active: false; pendingApprovals: PendingApproval[] } {
+  return {
+    active: false,
+    pendingApprovals: readPendingApprovals(root),
+  };
+}
+
 export function registerStatus(program: Command): void {
   program
     .command('status')
@@ -425,6 +438,10 @@ export function registerStatus(program: Command): void {
           }
           return;
         }
+        if (opts.json) {
+          output(JSON.stringify(buildNoActiveStatusJson(root), null, 2));
+          return;
+        }
         print(getMessage('status.no_active_sprint', lang));
         const pendingNoSprint = buildPendingApprovalsSection(root, lang);
         if (pendingNoSprint) print(pendingNoSprint);
@@ -496,11 +513,16 @@ export function registerStatus(program: Command): void {
         // Crash-case: an ACTIVE-shaped .dashboard whose writer died must not be
         // presented as live. Stale + no live sprint + no task files → honest
         // no-sprint view (the COMPLETE case is handled inside formatHumanStatus).
-        if (!opts.json && !opts.raw && isDashboardOrphaned(state, {
+        const isOrphaned = !opts.raw && isDashboardOrphaned(state, {
           hasLiveSprint: getCurrentSprintId(root) !== null,
           hasTasks: loadTaskFiles(root).length > 0,
           nowMs: Date.now(),
-        })) {
+        });
+        if (isOrphaned) {
+          if (opts.json) {
+            output(JSON.stringify(buildNoActiveStatusJson(root), null, 2));
+            return;
+          }
           print(getMessage('status.no_active_sprint', lang));
           const pendingOrphan = buildPendingApprovalsSection(root, lang);
           if (pendingOrphan) print(pendingOrphan);

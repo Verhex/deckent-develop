@@ -49,9 +49,13 @@
 | adr-g-033 | Dashboard (Observability Surface) | accepted |
 | adr-g-034 | Native Agentic Terminal | accepted |
 | adr-g-035 | Memory Architecture (DB-First, FTS5, Self-Learning Substrate) | accepted |
-| adr-g-036 | ADR-G-036: Zero-Hardcode Model & Flow Values (Parametric-Only) | accepted |
+| adr-g-036 | Zero-Hardcode Model & Flow Values (Parametric-Only) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-433 Learnings** (sprint-433): ## Sprint sprint-433 Learnings
+- STATUS-JSON-CONTRACT CLI düzeltmesini uygula: GO_WITH_TECH_DEBT — Fixed both no-acti...
+- **Sprint sprint-432 Learnings** (sprint-432): ## Sprint sprint-432 Learnings
+- SURF-0.4 — Sprint phases finalizer propagation: GO_WITH_TECH_DEBT — Audit: finalizeS...
 - **Sprint sprint-431 Learnings** (sprint-431): ## Sprint sprint-431 Learnings
 - scripts/lint-no-model-literal.mjs ratchet + baseline: GO_WITH_TECH_DEBT — Mirrors sc...
 - **Sprint sprint-430 Learnings** (sprint-430): ## Sprint sprint-430 Learnings
@@ -74,13 +78,9 @@
 
 ## Gains
 - 424-001 — TERM2 — shared actual-preview: plan-preview-service + proposal-c...
-- **Sprint sprint-423 Learnings** (sprint-423): ## Sprint sprint-423 Learnings
-- TT556 — PLANNER-PREFLIGHT: scope-satisfiability genişletme + gate-false-positive ail...
-- **Sprint sprint-422 Learnings** (sprint-422): ## Sprint sprint-422 Learnings
-- TT556 — PLANNER-PREFLIGHT: scope-satisfiability genişletme + gate-false-positive ail...
 
 ## Active Technical Debt
-_No active technical debt._
+- [NORMAL] Tech debt from 433-001-fix: Investigated the 433-001 NO_GO (brainEvaluationReaso
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat
@@ -150,4 +150,4 @@ _No active technical debt._
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 
-_Total entries: 1325 | Generated: 2026-07-12_
+_Total entries: 1333 | Generated: 2026-07-13_

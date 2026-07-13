@@ -9,6 +9,19 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint433] - 2026-07-13
+
+### Added
+
+- Hermetik STATUS-JSON-CONTRACT regresyon testlerini ekle
+
+### Changed
+
+- STATUS-JSON-CONTRACT CLI düzeltmesini uygula (completed with tech debt)
+
+
+_Tasks: 6 total, 4 done, 2 tech debt, 2 no-go_
+
 ## [1.0.0-beta.1-sprint432] - 2026-07-13
 
 ### Added
