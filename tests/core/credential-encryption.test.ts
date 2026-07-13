@@ -105,8 +105,12 @@ describe('credential-encryption — wrong key', () => {
     const key = makeTestKey();
     const encrypted = encrypt('test', key);
 
-    // Flip a byte in ciphertext
-    const tampered = { ...encrypted, ciphertext: 'ff' + encrypted.ciphertext.slice(2) };
+    // born-693: XOR-flip the first byte so the tamper is GUARANTEED to differ.
+    // The old `'ff' + slice(2)` was a no-op whenever the real first byte was
+    // already 0xff (1/256 of runs) — decrypt then succeeded and CI flaked.
+    const firstByte = parseInt(encrypted.ciphertext.slice(0, 2), 16);
+    const flipped = (firstByte ^ 0xff).toString(16).padStart(2, '0');
+    const tampered = { ...encrypted, ciphertext: flipped + encrypted.ciphertext.slice(2) };
     expect(() => decrypt(tampered, key)).toThrow(CredentialEncryptionError);
   });
 

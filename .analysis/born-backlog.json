@@ -3184,5 +3184,23 @@
   "source": "canli-vaka 2026-07-13 gece (born-688 do-kosusu ilk deneme, codex/sol planner)",
   "spec": "Katmanlar: (a) zero-config planner prompt'una 'her task scope.filesWrite >=1 dosya' kurali (buildZeroConfigPlanPrompt); (b) compileRunProposalIntent bos-filesWrite task'i yakalayip RunProposalPlanError'a TIPLI mesajla cevirsin (hangi task, neden); (c) opsiyonel tek-seferlik planner-retry (ayni intent + ihlal geri-bildirimi). do-UX: kullanici-donuk mesaj i18n'li olmali.",
   "master_plan_row": 566
+ },
+ {
+  "born_id": 692,
+  "title": "DO-UX (691 ailesi): planner task-BASLIGINDA virgul kullaninca deps-referansi directives-builder ',' join-delimiter round-trip hatasiyla oluyor — ciplak teknik hata kullaniciya siziyor, plan-onarim yok",
+  "priority": "P2",
+  "status": "OPEN",
+  "source": "canli-vaka 2026-07-14 gece (born-686 do-kosusu ilk deneme, codex/sol planner)",
+  "spec": "Katmanlar: (a) zero-config planner prompt'una 'task title icinde virgul/join-delimiter YASAK' kurali; (b) compileRunProposalIntent/toDirectiveTask basliktaki delimiter'i sanitize etsin (or. virgul->tire) YA DA deps eslesmesini title yerine index/slot-id ile yapsin (kalici cozum); (c) hata tipli+i18n RunProposalPlanError'a cevrilsin. 691 ile birlikte tek 'planner-output-sanitization' dilimi yapilabilir.",
+  "master_plan_row": 566
+ },
+ {
+  "born_id": 693,
+  "title": "CI-FLAKE (1/256 olasiliksal): credential-encryption 'tampered ciphertext' testi — 'ff'+slice(2) tamper'i orijinal ilk byte 0xff iken NO-OP → decrypt basarili → throw yok → CI kirmizi (f36fec85'te patladi, degisiklikle alakasiz)",
+  "priority": "P1",
+  "status": "DONE",
+  "source": "canli-vaka 2026-07-14 gece (f36fec85 CI=failure); ci_green_root_causes ailesine yeni desen: deterministik-olmayan-tamper",
+  "fix": "CC-el: XOR 0xff flip (garantili-farkli byte) + aciklayici yorum; 3x lokal kosu yesil. DERS: kripto-tamper testlerinde sabit-deger yazma, mevcut degeri OKUYUP degistir.",
+  "master_plan_row": null
  }
 ]
