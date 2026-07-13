@@ -59,6 +59,26 @@ class SmokeStepError extends Error {
   }
 }
 
+/**
+ * born-695: honest, diagnosis-grade failure detail for a runCmd result.
+ * The 1570143b windows leg failed as a bare "npm install -g exited 1" while
+ * BOTH attempts actually ran ~300s (>180s spawn timeout) and npm's real error
+ * lived in stdout/its debug log — stderr alone carried only warnings. Every
+ * step-failure now reports timedOut + elapsed + stderr + stdout tail so a CI
+ * failure is diagnosable from the job log alone.
+ */
+function failDetail(result, elapsedMs) {
+  const tail = (s, n) => {
+    const lines = (s ?? '').split('\n');
+    return lines.length > n ? `…(+${lines.length - n} lines)\n${lines.slice(-n).join('\n')}` : (s ?? '');
+  };
+  return (
+    `exited ${result.exitCode} (timedOut=${result.timedOut}, elapsed=${Math.round(elapsedMs / 1000)}s)\n` +
+    `STDERR:\n${tail(result.stderr, 80)}\n` +
+    `STDOUT(tail):\n${tail(result.stdout, 120)}`
+  );
+}
+
 /** Async spawn wrapper — never spawnSync; multi-minute install steps must not block the event loop. */
 function runCmd(cmd, args, cwd, timeoutMs, env) {
   return new Promise((resolvePromise) => {
@@ -153,12 +173,17 @@ async function main() {
     // script to fetch/build the correct native binding for THIS OS/arch — the
     // whole point of this smoke is proving that resolves on every platform.
     const installEnv = { ...isolatedEnv, npm_config_prefix: globalPrefix };
+    // born-695: 180s was too tight for a slow windows-latest runner — the
+    // 1570143b leg's native-binding install (better-sqlite3 prebuild/gyp)
+    // legitimately ran ~300s on BOTH attempts. 360s gives slow runners
+    // headroom while the workflow-level bounded retry still caps total cost.
+    const installStart = Date.now();
     const installResult = await runCmd(
       'npm', ['install', '-g', tarballPath, '--no-audit', '--no-fund'],
-      tmpRoot, 180_000, installEnv,
+      tmpRoot, 360_000, installEnv,
     );
     if (installResult.exitCode !== 0) {
-      throw new SmokeStepError('install', `npm install -g exited ${installResult.exitCode}\n${installResult.stderr}`);
+      throw new SmokeStepError('install', `npm install -g ${failDetail(installResult, Date.now() - installStart)}`);
     }
     const candidates = candidateBinPaths(globalPrefix);
     const resolvedBin = candidates.find((p) => existsSync(p));

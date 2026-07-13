@@ -69,7 +69,12 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    # born-695: 20 → 28. The smoke's install timeout grew 180s→360s (slow
+    # windows runners legitimately need ~5min for the native-binding install)
+    # and the bounded ×2 retry doubles that worst case — the old 20min ceiling
+    # would have converted a slow-but-passing second attempt into a job kill.
+    # Required-status stays untouched; this is only the time budget.
+    timeout-minutes: 28
     env:
       # Real npm-level retry (make-fetch-happen) layered under the bounded
       # bash retry loops below — absorbs transient registry blips inside a
@@ -126,16 +131,26 @@ jobs:
             sleep 30
           done
 
-      - name: Resolve npm diagnostic log path
+      # born-695: upload-artifact v4 rejects files OUTSIDE the workspace
+      # ("rootDirectory is not a parent directory" — the windows npm cache
+      # lives at C:\npm\cache while the workspace is on D:), which silently
+      # destroyed the diagnostics on the exact failure they were added for.
+      # Copy everything INTO the workspace first, then upload from there.
+      - name: Collect diagnostics into workspace
         if: failure()
-        id: npm-diag
         shell: bash
         run: |
+          set -u
+          mkdir -p xplat-diag
           npm_cache_dir="$(npm config get cache 2>/dev/null)"
           if [ -z "$npm_cache_dir" ]; then
             npm_cache_dir="$HOME/.npm"
           fi
-          echo "logs-glob=${npm_cache_dir}/_logs/**" >> "$GITHUB_OUTPUT"
+          if [ -d "${npm_cache_dir}/_logs" ]; then
+            cp -r "${npm_cache_dir}/_logs" xplat-diag/npm-logs || true
+          fi
+          cp .tasks/task-*.log xplat-diag/ 2>/dev/null || true
+          ls -la xplat-diag/ || true
 
       - name: Upload diagnostics on failure
         if: failure()
@@ -147,8 +162,6 @@ jobs:
           # (src/orchestra/tmux.ts) — no dedicated "server log" file exists
           # in this codebase; if-no-files-found: ignore keeps this honest
           # for legs where neither path materializes.
-          path: |
-            ${{ steps.npm-diag.outputs.logs-glob }}
-            .tasks/task-*.log
+          path: xplat-diag/**
           if-no-files-found: ignore
           retention-days: 7

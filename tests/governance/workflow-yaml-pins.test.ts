@@ -397,11 +397,23 @@ function analyzeDiagnosticArtifactStep(steps: WorkflowStep[]): DiagnosticArtifac
     (failureStep.with as Record<string, unknown> | undefined)?.['if-no-files-found'] ?? '',
   );
 
+  // born-695: upload-artifact v4 rejects workspace-OUTSIDE paths (windows npm
+  // cache lives on another drive), so npm logs are now COPIED into a
+  // workspace-local diag dir by a failure()-only collect step and uploaded
+  // from there. "Covers npm logs" therefore holds when EITHER the upload path
+  // itself names npm, OR it names the diag dir AND a failure()-only collect
+  // step demonstrably copies the npm _logs directory into it.
+  const collectStep = steps.find(
+    (s) => /failure\(\)/.test(String(s.if ?? '')) && /xplat-diag/.test(String(s.run ?? '')),
+  );
+  const collectCopiesNpmLogs = /_logs/.test(String(collectStep?.run ?? ''));
+
   return {
     found: true,
     isFailureOnly: !alwaysOrUnconditional,
     isFullShaPinned: isFullShaPinned(failureStep.uses ?? ''),
-    coversNpmLogs: /npm/i.test(pathText),
+    coversNpmLogs:
+      /npm/i.test(pathText) || (/xplat-diag/.test(pathText) && collectCopiesNpmLogs),
     toleratesMissingOptionalLogs: ifNoFilesFound === 'ignore',
   };
 }

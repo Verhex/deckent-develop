@@ -3214,5 +3214,14 @@
   "source": "canli-vaka 2026-07-14 gece (f8b5d8a6 CI 'Tests — CLI' failure); karpathy CUSTOM 'CI=fresh checkout' kuralinin worker tarafindan kacirilmis hali",
   "fix": "CC-el: describe.skipIf(!DIST_AVAILABLE) skip-guard (platform-tags emsali) + gerekce-yorumu; iki-yonlu dogrulama (dist-var: 2 test kosar yesil; dist-yok simulasyonu: suite skip, exit 0). FOLLOW-UP fikri: hermetic-test lint'ine 'dist/ referansi olan test skipIf-guard tasimali' deseni eklenebilir.",
   "master_plan_row": null
+ },
+ {
+  "born_id": 695,
+  "title": "XPLAT gozlemlenebilirlik cifti (1570143b dususunun otopsisi): (a) smoke FAIL detayi kor — 'exited 1' derken iki deneme de ~300s surdu (180s install-timeout'u asan yavas-runner native-install; timedOut/stdout maskelendi); (b) tani-artifact upload'i Windows'ta workspace-DISI npm-cache path'ini reddedip DUSTU — tani tam ihtiyac aninda kayboldu",
+  "priority": "P1",
+  "status": "DONE",
+  "source": "canli-vaka 2026-07-14 gece (1570143b XPLAT win bacagi); born-686 sertlestirmesinin ilk gercek-dusus otopsisi",
+  "fix": "CC-el: (1) xplat-install-smoke.mjs failDetail() — timedOut+elapsed+stderr+stdout-tail her step-FAIL'de (kor 'exited 1' oldu); (2) install timeout 180s→360s (yavas win-runner ~300s mesru); (3) workflow: failure-only 'Collect diagnostics into workspace' (npm _logs → xplat-diag/) + upload path=xplat-diag/** (v4 workspace-disi-path reddi cozuldu); (4) job timeout 20→28dk (retry x2 payi; gate GEVSEMEDI); (5) pin-analyzer coversNpmLogs collect-step-farkindaligi. 144 governance/workflow/script testi yesil + YAML-valid.",
+  "master_plan_row": 571
  }
 ]
