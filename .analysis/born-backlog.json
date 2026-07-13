@@ -3231,6 +3231,7 @@
   "status": "OPEN",
   "source": "canli-vaka 2026-07-14 01:30-02:00 (born-679 kosusu sprint-436); result: markerType=EXIT_WITHOUT_RESULT exit=1 opus $2.02; log: 'API Error: Stream idle timeout' x2",
   "spec": "(a) icin is: worker-wrapper stream-idle-timeout'u TIPLI provider-hata olarak yakalayip result'a yazsin (EXIT_WITHOUT_RESULT yerine PROVIDER_STREAM_TIMEOUT marker'i) + FIX-fazina 'API-saglik-bekle + tek-retry' politikasi; (b) icin is: FIX-spawn'inin queued-task'i worker-havuzu bosaldiginda GERCEKTEN tetikledigini garanti eden watchdog/receipt (queued>Ndk + 0-worker = loud-alert). born-679 isi bu sprint'ten CIKMADI — API duzelince yeniden kosulacak.",
-  "master_plan_row": null
+  "master_plan_row": null,
+  "evidence_update": "30dk gozlem (02:00-02:35): self-recovery YOK — fix-task 'Queued' + 0 worker sabit; FIX-spawn watchdog eksikligi KESINLESTI. Mudahale (kill/recover) Alperen sabah-kararina birakildi; born-679 yeniden-kosusu API-saglik-sonrasi."
  }
 ]
