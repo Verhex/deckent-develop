@@ -15,6 +15,33 @@
     "exclude": [],
     "minScore": 5
   },
+  "capabilities": {
+    "capabilitiesVersion": 3,
+    "content": {
+      "workTypes": [
+        { "type": "build", "proficiency": "primary" },
+        { "type": "fix", "proficiency": "secondary" }
+      ],
+      "expertise": [
+        "feature construction from a spec",
+        "following the codebase's existing pattern",
+        "wiring new behavior into an existing surface"
+      ],
+      "personaSlices": ["implementation", "bugfix", "default"]
+    },
+    "positional": {
+      "domains": [{ "id": "*", "proficiency": "able" }],
+      "surfaces": [],
+      "writeAuthority": true,
+      "role": "implementer",
+      "deliverables": ["code-src", "code-test"]
+    },
+    "numerical": {
+      "preferredModel": "sonnet",
+      "costTier": "standard",
+      "maxParallel": null
+    }
+  },
   "expertise": [
     "feature-implementation",
     "api-integration",

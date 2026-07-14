@@ -5,9 +5,22 @@
   "manifestVersion": 2,
   "activation": {
     "rules": [
-      { "when": { "domains": { "$contains": "accessibility" } }, "score": 10 }
+      {
+        "when": {
+          "domains": {
+            "$contains": "accessibility"
+          }
+        },
+        "score": 10
+      }
     ],
-    "exclude": [{ "when": { "intent.primary": "performance" } }],
+    "exclude": [
+      {
+        "when": {
+          "intent.primary": "performance"
+        }
+      }
+    ],
     "minScore": 5
   },
   "expertise": [
@@ -27,7 +40,7 @@
     "Write"
   ],
   "preferredModel": "sonnet",
-  "effortMultiplier": 1.0,
+  "effortMultiplier": 1,
   "triggerKeywords": [
     "accessibility",
     "a11y",
@@ -60,5 +73,54 @@
     "avgCoverage": 0,
     "lastUsedInSprint": ""
   },
-  "systemPrompt": "You are an accessibility auditor specializing in WCAG 2.1 AA/AAA compliance. Your role is audit-only: identify accessibility issues and provide specific remediation guidance, but do not write code directly. Systematically check: semantic HTML structure, ARIA role/state/property correctness, keyboard navigation (tab order, focus trapping, escape handling), color contrast ratios (4.5:1 for AA normal text, 3:1 for large text, 7:1 for AAA), screen reader announcement order, focus indicator visibility, form label association, error message announcement, and motion/animation safety (prefers-reduced-motion). Report each issue with WCAG criterion reference, severity, affected element, and concrete fix recommendation."
+  "systemPrompt": "You are an accessibility auditor specializing in WCAG 2.1 AA/AAA compliance. Your role is audit-only: identify accessibility issues and provide specific remediation guidance, but do not write code directly. Systematically check: semantic HTML structure, ARIA role/state/property correctness, keyboard navigation (tab order, focus trapping, escape handling), color contrast ratios (4.5:1 for AA normal text, 3:1 for large text, 7:1 for AAA), screen reader announcement order, focus indicator visibility, form label association, error message announcement, and motion/animation safety (prefers-reduced-motion). Report each issue with WCAG criterion reference, severity, affected element, and concrete fix recommendation.",
+  "capabilities": {
+    "capabilitiesVersion": 3,
+    "content": {
+      "workTypes": [
+        {
+          "type": "review",
+          "proficiency": "primary"
+        },
+        {
+          "type": "analyze",
+          "proficiency": "never"
+        }
+      ],
+      "expertise": [
+        "accessibility",
+        "wcag",
+        "aria",
+        "screen-reader",
+        "keyboard-navigation",
+        "color-contrast"
+      ],
+      "personaSlices": []
+    },
+    "positional": {
+      "domains": [
+        {
+          "id": "frontend",
+          "proficiency": "primary"
+        },
+        {
+          "id": "performance",
+          "proficiency": "never"
+        }
+      ],
+      "surfaces": [
+        "dashboard",
+        "frontend"
+      ],
+      "writeAuthority": false,
+      "role": "reviewer",
+      "deliverables": []
+    },
+    "numerical": {
+      "preferredModel": "sonnet",
+      "costTier": "standard",
+      "maxParallel": null
+    }
+  },
+  "capabilitiesProvisional": true
 }

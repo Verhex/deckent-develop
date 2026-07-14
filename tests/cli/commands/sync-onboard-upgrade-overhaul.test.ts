@@ -46,17 +46,17 @@ vi.mock('../../../src/cli/helpers/wizard.js', () => ({
   runWizard: vi.fn().mockResolvedValue({ language: 'en', mode: 'max_plan', runInit: false }),
 }));
 
-vi.mock('../../../src/core/constants.js', () => ({
+// Partial mock (445 close): the enumerated full-mock broke every time the sync
+// path gained a new constants import (latest: PROJECT_CONFIG_PATH via
+// agent-prompt-sync). Spread the real module so future export additions cannot
+// re-break this suite; keep only the historically pinned overrides (values
+// identical to the real module).
+vi.mock('../../../src/core/constants.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/core/constants.js')>()),
   RUNTIME_DIR: '.deckent/runtime',  // sprint-429 (429-011) tool-inventory yolu modül-yüklemede okur
   DECKENT_DIR: '.deckent',
   SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur
   DECKENT_VERSION: '1.0.0',
-  DECKENT_FILE: 'DECKENT.md',
-  CLAUDE_FILE: 'CLAUDE.md',
-  AGENTS_FILE: 'AGENTS.md',
-  BRAIN_DIR: '.brain',
-  SPRINTS_DIR: 'sprints',
-  MEMORY_FILE: 'MEMORY.md',
 }));
 
 vi.mock('../../../src/core/stack-detector.js', () => ({

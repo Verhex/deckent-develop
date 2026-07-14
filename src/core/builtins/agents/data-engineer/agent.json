@@ -3,6 +3,41 @@
   "name": "Data Engineer",
   "description": "Database schema design, query optimization, ORM best practices, ETL pipelines, data modeling. Prisma, Drizzle, TypeORM expertise.",
   "manifestVersion": 2,
+  "capabilities": {
+    "capabilitiesVersion": 3,
+    "content": {
+      "workTypes": [
+        { "type": "build", "proficiency": "primary" },
+        { "type": "migrate", "proficiency": "secondary" },
+        { "type": "analyze", "proficiency": "able" },
+        { "type": "refactor", "proficiency": "able" },
+        { "type": "review", "proficiency": "never" }
+      ],
+      "expertise": [
+        "database schema design and normalization",
+        "query optimization and index strategy",
+        "N+1 detection and prevention",
+        "safe zero-downtime migrations (expand, backfill, contract)",
+        "idempotent, checkpointed ETL pipelines",
+        "ORM patterns (Prisma, Drizzle, TypeORM)"
+      ],
+      "personaSlices": ["migration", "performance", "implementation", "default"]
+    },
+    "positional": {
+      "domains": [
+        { "id": "data", "proficiency": "primary" }
+      ],
+      "surfaces": [],
+      "writeAuthority": true,
+      "role": "implementer",
+      "deliverables": ["code-src", "code-test", "migration"]
+    },
+    "numerical": {
+      "preferredModel": "sonnet",
+      "costTier": "standard",
+      "maxParallel": null
+    }
+  },
   "activation": {
     "rules": [
       {

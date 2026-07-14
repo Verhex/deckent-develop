@@ -9,6 +9,33 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint445] - 2026-07-14
+
+### Added
+
+- routing3 core types and vocabulary builtin work-type core
+- vocabulary builtin base domain registry and deliverable evidence map
+- vocabulary 3-layer registry loader
+- requirement-vector schema and positional producer
+- requirement-vector numerical producer
+- structural content producer (governance-mode backbone)
+- capability-vector schema for agents
+- capability profile schema for skills
+- v2 to v3 manifest migrator
+- routing3 config schema and 3-layer merge
+
+### Changed
+
+- builtin capabilities authoring — construction family (completed with tech debt)
+- builtin capabilities authoring — architecture and review family (completed with tech debt)
+- builtin capabilities authoring — surface builders family (completed with tech debt)
+- builtin capabilities authoring — audit family (completed with tech debt)
+- builtin capabilities authoring — pipeline and integration family (completed with tech debt)
+- vocabulary doctor checks (completed with tech debt)
+
+
+_Tasks: 34 total, 32 done, 10 tech debt, 2 no-go_
+
 ## [1.0.0-beta.1-sprint444] - 2026-07-14
 
 ### Added

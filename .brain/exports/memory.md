@@ -1,5 +1,27 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-445 Learnings
+- Sprint sprint-445 Learnings: ## Sprint sprint-445 Learnings
+- builtin capabilities authoring — construction family: GO_WITH_TECH_DEBT — Authored REAL (non-provisional) capabilities v3 blocks on the 3 construction-family builtin manifests, additive to (neve
+- builtin capabilities authoring — architecture and review family: GO_WITH_TECH_DEBT — Authored REAL (non-provisional) capabilities-v3 blocks into the 3 architecture/review-family builtin manifests, persona-
+- builtin capabilities authoring — surface builders family: GO_WITH_TECH_DEBT — Authored REAL (non-provisional, no capabilitiesProvisional flag) v3 `capabilities` blocks on the 2/3 manifests that exis
+- builtin capabilities authoring — audit family: GO_WITH_TECH_DEBT — Authored REAL (non-provisional) capabilitiesVersion:3 `capabilities` blocks for the audit family, purely additive (appen
+- builtin capabilities authoring — pipeline and integration family: GO_WITH_TECH_DEBT — Added REAL (non-provisional) capabilities v3 blocks to all 3 in-scope manifests, dual-carry (activation.rules/exclude an
+- builtin capabilities authoring — data and remaining family: NO_GO — AUTHORED 2/3 capability blocks (additive/dual-carry — activation.rules untouched, nothing removed):
+- data-engineer: bui
+- vocabulary doctor checks: GO_WITH_TECH_DEBT — Implemented runVocabularyDoctor() in src/core/routing3/vocabulary-doctor.ts (new, core layer, zero cli/getMessage import
+
+## Gains
+- 445-001 — routing3 core types and vocabulary builtin work-type core — RoutingEngineV3 Slice-0 closed-core vocabulary foundation.
+- 445-002 — vocabulary builtin base domain registry and deliverable evidence map — Extended vocabulary-builtin.ts with BUILTIN_DOMAINS: the 14 builtin-base DomainDef entries from s...
+- 445-003 — vocabulary 3-layer registry loader — loadVocabulary(projectRoot, opts?) merges the DomainDef registry across 3 precedence layers: buil...
+- 445-004 — requirement-vector schema and positional producer — RequirementVector zod schema (content/positional/numerical, spec §2a) + producePositional(task, v...
+- 445-005 — requirement-vector numerical producer — Added produceNumerical(task, vocabulary = { domains: BUILTIN_DOMAINS }) to requirement-vector.ts,...
+- 445-006 — structural content producer (governance-mode backbone) — produceContentStructural(task, positional, structuralConfidence?) added to src/core/routing3/requ...
+- 445-007 — capability-vector schema for agents — agent.json-v3 `capabilities` zod schema per spec §2b (.analysis/routing-v3-secenek-b-detay-2026-0...
+- 445-008 — capability profile schema for skills — Added SkillProfile (spec section 2b) as an in-file extension of 445-007's capability-vector.ts: S...
+- …and 11 more delivered
+
 ## Sprint sprint-444 Learnings
 - Sprint sprint-444 Learnings: ## Sprint sprint-444 Learnings
 - F3 routing pins move to the implementer era: GO_WITH_TECH_DEBT — All 4 target files pass (32/32) and npx tsc --noEmit is clean. routing-impl-builtin.test.ts (fully hermetic) is hard-pin

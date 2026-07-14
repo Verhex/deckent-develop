@@ -10918,3 +10918,50 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 444-007: mini-sprint integration and routing smoke (DONE)
 
 ---
+## Sprint 445 — sprint-445
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-14
+**Duration:** 5353s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 34 |
+| Completed | 32 |
+| Tech Debt | 10 |
+| No-Go | 2 |
+| Coverage | NaN% |
+| Duration | 5353467ms |
+
+### Tasks
+
+- 445-001: routing3 core types and vocabulary builtin work-type core (DONE)
+- 445-002: vocabulary builtin base domain registry and deliverable evidence map (DONE)
+- 445-003: vocabulary 3-layer registry loader (DONE)
+- 445-004: requirement-vector schema and positional producer (DONE)
+- 445-005: requirement-vector numerical producer (DONE)
+- 445-006: structural content producer (governance-mode backbone) (DONE)
+- 445-007: capability-vector schema for agents (DONE)
+- 445-008: capability profile schema for skills (DONE)
+- 445-009: v2 to v3 manifest migrator (DONE)
+- 445-010: routing3 config schema and 3-layer merge (DONE)
+- 445-011: sync wire for capabilities migration (dual-carry) (DONE)
+- 445-012: agent-pool additive load of capabilities (DONE)
+- 445-013: builtin capabilities authoring — construction family (GO_WITH_TECH_DEBT)
+- 445-014: builtin capabilities authoring — architecture and review family (GO_WITH_TECH_DEBT)
+- 445-015: builtin capabilities authoring — surface builders family (GO_WITH_TECH_DEBT)
+- 445-016: builtin capabilities authoring — audit family (GO_WITH_TECH_DEBT)
+- 445-017: builtin capabilities authoring — pipeline and integration family (GO_WITH_TECH_DEBT)
+- 445-018: builtin capabilities authoring — content and platform family (DONE)
+- 445-019: builtin capabilities authoring — data and remaining family (NO_GO)
+- 445-020: builtin skill profiles authoring (DONE)
+- 445-021: vocabulary doctor checks (GO_WITH_TECH_DEBT)
+- 445-022: vocabulary bootstrap generator from project analysis (DONE)
+- 445-023: ADR-G-006 today-clause amendment draft (DONE)
+- 445-024: schema round-trip integration test (DONE)
+- 445-025: foundation catalog conventions guard (DONE)
+- 445-026: slice-0 integration smoke and regression sweep (DONE)
+
+---

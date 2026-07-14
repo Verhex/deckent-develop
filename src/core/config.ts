@@ -13,6 +13,11 @@ import {
 import { readJsonSafeAsync, debugLog } from './utils.js';
 import { needsMigration, migrateConfig, removeDuplicateKeys } from './config-migration.js';
 import { loadApprovalRules } from './approval-rules-load.js';
+// Import cycle note: routing3/config.ts imports deepMerge from THIS module. The
+// cycle is init-safe — each side references the other's bindings only inside
+// function bodies (routing3's top-level code builds zod schemas only), never at
+// module-initialization time.
+import { resolveRoutingV3Config } from './routing3/config.js';
 import { normalizeGlobalScopePlatform, resolveGlobalScopePaths } from './global-scope-resolver.js';
 import type { GlobalScopeEnv } from './global-scope-resolver.js';
 import type {
@@ -1844,6 +1849,10 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     worker_comms: config.worker_comms,
     // Cost Guard — passed through (opt-in, absent = disabled)
     cost_guard: config.cost_guard,
+    // Routing Engine v3 (445 Slice-0) — resolved to the full defaulted+validated
+    // shape (config already carries the merged overrides, passed as the project
+    // layer; defaults live solely in routing3/config.ts).
+    routing_v3: resolveRoutingV3Config(null, config),
     // Scheduler shadow-reducer (SCHED4) — passed through (opt-in, absent = disabled)
     scheduler: config.scheduler,
     // Gate — passed through (opt-in, default-off)
@@ -2592,6 +2601,10 @@ export function mergeConfigs(
     worker_comms: config.worker_comms,
     // Cost Guard — passed through (opt-in, absent = disabled)
     cost_guard: config.cost_guard,
+    // Routing Engine v3 (445 Slice-0) — resolved to the full defaulted+validated
+    // shape (config already carries the merged overrides, passed as the project
+    // layer; defaults live solely in routing3/config.ts).
+    routing_v3: resolveRoutingV3Config(null, config),
     // Scheduler shadow-reducer (SCHED4) — passed through (opt-in, absent = disabled)
     scheduler: config.scheduler,
     // Gate — passed through (opt-in, default-off)

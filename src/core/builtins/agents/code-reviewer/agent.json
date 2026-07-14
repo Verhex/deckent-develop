@@ -57,5 +57,50 @@
     "avgCoverage": 0,
     "lastUsedInSprint": ""
   },
+  "capabilities": {
+    "capabilitiesVersion": 3,
+    "content": {
+      "workTypes": [
+        {
+          "type": "review",
+          "proficiency": "primary"
+        },
+        {
+          "type": "refactor",
+          "proficiency": "able"
+        }
+      ],
+      "expertise": [
+        "code-review",
+        "quality-analysis",
+        "best-practices",
+        "design-patterns"
+      ],
+      "personaSlices": [
+        "refactor",
+        "bugfix",
+        "security"
+      ]
+    },
+    "positional": {
+      "domains": [
+        {
+          "id": "*",
+          "proficiency": "able"
+        }
+      ],
+      "surfaces": [],
+      "writeAuthority": false,
+      "role": "code-reviewer",
+      "deliverables": [
+        "doc"
+      ]
+    },
+    "numerical": {
+      "preferredModel": "opus",
+      "costTier": "premium",
+      "maxParallel": null
+    }
+  },
   "systemPrompt": "You are a code reviewer. Check for correctness bugs (off-by-one, null dereference, race conditions), performance issues (N+1 queries, unnecessary allocations, missing indexes), readability problems (unclear naming, deep nesting, long functions), and security vulnerabilities (injection, auth bypass, data exposure). Evaluate error handling: are errors caught at the right level? Are they logged with context? Verify tests cover the changed behavior. Check API contracts: are breaking changes documented? Review for consistency with existing codebase patterns. Provide actionable feedback: explain what is wrong, why it matters, and suggest a concrete fix. Distinguish must-fix from nice-to-have."
 }

@@ -9,6 +9,8 @@ import { createDefaultStats } from './agent-types.js';
 import type { ActivationRule } from './routing-types.js';
 import { createDefaultActivationConfig } from './routing-types.js';
 import { readJsonSafe, debugLog } from './utils.js';
+import { capabilityVectorSchema } from './routing3/capability-vector.js';
+import type { CapabilityVector } from './routing3/capability-vector.js';
 
 // ─── Builtin Fallback (371-001 CATALOG-MATERIALIZE) ─────────────────────────
 //
@@ -186,12 +188,16 @@ export type AgentDomain = 'cli' | 'react' | 'system' | 'test' | 'doc' | 'devops'
  */
 export type AgentRole = 'implementer' | 'reviewer' | 'analyst';
 
-// Module augmentation: adds domain?/role? to AgentDefinition (backward compat —
-// undefined → 'generic' / 'implementer')
+// Module augmentation: adds domain?/role?/capabilities? to AgentDefinition
+// (backward compat — undefined → 'generic' / 'implementer' / no capability vector).
+// `capabilities` (445-012, routing-v3 Slice-0) is purely additive: the V2 scoring
+// path (routing-engine.ts / activation-engine.ts) never reads this field, so its
+// presence or absence cannot change any V2 RoutingDecision.
 declare module './agent-types.js' {
   interface AgentDefinition {
     domain?: AgentDomain;
     role?: AgentRole;
+    capabilities?: CapabilityVector;
   }
 }
 
@@ -389,6 +395,13 @@ export interface InvalidManifestEntry {
   id: string;
   path: string;
   errors: string[];
+  /**
+   * 'skip' (default, born-590): the WHOLE manifest was rejected and the agent is
+   * absent from the pool. 'warning' (445-012): only an additive field (e.g.
+   * `capabilities`) failed validation — the agent still loaded normally on its
+   * other V2 fields, just without that one field attached.
+   */
+  severity?: 'skip' | 'warning';
 }
 
 // ─── Stats Sidecar (born-605 STATS-SIDECAR) ─────────────────────────────────
@@ -476,9 +489,15 @@ export class AgentPoolManager {
    * DECKENT_DEBUG is set, always persisted to .brain/ERRORS.md) — replacing
    * the previous fully-silent skip (born-590).
    */
-  private _recordInvalidManifest(id: string, manifestPath: string, errors: string[]): void {
-    this.invalidManifests.push({ id, path: manifestPath, errors });
-    debugLog('agent-pool:invalid-manifest', `${id} (${manifestPath}): ${errors.join('; ')}`);
+  private _recordInvalidManifest(
+    id: string,
+    manifestPath: string,
+    errors: string[],
+    severity: 'skip' | 'warning' = 'skip',
+  ): void {
+    this.invalidManifests.push({ id, path: manifestPath, errors, severity });
+    const label = severity === 'warning' ? 'WARNING' : 'SKIP';
+    debugLog('agent-pool:invalid-manifest', `[${label}] ${id} (${manifestPath}): ${errors.join('; ')}`);
   }
 
   /** Manifests skipped during the most recent loadAgents() call because they failed validation or JSON parsing (born-590). */
@@ -489,6 +508,36 @@ export class AgentPoolManager {
   /** Count of manifests skipped during the most recent loadAgents() call (born-590). */
   getInvalidCount(): number {
     return this.invalidManifests.length;
+  }
+
+  /**
+   * Validate `raw.capabilities` (routing-v3 Slice-0 CapabilityVector, 445-012) against
+   * {@link capabilityVectorSchema} when present, in place on the raw manifest record.
+   *
+   * Unlike `activation` (validateActivationField, born-590) — where a malformed block
+   * rejects the ENTIRE manifest — an invalid `capabilities` block does NOT reject the
+   * agent: it is dropped (so the loaded AgentDefinition simply has no `capabilities`)
+   * and recorded as a visible WARNING via the existing _recordInvalidManifest channel.
+   * The agent still loads normally on its other (V2) fields. This keeps the V2 scoring
+   * path (routing-engine.ts / activation-engine.ts, which never reads `capabilities`)
+   * completely unaffected by this field's presence, absence, or validity.
+   */
+  private _validateAndAttachCapabilities(raw: Record<string, unknown>, id: string, manifestPath: string): void {
+    const capabilities = raw['capabilities'];
+    if (capabilities === undefined) return;
+
+    const result = capabilityVectorSchema.safeParse(capabilities);
+    if (result.success) {
+      raw['capabilities'] = result.data;
+      return;
+    }
+
+    const errors = result.error.issues.map((issue) => {
+      const fieldPath = issue.path.length > 0 ? `.${issue.path.join('.')}` : '';
+      return `"capabilities${fieldPath}" ${issue.message}`;
+    });
+    delete raw['capabilities'];
+    this._recordInvalidManifest(id, manifestPath, errors, 'warning');
   }
 
   // ─── Load ────────────────────────────────────────────────────────────────────
@@ -663,6 +712,7 @@ export class AgentPoolManager {
         const validation = AgentPoolManager.validateAgentDefinition(raw);
         if (validation.valid) {
           normalizeAgentManifest(raw);
+          this._validateAndAttachCapabilities(raw, entry.name, agentFile);
           const agent = raw as unknown as AgentDefinition;
           applyBuiltinImplementationRules(agent);
           pool.set(agent.id, agent);

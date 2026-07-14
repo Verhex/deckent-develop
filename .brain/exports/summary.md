@@ -52,6 +52,8 @@
 | adr-g-036 | Zero-Hardcode Model & Flow Values (Parametric-Only) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-445 Learnings** (sprint-445): ## Sprint sprint-445 Learnings
+- builtin capabilities authoring — construction family: GO_WITH_TECH_DEBT — Authored R...
 - **Sprint sprint-444 Learnings** (sprint-444): ## Sprint sprint-444 Learnings
 - F3 routing pins move to the implementer era: GO_WITH_TECH_DEBT — All 4 target files ...
 - **Sprint sprint-443 Learnings** (sprint-443): ## Sprint sprint-443 Learnings
@@ -74,11 +76,13 @@
 
 ## Gains
 - 435-001 — Planner derleme sınırlarını sağlamlaştır — born-691 + born-692 s...
-- **Sprint sprint-434 Learnings** (sprint-434): ## Sprint sprint-434 Learnings
-- Packed-install retry-hardening: GO_WITH_TECH_DEBT — packed-install job hardened, sco...
 
 ## Active Technical Debt
-- [HIGH] Tech debt from 443-001-xfix: Investigated the cross-dependency hypothesis first 
+- [NORMAL] Tech debt from 445-013-fix: REAL (non-provisional) v3 capabilities blocks for th
+- [NORMAL] Timeout-partial from 445-014-fix: worker killed mid-execution, work accepted
+- [NORMAL] Tech debt from 445-015-fix: ROOT CAUSE of the original 445-015 NO_GO ('rubric to
+- [NORMAL] Tech debt from 445-017-fix: No new edit was made this round -- 445-017's prior a
+- [CRITICAL] Tech debt from 443-001-xfix: Investigated the cross-dependency hypothesis first 
 - [CRITICAL] Tech debt from 433-001-fix: Investigated the 433-001 NO_GO (brainEvaluationReaso
 
 ## Active Patterns
@@ -150,5 +154,6 @@
 - Violation pattern: stale_heartbeat
 - Violation pattern: stale_heartbeat
 - Violation pattern: file_outside_scope
+- Violation pattern: doc_sync_ground_truth_mismatch
 
-_Total entries: 1380 | Generated: 2026-07-14_
+_Total entries: 1391 | Generated: 2026-07-14_

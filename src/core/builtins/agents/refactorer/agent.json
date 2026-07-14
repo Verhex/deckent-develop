@@ -15,6 +15,34 @@
     "exclude": [],
     "minScore": 5
   },
+  "capabilities": {
+    "capabilitiesVersion": 3,
+    "content": {
+      "workTypes": [
+        { "type": "refactor", "proficiency": "primary" },
+        { "type": "review", "proficiency": "able" },
+        { "type": "build", "proficiency": "never" }
+      ],
+      "expertise": [
+        "behavior-preserving code restructuring",
+        "extract / rename / move / split refactoring patterns",
+        "reducing coupling and eliminating duplication"
+      ],
+      "personaSlices": ["refactor", "architecture", "default"]
+    },
+    "positional": {
+      "domains": [{ "id": "*", "proficiency": "able" }],
+      "surfaces": [],
+      "writeAuthority": true,
+      "role": "implementer",
+      "deliverables": ["code-src", "code-test"]
+    },
+    "numerical": {
+      "preferredModel": "sonnet",
+      "costTier": "standard",
+      "maxParallel": null
+    }
+  },
   "expertise": [
     "refactoring",
     "design-patterns",

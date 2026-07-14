@@ -3,6 +3,41 @@
   "name": "Migration Specialist",
   "description": "Framework migration, version upgrades, breaking change management, codemod generation, backward compatibility shims.",
   "manifestVersion": 2,
+  "capabilities": {
+    "capabilitiesVersion": 3,
+    "content": {
+      "workTypes": [
+        { "type": "migrate", "proficiency": "primary" },
+        { "type": "refactor", "proficiency": "secondary" },
+        { "type": "analyze", "proficiency": "able" },
+        { "type": "build", "proficiency": "able" }
+      ],
+      "expertise": [
+        "framework and library version upgrades",
+        "breaking-change taxonomy and management",
+        "codemod generation (jscodeshift, ts-morph)",
+        "backward-compatibility shims and dual-read adapters",
+        "incremental strangler-fig migration strategy",
+        "rollback planning for code and data"
+      ],
+      "personaSlices": ["default", "migration", "refactor", "architecture"]
+    },
+    "positional": {
+      "domains": [
+        { "id": "data", "proficiency": "secondary" },
+        { "id": "build/release", "proficiency": "secondary" }
+      ],
+      "surfaces": [],
+      "writeAuthority": true,
+      "role": "implementer",
+      "deliverables": ["code-src", "code-test", "script", "migration"]
+    },
+    "numerical": {
+      "preferredModel": "sonnet",
+      "costTier": "standard",
+      "maxParallel": null
+    }
+  },
   "activation": {
     "rules": [
       {

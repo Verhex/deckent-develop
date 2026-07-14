@@ -70,5 +70,48 @@
     "successRate": 0,
     "avgCoverage": 0,
     "lastUsedInSprint": ""
-  }
+  },
+  "capabilities": {
+    "capabilitiesVersion": 3,
+    "content": {
+      "workTypes": [
+        {
+          "type": "build",
+          "proficiency": "never"
+        },
+        {
+          "type": "configure",
+          "proficiency": "primary"
+        }
+      ],
+      "expertise": [
+        "ci-cd",
+        "testing",
+        "regression-detection",
+        "build-verification",
+        "github-actions"
+      ],
+      "personaSlices": []
+    },
+    "positional": {
+      "domains": [
+        {
+          "id": "devops/ci",
+          "proficiency": "primary"
+        }
+      ],
+      "surfaces": [],
+      "writeAuthority": true,
+      "role": "implementer",
+      "deliverables": [
+        "config"
+      ]
+    },
+    "numerical": {
+      "preferredModel": "sonnet",
+      "costTier": "standard",
+      "maxParallel": null
+    }
+  },
+  "capabilitiesProvisional": true
 }

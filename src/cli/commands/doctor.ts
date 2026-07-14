@@ -55,6 +55,7 @@ import {
 import { detectEnvironment } from '../../core/environment.js';
 import { loadDeckSecrets, validateDeckFile, KNOWN_DECK_KEYS } from '../../core/deck-file.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
+import { runVocabularyDoctor, type VocabularyDoctorReport } from '../../core/routing3/vocabulary-doctor.js';
 
 export function isRunningInWSL(): boolean {
   // Check WSL environment variable (set by WSL2 interop)
@@ -281,6 +282,8 @@ export interface HumanDoctorInput {
   platformProfile?: PlatformProfileReport;
   /** Optional (ONB-2-DILIM-3, Task 368-002): config-based (env + .deck) auth state, no network. */
   authStateReport?: AuthStateResult[];
+  /** Optional (Sprint 445, Task 445-021): routing3 vocabulary health report (layer shadowing, dead pathPatterns, duplicate aliases, missing descriptions). */
+  vocabularyReport?: VocabularyDoctorReport;
 }
 
 /**
@@ -754,6 +757,152 @@ export function formatWorkerResourcesLines(info: WorkerResourcesInfo, lang: stri
   return lines;
 }
 
+// ─── Vocabulary Doctor Section (Sprint 445, Task 445-021) ────────────────────
+//
+// Surfaces routing3/vocabulary-doctor.ts's read-only health report (layer
+// shadowing, dead pathPatterns, duplicate aliases, domains missing a
+// description) in `deckent doctor` output.
+//
+// docImpact: src/cli/helpers/messages.ts is outside this task's write scope
+// (same constraint already documented at formatAuthStateLines above, born-203/
+// Task 270-006/368-002 precedent). VOCABULARY_MESSAGES is a LOCAL en/tr table
+// with the exact getMessage(key, lang, vars) contract (key -> {en,tr}, {var}
+// interpolation) so promoting it into messages.ts's MESSAGES map later is a
+// pure copy/paste, not a rewrite. Follow-up task should do that migration.
+
+const VOCABULARY_MESSAGES: Readonly<Record<string, Readonly<{ en: string; tr: string }>>> = {
+  'doctor.vocabulary_header': { en: 'Vocabulary:', tr: 'Sözlük (Vocabulary):' },
+  'doctor.vocabulary_layer_counts': {
+    en: '{count} domain(s) loaded (builtin {builtin}, org-overlay {org}, project {project})',
+    tr: '{count} domain yüklendi (builtin {builtin}, org-overlay {org}, project {project})',
+  },
+  'doctor.vocabulary_clean': {
+    en: 'No shadowing, dead patterns, duplicate aliases, or missing descriptions.',
+    tr: "Shadowing, ölü pattern, yinelenen alias veya eksik açıklama yok.",
+  },
+  'doctor.vocabulary_shadowed_header': {
+    en: '{count} shadowed domain(s):',
+    tr: "{count} shadow'lanmış domain:",
+  },
+  'doctor.vocabulary_shadowed_line': {
+    en: '{domainId}: {shadowedLayer} definition overridden by {shadowingLayer}',
+    tr: '{domainId}: {shadowedLayer} tanımı {shadowingLayer} tarafından geçersiz kılındı',
+  },
+  'doctor.vocabulary_dead_pattern_header': {
+    en: '{count} dead pathPattern(s) (match nothing under this project):',
+    tr: '{count} ölü pathPattern (bu projede hiçbir şeyle eşleşmiyor):',
+  },
+  'doctor.vocabulary_dead_pattern_line': {
+    en: '{domainId}: "{pattern}"',
+    tr: '{domainId}: "{pattern}"',
+  },
+  'doctor.vocabulary_dup_alias_header': {
+    en: '{count} duplicate alias(es) across domains:',
+    tr: '{count} domain arası yinelenen alias:',
+  },
+  'doctor.vocabulary_dup_alias_line': {
+    en: '"{alias}" used by: {domainIds}',
+    tr: '"{alias}" şu domainlerce kullanılıyor: {domainIds}',
+  },
+  'doctor.vocabulary_no_description_header': {
+    en: '{count} domain(s) with no description:',
+    tr: '{count} açıklaması olmayan domain:',
+  },
+  'doctor.vocabulary_no_description_line': {
+    en: '{domainId}',
+    tr: '{domainId}',
+  },
+};
+
+/**
+ * Local getMessage-shaped lookup for the Vocabulary section (see docImpact
+ * note above) — same key -> {en,tr} + {var} interpolation contract as
+ * getMessage in src/cli/helpers/messages.ts, so it stays a drop-in once that
+ * file is back in scope.
+ */
+function vocabMessage(key: string, lang: string, vars?: Record<string, string>): string {
+  const entry = VOCABULARY_MESSAGES[key];
+  if (!entry) return key;
+  const normalizedLang = lang === 'tr' ? 'tr' : 'en';
+  const template = entry[normalizedLang];
+  if (!vars) return template;
+  return template.replace(/\{(\w+)\}/g, (_, varName: string) => vars[varName] ?? `{${varName}}`);
+}
+
+/**
+ * Render the Vocabulary doctor report: a PASS layer-count summary line, then
+ * one WARN block per non-empty issue category (shadowed / dead pathPattern /
+ * duplicate alias / missing description), or a single clean PASS line when
+ * all four categories are empty.
+ */
+export function formatVocabularyDoctorLines(report: VocabularyDoctorReport, lang: string = 'en'): string[] {
+  const lines: string[] = [vocabMessage('doctor.vocabulary_header', lang)];
+  lines.push(`  ${doctorStatusIcon('pass')} ${vocabMessage('doctor.vocabulary_layer_counts', lang, {
+    count: String(report.domainCount),
+    builtin: String(report.layerCounts.builtin),
+    org: String(report.layerCounts.orgOverlay),
+    project: String(report.layerCounts.project),
+  })}`);
+
+  const hasIssues = report.shadowed.length > 0
+    || report.deadPathPatterns.length > 0
+    || report.duplicateAliases.length > 0
+    || report.domainsMissingDescription.length > 0;
+
+  if (!hasIssues) {
+    lines.push(`  ${doctorStatusIcon('pass')} ${vocabMessage('doctor.vocabulary_clean', lang)}`);
+    return lines;
+  }
+
+  if (report.shadowed.length > 0) {
+    lines.push(`  ${doctorStatusIcon('warn')} ${vocabMessage('doctor.vocabulary_shadowed_header', lang, {
+      count: String(report.shadowed.length),
+    })}`);
+    for (const s of report.shadowed) {
+      lines.push(`    - ${vocabMessage('doctor.vocabulary_shadowed_line', lang, {
+        domainId: s.domainId,
+        shadowedLayer: s.shadowedLayer,
+        shadowingLayer: s.shadowingLayer,
+      })}`);
+    }
+  }
+
+  if (report.deadPathPatterns.length > 0) {
+    lines.push(`  ${doctorStatusIcon('warn')} ${vocabMessage('doctor.vocabulary_dead_pattern_header', lang, {
+      count: String(report.deadPathPatterns.length),
+    })}`);
+    for (const d of report.deadPathPatterns) {
+      lines.push(`    - ${vocabMessage('doctor.vocabulary_dead_pattern_line', lang, {
+        domainId: d.domainId,
+        pattern: d.pattern,
+      })}`);
+    }
+  }
+
+  if (report.duplicateAliases.length > 0) {
+    lines.push(`  ${doctorStatusIcon('warn')} ${vocabMessage('doctor.vocabulary_dup_alias_header', lang, {
+      count: String(report.duplicateAliases.length),
+    })}`);
+    for (const a of report.duplicateAliases) {
+      lines.push(`    - ${vocabMessage('doctor.vocabulary_dup_alias_line', lang, {
+        alias: a.alias,
+        domainIds: a.domainIds.join(', '),
+      })}`);
+    }
+  }
+
+  if (report.domainsMissingDescription.length > 0) {
+    lines.push(`  ${doctorStatusIcon('warn')} ${vocabMessage('doctor.vocabulary_no_description_header', lang, {
+      count: String(report.domainsMissingDescription.length),
+    })}`);
+    for (const id of report.domainsMissingDescription) {
+      lines.push(`    - ${vocabMessage('doctor.vocabulary_no_description_line', lang, { domainId: id })}`);
+    }
+  }
+
+  return lines;
+}
+
 /** Outcome of {@link maybeFixWorkerImage} — used by callers/tests, never thrown. */
 export type FixImageOutcome = 'disabled' | 'already-ready' | 'declined' | 'built' | 'build-failed';
 
@@ -1150,6 +1299,12 @@ export function formatHumanDoctor(input: HumanDoctorInput): string {
   // --- Worker Resources (Sprint 271, Task 271-006) ---
   if (input.workerResources) {
     lines.push(...formatWorkerResourcesLines(input.workerResources, input.lang ?? 'en'));
+    lines.push('');
+  }
+
+  // --- Vocabulary (Sprint 445, Task 445-021) ---
+  if (input.vocabularyReport) {
+    lines.push(...formatVocabularyDoctorLines(input.vocabularyReport, input.lang ?? 'en'));
     lines.push('');
   }
 
@@ -2044,6 +2199,17 @@ export function registerDoctor(program: Command): void {
         // is purely advisory — it does NOT touch result.ok / process.exitCode.
         const daemonHygiene = await checkDaemonHygiene({ lang });
 
+        // Vocabulary (Sprint 445, Task 445-021): read-only routing3 vocabulary health
+        // report (layer shadowing, dead pathPatterns, duplicate aliases, missing
+        // descriptions). Wrapped defensively so a filesystem hiccup never breaks doctor —
+        // same precedent as the workerImage try/catch above.
+        let vocabularyReport: VocabularyDoctorReport | undefined;
+        try {
+          vocabularyReport = await runVocabularyDoctor(root);
+        } catch {
+          vocabularyReport = undefined;
+        }
+
         print(formatHumanDoctor({
           result,
           providers,
@@ -2062,6 +2228,7 @@ export function registerDoctor(program: Command): void {
           daemonHygieneLines: daemonHygiene.lines,
           platformProfile,
           authStateReport,
+          vocabularyReport,
         }));
 
         // F1-IMG consent (ADR-063): only the explicit --fix-image flag, plus an

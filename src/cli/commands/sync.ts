@@ -1,12 +1,15 @@
-import { existsSync, readdirSync, statSync, mkdirSync } from 'node:fs';
+import { existsSync, readdirSync, statSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import type { Dirent } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type { Command } from 'commander';
-import { DECKENT_FILE, CLAUDE_FILE, AGENTS_FILE, BRAIN_DIR, SPRINTS_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
+import { DECKENT_FILE, DECKENT_DIR, CLAUDE_FILE, AGENTS_FILE, BRAIN_DIR, SPRINTS_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { ensureDeckentImport, debugLog } from '../../core/utils.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import { syncBuiltinAgentPrompts } from '../../core/agent-prompt-sync.js';
 import type { AgentPromptSyncReport } from '../../core/agent-prompt-sync.js';
+import { migrateManifestV2toV3 } from '../../core/manifest-migrator.js';
+import { BUILTIN_DOMAINS } from '../../core/routing3/vocabulary-builtin.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
@@ -19,6 +22,13 @@ const CURSOR_RULES_FILE = join(CURSOR_RULES_DIR, 'rules');
 const CODEX_DIR = '.codex';
 const CODEX_AGENTS_FILE = join(CODEX_DIR, 'AGENTS.md');
 const MAX_FILE_LIST = 50;
+
+// Local copy of the shadow agent-manifest location, mirroring the same
+// per-module duplication established by agent-pool.ts / agent-prompt-sync.ts
+// (each owner of this concept keeps its own small constant rather than a
+// shared cross-module import — ADR-D-006 cohesion-based module boundaries).
+const AGENTS_DIR = join(DECKENT_DIR, 'agents');
+const AGENT_MANIFEST_FILENAME = 'agent.json';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -524,6 +534,111 @@ export function syncAdapterFilesWithReport(root: string, dryRun = false): Adapte
   return { synced, errors };
 }
 
+// ─── Agent Capabilities Migration Sync (445-011) ────────────────────
+
+/**
+ * One migration issue surfaced for a single agent id (the migrator's own
+ * `ManifestMigrationIssue.manifestId` is replaced with the shadow directory
+ * name here, so callers can correlate without re-parsing the manifest).
+ */
+export interface AgentCapabilitiesMigrationIssue {
+  agentId: string;
+  code: string;
+  message: string;
+}
+
+export interface AgentCapabilitiesSyncReport {
+  /** Agent ids whose manifest was migrated to carry a provisional v3 `capabilities` block. */
+  migrated: string[];
+  /** Agent ids that already carried `capabilities` — left byte-untouched. */
+  alreadyV3: string[];
+  /** Non-fatal problems encountered while migrating (never aborts the sweep). */
+  issues: AgentCapabilitiesMigrationIssue[];
+}
+
+function emptyAgentCapabilitiesSyncReport(): AgentCapabilitiesSyncReport {
+  return { migrated: [], alreadyV3: [], issues: [] };
+}
+
+/**
+ * V2 -> V3 capabilities dual-carry sync. For each builtin agent manifest under
+ * `.deckent/agents/<id>/agent.json` (the shadow copy the runtime actually
+ * loads — see agent-pool.ts's loadAgents()) that lacks a `capabilities` block,
+ * runs `migrateManifestV2toV3` and writes the result ALONGSIDE the existing
+ * `activation.rules` (dual-carry — nothing removed), flagged
+ * `capabilitiesProvisional: true`. A manifest that already carries
+ * `capabilities`, or whose `source` isn't `'builtin'`, is left byte-untouched.
+ *
+ * Unlike the 444-005 PROMPT.md shadow sync, this needs no external "builtin
+ * source" reference: every input the migrator reads (activation rules,
+ * deniedTools, domain, expertise, preferredModel) already lives on the same
+ * manifest object being migrated. Never throws: one unreadable/malformed
+ * manifest is recorded as a typed issue and the sweep continues.
+ */
+export function syncAgentCapabilities(root: string, dryRun = false): AgentCapabilitiesSyncReport {
+  const report = emptyAgentCapabilitiesSyncReport();
+  const agentsDir = join(root, AGENTS_DIR);
+  if (!existsSync(agentsDir)) return report;
+
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(agentsDir, { withFileTypes: true }) as unknown as Dirent[];
+  } catch {
+    return report;
+  }
+  if (!Array.isArray(entries)) return report;
+
+  for (const entry of entries) {
+    if (!entry.isDirectory || !entry.isDirectory()) continue;
+    const agentId = entry.name;
+    if (agentId === 'archive') continue;
+
+    const manifestPath = join(agentsDir, agentId, AGENT_MANIFEST_FILENAME);
+    if (!existsSync(manifestPath)) continue;
+
+    let raw: string;
+    try {
+      raw = readFileSync(manifestPath, 'utf8');
+    } catch (e) {
+      report.issues.push({ agentId, code: 'read-error', message: e instanceof Error ? e.message : String(e) });
+      continue;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      report.issues.push({ agentId, code: 'invalid-json', message: e instanceof Error ? e.message : String(e) });
+      continue;
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      report.issues.push({ agentId, code: 'invalid-manifest', message: 'agent.json is not an object' });
+      continue;
+    }
+    const manifest = parsed as Record<string, unknown>;
+
+    if (manifest.source !== 'builtin') continue;
+
+    if (manifest.capabilities && typeof manifest.capabilities === 'object') {
+      report.alreadyV3.push(agentId);
+      continue;
+    }
+
+    const { capabilities, issues } = migrateManifestV2toV3(manifest, BUILTIN_DOMAINS);
+    for (const issue of issues) {
+      report.issues.push({ agentId, code: issue.code, message: issue.message });
+    }
+
+    const migratedManifest = { ...manifest, capabilities, capabilitiesProvisional: true };
+    if (!dryRun) {
+      writeFileSync(manifestPath, JSON.stringify(migratedManifest, null, 2) + '\n', 'utf8');
+    }
+    report.migrated.push(agentId);
+  }
+
+  return report;
+}
+
 // ─── Command Registration ───────────────────────────────────────────
 
 export function registerSync(program: Command): void {
@@ -541,6 +656,7 @@ export function registerSync(program: Command): void {
         adaptersSynced?: string[];
         adapterErrors?: AdapterSyncError[];
         agentPromptSync?: AgentPromptSyncReport;
+        agentCapabilitiesSync?: AgentCapabilitiesSyncReport;
         gitChanges?: SyncResult | null;
         warnings?: string[];
       } = {};
@@ -591,6 +707,20 @@ export function registerSync(program: Command): void {
           for (const conflict of promptSyncReport.conflicts) {
             print(`Warning: agent prompt "${conflict.agentId}" kept as local edit (${conflict.reason})`);
           }
+        }
+
+        // --- Builtin agent.json V2->V3 capabilities dual-carry sync (445-011) ---
+        const capabilitiesSyncReport = syncAgentCapabilities(root, opts.dryRun);
+        output.agentCapabilitiesSync = capabilitiesSyncReport;
+
+        if (!opts.json) {
+          for (const id of capabilitiesSyncReport.migrated) {
+            print(`${opts.dryRun ? '[dry-run] ' : ''}Agent capabilities migrated: .deckent/agents/${id}/agent.json (provisional v3)`);
+          }
+          for (const issue of capabilitiesSyncReport.issues) {
+            print(`Warning: agent "${issue.agentId}" capabilities migration issue (${issue.code}) — ${issue.message}`);
+          }
+          print(`Agent capabilities: ${capabilitiesSyncReport.migrated.length} migrated, ${capabilitiesSyncReport.alreadyV3.length} already v3`);
         }
       }
 

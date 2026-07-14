@@ -312,6 +312,58 @@ export interface WorkerOutputContractConfig {
   strict_report?: boolean;
 }
 
+/** RoutingEngineV3 axis-weight distribution (spec §2, `.analysis/routing-v3-secenek-b-detay-2026-07-14.md`).
+ *  `content` + `positional` + `numerical` MUST sum to 1.0 — enforced by
+ *  `resolveRoutingV3Config`/`validateRoutingV3Config` (core/routing3/config.ts), not here (this
+ *  file has no runtime validation, types only). */
+export interface RoutingV3Weights {
+  /** Content-fit axis weight — LLM semantic match against the closed work-type/domain vocabulary. */
+  content: number;
+  /** Positional-evidence axis weight — derived deterministically from a task's filesWrite → DeliverableType. */
+  positional: number;
+  /** Numerical/statistical axis weight — agent historical success-rate signal. */
+  numerical: number;
+}
+
+/** Governance strategy for ambiguous/low-confidence RoutingEngineV3 decisions. */
+export type RoutingV3GovernanceMode = 'ai' | 'deterministic';
+
+/**
+ * Full RoutingEngineV3 configuration schema (Sprint 445 Slice-0 foundation, Task 445-010) — the
+ * **single source of truth** for the `routing_v3` block's shape, referenced by both
+ * {@link DeckentConfig} and {@link ResolvedConfig}.
+ *
+ * Unlike {@link NervousSystemConfig} above (whose mirrored zod schema lives in `core/config.ts`,
+ * `NERVOUS_SYSTEM_SCHEMA`), this schema's zod mirror + `DEFAULT_ROUTING_V3_CONFIG` (the ONE place
+ * defaults live) + weights-sum validation live in `core/routing3/config.ts`
+ * (`ROUTING_V3_SCHEMA` / `resolveRoutingV3Config`) — `routing_v3` is exclusively consumed by the
+ * routing3 subsystem, so its schema stays scoped there instead of growing `config.ts` (out of this
+ * task's write scope). `loadConfig`/`mergeConfigs` (config.ts) do NOT yet assign this field onto
+ * their resolved-object literal — same "type-only pass-through, wiring is a follow-up task" caveat
+ * as `computer_use`/`worker_output_contract` below; call `resolveRoutingV3Config()` directly until
+ * that follow-up lands.
+ *
+ * Default: `enabled: false` — the RoutingEngineV3 cut-over flips this in Slice-3. Nothing in
+ * Slice-0/1/2 may alter a live routing decision.
+ */
+export interface RoutingV3Config {
+  /** Master switch for RoutingEngineV3 vector-based agent/skill selection (default: false). */
+  enabled: boolean;
+  /** Axis weight distribution — MUST sum to 1.0 (default: content 0.5, positional 0.3, numerical 0.2). */
+  weights: RoutingV3Weights;
+  /** Minimum composite confidence required to accept a vector-routing decision before falling
+   *  back to the deterministic/legacy path (0-1, default: 0.6). */
+  confidenceFloor: number;
+  /** Governance mode for ambiguous/low-confidence decisions: 'ai' (LLM tiebreak) |
+   *  'deterministic' (fixed fallback rule) (default: 'ai'). */
+  governanceMode: RoutingV3GovernanceMode;
+  /** Number of top-scoring candidates considered before the governance tiebreak (default: 5). */
+  topK: number;
+  /** Minimum structural-evidence confidence (positional axis) required to treat a deliverable-type
+   *  match as trustworthy (0-1, default: 0.7). */
+  structuralConfidence: number;
+}
+
 // ─── Cost Guard Config ───────────────────────────────────────────────
 /** Mid-sprint token-usage abort guard (Sprint 279 WK-cost). Opt-in — absent block = disabled. */
 export interface CostGuardConfig {
@@ -949,6 +1001,13 @@ export interface DeckentConfig {
   /** Worker-runner ordered progress-stream (ADR-G-025 §4). @see LiveTraceConfig */
   live_trace?: LiveTraceConfig;
 
+  // ─── Routing Engine v3 (Sprint 445 Slice-0 foundation) ───────────────
+  /** RoutingEngineV3 vector-selection config — raw project-config override shape (mirrors
+   *  `timeout?: Partial<TimeoutConfig>`). Resolve via `resolveRoutingV3Config()`
+   *  (core/routing3/config.ts), not by reading this field directly — it is a partial user
+   *  override, not the defaulted/validated shape. Default: enabled=false. @see RoutingV3Config */
+  routing_v3?: Partial<RoutingV3Config>;
+
   // ─── Doc-Tracking (ADR-090) ──────────────────────────────────────────
   /** Doc-tracking options. */
   doc_tracking?: {
@@ -1458,6 +1517,12 @@ export interface ResolvedConfig {
   training_trace?: DeckentConfig['training_trace'];
   /** Worker-runner ordered progress-stream (passed through from DeckentConfig, ADR-G-025 §4). */
   live_trace?: DeckentConfig['live_trace'];
+  /** Fully-resolved RoutingEngineV3 config (Sprint 445 Slice-0). NOTE: type-only pass-through
+   *  today — `loadConfig`/`mergeConfigs` (config.ts) do not yet assign this field in their
+   *  resolved-object literal (same caveat as `computer_use`/`worker_output_contract` above; out of
+   *  this task's write scope). Call `resolveRoutingV3Config()` (core/routing3/config.ts) directly
+   *  until that follow-up wiring task lands. @see RoutingV3Config */
+  routing_v3?: RoutingV3Config;
   /** Doc-tracking options (passed through from DeckentConfig, ADR-090). */
   doc_tracking?: {
     /** Run a DB-only doc-tracking sync at sprint finalize (default: false). */
