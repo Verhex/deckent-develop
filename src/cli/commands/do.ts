@@ -216,6 +216,20 @@ export async function runDoRunFlow(
     return;
   }
 
+  // born-698a: the detached child's PLAN phase is FAIL-CLOSED on prompt-gate
+  // BLOCKs, so approving past a failed gate produced a "Run başlatıldı" message
+  // followed by a silently-dead run (sprint-440/442 live cases — the death was
+  // visible only in .deckent/recently-works/). The front door now makes the
+  // SAME decision the child will make; --yes is consent, not a gate override.
+  if (preview.gateResult === 'fail') {
+    controller.reject('prompt-gate-block');
+    printError(getMessage('do.gate_blocked', lang, {
+      count: String(preview.gateFindings?.length ?? 0),
+    }));
+    process.exitCode = 1;
+    return;
+  }
+
   try {
     controller.approve({ id: 'cli-non-interactive' });
     const finalCtx = controller.startApproved ? controller.startApproved() : controller.getContext();

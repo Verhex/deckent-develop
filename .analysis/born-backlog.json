@@ -3248,10 +3248,11 @@
   "born_id": 698,
   "title": "DO-UX SESSIZ-OLUM: do 'Run basladi' dedikten sonra detached-child PLAN-fazinda prompt-gate BLOCK'uyla olurse HICBIR kanal bunu bildirmiyor — kullanici isin kostugunu saniyor (sprint-440 canli-vaka: do-gate ayni BLOCK'lari gosterip GECTI/IZIN-VER derken child-gate fail-closed durdurdu; iki gate-esigi tutarsiz)",
   "priority": "P1",
-  "status": "OPEN",
+  "status": "PARTIAL",
   "source": "canli-vaka 2026-07-14 (PCOMP-6 D3 ilk deneme); child-log: .deckent/recently-works/start-119c3246-*.log 'Sprint failed at phase PLAN: Prompt gate: 2 blocking finding(s)'",
   "spec": "(a) do-yuzeyi ile child prompt-gate esigi TEK karar olsun: do-preview BLOCK gosteriyorsa ya do da reddetsin (--force-prompt-gate onerisiyle) ya da child'a acknowledge gecsin — ikisi ayni politikayi okusun; (b) child PLAN-olumu run-completion-watch/result-turn'e FAILED-kaydi olarak dussun (jobs/<id>.json status=FAILED + reason) — sessiz-olum olmasin; (c) do --run ciktisinda 'detached izleme: <logRef>' satiri zaten varsa PLAN-fail'de nervous-notify tetiklensin. SURF-1c coordinator-gocuyle birlesebilir.",
-  "master_plan_row": 566
+  "master_plan_row": 566,
+  "fix_a": "CC-el (2026-07-14, 442-tekrari sonrasi): do on-kapisi child'la AYNI karari verir — preview.gateResult='fail' ise approve/start YOK, typed i18n-mesaj + exit 1 (--yes onay demek, gate-override degil). Kalan (b) child-PLAN-olumu result-turn'e FAILED-kaydi + (c) nervous-notify = SURF-1c."
  },
  {
   "born_id": 699,

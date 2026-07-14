@@ -2782,6 +2782,10 @@ const MESSAGES: MessageMap = {
     en: 'Dry-run complete — nothing was started. Re-run with --run to execute this plan.',
     tr: 'Dry-run tamamlandı — hiçbir şey başlatılmadı. Bu planı çalıştırmak için --run ile tekrar çalıştırın.',
   },
+  'do.gate_blocked': {
+    en: 'Prompt gate: {count} blocking finding(s) — run NOT started (the detached child would die at PLAN with the same verdict). Fix the plan or re-run with an adjusted goal.',
+    tr: 'Prompt-gate: {count} engelleyici bulgu — koşu BAŞLATILMADI (detached-child PLAN fazında aynı kararla ölecekti). Planı düzeltin ya da hedefi ayarlayıp yeniden deneyin.',
+  },
   'do.cancelled': {
     en: 'Cancelled at stage "{stage}" ({reason}). Nothing was started.',
     tr: '"{stage}" aşamasında iptal edildi ({reason}). Hiçbir şey başlatılmadı.',
