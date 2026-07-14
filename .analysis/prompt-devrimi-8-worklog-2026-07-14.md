@@ -45,3 +45,43 @@
 **İz#4 · Planner-decomposition şeması:** A2'nin giriş-maddesine devredildi (snapshot-plan eldeki veri).
 
 **A1-meta:** iki kanıt-hatamı (rapor-etiketi + fixture-defter) bu turda kendim yakaladım — "kanıt=canlı-gövde" kanunu çalışıyor.
+
+## A2 — MEVCUT-DURUM: 7-Katman Haritası (kanıt-referanslı; 2026-07-14)
+
+> Her katman: SORUMLULUĞU → BUGÜNKÜ GERÇEK DAVRANIŞ → PCOMP-6'da ne oldu → KALAN KUSUR.
+> Kanıt-kaynakları: 442-snapshot şema-dökümü · A1-izleri · 31-korpus ölçümleri · Explore pipeline-haritası.
+
+### L1 · NL-SPEC (Brain/CC'nin do-girdisi)
+- **Sorumluluk:** hedef+sınırlar+kabul-ölçütleri; ADR-uyumlu talep.
+- **Gerçek:** serbest-metin; kalite yazana bağlı. Format-kuralları (virgülsüz-başlık, filesWrite≥1, rapor-dosyası-yasağı) her NL'ye ELLE tekrar yazılıyor — kural-tekrarı insan-hafızasına emanet.
+- **PCOMP-6:** ADR-recall kanunu (davranış) geldi; ŞABLON gelmedi.
+- **Kusur:** zorunlu-bölümlü spec-şablonu yok (edge-case-politikası, dönüş-semantiği, test-eşlemesi boş bırakılabiliyor — Alperen-analizi 3.5-3.9 sınıfı).
+
+### L2 · ZERO-CONFIG PLANNER (NL→task'lar)
+- **Sorumluluk:** doğru-bölümleme + TAM alan-üretimi.
+- **Gerçek (442-şema-dökümü):** ürettiği: title/description/model/effort/priority/reason/scope/deps/goNogo. **filesRead=[] (HİÇ doldurmuyor)** → "core-dosyaları read-scope'ta yok" sınıfının doğum-yeri. Test-write'ı ayrı-task'a koyuyor (442-003) → kod-task'ı testsiz + verify-placeholder sınıfı. Task-aralığı KODDA 3-5 (ZERO_CONFIG_MIN/MAX) → 20-40-mikro kanunuyla yapısal çelişki. Smoke/authMode üretmiyor. ADR-kısıt-bloğu artık prompt'unda (D4.5 ✓) ama şema-kuralları (yol-tam-yazımı vs) NL'den geliyor.
+- **PCOMP-6:** yalnız ADR-bloğu eklendi; decomposition-kuralları (read-scope tamamlama, test-write eşleme, aralık) HİÇ ele alınmadı — **6-7. turların ana kör-noktası.**
+- **Kusur:** planner çıktı-sözleşmesi eksik-alanlı; hiçbir katman tamamlamıyor (task-compiler reddedilen öneriydi — A5'te yeniden, kanıtlarla).
+
+### L3 · DIRECTIVES yazım/okuma (round-trip)
+- **Gerçek:** yazıcı escape'li (born-677 ✓); RunFlow-okuyucu unescape'li ✓; **legacy-okuyucu (extractGoNogoCriteria) D5'e kadar unescape'siz** (\;-sızıntısı — fix'lendi ✓). `toDirectiveTask` **traceability-metadata'sını description'a GÖMÜYOR** → L4'ü zehirliyor (A1-İz#2-b: 'cd'⊂flowId-hex). deps title-eşlemeli (692'de sanitize ✓).
+- **Kusur (AÇIK):** metadata-gömme — flowId/revision/actor ayrı-alan olmalı, içerik değil.
+
+### L4 · ROUTING (intent→persona/skill)
+- **Gerçek:** `classifyIntent` eşleşmesi **kelime-sınırsız substring** → 'ci'⊂'içindeki', 'cd'⊂hex (A1-İz#2-a); intent tek-değere çökünce persona/skill zinciri yanlış (442: devops×4-task). D3-fix'leri (çifte-sayım, refactorer-guard, ci-guardian-bonusu) İNDİ ama motor-substring kaldı — **kısmi-fix deseni**. Skill-floor/filtre D4'te düzeldi (İz#1: gate ÇALIŞIYOR ✓).
+- **Kusur (AÇIK):** classifier'a containsWord + Türkçe-morfoloji farkındalığı; intent-confidence düşükken persona-fallback politikası.
+
+### L5 · COMPOSE (buildWorkerPrompt bağlam-toplama)
+- **Gerçek:** trackedFiles/verify/ADR/env-probe toplanıyor; skill-filtre sinyalli ✓; **lint-hook warn-only** + defter artık VITEST-korumalı (İz#3 ✓). ADR'ler tam-gövde (focused-clause yok).
+- **Kusur:** lint bulguları hâlâ yalnız kayıt — düzeltme/derleme yok (Alperen task-compiler'ı reddetti; A5'te kanıt-temelli yeniden-öneri).
+
+### L6 · RENDER (prompt-god-template)
+- **Gerçek:** exact-verify D1a ✓ (ama "test-başka-task'ta" sınıfında placeholder'a düşer — 442'de canlı); DONE=checklist-bağlı ✓; behavior-bloğu all-test-suppress ✓; persona/skill/ADR gövde-maliyeti: görev-çekirdeği ortalamanın ~%11'i.
+- **Kusur:** persona tam-gövde (devops'un Dockerfile-rehberi coordinator-işinde — L4 düzelse bile İLGİSİZ-BÖLÜM sorunu genel); ADR focused-clause yok; tekrar ~4.5 goCriteria-teması.
+
+### L7 · SPAWN/VERIFY/EVAL
+- **Gerçek:** çocuk-gate fail-closed ✓ + do-ön-kapı eşitliği (born-698a ✓); post-sprint smoke CC-adımı (ders ✓); Brain-eval+disk-verify canlı; FIX-fazı çalışıyor (442'de 0 fix gerek kalmadı).
+- **Kusur:** PLAN-ölümü result-turn'e düşmüyor (698 b/c); worker'ın verify'ı hâlâ kendi beyanı (rubric evaluation-side).
+
+### A2-SENTEZ — tek cümle
+**Boru hattının ARKA yarısı (L5-L7) 6-7. turlarda gerçekten sertleşti; ÖN yarısı (L1-L4: spec-şablonu, planner-decomposition, metadata-hijyeni, intent-motoru) neredeyse hiç dokunulmadı — 8 turun "düzelmiyor" hissinin yapısal nedeni bu asimetri.** 100/100, ön-yarı sözleşmeleri kurulmadan imkânsız (A3-gap-matrisi bunun envanterini çıkaracak).
