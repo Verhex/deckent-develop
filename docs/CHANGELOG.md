@@ -9,6 +9,18 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint438] - 2026-07-14
+
+### Added
+
+- RunFlow contract additive alanlar — commandId ve sequence
+- run-flow-store per-flow event-log — appendFlowEvent ve readFlowEvents ve listFlowIds
+- Reducer purity-contract koruma testleri
+- Hermetik event-log test ailesi ve tam regresyon doğrulaması
+
+
+_Tasks: 4 total, 4 done, 0 tech debt, 0 no-go_
+
 ## [1.0.0-beta.1-sprint437] - 2026-07-14
 
 ### Added

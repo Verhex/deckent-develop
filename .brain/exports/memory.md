@@ -1,5 +1,14 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-438 Learnings
+- Sprint sprint-438 Learnings: ## Sprint sprint-438 Learnings
+
+## Gains
+- 438-001 — RunFlow contract additive alanlar — commandId ve sequence — Added two optional fields to RunFlowEventBase (src/core/run-flow-contract.ts): commandId?: string...
+- 438-002 — run-flow-store per-flow event-log — appendFlowEvent ve readFlowEvents ve listFlowIds — Added additive per-flow durable event-log API to src/core/run-flow-store.ts (+77/-0, purely addit...
+- 438-003 — Reducer purity-contract koruma testleri — New hermetic test file tests/orchestra/run-flow-reducer-purity.test.ts (28 tests) locks the reduc...
+- 438-004 — Hermetik event-log test ailesi ve tam regresyon doğrulaması — New hermetic test file tests/core/run-flow-event-log.test.ts (8 tests across 6 scenario describe-...
+
 ## Sprint sprint-437 Learnings
 - Sprint sprint-437 Learnings: ## Sprint sprint-437 Learnings
 - NOTIFY-DEDUP kalıcı bildirim-state modülü ve relay wiring: GO_WITH_TECH_DEBT — New src/core/approval-notify-dedup.ts: ApprovalNotifyDedup class persists notified request-ids to <storeDir>/.notified.j

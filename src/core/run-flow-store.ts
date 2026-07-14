@@ -40,6 +40,7 @@ import { randomUUID } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   renameSync,
   unlinkSync,
@@ -47,6 +48,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { RUNTIME_DIR } from './constants.js';
+import type { RunFlowEvent } from './run-flow-contract.js';
 import type { Sprint } from './types.js';
 import type { ActorContext } from './work-model.js';
 // RunHandle is duck-typed against core/run-flow-contract.ts but deliberately
@@ -94,6 +96,10 @@ function snapshotLogPath(root: string, flowId: string): string {
 
 function handleLogPath(root: string, flowId: string): string {
   return join(storeDir(root), `${flowId}.handle.jsonl`);
+}
+
+function eventsLogPath(root: string, flowId: string): string {
+  return join(storeDir(root), `${flowId}.events.jsonl`);
 }
 
 // ─── Low-level JSONL append (atomic tmp+rename, whole-file rewrite) ────────
@@ -176,4 +182,75 @@ export function saveRunHandle(root: string, record: StoredRunHandleRecord): void
 export function loadRunHandle(root: string, flowId: string): StoredRunHandleRecord | undefined {
   const records = readJsonlRecords<StoredRunHandleRecord>(handleLogPath(root, flowId));
   return records.length > 0 ? records[records.length - 1] : undefined;
+}
+
+// ─── Public API — per-flow durable event log ─────────────────────────────
+//
+// A per-flowId append-only event log (`<flowId>.events.jsonl`), the durable
+// counterpart to the in-memory reducer stream (run-flow-reducer.ts). Every
+// append is stamped with a store-assigned monotonic `sequence` so a replay
+// cursor can resume from exactly where it left off. Sequence is assigned ONLY
+// here — the reducer never produces or reads it (run-flow-contract.ts's
+// RunFlowEventBase.sequence purity contract). Same atomic tmp+rename append
+// and torn-line-tolerant read as the snapshot/handle logs above (reused, not
+// re-invented); no new consumer is wired in this slice — the coordinator that
+// reads this log is the next one.
+
+/** Options for {@link readFlowEvents}. */
+export interface ReadFlowEventsOptions {
+  /** Replay cursor — return only events whose store-assigned `sequence` is
+   *  strictly greater than this. Omit to read the whole log. */
+  readonly afterSequence?: number;
+}
+
+/** Append `event` to `flowId`'s durable event log, stamping it with the next
+ *  monotonic sequence (last record's sequence + 1; 1 when the log does not yet
+ *  exist). The store is the sole authority for `sequence` — any value on the
+ *  incoming `event` is overwritten. Returns the assigned sequence. Atomic
+ *  (tmp+rename) via the shared {@link appendJsonlRecord} primitive. */
+export function appendFlowEvent(root: string, flowId: string, event: RunFlowEvent): number {
+  const path = eventsLogPath(root, flowId);
+  const existing = readJsonlRecords<RunFlowEvent>(path);
+  const last = existing[existing.length - 1];
+  const nextSequence = (last?.sequence ?? 0) + 1;
+  // Built at appendJsonlRecord's `unknown` param — no discriminated-union
+  // spread widening, and `sequence` last so it wins over any caller-supplied value.
+  appendJsonlRecord(path, { ...event, sequence: nextSequence });
+  return nextSequence;
+}
+
+/** Read `flowId`'s durable event log in append order, torn-line tolerant. With
+ *  `opts.afterSequence`, returns only events past that replay cursor. Returns
+ *  an empty array when the log does not exist. */
+export function readFlowEvents(root: string, flowId: string, opts: ReadFlowEventsOptions = {}): RunFlowEvent[] {
+  const records = readJsonlRecords<RunFlowEvent>(eventsLogPath(root, flowId));
+  const { afterSequence } = opts;
+  if (afterSequence === undefined) return records;
+  return records.filter(r => r.sequence !== undefined && r.sequence > afterSequence);
+}
+
+/** Enumerate every flowId that has any durable log (snapshot, handle, or
+ *  events) under `root`'s store dir. Files whose name matches none of the
+ *  known `<flowId>.<kind>.jsonl` suffixes (e.g. in-flight `.tmp` files) are
+ *  silently skipped. Result is deduped and sorted for cross-platform-stable
+ *  output (readdirSync order is not guaranteed — Yasa #2). */
+export function listFlowIds(root: string): string[] {
+  const dir = storeDir(root);
+  if (!existsSync(dir)) return [];
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return [];
+  }
+  const flowIds = new Set<string>();
+  for (const name of entries) {
+    for (const suffix of ['.snapshot.jsonl', '.handle.jsonl', '.events.jsonl']) {
+      if (name.length > suffix.length && name.endsWith(suffix)) {
+        flowIds.add(name.slice(0, -suffix.length));
+        break;
+      }
+    }
+  }
+  return [...flowIds].sort();
 }

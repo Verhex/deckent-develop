@@ -43,8 +43,15 @@ function fail(context: RunFlowContext, event: RunFlowEvent, detail: string): nev
     context.flowId,
     context.state,
     event.type,
-    `run-flow: cannot apply '${event.type}' to state '${context.state}' (flowId=${context.flowId ?? '<unset>'}): ${detail}`,
+    withCommandId(`run-flow: cannot apply '${event.type}' to state '${context.state}' (flowId=${context.flowId ?? '<unset>'}): ${detail}`, event),
   );
+}
+
+/** Appends a `[commandId=...]` marker IFF the event carries one — otherwise returns
+ *  `message` unchanged (byte-identical to the pre-commandId format). Shared by every
+ *  mismatch-message call site below so a caller-supplied commandId is never dropped. */
+function withCommandId(message: string, event: RunFlowEvent): string {
+  return event.commandId !== undefined ? `${message} [commandId=${event.commandId}]` : message;
 }
 
 /** CAS key shared by APPROVAL_GRANTED (vs. the live preview) and re-checked by
@@ -114,9 +121,11 @@ export function reduceRunFlow(context: RunFlowContext, event: RunFlowEvent): Run
           return {
             ...context,
             state: 'BLOCKED',
-            blockedReason:
+            blockedReason: withCommandId(
               `approval targets revision=${event.revision}/digest=${event.planDigest}, ` +
-              `but the live preview is revision=${context.preview.revision}/digest=${context.preview.planDigest}`,
+                `but the live preview is revision=${context.preview.revision}/digest=${context.preview.planDigest}`,
+              event,
+            ),
             updatedAt: event.timestamp,
           };
         }
@@ -139,7 +148,10 @@ export function reduceRunFlow(context: RunFlowContext, event: RunFlowEvent): Run
         return {
           ...context,
           state: 'BLOCKED',
-          blockedReason: 'duplicate APPROVAL_GRANTED with a revision/digest that does not match the already-approved snapshot',
+          blockedReason: withCommandId(
+            'duplicate APPROVAL_GRANTED with a revision/digest that does not match the already-approved snapshot',
+            event,
+          ),
           updatedAt: event.timestamp,
         };
       }
@@ -158,9 +170,11 @@ export function reduceRunFlow(context: RunFlowContext, event: RunFlowEvent): Run
           return {
             ...context,
             state: 'BLOCKED',
-            blockedReason:
+            blockedReason: withCommandId(
               `start targets revision=${event.revision}/digest=${event.planDigest}, ` +
-              `but the approved snapshot is revision=${context.approvedSnapshot.revision}/digest=${context.approvedSnapshot.planDigest}`,
+                `but the approved snapshot is revision=${context.approvedSnapshot.revision}/digest=${context.approvedSnapshot.planDigest}`,
+              event,
+            ),
             updatedAt: event.timestamp,
           };
         }
@@ -176,7 +190,10 @@ export function reduceRunFlow(context: RunFlowContext, event: RunFlowEvent): Run
         return {
           ...context,
           state: 'BLOCKED',
-          blockedReason: 'duplicate START_REQUESTED with a revision/digest that does not match the approved snapshot',
+          blockedReason: withCommandId(
+            'duplicate START_REQUESTED with a revision/digest that does not match the approved snapshot',
+            event,
+          ),
           updatedAt: event.timestamp,
         };
       }

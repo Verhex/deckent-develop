@@ -10718,3 +10718,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 437-005: Hermetik entegrasyon test paketi — expired/geçerli/karar-verilmiş ve dedup-restart senaryoları (DONE)
 
 ---
+## Sprint 438 — sprint-438
+
+**Status:** RETROSPECTIVE
+**Date:** 2026-07-14
+**Duration:** 1074s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | NaN% |
+| Duration | 1073970ms |
+
+### Tasks
+
+- 438-001: RunFlow contract additive alanlar — commandId ve sequence (DONE)
+- 438-002: run-flow-store per-flow event-log — appendFlowEvent ve readFlowEvents ve listFlowIds (DONE)
+- 438-003: Reducer purity-contract koruma testleri (DONE)
+- 438-004: Hermetik event-log test ailesi ve tam regresyon doğrulaması (DONE)
+
+---

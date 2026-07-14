@@ -129,6 +129,14 @@ interface RunFlowEventBase {
   readonly flowId: string;
   /** Caller-supplied ISO-8601 timestamp — the reducer never calls Date.now(). */
   readonly timestamp: string;
+  /** Optional command-dedup key — lets a store/adapter recognize a retried/replayed command. */
+  readonly commandId?: string;
+  /**
+   * Optional store-assigned monotonic sequence for this event within its flow.
+   * Purity contract: this field is assigned ONLY by the store; the reducer never
+   * produces or reads it — sequence alanını YALNIZ store atar, reducer ASLA üretmez/okumaz.
+   */
+  readonly sequence?: number;
 }
 
 export type RunFlowEvent =

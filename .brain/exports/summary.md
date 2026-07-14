@@ -52,6 +52,10 @@
 | adr-g-036 | Zero-Hardcode Model & Flow Values (Parametric-Only) | accepted |
 
 ## Recent Learnings
+- **Sprint sprint-438 Learnings** (sprint-438): ## Sprint sprint-438 Learnings
+
+## Gains
+- 438-001 — RunFlow contract additive alanlar — commandId ve sequence — Adde...
 - **Sprint sprint-437 Learnings** (sprint-437): ## Sprint sprint-437 Learnings
 - NOTIFY-DEDUP kalıcı bildirim-state modülü ve relay wiring: GO_WITH_TECH_DEBT — New s...
 - **Sprint sprint-435 Learnings** (sprint-435): ## Sprint sprint-435 Learnings
@@ -76,8 +80,6 @@
 
 ## Gains
 - 428-001 — W674A — ctx-doldurma: toolInventory + verifyCommands (born-674) ...
-- **Sprint sprint-427 Learnings** (sprint-427): ## Sprint sprint-427 Learnings
-- WIRE-PROBE — sprint-start env-probe doldurma (born-670a): GO_WITH_TECH_DEBT — born-6...
 
 ## Active Technical Debt
 - [CRITICAL] Tech debt from 433-001-fix: Investigated the 433-001 NO_GO (brainEvaluationReaso
@@ -150,4 +152,4 @@
 - Violation pattern: file_outside_scope
 - Violation pattern: stale_heartbeat
 
-_Total entries: 1346 | Generated: 2026-07-14_
+_Total entries: 1349 | Generated: 2026-07-14_

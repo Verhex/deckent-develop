@@ -407,6 +407,10 @@ describe('known-consumer allowlist (Sprint-1 pin evolved for Sprint-2: preview-s
     walk(srcRoot);
 
     const KNOWN_CONSUMERS = [
+      // SURF-1a (sprint-438): the durable event-log lives in the store, so the
+      // store now imports the contract's RunFlowEvent type to append/read
+      // sequenced events — the designed persistence consumer, not a leak.
+      'core/run-flow-store.ts',
       // Sprint-2 dilim (424-001): the shared actual-preview layer is the
       // designed consumer of the contract/reducer pair — not a leak.
       'orchestra/plan-preview-service.ts',
