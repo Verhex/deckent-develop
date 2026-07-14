@@ -1,5 +1,14 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-439 Learnings
+- Sprint sprint-439 Learnings: ## Sprint sprint-439 Learnings
+- Rehydrate katmanı — event-fold ve legacy dual-read ile KNOWN_CONSUMERS pini: NO_GO — Cascade-skipped (SCHED6-EFF persist-before-commit executor): dependency 439-001 ended NO_GO/MANUAL_REVIEW, so this depen
+- Koordinatör hermetik test ailesi ve RunFlow regresyon doğrulaması: NO_GO — Cascade-skipped (SCHED6-EFF persist-before-commit executor): dependency 439-001 ended NO_GO/MANUAL_REVIEW, so this depen
+
+## Gains
+- 439-001 — RunFlowCoordinator çekirdeği — factory ve tipli komut zinciri — Worker exited without writing result (exitCode=1, source=wrapper).
+- 439-003 — Hermetik test-harness ve legacy-fixture üreticileri — Created tests/orchestra/run-flow-coordinator-harness.ts — hermetic shared infra for the upcoming ...
+
 ## Sprint sprint-438 Learnings
 - Sprint sprint-438 Learnings: ## Sprint sprint-438 Learnings
 

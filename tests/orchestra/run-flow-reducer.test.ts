@@ -407,6 +407,11 @@ describe('known-consumer allowlist (Sprint-1 pin evolved for Sprint-2: preview-s
     walk(srcRoot);
 
     const KNOWN_CONSUMERS = [
+      // SURF-1b (sprint-439): the durable multi-flow coordinator IS the designed
+      // single-writer around reducer+store+contract — the central consumer this
+      // whole slice exists to create (CC pin-sync; 439-002's own scope carried
+      // this pin but ended NO_GO — the coordinator itself landed via 439-001).
+      'orchestra/run-flow-coordinator.ts',
       // SURF-1a (sprint-438): the durable event-log lives in the store, so the
       // store now imports the contract's RunFlowEvent type to append/read
       // sequenced events — the designed persistence consumer, not a leak.

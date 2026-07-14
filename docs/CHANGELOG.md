@@ -9,6 +9,19 @@
 > `.github/workflows/release.yml` at publish time) live at the project root:
 > [CHANGELOG.md](../CHANGELOG.md).
 
+## [1.0.0-beta.1-sprint439] - 2026-07-14
+
+### Added
+
+- RunFlowCoordinator çekirdeği — factory ve tipli komut zinciri
+
+### Fixed
+
+- Hermetik test-harness ve legacy-fixture üreticileri
+
+
+_Tasks: 5 total, 3 done, 0 tech debt, 2 no-go_
+
 ## [1.0.0-beta.1-sprint438] - 2026-07-14
 
 ### Added
