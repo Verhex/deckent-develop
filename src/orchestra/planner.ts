@@ -28,6 +28,7 @@ import {
 // isPlanSlotId classifies dropped refs. No import cycle — only sprint-planner
 // imports planner.js, so task-builder never re-enters this module.
 import { resolveDependencyRef, isPlanSlotId } from './task-builder.js';
+import { normalizePlannerResult } from './planner-normalize.js';
 
 // ─── Model enum values for Zod schemas ───────────────────────────────────
 const MODEL_ENUM_VALUES = ALL_MODELS as unknown as [string, ...string[]];
@@ -579,8 +580,15 @@ export function callBrainPlanner(
 
 // ─── Zero-Config AI Planner ───────────────────────────────────────
 
-const ZERO_CONFIG_MIN_TASKS = 3;
-const ZERO_CONFIG_MAX_TASKS = 5;
+// U2-G6 (PCOMP-8): the 3-5 hardcode structurally violated the 20-40-micro-task
+// law (scale_up — CC'nin kayıtlı ihlal-itirafı). The range now comes from
+// config/env; the historical 3-5 stays as the ABSOLUTE fallback so foreign
+// projects without config keep today's behavior.
+function zeroConfigTaskRange(): { min: number; max: number } {
+  const min = Number(process.env['DECKENT_PLANNER_MIN_TASKS'] ?? '') || 3;
+  const max = Number(process.env['DECKENT_PLANNER_MAX_TASKS'] ?? '') || 5;
+  return min <= max ? { min, max } : { min: 3, max: 5 };
+}
 
 /**
  * Build a prompt specifically for splitting a single natural-language description
@@ -600,7 +608,7 @@ export function buildZeroConfigPlanPrompt(
 
   if (isEn) {
     return `You are a software project orchestrator. A user requested a feature in natural language.
-Split this request into ${ZERO_CONFIG_MIN_TASKS}-${ZERO_CONFIG_MAX_TASKS} independent, parallel-executable tasks.
+Split this request into ${zeroConfigTaskRange().min}-${zeroConfigTaskRange().max} independent, parallel-executable tasks.
 
 PROJECT: ${projectName}
 USER REQUEST: "${description}"${treeSection}
@@ -608,7 +616,7 @@ USER REQUEST: "${description}"${treeSection}
 TASK SPLITTING RULES:
 - Each task must be independently executable (parallel execution possible)
 - Specify dependencies if any (e.g., UI depends on backend API)
-- Create exactly ${ZERO_CONFIG_MIN_TASKS}-${ZERO_CONFIG_MAX_TASKS} tasks (no more, no less)
+- Create exactly ${zeroConfigTaskRange().min}-${zeroConfigTaskRange().max} tasks (no more, no less)
 - Define scope (directories + filesWrite) for each task
 - EVERY task's scope.filesWrite MUST contain at least one file path — an empty filesWrite array is invalid
 - A task's "title" MUST NOT contain a comma (,) character — rephrase with "and"/a dash instead
@@ -647,7 +655,7 @@ OUTPUT FORMAT (JSON ONLY, nothing else):
   }
 
   return `Sen bir yazılım proje orkestratörüsün. Kullanıcı tek satır doğal dil ile bir özellik talep etti.
-Bu talebi ${ZERO_CONFIG_MIN_TASKS}-${ZERO_CONFIG_MAX_TASKS} bağımsız, paralel çalışabilir göreve böl.
+Bu talebi ${zeroConfigTaskRange().min}-${zeroConfigTaskRange().max} bağımsız, paralel çalışabilir göreve böl.
 
 PROJE: ${projectName}
 KULLANICI TALEBİ: "${description}"${treeSection}
@@ -655,7 +663,7 @@ KULLANICI TALEBİ: "${description}"${treeSection}
 GÖREV BÖLME KURALLARI:
 - Her görev bağımsız çalışabilmeli (paralel execution mümkün olmalı)
 - Bağımlılık varsa dependencies array'inde belirt (örn. UI, backend API'ye bağlıysa)
-- Toplam ${ZERO_CONFIG_MIN_TASKS}-${ZERO_CONFIG_MAX_TASKS} görev oluştur (ne az ne fazla)
+- Toplam ${zeroConfigTaskRange().min}-${zeroConfigTaskRange().max} görev oluştur (ne az ne fazla)
 - Her görev için scope (directories + filesWrite) belirle
 - HER görevin scope.filesWrite alanı EN AZ bir dosya yolu içermeli — boş filesWrite array'i geçersizdir
 - Bir görevin "title" alanı VİRGÜL (,) karakteri İÇEREMEZ — bunun yerine "ve" bağlacı veya tire kullan
@@ -722,7 +730,35 @@ export function callZeroConfigPlanner(
   });
 
   if (result.status !== 0 || !result.stdout) return null;
-  return parsePlannerResponse(result.stdout, resolved);
+  let parsed = parsePlannerResponse(result.stdout, resolved);
+
+  // U2 (PCOMP-8): single schema-feedback retry — a nondeterministic model
+  // occasionally returns unparseable/invalid JSON; one corrective round-trip
+  // with the violation named beats silently returning null (which upstream
+  // reads as "provider unavailable").
+  if (!parsed) {
+    const retryPrompt = `${prompt}\n\nÖNCEKİ YANITIN GEÇERSİZDİ (şema/JSON hatası). YALNIZ istenen JSON şemasında, başka hiçbir metin olmadan yeniden yanıtla.`;
+    const { command: c2, args: a2 } = buildPlannerSpawnArgs(resolved, retryPrompt, model);
+    const retry = spawnSync(c2, a2, { encoding: 'utf-8', timeout: timeout ?? BRAIN_PLAN_TIMEOUT_MS });
+    if (retry.status === 0 && retry.stdout) parsed = parsePlannerResponse(retry.stdout, resolved);
+  }
+  if (!parsed) return null;
+
+  // U2 output-contract completion (deterministic): filesRead mentioned+import
+  // completion + mirror-test create-if-missing. Fail-soft I/O — a completion
+  // that cannot run leaves the plan as-is.
+  try {
+    const cwd = process.cwd();
+    const ls = spawnSync('git', ['ls-files'], { encoding: 'utf-8', cwd });
+    const trackedFiles = ls.status === 0 ? ls.stdout.trim().split('\n') : [];
+    if (trackedFiles.length > 0) {
+      parsed = normalizePlannerResult(parsed, {
+        trackedFiles,
+        readFile: (rel) => { try { return readFileSync(join(cwd, rel), 'utf-8'); } catch { return null; } },
+      });
+    }
+  } catch { /* normalization is best-effort; linter W-checks remain witnesses */ }
+  return parsed;
 }
 
 // ─── Bug Y2: Plan-time Ground-Truth Audit (Sprint 166) ───────────────
