@@ -3243,5 +3243,14 @@
   "source": "sprint-437 debt-notlari (437-003 relay-constructor additive-param + 437-004 'end-to-end delivery needs follow-up wiring')",
   "spec": "Is: (a) approval-relay expired-yanit render'ini bot-callback'e baglasin (Telegram butonuna basinca 'suresi dolmus' i18n-mesaji kullaniciya gorunur); (b) terminal-channel ayni typed-yaniti REPL onay-kartinda gostersin; (c) canli-smoke: expired karta buton/keypress -> gorunur-mesaj. SURF-3 canli-approval dilimiyle birlesebilir.",
   "master_plan_row": 572
+ },
+ {
+  "born_id": 698,
+  "title": "DO-UX SESSIZ-OLUM: do 'Run basladi' dedikten sonra detached-child PLAN-fazinda prompt-gate BLOCK'uyla olurse HICBIR kanal bunu bildirmiyor — kullanici isin kostugunu saniyor (sprint-440 canli-vaka: do-gate ayni BLOCK'lari gosterip GECTI/IZIN-VER derken child-gate fail-closed durdurdu; iki gate-esigi tutarsiz)",
+  "priority": "P1",
+  "status": "OPEN",
+  "source": "canli-vaka 2026-07-14 (PCOMP-6 D3 ilk deneme); child-log: .deckent/recently-works/start-119c3246-*.log 'Sprint failed at phase PLAN: Prompt gate: 2 blocking finding(s)'",
+  "spec": "(a) do-yuzeyi ile child prompt-gate esigi TEK karar olsun: do-preview BLOCK gosteriyorsa ya do da reddetsin (--force-prompt-gate onerisiyle) ya da child'a acknowledge gecsin — ikisi ayni politikayi okusun; (b) child PLAN-olumu run-completion-watch/result-turn'e FAILED-kaydi olarak dussun (jobs/<id>.json status=FAILED + reason) — sessiz-olum olmasin; (c) do --run ciktisinda 'detached izleme: <logRef>' satiri zaten varsa PLAN-fail'de nervous-notify tetiklensin. SURF-1c coordinator-gocuyle birlesebilir.",
+  "master_plan_row": 566
  }
 ]
