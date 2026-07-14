@@ -197,3 +197,6 @@ Kod: e0cef74c (G1 motor · G1b güven-demotion · G1c doc-yapısal · G2 meta-ro
 Kod: 4a675b4b — planner-normalize (N1 mentioned→read · N2 import-scan→read · N3 mirror-test create-if-missing, plan-genel çakışma-istisnalı) + şema-retry + 3-5-hardcode ölümü (env-parametrik).
 **Kanıtlar:** 442-gerçek-planı: filesRead 0→4 (dört task) · 113 test · **A6-canlı (taze-NL, tam-zincir): 4 task, read 6/29/3/6 (sıfır-boş), mirror-test 3/4'te filesWrite'ta** (`.analysis/a6-sinav-u1/sinav4-u2-canli.md`).
 İlan: teslim-edildi, sınav-bekliyor. Kalan-U: U3 spec-şablonu · U4 focused-render · U5 kalan-🟡'lar.
+
+## U3 — TESLİM + SINAV (Alperen-skoru bekleniyor)
+`docs/templates/spec-sablonu.md`: 7 zorunlu-bölüm (amaç · dosya-kapsamı+ayrık-test-kararı · edge-politikaları · dönüş/mutasyon-semantiği · **kanıt=davranış-koşusu, yalnız-tsc YASAK** · sabit-yasaklar · büyüklük). Kaynak: 442-analizi §3.5-3.9 muğlaklık-sınıfları soru-formuna dönüştü. Kullanım-kuralı: CC hiçbir do-NL/spec'i boş-bölümle gönderemez. **Sınav:** aynı işin şablonsuz-NL'si (sinav-1) vs şablonlu-spec'i karşılaştırmalı — `sinav5-u3-sablonlu-spec.md` (sequence-edge'lerin TAMAMI artık spec'te cevaplı). İleride `do --spec` makine-okur (MASTER-PLAN-notu).
