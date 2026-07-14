@@ -35,7 +35,12 @@ export interface SatisfiabilityFinding {
 // swallowing the trailing "/cli.md" fragment. The final segment's extension is
 // `(?:\.[A-Za-z0-9]+)+` (one-or-more), not a single group, so multi-part
 // extensions like ".test.ts" / ".spec.ts" aren't truncated to ".test".
-const PRIMARY_PATH_RE = /(?:[A-Za-z0-9_-]+\/)+[A-Za-z0-9_-]+(?:\.[A-Za-z0-9]+)+/g;
+// The FIRST segment may carry a leading dot (".analysis/", ".deckent/") — without
+// it the mention tokenizes dot-less ("analysis/…") and can never equal the real
+// filesWrite entry, a false MENTIONED_NOT_WRITABLE family (sprint-443 plan-gate).
+// The lookbehind keeps a mid-token dot ("agents.md/…") from re-opening the
+// greedy-shorthand class the intermediate-segment rule exists to prevent.
+const PRIMARY_PATH_RE = /(?<![\w.])\.?[A-Za-z0-9_-]+\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+(?:\.[A-Za-z0-9]+)+/g;
 
 // Bare "name.ext" token with no directory prefix — candidate for the root-file
 // OR-clause (e.g. "README.md") and for the looser UNCHANGED_IN_WRITE resolution

@@ -2631,3 +2631,24 @@ Depends on task 0 (first task in the list).`;
     expect(resolved).toEqual(['325-001']);
   });
 });
+
+// ─── extractScopeFromDirective — qualified-path .md tail duplication ──────
+// Sprint-443 plan-gate live case: "- Files: src/core/builtins/agents/x/PROMPT.md"
+// ALSO matched the bare ".md" alternative ("PROMPT.md"), pushing an unqualified
+// duplicate into filesWrite; scope-sanitizer then dropped it and prompt-gate read
+// the drop as a write-authority-shrink BLOCK on all 20 U4 content tasks.
+
+describe('extractScopeFromDirective — bare .md tail of a qualified path', () => {
+  it('does not duplicate PROMPT.md when the full path is on the line', () => {
+    const scope = extractScopeFromDirective(
+      '- Files: src/core/builtins/agents/devops-engineer/PROMPT.md',
+    );
+    expect(scope.filesWrite).toContain('src/core/builtins/agents/devops-engineer/PROMPT.md');
+    expect(scope.filesWrite).not.toContain('PROMPT.md');
+  });
+
+  it('still captures a genuinely root-level .md file', () => {
+    const scope = extractScopeFromDirective('- Files: DECKENT.md');
+    expect(scope.filesWrite).toContain('DECKENT.md');
+  });
+});

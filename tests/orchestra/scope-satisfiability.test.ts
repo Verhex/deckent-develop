@@ -399,3 +399,40 @@ describe('lintScopeSatisfiability — real sprint-397 fixtures', () => {
     expect(findings.some(f => f.path === '.secrets-baseline')).toBe(false);
   });
 });
+
+// ─── Dot-directory mention parity (sprint-443 plan-gate live case) ─────
+// PRIMARY_PATH_RE used to tokenize ".analysis/u4-olcum/notes.md" WITHOUT its
+// leading dot ("analysis/…"), so the mention could never equal the real
+// filesWrite entry and rule 1 fired a false MENTIONED_NOT_WRITABLE BLOCK on
+// the U4 sprint's own DIRECTIVES. The dot now survives tokenization.
+
+describe('lintScopeSatisfiability — leading-dot path mentions', () => {
+  it('a goCriteria mention of a .analysis/ path in filesWrite produces no finding', () => {
+    const input = base({
+      goCriteria: 'sync finding documented in .analysis/u4-olcum/integration-notes.md; tests green.',
+      filesWrite: ['.analysis/u4-olcum/integration-notes.md'],
+    });
+    expect(findingsOf('MENTIONED_NOT_WRITABLE', lintScopeSatisfiability(input))).toEqual([]);
+  });
+
+  it('a .deckent/ mention outside write authority still BLOCKs (with its dot intact)', () => {
+    const input = base({
+      goCriteria: 'write the flag into .deckent/config-extra.json and keep it stable.',
+      filesWrite: ['src/core/config.ts'],
+    });
+    const found = findingsOf('MENTIONED_NOT_WRITABLE', lintScopeSatisfiability(input));
+    expect(found).toEqual([
+      expect.objectContaining({ severity: 'BLOCK', path: '.deckent/config-extra.json' }),
+    ]);
+  });
+
+  it('the greedy-shorthand class stays dead: "agents.md/cli.md" never tokenizes as one path', () => {
+    const input = base({
+      goCriteria: 'update the agents.md/cli.md reference pages under docs/reference/.',
+      filesWrite: ['docs/reference/agents.md', 'docs/reference/cli.md'],
+    });
+    const found = findingsOf('MENTIONED_NOT_WRITABLE', lintScopeSatisfiability(input));
+    expect(found.map(f => f.path)).not.toContain('.md/cli.md');
+    expect(found.map(f => f.path)).not.toContain('agents.md/cli.md');
+  });
+});

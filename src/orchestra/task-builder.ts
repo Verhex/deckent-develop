@@ -888,6 +888,14 @@ export function extractScopeFromDirective(line: string): TaskScope {
   const docFileMatches = line.match(/\b(docs\/[\w/.-]+\.(?:md|ts|js)|(?:[\w-]+)\.md)\b/g);
   if (docFileMatches) {
     for (const f of docFileMatches) {
+      // U4-gate fix (sprint-443 plan): a bare .md basename that is merely the tail
+      // of a longer slash-qualified path on the same line (".../agents/x/PROMPT.md"
+      // also matching "PROMPT.md") is NOT a root-level file — skipping it keeps the
+      // unqualified duplicate out of filesWrite (scope-sanitizer would drop it and
+      // prompt-gate reads that drop as a write-authority shrink BLOCK).
+      if (!f.includes('/') && (line.includes(`/${f}`) || filesWrite.some(existing => existing.endsWith(`/${f}`)))) {
+        continue;
+      }
       // Only add docs/ directory when the file is actually inside docs/
       // Standalone .md files (DECKENT.md, CONTRIBUTING.md) should NOT trigger docs/ directory
       if (f.startsWith('docs/') && !directories.some(d => d.startsWith('docs/'))) {

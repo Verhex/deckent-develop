@@ -107,13 +107,18 @@ describe('born-653 — scope derivation phantom paths', () => {
   });
 });
 
-// ─── born-650: G6 code-token false-positive (real lint → RED, gate → GREEN) ───
+// ─── born-650: G6 code-token false-positive (defect KILLED at the extractor) ───
+// Originally a RED pin: the raw extractor treated "now/process.env" and
+// "23/4.25dk" as paths, and only the wired gate's filtering hid it. The
+// sprint-443 PRIMARY_PATH_RE lookbehind (`(?<![\w.])` — added for leading-dot
+// paths) kills the class at the SOURCE: a slash-token preceded by a word/dot
+// character ("Date.now/…", "$2.23/…") can no longer start a path match.
 
 describe('born-650 — code/money tokens are not file paths', () => {
   const CODE_MONEY_GO =
     'Regresyon: (Date.now/process.env/fs importu YOK) doğrulanır; maliyet $2.23/4.25dk sınırında kalır.';
 
-  it('RED: real lintScopeSatisfiability BLOCKs the code/money tokens as phantom paths', () => {
+  it('the raw extractor no longer produces code/money phantom paths (defect dead)', () => {
     const findings = lintScopeSatisfiability({
       description: '',
       goCriteria: CODE_MONEY_GO,
@@ -122,9 +127,8 @@ describe('born-650 — code/money tokens are not file paths', () => {
       directories: [],
       trackedFiles: ['src/orchestra/planner.ts'],
     });
-    // Live defect: the raw extractor treats "now/process.env" and/or "23/4.25dk" as paths.
     const badPaths = findings.map((f) => f.path);
-    expect(badPaths.some((p) => p.includes('process.env') || /\d\/\d/.test(p))).toBe(true);
+    expect(badPaths.some((p) => p.includes('process.env') || /\d\/\d/.test(p))).toBe(false);
   });
 
   it('GREEN: the wired gate emits no BLOCK for the code/money sentence', () => {
