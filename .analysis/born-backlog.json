@@ -3252,5 +3252,23 @@
   "source": "canli-vaka 2026-07-14 (PCOMP-6 D3 ilk deneme); child-log: .deckent/recently-works/start-119c3246-*.log 'Sprint failed at phase PLAN: Prompt gate: 2 blocking finding(s)'",
   "spec": "(a) do-yuzeyi ile child prompt-gate esigi TEK karar olsun: do-preview BLOCK gosteriyorsa ya do da reddetsin (--force-prompt-gate onerisiyle) ya da child'a acknowledge gecsin — ikisi ayni politikayi okusun; (b) child PLAN-olumu run-completion-watch/result-turn'e FAILED-kaydi olarak dussun (jobs/<id>.json status=FAILED + reason) — sessiz-olum olmasin; (c) do --run ciktisinda 'detached izleme: <logRef>' satiri zaten varsa PLAN-fail'de nervous-notify tetiklensin. SURF-1c coordinator-gocuyle birlesebilir.",
   "master_plan_row": 566
+ },
+ {
+  "born_id": 699,
+  "title": "OLU-KOD TAM-CERRAHISI: selectAgent/suggestNewAgent (agent-selector.ts, 0 src-cagiran) + selectSkills (skill-selector.ts; resolveComposition CANLI kalir) silinmeli — 6 test-dosyasi (847+ satir; agent-selector/skill-selector kendi testleri + manifest-schema-lint/skill-auto-activation/ci-guardian/skill-ci-testing) legacy-yolu pinleyip YANLIS-GUVEN uretiyor; canli-yol routeTaskV2/evaluateActivation testlerine PORT edilmeli",
+  "priority": "P2",
+  "status": "OPEN",
+  "source": "PCOMP-6 ground-truth (Explore-haritasi) + D5 kapsam-karari (kor-silme davranis-pinlerini kaybettirir)",
+  "spec": "D5'te yapilan: @deprecated bloklari + CLAUDE.md brain.md referans-fix. Kalan: 6 testin aktivasyon/manifest-davranis-pinlerini routeTaskV2-yoluna port et -> olu fonksiyonlari + salt-legacy testleri sil -> dead-code-audit/orphan pinleri senkron.",
+  "master_plan_row": 573
+ },
+ {
+  "born_id": 700,
+  "title": "PROMPT-ARSIV EKSIK-KALIYOR: cleanup/lifecycle .prompt-* arsivleme mekanizmasi VAR ama arsivde sprint-basina ~1 prompt kaliyor (31-task korpusunda yalniz 436-001 tam-prompt bulundu) — muhtemel kok: worker-wrapper basarili-biteste kendi prompt'unu siliyor ya da finalize-oncesi bir yol supuruyor",
+  "priority": "P3",
+  "status": "OPEN",
+  "source": "PCOMP-6 korpus-toplama gozlemi (2026-07-14); denetim/audit-korpusu kaybi",
+  "spec": "Iz: spawn->worker-exit->finalize zincirinde .prompt-<id> dosyasinin yasam-dongusunu logla; silen yolu bul; arsive-tasi davranisini TUM prompt'lar icin garanti et (retention-politikasiyla).",
+  "master_plan_row": 573
  }
 ]

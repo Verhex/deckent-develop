@@ -44,6 +44,13 @@ function globMatch(pattern: string, text: string): boolean {
  * 4. Tie-break by agent stats successRate (higher wins)
  * 5. Return best or null
  */
+/**
+ * @deprecated DEAD IN PRODUCTION (PCOMP-6 ground-truth, 2026-07-14): zero src/
+ * callers — the live path is routeTaskV2 → selectBestAgent (core/routing-engine.ts).
+ * Six test files still pin THIS legacy behavior and give false confidence;
+ * porting them to the live path + deleting this function is born-699.
+ * Do NOT add new callers.
+ */
 export function selectAgent(
   task: {
     title: string;

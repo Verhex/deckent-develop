@@ -2,6 +2,7 @@
 // Extracted from sprint-controller.ts — pure utility functions with
 // minimal state dependencies. Sprint 075: God Object Split Phase 2.
 
+import { unescapeListItem } from './directives-builder.js';
 import {
   readFileSync, existsSync, writeFileSync,
   mkdirSync, unlinkSync, statSync,
@@ -474,13 +475,19 @@ export function extractGoNogoCriteria(
     }
   }
 
+  // PCOMP-6 D5: DIRECTIVES writers escape intra-item ';' as '\;' (born-677
+  // round-trip). This reader previously kept the escape, so '\;' leaked into
+  // task.goNogo and every downstream prompt (28/31 corpus prompts). Unescape
+  // per line with the SAME helper the canonical reader uses.
   const specificCriteria = proofLines
     .slice(0, 3)
     .map(stripProofLabel)
+    .map(unescapeListItem)
     .join('; ');
   const specificNoGo = noGoLines
     .slice(0, 3)
     .map(stripNoGoLabel)
+    .map(unescapeListItem)
     .join('; ');
   const hasSpecific = proofLines.length > 0 || noGoLines.length > 0;
 

@@ -32,7 +32,7 @@ paths: ["DIRECTIVES.md",".tasks/*",".brain/*"]
 - Sprint is NEVER left incomplete
 
 ## Agent & Skill Selection
-- Run selectAgent() for EVERY task — even when forceModel is set
+- Ensure agent selection happens for EVERY task via routeTaskV2 (selectAgent() is DEAD legacy — born-699) — even when forceModel is set
 - Agent selection is independent of model selection
 - Resolve agent's PROMPT.md + systemPrompt for worker context injection
 - Run selectSkills() based on task scope + project stack — avoid generic selection

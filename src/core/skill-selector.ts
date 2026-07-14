@@ -20,6 +20,13 @@ const DEFAULT_MAX_SKILLS = 3;
  * 7. Sort by score descending, then priority
  * 8. Cap at maxSkills (default 3)
  */
+/**
+ * @deprecated DEAD IN PRODUCTION (PCOMP-6 ground-truth, 2026-07-14): zero src/
+ * callers — the live path is routeTaskV2 skill-scoring + evaluateActivation (core/routing-engine.ts).
+ * Six test files still pin THIS legacy behavior and give false confidence;
+ * porting them to the live path + deleting this function is born-699.
+ * Do NOT add new callers.
+ */
 export function selectSkills(
   task: { title: string; description: string; scope?: { directories?: string[]; filesWrite?: string[] } },
   projectStack: ProjectStack | null,

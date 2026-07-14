@@ -424,6 +424,11 @@ describe('findOrphanFiles — fixture determinism', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const KNOWN_ORPHANS = [
+  // SURF-1b (sprint-439): the durable RunFlowCoordinator core landed but its
+  // consumers (terminal controller + API routes) are the SURF-1c driver-
+  // migration slice — deliberately frozen mid-train (Alperen, 2026-07-14:
+  // SURF dondu, PCOMP-6 öncelik). Un-orphans when SURF-1c wires it.
+  'src/orchestra/run-flow-coordinator.ts',
   'src/agents/auditor.ts',
   'src/agents/cross-sprint-analyzer.ts',
   'src/agents/http-agentic-worker.ts',
@@ -519,7 +524,7 @@ const KNOWN_ORPHANS = [
 
 describe('KNOWN_ORPHANS allowlist sanity', () => {
   it('has the expected count and only well-formed src/**/*.ts(x) entries', () => {
-    expect(KNOWN_ORPHANS.length).toBe(85); // 86->85: plan-preview-card TERM4B mount'uyla kapandi (sprint-426)
+    expect(KNOWN_ORPHANS.length).toBe(86); // 86->85: plan-preview-card TERM4B mount'uyla kapandi (sprint-426)
     for (const entry of KNOWN_ORPHANS) {
       expect(entry.startsWith('src/')).toBe(true);
       expect(entry.endsWith('.ts') || entry.endsWith('.tsx')).toBe(true);

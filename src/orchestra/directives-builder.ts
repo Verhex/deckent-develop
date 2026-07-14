@@ -146,7 +146,9 @@ function splitEscaped(joined: string, delimiter: string): string[] {
   return parts;
 }
 
-function unescapeListItem(item: string): string {
+/** Exported (PCOMP-6 D5): the single unescape used by every DIRECTIVES reader —
+ *  sprint-utils' goNogo extraction shares it so `\;` never leaks into task JSON. */
+export function unescapeListItem(item: string): string {
   let out = '';
   for (let i = 0; i < item.length; i++) {
     const ch = item[i];

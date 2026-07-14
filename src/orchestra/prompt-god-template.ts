@@ -1410,7 +1410,7 @@ export function buildBehaviorPrecedenceNote(
     filesWrite.length > 0 &&
     filesWrite.every((f) => /(^|\/)tests?\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f));
   if (allTests) return '';
-  return `\n> Behavior-precedence (this task overrides your persona): this task CHANGES external behavior — it is a ${intent} task, not a refactor. Your persona's "zero functional changes / preserve behavior" mandate is SUSPENDED for THIS task: implement the behavior change the goCriteria asks for (do not preserve the current/buggy behavior). The task's goCriteria is the authority.`;
+  return `\n> Behavior-precedence (this task overrides your persona): this task CHANGES external behavior — it is ${/^[aeiou]/i.test(intent) ? 'an' : 'a'} ${intent} task, not a refactor. Your persona's "zero functional changes / preserve behavior" mandate is SUSPENDED for THIS task: implement the behavior change the goCriteria asks for (do not preserve the current/buggy behavior). The task's goCriteria is the authority.`;
 }
 
 /**

@@ -1804,8 +1804,12 @@ export function buildWorkerPrompt(
   // logged to stderr (debug) and appended fail-soft to a measurement ledger
   // so the false-positive rate can be measured before any gating flip.
   try {
+    // D5: calibration/regeneration runs (golden-set measurements) must not
+    // pollute the production measurement ledger — the fail-closed flip decision
+    // reads it. Set DECKENT_PROMPT_LINT_LEDGER=0 to lint without recording.
+    const ledgerEnabled = process.env['DECKENT_PROMPT_LINT_LEDGER'] !== '0';
     const findings = lintWorkerPromptContract(task, trackedFiles);
-    if (findings.length > 0) {
+    if (findings.length > 0 && ledgerEnabled) {
       for (const f of findings) {
         debugLog('prompt-lint', `[${f.check}] task=${f.taskId}: ${f.detail}`);
       }
