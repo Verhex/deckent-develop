@@ -45,9 +45,17 @@ describe('AGSK-6: api-designer + observability-engineer + i18n-specialist agent 
         expect(existsSync(resolve(BUILTINS_DIR, spec.id, 'PROMPT.md'))).toBe(true);
       });
 
-      it('PROMPT.md stays within the 4KB rubric cap and is non-trivial', () => {
+      it('PROMPT.md core body stays within the 4KB rubric cap and is non-trivial', () => {
+        // U4 amendment (sprint-443, Brain-FIX for 443-008's honest NO_GO): the
+        // rubric cap guards the CORE persona body. The PCOMP-8 U4 focused-render
+        // work appends an additive '## Guidance Slices' section (intent-keyed
+        // 5-15-line marker slices) — in guidance render mode the worker receives
+        // ONE slice, never the whole section, so the section is exempt from the
+        // transport-size rubric. The cap therefore applies to everything ABOVE
+        // that heading; a missing heading means the whole file is the core body.
         const content = readPrompt(spec.id);
-        const byteLength = Buffer.byteLength(content, 'utf8');
+        const coreBody = content.split(/^## Guidance Slices$/m)[0]!.trimEnd();
+        const byteLength = Buffer.byteLength(coreBody, 'utf8');
         expect(byteLength).toBeLessThanOrEqual(MAX_PROMPT_BYTES);
         expect(byteLength).toBeGreaterThan(100);
       });

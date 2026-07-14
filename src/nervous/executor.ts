@@ -15,6 +15,7 @@ import {
 } from '../core/config.js';
 import { ACTION_BY_ID } from './action-registry.js';
 import { awaitPanicGateApproval, isLockedPanicAction } from './panic-gate.js';
+import { recordDecision } from './decision-memory.js';
 import { randomUUID } from 'node:crypto';
 
 // ─── NervousHistory Interface ────────────────────────────────────────────────
@@ -185,10 +186,30 @@ export class Executor {
       }
     }
     if (pending) {
+      // APPROVAL-LOOP fix (sprint-443): the decision binds to the FINDING, not the
+      // instance — record it in the durable decision-memory so the next scan's
+      // re-emission of the same fingerprint is suppressed (reject) or cooled-down
+      // (accept) instead of re-asking the operator the same question forever.
+      const fp = pending.notification.fingerprint;
+      if (fp) recordDecision(this.projectRoot, fp, decision);
       pending.resolve(decision, opts?.modifiedPayload);
       this.pendingApprovals.delete(resolvedKey);
       this.pendingStore?.remove(resolvedKey);
       return true;
+    }
+    return false;
+  }
+
+  /**
+   * APPROVAL-LOOP fix (sprint-443) — pending-dedup surface: is an approval with
+   * this finding-fingerprint ALREADY parked? The pipeline consults this before
+   * dispatch so the same finding never accumulates duplicate Telegram asks
+   * within one approval window.
+   */
+  hasPendingFingerprint(fingerprint: string): boolean {
+    if (!fingerprint) return false;
+    for (const p of this.pendingApprovals.values()) {
+      if (p.notification.fingerprint === fingerprint) return true;
     }
     return false;
   }
@@ -233,7 +254,7 @@ export class Executor {
 
     switch (action.policy) {
       case 'autonomous':
-        return this.handleAutonomous(baseFields, action);
+        return this.handleAutonomous(notification, baseFields, action);
 
       case 'suggest-5m':
       case 'suggest-30m':
@@ -247,12 +268,33 @@ export class Executor {
     }
   }
 
+  /**
+   * APPROVAL-LOOP fix (sprint-443): single funnel over `actionHandler` — a
+   * SUCCESSFUL execution stamps the finding-fingerprint 'executed' in the durable
+   * decision-memory, so the next scan's identical re-fire is cooled-down (and a
+   * post-cool-down re-fire surfaces as "action did not clear the condition")
+   * instead of silently re-executing the same suggestion every cycle (the
+   *  history-evidenced SCOPE_COLLISION_REORDER-every-5-minutes loop).
+   */
+  private async invokeAction(
+    notification: NervousNotification,
+    actionId: string,
+    payload: Record<string, unknown>,
+  ): Promise<Awaited<ReturnType<ActionHandler>>> {
+    const result = await this.actionHandler(actionId, payload);
+    if (result.outcome === 'success' && notification.fingerprint) {
+      recordDecision(this.projectRoot, notification.fingerprint, 'executed');
+    }
+    return result;
+  }
+
   private async handleAutonomous(
+    notification: NervousNotification,
     baseFields: ExecutionRecordBase,
     action: NotificationAction,
   ): Promise<ExecutionRecord> {
     try {
-      const result = await this.actionHandler(action.id, action.payload ?? {});
+      const result = await this.invokeAction(notification, action.id, action.payload ?? {});
       return {
         ...baseFields,
         decision: 'autonomous',
@@ -287,7 +329,7 @@ export class Executor {
         this.pendingStore?.remove(notification.id);
 
         try {
-          const result = await this.actionHandler(action.id, action.payload ?? {});
+          const result = await this.invokeAction(notification, action.id, action.payload ?? {});
           resolve({
             ...baseFields,
             decision: 'timeout-auto-applied',
@@ -327,7 +369,7 @@ export class Executor {
               const effectivePayload = modifiedPayload
                 ? { ...(action.payload ?? {}), ...modifiedPayload }
                 : action.payload ?? {};
-              const result = await this.actionHandler(action.id, effectivePayload);
+              const result = await this.invokeAction(notification, action.id, effectivePayload);
               resolve({
                 ...baseFields,
                 decision: 'accepted',
@@ -384,7 +426,7 @@ export class Executor {
             const effectivePayload = modifiedPayload
               ? { ...(action.payload ?? {}), ...modifiedPayload }
               : action.payload ?? {};
-            const result = await this.actionHandler(action.id, effectivePayload);
+            const result = await this.invokeAction(notification, action.id, effectivePayload);
             outerResolve({
               ...baseFields,
               decision,

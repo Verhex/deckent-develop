@@ -168,16 +168,18 @@ describe('Proposer', () => {
     expect(notification!.actions[1].id).toBe('SCOPE_COLLISION_REORDER');
   });
 
-  it('mints a short, deterministic approval code (phone-typeable, derived from id)', () => {
+  it('mints a short, deterministic approval code (phone-typeable, derived from the FINDING fingerprint)', () => {
+    // APPROVAL-LOOP fix (sprint-443): the code derives from the content-fingerprint,
+    // NOT the per-instance uuid — the same finding shows the operator the SAME code
+    // across re-emissions, so one decision terminates the finding, not one instance.
     const result = makeDetectorResult({ groupKey: 'stale-worker:w-9' });
     const decisions = [makeDecision('WORKER_RESPAWN')];
     const n = proposer.propose(result, decisions, makeContext());
     expect(n).not.toBeNull();
     // 5-char base36 — short enough to type on a phone, not a UUID.
     expect(n!.shortCode).toMatch(/^[0-9a-z]{5}$/);
-    // Deterministic: the code is a pure function of the notification id (pins the
-    // documented derivation so the resolver/CLI/Telegram all agree on the code).
-    const h = createHash('sha256').update(n!.id).digest('hex');
+    expect(n!.fingerprint).toBeTruthy();
+    const h = createHash('sha256').update(n!.fingerprint!).digest('hex');
     const expected = parseInt(h.slice(0, 12), 16).toString(36).slice(0, 5).padStart(5, '0');
     expect(n!.shortCode).toBe(expected);
   });

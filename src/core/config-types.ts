@@ -1099,6 +1099,17 @@ export interface PromptConfig {
    */
   adr_render?: 'full' | 'operative';
   /**
+   * Persona render mode for worker prompt injection (ADR-G-027 sanctioned
+   * condensed+pointer shape — content-completeness bound WITHOUT access-loss).
+   * 'full' (default): full persona/agent-prompt content emitted as-is
+   * (byte-identical to pre-existing behavior).
+   * 'guidance': a focused, condensed persona render — active-constraint head +
+   * summary + pointer to the full source, mirroring the `adr_render: 'operative'`
+   * shape for persona content. No content is ever dropped from disk/access, only
+   * from the transport render.
+   */
+  persona_render?: 'full' | 'guidance';
+  /**
    * Pass the Claude CLI `--exclude-dynamic-system-prompt-sections` flag on every
    * claude worker spawn (F3.1). The flag moves per-machine sections (cwd, env,
    * memory paths, git status) out of the default system prompt and into the first
@@ -1168,6 +1179,15 @@ export interface NervousSystemConfig {
    *  auto-proceed: such actions then stay pending until you explicitly accept or
    *  reject (safety-floor actions never auto-proceed regardless). */
   approve_timeout_ms?: number;
+  /** APPROVAL-LOOP fix (sprint-443): how long (ms) a REJECTED finding-fingerprint
+   *  stays suppressed — the same finding is NOT re-asked within this window
+   *  (default: decision-memory DEFAULT_REJECT_SUPPRESS_MS = 6h). */
+  reject_suppress_ms?: number;
+  /** APPROVAL-LOOP fix (sprint-443): cool-down (ms) after an ACCEPTED/EXECUTED
+   *  finding-fingerprint — the same finding is not re-asked while the action takes
+   *  effect; if it re-fires AFTER the window it is surfaced as a repeat-escalation
+   *  (default: decision-memory DEFAULT_ACCEPT_COOLDOWN_MS = 30m). */
+  accept_cooldown_ms?: number;
   /** N3 (default false): opt-in cooperative worker respawn. When true, the nervous
    *  WORKER_RESPAWN action writes a durable respawn-REQUEST the sprint-controller
    *  drains + actions through its own lifecycle (no race). False → propose. */

@@ -20,13 +20,38 @@ import type {
 import { randomUUID, createHash } from 'node:crypto';
 
 /**
- * Kısa, insan-yazılabilir onay kodu — notification id'sinden DETERMINISTIK türetilir
- * (aynı id → aynı kod), bekleyen birkaç bildirim arasında çakışması ihmal edilebilir.
- * Operatör Telegram'da uzun UUID yerine `approve <code>` yazabilsin diye (5 base36 hane).
+ * Kısa, insan-yazılabilir onay kodu — bulgunun FINGERPRINT'inden DETERMINISTIK
+ * türetilir. APPROVAL-LOOP fix (sprint-443): eskiden per-instance UUID'den
+ * türüyordu → aynı bulgu her yeniden-üretimde YENİ kod alıyordu ve operatörün
+ * accept/reject'i yalnız o instance'ı kapatıyordu. Artık aynı bulgu = HEP aynı
+ * kod (5 base36 hane) — `approve <code>` bulguyu kapatır, pending-dedup aynı
+ * anda tek instance garantiler (kod-çakışması pending içinde imkânsızlaşır).
  */
-function shortApprovalCode(id: string): string {
-  const h = createHash('sha256').update(id).digest('hex');
+function shortApprovalCode(fingerprint: string): string {
+  const h = createHash('sha256').update(fingerprint).digest('hex');
   return parseInt(h.slice(0, 12), 16).toString(36).slice(0, 5).padStart(5, '0');
+}
+
+/**
+ * İçerik-parmakizi — sprintId + detectorId + groupKey (yoksa type+title) +
+ * sıralı action-id listesinden sha256. AYNI bulgu kaç kez yeniden-üretilirse
+ * üretilsin sabittir; decision-memory + pending-dedup bu anahtar üzerinden çalışır.
+ *
+ * Sprint-KAPSAMLI (yutma-analizi bulgusu): groupKey'ler çoğu dedektörde task-id
+ * içermez (scope-collision = dosya-listesi) — sprintId olmasa YENİ sprint'in yeni
+ * çakışması, önceki sprint'te verilmiş bir reject'in susturma-penceresine takılırdı.
+ * sprintId'siz bulgular (sprint-bağımsız dedektörler) global kapsamda kalır.
+ */
+export function findingFingerprint(
+  detectorId: string,
+  detectorResult: DetectorResult,
+  actionIds: readonly string[],
+  sprintId?: string,
+): string {
+  const identity = detectorResult.groupKey
+    ?? `${String(detectorResult.metadata?.type ?? 'generic')}|${detectorResult.title}`;
+  const actions = [...actionIds].sort().join(',');
+  return createHash('sha256').update(`${sprintId ?? ''}|${detectorId}|${identity}|${actions}`).digest('hex');
 }
 
 // ─── Severity Rank ───────────────────────────────────────────────────────────
@@ -100,9 +125,11 @@ export class Proposer {
     // Build notification
     const now = context.now ?? new Date();
     const id = randomUUID();
+    const fingerprint = findingFingerprint(context.detectorId, detectorResult, actions.map(a => a.id), context.sprintId);
     const notification: NervousNotification = {
       id,
-      shortCode: shortApprovalCode(id),
+      fingerprint,
+      shortCode: shortApprovalCode(fingerprint),
       type: (detectorResult.metadata?.type as string) ?? 'generic',
       title: context.title,
       message: context.message,

@@ -20,6 +20,9 @@ import { join } from 'node:path';
 interface TaskFileData {
   id: string;
   status?: string;
+  /** APPROVAL-LOOP fix (sprint-443): bağımlılık-zinciri farkındalığı için okunur —
+   *  bağımlılıkla TAM-SIRALI task'lar aynı dosyaya asla eşzamanlı yazamaz. */
+  dependencies?: string[];
   scope?: {
     filesWrite?: string[];
   };
@@ -78,7 +81,12 @@ export class ScopeCollisionMonitor {
     const writeMap = this.buildWriteMap(tasks);
 
     // ── Çakışmaları bul ──────────────────────────────────────────────────────
-    const collisions = this.findCollisions(writeMap);
+    // APPROVAL-LOOP fix (sprint-443): bağımlılıkla tam-sıralı gruplar çakışma
+    // DEĞİLDİR (dependent, bağımlılığı bitmeden asla dispatch edilmez → eşzamanlı
+    // yazım imkânsız). Eski davranış meşru sıralı-decomposition'ı (443-003→004)
+    // her taramada yeniden flag'leyip onay-döngüsünü besliyordu.
+    const collisions = this.findCollisions(writeMap)
+      .filter(c => !this.isFullySequenced(c.taskIds, tasks));
     if (collisions.length === 0) return null;
 
     // ── DetectorResult üret ──────────────────────────────────────────────────
@@ -148,6 +156,33 @@ export class ScopeCollisionMonitor {
    */
   private normalizePath(filePath: string): string {
     return filePath.replace(/\/+/g, '/').toLowerCase();
+  }
+
+  /**
+   * APPROVAL-LOOP fix (sprint-443): bir çakışma-grubu bağımlılık-grafiğiyle
+   * TAM-SIRALI mı? Her (a,b) çifti için a⇝b veya b⇝a (geçişli erişilebilirlik)
+   * sağlanıyorsa task'lar hiçbir zaman eşzamanlı çalışamaz → gerçek çakışma yok.
+   * Kısmî sıralı gruplar (tek bağımsız üye bile) çakışma olarak KALIR.
+   */
+  private isFullySequenced(taskIds: string[], tasks: TaskFileData[]): boolean {
+    if (taskIds.length < 2) return true;
+    const depsById = new Map<string, string[]>(
+      tasks.map(t => [t.id, t.dependencies ?? []]),
+    );
+    const reaches = (from: string, to: string, seen = new Set<string>()): boolean => {
+      if (from === to) return true;
+      if (seen.has(from)) return false;
+      seen.add(from);
+      return (depsById.get(from) ?? []).some(dep => reaches(dep, to, seen));
+    };
+    for (let i = 0; i < taskIds.length; i++) {
+      for (let j = i + 1; j < taskIds.length; j++) {
+        const a = taskIds[i]!;
+        const b = taskIds[j]!;
+        if (!reaches(a, b) && !reaches(b, a)) return false;
+      }
+    }
+    return true;
   }
 
   /**

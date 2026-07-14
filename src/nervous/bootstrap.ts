@@ -32,6 +32,7 @@ import {
   isNervousPollerAlive,
 } from './ipc-queue.js';
 import { createActionHandler } from './action-handlers.js';
+import { evaluateSuppression } from './decision-memory.js';
 import { requestWorkerRespawn } from './respawn-request.js';
 import type { ActionHandler, PendingApprovalStore } from './executor.js';
 import type {
@@ -268,7 +269,13 @@ export function createNervousSystemIfEnabled(
   if (typeof heartbeatTimer.unref === 'function') heartbeatTimer.unref();
 
   observer.on('detection', (result: DetectorResult, event: ObserverEvent) => {
-    void runPipeline(result, event, decisionEngine, proposer, dispatcher, executor);
+    void runPipeline(result, event, decisionEngine, proposer, dispatcher, executor, {
+      projectRoot,
+      config: {
+        ...(nervousConfig.reject_suppress_ms !== undefined ? { reject_suppress_ms: nervousConfig.reject_suppress_ms } : {}),
+        ...(nervousConfig.accept_cooldown_ms !== undefined ? { accept_cooldown_ms: nervousConfig.accept_cooldown_ms } : {}),
+      },
+    });
   });
 
   observer.start();
@@ -310,6 +317,11 @@ export async function runPipeline(
   proposer: Proposer,
   dispatcher: NervousDispatcher,
   executor: Executor,
+  /** APPROVAL-LOOP fix (sprint-443): when provided, the pipeline consults the
+   *  durable decision-memory + the executor's pending set BEFORE dispatching —
+   *  a decided or already-parked finding-fingerprint is never re-asked. Omitted
+   *  (legacy callers/tests) → byte-identical pre-fix behavior. */
+  suppression?: { projectRoot: string; config?: { reject_suppress_ms?: number; accept_cooldown_ms?: number } },
 ): Promise<void> {
   try {
     const decisions = decisionEngine.decide(result);
@@ -320,7 +332,7 @@ export async function runPipeline(
     // the `?? 'detector'` only fires if that stamp is bypassed, never 'unknown'.
     const detectorId = result.detectorId
       ?? String((result.metadata as { type?: unknown } | undefined)?.type ?? 'detector');
-    const notification = proposer.propose(result, decisions, {
+    let notification = proposer.propose(result, decisions, {
       detectorId,
       sprintId: event.sprintId,
       taskId: event.taskId,
@@ -328,6 +340,31 @@ export async function runPipeline(
       message: result.message,
     });
     if (!notification) return;
+
+    // APPROVAL-LOOP gates (sprint-443) — order matters:
+    //   1. pending-dedup: the SAME finding is already parked awaiting a decision →
+    //      do not mint a duplicate ask (the old loop pinged Telegram every 5min
+    //      while a 30min approval window was still open).
+    //   2. decision-memory: the finding was already rejected (suppress-window) or
+    //      accepted/executed (cool-down) → the operator is never asked the same
+    //      question again; a post-cool-down re-fire is ESCALATED as "action did
+    //      not clear the condition", not re-asked verbatim.
+    if (notification.fingerprint && suppression) {
+      if (executor.hasPendingFingerprint(notification.fingerprint)) return;
+      const verdict = evaluateSuppression(
+        suppression.projectRoot,
+        notification.fingerprint,
+        suppression.config,
+      );
+      if (verdict.suppress) return;
+      if (verdict.repeatAfterAction) {
+        notification = {
+          ...notification,
+          title: `[repeat — prior action did not clear this] ${notification.title}`,
+          message: `${notification.message}\n(decision-memory: ${verdict.reason})`,
+        };
+      }
+    }
 
     await Promise.allSettled([
       dispatcher.dispatch(notification),

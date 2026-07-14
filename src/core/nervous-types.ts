@@ -103,10 +103,16 @@ export interface NotificationAction {
  * - File log adapter: .deckent/nervous-history.jsonl append
  */
 export interface NervousNotification {
-  /** UUID v4 — cross-channel dedup için */
+  /** UUID v4 — bu ÜRETİMİN (instance) kimliği; her yeniden-üretimde değişir */
   readonly id: string;
-  /** Kısa, insan-yazılabilir onay kodu (id'den deterministik türetilir). Operatör
-   *  Telegram'da UUID yerine `approve <shortCode>` yazabilsin diye (proposer mint eder). */
+  /** İçerik-parmakizi (sha256 hex) — detectorId + groupKey + action-id'lerinden
+   *  DETERMINISTIK türetilir: AYNI bulgu kaç kez yeniden-üretilirse üretilsin aynı
+   *  kalır. Karar-hafızası (decision-memory) + pending-dedup bu anahtar üzerinden
+   *  çalışır — APPROVAL-LOOP fix (sprint-443): karar instance'a değil BULGUYA bağlanır. */
+  readonly fingerprint?: string;
+  /** Kısa, insan-yazılabilir onay kodu (fingerprint'ten deterministik türetilir —
+   *  aynı bulgu = HEP aynı kod; operatör Telegram'da UUID yerine `approve <shortCode>`
+   *  yazabilsin diye, proposer mint eder). */
   readonly shortCode?: string;
   /** Notification tipi — Detector tarafından belirlenir */
   readonly type: string;
@@ -186,7 +192,7 @@ export interface AuthorityMatrix {
 export type NervousSystemConfigV1 =
   // Shared fields — derived from the V2 SSOT so they can never diverge from the canonical schema.
   & Readonly<Pick<NervousSystemConfig, 'mode' | 'enabled'>>
-  & Readonly<Partial<Pick<NervousSystemConfig, 'actionOverrides' | 'approve_timeout_ms' | 'worker_respawn'>>>
+  & Readonly<Partial<Pick<NervousSystemConfig, 'actionOverrides' | 'approve_timeout_ms' | 'worker_respawn' | 'reject_suppress_ms' | 'accept_cooldown_ms'>>>
   // Legacy camelCase runtime-view aliases — absent from V2; retained for behavior-preserving reads.
   & {
       /** Quiet hours: {start: "23:00", end: "07:00"}. Legacy alias — V2 nests this as
