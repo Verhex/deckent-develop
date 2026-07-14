@@ -52,18 +52,17 @@ Kalite her seferinde kullanıcının prompt'uyla düzeltilmemeli; **ilk seferde 
 </quality_bar>
 
 <operating_rules>
-## ⚖️ Bağlayıcı Operasyon Kuralları (memory-promoted — her oturum geçerli)
-Auto-memory lazy yüklenir (topic dosyaları yalnız okunca gelir); bu yüzden gerçekten-bağlayıcı kurallar buraya terfi edildi (her oturum garanti). Detay: `~/.claude/projects/.../memory/`.
-- **Türkçe konuş** (Alperen) — anlatım TR, kod/komut/teknik terim EN.
+## ⚖️ Bağlayıcı Operasyon Kuralları (sprint-mekaniği — her oturum geçerli)
+Davranış-KANUNLARI tek-yer = auto-memory `MEMORY.md` (11 kalıcı kanun, Alperen-seçimi 2026-07-14; her oturum yüklenir). Buradakiler yalnız sprint-mekaniği:
 - **Sprint'i Alperen onayı olmadan kill/cleanup ETME**; `rm .tasks/*` YASAK.
 - **`.brain/memory.db` ASLA silinmez** — tüm Brain knowledge orada.
-- **Sprint çalışırken `npm run build` ve `/login` YASAK** (ESM cache + worker auth-loss); build sonrası `/mcp restart` Alperen yapar.
-- **Commit/push öncesi `git branch -vv`** — shared-worktree HEAD-drift; başka oturumun commit'ini bozma; commit yalnız Alperen isteyince.
+- **Sprint çalışırken `npm run build` ve `/login` YASAK** (ESM cache + worker auth-loss); build sonrası `/mcp restart` Alperen yapar, bot stop→start CC yapar.
+- **Commit/push öncesi `git branch -vv`** — shared-worktree HEAD-drift; commit yalnız Alperen isteyince.
 - **Sprint'ler CLI'dan** (`env -u ANTHROPIC_API_KEY deckent …`), MCP'den start/run/plan değil.
-- **Disk-verify ground truth** — Brain sentetik NO_GO'ya güvenme; `git diff --stat`/`git ls-files` ile doğrula.
-- **haiku yalnız doc** — kod/tsx'e route etme.
-- **İş-takip SSOT** = `docs/MASTER-PLAN.md` (tek pillar-tablo, 209 madde, Durum+Tarih sütunlu) + memory `work_tracking_ledger`; aktif öncelikler MEMORY.md tepesinde pinned. Eski plan: `docs/archive/MASTER-PLAN-archived-2026-06-29.md`.
-- **🧭 Aktif Yön (2026-06-29 pivot — Hermes-vs-Deckent analiz turu):** terminal = ana yönetim+kullanım yüzeyi (tool-driven, derin, **full-control + yormayan**; iş CLI değil terminalden, CLI/MCP opsiyonel) · dashboard = yalnız izleme. **P0:** training-trace WIRE · runtime-wide ApprovalBroker (çok-ortam canlı onay) · Hermes-rol-model tool + progressive disclosure · global-install+proje-scope · DIRECTIVES 0-kırılganlık. **Koru (yeniden-yazma YOK):** deterministik 8-faz eval-backed orchestration · kapalı outcome→routing→promotion öğrenme · governance-by-construction. Detay: `.analysis/hermes-vs-deckent-direction-decisions.md` + memory `project_hermes_deckent_direction_2026_06`.
+- **haiku yalnız doc/config** — kod/tsx'e route etme.
+- **Model-atamasını CC YAPMAZ — Brain/routing yapar** (Alperen 2026-07-14).
+- **İş-takip SSOT** = `docs/MASTER-PLAN.md` (tek tablo, Durum+Tarih sütunlu). Eski plan: `docs/archive/MASTER-PLAN-archived-2026-06-29.md`.
+- **🧭 Aktif Yön:** terminal = ana yüzey (full-control + yormayan) · dashboard = yalnız izleme · Desktop = chat+console (SURF-treni). Güncel çerçeve: MASTER-PLAN mercek-bloğu (karar-turu-4). **Koru (yeniden-yazma YOK):** deterministik 8-faz eval-backed orchestration · kapalı outcome→routing→promotion öğrenme · governance-by-construction.
 </operating_rules>
 
 <rules>
@@ -96,7 +95,7 @@ Test: `npm test` (vitest run) | Watch: `npm run test:watch` | Coverage: `npm run
 Test Dashboard: `npm run test:dashboard` (vitest.dashboard.config.ts)
 Lint: `npm run lint` (tsc --noEmit) | ADR: `npm run lint:adr` | Errors: `npm run lint:errors` | Links: `npm run lint:link`
 Dev: `npm run dev` (tsc --watch)
-Publish gate: `npm run validate:publish` — Alperen runs `npm publish` manually (see memory: npm publish approval)
+Publish gate: `npm run validate:publish` — Alperen runs `npm publish` manually (npm publish'i Alperen elle yapar)
 </commands>
 
 <agent_instructions>
@@ -122,7 +121,7 @@ When acting as Worker: @.claude/rules/worker-default.md
 - **MCP server restart**: `dist/` rebuild sonrası long-lived MCP process eski kodu cache'ler. `/mcp restart` veya Claude Code yeniden başlat.
 - **`deckent_start` fire-and-forget**: MCP stdio aynı process'te runSprint Promise event loop'u bloke edebilir. Long sprint için CLI `deckent start` tercih edilir.
 - **Scope enforcement**: Worker `scope.filesWrite` dışına yazamaz — ADR-037 RBAC **compile-time lint + audit-trail**; runtime **advisory/soft** (V1.0 Layer-2 kasıtlı eksik — ihlal `git diff --stat` ile Auditor tarafından izlenir + warn/emit edilir, **bloke ETMEZ**; hard-flip post-GA V2). Honest-gate worker tarafında self-flag eder (örn. BOUNDARY_VIOLATION → NO_GO), Brain FIX/cascade uygular.
-- **Sprint kill/cleanup**: Alperen onayı olmadan `deckent_kill`, `deckent_cleanup` (canlı sprint), `rm .tasks/*` YASAK (memory: feedback_deckent_kill_approval_required).
+- **Sprint kill/cleanup**: Alperen onayı olmadan `deckent_kill`, `deckent_cleanup` (canlı sprint), `rm .tasks/*` YASAK.
 </gotchas>
 
 ## Live Status
