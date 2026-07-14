@@ -1807,7 +1807,10 @@ export function buildWorkerPrompt(
     // D5: calibration/regeneration runs (golden-set measurements) must not
     // pollute the production measurement ledger — the fail-closed flip decision
     // reads it. Set DECKENT_PROMPT_LINT_LEDGER=0 to lint without recording.
-    const ledgerEnabled = process.env['DECKENT_PROMPT_LINT_LEDGER'] !== '0';
+    // A1-İz#3 (2026-07-14): vitest fixture-çağrıları defteri kirletiyordu
+    // (186/193 sahte-W6, taskId=025-* foo.ts) — test-ortamında ledger kapalı.
+    const ledgerEnabled =
+      process.env['DECKENT_PROMPT_LINT_LEDGER'] !== '0' && process.env['VITEST'] === undefined;
     const findings = lintWorkerPromptContract(task, trackedFiles);
     if (findings.length > 0 && ledgerEnabled) {
       for (const f of findings) {

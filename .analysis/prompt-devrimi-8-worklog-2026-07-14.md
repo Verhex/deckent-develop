@@ -30,3 +30,18 @@
 2. `routeTaskV2`'nun 442-planı için agent-karar-izi: devops-engineer'ı hangi aktivasyon/bonus seçti? (planner mı `-Agent:` yazdı, routing mi seçti — DIRECTIVES'e bak.)
 3. W6'nın 186 yanlış-pozitifinin ilk-10 örneğini sınıflandır (trackedFiles-kaynağı? path-normalizasyonu? yeni-dosya-adı metinde-var-ama-regex-kaçırıyor?).
 4. Planner-decomposition katmanının (read-scope/test-write/persona-önerisi) bugün NEYİ ürettiğinin şema-dökümü — 442 DIRECTIVES'i satır-satır.
+
+## A1 — KAPANIŞ (4 iz, 3 kök-kanıt + 1 devir; 2026-07-14)
+
+**İz#1 · Skill-gate:** ÇALIŞIYOR — güncel-zincirle 442-001 regen'inde Skills-bloğu YOK (sinyalli-filtre devops'u düşürüyor). Dünkü "skill geçti" iddiam **rapor-etiketi okuma hatamdı** (assignedSkills = plan-time etiketi; prompt-gövdesi değil). Ders: kanıt = ancak prompt-gövdesi.
+
+**İz#2 · ANA-KÖK (agent-katmanı):** 442 task'ları `intent=devops (0.67)` sınıflanmış → devops-persona seçilmiş. Tetik — türünün en temiz kanıtı:
+- `'ci'` keyword'ü Türkçe **"i·çi·ndeki"** kelimesinin İÇİNDEN eşleşti (kelime-sınırsız substring);
+- `'cd'` keyword'ü **flowId-hex'inden** (`1cd42609…`) eşleşti — çünkü `toDirectiveTask` traceability-satırını (RunProposal metadata) description'a GÖMÜYOR → her do-task'ının metni hex taşıyor.
+İki bileşik kök: **(a)** intent-classifier eşleşmesi substring (D4 yalnız optimizer'a containsWord koydu; classifier'a dokunulmadı); **(b)** metadata description-kirliliği (sınıflandırıcı+planner metadata'yı içerik sanıyor). → Fix-adayları A5'e: classifier'a kelime-sınırı + traceability'nin description-DIŞI ayrı-alana taşınması.
+
+**İz#3 · W6 %96-gürültü:** canlı değil — **vitest fixture-çağrıları** deftere yazıyordu (taskId=025-*, `src/core/foo.ts`). İkinci ölçüm-hatam: "temiz defter" test-kirliliğiydi. Fix uygulandı: hook `VITEST` ortamında ledger-off; kirli-defter arşivlendi. **Gerçek-442 sinyali: 7 bulgu** (skill-suspect 4 · adr-constraint 1 · W1 1 · persona 1) — linter canlıda isabetli.
+
+**İz#4 · Planner-decomposition şeması:** A2'nin giriş-maddesine devredildi (snapshot-plan eldeki veri).
+
+**A1-meta:** iki kanıt-hatamı (rapor-etiketi + fixture-defter) bu turda kendim yakaladım — "kanıt=canlı-gövde" kanunu çalışıyor.
